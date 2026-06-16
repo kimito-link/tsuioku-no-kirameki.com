@@ -294,28 +294,99 @@ export function selectVenueVipRegularKeys(participants, opts = {}) {
 }
 
 /**
- * 参加者を会場の優先度で並べ、最大 maxSeats 件に絞る純関数(入れ替え制)。
- * 優先度(2026-06-14 ユーザー方針「サムネ持ちを前列に優先」で①を追加):
- *   ①実サムネ持ち(名前+顔)を最優先 → 前列(手前・大きい段)へ。
- *   ②ギフト参加者を優先 ③最終発言が新しい順 ④発言数。超過分は「降ろす」(=会場から外す)。
- * これで実サムネ持ちが手前に集まり、匿名(ゆっくり顔)はアリーナに残しつつ後列へ流れる。
+ * 参加者を会場の優先度で並べ、最大 maxSeats 件に絞る純関数。
+ *
+ * v0.1.790「満席にするのに減る意味がわからない」(会議6体一致+司令塔裏取り):
+ *   旧実装は「③最終発言が新しい順」を主軸に slice する単一ソートだったため、満席後に
+ *   誰かがしゃべる度に【最も長く黙っている人】がランキングから押し出されて席を失った
+ *   (=ユーザーの「時間が経つと減る」)。一度落ちた人は assignVenueSeats の sticky 維持にも
+ *   届かない(ランキングで先に消えるため)。
+ *
+ *   会議の収束=「単一ソートの奪い合い」を「優先度順の充填(Fill & Merge)」へ。固定枠配分は
+ *   罠(実機は顔出し~5人=顔出し枠を固定すると空いて無駄・nvidia/openrouter 指摘)なので、
+ *   各層を【まだ選ばれていない人だけ】フィルタ→その層の基準でソート→連結し、先頭から cap 取る。
+ *   顔出しが少なければ常連が、常連が少なければ新着が自動で席を埋める「流動的満員」になる。
+ *
+ *   優先度(上の層ほど会場に残りやすい):
+ *     ① 既に座っていた人(prevSeatByKey にいる) — 一度入ったら黙っても降ろさない(満席維持の核)
+ *     ② 実サムネ持ち(顔出し・稀少) — 発言数多い順で
+ *     ③ 発言数が多い人(常連) — 黙っても常連は残る
+ *     ④ 最近しゃべった人(今の盛り上げ) — lastAt 降順
+ *     ⑤ 残り(匿名のにぎやかし) — lastAt 降順
+ *   ギフトは発言数スコアに既に効く(giftCount>0=preHasGift)ため独立の層は設けない。
+ *
+ * 純関数(Date.now 非依存=lastAt の相対順序だけ使う・テスト可能)。prevSeatByKey 省略時は
+ *   ①が空集合になり「サムネ→発言数→最近」の充填に degrade(後方互換)。
  *
  * @param {ReturnType<typeof collectVenueParticipants>} participants
  * @param {number} [maxSeats]
+ * @param {Map<string, number>|Record<string, number>|null} [prevSeatByKey]
+ *   前回の key→seatIndex。ここに居る人は「既に座っていた人」として最優先で残す(降ろさない)。
  * @returns {ReturnType<typeof collectVenueParticipants>} 会場に残る参加者(優先度順・最大 maxSeats)
  */
-export function rankVenueParticipants(participants, maxSeats = VENUE_MAX_SEATS) {
+export function rankVenueParticipants(participants, maxSeats = VENUE_MAX_SEATS, prevSeatByKey = null) {
   const list = Array.isArray(participants) ? participants.slice() : [];
   const cap = Number.isFinite(maxSeats) && maxSeats > 0 ? Math.floor(maxSeats) : VENUE_MAX_SEATS;
-  list.sort((a, b) => {
-    const aReal = hasRealThumbnail(a.avatar);
-    const bReal = hasRealThumbnail(b.avatar);
-    if (aReal !== bReal) return aReal ? -1 : 1;
-    if (!!b.hasGift !== !!a.hasGift) return b.hasGift ? 1 : -1;
-    if (b.lastAt !== a.lastAt) return b.lastAt - a.lastAt;
-    return b.count - a.count;
-  });
-  return list.slice(0, cap);
+
+  /** @type {Set<string>} 前回 cap 内に座っていた人の key(=今回も最優先で残す) */
+  const seated = new Set();
+  if (prevSeatByKey instanceof Map) {
+    for (const [k, seat] of prevSeatByKey) {
+      const s = Number(seat);
+      if (Number.isInteger(s) && s >= 0 && s < cap) seated.add(String(k));
+    }
+  } else if (prevSeatByKey && typeof prevSeatByKey === 'object') {
+    for (const [k, seat] of Object.entries(prevSeatByKey)) {
+      const s = Number(seat);
+      if (Number.isInteger(s) && s >= 0 && s < cap) seated.add(String(k));
+    }
+  }
+
+  // 各層の基準(同層内のみで効く・降ろす/残すは層の順序で決まる)。
+  /** @typedef {ReturnType<typeof collectVenueParticipants>[number]} VenueParticipant */
+  /** @param {VenueParticipant} a @param {VenueParticipant} b */
+  const byCountThenRecent = (a, b) => {
+    if (b.count !== a.count) return b.count - a.count; // 発言数多い順(常連)
+    if (b.lastAt !== a.lastAt) return b.lastAt - a.lastAt; // 同数は最近順
+    return a.key < b.key ? -1 : a.key > b.key ? 1 : 0; // 安定
+  };
+  /** @param {VenueParticipant} a @param {VenueParticipant} b */
+  const byRecentThenCount = (a, b) => {
+    if (b.lastAt !== a.lastAt) return b.lastAt - a.lastAt; // 最近しゃべった順
+    if (b.count !== a.count) return b.count - a.count;
+    return a.key < b.key ? -1 : a.key > b.key ? 1 : 0;
+  };
+
+  const picked = new Set();
+  /** @type {ReturnType<typeof collectVenueParticipants>} */
+  const out = [];
+  /**
+   * 層を充填: 未選択かつ pred を満たす人を sorter 順に out へ足す(cap まで)。
+   * @param {(p: any) => boolean} pred
+   * @param {(a: any, b: any) => number} sorter
+   */
+  const fill = (pred, sorter) => {
+    if (out.length >= cap) return;
+    const layer = list
+      .filter((p) => p && !picked.has(p.key) && pred(p))
+      .sort(sorter);
+    for (const p of layer) {
+      if (out.length >= cap) break;
+      picked.add(p.key);
+      out.push(p);
+    }
+  };
+
+  // ① 既に座っていた人(降ろさない・満席維持の核)。前回の並び感を尊重しつつ常連順で。
+  fill((p) => seated.has(p.key), byCountThenRecent);
+  // ② 実サムネ持ち(顔出し・稀少)。
+  fill((p) => hasRealThumbnail(p.avatar), byCountThenRecent);
+  // ③ 発言数が多い人(常連)。黙っていても残る。
+  fill((p) => (p.count || 0) >= 2, byCountThenRecent);
+  // ④ 最近しゃべった人(今の盛り上げ)。
+  fill(() => true, byRecentThenCount);
+
+  return out.slice(0, cap);
 }
 
 /**
@@ -518,7 +589,9 @@ export function buildVenueSeating(rows, opts = {}) {
     isGenericName: opts.isGenericName,
     promoteUserIds
   });
-  const ranked = rankVenueParticipants(participants, maxSeats);
+  // v0.1.790: prevSeatByKey をランキングにも渡す=「前回座っていた人」を最優先で残し
+  //   満席後にしゃべった新規が常連を押し出す入れ替えを止める(=「時間で減る」根治)。
+  const ranked = rankVenueParticipants(participants, maxSeats, opts.prevSeatByKey);
   const { seats, seatByKey } = assignVenueSeats(ranked, opts.prevSeatByKey, maxSeats, frontRow);
   // VIP(常連・大応援)光らせ判定は全参加者でスコアリングしてから席へ印を付ける。
   //   vipRegular:false(既定) で無効化可(後方互換)。明示 opts で閾値/上限を上書きできる。
