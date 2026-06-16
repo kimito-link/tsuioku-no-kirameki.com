@@ -612,10 +612,13 @@ function enqueueVoiceTimelineItems(items) {
     const merged = mergeRepeatedVoiceItem(_voiceQueue, candidate);
     _voiceQueue = merged.queue;
     if (merged.merged) continue;
+    // v0.1.782: わんコメ(OneComme limitQueue=10)式に、リアルタイム維持の主軸を件数ゲート
+    //   (最古drop)に置く。上限 12→8 でラグを有界化(voicePlayer 会場/会話版と揃える)。
+    //   時間ゲート(isVoiceItemStale)は安全網に格下げ済み(voiceAgeGate v0.1.782)。
     const pushed = pushVoiceQueue(
       _voiceQueue,
       candidate,
-      { max: 12 }
+      { max: 8 }
     );
     _voiceQueue = pushed.queue;
     droppedCount += pushed.dropped.length;
