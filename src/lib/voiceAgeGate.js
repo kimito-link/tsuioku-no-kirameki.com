@@ -14,12 +14,21 @@
  * @returns {{ stale: boolean, reason: string }}
  */
 
-/** 通常コメントの鮮度しきい値(ms・キューが空いている時)。これを超えたら読まずに捨てる。 */
-export const VOICE_STALE_MS_NORMAL = 2500;
+/**
+ * 通常コメントの鮮度しきい値(ms・キューが空いている時)。これを超えたら読まずに捨てる。
+ * v0.1.773 長時間の定常ラグ根治(会議 reference_rt_sync_longrun_meeting_2026-06-16):
+ *   2500→1800ms。コメントレートが合成+再生をやや上回ると queue が1〜2件で安定し、
+ *   旧 backlog しきい値(3件)に届かず通常2500msのまま=音声が常時約1.5〜2秒遅れ続ける定常ラグの帯。
+ *   通常しきい値を縮め、その定常ラグを sub-second 寄りへ詰めて「今」に追従させる。
+ */
+export const VOICE_STALE_MS_NORMAL = 1800;
 /** バックログがある時(queueLength >= VOICE_STALE_BACKLOG_QUEUE)の短縮しきい値(ms)。 */
-export const VOICE_STALE_MS_BACKLOG = 1200;
-/** この件数以上溜まったら短縮しきい値に切り替えてドロップを加速(リアルタイム維持)。 */
-export const VOICE_STALE_BACKLOG_QUEUE = 3;
+export const VOICE_STALE_MS_BACKLOG = 800;
+/**
+ * この件数以上溜まったら短縮しきい値に切り替えてドロップを加速(リアルタイム維持)。
+ * v0.1.773: 3→2。定常ラグは queue=1〜2 帯で起きるので、そこへ短縮しきい値を効かせるのが要。
+ */
+export const VOICE_STALE_BACKLOG_QUEUE = 2;
 /** ギフト等の高優先は確実に読みたいので長め(ms)。 */
 export const VOICE_STALE_MS_HIGH_PRIORITY = 6000;
 

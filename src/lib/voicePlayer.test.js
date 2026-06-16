@@ -100,6 +100,28 @@ describe('VoicePlayer', () => {
     expect(onPlayStart).toHaveBeenCalled(); // 消費されたことは通知される
   });
 
+  it('v0.1.773: flushPendingQueue は待機中キューを破棄し件数を返す(長時間ラグ対策)', async () => {
+    // 合成を保留させて drain を止め、キューに溜める。
+    let resolveSynth;
+    player.fetchSynthesizeVoice = vi.fn(() => new Promise((r) => { resolveSynth = r; }));
+    await player.enable({ persist: false });
+    const onPlayStart = vi.fn();
+    player.enqueue([
+      { kind: 'comment', userId: 'a', nickname: 'A', text: '1', onPlayStart },
+      { kind: 'comment', userId: 'b', nickname: 'B', text: '2', onPlayStart },
+      { kind: 'comment', userId: 'c', nickname: 'C', text: '3', onPlayStart }
+    ]);
+    await new Promise(r => setTimeout(r, 10));
+    // 先頭1件は drain で shift され合成待ち。残りが queue に積まれている。
+    const before = player.queue.length;
+    expect(before).toBeGreaterThan(0);
+    const dropped = player.flushPendingQueue();
+    expect(dropped).toBe(before);
+    expect(player.queue.length).toBe(0);
+    expect(onPlayStart).toHaveBeenCalled(); // 破棄分は消費通知される
+    if (resolveSynth) resolveSynth(null); // 後始末
+  });
+
   it('初回 alive-check 失敗でも1回リトライして成功すれば有効化する(SWコールド起床対策)', async () => {
     // 1回目 false(SW 寝てる)→ 2回目 true(SW 起きた)を模す。
     const aliveProbe = vi
