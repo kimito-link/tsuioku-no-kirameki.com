@@ -231,4 +231,26 @@ describe('buildBackfillProgressLine（v0.1.692 過去ログ取得の診断行）
       buildBackfillProgressLine({ lid: 'lv9', rows: 5, done: 1, stopReason: 'reached_start', errMsg: '' })
     ).toBe('過去ログ取得: [lv9] 完了・取得5件・停止理由=reached_start');
   });
+
+  // v0.1.794: 進捗キーが null(走行中/完走前)でも記録中なら「取り込み中…」を出すフォールバック。
+  it('bp=null でも catchingUp=true なら「取り込み中…」を出す（status と popup の対称化）', () => {
+    expect(buildBackfillProgressLine(null, { catchingUp: true })).toBe(
+      '過去ログ取得: 取り込み中…（過去のコメントをさかのぼって取得しています）'
+    );
+    expect(buildBackfillProgressLine(undefined, { catchingUp: true })).toBe(
+      '過去ログ取得: 取り込み中…（過去のコメントをさかのぼって取得しています）'
+    );
+  });
+
+  it('bp=null で catchingUp=false なら従来どおり空（記録していない時に湧かせない）', () => {
+    expect(buildBackfillProgressLine(null, { catchingUp: false })).toBe('');
+    expect(buildBackfillProgressLine(null, {})).toBe('');
+    expect(buildBackfillProgressLine(null)).toBe(''); // opts 省略=後方互換
+  });
+
+  it('実 bp があれば catchingUp に関係なく実 bp の行を優先（フォールバックに化けない）', () => {
+    expect(
+      buildBackfillProgressLine({ lid: 'lv5', rows: 99, done: 0 }, { catchingUp: true })
+    ).toBe('過去ログ取得: [lv5] 取得中・取得99件');
+  });
 });
