@@ -80,6 +80,13 @@ import {
   resolveVoiceLoadingView,
   VOICE_LOADING_FLICKER_GUARD_MS
 } from '../lib/voiceLoadingState.js';
+import {
+  nextBubbleVoiceState,
+  selectBubblesToEvict,
+  resolvePendingLifetimeMs,
+  BUBBLE_VOICE_AFTERGLOW_MS,
+  BUBBLE_VOICE_SPEAKING_CAP_MS
+} from '../lib/venueBubbleLifecycle.js';
 import { resolveVoiceForUser } from '../lib/voiceAssignment.js';
 import {
   isVoicevoxAlive,
@@ -1587,9 +1594,15 @@ export function mountVenueBarButton(options = {}) {
   const spokenUserIds = new Set();
   /** @type {Map<string, number>} */
   let seatByKey = new Map();
-  /** @type {Map<number|string, { bubbleKey?: number|string, seatIndex: number, fallbackAnchor?: {x:number,y:number}|null, element: HTMLDivElement, fadeTimer: number, removeTimer: number, removed: boolean, _x?: number, _y?: number, _h?: number }>} */
+  /**
+   * @typedef {{ bubbleKey?: number|string, seatIndex: number, fallbackAnchor?: {x:number,y:number}|null,
+   *   element: HTMLDivElement, fadeTimer: number, removeTimer: number, removed: boolean,
+   *   voiceState?: string, createdAt?: number, flowLifetimeMs?: number, reducedMotion?: boolean,
+   *   speakingCapTimer?: number, _x?: number, _y?: number, _h?: number }} VenueBubble
+   */
+  /** @type {Map<number|string, VenueBubble>} */
   const bubbleBySeat = new Map();
-  /** @type {Array<{ bubbleKey?: number|string, seatIndex: number, fallbackAnchor?: {x:number,y:number}|null, element: HTMLDivElement, fadeTimer: number, removeTimer: number, removed: boolean, _x?: number, _y?: number, _h?: number }>} */
+  /** @type {VenueBubble[]} */
   const activeBubbles = [];
 
   // v0.1.755 リアルタイム完璧化: 吹き出しの「流速(件/秒)」を直近窓で測り、寿命を可変にする
@@ -1612,13 +1625,14 @@ export function mountVenueBarButton(options = {}) {
   };
 
   /**
-   * @param {{ bubbleKey?: number|string, seatIndex: number, element: HTMLDivElement, fadeTimer: number, removeTimer: number, removed: boolean, _x?: number, _y?: number, _h?: number }} bubble
+   * @param {VenueBubble} bubble
    */
   const removeBubble = (bubble) => {
     if (!bubble || bubble.removed) return;
     bubble.removed = true;
     if (bubble.fadeTimer) clearTimeout(bubble.fadeTimer);
     if (bubble.removeTimer) clearTimeout(bubble.removeTimer);
+    if (bubble.speakingCapTimer) clearTimeout(bubble.speakingCapTimer);
     const key = bubble.bubbleKey != null ? bubble.bubbleKey : bubble.seatIndex;
     if (bubbleBySeat.get(key) === bubble) {
       bubbleBySeat.delete(key);
@@ -1700,8 +1714,11 @@ export function mountVenueBarButton(options = {}) {
     const bubbleKey = seatUsable ? seatIndex : `nf:${speech.speakerKey}`;
     const previous = bubbleBySeat.get(bubbleKey);
     if (previous) removeBubble(previous);
-    while (activeBubbles.length >= BUBBLE_MAX) {
-      removeBubble(activeBubbles[0]);
+    // v0.1.771: 上限超過時は「読み上げ中(speaking)は最後まで残す」優先順位で消す。
+    //   会議: unvoiced/pending(古い順)→ done → speaking(古い発言順)。盲目的な最古削除をやめる。
+    if (activeBubbles.length >= BUBBLE_MAX) {
+      const toEvict = selectBubblesToEvict(activeBubbles, BUBBLE_MAX - 1, Date.now());
+      for (const victim of toEvict) removeBubble(victim);
     }
 
     const element = document.createElement('div');
@@ -1716,22 +1733,6 @@ export function mountVenueBarButton(options = {}) {
     // 会議確定A: 席ノードでなく最上位レイヤーへ描く(overflow:hidden に切られない)。
     bubbleLayer.appendChild(element);
 
-    const bubble = {
-      bubbleKey,
-      seatIndex: seatUsable ? seatIndex : -1,
-      // 席が無い発言者は観客領域の決定座標(speakerKey ハッシュで毎回同じ位置)へ。
-      fallbackAnchor: seatUsable ? null : crowdBubbleAnchor(speech.speakerKey),
-      element,
-      fadeTimer: 0,
-      removeTimer: 0,
-      removed: false
-    };
-    bubbleBySeat.set(bubbleKey, bubble);
-    activeBubbles.push(bubble);
-
-    // 席の座標を測ってレイヤー基準の頭上へ配置。既存吹き出しと重なれば上へ逃がす(衝突回避)。
-    positionBubble(bubble);
-
     // v0.1.755 リアルタイム完璧化: 流速可変の基準寿命(速い配信は短命=次々入れ替え、過疎は長く)。
     //   その上で連続発言の人は少し長く残す(会話の連鎖)。max で「連続発言は流速可変より短くしない」。
     const now = Date.now();
@@ -1741,16 +1742,91 @@ export function mountVenueBarButton(options = {}) {
     const reducedMotion =
       typeof window.matchMedia === 'function' &&
       window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    if (!reducedMotion) {
+
+    const bubble = {
+      bubbleKey,
+      seatIndex: seatUsable ? seatIndex : -1,
+      // 席が無い発言者は観客領域の決定座標(speakerKey ハッシュで毎回同じ位置)へ。
+      fallbackAnchor: seatUsable ? null : crowdBubbleAnchor(speech.speakerKey),
+      element,
+      fadeTimer: 0,
+      removeTimer: 0,
+      removed: false,
+      // v0.1.771 読み上げ連動: pending=合成待ち(流速寿命で消える)/speaking=再生中(消さない)/
+      //   done=再生終了(余韻)/unvoiced=鳴らない(流速寿命のまま)。createdAt/flowLifetimeMs/reducedMotion は
+      //   状態が変わったとき寿命を再計算するために保持。
+      voiceState: 'pending',
+      createdAt: now,
+      flowLifetimeMs: lifetimeMs,
+      reducedMotion,
+      speakingCapTimer: 0
+    };
+    bubbleBySeat.set(bubbleKey, bubble);
+    activeBubbles.push(bubble);
+
+    // 席の座標を測ってレイヤー基準の頭上へ配置。既存吹き出しと重なれば上へ逃がす(衝突回避)。
+    positionBubble(bubble);
+
+    // 初期(pending)の寿命。読み上げONなら合成遅れに備えて床(BUBBLE_PENDING_VOICE_FLOOR_MS)を効かせ、
+    //   「声が鳴り始める前に流速寿命で消える」隙間を塞ぐ。speaking になればこのタイマーは解除される。
+    scheduleBubbleFade(bubble, resolvePendingLifetimeMs(lifetimeMs, voicePlayer.enabled));
+    return bubble;
+  };
+
+  /**
+   * 吹き出しの fade/remove タイマーを(再)設定する。寿命変更(状態遷移)時に呼ぶ。
+   * @param {VenueBubble} bubble
+   * @param {number} lifetimeMs 表示開始(createdAt)からの総寿命でなく「今から」消えるまでの ms
+   */
+  const scheduleBubbleFade = (bubble, lifetimeMs) => {
+    if (!bubble || bubble.removed) return;
+    if (bubble.fadeTimer) { clearTimeout(bubble.fadeTimer); bubble.fadeTimer = 0; }
+    if (bubble.removeTimer) { clearTimeout(bubble.removeTimer); bubble.removeTimer = 0; }
+    const ms = Math.max(0, lifetimeMs);
+    if (!bubble.reducedMotion) {
       bubble.fadeTimer = window.setTimeout(() => {
         bubble.fadeTimer = 0;
-        if (!bubble.removed) element.classList.add('nlsb-is-leaving');
-      }, lifetimeMs - BUBBLE_FADE_MS);
+        if (!bubble.removed) bubble.element.classList.add('nlsb-is-leaving');
+      }, Math.max(0, ms - BUBBLE_FADE_MS));
     }
     bubble.removeTimer = window.setTimeout(() => {
       bubble.removeTimer = 0;
       removeBubble(bubble);
-    }, lifetimeMs);
+    }, ms);
+  };
+
+  /**
+   * 読み上げが【実際に始まった】= speaking。再生終了(markBubbleDone)まで吹き出しを消さない。
+   *   滞留対策として安全上限(SPEAKING_CAP)だけは保険のタイマーを張る。
+   * @param {VenueBubble} bubble
+   */
+  const markBubbleSpeaking = (bubble) => {
+    if (!bubble || bubble.removed) return;
+    const next = nextBubbleVoiceState(bubble.voiceState, 'audioStart');
+    if (next !== 'speaking' || bubble.voiceState === 'speaking') { bubble.voiceState = next; return; }
+    bubble.voiceState = 'speaking';
+    // 消えるタイマーを解除して「鳴っている間は残す」。fade も戻す(既に薄くなっていたら濃く戻る)。
+    if (bubble.fadeTimer) { clearTimeout(bubble.fadeTimer); bubble.fadeTimer = 0; }
+    if (bubble.removeTimer) { clearTimeout(bubble.removeTimer); bubble.removeTimer = 0; }
+    bubble.element.classList.remove('nlsb-is-leaving');
+    if (bubble.speakingCapTimer) clearTimeout(bubble.speakingCapTimer);
+    bubble.speakingCapTimer = window.setTimeout(() => {
+      bubble.speakingCapTimer = 0;
+      // 上限超過(極端に長い読み上げ)= done 同様に余韻で畳む(枠を空ける)。
+      markBubbleDone(bubble);
+    }, BUBBLE_VOICE_SPEAKING_CAP_MS);
+  };
+
+  /**
+   * 読み上げが【終わった】= done。余韻(AFTERGLOW)を置いてから消す。
+   * @param {VenueBubble} bubble
+   */
+  const markBubbleDone = (bubble) => {
+    if (!bubble || bubble.removed) return;
+    const next = nextBubbleVoiceState(bubble.voiceState, 'audioEnd');
+    bubble.voiceState = next;
+    if (bubble.speakingCapTimer) { clearTimeout(bubble.speakingCapTimer); bubble.speakingCapTimer = 0; }
+    if (next === 'done') scheduleBubbleFade(bubble, BUBBLE_VOICE_AFTERGLOW_MS);
   };
 
   /**
@@ -2403,14 +2479,21 @@ export function mountVenueBarButton(options = {}) {
       //   無い/起動していないと声が鳴らず onPlayStart が呼ばれない→吹き出しが永久に出ない
       //   バグだった(ユーザー実機で発覚)。会場の既定は読み上げ自動ONなので踏みやすい。
       //   吹き出しは視覚要素なので音声の成否に依存させない。声は鳴るなら別途鳴る。
-      showSpeechBubble(speech);
+      const bubble = showSpeechBubble(speech);
       if (voicePlayer.enabled) {
+        // v0.1.771: 吹き出しを読み上げに連動。実際に鳴り始めたら speaking(消さない)、鳴り終えたら done。
+        //   鳴らずに消費(stale/合成失敗/OFF/merge)された場合は何もしない=pending のまま流速寿命で自然に消える
+        //   (=会議の unvoiced と同じ挙動)。onPlayStart(=resolved)は実再生時にも発火するので吹き出しには
+        //   配線しない(配線すると pending→unvoiced 終端化で後続の onAudioStart を取りこぼす)。
+        //   bubble が無い(空テキスト等で出なかった)場合は no-op で安全。
         voicePlayer.enqueue([{
           kind: 'comment',
           userId: speech.userId,
           nickname: speech.name,
           key: speech.key,
-          text: speech.text
+          text: speech.text,
+          onAudioStart: bubble ? () => markBubbleSpeaking(bubble) : undefined,
+          onAudioEnd: bubble ? () => markBubbleDone(bubble) : undefined
         }]);
       }
     }
