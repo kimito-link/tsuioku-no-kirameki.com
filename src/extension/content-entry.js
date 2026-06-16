@@ -539,6 +539,12 @@ import {
 
 const DEBOUNCE_MS = INGEST_TIMING.debounceMs;
 /**
+ * v0.1.786: ギフトの storage 更新(get→merge→set)の有界化上限(ms)。ギフトは記録本体より優先度が
+ *   低いので persist(10秒)より短く設定し、共有 storage stall 時に早く諦めてスロットを解放する。
+ *   timeout したギフトは次のギフト受信で再試行されるので取りこぼしは実害が小さい。
+ */
+const GIFT_STORAGE_RMW_TIMEOUT_MS = 5000;
+/**
  * スクロール中は DOM ハーベスト（MutationObserver 由来の重い走査）を見送る窓（ms）。
  * 連続スクロールではホイール tick ごとに lastUserInitiatedScrollAt が更新されるため、
  * この窓を少し長め（>1 tick 間隔）に取ると「スクロール中はずっと見送り、指を離して
@@ -1187,6 +1193,51 @@ function recordGiftSenderObservation(userId, nickname) {
 }
 
 /**
+ * v0.1.786 記録停止/会場空/状態ページ固まりの根治: ギフトの storage 更新(get→merge→set)を
+ *   有界化する共通ヘルパー。
+ *
+ * 真因(最強モード会議7体一致+司令塔の実コード裏取り): ギフトの read-modify-write は3経路
+ *   (v0.1.780 コメント由来 nls_gift_events / v0.1.207 NDGR nls_gift_events / v0.1.214 NDGR
+ *   nls_gift_users)とも【生の chrome.storage.local.get/set で有界化されていなかった】。共有
+ *   chrome.storage.local(単一 LevelDB・全 watch タブ+popup+status+会場で共有)が多タブで stall
+ *   すると、これらの get/set の await が【reject でなく永久 pending】化し、storage 操作キューの
+ *   スロットを解放せず居座る。コメント persist 本体は runStorageOpWithTimeout で有界化済み(timeout→
+ *   requeue で回復)だが、ギフト経路だけが無界で、永久 pending を積み上げて共有 storage を飢餓させ、
+ *   記録 persist / 会場 roster / status の read を巻き込んで止めていた(=3症状同時)。
+ *   ※ 配列肥大は無関係(appendGiftEvents は500・mergeGiftUsers は2000で cap 済み)=会議の「肥大化」説は
+ *     司令塔が cap を確認して棄却。真因は【無界 pending の積み上げ】。
+ *
+ * 修正: get と set の両方を runStorageOpWithTimeout で有界化。timeout したら静かに諦める
+ *   (ギフトは記録本体より優先度が低い・次のギフトで再試行される)。これでギフト経路が永久 pending
+ *   スロットを握り続けるのを止め、共有 storage の飢餓を断つ。
+ *
+ * @param {string} storageKey
+ * @param {(existing: any[]) => { next: any[], storageTouched: boolean }} mergeFn
+ * @param {(err: unknown) => void} [onError]
+ * @returns {Promise<void>}
+ */
+async function boundedGiftStorageRmw(storageKey, mergeFn, onError) {
+  try {
+    const bag = await runStorageOpWithTimeout(
+      () => chrome.storage.local.get(storageKey),
+      GIFT_STORAGE_RMW_TIMEOUT_MS
+    );
+    const existing = Array.isArray(bag[storageKey]) ? bag[storageKey] : [];
+    const { next, storageTouched } = mergeFn(existing);
+    if (!storageTouched) return;
+    await runStorageOpWithTimeout(
+      () => chrome.storage.local.set({ [storageKey]: next }),
+      GIFT_STORAGE_RMW_TIMEOUT_MS
+    );
+  } catch (err) {
+    // STORAGE_OP_TIMED_OUT(共有 storage stall)は静かに諦める=スロットを解放して飢餓を断つ。
+    //   次のギフトで再試行される。それ以外の実エラーだけ onError へ。
+    if (err === STORAGE_OP_TIMED_OUT) return;
+    if (typeof onError === 'function') onError(err);
+  }
+}
+
+/**
  * 0.1.176: パース済ギフトコメントを lifetime に蓄積する共通関数。
  * DOM 経路と NDGR 経路の両方から呼ばれる。rawText を key に重複排除。
  *
@@ -1217,14 +1268,13 @@ function recordGiftCommentObservation(parsed, rawText) {
   //   userId は gift コメントからは取れない(名無しが多い)→空のまま=会場側は crowdBubbleAnchor 起点。
   if (liveId && hasExtensionContext()) {
     const eventsKey = `nls_gift_events_${liveId}`;
-    chrome.storage.local.get(eventsKey).then((bag) => {
-      const existing = Array.isArray(bag[eventsKey]) ? bag[eventsKey] : [];
-      const incoming = [{ userId: '', nickname: parsed.sender, itemName: parsed.item, point: parsed.point }];
-      const { next, storageTouched } = appendGiftEvents(existing, incoming, Date.now());
-      if (storageTouched) {
-        chrome.storage.local.set({ [eventsKey]: next }).catch(() => {});
-      }
-    }).catch((err) => reportSilentErrorToStorage('gift-events-domscan', err));
+    const incoming = [{ userId: '', nickname: parsed.sender, itemName: parsed.item, point: parsed.point }];
+    // v0.1.786: 有界化(boundedGiftStorageRmw)で永久 pending スロットの積み上げを防ぐ。
+    void boundedGiftStorageRmw(
+      eventsKey,
+      (existing) => appendGiftEvents(existing, incoming, Date.now()),
+      (err) => reportSilentErrorToStorage('gift-events-domscan', err)
+    );
   }
   if (_d.giftCommentObservations.size > 500) {
     // v0.1.353: 全コピー+全ソートで最古 drop 件を削っていたのを、Map の挿入順走査に置換。
@@ -2185,47 +2235,35 @@ window.addEventListener('message', (e) => {
       }
     }
     if (Array.isArray(raw) && raw.length && liveId && hasExtensionContext()) {
-      // 既存: throwCount 集約版（nls_gift_users_<liveId>）
-      const key = giftUsersStorageKey(liveId);
-      chrome.storage.local.get(key).then((bag) => {
-        const existing = Array.isArray(bag[key]) ? bag[key] : [];
-        const { next, storageTouched } = mergeGiftUsers(existing, raw);
-        if (storageTouched) {
-          chrome.storage.local.set({ [key]: next }).catch((err) => {
-            if (!isContextInvalidatedError(err) && hasExtensionContext()) {
-              setStorageLocalSilent(
-                { [KEY_STORAGE_WRITE_ERROR]: buildStorageWriteErrorPayload(liveId, err) },
-                { warn: false }
-              );
-            }
-          });
+      const lidForGift = liveId;
+      // v0.1.786: NDGR ギフトの storage 更新も有界化(boundedGiftStorageRmw)。生 get/set のままだと
+      //   共有 storage stall で永久 pending 化しスロットを握り続け、記録/会場/status を巻き込んで止める。
+      /** @param {unknown} err */
+      const onGiftWriteError = (err) => {
+        if (!isContextInvalidatedError(err) && hasExtensionContext()) {
+          setStorageLocalSilent(
+            { [KEY_STORAGE_WRITE_ERROR]: buildStorageWriteErrorPayload(lidForGift, err) },
+            { warn: false }
+          );
         }
-      }).catch((err) => reportSilentErrorToStorage('gift', err));
+      };
+      // 既存: throwCount 集約版（nls_gift_users_<liveId>）
+      void boundedGiftStorageRmw(
+        giftUsersStorageKey(lidForGift),
+        (existing) => mergeGiftUsers(existing, raw),
+        onGiftWriteError
+      );
 
       // v0.1.207 Phase A: 個別 event の時系列ストア（nls_gift_events_<liveId>）
       // proto 準拠 decoder（v0.1.204 Patch B）+ payload 拡張（v0.1.205 prep
       // Patch C-1）で取れる itemId / itemName / point / message /
       // contributionRank を保存。popup の ranking / 履歴 / avatar 補完で
       // 使う（DOM 統合は v0.1.208 以降の別 PR）。
-      const eventsKey = `nls_gift_events_${liveId}`;
-      chrome.storage.local.get(eventsKey).then((bag2) => {
-        const existing = Array.isArray(bag2[eventsKey]) ? bag2[eventsKey] : [];
-        const { next, storageTouched } = appendGiftEvents(
-          existing,
-          raw,
-          Date.now()
-        );
-        if (storageTouched) {
-          chrome.storage.local.set({ [eventsKey]: next }).catch((err) => {
-            if (!isContextInvalidatedError(err) && hasExtensionContext()) {
-              setStorageLocalSilent(
-                { [KEY_STORAGE_WRITE_ERROR]: buildStorageWriteErrorPayload(liveId, err) },
-                { warn: false }
-              );
-            }
-          });
-        }
-      }).catch((err) => reportSilentErrorToStorage('gift-events', err));
+      void boundedGiftStorageRmw(
+        `nls_gift_events_${lidForGift}`,
+        (existing) => appendGiftEvents(existing, raw, Date.now()),
+        onGiftWriteError
+      );
     }
     return;
   }
