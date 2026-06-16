@@ -11714,6 +11714,8 @@ async function flushToStorage() {
 
   /** @type {ParsedCommentRow[]} */
   const rows = [];
+  // 2026-06-17: DOM harvest の同期抽出を marker で囲む(longtask 発生源の切り分け用)。
+  runMarkedSync('domHarvestFlush', () => {
   for (const n of pendingRoots) {
     if (n.nodeType === Node.ELEMENT_NODE) {
       const el = /** @type {Element} */ (n);
@@ -11730,6 +11732,7 @@ async function flushToStorage() {
       bindCommentPanelUserIconLoads(el);
     }
   }
+  });
   pendingRoots.clear();
 
   if (!rows.length) return;
@@ -12287,10 +12290,14 @@ function scanVisibleCommentsNow() {
     scheduleVisibleScanAfterScrollQuiet();
     return;
   }
-  const panel = findNicoCommentPanel(document);
-  const root = panel || findWatchCommentHarvestFallbackRoot(document);
-  if (!root) return;
-  const rows = extractCommentsFromNode(root);
+  // 2026-06-17: 550ms 周期のパネル全体再ハーベスト(同期抽出)を marker で囲む。
+  const rows = runMarkedSync('scanVisibleComments', () => {
+    const panel = findNicoCommentPanel(document);
+    const root = panel || findWatchCommentHarvestFallbackRoot(document);
+    if (!root) return null;
+    return extractCommentsFromNode(root);
+  });
+  if (!rows) return;
   void persistCommentRows(rows, { source: COMMENT_INGEST_SOURCE.VISIBLE });
   void syncCommentHarvestPanelStatus();
   // 注: probeAndRestoreCommentPanelHealth はここでは呼ばない。
