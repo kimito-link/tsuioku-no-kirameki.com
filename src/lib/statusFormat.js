@@ -119,6 +119,64 @@ export function buildBackfillProgressLine(bp) {
 }
 
 /**
+ * v0.1.766(ユーザー要望「概要にレーン状況も入れたい」): 公式値レーン(北極星レーン)の状況を
+ *   状態速報の概要に1行で出す純関数。「レーンが出ていない時」を一目で分かるようにする。
+ *
+ * 入力は fastDiag.content.giftDiagnostics の「北極星レーン」相当(視聴中の配信のみ取得可能)。
+ *   各レーンの state を「出てる/取得中/この配信に無し/空」に分類して短く並べる。
+ *   value/count が正なら「出てる(N)」、ok だが 0 なら「空」、iframe_unrendered は「取得中」、
+ *   no_event/no_program_gift は「無し」(この配信にイベント/ギフトが無い=正常)。
+ *
+ * @param {Record<string, {state?: string, value?: number|null, count?: number,
+ *   ndgrValue?: number|null, foundCountLifetime?: number}>|null|undefined} lanes
+ *   北極星レーン オブジェクト(キー例: "1_貢献度ランキング" / "2_ギフト履歴" /
+ *   "3_イベント累計スコア" / "4_番組累計ポイント" / "5_イベント現在順位" / "+α_広告ランキング")。
+ * @returns {string} レーン状況の1行(データ無しなら '')。
+ */
+export function buildLaneStatusLine(lanes) {
+  if (!lanes || typeof lanes !== 'object') return '';
+  // 表示順と短縮ラベル(キー先頭の番号で並ぶが、明示順で安定させる)。
+  const order = [
+    ['1_貢献度ランキング', '貢献度'],
+    ['+α_広告ランキング', '広告'],
+    ['2_ギフト履歴', 'ギフト履歴'],
+    ['4_番組累計ポイント', '番組pt'],
+    ['3_イベント累計スコア', 'Eスコア'],
+    ['5_イベント現在順位', 'E順位']
+  ];
+  const parts = [];
+  for (const [key, label] of order) {
+    const lane = lanes[key];
+    if (!lane || typeof lane !== 'object') continue;
+    const state = String(lane.state || '');
+    const n =
+      Number(lane.count) ||
+      Number(lane.value) ||
+      Number(lane.ndgrValue) ||
+      Number(lane.foundCountLifetime) ||
+      0;
+    /** @type {string} */
+    let mark;
+    if (state === 'no_event' || state === 'no_program_gift') {
+      continue; // この配信にイベント/ギフトが無い=出なくて正常。ノイズにしない。
+    } else if (state === 'iframe_unrendered' || state === 'loading') {
+      mark = '⏳取得中';
+    } else if (state === 'ok' && n > 0) {
+      mark = `✅${n}`;
+    } else if (state === 'ok') {
+      mark = '空'; // 取得経路は生きているが中身が空(まだ来ていない/この時点で0)。
+    } else if (state) {
+      mark = `⚠${state}`; // 想定外 state はそのまま出して気づけるように。
+    } else {
+      continue;
+    }
+    parts.push(`${label}:${mark}`);
+  }
+  if (!parts.length) return '';
+  return `公式値レーン: ${parts.join(' / ')}`;
+}
+
+/**
  * 経過秒を `h:mm:ss` / `m:ss` に整形する。
  * @param {number|null|undefined} sec
  * @returns {string} 不正値は '?'
