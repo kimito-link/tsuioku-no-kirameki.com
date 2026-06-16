@@ -393,42 +393,65 @@ describe('resolveVenueLayoutMode', () => {
 });
 
 describe('rankVenueParticipants', () => {
-  it('ギフト参加者を優先し、次に最終発言が新しい順', () => {
+  it('全員1回発言・サムネなしは最終発言が新しい順(④ライブ層)', () => {
     const ps = [
-      { key: 'u:a', lastAt: 300, count: 1, hasGift: false },
-      { key: 'u:b', lastAt: 100, count: 1, hasGift: true },
-      { key: 'u:c', lastAt: 200, count: 1, hasGift: false }
+      { key: 'u:a', avatar: '', lastAt: 300, count: 1, hasGift: false },
+      { key: 'u:b', avatar: '', lastAt: 100, count: 1, hasGift: true },
+      { key: 'u:c', avatar: '', lastAt: 200, count: 1, hasGift: false }
     ];
-    expect(rankVenueParticipants(ps).map((p) => p.key)).toEqual(['u:b', 'u:a', 'u:c']);
+    // sticky/サムネ/常連(count>=2) いずれも該当なし → 全員④で lastAt 降順。
+    expect(rankVenueParticipants(ps).map((p) => p.key)).toEqual(['u:a', 'u:c', 'u:b']);
   });
 
-  it('maxSeats を超えた静かな参加者は降ろす(入れ替え)', () => {
+  it('v0.1.790: 一度座った人(prevSeatByKey)は黙っても降ろさない(満席維持)', () => {
+    // cap=2。前回 u:a(席0)/u:b(席1) が座っていた。今回 u:c が新しくしゃべった(lastAt 最新)。
+    // 旧実装は「最近順」で u:c が u:b(古い)を押し出して減らした。新実装は sticky 最優先で
+    // u:a/u:b が残り、満席の u:c は座れない(=常連が新着に押し出されない)。
     const ps = [
-      { key: 'u:a', lastAt: 300, count: 1, hasGift: false },
-      { key: 'u:b', lastAt: 200, count: 1, hasGift: false },
-      { key: 'u:c', lastAt: 100, count: 1, hasGift: false }
+      { key: 'u:a', avatar: '', lastAt: 100, count: 1, hasGift: false },
+      { key: 'u:b', avatar: '', lastAt: 90, count: 1, hasGift: false },
+      { key: 'u:c', avatar: '', lastAt: 999, count: 1, hasGift: false } // 今しゃべった新規
     ];
-    const ranked = rankVenueParticipants(ps, 2);
-    expect(ranked.map((p) => p.key)).toEqual(['u:a', 'u:b']);
+    const prev = new Map([['u:a', 0], ['u:b', 1]]);
+    const ranked = rankVenueParticipants(ps, 2, prev);
+    expect(ranked.map((p) => p.key).sort()).toEqual(['u:a', 'u:b']);
   });
 
-  it('実サムネ持ちをギフトより最優先(サムネ持ちを前列に)', () => {
+  it('v0.1.790: 空席があれば新着も座る(満席でない限り締め出さない)', () => {
     const ps = [
-      // 匿名だがギフト持ち(従来は最優先だった)
-      { key: 'u:a', avatar: '', lastAt: 300, count: 5, hasGift: true },
-      // 実サムネ持ちだがギフトなし・発言も古い
-      { key: 'u:b', avatar: 'https://example.com/b.png', lastAt: 100, count: 1, hasGift: false }
+      { key: 'u:a', avatar: '', lastAt: 100, count: 1, hasGift: false },
+      { key: 'u:c', avatar: '', lastAt: 999, count: 1, hasGift: false }
     ];
-    // 実サムネ持ち u:b が先頭に来る(ギフトより優先)。
-    expect(rankVenueParticipants(ps).map((p) => p.key)).toEqual(['u:b', 'u:a']);
+    const prev = new Map([['u:a', 0]]); // 1人だけ前回着席・cap=3 で空席あり
+    const ranked = rankVenueParticipants(ps, 3, prev);
+    expect(ranked.map((p) => p.key).sort()).toEqual(['u:a', 'u:c']);
   });
 
-  it('実サムネ同士は従来順(ギフト→最新→発言数)を維持', () => {
+  it('実サムネ持ちは発言が古くても常連枠で残る(②サムネ層)', () => {
+    const ps = [
+      { key: 'u:a', avatar: '', lastAt: 999, count: 1, hasGift: true }, // 匿名・今しゃべった
+      { key: 'u:b', avatar: 'https://example.com/b.png', lastAt: 1, count: 1, hasGift: false } // 顔出し・古い
+    ];
+    // cap=1 でも顔出し u:b が残る(②が④より上)。
+    expect(rankVenueParticipants(ps, 1).map((p) => p.key)).toEqual(['u:b']);
+  });
+
+  it('発言数が多い常連は黙っても残る(③常連層が④ライブ層より上)', () => {
+    const ps = [
+      { key: 'u:regular', avatar: '', lastAt: 1, count: 50, hasGift: false }, // 常連・今は黙ってる
+      { key: 'u:newbie', avatar: '', lastAt: 999, count: 1, hasGift: false } // 新規・今しゃべった
+    ];
+    // cap=1。常連 u:regular(count>=2) が③で先に確保され、新規は④止まりで席に入れない。
+    expect(rankVenueParticipants(ps, 1).map((p) => p.key)).toEqual(['u:regular']);
+  });
+
+  it('サムネ持ち同士は発言数の多い順→最近順', () => {
     const ps = [
       { key: 'u:a', avatar: 'https://e/a.png', lastAt: 300, count: 1, hasGift: false },
-      { key: 'u:b', avatar: 'https://e/b.png', lastAt: 100, count: 1, hasGift: true },
+      { key: 'u:b', avatar: 'https://e/b.png', lastAt: 100, count: 5, hasGift: true },
       { key: 'u:c', avatar: 'https://e/c.png', lastAt: 200, count: 1, hasGift: false }
     ];
+    // 発言数最多の u:b が先頭。残り同数(count1)は lastAt 降順で u:a→u:c。
     expect(rankVenueParticipants(ps).map((p) => p.key)).toEqual(['u:b', 'u:a', 'u:c']);
   });
 });
