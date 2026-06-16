@@ -122,6 +122,27 @@ describe('VoicePlayer', () => {
     if (resolveSynth) resolveSynth(null); // 後始末
   });
 
+  it('v0.1.781: 全部 stale でも最新の1件は読む(ゼロ音声回帰の防止)', async () => {
+    const synthCalls = [];
+    player.fetchSynthesizeVoice = vi.fn((text) => {
+      synthCalls.push(String(text || ''));
+      return Promise.resolve(new ArrayBuffer(8));
+    });
+    await player.enable({ persist: false });
+    // enqueue の自動 drain レースを避けるため、queue を直接セットして all-stale 状態を作る
+    //   (全件 2.5s 超に backdate)。drain の allStale 分岐が「最新を残す」かを単体で検証する。
+    const past = Date.now() - 99999;
+    const mk = (text) => ({
+      userKey: text, name: '', body: text, count: 1,
+      enqueuedAt: past, priority: 'normal'
+    });
+    player.queue = [mk('old1'), mk('old2'), mk('newest')];
+    await player._drainQueue();
+    await new Promise(r => setTimeout(r, 20));
+    // all-stale でも最新(newest)は合成される=ゼロ音声にならない(全捨て回帰の防止)。
+    expect(synthCalls.some((t) => t.includes('newest'))).toBe(true);
+  });
+
   it('初回 alive-check 失敗でも1回リトライして成功すれば有効化する(SWコールド起床対策)', async () => {
     // 1回目 false(SW 寝てる)→ 2回目 true(SW 起きた)を模す。
     const aliveProbe = vi
