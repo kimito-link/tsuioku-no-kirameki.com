@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.785',
+    date: '2026-06-16',
+    summary: '状態ページのタイムアウト警告を拡張エラー欄に出さない',
+    items: Object.freeze([
+      '状態ページ(拡張の状態を表示する画面)が、保存領域の読み取りに時間がかかった時に chrome://extensions のエラー欄へ黄色い警告を出していたのをやめました。この警告は「状態の表示だけが少し遅れた・記録自体は視聴タブ側で続いている」という想定内のもので、状態ページ自身の画面にも分かりやすく表示されるため、エラー欄に重ねて出す必要はありませんでした(見た方が「これ見てどうすればいいの?」となるだけ)。開発者向けの詳細ログ(DevTools)には引き続き残します'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.784',
     date: '2026-06-16',
     summary: 'コメビュが固まって新着が止まる不具合を根治',
