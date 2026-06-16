@@ -151,6 +151,20 @@ describe('shouldSwKickBackfillForLive', () => {
     });
   });
 
+  it('v0.1.796: enabled 未指定/true 以外は既定 OFF(disabled)=記録保護の opt-in', () => {
+    // enabled を渡さない(undefined)→ disabled
+    expect(
+      shouldSwKickBackfillForLive({
+        heartbeat: freshHb(),
+        now: NOW,
+        swAlreadyCrawling: false,
+        hasForegroundTab: false
+      }).reason
+    ).toBe('disabled');
+    // truthy だが true 厳密一致でない値も disabled
+    expect(shouldSwKickBackfillForLive(args({ enabled: 1 })).reason).toBe('disabled');
+  });
+
   it('hb 無し/壊れは no_hb', () => {
     expect(shouldSwKickBackfillForLive(args({ heartbeat: null })).reason).toBe('no_hb');
     expect(shouldSwKickBackfillForLive(args({ heartbeat: {} })).reason).toBe('no_hb');
