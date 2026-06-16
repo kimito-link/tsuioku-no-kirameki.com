@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.777',
+    date: '2026-06-16',
+    summary: '会場モードを3キャラの額縁フレームで囲む装飾を追加',
+    items: Object.freeze([
+      '会場モードで、りんく・こん太・たぬ姉の3キャラのいろいろな表情を画面の四辺(上下左右)に並べて、額縁のように囲む装飾を追加しました。中央の配信映像とコメント欄の邪魔にならないよう、縁の小さな画像として配置しています。動作を軽く保つため軽量サムネ画像を使っています'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.776',
     date: '2026-06-16',
     summary: 'コメント送信の計測警告を拡張エラー欄に出さないように',
