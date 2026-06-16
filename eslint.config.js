@@ -23,6 +23,10 @@ export default [
       'app/dist/**',
       'node_modules/**',
       '.claude/**',
+      // .artifacts/** は verify ログ・調査用展開物（asar 展開した第三者 minified
+      // バンドル等）の作業用スクラッチ置き場。git-ignore 済みだが lint 対象だと
+      // 展開した minified コードで数千 error になるため除外する。
+      '.artifacts/**',
       'build/**',
       'test-results/**',
       'playwright-report/**',
