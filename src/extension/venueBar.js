@@ -75,6 +75,11 @@ import {
   heatLevelToLabel
 } from '../lib/venueHeat.js';
 import { VoicePlayer } from '../lib/voicePlayer.js';
+import {
+  shouldRenderLoading,
+  resolveVoiceLoadingView,
+  VOICE_LOADING_FLICKER_GUARD_MS
+} from '../lib/voiceLoadingState.js';
 import { resolveVoiceForUser } from '../lib/voiceAssignment.js';
 import {
   isVoicevoxAlive,
@@ -250,6 +255,27 @@ const VENUE_CSS = `
   .nlsb-close:focus-visible {
     outline: 2px solid #8dc8ff;
     outline-offset: 2px;
+  }
+  /* v0.1.770 VOICEVOX 起動待ちの「楽しいローディング」(会議 2026-06-16):
+     会場は『開演前の期待感』。控えめにふわっと脈動する(派手すぎ厳禁=過去にリバーブ等は却下)。
+     遅延ガード(180ms)は JS 側で制御し、一瞬成功ではこの class が付かない=チラつかない。 */
+  .nlsb-voice-status.is-loading {
+    color: #ffd98a;
+    animation: nlsb-voice-loading 1.25s ease-in-out infinite;
+  }
+  .nlsb-voice-status.is-error {
+    color: #ffb4a2;
+    animation: none;
+  }
+  @keyframes nlsb-voice-loading {
+    0%, 100% { opacity: 0.6; }
+    50% { opacity: 1; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .nlsb-voice-status.is-loading {
+      animation: none;
+      opacity: 0.92;
+    }
   }
   /*
    * 会議確定B(2026-06-13): 中央に「映像セーフエリア」を確保して配信映像を見せる。
@@ -1141,9 +1167,19 @@ export function mountVenueBarButton(options = {}) {
   close.className = 'nlsb-close';
   close.textContent = '✕ 閉じる';
 
+  // v0.1.770 ユーザー要望「会場モードの閉じるボタンも会場のタブにつけて」:
+  //   別窓化した会場タブ(standalone=venue.html)にも閉じるボタンを出す。インライン版は会場を畳むだけ
+  //   だが、standalone は専用タブなので【タブごと閉じる】(window.close())。OBS キャプチャ用途では
+  //   ツールバーを出したくないので OBS モードのときだけ従来どおり隠す。
+  const isObsCapture = (window.name || '').includes('OBS') || window.location.search.includes('obs=');
   if (isStandalone) {
     toggle.style.display = 'none';
-    close.style.display = 'none';
+    if (isObsCapture) {
+      close.style.display = 'none';
+    } else {
+      close.textContent = '✕ タブを閉じる';
+      close.title = '会場タブを閉じます';
+    }
     // スタンドアロン時は背景を黒系に塗り、映像セーフエリアを確保
     root.style.background = '#0a0b0c';
   }
@@ -1359,6 +1395,34 @@ export function mountVenueBarButton(options = {}) {
   // eslint-disable-next-line no-unused-vars
   let userChangedOpen = false;
 
+  // v0.1.770 起動待ちの「楽しいローディング」(会議 2026-06-16・遅延ガードで一瞬成功はチラつかせない)。
+  //   状態を受け、checking は 180ms 経ってもまだ ready で無ければ初めて演出を描く。connecting(再試行中)は
+  //   即描く。ready/idle で空にし、notfound で起動案内に切替。voiceStatus の内容/見た目はこの driver が所有。
+  let voiceLoadingTimer = 0;
+  const renderVoiceLoading = (/** @type {string} */ state) => {
+    const view = resolveVoiceLoadingView(state, 'venue');
+    voiceStatus.classList.toggle('is-loading', view.kind === 'loading');
+    voiceStatus.classList.toggle('is-error', view.kind === 'error');
+    voiceStatus.textContent = view.text;
+  };
+  const driveVoiceLoading = (/** @type {string} */ state) => {
+    if (voiceLoadingTimer) {
+      window.clearTimeout(voiceLoadingTimer);
+      voiceLoadingTimer = 0;
+    }
+    if (state === 'checking') {
+      // 遅延ガード: すぐには描かない。180ms 後にまだ checking のままなら初めて演出を出す。
+      voiceStatus.classList.remove('is-loading', 'is-error');
+      voiceStatus.textContent = '';
+      voiceLoadingTimer = window.setTimeout(() => {
+        voiceLoadingTimer = 0;
+        if (shouldRenderLoading('checking', VOICE_LOADING_FLICKER_GUARD_MS)) renderVoiceLoading('checking');
+      }, VOICE_LOADING_FLICKER_GUARD_MS);
+      return;
+    }
+    renderVoiceLoading(state);
+  };
+
   const voicePlayer = new VoicePlayer({
     storage: typeof chrome !== 'undefined' && chrome.storage ? chrome.storage.local : null,
     onToggle: (/** @type {boolean} */ enabled, /** @type {boolean} */ readNameEnabled, /** @type {boolean} */ toggleBusy) => {
@@ -1366,9 +1430,15 @@ export function mountVenueBarButton(options = {}) {
       voiceBtn.classList.toggle('is-on', enabled);
       voiceBtn.textContent = enabled ? '🔊 読み上げ: ON' : '🔈 読み上げ: OFF';
     },
+    // onStatus は読み上げブロック警告(audio NotAllowedError)等の臨時メッセージ用に温存。
+    //   起動待ちの状態表示は onLoadingState(driveVoiceLoading)が所有する。
     onStatus: (/** @type {string} */ msg) => {
+      if (!msg) return; // 空クリアは onLoadingState('ready') 側でやる(driver の class も外す)
+      voiceStatus.classList.remove('is-loading');
+      voiceStatus.classList.toggle('is-error', /見つかりません|ブロック/.test(msg));
       voiceStatus.textContent = msg;
     },
+    onLoadingState: (/** @type {string} */ state) => driveVoiceLoading(state),
     onSkip: () => {},
     isObsMode: () => {
       return (window.name || '').includes('OBS') || window.location.search.includes('obs=');
@@ -2591,6 +2661,22 @@ export function mountVenueBarButton(options = {}) {
     setOpen(!open, true);
   });
   close.addEventListener('click', () => {
+    // v0.1.770: standalone(別窓化した会場タブ)はタブごと閉じる。インライン版は会場を畳むだけ。
+    if (isStandalone) {
+      // まず集計/再生を止めてから閉じる(pagehide でも止まるが先に止めて取りこぼし防止)。
+      stopAggregation();
+      stopSpeechPolling();
+      stopCrowdMotion();
+      try {
+        window.close();
+      } catch {
+        /* window.close が拒否される環境(稀)では会場だけ畳んでフォールバック */
+      }
+      // window.close が無視された場合の保険: 会場ステージを閉じる。
+      userChangedOpen = true;
+      setOpen(false, false);
+      return;
+    }
     userChangedOpen = true;
     setOpen(false, true);
   });

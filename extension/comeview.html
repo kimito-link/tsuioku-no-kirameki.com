@@ -100,6 +100,27 @@
         color: #b54708;
         line-height: 1.3;
       }
+      /* v0.1.770 VOICEVOX 起動待ちの「楽しいローディング」(会議 2026-06-16):
+         コメビュは『実況の準備=マイクチェック』。控えめに脈動。遅延ガード(180ms)は JS 側で制御し、
+         一瞬成功ではこの class が付かない=チラつかない。 */
+      .cv-voice-status.is-loading {
+        color: var(--cv-accent, #2563eb);
+        animation: cv-voice-loading 1.25s ease-in-out infinite;
+      }
+      .cv-voice-status.is-error {
+        color: #b54708;
+        animation: none;
+      }
+      @keyframes cv-voice-loading {
+        0%, 100% { opacity: 0.55; }
+        50% { opacity: 1; }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .cv-voice-status.is-loading {
+          animation: none;
+          opacity: 0.92;
+        }
+      }
       .cv-voice-skip {
         color: var(--cv-sub);
         white-space: nowrap;

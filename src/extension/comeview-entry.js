@@ -87,6 +87,11 @@ import {
   upgradeAnonymousAvatarImages
 } from '../lib/avatarPartsComposer.js';
 import { isVoiceItemStale } from '../lib/voiceAgeGate.js';
+import {
+  shouldRenderLoading,
+  resolveVoiceLoadingView,
+  VOICE_LOADING_FLICKER_GUARD_MS
+} from '../lib/voiceLoadingState.js';
 
 /** POP のタイムラインと同じ既定アバター(extension ルート相対・popup.html と同一)。 */
 const DEFAULT_TILE_IMG =
@@ -292,7 +297,43 @@ function updateVoiceToggle() {
 
 function setVoiceStatus(message) {
   const status = document.getElementById('cvVoiceStatus');
-  if (status) status.textContent = String(message || '');
+  if (!status) return;
+  // 臨時メッセージ(audio ブロック警告等)。ローディング演出 class は外す。空クリアも同様。
+  status.classList.remove('is-loading');
+  status.classList.toggle('is-error', /見つかりません|ブロック/.test(String(message || '')));
+  status.textContent = String(message || '');
+}
+
+// v0.1.770 起動待ちの「楽しいローディング」(会議 2026-06-16・遅延ガードで一瞬成功はチラつかせない)。
+//   会場(venueBar)と同じ純関数(voiceLoadingState)を共用。文言だけ comeview 用。
+let _cvVoiceLoadingTimer = null;
+function renderCvVoiceLoading(state) {
+  const status = document.getElementById('cvVoiceStatus');
+  if (!status) return;
+  const view = resolveVoiceLoadingView(state, 'comeview');
+  status.classList.toggle('is-loading', view.kind === 'loading');
+  status.classList.toggle('is-error', view.kind === 'error');
+  status.textContent = view.text;
+}
+function driveCvVoiceLoading(state) {
+  if (_cvVoiceLoadingTimer != null) {
+    clearTimeout(_cvVoiceLoadingTimer);
+    _cvVoiceLoadingTimer = null;
+  }
+  if (state === 'checking') {
+    // 遅延ガード: すぐには描かない。180ms 後にまだ checking なら初めて演出を出す。
+    const status = document.getElementById('cvVoiceStatus');
+    if (status) {
+      status.classList.remove('is-loading', 'is-error');
+      status.textContent = '';
+    }
+    _cvVoiceLoadingTimer = window.setTimeout(() => {
+      _cvVoiceLoadingTimer = null;
+      if (shouldRenderLoading('checking', VOICE_LOADING_FLICKER_GUARD_MS)) renderCvVoiceLoading('checking');
+    }, VOICE_LOADING_FLICKER_GUARD_MS);
+    return;
+  }
+  renderCvVoiceLoading(state);
 }
 
 function showVoiceSkipped(count) {
@@ -339,11 +380,18 @@ async function enableVoiceReading({ persist = true } = {}) {
   if (isObsMode() || _voiceToggleBusy) return;
   _voiceToggleBusy = true;
   updateVoiceToggle();
-  setVoiceStatus('VOICEVOXを確認中…');
-  const alive = await isVoicevoxAlive();
+  // v0.1.770: 起動待ちは状態駆動の楽しいローディング(遅延ガードで一瞬成功はチラつかせない)。
+  driveCvVoiceLoading('checking');
+  // v0.1.770: 会場(VoicePlayer)と非対称だったのを解消。初回が空振りしても1回だけ再試行する
+  //   (MV3 SW コールド起床で初回 alive-check がタイムアウトしやすい)。本当に未起動なら2回とも失敗。
+  let alive = await isVoicevoxAlive();
+  if (!alive) {
+    driveCvVoiceLoading('connecting');
+    alive = await isVoicevoxAlive();
+  }
   if (!alive) {
     disableVoiceReading({ persist: true });
-    setVoiceStatus('VOICEVOXが見つかりません(起動してください)');
+    driveCvVoiceLoading('notfound');
     return;
   }
 
@@ -351,7 +399,7 @@ async function enableVoiceReading({ persist = true } = {}) {
   _voiceGeneration += 1;
   _voiceReadingEnabled = true;
   _voiceToggleBusy = false;
-  setVoiceStatus('');
+  driveCvVoiceLoading('ready');
   updateVoiceToggle();
   if (persist) persistVoiceReadingEnabled(true);
 }
