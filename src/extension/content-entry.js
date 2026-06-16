@@ -9908,8 +9908,17 @@ async function seedTailFromMain(lid) {
     if (err !== STORAGE_OP_TIMED_OUT) throw err;
     console.debug(formatPipelinePhase('tail_seed_main_timeout', {}));
     main = null;
-    liveChunkIndex = null;
-    liveChunkMigrated = false;
+    // v0.1.769 storage stall spiral 根治: シード read が timeout しても O(N) 全件書きに【落とさない】。
+    //   従来は liveChunkMigrated=false に倒していたが、それだと boundedWrite=false → 毎 flush で main 配列を
+    //   丸ごと書く → 共有 storage がさらに詰まる → 次の read も timeout、の自己増殖スパイラルだった
+    //   (記録131/レーン空/状態ページ全 timeout の真因)。代わりに【空の in-memory チャンク状態】を立てて
+    //   bounded(追記専用 incrementalMode)で書き続ける。既存 main は削除せず温存され、読めなかった dedup キーは
+    //   この後の mergeNewComments / incrementalMode が前方向に再構築して取りこぼしを最終担保する
+    //   (line 9866-9867 の方針=「全件 read が timeout しても seed を必ず完了させ記録を止めない」を貫徹)。
+    liveChunkIndex = /** @type {any} */ (planMigrateMainToChunks(lid, []).index);
+    liveChunkMigrated = true;
+    liveDedupeState = buildCommentDedupeState(lid, []);
+    liveDedupeStateLiveId = lid;
   }
   if (main) {
     tailMainCount = main.length;
@@ -12832,16 +12841,18 @@ async function start() {
 
   // v0.1.767「最終系(b): forward 常時ON」: 前方向 NDGR 継続取得を【既定 ON】にする(ユーザー「あとから
   //   取れるけど遅れる感じ」根治)。受動傍受(プレイヤー依存)をやめ、拡張が切れる前から自分で NDGR を
-  //   引き続けることで token を常に新鮮に保ち、過去ログが構造的に止まらない+遅延が縮む(会議全会一致の
-  //   最終系)。既定 ON だが KEY_NDGR_FORWARD_ENABLED を明示 false にすればキルスイッチで OFF(=true 厳密
-  //   一致でなく『!== false』。仕様変更で壊れたら false にして受動傍受へ degrade)。起動の実ガード
-  //   (前面のみ/全タブ横断1本/hidden abort/429 backoff)は maybeStartNdgrForwardCrawl が担う=常時ONでも
-  //   負荷は有界。PR1-b-3 SW backfill モードは従来どおり既定 OFF(true 厳密一致)。
+  //   引き続けることで token を常に新鮮に保つ「最終系」(v0.1.767 で既定 ON 化)。だが v0.1.769 で
+  //   既定 OFF へ撤回: 忙しい高速配信(本家13k超)で forward の常時 fetch が共有 chrome.storage.local を
+  //   限界超えさせ、初回シード read がタイムアウト→チャンク未移行→毎回 O(N) 全件書き→さらに詰まる、の
+  //   自己増殖ストール スパイラルを誘発した(記録131/レーン空/状態ページ全 storage timeout)。常時 fetch を
+  //   やめ、v0.1.765 の on-demand 再活性(入口が本当に死んだ時だけ起動=shouldActivateForwardForDeadEntry)
+  //   に戻す。KEY_NDGR_FORWARD_ENABLED を明示 true にすればオプトインで常時 ON を選べる(=true 厳密一致で復活)。
+  //   PR1-b-3 SW backfill モードも従来どおり既定 OFF(true 厳密一致)。
   try {
     chrome.storage.local.get([KEY_NDGR_FORWARD_ENABLED, KEY_BACKFILL_SW_MODE]).then((bag) => {
-      _ndgrForwardEnabled = !(bag && bag[KEY_NDGR_FORWARD_ENABLED] === false);
+      _ndgrForwardEnabled = !!(bag && bag[KEY_NDGR_FORWARD_ENABLED] === true);
       _backfillSwModeEnabled = !!(bag && bag[KEY_BACKFILL_SW_MODE] === true);
-    }).catch(() => { /* 既定 ON を維持(取得失敗時も forward は走らせる) */ });
+    }).catch(() => { /* 既定 OFF を維持(取得失敗時も常時 forward は走らせない) */ });
   } catch { /* no-op */ }
 
   // v0.1.513 / fix/persist-plateau: チャンクモード dedupe のインメモリ・インクリメンタル化（既定 ON）。
@@ -12924,12 +12935,12 @@ async function start() {
         changes[KEY_NDGR_DETERMINISTIC_BACKFILL].newValue === true;
     }
 
-    // v0.1.511/767: 前方向 NDGR 継続取得。OFF→ON の立ち上がりで即起動（次 tick を待たない）。
-    //   ON→OFF は走行中の crawl を abort して止める。v0.1.767 最終系(b)= 既定 ON なので、明示 false
-    //   のときだけ OFF（キルスイッチ）。それ以外（true / 未設定相当の値）は ON。
+    // v0.1.511/767/769: 前方向 NDGR 継続取得。OFF→ON の立ち上がりで即起動（次 tick を待たない）。
+    //   ON→OFF は走行中の crawl を abort して止める。v0.1.769 で既定 OFF へ撤回(storage stall 回避)。
+    //   明示 true のときだけ常時 ON(オプトイン)。それ以外(false / 未設定相当)は OFF=on-demand 再活性に委ねる。
     if (changes[KEY_NDGR_FORWARD_ENABLED]) {
       const wasEnabled = _ndgrForwardEnabled;
-      _ndgrForwardEnabled = changes[KEY_NDGR_FORWARD_ENABLED].newValue !== false;
+      _ndgrForwardEnabled = changes[KEY_NDGR_FORWARD_ENABLED].newValue === true;
       if (!wasEnabled && _ndgrForwardEnabled) {
         maybeStartNdgrForwardCrawl();
       } else if (wasEnabled && !_ndgrForwardEnabled && _ndgrForwardAbort) {
@@ -16064,10 +16075,11 @@ function maybeAutoStartBackfill() {
 //   ページ非依存の独立経路で「記録 < 本家コメ」desync を補う。リーダータブ1本が放送中走り続け、
 //   hidden では abort しない（abort は liveId 変化・記録停止・番組終了・unload のみ）。詳細は git 履歴。
 
-/** @type {boolean} 前方向継続取得が有効か。v0.1.767 最終系(b): 既定 ON(切れる前から自分で NDGR を
- *   引き続け token を新鮮に保つ→過去ログが止まらない+遅延が縮む)。KEY_NDGR_FORWARD_ENABLED を明示
- *   false にすればキルスイッチで OFF。初回 storage 読み込み + onChanged で反映。 */
-let _ndgrForwardEnabled = true;
+/** @type {boolean} 前方向継続取得が有効か。v0.1.769 で既定 OFF へ撤回(v0.1.767 の常時 ON は忙しい
+ *   高速配信で共有 chrome.storage.local を限界超えさせ storage stall spiral を誘発した)。既定では走らせず、
+ *   入口が本当に死んだ時だけ on-demand 再活性(v0.1.765 shouldActivateForwardForDeadEntry)で一時的に ON に
+ *   する。KEY_NDGR_FORWARD_ENABLED を明示 true にすればオプトインで常時 ON。初回 storage 読み込み + onChanged で反映。 */
+let _ndgrForwardEnabled = false;
 /** @type {AbortController|null} 進行中の前方向 crawl（liveId 変化 / 記録停止 / unload で abort）。 */
 let _ndgrForwardAbort = null;
 /** @type {string} 現在 crawl を走らせている liveId（fail-open 環境での多重起動 guard）。 */
