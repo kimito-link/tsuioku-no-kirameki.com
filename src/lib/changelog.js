@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.779',
+    date: '2026-06-16',
+    summary: 'ギフト投げ演出の発火を確実に(構造化イベントから)',
+    items: Object.freeze([
+      '前バージョンで追加したギフト投げ演出が、ギフトの「コメント文」が流れてこない放送では発火しないことがあったため、ギフトの構造化データ(送り主・アイテム名・ポイントを直接持つイベント)からも投げ演出を発火するようにしました。これでギフトが届けば確実に投げ主の席から飛びます。同じギフトを二重に投げないよう重複除外しています'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.778',
     date: '2026-06-16',
     summary: 'ギフト・広告が投げ主の席から配信画面へ飛ぶ演出を追加',
