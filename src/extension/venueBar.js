@@ -89,6 +89,12 @@ import {
 } from '../lib/venueBubbleLifecycle.js';
 import { resolveVoiceForUser } from '../lib/voiceAssignment.js';
 import { buildVenueCharacterFrame } from '../lib/venueCharacterFrame.js';
+import { parseGiftCommentText, parseNicoadCommentText } from '../lib/parseGiftComment.js';
+import {
+  resolveGiftProjectile,
+  resolveGiftThrowPath,
+  canLaunchGiftThrow
+} from '../lib/giftThrowProjectile.js';
 import {
   isVoicevoxAlive,
   listVoicevoxStyleIds,
@@ -424,6 +430,48 @@ const VENUE_CSS = `
   .nlsb-charframe-tile[data-edge="bottom"] { bottom: 2px; transform: translateX(-50%); }
   .nlsb-charframe-tile[data-edge="left"]   { left: 2px; transform: translateY(-50%); }
   .nlsb-charframe-tile[data-edge="right"]  { right: 2px; transform: translateY(-50%); }
+  /* v0.1.778 ギフト/広告の投げ演出: 投げ主のサムネ座標から中央映像へ放物線で飛ぶ。
+     bubbleLayer(最前面・overflow外)に乗せ、JS は起点 left/top と --dx/--dy/--mid* を CSS 変数で
+     渡すだけ=GPU アニメで毎フレーム JS 計算しない。プール再利用+同時上限で会場を重くしない。 */
+  .nlsb-gift-proj {
+    position: absolute;
+    z-index: 7; /* 吹き出し(z5)・常駐(z6)より前=投げ物は最前面で映像へ飛ぶ */
+    display: none;
+    align-items: center;
+    gap: 3px;
+    padding: 2px 7px;
+    border-radius: 999px;
+    background: rgba(20, 24, 32, 0.78);
+    color: #fff;
+    font-size: 12px;
+    font-weight: 700;
+    white-space: nowrap;
+    pointer-events: none;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.85);
+    will-change: transform, opacity;
+    mix-blend-mode: screen; /* 中央映像を隠しすぎない */
+    transform: translate(-50%, -50%);
+  }
+  .nlsb-gift-proj.is-flying {
+    display: inline-flex;
+    animation: nlsb-gift-fly var(--nlsb-gift-dur, 1300ms) cubic-bezier(0.22, 0.61, 0.36, 1) forwards;
+  }
+  .nlsb-gift-proj-emoji { font-size: 16px; }
+  @keyframes nlsb-gift-fly {
+    0%   { transform: translate(-50%, -50%) scale(0.7); opacity: 0; }
+    12%  { transform: translate(-50%, -50%) scale(1.05); opacity: 1; }
+    55%  { transform: translate(calc(-50% + var(--nlsb-gift-mx)), calc(-50% + var(--nlsb-gift-my))) scale(1.12) rotate(8deg); opacity: 1; }
+    100% { transform: translate(calc(-50% + var(--nlsb-gift-dx)), calc(-50% + var(--nlsb-gift-dy))) scale(0.45) rotate(-6deg); opacity: 0; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .nlsb-gift-proj.is-flying {
+      animation: nlsb-gift-fade var(--nlsb-gift-dur, 1300ms) ease-out forwards;
+    }
+    @keyframes nlsb-gift-fade {
+      0% { transform: translate(-50%, -50%) scale(1); opacity: 0.95; }
+      100% { transform: translate(-50%, -50%) scale(1); opacity: 0; }
+    }
+  }
   .nlsb-header {
     grid-area: header;
     position: sticky;
@@ -1871,6 +1919,104 @@ export function mountVenueBarButton(options = {}) {
     if (next === 'done') scheduleBubbleFade(bubble, BUBBLE_VOICE_AFTERGLOW_MS);
   };
 
+  // v0.1.778 ギフト/広告の投げ演出: 投げ主のサムネ座標→中央映像へ放物線で飛ばす。
+  //   DOMプール(固定数を使い回し)+同時上限(canLaunchGiftThrow)で会場を重くしない。
+  /** @type {HTMLDivElement[]} 使い回す投げ物要素のプール。 */
+  const giftProjPool = [];
+  let giftProjActive = 0;
+  const GIFT_PROJ_POOL_SIZE = 10;
+  /** bubbleLayer ローカル座標での席アイコン中心(無ければ crowdBubbleAnchor)。 @param {string} speakerKey */
+  const giftThrowOriginForSpeaker = (speakerKey) => {
+    const seatIndex = seatByKey.get(speakerKey);
+    const node = typeof seatIndex === 'number' ? seatNodes[seatIndex] : null;
+    if (node && node.icon && node.icon.isConnected) {
+      try {
+        const layerRect = bubbleLayer.getBoundingClientRect();
+        const r = node.icon.getBoundingClientRect();
+        if (r.width > 0) {
+          return { x: r.left - layerRect.left + r.width / 2, y: r.top - layerRect.top + r.height / 2 };
+        }
+      } catch { /* fallthrough */ }
+    }
+    return crowdBubbleAnchor(speakerKey); // 席無し/匿名/座標不能はフォールバック
+  };
+  /** 中央映像(safeArea)の中心を bubbleLayer ローカル座標で。 */
+  const giftThrowTarget = () => {
+    try {
+      const layerRect = bubbleLayer.getBoundingClientRect();
+      const r = safeArea.getBoundingClientRect();
+      if (r.width > 0) {
+        return { x: r.left - layerRect.left + r.width / 2, y: r.top - layerRect.top + r.height / 2 };
+      }
+    } catch { /* fallthrough */ }
+    // 保険: レイヤー中央上寄り。
+    const lr = bubbleLayer.getBoundingClientRect();
+    return { x: lr.width / 2, y: lr.height * 0.4 };
+  };
+  /**
+   * @param {string} speakerKey
+   * @param {{ kind:string, emoji:string, label:string, durationMs:number }} proj
+   */
+  const launchGiftThrow = (speakerKey, proj) => {
+    if (!proj || !open) return;
+    if (!canLaunchGiftThrow(giftProjActive)) return; // 上限超過は捨てる(性能最優先)
+    const el = giftProjPool.pop() || (() => {
+      const d = document.createElement('div');
+      d.className = 'nlsb-gift-proj';
+      bubbleLayer.appendChild(d);
+      return d;
+    })();
+    const origin = giftThrowOriginForSpeaker(speakerKey);
+    const target = giftThrowTarget();
+    const path = resolveGiftThrowPath(origin, target);
+    el.innerHTML = '';
+    const emoji = document.createElement('span');
+    emoji.className = 'nlsb-gift-proj-emoji';
+    emoji.textContent = proj.emoji;
+    const label = document.createElement('span');
+    label.textContent = proj.label;
+    el.append(emoji, label);
+    el.style.left = `${path.startX}px`;
+    el.style.top = `${path.startY}px`;
+    el.style.setProperty('--nlsb-gift-dx', `${path.dx}px`);
+    el.style.setProperty('--nlsb-gift-dy', `${path.dy}px`);
+    el.style.setProperty('--nlsb-gift-mx', `${path.midX}px`);
+    el.style.setProperty('--nlsb-gift-my', `${path.midY}px`);
+    el.style.setProperty('--nlsb-gift-dur', `${proj.durationMs}ms`);
+    giftProjActive += 1;
+    const recycle = () => {
+      el.removeEventListener('animationend', recycle);
+      el.classList.remove('is-flying');
+      el.style.cssText = '';
+      el.textContent = '';
+      giftProjActive = Math.max(0, giftProjActive - 1);
+      if (giftProjPool.length < GIFT_PROJ_POOL_SIZE) giftProjPool.push(el);
+      else el.remove();
+    };
+    el.addEventListener('animationend', recycle, { once: true });
+    // 念のための保険タイマー(animationend 取りこぼし時も必ず回収)。
+    window.setTimeout(recycle, proj.durationMs + 400);
+    // reflow を挟んでから is-flying(アニメ再起動の確実化)。
+    void el.offsetWidth;
+    el.classList.add('is-flying');
+  };
+  /** speech.text からギフト/広告を検出して投げる。 @param {{ text?: unknown, speakerKey?: string }} speech */
+  const maybeThrowGiftFromSpeech = (speech) => {
+    const text = String(speech?.text || '');
+    if (!text) return;
+    const gift = parseGiftCommentText(text);
+    if (gift) {
+      const p = resolveGiftProjectile(gift, 'gift');
+      if (p) launchGiftThrow(speech.speakerKey, p);
+      return;
+    }
+    const ad = parseNicoadCommentText(text);
+    if (ad) {
+      const p = resolveGiftProjectile(ad, 'ad');
+      if (p) launchGiftThrow(speech.speakerKey, p);
+    }
+  };
+
   /**
    * 1つの吹き出しを、対応する席の頭上(レイヤー基準)へ絶対配置する。
    * 既に表示中の吹き出しと縦に重なる場合は上方向へオフセットして読めるようにする。
@@ -2547,6 +2693,8 @@ export function mountVenueBarButton(options = {}) {
       //   バグだった(ユーザー実機で発覚)。会場の既定は読み上げ自動ONなので踏みやすい。
       //   吹き出しは視覚要素なので音声の成否に依存させない。声は鳴るなら別途鳴る。
       const bubble = showSpeechBubble(speech);
+      // v0.1.778: ギフト/広告コメントなら投げ主のサムネから中央映像へアイテムを投げる。
+      maybeThrowGiftFromSpeech(speech);
       if (voicePlayer.enabled) {
         // v0.1.771: 吹き出しを読み上げに連動。実際に鳴り始めたら speaking(消さない)、鳴り終えたら done。
         //   鳴らずに消費(stale/合成失敗/OFF/merge)された場合は何もしない=pending のまま流速寿命で自然に消える
