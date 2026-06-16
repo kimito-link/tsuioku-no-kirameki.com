@@ -4,7 +4,8 @@ import {
   computeVoiceQueueSpeedBoost,
   isVoicePrefetchUsable,
   mergeRepeatedVoiceItem,
-  pushVoiceQueue
+  pushVoiceQueue,
+  resolveVoiceSynthDepth
 } from './voiceReadQueue.js';
 
 describe('pushVoiceQueue', () => {
@@ -220,6 +221,48 @@ describe('computeVoiceCongestion (v0.1.755 リアルタイム化=早く強くブ
     expect(computeVoiceCongestion(-1)).toEqual({ speedBoost: 0, maxChars: 60 });
     expect(computeVoiceCongestion('invalid')).toEqual({ speedBoost: 0, maxChars: 60 });
     expect(computeVoiceCongestion(Infinity)).toEqual({ speedBoost: 0, maxChars: 60 });
+  });
+});
+
+describe('resolveVoiceSynthDepth (v0.1.768 合成パイプライン深さ=詰まるほど先読みを増やす)', () => {
+  it('落ち着いている時は深さ1(先読み1件・無駄打ちしない)', () => {
+    // 再生中に1件しか待っていないなら先読み1で十分=合成を遊ばせない範囲で最小。
+    expect(resolveVoiceSynthDepth(0)).toBe(1);
+    expect(resolveVoiceSynthDepth(1)).toBe(1);
+    expect(resolveVoiceSynthDepth(2)).toBe(1);
+  });
+
+  it('詰まってきたら深さ2(再生中にN+1とN+2を先行合成)', () => {
+    expect(resolveVoiceSynthDepth(3)).toBe(2);
+    expect(resolveVoiceSynthDepth(4)).toBe(2);
+  });
+
+  it('洪水時は深さ3で上限(CPU有界=これ以上は増やさない)', () => {
+    expect(resolveVoiceSynthDepth(5)).toBe(3);
+    expect(resolveVoiceSynthDepth(8)).toBe(3);
+    expect(resolveVoiceSynthDepth(50)).toBe(3);
+  });
+
+  it('深さは待機件数を超えない(無いものは先読みできない)', () => {
+    // 待機0件なら先読み対象が無い=深さ0。1件なら最大1。
+    expect(resolveVoiceSynthDepth(0, { pending: 0 })).toBe(0);
+    expect(resolveVoiceSynthDepth(8, { pending: 1 })).toBe(1);
+    expect(resolveVoiceSynthDepth(8, { pending: 2 })).toBe(2);
+  });
+
+  it('深さは単調増加(詰まるほど先読みが深くなる)', () => {
+    const lens = [0, 1, 2, 3, 4, 5, 8, 20];
+    for (let i = 1; i < lens.length; i++) {
+      expect(resolveVoiceSynthDepth(lens[i])).toBeGreaterThanOrEqual(
+        resolveVoiceSynthDepth(lens[i - 1])
+      );
+    }
+  });
+
+  it('負数や不正値は0件として扱い深さ1(下限)', () => {
+    expect(resolveVoiceSynthDepth(-5)).toBe(1);
+    expect(resolveVoiceSynthDepth('invalid')).toBe(1);
+    expect(resolveVoiceSynthDepth(Infinity)).toBe(1);
   });
 });
 

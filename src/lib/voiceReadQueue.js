@@ -101,3 +101,35 @@ export function computeVoiceCongestion(queueLength) {
 export function computeVoiceQueueSpeedBoost(queueLength) {
   return computeVoiceCongestion(queueLength).speedBoost;
 }
+
+/**
+ * 合成パイプラインの「先読み深さ」(再生中に何件先まで先行合成するか)を返す純関数。
+ *
+ * v0.1.768 リアルタイム最大化(2026-06-16 会議+実コード裏取り): 従来の drain ループは
+ *   再生中に N+1 を1件だけ先行合成する【深さ1】で、N の再生が終わるまで N+2 以降の合成が
+ *   遊んでいた=フラッド時に合成が前に出られず、これがコメビュに負ける唯一の構造的理由だった。
+ *   そこで「詰まるほど先読みを深くする」ことで、再生時間ぶんを使って先の合成を貯める。
+ *   同一 VOICEVOX サーバへの並行 audio_query/synthesis は可能。再生は元々1本ずつ(重ねない)
+ *   なので増やすのは“合成の先読み深さ”だけ=不協和は起きない。CPU 有界化のため上限は3。
+ *
+ *   落ち着いている時(待機<=2)は深さ1=無駄打ちしない。3〜4件で2、5件以上で3(上限)。
+ *   pending(実際に先読みできる件数)が小さければそれで頭打ち=無いものは先読みできない。
+ *
+ * @param {unknown} queueLength 混雑判定に使う待機件数
+ * @param {{ pending?: unknown }} [opts] pending=先読み対象として実在する件数(任意・深さの上限)
+ * @returns {number} 0以上の整数(先読み深さ)
+ */
+export function resolveVoiceSynthDepth(queueLength, opts = {}) {
+  const rawLength = Number(queueLength);
+  const length =
+    Number.isFinite(rawLength) && rawLength >= 0 ? Math.floor(rawLength) : 0;
+  let depth;
+  if (length >= 5) depth = 3;
+  else if (length >= 3) depth = 2;
+  else depth = 1;
+  const rawPending = Number(opts?.pending);
+  if (Number.isFinite(rawPending) && rawPending >= 0) {
+    depth = Math.min(depth, Math.floor(rawPending));
+  }
+  return depth;
+}

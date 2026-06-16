@@ -4,9 +4,9 @@ import { buildVoiceReadingText, buildMergedVoiceText } from './voicevoxClient.js
 import { isVoiceItemStale } from './voiceAgeGate.js';
 import {
   computeVoiceCongestion,
-  isVoicePrefetchUsable,
   mergeRepeatedVoiceItem,
-  pushVoiceQueue
+  pushVoiceQueue,
+  resolveVoiceSynthDepth
 } from './voiceReadQueue.js';
 
 export class VoicePlayer {
@@ -30,7 +30,10 @@ export class VoicePlayer {
     this.styleIds = [];
     this.assignments = {};
     this.queue = [];
-    this.prefetch = null;
+    // v0.1.768: 先読み合成を【深さ1→最大3】に。単一スロット this.prefetch から、
+    //   item オブジェクトをキーに「合成中の WAV Promise」を持つ Map に拡張。
+    //   再生中に N+1 だけでなく N+2/N+3 も先行合成し、フラッド時に合成を遊ばせない。
+    this.prefetches = new Map();
     this.playing = false;
     this.generation = 0;
     this.stopCurrent = null;
@@ -86,7 +89,7 @@ export class VoicePlayer {
   stop() {
     this.queue = [];
     this.generation += 1;
-    this.prefetch = null;
+    this.prefetches.clear();
     if (typeof this.stopCurrent === 'function') this.stopCurrent();
     this.stopCurrent = null;
   }
@@ -139,25 +142,49 @@ export class VoicePlayer {
     return userId || key || name || 'anon';
   }
 
+  /** item 1件ぶんの合成を起動し、in-flight WAV Promise を返す(まだ無ければ）。 */
+  _ensurePrefetch(item, generation) {
+    if (!item || generation !== this.generation) return null;
+    const existing = this.prefetches.get(item);
+    if (existing && existing.generation === generation) return existing.promise;
+    const congestion = computeVoiceCongestion(this.queue.length);
+    const assigned = this.resolveVoice(item.userKey, this.assignments, this.styleIds);
+    const promise = this.fetchSynthesizeVoice(
+      buildMergedVoiceText(item, { maxChars: congestion.maxChars }),
+      {
+        ...assigned,
+        speedOffset: assigned.speedOffset + congestion.speedBoost
+      }
+    ).catch(() => null);
+    this.prefetches.set(item, { generation, promise });
+    return promise;
+  }
+
+  /**
+   * v0.1.768: 先頭から深さ分(最大3)の item を先行合成する。
+   *   再生中に N+1 だけでなく N+2/N+3 も貯めることで、フラッド時に合成を遊ばせない。
+   *   深さは詰まり具合(resolveVoiceSynthDepth)で動的=落ち着いていれば1=無駄打ちしない。
+   *   先読みした item が後で stale 破棄されても、再生直前に必ず age-gate を通すので無駄打ちは回収。
+   */
   _startPrefetch(generation) {
-    const next = this.queue[0];
-    if (!next || generation !== this.generation) {
-      this.prefetch = null;
+    if (generation !== this.generation) {
+      this.prefetches.clear();
       return;
     }
-    const congestion = computeVoiceCongestion(this.queue.length);
-    const assigned = this.resolveVoice(next.userKey, this.assignments, this.styleIds);
-    this.prefetch = {
-      item: next,
-      generation,
-      promise: this.fetchSynthesizeVoice(
-        buildMergedVoiceText(next, { maxChars: congestion.maxChars }),
-        {
-          ...assigned,
-          speedOffset: assigned.speedOffset + congestion.speedBoost
-        }
-      ).catch(() => null)
-    };
+    const depth = resolveVoiceSynthDepth(this.queue.length, {
+      pending: this.queue.length
+    });
+    const wanted = new Set();
+    for (let i = 0; i < depth && i < this.queue.length; i++) {
+      const item = this.queue[i];
+      if (!item) continue;
+      wanted.add(item);
+      this._ensurePrefetch(item, generation);
+    }
+    // キューから消えた item の先読みは破棄(取りこぼした WAV は GC される=メモリ有界)。
+    for (const key of this.prefetches.keys()) {
+      if (!wanted.has(key)) this.prefetches.delete(key);
+    }
   }
 
   async _drainQueue() {
@@ -184,6 +211,11 @@ export class VoicePlayer {
         }
 
         const queueLength = this.queue.length;
+        const generation = this.generation;
+        // v0.1.768: 先頭から深さ分(最大3)を【先に】合成起動してから先頭を取り出す。
+        //   こうすると N の再生でブロックしている間に N+1/N+2/N+3 の合成が並走する。
+        this._startPrefetch(generation);
+
         const item = this.queue.shift();
         if (!item) continue;
 
@@ -191,20 +223,17 @@ export class VoicePlayer {
         if (ageCheck.stale) {
           if (typeof item.onPlayStart === 'function') item.onPlayStart();
           this._showSkipped(1);
-          if (this.prefetch && this.prefetch.item === item) {
-            this.prefetch = null;
-          }
+          this.prefetches.delete(item);
           continue;
         }
 
-        const generation = this.generation;
         const congestion = computeVoiceCongestion(queueLength);
         const assigned = this.resolveVoice(item.userKey, this.assignments, this.styleIds);
-        
-        const pf = this.prefetch;
-        this.prefetch = null;
-        
-        const wav = isVoicePrefetchUsable(pf, item, generation)
+
+        // 先頭は _startPrefetch で必ず先読み起動済み(深さ>=1)。その in-flight を再利用する。
+        const pf = this.prefetches.get(item);
+        this.prefetches.delete(item);
+        const wav = pf
           ? await pf.promise
           : await this.fetchSynthesizeVoice(
               buildMergedVoiceText(item, { maxChars: congestion.maxChars }),
@@ -219,8 +248,9 @@ export class VoicePlayer {
           continue;
         }
 
+        // 再生開始の直前にもう一段、先の合成を深める(消化が進んだぶん次を貯める)。
         this._startPrefetch(generation);
-        
+
         let objectUrl = '';
         try {
           const blob = new Blob([wav], { type: 'audio/wav' });
