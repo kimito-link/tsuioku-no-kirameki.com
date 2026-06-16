@@ -16,19 +16,20 @@
 
 /**
  * 通常コメントの鮮度しきい値(ms・キューが空いている時)。これを超えたら読まずに捨てる。
- * v0.1.773 長時間の定常ラグ根治(会議 reference_rt_sync_longrun_meeting_2026-06-16):
- *   2500→1800ms。コメントレートが合成+再生をやや上回ると queue が1〜2件で安定し、
- *   旧 backlog しきい値(3件)に届かず通常2500msのまま=音声が常時約1.5〜2秒遅れ続ける定常ラグの帯。
- *   通常しきい値を縮め、その定常ラグを sub-second 寄りへ詰めて「今」に追従させる。
+ * v0.1.781 回帰修正: v0.1.773 で 1800ms へ縮めたが、これが「吹き出しは出るが音声が全く出ない」回帰を
+ *   生んだ。1件の読み上げ(合成+再生)は普通に1〜3秒かかるため、しきい値が再生時間を下回ると、
+ *   2件目以降が【自分の再生順が来る前に】必ず stale 化して全部捨てられ、結果ゼロ音声になる。
+ *   再生1本ぶんを下回らない 2500ms に戻す(v0.1.773 以前の実績値)。
  */
-export const VOICE_STALE_MS_NORMAL = 1800;
+export const VOICE_STALE_MS_NORMAL = 2500;
 /** バックログがある時(queueLength >= VOICE_STALE_BACKLOG_QUEUE)の短縮しきい値(ms)。 */
-export const VOICE_STALE_MS_BACKLOG = 800;
+export const VOICE_STALE_MS_BACKLOG = 1200;
 /**
  * この件数以上溜まったら短縮しきい値に切り替えてドロップを加速(リアルタイム維持)。
- * v0.1.773: 3→2。定常ラグは queue=1〜2 帯で起きるので、そこへ短縮しきい値を効かせるのが要。
+ * v0.1.781: 2→3 に戻す。queue=2 で 1200ms に縮めると、再生待ち1本(1〜3秒)で常に stale 化し
+ *   音声が全く出なくなる(ゼロ音声回帰)。3件以上溜まった時だけ加速する実績値に戻す。
  */
-export const VOICE_STALE_BACKLOG_QUEUE = 2;
+export const VOICE_STALE_BACKLOG_QUEUE = 3;
 /** ギフト等の高優先は確実に読みたいので長め(ms)。 */
 export const VOICE_STALE_MS_HIGH_PRIORITY = 6000;
 

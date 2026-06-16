@@ -226,13 +226,18 @@ export class VoicePlayer {
           }
         }
         if (allStale && this.queue.length > 0) {
-          const dropCount = this.queue.length;
-          for (const dropped of this.queue) {
-            if (typeof dropped.onPlayStart === 'function') dropped.onPlayStart();
+          // v0.1.781: 全部 stale でも【最新の1件は読む】。以前は全捨て→ゼロ音声(回帰)だったが、
+          //   コメントが流れている限り「今のコメント」は必ず1つ読む方が体感が良い(無音より新着優先)。
+          //   古い分だけ捨て、最新(末尾)を残してそのまま再生フローへ進める。
+          const newest = this.queue[this.queue.length - 1];
+          const dropped = this.queue.slice(0, this.queue.length - 1);
+          for (const d of dropped) {
+            if (typeof d.onPlayStart === 'function') d.onPlayStart();
           }
-          this.queue = [];
-          this._showSkipped(dropCount);
-          break;
+          this.queue = [newest];
+          if (dropped.length > 0) this._showSkipped(dropped.length);
+          // newest はこの後の通常フロー(下の shift→合成→再生)で必ず再生される。
+          //   その際の age-gate は queueLength=1 で評価される(下で再取得)ので通常しきい値が効く。
         }
 
         const queueLength = this.queue.length;
