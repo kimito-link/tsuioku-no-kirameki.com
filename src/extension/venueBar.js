@@ -88,6 +88,7 @@ import {
   BUBBLE_VOICE_SPEAKING_CAP_MS
 } from '../lib/venueBubbleLifecycle.js';
 import { resolveVoiceForUser } from '../lib/voiceAssignment.js';
+import { buildVenueCharacterFrame } from '../lib/venueCharacterFrame.js';
 import {
   isVoicevoxAlive,
   listVoicevoxStyleIds,
@@ -402,6 +403,27 @@ const VENUE_CSS = `
   @media (prefers-reduced-motion: reduce) {
     .nlsb-resident-img { animation: none; }
   }
+  /* v0.1.777 額縁フレーム: 3キャラ全表情サムネを四辺に沿って並べ会場を囲む。中央(映像)と
+     コメント欄は触らない。各タイルは JS が edge(top/right/bottom/left)と pos(0..1)を data 属性で渡し、
+     ここで辺に貼り付ける。軽量 .thumb128 を使い負荷を抑える。 */
+  .nlsb-charframe {
+    position: absolute;
+    inset: 0;
+    z-index: 4; /* 客席(seats)より背面・映像セーフエリアより前。吹き出し(z5)/常駐(z6)より背面 */
+    pointer-events: none;
+    overflow: hidden;
+  }
+  .nlsb-charframe-tile {
+    position: absolute;
+    width: clamp(26px, 2.6vw, 40px);
+    height: auto;
+    opacity: 0.85;
+    filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.6));
+  }
+  .nlsb-charframe-tile[data-edge="top"]    { top: 2px; transform: translateX(-50%); }
+  .nlsb-charframe-tile[data-edge="bottom"] { bottom: 2px; transform: translateX(-50%); }
+  .nlsb-charframe-tile[data-edge="left"]   { left: 2px; transform: translateY(-50%); }
+  .nlsb-charframe-tile[data-edge="right"]  { right: 2px; transform: translateY(-50%); }
   .nlsb-header {
     grid-area: header;
     position: sticky;
@@ -1390,12 +1412,17 @@ export function mountVenueBarButton(options = {}) {
   residentsLayer.className = 'nlsb-residents';
   residentsLayer.setAttribute('aria-hidden', 'false');
 
+  // v0.1.777 額縁フレーム: 3キャラ全表情サムネで四辺を囲む専用レイヤー(中央の映像/コメント欄は触らない)。
+  const charFrameLayer = document.createElement('div');
+  charFrameLayer.className = 'nlsb-charframe';
+  charFrameLayer.setAttribute('aria-hidden', 'true');
+
   // seating は下端のひな壇だけ(header + seats)。
   seating.append(header, seatsHost);
   // center は CSS で display:none(撤去)だが、互換のため DOM には残す。
   // 3キャラ常駐は配信画面の「まわり(左右の縁)」に出す(会場の席とは重ねない=邪魔にしない)。
   //   stageLayout 基準=映像セーフエリアの高さに合わせて左右に配置できる。
-  stageLayout.append(crowdCanvas, safeArea, seating, center, residentsLayer);
+  stageLayout.append(crowdCanvas, safeArea, charFrameLayer, seating, center, residentsLayer);
   // 吹き出し専用の最上位レイヤー(会議確定A): 席コンテナの overflow:hidden の外に置くことで
   //   セリフがクリップされず・アバターに潜らない。席の座標を測ってこの上に頭上配置する。
   const bubbleLayer = document.createElement('div');
@@ -2033,6 +2060,31 @@ export function mountVenueBarButton(options = {}) {
       residentsLayer.appendChild(cell);
     }
     residentsRendered = true;
+  };
+
+  // v0.1.777 額縁フレーム: 3キャラ全表情サムネを四辺に並べ会場を囲む(1回だけ描画・軽量 thumb128)。
+  let charFrameRendered = false;
+  const renderCharFrame = () => {
+    if (charFrameRendered) return;
+    const resolveUrl =
+      typeof chrome !== 'undefined' && chrome.runtime && typeof chrome.runtime.getURL === 'function'
+        ? /** @param {string} rel */ (rel) => chrome.runtime.getURL(rel)
+        : /** @param {string} rel */ (rel) => rel;
+    const tiles = buildVenueCharacterFrame(resolveUrl);
+    charFrameLayer.textContent = '';
+    for (const t of tiles) {
+      const img = document.createElement('img');
+      img.className = 'nlsb-charframe-tile';
+      img.src = t.src;
+      img.alt = '';
+      img.dataset.edge = t.edge;
+      // 辺に沿った位置(pos 0..1)を %。top/bottom は left%、left/right は top%。
+      if (t.edge === 'top' || t.edge === 'bottom') img.style.left = `${(t.pos * 100).toFixed(2)}%`;
+      else img.style.top = `${(t.pos * 100).toFixed(2)}%`;
+      img.addEventListener('error', () => { img.style.display = 'none'; });
+      charFrameLayer.appendChild(img);
+    }
+    charFrameRendered = true;
   };
 
   /**
@@ -2738,6 +2790,7 @@ export function mountVenueBarButton(options = {}) {
       addBubbleReflowListener();
       // 3キャラ常駐: 集計を待たず先に描く=開いた瞬間から必ず誰かが居る(無人に見せない)。
       renderResidents();
+      renderCharFrame(); // v0.1.777 額縁フレーム(四辺を3キャラで囲む)
       startAggregation();
       startSpeechPolling();
     } else {
