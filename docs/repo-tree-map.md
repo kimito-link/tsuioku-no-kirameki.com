@@ -18,7 +18,7 @@
 <sub>ファイル 20 件</sub>
 
 ## `docs/` — 設計正本・マインドマップ・フロー図・feature-map(AI/人間向け)  〔設計 / レポート〕
-<sub>ファイル 60 件</sub>
+<sub>ファイル 62 件</sub>
 
 - `article-assets/`（3 件） — 記事用の画像・動画・音声アセット  〔記事 / 画像〕
 - `feature-map/`（11 件） — 機能ごと依存図(自動生成)。誰が storage を書き/読むか  〔依存図 / 自動生成〕
@@ -41,7 +41,7 @@
 - `avatar-parts/`（26 件） — アバター素材(顔シート等)の参考画像  〔アバター / 画像〕
 
 ## `scripts/` — ビルド・検証・自動生成スクリプト(build/feature-map/repo-tree-map 等)  〔ビルド / 自動生成〕
-<sub>ファイル 25 件</sub>
+<sub>ファイル 26 件</sub>
 
 - `xserver/`（2 件） — Xserver 向け webhook(git pull デプロイ)スクリプト  〔デプロイ / webhook〕
 
@@ -74,6 +74,102 @@
 - `articles/`（12 件） — 技術記事(防御的公開)。手法を再利用可能な形で解説  〔記事 / 公開〕
 - `images/`（17 件） — LP 用の favicon・OG 画像等  〔画像〕
 - `sound/`（1 件） — LP 公開用の音声素材(エール音等)  〔音声 / 公開〕
+
+---
+
+# 機能 → 担当ファイル 逆引き索引（「○○を司るのはここ」）
+
+> 「あの挙動どこ?」の逆引き。`scripts/repo-tree-map.mjs` の `FEATURES` 辞書が正本（実コードで裏取りした担当のみ）。
+> 新しい機能を足すときは、実際に grep して司っているファイルを確かめてから `FEATURES` に1行足す。
+
+### コメント送信(確認/プロファイル)  〔送信 / コメント〕
+拡張から watch のコメント欄へ送信し、入力欄の変化で成功を推定。送信経路の手元プロファイルも
+
+- [`src/lib/commentSubmitConfirm.js`](../src/lib/commentSubmitConfirm.js)
+- [`src/lib/commentSubmitProfiling.js`](../src/lib/commentSubmitProfiling.js)
+
+### popup スクロール(要素を見せる)  〔popup / スクロール〕
+.nl-main などスクロール親で、子要素を見せるための scrollTop 加算 delta を計算
+
+- [`src/lib/nlMainScrollReveal.js`](../src/lib/nlMainScrollReveal.js)
+
+### 会場ドラッグスクロール(パン)  〔会場 / スクロール〕
+会場を左ドラッグで縦スクロール(パン)する純ロジック。venueBar が pointer を配線して呼ぶ
+
+- [`src/lib/venueDragScroll.js`](../src/lib/venueDragScroll.js)
+
+### コメント収穫(DOM 観測)  〔コメント / 取得 / DOM〕
+watch の仮想スクロールを送りながら DOM 上のコメント行を拾い集める。受理判定は nicoliveDom
+
+- [`src/lib/commentHarvest.js`](../src/lib/commentHarvest.js)
+- [`src/lib/nicoliveDom.js`](../src/lib/nicoliveDom.js)
+
+### 過去ログ取得(バックフィル巡回)  〔過去ログ / 取得〕
+NDGR の backward URI を辿り配信開始まで遡って過去コメントを取り込む巡回エンジン(純ロジック)
+
+- [`src/lib/ndgrBackfillCrawl.js`](../src/lib/ndgrBackfillCrawl.js)
+
+### コメント重複除去(NDGR)  〔コメント / 重複除去〕
+再送/再接続/relay overlap の重複を liveId+messageId の canonical key で排除
+
+- [`src/lib/ndgrMessageDedupe.js`](../src/lib/ndgrMessageDedupe.js)
+
+### 応援レーン集約(誰が候補か)  〔応援 / 集約〕
+保存コメント行を userId 単位に畳み込みレーン候補を作る唯一の集約正本(popup/venue 共通)
+
+- [`src/lib/userLaneCandidatesFromStorage.js`](../src/lib/userLaneCandidatesFromStorage.js)
+
+### 人物タイル描画(丸サムネ)  〔応援 / 描画〕
+popup 応援アイコン列の「1人ぶんのタイル(丸サムネ+ID+名前)」生成の正本 DOM ビルダー
+
+- [`src/lib/personTileDom.js`](../src/lib/personTileDom.js)
+
+### 会場の席割り  〔会場 / 席〕
+150席上限+入れ替えで席を割り当てる。席資格(venueParticipantKey)もここ
+
+- [`src/lib/venueSeats.js`](../src/lib/venueSeats.js)
+
+### 背景群衆(来場者数の表現)  〔会場 / 色 / 描画〕
+席に出せない来場者数(PV)を背景群衆 Canvas の密度で描く
+
+- [`src/lib/crowdRasterizer.js`](../src/lib/crowdRasterizer.js)
+
+### 読み上げ(再生/キュー/年齢ゲート)  〔読み上げ / 音声〕
+コメント読み上げの再生・キュー上限・年齢ゲート・ロード状態
+
+- [`src/lib/voicePlayer.js`](../src/lib/voicePlayer.js)
+- [`src/lib/voiceReadQueue.js`](../src/lib/voiceReadQueue.js)
+- [`src/lib/voiceAgeGate.js`](../src/lib/voiceAgeGate.js)
+
+### ギフト投擲演出  〔ギフト / 演出〕
+会場でギフト/広告を投げ主サムネから中央映像へ投げる演出の純関数群
+
+- [`src/lib/giftThrowProjectile.js`](../src/lib/giftThrowProjectile.js)
+
+### 吹き出し寿命管理  〔会場 / 吹き出し〕
+会場の吹き出しの表示上限・追い出し(eviction)ライフサイクル
+
+- [`src/lib/venueBubbleLifecycle.js`](../src/lib/venueBubbleLifecycle.js)
+
+### HTMLレポート生成  〔レポート〕
+マーケ/イベント順位/タイムライン等を1枚の HTML レポートに組み立てる(popup-entry 内)
+
+- [`src/extension/popup-entry.js`](../src/extension/popup-entry.js)
+
+### 状態速報の整形  〔レポート / 診断〕
+記録件数・取得率・バックフィル進捗・レーン状態などの状態テキストを整形
+
+- [`src/lib/statusFormat.js`](../src/lib/statusFormat.js)
+
+### 記録件数の単調化(減らない表示)  〔記録 / コメント〕
+per-live ゲートで記録件数の表示が後退しないようにする
+
+- [`src/lib/monotonicCommentCount.js`](../src/lib/monotonicCommentCount.js)
+
+### storage キー定義  〔storage〕
+chrome.storage のキー名の正本(nls_comments_<lv> 等)
+
+- [`src/lib/storageKeys.js`](../src/lib/storageKeys.js)
 
 ---
 

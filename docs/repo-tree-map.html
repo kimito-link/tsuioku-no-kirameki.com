@@ -34,6 +34,17 @@
   .legend{ margin-top:22px; font-size:12.5px; color:var(--sub); background:var(--panel);
     border:1px solid var(--line); border-radius:12px; padding:14px 18px; line-height:1.9; }
   .legend b{ color:var(--ink); }
+  .secttl{ font-size:17px; font-weight:700; color:#fff; margin:30px 0 6px; }
+  .secsub{ font-size:12px; color:var(--muted); margin:0 0 14px; line-height:1.6; }
+  section.feat{ background:var(--panel); border:1px solid var(--line); border-radius:10px;
+    padding:11px 16px; margin:0 0 9px; }
+  .fhead{ display:flex; align-items:baseline; gap:8px; flex-wrap:wrap; }
+  .fname{ font-size:14.5px; font-weight:700; color:#ffe3b8; }
+  .fdesc{ font-size:12.5px; color:var(--sub); margin:4px 0 7px; line-height:1.6; }
+  .fpaths{ display:flex; gap:6px; flex-wrap:wrap; }
+  .path{ font-family:"Menlo","Consolas",monospace; font-size:11.5px; background:rgba(255,255,255,.06);
+    border:1px solid var(--line); border-radius:6px; padding:2px 7px; color:#bcd2f6; }
+  .path.dead{ color:#f6c7d2; border-color:var(--warn); background:rgba(181,72,95,.12); }
 </style>
 </head>
 <body>
@@ -60,7 +71,7 @@
       
     </section>
 <section class="dir">
-      <div class="dhead"><span class="dname">docs/</span><span class="cnt">60 件</span></div>
+      <div class="dhead"><span class="dname">docs/</span><span class="cnt">62 件</span></div>
       <div class="drole">設計正本・マインドマップ・フロー図・feature-map(AI/人間向け) <span class="tag">設計</span><span class="tag">レポート</span></div>
       <div class="kids"><div class="kid"><div class="kname">article-assets/ <span class="cnt">3</span></div><div class="krole">記事用の画像・動画・音声アセット <span class="tag">記事</span><span class="tag">画像</span></div></div><div class="kid"><div class="kname">feature-map/ <span class="cnt">11</span></div><div class="krole">機能ごと依存図(自動生成)。誰が storage を書き/読むか <span class="tag">依存図</span><span class="tag">自動生成</span></div></div><div class="kid"><div class="kname">policies/ <span class="cnt">1</span></div><div class="krole">運用方針メモ(統計の失敗モード等) <span class="tag">方針</span></div></div><div class="kid"><div class="kname">releases/ <span class="cnt">4</span></div><div class="krole">リリース関連メモ(CWS 公開 API 設定・版ごとの記事下書き) <span class="tag">リリース</span></div></div><div class="kid"><div class="kname">research/ <span class="cnt">2</span></div><div class="krole">ディープリサーチ成果(ギフトランキング等の調査) <span class="tag">調査</span><span class="tag">レポート</span></div></div><div class="kid"><div class="kname">workflows/ <span class="cnt">1</span></div><div class="krole">開発ワークフロー設計(TDD/UI-UX ロードマップ等) <span class="tag">ワークフロー</span></div></div></div>
     </section>
@@ -75,7 +86,7 @@
       <div class="kids"><div class="kid"><div class="kname">archive/ <span class="cnt">12</span></div><div class="krole">過去セッションの引き継ぎ(HANDOFF)アーカイブ <span class="tag">メモリ</span><span class="tag">履歴</span></div></div><div class="kid"><div class="kname">avatar-parts/ <span class="cnt">26</span></div><div class="krole">アバター素材(顔シート等)の参考画像 <span class="tag">アバター</span><span class="tag">画像</span></div></div></div>
     </section>
 <section class="dir">
-      <div class="dhead"><span class="dname">scripts/</span><span class="cnt">25 件</span></div>
+      <div class="dhead"><span class="dname">scripts/</span><span class="cnt">26 件</span></div>
       <div class="drole">ビルド・検証・自動生成スクリプト(build/feature-map/repo-tree-map 等) <span class="tag">ビルド</span><span class="tag">自動生成</span></div>
       <div class="kids"><div class="kid"><div class="kname">xserver/ <span class="cnt">2</span></div><div class="krole">Xserver 向け webhook(git pull デプロイ)スクリプト <span class="tag">デプロイ</span><span class="tag">webhook</span></div></div></div>
     </section>
@@ -99,10 +110,100 @@
       <div class="drole">本番 LP の配信ディレクトリ(Cloudflare Pages へ deploy) <span class="tag">LP</span><span class="tag">公開</span></div>
       <div class="kids"><div class="kid"><div class="kname">articles/ <span class="cnt">12</span></div><div class="krole">技術記事(防御的公開)。手法を再利用可能な形で解説 <span class="tag">記事</span><span class="tag">公開</span></div></div><div class="kid"><div class="kname">images/ <span class="cnt">17</span></div><div class="krole">LP 用の favicon・OG 画像等 <span class="tag">画像</span></div></div><div class="kid"><div class="kname">sound/ <span class="cnt">1</span></div><div class="krole">LP 公開用の音声素材(エール音等) <span class="tag">音声</span><span class="tag">公開</span></div></div></div>
     </section>
+
+  <div class="secttl">機能 → 担当ファイル 逆引き索引（「○○を司るのはここ」）</div>
+  <p class="secsub">「あの挙動どこ?」の逆引き。<code>FEATURES</code> 辞書が正本（実コードで裏取りした担当のみ）。赤いパスは消失/リネームで <code>FEATURES</code> 更新が必要。</p>
+  <section class="feat">
+      <div class="fhead"><span class="fname">コメント送信(確認/プロファイル)</span> <span class="tag">送信</span><span class="tag">コメント</span></div>
+      <div class="fdesc">拡張から watch のコメント欄へ送信し、入力欄の変化で成功を推定。送信経路の手元プロファイルも</div>
+      <div class="fpaths"><code class="path">src/lib/commentSubmitConfirm.js</code><code class="path">src/lib/commentSubmitProfiling.js</code></div>
+    </section>
+<section class="feat">
+      <div class="fhead"><span class="fname">popup スクロール(要素を見せる)</span> <span class="tag">popup</span><span class="tag">スクロール</span></div>
+      <div class="fdesc">.nl-main などスクロール親で、子要素を見せるための scrollTop 加算 delta を計算</div>
+      <div class="fpaths"><code class="path">src/lib/nlMainScrollReveal.js</code></div>
+    </section>
+<section class="feat">
+      <div class="fhead"><span class="fname">会場ドラッグスクロール(パン)</span> <span class="tag">会場</span><span class="tag">スクロール</span></div>
+      <div class="fdesc">会場を左ドラッグで縦スクロール(パン)する純ロジック。venueBar が pointer を配線して呼ぶ</div>
+      <div class="fpaths"><code class="path">src/lib/venueDragScroll.js</code></div>
+    </section>
+<section class="feat">
+      <div class="fhead"><span class="fname">コメント収穫(DOM 観測)</span> <span class="tag">コメント</span><span class="tag">取得</span><span class="tag">DOM</span></div>
+      <div class="fdesc">watch の仮想スクロールを送りながら DOM 上のコメント行を拾い集める。受理判定は nicoliveDom</div>
+      <div class="fpaths"><code class="path">src/lib/commentHarvest.js</code><code class="path">src/lib/nicoliveDom.js</code></div>
+    </section>
+<section class="feat">
+      <div class="fhead"><span class="fname">過去ログ取得(バックフィル巡回)</span> <span class="tag">過去ログ</span><span class="tag">取得</span></div>
+      <div class="fdesc">NDGR の backward URI を辿り配信開始まで遡って過去コメントを取り込む巡回エンジン(純ロジック)</div>
+      <div class="fpaths"><code class="path">src/lib/ndgrBackfillCrawl.js</code></div>
+    </section>
+<section class="feat">
+      <div class="fhead"><span class="fname">コメント重複除去(NDGR)</span> <span class="tag">コメント</span><span class="tag">重複除去</span></div>
+      <div class="fdesc">再送/再接続/relay overlap の重複を liveId+messageId の canonical key で排除</div>
+      <div class="fpaths"><code class="path">src/lib/ndgrMessageDedupe.js</code></div>
+    </section>
+<section class="feat">
+      <div class="fhead"><span class="fname">応援レーン集約(誰が候補か)</span> <span class="tag">応援</span><span class="tag">集約</span></div>
+      <div class="fdesc">保存コメント行を userId 単位に畳み込みレーン候補を作る唯一の集約正本(popup/venue 共通)</div>
+      <div class="fpaths"><code class="path">src/lib/userLaneCandidatesFromStorage.js</code></div>
+    </section>
+<section class="feat">
+      <div class="fhead"><span class="fname">人物タイル描画(丸サムネ)</span> <span class="tag">応援</span><span class="tag">描画</span></div>
+      <div class="fdesc">popup 応援アイコン列の「1人ぶんのタイル(丸サムネ+ID+名前)」生成の正本 DOM ビルダー</div>
+      <div class="fpaths"><code class="path">src/lib/personTileDom.js</code></div>
+    </section>
+<section class="feat">
+      <div class="fhead"><span class="fname">会場の席割り</span> <span class="tag">会場</span><span class="tag">席</span></div>
+      <div class="fdesc">150席上限+入れ替えで席を割り当てる。席資格(venueParticipantKey)もここ</div>
+      <div class="fpaths"><code class="path">src/lib/venueSeats.js</code></div>
+    </section>
+<section class="feat">
+      <div class="fhead"><span class="fname">背景群衆(来場者数の表現)</span> <span class="tag">会場</span><span class="tag">色</span><span class="tag">描画</span></div>
+      <div class="fdesc">席に出せない来場者数(PV)を背景群衆 Canvas の密度で描く</div>
+      <div class="fpaths"><code class="path">src/lib/crowdRasterizer.js</code></div>
+    </section>
+<section class="feat">
+      <div class="fhead"><span class="fname">読み上げ(再生/キュー/年齢ゲート)</span> <span class="tag">読み上げ</span><span class="tag">音声</span></div>
+      <div class="fdesc">コメント読み上げの再生・キュー上限・年齢ゲート・ロード状態</div>
+      <div class="fpaths"><code class="path">src/lib/voicePlayer.js</code><code class="path">src/lib/voiceReadQueue.js</code><code class="path">src/lib/voiceAgeGate.js</code></div>
+    </section>
+<section class="feat">
+      <div class="fhead"><span class="fname">ギフト投擲演出</span> <span class="tag">ギフト</span><span class="tag">演出</span></div>
+      <div class="fdesc">会場でギフト/広告を投げ主サムネから中央映像へ投げる演出の純関数群</div>
+      <div class="fpaths"><code class="path">src/lib/giftThrowProjectile.js</code></div>
+    </section>
+<section class="feat">
+      <div class="fhead"><span class="fname">吹き出し寿命管理</span> <span class="tag">会場</span><span class="tag">吹き出し</span></div>
+      <div class="fdesc">会場の吹き出しの表示上限・追い出し(eviction)ライフサイクル</div>
+      <div class="fpaths"><code class="path">src/lib/venueBubbleLifecycle.js</code></div>
+    </section>
+<section class="feat">
+      <div class="fhead"><span class="fname">HTMLレポート生成</span> <span class="tag">レポート</span></div>
+      <div class="fdesc">マーケ/イベント順位/タイムライン等を1枚の HTML レポートに組み立てる(popup-entry 内)</div>
+      <div class="fpaths"><code class="path">src/extension/popup-entry.js</code></div>
+    </section>
+<section class="feat">
+      <div class="fhead"><span class="fname">状態速報の整形</span> <span class="tag">レポート</span><span class="tag">診断</span></div>
+      <div class="fdesc">記録件数・取得率・バックフィル進捗・レーン状態などの状態テキストを整形</div>
+      <div class="fpaths"><code class="path">src/lib/statusFormat.js</code></div>
+    </section>
+<section class="feat">
+      <div class="fhead"><span class="fname">記録件数の単調化(減らない表示)</span> <span class="tag">記録</span><span class="tag">コメント</span></div>
+      <div class="fdesc">per-live ゲートで記録件数の表示が後退しないようにする</div>
+      <div class="fpaths"><code class="path">src/lib/monotonicCommentCount.js</code></div>
+    </section>
+<section class="feat">
+      <div class="fhead"><span class="fname">storage キー定義</span> <span class="tag">storage</span></div>
+      <div class="fdesc">chrome.storage のキー名の正本(nls_comments_&lt;lv&gt; 等)</div>
+      <div class="fpaths"><code class="path">src/lib/storageKeys.js</code></div>
+    </section>
+
   <div class="legend">
     <p><b>読み方</b></p>
-    <p>● 各カード = トップレベルディレクトリ。タグ〔色 / コメント / レポート…〕がそのディレクトリの担当ドメイン。<br>
-    ● <b>赤枠</b> = 役割が未記入のディレクトリ。<code>ROLES</code> 辞書に1行足してから再生成する。<br>
+    <p>● 上半分 = ディレクトリマップ（場所 → 役割）。各カード = トップレベルディレクトリ。タグ〔色 / コメント / レポート…〕が担当ドメイン。<br>
+    ● 下半分 = 機能逆引き（機能 → 担当ファイル）。「送信を司るのはどこ?」に一発で答える索引。<br>
+    ● <b>赤枠/赤パス</b> = 役割未記入のディレクトリ or 消えた担当ファイル。辞書を直して再生成する。<br>
     ● ファイル件数は git 追跡分（生成物 <code>build/</code> や <code>.git</code> 等は除外）。</p>
   </div>
 </div>

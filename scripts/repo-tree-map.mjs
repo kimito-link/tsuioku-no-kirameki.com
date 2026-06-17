@@ -78,6 +78,35 @@ const ROLES = {
   'memory/avatar-parts': { role: 'アバター素材(顔シート等)の参考画像', tags: ['アバター', '画像'] }
 };
 
+/**
+ * 機能 → 担当ファイルの逆引き索引(「○○を司るのはここ」)。人間が決める正本。
+ * 「あの挙動どこ?」に一発で答えるための索引。ディレクトリマップ(場所→役割)の逆向き。
+ *
+ * すべて実コードで裏取りした担当のみ載せる(推測で『担当』を正本化しない)。
+ * paths は実在必須(`--check` でファイル消失/リネームを検知=腐り防止)。
+ * 新しい機能を足すときは、実際に grep して司っているファイルを確かめてから1行足す。
+ * @type {{ feature: string, desc: string, paths: string[], tags?: string[] }[]}
+ */
+const FEATURES = [
+  { feature: 'コメント送信(確認/プロファイル)', desc: '拡張から watch のコメント欄へ送信し、入力欄の変化で成功を推定。送信経路の手元プロファイルも', paths: ['src/lib/commentSubmitConfirm.js', 'src/lib/commentSubmitProfiling.js'], tags: ['送信', 'コメント'] },
+  { feature: 'popup スクロール(要素を見せる)', desc: '.nl-main などスクロール親で、子要素を見せるための scrollTop 加算 delta を計算', paths: ['src/lib/nlMainScrollReveal.js'], tags: ['popup', 'スクロール'] },
+  { feature: '会場ドラッグスクロール(パン)', desc: '会場を左ドラッグで縦スクロール(パン)する純ロジック。venueBar が pointer を配線して呼ぶ', paths: ['src/lib/venueDragScroll.js'], tags: ['会場', 'スクロール'] },
+  { feature: 'コメント収穫(DOM 観測)', desc: 'watch の仮想スクロールを送りながら DOM 上のコメント行を拾い集める。受理判定は nicoliveDom', paths: ['src/lib/commentHarvest.js', 'src/lib/nicoliveDom.js'], tags: ['コメント', '取得', 'DOM'] },
+  { feature: '過去ログ取得(バックフィル巡回)', desc: 'NDGR の backward URI を辿り配信開始まで遡って過去コメントを取り込む巡回エンジン(純ロジック)', paths: ['src/lib/ndgrBackfillCrawl.js'], tags: ['過去ログ', '取得'] },
+  { feature: 'コメント重複除去(NDGR)', desc: '再送/再接続/relay overlap の重複を liveId+messageId の canonical key で排除', paths: ['src/lib/ndgrMessageDedupe.js'], tags: ['コメント', '重複除去'] },
+  { feature: '応援レーン集約(誰が候補か)', desc: '保存コメント行を userId 単位に畳み込みレーン候補を作る唯一の集約正本(popup/venue 共通)', paths: ['src/lib/userLaneCandidatesFromStorage.js'], tags: ['応援', '集約'] },
+  { feature: '人物タイル描画(丸サムネ)', desc: 'popup 応援アイコン列の「1人ぶんのタイル(丸サムネ+ID+名前)」生成の正本 DOM ビルダー', paths: ['src/lib/personTileDom.js'], tags: ['応援', '描画'] },
+  { feature: '会場の席割り', desc: '150席上限+入れ替えで席を割り当てる。席資格(venueParticipantKey)もここ', paths: ['src/lib/venueSeats.js'], tags: ['会場', '席'] },
+  { feature: '背景群衆(来場者数の表現)', desc: '席に出せない来場者数(PV)を背景群衆 Canvas の密度で描く', paths: ['src/lib/crowdRasterizer.js'], tags: ['会場', '色', '描画'] },
+  { feature: '読み上げ(再生/キュー/年齢ゲート)', desc: 'コメント読み上げの再生・キュー上限・年齢ゲート・ロード状態', paths: ['src/lib/voicePlayer.js', 'src/lib/voiceReadQueue.js', 'src/lib/voiceAgeGate.js'], tags: ['読み上げ', '音声'] },
+  { feature: 'ギフト投擲演出', desc: '会場でギフト/広告を投げ主サムネから中央映像へ投げる演出の純関数群', paths: ['src/lib/giftThrowProjectile.js'], tags: ['ギフト', '演出'] },
+  { feature: '吹き出し寿命管理', desc: '会場の吹き出しの表示上限・追い出し(eviction)ライフサイクル', paths: ['src/lib/venueBubbleLifecycle.js'], tags: ['会場', '吹き出し'] },
+  { feature: 'HTMLレポート生成', desc: 'マーケ/イベント順位/タイムライン等を1枚の HTML レポートに組み立てる(popup-entry 内)', paths: ['src/extension/popup-entry.js'], tags: ['レポート'] },
+  { feature: '状態速報の整形', desc: '記録件数・取得率・バックフィル進捗・レーン状態などの状態テキストを整形', paths: ['src/lib/statusFormat.js'], tags: ['レポート', '診断'] },
+  { feature: '記録件数の単調化(減らない表示)', desc: 'per-live ゲートで記録件数の表示が後退しないようにする', paths: ['src/lib/monotonicCommentCount.js'], tags: ['記録', 'コメント'] },
+  { feature: 'storage キー定義', desc: 'chrome.storage のキー名の正本(nls_comments_<lv> 等)', paths: ['src/lib/storageKeys.js'], tags: ['storage'] }
+];
+
 /** ツリーから除外するトップレベル(ドット系・生成物・巨大画像ディレクトリ等) */
 const SKIP_TOP = new Set(['.git', '.github', '.husky', '.cursor', '.takt', 'node_modules', 'build', '.artifacts']);
 
@@ -139,6 +168,21 @@ function roleOf(dir) {
   return ROLES[dir] || null;
 }
 
+/**
+ * FEATURES の paths のうち、git 追跡に存在しないもの(消失/リネーム)を返す。
+ * @param {Set<string>} trackedSet
+ * @returns {{ feature: string, path: string }[]}
+ */
+function featureDeadPaths(trackedSet) {
+  const dead = [];
+  for (const f of FEATURES) {
+    for (const p of f.paths) {
+      if (!trackedSet.has(p)) dead.push({ feature: f.feature, path: p });
+    }
+  }
+  return dead;
+}
+
 /** ---- Markdown 出力 ---- */
 function renderMarkdown(nodes, files) {
   const lines = [];
@@ -174,6 +218,28 @@ function renderMarkdown(nodes, files) {
       lines.push(`- \`${name}/\`（${kn.totalFiles} 件） — ${krTxt}${ktags}`);
     }
     if (kids.length) lines.push('');
+  }
+
+  // 機能 → 担当ファイル 逆引き索引(「○○を司るのはここ」)
+  lines.push('---');
+  lines.push('');
+  lines.push('# 機能 → 担当ファイル 逆引き索引（「○○を司るのはここ」）');
+  lines.push('');
+  lines.push('> 「あの挙動どこ?」の逆引き。`scripts/repo-tree-map.mjs` の `FEATURES` 辞書が正本（実コードで裏取りした担当のみ）。');
+  lines.push('> 新しい機能を足すときは、実際に grep して司っているファイルを確かめてから `FEATURES` に1行足す。');
+  lines.push('');
+  const trackedSet = new Set(files);
+  for (const f of FEATURES) {
+    const tags = f.tags?.length ? `  〔${f.tags.join(' / ')}〕` : '';
+    lines.push(`### ${f.feature}${tags}`);
+    lines.push(f.desc);
+    lines.push('');
+    for (const p of f.paths) {
+      const exists = trackedSet.has(p);
+      const link = exists ? `[\`${p}\`](../${p})` : `\`${p}\` ⚠️ **見つからない（消失/リネーム）**`;
+      lines.push(`- ${link}`);
+    }
+    lines.push('');
   }
 
   lines.push('---');
@@ -224,6 +290,23 @@ function renderHtml(nodes, files, missing) {
     ? `<div class="banner warn">⚠️ 役割が未記入のディレクトリ ${missing.length} 件: ${missing.map((m) => `<code>${escapeHtml(m)}</code>`).join(' ')} — <code>scripts/repo-tree-map.mjs</code> の <code>ROLES</code> に追記</div>`
     : `<div class="banner ok">✅ すべてのディレクトリに役割が記入済み</div>`;
 
+  // 機能 → 担当ファイル 逆引き索引
+  const trackedSet = new Set(files);
+  const featureCards = FEATURES.map((f) => {
+    const tags = (f.tags || []).map((t) => `<span class="tag">${escapeHtml(t)}</span>`).join('');
+    const paths = f.paths.map((p) => {
+      const exists = trackedSet.has(p);
+      return exists
+        ? `<code class="path">${escapeHtml(p)}</code>`
+        : `<code class="path dead">${escapeHtml(p)} ⚠️ 見つからない</code>`;
+    }).join('');
+    return `<section class="feat">
+      <div class="fhead"><span class="fname">${escapeHtml(f.feature)}</span> ${tags}</div>
+      <div class="fdesc">${escapeHtml(f.desc)}</div>
+      <div class="fpaths">${paths}</div>
+    </section>`;
+  }).join('\n');
+
   return `<!DOCTYPE html>
 <html lang="ja">
 <head>
@@ -260,6 +343,17 @@ function renderHtml(nodes, files, missing) {
   .legend{ margin-top:22px; font-size:12.5px; color:var(--sub); background:var(--panel);
     border:1px solid var(--line); border-radius:12px; padding:14px 18px; line-height:1.9; }
   .legend b{ color:var(--ink); }
+  .secttl{ font-size:17px; font-weight:700; color:#fff; margin:30px 0 6px; }
+  .secsub{ font-size:12px; color:var(--muted); margin:0 0 14px; line-height:1.6; }
+  section.feat{ background:var(--panel); border:1px solid var(--line); border-radius:10px;
+    padding:11px 16px; margin:0 0 9px; }
+  .fhead{ display:flex; align-items:baseline; gap:8px; flex-wrap:wrap; }
+  .fname{ font-size:14.5px; font-weight:700; color:#ffe3b8; }
+  .fdesc{ font-size:12.5px; color:var(--sub); margin:4px 0 7px; line-height:1.6; }
+  .fpaths{ display:flex; gap:6px; flex-wrap:wrap; }
+  .path{ font-family:"Menlo","Consolas",monospace; font-size:11.5px; background:rgba(255,255,255,.06);
+    border:1px solid var(--line); border-radius:6px; padding:2px 7px; color:#bcd2f6; }
+  .path.dead{ color:#f6c7d2; border-color:var(--warn); background:rgba(181,72,95,.12); }
 </style>
 </head>
 <body>
@@ -271,10 +365,16 @@ function renderHtml(nodes, files, missing) {
   </p>
   ${missBanner}
   ${cards.join('\n')}
+
+  <div class="secttl">機能 → 担当ファイル 逆引き索引（「○○を司るのはここ」）</div>
+  <p class="secsub">「あの挙動どこ?」の逆引き。<code>FEATURES</code> 辞書が正本（実コードで裏取りした担当のみ）。赤いパスは消失/リネームで <code>FEATURES</code> 更新が必要。</p>
+  ${featureCards}
+
   <div class="legend">
     <p><b>読み方</b></p>
-    <p>● 各カード = トップレベルディレクトリ。タグ〔色 / コメント / レポート…〕がそのディレクトリの担当ドメイン。<br>
-    ● <b>赤枠</b> = 役割が未記入のディレクトリ。<code>ROLES</code> 辞書に1行足してから再生成する。<br>
+    <p>● 上半分 = ディレクトリマップ（場所 → 役割）。各カード = トップレベルディレクトリ。タグ〔色 / コメント / レポート…〕が担当ドメイン。<br>
+    ● 下半分 = 機能逆引き（機能 → 担当ファイル）。「送信を司るのはどこ?」に一発で答える索引。<br>
+    ● <b>赤枠/赤パス</b> = 役割未記入のディレクトリ or 消えた担当ファイル。辞書を直して再生成する。<br>
     ● ファイル件数は git 追跡分（生成物 <code>build/</code> や <code>.git</code> 等は除外）。</p>
   </div>
 </div>
@@ -289,22 +389,28 @@ function generate() {
   const nodes = buildTree(files);
   const { md, missing } = renderMarkdown(nodes, files);
   const html = renderHtml(nodes, files, missing);
-  return { md, html, missing };
+  const dead = featureDeadPaths(new Set(files));
+  return { md, html, missing, dead };
 }
 
 const isCheck = process.argv.includes('--check');
-const { md, html, missing } = generate();
+const { md, html, missing, dead } = generate();
 
 if (isCheck) {
-  let drift = false;
+  let fail = false;
   for (const [path, content] of [[OUT_MD, md], [OUT_HTML, html]]) {
     const cur = existsSync(path) ? readFileSync(path, 'utf8') : '';
     if (cur !== content) {
-      drift = true;
+      fail = true;
       console.error(`[repo-tree-map] drift: ${path} は最新ではありません。\`npm run tree-map\` を実行してコミットしてください。`);
     }
   }
-  if (drift) process.exit(1);
+  // FEATURES の担当ファイルが消失/リネームしていたら失敗(逆引き索引の腐り検知)
+  for (const d of dead) {
+    fail = true;
+    console.error(`[repo-tree-map] FEATURES の担当ファイルが見つかりません: "${d.feature}" → ${d.path}（FEATURES を更新して \`npm run tree-map\`）`);
+  }
+  if (fail) process.exit(1);
   console.log('[repo-tree-map] up to date.');
   if (missing.length) {
     console.warn(`[repo-tree-map] 注意: 役割未記入 ${missing.length} 件: ${missing.join(', ')}`);
@@ -316,5 +422,8 @@ if (isCheck) {
   console.log(`[repo-tree-map] wrote ${OUT_MD} and ${OUT_HTML}`);
   if (missing.length) {
     console.warn(`[repo-tree-map] 役割未記入 ${missing.length} 件(ROLES に追記推奨): ${missing.join(', ')}`);
+  }
+  for (const d of dead) {
+    console.warn(`[repo-tree-map] FEATURES の担当ファイルが見つかりません: "${d.feature}" → ${d.path}`);
   }
 }
