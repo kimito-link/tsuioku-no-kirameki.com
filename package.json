@@ -19,6 +19,8 @@
     "feature-map": "node scripts/feature-map.mjs",
     "tree-map": "node scripts/repo-tree-map.mjs",
     "tree-map:check": "node scripts/repo-tree-map.mjs --check",
+    "site-health": "node scripts/site-health.mjs",
+    "site-health:check": "node scripts/site-health.mjs --check",
     "test:e2e": "npm run build && node scripts/run-e2e.mjs",
     "test:e2e:headed": "npm run build && node scripts/run-e2e.mjs --headed",
     "test:e2e:smoke": "npm run build && node scripts/run-e2e.mjs --headed tests/e2e/smoke.spec.js",
