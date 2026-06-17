@@ -805,6 +805,15 @@ export function resolveUserIdOnElement(el) {
  * 新ニコ生PC: div.table-row + .comment-number + .comment-text
  * data-comment-type は normal 以外（generalSystemMessage 等）も公式コメント数に含まれるため、
  * 番号・本文が取れる行は種類を問わず記録する。
+ *
+ * ⚠️【既知のドリフト・2026-06-17 実DOM確証】現行ニコ生はコメント行から `.comment-number`(番号セル)を
+ *   外した。実DOM(Chrome DevTools 確認)は role="grid" の data-grid で、行は
+ *   `<div class="table-row" data-comment-type="normal"><span ...><div class="content-area">
+ *    <span class="comment-text">本文</span></div></span></div>` ＝ 本文(.comment-text)はあるが
+ *   .comment-number が無い。このため下の「numEl も textEl も必須」判定で DOM観測コメントが全捨てになり、
+ *   commentIngestBySource.visible=0 / commentTablePresent=false になる(NDGR経由では取れている)。
+ *   → 番号必須を緩める修正は別タスク(person-tile-unify の別件)。誤検知(おすすめ生放送等)ガードが
+ *     必須なので慎重に。ここは「なぜ番号必須か」で迷わないための記録。
  * @param {Element} el — 行要素またはその子孫
  * @returns {{ commentNo: string, text: string, userId: string|null, nickname?: string, avatarUrl?: string } | null}
  */

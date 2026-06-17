@@ -47,6 +47,32 @@ describe('venueParticipantKey', () => {
   });
 });
 
+// ───────────────────────────────────────────────────────────────────────────
+// 方針ドリフト検知(2026-06-17 確定)。venueSeats.js#venueParticipantKey の JSDoc 正本ルール
+//   「アクティブユーザー(=userId が観測できた人)は匿名/非匿名問わず全員着席」を test で固定する。
+//   ⚠️ もし将来うっかり旧方針(2026-06-13「匿名はアリーナじゃない=名前のある人だけ」)に戻したら、
+//      ここが落ちて気づける。コメントだけの正本は読み飛ばされる→test で物理的に固定するのが Task。
+// ───────────────────────────────────────────────────────────────────────────
+describe('venueParticipantKey 方針ドリフト検知(匿名も着席・正本固定)', () => {
+  it('a: 形式の匿名 userId(実機で実在)でも席キーを返す', () => {
+    // 実機のニコ生匿名(184)は userId が `a:xxxxx` 形式で来る。これも着席が正。
+    expect(venueParticipantKey({ userId: 'a:9f3kZ', name: '匿名' }, isGeneric)).toBe('u:a:9f3kZ');
+    expect(venueParticipantKey({ userId: 'a:9f3kZ' })).toBe('u:a:9f3kZ');
+  });
+  it('数値ID・匿名a:・名前ありを「同じ土俵で」席キーにする(差別しない)', () => {
+    // popup 応援アイコン列と会場の顔ぶれを一致させる前提。userId があればどの形式でも u:${uid}。
+    expect(venueParticipantKey({ userId: '12345678' })).toBe('u:12345678');
+    expect(venueParticipantKey({ userId: 'a:anon01' })).toBe('u:a:anon01');
+    expect(venueParticipantKey({ userId: '777', name: 'なまえ' })).toBe('u:777');
+  });
+  it('席に座れないのは「userIdも識別名も無い」1ケースだけ', () => {
+    // 来場者数(PV・無言視聴者)は userId が取れないのでここに来ない=null になるのが正。
+    expect(venueParticipantKey({})).toBeNull();
+    expect(venueParticipantKey({ name: '匿名' }, isGeneric)).toBeNull();
+    expect(venueParticipantKey({ name: '名無し' }, isGeneric)).toBeNull();
+  });
+});
+
 describe('buildVenueSeating promoteUserIds', () => {
   it('userIdがある匿名は自動的にアリーナ席となる', () => {
     const rows = [

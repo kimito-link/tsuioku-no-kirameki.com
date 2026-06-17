@@ -1,16 +1,27 @@
 // venueSeats.js
 // v0.1.707: ライブ会場モードの「座席モデル」純関数。
 //
-// 設計正本: memory/reference_venue_mode_meeting.md(全員集合会議 2026-06-13)。
-//   SHOWROOM 風の会場感を、ごちゃごちゃさせず整理して出す。会場には「会場参加者」が
-//   アバターで並ぶ。⚠️ 無言の視聴者一覧は NDGR で取れない(Codex 指摘)ので、ここで扱うのは
-//   「発言した人・ギフトを送った人」= 素性が観測できた参加者だけ。
+// ───────────────────────────────────────────────────────────────────────────
+// 【会場の席に座る人=アクティブユーザー・2026-06-17 確定】
+//   席に座るのは【アクティブユーザー】= コメント/ギフト/広告(貢献)でアクションし、素性(userId)が
+//   観測できた人。匿名(a:xxx・184)か数値IDかは無関係=アクションした人は全員、会場の主役。
+//   席資格の唯一の正本は venueParticipantKey(下記)。userId があれば匿名でも座る。
+//
+//   ⚠️【来場者数(PV)とは別物】ニコ生公式の「来場 N人」は PV 的な延べアクセス(同じ人の入り直し・
+//      無言の通りすがり込み)で userId が取れない=席には出せない。来場者数は席ではなく背景群衆
+//      Canvas の密度で表現する(venueBar 側・別レイヤー)。「会場参加者 N人」(席)と「来場 N人」(PV)を
+//      取り違えないこと。無言視聴者一覧は NDGR で取れない(Codex 指摘)のが原理的制約。
+// ───────────────────────────────────────────────────────────────────────────
+//
+// 設計正本: memory/reference_venue_mode_meeting.md(全員集合会議 2026-06-13) + council/person-tile-unify-SYNTHESIS.md(2026-06-17)
+//   + docs/person-tile-architecture.md(人物タイル経路の正本マインドマップ・用語/データフロー/方針変遷)。
+//   SHOWROOM 風の会場感を、ごちゃごちゃさせず整理して出す。
 //
 // このファイルは席割りの核ロジックだけ(DOM/storage/chrome.* 非依存・テスト可能・Web/OBS版で共用):
-//   - 参加者(発言行)を一意キーでまとめ、最終発言時刻・発言数を集計
+//   - 参加者(アクション行)を一意キー(venueParticipantKey)でまとめ、最終発言時刻・発言数・ギフト数を集計
 //   - 最大 N 席に cap。超過時はスクロールでなく「入れ替え制」(最も古い参加者を降ろす)
 //   - 席は安定割り当て(同じ人=同じ席インデックス)→ アバター位置と吹き出し位置が飛ばない
-//   - 「直近発言者 > ギフト参加者 > その他」の優先で席を確保する
+//   - 「直近アクション > ギフト参加者 > その他」の優先で席を確保する(匿名も同じ土俵)
 //
 // 軽さの肝: DOM を増やし続けない。席数は固定上限、参加者超過は入れ替えで吸収する。
 
@@ -55,33 +66,48 @@ export function resolveVenueLayoutMode(arenaCount) {
 /**
  * アリーナ席(会場の前に座る参加者)の安定キーを決める純関数。
  *
- * ユーザー方針(2026-06-13)「匿名はアリーナじゃないみたいなのがいい」: SHOWROOM のアリーナ席は
- *   名前のある人が座り、匿名は別枠の観客。だから **名前のある人だけ**にキーを返す。
- *   名前が無い/汎用プレースホルダ(匿名・名無し)はアリーナに座らせず null を返す
- *   (= venueBar 側で「ほか観客 ◯人」に集約する)。
- * キーは userId があれば userId(再接続でも同一人物・同名の別人も区別)、無ければ name。
+ * ───────────────────────────────────────────────────────────────────────────
+ * 【正本ルール・2026-06-17 確定】= この関数が「誰が会場の席に座れるか」の唯一の正本。
+ *   会場の席に座れるのは【アクティブユーザー】= コメント/ギフト/広告(貢献)のいずれかで
+ *   アクションし、素性(userId)が観測できた人。匿名(a:xxx・184)か数値IDかは一切無関係。
+ *   → userId があれば【匿名でも必ず】席キー `u:${uid}` を返す(下記実装の通り)。
+ *   popup の応援アイコン列(renderStoryUserLane)に出る人と、会場の席の顔ぶれを一致させる。
+ *
+ * 【席に座れない=null を返すのは1ケースだけ】userId も無く、個人を識別できる name も無い
+ *   (または汎用プレースホルダ名)行。userId が取れていない行は「誰か」を固定できないため。
+ *   ※ 来場者数(ニコ生公式「来場 N人」)は PV 的な延べアクセスで無言の通りすがり込み=userId が
+ *      取れず、ここには来ない。来場者数は席ではなく背景群衆 Canvas の密度で表現する(別レイヤー)。
+ *
+ * 【方針の変遷・⚠️ 古い理解で誤らないため明記】
+ *   - 2026-06-13 旧方針「匿名はアリーナじゃない=名前のある人だけ席・匿名は観客に集約」← 【撤回済み】
+ *   - 2026-06-14 「匿名も userId があれば席に座らせる(満員感)」で上の旧方針を撤回
+ *   - 2026-06-17 「アクティブユーザー(アクションした人)は匿名/非匿名問わず全員着席」で確定
+ *   旧方針(2026-06-13)を前提にしたコメントは全て無効。本 JSDoc が現行の正本。
+ * ───────────────────────────────────────────────────────────────────────────
+ *
+ * キーは userId があれば `u:${userId}`(再接続でも同一人物・同名の別人も区別)、無ければ `n:${name}`。
  *
  * @param {{ userId?: string, name?: string }} row 正規化済み行(normalizeComeviewRow 形)
  * @param {(name: string) => boolean} [isGenericName] 汎用プレースホルダ名判定(comeviewRows から注入)
  * @param {Set<string>|null} [_promoteUserIds] (互換のため残置・現在は未使用)
- *   2026-06-14 方針変更で「userId があれば promote 有無に関わらずアリーナ」に。引数は呼び出し
- *   側互換のため残す(位置引数)。
- * @returns {string|null} アリーナ席のキー、または匿名/無名なら null
+ *   2026-06-14 以降「userId があれば promote 有無に関わらず着席」なので promote 判定は不要。
+ *   引数は呼び出し側の位置引数互換のため残す。
+ * @returns {string|null} 席キー(`u:${uid}` か `n:${name}`)、または userId も識別名も無い行は null
  */
 export function venueParticipantKey(row, isGenericName, _promoteUserIds) {
   if (!row || typeof row !== 'object') return null;
   const uid = String(row.userId || '').trim();
-  // ユーザー方針(2026-06-14)「匿名もいれたほうが満員感が出る」: 
-  // 匿名(184)でも userId があればアリーナに座れるようにする。
-  // promoteUserIds に限らず userId があればキーを返す。
+  // 【正本】userId があれば匿名(184)でも必ず席に座らせる。アクティブユーザー=アクションした人は
+  //   匿名/非匿名問わず会場の主役(2026-06-17 確定)。promote 有無は問わない。
   if (uid) {
     return `u:${uid}`;
   }
+  // userId が無い行は name で救済を試みる。個人を識別できる名前があれば席に座らせる。
+  //   名前も無い/汎用名(匿名・名無し)は「誰か」を固定できないので席に座らせず null。
   const name = String(row.name || '').trim();
-  // 通常のアリーナ資格は「個人を識別できる名前があること」。名前が無い/汎用名はアリーナに座らない。
   if (!name) return null;
   if (typeof isGenericName === 'function' && isGenericName(name)) return null;
-  return uid ? `u:${uid}` : `n:${name}`;
+  return `n:${name}`;
 }
 
 /**
@@ -505,21 +531,27 @@ export function countAnonymousParticipants(rows, isGenericName, promoteUserIds, 
   return anonUids.size + (hasUidlessAnon ? 1 : 0);
 }
 
-/** 観客席に「顔つきで」並べる匿名の最大人数(これ超は人数テキストで補う)。性能上限。 */
+/** 観客席に「顔つきで」並べる超過アクティブユーザーの最大人数(これ超は人数テキストで補う)。性能上限。 */
 export const VENUE_AUDIENCE_FACE_MAX = 120;
 
 /**
- * 観客席にゆっくり顔で並べる匿名参加者の userId 一覧を返す純関数。
+ * 「観客席」に顔つきで並べる参加者の userId 一覧を返す純関数。
  *
- * 仕上げ会議の確定2「匿名も観客席に顔つきで」: アリーナ(名前付き)に座らない匿名でも
- * userId があれば anonymousIdenticonDataUrl(userId) でゆっくり顔を出せる。観客席を顔なし
- * ドットでなく顔つきにする。ただし全員(数千)は重いので最大 cap、超過は人数テキストで補う。
- * 直近にしゃべった順(capturedAt 降順)で cap 内に入れる=最近の人を優先表示。
+ * 【観客席の意味・2026-06-17 確定】アクティブユーザー(コメント/ギフト/広告でアクションした人・
+ *   匿名/非匿名問わず)は全員アリーナ席が本来の居場所。ここで扱う「観客」は【1画面に表示した席
+ *   (visibleSeats)に入りきらなかったアクティブユーザー】= excludeKeys に渡された「実際に画面表示した
+ *   席のキー」を除いた残り。1画面の表示席数は画面幅×段数(最大8段)で決まり、論理上限150席とは別に
+ *   さらに間引かれることがある(venueBar の resolveVisibleArenaCount/selectStableVisibleMembers)。
+ *   ⚠️ ここで言う「観客」は来場者数(PV・無言視聴者)とは無関係。来場者数は背景群衆 Canvas で別途表現。
+ *
+ * 顔つき表示: userId があれば anonymousIdenticonDataUrl(userId)/アカウントアイコンで顔を出す。
+ *   全員(数千)は重いので最大 cap(max)、超過は totalAnonymous の人数テキストで補う。
+ *   直近にアクションした順(capturedAt 降順)で cap 内に入れる=最近の人を優先表示。
  *
  * @param {Array<Record<string, unknown>>} rows 正規化済み発言行
  * @param {{ isGenericName?: (name: string) => boolean, max?: number, promoteUserIds?: Set<string>|null, excludeKeys?: Set<string>|null }} [opts]
  * @returns {{ faceUserIds: string[], totalAnonymous: number }}
- *   faceUserIds=顔を出す匿名 userId(最大 max・直近順) / totalAnonymous=匿名総数(テキスト用)
+ *   faceUserIds=顔を出す超過アクティブ userId(最大 max・直近順) / totalAnonymous=観客席の総数(テキスト用)
  */
 export function collectAudienceFaceUserIds(rows, opts = {}) {
   const list = Array.isArray(rows) ? rows : [];

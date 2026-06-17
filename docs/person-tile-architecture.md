@@ -1,0 +1,82 @@
+# 人物タイル経路 設計マインドマップ（正本・手書き）
+
+> 設計意図の正本。`docs/feature-map/`(自動生成・import グラフ)とは別物で、こちらは「なぜこうなっているか・誰が正本か・方針の変遷」を人間も AI も誤らないために手書きで保つ。
+> 関連: [council/person-tile-unify-SYNTHESIS.md](../council/person-tile-unify-SYNTHESIS.md)（会議統合）/ [docs/feature-map/venue.md](feature-map/venue.md)・[popup.md](feature-map/popup.md)（自動生成の依存図）
+> 最終更新 2026-06-17。
+
+## これは何
+ニコ生視聴者を表す「丸いサムネイル（人物タイル）」が、popup の応援アイコン列と会場モードの席で、どう同じデータから描かれるか。「popup に出るのに会場に出ない」を二度と起こさないための正本図。
+
+## 用語の正本（取り違え厳禁）
+
+| 用語 | 定義 | 会場での扱い | データ源 |
+|---|---|---|---|
+| **アクティブユーザー** | コメント/ギフト/広告(貢献)でアクションし、userId が観測できた人。**匿名(a:xxx)/非匿名は無関係** | **全員、席に座る**（顔が見える） | 記録コメント行(userId 付き) |
+| **来場者数(PV)** | ニコ生公式「来場 N人」。延べアクセス・同じ人の入り直し・無言の通りすがり込み | 席には出せない（userId 取れない）→**背景群衆 Canvas の密度**で表現 | 公式値(NDGR/DOM) |
+| **ほか観客 N人** | アクティブユーザーのうち、1画面に表示した席(visibleSeats)に入りきらなかった分 | 観客席にゆっくり顔 or 人数テキスト | rows − visibleSeatKeys |
+
+⚠️ **「会場参加者 N人」(席=アクティブ) と「来場 N人」(PV) は全く別物**。混同しない。無言視聴者一覧は NDGR で取れないのが原理的制約（venueSeats.js 冒頭・Codex 指摘）。
+
+## データフロー（正本）
+
+```mermaid
+flowchart TD
+  REC["記録コメント行(userId付き)<br/>withUid ほぼ100%"]
+  AGG["userLaneCandidatesFromStorage()<br/>【唯一の集約正本・popup/venue共通】<br/>userId単位: nickname/avatarUrl/commentCount/giftCount"]
+  REC --> AGG
+
+  AGG -->|同じ集約結果を共有| POPUP
+  AGG -->|同じ集約結果を共有<br/>v0.1.789「鏡映」| VENUE
+
+  subgraph POPUP["popup 応援アイコン列"]
+    P1["renderStoryUserLane()<br/>popup-entry.js"]
+    P2["profileTier判定<br/>explainSupportGridDisplayTier"]
+    P3["段振り分け bucketStoryUserLanePicks<br/>link/gift/konta/tanu"]
+    P4["fillLaneTier()<br/>renderStoryUserLaneDom.js<br/>＝丸サムネタイルDOM生成"]
+    P1 --> P2 --> P3 --> P4
+  end
+
+  subgraph VENUE["会場モード(席)"]
+    V1["venueParticipantKey()<br/>【席資格の正本・venueSeats.js】<br/>userIdあれば匿名でも u:uid"]
+    V2["buildVenueSeating()<br/>150席上限+入れ替え制"]
+    V3["selectStableVisibleMembers<br/>1画面の表示間引き"]
+    V4["ひな壇DOM(別物の描画)"]
+    V5["吹き出し/読み上げ/ギフト投擲<br/>(venue専用・タイルに被せる)"]
+    V1 --> V2 --> V3 --> V4 --> V5
+  end
+
+  PV["来場者数(PV・無言込み)"] -->|席に出せない| CROWD["背景群衆 Canvas<br/>drawCrowdOnCanvas"]
+```
+
+## 正本ファイル（どれが「真実」か）
+
+| 役割 | 正本ファイル/関数 | 注意 |
+|---|---|---|
+| **集約(誰がレーン候補か)** | `userLaneCandidatesFromStorage()` | popup/venue 共通。commentCount/giftCount を既に userId 単位で持つ |
+| **席資格(誰が会場に座れるか)** | `venueParticipantKey()` (venueSeats.js) | userId あれば匿名も着席。座れない=null は「userIdも識別名も無い」1ケースだけ |
+| **popup タイルDOM生成** | `fillLaneTier()` (renderStoryUserLaneDom.js) | 丸サムネ+ID+名前のセル生成。将来 venue と共通化する切り出し候補 |
+| **席割り** | `buildVenueSeating()` (venueSeats.js) | 150席上限・入れ替え・安定席 |
+| **表示間引き** | `selectStableVisibleMembers` / `resolveVisibleArenaCount` (venueBar.js) | 1画面に収める数。ここで落ちた分が「ほか観客」 |
+| **来場者数の表現** | `drawCrowdOnCanvas` (crowdRasterizer.js) | 背景群衆。席とは別レイヤー |
+
+## 方針の変遷（⚠️ 古い理解で誤らないため）
+
+- **2026-06-13** 旧方針「匿名はアリーナじゃない＝名前のある人だけ席」← **撤回済み**
+- **2026-06-14** 「匿名も userId があれば席に座らせる(満員感)」で撤回
+- **2026-06-17** 「アクティブユーザー(アクションした人)は匿名/非匿名問わず全員着席」で確定。来場者数(PV)は背景群衆で別表現。
+
+→ venueSeats.js の `venueParticipantKey` JSDoc が現行正本。drift は `venueSeats.test.js` の「方針ドリフト検知」ブロックが固定（旧方針に戻すと落ちる）。
+
+## 「会場に出ない」の真因（実コードで確定・2026-06-17）
+
+席資格は匿名込みで全員候補。それでも popup と顔ぶれが食い違う原因は席資格より後ろ：
+1. **userId が乗らない DOM観測コメント** — 現行ニコ生がコメント行から `.comment-number`(番号セル)を外した(実DOM確証)。`parseNicoLiveTableRow`(nicoliveDom.js)が「番号+本文両方必須」で DOM観測コメントを全捨て→`visible:0`→userId が乗らず席にも出ない。【別タスクで番号必須を緩める・誤検知ガード必須】
+2. **席数150上限＋表示間引き**(visibleSeats) — 1画面に収まらない分が「ほか観客」へ
+3. **描画が別物**(popup タイル vs venue 席) — 将来 fillLaneTier を共通タイル部品に切り出して解消
+
+## 未実装(SYNTHESIS の段階導入)
+- 第1: `buildPersonProfilesFromRows`(userId に comments/gifts/ads 畳み込む純関数・書き込みゼロ)
+- 第2: 丸サムネタイルDOMビルダーを切り出し popup 置換
+- 第3: venue 席を同ビルダーに統一(顔ぶれ一致)
+- 第4: 来場者数の二層化(超過アクティブ vs PV)・「ほか観客」ラベル明確化
+- 別: `.comment-number` 消失で DOM観測全捨ての件

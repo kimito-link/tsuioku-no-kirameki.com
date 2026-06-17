@@ -44,6 +44,11 @@ import {
  *
  * true に戻すと v0.1.754 のストリーム駆動 roster へロールバック可(キルスイッチ温存)。
  * standalone(venue.html)は onLiveComments が来ないため元から false 扱い(rosterDriven=!isStandalone と合成)。
+ *
+ * 正本(2026-06-17): 会場の参加者データ源は popup 応援アイコン列(renderStoryUserLane)と同一の
+ *   純関数 userLaneCandidatesFromStorage。popup と会場の顔ぶれは一致するのが正(=この「鏡映」設計)。
+ *   席資格(誰が座れるか)の正本は venueSeats.js#venueParticipantKey(userId あれば匿名も着席)。
+ *   popup と会場で「誰を出すか」がズレたら、それは描画/表示間引き(visibleSeats)層のバグ=ここではない。
  */
 const VENUE_ROSTER_ENABLED = false;
 import { resolveDisplayRows } from '../lib/venueDisplayRows.js';
@@ -2448,8 +2453,10 @@ export function mountVenueBarButton(options = {}) {
     const visibleSeats = partitionThumbnailFirst(visibleSeatsRaw, seatHasRealThumb);
     const visibleSeatKeys = new Set(visibleSeats.map(entry => entry.participant.key));
 
-    // アリーナ席は名前付き + しゃべった匿名(promote)。それ以外の匿名は後方の観客席へ
-    // ゆっくり顔で表示し、上限超過分だけ人数で補う。
+    // 【2026-06-17 確定】アリーナ席=アクティブユーザー(コメント/ギフト/広告した人・匿名/非匿名問わず)。
+    //   userId があれば匿名でも venueParticipantKey が席キーを返す(席資格の正本は venueSeats.js)。
+    //   ここで数える「ほか観客」= 1画面に表示した席(visibleSeatKeys)に入りきらなかったアクティブ分。
+    //   来場者数(PV)とは別物(来場者は背景群衆 Canvas)。promoteUserIds は表示優先のヒントで席資格ではない。
     const { totalAnonymous } = collectAudienceFaceUserIds(rows, {
       isGenericName: isGenericComeviewName,
       promoteUserIds: spokenUserIds,
@@ -2461,6 +2468,9 @@ export function mountVenueBarButton(options = {}) {
       visibleSeats,
       audienceCount: totalAnonymous
     };
+    // TODO(person-tile-unify 第4コミット): 「ほか観客 N人」はユーザーに来場者数(PV)と取り違えられ
+    //   紛らわしい(2026-06-17 指摘)。本来は「席に表示しきれなかったアクティブ N人」。将来ラベルを
+    //   明確化し、来場者数(PV)は別途背景群衆で出す二層表示にする。今は挙動不変のため文言据え置き。
     title.textContent =
       totalAnonymous > 0
         ? `会場参加者 ${seating.participantCount}人 ・ ほか観客 ${totalAnonymous}人`
