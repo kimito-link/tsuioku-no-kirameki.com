@@ -14442,7 +14442,6 @@ async function maybeResolveNamedUserProfilesOnce() {
     const commentsKey = commentsStorageKey(lid);
     const giftsKey = giftUsersStorageKey(lid);
     const bag = await chrome.storage.local.get([
-      commentsKey,
       giftsKey,
       KEY_USER_COMMENT_PROFILE_CACHE,
       KEY_COMMENTER_FOLLOW_CACHE,
@@ -14455,7 +14454,10 @@ async function maybeResolveNamedUserProfilesOnce() {
     // フォロー/フォロワー横断キャッシュ（数値 uid キー・TTL 付き）。同じ nvapi 応答から拾う。
     const followMap = normalizeCommenterFollowMap(bag[KEY_COMMENTER_FOLLOW_CACHE]);
     const followNow = Date.now();
-    let comments = Array.isArray(bag[commentsKey]) ? bag[commentsKey] : [];
+    // v0.1.807: chunk モード対応。旧 main キー直読みだと chunk 配信で comments 空=候補ゼロで
+    //   profile(nickname/avatar)解決が走らない断線だった。readChunkedComments で chunk→main を読む。
+    const chunkRead = await readChunkedComments(lid, commentsKey, chunkGetMany);
+    let comments = Array.isArray(chunkRead?.rows) ? chunkRead.rows : [];
     const giftUsers = Array.isArray(bag[giftsKey]) ? bag[giftsKey] : [];
 
     /** @type {string[]} */
@@ -14592,12 +14594,15 @@ async function maybeFetchCommenterFollowBatchOnce() {
     _commenterFollowFetchLastAt = now;
 
     const commentsKey = commentsStorageKey(lid);
+    // v0.1.807: chunk モードでは旧 main キー(nls_comments_<lv>)は空=コメント者を拾えず profile/follow
+    //   fetch が一度も走らない断線だった。表示経路と同じ readChunkedComments(chunk→main フォールバック)
+    //   でコメントを読む(正本=council/profile-avatar-resolution-broken-SYNTHESIS.md)。
     const bag = await chrome.storage.local.get([
-      commentsKey,
       KEY_USER_COMMENT_PROFILE_CACHE,
       KEY_COMMENTER_FOLLOW_CACHE
     ]);
-    const comments = Array.isArray(bag[commentsKey]) ? bag[commentsKey] : [];
+    const chunkRead = await readChunkedComments(lid, commentsKey, chunkGetMany);
+    const comments = Array.isArray(chunkRead?.rows) ? chunkRead.rows : [];
     const profileMap = normalizeUserCommentProfileMap(bag[KEY_USER_COMMENT_PROFILE_CACHE]);
     const followMap = normalizeCommenterFollowMap(bag[KEY_COMMENTER_FOLLOW_CACHE]);
     const broadcasterUid = String(detectBroadcasterUserIdFromDom() || broadcasterUidCache || '').trim();
