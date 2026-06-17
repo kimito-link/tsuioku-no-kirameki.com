@@ -65,6 +65,7 @@ const steps = [
   ['build', 'build'],
   ['tree-map', 'tree-map:check'],
   ['site-health', 'site-health:check'],
+  ['feature-map', 'feature-map:check'],
   ['verify:bump', 'verify:bump']
 ];
 

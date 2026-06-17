@@ -22,12 +22,13 @@ graph LR
   n_popup --> n_src_domain_lane_columns_tanuPolicy_js["domain/lane/columns/tanuPolicy.js"]
   n_popup --> n_src_domain_lane_tier_js["domain/lane/tier.js"]
   n_popup --> n_src_domain_user_avatar_js["domain/user/avatar.js"]
-  n_popup --> n_src_domain_user_identity_js["domain/user/identity.js"]
+  n_popup --> n_src_domain_user_identity_js["domain/user/identity.js"]:::shared
   n_popup --> n_src_domain_user_nickname_js["domain/user/nickname.js"]
   n_popup --> n_src_extension_story_renderStoryUserLaneDom_js["extension/story/renderStoryUserLaneDom.js"]
   n_popup --> n_src_lib_acquisitionDashboardChart_js["lib/acquisitionDashboardChart.js"]
   n_popup --> n_src_lib_aiShareDiagSchema_js["lib/aiShareDiagSchema.js"]
   n_popup --> n_src_lib_aiShareFastDiagKey_js["lib/aiShareFastDiagKey.js"]:::shared
+  n_popup --> n_src_lib_aiSharePopupDiagKey_js["lib/aiSharePopupDiagKey.js"]:::shared
   n_popup --> n_src_lib_anonymousIdenticon_js["lib/anonymousIdenticon.js"]:::shared
   n_popup --> n_src_lib_audienceEngagementGap_js["lib/audienceEngagementGap.js"]
   n_popup --> n_src_lib_auditionEventRankingApi_js["lib/auditionEventRankingApi.js"]:::shared
@@ -52,8 +53,7 @@ graph LR
   n_popup --> n_src_lib_broadcasterProfileCard_js["lib/broadcasterProfileCard.js"]:::shared
   n_popup --> n_src_lib_buildNorthStarAdRankingStatsHtml_js["lib/buildNorthStarAdRankingStatsHtml.js"]
   n_popup --> n_src_lib_buildWatchMetaCardAudienceViewModel_js["lib/buildWatchMetaCardAudienceViewModel.js"]
-  n_popup --> n_src_lib_capCommentsForAnalytics_js["lib/capCommentsForAnalytics.js"]
   classDef shared fill:#eee,stroke:#999,color:#666;
 ```
 
-> ほか 233 ファイル省略（全件は storage-bus.md / metafile 参照）。
+> ほか 241 ファイル省略（全件は storage-bus.md / metafile 参照）。
