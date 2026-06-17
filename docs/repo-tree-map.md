@@ -99,6 +99,9 @@ graph LR
   f15 --> f15_0["lib/monotonicCommentCount.js"]
   HUB --> f16["storage キー定義"]
   f16 --> f16_0["lib/storageKeys.js"]
+  HUB --> f17["AI診断の状態速報集約"]
+  f17 --> f17_0["lib/aiSharePopupDiagKey.js"]
+  f17 --> f17_1["extension/status-entry.js"]
 ```
 
 ---
@@ -143,14 +146,14 @@ graph LR
 - `xserver/`（2 件） — Xserver 向け webhook(git pull デプロイ)スクリプト  〔デプロイ / webhook〕
 
 ## `src/` — LP 側 + 純粋関数ライブラリの源  〔ソース〕
-<sub>ファイル 1079 件</sub>
+<sub>ファイル 1081 件</sub>
 
 - `data/`（6 件） — 保存コメントからレーン候補を読む acquirer / source 層  〔コメント / 取得〕
 - `domain/`（18 件） — ドメイン正本(応援レーンの集約・列ポリシー等。識別子判定など)  〔応援 / 集約 / 識別子〕
 - `extension/`（11 件） — バンドル entry(content/popup/venue/status/offscreen/backfill-sw 等=機能境界)  〔entry / 記録 / 会場 / 応援〕
 - `fixtures/`（1 件） — テスト用フィクスチャ  〔テスト〕
 - `images/`（165 件） — LP / CWS 提出物のマスター画像  〔画像〕
-- `lib/`（869 件） — 純粋関数ライブラリ(unit test 対象)。色・速度・コメント・レポート等の計算ロジックの大半  〔色 / 速度 / コメント / レポート / 純粋関数〕
+- `lib/`（871 件） — 純粋関数ライブラリ(unit test 対象)。色・速度・コメント・レポート等の計算ロジックの大半  〔色 / 速度 / コメント / レポート / 純粋関数〕
 - `shared/`（7 件） — 複数機能で共有する小部品(アバター URL ガード等)  〔共有 / アバター〕
 - `sound/`（1 件） — 音声素材(src 側)  〔音声〕
 
@@ -267,6 +270,12 @@ per-live ゲートで記録件数の表示が後退しないようにする
 chrome.storage のキー名の正本(nls_comments_<lv> 等)
 
 - [`src/lib/storageKeys.js`](../src/lib/storageKeys.js)
+
+### AI診断の状態速報集約  〔診断 / レポート / 集約〕
+popup の AI診断コピー固有情報を別キーへ書き、status.html(状態速報)の AI共有まとめに集約。status を見れば全部わかる
+
+- [`src/lib/aiSharePopupDiagKey.js`](../src/lib/aiSharePopupDiagKey.js)
+- [`src/extension/status-entry.js`](../src/extension/status-entry.js)
 
 ---
 
