@@ -9,7 +9,8 @@
  *
  * データソース(全て chrome.storage.local の既存キー・触らない):
  *   - nls_panel_summary_<lv>       軽量サマリ(主要データ)
- *   - nls_ai_share_fast_diag_v1    fastDiag キャッシュ(視聴中 lives 列挙)
+ *   - nls_ai_share_fast_diag_v1    fastDiag キャッシュ(視聴中 lives 列挙・content 由来)
+ *   - nls_ai_share_popup_diag_v1   popup 固有診断(AI診断コピー由来・popup を開くと更新)
  *   - nls_last_watch_url           最後に視聴した URL(フォールバック)
  *
  * 自動更新:
@@ -21,6 +22,7 @@
  */
 
 import { KEY_AI_SHARE_FAST_DIAG } from '../lib/aiShareFastDiagKey.js';
+import { KEY_AI_SHARE_POPUP_DIAG } from '../lib/aiSharePopupDiagKey.js';
 import {
   buildOverviewText,
   buildLiveBlockText,
@@ -158,13 +160,15 @@ async function refresh(opts = {}) {
     const summaries = await runStorageOpWithTimeout(() => loadAllSummaries(lvList), tmo);
     step = 'loadFastDiagSafe';
     const fastDiag = await runStorageOpWithTimeout(() => loadFastDiagSafe(), tmo);
+    step = 'loadPopupDiagSafe';
+    const popupDiag = await runStorageOpWithTimeout(() => loadPopupDiagSafe(), tmo);
     step = 'loadBackfillProgress';
     const backfillProgress = await runStorageOpWithTimeout(
       () => loadBackfillProgressSafe(),
       tmo
     );
     step = 'renderAll';
-    renderAll({ lvList, summaries, fastDiag, backfillProgress });
+    renderAll({ lvList, summaries, fastDiag, popupDiag, backfillProgress });
     updateLastUpdateMeta();
     _statusLastErrorText = '';
   } catch (err) {
@@ -304,6 +308,17 @@ async function loadFastDiagSafe() {
   }
 }
 
+// 2026-06-18: popup の AI診断コピーにしか無い popup 固有診断(別キー)を読む。
+//   popup を開いたときだけ更新される=古いことがあるので persistedAt を併記して集約する。
+async function loadPopupDiagSafe() {
+  try {
+    const bag = await chrome.storage.local.get(KEY_AI_SHARE_POPUP_DIAG);
+    return bag?.[KEY_AI_SHARE_POPUP_DIAG] || null;
+  } catch {
+    return null;
+  }
+}
+
 /**
  * v0.1.659: 過去ログ取得の診断(stopReason)を読む。「一気に取れない・50%停止」の真因を
  *   ユーザーが status を開くだけで AI に共有できるように、どの配信が何の理由で止まったかを表示。
@@ -332,7 +347,7 @@ async function loadBackfillProgressSafe() {
  * レンダリング
  * ========================================================================== */
 
-function renderAll({ lvList, summaries, fastDiag, backfillProgress }) {
+function renderAll({ lvList, summaries, fastDiag, popupDiag, backfillProgress }) {
   const livesData = lvList.map((lv) =>
     summarizeOneLive(
       lv,
@@ -421,7 +436,7 @@ function renderAll({ lvList, summaries, fastDiag, backfillProgress }) {
   }
 
   // AI 共有用テキスト
-  const fullText = buildAiShareFullText({ overviewText, livesData, fastDiag });
+  const fullText = buildAiShareFullText({ overviewText, livesData, fastDiag, popupDiag });
   const ta = /** @type {HTMLTextAreaElement|null} */ (
     document.getElementById('aiShareText')
   );
@@ -545,7 +560,7 @@ function summarizeOneLive(lv, summary, snapshot, perfDiag, endedFlag) {
   };
 }
 
-function buildAiShareFullText({ overviewText, livesData, fastDiag }) {
+function buildAiShareFullText({ overviewText, livesData, fastDiag, popupDiag }) {
   const lines = [];
   lines.push('## 君斗りんくの追憶のきらめき 状態速報');
   lines.push(`生成: ${new Date().toISOString()}`);
@@ -573,6 +588,34 @@ function buildAiShareFullText({ overviewText, livesData, fastDiag }) {
     lines.push('{}');
   }
   lines.push('```');
+
+  // 2026-06-18: popup の AI診断コピーにしか無い popup 固有診断を集約(別キー由来)。
+  //   popup を開いたときだけ更新される=古いことがあるので persistedAt と経過を明示する。
+  if (popupDiag && typeof popupDiag === 'object') {
+    lines.push('');
+    lines.push('### popup 固有診断 (AI診断コピー由来)');
+    const persistedAt = String(popupDiag.persistedAt || '').trim();
+    if (persistedAt) {
+      const ageMs = Date.now() - Date.parse(persistedAt);
+      const ageStr = Number.isFinite(ageMs)
+        ? `(約${Math.max(0, Math.round(ageMs / 1000))}秒前にpopupで取得)`
+        : '';
+      lines.push(`取得時刻: ${persistedAt} ${ageStr}`);
+    } else {
+      lines.push('取得時刻: 不明(popup を一度開くと更新されます)');
+    }
+    lines.push('```json');
+    try {
+      lines.push(JSON.stringify(popupDiag.popup ?? popupDiag, null, 2));
+    } catch {
+      lines.push('{}');
+    }
+    lines.push('```');
+  } else {
+    lines.push('');
+    lines.push('### popup 固有診断 (AI診断コピー由来)');
+    lines.push('未取得。ニコ生 watch を開いた状態で拡張ポップアップの「AI診断コピー」を一度押すと、ここに集約されます。');
+  }
   return lines.join('\n');
 }
 
