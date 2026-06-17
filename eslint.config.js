@@ -71,7 +71,7 @@ export default [
   },
   {
     files: ['src/extension/content-entry.js'],
-    rules: { 'max-lines': ['error', { max: 17297, skipBlankLines: false, skipComments: false }] }
+    rules: { 'max-lines': ['error', { max: 17267, skipBlankLines: false, skipComments: false }] }
   },
   {
     files: ['extension/background.js'],
