@@ -101,7 +101,7 @@ export function resolveVisibleArenaCount(opts) {
 
 /**
  * 観客席(顔の帯)に同時に並べる顔数を決める。
- * 映像を覆わないよう「1〜2行に収まる数」に厳しく絞る。残りは「ほか観客 N 人」へ。
+ * 映像を覆わないよう「1〜2行に収まる数」に厳しく絞る。残りは会場ヘッダーの「ほか N 人」へ。
  * @param {object} opts
  * @param {number} opts.totalFaces 顔つき観客の候補数
  * @param {number} opts.perRow 1行に収まる顔数
