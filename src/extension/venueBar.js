@@ -1026,6 +1026,25 @@ const VENUE_CSS = `
   .nlsb-bubble.nlsb-is-leaving {
     opacity: 0;
   }
+  /* v0.1.800「吹き出しと読み上げを同時に立ち上げる」(会議 案C・2段階表示):
+     読み上げONのとき、声が鳴り始める前は「仮(淡い・少し小さい)」で出し、onAudioStart で
+     仮 class を外す瞬間に「本(鮮明・等倍)」へ瞬時昇格=声と同時に立ち上がった体感を作る。
+     声非依存(v0.1.757)は不変: 仮でも必ず即出る・声が来なければ仮のまま流速寿命で消える。
+     transition は短く(120ms)=「遅延」と感じない範囲で昇格のメリハリだけ付ける。 */
+  .nlsb-bubble.nlsb-bubble-previoice {
+    opacity: 0.78;
+    transform: translateY(-100%) scale(0.965);
+    transform-origin: bottom center;
+    transition:
+      opacity 120ms ease,
+      transform 120ms ease;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .nlsb-bubble.nlsb-bubble-previoice {
+      transform: translateY(-100%);
+      transition: none;
+    }
+  }
   /* v0.1.773 軽い同期: 読み上げが鳴り始めた瞬間に一度だけ淡く光らせ「声＝この吹き出し」を結ぶ。
      上品に1回だけ(派手すぎ厳禁)。即時表示は変えない=即時性は維持。 */
   .nlsb-bubble.nlsb-bubble-voiced {
@@ -1898,6 +1917,9 @@ export function mountVenueBarButton(options = {}) {
     // 初期(pending)の寿命。読み上げONなら合成遅れに備えて床(BUBBLE_PENDING_VOICE_FLOOR_MS)を効かせ、
     //   「声が鳴り始める前に流速寿命で消える」隙間を塞ぐ。speaking になればこのタイマーは解除される。
     scheduleBubbleFade(bubble, resolvePendingLifetimeMs(lifetimeMs, voicePlayer.enabled));
+    // v0.1.800 案C: 読み上げONのときだけ「仮(previoice)」見た目で出す(声が鳴り始めたら本表示へ昇格)。
+    //   読み上げOFF/VOICEVOX無しのときは付けない=従来どおり最初から鮮明(声非依存・v0.1.757 不変)。
+    if (voicePlayer.enabled) element.classList.add('nlsb-bubble-previoice');
     return bubble;
   };
 
@@ -1937,6 +1959,9 @@ export function mountVenueBarButton(options = {}) {
     if (bubble.fadeTimer) { clearTimeout(bubble.fadeTimer); bubble.fadeTimer = 0; }
     if (bubble.removeTimer) { clearTimeout(bubble.removeTimer); bubble.removeTimer = 0; }
     bubble.element.classList.remove('nlsb-is-leaving');
+    // v0.1.800 案C: 声が鳴り始めた瞬間に「仮(previoice)」を外して「本(鮮明・等倍)」へ瞬時昇格
+    //   =声と同時に立ち上がった体感。あわせて一度だけ淡く光らせる(v0.1.773 voiced)。
+    bubble.element.classList.remove('nlsb-bubble-previoice');
     // v0.1.773 軽い同期: 声が鳴り始めた瞬間に吹き出しを一度だけ強調(視聴覚を結びつけ「同時」と
     //   感じさせる)。吹き出しは即時のまま=即時性は犠牲にしない(会議の(A)全面同期は不採用)。
     bubble.element.classList.add('nlsb-bubble-voiced');
@@ -1956,6 +1981,8 @@ export function mountVenueBarButton(options = {}) {
     if (!bubble || bubble.removed) return;
     const next = nextBubbleVoiceState(bubble.voiceState, 'audioEnd');
     bubble.voiceState = next;
+    // v0.1.800 案C: 念のため仮(previoice)を外す(pending のまま audioEnd 取りこぼし経路でも鮮明に)。
+    bubble.element.classList.remove('nlsb-bubble-previoice');
     if (bubble.speakingCapTimer) { clearTimeout(bubble.speakingCapTimer); bubble.speakingCapTimer = 0; }
     if (next === 'done') scheduleBubbleFade(bubble, BUBBLE_VOICE_AFTERGLOW_MS);
   };
@@ -1972,6 +1999,9 @@ export function mountVenueBarButton(options = {}) {
     const next = nextBubbleVoiceState(bubble.voiceState, 'resolved');
     if (next === bubble.voiceState) return; // speaking/done/unvoiced は変化なし
     bubble.voiceState = next; // pending → unvoiced
+    // v0.1.800 案C: 鳴らないと確定したら「仮(previoice)」を外して鮮明に戻す(淡いまま消えると
+    //   「読まれなかったから薄いまま」に見えて不自然。鳴らないコメントも普通の吹き出しとして見せる)。
+    bubble.element.classList.remove('nlsb-bubble-previoice');
     // 流速寿命(=showSpeechBubble 当初の lifetimeMs)で消す。床(pending floor)は使わない。
     const flow = typeof bubble.flowLifetimeMs === 'number' && bubble.flowLifetimeMs > 0
       ? bubble.flowLifetimeMs

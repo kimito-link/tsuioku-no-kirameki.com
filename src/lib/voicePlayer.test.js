@@ -139,6 +139,27 @@ describe('VoicePlayer', () => {
     if (resolveSynth) resolveSynth(null);
   });
 
+  it('v0.1.800: enqueue した瞬間に合成を即起動する(Δ短縮・吹き出しと同時化)', async () => {
+    let resolveSynth;
+    const synth = vi.fn(() => new Promise((r) => { resolveSynth = r; }));
+    player.fetchSynthesizeVoice = synth;
+    await player.enable({ persist: false });
+    synth.mockClear(); // enable 後に enqueue ぶんだけ数える
+    player.enqueue([{ kind: 'comment', userId: 'p1', nickname: 'P', text: 'はやく合成して' }]);
+    // drain の setTimeout を待たずに、enqueue 内の即時 prefetch で合成が起動していること。
+    expect(synth).toHaveBeenCalled();
+    if (resolveSynth) resolveSynth(null);
+  });
+
+  it('v0.1.800: kickPrefetch は読み上げOFFなら何もしない(暴走/無駄合成しない)', async () => {
+    const synth = vi.fn().mockResolvedValue(new ArrayBuffer(8));
+    player.fetchSynthesizeVoice = synth;
+    // enable していない(=disabled)。queue に直接積んでも kickPrefetch は no-op。
+    player.queue = [{ userKey: 'x', name: '', body: 'y', count: 1, enqueuedAt: Date.now(), priority: 'normal' }];
+    player.kickPrefetch();
+    expect(synth).not.toHaveBeenCalled();
+  });
+
   it('v0.1.773: flushPendingQueue は待機中キューを破棄し件数を返す(長時間ラグ対策)', async () => {
     // 合成を保留させて drain を止め、キューに溜める。
     let resolveSynth;
