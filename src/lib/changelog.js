@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.805',
+    date: '2026-06-17',
+    summary: '状態のローカル保存ダイアログ連発を停止',
+    items: Object.freeze([
+      'JSONファイル(status-latest.json)の保存ダイアログが勝手に何度も出る不具合を直しました。原因は、開発担当が状態を確認するためのローカル保存機能(v0.1.798)を既定オンで動かしていたため、お使いの環境のChrome設定(各ファイルの保存場所を毎回確認する等)で1分ごとに保存ダイアログが出ていたことです。裏方の確認機能が操作を妨げるのは本末転倒なので、この自動保存を既定オフ(必要なときだけ手動で有効化)に格下げしました。これでダイアログは出なくなります。記録やバックアップには一切影響しません'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.804',
     date: '2026-06-17',
     summary: '記録件数がまた減るのを根治',
