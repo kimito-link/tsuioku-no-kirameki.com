@@ -1,0 +1,254 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <title>フェーズ・状態色・依存ゲートで設計の正本を描く ― AI と人間が同じ図を見て手戻りを防ぐ ― 君斗りんくの追憶のきらめき</title>
+
+    <link rel="icon" href="../images/favicon.ico" sizes="any">
+    <link rel="icon" type="image/png" sizes="32x32" href="../images/favicon-32.png">
+
+    <meta name="description" content="段階導入のタスクを、フェーズ番号・状態色（完了／ブロッカー／凍結／仮説）・依存ゲート（この前提が崩れると以降が無駄）で 1 枚の図に正本化する手法。AI エージェントと人間が同じ図を参照することで、誤った前提に基づく手戻りを構造的に防ぐ。実際に『前提が実機で覆り後続実装を凍結できた』事例を併記。">
+    <meta name="theme-color" content="#f7f1e7">
+    <meta name="robots" content="index,follow">
+    <link rel="canonical" href="https://tsuioku-no-kirameki.com/articles/phase-gate-flow-canon.html">
+
+    <meta property="og:type" content="article">
+    <meta property="og:url" content="https://tsuioku-no-kirameki.com/articles/phase-gate-flow-canon.html">
+    <meta property="og:title" content="フェーズ・状態色・依存ゲートで設計の正本を描く ― AI と人間が同じ図を見て手戻りを防ぐ">
+    <meta property="og:description" content="段階導入タスクをフェーズ番号・状態色・依存ゲートで 1 枚の図に正本化し、AI と人間が同じ図で手戻りを防ぐ手法。">
+    <meta property="og:site_name" content="君斗りんくの追憶のきらめき">
+    <meta property="og:locale" content="ja_JP">
+    <meta property="article:published_time" content="2026-06-18T00:00:00+09:00">
+    <meta property="article:author" content="君斗りんく / Kimito-Link Project">
+
+    <script type="application/ld+json">
+      {"@context":"https://schema.org","@type":"TechArticle","headline":"フェーズ・状態色・依存ゲートで設計の正本を描く ― AI と人間が同じ図を見て手戻りを防ぐ","datePublished":"2026-06-18","dateModified":"2026-06-18","author":{"@type":"Organization","name":"Kimito-Link Project","url":"https://kimito-link.com/"},"publisher":{"@type":"Organization","name":"Kimito-Link Project","url":"https://kimito-link.com/"},"url":"https://tsuioku-no-kirameki.com/articles/phase-gate-flow-canon.html","inLanguage":"ja-JP","license":"https://opensource.org/licenses/MIT"}
+    </script>
+
+    <style>
+      :root{--bg1:#f7f1e7;--bg2:#e8dac4;--paper:rgba(255,251,245,.94);--ink:#2c2117;--muted:#4f4338;--line:rgba(88,62,28,.12);--gold:#c98e2b;--blue:#255d9b;--brown:#8a3d19;--shadow:0 18px 44px rgba(70,49,20,.12);--r2:24px;--r3:18px;--maxw:880px;--space-sm:16px;--space-md:24px;--space-lg:32px;--space-xl:48px;--space-2xl:64px;--shell-pad:16px;--lh-body:1.82;--lh-heading:1.22;--anchor-offset:56px;--code-bg:rgba(45,33,23,.05);}
+      @media (min-width:480px){:root{--shell-pad:clamp(16px,3.2vw,28px)}}
+      *{box-sizing:border-box}html{scroll-behavior:smooth;overflow-x:hidden}
+      body{margin:0;color:var(--ink);font-family:"BIZ UDPGothic","Hiragino Sans","Yu Gothic UI",sans-serif;line-height:var(--lh-body);background:radial-gradient(ellipse 70% 48% at 98% 4%,rgba(255,210,228,.35),transparent 46%),radial-gradient(circle at top right,rgba(132,184,207,.4),transparent 28%),linear-gradient(180deg,var(--bg1),#f1e7da 46%,var(--bg2));min-height:100vh}
+      a{color:var(--blue);text-underline-offset:3px}a:hover{color:var(--brown)}
+      .shell{width:min(calc(100% - 2 * var(--shell-pad)),var(--maxw));margin:0 auto}
+      .topbar{position:sticky;top:0;z-index:50;background:rgba(250,244,235,.88);backdrop-filter:blur(16px);border-bottom:1px solid rgba(88,62,28,.07);}
+      .topbar-inner{display:flex;justify-content:space-between;align-items:center;gap:12px;min-height:44px;padding:8px 0}
+      .topbar__logo{display:flex;align-items:center;text-decoration:none;color:inherit}
+      .topbar__logo img{height:34px;width:auto}
+      .topbar__back{display:inline-flex;align-items:center;gap:6px;padding:8px 14px;border-radius:999px;font-size:.85rem;font-weight:600;text-decoration:none;color:var(--ink);background:rgba(255,252,247,.94);border:1px solid var(--line);}
+      .topbar__back:hover{background:#fff;border-color:rgba(88,62,28,.22);color:var(--brown)}
+      header.page{padding:var(--space-xl) 0 var(--space-lg)}
+      header.page .breadcrumb{font-size:.82rem;color:var(--muted);margin:0 0 var(--space-sm)}
+      header.page .breadcrumb a{color:var(--muted)}
+      header.page h1{font-size:clamp(1.55rem,4.2vw,2.15rem);line-height:var(--lh-heading);margin:0 0 var(--space-sm);color:#1a1208}
+      header.page .lead{color:var(--muted);font-size:1rem;margin:0 0 var(--space-md)}
+      header.page .meta{font-size:.84rem;color:var(--muted);display:flex;flex-wrap:wrap;gap:14px;padding:var(--space-sm) 0;border-top:1px solid var(--line);border-bottom:1px solid var(--line);}
+      header.page .meta strong{color:var(--ink)}
+      main{padding-bottom:var(--space-2xl)}
+      section.box{background:var(--paper);border:1px solid var(--line);border-radius:var(--r2);padding:var(--space-lg);margin:0 0 var(--space-lg);box-shadow:var(--shadow);scroll-margin-top:var(--anchor-offset);}
+      section.box h2{font-size:1.2rem;margin:0 0 var(--space-md);color:#1a1208}
+      section.box h2 .num{display:inline-block;min-width:1.8em;color:var(--gold);font-weight:800;margin-right:.2em}
+      section.box h3{font-size:1rem;margin:var(--space-md) 0 8px;color:var(--ink);font-weight:700}
+      section.box p{margin:0 0 var(--space-sm)}
+      section.box ul,section.box ol{margin:0 0 var(--space-sm);padding-left:1.4em}
+      section.box li{margin-bottom:6px}section.box li::marker{color:var(--gold)}
+      nav.toc{background:rgba(255,251,245,.72);border:1px solid var(--line);border-radius:var(--r3);padding:16px 20px;margin:0 0 var(--space-lg)}
+      nav.toc h2{font-size:.95rem;margin:0 0 8px;color:var(--muted);font-weight:700}
+      nav.toc ol{margin:0;padding-left:1.6em;font-size:.92rem;line-height:1.65}
+      nav.toc a{text-decoration:none;color:var(--ink)}nav.toc a:hover{color:var(--brown);text-decoration:underline}
+      .digest{padding:18px 22px;border-radius:var(--r3);background:linear-gradient(160deg,rgba(243,170,37,.1),rgba(15,94,79,.06));border:1px solid var(--line);margin:0 0 var(--space-lg)}
+      .digest h3{margin:0 0 6px;font-size:1rem;color:var(--ink)}
+      .digest ul{margin:0;padding-left:1.4em}.digest li{margin-bottom:4px;font-size:.94rem}
+      .note{font-size:.86rem;color:var(--muted);background:rgba(255,255,255,.55);border-left:3px solid var(--gold);padding:10px 14px;border-radius:8px;margin:var(--space-sm) 0}
+      .note b{color:var(--brown);font-weight:700}
+      code,kbd{font-family:"Menlo","Consolas",monospace;font-size:.92em;background:var(--code-bg);padding:1px 6px;border-radius:4px}
+      pre.code{margin:var(--space-sm) 0;padding:14px 18px;background:#1f1d1a;color:#e8e0d2;border-radius:var(--r3);overflow-x:auto;font-family:"Menlo","Consolas",monospace;font-size:.84rem;line-height:1.6;border:1px solid rgba(0,0,0,.3)}
+      pre.code code{background:transparent;padding:0;color:inherit;font-size:1em}
+      pre.code .kw{color:#ff9d6c}.fn{color:#a8d8ff}.str{color:#b6e0a0}.num{color:#d6b8ff}.cm{color:#7d8694;font-style:italic}
+      table.cmp{width:100%;border-collapse:collapse;margin:var(--space-sm) 0;font-size:.88rem}
+      table.cmp th,table.cmp td{border:1px solid var(--line);padding:8px 10px;text-align:left;vertical-align:top}
+      table.cmp th{background:rgba(243,170,37,.08);font-weight:700;color:var(--ink)}
+      .flow{display:flex;flex-direction:column;gap:10px;margin:var(--space-sm) 0}
+      .pcard{border-radius:14px;padding:12px 16px;border:1.5px solid var(--line);background:rgba(255,253,248,.85)}
+      .pcard .pt{font-weight:700;margin:0 0 4px;font-size:.98rem}
+      .pcard .pd{margin:0;font-size:.88rem;color:var(--muted);line-height:1.6}
+      .pcard.ok{background:rgba(15,94,79,.1);border-color:rgba(15,94,79,.4)}
+      .pcard.block{background:rgba(149,43,42,.1);border-color:rgba(149,43,42,.45)}
+      .pcard.freeze{background:rgba(37,93,155,.1);border-color:rgba(37,93,155,.4)}
+      .pcard.opp{background:rgba(201,142,43,.12);border-color:rgba(201,142,43,.5)}
+      .gate{text-align:center;color:var(--muted);font-size:.82rem;line-height:1.3}
+      .gate .arr{font-size:1.1rem;color:#952b2a}
+      footer.page{margin-top:var(--space-xl);padding:var(--space-lg) 0 var(--space-2xl);text-align:center;font-size:.85rem;color:var(--muted);border-top:1px solid var(--line)}
+      footer.page a{color:var(--muted)}footer.page a:hover{color:var(--brown)}
+      @media(max-width:520px){section.box{padding:var(--space-md)}pre.code{padding:12px 14px;font-size:.78rem}table.cmp{font-size:.78rem}}
+    </style>
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="shell topbar-inner">
+        <a class="topbar__logo" href="../"><img src="../../extension/images/logo/kimito-link-color.png" width="160" height="34" alt="Kimito-Link Project"></a>
+        <a class="topbar__back" href="./">← 記事一覧へ</a>
+      </div>
+    </header>
+
+    <header class="page">
+      <div class="shell">
+        <p class="breadcrumb"><a href="../">トップ</a> ／ <a href="./">技術記事</a> ／ フェーズ・状態色・依存ゲートで設計の正本を描く</p>
+        <h1>フェーズ・状態色・依存ゲートで設計の正本を描く<br>― AI と人間が同じ図を見て手戻りを防ぐ</h1>
+        <p class="lead">段階導入で進めるタスクを、<strong>フェーズ番号</strong>・<strong>状態色</strong>（完了／ブロッカー／凍結／仮説）・<strong>依存ゲート</strong>（この前提が崩れると以降が無駄）で 1 枚の図に正本化する。AI エージェントと人間が<strong>同じ図を参照</strong>することで、誤った前提に基づく手戻りを構造的に防ぐ。実際にこの図のおかげで「前提が実機で覆り、後続実装を凍結できた」事例を併記する。</p>
+        <div class="meta">
+          <span>公開日: <strong>2026-06-18</strong></span>
+          <span>著者: <strong>君斗りんく / Kimito-Link Project</strong></span>
+          <span>ライセンス: <strong>MIT</strong></span>
+          <span>実装: <strong><a href="https://github.com/kimito-link/tsuioku-no-kirameki.com/blob/master/docs/comment-number-rescue-flow.html" target="_blank" rel="noopener">GitHub</a></strong></span>
+        </div>
+      </div>
+    </header>
+
+    <main>
+      <div class="shell">
+        <aside class="digest">
+          <h3>3 行要約</h3>
+          <ul>
+            <li><strong>1 枚の図に、フェーズ番号・状態色・依存ゲートを同居させる。</strong>「いま何がどこまで進み・何が止まっているか」を AI も人間も同じに読める正本にする。</li>
+            <li><strong>依存ゲートが肝。</strong>「この前提が崩れると以降が無駄」を矢印＋一言で明示し、前提が未検証なら後続フェーズに進ませない。</li>
+            <li><strong>テキスト正本が真実・図は視覚ビュー。</strong>状態が変わったら（完了／凍結／前提否定）両方を同期し、ドリフトを防ぐ。</li>
+          </ul>
+        </aside>
+
+        <nav class="toc"><h2>目次</h2>
+          <ol>
+            <li><a href="#s1">解決したい課題</a></li>
+            <li><a href="#s2">手法の概要</a></li>
+            <li><a href="#s3">図の構成要素</a></li>
+            <li><a href="#s4">実例：前提が覆って後続を凍結できた</a></li>
+            <li><a href="#s5">なぜこの設計なのか（原則）</a></li>
+            <li><a href="#s6">運用ルール（いつ作り・いつ更新するか）</a></li>
+            <li><a href="#s7">関連する既知技術（先行技術）</a></li>
+            <li><a href="#s8">本記事の位置づけ・ライセンス</a></li>
+          </ol>
+        </nav>
+
+        <section class="box" id="s1">
+          <h2><span class="num">1.</span>解決したい課題</h2>
+          <p>1 つの機能を複数コミットに分けて段階導入するとき、進捗の状態は「文章のログ」に溜まりがちだ。文章ログには 3 つの弱点がある:</p>
+          <ul>
+            <li><strong>依存関係が読み取りにくい</strong> ― 「フェーズ B はフェーズ A の前提が真でないと無駄」という関係が、長い文章に埋もれる。</li>
+            <li><strong>状態が一目で分からない</strong> ― 完了・保留・凍結・仮説が散文の中で混ざり、「いま何が止まっているか」を把握するのに読み込みが要る。</li>
+            <li><strong>読み手によって解釈がぶれる</strong> ― 特に AI エージェントは、毎回ゼロから文脈を再構築するため、前提の確度を取り違えて<strong>未検証の前提のまま後続を実装</strong>してしまう。</li>
+          </ul>
+          <p>結果として、<strong>誤った前提に基づく手戻り</strong>が起きる。本手法は、進捗を 1 枚の図に正本化し、特に<strong>依存ゲートを視覚的に明示</strong>することで、これを防ぐ。</p>
+        </section>
+
+        <section class="box" id="s2">
+          <h2><span class="num">2.</span>手法の概要</h2>
+          <p>段階導入タスクごとに、設計文書（テキスト正本）に加えて<strong>フェーズ・フロー図</strong>を 1 枚用意する。図は次の 3 要素を同居させる:</p>
+          <ol>
+            <li><strong>フェーズ番号</strong>（0 → 1 → 2 …）で時系列・依存順に並べる。各コミット段階に対応させる。</li>
+            <li><strong>状態色</strong>で各フェーズの状態を一目化する（完了・ブロッカー・凍結・仮説・要人手）。</li>
+            <li><strong>依存ゲート</strong>を矢印＋一言で挟む（「この前提が崩れると以降が無駄」「突破して初めて次が活きる」）。</li>
+          </ol>
+          <p>原則は単純で、<strong>テキスト正本（設計文書）が真実、図はその視覚ビュー</strong>。状態が変わったら両方を同期する。図だけが更新されて文書が古い、という乖離を作らない。</p>
+        </section>
+
+        <section class="box" id="s3">
+          <h2><span class="num">3.</span>図の構成要素</h2>
+          <h3>3-1. 状態色の語彙</h3>
+          <table class="cmp">
+            <thead><tr><th>色 / 記号</th><th>意味</th><th>使いどころ</th></tr></thead>
+            <tbody>
+              <tr><td>✅ 緑：完了・安全</td><td>着地済み（理想は挙動不変で）</td><td>テストで等価性を担保したコミット</td></tr>
+              <tr><td>🟥 赤：ブロッカー／前提否定</td><td>ここが崩れると以降が無駄</td><td>未解決の壁・実機で覆った前提</td></tr>
+              <tr><td>❄️ 青：凍結</td><td>やらない判断（再開条件つき）</td><td>前提否定で見送ったフェーズ</td></tr>
+              <tr><td>⚙️ 黄：仮説／伸びしろ</td><td>要確証 or 次の候補</td><td>着手前の前提・次に追う候補</td></tr>
+              <tr><td>🙋 紫：要人手</td><td>自動化できない手作業</td><td>外部審査・手動承認など</td></tr>
+            </tbody>
+          </table>
+          <h3>3-2. 依存ゲートの書き方</h3>
+          <p>フェーズの間に矢印を置き、<strong>「何が真でないと先に進めないか」</strong>を一言で添える。これが本手法の中核だ。ゲートが無い図は単なる進捗リストだが、ゲートがある図は<strong>「未検証の前提のまま後続へ進むこと」自体を止める</strong>装置になる。</p>
+          <pre class="code"><code>フェーズ1：当初の仮説（⚙️ 要確証）
+        ↓  この前提が真でないと、以降の実装は無駄になる
+フェーズ2：安全な土台（✅ 挙動不変）
+        ↓  緩和の前に、前提を実機で必ず確かめる
+フェーズ3：前提検証（★最重要ゲート）
+        ↓  前提が覆ったら → 後続は凍結
+フェーズ4：判断（❄️ 凍結 / ⚙️ 真の経路へ）</code></pre>
+        </section>
+
+        <section class="box" id="s4">
+          <h2><span class="num">4.</span>実例：前提が覆って後続を凍結できた</h2>
+          <p>本手法は、あるコメント収穫タスクで実際に手戻りを防いだ。当初の仮説は「配信サイトがコメント行から番号セルを外したので、受理判定を緩めれば直る」だった。この仮説を図のフェーズ 1（⚙️ 仮説）に置き、フェーズ 3 に<strong>「緩和の前に実機 DOM で前提を確かめる」依存ゲート</strong>を明示した。</p>
+          <div class="flow">
+            <div class="pcard opp"><p class="pt">フェーズ1 ⚙️ 仮説</p><p class="pd">「番号セルが消えた → 受理が全行を取りこぼす。緩めれば直る」</p></div>
+            <div class="gate"><span class="arr">↓</span> この前提が真でないと、以降の実装は無駄</div>
+            <div class="pcard ok"><p class="pt">フェーズ2 ✅ 安全な土台（挙動不変）</p><p class="pd">散らばった受理判定を 1 つの純粋関数へ正本化。既存テストで等価性を担保。</p></div>
+            <div class="gate"><span class="arr">↓</span> 緩和の前に、実機で前提を確かめる</div>
+            <div class="pcard block"><p class="pt">フェーズ3 🟥 前提が覆った（実機検証）</p><p class="pd">実配信を検証 → ① 番号セルは消えていなかった（取りこぼし 0 件） ② 匿名話者の識別子は DOM に存在せず、緩めても取れない。</p></div>
+            <div class="gate"><span class="arr">↓</span> 前提否定 → 緩和は利得ゼロ・働くガードを弱めるだけ</div>
+            <div class="pcard freeze"><p class="pt">フェーズ4 ❄️ 後続を凍結 ／ ⚙️ 真の経路へ</p><p class="pd">受理緩和は凍結（再開条件つき）。安全な土台は維持。真の経路は別レイヤー（ストリーム層）と判明。</p></div>
+          </div>
+          <p class="note"><b>効果:</b> フェーズ 3 の依存ゲートが図にあったから、前提が間違っていた緩和（フェーズ 4 の本来の続き）を<strong>盲目的に実装せずに済んだ</strong>。図が無ければ、もっともらしい仮説のまま緩和を実装し、働いているガードを弱めて機能を退化させていた可能性が高い。</p>
+        </section>
+
+        <section class="box" id="s5">
+          <h2><span class="num">5.</span>なぜこの設計なのか（原則）</h2>
+          <ol>
+            <li><strong>依存ゲートを視覚化することが本質</strong> ― 進捗リストではなく「前提 → 後続」の依存を明示する。未検証の前提のまま進むことを止める。</li>
+            <li><strong>状態色で「いま止まっているもの」を即読する</strong> ― 散文を読み込まずに、赤（ブロッカー）と青（凍結）が一目で分かる。</li>
+            <li><strong>AI と人間が同じ正本を見る</strong> ― AI は毎回ゼロから文脈を再構築するため、確度の取り違えが起きやすい。同じ図を参照させることで前提の解釈を揃える。</li>
+            <li><strong>テキスト正本が真実・図は視覚ビュー</strong> ― 設計文書を真実とし、図はそれを映す。状態変化で両方を同期し、片方だけ古い乖離を作らない。</li>
+            <li><strong>「凍結」を一級市民にする</strong> ― 「やらない判断」を再開条件つきで明記する。中断を曖昧に放置せず、なぜ止めたか・いつ再開するかを残す。</li>
+            <li><strong>段階導入と相性が良い</strong> ― フェーズ番号がコミット段階に対応するので、図の更新と実装の進行が自然に同期する。</li>
+          </ol>
+        </section>
+
+        <section class="box" id="s6">
+          <h2><span class="num">6.</span>運用ルール（いつ作り・いつ更新するか）</h2>
+          <ul>
+            <li><strong>作る対象</strong> ― 段階導入（複数コミット）・前提に不確実性がある・真因究明を伴う、実質的なタスク。1 ファイル挙動不変の軽微な修正には作らない（過剰になる）。</li>
+            <li><strong>置き場所</strong> ― 設計文書（テキスト正本）と同じディレクトリに、視覚ビューとして 1 枚。先頭に設計文書へのリンクと最終更新日を入れる。</li>
+            <li><strong>更新タイミング</strong> ― コミットで状態が変わったら（完了／凍結／前提否定）図の色とゲートを同期する。設計文書を更新するのと同じタイミングで図も直す。</li>
+            <li><strong>更新の責務</strong> ― 正本の更新者を 1 つに固定する（複数のツール／人が別々に書くと食い違う）。</li>
+          </ul>
+        </section>
+
+        <section class="box" id="s7">
+          <h2><span class="num">7.</span>関連する既知技術（先行技術）</h2>
+          <table class="cmp">
+            <thead><tr><th>手法</th><th>主眼</th><th>本手法との関係</th></tr></thead>
+            <tbody>
+              <tr><td>本手法（フェーズ・ゲート図）</td><td>前提→後続の依存を視覚化し手戻りを防ぐ</td><td>―</td></tr>
+              <tr><td>Stage-Gate（フェーズゲート法）</td><td>各段階の出口でゴー／ノーゴー判定</td><td>「ゲートで前進可否を判定」の源流</td></tr>
+              <tr><td>カンバン（状態列での可視化）</td><td>作業状態を色／列で一目化</td><td>状態色の発想が共通</td></tr>
+              <tr><td>RFC / ADR（設計判断の記録）</td><td>判断と背景をテキスト正本に残す</td><td>「テキスト正本＋凍結理由」と同系統</td></tr>
+              <tr><td>CI のゲート（required check）</td><td>条件を満たすまで後続を止める</td><td>依存ゲートの自動化版</td></tr>
+              <tr><td>前提を実機で確かめる文化</td><td>推測でなく観測で前提を検証</td><td>フェーズ3（前提検証ゲート）の根拠</td></tr>
+            </tbody>
+          </table>
+          <h3>7-1. Stage-Gate（フェーズゲート法）</h3>
+          <p>製品開発で各段階の出口に「ゲート」を置き、次へ進むか止めるかを判定するマネジメント手法。本手法は、これを<strong>1 枚の図に圧縮し、AI も読める粒度</strong>に落とし込んだもの。</p>
+          <h3>7-2. カンバン / 状態の可視化</h3>
+          <p>作業項目を状態（To Do / Doing / Done 等）で色分け・列分けする可視化。本手法の状態色（完了／ブロッカー／凍結／仮説）はこの語彙を、依存関係を持つフェーズに適用したもの。</p>
+          <h3>7-3. RFC / ADR（Architecture Decision Record）</h3>
+          <p>設計判断とその背景・却下案をテキストで残す文化。本手法の「テキスト正本が真実・凍結理由と再開条件を残す」は、ADR の判断記録の発想と一致する。</p>
+          <h3>7-4. 推測でなく観測で前提を検証する</h3>
+          <p>「もっともらしい仮説」をコードに落とす前に、実機・実データで前提そのものを確かめる規律。本手法は、その検証を<strong>図の中の依存ゲートとして手順に強制</strong>する点が特徴。</p>
+        </section>
+
+        <section class="box" id="s8">
+          <h2><span class="num">8.</span>本記事の位置づけ・ライセンス</h2>
+          <p>本記事は、Chrome 拡張機能『君斗りんくの追憶のきらめき』の開発運用で 2026 年 6 月 18 日に確立した「フェーズ・状態色・依存ゲートによる設計正本図」の手法を、同日付で公開するものである。実プロジェクトでは設計文書（<code>SYNTHESIS</code> 等のテキスト正本）とセットで、視覚ビューの HTML を 1 枚用意し、AI エージェントと人間が同じ図を参照する運用を採っている。</p>
+          <p>手法は「フェーズ番号で依存順に並べる」「状態色で止まっているものを即読する」「依存ゲートで未検証の前提のまま後続へ進ませない」「テキスト正本が真実・図は視覚ビュー」という再利用可能な原則にまとめられる。先行技術として Stage-Gate 法・カンバン・RFC / ADR・CI の required check を参照した。</p>
+          <p>参考実装（図のテンプレート）は <strong>MIT</strong>、本記事文章は <strong>CC BY 4.0</strong> のもとで自由に複製・引用可。</p>
+          <div class="note"><b>引用例:</b> 君斗りんく「フェーズ・状態色・依存ゲートで設計の正本を描く ― AI と人間が同じ図を見て手戻りを防ぐ」<i>君斗りんくの追憶のきらめき</i>、2026 年 6 月 18 日公開、<code>https://tsuioku-no-kirameki.com/articles/phase-gate-flow-canon.html</code></div>
+        </section>
+      </div>
+    </main>
+
+    <footer class="page">
+      <div class="shell"><p>&copy; Kimito-Link Project ― <a href="../">トップへ戻る</a> ／ <a href="./">技術記事一覧</a> ／ <a href="../privacy.html">プライバシーポリシー</a></p></div>
+    </footer>
+  </body>
+</html>
