@@ -5,6 +5,7 @@ import {
   buildBackfillProgressLine,
   buildCaptureRateLine,
   buildLaneStatusLine,
+  sumRecordedFromLives,
   formatElapsed,
   formatAgo
 } from './statusFormat.js';
@@ -107,6 +108,48 @@ describe('buildOverviewText', () => {
   it('公式が 0 のときは公式行を出さない', () => {
     const lives = [{ recordedCount: 10, officialCommentCount: 0 }];
     expect(buildOverviewText(lives)).toBe('記録中 1 配信 / 累計 記録 10 件');
+  });
+
+  // v0.1.804: enumerate の一瞬の揺れで累計だけが後退するのを床(recordedSumFloor)で止める。
+  it('opts.recordedSumFloor が実合算より大きいとき累計を床で据え置く', () => {
+    const lives = [{ recordedCount: 40, officialCommentCount: 0 }];
+    // 実合算 40 だが直近の床 150 → 累計は 150 のまま据え置き(後退させない)。
+    expect(buildOverviewText(lives, { recordedSumFloor: 150 })).toBe(
+      '記録中 1 配信 / 累計 記録 150 件'
+    );
+  });
+  it('実合算が床を上回れば実値を出す(床は伸びる側には効かない)', () => {
+    const lives = [{ recordedCount: 200, officialCommentCount: 0 }];
+    expect(buildOverviewText(lives, { recordedSumFloor: 150 })).toBe(
+      '記録中 1 配信 / 累計 記録 200 件'
+    );
+  });
+  it('床は取得率の分母(公式)には影響しない=取得率は実合算ベース', () => {
+    const lives = [{ recordedCount: 40, officialCommentCount: 80 }];
+    // 累計表示は床 100 に据え置くが、取得率は床込みの 100/80 で計算する(表示の一貫性)。
+    const text = buildOverviewText(lives, { recordedSumFloor: 100 });
+    expect(text).toContain('累計 記録 100 件');
+    expect(text).toContain('公式累計 80 件');
+  });
+  it('opts 省略は従来どおり(後方互換・床なし)', () => {
+    const lives = [{ recordedCount: 10, officialCommentCount: 0 }];
+    expect(buildOverviewText(lives)).toBe('記録中 1 配信 / 累計 記録 10 件');
+  });
+});
+
+describe('sumRecordedFromLives (v0.1.804 累計床の計算用純関数)', () => {
+  it('recordedCount を合算する', () => {
+    expect(
+      sumRecordedFromLives([{ recordedCount: 7 }, { recordedCount: 88 }])
+    ).toBe(95);
+  });
+  it('recordedCount 欠落・null 要素は 0 扱い', () => {
+    expect(sumRecordedFromLives([{ recordedCount: 5 }, {}, null])).toBe(5);
+  });
+  it('非配列/空は 0', () => {
+    expect(sumRecordedFromLives([])).toBe(0);
+    expect(sumRecordedFromLives(null)).toBe(0);
+    expect(sumRecordedFromLives(undefined)).toBe(0);
   });
 });
 

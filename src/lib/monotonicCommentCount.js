@@ -79,3 +79,68 @@ export function resolveMonotonicCommentCount(state, lv, candidate) {
   }
   return state.max;
 }
+
+// ---------------------------------------------------------------------------
+// v0.1.804: per-live 化(「記録がまた減る」根治)
+//
+// 背景: 単一 state(MonotonicCommentCountState)は「現在描画中の 1 lv」しか覚えられず、
+//   別 lv が渡るたびに max がリセットされる。さらに recording の手動 OFF/ON で
+//   呼ばれる resetOfficialCommentSamplingState() がゲートごと消すため、同一配信でも
+//   トグルすると max が飛んで件数が後退していた(会議 4 応答一致=経路1)。
+//
+// 方針: ゲートを lv ごとの Map で保持する。recording OFF/ON では Map を触らない=max 保持。
+//   「本当の配信切替(liveIdSwitched)」のときだけ forget で該当 lv を消す=新セッションは 0 から
+//   (会議の批判役が挙げた『古い max が残る罠』を、録画セッション ID を新設せず既存の
+//   liveIdSwitched で防ぐ=司令塔の裏取りで会議提案 KEY_RECORDING_SESSION は実在せず不採用)。
+//
+// 状態(Map)は呼び出し側が 1 インスタンス保持する。Map のサイズは同時視聴配信数(通常 1〜3)
+//   ぶんで有界=星野ロミ「重くしない・有界」。
+// ---------------------------------------------------------------------------
+
+/**
+ * per-live 単調ゲートの初期状態(Map<lv, max>)を作る。
+ * @returns {Map<string, number>}
+ */
+export function createMonotonicCommentCountMap() {
+  return new Map();
+}
+
+/**
+ * lv ごとに「同一 lv 内で後退させない」コメント件数を解決する。
+ *
+ * - candidate が有限な数値でない / 負 のときは null を返す(呼び出し側は素通しでよい)。
+ * - lv が取れないときはゲートせず candidate をそのまま返す(Map は汚さない)。
+ * - 同一 lv では max(previousMax, candidate) を返し、Map を更新する。
+ *
+ * @param {Map<string, number>} map  createMonotonicCommentCountMap() の戻り値
+ * @param {string} lv  現在の lv(正規化前で可)
+ * @param {unknown} candidate  表示したい件数
+ * @returns {number|null}  表示すべき数値。null = ゲート対象外
+ */
+export function resolveMonotonicCommentCountForLive(map, lv, candidate) {
+  const num =
+    typeof candidate === 'number' && Number.isFinite(candidate) ? candidate : NaN;
+  if (Number.isNaN(num) || num < 0) return null;
+
+  const normLv = normalizeMonotonicLiveId(lv);
+  // lv が取れない場合はゲートを通さず素通し(Map は汚さない)。
+  if (!normLv) return num;
+
+  const prev = map instanceof Map ? map.get(normLv) : undefined;
+  const next = typeof prev === 'number' && prev > num ? prev : num;
+  if (map instanceof Map) map.set(normLv, next);
+  return next;
+}
+
+/**
+ * 該当 lv のゲートを破棄する。本当の配信切替(liveIdSwitched)で呼ぶ。
+ * 同一 lv を「新しい録画セッション」として 0 から数え直せるようにする。
+ * @param {Map<string, number>} map
+ * @param {string} lv
+ * @returns {void}
+ */
+export function forgetMonotonicCommentCountForLive(map, lv) {
+  if (!(map instanceof Map)) return;
+  const normLv = normalizeMonotonicLiveId(lv);
+  if (normLv) map.delete(normLv);
+}
