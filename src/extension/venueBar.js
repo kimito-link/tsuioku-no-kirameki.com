@@ -2456,7 +2456,7 @@ export function mountVenueBarButton(options = {}) {
 
     // 【2026-06-17 確定】アリーナ席=アクティブユーザー(コメント/ギフト/広告した人・匿名/非匿名問わず)。
     //   userId があれば匿名でも venueParticipantKey が席キーを返す(席資格の正本は venueSeats.js)。
-    //   ここで数える「ほか観客」= 1画面に表示した席(visibleSeatKeys)に入りきらなかったアクティブ分。
+    //   ここで数える「ほか N人」= 1画面に表示した席(visibleSeatKeys)に入りきらなかったアクティブ分。
     //   来場者数(PV)とは別物(来場者は背景群衆 Canvas)。promoteUserIds は表示優先のヒントで席資格ではない。
     const { totalAnonymous } = collectAudienceFaceUserIds(rows, {
       isGenericName: isGenericComeviewName,
@@ -2469,12 +2469,14 @@ export function mountVenueBarButton(options = {}) {
       visibleSeats,
       audienceCount: totalAnonymous
     };
-    // TODO(person-tile-unify 第4コミット): 「ほか観客 N人」はユーザーに来場者数(PV)と取り違えられ
-    //   紛らわしい(2026-06-17 指摘)。本来は「席に表示しきれなかったアクティブ N人」。将来ラベルを
-    //   明確化し、来場者数(PV)は別途背景群衆で出す二層表示にする。今は挙動不変のため文言据え置き。
+    // person-tile-unify 第4コミット(2026-06-17): 旧「ほか観客 N人」は来場者数(PV)や「匿名の観客」と
+    //   二重に取り違えられ紛らわしかった。totalAnonymous の実態は「席(visibleSeats)に表示しきれなかった
+    //   アクティブ参加者」(席に座った人を excludeKeys で除外済み・匿名とは限らず数値IDも含む)。
+    //   誤読の核だった「観客」語を外し「ほか N人」に正本化(全員『会場参加者』前提で残りを表す)。
+    //   来場者数(PV)の実値取得→二層表示は別途(PV 取得経路の新規配線が要るため範囲外・過剰実装回避)。
     title.textContent =
       totalAnonymous > 0
-        ? `会場参加者 ${seating.participantCount}人 ・ ほか観客 ${totalAnonymous}人`
+        ? `会場参加者 ${seating.participantCount}人 ・ ほか ${totalAnonymous}人`
         : `会場参加者 ${seating.participantCount}人`;
     // PR-C1: 人数ラスタライザ Canvas (Antigravity Enhanced)
     if (totalAnonymous > 0) {

@@ -13,7 +13,7 @@
 |---|---|---|---|
 | **アクティブユーザー** | コメント/ギフト/広告(貢献)でアクションし、userId が観測できた人。**匿名(a:xxx)/非匿名は無関係** | **全員、席に座る**（顔が見える） | 記録コメント行(userId 付き) |
 | **来場者数(PV)** | ニコ生公式「来場 N人」。延べアクセス・同じ人の入り直し・無言の通りすがり込み | 席には出せない（userId 取れない）→**背景群衆 Canvas の密度**で表現 | 公式値(NDGR/DOM) |
-| **ほか観客 N人** | アクティブユーザーのうち、1画面に表示した席(visibleSeats)に入りきらなかった分 | 観客席にゆっくり顔 or 人数テキスト | rows − visibleSeatKeys |
+| **ほか N人**（旧「ほか観客 N人」） | アクティブユーザーのうち、1画面に表示した席(visibleSeats)に入りきらなかった分。**匿名とは限らず数値IDも含む**(席に座った人は excludeKeys で除外済み) | 観客席にゆっくり顔 or 人数テキスト | rows − visibleSeatKeys |
 
 ⚠️ **「会場参加者 N人」(席=アクティブ) と「来場 N人」(PV) は全く別物**。混同しない。無言視聴者一覧は NDGR で取れないのが原理的制約（venueSeats.js 冒頭・Codex 指摘）。
 
@@ -54,9 +54,9 @@ flowchart TD
 |---|---|---|
 | **集約(誰がレーン候補か)** | `userLaneCandidatesFromStorage()` | popup/venue 共通。commentCount/giftCount を既に userId 単位で持つ |
 | **席資格(誰が会場に座れるか)** | `venueParticipantKey()` (venueSeats.js) | userId あれば匿名も着席。座れない=null は「userIdも識別名も無い」1ケースだけ |
-| **popup タイルDOM生成** | `fillLaneTier()` (renderStoryUserLaneDom.js) | 丸サムネ+ID+名前のセル生成。将来 venue と共通化する切り出し候補 |
+| **popup タイルDOM生成** | `buildPersonTileEl()` (personTileDom.js・第2コミットで切出し)。`fillLaneTier()` (renderStoryUserLaneDom.js) が呼ぶ | 丸サムネ+ID+名前のセル生成。リンク可否は `isNumericNicoUserId`(domain 正本・第3コミットで統一) |
 | **席割り** | `buildVenueSeating()` (venueSeats.js) | 150席上限・入れ替え・安定席 |
-| **表示間引き** | `selectStableVisibleMembers` / `resolveVisibleArenaCount` (venueBar.js) | 1画面に収める数。ここで落ちた分が「ほか観客」 |
+| **表示間引き** | `selectStableVisibleMembers` / `resolveVisibleArenaCount` (venueBar.js) | 1画面に収める数。ここで落ちた分が「ほか N人」 |
 | **来場者数の表現** | `drawCrowdOnCanvas` (crowdRasterizer.js) | 背景群衆。席とは別レイヤー |
 
 ## 方針の変遷（⚠️ 古い理解で誤らないため）
@@ -71,12 +71,12 @@ flowchart TD
 
 席資格は匿名込みで全員候補。それでも popup と顔ぶれが食い違う原因は席資格より後ろ：
 1. **userId が乗らない DOM観測コメント** — 現行ニコ生がコメント行から `.comment-number`(番号セル)を外した(実DOM確証)。`parseNicoLiveTableRow`(nicoliveDom.js)が「番号+本文両方必須」で DOM観測コメントを全捨て→`visible:0`→userId が乗らず席にも出ない。【別タスクで番号必須を緩める・誤検知ガード必須】
-2. **席数150上限＋表示間引き**(visibleSeats) — 1画面に収まらない分が「ほか観客」へ
-3. **描画が別物**(popup タイル vs venue 席) — 将来 fillLaneTier を共通タイル部品に切り出して解消
+2. **席数150上限＋表示間引き**(visibleSeats) — 1画面に収まらない分が「ほか N人」へ
+3. **描画が別物**(popup タイル vs venue 席) — popup は `buildPersonTileEl` に集約済(第2)。venue 席の DOM(.nlsb-seat 等)は席プール再利用/読み上げ連動で構造が別物のため DOM 自体は統一せず、**リンク判定など純粋ロジックを domain 正本に寄せて顔ぶれ一致**(第3)
 
-## 未実装(SYNTHESIS の段階導入)
-- 第1: `buildPersonProfilesFromRows`(userId に comments/gifts/ads 畳み込む純関数・書き込みゼロ)
-- 第2: 丸サムネタイルDOMビルダーを切り出し popup 置換
-- 第3: venue 席を同ビルダーに統一(顔ぶれ一致)
-- 第4: 来場者数の二層化(超過アクティブ vs PV)・「ほか観客」ラベル明確化
-- 別: `.comment-number` 消失で DOM観測全捨ての件
+## SYNTHESIS の段階導入（進捗）
+- ✅ 第1(v0.1.816): `buildPersonProfilesFromRows`(userId に comments/gifts 畳み込む純関数・書き込みゼロ)
+- ✅ 第2(v0.1.817): 丸サムネタイルDOMビルダー `buildPersonTileEl` を切り出し popup 置換(見た目不変)
+- ✅ 第3(v0.1.818): リンク判定を domain 正本 `isNumericNicoUserId`(^\d{5,14}$)に統一(popup/venue 同基準・顔ぶれ一致)
+- ✅ 第4(v0.1.819): 「ほか観客 N人」→「ほか N人」へラベル正本化(誤読の核「観客」語を除去)。**来場者数(PV)の実値取得→二層表示は別途**(venue に PV 実値が無く、取得経路の新規配線が要るため範囲外・過剰実装回避)
+- ⬜ 別: `.comment-number` 消失で DOM観測全捨ての件(次タスク)
