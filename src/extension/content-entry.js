@@ -468,6 +468,7 @@ import {
   KEY_BACKFILL_HEARTBEAT_INDEX,
   KEY_BACKFILL_BG_KICK_ENABLED
 } from '../lib/backfillHeartbeat.js';
+import { normalizeAutoBackupState, pruneAutoBackupLives } from '../lib/autoBackupState.js';
 import { migrateFloatingInlinePanelToDockOnce } from '../lib/migrateInlinePanelFloatToDock.js';
 import { migrateBelowInlinePanelToDockOnce } from '../lib/migrateInlinePanelBelowToDock.js';
 import { migrateSuggestInitialInlinePanelPlacementOnce } from '../lib/migrateSuggestInitialInlinePanelPlacement.js';
@@ -9833,50 +9834,8 @@ function consumeMatchedSelfPostedRecents(added, pendingItems, lid) {
  * @param {unknown} raw
  * @returns {{ lives: Record<string, { liveId: string, commentCount: number, updatedAt: number, lastCommentAt: number, watchUrl: string, lastBackupAt: number, lastBackedUpdatedAt: number, lastBackupCount: number }> }}
  */
-function normalizeAutoBackupState(raw) {
-  const src = raw && typeof raw === 'object' ? raw : {};
-  const rawLives =
-    src &&
-    typeof src === 'object' &&
-    'lives' in src &&
-    src.lives &&
-    typeof src.lives === 'object'
-      ? src.lives
-      : {};
-  /** @type {Record<string, { liveId: string, commentCount: number, updatedAt: number, lastCommentAt: number, watchUrl: string, lastBackupAt: number, lastBackedUpdatedAt: number, lastBackupCount: number }>} */
-  const lives = {};
-  for (const [liveId, meta] of Object.entries(rawLives)) {
-    const lid = String(liveId || '').trim().toLowerCase();
-    if (!lid) continue;
-    const row = meta && typeof meta === 'object' ? meta : {};
-    lives[lid] = {
-      liveId: lid,
-      commentCount: Math.max(0, Number(row.commentCount) || 0),
-      updatedAt: Math.max(0, Number(row.updatedAt) || 0),
-      lastCommentAt: Math.max(0, Number(row.lastCommentAt) || 0),
-      watchUrl: String(row.watchUrl || '').trim(),
-      lastBackupAt: Math.max(0, Number(row.lastBackupAt) || 0),
-      lastBackedUpdatedAt: Math.max(0, Number(row.lastBackedUpdatedAt) || 0),
-      lastBackupCount: Math.max(0, Number(row.lastBackupCount) || 0)
-    };
-  }
-  return { lives };
-}
-
-/**
- * @param {{ lives: Record<string, { liveId: string, commentCount: number, updatedAt: number, lastCommentAt: number, watchUrl: string, lastBackupAt: number, lastBackedUpdatedAt: number, lastBackupCount: number }> }} state
- */
-function pruneAutoBackupLives(state) {
-  const entries = Object.entries(state?.lives || {});
-  if (entries.length <= AUTO_BACKUP_LIVES_MAX) return state;
-  entries.sort((a, b) => {
-    const aAt = Math.max(Number(a[1]?.updatedAt) || 0, Number(a[1]?.lastBackupAt) || 0);
-    const bAt = Math.max(Number(b[1]?.updatedAt) || 0, Number(b[1]?.lastBackupAt) || 0);
-    return bAt - aAt;
-  });
-  state.lives = Object.fromEntries(entries.slice(0, AUTO_BACKUP_LIVES_MAX));
-  return state;
-}
+// v0.1.808: normalizeAutoBackupState / pruneAutoBackupLives は src/lib/autoBackupState.js へ抽出
+//   (純関数・挙動完全不変・pruneAutoBackupLives は AUTO_BACKUP_LIVES_MAX を第2引数で注入)。
 
 /** NDGR・MutationObserver・deep harvest が同時に来ても storage の merge が壊れないよう直列化 */
 let persistCommentRowsChain = Promise.resolve();
@@ -11474,7 +11433,7 @@ async function persistCommentRowsImpl(rows, opts = {}) {
       lastBackedUpdatedAt: Math.max(0, Number(freshLiveMeta.lastBackedUpdatedAt) || 0),
       lastBackupCount: Math.max(0, Number(freshLiveMeta.lastBackupCount) || 0)
     };
-    pruneAutoBackupLives(autoBackupState);
+    pruneAutoBackupLives(autoBackupState, AUTO_BACKUP_LIVES_MAX);
     // v0.1.509: チャンクモードでは「新規分（next 末尾の added 件）だけ」を新チャンクへ追記し、
     //   既存チャンク・巨大配列の全件 write を撃たない（ホットパスの構造化クローンを件数非依存に）。
     //   過去行への patch（profile/avatar）は永続化されないが、popup 側が profile cache を
