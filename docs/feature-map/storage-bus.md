@@ -16,6 +16,7 @@
 
 - 🟠 **KEY_PAINT_PERF_RING_V1** — 書く人だけ（読む経路が無い疑い）: src/extension/popup-entry.js
 - 🟠 **KEY_SW_PROGRESS** — 書く人だけ（読む経路が無い疑い）: src/extension/backfill-sw-entry.js
+- 🟠 **fn:backfillHeartbeatKey** — 書く人だけ（読む経路が無い疑い）: src/extension/content-entry.js
 - 🟠 **fn:chunkMigratedKey** — 書く人だけ（読む経路が無い疑い）: src/extension/content-entry.js
 - 🟠 **fn:comeviewPinStorageKey** — 書く人だけ（読む経路が無い疑い）: src/extension/comeview-entry.js
 - 🟠 **fn:eventDomStorageKey** — 書く人だけ（読む経路が無い疑い）: src/extension/content-entry.js
@@ -26,6 +27,7 @@
 - 🔵 **KEY_AUTOPATROL_ENABLED** — 読む人だけ（書く経路が無い疑い）: src/extension/popup-entry.js
 - 🔵 **KEY_AUTOPATROL_STATE** — 読む人だけ（書く経路が無い疑い）: src/extension/popup-entry.js
 - 🔵 **KEY_BACKFILL_AUTO_DISABLED** — 読む人だけ（書く経路が無い疑い）: src/extension/content-entry.js, src/extension/popup-entry.js
+- 🔵 **KEY_BACKFILL_BG_KICK_ENABLED** — 読む人だけ（書く経路が無い疑い）: src/extension/content-entry.js
 - 🔵 **KEY_BACKFILL_SW_MODE** — 読む人だけ（書く経路が無い疑い）: src/extension/content-entry.js
 - 🔵 **KEY_CALM_PANEL_MOTION** — 読む人だけ（書く経路が無い疑い）: src/extension/popup-entry.js
 - 🔵 **KEY_CDB_OFFSCREEN_ENABLED** — 読む人だけ（書く経路が無い疑い）: src/extension/content-entry.js
@@ -65,7 +67,9 @@
 | `KEY_AUTOPATROL_STATE` | — | extension/popup-entry.js |
 | `KEY_AUTO_BACKUP_STATE` | extension/content-entry.js | extension/content-entry.js |
 | `KEY_BACKFILL_AUTO_DISABLED` | — | extension/content-entry.js<br>extension/popup-entry.js |
+| `KEY_BACKFILL_BG_KICK_ENABLED` | — | extension/content-entry.js |
 | `KEY_BACKFILL_ENABLED` | extension/popup-entry.js | extension/content-entry.js |
+| `KEY_BACKFILL_HEARTBEAT_INDEX` | extension/content-entry.js | extension/content-entry.js |
 | `KEY_BACKFILL_PROGRESS` | extension/backfill-sw-entry.js<br>extension/content-entry.js<br>extension/popup-entry.js | extension/popup-entry.js |
 | `KEY_BACKFILL_SW_MODE` | — | extension/content-entry.js |
 | `KEY_CALM_PANEL_MOTION` | — | extension/popup-entry.js |
@@ -110,6 +114,7 @@
 | `KEY_THUMB_INTERVAL_MS` | — | extension/content-entry.js<br>extension/popup-entry.js |
 | `KEY_USER_COMMENT_PROFILE_CACHE` | extension/content-entry.js | extension/comeview-entry.js<br>extension/content-entry.js<br>extension/popup-entry.js<br>extension/venueBar.js |
 | `KEY_VOICE_INPUT_DEVICE` | extension/popup-entry.js | extension/popup-entry.js |
+| `fn:backfillHeartbeatKey` | extension/content-entry.js | — |
 | `fn:chunkIndexKey` | extension/content-entry.js | extension/popup-entry.js |
 | `fn:chunkMigratedKey` | extension/content-entry.js | — |
 | `fn:comeviewPinStorageKey` | extension/comeview-entry.js | — |

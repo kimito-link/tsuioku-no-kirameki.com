@@ -17,4 +17,4 @@
 
 ## データの流れ
 
-- [storage データバス図](storage-bus.md) — 全 62 キーの producer/consumer と断線検出
+- [storage データバス図](storage-bus.md) — 全 65 キーの producer/consumer と断線検出
