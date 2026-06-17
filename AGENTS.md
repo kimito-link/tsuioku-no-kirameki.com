@@ -181,6 +181,9 @@ build/                 ← .gitignore 対象。CWS 提出用 ZIP + 生成アセ�
   「○○を司るのはどこ?」は**機能逆引き索引**（機能 → 担当ファイル）、「これどこに置く?」は
   **ディレクトリマップ**（場所 → 役割）、全体像は冒頭の**マインドマップ**で掴める。推測で探し回らない。
   そこに無ければ grep で実コードを確かめ、確定したら `FEATURES`/`ROLES` 辞書に1行足す（§4）。
+- **公開ページ(LP/記事/docs)のリンクや URL を触ったら `npm run site-health` を走らせる**。
+  内部リンク切れ・canonical/og:url 取り違えを静的検出する（`verify:cc` の `site-health:check` でも自動で落ちる）。
+  記事をコピペで増やすときは canonical/og:url を自ファイル名へ直すのを忘れない。正本=[`docs/site-health.md`](docs/site-health.md)。
 - **この AGENTS.md を最初に読むこと**。とくに §3.1「ゆっくり OK」と §3.2「3 キャラの役割」はコピー＆新規生成するコンテンツに波及しやすい
 - **CWS 申請関連のファイル**（`src/images/googlechrom/`, `build/store-listing/` の `description-ja.txt` / `privacy-justifications-ja.txt`）は、仕様・文言を変える際に必ず「審査通過後の差分提出」を意識する
 - **プライバシー周り**の文言を変更したら、`privacy.html` と `description-ja.txt` と `privacy-justifications-ja.txt` の 3 点を同期させる（片方だけ変わると審査で齟齬として指摘される）

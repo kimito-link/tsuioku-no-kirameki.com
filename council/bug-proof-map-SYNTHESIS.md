@@ -61,8 +61,12 @@ design に分類され3体召集、**2/3 が回答**(nvidia/qwen3.5-122b は abo
 - **第1コミット**: `scripts/site-health.mjs` 新設＝**内部リンク健全性のみ**(公開HTML/docs の相対 .html/.md リンク先実在を
   ディスク照合)＋ `docs/site-health.md` 生成＋ `--check`。純ロジックは lib に切り出し characterization test。
   まだ verify:cc には挿さず手動 `npm run site-health` で挙動確認(挙動不変)。
-- **第2コミット**: `verify:cc` に `site-health:check` を追加(腐り検知 ON)＋ canonical/og:url 一致検証を足す。
-- **第3コミット**: status.html マインドマップに「サイト健全性」枝を追加＋ AGENTS.md §10 導線＋ FEATURES 登録。
+- **第2コミット**: `verify:cc` に `site-health:check` を追加(腐り検知 ON)＋ canonical/og:url 一致検証を足す。✅完了。
+- **第3コミット**: AGENTS.md §10 に「公開ページを触ったら site-health を走らせる」導線＋ FEATURES 登録。✅完了。
+  ⚠️**訂正**: 当初案の「status.html マインドマップに『サイト健全性』枝」は**やめた**。status マインドマップは
+  *拡張のランタイム状態*(storage 由来)を映すもので、site-health は*ビルド時の dev チェック*(docs/site-health.md・
+  verify ゲート)。runtime ページに「npm を走らせて」という静的ノードを混ぜると live 結果が出せず誤解を招く＝
+  SYNTHESIS の「過剰実装しない/責務を混ぜない」に反する。site-health の結果は docs/site-health.md＋verify が正本。
 
 ## 退化ガード（厳守）
 - 外部送信ゼロ・追加依存ゼロ(Node 標準 fs/正規表現のみ・got/cheerio 等は使わない)。

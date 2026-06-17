@@ -121,10 +121,10 @@ graph LR
 - `dist/`（1 件） — Web 版アプリのビルド成果物  〔ビルド成果物〕
 
 ## `council/` — 会議(COUNCIL)の問い・回答・統合(SYNTHESIS)。設計判断の根拠  〔会議 / 設計〕
-<sub>ファイル 20 件</sub>
+<sub>ファイル 24 件</sub>
 
 ## `docs/` — 設計正本・マインドマップ・フロー図・feature-map(AI/人間向け)  〔設計 / レポート〕
-<sub>ファイル 62 件</sub>
+<sub>ファイル 63 件</sub>
 
 - `article-assets/`（3 件） — 記事用の画像・動画・音声アセット  〔記事 / 画像〕
 - `feature-map/`（11 件） — 機能ごと依存図(自動生成)。誰が storage を書き/読むか  〔依存図 / 自動生成〕
@@ -147,19 +147,19 @@ graph LR
 - `avatar-parts/`（26 件） — アバター素材(顔シート等)の参考画像  〔アバター / 画像〕
 
 ## `scripts/` — ビルド・検証・自動生成スクリプト(build/feature-map/repo-tree-map 等)  〔ビルド / 自動生成〕
-<sub>ファイル 26 件</sub>
+<sub>ファイル 27 件</sub>
 
 - `xserver/`（2 件） — Xserver 向け webhook(git pull デプロイ)スクリプト  〔デプロイ / webhook〕
 
 ## `src/` — LP 側 + 純粋関数ライブラリの源  〔ソース〕
-<sub>ファイル 1083 件</sub>
+<sub>ファイル 1085 件</sub>
 
 - `data/`（6 件） — 保存コメントからレーン候補を読む acquirer / source 層  〔コメント / 取得〕
 - `domain/`（18 件） — ドメイン正本(応援レーンの集約・列ポリシー等。識別子判定など)  〔応援 / 集約 / 識別子〕
 - `extension/`（11 件） — バンドル entry(content/popup/venue/status/offscreen/backfill-sw 等=機能境界)  〔entry / 記録 / 会場 / 応援〕
 - `fixtures/`（1 件） — テスト用フィクスチャ  〔テスト〕
 - `images/`（165 件） — LP / CWS 提出物のマスター画像  〔画像〕
-- `lib/`（873 件） — 純粋関数ライブラリ(unit test 対象)。色・速度・コメント・レポート等の計算ロジックの大半  〔色 / 速度 / コメント / レポート / 純粋関数〕
+- `lib/`（875 件） — 純粋関数ライブラリ(unit test 対象)。色・速度・コメント・レポート等の計算ロジックの大半  〔色 / 速度 / コメント / レポート / 純粋関数〕
 - `shared/`（7 件） — 複数機能で共有する小部品(アバター URL ガード等)  〔共有 / アバター〕
 - `sound/`（1 件） — 音声素材(src 側)  〔音声〕
 
@@ -292,8 +292,8 @@ status.html を開けば今の状態を枝(概要/コメント取得/北極星/�
 ### サイト健全性検証(リンク切れ防止)  〔Web / 健全性 / リンク〕
 公開ページ(LP/記事/docs)の相対内部リンク先がディスクに実在するか静的照合。外部リンクは叩かない(依存/プライバシー/速度ゼロ)。docs/site-health.md に出力・腐り検知
 
-- `src/lib/siteLinkHealth.js` ⚠️ **見つからない（消失/リネーム）**
-- `scripts/site-health.mjs` ⚠️ **見つからない（消失/リネーム）**
+- [`src/lib/siteLinkHealth.js`](../src/lib/siteLinkHealth.js)
+- [`scripts/site-health.mjs`](../scripts/site-health.mjs)
 
 ---
 
