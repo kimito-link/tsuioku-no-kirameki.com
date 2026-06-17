@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.812',
+    date: '2026-06-17',
+    summary: '内部構造の整理(HTMLレポートの外部リンク欄を部品化)',
+    items: Object.freeze([
+      '見た目や動作は変わりません(内部の整理です)。HTMLレポートの「支援物資・外部リンク」欄を組み立てる純粋な関数を独立したファイルに切り出し、テストを付けました。コンポーネント化の第5弾で、巨大ファイルを少しずつ安全に分けています(挙動は抽出前と完全に同じであることをテストで保証。記録した本体のコメントには一切影響しません)。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.811',
     date: '2026-06-17',
     summary: '内部構造の整理(HTMLレポートの次枠メモを部品化)',
