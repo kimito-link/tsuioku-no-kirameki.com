@@ -4,6 +4,7 @@ import {
   parseCommentLineText,
   parseCommentElement,
   parseNicoLiveTableRow,
+  isHarvestableNicoCommentRow,
   closestHarvestableNicoCommentRow,
   extractCommentsFromNode,
   extractUserIdFromLinks,
@@ -322,6 +323,87 @@ describe('parseNicoLiveTableRow', () => {
       avatarUrl:
         'https://secure-dcdn.cdn.nimg.jp/nicoaccount/usericon/s/1/10000111.jpg'
     });
+  });
+});
+
+describe('isHarvestableNicoCommentRow（受理門の正本・第1コミット）', () => {
+  /** @param {string} html */
+  const rowFrom = (html) => {
+    const w = document.createElement('div');
+    w.innerHTML = html;
+    return w.querySelector('.table-row');
+  };
+
+  it('requireNumber 既定(true): 番号セル + 本文セル 両方あれば受理（従来挙動）', () => {
+    const row = rowFrom(`
+      <div class="table-row" data-comment-type="normal">
+        <span class="comment-number">12</span>
+        <span class="comment-text">本文</span>
+      </div>`);
+    expect(isHarvestableNicoCommentRow(row)).toBe(true);
+    expect(isHarvestableNicoCommentRow(row, { requireNumber: true })).toBe(true);
+  });
+
+  it('requireNumber:true: 番号セルが無ければ拒否（data-comment-type があっても）', () => {
+    const row = rowFrom(`
+      <div class="table-row" data-comment-type="normal">
+        <span class="comment-text">本文だけ</span>
+      </div>`);
+    expect(isHarvestableNicoCommentRow(row, { requireNumber: true })).toBe(false);
+    expect(isHarvestableNicoCommentRow(row)).toBe(false);
+  });
+
+  it('requireNumber:true: 本文セルが無ければ拒否（番号があっても）', () => {
+    const row = rowFrom(`
+      <div class="table-row" data-comment-type="normal">
+        <span class="comment-number">12</span>
+      </div>`);
+    expect(isHarvestableNicoCommentRow(row, { requireNumber: true })).toBe(false);
+  });
+
+  it('requireNumber:false: 番号セルが無くても data-comment-type があれば受理（第2コミットの開放）', () => {
+    const row = rowFrom(`
+      <div class="table-row" data-comment-type="normal">
+        <div class="content-area"><span class="comment-text">番号無し本文</span></div>
+      </div>`);
+    expect(isHarvestableNicoCommentRow(row, { requireNumber: false })).toBe(true);
+  });
+
+  it('requireNumber:false: 番号も data-comment-type も無ければ拒否（おすすめカード等の構造誤マッチ防止）', () => {
+    const row = rowFrom(`
+      <div class="table-row">
+        <div class="content-area"><span class="comment-text">構造ラベル無し</span></div>
+      </div>`);
+    expect(isHarvestableNicoCommentRow(row, { requireNumber: false })).toBe(false);
+  });
+
+  it('requireNumber:false でも本文セルが無ければ拒否', () => {
+    const row = rowFrom(`
+      <div class="table-row" data-comment-type="normal"><span>x</span></div>`);
+    expect(isHarvestableNicoCommentRow(row, { requireNumber: false })).toBe(false);
+  });
+
+  it('guardRecommendedSections: おすすめ生放送セクション内は拒否', () => {
+    const w = document.createElement('div');
+    w.innerHTML = `
+      <div class="___program-card___X program-card">
+        <div class="table-row" data-comment-type="normal">
+          <span class="comment-number">1</span>
+          <span class="comment-text">本文</span>
+        </div>
+      </div>`;
+    const row = w.querySelector('.table-row');
+    // ガード無し（既定）なら構造的には受理
+    expect(isHarvestableNicoCommentRow(row)).toBe(true);
+    // ガード有りなら section で除外
+    expect(
+      isHarvestableNicoCommentRow(row, { guardRecommendedSections: true })
+    ).toBe(false);
+  });
+
+  it('null / 非要素は false', () => {
+    expect(isHarvestableNicoCommentRow(null)).toBe(false);
+    expect(isHarvestableNicoCommentRow(undefined)).toBe(false);
   });
 });
 
