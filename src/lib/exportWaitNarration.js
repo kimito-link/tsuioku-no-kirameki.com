@@ -26,13 +26,18 @@ export const EXPORT_WAIT_LINES_MARKETING = Object.freeze([
 
 /**
  * コメント件数に応じて buildHtmlReportDocument のタイムアウト（ms）を決める。
+ *
+ * v0.1.806: 旧式 +3ms/件 は緩すぎて 5000件で ~97秒どまり=実際の組み立て(全件マーケ集計+
+ *   audience gap など実測 ~100〜120秒)に届かず「完了間際で問答無用 kill」=html_report_build_timeout
+ *   の主因だった。傾きを +12ms/件に上げ、上限も 300秒へ。yield 分割(popup 側)と併せて『重い配信でも
+ *   必ず最後まで完了させる(落とさない)』を最優先にする(星野ロミ式=失敗体験の除去)。
  * @param {number} commentCount
  * @returns {number}
  */
 export function resolveHtmlReportBuildTimeoutMs(commentCount) {
   const n = Math.max(0, Number(commentCount) || 0);
   if (n <= 2500) return 90_000;
-  return Math.min(180_000, 90_000 + Math.floor((n - 2500) * 3));
+  return Math.min(300_000, 90_000 + Math.floor((n - 2500) * 12));
 }
 
 /**

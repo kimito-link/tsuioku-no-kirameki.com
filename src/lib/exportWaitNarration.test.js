@@ -16,7 +16,10 @@ describe('exportWaitNarration', () => {
   it('resolveHtmlReportBuildTimeoutMs は件数に応じて延長', () => {
     expect(resolveHtmlReportBuildTimeoutMs(100)).toBe(90_000);
     expect(resolveHtmlReportBuildTimeoutMs(10_000)).toBeGreaterThan(90_000);
-    expect(resolveHtmlReportBuildTimeoutMs(100_000)).toBeLessThanOrEqual(180_000);
+    // v0.1.806: 上限は 300秒(旧 180秒)。大量件数でも確実に完了させる。
+    expect(resolveHtmlReportBuildTimeoutMs(100_000)).toBeLessThanOrEqual(300_000);
+    // v0.1.806: 5000件級(実機で 97秒どまりで kill されていた)は十分な予算(>=115秒)を与える。
+    expect(resolveHtmlReportBuildTimeoutMs(5051)).toBeGreaterThanOrEqual(115_000);
   });
 
   it('exportWaitLinesForKind', () => {
