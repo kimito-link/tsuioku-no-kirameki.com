@@ -105,7 +105,8 @@ const FEATURES = [
   { feature: '状態速報の整形', desc: '記録件数・取得率・バックフィル進捗・レーン状態などの状態テキストを整形', paths: ['src/lib/statusFormat.js'], tags: ['レポート', '診断'] },
   { feature: '記録件数の単調化(減らない表示)', desc: 'per-live ゲートで記録件数の表示が後退しないようにする', paths: ['src/lib/monotonicCommentCount.js'], tags: ['記録', 'コメント'] },
   { feature: 'storage キー定義', desc: 'chrome.storage のキー名の正本(nls_comments_<lv> 等)', paths: ['src/lib/storageKeys.js'], tags: ['storage'] },
-  { feature: 'AI診断の状態速報集約', desc: 'popup の AI診断コピー固有情報を別キーへ書き、status.html(状態速報)の AI共有まとめに集約。status を見れば全部わかる', paths: ['src/lib/aiSharePopupDiagKey.js', 'src/extension/status-entry.js'], tags: ['診断', 'レポート', '集約'] }
+  { feature: 'AI診断の状態速報集約', desc: 'popup の AI診断コピー固有情報を別キーへ書き、status.html(状態速報)の AI共有まとめに集約。status を見れば全部わかる', paths: ['src/lib/aiSharePopupDiagKey.js', 'src/extension/status-entry.js'], tags: ['診断', 'レポート', '集約'] },
+  { feature: '状態速報の全体マインドマップ', desc: 'status.html を開けば今の状態を枝(概要/コメント取得/北極星/過去ログ/健全性/popup診断)で俯瞰。🟢🟡🔴⚪ の badge 付き折りたたみツリー(外部依存ゼロ)', paths: ['src/lib/statusMindmapModel.js', 'src/extension/status-entry.js'], tags: ['診断', 'レポート', 'マインドマップ'] }
 ];
 
 /** ツリーから除外するトップレベル(ドット系・生成物・巨大画像ディレクトリ等) */
@@ -170,7 +171,8 @@ function roleOf(dir) {
 }
 
 /**
- * FEATURES の paths のうち、git 追跡に存在しないもの(消失/リネーム)を返す。
+ * FEATURES の paths のうち、消失/リネームしたもの(実体が無い)を返す。
+ * git 追跡 or ディスク上に在れば OK(新規ファイルはコミット前=未追跡でも実在すれば誤検知しない)。
  * @param {Set<string>} trackedSet
  * @returns {{ feature: string, path: string }[]}
  */
@@ -178,7 +180,8 @@ function featureDeadPaths(trackedSet) {
   const dead = [];
   for (const f of FEATURES) {
     for (const p of f.paths) {
-      if (!trackedSet.has(p)) dead.push({ feature: f.feature, path: p });
+      const ok = trackedSet.has(p) || existsSync(join(ROOT, p));
+      if (!ok) dead.push({ feature: f.feature, path: p });
     }
   }
   return dead;

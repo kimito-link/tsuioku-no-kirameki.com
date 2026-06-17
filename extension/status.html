@@ -192,6 +192,62 @@
         color: var(--nl-text-soft);
         margin-top: 8px;
       }
+      /* 全体マインドマップ(折りたたみツリー・外部ライブラリ無し) */
+      .mind-controls button {
+        background: var(--nl-card-bg);
+        color: var(--nl-text);
+        border: 1px solid var(--nl-border);
+        padding: 4px 12px;
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 12px;
+      }
+      .mind-controls button:hover {
+        border-color: var(--nl-accent);
+      }
+      .mind details {
+        margin: 0;
+        padding-left: 14px;
+        border-left: 1px solid var(--nl-border);
+      }
+      .mind > details {
+        padding-left: 0;
+        border-left: none;
+      }
+      .mind summary {
+        cursor: pointer;
+        list-style: none;
+        padding: 2px 0;
+        font-size: 13px;
+      }
+      .mind summary::-webkit-details-marker {
+        display: none;
+      }
+      .mind summary::before {
+        content: '▸';
+        display: inline-block;
+        width: 1em;
+        color: var(--nl-text-soft);
+        transition: transform 0.1s;
+      }
+      .mind details[open] > summary::before {
+        transform: rotate(90deg);
+      }
+      .mind .leaf {
+        padding: 2px 0 2px 1em;
+        font-size: 13px;
+      }
+      .mind .mlabel {
+        font-weight: 600;
+      }
+      .mind .mvalue {
+        color: var(--nl-text-soft);
+        font-family: var(--nl-mono);
+        font-size: 12px;
+      }
+      .mind .badge {
+        margin-right: 4px;
+      }
     </style>
   </head>
   <body>
@@ -216,6 +272,18 @@
 
     <div class="status-meta" id="uploadResult" style="margin-bottom: 12px"></div>
     <div class="status-meta" id="patrolResult" style="margin-bottom: 12px"></div>
+
+    <section class="lane" id="mindmapLane">
+      <h2>🧠 全体マインドマップ（ここを見れば全部わかる）</h2>
+      <div class="status-meta" style="margin-bottom: 8px">
+        今の状態を枝で俯瞰します。🟢=健全 / 🟡=注目 / 🔴=要対応 / ⚪=情報。枝はクリックで開閉できます。
+      </div>
+      <div class="mind-controls" style="margin-bottom: 8px">
+        <button id="btnMindExpand" type="button">全部ひらく</button>
+        <button id="btnMindCollapse" type="button">全部とじる</button>
+      </div>
+      <div id="mindmapBody" class="empty-note">読み込み中...</div>
+    </section>
 
     <section class="lane" id="overviewLane">
       <h2>概要</h2>
