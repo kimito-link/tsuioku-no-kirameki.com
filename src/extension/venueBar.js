@@ -1960,6 +1960,26 @@ export function mountVenueBarButton(options = {}) {
     if (next === 'done') scheduleBubbleFade(bubble, BUBBLE_VOICE_AFTERGLOW_MS);
   };
 
+  /**
+   * v0.1.799: 読み上げが【鳴らずに捨てられた】(stale/件数drop/合成失敗/merge)= resolved。
+   *   pending のままだと床(=鮮度ゲート8秒)いっぱい残ってしまうので unvoiced に落とし、
+   *   通常の流速寿命で普通に消す。onDropped は再生では発火しないので speaking 中に来ない
+   *   (nextBubbleVoiceState の終端ガードでも speaking/done は維持=取りこぼし無し)。
+   * @param {VenueBubble} bubble
+   */
+  const markBubbleResolved = (bubble) => {
+    if (!bubble || bubble.removed) return;
+    const next = nextBubbleVoiceState(bubble.voiceState, 'resolved');
+    if (next === bubble.voiceState) return; // speaking/done/unvoiced は変化なし
+    bubble.voiceState = next; // pending → unvoiced
+    // 流速寿命(=showSpeechBubble 当初の lifetimeMs)で消す。床(pending floor)は使わない。
+    const flow = typeof bubble.flowLifetimeMs === 'number' && bubble.flowLifetimeMs > 0
+      ? bubble.flowLifetimeMs
+      : 0;
+    const age = Date.now() - (bubble.createdAt || Date.now());
+    scheduleBubbleFade(bubble, Math.max(0, flow - age));
+  };
+
   // v0.1.778 ギフト/広告の投げ演出: 投げ主のサムネ座標→中央映像へ放物線で飛ばす。
   //   DOMプール(固定数を使い回し)+同時上限(canLaunchGiftThrow)で会場を重くしない。
   /** @type {HTMLDivElement[]} 使い回す投げ物要素のプール。 */
@@ -2823,9 +2843,10 @@ export function mountVenueBarButton(options = {}) {
       maybeThrowGiftFromSpeech(speech);
       if (voicePlayer.enabled) {
         // v0.1.771: 吹き出しを読み上げに連動。実際に鳴り始めたら speaking(消さない)、鳴り終えたら done。
-        //   鳴らずに消費(stale/合成失敗/OFF/merge)された場合は何もしない=pending のまま流速寿命で自然に消える
-        //   (=会議の unvoiced と同じ挙動)。onPlayStart(=resolved)は実再生時にも発火するので吹き出しには
-        //   配線しない(配線すると pending→unvoiced 終端化で後続の onAudioStart を取りこぼす)。
+        // v0.1.799「読み上げとコメントがずれる」根治: 床を鮮度ゲート(8秒)に合わせたので、鳴らずに
+        //   捨てられた吹き出しが pending のまま8秒残らないよう、onDropped(再生では発火しない drop 専用
+        //   シグナル)で resolved を通知し unvoiced(流速寿命)へ落とす。再生時は onAudioStart→speaking。
+        //   onPlayStart(再生/破棄の両方で発火する曖昧信号)は配線しない(取りこぼし回避・従来どおり)。
         //   bubble が無い(空テキスト等で出なかった)場合は no-op で安全。
         voicePlayer.enqueue([{
           kind: 'comment',
@@ -2834,7 +2855,8 @@ export function mountVenueBarButton(options = {}) {
           key: speech.key,
           text: speech.text,
           onAudioStart: bubble ? () => markBubbleSpeaking(bubble) : undefined,
-          onAudioEnd: bubble ? () => markBubbleDone(bubble) : undefined
+          onAudioEnd: bubble ? () => markBubbleDone(bubble) : undefined,
+          onDropped: bubble ? () => markBubbleResolved(bubble) : undefined
         }]);
       }
     }

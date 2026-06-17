@@ -90,10 +90,26 @@ export class VoicePlayer {
     this.onSkip(count);
   }
 
+  /**
+   * v0.1.799: item が【鳴らずに捨てられた】(stale/件数drop/合成失敗/flush/stop/merge)ときだけ
+   *   呼ぶ drop 専用シグナル。再生パスでは絶対に呼ばない(=onAudioStart と排他)。吹き出し側は
+   *   これを resolved として受け、pending→unvoiced に落として流速寿命で消す(床いっぱい残さない)。
+   *   onPlayStart(再生・破棄の両方で発火する曖昧な「消費」信号)は後方互換でそのまま残す。
+   * @param {{ onDropped?: Function }} item
+   */
+  _notifyDropped(item) {
+    if (item && typeof item.onDropped === 'function') {
+      try { item.onDropped(); } catch { /* no-op: 吹き出し通知失敗は再生に影響させない */ }
+    }
+  }
+
   stop() {
+    const dropped = this.queue;
     this.queue = [];
     this.generation += 1;
     this.prefetches.clear();
+    // v0.1.799: 破棄した待機 item の吹き出しを unvoiced へ(pending のまま床いっぱい残さない)。
+    for (const item of dropped) this._notifyDropped(item);
     if (typeof this.stopCurrent === 'function') this.stopCurrent();
     this.stopCurrent = null;
   }
@@ -111,6 +127,7 @@ export class VoicePlayer {
     this.prefetches.clear();
     for (const item of dropped) {
       if (item && typeof item.onPlayStart === 'function') item.onPlayStart();
+      this._notifyDropped(item); // v0.1.799: 鳴らず破棄→吹き出しを unvoiced へ
     }
     if (dropped.length > 0) this._showSkipped(dropped.length);
     return dropped.length;
@@ -233,6 +250,7 @@ export class VoicePlayer {
           const dropped = this.queue.slice(0, this.queue.length - 1);
           for (const d of dropped) {
             if (typeof d.onPlayStart === 'function') d.onPlayStart();
+            this._notifyDropped(d); // v0.1.799: 鳴らず破棄→吹き出しを unvoiced へ
           }
           this.queue = [newest];
           if (dropped.length > 0) this._showSkipped(dropped.length);
@@ -252,6 +270,7 @@ export class VoicePlayer {
         const ageCheck = isVoiceItemStale(item.enqueuedAt, Date.now(), queueLength, item.priority === 'high');
         if (ageCheck.stale) {
           if (typeof item.onPlayStart === 'function') item.onPlayStart();
+          this._notifyDropped(item); // v0.1.799: stale で鳴らず破棄→吹き出しを unvoiced へ
           this._showSkipped(1);
           this.prefetches.delete(item);
           continue;
@@ -275,6 +294,7 @@ export class VoicePlayer {
 
         if (!wav || !this.enabled || generation !== this.generation || this.isObsMode()) {
           if (typeof item.onPlayStart === 'function') item.onPlayStart();
+          this._notifyDropped(item); // v0.1.799: 合成失敗/無効化で鳴らず→吹き出しを unvoiced へ
           continue;
         }
 
@@ -330,6 +350,9 @@ export class VoicePlayer {
           });
         } catch {
           if (typeof item.onPlayStart === 'function') item.onPlayStart();
+          // v0.1.799: 再生例外。onAudioStart 済みなら speaking のままで resolved は無視されるため安全。
+          //   未再生なら pending→unvoiced で吹き出しを流速寿命へ(床いっぱい残さない)。
+          this._notifyDropped(item);
           if (objectUrl) this.revokeObjectURL(objectUrl);
         }
       }
@@ -371,13 +394,16 @@ export class VoicePlayer {
         // v0.1.771: 吹き出しを読み上げに連動させるため、実際の再生開始/終了だけを通知する。
         //   onAudioStart は audio.play() が実際に走ったときだけ・onAudioEnd は再生終了(ended/error/stop)時。
         onAudioStart: item.onAudioStart,
-        onAudioEnd: item.onAudioEnd
+        onAudioEnd: item.onAudioEnd,
+        // v0.1.799: 鳴らず破棄された時だけ発火する drop 専用シグナル(再生では呼ばれない)。
+        onDropped: item.onDropped
       };
-      
+
       const merged = mergeRepeatedVoiceItem(this.queue, candidate);
       this.queue = merged.queue;
       if (merged.merged) {
         if (typeof candidate.onPlayStart === 'function') candidate.onPlayStart();
+        this._notifyDropped(candidate); // v0.1.799: merge で吸収=この吹き出しは別途鳴らない→unvoiced へ
         continue;
       }
       
@@ -391,6 +417,7 @@ export class VoicePlayer {
       if (pushed.dropped && pushed.dropped.length > 0) {
         for (const dropped of pushed.dropped) {
           if (typeof dropped.onPlayStart === 'function') dropped.onPlayStart();
+          this._notifyDropped(dropped); // v0.1.799: 件数ゲートで最古drop→吹き出しを unvoiced へ
         }
         droppedCount += pushed.dropped.length;
       }
