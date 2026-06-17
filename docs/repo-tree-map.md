@@ -102,6 +102,9 @@ graph LR
   HUB --> f17["AI診断の状態速報集約"]
   f17 --> f17_0["lib/aiSharePopupDiagKey.js"]
   f17 --> f17_1["extension/status-entry.js"]
+  HUB --> f18["状態速報の全体マインドマップ"]
+  f18 --> f18_0["lib/statusMindmapModel.js"]
+  f18 --> f18_1["extension/status-entry.js"]
 ```
 
 ---
@@ -275,6 +278,12 @@ chrome.storage のキー名の正本(nls_comments_<lv> 等)
 popup の AI診断コピー固有情報を別キーへ書き、status.html(状態速報)の AI共有まとめに集約。status を見れば全部わかる
 
 - [`src/lib/aiSharePopupDiagKey.js`](../src/lib/aiSharePopupDiagKey.js)
+- [`src/extension/status-entry.js`](../src/extension/status-entry.js)
+
+### 状態速報の全体マインドマップ  〔診断 / レポート / マインドマップ〕
+status.html を開けば今の状態を枝(概要/コメント取得/北極星/過去ログ/健全性/popup診断)で俯瞰。🟢🟡🔴⚪ の badge 付き折りたたみツリー(外部依存ゼロ)
+
+- `src/lib/statusMindmapModel.js` ⚠️ **見つからない（消失/リネーム）**
 - [`src/extension/status-entry.js`](../src/extension/status-entry.js)
 
 ---

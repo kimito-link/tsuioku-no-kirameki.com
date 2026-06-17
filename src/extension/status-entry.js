@@ -23,6 +23,7 @@
 
 import { KEY_AI_SHARE_FAST_DIAG } from '../lib/aiShareFastDiagKey.js';
 import { KEY_AI_SHARE_POPUP_DIAG } from '../lib/aiSharePopupDiagKey.js';
+import { buildStatusMindmapModel } from '../lib/statusMindmapModel.js';
 import {
   buildOverviewText,
   buildLiveBlockText,
@@ -435,6 +436,9 @@ function renderAll({ lvList, summaries, fastDiag, popupDiag, backfillProgress })
     }
   }
 
+  // 全体マインドマップ(折りたたみツリー・ここを見れば全部わかる)
+  renderMindmap({ overviewText, livesData, fastDiag, popupDiag });
+
   // AI 共有用テキスト
   const fullText = buildAiShareFullText({ overviewText, livesData, fastDiag, popupDiag });
   const ta = /** @type {HTMLTextAreaElement|null} */ (
@@ -455,6 +459,81 @@ function renderAll({ lvList, summaries, fastDiag, popupDiag, backfillProgress })
       fastDiag
     }
   };
+}
+
+/* ============================================================================
+ * 全体マインドマップ(折りたたみツリー・native <details>・外部ライブラリ無し)
+ * ========================================================================== */
+
+const MIND_BADGE = { ok: '🟢', warn: '🟡', bad: '🔴', info: '⚪', '': '' };
+
+/**
+ * モデルノードを <details>/<summary>(子あり) or <div.leaf>(葉) の DOM へ。
+ * @param {{ label: string, value?: string, badge?: string, children?: any[], open?: boolean }} node
+ * @returns {HTMLElement}
+ */
+function buildMindNodeEl(node) {
+  const badge = MIND_BADGE[node.badge || ''] || '';
+  const hasKids = Array.isArray(node.children) && node.children.length > 0;
+  if (!hasKids) {
+    const leaf = document.createElement('div');
+    leaf.className = 'leaf';
+    const b = document.createElement('span');
+    b.className = 'badge';
+    b.textContent = badge;
+    const lab = document.createElement('span');
+    lab.className = 'mlabel';
+    lab.textContent = node.label;
+    leaf.appendChild(b);
+    leaf.appendChild(lab);
+    if (node.value) {
+      const v = document.createElement('span');
+      v.className = 'mvalue';
+      v.textContent = ` — ${node.value}`;
+      leaf.appendChild(v);
+    }
+    return leaf;
+  }
+  const details = document.createElement('details');
+  if (node.open) details.open = true;
+  const summary = document.createElement('summary');
+  summary.textContent = `${badge} ${node.label}${node.value ? ` — ${node.value}` : ''}`;
+  details.appendChild(summary);
+  for (const child of node.children) {
+    details.appendChild(buildMindNodeEl(child));
+  }
+  return details;
+}
+
+/**
+ * @param {{ overviewText?: string, livesData?: any[], fastDiag?: any, popupDiag?: any }} data
+ */
+function renderMindmap(data) {
+  const host = document.getElementById('mindmapBody');
+  if (!host) return;
+  let model;
+  try {
+    model = buildStatusMindmapModel(data);
+  } catch {
+    host.className = 'empty-note';
+    host.textContent = 'マインドマップの組み立てに失敗しました。';
+    return;
+  }
+  host.className = 'mind';
+  host.innerHTML = '';
+  // 根の子(主要枝)を並べる。根自身は見出しに既に出ているので展開済みで描く。
+  for (const branch of model.children || []) {
+    host.appendChild(buildMindNodeEl(branch));
+  }
+}
+
+/** 全部ひらく/とじる(マインドマップ内の details を一括操作) */
+function setAllMindDetails(open) {
+  const host = document.getElementById('mindmapBody');
+  if (!host) return;
+  host.querySelectorAll('details').forEach((d) => {
+    /** @type {HTMLDetailsElement} */ (d).open = open;
+  });
 }
 
 /* ============================================================================
@@ -706,6 +785,11 @@ function setupPatrolButtons() {
       }
     });
   }
+  // 全体マインドマップの全展開/全折りたたみ
+  const btnMindExpand = document.getElementById('btnMindExpand');
+  if (btnMindExpand) btnMindExpand.addEventListener('click', () => setAllMindDetails(true));
+  const btnMindCollapse = document.getElementById('btnMindCollapse');
+  if (btnMindCollapse) btnMindCollapse.addEventListener('click', () => setAllMindDetails(false));
   // 「次の上位配信へ」: SW にランキング巡回を1歩進めさせる。
   const btnNext = document.getElementById('btnNextLive');
   const resultEl = document.getElementById('patrolResult');
