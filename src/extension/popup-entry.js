@@ -14039,11 +14039,12 @@ async function refresh() {
       !!userRoomsUl &&
       userRoomsUl.childElementCount > 0 &&
       _lastUserRoomsPaintedLiveId === lv;
-    const _perfDeferActive = shouldDeferHeavyPopupPaintNow() && userRoomsAlreadyPainted;
-    if (shouldDeferHeavyPopupPaintNow() && userRoomsAlreadyPainted) {
-      // スクロール中 & 同 liveId が既に塗ってある: 全消し再構築を見送る(白抜け防止)。
-      //   別配信のときは _lastUserRoomsPaintedLiveId !== lv で painted=false になり描画される。
-    } else {
+    // v0.1.813(スクロール/描画 重い 根治): 裏タブ(document.hidden)で描画済みなら重い paint を見送る
+    //   (見えないので不要・万件で paint 135ms。可視復帰は visibilitychange→safeRefresh が塗り直す)。
+    const _hiddenSkipHeavyPaint = typeof document !== 'undefined' && document.hidden === true && userRoomsAlreadyPainted;
+    const _perfDeferActive = (shouldDeferHeavyPopupPaintNow() && userRoomsAlreadyPainted) || _hiddenSkipHeavyPaint;
+    // _perfDeferActive(スクロール中 or 裏タブ・描画済)は全消し再構築を見送る(白抜け防止・別配信は描画)。
+    if (!_perfDeferActive) {
       renderUserRooms(
         /** @type {PopupCommentEntry[]} */ (laneFeedPick.entries),
         lv,
@@ -14051,9 +14052,7 @@ async function refresh() {
       );
       _lastUserRoomsPaintedLiveId = lv;
     }
-    // 白フラッシュ対策(複数タブ): renderCharacterScene も内部で innerHTML='' 系の
-    //   重い再構築をする。renderUserRooms と同様、同 liveId が既に塗ってあれば
-    //   スクロール中は見送る(初回/配信切替/未描画時は必ず描画)。
+    // renderCharacterScene も innerHTML='' 系の重い再構築=同様に見送る。
     if (!_perfDeferActive) {
       renderCharacterScene({
         hasWatch: true,
@@ -14063,7 +14062,8 @@ async function refresh() {
         snapshot: snapForCards
       });
     }
-    renderWatchMetaCard(snapForCards, arr);
+    // v0.1.813: renderWatchMetaCard も 1万件 O(N) 集計の重い描画。スクロール中/裏タブ(描画済)は見送る。
+    if (!_perfDeferActive) renderWatchMetaCard(snapForCards, arr);
     // 白フラッシュ見える化: paint 区間の所要 ms を nls_perf_diag_<lv> に間引き保存。
     {
       const _perfPaintT1 = typeof performance !== 'undefined' ? performance.now() : Date.now();
