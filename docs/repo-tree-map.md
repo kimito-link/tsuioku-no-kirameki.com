@@ -108,6 +108,9 @@ graph LR
   HUB --> f19["サイト健全性検証(リンク切れ防止)"]
   f19 --> f19_0["lib/siteLinkHealth.js"]
   f19 --> f19_1["site-health.mjs"]
+  HUB --> f20["影響範囲マップ(変えたら何が壊れるか)"]
+  f20 --> f20_0["feature-map.mjs"]
+  f20 --> f20_1["feature-map/impact-map.md"]
 ```
 
 ---
@@ -294,6 +297,12 @@ status.html を開けば今の状態を枝(概要/コメント取得/北極星/�
 
 - [`src/lib/siteLinkHealth.js`](../src/lib/siteLinkHealth.js)
 - [`scripts/site-health.mjs`](../scripts/site-health.mjs)
+
+### 影響範囲マップ(変えたら何が壊れるか)  〔影響範囲 / 依存図 / 実装前ゲート〕
+esbuild の import 到達グラフを逆引きし「このファイルを変えたら、どの機能(entry)が壊れうるか」を波及機能数の降順で一覧。docs/feature-map/impact-map.md。新規ビルド/依存ゼロ(reach 再利用)
+
+- [`scripts/feature-map.mjs`](../scripts/feature-map.mjs)
+- `docs/feature-map/impact-map.md` ⚠️ **見つからない（消失/リネーム）**
 
 ---
 

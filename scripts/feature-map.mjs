@@ -248,9 +248,61 @@ async function main() {
 
   writeStorageBusMap(keyMap);
   writeFeatureMaps(reach, access, f2f);
+  writeImpactMap(f2f);
   writeIndex(keyMap);
 
-  console.log(`feature-map: generated ${FEATURES.length} feature maps + storage-bus into docs/feature-map/`);
+  console.log(`feature-map: generated ${FEATURES.length} feature maps + storage-bus + impact-map into docs/feature-map/`);
+}
+
+/** feature 名 → 人間向けラベル(FEATURES の label)。 */
+function featureLabel(feature) {
+  const f = FEATURES.find((x) => x.feature === feature);
+  return f ? f.label : feature;
+}
+
+/**
+ * 影響範囲マップ(impact-map.md)。
+ * 「このファイルを変えたら、どの機能(entry/バンドル)が壊れうるか」を逆引きで一覧化する。
+ * f2f(file → 到達している feature 配列)を blast radius(波及機能数)の降順で並べる。
+ * 既存の import 到達グラフ(buildImportReach)を再利用するだけ=新規 esbuild 実行も新依存もゼロ。
+ * @param {Map<string, string[]>} f2f
+ */
+function writeImpactMap(f2f) {
+  // 共有度(複数 feature に到達)の高い順 → 同数ならパス名順。
+  const rows = [...f2f.entries()]
+    .map(([file, feats]) => ({ file, feats: [...new Set(feats)].sort() }))
+    .sort((a, b) => b.feats.length - a.feats.length || a.file.localeCompare(b.file));
+
+  const lines = [];
+  lines.push('# 影響範囲マップ（自動生成・このファイルを変えたら何が壊れるか）');
+  lines.push('');
+  lines.push('> `npm run feature-map` で再生成。手で編集しない。');
+  lines.push('> 各 src/app ファイルが、どの機能(esbuild entry=バンドル)に取り込まれているかの逆引き。');
+  lines.push('> **波及機能数(blast radius)が多いファイルほど、変更時の影響が大きい**(共有部品)。');
+  lines.push('> 実装前にここで「触るファイルが何に波及するか」を確認すると誤前提を潰せる。');
+  lines.push('');
+
+  const widespread = rows.filter((r) => r.feats.length >= 3);
+  if (widespread.length) {
+    lines.push(`## ⚠️ 影響大（3機能以上に波及・${widespread.length} ファイル）`);
+    lines.push('');
+    lines.push('ここを変えると複数の実行コンテキストに影響する。変更時は各 feature の動作確認を。');
+    lines.push('');
+    for (const r of widespread) {
+      lines.push(`- \`${r.file}\` → **${r.feats.length} 機能**: ${r.feats.map(featureLabel).join(' / ')}`);
+    }
+    lines.push('');
+  }
+
+  lines.push('## 全ファイルの波及先（機能数の多い順）');
+  lines.push('');
+  lines.push('| ファイル | 波及機能数 | 波及先(機能) |');
+  lines.push('|---|---|---|');
+  for (const r of rows) {
+    lines.push(`| \`${r.file}\` | ${r.feats.length} | ${r.feats.map(featureLabel).join(' / ')} |`);
+  }
+  lines.push('');
+  writeFileSync(join(OUT_DIR, 'impact-map.md'), lines.join('\n'), 'utf8');
 }
 
 /**
@@ -395,9 +447,10 @@ function writeIndex(keyMap) {
     lines.push(`- [${f.label}](${f.feature}.md) — \`${f.entry}\``);
   }
   lines.push('');
-  lines.push('## データの流れ');
+  lines.push('## データの流れ・影響範囲');
   lines.push('');
   lines.push(`- [storage データバス図](storage-bus.md) — 全 ${keyMap.size} キーの producer/consumer と断線検出`);
+  lines.push('- [影響範囲マップ](impact-map.md) — このファイルを変えたら何が壊れるか(波及機能の逆引き)');
   lines.push('');
   writeFileSync(join(OUT_DIR, 'index.md'), lines.join('\n'), 'utf8');
 }

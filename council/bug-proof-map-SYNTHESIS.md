@@ -68,6 +68,16 @@ design に分類され3体召集、**2/3 が回答**(nvidia/qwen3.5-122b は abo
   verify ゲート)。runtime ページに「npm を走らせて」という静的ノードを混ぜると live 結果が出せず誤解を招く＝
   SYNTHESIS の「過剰実装しない/責務を混ぜない」に反する。site-health の結果は docs/site-health.md＋verify が正本。
 
+## 追補（2026-06-18）: 影響範囲マップも実装（llama 案の核を裏取りして採用）
+会議のもう一方の信号(llama=影響範囲)も、裏取りで「**feature-map が import 到達グラフ(reach)と
+file→features 逆引き(f2f)を既に計算済み・ただし"このファイルを変えたら何が壊れるか"の集約ビューが無い**」と
+判明したので、その**集約だけ**を追加(再発明でなく、既存 reach を反転するだけ=新規 esbuild も新依存もゼロ)。
+- `scripts/feature-map.mjs` に `writeImpactMap(f2f)` 追加 → `docs/feature-map/impact-map.md` 生成。
+  波及機能数(blast radius)の降順。3機能以上は「⚠️影響大」(commentRecord/storageKeys 等=7機能)。
+- AGENTS.md §10 に「共有 lib を変える前に impact-map を見る」導線(§12.1 着手前ゲートの判断材料)。
+- repo-tree-map FEATURES に「影響範囲マップ」登録。
+→ これで会議の2信号(Web健全性=site-health / 影響範囲=impact-map)を両方、最小・依存ゼロで満たした。
+
 ## 退化ガード（厳守）
 - 外部送信ゼロ・追加依存ゼロ(Node 標準 fs/正規表現のみ・got/cheerio 等は使わない)。
 - 既存 verify:bump / tree-map:check と**責務を重複させない**(版整合は verify:bump、生成鮮度は tree-map:check に委譲)。
