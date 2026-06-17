@@ -252,6 +252,52 @@ export function decodeChat(buf, start, end) {
   return { no, rawUserId, hashedUserId, name, content, vpos, accountStatus, is184 };
 }
 
+/** 匿名(184)コメントの hashedUserId が満たす ID 形式。gift の item_name(日本語)を弾く。 */
+const NDGR_HASHED_USER_ID_RE = /^[a-zA-Z0-9_:-]{8,}$/;
+
+/**
+ * v0.1.803(星野ロミ式最大化): decode した NDGR chat を「表示できるコメント」として
+ *   採用してよいかの判定（純関数・コンポーネントファクタリング）。
+ *
+ * 旧実装は `chat.no != null`(コメント番号)が無いと丸ごと捨てていた。だが匿名(184)
+ *   コメントは no を持たず content/rawUserId/hashedUserId は持っている。捨てると
+ *   userId が失われ、コメントは DOM(visible)でしか拾えず userId 無し → レーン
+ *   (userLaneCandidatesFromStorage は userId 必須)に乗らない → 会場/レーンが空。
+ *   = 「元からあるデータ(届いている userId 付き chat)を活かせていない」退化。
+ *
+ * 採用条件:
+ *   - `no != null` なら従来どおり採用（コメント番号がある=確実な chat）。
+ *   - no が無い場合は「content が非空 かつ userId(rawUserId/hashedUserId)を持つ」
+ *     ときだけ採用する。これが匿名(184)コメント。
+ *
+ * ⚠️ なぜ no 無しで userId 必須か(司令塔の裏取り):
+ *   NDGR の gift は msg.1 に Gift 構造(fn=1=item_id 文字列)で乗ることがあり、
+ *   decodeChat に通すと item_id が content(fn=1)として読まれて「content 非空」を
+ *   すり抜ける。だが gift payload は rawUserId(fn=5)を持たない。item_name(fn=6)は
+ *   decodeChat が【無検証で】hashedUserId に入れてしまう(decodeChat:236 は fn=6 を
+ *   そのまま代入し、ID 形式の正規表現検証は fn=9〜15 のフォールバック経路にしか
+ *   無い)ため、「バスケットボール」のような日本語 item_name が hashedUserId に
+ *   化けて userId 有りに見える。よってここで hashedUserId を【ID 形式
+ *   (^[a-zA-Z0-9_:-]{8,}$)のときだけ】userId とみなし、日本語 item_name を弾く。
+ *   これで gift を chat と誤認せず gift fallback へ正しく流せる(v0.1.210 の gift
+ *   fallback を壊さない)。真の匿名コメントの hashedUserId は ID 形式なので採用
+ *   される。ギフトコメント形式(「〜さんがギフト〜」等)の本文除外は記録変換側
+ *   (ndgrChatsToMergeRows = parseGiftCommentText)に委ねる。
+ *
+ * @param {Pick<NdgrChat, 'no' | 'content' | 'rawUserId' | 'hashedUserId'>} chat
+ * @returns {boolean}
+ */
+export function shouldAcceptNdgrChatAsComment(chat) {
+  if (!chat) return false;
+  if (chat.no != null) return true;
+  if (String(chat.content || '').trim().length === 0) return false;
+  const hasRawUserId = chat.rawUserId != null && chat.rawUserId !== 0;
+  const hashed = String(chat.hashedUserId || '').trim();
+  // hashedUserId は ID 形式のときだけ信用(gift の item_name 日本語混入を弾く)。
+  const hasHashedUserId = NDGR_HASHED_USER_ID_RE.test(hashed);
+  return hasRawUserId || hasHashedUserId;
+}
+
 /**
  * v0.1.211: msg.24 の "nx:gift:show" event を decode する純関数。
  *
@@ -688,9 +734,13 @@ export function decodeChunkedMessage(buf, start, end) {
 
         if (mfn === 1 || mfn === 20) {
           const chat = decodeChat(buf, ms, me);
-          if (chat.no != null) {
+          // v0.1.803(星野ロミ式最大化): no が無くても content があれば採用し、
+          //   userId 付き匿名(184)コメントを捨てずレーンへ活かす。判定は
+          //   shouldAcceptNdgrChatAsComment(純関数・テスト済)に一元化。
+          if (shouldAcceptNdgrChatAsComment(chat)) {
             chats.push(chat);
           } else {
+            // chat として採用しない場合のみ gift として fallback 試行。
             // v0.1.210: chat 失敗時は gift として fallback 試行。
             // v0.1.211: false positive 抑制のため "nx:" / "system:" prefix を除外。
             // v0.1.233: 判定を looksLikeValidGiftItemId に強化。chat 本文（日本語等）が

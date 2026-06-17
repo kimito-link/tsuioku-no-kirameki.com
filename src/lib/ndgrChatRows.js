@@ -5,6 +5,7 @@
 import { normalizeCommentText } from './commentRecord.js';
 import { anonymousNicknameFallback } from './nicoAnonymousDisplay.js';
 import { parseGiftCommentText } from './parseGiftComment.js';
+import { shouldAcceptNdgrChatAsComment } from './ndgrDecode.js';
 
 /**
  * @param {import('./ndgrDecode.js').NdgrChat} chat
@@ -33,14 +34,20 @@ export function ndgrChatsToMergeRows(chats) {
   /** @type {NdgrMergeRow[]} */
   const out = [];
   for (const chat of chats) {
-    if (!chat || chat.no == null) continue;
+    if (!chat) continue;
     const text = normalizeCommentText(chat.content);
     if (!text) continue;
     // v0.1.195: ギフトシステムメッセージは通常コメントとして記録しない
     // （cleanNdgrChatRows と同じ guard を NDGR decode 経路にも適用）
     if (parseGiftCommentText(text)) continue;
-    const commentNo = String(chat.no).trim();
-    if (!commentNo) continue;
+    // v0.1.803(星野ロミ式最大化): 採用判定を shouldAcceptNdgrChatAsComment に一元化。
+    //   no(コメント番号)が無くても「content 非空 かつ userId を持つ」匿名(184)
+    //   コメントは採用し、捨てずレーンへ活かす(userLaneCandidatesFromStorage は
+    //   userId 必須)。no 無し+userId 無し(gift payload 誤読等)は採用しない。
+    //   commentNo 欠落行は buildDedupeKey が text+sec+uid フォールバックで安全に
+    //   重複排除する(commentRecord.js:75-84 + createLoneDedupeIndex で裏取り済)。
+    if (!shouldAcceptNdgrChatAsComment(chat)) continue;
+    const commentNo = chat.no != null ? String(chat.no).trim() : '';
     const uid = ndgrChatUserId(chat);
     /** @type {NdgrMergeRow} */
     const row = { commentNo, text, userId: uid || null };

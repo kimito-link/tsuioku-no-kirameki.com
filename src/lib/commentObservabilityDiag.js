@@ -9,6 +9,7 @@
 
 import { normalizeCommentText } from './commentRecord.js';
 import { parseGiftCommentText } from './parseGiftComment.js';
+import { shouldAcceptNdgrChatAsComment } from './ndgrDecode.js';
 
 const USER_ID_LIKE_ATTRS = Object.freeze([
   'data-user-id',
@@ -91,8 +92,8 @@ export function probeCommentRowDataAttributes(rowElements, opts) {
 
 /**
  * NDGR chats を `ndgrChatsToMergeRows` と同じ条件で walk し、reject 理由別カウントを返す。
- * `ndgrChatRows.js` 本体には触らず、観測専用にこちらで再現する。
- * @param {ReadonlyArray<{ no?: number|string|null, content?: string }>|null|undefined} chats
+ * 採用判定は本体と同じ `shouldAcceptNdgrChatAsComment` を使い、ドリフトを防ぐ。
+ * @param {ReadonlyArray<{ no?: number|string|null, content?: string, rawUserId?: number|string|null, hashedUserId?: string }>|null|undefined} chats
  * @returns {NdgrChatRejectionStats}
  */
 export function analyzeNdgrChatRejection(chats) {
@@ -102,12 +103,13 @@ export function analyzeNdgrChatRejection(chats) {
   let giftSystemMsgSkip = 0;
   let accepted = 0;
   for (const chat of list) {
-    if (!chat || chat.no == null) {
+    if (!chat) {
       noNumberSkip += 1;
       continue;
     }
     const text = normalizeCommentText(chat.content);
     if (!text) {
+      // 本体(ndgrChatsToMergeRows)が text 空を先に skip するのに合わせる。
       emptyTextSkip += 1;
       continue;
     }
@@ -115,7 +117,14 @@ export function analyzeNdgrChatRejection(chats) {
       giftSystemMsgSkip += 1;
       continue;
     }
-    accepted += 1;
+    // v0.1.803(星野ロミ式最大化): 採用判定は本体と同じ shouldAcceptNdgrChatAsComment。
+    //   no があるか、または「content 非空 かつ userId 有り」(匿名コメント)なら採用。
+    //   no も userId も無い(同定不能・gift payload 誤読等)は noNumberSkip に計上。
+    if (shouldAcceptNdgrChatAsComment(chat)) {
+      accepted += 1;
+    } else {
+      noNumberSkip += 1;
+    }
   }
   return {
     totalInput: list.length,

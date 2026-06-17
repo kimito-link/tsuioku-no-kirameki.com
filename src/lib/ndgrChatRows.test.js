@@ -50,7 +50,46 @@ describe('ndgrChatsToMergeRows', () => {
     expect(rows).toEqual([{ commentNo: '1', text: 'x', userId: 'hashonly' }]);
   });
 
-  it('no が null のチャットは除外', () => {
+  // v0.1.803(星野ロミ式最大化): no(コメント番号)が無くても content があれば採用。
+  //   匿名(184)コメントを捨てずレーンへ活かす。commentNo は空文字で返す。
+  it('no が null でも content があれば userId 付きで採用(commentNo 空)', () => {
+    const rows = ndgrChatsToMergeRows([
+      {
+        no: null,
+        rawUserId: 86255751,
+        hashedUserId: '',
+        name: '',
+        content: 'こんにちは'
+      }
+    ]);
+    expect(rows).toEqual([
+      { commentNo: '', text: 'こんにちは', userId: '86255751' }
+    ]);
+  });
+
+  it('no が null・hashedUserId のみでも採用(184想定・nickname 匿名)', () => {
+    const rows = ndgrChatsToMergeRows([
+      {
+        no: null,
+        rawUserId: 'a:AXaKZ_4ShxQHJVsX',
+        hashedUserId: '',
+        name: '',
+        content: 'やっほー',
+        is184: true
+      }
+    ]);
+    expect(rows).toEqual([
+      {
+        commentNo: '',
+        text: 'やっほー',
+        userId: 'a:AXaKZ_4ShxQHJVsX',
+        nickname: '匿名',
+        is184: true
+      }
+    ]);
+  });
+
+  it('no が null かつ content も空なら採用しない(偽陽性抑止)', () => {
     expect(
       ndgrChatsToMergeRows([
         {
@@ -58,7 +97,7 @@ describe('ndgrChatsToMergeRows', () => {
           rawUserId: 1,
           hashedUserId: '',
           name: '',
-          content: 'a'
+          content: '   \n  '
         }
       ])
     ).toEqual([]);
@@ -171,18 +210,19 @@ describe('ndgrChatsToMergeRows', () => {
     expect(ndgrChatsToMergeRows(/** @type {any} */ (null))).toEqual([]);
   });
 
-  it('commentNo が空白のみならスキップ', () => {
-    expect(
-      ndgrChatsToMergeRows([
-        {
-          no: '  \t  ',
-          rawUserId: 1,
-          hashedUserId: '',
-          name: '',
-          content: 'hello'
-        }
-      ])
-    ).toEqual([]);
+  // v0.1.803: no が空白文字列(実経路では no は number|null なので来ない異常系)でも
+  //   content+userId があれば採用し commentNo は空に正規化する(匿名コメント扱い)。
+  it('commentNo が空白のみなら commentNo 空で採用(content+userId 有り)', () => {
+    const rows = ndgrChatsToMergeRows([
+      {
+        no: '  \t  ',
+        rawUserId: 1,
+        hashedUserId: '',
+        name: '',
+        content: 'hello'
+      }
+    ]);
+    expect(rows).toEqual([{ commentNo: '', text: 'hello', userId: '1' }]);
   });
 
   it('vpos/accountStatus/is184 をパススルーする', () => {

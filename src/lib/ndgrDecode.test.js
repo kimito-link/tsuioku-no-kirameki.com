@@ -6,6 +6,7 @@ import {
   ndgrStatisticsHasWireSignal,
   mergeNdgrStatistics,
   decodeChat,
+  shouldAcceptNdgrChatAsComment,
   decodeGift,
   decodeChunkedMessage,
   decodePackedSegment,
@@ -433,6 +434,76 @@ describe('decodeChunkedMessage', () => {
     expect(result.gifts.length).toBe(0);
   });
 
+  // v0.1.803(星野ロミ式最大化): no(コメント番号)が無くても content があれば chat
+  //   として採用する。匿名(184)コメントは no を持たないが userId/本文を持っており、
+  //   捨てると userId が失われレーンに乗らない退化だった。実バイトで裏取りする。
+  it('採用: no(field8) が無くても content があれば chat に乗る(匿名コメント)', () => {
+    const chat = new Uint8Array([
+      ...strField(1, 'やっほー'), // content
+      ...varintField(5, 99887766) // raw_user_id (no(field8) は無い=匿名)
+    ]);
+    const nicoliveMessage = new Uint8Array(lenDelimited(1, [...chat]));
+    const chunkedMessage = new Uint8Array(lenDelimited(2, [...nicoliveMessage]));
+
+    const result = decodeChunkedMessage(chunkedMessage);
+    expect(result.chats.length).toBe(1);
+    expect(result.chats[0].no).toBeNull();
+    expect(result.chats[0].rawUserId).toBe(99887766);
+    expect(result.chats[0].content).toBe('やっほー');
+    // content がある匿名 chat は gift fallback に流れない(偽陽性 gift を増やさない)
+    expect(result.gifts.length).toBe(0);
+  });
+
+  it('採用: no も content も無い空 chat は chat に乗らず gift fallback へ', () => {
+    // userId だけで content も no も無い chat = システム/座席等。chat にはしない。
+    // gift item_id も無いので gift にも乗らず、結局どこにも残らない(従来どおり)。
+    const chat = new Uint8Array([...varintField(5, 12345)]);
+    const nicoliveMessage = new Uint8Array(lenDelimited(1, [...chat]));
+    const chunkedMessage = new Uint8Array(lenDelimited(2, [...nicoliveMessage]));
+
+    const result = decodeChunkedMessage(chunkedMessage);
+    expect(result.chats.length).toBe(0);
+    expect(result.gifts.length).toBe(0);
+  });
+
+  it('shouldAcceptNdgrChatAsComment: no有り→true(userId不問)', () => {
+    expect(
+      shouldAcceptNdgrChatAsComment({ no: 7, content: '', rawUserId: null, hashedUserId: '' })
+    ).toBe(true);
+  });
+
+  it('shouldAcceptNdgrChatAsComment: no無しは content非空+userId有りで true', () => {
+    // rawUserId 有り → 採用(匿名コメント)
+    expect(
+      shouldAcceptNdgrChatAsComment({ no: null, content: 'あ', rawUserId: 123, hashedUserId: '' })
+    ).toBe(true);
+    // hashedUserId 有り → 採用
+    expect(
+      shouldAcceptNdgrChatAsComment({ no: null, content: 'あ', rawUserId: null, hashedUserId: 'h8charsXX' })
+    ).toBe(true);
+  });
+
+  it('shouldAcceptNdgrChatAsComment: no無し+userId無し→false(gift払い分けの肝)', () => {
+    // content はあるが userId が無い = gift payload 等。chat にしない。
+    expect(
+      shouldAcceptNdgrChatAsComment({ no: null, content: 'stamp_basketball', rawUserId: null, hashedUserId: '' })
+    ).toBe(false);
+    // rawUserId が 0 は falsy 扱い(=未設定)
+    expect(
+      shouldAcceptNdgrChatAsComment({ no: null, content: 'あ', rawUserId: 0, hashedUserId: '' })
+    ).toBe(false);
+  });
+
+  it('shouldAcceptNdgrChatAsComment: content空 / null は false', () => {
+    expect(
+      shouldAcceptNdgrChatAsComment({ no: null, content: '  \n ', rawUserId: 1, hashedUserId: '' })
+    ).toBe(false);
+    expect(
+      shouldAcceptNdgrChatAsComment({ no: null, content: '', rawUserId: 1, hashedUserId: '' })
+    ).toBe(false);
+    expect(shouldAcceptNdgrChatAsComment(/** @type {any} */ (null))).toBe(false);
+  });
+
   it('decodes gift from NicoliveMessage field 8 (proto schema)', () => {
     const gift = new Uint8Array([
       ...strField(1, 'stamp_xxx'),
@@ -725,6 +796,26 @@ describe('v0.1.210 gift fallback (msg.1 chat 失敗時 + msg.其他 で itemId �
     expect(r.chats).toHaveLength(0);
   });
 
+  // v0.1.803: gift payload は item_name(fn=6) が日本語で、decodeChat はそれを
+  //   hashedUserId に【無検証で】入れてしまう。shouldAcceptNdgrChatAsComment が
+  //   hashedUserId を ID 形式(^[a-zA-Z0-9_:-]{8,}$)でのみ信用するので、日本語
+  //   item_name は userId と誤認されず gift fallback へ正しく流れる(chat に化けない)。
+  it('item_name(fn=6) が日本語の gift payload は chat に化けず gift 認定される', () => {
+    const giftPayload = new Uint8Array([
+      ...strField(1, 'stamp_basketball'), // item_id → decodeChat では content
+      ...strField(3, 'よしださん'), // advertiser_name(string) → chat の vpos(varint) 期待なので無視
+      ...varintField(4, 11000), // point → chat の account_status
+      ...strField(6, 'バスケットボール') // item_name(日本語) → decodeChat では hashedUserId
+      // fn=5(rawUserId) / fn=8(no) は無い
+    ]);
+    const msg = new Uint8Array(lenDelimited(1, [...giftPayload]));
+    const chunked = new Uint8Array(lenDelimited(1, [...msg]));
+    const r = decodeChunkedMessage(chunked);
+    expect(r.chats).toHaveLength(0);
+    expect(r.gifts).toHaveLength(1);
+    expect(r.gifts[0].itemId).toBe('stamp_basketball');
+  });
+
   it('msg.1 で chat 成功時は gift fallback しない（chat 優先）', () => {
     const chat = new Uint8Array([
       ...strField(1, 'こんにちは'),
@@ -764,16 +855,33 @@ describe('v0.1.210 gift fallback (msg.1 chat 失敗時 + msg.其他 で itemId �
 });
 
 describe('v0.1.233 chat fallback false positive 抑制 (looksLikeValidGiftItemId)', () => {
-  it('msg.1 chat 本文（日本語「草」）は gift として記録しない', () => {
-    // chat decode が chat.no=null（fn=8 が無いだけ）で抜けるケースを想定。
-    // chat 本文「草」が itemId と誤認されて gift 量産する v0.1.222 までの
-    // 振る舞いをテストで阻止する。
+  // v0.1.803(星野ロミ式最大化 + OneComme 実装裏取り): no が無くても rawUserId を持つ
+  //   本文「草」は【正当な匿名コメント】として chat 採用する(content+userId 有り)。
+  //   OneComme(参考実装)も rawUserId/hashedUserId を持つ chat はコメントとして表示し、
+  //   userId 無しのみ捨てる。重要なのは「草が gift に誤認されない」こと(gifts:0)で、
+  //   それは引き続き保証する。
+  it('msg.1 chat 本文「草」+rawUserId は匿名コメントとして採用(gift 誤認しない)', () => {
     const chatNoNumber = new Uint8Array([
       ...strField(1, '草'),
       ...varintField(5, 12345)
       // fn=8 (chat.no) を意図的に省略
     ]);
     const msg = new Uint8Array(lenDelimited(1, [...chatNoNumber]));
+    const chunked = new Uint8Array(lenDelimited(1, [...msg]));
+    const r = decodeChunkedMessage(chunked);
+    expect(r.gifts).toHaveLength(0);
+    expect(r.chats).toHaveLength(1);
+    expect(r.chats[0].content).toBe('草');
+    expect(r.chats[0].rawUserId).toBe(12345);
+    expect(r.chats[0].no).toBeNull();
+  });
+
+  it('msg.1 本文「草」だが userId が無ければ chat にも gift にもしない(同定不能)', () => {
+    const chatNoUser = new Uint8Array([
+      ...strField(1, '草')
+      // fn=5(rawUserId) / fn=6(hashedUserId) / fn=8(no) すべて無し
+    ]);
+    const msg = new Uint8Array(lenDelimited(1, [...chatNoUser]));
     const chunked = new Uint8Array(lenDelimited(1, [...msg]));
     const r = decodeChunkedMessage(chunked);
     expect(r.gifts).toHaveLength(0);
