@@ -5675,8 +5675,8 @@ function syncStorySourceEntries(liveId, displayList, storageRowsForLane) {
   STORY_SOURCE_STATE.storageRowsForCurrentLive = Array.isArray(storageRowsForLane)
     ? storageRowsForLane
     : [];
-  // 0.1.79: 4 層目のガード — 応援ユーザーレーン（アイコン列）の集約時にも
-  //   broadcaster icon の取り違えを除外する。
+  // 0.1.79: 4層目=集約時に broadcaster icon 取り違え除外。正本(2026-06-17): userLaneCandidatesFromStorage
+  //   は会場(venueBar.js)と同一純関数=popup列と会場席は同じ集約を共有し顔ぶれ一致が正(「鏡映」設計・匿名a:含む)。
   STORY_SOURCE_STATE.laneAggregates = nextLiveId
     ? userLaneCandidatesFromStorage(
         STORY_SOURCE_STATE.storageRowsForCurrentLive,
