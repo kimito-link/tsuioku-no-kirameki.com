@@ -615,6 +615,15 @@ import {
           anonymousNicknameFallback(String(uid), chat.name),
           ''
         );
+      } else if (chat.no == null && uid) {
+        // v0.1.803(星野ロミ式最大化): no(コメント番号)が無くても userId を持つ
+        //   匿名(184)コメントは、enqueue(commentNo 必須)に乗せられないが
+        //   learnUser(userId だけの学習経路)で userId→nickname を seed する。
+        //   これで匿名コメントの userId が known プロファイルに乗り、レーン/会場
+        //   のアバター解決に活きる(=「届いている userId 付き chat を捨てない」)。
+        //   診断 _ndgr.chats も「採用したコメント」として計上しズレを解消。
+        _ndgr.chats++;
+        learnUser(uid, anonymousNicknameFallback(String(uid), chat.name), '');
       }
     }
     const giftList = result.gifts || [];

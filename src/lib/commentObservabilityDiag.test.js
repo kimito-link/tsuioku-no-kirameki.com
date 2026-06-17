@@ -74,15 +74,36 @@ describe('probeCommentRowDataAttributes', () => {
 });
 
 describe('analyzeNdgrChatRejection', () => {
-  it('chat.no が null/undefined は noNumberSkip', () => {
+  // v0.1.803(星野ロミ式最大化): no が無くても「content 非空 + userId 有り」なら採用
+  //   (匿名コメントをレーンへ活かす本体 ndgrChatsToMergeRows と一致)。
+  it('chat.no が null/undefined でも content+userId があれば accepted', () => {
     const r = analyzeNdgrChatRejection([
-      { no: null, content: 'a' },
-      { no: undefined, content: 'b' },
-      { content: 'c' }
+      { no: null, content: 'a', rawUserId: 111 },
+      { no: undefined, content: 'b', hashedUserId: 'h8charsXX' },
+      { content: 'c', rawUserId: 222 }
     ]);
-    expect(r.noNumberSkip).toBe(3);
-    expect(r.accepted).toBe(0);
+    expect(r.accepted).toBe(3);
+    expect(r.noNumberSkip).toBe(0);
     expect(r.totalInput).toBe(3);
+  });
+
+  it('no 無し+userId 無し(content 有り)は noNumberSkip(gift payload 誤読の払い分け)', () => {
+    const r = analyzeNdgrChatRejection([
+      { no: null, content: 'stamp_basketball' },
+      { no: null, content: 'あ', rawUserId: 0 }
+    ]);
+    expect(r.noNumberSkip).toBe(2);
+    expect(r.accepted).toBe(0);
+  });
+
+  it('content も無い空 chat は emptyTextSkip(偽陽性抑止)', () => {
+    const r = analyzeNdgrChatRejection([
+      { no: null, content: '' },
+      { content: '   ' },
+      {}
+    ]);
+    expect(r.emptyTextSkip).toBe(3);
+    expect(r.accepted).toBe(0);
   });
 
   it('content が空は emptyTextSkip', () => {
@@ -110,19 +131,21 @@ describe('analyzeNdgrChatRejection', () => {
     expect(r.accepted).toBe(2);
   });
 
-  it('複合: 4 種類の reason を同時集計', () => {
+  // v0.1.803: no 無しでも「content+userId」なら accepted、userId 無しは noNumberSkip。
+  it('複合: reason を同時集計(no無し+userId有りは accepted、userId無しは noNumberSkip)', () => {
     const r = analyzeNdgrChatRejection([
-      { no: null, content: 'a' },
-      { no: 1, content: '' },
-      { no: 2, content: 'シンラツさんがギフト「メガホン（10pt）」を贈りました' },
-      { no: 3, content: '通常コメ' }
+      { no: null, content: 'a', rawUserId: 111 }, // 匿名コメント → accepted
+      { no: null, content: 'stamp_basketball' }, // userId 無し → noNumberSkip
+      { no: 1, content: '' }, // 本文空 → emptyTextSkip
+      { no: 2, content: 'シンラツさんがギフト「メガホン（10pt）」を贈りました' }, // gift
+      { no: 3, content: '通常コメ' } // accepted
     ]);
     expect(r).toEqual({
-      totalInput: 4,
+      totalInput: 5,
       noNumberSkip: 1,
       emptyTextSkip: 1,
       giftSystemMsgSkip: 1,
-      accepted: 1
+      accepted: 2
     });
   });
 
