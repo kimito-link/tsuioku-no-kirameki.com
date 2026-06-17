@@ -496,6 +496,48 @@ describe('crawlNdgrBackward（過去ログ backward 巡回エンジン）', () =
     expect(result.stopReason).toBe('reached_start');
   });
 
+  it('v0.1.814: 入口なし(!backwardUri)の reseed 橋渡し中は bridging:true イベントを yield する（stall watchdog 誤殺の根治）', async () => {
+    // 真因: 空区画の reseed(seek で入口が見つからず起点を前へ送る)中は chats=0 のため
+    //   従来は consumer へ yield せず、content の _backfillLastProgressAt が更新されない。
+    //   裏タブの遅いペースで240回橋渡しすると 150秒 stall watchdog が「正常な橋渡し」を
+    //   失速と誤認して abort→rearm を繰り返した。空 reseed でも bridging イベントを yield して
+    //   『生きて橋渡し中』を伝える(rows は増えない=記録/件数不変)。
+    const PROGRAM_START = 1000;
+    const BK_A = 'https://mpn.live.nicovideo.jp/data/backward/v4/BRIDGE_A';
+    const BK_OLD = 'https://mpn.live.nicovideo.jp/data/backward/v4/BRIDGE_OLD';
+
+    const map = new Map();
+    map.set(atUrl('now'), nowEntryBytes(1000));
+    // 区画1: SEED_AT=910 で見つかる。
+    map.set(ENTRY_AT, viewEntryBytes({ backwardUri: BK_A }));
+    map.set(BK_A, packedSegmentBytes([{ no: 50, content: '途中', name: 'u', vpos: 60000 }]));
+    // 再シード(860)は View に backwardUri を含めない=入口なし(!backwardUri)→ bridging yield して前へ。
+    map.set(atUrl(860), viewEntryBytes({}));
+    // 次の再シード(810)で配信開始区画に届く。
+    map.set(atUrl(810), viewEntryBytes({ backwardUri: BK_OLD }));
+    map.set(BK_OLD, packedSegmentBytes([{ no: 5, content: '配信序盤', name: 'u', vpos: 100 }]));
+
+    const { fetchBinary } = makeFetchFromMap(map);
+    const { sleep } = makeNoopSleep();
+    const { events, chatsAll } = await drain(
+      crawlNdgrBackward({
+        viewBase: VIEW_BASE,
+        fetchBinary,
+        sleep,
+        now: () => 1_000_000,
+        programStartSec: PROGRAM_START
+      })
+    );
+
+    // 入口なし reseed で bridging:true イベントが少なくとも1回出る(=consumer が進捗時刻を更新できる)。
+    const bridgingEvents = events.filter((e) => e && e.bridging === true);
+    expect(bridgingEvents.length).toBeGreaterThanOrEqual(1);
+    // bridging イベントは chats を増やさない(記録/件数不変=取りこぼし無し)。
+    for (const be of bridgingEvents) expect(be.chats).toEqual([]);
+    // それでも橋渡しして配信序盤(no=5)まで遡れる。
+    expect(chatsAll.map((c) => c.no)).toContain(5);
+  });
+
   it('途中参加: 空区画が連続しても、リトライ上限(12)内なら飛び越えて配信開始まで遡る（v0.1.455・無コメント区間の飛び越え）', async () => {
     // 配信序盤に長い無コメント区間（運営コメントだけの区画が連続）がある配信を模す。
     //   旧実装（上限4・空区画即終了）では飛び越えられなかった。v0.1.455 では空区画もリトライ

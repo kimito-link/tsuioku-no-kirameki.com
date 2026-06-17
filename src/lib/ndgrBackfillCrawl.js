@@ -218,13 +218,16 @@ export const NDGR_BACKFILL_TRANSIENT_RETRY_MS = Object.freeze([500, 1_000, 2_000
 
 /**
  * generator が segment ごとに yield する進捗イベント。
+ * v0.1.814: bridging=true は「空区画(入口なし)を reseed で前へ送っている橋渡し中」を示す軽量イベント
+ *   (chats は常に空)。consumer が _backfillLastProgressAt を更新して stall watchdog の誤殺を防ぐ用。
  * @typedef {{
  *   chats: import('./ndgrDecode.js').NdgrChat[],
  *   segmentsFetched: number,
  *   rowsSeen: number,
  *   bytesFetched: number,
  *   minCommentNo: number|null,
- *   minVposReached?: number|null
+ *   minVposReached?: number|null,
+ *   bridging?: boolean
  * }} NdgrBackfillProgress
  */
 
@@ -836,6 +839,22 @@ export async function* crawlNdgrBackward(opts) {
       //   1200s×streak も戻し、46 分級の配信では配信開始を飛び越して programStart に張り付き、
       //   毎回同じ場所＝ no_progress 即終了だった。バケット幅で着実に隣のバケットへ降ろす。
       seedAtSec = nextSeedAtSec(seedAtSec - NDGR_BACKFILL_RESEED_BUCKET_STEP_SEC);
+      // v0.1.814「疎区間橋渡し中に stalled で殺される」根治: 空区画(コメントの無い時間帯)を
+      //   reseed で前へ送っている間は chats=0 行のため、従来は consumer へ yield せず content の
+      //   _backfillLastProgressAt が更新されなかった。裏タブの遅いペース(150ms)で240回橋渡しすると
+      //   150秒の stall watchdog(content-entry:16324)が【正常な橋渡しを失速と誤認】して abort→rearm
+      //   →やり直しを繰り返し「大配信でなかなか100%にならない」体感の真因だった。空 reseed でも
+      //   bridging イベントを yield して『生きて橋渡し中』を consumer に伝える(rows は増えないので
+      //   記録・件数は不変・取りこぼし無し)。本物のハングは caps.elapsedMs(15分上限)で従来どおり停止。
+      yield {
+        chats: [],
+        segmentsFetched,
+        rowsSeen,
+        bytesFetched,
+        minCommentNo: null,
+        minVposReached: globalMinVpos,
+        bridging: true
+      };
       // v0.1.695: 空リトライ間に小休止を挟む。従来は上限240回まで無休で空シークを連発し、
       //   SW/コンテンツのイベントループとNDGRをリクエスト嵐で圧迫していた(実機: SWがメッセージ
       //   応答不能)。橋渡しの正しさは不変(回数・順序は同じ)・ペースだけ毎秒数件に落とす。
