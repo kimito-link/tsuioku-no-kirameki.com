@@ -20,18 +20,30 @@ import { buildPerfDiagLine } from './perfDiag.js';
 
 /**
  * 概要テキスト(配信数・累計記録・公式累計・取得率)を組み立てる。
+ *
+ * v0.1.804: 累計記録は各 live の(per-live で単調化済み)記録件数を合算するが、enumerate の
+ *   一瞬の揺れ(タブの query タイミング・storage クランプで panel summary が一時的に欠ける等)で
+ *   合算対象から live が落ちると累計だけが後退して見えることがある。これを表示層で吸収するため、
+ *   呼び出し側が「直近に出した累計の最大」を opts.recordedSumFloor として渡せる。床は表示だけで、
+ *   storage には書かない(リロードすれば素直に再計算=「タブを閉じたら本当に減る」を恒久には隠さない)。
+ *
  * @param {object[]} livesData
+ * @param {{ recordedSumFloor?: number }} [opts]
  * @returns {string} 空配列なら ''
  */
-export function buildOverviewText(livesData) {
+export function buildOverviewText(livesData, opts = {}) {
   if (!Array.isArray(livesData) || !livesData.length) return '';
   const lines = [];
   const total = livesData.length;
-  let recordedSum = 0;
+  let recordedSum = sumRecordedFromLives(livesData);
   let officialSum = 0;
   for (const r of livesData) {
-    recordedSum += r.recordedCount || 0;
     officialSum += r.officialCommentCount || 0;
+  }
+  // 累計の後退だけを床で止める(per-live は既に単調化済みなので、ここは enumerate 揺れ対策)。
+  const floor = Number(opts && opts.recordedSumFloor);
+  if (Number.isFinite(floor) && floor > recordedSum) {
+    recordedSum = floor;
   }
   const ratePct = officialSum > 0 ? Math.round((recordedSum / officialSum) * 100) : null;
   lines.push(`記録中 ${total} 配信 / 累計 記録 ${recordedSum.toLocaleString('ja-JP')} 件`);
@@ -39,6 +51,18 @@ export function buildOverviewText(livesData) {
     lines.push(`公式累計 ${officialSum.toLocaleString('ja-JP')} 件 (取得率 ${ratePct}%)`);
   }
   return lines.join('\n');
+}
+
+/**
+ * livesData の記録件数を合算する純関数(累計の床を呼び出し側が保持するために使う)。
+ * @param {object[]} livesData
+ * @returns {number} 記録件数の合算(空/非配列は 0)
+ */
+export function sumRecordedFromLives(livesData) {
+  if (!Array.isArray(livesData)) return 0;
+  let sum = 0;
+  for (const r of livesData) sum += (r && r.recordedCount) || 0;
+  return sum;
 }
 
 /**

@@ -25,7 +25,8 @@ import {
   buildOverviewText,
   buildLiveBlockText,
   buildBackfillProgressLine,
-  buildLaneStatusLine
+  buildLaneStatusLine,
+  sumRecordedFromLives
 } from '../lib/statusFormat.js';
 import { resolveVisitorCount } from '../lib/resolveVisitorCount.js';
 import { PERF_DIAG_PREFIX, isPerfDiag } from '../lib/perfDiag.js';
@@ -73,6 +74,12 @@ let _refreshTimerId = /** @type {number|null} */ (null);
 let _lastRenderedBundle = /** @type {{ overview: string, lives: object[], textBlob: string, jsonBlob: object }|null} */ (
   null
 );
+/**
+ * v0.1.804: 概要「累計 記録」を後退させない床。enumerate の一瞬の揺れ(タブ query タイミング・
+ *   storage クランプで panel summary が一時欠ける)で合算対象から live が落ちて累計だけが減るのを
+ *   表示層で吸収する。床はこのページが開いている間だけ(リロードで素直に再計算)。storage には書かない。
+ */
+let _recordedSumFloor = 0;
 
 /* ============================================================================
  * 起動
@@ -337,7 +344,11 @@ function renderAll({ lvList, summaries, fastDiag, backfillProgress }) {
   );
 
   // 概要セクション
-  const overviewText = buildOverviewText(livesData);
+  // v0.1.804: enumerate の一瞬の揺れで累計だけが後退するのを床で吸収する。床はページが開いている間
+  //   だけ保持し(リロードで素直に再計算)、storage には書かない。本当の値が床を超えれば床も上がる。
+  const overviewText = buildOverviewText(livesData, { recordedSumFloor: _recordedSumFloor });
+  const recordedSumNow = sumRecordedFromLives(livesData);
+  if (recordedSumNow > _recordedSumFloor) _recordedSumFloor = recordedSumNow;
   // v0.1.659: 過去ログ取得の診断(stopReason)を概要に併記。「一気に取れない・50%停止」の真因を
   //   ユーザーが status を開くだけで AI 共有できる(reached_start=完走 / no_progress=疎区間で停止 /
   //   backward_exhausted=入口無し / cap_*=上限 / rate_limited=混雑)。

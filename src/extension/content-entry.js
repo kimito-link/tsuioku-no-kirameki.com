@@ -71,8 +71,9 @@ import {
 import { addThumbBlob, countThumbsForLive, isIndexedDbAvailable } from '../lib/thumbDb.js';
 import { createDevReloadState, applyDevReloadSignal } from '../lib/devReloadSignal.js';
 import {
-  createMonotonicCommentCountState,
-  resolveMonotonicCommentCount
+  createMonotonicCommentCountMap,
+  resolveMonotonicCommentCountForLive,
+  forgetMonotonicCommentCountForLive
 } from '../lib/monotonicCommentCount.js';
 import {
   evaluateRecordingStall,
@@ -717,17 +718,21 @@ let observedRecordedCommentCount = 0;
 //   渡す瞬間だけ】同一配信内で後退させない単調ゲート(既存 monotonicCommentCount)を通す。
 //   6経路の絶対代入が非同期に別正本(テール/IDB/chunk)を見て上書き合戦し、後着の小さい値が
 //   表示を後退させていた症状を、表示層でだけ吸収する(内部ロジックは不変=安全)。
-const _recordedDisplayMonotonicState = createMonotonicCommentCountState();
+// v0.1.804「記録がまた減る」根治: 単一 state は lv が変わるたびリセットされ、さらに recording の
+//   手動 OFF/ON で resetOfficialCommentSamplingState() がゲートごと消すため、同一配信でもトグルで
+//   max が飛んで件数が後退していた。ゲートを lv ごとの Map に変え、recording OFF/ON では消さず
+//   (max 保持)、本当の配信切替(liveIdSwitched)でだけ該当 lv を forget する(新セッションは 0 から)。
+const _recordedDisplayMonotonicByLive = createMonotonicCommentCountMap();
 /**
  * 表示用サマリに出すコメント件数を、同一配信内で後退させない値に解決する。
- * 内部ロジック用の observedRecordedCommentCount(生値)は変えない。lv が変われば
- *   resolveMonotonicCommentCount が自動でリセットする(別配信)。
+ * 内部ロジック用の observedRecordedCommentCount(生値)は変えない。lv ごとに max を
+ *   保持するので、別配信は別カウント・recording の OFF/ON では max を保つ。
  * @param {string} lid
  * @returns {number}
  */
 function recordedCountForDisplay(lid) {
-  const gated = resolveMonotonicCommentCount(
-    _recordedDisplayMonotonicState,
+  const gated = resolveMonotonicCommentCountForLive(
+    _recordedDisplayMonotonicByLive,
     lid,
     observedRecordedCommentCount
   );
@@ -2010,11 +2015,10 @@ function resetOfficialCommentSamplingState() {
   officialCommentHistory.length = 0;
   observedRecordedCommentCount = 0;
   _lastPanelSummaryRecordedWritten = -1;
-  // v0.1.792: 表示用の単調ゲートも明示クリア。配信切替/非watch遷移で生件数が 0 から積み直す
-  //   とき、古い max が残って嘘の件数を出すのを防ぐ(単調化の罠回避)。lv 変化時は
-  //   resolveMonotonicCommentCount が自動リセットするが、同一 lv で 0 へ戻る経路に備えここでも消す。
-  _recordedDisplayMonotonicState.lv = '';
-  _recordedDisplayMonotonicState.max = 0;
+  // v0.1.804: 表示用の単調ゲート(per-live Map)は【ここでは消さない】。この関数は recording の
+  //   手動 OFF/ON(KEY_RECORDING→OFF)でも呼ばれるため、ここで Map を消すと同一配信のトグルで
+  //   max が飛んで件数が後退する(v0.1.792 で消していたのが再発の真因)。本当の配信切替のときだけ
+  //   syncLiveIdFromLocation の liveIdSwitched 分岐で forgetMonotonicCommentCountForLive(旧lv) する。
 }
 
 /** `#embedded-data` の遅延出現後に programBeginAt を一度だけ埋める（L3 補助） */
@@ -11637,6 +11641,12 @@ function syncLiveIdFromLocation() {
     }
     if (ctx.liveIdSwitched) {
       void clearCommentHarvestPanelDiagnostic();
+      // v0.1.804: 本当の配信切替で【入る側(ctx.liveId)】の記録件数 単調ゲートを破棄する。
+      //   入る live は記録がテール/0 から積み直しになるので、その live の過去 max を 0 から数え直す。
+      //   旧 lv ではなく新 lv を forget するのは「録画を止めて別 live を見て【同じ lv に戻った】とき
+      //   古い大きい max が残る」批判役の罠を、録画セッション ID を新設せず防ぐため(戻った lv=入る側)。
+      //   recording の手動 OFF/ON では呼ばれない=同一 live のトグルでは max 保持(経路1 根治)。
+      forgetMonotonicCommentCountForLive(_recordedDisplayMonotonicByLive, ctx.liveId);
       // 別 lv へ切替＝leo-player も組み直されるので初回ゲートを再武装。
       resetInlineFirstPaintGate();
       pendingRoots.clear();

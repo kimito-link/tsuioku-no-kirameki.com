@@ -3,6 +3,9 @@ import {
   createMonotonicCommentCountState,
   normalizeMonotonicLiveId,
   resolveMonotonicCommentCount,
+  createMonotonicCommentCountMap,
+  resolveMonotonicCommentCountForLive,
+  forgetMonotonicCommentCountForLive,
 } from './monotonicCommentCount.js';
 
 describe('normalizeMonotonicLiveId', () => {
@@ -83,5 +86,71 @@ describe('resolveMonotonicCommentCount', () => {
     // リセット後: 同一 lv でも低い値から正しく再開する
     expect(resolveMonotonicCommentCount(s, 'lv1', 3)).toBe(3);
     expect(s.max).toBe(3);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// v0.1.804: per-live Map 版(「記録がまた減る」根治)
+// ---------------------------------------------------------------------------
+
+describe('resolveMonotonicCommentCountForLive (per-live Map)', () => {
+  it('lv ごとに独立して max を保持する(複数配信同時でも混ざらない)', () => {
+    const m = createMonotonicCommentCountMap();
+    expect(resolveMonotonicCommentCountForLive(m, 'lv1', 100)).toBe(100);
+    expect(resolveMonotonicCommentCountForLive(m, 'lv2', 5)).toBe(5);
+    // lv1 に低い値が来ても lv1 の max は据え置き、lv2 は独立
+    expect(resolveMonotonicCommentCountForLive(m, 'lv1', 80)).toBe(100);
+    expect(resolveMonotonicCommentCountForLive(m, 'lv2', 9)).toBe(9);
+  });
+
+  it('同一 lv 内で後退させない(核心)', () => {
+    const m = createMonotonicCommentCountMap();
+    expect(resolveMonotonicCommentCountForLive(m, 'lv1', 88)).toBe(88);
+    expect(resolveMonotonicCommentCountForLive(m, 'lv1', 7)).toBe(88); // テール seed の小さい値→据え置き
+    expect(resolveMonotonicCommentCountForLive(m, 'lv1', 120)).toBe(120); // 伸びる
+  });
+
+  it('recording OFF/ON 相当(Map を触らない)では max が保持される=経路1 根治', () => {
+    const m = createMonotonicCommentCountMap();
+    resolveMonotonicCommentCountForLive(m, 'lv1', 88);
+    // 旧実装は resetOfficialCommentSamplingState でゲートを消していた。
+    // 新実装は Map を触らないので、トグル後にテール seed の小さい値が来ても後退しない。
+    expect(resolveMonotonicCommentCountForLive(m, 'lv1', 7)).toBe(88);
+  });
+
+  it('非数値/負は null・lv 不正は素通し(Map を汚さない)', () => {
+    const m = createMonotonicCommentCountMap();
+    expect(resolveMonotonicCommentCountForLive(m, 'lv1', '文言')).toBeNull();
+    expect(resolveMonotonicCommentCountForLive(m, 'lv1', -1)).toBeNull();
+    expect(resolveMonotonicCommentCountForLive(m, 'co1', 50)).toBe(50);
+    expect(resolveMonotonicCommentCountForLive(m, '', 50)).toBe(50);
+    expect(m.size).toBe(0);
+  });
+
+  it('case/whitespace 変化は同一 lv 扱い', () => {
+    const m = createMonotonicCommentCountMap();
+    expect(resolveMonotonicCommentCountForLive(m, 'lv9', 100)).toBe(100);
+    expect(resolveMonotonicCommentCountForLive(m, '  LV9 ', 50)).toBe(100);
+  });
+});
+
+describe('forgetMonotonicCommentCountForLive (genuine switch のみ 0 から)', () => {
+  it('該当 lv のエントリだけ消す=同 lv を新セッションで 0 から数え直せる', () => {
+    const m = createMonotonicCommentCountMap();
+    resolveMonotonicCommentCountForLive(m, 'lv1', 500);
+    resolveMonotonicCommentCountForLive(m, 'lv2', 300);
+    forgetMonotonicCommentCountForLive(m, 'lv1');
+    // lv1 は消えた→低い値から再開、lv2 は残る
+    expect(resolveMonotonicCommentCountForLive(m, 'lv1', 3)).toBe(3);
+    expect(resolveMonotonicCommentCountForLive(m, 'lv2', 10)).toBe(300);
+  });
+
+  it('lv 不正・非 Map は no-op(壊れない)', () => {
+    const m = createMonotonicCommentCountMap();
+    resolveMonotonicCommentCountForLive(m, 'lv1', 100);
+    forgetMonotonicCommentCountForLive(m, '');
+    forgetMonotonicCommentCountForLive(m, 'co1');
+    forgetMonotonicCommentCountForLive(null, 'lv1');
+    expect(resolveMonotonicCommentCountForLive(m, 'lv1', 50)).toBe(100); // 消えていない
   });
 });
