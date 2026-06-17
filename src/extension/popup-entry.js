@@ -247,8 +247,7 @@ import {
 import {
   RINKU_IMGS,
   KONTA_IMGS,
-  TANUNEE_IMGS,
-  CHARA_IMG_BASE
+  TANUNEE_IMGS
 } from '../lib/celebrationCharaAssets.js';
 import {
   NLS_PLAY_WATCH_CELEBRATION,
@@ -501,6 +500,7 @@ import {
   parseCommentPanelStatusPayload
 } from '../lib/commentPanelStatus.js';
 import { escapeHtml, escapeAttr } from '../lib/htmlEscape.js';
+import { buildEventSelfStatusHeaderHtml } from '../lib/eventSelfStatusHeaderHtml.js';
 import { topSupportRankLineModels } from '../lib/topSupportRankStripLines.js';
 import { TOP_SUPPORT_RANK_STRIP_MAX } from '../lib/topSupportRankStripConfig.js';
 import { topSupportRankStripStableKey } from '../lib/topSupportRankStripStableKey.js';
@@ -9808,55 +9808,8 @@ function buildEventBroadcasterLaneCurrentRankPretext() {
  * @param {string} [broadcasterName] 拡張が持つ正本配信者名
  * @returns {string}
  */
-function buildEventSelfStatusHeaderHtml(self, broadcasterName) {
-  if (!self || typeof self !== 'object') return '';
-  const rank = typeof self.rank === 'number' && Number.isFinite(self.rank) && self.rank > 0 ? Math.trunc(self.rank) : null;
-  const score = typeof self.score === 'number' && Number.isFinite(self.score) && self.score >= 0 ? Math.trunc(self.score) : null;
-  const diff = typeof self.diffToNext === 'number' && Number.isFinite(self.diffToNext) && self.diffToNext >= 0 ? Math.trunc(self.diffToNext) : null;
-  const eventName = String(self.eventName || '').trim();
-  const name = String(broadcasterName || '').trim();
-  const fmt = (/** @type {number} */ n) => n.toLocaleString('en-US');
-
-  // 本人の順位が確定できなければヘッダ自体を出さない（順位を大きく見せるのが主目的）。
-  if (rank == null) return '';
-
-  // 1-3 位はメダル絵文字、それ以外は順位数字を強調。
-  const medal = rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : '';
-  const tierClass = rank <= 3 ? ` nl-event-self__badge--top${rank}` : '';
-  const badgeInner = medal
-    ? `<span class="nl-event-self__medal">${medal}</span><span class="nl-event-self__rank-num">${rank}<span class="nl-event-self__rank-suffix">位</span></span>`
-    : `<span class="nl-event-self__rank-num nl-event-self__rank-num--plain">${rank}<span class="nl-event-self__rank-suffix">位</span></span>`;
-
-  // ゆっくりりんくの語りかけ。配信者名がある時だけ名前入りに。
-  const whoLabel = name ? `${escapeHtml(name)}さん` : 'この配信者さん';
-  const scoreTxt = score != null ? `（💎${fmt(score)}）` : '';
-  const talkMain = `${whoLabel}は現在 <strong>${rank}位</strong> ${scoreTxt}だよ！`;
-  let talkPush;
-  if (rank === 1) {
-    talkPush = '🎉 堂々の<strong>1位</strong>！みんなで応援して守ろう！';
-  } else if (diff != null && diff > 0) {
-    talkPush = `あと <strong>💎${fmt(diff)}</strong> で <strong>${rank - 1}位</strong>！みんなでランキングに入れるよう応援しよう！`;
-  } else {
-    talkPush = 'みんなでランキングに入れるよう応援しよう！';
-  }
-
-  const eventLine = eventName
-    ? `<p class="nl-event-self__event">🏆 ${escapeHtml(eventName)}</p>`
-    : '';
-
-  return (
-    `<div class="nl-event-self">` +
-      `<div class="nl-event-self__badge${tierClass}">${badgeInner}</div>` +
-      `<div class="nl-event-self__body">` +
-        eventLine +
-        `<p class="nl-event-self__talk">` +
-          `<img class="nl-event-self__rinku" src="${CHARA_IMG_BASE}/link/link-yukkuri-smile-mouth-open.png" alt="ゆっくりりんく" onerror="this.style.display='none'" />` +
-          `<span class="nl-event-self__talk-text">${talkMain} ${talkPush}</span>` +
-        `</p>` +
-      `</div>` +
-    `</div>`
-  );
-}
+// v0.1.809: buildEventSelfStatusHeaderHtml は src/lib/eventSelfStatusHeaderHtml.js へ抽出
+//   (純関数・挙動完全不変・依存は escapeHtml/CHARA_IMG_BASE のみで lib 側が直接 import)。
 
 /**
  * 第2弾 北極星レーン「同じイベントに参加中の配信者」。
