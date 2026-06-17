@@ -105,6 +105,16 @@ build/                 ← .gitignore 対象。CWS 提出用 ZIP + 生成アセ�
 - `build/` は gitignore されているので、中の成果物は `_gen_*.py` から **再生成可能な状態** を保つこと
 - CWS 提出物のマスターは `src/images/googlechrom/` にだけ置く（`build/store-listing/` は中間生成物扱い）
 
+**ディレクトリマップ（自動生成・どこに置く/どこを直すで迷わないため）**:
+- `docs/repo-tree-map.md`（テキスト正本）＋ `docs/repo-tree-map.html`（色付き視覚ビュー）が、
+  各ディレクトリの役割（色・速度・コメント・レポート 等どの機能担当か）を一覧化する。
+- 実体は `scripts/repo-tree-map.mjs` が git 追跡ファイルから**自動生成**（`npm run tree-map`）。
+  ツリーは手で書かない。役割の一言説明だけ同スクリプトの `ROLES` 辞書が正本。
+- **新しいディレクトリを作ったら**: マップに「⚠️ 未記入」で赤く出る → `ROLES` に1行足して `npm run tree-map`。
+- `npm run verify:cc` に `tree-map:check`（再生成して差分が出たら失敗）が入っているので、
+  ディレクトリ追加・削除でマップが古いままだと検証で気づく（腐らない）。
+- この仕組みは `docs/feature-map/`（機能ごと依存図・`npm run feature-map`）と同じ流儀の姉妹。
+
 ---
 
 ## 5. 直近の変更履歴

@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>リポジトリ ディレクトリマップ — 君斗りんくの追憶のきらめき</title>
+<style>
+  :root{ --bg:#0f1115; --panel:#161922; --ink:#e6e8ec; --sub:#aab0bb; --muted:#7b8390; --line:#2a2f3a;
+    --ok:#2f7d4a; --warn:#b5485f; --tag-bg:#1d2740; --tag-bd:#3f5b8c; --tag-ink:#bcd2f6; }
+  body{ margin:0; padding:28px 20px; background:var(--bg); color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Hiragino Sans","Yu Gothic UI",sans-serif; }
+  .wrap{ max-width:1040px; margin:0 auto; }
+  h1{ font-size:21px; margin:0 0 4px; }
+  .meta{ color:var(--muted); font-size:12px; margin:0 0 18px; line-height:1.6; }
+  .meta a{ color:#7fa8e0; }
+  .banner{ border-radius:10px; padding:10px 14px; font-size:13px; margin:0 0 18px; line-height:1.6; }
+  .banner.ok{ background:rgba(47,125,74,.16); border:1px solid var(--ok); color:#b8f0cf; }
+  .banner.warn{ background:rgba(181,72,95,.16); border:1px solid var(--warn); color:#f6c7d2; }
+  .banner code{ background:rgba(255,255,255,.08); padding:1px 5px; border-radius:4px; }
+  section.dir{ background:var(--panel); border:1.5px solid var(--line); border-radius:12px;
+    padding:14px 18px; margin:0 0 14px; }
+  section.dir.miss{ border-color:var(--warn); background:rgba(181,72,95,.08); }
+  .dhead{ display:flex; align-items:baseline; gap:10px; }
+  .dname{ font-size:16px; font-weight:700; color:#fff; font-family:"Menlo","Consolas",monospace; }
+  .cnt{ font-size:11px; color:var(--muted); }
+  .drole{ font-size:13px; color:var(--sub); margin:5px 0 0; line-height:1.6; }
+  .kids{ margin-top:10px; display:grid; grid-template-columns:repeat(auto-fill,minmax(280px,1fr)); gap:8px; }
+  .kid{ background:rgba(255,255,255,.03); border:1px solid var(--line); border-radius:8px; padding:8px 11px; }
+  .kid.miss{ border-color:var(--warn); }
+  .kname{ font-family:"Menlo","Consolas",monospace; font-size:12.5px; color:var(--ink); }
+  .krole{ font-size:11.5px; color:var(--muted); margin-top:3px; line-height:1.5; }
+  .tag{ display:inline-block; font-size:10px; padding:1px 7px; border-radius:999px; margin:2px 3px 0 0;
+    background:var(--tag-bg); border:1px solid var(--tag-bd); color:var(--tag-ink); }
+  .legend{ margin-top:22px; font-size:12.5px; color:var(--sub); background:var(--panel);
+    border:1px solid var(--line); border-radius:12px; padding:14px 18px; line-height:1.9; }
+  .legend b{ color:var(--ink); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>リポジトリ ディレクトリマップ</h1>
+  <p class="meta">
+    どのディレクトリが何の担当か（色・速度・コメント・レポート…）を一目で。<code>scripts/repo-tree-map.mjs</code> が git 追跡ファイルから自動生成（手編集しない）。<br>
+    テキスト正本: <a href="repo-tree-map.md">repo-tree-map.md</a> ／ 機能依存図: <a href="feature-map/index.md">feature-map/index.md</a> ／ 配置ルール: <a href="../AGENTS.md">AGENTS.md</a> §4。
+  </p>
+  <div class="banner ok">✅ すべてのディレクトリに役割が記入済み</div>
+  <section class="dir">
+      <div class="dhead"><span class="dname">api/</span><span class="cnt">1 件</span></div>
+      <div class="drole">サーバレス API(status エンドポイント) <span class="tag">API</span></div>
+      
+    </section>
+<section class="dir">
+      <div class="dhead"><span class="dname">app/</span><span class="cnt">3 件</span></div>
+      <div class="drole">Web 版状態ページのアプリ(app.js + dist) <span class="tag">Web版</span></div>
+      <div class="kids"><div class="kid"><div class="kname">dist/ <span class="cnt">1</span></div><div class="krole">Web 版アプリのビルド成果物 <span class="tag">ビルド成果物</span></div></div></div>
+    </section>
+<section class="dir">
+      <div class="dhead"><span class="dname">council/</span><span class="cnt">20 件</span></div>
+      <div class="drole">会議(COUNCIL)の問い・回答・統合(SYNTHESIS)。設計判断の根拠 <span class="tag">会議</span><span class="tag">設計</span></div>
+      
+    </section>
+<section class="dir">
+      <div class="dhead"><span class="dname">docs/</span><span class="cnt">60 件</span></div>
+      <div class="drole">設計正本・マインドマップ・フロー図・feature-map(AI/人間向け) <span class="tag">設計</span><span class="tag">レポート</span></div>
+      <div class="kids"><div class="kid"><div class="kname">article-assets/ <span class="cnt">3</span></div><div class="krole">記事用の画像・動画・音声アセット <span class="tag">記事</span><span class="tag">画像</span></div></div><div class="kid"><div class="kname">feature-map/ <span class="cnt">11</span></div><div class="krole">機能ごと依存図(自動生成)。誰が storage を書き/読むか <span class="tag">依存図</span><span class="tag">自動生成</span></div></div><div class="kid"><div class="kname">policies/ <span class="cnt">1</span></div><div class="krole">運用方針メモ(統計の失敗モード等) <span class="tag">方針</span></div></div><div class="kid"><div class="kname">releases/ <span class="cnt">4</span></div><div class="krole">リリース関連メモ(CWS 公開 API 設定・版ごとの記事下書き) <span class="tag">リリース</span></div></div><div class="kid"><div class="kname">research/ <span class="cnt">2</span></div><div class="krole">ディープリサーチ成果(ギフトランキング等の調査) <span class="tag">調査</span><span class="tag">レポート</span></div></div><div class="kid"><div class="kname">workflows/ <span class="cnt">1</span></div><div class="krole">開発ワークフロー設計(TDD/UI-UX ロードマップ等) <span class="tag">ワークフロー</span></div></div></div>
+    </section>
+<section class="dir">
+      <div class="dhead"><span class="dname">extension/</span><span class="cnt">106 件</span></div>
+      <div class="drole">拡張本体の配布版ソース(ここを編集)。manifest/background/各 html <span class="tag">配布</span><span class="tag">manifest</span></div>
+      <div class="kids"><div class="kid"><div class="kname">dist/ <span class="cnt">9</span></div><div class="krole">ビルド成果物(content/popup/status 等の bundle)。build が生成 <span class="tag">ビルド成果物</span></div></div><div class="kid"><div class="kname">images/ <span class="cnt">87</span></div><div class="krole">アイコン・ロゴのマスター画像 <span class="tag">画像</span></div></div><div class="kid"><div class="kname">sound/ <span class="cnt">2</span></div><div class="krole">読み上げ・完了音などの音声素材 <span class="tag">音声</span></div></div></div>
+    </section>
+<section class="dir">
+      <div class="dhead"><span class="dname">memory/</span><span class="cnt">76 件</span></div>
+      <div class="drole">セッション横断の知見・引き継ぎ(AI のメモリ)。コミット対象外も混在 <span class="tag">メモリ</span><span class="tag">知見</span></div>
+      <div class="kids"><div class="kid"><div class="kname">archive/ <span class="cnt">12</span></div><div class="krole">過去セッションの引き継ぎ(HANDOFF)アーカイブ <span class="tag">メモリ</span><span class="tag">履歴</span></div></div><div class="kid"><div class="kname">avatar-parts/ <span class="cnt">26</span></div><div class="krole">アバター素材(顔シート等)の参考画像 <span class="tag">アバター</span><span class="tag">画像</span></div></div></div>
+    </section>
+<section class="dir">
+      <div class="dhead"><span class="dname">scripts/</span><span class="cnt">25 件</span></div>
+      <div class="drole">ビルド・検証・自動生成スクリプト(build/feature-map/repo-tree-map 等) <span class="tag">ビルド</span><span class="tag">自動生成</span></div>
+      <div class="kids"><div class="kid"><div class="kname">xserver/ <span class="cnt">2</span></div><div class="krole">Xserver 向け webhook(git pull デプロイ)スクリプト <span class="tag">デプロイ</span><span class="tag">webhook</span></div></div></div>
+    </section>
+<section class="dir">
+      <div class="dhead"><span class="dname">src/</span><span class="cnt">1079 件</span></div>
+      <div class="drole">LP 側 + 純粋関数ライブラリの源 <span class="tag">ソース</span></div>
+      <div class="kids"><div class="kid"><div class="kname">data/ <span class="cnt">6</span></div><div class="krole">保存コメントからレーン候補を読む acquirer / source 層 <span class="tag">コメント</span><span class="tag">取得</span></div></div><div class="kid"><div class="kname">domain/ <span class="cnt">18</span></div><div class="krole">ドメイン正本(応援レーンの集約・列ポリシー等。識別子判定など) <span class="tag">応援</span><span class="tag">集約</span><span class="tag">識別子</span></div></div><div class="kid"><div class="kname">extension/ <span class="cnt">11</span></div><div class="krole">バンドル entry(content/popup/venue/status/offscreen/backfill-sw 等=機能境界) <span class="tag">entry</span><span class="tag">記録</span><span class="tag">会場</span><span class="tag">応援</span></div></div><div class="kid"><div class="kname">fixtures/ <span class="cnt">1</span></div><div class="krole">テスト用フィクスチャ <span class="tag">テスト</span></div></div><div class="kid"><div class="kname">images/ <span class="cnt">165</span></div><div class="krole">LP / CWS 提出物のマスター画像 <span class="tag">画像</span></div></div><div class="kid"><div class="kname">lib/ <span class="cnt">869</span></div><div class="krole">純粋関数ライブラリ(unit test 対象)。色・速度・コメント・レポート等の計算ロジックの大半 <span class="tag">色</span><span class="tag">速度</span><span class="tag">コメント</span><span class="tag">レポート</span><span class="tag">純粋関数</span></div></div><div class="kid"><div class="kname">shared/ <span class="cnt">7</span></div><div class="krole">複数機能で共有する小部品(アバター URL ガード等) <span class="tag">共有</span><span class="tag">アバター</span></div></div><div class="kid"><div class="kname">sound/ <span class="cnt">1</span></div><div class="krole">音声素材(src 側) <span class="tag">音声</span></div></div></div>
+    </section>
+<section class="dir">
+      <div class="dhead"><span class="dname">tests/</span><span class="cnt">73 件</span></div>
+      <div class="drole">E2E / contract テスト(layer 依存・描画 spec 等) <span class="tag">テスト</span></div>
+      <div class="kids"><div class="kid"><div class="kname">contract/ <span class="cnt">1</span></div><div class="krole">レイヤ依存などアーキテクチャ契約のテスト <span class="tag">テスト</span><span class="tag">契約</span></div></div><div class="kid"><div class="kname">e2e/ <span class="cnt">72</span></div><div class="krole">Playwright の E2E(描画 spec・クリップ崩れ検出等) <span class="tag">テスト</span><span class="tag">E2E</span><span class="tag">描画</span></div></div></div>
+    </section>
+<section class="dir">
+      <div class="dhead"><span class="dname">tools/</span><span class="cnt">5 件</span></div>
+      <div class="drole">補助ツール(LP overflow 監査・MCP サーバ等) <span class="tag">ツール</span></div>
+      <div class="kids"><div class="kid"><div class="kname">mcp-nicolive/ <span class="cnt">3</span></div><div class="krole">ニコ生状態を読む MCP サーバ(司令塔の状態取得用) <span class="tag">MCP</span><span class="tag">診断</span></div></div></div>
+    </section>
+<section class="dir">
+      <div class="dhead"><span class="dname">tsuioku-no-kirameki/</span><span class="cnt">38 件</span></div>
+      <div class="drole">本番 LP の配信ディレクトリ(Cloudflare Pages へ deploy) <span class="tag">LP</span><span class="tag">公開</span></div>
+      <div class="kids"><div class="kid"><div class="kname">articles/ <span class="cnt">12</span></div><div class="krole">技術記事(防御的公開)。手法を再利用可能な形で解説 <span class="tag">記事</span><span class="tag">公開</span></div></div><div class="kid"><div class="kname">images/ <span class="cnt">17</span></div><div class="krole">LP 用の favicon・OG 画像等 <span class="tag">画像</span></div></div><div class="kid"><div class="kname">sound/ <span class="cnt">1</span></div><div class="krole">LP 公開用の音声素材(エール音等) <span class="tag">音声</span><span class="tag">公開</span></div></div></div>
+    </section>
+  <div class="legend">
+    <p><b>読み方</b></p>
+    <p>● 各カード = トップレベルディレクトリ。タグ〔色 / コメント / レポート…〕がそのディレクトリの担当ドメイン。<br>
+    ● <b>赤枠</b> = 役割が未記入のディレクトリ。<code>ROLES</code> 辞書に1行足してから再生成する。<br>
+    ● ファイル件数は git 追跡分（生成物 <code>build/</code> や <code>.git</code> 等は除外）。</p>
+  </div>
+</div>
+</body>
+</html>
