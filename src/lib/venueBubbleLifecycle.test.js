@@ -9,6 +9,7 @@ import {
   BUBBLE_VOICE_SPEAKING_CAP_MS,
   BUBBLE_PENDING_VOICE_FLOOR_MS
 } from './venueBubbleLifecycle.js';
+import { VOICE_STALE_MS_NORMAL } from './voiceAgeGate.js';
 
 describe('nextBubbleVoiceState (状態遷移)', () => {
   it('pending → audioStart で speaking', () => {
@@ -111,13 +112,24 @@ describe('resolvePendingLifetimeMs (合成遅れの床)', () => {
     expect(resolvePendingLifetimeMs(5000, false)).toBe(5000);
   });
 
-  it('読み上げONなら床(2500ms)を下回らない', () => {
+  it('読み上げONなら床を下回らない', () => {
     expect(resolvePendingLifetimeMs(1200, true)).toBe(BUBBLE_PENDING_VOICE_FLOOR_MS);
     expect(resolvePendingLifetimeMs(800, true)).toBe(BUBBLE_PENDING_VOICE_FLOOR_MS);
   });
 
   it('読み上げONでも流速寿命が床より長ければそのまま', () => {
-    expect(resolvePendingLifetimeMs(4000, true)).toBe(4000);
+    // v0.1.799: 床が鮮度ゲート(8000ms)に上がったので、床より長い値で検証する。
+    expect(resolvePendingLifetimeMs(BUBBLE_PENDING_VOICE_FLOOR_MS + 2000, true)).toBe(
+      BUBBLE_PENDING_VOICE_FLOOR_MS + 2000
+    );
+  });
+});
+
+describe('v0.1.799: pending 床と読み上げ鮮度ゲートの単一正本(再発防止)', () => {
+  it('BUBBLE_PENDING_VOICE_FLOOR_MS === VOICE_STALE_MS_NORMAL(常に一致)', () => {
+    // 床(吹き出しを pending で残す上限)と鮮度ゲート(音声が鳴りうる上限)が食い違うと
+    //   「声が鳴る前に吹き出しが消える」ずれが再発する。物理的に同一値であることを担保。
+    expect(BUBBLE_PENDING_VOICE_FLOOR_MS).toBe(VOICE_STALE_MS_NORMAL);
   });
 });
 

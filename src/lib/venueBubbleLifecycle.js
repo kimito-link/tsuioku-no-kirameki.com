@@ -14,17 +14,28 @@
  * @typedef {'pending'|'speaking'|'done'|'unvoiced'} BubbleVoiceState
  */
 
+import { VOICE_STALE_MS_NORMAL } from './voiceAgeGate.js';
+
 /** 再生終了後に吹き出しを残す余韻(ms)。声が切れた瞬間に消えると不自然なので少し残す。 */
 export const BUBBLE_VOICE_AFTERGLOW_MS = 500;
 
 /**
  * 読み上げONのとき、pending(合成待ち)の吹き出しを最低これだけは残す床(ms)。
  * 合成→再生開始までの遅れで「声が鳴り始める前に吹き出しが流速寿命で消える」隙間を塞ぐ。
- * voiceAgeGate の通常しきい値(VOICE_STALE_MS_NORMAL)に合わせる: それより遅い音声はそもそも
- *  stale で鳴らない=鳴る音声なら必ずこの床の内側で onAudioStart が来て speaking に切り替わる。
- * v0.1.773: 鮮度ゲート短縮(2500→1800ms)に追従して床も 1800ms へ(鳴らない声を待ち続けない)。
+ *
+ * v0.1.799「読み上げとコメントがずれる」根治(会議6応答+司令塔裏取り): 床は voiceAgeGate の通常
+ *  しきい値(VOICE_STALE_MS_NORMAL)と【常に一致】させるのが正しい。鮮度ゲート以内なら音声は
+ *  まだ鳴る可能性があり、そのコメントの吹き出しは「鳴り始める(onAudioStart で speaking)」まで
+ *  残すべきだから。かつて床を 1800ms にハードコード(v0.1.773 当時の鮮度ゲート値)していたが、
+ *  v0.1.782 で鮮度ゲートが 8000ms に戻されたのに床が 1800ms に取り残され、声が鳴る前(最大8秒後)に
+ *  吹き出しが消える【ずれ】が発生していた。二度と食い違わせないため、ハードコードをやめ
+ *  voiceAgeGate の正本を import する(=単一正本)。
+ *
+ * ⚠️ 鳴らずに捨てられた(stale/drop/合成失敗)吹き出しがこの床いっぱい(8秒)残らないように、
+ *  呼び出し側(venueBar/comeview)は voicePlayer の onDropped(再生では絶対に発火しない drop 専用
+ *  シグナル)で resolved を通知し、pending→unvoiced へ落として流速寿命で消すこと(v0.1.799)。
  */
-export const BUBBLE_PENDING_VOICE_FLOOR_MS = 1800;
+export const BUBBLE_PENDING_VOICE_FLOOR_MS = VOICE_STALE_MS_NORMAL;
 
 /**
  * 表示直後(pending)の寿命を返す純関数。読み上げONなら合成遅れに備えて床を効かせる。

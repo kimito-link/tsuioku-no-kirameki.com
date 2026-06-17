@@ -100,6 +100,45 @@ describe('VoicePlayer', () => {
     expect(onPlayStart).toHaveBeenCalled(); // 消費されたことは通知される
   });
 
+  it('v0.1.799: 鳴らず破棄(合成失敗)で onDropped を呼ぶ(吹き出しを unvoiced へ)', async () => {
+    player.fetchSynthesizeVoice = vi.fn().mockResolvedValue(null); // 合成失敗=再生に到達しない
+    await player.enable({ persist: false });
+    const onAudioStart = vi.fn();
+    const onDropped = vi.fn();
+    player.enqueue([{ kind: 'comment', userId: 'u3', nickname: 'C', text: 'x', onAudioStart, onDropped }]);
+    await new Promise(r => setTimeout(r, 50));
+    expect(onAudioStart).not.toHaveBeenCalled();
+    expect(onDropped).toHaveBeenCalledTimes(1); // 鳴らなかった→drop 通知
+  });
+
+  it('v0.1.799: 実再生時は onDropped を【呼ばない】(speaking を壊さない=ずれ再発防止)', async () => {
+    await player.enable({ persist: false });
+    const onAudioStart = vi.fn();
+    const onDropped = vi.fn();
+    player.enqueue([{ kind: 'comment', userId: 'u4', nickname: 'D', text: 'Hello', onAudioStart, onDropped }]);
+    await new Promise(r => setTimeout(r, 50));
+    expect(onAudioStart).toHaveBeenCalledTimes(1); // 鳴った
+    expect(onDropped).not.toHaveBeenCalled(); // 再生では drop 通知しない
+  });
+
+  it('v0.1.799: flushPendingQueue / stop は待機 item に onDropped を通知する', async () => {
+    let resolveSynth;
+    player.fetchSynthesizeVoice = vi.fn(() => new Promise((r) => { resolveSynth = r; }));
+    await player.enable({ persist: false });
+    const onDropped = vi.fn();
+    player.enqueue([
+      { kind: 'comment', userId: 'a', nickname: 'A', text: '1', onDropped },
+      { kind: 'comment', userId: 'b', nickname: 'B', text: '2', onDropped },
+      { kind: 'comment', userId: 'c', nickname: 'C', text: '3', onDropped }
+    ]);
+    await new Promise(r => setTimeout(r, 10));
+    const waiting = player.queue.length;
+    expect(waiting).toBeGreaterThan(0);
+    player.flushPendingQueue();
+    expect(onDropped).toHaveBeenCalledTimes(waiting); // 待機分すべてに drop 通知
+    if (resolveSynth) resolveSynth(null);
+  });
+
   it('v0.1.773: flushPendingQueue は待機中キューを破棄し件数を返す(長時間ラグ対策)', async () => {
     // 合成を保留させて drain を止め、キューに溜める。
     let resolveSynth;
