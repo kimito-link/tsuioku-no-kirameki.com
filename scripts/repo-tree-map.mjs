@@ -183,6 +183,71 @@ function featureDeadPaths(trackedSet) {
   return dead;
 }
 
+/** Mermaid ノード ID 用に安全化(英数_のみ・日本語等は除去)。衝突回避に index を付ける。 */
+function mmId(prefix, i) {
+  return `${prefix}${i}`;
+}
+/** Mermaid ラベル用エスケープ("内に " を入れられないので全角に逃がす・改行は除去) */
+function mmLabel(s) {
+  return String(s).replace(/"/g, '”').replace(/[\r\n]+/g, ' ');
+}
+
+/**
+ * ROLES/FEATURES 辞書から Mermaid マインドマップ(graph LR=左→右の枝分かれ)を2枚作る。
+ * feature-map と同じ graph LR 記法。GitHub で自動描画。辞書更新で自動再生成=腐らない。
+ */
+function renderMindmaps(nodes) {
+  const lines = [];
+  lines.push('## マインドマップ（自動生成・GitHub で図として表示）');
+  lines.push('');
+  lines.push('> `ROLES` / `FEATURES` 辞書から自動生成。辞書を更新すれば図も自動更新。');
+  lines.push('');
+
+  // 1) ディレクトリツリー型(リポジトリ → トップ → サブ)
+  lines.push('### ディレクトリツリー（場所 → 役割）');
+  lines.push('');
+  lines.push('```mermaid');
+  lines.push('graph LR');
+  lines.push('  ROOT["リポジトリ"]');
+  const tops = topDirs(nodes);
+  tops.forEach((top, ti) => {
+    const r = roleOf(top);
+    const tid = mmId('d', ti);
+    const tlabel = mmLabel(`${top}/${r?.tags?.length ? ' 〔' + r.tags.join('/') + '〕' : ''}`);
+    lines.push(`  ROOT --> ${tid}["${tlabel}"]`);
+    const kids = [...nodes.get(top).children].sort();
+    kids.forEach((kid, ki) => {
+      const kr = roleOf(kid);
+      const kid_ = mmId(`d${ti}_`, ki);
+      const name = kid.split('/').slice(1).join('/');
+      const klabel = mmLabel(`${name}/${kr?.tags?.length ? ' 〔' + kr.tags.join('/') + '〕' : ''}`);
+      lines.push(`  ${tid} --> ${kid_}["${klabel}"]`);
+    });
+  });
+  lines.push('```');
+  lines.push('');
+
+  // 2) 機能逆引き型(中心 → 機能 → 担当ファイル)
+  lines.push('### 機能逆引き（機能 → 担当ファイル）');
+  lines.push('');
+  lines.push('```mermaid');
+  lines.push('graph LR');
+  lines.push('  HUB["機能"]');
+  FEATURES.forEach((f, fi) => {
+    const fid = mmId('f', fi);
+    lines.push(`  HUB --> ${fid}["${mmLabel(f.feature)}"]`);
+    f.paths.forEach((p, pi) => {
+      const pid = mmId(`f${fi}_`, pi);
+      const base = p.split('/').slice(1).join('/'); // src/ を落として短く
+      lines.push(`  ${fid} --> ${pid}["${mmLabel(base)}"]`);
+    });
+  });
+  lines.push('```');
+  lines.push('');
+
+  return lines.join('\n');
+}
+
 /** ---- Markdown 出力 ---- */
 function renderMarkdown(nodes, files) {
   const lines = [];
@@ -190,9 +255,15 @@ function renderMarkdown(nodes, files) {
   lines.push('');
   lines.push('> `scripts/repo-tree-map.mjs` が git 追跡ファイルから自動生成。**手で編集しない**（再生成で上書き）。');
   lines.push('> 役割の一言説明は同スクリプトの `ROLES` 辞書が正本。**未記入**のディレクトリは下に ⚠️ で出るので `ROLES` に1行足す。');
+  lines.push('> 下にマインドマップ（GitHub で図として表示）→ ディレクトリ一覧 → 機能逆引き索引 の順。');
   lines.push('> 視覚ビュー: [repo-tree-map.html](repo-tree-map.html) ／ 機能依存図: [feature-map/index.md](feature-map/index.md) ／ 配置ルール正本: [AGENTS.md](../AGENTS.md) §4。');
   lines.push('');
   lines.push(`ルート直下の設定ファイル: ${rootFileCount(files)} 件（package.json / *.config.js / AGENTS.md 等）`);
+  lines.push('');
+
+  // マインドマップ(GitHub で図として表示)を先頭に
+  lines.push(renderMindmaps(nodes));
+  lines.push('---');
   lines.push('');
 
   const missing = [];
