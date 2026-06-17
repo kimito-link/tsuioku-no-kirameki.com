@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.798',
+    date: '2026-06-17',
+    summary: '状態を司令塔がローカル確認できる仕組みを追加',
+    items: Object.freeze([
+      '状態速報ページ(status.html)を開いて中身を貼らなくても、開発担当(Claude Code)が不具合の状態をローカルで直接確認できる仕組みを追加しました。拡張機能の常駐部分が1分ごとに、診断用のJSON(どの配信を記録中か・取得の進み具合など)をダウンロードフォルダの固定ファイル(nicolivelog-mcp/status-latest.json)に上書き保存します。これで「状態ページを開いて貼る」作業が不要になり、ページが重くて開けないときでも状態を追えます。保存は診断用の小さなデータだけで記録への負荷はかけず、ダウンロード履歴(通知)も毎回消すので画面を汚しません。不要なら設定で止められます(既定はオン)'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.797',
     date: '2026-06-17',
     summary: '状態ページが重くて開かない問題を解消',
