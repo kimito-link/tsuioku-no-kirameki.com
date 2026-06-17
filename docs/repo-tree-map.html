@@ -213,6 +213,11 @@
       <div class="fdesc">公開ページ(LP/記事/docs)の相対内部リンク先がディスクに実在するか静的照合。外部リンクは叩かない(依存/プライバシー/速度ゼロ)。docs/site-health.md に出力・腐り検知</div>
       <div class="fpaths"><code class="path">src/lib/siteLinkHealth.js</code><code class="path">scripts/site-health.mjs</code></div>
     </section>
+<section class="feat">
+      <div class="fhead"><span class="fname">影響範囲マップ(変えたら何が壊れるか)</span> <span class="tag">影響範囲</span><span class="tag">依存図</span><span class="tag">実装前ゲート</span></div>
+      <div class="fdesc">esbuild の import 到達グラフを逆引きし「このファイルを変えたら、どの機能(entry)が壊れうるか」を波及機能数の降順で一覧。docs/feature-map/impact-map.md。新規ビルド/依存ゼロ(reach 再利用)</div>
+      <div class="fpaths"><code class="path">scripts/feature-map.mjs</code><code class="path dead">docs/feature-map/impact-map.md ⚠️ 見つからない</code></div>
+    </section>
 
   <div class="legend">
     <p><b>読み方</b></p>

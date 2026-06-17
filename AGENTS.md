@@ -184,6 +184,10 @@ build/                 ← .gitignore 対象。CWS 提出用 ZIP + 生成アセ�
 - **公開ページ(LP/記事/docs)のリンクや URL を触ったら `npm run site-health` を走らせる**。
   内部リンク切れ・canonical/og:url 取り違えを静的検出する（`verify:cc` の `site-health:check` でも自動で落ちる）。
   記事をコピペで増やすときは canonical/og:url を自ファイル名へ直すのを忘れない。正本=[`docs/site-health.md`](docs/site-health.md)。
+- **共有 lib を変える前に [`docs/feature-map/impact-map.md`](docs/feature-map/impact-map.md) で波及先を確認する**。
+  「このファイルを変えたら、どの機能(entry/バンドル)が壊れうるか」の逆引き。波及機能数が多いファイル
+  (commentRecord/storageKeys/identity 等)は複数の実行コンテキストに影響するので、変更後は各 feature の動作確認を。
+  再生成は `npm run feature-map`（§12.1 の着手前ゲートの判断材料に使う）。
 - **この AGENTS.md を最初に読むこと**。とくに §3.1「ゆっくり OK」と §3.2「3 キャラの役割」はコピー＆新規生成するコンテンツに波及しやすい
 - **CWS 申請関連のファイル**（`src/images/googlechrom/`, `build/store-listing/` の `description-ja.txt` / `privacy-justifications-ja.txt`）は、仕様・文言を変える際に必ず「審査通過後の差分提出」を意識する
 - **プライバシー周り**の文言を変更したら、`privacy.html` と `description-ja.txt` と `privacy-justifications-ja.txt` の 3 点を同期させる（片方だけ変わると審査で齟齬として指摘される）
