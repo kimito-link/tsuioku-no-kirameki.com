@@ -387,6 +387,7 @@ import { retrySnapshotRequestUntilReady } from '../lib/popupWatchSnapshotRetry.j
 import { buildCommentTickerNameHref } from '../lib/commentTickerNameLink.js';
 import { buildCommentTickerLatestHtml } from '../lib/commentTickerLatestHtml.js';
 import { buildUserProfileLinkedLabelHtml } from '../lib/userProfileLinkHtml.js';
+import { buildEventRankingSectionHtml } from '../lib/eventRankingSectionHtml.js';
 import { createBooleanSettingController } from '../lib/popupBooleanSettingController.js';
 import { createBooleanSettingsRegistry } from '../lib/popupBooleanSettingsRegistry.js';
 import {
@@ -16280,81 +16281,11 @@ async function buildHtmlReportDocument(
   // イベント順位セクション（Phase B・会議 2026-05-26）。eventRankingModel が無ければ空＝
   //   イベント不参加/未取得はセクションごと省略（fail-soft・誤値ゼロ）。
   //   サムネは model 側で http/https のみに正規化済みだが、出力時も escapeAttr で二重防御。
-  let eventRankingSectionHtml = '';
-  try {
-    const erm = eventRankingModel;
-    if (erm && typeof erm === 'object') {
-      const fmtN = (/** @type {number} */ n) => Number(n).toLocaleString('en-US');
-      const self = erm.self && typeof erm.self === 'object' ? erm.self : null;
-      const evName = String(erm.eventName || '').trim();
-      const rows = Array.isArray(erm.rows) ? erm.rows : [];
-
-      const headParts = [];
-      if (evName) headParts.push(`<p class="event-rank__name">🏆 ${escapeHtml(evName)}</p>`);
-      if (self && (self.rank != null || self.score != null)) {
-        const selfUid = String(broadcasterProfileModel?.userId || '').trim();
-        const selfNameHtml = self.broadcasterName
-          ? /^\d{1,18}$/.test(selfUid)
-            ? buildUserProfileLinkedLabelHtml(selfUid, String(self.broadcasterName))
-            : escapeHtml(String(self.broadcasterName))
-          : '';
-        const who = self.broadcasterName ? `${selfNameHtml}さん` : 'この配信者さん';
-        const rk = self.rank != null ? `現在 <strong>${escapeHtml(String(self.rank))}</strong> 位` : '';
-        const sc = self.score != null ? ` 💎 <strong>${escapeHtml(fmtN(self.score))}</strong>` : '';
-        headParts.push(`<p class="event-rank__self">${who} ${rk}${sc}</p>`);
-        if (self.rank != null && self.rank > 1 && self.diffToNext != null && self.diffToNext > 0) {
-          headParts.push(`<p class="event-rank__diff">あと 💎 ${escapeHtml(fmtN(self.diffToNext))} で ${escapeHtml(String(self.rank - 1))} 位</p>`);
-        }
-      }
-
-      const rowsHtml = rows
-        .map((r) => {
-          const rank = escapeHtml(String(r.rank));
-          const rowUid = String(r.userId || '').trim();
-          const rawName = String(r.name || '名無し');
-          const name = /^\d{1,18}$/.test(rowUid)
-            ? buildUserProfileLinkedLabelHtml(rowUid, rawName)
-            : escapeHtml(rawName);
-          const score = escapeHtml(fmtN(Number(r.score) || 0));
-          // model 側で http/https のみに正規化済み。出力時も二重で scheme 検証（S-2）。
-          const thumb = /^https?:\/\//i.test(String(r.thumbnailUrl || '')) ? String(r.thumbnailUrl) : '';
-          const imgInner = thumb
-            ? `<img class="event-rank__thumb" src="${escapeAttr(thumb)}" alt="" width="28" height="28" decoding="async" referrerpolicy="no-referrer" onerror="this.style.visibility='hidden'" />`
-            : `<span class="event-rank__thumb event-rank__thumb--none" aria-hidden="true"></span>`;
-          const img = /^\d{1,18}$/.test(rowUid)
-            ? `<a href="https://www.nicovideo.jp/user/${encodeURIComponent(rowUid)}" target="_blank" rel="noopener noreferrer" class="nl-user-thumb-link">${imgInner}</a>`
-            : imgInner;
-          return (
-            `<tr>` +
-            `<td class="event-rank__rank">${rank}</td>` +
-            `<td>${img}</td>` +
-            `<td class="event-rank__user">${name}</td>` +
-            `<td class="event-rank__score">💎 ${score}</td>` +
-            `</tr>`
-          );
-        })
-        .join('');
-
-      const staleNote = erm.isStale
-        ? `<p class="event-rank__stale">※ この順位は少し前に取得した値です（配信中に変動します）。</p>`
-        : '';
-
-      if (headParts.length > 0 || rowsHtml) {
-        eventRankingSectionHtml =
-          `<section class="card" id="sec-event-ranking" style="margin-top:12px;">` +
-          `<h2>イベント順位</h2>` +
-          `<p class="guide-lead">この配信が参加しているイベントの💎スコア順ランキングなのだ（公式の表示に準拠）。</p>` +
-          (headParts.length ? `<div class="event-rank__head">${headParts.join('')}</div>` : '') +
-          (rowsHtml
-            ? `<table class="event-rank__table"><thead><tr><th>順位</th><th></th><th>配信者</th><th>累計💎</th></tr></thead><tbody>${rowsHtml}</tbody></table>`
-            : '') +
-          staleNote +
-          `</section>`;
-      }
-    }
-  } catch {
-    eventRankingSectionHtml = '';
-  }
+  // v0.1.810: イベント順位セクション生成は純関数 buildEventRankingSectionHtml(src/lib)へ抽出(挙動不変)。
+  const eventRankingSectionHtml = buildEventRankingSectionHtml(
+    eventRankingModel,
+    broadcasterProfileModel
+  );
 
   return `<!doctype html>
 <html lang="ja">
