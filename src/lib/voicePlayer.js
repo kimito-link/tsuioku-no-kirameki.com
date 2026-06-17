@@ -424,6 +424,22 @@ export class VoicePlayer {
     }
     
     if (droppedCount > 0) this._showSkipped(droppedCount);
+    // v0.1.800「吹き出しと読み上げを同時に」(会議 案B): enqueue した瞬間にキュー先頭の合成を
+    //   即起動して、再生開始までの待ち(Δ)を縮める。再生中(playing)でも prefetch は並走できる
+    //   (_drainQueue は playing なら return するが prefetch は別)。順序は変えない(FIFO 不変=
+    //   どの声がどの吹き出しか崩さない)。深さは resolveVoiceSynthDepth で有界=速い配信でも暴走しない。
+    if (this.enabled && !this.isObsMode() && this.queue.length) {
+      try { this._startPrefetch(this.generation); } catch { /* no-op: 先回し合成失敗は再生に影響させない */ }
+    }
     if (this.queue.length) void this._drainQueue();
+  }
+
+  /**
+   * v0.1.800: 外部(会場)から「今キューにある先頭群の合成を即起動」するための公開フック。
+   *   吹き出しを出した直後に呼ぶと、再生開始までの待ち(Δ)が合成時間まで縮む。深さ有界・FIFO不変。
+   */
+  kickPrefetch() {
+    if (!this.enabled || this.isObsMode() || !this.queue.length) return;
+    try { this._startPrefetch(this.generation); } catch { /* no-op */ }
   }
 }
