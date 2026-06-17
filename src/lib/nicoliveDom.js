@@ -802,6 +802,48 @@ export function resolveUserIdOnElement(el) {
 }
 
 /**
+ * 1 つの table-row が「収穫可能な本物のコメント行か」を判定する純関数（受理門の正本）。
+ *
+ * 番号必須が parseNicoLiveTableRow / closestHarvestableNicoCommentRow /
+ * collectNicoLiveTableRows の 3 箇所に散らばってドリフトしうるため、構造的な受理判定を
+ * ここ 1 つに寄せる（OneComme の「受理門を 1 箇所に・身元+本文で受理」原則の DOM 版。
+ * 詳細: council/comment-number-missing-dom-rescue-SYNTHESIS.md）。
+ *
+ * 段階導入の第 1 コミット時点では `requireNumber` 既定 true で、従来の
+ * 「.comment-number セル + .comment-text セル 両方必須」と同値（挙動完全不変）。
+ * 第 2 コミットで `requireNumber:false` + `data-comment-type` 構造ガードを開放して
+ * 番号セルが消えた現行ニコ生の行を救う（誤検知は data-comment-type + section ガードで防ぐ）。
+ *
+ * ⚠️ ここは「セルの有無（構造）」だけを見る。.comment-number の桁検証（^\d{1,18}$）や
+ *   本文の非空チェックは値の検証なので呼び出し側（parseNicoLiveTableRow）に残す
+ *   （closest/collect は従来から桁検証していない＝そちらの挙動を変えないため）。
+ *
+ * @param {Element|null|undefined} row 判定対象の table-row 要素
+ * @param {{ requireNumber?: boolean, guardRecommendedSections?: boolean }} [opts]
+ *   - requireNumber: true(既定) なら .comment-number セルが必須（従来挙動）。
+ *     false なら番号セルが無くても data-comment-type を持つ行を受理（第 2 コミットで使用）。
+ *   - guardRecommendedSections: true なら おすすめ生放送/ユーザー セクション内を除外。
+ *     既定 false（呼び出し側でガード済み or 従来ガード無しの箇所と挙動を揃える）。
+ * @returns {boolean}
+ */
+export function isHarvestableNicoCommentRow(row, opts = {}) {
+  if (!row || row.nodeType !== 1) return false;
+  const requireNumber = opts.requireNumber !== false;
+  const guardSections = Boolean(opts.guardRecommendedSections);
+  if (guardSections) {
+    if (isInsideRecommendedLiveSection(row)) return false;
+    if (isInsideRecommendedUserSection(row)) return false;
+  }
+  if (!row.querySelector?.('.comment-text')) return false;
+  const hasNumber = Boolean(row.querySelector?.('.comment-number'));
+  if (requireNumber) return hasNumber;
+  // requireNumber:false — 番号セルが無くても、niconico 供給の構造ラベル
+  //   data-comment-type を持つ行なら本物のコメント行として受理（おすすめカードには無い）。
+  if (hasNumber) return true;
+  return Boolean(row.getAttribute?.('data-comment-type'));
+}
+
+/**
  * 新ニコ生PC: div.table-row + .comment-number + .comment-text
  * data-comment-type は normal 以外（generalSystemMessage 等）も公式コメント数に含まれるため、
  * 番号・本文が取れる行は種類を問わず記録する。
@@ -810,10 +852,12 @@ export function resolveUserIdOnElement(el) {
  *   外した。実DOM(Chrome DevTools 確認)は role="grid" の data-grid で、行は
  *   `<div class="table-row" data-comment-type="normal"><span ...><div class="content-area">
  *    <span class="comment-text">本文</span></div></span></div>` ＝ 本文(.comment-text)はあるが
- *   .comment-number が無い。このため下の「numEl も textEl も必須」判定で DOM観測コメントが全捨てになり、
+ *   .comment-number が無い。従来の「番号セル必須」判定で DOM観測コメントが全捨てになり、
  *   commentIngestBySource.visible=0 / commentTablePresent=false になる(NDGR経由では取れている)。
- *   → 番号必須を緩める修正は別タスク(person-tile-unify の別件)。誤検知(おすすめ生放送等)ガードが
- *     必須なので慎重に。ここは「なぜ番号必須か」で迷わないための記録。
+ *   → 受理門を isHarvestableNicoCommentRow に正本化済（第 1 コミット＝挙動不変）。番号必須を
+ *     緩める（requireNumber:false + data-comment-type 構造ガード）のは第 2 コミットで開放する。
+ *     誤検知(おすすめ生放送等)ガードが必須なので段階導入。
+ *     設計: council/comment-number-missing-dom-rescue-SYNTHESIS.md。
  * @param {Element} el — 行要素またはその子孫
  * @returns {{ commentNo: string, text: string, userId: string|null, nickname?: string, avatarUrl?: string } | null}
  */
@@ -826,11 +870,13 @@ export function parseNicoLiveTableRow(el) {
   if (isInsideRecommendedLiveSection(row)) return null;
   if (isInsideRecommendedUserSection(row)) return null;
 
+  // 受理門（構造）は isHarvestableNicoCommentRow に正本化（第 1 コミット＝従来と同値）。
+  if (!isHarvestableNicoCommentRow(row, { requireNumber: true })) return null;
+
   const numEl = row.querySelector('.comment-number');
   const textEl = row.querySelector('.comment-text');
-  if (!numEl || !textEl) return null;
 
-  const commentNo = String(numEl.textContent || '').replace(/\s+/g, '').trim();
+  const commentNo = String(numEl?.textContent || '').replace(/\s+/g, '').trim();
   /* 長時間・高流量配信で番号桁が伸びても拾えるよう上限は寛め（従来 12 桁で落ちる取りこぼし防止） */
   if (!commentNo || !/^\d{1,18}$/.test(commentNo)) return null;
 
@@ -906,8 +952,9 @@ export function closestHarvestableNicoCommentRow(el) {
   const row =
     el.closest?.('div.table-row[role="row"]') || el.closest?.('div.table-row');
   if (!row) return null;
-  if (!row.querySelector?.('.comment-number') || !row.querySelector?.('.comment-text'))
-    return null;
+  // 受理門は isHarvestableNicoCommentRow に正本化（第 1 コミット＝従来と同値・section ガードは
+  // 従来どおりここでは掛けない＝呼び出し側の MutationObserver 経路で別途除外している）。
+  if (!isHarvestableNicoCommentRow(row, { requireNumber: true })) return null;
   return row;
 }
 
@@ -928,8 +975,9 @@ function collectNicoLiveTableRows(el) {
   const set = new Set();
   /** @param {Element} r */
   const maybeAdd = (r) => {
-    if (!r.querySelector?.('.comment-number') || !r.querySelector?.('.comment-text'))
-      return;
+    // 受理門は isHarvestableNicoCommentRow に正本化（第 1 コミット＝従来と同値）。
+    // section ガードは従来どおり受理門と独立に掛ける（v0.1.200 真因 fix を維持）。
+    if (!isHarvestableNicoCommentRow(r, { requireNumber: true })) return;
     // v0.1.200: おすすめ生放送セクション内の DOM は除外（真因 fix）
     if (isInsideRecommendedLiveSection(r)) return;
     if (isInsideRecommendedUserSection(r)) return;

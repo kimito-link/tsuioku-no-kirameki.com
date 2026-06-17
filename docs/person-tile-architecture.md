@@ -70,7 +70,7 @@ flowchart TD
 ## 「会場に出ない」の真因（実コードで確定・2026-06-17）
 
 席資格は匿名込みで全員候補。それでも popup と顔ぶれが食い違う原因は席資格より後ろ：
-1. **userId が乗らない DOM観測コメント** — 現行ニコ生がコメント行から `.comment-number`(番号セル)を外した(実DOM確証)。`parseNicoLiveTableRow`(nicoliveDom.js)が「番号+本文両方必須」で DOM観測コメントを全捨て→`visible:0`→userId が乗らず席にも出ない。【別タスクで番号必須を緩める・誤検知ガード必須】
+1. **userId が乗らない DOM観測コメント** — 現行ニコ生がコメント行から `.comment-number`(番号セル)を外した(実DOM確証)。`parseNicoLiveTableRow`(nicoliveDom.js)が「番号+本文両方必須」で DOM観測コメントを全捨て→`visible:0`→userId が乗らず席にも出ない。**受理門を純関数 `isHarvestableNicoCommentRow` に正本化済(v0.1.820・第1コミット=挙動不変)。番号必須を緩める(`requireNumber:false`+`data-comment-type` 構造ガード)のは第2コミットで開放。** 設計=[council/comment-number-missing-dom-rescue-SYNTHESIS.md](../council/comment-number-missing-dom-rescue-SYNTHESIS.md)。OneComme は DOM を読まず NDGR 直読みのため DOM 緩和の直接答え合わせは不可・受理原則(身元+本文・番号不要)のみ転用。
 2. **席数150上限＋表示間引き**(visibleSeats) — 1画面に収まらない分が「ほか N人」へ
 3. **描画が別物**(popup タイル vs venue 席) — popup は `buildPersonTileEl` に集約済(第2)。venue 席の DOM(.nlsb-seat 等)は席プール再利用/読み上げ連動で構造が別物のため DOM 自体は統一せず、**リンク判定など純粋ロジックを domain 正本に寄せて顔ぶれ一致**(第3)
 
@@ -79,4 +79,4 @@ flowchart TD
 - ✅ 第2(v0.1.817): 丸サムネタイルDOMビルダー `buildPersonTileEl` を切り出し popup 置換(見た目不変)
 - ✅ 第3(v0.1.818): リンク判定を domain 正本 `isNumericNicoUserId`(^\d{5,14}$)に統一(popup/venue 同基準・顔ぶれ一致)
 - ✅ 第4(v0.1.819): 「ほか観客 N人」→「ほか N人」へラベル正本化(誤読の核「観客」語を除去)。**来場者数(PV)の実値取得→二層表示は別途**(venue に PV 実値が無く、取得経路の新規配線が要るため範囲外・過剰実装回避)
-- ⬜ 別: `.comment-number` 消失で DOM観測全捨ての件(次タスク)
+- 🔄 別: `.comment-number` 消失で DOM観測全捨ての件 — ✅第1(v0.1.820): 受理門を `isHarvestableNicoCommentRow` に正本化(挙動不変) / ⬜第2: `requireNumber:false`+`data-comment-type` で番号無し行を開放(実機 DOM 再確証してから)
