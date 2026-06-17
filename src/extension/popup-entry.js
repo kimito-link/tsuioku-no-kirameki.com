@@ -388,6 +388,7 @@ import { buildCommentTickerNameHref } from '../lib/commentTickerNameLink.js';
 import { buildCommentTickerLatestHtml } from '../lib/commentTickerLatestHtml.js';
 import { buildUserProfileLinkedLabelHtml } from '../lib/userProfileLinkHtml.js';
 import { buildEventRankingSectionHtml } from '../lib/eventRankingSectionHtml.js';
+import { buildReportNextMemoSectionHtml } from '../lib/reportNextMemoSectionHtml.js';
 import { createBooleanSettingController } from '../lib/popupBooleanSettingController.js';
 import { createBooleanSettingsRegistry } from '../lib/popupBooleanSettingsRegistry.js';
 import {
@@ -16214,66 +16215,12 @@ async function buildHtmlReportDocument(
       broadcasterUserId: reportBroadcasterUserId,
       maskShareLabels: false
     });
-    const memLis =
-      memo.nextMemos.length > 0
-        ? memo.nextMemos.map((m) => `<li>${escapeHtml(m)}</li>`).join('')
-        : '<li>（まだ十分なメモが出ません）</li>';
-    const hiLis =
-      memo.highlights.length > 0
-        ? memo.highlights
-            .map(
-              (h) =>
-                `<li><strong>${escapeHtml(h.atLabel)}</strong> — ${escapeHtml(h.reason)}<br><span class="memo-sample">${escapeHtml(h.sampleLine)}</span></li>`
-            )
-            .join('')
-        : '<li>（この枠では目立つ場面の抽出がまだ少ないです）</li>';
-    const thLis =
-      memo.thanksPoints.length > 0
-        ? memo.thanksPoints.map((t) => `<li>${escapeHtml(t)}</li>`).join('')
-        : '<li>（記録が増えるとここが埋まります）</li>';
-    const tplLis =
-      memo.templates.length > 0
-        ? memo.templates.map((t) => `<li>${escapeHtml(t)}</li>`).join('')
-        : '<li>（テンプレはマーケ分析の「りんく達の作戦会議」も参照）</li>';
-    const dynamicNote = 'この内容は今回の配信データから組み立てています。配信内容によって毎回変わります。';
-    const trioGuideHtml = `
-        <div class="yukkuri-guide memo-yukkuri-guide" role="note" aria-label="りんく・こん太・たぬ姉の次枠ガイド">
-          <div class="yukkuri-row">
-            ${avatarLink}
-            <div class="speech-bubble">
-              <strong>りんくより</strong>
-              <p>次の枠で試しやすい順に、まずはやってみる作戦をまとめたよ。1つだけでも十分なのだ。</p>
-            </div>
-          </div>
-          <div class="yukkuri-row">
-            ${avatarKonta}
-            <div class="speech-bubble">
-              <strong>こん太より</strong>
-              <p>リスナーが参加しやすかった流れを拾ってるよ。声かけやお礼の言葉に使うと、空気があたたまりやすいのだ。</p>
-            </div>
-          </div>
-          <div class="yukkuri-row">
-            ${avatarTanu}
-            <div class="speech-bubble">
-              <strong>たぬ姉より</strong>
-              <p>${escapeHtml(dynamicNote)}</p>
-            </div>
-          </div>
-        </div>`;
-    nextMemoSectionHtml = `
-      <section class="card yukkuri-guide-card" id="sec-next-memo" style="margin-top:12px;">
-        <h2>りんく・こん太・たぬ姉の次枠メモ</h2>
-        <p class="guide-lead">詳しい分析より先に、次の配信で試せる短い作戦をまとめたのだ。</p>
-        ${trioGuideHtml}
-        <h3>次の配信で試したいこと（最大3）</h3>
-        <ol>${memLis}</ol>
-        <h3>盛り上がった場面（最大3）</h3>
-        <ul>${hiLis}</ul>
-        <h3>ありがとうポイント</h3>
-        <ul>${thLis}</ul>
-        <h3>次の配信で使える一言テンプレ</h3>
-        <ul>${tplLis}</ul>
-      </section>`;
+    // v0.1.811: memo の算出は entry に残し、純粋な HTML 組み立ては buildReportNextMemoSectionHtml(src/lib)へ。
+    nextMemoSectionHtml = buildReportNextMemoSectionHtml(memo, {
+      avatarLink,
+      avatarKonta,
+      avatarTanu
+    });
   } catch {
     nextMemoSectionHtml = '';
   }
