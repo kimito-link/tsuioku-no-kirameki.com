@@ -70,7 +70,7 @@ flowchart TD
 ## 「会場に出ない」の真因（実コードで確定・2026-06-17）
 
 席資格は匿名込みで全員候補。それでも popup と顔ぶれが食い違う原因は席資格より後ろ：
-1. **userId が乗らない DOM観測コメント** — 現行ニコ生がコメント行から `.comment-number`(番号セル)を外した(実DOM確証)。`parseNicoLiveTableRow`(nicoliveDom.js)が「番号+本文両方必須」で DOM観測コメントを全捨て→`visible:0`→userId が乗らず席にも出ない。**受理門を純関数 `isHarvestableNicoCommentRow` に正本化済(v0.1.820・第1コミット=挙動不変)。番号必須を緩める(`requireNumber:false`+`data-comment-type` 構造ガード)のは第2コミットで開放。** 設計=[council/comment-number-missing-dom-rescue-SYNTHESIS.md](../council/comment-number-missing-dom-rescue-SYNTHESIS.md)。OneComme は DOM を読まず NDGR 直読みのため DOM 緩和の直接答え合わせは不可・受理原則(身元+本文・番号不要)のみ転用。
+1. **匿名コメントは DOM に userId が無い（番号セルではない）** — ⚠️**2026-06-18 実機DOM答え合わせで前提が覆った**: 配信中 watch(ニコニコ実況・匿名主体)を Claude-in-Chrome 検証すると **`.comment-number` は消えていない**(検出12行すべてに存在・`droppedNoNumber:0`=現行ゲートは1行も落とさない)。本当の断線は **匿名(184)コメントは DOM/React fiber に userId(hashedUserId)が一切無い**(70連鎖walk で確認)→ 番号ゲートを緩めても席に出せない。匿名 userId は NDGR(protobuf)にしか無い(v0.1.803 で取得済)。**∴ 第2コミット(番号緩和)は保留(凍結)=利得ゼロ・働くガードを弱めるだけ。** 第1(v0.1.820・受理門の正本化・挙動不変)は維持。真の経路は「NDGR 匿名 userId をレーン/席に通す」(lane-empty-uid-missing 系)。**再開条件**=ユーザー自身の配信で実際に番号無し行(noNumberRowCount>0)が観測された場合のみ。答え合わせ正本=[council/comment-number-missing-dom-rescue-SYNTHESIS.md](../council/comment-number-missing-dom-rescue-SYNTHESIS.md)。OneComme は DOM を読まず NDGR 直読みのため DOM 緩和の直接答え合わせ不可・受理原則(身元+本文・番号不要)のみ転用。
 2. **席数150上限＋表示間引き**(visibleSeats) — 1画面に収まらない分が「ほか N人」へ
 3. **描画が別物**(popup タイル vs venue 席) — popup は `buildPersonTileEl` に集約済(第2)。venue 席の DOM(.nlsb-seat 等)は席プール再利用/読み上げ連動で構造が別物のため DOM 自体は統一せず、**リンク判定など純粋ロジックを domain 正本に寄せて顔ぶれ一致**(第3)
 
@@ -79,4 +79,4 @@ flowchart TD
 - ✅ 第2(v0.1.817): 丸サムネタイルDOMビルダー `buildPersonTileEl` を切り出し popup 置換(見た目不変)
 - ✅ 第3(v0.1.818): リンク判定を domain 正本 `isNumericNicoUserId`(^\d{5,14}$)に統一(popup/venue 同基準・顔ぶれ一致)
 - ✅ 第4(v0.1.819): 「ほか観客 N人」→「ほか N人」へラベル正本化(誤読の核「観客」語を除去)。**来場者数(PV)の実値取得→二層表示は別途**(venue に PV 実値が無く、取得経路の新規配線が要るため範囲外・過剰実装回避)
-- 🔄 別: `.comment-number` 消失で DOM観測全捨ての件 — ✅第1(v0.1.820): 受理門を `isHarvestableNicoCommentRow` に正本化(挙動不変) / ⬜第2: `requireNumber:false`+`data-comment-type` で番号無し行を開放(実機 DOM 再確証してから)
+- 🧊 別: `.comment-number` 消失で DOM観測全捨ての件 — ✅第1(v0.1.820): 受理門を `isHarvestableNicoCommentRow` に正本化(挙動不変・ドリフト防止で価値あり維持) / ❄️第2: **凍結**(2026-06-18 実機DOMで番号セルは現存・匿名はDOMにuserId無しと確認→番号緩和は利得ゼロ。再開はユーザー配信で番号無し行が実観測された場合のみ)
