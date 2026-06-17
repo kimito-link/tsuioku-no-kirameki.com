@@ -53,6 +53,24 @@ describe('background.js の背面 backfill kick ミラー(drift 検知)', () => 
     expect(backgroundSrc.includes("'nls_ai_share_fast_diag_v1'"), reminder).toBe(true);
   });
 
+  it('v0.1.802: 診断ダンプは SW で動く data: URL を使う(createObjectURL は SW で throw=書けない)', () => {
+    // SW に URL.createObjectURL は無く throw する。data: URL(utf8ToBase64)でないとファイルが書けない。
+    expect(
+      backgroundSrc.includes('data:application/json'),
+      'runMcpDiagDumpTick は data: URL で download する(SW に createObjectURL は無い)'
+    ).toBe(true);
+    expect(backgroundSrc.includes('utf8ToBase64'), reminder).toBe(true);
+    // ダンプ経路で createObjectURL を使っていないこと(使うと SW で throw して無音失敗する)。
+    const startIdx = backgroundSrc.indexOf('async function runMcpDiagDumpTick');
+    const after = startIdx > -1 ? backgroundSrc.slice(startIdx + 1) : '';
+    const nextFnRel = after.indexOf('\nasync function ');
+    const body = nextFnRel > -1 ? after.slice(0, nextFnRel) : after;
+    expect(
+      body.includes('createObjectURL'),
+      'runMcpDiagDumpTick は createObjectURL を使わない(SW では throw する)'
+    ).toBe(false);
+  });
+
   it('kick tick は get(null) 全件走査でなく索引→該当 hb だけ get している(stall 回避)', () => {
     expect(backgroundSrc.includes('KEY_BACKFILL_HEARTBEAT_INDEX'), reminder).toBe(true);
     // runBackfillBgKickTick の関数本体だけを抜き出して get(null) を含まないことを確認。
