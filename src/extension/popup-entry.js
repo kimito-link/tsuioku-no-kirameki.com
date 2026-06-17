@@ -389,6 +389,7 @@ import { buildCommentTickerLatestHtml } from '../lib/commentTickerLatestHtml.js'
 import { buildUserProfileLinkedLabelHtml } from '../lib/userProfileLinkHtml.js';
 import { buildEventRankingSectionHtml } from '../lib/eventRankingSectionHtml.js';
 import { buildReportNextMemoSectionHtml } from '../lib/reportNextMemoSectionHtml.js';
+import { buildExternalLinksSectionHtml } from '../lib/externalLinksSectionHtml.js';
 import { createBooleanSettingController } from '../lib/popupBooleanSettingController.js';
 import { createBooleanSettingsRegistry } from '../lib/popupBooleanSettingsRegistry.js';
 import {
@@ -15829,32 +15830,8 @@ async function buildHtmlReportDocument(
     broadcasterProfileModel
   );
   // 支援物資・外部リンク（配信ページの noopenerLinks。http/https のみ・最大20件）。
-  const externalLinksHtml = (() => {
-    const links = Array.isArray(snapshot?.noopenerLinks) ? snapshot.noopenerLinks : [];
-    const seen = new Set();
-    const chips = [];
-    for (const l of links) {
-      const href = String(l?.href || '').trim();
-      if (!isHttpOrHttpsUrl(href) || seen.has(href)) continue;
-      seen.add(href);
-      let label = String(l?.text || '').replace(/\s+/g, ' ').trim();
-      if (!label) {
-        try {
-          label = new URL(href).hostname.replace(/^www\./, '');
-        } catch {
-          label = href;
-        }
-      }
-      if (label.length > 60) label = `${label.slice(0, 57)}…`;
-      chips.push(
-        `<a class="tag-chip nl-user-profile-link" href="${escapeAttr(href)}" target="_blank" rel="noopener noreferrer">${escapeHtml(label)}</a>`
-      );
-      if (chips.length >= 20) break;
-    }
-    return chips.length
-      ? `<h2 style="margin-top:12px;">支援物資・外部リンク</h2><div class="tag-list">${chips.join('')}</div>`
-      : '';
-  })();
+  // v0.1.812: 外部リンクセクション生成は純関数 buildExternalLinksSectionHtml(src/lib)へ抽出(挙動不変)。
+  const externalLinksHtml = buildExternalLinksSectionHtml(snapshot?.noopenerLinks);
   // 漫画コマ風の「番組のおさらい」セクション。レスポンシブ（clamp + container query）。
   const mangaReportPanels = buildMangaBroadcastPanels({
     bundle: eventDomBundleForReport,
