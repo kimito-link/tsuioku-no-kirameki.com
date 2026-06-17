@@ -2,9 +2,106 @@
 
 > `scripts/repo-tree-map.mjs` が git 追跡ファイルから自動生成。**手で編集しない**（再生成で上書き）。
 > 役割の一言説明は同スクリプトの `ROLES` 辞書が正本。**未記入**のディレクトリは下に ⚠️ で出るので `ROLES` に1行足す。
+> 下にマインドマップ（GitHub で図として表示）→ ディレクトリ一覧 → 機能逆引き索引 の順。
 > 視覚ビュー: [repo-tree-map.html](repo-tree-map.html) ／ 機能依存図: [feature-map/index.md](feature-map/index.md) ／ 配置ルール正本: [AGENTS.md](../AGENTS.md) §4。
 
 ルート直下の設定ファイル: 16 件（package.json / *.config.js / AGENTS.md 等）
+
+## マインドマップ（自動生成・GitHub で図として表示）
+
+> `ROLES` / `FEATURES` 辞書から自動生成。辞書を更新すれば図も自動更新。
+
+### ディレクトリツリー（場所 → 役割）
+
+```mermaid
+graph LR
+  ROOT["リポジトリ"]
+  ROOT --> d0["api/ 〔API〕"]
+  ROOT --> d1["app/ 〔Web版〕"]
+  d1 --> d1_0["dist/ 〔ビルド成果物〕"]
+  ROOT --> d2["council/ 〔会議/設計〕"]
+  ROOT --> d3["docs/ 〔設計/レポート〕"]
+  d3 --> d3_0["article-assets/ 〔記事/画像〕"]
+  d3 --> d3_1["feature-map/ 〔依存図/自動生成〕"]
+  d3 --> d3_2["policies/ 〔方針〕"]
+  d3 --> d3_3["releases/ 〔リリース〕"]
+  d3 --> d3_4["research/ 〔調査/レポート〕"]
+  d3 --> d3_5["workflows/ 〔ワークフロー〕"]
+  ROOT --> d4["extension/ 〔配布/manifest〕"]
+  d4 --> d4_0["dist/ 〔ビルド成果物〕"]
+  d4 --> d4_1["images/ 〔画像〕"]
+  d4 --> d4_2["sound/ 〔音声〕"]
+  ROOT --> d5["memory/ 〔メモリ/知見〕"]
+  d5 --> d5_0["archive/ 〔メモリ/履歴〕"]
+  d5 --> d5_1["avatar-parts/ 〔アバター/画像〕"]
+  ROOT --> d6["scripts/ 〔ビルド/自動生成〕"]
+  d6 --> d6_0["xserver/ 〔デプロイ/webhook〕"]
+  ROOT --> d7["src/ 〔ソース〕"]
+  d7 --> d7_0["data/ 〔コメント/取得〕"]
+  d7 --> d7_1["domain/ 〔応援/集約/識別子〕"]
+  d7 --> d7_2["extension/ 〔entry/記録/会場/応援〕"]
+  d7 --> d7_3["fixtures/ 〔テスト〕"]
+  d7 --> d7_4["images/ 〔画像〕"]
+  d7 --> d7_5["lib/ 〔色/速度/コメント/レポート/純粋関数〕"]
+  d7 --> d7_6["shared/ 〔共有/アバター〕"]
+  d7 --> d7_7["sound/ 〔音声〕"]
+  ROOT --> d8["tests/ 〔テスト〕"]
+  d8 --> d8_0["contract/ 〔テスト/契約〕"]
+  d8 --> d8_1["e2e/ 〔テスト/E2E/描画〕"]
+  ROOT --> d9["tools/ 〔ツール〕"]
+  d9 --> d9_0["mcp-nicolive/ 〔MCP/診断〕"]
+  ROOT --> d10["tsuioku-no-kirameki/ 〔LP/公開〕"]
+  d10 --> d10_0["articles/ 〔記事/公開〕"]
+  d10 --> d10_1["images/ 〔画像〕"]
+  d10 --> d10_2["sound/ 〔音声/公開〕"]
+```
+
+### 機能逆引き（機能 → 担当ファイル）
+
+```mermaid
+graph LR
+  HUB["機能"]
+  HUB --> f0["コメント送信(確認/プロファイル)"]
+  f0 --> f0_0["lib/commentSubmitConfirm.js"]
+  f0 --> f0_1["lib/commentSubmitProfiling.js"]
+  HUB --> f1["popup スクロール(要素を見せる)"]
+  f1 --> f1_0["lib/nlMainScrollReveal.js"]
+  HUB --> f2["会場ドラッグスクロール(パン)"]
+  f2 --> f2_0["lib/venueDragScroll.js"]
+  HUB --> f3["コメント収穫(DOM 観測)"]
+  f3 --> f3_0["lib/commentHarvest.js"]
+  f3 --> f3_1["lib/nicoliveDom.js"]
+  HUB --> f4["過去ログ取得(バックフィル巡回)"]
+  f4 --> f4_0["lib/ndgrBackfillCrawl.js"]
+  HUB --> f5["コメント重複除去(NDGR)"]
+  f5 --> f5_0["lib/ndgrMessageDedupe.js"]
+  HUB --> f6["応援レーン集約(誰が候補か)"]
+  f6 --> f6_0["lib/userLaneCandidatesFromStorage.js"]
+  HUB --> f7["人物タイル描画(丸サムネ)"]
+  f7 --> f7_0["lib/personTileDom.js"]
+  HUB --> f8["会場の席割り"]
+  f8 --> f8_0["lib/venueSeats.js"]
+  HUB --> f9["背景群衆(来場者数の表現)"]
+  f9 --> f9_0["lib/crowdRasterizer.js"]
+  HUB --> f10["読み上げ(再生/キュー/年齢ゲート)"]
+  f10 --> f10_0["lib/voicePlayer.js"]
+  f10 --> f10_1["lib/voiceReadQueue.js"]
+  f10 --> f10_2["lib/voiceAgeGate.js"]
+  HUB --> f11["ギフト投擲演出"]
+  f11 --> f11_0["lib/giftThrowProjectile.js"]
+  HUB --> f12["吹き出し寿命管理"]
+  f12 --> f12_0["lib/venueBubbleLifecycle.js"]
+  HUB --> f13["HTMLレポート生成"]
+  f13 --> f13_0["extension/popup-entry.js"]
+  HUB --> f14["状態速報の整形"]
+  f14 --> f14_0["lib/statusFormat.js"]
+  HUB --> f15["記録件数の単調化(減らない表示)"]
+  f15 --> f15_0["lib/monotonicCommentCount.js"]
+  HUB --> f16["storage キー定義"]
+  f16 --> f16_0["lib/storageKeys.js"]
+```
+
+---
 
 ## `api/` — サーバレス API(status エンドポイント)  〔API〕
 <sub>ファイル 1 件</sub>
