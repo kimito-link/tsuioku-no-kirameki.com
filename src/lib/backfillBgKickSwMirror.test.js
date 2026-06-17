@@ -43,6 +43,16 @@ describe('background.js の背面 backfill kick ミラー(drift 検知)', () => 
     expect(backgroundSrc.includes('__nlsSwBackfill'), reminder).toBe(true);
   });
 
+  it('v0.1.798: ローカル診断ダンプ(Claude Code が Read する固定パス)が配線されている', () => {
+    // 司令塔がブラウザ無しで状態を読む正本。パスが変わると Read 先がズレるので固定を担保。
+    expect(backgroundSrc.includes("'nicolivelog-mcp/status-latest.json'"), reminder).toBe(true);
+    expect(backgroundSrc.includes("'nls_mcp_diag_dump'"), reminder).toBe(true);
+    expect(backgroundSrc.includes('runMcpDiagDumpTick'), reminder).toBe(true);
+    expect(backgroundSrc.includes('ensureMcpDiagDumpAlarm'), reminder).toBe(true);
+    // fastDiag の1キーだけ読む(全件走査しない=記録を圧迫しない)。
+    expect(backgroundSrc.includes("'nls_ai_share_fast_diag_v1'"), reminder).toBe(true);
+  });
+
   it('kick tick は get(null) 全件走査でなく索引→該当 hb だけ get している(stall 回避)', () => {
     expect(backgroundSrc.includes('KEY_BACKFILL_HEARTBEAT_INDEX'), reminder).toBe(true);
     // runBackfillBgKickTick の関数本体だけを抜き出して get(null) を含まないことを確認。

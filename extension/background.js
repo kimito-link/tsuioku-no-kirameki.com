@@ -957,6 +957,7 @@ chrome.runtime.onInstalled.addListener((details) => {
   ensureToolbarOpensPopupNotSidePanel();
   void ensureAutoBackupAlarm();
   void ensureBackfillBgKickAlarm();
+  void ensureMcpDiagDumpAlarm();
   void (async () => {
     await migrateFloatingPanelToDockProfileOnce();
     await migrateBelowPanelToDockProfileOnce();
@@ -1013,6 +1014,7 @@ chrome.runtime.onStartup.addListener(() => {
   ensureToolbarOpensPopupNotSidePanel();
   void ensureAutoBackupAlarm();
   void ensureBackfillBgKickAlarm();
+  void ensureMcpDiagDumpAlarm();
   void migrateFloatingPanelToDockProfileOnce();
   void migrateBelowPanelToDockProfileOnce();
   void injectIntoExistingTabs();
@@ -1030,6 +1032,10 @@ chrome.alarms.onAlarm.addListener((alarm) => {
   }
   if (alarm?.name === BACKFILL_BG_KICK_ALARM) {
     void runBackfillBgKickTick();
+    return;
+  }
+  if (alarm?.name === MCP_DIAG_DUMP_ALARM) {
+    void runMcpDiagDumpTick();
   }
 });
 
@@ -1377,6 +1383,113 @@ async function ensureBackfillBgKickAlarm() {
     });
   } catch {
     /* no-op */
+  }
+}
+
+/* ================================================================== */
+/* v0.1.798: ローカル診断ダンプ — Claude Code(司令塔)が状態を貼らずに読む仕組み              */
+/*                                                                      */
+/* ユーザー要望「watch tab を読まなくても、ローカルで Claude Code が確認できる仕組み」。     */
+/*   status.html は chrome-extension:// で外部ツールから開けず、重いと開けない。スマホ送信も */
+/*   遠回り。そこで SW が alarm(1分)で診断 JSON(nls_ai_share_fast_diag_v1)を                  */
+/*   ダウンロードフォルダの固定パス nicolivelog-mcp/status-latest.json に上書き保存する。     */
+/*   Claude Code はそのファイルを Read するだけで実機状態を確認できる(ブラウザ/貼り付け不要)。 */
+/*                                                                      */
+/* 軽量化: 読むのは fastDiag の1キーだけ(小)。書き込みは chrome.storage でなくディスク        */
+/*   (downloads)なので記録の共有 storage を圧迫しない。毎回 downloads.erase で履歴(シェルフ) */
+/*   を消し、通知/履歴を溜めない。conflictAction:'overwrite' で同一パスを保つ。               */
+/* ================================================================== */
+
+const MCP_DIAG_DUMP_ALARM = 'nls_mcp_diag_dump';
+/** ダンプ周期(分)。1分で十分(司令塔が随時 Read する)。 */
+const MCP_DIAG_DUMP_MINUTES = 1;
+/** ダウンロードフォルダ内の固定相対パス(Claude Code が Read する先)。 */
+const MCP_DIAG_DUMP_PATH = 'nicolivelog-mcp/status-latest.json';
+const KEY_AI_SHARE_FAST_DIAG_BG = 'nls_ai_share_fast_diag_v1';
+/** 既定 ON(ユーザーが明示要望)。false で停止できるキルスイッチ。 */
+const KEY_MCP_DIAG_DUMP_ENABLED = 'nls_mcp_diag_dump_enabled_v1';
+
+async function ensureMcpDiagDumpAlarm() {
+  try {
+    const existing = await chrome.alarms.get(MCP_DIAG_DUMP_ALARM);
+    if (existing) return;
+    chrome.alarms.create(MCP_DIAG_DUMP_ALARM, {
+      delayInMinutes: MCP_DIAG_DUMP_MINUTES,
+      periodInMinutes: MCP_DIAG_DUMP_MINUTES
+    });
+  } catch {
+    /* no-op */
+  }
+}
+
+/** 診断 JSON をローカル固定パスへ1回書き出す(履歴は消してシェルフを汚さない)。 */
+async function runMcpDiagDumpTick() {
+  try {
+    // 既定 ON。明示 false のときだけ止める。
+    let enabled = true;
+    try {
+      const flagBag = await chrome.storage.local.get(KEY_MCP_DIAG_DUMP_ENABLED);
+      enabled = flagBag[KEY_MCP_DIAG_DUMP_ENABLED] !== false;
+    } catch {
+      enabled = true;
+    }
+    if (!enabled) return;
+    if (!chrome.downloads || typeof chrome.downloads.download !== 'function') return;
+
+    // 診断は fastDiag の1キーだけ読む(軽い)。タブ一覧も少量で足す(どの配信が記録中か司令塔が分かるように)。
+    let fastDiag = null;
+    try {
+      const bag = await chrome.storage.local.get(KEY_AI_SHARE_FAST_DIAG_BG);
+      fastDiag = bag[KEY_AI_SHARE_FAST_DIAG_BG] || null;
+    } catch {
+      fastDiag = null;
+    }
+    let watchTabs = [];
+    try {
+      const tabs = await chrome.tabs.query({ url: 'https://*.nicovideo.jp/watch/*' });
+      watchTabs = (tabs || []).map((t) => ({
+        lid: (String(t?.url || '').match(/watch\/(lv\d{1,15})/) || [])[1] || '',
+        active: !!t?.active,
+        discarded: !!t?.discarded,
+        // status:'complete'|'loading' で「ローディングが終わらない」タブを司令塔が見分けられる。
+        status: String(t?.status || '')
+      }));
+    } catch {
+      watchTabs = [];
+    }
+
+    const payload = {
+      writtenBy: 'sw',
+      writtenAtIso: new Date().toISOString(),
+      manifestVersion: (() => {
+        try { return chrome.runtime.getManifest()?.version || ''; } catch { return ''; }
+      })(),
+      watchTabs,
+      fastDiag
+    };
+    const json = JSON.stringify(payload, null, 2);
+    const blob = new Blob([json], { type: 'application/json;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    let downloadId = null;
+    try {
+      downloadId = await chrome.downloads.download({
+        url,
+        filename: MCP_DIAG_DUMP_PATH,
+        saveAs: false,
+        conflictAction: 'overwrite'
+      });
+    } catch {
+      downloadId = null;
+    } finally {
+      // blob URL は download が読み終わるまで生かす。即 revoke で競合しないよう少し遅延して解放。
+      setTimeout(() => { try { URL.revokeObjectURL(url); } catch { /* no-op */ } }, 2000);
+    }
+    // シェルフ/履歴を汚さないよう、完了後にダウンロード記録だけ消す(ファイル本体は残る)。
+    if (downloadId != null && chrome.downloads.erase) {
+      try { await chrome.downloads.erase({ id: downloadId }); } catch { /* no-op */ }
+    }
+  } catch {
+    /* best-effort: 次の alarm で立て直す */
   }
 }
 
