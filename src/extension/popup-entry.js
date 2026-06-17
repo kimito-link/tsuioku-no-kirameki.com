@@ -492,6 +492,7 @@ import {
   exportWaitLinesForKind,
   resolveHtmlReportBuildTimeoutMs
 } from '../lib/exportWaitNarration.js';
+import { playReportCompleteVoiceSequence } from '../lib/reportCompleteVoice.js';
 import { createSupportAvatarLoadGuard } from '../lib/supportGrowthAvatarLoad.js';
 import { entriesRelatedForStoryDetail } from '../lib/storyDetailRelatedEntries.js';
 import { storageErrorRelevantToLiveId } from '../lib/storageErrorState.js';
@@ -16024,19 +16025,15 @@ async function buildHtmlReportDocument(
     : comments;
 
   const sessionSummaryRows = await sessionSummaryPromise;
-  const participationSummaryReport = aggregateMarketingReport(commentsForReport, liveId, {
-    broadcasterUserId: reportBroadcasterUserId
-  });
+  await yieldToBrowserPaint(); // v0.1.806: 重い全件集計の前後で yield(html_report_build_timeout 根治)
+  const participationSummaryReport = aggregateMarketingReport(commentsForReport, liveId, { broadcasterUserId: reportBroadcasterUserId });
+  await yieldToBrowserPaint();
   const audienceGapForReport = analyzeAudienceEngagementGap(
     {
-      liveId,
-      comments: commentsForReport,
+      liveId, comments: commentsForReport,
       samples: sessionSummaryRows,
       snapshot,
-      visitorCount:
-        eventDomBundleForReport?.programStats?.watchCount ??
-        snapshot?.viewerCountFromDom ??
-        null,
+      visitorCount: eventDomBundleForReport?.programStats?.watchCount ?? snapshot?.viewerCountFromDom ?? null,
       officialCommentCount: eventDomBundleForReport?.programStats?.commentCount ?? null
     },
     { broadcasterUserId: reportBroadcasterUserId, liveId }
@@ -19093,6 +19090,8 @@ async function initPopup() {
       const done = `メディアキットを保存しました（過去90日 ${result.liveCount}枠）`;
       setExportWaitTechStatus(done);
       if (postStatus) postStatus.textContent = done;
+      // v0.1.806: 保存成功の直後に完了音声(完成しました→ゆっくりみていってね)。
+      playReportCompleteVoiceSequence();
     } catch (error) {
       if (isExtensionContextInvalidatedError(error)) {
         renderExtensionContextBanner(true);
@@ -19356,6 +19355,7 @@ async function initPopup() {
       if (stEl) {
         stEl.textContent = `${mktDone.summary} · ${report.totalComments}件 / ${report.uniqueUsers}人`;
       }
+      playReportCompleteVoiceSequence(); // v0.1.806: マーケ保存成功直後に完了音声
     } catch (e) {
       const msg = String(
         e && typeof e === 'object' && 'message' in e
@@ -20115,6 +20115,7 @@ async function initPopup() {
           setExportWaitTechStatus(summary);
         }
       });
+      playReportCompleteVoiceSequence(); // v0.1.806: 保存成功直後に完了音声(完成→ゆっくりみてね)
     } catch (e) {
       const errMsg = String(
         e && typeof e === 'object' && 'message' in e
