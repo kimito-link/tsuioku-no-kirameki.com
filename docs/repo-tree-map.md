@@ -105,6 +105,9 @@ graph LR
   HUB --> f18["状態速報の全体マインドマップ"]
   f18 --> f18_0["lib/statusMindmapModel.js"]
   f18 --> f18_1["extension/status-entry.js"]
+  HUB --> f19["サイト健全性検証(リンク切れ防止)"]
+  f19 --> f19_0["lib/siteLinkHealth.js"]
+  f19 --> f19_1["site-health.mjs"]
 ```
 
 ---
@@ -149,14 +152,14 @@ graph LR
 - `xserver/`（2 件） — Xserver 向け webhook(git pull デプロイ)スクリプト  〔デプロイ / webhook〕
 
 ## `src/` — LP 側 + 純粋関数ライブラリの源  〔ソース〕
-<sub>ファイル 1081 件</sub>
+<sub>ファイル 1083 件</sub>
 
 - `data/`（6 件） — 保存コメントからレーン候補を読む acquirer / source 層  〔コメント / 取得〕
 - `domain/`（18 件） — ドメイン正本(応援レーンの集約・列ポリシー等。識別子判定など)  〔応援 / 集約 / 識別子〕
 - `extension/`（11 件） — バンドル entry(content/popup/venue/status/offscreen/backfill-sw 等=機能境界)  〔entry / 記録 / 会場 / 応援〕
 - `fixtures/`（1 件） — テスト用フィクスチャ  〔テスト〕
 - `images/`（165 件） — LP / CWS 提出物のマスター画像  〔画像〕
-- `lib/`（871 件） — 純粋関数ライブラリ(unit test 対象)。色・速度・コメント・レポート等の計算ロジックの大半  〔色 / 速度 / コメント / レポート / 純粋関数〕
+- `lib/`（873 件） — 純粋関数ライブラリ(unit test 対象)。色・速度・コメント・レポート等の計算ロジックの大半  〔色 / 速度 / コメント / レポート / 純粋関数〕
 - `shared/`（7 件） — 複数機能で共有する小部品(アバター URL ガード等)  〔共有 / アバター〕
 - `sound/`（1 件） — 音声素材(src 側)  〔音声〕
 
@@ -283,8 +286,14 @@ popup の AI診断コピー固有情報を別キーへ書き、status.html(状�
 ### 状態速報の全体マインドマップ  〔診断 / レポート / マインドマップ〕
 status.html を開けば今の状態を枝(概要/コメント取得/北極星/過去ログ/健全性/popup診断)で俯瞰。🟢🟡🔴⚪ の badge 付き折りたたみツリー(外部依存ゼロ)
 
-- `src/lib/statusMindmapModel.js` ⚠️ **見つからない（消失/リネーム）**
+- [`src/lib/statusMindmapModel.js`](../src/lib/statusMindmapModel.js)
 - [`src/extension/status-entry.js`](../src/extension/status-entry.js)
+
+### サイト健全性検証(リンク切れ防止)  〔Web / 健全性 / リンク〕
+公開ページ(LP/記事/docs)の相対内部リンク先がディスクに実在するか静的照合。外部リンクは叩かない(依存/プライバシー/速度ゼロ)。docs/site-health.md に出力・腐り検知
+
+- `src/lib/siteLinkHealth.js` ⚠️ **見つからない（消失/リネーム）**
+- `scripts/site-health.mjs` ⚠️ **見つからない（消失/リネーム）**
 
 ---
 

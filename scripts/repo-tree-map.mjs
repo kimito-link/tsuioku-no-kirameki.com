@@ -106,7 +106,8 @@ const FEATURES = [
   { feature: '記録件数の単調化(減らない表示)', desc: 'per-live ゲートで記録件数の表示が後退しないようにする', paths: ['src/lib/monotonicCommentCount.js'], tags: ['記録', 'コメント'] },
   { feature: 'storage キー定義', desc: 'chrome.storage のキー名の正本(nls_comments_<lv> 等)', paths: ['src/lib/storageKeys.js'], tags: ['storage'] },
   { feature: 'AI診断の状態速報集約', desc: 'popup の AI診断コピー固有情報を別キーへ書き、status.html(状態速報)の AI共有まとめに集約。status を見れば全部わかる', paths: ['src/lib/aiSharePopupDiagKey.js', 'src/extension/status-entry.js'], tags: ['診断', 'レポート', '集約'] },
-  { feature: '状態速報の全体マインドマップ', desc: 'status.html を開けば今の状態を枝(概要/コメント取得/北極星/過去ログ/健全性/popup診断)で俯瞰。🟢🟡🔴⚪ の badge 付き折りたたみツリー(外部依存ゼロ)', paths: ['src/lib/statusMindmapModel.js', 'src/extension/status-entry.js'], tags: ['診断', 'レポート', 'マインドマップ'] }
+  { feature: '状態速報の全体マインドマップ', desc: 'status.html を開けば今の状態を枝(概要/コメント取得/北極星/過去ログ/健全性/popup診断)で俯瞰。🟢🟡🔴⚪ の badge 付き折りたたみツリー(外部依存ゼロ)', paths: ['src/lib/statusMindmapModel.js', 'src/extension/status-entry.js'], tags: ['診断', 'レポート', 'マインドマップ'] },
+  { feature: 'サイト健全性検証(リンク切れ防止)', desc: '公開ページ(LP/記事/docs)の相対内部リンク先がディスクに実在するか静的照合。外部リンクは叩かない(依存/プライバシー/速度ゼロ)。docs/site-health.md に出力・腐り検知', paths: ['src/lib/siteLinkHealth.js', 'scripts/site-health.mjs'], tags: ['Web', '健全性', 'リンク'] }
 ];
 
 /** ツリーから除外するトップレベル(ドット系・生成物・巨大画像ディレクトリ等) */
