@@ -127,10 +127,10 @@ graph LR
 <sub>ファイル 24 件</sub>
 
 ## `docs/` — 設計正本・マインドマップ・フロー図・feature-map(AI/人間向け)  〔設計 / レポート〕
-<sub>ファイル 63 件</sub>
+<sub>ファイル 64 件</sub>
 
 - `article-assets/`（3 件） — 記事用の画像・動画・音声アセット  〔記事 / 画像〕
-- `feature-map/`（11 件） — 機能ごと依存図(自動生成)。誰が storage を書き/読むか  〔依存図 / 自動生成〕
+- `feature-map/`（12 件） — 機能ごと依存図(自動生成)。誰が storage を書き/読むか  〔依存図 / 自動生成〕
 - `policies/`（1 件） — 運用方針メモ(統計の失敗モード等)  〔方針〕
 - `releases/`（4 件） — リリース関連メモ(CWS 公開 API 設定・版ごとの記事下書き)  〔リリース〕
 - `research/`（2 件） — ディープリサーチ成果(ギフトランキング等の調査)  〔調査 / レポート〕
@@ -302,7 +302,7 @@ status.html を開けば今の状態を枝(概要/コメント取得/北極星/�
 esbuild の import 到達グラフを逆引きし「このファイルを変えたら、どの機能(entry)が壊れうるか」を波及機能数の降順で一覧。docs/feature-map/impact-map.md。新規ビルド/依存ゼロ(reach 再利用)
 
 - [`scripts/feature-map.mjs`](../scripts/feature-map.mjs)
-- `docs/feature-map/impact-map.md` ⚠️ **見つからない（消失/リネーム）**
+- [`docs/feature-map/impact-map.md`](../docs/feature-map/impact-map.md)
 
 ---
 

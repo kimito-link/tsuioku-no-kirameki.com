@@ -23,6 +23,7 @@
 - 🟠 **fn:giftSubAppHistoryStorageKey** — 書く人だけ（読む経路が無い疑い）: src/extension/content-entry.js
 - 🟠 **fn:perfDiagStorageKey** — 書く人だけ（読む経路が無い疑い）: src/extension/popup-entry.js
 - 🟠 **fn:tailStorageKey** — 書く人だけ（読む経路が無い疑い）: src/extension/content-entry.js
+- 🔵 **KEY_AI_SHARE_POPUP_DIAG** — 読む人だけ（書く経路が無い疑い）: src/extension/status-entry.js
 - 🔵 **KEY_ANONYMOUS_IDENTICON_ENABLED** — 読む人だけ（書く経路が無い疑い）: src/extension/popup-entry.js
 - 🔵 **KEY_AUTOPATROL_ENABLED** — 読む人だけ（書く経路が無い疑い）: src/extension/popup-entry.js
 - 🔵 **KEY_AUTOPATROL_STATE** — 読む人だけ（書く経路が無い疑い）: src/extension/popup-entry.js
@@ -62,6 +63,7 @@
 | キー | 書く人(producer) | 読む人(consumer) |
 |---|---|---|
 | `KEY_AI_SHARE_FAST_DIAG` | extension/content-entry.js | extension/popup-entry.js<br>extension/status-entry.js |
+| `KEY_AI_SHARE_POPUP_DIAG` | — | extension/status-entry.js |
 | `KEY_ANONYMOUS_IDENTICON_ENABLED` | — | extension/popup-entry.js |
 | `KEY_AUTOPATROL_ENABLED` | — | extension/popup-entry.js |
 | `KEY_AUTOPATROL_STATE` | — | extension/popup-entry.js |

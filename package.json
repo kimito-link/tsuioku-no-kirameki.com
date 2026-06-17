@@ -17,6 +17,7 @@
     "build": "node scripts/build.mjs",
     "build:watch": "node scripts/build-watch.mjs",
     "feature-map": "node scripts/feature-map.mjs",
+    "feature-map:check": "node scripts/feature-map.mjs --check",
     "tree-map": "node scripts/repo-tree-map.mjs",
     "tree-map:check": "node scripts/repo-tree-map.mjs --check",
     "site-health": "node scripts/site-health.mjs",

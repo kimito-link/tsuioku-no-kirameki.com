@@ -13,6 +13,7 @@
 ```mermaid
 graph LR
   n_venue["会場モード(standalone)"]
+  n_venue --> n_src_domain_user_identity_js["domain/user/identity.js"]:::shared
   n_venue --> n_src_extension_venueBar_js["extension/venueBar.js"]:::shared
   n_venue --> n_src_lib_anonymousIdenticon_js["lib/anonymousIdenticon.js"]:::shared
   n_venue --> n_src_lib_avatarBroadcasterGuard_js["lib/avatarBroadcasterGuard.js"]:::shared
@@ -52,8 +53,7 @@ graph LR
   n_venue --> n_src_lib_venueRoster_js["lib/venueRoster.js"]:::shared
   n_venue --> n_src_lib_venueSeats_js["lib/venueSeats.js"]:::shared
   n_venue --> n_src_lib_venueSpeech_js["lib/venueSpeech.js"]:::shared
-  n_venue --> n_src_lib_venueSpeechStreak_js["lib/venueSpeechStreak.js"]:::shared
   classDef shared fill:#eee,stroke:#999,color:#666;
 ```
 
-> ほか 10 ファイル省略（全件は storage-bus.md / metafile 参照）。
+> ほか 11 ファイル省略（全件は storage-bus.md / metafile 参照）。

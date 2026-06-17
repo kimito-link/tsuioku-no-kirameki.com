@@ -78,6 +78,15 @@ file→features 逆引き(f2f)を既に計算済み・ただし"このファイ�
 - repo-tree-map FEATURES に「影響範囲マップ」登録。
 → これで会議の2信号(Web健全性=site-health / 影響範囲=impact-map)を両方、最小・依存ゼロで満たした。
 
+### さらに腐り検知を全マップに(2026-06-18)
+- `feature-map --check`(`npm run feature-map:check`)を新設し `verify:cc` に追加。検知2種:
+  ①生成物 drift(再生成して docs/feature-map/* と差分が出たら exit 1)
+  ②**新規の storage 断線**(`STORAGE_DISCONNECT_BASELINE` に無い producer-only/consumer-only キーが出たら exit 1)。
+  ベースライン=現状の42件(大半は MVP 静的解析の偽陽性=設定キーを lib 純関数で set 等)を許容し、**新しく入った
+  本物の断線(broadcaster バグ型)だけ落とす**(baseline ratchet)。実際に追加直後の `KEY_AI_SHARE_POPUP_DIAG`
+  (optional-chaining+computed key で producer 取りこぼし=偽陽性)を check が即検出→裏取りして baseline へ。
+- これで verify:cc の腐り検知は **tree-map + site-health + feature-map** の3本立て。地図がコードとズレたら検証が落ちる。
+
 ## 退化ガード（厳守）
 - 外部送信ゼロ・追加依存ゼロ(Node 標準 fs/正規表現のみ・got/cheerio 等は使わない)。
 - 既存 verify:bump / tree-map:check と**責務を重複させない**(版整合は verify:bump、生成鮮度は tree-map:check に委譲)。

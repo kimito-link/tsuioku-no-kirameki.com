@@ -25,6 +25,33 @@ const ROOT = resolve(process.cwd());
 const SRC = join(ROOT, 'src');
 const OUT_DIR = join(ROOT, 'docs', 'feature-map');
 
+/** --check: 再生成して tracked 出力と差分が出たら / 新規の storage 断線が出たら exit 1。 */
+const CHECK_MODE = process.argv.includes('--check');
+/** @type {string[]} check モードで検出した問題。 */
+const checkProblems = [];
+
+/**
+ * 生成物を「書く(通常)」or「既存と比較(check)」する。OUT_DIR 相対のファイル名で受ける。
+ * @param {string} filename
+ * @param {string} content
+ */
+function emit(filename, content) {
+  const full = join(OUT_DIR, filename);
+  if (CHECK_MODE) {
+    let cur = '';
+    try {
+      cur = readFileSync(full, 'utf8');
+    } catch {
+      cur = '';
+    }
+    if (cur !== content) {
+      checkProblems.push(`drift: docs/feature-map/${filename} が最新ではありません(\`npm run feature-map\` を実行してコミット)`);
+    }
+  } else {
+    writeFileSync(full, content, 'utf8');
+  }
+}
+
 /**
  * build.mjs と同じ entry → 機能名の対応表(機能境界の正本)。
  * build.mjs が entry を増やしたらここも足す(意図的に手で名付ける=機能名は人間が決める)。
@@ -44,6 +71,32 @@ const FEATURES = [
 
 /** 解析から除外するパス断片。 */
 const EXCLUDE = [/\.test\.js$/, /node_modules/];
+
+/**
+ * storage 断線の「既知の疑い」ベースライン(2026-06-18 時点の全件)。
+ * 大半は MVP 静的解析の偽陽性(設定キーを lib 純関数経由で set / background.js・offscreen で書く 等)。
+ * `--check` は **この一覧に無い新規の断線が出たときだけ失敗**する(=本物の新規断線=今回の broadcaster バグ型を検知)。
+ * 偽陽性が将来解消されたら(producer/consumer が両方付いたら)この一覧から消えても check は通る(緩む方向は安全)。
+ * 新しいキーを足して意図的に producer/consumer 片方だけなら、ここに1行足してから再生成する。
+ */
+const STORAGE_DISCONNECT_BASELINE = new Set([
+  'KEY_ANONYMOUS_IDENTICON_ENABLED', 'KEY_AUTOPATROL_ENABLED', 'KEY_AUTOPATROL_STATE',
+  'KEY_BACKFILL_AUTO_DISABLED', 'KEY_BACKFILL_BG_KICK_ENABLED', 'KEY_BACKFILL_SW_MODE',
+  'KEY_CALM_PANEL_MOTION', 'KEY_CDB_OFFSCREEN_ENABLED', 'KEY_COMMENTER_FOLLOWING_LIST_CACHE',
+  'KEY_COMMENT_IDB_ENABLED', 'KEY_COMMENT_PANEL_AUTO_RESTORE', 'KEY_DEEP_HARVEST_QUIET_UI',
+  'KEY_FOLD_ANONYMOUS_IN_RANK_STRIP', 'KEY_INCREMENTAL_DEDUP_ENABLED', 'KEY_INLINE_FLOATING_ANCHOR',
+  'KEY_INLINE_PANEL_AUTOSHOW_ENABLED', 'KEY_INLINE_PANEL_PLACEMENT_USER_EXPLICIT',
+  'KEY_INLINE_PANEL_VIEWPORT_WIDE_POLICY', 'KEY_INLINE_PANEL_WIDTH_MODE', 'KEY_LAST_WATCH_URL',
+  'KEY_MARKETING_EXPORT_MASK_LABELS', 'KEY_NDGR_DETERMINISTIC_BACKFILL', 'KEY_NDGR_FORWARD_ENABLED',
+  'KEY_PAINT_PERF_RING_V1', 'KEY_PROFILE_RESOLVE_STATE', 'KEY_RECORDING', 'KEY_STORY_GROWTH_COLLAPSED',
+  'KEY_SUPPORT_CELEBRATION_STATE', 'KEY_SW_PROGRESS', 'KEY_THUMB_AUTO', 'KEY_THUMB_INTERVAL_MS',
+  'fn:backfillHeartbeatKey', 'fn:chunkMigratedKey', 'fn:comeviewPinStorageKey', 'fn:commentDbSummaryKey',
+  'fn:eventDomStorageKey', 'fn:giftSubAppHistoryStorageKey', 'fn:perfDiagStorageKey', 'fn:tailStorageKey',
+  'fn:watchSnapshotStorageKey', 'nls_backfill_progress_v1', 'nls_mcp_live_latest_v1',
+  // popup が optional-chaining + computed key で set するため producer を静的解析が取りこぼす偽陽性
+  // (実書込は popup-entry.js:collectAiShareDevMonitorPayloadBundle・status-entry.js が読む。2026-06-18 確認)
+  'KEY_AI_SHARE_POPUP_DIAG'
+]);
 
 /**
  * @param {string} p
@@ -220,7 +273,7 @@ function mlabel(s) {
 }
 
 async function main() {
-  mkdirSync(OUT_DIR, { recursive: true });
+  if (!CHECK_MODE) mkdirSync(OUT_DIR, { recursive: true });
 
   const sourceFiles = listSourceFiles();
   const reach = await buildImportReach();
@@ -251,6 +304,14 @@ async function main() {
   writeImpactMap(f2f);
   writeIndex(keyMap);
 
+  if (CHECK_MODE) {
+    if (checkProblems.length) {
+      for (const p of checkProblems) console.error(`[feature-map] ${p}`);
+      process.exit(1);
+    }
+    console.log('[feature-map] up to date(生成物 drift なし・新規 storage 断線なし)。');
+    return;
+  }
   console.log(`feature-map: generated ${FEATURES.length} feature maps + storage-bus + impact-map into docs/feature-map/`);
 }
 
@@ -302,7 +363,7 @@ function writeImpactMap(f2f) {
     lines.push(`| \`${r.file}\` | ${r.feats.length} | ${r.feats.map(featureLabel).join(' / ')} |`);
   }
   lines.push('');
-  writeFileSync(join(OUT_DIR, 'impact-map.md'), lines.join('\n'), 'utf8');
+  emit('impact-map.md', lines.join('\n'));
 }
 
 /**
@@ -327,6 +388,13 @@ function writeStorageBusMap(keyMap) {
     const hasC = v.consumers.size > 0;
     if (hasP && !hasC) producerOnly.push(k);
     if (!hasP && hasC) consumerOnly.push(k);
+  }
+
+  // --check: ベースラインに無い【新規の断線】だけを失敗にする(既存の偽陽性は許容)。
+  for (const k of [...producerOnly, ...consumerOnly]) {
+    if (!STORAGE_DISCONNECT_BASELINE.has(k)) {
+      checkProblems.push(`新規の storage 断線: "${k}"(producer/consumer の片方しか無い)。経路を繋ぐか、意図的なら STORAGE_DISCONNECT_BASELINE に追記`);
+    }
   }
 
   lines.push('## ⚠️ 断線の疑い（書く人だけ / 読む人だけ）');
@@ -364,7 +432,7 @@ function writeStorageBusMap(keyMap) {
   }
   lines.push('');
 
-  writeFileSync(join(OUT_DIR, 'storage-bus.md'), lines.join('\n'), 'utf8');
+  emit('storage-bus.md', lines.join('\n'));
 }
 
 /** src/extension/foo.js → extension/foo.js のように短く。 */
@@ -426,7 +494,7 @@ function writeFeatureMaps(reach, access, f2f) {
       lines.push('');
     }
 
-    writeFileSync(join(OUT_DIR, `${f.feature}.md`), lines.join('\n'), 'utf8');
+    emit(`${f.feature}.md`, lines.join('\n'));
   }
 }
 
@@ -452,7 +520,7 @@ function writeIndex(keyMap) {
   lines.push(`- [storage データバス図](storage-bus.md) — 全 ${keyMap.size} キーの producer/consumer と断線検出`);
   lines.push('- [影響範囲マップ](impact-map.md) — このファイルを変えたら何が壊れるか(波及機能の逆引き)');
   lines.push('');
-  writeFileSync(join(OUT_DIR, 'index.md'), lines.join('\n'), 'utf8');
+  emit('index.md', lines.join('\n'));
 }
 
 main().catch((err) => {
