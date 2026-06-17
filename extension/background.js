@@ -1407,11 +1407,31 @@ const MCP_DIAG_DUMP_MINUTES = 1;
 /** ダウンロードフォルダ内の固定相対パス(Claude Code が Read する先)。 */
 const MCP_DIAG_DUMP_PATH = 'nicolivelog-mcp/status-latest.json';
 const KEY_AI_SHARE_FAST_DIAG_BG = 'nls_ai_share_fast_diag_v1';
-/** 既定 ON(ユーザーが明示要望)。false で停止できるキルスイッチ。 */
+/**
+ * v0.1.805: 既定 OFF(opt-in)へ格下げ。理由=実機で Chrome の「各ファイルの保存場所を毎回確認する」
+ *   設定や上書き挙動により、1分ごとの自動ダンプが保存ダイアログを連発してユーザーの操作を妨げた。
+ *   裏方の状態確認機能が作業を邪魔するのは本末転倒なので既定では一切ダウンロードしない。
+ *   このキーを明示 true にしたときだけ alarm を張り、ダンプする(司令塔が必要なときだけ有効化)。
+ */
 const KEY_MCP_DIAG_DUMP_ENABLED = 'nls_mcp_diag_dump_enabled_v1';
+
+/** v0.1.805: ダンプが明示 ON のときだけ true。OFF(既定)なら alarm を張らない・ダンプもしない。 */
+async function isMcpDiagDumpEnabled() {
+  try {
+    const flagBag = await chrome.storage.local.get(KEY_MCP_DIAG_DUMP_ENABLED);
+    return flagBag[KEY_MCP_DIAG_DUMP_ENABLED] === true;
+  } catch {
+    return false;
+  }
+}
 
 async function ensureMcpDiagDumpAlarm() {
   try {
+    // v0.1.805: 既定 OFF。明示 ON のときだけ alarm を張る。OFF なら既存 alarm も掃除して連発を止める。
+    if (!(await isMcpDiagDumpEnabled())) {
+      try { await chrome.alarms.clear(MCP_DIAG_DUMP_ALARM); } catch { /* no-op */ }
+      return;
+    }
     const existing = await chrome.alarms.get(MCP_DIAG_DUMP_ALARM);
     if (existing) return;
     chrome.alarms.create(MCP_DIAG_DUMP_ALARM, {
@@ -1442,15 +1462,8 @@ function utf8ToBase64(str) {
 /** 診断 JSON をローカル固定パスへ1回書き出す(履歴は消してシェルフを汚さない)。 */
 async function runMcpDiagDumpTick() {
   try {
-    // 既定 ON。明示 false のときだけ止める。
-    let enabled = true;
-    try {
-      const flagBag = await chrome.storage.local.get(KEY_MCP_DIAG_DUMP_ENABLED);
-      enabled = flagBag[KEY_MCP_DIAG_DUMP_ENABLED] !== false;
-    } catch {
-      enabled = true;
-    }
-    if (!enabled) return;
+    // v0.1.805: 既定 OFF(opt-in)。明示 true のときだけ書く(保存ダイアログ連発を止める)。
+    if (!(await isMcpDiagDumpEnabled())) return;
     if (!chrome.downloads || typeof chrome.downloads.download !== 'function') return;
 
     // 診断は fastDiag の1キーだけ読む(軽い)。タブ一覧も少量で足す(どの配信が記録中か司令塔が分かるように)。

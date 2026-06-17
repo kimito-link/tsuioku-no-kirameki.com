@@ -53,6 +53,26 @@ describe('background.js の背面 backfill kick ミラー(drift 検知)', () => 
     expect(backgroundSrc.includes("'nls_ai_share_fast_diag_v1'"), reminder).toBe(true);
   });
 
+  it('v0.1.805: 診断ダンプは既定 OFF(opt-in)=保存ダイアログ連発を起こさない', () => {
+    // 実機で 1分ごとの自動ダンプが保存ダイアログを連発した(Chrome の保存場所確認設定/上書き挙動)。
+    // 既定 OFF(明示 true のときだけ ON)に格下げ済み。!== false(既定 ON)へ戻すと再発するので検知。
+    expect(
+      backgroundSrc.includes('=== true'),
+      '診断ダンプは isMcpDiagDumpEnabled() で === true 判定(既定 OFF)にする'
+    ).toBe(true);
+    expect(backgroundSrc.includes('isMcpDiagDumpEnabled'), reminder).toBe(true);
+    // 既定 ON を示す `!== false` でダンプを許可していないこと(連発の再発防止)。
+    const startIdx = backgroundSrc.indexOf('async function isMcpDiagDumpEnabled');
+    expect(startIdx, 'isMcpDiagDumpEnabled が見つからない').toBeGreaterThan(-1);
+    const after = backgroundSrc.slice(startIdx + 1);
+    const nextFnRel = after.indexOf('\nasync function ');
+    const body = nextFnRel > -1 ? after.slice(0, nextFnRel) : after;
+    expect(
+      body.includes('!== false'),
+      'isMcpDiagDumpEnabled は !== false(既定 ON)を使わない=既定 OFF'
+    ).toBe(false);
+  });
+
   it('v0.1.802: 診断ダンプは SW で動く data: URL を使う(createObjectURL は SW で throw=書けない)', () => {
     // SW に URL.createObjectURL は無く throw する。data: URL(utf8ToBase64)でないとファイルが書けない。
     expect(
