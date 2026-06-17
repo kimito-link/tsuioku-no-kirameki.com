@@ -13822,6 +13822,9 @@ let _followingListFetchedThisLive = 0;
 function runExternalApiFetchesAsTabLeader(opts = {}) {
   const lid = String(liveId || '').trim().toLowerCase();
   if (!/^lv\d{1,15}$/.test(lid)) return Promise.resolve();
+  // v0.1.801: autopatrol(背景巡回・使い捨て)タブでは per-live 鏡(koken/nicoad/参加/ギフト履歴/audition/
+  //   プロフィール)を fetch・保存しない=過去配信キャッシュ無界蓄積の発生源を断つ。autopatrol は較正だけで良い。
+  if (isAutopatrolTab()) return Promise.resolve();
   const includeEvt = opts.includeEventParticipation !== false;
   // v0.1.616: 観測。interval が実際に fetch 要求まで来たかを数える。
   _externalFetchProbe.intervalTicks += 1;
@@ -16964,6 +16967,11 @@ async function readPrunableStorageBagCheap() {
 
 async function persistOfficialEventDomBundleNow() {
   if (!hasExtensionContext()) return;
+  // v0.1.801「過去配信キャッシュの無界蓄積」根治(会議4役一致+司令塔裏取り): autopatrol(背景巡回)で
+  //   開いた使い捨て配信では per-live キャッシュ(nls_event_dom_<lv> 等)を書かない=513件蓄積の主発生源を断つ。
+  //   autopatrol は同接較正データ(別キー・maybeLogConcurrentCalibrationSample)だけ取れれば良く、
+  //   イベントDOM/貢献度/ギフト鏡の per-live キャッシュは不要。較正収集は別経路なので壊さない。
+  if (isAutopatrolTab()) return;
   const lid = String(liveId || '').trim().toLowerCase();
   if (!lid) return;
   ensureOfficialEventDomObserver();
