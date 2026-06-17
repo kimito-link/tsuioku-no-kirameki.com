@@ -583,6 +583,7 @@ import {
   buildSessionCommentCache
 } from '../lib/sessionCommentCache.js';
 import { KEY_AI_SHARE_FAST_DIAG } from '../lib/aiShareFastDiagKey.js';
+import { KEY_AI_SHARE_POPUP_DIAG, buildAiSharePopupDiagRecord } from '../lib/aiSharePopupDiagKey.js';
 import { buildHtmlReportCommenterFollowBlock } from '../lib/htmlReportCommenterFollowSection.js';
 import { shouldDeferHeavyPopupPaintDuringScroll } from '../lib/popupMainScrollDefer.js';
 import { STORY_GROWTH_MAX_CELLS } from '../lib/storyGrowthLimits.js';
@@ -17928,11 +17929,7 @@ async function collectAiShareDevMonitorPayloadBundle(watchUrl) {
     popup: {
       exportedAt: new Date().toISOString(),
       embedded: (() => {
-        try {
-          return window.self !== window.top;
-        } catch {
-          return true;
-        }
+        try { return window.self !== window.top; } catch { return true; }
       })(),
       watchSnapshotMeta: (() => {
         const snap = watchMetaCache?.snapshot;
@@ -17955,11 +17952,7 @@ async function collectAiShareDevMonitorPayloadBundle(watchUrl) {
       //   load 成否を集計（同期読み取りのみ）。usericonFailed が多い・失敗サンプルが特定の
       //   形に偏るなら 404/CORS が真因＝nvapi 経由等の対処へ進む判断材料にする。
       avatarLoadDiag: (() => {
-        try {
-          return storyAvatarLoadGuard.getDiagnostics();
-        } catch {
-          return null;
-        }
+        try { return storyAvatarLoadGuard.getDiagnostics(); } catch { return null; }
       })(),
       // v0.1.616: 北極星描画経路の観測。content は取得完璧(koken 69件)なのに popup の
       //   レーンが空の真因を一点に絞る。
@@ -18113,6 +18106,11 @@ async function collectAiShareDevMonitorPayloadBundle(watchUrl) {
     }
   }
   payload.diagSchemaVersion = AI_SHARE_DIAG_SCHEMA_VERSION;
+  // status.html 集約用: popup 固有診断を別キーへ best-effort 書込(fastDiag と別キー=上書き合戦回避)
+  try {
+    const rec = buildAiSharePopupDiagRecord(payload, AI_SHARE_DIAG_SCHEMA_VERSION, new Date().toISOString());
+    if (rec) void globalThis.chrome?.storage?.local?.set({ [KEY_AI_SHARE_POPUP_DIAG]: rec });
+  } catch { /* 書き込み失敗はコピーを妨げない */ }
   return { payload, lastErr, manifest };
 }
 
