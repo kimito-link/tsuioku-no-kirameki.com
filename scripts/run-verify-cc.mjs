@@ -63,6 +63,7 @@ const steps = [
   ['lint', 'lint'],
   ['typecheck', 'typecheck'],
   ['build', 'build'],
+  ['tree-map', 'tree-map:check'],
   ['verify:bump', 'verify:bump']
 ];
 
