@@ -53,6 +53,26 @@ describe('buildPersonTileEl', () => {
     expect(cell.getAttribute('href')).toBeNull();
   });
 
+  // ドリフト検知: リンク可否は domain 正本 isNumericNicoUserId(^\d{5,14}$=本登録)に統一した。
+  // venue 席(venueBar)も同基準。緩い nicoUserPageUrl(^\d{1,18}$)へ戻すと境界(4桁以下/15桁以上)で
+  // popup と venue がズレ、これらが落ちる。
+  it('本登録の境界: 5桁はリンク、4桁以下はリンクにしない', () => {
+    const linkable = buildPersonTileEl(makeItem({ entry: { userId: '12345' } }), makeIo());
+    expect(linkable.tagName).toBe('A');
+    expect(linkable.getAttribute('href')).toBe('https://www.nicovideo.jp/user/12345');
+    const tooShort = buildPersonTileEl(makeItem({ entry: { userId: '1234' } }), makeIo());
+    expect(tooShort.tagName).toBe('SPAN');
+    expect(tooShort.getAttribute('href')).toBeNull();
+  });
+
+  it('本登録の境界: 14桁はリンク、15桁以上はリンクにしない', () => {
+    const linkable = buildPersonTileEl(makeItem({ entry: { userId: '12345678901234' } }), makeIo());
+    expect(linkable.tagName).toBe('A');
+    const tooLong = buildPersonTileEl(makeItem({ entry: { userId: '123456789012345' } }), makeIo());
+    expect(tooLong.tagName).toBe('SPAN');
+    expect(tooLong.getAttribute('href')).toBeNull();
+  });
+
   it('userId が無い行も落ちずに <span> セルになる', () => {
     const cell = buildPersonTileEl(makeItem({ entry: {} }), makeIo());
     expect(cell.tagName).toBe('SPAN');

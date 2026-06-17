@@ -21,6 +21,9 @@
  * ───────────────────────────────────────────────────────────────────────────
  */
 
+import { isNumericNicoUserId } from '../domain/user/identity.js';
+import { nicoUserPageUrl } from './nicoUserPage.js';
+
 /**
  * @typedef {{
  *   displaySrc: string,
@@ -49,15 +52,17 @@
  */
 export function buildPersonTileEl(p, io) {
   const fullUid = String(p.entry?.userId || '').trim();
-  // 数値 ID（5〜14桁）ならニコニコのユーザーページにリンク
-  const isLinkable = /^\d{5,14}$/.test(fullUid);
+  // 本登録の数値 ID ならニコニコのユーザーページにリンク。
+  // リンク可否は domain 正本 isNumericNicoUserId(^\d{5,14}$=本登録)・URL は nicoUserPageUrl に
+  // 寄せる(旧インライン /^\d{5,14}$/ の重複を排し、venue 席のリンク判定と同一基準にしてドリフト防止)。
+  const pageUrl = nicoUserPageUrl(fullUid);
+  const isLinkable = isNumericNicoUserId(fullUid) && pageUrl !== '';
   const cell = isLinkable
     ? document.createElement('a')
     : document.createElement('span');
   cell.className = 'nl-story-userlane-cell';
   if (isLinkable) {
-    /** @type {HTMLAnchorElement} */ (cell).href =
-      `https://www.nicovideo.jp/user/${fullUid}`;
+    /** @type {HTMLAnchorElement} */ (cell).href = pageUrl;
     /** @type {HTMLAnchorElement} */ (cell).target = '_blank';
     /** @type {HTMLAnchorElement} */ (cell).rel = 'noopener noreferrer';
     cell.classList.add('nl-story-userlane-cell--linkable');
