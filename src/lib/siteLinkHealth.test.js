@@ -3,7 +3,8 @@ import {
   extractInternalLinks,
   resolveRelativeLink,
   resolveLinkCandidates,
-  findBrokenInternalLinks
+  findBrokenInternalLinks,
+  findMetaUrlMismatches
 } from './siteLinkHealth.js';
 
 describe('extractInternalLinks', () => {
@@ -30,6 +31,17 @@ describe('extractInternalLinks', () => {
     expect(extractInternalLinks(md, { html: false })).toEqual([
       './person-tile-unify-SYNTHESIS.md', '../docs/x.html', 'repo-tree-map.md'
     ]);
+  });
+
+  it('Markdown: コード内のリンク記法は検証しない(誤検知防止)', () => {
+    const md = [
+      'inline example: `[..](xxx.md)` は説明用なので無視',
+      '```',
+      'fenced [block](gone.md) も無視',
+      '```',
+      '本物 [real](./real.md) だけ拾う'
+    ].join('\n');
+    expect(extractInternalLinks(md, { html: false })).toEqual(['./real.md']);
   });
 });
 
@@ -114,5 +126,45 @@ describe('findBrokenInternalLinks', () => {
     expect(findBrokenInternalLinks(files, () => false)).toEqual([
       { from: 'docs/index.md', link: './gone.md', resolved: 'docs/gone.md' }
     ]);
+  });
+});
+
+describe('findMetaUrlMismatches', () => {
+  const okHtml = (name) => ({
+    path: `tsuioku-no-kirameki/articles/${name}`,
+    text: `<link rel="canonical" href="https://tsuioku-no-kirameki.com/articles/${name}">
+           <meta property="og:url" content="https://tsuioku-no-kirameki.com/articles/${name}">`
+  });
+
+  it('canonical/og:url がファイル名と一致なら問題なし', () => {
+    expect(findMetaUrlMismatches([okHtml('ndgr.html')])).toEqual([]);
+  });
+
+  it('コピペで canonical が前記事のまま=不一致を検出', () => {
+    const files = [{
+      path: 'tsuioku-no-kirameki/articles/new-article.html',
+      text: `<link rel="canonical" href="https://tsuioku-no-kirameki.com/articles/old-article.html">
+             <meta property="og:url" content="https://tsuioku-no-kirameki.com/articles/new-article.html">`
+    }];
+    const m = findMetaUrlMismatches(files);
+    expect(m).toEqual([
+      { from: 'tsuioku-no-kirameki/articles/new-article.html', kind: 'canonical', urlBasename: 'old-article.html', fileBasename: 'new-article.html' }
+    ]);
+  });
+
+  it('canonical/og:url が無いファイルはスキップ(必須化しない)', () => {
+    expect(findMetaUrlMismatches([{ path: 'docs/x.html', text: '<h1>no meta</h1>' }])).toEqual([]);
+  });
+
+  it('ディレクトリ index(canonical が …/articles/)は対象外', () => {
+    const files = [{
+      path: 'tsuioku-no-kirameki/articles/index.html',
+      text: '<link rel="canonical" href="https://tsuioku-no-kirameki.com/articles/">'
+    }];
+    expect(findMetaUrlMismatches(files)).toEqual([]);
+  });
+
+  it('md は対象外(HTML のみ)', () => {
+    expect(findMetaUrlMismatches([{ path: 'docs/x.md', text: 'canonical?' }])).toEqual([]);
   });
 });

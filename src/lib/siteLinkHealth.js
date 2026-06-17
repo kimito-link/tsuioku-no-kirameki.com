@@ -45,14 +45,24 @@ export function extractInternalLinks(text, opts = {}) {
     let m;
     while ((m = re.exec(s)) != null) consider(m[1] || m[2]);
   } else {
+    // Markdown は「コード(```fenced``` / `inline`)内のリンク記法はリンクではない」ので先に剥がす。
+    //   例: 説明文中の `[..](xxx.md)` は実リンクでないため検証しない(誤検知防止)。
+    const noCode = stripMarkdownCode(s);
     // Markdown のリンク [text](path) と <path>
     const reMd = /\]\(([^)\s]+)(?:\s+"[^"]*")?\)/g;
     let m;
-    while ((m = reMd.exec(s)) != null) consider(m[1]);
+    while ((m = reMd.exec(noCode)) != null) consider(m[1]);
     const reAngle = /<([^>\s:]+\.(?:html?|md))>/gi;
-    while ((m = reAngle.exec(s)) != null) consider(m[1]);
+    while ((m = reAngle.exec(noCode)) != null) consider(m[1]);
   }
   return out;
+}
+
+/** Markdown の fenced code block(```...```)と inline code(`...`)を空白へ潰す(リンク誤検知防止)。 */
+export function stripMarkdownCode(text) {
+  return String(text || '')
+    .replace(/```[\s\S]*?```/g, ' ')
+    .replace(/`[^`\n]*`/g, ' ');
 }
 
 /**
@@ -119,4 +129,46 @@ export function findBrokenInternalLinks(files, exists) {
     }
   }
   return broken;
+}
+
+/** URL/パスの末尾セグメント(ファイル名)を返す。クエリ/アンカーは除去。 */
+function lastSegment(url) {
+  const s = String(url || '').split('#')[0].split('?')[0].replace(/\/+$/, '');
+  const seg = s.split('/').pop() || '';
+  return seg;
+}
+
+/**
+ * HTML の canonical / og:url が「自分のファイル名」と一致するか検証する純関数。
+ * コピペで記事を作ったときに canonical だけ前の記事のままになる事故(URL 取り違え)を防ぐ。
+ * canonical / og:url が無いファイルはスキップ(必須化はしない=既存ページを壊さない)。
+ *
+ * @param {{ path: string, text: string }[]} files HTML ファイル(path=リポジトリ相対)
+ * @returns {{ from: string, kind: 'canonical'|'og:url', urlBasename: string, fileBasename: string }[]} 不一致一覧
+ */
+export function findMetaUrlMismatches(files) {
+  const out = [];
+  for (const f of Array.isArray(files) ? files : []) {
+    const from = String(f?.path || '');
+    if (!from || !/\.html?$/i.test(from)) continue;
+    const text = String(f.text || '');
+    const fileBasename = lastSegment(from);
+
+    const canon = text.match(/<link\s+rel=["']canonical["']\s+href=["']([^"']+)["']/i);
+    if (canon) {
+      const urlBasename = lastSegment(canon[1]);
+      // ディレクトリ index(canonical が "…/articles/" 等で末尾ファイル名が無い)は対象外
+      if (urlBasename && /\.html?$/i.test(urlBasename) && urlBasename !== fileBasename) {
+        out.push({ from, kind: 'canonical', urlBasename, fileBasename });
+      }
+    }
+    const og = text.match(/<meta\s+property=["']og:url["']\s+content=["']([^"']+)["']/i);
+    if (og) {
+      const urlBasename = lastSegment(og[1]);
+      if (urlBasename && /\.html?$/i.test(urlBasename) && urlBasename !== fileBasename) {
+        out.push({ from, kind: 'og:url', urlBasename, fileBasename });
+      }
+    }
+  }
+  return out;
 }
