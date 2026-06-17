@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.817',
+    date: '2026-06-17',
+    summary: '応援アイコンのタイル描画を共通部品に整理(見た目不変・土台整備)',
+    items: Object.freeze([
+      '応援アイコン列の「丸いサムネイル1個」を作る処理を、ひとつの共通部品にまとめ直しました。これは将来、会場モードの席と応援アイコン列で「同じ人が同じ見た目で出る」ようにするための内部整理です。生成される見た目(アイコン・ID・名前の並び・リンク)は今までと1ミリも変わりません。記録・読み上げ・吹き出し・ギフト演出も従来どおりです。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.816',
     date: '2026-06-17',
     summary: '人物情報のまとめ役を内部に新設(挙動は変わりません・土台整備)',

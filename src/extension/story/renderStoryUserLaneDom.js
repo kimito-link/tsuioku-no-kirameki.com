@@ -15,6 +15,7 @@ import {
   buildStoryUserLaneGuideTopHtml
 } from '../../lib/storyUserLaneGuideHtml.js';
 import { buildStoryUserLaneStackAriaLabel } from '../../lib/supportVisualStoryCopy.js';
+import { buildPersonTileEl } from '../../lib/personTileDom.js';
 
 /**
  * @typedef {{
@@ -135,64 +136,9 @@ function fillLaneTier(el, items, io) {
   el.hidden = false;
   const frag = document.createDocumentFragment();
   for (const p of items) {
-    const fullUid = String(p.entry?.userId || '').trim();
-    // 数値 ID（5〜14桁）ならニコニコのユーザーページにリンク
-    const isLinkable = /^\d{5,14}$/.test(fullUid);
-    const cell = isLinkable
-      ? document.createElement('a')
-      : document.createElement('span');
-    cell.className = 'nl-story-userlane-cell';
-    if (isLinkable) {
-      /** @type {HTMLAnchorElement} */ (cell).href =
-        `https://www.nicovideo.jp/user/${fullUid}`;
-      /** @type {HTMLAnchorElement} */ (cell).target = '_blank';
-      /** @type {HTMLAnchorElement} */ (cell).rel = 'noopener noreferrer';
-      cell.classList.add('nl-story-userlane-cell--linkable');
-    }
-
-    const img = document.createElement('img');
-    img.className = 'nl-story-userlane-avatar';
-    const requestedLane = p.displaySrc;
-    const displayLane = io.storyAvatarLoadGuard.pickDisplaySrc(requestedLane);
-    img.src = displayLane;
-    io.storyAvatarLoadGuard.noteRemoteAttempt(img, requestedLane);
-    img.classList.toggle(
-      'nl-avatar--tv-fallback',
-      io.storyTileUsesYukkuriTvStyle(requestedLane, displayLane)
-    );
-    img.alt = '';
-    const tip =
-      fullUid && fullUid !== p.meta.idLine
-        ? `${p.title} | ${fullUid}`
-        : p.title;
-    img.title = tip;
-    cell.title = tip;
-    img.decoding = 'async';
-    if (io.isHttpOrHttpsUrl(img.src)) {
-      img.referrerPolicy = 'no-referrer';
-    }
-    if (
-      fullUid &&
-      requestedLane.startsWith('data:image/svg+xml') &&
-      typeof io.upgradeAnonymousAvatarImage === 'function'
-    ) {
-      io.upgradeAnonymousAvatarImage(img, fullUid, 64);
-    }
-
-    const metaEl = document.createElement('span');
-    metaEl.className = 'nl-story-userlane-meta';
-    const idRow = document.createElement('span');
-    idRow.className = 'nl-story-userlane-meta__id';
-    idRow.textContent = p.meta.idLine;
-    const nameRow = document.createElement('span');
-    nameRow.className = 'nl-story-userlane-meta__name';
-    nameRow.textContent = p.meta.nameLine;
-    metaEl.appendChild(idRow);
-    metaEl.appendChild(nameRow);
-
-    cell.appendChild(img);
-    cell.appendChild(metaEl);
-    frag.appendChild(cell);
+    // タイル本体の生成は人物タイル正本(buildPersonTileEl)に集約。
+    // ループ・innerHTML クリア・hidden 制御(=レイアウト)はここに残す。
+    frag.appendChild(buildPersonTileEl(p, io));
   }
   el.appendChild(frag);
 }
