@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>人物タイル経路 設計図 — 君斗りんくの追憶のきらめき</title>
+<style>
+  body { margin: 0; padding: 24px; background: #fafafa; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Hiragino Sans", "Yu Gothic UI", sans-serif; color: #1a1a1a; }
+  .wrap { max-width: 880px; margin: 0 auto; }
+  h1 { font-size: 20px; margin: 0 0 4px; }
+  .meta { color: #777; font-size: 12px; margin: 0 0 20px; }
+  .meta a { color: #4a6ea8; }
+  svg { width: 100%; height: auto; display: block; background: #fff; border: 1px solid #e3e3e3; border-radius: 10px; }
+  .legend { margin-top: 20px; font-size: 13px; line-height: 1.7; color: #333; background: #fff; border: 1px solid #e3e3e3; border-radius: 10px; padding: 14px 18px; }
+  .legend b { color: #1a1a1a; }
+  .src { color: #777; font-size: 11.5px; margin-top: 8px; }
+  code { background: #f0f0f0; padding: 1px 5px; border-radius: 4px; font-size: 12px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>人物タイル経路 設計図</h1>
+  <p class="meta">正本マインドマップ（手書き・視覚ビュー）。テキスト版は <a href="person-tile-architecture.md">person-tile-architecture.md</a> ／ 会議統合は <a href="../council/person-tile-unify-SYNTHESIS.md">person-tile-unify-SYNTHESIS.md</a>。最終更新 2026-06-17。</p>
+
+  <svg viewBox="0 0 760 600" xmlns="http://www.w3.org/2000/svg" role="img" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif">
+    <title>人物タイル経路の設計図</title>
+    <desc>記録コメントから userId 単位に集約し、popup の応援アイコン列と会場の席が同じ集約を共有する。来場者数(PV)は席ではなく背景群衆で表現する。</desc>
+    <style>
+      .lbl { fill: #1a1a1a; font-size: 13px; font-weight: 600; }
+      .sub { fill: #555; font-size: 10.5px; }
+      .hdr { fill: #fff; font-size: 13px; font-weight: 700; }
+      .note { fill: #777; font-size: 10px; }
+      .arrow { stroke: #999; stroke-width: 1.6; fill: none; marker-end: url(#ah); }
+      .legtxt { fill: #555; font-size: 10.5px; }
+    </style>
+    <defs>
+      <marker id="ah" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+        <path d="M0,0 L6,3 L0,6 Z" fill="#999"/>
+      </marker>
+    </defs>
+
+    <rect x="0" y="0" width="760" height="600" fill="#fafafa"/>
+
+    <rect x="250" y="20" width="260" height="46" rx="8" fill="#e8eef7" stroke="#9bb3d4"/>
+    <text x="380" y="40" text-anchor="middle" class="lbl">記録コメント行 (userId付き)</text>
+    <text x="380" y="57" text-anchor="middle" class="sub">withUid ほぼ100%</text>
+
+    <rect x="230" y="92" width="300" height="54" rx="8" fill="#d9e6c8" stroke="#7fa455"/>
+    <text x="380" y="113" text-anchor="middle" class="lbl">userLaneCandidatesFromStorage()</text>
+    <text x="380" y="130" text-anchor="middle" class="sub">唯一の集約正本 ・ popup と会場で共有</text>
+
+    <line x1="380" y1="66" x2="380" y2="90" class="arrow"/>
+
+    <path d="M300,146 C230,165 195,175 195,196" class="arrow"/>
+    <path d="M460,146 C530,165 565,175 565,196" class="arrow"/>
+    <text x="250" y="172" class="note">同じ集約結果</text>
+    <text x="505" y="172" class="note">同じ集約結果(鏡映)</text>
+
+    <rect x="40" y="198" width="310" height="186" rx="8" fill="#f3f3f3" stroke="#ccc"/>
+    <rect x="40" y="198" width="310" height="26" rx="8" fill="#6b7fa3"/>
+    <text x="195" y="216" text-anchor="middle" class="hdr">popup 応援アイコン列</text>
+    <rect x="60" y="236" width="270" height="32" rx="6" fill="#fff" stroke="#ddd"/>
+    <text x="195" y="256" text-anchor="middle" class="lbl">renderStoryUserLane()</text>
+    <rect x="60" y="278" width="270" height="32" rx="6" fill="#fff" stroke="#ddd"/>
+    <text x="195" y="298" text-anchor="middle" class="sub">段分け link / gift / konta / tanu</text>
+    <rect x="60" y="320" width="270" height="46" rx="6" fill="#fff" stroke="#ddd"/>
+    <text x="195" y="340" text-anchor="middle" class="lbl">fillLaneTier()</text>
+    <text x="195" y="356" text-anchor="middle" class="sub">丸サムネタイル DOM (横並び)</text>
+
+    <rect x="410" y="198" width="310" height="186" rx="8" fill="#f3f3f3" stroke="#ccc"/>
+    <rect x="410" y="198" width="310" height="26" rx="8" fill="#6b7fa3"/>
+    <text x="565" y="216" text-anchor="middle" class="hdr">会場モード (席)</text>
+    <rect x="430" y="236" width="270" height="32" rx="6" fill="#fff8e0" stroke="#d8b94a"/>
+    <text x="565" y="251" text-anchor="middle" class="lbl">venueParticipantKey()</text>
+    <text x="565" y="263" text-anchor="middle" class="sub">席資格の正本 ・ userIdあれば匿名も着席</text>
+    <rect x="430" y="278" width="270" height="32" rx="6" fill="#fff" stroke="#ddd"/>
+    <text x="565" y="298" text-anchor="middle" class="sub">buildVenueSeating 150席+入れ替え</text>
+    <rect x="430" y="320" width="270" height="46" rx="6" fill="#fff" stroke="#ddd"/>
+    <text x="565" y="338" text-anchor="middle" class="lbl">ひな壇 DOM ＋ 吹き出し/読み上げ/ギフト</text>
+    <text x="565" y="356" text-anchor="middle" class="sub">venue専用 ・ タイルに被せる</text>
+
+    <rect x="40" y="430" width="310" height="60" rx="8" fill="#f7e8e8" stroke="#d49b9b"/>
+    <text x="195" y="453" text-anchor="middle" class="lbl">来場者数 (PV・無言込み)</text>
+    <text x="195" y="471" text-anchor="middle" class="sub">userId 取れず → 席に出せない</text>
+    <rect x="410" y="430" width="310" height="60" rx="8" fill="#f7e8e8" stroke="#d49b9b"/>
+    <text x="565" y="453" text-anchor="middle" class="lbl">背景群衆 Canvas</text>
+    <text x="565" y="471" text-anchor="middle" class="sub">drawCrowdOnCanvas ・ 密度で賑わい</text>
+    <path d="M350,460 L408,460" class="arrow"/>
+
+    <rect x="40" y="508" width="680" height="72" rx="8" fill="#eef2f6" stroke="#c2cfde"/>
+    <text x="56" y="528" class="lbl">取り違え厳禁の2語</text>
+    <text x="56" y="547" class="legtxt">● アクティブユーザー = コメント/ギフト/広告でアクションした人(匿名/非匿名問わず) → 席に座る</text>
+    <text x="56" y="564" class="legtxt">● 来場者数(PV) = 延べアクセス・無言の通りすがり込み → 席に出せない・背景群衆で表現</text>
+    <text x="56" y="576" class="note">正本: venueSeats.js#venueParticipantKey ／ ドリフトは venueSeats.test.js が検知</text>
+  </svg>
+
+  <div class="legend">
+    <p><b>この図の読み方</b></p>
+    <p>● <b>緑</b>＝唯一の集約正本 <code>userLaneCandidatesFromStorage()</code>。popup も会場もここから同じデータを受け取る。<br>
+    ● <b>左＝popup列 / 右＝会場席</b>。同じ集約を共有する「鏡映」設計（顔ぶれ一致が正）。<br>
+    ● <b>黄＝席資格の正本</b> <code>venueParticipantKey()</code>。userId があれば匿名でも席に座る。<br>
+    ● <b>赤＝来場者数(PV)</b>。無言の通りすがり込みで userId が取れない→席に出せない→背景群衆 Canvas で密度として表現。</p>
+    <p class="src">方針の変遷: 2026-06-13「匿名は座らせない」←撤回 → 2026-06-14「匿名も userId あれば着席」 → 2026-06-17「アクティブユーザー(アクションした人)は匿名/非匿名問わず全員着席」で確定。古い理解で誤らないこと。</p>
+  </div>
+</div>
+</body>
+</html>

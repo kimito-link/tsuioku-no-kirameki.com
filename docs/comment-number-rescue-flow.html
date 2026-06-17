@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>.comment-number 消失救済 フロー図 — 君斗りんくの追憶のきらめき</title>
+<style>
+  :root {
+    --bg: #0f1115; --panel: #161922; --ink: #e6e8ec; --sub: #aab0bb; --muted: #7b8390;
+    --line: #2a2f3a;
+    --ok-bg: #14361f; --ok-bd: #2f7d4a; --ok-ink: #b8f0cf;
+    --block-bg: #3a1620; --block-bd: #b5485f; --block-ink: #f6c7d2;
+    --freeze-bg: #14283a; --freeze-bd: #3f7fb5; --freeze-ink: #c7e1f6;
+    --opp-bg: #3a3216; --opp-bd: #b59a3f; --opp-ink: #f0e3b8;
+    --human-bg: #2b1a3a; --human-bd: #8a5fb5; --human-ink: #e3d2f6;
+  }
+  body { margin: 0; padding: 28px 20px; background: var(--bg); color: var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Hiragino Sans", "Yu Gothic UI", sans-serif; }
+  .wrap { max-width: 1040px; margin: 0 auto; }
+  h1 { font-size: 21px; margin: 0 0 4px; }
+  .meta { color: var(--muted); font-size: 12px; margin: 0 0 24px; line-height: 1.6; }
+  .meta a { color: #7fa8e0; }
+  .phase { margin: 0 0 6px; }
+  .phase-label { color: var(--sub); font-size: 13px; font-weight: 600; margin: 18px 0 8px; }
+  .row { display: flex; gap: 16px; flex-wrap: wrap; }
+  .card { flex: 1 1 280px; border-radius: 12px; padding: 14px 18px; border: 1.5px solid var(--line);
+    background: var(--panel); min-width: 240px; }
+  .card .t { font-size: 15px; font-weight: 700; margin: 0 0 6px; }
+  .card .d { font-size: 12.5px; line-height: 1.7; color: var(--sub); margin: 0; }
+  .card .d code { background: rgba(255,255,255,.08); padding: 1px 5px; border-radius: 4px; font-size: 11.5px; }
+  .ok     { background: var(--ok-bg);     border-color: var(--ok-bd); }
+  .ok .t     { color: var(--ok-ink); }
+  .block  { background: var(--block-bg);  border-color: var(--block-bd); }
+  .block .t  { color: var(--block-ink); }
+  .freeze { background: var(--freeze-bg); border-color: var(--freeze-bd); }
+  .freeze .t { color: var(--freeze-ink); }
+  .opp    { background: var(--opp-bg);    border-color: var(--opp-bd); }
+  .opp .t    { color: var(--opp-ink); }
+  .human  { background: var(--human-bg);  border-color: var(--human-bd); }
+  .human .t  { color: var(--human-ink); }
+  .gate { text-align: center; margin: 4px 0; }
+  .gate .arr { color: var(--muted); font-size: 18px; line-height: 1; }
+  .gate .why { color: #b5485f; font-size: 12px; margin-left: 8px; }
+  .legend { margin-top: 26px; font-size: 12.5px; line-height: 1.9; color: var(--sub);
+    background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 14px 18px; }
+  .legend b { color: var(--ink); }
+  .chip { display: inline-block; width: 11px; height: 11px; border-radius: 3px; margin-right: 6px; vertical-align: middle; }
+  .src { color: var(--muted); font-size: 11.5px; margin-top: 10px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>.comment-number 消失救済 — フェーズ・フロー図</h1>
+  <p class="meta">
+    状態色で「いま何がどこまで進み・何が止まっているか」を AI も人間も一目で同じに読むための正本ビュー。<br>
+    設計/答え合わせの正本: <a href="../council/comment-number-missing-dom-rescue-SYNTHESIS.md">comment-number-missing-dom-rescue-SYNTHESIS.md</a>
+    ／ 関連: <a href="person-tile-architecture.md">person-tile-architecture.md</a>「会場に出ない真因 #1」。最終更新 2026-06-18。
+  </p>
+
+  <!-- フェーズ0 -->
+  <div class="phase-label">フェーズ0：前提（この症状を直したい）</div>
+  <div class="row">
+    <div class="card">
+      <p class="t">会場・応援レーンに人が出ない</p>
+      <p class="d">コメントは大量に取れるのに、会場の席／応援アイコン列に人が並ばない。userId が乗らない行は席に出せない（<code>venueParticipantKey</code> が null）。</p>
+    </div>
+  </div>
+
+  <!-- フェーズ1 -->
+  <div class="phase-label">フェーズ1：当初の仮説（★着手前の前提）</div>
+  <div class="row">
+    <div class="card opp">
+      <p class="t">⚙️ 仮説：番号セルが消えた</p>
+      <p class="d">「現行ニコ生がコメント行から <code>.comment-number</code> を外した → <code>parseNicoLiveTableRow</code> が番号必須で DOM 観測を全捨て → visible:0」。緩めれば直る、という読み。</p>
+    </div>
+  </div>
+
+  <div class="gate"><span class="arr">↓</span><span class="why">この前提が真でないと、以降の実装は無駄になる</span></div>
+
+  <!-- フェーズ2 -->
+  <div class="phase-label">フェーズ2：第1コミット（安全な土台・挙動不変）</div>
+  <div class="row">
+    <div class="card ok">
+      <p class="t">✅ 受理門を純関数に正本化 <span style="font-weight:600;font-size:12px;color:var(--muted)">v0.1.820</span></p>
+      <p class="d">番号必須が3箇所に散在 → <code>isHarvestableNicoCommentRow</code> 1つに集約（ドリフト防止）。<code>requireNumber:true</code> 既定で従来と<b>完全同値</b>。既存テスト65本が緑のまま＝等価性を担保。<b>挙動不変なので安全。</b></p>
+    </div>
+  </div>
+
+  <div class="gate"><span class="arr">↓</span><span class="why">緩和（第2）の前に、前提を実機で必ず確かめる</span></div>
+
+  <!-- フェーズ3 -->
+  <div class="phase-label">フェーズ3：実機DOM答え合わせ（★最重要ゲート）</div>
+  <div class="row">
+    <div class="card block">
+      <p class="t">🟥 前提が覆った（2026-06-18・Claude-in-Chrome）</p>
+      <p class="d">配信中 watch（ニコニコ実況・匿名主体）の実 DOM を検証：<br>
+        ① <b>番号セルは消えていない</b>（12行すべてに存在・<code>droppedNoNumber:0</code>＝現行ゲートは1行も落とさない）。<br>
+        ② <b>匿名はDOMにuserIdが無い</b>（React fiber 70連鎖walk でも <code>hashedUserId</code> 等ゼロ）。番号を緩めても席に出せない。</p>
+    </div>
+  </div>
+
+  <div class="gate"><span class="arr">↓</span><span class="why">前提否定 → 緩和は利得ゼロ・働くガードを弱めるだけ</span></div>
+
+  <!-- フェーズ4 -->
+  <div class="phase-label">フェーズ4：判断（第2は凍結 / 真の経路へ）</div>
+  <div class="row">
+    <div class="card freeze">
+      <p class="t">❄️ 第2コミット：凍結</p>
+      <p class="d">番号緩和は観測された問題を解決しない。<b>再開条件</b>＝ユーザー自身の配信で実際に番号無し行（<code>noNumberRowCount&gt;0</code>）が観測された場合のみ。第1（正本化・挙動不変）は維持。</p>
+    </div>
+    <div class="card opp">
+      <p class="t">⚙️ 真の経路（次の伸びしろ）</p>
+      <p class="d">匿名 userId（hashedUserId）は <b>NDGR(protobuf)にしか無い</b>（v0.1.803 で取得済）。「会場/レーンに人が出ない」の本筋は <b>NDGR の匿名 userId をレーン/席に確実に通す</b>こと（lane-empty-uid-missing 系）。</p>
+    </div>
+  </div>
+
+  <div class="legend">
+    <p><b>状態色の読み方</b></p>
+    <p>
+      <span class="chip" style="background:var(--ok-bd)"></span><b>✅ 緑＝完了・安全</b>（挙動不変で着地済み）<br>
+      <span class="chip" style="background:var(--block-bd)"></span><b>🟥 赤＝ブロッカー／前提否定</b>（ここが崩れると以降が無駄）<br>
+      <span class="chip" style="background:var(--freeze-bd)"></span><b>❄️ 青＝凍結</b>（やらない判断。再開条件つき）<br>
+      <span class="chip" style="background:var(--opp-bd)"></span><b>⚙️ 黄＝仮説／伸びしろ</b>（要確証 or 次の候補）<br>
+      <span class="chip" style="background:var(--human-bd)"></span><b>🙋 紫＝人間の手が要る</b>（自動化できない手作業）
+    </p>
+    <p class="src">この図の教訓：フェーズ1（仮説）→フェーズ3（実機確証）のゲートがあったから、前提が間違っていた第2を盲目的に作らずに済んだ。<b>「この前提が崩れると以降が無駄」という依存ゲートを明示するのが、AIも人間もミスを減らす肝。</b></p>
+  </div>
+</div>
+</body>
+</html>
