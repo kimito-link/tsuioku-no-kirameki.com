@@ -958,6 +958,7 @@ chrome.runtime.onInstalled.addListener((details) => {
   void ensureAutoBackupAlarm();
   void ensureBackfillBgKickAlarm();
   void ensureMcpDiagDumpAlarm();
+  void runMcpDiagDumpTick(); // v0.1.802: 反映直後に1回書いて司令塔がすぐ読めるように(alarm の1分を待たない)
   void (async () => {
     await migrateFloatingPanelToDockProfileOnce();
     await migrateBelowPanelToDockProfileOnce();
@@ -1422,6 +1423,22 @@ async function ensureMcpDiagDumpAlarm() {
   }
 }
 
+/**
+ * v0.1.802: UTF-8 文字列を base64 に変換する(SW で data: URL を作るため)。
+ *   btoa は Latin-1 しか扱えず日本語で例外になるので、TextEncoder でバイト列にしてから base64 化する。
+ * @param {string} str
+ * @returns {string}
+ */
+function utf8ToBase64(str) {
+  const bytes = new TextEncoder().encode(str);
+  let binary = '';
+  const CHUNK = 0x8000; // String.fromCharCode のスタック超過を避ける
+  for (let i = 0; i < bytes.length; i += CHUNK) {
+    binary += String.fromCharCode.apply(null, bytes.subarray(i, i + CHUNK));
+  }
+  return btoa(binary);
+}
+
 /** 診断 JSON をローカル固定パスへ1回書き出す(履歴は消してシェルフを汚さない)。 */
 async function runMcpDiagDumpTick() {
   try {
@@ -1468,8 +1485,10 @@ async function runMcpDiagDumpTick() {
       fastDiag
     };
     const json = JSON.stringify(payload, null, 2);
-    const blob = new Blob([json], { type: 'application/json;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
+    // v0.1.802 修正: Service Worker には blob URL を作る API が無く(throw)、v0.1.798 の blob 方式は
+    //   ファイルを書けていなかった(eventDomLvCount は減ったのに status-latest.json が生成されなかった
+    //   真因)。SW でも使える data: URL(UTF-8→base64)に切替える。
+    const url = 'data:application/json;charset=utf-8;base64,' + utf8ToBase64(json);
     let downloadId = null;
     try {
       downloadId = await chrome.downloads.download({
@@ -1480,9 +1499,6 @@ async function runMcpDiagDumpTick() {
       });
     } catch {
       downloadId = null;
-    } finally {
-      // blob URL は download が読み終わるまで生かす。即 revoke で競合しないよう少し遅延して解放。
-      setTimeout(() => { try { URL.revokeObjectURL(url); } catch { /* no-op */ } }, 2000);
     }
     // シェルフ/履歴を汚さないよう、完了後にダウンロード記録だけ消す(ファイル本体は残る)。
     if (downloadId != null && chrome.downloads.erase) {

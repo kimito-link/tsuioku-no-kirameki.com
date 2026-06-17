@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.802',
+    date: '2026-06-17',
+    summary: '状態のローカル保存がSWで書けない不具合を修正',
+    items: Object.freeze([
+      '開発担当(Claude Code)が状態を貼らずに確認するためのローカル保存(v0.1.798)が、実は書き込めていなかった不具合を直しました。原因は、その保存処理を拡張機能の常駐部分(Service Worker)で動かしていたのに、そこでは使えない仕組み(URLのblob変換)を使っていて静かに失敗していたことです(過去配信キャッシュは減ったのにファイルだけ出来ていませんでした)。常駐部分でも使える方式(データURL)に切り替え、拡張を更新した直後にも一度すぐ書き出すようにしました。これで状態速報を毎回コピーして貼る手間が本当に不要になります(保存先はダウンロードフォルダの nicolivelog-mcp/status-latest.json)'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.801',
     date: '2026-06-17',
     summary: '過去配信キャッシュの溜め込みを抑え軽量化',
