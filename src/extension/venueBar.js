@@ -72,6 +72,7 @@ import {
 } from '../lib/venueSpeechStreak.js';
 import { enrichVenueRowsWithProfileAvatars } from '../lib/venueAvatar.js';
 import { nicoUserPageUrl, anonymousDisplayLabel } from '../lib/nicoUserPage.js';
+import { isNumericNicoUserId } from '../domain/user/identity.js';
 import {
   seatsPerRow,
   resolveVisibleArenaCount,
@@ -2540,7 +2541,10 @@ export function mountVenueBarButton(options = {}) {
         node.seat.dataset.tierIndex = String(tier.rowIndex);
         const i = entry.seatIndex;
         const uid = String(participant.userId || '').trim();
-        const pageUrl = nicoUserPageUrl(uid);
+        // リンク可否は domain 正本 isNumericNicoUserId(^\d{5,14}$=本登録)で判定し、popup 応援
+        // アイコン列(personTileDom.buildPersonTileEl)と同一基準にそろえる。nicoUserPageUrl は
+        // ^\d{1,18}$ と緩く、15桁以上/4桁以下も拾ってしまい popup と顔ぶれ・リンクがドリフトしていた。
+        const pageUrl = isNumericNicoUserId(uid) ? nicoUserPageUrl(uid) : '';
         // 名前: 本名があれば本名・無ければ匿名は「匿名NNN」で安定表示(顔だけにしない=原則)。
         const rawName = String(participant.name || '').trim();
         const displayName =
