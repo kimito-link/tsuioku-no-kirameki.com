@@ -78,7 +78,34 @@ OneComme(`C:\Users\info\AppData\Local\Programs\OneComme`・app.asar→out/main/i
   実機で visible>0・会場/レーンに番号無しコメント主が並ぶことをユーザー目視。
 - **第3コミット(任意)**: 番号無し時の dedup キーに userId を含める（同一本文の別人衝突を防ぐ・要実データ確認）。
 
-## 未確定 / 要検証（実機・実データ）
-- 番号無し行が実際に `data-comment-type` を持つか（doc の実DOMでは `data-comment-type="normal"` が付いている例）→ **第2コミット前に実機 DOM で再確証**。
-  もし type も消えていたら、構造ガードを `content-area`/`comment-text` の親構造など別の構造特徴へ調整（番号同様、単独で誤検知しない狭い形に限定）。
-- extractCommentsFromNode の text-only dedup が番号無し別人を潰さないか（第3で userId 込みキー検討）。
+## 実機 DOM 答え合わせの結果（2026-06-18・第2コミット前の再確証）⚠️前提が覆った
+
+Claude-in-Chrome で **配信中**の watch ページ(ニコニコ実況 NHK総合 lv350717943・コメント大量・大半が匿名184)を実 DOM 検証した結果:
+
+1. **`.comment-number`(番号セル)は消えていない。** 検出した `div.table-row` 12行すべてに `.comment-number` が存在
+   (`withNum:12 / noNumberRowCount:0`)・可視(width 30px・color #b3b3b3・display block)・有効な数字(51531…)。
+   DOM 構造は `table-row[data-comment-type=normal] > span.table-cell > [span.comment-number, div.content-area > span.comment-text]`
+   = **番号セルがある**。コメント番号表示の ON/OFF トグルも見当たらず(列ヘッダは「コメント」のみ)。
+   → **現行 `parseNicoLiveTableRow` の番号必須ゲートはこの配信では1行も落とさない(`droppedNoNumber:0`)。**
+   → doc/SYNTHESIS が前提にした「現行ニコ生は番号セルを外した」は **この配信では再現せず**。
+     (元の観測はユーザー固有の配信/特定ページ状態/別レイアウト等、条件限定だった可能性が高い。)
+
+2. **本当の断線は別=匿名(184)コメントは DOM に userId が存在しない。** 12行すべてが匿名
+   (`a[href*="/user/"]` 無し・`anonGuess:12`)。さらに **行サブツリーの React fiber を70連鎖たどっても
+   `userId/hashedUserId/rawUserId/anonymity` は一切無い**(`userThumbnailAltSrc` と `onUserSelect` ハンドラはあるが
+   識別子そのものは無い)。data-* 属性・img も無し。
+   → **番号ゲートを緩めても、保たれた行に userId が無いので会場/レーンには出せない。** 匿名の userId(hashedUserId)は
+     **NDGR(protobuf)ストリームにしか無い**(拡張は v0.1.803 で既に NDGR 経由で取得済)。
+
+### 結論（重要）
+- **第2コミット(番号必須を緩める)は、観測された問題を解決しない**。番号セルは現存し落としていない上、
+  仮に番号無し行を救っても匿名行は DOM に userId が無く席に出せない。working な番号ガードを弱めるだけで利得ゼロ・誤検知リスク増。
+  → **第2コミットは保留(凍結)。** 第1コミット(受理門の正本化・挙動不変)はドリフト防止の価値があるので維持。
+- 「会場/レーンに人が出ない(匿名主体の配信で)」の真の経路は **NDGR の匿名 userId をレーン/席に確実に通すこと**
+  (= lane-empty-uid-missing-SYNTHESIS / v0.1.803 の no無しNDGR採用の延長)であり、DOM 番号ゲートではない。
+- ⚠️ **再開条件**: ユーザー自身の配信で実際に `noNumberRowCount>0`(番号セルが本当に無い行が観測される)場合に限り、
+  第2コミットを再検討する。その際も構造ガード(`data-comment-type`)+ userId 源の有無を実 DOM で必ず先に確認する。
+
+### (将来 第2を再開する場合の)未確定メモ
+- 番号無し行が `data-comment-type` を持つか（持てば構造ガードに使える・上の実DOMでは normal が付いていた）。
+- extractCommentsFromNode の text-only dedup が番号無し別人を潰さないか（userId 込みキー検討）。
