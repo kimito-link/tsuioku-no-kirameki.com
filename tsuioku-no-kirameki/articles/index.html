@@ -182,6 +182,32 @@
           <h2>記事一覧</h2>
           <ul class="article-list">
             <li>
+              <a class="article-card" href="dom-comment-harvest-identity-gate.html">
+                <div class="article-card__date">2026-06-18 公開</div>
+                <div class="article-card__title">消えた DOM マーカーに依存しないコメント収穫 ― 「番号」ではなく「身元＋本文」で受理する構造ゲート</div>
+                <p class="article-card__sub">配信ページの DOM からコメントを収穫する際、サイト改修で消えうる「コメント番号セル」に受理判定を依存させると一夜で全捨てになる。番号ではなく「身元＋本文」を受理ゲートにし、サイト供給の構造ラベル（data-comment-type 等の protobuf oneof 相当）を誤検知ガードに使う再利用可能な設計。DOM に無い識別子（匿名 ID）は緩めても取れないという、緩和前に実機で確かめるべき観測も併記。</p>
+                <div class="article-card__tags">
+                  <span class="article-card__tag">chrome extension</span>
+                  <span class="article-card__tag">DOM scraping</span>
+                  <span class="article-card__tag">resilient parsing</span>
+                  <span class="article-card__tag">structural gate</span>
+                </div>
+              </a>
+            </li>
+            <li>
+              <a class="article-card" href="phase-gate-flow-canon.html">
+                <div class="article-card__date">2026-06-18 公開</div>
+                <div class="article-card__title">フェーズ・状態色・依存ゲートで設計の正本を描く ― AI と人間が同じ図を見て手戻りを防ぐ</div>
+                <p class="article-card__sub">段階導入のタスクを、フェーズ番号・状態色（完了／ブロッカー／凍結／仮説）・依存ゲート（この前提が崩れると以降が無駄）で 1 枚の図に正本化する手法。AI エージェントと人間が同じ図を参照することで、誤った前提に基づく手戻りを構造的に防ぐ。実際に「前提が実機で覆り後続実装を凍結できた」事例を併記。</p>
+                <div class="article-card__tags">
+                  <span class="article-card__tag">design canon</span>
+                  <span class="article-card__tag">AI agents</span>
+                  <span class="article-card__tag">stage-gate</span>
+                  <span class="article-card__tag">dependency gate</span>
+                </div>
+              </a>
+            </li>
+            <li>
               <a class="article-card" href="ndgr-message-id-dedupe.html">
                 <div class="article-card__date">2026-05-11 公開</div>
                 <div class="article-card__title">ライブ配信プロトコル NDGR の Message ID 単位重複除去 ― 分散システム原則の Chrome 拡張への適用</div>

@@ -1,0 +1,257 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <title>消えた DOM マーカーに依存しないコメント収穫 ― 「番号」ではなく「身元＋本文」で受理する構造ゲート ― 君斗りんくの追憶のきらめき</title>
+
+    <link rel="icon" href="../images/favicon.ico" sizes="any">
+    <link rel="icon" type="image/png" sizes="32x32" href="../images/favicon-32.png">
+
+    <meta name="description" content="ライブ配信ページの DOM からコメントを収穫する際、サイト改修で消えうる『コメント番号セル』に受理判定を依存させると一夜で全捨てになる。番号ではなく『身元＋本文』を受理ゲートにし、サイト供給の構造ラベル（data-comment-type 等の oneof 相当）を誤検知ガードに使う再利用可能な設計。DOM に存在しない識別子（匿名 ID）は protobuf ストリームにしか無いという観測も併記。">
+    <meta name="theme-color" content="#f7f1e7">
+    <meta name="robots" content="index,follow">
+    <link rel="canonical" href="https://tsuioku-no-kirameki.com/articles/dom-comment-harvest-identity-gate.html">
+
+    <meta property="og:type" content="article">
+    <meta property="og:url" content="https://tsuioku-no-kirameki.com/articles/dom-comment-harvest-identity-gate.html">
+    <meta property="og:title" content="消えた DOM マーカーに依存しないコメント収穫 ― 「番号」ではなく「身元＋本文」で受理する構造ゲート">
+    <meta property="og:description" content="サイト改修で消えうる DOM マーカーに受理判定を依存させない。番号ではなく身元＋本文で受理し、サイト供給の構造ラベルを誤検知ガードに使う再利用可能な設計。">
+    <meta property="og:site_name" content="君斗りんくの追憶のきらめき">
+    <meta property="og:locale" content="ja_JP">
+    <meta property="article:published_time" content="2026-06-18T00:00:00+09:00">
+    <meta property="article:author" content="君斗りんく / Kimito-Link Project">
+
+    <script type="application/ld+json">
+      {"@context":"https://schema.org","@type":"TechArticle","headline":"消えた DOM マーカーに依存しないコメント収穫 ― 「番号」ではなく「身元＋本文」で受理する構造ゲート","datePublished":"2026-06-18","dateModified":"2026-06-18","author":{"@type":"Organization","name":"Kimito-Link Project","url":"https://kimito-link.com/"},"publisher":{"@type":"Organization","name":"Kimito-Link Project","url":"https://kimito-link.com/"},"url":"https://tsuioku-no-kirameki.com/articles/dom-comment-harvest-identity-gate.html","inLanguage":"ja-JP","license":"https://opensource.org/licenses/MIT"}
+    </script>
+
+    <style>
+      :root{--bg1:#f7f1e7;--bg2:#e8dac4;--paper:rgba(255,251,245,.94);--ink:#2c2117;--muted:#4f4338;--line:rgba(88,62,28,.12);--gold:#c98e2b;--blue:#255d9b;--brown:#8a3d19;--shadow:0 18px 44px rgba(70,49,20,.12);--r2:24px;--r3:18px;--maxw:880px;--space-sm:16px;--space-md:24px;--space-lg:32px;--space-xl:48px;--space-2xl:64px;--shell-pad:16px;--lh-body:1.82;--lh-heading:1.22;--anchor-offset:56px;--code-bg:rgba(45,33,23,.05);}
+      @media (min-width:480px){:root{--shell-pad:clamp(16px,3.2vw,28px)}}
+      *{box-sizing:border-box}html{scroll-behavior:smooth;overflow-x:hidden}
+      body{margin:0;color:var(--ink);font-family:"BIZ UDPGothic","Hiragino Sans","Yu Gothic UI",sans-serif;line-height:var(--lh-body);background:radial-gradient(ellipse 70% 48% at 98% 4%,rgba(255,210,228,.35),transparent 46%),radial-gradient(circle at top right,rgba(132,184,207,.4),transparent 28%),linear-gradient(180deg,var(--bg1),#f1e7da 46%,var(--bg2));min-height:100vh}
+      a{color:var(--blue);text-underline-offset:3px}a:hover{color:var(--brown)}
+      .shell{width:min(calc(100% - 2 * var(--shell-pad)),var(--maxw));margin:0 auto}
+      .topbar{position:sticky;top:0;z-index:50;background:rgba(250,244,235,.88);backdrop-filter:blur(16px);border-bottom:1px solid rgba(88,62,28,.07);}
+      .topbar-inner{display:flex;justify-content:space-between;align-items:center;gap:12px;min-height:44px;padding:8px 0}
+      .topbar__logo{display:flex;align-items:center;text-decoration:none;color:inherit}
+      .topbar__logo img{height:34px;width:auto}
+      .topbar__back{display:inline-flex;align-items:center;gap:6px;padding:8px 14px;border-radius:999px;font-size:.85rem;font-weight:600;text-decoration:none;color:var(--ink);background:rgba(255,252,247,.94);border:1px solid var(--line);}
+      .topbar__back:hover{background:#fff;border-color:rgba(88,62,28,.22);color:var(--brown)}
+      header.page{padding:var(--space-xl) 0 var(--space-lg)}
+      header.page .breadcrumb{font-size:.82rem;color:var(--muted);margin:0 0 var(--space-sm)}
+      header.page .breadcrumb a{color:var(--muted)}
+      header.page h1{font-size:clamp(1.55rem,4.2vw,2.15rem);line-height:var(--lh-heading);margin:0 0 var(--space-sm);color:#1a1208}
+      header.page .lead{color:var(--muted);font-size:1rem;margin:0 0 var(--space-md)}
+      header.page .meta{font-size:.84rem;color:var(--muted);display:flex;flex-wrap:wrap;gap:14px;padding:var(--space-sm) 0;border-top:1px solid var(--line);border-bottom:1px solid var(--line);}
+      header.page .meta strong{color:var(--ink)}
+      main{padding-bottom:var(--space-2xl)}
+      section.box{background:var(--paper);border:1px solid var(--line);border-radius:var(--r2);padding:var(--space-lg);margin:0 0 var(--space-lg);box-shadow:var(--shadow);scroll-margin-top:var(--anchor-offset);}
+      section.box h2{font-size:1.2rem;margin:0 0 var(--space-md);color:#1a1208}
+      section.box h2 .num{display:inline-block;min-width:1.8em;color:var(--gold);font-weight:800;margin-right:.2em}
+      section.box h3{font-size:1rem;margin:var(--space-md) 0 8px;color:var(--ink);font-weight:700}
+      section.box p{margin:0 0 var(--space-sm)}
+      section.box ul,section.box ol{margin:0 0 var(--space-sm);padding-left:1.4em}
+      section.box li{margin-bottom:6px}section.box li::marker{color:var(--gold)}
+      nav.toc{background:rgba(255,251,245,.72);border:1px solid var(--line);border-radius:var(--r3);padding:16px 20px;margin:0 0 var(--space-lg)}
+      nav.toc h2{font-size:.95rem;margin:0 0 8px;color:var(--muted);font-weight:700}
+      nav.toc ol{margin:0;padding-left:1.6em;font-size:.92rem;line-height:1.65}
+      nav.toc a{text-decoration:none;color:var(--ink)}nav.toc a:hover{color:var(--brown);text-decoration:underline}
+      .digest{padding:18px 22px;border-radius:var(--r3);background:linear-gradient(160deg,rgba(243,170,37,.1),rgba(15,94,79,.06));border:1px solid var(--line);margin:0 0 var(--space-lg)}
+      .digest h3{margin:0 0 6px;font-size:1rem;color:var(--ink)}
+      .digest ul{margin:0;padding-left:1.4em}.digest li{margin-bottom:4px;font-size:.94rem}
+      .note{font-size:.86rem;color:var(--muted);background:rgba(255,255,255,.55);border-left:3px solid var(--gold);padding:10px 14px;border-radius:8px;margin:var(--space-sm) 0}
+      .note b{color:var(--brown);font-weight:700}
+      code,kbd{font-family:"Menlo","Consolas",monospace;font-size:.92em;background:var(--code-bg);padding:1px 6px;border-radius:4px}
+      pre.code{margin:var(--space-sm) 0;padding:14px 18px;background:#1f1d1a;color:#e8e0d2;border-radius:var(--r3);overflow-x:auto;font-family:"Menlo","Consolas",monospace;font-size:.84rem;line-height:1.6;border:1px solid rgba(0,0,0,.3)}
+      pre.code code{background:transparent;padding:0;color:inherit;font-size:1em}
+      pre.code .kw{color:#ff9d6c}.fn{color:#a8d8ff}.str{color:#b6e0a0}.num{color:#d6b8ff}.cm{color:#7d8694;font-style:italic}
+      table.cmp{width:100%;border-collapse:collapse;margin:var(--space-sm) 0;font-size:.88rem}
+      table.cmp th,table.cmp td{border:1px solid var(--line);padding:8px 10px;text-align:left;vertical-align:top}
+      table.cmp th{background:rgba(243,170,37,.08);font-weight:700;color:var(--ink)}
+      footer.page{margin-top:var(--space-xl);padding:var(--space-lg) 0 var(--space-2xl);text-align:center;font-size:.85rem;color:var(--muted);border-top:1px solid var(--line)}
+      footer.page a{color:var(--muted)}footer.page a:hover{color:var(--brown)}
+      @media(max-width:520px){section.box{padding:var(--space-md)}pre.code{padding:12px 14px;font-size:.78rem}table.cmp{font-size:.78rem}}
+    </style>
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="shell topbar-inner">
+        <a class="topbar__logo" href="../"><img src="../../extension/images/logo/kimito-link-color.png" width="160" height="34" alt="Kimito-Link Project"></a>
+        <a class="topbar__back" href="./">← 記事一覧へ</a>
+      </div>
+    </header>
+
+    <header class="page">
+      <div class="shell">
+        <p class="breadcrumb"><a href="../">トップ</a> ／ <a href="./">技術記事</a> ／ 消えた DOM マーカーに依存しないコメント収穫</p>
+        <h1>消えた DOM マーカーに依存しないコメント収穫<br>― 「番号」ではなく「身元＋本文」で受理する構造ゲート</h1>
+        <p class="lead">ライブ配信ページの DOM からコメントを収穫するとき、受理判定を「コメント番号セルの有無」に依存させると、サイト改修でそのセルが消えた瞬間に<strong>全コメントが取りこぼし</strong>になる。本記事は、番号という<strong>偶発的マーカー</strong>ではなく<strong>身元＋本文という本質</strong>で受理し、サイトが供給する<strong>構造ラベル（protobuf の oneof 相当）</strong>を誤検知ガードに使う再利用可能な設計を示す。あわせて「<strong>DOM に存在しない識別子はいくら DOM を緩めても取れない</strong>（匿名 ID はストリーム層にしか無い）」という、緩和の前に実機で確かめるべき観測を記録する。</p>
+        <div class="meta">
+          <span>公開日: <strong>2026-06-18</strong></span>
+          <span>著者: <strong>君斗りんく / Kimito-Link Project</strong></span>
+          <span>ライセンス: <strong>MIT</strong></span>
+          <span>実装: <strong><a href="https://github.com/kimito-link/tsuioku-no-kirameki.com/blob/master/src/lib/nicoliveDom.js" target="_blank" rel="noopener">GitHub</a></strong></span>
+        </div>
+      </div>
+    </header>
+
+    <main>
+      <div class="shell">
+        <aside class="digest">
+          <h3>3 行要約</h3>
+          <ul>
+            <li><strong>受理ゲートを「番号セルの有無」から「身元＋本文」へ移す。</strong>番号はコメントである証ではなく、便利だが消えうる付随マーカー。本質は「誰が・何を言ったか」。</li>
+            <li><strong>誤検知ガードはサイト供給の構造ラベル（<code>data-comment-type</code> 等）で行う。</strong>これは protobuf の oneof フィールド名で分岐する手法の DOM 版で、ヒューリスティック文字列判定より堅い。</li>
+            <li><strong>緩和の前に実機 DOM を確かめる。</strong>「マーカーが消えた」前提が誤りのこともあり、また DOM に無い識別子（匿名 ID）はゲートを緩めても取れない。前提検証を依存ゲートとして手順に組み込む。</li>
+          </ul>
+        </aside>
+
+        <nav class="toc"><h2>目次</h2>
+          <ol>
+            <li><a href="#s1">解決したい課題</a></li>
+            <li><a href="#s2">手法の概要</a></li>
+            <li><a href="#s3">受理ゲートの設計</a></li>
+            <li><a href="#s4">参考実装（JavaScript）</a></li>
+            <li><a href="#s5">なぜこの設計なのか（原則）</a></li>
+            <li><a href="#s6">緩和の前に実機で確かめる（前提検証ゲート）</a></li>
+            <li><a href="#s7">関連する既知技術（先行技術）</a></li>
+            <li><a href="#s8">本記事の位置づけ・ライセンス</a></li>
+          </ol>
+        </nav>
+
+        <section class="box" id="s1">
+          <h2><span class="num">1.</span>解決したい課題</h2>
+          <p>ライブ配信ページのコメント一覧を、ブラウザ拡張が<strong>独自に DOM から収穫</strong>して集計・可視化することがある。多くの実装は「1 行＝コメント」を見分けるために、行内の<strong>コメント番号セル</strong>（連番が入る小さな要素）の存在を受理条件にしている。番号があれば本物のコメント、無ければスキップ、という素直な判定だ。</p>
+          <p>ところがこの設計には構造的な脆さがある。配信サイトは前触れなく DOM を改修する。ある日、コメント行から<strong>番号セルだけが取り除かれる</strong>と、次のことが起きる:</p>
+          <ul>
+            <li>受理条件「番号セル＋本文セルの両方必須」が満たされず、<strong>全行が取りこぼし</strong>になる。</li>
+            <li>収穫経路の観測値が <code>visible:0</code> に落ち、コメントは画面に出ているのに拡張側だけ「0 件」になる。</li>
+            <li>番号セルに依存して付与していた付随情報（ユーザー識別子など）も同時に途切れる。</li>
+          </ul>
+          <p>つまり、<strong>偶発的に存在していた DOM マーカー</strong>に受理判定を結びつけたことが原因で、サイト改修一発で機能が全停止する。本手法は、この依存を断ち切る。</p>
+        </section>
+
+        <section class="box" id="s2">
+          <h2><span class="num">2.</span>手法の概要</h2>
+          <p>鍵となる観点は 1 つ。<strong>「番号」はコメントである証ではない。</strong>コメントの本質は「<strong>身元（誰が）＋本文（何を言ったか）</strong>」であって、連番は表示上の便宜にすぎない。だから受理ゲートも本質で組む。</p>
+          <p>収穫パイプラインの構造:</p>
+          <pre class="code"><code>配信ページの DOM（コメント一覧・仮想スクロール）
+   ↓
+行候補を列挙（table-row 相当）
+   ↓
+<span class="cm">★ 受理ゲート（本手法）: 本文あり ＆ 構造ラベルあり（番号は任意）</span>
+   ↓
+身元・本文・付随情報を抽出
+   ↓
+重複排除して集計層へ</code></pre>
+          <p>受理判定を 1 つの<strong>純粋関数</strong>に集約するのが要点。番号必須のロジックが収穫経路の複数箇所（行パース・祖先たどり・サブツリー収集など）に散らばっていると、片方だけ直して<strong>挙動がドリフト</strong>する。判定を 1 か所に正本化し、全経路がそこへ委譲する。</p>
+        </section>
+
+        <section class="box" id="s3">
+          <h2><span class="num">3.</span>受理ゲートの設計</h2>
+          <h3>3-1. 受理条件（番号は任意・本文は必須）</h3>
+          <ol>
+            <li><strong>本文セルがあること</strong>（必須）。本文の無い行はコメントではない。</li>
+            <li>次のいずれかを満たすこと:
+              <ul>
+                <li>番号セルがある（従来どおりの本物のコメント行）、<strong>または</strong></li>
+                <li>番号セルが無くても、<strong>サイト供給の構造ラベル</strong>（例: <code>data-comment-type</code> 属性）を持つ。</li>
+              </ul>
+            </li>
+            <li>推薦枠・広告カードなど<strong>別セクション内</strong>の DOM を除外する（後述の構造ガード）。</li>
+          </ol>
+          <h3>3-2. なぜ「構造ラベル」を誤検知ガードに使うのか</h3>
+          <p>番号必須を単純に外すと、配信ページ内の「おすすめ番組カード」など<strong>コメントではない行</strong>を誤って拾うリスクが上がる。これを防ぐのが、サイト自身がコメント行に付ける<strong>構造ラベル</strong>だ。本物のコメント行には <code>data-comment-type="normal"</code> のような属性が付き、推薦カードには付かない。これは「文字列パターンで推測する」ヒューリスティックではなく、<strong>サイトが意味づけした構造情報</strong>なので堅い。</p>
+          <p>この発想は、ストリーム層（protocol buffers）で comment と gift と system message を<strong>oneof フィールド名で構造的に分岐</strong>する手法と同型である（後述の先行技術）。DOM 層における oneof 相当が、この構造ラベル属性だ。</p>
+          <h3>3-3. 値検証は受理と分離する</h3>
+          <p>「番号の桁が正しいか」「本文が空白だけでないか」といった<strong>値の検証</strong>は、受理ゲート（構造の有無を見る）とは別レイヤーに置く。受理ゲートは「この行は収穫対象か」だけを判定し、値の正規化は抽出側で行う。これにより、経路ごとに異なる値検証の有無を変えずに受理だけ正本化できる。</p>
+        </section>
+
+        <section class="box" id="s4">
+          <h2><span class="num">4.</span>参考実装（JavaScript / 純粋関数）</h2>
+          <p>受理判定を 1 つの純粋関数に集約する。<code>requireNumber</code> フラグで「従来どおり番号必須」と「番号任意（構造ラベルで受理）」を切り替えられるようにし、段階導入と後方互換を両立する。</p>
+<pre class="code"><code><span class="cm">/**
+ * 1 行が「収穫対象の本物のコメント行か」を判定する純粋関数。
+ * 受理ゲートを 1 か所に正本化し、収穫経路の各所がここへ委譲する。
+ */</span>
+<span class="kw">export function</span> <span class="fn">isHarvestableCommentRow</span>(row, opts = {}) {
+  <span class="kw">if</span> (!row || row.nodeType !== <span class="num">1</span>) <span class="kw">return</span> <span class="kw">false</span>;
+  <span class="kw">const</span> requireNumber = opts.requireNumber !== <span class="kw">false</span>;  <span class="cm">// 既定は従来挙動</span>
+  <span class="kw">const</span> guardSections = Boolean(opts.guardRecommendedSections);
+
+  <span class="cm">// 推薦枠・広告カードなど別セクション内は除外（構造ガード）</span>
+  <span class="kw">if</span> (guardSections &amp;&amp; <span class="fn">isInsideRecommendedSection</span>(row)) <span class="kw">return</span> <span class="kw">false</span>;
+
+  <span class="cm">// 本文は必須</span>
+  <span class="kw">if</span> (!row.<span class="fn">querySelector</span>?.(<span class="str">'.comment-text'</span>)) <span class="kw">return</span> <span class="kw">false</span>;
+
+  <span class="kw">const</span> hasNumber = Boolean(row.<span class="fn">querySelector</span>?.(<span class="str">'.comment-number'</span>));
+  <span class="kw">if</span> (requireNumber) <span class="kw">return</span> hasNumber;
+
+  <span class="cm">// requireNumber:false — 番号が無くても、サイト供給の構造ラベル</span>
+  <span class="cm">// （oneof 相当）を持つ行は本物のコメントとして受理する。</span>
+  <span class="kw">if</span> (hasNumber) <span class="kw">return</span> <span class="kw">true</span>;
+  <span class="kw">return</span> Boolean(row.<span class="fn">getAttribute</span>?.(<span class="str">'data-comment-type'</span>));
+}</code></pre>
+          <p class="note"><b>段階導入の勘所:</b> 第 1 段階では <code>requireNumber:true</code> 既定のまま、散らばっていた番号必須ロジックをこの関数へ<strong>委譲だけ</strong>する（挙動完全不変・既存テストが等価性を担保）。番号任意への緩和（<code>requireNumber:false</code>）は、後述の<strong>前提検証ゲート</strong>を通してから第 2 段階で開放する。</p>
+        </section>
+
+        <section class="box" id="s5">
+          <h2><span class="num">5.</span>なぜこの設計なのか（原則）</h2>
+          <ol>
+            <li><strong>受理は本質で組む（番号 ≠ コメントの証）</strong> ― コメントの本質は身元＋本文。連番は表示の便宜にすぎず、サイト改修で消えうる。本質に依存すれば改修耐性が上がる。</li>
+            <li><strong>受理ゲートは 1 か所に正本化する</strong> ― 同じ判定が複数経路に散ると、片方だけ直して挙動がドリフトする。1 つの純粋関数に集約し全経路が委譲する。</li>
+            <li><strong>誤検知ガードは「推測」でなく「サイト供給の構造」で</strong> ― 文字列パターンで「コメントっぽい」を推測すると推薦カードを誤検知する。サイトが意味づけした構造ラベル（oneof 相当）を使う。</li>
+            <li><strong>受理と値検証を分離する</strong> ― 「収穫対象か（構造）」と「値が妥当か（桁・空白）」は別レイヤー。受理だけを安全に正本化できる。</li>
+            <li><strong>段階導入で退化ゼロ</strong> ― まず挙動不変の正本化（既存テストで等価性担保）、次に前提検証を経てから緩和。一気に変えない。</li>
+            <li><strong>緩和の前に前提を実機で検証する</strong> ― 「マーカーが消えた」という前提自体が誤りのことがある（後述）。前提検証を依存ゲートとして手順に組み込む。</li>
+          </ol>
+        </section>
+
+        <section class="box" id="s6">
+          <h2><span class="num">6.</span>緩和の前に実機で確かめる（前提検証ゲート）</h2>
+          <p>「番号セルが消えたから受理を緩める」は一見もっともだが、<strong>緩和を実装する前に実機 DOM で前提を検証</strong>すべきだ。本手法を実配信ページ（コメント大量・大半が匿名）で確認したところ、2 つの重要な事実が分かった。</p>
+          <h3>6-1. 「マーカーが消えた」が常に真とは限らない</h3>
+          <p>検証した配信では、観測したコメント行<strong>すべてに番号セルが存在</strong>していた（取りこぼし 0 件）。「現行はマーカーを外した」という当初の前提は、その配信では<strong>再現しなかった</strong>。マーカー消失はページ状態・配信種別・レイアウト等に依存する条件付きの現象でありうる。前提が真でない場所で受理を緩めれば、<strong>働いているガードを弱めるだけで利得はゼロ</strong>になる。</p>
+          <h3>6-2. DOM に無い識別子は、ゲートを緩めても取れない</h3>
+          <p>さらに重要な観測として、匿名コメント行には<strong>DOM／フレームワーク内部状態のどこにもユーザー識別子が存在しなかった</strong>（行サブツリーの内部状態を多段にたどっても識別子は皆無）。これは、受理ゲートをいくら緩めても匿名話者を「誰」として扱えないことを意味する。匿名識別子は<strong>配信プロトコル（protobuf ストリーム）にしか無い</strong>のであり、その経路で取得すべき問題だった。</p>
+          <p class="note"><b>教訓:</b> 「DOM 受理ゲートを緩める」と「DOM に存在しない情報を取る」は別問題。前者をいじっても後者は解決しない。<b>緩和の前に実機で前提（マーカー有無・必要情報の所在）を確かめる</b>ことが、無駄な実装と機能退化を同時に防ぐ。</p>
+        </section>
+
+        <section class="box" id="s7">
+          <h2><span class="num">7.</span>関連する既知技術（先行技術）</h2>
+          <table class="cmp">
+            <thead><tr><th>手法 / システム</th><th>受理の基準</th><th>曖昧さの解消</th><th>本手法との関係</th></tr></thead>
+            <tbody>
+              <tr><td>本手法（DOM 収穫）</td><td>身元＋本文</td><td>サイト供給の構造ラベル</td><td>―</td></tr>
+              <tr><td>protobuf oneof 分岐</td><td>フィールドの存在</td><td>oneof フィールド名</td><td>構造ラベルの源流（DOM 版が本手法）</td></tr>
+              <tr><td>セマンティック HTML / ARIA</td><td>role 属性</td><td>role="row" 等</td><td>構造で意味を読む同系統</td></tr>
+              <tr><td>マイクロデータ / schema.org</td><td>itemtype</td><td>itemprop</td><td>サイト供給の構造を信頼する点が共通</td></tr>
+              <tr><td>HTML サニタイザのホワイトリスト</td><td>許可タグ／属性</td><td>許可リスト</td><td>「推測でなく明示的許可」の思想が共通</td></tr>
+            </tbody>
+          </table>
+          <h3>7-1. protocol buffers の oneof 分岐</h3>
+          <p>ストリーム配信のメッセージ解析では、1 つのメッセージが comment / gift / system のどれかを <code>oneof</code> フィールドで表す。受理側は <code>"chat" in msg</code> / <code>"gift" in msg</code> のように<strong>フィールド名で構造的に分岐</strong>し、本文や種別を推測しない。本手法の構造ラベル（<code>data-comment-type</code>）は、この oneof 分岐を DOM 層に持ち込んだものに相当する。</p>
+          <h3>7-2. セマンティック HTML / ARIA role</h3>
+          <p><code>role="row"</code> や <code>role="gridcell"</code> など、DOM に付与された意味情報を読み取って構造を理解する手法。クラス名の文字列推測より安定する。本手法の「構造ラベルを信頼する」方針と同系統。</p>
+          <h3>7-3. 「推測でなく明示的許可」のサニタイザ思想</h3>
+          <p>HTML サニタイザがタグ・属性の<strong>許可リスト</strong>で安全性を担保するのと同様、本手法も「コメントっぽい」を推測せず、サイトが明示した構造ラベルを受理根拠にする。誤検知を構造で排除する点で思想が一致する。</p>
+        </section>
+
+        <section class="box" id="s8">
+          <h2><span class="num">8.</span>本記事の位置づけ・ライセンス</h2>
+          <p>本記事は、Chrome 拡張機能『君斗りんくの追憶のきらめき』内のコメント収穫モジュール（<code>nicoliveDom.js</code>）で 2026 年 6 月に投入された「受理ゲートの純粋関数への正本化」と、その緩和を実機検証で見送った判断を、<strong>2026 年 6 月 18 日</strong>付で公開するものである。</p>
+          <p>設計は「番号という偶発マーカーではなく身元＋本文という本質で受理する」「誤検知ガードはサイト供給の構造（protobuf oneof 相当）で行う」「緩和の前に実機で前提を検証する」という再利用可能な原則にまとめられる。先行技術として protocol buffers の oneof 分岐・セマンティック HTML / ARIA・サニタイザのホワイトリスト思想を参照した。</p>
+          <p>参考実装は <strong>MIT</strong>、本記事文章は <strong>CC BY 4.0</strong> のもとで自由に複製・引用可。</p>
+          <div class="note"><b>引用例:</b> 君斗りんく「消えた DOM マーカーに依存しないコメント収穫 ― 『番号』ではなく『身元＋本文』で受理する構造ゲート」<i>君斗りんくの追憶のきらめき</i>、2026 年 6 月 18 日公開、<code>https://tsuioku-no-kirameki.com/articles/dom-comment-harvest-identity-gate.html</code></div>
+        </section>
+      </div>
+    </main>
+
+    <footer class="page">
+      <div class="shell"><p>&copy; Kimito-Link Project ― <a href="../">トップへ戻る</a> ／ <a href="./">技術記事一覧</a> ／ <a href="../privacy.html">プライバシーポリシー</a></p></div>
+    </footer>
+  </body>
+</html>
