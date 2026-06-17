@@ -11,7 +11,16 @@
  * 副作用なし。
  */
 
-const DEFAULT_TTL_MS = 24 * 60 * 60 * 1000; // 24h
+// v0.1.801: TTL を 24h→6h へ短縮。発生源(autopatrol の per-live キャッシュ書き込み)を断った上で、
+//   人間の再訪は数時間内に収まるため 6h で十分。TTL だけでは「短時間に大量アクセス」で爆発するので
+//   件数上限(LRU)を併用する(下記 DEFAULT_MAX_KEEP)。
+const DEFAULT_TTL_MS = 6 * 60 * 60 * 1000; // 6h
+/**
+ * v0.1.801: per-live event-dom キャッシュの件数上限(LRU)。TTL 内でも、capturedAt 新しい順に
+ *   この件数だけ残し超過分は prune する=無界蓄積(実機 513件)の根を断つ予備防衛線。現 lv は別枠で必ず保護。
+ *   30 = 人間が数時間で再訪する配信数として十分・autopatrol を止めればまず到達しない頭打ち。
+ */
+const DEFAULT_MAX_KEEP = 30;
 
 /**
  * @typedef {{ lv: string, capturedAt?: number }} EventDomEntry
@@ -23,14 +32,16 @@ const DEFAULT_TTL_MS = 24 * 60 * 60 * 1000; // 24h
  * @param {EventDomEntry[]|null|undefined} entries  storage の nls_event_dom_* 一覧
  * @param {string|null|undefined} currentLiveId  現在 watch 中の lv（保護）
  * @param {number} nowMs  現在時刻 Date.now()
- * @param {number} [ttlMs=86400000]  残骸 TTL（ms）デフォルト 24h
+ * @param {number} [ttlMs=21600000]  残骸 TTL（ms）デフォルト 6h
+ * @param {number} [maxKeep=30]  TTL 内でも残す件数上限(LRU・capturedAt 新しい順)。現 lv は別枠保護。
  * @returns {PruneResult}
  */
 export function pruneStaleEventDomLvs(
   entries,
   currentLiveId,
   nowMs,
-  ttlMs = DEFAULT_TTL_MS
+  ttlMs = DEFAULT_TTL_MS,
+  maxKeep = DEFAULT_MAX_KEEP
 ) {
   /** @type {string[]} */
   const keep = [];
@@ -46,13 +57,22 @@ export function pruneStaleEventDomLvs(
     typeof ttlMs === 'number' && Number.isFinite(ttlMs) && ttlMs > 0
       ? ttlMs
       : DEFAULT_TTL_MS;
+  const cap =
+    typeof maxKeep === 'number' && Number.isFinite(maxKeep) && maxKeep > 0
+      ? Math.floor(maxKeep)
+      : DEFAULT_MAX_KEEP;
+
+  // v0.1.801: TTL 通過した非現 lv を capturedAt 新しい順に並べ、上限超過分を prune に回す。
+  //   現 lv は無条件 keep(上限の枠外)。capturedAt 不明は即 prune(従来どおり)。
+  /** @type {{ lv: string, captured: number }[]} */
+  const ttlSurvivors = [];
 
   for (const e of entries) {
     if (!e || typeof e !== 'object') continue;
     const lv = typeof e.lv === 'string' ? e.lv.trim() : '';
     if (!lv) continue;
 
-    // 現在 watch 中の lv は無条件で保護
+    // 現在 watch 中の lv は無条件で保護(件数上限の枠外)
     if (cur && lv === cur) {
       keep.push(lv);
       continue;
@@ -71,10 +91,17 @@ export function pruneStaleEventDomLvs(
 
     const age = nowMs - captured;
     if (age < ttl) {
-      keep.push(lv);
+      ttlSurvivors.push({ lv, captured });
     } else {
       prune.push(lv);
     }
+  }
+
+  // 件数上限(LRU): 新しい順に cap 件だけ keep、超過分(古い側)は prune。
+  ttlSurvivors.sort((a, b) => b.captured - a.captured); // 新しい順
+  for (let i = 0; i < ttlSurvivors.length; i += 1) {
+    if (i < cap) keep.push(ttlSurvivors[i].lv);
+    else prune.push(ttlSurvivors[i].lv);
   }
 
   return { keep, prune };

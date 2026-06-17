@@ -37,13 +37,14 @@ describe('pruneStaleEventDomLvs', () => {
     expect(r.prune).toEqual(['lv-old']);
   });
 
-  it('TTL 内（24h 未満）の lv は keep', () => {
+  it('v0.1.801: TTL 内（6h 未満）の lv は keep・超過は prune', () => {
     const entries = [
-      { lv: 'lv1', capturedAt: NOW - 1 * HOUR },
-      { lv: 'lv2', capturedAt: NOW - 23 * HOUR },
-      { lv: 'lv3', capturedAt: NOW - 25 * HOUR }
+      { lv: 'lv1', capturedAt: NOW - 1 * HOUR }, // 6h 未満 keep
+      { lv: 'lv2', capturedAt: NOW - 5 * HOUR }, // 6h 未満 keep
+      { lv: 'lv3', capturedAt: NOW - 7 * HOUR } // 6h 超 prune
     ];
     const r = pruneStaleEventDomLvs(entries, 'lv-current', NOW);
+    // keep は capturedAt 新しい順(LRU)。lv1(1h)→lv2(5h)。
     expect(r.keep).toEqual(['lv1', 'lv2']);
     expect(r.prune).toEqual(['lv3']);
   });
@@ -55,8 +56,34 @@ describe('pruneStaleEventDomLvs', () => {
       { lv: 'lv-recent', capturedAt: NOW - 1 * HOUR }
     ];
     const r = pruneStaleEventDomLvs(entries, 'lv-current', NOW);
+    // 現 lv は先頭(無条件枠)、その後 TTL 生存を新しい順に並べる。
     expect(r.keep).toEqual(['lv-current', 'lv-recent']);
     expect(r.prune).toEqual(['lv-no-time']);
+  });
+
+  it('v0.1.801: 件数上限(LRU)で TTL 内でも新しい順に maxKeep 件だけ残す', () => {
+    const entries = [];
+    // すべて TTL(6h)内。新しい順に lv-0(0.1h) ... lv-39(3.9h)。
+    for (let i = 0; i < 40; i++) {
+      entries.push({ lv: `lv-${i}`, capturedAt: NOW - (i + 1) * 6 * 60 * 1000 }); // i*6分前
+    }
+    const r = pruneStaleEventDomLvs(entries, '', NOW, undefined, 30);
+    expect(r.keep).toHaveLength(30); // 新しい 30 件
+    expect(r.prune).toHaveLength(10); // 古い 10 件
+    expect(r.keep[0]).toBe('lv-0'); // 最新が先頭
+    expect(r.keep).not.toContain('lv-39'); // 最古は prune
+    expect(r.prune).toContain('lv-39');
+  });
+
+  it('v0.1.801: 現 lv は件数上限の枠外で必ず保護', () => {
+    const entries = [{ lv: 'lv-current', capturedAt: NOW - 100 * HOUR }]; // TTL 超でも現lvは keep
+    for (let i = 0; i < 35; i++) {
+      entries.push({ lv: `lv-${i}`, capturedAt: NOW - (i + 1) * 60 * 1000 });
+    }
+    const r = pruneStaleEventDomLvs(entries, 'lv-current', NOW, undefined, 30);
+    expect(r.keep).toContain('lv-current'); // 枠外で保護
+    // 現 lv 以外の TTL 生存は 35 件 → 上限 30 で 5 件 prune。
+    expect(r.keep.filter((lv) => lv !== 'lv-current')).toHaveLength(30);
   });
 
   it('カスタム TTL で動く（1 時間に圧縮）', () => {
@@ -107,10 +134,10 @@ describe('pruneStaleEventDomLvs', () => {
     ).toEqual({ keep: [], prune: [] });
   });
 
-  it('TTL 0 / 負数 → デフォルト 24h を使用', () => {
+  it('TTL 0 / 負数 → デフォルト(6h)を使用', () => {
     const entries = [{ lv: 'lv1', capturedAt: NOW - 1 * HOUR }];
     const r = pruneStaleEventDomLvs(entries, '', NOW, 0);
-    expect(r.keep).toEqual(['lv1']); // デフォルト 24h で keep
+    expect(r.keep).toEqual(['lv1']); // デフォルト 6h 内なので keep
   });
 });
 
