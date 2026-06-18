@@ -3,7 +3,7 @@
 > `scripts/repo-tree-map.mjs` が git 追跡ファイルから自動生成。**手で編集しない**（再生成で上書き）。
 > 役割の一言説明は同スクリプトの `ROLES` 辞書が正本。**未記入**のディレクトリは下に ⚠️ で出るので `ROLES` に1行足す。
 > 下にマインドマップ（GitHub で図として表示）→ ディレクトリ一覧 → 機能逆引き索引 の順。
-> 視覚ビュー: [repo-tree-map.html](repo-tree-map.html) ／ 機能依存図: [feature-map/index.md](feature-map/index.md) ／ 配置ルール正本: [AGENTS.md](../AGENTS.md) §4。
+> **全部の地図への入口: [MAP.md](MAP.md)** ／ 視覚ビュー: [repo-tree-map.html](repo-tree-map.html) ／ 機能依存図: [feature-map/index.md](feature-map/index.md) ／ 配置ルール正本: [AGENTS.md](../AGENTS.md) §4。
 
 ルート直下の設定ファイル: 16 件（package.json / *.config.js / AGENTS.md 等）
 
@@ -111,6 +111,8 @@ graph LR
   HUB --> f20["影響範囲マップ(変えたら何が壊れるか)"]
   f20 --> f20_0["feature-map.mjs"]
   f20 --> f20_1["feature-map/impact-map.md"]
+  HUB --> f21["全体マップ(全地図への入口)"]
+  f21 --> f21_0["MAP.md"]
 ```
 
 ---
@@ -127,7 +129,7 @@ graph LR
 <sub>ファイル 24 件</sub>
 
 ## `docs/` — 設計正本・マインドマップ・フロー図・feature-map(AI/人間向け)  〔設計 / レポート〕
-<sub>ファイル 64 件</sub>
+<sub>ファイル 65 件</sub>
 
 - `article-assets/`（3 件） — 記事用の画像・動画・音声アセット  〔記事 / 画像〕
 - `feature-map/`（12 件） — 機能ごと依存図(自動生成)。誰が storage を書き/読むか  〔依存図 / 自動生成〕
@@ -303,6 +305,11 @@ esbuild の import 到達グラフを逆引きし「このファイルを変え�
 
 - [`scripts/feature-map.mjs`](../scripts/feature-map.mjs)
 - [`docs/feature-map/impact-map.md`](../docs/feature-map/impact-map.md)
+
+### 全体マップ(全地図への入口)  〔ハブ / 入口 / 地図〕
+地図・診断・検証への唯一の入口ハブ。「どこを直す/何が壊れる/今の状態/壊れてないか/公開記事」を1枚から辿れる。迷ったらここ起点(AGENTS.md §10)
+
+- [`docs/MAP.md`](../docs/MAP.md)
 
 ---
 
