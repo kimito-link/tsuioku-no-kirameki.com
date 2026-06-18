@@ -453,6 +453,7 @@
 | `src/lib/shouldSkipDeepHarvest.js` | 1 | 記録エンジン(watchページ常駐) |
 | `src/lib/shouldTriggerOfficialGapDeepHarvest.js` | 1 | 記録エンジン(watchページ常駐) |
 | `src/lib/standalonePopupClose.js` | 1 | ポップアップ(応援レーン) |
+| `src/lib/statusActionAdvisor.js` | 1 | 状態速報ページ |
 | `src/lib/statusMindmapModel.js` | 1 | 状態速報ページ |
 | `src/lib/storedCommentDedupeMerge.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/storyAvatarDiagLine.js` | 1 | ポップアップ(応援レーン) |

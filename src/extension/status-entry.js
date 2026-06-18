@@ -24,6 +24,7 @@
 import { KEY_AI_SHARE_FAST_DIAG } from '../lib/aiShareFastDiagKey.js';
 import { KEY_AI_SHARE_POPUP_DIAG } from '../lib/aiSharePopupDiagKey.js';
 import { buildStatusMindmapModel } from '../lib/statusMindmapModel.js';
+import { buildStatusActions } from '../lib/statusActionAdvisor.js';
 import {
   buildOverviewText,
   buildLiveBlockText,
@@ -436,6 +437,9 @@ function renderAll({ lvList, summaries, fastDiag, popupDiag, backfillProgress })
     }
   }
 
+  // 🩹 いま気になる点と対処(症状→原因→次の一手・最上部)
+  renderActionCards({ livesData, fastDiag, popupDiag });
+
   // 全体マインドマップ(折りたたみツリー・ここを見れば全部わかる)
   renderMindmap({ overviewText, livesData, fastDiag, popupDiag });
 
@@ -459,6 +463,61 @@ function renderAll({ lvList, summaries, fastDiag, popupDiag, backfillProgress })
       fastDiag
     }
   };
+}
+
+/* ============================================================================
+ * 🩹 いま気になる点と対処(症状→原因→次の一手・解決カード)
+ * ========================================================================== */
+
+const ACTION_BADGE = { bad: '🔴', warn: '🟡', info: '⚪' };
+const FIXABLE_LABEL = {
+  yes: 'この画面の操作で対処できます',
+  partly: '操作で改善することがあります',
+  no: 'status の外が原因(下記の手動操作を試してください)'
+};
+
+/**
+ * @param {{ livesData?: any[], fastDiag?: any, popupDiag?: any }} data
+ */
+function renderActionCards(data) {
+  const host = document.getElementById('actionBody');
+  if (!host) return;
+  let cards;
+  try {
+    cards = buildStatusActions(data);
+  } catch {
+    host.className = 'empty-note';
+    host.textContent = '対処カードの組み立てに失敗しました。';
+    return;
+  }
+  host.className = '';
+  host.innerHTML = '';
+  if (!cards.length) {
+    host.className = 'empty-note';
+    host.textContent = '🟢 大きな問題は見当たりません。';
+    return;
+  }
+  for (const c of cards) {
+    const card = document.createElement('div');
+    const accent = c.severity === 'bad' ? '#f0a0a0' : c.severity === 'warn' ? '#e0b050' : 'var(--nl-border)';
+    card.style.cssText =
+      'padding:10px 12px;border-radius:8px;margin-bottom:8px;' +
+      `border:1px solid var(--nl-border);border-left:4px solid ${accent};background:var(--nl-card-bg);`;
+    const head = document.createElement('div');
+    head.style.cssText = 'font-weight:700;margin-bottom:4px;';
+    head.textContent = `${ACTION_BADGE[c.severity] || '⚪'} ${c.symptom}`;
+    const cause = document.createElement('div');
+    cause.style.cssText = 'font-size:13px;color:var(--nl-text-soft);margin-bottom:4px;';
+    cause.textContent = `原因(推定): ${c.cause}`;
+    const action = document.createElement('div');
+    action.style.cssText = 'font-size:13px;margin-bottom:2px;';
+    action.textContent = `➡ 次の一手: ${c.action}`;
+    const fix = document.createElement('div');
+    fix.style.cssText = 'font-size:11.5px;color:var(--nl-text-soft);';
+    fix.textContent = FIXABLE_LABEL[c.fixableHere] || '';
+    card.append(head, cause, action, fix);
+    host.appendChild(card);
+  }
 }
 
 /* ============================================================================
