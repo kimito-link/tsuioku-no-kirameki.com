@@ -190,6 +190,10 @@ build/                 ← .gitignore 対象。CWS 提出用 ZIP + 生成アセ�
   diff から「影響大(複数機能に波及)の変更ファイル」を検出し、波及先の機能を列挙する。**警告のみでブロックしない**
   (摩擦ゼロ)が、列挙された各 feature の動作確認を必ず行う。CI で明示ゲートにしたいときは `--strict`(exit 1)。
   元データ: [`docs/feature-map/impact-map.md`](docs/feature-map/impact-map.md)(逆引き)。再生成 `npm run feature-map`。
+  - **コミット時は自動**: `.husky/pre-commit` が `impact-check` を毎コミット実行(staged 対象・**ブロックしない**)。
+    影響大の変更をステージしてコミットすると、波及先の警告が出る(止まらない=確認すべき機能が必ず目に入るだけ)。
+  - **`--strict` をゲートにしたいとき**だけ CI/pre-push で `npm run impact-check -- --strict --base origin/master` を足す
+    (このリポの既定は非ブロッキング=開発の摩擦を増やさない)。
 - **この AGENTS.md を最初に読むこと**。とくに §3.1「ゆっくり OK」と §3.2「3 キャラの役割」はコピー＆新規生成するコンテンツに波及しやすい
 - **CWS 申請関連のファイル**（`src/images/googlechrom/`, `build/store-listing/` の `description-ja.txt` / `privacy-justifications-ja.txt`）は、仕様・文言を変える際に必ず「審査通過後の差分提出」を意識する
 - **プライバシー周り**の文言を変更したら、`privacy.html` と `description-ja.txt` と `privacy-justifications-ja.txt` の 3 点を同期させる（片方だけ変わると審査で齟齬として指摘される）
