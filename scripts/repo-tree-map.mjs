@@ -108,7 +108,8 @@ const FEATURES = [
   { feature: 'AI診断の状態速報集約', desc: 'popup の AI診断コピー固有情報を別キーへ書き、status.html(状態速報)の AI共有まとめに集約。status を見れば全部わかる', paths: ['src/lib/aiSharePopupDiagKey.js', 'src/extension/status-entry.js'], tags: ['診断', 'レポート', '集約'] },
   { feature: '状態速報の全体マインドマップ', desc: 'status.html を開けば今の状態を枝(概要/コメント取得/北極星/過去ログ/健全性/popup診断)で俯瞰。🟢🟡🔴⚪ の badge 付き折りたたみツリー(外部依存ゼロ)', paths: ['src/lib/statusMindmapModel.js', 'src/extension/status-entry.js'], tags: ['診断', 'レポート', 'マインドマップ'] },
   { feature: 'サイト健全性検証(リンク切れ防止)', desc: '公開ページ(LP/記事/docs)の相対内部リンク先がディスクに実在するか静的照合。外部リンクは叩かない(依存/プライバシー/速度ゼロ)。docs/site-health.md に出力・腐り検知', paths: ['src/lib/siteLinkHealth.js', 'scripts/site-health.mjs'], tags: ['Web', '健全性', 'リンク'] },
-  { feature: '影響範囲マップ(変えたら何が壊れるか)', desc: 'esbuild の import 到達グラフを逆引きし「このファイルを変えたら、どの機能(entry)が壊れうるか」を波及機能数の降順で一覧。docs/feature-map/impact-map.md。新規ビルド/依存ゼロ(reach 再利用)', paths: ['scripts/feature-map.mjs', 'docs/feature-map/impact-map.md'], tags: ['影響範囲', '依存図', '実装前ゲート'] }
+  { feature: '影響範囲マップ(変えたら何が壊れるか)', desc: 'esbuild の import 到達グラフを逆引きし「このファイルを変えたら、どの機能(entry)が壊れうるか」を波及機能数の降順で一覧。docs/feature-map/impact-map.md。新規ビルド/依存ゼロ(reach 再利用)', paths: ['scripts/feature-map.mjs', 'docs/feature-map/impact-map.md'], tags: ['影響範囲', '依存図', '実装前ゲート'] },
+  { feature: '全体マップ(全地図への入口)', desc: '地図・診断・検証への唯一の入口ハブ。「どこを直す/何が壊れる/今の状態/壊れてないか/公開記事」を1枚から辿れる。迷ったらここ起点(AGENTS.md §10)', paths: ['docs/MAP.md'], tags: ['ハブ', '入口', '地図'] }
 ];
 
 /** ツリーから除外するトップレベル(ドット系・生成物・巨大画像ディレクトリ等) */
@@ -262,7 +263,7 @@ function renderMarkdown(nodes, files) {
   lines.push('> `scripts/repo-tree-map.mjs` が git 追跡ファイルから自動生成。**手で編集しない**（再生成で上書き）。');
   lines.push('> 役割の一言説明は同スクリプトの `ROLES` 辞書が正本。**未記入**のディレクトリは下に ⚠️ で出るので `ROLES` に1行足す。');
   lines.push('> 下にマインドマップ（GitHub で図として表示）→ ディレクトリ一覧 → 機能逆引き索引 の順。');
-  lines.push('> 視覚ビュー: [repo-tree-map.html](repo-tree-map.html) ／ 機能依存図: [feature-map/index.md](feature-map/index.md) ／ 配置ルール正本: [AGENTS.md](../AGENTS.md) §4。');
+  lines.push('> **全部の地図への入口: [MAP.md](MAP.md)** ／ 視覚ビュー: [repo-tree-map.html](repo-tree-map.html) ／ 機能依存図: [feature-map/index.md](feature-map/index.md) ／ 配置ルール正本: [AGENTS.md](../AGENTS.md) §4。');
   lines.push('');
   lines.push(`ルート直下の設定ファイル: ${rootFileCount(files)} 件（package.json / *.config.js / AGENTS.md 等）`);
   lines.push('');

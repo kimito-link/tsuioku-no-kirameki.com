@@ -71,7 +71,7 @@
       
     </section>
 <section class="dir">
-      <div class="dhead"><span class="dname">docs/</span><span class="cnt">64 件</span></div>
+      <div class="dhead"><span class="dname">docs/</span><span class="cnt">65 件</span></div>
       <div class="drole">設計正本・マインドマップ・フロー図・feature-map(AI/人間向け) <span class="tag">設計</span><span class="tag">レポート</span></div>
       <div class="kids"><div class="kid"><div class="kname">article-assets/ <span class="cnt">3</span></div><div class="krole">記事用の画像・動画・音声アセット <span class="tag">記事</span><span class="tag">画像</span></div></div><div class="kid"><div class="kname">feature-map/ <span class="cnt">12</span></div><div class="krole">機能ごと依存図(自動生成)。誰が storage を書き/読むか <span class="tag">依存図</span><span class="tag">自動生成</span></div></div><div class="kid"><div class="kname">policies/ <span class="cnt">1</span></div><div class="krole">運用方針メモ(統計の失敗モード等) <span class="tag">方針</span></div></div><div class="kid"><div class="kname">releases/ <span class="cnt">4</span></div><div class="krole">リリース関連メモ(CWS 公開 API 設定・版ごとの記事下書き) <span class="tag">リリース</span></div></div><div class="kid"><div class="kname">research/ <span class="cnt">2</span></div><div class="krole">ディープリサーチ成果(ギフトランキング等の調査) <span class="tag">調査</span><span class="tag">レポート</span></div></div><div class="kid"><div class="kname">workflows/ <span class="cnt">1</span></div><div class="krole">開発ワークフロー設計(TDD/UI-UX ロードマップ等) <span class="tag">ワークフロー</span></div></div></div>
     </section>
@@ -217,6 +217,11 @@
       <div class="fhead"><span class="fname">影響範囲マップ(変えたら何が壊れるか)</span> <span class="tag">影響範囲</span><span class="tag">依存図</span><span class="tag">実装前ゲート</span></div>
       <div class="fdesc">esbuild の import 到達グラフを逆引きし「このファイルを変えたら、どの機能(entry)が壊れうるか」を波及機能数の降順で一覧。docs/feature-map/impact-map.md。新規ビルド/依存ゼロ(reach 再利用)</div>
       <div class="fpaths"><code class="path">scripts/feature-map.mjs</code><code class="path">docs/feature-map/impact-map.md</code></div>
+    </section>
+<section class="feat">
+      <div class="fhead"><span class="fname">全体マップ(全地図への入口)</span> <span class="tag">ハブ</span><span class="tag">入口</span><span class="tag">地図</span></div>
+      <div class="fdesc">地図・診断・検証への唯一の入口ハブ。「どこを直す/何が壊れる/今の状態/壊れてないか/公開記事」を1枚から辿れる。迷ったらここ起点(AGENTS.md §10)</div>
+      <div class="fpaths"><code class="path">docs/MAP.md</code></div>
     </section>
 
   <div class="legend">
