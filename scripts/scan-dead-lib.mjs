@@ -7,15 +7,19 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const root = path.join(__dirname, '..');
 const libDir = path.join(root, 'src/lib');
 
-const entryFiles = [
-  'src/extension/popup-entry.js',
-  'src/extension/content-entry.js',
-  'src/extension/comeview-entry.js',
-  'src/extension/status-entry.js',
-  'src/extension/offscreen-entry.js',
-  'src/extension/background.js',
-  'src/extension/page-intercept-entry.js',
-].map(f => path.join(root, f));
+// entry は「実行コンテキストの起点」。漏らすと使用中ファイルを誤って死蔵判定するので、
+// 固定リストを手書きせず src/extension の *-entry.js を自動収集し、特殊 entry を足す
+// (2026-06-19: venue-entry / backfill-sw-entry / app.js の漏れで swCrawlSlots を誤検知した反省)。
+const autoEntries = fs.readdirSync(path.join(root, 'src/extension'))
+  .filter(f => f.endsWith('-entry.js'))
+  .map(f => path.join('src/extension', f));
+const specialEntries = [
+  'src/extension/background.js', // SW(MV3)・バンドル対象外だが lib を import しうる
+  'app/app.js'                   // Web 版状態ページ
+];
+const entryFiles = [...new Set([...autoEntries, ...specialEntries])]
+  .map(f => path.join(root, f))
+  .filter(f => fs.existsSync(f));
 
 // libの全実装ファイル収集
 const allLibFiles = fs.readdirSync(libDir)
