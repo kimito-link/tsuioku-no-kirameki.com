@@ -485,9 +485,12 @@ function renderActionCards(data) {
   let cards;
   try {
     cards = buildStatusActions(data);
-  } catch {
+  } catch (err) {
+    // 星野メソッド: 失敗を空白で終わらせない。必ず「次の一手」を出す(下の AI共有まとめは常に動く)。
     host.className = 'empty-note';
-    host.textContent = '対処カードの組み立てに失敗しました。';
+    host.textContent =
+      `対処カードを組み立てられませんでした(${String(err?.message || err).slice(0, 80)})。` +
+      '下の「🤖 AI に貼る用テキスト」をコピーして AI に貼ると原因を調べられます。';
     return;
   }
   host.className = '';
@@ -573,9 +576,12 @@ function renderMindmap(data) {
   let model;
   try {
     model = buildStatusMindmapModel(data);
-  } catch {
+  } catch (err) {
+    // 星野メソッド: 失敗を空白で終わらせない。必ず「次の一手」を出す。
     host.className = 'empty-note';
-    host.textContent = 'マインドマップの組み立てに失敗しました。';
+    host.textContent =
+      `マインドマップを組み立てられませんでした(${String(err?.message || err).slice(0, 80)})。` +
+      '下の「🤖 AI に貼る用テキスト」をコピーして AI に貼ると原因を調べられます。';
     return;
   }
   host.className = 'mind';
