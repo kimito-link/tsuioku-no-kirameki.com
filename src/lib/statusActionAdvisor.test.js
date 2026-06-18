@@ -81,6 +81,28 @@ describe('buildStatusActions', () => {
     expect(c.fixableHere).toBe('no');
   });
 
+  it('content/popup の記録エラー → recorded-errors(bad・サンプル併記)', () => {
+    const cards = buildStatusActions({
+      livesData: [{ liveId: 'lv1', officialRatePct: 90 }],
+      fastDiag: { content: { consoleErrorProbe: {
+        recentErrors: [{ message: 'TypeError: x is undefined', source: 'content' }],
+        totalCount: 1, ignoredCount: 0
+      } } }
+    });
+    const c = cards.find((x) => x.id === 'recorded-errors');
+    expect(c).toBeTruthy();
+    expect(c.severity).toBe('bad');
+    expect(c.cause).toContain('TypeError');
+  });
+
+  it('recentErrors 空なら recorded-errors は出ない(ノイズで鳴らさない)', () => {
+    const cards = buildStatusActions({
+      livesData: [{ liveId: 'lv1', officialRatePct: 90 }],
+      fastDiag: { content: { consoleErrorProbe: { recentErrors: [], totalCount: 0, ignoredCount: 5 } } }
+    });
+    expect(cards.find((x) => x.id === 'recorded-errors')).toBeFalsy();
+  });
+
   it('多タブ DOM 混入 → stale-dom', () => {
     const cards = buildStatusActions({
       livesData: [{ liveId: 'lv1', officialRatePct: 90 }],

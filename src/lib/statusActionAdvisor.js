@@ -43,6 +43,23 @@ export function buildStatusActions(data) {
   const cards = [];
   const add = (c) => cards.push(c);
 
+  // --- content/popup で記録された実エラー(静かな失敗を status に集約) ---
+  // content が consoleErrorProbe.recentErrors に【ノイズ除外済みの実エラー】を記録している。
+  // status はこれを見ていなかった=深部の握り潰しが画面に出ない穴。ここで拾って最上位カードにする。
+  const errProbe = fast?.consoleErrorProbe;
+  const recentErrors = Array.isArray(errProbe?.recentErrors) ? errProbe.recentErrors : [];
+  if (recentErrors.length) {
+    const sample = recentErrors.slice(-3).map((e) => String(e?.message || e || '').slice(0, 80)).filter(Boolean);
+    add({
+      id: 'recorded-errors',
+      severity: 'bad',
+      symptom: `エラーが記録されています(直近 ${recentErrors.length} 件)`,
+      cause: `拡張内部で実エラーが発生・記録されました${sample.length ? ': ' + sample.join(' / ') : ''}`,
+      action: '下の「🤖 AI に貼る用テキスト」をコピーして AI に貼ると原因を特定できます。再現するなら watch タブを F5',
+      fixableHere: 'partly'
+    });
+  }
+
   // --- 視聴中の配信なし(最優先で分かりやすい) ---
   if (!livesData.length) {
     add({

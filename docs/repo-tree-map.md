@@ -135,10 +135,10 @@ graph LR
 <sub>ファイル 28 件</sub>
 
 ## `docs/` — 設計正本・マインドマップ・フロー図・feature-map(AI/人間向け)  〔設計 / レポート〕
-<sub>ファイル 65 件</sub>
+<sub>ファイル 66 件</sub>
 
 - `article-assets/`（3 件） — 記事用の画像・動画・音声アセット  〔記事 / 画像〕
-- `feature-map/`（12 件） — 機能ごと依存図(自動生成)。誰が storage を書き/読むか  〔依存図 / 自動生成〕
+- `feature-map/`（13 件） — 機能ごと依存図(自動生成)。誰が storage を書き/読むか  〔依存図 / 自動生成〕
 - `policies/`（1 件） — 運用方針メモ(統計の失敗モード等)  〔方針〕
 - `releases/`（4 件） — リリース関連メモ(CWS 公開 API 設定・版ごとの記事下書き)  〔リリース〕
 - `research/`（2 件） — ディープリサーチ成果(ギフトランキング等の調査)  〔調査 / レポート〕
@@ -158,7 +158,7 @@ graph LR
 - `avatar-parts/`（26 件） — アバター素材(顔シート等)の参考画像  〔アバター / 画像〕
 
 ## `scripts/` — ビルド・検証・自動生成スクリプト(build/feature-map/repo-tree-map 等)  〔ビルド / 自動生成〕
-<sub>ファイル 27 件</sub>
+<sub>ファイル 28 件</sub>
 
 - `xserver/`（2 件） — Xserver 向け webhook(git pull デプロイ)スクリプト  〔デプロイ / webhook〕
 
@@ -326,8 +326,8 @@ esbuild の import 到達グラフを逆引きし「このファイルを変え�
 ### 影響範囲ゲート(規律を自動化)  〔影響範囲 / 自動ゲート / 再発防止〕
 星野ロミ式「規律を自動ゲートに」。diff から影響大(複数機能波及)の変更ファイルを検出し波及先機能を列挙。警告のみ(摩擦ゼロ)・--strict で exit1。AGENTS.md §10 のルールを diff 発火に
 
-- `scripts/impact-check.mjs` ⚠️ **見つからない（消失/リネーム）**
-- `docs/feature-map/impact-map.json` ⚠️ **見つからない（消失/リネーム）**
+- [`scripts/impact-check.mjs`](../scripts/impact-check.mjs)
+- [`docs/feature-map/impact-map.json`](../docs/feature-map/impact-map.json)
 
 ---
 
