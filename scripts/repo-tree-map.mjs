@@ -110,7 +110,8 @@ const FEATURES = [
   { feature: '状態速報の対処カード(症状→原因→次の一手)', desc: '既知パターン辞書で fastDiag/popupDiag を照合し「症状→原因(推定)→次の一手」を重大度順カードで提示。直せない原因は status の外と正直に出す(COUNCIL status-allinone)', paths: ['src/lib/statusActionAdvisor.js', 'src/extension/status-entry.js'], tags: ['診断', '対処', '自己解決'] },
   { feature: 'サイト健全性検証(リンク切れ防止)', desc: '公開ページ(LP/記事/docs)の相対内部リンク先がディスクに実在するか静的照合。外部リンクは叩かない(依存/プライバシー/速度ゼロ)。docs/site-health.md に出力・腐り検知', paths: ['src/lib/siteLinkHealth.js', 'scripts/site-health.mjs'], tags: ['Web', '健全性', 'リンク'] },
   { feature: '影響範囲マップ(変えたら何が壊れるか)', desc: 'esbuild の import 到達グラフを逆引きし「このファイルを変えたら、どの機能(entry)が壊れうるか」を波及機能数の降順で一覧。docs/feature-map/impact-map.md。新規ビルド/依存ゼロ(reach 再利用)', paths: ['scripts/feature-map.mjs', 'docs/feature-map/impact-map.md'], tags: ['影響範囲', '依存図', '実装前ゲート'] },
-  { feature: '全体マップ(全地図への入口)', desc: '地図・診断・検証への唯一の入口ハブ。「どこを直す/何が壊れる/今の状態/壊れてないか/公開記事」を1枚から辿れる。迷ったらここ起点(AGENTS.md §10)', paths: ['docs/MAP.md'], tags: ['ハブ', '入口', '地図'] }
+  { feature: '全体マップ(全地図への入口)', desc: '地図・診断・検証への唯一の入口ハブ。「どこを直す/何が壊れる/今の状態/壊れてないか/公開記事」を1枚から辿れる。迷ったらここ起点(AGENTS.md §10)', paths: ['docs/MAP.md'], tags: ['ハブ', '入口', '地図'] },
+  { feature: '影響範囲ゲート(規律を自動化)', desc: '星野ロミ式「規律を自動ゲートに」。diff から影響大(複数機能波及)の変更ファイルを検出し波及先機能を列挙。警告のみ(摩擦ゼロ)・--strict で exit1。AGENTS.md §10 のルールを diff 発火に', paths: ['scripts/impact-check.mjs', 'docs/feature-map/impact-map.json'], tags: ['影響範囲', '自動ゲート', '再発防止'] }
 ];
 
 /** ツリーから除外するトップレベル(ドット系・生成物・巨大画像ディレクトリ等) */

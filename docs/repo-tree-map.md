@@ -116,6 +116,9 @@ graph LR
   f21 --> f21_1["feature-map/impact-map.md"]
   HUB --> f22["全体マップ(全地図への入口)"]
   f22 --> f22_0["MAP.md"]
+  HUB --> f23["影響範囲ゲート(規律を自動化)"]
+  f23 --> f23_0["impact-check.mjs"]
+  f23 --> f23_1["feature-map/impact-map.json"]
 ```
 
 ---
@@ -319,6 +322,12 @@ esbuild の import 到達グラフを逆引きし「このファイルを変え�
 地図・診断・検証への唯一の入口ハブ。「どこを直す/何が壊れる/今の状態/壊れてないか/公開記事」を1枚から辿れる。迷ったらここ起点(AGENTS.md §10)
 
 - [`docs/MAP.md`](../docs/MAP.md)
+
+### 影響範囲ゲート(規律を自動化)  〔影響範囲 / 自動ゲート / 再発防止〕
+星野ロミ式「規律を自動ゲートに」。diff から影響大(複数機能波及)の変更ファイルを検出し波及先機能を列挙。警告のみ(摩擦ゼロ)・--strict で exit1。AGENTS.md §10 のルールを diff 発火に
+
+- `scripts/impact-check.mjs` ⚠️ **見つからない（消失/リネーム）**
+- `docs/feature-map/impact-map.json` ⚠️ **見つからない（消失/リネーム）**
 
 ---
 

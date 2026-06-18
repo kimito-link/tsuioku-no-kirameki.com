@@ -228,6 +228,11 @@
       <div class="fdesc">地図・診断・検証への唯一の入口ハブ。「どこを直す/何が壊れる/今の状態/壊れてないか/公開記事」を1枚から辿れる。迷ったらここ起点(AGENTS.md §10)</div>
       <div class="fpaths"><code class="path">docs/MAP.md</code></div>
     </section>
+<section class="feat">
+      <div class="fhead"><span class="fname">影響範囲ゲート(規律を自動化)</span> <span class="tag">影響範囲</span><span class="tag">自動ゲート</span><span class="tag">再発防止</span></div>
+      <div class="fdesc">星野ロミ式「規律を自動ゲートに」。diff から影響大(複数機能波及)の変更ファイルを検出し波及先機能を列挙。警告のみ(摩擦ゼロ)・--strict で exit1。AGENTS.md §10 のルールを diff 発火に</div>
+      <div class="fpaths"><code class="path dead">scripts/impact-check.mjs ⚠️ 見つからない</code><code class="path dead">docs/feature-map/impact-map.json ⚠️ 見つからない</code></div>
+    </section>
 
   <div class="legend">
     <p><b>読み方</b></p>
