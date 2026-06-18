@@ -711,6 +711,25 @@ function buildAiShareFullText({ overviewText, livesData, fastDiag, popupDiag }) 
     if (laneStr) lines.push(laneStr);
     lines.push('');
   }
+  // 検知された対処候補(症状→原因→次の一手)。AI が「何を直すか」を先頭で掴めるように上に置く。
+  try {
+    const actions = buildStatusActions({ livesData, fastDiag, popupDiag });
+    lines.push('### 検知された対処候補(症状→原因→次の一手)');
+    if (!actions.length) {
+      lines.push('- 既知パターンに該当する問題は検知されませんでした(未知の症状なら下の診断 JSON を参照)。');
+    } else {
+      for (const a of actions) {
+        const mark = a.severity === 'bad' ? '🔴' : a.severity === 'warn' ? '🟡' : '⚪';
+        const fix = a.fixableHere === 'no' ? ' [statusの外が原因]' : a.fixableHere === 'partly' ? ' [操作で改善する場合あり]' : '';
+        lines.push(`- ${mark} ${a.symptom}${fix}`);
+        lines.push(`    原因(推定): ${a.cause}`);
+        lines.push(`    次の一手: ${a.action}`);
+      }
+    }
+    lines.push('');
+  } catch {
+    // 対処候補の生成失敗は AI共有を妨げない
+  }
   if (livesData.length) {
     lines.push('### 配信ごと');
     for (const live of livesData) {
