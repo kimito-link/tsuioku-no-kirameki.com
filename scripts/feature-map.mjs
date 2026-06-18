@@ -364,6 +364,18 @@ function writeImpactMap(f2f) {
   }
   lines.push('');
   emit('impact-map.md', lines.join('\n'));
+
+  // 機械可読版(impact-check.mjs が読む・markdown を parse させない)。labels も同梱。
+  const json = {
+    generatedBy: 'scripts/feature-map.mjs',
+    files: rows.map((r) => ({
+      file: r.file,
+      featureCount: r.feats.length,
+      features: r.feats,
+      labels: r.feats.map(featureLabel)
+    }))
+  };
+  emit('impact-map.json', JSON.stringify(json, null, 2) + '\n');
 }
 
 /**
