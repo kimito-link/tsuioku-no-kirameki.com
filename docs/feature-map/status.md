@@ -25,6 +25,7 @@ graph LR
   n_status --> n_src_lib_pickBroadcasterNameForReputation_js["lib/pickBroadcasterNameForReputation.js"]
   n_status --> n_src_lib_rankingPatrolMessages_js["lib/rankingPatrolMessages.js"]
   n_status --> n_src_lib_resolveVisitorCount_js["lib/resolveVisitorCount.js"]
+  n_status --> n_src_lib_statusActionAdvisor_js["lib/statusActionAdvisor.js"]
   n_status --> n_src_lib_statusFormat_js["lib/statusFormat.js"]:::shared
   n_status --> n_src_lib_statusMindmapModel_js["lib/statusMindmapModel.js"]
   n_status --> n_src_lib_storageOpTimeout_js["lib/storageOpTimeout.js"]:::shared

@@ -209,6 +209,11 @@
       <div class="fpaths"><code class="path">src/lib/statusMindmapModel.js</code><code class="path">src/extension/status-entry.js</code></div>
     </section>
 <section class="feat">
+      <div class="fhead"><span class="fname">状態速報の対処カード(症状→原因→次の一手)</span> <span class="tag">診断</span><span class="tag">対処</span><span class="tag">自己解決</span></div>
+      <div class="fdesc">既知パターン辞書で fastDiag/popupDiag を照合し「症状→原因(推定)→次の一手」を重大度順カードで提示。直せない原因は status の外と正直に出す(COUNCIL status-allinone)</div>
+      <div class="fpaths"><code class="path dead">src/lib/statusActionAdvisor.js ⚠️ 見つからない</code><code class="path">src/extension/status-entry.js</code></div>
+    </section>
+<section class="feat">
       <div class="fhead"><span class="fname">サイト健全性検証(リンク切れ防止)</span> <span class="tag">Web</span><span class="tag">健全性</span><span class="tag">リンク</span></div>
       <div class="fdesc">公開ページ(LP/記事/docs)の相対内部リンク先がディスクに実在するか静的照合。外部リンクは叩かない(依存/プライバシー/速度ゼロ)。docs/site-health.md に出力・腐り検知</div>
       <div class="fpaths"><code class="path">src/lib/siteLinkHealth.js</code><code class="path">scripts/site-health.mjs</code></div>

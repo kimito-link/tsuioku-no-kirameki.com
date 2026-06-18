@@ -105,14 +105,17 @@ graph LR
   HUB --> f18["状態速報の全体マインドマップ"]
   f18 --> f18_0["lib/statusMindmapModel.js"]
   f18 --> f18_1["extension/status-entry.js"]
-  HUB --> f19["サイト健全性検証(リンク切れ防止)"]
-  f19 --> f19_0["lib/siteLinkHealth.js"]
-  f19 --> f19_1["site-health.mjs"]
-  HUB --> f20["影響範囲マップ(変えたら何が壊れるか)"]
-  f20 --> f20_0["feature-map.mjs"]
-  f20 --> f20_1["feature-map/impact-map.md"]
-  HUB --> f21["全体マップ(全地図への入口)"]
-  f21 --> f21_0["MAP.md"]
+  HUB --> f19["状態速報の対処カード(症状→原因→次の一手)"]
+  f19 --> f19_0["lib/statusActionAdvisor.js"]
+  f19 --> f19_1["extension/status-entry.js"]
+  HUB --> f20["サイト健全性検証(リンク切れ防止)"]
+  f20 --> f20_0["lib/siteLinkHealth.js"]
+  f20 --> f20_1["site-health.mjs"]
+  HUB --> f21["影響範囲マップ(変えたら何が壊れるか)"]
+  f21 --> f21_0["feature-map.mjs"]
+  f21 --> f21_1["feature-map/impact-map.md"]
+  HUB --> f22["全体マップ(全地図への入口)"]
+  f22 --> f22_0["MAP.md"]
 ```
 
 ---
@@ -292,6 +295,12 @@ popup の AI診断コピー固有情報を別キーへ書き、status.html(状�
 status.html を開けば今の状態を枝(概要/コメント取得/北極星/過去ログ/健全性/popup診断)で俯瞰。🟢🟡🔴⚪ の badge 付き折りたたみツリー(外部依存ゼロ)
 
 - [`src/lib/statusMindmapModel.js`](../src/lib/statusMindmapModel.js)
+- [`src/extension/status-entry.js`](../src/extension/status-entry.js)
+
+### 状態速報の対処カード(症状→原因→次の一手)  〔診断 / 対処 / 自己解決〕
+既知パターン辞書で fastDiag/popupDiag を照合し「症状→原因(推定)→次の一手」を重大度順カードで提示。直せない原因は status の外と正直に出す(COUNCIL status-allinone)
+
+- `src/lib/statusActionAdvisor.js` ⚠️ **見つからない（消失/リネーム）**
 - [`src/extension/status-entry.js`](../src/extension/status-entry.js)
 
 ### サイト健全性検証(リンク切れ防止)  〔Web / 健全性 / リンク〕
