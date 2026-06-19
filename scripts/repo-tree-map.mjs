@@ -477,6 +477,23 @@ function renderHtml(nodes, files, missing) {
 /** 役割を抽出する対象拡張子(ソースのみ。画像/音声/json 等は役割文を持たない)。 */
 const ROLE_EXT = /\.(mjs|js|ts|jsx|tsx)$/;
 
+/**
+ * データの一生「取得→記録→集計→表示」の背骨(spine)。code-tree の冒頭に出す“流れ”の見出し。
+ * 枝葉(個々の純関数)は下のツリー本体で見るので、ここは各段の代表ファイルだけ(実コードで裏取り済み)。
+ * storage キーの断線検知(broadcaster バグ型)は `npm run feature-map -- --check`(機械ゲート)が担う。
+ * @type {{ id:string, label:string, emoji:string, desc:string, files:string[] }[]}
+ */
+const SPINE_STAGES = [
+  { id: 'acquire', label: '取得', emoji: '📡', desc: 'NDGR(protobuf直読み)+watch DOM観測でコメント/ギフトを集める',
+    files: ['src/extension/content-entry.js', 'src/extension/page-intercept-entry.js'] },
+  { id: 'record', label: '記録', emoji: '💾', desc: 'IndexedDB / chunk / tail バッファへ永続化(記録本体)',
+    files: ['src/extension/content-entry.js', 'src/extension/offscreen-entry.js', 'src/extension/backfill-sw-entry.js'] },
+  { id: 'aggregate', label: '集計', emoji: '🧮', desc: '保存データ→応援レーン/会場/ランキング/プロフィールへ畳み込む',
+    files: ['src/domain', 'src/data', 'src/lib'] },
+  { id: 'display', label: '表示', emoji: '🪟', desc: 'パネル(応援レーン)/会場/状態ページへ描く',
+    files: ['src/extension/popup-entry.js', 'src/extension/venueBar.js', 'src/extension/status-entry.js'] }
+];
+
 /** code-tree から除外するトップ(ツリーが巨大化する生成物/メモ等。SKIP_TOP に加えて)。 */
 const CODE_TREE_SKIP_TOP = new Set([...SKIP_TOP, 'memory', 'council', '.artifacts']);
 
@@ -641,6 +658,19 @@ function renderCodeTreeHtml(root, roles) {
     ? `<div class="banner warn">⚠️ 役割コメントが無いソース ${unknownSrc.length} / ${total} 件 — 赤いファイルの先頭に1行「何をするか」を書けば消えます（AIも人間も迷わない）。</div>`
     : `<div class="banner ok">✅ 全 ${total} ソースに役割コメントあり（毛細血管まで説明済み）。</div>`;
 
+  // 冒頭の「データの流れ(背骨)」= 取得→記録→集計→表示。各段の代表ファイルを出す(枝葉は下のツリー)。
+  const spineCards = SPINE_STAGES.map((s, i) => {
+    const fileChips = s.files.map((f) => `<code class="sf">${escapeHtml(f)}</code>`).join('');
+    const arrow = i < SPINE_STAGES.length - 1 ? '<div class="sarrow">↓</div>' : '';
+    return `<div class="sstage"><div class="shead"><span class="snum">${i + 1}</span>`
+      + `<span class="semoji">${escapeHtml(s.emoji)}</span><span class="sname">${escapeHtml(s.label)}</span></div>`
+      + `<div class="sdesc">${escapeHtml(s.desc)}</div><div class="sfiles">${fileChips}</div></div>${arrow}`;
+  }).join('');
+  const spineHtml = `<details class="spine" open><summary>🦴 データの流れ（取得→記録→集計→表示）</summary>`
+    + `<div class="spinebody">${spineCards}</div>`
+    + `<div class="spinenote">この4段が根幹。値が作られても次の段へ届かない「断線」（過去の broadcaster バグ型）は`
+    + ` <code>npm run feature-map -- --check</code> が機械的に検知して止めます。各ファイルの中身は下のツリーで。</div></details>`;
+
   return `<!DOCTYPE html>
 <html lang="ja">
 <head>
@@ -662,6 +692,22 @@ function renderCodeTreeHtml(root, roles) {
   .banner{ border-radius:10px; padding:10px 14px; font-size:13px; margin:0 0 16px; line-height:1.6; }
   .banner.ok{ background:rgba(47,125,74,.16); border:1px solid var(--ok); color:#b8f0cf; }
   .banner.warn{ background:rgba(181,72,95,.16); border:1px solid var(--warn); color:#f6c7d2; }
+  details.spine{ background:var(--panel); border:1px solid var(--line); border-radius:12px;
+    padding:6px 16px 14px; margin:0 0 18px; }
+  details.spine > summary{ cursor:pointer; font-size:15px; font-weight:700; color:#fff; padding:8px 0; }
+  .spinebody{ display:flex; flex-direction:column; gap:0; }
+  .sstage{ background:rgba(255,255,255,.03); border:1px solid var(--line); border-radius:10px; padding:9px 13px; }
+  .shead{ display:flex; align-items:center; gap:9px; }
+  .snum{ display:inline-flex; align-items:center; justify-content:center; width:22px; height:22px;
+    border-radius:50%; background:var(--tag-bg); border:1px solid var(--tag-bd); color:var(--tag-ink);
+    font-size:12px; font-weight:700; }
+  .semoji{ font-size:16px; } .sname{ font-size:15px; font-weight:700; color:#fff; }
+  .sdesc{ font-size:12px; color:var(--sub); margin:4px 0 7px; line-height:1.55; }
+  .sfiles{ display:flex; gap:6px; flex-wrap:wrap; }
+  .sf{ font-family:"Menlo","Consolas",monospace; font-size:11px; background:rgba(255,255,255,.06);
+    border:1px solid var(--line); border-radius:6px; padding:2px 7px; color:#bcd2f6; }
+  .sarrow{ text-align:center; color:var(--tag-bd); font-size:15px; line-height:1.4; }
+  .spinenote{ font-size:11.5px; color:var(--muted); margin-top:10px; line-height:1.6; }
   details.d{ margin:2px 0; }
   details.d > summary{ cursor:pointer; font-family:"Menlo","Consolas",monospace; font-size:13px;
     color:#cfe0ff; padding:3px 6px; border-radius:6px; list-style:none; }
@@ -686,12 +732,13 @@ function renderCodeTreeHtml(root, roles) {
 <div class="wrap">
   <h1>🌳 コード全ツリー（毛細血管まで）</h1>
   <p class="meta">
-    全ファイルを枝分かれで網羅。各ファイルの右に「何をするか」（先頭コメントから自動抽出）。
+    まず上の「データの流れ」で根幹を掴み、下のツリーで全ファイルの「何をするか」（先頭コメントから自動抽出）まで。
     <b>畳めば俯瞰・開けば毛細血管</b>。<code>scripts/repo-tree-map.mjs</code> が自動生成（手編集しない・no CDN）。<br>
-    全地図の入口: <a href="MAP.md">MAP.md</a> ／ 根幹の流れ: <a href="spine-map.html">spine-map.html</a> ／
-    役割の逆引き: <a href="repo-tree-map.html">repo-tree-map.html</a> ／ AI用テキスト: <a href="code-tree.md">code-tree.md</a>。
+    全地図の入口: <a href="MAP.md">MAP.md</a> ／ 役割の逆引き: <a href="repo-tree-map.html">repo-tree-map.html</a> ／
+    AI用テキスト: <a href="code-tree.md">code-tree.md</a>。
   </p>
   ${banner}
+  ${spineHtml}
   <div class="ctrl">
     <button onclick="document.querySelectorAll('details.d').forEach(d=>d.open=true)">全部ひらく</button>
     <button onclick="document.querySelectorAll('details.d').forEach(d=>d.open=false)">全部とじる</button>
@@ -724,12 +771,27 @@ function renderCodeTreeMd(root, roles) {
   lines.push('> 全ファイルと「何をするか」（各ファイルの先頭コメントから自動抽出）。視覚版: [code-tree.html](code-tree.html)。');
   lines.push('> ⚠️ の付いたソースは先頭に役割コメントが無い＝説明を1行足すと AI も人間も迷わない。');
   lines.push('');
+  // データの流れ(背骨)= 取得→記録→集計→表示。根幹を先に。
+  lines.push('## 🦴 データの流れ（取得→記録→集計→表示）');
+  lines.push('');
+  for (let i = 0; i < SPINE_STAGES.length; i++) {
+    const s = SPINE_STAGES[i];
+    lines.push(`${i + 1}. ${s.emoji} **${s.label}** — ${s.desc}`);
+    for (const f of s.files) lines.push(`   - \`${f}\``);
+    if (i < SPINE_STAGES.length - 1) lines.push('   ↓');
+  }
+  lines.push('');
+  lines.push('> 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。');
+  lines.push('');
+
   lines.push(unknownSrc.length
     ? `## ⚠️ 役割コメントが無いソース ${unknownSrc.length} / ${total} 件`
     : `✅ 全 ${total} ソースに役割コメントあり。`);
   if (unknownSrc.length) {
     for (const f of unknownSrc) lines.push(`- \`${f}\``);
   }
+  lines.push('');
+  lines.push('## 全ファイルツリー');
   lines.push('');
 
   const walk = (node, depth) => {
