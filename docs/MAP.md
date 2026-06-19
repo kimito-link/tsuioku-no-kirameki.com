@@ -2,7 +2,19 @@
 
 > このプロジェクトの「地図・診断・検証」への**唯一の入口**。迷ったらまずここ。
 > 各リンク先は `npm run site-health` がリンク切れを検証しているので、リンクが死んだら verify で落ちる（腐らない）。
-> 最終更新 2026-06-18。
+> 最終更新 2026-06-20。
+
+---
+
+## 👀 まず開く（ブラウザで図として全部わかる・md を読まなくていい）
+
+| ブラウザで開く | 何が見える |
+|---|---|
+| 🌳 **[code-tree.html](code-tree.html)** | **全ファイルのツリー＋各ファイルが「何をするか」**。畳めば俯瞰・開けば毛細血管。役割コメントが無いファイルは赤＝改善対象が一目で。 |
+| 🦴 **[spine-map.html](spine-map.html)** | データの根幹（取得→記録→集計→表示）の**背骨1本**。storageキー（血管）が切れていたら赤。 |
+| 🎨 [repo-tree-map.html](repo-tree-map.html) | ディレクトリ役割＋機能逆引きの色付きカード。 |
+
+> AI に渡すなら同じ内容のテキスト版: [code-tree.md](code-tree.md) ／ [spine-map.md](spine-map.md)。
 
 ---
 
@@ -10,6 +22,7 @@
 
 | 見たいこと | 開くファイル | これは何 |
 |---|---|---|
+| **🦴 データの根幹（取得→記録→集計→表示）を1本で** | [spine-map.html](spine-map.html) ／ [.md](spine-map.md) | コードの背骨。線（storageキー＝血管）が**つながっているか**で「値が届かない断線」（broadcaster バグ型）に気づける |
 | **「○○を司るのはどこ？」** | [repo-tree-map.md](repo-tree-map.md) の「機能逆引き索引」 | 機能 → 担当ファイル（例: 送信→commentSubmitConfirm.js） |
 | **「これどこに置く？」** | [repo-tree-map.md](repo-tree-map.md) の「ディレクトリマップ」 | 場所 → 役割（色・速度・コメント・レポート…） |
 | **全体像をマインドマップで** | [repo-tree-map.md](repo-tree-map.md) 冒頭 | Mermaid（GitHub で図表示・ツリー型＋機能逆引き型） |

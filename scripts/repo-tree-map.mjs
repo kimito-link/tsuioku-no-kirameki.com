@@ -23,6 +23,8 @@ const ROOT = resolve(process.cwd());
 const OUT_DIR = join(ROOT, 'docs');
 const OUT_MD = join(OUT_DIR, 'repo-tree-map.md');
 const OUT_HTML = join(OUT_DIR, 'repo-tree-map.html');
+const OUT_CODE_TREE_HTML = join(OUT_DIR, 'code-tree.html');
+const OUT_CODE_TREE_MD = join(OUT_DIR, 'code-tree.md');
 
 /** ツリーに含めるトップレベル(これ以外=ドット系/生成物は除外) */
 const MAX_DEPTH = 2; // トップ + 2 階層まで(src/lib/... は src/lib で止める)
@@ -463,6 +465,293 @@ function renderHtml(nodes, files, missing) {
 `;
 }
 
+/* ============================================================================
+ * 完全網羅ツリー(code-tree): 全ファイルを「毛細血管」まで枝分かれで描く(2026-06-20 ユーザー要望)。
+ *   添付イメージのツリー構造で、各ファイルが「何をするか」を AI も人間も開けば分かる。
+ *   役割は各ファイルの【先頭コメント】から自動抽出(src の 97% が既に持っている=人手辞書ゼロ)。
+ *   役割が取れないファイルは赤=「説明が無い箇所」が一目で分かる(=改善対象を晒す)。
+ *   出力 docs/code-tree.html(ネイティブ <details> 折りたたみ・依存ゼロ・no CDN)+ AI用 docs/code-tree.md。
+ *   全部ひらけば毛細血管・畳めば俯瞰。`--check` で腐り検知(verify:cc)。
+ * ========================================================================== */
+
+/** 役割を抽出する対象拡張子(ソースのみ。画像/音声/json 等は役割文を持たない)。 */
+const ROLE_EXT = /\.(mjs|js|ts|jsx|tsx)$/;
+
+/** code-tree から除外するトップ(ツリーが巨大化する生成物/メモ等。SKIP_TOP に加えて)。 */
+const CODE_TREE_SKIP_TOP = new Set([...SKIP_TOP, 'memory', 'council', '.artifacts']);
+
+/** code-tree から除外するパス断片(ビルド成果物=役割コメントが無くて当然=改善対象ではない)。 */
+const CODE_TREE_SKIP_PATH = [/(^|\/)dist\//, /\.min\.js$/];
+
+/**
+ * code-tree(完全網羅ツリー)に載せるファイルか。生成物 dist は除外する。
+ * @param {string} f ROOT 相対パス
+ */
+function inCodeTree(f) {
+  const parts = f.split('/');
+  if (parts.length === 1) return false; // ルート直下は別扱い
+  if (CODE_TREE_SKIP_TOP.has(parts[0])) return false;
+  if (CODE_TREE_SKIP_PATH.some((re) => re.test(f))) return false;
+  return true;
+}
+
+/**
+ * ファイルの先頭コメントから「役割の1行」を抽出する純関数。
+ *   //  行コメントが続く塊、または /* ... *\/ ブロックの最初の意味ある行を拾う。
+ *   ファイル名の再掲(例 "// foo.js")や @ts-... ディレクティブ、区切り線(===,---,***)は飛ばす。
+ * 取れなければ null(=役割不明=赤)。
+ * @param {string} text ファイル内容(先頭数 KB で十分)
+ * @param {string} fileName ベース名(再掲スキップ用)
+ * @returns {string|null}
+ */
+function extractRoleDoc(text, fileName) {
+  const head = text.slice(0, 4000);
+  /** @type {string[]} */
+  const lines = [];
+  // 先頭の行コメント(// …)が何行続いても、その後に /** */ ブロックがあれば両方を候補に集める。
+  // 例: 1行目 `// @ts-nocheck …` → 2行目から `/** 役割 */` のパターン(personTileDom 型)を救う。
+  let rest = head.trimStart();
+  // (1) 連続する行コメント塊を集める
+  for (;;) {
+    const m = /^\/\/+[^\n]*\n?/.exec(rest);
+    if (!m) break;
+    lines.push(m[0].replace(/^\/\/+\s?/, '').trim());
+    rest = rest.slice(m[0].length).replace(/^\s*\n/, '');
+  }
+  // (2) 続けてブロックコメント /* ... */ があれば中身も集める
+  rest = rest.trimStart();
+  if (rest.startsWith('/*')) {
+    const end = rest.indexOf('*/');
+    const block = end >= 0 ? rest.slice(2, end) : rest.slice(2);
+    for (const l of block.split('\n')) lines.push(l.replace(/^\s*\*+\s?/, '').trim());
+  }
+
+  const base = fileName.replace(ROLE_EXT, '');
+  const isFileName = (s) => {
+    const bare = s.replace(/[`'"]/g, '').trim();
+    return bare.toLowerCase() === fileName.toLowerCase() || bare.toLowerCase() === base.toLowerCase();
+  };
+  for (const l of lines) {
+    if (!l) continue;
+    if (/^[=\-*_~#]{3,}$/.test(l)) continue; // 区切り線
+    if (/^@(ts-|type|param|returns|typedef|module|file|fileoverview)/.test(l)) continue; // JSDoc/TS ディレクティブ
+    if (/^(eslint|prettier|global|import|export)\b/.test(l)) continue;
+    if (isFileName(l)) continue; // ファイル名だけの行(crowdRasterizer.js / // foo.js)はスキップ
+    // 行頭にファイル名が再掲されている場合だけ除去(末尾の .js 等は本文なので消さない)
+    const noFile = l.replace(/^[`'"]?[\w-]+\.(mjs|js|ts|jsx|tsx)[`'"]?\s*[:：—-]\s*/i, '').trim();
+    const cand = noFile || l;
+    if (isFileName(cand)) continue;
+    if (cand.length >= 4) return cand.length > 110 ? cand.slice(0, 108) + '…' : cand;
+  }
+  return null;
+}
+
+/**
+ * 全ファイルから「ディレクトリ→ファイル」の完全ツリーを組む(深さ無制限=毛細血管)。
+ * @param {string[]} files git 追跡ファイル(ROOT 相対・/区切り)
+ * @returns {{ name: string, path: string, dirs: Map<string,any>, files: string[] }} root ノード
+ */
+function buildFullTree(files) {
+  const root = { name: '', path: '', dirs: new Map(), files: [] };
+  for (const f of files) {
+    if (!inCodeTree(f)) continue;
+    const parts = f.split('/');
+    let cur = root;
+    for (let i = 0; i < parts.length - 1; i++) {
+      const seg = parts[i];
+      if (!cur.dirs.has(seg)) {
+        cur.dirs.set(seg, { name: seg, path: parts.slice(0, i + 1).join('/'), dirs: new Map(), files: [] });
+      }
+      cur = cur.dirs.get(seg);
+    }
+    cur.files.push(parts[parts.length - 1]);
+  }
+  return root;
+}
+
+/**
+ * ツリーの各ファイルの役割を抽出してマップに。役割不明(ソースなのに取れない)も数える。
+ * @param {string[]} files
+ * @returns {{ roleByPath: Map<string,string|null>, unknownSrc: string[], total: number }}
+ */
+function collectFileRoles(files) {
+  /** @type {Map<string, string|null>} */
+  const roleByPath = new Map();
+  const unknownSrc = [];
+  let total = 0;
+  for (const f of files) {
+    if (!inCodeTree(f)) continue;
+    const parts = f.split('/');
+    const base = parts[parts.length - 1];
+    if (!ROLE_EXT.test(base) || base.endsWith('.test.js') || base.endsWith('.test.ts')) {
+      roleByPath.set(f, null);
+      continue;
+    }
+    total += 1;
+    let role = null;
+    try {
+      role = extractRoleDoc(readFileSync(join(ROOT, f), 'utf8'), base);
+    } catch { role = null; }
+    roleByPath.set(f, role);
+    if (!role) unknownSrc.push(f);
+  }
+  return { roleByPath, unknownSrc, total };
+}
+
+/** ディレクトリノードの総ファイル数(再帰)。畳んだ summary に件数を出す用。 */
+function countTreeFiles(node) {
+  let n = node.files.length;
+  for (const d of node.dirs.values()) n += countTreeFiles(d);
+  return n;
+}
+
+/**
+ * 完全網羅ツリーの HTML をネイティブ <details> で再帰生成(添付イメージの枝分かれ・依存ゼロ)。
+ * @param {ReturnType<typeof buildFullTree>} root
+ * @param {ReturnType<typeof collectFileRoles>} roles
+ */
+function renderCodeTreeHtml(root, roles) {
+  const { roleByPath, unknownSrc, total } = roles;
+
+  /** 1ディレクトリ(枝)を <details> で。子ディレクトリ→ファイルの順。 */
+  const renderDir = (node, depth) => {
+    const dirNames = [...node.dirs.keys()].sort();
+    const fileNames = [...node.files].sort();
+    const kids = [];
+    for (const dn of dirNames) kids.push(renderDir(node.dirs.get(dn), depth + 1));
+    for (const fn of fileNames) {
+      const path = node.path ? `${node.path}/${fn}` : fn;
+      const role = roleByPath.get(path);
+      const isSrc = ROLE_EXT.test(fn) && !fn.endsWith('.test.js') && !fn.endsWith('.test.ts');
+      const unknown = isSrc && !role;
+      const roleTxt = role
+        ? `<span class="frole">${escapeHtml(role)}</span>`
+        : unknown
+          ? '<span class="frole miss">⚠️ 役割コメント無し（先頭に1行説明を)</span>'
+          : '';
+      kids.push(`<div class="f${unknown ? ' miss' : ''}"><span class="fn">${escapeHtml(fn)}</span>${roleTxt}</div>`);
+    }
+    const count = countTreeFiles(node);
+    const open = depth <= 1 ? ' open' : '';
+    return `<details class="d"${open}><summary>📁 ${escapeHtml(node.name)}/ <span class="cnt">${count}</span></summary><div class="branch">${kids.join('')}</div></details>`;
+  };
+
+  const topDirsHtml = [...root.dirs.keys()].sort().map((dn) => renderDir(root.dirs.get(dn), 1)).join('\n');
+  const banner = unknownSrc.length
+    ? `<div class="banner warn">⚠️ 役割コメントが無いソース ${unknownSrc.length} / ${total} 件 — 赤いファイルの先頭に1行「何をするか」を書けば消えます（AIも人間も迷わない）。</div>`
+    : `<div class="banner ok">✅ 全 ${total} ソースに役割コメントあり（毛細血管まで説明済み）。</div>`;
+
+  return `<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>コード全ツリー（毛細血管まで）— 君斗りんくの追憶のきらめき</title>
+<style>
+  :root{ --bg:#0f1115; --panel:#161922; --ink:#e6e8ec; --sub:#aab0bb; --muted:#7b8390; --line:#2a2f3a;
+    --ok:#2f7d4a; --warn:#b5485f; --tag-bg:#1d2740; --tag-bd:#3f5b8c; --tag-ink:#bcd2f6; }
+  body{ margin:0; padding:28px 20px; background:var(--bg); color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Hiragino Sans","Yu Gothic UI",sans-serif; }
+  .wrap{ max-width:1040px; margin:0 auto; }
+  h1{ font-size:21px; margin:0 0 4px; }
+  .meta{ color:var(--muted); font-size:12px; margin:0 0 14px; line-height:1.6; }
+  .meta a{ color:#7fa8e0; }
+  .ctrl{ margin:0 0 14px; display:flex; gap:8px; }
+  .ctrl button{ background:var(--tag-bg); border:1px solid var(--tag-bd); color:var(--tag-ink);
+    border-radius:8px; padding:5px 12px; font-size:12px; cursor:pointer; }
+  .banner{ border-radius:10px; padding:10px 14px; font-size:13px; margin:0 0 16px; line-height:1.6; }
+  .banner.ok{ background:rgba(47,125,74,.16); border:1px solid var(--ok); color:#b8f0cf; }
+  .banner.warn{ background:rgba(181,72,95,.16); border:1px solid var(--warn); color:#f6c7d2; }
+  details.d{ margin:2px 0; }
+  details.d > summary{ cursor:pointer; font-family:"Menlo","Consolas",monospace; font-size:13px;
+    color:#cfe0ff; padding:3px 6px; border-radius:6px; list-style:none; }
+  details.d > summary::-webkit-details-marker{ display:none; }
+  details.d > summary::before{ content:"▸ "; color:var(--muted); }
+  details.d[open] > summary::before{ content:"▾ "; }
+  details.d > summary:hover{ background:rgba(255,255,255,.04); }
+  .cnt{ color:var(--muted); font-size:11px; font-family:inherit; }
+  .branch{ margin-left:14px; padding-left:12px; border-left:1px solid var(--line); }
+  .f{ display:flex; gap:10px; align-items:baseline; padding:2px 6px; border-radius:6px; }
+  .f:hover{ background:rgba(255,255,255,.03); }
+  .f.miss{ background:rgba(181,72,95,.08); }
+  .fn{ font-family:"Menlo","Consolas",monospace; font-size:12px; color:var(--ink); flex:0 0 auto; min-width:180px; }
+  .frole{ font-size:12px; color:var(--sub); line-height:1.5; }
+  .frole.miss{ color:#f6c7d2; }
+  .legend{ margin-top:20px; font-size:12.5px; color:var(--sub); background:var(--panel);
+    border:1px solid var(--line); border-radius:12px; padding:14px 18px; line-height:1.9; }
+  .legend b{ color:var(--ink); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>🌳 コード全ツリー（毛細血管まで）</h1>
+  <p class="meta">
+    全ファイルを枝分かれで網羅。各ファイルの右に「何をするか」（先頭コメントから自動抽出）。
+    <b>畳めば俯瞰・開けば毛細血管</b>。<code>scripts/repo-tree-map.mjs</code> が自動生成（手編集しない・no CDN）。<br>
+    全地図の入口: <a href="MAP.md">MAP.md</a> ／ 根幹の流れ: <a href="spine-map.html">spine-map.html</a> ／
+    役割の逆引き: <a href="repo-tree-map.html">repo-tree-map.html</a> ／ AI用テキスト: <a href="code-tree.md">code-tree.md</a>。
+  </p>
+  ${banner}
+  <div class="ctrl">
+    <button onclick="document.querySelectorAll('details.d').forEach(d=>d.open=true)">全部ひらく</button>
+    <button onclick="document.querySelectorAll('details.d').forEach(d=>d.open=false)">全部とじる</button>
+  </div>
+  ${topDirsHtml}
+  <div class="legend">
+    <b>読み方</b>: 📁=ディレクトリ（クリックで開閉・数字=配下ファイル数）。その下が中のファイルと役割。<br>
+    <b style="color:#f6c7d2">赤いファイル</b>=先頭に役割コメントが無いソース＝「何をするか」が説明されていない箇所。
+    そのファイルの先頭に1行コメントを足せば緑になり、AIも人間も迷わなくなる（=エラーの芽を消す）。<br>
+    役割は各ファイルの先頭コメントから機械抽出（人手辞書ゼロ＝腐らない）。<code>npm run tree-map -- --check</code> が
+    verify:cc でこのツリーの最新性を検証する。
+  </div>
+</div>
+</body>
+</html>
+`;
+}
+
+/**
+ * 完全網羅ツリーの Markdown(AI/GitHub 用のテキスト正本)。インデントでツリーを表す。
+ * @param {ReturnType<typeof buildFullTree>} root
+ * @param {ReturnType<typeof collectFileRoles>} roles
+ */
+function renderCodeTreeMd(root, roles) {
+  const { roleByPath, unknownSrc, total } = roles;
+  const lines = [];
+  lines.push('# 🌳 コード全ツリー（毛細血管まで・自動生成）');
+  lines.push('');
+  lines.push('> `npm run tree-map` で再生成。手で編集しない（`--check` が verify:cc で腐りを検知）。');
+  lines.push('> 全ファイルと「何をするか」（各ファイルの先頭コメントから自動抽出）。視覚版: [code-tree.html](code-tree.html)。');
+  lines.push('> ⚠️ の付いたソースは先頭に役割コメントが無い＝説明を1行足すと AI も人間も迷わない。');
+  lines.push('');
+  lines.push(unknownSrc.length
+    ? `## ⚠️ 役割コメントが無いソース ${unknownSrc.length} / ${total} 件`
+    : `✅ 全 ${total} ソースに役割コメントあり。`);
+  if (unknownSrc.length) {
+    for (const f of unknownSrc) lines.push(`- \`${f}\``);
+  }
+  lines.push('');
+
+  const walk = (node, depth) => {
+    const pad = '  '.repeat(depth);
+    for (const dn of [...node.dirs.keys()].sort()) {
+      const child = node.dirs.get(dn);
+      lines.push(`${pad}- 📁 **${dn}/** (${countTreeFiles(child)})`);
+      walk(child, depth + 1);
+    }
+    for (const fn of [...node.files].sort()) {
+      const path = node.path ? `${node.path}/${fn}` : fn;
+      const role = roleByPath.get(path);
+      const isSrc = ROLE_EXT.test(fn) && !fn.endsWith('.test.js') && !fn.endsWith('.test.ts');
+      const suffix = role ? ` — ${role}` : (isSrc ? ' — ⚠️ 役割コメント無し' : '');
+      lines.push(`${pad}- \`${fn}\`${suffix}`);
+    }
+  };
+  walk(root, 0);
+  lines.push('');
+  return lines.join('\n');
+}
+
 /** ---- main ---- */
 function generate() {
   const files = trackedFiles();
@@ -470,15 +759,19 @@ function generate() {
   const { md, missing } = renderMarkdown(nodes, files);
   const html = renderHtml(nodes, files, missing);
   const dead = featureDeadPaths(new Set(files));
-  return { md, html, missing, dead };
+  const fullTree = buildFullTree(files);
+  const roles = collectFileRoles(files);
+  const codeTreeHtml = renderCodeTreeHtml(fullTree, roles);
+  const codeTreeMd = renderCodeTreeMd(fullTree, roles);
+  return { md, html, missing, dead, codeTreeHtml, codeTreeMd };
 }
 
 const isCheck = process.argv.includes('--check');
-const { md, html, missing, dead } = generate();
+const { md, html, missing, dead, codeTreeHtml, codeTreeMd } = generate();
 
 if (isCheck) {
   let fail = false;
-  for (const [path, content] of [[OUT_MD, md], [OUT_HTML, html]]) {
+  for (const [path, content] of [[OUT_MD, md], [OUT_HTML, html], [OUT_CODE_TREE_HTML, codeTreeHtml], [OUT_CODE_TREE_MD, codeTreeMd]]) {
     const cur = existsSync(path) ? readFileSync(path, 'utf8') : '';
     if (cur !== content) {
       fail = true;
@@ -499,7 +792,9 @@ if (isCheck) {
   mkdirSync(OUT_DIR, { recursive: true });
   writeFileSync(OUT_MD, md, 'utf8');
   writeFileSync(OUT_HTML, html, 'utf8');
-  console.log(`[repo-tree-map] wrote ${OUT_MD} and ${OUT_HTML}`);
+  writeFileSync(OUT_CODE_TREE_HTML, codeTreeHtml, 'utf8');
+  writeFileSync(OUT_CODE_TREE_MD, codeTreeMd, 'utf8');
+  console.log(`[repo-tree-map] wrote ${OUT_MD}, ${OUT_HTML}, ${OUT_CODE_TREE_HTML}, ${OUT_CODE_TREE_MD}`);
   if (missing.length) {
     console.warn(`[repo-tree-map] 役割未記入 ${missing.length} 件(ROLES に追記推奨): ${missing.join(', ')}`);
   }

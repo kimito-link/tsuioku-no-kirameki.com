@@ -53,6 +53,29 @@ function emit(filename, content) {
 }
 
 /**
+ * docs/ 直下(feature-map サブフォルダではない)へ生成物を書く/比較する。
+ * spine-map は MAP.md / repo-tree-map.html と同階層に置く(全地図が docs/ 直下に並ぶ)。
+ * @param {string} filename docs/ 相対のファイル名
+ * @param {string} content
+ */
+function emitDocs(filename, content) {
+  const full = join(ROOT, 'docs', filename);
+  if (CHECK_MODE) {
+    let cur = '';
+    try {
+      cur = readFileSync(full, 'utf8');
+    } catch {
+      cur = '';
+    }
+    if (cur !== content) {
+      checkProblems.push(`drift: docs/${filename} が最新ではありません(\`npm run feature-map\` を実行してコミット)`);
+    }
+  } else {
+    writeFileSync(full, content, 'utf8');
+  }
+}
+
+/**
  * build.mjs と同じ entry → 機能名の対応表(機能境界の正本)。
  * build.mjs が entry を増やしたらここも足す(意図的に手で名付ける=機能名は人間が決める)。
  * @type {{ entry: string, feature: string, label: string }[]}
@@ -68,6 +91,49 @@ const FEATURES = [
   { entry: 'src/extension/page-intercept-entry.js', feature: 'page-intercept', label: 'ページ傍受' },
   { entry: 'app/app.js', feature: 'web-status', label: 'Web版 状態(スマホ)' }
 ];
+
+/**
+ * 「コードの背骨(spine)」= データの一生を4段に削いだ正本(2026-06-20 会議+世界事例リサーチ)。
+ *
+ * 狙い: 既存マップ(repo-tree-map=ディレクトリ羅列 / feature-map=網羅依存図 / storage-bus=全キー一覧)は
+ *   どれも「網羅型」で細かい。今回ほしいのは枝葉を削いだ **背骨1本**=「取得→記録→集計→表示」を、
+ *   ブラウザで開けば10秒で追える図。データの受け渡しは chrome.storage キー(=血管)で起きる断線
+ *   (broadcaster バグ型)を赤で晒す。
+ *
+ * 設計判断(リサーチ結論):
+ *   - 節(stage)は人間が決める正本(枝葉=個々の純関数は載せない)。`file` は実在必須=`--check` で消失検知。
+ *   - 段間を渡る storage キー(`wires`)は人間が「背骨の血管」を選ぶが、producer/consumer と断線色は
+ *     既存解析(keyMap)から機械が埋める=辞書はキー名だけ・状態は自動(腐らない)。
+ *   - wires のキー名・file はすべて実コードで裏取り済み(storage-bus.md の実データと一致)。
+ *
+ * 節を足す/変えるとき: 実際に grep して「その段の代表ファイル」「段間を渡る実キー」を確かめてから直す。
+ * @type {{
+ *   stages: { id: string, label: string, emoji: string, desc: string, files: string[] }[],
+ *   wires: { key: string, from: string, to: string, note: string }[]
+ * }}
+ */
+const SPINE = {
+  stages: [
+    { id: 'acquire', label: '取得', emoji: '📡', desc: 'NDGR(protobuf直読み)+watch DOM観測でコメント/ギフトを集める',
+      files: ['src/extension/content-entry.js', 'src/extension/page-intercept-entry.js'] },
+    { id: 'record', label: '記録', emoji: '💾', desc: 'IndexedDB / chunk / tail バッファへ永続化(記録本体)',
+      files: ['src/extension/content-entry.js', 'src/extension/offscreen-entry.js', 'src/extension/backfill-sw-entry.js'] },
+    { id: 'aggregate', label: '集計', emoji: '🧮', desc: '保存データ→応援レーン/会場/ランキング/プロフィールへ畳み込む',
+      files: ['src/domain', 'src/data', 'src/lib'] },
+    { id: 'display', label: '表示', emoji: '🪟', desc: 'パネル(応援レーン)/会場/状態ページへ描く',
+      files: ['src/extension/popup-entry.js', 'src/extension/venueBar.js', 'src/extension/status-entry.js'] }
+  ],
+  // 段間を渡る「血管」= 代表 storage キー(全て実コードで裏取り・storage-bus.md と一致)。
+  // producer/consumer の実体・断線判定は keyMap から自動で埋める(ここはキー名と意味だけ)。
+  wires: [
+    { key: 'KEY_AI_SHARE_FAST_DIAG', from: 'acquire', to: 'display', note: '診断スナップショット(content→popup/status)' },
+    { key: 'KEY_COMMENT_PANEL_STATUS', from: 'record', to: 'display', note: '記録パネルの状態(content→popup)' },
+    { key: 'fn:chunkIndexKey', from: 'record', to: 'display', note: 'chunk 索引(content→popup)' },
+    { key: 'KEY_BACKFILL_PROGRESS', from: 'record', to: 'display', note: '過去ログ取得の進捗(sw/content→popup)' },
+    { key: 'KEY_USER_COMMENT_PROFILE_CACHE', from: 'aggregate', to: 'display', note: 'コメント者プロフィール(content→comeview/popup/venue)' },
+    { key: 'KEY_LIVE_BROADCASTER_CTX', from: 'aggregate', to: 'display', note: '配信者本人の身元(content→venue)=過去の断線バグの経路' }
+  ]
+};
 
 /** 解析から除外するパス断片。 */
 const EXCLUDE = [/\.test\.js$/, /node_modules/];
@@ -303,6 +369,7 @@ async function main() {
   writeFeatureMaps(reach, access, f2f);
   writeImpactMap(f2f);
   writeIndex(keyMap);
+  writeSpineMap(keyMap, sourceFiles);
 
   if (CHECK_MODE) {
     if (checkProblems.length) {
@@ -313,6 +380,277 @@ async function main() {
     return;
   }
   console.log(`feature-map: generated ${FEATURES.length} feature maps + storage-bus + impact-map into docs/feature-map/`);
+}
+
+/* ============================================================================
+ * 背骨マップ(spine-map): データの一生「取得→記録→集計→表示」を1本の縦図に削ぐ。
+ *   - docs/spine-map.html … ブラウザで開けば図(inline SVG・依存ゼロ・no CDN)。
+ *   - docs/spine-map.md  … AI/GitHub 用のテキスト正本(同じ内容)。
+ * SPINE 辞書(人間が決める節と血管)+ keyMap(機械が埋める producer/consumer/断線)から生成。
+ * ========================================================================== */
+
+/** HTML エスケープ(テキストノード/属性両用の最小)。 */
+function esc(s) {
+  return String(s == null ? '' : s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+/**
+ * SPINE.stages の各節が「実在するファイル/ディレクトリを持つか」を判定する。
+ * 1つも実在しなければ節が腐っている=`--check` で落とす(リサーチ: 空ルールは no-op になる前に殺す)。
+ * @param {string[]} sourceFiles ROOT 相対の全 src/app ファイル
+ * @returns {{ stage: typeof SPINE.stages[number], presentFiles: string[], missingFiles: string[] }[]}
+ */
+function resolveSpineStages(sourceFiles) {
+  return SPINE.stages.map((stage) => {
+    const presentFiles = [];
+    const missingFiles = [];
+    for (const f of stage.files) {
+      // ディレクトリ指定(src/lib 等)は配下に1つでもファイルがあれば実在とみなす。
+      const isDir = !f.endsWith('.js');
+      const exists = isDir
+        ? sourceFiles.some((sf) => sf === f || sf.startsWith(f + '/'))
+        : sourceFiles.includes(f);
+      if (exists) presentFiles.push(f);
+      else missingFiles.push(f);
+    }
+    return { stage, presentFiles, missingFiles };
+  });
+}
+
+/**
+ * SPINE.wires の各血管の接続状態を keyMap から判定する。
+ *   connected … producer も consumer も居る(正常)
+ *   broken    … 片側しか居ない(broadcaster バグ型=赤)
+ *   missing   … キー自体が解析に出てこない(辞書が腐っている疑い=要再確認)
+ * @param {Map<string, { producers: Set<string>, consumers: Set<string> }>} keyMap
+ * @returns {{ wire: typeof SPINE.wires[number], status: 'connected'|'broken'|'missing', producers: string[], consumers: string[] }[]}
+ */
+function resolveSpineWires(keyMap) {
+  return SPINE.wires.map((wire) => {
+    const entry = keyMap.get(wire.key);
+    if (!entry) return { wire, status: /** @type {const} */ ('missing'), producers: [], consumers: [] };
+    const producers = [...entry.producers].sort();
+    const consumers = [...entry.consumers].sort();
+    const status = producers.length && consumers.length
+      ? /** @type {const} */ ('connected')
+      : /** @type {const} */ ('broken');
+    return { wire, status, producers, consumers };
+  });
+}
+
+/** ファイル名だけ(パスの末尾)に短縮。表示を軽くする。 */
+function baseName(p) {
+  return String(p).split('/').pop();
+}
+
+/**
+ * 背骨の HTML(inline SVG)を組み立てる。縦に4段の節カード、節間に血管(矢印+キー名)。
+ * 断線(broken/missing)は赤。依存ゼロ(素の HTML+CSS+inline SVG・no CDN)。
+ * @param {ReturnType<typeof resolveSpineStages>} stages
+ * @param {ReturnType<typeof resolveSpineWires>} wires
+ */
+function buildSpineHtml(stages, wires) {
+  const brokenWires = wires.filter((w) => w.status !== 'connected');
+  const missingStageFiles = stages.flatMap((s) => s.missingFiles);
+  const banner = brokenWires.length || missingStageFiles.length
+    ? `<div class="banner warn">⚠️ 断線の疑い ${brokenWires.length} 件 / 節ファイル消失 ${missingStageFiles.length} 件 — 下の赤い血管・節を確認。</div>`
+    : '<div class="banner ok">✅ 背骨の血管はすべて producer/consumer 両側がつながっています。</div>';
+
+  // 各段カード(節)。
+  const stageCards = stages.map(({ stage, presentFiles, missingFiles }, i) => {
+    const wiresOut = wires.filter((w) => w.wire.from === stage.id);
+    const wireRows = wiresOut.map((w) => {
+      const toLabel = SPINE.stages.find((s) => s.id === w.wire.to)?.label || w.wire.to;
+      const cls = w.status === 'connected' ? 'wire ok' : 'wire bad';
+      const statusTxt = w.status === 'connected' ? 'つながっている'
+        : w.status === 'broken' ? '⚠️ 片側のみ(断線の疑い)' : '⚠️ 解析に出ない(辞書要確認)';
+      const detail = w.status === 'connected'
+        ? `書: ${w.producers.map(baseName).join(', ')} → 読: ${w.consumers.map(baseName).join(', ')}`
+        : w.status === 'broken'
+          ? `書: ${w.producers.map(baseName).join(', ') || '(なし)'} / 読: ${w.consumers.map(baseName).join(', ') || '(なし)'}`
+          : 'keyMap に producer も consumer も無い';
+      return `<div class="${cls}" title="${esc(w.wire.key)}: ${esc(statusTxt)}">`
+        + `<span class="wkey">🩸 ${esc(w.wire.key)}</span> <span class="warrow">→ ${esc(toLabel)}</span>`
+        + `<div class="wnote">${esc(w.wire.note)} — <b>${esc(statusTxt)}</b><br><span class="wfiles">${esc(detail)}</span></div>`
+        + '</div>';
+    }).join('');
+    const fileChips = [
+      ...presentFiles.map((f) => `<span class="path">${esc(f)}</span>`),
+      ...missingFiles.map((f) => `<span class="path dead">${esc(f)} (消失)</span>`)
+    ].join('');
+    const connector = i < stages.length - 1
+      ? '<div class="connector"><svg viewBox="0 0 40 34" width="40" height="34" aria-hidden="true">'
+        + '<line x1="20" y1="0" x2="20" y2="26" stroke="currentColor" stroke-width="2"/>'
+        + '<polygon points="20,34 14,24 26,24" fill="currentColor"/></svg></div>'
+      : '';
+    return `<section class="stage${missingFiles.length ? ' miss' : ''}">`
+      + `<div class="shead"><span class="snum">${i + 1}</span>`
+      + `<span class="semoji">${esc(stage.emoji)}</span>`
+      + `<span class="sname">${esc(stage.label)}</span></div>`
+      + `<div class="sdesc">${esc(stage.desc)}</div>`
+      + `<div class="paths">${fileChips}</div>`
+      + (wireRows ? `<div class="wires">${wireRows}</div>` : '')
+      + '</section>'
+      + connector;
+  }).join('');
+
+  return `<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>コードの背骨マップ — 君斗りんくの追憶のきらめき</title>
+<style>
+  :root{ --bg:#0f1115; --panel:#161922; --ink:#e6e8ec; --sub:#aab0bb; --muted:#7b8390; --line:#2a2f3a;
+    --ok:#2f7d4a; --warn:#b5485f; --tag-bg:#1d2740; --tag-bd:#3f5b8c; --tag-ink:#bcd2f6; }
+  body{ margin:0; padding:28px 20px; background:var(--bg); color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Hiragino Sans","Yu Gothic UI",sans-serif; }
+  .wrap{ max-width:860px; margin:0 auto; }
+  h1{ font-size:21px; margin:0 0 4px; }
+  .meta{ color:var(--muted); font-size:12px; margin:0 0 16px; line-height:1.6; }
+  .meta a{ color:#7fa8e0; }
+  .banner{ border-radius:10px; padding:10px 14px; font-size:13px; margin:0 0 18px; line-height:1.6; }
+  .banner.ok{ background:rgba(47,125,74,.16); border:1px solid var(--ok); color:#b8f0cf; }
+  .banner.warn{ background:rgba(181,72,95,.16); border:1px solid var(--warn); color:#f6c7d2; }
+  section.stage{ background:var(--panel); border:1.5px solid var(--line); border-radius:12px; padding:14px 18px; }
+  section.stage.miss{ border-color:var(--warn); background:rgba(181,72,95,.08); }
+  .shead{ display:flex; align-items:center; gap:10px; }
+  .snum{ display:inline-flex; align-items:center; justify-content:center; width:24px; height:24px;
+    border-radius:50%; background:var(--tag-bg); border:1px solid var(--tag-bd); color:var(--tag-ink);
+    font-size:13px; font-weight:700; }
+  .semoji{ font-size:18px; }
+  .sname{ font-size:17px; font-weight:700; color:#fff; }
+  .sdesc{ font-size:12.5px; color:var(--sub); margin:6px 0 9px; line-height:1.6; }
+  .paths{ display:flex; gap:6px; flex-wrap:wrap; }
+  .path{ font-family:"Menlo","Consolas",monospace; font-size:11.5px; background:rgba(255,255,255,.06);
+    border:1px solid var(--line); border-radius:6px; padding:2px 7px; color:#bcd2f6; }
+  .path.dead{ color:#f6c7d2; border-color:var(--warn); background:rgba(181,72,95,.12); }
+  .wires{ margin-top:11px; display:grid; gap:7px; }
+  .wire{ border-radius:8px; padding:7px 11px; font-size:12px; border:1px solid var(--line);
+    background:rgba(255,255,255,.03); }
+  .wire.ok{ border-left:3px solid var(--ok); }
+  .wire.bad{ border-left:3px solid var(--warn); background:rgba(181,72,95,.10); border-color:var(--warn); }
+  .wkey{ font-family:"Menlo","Consolas",monospace; font-size:11.5px; color:#ffe3b8; }
+  .warrow{ color:var(--muted); font-size:11.5px; }
+  .wnote{ color:var(--sub); margin-top:3px; line-height:1.55; }
+  .wire.bad .wnote b{ color:#f6c7d2; }
+  .wfiles{ color:var(--muted); font-family:"Menlo","Consolas",monospace; font-size:10.5px; }
+  .connector{ color:var(--tag-bd); display:flex; justify-content:center; margin:2px 0; }
+  .legend{ margin-top:22px; font-size:12.5px; color:var(--sub); background:var(--panel);
+    border:1px solid var(--line); border-radius:12px; padding:14px 18px; line-height:1.9; }
+  .legend b{ color:var(--ink); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>🦴 コードの背骨マップ（データの一生）</h1>
+  <p class="meta">
+    取得→記録→集計→表示の<b>背骨1本</b>。網羅でなく根幹だけ。線（🩸=storageキー＝血管）が
+    <b>つながっているか</b>を見れば、値が作られても届かない「断線」（過去の broadcaster バグ型）に気づける。<br>
+    <code>scripts/feature-map.mjs</code> が実コードから自動生成（手編集しない・no CDN・依存ゼロ）。
+    テキスト正本: <a href="spine-map.md">spine-map.md</a> ／ 全地図の入口: <a href="MAP.md">MAP.md</a> ／
+    全storageキー: <a href="feature-map/storage-bus.md">storage-bus.md</a>。
+  </p>
+  ${banner}
+  <div class="spine">
+    ${stageCards}
+  </div>
+  <div class="legend">
+    <b>読み方</b>: 上から下へデータが流れる。各カード＝1つの段（節）。カード内の🩸＝その段から次の段へ
+    データを渡す storage キー（血管）。<br>
+    <b style="color:#b8f0cf">緑の血管</b>＝書く人(producer)も読む人(consumer)も居る＝つながっている。
+    <b style="color:#f6c7d2">赤の血管</b>＝片側しか居ない＝<b>断線の疑い</b>（値は作られたが届かない／その逆）。<br>
+    <b>節ファイルが消失</b>すると赤枠＋(消失)。<code>npm run feature-map -- --check</code> が verify:cc で
+    これを検知して落とす（地図が腐らない）。
+  </div>
+</div>
+</body>
+</html>
+`;
+}
+
+/**
+ * 背骨の Markdown(AI/GitHub 用のテキスト正本)。HTML と同じ内容をプレーンに。
+ * @param {ReturnType<typeof resolveSpineStages>} stages
+ * @param {ReturnType<typeof resolveSpineWires>} wires
+ */
+function buildSpineMd(stages, wires) {
+  const lines = [];
+  lines.push('# 🦴 コードの背骨マップ（データの一生・自動生成）');
+  lines.push('');
+  lines.push('> `npm run feature-map` で再生成。手で編集しない（`--check` が verify:cc で腐りを検知）。');
+  lines.push('> 取得→記録→集計→表示の**背骨1本**。網羅でなく根幹だけ。視覚版: [spine-map.html](spine-map.html)。');
+  lines.push('> 🩸=段間を渡る storage キー(血管)。両側(producer/consumer)が居れば「つながっている」、');
+  lines.push('> 片側だけなら**断線の疑い**(値は作られたが届かない=過去の broadcaster バグ型)。');
+  lines.push('');
+
+  const brokenWires = wires.filter((w) => w.status !== 'connected');
+  const missingStageFiles = stages.flatMap((s) => s.missingFiles);
+  if (brokenWires.length || missingStageFiles.length) {
+    lines.push(`## ⚠️ 要確認: 断線の疑い ${brokenWires.length} 件 / 節ファイル消失 ${missingStageFiles.length} 件`);
+    for (const w of brokenWires) {
+      lines.push(`- 🔴 \`${w.wire.key}\` (${w.wire.note}) — ` +
+        (w.status === 'broken'
+          ? `書: ${w.producers.join(', ') || '(なし)'} / 読: ${w.consumers.join(', ') || '(なし)'}`
+          : 'keyMap に producer も consumer も無い(辞書要確認)'));
+    }
+    for (const f of missingStageFiles) lines.push(`- 🔴 節ファイル消失: \`${f}\``);
+    lines.push('');
+  } else {
+    lines.push('✅ 背骨の血管はすべて producer/consumer 両側がつながっています。');
+    lines.push('');
+  }
+
+  for (let i = 0; i < stages.length; i++) {
+    const { stage, presentFiles, missingFiles } = stages[i];
+    lines.push(`## ${i + 1}. ${stage.emoji} ${stage.label}`);
+    lines.push('');
+    lines.push(stage.desc);
+    lines.push('');
+    lines.push('担当ファイル:');
+    for (const f of presentFiles) lines.push(`- \`${f}\``);
+    for (const f of missingFiles) lines.push(`- 🔴 \`${f}\` (消失)`);
+    const wiresOut = wires.filter((w) => w.wire.from === stage.id);
+    if (wiresOut.length) {
+      lines.push('');
+      lines.push('次の段へ渡す血管(storageキー):');
+      for (const w of wiresOut) {
+        const toLabel = SPINE.stages.find((s) => s.id === w.wire.to)?.label || w.wire.to;
+        const mark = w.status === 'connected' ? '🟢' : '🔴';
+        const detail = w.status === 'connected'
+          ? `書 ${w.producers.join(', ')} → 読 ${w.consumers.join(', ')}`
+          : w.status === 'broken'
+            ? `片側のみ — 書 ${w.producers.join(', ') || '(なし)'} / 読 ${w.consumers.join(', ') || '(なし)'}`
+            : '解析に出ない(辞書要確認)';
+        lines.push(`- ${mark} \`${w.wire.key}\` → ${toLabel}: ${w.wire.note} — ${detail}`);
+      }
+    }
+    if (i < stages.length - 1) {
+      lines.push('');
+      lines.push('  ↓');
+    }
+    lines.push('');
+  }
+  return lines.join('\n');
+}
+
+/**
+ * spine-map.html + spine-map.md を docs/ 直下へ出す(または --check で比較)。
+ * @param {Map<string, { producers: Set<string>, consumers: Set<string> }>} keyMap
+ * @param {string[]} sourceFiles
+ */
+function writeSpineMap(keyMap, sourceFiles) {
+  const stages = resolveSpineStages(sourceFiles);
+  const wires = resolveSpineWires(keyMap);
+  // 節が完全に消えている(presentFiles ゼロ)なら辞書が腐っている=check で落とす。
+  for (const { stage, presentFiles } of stages) {
+    if (presentFiles.length === 0) {
+      checkProblems.push(`spine: 段「${stage.label}」の担当ファイルが1つも実在しません(SPINE 辞書を実コードで直す)`);
+    }
+  }
+  emitDocs('spine-map.html', buildSpineHtml(stages, wires));
+  emitDocs('spine-map.md', buildSpineMd(stages, wires));
 }
 
 /** feature 名 → 人間向けラベル(FEATURES の label)。 */
