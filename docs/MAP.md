@@ -10,11 +10,10 @@
 
 | ブラウザで開く | 何が見える |
 |---|---|
-| 🌳 **[code-tree.html](code-tree.html)** | **全ファイルのツリー＋各ファイルが「何をするか」**。畳めば俯瞰・開けば毛細血管。役割コメントが無いファイルは赤＝改善対象が一目で。 |
-| 🦴 **[spine-map.html](spine-map.html)** | データの根幹（取得→記録→集計→表示）の**背骨1本**。storageキー（血管）が切れていたら赤。 |
+| 🌳 **[code-tree.html](code-tree.html)** | **これ1枚で全部**。冒頭に「🦴 データの流れ（取得→記録→集計→表示）」の根幹、その下に全ファイルのツリー＋各ファイルが「何をするか」。畳めば俯瞰・開けば毛細血管。役割コメントが無いファイルは赤＝改善対象が一目で。 |
 | 🎨 [repo-tree-map.html](repo-tree-map.html) | ディレクトリ役割＋機能逆引きの色付きカード。 |
 
-> AI に渡すなら同じ内容のテキスト版: [code-tree.md](code-tree.md) ／ [spine-map.md](spine-map.md)。
+> AI に渡すなら同じ内容のテキスト版: [code-tree.md](code-tree.md)。
 
 ---
 
@@ -22,7 +21,7 @@
 
 | 見たいこと | 開くファイル | これは何 |
 |---|---|---|
-| **🦴 データの根幹（取得→記録→集計→表示）を1本で** | [spine-map.html](spine-map.html) ／ [.md](spine-map.md) | コードの背骨。線（storageキー＝血管）が**つながっているか**で「値が届かない断線」（broadcaster バグ型）に気づける |
+| **🌳 全ファイル＋各役割＋データの流れ** | [code-tree.html](code-tree.html) ／ [.md](code-tree.md) | これ1枚で全部。冒頭に根幹（取得→記録→集計→表示）、下に毛細血管まで網羅。役割が無い箇所は赤 |
 | **「○○を司るのはどこ？」** | [repo-tree-map.md](repo-tree-map.md) の「機能逆引き索引」 | 機能 → 担当ファイル（例: 送信→commentSubmitConfirm.js） |
 | **「これどこに置く？」** | [repo-tree-map.md](repo-tree-map.md) の「ディレクトリマップ」 | 場所 → 役割（色・速度・コメント・レポート…） |
 | **全体像をマインドマップで** | [repo-tree-map.md](repo-tree-map.md) 冒頭 | Mermaid（GitHub で図表示・ツリー型＋機能逆引き型） |

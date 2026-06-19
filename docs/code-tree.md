@@ -4,6 +4,29 @@
 > 全ファイルと「何をするか」（各ファイルの先頭コメントから自動抽出）。視覚版: [code-tree.html](code-tree.html)。
 > ⚠️ の付いたソースは先頭に役割コメントが無い＝説明を1行足すと AI も人間も迷わない。
 
+## 🦴 データの流れ（取得→記録→集計→表示）
+
+1. 📡 **取得** — NDGR(protobuf直読み)+watch DOM観測でコメント/ギフトを集める
+   - `src/extension/content-entry.js`
+   - `src/extension/page-intercept-entry.js`
+   ↓
+2. 💾 **記録** — IndexedDB / chunk / tail バッファへ永続化(記録本体)
+   - `src/extension/content-entry.js`
+   - `src/extension/offscreen-entry.js`
+   - `src/extension/backfill-sw-entry.js`
+   ↓
+3. 🧮 **集計** — 保存データ→応援レーン/会場/ランキング/プロフィールへ畳み込む
+   - `src/domain`
+   - `src/data`
+   - `src/lib`
+   ↓
+4. 🪟 **表示** — パネル(応援レーン)/会場/状態ページへ描く
+   - `src/extension/popup-entry.js`
+   - `src/extension/venueBar.js`
+   - `src/extension/status-entry.js`
+
+> 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
+
 ## ⚠️ 役割コメントが無いソース 101 / 566 件
 - `scripts/build-watch.mjs`
 - `scripts/build.mjs`
@@ -107,12 +130,14 @@
 - `tests/e2e/watch-messaging.spec.js`
 - `tools/mcp-nicolive/server.mjs`
 
+## 全ファイルツリー
+
 - 📁 **api/** (1)
   - `status.js` — status 受け口 Vercel Serverless Function。
 - 📁 **app/** (2)
   - `app.js` — スマホ閲覧用 status Web 版。
   - `index.html`
-- 📁 **docs/** (66)
+- 📁 **docs/** (68)
   - 📁 **article-assets/** (3)
     - `venue-mode-sound.mp4`
     - `venue-mode.gif`
@@ -145,6 +170,8 @@
     - `tdd-ui-ux-roadmap.md`
   - `MAP.md`
   - `agents-session-history-archive.md`
+  - `code-tree.html`
+  - `code-tree.md`
   - `codex-commenter-follow-analytics-v0535.md`
   - `codex-event-lane-stuck-fix-v0613.md`
   - `codex-gift-throw-ledger-data-v0572.md`
