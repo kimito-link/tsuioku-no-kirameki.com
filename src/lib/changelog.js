@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.831',
+    date: '2026-06-20',
+    summary: '「はじめての方へ」に3キャラの笑顔を添えて応援感を強化',
+    items: Object.freeze([
+      '状態ページ先頭の「🧭 はじめての方へ」の応援メッセージに、りんく・こんた・たぬねえの3キャラの笑顔イラスト(拡張に同梱済みの軽量画像)を添えました。これから何かを創ろうとする方を、3キャラが一緒に応援している雰囲気にしています。画像は軽い縮小版を使っているのでページは重くなりません。記録・コメント取得には影響しません。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.830',
     date: '2026-06-20',
     summary: '状態ページ先頭に「はじめての方へ」みちしるべを追加',

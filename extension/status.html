@@ -116,6 +116,27 @@
         line-height: 1.7;
         border-top: 1px dashed var(--nl-border);
         padding-top: 12px;
+        display: flex;
+        align-items: flex-start;
+        gap: 14px;
+      }
+      .guidepost-cheer .cheer-chara {
+        flex: 0 0 auto;
+        display: flex;
+        gap: 2px;
+        align-items: flex-end;
+      }
+      .guidepost-cheer .cheer-chara img {
+        width: 52px;
+        height: 52px;
+        object-fit: contain;
+        image-rendering: auto;
+      }
+      .guidepost-cheer .cheer-text {
+        flex: 1 1 auto;
+      }
+      @media (max-width: 520px) {
+        .guidepost-cheer { flex-direction: column; align-items: center; text-align: center; }
       }
       .status-buttons {
         display: flex;
@@ -354,12 +375,19 @@
           <div class="gp-desc">プログラムの中身そのもの。自由に読んで・学んで・自分の作品に活かしてOK。</div>
         </a>
       </div>
-      <p class="guidepost-cheer">
-        🌱 <strong>これから何かを創ろうとしているあなたへ</strong> ——
-        最初は誰でも「何が分からないのか分からない」ところから始まります。だから、このページは
-        <em>地図</em>を用意しました。迷ったら 🗺️ から眺めてみてください。完璧じゃなくて大丈夫。
-        一歩ずつで、ちゃんと形になります。あなたの「創りたい」を応援しています。
-      </p>
+      <div class="guidepost-cheer">
+        <div class="cheer-chara">
+          <img src="images/yukkuri-charactore-english/link/link-yukkuri-smile-mouth-open.thumb128.png" alt="りんく(笑顔)" width="52" height="52" loading="lazy">
+          <img src="images/yukkuri-charactore-english/konta/kitsune-yukkuri-smile-mouth-open.thumb128.png" alt="こんた(笑顔)" width="52" height="52" loading="lazy">
+          <img src="images/yukkuri-charactore-english/tanunee/tanuki-yukkuri-smile-mouth-open.thumb128.png" alt="たぬねえ(笑顔)" width="52" height="52" loading="lazy">
+        </div>
+        <p class="cheer-text">
+          🌱 <strong>これから何かを創ろうとしているあなたへ</strong> ——
+          最初は誰でも「何が分からないのか分からない」ところから始まります。だから、このページは
+          <em>地図</em>を用意しました。迷ったら 🗺️ から眺めてみてください。完璧じゃなくて大丈夫。
+          一歩ずつで、ちゃんと形になります。わたしたちも、あなたの「創りたい」を応援しています。
+        </p>
+      </div>
     </section>
 
     <div class="status-buttons">
