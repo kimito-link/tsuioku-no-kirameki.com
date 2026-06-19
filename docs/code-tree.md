@@ -36,7 +36,7 @@
 - 📁 **app/** (2)
   - `app.js` — スマホ閲覧用 status Web 版。
   - `index.html`
-- 📁 **docs/** (68)
+- 📁 **docs/** (70)
   - 📁 **article-assets/** (3)
     - `venue-mode-sound.mp4`
     - `venue-mode.gif`
@@ -86,6 +86,8 @@
   - `comment-number-rescue-flow.html`
   - `cursor-handoff-direct-concurrent-viewers.md`
   - `extension-bump-checklist.md`
+  - `feature-sitemap.html`
+  - `feature-sitemap.md`
   - `inline-popup-sync.md`
   - `investigation-prompt-popup-not-appearing.md`
   - `koken-contrib-hidden-tab-stuck-fix-v0616.md`
