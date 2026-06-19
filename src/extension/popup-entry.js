@@ -585,6 +585,7 @@ import {
 } from '../lib/sessionCommentCache.js';
 import { KEY_AI_SHARE_FAST_DIAG } from '../lib/aiShareFastDiagKey.js';
 import { KEY_AI_SHARE_POPUP_DIAG, buildAiSharePopupDiagRecord } from '../lib/aiSharePopupDiagKey.js';
+import { createPopupDiagAutoPublisher, resolvePopupWatchUrl } from '../lib/popupDiagAutoPublish.js';
 import { buildHtmlReportCommenterFollowBlock } from '../lib/htmlReportCommenterFollowSection.js';
 import { shouldDeferHeavyPopupPaintDuringScroll } from '../lib/popupMainScrollDefer.js';
 import { STORY_GROWTH_MAX_CELLS } from '../lib/storyGrowthLimits.js';
@@ -18115,6 +18116,16 @@ async function collectAiShareDevMonitorPayloadBundle(watchUrl) {
   return { payload, lastErr, manifest };
 }
 
+// v0.1.828: popup の watchUrl 解決(AI診断コピー/DL/自動集約で共有・純ロジックは popupDiagAutoPublish.js)。
+const currentWatchUrlForDiag = () => resolvePopupWatchUrl({
+  datasetWatchUrl: $('exportJson')?.dataset?.watchUrl,
+  readLastWatchUrl: async () => (await chrome.storage.local.get(KEY_LAST_WATCH_URL))[KEY_LAST_WATCH_URL]
+});
+// popup を開くだけで popup 固有診断を status へ自動集約(『AI診断コピー』押下を不要に・設計 popup-less-diag-SYNTHESIS.md)。
+const schedulePopupDiagAutoPublish = createPopupDiagAutoPublisher(
+  () => collectAiShareDevMonitorPayloadBundle(currentWatchUrlForDiag()) // 内部で診断キーを書く(コピーはしない)
+);
+
 /**
  * v0.1.196: v0.1.172 〜 v0.1.194 までの間に NDGR ギフトシステムメッセージが
  * `nls_comments_<lv>` に通常コメントとして persist されていた汚染を、
@@ -18629,16 +18640,7 @@ async function initPopup() {
     const stEl = /** @type {HTMLElement|null} */ ($('devMonitorExportTrendStatus'));
     const aiCopyBtn = /** @type {HTMLButtonElement|null} */ ($('devMonitorCopyAiBundleBtn'));
     if (aiCopyBtn) aiCopyBtn.disabled = true;
-    const exportBtn = /** @type {HTMLButtonElement|null} */ ($('exportJson'));
-    let watchUrl = String(exportBtn?.dataset.watchUrl || '').trim();
-    if (!watchUrl) {
-      try {
-        const bag = await chrome.storage.local.get(KEY_LAST_WATCH_URL);
-        watchUrl = String(bag[KEY_LAST_WATCH_URL] || '').trim();
-      } catch {
-        watchUrl = '';
-      }
-    }
+    const watchUrl = await currentWatchUrlForDiag();
     if (stEl) stEl.textContent = '収集中…';
     else setPostStatus('診断データを収集中…', 'idle');
     try {
@@ -18742,16 +18744,7 @@ async function initPopup() {
     const stEl = /** @type {HTMLElement|null} */ ($('devMonitorExportTrendStatus'));
     const dlBtn = /** @type {HTMLButtonElement|null} */ ($('devMonitorDownloadAiBundleBtn'));
     if (dlBtn) dlBtn.disabled = true;
-    const exportBtn = /** @type {HTMLButtonElement|null} */ ($('exportJson'));
-    let watchUrl = String(exportBtn?.dataset.watchUrl || '').trim();
-    if (!watchUrl) {
-      try {
-        const bag = await chrome.storage.local.get(KEY_LAST_WATCH_URL);
-        watchUrl = String(bag[KEY_LAST_WATCH_URL] || '').trim();
-      } catch {
-        watchUrl = '';
-      }
-    }
+    const watchUrl = await currentWatchUrlForDiag();
     if (stEl) stEl.textContent = '診断JSONを準備中…';
     let objectUrl = '';
     try {
@@ -20988,6 +20981,14 @@ if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', initPopup);
 } else {
   initPopup();
+}
+
+// v0.1.828: popup を開いたら popup 固有診断を status へ自動集約(『AI診断コピー』押下を不要に)。
+//   初期描画を妨げないようアイドル遅延で1回だけ(schedulePopupDiagAutoPublish 内でガード)。
+try {
+  schedulePopupDiagAutoPublish();
+} catch {
+  // no-op(自動集約の失敗は popup 表示を妨げない)
 }
 
 // 安全網：万が一 initPopup が throw して initialRefreshDone が立たなくても、

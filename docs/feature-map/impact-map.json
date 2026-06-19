@@ -3934,6 +3934,16 @@
       ]
     },
     {
+      "file": "src/lib/popupDiagAutoPublish.js",
+      "featureCount": 1,
+      "features": [
+        "popup"
+      ],
+      "labels": [
+        "ポップアップ(応援レーン)"
+      ]
+    },
+    {
       "file": "src/lib/popupEntryPendingSelfPost.js",
       "featureCount": 1,
       "features": [
