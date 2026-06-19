@@ -407,6 +407,7 @@
 | `src/lib/popupCelebrationGate.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/popupConcurrentEstimateGate.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/popupContextBarModel.js` | 1 | ポップアップ(応援レーン) |
+| `src/lib/popupDiagAutoPublish.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/popupEntryPendingSelfPost.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/popupFrameCodec.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/popupFramePresets.js` | 1 | ポップアップ(応援レーン) |
