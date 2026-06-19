@@ -25,6 +25,8 @@ const OUT_MD = join(OUT_DIR, 'repo-tree-map.md');
 const OUT_HTML = join(OUT_DIR, 'repo-tree-map.html');
 const OUT_CODE_TREE_HTML = join(OUT_DIR, 'code-tree.html');
 const OUT_CODE_TREE_MD = join(OUT_DIR, 'code-tree.md');
+const OUT_FEATURE_SITEMAP_HTML = join(OUT_DIR, 'feature-sitemap.html');
+const OUT_FEATURE_SITEMAP_MD = join(OUT_DIR, 'feature-sitemap.md');
 
 /** ツリーに含めるトップレベル(これ以外=ドット系/生成物は除外) */
 const MAX_DEPTH = 2; // トップ + 2 階層まで(src/lib/... は src/lib で止める)
@@ -115,6 +117,42 @@ const FEATURES = [
   { feature: '全体マップ(全地図への入口)', desc: '地図・診断・検証への唯一の入口ハブ。「どこを直す/何が壊れる/今の状態/壊れてないか/公開記事」を1枚から辿れる。迷ったらここ起点(AGENTS.md §10)', paths: ['docs/MAP.md'], tags: ['ハブ', '入口', '地図'] },
   { feature: '影響範囲ゲート(規律を自動化)', desc: '星野ロミ式「規律を自動ゲートに」。diff から影響大(複数機能波及)の変更ファイルを検出し波及先機能を列挙。警告のみ(摩擦ゼロ)・--strict で exit1。AGENTS.md §10 のルールを diff 発火に', paths: ['scripts/impact-check.mjs', 'docs/feature-map/impact-map.json'], tags: ['影響範囲', '自動ゲート', '再発防止'] }
 ];
+
+/**
+ * 機能を「データの一生 + 横断」の大分類に束ねる(人間が決める正本)。
+ * docs/feature-sitemap.html(添付イメージ型のカード+線マップ)で「トップ→分類→機能」の階層を作るため。
+ * key = FEATURES[].feature の完全一致。ここに無い機能は「その他」に入る(=分類追記の合図)。
+ * 分類の並びは CATEGORY_ORDER で固定(取得→記録→…の流れ順)。
+ * @type {Record<string, string>}
+ */
+const FEATURE_CATEGORY = {
+  'コメント送信(確認/プロファイル)': '📤 送信',
+  'コメント収穫(DOM 観測)': '📥 取得',
+  '過去ログ取得(バックフィル巡回)': '📥 取得',
+  'コメント重複除去(NDGR)': '📥 取得',
+  '記録件数の単調化(減らない表示)': '💾 記録',
+  'storage キー定義': '💾 記録',
+  '応援レーン集約(誰が候補か)': '🧮 集計',
+  '人物タイル描画(丸サムネ)': '🪟 表示・演出',
+  '会場の席割り': '🪟 表示・演出',
+  '背景群衆(来場者数の表現)': '🪟 表示・演出',
+  '会場ドラッグスクロール(パン)': '🪟 表示・演出',
+  '吹き出し寿命管理': '🪟 表示・演出',
+  'ギフト投擲演出': '🪟 表示・演出',
+  '読み上げ(再生/キュー/年齢ゲート)': '🔊 読み上げ',
+  'popup スクロール(要素を見せる)': '🪟 表示・演出',
+  'HTMLレポート生成': '📊 レポート',
+  '状態速報の整形': '🩺 診断・地図',
+  'AI診断の状態速報集約': '🩺 診断・地図',
+  '状態速報の全体マインドマップ': '🩺 診断・地図',
+  '状態速報の対処カード(症状→原因→次の一手)': '🩺 診断・地図',
+  'サイト健全性検証(リンク切れ防止)': '🩺 診断・地図',
+  '影響範囲マップ(変えたら何が壊れるか)': '🩺 診断・地図',
+  '全体マップ(全地図への入口)': '🩺 診断・地図',
+  '影響範囲ゲート(規律を自動化)': '🩺 診断・地図'
+};
+/** 大分類の表示順(データの流れ順 + 横断)。 */
+const CATEGORY_ORDER = ['📤 送信', '📥 取得', '💾 記録', '🧮 集計', '🪟 表示・演出', '🔊 読み上げ', '📊 レポート', '🩺 診断・地図', 'その他'];
 
 /** ツリーから除外するトップレベル(ドット系・生成物・巨大画像ディレクトリ等) */
 const SKIP_TOP = new Set(['.git', '.github', '.husky', '.cursor', '.takt', 'node_modules', 'build', '.artifacts']);
@@ -837,6 +875,132 @@ function renderCodeTreeMd(root, roles) {
   return lines.join('\n');
 }
 
+/* ============================================================================
+ * 機能サイトマップ(feature-sitemap): 添付イメージ型の「トップ→分類→機能」カード+線マップ。
+ *   既存 FEATURES(機能名/役割desc/担当ファイル)を FEATURE_CATEGORY で大分類に束ね、各機能を
+ *   役割つきカードで縦に並べる。AI も人間も「どの機能が・何をして・どのファイルか」を1枚で掴める。
+ *   依存ゼロ(素の HTML+CSS・no CDN)。AI 用に docs/feature-sitemap.md も出す。`--check` で腐り検知。
+ * ========================================================================== */
+
+/** FEATURES をカテゴリ順にグルーピングして返す。 */
+function groupFeaturesByCategory() {
+  /** @type {Map<string, typeof FEATURES>} */
+  const byCat = new Map();
+  for (const f of FEATURES) {
+    const cat = FEATURE_CATEGORY[f.feature] || 'その他';
+    if (!byCat.has(cat)) byCat.set(cat, []);
+    byCat.get(cat).push(f);
+  }
+  return CATEGORY_ORDER.filter((c) => byCat.has(c)).map((cat) => ({ cat, features: byCat.get(cat) }));
+}
+
+/**
+ * 機能サイトマップ HTML(添付イメージ型・トップ→分類→機能カード)。依存ゼロ。
+ * @param {string[]} files 実在検証用(消えた担当ファイルを赤く)
+ */
+function renderFeatureSitemapHtml(files) {
+  const trackedSet = new Set(files);
+  const groups = groupFeaturesByCategory();
+  const colCards = groups.map(({ cat, features }) => {
+    const featCards = features.map((f) => {
+      const paths = (f.paths || []).map((p) => {
+        const ok = trackedSet.has(p) || existsSync(join(ROOT, p));
+        return ok
+          ? `<code class="fs-path">${escapeHtml(p)}</code>`
+          : `<code class="fs-path dead">${escapeHtml(p)} ⚠️</code>`;
+      }).join('');
+      return `<div class="fs-feat"><div class="fs-fname">${escapeHtml(f.feature)}</div>`
+        + `<div class="fs-fdesc">${escapeHtml(f.desc)}</div>`
+        + `<div class="fs-paths">${paths}</div></div>`;
+    }).join('');
+    return `<section class="fs-col"><div class="fs-cat">${escapeHtml(cat)}</div>${featCards}</section>`;
+  }).join('');
+
+  return `<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>機能サイトマップ — 君斗りんくの追憶のきらめき</title>
+<style>
+  :root{ --bg:#0f1115; --panel:#161922; --ink:#e6e8ec; --sub:#aab0bb; --muted:#7b8390; --line:#2a2f3a;
+    --ok:#2f7d4a; --warn:#b5485f; --tag-bg:#1d2740; --tag-bd:#3f5b8c; --tag-ink:#bcd2f6; --accent:#4a8de0; }
+  body{ margin:0; padding:28px 20px; background:var(--bg); color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Hiragino Sans","Yu Gothic UI",sans-serif; }
+  .wrap{ max-width:1180px; margin:0 auto; }
+  h1{ font-size:21px; margin:0 0 4px; }
+  .meta{ color:var(--muted); font-size:12px; margin:0 0 18px; line-height:1.6; }
+  .meta a{ color:#7fa8e0; }
+  .fs-top{ display:flex; justify-content:center; margin:0 0 6px; }
+  .fs-top span{ background:var(--accent); color:#fff; font-weight:700; font-size:15px;
+    padding:9px 22px; border-radius:999px; }
+  .fs-stem{ width:2px; height:18px; background:var(--line); margin:0 auto; }
+  .fs-cols{ display:grid; grid-template-columns:repeat(auto-fill,minmax(280px,1fr)); gap:14px;
+    border-top:2px solid var(--line); padding-top:18px; }
+  .fs-col{ background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:12px 14px; }
+  .fs-cat{ font-size:15px; font-weight:700; color:#fff; padding-bottom:8px; margin-bottom:10px;
+    border-bottom:2px solid var(--tag-bd); }
+  .fs-feat{ background:rgba(255,255,255,.03); border:1px solid var(--line); border-left:3px solid var(--accent);
+    border-radius:8px; padding:8px 11px; margin:0 0 8px; }
+  .fs-fname{ font-size:13.5px; font-weight:700; color:#ffe3b8; }
+  .fs-fdesc{ font-size:12px; color:var(--sub); margin:4px 0 6px; line-height:1.55; }
+  .fs-paths{ display:flex; gap:5px; flex-wrap:wrap; }
+  .fs-path{ font-family:"Menlo","Consolas",monospace; font-size:10.5px; background:rgba(255,255,255,.06);
+    border:1px solid var(--line); border-radius:5px; padding:1px 6px; color:#bcd2f6; }
+  .fs-path.dead{ color:#f6c7d2; border-color:var(--warn); background:rgba(181,72,95,.12); }
+  .legend{ margin-top:20px; font-size:12.5px; color:var(--sub); background:var(--panel);
+    border:1px solid var(--line); border-radius:12px; padding:14px 18px; line-height:1.9; }
+  .legend b{ color:var(--ink); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>🗺️ 機能サイトマップ(何が・何をして・どのファイルか)</h1>
+  <p class="meta">
+    アプリの全機能を「分類 → 機能 → 役割 → 担当ファイル」で1枚に。AI も人間も、どの機能がどこにあるか一目で。
+    <code>scripts/repo-tree-map.mjs</code> の <code>FEATURES</code>/<code>FEATURE_CATEGORY</code> から自動生成(手編集しない・no CDN)。<br>
+    全地図の入口: <a href="MAP.md">MAP.md</a> ／ 全ファイル: <a href="code-tree.html">code-tree.html</a> ／
+    逆引き索引: <a href="repo-tree-map.html">repo-tree-map.html</a> ／ AI用テキスト: <a href="feature-sitemap.md">feature-sitemap.md</a>。
+  </p>
+  <div class="fs-top"><span>君斗りんく(アプリ全体)</span></div>
+  <div class="fs-stem"></div>
+  <div class="fs-cols">${colCards}</div>
+  <div class="legend">
+    <b>読み方</b>: 上=アプリ全体。下の各列=機能の<b>分類</b>(取得→記録→集計→表示・演出→読み上げ→レポート→診断)。
+    列の中のカード=1つの<b>機能</b>(太字=機能名・その下=何をするか・最下段=担当ファイル)。<br>
+    <b style="color:#f6c7d2">赤いファイル</b>=消えた/リネームされた担当(<code>FEATURES</code> 更新が必要)。
+    新機能を足したら <code>FEATURES</code> と <code>FEATURE_CATEGORY</code> に1行。<code>npm run tree-map -- --check</code> が腐りを検知。
+  </div>
+</div>
+</body>
+</html>
+`;
+}
+
+/** 機能サイトマップ Markdown(AI/GitHub 用のテキスト正本)。 */
+function renderFeatureSitemapMd(files) {
+  const trackedSet = new Set(files);
+  const lines = [];
+  lines.push('# 🗺️ 機能サイトマップ(何が・何をして・どのファイルか・自動生成)');
+  lines.push('');
+  lines.push('> `npm run tree-map` で再生成。手で編集しない(`--check` が verify:cc で腐りを検知)。');
+  lines.push('> 全機能を「分類 → 機能 → 役割 → 担当ファイル」で。視覚版: [feature-sitemap.html](feature-sitemap.html)。');
+  lines.push('');
+  for (const { cat, features } of groupFeaturesByCategory()) {
+    lines.push(`## ${cat}`);
+    lines.push('');
+    for (const f of features) {
+      lines.push(`- **${f.feature}** — ${f.desc}`);
+      for (const p of (f.paths || [])) {
+        const ok = trackedSet.has(p) || existsSync(join(ROOT, p));
+        lines.push(`  - \`${p}\`${ok ? '' : ' ⚠️ 見つからない'}`);
+      }
+    }
+    lines.push('');
+  }
+  return lines.join('\n');
+}
+
 /** ---- main ---- */
 function generate() {
   const files = trackedFiles();
@@ -848,15 +1012,17 @@ function generate() {
   const roles = collectFileRoles(files);
   const codeTreeHtml = renderCodeTreeHtml(fullTree, roles);
   const codeTreeMd = renderCodeTreeMd(fullTree, roles);
-  return { md, html, missing, dead, codeTreeHtml, codeTreeMd };
+  const featureSitemapHtml = renderFeatureSitemapHtml(files);
+  const featureSitemapMd = renderFeatureSitemapMd(files);
+  return { md, html, missing, dead, codeTreeHtml, codeTreeMd, featureSitemapHtml, featureSitemapMd };
 }
 
 const isCheck = process.argv.includes('--check');
-const { md, html, missing, dead, codeTreeHtml, codeTreeMd } = generate();
+const { md, html, missing, dead, codeTreeHtml, codeTreeMd, featureSitemapHtml, featureSitemapMd } = generate();
 
 if (isCheck) {
   let fail = false;
-  for (const [path, content] of [[OUT_MD, md], [OUT_HTML, html], [OUT_CODE_TREE_HTML, codeTreeHtml], [OUT_CODE_TREE_MD, codeTreeMd]]) {
+  for (const [path, content] of [[OUT_MD, md], [OUT_HTML, html], [OUT_CODE_TREE_HTML, codeTreeHtml], [OUT_CODE_TREE_MD, codeTreeMd], [OUT_FEATURE_SITEMAP_HTML, featureSitemapHtml], [OUT_FEATURE_SITEMAP_MD, featureSitemapMd]]) {
     const cur = existsSync(path) ? readFileSync(path, 'utf8') : '';
     if (cur !== content) {
       fail = true;
@@ -879,7 +1045,9 @@ if (isCheck) {
   writeFileSync(OUT_HTML, html, 'utf8');
   writeFileSync(OUT_CODE_TREE_HTML, codeTreeHtml, 'utf8');
   writeFileSync(OUT_CODE_TREE_MD, codeTreeMd, 'utf8');
-  console.log(`[repo-tree-map] wrote ${OUT_MD}, ${OUT_HTML}, ${OUT_CODE_TREE_HTML}, ${OUT_CODE_TREE_MD}`);
+  writeFileSync(OUT_FEATURE_SITEMAP_HTML, featureSitemapHtml, 'utf8');
+  writeFileSync(OUT_FEATURE_SITEMAP_MD, featureSitemapMd, 'utf8');
+  console.log(`[repo-tree-map] wrote ${OUT_MD}, ${OUT_HTML}, code-tree, feature-sitemap`);
   if (missing.length) {
     console.warn(`[repo-tree-map] 役割未記入 ${missing.length} 件(ROLES に追記推奨): ${missing.join(', ')}`);
   }
