@@ -1076,26 +1076,33 @@ function setupButtons() {
       }
     });
   }
-  const btnCopy = document.getElementById('btnCopy');
-  if (btnCopy) {
-    btnCopy.addEventListener('click', async () => {
+  // AI共有テキストの「ワンクリックcoピー」を配線する共通ヘルパ(上部ボタンと AI共有欄の直近ボタンで共有)。
+  //   clipboard.writeText が失敗(権限/非対応)しても、textarea を select して Ctrl+C できる状態にして
+  //   フォールバックする(「コピーできない」で詰ませない=星野ロミ式)。
+  const wireCopyButton = (id, label) => {
+    const btn = document.getElementById(id);
+    if (!btn) return;
+    btn.addEventListener('click', async () => {
       const text = _lastRenderedBundle?.textBlob || '';
       if (!text) return;
+      const flash = (msg, ms) => {
+        btn.textContent = msg;
+        setTimeout(() => { btn.textContent = label; }, ms);
+      };
       try {
         await navigator.clipboard.writeText(text);
-        btnCopy.textContent = 'コピーしました ✓';
-        setTimeout(() => {
-          btnCopy.textContent = 'クリップボードへコピー';
-        }, 1500);
+        flash('コピーしました ✓', 1500);
       } catch (err) {
         console.warn('[status] clipboard failed:', err);
-        btnCopy.textContent = 'コピー失敗(範囲選択して Ctrl+C)';
-        setTimeout(() => {
-          btnCopy.textContent = 'クリップボードへコピー';
-        }, 2000);
+        // フォールバック: テキストを選択状態にして「あとは Ctrl+C」まで持っていく。
+        const ta = /** @type {HTMLTextAreaElement|null} */ (document.getElementById('aiShareText'));
+        if (ta) { ta.focus(); ta.select(); }
+        flash('選択しました→Ctrl+C', 2000);
       }
     });
-  }
+  };
+  wireCopyButton('btnCopy', 'クリップボードへコピー');
+  wireCopyButton('btnCopyAiShareInline', '📋 まるごとコピー');
   const btnDownload = document.getElementById('btnDownload');
   if (btnDownload) {
     btnDownload.addEventListener('click', () => {

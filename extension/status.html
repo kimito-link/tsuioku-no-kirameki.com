@@ -106,6 +106,26 @@
         color: var(--nl-text-soft);
         font-size: 12px;
       }
+      .ai-share-actions {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        flex-wrap: wrap;
+        margin: 0 0 8px;
+      }
+      .ai-share-actions button {
+        font-size: 14px;
+        font-weight: 700;
+        padding: 8px 16px;
+        border-radius: 8px;
+        border: 1px solid var(--nl-accent);
+        background: var(--nl-accent);
+        color: #fff;
+        cursor: pointer;
+      }
+      .ai-share-actions button:hover {
+        opacity: 0.9;
+      }
       textarea#aiShareText {
         width: 100%;
         min-height: 220px;
@@ -323,7 +343,11 @@
     </section>
 
     <section class="lane" id="aiShareLane">
-      <h2>🤖 AI に貼る用テキスト (範囲選択→Ctrl+C)</h2>
+      <h2>🤖 AI に貼る用テキスト</h2>
+      <div class="ai-share-actions">
+        <button id="btnCopyAiShareInline" type="button">📋 まるごとコピー</button>
+        <span class="status-meta" id="aiShareCopyHint">押すだけでクリップボードに入ります（Ctrl+C 不要）</span>
+      </div>
       <textarea
         id="aiShareText"
         readonly
