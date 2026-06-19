@@ -60,6 +60,26 @@ export function buildStatusActions(data) {
     });
   }
 
+  // --- 多タブ負荷(「1配信が安定してから複数タブが安全か」をユーザーに見せる) ---
+  // ユーザー要望: 多タブで重い/固まる体験を、開く前に分かる「状態」にする。
+  // 複数配信を同時記録 かつ (他タブDOM混入 or 大型配信の過去ログ取得中) = 実際に重くなる兆候。
+  const recordingLives = livesData.filter((lv) => lv?.recording).length;
+  const staleDom = Boolean(gift?.multiTabDiag?.staleDomBundleSuspected);
+  const heavyBackfillRunning = Boolean(fast?.romiDebug?.backfill?.running) &&
+    (num(fast?.romiDebug?.backfill?.rows) || 0) > 2000; // 大型配信の遡り取得中
+  if (recordingLives >= 2 && (staleDom || heavyBackfillRunning)) {
+    add({
+      id: 'multitab-heavy',
+      severity: 'warn',
+      symptom: `多タブで重くなっています(${recordingLives} 配信を同時記録中)`,
+      cause: heavyBackfillRunning
+        ? '複数タブ同時記録に加え、大型配信の過去ログ取得(backfill)が走っていて負荷が高い'
+        : '複数タブ同時記録で storage の読み書きが混雑し、status の表示や会場が重くなりやすい',
+      action: '見ていない watch タブを閉じて1〜2配信に絞ると軽くなります。まず1配信が安定してから増やすのが安全です',
+      fixableHere: 'yes'
+    });
+  }
+
   // --- 視聴中の配信なし(最優先で分かりやすい) ---
   if (!livesData.length) {
     add({
