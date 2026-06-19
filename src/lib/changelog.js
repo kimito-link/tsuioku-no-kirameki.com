@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.829',
+    date: '2026-06-20',
+    summary: 'AI共有テキストに「まるごとコピー」ボタンを追加',
+    items: Object.freeze([
+      '状態速報ページの「🤖 AI に貼る用テキスト」を、これまでは範囲選択して Ctrl+C する必要がありましたが、テキストのすぐ上に「📋 まるごとコピー」ボタンを置きました。押すだけで全文がクリップボードに入ります(Ctrl+C 不要)。もしブラウザの権限などでコピーに失敗した場合は、自動でテキストを選択状態にして「あとは Ctrl+C」まで持っていくので、コピーできずに詰まることはありません。記録・コメント取得には影響しません。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.828',
     date: '2026-06-20',
     summary: 'ポップアップを開くだけで状態ページに診断が集約',
