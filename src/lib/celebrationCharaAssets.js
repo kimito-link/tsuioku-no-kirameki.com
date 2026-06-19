@@ -1,3 +1,4 @@
+// celebrationCharaAssets.js — お祝い演出で使う3キャラ(りんく/こんた/混在)の画像パス定義。
 /** @typedef {'rinku'|'konta'|'mixed'} CelebrationCharacterSet */
 
 export const CHARA_IMG_BASE = 'images/yukkuri-charactore-english';

@@ -1,3 +1,4 @@
+// topSupportRankStripLines.js — 応援ランキング上位ストリップの各行(サムネ/色アクセント/リンク)を組み立てる純ロジック。
 import {
   isHttpOrHttpsUrl,
   isAnonymousStyleNicoUserId,

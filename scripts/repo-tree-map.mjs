@@ -478,6 +478,20 @@ function renderHtml(nodes, files, missing) {
 const ROLE_EXT = /\.(mjs|js|ts|jsx|tsx)$/;
 
 /**
+ * テストファイルか(.test.* / .spec.*)。役割コメント対象外(テストは名前で何をテストするか自明)。
+ * 3箇所で同じ判定が要るので正本を1つに(ドリフト防止)。
+ * @param {string} name ベース名
+ */
+function isTestFile(name) {
+  return /\.(test|spec)\.(mjs|js|ts|jsx|tsx)$/.test(name);
+}
+
+/** 役割コメントを持つべき「ソース」か(対象拡張子 かつ テストでない)。 */
+function isRoleSource(name) {
+  return ROLE_EXT.test(name) && !isTestFile(name);
+}
+
+/**
  * データの一生「取得→記録→集計→表示」の背骨(spine)。code-tree の冒頭に出す“流れ”の見出し。
  * 枝葉(個々の純関数)は下のツリー本体で見るので、ここは各段の代表ファイルだけ(実コードで裏取り済み)。
  * storage キーの断線検知(broadcaster バグ型)は `npm run feature-map -- --check`(機械ゲート)が担う。
@@ -527,20 +541,29 @@ function extractRoleDoc(text, fileName) {
   const lines = [];
   // 先頭の行コメント(// …)が何行続いても、その後に /** */ ブロックがあれば両方を候補に集める。
   // 例: 1行目 `// @ts-nocheck …` → 2行目から `/** 役割 */` のパターン(personTileDom 型)を救う。
+  // 先頭コメント領域を「種類を問わず」集める: 行コメント(//)・ブロック(/* */)・import・空行が
+  //   どの順で来ても、実コード(export/function/const 等)が始まるまで読み進める。
+  //   例 content-entry.js は `/* eslint */` → `// @ts-nocheck` → `// 役割` → import の順 = 1ループで救う。
+  //   ブロックの過剰追跡を避けるため最大8ステップ・ブロックは最大3個まで。
   let rest = head.trimStart();
-  // (1) 連続する行コメント塊を集める
-  for (;;) {
-    const m = /^\/\/+[^\n]*\n?/.exec(rest);
-    if (!m) break;
-    lines.push(m[0].replace(/^\/\/+\s?/, '').trim());
-    rest = rest.slice(m[0].length).replace(/^\s*\n/, '');
-  }
-  // (2) 続けてブロックコメント /* ... */ があれば中身も集める
-  rest = rest.trimStart();
-  if (rest.startsWith('/*')) {
-    const end = rest.indexOf('*/');
-    const block = end >= 0 ? rest.slice(2, end) : rest.slice(2);
-    for (const l of block.split('\n')) lines.push(l.replace(/^\s*\*+\s?/, '').trim());
+  // shebang(#!/usr/bin/env node)は飛ばす(CLI スクリプトの役割は2行目以降にある)。
+  rest = rest.replace(/^#![^\n]*\n?/, '').trimStart();
+  let blocks = 0;
+  for (let step = 0; step < 8; step++) {
+    rest = rest.replace(/^\s*\n/, '').replace(/^[ \t]+/, '');
+    const imp = /^import\b[^\n]*\n?/.exec(rest);
+    if (imp) { rest = rest.slice(imp[0].length); continue; }
+    const ln = /^\/\/+[^\n]*\n?/.exec(rest);
+    if (ln) { lines.push(ln[0].replace(/^\/\/+\s?/, '').trim()); rest = rest.slice(ln[0].length); continue; }
+    if (rest.startsWith('/*') && blocks < 3) {
+      blocks += 1;
+      const end = rest.indexOf('*/');
+      const block = end >= 0 ? rest.slice(2, end) : rest.slice(2);
+      for (const l of block.split('\n')) lines.push(l.replace(/^\s*\*+\s?/, '').trim());
+      rest = end >= 0 ? rest.slice(end + 2) : '';
+      continue;
+    }
+    break; // 実コード開始 or これ以上コメント無し
   }
 
   const base = fileName.replace(ROLE_EXT, '');
@@ -552,7 +575,7 @@ function extractRoleDoc(text, fileName) {
     if (!l) continue;
     if (/^[=\-*_~#]{3,}$/.test(l)) continue; // 区切り線
     if (/^@(ts-|type|param|returns|typedef|module|file|fileoverview)/.test(l)) continue; // JSDoc/TS ディレクティブ
-    if (/^(eslint|prettier|global|import|export)\b/.test(l)) continue;
+    if (/^(eslint|prettier|globalThis|import|export)\b/.test(l)) continue;
     if (isFileName(l)) continue; // ファイル名だけの行(crowdRasterizer.js / // foo.js)はスキップ
     // 行頭にファイル名が再掲されている場合だけ除去(末尾の .js 等は本文なので消さない)
     const noFile = l.replace(/^[`'"]?[\w-]+\.(mjs|js|ts|jsx|tsx)[`'"]?\s*[:：—-]\s*/i, '').trim();
@@ -600,7 +623,7 @@ function collectFileRoles(files) {
     if (!inCodeTree(f)) continue;
     const parts = f.split('/');
     const base = parts[parts.length - 1];
-    if (!ROLE_EXT.test(base) || base.endsWith('.test.js') || base.endsWith('.test.ts')) {
+    if (!isRoleSource(base)) {
       roleByPath.set(f, null);
       continue;
     }
@@ -639,7 +662,7 @@ function renderCodeTreeHtml(root, roles) {
     for (const fn of fileNames) {
       const path = node.path ? `${node.path}/${fn}` : fn;
       const role = roleByPath.get(path);
-      const isSrc = ROLE_EXT.test(fn) && !fn.endsWith('.test.js') && !fn.endsWith('.test.ts');
+      const isSrc = isRoleSource(fn);
       const unknown = isSrc && !role;
       const roleTxt = role
         ? `<span class="frole">${escapeHtml(role)}</span>`
@@ -804,7 +827,7 @@ function renderCodeTreeMd(root, roles) {
     for (const fn of [...node.files].sort()) {
       const path = node.path ? `${node.path}/${fn}` : fn;
       const role = roleByPath.get(path);
-      const isSrc = ROLE_EXT.test(fn) && !fn.endsWith('.test.js') && !fn.endsWith('.test.ts');
+      const isSrc = isRoleSource(fn);
       const suffix = role ? ` — ${role}` : (isSrc ? ' — ⚠️ 役割コメント無し' : '');
       lines.push(`${pad}- \`${fn}\`${suffix}`);
     }

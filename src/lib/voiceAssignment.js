@@ -1,3 +1,4 @@
+// voiceAssignment.js — コメント者ごとに読み上げ声(styleId/ピッチ/速度オフセット)を決定論的に割り当てる純ロジック。
 const DEFAULT_VOICE = Object.freeze({
   styleId: 3,
   pitchOffset: 0,

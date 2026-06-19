@@ -1,3 +1,4 @@
+// avatarPartsComposer.js — 匿名ユーザー用アバターのパーツ(髪/目/口など)定義と組み合わせ合成。
 import { anonymousIdenticonDataUrl } from './anonymousIdenticon.js';
 
 export const AVATAR_PART_KEYS = Object.freeze({

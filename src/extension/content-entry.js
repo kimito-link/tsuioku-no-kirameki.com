@@ -1,5 +1,6 @@
 /* eslint-disable max-lines */
 // @ts-nocheck — content script; DOM/Chrome API が広く any 相当
+// content-entry.js — watch ページ常駐の記録エンジン本体。コメント取得(NDGR+DOM)・記録・バックフィル・パネル描画の中枢。
 import {
   extractLiveIdFromDom,
   extractLiveIdFromUrl,

@@ -1,3 +1,4 @@
+// kiramekiAwardsSectionHtml.js — HTMLレポートの「きらめき表彰」セクション(CSS+各賞カード)の組み立て。
 import { buildUserProfileLinkedLabelHtml } from './userProfileLinkHtml.js';
 
 export const KIRAMEKI_AWARDS_CSS = `

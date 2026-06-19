@@ -1,4 +1,5 @@
 // @ts-nocheck — popup UI; DOM/Chrome API が広く any 相当
+// popup-entry.js — ポップアップ UI 本体。応援レーン描画・HTMLレポート生成・各種診断/共有のまとめ役。
 import { extractLiveIdFromUrl, isNicoLiveWatchUrl, watchPageUrlsMatchForSnapshot } from '../lib/broadcastUrl.js';
 import { pickWatchUrlFromMultipleSources } from '../lib/popupWatchUrlResolveMultiTab.js';
 import { shouldCloseStandalonePopupAfterNavigate } from '../lib/standalonePopupClose.js';

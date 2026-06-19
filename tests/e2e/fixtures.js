@@ -1,3 +1,4 @@
+// fixtures.js — e2e テスト共通の土台(拡張をロードした Chromium 起動・test/expect の再エクスポート)。
 import { test as base, chromium, expect } from '@playwright/test';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';

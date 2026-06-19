@@ -1,3 +1,4 @@
+// comeviewInstantRender.js — コメビュ別窓で行を即時描画する純ロジック(本文の切り詰め・行の隠し判定など)。
 import { comeviewUserKeyForRow } from './comeviewActions.js';
 
 /** @param {unknown} value @param {number} max */

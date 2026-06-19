@@ -1,3 +1,4 @@
+// popupWatchMetaConcurrentGate.js — popup の同時視聴者数推定を「出してよいか」判定するゲート(DOM/公式値/直近アクティブから)。
 import {
   concurrentEstimateIsSparseSignal,
   shouldShowConcurrentEstimate

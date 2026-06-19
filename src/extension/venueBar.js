@@ -1,3 +1,4 @@
+// venueBar.js — 会場モード UI 本体。観客の席割り・群衆・吹き出し・ギフト演出・読み上げ連動を描く。
 import { isGenericComeviewName } from '../lib/comeviewRows.js';
 import {
   buildVenueSeating,
