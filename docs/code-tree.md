@@ -1,0 +1,1607 @@
+# 🌳 コード全ツリー（毛細血管まで・自動生成）
+
+> `npm run tree-map` で再生成。手で編集しない（`--check` が verify:cc で腐りを検知）。
+> 全ファイルと「何をするか」（各ファイルの先頭コメントから自動抽出）。視覚版: [code-tree.html](code-tree.html)。
+> ⚠️ の付いたソースは先頭に役割コメントが無い＝説明を1行足すと AI も人間も迷わない。
+
+## ⚠️ 役割コメントが無いソース 101 / 566 件
+- `scripts/build-watch.mjs`
+- `scripts/build.mjs`
+- `scripts/cws-publish.mjs`
+- `scripts/inspect-nicolive-watch-stats.mjs`
+- `scripts/meeting.mjs`
+- `scripts/run-verify-cc.mjs`
+- `scripts/setup-claude-code.mjs`
+- `scripts/verify-bump.mjs`
+- `src/extension/backfill-sw-entry.js`
+- `src/extension/content-entry.js`
+- `src/extension/popup-entry.js`
+- `src/extension/venue-entry.js`
+- `src/extension/venueBar.js`
+- `src/lib/avatarPartsComposer.js`
+- `src/lib/backfillRemoveGiftSystemMessages.js`
+- `src/lib/broadcasterReputationView.js`
+- `src/lib/celebrationCharaAssets.js`
+- `src/lib/cleanNdgrChatRows.js`
+- `src/lib/comeviewInstantRender.js`
+- `src/lib/commentKindnessNudge.js`
+- `src/lib/commentTickerLatestHtml.js`
+- `src/lib/commentTickerNameLink.js`
+- `src/lib/deepExportPolicy.js`
+- `src/lib/deepHarvestReason.js`
+- `src/lib/enrichmentAvatarFallback.js`
+- `src/lib/globalFetchRateLimiter.js`
+- `src/lib/interceptAvatarHydration.js`
+- `src/lib/kiramekiAwardsSectionHtml.js`
+- `src/lib/lengthDelimitedStream.js`
+- `src/lib/marketingAggregate.js`
+- `src/lib/marketingChartsHtml.js`
+- `src/lib/nicoUserProfileApi.js`
+- `src/lib/officialNicoStatsStripDigest.js`
+- `src/lib/officialStatsWindow.js`
+- `src/lib/popupWatchMetaConcurrentGate.js`
+- `src/lib/reportSilentError.js`
+- `src/lib/shouldSkipDeepHarvest.js`
+- `src/lib/topSupportRankAnonymousFold.js`
+- `src/lib/topSupportRankStripLines.js`
+- `src/lib/userSupportGridAccent.js`
+- `src/lib/voiceAssignment.js`
+- `src/lib/voicevoxClient.js`
+- `src/lib/watchFrameRank.js`
+- `src/lib/watchSnapshotAlignment.js`
+- `src/lib/watchTabPrioritize.js`
+- `tests/e2e/acquisition-dashboard-render.spec.js`
+- `tests/e2e/ad-ranking-card-no-clip.spec.js`
+- `tests/e2e/avatar-load-diag.spec.js`
+- `tests/e2e/backfill-optin-button.spec.js`
+- `tests/e2e/card-count-no-overflow.spec.js`
+- `tests/e2e/card-freshness-note.spec.js`
+- `tests/e2e/comment-post.spec.js`
+- `tests/e2e/comment-send-ctx-invalidated-recovery.spec.js`
+- `tests/e2e/comment-ticker-render.spec.js`
+- `tests/e2e/compose-toolbar.spec.js`
+- `tests/e2e/contribution-card-no-clip.spec.js`
+- `tests/e2e/contribution-ranking-official-link.spec.js`
+- `tests/e2e/event-broadcasters-lane.spec.js`
+- `tests/e2e/event-card-show-when-participating.spec.js`
+- `tests/e2e/event-current-rank-display.spec.js`
+- `tests/e2e/extension-interaction.spec.js`
+- `tests/e2e/extension-recording.spec.js`
+- `tests/e2e/fixtures.js`
+- `tests/e2e/gift-history-live-source.spec.js`
+- `tests/e2e/gift-history-points-ranking.spec.js`
+- `tests/e2e/global-teardown.js`
+- `tests/e2e/header-placement-quickbar-narrow-hint.spec.js`
+- `tests/e2e/header-placement-quickbar.spec.js`
+- `tests/e2e/hidden-iframe-audition-only.spec.js`
+- `tests/e2e/html-report-event-ranking.spec.js`
+- `tests/e2e/inline-panel-align.spec.js`
+- `tests/e2e/inline-panel-realtime-refresh.spec.js`
+- `tests/e2e/lane-wait-honest.spec.js`
+- `tests/e2e/live-chat-check.spec.js`
+- `tests/e2e/multitab-storage-contention.spec.js`
+- `tests/e2e/nico-user-profile-resolve.spec.js`
+- `tests/e2e/nicoad-ad-ranking-display.spec.js`
+- `tests/e2e/open-comment-asset-picker.spec.js`
+- `tests/e2e/page-frame.spec.js`
+- `tests/e2e/panel-metrics-cold-open.spec.js`
+- `tests/e2e/panel-vanish-debounce.spec.js`
+- `tests/e2e/popup-comment-compose.spec.js`
+- `tests/e2e/popup-compose-visibility.spec.js`
+- `tests/e2e/popup-double-scroll.spec.js`
+- `tests/e2e/popup-layout.spec.js`
+- `tests/e2e/popup-live-stat-cards.spec.js`
+- `tests/e2e/popup-monkey.spec.js`
+- `tests/e2e/popup-no-auto-mic.spec.js`
+- `tests/e2e/popup-open-performance.spec.js`
+- `tests/e2e/popup-settings-details.spec.js`
+- `tests/e2e/refresh-storage-hang-resilient.spec.js`
+- `tests/e2e/save-ctx-invalidated-recovery.spec.js`
+- `tests/e2e/smoke.spec.js`
+- `tests/e2e/snapshot-fetch-hang-resilient.spec.js`
+- `tests/e2e/storage-banners.spec.js`
+- `tests/e2e/support-activity-timeline.spec.js`
+- `tests/e2e/support-timeline-persist-open.spec.js`
+- `tests/e2e/thumbnail-capture.spec.js`
+- `tests/e2e/timeline-fill-standalone-window.spec.js`
+- `tests/e2e/watch-messaging.spec.js`
+- `tools/mcp-nicolive/server.mjs`
+
+- 📁 **api/** (1)
+  - `status.js` — status 受け口 Vercel Serverless Function。
+- 📁 **app/** (2)
+  - `app.js` — スマホ閲覧用 status Web 版。
+  - `index.html`
+- 📁 **docs/** (66)
+  - 📁 **article-assets/** (3)
+    - `venue-mode-sound.mp4`
+    - `venue-mode.gif`
+    - `venue-mode.mp4`
+  - 📁 **feature-map/** (13)
+    - `backfill-sw.md`
+    - `comeview.md`
+    - `content.md`
+    - `impact-map.json`
+    - `impact-map.md`
+    - `index.md`
+    - `offscreen.md`
+    - `page-intercept.md`
+    - `popup.md`
+    - `status.md`
+    - `storage-bus.md`
+    - `venue.md`
+    - `web-status.md`
+  - 📁 **policies/** (1)
+    - `STATS_FAILURE_MODES.md`
+  - 📁 **releases/** (4)
+    - `0.1.7-x-article.md`
+    - `cws-publish-api-setup.md`
+    - `cws-store-listing.md`
+    - `cws-submission-texts.md`
+  - 📁 **research/** (2)
+    - `gift-ranking-deep-research-2026-05-15.md`
+    - `gift-related-deep-research.md`
+  - 📁 **workflows/** (1)
+    - `tdd-ui-ux-roadmap.md`
+  - `MAP.md`
+  - `agents-session-history-archive.md`
+  - `codex-commenter-follow-analytics-v0535.md`
+  - `codex-event-lane-stuck-fix-v0613.md`
+  - `codex-gift-throw-ledger-data-v0572.md`
+  - `codex-interest-arrival-analytics-v0563.md`
+  - `codex-koken-api-lane-stuck-fix-v0616.md`
+  - `codex-marketing-analytics-brief-v0205-addendum.md`
+  - `codex-marketing-analytics-brief.md`
+  - `codex-self-action-celebration-v0557.md`
+  - `codex-supporter-power-scoring-design-v0607.md`
+  - `codex-watch-frozen-investigation-v0606.md`
+  - `comment-ingest-log-debug.md`
+  - `comment-metadata-pipeline-notes.md`
+  - `comment-number-rescue-flow.html`
+  - `cursor-handoff-direct-concurrent-viewers.md`
+  - `extension-bump-checklist.md`
+  - `inline-popup-sync.md`
+  - `investigation-prompt-popup-not-appearing.md`
+  - `koken-contrib-hidden-tab-stuck-fix-v0616.md`
+  - `lane-architecture-redesign.md`
+  - `llm-handoff-inline-panel-current-state.md`
+  - `llm-handoff-questions.md`
+  - `loading-scroll-research-checklist.md`
+  - `lp-preview.html`
+  - `north-star-lane-repaint-refactor-v0617.md`
+  - `opening-celebration-repro-protocol.md`
+  - `person-tile-architecture.html`
+  - `person-tile-architecture.md`
+  - `plan-avatar-resolver-refactor.md`
+  - `plan-empty-state-no-broadcast.md`
+  - `plan-story-user-lane-tiers.md`
+  - `reference_deterministic_backfill.md`
+  - `reliability-backlog-phase-b.md`
+  - `repo-tree-map.html`
+  - `repo-tree-map.md`
+  - `research-nicolive-pc-comments.md`
+  - `site-health.md`
+  - `story-user-lane-pipeline.md`
+  - `surechigai-lite-improvement-plan.md`
+  - `ux-tdd-hypothesis-matrix.md`
+  - `visual-explainer.md`
+- 📁 **extension/** (97)
+  - 📁 **images/** (87)
+    - 📁 **avatar-parts/** (22)
+      - `cheek-0.png`
+      - `cheek-1.png`
+      - `eyes-jito.png`
+      - `eyes-open.png`
+      - `eyes-sleepy.png`
+      - `eyes-smile.png`
+      - `eyes-sparkle.png`
+      - `eyes-surprised.png`
+      - `hair-bob.png`
+      - `hair-center-part.png`
+      - `hair-long.png`
+      - `hair-mushroom.png`
+      - `hair-ponytail.png`
+      - `hair-short-flip.png`
+      - `hair-twintail.png`
+      - `hair-wolf.png`
+      - `mouth-mu.png`
+      - `mouth-omega.png`
+      - `mouth-open.png`
+      - `mouth-pokan.png`
+      - `mouth-smile.png`
+      - `mouth-smirk.png`
+    - 📁 **creator/** (1)
+      - `character.png`
+    - 📁 **logo/** (17)
+      - `kimito-link-color.png`
+      - `kimito-link-ginga-color.png`
+      - `kimito-maru-black.png`
+      - `kimito-rinku-app-icon-128.png`
+      - `kimito-rinku-app-icon-16.png`
+      - `kimito-rinku-app-icon-2048.png`
+      - `kimito-rinku-app-icon-256.png`
+      - `kimito-rinku-app-icon-32.png`
+      - `kimito-rinku-app-icon-48.png`
+      - `kimito-rinku-app-icon-512.png`
+      - `konta-yukkuri-icon-128.png`
+      - `konta-yukkuri-icon-16.png`
+      - `konta-yukkuri-icon-256.png`
+      - `konta-yukkuri-icon-32.png`
+      - `konta-yukkuri-icon-48.png`
+      - `konta-yukkuri-icon-512.png`
+      - `nc321221_creatorcross.png`
+    - 📁 **lp/** (2)
+      - `sample-circle-icon.png`
+      - `twitter-icon.png`
+    - 📁 **marketing-html-avatars/** (3)
+      - `konta-72.png`
+      - `rink-72.png`
+      - `tanu-72.png`
+    - 📁 **yukkuri-charactore-english/** (40)
+      - 📁 **konta/** (12)
+        - `kitsune-yukkuri-blink-mouth-closed.png`
+        - `kitsune-yukkuri-blink-mouth-closed.thumb128.png`
+        - `kitsune-yukkuri-blink-mouth-open.png`
+        - `kitsune-yukkuri-half-eyes-mouth-closed.png`
+        - `kitsune-yukkuri-half-eyes-mouth-closed.thumb128.png`
+        - `kitsune-yukkuri-half-eyes-mouth-open.png`
+        - `kitsune-yukkuri-mouth-closed.png`
+        - `kitsune-yukkuri-normal.png`
+        - `kitsune-yukkuri-normal.thumb128.png`
+        - `kitsune-yukkuri-smile-mouth-closed.png`
+        - `kitsune-yukkuri-smile-mouth-open.png`
+        - `kitsune-yukkuri-smile-mouth-open.thumb128.png`
+      - 📁 **link/** (15)
+        - `link-normal.png`
+        - `link-yukkuri-blink-mouth-closed.png`
+        - `link-yukkuri-blink-mouth-closed.thumb128.png`
+        - `link-yukkuri-blink-mouth-open.png`
+        - `link-yukkuri-fuji-background.png`
+        - `link-yukkuri-half-eyes-mouth-closed.png`
+        - `link-yukkuri-half-eyes-mouth-closed.thumb128.png`
+        - `link-yukkuri-half-eyes-mouth-open.png`
+        - `link-yukkuri-normal-mouth-closed.png`
+        - `link-yukkuri-normal-mouth-closed.thumb128.png`
+        - `link-yukkuri-normal-mouth-open.png`
+        - `link-yukkuri-normal-mouth-open.thumb128.png`
+        - `link-yukkuri-smile-mouth-closed.png`
+        - `link-yukkuri-smile-mouth-open.png`
+        - `link-yukkuri-smile-mouth-open.thumb128.png`
+      - 📁 **tanunee/** (13)
+        - `tanuki-yukkuri-blink-mouth-closed.png`
+        - `tanuki-yukkuri-blink-mouth-closed.thumb128.png`
+        - `tanuki-yukkuri-blink-mouth-open.png`
+        - `tanuki-yukkuri-half-eyes-mouth-closed.png`
+        - `tanuki-yukkuri-half-eyes-mouth-closed.thumb128.png`
+        - `tanuki-yukkuri-half-eyes-mouth-open.png`
+        - `tanuki-yukkuri-normal-mouth-closed.png`
+        - `tanuki-yukkuri-normal-mouth-closed.thumb128.png`
+        - `tanuki-yukkuri-normal-mouth-open.png`
+        - `tanuki-yukkuri-normal-mouth-open.thumb128.png`
+        - `tanuki-yukkuri-smile-mouth-closed.png`
+        - `tanuki-yukkuri-smile-mouth-open.png`
+        - `tanuki-yukkuri-smile-mouth-open.thumb128.png`
+    - `nico-retro-tv-placeholder.svg`
+    - `toumeilink.png`
+  - 📁 **sound/** (2)
+    - `voice-complete.mp3`
+    - `voice-watch.mp3`
+  - `background.js` — MV3 Service Worker
+  - `comeview.html`
+  - `manifest.json`
+  - `offscreen.html`
+  - `popup.html`
+  - `sidepanel.html`
+  - `status.html`
+  - `venue.html`
+- 📁 **scripts/** (28)
+  - 📁 **xserver/** (2)
+    - `github-webhook-pull.php.example`
+    - `webhook-git-pull-for-upload.php`
+  - `build-watch.mjs` — ⚠️ 役割コメント無し
+  - `build.mjs` — ⚠️ 役割コメント無し
+  - `capture-store-screenshots.mjs` — Chrome ウェブストア用スクショ自動撮影
+  - `cws-publish.mjs` — ⚠️ 役割コメント無し
+  - `delete-dead-lib.mjs` — scripts/delete-dead-lib.mjs — 死蔵lib実装ファイルとそのテストを削除
+  - `encode-marketing-html-avatars.mjs` — extension/images/marketing-html-avatars/*.png を data URI にし、
+  - `feature-map.mjs` — コードベースの「機能ごとマインドマップ」を自動生成する(2026-06-17 会議結論)。
+  - `fix-src-images-mojibake.mjs` — Normalizes known mojibake paths under src/images (mirrored from kimito-link).
+  - `gen-loading-thumbs.py`
+  - `impact-check.mjs` — 星野ロミ式「規律を自動ゲートに」(2026-06-18・COUNCIL の次の一手)。
+  - `inspect-nicolive-watch-stats.mjs` — ⚠️ 役割コメント無し
+  - `meeting.mjs` — ⚠️ 役割コメント無し
+  - `repo-tree-map.mjs` — リポジトリのディレクトリツリー＋各ディレクトリの「役割」を自動生成する(2026-06-18 ユーザー提案)。
+  - `resize-marketing-html-avatars.ps1`
+  - `run-e2e.mjs` — SKIP_E2E=1 のときは成功終了（CI などディスプレイなし環境用）。
+  - `run-verify-cc.mjs` — ⚠️ 役割コメント無し
+  - `scan-dead-lib.mjs` — scripts/scan-dead-lib.mjs — lib/ の死蔵ファイルを entry から到達性スキャンして報告
+  - `setup-claude-code.mjs` — ⚠️ 役割コメント無し
+  - `site-health.mjs` — 公開ページ(LP/記事/docs)の「内部リンク健全性」を検証する(2026-06-18・COUNCIL bug-proof-map)。
+  - `split-avatar-parts.mjs` — 偽市松背景の除去 + パーツ切り出し(one-off アセットパイプライン)
+  - `split-changelog.mjs` — scripts/split-changelog.mjs — changelog.js を直近20版(本体)と旧版(archive)に分割
+  - `stage-submission.py`
+  - `sync-lp-twitter-icon.mjs` — LP 右端コラボ用: src/images/icon/twitter-icon.png → extension/images/lp/twitter-icon.png
+  - `vendor-visual-explainer.mjs` — Vendors nicobailon/visual-explainer (MIT) into .cursor/skills/visual-explainer/
+  - `verify-bump.mjs` — ⚠️ 役割コメント無し
+  - `write-extension-placeholder-icons.mjs` — リポジトリに 256px アイコンしか無い環境向け: manifest 用の小さめ PNG を生成する。
+- 📁 **src/** (1087)
+  - 📁 **data/** (6)
+    - 📁 **acquirers/** (2)
+      - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
+      - `laneFromStorage.test.js`
+    - 📁 **sources/** (2)
+      - `laneFromStoredComments.js` — 応援ユーザーレーン: 保存済みコメント配列 → LaneCandidate[] の adapter。
+      - `laneFromStoredComments.test.js`
+    - 📁 **store/** (2)
+      - `laneStore.js` — 応援ユーザーレーンの単一 store。
+      - `laneStore.test.js`
+  - 📁 **domain/** (18)
+    - 📁 **lane/** (7)
+      - 📁 **columns/** (3)
+        - `kontaPolicy.js` — こん太段（konta）の配属 policy — 過渡状態 catchall。
+        - `linkPolicy.js` — りんく段（link）の配属 policy。
+        - `tanuPolicy.js` — たぬ姉段（tanu）の配属 policy。
+      - `aggregate.js` — 応援ユーザーレーンの per-row → per-user 集約（純関数）。
+      - `aggregate.test.js`
+      - `tier.js` — 応援ユーザーレーンの tier（段）決定。
+      - `tier.test.js`
+    - 📁 **observations/** (5)
+      - `StatObservation.js` — StatObservation - ニコ生から取得する数値の「契約付き観測値」純関数 factory。
+      - `StatObservation.test.js`
+      - `observationStore.js` — observationStore - StatObservation のメモリ常駐リングバッファ。
+      - `observationStore.test.js`
+      - `vocabulary.js` — 観測層 (StatObservation) の語彙集 - 不変な enum 定義のみ。
+    - 📁 **user/** (6)
+      - `avatar.js` — ユーザーのアバター観測信号と表示 URL を 1 箇所で組み立てる純関数。
+      - `avatar.test.js`
+      - `avatarResolver.js` — アバター解決の単一エントリポイント（Hoshino-Romi 流 single component）。
+      - `avatarResolver.test.js`
+      - `identity.js` — ニコ生ユーザー ID の「匿名性」判定と関連アイデンティティ・ユーティリティ。
+      - `nickname.js` — 表示名（ニックネーム）の「強弱」判定。
+  - 📁 **extension/** (11)
+    - 📁 **story/** (1)
+      - `renderStoryUserLaneDom.js` — 応援ユーザーレーン DOM の同期（popup-entry から切り出し・状態は引数で受け取る）。
+    - `backfill-sw-entry.js` — ⚠️ 役割コメント無し
+    - `comeview-entry.js` — v0.1.652: 独自コメビュ「KIRAMEKI Comment View」(comeview.html)。
+    - `content-entry.js` — ⚠️ 役割コメント無し
+    - `offscreen-entry.js` — feat/multitab-scale-globalcap（2026-05-31）: コメント IDB の「常駐・単一書き手」を担う
+    - `page-intercept-entry.js` — MAIN world エントリ（esbuild で単一 IIFE にバンドルされる）
+    - `popup-entry.js` — ⚠️ 役割コメント無し
+    - `popupUserLaneAvatarObservedFlow.test.js`
+    - `status-entry.js` — v0.1.629: 固定 URL 状態表示ページ。
+    - `venue-entry.js` — ⚠️ 役割コメント無し
+    - `venueBar.js` — ⚠️ 役割コメント無し
+  - 📁 **fixtures/** (1)
+    - `nicolive-comment-list.html`
+  - 📁 **images/** (165)
+    - 📁 **brand/** (39)
+      - 📁 **backgrounds/** (1)
+        - `galaxy-background.PNG`
+      - 📁 **logo/** (37)
+        - 📁 **black/** (3)
+          - `logo_kimito-link_black_RGB_black.png`
+          - `logo_kimito-link_black_RGB_link_black.png`
+          - `logo_kimito-link_black_RGB_maru_black.png`
+        - 📁 **color/** (31)
+          - `logo_funlink_CMYK_color.jpg`
+          - `logo_funlink_CMYK_ginga_color.jpg`
+          - `logo_funlink_CMYK_maru_blue.jpg`
+          - `logo_funlink_CMYK_maru_orange.jpg`
+          - `logo_funlink_RGB_black.jpg`
+          - `logo_funlink_RGB_black.png`
+          - `logo_funlink_RGB_color.jpg`
+          - `logo_funlink_RGB_color.png`
+          - `logo_funlink_RGB_favi_blue.jpg`
+          - `logo_funlink_RGB_favi_blue.png`
+          - `logo_funlink_RGB_favi_orange.jpg`
+          - `logo_funlink_RGB_favi_orange.png`
+          - `logo_funlink_RGB_ginga_color.jpg`
+          - `logo_funlink_RGB_ginga_color.png`
+          - `logo_funlink_RGB_maru_black.jpg`
+          - `logo_funlink_RGB_maru_black.png`
+          - `logo_funlink_RGB_maru_blue.jpg`
+          - `logo_funlink_RGB_maru_blue.png`
+          - `logo_funlink_RGB_maru_orange.jpg`
+          - `logo_funlink_RGB_maru_orange.png`
+          - `logo_funlink_RGB_white.png`
+          - `logo_kimito-link_RGB_color.png`
+          - `logo_kimito-link_RGB_favi_blue.png`
+          - `logo_kimito-link_RGB_favi_orange.png`
+          - `logo_kimito-link_RGB_ginga_color.png`
+          - `logo_kimito-link_RGB_hoshi.png`
+          - `logo_kimito-link_RGB_link_hoshi.png`
+          - `logo_kimito-link_RGB_link_orange.png`
+          - `logo_kimito-link_RGB_maru_blue.png`
+          - `logo_kimito-link_RGB_maru_ginga.png`
+          - `logo_kimito-link_RGB_maru_orange.png`
+        - 📁 **white/** (3)
+          - `logo_kimito-link_white_RGB_black.png`
+          - `logo_kimito-link_white_RGB_link_black.png`
+          - `logo_kimito-link_white_RGB_maru_black.png`
+      - `logo_guide.pdf`
+    - 📁 **company/** (2)
+      - `logo.png`
+      - `sample-company.png`
+    - 📁 **creator/** (3)
+      - `character.png`
+      - `kimito-link-main-image.png`
+      - `sample-creator.png`
+    - 📁 **downloads/** (18)
+      - 📁 **company/** (9)
+        - 📁 **black/** (2)
+          - `logo_funlink_black_CMYK_black.jpg`
+          - `logo_funlink_black_RGB_black.png`
+        - 📁 **color/** (6)
+          - `logo_funlink_CMYK_color.jpg`
+          - `logo_funlink_CMYK_maru_blue.jpg`
+          - `logo_funlink_CMYK_maru_orange.jpg`
+          - `logo_funlink_RGB_color.png`
+          - `logo_funlink_RGB_maru_blue.png`
+          - `logo_funlink_RGB_maru_orange.png`
+        - 📁 **white/** (1)
+          - `logo_funlink_white_RGB_black.png`
+      - 📁 **creator/** (9)
+        - 📁 **black/** (2)
+          - `logo_funlink_black_RGB_black.png`
+          - `logo_funlink_black_RGB_maru_black.png`
+        - 📁 **color/** (5)
+          - `logo_funlink_RGB_color.png`
+          - `logo_funlink_RGB_ginga_color.png`
+          - `logo_funlink_RGB_maru_blue.png`
+          - `logo_funlink_RGB_maru_ginga.png`
+          - `logo_funlink_RGB_maru_orange.png`
+        - 📁 **white/** (2)
+          - `logo_funlink_white_RGB_black.png`
+          - `logo_funlink_white_RGB_maru_black.png`
+    - 📁 **googlechrom/** (3)
+      - `konta-yukkuri-icon-128.png`
+      - `marquee-1400x560.jpg`
+      - `promo-tile-440x280.jpg`
+    - 📁 **icon/** (7)
+      - `instagram-icon.png`
+      - `kewXCUOt_400x400.jpg`
+      - `sample-circle-icon.png`
+      - `ticktock-icon.png`
+      - `twitter-icon.png`
+      - `x-icon.png`
+      - `youtube-con.png`
+    - 📁 **kobou/** (16)
+      - 📁 **web-health-check/** (16)
+        - `csv-export.png`
+        - `diagnosis-summary.png`
+        - `dns-info.png`
+        - `email-security.png`
+        - `ip-info.png`
+        - `main-screen.png`
+        - `score-evaluation.png`
+        - `security-wordpress.png`
+        - `seo-headings.png`
+        - `seo-meta.png`
+        - `site-category-structure.png`
+        - `ssl-certificate.png`
+        - `suggest-check.png`
+        - `theme-plugins.png`
+        - `wayback-machine.png`
+        - `whois-info.png`
+    - 📁 **line/** (2)
+      - 📁 **rich-message/** (2)
+        - `kimito-link-rich-message-1040x1040.png`
+        - `line-rich-message-source.png`
+    - 📁 **logo/** (13)
+      - 📁 **black/** (3)
+        - `logo_kimito-link_black_RGB_black.png`
+        - `logo_kimito-link_black_RGB_link_black.png`
+        - `logo_kimito-link_black_RGB_maru_black.png`
+      - 📁 **color/** (4)
+        - `logo_kimito-link_RGB_color.png`
+        - `logo_kimito-link_RGB_ginga_color.png`
+        - `logo_kimito-link_RGB_hoshi.png`
+        - `logo_kimito-link_RGB_link_hoshi.png`
+      - 📁 **データ一式/** (3)
+        - 📁 **RGB/** (1)
+          - `logo_kimitolink_RGB_ginga_color.jpg`
+        - `251016_logo_guide_kimitolink_ol.ai`
+        - `251016_logo_guide_kimitolink_ol.pdf`
+      - `creatorcrossposter.png`
+      - `logo-text.png`
+      - `nc321221_creatorcross.png`
+    - 📁 **og/** (3)
+      - `og-characters-trio.png`
+      - `og-kimilink-voice.png`
+      - `og-wcag-editorial-3x1.png`
+    - 📁 **utilized-multiple-ways/** (1)
+      - 📁 **cd-case/** (1)
+        - `cd-case-01.jpg`
+    - 📁 **yukkuri-charactore-english/** (26)
+      - 📁 **konta/** (8)
+        - `kitsune-yukkuri-blink-mouth-closed.png`
+        - `kitsune-yukkuri-blink-mouth-open.png`
+        - `kitsune-yukkuri-half-eyes-mouth-closed.png`
+        - `kitsune-yukkuri-half-eyes-mouth-open.png`
+        - `kitsune-yukkuri-mouth-closed.png`
+        - `kitsune-yukkuri-normal.png`
+        - `kitsune-yukkuri-smile-mouth-closed.png`
+        - `kitsune-yukkuri-smile-mouth-open.png`
+      - 📁 **link/** (10)
+        - `link-normal.png`
+        - `link-yukkuri-blink-mouth-closed.png`
+        - `link-yukkuri-blink-mouth-open.png`
+        - `link-yukkuri-fuji-background.png`
+        - `link-yukkuri-half-eyes-mouth-closed.png`
+        - `link-yukkuri-half-eyes-mouth-open.png`
+        - `link-yukkuri-normal-mouth-closed.png`
+        - `link-yukkuri-normal-mouth-open.png`
+        - `link-yukkuri-smile-mouth-closed.png`
+        - `link-yukkuri-smile-mouth-open.png`
+      - 📁 **tanunee/** (8)
+        - `tanuki-yukkuri-blink-mouth-closed.png`
+        - `tanuki-yukkuri-blink-mouth-open.png`
+        - `tanuki-yukkuri-half-eyes-mouth-closed.png`
+        - `tanuki-yukkuri-half-eyes-mouth-open.png`
+        - `tanuki-yukkuri-normal-mouth-closed.png`
+        - `tanuki-yukkuri-normal-mouth-open.png`
+        - `tanuki-yukkuri-smile-mouth-closed.png`
+        - `tanuki-yukkuri-smile-mouth-open.png`
+    - 📁 **データ出力/** (31)
+      - 📁 **black/** (8)
+        - 📁 **JPEG/** (4)
+          - `logo_funlink_black_CMYK.ai`
+          - `logo_funlink_black_CMYK_black.jpg`
+          - `logo_funlink_black_CMYK_link_black.jpg`
+          - `logo_funlink_black_CMYK_maru_black.jpg`
+        - 📁 **PNG/** (4)
+          - `logo_funlink_black_RGB.ai`
+          - `logo_funlink_black_RGB_black.png`
+          - `logo_funlink_black_RGB_link_black.png`
+          - `logo_funlink_black_RGB_maru_black.png`
+      - 📁 **color/** (18)
+        - 📁 **CMYK_データ用/** (9)
+          - `logo_funlink_CMYK.ai`
+          - `logo_funlink_CMYK_color.jpg`
+          - `logo_funlink_CMYK_ginga_color.jpg`
+          - `logo_funlink_CMYK_hoshi.jpg`
+          - `logo_funlink_CMYK_link_hoshi.jpg`
+          - `logo_funlink_CMYK_link_orange.jpg`
+          - `logo_funlink_CMYK_maru_blue.jpg`
+          - `logo_funlink_CMYK_maru_ginga.jpg`
+          - `logo_funlink_CMYK_maru_orange.jpg`
+        - 📁 **RGB_データ用/** (9)
+          - `logo_funlink_RGB.ai`
+          - `logo_funlink_RGB_color.png`
+          - `logo_funlink_RGB_ginga_color.png`
+          - `logo_funlink_RGB_hoshi.png`
+          - `logo_funlink_RGB_link_hoshi.png`
+          - `logo_funlink_RGB_link_orange.png`
+          - `logo_funlink_RGB_maru_blue.png`
+          - `logo_funlink_RGB_maru_ginga.png`
+          - `logo_funlink_RGB_maru_orange.png`
+      - 📁 **white/** (4)
+        - `logo_funlink_white_RGB.ai`
+        - `logo_funlink_white_RGB_black.png`
+        - `logo_funlink_white_RGB_link_black.png`
+        - `logo_funlink_white_RGB_maru_black.png`
+      - `logo_guide_funlink_ol.pdf`
+    - `hero-connect-hub.svg`
+  - 📁 **lib/** (877)
+    - 📁 **fixtures/** (2)
+      - `interceptLearn.sample.json`
+      - `nicoliveVisitorJoinSignal.placeholder.json`
+    - 📁 **mcpBridge/** (11)
+      - `buildLiveMcpSnapshot.js` — L0 Evidence（拡張の観測データ）→ L1 Canonical Snapshot 変換。
+      - `buildLiveMcpSnapshot.test.js`
+      - `buildMcpMismatchReasons.js` — MCP L1 snapshot の `diag.mismatchReasons` を組み立てる純関数。
+      - `buildMcpMismatchReasons.test.js`
+      - `buildMcpRankingSnippet.js` — MCP / L1 向けに貢献度・広告ランキングの **PII 最小スナップショット** を組み立てる。
+      - `buildMcpRankingSnippet.test.js`
+      - `mergeLiveMcpSnapshot.js` — Canonical Snapshot のマージ（Deterministic + Monotonic Sequence）。
+      - `schema.js` — L1 Canonical Snapshot の schema 定義（MCP Bridge から AI に返す正準形）。
+      - `schema.test.js`
+      - `validateAndMerge.test.js`
+      - `validateLiveMcpSnapshot.js` — Canonical Snapshot の構造検証。schema.js の isCanonicalLiveSnapshot より詳細な
+    - `acquisitionDashboardChart.js` — 「データ取得率」ダッシュボードのチャート計算（純関数）。
+    - `acquisitionDashboardChart.test.js`
+    - `aiShareDiagSchema.js` — AI 共有診断バンドル（popup が組み立てる JSON / storage の nls_ai_share_fast_diag_v1）の
+    - `aiShareFastDiagKey.js` — v0.1.629: AI 共有 fastDiag キャッシュの storage key を popup と status ページで共有。
+    - `aiShareFastDiagKey.test.js`
+    - `aiSharePopupDiagKey.js` — AI 共有「popup 固有診断」キャッシュの storage key を popup と status ページで共有。
+    - `aiSharePopupDiagKey.test.js`
+    - `anonymousIdenticon.js` — 匿名 userId 向けの決定論的アバター（SVG data URL）。
+    - `anonymousIdenticon.test.js`
+    - `audienceEngagementGap.js` — 来場者数は多いがコメントが少ない状態を検出するローカル分析コア。
+    - `audienceEngagementGap.test.js`
+    - `auditionEventRankingApi.js` — audition 公式「イベント💎ランキング」無認証 JSON API の URL 組立 & 正規化（純関数）。
+    - `auditionEventRankingApi.test.js`
+    - `autoBackupState.js` — v0.1.808(星野ロミ式コンポーネント化・第1弾): content-entry.js の巨大化を抑えるため、
+    - `autoBackupState.test.js`
+    - `avatarBroadcasterGuard.js` — 配信者アイコン取り違え防止ガード（純粋関数）。
+    - `avatarBroadcasterGuard.test.js`
+    - `avatarPartsComposer.js` — ⚠️ 役割コメント無し
+    - `avatarPartsComposer.test.js`
+    - `avatarUrlCompare.js` — アバター URL の比較用ヘルパ（純粋関数）。
+    - `avatarUrlCompare.test.js`
+    - `backfillBgKickSwMirror.test.js`
+    - `backfillCapturedAt.js` — v0.1.405: バックフィルした過去コメントの「実時刻 capturedAt」を推定する純関数。
+    - `backfillCapturedAt.test.js`
+    - `backfillFlushThreshold.js` — バックフィル（過去ログ一括取り込み）の persist フラッシュ閾値を、
+    - `backfillFlushThreshold.test.js`
+    - `backfillHeartbeat.js` — v0.1.795: 裏(背面)タブでも過去ログ backfill を取り切るための「ハートビート」純ロジック。
+    - `backfillHeartbeat.test.js`
+    - `backfillOptIn.js` — v0.1.405: 過去ログ一括バックフィル（NDGR backward 巡回）の opt-in 判定 純関数群。
+    - `backfillOptIn.test.js`
+    - `backfillRemoveGiftSystemMessages.js` — ⚠️ 役割コメント無し
+    - `backfillRemoveGiftSystemMessages.test.js`
+    - `backfillRemoveRecommendedLivePollution.js` — v0.1.200: v0.1.199 以前の間に「おすすめ生放送」セクションの DOM が
+    - `backfillRemoveRecommendedLivePollution.test.js`
+    - `backfillRetryBackoff.js` — v0.1.442: 過去ログバックフィルの一過性 stop 自動リトライの遅延計算（純関数）。
+    - `backfillRetryBackoff.test.js`
+    - `backfillRinkuNarration.js` — v0.1.410: 過去ログ取り込み（backfill）の進捗に合わせた「りんくのセリフ」を返す純関数。
+    - `backfillRinkuNarration.test.js`
+    - `backfillRotationGate.js` — v0.1.642: backfill の rotation_yield(90秒強制打ち切り)を「待機している別タブが居るときだけ」
+    - `backfillRotationGate.test.js`
+    - `backfillSlotAutoThrottle.js` — v0.1.6xx: 複数タブ並列 backfill の動的throttle純関数(PR2)。
+    - `backfillSlotAutoThrottle.test.js`
+    - `backfillSlotPool.js` — v0.1.663: 複数タブ並列 backfill のスロットプール(純ロジック)。
+    - `backfillSlotPool.test.js`
+    - `backfillTransientRetry.js` — v0.1.431: 過去ログ一括バックフィルの「一過性 stop での自動リトライ」判定（純ロジック）。
+    - `backfillTransientRetry.test.js`
+    - `backfillVisibilityRearm.js` — v0.1.633: 過去ログ一括バックフィルの「タブ可視状態に戻った時の再開(rearm)」判定（純ロジック）。
+    - `backfillVisibilityRearm.test.js`
+    - `blobDownload.js` — Blob を指定ファイル名で保存する。
+    - `blobDownload.test.js`
+    - `broadcastContext.js` — v0.1.793: 「この配信の配信者(broadcaster)情報」を 1 か所で型定義し、storage キー・
+    - `broadcastContext.test.js`
+    - `broadcastCrossCompare.js` — 0.1.24 (Y): 横断比較系の純粋関数群。
+    - `broadcastCrossCompare.test.js`
+    - `broadcastDurationLabel.js` — HTML レポートの「配信時間」表示ラベルを純粋に整形する。
+    - `broadcastDurationLabel.test.js`
+    - `broadcastNarrativeBuilder.js` — コメント本文だけから「配信内容の流れ」を再構成する純粋関数。
+    - `broadcastNarrativeBuilder.test.js`
+    - `broadcastReportSummary.js` — HTML レポート / マーケ分析の双方で使う「放送全体の純粋集計」。
+    - `broadcastReportSummary.test.js`
+    - `broadcastSessionSummaryDb.js` — 配信セッション単位の軽量サマリ（ポップアップの IndexedDB）
+    - `broadcastSessionSummaryFlush.js` — サマリ IndexedDB への間欠フラッシュ（ポップアップから呼ぶ）
+    - `broadcastSessionSummaryFlush.test.js`
+    - `broadcastUrl.dom.test.js`
+    - `broadcastUrl.js` — ニコニコ生放送 URL / パスから lv ID を取り出す（純関数・DOM非依存）
+    - `broadcastUrl.test.js`
+    - `broadcastWaveformFingerprint.js` — L3: コメ波形フィンガープリント。
+    - `broadcastWaveformFingerprint.test.js`
+    - `broadcasterExcludedCount.js` — v0.1.774: 記録カードの見出し数値から「配信者本人のコメント」を差し引いて、公式(本家コメ)と
+    - `broadcasterExcludedCount.test.js`
+    - `broadcasterFollowTarget.js` — 配信者タイル / casterBanner で出す「配信者の page URL とアイコン」を、
+    - `broadcasterFollowTarget.test.js`
+    - `broadcasterProfileCard.js` — 配信者プロフィールの「レポート用 正規化モデル」と HTML 断片ビルダー（純関数）。
+    - `broadcasterProfileCard.test.js`
+    - `broadcasterReputationKeywords.js` — 配信者の評判チェック - ネガティブキーワード判定エンジン
+    - `broadcasterReputationKeywords.test.js`
+    - `broadcasterReputationView.js` — ⚠️ 役割コメント無し
+    - `broadcasterReputationView.test.js`
+    - `broadcasterUserId.js` — 配信者 userId を embedded-data / DOM から純粋関数で抽出する。
+    - `broadcasterUserId.test.js`
+    - `buildNorthStarAdRankingStatsHtml.js` — 北極星「広告ランキング」レーン用: watch の番組統計と一覧の「貢」の内訳を短い HTML にする。
+    - `buildNorthStarAdRankingStatsHtml.test.js`
+    - `buildWatchMetaCardAudienceViewModel.js` — Watch メタカード「観客」ブロック用 ViewModel（DOM 非依存）。
+    - `buildWatchMetaCardAudienceViewModel.test.js`
+    - `bundleFixesPresent.test.js`
+    - `capCommentsForAnalytics.js` — マーケ分析・タイムライン用のコメント上限（heavy 時の全件再走査を防ぐ）
+    - `capCommentsForAnalytics.test.js`
+    - `captureAuditionRichviewEventScoreDiagProbe.js` — audition.nicovideo.jp `/embedded/richview/live` 向けの診断ペイロード（PR1）。
+    - `captureAuditionRichviewEventScoreDiagProbe.test.js`
+    - `cardFreshnessNote.js` — カードの「鮮度」表示（最終更新からの経過）を作る純関数。
+    - `cardFreshnessNote.test.js`
+    - `celebrationCharaAssets.js` — ⚠️ 役割コメント無し
+    - `celebrationCommentIncrementalScan.js` — コメント配列のギフト／広告演出: 配信ごとに初回は全件 prime のみ、以降は追加分だけ process。
+    - `celebrationCommentIncrementalScan.test.js`
+    - `celebrationCommentScanSeed.js` — コメント走査系演出のシード（過去分を再発火させない）制御。
+    - `celebrationCommentScanSeed.test.js`
+    - `celebrationFlyText.js` — ニコニコ／ボカロ MV 風 — 文字が飛び交う演出の文言生成（純関数）。
+    - `celebrationFlyText.test.js`
+    - `celebrationPika.js` — パチンコ／ボカロ MV 風 — 画面全体「ぴかっ」フラッシュ spec（純関数）。
+    - `celebrationPika.test.js`
+    - `changelog-archive.js` — 追憶のきらめき 更新履歴アーカイブ（v0.1.663 以前）。
+    - `changelog.js` — 拡張の更新履歴データと semver 比較ヘルパ。
+    - `changelog.test.js`
+    - `channelBroadcasterMeta.js` — 公式チャンネル放送（運営・業者）の broadcaster メタを embedded-data から
+    - `channelBroadcasterMeta.test.js`
+    - `cheerPalette.js` — 盛り上げワード（8888 / wwwww / 顔文字 等）のワンクリック挿入パレット。
+    - `cheerPalette.test.js`
+    - `cleanNdgrChatRows.js` — ⚠️ 役割コメント無し
+    - `cleanNdgrChatRows.test.js`
+    - `comeviewActions.js` — v0.1.666: コメビュのコメント単位アクション(わんコメ同等+追憶独自)の純ロジック。
+    - `comeviewActions.test.js`
+    - `comeviewInstantRender.js` — ⚠️ 役割コメント無し
+    - `comeviewInstantRender.test.js`
+    - `comeviewRows.js` — v0.1.652: 独自コメビュ「KIRAMEKI Comment View」の表示行ロジック(純関数)。
+    - `comeviewRows.test.js`
+    - `comeviewUserNotes.js` — v0.1.667: コメビュのユーザー詳細(わんコメ式 ニックネーム/ラベル/メモ)の純ロジック。
+    - `comeviewUserNotes.test.js`
+    - `commentChunkStore.js` — v0.1.509: コメント本体の「追記専用チャンク分割」純関数群＋ストレージ orchestration。
+    - `commentChunkStore.test.js`
+    - `commentComposeShortcuts.js` — コメント欄の Enter 系キーで送信するか／既定動作に任せるか。
+    - `commentComposeShortcuts.test.js`
+    - `commentDb.js` — v0.1.514: コメント本体の保存先を `chrome.storage.local`（値まるごと structured clone・
+    - `commentDb.test.js`
+    - `commentEchoDetector.js` — L1 コメ伝染 + L5 コメ被り瞬間検出。
+    - `commentEchoDetector.test.js`
+    - `commentFatigue.js` — コメント疲労（「短い時間でコメントを打つと疲れて失速する」）をデータ化する純関数。
+    - `commentFatigue.test.js`
+    - `commentHarvest.js` — ニコ生PC: コメント一覧が仮想スクロールのため、スクロール位置を動かしながら DOM 上の行を拾い集める
+    - `commentHarvest.test.js`
+    - `commentIngestLog.js` — コメント取り込みの監査ログ（しおりのようにストレージへイベントが積まれる）。
+    - `commentIngestLog.test.js`
+    - `commentKindnessDisplayModel.js` — やさしさナッジ（コメント送信前の言い換え促し）の「表示モデル」を導出する純関数。
+    - `commentKindnessDisplayModel.test.js`
+    - `commentKindnessNudge.js` — ⚠️ 役割コメント無し
+    - `commentKindnessNudge.test.js`
+    - `commentObservabilityDiag.js` — v0.1.225: コメント記録の uid 解決経路を AI 共有診断 JSON に自動で乗せる純関数。
+    - `commentObservabilityDiag.test.js`
+    - `commentPanelHealthProbe.js` — ニコ生の watch ページでコメント欄が「見えない／届かない」状態を検出し、
+    - `commentPanelHealthProbe.test.js`
+    - `commentPanelStatus.js` — コメントパネル検出失敗（DOM 変更等）をポップアップ向けに解釈する純関数
+    - `commentPanelStatus.test.js`
+    - `commentPipelineLog.js` — コメント取り込みパイプラインの構造化デバッグログ（純関数フォーマッタ）。
+    - `commentPipelineLog.test.js`
+    - `commentPostDom.js` — コメント送信ボタン探索を、同一フォーム/近傍スコープを優先して行う。
+    - `commentPostDom.test.js`
+    - `commentPostRetriable.js` — popup のコメント送信で、別 frameId を試す価値があるか（8s 走査を避ける判定）。
+    - `commentPostRetriable.test.js`
+    - `commentPostStatusPresentation.js` — コメント送信 UI の「最終ステータス表示」と aria-describedby を決める純関数群。
+    - `commentPostStatusPresentation.test.js`
+    - `commentPostUi.js` — ポップアップのコメント送信 UI を、watch 接続状態と入力状態から一貫して決める。
+    - `commentPostUi.test.js`
+    - `commentProgressMonitor.js` — 記録進捗の自動監視ロジック（純関数）。
+    - `commentProgressMonitor.test.js`
+    - `commentRecord.js` — コメント1件の形・重複排除・マージ（純関数）
+    - `commentRecord.test.js`
+    - `commentRecordBreakdown.js` — v0.1.627: コメント記録カードの「内訳」表示用・純関数。
+    - `commentRecordBreakdown.test.js`
+    - `commentSendTroubleshootHint.js` — コメント送信エラー文に「再読み込み案内」を 1 回だけ追加する純関数。
+    - `commentSendTroubleshootHint.test.js`
+    - `commentSilenceZones.js` — コメントの沈黙ゾーン検出（連続 X 秒以上のコメ無し区間）+ L2 沈黙の質判定。
+    - `commentSilenceZones.test.js`
+    - `commentSubmitConfirm.js` — 拡張から watch のコメント欄へ送信したあと、入力欄の変化で成功を推定するためのポーリング。
+    - `commentSubmitConfirm.test.js`
+    - `commentSubmitProfiling.js` — コメント送信経路の手元プロファイル（本番常時 ON にしない）。
+    - `commentSubmitProfiling.test.js`
+    - `commentSubmitSteps.js` — コメント送信パイプラインの純粋な判定ロジック。
+    - `commentSubmitSteps.test.js`
+    - `commentSummary.js` — v0.1.508: コメント記録の「軽量サマリ（0 秒表示）」純関数群。
+    - `commentSummary.test.js`
+    - `commentTailBuffer.js` — v0.1.505: コメント保存の「テールバッファ（追記式チャンク）」純関数群。
+    - `commentTailBuffer.test.js`
+    - `commentTickerLatestHtml.js` — ⚠️ 役割コメント無し
+    - `commentTickerLatestHtml.test.js`
+    - `commentTickerNameLink.js` — ⚠️ 役割コメント無し
+    - `commentTickerNameLink.test.js`
+    - `commentVelocityTimeline.js` — コメントの時系列粒度集計と「笑い密度（L4 笑いの瞬間検出）」を純粋関数で計算する。
+    - `commentVelocityTimeline.test.js`
+    - `commentVelocityWindow.js` — 直近ウィンドウ内のコメント件数と「件/分」換算（純関数）
+    - `commentVelocityWindow.test.js`
+    - `commenterCulturalAnalytics.js` — L6 / L10 / L11 / L14 / L15 — 文化分析系の純粋関数を 1 ファイルに集約。
+    - `commenterCulturalAnalytics.test.js`
+    - `commenterFollowAnalytics.js` — 数値IDコメンターのフォロー情報を、マーケ分析HTMLで扱いやすい形へ整える純関数群。
+    - `commenterFollowAnalytics.test.js`
+    - `commenterFollowCache.js` — コメンター（数値 userId）のフォロー/フォロワー数・プレミアム・LV を userId 単位でためる
+    - `commenterFollowCache.test.js`
+    - `commenterFollowingListCache.js` — コメンター（数値 userId）のフォロー先 userId リスト横断キャッシュ。
+    - `commenterFollowingListCache.test.js`
+    - `commenterHistoricalAnalytics.js` — 過去 N 配信 × 現在配信のコメンターを横断分析する純粋関数群。
+    - `commenterHistoricalAnalytics.test.js`
+    - `commenterSurvivalCurve.js` — コメンター生存曲線（B6）。
+    - `commenterSurvivalCurve.test.js`
+    - `concurrentCalibrationFit.js` — 較正フィット（蓄積した較正サンプルから係数の「推奨値」を導く純関数）。
+    - `concurrentCalibrationFit.test.js`
+    - `concurrentCalibrationLog.js` — 同接推定の較正データロガー（しおりのようにストレージへサンプルが積まれる）。
+    - `concurrentCalibrationLog.test.js`
+    - `concurrentEstimate.js` — 複合シグナルによる同時接続数推定モジュール。
+    - `concurrentEstimate.test.js`
+    - `concurrentPeakAnalysis.js` — 同接推移カーブから「ピーク到達 / 終了時保持率 / 半減点」を求める純粋関数。
+    - `concurrentPeakAnalysis.test.js`
+    - `concurrentResolvedFromSnapshot.js` — watch スナップショット（content-entry の collectWatchPageSnapshot 戻り、popup へ送るのと
+    - `concurrentResolvedFromSnapshot.test.js`
+    - `concurrentTimelineSeries.js` — 同接推移カーブ（視聴維持率の核）の時系列データを純粋関数で構築する。
+    - `concurrentTimelineSeries.test.js`
+    - `consoleErrorBuffer.js` — v0.1.201: window.error / unhandledrejection を捕捉する ring buffer。
+    - `consoleErrorBuffer.test.js`
+    - `contentViewerNicoadCelebration.js` — watch ページ（content）上で、自分のニコニ広告を DOM から即検知して演出する。
+    - `crowdRasterizer.js` — 人数ラスタライザ Canvas (Antigravity Enhanced Version)
+    - `crowdRasterizer.test.js`
+    - `deepExportPolicy.js` — ⚠️ 役割コメント無し
+    - `deepExportPolicy.test.js`
+    - `deepHarvestReason.js` — ⚠️ 役割コメント無し
+    - `deepHarvestReason.test.js`
+    - `deriveAvatarUrlFromUid.js` — v0.1.203 Patch 1: niconico ユーザー UID から avatar URL を確定パターンで生成する純関数。
+    - `deriveAvatarUrlFromUid.test.js`
+    - `devMonitorAvatarStats.js` — 開発者向け監視: storage コメント配列からアバター／userId の集計（PII なし・件数のみ）
+    - `devMonitorAvatarStats.test.js`
+    - `devMonitorDebugSubset.js` — ポップアップ「開発・テスト用 監視」用: watch スナップショット _debug から
+    - `devMonitorDebugSubset.test.js`
+    - `devMonitorPaintGate.js` — v0.1.637: 開発者診断パネル(dev monitor)の重い集計を「パネルが開いているときだけ」走らせる
+    - `devMonitorPaintGate.test.js`
+    - `devMonitorTrendSession.js` — 開発監視トレンド: sessionStorage（セッション）+ chrome.storage.local（永続・最大7日）
+    - `devMonitorTrendSession.test.js`
+    - `devMonitorViz.js` — 開発・テスト用監視パネル向けの純粋 HTML 断片（DOM 非依存）。
+    - `devMonitorViz.test.js`
+    - `devReloadSignal.js` — 開発用ホットリロードのシグナル判定（純関数）。
+    - `devReloadSignal.test.js`
+    - `diagPaintDeferGate.js` — v0.1.639: paint 内の「重い diag 集計(全件 O(N))をスクロール中スキップしてよいか」の純判定。
+    - `diagPaintDeferGate.test.js`
+    - `diagWarnings.js` — v0.1.201: 診断 JSON の現在値から「なぜ取れていないか」を導出する純関数群。
+    - `diagWarnings.test.js`
+    - `diagnosticErrorRing.js` — chrome.storage.local に保存する診断エラーリング（純粋・マージのみ）。
+    - `diagnosticErrorRing.test.js`
+    - `diagnosticRedact.js` — AI共有・診断バンドル向けの URL / 文字列のサニタイズ（純粋関数）。
+    - `diagnosticRedact.test.js`
+    - `diagnosticRingStore.js` — 診断エラーリングを chrome.storage.local に追記（拡張コンテキスト専用）。
+    - `domHarvestScrollDefer.js` — 「ユーザーが今まさにスクロール中か」を判定して、コメントの DOM ハーベスト
+    - `domHarvestScrollDefer.test.js`
+    - `embeddedDataExtract.js` — ニコ生 watch ページの `#embedded-data[data-props]` から初期メタ情報を抽出する純関数。
+    - `embeddedDataExtract.test.js`
+    - `enrichmentAvatarFallback.js` — ⚠️ 役割コメント無し
+    - `enrichmentAvatarFallback.test.js`
+    - `errorAutoDiagnosis.js` — v0.1.205 Phase D: 既存の診断データ（consoleErrors / networkErrors / diagWarnings）から
+    - `errorAutoDiagnosis.test.js`
+    - `eventParticipationProgramsApi.js` — ニコ生「企画イベント参加番組一覧」公式 JSON API の URL 組立 & 正規化（純関数）。
+    - `eventParticipationProgramsApi.test.js`
+    - `eventRankingMarketingIntegration.test.js`
+    - `eventRankingReportModel.js` — イベントランキングの「レポート用 正規化モデル」純関数（Phase A・2026-05-26 会議）。
+    - `eventRankingReportModel.test.js`
+    - `eventRankingSectionHtml.js` — v0.1.810(星野ロミ式コンポーネント化・第3弾): popup-entry.js の巨大 HTML ビルダー
+    - `eventRankingSectionHtml.test.js`
+    - `eventScoreRankingRelay.js` — audition richview 由来のイベント💎順位リストを親へ relay するときの
+    - `eventScoreRankingRelay.test.js`
+    - `eventSelfStatusHeaderHtml.js` — v0.1.809(星野ロミ式コンポーネント化・第2弾): popup-entry.js の純粋寄り HTML ビルダー
+    - `eventSelfStatusHeaderHtml.test.js`
+    - `excludeBroadcasterFromCommentEntries.js` — popup の表示用 comment 配列から、配信者本人 user の comment を除外する純関数。
+    - `excludeBroadcasterFromCommentEntries.test.js`
+    - `excludeBroadcasterFromRankedRooms.js` — 応援ランクストリップに渡す前に、配信者本人の room を除外する純関数。
+    - `excludeBroadcasterFromRankedRooms.test.js`
+    - `executeScriptWithTimeout.js` — v0.1.441: `chrome.scripting.executeScript` を timeout 付きで実行する純関数ラッパ。
+    - `executeScriptWithTimeout.test.js`
+    - `exportDownloadFilename.js` — HTML / マーケ分析のダウンロードファイル名（配信開始日 + liveId）。
+    - `exportDownloadFilename.test.js`
+    - `exportStageProfiler.js` — HTML / マーケ DL の段階計測（体感調査用）。chrome 非依存の純関数。
+    - `exportStageProfiler.test.js`
+    - `exportWaitNarration.js` — HTML / マーケ DL 待ち中の りんく・こん太・たぬ姉 セリフ（popup 吹き出し用）。
+    - `exportWaitNarration.test.js`
+    - `externalLinksSectionHtml.js` — v0.1.812(星野ロミ式コンポーネント化・第5弾): buildHtmlReportDocument 内の
+    - `externalLinksSectionHtml.test.js`
+    - `formatDateTime.js` — 日時の数値（epoch ms）を日本語ロケールで `YYYY/MM/DD HH:MM:SS` 形式に整形する
+    - `formatDateTime.test.js`
+    - `formatGiftSubAppHistory.js` — v0.1.198: gift sub-app DOM 由来の history / totalCounts を popup 表示用に
+    - `formatGiftSubAppHistory.test.js`
+    - `formatOfficialStreamAgeMinutes.js` — 視聴ページ由来の「放送開始からの経過（分）」を短い日本語にする。
+    - `formatOfficialStreamAgeMinutes.test.js`
+    - `forwardReactivation.js` — v0.1.765「最終系(a): 入口が死んだ時だけ forward crawl を起動して再接続」の判定(純ロジック)。
+    - `forwardReactivation.test.js`
+    - `geminiNanoBridge.js` — v0.1.205 Phase C: Built-in AI (Gemini Nano, Chrome 138+) の薄いラッパー。
+    - `geminiNanoBridge.test.js`
+    - `giftBahamutCelebration.js` — ギフト到着時の「画面ズームイン」演出 spec（純関数）。
+    - `giftBahamutCelebration.test.js`
+    - `giftDisplayNickname.js` — NDGR ギフト protobuf から拾いがちな「内部用ラベル」を表示名から除外する。
+    - `giftDisplayNickname.test.js`
+    - `giftEventStore.js` — v0.1.206 Phase A: NDGR gift event の時系列ストア（純関数）。
+    - `giftEventStore.test.js`
+    - `giftHistoryNorthStarPaintKey.js` — 北極星ギフト履歴レーンの再描画スキップ用キー（v0.1.582）。
+    - `giftHistoryNorthStarPaintKey.test.js`
+    - `giftHistoryOfficialReconcile.js` — 北極星ギフト履歴: 公式番組累計 pt と履歴 API 合計の表示整合（v0.1.581）。
+    - `giftHistoryOfficialReconcile.test.js`
+    - `giftHistoryScraperParity.test.js`
+    - `giftHistorySourcePreference.js` — ギフト履歴レーンの「どのデータ源を表示するか」を決める純関数（v0.1.395）。
+    - `giftHistorySourcePreference.test.js`
+    - `giftHistoryViewModel.js` — 北極星ギフト履歴レーン用 ViewModel（送り主集計 + 個別投げ一覧）。
+    - `giftHistoryViewModel.test.js`
+    - `giftMomentumAnalytics.js` — HTML マーケ分析向けのギフト深掘り集計。
+    - `giftMomentumAnalytics.test.js`
+    - `giftRankStripConfig.js` — ギフト貢献／応援ストリップに並べる行の上限。
+    - `giftRankingLaneOptIn.js` — v0.1.228: ギフトランキングレーンの opt-in 判定 純関数群。
+    - `giftRankingLaneOptIn.test.js`
+    - `giftRecord.js` — ギフト/広告ユーザーの永続化（純関数）
+    - `giftRecord.test.js`
+    - `giftRelayStorageLiveId.js` — ギフト sub-app iframe からの postMessage を storage に書くときの liveId 解決。
+    - `giftRelayStorageLiveId.test.js`
+    - `giftSenderObservation.js` — v0.1.214: anonymous gift（userId 空）も nickname を bucket key にして
+    - `giftSenderObservation.test.js`
+    - `giftSidebarRankTabPick.js` — ギフトサイドバー内から「貢献度ランキング」タブ相当の要素を選ぶ。
+    - `giftSidebarRankTabPick.test.js`
+    - `giftSubAppFrameSource.js` — v0.1.230: iframe relay の送信元 frame URL を意味のあるカテゴリに分類する純関数群。
+    - `giftSubAppFrameSource.test.js`
+    - `giftSubAppIframeDomShape.js` — gift sub-app iframe（gift/koken/audition.nicovideo.jp）内の scrape が 0 件の
+    - `giftSubAppIframeDomShape.test.js`
+    - `giftSubAppRelayDiag.js` — v0.1.226: ギフトサイドバー cross-origin iframe relay 経路の生存確認用 純関数。
+    - `giftSubAppRelayDiag.test.js`
+    - `giftSubAppRelayTrust.js` — Cross-frame gift relay messages are accepted only from NicoNico/local-dev
+    - `giftSubAppRelayTrust.test.js`
+    - `giftThrowLedgerTableHtml.js` — ギフト投げ一覧テーブル HTML（マーケ #mkt-gift-ledger と同型・popup 用 nl- クラス）。
+    - `giftThrowLedgerTableHtml.test.js`
+    - `giftThrowProjectile.js` — 会場モードの「ギフト/広告を投げ主のサムネから中央映像へ投げる」演出の純関数群。
+    - `giftThrowProjectile.test.js`
+    - `globalBackfillQueue.js` — 多タブ時の NDGR バックフィル待ち行列・前面タブ優先（session 共有）。
+    - `globalBackfillQueue.test.js`
+    - `globalFetchRateLimiter.js` — ⚠️ 役割コメント無し
+    - `globalFetchRateLimiter.test.js`
+    - `googleSuggest.js` — Google サジェスト取得の契約 (URL組み立て + レスポンスパース + message type)
+    - `googleSuggest.test.js`
+    - `hiddenOfficialIframeReinjectGate.js` — hidden audition iframe を「再 inject してよいか」を判定する純関数（v0.1.394）。
+    - `hiddenOfficialIframeReinjectGate.test.js`
+    - `hiddenTabExternalFetchGate.js` — v0.1.616: 非可視タブでも外部 API fetch（koken 貢献度 / nicoad 広告 / ギフト履歴 /
+    - `hiddenTabExternalFetchGate.test.js`
+    - `htmlEscape.js` — 旧パス：`src/lib/htmlEscape.js`
+    - `htmlEscape.test.js`
+    - `htmlReportCommenterFollowSection.js` — HTML レポート向けコメンターフォロー分析ブロック。
+    - `htmlReportCommenterFollowSection.test.js`
+    - `htmlReportConceptGuide.js` — HTML レポート用キャラガイド（この拡張の説明／保存ページの使い方）
+    - `htmlReportConceptGuide.test.js`
+    - `iframeOfficialDomFromRelay.js` — v0.1.231: iframe relay (NLS_GIFT_HISTORY_FROM_IFRAME) 受信時の
+    - `iframeOfficialDomFromRelay.test.js`
+    - `inferBroadcasterUserIdFromComments.js` — snapshot の broadcasterUserId が空のとき、保存済みコメント内の表示名から
+    - `inferBroadcasterUserIdFromComments.test.js`
+    - `inlineBelowWideRowInsert.js` — below 配置でインラインホストを「動画列の内側」から外すための挿入点解決。
+    - `inlineBelowWideRowInsert.test.js`
+    - `inlineFirstPaintGate.js` — 初回パネル表示ゲート（横付き）の純粋判定ロジック。
+    - `inlineFirstPaintGate.test.js`
+    - `inlineHostAnchorScoring.js` — 埋め込みパネル（inline host）の挿入アンカー候補をスコアリングする純粋関数。
+    - `inlineHostAnchorScoring.test.js`
+    - `inlineHostBesideSizing.js` — beside（横付き）モードの inline panel の幅・高さを最適計算する純粋関数。
+    - `inlineHostBesideSizing.test.js`
+    - `inlineHostDockSizing.js` — dock_bottom モードの inline panel 高さを viewport と player rect から最適計算する純粋関数。
+    - `inlineHostDockSizing.test.js`
+    - `inlineHostLayoutReset.js` — インラインパネルの placement（below / beside / floating / dock_bottom）を切り替える際に、
+    - `inlineHostLayoutReset.test.js`
+    - `inlinePanelFocusGate.js` — インラインパネル host element が toolbar 起点の「前面化」操作を受けられる
+    - `inlinePanelFocusGate.test.js`
+    - `inlinePanelLayout.js` — 視聴ページに埋め込む nicolivelog パネルの幅・位置を、動画要素の表示矩形に合わせるための純関数。
+    - `inlinePanelLayout.test.js`
+    - `inlinePanelPlacementResolver.js` — インラインパネル配置の「単一の真実」コンポーネント。
+    - `inlinePanelPlacementResolver.test.js`
+    - `inlinePanelPlacementStorage.js` — インライン配置・幅・ビューポート幅・浮遊アンカーの chrome.storage.local 正本まわり。
+    - `inlinePanelPlacementStorage.test.js`
+    - `inlinePanelViewportWide.js` — インラインパネルを「タブ幅に近い」まで広げる幅の純粋計算（content-entry から利用）。
+    - `inlinePanelViewportWide.test.js`
+    - `inlinePlacementQuickbar.js` — ヘッダーの「パネル位置」クイックバー用 純関数（v0.1.334）。
+    - `inlinePlacementQuickbar.test.js`
+    - `inlinePopupHostPrimaryPick.js` — 複数 `#nls-inline-popup-host` が `isConnected` なとき、どれを primary として残すか。
+    - `inlinePopupHostPrimaryPick.test.js`
+    - `inlinePopupIframeVisibilityPolicy.js` — `ensureInlinePopupIframe` の early-return 経路で iframe を再表示するか（DOM 非依存の判定部）。
+    - `inlinePopupIframeVisibilityPolicy.test.js`
+    - `interceptAvatarHydration.js` — ⚠️ 役割コメント無し
+    - `interceptAvatarHydration.test.js`
+    - `interceptBinaryTextExtract.js` — バイナリを UTF-8 として解釈した文字列から、近傍の commentNo とユーザー識別子の組を拾う（ヒューリスティック）。
+    - `interceptBinaryTextExtract.test.js`
+    - `interceptReconcileHotPathGuard.test.js`
+    - `interceptViewerJoinSignals.js` — page-intercept 用: JSON から「視聴者入室・オーディエンス更新」らしいユーザ配列を抽出（純関数・PII は userId/表示名/アイコン URL のみ）
+    - `interceptViewerJoinSignals.test.js`
+    - `interceptVisitorProbeDebug.js` — TAKT B フォールバック: 来場・入室信号の観測用。既定 OFF。
+    - `interceptVisitorProbeDebug.test.js`
+    - `isInsideRecommendedLiveSection.js` — v0.1.200: ニコ生 watch ページの「おすすめ生放送」セクション内 DOM を識別する純関数。
+    - `isInsideRecommendedLiveSection.test.js`
+    - `isInsideRecommendedUserSection.js` — ニコニコ視聴ページ周辺に出る「おすすめユーザー／フォロー候補」系 UI の子孫かを粗く判定する。
+    - `isInsideRecommendedUserSection.test.js`
+    - `keyboardTypeDiagnostic.js` — L12: キーボード型診断（コメンターを 5 つの型に分類）。
+    - `keyboardTypeDiagnostic.test.js`
+    - `kiramekiAwards.js` — 「きらめきの賞」判定ロジック（純関数）。
+    - `kiramekiAwards.test.js`
+    - `kiramekiAwardsSectionHtml.js` — ⚠️ 役割コメント無し
+    - `kiramekiAwardsSectionHtml.test.js`
+    - `kokenContributionRankingApi.js` — koken 公式「ギフト貢献度ランキング」無認証 JSON API の URL 組立 & 正規化（純関数）。
+    - `kokenContributionRankingApi.test.js`
+    - `kokenGiftHistoryApi.js` — koken 公式「ギフト履歴（個別イベント）」無認証 JSON API の URL 組立 & 正規化（純関数）。
+    - `kokenGiftHistoryApi.test.js`
+    - `kokenGiftHistoryFetchClient.js` — popup / content から service-worker 経由で koken ギフト履歴 API を叩く薄いクライアント。
+    - `lengthDelimitedStream.js` — ⚠️ 役割コメント無し
+    - `lengthDelimitedStream.test.js`
+    - `liveAudienceDom.js` — watch ページ DOM から「同時接続（ページ表示）」に近い視聴者数を読む（純関数・ベストエフォート）
+    - `liveAudienceDom.test.js`
+    - `liveCommenterStats.js` — 記録済みコメントから「ユニーク投稿者（推定）」用の集計（純関数）
+    - `liveCommenterStats.test.js`
+    - `liveEndedFlag.js` — 配信終了フラグ。
+    - `liveEndedFlag.test.js`
+    - `liveHealthScore.js` — 配信ごとの「健康チェック」5段階評価(純関数)。
+    - `liveHealthScore.test.js`
+    - `livePersistInterval.js` — v0.1.498〜501: ライブ記録の保存（コアレッサ）最小間隔を決める純粋関数。フリーズ対策 A。
+    - `livePersistInterval.test.js`
+    - `liveStatValuePlaceholder.js` — `.nl-live-stat-value` 向け: 数字表示かプレースホルダー文言かを判定（0.1.68 の極太フォント切替と共通）。
+    - `liveStatValuePlaceholder.test.js`
+    - `loadLastBroadcastSummary.js` — 0.1.69 (AY): empty state（配信なし）popup で「前回の配信」cards を復元するために、
+    - `loadLastBroadcastSummary.test.js`
+    - `longTaskTracker.js` — メインスレッドを長時間ブロックした「Long Task」を有界に記録する純関数群。
+    - `longTaskTracker.test.js`
+    - `lpIndexAnonymousIdenticon.test.js`
+    - `lpIndexBoardDarkContrast.test.js`
+    - `lpIndexExtensionLiveScene.test.js`
+    - `lpIndexFeatures.test.js`
+    - `lpIndexPlainLanguage.test.js`
+    - `lpIndexPseudoFlow.test.js`
+    - `lpIndexSnapshotFutureComparison.test.js`
+    - `lpIndexSnapshotGiftDetail.test.js`
+    - `lpIndexSnapshotMultiTabSafety.test.js`
+    - `lpIndexSnapshotObservability.test.js`
+    - `lpIndexSnapshotRanking.test.js`
+    - `lpIndexUnifiedSnapshotIntegration.test.js`
+    - `lpIndexUnifiedSnapshotOverview.test.js`
+    - `mangaBroadcastSummary.js` — 放送終了後の HTML レポート / マーケ分析の頭にくる「漫画読み体験」要約。
+    - `mangaBroadcastSummary.test.js`
+    - `marketingAggregate.js` — ⚠️ 役割コメント無し
+    - `marketingAggregate.test.js`
+    - `marketingChartsHtml.js` — ⚠️ 役割コメント無し
+    - `marketingChartsHtml.test.js`
+    - `marketingChartsHtmlAnalyticsDedup.test.js`
+    - `marketingDynamicAdvice.js` — 0.1.33 (AH): マーケ分析の各セクションに「内容に応じて変わる」キャラ解説を出す
+    - `marketingGiftThrowLedger.js` — マーケ分析 HTML 用: 「誰が・どのアイテムを・いくら投げたか」の投げ履歴台帳を組み立てる純関数。
+    - `marketingGiftThrowLedger.test.js`
+    - `marketingHtmlAdvisorAvatars.js` — マーケ分析HTML内のキャラアイコン（単体HTMLで表示するため data URI）。
+    - `marketingReportEmbed.js` — マーケ分析 HTML に埋め込む JSON（表計算・ツール連携用）。
+    - `marketingReportEmbed.test.js`
+    - `marketingSupportParticipationCounts.js` — マーケ分析・HTMLレポート先頭 KPI: ギフト投げ主・広告した人の人数。
+    - `marketingSupportParticipationCounts.test.js`
+    - `mediaKitHtml.js` — 追憶メディアキットの共有用 single-file HTML。
+    - `mediaKitHtml.test.js`
+    - `mediaKitStats.js` — 追憶メディアキット向けの期間集計。
+    - `mediaKitStats.test.js`
+    - `mergeGiftHistoryThrows.js` — v0.1.216: 公式ギフト sub-app DOM (`ul.gift-history-list`) から scrape した
+    - `mergeGiftHistoryThrows.test.js`
+    - `mergeProgramStatsWatchIntoWatchMetaSnapshot.js` — 公式 DOM bundle の programStats.watchCount（累計来場）を snapshot に補完する。
+    - `mergeProgramStatsWatchIntoWatchMetaSnapshot.test.js`
+    - `migrateInlinePanelBelowToDock.js` — `below` → `dock_bottom` のワンショット移行（0.1.63 AS）。
+    - `migrateInlinePanelBelowToDock.test.js`
+    - `migrateInlinePanelFloatToDock.js` — 旧「ポップアップ風（floating）」利用者を画面下ドックへ一度だけ移す（公式右パネルとの衝突緩和）。
+    - `migrateInlinePanelFloatToDock.test.js`
+    - `migrateSuggestInitialInlinePanelPlacement.js` — 新規インストール時のみ、インライン配置キーが未保存なら画面幅で既定を一度書き込む。
+    - `migrateSuggestInitialInlinePanelPlacement.test.js`
+    - `mirrorSanitize.js` — v0.1.237: 北極星「鏡のように貼り付け」用の自前最小サニタイザ。
+    - `mirrorSanitize.test.js`
+    - `monotonicCommentCount.js` — v0.1.645: コメント記録件数の「数値ズレ」根治。
+    - `monotonicCommentCount.test.js`
+    - `ndgrBackfillCrawl.js` — v0.1.404: コメント過去ログ一括バックフィルの「巡回エンジン」（純ロジック）。
+    - `ndgrBackfillCrawl.test.js`
+    - `ndgrBacklog.js` — NDGR flush を liveId 確定まで遅延するかを判定する純関数。
+    - `ndgrBacklog.test.js`
+    - `ndgrChatRows.js` — NDGR decodeChat の結果を mergeNewComments 向け行に変換する。
+    - `ndgrChatRows.test.js`
+    - `ndgrDecode.js` — NDGR (のどぐろ) Protobuf 軽量デコーダー
+    - `ndgrDecode.test.js`
+    - `ndgrForwardCrawl.js` — v0.1.511: NDGR コメントの「前方向（forward）継続取得」巡回エンジン（純ロジック）。
+    - `ndgrForwardCrawl.test.js`
+    - `ndgrMessageDedupe.js` — v0.1.238: NDGR Message ID dedupe
+    - `ndgrMessageDedupe.test.js`
+    - `networkErrorProbe.js` — v0.1.201: 拡張の network 層異常を診断 JSON 用に集約する純関数。
+    - `networkErrorProbe.test.js`
+    - `nicoAnonymousDisplay.js` — ニコ生の匿名ユーザーID（a: で始まる内部ID）向けの表示補完。
+    - `nicoAnonymousDisplay.test.js`
+    - `nicoCommentPanelAssetLauncher.js` — ニコ生 watch のコメント欄付近から「ギフト / アイテム / スタンプ」等の起動ボタンを推定する。
+    - `nicoCommentPanelAssetLauncher.test.js`
+    - `nicoUserFollowingApi.js` — nvapi /v1/users/{uid}/following/users の URL 構築とレスポンス正規化。
+    - `nicoUserFollowingApi.test.js`
+    - `nicoUserPage.js` — 汎用: ニコ生ユーザーの公開ページ URL / 表示名 を作る純関数。
+    - `nicoUserPage.test.js`
+    - `nicoUserProfileApi.js` — ⚠️ 役割コメント無し
+    - `nicoUserProfileApi.test.js`
+    - `nicoUserProfilePage.js` — www.nicovideo.jp/user/<id> のプロフィールページに表示されている
+    - `nicoUserProfilePage.test.js`
+    - `nicoadCelebrationKey.js` — ニコ広/ギフトのシステムコメント演出を「同じコメントで二度光らせない」ための
+    - `nicoadCelebrationKey.test.js`
+    - `nicoadContributionRankingApi.js` — ニコニ広告(nicoad)「貢献度ランキング」無認証 JSON API の URL 組立 & 正規化（純関数）。
+    - `nicoadContributionRankingApi.test.js`
+    - `nicoliveDom.js` — ニコ生 watch ページのコメント一覧からの抽出（セレクタは実機で要調整）
+    - `nicoliveDom.test.js`
+    - `niconicoInterceptLearn.js` — page-intercept が JSON から拾う userId / nickname / avatar / commentNo の走査（純関数）
+    - `niconicoInterceptLearn.test.js`
+    - `nlMainScrollReveal.js` — `.nl-main` のようなスクロール親の getBoundingClientRect と子要素の rect から、
+    - `nlMainScrollReveal.test.js`
+    - `nlsInterceptAuth.js` — v0.1.234: page-intercept (MAIN world) → content-entry (ISOLATED world) 経路の
+    - `nlsInterceptAuth.test.js`
+    - `northStarAcquisitionGauge.js` — 北極星レーン左ガジェット「取得率」メーター用の純関数。
+    - `northStarAcquisitionGauge.test.js`
+    - `northStarCharaTrioConfig.js` — 北極星 3 キャラ trio（りんく / こん太 / たぬ姉）の slot 構成と tier 連動 src 解決。
+    - `northStarCharaTrioConfig.test.js`
+    - `northStarFallbackHtml.js` — v0.1.241: 北極星「鏡のように貼り付け」レーンの fallback HTML 生成。
+    - `northStarFallbackHtml.test.js`
+    - `northStarLaneGadgetChara.js` — 北極星レーン左ガジェットのキャラ画像（拡張ルート相対）。
+    - `northStarLaneGadgetChara.test.js`
+    - `northStarLaneReason.js` — v0.1.244: 北極星「公式値レーン」の state 細分化用、reason 判定純関数。
+    - `northStarLaneReason.test.js`
+    - `northStarLaneVisibility.js` — 北極星レーンの表示/非表示を `data-lane-state` から決める純関数（副作用なし）。
+    - `northStarLaneVisibility.test.js`
+    - `northStarLaneWaitingUi.js` — 北極星「公式値レーン」の取得待ち（not_yet / iframe_unrendered）用 UI 断片。
+    - `northStarLaneWaitingUi.test.js`
+    - `objectUrlRevokeQueue.js` — `URL.createObjectURL` で作った blob URL を、メモリ滞留を抑えながら revoke する
+    - `objectUrlRevokeQueue.test.js`
+    - `observerTarget.js` — MutationObserver の監視ルートを決める（ニコ生コメントパネル優先）
+    - `observerTarget.test.js`
+    - `officialContributionRankingResolver.js` — 公式貢献度ランキングの取得経路（Koken API / DOM bundle / iframe storage）から
+    - `officialContributionRankingResolver.test.js`
+    - `officialDomRankingRowsToStripRooms.js` — 公式イベント DOM バンドルの貢献度／広告ランキング行を、
+    - `officialDomRankingRowsToStripRooms.test.js`
+    - `officialEventBannerDom.js` — niconico の watch ページに描画される「○○さんが参加しています！」グリーンバナーから
+    - `officialEventBannerDom.test.js`
+    - `officialEventDomBundle.js` — watch ページの DOM から「配信者の番組周辺の正本値」を 1 関数で総取りするオーケストレータ。
+    - `officialEventDomBundle.test.js`
+    - `officialNicoStatsStripDigest.js` — ⚠️ 役割コメント無し
+    - `officialNicoStatsStripDigest.test.js`
+    - `officialStatsWindow.js` — ⚠️ 役割コメント無し
+    - `officialStatsWindow.test.js`
+    - `openingFiveMinuteCorrelation.js` — L13: 冒頭 5 分の予兆 → ピーク CPM 相関（散布図用）。
+    - `openingFiveMinuteCorrelation.test.js`
+    - `ownPostedUserIdSet.js` — v0.1.773: 「自分が投稿した userId」の集合を1パスで作る純関数。
+    - `ownPostedUserIdSet.test.js`
+    - `paintPerfLog.js` — v0.1.725: 描画(paint)コストの軽量リングバッファ記録(純関数)。
+    - `paintPerfLog.test.js`
+    - `panelLiveSummary.js` — パネルカード用の超軽量サマリ（多タブ時の snapshot / 巨大配列 read 待ちを避ける）。
+    - `panelLiveSummary.test.js`
+    - `panelMetricsExport.js` — パネル向け速報メトリクス（content メモリ → popup 直結、storage バイパス）。
+    - `panelMetricsExport.test.js`
+    - `parseEmbeddedDataViewerInfo.js` — v0.1.203 Patch 3: niconico watch ページの `<script id="embedded-data" data-props='{...}'>`
+    - `parseEmbeddedDataViewerInfo.test.js`
+    - `parseGiftComment.js` — ニコ生のギフトコメント文字列をパースする純粋関数。
+    - `parseGiftComment.test.js`
+    - `parseInterestArrivalComment.js` — ニコ生の興味タグ来場システムコメントをパースする純関数。
+    - `parseInterestArrivalComment.test.js`
+    - `perfDiag.js` — 複数タブ paint 負荷の診断スナップショット。
+    - `perfDiag.test.js`
+    - `persistThrottle.js` — v0.1.431: 連続フラッシュの合間にイベントループへ制御を返す既定の yield。
+    - `persistThrottle.test.js`
+    - `persistableCommentRow.js` — v0.1.362: DOM ハーベスト経路で拾ったコメント行を `nls_comments_<lv>` に保存して
+    - `persistableCommentRow.test.js`
+    - `personProfiles.js` — 人物プロファイル畳み込み（person-tile-unify 第1コミット・2026-06-17）。
+    - `personProfiles.test.js`
+    - `personTileDom.js` — 人物タイル(丸サムネ＋ID＋ニックネーム)の DOM ビルダー（person-tile-unify 第2コミット・2026-06-17）。
+    - `personTileDom.test.js`
+    - `pickBroadcasterNameForReputation.js` — 評判チェック用に「配信者名」を解決する純関数 (PR R4)
+    - `pickBroadcasterNameForReputation.test.js`
+    - `pickLatestComment.js` — ストレージ上のコメント配列の並びは一定でないため、
+    - `pickLatestComment.test.js`
+    - `pollUntil.js` — 再読み込み直後など DOM が遅れて現れるまで待つ（純粋な間隔ポーリング）
+    - `pollUntil.test.js`
+    - `popupAiDiagOrchestrator.js` — v0.1.211: popup「AI 診断」ボタンのオーケストレータ純関数。
+    - `popupAiDiagOrchestrator.test.js`
+    - `popupAvatarResolver.js` — v0.1.206 Phase B: popup 表示の avatar URL を統一的に解決する純関数。
+    - `popupAvatarResolver.test.js`
+    - `popupBooleanSettingController.js` — popup のブール設定 1 件を管理する純粋コントローラ。
+    - `popupBooleanSettingController.test.js`
+    - `popupBooleanSettingsRegistry.js` — popup のブール設定コントローラをまとめて扱うレジストリ。
+    - `popupBooleanSettingsRegistry.test.js`
+    - `popupCelebrationGate.js` — popup / watch 埋め込みパネル再描画時の応援演出ゲート（単一の開幕判定）。
+    - `popupCelebrationGate.test.js`
+    - `popupConcurrentEstimateGate.js` — ポップアップ「推定同時接続」カードでローディングを解除するかどうか。
+    - `popupConcurrentEstimateGate.test.js`
+    - `popupContextBarModel.js` — popup 上部の接続コンテキスト表示・復旧バー表示・stat 表面状態の純粋ロジック。
+    - `popupContextBarModel.test.js`
+    - `popupEntryPendingSelfPost.js` — popup の表示経路で「pending self-post entry（ndgr 観測前の自コメ仮置き）」を
+    - `popupEntryPendingSelfPost.test.js`
+    - `popupFrameCodec.js` — popup の配色フレーム「共有コード」の エンコード／デコード。
+    - `popupFrameCodec.test.js`
+    - `popupFramePresets.js` — popup の配色プリセット（フレーム）管理。
+    - `popupFramePresets.test.js`
+    - `popupHtmlAnonymousIdenticon.test.js`
+    - `popupMainScrollDefer.js` — 拡張ポップアップ `.nl-main` スクロール中に重い DOM 更新を見送るかどうか。
+    - `popupMainScrollDefer.test.js`
+    - `popupStorageRefreshCoalesce.js` — popup / inline のコメント再描画スケジューラ。
+    - `popupStorageRefreshCoalesce.test.js`
+    - `popupVisibilityGate.js` — popup / inline コメント再描画の可視性ゲート（v0.1.440）。
+    - `popupVisibilityGate.test.js`
+    - `popupWatchMetaConcurrentGate.js` — ⚠️ 役割コメント無し
+    - `popupWatchMetaConcurrentGate.test.js`
+    - `popupWatchSnapshotPersist.js` — 取得した watch snapshot を generation を超えて永続化するためのヘルパ。
+    - `popupWatchSnapshotPersist.test.js`
+    - `popupWatchSnapshotRetry.js` — 視聴タブのリロード直後は content script の readiness が揃わず、
+    - `popupWatchSnapshotRetry.test.js`
+    - `popupWatchUrlResolveMultiTab.js` — popup が参照する watch URL を「複数の候補ソース」から決める純粋関数。
+    - `popupWatchUrlResolveMultiTab.test.js`
+    - `popupWindowEmptyHeight.js` — 0.1.71 (BA): popup window の高さを「state（active watch / empty+history /
+    - `popupWindowEmptyHeight.test.js`
+    - `prewarmCoordinator.js` — 複数 watch タブで popup.html の prewarm が同時に走るのを防ぐ
+    - `prewarmCoordinator.test.js`
+    - `privacyDisplay.js` — 共有・掲載向けに表示ラベルを短く伏せる（完全一致検索を難しくする程度。暗号化や匿名化ではない）。
+    - `privacyDisplay.test.js`
+    - `probeRecommendedLiveSection.js` — v0.1.200: ニコ生 watch ページ内「おすすめ生放送」セクションの観測純関数。
+    - `probeRecommendedLiveSection.test.js`
+    - `probeWatchPageDomStructure.js` — v0.1.201: ニコ生 watch ページ主要 DOM の存在を観測する純関数。
+    - `probeWatchPageDomStructure.test.js`
+    - `profileResolveState.js` — v0.1.720 PR-T2: プロフィール解決の状態管理（純関数）。
+    - `profileResolveState.test.js`
+    - `protobufVarint.js` — Protobuf の非負 varint を読み取る（length-delimited の長さ用）。
+    - `protobufVarint.test.js`
+    - `provisionalLaneCommentRows.js` — heavy read 完了前に応援ランキングへ載せる暫定コメント行の合成（0 秒表示用）。
+    - `provisionalLaneCommentRows.test.js`
+    - `prunableStorageKeys.js` — v0.1.419: storage.local の「定期 prune 対象キー」だけを prefix で絞り込む純関数。
+    - `prunableStorageKeys.test.js`
+    - `pruneStaleEventDomLvs.js` — v0.1.203 Patch 4: 古い event-dom snapshot 残骸を cleanup 対象として識別する純関数。
+    - `pruneStaleEventDomLvs.test.js`
+    - `rankingPatrolMessages.js` — ランキング巡回(「次の上位配信へ」/ 自動巡回トグル)の共有定数と純関数。
+    - `rankingPatrolMessages.test.js`
+    - `rankingVisibleRetryDecision.js` — 「タブが可視に復帰したとき、貢献度ランキング取得を再試行すべきか」を決める純関数。
+    - `rankingVisibleRetryDecision.test.js`
+    - `recentBroadcastLiveIds.js` — 最近の放送 liveId を `broadcastSessionSummary_v1` IDB から取得する純粋関数群。
+    - `recordRate.js` — 取得スピード(records/sec)の算出と健康スコア化(純ロジック)。
+    - `recordRate.test.js`
+    - `recordingStallWatchdog.js` — 記録停止ウォッチドッグの純粋判定ロジック。
+    - `recordingStallWatchdog.test.js`
+    - `refreshTaskGuard.js` — v0.1.437: popup の `refresh()` で chrome API が永久 pending になっても全カード「—」固定にしない
+    - `refreshTaskGuard.test.js`
+    - `reportCommentsCsv.js` — 保存コメント配列を「Excel / LibreOffice / Google Sheets で安全に開ける CSV」に変換する純関数。
+    - `reportCommentsCsv.test.js`
+    - `reportCommentsTableSection.js` — HTML レポート「保存コメント一覧」セクション。
+    - `reportCommentsTableSection.test.js`
+    - `reportCompleteVoice.js` — v0.1.806: レポート(HTML/マーケ/メディアキット)の保存が【成功した直後】に、完了の合図として
+    - `reportCompleteVoice.test.js`
+    - `reportFriendlyMetaRowsHtml.js` — v0.1.635: HTML レポートの「やさしいメタ情報」テーブル行ビルダ + ラベル変換（純ロジック）。
+    - `reportFriendlyMetaRowsHtml.test.js`
+    - `reportHeadInfoRowsHtml.js` — HTML レポートの「head 情報」テーブル行（link / meta / script / noopener）を
+    - `reportHeadInfoRowsHtml.test.js`
+    - `reportNextMemoSectionHtml.js` — v0.1.811(星野ロミ式コンポーネント化・第4弾): popup-entry.js の buildHtmlReportDocument 内
+    - `reportNextMemoSectionHtml.test.js`
+    - `reportSelfPostedRowsHtml.js` — v0.1.634: HTML レポートの「自分のコメント抜粋」テーブル行ビルダ（純ロジック）。
+    - `reportSelfPostedRowsHtml.test.js`
+    - `reportSilentError.js` — ⚠️ 役割コメント無し
+    - `reportSilentError.test.js`
+    - `reportThumbedUsersSectionHtml.js` — HTML レポートの「サムネ付きユーザー一覧」セクションを純粋に組み立てる。
+    - `reportThumbedUsersSectionHtml.test.js`
+    - `reportUserRoomTableHtml.js` — v0.1.636: HTML レポートの「ユーザー別集計テーブル」行ビルダ（純ロジック）。
+    - `reportUserRoomTableHtml.test.js`
+    - `reportUserThumb.js` — HTML レポート / マーケ分析の各ユーザー行に「最低サムネ」を必ず出すための
+    - `reportUserThumb.test.js`
+    - `resolveKiramekiReturningAndFirstTimeUserKeys.js` — 「きらめきの賞」のかよい / はじまり判定用 userKey 分類（純関数）。
+    - `resolveKiramekiReturningAndFirstTimeUserKeys.test.js`
+    - `resolveVisitorCount.js` — v0.1.646: 「来場(累計来場者数)」の単一定義。表示場所(popup / status / レポート)で
+    - `resolveVisitorCount.test.js`
+    - `sameOriginContribRankingDomShape.js` — watch ページ（live.nicovideo.jp＝content script と同一 origin）の gift
+    - `sameOriginContribRankingDomShape.test.js`
+    - `sanitizeRoomAvatarsForBroadcaster.js` — 集計済み user room の avatarUrl から「broadcaster icon の取り違え」を除去する純粋関数。
+    - `sanitizeRoomAvatarsForBroadcaster.test.js`
+    - `scrapeEventScoreRankingFromRichviewDom.js` — audition richview（イベント💎順位リスト想定）の DOM から順位つきスコア行を掬う純関数（PR2）。
+    - `scrapeEventScoreRankingFromRichviewDom.test.js`
+    - `scrapeGiftHistoryList.js` — niconico ギフト sub-app の `gift-history-list` から個別ギフトを抽出する純関数（v0.1.198）。
+    - `scrapeGiftHistoryList.test.js`
+    - `scrapeTotalGiftCountList.js` — niconico ギフト sub-app の `total-dold-count-list` から種類別集計を抽出する純関数（v0.1.198）。
+    - `scrapeTotalGiftCountList.test.js`
+    - `selfActionCelebration.js` — アプリから自分が操作した直後に返す軽量演出の spec。
+    - `selfActionCelebration.test.js`
+    - `selfPostedMatcher.js` — 自己投稿コメント（self-posted recents）と、保存済みコメント一覧の
+    - `selfPostedMatcher.test.js`
+    - `sessionCommentCache.js` — v0.1.650: JSONキャッシュ即時表示の本丸。「開いた瞬間に全コメント表示・ローディングなし」。
+    - `sessionCommentCache.test.js`
+    - `shouldRearmBackfillForOfficialGap.js` — 自動補充の核心: 「公式コメント件数と記録件数のギャップが大きいまま、NDGR バックフィルが
+    - `shouldRearmBackfillForOfficialGap.test.js`
+    - `shouldSkipDeepHarvest.js` — ⚠️ 役割コメント無し
+    - `shouldSkipDeepHarvest.test.js`
+    - `shouldTriggerOfficialGapDeepHarvest.js` — ライブ中に「公式 statistics コメント数」と「記録件数」の差が大きいとき、
+    - `shouldTriggerOfficialGapDeepHarvest.test.js`
+    - `siteLinkHealth.js` — 公開ページ(LP/記事/docs)の「内部リンク健全性」を検証する純ロジック(2026-06-18)。
+    - `siteLinkHealth.test.js`
+    - `standalonePopupClose.js` — v0.1.433: 別ウィンドウ POP（standalone popup window）を「配信に飛ばしたら閉じる」判定（純ロジック）。
+    - `standalonePopupClose.test.js`
+    - `statusActionAdvisor.js` — status.html「🩹 いま気になる点と対処」解決カードを組み立てる純関数(2026-06-18・COUNCIL status-allinone)。
+    - `statusActionAdvisor.test.js`
+    - `statusFormat.js` — status 整形の純関数群。
+    - `statusFormat.test.js`
+    - `statusMindmapModel.js` — status.html「全体マインドマップ」のツリーモデルを組み立てる純関数(2026-06-18 ユーザー要望)。
+    - `statusMindmapModel.test.js`
+    - `storageErrorState.js` — ストレージ書き込みエラーをポップアップ向けにシリアライズする純関数
+    - `storageErrorState.test.js`
+    - `storageKeys.js` — chrome.storage.local キー（プレフィックスで衝突回避）
+    - `storageKeys.test.js`
+    - `storageOpTimeout.js` — v0.1.502: 単発の非同期処理（主に chrome.storage.local の get/set/remove）を
+    - `storageOpTimeout.test.js`
+    - `storedCommentDedupeMerge.js` — popup normalizeStoredCommentEntries 用: 同一キー重複行のマージ（PII を増やさずフラグのみ統合）
+    - `storyAvatarDiagLine.js` — 応援グリッド用・診断表示（PII なし・件数のみ）。
+    - `storyAvatarDiagLine.test.js`
+    - `storyDetailRelatedEntries.js` — ストーリー詳細／プレビュー脇の「同一ユーザーの直近」リスト用。
+    - `storyDetailRelatedEntries.test.js`
+    - `storyGrowthLimits.js` — りんく成長グリッド（story growth）の描画上限。
+    - `storyTileTvStyle.js` — ストーリータイル / レーンアバターで「ゆっくり風キャラ画像かどうか」を判定する純関数。
+    - `storyTileTvStyle.test.js`
+    - `storyUserLaneBuckets.js` — 応援ユーザーレーン: ソート済み候補を tier（profileTier）別に上限付きで分割する。
+    - `storyUserLaneBuckets.test.js`
+    - `storyUserLaneContaminationGuard.js` — 応援ユーザーレーン候補から、視聴者/配信者 UID の混入を除外する判定。
+    - `storyUserLaneContaminationGuard.test.js`
+    - `storyUserLaneDisplaySrc.js` — 応援ユーザーレーン（りんく・こん太・たぬ姉）のセル画像 URL。
+    - `storyUserLaneDisplaySrc.test.js`
+    - `storyUserLaneGuideHtml.js` — 応援ユーザーレーンの案内 HTML（ポップアップ・E2E と共有）
+    - `storyUserLaneGuideHtml.test.js`
+    - `storyUserLaneRowModel.js` — 応援ユーザーレーン: 1 ユーザー候補あたりの tier・サムネ・ソート用スコアを一箇所で組み立てる。
+    - `storyUserLaneRowModel.test.js`
+    - `suggestInitialInlinePanelPlacement.js` — 新規インストール直後の「おすすめ」インライン配置（storage 未設定時のみ migrate が使う）。
+    - `suggestInitialInlinePanelPlacement.test.js`
+    - `summarizeDevMonitorGiftRanking.js` — v0.1.202 A-0: popup「詳しい状況（開発・切り分け用・折りたたみ）」の
+    - `summarizeDevMonitorGiftRanking.test.js`
+    - `summarizeGiftSubAppHistoryDiag.js` — v0.1.201: gift sub-app DOM の payload を診断 JSON 用 summary に変換する純関数。
+    - `summarizeGiftSubAppHistoryDiag.test.js`
+    - `supportActivityTimeline.js` — 応援タイムライン: コメントとギフト着弾を時刻順に統合する純関数（v0.1.340）。
+    - `supportActivityTimeline.test.js`
+    - `supportCelebration.js` — 配信中のマイルストーン演出（コメント件数・イベント順位 UP・ギフト件数）の判定。
+    - `supportCelebration.test.js`
+    - `supportGridDisplayTier.js` — 応援ユーザーの「表示の立ち位置」（LP モック・ユーザーレーン並びの共通ルール）
+    - `supportGridDisplayTier.test.js`
+    - `supportGrowthAvatarLoad.js` — 応援グリッド等のリモート avatar img の読み込みガード。
+    - `supportGrowthAvatarLoad.test.js`
+    - `supportGrowthInsights.js` — マーケ分析 / HTML レポート向け「次回の行動提案」を既存集計データから組み立てる（純粋関数）。
+    - `supportGrowthInsights.test.js`
+    - `supportGrowthTileSrc.js` — 応援グリッド用タイル画像 URL の優先解決（純関数）
+    - `supportGrowthTileSrc.test.js`
+    - `supportTimelineGuard.js` — 応援タイムラインの重い全件読み込みを実行してよいか判定する。
+    - `supportTimelineGuard.test.js`
+    - `supportTimelineHtml.js` — 応援タイムラインの行 HTML を純粋に組み立てる（v0.1.340）。
+    - `supportTimelineHtml.test.js`
+    - `supportVisualExpanded.js` — 応援ビジュアル（アイコン列・グリッド・診断）の開閉を storage に保存するときの正規化。
+    - `supportVisualExpanded.test.js`
+    - `supportVisualStoryCopy.js` — アイコン列・診断ブロックで共有する文言（二重定義防止）。
+    - `supportVisualStoryCopy.test.js`
+    - `supporterChikuranScore.js` — 「応援者ちくらん β」用のローカル集計コア。
+    - `supporterChikuranScore.test.js`
+    - `supporterPowerScoring.js` — 応援者パワー診断スコアリング（OSINT Phase 2-A・v0.1.609）。
+    - `supporterPowerScoring.test.js`
+    - `swBackfillStaging.js` — Service Worker backfill の取り置きペイロードを扱う純関数群。
+    - `swBackfillStaging.test.js`
+    - `swBackfillTrigger.js` — SW backfill モード(実験)の起動判定純関数。
+    - `swBackfillTrigger.test.js`
+    - `swCrawlSlots.js` — SW backfill の per-lid 並列スロット判定。
+    - `swCrawlSlots.test.js`
+    - `tabLeaderLock.js` — PR1-b/PR2（feat/multitab-scale-ultraC）: 同一 origin の複数タブのうち「1タブだけ」が
+    - `tabLeaderLock.test.js`
+    - `thumbDb.js` — サムネイル用 IndexedDB（コンテンツスクリプトのみで使用）
+    - `thumbFifo.js` — サムネ IndexedDB の FIFO トリム用純関数（古い capturedAt 順＝先頭が最古）
+    - `thumbFifo.test.js`
+    - `thumbSettings.js` — 定期サムネイル設定（ストレージ値の正規化）
+    - `thumbSettings.test.js`
+    - `timingConstants.js` — content-entry.js に散在していたマジックナンバーを集約した定数テーブル。
+    - `timingConstants.test.js`
+    - `tokenBucket.js` — PR5（feat/multitab-scale-ultraC）: トークンバケットによるグローバル流量制御の純ロジック。
+    - `tokenBucket.test.js`
+    - `topSupportRankAnonymousFold.js` — ⚠️ 役割コメント無し
+    - `topSupportRankAnonymousFold.test.js`
+    - `topSupportRankStripConfig.js` — ポップアップ「応援ランキング」ストリップに並べる行数の上限（aggregateCommentsByUser の1行＝1カード）。
+    - `topSupportRankStripConfig.test.js`
+    - `topSupportRankStripLines.js` — ⚠️ 役割コメント無し
+    - `topSupportRankStripLines.test.js`
+    - `topSupportRankStripStableKey.js` — 応援ランキングストリップの DOM を組み直す必要があるか判定するキー。
+    - `topSupportRankStripStableKey.test.js`
+    - `trimMap.js` — Map のサイズを max 以下に制限し、先頭（最古挿入順）から削除する。
+    - `trimMap.test.js`
+    - `uiUxRoadmapTdd.test.js`
+    - `userCommentProfileCache.js` — userId 単位で表示名・個人サムネ（弱い CDN 既定アイコン以外の http URL）を蓄積し、
+    - `userCommentProfileCache.test.js`
+    - `userEntryAvatarResolve.js` — 1 ユーザーエントリーのアバター状態を組み立てる純関数レイヤ。
+    - `userEntryAvatarResolve.test.js`
+    - `userIdPreference.js` — コメント記録まわり: userId の「観測強度」（数字 ID を匿名系より優先する等）
+    - `userIdPreference.test.js`
+    - `userLaneCandidatesFromStorage.js` — 応援ユーザーレーン用: nls_comments 相当の StoredComment 配列から userId 単位に集約した候補。
+    - `userLaneCandidatesFromStorage.test.js`
+    - `userLaneDiagSnapshot.js` — Popup DevTools 用: lane pipeline の観測スナップショット（PII を含めない）。
+    - `userLaneDiagSnapshot.test.js`
+    - `userLaneMergeGiftThrowers.js` — ギフト／広告投げ主専用レーン用のエントリ一覧（りんく列とは別段）。
+    - `userLaneMergeGiftThrowers.test.js`
+    - `userProfileLinkHtml.js` — 応援コメントの各種 HTML 出力（マーケティング HTML・HTML 保存レポート等）で、
+    - `userProfileLinkHtml.test.js`
+    - `userRooms.js` — 保存済みコメントを「ユーザー＝ルーム」に集計（純関数）
+    - `userRooms.test.js`
+    - `userSupportGridAccent.js` — ⚠️ 役割コメント無し
+    - `userSupportGridAccent.test.js`
+    - `userThumbGrid.js` — 「サムネ付きユーザー一覧」のカテゴリ分け純粋関数。
+    - `userThumbGrid.test.js`
+    - `venueAvatar.js` — v0.1.712: 会場モードのアバター解決(サムネ補強)純関数。
+    - `venueAvatar.test.js`
+    - `venueBubbleLayout.js` — v0.1.717: 会場モードの吹き出し(セリフ)を「席の外の最上位レイヤー」に置くための配置純関数。
+    - `venueBubbleLayout.test.js`
+    - `venueBubbleLifecycle.js` — 吹き出しの寿命を「読み上げ(TTS)」に連動させる純関数群。
+    - `venueBubbleLifecycle.test.js`
+    - `venueCharacterFrame.js` — 会場モードの「額縁(フレーム)」: ゆっくり3キャラ(りんく/こん太/たぬ姉)の全表情サムネを、
+    - `venueCharacterFrame.test.js`
+    - `venueCrowdMotion.js` — 会場の観客シルエット群を「生きている会場」にするための動きパラメータ(純関数)。
+    - `venueCrowdMotion.test.js`
+    - `venueDisplayRows.js` — 会場モードの「空っぽ・途中で消える・ちらつき」根治の正本(2026-06-15・会議+根本原因調査)。
+    - `venueDisplayRows.test.js`
+    - `venueDragScroll.js` — 2026-06-14 会議(星野ロミ・摩擦ゼロUI): 会場を左ドラッグでパン(縦スクロール)する純ロジック。
+    - `venueDragScroll.test.js`
+    - `venueHeat.js` — v0.1.732: 会場モードの「熱量の色温度」純関数。
+    - `venueHeat.test.js`
+    - `venueIncrementalAggregate.js` — v0.1.754 会場の3時間安定化(会議6体ほぼ全会一致の最大ボトルネック根治): 参加者集計を
+    - `venueIncrementalAggregate.test.js`
+    - `venueLiveRoster.js` — v0.1.754 会場の3時間安定化(星野ロミ・メソッド会議の本質解・6体ほぼ全会一致):
+    - `venueLiveRoster.test.js`
+    - `venueResidents.js` — 会場モードの常駐3キャラ(りんく・こん太・たぬ姉)の描画モデル(純関数)。
+    - `venueResidents.test.js`
+    - `venueRoster.js` — 2026-06-14 ユーザー要望「今会場にいるメンバーを視覚的に確認できるボタン・AIも人間も検証
+    - `venueRoster.test.js`
+    - `venueSeats.js` — v0.1.707: ライブ会場モードの「座席モデル」純関数。
+    - `venueSeats.test.js`
+    - `venueSpeech.js` — v0.1.711: ライブ会場モードの「発言→吹き出し」純関数。
+    - `venueSpeech.test.js`
+    - `venueSpeechStreak.js` — 「会話の連鎖」(2026-06-15 会議の最大多数決の本命・弱点A/C):
+    - `venueSpeechStreak.test.js`
+    - `venueViewport.js` — v0.1.715: 会場モードの「映像セーフエリア」と「同時表示人数」を決める純関数。
+    - `venueViewport.test.js`
+    - `videoCapture.js` — watch ページの video から PNG を取るためのユーティリティ。
+    - `videoCapture.test.js`
+    - `viewerCelebrationMatch.js` — 視聴者本人のギフト／広告システムコメント判定（ニコ生の表記揺れに耐える）。
+    - `viewerCelebrationMatch.test.js`
+    - `viewerSelfLaneAggregate.js` — v0.1.775: popup の応援アイコン列(りんく段)に「自分(視聴者)」を出すための合成集約。
+    - `viewerSelfLaneAggregate.test.js`
+    - `voiceAgeGate.js` — 読み上げアイテムが鮮度切れかどうか判定する純関数。
+    - `voiceAgeGate.test.js`
+    - `voiceAssignment.js` — ⚠️ 役割コメント無し
+    - `voiceAssignment.test.js`
+    - `voiceComment.js` — ニコ生コメント欄の最大文字数（textarea maxlength と一致）
+    - `voiceComment.test.js`
+    - `voiceInputDevices.js` — マイク確認でサンプルする時間（ms）
+    - `voiceInputDevices.test.js`
+    - `voiceLoadingState.js` — VOICEVOX 起動待ちのローディング表示を決める純関数群。
+    - `voiceLoadingState.test.js`
+    - `voicePlayer.js` — comeview-entry.js と同じ方針(@ts-nocheck)。ロジックは変更しない。
+    - `voicePlayer.test.js`
+    - `voiceReadQueue.js` — 読み上げキュー末尾へ追加し、上限超過分を古い順に返す。
+    - `voiceReadQueue.test.js`
+    - `voicevoxClient.js` — ⚠️ 役割コメント無し
+    - `voicevoxClient.test.js`
+    - `watchAudienceCopy.js` — watch パネル「観客メモ」用の短文・ツールチップ文言（DOM 非依存）。
+    - `watchAudienceCopy.test.js`
+    - `watchCelebrationOverlay.js` — popup iframe から content script 経由で呼ぶ。
+    - `watchConcurrentEstimateUiCopy.js` — 同接ツールチップ先頭に載せる、推定方式の短い説明（`renderWatchMetaCard` と一致させる）。
+    - `watchConcurrentEstimateUiCopy.test.js`
+    - `watchContext.js` — watch ページ URL と直前の lv から、コンテンツスクリプト用の文脈を純関数で求める
+    - `watchContext.test.js`
+    - `watchFrameCommentPostGate.js` — watch 上の各フレームが `NLS_POST_COMMENT` / コメント欄系操作を受けてよいかの判定。
+    - `watchFrameCommentPostGate.test.js`
+    - `watchFrameRank.js` — ⚠️ 役割コメント無し
+    - `watchFrameRank.test.js`
+    - `watchMetaCardStateGate.js` — watch メタカードの「来場者数 / 推定同時接続」表示状態を、
+    - `watchMetaCardStateGate.test.js`
+    - `watchPageViewerProfile.js` — watch ページのサイトヘッダー付近からログイン中ユーザーのアイコン・表示名を推定。
+    - `watchPageViewerProfile.test.js`
+    - `watchPopupCelebrationGuard.js` — popup 再描画時の応援演出ガード（純関数）。
+    - `watchPopupCelebrationGuard.test.js`
+    - `watchPopupLoadDiagnostics.js` — watch インラインパネルの読み込みフェーズ計測（DevTools / 実機メモ用）。
+    - `watchProgramEndState.js` — 視聴ページ文言から「番組終了状態」を推定する。
+    - `watchProgramEndState.test.js`
+    - `watchSnapshotAlignment.js` — ⚠️ 役割コメント無し
+    - `watchSnapshotAlignment.test.js`
+    - `watchSnapshotOfficialFields.js` — collectWatchPageSnapshot が返すオブジェクトのうち、公式統計・キャプチャ率まわり（DOM 非依存）。
+    - `watchSnapshotOfficialFields.test.js`
+    - `watchSnapshotPartialMerge.js` — watchMetaCache.snapshot を更新する際の partial-merge 純粋関数。
+    - `watchSnapshotPartialMerge.test.js`
+    - `watchTabPrioritize.js` — ⚠️ 役割コメント無し
+    - `watchTabPrioritize.test.js`
+    - `yukkuriBroadcastSummary.js` — 放送終了後の HTML レポート / マーケ分析の頭にくる「ゆっくり解説風」要約セクション。
+    - `yukkuriBroadcastSummary.test.js`
+  - 📁 **shared/** (7)
+    - 📁 **avatar/** (3)
+      - `avatarUrlGuard.js` — avatar URL 比較・抽出・整合性判定の純粋関数群（shared レイヤ）。
+      - `clampAvatarUrl.js` — avatar URL の長さ上限を一元適用する純関数（H2 / D-5 / S-13 の根治）。
+      - `clampAvatarUrl.test.js`
+    - 📁 **html/** (2)
+      - `escape.js` — ユーザー由来文字列を HTML 断片に埋め込む前にエスケープする（XSS 対策の共通実装）。
+      - `escape.test.js`
+    - 📁 **niconico/** (2)
+      - `liveId.js` — ニコ生 放送 ID（`lv…` / `ch…`（チャンネル枠））の正規化ユーティリティ。
+      - `liveId.test.js`
+  - 📁 **sound/** (1)
+    - `yozora-small-yell.mp3`
+  - `speech-recognition-globals.d.ts` — Web Speech API（Chrome は webkit 接頭辞のことがある）
+- 📁 **tests/** (73)
+  - 📁 **contract/** (1)
+    - `layer-dependency.test.js`
+  - 📁 **e2e/** (72)
+    - 📁 **fixtures/** (1)
+      - 📁 **watch/** (1)
+        - 📁 **lv888888888/** (1)
+          - `index.html`
+    - `acquisition-dashboard-render.spec.js` — ⚠️ 役割コメント無し
+    - `ad-ranking-card-no-clip.spec.js` — ⚠️ 役割コメント無し
+    - `avatar-load-diag.spec.js` — ⚠️ 役割コメント無し
+    - `backfill-auto-toggle.spec.js` — v0.1.418: 過去ログ「自動取り込み」トグルの実拡張検証。
+    - `backfill-optin-button.spec.js` — ⚠️ 役割コメント無し
+    - `backfill-rinku-honest-completion.spec.js` — v0.1.415: 過去ログ取り込みの「りんくの語り」が stopReason で正直に出し分けることを
+    - `card-count-no-overflow.spec.js` — ⚠️ 役割コメント無し
+    - `card-freshness-note.spec.js` — ⚠️ 役割コメント無し
+    - `comment-post.spec.js` — ⚠️ 役割コメント無し
+    - `comment-send-ctx-invalidated-recovery.spec.js` — ⚠️ 役割コメント無し
+    - `comment-ticker-render.spec.js` — ⚠️ 役割コメント無し
+    - `compose-toolbar.spec.js` — ⚠️ 役割コメント無し
+    - `constants.js` — E2E モック視聴ページ（playwright.config の webServer・manifest の host_permissions と一致させる）
+    - `contribution-card-no-clip.spec.js` — ⚠️ 役割コメント無し
+    - `contribution-ranking-official-link.spec.js` — ⚠️ 役割コメント無し
+    - `event-broadcasters-lane.spec.js` — ⚠️ 役割コメント無し
+    - `event-card-show-when-participating.spec.js` — ⚠️ 役割コメント無し
+    - `event-current-rank-display.spec.js` — ⚠️ 役割コメント無し
+    - `extension-interaction.spec.js` — ⚠️ 役割コメント無し
+    - `extension-recording.spec.js` — ⚠️ 役割コメント無し
+    - `fixtures.js` — ⚠️ 役割コメント無し
+    - `gift-history-live-source.spec.js` — ⚠️ 役割コメント無し
+    - `gift-history-points-ranking.spec.js` — ⚠️ 役割コメント無し
+    - `global-setup.js` — ローカル（CI 以外）でモック watch 用の静的サーバが未起動のとき、
+    - `global-teardown.js` — ⚠️ 役割コメント無し
+    - `header-placement-quickbar-narrow-hint.spec.js` — ⚠️ 役割コメント無し
+    - `header-placement-quickbar.spec.js` — ⚠️ 役割コメント無し
+    - `hidden-iframe-audition-only.spec.js` — ⚠️ 役割コメント無し
+    - `html-report-event-ranking.spec.js` — ⚠️ 役割コメント無し
+    - `inline-panel-align.spec.js` — ⚠️ 役割コメント無し
+    - `inline-panel-realtime-refresh.spec.js` — ⚠️ 役割コメント無し
+    - `inline-panel-visibility-recover.spec.js` — visibility 切替でインラインパネルが確実に復帰描画されることの回帰テスト。
+    - `lane-wait-honest.spec.js` — ⚠️ 役割コメント無し
+    - `live-chat-check.spec.js` — ⚠️ 役割コメント無し
+    - `lp-preview.spec.js` — tsuioku-no-kirameki/index.html（旧 docs/lp-preview.html）のレスポンシブ挙動（拡張なし・file://）。
+    - `multitab-inline-panel-not-blank.spec.js` — 複数タブ白化の自動検出(2026-06-04 セッションの「手で特定する消耗」を根絶するため)。
+    - `multitab-monkey-no-blank.spec.js` — 複数タブ モンキーテスト(白化/クラッシュの自動炙り出し)。
+    - `multitab-storage-contention.spec.js` — ⚠️ 役割コメント無し
+    - `nico-user-profile-resolve.spec.js` — ⚠️ 役割コメント無し
+    - `nicoad-ad-ranking-display.spec.js` — ⚠️ 役割コメント無し
+    - `open-comment-asset-picker.spec.js` — ⚠️ 役割コメント無し
+    - `page-frame.spec.js` — ⚠️ 役割コメント無し
+    - `panel-metrics-cold-open.spec.js` — ⚠️ 役割コメント無し
+    - `panel-vanish-debounce.spec.js` — ⚠️ 役割コメント無し
+    - `popup-comment-compose.spec.js` — ⚠️ 役割コメント無し
+    - `popup-compose-visibility.spec.js` — ⚠️ 役割コメント無し
+    - `popup-double-scroll.spec.js` — ⚠️ 役割コメント無し
+    - `popup-empty-state-window-height.spec.js` — 0.1.72 (BB): popup window が empty state（配信なし）時に
+    - `popup-layout.spec.js` — ⚠️ 役割コメント無し
+    - `popup-live-stat-cards.spec.js` — ⚠️ 役割コメント無し
+    - `popup-monkey.spec.js` — ⚠️ 役割コメント無し
+    - `popup-multitab-empty-dash-rescue.spec.js` — v0.1.414: 複数タブ時に別ウィンドウ POP（standalone）が全カード/全チップ「—」で
+    - `popup-no-auto-mic.spec.js` — ⚠️ 役割コメント無し
+    - `popup-open-performance.spec.js` — ⚠️ 役割コメント無し
+    - `popup-recording-sa.spec.js` — H1-Perception / H1-a11y / H2-Consistency
+    - `popup-settings-details.spec.js` — ⚠️ 役割コメント無し
+    - `popup-window-empty-history-real.spec.js` — 実 type:popup ウィンドウで empty-history の下空白を観測する診断用 spec。
+    - `popup-window-empty-history-whitespace.spec.js` — v0.1.357: 別ウィンドウ(standalone popup window=html.nl-popup-window)で
+    - `refresh-storage-hang-resilient.spec.js` — ⚠️ 役割コメント無し
+    - `save-ctx-invalidated-recovery.spec.js` — ⚠️ 役割コメント無し
+    - `smoke.spec.js` — ⚠️ 役割コメント無し
+    - `snapshot-fetch-hang-resilient.spec.js` — ⚠️ 役割コメント無し
+    - `storage-banners.spec.js` — ⚠️ 役割コメント無し
+    - `storage-prune-cheap-read.spec.js` — v0.1.419: 定期 prune の cheap read（get(null)→prefix 絞り）が実 Chrome で機能することを確認。
+    - `story-user-lane-profile-nickname.spec.js` — 応援ユーザーレーン: NDGR 等の stamp_* / nicolive_* 内部表示名より、
+    - `story-user-lane-visibility.spec.js` — 応援ユーザーレーンの「可視性」契約テスト。
+    - `support-activity-timeline.spec.js` — ⚠️ 役割コメント無し
+    - `support-timeline-persist-open.spec.js` — ⚠️ 役割コメント無し
+    - `thumbnail-capture.spec.js` — ⚠️ 役割コメント無し
+    - `timeline-fill-standalone-window.spec.js` — ⚠️ 役割コメント無し
+    - `watch-messaging.spec.js` — ⚠️ 役割コメント無し
+- 📁 **tools/** (5)
+  - 📁 **mcp-nicolive/** (3)
+    - `README.md`
+    - `server.mjs` — ⚠️ 役割コメント無し
+    - `store.mjs` — NicoLive Local MCP Bridge - Snapshot Store.
+  - `audit-lp-overflow.mjs` — One-off LP overflow audit (run: node tools/audit-lp-overflow.mjs)
+  - `render-og.js` — 追憶の煌めき LP 用 OG 画像（1200×630）を生成する。
+- 📁 **tsuioku-no-kirameki/** (38)
+  - 📁 **articles/** (12)
+    - `comment-echo-detection.html`
+    - `comment-silence-zones.html`
+    - `comment-waveform-fingerprint.html`
+    - `commenter-survival-curve.html`
+    - `dom-comment-harvest-identity-gate.html`
+    - `index.html`
+    - `inline-host-anchor-scoring.html`
+    - `ndgr-message-id-dedupe.html`
+    - `north-star-mirror-lanes.html`
+    - `phase-gate-flow-canon.html`
+    - `prewarm-coordinator-lease.html`
+    - `reaction-template-classifier.html`
+  - 📁 **images/** (17)
+    - 📁 **venue/** (6)
+      - `venue-living-overview.jpg`
+      - `venue-living-overview.mp4`
+      - `venue-living-vip.jpg`
+      - `venue-living-vip.mp4`
+      - `venue-mode.mp4`
+      - `venue-poster.jpg`
+    - `apple-touch-icon.png`
+    - `favicon-16.png`
+    - `favicon-180.png`
+    - `favicon-192.png`
+    - `favicon-32.png`
+    - `favicon-48.png`
+    - `favicon-512.png`
+    - `favicon.ico`
+    - `og-image.jpg`
+    - `og-image.png`
+    - `twitter-icon.png`
+  - 📁 **sound/** (1)
+    - `yozora-small-yell.mp3`
+  - `.htaccess`
+  - `google7e3e79636d884c2.html`
+  - `google7e3e79636d884c2f.html`
+  - `index.html`
+  - `privacy.html`
+  - `robots.txt`
+  - `site.webmanifest`
+  - `sitemap.xml`
