@@ -61,6 +61,62 @@
         font-size: 13px;
         font-family: var(--nl-mono);
       }
+      /* みちしるべ: 知識のない人でもここから全部たどれる入口 + これから創る人への応援 */
+      section.guidepost {
+        background: linear-gradient(135deg, rgba(236, 72, 153, 0.10), rgba(99, 102, 241, 0.10));
+        border: 1px solid var(--nl-border);
+        border-radius: 12px;
+        padding: 16px 18px;
+        margin-bottom: 16px;
+      }
+      section.guidepost h2 {
+        margin: 0 0 4px;
+        font-size: 17px;
+        color: var(--nl-text);
+      }
+      .guidepost-lead {
+        font-size: 13px;
+        color: var(--nl-text-soft);
+        line-height: 1.7;
+        margin: 0 0 14px;
+      }
+      .guidepost-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+        gap: 10px;
+      }
+      a.guidepost-card {
+        display: block;
+        background: var(--nl-card-bg);
+        border: 1px solid var(--nl-border);
+        border-radius: 10px;
+        padding: 11px 13px;
+        text-decoration: none;
+        color: var(--nl-text);
+        transition: border-color 0.15s, transform 0.1s;
+      }
+      a.guidepost-card:hover {
+        border-color: var(--nl-accent);
+        transform: translateY(-2px);
+      }
+      .guidepost-card .gp-title {
+        font-size: 14px;
+        font-weight: 700;
+        margin-bottom: 3px;
+      }
+      .guidepost-card .gp-desc {
+        font-size: 11.5px;
+        color: var(--nl-text-soft);
+        line-height: 1.5;
+      }
+      .guidepost-cheer {
+        margin-top: 14px;
+        font-size: 12.5px;
+        color: var(--nl-text-soft);
+        line-height: 1.7;
+        border-top: 1px dashed var(--nl-border);
+        padding-top: 12px;
+      }
       .status-buttons {
         display: flex;
         flex-wrap: wrap;
@@ -277,6 +333,34 @@
       <span class="status-meta" id="metaLastUpdate">最終更新 —</span>
       <span class="status-meta" id="metaAutoRefresh">自動更新: 2秒</span>
     </header>
+
+    <section class="guidepost">
+      <h2>🧭 はじめての方へ — ここから全部たどれます</h2>
+      <p class="guidepost-lead">
+        このページは「いまの調子」を映す画面です。下にスクロールすると、配信の記録状況や気になる点が出ます。<br>
+        仕組みやコードを知りたくなったら、下のカードをクリック。専門知識がなくても、図で全体が分かるようになっています。
+      </p>
+      <div class="guidepost-grid">
+        <a class="guidepost-card" href="https://htmlpreview.github.io/?https://raw.githubusercontent.com/kimito-link/tsuioku-no-kirameki.com/master/docs/feature-sitemap.html" target="_blank" rel="noopener">
+          <div class="gp-title">🗺️ 機能マップ（できることの地図）</div>
+          <div class="gp-desc">「何ができる？」を分類ごとに。記録・会場・読み上げ…どの機能がどこにあるか一目で。まず見るならこれ。</div>
+        </a>
+        <a class="guidepost-card" href="https://htmlpreview.github.io/?https://raw.githubusercontent.com/kimito-link/tsuioku-no-kirameki.com/master/docs/code-tree.html" target="_blank" rel="noopener">
+          <div class="gp-title">🌳 コードの地図（全ファイル）</div>
+          <div class="gp-desc">すべてのファイルが「何をするか」付きの枝分かれツリー。データの流れ（取得→記録→表示）も冒頭に。</div>
+        </a>
+        <a class="guidepost-card" href="https://github.com/kimito-link/tsuioku-no-kirameki.com" target="_blank" rel="noopener">
+          <div class="gp-title">📦 ソースコード（GitHub）</div>
+          <div class="gp-desc">プログラムの中身そのもの。自由に読んで・学んで・自分の作品に活かしてOK。</div>
+        </a>
+      </div>
+      <p class="guidepost-cheer">
+        🌱 <strong>これから何かを創ろうとしているあなたへ</strong> ——
+        最初は誰でも「何が分からないのか分からない」ところから始まります。だから、このページは
+        <em>地図</em>を用意しました。迷ったら 🗺️ から眺めてみてください。完璧じゃなくて大丈夫。
+        一歩ずつで、ちゃんと形になります。あなたの「創りたい」を応援しています。
+      </p>
+    </section>
 
     <div class="status-buttons">
       <button id="btnComeview" type="button">💬 コメビュを開く</button>
