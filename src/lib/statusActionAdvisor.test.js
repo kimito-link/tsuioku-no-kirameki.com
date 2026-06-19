@@ -103,6 +103,50 @@ describe('buildStatusActions', () => {
     expect(cards.find((x) => x.id === 'recorded-errors')).toBeFalsy();
   });
 
+  it('複数記録中+他タブDOM混入 → multitab-heavy(warn・タブを絞る案内)', () => {
+    const cards = buildStatusActions({
+      livesData: [
+        { liveId: 'lv1', officialRatePct: 90, recording: true },
+        { liveId: 'lv2', officialRatePct: 90, recording: true }
+      ],
+      fastDiag: { content: { giftDiagnostics: { multiTabDiag: { staleDomBundleSuspected: true } } } }
+    });
+    const c = cards.find((x) => x.id === 'multitab-heavy');
+    expect(c).toBeTruthy();
+    expect(c.severity).toBe('warn');
+    expect(c.action).toContain('1配信が安定してから');
+  });
+
+  it('複数記録中+大型backfill実行中 → multitab-heavy', () => {
+    const cards = buildStatusActions({
+      livesData: [
+        { liveId: 'lv1', officialRatePct: 90, recording: true },
+        { liveId: 'lv2', officialRatePct: 5, recording: true }
+      ],
+      fastDiag: { content: { romiDebug: { backfill: { running: true, rows: 14000 } } } }
+    });
+    expect(cards.find((x) => x.id === 'multitab-heavy')).toBeTruthy();
+  });
+
+  it('1配信だけなら multitab-heavy は出ない(単独は安全)', () => {
+    const cards = buildStatusActions({
+      livesData: [{ liveId: 'lv1', officialRatePct: 90, recording: true }],
+      fastDiag: { content: { giftDiagnostics: { multiTabDiag: { staleDomBundleSuspected: true } } } }
+    });
+    expect(cards.find((x) => x.id === 'multitab-heavy')).toBeFalsy();
+  });
+
+  it('複数タブでも重い兆候が無ければ multitab-heavy は出ない', () => {
+    const cards = buildStatusActions({
+      livesData: [
+        { liveId: 'lv1', officialRatePct: 90, recording: true },
+        { liveId: 'lv2', officialRatePct: 90, recording: true }
+      ],
+      fastDiag: { content: {} }
+    });
+    expect(cards.find((x) => x.id === 'multitab-heavy')).toBeFalsy();
+  });
+
   it('多タブ DOM 混入 → stale-dom', () => {
     const cards = buildStatusActions({
       livesData: [{ liveId: 'lv1', officialRatePct: 90 }],
