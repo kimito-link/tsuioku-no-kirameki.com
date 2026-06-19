@@ -1,3 +1,4 @@
+// commentKindnessNudge.js — 送信前コメントの攻撃的表現を検知し「やさしく一言」確認を促す純ロジック。
 import { normalizeCommentText } from './commentRecord.js';
 
 const COMMENT_KINDNESS_CONFIRM_JA =

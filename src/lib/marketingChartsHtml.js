@@ -1,3 +1,4 @@
+// marketingChartsHtml.js — マーケ集計(MarketingReport)から HTMLレポート用のグラフ/チャート HTML を組み立てる。
 /**
  * @typedef {import('./marketingAggregate.js').MarketingReport} MarketingReport
  * @typedef {import('./marketingAggregate.js').UserCommentProfile} UserCommentProfile

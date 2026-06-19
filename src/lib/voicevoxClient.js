@@ -1,3 +1,4 @@
+// voicevoxClient.js — ローカル VOICEVOX エンジン(127.0.0.1:50021)へ音声合成をリクエストするクライアント。
 export const VOICEVOX_BASE_URL = 'http://127.0.0.1:50021';
 
 /**

@@ -1,4 +1,5 @@
 // @ts-nocheck — SW エンジン骨格(PR1-b-1)。chrome API 多用のため checkJs 対象外。
+// backfill-sw-entry.js — Service Worker 側の過去ログ取得(バックフィル)エンジン。NDGR を遡って取り込む。
 import {
   crawlNdgrBackward,
   crawlNdgrBackwardDeterministic

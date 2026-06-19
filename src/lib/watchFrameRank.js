@@ -1,3 +1,4 @@
+// watchFrameRank.js — 複数 watch フレーム/タブから「今解決すべき配信」を innerText とURL一致でスコア付けして選ぶ純ロジック。
 import {
   extractLiveIdFromUrl,
   watchPageUrlsMatchForSnapshot

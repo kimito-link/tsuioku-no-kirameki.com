@@ -1,3 +1,4 @@
+// watchSnapshotAlignment.js — content からの応答(intercept/AI診断 等)が現在解決済の watch と同じ配信由来か判定し別 live の混入を防ぐ。
 import {
   extractLiveIdFromUrl,
   isNicoLiveWatchUrl,

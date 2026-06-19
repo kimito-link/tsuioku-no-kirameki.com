@@ -1,3 +1,4 @@
+// nicoUserProfileApi.js — ニコニコのユーザープロフィール取得用メッセージ型と uid 妥当性判定(background と文字列同期)。
 export const NICO_USER_PROFILE_FETCH_MESSAGE_TYPE = 'NLS_NICO_USER_PROFILE_FETCH';
 /** プロフィール HTML ページ取得用メッセージ型（background.js と文字列同期）。 */
 export const NICO_USER_PROFILE_PAGE_FETCH_MESSAGE_TYPE = 'NLS_NICO_USER_PROFILE_PAGE_FETCH';

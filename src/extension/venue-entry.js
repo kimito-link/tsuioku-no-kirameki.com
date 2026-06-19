@@ -1,3 +1,4 @@
+// venue-entry.js — 会場モード(standalone)のエントリ。venueBar をページに mount するだけの薄い起動点。
 import { mountVenueStandalone } from './venueBar.js';
 
 function main() {

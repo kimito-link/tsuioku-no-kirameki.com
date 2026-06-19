@@ -1,3 +1,4 @@
+// reportSilentError.js — 内部エラーを静かに記録する純ロジック(context invalidated 等の判定・メッセージ正規化)。
 const MESSAGE_MAX = 200;
 
 /**
