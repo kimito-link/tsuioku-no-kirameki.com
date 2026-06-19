@@ -869,6 +869,21 @@ function setupPatrolButtons() {
       }
     });
   }
+  // 🗺️ コードの地図を開く: 公開リポの code-tree.html を htmlpreview 経由で図として別タブに。
+  //   code-tree.html は拡張に同梱していない(リポの docs/ にある静的コード地図)ため、
+  //   GitHub raw を htmlpreview.github.io で描画して開く(配信していなくても・AI にも渡せる URL)。
+  const btnCodeMap = document.getElementById('btnCodeMap');
+  if (btnCodeMap) {
+    btnCodeMap.addEventListener('click', () => {
+      const raw = 'https://raw.githubusercontent.com/kimito-link/tsuioku-no-kirameki.com/master/docs/code-tree.html';
+      const url = 'https://htmlpreview.github.io/?' + raw;
+      try {
+        chrome.tabs.create({ url });
+      } catch {
+        window.open(url, '_blank');
+      }
+    });
+  }
   // 全体マインドマップの全展開/全折りたたみ
   const btnMindExpand = document.getElementById('btnMindExpand');
   if (btnMindExpand) btnMindExpand.addEventListener('click', () => setAllMindDetails(true));

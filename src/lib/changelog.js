@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.827',
+    date: '2026-06-20',
+    summary: '状態ページに「コードの地図を開く」ボタンを追加',
+    items: Object.freeze([
+      '状態速報ページのボタン列に「🗺️ コードの地図を開く」を追加しました。押すと、このソフトの全ファイルが「何をするか」とデータの流れ(取得→記録→集計→表示)を1枚で見られる図(code-tree)が別タブで開きます。状態ページを開く習慣だけで、コードの全体像にもすぐ辿り着けます。記録・コメント取得には影響しません。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.826',
     date: '2026-06-19',
     summary: '多タブで重い時に「タブを絞ると軽い」と案内',
