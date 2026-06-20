@@ -188,7 +188,7 @@ export function buildBackfillProgressLine(bp, opts) {
  *   no_event/no_program_gift は「無し」(この配信にイベント/ギフトが無い=正常)。
  *
  * @param {Record<string, {state?: string, value?: number|null, count?: number,
- *   ndgrValue?: number|null, foundCountLifetime?: number}>|null|undefined} lanes
+ *   apiRows?: number, ndgrValue?: number|null, foundCountLifetime?: number}>|null|undefined} lanes
  *   北極星レーン オブジェクト(キー例: "1_貢献度ランキング" / "2_ギフト履歴" /
  *   "3_イベント累計スコア" / "4_番組累計ポイント" / "5_イベント現在順位" / "+α_広告ランキング")。
  * @returns {string} レーン状況の1行(データ無しなら '')。
@@ -209,7 +209,11 @@ export function buildLaneStatusLine(lanes) {
     const lane = lanes[key];
     if (!lane || typeof lane !== 'object') continue;
     const state = String(lane.state || '');
+    // v0.1.844: apiRows(Koken/Nicoad 無認証 API で実際に取れた行数)を最優先。従来は count
+    //   (DOM bundle 長)だけ見て、autoOpen 未発火配信で API 13行があっても n:0→「空」と誤報した。
+    //   レーンが実描画に使う正本は API 行なので、これを n に含めて実数(✅13 等)で出す。
     const n =
+      Number(lane.apiRows) ||
       Number(lane.count) ||
       Number(lane.value) ||
       Number(lane.ndgrValue) ||
