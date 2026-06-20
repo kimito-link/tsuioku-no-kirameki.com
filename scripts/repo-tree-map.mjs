@@ -18,6 +18,7 @@
 import { execSync } from 'node:child_process';
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'node:fs';
 import { join, resolve } from 'node:path';
+import { classifyFeatureCategory } from '../src/lib/classifyFeatureCategory.js';
 
 const ROOT = resolve(process.cwd());
 const OUT_DIR = join(ROOT, 'docs');
@@ -990,6 +991,35 @@ function groupFeaturesByCategory() {
   return CATEGORY_ORDER.filter((c) => byCat.has(c)).map((cat) => ({ cat, features: byCat.get(cat) }));
 }
 
+/** 手動 FEATURES が既に paths で持つファイル集合(自動分類で重複表示しないため)。 */
+function manualFeaturePathSet() {
+  const s = new Set();
+  for (const f of FEATURES) for (const p of f.paths || []) s.add(p);
+  return s;
+}
+
+/**
+ * v0.1.840(マップ網羅化 第2): 全ソースを classifyFeatureCategory で自動分類し、カテゴリ別に
+ *   { path, role } を返す。手動 FEATURES が既に載せたファイルは除外(重複回避)。
+ *   roleByPath = collectFileRoles().roleByPath(先頭コメント由来の役割)。
+ * @param {Map<string,string|null>} roleByPath
+ * @returns {Map<string, {path:string, role:string|null}[]>}
+ */
+function classifyAllSourceFiles(roleByPath) {
+  const manual = manualFeaturePathSet();
+  /** @type {Map<string, {path:string, role:string|null}[]>} */
+  const byCat = new Map();
+  for (const [path, role] of roleByPath.entries()) {
+    if (role == null) continue; // 役割コメントが無い(=非ソース/生成物)は対象外。
+    if (manual.has(path)) continue; // 手動 FEATURES に載っている代表は重複させない。
+    const cat = classifyFeatureCategory(path, role);
+    if (!byCat.has(cat)) byCat.set(cat, []);
+    byCat.get(cat).push({ path, role });
+  }
+  for (const arr of byCat.values()) arr.sort((a, b) => a.path.localeCompare(b.path));
+  return byCat;
+}
+
 /** 分類ごとの枝の色(MindMeister 風の色分け)。CATEGORY_ORDER と対応。 */
 const CATEGORY_COLOR = {
   '📤 送信': '#e0794a', '📥 取得': '#4a8de0', '💾 記録': '#9b6fe0',
@@ -1002,10 +1032,16 @@ const CATEGORY_COLOR = {
  * 横方向のツリー: 左に中心ノード、右へ分類が枝分かれ。各分類に色とりんく/こん太/たぬ姉の解説。
  * @param {string[]} files 実在検証用(消えた担当ファイルを赤く)
  */
-function renderFeatureSitemapHtml(files) {
+function renderFeatureSitemapHtml(files, roleByPath) {
   const trackedSet = new Set(files);
   const groups = groupFeaturesByCategory();
-  const branches = groups.map(({ cat, features }) => {
+  const autoByCat = classifyAllSourceFiles(roleByPath || new Map());
+  // 手動 FEATURES が1つも無いカテゴリも、自動分類でファイルがあれば枝を出す(網羅)。
+  const catsWithManual = new Set(groups.map((g) => g.cat));
+  const extraCats = CATEGORY_ORDER.filter((c) => autoByCat.has(c) && !catsWithManual.has(c));
+  const allGroups = [...groups, ...extraCats.map((cat) => ({ cat, features: [] }))]
+    .sort((a, b) => CATEGORY_ORDER.indexOf(a.cat) - CATEGORY_ORDER.indexOf(b.cat));
+  const branches = allGroups.map(({ cat, features }) => {
     const color = CATEGORY_COLOR[cat] || '#7b8390';
     const note = CATEGORY_CHARA_NOTE[cat];
     const charaRows = note
@@ -1023,9 +1059,20 @@ function renderFeatureSitemapHtml(files) {
       return `<div class="mm-leaf"><div class="mm-fname">${escapeHtml(f.feature)}</div>`
         + `<div class="mm-fdesc">${escapeHtml(f.desc)}</div><div class="mm-paths">${paths}</div></div>`;
     }).join('');
+    // v0.1.840: このカテゴリの全担当ファイル(自動分類)を折りたたみで網羅表示(手動代表の下層)。
+    const auto = autoByCat.get(cat) || [];
+    const autoRows = auto.map((a) =>
+      `<div class="mm-auto-row"><code class="mm-path">${escapeHtml(a.path)}</code>`
+      + `<span class="mm-auto-role">${escapeHtml(a.role || '')}</span></div>`
+    ).join('');
+    const autoBlock = auto.length
+      ? `<details class="mm-auto"><summary>🗂 このカテゴリの全担当ファイル(自動分類) <span class="mm-cnt">${auto.length}</span></summary>`
+        + `<div class="mm-auto-list">${autoRows}</div></details>`
+      : '';
+    const totalCnt = features.length + auto.length;
     return `<details class="mm-branch" open style="--branch:${color}">`
-      + `<summary><span class="mm-cat">${escapeHtml(cat)}</span><span class="mm-cnt">${features.length}</span></summary>`
-      + `${charaRows}<div class="mm-leaves">${leaves}</div></details>`;
+      + `<summary><span class="mm-cat">${escapeHtml(cat)}</span><span class="mm-cnt">${totalCnt}</span></summary>`
+      + `${charaRows}<div class="mm-leaves">${leaves}</div>${autoBlock}</details>`;
   }).join('');
 
   return `<!DOCTYPE html>
@@ -1072,6 +1119,15 @@ function renderFeatureSitemapHtml(files) {
   .mm-path{ font-family:"Menlo","Consolas",monospace; font-size:10.5px; background:rgba(255,255,255,.06);
     border:1px solid var(--line); border-radius:5px; padding:1px 6px; color:#bcd2f6; }
   .mm-path.dead{ color:#f6c7d2; border-color:var(--warn); background:rgba(181,72,95,.12); }
+  details.mm-auto{ margin-top:8px; border-top:1px dashed var(--line); padding-top:6px; }
+  details.mm-auto > summary{ cursor:pointer; font-size:12px; color:var(--sub); list-style:none; }
+  details.mm-auto > summary::-webkit-details-marker{ display:none; }
+  details.mm-auto > summary::before{ content:"▸ "; color:var(--branch); }
+  details.mm-auto[open] > summary::before{ content:"▾ "; }
+  .mm-auto-list{ display:grid; gap:3px; margin-top:6px; }
+  .mm-auto-row{ display:flex; gap:8px; align-items:baseline; flex-wrap:wrap; }
+  .mm-auto-row .mm-path{ flex:0 0 auto; }
+  .mm-auto-role{ font-size:11px; color:var(--muted); line-height:1.5; }
   .ctrl{ margin:0 0 14px; display:flex; gap:8px; }
   .ctrl button{ background:rgba(255,255,255,.06); border:1px solid var(--line); color:var(--ink);
     border-radius:8px; padding:5px 12px; font-size:12px; cursor:pointer; }
@@ -1115,15 +1171,21 @@ ${NAV_CSS}
 }
 
 /** 機能サイトマップ Markdown(AI/GitHub 用のテキスト正本)。 */
-function renderFeatureSitemapMd(files) {
+function renderFeatureSitemapMd(files, roleByPath) {
   const trackedSet = new Set(files);
+  const autoByCat = classifyAllSourceFiles(roleByPath || new Map());
   const lines = [];
   lines.push('# 🗺️ 機能サイトマップ(何が・何をして・どのファイルか・自動生成)');
   lines.push('');
   lines.push('> `npm run tree-map` で再生成。手で編集しない(`--check` が verify:cc で腐りを検知)。');
-  lines.push('> 全機能を「分類 → 機能 → 役割 → 担当ファイル」で。視覚版: [feature-sitemap.html](feature-sitemap.html)。');
+  lines.push('> 全機能を「分類 → 機能 → 役割 → 担当ファイル」で。代表は手動 FEATURES・残りは自動分類で全網羅。視覚版: [feature-sitemap.html](feature-sitemap.html)。');
   lines.push('');
-  for (const { cat, features } of groupFeaturesByCategory()) {
+  const manualGroups = groupFeaturesByCategory();
+  const catsWithManual = new Set(manualGroups.map((g) => g.cat));
+  const extraCats = CATEGORY_ORDER.filter((c) => autoByCat.has(c) && !catsWithManual.has(c));
+  const allGroups = [...manualGroups, ...extraCats.map((cat) => ({ cat, features: [] }))]
+    .sort((a, b) => CATEGORY_ORDER.indexOf(a.cat) - CATEGORY_ORDER.indexOf(b.cat));
+  for (const { cat, features } of allGroups) {
     lines.push(`## ${cat}`);
     lines.push('');
     const note = CATEGORY_CHARA_NOTE[cat];
@@ -1140,9 +1202,40 @@ function renderFeatureSitemapMd(files) {
         lines.push(`  - \`${p}\`${ok ? '' : ' ⚠️ 見つからない'}`);
       }
     }
+    // v0.1.840: このカテゴリの全担当ファイル(自動分類・手動代表の重複は除く)を網羅。
+    const auto = autoByCat.get(cat) || [];
+    if (auto.length) {
+      lines.push(`<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) ${auto.length}</summary>`);
+      lines.push('');
+      for (const a of auto) lines.push(`- \`${a.path}\` — ${a.role || ''}`);
+      lines.push('');
+      lines.push('</details>');
+    }
     lines.push('');
   }
   return lines.join('\n');
+}
+
+/**
+ * v0.1.840(マップ網羅化 第2・腐り検知): 全ソース(役割コメントを持つファイル)が逆引きに
+ *   1つ以上出ているか検証する。手動 FEATURES または自動分類のどちらかに入っていれば OK。
+ *   'その他'(未分類)に落ちた件数を返す(--check で件数を警告し、分類キー追加 or 手動 FEATURES を喚起)。
+ * @param {Map<string,string|null>} roleByPath
+ * @returns {{ total:number, misc:number, miscFiles:string[] }}
+ */
+function assertAllFilesIndexed(roleByPath) {
+  const autoByCat = classifyAllSourceFiles(roleByPath);
+  const manual = manualFeaturePathSet();
+  let total = 0;
+  const miscFiles = [];
+  for (const [path, role] of roleByPath.entries()) {
+    if (role == null) continue;
+    total += 1;
+    if (manual.has(path)) continue;
+    if (classifyFeatureCategory(path, role) === 'その他') miscFiles.push(path);
+  }
+  void autoByCat;
+  return { total, misc: miscFiles.length, miscFiles };
 }
 
 /** ---- main ---- */
@@ -1156,13 +1249,15 @@ function generate() {
   const roles = collectFileRoles(files);
   const codeTreeHtml = renderCodeTreeHtml(fullTree, roles);
   const codeTreeMd = renderCodeTreeMd(fullTree, roles);
-  const featureSitemapHtml = renderFeatureSitemapHtml(files);
-  const featureSitemapMd = renderFeatureSitemapMd(files);
-  return { md, html, missing, dead, codeTreeHtml, codeTreeMd, featureSitemapHtml, featureSitemapMd };
+  const featureSitemapHtml = renderFeatureSitemapHtml(files, roles.roleByPath);
+  const featureSitemapMd = renderFeatureSitemapMd(files, roles.roleByPath);
+  // v0.1.840: 全ソースが逆引き(手動 or 自動分類)に1つ以上出ているか。'その他'(未分類)件数も返す。
+  const indexCoverage = assertAllFilesIndexed(roles.roleByPath);
+  return { md, html, missing, dead, codeTreeHtml, codeTreeMd, featureSitemapHtml, featureSitemapMd, indexCoverage };
 }
 
 const isCheck = process.argv.includes('--check');
-const { md, html, missing, dead, codeTreeHtml, codeTreeMd, featureSitemapHtml, featureSitemapMd } = generate();
+const { md, html, missing, dead, codeTreeHtml, codeTreeMd, featureSitemapHtml, featureSitemapMd, indexCoverage } = generate();
 
 if (isCheck) {
   let fail = false;
@@ -1182,6 +1277,10 @@ if (isCheck) {
   console.log('[repo-tree-map] up to date.');
   if (missing.length) {
     console.warn(`[repo-tree-map] 注意: 役割未記入 ${missing.length} 件: ${missing.join(', ')}`);
+  }
+  // v0.1.840: 逆引き網羅の腐り検知(warn)。'その他'(未分類)が増えたら分類キーワード追加を喚起。
+  if (indexCoverage && indexCoverage.misc > 0) {
+    console.warn(`[repo-tree-map] 注意: 逆引きで未分類(その他)${indexCoverage.misc} / ${indexCoverage.total} 件。classifyFeatureCategory に分類キーを足すか手動 FEATURES に載せると精度が上がります。`);
   }
 } else {
   mkdirSync(OUT_DIR, { recursive: true });
