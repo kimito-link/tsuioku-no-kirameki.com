@@ -351,22 +351,65 @@ async function loadBackfillProgressSafe() {
  * ========================================================================== */
 
 function renderAll({ lvList, summaries, fastDiag, popupDiag, backfillProgress }) {
-  const livesData = lvList.map((lv) =>
-    summarizeOneLive(
-      lv,
-      summaries[PANEL_SUMMARY_PREFIX + lv],
-      summaries[WATCH_SNAPSHOT_PREFIX + lv],
-      summaries[PERF_DIAG_PREFIX + lv],
-      summaries[LIVE_ENDED_PREFIX + lv]
-    )
-  );
+  // v0.1.847: 各描画セクションを独立 try/catch で隔離するヘルパ。1つが throw しても他のセクションと
+  //   最終更新メタを巻き込まない=「セルが全部消える/最終更新—のまま固まる」を根治。落ちた場所は
+  //   console と AI 共有欄に出して真因を追えるようにする(star-romi 失敗体験の除去)。
+  /** @param {string} name @param {() => void} fn */
+  const safeSection = (name, fn) => {
+    try {
+      fn();
+    } catch (err) {
+      try {
+        console.error(`[status] section "${name}" failed:`, err);
+      } catch {
+        /* no-op */
+      }
+      _statusLastErrorText =
+        `⚠ 状態表示の一部(${name})でつまずきました: ${String(err?.message || err)}\n` +
+        `  (他の表示と記録は継続しています。次の自動更新で回復する場合があります)`;
+    }
+  };
+
+  // v0.1.847: livesData 組み立ては全セクションの土台。1配信の summarizeOneLive が throw しても
+  //   その配信だけ落とし、他の配信と全セクションを白紙にしない(従来は1件の例外で renderAll 全滅→
+  //   セル全消失・最終更新—固着の真因の1つ)。
+  const livesData = (Array.isArray(lvList) ? lvList : [])
+    .map((lv) => {
+      try {
+        return summarizeOneLive(
+          lv,
+          summaries[PANEL_SUMMARY_PREFIX + lv],
+          summaries[WATCH_SNAPSHOT_PREFIX + lv],
+          summaries[PERF_DIAG_PREFIX + lv],
+          summaries[LIVE_ENDED_PREFIX + lv]
+        );
+      } catch (err) {
+        try {
+          console.error('[status] summarizeOneLive failed for', lv, err);
+        } catch {
+          /* no-op */
+        }
+        return null;
+      }
+    })
+    .filter(Boolean);
 
   // 概要セクション
   // v0.1.804: enumerate の一瞬の揺れで累計だけが後退するのを床で吸収する。床はページが開いている間
   //   だけ保持し(リロードで素直に再計算)、storage には書かない。本当の値が床を超えれば床も上がる。
-  const overviewText = buildOverviewText(livesData, { recordedSumFloor: _recordedSumFloor });
-  const recordedSumNow = sumRecordedFromLives(livesData);
-  if (recordedSumNow > _recordedSumFloor) _recordedSumFloor = recordedSumNow;
+  // v0.1.847: 概要算出が throw しても空文字でフォールバック=後続セクションを止めない。
+  let overviewText = '';
+  try {
+    overviewText = buildOverviewText(livesData, { recordedSumFloor: _recordedSumFloor });
+    const recordedSumNow = sumRecordedFromLives(livesData);
+    if (recordedSumNow > _recordedSumFloor) _recordedSumFloor = recordedSumNow;
+  } catch (err) {
+    try {
+      console.error('[status] buildOverviewText failed:', err);
+    } catch {
+      /* no-op */
+    }
+  }
   // v0.1.659: 過去ログ取得の診断(stopReason)を概要に併記。「一気に取れない・50%停止」の真因を
   //   ユーザーが status を開くだけで AI 共有できる(reached_start=完走 / no_progress=疎区間で停止 /
   //   backward_exhausted=入口無し / cap_*=上限 / rate_limited=混雑)。
@@ -376,16 +419,21 @@ function renderAll({ lvList, summaries, fastDiag, popupDiag, backfillProgress })
   //   走行中ずっと backfillProgress=null=この行が空になり「過去ログを取っている気配が出ない」。
   //   記録中×放送中(endedAt無し)×未達(取得率<100)の配信があれば「取り込み中…」のフォールバックを
   //   出す(popup の v0.1.764 と対称・数字は出さず不安にさせない)。判定は livesData から行う。
-  const catchingUp = livesData.some(
-    (lv) => !lv.endedAt && lv.recordedCount > 0 && (lv.officialRatePct == null || lv.officialRatePct < 100)
-  );
-  const bpLine = buildBackfillProgressLine(backfillProgress, { catchingUp });
-  const backfillLine = bpLine ? `\n${bpLine}` : '';
-  // v0.1.766(ユーザー要望「概要にレーン状況も入れたい」): 公式値レーン(北極星レーン)の状況を
-  //   概要に併記。「レーンが出ていない時」を status を見るだけで分かる。視聴中の配信のみ取得可能
-  //   (fastDiag.content.giftDiagnostics の「北極星レーン」)なので、取れたときだけ1行足す。
-  const laneStr = buildLaneStatusLine(fastDiag?.content?.giftDiagnostics?.['北極星レーン']);
-  const laneLine = laneStr ? `\n${laneStr}` : '';
+  // v0.1.847: 概要の併記行(過去ログ進捗・公式値レーン)組み立てを隔離。throw しても概要本体は出す。
+  let backfillLine = '';
+  let laneLine = '';
+  safeSection('概要併記', () => {
+    const catchingUp = livesData.some(
+      (lv) => !lv.endedAt && lv.recordedCount > 0 && (lv.officialRatePct == null || lv.officialRatePct < 100)
+    );
+    const bpLine = buildBackfillProgressLine(backfillProgress, { catchingUp });
+    backfillLine = bpLine ? `\n${bpLine}` : '';
+    // v0.1.766(ユーザー要望「概要にレーン状況も入れたい」): 公式値レーン(北極星レーン)の状況を
+    //   概要に併記。「レーンが出ていない時」を status を見るだけで分かる。視聴中の配信のみ取得可能
+    //   (fastDiag.content.giftDiagnostics の「北極星レーン」)なので、取れたときだけ1行足す。
+    const laneStr = buildLaneStatusLine(fastDiag?.content?.giftDiagnostics?.['北極星レーン']);
+    laneLine = laneStr ? `\n${laneStr}` : '';
+  });
   const overviewEl = document.getElementById('overviewBody');
   if (overviewEl) {
     overviewEl.textContent =
@@ -394,6 +442,7 @@ function renderAll({ lvList, summaries, fastDiag, popupDiag, backfillProgress })
   }
 
   // 配信ごとのカード
+  safeSection('配信カード', () => {
   const livesEl = document.getElementById('livesBody');
   if (livesEl) {
     if (!livesData.length) {
@@ -437,24 +486,26 @@ function renderAll({ lvList, summaries, fastDiag, popupDiag, backfillProgress })
       }
     }
   }
+  });
 
   // 🩹 いま気になる点と対処(症状→原因→次の一手・最上部)
-  renderActionCards({ livesData, fastDiag, popupDiag });
+  safeSection('対処候補', () => renderActionCards({ livesData, fastDiag, popupDiag }));
 
   // 健全度パネル(ファーストビュー・正常100/異常だけ色・対象外は—)
-  renderHealthCells({ livesData, fastDiag });
+  safeSection('健全度パネル', () => renderHealthCells({ livesData, fastDiag }));
 
   // 全体マインドマップ(折りたたみツリー・ここを見れば全部わかる)
-  renderMindmap({ overviewText, livesData, fastDiag, popupDiag });
+  safeSection('マインドマップ', () => renderMindmap({ overviewText, livesData, fastDiag, popupDiag }));
 
   // AI 共有用テキスト
-  const fullText = buildAiShareFullText({ overviewText, livesData, fastDiag, popupDiag });
-  const ta = /** @type {HTMLTextAreaElement|null} */ (
-    document.getElementById('aiShareText')
-  );
-  if (ta) {
-    if (ta.value !== fullText) ta.value = fullText;
-  }
+  let fullText = '';
+  safeSection('AI共有テキスト', () => {
+    fullText = buildAiShareFullText({ overviewText, livesData, fastDiag, popupDiag });
+    const ta = /** @type {HTMLTextAreaElement|null} */ (
+      document.getElementById('aiShareText')
+    );
+    if (ta && ta.value !== fullText) ta.value = fullText;
+  });
 
   _lastRenderedBundle = {
     overview: overviewText,
