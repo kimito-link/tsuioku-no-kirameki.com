@@ -75,6 +75,46 @@ describe('buildHealthCells', () => {
     expect(cellById(named, 'uid-rate').level).toBe('ok');
   });
 
+  it('userId付き保存: NDGR接続中で低率(匿名184主体)は na=該当外(🔴にしない・v0.1.860)', () => {
+    // 実機 lv350796749: withUidPercent 6% だが NDGR connected=匿名主体で仕様。
+    //   健全度パネルだけ🔴を出すと対処カード(uid-low=⚪仕様)と食い違う=self-verifying違反。
+    const cells = buildHealthCells({
+      fastDiag: {
+        content: {
+          networkErrorProbe: { ndgrConnectStatus: 'connected' },
+          giftDiagnostics: { commentObservability: { savedCommentsUidStats: { totalSaved: 83, withUid: 5, withUidPercent: 6 } } }
+        }
+      }
+    });
+    expect(cellById(cells, 'uid-rate').level).toBe('na');
+  });
+
+  it('userId付き保存: NDGR切断で低率は通常評価(bad)=NDGR異常は隠さない', () => {
+    // NDGR が切れているなら低率は仕様でなく異常の可能性=na に倒さず通常評価。
+    //   (本体の NDGR 障害は専用セルが赤・ここは匿名仕様だけを na にする)
+    const cells = buildHealthCells({
+      fastDiag: {
+        content: {
+          networkErrorProbe: { ndgrConnectStatus: 'disconnected' },
+          giftDiagnostics: { commentObservability: { savedCommentsUidStats: { totalSaved: 83, withUidPercent: 6 } } }
+        }
+      }
+    });
+    expect(cellById(cells, 'uid-rate').level).toBe('bad');
+  });
+
+  it('userId付き保存: NDGR接続中でも高率(60%)は通常評価で ok(匿名 na 化は<50%のみ)', () => {
+    const cells = buildHealthCells({
+      fastDiag: {
+        content: {
+          networkErrorProbe: { ndgrConnectStatus: 'connected' },
+          giftDiagnostics: { commentObservability: { savedCommentsUidStats: { totalSaved: 100, withUidPercent: 95 } } }
+        }
+      }
+    });
+    expect(cellById(cells, 'uid-rate').level).toBe('ok');
+  });
+
   it('実機相当(健全配信)= 赤(bad)が出ない', () => {
     // lv350761522 相当: 取得率99 / connected / 北極星 ok×3+na×2+warn×1。
     const cells = buildHealthCells({

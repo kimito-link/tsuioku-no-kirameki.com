@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 1 / 515 件
+## ⚠️ 役割コメントが無いソース 1 / 516 件
 - `src/lib/reportPreviewPublish.js`
 
 ## 全ファイルツリー
@@ -253,7 +253,7 @@
   - `vendor-visual-explainer.mjs` — Vendors nicobailon/visual-explainer (MIT) into .cursor/skills/visual-explainer/
   - `verify-bump.mjs` — extension bump 後の整合性チェッカー
   - `write-extension-placeholder-icons.mjs` — リポジトリに 256px アイコンしか無い環境向け: manifest 用の小さめ PNG を生成する。
-- 📁 **src/** (1118)
+- 📁 **src/** (1120)
   - 📁 **data/** (6)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -511,7 +511,7 @@
         - `logo_funlink_white_RGB_maru_black.png`
       - `logo_guide_funlink_ol.pdf`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (908)
+  - 📁 **lib/** (910)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -1051,6 +1051,8 @@
     - `northStarLaneVisibility.test.js`
     - `northStarLaneWaitingUi.js` — 北極星「公式値レーン」の取得待ち（not_yet / iframe_unrendered）用 UI 断片。
     - `northStarLaneWaitingUi.test.js`
+    - `numberConsistency.js` — 状態速報の「数字の自己矛盾」を自動検知する純関数(v0.1.859)。
+    - `numberConsistency.test.js`
     - `objectUrlRevokeQueue.js` — `URL.createObjectURL` で作った blob URL を、メモリ滞留を抑えながら revoke する
     - `objectUrlRevokeQueue.test.js`
     - `observerTarget.js` — MutationObserver の監視ルートを決める（ニコ生コメントパネル優先）
