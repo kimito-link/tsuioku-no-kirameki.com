@@ -26,6 +26,8 @@ import { KEY_AI_SHARE_POPUP_DIAG } from '../lib/aiSharePopupDiagKey.js';
 import { buildStatusMindmapModel } from '../lib/statusMindmapModel.js';
 import { buildStatusActions } from '../lib/statusActionAdvisor.js';
 import { buildHealthCells, summarizeHealthVerdict } from '../lib/healthCells.js';
+import { buildVoiceDiagLine } from '../lib/voiceDiag.js';
+import { KEY_VOICE_DIAG } from '../lib/voiceDiagKey.js';
 import {
   buildOverviewText,
   buildLiveBlockText,
@@ -170,8 +172,10 @@ async function refresh(opts = {}) {
       () => loadBackfillProgressSafe(),
       tmo
     );
+    step = 'loadVoiceDiagSafe';
+    const voiceDiag = await runStorageOpWithTimeout(() => loadVoiceDiagSafe(), tmo);
     step = 'renderAll';
-    renderAll({ lvList, summaries, fastDiag, popupDiag, backfillProgress });
+    renderAll({ lvList, summaries, fastDiag, popupDiag, backfillProgress, voiceDiag });
     updateLastUpdateMeta();
     _statusLastErrorText = '';
   } catch (err) {
@@ -322,6 +326,17 @@ async function loadPopupDiagSafe() {
   }
 }
 
+// v0.1.852: 会場モード(comeview・別ページ)の読み上げ診断を読む。comeview が定期的に
+//   KEY_VOICE_DIAG(nls_voice_diag_v1)へ書く(発話/間引き時)。会場モード未使用なら null=表示しない。
+async function loadVoiceDiagSafe() {
+  try {
+    const bag = await chrome.storage.local.get(KEY_VOICE_DIAG);
+    return bag?.[KEY_VOICE_DIAG] || null;
+  } catch {
+    return null;
+  }
+}
+
 /**
  * v0.1.659: 過去ログ取得の診断(stopReason)を読む。「一気に取れない・50%停止」の真因を
  *   ユーザーが status を開くだけで AI に共有できるように、どの配信が何の理由で止まったかを表示。
@@ -350,7 +365,7 @@ async function loadBackfillProgressSafe() {
  * レンダリング
  * ========================================================================== */
 
-function renderAll({ lvList, summaries, fastDiag, popupDiag, backfillProgress }) {
+function renderAll({ lvList, summaries, fastDiag, popupDiag, backfillProgress, voiceDiag }) {
   // v0.1.847: 各描画セクションを独立 try/catch で隔離するヘルパ。1つが throw しても他のセクションと
   //   最終更新メタを巻き込まない=「セルが全部消える/最終更新—のまま固まる」を根治。落ちた場所は
   //   console と AI 共有欄に出して真因を追えるようにする(star-romi 失敗体験の除去)。
@@ -434,10 +449,17 @@ function renderAll({ lvList, summaries, fastDiag, popupDiag, backfillProgress })
     const laneStr = buildLaneStatusLine(fastDiag?.content?.giftDiagnostics?.['北極星レーン']);
     laneLine = laneStr ? `\n${laneStr}` : '';
   });
+  // v0.1.852: 会場モードの読み上げ診断を概要に併記(使っていなければ空)。「たまに遅れる」の
+  //   切り分け=待機ピーク/間引き/最終発話からの経過を status を見るだけで AI 共有できる。
+  let voiceLine = '';
+  safeSection('会場読み上げ診断', () => {
+    const vStr = buildVoiceDiagLine(voiceDiag, Date.now());
+    voiceLine = vStr ? `\n${vStr}` : '';
+  });
   const overviewEl = document.getElementById('overviewBody');
   if (overviewEl) {
     overviewEl.textContent =
-      (overviewText || '視聴中の配信はありません。') + backfillLine + laneLine;
+      (overviewText || '視聴中の配信はありません。') + backfillLine + laneLine + voiceLine;
     overviewEl.classList.toggle('empty-note', !overviewText);
   }
 
@@ -500,7 +522,7 @@ function renderAll({ lvList, summaries, fastDiag, popupDiag, backfillProgress })
   // AI 共有用テキスト
   let fullText = '';
   safeSection('AI共有テキスト', () => {
-    fullText = buildAiShareFullText({ overviewText, livesData, fastDiag, popupDiag });
+    fullText = buildAiShareFullText({ overviewText, livesData, fastDiag, popupDiag, voiceDiag });
     const ta = /** @type {HTMLTextAreaElement|null} */ (
       document.getElementById('aiShareText')
     );
@@ -798,7 +820,7 @@ function summarizeOneLive(lv, summary, snapshot, perfDiag, endedFlag) {
   };
 }
 
-function buildAiShareFullText({ overviewText, livesData, fastDiag, popupDiag }) {
+function buildAiShareFullText({ overviewText, livesData, fastDiag, popupDiag, voiceDiag }) {
   const lines = [];
   lines.push('## 君斗りんくの追憶のきらめき 状態速報');
   lines.push(`生成: ${new Date().toISOString()}`);
@@ -818,6 +840,13 @@ function buildAiShareFullText({ overviewText, livesData, fastDiag, popupDiag }) 
     // v0.1.766: 概要に公式値レーン(北極星レーン)の状況も併記(視聴中の配信のみ)。
     const laneStr = buildLaneStatusLine(fastDiag?.content?.giftDiagnostics?.['北極星レーン']);
     if (laneStr) lines.push(laneStr);
+    // v0.1.852: 会場モードの読み上げ診断(使用時のみ)。「たまに遅れる」の切り分け材料を AI 共有に載せる。
+    try {
+      const vStr = buildVoiceDiagLine(voiceDiag, Date.now());
+      if (vStr) lines.push(vStr);
+    } catch {
+      /* no-op */
+    }
     lines.push('');
   }
   // 検知された対処候補(症状→原因→次の一手)。AI が「何を直すか」を先頭で掴めるように上に置く。

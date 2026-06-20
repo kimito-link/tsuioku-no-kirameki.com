@@ -6,7 +6,7 @@
 ## storage の出入り
 
 - 書くキー: (なし)
-- 読むキー: `KEY_AI_SHARE_FAST_DIAG`, `KEY_AI_SHARE_POPUP_DIAG`, `KEY_LAST_WATCH_URL`, `nls_backfill_progress_v1`
+- 読むキー: `KEY_AI_SHARE_FAST_DIAG`, `KEY_AI_SHARE_POPUP_DIAG`, `KEY_LAST_WATCH_URL`, `KEY_VOICE_DIAG`, `nls_backfill_progress_v1`
 
 ## 構成ファイル（import 到達・最大40件表示）
 
@@ -30,6 +30,8 @@ graph LR
   n_status --> n_src_lib_statusFormat_js["lib/statusFormat.js"]:::shared
   n_status --> n_src_lib_statusMindmapModel_js["lib/statusMindmapModel.js"]
   n_status --> n_src_lib_storageOpTimeout_js["lib/storageOpTimeout.js"]:::shared
+  n_status --> n_src_lib_voiceDiag_js["lib/voiceDiag.js"]:::shared
+  n_status --> n_src_lib_voiceDiagKey_js["lib/voiceDiagKey.js"]:::shared
   n_status --> n_src_shared_html_escape_js["shared/html/escape.js"]:::shared
   classDef shared fill:#eee,stroke:#999,color:#666;
 ```

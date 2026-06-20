@@ -5,7 +5,7 @@
 
 ## storage の出入り
 
-- 書くキー: `fn:comeviewPinStorageKey`
+- 書くキー: `KEY_VOICE_DIAG`, `fn:comeviewPinStorageKey`
 - 読むキー: `KEY_LAST_WATCH_URL`, `KEY_USER_COMMENT_PROFILE_CACHE`
 
 ## 構成ファイル（import 到達・最大40件表示）
@@ -38,6 +38,8 @@ graph LR
   n_comeview --> n_src_lib_userIdPreference_js["lib/userIdPreference.js"]:::shared
   n_comeview --> n_src_lib_voiceAgeGate_js["lib/voiceAgeGate.js"]:::shared
   n_comeview --> n_src_lib_voiceAssignment_js["lib/voiceAssignment.js"]:::shared
+  n_comeview --> n_src_lib_voiceDiag_js["lib/voiceDiag.js"]:::shared
+  n_comeview --> n_src_lib_voiceDiagKey_js["lib/voiceDiagKey.js"]:::shared
   n_comeview --> n_src_lib_voiceLoadingState_js["lib/voiceLoadingState.js"]:::shared
   n_comeview --> n_src_lib_voiceReadQueue_js["lib/voiceReadQueue.js"]:::shared
   n_comeview --> n_src_lib_voicevoxClient_js["lib/voicevoxClient.js"]:::shared

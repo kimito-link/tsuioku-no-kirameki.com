@@ -82,6 +82,8 @@ import {
   pushVoiceQueue,
   resolveVoiceSynthDepth
 } from '../lib/voiceReadQueue.js';
+import { makeInitialVoiceDiag, buildVoiceDiagSnapshot } from '../lib/voiceDiag.js';
+import { KEY_VOICE_DIAG } from '../lib/voiceDiagKey.js';
 import {
   upgradeAnonymousAvatarImage,
   upgradeAnonymousAvatarImages
@@ -195,6 +197,29 @@ let _voiceGeneration = 0;
 let _voiceStopCurrent = null;
 let _voiceSkipTimer = null;
 let _initialVoicesPrimed = false;
+
+/**
+ * v0.1.852: 読み上げのリアルタイム性診断(「たまに遅れて出る」の真因切り分け)。純観測。
+ *   comeview は content/popup と別ページなので、状態速報(status)へ集約するために専用 storage キーへ
+ *   定期スナップショットを書く(popup 診断ブリッジと同思想)。記録/発話には一切触れない。
+ */
+const _voiceDiag = makeInitialVoiceDiag(); // プロパティのみ更新(再代入しない)。
+let _voiceDiagLastWriteAt = 0;
+
+/** _voiceDiag を storage へ(min-gap で間引き)。失敗は握る=発話を止めない。 */
+function publishVoiceDiag() {
+  try {
+    const now = Date.now();
+    if (now - _voiceDiagLastWriteAt < 3000) return; // 3秒 min-gap=書き過ぎない。
+    _voiceDiagLastWriteAt = now;
+    const snap = buildVoiceDiagSnapshot(_voiceDiag, now);
+    chrome.storage.local.set({ [KEY_VOICE_DIAG]: snap }).catch(() => {
+      /* best-effort: storage 不可・context 消失 */
+    });
+  } catch {
+    /* no-op */
+  }
+}
 
 /** @type {Array<{key:string,name:string,at:number}>} ユーザーNG リスト(storage 永続)。 */
 let _ngList = [];
@@ -488,10 +513,16 @@ async function drainVoiceQueue() {
         const dropCount = _voiceQueue.length;
         _voiceQueue = []; // 全て古い場合は一括で捨てる
         showVoiceSkipped(dropCount);
+        _voiceDiag.staleDropTotal += dropCount; // v0.1.852 観測: 間引き累計=遅延の傍証。
+        _voiceDiag.queueNow = 0;
+        publishVoiceDiag();
         break;
       }
 
       const queueLength = _voiceQueue.length;
+      // v0.1.852 観測: 待機ピークを記録(詰まりの最大)。
+      if (queueLength > _voiceDiag.queueMax) _voiceDiag.queueMax = queueLength;
+      _voiceDiag.queueNow = queueLength;
       const generation = _voiceGeneration;
       // v0.1.768: 先頭から深さ分(最大3)を【先に】合成起動してから先頭を取り出す。
       //   N の再生でブロックしている間に N+1/N+2/N+3 の合成が並走する。
@@ -504,10 +535,14 @@ async function drainVoiceQueue() {
       const ageCheck = isVoiceItemStale(item.enqueuedAt, Date.now(), queueLength, item.priority === 'high');
       if (ageCheck.stale) {
         showVoiceSkipped(1);
+        _voiceDiag.staleDropTotal += 1; // v0.1.852 観測。
         _voicePrefetches.delete(item); // prefetch が stale 向けなら破棄
         continue; // 読まずに捨てる
       }
       const congestion = computeVoiceCongestion(queueLength);
+      // v0.1.852 観測: 直近の混雑対応(速度ブースト・先読み深さ)を記録。
+      _voiceDiag.lastSpeedBoost = congestion.speedBoost;
+      _voiceDiag.lastDepth = resolveVoiceSynthDepth(queueLength, { pending: queueLength });
       const assigned = resolveVoiceForUser(
         item.userKey,
         _voiceAssignments,
@@ -516,6 +551,7 @@ async function drainVoiceQueue() {
       // 先頭は startVoicePrefetch で必ず先読み起動済み(深さ>=1)。その in-flight を再利用する。
       const prefetch = _voicePrefetches.get(item);
       _voicePrefetches.delete(item);
+      const _synthStart = Date.now(); // v0.1.852 観測: 合成所要(先読み済なら待ち時間=ほぼ0)。
       const wav = prefetch
         ? await prefetch.promise
         : await synthesizeVoice(
@@ -525,6 +561,7 @@ async function drainVoiceQueue() {
               speedOffset: assigned.speedOffset + congestion.speedBoost
             }
           );
+      _voiceDiag.lastSynthMs = Math.max(0, Date.now() - _synthStart);
       if (
         !wav ||
         !_voiceReadingEnabled ||
@@ -581,6 +618,12 @@ async function drainVoiceQueue() {
       } catch {
         if (objectUrl) URL.revokeObjectURL(objectUrl);
       }
+      // v0.1.852 観測: 1件 発話完了。最終発話時刻と件数・現在の待機を記録して storage へ。
+      _voiceDiag.spokenTotal += 1;
+      _voiceDiag.lastSpokenBase = Date.now();
+      _voiceDiag.queueNow = _voiceQueue.length;
+      _voiceDiag.enabled = _voiceReadingEnabled;
+      publishVoiceDiag();
     }
   } finally {
     _voicePlaying = false;
@@ -631,6 +674,13 @@ function enqueueVoiceTimelineItems(items) {
     droppedCount += pushed.dropped.length;
   }
   if (droppedCount > 0) showVoiceSkipped(droppedCount);
+  // v0.1.852 観測: 件数ゲート(max:8 最古drop)の drop も間引きに計上=「追いつけず捨てた」傍証。
+  //   enabled/queueNow/queueMax も enqueue 時点で更新(発話前でも詰まりが見える)。
+  _voiceDiag.staleDropTotal += droppedCount;
+  _voiceDiag.enabled = _voiceReadingEnabled;
+  _voiceDiag.queueNow = _voiceQueue.length;
+  if (_voiceQueue.length > _voiceDiag.queueMax) _voiceDiag.queueMax = _voiceQueue.length;
+  publishVoiceDiag();
   if (_voiceQueue.length) void drainVoiceQueue();
 }
 

@@ -172,6 +172,8 @@
 | `src/lib/venueViewport.js` | 2 | 記録エンジン(watchページ常駐) / 会場モード(standalone) |
 | `src/lib/videoCapture.js` | 2 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) |
 | `src/lib/viewerCelebrationMatch.js` | 2 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) |
+| `src/lib/voiceDiag.js` | 2 | コメビュ(別窓) / 状態速報ページ |
+| `src/lib/voiceDiagKey.js` | 2 | コメビュ(別窓) / 状態速報ページ |
 | `src/lib/voiceInputDevices.js` | 2 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) |
 | `src/lib/voicePlayer.js` | 2 | 記録エンジン(watchページ常駐) / 会場モード(standalone) |
 | `src/lib/watchCelebrationOverlay.js` | 2 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) |
