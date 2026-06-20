@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 1 / 517 件
+## ⚠️ 役割コメントが無いソース 1 / 519 件
 - `src/lib/reportPreviewPublish.js`
 
 ## 全ファイルツリー
@@ -254,7 +254,7 @@
   - `vendor-visual-explainer.mjs` — Vendors nicobailon/visual-explainer (MIT) into .cursor/skills/visual-explainer/
   - `verify-bump.mjs` — extension bump 後の整合性チェッカー
   - `write-extension-placeholder-icons.mjs` — リポジトリに 256px アイコンしか無い環境向け: manifest 用の小さめ PNG を生成する。
-- 📁 **src/** (1122)
+- 📁 **src/** (1125)
   - 📁 **data/** (6)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -512,7 +512,7 @@
         - `logo_funlink_white_RGB_maru_black.png`
       - `logo_guide_funlink_ol.pdf`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (912)
+  - 📁 **lib/** (915)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -1238,6 +1238,9 @@
     - `statusFormat.test.js`
     - `statusMindmapModel.js` — status.html「全体マインドマップ」のツリーモデルを組み立てる純関数(2026-06-18 ユーザー要望)。
     - `statusMindmapModel.test.js`
+    - `statusTrend.js` — 状態速報の主要KPIを時系列で記録し、「スナップショットでは見えない劣化」を検知する純関数(v0.1.862)。
+    - `statusTrend.test.js`
+    - `statusTrendKey.js` — 状態トレンド(時系列KPI)の storage キー正本。status が自分で読み書きする(producer=consumer=status)。
     - `storageErrorState.js` — ストレージ書き込みエラーをポップアップ向けにシリアライズする純関数
     - `storageErrorState.test.js`
     - `storageKeys.js` — chrome.storage.local キー（プレフィックスで衝突回避）

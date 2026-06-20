@@ -32,8 +32,8 @@ function ja(n) {
 }
 
 /**
- * livesData(配信ごと)と reportPreview(保存前KPI)を照合し、矛盾を検知する。
- * @param {{ livesData?: any[], reportPreview?: any }} data
+ * livesData(配信ごと)と reportPreview(保存前KPI)と fastDiag(公式値 DOM↔NDGR)を照合し、矛盾を検知する。
+ * @param {{ livesData?: any[], reportPreview?: any, fastDiag?: any }} data
  * @returns {ConsistencyFinding[]}
  */
 export function detectNumberInconsistencies(data) {
@@ -104,6 +104,37 @@ export function detectNumberInconsistencies(data) {
           message:
             `レポートの本文コメント(${ja(total)})が記録総数(${ja(recorded)})の半分未満です。` +
             `レポートが全件でなく表示用の一部だけを集計している断線(過小集計)の疑いがあります。`
+        });
+      }
+    }
+  }
+
+  // --- 公式値の DOM↔NDGR 乖離。同じ公式値を2経路(DOM 表示/NDGR protobuf)で取っていて、両方とも
+  //     数値が取れているのに食い違う=どちらかの取得がズレているサイン(v0.1.862 照合拡充)。
+  //     両方が有限数の時だけ比較(片方 null=未取得は比較しない=誤検知防止)。
+  const v2 = data?.fastDiag?.content?.giftDiagnostics?.officialValuesV2;
+  if (v2 && typeof v2 === 'object') {
+    /** @type {Array<[string, string]>} */
+    const pairs = [
+      ['giftPoints', 'ギフトpt'],
+      ['adPoints', '広告pt']
+    ];
+    for (const [key, label] of pairs) {
+      const entry = v2[key];
+      const ndgr = num(entry?.ndgr?.value);
+      const dom = num(entry?.domStats?.value);
+      if (ndgr == null || dom == null) continue; // どちらか未取得=比較しない。
+      // 完全一致が基本。pt 系は大きい値もあるので「差が大きい時だけ」(絶対差>=100 かつ 相対差>=20%)。
+      //   小さなタイミング差(DOM 更新ラグ)で毎回⚠を出さないための二重ゲート。
+      const absDiff = Math.abs(ndgr - dom);
+      const base = Math.max(Math.abs(ndgr), Math.abs(dom), 1);
+      if (absDiff >= 100 && absDiff / base >= 0.2) {
+        findings.push({
+          id: `domndgr-${key}`,
+          severity: 'warn',
+          message:
+            `${label}が DOM 表示(${ja(dom)})と NDGR(${ja(ndgr)})で食い違っています。` +
+            `公式値の取得経路のどちらかがズレている可能性があります。`
         });
       }
     }

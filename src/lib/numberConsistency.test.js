@@ -101,4 +101,56 @@ describe('detectNumberInconsistencies', () => {
     });
     expect(out).toEqual([]);
   });
+
+  // --- 公式値 DOM↔NDGR 乖離(v0.1.862 照合拡充) ---
+  const v2 = (giftPoints, adPoints) => ({
+    fastDiag: { content: { giftDiagnostics: { officialValuesV2: { giftPoints, adPoints } } } }
+  });
+
+  it('ギフトpt が DOM と NDGR で大きく食い違う=warn', () => {
+    const out = detectNumberInconsistencies(
+      v2({ ndgr: { value: 5000 }, domStats: { value: 500 } }, null)
+    );
+    const f = out.find((x) => x.id === 'domndgr-giftPoints');
+    expect(f).toBeTruthy();
+    expect(f.severity).toBe('warn');
+    expect(f.message).toContain('ギフトpt');
+    expect(f.message).toContain('DOM 表示(500)');
+    expect(f.message).toContain('NDGR(5,000)');
+  });
+
+  it('一致(同値)なら出さない', () => {
+    const out = detectNumberInconsistencies(
+      v2({ ndgr: { value: 1300 }, domStats: { value: 1300 } }, { ndgr: { value: 1800 }, domStats: { value: 1800 } })
+    );
+    expect(out.find((x) => x.id?.startsWith('domndgr-'))).toBeUndefined();
+  });
+
+  it('小さな差(絶対差<100 or 相対差<20%)は出さない(更新ラグの誤検知防止)', () => {
+    // 絶対差 50 <100 → 出さない
+    expect(
+      detectNumberInconsistencies(v2({ ndgr: { value: 1850 }, domStats: { value: 1800 } }, null)).find(
+        (x) => x.id === 'domndgr-giftPoints'
+      )
+    ).toBeUndefined();
+    // 絶対差 200 >=100 だが相対差 200/1200=16.7% <20% → 出さない
+    expect(
+      detectNumberInconsistencies(v2({ ndgr: { value: 1200 }, domStats: { value: 1000 } }, null)).find(
+        (x) => x.id === 'domndgr-giftPoints'
+      )
+    ).toBeUndefined();
+  });
+
+  it('片方が未取得(null/no_field)なら比較しない', () => {
+    // 実機 lv350796749 相当: giftPoints は ndgr:0 / dom:null。
+    const out = detectNumberInconsistencies(
+      v2({ ndgr: { value: 0 }, domStats: { value: null } }, null)
+    );
+    expect(out.find((x) => x.id?.startsWith('domndgr-'))).toBeUndefined();
+  });
+
+  it('officialValuesV2 が無い/壊れていても落ちない', () => {
+    expect(detectNumberInconsistencies({ fastDiag: { content: {} } })).toEqual([]);
+    expect(detectNumberInconsistencies({ fastDiag: 'x' })).toEqual([]);
+  });
 });

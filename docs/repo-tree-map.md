@@ -193,14 +193,14 @@ graph LR
 - `xserver/`（2 件） — Xserver 向け webhook(git pull デプロイ)スクリプト  〔デプロイ / webhook〕
 
 ## `src/` — LP 側 + 純粋関数ライブラリの源  〔ソース〕
-<sub>ファイル 1122 件</sub>
+<sub>ファイル 1125 件</sub>
 
 - `data/`（6 件） — 保存コメントからレーン候補を読む acquirer / source 層  〔コメント / 取得〕
 - `domain/`（18 件） — ドメイン正本(応援レーンの集約・列ポリシー等。識別子判定など)  〔応援 / 集約 / 識別子〕
 - `extension/`（11 件） — バンドル entry(content/popup/venue/status/offscreen/backfill-sw 等=機能境界)  〔entry / 記録 / 会場 / 応援〕
 - `fixtures/`（1 件） — テスト用フィクスチャ  〔テスト〕
 - `images/`（165 件） — LP / CWS 提出物のマスター画像  〔画像〕
-- `lib/`（912 件） — 純粋関数ライブラリ(unit test 対象)。色・速度・コメント・レポート等の計算ロジックの大半  〔色 / 速度 / コメント / レポート / 純粋関数〕
+- `lib/`（915 件） — 純粋関数ライブラリ(unit test 対象)。色・速度・コメント・レポート等の計算ロジックの大半  〔色 / 速度 / コメント / レポート / 純粋関数〕
 - `shared/`（7 件） — 複数機能で共有する小部品(アバター URL ガード等)  〔共有 / アバター〕
 - `sound/`（1 件） — 音声素材(src 側)  〔音声〕
 
@@ -334,7 +334,7 @@ HTML/マーケ/メディアキットの主要KPI(本文数/コメントした人
 - [`src/extension/status-entry.js`](../src/extension/status-entry.js)
 
 ### 数字の自己矛盾の自動検知(self-verifying)  〔診断 / レポート / 記録〕
-状態速報が自分の出した数字どうしを照合し、論理的に不可能/桁違いの食い違いを⚠に出す。コメントした人>来場・のべ別キー>本文数・レポート本文が記録総数の半分未満(過小集計の疑い)・記録が公式を大きく上回る(別配信混入/二重計上の疑い)。人が目で照合しなくても診断が自動で気づく(v0.1.859・statusActionAdvisor の対処カードに統合)
+状態速報が自分の出した数字どうしを照合し、論理的に不可能/桁違いの食い違いを⚠に出す。コメントした人>来場・のべ別キー>本文数・レポート本文が記録総数の半分未満(過小集計の疑い)・記録が公式を大きく上回る(別配信混入/二重計上の疑い)・公式値の DOM↔NDGR 乖離(ギフトpt/広告pt が2経路で食い違う・v0.1.863)。人が目で照合しなくても診断が自動で気づく(v0.1.859・statusActionAdvisor の対処カードに統合)
 
 - [`src/lib/numberConsistency.js`](../src/lib/numberConsistency.js)
 - [`src/lib/statusActionAdvisor.js`](../src/lib/statusActionAdvisor.js)
@@ -349,8 +349,8 @@ HTML/マーケ/メディアキットの主要KPI(本文数/コメントした人
 ### 時系列トレンド(スナップショットで見えない劣化検知)  〔診断 / 記録 / 集約〕
 status が主要KPI(記録/公式/取得率/来場)を30秒間引きで storage リング(KEY_STATUS_TREND・上限120点≈1時間)に積み、analyzeTrend が「記録が止まっている(公式だけ増える=取りこぼし)」「取得率が単調に下がり続け>=10pt低下」を時間変化で検知。瞬間のスナップショットでは正常に見える劣化を捕まえる診断3層目(信頼度メーター=値の意味/自己矛盾=瞬間の食い違い/トレンド=時間変化)。statusActionAdvisor の対処カードに統合(v0.1.862)
 
-- `src/lib/statusTrend.js` ⚠️ **見つからない（消失/リネーム）**
-- `src/lib/statusTrendKey.js` ⚠️ **見つからない（消失/リネーム）**
+- [`src/lib/statusTrend.js`](../src/lib/statusTrend.js)
+- [`src/lib/statusTrendKey.js`](../src/lib/statusTrendKey.js)
 - [`src/extension/status-entry.js`](../src/extension/status-entry.js)
 - [`src/lib/statusActionAdvisor.js`](../src/lib/statusActionAdvisor.js)
 
