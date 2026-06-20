@@ -122,12 +122,15 @@ export function buildStatusActions(data) {
   }
 
   // --- 北極星レーン: state=ok だが空 ---
+  //   v0.1.849: apiRows(Koken/Nicoad 無認証 API の実取得行数)も中身として数える。従来は
+  //   count(DOM bundle長)/value/ndgrValue だけ見て、autoOpen 未発火配信で API 31行取れていても
+  //   「貢献度ランキングが空」と誤報していた(statusFormat の v0.1.844 と同じバグの別ファイル版)。
   const lanes = gift?.['北極星レーン'];
   if (lanes && typeof lanes === 'object') {
     const emptyOk = Object.entries(lanes).filter(([, info]) => {
       if (!info || typeof info !== 'object') return false;
-      const v = num(info.value), c = num(info.count), nd = num(info.ndgrValue);
-      return info.state === 'ok' && !(c > 0 || v > 0 || nd != null);
+      const v = num(info.value), c = num(info.count), nd = num(info.ndgrValue), api = num(info.apiRows);
+      return info.state === 'ok' && !(c > 0 || v > 0 || nd != null || api > 0);
     }).map(([name]) => name);
     if (emptyOk.length) {
       add({

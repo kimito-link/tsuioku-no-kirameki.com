@@ -56,8 +56,12 @@ function stateCell(id, label, level, text) {
 /**
  * 北極星レーンの state → セル level。no_event/該当無しは na(赤にしない)。
  * v0.1.845: iframe_unrendered/loading は「取得中=正常な途中」なので processing(青)に
- *   (会議 health-panel-allgreen)。fetch_error(本当の失敗)は bad のまま・
- *   event_present_unscrapable(イベント有だが構造的に読めない)は warn のまま=過大申告しない。
+ *   (会議 health-panel-allgreen)。fetch_error(本当の失敗)は bad のまま。
+ * v0.1.849: event_present_unscrapable は warn→na(対象外)に。これは「NDGR はイベント参加を示すが
+ *   公式の順位/スコアの"数値"が cross-origin iframe で構造的に読めない」ケース(northStarLaneReason.js:22)。
+ *   匿名 userId と同じく原理的に100%不可能=異常でない。さらにこのレーン自体は v0.1.282/05-19 で
+ *   「空placeholderがスペース浪費」とユーザー実機指摘で popup 表示から撤回(非表示)済みなのに、
+ *   健全度パネルだけ黄で蒸し返していた=v0.1.846「構造的限界は正常(na)扱い」の入れ漏れを是正。
  * @param {unknown} state
  * @returns {{ level:'ok'|'warn'|'bad'|'na'|'processing', text:string }}
  */
@@ -66,7 +70,7 @@ function northStarLevel(state) {
   if (s === 'ok') return { level: 'ok', text: 'OK' };
   if (s === 'iframe_unrendered' || s === 'loading') return { level: 'processing', text: '取得中' };
   if (s === 'fetch_error') return { level: 'bad', text: '取得エラー' };
-  if (s === 'event_present_unscrapable') return { level: 'warn', text: 'イベント有(読取不可)' };
+  if (s === 'event_present_unscrapable') return { level: 'na', text: '参加中(数値は取得不可)' };
   if (s === 'no_event' || s === 'no_program_gift' || s === '' || s === 'missing') {
     return { level: 'na', text: '—' }; // その配信に該当が無いだけ=赤にしない。
   }
