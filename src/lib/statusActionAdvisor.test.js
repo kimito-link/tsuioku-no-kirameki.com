@@ -230,4 +230,22 @@ describe('buildStatusActions', () => {
     });
     expect(cards.find((c) => c.id?.startsWith('consistency-'))).toBeUndefined();
   });
+
+  it('時系列トレンドの findings を対処カードに出す(v0.1.862)', () => {
+    const cards = buildStatusActions({
+      trendFindings: [
+        { id: 'records-stalled', severity: 'bad', message: '記録が約4分前から増えていません(公式は 20 件増加)。…F5' }
+      ]
+    });
+    const card = cards.find((c) => c.id === 'trend-records-stalled');
+    expect(card).toBeTruthy();
+    expect(card.severity).toBe('bad');
+    expect(card.symptom).toContain('時間変化で検知');
+    expect(card.action).toContain('F5');
+  });
+
+  it('trendFindings が空/未指定なら trend カードは出さない', () => {
+    expect(buildStatusActions({}).find((c) => c.id?.startsWith('trend-'))).toBeUndefined();
+    expect(buildStatusActions({ trendFindings: [] }).find((c) => c.id?.startsWith('trend-'))).toBeUndefined();
+  });
 });

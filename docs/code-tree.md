@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 1 / 516 件
+## ⚠️ 役割コメントが無いソース 1 / 517 件
 - `src/lib/reportPreviewPublish.js`
 
 ## 全ファイルツリー
@@ -254,7 +254,7 @@
   - `vendor-visual-explainer.mjs` — Vendors nicobailon/visual-explainer (MIT) into .cursor/skills/visual-explainer/
   - `verify-bump.mjs` — extension bump 後の整合性チェッカー
   - `write-extension-placeholder-icons.mjs` — リポジトリに 256px アイコンしか無い環境向け: manifest 用の小さめ PNG を生成する。
-- 📁 **src/** (1120)
+- 📁 **src/** (1122)
   - 📁 **data/** (6)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -512,7 +512,7 @@
         - `logo_funlink_white_RGB_maru_black.png`
       - `logo_guide_funlink_ol.pdf`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (910)
+  - 📁 **lib/** (912)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -986,6 +986,8 @@
     - `mergeGiftHistoryThrows.test.js`
     - `mergeProgramStatsWatchIntoWatchMetaSnapshot.js` — 公式 DOM bundle の programStats.watchCount（累計来場）を snapshot に補完する。
     - `mergeProgramStatsWatchIntoWatchMetaSnapshot.test.js`
+    - `metricConfidence.js` — 診断の各数値に「どういう意味か・どれだけ信頼できるか」の短い注釈を付ける純関数(v0.1.861)。
+    - `metricConfidence.test.js`
     - `migrateInlinePanelBelowToDock.js` — `below` → `dock_bottom` のワンショット移行（0.1.63 AS）。
     - `migrateInlinePanelBelowToDock.test.js`
     - `migrateInlinePanelFloatToDock.js` — 旧「ポップアップ風（floating）」利用者を画面下ドックへ一度だけ移す（公式右パネルとの衝突緩和）。
