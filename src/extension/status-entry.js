@@ -1260,6 +1260,41 @@ function setupButtons() {
   };
   wireCopyButton('btnCopy', 'クリップボードへコピー');
   wireCopyButton('btnCopyAiShareInline', '📋 まるごとコピー');
+  // v0.1.856: ファーストビューの「原因が全部わかる共有」大ボタン。中身は同じ全文(textBlob)だが、
+  //   まだ生成前(初回 refresh 未完)でも詰ませないよう、空なら1回 refresh を待ってからコピーする。
+  {
+    const heroLabel = '🔎 これを共有すれば原因が全部わかる（コピー）';
+    const heroBtn = document.getElementById('btnShareAll');
+    if (heroBtn) {
+      heroBtn.addEventListener('click', async () => {
+        const heroFlash = (msg, ms) => {
+          heroBtn.textContent = msg;
+          setTimeout(() => { heroBtn.textContent = heroLabel; }, ms);
+        };
+        let text = _lastRenderedBundle?.textBlob || '';
+        if (!text) {
+          heroFlash('まとめ中…', 1200);
+          try { await refresh({ timeoutMs: 12000 }); } catch { /* best-effort */ }
+          text = _lastRenderedBundle?.textBlob || '';
+        }
+        if (!text) {
+          // それでも空=まだ読み込み中。AI共有欄(あれば)を選択して Ctrl+C に逃がす。
+          const ta = /** @type {HTMLTextAreaElement|null} */ (document.getElementById('aiShareText'));
+          if (ta && ta.value) { ta.focus(); ta.select(); heroFlash('選択しました→Ctrl+C', 2500); return; }
+          heroFlash('まだ読み込み中…もう一度押してください', 2500);
+          return;
+        }
+        try {
+          await navigator.clipboard.writeText(text);
+          heroFlash('コピーしました ✓ そのまま貼ってください', 2500);
+        } catch {
+          const ta = /** @type {HTMLTextAreaElement|null} */ (document.getElementById('aiShareText'));
+          if (ta) { ta.focus(); ta.select(); }
+          heroFlash('選択しました→Ctrl+C', 2500);
+        }
+      });
+    }
+  }
   const btnDownload = document.getElementById('btnDownload');
   if (btnDownload) {
     btnDownload.addEventListener('click', () => {
