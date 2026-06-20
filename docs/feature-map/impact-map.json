@@ -3554,6 +3554,16 @@
       ]
     },
     {
+      "file": "src/lib/ndgrFlushDedupKey.js",
+      "featureCount": 1,
+      "features": [
+        "content"
+      ],
+      "labels": [
+        "記録エンジン(watchページ常駐)"
+      ]
+    },
+    {
       "file": "src/lib/ndgrForwardCrawl.js",
       "featureCount": 1,
       "features": [

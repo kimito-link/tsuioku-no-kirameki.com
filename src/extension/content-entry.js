@@ -481,6 +481,7 @@ import { recordDiagnosticException } from '../lib/diagnosticRingStore.js';
 import { isPersistableHarvestedCommentRow } from '../lib/persistableCommentRow.js';
 import { buildSilentErrorPayload, isContextInvalidatedError as isCtxInvalidated } from '../lib/reportSilentError.js';
 import { cleanNdgrChatRows } from '../lib/cleanNdgrChatRows.js';
+import { ndgrFlushDedupKey } from '../lib/ndgrFlushDedupKey.js';
 import {
   parseGiftCommentText,
   parseNicoadCommentText,
@@ -1791,9 +1792,13 @@ async function flushNdgrChatRowsBatch(batch) {
     if (!r || typeof r !== 'object') continue;
     const no = String(r.commentNo ?? '').trim();
     const text = normalizeCommentText(r.text);
-    if (!no || !text) continue;
-    const k = `${no}\t${text}`;
     const uid = String(r.userId || '').trim();
+    // v0.1.836 匿名(184)救済: 本文必須は維持しつつ、番号無しでも識別子(userId)があれば通す。
+    //   重複排除キーは行種で分岐(番号あり=従来と同値・番号無し=識別子+本文+位置)。
+    //   識別不能(番号も識別子も無い)行はキー null=受理しない。設計=council/anon-comment-rescue-SYNTHESIS.md。
+    if (!text) continue;
+    const k = ndgrFlushDedupKey({ commentNo: no, text, userId: uid, vpos: r.vpos });
+    if (!k) continue;
     const nick = String(r.nickname || '').trim();
     const prev = byKey.get(k);
     if (!prev) {
@@ -1801,7 +1806,8 @@ async function flushNdgrChatRowsBatch(batch) {
         commentNo: no,
         text,
         userId: uid || null,
-        ...(nick ? { nickname: nick } : {})
+        ...(nick ? { nickname: nick } : {}),
+        ...(r.vpos != null ? { vpos: r.vpos } : {})
       });
       continue;
     }
@@ -1811,7 +1817,8 @@ async function flushNdgrChatRowsBatch(batch) {
       commentNo: no,
       text,
       userId: mUid || null,
-      ...(mNick ? { nickname: mNick } : {})
+      ...(mNick ? { nickname: mNick } : {}),
+      ...(prev.vpos != null ? { vpos: prev.vpos } : r.vpos != null ? { vpos: r.vpos } : {})
     });
   }
   const merged = [...byKey.values()].map((r) => {
