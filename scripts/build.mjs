@@ -35,7 +35,16 @@ const common = {
   define: { NL_BUILD_ID: JSON.stringify(BUILD_ID), NL_DEV_HOTRELOAD: 'false' }
 };
 
-const popupDefine = { NL_BUILD_ID: JSON.stringify(BUILD_ID), NL_DEV_HOTRELOAD: 'false' };
+// v0.1.857: NL_RELEASE。配布(release)ビルドでは status の「生診断JSON/全文共有ボタン/AI共有欄」
+//   (自分の viewerUserId・配信URL を含む開発用エクスポート)を出さない。既定(npm run build)は dev=
+//   false で診断はそのまま出す。release は `NL_RELEASE=1 npm run build`。esbuild define なので
+//   `if (NL_RELEASE)` で分岐すれば dead-code 除去も効く(NL_DEV_HOTRELOAD と同方式)。
+const IS_RELEASE = process.env.NL_RELEASE === '1' || process.env.NL_RELEASE === 'true';
+const popupDefine = {
+  NL_BUILD_ID: JSON.stringify(BUILD_ID),
+  NL_DEV_HOTRELOAD: 'false',
+  NL_RELEASE: JSON.stringify(IS_RELEASE)
+};
 
 // status ページのアップロード機能に渡すキー。ソース直書きを避け、環境変数(.env)から注入。
 //   - NL_STATUS_INGEST_KEY: api/status の書き込み認証(x-share-key)
