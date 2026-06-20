@@ -12,7 +12,13 @@
  * 各セル= { id, label, kind:'pct'|'state', value:number|null, level:'ok'|'warn'|'bad'|'na', text?:string }。
  */
 
-/** @typedef {{ id:string, label:string, kind:'pct'|'state', value:number|null, level:'ok'|'warn'|'bad'|'na', text?:string }} HealthCell */
+/**
+ * v0.1.845: level に 'processing'(青) を追加。会議(health-panel-allgreen-SYNTHESIS)全員一致=
+ *   「配信を見た瞬間ほぼ全部緑に見せたいが嘘はつかない」を、進行中(backfill中/取得中)を
+ *   【異常な黄】でなく【正常な途中=青】に分けて実現。黄/赤は本当の異常(失速/エラー/停止)だけ。
+ *   renderer(status-entry.js:495)は `hc-${level}` で CSS クラス化=`.hc-processing` を status.html に追加。
+ */
+/** @typedef {{ id:string, label:string, kind:'pct'|'state', value:number|null, level:'ok'|'warn'|'bad'|'na'|'processing', text?:string }} HealthCell */
 
 /** @param {unknown} x @returns {number|null} */
 function num(x) {
@@ -22,8 +28,10 @@ function num(x) {
 
 /**
  * % セル: value(0-100) と 80/40 閾値で level。value=null は na('—')。
+ * v0.1.845: opts.processing=true なら閾値評価をせず level='processing'(青・進行中=正常な途中)。
+ *   数値(value)はそのまま保持=嘘をつかない(率70%は70%のまま色だけ青)。
  * @param {string} id @param {string} label @param {number|null} value
- * @param {{ okAt?:number, warnAt?:number }} [opts]
+ * @param {{ okAt?:number, warnAt?:number, processing?:boolean }} [opts]
  * @returns {HealthCell}
  */
 function pctCell(id, label, value, opts = {}) {
@@ -31,13 +39,14 @@ function pctCell(id, label, value, opts = {}) {
   const warnAt = opts.warnAt ?? 40;
   if (value == null) return { id, label, kind: 'pct', value: null, level: 'na', text: '—' };
   const v = Math.max(0, Math.min(100, Math.round(value)));
+  if (opts.processing) return { id, label, kind: 'pct', value: v, level: 'processing' };
   const level = v >= okAt ? 'ok' : v >= warnAt ? 'warn' : 'bad';
   return { id, label, kind: 'pct', value: v, level };
 }
 
 /**
  * 状態セル: level と短文。
- * @param {string} id @param {string} label @param {'ok'|'warn'|'bad'|'na'} level @param {string} [text]
+ * @param {string} id @param {string} label @param {'ok'|'warn'|'bad'|'na'|'processing'} level @param {string} [text]
  * @returns {HealthCell}
  */
 function stateCell(id, label, level, text) {
@@ -46,13 +55,16 @@ function stateCell(id, label, level, text) {
 
 /**
  * 北極星レーンの state → セル level。no_event/該当無しは na(赤にしない)。
+ * v0.1.845: iframe_unrendered/loading は「取得中=正常な途中」なので processing(青)に
+ *   (会議 health-panel-allgreen)。fetch_error(本当の失敗)は bad のまま・
+ *   event_present_unscrapable(イベント有だが構造的に読めない)は warn のまま=過大申告しない。
  * @param {unknown} state
- * @returns {{ level:'ok'|'warn'|'bad'|'na', text:string }}
+ * @returns {{ level:'ok'|'warn'|'bad'|'na'|'processing', text:string }}
  */
 function northStarLevel(state) {
   const s = String(state || '');
   if (s === 'ok') return { level: 'ok', text: 'OK' };
-  if (s === 'iframe_unrendered') return { level: 'warn', text: '取得中' };
+  if (s === 'iframe_unrendered' || s === 'loading') return { level: 'processing', text: '取得中' };
   if (s === 'fetch_error') return { level: 'bad', text: '取得エラー' };
   if (s === 'event_present_unscrapable') return { level: 'warn', text: 'イベント有(読取不可)' };
   if (s === 'no_event' || s === 'no_program_gift' || s === '' || s === 'missing') {
@@ -74,10 +86,20 @@ export function buildHealthCells(data) {
   /** @type {HealthCell[]} */
   const cells = [];
 
-  // 1. 取得率(記録/公式・累計)。公式0件は na。
+  // v0.1.845: backfill(過去ログ取り込み)が進行中か。進行中なら率(取得率・記録↔公式一致)は
+  //   「まだ取り込み中=正常な途中」なので processing(青)にして、初動の黄/赤を消す(嘘はつかない=
+  //   数字はそのまま)。失速(stalled)/完了(done)後は通常評価。会議 health-panel-allgreen。
+  const bf = gift?.romiDebug?.backfill || data?.fastDiag?.content?.romiDebug?.backfill || null;
+  const bfDone = bf
+    ? Number(bf.done) === 1 || bf.stopReason === 'reached_start' || bf.stopReason === 'backward_exhausted'
+    : false;
+  const bfStalled = bf ? bf.stopReason === 'stalled' : false;
+  const bfRunning = bf ? !!bf.running && !bfDone && !bfStalled : false;
+
+  // 1. 取得率(記録/公式・累計)。公式0件は na。backfill 進行中は processing(青・順調に取得中)。
   const recordedSum = livesData.reduce((a, lv) => a + (num(lv?.recordedCount) || 0), 0);
   const officialSum = livesData.reduce((a, lv) => a + (num(lv?.officialCommentCount) || 0), 0);
-  cells.push(pctCell('capture-rate', '取得率', officialSum > 0 ? (recordedSum / officialSum) * 100 : null));
+  cells.push(pctCell('capture-rate', '取得率', officialSum > 0 ? (recordedSum / officialSum) * 100 : null, { processing: bfRunning }));
 
   // 2. userId 付き保存率。保存0は na。
   const uid = obs.savedCommentsUidStats || {};
@@ -97,23 +119,23 @@ export function buildHealthCells(data) {
     minAgo == null ? 'na' : minAgo < 120000 ? 'ok' : minAgo < 300000 ? 'warn' : 'bad',
     minAgo == null ? '—' : `${Math.round(minAgo / 1000)}秒前`));
 
-  // 5. 過去ログ(backfill)。
-  const bf = gift?.romiDebug?.backfill || data?.fastDiag?.content?.romiDebug?.backfill || null;
+  // 5. 過去ログ(backfill)。v0.1.845: 取得中は processing(青・正常な途中)・失速だけ bad。
   if (bf) {
-    const done = Number(bf.done) === 1 || bf.stopReason === 'reached_start' || bf.stopReason === 'backward_exhausted';
-    const stalled = bf.stopReason === 'stalled';
     cells.push(stateCell('backfill', '過去ログ取得',
-      done ? 'ok' : stalled ? 'bad' : bf.running ? 'warn' : 'na',
-      done ? '完了' : stalled ? '失速' : bf.running ? '取得中' : '—'));
+      bfDone ? 'ok' : bfStalled ? 'bad' : bfRunning ? 'processing' : 'na',
+      bfDone ? '完了' : bfStalled ? '失速' : bfRunning ? '取得中' : '—'));
   } else {
     cells.push(stateCell('backfill', '過去ログ取得', 'na', '—'));
   }
 
   // 6. アバター解決率。観測0(intercept0)は na。
+  //   v0.1.845: アバターは観測ユーザーの後を追って非同期取得=構造的に遅れて埋まる「追いつき」で、
+  //   ハード失敗しない(時間で埋まる・status の対処候補も ⚪ 扱い)。よって ok 未満は warn でなく
+  //   processing(青・取得中)。「見た瞬間に黄」で不安にさせないため(会議 health-panel-allgreen)。
   const avMap = num(gift?.interceptAvatarSize ?? gift?.avatarUidDiag?.avatarMapSize);
   const interceptN = num(gift?.romiDebug?.interceptMapSize ?? gift?.avatarUidDiag?.interceptedUsersTotal);
-  cells.push(pctCell('avatar', 'アバター解決',
-    interceptN && interceptN > 0 && avMap != null ? Math.min(100, (avMap / interceptN) * 100) : null));
+  const avatarPct = interceptN && interceptN > 0 && avMap != null ? Math.min(100, (avMap / interceptN) * 100) : null;
+  cells.push(pctCell('avatar', 'アバター解決', avatarPct, { processing: avatarPct != null && avatarPct < 80 }));
 
   // 7. 描画(paint)。%でなく色+短文(恣意的%を作らない)。裏タブ等で値無しは na。
   const paint = num(livesData.map((lv) => num(lv?.paintMs)).filter((x) => x != null)[0]);
@@ -154,17 +176,19 @@ export function buildHealthCells(data) {
     swInactive == null ? 'na' : swInactive ? 'bad' : 'ok',
     swInactive == null ? '—' : swInactive ? 'SW停止' : '正常'));
 
-  // 17. NDGR取りこぼし(decoded>0 なのに chats=0=匿名主体 or 取得前。比率でなく状態)。
+  // 17. NDGR取りこぼし(decoded>0 なのに chats=0=匿名主体 or 取得前)。v0.1.845: warn→processing
+  //   (匿名184主体は仕様で取れない=異常でない・取得前は途中=どちらも黄にせず青の「途中/対象外」扱い)。
   const wc = gift?.ndgrWireCounters || {};
   const decoded = num(wc.decoded);
   const chats = num(wc.chats);
   cells.push(stateCell('ndgr-chats', 'NDGRコメント',
-    decoded == null ? 'na' : (chats && chats > 0) ? 'ok' : (decoded > 0 ? 'warn' : 'na'),
+    decoded == null ? 'na' : (chats && chats > 0) ? 'ok' : (decoded > 0 ? 'processing' : 'na'),
     decoded == null ? '—' : (chats && chats > 0) ? `${chats}件` : (decoded > 0 ? '0(匿名/取得前)' : '—')));
 
   // 18. 記録↔公式一致(B後・per-live の率の最小=一番ズレてる配信)。公式0は na。
+  //   v0.1.845: backfill 進行中は processing(青・取り込み中で率が低いのは当然=異常でない)。
   const rates = livesData.map((lv) => num(lv?.officialRatePct)).filter((x) => x != null);
-  cells.push(pctCell('match', '記録↔公式一致', rates.length ? Math.min(...rates) : null, { okAt: 90, warnAt: 60 }));
+  cells.push(pctCell('match', '記録↔公式一致', rates.length ? Math.min(...rates) : null, { okAt: 90, warnAt: 60, processing: bfRunning }));
 
   return cells;
 }
