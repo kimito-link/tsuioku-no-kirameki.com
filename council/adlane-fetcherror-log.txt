@@ -1,0 +1,193 @@
+
+分類: category=design  by=groq/llama-3.3-70b  (設計判断・アーキテクチャ・技術選定・トレードオフ)
+  分類器の生出力: {"category":"design"}
+[FAST] 批判役を local/deepseek-r1:14b → groq/gpt-oss-120b に差し替え（速度優先）
+召集 3体（最大4）: nvidia/qwen3.5-122b[発散アイデア（推論強）], groq/llama-3.3-70b[爆速の視点], groq/gpt-oss-120b[批判・詰め（推論特化）]
+
+[ルーティング選抜・design] 3体に問い合わせ中: nvidia/qwen3.5-122b, groq/llama-3.3-70b, groq/gpt-oss-120b
+
+########################################################################
+# ルーティング選抜・design
+########################################################################
+
+========================================================================
+### nvidia/qwen3.5-122b  [発散アイデア（推論強）]  (46668ms)
+========================================================================
+### 結論
+「fetch_error」という単一のラベルで「通信失敗」と「データ不在」を混ぜる現在の設計は、**「状態の混同（State Conflation）」**という根本的な欠陥です。
+これを解消するための発散的な2つのアプローチを提案します。
+
+1.  **「空の成功（Empty Success）」という新ステータスの導入（Semantic Shift）**
+    *   `fetch_error` を「通信エラー」に限定し、API 成功かつ 0 件を `no_data`（または `empty`）という独立したステータスとして定義する。
+    *   既存の `na`（Not Applicable）と `no_data` を明確に区別する（前者は「対象外」、後者は「対象だが存在しない」）。
+2.  **「レコードの存在性」を引数として明示する型安全なインターフェース（Type-Safe Signature）**
+    *   現状の「null = 未取得/0 件の曖昧な状態」を破棄し、`rows` 引数を `null | [] | [data]` の明確な区別が可能にする形式（例：`{ rows: any[], isFetched: boolean }` オブジェクト）に変更する。
+    *   これにより、`northStarLaneReason.js` 内部で「0 件かどうか」を判断するロジックが、外部の「通信結果」に依存せず、純粋なデータ検証ロジックとして独立する。
+
+---
+
+### 根拠
+1.  **現行の致命的な欠陥**:
+    現状、`nicoadApiRows` が `null` になる条件が「取得失敗」か「取得成功だが 0 件」の両方を網羅しています。この「情報の圧縮（Lossy Compression）」が、`return 'fetch_error'` という誤った判定を招いています。ユーザー（および AI）にとって、「赤（エラー）」は「システムが壊れた/通信できない」という意味で、「オレンジ/グレー（該当無し）」は「システムは正常だが、その瞬間にデータがない」という意味で、心理的・機能的に全く異なります。
+2.  **星野ロミ式・自己検証ループの要請**:
+    「該当データが無いだけのものを赤にしない」という方針は、単なる色の変更ではなく、**「状態の定義そのもの」**を変える必要があります。`fetch_error` という名前自体が「失敗」を暗示しているため、この名前を「成功して 0 件」のケースに使うこと自体が「嘘の診断」です。
+3.  **3 年後楽の構造ガード**:
+    現在のコードは、`rows` の値だけで状態を推測しようとしていますが、これは「API の仕様変更（0 件をどう返すか）」に脆弱です。`isFetched` や `status` を引数に含めることで、API の振る舞いが変わっても（例：0 件を空配列ではなく null で返すようになった場合でも）、ロジックの分岐点は「通信成功フラグ」に固定され、保守性が向上します。
+
+---
+
+### 反論・リスク
+*   **反論**: 「`no_data` という新しいステータス値を増やすと、`healthCells.js` や UI 側のマッピングロジックが増大し、バグの温床になるのではないか？」
+    *   **回答**: 逆に、現在の `fetch_error` が「二つの意味」を持っていることがバグの温床です。ステータスを増やすことは「状態の分解（Decomposition）」であり、`if (state === 'error')` で全て処理する曖昧なロジックを `if (state === 'error') { ... } else if (state === 'empty') { ... }` と明確に分けることで、将来の拡張（例：「データが古すぎる」など）に対応しやすくなります。
+*   **反論**: 「引数に `{ ok, status, rows }` を渡すと、既存の関数シグネチャが変わり、`northStarLaneReason.js` を触らざるを得なくなる（DO_NOT_REWRITE 違反ではないか？）」
+    *   **回答**: `DO_NOT_REWRITE` は「意図（優先度テーブル）を壊すな」という意味です。引数の型を「より正確な情報源」に変えることは、意図の強化であり、破壊ではありません。むしろ、`rows` だけを見て推測する現在のロジックの方が「脆弱な推測」であり、修正すべき対象です。
+*   **リスク**: 既存の `characterization test` が、`fetch_error` を期待するケース（0 件のケース）で失敗する可能性が高い。
+    *   **対策**: テストケースを「通信成功 0 件」のケースと「通信失敗」のケースに分割し、それぞれ期待値を `no_data` と `fetch_error` に書き換える必要があります。これは「テストの品質向上」であり、移行コストです。
+
+---
+
+### 具体案
+
+#### 案 1：ステータス名の意味論的再定義（Semantic Shift）
+**コア思想**: `fetch_error` は「通信エラー」のみとする。0 件は `no_data`（または `not_found`）とする。
+
+1.  **ステータス名の定義変更**
+    *   `fetch_error`: ネットワークエラー、HTTP 5xx、タイムアウト、JSON パース失敗など、**「データ取得プロセスが失敗した」**場合のみ。
+    *   `no_data`: API 通信成功（200 OK）、だが**「該当データが 0 件」**の場合。
+    *   `na`: 対象配信ではない、またはレーン自体が無効な場合（既存の `no_event` などと同様）。
+
+2.  **実装手順**
+    *   **`src/lib/northStarLaneReason.js` の変更**:
+        現在の `return 'fetch_error'` を以下のように分岐させる。
+        ```javascript
+        // 仮のシグネチャ変更案：引数に取得結果オブジェクトを追加する（案 2 と連動）
+        // 引数: { apiSuccess: boolean, rows: any[] | null }
+        case 'adRanking':
+          // 1. 通信自体が失敗しているか？
+          if (!apiSuccess) return 'fetch_error'; // 本物のエラー（赤）
+
+          // 2. 通信成功だが、データが 0 件か？
+          if (!rows || rows.length === 0) return 'no_data'; // 該当無し（グレー/オレンジ）
+
+          // 3. 通常の判定
+          const count = bundle?.adContributionRanking?.length || 0;
+          const mirror = strNonEmpty(bundle?.adRankingMirrorHtml);
+          if (count > 0 || mirror) return 'ok';
+          
+          // 予期せぬ状態（API 成功かつ rows 非 null だが、DOM も 0 の場合のフォールバック）
+          // ここは API と DOM の不一致を検知するべきかもしれないが、現状は 'no_data' で良い
+          return 'no_data'; 
+        ```
+
+3.  **`healthCells.js` のマッピング変更**
+
+
+========================================================================
+### groq/llama-3.3-70b  [爆速の視点]  (1605ms)
+========================================================================
+**結論**
+1. fetch_error を (A) 本物の通信失敗 と (B) 成功・0件(該当無し) に分ける最小で正しい設計は、no_ad_ranking という新しい state 名を追加することです。
+2. (B) を判定するのに必要な信号は、nicoadLastOk と nicoadLastStatus です。determineNorthStarLaneState のシグネチャを { ok, status, rows } のような小さな結果オブジェクトで渡すのが最小です。
+3. healthCells.js の northStarLevel で、新 state (no_ad_ranking) を na (対象外) にすべきです。
+4. northStarLaneReason.js の「3年後楽ガード/優先度テーブル」を壊さずに (A)(B) 分離を入れる手順は、既存の characterize 函数を修正して、no_ad_ranking を追加することです。
+
+**根拠**
+* fetch_error は、本物の通信失敗と成功・0件(該当無し) の 2 種類の異なる状態を表しています。
+* nicoadLastOk と nicoadLastStatus は、通信の成功・失敗を判断するために必要な情報です。
+* no_ad_ranking は、該当データが無いことを示すため、na (対象外) にすべきです。
+
+**反論・リスク**
+* 新しい state 名を追加することで、既存のコードを修正する必要があります。
+* determineNorthStarLaneState のシグネチャを変更することで、呼び出し側のコードを修正する必要があります。
+
+**具体案**
+```javascript
+// northStarLaneReason.js
+export function determineNorthStarLaneState({ ok, status, rows }) {
+  if (!ok) return 'fetch_error';
+  if (rows.length === 0) return 'no_ad_ranking';
+  return 'ok';
+}
+
+// healthCells.js
+export function northStarLevel(state) {
+  switch (state) {
+    case 'fetch_error':
+      return 'bad';
+    case 'no_ad_ranking':
+      return 'na';
+    case 'ok':
+      return 'good';
+    default:
+      return 'unknown';
+  }
+}
+```
+
+========================================================================
+### groq/gpt-oss-120b  [批判・詰め（推論特化）]  (7425ms)
+========================================================================
+**結論**  
+1. **state 名は既存の “na” 系列に寄せる**  
+   - `fetch_error` は **本物の通信失敗** のみを表す `fetch_error` に残し、**成功・0件** は `na` 系列の新サブステート `no_ad_ranking`（＝`na_ad_ranking`）として扱う。  
+2. **判定に必要なシグナルは `nicoadLastOk` と `nicoadLastStatus`**（両方が取得できていれば成功、かつ `rows` が `null` でも 0 件と判定できる）。`determineNorthStarLaneState` のシグネチャは `{ ok: boolean | null, status: number | null, rows: any[] | null }` に拡張すれば最小。  
+3. **healthCells.js の色割り当て**  
+   - `no_ad_ranking` は **“na”（対象外）** と同色（灰色系）にし、赤は **本物の `fetch_error`** のみ。  
+   - 取得中は既存の `processing`（黄）を維持。  
+4. **northStarLaneReason.js の安全な導入手順**  
+   - ① 既存ロジックを **純粋関数** として分離し、`determineNorthStarLaneState` のテストケースを **3 状態**（`ok`、`na_ad_ranking`、`fetch_error`）に拡張。  
+   - ② `case 'adRanking'` の分岐を **優先度テーブル**（API → DOM → mirror）を崩さずに、`if (!ok) return 'fetch_error';` → `if (ok && rows && rows.length > 0) return 'ok';` → `return 'na_ad_ranking';` に置き換える。  
+   - ③ 変更前後の **characterization test** を **スナップショット比較** で自動化し、`state === 'fetch_error'` が本物エラーだけになることを保証。  
+
+---
+
+### 根拠  
+
+| 項目 | 現状の問題点 | 提案の根拠 |
+|------|--------------|------------|
+| **state の意味体系** | `fetch_error` が「通信失敗」＋「0件」混在し、ユーザーに赤警告を出す誤誘導が発生。 | `na` 系列は既に「対象外」や「取得不要」を表す設計で、**「データはあるが 0 件」** という意味に自然に拡張できる。 |
+| **判定情報** | `nicoadApiRows` が `null` だけで **成功0件** と **取得失敗** を区別できない。 | `nicoadLastOk`（boolean）と `nicoadLastStatus`（200 か否か）は **必ず取得できる**（`content‑entry.js` で保持）。これらが揃えば「通信成功」→`ok`、失敗→`fetch_error` が明確。 |
+| **色マッピング** | 現在は `fetch_error` が赤 → 本来の失敗と 0 件が同色。 | 赤は **本当に失敗した** 場合だけに限定し、`na` 系列は **灰色系**（既存の `na` と同色）にすれば、ユーザーは「失敗」か「データなし」かを直感的に区別できる。 |
+| **既存テスト・ガード** | `northStarLaneReason.js` は「3 年後楽の構造ガード」＝純関数・テストで保護。 | 変更は **純粋関数内部** の分岐ロジックだけに留め、外部インターフェース（シグネチャ）とテストケースを拡張すれば、既存の **characterization test** が失敗しない。 |
+
+---
+
+### 反論・リスク  
+
+| リスク | 内容 | 緩和策 |
+|--------|------|--------|
+| **新ステート `na_ad_ranking` の追加でコードベースが散らかる** | 既存の `na` 系列は対象外を意味しているため、意味が拡散する恐れ。 | 名前を **`na_ad_ranking`** と明示的に **「対象はあるがデータなし」** とドキュメント化し、`healthCells` のマッピングだけに限定して使用。 |
+| **シグネチャ拡張が呼び出し側に波及** | `determineNorthStarLaneState` を呼び出す全箇所で `{ok,status,rows}` が必要になる。 | 呼び出し側は **既存の `nicoadApiRows`** をラップした小さなユーティリティ関数 `makeLaneResult()` を追加し、**1 行で変換**できるようにする（例: `makeLaneResult(nicoadLastOk, nicoadLastStatus, nicoadApiRows)`）。 |
+| **テストが増えて保守コスト上昇** | 3 状態分のテストケースが必要になる。 | 既存の **characterization test** に **パラメタ化テスト**（`test.each`）を導入し、**状態ごとに 1 行**で追加できるようにする。 |
+| **逆張り的リスク** | 「0 件は赤にしない」方針が、**実際に広告が期待される UI** でユーザーに「何も表示されていない」ことを見逃す可能性。 | **逆張りオプション**として、`adRanking` が **重要度高**（例: UI が広告ランキングを必須表示すべき場合）なら `no_ad_ranking` を **黄色（warning）** にし、**注意喚起**だけを出す。これをオプションフラグ `adRankingCritical` で制御できるようにする。 |
+
+---
+
+### 具体案（実装粒度）  
+
+#### 1. データオブジェクト化（最小変更）
+
+```js
+// src/lib/northStarLaneResult.js
+export function makeLaneResult({ ok, status, rows }) {
+  return {
+    ok: !!ok,                     // true/false/null → boolean (null → false)
+    status: status ?? null,       // 200 か null
+    rows: rows ?? null,           // [] か null
+  };
+}
+```
+
+呼び出し側（例: `content-entry.js`）:
+
+```js
+import { makeLaneResult } from './northStarLaneResult.js';
+
+const adRankingResult = makeLaneResult({
+  ok: nicoadLastOk,
+  status: nicoadLastStatus,
+  rows: nicoadApiRows,  
+--- [ルーティング選抜・design] 成功 3/3 ---
+
+=== 完了 50942ms ===
+保存: council/adlane-fetcherror-answers.json

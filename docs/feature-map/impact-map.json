@@ -1172,6 +1172,18 @@
       ]
     },
     {
+      "file": "src/lib/northStarLaneResult.js",
+      "featureCount": 2,
+      "features": [
+        "content",
+        "popup"
+      ],
+      "labels": [
+        "記録エンジン(watchページ常駐)",
+        "ポップアップ(応援レーン)"
+      ]
+    },
+    {
       "file": "src/lib/officialContributionRankingResolver.js",
       "featureCount": 2,
       "features": [

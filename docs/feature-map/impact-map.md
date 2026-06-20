@@ -138,6 +138,7 @@
 | `src/lib/nicoUserProfilePage.js` | 2 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) |
 | `src/lib/nlsInterceptAuth.js` | 2 | 記録エンジン(watchページ常駐) / ページ傍受 |
 | `src/lib/northStarLaneReason.js` | 2 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) |
+| `src/lib/northStarLaneResult.js` | 2 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) |
 | `src/lib/officialContributionRankingResolver.js` | 2 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) |
 | `src/lib/officialEventBannerDom.js` | 2 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) |
 | `src/lib/panelLiveSummary.js` | 2 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) |

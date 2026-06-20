@@ -71,6 +71,10 @@ function northStarLevel(state) {
   if (s === 'iframe_unrendered' || s === 'loading') return { level: 'processing', text: '取得中' };
   if (s === 'fetch_error') return { level: 'bad', text: '取得エラー' };
   if (s === 'event_present_unscrapable') return { level: 'na', text: '参加中(数値は取得不可)' };
+  // v0.1.851: no_ranking_data=通信成功だがランキング0件(この配信に無いだけ)=赤にしない(na)。
+  //   fetch_error は本物の取得失敗(ok===false)専用に分離(council/adlane-fetcherror-SYNTHESIS)。
+  if (s === 'no_ranking_data') return { level: 'na', text: 'ランキング無し' };
+  if (s === 'not_yet') return { level: 'processing', text: '取得中' }; // 起動直後=途中=青(赤/黄にしない)。
   if (s === 'no_event' || s === 'no_program_gift' || s === '' || s === 'missing') {
     return { level: 'na', text: '—' }; // その配信に該当が無いだけ=赤にしない。
   }

@@ -29,8 +29,15 @@
  * （lv350522265）。`northStarLaneVisibility` の可視 set から除外＝**非表示**へ
  * 撤回。本 state 自体は reason 判定/診断 JSON 用に温存（DO_NOT_REWRITE）。
  *
- * @typedef {'ok' | 'no_event' | 'no_program_gift' | 'iframe_unrendered' | 'fetch_error' | 'not_yet' | 'missing' | 'event_present_unscrapable'} NorthStarLaneState
+ * v0.1.851: `no_ranking_data` を追加(council/adlane-fetcherror-SYNTHESIS)。Koken/Nicoad API が
+ * 通信成功(ok===true・200)だが該当ランキングが 0 件=「この配信にランキングが無いだけ」を表す。
+ * 従来は 0 件も `fetch_error`(取得エラー=赤)と誤称しユーザー/AI を誤誘導していた。`fetch_error` は
+ * 以後「本物の取得失敗(ok===false)」専用。健全度パネルは no_ranking_data=na(対象外・灰)。
+ *
+ * @typedef {'ok' | 'no_event' | 'no_program_gift' | 'iframe_unrendered' | 'fetch_error' | 'not_yet' | 'missing' | 'event_present_unscrapable' | 'no_ranking_data'} NorthStarLaneState
  */
+
+import { classifyLaneResult } from './northStarLaneResult.js';
 
 /**
  * NDGR / bundle が「このイベントに参加している」ことを示す signal を持つか
@@ -61,12 +68,17 @@ export function hasEventParticipationSignal(bundle, snap) {
  *   bundle?: any,
  *   snap?: any,
  *   kokenApiRows?: any[]|null,
- *   nicoadApiRows?: any[]|null
+ *   nicoadApiRows?: any[]|null,
+ *   contribResult?: { ok: boolean|null, status: number|null, rows: any[]|null }|null,
+ *   adResult?: { ok: boolean|null, status: number|null, rows: any[]|null }|null
  * }} ctx
  *   v0.1.617: kokenApiRows / nicoadApiRows は無認証 API 直叩きで storage に入った rows。
  *   取れていれば `ok` を返し、iframe scrape 時代の `iframe_unrendered` / `fetch_error`
  *   (=「公式から問い合わせ中」キャラ案内)を出さない。省略時(undefined)は旧ロジックと完全同一
  *   (bundle のみ参照)＝後方互換。
+ *   v0.1.851: contribResult / adResult(makeLaneResult の戻り)が渡されたら、0件フォールバックを
+ *   「成功0件=no_ranking_data(該当無し)」「失敗=fetch_error」「未取得=not_yet」に正しく分ける。
+ *   省略時は従来の rows のみ経路(等価)＝後方互換。
  * @returns {NorthStarLaneState}
  */
 export function determineNorthStarLaneState(laneId, ctx) {
@@ -74,6 +86,8 @@ export function determineNorthStarLaneState(laneId, ctx) {
   const snap = ctx?.snap || null;
   const kokenApiRows = Array.isArray(ctx?.kokenApiRows) ? ctx.kokenApiRows : null;
   const nicoadApiRows = Array.isArray(ctx?.nicoadApiRows) ? ctx.nicoadApiRows : null;
+  const contribResult = ctx?.contribResult || null;
+  const adResult = ctx?.adResult || null;
 
   // 起動直後（bundle / snap がどちらも空）→ not_yet
   if (!bundle && !snap) return 'not_yet';
@@ -86,9 +100,14 @@ export function determineNorthStarLaneState(laneId, ctx) {
         ? bundle.contributionRanking.length
         : 0;
       if (count > 0) return 'ok';
-      // gift sidebar cross-origin iframe の Vue mount 不全（v0.1.218〜）
-      // 詳細判定は heartbeat 情報があれば iframe_unrendered/fetch_error を分けられるが、
-      // popup 側からは bundle/snap しか見えない。簡素化して iframe_unrendered を返す。
+      // v0.1.851: 取得結果(contribResult)があれば 0件フォールバックを正しく分ける。
+      //   成功0件=no_ranking_data(該当無し・赤にしない) / 失敗=fetch_error / 未取得=not_yet。
+      const cls = classifyLaneResult(contribResult);
+      if (cls === 'empty_ok') return 'no_ranking_data';
+      if (cls === 'failed') return 'fetch_error';
+      if (cls === 'pending') return 'not_yet';
+      // result 無し(旧経路): gift sidebar cross-origin iframe の Vue mount 不全（v0.1.218〜）。
+      //   詳細判定は heartbeat があれば分けられるが popup からは bundle/snap しか見えない＝従来どおり。
       return 'iframe_unrendered';
     }
     case 'giftHistory': {
@@ -172,8 +191,16 @@ export function determineNorthStarLaneState(laneId, ctx) {
         : 0;
       const mirror = strNonEmpty(bundle?.adRankingMirrorHtml);
       if (count > 0 || mirror) return 'ok';
-      // 広告ランキングは多くの配信で取れる（v0.1.237 実装、nicoad relay）
-      // 取れていない場合は配信開始直後 or 取得エラー
+      // v0.1.851: 取得結果(adResult)があれば 0件フォールバックを正しく分ける(根本治療)。
+      //   旧実装は「API 0件 && DOM 0」を一律 fetch_error と誤称していた(実機 lv350746231:
+      //   nicoadLastOk:true/200 なのに赤)。成功0件=no_ranking_data(該当無し・灰) /
+      //   本物の失敗(ok===false)=fetch_error(赤) / 未取得(ok==null)=not_yet。
+      const cls = classifyLaneResult(adResult);
+      if (cls === 'empty_ok') return 'no_ranking_data';
+      if (cls === 'failed') return 'fetch_error';
+      if (cls === 'pending') return 'not_yet';
+      // result 無し(旧経路・後方互換): 広告ランキングは多くの配信で取れる（v0.1.237 nicoad relay）。
+      //   取れていない=配信開始直後 or 取得エラー＝従来どおり fetch_error。
       return 'fetch_error';
     }
     default:

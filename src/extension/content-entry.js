@@ -195,6 +195,7 @@ import {
   fetchOfficialEventBannerFromAuditionEmbed
 } from '../lib/officialEventDomBundle.js';
 import { determineNorthStarLaneState } from '../lib/northStarLaneReason.js';
+import { makeLaneResult } from '../lib/northStarLaneResult.js';
 import { liveEndedStorageKey, buildLiveEndedFlag } from '../lib/liveEndedFlag.js';
 import {
   scrapeContributionRankingFromDom,
@@ -6073,12 +6074,27 @@ function buildGiftDiagnosticsBundle() {
       //   rows 配列を渡すことで、純関数側の v0.1.617 で実装済みの ok 判定経路を発火させる。
       const kokenApiRows = _externalFetchProbe.kokenLastRowsArr;
       const nicoadApiRows = _externalFetchProbe.nicoadLastRowsArr;
+      // v0.1.851: 取得結果(ok/status/rows)を渡し、0件フォールバックを成功0件=no_ranking_data /
+      //   本物の失敗=fetch_error / 未取得=not_yet に正しく分ける(council/adlane-fetcherror-SYNTHESIS)。
+      //   rowsArr は成功0件で null になるが、lastOk:true でそれが「該当無し」と判定できる。
+      const contribResult = makeLaneResult({
+        ok: _externalFetchProbe.kokenLastOk,
+        status: _externalFetchProbe.kokenLastStatus,
+        rows: kokenApiRows
+      });
+      const adResult = makeLaneResult({
+        ok: _externalFetchProbe.nicoadLastOk,
+        status: _externalFetchProbe.nicoadLastStatus,
+        rows: nicoadApiRows
+      });
       const stateOf = (laneId) =>
         determineNorthStarLaneState(laneId, {
           bundle: b,
           snap: snapForReason,
           kokenApiRows,
-          nicoadApiRows
+          nicoadApiRows,
+          contribResult,
+          adResult
         });
       // v0.1.844: status 速報の「貢献度:空」誤報の根治。レーン件数 n は従来 DOM 由来
       //   (count=bundle長 / foundCountLifetime=DOM scrape累計)しか見ず、Koken/Nicoad の

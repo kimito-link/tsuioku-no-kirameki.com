@@ -194,6 +194,58 @@ describe('determineNorthStarLaneState', () => {
     });
   });
 
+  describe('v0.1.851 取得結果(adResult/contribResult)で3状態を正しく分ける', () => {
+    const snap = {};
+    it('adRanking: 通信成功(ok:true)だが0件 → no_ranking_data(該当無し・赤にしない)', () => {
+      expect(
+        determineNorthStarLaneState('adRanking', {
+          bundle: {}, snap,
+          adResult: { ok: true, status: 200, rows: null }
+        })
+      ).toBe('no_ranking_data');
+    });
+    it('adRanking: 本物の失敗(ok:false) → fetch_error(赤)', () => {
+      expect(
+        determineNorthStarLaneState('adRanking', {
+          bundle: {}, snap,
+          adResult: { ok: false, status: null, rows: null }
+        })
+      ).toBe('fetch_error');
+    });
+    it('adRanking: 未取得(ok:null) → not_yet(赤にしない)', () => {
+      expect(
+        determineNorthStarLaneState('adRanking', {
+          bundle: {}, snap,
+          adResult: { ok: null, status: null, rows: null }
+        })
+      ).toBe('not_yet');
+    });
+    it('adRanking: rows>0 は adResult より先に ok(優先度テーブル不変)', () => {
+      expect(
+        determineNorthStarLaneState('adRanking', {
+          bundle: {}, snap, nicoadApiRows: [{ rank: 1 }],
+          adResult: { ok: true, status: 200, rows: [{ rank: 1 }] }
+        })
+      ).toBe('ok');
+    });
+    it('contributionRanking: 成功0件 → no_ranking_data / 失敗 → fetch_error', () => {
+      expect(
+        determineNorthStarLaneState('contributionRanking', {
+          bundle: {}, snap, contribResult: { ok: true, status: 200, rows: [] }
+        })
+      ).toBe('no_ranking_data');
+      expect(
+        determineNorthStarLaneState('contributionRanking', {
+          bundle: {}, snap, contribResult: { ok: false, status: null, rows: null }
+        })
+      ).toBe('fetch_error');
+    });
+    it('result 省略時は従来挙動(後方互換)=adRanking fetch_error / contrib iframe_unrendered', () => {
+      expect(determineNorthStarLaneState('adRanking', { bundle: {}, snap })).toBe('fetch_error');
+      expect(determineNorthStarLaneState('contributionRanking', { bundle: {}, snap })).toBe('iframe_unrendered');
+    });
+  });
+
   describe('未知の laneId', () => {
     it('missing を返す', () => {
       const bundle = {};

@@ -1,0 +1,63 @@
+お題【根本治療・根底から改善】: 公式値レーンの state が「取得できた/該当が無い/本当に失敗した」を
+正直に表せていない。fetch_error が「API成功(200・0行=該当無し)」まで「取得エラー」と誤称している。
+小手先の color 変更でなく、state の意味体系を根底から3状態(ok / 該当無し / 本物の失敗)に正本化する設計を出す。
+
+# 文脈(実コードで確認済み・ハルシネ禁止)
+Chrome拡張(ニコ生コメント記録)。status.html の健全度パネルが各レーンの state を色にする。
+広告ランキング(adRanking)レーンが実機で 🔴「取得エラー(fetch_error)」と出た。だが実データは:
+- externalFetchProbe.nicoadLastOk: true / nicoadLastStatus: 200 / nicoadLastRows: 0
+- networkErrorProbe.nicoadFetchErrorMessages: [] / nicoadFetchStatus: "ok"
+= 通信は成功。ただこの小規模配信(視聴232人)に広告ランキングが 0 件なだけ。エラーではない。
+
+# 真因(実コードで確定)
+src/lib/northStarLaneReason.js の adRanking 判定(行167-177):
+```
+case 'adRanking':
+  if (nicoadApiRows && nicoadApiRows.length > 0) return 'ok';   // API 0行で通らない
+  const count = bundle?.adContributionRanking?.length || 0;
+  const mirror = strNonEmpty(bundle?.adRankingMirrorHtml);
+  if (count > 0 || mirror) return 'ok';                          // DOM も 0
+  return 'fetch_error';                                          // ← ここ。0件を一律「エラー」扱い
+```
+fetch_error は「nicoad API でも DOM でも 0行」の時の唯一の fallback。だが実態は2種類が潰れている:
+(A) 本当に通信失敗(nicoadLastOk:false / status != 200 / errorMessages あり)= 本物のエラー(赤が正しい)
+(B) 通信成功・200・0行(この配信に広告ランキングが無いだけ)= 異常でない(赤は誤誘導)
+
+contributionRanking(貢献度)レーンも同型で、0行時の state を確認・同じ問題があれば同様に扱う。
+
+# このプロジェクトの確立した方針(必ず尊重)
+- self-verifying-loop: 嘘の診断を出さない。検証可能な事実だけを state にする。
+  「fetch_error」という語が status の AI 共有に出て、ユーザーと AI を誤誘導している(過去にも
+   stale-DOM で「公式値レーンが混乱」という嘘診断が誤誘導した実績=同じ轍を踏まない)。
+- 星野ロミ式: 該当データが無いだけのものを赤にしない(失敗体験の除去)。だが本物のエラーは隠さない。
+- northStarLaneReason.js は「3年後楽の構造ガード」=純関数・unit test で優先度を固定する設計。
+  DO_NOT_REWRITE 注記が多い保護ファイル。優先度テーブルの意図(Koken/nicoad API → DOM → mirror)は壊さない。
+- 健全度パネル(healthCells.js northStarLevel)は state→色のマッパ。no_event/no_program_gift は既に
+  na(対象外・赤にしない)。fetch_error は現在 bad(赤)。
+
+# 制約(実装の境界)
+- ★実コードで確定した核心事実(会議の土台・これを前提に答えること):
+  content-entry.js:13991-13993 で
+    nicoadLastRows    = Array.isArray(rows) ? rows.length : 0;        // 0 にもなる(成功0件)
+    nicoadLastRowsArr = (rows.length>0) ? rows : null;                // 0件は null=未取得と潰れる
+  ∴ 今 determineNorthStarLaneState に渡っている nicoadApiRows(=rowsArr)では
+    「成功0件(該当無し)」と「未取得/失敗」が区別不能(両方 null)。
+  だが nicoadLastOk(true/false/初期null)・nicoadLastStatus(200/null)・nicoadSent(送信回数)は
+    別々に取れている=これらを使えば3状態を正直に分けられる。kokenLastRows/Ok/Status も同型(貢献度も同じ)。
+  → 根治の核心は「rowsArr だけ渡す」のをやめ、レーンの取得結果を {ok, status, rows} のような
+    小さな結果オブジェクトで渡し、純関数が ok&&rows.length===0=該当無し / !ok=失敗 を分けること。
+- 記録本体・コメント取得は不可侵。新規storage書き込みゼロ。hot path を重くしない。
+
+# 問い(4点)
+1. fetch_error を (A)本物の通信失敗 と (B)成功・0件(該当無し) に分ける最小で正しい設計は?
+   新しい state 名(例: no_ad_ranking / empty)を足すか、既存の no_event/no_program_gift 相当へ寄せるか?
+2. (B)を判定するのに必要な信号は何か。determineNorthStarLaneState のシグネチャ(引数)をどう増やすのが
+   最小か(nicoadLastOk/Status を渡す? それとも nicoadApiRows が「空配列 vs null」で区別できるよう呼び出し側を変える?)。
+   ※現状 nicoadApiRows は「rows>0 の時だけ非null・それ以外 null」で、成功0件と未取得が区別不能な疑い=要確認。
+3. healthCells.js の northStarLevel で、新 state をどの色にすべきか(na 対象外 / processing 取得中 / 本物の
+   fetch_error だけ bad)。総合判定(summarizeHealthVerdict)が誤って異常を出さないように。
+4. northStarLaneReason.js の「3年後楽ガード/優先度テーブル」を壊さずに(A)(B)分離を入れる手順。
+   既存の characterization test が落ちない移行(等価性担保)はどうするか。
+
+# 出力フォーマット(各メンバー固定)
+結論 → 根拠 → 反論・リスク → 具体案(実装の粒度で・既存の関数名/フィールド名/state名を使って)
