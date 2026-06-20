@@ -28,6 +28,11 @@ import { buildStatusActions } from '../lib/statusActionAdvisor.js';
 import { buildHealthCells, summarizeHealthVerdict } from '../lib/healthCells.js';
 import { buildVoiceDiagLine } from '../lib/voiceDiag.js';
 import { KEY_VOICE_DIAG } from '../lib/voiceDiagKey.js';
+import { buildReportPreviewLines } from '../lib/reportPreview.js';
+import {
+  KEY_REPORT_PREVIEW,
+  isReportPreviewFresh
+} from '../lib/reportPreviewKey.js';
 import {
   buildOverviewText,
   buildLiveBlockText,
@@ -174,8 +179,10 @@ async function refresh(opts = {}) {
     );
     step = 'loadVoiceDiagSafe';
     const voiceDiag = await runStorageOpWithTimeout(() => loadVoiceDiagSafe(), tmo);
+    step = 'loadReportPreviewSafe';
+    const reportPreview = await runStorageOpWithTimeout(() => loadReportPreviewSafe(), tmo);
     step = 'renderAll';
-    renderAll({ lvList, summaries, fastDiag, popupDiag, backfillProgress, voiceDiag });
+    renderAll({ lvList, summaries, fastDiag, popupDiag, backfillProgress, voiceDiag, reportPreview });
     updateLastUpdateMeta();
     _statusLastErrorText = '';
   } catch (err) {
@@ -358,6 +365,19 @@ async function loadVoiceDiagSafe() {
   }
 }
 
+// v0.1.858: レポート(HTML/マーケ/メディアキット)の DL前 主要KPI を読む。popup が
+//   KEY_REPORT_PREVIEW へ定期(15秒)に書く。古い snapshot(2分超)や popup 未起動なら null=表示しない。
+async function loadReportPreviewSafe() {
+  try {
+    const bag = await chrome.storage.local.get(KEY_REPORT_PREVIEW);
+    const rec = bag?.[KEY_REPORT_PREVIEW];
+    if (!isReportPreviewFresh(rec, Date.now())) return null;
+    return rec;
+  } catch {
+    return null;
+  }
+}
+
 /**
  * v0.1.659: 過去ログ取得の診断(stopReason)を読む。「一気に取れない・50%停止」の真因を
  *   ユーザーが status を開くだけで AI に共有できるように、どの配信が何の理由で止まったかを表示。
@@ -386,7 +406,7 @@ async function loadBackfillProgressSafe() {
  * レンダリング
  * ========================================================================== */
 
-function renderAll({ lvList, summaries, fastDiag, popupDiag, backfillProgress, voiceDiag }) {
+function renderAll({ lvList, summaries, fastDiag, popupDiag, backfillProgress, voiceDiag, reportPreview }) {
   // v0.1.847: 各描画セクションを独立 try/catch で隔離するヘルパ。1つが throw しても他のセクションと
   //   最終更新メタを巻き込まない=「セルが全部消える/最終更新—のまま固まる」を根治。落ちた場所は
   //   console と AI 共有欄に出して真因を追えるようにする(star-romi 失敗体験の除去)。
@@ -477,10 +497,18 @@ function renderAll({ lvList, summaries, fastDiag, popupDiag, backfillProgress, v
     const vStr = buildVoiceDiagLine(voiceDiag, Date.now());
     voiceLine = vStr ? `\n${vStr}` : '';
   });
+  // v0.1.858: レポート(HTML/マーケ/メディアキット)の DL前 主要KPI を概要に併記。popup を開いて
+  //   いる配信だけ取れる(popup が15秒ごとに publish)。保存しなくても中身が分かる=過小集計を即発見。
+  let reportPreviewLine = '';
+  safeSection('レポート内容プレビュー', () => {
+    const rStr = buildReportPreviewLines(reportPreview);
+    reportPreviewLine = rStr ? `\n${rStr}` : '';
+  });
   const overviewEl = document.getElementById('overviewBody');
   if (overviewEl) {
     overviewEl.textContent =
-      (overviewText || '視聴中の配信はありません。') + backfillLine + laneLine + voiceLine;
+      (overviewText || '視聴中の配信はありません。') +
+      backfillLine + laneLine + voiceLine + reportPreviewLine;
     overviewEl.classList.toggle('empty-note', !overviewText);
   }
 
@@ -543,7 +571,7 @@ function renderAll({ lvList, summaries, fastDiag, popupDiag, backfillProgress, v
   // AI 共有用テキスト
   let fullText = '';
   safeSection('AI共有テキスト', () => {
-    fullText = buildAiShareFullText({ overviewText, livesData, fastDiag, popupDiag, voiceDiag });
+    fullText = buildAiShareFullText({ overviewText, livesData, fastDiag, popupDiag, voiceDiag, reportPreview });
     const ta = /** @type {HTMLTextAreaElement|null} */ (
       document.getElementById('aiShareText')
     );
@@ -845,7 +873,7 @@ function summarizeOneLive(lv, summary, snapshot, perfDiag, endedFlag) {
   };
 }
 
-function buildAiShareFullText({ overviewText, livesData, fastDiag, popupDiag, voiceDiag }) {
+function buildAiShareFullText({ overviewText, livesData, fastDiag, popupDiag, voiceDiag, reportPreview }) {
   const lines = [];
   lines.push('## 君斗りんくの追憶のきらめき 状態速報');
   lines.push(`生成: ${new Date().toISOString()}`);
@@ -869,6 +897,13 @@ function buildAiShareFullText({ overviewText, livesData, fastDiag, popupDiag, vo
     try {
       const vStr = buildVoiceDiagLine(voiceDiag, Date.now());
       if (vStr) lines.push(vStr);
+    } catch {
+      /* no-op */
+    }
+    // v0.1.858: レポート(DL前)の主要KPI(本文N/ユニーク/来場と応援参加…)。保存せず中身を共有できる。
+    try {
+      const rStr = buildReportPreviewLines(reportPreview);
+      if (rStr) lines.push(rStr);
     } catch {
       /* no-op */
     }

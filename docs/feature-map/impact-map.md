@@ -143,6 +143,8 @@
 | `src/lib/officialEventBannerDom.js` | 2 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) |
 | `src/lib/panelLiveSummary.js` | 2 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) |
 | `src/lib/panelMetricsExport.js` | 2 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) |
+| `src/lib/reportPreview.js` | 2 | ポップアップ(応援レーン) / 状態速報ページ |
+| `src/lib/reportPreviewKey.js` | 2 | ポップアップ(応援レーン) / 状態速報ページ |
 | `src/lib/scrapeGiftHistoryList.js` | 2 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) |
 | `src/lib/selfActionCelebration.js` | 2 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) |
 | `src/lib/selfPostedMatcher.js` | 2 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) |
@@ -446,6 +448,7 @@
 | `src/lib/reportFriendlyMetaRowsHtml.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/reportHeadInfoRowsHtml.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/reportNextMemoSectionHtml.js` | 1 | ポップアップ(応援レーン) |
+| `src/lib/reportPreviewPublish.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/reportSelfPostedRowsHtml.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/reportThumbedUsersSectionHtml.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/reportUserRoomTableHtml.js` | 1 | ポップアップ(応援レーン) |

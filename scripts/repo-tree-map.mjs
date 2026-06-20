@@ -112,6 +112,7 @@ const FEATURES = [
   { feature: '吹き出し寿命管理', desc: '会場の吹き出しの表示上限・追い出し(eviction)ライフサイクル', paths: ['src/lib/venueBubbleLifecycle.js'], tags: ['会場', '吹き出し'] },
   { feature: 'HTMLレポート生成', desc: 'マーケ/イベント順位/タイムライン等を1枚の HTML レポートに組み立てる(popup-entry 内)', paths: ['src/extension/popup-entry.js'], tags: ['レポート'] },
   { feature: 'レポートのコメント源(全件storage)', desc: 'HTML/メディアキットレポートは storage の全件(IDB→チャンク→テール)を読む。popup を当該配信で開いていても表示用キャップ済みエントリで上書きしない(v0.1.853 断線根治)。空のときだけ表示エントリにフォールバック', paths: ['src/lib/pickCommentsForExport.js', 'src/extension/popup-entry.js'], tags: ['レポート', 'コメント', '記録'] },
+  { feature: 'レポート内容プレビュー(DL前のリアルタイム可視化)', desc: 'HTML/マーケ/メディアキットの主要KPI(本文数/ユニーク/分速/ヘビー・一度きり%/来場と応援参加/沈黙視聴者推定)をレポートが使う純関数(aggregateMarketingReport/analyzeAudienceEngagementGap)で集計し、保存せず status 速報へ。popup が KEY_REPORT_PREVIEW へ15秒間引き publish→status が読む(voiceDiag と同じ storage ブリッジ)。過小集計を保存前に発見できる純観測(v0.1.858)', paths: ['src/lib/reportPreview.js', 'src/lib/reportPreviewKey.js', 'src/extension/popup-entry.js', 'src/extension/status-entry.js'], tags: ['レポート', '診断', '集約'] },
   { feature: '状態速報の整形', desc: '記録件数・取得率・バックフィル進捗・レーン状態などの状態テキストを整形', paths: ['src/lib/statusFormat.js'], tags: ['レポート', '診断'] },
   { feature: '記録件数の単調化(減らない表示)', desc: 'per-live ゲートで記録件数の表示が後退しないようにする', paths: ['src/lib/monotonicCommentCount.js'], tags: ['記録', 'コメント'] },
   { feature: 'storage キー定義', desc: 'chrome.storage のキー名の正本(nls_comments_<lv> 等)', paths: ['src/lib/storageKeys.js'], tags: ['storage'] },

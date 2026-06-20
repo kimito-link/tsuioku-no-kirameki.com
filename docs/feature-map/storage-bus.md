@@ -107,6 +107,7 @@
 | `KEY_PROFILE_RESOLVE_STATE` | — | extension/content-entry.js |
 | `KEY_RECORDING` | — | extension/content-entry.js<br>extension/popup-entry.js |
 | `KEY_RECORDING_WATCHDOG` | extension/content-entry.js | extension/popup-entry.js |
+| `KEY_REPORT_PREVIEW` | lib/reportPreviewPublish.js | extension/status-entry.js |
 | `KEY_SELF_POSTED_RECENTS` | extension/content-entry.js | extension/content-entry.js<br>extension/popup-entry.js |
 | `KEY_STORAGE_WRITE_ERROR` | extension/content-entry.js<br>extension/popup-entry.js | extension/popup-entry.js |
 | `KEY_STORY_GROWTH_COLLAPSED` | — | extension/popup-entry.js |

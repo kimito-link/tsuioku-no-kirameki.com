@@ -211,6 +211,11 @@
       <div class="fpaths"><code class="path">src/lib/pickCommentsForExport.js</code><code class="path">src/extension/popup-entry.js</code></div>
     </section>
 <section class="feat">
+      <div class="fhead"><span class="fname">レポート内容プレビュー(DL前のリアルタイム可視化)</span> <span class="tag">レポート</span><span class="tag">診断</span><span class="tag">集約</span></div>
+      <div class="fdesc">HTML/マーケ/メディアキットの主要KPI(本文数/ユニーク/分速/ヘビー・一度きり%/来場と応援参加/沈黙視聴者推定)をレポートが使う純関数(aggregateMarketingReport/analyzeAudienceEngagementGap)で集計し、保存せず status 速報へ。popup が KEY_REPORT_PREVIEW へ15秒間引き publish→status が読む(voiceDiag と同じ storage ブリッジ)。過小集計を保存前に発見できる純観測(v0.1.858)</div>
+      <div class="fpaths"><code class="path dead">src/lib/reportPreview.js ⚠️ 見つからない</code><code class="path dead">src/lib/reportPreviewKey.js ⚠️ 見つからない</code><code class="path">src/extension/popup-entry.js</code><code class="path">src/extension/status-entry.js</code></div>
+    </section>
+<section class="feat">
       <div class="fhead"><span class="fname">状態速報の整形</span> <span class="tag">レポート</span><span class="tag">診断</span></div>
       <div class="fdesc">記録件数・取得率・バックフィル進捗・レーン状態などの状態テキストを整形</div>
       <div class="fpaths"><code class="path">src/lib/statusFormat.js</code></div>
