@@ -1944,6 +1944,16 @@
       ]
     },
     {
+      "file": "src/lib/broadcasterCommentCount.js",
+      "featureCount": 1,
+      "features": [
+        "popup"
+      ],
+      "labels": [
+        "ポップアップ(応援レーン)"
+      ]
+    },
+    {
       "file": "src/lib/broadcasterExcludedCount.js",
       "featureCount": 1,
       "features": [

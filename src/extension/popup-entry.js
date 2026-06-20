@@ -36,6 +36,7 @@ import {
 import { sanitizeRoomAvatarsForBroadcaster } from '../lib/sanitizeRoomAvatarsForBroadcaster.js';
 import { excludeBroadcasterFromRankedRooms } from '../lib/excludeBroadcasterFromRankedRooms.js';
 import { excludeBroadcasterFromCommentEntries } from '../lib/excludeBroadcasterFromCommentEntries.js';
+import { resolveBroadcasterCommentCount } from '../lib/broadcasterCommentCount.js';
 import { buildOfficialNicoStatsStripDigest } from '../lib/officialNicoStatsStripDigest.js';
 
 import { GIFT_HISTORY_LANE_MAX } from '../lib/giftRankStripConfig.js';
@@ -13888,35 +13889,30 @@ async function refresh() {
       STORY_AVATAR_DIAG_STATE.selfPendingMatched = getOwnPostedMatchedIdSet(arr, lv).size;
     }
     STORY_AVATAR_DIAG_STATE.selfPending = countPendingSelfPostedRecentsForLive(lv);
-    // 0.1.100: 配信者本人 user の自コメは「応援コメ」ではないので popup display
-    //   経路から除外（story growth grid / 集計件数 / lane / ticker 全部に効く）。
-    //   配信者カードは watchMetaCache.snapshot.broadcaster* から別経路で描画されるため
-    //   表示情報は失われない。HTML レポート側 (popup-entry.js:7745 周辺) では
-    //   既に同等の inline filter が個別コメに適用されている。
-    // v0.1.649 PR6: 入力(arr 参照・lv)が前回 paint と完全一致なら、O(N)×3 の
-    //   displayEntries 構築を skip して前回結果を再利用(参照等価メモ化)。
-    //   arr が新配列(新着/enrich昇格)になったら ref 不一致で必ず再計算=取りこぼしなし。
+    // 0.1.100: 配信者本人の自コメは応援コメでないので display 経路から除外(grid/件数/lane/ticker)。
+    //   配信者カードは watchMetaCache.snapshot.broadcaster* で別途描画=情報は失われない。
+    // v0.1.649 PR6: arr 参照・lv が前回 paint と一致なら displayEntries 構築を skip(参照等価メモ化)。
     let displayEntriesBase;
+    let _preExcludeLen = 0; // v0.1.838: 配信者除外【前】の件数。
     if (
       _displayEntriesMemo &&
       _displayEntriesMemo.arr === arr &&
       _displayEntriesMemo.lv === lv
     ) {
       displayEntriesBase = /** @type {PopupCommentEntry[]} */ (_displayEntriesMemo.displayEntries);
+      const memoPre = Number(_displayEntriesMemo.preExcludeLen);
+      _preExcludeLen = Number.isFinite(memoPre) ? memoPre : displayEntriesBase.length;
     } else {
-      const broadcasterUidForCommentExclude = inferBroadcasterUserIdFromComments(
-        arr,
-        watchMetaCache.snapshot || {}
-      );
-      displayEntriesBase = excludeBroadcasterFromCommentEntries(
-        buildDisplayCommentEntries(arr, lv),
-        broadcasterUidForCommentExclude
-      );
+      const bcUid = inferBroadcasterUserIdFromComments(arr, watchMetaCache.snapshot || {});
+      const _preExcludeEntries = buildDisplayCommentEntries(arr, lv); // v0.1.838: 除外前の件数
+      _preExcludeLen = _preExcludeEntries.length;
+      displayEntriesBase = excludeBroadcasterFromCommentEntries(_preExcludeEntries, bcUid);
       _displayEntriesMemo = {
         arr,
         lv,
         displayEntries: displayEntriesBase,
-        broadcasterUid: broadcasterUidForCommentExclude
+        broadcasterUid: bcUid,
+        preExcludeLen: _preExcludeEntries.length
       };
     }
     const displayEntries = displayEntriesBase;
@@ -13974,9 +13970,10 @@ async function refresh() {
       watchSnapshot,
       panelLiveSummary
     );
-    // v0.1.627: 記録の内訳を集計。v0.1.685: countToShow>displayEntries 差=配信者コメント。
+    // v0.1.838(記録0バグ根治): 配信者数=除外で減った件数。旧 `countToShow−除外後` は記録総数を
+    //   丸ごと引き 0 に潰した(council/recorded-count-zero-bug.md)。
     const recordedBreakdown = summarizeCommentRecordBreakdown(displayEntries);
-    const _broadcasterCount = Math.max(0, countToShow - displayEntriesBase.length);
+    const _broadcasterCount = resolveBroadcasterCommentCount(_preExcludeLen, displayEntriesBase.length);
     if (_broadcasterCount > 0) recordedBreakdown._broadcasterCount = _broadcasterCount;
     setCountDisplay(countToShow, snapForCards, recordedBreakdown);
     markWatchPopupLoadPhase('count_card', {
