@@ -6080,10 +6080,18 @@ function buildGiftDiagnosticsBundle() {
           kokenApiRows,
           nicoadApiRows
         });
+      // v0.1.844: status 速報の「貢献度:空」誤報の根治。レーン件数 n は従来 DOM 由来
+      //   (count=bundle長 / foundCountLifetime=DOM scrape累計)しか見ず、Koken/Nicoad の
+      //   無認証 API で実際に取れている行(kokenLastRows:13 等)を無視していた。autoOpen 未発火
+      //   配信では DOM が常に 0 なので、API で13行取れていても state:ok && n:0 で「空」と誤報。
+      //   API 実行数を apiRows としてレーンに載せ、buildLaneStatusLine の n に含める=実数表示。
+      const kokenApiRowCount = Array.isArray(kokenApiRows) ? kokenApiRows.length : 0;
+      const nicoadApiRowCount = Array.isArray(nicoadApiRows) ? nicoadApiRows.length : 0;
       return {
         '1_貢献度ランキング': {
           state: stateOf('contributionRanking'),
           count: contribCount,
+          apiRows: kokenApiRowCount,
           foundCountLifetime: _d.contributionRankingFoundCount
         },
         '2_ギフト履歴': {
@@ -6114,6 +6122,7 @@ function buildGiftDiagnosticsBundle() {
         '+α_広告ランキング': {
           state: stateOf('adRanking'),
           count: adCount,
+          apiRows: nicoadApiRowCount,
           mirrorHtmlBytes: adMirrorBytes,
           foundCountLifetime: _d.adContributionRankingFoundCount
         }

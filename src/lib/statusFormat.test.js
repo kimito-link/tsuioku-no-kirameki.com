@@ -60,6 +60,26 @@ describe('buildLaneStatusLine (v0.1.766 概要にレーン状況)', () => {
     const line = buildLaneStatusLine({ '1_貢献度ランキング': { state: 'weird_new_state' } });
     expect(line).toContain('貢献度:⚠weird_new_state');
   });
+
+  it('v0.1.844: apiRows(Koken/Nicoad実数)を最優先=DOM空でも API取得済なら ✅件数(「空」誤報の根治)', () => {
+    // 実機 lv350792705: autoOpen 未発火で DOM bundle 長(count)=0 だが Koken API は13行取得済。
+    // 旧実装は count/foundCountLifetime しか見ず ✅0→「空」と誤報した。apiRows を n に入れて実数表示。
+    const lanes = {
+      '1_貢献度ランキング': { state: 'ok', count: 0, apiRows: 13, foundCountLifetime: 0 },
+      '+α_広告ランキング': { state: 'ok', count: 0, apiRows: 10, foundCountLifetime: 0 }
+    };
+    const line = buildLaneStatusLine(lanes);
+    expect(line).toContain('貢献度:✅13');
+    expect(line).toContain('広告:✅10');
+    expect(line).not.toContain('空');
+  });
+
+  it('v0.1.844: apiRows も count も 0 なら従来どおり「空」(API も DOM も来ていない)', () => {
+    const line = buildLaneStatusLine({
+      '1_貢献度ランキング': { state: 'ok', count: 0, apiRows: 0, foundCountLifetime: 0 }
+    });
+    expect(line).toBe('公式値レーン: 貢献度:空');
+  });
 });
 
 describe('formatElapsed', () => {
