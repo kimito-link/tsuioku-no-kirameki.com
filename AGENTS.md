@@ -377,3 +377,15 @@ MEMORY/SYNTHESIS を更新する時に html も併せて直す(`§T` の「MEMOR
 位置づけ)のカードに実害語(混乱/混入/汚染/破壊…)が混ざっていないか機械照合する(`statusActionAdvisor.test.js`
 から回帰防止)。**嘘の自動判定はしない**(散文の因果が正しいかは意味照合で機械決定できない=全自動の嘘検出は
 作らない・過剰実装)。あくまで「info なのに不安語=人間が実コードで裏取りせよ」の喚起まで。
+
+### 12.8 記録件数の「表示の正本」は1本(2026-06-20・数字バラバラ根治の第1)
+
+> 背景: ユーザー根底批判「記録の数字がソース/画面ごとにバラバラで正確さが崩れた」。実コード棚卸しで
+> 「記録件数」が6カウンタに分裂と判明(council/recorded-count-zero-bug.md / count-simplify-SYNTHESIS.md)。
+
+**規律**: 画面に出す「記録件数」の正本は **`recordedCountForDisplay(lid)`(= panel summary の `recordedCount`・
+per-live 単調化済み)の1本だけ**。取り出しは `src/lib/displayRecordedCount.js#selectDisplayRecordedCount`
+を通す。**表示に混ぜてはいけない診断専用カウンタ**= `savedCommentsUidStats`(最後の flush batch だけ)・
+`commentIngestBySource`(取込源別の累積・重複込み)・`displayEntriesBase.length`(UI生成数・0潰しの一因)。
+診断カウンタは AI 診断 JSON 用であって表示用ではない(役割を混同しない)。第2以降で countToShow の max・
+配信者除外の引き算・各ゲートを段階的に剥がす(一斉撤去はしない・回帰テストで「増えて減る/0潰れ」を固定してから)。

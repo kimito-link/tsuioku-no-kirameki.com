@@ -37,6 +37,7 @@ import { sanitizeRoomAvatarsForBroadcaster } from '../lib/sanitizeRoomAvatarsFor
 import { excludeBroadcasterFromRankedRooms } from '../lib/excludeBroadcasterFromRankedRooms.js';
 import { excludeBroadcasterFromCommentEntries } from '../lib/excludeBroadcasterFromCommentEntries.js';
 import { resolveBroadcasterCommentCount } from '../lib/broadcasterCommentCount.js';
+import { selectDisplayRecordedCount } from '../lib/displayRecordedCount.js';
 import { buildOfficialNicoStatsStripDigest } from '../lib/officialNicoStatsStripDigest.js';
 
 import { GIFT_HISTORY_LANE_MAX } from '../lib/giftRankStripConfig.js';
@@ -7292,7 +7293,8 @@ function mergeWatchSnapshotWithPanelSummary(snapshot, panelSummary) {
 function applyPanelMetricsFromContent(summary, lv) {
   if (!isPanelLiveSummary(summary, lv)) return;
   _panelMetricsAppliedForLv = lv;
-  const recorded = Math.max(0, Number(summary.recordedCount) || 0);
+  // v0.1.839(第1): 表示記録件数は recordedCount 1本だけを正本に(診断カウンタに引っ張られない)。
+  const recorded = selectDisplayRecordedCount(summary);
   let snapForCards = mergeWatchSnapshotWithPanelSummary(
     watchMetaCache.snapshot,
     summary

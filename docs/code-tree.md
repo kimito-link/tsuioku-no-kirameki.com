@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-✅ 全 503 ソースに役割コメントあり。
+✅ 全 504 ソースに役割コメントあり。
 
 ## 全ファイルツリー
 
@@ -252,7 +252,7 @@
   - `vendor-visual-explainer.mjs` — Vendors nicobailon/visual-explainer (MIT) into .cursor/skills/visual-explainer/
   - `verify-bump.mjs` — extension bump 後の整合性チェッカー
   - `write-extension-placeholder-icons.mjs` — リポジトリに 256px アイコンしか無い環境向け: manifest 用の小さめ PNG を生成する。
-- 📁 **src/** (1095)
+- 📁 **src/** (1097)
   - 📁 **data/** (6)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -510,7 +510,7 @@
         - `logo_funlink_white_RGB_maru_black.png`
       - `logo_guide_funlink_ol.pdf`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (885)
+  - 📁 **lib/** (887)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -594,6 +594,8 @@
     - `broadcastUrl.test.js`
     - `broadcastWaveformFingerprint.js` — L3: コメ波形フィンガープリント。
     - `broadcastWaveformFingerprint.test.js`
+    - `broadcasterCommentCount.js` — 「配信者本人のコメント数」を正しく算出する純関数(v0.1.838)。
+    - `broadcasterCommentCount.test.js`
     - `broadcasterExcludedCount.js` — v0.1.774: 記録カードの見出し数値から「配信者本人のコメント」を差し引いて、公式(本家コメ)と
     - `broadcasterExcludedCount.test.js`
     - `broadcasterFollowTarget.js` — 配信者タイル / casterBanner で出す「配信者の page URL とアイコン」を、
