@@ -8,13 +8,25 @@ describe('cleanNdgrChatRows', () => {
     expect(result).toEqual([{ commentNo: '1', text: 'hello', userId: 'u1' }]);
   });
 
-  it('commentNo が空の行を除外', () => {
+  // v0.1.836 匿名(184)救済: 番号無しでも「本文+識別子」があれば受理に変更。
+  it('commentNo 無し + 本文 + 識別子(userId) → 受理する(匿名救済)', () => {
     const rows = [
       { commentNo: '1', text: 'ok', userId: 'u1' },
-      { commentNo: '', text: 'skip', userId: 'u2' },
-      { commentNo: '  ', text: 'skip2', userId: 'u3' }
+      { commentNo: '', text: 'anon hello', userId: 'a:hashed1' },
+      { commentNo: '  ', text: 'anon hi', userId: 'a:hashed2' }
     ];
-    expect(cleanNdgrChatRows(rows)).toHaveLength(1);
+    // 旧挙動は「番号無しは全捨て=1件」だったが、匿名本文を救うため3件すべて通す。
+    expect(cleanNdgrChatRows(rows)).toHaveLength(3);
+  });
+
+  it('commentNo 無し + 識別子無し → 捨てる(身元ゼロは受理しない)', () => {
+    const rows = [{ commentNo: '', text: 'no id', userId: '' }];
+    expect(cleanNdgrChatRows(rows)).toHaveLength(0);
+  });
+
+  it('commentNo 無し + 識別子あり + 本文空 → 捨てる(本文必須)', () => {
+    const rows = [{ commentNo: '', text: '   ', userId: 'a:hashed1' }];
+    expect(cleanNdgrChatRows(rows)).toHaveLength(0);
   });
 
   it('null / undefined を含む配列からスキップ', () => {
