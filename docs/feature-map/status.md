@@ -6,7 +6,7 @@
 ## storage の出入り
 
 - 書くキー: (なし)
-- 読むキー: `KEY_AI_SHARE_FAST_DIAG`, `KEY_AI_SHARE_POPUP_DIAG`, `KEY_LAST_WATCH_URL`, `KEY_VOICE_DIAG`, `nls_backfill_progress_v1`
+- 読むキー: `KEY_AI_SHARE_FAST_DIAG`, `KEY_AI_SHARE_POPUP_DIAG`, `KEY_LAST_WATCH_URL`, `KEY_REPORT_PREVIEW`, `KEY_VOICE_DIAG`, `nls_backfill_progress_v1`
 
 ## 構成ファイル（import 到達・最大40件表示）
 
@@ -25,6 +25,8 @@ graph LR
   n_status --> n_src_lib_perfDiag_js["lib/perfDiag.js"]:::shared
   n_status --> n_src_lib_pickBroadcasterNameForReputation_js["lib/pickBroadcasterNameForReputation.js"]
   n_status --> n_src_lib_rankingPatrolMessages_js["lib/rankingPatrolMessages.js"]
+  n_status --> n_src_lib_reportPreview_js["lib/reportPreview.js"]:::shared
+  n_status --> n_src_lib_reportPreviewKey_js["lib/reportPreviewKey.js"]:::shared
   n_status --> n_src_lib_resolveVisitorCount_js["lib/resolveVisitorCount.js"]
   n_status --> n_src_lib_statusActionAdvisor_js["lib/statusActionAdvisor.js"]
   n_status --> n_src_lib_statusFormat_js["lib/statusFormat.js"]:::shared

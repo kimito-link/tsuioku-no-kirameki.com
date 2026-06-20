@@ -1232,6 +1232,30 @@
       ]
     },
     {
+      "file": "src/lib/reportPreview.js",
+      "featureCount": 2,
+      "features": [
+        "popup",
+        "status"
+      ],
+      "labels": [
+        "ポップアップ(応援レーン)",
+        "状態速報ページ"
+      ]
+    },
+    {
+      "file": "src/lib/reportPreviewKey.js",
+      "featureCount": 2,
+      "features": [
+        "popup",
+        "status"
+      ],
+      "labels": [
+        "ポップアップ(応援レーン)",
+        "状態速報ページ"
+      ]
+    },
+    {
       "file": "src/lib/scrapeGiftHistoryList.js",
       "featureCount": 2,
       "features": [
@@ -4321,6 +4345,16 @@
     },
     {
       "file": "src/lib/reportNextMemoSectionHtml.js",
+      "featureCount": 1,
+      "features": [
+        "popup"
+      ],
+      "labels": [
+        "ポップアップ(応援レーン)"
+      ]
+    },
+    {
+      "file": "src/lib/reportPreviewPublish.js",
       "featureCount": 1,
       "features": [
         "popup"

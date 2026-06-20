@@ -105,32 +105,37 @@ graph LR
   HUB --> f16["レポートのコメント源(全件storage)"]
   f16 --> f16_0["lib/pickCommentsForExport.js"]
   f16 --> f16_1["extension/popup-entry.js"]
-  HUB --> f17["状態速報の整形"]
-  f17 --> f17_0["lib/statusFormat.js"]
-  HUB --> f18["記録件数の単調化(減らない表示)"]
-  f18 --> f18_0["lib/monotonicCommentCount.js"]
-  HUB --> f19["storage キー定義"]
-  f19 --> f19_0["lib/storageKeys.js"]
-  HUB --> f20["AI診断の状態速報集約"]
-  f20 --> f20_0["lib/aiSharePopupDiagKey.js"]
-  f20 --> f20_1["extension/status-entry.js"]
-  HUB --> f21["状態速報の全体マインドマップ"]
-  f21 --> f21_0["lib/statusMindmapModel.js"]
+  HUB --> f17["レポート内容プレビュー(DL前のリアルタイム可視化)"]
+  f17 --> f17_0["lib/reportPreview.js"]
+  f17 --> f17_1["lib/reportPreviewKey.js"]
+  f17 --> f17_2["extension/popup-entry.js"]
+  f17 --> f17_3["extension/status-entry.js"]
+  HUB --> f18["状態速報の整形"]
+  f18 --> f18_0["lib/statusFormat.js"]
+  HUB --> f19["記録件数の単調化(減らない表示)"]
+  f19 --> f19_0["lib/monotonicCommentCount.js"]
+  HUB --> f20["storage キー定義"]
+  f20 --> f20_0["lib/storageKeys.js"]
+  HUB --> f21["AI診断の状態速報集約"]
+  f21 --> f21_0["lib/aiSharePopupDiagKey.js"]
   f21 --> f21_1["extension/status-entry.js"]
-  HUB --> f22["状態速報の対処カード(症状→原因→次の一手)"]
-  f22 --> f22_0["lib/statusActionAdvisor.js"]
+  HUB --> f22["状態速報の全体マインドマップ"]
+  f22 --> f22_0["lib/statusMindmapModel.js"]
   f22 --> f22_1["extension/status-entry.js"]
-  HUB --> f23["サイト健全性検証(リンク切れ防止)"]
-  f23 --> f23_0["lib/siteLinkHealth.js"]
-  f23 --> f23_1["site-health.mjs"]
-  HUB --> f24["影響範囲マップ(変えたら何が壊れるか)"]
-  f24 --> f24_0["feature-map.mjs"]
-  f24 --> f24_1["feature-map/impact-map.md"]
-  HUB --> f25["全体マップ(全地図への入口)"]
-  f25 --> f25_0["MAP.md"]
-  HUB --> f26["影響範囲ゲート(規律を自動化)"]
-  f26 --> f26_0["impact-check.mjs"]
-  f26 --> f26_1["feature-map/impact-map.json"]
+  HUB --> f23["状態速報の対処カード(症状→原因→次の一手)"]
+  f23 --> f23_0["lib/statusActionAdvisor.js"]
+  f23 --> f23_1["extension/status-entry.js"]
+  HUB --> f24["サイト健全性検証(リンク切れ防止)"]
+  f24 --> f24_0["lib/siteLinkHealth.js"]
+  f24 --> f24_1["site-health.mjs"]
+  HUB --> f25["影響範囲マップ(変えたら何が壊れるか)"]
+  f25 --> f25_0["feature-map.mjs"]
+  f25 --> f25_1["feature-map/impact-map.md"]
+  HUB --> f26["全体マップ(全地図への入口)"]
+  f26 --> f26_0["MAP.md"]
+  HUB --> f27["影響範囲ゲート(規律を自動化)"]
+  f27 --> f27_0["impact-check.mjs"]
+  f27 --> f27_1["feature-map/impact-map.json"]
 ```
 
 ---
@@ -305,6 +310,14 @@ HTML/メディアキットレポートは storage の全件(IDB→チャンク�
 
 - [`src/lib/pickCommentsForExport.js`](../src/lib/pickCommentsForExport.js)
 - [`src/extension/popup-entry.js`](../src/extension/popup-entry.js)
+
+### レポート内容プレビュー(DL前のリアルタイム可視化)  〔レポート / 診断 / 集約〕
+HTML/マーケ/メディアキットの主要KPI(本文数/ユニーク/分速/ヘビー・一度きり%/来場と応援参加/沈黙視聴者推定)をレポートが使う純関数(aggregateMarketingReport/analyzeAudienceEngagementGap)で集計し、保存せず status 速報へ。popup が KEY_REPORT_PREVIEW へ15秒間引き publish→status が読む(voiceDiag と同じ storage ブリッジ)。過小集計を保存前に発見できる純観測(v0.1.858)
+
+- `src/lib/reportPreview.js` ⚠️ **見つからない（消失/リネーム）**
+- `src/lib/reportPreviewKey.js` ⚠️ **見つからない（消失/リネーム）**
+- [`src/extension/popup-entry.js`](../src/extension/popup-entry.js)
+- [`src/extension/status-entry.js`](../src/extension/status-entry.js)
 
 ### 状態速報の整形  〔レポート / 診断〕
 記録件数・取得率・バックフィル進捗・レーン状態などの状態テキストを整形

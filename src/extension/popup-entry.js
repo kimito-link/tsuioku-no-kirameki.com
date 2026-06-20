@@ -559,6 +559,7 @@ import {
 } from '../lib/devMonitorTrendSession.js';
 import { aggregateMarketingReport } from '../lib/marketingAggregate.js';
 import { analyzeAudienceEngagementGap } from '../lib/audienceEngagementGap.js';
+import { publishReportPreviewThrottled } from '../lib/reportPreviewPublish.js';
 import {
   resolveMarketingSupportParticipationCounts,
   supportParticipationPctAgainstVisitors
@@ -14076,6 +14077,8 @@ async function refresh() {
         displayEntries.length,
         _perfDeferActive
       );
+      // v0.1.858: レポート(DL前)主要KPIを status へ(本体は reportPreviewPublish.js・15秒間引き・純観測)。
+      publishReportPreviewThrottled(lv, { resolveComments: resolveCommentsForHtmlExport, getSnapshot: () => watchMetaCache.snapshot, now: () => Date.now() });
     }
     // v0.1.503 perf: renderCharacterScene→syncStoryGrowth が source signature 一致時は
     //   既に patch 済み／skip 済み。ここで毎ポーリング無条件に O(N) patch を回すと、
