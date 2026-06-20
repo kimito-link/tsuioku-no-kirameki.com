@@ -48,12 +48,12 @@ graph LR
   n_popup --> n_src_lib_broadcastSessionSummaryFlush_js["lib/broadcastSessionSummaryFlush.js"]
   n_popup --> n_src_lib_broadcastUrl_js["lib/broadcastUrl.js"]:::shared
   n_popup --> n_src_lib_broadcastWaveformFingerprint_js["lib/broadcastWaveformFingerprint.js"]
+  n_popup --> n_src_lib_broadcasterCommentCount_js["lib/broadcasterCommentCount.js"]
   n_popup --> n_src_lib_broadcasterExcludedCount_js["lib/broadcasterExcludedCount.js"]
   n_popup --> n_src_lib_broadcasterFollowTarget_js["lib/broadcasterFollowTarget.js"]
   n_popup --> n_src_lib_broadcasterProfileCard_js["lib/broadcasterProfileCard.js"]:::shared
   n_popup --> n_src_lib_buildNorthStarAdRankingStatsHtml_js["lib/buildNorthStarAdRankingStatsHtml.js"]
-  n_popup --> n_src_lib_buildWatchMetaCardAudienceViewModel_js["lib/buildWatchMetaCardAudienceViewModel.js"]
   classDef shared fill:#eee,stroke:#999,color:#666;
 ```
 
-> ほか 242 ファイル省略（全件は storage-bus.md / metafile 参照）。
+> ほか 243 ファイル省略（全件は storage-bus.md / metafile 参照）。
