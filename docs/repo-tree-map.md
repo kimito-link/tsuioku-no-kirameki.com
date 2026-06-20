@@ -118,32 +118,37 @@ graph LR
   f19 --> f19_0["lib/metricConfidence.js"]
   f19 --> f19_1["lib/reportPreview.js"]
   f19 --> f19_2["extension/status-entry.js"]
-  HUB --> f20["状態速報の整形"]
-  f20 --> f20_0["lib/statusFormat.js"]
-  HUB --> f21["記録件数の単調化(減らない表示)"]
-  f21 --> f21_0["lib/monotonicCommentCount.js"]
-  HUB --> f22["storage キー定義"]
-  f22 --> f22_0["lib/storageKeys.js"]
-  HUB --> f23["AI診断の状態速報集約"]
-  f23 --> f23_0["lib/aiSharePopupDiagKey.js"]
-  f23 --> f23_1["extension/status-entry.js"]
-  HUB --> f24["状態速報の全体マインドマップ"]
-  f24 --> f24_0["lib/statusMindmapModel.js"]
+  HUB --> f20["時系列トレンド(スナップショットで見えない劣化検知)"]
+  f20 --> f20_0["lib/statusTrend.js"]
+  f20 --> f20_1["lib/statusTrendKey.js"]
+  f20 --> f20_2["extension/status-entry.js"]
+  f20 --> f20_3["lib/statusActionAdvisor.js"]
+  HUB --> f21["状態速報の整形"]
+  f21 --> f21_0["lib/statusFormat.js"]
+  HUB --> f22["記録件数の単調化(減らない表示)"]
+  f22 --> f22_0["lib/monotonicCommentCount.js"]
+  HUB --> f23["storage キー定義"]
+  f23 --> f23_0["lib/storageKeys.js"]
+  HUB --> f24["AI診断の状態速報集約"]
+  f24 --> f24_0["lib/aiSharePopupDiagKey.js"]
   f24 --> f24_1["extension/status-entry.js"]
-  HUB --> f25["状態速報の対処カード(症状→原因→次の一手)"]
-  f25 --> f25_0["lib/statusActionAdvisor.js"]
+  HUB --> f25["状態速報の全体マインドマップ"]
+  f25 --> f25_0["lib/statusMindmapModel.js"]
   f25 --> f25_1["extension/status-entry.js"]
-  HUB --> f26["サイト健全性検証(リンク切れ防止)"]
-  f26 --> f26_0["lib/siteLinkHealth.js"]
-  f26 --> f26_1["site-health.mjs"]
-  HUB --> f27["影響範囲マップ(変えたら何が壊れるか)"]
-  f27 --> f27_0["feature-map.mjs"]
-  f27 --> f27_1["feature-map/impact-map.md"]
-  HUB --> f28["全体マップ(全地図への入口)"]
-  f28 --> f28_0["MAP.md"]
-  HUB --> f29["影響範囲ゲート(規律を自動化)"]
-  f29 --> f29_0["impact-check.mjs"]
-  f29 --> f29_1["feature-map/impact-map.json"]
+  HUB --> f26["状態速報の対処カード(症状→原因→次の一手)"]
+  f26 --> f26_0["lib/statusActionAdvisor.js"]
+  f26 --> f26_1["extension/status-entry.js"]
+  HUB --> f27["サイト健全性検証(リンク切れ防止)"]
+  f27 --> f27_0["lib/siteLinkHealth.js"]
+  f27 --> f27_1["site-health.mjs"]
+  HUB --> f28["影響範囲マップ(変えたら何が壊れるか)"]
+  f28 --> f28_0["feature-map.mjs"]
+  f28 --> f28_1["feature-map/impact-map.md"]
+  HUB --> f29["全体マップ(全地図への入口)"]
+  f29 --> f29_0["MAP.md"]
+  HUB --> f30["影響範囲ゲート(規律を自動化)"]
+  f30 --> f30_0["impact-check.mjs"]
+  f30 --> f30_1["feature-map/impact-map.json"]
 ```
 
 ---
@@ -188,14 +193,14 @@ graph LR
 - `xserver/`（2 件） — Xserver 向け webhook(git pull デプロイ)スクリプト  〔デプロイ / webhook〕
 
 ## `src/` — LP 側 + 純粋関数ライブラリの源  〔ソース〕
-<sub>ファイル 1120 件</sub>
+<sub>ファイル 1122 件</sub>
 
 - `data/`（6 件） — 保存コメントからレーン候補を読む acquirer / source 層  〔コメント / 取得〕
 - `domain/`（18 件） — ドメイン正本(応援レーンの集約・列ポリシー等。識別子判定など)  〔応援 / 集約 / 識別子〕
 - `extension/`（11 件） — バンドル entry(content/popup/venue/status/offscreen/backfill-sw 等=機能境界)  〔entry / 記録 / 会場 / 応援〕
 - `fixtures/`（1 件） — テスト用フィクスチャ  〔テスト〕
 - `images/`（165 件） — LP / CWS 提出物のマスター画像  〔画像〕
-- `lib/`（910 件） — 純粋関数ライブラリ(unit test 対象)。色・速度・コメント・レポート等の計算ロジックの大半  〔色 / 速度 / コメント / レポート / 純粋関数〕
+- `lib/`（912 件） — 純粋関数ライブラリ(unit test 対象)。色・速度・コメント・レポート等の計算ロジックの大半  〔色 / 速度 / コメント / レポート / 純粋関数〕
 - `shared/`（7 件） — 複数機能で共有する小部品(アバター URL ガード等)  〔共有 / アバター〕
 - `sound/`（1 件） — 音声素材(src 側)  〔音声〕
 
@@ -337,9 +342,17 @@ HTML/マーケ/メディアキットの主要KPI(本文数/コメントした人
 ### 診断の信頼度メーター(数値の意味注釈)  〔診断 / レポート / 表示〕
 各数値に「どういう意味か・どれだけ信頼できるか」の短い注釈を付け、確定値と推定値・正本と過大値の取り違えを防ぐ。コメントした人=匿名主体なら推定寄り(NDGR未受信は更に不確か)・のべ別キー=匿名で過大・沈黙視聴者=推定・取得率=backfill中は暫定。NDGR接続/uid率/backfill状態から機械的に決まるものだけ(推測の信頼度を盛らない)。reportPreview の速報行に統合(v0.1.861)
 
-- `src/lib/metricConfidence.js` ⚠️ **見つからない（消失/リネーム）**
+- [`src/lib/metricConfidence.js`](../src/lib/metricConfidence.js)
 - [`src/lib/reportPreview.js`](../src/lib/reportPreview.js)
 - [`src/extension/status-entry.js`](../src/extension/status-entry.js)
+
+### 時系列トレンド(スナップショットで見えない劣化検知)  〔診断 / 記録 / 集約〕
+status が主要KPI(記録/公式/取得率/来場)を30秒間引きで storage リング(KEY_STATUS_TREND・上限120点≈1時間)に積み、analyzeTrend が「記録が止まっている(公式だけ増える=取りこぼし)」「取得率が単調に下がり続け>=10pt低下」を時間変化で検知。瞬間のスナップショットでは正常に見える劣化を捕まえる診断3層目(信頼度メーター=値の意味/自己矛盾=瞬間の食い違い/トレンド=時間変化)。statusActionAdvisor の対処カードに統合(v0.1.862)
+
+- `src/lib/statusTrend.js` ⚠️ **見つからない（消失/リネーム）**
+- `src/lib/statusTrendKey.js` ⚠️ **見つからない（消失/リネーム）**
+- [`src/extension/status-entry.js`](../src/extension/status-entry.js)
+- [`src/lib/statusActionAdvisor.js`](../src/lib/statusActionAdvisor.js)
 
 ### 状態速報の整形  〔レポート / 診断〕
 記録件数・取得率・バックフィル進捗・レーン状態などの状態テキストを整形

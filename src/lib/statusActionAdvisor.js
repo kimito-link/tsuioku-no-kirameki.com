@@ -28,7 +28,7 @@ function num(v) {
 
 /**
  * 既知パターン辞書から、現在の診断に該当する解決カードを重大度順に返す。
- * @param {{ livesData?: any[], fastDiag?: any, popupDiag?: any, reportPreview?: any }} data
+ * @param {{ livesData?: any[], fastDiag?: any, popupDiag?: any, reportPreview?: any, trendFindings?: any[] }} data
  * @returns {ActionCard[]}
  */
 export function buildStatusActions(data) {
@@ -216,6 +216,24 @@ export function buildStatusActions(data) {
       cause: '同じ配信で互いに一致すべき数字がズレています。どちらかの集計が壊れている/意味が違う可能性があります(診断の自己照合)',
       action: 'この食い違いを開発者(Claude)に状態速報ごと共有してください。集計のどこがズレているかを実コードで特定して直します',
       fixableHere: 'no'
+    });
+  }
+
+  // --- 時系列トレンド(スナップショットでは見えない劣化)。v0.1.862 ---
+  // statusTrend.analyzeTrend が「記録が止まっている/取得率が下がり続けている」を時間変化で検知。
+  //   呼び出し側(status-entry)が findings を作って渡す(純関数 advisor は storage を読まない)。
+  const trendFindings = Array.isArray(data?.trendFindings) ? data.trendFindings : [];
+  for (const f of trendFindings) {
+    if (!f || typeof f !== 'object') continue;
+    add({
+      id: `trend-${f.id || 'x'}`,
+      severity: f.severity === 'bad' ? 'bad' : 'warn',
+      symptom: `時間変化で検知: ${String(f.message || '')}`,
+      cause: '時間の経過でしか分からない劣化です(瞬間のスナップショットでは正常に見えます)',
+      action: String(f.message || '').includes('F5')
+        ? 'メッセージの手順(タブを前面・F5)をお試しください。記録(IndexedDB)は失われません'
+        : 'タブを前面にして数分様子を見てください。続くようなら状態速報ごと開発者に共有してください',
+      fixableHere: 'partly'
     });
   }
 

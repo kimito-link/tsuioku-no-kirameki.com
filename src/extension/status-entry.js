@@ -33,6 +33,8 @@ import {
   KEY_REPORT_PREVIEW,
   isReportPreviewFresh
 } from '../lib/reportPreviewKey.js';
+import { appendTrendSample, analyzeTrend } from '../lib/statusTrend.js';
+import { KEY_STATUS_TREND } from '../lib/statusTrendKey.js';
 import {
   buildOverviewText,
   buildLiveBlockText,
@@ -181,8 +183,15 @@ async function refresh(opts = {}) {
     const voiceDiag = await runStorageOpWithTimeout(() => loadVoiceDiagSafe(), tmo);
     step = 'loadReportPreviewSafe';
     const reportPreview = await runStorageOpWithTimeout(() => loadReportPreviewSafe(), tmo);
+    // v0.1.862: 時系列トレンド。既存サンプルで劣化を判定(分析は今回の新点を積む前=過去の傾向)→
+    //   今回のKPIを積んで書き戻す(throttle は純関数側)。スナップショットでは見えない記録停止/取得率低下を捕まえる。
+    step = 'loadStatusTrend';
+    const trendFindings = await runStorageOpWithTimeout(
+      () => recordAndAnalyzeTrendSafe(lvList, summaries),
+      tmo
+    );
     step = 'renderAll';
-    renderAll({ lvList, summaries, fastDiag, popupDiag, backfillProgress, voiceDiag, reportPreview });
+    renderAll({ lvList, summaries, fastDiag, popupDiag, backfillProgress, voiceDiag, reportPreview, trendFindings });
     updateLastUpdateMeta();
     _statusLastErrorText = '';
   } catch (err) {
@@ -378,6 +387,41 @@ async function loadReportPreviewSafe() {
   }
 }
 
+// v0.1.862: 時系列トレンドの記録+分析。panel_summary から今回の集計KPI(記録/公式/取得率/来場)を作り、
+//   ①既存ログ(新点を積む前=過去の傾向)で劣化を analyzeTrend ②今回のKPIを appendTrendSample で積んで
+//   書き戻す(throttle は純関数側=30秒間引き)。分析を「積む前」にするのは、今回の点を含めると現在の値が
+//   トレンドの端に入って判定が鈍るため(過去の連続点で傾向を見る)。失敗は握る=他の表示を妨げない。
+//   @returns {Promise<import('../lib/statusTrend.js').TrendFinding[]>}
+async function recordAndAnalyzeTrendSafe(lvList, summaries) {
+  try {
+    const lvs = Array.isArray(lvList) ? lvList : [];
+    let recorded = 0;
+    let official = 0;
+    let watch = 0;
+    let hasWatch = false;
+    for (const lv of lvs) {
+      const s = summaries[PANEL_SUMMARY_PREFIX + lv];
+      const snap = summaries[WATCH_SNAPSHOT_PREFIX + lv];
+      recorded += Number(s?.recordedCount) || 0;
+      official += Number(s?.officialCount ?? snap?.officialCommentCount) || 0;
+      const w = Number(snap?.viewerCountFromDom);
+      if (Number.isFinite(w)) { watch += w; hasWatch = true; }
+    }
+    const ratePct = official > 0 ? Math.round((recorded / official) * 100) : null;
+    const kpi = { recorded, official, ratePct, watch: hasWatch ? watch : null };
+
+    const bag = await chrome.storage.local.get(KEY_STATUS_TREND);
+    const prev = bag?.[KEY_STATUS_TREND] || null;
+    const now = Date.now();
+    const findings = analyzeTrend(prev, now); // 過去の傾向(今回の点を積む前)。
+    const next = appendTrendSample(prev, kpi, now); // throttle で間引かれたら null。
+    if (next) await chrome.storage.local.set({ [KEY_STATUS_TREND]: next }).catch(() => {});
+    return findings;
+  } catch {
+    return [];
+  }
+}
+
 /**
  * v0.1.659: 過去ログ取得の診断(stopReason)を読む。「一気に取れない・50%停止」の真因を
  *   ユーザーが status を開くだけで AI に共有できるように、どの配信が何の理由で止まったかを表示。
@@ -422,7 +466,7 @@ function reportPreviewCtxFromFastDiag(fastDiag, backfillProgress) {
   };
 }
 
-function renderAll({ lvList, summaries, fastDiag, popupDiag, backfillProgress, voiceDiag, reportPreview }) {
+function renderAll({ lvList, summaries, fastDiag, popupDiag, backfillProgress, voiceDiag, reportPreview, trendFindings }) {
   // v0.1.847: 各描画セクションを独立 try/catch で隔離するヘルパ。1つが throw しても他のセクションと
   //   最終更新メタを巻き込まない=「セルが全部消える/最終更新—のまま固まる」を根治。落ちた場所は
   //   console と AI 共有欄に出して真因を追えるようにする(star-romi 失敗体験の除去)。
@@ -576,7 +620,7 @@ function renderAll({ lvList, summaries, fastDiag, popupDiag, backfillProgress, v
   });
 
   // 🩹 いま気になる点と対処(症状→原因→次の一手・最上部)
-  safeSection('対処候補', () => renderActionCards({ livesData, fastDiag, popupDiag, reportPreview }));
+  safeSection('対処候補', () => renderActionCards({ livesData, fastDiag, popupDiag, reportPreview, trendFindings }));
 
   // 健全度パネル(ファーストビュー・正常100/異常だけ色・対象外は—)
   safeSection('健全度パネル', () => renderHealthCells({ livesData, fastDiag }));
@@ -587,7 +631,7 @@ function renderAll({ lvList, summaries, fastDiag, popupDiag, backfillProgress, v
   // AI 共有用テキスト
   let fullText = '';
   safeSection('AI共有テキスト', () => {
-    fullText = buildAiShareFullText({ overviewText, livesData, fastDiag, popupDiag, voiceDiag, reportPreview });
+    fullText = buildAiShareFullText({ overviewText, livesData, fastDiag, popupDiag, voiceDiag, reportPreview, trendFindings });
     const ta = /** @type {HTMLTextAreaElement|null} */ (
       document.getElementById('aiShareText')
     );
@@ -889,7 +933,7 @@ function summarizeOneLive(lv, summary, snapshot, perfDiag, endedFlag) {
   };
 }
 
-function buildAiShareFullText({ overviewText, livesData, fastDiag, popupDiag, voiceDiag, reportPreview }) {
+function buildAiShareFullText({ overviewText, livesData, fastDiag, popupDiag, voiceDiag, reportPreview, trendFindings }) {
   const lines = [];
   lines.push('## 君斗りんくの追憶のきらめき 状態速報');
   lines.push(`生成: ${new Date().toISOString()}`);
@@ -928,7 +972,7 @@ function buildAiShareFullText({ overviewText, livesData, fastDiag, popupDiag, vo
   }
   // 検知された対処候補(症状→原因→次の一手)。AI が「何を直すか」を先頭で掴めるように上に置く。
   try {
-    const actions = buildStatusActions({ livesData, fastDiag, popupDiag, reportPreview });
+    const actions = buildStatusActions({ livesData, fastDiag, popupDiag, reportPreview, trendFindings });
     lines.push('### 検知された対処候補(症状→原因→次の一手)');
     if (!actions.length) {
       lines.push('- 既知パターンに該当する問題は検知されませんでした(未知の症状なら下の診断 JSON を参照)。');
