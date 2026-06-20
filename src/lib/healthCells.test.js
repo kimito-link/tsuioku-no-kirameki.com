@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildHealthCells } from './healthCells.js';
+import { buildHealthCells, summarizeHealthVerdict } from './healthCells.js';
 
 const cellById = (cells, id) => cells.find((c) => c.id === id);
 
@@ -170,5 +170,64 @@ describe('buildHealthCells v0.1.845 進行中=processing(青)・見た瞬間ほ�
     expect(cellById(cells, 'capture-rate').level).toBe('processing');
     expect(cellById(cells, 'ndgr-chats').level).toBe('processing');
     expect(cellById(cells, 'ns-gift-hist').level).toBe('processing');
+  });
+});
+
+describe('summarizeHealthVerdict v0.1.846 満点=「異常ゼロ」(進行中/対象外は正常)', () => {
+  it('warn も bad も無ければ「異常なし ✓」(ok)=満点。進行中があれば順調表示', () => {
+    const cells = [
+      { id: 'a', label: 'A', level: 'ok' }, { id: 'b', label: 'B', level: 'processing' },
+      { id: 'c', label: 'C', level: 'na' }
+    ];
+    const v = summarizeHealthVerdict(cells);
+    expect(v.level).toBe('ok');
+    expect(v.text).toContain('異常なし');
+    expect(v.text).toContain('順調に取得中'); // processing があるので添える。
+    expect(v.processingCount).toBe(1);
+  });
+
+  it('全部 ok/na(進行中なし)でも「異常なし ✓」=満点(自動修復不要)', () => {
+    const v = summarizeHealthVerdict([{ id: 'a', label: 'A', level: 'ok' }, { id: 'b', label: 'B', level: 'na' }]);
+    expect(v.level).toBe('ok');
+    expect(v.text).toBe('異常なし ✓');
+  });
+
+  it('warn があれば注意(その項目を列挙)・ok にならない', () => {
+    const v = summarizeHealthVerdict([{ id: 'a', label: '多タブ名残', level: 'warn' }, { id: 'b', label: 'B', level: 'ok' }]);
+    expect(v.level).toBe('warn');
+    expect(v.text).toContain('多タブ名残');
+    expect(v.warnLabels).toEqual(['多タブ名残']);
+  });
+
+  it('bad があれば異常あり(bad を優先・本当の異常は隠さない=self-verifying)', () => {
+    const v = summarizeHealthVerdict([
+      { id: 'a', label: 'NDGR接続', level: 'bad' }, { id: 'b', label: '多タブ名残', level: 'warn' }
+    ]);
+    expect(v.level).toBe('bad');
+    expect(v.text).toContain('NDGR接続');
+    expect(v.badLabels).toEqual(['NDGR接続']);
+  });
+
+  it('実機初動相当(進行中だらけだが異常ゼロ)= 総合判定は満点(緑)', () => {
+    const cells = buildHealthCells({
+      livesData: [{ recordedCount: 116, officialCommentCount: 1555, officialRatePct: 7, lastIngestAgoMs: 1000, paintMs: 40 }],
+      fastDiag: { content: {
+        networkErrorProbe: { ndgrConnectStatus: 'connected', serviceWorkerInactive: false },
+        consoleErrorProbe: { totalCount: 0 },
+        giftDiagnostics: {
+          romiDebug: { backfill: { running: true, done: 0, stopReason: '' }, interceptMapSize: 23 },
+          commentObservability: { savedCommentsUidStats: { totalSaved: 116, withUidPercent: 100 } },
+          ndgrWireCounters: { decoded: 89, chats: 0 }, interceptAvatarSize: 17,
+          '北極星レーン': {
+            '4_番組累計ポイント': { state: 'ok' }, '1_貢献度ランキング': { state: 'ok', apiRows: 2 },
+            '+α_広告ランキング': { state: 'ok', apiRows: 4 }, '2_ギフト履歴': { state: 'iframe_unrendered' },
+            '3_イベント累計スコア': { state: 'no_event' }, '5_イベント現在順位': { state: 'no_event' }
+          }
+        }
+      } }
+    });
+    const v = summarizeHealthVerdict(cells);
+    expect(v.level).toBe('ok'); // 進行中だらけでも異常ゼロ=満点。
+    expect(v.text).toContain('異常なし');
   });
 });

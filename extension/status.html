@@ -409,6 +409,12 @@
       .hc-bad .hc-val { color: #d4495f; }
       .hc-na { opacity: 0.55; }
       .hc-na .hc-val { color: var(--nl-text-soft); font-weight: 400; }
+      /* v0.1.846 総合判定バッジ: 満点=「異常ゼロ」。進行中/対象外は正常扱い=緑。 */
+      .health-verdict { font-size: 14px; font-weight: 700; padding: 7px 12px; border-radius: 8px; margin-bottom: 8px; border: 1px solid var(--nl-border); }
+      .health-verdict:empty { display: none; }
+      .hv-ok { color: #2f9e57; border-color: rgba(47, 125, 74, 0.35); background: rgba(47, 125, 74, 0.06); }
+      .hv-warn { color: #c8861f; border-color: #e0a93f; background: rgba(224, 169, 63, 0.08); }
+      .hv-bad { color: #d4495f; border-color: #d4495f; background: rgba(212, 73, 95, 0.10); }
     </style>
   </head>
   <body>
@@ -427,6 +433,7 @@
     </nav>
 
     <section class="health-panel" id="healthPanel" aria-label="健全度パネル">
+      <div class="health-verdict hv-ok" id="healthVerdict" aria-live="polite"></div>
       <div class="health-cells" id="healthCells"></div>
     </section>
 
