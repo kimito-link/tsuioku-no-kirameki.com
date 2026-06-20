@@ -221,8 +221,8 @@ export function buildLaneStatusLine(lanes) {
       0;
     /** @type {string} */
     let mark;
-    if (state === 'no_event' || state === 'no_program_gift') {
-      continue; // この配信にイベント/ギフトが無い=出なくて正常。ノイズにしない。
+    if (state === 'no_event' || state === 'no_program_gift' || state === 'no_ranking_data') {
+      continue; // この配信にイベント/ギフト/ランキングが無い=出なくて正常。ノイズにしない(v0.1.851)。
     } else if (state === 'iframe_unrendered' || state === 'loading') {
       mark = '⏳取得中';
     } else if (state === 'ok' && n > 0) {
