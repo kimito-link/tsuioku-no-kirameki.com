@@ -577,7 +577,6 @@ import {
   createMonotonicCommentCountState,
   resolveMonotonicCommentCount
 } from '../lib/monotonicCommentCount.js';
-import { createBroadcasterCountState, resolveBroadcasterExcludedCount } from '../lib/broadcasterExcludedCount.js';
 import { buildOwnPostedUserIdSet } from '../lib/ownPostedUserIdSet.js';
 import { appendViewerSelfLaneAggregate } from '../lib/viewerSelfLaneAggregate.js';
 import {
@@ -945,9 +944,6 @@ let _prevSupportCount = /** @type {number|null} */ (null);
 //   4 経路(panel即時 / panel軽量 / 公式統計 / メイン全件)が別タイミングの生値で
 //   setCountDisplay を呼び合うため数値がズレ・前後していた。最大値=正本で収束させる。
 const _monotonicCommentCountState = createMonotonicCommentCountState();
-
-// v0.1.774: 見出しから配信者本人のコメントを除き公式と同基準に(broadcasterExcludedCount.js・テスト済)。
-const _broadcasterCountState = createBroadcasterCountState();
 
 /** @type {number|null} */
 let _prevMilestoneCommentHighWater = null;
@@ -2307,14 +2303,12 @@ function setCountDisplay(value, watchSnapshot = null, breakdown = undefined) {
     else { text = s; }
   }
 
-  // v0.1.774: 見出しから配信者本人のコメント分を差し引き公式と同基準に(純関数=テスト済)。breakdown=null は
-  //   記憶リセット/_broadcasterCount で確定/無ければ記憶流用。込みで固まったゲート max は rebaseGateBy ぶん下げる。
-  const bcBkd = breakdown === null ? null : (breakdown && typeof (/** @type {any} */ (breakdown)._broadcasterCount) === 'number' ? /** @type {any} */ (breakdown)._broadcasterCount : undefined);
-  const bcRes = resolveBroadcasterExcludedCount(_broadcasterCountState, watchPopupLastPaintedLiveId, recordedNum, bcBkd);
-  if (bcRes.rebaseGateBy > 0 && _monotonicCommentCountState.lv === String(watchPopupLastPaintedLiveId ?? '').trim().toLowerCase() && _monotonicCommentCountState.max > 0) {
-    _monotonicCommentCountState.max = Math.max(0, _monotonicCommentCountState.max - bcRes.rebaseGateBy);
-  }
-  if (recordedNum != null && bcRes.displayCount != null) { recordedNum = bcRes.displayCount; text = recordedNum.toLocaleString('ja-JP'); }
+  // v0.1.842(B・council/count-simplify-SYNTHESIS.md 第3): 見出しの記録件数から配信者ぶんを【引かない】。
+  //   旧 v0.1.774 は「公式と同基準に」と引き算していたが、引き算ゲートが脆く(0潰し v0.1.838 の温床)、
+  //   かつ公式 commentCount は配信者コメントを含むため、引くと逆に記録が公式より小さくズレていた
+  //   (実機 記録3,630 < 公式3,653)。引かず素直に「記録した全件」を出すと記録 ≒ 公式に一致する。
+  //   配信者ぶんは見出しから引かず、内訳 sub 行に「うち配信者 M」と並記する(下記 breakdown 経路)。
+  //   _broadcasterCount は内訳表示にのみ使う。引き算(resolveBroadcasterExcludedCount)は廃止。
 
   // v0.1.645: 数値表示は同一 lv 内で単調増加に固定(数値ズレ根治)。4経路の別ソース別タイミングの
   //   生値を「これまで表示した最大」に収束。文言は gate=null で素通し・lv 切替は gate 内でリセット。
@@ -2352,10 +2346,11 @@ function setCountDisplay(value, watchSnapshot = null, breakdown = undefined) {
     const oc = watchSnapshot?.officialCommentCount;
     if (typeof oc === 'number' && Number.isFinite(oc) && oc >= 0) {
       officialEl.hidden = false;
-      // v0.1.684: breakdown.normal(通常コメント)優先で公式と比較（配信者コメ除外で正確）。
-      const normalCount = breakdown && typeof breakdown.normal === 'number' ? breakdown.normal : null;
-      const recorded = normalCount != null ? normalCount
-        : (recordedNum != null && Number.isFinite(recordedNum) ? recordedNum : parseInt(String(text).replace(/[,，]/g, ''), 10));
+      // v0.1.842(B): 公式 commentCount は配信者コメントを含むので、見出しと同じ【記録した全件】で比較する
+      //   (旧 v0.1.684 は breakdown.normal=配信者除外で比較していたが、引き算をやめた今は全件が同基準)。
+      const recorded = (recordedNum != null && Number.isFinite(recordedNum))
+        ? recordedNum
+        : parseInt(String(text).replace(/[,，]/g, ''), 10);
       let line = `公式 ${oc.toLocaleString('ja-JP')} 件`;
       if (!Number.isNaN(recorded) && recorded >= 0 && oc > 0) {
         if (recorded > oc) {
@@ -2370,7 +2365,7 @@ function setCountDisplay(value, watchSnapshot = null, breakdown = undefined) {
       }
       officialEl.textContent = line;
       officialEl.title =
-        'この「公式」は視聴用WebSocket等の statistics メッセージ（comments / commentCount）の累計です。プレイヤー付近に出るコメント数とは別経路のため一致しないことがあります。比較の基準はこちらです。同じタブで見続け、NDGR（ページ内インターセプト）が効いているときは記録が近づきやすいです。途中入室・仮想リスト・記録OFF・非表示タブ・サイト改修・ストレージ上限でも差が出ます。';
+        'この「公式」は視聴用WebSocket等の statistics メッセージ（commentCount）の累計です。記録の数字は配信者ぶんも含めた「記録した全件」で、公式と同じ基準なのでほぼ一致します（配信者ぶんは内訳に「うち配信者」で示します）。同じタブで見続け、NDGR（ページ内インターセプト）が効いていれば記録は公式に近づきます。途中入室・記録OFF・非表示タブ・サイト改修・ストレージ上限のときだけ差が出ることがあります。';
     } else {
       officialEl.hidden = true;
       officialEl.textContent = '';
