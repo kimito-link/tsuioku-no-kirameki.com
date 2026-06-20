@@ -409,6 +409,16 @@
       .hc-bad .hc-val { color: #d4495f; }
       .hc-na { opacity: 0.55; }
       .hc-na .hc-val { color: var(--nl-text-soft); font-weight: 400; }
+      /* v0.1.856 ファーストビューの「原因が全部わかる共有」大ボタン(一番目立つ位置)。 */
+      .share-hero { margin: 0 0 14px; }
+      .share-hero-btn {
+        width: 100%; padding: 14px 16px; font-size: 16px; font-weight: 700;
+        color: #fff; background: #2f7dbf; border: 1px solid #2f7dbf;
+        border-radius: 10px; cursor: pointer; line-height: 1.4;
+      }
+      .share-hero-btn:hover { background: #2566a0; }
+      .share-hero-btn:active { transform: scale(0.99); }
+      .share-hero-note { margin: 6px 2px 0; font-size: 12px; color: var(--nl-text-soft); line-height: 1.5; }
       /* v0.1.846 総合判定バッジ: 満点=「異常ゼロ」。進行中/対象外は正常扱い=緑。 */
       .health-verdict { font-size: 14px; font-weight: 700; padding: 7px 12px; border-radius: 8px; margin-bottom: 8px; border: 1px solid var(--nl-border); }
       .health-verdict:empty { display: none; }
@@ -431,6 +441,13 @@
       <a class="nav-item" href="https://htmlpreview.github.io/?https://raw.githubusercontent.com/kimito-link/tsuioku-no-kirameki.com/master/docs/repo-tree-map.html" target="_blank" rel="noopener">🧭 逆引き索引</a>
       <span class="nav-item nav-here" aria-current="page">📊 状態（ここ）</span>
     </nav>
+
+    <section class="share-hero" aria-label="不具合を共有">
+      <button id="btnShareAll" type="button" class="share-hero-btn">
+        🔎 これを共有すれば原因が全部わかる（コピー）
+      </button>
+      <p class="share-hero-note">うまく動かない時はこのボタンを押して、出てきた内容を貼ってください。今の状態(記録・取得・レーン・描画・popup診断)を1枚にまとめます。</p>
+    </section>
 
     <section class="health-panel" id="healthPanel" aria-label="健全度パネル">
       <div class="health-verdict hv-ok" id="healthVerdict" aria-live="polite"></div>
