@@ -1,0 +1,170 @@
+/**
+ * healthCells.js — status ファーストビューの「健全度セル」を作る純関数(v0.1.843)。
+ *
+ * 背景(council/health-panel-SYNTHESIS.md): ユーザー要望「ファーストビューに20個ぐらいのセル・
+ * 正常を100%・おかしいのは90/88と数値で一目で分かるように」。既存 statusMindmapModel/statusActionAdvisor が
+ * 計算する値を【%+色】に再表示するだけ(新規集計ゼロ・hot path を重くしない)。
+ *
+ * 重要(星野ロミ式・失敗体験の除去): 不明/該当データ無しは 0%=赤にしない=【na('—')】にして色もスコアも
+ * 付けない。正常配信で赤だらけにならないように。数値が意味を持つセルだけ pct、状態セルは state(色+短文)。
+ *
+ * 入力は status-entry が既に持つ { livesData, fastDiag }(buildStatusActions と同じ契約)。副作用なし。
+ * 各セル= { id, label, kind:'pct'|'state', value:number|null, level:'ok'|'warn'|'bad'|'na', text?:string }。
+ */
+
+/** @typedef {{ id:string, label:string, kind:'pct'|'state', value:number|null, level:'ok'|'warn'|'bad'|'na', text?:string }} HealthCell */
+
+/** @param {unknown} x @returns {number|null} */
+function num(x) {
+  const n = Number(x);
+  return Number.isFinite(n) ? n : null;
+}
+
+/**
+ * % セル: value(0-100) と 80/40 閾値で level。value=null は na('—')。
+ * @param {string} id @param {string} label @param {number|null} value
+ * @param {{ okAt?:number, warnAt?:number }} [opts]
+ * @returns {HealthCell}
+ */
+function pctCell(id, label, value, opts = {}) {
+  const okAt = opts.okAt ?? 80;
+  const warnAt = opts.warnAt ?? 40;
+  if (value == null) return { id, label, kind: 'pct', value: null, level: 'na', text: '—' };
+  const v = Math.max(0, Math.min(100, Math.round(value)));
+  const level = v >= okAt ? 'ok' : v >= warnAt ? 'warn' : 'bad';
+  return { id, label, kind: 'pct', value: v, level };
+}
+
+/**
+ * 状態セル: level と短文。
+ * @param {string} id @param {string} label @param {'ok'|'warn'|'bad'|'na'} level @param {string} [text]
+ * @returns {HealthCell}
+ */
+function stateCell(id, label, level, text) {
+  return { id, label, kind: 'state', value: null, level: level || 'na', text: text || (level === 'na' ? '—' : '') };
+}
+
+/**
+ * 北極星レーンの state → セル level。no_event/該当無しは na(赤にしない)。
+ * @param {unknown} state
+ * @returns {{ level:'ok'|'warn'|'bad'|'na', text:string }}
+ */
+function northStarLevel(state) {
+  const s = String(state || '');
+  if (s === 'ok') return { level: 'ok', text: 'OK' };
+  if (s === 'iframe_unrendered') return { level: 'warn', text: '取得中' };
+  if (s === 'fetch_error') return { level: 'bad', text: '取得エラー' };
+  if (s === 'event_present_unscrapable') return { level: 'warn', text: 'イベント有(読取不可)' };
+  if (s === 'no_event' || s === 'no_program_gift' || s === '' || s === 'missing') {
+    return { level: 'na', text: '—' }; // その配信に該当が無いだけ=赤にしない。
+  }
+  return { level: 'warn', text: s };
+}
+
+/**
+ * 健全度セル配列を作る。
+ * @param {{ livesData?: any[], fastDiag?: any }} data
+ * @returns {HealthCell[]}
+ */
+export function buildHealthCells(data) {
+  const livesData = Array.isArray(data?.livesData) ? data.livesData : [];
+  const fast = data?.fastDiag?.content && typeof data.fastDiag.content === 'object' ? data.fastDiag.content : null;
+  const gift = fast?.giftDiagnostics && typeof fast.giftDiagnostics === 'object' ? fast.giftDiagnostics : null;
+  const obs = gift?.commentObservability || {};
+  /** @type {HealthCell[]} */
+  const cells = [];
+
+  // 1. 取得率(記録/公式・累計)。公式0件は na。
+  const recordedSum = livesData.reduce((a, lv) => a + (num(lv?.recordedCount) || 0), 0);
+  const officialSum = livesData.reduce((a, lv) => a + (num(lv?.officialCommentCount) || 0), 0);
+  cells.push(pctCell('capture-rate', '取得率', officialSum > 0 ? (recordedSum / officialSum) * 100 : null));
+
+  // 2. userId 付き保存率。保存0は na。
+  const uid = obs.savedCommentsUidStats || {};
+  const totalSaved = num(uid.totalSaved);
+  cells.push(pctCell('uid-rate', 'userId付き保存', totalSaved && totalSaved > 0 ? num(uid.withUidPercent) : null, { okAt: 90, warnAt: 50 }));
+
+  // 3. NDGR接続。unknown(未受信)は na(障害でない)。
+  const ndgr = String(fast?.networkErrorProbe?.ndgrConnectStatus || '');
+  cells.push(stateCell('ndgr', 'NDGR接続',
+    ndgr === 'connected' ? 'ok' : ndgr === 'disconnected' ? 'bad' : 'na',
+    ndgr === 'connected' ? '接続中' : ndgr === 'disconnected' ? '切断' : '—'));
+
+  // 4. リアルタイム取り込み(最終取り込み)。取り込み無し配信は na。
+  const agos = livesData.map((lv) => num(lv?.lastIngestAgoMs)).filter((x) => x != null);
+  const minAgo = agos.length ? Math.min(...agos) : null;
+  cells.push(stateCell('ingest', 'リアルタイム取込',
+    minAgo == null ? 'na' : minAgo < 120000 ? 'ok' : minAgo < 300000 ? 'warn' : 'bad',
+    minAgo == null ? '—' : `${Math.round(minAgo / 1000)}秒前`));
+
+  // 5. 過去ログ(backfill)。
+  const bf = gift?.romiDebug?.backfill || data?.fastDiag?.content?.romiDebug?.backfill || null;
+  if (bf) {
+    const done = Number(bf.done) === 1 || bf.stopReason === 'reached_start' || bf.stopReason === 'backward_exhausted';
+    const stalled = bf.stopReason === 'stalled';
+    cells.push(stateCell('backfill', '過去ログ取得',
+      done ? 'ok' : stalled ? 'bad' : bf.running ? 'warn' : 'na',
+      done ? '完了' : stalled ? '失速' : bf.running ? '取得中' : '—'));
+  } else {
+    cells.push(stateCell('backfill', '過去ログ取得', 'na', '—'));
+  }
+
+  // 6. アバター解決率。観測0(intercept0)は na。
+  const avMap = num(gift?.interceptAvatarSize ?? gift?.avatarUidDiag?.avatarMapSize);
+  const interceptN = num(gift?.romiDebug?.interceptMapSize ?? gift?.avatarUidDiag?.interceptedUsersTotal);
+  cells.push(pctCell('avatar', 'アバター解決',
+    interceptN && interceptN > 0 && avMap != null ? Math.min(100, (avMap / interceptN) * 100) : null));
+
+  // 7. 描画(paint)。%でなく色+短文(恣意的%を作らない)。裏タブ等で値無しは na。
+  const paint = num(livesData.map((lv) => num(lv?.paintMs)).filter((x) => x != null)[0]);
+  cells.push(stateCell('paint', '描画',
+    paint == null ? 'na' : paint < 60 ? 'ok' : paint < 150 ? 'warn' : 'bad',
+    paint == null ? '—' : `${paint}ms`));
+
+  // 8. 多タブ名残(stale)。警告だが赤にしない=warn まで(実害なし・v0.1.834)。
+  const stale = !!gift?.multiTabDiag?.staleDomBundleSuspected;
+  cells.push(stateCell('stale', '多タブ名残', stale ? 'warn' : 'ok', stale ? '履歴あり' : 'なし'));
+
+  // 9-14. 北極星6レーン。
+  const ns = gift?.['北極星レーン'] || {};
+  const NS = [
+    ['ns-contrib', '貢献度ランキング', '1_貢献度ランキング'],
+    ['ns-ad', '広告ランキング', '+α_広告ランキング'],
+    ['ns-gift-hist', 'ギフト履歴', '2_ギフト履歴'],
+    ['ns-escore', 'イベントスコア', '3_イベント累計スコア'],
+    ['ns-prog-pt', '番組累計pt', '4_番組累計ポイント'],
+    ['ns-erank', 'イベント順位', '5_イベント現在順位']
+  ];
+  for (const [id, label, key] of NS) {
+    const lane = ns[key];
+    if (!lane) { cells.push(stateCell(id, label, 'na', '—')); continue; }
+    const { level, text } = northStarLevel(lane.state);
+    cells.push(stateCell(id, label, level, text));
+  }
+
+  // 15. コンソールエラー。
+  const errTotal = num(fast?.consoleErrorProbe?.totalCount);
+  cells.push(stateCell('console', 'エラー',
+    errTotal == null ? 'na' : errTotal === 0 ? 'ok' : 'bad',
+    errTotal == null ? '—' : errTotal === 0 ? '0件' : `${errTotal}件`));
+
+  // 16. storage安定(SW/stall)。
+  const swInactive = fast?.networkErrorProbe?.serviceWorkerInactive;
+  cells.push(stateCell('storage', 'storage安定',
+    swInactive == null ? 'na' : swInactive ? 'bad' : 'ok',
+    swInactive == null ? '—' : swInactive ? 'SW停止' : '正常'));
+
+  // 17. NDGR取りこぼし(decoded>0 なのに chats=0=匿名主体 or 取得前。比率でなく状態)。
+  const wc = gift?.ndgrWireCounters || {};
+  const decoded = num(wc.decoded);
+  const chats = num(wc.chats);
+  cells.push(stateCell('ndgr-chats', 'NDGRコメント',
+    decoded == null ? 'na' : (chats && chats > 0) ? 'ok' : (decoded > 0 ? 'warn' : 'na'),
+    decoded == null ? '—' : (chats && chats > 0) ? `${chats}件` : (decoded > 0 ? '0(匿名/取得前)' : '—')));
+
+  // 18. 記録↔公式一致(B後・per-live の率の最小=一番ズレてる配信)。公式0は na。
+  const rates = livesData.map((lv) => num(lv?.officialRatePct)).filter((x) => x != null);
+  cells.push(pctCell('match', '記録↔公式一致', rates.length ? Math.min(...rates) : null, { okAt: 90, warnAt: 60 }));
+
+  return cells;
+}
