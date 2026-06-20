@@ -246,13 +246,13 @@ function buildPipelineHealthBranch(fast) {
       badge: maxMs < 100 ? 'ok' : maxMs < 250 ? 'warn' : 'bad'
     });
   }
-  // 多タブ汚染の注意
+  // 多タブ DOM の名残(実害なし・誤解を生まない文言に・v0.1.834)
   const md = fast.giftDiagnostics?.multiTabDiag;
   if (md && md.staleDomBundleSuspected) {
     node.children.push({
-      label: '多タブ DOM 混入',
-      value: `他配信 DOM ${num(md.eventDomLvCount) ?? '?'} 件混入の疑い(記録に影響なし)`,
-      badge: 'warn'
+      label: '過去タブの履歴あり',
+      value: `過去に開いた配信 ${num(md.eventDomLvCount) ?? '?'} 件の履歴が残存(記録・表示に影響なし・数時間で自動消去)`,
+      badge: 'info'
     });
   }
   return node;

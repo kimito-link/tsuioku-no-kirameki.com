@@ -148,22 +148,34 @@ describe('deriveStaleDomBundleSuspected', () => {
     ).toBe(false);
   });
 
-  it('eventDomLvCount > 30 → true（過去残骸大量）', () => {
+  it('eventDomLvCount > 60 → true（prune が効かない異常膨張）', () => {
     expect(
       deriveStaleDomBundleSuspected({
         hasSnapshot: true,
-        eventDomLvCount: 46,
+        eventDomLvCount: 61,
         currentLiveIdInEventDom: true,
         currentLiveIdInNicoad: true
       })
     ).toBe(true);
   });
 
-  it('eventDomLvCount = 30（境界） → false', () => {
+  it('eventDomLvCount = 31（LRU上限30直後）→ false（誤検知防止・v0.1.834）', () => {
+    // 旧 `>30` では 31 で誤警告が立っていた(実機)。LRU 上限と結合を解いたので false。
     expect(
       deriveStaleDomBundleSuspected({
         hasSnapshot: true,
-        eventDomLvCount: 30,
+        eventDomLvCount: 31,
+        currentLiveIdInEventDom: true,
+        currentLiveIdInNicoad: true
+      })
+    ).toBe(false);
+  });
+
+  it('eventDomLvCount = 60（境界） → false', () => {
+    expect(
+      deriveStaleDomBundleSuspected({
+        hasSnapshot: true,
+        eventDomLvCount: 60,
         currentLiveIdInEventDom: true,
         currentLiveIdInNicoad: true
       })
@@ -181,22 +193,22 @@ describe('deriveStaleDomBundleSuspected', () => {
     ).toBe(true);
   });
 
-  it('currentLiveIdInNicoad=false かつ eventCount>5 → true', () => {
+  it('currentLiveIdInNicoad=false かつ eventCount>10 → true', () => {
     expect(
       deriveStaleDomBundleSuspected({
         hasSnapshot: true,
-        eventDomLvCount: 6,
+        eventDomLvCount: 11,
         currentLiveIdInEventDom: true,
         currentLiveIdInNicoad: false
       })
     ).toBe(true);
   });
 
-  it('currentLiveIdInNicoad=false かつ eventCount<=5 → false', () => {
+  it('currentLiveIdInNicoad=false かつ eventCount<=10 → false', () => {
     expect(
       deriveStaleDomBundleSuspected({
         hasSnapshot: true,
-        eventDomLvCount: 5,
+        eventDomLvCount: 10,
         currentLiveIdInEventDom: true,
         currentLiveIdInNicoad: false
       })
