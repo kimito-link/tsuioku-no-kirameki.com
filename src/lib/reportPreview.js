@@ -21,6 +21,8 @@
  * }} ReportPreview
  */
 
+import { withConfidence } from './metricConfidence.js';
+
 /**
  * @param {(...args: any[]) => any} aggregateMarketingReport DI: marketingAggregate.aggregateMarketingReport
  * @param {(...args: any[]) => any} analyzeAudienceEngagementGap DI: audienceEngagementGap.analyzeAudienceEngagementGap
@@ -107,9 +109,10 @@ export function extractReportPreviewInputs(snapshot) {
  * プレビューを status 速報の1行(複数行)に整形する純関数。保存せずに中身が分かる。
  * 値がほぼ空(コメント0)なら ''(まだ何も無い=ノイズにしない)。
  * @param {ReportPreview|null|undefined} p
+ * @param {import('./metricConfidence.js').MetricContext} [ctx] 信頼度注釈の文脈(NDGR接続/匿名率など・任意)
  * @returns {string}
  */
-export function buildReportPreviewLines(p) {
+export function buildReportPreviewLines(p, ctx = {}) {
   if (!p || typeof p !== 'object') return '';
   const total = Number(p.totalComments) || 0;
   if (total <= 0) return '';
@@ -119,10 +122,11 @@ export function buildReportPreviewLines(p) {
   //   同じ正本=gap の commenters(識別可能な実人数・匿名 a:hash 含む)を使う。marketing の uniqueUsers は
   //   userId 空コメントを `anon:commentNo` で1件ずつ別人カウントするため過大=正本にしない(二枚舌を出さない)。
   //   commenters が未取得(popup 未起動等)の時だけ uniqueUsers を「のべ別キー」と明示してフォールバック。
+  // v0.1.861: 数値に信頼度注釈を添える(匿名主体=推定寄り 等)=見る人が確定値と推定を取り違えない。
   if (p.commenters > 0) {
-    parts.push(`コメントした人 ${p.commenters.toLocaleString('ja-JP')}人`);
+    parts.push(`コメントした人 ${withConfidence(`${p.commenters.toLocaleString('ja-JP')}人`, 'commenters', ctx)}`);
   } else if (p.uniqueUsers > 0) {
-    parts.push(`のべ別キー ${p.uniqueUsers.toLocaleString('ja-JP')}(匿名は過大)`);
+    parts.push(`${withConfidence(p.uniqueUsers.toLocaleString('ja-JP'), 'uniqueUsers', ctx)}`);
   }
   if (p.commentsPerMinute > 0) parts.push(`分速 ${p.commentsPerMinute}`);
   if (p.heavyPct > 0) parts.push(`ヘビー ${p.heavyPct}%`);
@@ -131,7 +135,9 @@ export function buildReportPreviewLines(p) {
   // 来場と応援参加(audienceGap)は値があるときだけ2行目に。コメントした人は上で出したので来場/沈黙のみ。
   if (p.visitors > 0) {
     const g = [`来場 ${p.visitors.toLocaleString('ja-JP')}`];
-    if (p.silentEstimate > 0) g.push(`沈黙視聴者(推定) ${p.silentEstimate.toLocaleString('ja-JP')}`);
+    if (p.silentEstimate > 0) {
+      g.push(`沈黙視聴者 ${withConfidence(p.silentEstimate.toLocaleString('ja-JP'), 'silentEstimate', ctx)}`);
+    }
     return `${head}\n  来場と応援参加: ${g.join(' / ')}`;
   }
   return head;

@@ -1088,6 +1088,18 @@
       ]
     },
     {
+      "file": "src/lib/metricConfidence.js",
+      "featureCount": 2,
+      "features": [
+        "popup",
+        "status"
+      ],
+      "labels": [
+        "ポップアップ(応援レーン)",
+        "状態速報ページ"
+      ]
+    },
+    {
       "file": "src/lib/monotonicCommentCount.js",
       "featureCount": 2,
       "features": [

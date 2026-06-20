@@ -406,6 +406,22 @@ async function loadBackfillProgressSafe() {
  * レンダリング
  * ========================================================================== */
 
+// v0.1.861: レポートプレビューの信頼度注釈(匿名主体=推定寄り 等)の文脈を fastDiag から作る。
+//   NDGR 接続/userId 付き率/backfill 進行を渡すと metricConfidence が「コメントした人」等に注釈を付け、
+//   見る人が確定値と推定を取り違えない。文脈不明(fastDiag 無し)は注釈なしに倒れる(煽らない)。
+function reportPreviewCtxFromFastDiag(fastDiag, backfillProgress) {
+  const c = fastDiag?.content;
+  const obs = c?.giftDiagnostics?.commentObservability;
+  const uidPct = obs?.savedCommentsUidStats?.withUidPercent;
+  const ndgr = String(c?.networkErrorProbe?.ndgrConnectStatus || '');
+  return {
+    // 'connected'=true / 'disconnected'=false / 'unknown'等=undefined(不明は煽らない)
+    ndgrConnected: ndgr === 'connected' ? true : ndgr === 'disconnected' ? false : undefined,
+    withUidPercent: typeof uidPct === 'number' ? uidPct : null,
+    backfillRunning: !!(backfillProgress && backfillProgress.done === 0 && backfillProgress.stopReason === '')
+  };
+}
+
 function renderAll({ lvList, summaries, fastDiag, popupDiag, backfillProgress, voiceDiag, reportPreview }) {
   // v0.1.847: 各描画セクションを独立 try/catch で隔離するヘルパ。1つが throw しても他のセクションと
   //   最終更新メタを巻き込まない=「セルが全部消える/最終更新—のまま固まる」を根治。落ちた場所は
@@ -501,7 +517,7 @@ function renderAll({ lvList, summaries, fastDiag, popupDiag, backfillProgress, v
   //   いる配信だけ取れる(popup が15秒ごとに publish)。保存しなくても中身が分かる=過小集計を即発見。
   let reportPreviewLine = '';
   safeSection('レポート内容プレビュー', () => {
-    const rStr = buildReportPreviewLines(reportPreview);
+    const rStr = buildReportPreviewLines(reportPreview, reportPreviewCtxFromFastDiag(fastDiag, backfillProgress));
     reportPreviewLine = rStr ? `\n${rStr}` : '';
   });
   const overviewEl = document.getElementById('overviewBody');
@@ -900,9 +916,10 @@ function buildAiShareFullText({ overviewText, livesData, fastDiag, popupDiag, vo
     } catch {
       /* no-op */
     }
-    // v0.1.858: レポート(DL前)の主要KPI(本文N/ユニーク/来場と応援参加…)。保存せず中身を共有できる。
+    // v0.1.858: レポート(DL前)の主要KPI(本文N/コメントした人/来場と応援参加…)。保存せず中身を共有できる。
+    // v0.1.861: 信頼度注釈の文脈を fastDiag から作って渡す(匿名主体=推定寄り 等)。
     try {
-      const rStr = buildReportPreviewLines(reportPreview);
+      const rStr = buildReportPreviewLines(reportPreview, reportPreviewCtxFromFastDiag(fastDiag));
       if (rStr) lines.push(rStr);
     } catch {
       /* no-op */
