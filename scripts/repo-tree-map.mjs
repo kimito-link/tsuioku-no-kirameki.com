@@ -154,6 +154,59 @@ const FEATURE_CATEGORY = {
 /** 大分類の表示順(データの流れ順 + 横断)。 */
 const CATEGORY_ORDER = ['📤 送信', '📥 取得', '💾 記録', '🧮 集計', '🪟 表示・演出', '🔊 読み上げ', '📊 レポート', '🩺 診断・地図', 'その他'];
 
+/**
+ * 各分類を、りんく・こん太・たぬ姉が知識のない人にも分かるよう噛み砕いて解説する(公式LP の口調)。
+ * マインドマップ/サイトマップで分類ノードに添える。{ link, konta, tanu } の3キャラ一言ずつ。
+ * @type {Record<string, { link: string, konta: string, tanu: string }>}
+ */
+const CATEGORY_CHARA_NOTE = {
+  '📤 送信': {
+    link: 'コメントを配信に送る係なのだ。',
+    konta: 'ちゃんと送れたか確かめてるのだ。',
+    tanu: '送った人の手元メモも残すのだ。'
+  },
+  '📥 取得': {
+    link: 'コメントを集めてくる入り口なのだ。',
+    konta: '今のコメントも、過去のコメントも拾うのだ。',
+    tanu: '同じものは1回だけにする掃除もここなのだ。'
+  },
+  '💾 記録': {
+    link: '集めたコメントを安全にしまう係なのだ。',
+    konta: '数えた件数が減って見えないように守るのだ。',
+    tanu: 'しまう場所(キー)の名前もここで決めるのだ。'
+  },
+  '🧮 集計': {
+    link: 'バラバラのコメントを「人ごと」にまとめるのだ。',
+    konta: '誰が応援してくれたか分かるようにするのだ。',
+    tanu: '応援レーンの素になる大事な計算なのだ。'
+  },
+  '🪟 表示・演出': {
+    link: '画面に見えるものは、ほぼここなのだ。',
+    konta: '会場の席・群衆・吹き出し・ギフトの演出なのだ。',
+    tanu: '応援アイコンの丸い顔もここで描くのだ。'
+  },
+  '🔊 読み上げ': {
+    link: 'コメントを声で読み上げる係なのだ。',
+    konta: '順番待ちや年齢のチェックもするのだ。',
+    tanu: '読みすぎないよう上限も決めてるのだ。'
+  },
+  '📊 レポート': {
+    link: '配信のまとめを1枚の絵にする係なのだ。',
+    konta: '順位やタイムラインを見やすくするのだ。',
+    tanu: '後で振り返るときに役立つのだ。'
+  },
+  '🩺 診断・地図': {
+    link: '今このページ(状態)を作ってる係なのだ。',
+    konta: '困りごとを「症状→原因→次の一手」で出すのだ。',
+    tanu: 'このマップたちも、ここが作ってるのだ。'
+  },
+  'その他': {
+    link: 'まだ分類していない機能なのだ。',
+    konta: '見つけたら分類してあげるのだ。',
+    tanu: 'FEATURE_CATEGORY に1行足すだけなのだ。'
+  }
+};
+
 /** ツリーから除外するトップレベル(ドット系・生成物・巨大画像ディレクトリ等) */
 const SKIP_TOP = new Set(['.git', '.github', '.husky', '.cursor', '.takt', 'node_modules', 'build', '.artifacts']);
 
@@ -894,26 +947,42 @@ function groupFeaturesByCategory() {
   return CATEGORY_ORDER.filter((c) => byCat.has(c)).map((cat) => ({ cat, features: byCat.get(cat) }));
 }
 
+/** 分類ごとの枝の色(MindMeister 風の色分け)。CATEGORY_ORDER と対応。 */
+const CATEGORY_COLOR = {
+  '📤 送信': '#e0794a', '📥 取得': '#4a8de0', '💾 記録': '#9b6fe0',
+  '🧮 集計': '#3fae8e', '🪟 表示・演出': '#e05a8d', '🔊 読み上げ': '#d6a73a',
+  '📊 レポート': '#5aa7e8', '🩺 診断・地図': '#6fae5a', 'その他': '#7b8390'
+};
+
 /**
- * 機能サイトマップ HTML(添付イメージ型・トップ→分類→機能カード)。依存ゼロ。
+ * 機能マインドマップ HTML(MindMeister 風・中心→分類枝→機能・色分け・キャラ解説)。依存ゼロ。
+ * 横方向のツリー: 左に中心ノード、右へ分類が枝分かれ。各分類に色とりんく/こん太/たぬ姉の解説。
  * @param {string[]} files 実在検証用(消えた担当ファイルを赤く)
  */
 function renderFeatureSitemapHtml(files) {
   const trackedSet = new Set(files);
   const groups = groupFeaturesByCategory();
-  const colCards = groups.map(({ cat, features }) => {
-    const featCards = features.map((f) => {
+  const branches = groups.map(({ cat, features }) => {
+    const color = CATEGORY_COLOR[cat] || '#7b8390';
+    const note = CATEGORY_CHARA_NOTE[cat];
+    const charaRows = note
+      ? `<div class="mm-chara">`
+        + `<div class="mm-c"><img src="../extension/images/yukkuri-charactore-english/link/link-yukkuri-smile-mouth-open.thumb128.png" alt="りんく" loading="lazy"><span>${escapeHtml(note.link)}</span></div>`
+        + `<div class="mm-c"><img src="../extension/images/yukkuri-charactore-english/konta/kitsune-yukkuri-smile-mouth-open.thumb128.png" alt="こん太" loading="lazy"><span>${escapeHtml(note.konta)}</span></div>`
+        + `<div class="mm-c"><img src="../extension/images/yukkuri-charactore-english/tanunee/tanuki-yukkuri-smile-mouth-open.thumb128.png" alt="たぬ姉" loading="lazy"><span>${escapeHtml(note.tanu)}</span></div>`
+        + `</div>`
+      : '';
+    const leaves = features.map((f) => {
       const paths = (f.paths || []).map((p) => {
         const ok = trackedSet.has(p) || existsSync(join(ROOT, p));
-        return ok
-          ? `<code class="fs-path">${escapeHtml(p)}</code>`
-          : `<code class="fs-path dead">${escapeHtml(p)} ⚠️</code>`;
+        return ok ? `<code class="mm-path">${escapeHtml(p)}</code>` : `<code class="mm-path dead">${escapeHtml(p)} ⚠️</code>`;
       }).join('');
-      return `<div class="fs-feat"><div class="fs-fname">${escapeHtml(f.feature)}</div>`
-        + `<div class="fs-fdesc">${escapeHtml(f.desc)}</div>`
-        + `<div class="fs-paths">${paths}</div></div>`;
+      return `<div class="mm-leaf"><div class="mm-fname">${escapeHtml(f.feature)}</div>`
+        + `<div class="mm-fdesc">${escapeHtml(f.desc)}</div><div class="mm-paths">${paths}</div></div>`;
     }).join('');
-    return `<section class="fs-col"><div class="fs-cat">${escapeHtml(cat)}</div>${featCards}</section>`;
+    return `<details class="mm-branch" open style="--branch:${color}">`
+      + `<summary><span class="mm-cat">${escapeHtml(cat)}</span><span class="mm-cnt">${features.length}</span></summary>`
+      + `${charaRows}<div class="mm-leaves">${leaves}</div></details>`;
   }).join('');
 
   return `<!DOCTYPE html>
@@ -921,55 +990,78 @@ function renderFeatureSitemapHtml(files) {
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>機能サイトマップ — 君斗りんくの追憶のきらめき</title>
+<title>機能マインドマップ — 君斗りんくの追憶のきらめき</title>
 <style>
   :root{ --bg:#0f1115; --panel:#161922; --ink:#e6e8ec; --sub:#aab0bb; --muted:#7b8390; --line:#2a2f3a;
-    --ok:#2f7d4a; --warn:#b5485f; --tag-bg:#1d2740; --tag-bd:#3f5b8c; --tag-ink:#bcd2f6; --accent:#4a8de0; }
+    --warn:#b5485f; --accent:#ec4899; }
   body{ margin:0; padding:28px 20px; background:var(--bg); color:var(--ink);
     font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Hiragino Sans","Yu Gothic UI",sans-serif; }
   .wrap{ max-width:1180px; margin:0 auto; }
   h1{ font-size:21px; margin:0 0 4px; }
   .meta{ color:var(--muted); font-size:12px; margin:0 0 18px; line-height:1.6; }
   .meta a{ color:#7fa8e0; }
-  .fs-top{ display:flex; justify-content:center; margin:0 0 6px; }
-  .fs-top span{ background:var(--accent); color:#fff; font-weight:700; font-size:15px;
-    padding:9px 22px; border-radius:999px; }
-  .fs-stem{ width:2px; height:18px; background:var(--line); margin:0 auto; }
-  .fs-cols{ display:grid; grid-template-columns:repeat(auto-fill,minmax(280px,1fr)); gap:14px;
-    border-top:2px solid var(--line); padding-top:18px; }
-  .fs-col{ background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:12px 14px; }
-  .fs-cat{ font-size:15px; font-weight:700; color:#fff; padding-bottom:8px; margin-bottom:10px;
-    border-bottom:2px solid var(--tag-bd); }
-  .fs-feat{ background:rgba(255,255,255,.03); border:1px solid var(--line); border-left:3px solid var(--accent);
-    border-radius:8px; padding:8px 11px; margin:0 0 8px; }
-  .fs-fname{ font-size:13.5px; font-weight:700; color:#ffe3b8; }
-  .fs-fdesc{ font-size:12px; color:var(--sub); margin:4px 0 6px; line-height:1.55; }
-  .fs-paths{ display:flex; gap:5px; flex-wrap:wrap; }
-  .fs-path{ font-family:"Menlo","Consolas",monospace; font-size:10.5px; background:rgba(255,255,255,.06);
+  .mm{ display:flex; align-items:flex-start; gap:0; }
+  .mm-center{ flex:0 0 auto; align-self:center; background:linear-gradient(135deg,#ec4899,#6366f1);
+    color:#fff; font-weight:700; font-size:15px; padding:14px 18px; border-radius:16px;
+    box-shadow:0 4px 16px rgba(0,0,0,.4); text-align:center; line-height:1.5; }
+  .mm-trunk{ flex:0 0 28px; align-self:stretch; border-left:2px solid var(--line); margin-left:14px; }
+  .mm-branches{ flex:1 1 auto; display:grid; gap:12px; }
+  details.mm-branch{ background:var(--panel); border:1px solid var(--line); border-left:5px solid var(--branch);
+    border-radius:12px; padding:8px 14px; }
+  details.mm-branch > summary{ cursor:pointer; display:flex; align-items:center; gap:10px; list-style:none;
+    font-size:16px; font-weight:700; color:#fff; padding:4px 0; }
+  details.mm-branch > summary::-webkit-details-marker{ display:none; }
+  details.mm-branch > summary::before{ content:"▸"; color:var(--branch); font-size:14px; }
+  details.mm-branch[open] > summary::before{ content:"▾"; }
+  .mm-cat{ color:var(--branch); }
+  .mm-cnt{ font-size:11px; color:var(--muted); font-weight:400; }
+  .mm-chara{ display:flex; gap:8px; flex-wrap:wrap; margin:6px 0 10px; }
+  .mm-c{ display:flex; align-items:center; gap:6px; background:rgba(255,255,255,.04);
+    border:1px solid var(--line); border-radius:999px; padding:3px 10px 3px 3px; }
+  .mm-c img{ width:30px; height:30px; object-fit:contain; }
+  .mm-c span{ font-size:11px; color:var(--sub); line-height:1.4; }
+  .mm-leaves{ display:grid; grid-template-columns:repeat(auto-fill,minmax(240px,1fr)); gap:8px; }
+  .mm-leaf{ background:rgba(255,255,255,.03); border:1px solid var(--line);
+    border-left:3px solid var(--branch); border-radius:8px; padding:8px 11px; }
+  .mm-fname{ font-size:13px; font-weight:700; color:#ffe3b8; }
+  .mm-fdesc{ font-size:11.5px; color:var(--sub); margin:4px 0 6px; line-height:1.55; }
+  .mm-paths{ display:flex; gap:5px; flex-wrap:wrap; }
+  .mm-path{ font-family:"Menlo","Consolas",monospace; font-size:10.5px; background:rgba(255,255,255,.06);
     border:1px solid var(--line); border-radius:5px; padding:1px 6px; color:#bcd2f6; }
-  .fs-path.dead{ color:#f6c7d2; border-color:var(--warn); background:rgba(181,72,95,.12); }
+  .mm-path.dead{ color:#f6c7d2; border-color:var(--warn); background:rgba(181,72,95,.12); }
+  .ctrl{ margin:0 0 14px; display:flex; gap:8px; }
+  .ctrl button{ background:rgba(255,255,255,.06); border:1px solid var(--line); color:var(--ink);
+    border-radius:8px; padding:5px 12px; font-size:12px; cursor:pointer; }
   .legend{ margin-top:20px; font-size:12.5px; color:var(--sub); background:var(--panel);
     border:1px solid var(--line); border-radius:12px; padding:14px 18px; line-height:1.9; }
   .legend b{ color:var(--ink); }
+  @media (max-width:640px){ .mm{ flex-direction:column; } .mm-center{ align-self:stretch; margin-bottom:10px; }
+    .mm-trunk{ display:none; } }
 </style>
 </head>
 <body>
 <div class="wrap">
-  <h1>🗺️ 機能サイトマップ(何が・何をして・どのファイルか)</h1>
+  <h1>🧠 機能マインドマップ(りんく・こん太・たぬ姉の解説つき)</h1>
   <p class="meta">
-    アプリの全機能を「分類 → 機能 → 役割 → 担当ファイル」で1枚に。AI も人間も、どの機能がどこにあるか一目で。
-    <code>scripts/repo-tree-map.mjs</code> の <code>FEATURES</code>/<code>FEATURE_CATEGORY</code> から自動生成(手編集しない・no CDN)。<br>
+    アプリ全体から「分類 → 機能 → 役割 → 担当ファイル」へ枝分かれ。分類ごとに色分けし、りんく・こん太・たぬ姉が
+    やさしく解説します。<code>scripts/repo-tree-map.mjs</code> から自動生成(手編集しない・no CDN)。<br>
     全地図の入口: <a href="MAP.md">MAP.md</a> ／ 全ファイル: <a href="code-tree.html">code-tree.html</a> ／
     逆引き索引: <a href="repo-tree-map.html">repo-tree-map.html</a> ／ AI用テキスト: <a href="feature-sitemap.md">feature-sitemap.md</a>。
   </p>
-  <div class="fs-top"><span>君斗りんく(アプリ全体)</span></div>
-  <div class="fs-stem"></div>
-  <div class="fs-cols">${colCards}</div>
+  <div class="ctrl">
+    <button onclick="document.querySelectorAll('details.mm-branch').forEach(d=>d.open=true)">全部ひらく</button>
+    <button onclick="document.querySelectorAll('details.mm-branch').forEach(d=>d.open=false)">全部とじる</button>
+  </div>
+  <div class="mm">
+    <div class="mm-center">🌟<br>君斗りんく<br><span style="font-size:11px;font-weight:400;">アプリ全体</span></div>
+    <div class="mm-trunk"></div>
+    <div class="mm-branches">${branches}</div>
+  </div>
   <div class="legend">
-    <b>読み方</b>: 上=アプリ全体。下の各列=機能の<b>分類</b>(取得→記録→集計→表示・演出→読み上げ→レポート→診断)。
-    列の中のカード=1つの<b>機能</b>(太字=機能名・その下=何をするか・最下段=担当ファイル)。<br>
-    <b style="color:#f6c7d2">赤いファイル</b>=消えた/リネームされた担当(<code>FEATURES</code> 更新が必要)。
-    新機能を足したら <code>FEATURES</code> と <code>FEATURE_CATEGORY</code> に1行。<code>npm run tree-map -- --check</code> が腐りを検知。
+    <b>読み方</b>: 左=アプリ全体(中心)。右へ枝分かれするのが<b>分類</b>(色ごと)。分類を開くと、3キャラの解説と、
+    その分類の<b>機能</b>(太字=機能名・その下=何をするか・最下段=担当ファイル)が出ます。<br>
+    <b style="color:#f6c7d2">赤いファイル</b>=消えた/リネームされた担当。新機能は <code>FEATURES</code> /
+    <code>FEATURE_CATEGORY</code> に1行。<code>npm run tree-map -- --check</code> が腐りを検知。
   </div>
 </div>
 </body>
@@ -989,6 +1081,13 @@ function renderFeatureSitemapMd(files) {
   for (const { cat, features } of groupFeaturesByCategory()) {
     lines.push(`## ${cat}`);
     lines.push('');
+    const note = CATEGORY_CHARA_NOTE[cat];
+    if (note) {
+      lines.push(`> 🦊りんく: ${note.link}`);
+      lines.push(`> 🦊こん太: ${note.konta}`);
+      lines.push(`> 🦝たぬ姉: ${note.tanu}`);
+      lines.push('');
+    }
     for (const f of features) {
       lines.push(`- **${f.feature}** — ${f.desc}`);
       for (const p of (f.paths || [])) {
