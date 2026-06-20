@@ -560,7 +560,7 @@ function renderAll({ lvList, summaries, fastDiag, popupDiag, backfillProgress, v
   });
 
   // 🩹 いま気になる点と対処(症状→原因→次の一手・最上部)
-  safeSection('対処候補', () => renderActionCards({ livesData, fastDiag, popupDiag }));
+  safeSection('対処候補', () => renderActionCards({ livesData, fastDiag, popupDiag, reportPreview }));
 
   // 健全度パネル(ファーストビュー・正常100/異常だけ色・対象外は—)
   safeSection('健全度パネル', () => renderHealthCells({ livesData, fastDiag }));
@@ -911,7 +911,7 @@ function buildAiShareFullText({ overviewText, livesData, fastDiag, popupDiag, vo
   }
   // 検知された対処候補(症状→原因→次の一手)。AI が「何を直すか」を先頭で掴めるように上に置く。
   try {
-    const actions = buildStatusActions({ livesData, fastDiag, popupDiag });
+    const actions = buildStatusActions({ livesData, fastDiag, popupDiag, reportPreview });
     lines.push('### 検知された対処候補(症状→原因→次の一手)');
     if (!actions.length) {
       lines.push('- 既知パターンに該当する問題は検知されませんでした(未知の症状なら下の診断 JSON を参照)。');

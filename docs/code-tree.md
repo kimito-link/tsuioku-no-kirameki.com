@@ -27,7 +27,8 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-✅ 全 512 ソースに役割コメントあり。
+## ⚠️ 役割コメントが無いソース 1 / 515 件
+- `src/lib/reportPreviewPublish.js`
 
 ## 全ファイルツリー
 
@@ -252,7 +253,7 @@
   - `vendor-visual-explainer.mjs` — Vendors nicobailon/visual-explainer (MIT) into .cursor/skills/visual-explainer/
   - `verify-bump.mjs` — extension bump 後の整合性チェッカー
   - `write-extension-placeholder-icons.mjs` — リポジトリに 256px アイコンしか無い環境向け: manifest 用の小さめ PNG を生成する。
-- 📁 **src/** (1112)
+- 📁 **src/** (1118)
   - 📁 **data/** (6)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -510,7 +511,7 @@
         - `logo_funlink_white_RGB_maru_black.png`
       - `logo_guide_funlink_ol.pdf`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (902)
+  - 📁 **lib/** (908)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -1180,6 +1181,12 @@
     - `reportHeadInfoRowsHtml.test.js`
     - `reportNextMemoSectionHtml.js` — v0.1.811(星野ロミ式コンポーネント化・第4弾): popup-entry.js の buildHtmlReportDocument 内
     - `reportNextMemoSectionHtml.test.js`
+    - `reportPreview.js` — HTML/マーケ/メディアキットレポートで「ダウンロードして初めて見られる」主要集計を、
+    - `reportPreview.test.js`
+    - `reportPreviewKey.js` — レポート中身プレビュー(保存前の主要KPI)の storage キー正本。
+    - `reportPreviewKey.test.js`
+    - `reportPreviewPublish.js` — ⚠️ 役割コメント無し
+    - `reportPreviewPublish.test.js`
     - `reportSelfPostedRowsHtml.js` — v0.1.634: HTML レポートの「自分のコメント抜粋」テーブル行ビルダ（純ロジック）。
     - `reportSelfPostedRowsHtml.test.js`
     - `reportSilentError.js` — 内部エラーを静かに記録する純ロジック(context invalidated 等の判定・メッセージ正規化)。

@@ -108,34 +108,38 @@ graph LR
   HUB --> f17["レポート内容プレビュー(DL前のリアルタイム可視化)"]
   f17 --> f17_0["lib/reportPreview.js"]
   f17 --> f17_1["lib/reportPreviewKey.js"]
-  f17 --> f17_2["extension/popup-entry.js"]
-  f17 --> f17_3["extension/status-entry.js"]
-  HUB --> f18["状態速報の整形"]
-  f18 --> f18_0["lib/statusFormat.js"]
-  HUB --> f19["記録件数の単調化(減らない表示)"]
-  f19 --> f19_0["lib/monotonicCommentCount.js"]
-  HUB --> f20["storage キー定義"]
-  f20 --> f20_0["lib/storageKeys.js"]
-  HUB --> f21["AI診断の状態速報集約"]
-  f21 --> f21_0["lib/aiSharePopupDiagKey.js"]
-  f21 --> f21_1["extension/status-entry.js"]
-  HUB --> f22["状態速報の全体マインドマップ"]
-  f22 --> f22_0["lib/statusMindmapModel.js"]
+  f17 --> f17_2["lib/reportPreviewPublish.js"]
+  f17 --> f17_3["extension/popup-entry.js"]
+  f17 --> f17_4["extension/status-entry.js"]
+  HUB --> f18["数字の自己矛盾の自動検知(self-verifying)"]
+  f18 --> f18_0["lib/numberConsistency.js"]
+  f18 --> f18_1["lib/statusActionAdvisor.js"]
+  HUB --> f19["状態速報の整形"]
+  f19 --> f19_0["lib/statusFormat.js"]
+  HUB --> f20["記録件数の単調化(減らない表示)"]
+  f20 --> f20_0["lib/monotonicCommentCount.js"]
+  HUB --> f21["storage キー定義"]
+  f21 --> f21_0["lib/storageKeys.js"]
+  HUB --> f22["AI診断の状態速報集約"]
+  f22 --> f22_0["lib/aiSharePopupDiagKey.js"]
   f22 --> f22_1["extension/status-entry.js"]
-  HUB --> f23["状態速報の対処カード(症状→原因→次の一手)"]
-  f23 --> f23_0["lib/statusActionAdvisor.js"]
+  HUB --> f23["状態速報の全体マインドマップ"]
+  f23 --> f23_0["lib/statusMindmapModel.js"]
   f23 --> f23_1["extension/status-entry.js"]
-  HUB --> f24["サイト健全性検証(リンク切れ防止)"]
-  f24 --> f24_0["lib/siteLinkHealth.js"]
-  f24 --> f24_1["site-health.mjs"]
-  HUB --> f25["影響範囲マップ(変えたら何が壊れるか)"]
-  f25 --> f25_0["feature-map.mjs"]
-  f25 --> f25_1["feature-map/impact-map.md"]
-  HUB --> f26["全体マップ(全地図への入口)"]
-  f26 --> f26_0["MAP.md"]
-  HUB --> f27["影響範囲ゲート(規律を自動化)"]
-  f27 --> f27_0["impact-check.mjs"]
-  f27 --> f27_1["feature-map/impact-map.json"]
+  HUB --> f24["状態速報の対処カード(症状→原因→次の一手)"]
+  f24 --> f24_0["lib/statusActionAdvisor.js"]
+  f24 --> f24_1["extension/status-entry.js"]
+  HUB --> f25["サイト健全性検証(リンク切れ防止)"]
+  f25 --> f25_0["lib/siteLinkHealth.js"]
+  f25 --> f25_1["site-health.mjs"]
+  HUB --> f26["影響範囲マップ(変えたら何が壊れるか)"]
+  f26 --> f26_0["feature-map.mjs"]
+  f26 --> f26_1["feature-map/impact-map.md"]
+  HUB --> f27["全体マップ(全地図への入口)"]
+  f27 --> f27_0["MAP.md"]
+  HUB --> f28["影響範囲ゲート(規律を自動化)"]
+  f28 --> f28_0["impact-check.mjs"]
+  f28 --> f28_1["feature-map/impact-map.json"]
 ```
 
 ---
@@ -180,14 +184,14 @@ graph LR
 - `xserver/`（2 件） — Xserver 向け webhook(git pull デプロイ)スクリプト  〔デプロイ / webhook〕
 
 ## `src/` — LP 側 + 純粋関数ライブラリの源  〔ソース〕
-<sub>ファイル 1112 件</sub>
+<sub>ファイル 1118 件</sub>
 
 - `data/`（6 件） — 保存コメントからレーン候補を読む acquirer / source 層  〔コメント / 取得〕
 - `domain/`（18 件） — ドメイン正本(応援レーンの集約・列ポリシー等。識別子判定など)  〔応援 / 集約 / 識別子〕
 - `extension/`（11 件） — バンドル entry(content/popup/venue/status/offscreen/backfill-sw 等=機能境界)  〔entry / 記録 / 会場 / 応援〕
 - `fixtures/`（1 件） — テスト用フィクスチャ  〔テスト〕
 - `images/`（165 件） — LP / CWS 提出物のマスター画像  〔画像〕
-- `lib/`（902 件） — 純粋関数ライブラリ(unit test 対象)。色・速度・コメント・レポート等の計算ロジックの大半  〔色 / 速度 / コメント / レポート / 純粋関数〕
+- `lib/`（908 件） — 純粋関数ライブラリ(unit test 対象)。色・速度・コメント・レポート等の計算ロジックの大半  〔色 / 速度 / コメント / レポート / 純粋関数〕
 - `shared/`（7 件） — 複数機能で共有する小部品(アバター URL ガード等)  〔共有 / アバター〕
 - `sound/`（1 件） — 音声素材(src 側)  〔音声〕
 
@@ -312,12 +316,19 @@ HTML/メディアキットレポートは storage の全件(IDB→チャンク�
 - [`src/extension/popup-entry.js`](../src/extension/popup-entry.js)
 
 ### レポート内容プレビュー(DL前のリアルタイム可視化)  〔レポート / 診断 / 集約〕
-HTML/マーケ/メディアキットの主要KPI(本文数/ユニーク/分速/ヘビー・一度きり%/来場と応援参加/沈黙視聴者推定)をレポートが使う純関数(aggregateMarketingReport/analyzeAudienceEngagementGap)で集計し、保存せず status 速報へ。popup が KEY_REPORT_PREVIEW へ15秒間引き publish→status が読む(voiceDiag と同じ storage ブリッジ)。過小集計を保存前に発見できる純観測(v0.1.858)
+HTML/マーケ/メディアキットの主要KPI(本文数/コメントした人=gap正本/分速/ヘビー・一度きり%/来場/沈黙視聴者推定)をレポートが使う純関数(aggregateMarketingReport/analyzeAudienceEngagementGap)で集計し、保存せず status 速報へ。popup が KEY_REPORT_PREVIEW へ15秒間引き publish→status が読む(voiceDiag と同じ storage ブリッジ)。過小集計を保存前に発見できる純観測(v0.1.858)。「コメントした人」はレポート本体と同じ gap.uniqueCommenters を正本に統一(v0.1.859・marketing の uniqueUsers は匿名で過大なので表示しない)
 
-- `src/lib/reportPreview.js` ⚠️ **見つからない（消失/リネーム）**
-- `src/lib/reportPreviewKey.js` ⚠️ **見つからない（消失/リネーム）**
+- [`src/lib/reportPreview.js`](../src/lib/reportPreview.js)
+- [`src/lib/reportPreviewKey.js`](../src/lib/reportPreviewKey.js)
+- [`src/lib/reportPreviewPublish.js`](../src/lib/reportPreviewPublish.js)
 - [`src/extension/popup-entry.js`](../src/extension/popup-entry.js)
 - [`src/extension/status-entry.js`](../src/extension/status-entry.js)
+
+### 数字の自己矛盾の自動検知(self-verifying)  〔診断 / レポート / 記録〕
+状態速報が自分の出した数字どうしを照合し、論理的に不可能/桁違いの食い違いを⚠に出す。コメントした人>来場・のべ別キー>本文数・レポート本文が記録総数の半分未満(過小集計の疑い)・記録が公式を大きく上回る(別配信混入/二重計上の疑い)。人が目で照合しなくても診断が自動で気づく(v0.1.859・statusActionAdvisor の対処カードに統合)
+
+- `src/lib/numberConsistency.js` ⚠️ **見つからない（消失/リネーム）**
+- [`src/lib/statusActionAdvisor.js`](../src/lib/statusActionAdvisor.js)
 
 ### 状態速報の整形  〔レポート / 診断〕
 記録件数・取得率・バックフィル進捗・レーン状態などの状態テキストを整形

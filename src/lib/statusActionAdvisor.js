@@ -17,6 +17,8 @@
  * }} ActionCard
  */
 
+import { detectNumberInconsistencies } from './numberConsistency.js';
+
 const SEV_RANK = { bad: 0, warn: 1, info: 2 };
 
 function num(v) {
@@ -26,7 +28,7 @@ function num(v) {
 
 /**
  * 既知パターン辞書から、現在の診断に該当する解決カードを重大度順に返す。
- * @param {{ livesData?: any[], fastDiag?: any, popupDiag?: any }} data
+ * @param {{ livesData?: any[], fastDiag?: any, popupDiag?: any, reportPreview?: any }} data
  * @returns {ActionCard[]}
  */
 export function buildStatusActions(data) {
@@ -200,6 +202,20 @@ export function buildStatusActions(data) {
       cause: '記録にも表示にも影響しません。今見ている配信のデータだけを使うので、過去タブの履歴が残っていても表示は混ざりません（古い履歴は数時間で自動的に消えます）',
       action: '気になる場合だけ、使っていないニコ生タブを閉じてください（閉じなくても問題ありません）',
       fixableHere: 'partly'
+    });
+  }
+
+  // --- 数字の自己矛盾(診断が自分の出した数字どうしを照合)。v0.1.859 ---
+  // 「同じ配信なのにユニーク127 vs コメントした人26」「本文188 vs 記録194」のような食い違いを、
+  //   人が目で照合しなくても診断が自動で⚠に出す(self-verifying loop の核)。論理的に不可能/桁違いだけ。
+  for (const f of detectNumberInconsistencies(data)) {
+    add({
+      id: `consistency-${f.id}`,
+      severity: f.severity,
+      symptom: `数字の食い違いを検知: ${f.message}`,
+      cause: '同じ配信で互いに一致すべき数字がズレています。どちらかの集計が壊れている/意味が違う可能性があります(診断の自己照合)',
+      action: 'この食い違いを開発者(Claude)に状態速報ごと共有してください。集計のどこがズレているかを実コードで特定して直します',
+      fixableHere: 'no'
     });
   }
 

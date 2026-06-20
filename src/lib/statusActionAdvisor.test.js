@@ -211,4 +211,23 @@ describe('buildStatusActions', () => {
     const hits = findHarmWordsInInfoCards(cards);
     expect(hits, `info カードに実害語: ${JSON.stringify(hits)}`).toEqual([]);
   });
+
+  it('数字の自己矛盾(コメントした人>来場)を対処カードに出す(v0.1.859)', () => {
+    const cards = buildStatusActions({
+      reportPreview: { totalComments: 100, commenters: 900, visitors: 800 }
+    });
+    const card = cards.find((c) => c.id === 'consistency-commenters-gt-visitors');
+    expect(card).toBeTruthy();
+    expect(card.severity).toBe('bad');
+    expect(card.symptom).toContain('数字の食い違いを検知');
+    expect(card.symptom).toContain('コメントした人');
+  });
+
+  it('数字が整合していれば consistency カードは出さない', () => {
+    const cards = buildStatusActions({
+      livesData: [{ liveId: 'lv1', recordedCount: 194, officialCommentCount: 193 }],
+      reportPreview: { totalComments: 188, uniqueUsers: 127, commenters: 26, visitors: 811 }
+    });
+    expect(cards.find((c) => c.id?.startsWith('consistency-'))).toBeUndefined();
+  });
 });
