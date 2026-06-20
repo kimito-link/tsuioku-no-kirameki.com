@@ -192,3 +192,30 @@ export function buildHealthCells(data) {
 
   return cells;
 }
+
+/**
+ * v0.1.846: 健全度パネル先頭の「総合判定」バッジ。ユーザー要望「全部100%になるまで自動修復=
+ *   修復する必要ないぐらい完全に」への回答=【満点の定義を『全セル緑』でなく『異常ゼロ』に置き換える】。
+ *   進行中(processing=待てば埋まる)・対象外/構造的限界(na=匿名や該当無しで100%不可能)は
+ *   「正常」とみなし、本当の異常(warn/bad)だけを数える。異常ゼロなら「異常なし ✓」=満点。
+ *   これにより自動修復ループは不要(直せるものは既に青で進行中・直せないものは正常扱い)で、
+ *   嘘もつかない(取れてないのに緑にしない)。star-romi: 失敗体験の除去 × self-verifying。
+ *
+ * @param {HealthCell[]} cells
+ * @returns {{ level:'ok'|'warn'|'bad', text:string, badLabels:string[], warnLabels:string[], processingCount:number }}
+ */
+export function summarizeHealthVerdict(cells) {
+  const list = Array.isArray(cells) ? cells : [];
+  const badLabels = list.filter((c) => c && c.level === 'bad').map((c) => c.label);
+  const warnLabels = list.filter((c) => c && c.level === 'warn').map((c) => c.label);
+  const processingCount = list.filter((c) => c && c.level === 'processing').length;
+  if (badLabels.length > 0) {
+    return { level: 'bad', text: `異常あり: ${badLabels.join('・')}`, badLabels, warnLabels, processingCount };
+  }
+  if (warnLabels.length > 0) {
+    return { level: 'warn', text: `注意: ${warnLabels.join('・')}`, badLabels, warnLabels, processingCount };
+  }
+  // 異常ゼロ=満点。進行中があれば「順調に取得中」を添える(待てば埋まる=正常)。
+  const text = processingCount > 0 ? '異常なし ✓(順調に取得中)' : '異常なし ✓';
+  return { level: 'ok', text, badLabels, warnLabels, processingCount };
+}

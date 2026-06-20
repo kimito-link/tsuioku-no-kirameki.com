@@ -25,7 +25,7 @@ import { KEY_AI_SHARE_FAST_DIAG } from '../lib/aiShareFastDiagKey.js';
 import { KEY_AI_SHARE_POPUP_DIAG } from '../lib/aiSharePopupDiagKey.js';
 import { buildStatusMindmapModel } from '../lib/statusMindmapModel.js';
 import { buildStatusActions } from '../lib/statusActionAdvisor.js';
-import { buildHealthCells } from '../lib/healthCells.js';
+import { buildHealthCells, summarizeHealthVerdict } from '../lib/healthCells.js';
 import {
   buildOverviewText,
   buildLiveBlockText,
@@ -489,6 +489,17 @@ function renderHealthCells(data) {
   const host = document.getElementById('healthCells');
   if (!host) return;
   const cells = buildHealthCells(data);
+  // v0.1.846: 先頭に総合判定バッジ。満点=「全部緑」でなく「異常ゼロ」(進行中/対象外は正常)。
+  const verdictHost = document.getElementById('healthVerdict');
+  if (verdictHost) {
+    const v = summarizeHealthVerdict(cells);
+    verdictHost.replaceChildren();
+    verdictHost.className = `health-verdict hv-${v.level}`;
+    const mark = v.level === 'ok' ? '🟢' : v.level === 'warn' ? '🟡' : '🔴';
+    const span = document.createElement('span');
+    span.textContent = `${mark} 総合判定: ${v.text}`;
+    verdictHost.appendChild(span);
+  }
   host.replaceChildren();
   for (const c of cells) {
     const div = document.createElement('div');
@@ -744,6 +755,15 @@ function buildAiShareFullText({ overviewText, livesData, fastDiag, popupDiag }) 
   if (overviewText) {
     lines.push('### 概要');
     lines.push(overviewText);
+    // v0.1.846: 総合判定を概要に1行併記。満点=「異常ゼロ」(進行中/対象外は正常扱い)。
+    //   ユーザー要望「全部100%になるまで=修復いらないぐらい完全に」への回答=異常が無ければ満点。
+    try {
+      const verdict = summarizeHealthVerdict(buildHealthCells({ livesData, fastDiag }));
+      const vmark = verdict.level === 'ok' ? '🟢' : verdict.level === 'warn' ? '🟡' : '🔴';
+      lines.push(`総合判定: ${vmark} ${verdict.text}`);
+    } catch {
+      /* no-op: 判定失敗は概要を壊さない */
+    }
     // v0.1.766: 概要に公式値レーン(北極星レーン)の状況も併記(視聴中の配信のみ)。
     const laneStr = buildLaneStatusLine(fastDiag?.content?.giftDiagnostics?.['北極星レーン']);
     if (laneStr) lines.push(laneStr);
