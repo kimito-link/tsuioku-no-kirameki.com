@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.837',
+    date: '2026-06-20',
+    summary: 'ギフト送信者の文字化け表示を抑止',
+    items: Object.freeze([
+      'ギフトを贈った人の一部が、診断情報の中で文字化けした内部用の文字列（「__anon_」に意味不明な記号が続くもの）として出ることがあった問題を直しました。名前として読めない文字化けデータ（制御文字などが混じった生データ）は、人の名前のまとまりとして扱わないようにしました。すでにギフトの記録側では同じ対策が入っていたので、送信者の集計側にもそろえた形です。記録・コメント取得・会場表示には影響しません。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.836',
     date: '2026-06-20',
     summary: '匿名コメントの記録を救済(第1歩)',

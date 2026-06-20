@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-✅ 全 502 ソースに役割コメントあり。
+✅ 全 503 ソースに役割コメントあり。
 
 ## 全ファイルツリー
 
@@ -252,7 +252,7 @@
   - `vendor-visual-explainer.mjs` — Vendors nicobailon/visual-explainer (MIT) into .cursor/skills/visual-explainer/
   - `verify-bump.mjs` — extension bump 後の整合性チェッカー
   - `write-extension-placeholder-icons.mjs` — リポジトリに 256px アイコンしか無い環境向け: manifest 用の小さめ PNG を生成する。
-- 📁 **src/** (1093)
+- 📁 **src/** (1095)
   - 📁 **data/** (6)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -510,7 +510,7 @@
         - `logo_funlink_white_RGB_maru_black.png`
       - `logo_guide_funlink_ol.pdf`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (883)
+  - 📁 **lib/** (885)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -992,6 +992,8 @@
     - `ndgrChatRows.test.js`
     - `ndgrDecode.js` — NDGR (のどぐろ) Protobuf 軽量デコーダー
     - `ndgrDecode.test.js`
+    - `ndgrFlushDedupKey.js` — NDGR フラッシュ時の重複排除キーを作る純関数(v0.1.836)。
+    - `ndgrFlushDedupKey.test.js`
     - `ndgrForwardCrawl.js` — v0.1.511: NDGR コメントの「前方向（forward）継続取得」巡回エンジン（純ロジック）。
     - `ndgrForwardCrawl.test.js`
     - `ndgrMessageDedupe.js` — v0.1.238: NDGR Message ID dedupe
