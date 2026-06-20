@@ -49,6 +49,9 @@ export default [
         NL_BUILD_ID: 'readonly',
         // esbuild --define で注入する dev フラグ（本番 false / dev watch true）。
         NL_DEV_HOTRELOAD: 'readonly',
+        // esbuild --define で注入する release フラグ（NL_RELEASE=1 ビルドで true）。
+        //   true のとき status の生診断JSON/全文共有ボタン/AI共有欄を隠す(v0.1.857)。
+        NL_RELEASE: 'readonly',
         // status の「スマホへ送信」用に esbuild --define で注入するアップロード設定
         //（.env から。未設定時は空文字 → ボタン無効）。
         NL_STATUS_INGEST_KEY: 'readonly',

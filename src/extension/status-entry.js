@@ -1325,6 +1325,34 @@ function setupButtons() {
       }
     });
   }
+  hideDevDiagnosticsIfRelease();
+}
+
+// v0.1.857: 配布(release)ビルドでは「生診断JSON/全文共有ボタン/AI共有欄」を隠す。
+//   これらは自分の viewerUserId・配信URL を含む開発用エクスポートなので本番ユーザーには出さない
+//   (ユーザー方針「そもそも開発用なので release時は出さない」)。健全度パネル・総合判定・対処カードは
+//   ID を漏らさずユーザーに有用なので残す。NL_RELEASE は esbuild define(NL_DEV_HOTRELOAD と同方式)。
+function hideDevDiagnosticsIfRelease() {
+  const isRelease = typeof NL_RELEASE !== 'undefined' && NL_RELEASE === true;
+  if (!isRelease) return;
+  // 共有エクスポート系(ID/URL を含む生データ)だけ隠す。健全度パネルは残す。
+  const devOnlyIds = [
+    'aiShareLane',   // 🤖 AI に貼る用テキスト(全文・生JSON含む)+まるごとコピー
+    'btnShareAll',   // 🔎 これを共有すれば原因が全部わかる(全文コピー)
+    'btnCopy',       // クリップボードへコピー(全文)
+    'btnSelectAll',  // 全部選択(全文)
+    'btnDownload'    // JSON ダウンロード(生診断)
+  ];
+  for (const id of devOnlyIds) {
+    const el = document.getElementById(id);
+    if (el) {
+      el.hidden = true;
+      el.style.display = 'none';
+    }
+  }
+  // share-hero セクション(説明文ごと)も隠す。
+  const hero = document.querySelector('.share-hero');
+  if (hero instanceof HTMLElement) { hero.hidden = true; hero.style.display = 'none'; }
 }
 
 /* ============================================================================
