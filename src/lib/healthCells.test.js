@@ -115,14 +115,33 @@ describe('buildHealthCells v0.1.845 進行中=processing(青)・見た瞬間ほ�
       .not.toContain('bad');
   });
 
-  it('backfill 失速(stalled)は processing にせず bad のまま(詰まりを隠さない=self-verifying)', () => {
+  it('backfill 失速(stalled)は『過去ログ取得』セルが bad で示す(詰まりを隠さない=self-verifying)', () => {
+    // v0.1.850: 失速の赤は専用の『過去ログ取得』セルで示す。放送中の配信の率は statusFormat 同様
+    //   追いつき中(青)=二重に赤を出さない。終了済みで低率なら率セルも赤(下の別テスト)。
     const cells = buildHealthCells({
-      livesData: [{ recordedCount: 30, officialCommentCount: 100, officialRatePct: 30 }],
+      livesData: [{ recordedCount: 30, officialCommentCount: 100, officialRatePct: 30 }], // 放送中
       fastDiag: { content: { giftDiagnostics: { romiDebug: { backfill: { running: false, done: 0, stopReason: 'stalled' } } } } }
     });
-    expect(cellById(cells, 'backfill').level).toBe('bad');
-    // 失速時は取得率も進行中扱いにしない=通常評価で率30%は bad(本当に取れていない)。
-    expect(cellById(cells, 'capture-rate').level).toBe('bad');
+    expect(cellById(cells, 'backfill').level).toBe('bad'); // 失速はここで赤=見逃さない。
+    expect(cellById(cells, 'capture-rate').level).toBe('processing'); // 放送中=追いつき中(青)。
+  });
+
+  it('v0.1.850 foreground 1配信が backward_exhausted でも、放送中で追いつき中の別配信は赤にしない', () => {
+    // 実機 lv350788367: foreground backfill stopReason=backward_exhausted・running:true・取得率2%。
+    //   旧実装は backward_exhausted を bfDone とし anyCatchingUp を打ち消して「完了したのに2%=赤」と誤判定。
+    //   修正: per-live の追いつき中(放送中×記録あり×率<100)は foreground 1配信の done で打ち消さない。
+    const cells = buildHealthCells({
+      livesData: [
+        { recordedCount: 205, officialCommentCount: 10896, officialRatePct: 2 },   // 放送中・追いつき中
+        { recordedCount: 4884, officialCommentCount: 5076, officialRatePct: 96 },
+        { recordedCount: 1081, officialCommentCount: 1083, officialRatePct: 100 },
+        { recordedCount: 0, officialCommentCount: 0 }
+      ],
+      fastDiag: { content: { giftDiagnostics: { romiDebug: { backfill: { running: true, done: 0, stopReason: 'backward_exhausted' } } } } }
+    });
+    expect(cellById(cells, 'capture-rate').level).toBe('processing'); // 赤でなく青。
+    expect(cellById(cells, 'match').level).toBe('processing');
+    expect(summarizeHealthVerdict(cells).badLabels).not.toContain('取得率');
   });
 
   it('v0.1.849 イベントスコア/順位 event_present_unscrapable は na(構造的に数値取得不可=正常)', () => {

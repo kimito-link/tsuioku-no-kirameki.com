@@ -106,10 +106,15 @@ export function buildHealthCells(data) {
   //   snapshot は含まれない)ため、bfRunning だけだと『裏タブで追いつき中の低率』を異常(赤)と誤判定して
   //   いた(実機 lv350792764=裏タブ18%が赤)。配信ごとの表示は既に「⏳追いつき中」と出ているのに
   //   健全度パネルだけ非対称だった=これを解消。
-  //   ただし backfill が done/stalled のときは「追いつき中」扱いにしない=完了後に低い率は本当の
-  //   取りこぼし(warn/bad)・失速は隠さない(self-verifying)。done/stalled でない時だけ追いつき中。
-  //   判定材料は statusFormat の正本(放送中×記録あり×【既知の率が100未満】)に揃える。率が未知(null)は
-  //   追いつき中とみなさない=累計率での通常評価にフォールバック(過剰に青へ倒さない)。
+  //   判定材料は statusFormat の正本(放送中×記録あり×【既知の率が100未満】=追いつき中)に揃える。
+  //   率が未知(null)は追いつき中とみなさない=累計率での通常評価にフォールバック(過剰に青へ倒さない)。
+  //   v0.1.850 重要修正: anyCatchingUp は livesData(全配信)由来=per-live の正本。これを
+  //   romiDebug.backfill(フォアグラウンド【1配信】のフラグ)の done/stalled で打ち消してはいけない。
+  //   実機 lv350788367: foreground 1配信が stopReason:'backward_exhausted'(=その配信は入口まで到達)
+  //   でも running:true で取得率2%=実態は追いつき中。なのに旧 bfDone ゲートが【他の追いつき中配信まで】
+  //   無効化し「完了したのに2%=取りこぼし(赤)」と誤判定していた。放送中×低率は statusFormat 同様
+  //   常に追いつき中(青)とし、失速(stalled)は専用の『過去ログ取得』セルが赤で示す(二重に赤にしない)。
+  //   終了済み(endedAt)×低率は anyCatchingUp が除外済み=本当の取りこぼしとして通常評価(赤)。
   const anyCatchingUp = livesData.some(
     (lv) => {
       if (!lv || lv.endedAt || !(num(lv.recordedCount) > 0)) return false;
@@ -117,7 +122,7 @@ export function buildHealthCells(data) {
       return r != null && r < 100;
     }
   );
-  const ratesInProgress = bfRunning || (anyCatchingUp && !bfDone && !bfStalled);
+  const ratesInProgress = bfRunning || anyCatchingUp;
 
   // 1. 取得率(記録/公式・累計)。公式0件は na。追いつき中(放送中×未達 or backfill中)は processing(青)。
   const recordedSum = livesData.reduce((a, lv) => a + (num(lv?.recordedCount) || 0), 0);
