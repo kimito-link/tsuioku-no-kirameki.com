@@ -41,7 +41,9 @@ function numOrNull(v) {
  *   deferActive?: boolean,
  *   paintCount?: number|null,
  *   tabVisible?: boolean|null,
- *   recordRate?: number|null
+ *   recordRate?: number|null,
+ *   panelPainted?: boolean|null,
+ *   shadeActive?: boolean|null
  * }} [opts]
  * @returns {{
  *   liveId: string,
@@ -52,7 +54,9 @@ function numOrNull(v) {
  *   deferActive: boolean,
  *   paintCount: number|null,
  *   tabVisible: boolean|null,
- *   recordRate: number|null
+ *   recordRate: number|null,
+ *   panelPainted: boolean|null,
+ *   shadeActive: boolean|null
  * }}
  */
 export function buildPerfDiag(opts = {}) {
@@ -68,7 +72,12 @@ export function buildPerfDiag(opts = {}) {
     // この paint 時にタブが可視だったか(null=不明)。
     tabVisible: opts.tabVisible == null ? null : opts.tabVisible === true,
     // v0.1.640: 取得スピード(records/sec)。退行(取得停止)の自動検出用。
-    recordRate: numOrNull(opts.recordRate)
+    recordRate: numOrNull(opts.recordRate),
+    // v0.1.854: パネルに実コンテンツが描画済か(userRoomList に子がある等)。false=白(未描画)。
+    //   「スクロールで白・放置で固着」を DOM/F12 を見ずに status だけで切り分ける(null=不明)。
+    panelPainted: opts.panelPainted == null ? null : opts.panelPainted === true,
+    // v0.1.854: ローディング幕が今も出ているか。データが来た後も true=ローディング固着(null=不明)。
+    shadeActive: opts.shadeActive == null ? null : opts.shadeActive === true
   };
 }
 
@@ -103,6 +112,13 @@ export function buildPerfDiagLine(diag, nowMs = Date.now()) {
     parts.push(`コメント ${diag.commentCount.toLocaleString('ja-JP')}`);
   }
   if (diag.deferActive) parts.push('描画見送り中');
+  // v0.1.854: 「スクロールで白・放置でローディング固着」を DOM/F12 不要で切り分ける。
+  //   panelPainted===false かつ コメントがある=パネルが白(未描画)。shadeActive===true=幕が残っている。
+  //   どちらも『本当におかしい時だけ』出す(描画済/幕無しなら出さない=ノイズにしない)。
+  if (diag.panelPainted === false && (diag.commentCount == null || diag.commentCount > 0)) {
+    parts.push('⚠パネル未描画(白)');
+  }
+  if (diag.shadeActive === true) parts.push('⚠ローディング継続');
   if (diag.lastPaintAt != null && Number.isFinite(nowMs)) {
     const agoMs = Math.max(0, nowMs - diag.lastPaintAt);
     const ago =

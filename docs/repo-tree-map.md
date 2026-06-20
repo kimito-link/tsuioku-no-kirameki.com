@@ -92,41 +92,45 @@ graph LR
   f11 --> f11_1["lib/voiceDiagKey.js"]
   f11 --> f11_2["extension/comeview-entry.js"]
   f11 --> f11_3["extension/status-entry.js"]
-  HUB --> f12["ギフト投擲演出"]
-  f12 --> f12_0["lib/giftThrowProjectile.js"]
-  HUB --> f13["吹き出し寿命管理"]
-  f13 --> f13_0["lib/venueBubbleLifecycle.js"]
-  HUB --> f14["HTMLレポート生成"]
-  f14 --> f14_0["extension/popup-entry.js"]
-  HUB --> f15["レポートのコメント源(全件storage)"]
-  f15 --> f15_0["lib/pickCommentsForExport.js"]
-  f15 --> f15_1["extension/popup-entry.js"]
-  HUB --> f16["状態速報の整形"]
-  f16 --> f16_0["lib/statusFormat.js"]
-  HUB --> f17["記録件数の単調化(減らない表示)"]
-  f17 --> f17_0["lib/monotonicCommentCount.js"]
-  HUB --> f18["storage キー定義"]
-  f18 --> f18_0["lib/storageKeys.js"]
-  HUB --> f19["AI診断の状態速報集約"]
-  f19 --> f19_0["lib/aiSharePopupDiagKey.js"]
-  f19 --> f19_1["extension/status-entry.js"]
-  HUB --> f20["状態速報の全体マインドマップ"]
-  f20 --> f20_0["lib/statusMindmapModel.js"]
+  HUB --> f12["パネル描画診断(白化/ローディング固着)"]
+  f12 --> f12_0["lib/perfDiag.js"]
+  f12 --> f12_1["extension/popup-entry.js"]
+  f12 --> f12_2["extension/status-entry.js"]
+  HUB --> f13["ギフト投擲演出"]
+  f13 --> f13_0["lib/giftThrowProjectile.js"]
+  HUB --> f14["吹き出し寿命管理"]
+  f14 --> f14_0["lib/venueBubbleLifecycle.js"]
+  HUB --> f15["HTMLレポート生成"]
+  f15 --> f15_0["extension/popup-entry.js"]
+  HUB --> f16["レポートのコメント源(全件storage)"]
+  f16 --> f16_0["lib/pickCommentsForExport.js"]
+  f16 --> f16_1["extension/popup-entry.js"]
+  HUB --> f17["状態速報の整形"]
+  f17 --> f17_0["lib/statusFormat.js"]
+  HUB --> f18["記録件数の単調化(減らない表示)"]
+  f18 --> f18_0["lib/monotonicCommentCount.js"]
+  HUB --> f19["storage キー定義"]
+  f19 --> f19_0["lib/storageKeys.js"]
+  HUB --> f20["AI診断の状態速報集約"]
+  f20 --> f20_0["lib/aiSharePopupDiagKey.js"]
   f20 --> f20_1["extension/status-entry.js"]
-  HUB --> f21["状態速報の対処カード(症状→原因→次の一手)"]
-  f21 --> f21_0["lib/statusActionAdvisor.js"]
+  HUB --> f21["状態速報の全体マインドマップ"]
+  f21 --> f21_0["lib/statusMindmapModel.js"]
   f21 --> f21_1["extension/status-entry.js"]
-  HUB --> f22["サイト健全性検証(リンク切れ防止)"]
-  f22 --> f22_0["lib/siteLinkHealth.js"]
-  f22 --> f22_1["site-health.mjs"]
-  HUB --> f23["影響範囲マップ(変えたら何が壊れるか)"]
-  f23 --> f23_0["feature-map.mjs"]
-  f23 --> f23_1["feature-map/impact-map.md"]
-  HUB --> f24["全体マップ(全地図への入口)"]
-  f24 --> f24_0["MAP.md"]
-  HUB --> f25["影響範囲ゲート(規律を自動化)"]
-  f25 --> f25_0["impact-check.mjs"]
-  f25 --> f25_1["feature-map/impact-map.json"]
+  HUB --> f22["状態速報の対処カード(症状→原因→次の一手)"]
+  f22 --> f22_0["lib/statusActionAdvisor.js"]
+  f22 --> f22_1["extension/status-entry.js"]
+  HUB --> f23["サイト健全性検証(リンク切れ防止)"]
+  f23 --> f23_0["lib/siteLinkHealth.js"]
+  f23 --> f23_1["site-health.mjs"]
+  HUB --> f24["影響範囲マップ(変えたら何が壊れるか)"]
+  f24 --> f24_0["feature-map.mjs"]
+  f24 --> f24_1["feature-map/impact-map.md"]
+  HUB --> f25["全体マップ(全地図への入口)"]
+  f25 --> f25_0["MAP.md"]
+  HUB --> f26["影響範囲ゲート(規律を自動化)"]
+  f26 --> f26_0["impact-check.mjs"]
+  f26 --> f26_1["feature-map/impact-map.json"]
 ```
 
 ---
@@ -171,14 +175,14 @@ graph LR
 - `xserver/`（2 件） — Xserver 向け webhook(git pull デプロイ)スクリプト  〔デプロイ / webhook〕
 
 ## `src/` — LP 側 + 純粋関数ライブラリの源  〔ソース〕
-<sub>ファイル 1110 件</sub>
+<sub>ファイル 1112 件</sub>
 
 - `data/`（6 件） — 保存コメントからレーン候補を読む acquirer / source 層  〔コメント / 取得〕
 - `domain/`（18 件） — ドメイン正本(応援レーンの集約・列ポリシー等。識別子判定など)  〔応援 / 集約 / 識別子〕
 - `extension/`（11 件） — バンドル entry(content/popup/venue/status/offscreen/backfill-sw 等=機能境界)  〔entry / 記録 / 会場 / 応援〕
 - `fixtures/`（1 件） — テスト用フィクスチャ  〔テスト〕
 - `images/`（165 件） — LP / CWS 提出物のマスター画像  〔画像〕
-- `lib/`（900 件） — 純粋関数ライブラリ(unit test 対象)。色・速度・コメント・レポート等の計算ロジックの大半  〔色 / 速度 / コメント / レポート / 純粋関数〕
+- `lib/`（902 件） — 純粋関数ライブラリ(unit test 対象)。色・速度・コメント・レポート等の計算ロジックの大半  〔色 / 速度 / コメント / レポート / 純粋関数〕
 - `shared/`（7 件） — 複数機能で共有する小部品(アバター URL ガード等)  〔共有 / アバター〕
 - `sound/`（1 件） — 音声素材(src 側)  〔音声〕
 
@@ -274,6 +278,13 @@ popup 応援アイコン列の「1人ぶんのタイル(丸サムネ+ID+名前)�
 - [`src/extension/comeview-entry.js`](../src/extension/comeview-entry.js)
 - [`src/extension/status-entry.js`](../src/extension/status-entry.js)
 
+### パネル描画診断(白化/ローディング固着)  〔表示 / 診断 / 白フラッシュ〕
+popup/埋め込みパネルの paint 所要ms・描画見送り・【パネルが白(未描画)か】【ローディング幕が継続中か】を nls_perf_diag_<lv> に観測し status 速報へ。「スクロールで白・放置で固着」を DOM/F12 不要で切り分ける純観測
+
+- [`src/lib/perfDiag.js`](../src/lib/perfDiag.js)
+- [`src/extension/popup-entry.js`](../src/extension/popup-entry.js)
+- [`src/extension/status-entry.js`](../src/extension/status-entry.js)
+
 ### ギフト投擲演出  〔ギフト / 演出〕
 会場でギフト/広告を投げ主サムネから中央映像へ投げる演出の純関数群
 
@@ -292,7 +303,7 @@ popup 応援アイコン列の「1人ぶんのタイル(丸サムネ+ID+名前)�
 ### レポートのコメント源(全件storage)  〔レポート / コメント / 記録〕
 HTML/メディアキットレポートは storage の全件(IDB→チャンク→テール)を読む。popup を当該配信で開いていても表示用キャップ済みエントリで上書きしない(v0.1.853 断線根治)。空のときだけ表示エントリにフォールバック
 
-- `src/lib/pickCommentsForExport.js` ⚠️ **見つからない（消失/リネーム）**
+- [`src/lib/pickCommentsForExport.js`](../src/lib/pickCommentsForExport.js)
 - [`src/extension/popup-entry.js`](../src/extension/popup-entry.js)
 
 ### 状態速報の整形  〔レポート / 診断〕

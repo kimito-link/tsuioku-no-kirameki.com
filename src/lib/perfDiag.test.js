@@ -34,7 +34,9 @@ describe('buildPerfDiag', () => {
       deferActive: true,
       paintCount: 42,
       tabVisible: false,
-      recordRate: 8.5
+      recordRate: 8.5,
+      panelPainted: null, // 未指定=不明(null)。
+      shadeActive: null
     });
   });
   it('不正な数値は null・deferActive 既定 false', () => {
@@ -75,5 +77,25 @@ describe('buildPerfDiagLine', () => {
   it('perfDiag が無ければ空文字', () => {
     expect(buildPerfDiagLine(null)).toBe('');
     expect(buildPerfDiagLine(undefined)).toBe('');
+  });
+
+  it('v0.1.854 パネル未描画(白)= コメントがあるのに panelPainted:false で ⚠ を出す', () => {
+    const diag = buildPerfDiag({ liveId: 'lv1', lastPaintMs: 5, commentCount: 8000, panelPainted: false });
+    expect(buildPerfDiagLine(diag, 0)).toContain('⚠パネル未描画(白)');
+  });
+
+  it('v0.1.854 描画済(panelPainted:true)なら白警告を出さない', () => {
+    const diag = buildPerfDiag({ liveId: 'lv1', lastPaintMs: 5, commentCount: 8000, panelPainted: true });
+    expect(buildPerfDiagLine(diag, 0)).not.toContain('パネル未描画');
+  });
+
+  it('v0.1.854 ローディング幕継続(shadeActive:true)で ⚠ローディング継続', () => {
+    const diag = buildPerfDiag({ liveId: 'lv1', lastPaintMs: 5, commentCount: 100, shadeActive: true });
+    expect(buildPerfDiagLine(diag, 0)).toContain('⚠ローディング継続');
+  });
+
+  it('v0.1.854 panelPainted:false でもコメント0なら白警告は出さない(配信開始直後=正常)', () => {
+    const diag = buildPerfDiag({ liveId: 'lv1', lastPaintMs: 5, commentCount: 0, panelPainted: false });
+    expect(buildPerfDiagLine(diag, 0)).not.toContain('パネル未描画');
   });
 });

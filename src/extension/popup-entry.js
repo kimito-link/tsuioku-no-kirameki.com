@@ -1039,6 +1039,14 @@ function recordPerfDiagThrottled(liveId, paintMs, commentCount, deferActive) {
   if (!lv) return;
   const now = Date.now();
   if (now - _lastPerfDiagWriteAt < 2000) return;
+  // v0.1.854: 白化/固着を DOM/F12 不要で切り分け(純観測・panelPainted=子有/shadeActive=幕継続)。
+  let panelPainted = null, shadeActive = null;
+  try {
+    const ul = /** @type {HTMLElement|null} */ ($('userRoomList'));
+    panelPainted = !!ul && ul.childElementCount > 0;
+    const sh = document.getElementById('nlInitialLoadShade');
+    shadeActive = sh instanceof HTMLElement && !sh.classList.contains('nl-init-shade--done');
+  } catch { /* null */ }
   // v0.1.640: 取得スピード(records/sec)を前回サンプルとの差分で算出(退行=取得停止の自動検出)。
   //   liveId が変わったら前回値をリセット(別配信の件数を持ち越して負/異常レートにしない)。
   let recordRate = null;
@@ -1079,7 +1087,7 @@ function recordPerfDiagThrottled(liveId, paintMs, commentCount, deferActive) {
     deferActive,
     paintCount: _perfPaintCount,
     tabVisible: typeof document !== 'undefined' ? !document.hidden : null,
-    recordRate
+    recordRate, panelPainted, shadeActive
   });
   try {
     chrome.storage.local.set({ [perfDiagStorageKey(lv)]: diag }).catch(() => {});
@@ -6090,25 +6098,18 @@ async function readAllCommentsFromCommentDb(lv) {
 }
 
 /**
- * HTML/マーケ DL 用。メモリ上の記録済みコメントがあれば storage 読込と競走し、
- * 遅い IDB/storage 待ちで DL 開始が遅れないよう 2s でメモリ側へフォールバックする。
+ * HTML/マーケ DL 用のコメント集合。v0.1.853 根治: storage 全件(readAllCommentsForLive)を最優先し、
+ * 判定は純関数 pickCommentsForExport に正本化(従来は popup 表示中だと表示用キャップ済み27件へ短絡し
+ * 記録7,855件を反映しなかった)。storage 空のときだけ表示エントリにフォールバック。
  * @param {string} liveId
  * @returns {Promise<PopupCommentEntry[]>}
  */
 async function resolveCommentsForHtmlExport(liveId) {
-  // v0.1.853 根治: HTML レポートは「全件」が必要。従来は popup を当該配信で開いていると
-  //   (memLive===lid) STORY_SOURCE_STATE.entries(=応援アイコン列/ストーリー UI 用の【表示専用・
-  //   キャップ済み】displayList)へ短絡し、レポートが記録7,855件あっても 27件しか反映されない断線が
-  //   あった(実機 lv350792764: 保存コメント数27・コメントした人9人と誤集計)。レポートは storage の
-  //   正本(IDB→チャンク→テール=readAllCommentsForLive)を常に全件読む。storage が空(稀な読み失敗)
-  //   の時だけ、空レポートよりマシな最終手段として in-memory 表示エントリにフォールバックする。
   const lid = String(liveId || '').trim().toLowerCase();
-  const full = /** @type {PopupCommentEntry[]} */ (await readAllCommentsForLive(liveId));
+  const full = await readAllCommentsForLive(liveId);
   const memLive = String(STORY_SOURCE_STATE.liveId || '').trim().toLowerCase();
   const memEntries = Array.isArray(STORY_SOURCE_STATE.entries) ? STORY_SOURCE_STATE.entries : [];
-  return /** @type {PopupCommentEntry[]} */ (
-    pickCommentsForExport(full, memEntries, memLive === lid)
-  );
+  return /** @type {PopupCommentEntry[]} */ (pickCommentsForExport(full, memEntries, memLive === lid));
 }
 
 async function readAllCommentsForLive(lv) {
