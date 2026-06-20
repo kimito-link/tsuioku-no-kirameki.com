@@ -28,6 +28,7 @@ import {
 } from '../lib/commentSubmitProfiling.js';
 import { commentPostErrorWarrantsFrameDiscovery } from '../lib/commentPostRetriable.js';
 import { capCommentsForAnalytics } from '../lib/capCommentsForAnalytics.js';
+import { pickCommentsForExport } from '../lib/pickCommentsForExport.js';
 import { selectLaneFeedCommentRows } from '../lib/provisionalLaneCommentRows.js';
 import {
   markWatchPopupLoadPhase,
@@ -6095,15 +6096,19 @@ async function readAllCommentsFromCommentDb(lv) {
  * @returns {Promise<PopupCommentEntry[]>}
  */
 async function resolveCommentsForHtmlExport(liveId) {
+  // v0.1.853 根治: HTML レポートは「全件」が必要。従来は popup を当該配信で開いていると
+  //   (memLive===lid) STORY_SOURCE_STATE.entries(=応援アイコン列/ストーリー UI 用の【表示専用・
+  //   キャップ済み】displayList)へ短絡し、レポートが記録7,855件あっても 27件しか反映されない断線が
+  //   あった(実機 lv350792764: 保存コメント数27・コメントした人9人と誤集計)。レポートは storage の
+  //   正本(IDB→チャンク→テール=readAllCommentsForLive)を常に全件読む。storage が空(稀な読み失敗)
+  //   の時だけ、空レポートよりマシな最終手段として in-memory 表示エントリにフォールバックする。
   const lid = String(liveId || '').trim().toLowerCase();
+  const full = /** @type {PopupCommentEntry[]} */ (await readAllCommentsForLive(liveId));
   const memLive = String(STORY_SOURCE_STATE.liveId || '').trim().toLowerCase();
   const memEntries = Array.isArray(STORY_SOURCE_STATE.entries) ? STORY_SOURCE_STATE.entries : [];
-  const storageP = readAllCommentsForLive(liveId);
-  if (memLive === lid && memEntries.length > 0) {
-    void storageP.catch(() => {});
-    return /** @type {PopupCommentEntry[]} */ (memEntries);
-  }
-  return /** @type {PopupCommentEntry[]} */ (await storageP);
+  return /** @type {PopupCommentEntry[]} */ (
+    pickCommentsForExport(full, memEntries, memLive === lid)
+  );
 }
 
 async function readAllCommentsForLive(lv) {

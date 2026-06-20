@@ -252,7 +252,7 @@
   - `src/lib/giftThrowProjectile.js`
 - **吹き出し寿命管理** — 会場の吹き出しの表示上限・追い出し(eviction)ライフサイクル
   - `src/lib/venueBubbleLifecycle.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 153</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 152</summary>
 
 - `scripts/encode-marketing-html-avatars.mjs` — extension/images/marketing-html-avatars/*.png を data URI にし、
 - `scripts/split-avatar-parts.mjs` — 偽市松背景の除去 + パーツ切り出し(one-off アセットパイプライン)
@@ -266,7 +266,6 @@
 - `src/domain/user/avatar.js` — ユーザーのアバター観測信号と表示 URL を 1 箇所で組み立てる純関数。
 - `src/domain/user/avatarResolver.js` — アバター解決の単一エントリポイント（Hoshino-Romi 流 single component）。
 - `src/domain/user/nickname.js` — 表示名（ニックネーム）の「強弱」判定。
-- `src/extension/comeview-entry.js` — v0.1.652: 独自コメビュ「KIRAMEKI Comment View」(comeview.html)。
 - `src/extension/content-entry.js` — watch ページ常駐の記録エンジン本体。コメント取得(NDGR+DOM)・記録・バックフィル・パネル描画の中枢。
 - `src/extension/story/renderStoryUserLaneDom.js` — 応援ユーザーレーン DOM の同期（popup-entry から切り出し・状態は引数で受け取る）。
 - `src/extension/venue-entry.js` — 会場モード(standalone)のエントリ。venueBar をページに mount するだけの薄い起動点。
@@ -544,6 +543,14 @@
 > 🦊こん太: 見つけたら分類してあげるのだ。
 > 🦝たぬ姉: FEATURE_CATEGORY に1行足すだけなのだ。
 
+- **会場読み上げ診断(遅延の切り分け)** — 会場モード(comeview)の読み上げ待機件数/間引き/最終発話/合成msを観測し KEY_VOICE_DIAG 経由で status 速報へ集約。「たまに遅れる」の真因(キュー詰まり/合成遅延)を F12 不要で割る純観測
+  - `src/lib/voiceDiag.js`
+  - `src/lib/voiceDiagKey.js`
+  - `src/extension/comeview-entry.js`
+  - `src/extension/status-entry.js`
+- **レポートのコメント源(全件storage)** — HTML/メディアキットレポートは storage の全件(IDB→チャンク→テール)を読む。popup を当該配信で開いていても表示用キャップ済みエントリで上書きしない(v0.1.853 断線根治)。空のときだけ表示エントリにフォールバック
+  - `src/lib/pickCommentsForExport.js`
+  - `src/extension/popup-entry.js`
 <details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 91</summary>
 
 - `app/app.js` — スマホ閲覧用 status Web 版。
@@ -642,9 +649,10 @@
 
 ## 🧬 修正系譜マップ(この系統のバグを過去にどう直したか)
 
-> changelog 全 189 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
+> changelog 全 190 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
 
-### 💾 記録件数 (24版)
+### 💾 記録件数 (25版)
+- `v0.1.853` 2026-06-21 — HTMLレポートに記録が全部反映されない不具合を修正
 - `v0.1.852` 2026-06-21 — 会場モードの読み上げ状況を状態速報に表示(遅延の切り分け用)
 - `v0.1.849` 2026-06-20 — イベント順位/スコアの黄と「レーンが空」誤報を解消
 - `v0.1.844` 2026-06-20 — 状態速報のレーン件数を正確に
@@ -781,7 +789,8 @@
 - `v0.1.668` 2026-06-10 — パネルに「💬コメビュ」ボタンを追加
 - `v0.1.667` 2026-06-10 — コメビュに匿名OKのニックネーム・ラベル・メモ
 
-### 🏟 会場・席 (75版)
+### 🏟 会場・席 (76版)
+- `v0.1.853` 2026-06-21 — HTMLレポートに記録が全部反映されない不具合を修正
 - `v0.1.852` 2026-06-21 — 会場モードの読み上げ状況を状態速報に表示(遅延の切り分け用)
 - `v0.1.841` 2026-06-20 — 修正系譜マップ(再発防止)を地図に追加
 - `v0.1.840` 2026-06-20 — 機能逆引き地図を全ファイル網羅に

@@ -87,38 +87,46 @@ graph LR
   f10 --> f10_0["lib/voicePlayer.js"]
   f10 --> f10_1["lib/voiceReadQueue.js"]
   f10 --> f10_2["lib/voiceAgeGate.js"]
-  HUB --> f11["ギフト投擲演出"]
-  f11 --> f11_0["lib/giftThrowProjectile.js"]
-  HUB --> f12["吹き出し寿命管理"]
-  f12 --> f12_0["lib/venueBubbleLifecycle.js"]
-  HUB --> f13["HTMLレポート生成"]
-  f13 --> f13_0["extension/popup-entry.js"]
-  HUB --> f14["状態速報の整形"]
-  f14 --> f14_0["lib/statusFormat.js"]
-  HUB --> f15["記録件数の単調化(減らない表示)"]
-  f15 --> f15_0["lib/monotonicCommentCount.js"]
-  HUB --> f16["storage キー定義"]
-  f16 --> f16_0["lib/storageKeys.js"]
-  HUB --> f17["AI診断の状態速報集約"]
-  f17 --> f17_0["lib/aiSharePopupDiagKey.js"]
-  f17 --> f17_1["extension/status-entry.js"]
-  HUB --> f18["状態速報の全体マインドマップ"]
-  f18 --> f18_0["lib/statusMindmapModel.js"]
-  f18 --> f18_1["extension/status-entry.js"]
-  HUB --> f19["状態速報の対処カード(症状→原因→次の一手)"]
-  f19 --> f19_0["lib/statusActionAdvisor.js"]
+  HUB --> f11["会場読み上げ診断(遅延の切り分け)"]
+  f11 --> f11_0["lib/voiceDiag.js"]
+  f11 --> f11_1["lib/voiceDiagKey.js"]
+  f11 --> f11_2["extension/comeview-entry.js"]
+  f11 --> f11_3["extension/status-entry.js"]
+  HUB --> f12["ギフト投擲演出"]
+  f12 --> f12_0["lib/giftThrowProjectile.js"]
+  HUB --> f13["吹き出し寿命管理"]
+  f13 --> f13_0["lib/venueBubbleLifecycle.js"]
+  HUB --> f14["HTMLレポート生成"]
+  f14 --> f14_0["extension/popup-entry.js"]
+  HUB --> f15["レポートのコメント源(全件storage)"]
+  f15 --> f15_0["lib/pickCommentsForExport.js"]
+  f15 --> f15_1["extension/popup-entry.js"]
+  HUB --> f16["状態速報の整形"]
+  f16 --> f16_0["lib/statusFormat.js"]
+  HUB --> f17["記録件数の単調化(減らない表示)"]
+  f17 --> f17_0["lib/monotonicCommentCount.js"]
+  HUB --> f18["storage キー定義"]
+  f18 --> f18_0["lib/storageKeys.js"]
+  HUB --> f19["AI診断の状態速報集約"]
+  f19 --> f19_0["lib/aiSharePopupDiagKey.js"]
   f19 --> f19_1["extension/status-entry.js"]
-  HUB --> f20["サイト健全性検証(リンク切れ防止)"]
-  f20 --> f20_0["lib/siteLinkHealth.js"]
-  f20 --> f20_1["site-health.mjs"]
-  HUB --> f21["影響範囲マップ(変えたら何が壊れるか)"]
-  f21 --> f21_0["feature-map.mjs"]
-  f21 --> f21_1["feature-map/impact-map.md"]
-  HUB --> f22["全体マップ(全地図への入口)"]
-  f22 --> f22_0["MAP.md"]
-  HUB --> f23["影響範囲ゲート(規律を自動化)"]
-  f23 --> f23_0["impact-check.mjs"]
-  f23 --> f23_1["feature-map/impact-map.json"]
+  HUB --> f20["状態速報の全体マインドマップ"]
+  f20 --> f20_0["lib/statusMindmapModel.js"]
+  f20 --> f20_1["extension/status-entry.js"]
+  HUB --> f21["状態速報の対処カード(症状→原因→次の一手)"]
+  f21 --> f21_0["lib/statusActionAdvisor.js"]
+  f21 --> f21_1["extension/status-entry.js"]
+  HUB --> f22["サイト健全性検証(リンク切れ防止)"]
+  f22 --> f22_0["lib/siteLinkHealth.js"]
+  f22 --> f22_1["site-health.mjs"]
+  HUB --> f23["影響範囲マップ(変えたら何が壊れるか)"]
+  f23 --> f23_0["feature-map.mjs"]
+  f23 --> f23_1["feature-map/impact-map.md"]
+  HUB --> f24["全体マップ(全地図への入口)"]
+  f24 --> f24_0["MAP.md"]
+  HUB --> f25["影響範囲ゲート(規律を自動化)"]
+  f25 --> f25_0["impact-check.mjs"]
+  f25 --> f25_1["feature-map/impact-map.json"]
 ```
 
 ---
@@ -163,14 +171,14 @@ graph LR
 - `xserver/`（2 件） — Xserver 向け webhook(git pull デプロイ)スクリプト  〔デプロイ / webhook〕
 
 ## `src/` — LP 側 + 純粋関数ライブラリの源  〔ソース〕
-<sub>ファイル 1107 件</sub>
+<sub>ファイル 1110 件</sub>
 
 - `data/`（6 件） — 保存コメントからレーン候補を読む acquirer / source 層  〔コメント / 取得〕
 - `domain/`（18 件） — ドメイン正本(応援レーンの集約・列ポリシー等。識別子判定など)  〔応援 / 集約 / 識別子〕
 - `extension/`（11 件） — バンドル entry(content/popup/venue/status/offscreen/backfill-sw 等=機能境界)  〔entry / 記録 / 会場 / 応援〕
 - `fixtures/`（1 件） — テスト用フィクスチャ  〔テスト〕
 - `images/`（165 件） — LP / CWS 提出物のマスター画像  〔画像〕
-- `lib/`（897 件） — 純粋関数ライブラリ(unit test 対象)。色・速度・コメント・レポート等の計算ロジックの大半  〔色 / 速度 / コメント / レポート / 純粋関数〕
+- `lib/`（900 件） — 純粋関数ライブラリ(unit test 対象)。色・速度・コメント・レポート等の計算ロジックの大半  〔色 / 速度 / コメント / レポート / 純粋関数〕
 - `shared/`（7 件） — 複数機能で共有する小部品(アバター URL ガード等)  〔共有 / アバター〕
 - `sound/`（1 件） — 音声素材(src 側)  〔音声〕
 
@@ -258,6 +266,14 @@ popup 応援アイコン列の「1人ぶんのタイル(丸サムネ+ID+名前)�
 - [`src/lib/voiceReadQueue.js`](../src/lib/voiceReadQueue.js)
 - [`src/lib/voiceAgeGate.js`](../src/lib/voiceAgeGate.js)
 
+### 会場読み上げ診断(遅延の切り分け)  〔読み上げ / 診断 / 集約〕
+会場モード(comeview)の読み上げ待機件数/間引き/最終発話/合成msを観測し KEY_VOICE_DIAG 経由で status 速報へ集約。「たまに遅れる」の真因(キュー詰まり/合成遅延)を F12 不要で割る純観測
+
+- [`src/lib/voiceDiag.js`](../src/lib/voiceDiag.js)
+- [`src/lib/voiceDiagKey.js`](../src/lib/voiceDiagKey.js)
+- [`src/extension/comeview-entry.js`](../src/extension/comeview-entry.js)
+- [`src/extension/status-entry.js`](../src/extension/status-entry.js)
+
 ### ギフト投擲演出  〔ギフト / 演出〕
 会場でギフト/広告を投げ主サムネから中央映像へ投げる演出の純関数群
 
@@ -271,6 +287,12 @@ popup 応援アイコン列の「1人ぶんのタイル(丸サムネ+ID+名前)�
 ### HTMLレポート生成  〔レポート〕
 マーケ/イベント順位/タイムライン等を1枚の HTML レポートに組み立てる(popup-entry 内)
 
+- [`src/extension/popup-entry.js`](../src/extension/popup-entry.js)
+
+### レポートのコメント源(全件storage)  〔レポート / コメント / 記録〕
+HTML/メディアキットレポートは storage の全件(IDB→チャンク→テール)を読む。popup を当該配信で開いていても表示用キャップ済みエントリで上書きしない(v0.1.853 断線根治)。空のときだけ表示エントリにフォールバック
+
+- `src/lib/pickCommentsForExport.js` ⚠️ **見つからない（消失/リネーム）**
 - [`src/extension/popup-entry.js`](../src/extension/popup-entry.js)
 
 ### 状態速報の整形  〔レポート / 診断〕
