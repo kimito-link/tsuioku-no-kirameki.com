@@ -19,6 +19,8 @@ import { execSync } from 'node:child_process';
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { classifyFeatureCategory } from '../src/lib/classifyFeatureCategory.js';
+import { buildChangelogLineage } from '../src/lib/changelogLineage.js';
+import { EXTENSION_CHANGELOG } from '../src/lib/changelog.js';
 
 const ROOT = resolve(process.cwd());
 const OUT_DIR = join(ROOT, 'docs');
@@ -1075,6 +1077,24 @@ function renderFeatureSitemapHtml(files, roleByPath) {
       + `${charaRows}<div class="mm-leaves">${leaves}</div>${autoBlock}</details>`;
   }).join('');
 
+  // v0.1.841(修正系譜マップ): changelog 全版を系統で枝化。同系統のバグを過去にどう直したかを辿る=再発防止。
+  const lineage = buildChangelogLineage(EXTENSION_CHANGELOG);
+  const lineageBranches = lineage.map((b) => {
+    const vers = b.versions.map((v) =>
+      `<div class="lin-v"><span class="lin-ver">v${escapeHtml(v.version)}</span>`
+      + `<span class="lin-date">${escapeHtml(v.date)}</span>`
+      + `<span class="lin-sum">${escapeHtml(v.summary)}</span></div>`
+    ).join('');
+    const open = b.versions.length >= 5 ? '' : ''; // 既定は畳む(情報過多回避)。
+    return `<details class="lin-branch"${open}><summary>${escapeHtml(b.tag)}<span class="lin-cnt">${b.versions.length}版</span></summary>`
+      + `<div class="lin-vers">${vers}</div></details>`;
+  }).join('');
+  const lineageHtml = `<div class="lin">
+    <div class="lin-title">🧬 修正系譜マップ(この系統のバグを過去にどう直したか)</div>
+    <p class="lin-sub">changelog 全 ${EXTENSION_CHANGELOG.length} 版を「バグ系統」で束ねた枝。同じ系統をまた触るとき、ここを開けば過去の修正と「なぜ毎回触るか」が一目で分かる(再発防止)。新しい順。<code>npm run tree-map</code> で自動生成。</p>
+    ${lineageBranches}
+  </div>`;
+
   return `<!DOCTYPE html>
 <html lang="ja">
 <head>
@@ -1128,6 +1148,22 @@ function renderFeatureSitemapHtml(files, roleByPath) {
   .mm-auto-row{ display:flex; gap:8px; align-items:baseline; flex-wrap:wrap; }
   .mm-auto-row .mm-path{ flex:0 0 auto; }
   .mm-auto-role{ font-size:11px; color:var(--muted); line-height:1.5; }
+  /* 🧬 修正系譜マップ(同系統のバグを過去にどう直したか) */
+  .lin{ margin-top:22px; }
+  .lin-title{ font-size:16px; font-weight:700; color:#fff; margin:0 0 4px; }
+  .lin-sub{ font-size:12px; color:var(--muted); margin:0 0 12px; line-height:1.6; }
+  details.lin-branch{ background:var(--panel); border:1px solid var(--line); border-left:4px solid var(--accent,#ec4899);
+    border-radius:10px; padding:7px 13px; margin:0 0 8px; }
+  details.lin-branch > summary{ cursor:pointer; list-style:none; font-size:14px; font-weight:700; color:#fff; display:flex; gap:8px; align-items:center; }
+  details.lin-branch > summary::-webkit-details-marker{ display:none; }
+  details.lin-branch > summary::before{ content:"▸"; color:var(--accent,#ec4899); }
+  details.lin-branch[open] > summary::before{ content:"▾"; }
+  .lin-cnt{ font-size:11px; color:var(--muted); font-weight:400; }
+  .lin-vers{ margin:8px 0 2px; border-left:2px solid var(--line); padding-left:12px; display:grid; gap:5px; }
+  .lin-v{ display:flex; gap:8px; align-items:baseline; flex-wrap:wrap; }
+  .lin-ver{ font-family:"Menlo","Consolas",monospace; font-size:11px; color:#bcd2f6; flex:0 0 auto; }
+  .lin-date{ font-size:10.5px; color:var(--muted); flex:0 0 auto; }
+  .lin-sum{ font-size:12px; color:var(--sub); line-height:1.5; }
   .ctrl{ margin:0 0 14px; display:flex; gap:8px; }
   .ctrl button{ background:rgba(255,255,255,.06); border:1px solid var(--line); color:var(--ink);
     border-radius:8px; padding:5px 12px; font-size:12px; cursor:pointer; }
@@ -1158,6 +1194,7 @@ ${NAV_CSS}
     <div class="mm-trunk"></div>
     <div class="mm-branches">${branches}</div>
   </div>
+  ${lineageHtml}
   <div class="legend">
     <b>読み方</b>: 左=アプリ全体(中心)。右へ枝分かれするのが<b>分類</b>(色ごと)。分類を開くと、3キャラの解説と、
     その分類の<b>機能</b>(太字=機能名・その下=何をするか・最下段=担当ファイル)が出ます。<br>
@@ -1211,6 +1248,16 @@ function renderFeatureSitemapMd(files, roleByPath) {
       lines.push('');
       lines.push('</details>');
     }
+    lines.push('');
+  }
+  // v0.1.841(修正系譜マップ): changelog 全版を系統で枝化(AI/GitHub 用テキスト)。
+  lines.push('## 🧬 修正系譜マップ(この系統のバグを過去にどう直したか)');
+  lines.push('');
+  lines.push(`> changelog 全 ${EXTENSION_CHANGELOG.length} 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。`);
+  lines.push('');
+  for (const b of buildChangelogLineage(EXTENSION_CHANGELOG)) {
+    lines.push(`### ${b.tag} (${b.versions.length}版)`);
+    for (const v of b.versions) lines.push(`- \`v${v.version}\` ${v.date} — ${v.summary}`);
     lines.push('');
   }
   return lines.join('\n');
