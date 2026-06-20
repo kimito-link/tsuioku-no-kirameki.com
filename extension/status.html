@@ -381,6 +381,31 @@
         border-bottom: 2px solid var(--nl-accent);
         border-radius: 6px 6px 0 0;
       }
+      /* 健全度パネル: 正常は淡い緑、異常(黄/赤)だけ目を引く。対象外は灰の「—」。 */
+      section.health-panel { margin: 0 0 14px; }
+      .health-cells {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(108px, 1fr));
+        gap: 6px;
+      }
+      .hc {
+        border: 1px solid var(--nl-border);
+        border-radius: 9px;
+        padding: 6px 8px;
+        background: var(--nl-card-bg);
+        cursor: default;
+        line-height: 1.3;
+      }
+      .hc-label { font-size: 11px; color: var(--nl-text-soft); }
+      .hc-val { font-size: 17px; font-weight: 700; margin-top: 1px; }
+      .hc-ok { border-color: rgba(47, 125, 74, 0.35); }
+      .hc-ok .hc-val { color: #2f9e57; }
+      .hc-warn { border-color: #e0a93f; background: rgba(224, 169, 63, 0.08); }
+      .hc-warn .hc-val { color: #c8861f; }
+      .hc-bad { border-color: #d4495f; background: rgba(212, 73, 95, 0.10); }
+      .hc-bad .hc-val { color: #d4495f; }
+      .hc-na { opacity: 0.55; }
+      .hc-na .hc-val { color: var(--nl-text-soft); font-weight: 400; }
     </style>
   </head>
   <body>
@@ -397,6 +422,10 @@
       <a class="nav-item" href="https://htmlpreview.github.io/?https://raw.githubusercontent.com/kimito-link/tsuioku-no-kirameki.com/master/docs/repo-tree-map.html" target="_blank" rel="noopener">🧭 逆引き索引</a>
       <span class="nav-item nav-here" aria-current="page">📊 状態（ここ）</span>
     </nav>
+
+    <section class="health-panel" id="healthPanel" aria-label="健全度パネル">
+      <div class="health-cells" id="healthCells"></div>
+    </section>
 
     <section class="guidepost">
       <h2>🧭 はじめての方へ — ここから全部たどれます</h2>

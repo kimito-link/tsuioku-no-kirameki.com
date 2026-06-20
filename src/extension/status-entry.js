@@ -25,6 +25,7 @@ import { KEY_AI_SHARE_FAST_DIAG } from '../lib/aiShareFastDiagKey.js';
 import { KEY_AI_SHARE_POPUP_DIAG } from '../lib/aiSharePopupDiagKey.js';
 import { buildStatusMindmapModel } from '../lib/statusMindmapModel.js';
 import { buildStatusActions } from '../lib/statusActionAdvisor.js';
+import { buildHealthCells } from '../lib/healthCells.js';
 import {
   buildOverviewText,
   buildLiveBlockText,
@@ -440,6 +441,9 @@ function renderAll({ lvList, summaries, fastDiag, popupDiag, backfillProgress })
   // 🩹 いま気になる点と対処(症状→原因→次の一手・最上部)
   renderActionCards({ livesData, fastDiag, popupDiag });
 
+  // 健全度パネル(ファーストビュー・正常100/異常だけ色・対象外は—)
+  renderHealthCells({ livesData, fastDiag });
+
   // 全体マインドマップ(折りたたみツリー・ここを見れば全部わかる)
   renderMindmap({ overviewText, livesData, fastDiag, popupDiag });
 
@@ -475,6 +479,34 @@ const FIXABLE_LABEL = {
   partly: '操作で改善することがあります',
   no: 'status の外が原因(下記の手動操作を試してください)'
 };
+
+/**
+ * 健全度パネル(ファーストビュー)。buildHealthCells の純粋結果を %+色 セルで描く。
+ * 正常=淡い緑・劣化=黄/赤+値・対象外=灰の「—」(失敗体験の除去)。textContent で安全に組む。
+ * @param {{ livesData?: any[], fastDiag?: any }} data
+ */
+function renderHealthCells(data) {
+  const host = document.getElementById('healthCells');
+  if (!host) return;
+  const cells = buildHealthCells(data);
+  host.replaceChildren();
+  for (const c of cells) {
+    const div = document.createElement('div');
+    div.className = `hc hc-${c.level}`;
+    const label = document.createElement('div');
+    label.className = 'hc-label';
+    label.textContent = c.label;
+    const val = document.createElement('div');
+    val.className = 'hc-val';
+    val.textContent = c.kind === 'pct'
+      ? (c.value == null ? '—' : `${c.value}%`)
+      : (c.text || '—');
+    div.title = `${c.label}: ${val.textContent}`;
+    div.appendChild(label);
+    div.appendChild(val);
+    host.appendChild(div);
+  }
+}
 
 /**
  * @param {{ livesData?: any[], fastDiag?: any, popupDiag?: any }} data
