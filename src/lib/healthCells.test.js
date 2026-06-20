@@ -125,6 +125,23 @@ describe('buildHealthCells v0.1.845 進行中=processing(青)・見た瞬間ほ�
     expect(cellById(cells, 'capture-rate').level).toBe('bad');
   });
 
+  it('v0.1.849 イベントスコア/順位 event_present_unscrapable は na(構造的に数値取得不可=正常)', () => {
+    // NDGR はイベント参加(順位3位)を示すが、公式数値は cross-origin iframe で構造的に読めない。
+    // 匿名 userId と同じ原理的限界=黄でなく対象外(na)。
+    const cells = buildHealthCells({
+      fastDiag: { content: { giftDiagnostics: { '北極星レーン': {
+        '3_イベント累計スコア': { state: 'event_present_unscrapable', ndgrValue: null },
+        '5_イベント現在順位': { state: 'event_present_unscrapable', ndgrValue: 3 }
+      } } } }
+    });
+    expect(cellById(cells, 'ns-escore').level).toBe('na');
+    expect(cellById(cells, 'ns-erank').level).toBe('na');
+    // 総合判定で「異常/注意」として数えない。
+    const v = summarizeHealthVerdict(cells);
+    expect(v.warnLabels).not.toContain('イベントスコア');
+    expect(v.warnLabels).not.toContain('イベント順位');
+  });
+
   it('v0.1.848 裏タブで追いつき中の配信(放送中×未達)は romiDebug に出なくても processing', () => {
     // 実機 lv350792764: 裏タブで backfill 中・取得率18%。fastDiag.romiDebug.backfill は
     //   フォアグラウンドの別配信のものか、裏タブ配信の状態は snapshot に出ない。

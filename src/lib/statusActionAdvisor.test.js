@@ -50,6 +50,17 @@ describe('buildStatusActions', () => {
     expect(ids(cards)).toContain('lane-empty');
   });
 
+  it('v0.1.849 北極星 state=ok・count0 でも apiRows>0(Koken/Nicoad実取得)なら lane-empty を出さない', () => {
+    const cards = buildStatusActions({
+      livesData: [{ liveId: 'lv1', officialRatePct: 90 }],
+      fastDiag: { content: { giftDiagnostics: { '北極星レーン': {
+        '1_貢献度ランキング': { state: 'ok', count: 0, apiRows: 31 },
+        '+α_広告ランキング': { state: 'ok', count: 0, apiRows: 10 }
+      } } } }
+    });
+    expect(ids(cards)).not.toContain('lane-empty');
+  });
+
   it('北極星描画が詰まる(started>0,completed=0) → northstar-stuck(severity bad)', () => {
     const cards = buildStatusActions({
       livesData: [{ liveId: 'lv1', officialRatePct: 90 }],
