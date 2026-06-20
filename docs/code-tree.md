@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-✅ 全 511 ソースに役割コメントあり。
+✅ 全 512 ソースに役割コメントあり。
 
 ## 全ファイルツリー
 
@@ -252,7 +252,7 @@
   - `vendor-visual-explainer.mjs` — Vendors nicobailon/visual-explainer (MIT) into .cursor/skills/visual-explainer/
   - `verify-bump.mjs` — extension bump 後の整合性チェッカー
   - `write-extension-placeholder-icons.mjs` — リポジトリに 256px アイコンしか無い環境向け: manifest 用の小さめ PNG を生成する。
-- 📁 **src/** (1110)
+- 📁 **src/** (1112)
   - 📁 **data/** (6)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -510,7 +510,7 @@
         - `logo_funlink_white_RGB_maru_black.png`
       - `logo_guide_funlink_ol.pdf`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (900)
+  - 📁 **lib/** (902)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -1094,6 +1094,8 @@
     - `personTileDom.test.js`
     - `pickBroadcasterNameForReputation.js` — 評判チェック用に「配信者名」を解決する純関数 (PR R4)
     - `pickBroadcasterNameForReputation.test.js`
+    - `pickCommentsForExport.js` — HTML/メディアキットレポート用のコメント集合を選ぶ純関数。
+    - `pickCommentsForExport.test.js`
     - `pickLatestComment.js` — ストレージ上のコメント配列の並びは一定でないため、
     - `pickLatestComment.test.js`
     - `pollUntil.js` — 再読み込み直後など DOM が遅れて現れるまで待つ（純粋な間隔ポーリング）

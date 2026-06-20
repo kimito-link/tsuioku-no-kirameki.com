@@ -107,6 +107,7 @@ const FEATURES = [
   { feature: '背景群衆(来場者数の表現)', desc: '席に出せない来場者数(PV)を背景群衆 Canvas の密度で描く', paths: ['src/lib/crowdRasterizer.js'], tags: ['会場', '色', '描画'] },
   { feature: '読み上げ(再生/キュー/年齢ゲート)', desc: 'コメント読み上げの再生・キュー上限・年齢ゲート・ロード状態', paths: ['src/lib/voicePlayer.js', 'src/lib/voiceReadQueue.js', 'src/lib/voiceAgeGate.js'], tags: ['読み上げ', '音声'] },
   { feature: '会場読み上げ診断(遅延の切り分け)', desc: '会場モード(comeview)の読み上げ待機件数/間引き/最終発話/合成msを観測し KEY_VOICE_DIAG 経由で status 速報へ集約。「たまに遅れる」の真因(キュー詰まり/合成遅延)を F12 不要で割る純観測', paths: ['src/lib/voiceDiag.js', 'src/lib/voiceDiagKey.js', 'src/extension/comeview-entry.js', 'src/extension/status-entry.js'], tags: ['読み上げ', '診断', '集約'] },
+  { feature: 'パネル描画診断(白化/ローディング固着)', desc: 'popup/埋め込みパネルの paint 所要ms・描画見送り・【パネルが白(未描画)か】【ローディング幕が継続中か】を nls_perf_diag_<lv> に観測し status 速報へ。「スクロールで白・放置で固着」を DOM/F12 不要で切り分ける純観測', paths: ['src/lib/perfDiag.js', 'src/extension/popup-entry.js', 'src/extension/status-entry.js'], tags: ['表示', '診断', '白フラッシュ'] },
   { feature: 'ギフト投擲演出', desc: '会場でギフト/広告を投げ主サムネから中央映像へ投げる演出の純関数群', paths: ['src/lib/giftThrowProjectile.js'], tags: ['ギフト', '演出'] },
   { feature: '吹き出し寿命管理', desc: '会場の吹き出しの表示上限・追い出し(eviction)ライフサイクル', paths: ['src/lib/venueBubbleLifecycle.js'], tags: ['会場', '吹き出し'] },
   { feature: 'HTMLレポート生成', desc: 'マーケ/イベント順位/タイムライン等を1枚の HTML レポートに組み立てる(popup-entry 内)', paths: ['src/extension/popup-entry.js'], tags: ['レポート'] },
