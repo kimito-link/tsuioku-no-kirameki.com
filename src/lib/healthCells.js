@@ -134,9 +134,22 @@ export function buildHealthCells(data) {
   cells.push(pctCell('capture-rate', '取得率', officialSum > 0 ? (recordedSum / officialSum) * 100 : null, { processing: ratesInProgress }));
 
   // 2. userId 付き保存率。保存0は na。
+  //   v0.1.860: 匿名(184)主体の配信は userId 付き率が低くて当然=仕様であってバグではない
+  //   (匿名コメントは DOM に識別子が無く userId は NDGR にしか存在しない・memory
+  //   reference_comment_capture_anon_vs_named)。低率を🔴異常にすると『取れてないのに正常はおかしい』の
+  //   逆=『仕様なのに異常と嘘の赤』を出し、status の対処カード(uid-low=⚪情報・仕様と明記)と食い違う
+  //   (健全度パネルだけ赤=自己矛盾=self-verifying違反)。NDGR が connected で受信できているなら
+  //   低率は匿名主体=構造的に正常 → na(該当外・色を付けない)。NDGR 切断(本当の異常)は専用の
+  //   『NDGR接続』セルが赤で示す(ここで二重に赤にしない)。statusActionAdvisor の uid-low(<50%を
+  //   info=仕様)と判定をそろえる。
   const uid = obs.savedCommentsUidStats || {};
   const totalSaved = num(uid.totalSaved);
-  cells.push(pctCell('uid-rate', 'userId付き保存', totalSaved && totalSaved > 0 ? num(uid.withUidPercent) : null, { okAt: 90, warnAt: 50 }));
+  const ndgrConnected = String(fast?.networkErrorProbe?.ndgrConnectStatus || '') === 'connected';
+  const uidPct = totalSaved && totalSaved > 0 ? num(uid.withUidPercent) : null;
+  //   保存0=na / NDGR connected で低率(<50)=匿名主体で na / それ以外は通常評価(okAt90/warnAt50)。
+  const uidRateForCell =
+    uidPct != null && ndgrConnected && uidPct < 50 ? null : uidPct;
+  cells.push(pctCell('uid-rate', 'userId付き保存', uidRateForCell, { okAt: 90, warnAt: 50 }));
 
   // 3. NDGR接続。unknown(未受信)は na(障害でない)。
   const ndgr = String(fast?.networkErrorProbe?.ndgrConnectStatus || '');

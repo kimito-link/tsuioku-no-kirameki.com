@@ -219,6 +219,11 @@ export function buildLaneStatusLine(lanes) {
       Number(lane.ndgrValue) ||
       Number(lane.foundCountLifetime) ||
       0;
+    // v0.1.860: 「既知の0」と「未取得(空)」を区別する。value/ndgrValue が 0(数値として確定)なら
+    //   それは『取れていて0pt』=✅0 であって「空」ではない(実機 lv350796749=番組pt が NDGR で 0 と
+    //   確定しているのに value:null・ndgrValue:0 で「空」と誤表示=既知0と未取得の State Conflation)。
+    //   Number(x)||… は 0 を falsy で握り潰すため、厳密一致で 0 を別途拾う(null/undefined は除外)。
+    const knownZero = lane.value === 0 || lane.ndgrValue === 0;
     /** @type {string} */
     let mark;
     if (state === 'no_event' || state === 'no_program_gift' || state === 'no_ranking_data') {
@@ -227,8 +232,10 @@ export function buildLaneStatusLine(lanes) {
       mark = '⏳取得中';
     } else if (state === 'ok' && n > 0) {
       mark = `✅${n}`;
+    } else if (state === 'ok' && knownZero) {
+      mark = '✅0'; // 取得できていて中身が 0(例: まだギフト 0pt)。未取得ではないので「空」と書かない。
     } else if (state === 'ok') {
-      mark = '空'; // 取得経路は生きているが中身が空(まだ来ていない/この時点で0)。
+      mark = '空'; // 取得経路は生きているが中身が空(まだ来ていない=値が null)。
     } else if (state) {
       mark = `⚠${state}`; // 想定外 state はそのまま出して気づけるように。
     } else {

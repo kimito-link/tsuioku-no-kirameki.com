@@ -31,6 +31,24 @@ describe('buildLaneStatusLine (v0.1.766 概要にレーン状況)', () => {
     expect(line).not.toContain('Eスコア');
   });
 
+  it('既知の0(ndgrValue:0/value:0)は ✅0=「空」と区別する(v0.1.860)', () => {
+    // 実機 lv350796749: 番組pt が NDGR で 0 と確定(value:null・ndgrValue:0)。0pt は取れていて 0 であって
+    //   未取得(空)ではない。State Conflation(既知0 vs 未取得)を解消し ✅0 と出す。
+    const lanes = {
+      '4_番組累計ポイント': { state: 'ok', value: null, ndgrValue: 0 }
+    };
+    const line = buildLaneStatusLine(lanes);
+    expect(line).toContain('番組pt:✅0');
+    expect(line).not.toContain('番組pt:空');
+  });
+
+  it('value も ndgrValue も null(真に未取得)は「空」のまま', () => {
+    const lanes = {
+      '4_番組累計ポイント': { state: 'ok', value: null, ndgrValue: null }
+    };
+    expect(buildLaneStatusLine(lanes)).toContain('番組pt:空');
+  });
+
   it('全部「この配信に無し」なら空文字(概要を散らかさない)', () => {
     const lanes = {
       '3_イベント累計スコア': { state: 'no_event' },
