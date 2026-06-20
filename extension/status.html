@@ -74,69 +74,74 @@
         font-size: 17px;
         color: var(--nl-text);
       }
-      .guidepost-lead {
-        font-size: 13px;
-        color: var(--nl-text-soft);
-        line-height: 1.7;
-        margin: 0 0 14px;
-      }
-      .guidepost-grid {
+      /* LP(tsuioku-no-kirameki.com)と同じ「ゆっくり吹き出し会話」スタイル */
+      .gp-thread {
+        margin-top: 14px;
+        border-top: 1px dashed var(--nl-border);
+        padding-top: 14px;
         display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-        gap: 10px;
+        gap: 12px;
       }
-      a.guidepost-card {
-        display: block;
+      .y-row {
+        display: grid;
+        grid-template-columns: minmax(54px, 72px) minmax(0, 1fr);
+        gap: 10px;
+        align-items: start;
+      }
+      .y-row.reverse {
+        grid-template-columns: minmax(0, 1fr) minmax(54px, 72px);
+      }
+      .y-row .speaker {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 2px;
+      }
+      .y-row .speaker img {
+        width: 64px;
+        height: 64px;
+        object-fit: contain;
+      }
+      .y-row .speaker span {
+        font-size: 11px;
+        color: var(--nl-text-soft);
+      }
+      .y-row .bubble {
+        position: relative;
         background: var(--nl-card-bg);
         border: 1px solid var(--nl-border);
-        border-radius: 10px;
-        padding: 11px 13px;
-        text-decoration: none;
-        color: var(--nl-text);
-        transition: border-color 0.15s, transform 0.1s;
-      }
-      a.guidepost-card:hover {
-        border-color: var(--nl-accent);
-        transform: translateY(-2px);
-      }
-      .guidepost-card .gp-title {
-        font-size: 14px;
-        font-weight: 700;
-        margin-bottom: 3px;
-      }
-      .guidepost-card .gp-desc {
-        font-size: 11.5px;
-        color: var(--nl-text-soft);
-        line-height: 1.5;
-      }
-      .guidepost-cheer {
-        margin-top: 14px;
+        border-radius: 14px;
+        padding: 11px 14px;
         font-size: 12.5px;
-        color: var(--nl-text-soft);
-        line-height: 1.7;
-        border-top: 1px dashed var(--nl-border);
-        padding-top: 12px;
-        display: flex;
-        align-items: flex-start;
-        gap: 14px;
+        line-height: 1.65;
+        color: var(--nl-text);
+        min-width: 0;
+        align-self: center;
       }
-      .guidepost-cheer .cheer-chara {
-        flex: 0 0 auto;
-        display: flex;
-        gap: 2px;
-        align-items: flex-end;
+      .y-row .bubble strong { color: var(--nl-accent); }
+      .y-row .bubble a { color: #7fa8e0; font-weight: 700; }
+      /* 吹き出しのしっぽ(キャラ側へ三角) */
+      .y-row:not(.reverse) .bubble::after {
+        content: "";
+        position: absolute;
+        left: -7px;
+        top: 22px;
+        border: 7px solid transparent;
+        border-right-color: var(--nl-border);
       }
-      .guidepost-cheer .cheer-chara img {
-        width: 52px;
-        height: 52px;
-        object-fit: contain;
-        image-rendering: auto;
-      }
-      .guidepost-cheer .cheer-text {
-        flex: 1 1 auto;
+      .y-row.reverse .bubble::after {
+        content: "";
+        position: absolute;
+        right: -7px;
+        top: 22px;
+        border: 7px solid transparent;
+        border-left-color: var(--nl-border);
       }
       @media (max-width: 520px) {
-        .guidepost-cheer { flex-direction: column; align-items: center; text-align: center; }
+        .y-row, .y-row.reverse { grid-template-columns: 48px minmax(0, 1fr); }
+        .y-row.reverse .speaker { order: 2; }
+        .y-row .speaker img { width: 44px; height: 44px; }
+        .y-row .bubble::after { display: none; }
       }
       .status-buttons {
         display: flex;
@@ -357,36 +362,46 @@
 
     <section class="guidepost">
       <h2>🧭 はじめての方へ — ここから全部たどれます</h2>
-      <p class="guidepost-lead">
-        このページは「いまの調子」を映す画面です。下にスクロールすると、配信の記録状況や気になる点が出ます。<br>
-        仕組みやコードを知りたくなったら、下のカードをクリック。専門知識がなくても、図で全体が分かるようになっています。
-      </p>
-      <div class="guidepost-grid">
-        <a class="guidepost-card" href="https://htmlpreview.github.io/?https://raw.githubusercontent.com/kimito-link/tsuioku-no-kirameki.com/master/docs/feature-sitemap.html" target="_blank" rel="noopener">
-          <div class="gp-title">🗺️ 機能マップ（できることの地図）</div>
-          <div class="gp-desc">「何ができる？」を分類ごとに。記録・会場・読み上げ…どの機能がどこにあるか一目で。まず見るならこれ。</div>
-        </a>
-        <a class="guidepost-card" href="https://htmlpreview.github.io/?https://raw.githubusercontent.com/kimito-link/tsuioku-no-kirameki.com/master/docs/code-tree.html" target="_blank" rel="noopener">
-          <div class="gp-title">🌳 コードの地図（全ファイル）</div>
-          <div class="gp-desc">すべてのファイルが「何をするか」付きの枝分かれツリー。データの流れ（取得→記録→表示）も冒頭に。</div>
-        </a>
-        <a class="guidepost-card" href="https://github.com/kimito-link/tsuioku-no-kirameki.com" target="_blank" rel="noopener">
-          <div class="gp-title">📦 ソースコード（GitHub）</div>
-          <div class="gp-desc">プログラムの中身そのもの。自由に読んで・学んで・自分の作品に活かしてOK。</div>
-        </a>
-      </div>
-      <div class="guidepost-cheer">
-        <div class="cheer-chara">
-          <img src="images/yukkuri-charactore-english/link/link-yukkuri-smile-mouth-open.thumb128.png" alt="りんく(笑顔)" width="52" height="52" loading="lazy">
-          <img src="images/yukkuri-charactore-english/konta/kitsune-yukkuri-smile-mouth-open.thumb128.png" alt="こんた(笑顔)" width="52" height="52" loading="lazy">
-          <img src="images/yukkuri-charactore-english/tanunee/tanuki-yukkuri-smile-mouth-open.thumb128.png" alt="たぬねえ(笑顔)" width="52" height="52" loading="lazy">
+      <div class="gp-thread">
+        <div class="y-row">
+          <div class="speaker">
+            <img src="images/yukkuri-charactore-english/link/link-yukkuri-smile-mouth-open.thumb128.png" alt="りんく" width="64" height="64" loading="lazy">
+            <span>りんく</span>
+          </div>
+          <div class="bubble">
+            ようこそなのだ！ このページは「<strong>いまの調子</strong>」を映す画面なのだ。下にスクロールすると、配信の記録状況や気になる点が出るのだ。
+          </div>
         </div>
-        <p class="cheer-text">
-          🌱 <strong>これから何かを創ろうとしているあなたへ</strong> ——
-          最初は誰でも「何が分からないのか分からない」ところから始まります。だから、このページは
-          <em>地図</em>を用意しました。迷ったら 🗺️ から眺めてみてください。完璧じゃなくて大丈夫。
-          一歩ずつで、ちゃんと形になります。わたしたちも、あなたの「創りたい」を応援しています。
-        </p>
+        <div class="y-row reverse">
+          <div class="bubble">
+            「仕組みやコードも知りたい」って人へ。専門知識がなくても、<strong>図で全体が分かる</strong>地図を3つ用意したのだ。<br>
+            🗺️ <a href="https://htmlpreview.github.io/?https://raw.githubusercontent.com/kimito-link/tsuioku-no-kirameki.com/master/docs/feature-sitemap.html" target="_blank" rel="noopener">機能マップ</a>（何ができる？を分類で・まずはこれ）
+          </div>
+          <div class="speaker">
+            <img src="images/yukkuri-charactore-english/konta/kitsune-yukkuri-smile-mouth-open.thumb128.png" alt="こん太" width="64" height="64" loading="lazy">
+            <span>こん太</span>
+          </div>
+        </div>
+        <div class="y-row">
+          <div class="speaker">
+            <img src="images/yukkuri-charactore-english/tanunee/tanuki-yukkuri-smile-mouth-open.thumb128.png" alt="たぬねえ" width="64" height="64" loading="lazy">
+            <span>たぬねえ</span>
+          </div>
+          <div class="bubble">
+            もっと深く見たいときはこっちなのだ。<br>
+            🌳 <a href="https://htmlpreview.github.io/?https://raw.githubusercontent.com/kimito-link/tsuioku-no-kirameki.com/master/docs/code-tree.html" target="_blank" rel="noopener">コードの地図</a>（全ファイルが何をするか）／
+            📦 <a href="https://github.com/kimito-link/tsuioku-no-kirameki.com" target="_blank" rel="noopener">ソースコード</a>（GitHub・自由に学んでOK）
+          </div>
+        </div>
+        <div class="y-row reverse">
+          <div class="bubble">
+            🌱 <strong>これから何かを創ろうとしているあなたへ</strong>。最初は誰でも「何が分からないのか分からない」ところから始まるのだ。だから<em>地図</em>を用意したのだ。完璧じゃなくて大丈夫。一歩ずつで、ちゃんと形になるのだ。わたしたちも、あなたの「創りたい」を応援しているのだ！
+          </div>
+          <div class="speaker">
+            <img src="images/yukkuri-charactore-english/link/link-yukkuri-smile-mouth-open.thumb128.png" alt="りんく" width="64" height="64" loading="lazy">
+            <span>りんく</span>
+          </div>
+        </div>
       </div>
     </section>
 

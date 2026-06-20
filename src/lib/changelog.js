@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.832',
+    date: '2026-06-20',
+    summary: '「はじめての方へ」をLPと同じキャラ吹き出し会話に',
+    items: Object.freeze([
+      '状態ページ先頭の「🧭 はじめての方へ」を、公式サイト(tsuioku-no-kirameki.com)と同じ「ゆっくりキャラの吹き出し会話」スタイルにしました。りんく・こん太・たぬねえが左右交互に吹き出しで話しながら、機能マップ・コードの地図・ソースコードへの行き方と、これから創る方への応援を伝えます。専門用語が苦手な方でも、会話を読むだけで「どこを見ればいいか」が分かります。記録・コメント取得には影響しません。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.831',
     date: '2026-06-20',
     summary: '「はじめての方へ」に3キャラの笑顔を添えて応援感を強化',
