@@ -50,10 +50,22 @@
   .legend b{ color:var(--ink); }
   @media (max-width:640px){ .mm{ flex-direction:column; } .mm-center{ align-self:stretch; margin-bottom:10px; }
     .mm-trunk{ display:none; } }
+
+  .map-nav{ display:flex; flex-wrap:wrap; align-items:center; gap:6px 8px; margin:0 0 16px;
+    padding:8px 0; border-bottom:1px solid var(--line); }
+  .map-nav .nav-item{ font-size:12.5px; text-decoration:none; color:#9fb6da;
+    border:1px solid transparent; border-radius:999px; padding:3px 11px; line-height:1.5; white-space:nowrap; }
+  .map-nav a.nav-item:hover{ border-color:var(--line); color:#cfe0ff; }
+  .map-nav .nav-here{ color:#fff; font-weight:700; border-bottom:2px solid var(--accent,#ec4899);
+    border-radius:6px 6px 0 0; }
+  .map-nav .nav-ext{ color:#7fa8e0; }
+  .map-nav .nav-note{ font-size:11.5px; color:var(--muted); margin-left:auto; white-space:nowrap; }
+  @media (max-width:520px){ .map-nav .nav-note{ margin-left:0; flex-basis:100%; } }
 </style>
 </head>
 <body>
 <div class="wrap">
+  <nav class="map-nav" aria-label="地図ナビ"><span class="nav-item nav-here" aria-current="page">🧠 機能マップ</span><a class="nav-item" href="code-tree.html">🌳 コードの地図</a><a class="nav-item" href="repo-tree-map.html">🧭 逆引き索引</a><a class="nav-item nav-ext" href="MAP.md">🗺️ 入口(MAP)</a><a class="nav-item nav-ext" href="https://github.com/kimito-link/tsuioku-no-kirameki.com" target="_blank" rel="noopener">📦 ソース</a><span class="nav-note" title="状態ページは拡張のアイコンから開けます">📊 状態は拡張アイコンから</span></nav>
   <h1>🧠 機能マインドマップ(りんく・こん太・たぬ姉の解説つき)</h1>
   <p class="meta">
     アプリ全体から「分類 → 機能 → 役割 → 担当ファイル」へ枝分かれ。分類ごとに色分けし、りんく・こん太・たぬ姉が

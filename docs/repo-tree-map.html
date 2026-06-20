@@ -45,10 +45,22 @@
   .path{ font-family:"Menlo","Consolas",monospace; font-size:11.5px; background:rgba(255,255,255,.06);
     border:1px solid var(--line); border-radius:6px; padding:2px 7px; color:#bcd2f6; }
   .path.dead{ color:#f6c7d2; border-color:var(--warn); background:rgba(181,72,95,.12); }
+
+  .map-nav{ display:flex; flex-wrap:wrap; align-items:center; gap:6px 8px; margin:0 0 16px;
+    padding:8px 0; border-bottom:1px solid var(--line); }
+  .map-nav .nav-item{ font-size:12.5px; text-decoration:none; color:#9fb6da;
+    border:1px solid transparent; border-radius:999px; padding:3px 11px; line-height:1.5; white-space:nowrap; }
+  .map-nav a.nav-item:hover{ border-color:var(--line); color:#cfe0ff; }
+  .map-nav .nav-here{ color:#fff; font-weight:700; border-bottom:2px solid var(--accent,#ec4899);
+    border-radius:6px 6px 0 0; }
+  .map-nav .nav-ext{ color:#7fa8e0; }
+  .map-nav .nav-note{ font-size:11.5px; color:var(--muted); margin-left:auto; white-space:nowrap; }
+  @media (max-width:520px){ .map-nav .nav-note{ margin-left:0; flex-basis:100%; } }
 </style>
 </head>
 <body>
 <div class="wrap">
+  <nav class="map-nav" aria-label="地図ナビ"><a class="nav-item" href="feature-sitemap.html">🧠 機能マップ</a><a class="nav-item" href="code-tree.html">🌳 コードの地図</a><span class="nav-item nav-here" aria-current="page">🧭 逆引き索引</span><a class="nav-item nav-ext" href="MAP.md">🗺️ 入口(MAP)</a><a class="nav-item nav-ext" href="https://github.com/kimito-link/tsuioku-no-kirameki.com" target="_blank" rel="noopener">📦 ソース</a><span class="nav-note" title="状態ページは拡張のアイコンから開けます">📊 状態は拡張アイコンから</span></nav>
   <h1>リポジトリ ディレクトリマップ</h1>
   <p class="meta">
     どのディレクトリが何の担当か（色・速度・コメント・レポート…）を一目で。<code>scripts/repo-tree-map.mjs</code> が git 追跡ファイルから自動生成（手編集しない）。<br>

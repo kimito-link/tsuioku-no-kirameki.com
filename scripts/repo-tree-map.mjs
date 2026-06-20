@@ -435,6 +435,45 @@ function renderMarkdown(nodes, files) {
 function escapeHtml(s) {
   return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
+
+/* ── 全地図共通ナビ(どこからでもたどれる)──────────────────────────────
+ * 正本はここ1か所。3地図テンプレ(repo-tree-map / code-tree / feature-sitemap)が
+ * <div class="wrap"> 直後で ${navHeaderHtml('...')} を呼ぶ=ドリフトゼロ。
+ * 設計正本: council/nav-header-SYNTHESIS.md(星野ロミ式・死にリンクを作らない)。 */
+
+/** 共通ナビの CSS(3テンプレの <style> に NAV_CSS を1回ずつ差し込む=実体は1か所)。 */
+const NAV_CSS = `
+  .map-nav{ display:flex; flex-wrap:wrap; align-items:center; gap:6px 8px; margin:0 0 16px;
+    padding:8px 0; border-bottom:1px solid var(--line); }
+  .map-nav .nav-item{ font-size:12.5px; text-decoration:none; color:#9fb6da;
+    border:1px solid transparent; border-radius:999px; padding:3px 11px; line-height:1.5; white-space:nowrap; }
+  .map-nav a.nav-item:hover{ border-color:var(--line); color:#cfe0ff; }
+  .map-nav .nav-here{ color:#fff; font-weight:700; border-bottom:2px solid var(--accent,#ec4899);
+    border-radius:6px 6px 0 0; }
+  .map-nav .nav-ext{ color:#7fa8e0; }
+  .map-nav .nav-note{ font-size:11.5px; color:var(--muted); margin-left:auto; white-space:nowrap; }
+  @media (max-width:520px){ .map-nav .nav-note{ margin-left:0; flex-basis:100%; } }`;
+
+/** 全地図共通ナビ。active = 'feature-sitemap' | 'code-tree' | 'repo-tree-map'。
+ *  地図→地図 は相対リンク。status は公開URL不在ゆえ死にリンクにせず、到達可能な代替入口
+ *  (MAP.md・GitHub)を渡し、状態ページは補足テキストで案内(星野ロミ式・失敗体験の除去)。 */
+function navHeaderHtml(active) {
+  const pages = [
+    ['feature-sitemap', '🧠 機能マップ', 'feature-sitemap.html'],
+    ['code-tree', '🌳 コードの地図', 'code-tree.html'],
+    ['repo-tree-map', '🧭 逆引き索引', 'repo-tree-map.html'],
+  ];
+  const items = pages.map(([key, label, href]) =>
+    key === active
+      ? `<span class="nav-item nav-here" aria-current="page">${escapeHtml(label)}</span>`
+      : `<a class="nav-item" href="${href}">${escapeHtml(label)}</a>`
+  ).join('');
+  return `<nav class="map-nav" aria-label="地図ナビ">${items}`
+    + `<a class="nav-item nav-ext" href="MAP.md">🗺️ 入口(MAP)</a>`
+    + `<a class="nav-item nav-ext" href="https://github.com/kimito-link/tsuioku-no-kirameki.com" target="_blank" rel="noopener">📦 ソース</a>`
+    + `<span class="nav-note" title="状態ページは拡張のアイコンから開けます">📊 状態は拡張アイコンから</span></nav>`;
+}
+
 function renderHtml(nodes, files, missing) {
   const tops = topDirs(nodes);
   const cards = [];
@@ -527,10 +566,12 @@ function renderHtml(nodes, files, missing) {
   .path{ font-family:"Menlo","Consolas",monospace; font-size:11.5px; background:rgba(255,255,255,.06);
     border:1px solid var(--line); border-radius:6px; padding:2px 7px; color:#bcd2f6; }
   .path.dead{ color:#f6c7d2; border-color:var(--warn); background:rgba(181,72,95,.12); }
+${NAV_CSS}
 </style>
 </head>
 <body>
 <div class="wrap">
+  ${navHeaderHtml('repo-tree-map')}
   <h1>リポジトリ ディレクトリマップ</h1>
   <p class="meta">
     どのディレクトリが何の担当か（色・速度・コメント・レポート…）を一目で。<code>scripts/repo-tree-map.mjs</code> が git 追跡ファイルから自動生成（手編集しない）。<br>
@@ -840,10 +881,12 @@ function renderCodeTreeHtml(root, roles) {
   .legend{ margin-top:20px; font-size:12.5px; color:var(--sub); background:var(--panel);
     border:1px solid var(--line); border-radius:12px; padding:14px 18px; line-height:1.9; }
   .legend b{ color:var(--ink); }
+${NAV_CSS}
 </style>
 </head>
 <body>
 <div class="wrap">
+  ${navHeaderHtml('code-tree')}
   <h1>🌳 コード全ツリー（毛細血管まで）</h1>
   <p class="meta">
     まず上の「データの流れ」で根幹を掴み、下のツリーで全ファイルの「何をするか」（先頭コメントから自動抽出）まで。
@@ -1037,10 +1080,12 @@ function renderFeatureSitemapHtml(files) {
   .legend b{ color:var(--ink); }
   @media (max-width:640px){ .mm{ flex-direction:column; } .mm-center{ align-self:stretch; margin-bottom:10px; }
     .mm-trunk{ display:none; } }
+${NAV_CSS}
 </style>
 </head>
 <body>
 <div class="wrap">
+  ${navHeaderHtml('feature-sitemap')}
   <h1>🧠 機能マインドマップ(りんく・こん太・たぬ姉の解説つき)</h1>
   <p class="meta">
     アプリ全体から「分類 → 機能 → 役割 → 担当ファイル」へ枝分かれ。分類ごとに色分けし、りんく・こん太・たぬ姉が

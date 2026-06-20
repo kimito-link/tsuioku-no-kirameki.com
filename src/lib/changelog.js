@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.833',
+    date: '2026-06-20',
+    summary: '全地図とstatusに共通ナビを追加',
+    items: Object.freeze([
+      '機能マップ・コードの地図・逆引き索引(3つの地図ページ)と、この状態ページの先頭に「共通ナビ」を付けました。どのページを見ていても、上のナビから他の地図へワンクリックで移動できます。いま見ているページは色付きで分かるようにしています。地図ページからは、全地図の入口(MAP)とソースコード(GitHub)へも飛べます(状態ページだけは拡張のアイコンから開く案内を添えています)。狭い画面でも折り返して崩れません。記録・コメント取得には影響しません。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.832',
     date: '2026-06-20',
     summary: '「はじめての方へ」をLPと同じキャラ吹き出し会話に',
