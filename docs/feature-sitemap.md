@@ -501,7 +501,7 @@
 - **影響範囲ゲート(規律を自動化)** — 星野ロミ式「規律を自動ゲートに」。diff から影響大(複数機能波及)の変更ファイルを検出し波及先機能を列挙。警告のみ(摩擦ゼロ)・--strict で exit1。AGENTS.md §10 のルールを diff 発火に
   - `scripts/impact-check.mjs`
   - `docs/feature-map/impact-map.json`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 29</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 30</summary>
 
 - `api/status.js` — status 受け口 Vercel Serverless Function。
 - `scripts/run-verify-cc.mjs` — Claude Code 向け verify ランナー。
@@ -513,6 +513,7 @@
 - `src/lib/changelog-archive.js` — 追憶のきらめき 更新履歴アーカイブ（v0.1.663 以前）。
 - `src/lib/changelog.js` — 拡張の更新履歴データと semver 比較ヘルパ。
 - `src/lib/changelogConsistency.js` — 版番号の三者一致を機械照合する純関数(v0.1.835)。
+- `src/lib/changelogLineage.js` — changelog 全版を「バグ系統」で枝化する純関数(v0.1.841・修正系譜マップ 第1)。
 - `src/lib/commentPanelHealthProbe.js` — ニコ生の watch ページでコメント欄が「見えない／届かない」状態を検出し、
 - `src/lib/commentPanelStatus.js` — コメントパネル検出失敗（DOM 変更等）をポップアップ向けに解釈する純関数
 - `src/lib/commentPostStatusPresentation.js` — コメント送信 UI の「最終ステータス表示」と aria-describedby を決める純関数群。
@@ -639,9 +640,10 @@
 
 ## 🧬 修正系譜マップ(この系統のバグを過去にどう直したか)
 
-> changelog 全 178 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
+> changelog 全 179 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
 
-### 💾 記録件数 (20版)
+### 💾 記録件数 (21版)
+- `v0.1.842` 2026-06-20 — 記録件数を公式とほぼ一致させる(配信者引き算を廃止)
 - `v0.1.841` 2026-06-20 — 修正系譜マップ(再発防止)を地図に追加
 - `v0.1.839` 2026-06-20 — 記録件数の表示の正本を1本に固定(第1)
 - `v0.1.838` 2026-06-20 — 記録数が0に潰れる不具合を根治

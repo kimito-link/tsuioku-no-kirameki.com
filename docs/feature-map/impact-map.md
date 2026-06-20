@@ -209,7 +209,6 @@
 | `src/lib/broadcastCrossCompare.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/broadcastDurationLabel.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/broadcasterCommentCount.js` | 1 | ポップアップ(応援レーン) |
-| `src/lib/broadcasterExcludedCount.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/broadcasterFollowTarget.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/broadcasterReputationKeywords.js` | 1 | 状態速報ページ |
 | `src/lib/broadcasterReputationView.js` | 1 | 状態速報ページ |
