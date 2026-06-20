@@ -6,6 +6,7 @@
  * を未然に検出するための pre-flight check。npm run verify-bump で実行。
  *
  * 検証項目:
+ *   0. changelog/manifest/package の版番号が三者一致+先頭エントリの体裁 (v0.1.835)
  *   1. manifest.json の version が package.json または changelog 先頭と一致
  *   2. extension/dist/{popup,content,page-intercept}.js が存在し非空
  *   3. dist の各 .js が manifest.json より新しい (build 忘れ検出)
@@ -18,6 +19,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { execSync } from 'node:child_process';
+import { EXTENSION_CHANGELOG } from '../src/lib/changelog.js';
+import { checkChangelogConsistency } from '../src/lib/changelogConsistency.js';
 
 const ROOT = process.cwd();
 
@@ -59,10 +62,30 @@ const fail = (msg) => {
 
 console.log('verify-bump: extension bump 整合性チェック開始\n');
 
-// 1. manifest.json バージョン
+// 0. changelog/manifest/package 版番号の三者一致 + 先頭エントリ体裁 (v0.1.835)
+//    self-verifying loop の取り込み: 「どれか1つだけ bump し忘れ」を verify:cc 必須経路で機械照合。
+//    純ロジックは src/lib/changelogConsistency.js(test 付き)。正本=council/self-verifying-loop-SYNTHESIS.md。
 const manifestPath = path.join(ROOT, 'extension/manifest.json');
 const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
-console.log(`[1] manifest.json version: ${manifest.version}`);
+const pkg = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8'));
+console.log('[0] changelog/manifest/package 版番号の三者一致');
+{
+  const head = EXTENSION_CHANGELOG[0];
+  const violations = checkChangelogConsistency({
+    changelogVersion: head?.version,
+    manifestVersion: manifest.version,
+    packageVersion: pkg.version,
+    headEntry: head
+  });
+  if (violations.length === 0) {
+    log.ok(`三者一致 OK (${manifest.version})`);
+  } else {
+    for (const v of violations) fail(v);
+  }
+}
+
+// 1. manifest.json バージョン
+console.log(`\n[1] manifest.json version: ${manifest.version}`);
 if (!/^\d+\.\d+\.\d+$/.test(manifest.version)) {
   fail(`不正な version 形式: ${manifest.version}`);
 } else {

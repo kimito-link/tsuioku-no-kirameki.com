@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { buildStatusActions } from './statusActionAdvisor.js';
+import { findHarmWordsInInfoCards } from './diagWordingGuard.js';
 
 const ids = (cards) => cards.map((c) => c.id);
 
@@ -178,5 +179,25 @@ describe('buildStatusActions', () => {
     const sev = cards.map((c) => c.severity);
     expect(sev[0]).toBe('bad');
     expect(sev[sev.length - 1]).toBe('info');
+  });
+
+  it('info カードに実害語(混乱/混入/汚染…)を入れない（diagWordingGuard・v0.1.835）', () => {
+    // self-verifying loop の取り込み: 全カードを発火させ、info(実害なし位置づけ)カードに不安語が
+    // 混ざっていないか機械照合。混ざっていたら「実コードでその因果を裏取りせよ」のサイン=ここで落ちる。
+    // 多種カードを同時に出すシナリオ。
+    const cards = buildStatusActions({
+      livesData: [{ liveId: 'lv1', officialRatePct: 20 }],
+      fastDiag: {
+        content: {
+          networkErrorProbe: { ndgrConnectStatus: 'disconnected' },
+          giftDiagnostics: {
+            multiTabDiag: { staleDomBundleSuspected: true },
+            commentObservability: { savedCommentsUidStats: { withUidPercent: 10 } }
+          }
+        }
+      }
+    });
+    const hits = findHarmWordsInInfoCards(cards);
+    expect(hits, `info カードに実害語: ${JSON.stringify(hits)}`).toEqual([]);
   });
 });
