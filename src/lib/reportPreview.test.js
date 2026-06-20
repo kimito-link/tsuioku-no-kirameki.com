@@ -165,33 +165,49 @@ describe('buildReportPreviewLines(速報行の整形)', () => {
     expect(buildReportPreviewLines({ totalComments: 0 })).toBe('');
   });
 
-  it('本文ありなら主要 KPI を1行に並べる', () => {
+  it('「コメントした人」は正本(commenters)を見出しに出し、過大な uniqueUsers は出さない', () => {
     const line = buildReportPreviewLines({
       totalComments: 1234,
-      uniqueUsers: 50,
+      uniqueUsers: 127, // marketing の過大値(のべ別キー)
+      commenters: 26, // gap の正本(実人数)
       commentsPerMinute: 8.5,
       heavyPct: 12.3,
-      oncePct: 40
+      oncePct: 40,
+      visitors: 811,
+      silentEstimate: 785
     });
-    expect(line).toContain('レポート内容(保存前)');
     expect(line).toContain('本文コメント 1,234');
-    expect(line).toContain('ユニーク 50人');
+    expect(line).toContain('コメントした人 26人'); // 正本を見出しに
+    expect(line).not.toContain('127'); // 過大な uniqueUsers は出さない
+    expect(line).not.toContain('ユニーク 127');
     expect(line).toContain('分速 8.5');
     expect(line).toContain('ヘビー 12.3%');
     expect(line).toContain('一度きり 40%');
-    expect(line).not.toContain('来場と応援参加'); // visitors なし → 2行目なし
+    expect(line).toContain('来場と応援参加: 来場 811');
+    expect(line).toContain('沈黙視聴者(推定) 785');
+    // 「コメントした人」は見出し(1行目)に1回だけ=2行目には重複させない。
+    expect(line.split('\n')[1]).not.toContain('コメントした人');
   });
 
-  it('来場/コメント者があれば2行目に来場と応援参加を出す', () => {
+  it('commenters 未取得なら uniqueUsers を「のべ別キー(過大)」と明示してフォールバック', () => {
     const line = buildReportPreviewLines({
       totalComments: 100,
-      uniqueUsers: 20,
-      visitors: 1200,
+      uniqueUsers: 50,
+      commenters: 0
+    });
+    expect(line).toContain('のべ別キー 50(匿名は過大)');
+    expect(line).not.toContain('コメントした人');
+  });
+
+  it('visitors があれば2行目に来場と沈黙視聴者を出す(コメントした人は見出しへ)', () => {
+    const line = buildReportPreviewLines({
+      totalComments: 100,
       commenters: 20,
+      visitors: 1200,
       silentEstimate: 1180
     });
+    expect(line).toContain('コメントした人 20人'); // 見出し(1行目)
     expect(line).toContain('来場と応援参加: 来場 1,200');
-    expect(line).toContain('コメントした人 20');
     expect(line).toContain('沈黙視聴者(推定) 1,180');
     expect(line.split('\n').length).toBe(2);
   });
@@ -200,6 +216,7 @@ describe('buildReportPreviewLines(速報行の整形)', () => {
     const line = buildReportPreviewLines({
       totalComments: 5,
       uniqueUsers: 0,
+      commenters: 0,
       commentsPerMinute: 0,
       heavyPct: 0,
       oncePct: 0

@@ -392,6 +392,7 @@
 | `src/lib/northStarLaneGadgetChara.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/northStarLaneVisibility.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/northStarLaneWaitingUi.js` | 1 | ポップアップ(応援レーン) |
+| `src/lib/numberConsistency.js` | 1 | 状態速報ページ |
 | `src/lib/objectUrlRevokeQueue.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/observerTarget.js` | 1 | 記録エンジン(watchページ常駐) |
 | `src/lib/officialDomRankingRowsToStripRooms.js` | 1 | ポップアップ(応援レーン) |

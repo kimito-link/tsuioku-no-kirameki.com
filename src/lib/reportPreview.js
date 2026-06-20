@@ -11,7 +11,7 @@
  * @typedef {{
  *   liveId: string,
  *   totalComments: number,       // 本文ありコメント数(マーケ集計の母数)
- *   uniqueUsers: number,         // ユニークコメント者
+ *   uniqueUsers: number,         // marketing の「のべ別キー」数(匿名で過大・実人数の正本は commenters)
  *   commentsPerMinute: number,   // 分速
  *   heavyPct: number,            // ヘビー層%(segmentPcts.heavy)
  *   oncePct: number,             // 一度きり%
@@ -115,16 +115,22 @@ export function buildReportPreviewLines(p) {
   if (total <= 0) return '';
   const parts = [];
   parts.push(`本文コメント ${total.toLocaleString('ja-JP')}`);
-  if (p.uniqueUsers > 0) parts.push(`ユニーク ${p.uniqueUsers.toLocaleString('ja-JP')}人`);
+  // v0.1.859: 「コメントした人」は HTML レポート本体(resolveCommentsParticipation・marketingChartsHtml.js)と
+  //   同じ正本=gap の commenters(識別可能な実人数・匿名 a:hash 含む)を使う。marketing の uniqueUsers は
+  //   userId 空コメントを `anon:commentNo` で1件ずつ別人カウントするため過大=正本にしない(二枚舌を出さない)。
+  //   commenters が未取得(popup 未起動等)の時だけ uniqueUsers を「のべ別キー」と明示してフォールバック。
+  if (p.commenters > 0) {
+    parts.push(`コメントした人 ${p.commenters.toLocaleString('ja-JP')}人`);
+  } else if (p.uniqueUsers > 0) {
+    parts.push(`のべ別キー ${p.uniqueUsers.toLocaleString('ja-JP')}(匿名は過大)`);
+  }
   if (p.commentsPerMinute > 0) parts.push(`分速 ${p.commentsPerMinute}`);
   if (p.heavyPct > 0) parts.push(`ヘビー ${p.heavyPct}%`);
   if (p.oncePct > 0) parts.push(`一度きり ${p.oncePct}%`);
   const head = `レポート内容(保存前): ${parts.join(' / ')}`;
-  // 来場と応援参加(audienceGap)は値があるときだけ2行目に。
-  if (p.visitors > 0 || p.commenters > 0) {
-    const g = [];
-    if (p.visitors > 0) g.push(`来場 ${p.visitors.toLocaleString('ja-JP')}`);
-    if (p.commenters > 0) g.push(`コメントした人 ${p.commenters.toLocaleString('ja-JP')}`);
+  // 来場と応援参加(audienceGap)は値があるときだけ2行目に。コメントした人は上で出したので来場/沈黙のみ。
+  if (p.visitors > 0) {
+    const g = [`来場 ${p.visitors.toLocaleString('ja-JP')}`];
     if (p.silentEstimate > 0) g.push(`沈黙視聴者(推定) ${p.silentEstimate.toLocaleString('ja-JP')}`);
     return `${head}\n  来場と応援参加: ${g.join(' / ')}`;
   }
