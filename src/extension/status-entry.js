@@ -204,6 +204,27 @@ async function refresh(opts = {}) {
           ? '(ストレージ混雑中… 自動で再読み込みします)'
           : `(${step} で停止。再試行します…)`;
       }
+      // v0.1.855: 「いま気になる点」「マインドマップ」も初回 refresh が timeout/失敗すると
+      //   「読み込み中…」のまま固着し、最終更新も「—」のまま=何が起きたか分からず空白に見えた
+      //   (ユーザー実機: 状態のセルが全部出ない+理由も出ない)。残さず理由を出す(self-verifying)。
+      const stuckNote = timedOut
+        ? '(ストレージ混雑中… 数秒ごとに自動で再読み込みします)'
+        : `(${step} で停止。再試行します…)`;
+      for (const id of ['actionBody', 'mindmapBody']) {
+        const el = document.getElementById(id);
+        if (el && /読み込み中/.test(el.textContent || '')) {
+          el.className = 'empty-note';
+          el.textContent = stuckNote;
+        }
+      }
+      // 最終更新に「試みたが失敗」を出す。「—」固着=動いていないように見えるのを防ぐ。
+      const metaEl = document.getElementById('metaLastUpdate');
+      if (metaEl) {
+        const t = new Date();
+        const hh = String(t.getHours()).padStart(2, '0');
+        const mm = String(t.getMinutes()).padStart(2, '0');
+        metaEl.textContent = `最終更新 ${hh}:${mm} ⚠${timedOut ? '混雑' : '再試行'}`;
+      }
       // AI 共有欄にも出して、範囲選択コピーで開発者に渡せるように(実エラー時のみ)。
       const ta = /** @type {HTMLTextAreaElement|null} */ (document.getElementById('aiShareText'));
       if (ta && !ta.value && !timedOut) ta.value = _statusLastErrorText;
@@ -816,7 +837,11 @@ function summarizeOneLive(lv, summary, snapshot, perfDiag, endedFlag) {
     capturedAt,
     lastIngestAgoMs,
     perfDiag: diag,
-    endedAt
+    endedAt,
+    // v0.1.855: マインドマップ「記録中の配信」は lv.recording を数えるが、従来 summarizeOneLive は
+    //   この field を返しておらず【常に 0 件】と誤報していた(累計13,708件あるのに「記録中0件」=
+    //   self-verifying 違反・ユーザー指摘)。配信中(endedAt 無し=列挙された視聴中タブ)を記録中とみなす。
+    recording: !endedAt
   };
 }
 
