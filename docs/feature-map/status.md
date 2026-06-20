@@ -22,6 +22,7 @@ graph LR
   n_status --> n_src_lib_htmlEscape_js["lib/htmlEscape.js"]:::shared
   n_status --> n_src_lib_liveEndedFlag_js["lib/liveEndedFlag.js"]:::shared
   n_status --> n_src_lib_liveHealthScore_js["lib/liveHealthScore.js"]
+  n_status --> n_src_lib_metricConfidence_js["lib/metricConfidence.js"]:::shared
   n_status --> n_src_lib_numberConsistency_js["lib/numberConsistency.js"]
   n_status --> n_src_lib_perfDiag_js["lib/perfDiag.js"]:::shared
   n_status --> n_src_lib_pickBroadcasterNameForReputation_js["lib/pickBroadcasterNameForReputation.js"]

@@ -37,7 +37,7 @@
 - 📁 **app/** (2)
   - `app.js` — スマホ閲覧用 status Web 版。
   - `index.html`
-- 📁 **docs/** (70)
+- 📁 **docs/** (71)
   - 📁 **article-assets/** (3)
     - `venue-mode-sound.mp4`
     - `venue-mode.gif`
@@ -86,6 +86,7 @@
   - `comment-metadata-pipeline-notes.md`
   - `comment-number-rescue-flow.html`
   - `cursor-handoff-direct-concurrent-viewers.md`
+  - `diagnostics-strengthening-log.md`
   - `extension-bump-checklist.md`
   - `feature-sitemap.html`
   - `feature-sitemap.md`

@@ -177,14 +177,14 @@ describe('buildReportPreviewLines(速報行の整形)', () => {
       silentEstimate: 785
     });
     expect(line).toContain('本文コメント 1,234');
-    expect(line).toContain('コメントした人 26人'); // 正本を見出しに
+    expect(line).toContain('コメントした人 26人'); // 正本を見出しに(文脈なし=注釈なし)
     expect(line).not.toContain('127'); // 過大な uniqueUsers は出さない
     expect(line).not.toContain('ユニーク 127');
     expect(line).toContain('分速 8.5');
     expect(line).toContain('ヘビー 12.3%');
     expect(line).toContain('一度きり 40%');
     expect(line).toContain('来場と応援参加: 来場 811');
-    expect(line).toContain('沈黙視聴者(推定) 785');
+    expect(line).toContain('沈黙視聴者 785(推定)'); // v0.1.861: 信頼度注釈
     // 「コメントした人」は見出し(1行目)に1回だけ=2行目には重複させない。
     expect(line.split('\n')[1]).not.toContain('コメントした人');
   });
@@ -195,8 +195,26 @@ describe('buildReportPreviewLines(速報行の整形)', () => {
       uniqueUsers: 50,
       commenters: 0
     });
-    expect(line).toContain('のべ別キー 50(匿名は過大)');
+    expect(line).toContain('のべ別キー=匿名で過大'); // v0.1.861: 信頼度注釈
+    expect(line).toContain('50');
     expect(line).not.toContain('コメントした人');
+  });
+
+  it('匿名主体の文脈では「コメントした人」に推定注釈が付く(v0.1.861)', () => {
+    const line = buildReportPreviewLines(
+      { totalComments: 100, commenters: 26 },
+      { ndgrConnected: true, withUidPercent: 6 }
+    );
+    expect(line).toContain('コメントした人 26人(匿名多め=推定寄り)');
+  });
+
+  it('非匿名主体の文脈では「コメントした人」に注釈なし', () => {
+    const line = buildReportPreviewLines(
+      { totalComments: 100, commenters: 80 },
+      { ndgrConnected: true, withUidPercent: 93 }
+    );
+    expect(line).toContain('コメントした人 80人');
+    expect(line).not.toContain('推定寄り');
   });
 
   it('visitors があれば2行目に来場と沈黙視聴者を出す(コメントした人は見出しへ)', () => {
@@ -208,7 +226,7 @@ describe('buildReportPreviewLines(速報行の整形)', () => {
     });
     expect(line).toContain('コメントした人 20人'); // 見出し(1行目)
     expect(line).toContain('来場と応援参加: 来場 1,200');
-    expect(line).toContain('沈黙視聴者(推定) 1,180');
+    expect(line).toContain('沈黙視聴者 1,180(推定)');
     expect(line.split('\n').length).toBe(2);
   });
 
