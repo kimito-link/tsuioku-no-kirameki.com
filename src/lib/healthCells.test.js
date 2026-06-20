@@ -125,6 +125,33 @@ describe('buildHealthCells v0.1.845 進行中=processing(青)・見た瞬間ほ�
     expect(cellById(cells, 'capture-rate').level).toBe('bad');
   });
 
+  it('v0.1.848 裏タブで追いつき中の配信(放送中×未達)は romiDebug に出なくても processing', () => {
+    // 実機 lv350792764: 裏タブで backfill 中・取得率18%。fastDiag.romiDebug.backfill は
+    //   フォアグラウンドの別配信のものか、裏タブ配信の状態は snapshot に出ない。
+    //   それだけ見ると低率を赤にしてしまう。livesData の「放送中(endedAt無し)×記録あり×率<100」を
+    //   見て processing にする(配信ごと表示が既に「⏳追いつき中」なのと対称)。
+    const cells = buildHealthCells({
+      livesData: [
+        { recordedCount: 114, officialCommentCount: 114, officialRatePct: 100, endedAt: 1781956000000 }, // 完了済み別配信
+        { recordedCount: 494, officialCommentCount: 2696, officialRatePct: 18 } // 放送中×追いつき中(endedAt無し)
+      ],
+      // 裏タブ配信の backfill 状態は snapshot に無い(done/stalled でない=追いつき中とみなせる)。
+      fastDiag: { content: { giftDiagnostics: {} } }
+    });
+    expect(cellById(cells, 'capture-rate').level).toBe('processing'); // 赤でなく青。
+    expect(cellById(cells, 'match').level).toBe('processing');
+  });
+
+  it('全配信が終了済み(endedAt有)で率が低いのは追いつき中でない=通常評価(bad)', () => {
+    const cells = buildHealthCells({
+      livesData: [{ recordedCount: 30, officialCommentCount: 100, officialRatePct: 30, endedAt: 1781956000000 }],
+      fastDiag: { content: { giftDiagnostics: {} } }
+    });
+    // 終了済みで30%=本当の取りこぼし=赤(隠さない)。
+    expect(cellById(cells, 'capture-rate').level).toBe('bad');
+    expect(cellById(cells, 'match').level).toBe('bad');
+  });
+
   it('backfill 完了(done)後は率を通常評価(完了したのに低ければ warn/bad)', () => {
     const cells = buildHealthCells({
       livesData: [{ recordedCount: 70, officialCommentCount: 100 }],

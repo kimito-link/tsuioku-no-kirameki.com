@@ -96,10 +96,29 @@ export function buildHealthCells(data) {
   const bfStalled = bf ? bf.stopReason === 'stalled' : false;
   const bfRunning = bf ? !!bf.running && !bfDone && !bfStalled : false;
 
-  // 1. 取得率(記録/公式・累計)。公式0件は na。backfill 進行中は processing(青・順調に取得中)。
+  // v0.1.848: 取得率/記録↔公式一致の「進行中」判定を、romiDebug.backfill(フォアグラウンド1配信の
+  //   フラグ)だけでなく、statusFormat の正本ロジック「放送中(endedAt無し)×記録あり×率<100=
+  //   追いつき中(正常)」に揃える。裏タブで backfill 中の配信は romiDebug.backfill に出ない(その配信の
+  //   snapshot は含まれない)ため、bfRunning だけだと『裏タブで追いつき中の低率』を異常(赤)と誤判定して
+  //   いた(実機 lv350792764=裏タブ18%が赤)。配信ごとの表示は既に「⏳追いつき中」と出ているのに
+  //   健全度パネルだけ非対称だった=これを解消。
+  //   ただし backfill が done/stalled のときは「追いつき中」扱いにしない=完了後に低い率は本当の
+  //   取りこぼし(warn/bad)・失速は隠さない(self-verifying)。done/stalled でない時だけ追いつき中。
+  //   判定材料は statusFormat の正本(放送中×記録あり×【既知の率が100未満】)に揃える。率が未知(null)は
+  //   追いつき中とみなさない=累計率での通常評価にフォールバック(過剰に青へ倒さない)。
+  const anyCatchingUp = livesData.some(
+    (lv) => {
+      if (!lv || lv.endedAt || !(num(lv.recordedCount) > 0)) return false;
+      const r = num(lv.officialRatePct);
+      return r != null && r < 100;
+    }
+  );
+  const ratesInProgress = bfRunning || (anyCatchingUp && !bfDone && !bfStalled);
+
+  // 1. 取得率(記録/公式・累計)。公式0件は na。追いつき中(放送中×未達 or backfill中)は processing(青)。
   const recordedSum = livesData.reduce((a, lv) => a + (num(lv?.recordedCount) || 0), 0);
   const officialSum = livesData.reduce((a, lv) => a + (num(lv?.officialCommentCount) || 0), 0);
-  cells.push(pctCell('capture-rate', '取得率', officialSum > 0 ? (recordedSum / officialSum) * 100 : null, { processing: bfRunning }));
+  cells.push(pctCell('capture-rate', '取得率', officialSum > 0 ? (recordedSum / officialSum) * 100 : null, { processing: ratesInProgress }));
 
   // 2. userId 付き保存率。保存0は na。
   const uid = obs.savedCommentsUidStats || {};
@@ -186,9 +205,9 @@ export function buildHealthCells(data) {
     decoded == null ? '—' : (chats && chats > 0) ? `${chats}件` : (decoded > 0 ? '0(匿名/取得前)' : '—')));
 
   // 18. 記録↔公式一致(B後・per-live の率の最小=一番ズレてる配信)。公式0は na。
-  //   v0.1.845: backfill 進行中は processing(青・取り込み中で率が低いのは当然=異常でない)。
+  //   v0.1.845/848: 追いつき中(放送中×未達 or backfill中)は processing(青・取り込み中で率が低いのは当然)。
   const rates = livesData.map((lv) => num(lv?.officialRatePct)).filter((x) => x != null);
-  cells.push(pctCell('match', '記録↔公式一致', rates.length ? Math.min(...rates) : null, { okAt: 90, warnAt: 60, processing: bfRunning }));
+  cells.push(pctCell('match', '記録↔公式一致', rates.length ? Math.min(...rates) : null, { okAt: 90, warnAt: 60, processing: ratesInProgress }));
 
   return cells;
 }
