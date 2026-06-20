@@ -110,9 +110,16 @@ export function deriveGiftSubAppFailureReason(subApp) {
  * multi-tab race による DOM bundle の汚染が疑わしいかを bool で返す。
  *
  * 判定（いずれか one でも当てはまれば true）:
- *   - eventDomLvCount > 30                 … 過去 lv の残骸が大量
- *   - currentLiveIdInEventDom === false    … 現在 watch している lv の DOM が混入していない（古い snapshot）
- *   - currentLiveIdInNicoad === false かつ eventDomLvCount > 5
+ *   - currentLiveIdInEventDom === false    … 現在 watch している lv の DOM が混入していない（古い snapshot＝本当に怪しい）
+ *   - eventDomLvCount > 60                  … prune が複数周期効かない異常膨張のみ
+ *   - currentLiveIdInNicoad === false かつ eventDomLvCount > 10
+ *
+ * v0.1.834: 件数しきいを 30→60 へ。pruneStaleEventDomLvs の LRU 上限(DEFAULT_MAX_KEEP=30)と
+ *   旧 `>30` が同値で結合していたため、prune が正常に上限 30 件 keep した直後に新しい lv が1件来ただけで
+ *   31→誤警告が立っていた(実機 eventDomLvCount:31)。表示には現在 lv の単数 bundle しか使わず
+ *   (northStarLaneReason は単数受領・lv 切替で lastOfficialEventDomBundle=null 強制初期化)実害は無い＝
+ *   この警告は「自分の配信の痕跡が消えている(currentLiveIdInEventDom=false)」か「prune が効かない異常膨張」
+ *   のときだけ意味を持つ。星野ロミ式・誤検知(失敗体験)の除去。正本=council/stale-dom-bundle-SYNTHESIS.md。
  *
  * @param {MultiTabSnapshot|null|undefined} multiTabDiag
  * @returns {boolean}
@@ -125,9 +132,11 @@ export function deriveStaleDomBundleSuspected(multiTabDiag) {
     typeof multiTabDiag.eventDomLvCount === 'number'
       ? multiTabDiag.eventDomLvCount | 0
       : 0;
-  if (eventCount > 30) return true;
+  // 本当に怪しいのは「今見ている配信の痕跡が eventDom に無い」とき(別タブの世界を見ている疑い)。
   if (multiTabDiag.currentLiveIdInEventDom === false) return true;
-  if (multiTabDiag.currentLiveIdInNicoad === false && eventCount > 5)
+  // 単なる件数は LRU 上限(30)直後の +1 で誤検知する。prune が効かない異常膨張(>60)のみ警告。
+  if (eventCount > 60) return true;
+  if (multiTabDiag.currentLiveIdInNicoad === false && eventCount > 10)
     return true;
   return false;
 }

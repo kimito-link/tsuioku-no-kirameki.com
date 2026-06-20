@@ -147,12 +147,24 @@ describe('buildStatusActions', () => {
     expect(cards.find((x) => x.id === 'multitab-heavy')).toBeFalsy();
   });
 
-  it('多タブ DOM 混入 → stale-dom', () => {
+  it('多タブ DOM 名残 → stale-dom', () => {
     const cards = buildStatusActions({
       livesData: [{ liveId: 'lv1', officialRatePct: 90 }],
       fastDiag: { content: { giftDiagnostics: { multiTabDiag: { staleDomBundleSuspected: true } } } }
     });
     expect(ids(cards)).toContain('stale-dom');
+  });
+
+  it('stale-dom の cause は「混乱」と煽らず実害なしを明示する（v0.1.834 誤解の除去）', () => {
+    const cards = buildStatusActions({
+      livesData: [{ liveId: 'lv1', officialRatePct: 90 }],
+      fastDiag: { content: { giftDiagnostics: { multiTabDiag: { staleDomBundleSuspected: true } } } }
+    });
+    const card = cards.find((c) => c.id === 'stale-dom');
+    expect(card).toBeTruthy();
+    // 旧文言「公式値レーンが混乱することがある」は事実誤認だったので回帰防止。
+    expect(card.cause).not.toContain('混乱');
+    expect(card.cause).toContain('影響しません');
   });
 
   it('重大度順(bad → warn → info)に並ぶ', () => {

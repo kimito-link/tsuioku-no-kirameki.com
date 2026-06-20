@@ -185,14 +185,17 @@ export function buildStatusActions(data) {
     });
   }
 
-  // --- 多タブ DOM 混入 ---
+  // --- 多タブ DOM の名残（実害なし・誤解を生まない文言に・v0.1.834） ---
+  // 実コード上、表示は現在 lv の単数 bundle のみ使用(northStarLaneReason は単数受領・lv 切替で
+  // lastOfficialEventDomBundle=null 強制初期化)＝過去タブの履歴が残っても公式値レーンは混ざらない。
+  // 旧文言「公式値レーンが混乱することがある」は事実誤認だったので訂正。正本=council/stale-dom-bundle-SYNTHESIS.md。
   if (gift?.multiTabDiag?.staleDomBundleSuspected) {
     add({
       id: 'stale-dom',
       severity: 'info',
-      symptom: '他の配信の DOM が混ざっている疑い',
-      cause: '複数タブ/SPA 遷移の名残。記録には影響しないが公式値レーンが混乱することがある',
-      action: '使っていないニコ生タブを閉じる / この watch を開き直す',
+      symptom: '過去に開いた配信の履歴が残っています',
+      cause: '記録にも表示にも影響しません。今見ている配信のデータだけを使うので、過去タブの履歴が残っていても表示は混ざりません（古い履歴は数時間で自動的に消えます）',
+      action: '気になる場合だけ、使っていないニコ生タブを閉じてください（閉じなくても問題ありません）',
       fixableHere: 'partly'
     });
   }
