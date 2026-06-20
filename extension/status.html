@@ -350,6 +350,37 @@
       .mind .badge {
         margin-right: 4px;
       }
+      /* 全地図共通ナビ(どこからでもたどれる)。見た目は docs の地図ページと揃える。
+         status は拡張ページなので地図へは htmlpreview 絶対URL。設計正本: council/nav-header-SYNTHESIS.md */
+      nav.map-nav {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 6px 8px;
+        margin: 0 0 14px;
+        padding-bottom: 10px;
+        border-bottom: 1px solid var(--nl-border);
+      }
+      nav.map-nav .nav-item {
+        font-size: 12.5px;
+        text-decoration: none;
+        color: var(--nl-text-soft);
+        border: 1px solid transparent;
+        border-radius: 999px;
+        padding: 3px 11px;
+        line-height: 1.5;
+        white-space: nowrap;
+      }
+      nav.map-nav a.nav-item:hover {
+        border-color: var(--nl-border);
+        color: var(--nl-text);
+      }
+      nav.map-nav .nav-here {
+        color: var(--nl-text);
+        font-weight: 700;
+        border-bottom: 2px solid var(--nl-accent);
+        border-radius: 6px 6px 0 0;
+      }
     </style>
   </head>
   <body>
@@ -359,6 +390,13 @@
       <span class="status-meta" id="metaLastUpdate">最終更新 —</span>
       <span class="status-meta" id="metaAutoRefresh">自動更新: 2秒</span>
     </header>
+
+    <nav class="map-nav" aria-label="地図ナビ">
+      <a class="nav-item" href="https://htmlpreview.github.io/?https://raw.githubusercontent.com/kimito-link/tsuioku-no-kirameki.com/master/docs/feature-sitemap.html" target="_blank" rel="noopener">🧠 機能マップ</a>
+      <a class="nav-item" href="https://htmlpreview.github.io/?https://raw.githubusercontent.com/kimito-link/tsuioku-no-kirameki.com/master/docs/code-tree.html" target="_blank" rel="noopener">🌳 コードの地図</a>
+      <a class="nav-item" href="https://htmlpreview.github.io/?https://raw.githubusercontent.com/kimito-link/tsuioku-no-kirameki.com/master/docs/repo-tree-map.html" target="_blank" rel="noopener">🧭 逆引き索引</a>
+      <span class="nav-item nav-here" aria-current="page">📊 状態（ここ）</span>
+    </nav>
 
     <section class="guidepost">
       <h2>🧭 はじめての方へ — ここから全部たどれます</h2>
