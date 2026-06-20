@@ -1,7 +1,7 @@
 # 🗺️ 機能サイトマップ(何が・何をして・どのファイルか・自動生成)
 
 > `npm run tree-map` で再生成。手で編集しない(`--check` が verify:cc で腐りを検知)。
-> 全機能を「分類 → 機能 → 役割 → 担当ファイル」で。視覚版: [feature-sitemap.html](feature-sitemap.html)。
+> 全機能を「分類 → 機能 → 役割 → 担当ファイル」で。代表は手動 FEATURES・残りは自動分類で全網羅。視覚版: [feature-sitemap.html](feature-sitemap.html)。
 
 ## 📤 送信
 
@@ -12,6 +12,19 @@
 - **コメント送信(確認/プロファイル)** — 拡張から watch のコメント欄へ送信し、入力欄の変化で成功を推定。送信経路の手元プロファイルも
   - `src/lib/commentSubmitConfirm.js`
   - `src/lib/commentSubmitProfiling.js`
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 9</summary>
+
+- `src/lib/commentComposeShortcuts.js` — コメント欄の Enter 系キーで送信するか／既定動作に任せるか。
+- `src/lib/commentKindnessNudge.js` — 送信前コメントの攻撃的表現を検知し「やさしく一言」確認を促す純ロジック。
+- `src/lib/commentPostDom.js` — コメント送信ボタン探索を、同一フォーム/近傍スコープを優先して行う。
+- `src/lib/commentPostRetriable.js` — popup のコメント送信で、別 frameId を試す価値があるか（8s 走査を避ける判定）。
+- `src/lib/commentPostUi.js` — ポップアップのコメント送信 UI を、watch 接続状態と入力状態から一貫して決める。
+- `src/lib/commentSendTroubleshootHint.js` — コメント送信エラー文に「再読み込み案内」を 1 回だけ追加する純関数。
+- `src/lib/commentSubmitSteps.js` — コメント送信パイプラインの純粋な判定ロジック。
+- `src/lib/ownPostedUserIdSet.js` — v0.1.773: 「自分が投稿した userId」の集合を1パスで作る純関数。
+- `src/lib/selfPostedMatcher.js` — 自己投稿コメント（self-posted recents）と、保存済みコメント一覧の
+
+</details>
 
 ## 📥 取得
 
@@ -26,6 +39,62 @@
   - `src/lib/ndgrBackfillCrawl.js`
 - **コメント重複除去(NDGR)** — 再送/再接続/relay overlap の重複を liveId+messageId の canonical key で排除
   - `src/lib/ndgrMessageDedupe.js`
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 52</summary>
+
+- `src/domain/observations/StatObservation.js` — StatObservation - ニコ生から取得する数値の「契約付き観測値」純関数 factory。
+- `src/domain/observations/vocabulary.js` — 観測層 (StatObservation) の語彙集 - 不変な enum 定義のみ。
+- `src/extension/backfill-sw-entry.js` — Service Worker 側の過去ログ取得(バックフィル)エンジン。NDGR を遡って取り込む。
+- `src/extension/page-intercept-entry.js` — MAIN world エントリ（esbuild で単一 IIFE にバンドルされる）
+- `src/lib/acquisitionDashboardChart.js` — 「データ取得率」ダッシュボードのチャート計算（純関数）。
+- `src/lib/backfillCapturedAt.js` — v0.1.405: バックフィルした過去コメントの「実時刻 capturedAt」を推定する純関数。
+- `src/lib/backfillFlushThreshold.js` — バックフィル（過去ログ一括取り込み）の persist フラッシュ閾値を、
+- `src/lib/backfillHeartbeat.js` — v0.1.795: 裏(背面)タブでも過去ログ backfill を取り切るための「ハートビート」純ロジック。
+- `src/lib/backfillOptIn.js` — v0.1.405: 過去ログ一括バックフィル（NDGR backward 巡回）の opt-in 判定 純関数群。
+- `src/lib/backfillRemoveGiftSystemMessages.js` — v0.1.172 〜 v0.1.194 までの間に NDGR ギフトシステムメッセージが
+- `src/lib/backfillRemoveRecommendedLivePollution.js` — v0.1.200: v0.1.199 以前の間に「おすすめ生放送」セクションの DOM が
+- `src/lib/backfillRetryBackoff.js` — v0.1.442: 過去ログバックフィルの一過性 stop 自動リトライの遅延計算（純関数）。
+- `src/lib/backfillRinkuNarration.js` — v0.1.410: 過去ログ取り込み（backfill）の進捗に合わせた「りんくのセリフ」を返す純関数。
+- `src/lib/backfillRotationGate.js` — v0.1.642: backfill の rotation_yield(90秒強制打ち切り)を「待機している別タブが居るときだけ」
+- `src/lib/backfillSlotAutoThrottle.js` — v0.1.6xx: 複数タブ並列 backfill の動的throttle純関数(PR2)。
+- `src/lib/backfillSlotPool.js` — v0.1.663: 複数タブ並列 backfill のスロットプール(純ロジック)。
+- `src/lib/backfillTransientRetry.js` — v0.1.431: 過去ログ一括バックフィルの「一過性 stop での自動リトライ」判定（純ロジック）。
+- `src/lib/backfillVisibilityRearm.js` — v0.1.633: 過去ログ一括バックフィルの「タブ可視状態に戻った時の再開(rearm)」判定（純ロジック）。
+- `src/lib/cleanNdgrChatRows.js` — NDGR チャット行の正規化純関数。
+- `src/lib/commentIngestLog.js` — コメント取り込みの監査ログ（しおりのようにストレージへイベントが積まれる）。
+- `src/lib/commentObservabilityDiag.js` — v0.1.225: コメント記録の uid 解決経路を AI 共有診断 JSON に自動で乗せる純関数。
+- `src/lib/commentPipelineLog.js` — コメント取り込みパイプラインの構造化デバッグログ（純関数フォーマッタ）。
+- `src/lib/deepHarvestReason.js` — 深掘り収穫(deep harvest)の発動理由(起動/記録ON/配信切替/タブ可視)の定義と判定。
+- `src/lib/giftRelayStorageLiveId.js` — ギフト sub-app iframe からの postMessage を storage に書くときの liveId 解決。
+- `src/lib/giftSubAppRelayDiag.js` — v0.1.226: ギフトサイドバー cross-origin iframe relay 経路の生存確認用 純関数。
+- `src/lib/giftSubAppRelayTrust.js` — Cross-frame gift relay messages are accepted only from NicoNico/local-dev
+- `src/lib/globalBackfillQueue.js` — 多タブ時の NDGR バックフィル待ち行列・前面タブ優先（session 共有）。
+- `src/lib/googleSuggest.js` — Google サジェスト取得の契約 (URL組み立て + レスポンスパース + message type)
+- `src/lib/hiddenOfficialIframeReinjectGate.js` — hidden audition iframe を「再 inject してよいか」を判定する純関数（v0.1.394）。
+- `src/lib/iframeOfficialDomFromRelay.js` — v0.1.231: iframe relay (NLS_GIFT_HISTORY_FROM_IFRAME) 受信時の
+- `src/lib/interceptBinaryTextExtract.js` — バイナリを UTF-8 として解釈した文字列から、近傍の commentNo とユーザー識別子の組を拾う（ヒューリスティック）。
+- `src/lib/interceptViewerJoinSignals.js` — page-intercept 用: JSON から「視聴者入室・オーディエンス更新」らしいユーザ配列を抽出（純関数・PII は userId/表示名/アイコン URL のみ）
+- `src/lib/interceptVisitorProbeDebug.js` — TAKT B フォールバック: 来場・入室信号の観測用。既定 OFF。
+- `src/lib/mcpBridge/buildLiveMcpSnapshot.js` — L0 Evidence（拡張の観測データ）→ L1 Canonical Snapshot 変換。
+- `src/lib/ndgrBacklog.js` — NDGR flush を liveId 確定まで遅延するかを判定する純関数。
+- `src/lib/ndgrChatRows.js` — NDGR decodeChat の結果を mergeNewComments 向け行に変換する。
+- `src/lib/ndgrDecode.js` — NDGR (のどぐろ) Protobuf 軽量デコーダー
+- `src/lib/ndgrFlushDedupKey.js` — NDGR フラッシュ時の重複排除キーを作る純関数(v0.1.836)。
+- `src/lib/ndgrForwardCrawl.js` — v0.1.511: NDGR コメントの「前方向（forward）継続取得」巡回エンジン（純ロジック）。
+- `src/lib/niconicoInterceptLearn.js` — page-intercept が JSON から拾う userId / nickname / avatar / commentNo の走査（純関数）
+- `src/lib/nicoUserProfileApi.js` — ニコニコのユーザープロフィール取得用メッセージ型と uid 妥当性判定(background と文字列同期)。
+- `src/lib/nlsInterceptAuth.js` — v0.1.234: page-intercept (MAIN world) → content-entry (ISOLATED world) 経路の
+- `src/lib/northStarAcquisitionGauge.js` — 北極星レーン左ガジェット「取得率」メーター用の純関数。
+- `src/lib/popupFrameCodec.js` — popup の配色フレーム「共有コード」の エンコード／デコード。
+- `src/lib/probeRecommendedLiveSection.js` — v0.1.200: ニコ生 watch ページ内「おすすめ生放送」セクションの観測純関数。
+- `src/lib/probeWatchPageDomStructure.js` — v0.1.201: ニコ生 watch ページ主要 DOM の存在を観測する純関数。
+- `src/lib/shouldRearmBackfillForOfficialGap.js` — 自動補充の核心: 「公式コメント件数と記録件数のギャップが大きいまま、NDGR バックフィルが
+- `src/lib/shouldSkipDeepHarvest.js` — NDGR がリアルタイムでコメントを提供している間は deep harvest（仮想リスト走査）を
+- `src/lib/shouldTriggerOfficialGapDeepHarvest.js` — ライブ中に「公式 statistics コメント数」と「記録件数」の差が大きいとき、
+- `src/lib/swBackfillStaging.js` — Service Worker backfill の取り置きペイロードを扱う純関数群。
+- `src/lib/swBackfillTrigger.js` — SW backfill モード(実験)の起動判定純関数。
+- `src/lib/userIdPreference.js` — コメント記録まわり: userId の「観測強度」（数字 ID を匿名系より優先する等）
+
+</details>
 
 ## 💾 記録
 
@@ -37,6 +106,36 @@
   - `src/lib/monotonicCommentCount.js`
 - **storage キー定義** — chrome.storage のキー名の正本(nls_comments_<lv> 等)
   - `src/lib/storageKeys.js`
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 26</summary>
+
+- `src/lib/autoBackupState.js` — v0.1.808(星野ロミ式コンポーネント化・第1弾): content-entry.js の巨大化を抑えるため、
+- `src/lib/blobDownload.js` — Blob を指定ファイル名で保存する。
+- `src/lib/broadcastSessionSummaryDb.js` — 配信セッション単位の軽量サマリ（ポップアップの IndexedDB）
+- `src/lib/broadcastSessionSummaryFlush.js` — サマリ IndexedDB への間欠フラッシュ（ポップアップから呼ぶ）
+- `src/lib/commentChunkStore.js` — v0.1.509: コメント本体の「追記専用チャンク分割」純関数群＋ストレージ orchestration。
+- `src/lib/commentDb.js` — v0.1.514: コメント本体の保存先を `chrome.storage.local`（値まるごと structured clone・
+- `src/lib/commentProgressMonitor.js` — 記録進捗の自動監視ロジック（純関数）。
+- `src/lib/commentRecord.js` — コメント1件の形・重複排除・マージ（純関数）
+- `src/lib/commentRecordBreakdown.js` — v0.1.627: コメント記録カードの「内訳」表示用・純関数。
+- `src/lib/commentTailBuffer.js` — v0.1.505: コメント保存の「テールバッファ（追記式チャンク）」純関数群。
+- `src/lib/devMonitorTrendSession.js` — 開発監視トレンド: sessionStorage（セッション）+ chrome.storage.local（永続・最大7日）
+- `src/lib/displayRecordedCount.js` — 「画面に出す記録件数」の正本を1つに固定する純関数(v0.1.839・第1)。
+- `src/lib/giftRecord.js` — ギフト/広告ユーザーの永続化（純関数）
+- `src/lib/livePersistInterval.js` — v0.1.498〜501: ライブ記録の保存（コアレッサ）最小間隔を決める純粋関数。フリーズ対策 A。
+- `src/lib/longTaskTracker.js` — メインスレッドを長時間ブロックした「Long Task」を有界に記録する純関数群。
+- `src/lib/persistableCommentRow.js` — v0.1.362: DOM ハーベスト経路で拾ったコメント行を `nls_comments_<lv>` に保存して
+- `src/lib/persistThrottle.js` — v0.1.431: 連続フラッシュの合間にイベントループへ制御を返す既定の yield。
+- `src/lib/popupWatchSnapshotPersist.js` — 取得した watch snapshot を generation を超えて永続化するためのヘルパ。
+- `src/lib/prunableStorageKeys.js` — v0.1.419: storage.local の「定期 prune 対象キー」だけを prefix で絞り込む純関数。
+- `src/lib/recordingStallWatchdog.js` — 記録停止ウォッチドッグの純粋判定ロジック。
+- `src/lib/recordRate.js` — 取得スピード(records/sec)の算出と健康スコア化(純ロジック)。
+- `src/lib/storageOpTimeout.js` — v0.1.502: 単発の非同期処理（主に chrome.storage.local の get/set/remove）を
+- `src/lib/storyDetailRelatedEntries.js` — ストーリー詳細／プレビュー脇の「同一ユーザーの直近」リスト用。
+- `src/lib/supportVisualExpanded.js` — 応援ビジュアル（アイコン列・グリッド・診断）の開閉を storage に保存するときの正規化。
+- `src/lib/userProfileLinkHtml.js` — 応援コメントの各種 HTML 出力（マーケティング HTML・HTML 保存レポート等）で、
+- `src/lib/userRooms.js` — 保存済みコメントを「ユーザー＝ルーム」に集計（純関数）
+
+</details>
 
 ## 🧮 集計
 
@@ -46,6 +145,92 @@
 
 - **応援レーン集約(誰が候補か)** — 保存コメント行を userId 単位に畳み込みレーン候補を作る唯一の集約正本(popup/venue 共通)
   - `src/lib/userLaneCandidatesFromStorage.js`
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 82</summary>
+
+- `src/domain/lane/aggregate.js` — 応援ユーザーレーンの per-row → per-user 集約（純関数）。
+- `src/domain/observations/observationStore.js` — observationStore - StatObservation のメモリ常駐リングバッファ。
+- `src/domain/user/identity.js` — ニコ生ユーザー ID の「匿名性」判定と関連アイデンティティ・ユーティリティ。
+- `src/lib/auditionEventRankingApi.js` — audition 公式「イベント💎ランキング」無認証 JSON API の URL 組立 & 正規化（純関数）。
+- `src/lib/broadcastContext.js` — v0.1.793: 「この配信の配信者(broadcaster)情報」を 1 か所で型定義し、storage キー・
+- `src/lib/broadcastCrossCompare.js` — 0.1.24 (Y): 横断比較系の純粋関数群。
+- `src/lib/broadcastDurationLabel.js` — HTML レポートの「配信時間」表示ラベルを純粋に整形する。
+- `src/lib/broadcasterCommentCount.js` — 「配信者本人のコメント数」を正しく算出する純関数(v0.1.838)。
+- `src/lib/broadcasterExcludedCount.js` — v0.1.774: 記録カードの見出し数値から「配信者本人のコメント」を差し引いて、公式(本家コメ)と
+- `src/lib/broadcasterFollowTarget.js` — 配信者タイル / casterBanner で出す「配信者の page URL とアイコン」を、
+- `src/lib/broadcasterProfileCard.js` — 配信者プロフィールの「レポート用 正規化モデル」と HTML 断片ビルダー（純関数）。
+- `src/lib/broadcasterReputationKeywords.js` — 配信者の評判チェック - ネガティブキーワード判定エンジン
+- `src/lib/broadcasterReputationView.js` — 配信者の評判チェック - 表示ビューモデル + アラート HTML (純関数)
+- `src/lib/broadcasterUserId.js` — 配信者 userId を embedded-data / DOM から純粋関数で抽出する。
+- `src/lib/broadcastUrl.js` — ニコニコ生放送 URL / パスから lv ID を取り出す（純関数・DOM非依存）
+- `src/lib/broadcastWaveformFingerprint.js` — L3: コメ波形フィンガープリント。
+- `src/lib/buildNorthStarAdRankingStatsHtml.js` — 北極星「広告ランキング」レーン用: watch の番組統計と一覧の「貢」の内訳を短い HTML にする。
+- `src/lib/capCommentsForAnalytics.js` — マーケ分析・タイムライン用のコメント上限（heavy 時の全件再走査を防ぐ）
+- `src/lib/channelBroadcasterMeta.js` — 公式チャンネル放送（運営・業者）の broadcaster メタを embedded-data から
+- `src/lib/commentEchoDetector.js` — L1 コメ伝染 + L5 コメ被り瞬間検出。
+- `src/lib/commenterCulturalAnalytics.js` — L6 / L10 / L11 / L14 / L15 — 文化分析系の純粋関数を 1 ファイルに集約。
+- `src/lib/commenterFollowAnalytics.js` — 数値IDコメンターのフォロー情報を、マーケ分析HTMLで扱いやすい形へ整える純関数群。
+- `src/lib/commenterFollowCache.js` — コメンター（数値 userId）のフォロー/フォロワー数・プレミアム・LV を userId 単位でためる
+- `src/lib/commenterFollowingListCache.js` — コメンター（数値 userId）のフォロー先 userId リスト横断キャッシュ。
+- `src/lib/commenterHistoricalAnalytics.js` — 過去 N 配信 × 現在配信のコメンターを横断分析する純粋関数群。
+- `src/lib/commenterSurvivalCurve.js` — コメンター生存曲線（B6）。
+- `src/lib/commentFatigue.js` — コメント疲労（「短い時間でコメントを打つと疲れて失速する」）をデータ化する純関数。
+- `src/lib/commentSilenceZones.js` — コメントの沈黙ゾーン検出（連続 X 秒以上のコメ無し区間）+ L2 沈黙の質判定。
+- `src/lib/commentVelocityTimeline.js` — コメントの時系列粒度集計と「笑い密度（L4 笑いの瞬間検出）」を純粋関数で計算する。
+- `src/lib/commentVelocityWindow.js` — 直近ウィンドウ内のコメント件数と「件/分」換算（純関数）
+- `src/lib/concurrentCalibrationFit.js` — 較正フィット（蓄積した較正サンプルから係数の「推奨値」を導く純関数）。
+- `src/lib/concurrentCalibrationLog.js` — 同接推定の較正データロガー（しおりのようにストレージへサンプルが積まれる）。
+- `src/lib/concurrentEstimate.js` — 複合シグナルによる同時接続数推定モジュール。
+- `src/lib/concurrentPeakAnalysis.js` — 同接推移カーブから「ピーク到達 / 終了時保持率 / 半減点」を求める純粋関数。
+- `src/lib/concurrentResolvedFromSnapshot.js` — watch スナップショット（content-entry の collectWatchPageSnapshot 戻り、popup へ送るのと
+- `src/lib/concurrentTimelineSeries.js` — 同接推移カーブ（視聴維持率の核）の時系列データを純粋関数で構築する。
+- `src/lib/eventRankingReportModel.js` — イベントランキングの「レポート用 正規化モデル」純関数（Phase A・2026-05-26 会議）。
+- `src/lib/eventRankingSectionHtml.js` — v0.1.810(星野ロミ式コンポーネント化・第3弾): popup-entry.js の巨大 HTML ビルダー
+- `src/lib/eventScoreRankingRelay.js` — audition richview 由来のイベント💎順位リストを親へ relay するときの
+- `src/lib/excludeBroadcasterFromCommentEntries.js` — popup の表示用 comment 配列から、配信者本人 user の comment を除外する純関数。
+- `src/lib/excludeBroadcasterFromRankedRooms.js` — 応援ランクストリップに渡す前に、配信者本人の room を除外する純関数。
+- `src/lib/giftMomentumAnalytics.js` — HTML マーケ分析向けのギフト深掘り集計。
+- `src/lib/giftRankingLaneOptIn.js` — v0.1.228: ギフトランキングレーンの opt-in 判定 純関数群。
+- `src/lib/hiddenTabExternalFetchGate.js` — v0.1.616: 非可視タブでも外部 API fetch（koken 貢献度 / nicoad 広告 / ギフト履歴 /
+- `src/lib/inferBroadcasterUserIdFromComments.js` — snapshot の broadcasterUserId が空のとき、保存済みコメント内の表示名から
+- `src/lib/isInsideRecommendedUserSection.js` — ニコニコ視聴ページ周辺に出る「おすすめユーザー／フォロー候補」系 UI の子孫かを粗く判定する。
+- `src/lib/kiramekiAwards.js` — 「きらめきの賞」判定ロジック（純関数）。
+- `src/lib/kiramekiAwardsSectionHtml.js` — HTMLレポートの「きらめき表彰」セクション(CSS+各賞カード)の組み立て。
+- `src/lib/kokenContributionRankingApi.js` — koken 公式「ギフト貢献度ランキング」無認証 JSON API の URL 組立 & 正規化（純関数）。
+- `src/lib/liveCommenterStats.js` — 記録済みコメントから「ユニーク投稿者（推定）」用の集計（純関数）
+- `src/lib/loadLastBroadcastSummary.js` — 0.1.69 (AY): empty state（配信なし）popup で「前回の配信」cards を復元するために、
+- `src/lib/mangaBroadcastSummary.js` — 放送終了後の HTML レポート / マーケ分析の頭にくる「漫画読み体験」要約。
+- `src/lib/marketingAggregate.js` — userId: string,
+- `src/lib/mcpBridge/buildMcpRankingSnippet.js` — MCP / L1 向けに貢献度・広告ランキングの **PII 最小スナップショット** を組み立てる。
+- `src/lib/networkErrorProbe.js` — v0.1.201: 拡張の network 層異常を診断 JSON 用に集約する純関数。
+- `src/lib/nicoadContributionRankingApi.js` — ニコニ広告(nicoad)「貢献度ランキング」無認証 JSON API の URL 組立 & 正規化（純関数）。
+- `src/lib/nicoUserFollowingApi.js` — nvapi /v1/users/{uid}/following/users の URL 構築とレスポンス正規化。
+- `src/lib/officialContributionRankingResolver.js` — 公式貢献度ランキングの取得経路（Koken API / DOM bundle / iframe storage）から
+- `src/lib/officialDomRankingRowsToStripRooms.js` — 公式イベント DOM バンドルの貢献度／広告ランキング行を、
+- `src/lib/personProfiles.js` — 人物プロファイル畳み込み（person-tile-unify 第1コミット・2026-06-17）。
+- `src/lib/pickBroadcasterNameForReputation.js` — 評判チェック用に「配信者名」を解決する純関数 (PR R4)
+- `src/lib/popupConcurrentEstimateGate.js` — ポップアップ「推定同時接続」カードでローディングを解除するかどうか。
+- `src/lib/popupWatchMetaConcurrentGate.js` — popup の同時視聴者数推定を「出してよいか」判定するゲート(DOM/公式値/直近アクティブから)。
+- `src/lib/popupWatchUrlResolveMultiTab.js` — popup が参照する watch URL を「複数の候補ソース」から決める純粋関数。
+- `src/lib/rankingPatrolMessages.js` — ランキング巡回(「次の上位配信へ」/ 自動巡回トグル)の共有定数と純関数。
+- `src/lib/rankingVisibleRetryDecision.js` — 「タブが可視に復帰したとき、貢献度ランキング取得を再試行すべきか」を決める純関数。
+- `src/lib/recentBroadcastLiveIds.js` — 最近の放送 liveId を `broadcastSessionSummary_v1` IDB から取得する純粋関数群。
+- `src/lib/sameOriginContribRankingDomShape.js` — watch ページ（live.nicovideo.jp＝content script と同一 origin）の gift
+- `src/lib/scrapeEventScoreRankingFromRichviewDom.js` — audition richview（イベント💎順位リスト想定）の DOM から順位つきスコア行を掬う純関数（PR2）。
+- `src/lib/summarizeDevMonitorGiftRanking.js` — v0.1.202 A-0: popup「詳しい状況（開発・切り分け用・折りたたみ）」の
+- `src/lib/supporterChikuranScore.js` — 「応援者ちくらん β」用のローカル集計コア。
+- `src/lib/supporterPowerScoring.js` — 応援者パワー診断スコアリング（OSINT Phase 2-A・v0.1.609）。
+- `src/lib/supportGrowthInsights.js` — マーケ分析 / HTML レポート向け「次回の行動提案」を既存集計データから組み立てる（純粋関数）。
+- `src/lib/timingConstants.js` — content-entry.js に散在していたマジックナンバーを集約した定数テーブル。
+- `src/lib/topSupportRankStripConfig.js` — ポップアップ「応援ランキング」ストリップに並べる行数の上限（aggregateCommentsByUser の1行＝1カード）。
+- `src/lib/topSupportRankStripStableKey.js` — 応援ランキングストリップの DOM を組み直す必要があるか判定するキー。
+- `src/lib/venueIncrementalAggregate.js` — v0.1.754 会場の3時間安定化(会議6体ほぼ全会一致の最大ボトルネック根治): 参加者集計を
+- `src/lib/viewerSelfLaneAggregate.js` — v0.1.775: popup の応援アイコン列(りんく段)に「自分(視聴者)」を出すための合成集約。
+- `src/lib/watchConcurrentEstimateUiCopy.js` — 同接ツールチップ先頭に載せる、推定方式の短い説明（`renderWatchMetaCard` と一致させる）。
+- `src/lib/watchFrameRank.js` — 複数 watch フレーム/タブから「今解決すべき配信」を innerText とURL一致でスコア付けして選ぶ純ロジック。
+- `src/lib/watchTabPrioritize.js` — watch タブ候補リストを「対象 watch URL に最も近い」順に並べ替える純粋関数。
+- `src/lib/yukkuriBroadcastSummary.js` — 放送終了後の HTML レポート / マーケ分析の頭にくる「ゆっくり解説風」要約セクション。
+
+</details>
 
 ## 🪟 表示・演出
 
@@ -67,6 +252,162 @@
   - `src/lib/giftThrowProjectile.js`
 - **吹き出し寿命管理** — 会場の吹き出しの表示上限・追い出し(eviction)ライフサイクル
   - `src/lib/venueBubbleLifecycle.js`
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 152</summary>
+
+- `scripts/encode-marketing-html-avatars.mjs` — extension/images/marketing-html-avatars/*.png を data URI にし、
+- `scripts/split-avatar-parts.mjs` — 偽市松背景の除去 + パーツ切り出し(one-off アセットパイプライン)
+- `src/data/acquirers/laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
+- `src/data/sources/laneFromStoredComments.js` — 応援ユーザーレーン: 保存済みコメント配列 → LaneCandidate[] の adapter。
+- `src/data/store/laneStore.js` — 応援ユーザーレーンの単一 store。
+- `src/domain/lane/columns/kontaPolicy.js` — こん太段（konta）の配属 policy — 過渡状態 catchall。
+- `src/domain/lane/columns/linkPolicy.js` — りんく段（link）の配属 policy。
+- `src/domain/lane/columns/tanuPolicy.js` — たぬ姉段（tanu）の配属 policy。
+- `src/domain/lane/tier.js` — 応援ユーザーレーンの tier（段）決定。
+- `src/domain/user/avatar.js` — ユーザーのアバター観測信号と表示 URL を 1 箇所で組み立てる純関数。
+- `src/domain/user/avatarResolver.js` — アバター解決の単一エントリポイント（Hoshino-Romi 流 single component）。
+- `src/domain/user/nickname.js` — 表示名（ニックネーム）の「強弱」判定。
+- `src/extension/comeview-entry.js` — v0.1.652: 独自コメビュ「KIRAMEKI Comment View」(comeview.html)。
+- `src/extension/content-entry.js` — watch ページ常駐の記録エンジン本体。コメント取得(NDGR+DOM)・記録・バックフィル・パネル描画の中枢。
+- `src/extension/story/renderStoryUserLaneDom.js` — 応援ユーザーレーン DOM の同期（popup-entry から切り出し・状態は引数で受け取る）。
+- `src/extension/venue-entry.js` — 会場モード(standalone)のエントリ。venueBar をページに mount するだけの薄い起動点。
+- `src/extension/venueBar.js` — 会場モード UI 本体。観客の席割り・群衆・吹き出し・ギフト演出・読み上げ連動を描く。
+- `src/lib/anonymousIdenticon.js` — 匿名 userId 向けの決定論的アバター（SVG data URL）。
+- `src/lib/avatarBroadcasterGuard.js` — 配信者アイコン取り違え防止ガード（純粋関数）。
+- `src/lib/avatarPartsComposer.js` — 匿名ユーザー用アバターのパーツ(髪/目/口など)定義と組み合わせ合成。
+- `src/lib/avatarUrlCompare.js` — アバター URL の比較用ヘルパ（純粋関数）。
+- `src/lib/cardFreshnessNote.js` — カードの「鮮度」表示（最終更新からの経過）を作る純関数。
+- `src/lib/celebrationCharaAssets.js` — お祝い演出で使う3キャラ(りんく/こんた/混在)の画像パス定義。
+- `src/lib/celebrationCommentIncrementalScan.js` — コメント配列のギフト／広告演出: 配信ごとに初回は全件 prime のみ、以降は追加分だけ process。
+- `src/lib/celebrationCommentScanSeed.js` — コメント走査系演出のシード（過去分を再発火させない）制御。
+- `src/lib/celebrationFlyText.js` — ニコニコ／ボカロ MV 風 — 文字が飛び交う演出の文言生成（純関数）。
+- `src/lib/celebrationPika.js` — パチンコ／ボカロ MV 風 — 画面全体「ぴかっ」フラッシュ spec（純関数）。
+- `src/lib/cheerPalette.js` — 盛り上げワード（8888 / wwwww / 顔文字 等）のワンクリック挿入パレット。
+- `src/lib/comeviewActions.js` — v0.1.666: コメビュのコメント単位アクション(わんコメ同等+追憶独自)の純ロジック。
+- `src/lib/comeviewInstantRender.js` — コメビュ別窓で行を即時描画する純ロジック(本文の切り詰め・行の隠し判定など)。
+- `src/lib/comeviewRows.js` — v0.1.652: 独自コメビュ「KIRAMEKI Comment View」の表示行ロジック(純関数)。
+- `src/lib/comeviewUserNotes.js` — v0.1.667: コメビュのユーザー詳細(わんコメ式 ニックネーム/ラベル/メモ)の純ロジック。
+- `src/lib/commentKindnessDisplayModel.js` — やさしさナッジ（コメント送信前の言い換え促し）の「表示モデル」を導出する純関数。
+- `src/lib/commentSummary.js` — v0.1.508: コメント記録の「軽量サマリ（0 秒表示）」純関数群。
+- `src/lib/commentTickerLatestHtml.js` — コメントティッカー（最新 1 件）の表示 HTML を組み立てる純関数。
+- `src/lib/commentTickerNameLink.js` — 最新コメントティッカーの名前部分に、ニコ動ユーザーページへのリンクを張るかの判定。
+- `src/lib/contentViewerNicoadCelebration.js` — watch ページ（content）上で、自分のニコニ広告を DOM から即検知して演出する。
+- `src/lib/deriveAvatarUrlFromUid.js` — v0.1.203 Patch 1: niconico ユーザー UID から avatar URL を確定パターンで生成する純関数。
+- `src/lib/devMonitorAvatarStats.js` — 開発者向け監視: storage コメント配列からアバター／userId の集計（PII なし・件数のみ）
+- `src/lib/devMonitorPaintGate.js` — v0.1.637: 開発者診断パネル(dev monitor)の重い集計を「パネルが開いているときだけ」走らせる
+- `src/lib/diagPaintDeferGate.js` — v0.1.639: paint 内の「重い diag 集計(全件 O(N))をスクロール中スキップしてよいか」の純判定。
+- `src/lib/domHarvestScrollDefer.js` — 「ユーザーが今まさにスクロール中か」を判定して、コメントの DOM ハーベスト
+- `src/lib/enrichmentAvatarFallback.js` — enrichRowsWithInterceptedUserIds 内で、全ソースにアバターURLがない場合に
+- `src/lib/formatGiftSubAppHistory.js` — v0.1.198: gift sub-app DOM 由来の history / totalCounts を popup 表示用に
+- `src/lib/giftBahamutCelebration.js` — ギフト到着時の「画面ズームイン」演出 spec（純関数）。
+- `src/lib/giftDisplayNickname.js` — NDGR ギフト protobuf から拾いがちな「内部用ラベル」を表示名から除外する。
+- `src/lib/giftEventStore.js` — v0.1.206 Phase A: NDGR gift event の時系列ストア（純関数）。
+- `src/lib/giftHistoryNorthStarPaintKey.js` — 北極星ギフト履歴レーンの再描画スキップ用キー（v0.1.582）。
+- `src/lib/giftHistoryOfficialReconcile.js` — 北極星ギフト履歴: 公式番組累計 pt と履歴 API 合計の表示整合（v0.1.581）。
+- `src/lib/giftHistorySourcePreference.js` — ギフト履歴レーンの「どのデータ源を表示するか」を決める純関数（v0.1.395）。
+- `src/lib/giftHistoryViewModel.js` — 北極星ギフト履歴レーン用 ViewModel（送り主集計 + 個別投げ一覧）。
+- `src/lib/giftRankStripConfig.js` — ギフト貢献／応援ストリップに並べる行の上限。
+- `src/lib/giftSenderObservation.js` — v0.1.214: anonymous gift（userId 空）も nickname を bucket key にして
+- `src/lib/giftSidebarRankTabPick.js` — ギフトサイドバー内から「貢献度ランキング」タブ相当の要素を選ぶ。
+- `src/lib/giftSubAppFrameSource.js` — v0.1.230: iframe relay の送信元 frame URL を意味のあるカテゴリに分類する純関数群。
+- `src/lib/giftSubAppIframeDomShape.js` — gift sub-app iframe（gift/koken/audition.nicovideo.jp）内の scrape が 0 件の
+- `src/lib/giftThrowLedgerTableHtml.js` — ギフト投げ一覧テーブル HTML（マーケ #mkt-gift-ledger と同型・popup 用 nl- クラス）。
+- `src/lib/inlineBelowWideRowInsert.js` — below 配置でインラインホストを「動画列の内側」から外すための挿入点解決。
+- `src/lib/inlineFirstPaintGate.js` — 初回パネル表示ゲート（横付き）の純粋判定ロジック。
+- `src/lib/inlineHostAnchorScoring.js` — 埋め込みパネル（inline host）の挿入アンカー候補をスコアリングする純粋関数。
+- `src/lib/inlineHostBesideSizing.js` — beside（横付き）モードの inline panel の幅・高さを最適計算する純粋関数。
+- `src/lib/inlineHostDockSizing.js` — dock_bottom モードの inline panel 高さを viewport と player rect から最適計算する純粋関数。
+- `src/lib/inlineHostLayoutReset.js` — インラインパネルの placement（below / beside / floating / dock_bottom）を切り替える際に、
+- `src/lib/inlinePanelFocusGate.js` — インラインパネル host element が toolbar 起点の「前面化」操作を受けられる
+- `src/lib/inlinePanelLayout.js` — 視聴ページに埋め込む nicolivelog パネルの幅・位置を、動画要素の表示矩形に合わせるための純関数。
+- `src/lib/inlinePanelPlacementResolver.js` — インラインパネル配置の「単一の真実」コンポーネント。
+- `src/lib/inlinePanelPlacementStorage.js` — インライン配置・幅・ビューポート幅・浮遊アンカーの chrome.storage.local 正本まわり。
+- `src/lib/inlinePanelViewportWide.js` — インラインパネルを「タブ幅に近い」まで広げる幅の純粋計算（content-entry から利用）。
+- `src/lib/inlinePlacementQuickbar.js` — ヘッダーの「パネル位置」クイックバー用 純関数（v0.1.334）。
+- `src/lib/inlinePopupHostPrimaryPick.js` — 複数 `#nls-inline-popup-host` が `isConnected` なとき、どれを primary として残すか。
+- `src/lib/inlinePopupIframeVisibilityPolicy.js` — `ensureInlinePopupIframe` の early-return 経路で iframe を再表示するか（DOM 非依存の判定部）。
+- `src/lib/interceptAvatarHydration.js` — profile cache の強い avatar を intercept avatar map へ補完する。
+- `src/lib/kokenGiftHistoryApi.js` — koken 公式「ギフト履歴（個別イベント）」無認証 JSON API の URL 組立 & 正規化（純関数）。
+- `src/lib/kokenGiftHistoryFetchClient.js` — popup / content から service-worker 経由で koken ギフト履歴 API を叩く薄いクライアント。
+- `src/lib/liveAudienceDom.js` — watch ページ DOM から「同時接続（ページ表示）」に近い視聴者数を読む（純関数・ベストエフォート）
+- `src/lib/liveStatValuePlaceholder.js` — `.nl-live-stat-value` 向け: 数字表示かプレースホルダー文言かを判定（0.1.68 の極太フォント切替と共通）。
+- `src/lib/marketingGiftThrowLedger.js` — マーケ分析 HTML 用: 「誰が・どのアイテムを・いくら投げたか」の投げ履歴台帳を組み立てる純関数。
+- `src/lib/marketingHtmlAdvisorAvatars.js` — マーケ分析HTML内のキャラアイコン（単体HTMLで表示するため data URI）。
+- `src/lib/mergeGiftHistoryThrows.js` — v0.1.216: 公式ギフト sub-app DOM (`ul.gift-history-list`) から scrape した
+- `src/lib/migrateInlinePanelBelowToDock.js` — `below` → `dock_bottom` のワンショット移行（0.1.63 AS）。
+- `src/lib/migrateInlinePanelFloatToDock.js` — 旧「ポップアップ風（floating）」利用者を画面下ドックへ一度だけ移す（公式右パネルとの衝突緩和）。
+- `src/lib/migrateSuggestInitialInlinePanelPlacement.js` — 新規インストール時のみ、インライン配置キーが未保存なら画面幅で既定を一度書き込む。
+- `src/lib/nicoadCelebrationKey.js` — ニコ広/ギフトのシステムコメント演出を「同じコメントで二度光らせない」ための
+- `src/lib/nicoAnonymousDisplay.js` — ニコ生の匿名ユーザーID（a: で始まる内部ID）向けの表示補完。
+- `src/lib/nicoUserPage.js` — 汎用: ニコ生ユーザーの公開ページ URL / 表示名 を作る純関数。
+- `src/lib/nicoUserProfilePage.js` — www.nicovideo.jp/user/<id> のプロフィールページに表示されている
+- `src/lib/northStarLaneGadgetChara.js` — 北極星レーン左ガジェットのキャラ画像（拡張ルート相対）。
+- `src/lib/northStarLaneReason.js` — v0.1.244: 北極星「公式値レーン」の state 細分化用、reason 判定純関数。
+- `src/lib/northStarLaneVisibility.js` — 北極星レーンの表示/非表示を `data-lane-state` から決める純関数（副作用なし）。
+- `src/lib/northStarLaneWaitingUi.js` — 北極星「公式値レーン」の取得待ち（not_yet / iframe_unrendered）用 UI 断片。
+- `src/lib/officialEventBannerDom.js` — niconico の watch ページに描画される「○○さんが参加しています！」グリーンバナーから
+- `src/lib/paintPerfLog.js` — v0.1.725: 描画(paint)コストの軽量リングバッファ記録(純関数)。
+- `src/lib/parseGiftComment.js` — ニコ生のギフトコメント文字列をパースする純粋関数。
+- `src/lib/popupAvatarResolver.js` — v0.1.206 Phase B: popup 表示の avatar URL を統一的に解決する純関数。
+- `src/lib/popupCelebrationGate.js` — popup / watch 埋め込みパネル再描画時の応援演出ゲート（単一の開幕判定）。
+- `src/lib/popupContextBarModel.js` — popup 上部の接続コンテキスト表示・復旧バー表示・stat 表面状態の純粋ロジック。
+- `src/lib/popupEntryPendingSelfPost.js` — popup の表示経路で「pending self-post entry（ndgr 観測前の自コメ仮置き）」を
+- `src/lib/popupMainScrollDefer.js` — 拡張ポップアップ `.nl-main` スクロール中に重い DOM 更新を見送るかどうか。
+- `src/lib/popupStorageRefreshCoalesce.js` — popup / inline のコメント再描画スケジューラ。
+- `src/lib/popupVisibilityGate.js` — popup / inline コメント再描画の可視性ゲート（v0.1.440）。
+- `src/lib/privacyDisplay.js` — 共有・掲載向けに表示ラベルを短く伏せる（完全一致検索を難しくする程度。暗号化や匿名化ではない）。
+- `src/lib/provisionalLaneCommentRows.js` — heavy read 完了前に応援ランキングへ載せる暫定コメント行の合成（0 秒表示用）。
+- `src/lib/reportUserThumb.js` — HTML レポート / マーケ分析の各ユーザー行に「最低サムネ」を必ず出すための
+- `src/lib/resolveVisitorCount.js` — v0.1.646: 「来場(累計来場者数)」の単一定義。表示場所(popup / status / レポート)で
+- `src/lib/sanitizeRoomAvatarsForBroadcaster.js` — 集計済み user room の avatarUrl から「broadcaster icon の取り違え」を除去する純粋関数。
+- `src/lib/scrapeGiftHistoryList.js` — niconico ギフト sub-app の `gift-history-list` から個別ギフトを抽出する純関数（v0.1.198）。
+- `src/lib/scrapeTotalGiftCountList.js` — niconico ギフト sub-app の `total-dold-count-list` から種類別集計を抽出する純関数（v0.1.198）。
+- `src/lib/selfActionCelebration.js` — アプリから自分が操作した直後に返す軽量演出の spec。
+- `src/lib/sessionCommentCache.js` — v0.1.650: JSONキャッシュ即時表示の本丸。「開いた瞬間に全コメント表示・ローディングなし」。
+- `src/lib/storyAvatarDiagLine.js` — 応援グリッド用・診断表示（PII なし・件数のみ）。
+- `src/lib/storyGrowthLimits.js` — りんく成長グリッド（story growth）の描画上限。
+- `src/lib/storyTileTvStyle.js` — ストーリータイル / レーンアバターで「ゆっくり風キャラ画像かどうか」を判定する純関数。
+- `src/lib/storyUserLaneBuckets.js` — 応援ユーザーレーン: ソート済み候補を tier（profileTier）別に上限付きで分割する。
+- `src/lib/storyUserLaneContaminationGuard.js` — 応援ユーザーレーン候補から、視聴者/配信者 UID の混入を除外する判定。
+- `src/lib/storyUserLaneDisplaySrc.js` — 応援ユーザーレーン（りんく・こん太・たぬ姉）のセル画像 URL。
+- `src/lib/storyUserLaneGuideHtml.js` — 応援ユーザーレーンの案内 HTML（ポップアップ・E2E と共有）
+- `src/lib/storyUserLaneRowModel.js` — 応援ユーザーレーン: 1 ユーザー候補あたりの tier・サムネ・ソート用スコアを一箇所で組み立てる。
+- `src/lib/suggestInitialInlinePanelPlacement.js` — 新規インストール直後の「おすすめ」インライン配置（storage 未設定時のみ migrate が使う）。
+- `src/lib/supportCelebration.js` — 配信中のマイルストーン演出（コメント件数・イベント順位 UP・ギフト件数）の判定。
+- `src/lib/supportGridDisplayTier.js` — 応援ユーザーの「表示の立ち位置」（LP モック・ユーザーレーン並びの共通ルール）
+- `src/lib/supportGrowthAvatarLoad.js` — 応援グリッド等のリモート avatar img の読み込みガード。
+- `src/lib/supportGrowthTileSrc.js` — 応援グリッド用タイル画像 URL の優先解決（純関数）
+- `src/lib/thumbDb.js` — サムネイル用 IndexedDB（コンテンツスクリプトのみで使用）
+- `src/lib/thumbFifo.js` — サムネ IndexedDB の FIFO トリム用純関数（古い capturedAt 順＝先頭が最古）
+- `src/lib/thumbSettings.js` — 定期サムネイル設定（ストレージ値の正規化）
+- `src/lib/topSupportRankStripLines.js` — 応援ランキング上位ストリップの各行(サムネ/色アクセント/リンク)を組み立てる純ロジック。
+- `src/lib/userCommentProfileCache.js` — userId 単位で表示名・個人サムネ（弱い CDN 既定アイコン以外の http URL）を蓄積し、
+- `src/lib/userEntryAvatarResolve.js` — 1 ユーザーエントリーのアバター状態を組み立てる純関数レイヤ。
+- `src/lib/userLaneDiagSnapshot.js` — Popup DevTools 用: lane pipeline の観測スナップショット（PII を含めない）。
+- `src/lib/userLaneMergeGiftThrowers.js` — ギフト／広告投げ主専用レーン用のエントリ一覧（りんく列とは別段）。
+- `src/lib/userSupportGridAccent.js` — Paul Tol Bright に近い 8 色を OKLCH で表現（カテゴリ識別用）。
+- `src/lib/userThumbGrid.js` — 「サムネ付きユーザー一覧」のカテゴリ分け純粋関数。
+- `src/lib/venueAvatar.js` — v0.1.712: 会場モードのアバター解決(サムネ補強)純関数。
+- `src/lib/venueBubbleLayout.js` — v0.1.717: 会場モードの吹き出し(セリフ)を「席の外の最上位レイヤー」に置くための配置純関数。
+- `src/lib/venueCharacterFrame.js` — 会場モードの「額縁(フレーム)」: ゆっくり3キャラ(りんく/こん太/たぬ姉)の全表情サムネを、
+- `src/lib/venueCrowdMotion.js` — 会場の観客シルエット群を「生きている会場」にするための動きパラメータ(純関数)。
+- `src/lib/venueDisplayRows.js` — 会場モードの「空っぽ・途中で消える・ちらつき」根治の正本(2026-06-15・会議+根本原因調査)。
+- `src/lib/venueHeat.js` — v0.1.732: 会場モードの「熱量の色温度」純関数。
+- `src/lib/venueLiveRoster.js` — v0.1.754 会場の3時間安定化(星野ロミ・メソッド会議の本質解・6体ほぼ全会一致):
+- `src/lib/venueResidents.js` — 会場モードの常駐3キャラ(りんく・こん太・たぬ姉)の描画モデル(純関数)。
+- `src/lib/venueRoster.js` — 2026-06-14 ユーザー要望「今会場にいるメンバーを視覚的に確認できるボタン・AIも人間も検証
+- `src/lib/venueSpeech.js` — v0.1.711: ライブ会場モードの「発言→吹き出し」純関数。
+- `src/lib/venueSpeechStreak.js` — 「会話の連鎖」(2026-06-15 会議の最大多数決の本命・弱点A/C):
+- `src/lib/venueViewport.js` — v0.1.715: 会場モードの「映像セーフエリア」と「同時表示人数」を決める純関数。
+- `src/lib/viewerCelebrationMatch.js` — 視聴者本人のギフト／広告システムコメント判定（ニコ生の表記揺れに耐える）。
+- `src/lib/watchCelebrationOverlay.js` — popup iframe から content script 経由で呼ぶ。
+- `src/lib/watchMetaCardStateGate.js` — watch メタカードの「来場者数 / 推定同時接続」表示状態を、
+- `src/lib/watchPageViewerProfile.js` — watch ページのサイトヘッダー付近からログイン中ユーザーのアイコン・表示名を推定。
+- `src/lib/watchPopupCelebrationGuard.js` — popup 再描画時の応援演出ガード（純関数）。
+- `src/shared/avatar/avatarUrlGuard.js` — avatar URL 比較・抽出・整合性判定の純粋関数群（shared レイヤ）。
+- `src/shared/avatar/clampAvatarUrl.js` — avatar URL の長さ上限を一元適用する純関数（H2 / D-5 / S-13 の根治）。
+- `tools/render-og.js` — 追憶の煌めき LP 用 OG 画像（1200×630）を生成する。
+
+</details>
 
 ## 🔊 読み上げ
 
@@ -78,6 +419,16 @@
   - `src/lib/voicePlayer.js`
   - `src/lib/voiceReadQueue.js`
   - `src/lib/voiceAgeGate.js`
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 6</summary>
+
+- `src/lib/reportCompleteVoice.js` — v0.1.806: レポート(HTML/マーケ/メディアキット)の保存が【成功した直後】に、完了の合図として
+- `src/lib/voiceAssignment.js` — コメント者ごとに読み上げ声(styleId/ピッチ/速度オフセット)を決定論的に割り当てる純ロジック。
+- `src/lib/voiceComment.js` — ニコ生コメント欄の最大文字数（textarea maxlength と一致）
+- `src/lib/voiceInputDevices.js` — マイク確認でサンプルする時間（ms）
+- `src/lib/voiceLoadingState.js` — VOICEVOX 起動待ちのローディング表示を決める純関数群。
+- `src/lib/voicevoxClient.js` — ローカル VOICEVOX エンジン(127.0.0.1:50021)へ音声合成をリクエストするクライアント。
+
+</details>
 
 ## 📊 レポート
 
@@ -87,6 +438,40 @@
 
 - **HTMLレポート生成** — マーケ/イベント順位/タイムライン等を1枚の HTML レポートに組み立てる(popup-entry 内)
   - `src/extension/popup-entry.js`
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 30</summary>
+
+- `scripts/inspect-nicolive-watch-stats.mjs` — ニコ生 watch ページの HTML から、来場・同接まわりの数値がどう埋め込まれているかを CLI で確認する。
+- `src/lib/audienceEngagementGap.js` — 来場者数は多いがコメントが少ない状態を検出するローカル分析コア。
+- `src/lib/broadcastNarrativeBuilder.js` — コメント本文だけから「配信内容の流れ」を再構成する純粋関数。
+- `src/lib/broadcastReportSummary.js` — HTML レポート / マーケ分析の双方で使う「放送全体の純粋集計」。
+- `src/lib/deepExportPolicy.js` — popup からの deep export 要求時に、仮想リスト走査を行うかを判定する。
+- `src/lib/devMonitorViz.js` — 開発・テスト用監視パネル向けの純粋 HTML 断片（DOM 非依存）。
+- `src/lib/exportDownloadFilename.js` — HTML / マーケ分析のダウンロードファイル名（配信開始日 + liveId）。
+- `src/lib/exportStageProfiler.js` — HTML / マーケ DL の段階計測（体感調査用）。chrome 非依存の純関数。
+- `src/lib/exportWaitNarration.js` — HTML / マーケ DL 待ち中の りんく・こん太・たぬ姉 セリフ（popup 吹き出し用）。
+- `src/lib/htmlReportCommenterFollowSection.js` — HTML レポート向けコメンターフォロー分析ブロック。
+- `src/lib/htmlReportConceptGuide.js` — HTML レポート用キャラガイド（この拡張の説明／保存ページの使い方）
+- `src/lib/marketingChartsHtml.js` — マーケ集計(MarketingReport)から HTMLレポート用のグラフ/チャート HTML を組み立てる。
+- `src/lib/marketingDynamicAdvice.js` — 0.1.33 (AH): マーケ分析の各セクションに「内容に応じて変わる」キャラ解説を出す
+- `src/lib/marketingReportEmbed.js` — マーケ分析 HTML に埋め込む JSON（表計算・ツール連携用）。
+- `src/lib/marketingSupportParticipationCounts.js` — マーケ分析・HTMLレポート先頭 KPI: ギフト投げ主・広告した人の人数。
+- `src/lib/mediaKitHtml.js` — 追憶メディアキットの共有用 single-file HTML。
+- `src/lib/mediaKitStats.js` — 追憶メディアキット向けの期間集計。
+- `src/lib/northStarFallbackHtml.js` — v0.1.241: 北極星「鏡のように貼り付け」レーンの fallback HTML 生成。
+- `src/lib/panelMetricsExport.js` — パネル向け速報メトリクス（content メモリ → popup 直結、storage バイパス）。
+- `src/lib/reportCommentsCsv.js` — 保存コメント配列を「Excel / LibreOffice / Google Sheets で安全に開ける CSV」に変換する純関数。
+- `src/lib/reportCommentsTableSection.js` — HTML レポート「保存コメント一覧」セクション。
+- `src/lib/reportFriendlyMetaRowsHtml.js` — v0.1.635: HTML レポートの「やさしいメタ情報」テーブル行ビルダ + ラベル変換（純ロジック）。
+- `src/lib/reportHeadInfoRowsHtml.js` — HTML レポートの「head 情報」テーブル行（link / meta / script / noopener）を
+- `src/lib/reportNextMemoSectionHtml.js` — v0.1.811(星野ロミ式コンポーネント化・第4弾): popup-entry.js の buildHtmlReportDocument 内
+- `src/lib/reportSelfPostedRowsHtml.js` — v0.1.634: HTML レポートの「自分のコメント抜粋」テーブル行ビルダ（純ロジック）。
+- `src/lib/reportSilentError.js` — 内部エラーを静かに記録する純ロジック(context invalidated 等の判定・メッセージ正規化)。
+- `src/lib/reportThumbedUsersSectionHtml.js` — HTML レポートの「サムネ付きユーザー一覧」セクションを純粋に組み立てる。
+- `src/lib/reportUserRoomTableHtml.js` — v0.1.636: HTML レポートの「ユーザー別集計テーブル」行ビルダ（純ロジック）。
+- `src/lib/supportTimelineHtml.js` — 応援タイムラインの行 HTML を純粋に組み立てる（v0.1.340）。
+- `src/shared/html/escape.js` — ユーザー由来文字列を HTML 断片に埋め込む前にエスケープする（XSS 対策の共通実装）。
+
+</details>
 
 ## 🩺 診断・地図
 
@@ -116,3 +501,137 @@
 - **影響範囲ゲート(規律を自動化)** — 星野ロミ式「規律を自動ゲートに」。diff から影響大(複数機能波及)の変更ファイルを検出し波及先機能を列挙。警告のみ(摩擦ゼロ)・--strict で exit1。AGENTS.md §10 のルールを diff 発火に
   - `scripts/impact-check.mjs`
   - `docs/feature-map/impact-map.json`
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 29</summary>
+
+- `api/status.js` — status 受け口 Vercel Serverless Function。
+- `scripts/run-verify-cc.mjs` — Claude Code 向け verify ランナー。
+- `scripts/split-changelog.mjs` — scripts/split-changelog.mjs — changelog.js を直近20版(本体)と旧版(archive)に分割
+- `scripts/verify-bump.mjs` — extension bump 後の整合性チェッカー
+- `src/lib/aiShareDiagSchema.js` — AI 共有診断バンドル（popup が組み立てる JSON / storage の nls_ai_share_fast_diag_v1）の
+- `src/lib/aiShareFastDiagKey.js` — v0.1.629: AI 共有 fastDiag キャッシュの storage key を popup と status ページで共有。
+- `src/lib/captureAuditionRichviewEventScoreDiagProbe.js` — audition.nicovideo.jp `/embedded/richview/live` 向けの診断ペイロード（PR1）。
+- `src/lib/changelog-archive.js` — 追憶のきらめき 更新履歴アーカイブ（v0.1.663 以前）。
+- `src/lib/changelog.js` — 拡張の更新履歴データと semver 比較ヘルパ。
+- `src/lib/changelogConsistency.js` — 版番号の三者一致を機械照合する純関数(v0.1.835)。
+- `src/lib/commentPanelHealthProbe.js` — ニコ生の watch ページでコメント欄が「見えない／届かない」状態を検出し、
+- `src/lib/commentPanelStatus.js` — コメントパネル検出失敗（DOM 変更等）をポップアップ向けに解釈する純関数
+- `src/lib/commentPostStatusPresentation.js` — コメント送信 UI の「最終ステータス表示」と aria-describedby を決める純関数群。
+- `src/lib/diagnosticErrorRing.js` — chrome.storage.local に保存する診断エラーリング（純粋・マージのみ）。
+- `src/lib/diagnosticRedact.js` — AI共有・診断バンドル向けの URL / 文字列のサニタイズ（純粋関数）。
+- `src/lib/diagnosticRingStore.js` — 診断エラーリングを chrome.storage.local に追記（拡張コンテキスト専用）。
+- `src/lib/diagWarnings.js` — v0.1.201: 診断 JSON の現在値から「なぜ取れていないか」を導出する純関数群。
+- `src/lib/diagWordingGuard.js` — ユーザー向け診断カードの「実害を示唆する語」を検出する純関数(v0.1.835)。
+- `src/lib/errorAutoDiagnosis.js` — v0.1.205 Phase D: 既存の診断データ（consoleErrors / networkErrors / diagWarnings）から
+- `src/lib/eventSelfStatusHeaderHtml.js` — v0.1.809(星野ロミ式コンポーネント化・第2弾): popup-entry.js の純粋寄り HTML ビルダー
+- `src/lib/keyboardTypeDiagnostic.js` — L12: キーボード型診断（コメンターを 5 つの型に分類）。
+- `src/lib/liveHealthScore.js` — 配信ごとの「健康チェック」5段階評価(純関数)。
+- `src/lib/perfDiag.js` — 複数タブ paint 負荷の診断スナップショット。
+- `src/lib/popupAiDiagOrchestrator.js` — v0.1.211: popup「AI 診断」ボタンのオーケストレータ純関数。
+- `src/lib/popupDiagAutoPublish.js` — popup を開いたとき popup 固有診断を status へ自動集約するスケジューラ(純ロジック)。
+- `src/lib/summarizeGiftSubAppHistoryDiag.js` — v0.1.201: gift sub-app DOM の payload を診断 JSON 用 summary に変換する純関数。
+- `src/lib/supportVisualStoryCopy.js` — アイコン列・診断ブロックで共有する文言（二重定義防止）。
+- `src/lib/watchPopupLoadDiagnostics.js` — watch インラインパネルの読み込みフェーズ計測（DevTools / 実機メモ用）。
+- `src/lib/watchSnapshotAlignment.js` — content からの応答(intercept/AI診断 等)が現在解決済の watch と同じ配信由来か判定し別 live の混入を防ぐ。
+
+</details>
+
+## その他
+
+> 🦊りんく: まだ分類していない機能なのだ。
+> 🦊こん太: 見つけたら分類してあげるのだ。
+> 🦝たぬ姉: FEATURE_CATEGORY に1行足すだけなのだ。
+
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 90</summary>
+
+- `app/app.js` — スマホ閲覧用 status Web 版。
+- `extension/background.js` — MV3 Service Worker
+- `scripts/build-watch.mjs` — watch では起動時刻を埋める（rebuild 毎に再 import される訳ではないので、
+- `scripts/build.mjs` — ビルド時刻（JST, MMDD-HHmmss）を返す。popup の `NL_BUILD_ID` に埋め込み、
+- `scripts/capture-store-screenshots.mjs` — Chrome ウェブストア用スクショ自動撮影
+- `scripts/cws-publish.mjs` — Chrome Web Store Publish API で ZIP をアップロード(+任意で公開申請)する。
+- `scripts/delete-dead-lib.mjs` — scripts/delete-dead-lib.mjs — 死蔵lib実装ファイルとそのテストを削除
+- `scripts/fix-src-images-mojibake.mjs` — Normalizes known mojibake paths under src/images (mirrored from kimito-link).
+- `scripts/meeting.mjs` — 会議ハーネス: 同じ問いを「無料クラウド4系統 + ローカル ollama 数体」に投げ、
+- `scripts/repo-tree-map.mjs` — リポジトリのディレクトリツリー＋各ディレクトリの「役割」を自動生成する(2026-06-18 ユーザー提案)。
+- `scripts/run-e2e.mjs` — SKIP_E2E=1 のときは成功終了（CI などディスプレイなし環境用）。
+- `scripts/scan-dead-lib.mjs` — scripts/scan-dead-lib.mjs — lib/ の死蔵ファイルを entry から到達性スキャンして報告
+- `scripts/setup-claude-code.mjs` — プロジェクト用 Claude Code 設定を .claude/settings.json に展開する。
+- `scripts/sync-lp-twitter-icon.mjs` — LP 右端コラボ用: src/images/icon/twitter-icon.png → extension/images/lp/twitter-icon.png
+- `scripts/vendor-visual-explainer.mjs` — Vendors nicobailon/visual-explainer (MIT) into .cursor/skills/visual-explainer/
+- `scripts/write-extension-placeholder-icons.mjs` — リポジトリに 256px アイコンしか無い環境向け: manifest 用の小さめ PNG を生成する。
+- `src/extension/offscreen-entry.js` — feat/multitab-scale-globalcap（2026-05-31）: コメント IDB の「常駐・単一書き手」を担う
+- `src/lib/buildWatchMetaCardAudienceViewModel.js` — Watch メタカード「観客」ブロック用 ViewModel（DOM 非依存）。
+- `src/lib/consoleErrorBuffer.js` — v0.1.201: window.error / unhandledrejection を捕捉する ring buffer。
+- `src/lib/devMonitorDebugSubset.js` — ポップアップ「開発・テスト用 監視」用: watch スナップショット _debug から
+- `src/lib/devReloadSignal.js` — 開発用ホットリロードのシグナル判定（純関数）。
+- `src/lib/embeddedDataExtract.js` — ニコ生 watch ページの `#embedded-data[data-props]` から初期メタ情報を抽出する純関数。
+- `src/lib/eventParticipationProgramsApi.js` — ニコ生「企画イベント参加番組一覧」公式 JSON API の URL 組立 & 正規化（純関数）。
+- `src/lib/executeScriptWithTimeout.js` — v0.1.441: `chrome.scripting.executeScript` を timeout 付きで実行する純関数ラッパ。
+- `src/lib/externalLinksSectionHtml.js` — v0.1.812(星野ロミ式コンポーネント化・第5弾): buildHtmlReportDocument 内の
+- `src/lib/formatDateTime.js` — 日時の数値（epoch ms）を日本語ロケールで `YYYY/MM/DD HH:MM:SS` 形式に整形する
+- `src/lib/formatOfficialStreamAgeMinutes.js` — 視聴ページ由来の「放送開始からの経過（分）」を短い日本語にする。
+- `src/lib/forwardReactivation.js` — v0.1.765「最終系(a): 入口が死んだ時だけ forward crawl を起動して再接続」の判定(純ロジック)。
+- `src/lib/geminiNanoBridge.js` — v0.1.205 Phase C: Built-in AI (Gemini Nano, Chrome 138+) の薄いラッパー。
+- `src/lib/globalFetchRateLimiter.js` — v0.1.664 PR4: tokenBucket.js を用いた全タブ横断の fetch レートリミッター(土台)。
+- `src/lib/htmlEscape.js` — 旧パス：`src/lib/htmlEscape.js`
+- `src/lib/isInsideRecommendedLiveSection.js` — v0.1.200: ニコ生 watch ページの「おすすめ生放送」セクション内 DOM を識別する純関数。
+- `src/lib/lengthDelimitedStream.js` — length-delimited（varint 長 + ペイロード）の連続を分割する。
+- `src/lib/liveEndedFlag.js` — 配信終了フラグ。
+- `src/lib/mcpBridge/buildMcpMismatchReasons.js` — MCP L1 snapshot の `diag.mismatchReasons` を組み立てる純関数。
+- `src/lib/mcpBridge/mergeLiveMcpSnapshot.js` — Canonical Snapshot のマージ（Deterministic + Monotonic Sequence）。
+- `src/lib/mcpBridge/schema.js` — L1 Canonical Snapshot の schema 定義（MCP Bridge から AI に返す正準形）。
+- `src/lib/mcpBridge/validateLiveMcpSnapshot.js` — Canonical Snapshot の構造検証。schema.js の isCanonicalLiveSnapshot より詳細な
+- `src/lib/mergeProgramStatsWatchIntoWatchMetaSnapshot.js` — 公式 DOM bundle の programStats.watchCount（累計来場）を snapshot に補完する。
+- `src/lib/mirrorSanitize.js` — v0.1.237: 北極星「鏡のように貼り付け」用の自前最小サニタイザ。
+- `src/lib/nicoCommentPanelAssetLauncher.js` — ニコ生 watch のコメント欄付近から「ギフト / アイテム / スタンプ」等の起動ボタンを推定する。
+- `src/lib/northStarCharaTrioConfig.js` — 北極星 3 キャラ trio（りんく / こん太 / たぬ姉）の slot 構成と tier 連動 src 解決。
+- `src/lib/objectUrlRevokeQueue.js` — `URL.createObjectURL` で作った blob URL を、メモリ滞留を抑えながら revoke する
+- `src/lib/observerTarget.js` — MutationObserver の監視ルートを決める（ニコ生コメントパネル優先）
+- `src/lib/officialEventDomBundle.js` — watch ページの DOM から「配信者の番組周辺の正本値」を 1 関数で総取りするオーケストレータ。
+- `src/lib/officialNicoStatsStripDigest.js` — text: string,
+- `src/lib/officialStatsWindow.js` — at?: number|null,
+- `src/lib/openingFiveMinuteCorrelation.js` — L13: 冒頭 5 分の予兆 → ピーク CPM 相関（散布図用）。
+- `src/lib/panelLiveSummary.js` — パネルカード用の超軽量サマリ（多タブ時の snapshot / 巨大配列 read 待ちを避ける）。
+- `src/lib/parseEmbeddedDataViewerInfo.js` — v0.1.203 Patch 3: niconico watch ページの `<script id="embedded-data" data-props='{...}'>`
+- `src/lib/parseInterestArrivalComment.js` — ニコ生の興味タグ来場システムコメントをパースする純関数。
+- `src/lib/pickLatestComment.js` — ストレージ上のコメント配列の並びは一定でないため、
+- `src/lib/pollUntil.js` — 再読み込み直後など DOM が遅れて現れるまで待つ（純粋な間隔ポーリング）
+- `src/lib/popupBooleanSettingController.js` — popup のブール設定 1 件を管理する純粋コントローラ。
+- `src/lib/popupBooleanSettingsRegistry.js` — popup のブール設定コントローラをまとめて扱うレジストリ。
+- `src/lib/popupFramePresets.js` — popup の配色プリセット（フレーム）管理。
+- `src/lib/popupWatchSnapshotRetry.js` — 視聴タブのリロード直後は content script の readiness が揃わず、
+- `src/lib/popupWindowEmptyHeight.js` — 0.1.71 (BA): popup window の高さを「state（active watch / empty+history /
+- `src/lib/prewarmCoordinator.js` — 複数 watch タブで popup.html の prewarm が同時に走るのを防ぐ
+- `src/lib/profileResolveState.js` — v0.1.720 PR-T2: プロフィール解決の状態管理（純関数）。
+- `src/lib/protobufVarint.js` — Protobuf の非負 varint を読み取る（length-delimited の長さ用）。
+- `src/lib/pruneStaleEventDomLvs.js` — v0.1.203 Patch 4: 古い event-dom snapshot 残骸を cleanup 対象として識別する純関数。
+- `src/lib/refreshTaskGuard.js` — v0.1.437: popup の `refresh()` で chrome API が永久 pending になっても全カード「—」固定にしない
+- `src/lib/resolveKiramekiReturningAndFirstTimeUserKeys.js` — 「きらめきの賞」のかよい / はじまり判定用 userKey 分類（純関数）。
+- `src/lib/standalonePopupClose.js` — v0.1.433: 別ウィンドウ POP（standalone popup window）を「配信に飛ばしたら閉じる」判定（純ロジック）。
+- `src/lib/storageErrorState.js` — ストレージ書き込みエラーをポップアップ向けにシリアライズする純関数
+- `src/lib/storedCommentDedupeMerge.js` — popup normalizeStoredCommentEntries 用: 同一キー重複行のマージ（PII を増やさずフラグのみ統合）
+- `src/lib/supportActivityTimeline.js` — 応援タイムライン: コメントとギフト着弾を時刻順に統合する純関数（v0.1.340）。
+- `src/lib/supportTimelineGuard.js` — 応援タイムラインの重い全件読み込みを実行してよいか判定する。
+- `src/lib/swCrawlSlots.js` — SW backfill の per-lid 並列スロット判定。
+- `src/lib/tabLeaderLock.js` — PR1-b/PR2（feat/multitab-scale-ultraC）: 同一 origin の複数タブのうち「1タブだけ」が
+- `src/lib/tokenBucket.js` — PR5（feat/multitab-scale-ultraC）: トークンバケットによるグローバル流量制御の純ロジック。
+- `src/lib/topSupportRankAnonymousFold.js` — userKey: string,
+- `src/lib/trimMap.js` — Map のサイズを max 以下に制限し、先頭（最古挿入順）から削除する。
+- `src/lib/videoCapture.js` — watch ページの video から PNG を取るためのユーティリティ。
+- `src/lib/watchAudienceCopy.js` — watch パネル「観客メモ」用の短文・ツールチップ文言（DOM 非依存）。
+- `src/lib/watchContext.js` — watch ページ URL と直前の lv から、コンテンツスクリプト用の文脈を純関数で求める
+- `src/lib/watchFrameCommentPostGate.js` — watch 上の各フレームが `NLS_POST_COMMENT` / コメント欄系操作を受けてよいかの判定。
+- `src/lib/watchProgramEndState.js` — 視聴ページ文言から「番組終了状態」を推定する。
+- `src/lib/watchSnapshotOfficialFields.js` — collectWatchPageSnapshot が返すオブジェクトのうち、公式統計・キャプチャ率まわり（DOM 非依存）。
+- `src/lib/watchSnapshotPartialMerge.js` — watchMetaCache.snapshot を更新する際の partial-merge 純粋関数。
+- `src/shared/niconico/liveId.js` — ニコ生 放送 ID（`lv…` / `ch…`（チャンネル枠））の正規化ユーティリティ。
+- `src/speech-recognition-globals.d.ts` — Web Speech API（Chrome は webkit 接頭辞のことがある）
+- `tests/e2e/constants.js` — E2E モック視聴ページ（playwright.config の webServer・manifest の host_permissions と一致させる）
+- `tests/e2e/fixtures.js` — e2e テスト共通の土台(拡張をロードした Chromium 起動・test/expect の再エクスポート)。
+- `tests/e2e/global-setup.js` — ローカル（CI 以外）でモック watch 用の静的サーバが未起動のとき、
+- `tests/e2e/global-teardown.js` — global-setup が起動した serve の PID を片付ける（ローカル専用）。
+- `tools/audit-lp-overflow.mjs` — One-off LP overflow audit (run: node tools/audit-lp-overflow.mjs)
+- `tools/mcp-nicolive/server.mjs` — NicoLive Local MCP Bridge Phase1a (PoC) — stdio JSON-RPC server.
+- `tools/mcp-nicolive/store.mjs` — NicoLive Local MCP Bridge - Snapshot Store.
+
+</details>

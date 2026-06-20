@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-✅ 全 504 ソースに役割コメントあり。
+✅ 全 505 ソースに役割コメントあり。
 
 ## 全ファイルツリー
 
@@ -252,7 +252,7 @@
   - `vendor-visual-explainer.mjs` — Vendors nicobailon/visual-explainer (MIT) into .cursor/skills/visual-explainer/
   - `verify-bump.mjs` — extension bump 後の整合性チェッカー
   - `write-extension-placeholder-icons.mjs` — リポジトリに 256px アイコンしか無い環境向け: manifest 用の小さめ PNG を生成する。
-- 📁 **src/** (1097)
+- 📁 **src/** (1099)
   - 📁 **data/** (6)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -510,7 +510,7 @@
         - `logo_funlink_white_RGB_maru_black.png`
       - `logo_guide_funlink_ol.pdf`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (887)
+  - 📁 **lib/** (889)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -767,6 +767,8 @@
     - `diagnosticRedact.js` — AI共有・診断バンドル向けの URL / 文字列のサニタイズ（純粋関数）。
     - `diagnosticRedact.test.js`
     - `diagnosticRingStore.js` — 診断エラーリングを chrome.storage.local に追記（拡張コンテキスト専用）。
+    - `displayRecordedCount.js` — 「画面に出す記録件数」の正本を1つに固定する純関数(v0.1.839・第1)。
+    - `displayRecordedCount.test.js`
     - `domHarvestScrollDefer.js` — 「ユーザーが今まさにスクロール中か」を判定して、コメントの DOM ハーベスト
     - `domHarvestScrollDefer.test.js`
     - `embeddedDataExtract.js` — ニコ生 watch ページの `#embedded-data[data-props]` から初期メタ情報を抽出する純関数。
