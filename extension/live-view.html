@@ -5,16 +5,28 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>応援ライブビュー — 君斗りんくの追憶のきらめき</title>
     <style>
-      /* v0.1.874: popup(html.nl-skin-panel-dark)の正確な配色変数に完全一致させる(別物感を消す)。 */
+      /* v0.1.877: popup の正規変数(--nl-*・ライトが既定)をそのまま採用=完全コピー。アレンジを足さない。
+         旧エイリアス(--bg 等)も --nl-* に向けて残し、既存 live-view CSS を壊さない。 */
       :root {
-        --bg: #0a0e14;
-        --bg-soft: #121820;
-        --card: #161d27;
-        --line: rgb(71 85 105 / 48%);
-        --text: #e8edf4;
-        --muted: #8d9bb5;
-        --accent: #3b82f6;
-        --accent-hover: #60a5fa;
+        --nl-bg: #fffaf2;
+        --nl-bg-soft: #eef8ff;
+        --nl-surface: #ffffff;
+        --nl-text: #1f2937;
+        --nl-text-sub: #4b5563;
+        --nl-muted: #5b6475;
+        --nl-border: #d5e3f5;
+        --nl-accent: #0f8fd8;
+        --nl-accent-hover: #0b73ad;
+        --nl-rank-count: #0f766e;
+        /* 旧エイリアス → popup 変数へ。 */
+        --bg: var(--nl-bg);
+        --bg-soft: var(--nl-bg-soft);
+        --card: var(--nl-surface);
+        --line: var(--nl-border);
+        --text: var(--nl-text);
+        --muted: var(--nl-muted);
+        --accent: var(--nl-accent);
+        --accent-hover: var(--nl-accent-hover);
         --hot: #f97316;
         --blaze: #ef4444;
       }
@@ -89,76 +101,131 @@
         background: var(--card);
       }
       section.panel h2 { font-size: 15px; margin: 0 0 10px; }
-      /* v0.1.872: popup の応援者タイルを再現(アイコン+名前+件数+userId のグリッド)。 */
-      .rank-grid {
+      /* v0.1.877: popup の応援ランキング(.nl-top-support-rank__*)を【そのまま】コピー。アレンジ無し。
+         popup-entry.js renderTopSupportRankStrip と同じHTML/クラスを live-view-entry.js が生成する。
+         タイル状に並べるため __list を grid に(popup の userThumbGrid 相当の見た目)。 */
+      .nl-top-support-rank__list {
         display: grid;
         grid-template-columns: repeat(auto-fill, minmax(108px, 1fr));
-        gap: 10px;
+        gap: 8px;
+        list-style: none;
+        margin: 0;
+        padding: 0;
       }
-      .rank-tile {
+      .nl-top-support-rank__line {
         position: relative;
-        border: 1px solid var(--line);
-        border-radius: 10px;
-        background: #11161d;
-        padding: 12px 8px 8px;
-        text-align: center;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 2px;
+        padding: 12px 6px 8px;
+        border-radius: 8px;
+        border: 1px solid var(--nl-border);
+        background: var(--nl-surface);
+        text-decoration: none;
+        color: var(--nl-text);
+        min-width: 0;
       }
-      .tile-rank {
+      a.nl-top-support-rank__line--linkable:hover {
+        border-color: var(--nl-accent);
+      }
+      .nl-top-support-rank__place {
         position: absolute;
         top: 4px;
-        left: 6px;
-        font-size: 13px;
-        font-weight: 700;
-      }
-      .tile-av {
-        width: 48px;
-        height: 48px;
-        margin: 2px auto 6px;
-        border-radius: 50%;
-        overflow: hidden;
-        background: var(--line);
-        display: flex;
+        left: 5px;
+        display: inline-flex;
         align-items: center;
         justify-content: center;
-        font-size: 22px;
+        min-width: 1.4em;
+        height: 1.4em;
+        padding: 0 0.3em;
+        font-size: 11px;
+        font-weight: 800;
+        color: #fff;
+        background: linear-gradient(145deg, #64748b, #475569);
+        border-radius: 999px;
+        line-height: 1;
       }
-      .tile-av img { width: 100%; height: 100%; object-fit: cover; }
-      .tile-name {
-        font-size: 13px;
+      .nl-top-support-rank__line--has-accent .nl-top-support-rank__place {
+        background: var(--nl-rank-accent, var(--nl-accent));
+      }
+      .nl-top-support-rank__place--empty { visibility: hidden; }
+      .nl-top-support-rank__thumb-wrap {
+        width: 48px;
+        height: 48px;
+        border-radius: 50%;
+        overflow: hidden;
+        background: var(--nl-surface);
+        border: 1px solid color-mix(in srgb, var(--nl-border) 78%, #fff 22%);
+        flex-shrink: 0;
+      }
+      .nl-top-support-rank__thumb { width: 100%; height: 100%; object-fit: cover; display: block; }
+      .nl-top-support-rank__count {
+        font-weight: 800;
+        font-variant-numeric: tabular-nums;
+        font-size: 14px;
+        color: var(--nl-rank-count, #0f766e);
+      }
+      .nl-top-support-rank__name {
         font-weight: 600;
+        font-size: 12px;
+        max-width: 100%;
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
+        color: var(--nl-text);
       }
-      /* popup の応援件数色(dark の --nl-rank-count: シアン)に合わせる。 */
-      .tile-count { font-size: 14px; color: #5eead4; font-weight: 800; font-variant-numeric: tabular-nums; }
-      .tile-uid {
+      .nl-top-support-rank__id {
         font-size: 10px;
-        color: var(--muted);
+        color: var(--nl-text-sub);
+        max-width: 100%;
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
       }
-      /* v0.1.873: 配信者タイル(popup と同じくアクセント枠・先頭)。 */
-      .caster-tile {
-        border-color: color-mix(in srgb, var(--accent) 45%, var(--line));
-        background: color-mix(in srgb, var(--accent) 12%, #11161d);
+      /* 配信者タイル(popup と同じアクセント枠)。 */
+      .nl-top-support-rank__caster {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 3px;
+        padding: 12px 6px 8px;
+        border-radius: 8px;
+        border: 1px solid color-mix(in srgb, var(--nl-accent) 35%, var(--nl-border) 65%);
+        background: color-mix(in srgb, var(--nl-accent) 10%, var(--nl-surface) 90%);
+        text-decoration: none;
+        color: var(--nl-text);
       }
-      .tile-caster-label {
+      .nl-top-support-rank__caster-label {
         font-size: 10px;
         font-weight: 700;
-        color: var(--accent);
-        margin-bottom: 2px;
+        color: color-mix(in srgb, var(--nl-accent) 75%, var(--nl-text) 25%);
       }
-      .tile-follow {
-        display: inline-block;
-        margin-top: 4px;
-        padding: 2px 10px;
+      .nl-top-support-rank__caster-thumb {
+        width: 44px;
+        height: 44px;
+        border-radius: 50%;
+        object-fit: cover;
+        background: var(--nl-surface);
+        border: 2px solid color-mix(in srgb, var(--nl-accent) 30%, transparent);
+      }
+      .nl-top-support-rank__caster-name {
+        font-size: 12px;
+        font-weight: 600;
+        max-width: 100%;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .nl-top-support-rank__caster-follow {
+        display: inline-flex;
+        align-items: center;
+        padding: 2px 12px;
         border-radius: 999px;
         font-size: 11px;
-        text-decoration: none;
         color: #fff;
-        background: var(--accent);
+        background: var(--nl-accent);
+        text-decoration: none;
       }
       /* v0.1.875: りんく列/ギフト列(popup のアイコン列を再現)。小さめアイコンを横に流す。 */
       .lane-note {
