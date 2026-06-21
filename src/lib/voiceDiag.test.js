@@ -45,6 +45,26 @@ describe('buildVoiceDiagLine', () => {
     expect(line).toContain('合成120ms');
   });
 
+  it('再生TO(playbackTimeoutTotal>0)は固着の傍証として必ず出す', () => {
+    const now = 100000;
+    const line = buildVoiceDiagLine({
+      enabled: true, queueNow: 6, queueMax: 8, spokenTotal: 3,
+      staleDropTotal: 23, playbackTimeoutTotal: 2, lastSpokenBase: now - 2234000, lastSynthMs: 0
+    }, now);
+    expect(line).toContain('再生TO2件');
+    // snapshot 経由でも欠落しない。
+    const snap = buildVoiceDiagSnapshot({ playbackTimeoutTotal: 5 }, 0);
+    expect(snap.playbackTimeoutTotal).toBe(5);
+  });
+
+  it('再生TO0なら再生TO項目は出さない', () => {
+    const line = buildVoiceDiagLine({
+      enabled: true, queueNow: 0, queueMax: 2, spokenTotal: 5,
+      staleDropTotal: 0, playbackTimeoutTotal: 0, lastSpokenBase: 0, lastSynthMs: -1
+    }, 1000);
+    expect(line).not.toContain('再生TO');
+  });
+
   it('間引き0なら間引き項目は出さない', () => {
     const line = buildVoiceDiagLine({
       enabled: true, queueNow: 0, queueMax: 2, spokenTotal: 5, staleDropTotal: 0,
