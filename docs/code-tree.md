@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 1 / 522 件
+## ⚠️ 役割コメントが無いソース 1 / 524 件
 - `src/lib/reportPreviewPublish.js`
 
 ## 全ファイルツリー
@@ -115,7 +115,7 @@
   - `surechigai-lite-improvement-plan.md`
   - `ux-tdd-hypothesis-matrix.md`
   - `visual-explainer.md`
-- 📁 **extension/** (97)
+- 📁 **extension/** (98)
   - 📁 **images/** (87)
     - 📁 **avatar-parts/** (22)
       - `cheek-0.png`
@@ -218,6 +218,7 @@
     - `voice-watch.mp3`
   - `background.js` — MV3 Service Worker
   - `comeview.html`
+  - `live-view.html`
   - `manifest.json`
   - `offscreen.html`
   - `popup.html`
@@ -254,7 +255,7 @@
   - `vendor-visual-explainer.mjs` — Vendors nicobailon/visual-explainer (MIT) into .cursor/skills/visual-explainer/
   - `verify-bump.mjs` — extension bump 後の整合性チェッカー
   - `write-extension-placeholder-icons.mjs` — リポジトリに 256px アイコンしか無い環境向け: manifest 用の小さめ PNG を生成する。
-- 📁 **src/** (1131)
+- 📁 **src/** (1134)
   - 📁 **data/** (6)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -288,12 +289,13 @@
       - `avatarResolver.test.js`
       - `identity.js` — ニコ生ユーザー ID の「匿名性」判定と関連アイデンティティ・ユーティリティ。
       - `nickname.js` — 表示名（ニックネーム）の「強弱」判定。
-  - 📁 **extension/** (11)
+  - 📁 **extension/** (12)
     - 📁 **story/** (1)
       - `renderStoryUserLaneDom.js` — 応援ユーザーレーン DOM の同期（popup-entry から切り出し・状態は引数で受け取る）。
     - `backfill-sw-entry.js` — Service Worker 側の過去ログ取得(バックフィル)エンジン。NDGR を遡って取り込む。
     - `comeview-entry.js` — v0.1.652: 独自コメビュ「KIRAMEKI Comment View」(comeview.html)。
     - `content-entry.js` — watch ページ常駐の記録エンジン本体。コメント取得(NDGR+DOM)・記録・バックフィル・パネル描画の中枢。
+    - `live-view-entry.js` — 応援ライブビュー(live-view.html)のエントリ(v0.1.871)。
     - `offscreen-entry.js` — feat/multitab-scale-globalcap（2026-05-31）: コメント IDB の「常駐・単一書き手」を担う
     - `page-intercept-entry.js` — MAIN world エントリ（esbuild で単一 IIFE にバンドルされる）
     - `popup-entry.js` — ポップアップ UI 本体。応援レーン描画・HTMLレポート生成・各種診断/共有のまとめ役。
@@ -512,7 +514,7 @@
         - `logo_funlink_white_RGB_maru_black.png`
       - `logo_guide_funlink_ol.pdf`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (921)
+  - 📁 **lib/** (923)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -868,6 +870,8 @@
     - `googleSuggest.test.js`
     - `healthCells.js` — status ファーストビューの「健全度セル」を作る純関数(v0.1.843)。
     - `healthCells.test.js`
+    - `heatLevel.js` — 「盛り上がり(熱量)」を判定する純関数(v0.1.871)。
+    - `heatLevel.test.js`
     - `hiddenOfficialIframeReinjectGate.js` — hidden audition iframe を「再 inject してよいか」を判定する純関数（v0.1.394）。
     - `hiddenOfficialIframeReinjectGate.test.js`
     - `hiddenTabExternalFetchGate.js` — v0.1.616: 非可視タブでも外部 API fetch（koken 貢献度 / nicoad 広告 / ギフト履歴 /
