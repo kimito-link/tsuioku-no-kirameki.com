@@ -16,6 +16,14 @@ import { computeHeatLevel } from '../lib/heatLevel.js';
 import { categorizeUsersForThumbGrid } from '../lib/userThumbGrid.js';
 import { buildGiftThrowerLaneEntries } from '../lib/userLaneMergeGiftThrowers.js';
 import { buildNiconicoDefaultUserIconUrl } from '../lib/reportUserThumb.js';
+import { aggregateMarketingReport } from '../lib/marketingAggregate.js';
+import { buildSupporterRanking } from '../lib/supporterRanking.js';
+import {
+  isCommentDbAvailable,
+  openCommentDb,
+  countCommentsForLive,
+  readAllCommentsForLive
+} from '../lib/commentDb.js';
 
 const PANEL_SUMMARY_PREFIX = 'nls_panel_summary_';
 const WATCH_SNAPSHOT_PREFIX = 'nls_watch_snapshot_';
@@ -58,6 +66,35 @@ function createLiveViewDataSource(lv) {
       return { summary: null, snapshot: null, reportPreview: null, giftUsers: null };
     }
   };
+}
+
+// v0.1.876: 応援者ランキングを popup 非依存で自前集計。reportPreview は popup を開いた時しか来ないため、
+//   live-view 自身が IDB(commentDb)から全コメントを読み aggregateMarketingReport→buildSupporterRanking で
+//   topSupporters を作る(popup と同じ純関数=同じ結果)。重いので 15 秒間引きキャッシュ。これで popup を
+//   開いていなくても応援者が出る=「完全再現」。将来サーバー版はこの IDB 読みを fetch に差し替えるだけ。
+let _supCacheAt = 0;
+let _supCache = /** @type {any[]} */ ([]);
+/** @param {string} lv @param {number} nowMs @param {string} broadcasterUserId */
+async function computeSupportersFromDb(lv, nowMs, broadcasterUserId) {
+  if (nowMs - _supCacheAt < 15000) return _supCache; // 15秒間引き(全件集計は重い)。
+  _supCacheAt = nowMs;
+  if (!isCommentDbAvailable()) return _supCache;
+  let db = null;
+  try {
+    db = await openCommentDb();
+    const cnt = await countCommentsForLive(db, lv);
+    if (!Number.isFinite(cnt) || cnt <= 0) { _supCache = []; return _supCache; }
+    const comments = await readAllCommentsForLive(db, lv);
+    const mkt = aggregateMarketingReport(Array.isArray(comments) ? comments : [], lv, {
+      broadcasterUserId: String(broadcasterUserId || '')
+    });
+    _supCache = buildSupporterRanking(mkt?.topUsers, { limit: 80 });
+    return _supCache;
+  } catch {
+    return _supCache;
+  } finally {
+    try { if (db) db.close(); } catch { /* no-op */ }
+  }
 }
 
 /** @param {unknown} v */
@@ -156,12 +193,13 @@ function renderLiveView(lv, data, nowMs) {
   const box = $('heatBox');
   if (box) box.classList.toggle('pulse', heat.stage === 'hot' || heat.stage === 'blazing');
 
-  // 応援者ランキング(reportPreview がこの配信のものなら表示)。
+  // 応援者ランキング。v0.1.876: 自前集計(IDB から・popup 非依存)を最優先。無ければ reportPreview(popup 由来)。
   const rp = data?.reportPreview;
-  const rows =
+  const rpRows =
     rp && String(rp.liveId || '').trim().toLowerCase() === lv && Array.isArray(rp.topSupporters)
       ? rp.topSupporters
       : null;
+  const rows = Array.isArray(data?.supporters) && data.supporters.length ? data.supporters : rpRows;
   const body = $('rankBody');
   if (rows && rows.length) {
     body.className = 'rank-grid';
@@ -251,11 +289,11 @@ function renderLiveView(lv, data, nowMs) {
     }
   } else {
     body.className = 'empty';
-    body.textContent = 'この配信を拡張ポップアップで開くと、応援者ランキングがここにリアルタイムで出ます。';
+    body.textContent = '応援コメントを集計中です…(記録が貯まると順位が出ます)';
   }
 
   // v0.1.875: popup の全レーンを再現。①りんく列(数値ID+個人サムネ) ②ギフト列(ギフト投げた人)。
-  renderLanes(lv, data);
+  renderLanes(lv, data, rows);
 
   const d = new Date(nowMs);
   $('updatedAt').textContent = `最終更新 ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}:${String(d.getSeconds()).padStart(2, '0')}`;
@@ -291,17 +329,15 @@ function buildLaneTile(u) {
   return tile;
 }
 
-/** りんく列・ギフト列を描画(popup の全レーン再現)。データが無ければそのレーンを隠す(死にリンクにしない)。 @param {string} lv @param {any} data */
-function renderLanes(lv, data) {
-  const rp = data?.reportPreview;
-  const rpMatches = rp && String(rp.liveId || '').trim().toLowerCase() === lv;
-  // ① りんく列(数値ID+個人サムネが揃った応援だけ)。topSupporters を categorizeUsersForThumbGrid で振り分け。
+/** りんく列・ギフト列を描画(popup の全レーン再現)。データが無ければそのレーンを隠す(死にリンクにしない)。 @param {string} lv @param {any} data @param {any[]|null} supporters 解決済み応援者(自前集計優先) */
+function renderLanes(lv, data, supporters) {
+  // ① りんく列(数値ID+個人サムネが揃った応援だけ)。応援者を categorizeUsersForThumbGrid で振り分け。
   const linkSec = $('linkLaneSec');
   const linkBody = $('linkLaneBody');
   if (linkSec && linkBody) {
-    const supporters = rpMatches && Array.isArray(rp.topSupporters) ? rp.topSupporters : [];
-    // topSupporters(rank/name/avatarUrl/count/userId)を RawThumbGridUser 形に。
-    const raw = supporters.map((/** @type {any} */ r) => ({ userId: r.userId, nickname: r.name, avatarUrl: r.avatarUrl, count: r.count }));
+    const sup = Array.isArray(supporters) ? supporters : [];
+    // 応援者(rank/name/avatarUrl/count/userId)を RawThumbGridUser 形に。
+    const raw = sup.map((/** @type {any} */ r) => ({ userId: r.userId, nickname: r.name, avatarUrl: r.avatarUrl, count: r.count }));
     const { numericIdUsers } = categorizeUsersForThumbGrid(raw, { maxNumeric: 80 });
     if (numericIdUsers.length) {
       linkSec.hidden = false;
@@ -342,8 +378,12 @@ function start() {
   const fetchData = createLiveViewDataSource(lv);
   const tick = async () => {
     try {
-      const data = await fetchData();
-      renderLiveView(lv, data, Date.now());
+      const now = Date.now();
+      const base = await fetchData();
+      // v0.1.876: 応援者を popup 非依存で自前集計(IDB から・15秒間引き)。配信者は集計から除外。
+      const broadcasterUserId = String(base?.snapshot?.broadcasterUserId || '');
+      const supporters = await computeSupportersFromDb(lv, now, broadcasterUserId);
+      renderLiveView(lv, { ...base, supporters }, now);
     } catch {
       /* best-effort: 次の tick で回復 */
     }
