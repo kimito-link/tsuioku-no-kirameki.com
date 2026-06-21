@@ -111,47 +111,51 @@ graph LR
   f17 --> f17_2["lib/reportPreviewPublish.js"]
   f17 --> f17_3["extension/popup-entry.js"]
   f17 --> f17_4["extension/status-entry.js"]
-  HUB --> f18["状態→放送の導線(配信カードから watch へ)"]
-  f18 --> f18_0["lib/watchLink.js"]
-  f18 --> f18_1["extension/status-entry.js"]
-  HUB --> f19["数字の自己矛盾の自動検知(self-verifying)"]
-  f19 --> f19_0["lib/numberConsistency.js"]
-  f19 --> f19_1["lib/statusActionAdvisor.js"]
-  HUB --> f20["診断の信頼度メーター(数値の意味注釈)"]
-  f20 --> f20_0["lib/metricConfidence.js"]
-  f20 --> f20_1["lib/reportPreview.js"]
-  f20 --> f20_2["extension/status-entry.js"]
-  HUB --> f21["時系列トレンド(スナップショットで見えない劣化検知)"]
-  f21 --> f21_0["lib/statusTrend.js"]
-  f21 --> f21_1["lib/statusTrendKey.js"]
+  HUB --> f18["応援者ランキング(ちくらん風・将来の Kimito Link ランキング)"]
+  f18 --> f18_0["lib/supporterRanking.js"]
+  f18 --> f18_1["lib/reportPreview.js"]
+  f18 --> f18_2["extension/status-entry.js"]
+  HUB --> f19["状態→放送の導線(配信カードから watch へ)"]
+  f19 --> f19_0["lib/watchLink.js"]
+  f19 --> f19_1["extension/status-entry.js"]
+  HUB --> f20["数字の自己矛盾の自動検知(self-verifying)"]
+  f20 --> f20_0["lib/numberConsistency.js"]
+  f20 --> f20_1["lib/statusActionAdvisor.js"]
+  HUB --> f21["診断の信頼度メーター(数値の意味注釈)"]
+  f21 --> f21_0["lib/metricConfidence.js"]
+  f21 --> f21_1["lib/reportPreview.js"]
   f21 --> f21_2["extension/status-entry.js"]
-  f21 --> f21_3["lib/statusActionAdvisor.js"]
-  HUB --> f22["状態速報の整形"]
-  f22 --> f22_0["lib/statusFormat.js"]
-  HUB --> f23["記録件数の単調化(減らない表示)"]
-  f23 --> f23_0["lib/monotonicCommentCount.js"]
-  HUB --> f24["storage キー定義"]
-  f24 --> f24_0["lib/storageKeys.js"]
-  HUB --> f25["AI診断の状態速報集約"]
-  f25 --> f25_0["lib/aiSharePopupDiagKey.js"]
-  f25 --> f25_1["extension/status-entry.js"]
-  HUB --> f26["状態速報の全体マインドマップ"]
-  f26 --> f26_0["lib/statusMindmapModel.js"]
+  HUB --> f22["時系列トレンド(スナップショットで見えない劣化検知)"]
+  f22 --> f22_0["lib/statusTrend.js"]
+  f22 --> f22_1["lib/statusTrendKey.js"]
+  f22 --> f22_2["extension/status-entry.js"]
+  f22 --> f22_3["lib/statusActionAdvisor.js"]
+  HUB --> f23["状態速報の整形"]
+  f23 --> f23_0["lib/statusFormat.js"]
+  HUB --> f24["記録件数の単調化(減らない表示)"]
+  f24 --> f24_0["lib/monotonicCommentCount.js"]
+  HUB --> f25["storage キー定義"]
+  f25 --> f25_0["lib/storageKeys.js"]
+  HUB --> f26["AI診断の状態速報集約"]
+  f26 --> f26_0["lib/aiSharePopupDiagKey.js"]
   f26 --> f26_1["extension/status-entry.js"]
-  HUB --> f27["状態速報の対処カード(症状→原因→次の一手)"]
-  f27 --> f27_0["lib/statusActionAdvisor.js"]
+  HUB --> f27["状態速報の全体マインドマップ"]
+  f27 --> f27_0["lib/statusMindmapModel.js"]
   f27 --> f27_1["extension/status-entry.js"]
-  HUB --> f28["サイト健全性検証(リンク切れ防止)"]
-  f28 --> f28_0["lib/siteLinkHealth.js"]
-  f28 --> f28_1["site-health.mjs"]
-  HUB --> f29["影響範囲マップ(変えたら何が壊れるか)"]
-  f29 --> f29_0["feature-map.mjs"]
-  f29 --> f29_1["feature-map/impact-map.md"]
-  HUB --> f30["全体マップ(全地図への入口)"]
-  f30 --> f30_0["MAP.md"]
-  HUB --> f31["影響範囲ゲート(規律を自動化)"]
-  f31 --> f31_0["impact-check.mjs"]
-  f31 --> f31_1["feature-map/impact-map.json"]
+  HUB --> f28["状態速報の対処カード(症状→原因→次の一手)"]
+  f28 --> f28_0["lib/statusActionAdvisor.js"]
+  f28 --> f28_1["extension/status-entry.js"]
+  HUB --> f29["サイト健全性検証(リンク切れ防止)"]
+  f29 --> f29_0["lib/siteLinkHealth.js"]
+  f29 --> f29_1["site-health.mjs"]
+  HUB --> f30["影響範囲マップ(変えたら何が壊れるか)"]
+  f30 --> f30_0["feature-map.mjs"]
+  f30 --> f30_1["feature-map/impact-map.md"]
+  HUB --> f31["全体マップ(全地図への入口)"]
+  f31 --> f31_0["MAP.md"]
+  HUB --> f32["影響範囲ゲート(規律を自動化)"]
+  f32 --> f32_0["impact-check.mjs"]
+  f32 --> f32_1["feature-map/impact-map.json"]
 ```
 
 ---
@@ -196,14 +200,14 @@ graph LR
 - `xserver/`（2 件） — Xserver 向け webhook(git pull デプロイ)スクリプト  〔デプロイ / webhook〕
 
 ## `src/` — LP 側 + 純粋関数ライブラリの源  〔ソース〕
-<sub>ファイル 1125 件</sub>
+<sub>ファイル 1127 件</sub>
 
 - `data/`（6 件） — 保存コメントからレーン候補を読む acquirer / source 層  〔コメント / 取得〕
 - `domain/`（18 件） — ドメイン正本(応援レーンの集約・列ポリシー等。識別子判定など)  〔応援 / 集約 / 識別子〕
 - `extension/`（11 件） — バンドル entry(content/popup/venue/status/offscreen/backfill-sw 等=機能境界)  〔entry / 記録 / 会場 / 応援〕
 - `fixtures/`（1 件） — テスト用フィクスチャ  〔テスト〕
 - `images/`（165 件） — LP / CWS 提出物のマスター画像  〔画像〕
-- `lib/`（915 件） — 純粋関数ライブラリ(unit test 対象)。色・速度・コメント・レポート等の計算ロジックの大半  〔色 / 速度 / コメント / レポート / 純粋関数〕
+- `lib/`（917 件） — 純粋関数ライブラリ(unit test 対象)。色・速度・コメント・レポート等の計算ロジックの大半  〔色 / 速度 / コメント / レポート / 純粋関数〕
 - `shared/`（7 件） — 複数機能で共有する小部品(アバター URL ガード等)  〔共有 / アバター〕
 - `sound/`（1 件） — 音声素材(src 側)  〔音声〕
 
@@ -336,10 +340,17 @@ HTML/マーケ/メディアキットの主要KPI(本文数/コメントした人
 - [`src/extension/popup-entry.js`](../src/extension/popup-entry.js)
 - [`src/extension/status-entry.js`](../src/extension/status-entry.js)
 
+### 応援者ランキング(ちくらん風・将来の Kimito Link ランキング)  〔レポート / 診断 / 表示〕
+視聴中1配信の「コメントした人」を件数順に🥇🥈🥉付きで表示(段階A)。aggregateMarketingReport.topUsers(件数順・既存)を整形=新規取得ゼロ。匿名(a:hash/anon:/空)は「(匿名)」と明記し過大を予告(信頼度メーターと同方針)。0件除外。reportPreview の record に topSupporters として同梱し popup→storage→status の既存ブリッジに乗る(新規キー無し)。将来は複数配信横断の累計(段階B)へ拡張する土台(v0.1.865)
+
+- `src/lib/supporterRanking.js` ⚠️ **見つからない（消失/リネーム）**
+- [`src/lib/reportPreview.js`](../src/lib/reportPreview.js)
+- [`src/extension/status-entry.js`](../src/extension/status-entry.js)
+
 ### 状態→放送の導線(配信カードから watch へ)  〔診断 / 表示 / ナビ〕
 状態ページの配信ごとカードに「放送へ行く」状態別ボタン。今そのタブを開いていれば tabs.update で切替(別ウィンドウは windows.update で前面化)・無ければ tabs.create で新規タブ・終了済みは「終了済み」と予告して開く。切替失敗(タブ閉鎖)は新規タブにフォールバック=押しても何も起きないを構造的に潰す。lv 不正はボタンを出さない(死にリンク回避)。判定は純関数 pickOpenAction が正本・新規storage/ページ/権限ゼロ(tabs 既存)。星野ロミ式会議で A案採用(v0.1.864)
 
-- `src/lib/watchLink.js` ⚠️ **見つからない（消失/リネーム）**
+- [`src/lib/watchLink.js`](../src/lib/watchLink.js)
 - [`src/extension/status-entry.js`](../src/extension/status-entry.js)
 
 ### 数字の自己矛盾の自動検知(self-verifying)  〔診断 / レポート / 記録〕

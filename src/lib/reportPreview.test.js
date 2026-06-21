@@ -64,6 +64,19 @@ describe('buildReportPreview(実関数で結線=保存前に中身が取れる)'
     );
     expect(p.totalComments).toBe(10);
   });
+
+  it('topSupporters に応援者ランキング(件数順)が入る(v0.1.865)', () => {
+    // userId 100 が 5件、200 が 3件、300 が 2件 になるよう作る。
+    const comments = [
+      ...Array.from({ length: 5 }, (_, i) => ({ liveId: 'lv1', text: `x${i}`, userId: '100', capturedAt: t + i })),
+      ...Array.from({ length: 3 }, (_, i) => ({ liveId: 'lv1', text: `y${i}`, userId: '200', capturedAt: t + i })),
+      ...Array.from({ length: 2 }, (_, i) => ({ liveId: 'lv1', text: `z${i}`, userId: '300', capturedAt: t + i }))
+    ];
+    const p = buildReportPreview(aggregateMarketingReport, analyzeAudienceEngagementGap, comments, 'lv1');
+    expect(Array.isArray(p.topSupporters)).toBe(true);
+    expect(p.topSupporters[0]).toMatchObject({ rank: 1, userId: '100', count: 5, isAnonymous: false });
+    expect(p.topSupporters.map((r) => r.count)).toEqual([5, 3, 2]);
+  });
 });
 
 describe('buildReportPreview(DI で堅牢性=producer 不在/例外でも落ちない)', () => {
@@ -215,6 +228,25 @@ describe('buildReportPreviewLines(速報行の整形)', () => {
     );
     expect(line).toContain('コメントした人 80人');
     expect(line).not.toContain('推定寄り');
+  });
+
+  it('topSupporters があれば応援者ランキングを続けて出す(v0.1.865)', () => {
+    const line = buildReportPreviewLines({
+      totalComments: 100,
+      commenters: 20,
+      topSupporters: [
+        { rank: 1, userId: '100', name: 'りんく', count: 12, isAnonymous: false },
+        { rank: 2, userId: 'a:x', name: '匿名', count: 8, isAnonymous: true }
+      ]
+    });
+    expect(line).toContain('応援者ランキング(この配信):');
+    expect(line).toContain('🥇 りんく 12件');
+    expect(line).toContain('🥈 匿名(匿名) 8件');
+  });
+
+  it('topSupporters が無ければランキング行は出ない(後方互換)', () => {
+    const line = buildReportPreviewLines({ totalComments: 100, commenters: 20 });
+    expect(line).not.toContain('応援者ランキング');
   });
 
   it('visitors があれば2行目に来場と沈黙視聴者を出す(コメントした人は見出しへ)', () => {
