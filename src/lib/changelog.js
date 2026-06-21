@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.890',
+    date: '2026-06-22',
+    summary: '状態ページの更新所要時間を表示(重さの真因を見える化)',
+    items: Object.freeze([
+      '状態ページ(診断)の上部「最終更新」の隣に、画面の更新にかかった時間(◯ms)と、その中で一番時間がかかった処理を表示するようにしました。「状態速報が重い・開くのが遅い」と感じたとき、どの処理が重いのかを推測せず実際の数字で確認できます(次の改善はこの数字を見てから一番効くところを直します)。計測を表示するだけで、記録や取得の動きは一切変わりません。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.889',
     date: '2026-06-22',
     summary: '「貢献度ランキング」を「ギフト貢献度」に改称(広告ptと別物)',
