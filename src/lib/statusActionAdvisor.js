@@ -94,16 +94,20 @@ export function buildStatusActions(data) {
     });
   }
 
-  // --- 取得率(配信ごと・放送中で低いもの) ---
+  // --- 取得率(配信ごと) ---
+  //   v0.1.885: 放送中(endedAt 無し)の低%は『過去ログ追いつき中=正常な途中』なので🟡を出さない
+  //   (statusFormat も同%を「⏳追いつき中(正常)」と表示=同じ事実に2表示で片方だけ🟡=自己矛盾だった)。
+  //   ユーザー要望「取得率ローディングなしで全部グリーン」=取得中は警告にしない。本当に問題なのは
+  //   【終了済み(endedAt あり)なのに低%=もう増えないのに取りこぼしたまま】=これだけ🟡で残す。
   for (const lv of livesData) {
     const pct = num(lv?.officialRatePct);
-    if (pct == null || lv?.endedAt) continue;
-    if (pct < 40) {
+    if (pct == null) continue;
+    if (lv?.endedAt && pct < 40) {
       add({
         id: `capture-low-${lv.liveId || ''}`,
         severity: 'warn',
-        symptom: `取得率が低い(${pct}% / 配信 ${lv.liveId || ''})`,
-        cause: '過去ログの取り込み(backfill)が追いつき中、または失速している可能性',
+        symptom: `終了した配信の取得率が低い(${pct}% / 配信 ${lv.liveId || ''})`,
+        cause: '配信が終了したのに過去ログの取り込み(backfill)が途中で止まり、取りこぼしたままになっています',
         action: 'この配信タブを前面にして数分待つ → 改善しなければ watch タブを F5。記録自体(IndexedDB)は失われません',
         fixableHere: 'partly'
       });

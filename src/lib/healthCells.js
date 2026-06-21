@@ -146,9 +146,16 @@ export function buildHealthCells(data) {
   const totalSaved = num(uid.totalSaved);
   const ndgrConnected = String(fast?.networkErrorProbe?.ndgrConnectStatus || '') === 'connected';
   const uidPct = totalSaved && totalSaved > 0 ? num(uid.withUidPercent) : null;
-  //   保存0=na / NDGR connected で低率(<50)=匿名主体で na / それ以外は通常評価(okAt90/warnAt50)。
+  //   保存0=na。
+  //   v0.1.885: NDGR connected(=コメントは受信できている=取りこぼしではない)なら、userId 付き率が
+  //   90%未満は『匿名がそこそこ居るだけ=仕様』であり異常でない → na(対象外・色を付けない)。
+  //   従来は『<50 だけ na・50〜90 は🟡warn』だったため、匿名が半分くらいの配信(実機 54.3%)で
+  //   健全度パネルだけ🟡を出し、対処カード(advisor uid-low は <50 を『仕様で正常』と明言・50〜90 は
+  //   何も出さない=正常扱い)と食い違っていた=同じ事実に複数表示で片方だけ嘘(self-verifying 違反)。
+  //   高率(>=90)は記名主体で健全=ok(緑)は残す。NDGR connected で 90 未満は warn にせず na。
+  //   NDGR 切断の本当の異常は『NDGR接続』セルが赤で示す。NDGR 未接続時のみ通常評価(取りこぼし疑い)。
   const uidRateForCell =
-    uidPct != null && ndgrConnected && uidPct < 50 ? null : uidPct;
+    uidPct != null && ndgrConnected && uidPct < 90 ? null : uidPct;
   cells.push(pctCell('uid-rate', 'userId付き保存', uidRateForCell, { okAt: 90, warnAt: 50 }));
 
   // 3. NDGR接続。unknown(未受信)は na(障害でない)。

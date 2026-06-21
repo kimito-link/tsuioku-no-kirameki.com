@@ -25,11 +25,14 @@ describe('buildStatusActions', () => {
     expect(ids(buildStatusActions({}))).toContain('no-live');
   });
 
-  it('取得率が低い放送中 → capture-low(配信終了は対象外)', () => {
+  it('取得率が低い: 放送中(追いつき中)は🟡を出さない・終了済みで低%だけ出す(v0.1.885)', () => {
     const live = (pct, ended) => ({ liveId: 'lvX', officialRatePct: pct, endedAt: ended });
-    expect(ids(buildStatusActions({ livesData: [live(20, null)] }))).toContain('capture-low-lvX');
-    // 配信終了は出さない
-    expect(ids(buildStatusActions({ livesData: [live(20, 1700000000000)] }))).not.toContain('capture-low-lvX');
+    // 放送中で低% = 過去ログ追いつき中=正常な途中 → 出さない(statusFormat の「⏳追いつき中」と一致)。
+    expect(ids(buildStatusActions({ livesData: [live(20, null)] }))).not.toContain('capture-low-lvX');
+    // 終了済みで低% = もう増えないのに取りこぼしたまま=本当の問題 → 出す。
+    expect(ids(buildStatusActions({ livesData: [live(20, 1700000000000)] }))).toContain('capture-low-lvX');
+    // 終了済みでも高%(>=40)は出さない。
+    expect(ids(buildStatusActions({ livesData: [live(95, 1700000000000)] }))).not.toContain('capture-low-lvX');
   });
 
   it('userId 率が低い → uid-low(原理的=fixableHere:no)', () => {
