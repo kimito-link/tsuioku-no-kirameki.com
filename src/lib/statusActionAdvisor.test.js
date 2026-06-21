@@ -35,6 +35,20 @@ describe('buildStatusActions', () => {
     expect(ids(buildStatusActions({ livesData: [live(95, 1700000000000)] }))).not.toContain('capture-low-lvX');
   });
 
+  it('取得率が低い: 放送中でも取り込みが本当に止まった(最終取り込みが古い)なら capture-stalled を出す(v0.1.886)', () => {
+    const live = (pct, ago) => ({ liveId: 'lvY', officialRatePct: pct, endedAt: null, lastIngestAgoMs: ago });
+    // 放送中×低%×最終取り込みが古い(3分超) = 本当の stall → 出す。
+    expect(ids(buildStatusActions({ livesData: [live(20, 200000)] }))).toContain('capture-stalled-lvY');
+    // 放送中×低%だが最終取り込みが新しい(数秒前) = 正常な追いつき中 → 出さない。
+    expect(ids(buildStatusActions({ livesData: [live(20, 3000)] }))).not.toContain('capture-stalled-lvY');
+    // lastIngestAgoMs が無い(値なし)= 追いつき中とみなす → 出さない(放送中低%を一律に黄にしない)。
+    expect(ids(buildStatusActions({ livesData: [{ liveId: 'lvY', officialRatePct: 20, endedAt: null }] }))).not.toContain('capture-stalled-lvY');
+    // 100%到達済みは古くても出さない(取り切った=止まって正常)。
+    expect(ids(buildStatusActions({ livesData: [live(100, 999999)] }))).not.toContain('capture-stalled-lvY');
+    // 終了済みは capture-low の管轄=capture-stalled は出さない。
+    expect(ids(buildStatusActions({ livesData: [{ liveId: 'lvY', officialRatePct: 20, endedAt: 1700000000000, lastIngestAgoMs: 999999 }] }))).not.toContain('capture-stalled-lvY');
+  });
+
   it('userId 率が低い → uid-low(原理的=fixableHere:no)', () => {
     const cards = buildStatusActions({
       livesData: [{ liveId: 'lv1', officialRatePct: 90 }],
