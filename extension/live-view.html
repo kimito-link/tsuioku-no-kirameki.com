@@ -5,20 +5,24 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>応援ライブビュー — 君斗りんくの追憶のきらめき</title>
     <style>
+      /* v0.1.874: popup(html.nl-skin-panel-dark)の正確な配色変数に完全一致させる(別物感を消す)。 */
       :root {
-        --bg: #0e1117;
-        --card: #161b22;
-        --line: #2a3340;
-        --text: #e6edf3;
-        --muted: #9aa7b5;
-        --accent: #ec4899;
+        --bg: #0a0e14;
+        --bg-soft: #121820;
+        --card: #161d27;
+        --line: rgb(71 85 105 / 48%);
+        --text: #e8edf4;
+        --muted: #8d9bb5;
+        --accent: #3b82f6;
+        --accent-hover: #60a5fa;
         --hot: #f97316;
         --blaze: #ef4444;
       }
       * { box-sizing: border-box; }
       body {
         margin: 0;
-        background: var(--bg);
+        /* popup と同じグラデ背景(--nl-bg → --nl-bg-soft)。 */
+        background: linear-gradient(180deg, var(--bg), var(--bg-soft));
         color: var(--text);
         font-family: system-ui, -apple-system, "Segoe UI", "Hiragino Kaku Gothic ProN", Meiryo, sans-serif;
         line-height: 1.6;
@@ -126,7 +130,8 @@
         text-overflow: ellipsis;
         white-space: nowrap;
       }
-      .tile-count { font-size: 14px; color: var(--accent); font-weight: 700; }
+      /* popup の応援件数色(dark の --nl-rank-count: シアン)に合わせる。 */
+      .tile-count { font-size: 14px; color: #5eead4; font-weight: 800; font-variant-numeric: tabular-nums; }
       .tile-uid {
         font-size: 10px;
         color: var(--muted);

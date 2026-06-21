@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.874',
+    date: '2026-06-21',
+    summary: '応援ライブビューの配色を popup と完全一致(別物感を解消)',
+    items: Object.freeze([
+      '応援ライブビューの色合いを、拡張ポップアップ(ダーク表示)とまったく同じ配色に揃えました。これまでビューだけ少し違う暗い色で「別物」に見えていたのを、背景のグラデーション・カードの色・文字色・アクセント色・応援件数のシアン色まで、ポップアップで使っている正確な色に合わせました。これでポップアップとライブビューが同じ見た目になります。表示専用で記録・取得には影響しません。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.873',
     date: '2026-06-21',
     summary: '応援ライブビュー先頭に配信者タイル(popup と同じ見た目)',
