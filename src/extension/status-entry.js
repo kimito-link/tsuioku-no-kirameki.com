@@ -178,6 +178,18 @@ async function refresh(opts = {}) {
     ? Number(opts.timeoutMs)
     : 8000;
   let step = 'init';
+  // v0.1.890: 「状態速報が重い」の真因可視化。refresh 全体と各ステップの所要 ms を測り、最終更新メタに
+  //   出す(self-verifying: 推測で重さ対策をする前に、どのステップが重いかを実データで見る)。
+  //   計測は performance.now の差分だけ=描画/記録を一切妨げない純観測。
+  const _t0 = (typeof performance !== 'undefined' ? performance.now() : Date.now());
+  let _tPrev = _t0;
+  /** @type {Array<[string, number]>} 各ステップの所要 ms(降順表示用) */
+  const _stepMs = [];
+  const _mark = (name) => {
+    const now = (typeof performance !== 'undefined' ? performance.now() : Date.now());
+    _stepMs.push([name, Math.round(now - _tPrev)]);
+    _tPrev = now;
+  };
   try {
     // v0.1.868: chrome.storage.local は単一 LevelDB で【並行 read で stall する】(storageOpTimeout.js の
     //   背景コメント参照)。v0.1.867 で Promise.all 並行化したら逆に複数 read が競合して timeout 多発→
@@ -186,16 +198,22 @@ async function refresh(opts = {}) {
     //   (reportPreview/トレンド/watchTabMap)は失敗しても握って空で描く(画面を白くしない)。
     step = 'enumerateActiveLives';
     const lvList = await runStorageOpWithTimeout(() => enumerateActiveLives(), tmo);
+    _mark('lives');
     step = `loadAllSummaries(${lvList.length}件)`;
     const summaries = await runStorageOpWithTimeout(() => loadAllSummaries(lvList), tmo);
+    _mark(`summaries×${lvList.length}`);
     step = 'loadFastDiagSafe';
     const fastDiag = await runStorageOpWithTimeout(() => loadFastDiagSafe(), tmo);
+    _mark('fastDiag');
     step = 'loadPopupDiagSafe';
     const popupDiag = await runStorageOpWithTimeout(() => loadPopupDiagSafe(), tmo);
+    _mark('popupDiag');
     step = 'loadBackfillProgress';
     const backfillProgress = await runStorageOpWithTimeout(() => loadBackfillProgressSafe(), tmo);
+    _mark('backfill');
     step = 'loadVoiceDiagSafe';
     const voiceDiag = await runStorageOpWithTimeout(() => loadVoiceDiagSafe(), tmo);
+    _mark('voiceDiag');
     // 以下 3 つは「追加データ」=失敗しても他の表示と記録を妨げない(空で描く)。12 秒間引きでキャッシュ
     //   再利用=2 秒ごとの storage read を減らして「スムーズじゃない」を改善(コア表示は毎回更新のまま)。
     const extrasStale = Date.now() - _extrasCacheAt >= EXTRAS_REFETCH_MS;
@@ -211,11 +229,14 @@ async function refresh(opts = {}) {
       ).catch(() => []);
       _extrasCache = { reportPreview, watchTabMap, trendFindings };
       _extrasCacheAt = Date.now();
+      _mark('extras');
     }
     const { reportPreview, watchTabMap, trendFindings } = _extrasCache;
     step = 'renderAll';
     renderAll({ lvList, summaries, fastDiag, popupDiag, backfillProgress, voiceDiag, reportPreview, trendFindings, watchTabMap });
-    updateLastUpdateMeta();
+    _mark('render');
+    const _totalMs = Math.round((typeof performance !== 'undefined' ? performance.now() : Date.now()) - _t0);
+    updateLastUpdateMeta({ totalMs: _totalMs, stepMs: _stepMs });
     _statusLastErrorText = '';
   } catch (err) {
     // v0.1.797: timeout は「ストレージ混雑(記録は別途継続)」の想定内 degrade=不安にさせない文言に。
@@ -275,14 +296,32 @@ async function refresh(opts = {}) {
   }
 }
 
-function updateLastUpdateMeta() {
+/**
+ * @param {{ totalMs?: number, stepMs?: Array<[string, number]> }} [perf]
+ *   v0.1.890: refresh 所要時間の計器。totalMs と「重かったステップ top2」を最終更新の隣に出す=
+ *   「状態速報が重い」の真因を、推測せず実データで見えるようにする(self-verifying)。
+ */
+function updateLastUpdateMeta(perf) {
   const el = document.getElementById('metaLastUpdate');
   if (!el) return;
   const now = new Date();
   const hh = String(now.getHours()).padStart(2, '0');
   const mm = String(now.getMinutes()).padStart(2, '0');
   const ss = String(now.getSeconds()).padStart(2, '0');
-  el.textContent = `最終更新 ${hh}:${mm}:${ss}`;
+  let perfText = '';
+  const total = perf && Number.isFinite(Number(perf.totalMs)) ? Number(perf.totalMs) : null;
+  if (total != null) {
+    // 重かったステップ上位2件を「名前:ms」で添える(全体の内訳が一目で分かる)。
+    const steps = Array.isArray(perf?.stepMs) ? perf.stepMs.slice() : [];
+    steps.sort((a, b) => (Number(b?.[1]) || 0) - (Number(a?.[1]) || 0));
+    const topText = steps
+      .slice(0, 2)
+      .filter((s) => (Number(s?.[1]) || 0) > 0)
+      .map((s) => `${s[0]} ${s[1]}ms`)
+      .join(' / ');
+    perfText = ` ・ 更新 ${total}ms${topText ? `(${topText})` : ''}`;
+  }
+  el.textContent = `最終更新 ${hh}:${mm}:${ss}${perfText}`;
 }
 
 /* ============================================================================
