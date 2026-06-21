@@ -158,23 +158,49 @@ function renderLiveView(lv, data, nowMs) {
       : null;
   const body = $('rankBody');
   if (rows && rows.length) {
-    body.className = '';
+    body.className = 'rank-grid';
     body.innerHTML = '';
     const medals = ['🥇', '🥈', '🥉'];
-    for (const r of rows.slice(0, 15)) {
-      const row = document.createElement('div');
-      row.className = 'rank-row';
-      const b = document.createElement('span');
-      b.className = 'rank-badge';
-      b.textContent = medals[r.rank - 1] || `${r.rank}`;
-      const n = document.createElement('span');
-      n.className = 'rank-name';
-      n.textContent = String(r.name || '') + (r.isAnonymous ? '(匿名)' : '');
-      const c = document.createElement('span');
-      c.className = 'rank-count';
-      c.textContent = `${Number(r.count || 0).toLocaleString('ja-JP')}件`;
-      row.append(b, n, c);
-      body.appendChild(row);
+    for (const r of rows.slice(0, 30)) {
+      // v0.1.872: popup の応援者タイル(アイコン+名前+件数+userId)を live-view に再現。
+      const tile = document.createElement('div');
+      tile.className = 'rank-tile';
+
+      const badge = document.createElement('span');
+      badge.className = 'tile-rank';
+      badge.textContent = medals[r.rank - 1] || `${r.rank}`;
+      tile.appendChild(badge);
+
+      const av = document.createElement('div');
+      av.className = 'tile-av';
+      if (r.avatarUrl) {
+        const img = document.createElement('img');
+        img.src = r.avatarUrl;
+        img.alt = '';
+        img.referrerPolicy = 'no-referrer';
+        img.addEventListener('error', () => { try { img.remove(); av.textContent = r.isAnonymous ? '👤' : '🙂'; } catch { /* no-op */ } });
+        av.appendChild(img);
+      } else {
+        av.textContent = r.isAnonymous ? '👤' : '🙂';
+      }
+      tile.appendChild(av);
+
+      const name = document.createElement('div');
+      name.className = 'tile-name';
+      name.textContent = String(r.name || '');
+      tile.appendChild(name);
+
+      const cnt = document.createElement('div');
+      cnt.className = 'tile-count';
+      cnt.textContent = `${Number(r.count || 0).toLocaleString('ja-JP')}件`;
+      tile.appendChild(cnt);
+
+      const uid = document.createElement('div');
+      uid.className = 'tile-uid';
+      uid.textContent = r.isAnonymous ? '匿名' : String(r.userId || '');
+      tile.appendChild(uid);
+
+      body.appendChild(tile);
     }
   } else {
     body.className = 'empty';
