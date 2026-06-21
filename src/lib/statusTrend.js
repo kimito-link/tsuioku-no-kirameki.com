@@ -11,12 +11,16 @@
  *   append+cap 純関数)。analyzeTrend が直近の点列から停滞/低下を判定し、対処カードに出せる findings を返す。
  *   新規ネットワーク取得ゼロ・外部送信ゼロ。判定は『機械的に決まる事実(増えていない/下がり続け)』だけ。
  *
+ * v0.1.887: catchingUp = この時点に「放送中×追いつき中(率<100)」の配信があったか。true の間は取得率が
+ *   見かけ上下がるのが正常(新配信を開くと分母が判明して 100%→低% に落ちる)=rate-declining の偽陽性を抑止。
+ *
  * @typedef {{
  *   t: number,            // 記録時刻(ms)
  *   recorded: number,     // 記録合計(全配信)
  *   official: number,     // 公式コメント合計
  *   ratePct: number|null, // 取得率(記録/公式*100)。公式0なら null
- *   watch: number|null    // 来場合計。取れなければ null
+ *   watch: number|null,   // 来場合計。取れなければ null
+ *   catchingUp?: boolean  // 放送中×追いつき中の配信があったか(true なら下落は正常)
  * }} TrendSample
  *
  * @typedef {{ v: number, items: TrendSample[] }} TrendLog
@@ -50,7 +54,8 @@ function normalizeLog(raw) {
       recorded: Math.max(0, Math.floor(num(it?.recorded) ?? 0)),
       official: Math.max(0, Math.floor(num(it?.official) ?? 0)),
       ratePct: num(it?.ratePct),
-      watch: num(it?.watch)
+      watch: num(it?.watch),
+      catchingUp: it?.catchingUp === true
     });
   }
   return clean;
@@ -59,7 +64,7 @@ function normalizeLog(raw) {
 /**
  * KPI サンプルをリングに積む(throttle 付き)。前回から minGapMs 未満なら null を返す(=storage 更新しない)。
  * @param {unknown} prevRaw 既存 TrendLog(storage 由来)
- * @param {{ recorded?: number, official?: number, ratePct?: number|null, watch?: number|null }} kpi
+ * @param {{ recorded?: number, official?: number, ratePct?: number|null, watch?: number|null, catchingUp?: boolean }} kpi
  * @param {number} nowMs
  * @param {{ minGapMs?: number, maxPoints?: number }} [opts]
  * @returns {TrendLog|null} 更新後ログ。throttle で間引いたら null。
@@ -78,7 +83,8 @@ export function appendTrendSample(prevRaw, kpi, nowMs, opts = {}) {
     recorded: Math.max(0, Math.floor(num(kpi?.recorded) ?? 0)),
     official: Math.max(0, Math.floor(num(kpi?.official) ?? 0)),
     ratePct: num(kpi?.ratePct),
-    watch: num(kpi?.watch)
+    watch: num(kpi?.watch),
+    catchingUp: kpi?.catchingUp === true
   };
   const nextItems = [...items, row].slice(-cap);
   return { v: STATUS_TREND_VERSION, items: nextItems };
@@ -123,9 +129,14 @@ export function analyzeTrend(raw, nowMs) {
 
   // 2) 取得率が下がり続けている: ratePct が有効な点が3つ以上あり、単調に低下し、合計低下が >=10pt。
   //    多タブ名残の一時的揺れと区別するため「一貫した低下」かつ「明確な幅」だけ。
+  //    v0.1.887: ただし直近窓に「放送中×追いつき中(catchingUp)」の点が1つでもあれば出さない。
+  //    新配信を途中参加で開くと公式の分母が判明して取得率が 100%→低% に落ちるのは【正常な追いつき中】で
+  //    あって劣化ではない(per-stream の v0.1.886 と同じ偽陽性が trend 側に残っていた)。本当の劣化=
+  //    「もう追いつき中の配信が無い(全部 endedAt or 100%)のに取得率が単調低下」だけを warn にする。
   const rated = items.filter((s) => s.ratePct != null);
   if (rated.length >= 3) {
     const recent = rated.slice(-4);
+    const anyCatchingUp = recent.some((s) => s.catchingUp === true);
     let monotoneDown = true;
     for (let i = 1; i < recent.length; i++) {
       if (/** @type {number} */ (recent[i].ratePct) > /** @type {number} */ (recent[i - 1].ratePct)) {
@@ -135,7 +146,7 @@ export function analyzeTrend(raw, nowMs) {
     }
     const drop =
       /** @type {number} */ (recent[0].ratePct) - /** @type {number} */ (recent[recent.length - 1].ratePct);
-    if (monotoneDown && drop >= 10) {
+    if (monotoneDown && drop >= 10 && !anyCatchingUp) {
       findings.push({
         id: 'rate-declining',
         severity: 'warn',
