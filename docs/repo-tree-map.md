@@ -349,7 +349,7 @@ HTML/マーケ/メディアキットの主要KPI(本文数/コメントした人
 - [`src/extension/status-entry.js`](../src/extension/status-entry.js)
 
 ### 診断/ちくらん タブ+カードクリックで応援者展開  〔診断 / 表示 / ナビ〕
-状態ページ上部に「📊診断/🏆ちくらん」タブ(body.tab-chikuran で診断系レーンを CSS 非表示・配信カードに集中)。各配信カードに details「🏆応援者ランキングを見る」=クリックで topSupporters を🥇🥈🥉展開。応援者データは popup で開いている配信ぶんだけ(reportPreview.liveId 一致)=その配信は展開・他は popup で開く案内(死にリンクにしない)。signature に reportPreview を含めて応援者到着時にカード再構築。将来の Kimito Link ランキングの入口(v0.1.869)
+状態ページ【上部ナビ(.map-nav・地図リンクと同列)】に「📊診断/🏆ちくらん」切替を統合(v0.1.870)。body.tab-chikuran で診断系レーンを CSS 非表示・配信カードに集中。各配信カードに details「🏆応援者ランキングを見る」=クリックで topSupporters を🥇🥈🥉展開。応援者データは popup で開いている配信ぶんだけ(reportPreview.liveId 一致)=その配信は展開・他は popup で開く案内(死にリンクにしない)。signature に reportPreview を含めて応援者到着時にカード再構築。将来の Kimito Link ランキングの入口(v0.1.869)
 
 - [`src/extension/status-entry.js`](../src/extension/status-entry.js)
 - [`extension/status.html`](../extension/status.html)

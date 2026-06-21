@@ -1530,17 +1530,18 @@ function setupReputationCheck() {
   }
 }
 
-// v0.1.869: 診断 / ちくらん のタブ切替。body のクラスで CSS が診断系レーンの表示/非表示を切る。
-//   ちくらんは将来の Kimito Link ランキングの場所(配信カード=ちくらん風・クリックで応援者展開)。
+// v0.1.869/870: 診断 / ちくらん のタブ切替(上部ナビ .map-nav の button.nav-tab に統合)。body の
+//   クラスで CSS が診断系レーンの表示/非表示を切る。ちくらんは将来の Kimito Link ランキングの場所
+//   (配信カード=ちくらん風・クリックで応援者展開)。アクティブ表示は地図ナビと同じ nav-here。
 function setupStatusTabs() {
-  const tabs = document.querySelectorAll('.status-tab');
+  const tabs = document.querySelectorAll('.nav-tab');
   if (!tabs.length) return;
   /** @param {string} tab 'diag' | 'chikuran' */
   const activate = (tab) => {
     document.body.classList.toggle('tab-chikuran', tab === 'chikuran');
     for (const el of tabs) {
       const isThis = el instanceof HTMLElement && el.dataset.tab === tab;
-      el.classList.toggle('is-active', isThis);
+      el.classList.toggle('nav-here', isThis);
       if (el instanceof HTMLElement) el.setAttribute('aria-pressed', String(isThis));
     }
   };
