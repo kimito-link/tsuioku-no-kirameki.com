@@ -115,6 +115,8 @@ graph LR
   f18 --> f18_0["live-view.html"]
   f18 --> f18_1["extension/live-view-entry.js"]
   f18 --> f18_2["lib/heatLevel.js"]
+  f18 --> f18_3["lib/userThumbGrid.js"]
+  f18 --> f18_4["lib/userLaneMergeGiftThrowers.js"]
   HUB --> f19["盛り上がり判定(熱量・移植可能な純関数)"]
   f19 --> f19_0["lib/heatLevel.js"]
   HUB --> f20["診断/ちくらん タブ+カードクリックで応援者展開"]
@@ -355,11 +357,13 @@ HTML/マーケ/メディアキットの主要KPI(本文数/コメントした人
 - [`src/extension/status-entry.js`](../src/extension/status-entry.js)
 
 ### 応援ライブビュー(リアルタイム盛り上がり・新規タブ)  〔表示 / リアルタイム / レポート〕
-ちくらんカードの「🔥応援ライブビューを開く」で live-view.html?lv=... を新規タブで開く(chrome.runtime.getURL)。chrome.storage を2秒購読し盛り上がり🔥(分速→computeHeatLevel)/応援者🏆/コメント数/来場をリアルタイム再描画・hot/blazing でバー脈打つ。データ取得を createLiveViewDataSource に隔離=将来サーバー公開版(拡張不要で URL 閲覧)へ移植可能(描画は不変)。Web/iOS/Android への土台(v0.1.871)
+ちくらんカードの「🔥応援ライブビューを開く」で live-view.html?lv=... を新規タブで開く(chrome.runtime.getURL)。chrome.storage を2秒購読し盛り上がり🔥(分速→computeHeatLevel)/応援者ランキング🏆(配信者タイル先頭)/🔗りんく列(数値ID+個人サムネ・categorizeUsersForThumbGrid)/🎁ギフト列(nls_gift_users_<lv>・buildGiftThrowerLaneEntries)/コメント数/来場をリアルタイム再描画。配色は popup(dark)の正確な変数に完全一致。データ取得を createLiveViewDataSource に隔離=将来サーバー公開版(拡張不要で URL 閲覧)へ移植可能(描画は不変)。Web/iOS/Android への土台(v0.1.871-875)
 
 - [`extension/live-view.html`](../extension/live-view.html)
 - [`src/extension/live-view-entry.js`](../src/extension/live-view-entry.js)
 - [`src/lib/heatLevel.js`](../src/lib/heatLevel.js)
+- [`src/lib/userThumbGrid.js`](../src/lib/userThumbGrid.js)
+- [`src/lib/userLaneMergeGiftThrowers.js`](../src/lib/userLaneMergeGiftThrowers.js)
 
 ### 盛り上がり判定(熱量・移植可能な純関数)  〔リアルタイム / 集計 / 表示〕
 分速コメントから盛り上がり段階(idle/warm/hot/blazing)+スコア(バー幅%)を出す純関数 computeHeatLevel。拡張API非依存=Web/モバイルでそのまま再利用。閾値 8/30/100 per 分・score=min(100,cpm/2)。負/NaN は idle(v0.1.871)

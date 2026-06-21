@@ -160,6 +160,47 @@
         color: #fff;
         background: var(--accent);
       }
+      /* v0.1.875: りんく列/ギフト列(popup のアイコン列を再現)。小さめアイコンを横に流す。 */
+      .lane-note {
+        font-size: 12px;
+        color: var(--muted);
+        margin: 0 0 10px;
+        padding: 8px 10px;
+        border-radius: 8px;
+        background: color-mix(in srgb, var(--accent) 8%, transparent);
+      }
+      .lane-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(84px, 1fr));
+        gap: 8px;
+      }
+      .lane-tile { text-align: center; min-width: 0; }
+      .lane-av {
+        width: 40px;
+        height: 40px;
+        margin: 0 auto 4px;
+        border-radius: 50%;
+        overflow: hidden;
+        background: var(--line);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 18px;
+      }
+      .lane-av img { width: 100%; height: 100%; object-fit: cover; }
+      .lane-name {
+        font-size: 11px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .lane-uid {
+        font-size: 10px;
+        color: var(--muted);
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
       .empty { color: var(--muted); }
       .updated { color: var(--muted); font-size: 12px; margin-top: 16px; }
       .live-dot {
@@ -190,6 +231,20 @@
       <section class="panel">
         <h2>🏆 応援者ランキング</h2>
         <div id="rankBody" class="empty">読み込み中…</div>
+      </section>
+
+      <!-- v0.1.875: popup の「りんく列」(数値ID+個人サムネが揃った応援だけ)。 -->
+      <section class="panel" id="linkLaneSec" hidden>
+        <h2>🔗 りんく列(数値ID+個人サムネ)</h2>
+        <p class="lane-note">数値ユーザーID + 個人サムネが揃った応援だけ、この列に出ます。匿名(a:)はここには出さない設計です。</p>
+        <div id="linkLaneBody" class="lane-grid"></div>
+      </section>
+
+      <!-- v0.1.875: popup の「ギフト列」(この放送でギフト/広告を投げた人)。 -->
+      <section class="panel" id="giftLaneSec" hidden>
+        <h2>🎁 ギフト列(ギフト/広告を投げた人)</h2>
+        <p class="lane-note">この放送でギフトや広告を投げた人を、数値IDで記録できた順(最新が先)に並べます。</p>
+        <div id="giftLaneBody" class="lane-grid"></div>
       </section>
 
       <div class="updated"><span class="live-dot"></span><span id="updatedAt">—</span></div>
