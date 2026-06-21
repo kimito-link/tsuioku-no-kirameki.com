@@ -635,7 +635,10 @@ function renderAll({ lvList, summaries, fastDiag, popupDiag, backfillProgress, v
       //   丸ごと skip(描画/画像再取得を止める)。値が動いた時だけ作り直す。
       const sig = livesData
         .map((l) => `${l.lv}|${l.recordedCount}|${l.officialCommentCount}|${l.watchCount}|${l.giftPoints}|${l.elapsedSec}|${l.endedAt ? 1 : 0}|${l.thumbnailUrl ? 1 : 0}`)
-        .join('~');
+        .join('~')
+        // v0.1.869: 応援者データの配信(reportPreview.liveId)と件数も signature に含める=popup の応援者が
+        //   届いたら該当カードを作り直して展開に反映(届くまでは案内のまま)。
+        + `#rp:${String(reportPreview?.liveId || '')}:${Array.isArray(reportPreview?.topSupporters) ? reportPreview.topSupporters.length : 0}`;
       if (sig === _lastLivesSig) return; // 変化なし=再描画しない(チラつき/重さの主因を除去)。
       _lastLivesSig = sig;
       // 画面が広いとき方眼紙のように横へ並べるグリッド(狭いと1列)。
@@ -677,6 +680,12 @@ function renderAll({ lvList, summaries, fastDiag, popupDiag, backfillProgress, v
         // v0.1.864: 放送導線。状態別ボタン(切替/新規タブ/アーカイブ)。lv 不正なら出さない。
         const watchBtn = buildWatchLinkButton(live, watchTabMap);
         if (watchBtn) card.appendChild(watchBtn);
+
+        // v0.1.869: クリックで応援者ランキングを展開(将来の Kimito Link ランキング)。
+        //   応援者データ(topSupporters)は popup で開いている配信ぶんだけ取れる=その配信は展開表示、
+        //   他は「この配信を popup で開くと応援者が見えます」と案内(死にリンクにしない)。
+        const supEl = buildSupporterExpander(live, reportPreview);
+        if (supEl) card.appendChild(supEl);
 
         livesEl.appendChild(card);
       }
@@ -894,6 +903,52 @@ function setAllMindDetails(open) {
 /* ============================================================================
  * 集計/整形ヘルパ(純関数寄り・テスト容易)
  * ========================================================================== */
+
+// v0.1.869: 配信カードの「応援者ランキングを見る」展開(将来の Kimito Link ランキング)。
+//   応援者データ(reportPreview.topSupporters)は popup で開いている配信ぶんだけ取れる=その配信
+//   (live.lv === reportPreview.liveId)は展開で🥇🥈🥉を表示・他は popup で開く案内(死にリンクにしない)。
+//   クリックで開閉する details/summary。textContent で安全に組む。
+function buildSupporterExpander(live, reportPreview) {
+  const lv = String(live?.lv || '').trim().toLowerCase();
+  if (!lv) return null;
+  const rpLv = String(reportPreview?.liveId || '').trim().toLowerCase();
+  const rows = lv === rpLv && Array.isArray(reportPreview?.topSupporters) ? reportPreview.topSupporters : null;
+
+  const det = document.createElement('details');
+  det.style.cssText = 'margin-top:8px;';
+  const sum = document.createElement('summary');
+  sum.textContent = '🏆 応援者ランキングを見る';
+  sum.style.cssText = 'cursor:pointer;font-size:12px;color:var(--nl-accent);user-select:none;';
+  det.appendChild(sum);
+
+  const body = document.createElement('div');
+  body.style.cssText = 'margin-top:6px;font-size:13px;';
+  if (rows && rows.length) {
+    const medals = ['🥇', '🥈', '🥉'];
+    for (const r of rows.slice(0, 10)) {
+      const row = document.createElement('div');
+      row.style.cssText = 'display:flex;align-items:center;gap:6px;padding:2px 0;';
+      const badge = document.createElement('span');
+      badge.textContent = medals[r.rank - 1] || `${r.rank}.`;
+      badge.style.cssText = 'flex:0 0 auto;width:22px;text-align:center;';
+      const name = document.createElement('span');
+      name.textContent = r.name + (r.isAnonymous ? '(匿名)' : '');
+      name.style.cssText = 'flex:1 1 auto;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;';
+      const cnt = document.createElement('span');
+      cnt.textContent = `${Number(r.count || 0).toLocaleString('ja-JP')}件`;
+      cnt.style.cssText = 'flex:0 0 auto;color:var(--nl-text-soft);';
+      row.append(badge, name, cnt);
+      body.appendChild(row);
+    }
+  } else {
+    const hint = document.createElement('div');
+    hint.textContent = 'この配信を拡張ポップアップで開くと、応援者ランキングがここに出ます。';
+    hint.style.cssText = 'color:var(--nl-text-soft);';
+    body.appendChild(hint);
+  }
+  det.appendChild(body);
+  return det;
+}
 
 /**
  * v0.1.864: 放送導線ボタン。状態別(切替/新規タブ/アーカイブ)に文言と挙動を分ける(星野ロミ式・
@@ -1475,9 +1530,31 @@ function setupReputationCheck() {
   }
 }
 
+// v0.1.869: 診断 / ちくらん のタブ切替。body のクラスで CSS が診断系レーンの表示/非表示を切る。
+//   ちくらんは将来の Kimito Link ランキングの場所(配信カード=ちくらん風・クリックで応援者展開)。
+function setupStatusTabs() {
+  const tabs = document.querySelectorAll('.status-tab');
+  if (!tabs.length) return;
+  /** @param {string} tab 'diag' | 'chikuran' */
+  const activate = (tab) => {
+    document.body.classList.toggle('tab-chikuran', tab === 'chikuran');
+    for (const el of tabs) {
+      const isThis = el instanceof HTMLElement && el.dataset.tab === tab;
+      el.classList.toggle('is-active', isThis);
+      if (el instanceof HTMLElement) el.setAttribute('aria-pressed', String(isThis));
+    }
+  };
+  for (const el of tabs) {
+    el.addEventListener('click', () => {
+      if (el instanceof HTMLElement && el.dataset.tab) activate(el.dataset.tab);
+    });
+  }
+}
+
 function setupButtons() {
   setupPatrolButtons();
   setupReputationCheck();
+  setupStatusTabs();
   const btnUpload = document.getElementById('btnUpload');
   if (btnUpload) {
     const { ingestKey, viewToken } = getUploadConfig();
