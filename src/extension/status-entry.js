@@ -168,33 +168,36 @@ async function refresh(opts = {}) {
     : 8000;
   let step = 'init';
   try {
+    // v0.1.867: 重さ/開けない対策。従来は 9 個のストレージ/タブ取得を直列 await していて、記録中
+    //   (複数配信)でストレージが混むと初期 timeout(1500ms)を超えて画面が真っ白になっていた。
+    //   依存の無いものは Promise.all で並行化(直列 9 段→ lvList→[並行]の 2 段)=実時間を大幅短縮。
     step = 'enumerateActiveLives';
     const lvList = await runStorageOpWithTimeout(() => enumerateActiveLives(), tmo);
-    step = `loadAllSummaries(${lvList.length}件)`;
-    const summaries = await runStorageOpWithTimeout(() => loadAllSummaries(lvList), tmo);
-    step = 'loadFastDiagSafe';
-    const fastDiag = await runStorageOpWithTimeout(() => loadFastDiagSafe(), tmo);
-    step = 'loadPopupDiagSafe';
-    const popupDiag = await runStorageOpWithTimeout(() => loadPopupDiagSafe(), tmo);
-    step = 'loadBackfillProgress';
-    const backfillProgress = await runStorageOpWithTimeout(
-      () => loadBackfillProgressSafe(),
-      tmo
-    );
-    step = 'loadVoiceDiagSafe';
-    const voiceDiag = await runStorageOpWithTimeout(() => loadVoiceDiagSafe(), tmo);
-    step = 'loadReportPreviewSafe';
-    const reportPreview = await runStorageOpWithTimeout(() => loadReportPreviewSafe(), tmo);
-    // v0.1.862: 時系列トレンド。既存サンプルで劣化を判定(分析は今回の新点を積む前=過去の傾向)→
-    //   今回のKPIを積んで書き戻す(throttle は純関数側)。スナップショットでは見えない記録停止/取得率低下を捕まえる。
-    step = 'loadStatusTrend';
+    step = 'loadAll(並行)';
+    const [
+      summaries,
+      fastDiag,
+      popupDiag,
+      backfillProgress,
+      voiceDiag,
+      reportPreview,
+      watchTabMap
+    ] = await Promise.all([
+      runStorageOpWithTimeout(() => loadAllSummaries(lvList), tmo).catch(() => ({})),
+      runStorageOpWithTimeout(() => loadFastDiagSafe(), tmo).catch(() => null),
+      runStorageOpWithTimeout(() => loadPopupDiagSafe(), tmo).catch(() => null),
+      runStorageOpWithTimeout(() => loadBackfillProgressSafe(), tmo).catch(() => null),
+      runStorageOpWithTimeout(() => loadVoiceDiagSafe(), tmo).catch(() => null),
+      runStorageOpWithTimeout(() => loadReportPreviewSafe(), tmo).catch(() => null),
+      runStorageOpWithTimeout(() => queryWatchTabMap(), tmo).catch(() => new Map())
+    ]);
+    // 時系列トレンドは summaries に依存するので並行群の後。書き込みは throttle(純関数側・30秒間引き)。
+    //   失敗は握る=他の表示を妨げない(トレンドだけのために画面を白くしない)。
+    step = 'recordAndAnalyzeTrend';
     const trendFindings = await runStorageOpWithTimeout(
       () => recordAndAnalyzeTrendSafe(lvList, summaries),
       tmo
-    );
-    // v0.1.864: 放送導線。今開いている watch タブの lv→tab マップ(切替先解決用・新規取得ゼロ)。
-    step = 'queryWatchTabMap';
-    const watchTabMap = await runStorageOpWithTimeout(() => queryWatchTabMap(), tmo);
+    ).catch(() => []);
     step = 'renderAll';
     renderAll({ lvList, summaries, fastDiag, popupDiag, backfillProgress, voiceDiag, reportPreview, trendFindings, watchTabMap });
     updateLastUpdateMeta();
