@@ -36,6 +36,7 @@ graph LR
   n_status --> n_src_lib_statusTrend_js["lib/statusTrend.js"]
   n_status --> n_src_lib_statusTrendKey_js["lib/statusTrendKey.js"]
   n_status --> n_src_lib_storageOpTimeout_js["lib/storageOpTimeout.js"]:::shared
+  n_status --> n_src_lib_supporterRanking_js["lib/supporterRanking.js"]:::shared
   n_status --> n_src_lib_voiceDiag_js["lib/voiceDiag.js"]:::shared
   n_status --> n_src_lib_voiceDiagKey_js["lib/voiceDiagKey.js"]:::shared
   n_status --> n_src_lib_watchLink_js["lib/watchLink.js"]

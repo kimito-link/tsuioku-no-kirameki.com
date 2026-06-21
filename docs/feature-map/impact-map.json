@@ -1340,6 +1340,18 @@
       ]
     },
     {
+      "file": "src/lib/supporterRanking.js",
+      "featureCount": 2,
+      "features": [
+        "popup",
+        "status"
+      ],
+      "labels": [
+        "ポップアップ(応援レーン)",
+        "状態速報ページ"
+      ]
+    },
+    {
       "file": "src/lib/supportTimelineHtml.js",
       "featureCount": 2,
       "features": [

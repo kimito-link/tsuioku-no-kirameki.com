@@ -17,11 +17,13 @@
  *   oncePct: number,             // 一度きり%
  *   visitors: number,            // 来場(audienceGap.totalVisitors)
  *   commenters: number,          // コメントした人(audienceGap.uniqueCommenters)
- *   silentEstimate: number       // 沈黙視聴者の推定(audienceGap.silentVisitorEstimate)
+ *   silentEstimate: number,      // 沈黙視聴者の推定(audienceGap.silentVisitorEstimate)
+ *   topSupporters?: import('./supporterRanking.js').SupporterRow[] // 応援者ランキング上位(ちくらん風・v0.1.865)
  * }} ReportPreview
  */
 
 import { withConfidence } from './metricConfidence.js';
+import { buildSupporterRanking, buildSupporterRankingLines } from './supporterRanking.js';
 
 /**
  * @param {(...args: any[]) => any} aggregateMarketingReport DI: marketingAggregate.aggregateMarketingReport
@@ -71,6 +73,16 @@ export function buildReportPreview(
     gap = null;
   }
 
+  // v0.1.865: 応援者ランキング(ちくらん風)。topUsers(件数順)から上位を整形して同梱=既存の
+  //   popup→storage→status ブリッジに乗せる(新規キー無し)。匿名扱い/0件除外は supporterRanking が正本。
+  /** @type {import('./supporterRanking.js').SupporterRow[]} */
+  let topSupporters = [];
+  try {
+    topSupporters = buildSupporterRanking(mkt?.topUsers, { limit: 10 });
+  } catch {
+    topSupporters = [];
+  }
+
   return {
     liveId: lid,
     totalComments: num(mkt?.totalComments),
@@ -80,7 +92,8 @@ export function buildReportPreview(
     oncePct: num(mkt?.segmentPcts?.once),
     visitors: num(gap?.totalVisitors),
     commenters: num(gap?.uniqueCommenters),
-    silentEstimate: num(gap?.silentVisitorEstimate)
+    silentEstimate: num(gap?.silentVisitorEstimate),
+    topSupporters
   };
 }
 
@@ -131,14 +144,17 @@ export function buildReportPreviewLines(p, ctx = {}) {
   if (p.commentsPerMinute > 0) parts.push(`分速 ${p.commentsPerMinute}`);
   if (p.heavyPct > 0) parts.push(`ヘビー ${p.heavyPct}%`);
   if (p.oncePct > 0) parts.push(`一度きり ${p.oncePct}%`);
-  const head = `レポート内容(保存前): ${parts.join(' / ')}`;
-  // 来場と応援参加(audienceGap)は値があるときだけ2行目に。コメントした人は上で出したので来場/沈黙のみ。
+  const lines = [`レポート内容(保存前): ${parts.join(' / ')}`];
+  // 来場と応援参加(audienceGap)は値があるときだけ。コメントした人は上で出したので来場/沈黙のみ。
   if (p.visitors > 0) {
     const g = [`来場 ${p.visitors.toLocaleString('ja-JP')}`];
     if (p.silentEstimate > 0) {
       g.push(`沈黙視聴者 ${withConfidence(p.silentEstimate.toLocaleString('ja-JP'), 'silentEstimate', ctx)}`);
     }
-    return `${head}\n  来場と応援参加: ${g.join(' / ')}`;
+    lines.push(`  来場と応援参加: ${g.join(' / ')}`);
   }
-  return head;
+  // v0.1.865: 応援者ランキング(ちくらん風)。上位があれば続けて出す(空ならノイズにしない)。
+  const rankLines = buildSupporterRankingLines(p.topSupporters, { max: 5 });
+  if (rankLines) lines.push(rankLines);
+  return lines.join('\n');
 }
