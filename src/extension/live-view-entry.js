@@ -13,10 +13,14 @@
  */
 
 import { computeHeatLevel } from '../lib/heatLevel.js';
+import { categorizeUsersForThumbGrid } from '../lib/userThumbGrid.js';
+import { buildGiftThrowerLaneEntries } from '../lib/userLaneMergeGiftThrowers.js';
+import { buildNiconicoDefaultUserIconUrl } from '../lib/reportUserThumb.js';
 
 const PANEL_SUMMARY_PREFIX = 'nls_panel_summary_';
 const WATCH_SNAPSHOT_PREFIX = 'nls_watch_snapshot_';
 const KEY_REPORT_PREVIEW = 'nls_report_preview_v1';
+const GIFT_USERS_PREFIX = 'nls_gift_users_';
 const REFRESH_MS = 2000;
 
 /** URL の ?lv= から live id を取り出す(検証付き)。 */
@@ -33,7 +37,7 @@ function liveIdFromUrl() {
  * データ取得を隔離した「データソース」。拡張版は chrome.storage を読む。将来サーバー版はこの関数だけ
  *   fetch 実装に差し替える(描画は不変)。
  * @param {string} lv
- * @returns {() => Promise<{summary:any, snapshot:any, reportPreview:any}>}
+ * @returns {() => Promise<{summary:any, snapshot:any, reportPreview:any, giftUsers:any}>}
  */
 function createLiveViewDataSource(lv) {
   return async () => {
@@ -41,15 +45,17 @@ function createLiveViewDataSource(lv) {
       const bag = await chrome.storage.local.get([
         PANEL_SUMMARY_PREFIX + lv,
         WATCH_SNAPSHOT_PREFIX + lv,
-        KEY_REPORT_PREVIEW
+        KEY_REPORT_PREVIEW,
+        GIFT_USERS_PREFIX + lv
       ]);
       return {
         summary: bag?.[PANEL_SUMMARY_PREFIX + lv] || null,
         snapshot: bag?.[WATCH_SNAPSHOT_PREFIX + lv] || null,
-        reportPreview: bag?.[KEY_REPORT_PREVIEW] || null
+        reportPreview: bag?.[KEY_REPORT_PREVIEW] || null,
+        giftUsers: bag?.[GIFT_USERS_PREFIX + lv] || null
       };
     } catch {
-      return { summary: null, snapshot: null, reportPreview: null };
+      return { summary: null, snapshot: null, reportPreview: null, giftUsers: null };
     }
   };
 }
@@ -248,8 +254,83 @@ function renderLiveView(lv, data, nowMs) {
     body.textContent = 'この配信を拡張ポップアップで開くと、応援者ランキングがここにリアルタイムで出ます。';
   }
 
+  // v0.1.875: popup の全レーンを再現。①りんく列(数値ID+個人サムネ) ②ギフト列(ギフト投げた人)。
+  renderLanes(lv, data);
+
   const d = new Date(nowMs);
   $('updatedAt').textContent = `最終更新 ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}:${String(d.getSeconds()).padStart(2, '0')}`;
+}
+
+/** ユーザー行({thumbSrc,userId,nickname,count?})からアイコンタイル DOM を作る(popup の人物タイル相当)。 @param {any} u */
+function buildLaneTile(u) {
+  const tile = document.createElement('div');
+  tile.className = 'lane-tile';
+  const av = document.createElement('div');
+  av.className = 'lane-av';
+  const src = String(u?.thumbSrc || u?.avatarUrl || '').trim();
+  if (src) {
+    const img = document.createElement('img');
+    img.src = src;
+    img.alt = '';
+    img.referrerPolicy = 'no-referrer';
+    img.addEventListener('error', () => { try { img.remove(); av.textContent = '👤'; } catch { /* no-op */ } });
+    av.appendChild(img);
+  } else {
+    av.textContent = '👤';
+  }
+  tile.appendChild(av);
+  const name = document.createElement('div');
+  name.className = 'lane-name';
+  name.textContent = String(u?.nickname || u?.userId || '');
+  tile.appendChild(name);
+  const uid = document.createElement('div');
+  uid.className = 'lane-uid';
+  const c = Number(u?.count);
+  uid.textContent = Number.isFinite(c) && c > 0 ? `${String(u?.userId || '')} ・ ${c}件` : String(u?.userId || '');
+  tile.appendChild(uid);
+  return tile;
+}
+
+/** りんく列・ギフト列を描画(popup の全レーン再現)。データが無ければそのレーンを隠す(死にリンクにしない)。 @param {string} lv @param {any} data */
+function renderLanes(lv, data) {
+  const rp = data?.reportPreview;
+  const rpMatches = rp && String(rp.liveId || '').trim().toLowerCase() === lv;
+  // ① りんく列(数値ID+個人サムネが揃った応援だけ)。topSupporters を categorizeUsersForThumbGrid で振り分け。
+  const linkSec = $('linkLaneSec');
+  const linkBody = $('linkLaneBody');
+  if (linkSec && linkBody) {
+    const supporters = rpMatches && Array.isArray(rp.topSupporters) ? rp.topSupporters : [];
+    // topSupporters(rank/name/avatarUrl/count/userId)を RawThumbGridUser 形に。
+    const raw = supporters.map((/** @type {any} */ r) => ({ userId: r.userId, nickname: r.name, avatarUrl: r.avatarUrl, count: r.count }));
+    const { numericIdUsers } = categorizeUsersForThumbGrid(raw, { maxNumeric: 80 });
+    if (numericIdUsers.length) {
+      linkSec.hidden = false;
+      linkBody.innerHTML = '';
+      for (const u of numericIdUsers) linkBody.appendChild(buildLaneTile(u));
+    } else {
+      linkSec.hidden = true;
+    }
+  }
+  // ② ギフト列(この放送でギフト/広告を投げた人・数値IDで記録できた順)。storage の nls_gift_users_<lv>。
+  const giftSec = $('giftLaneSec');
+  const giftBody = $('giftLaneBody');
+  if (giftSec && giftBody) {
+    const entries = buildGiftThrowerLaneEntries(Array.isArray(data?.giftUsers) ? data.giftUsers : [], { liveId: lv });
+    if (entries.length) {
+      giftSec.hidden = false;
+      giftBody.innerHTML = '';
+      for (const e of entries.slice(0, 60)) {
+        // ギフト列は avatarUrl 空=数値IDの CDN アイコンで補う(popup と同じ「個人サムネ→ゆっくり画像」の前段)。
+        giftBody.appendChild(buildLaneTile({
+          userId: e.userId,
+          nickname: e.nickname,
+          thumbSrc: e.avatarUrl || buildNiconicoDefaultUserIconUrl(e.userId)
+        }));
+      }
+    } else {
+      giftSec.hidden = true;
+    }
+  }
 }
 
 function start() {

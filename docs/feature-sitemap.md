@@ -252,7 +252,7 @@
   - `src/lib/giftThrowProjectile.js`
 - **吹き出し寿命管理** — 会場の吹き出しの表示上限・追い出し(eviction)ライフサイクル
   - `src/lib/venueBubbleLifecycle.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 151</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 149</summary>
 
 - `scripts/encode-marketing-html-avatars.mjs` — extension/images/marketing-html-avatars/*.png を data URI にし、
 - `scripts/split-avatar-parts.mjs` — 偽市松背景の除去 + パーツ切り出し(one-off アセットパイプライン)
@@ -382,9 +382,7 @@
 - `src/lib/userCommentProfileCache.js` — userId 単位で表示名・個人サムネ（弱い CDN 既定アイコン以外の http URL）を蓄積し、
 - `src/lib/userEntryAvatarResolve.js` — 1 ユーザーエントリーのアバター状態を組み立てる純関数レイヤ。
 - `src/lib/userLaneDiagSnapshot.js` — Popup DevTools 用: lane pipeline の観測スナップショット（PII を含めない）。
-- `src/lib/userLaneMergeGiftThrowers.js` — ギフト／広告投げ主専用レーン用のエントリ一覧（りんく列とは別段）。
 - `src/lib/userSupportGridAccent.js` — Paul Tol Bright に近い 8 色を OKLCH で表現（カテゴリ識別用）。
-- `src/lib/userThumbGrid.js` — 「サムネ付きユーザー一覧」のカテゴリ分け純粋関数。
 - `src/lib/venueAvatar.js` — v0.1.712: 会場モードのアバター解決(サムネ補強)純関数。
 - `src/lib/venueBubbleLayout.js` — v0.1.717: 会場モードの吹き出し(セリフ)を「席の外の最上位レイヤー」に置くための配置純関数。
 - `src/lib/venueCharacterFrame.js` — 会場モードの「額縁(フレーム)」: ゆっくり3キャラ(りんく/こん太/たぬ姉)の全表情サムネを、
@@ -559,10 +557,12 @@
   - `src/lib/reportPreviewPublish.js`
   - `src/extension/popup-entry.js`
   - `src/extension/status-entry.js`
-- **応援ライブビュー(リアルタイム盛り上がり・新規タブ)** — ちくらんカードの「🔥応援ライブビューを開く」で live-view.html?lv=... を新規タブで開く(chrome.runtime.getURL)。chrome.storage を2秒購読し盛り上がり🔥(分速→computeHeatLevel)/応援者🏆/コメント数/来場をリアルタイム再描画・hot/blazing でバー脈打つ。データ取得を createLiveViewDataSource に隔離=将来サーバー公開版(拡張不要で URL 閲覧)へ移植可能(描画は不変)。Web/iOS/Android への土台(v0.1.871)
+- **応援ライブビュー(リアルタイム盛り上がり・新規タブ)** — ちくらんカードの「🔥応援ライブビューを開く」で live-view.html?lv=... を新規タブで開く(chrome.runtime.getURL)。chrome.storage を2秒購読し盛り上がり🔥(分速→computeHeatLevel)/応援者ランキング🏆(配信者タイル先頭)/🔗りんく列(数値ID+個人サムネ・categorizeUsersForThumbGrid)/🎁ギフト列(nls_gift_users_<lv>・buildGiftThrowerLaneEntries)/コメント数/来場をリアルタイム再描画。配色は popup(dark)の正確な変数に完全一致。データ取得を createLiveViewDataSource に隔離=将来サーバー公開版(拡張不要で URL 閲覧)へ移植可能(描画は不変)。Web/iOS/Android への土台(v0.1.871-875)
   - `extension/live-view.html`
   - `src/extension/live-view-entry.js`
   - `src/lib/heatLevel.js`
+  - `src/lib/userThumbGrid.js`
+  - `src/lib/userLaneMergeGiftThrowers.js`
 - **盛り上がり判定(熱量・移植可能な純関数)** — 分速コメントから盛り上がり段階(idle/warm/hot/blazing)+スコア(バー幅%)を出す純関数 computeHeatLevel。拡張API非依存=Web/モバイルでそのまま再利用。閾値 8/30/100 per 分・score=min(100,cpm/2)。負/NaN は idle(v0.1.871)
   - `src/lib/heatLevel.js`
 - **診断/ちくらん タブ+カードクリックで応援者展開** — 状態ページ【上部ナビ(.map-nav・地図リンクと同列)】に「📊診断/🏆ちくらん」切替を統合(v0.1.870)。body.tab-chikuran で診断系レーンを CSS 非表示・配信カードに集中。各配信カードに details「🏆応援者ランキングを見る」=クリックで topSupporters を🥇🥈🥉展開。応援者データは popup で開いている配信ぶんだけ(reportPreview.liveId 一致)=その配信は展開・他は popup で開く案内(死にリンクにしない)。signature に reportPreview を含めて応援者到着時にカード再構築。将来の Kimito Link ランキングの入口(v0.1.869)
@@ -690,7 +690,7 @@
 
 ## 🧬 修正系譜マップ(この系統のバグを過去にどう直したか)
 
-> changelog 全 211 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
+> changelog 全 212 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
 
 ### 💾 記録件数 (31版)
 - `v0.1.874` 2026-06-21 — 応援ライブビューの配色を popup と完全一致(別物感を解消)
@@ -725,7 +725,8 @@
 - `v0.1.672` 2026-06-10 — コメビュの二重表示の残りを根治
 - `v0.1.665` 2026-06-10 — 長い配信が7割等で止まったままになるのを根治
 
-### 📥 コメント取得 (97版)
+### 📥 コメント取得 (98版)
+- `v0.1.875` 2026-06-21 — 応援ライブビューにりんく列・ギフト列(popup の全レーン)を再現
 - `v0.1.874` 2026-06-21 — 応援ライブビューの配色を popup と完全一致(別物感を解消)
 - `v0.1.873` 2026-06-21 — 応援ライブビュー先頭に配信者タイル(popup と同じ見た目)
 - `v0.1.872` 2026-06-21 — 応援ライブビューの応援者をpopup風タイル(アイコン+件数)に
@@ -971,7 +972,8 @@
 - `v0.1.713` 2026-06-13 — 会場モードを明るくして発言を吹き出し表示
 - `v0.1.711` 2026-06-13 — 会場モードで発言を吹き出し表示
 
-### 🎁 ギフト (34版)
+### 🎁 ギフト (35版)
+- `v0.1.875` 2026-06-21 — 応援ライブビューにりんく列・ギフト列(popup の全レーン)を再現
 - `v0.1.866` 2026-06-21 — 診断の配信カードをちくらん風(サムネ+来場+コメント+ギフト)に
 - `v0.1.863` 2026-06-21 — 公式値のDOM↔NDGR食い違いも自己矛盾検知に追加
 - `v0.1.860` 2026-06-21 — 匿名主体の偽の赤と「既知0を空」表示を解消(診断の正直化)
@@ -1046,7 +1048,8 @@
 - `v0.1.699` 2026-06-12 — 読み上げの名前ON/OFF切替を追加
 - `v0.1.698` 2026-06-12 — コメビュにユーザー別の声で読み上げ機能を追加
 
-### 🪟 応援レーン・タイル (36版)
+### 🪟 応援レーン・タイル (37版)
+- `v0.1.875` 2026-06-21 — 応援ライブビューにりんく列・ギフト列(popup の全レーン)を再現
 - `v0.1.873` 2026-06-21 — 応援ライブビュー先頭に配信者タイル(popup と同じ見た目)
 - `v0.1.872` 2026-06-21 — 応援ライブビューの応援者をpopup風タイル(アイコン+件数)に
 - `v0.1.860` 2026-06-21 — 匿名主体の偽の赤と「既知0を空」表示を解消(診断の正直化)
