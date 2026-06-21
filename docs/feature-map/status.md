@@ -38,6 +38,7 @@ graph LR
   n_status --> n_src_lib_storageOpTimeout_js["lib/storageOpTimeout.js"]:::shared
   n_status --> n_src_lib_voiceDiag_js["lib/voiceDiag.js"]:::shared
   n_status --> n_src_lib_voiceDiagKey_js["lib/voiceDiagKey.js"]:::shared
+  n_status --> n_src_lib_watchLink_js["lib/watchLink.js"]
   n_status --> n_src_shared_html_escape_js["shared/html/escape.js"]:::shared
   classDef shared fill:#eee,stroke:#999,color:#666;
 ```

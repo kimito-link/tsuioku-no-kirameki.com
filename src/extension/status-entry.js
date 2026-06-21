@@ -35,6 +35,7 @@ import {
 } from '../lib/reportPreviewKey.js';
 import { appendTrendSample, analyzeTrend } from '../lib/statusTrend.js';
 import { KEY_STATUS_TREND } from '../lib/statusTrendKey.js';
+import { pickOpenAction } from '../lib/watchLink.js';
 import {
   buildOverviewText,
   buildLiveBlockText,
@@ -190,8 +191,11 @@ async function refresh(opts = {}) {
       () => recordAndAnalyzeTrendSafe(lvList, summaries),
       tmo
     );
+    // v0.1.864: 放送導線。今開いている watch タブの lv→tab マップ(切替先解決用・新規取得ゼロ)。
+    step = 'queryWatchTabMap';
+    const watchTabMap = await runStorageOpWithTimeout(() => queryWatchTabMap(), tmo);
     step = 'renderAll';
-    renderAll({ lvList, summaries, fastDiag, popupDiag, backfillProgress, voiceDiag, reportPreview, trendFindings });
+    renderAll({ lvList, summaries, fastDiag, popupDiag, backfillProgress, voiceDiag, reportPreview, trendFindings, watchTabMap });
     updateLastUpdateMeta();
     _statusLastErrorText = '';
   } catch (err) {
@@ -319,6 +323,31 @@ async function enumerateActiveLives() {
 
 function uniqLvSorted(arr) {
   return [...new Set(arr)].sort();
+}
+
+// v0.1.864: 放送導線用。今開いている watch タブの lv→{tabId,windowId} マップを作る(既存の
+//   tabs.query を再利用・新規取得ゼロ)。これでカードの「この放送に切替」が既存タブへフォーカスできる。
+//   失敗(権限なし等)は空 Map=ボタンは「放送を開く(新規タブ)」に自然に落ちる(死にリンクにしない)。
+//   @returns {Promise<Map<string, {tabId:number, windowId:number}>>}
+async function queryWatchTabMap() {
+  /** @type {Map<string, {tabId:number, windowId:number}>} */
+  const map = new Map();
+  try {
+    const tabs = await chrome.tabs.query({
+      url: ['https://live.nicovideo.jp/watch/*', 'https://sp.live.nicovideo.jp/watch/*']
+    });
+    for (const tab of tabs || []) {
+      const m = String(tab?.url || '').match(/\/watch\/(lv\d{1,15})/);
+      if (m && Number.isFinite(Number(tab?.id))) {
+        const lv = m[1].toLowerCase();
+        // 同 lv が複数タブにある時は最初の1つ(切替先は1つで十分)。
+        if (!map.has(lv)) map.set(lv, { tabId: Number(tab.id), windowId: Number(tab.windowId) });
+      }
+    }
+  } catch {
+    /* 権限なし/context 切れ=空 Map(ボタンは新規タブ経路に落ちる) */
+  }
+  return map;
 }
 
 /* ============================================================================
@@ -466,7 +495,7 @@ function reportPreviewCtxFromFastDiag(fastDiag, backfillProgress) {
   };
 }
 
-function renderAll({ lvList, summaries, fastDiag, popupDiag, backfillProgress, voiceDiag, reportPreview, trendFindings }) {
+function renderAll({ lvList, summaries, fastDiag, popupDiag, backfillProgress, voiceDiag, reportPreview, trendFindings, watchTabMap }) {
   // v0.1.847: 各描画セクションを独立 try/catch で隔離するヘルパ。1つが throw しても他のセクションと
   //   最終更新メタを巻き込まない=「セルが全部消える/最終更新—のまま固まる」を根治。落ちた場所は
   //   console と AI 共有欄に出して真因を追えるようにする(star-romi 失敗体験の除去)。
@@ -613,6 +642,11 @@ function renderAll({ lvList, summaries, fastDiag, popupDiag, backfillProgress, v
         pre.textContent = buildLiveBlockText(live);
         pre.style.margin = '0';
         card.appendChild(pre);
+
+        // v0.1.864: 放送導線。状態別ボタン(切替/新規タブ/アーカイブ)。lv 不正なら出さない。
+        const watchBtn = buildWatchLinkButton(live, watchTabMap);
+        if (watchBtn) card.appendChild(watchBtn);
+
         livesEl.appendChild(card);
       }
     }
@@ -829,6 +863,55 @@ function setAllMindDetails(open) {
 /* ============================================================================
  * 集計/整形ヘルパ(純関数寄り・テスト容易)
  * ========================================================================== */
+
+/**
+ * v0.1.864: 放送導線ボタン。状態別(切替/新規タブ/アーカイブ)に文言と挙動を分ける(星野ロミ式・
+ *   失敗体験の除去)。判定は純関数 pickOpenAction が正本。lv 不正なら null=ボタンを出さない(死にリンク回避)。
+ *   切替(tabs.update)が失敗(タブが既に閉じられた等)したら新規タブ生成にフォールバック=「押したのに
+ *   何も起きない」を構造的に潰す。
+ * @param {object} live
+ * @param {Map<string,{tabId:number,windowId:number}>|undefined} watchTabMap
+ * @returns {HTMLButtonElement|null}
+ */
+function buildWatchLinkButton(live, watchTabMap) {
+  const lv = String(live?.lv || '').trim().toLowerCase();
+  const tabEntry = watchTabMap instanceof Map ? watchTabMap.get(lv) || null : null;
+  const action = pickOpenAction({ lv, endedAt: live?.endedAt, tabEntry });
+  if (!action) return null; // lv 不正=出さない。
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.textContent = `▶ ${action.label}`;
+  btn.style.cssText =
+    'margin-top:8px;padding:5px 10px;border-radius:6px;cursor:pointer;font-size:12px;' +
+    'border:1px solid var(--nl-accent);background:var(--nl-card-bg);color:var(--nl-accent);';
+  const openNewTab = () => {
+    try {
+      if (action.url) chrome.tabs.create({ url: action.url });
+    } catch {
+      /* context 切れ=無視(次の更新で復帰) */
+    }
+  };
+  btn.addEventListener('click', () => {
+    if (action.kind === 'switch' && action.tabId != null) {
+      try {
+        chrome.tabs.update(action.tabId, { active: true }).then(
+          () => {
+            // ウィンドウも前面に(別ウィンドウのタブを切替えた時に見える)。
+            if (action.windowId != null) {
+              try { chrome.windows.update(action.windowId, { focused: true }); } catch { /* no-op */ }
+            }
+          },
+          () => openNewTab() // タブが既に閉じられている等=新規タブにフォールバック。
+        );
+      } catch {
+        openNewTab();
+      }
+    } else {
+      openNewTab(); // open / archive。
+    }
+  });
+  return btn;
+}
 
 /**
  * 健康チェック(5段階 ●○)の DOM を作る。
