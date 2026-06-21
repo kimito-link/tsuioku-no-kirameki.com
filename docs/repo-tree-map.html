@@ -216,6 +216,11 @@
       <div class="fpaths"><code class="path">src/lib/reportPreview.js</code><code class="path">src/lib/reportPreviewKey.js</code><code class="path">src/lib/reportPreviewPublish.js</code><code class="path">src/extension/popup-entry.js</code><code class="path">src/extension/status-entry.js</code></div>
     </section>
 <section class="feat">
+      <div class="fhead"><span class="fname">診断/ちくらん タブ+カードクリックで応援者展開</span> <span class="tag">診断</span><span class="tag">表示</span><span class="tag">ナビ</span></div>
+      <div class="fdesc">状態ページ上部に「📊診断/🏆ちくらん」タブ(body.tab-chikuran で診断系レーンを CSS 非表示・配信カードに集中)。各配信カードに details「🏆応援者ランキングを見る」=クリックで topSupporters を🥇🥈🥉展開。応援者データは popup で開いている配信ぶんだけ(reportPreview.liveId 一致)=その配信は展開・他は popup で開く案内(死にリンクにしない)。signature に reportPreview を含めて応援者到着時にカード再構築。将来の Kimito Link ランキングの入口(v0.1.869)</div>
+      <div class="fpaths"><code class="path">src/extension/status-entry.js</code><code class="path">extension/status.html</code><code class="path">src/lib/supporterRanking.js</code></div>
+    </section>
+<section class="feat">
       <div class="fhead"><span class="fname">ちくらん風 配信カード(サムネ+来場+コメント+ギフト)</span> <span class="tag">診断</span><span class="tag">表示</span><span class="tag">レポート</span></div>
       <div class="fdesc">ニコ生公式「注目番組ランキング(ちくらん)」風に、状態ページの配信カード上部へ サムネ画像+配信者名+タイトル+経過/来場/コメント/ギフト を1段表示。表示モデルは純関数 buildChikuranCardModel が正本(取れない値は null=空欄を0と偽らない・サムネ無しは枠+🎥・img onerror で壊れ画像を消す)。サムネ URL は snapshot.thumbnailUrl(og:image/channel thumb・summarizeOneLive が中継)。CSP は img-src 無指定で nicovideo CDN 画像を許可(既存 avatar と同じ)。健康チェック/詳細/放送ボタンは下に残す(v0.1.866)</div>
       <div class="fpaths"><code class="path">src/lib/chikuranCard.js</code><code class="path">src/extension/status-entry.js</code><code class="path">src/extension/content-entry.js</code></div>

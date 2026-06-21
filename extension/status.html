@@ -381,6 +381,38 @@
         border-bottom: 2px solid var(--nl-accent);
         border-radius: 6px 6px 0 0;
       }
+      /* v0.1.869: 診断/ちくらん タブ切替。 */
+      .status-tabs {
+        display: flex;
+        gap: 6px;
+        margin: 0 0 12px;
+        border-bottom: 1px solid var(--nl-border);
+      }
+      .status-tab {
+        appearance: none;
+        background: transparent;
+        border: none;
+        border-bottom: 3px solid transparent;
+        color: var(--nl-text-soft, #888);
+        font-size: 15px;
+        font-weight: 600;
+        padding: 8px 14px;
+        cursor: pointer;
+        margin-bottom: -1px;
+      }
+      .status-tab.is-active {
+        color: var(--nl-accent);
+        border-bottom-color: var(--nl-accent);
+      }
+      /* ちくらんタブ時は診断系レーンを隠し、視聴中の配信(ちくらん)に集中。 */
+      body.tab-chikuran #actionLane,
+      body.tab-chikuran #mindmapLane,
+      body.tab-chikuran #overviewLane,
+      body.tab-chikuran #reputationLane,
+      body.tab-chikuran #aiShareLane,
+      body.tab-chikuran .guidepost,
+      body.tab-chikuran .share-hero { display: none; }
+      /* 診断タブ時はちくらん見出しの「全画面」感を出さない(通常レーン)。livesLane は両方で表示。 */
       /* 健全度パネル: 正常は淡い緑、異常(黄/赤)だけ目を引く。対象外は灰の「—」。 */
       section.health-panel { margin: 0 0 14px; }
       .health-cells {
@@ -453,6 +485,12 @@
       <div class="health-verdict hv-ok" id="healthVerdict" aria-live="polite"></div>
       <div class="health-cells" id="healthCells"></div>
     </section>
+
+    <!-- v0.1.869: 診断 / ちくらん のタブ切替。ちくらんは将来の Kimito Link ランキングの場所。 -->
+    <nav class="status-tabs" id="statusTabs" aria-label="表示切替">
+      <button type="button" class="status-tab is-active" id="tabDiag" data-tab="diag" aria-pressed="true">📊 診断</button>
+      <button type="button" class="status-tab" id="tabChikuran" data-tab="chikuran" aria-pressed="false">🏆 ちくらん</button>
+    </nav>
 
     <section class="guidepost">
       <h2>🧭 はじめての方へ — ここから全部たどれます</h2>
