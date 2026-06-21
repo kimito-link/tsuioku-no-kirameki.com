@@ -224,11 +224,24 @@ describe('buildHealthCells v0.1.845 進行中=processing(青)・見た瞬間ほ�
       } } } }
     });
     expect(cellById(cells, 'ns-ad').level).toBe('na');     // 成功0件=該当無し=灰。
+    expect(cellById(cells, 'ns-ad').text).toBe('まだ広告無し'); // v0.1.889: 文脈化(空が正常だと分かる)。
     expect(cellById(cells, 'ns-contrib').level).toBe('bad'); // 本物の失敗=赤(隠さない)。
     // 総合判定: no_ranking_data は異常に数えない・fetch_error は数える。
     const v = summarizeHealthVerdict(cells);
-    expect(v.badLabels).toContain('貢献度ランキング');
+    expect(v.badLabels).toContain('ギフト貢献度'); // v0.1.889: ラベル変更(正体は koken /gift/ ランキング)。
     expect(v.badLabels).not.toContain('広告ランキング');
+  });
+
+  it('v0.1.889 ギフト貢献度の no_ranking_data は「まだギフト無し」と文脈化(空が正常だと分かる)', () => {
+    const cells = buildHealthCells({
+      fastDiag: { content: { giftDiagnostics: { '北極星レーン': {
+        '1_貢献度ランキング': { state: 'no_ranking_data', apiRows: 0 }
+      } } } }
+    });
+    const c = cellById(cells, 'ns-contrib');
+    expect(c.level).toBe('na');           // 空でも異常ではない。
+    expect(c.label).toBe('ギフト貢献度');  // ラベルも変更。
+    expect(c.text).toBe('まだギフト無し'); // 広告ptの有無と混同させない文言。
   });
 
   it('v0.1.848 裏タブで追いつき中の配信(放送中×未達)は romiDebug に出なくても processing', () => {

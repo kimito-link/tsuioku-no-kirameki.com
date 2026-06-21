@@ -62,10 +62,17 @@ function stateCell(id, label, level, text) {
  *   匿名 userId と同じく原理的に100%不可能=異常でない。さらにこのレーン自体は v0.1.282/05-19 で
  *   「空placeholderがスペース浪費」とユーザー実機指摘で popup 表示から撤回(非表示)済みなのに、
  *   健全度パネルだけ黄で蒸し返していた=v0.1.846「構造的限界は正常(na)扱い」の入れ漏れを是正。
+ * v0.1.889: no_ranking_data の文言を laneKind で文脈化。「貢献度ランキング」の正体は koken の
+ *   【ギフト貢献度】(API URL に /gift/・kokenContributionRankingApi.js)で、ギフトを投げた人の
+ *   ランキング=ギフト0ptの配信は投げた人0人で正しく空になる。なのに「ランキング無し」とだけ出ると
+ *   「広告ptはあるのに貢献度が無い=バグ?」とユーザーが誤解した(実機 lv350800580=広告24,200pt/
+ *   ギフト0pt で貢献度 no_ranking_data=仕様通りだが文言が不親切だった)。laneKind で「まだギフト無し」
+ *   等の文脈を添えて、空が正常だと分かるようにする。
  * @param {unknown} state
+ * @param {'gift-contrib'|'ad'|'other'} [laneKind] no_ranking_data の文言を文脈化するためのレーン種別
  * @returns {{ level:'ok'|'warn'|'bad'|'na'|'processing', text:string }}
  */
-function northStarLevel(state) {
+function northStarLevel(state, laneKind = 'other') {
   const s = String(state || '');
   if (s === 'ok') return { level: 'ok', text: 'OK' };
   if (s === 'iframe_unrendered' || s === 'loading') return { level: 'processing', text: '取得中' };
@@ -73,7 +80,13 @@ function northStarLevel(state) {
   if (s === 'event_present_unscrapable') return { level: 'na', text: '参加中(数値は取得不可)' };
   // v0.1.851: no_ranking_data=通信成功だがランキング0件(この配信に無いだけ)=赤にしない(na)。
   //   fetch_error は本物の取得失敗(ok===false)専用に分離(council/adlane-fetcherror-SYNTHESIS)。
-  if (s === 'no_ranking_data') return { level: 'na', text: 'ランキング無し' };
+  // v0.1.889: laneKind で「空が正常」と分かる文言に(ギフト貢献度=ギフト投げた人がいないだけ/
+  //   広告=ニコニ広告が無いだけ)。広告ptの有無と混同させない。
+  if (s === 'no_ranking_data') {
+    if (laneKind === 'gift-contrib') return { level: 'na', text: 'まだギフト無し' };
+    if (laneKind === 'ad') return { level: 'na', text: 'まだ広告無し' };
+    return { level: 'na', text: 'ランキング無し' };
+  }
   if (s === 'not_yet') return { level: 'processing', text: '取得中' }; // 起動直後=途中=青(赤/黄にしない)。
   if (s === 'no_event' || s === 'no_program_gift' || s === '' || s === 'missing') {
     return { level: 'na', text: '—' }; // その配信に該当が無いだけ=赤にしない。
@@ -200,19 +213,23 @@ export function buildHealthCells(data) {
   cells.push(stateCell('stale', '多タブ名残', stale ? 'warn' : 'ok', stale ? '履歴あり' : 'なし'));
 
   // 9-14. 北極星6レーン。
+  //   v0.1.889: 「貢献度ランキング」→「ギフト貢献度」にラベル変更(正体は koken の /gift/ ランキング=
+  //   広告貢献度とは別系統)。laneKind を渡して no_ranking_data の文言を「まだギフト無し/まだ広告無し」と
+  //   文脈化=「広告ptはあるのに貢献度無し?」の誤解を断つ。
   const ns = gift?.['北極星レーン'] || {};
+  /** @type {Array<[string,string,string,('gift-contrib'|'ad'|'other')]>} */
   const NS = [
-    ['ns-contrib', '貢献度ランキング', '1_貢献度ランキング'],
-    ['ns-ad', '広告ランキング', '+α_広告ランキング'],
-    ['ns-gift-hist', 'ギフト履歴', '2_ギフト履歴'],
-    ['ns-escore', 'イベントスコア', '3_イベント累計スコア'],
-    ['ns-prog-pt', '番組累計pt', '4_番組累計ポイント'],
-    ['ns-erank', 'イベント順位', '5_イベント現在順位']
+    ['ns-contrib', 'ギフト貢献度', '1_貢献度ランキング', 'gift-contrib'],
+    ['ns-ad', '広告ランキング', '+α_広告ランキング', 'ad'],
+    ['ns-gift-hist', 'ギフト履歴', '2_ギフト履歴', 'other'],
+    ['ns-escore', 'イベントスコア', '3_イベント累計スコア', 'other'],
+    ['ns-prog-pt', '番組累計pt', '4_番組累計ポイント', 'other'],
+    ['ns-erank', 'イベント順位', '5_イベント現在順位', 'other']
   ];
-  for (const [id, label, key] of NS) {
+  for (const [id, label, key, laneKind] of NS) {
     const lane = ns[key];
     if (!lane) { cells.push(stateCell(id, label, 'na', '—')); continue; }
-    const { level, text } = northStarLevel(lane.state);
+    const { level, text } = northStarLevel(lane.state, laneKind);
     cells.push(stateCell(id, label, level, text));
   }
 
