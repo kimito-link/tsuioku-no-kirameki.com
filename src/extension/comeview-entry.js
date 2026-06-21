@@ -578,15 +578,38 @@ async function drainVoiceQueue() {
         const audio = new Audio(objectUrl);
         await new Promise((resolve) => {
           let settled = false;
+          // v0.1.883: 再生完了の安全網(watchdog)。'ended'/'error' が一度も来ないケース
+          //   (裏タブで Chrome が音声を中断・音声デバイス切替・blob 再生 stall 等)に備える。
+          //   これが無いと await が永久 pending=_voicePlaying が true のまま固着し、以降の
+          //   drainVoiceQueue() が全て先頭 return=「待機が溜まるのに発話が止まったまま」になる
+          //   (実機: 最終発話2234秒前・待機6・合成0ms の固着の真因)。まず固定上限で張り、
+          //   メタデータが取れたら 実尺+余裕 に締めて短いクリップを長く待たない。
+          /** @type {ReturnType<typeof setTimeout>|null} */
+          let watchdog = null;
+          const VOICE_PLAYBACK_HARD_CAP_MS = 20000; // 1コメント読み上げがこれを超えることは無い。
+          const armWatchdog = (/** @type {number} */ ms) => {
+            if (watchdog !== null) clearTimeout(watchdog);
+            watchdog = setTimeout(() => {
+              // ended/error が来ず安全網で打ち切った=本物の固着回避。観測して状態速報に出す。
+              _voiceDiag.playbackTimeoutTotal += 1;
+              finish();
+            }, Math.max(1000, ms));
+          };
           const finish = () => {
             if (settled) return;
             settled = true;
+            if (watchdog !== null) { clearTimeout(watchdog); watchdog = null; }
             audio.removeEventListener('ended', finish);
             audio.removeEventListener('error', finish);
+            audio.removeEventListener('loadedmetadata', onMeta);
             if (objectUrl) URL.revokeObjectURL(objectUrl);
             objectUrl = '';
             _voiceStopCurrent = null;
             resolve();
+          };
+          const onMeta = () => {
+            const dur = Number(audio.duration);
+            if (Number.isFinite(dur) && dur > 0) armWatchdog(dur * 1000 + 1500);
           };
           _voiceStopCurrent = () => {
             try {
@@ -598,6 +621,8 @@ async function drainVoiceQueue() {
           };
           audio.addEventListener('ended', finish, { once: true });
           audio.addEventListener('error', finish, { once: true });
+          audio.addEventListener('loadedmetadata', onMeta, { once: true });
+          armWatchdog(VOICE_PLAYBACK_HARD_CAP_MS); // 先に固定上限で必ず張る(メタ未取得でも固着しない)。
           try {
             const playResult = audio.play();
             if (playResult && typeof playResult.catch === 'function') {

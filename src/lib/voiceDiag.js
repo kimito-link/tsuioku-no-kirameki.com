@@ -13,6 +13,7 @@
  *   queueMax: number,            // セッション中の最大待機件数(詰まりのピーク)
  *   spokenTotal: number,         // 発話完了数
  *   staleDropTotal: number,      // 鮮度切れで捨てた件数(リアルタイム維持のための間引き)
+ *   playbackTimeoutTotal: number,// 再生 watchdog 発火数(ended/error が来ず安全網で打ち切った=異常)
  *   lastSpokenBase: number,      // 最後に発話した時刻(epoch ms・0=未発話)
  *   lastSynthMs: number,         // 直近の合成所要 ms(-1=未計測)
  *   lastDepth: number,           // 直近の先読み深さ
@@ -28,6 +29,7 @@ export function makeInitialVoiceDiag() {
     queueMax: 0,
     spokenTotal: 0,
     staleDropTotal: 0,
+    playbackTimeoutTotal: 0,
     lastSpokenBase: 0,
     lastSynthMs: -1,
     lastDepth: 0,
@@ -56,6 +58,7 @@ export function buildVoiceDiagSnapshot(diag, nowMs) {
     queueMax: num(d.queueMax, base.queueMax),
     spokenTotal: num(d.spokenTotal, base.spokenTotal),
     staleDropTotal: num(d.staleDropTotal, base.staleDropTotal),
+    playbackTimeoutTotal: num(d.playbackTimeoutTotal, base.playbackTimeoutTotal),
     lastSpokenBase: num(d.lastSpokenBase, base.lastSpokenBase),
     lastSynthMs: num(d.lastSynthMs, base.lastSynthMs),
     lastDepth: num(d.lastDepth, base.lastDepth),
@@ -85,6 +88,9 @@ export function buildVoiceDiagLine(snap, nowMs) {
   parts.push(enabled ? '読み上げ:ON' : '読み上げ:OFF');
   parts.push(`待機${queueNow}(最大${queueMax})`);
   if (drop > 0) parts.push(`間引き${drop}件`); // リアルタイム維持で古い分を捨てた回数=遅延の傍証。
+  // 再生 watchdog 発火=ended/error が来ず固着しかけた異常。出たら必ず見せる(本物の固着の傍証)。
+  const pbTimeout = Number(snap.playbackTimeoutTotal) || 0;
+  if (pbTimeout > 0) parts.push(`再生TO${pbTimeout}件`);
   const base = Number(snap.lastSpokenBase) || 0;
   const now = Number.isFinite(Number(nowMs)) ? Number(nowMs) : 0;
   if (base > 0 && now > 0) {
