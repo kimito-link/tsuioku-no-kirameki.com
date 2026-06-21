@@ -27,6 +27,13 @@ import { resolveContributionRankingRowsFromSources } from '../lib/officialContri
 import { officialDomRankingRowsToStripRooms } from '../lib/officialDomRankingRowsToStripRooms.js';
 import { escapeHtml, escapeAttr } from '../shared/html/escape.js';
 import { isHttpOrHttpsUrl, isAnonymousStyleNicoUserId } from '../lib/supportGrowthTileSrc.js';
+// v0.1.880: ギフト履歴レーン(北極星)を popup と完全コピーで移植するための純関数。
+//   buildGiftHistoryNorthStarViewModel = popup の computeGiftHistoryNorthStarRoomsContext と同じ VM。
+import { buildGiftHistoryNorthStarViewModel } from '../lib/giftHistoryViewModel.js';
+import { giftSubAppHistoryStorageKey } from '../lib/storageKeys.js';
+import { giftHistoryThrowsStorageKey } from '../lib/kokenGiftHistoryApi.js';
+import { GIFT_HISTORY_LANE_MAX } from '../lib/giftRankStripConfig.js';
+import { resolveGiftHistorySummaryPoints, reconcileGiftHistoryNorthStarContext } from '../lib/giftHistoryOfficialReconcile.js';
 import {
   isCommentDbAvailable,
   openCommentDb,
@@ -43,6 +50,7 @@ const KOKEN_CONTRIB_PREFIX = 'nls_koken_api_contrib_'; // 貢献度ランキン�
 const IFRAME_OFFICIAL_DOM_PREFIX = 'nls_iframe_official_dom_'; // 貢献度ランキング(iframe relay フォールバック)
 const NICOAD_API_RANKING_PREFIX = 'nls_nicoad_api_ranking_'; // 広告ランキング(nicoad API)
 const REFRESH_MS = 2000;
+// v0.1.880: ギフト履歴レーンの storage キー(popup と同じ正本・関数経由で取る)。
 // popup と同じ「ゆっくり画像」フォールバック(STORY_GRID_DEFAULT_TILE_IMG・拡張内相対パス)。
 const STORY_GRID_DEFAULT_TILE_IMG =
   'images/yukkuri-charactore-english/link/link-yukkuri-half-eyes-mouth-closed.png';
@@ -74,7 +82,10 @@ function createLiveViewDataSource(lv) {
         // v0.1.879: 公式値レーン(北極星レーン)。popup と同じ storage 由来=popup 非依存で再現。
         KOKEN_CONTRIB_PREFIX + lv,
         IFRAME_OFFICIAL_DOM_PREFIX + lv,
-        NICOAD_API_RANKING_PREFIX + lv
+        NICOAD_API_RANKING_PREFIX + lv,
+        // v0.1.880: ギフト履歴レーン(送り主別累計pt+個別投げ一覧)。popup と同じ storage キー。
+        giftSubAppHistoryStorageKey(lv),
+        giftHistoryThrowsStorageKey(lv)
       ]);
       return {
         summary: bag?.[PANEL_SUMMARY_PREFIX + lv] || null,
@@ -83,12 +94,15 @@ function createLiveViewDataSource(lv) {
         giftUsers: bag?.[GIFT_USERS_PREFIX + lv] || null,
         kokenContrib: bag?.[KOKEN_CONTRIB_PREFIX + lv] || null,
         iframeOfficialDom: bag?.[IFRAME_OFFICIAL_DOM_PREFIX + lv] || null,
-        nicoadApiRanking: bag?.[NICOAD_API_RANKING_PREFIX + lv] || null
+        nicoadApiRanking: bag?.[NICOAD_API_RANKING_PREFIX + lv] || null,
+        giftSubAppHistory: bag?.[giftSubAppHistoryStorageKey(lv)] || null,
+        giftHistoryThrows: bag?.[giftHistoryThrowsStorageKey(lv)] || null
       };
     } catch {
       return {
         summary: null, snapshot: null, reportPreview: null, giftUsers: null,
-        kokenContrib: null, iframeOfficialDom: null, nicoadApiRanking: null
+        kokenContrib: null, iframeOfficialDom: null, nicoadApiRanking: null,
+        giftSubAppHistory: null, giftHistoryThrows: null
       };
     }
   };
@@ -558,6 +572,136 @@ function showNorthStarLane(laneId) {
   if (lane instanceof HTMLElement) lane.hidden = false;
 }
 
+// v0.1.880: ギフト履歴レーンの ctx を storage から作る(popup の computeGiftHistoryNorthStarRoomsContext と同型)。
+//   源0(最優先)= nls_gift_subapp_history_<lv>(koken/sub-app 履歴)を buildGiftHistoryNorthStarViewModel で VM 化。
+//   源1(フォールバック)= nls_gift_history_throws_<lv>(保存済み公式履歴 throws)を送り主別 pt 降順に。
+//   live-view は popup の in-memory 源(bundle.giftHistory / NDGR live nls_gift_events_)は持たないので storage 2 源のみ。
+/** @param {any} data @returns {{rooms:any[], noteText:string, unitSuffix:string, ariaLabel:string, throwsTableHtml:string, pointsSumAll:number, pointsSumDisplayed:number}|null} */
+function computeGiftHistoryForLiveView(data) {
+  // --- 源0: koken / sub-app 個別履歴。popup と同じく VM 化(rooms + 個別投げ一覧 throwsTableHtml)。
+  const subRaw = data?.giftSubAppHistory;
+  if (subRaw && typeof subRaw === 'object' && !Array.isArray(subRaw)) {
+    const vm = buildGiftHistoryNorthStarViewModel(
+      /** @type {{ history?: unknown[] }} */ (subRaw),
+      { maxRooms: GIFT_HISTORY_LANE_MAX, maxThrows: 20 }
+    );
+    if (vm && vm.rooms.length > 0) {
+      const senderN = vm.senderCount;
+      const shownN = vm.rooms.length;
+      const rankCap = shownN < senderN ? `（表示${shownN}名・上位${GIFT_HISTORY_LANE_MAX}まで）` : '';
+      const srcLabel = vm.source === 'koken-api' ? 'koken 公式 API' : 'ギフトサイドバー履歴';
+      return {
+        rooms: vm.rooms.map((/** @type {any} */ r) => ({
+          userKey: String(r.userKey || ''),
+          nickname: String(r.nickname || ''),
+          count: Number(r.count) || 0,
+          avatarUrl: String(r.avatarUrl || '').trim()
+        })),
+        noteText: `${srcLabel}の個別履歴（history）から送り主別累計pt順。送り主${senderN}名・投げ${vm.throwCount}件${rankCap}（番組累計ポイントとは別指標）`,
+        unitSuffix: 'pt',
+        ariaLabel: 'koken 公式ギフト履歴の送り主別集計',
+        throwsTableHtml: String(vm.throwsTableHtml || ''),
+        pointsSumAll: Number(vm.pointsSumAll) || 0,
+        pointsSumDisplayed: Number(vm.pointsSumDisplayed) || 0
+      };
+    }
+  }
+  // --- 源1: 保存済み公式履歴 throws(送り主別 pt 降順・popup の throws フォールバックと同じ)。
+  const throwsRows = Array.isArray(data?.giftHistoryThrows) ? data.giftHistoryThrows : [];
+  if (throwsRows.length > 0) {
+    const sorted = [...throwsRows].sort(
+      (/** @type {any} */ a, /** @type {any} */ b) => (Number(b?.totalPoints) || 0) - (Number(a?.totalPoints) || 0)
+    );
+    const senderN = sorted.length;
+    const throwM = sorted.reduce((/** @type {number} */ s, /** @type {any} */ r) => s + (Number(r?.throwCount) || 0), 0);
+    const rooms = sorted.slice(0, GIFT_HISTORY_LANE_MAX).map((/** @type {any} */ r) => ({
+      userKey: String(r?.userId || ''),
+      nickname: String(r?.nickname || ''),
+      count: Number(r?.totalPoints) || 0,
+      avatarUrl: String(r?.avatarUrl || '').trim()
+    }));
+    const pointsSumAll = sorted.reduce((/** @type {number} */ s, /** @type {any} */ r) => s + (Number(r?.totalPoints) || 0), 0);
+    const pointsSumDisplayed = rooms.reduce((s, r) => s + (Number(r.count) || 0), 0);
+    return {
+      rooms,
+      noteText: `保存済み公式履歴からユーザー別累計pt順。送り主${senderN}名・投げ${throwM}件（番組累計ポイントとは別指標）`,
+      unitSuffix: 'pt',
+      ariaLabel: '公式サイドバー履歴のユーザー別集計',
+      throwsTableHtml: '',
+      pointsSumAll,
+      pointsSumDisplayed
+    };
+  }
+  return null;
+}
+
+// v0.1.880: ギフト履歴レーンの summary gadget(表示の合計pt)を popup と同じ純関数で塗る。
+/** @param {{pointsSumAll:number, pointsSumDisplayed:number, officialProgramGiftPts:number|null, roomCount:number}} t */
+function paintGiftHistorySummaryGadgetLV(t) {
+  const summary = document.getElementById('northStarLaneGadgetSummary-giftHistory');
+  if (!(summary instanceof HTMLElement)) return;
+  const resolved = resolveGiftHistorySummaryPoints({
+    historySumAll: t.pointsSumAll,
+    historySumDisplayed: t.pointsSumDisplayed,
+    officialProgramGiftPts: t.officialProgramGiftPts
+  });
+  const showPts = resolved.usesOfficialSummary
+    ? resolved.summaryPoints
+    : Math.max(0, Math.floor(Number(t.pointsSumDisplayed) || 0));
+  const numEl = summary.querySelector('.nl-north-star-lane__summary-pt-num');
+  const unitEl = summary.querySelector('.nl-north-star-lane__summary-pt-unit');
+  const noteEl = summary.querySelector('.nl-north-star-lane__summary-note');
+  if (numEl instanceof HTMLElement) numEl.textContent = String(showPts);
+  if (unitEl instanceof HTMLElement) unitEl.textContent = 'pt';
+  if (noteEl instanceof HTMLElement) {
+    if (resolved.usesOfficialSummary) {
+      noteEl.textContent = resolved.gapPoints > 0
+        ? `公式番組累計（内訳に履歴未取得 ${resolved.gapPoints.toLocaleString('ja-JP')}pt を含む）`
+        : '公式番組累計（プレイヤー表示と同じ）';
+    } else if (Math.floor(Number(t.pointsSumAll) || 0) > showPts) {
+      noteEl.textContent = `表示中${t.roomCount}名の合計（全${Math.floor(Number(t.pointsSumAll) || 0)}pt）`;
+    } else {
+      noteEl.textContent = '履歴一覧からの合計';
+    }
+  }
+  summary.hidden = false;
+  summary.removeAttribute('aria-hidden');
+}
+
+/** ギフト履歴ヘッダ右の「公式累計pt」を塗る(popup の syncGiftHistoryHeaderProgramPt 相当)。 @param {number|null} v */
+function syncGiftHistoryHeaderProgramPtLV(v) {
+  const wrap = document.getElementById('giftHistoryProgramPt');
+  if (!(wrap instanceof HTMLElement)) return;
+  const numEl = wrap.querySelector('.nl-north-star-lane__program-pt-num');
+  if (typeof v === 'number' && Number.isFinite(v) && v >= 0) {
+    wrap.classList.remove('is-placeholder');
+    if (numEl instanceof HTMLElement) numEl.textContent = Math.floor(v).toLocaleString('ja-JP');
+  } else {
+    wrap.classList.add('is-placeholder');
+    if (numEl instanceof HTMLElement) numEl.textContent = '—';
+  }
+}
+
+/** ギフト履歴の個別投げ一覧パネルを塗る(popup の paintNorthStarGiftThrowsPanel 相当)。 @param {string} html */
+function paintGiftThrowsPanelLV(html) {
+  const panel = document.getElementById('northStarLaneThrows-giftHistory');
+  if (!(panel instanceof HTMLElement)) return;
+  const trimmed = String(html || '').trim();
+  if (!trimmed) {
+    panel.innerHTML = '';
+    panel.hidden = true;
+    panel.setAttribute('aria-hidden', 'true');
+    return;
+  }
+  panel.innerHTML = trimmed;
+  panel.hidden = false;
+  panel.removeAttribute('aria-hidden');
+  // 壊れ画像は消す(popup の bindOnErrorHandlersWithin 相当の最小版)。
+  for (const img of panel.querySelectorAll('img')) {
+    img.addEventListener('error', () => { try { /** @type {HTMLElement} */ (img).style.visibility = 'hidden'; } catch { /* no-op */ } });
+  }
+}
+
 // v0.1.879: 公式値レーンを storage から描画(popup の refreshNorthStar*Lane 相当)。
 //   貢献度=3経路優先解決→officialDomRankingRowsToStripRooms→paint。広告=nicoad API rows。
 //   北極星セクション全体は、何か1レーンでも出れば show・全部空なら hide。
@@ -618,8 +762,48 @@ function renderNorthStarLanes(lv, data) {
     }
   }
 
-  // live-view では storage から取れない他レーン(ギフト履歴の个別投げ・イベント系)は静かに畳む。
-  for (const laneId of ['giftHistory', 'programPoints', 'eventRank', 'eventScore', 'eventBroadcasters', 'eventVotingSupporters']) {
+  // ③ ギフト履歴(送り主別累計pt + 個別投げ一覧)。storage(subapp history / 保存 throws)由来=popup と同型。
+  {
+    const body = document.getElementById('northStarLaneBody-giftHistory');
+    // 公式番組累計pt(ヘッダ右 + summary gadget で使う)= snapshot/summary 由来。
+    const snap = data?.snapshot || {};
+    const s = data?.summary || {};
+    const officialGiftPts = num(snap.officialGiftPointsNdgr) ?? num(s.giftPoints);
+    syncGiftHistoryHeaderProgramPtLV(officialGiftPts);
+    const ctxRaw = computeGiftHistoryForLiveView(data);
+    if (body && ctxRaw && ctxRaw.rooms.length > 0) {
+      // popup と同じ: 公式番組累計との整合を取り直す(reconcile)。
+      const rec = reconcileGiftHistoryNorthStarContext({
+        rooms: ctxRaw.rooms,
+        pointsSumAll: ctxRaw.pointsSumAll,
+        pointsSumDisplayed: ctxRaw.pointsSumDisplayed,
+        officialProgramGiftPts: officialGiftPts,
+        maxRooms: GIFT_HISTORY_LANE_MAX
+      });
+      const rooms = rec.rooms;
+      paintNorthStarStripInto(body, rooms, {
+        noteText: ctxRaw.noteText,
+        unitSuffix: ctxRaw.unitSuffix,
+        ariaLabel: ctxRaw.ariaLabel
+      });
+      // 個別投げ一覧(throws-panel)+ summary gadget(表示の合計pt)。
+      paintGiftThrowsPanelLV(ctxRaw.throwsTableHtml);
+      paintGiftHistorySummaryGadgetLV({
+        pointsSumAll: rec.pointsSumAll,
+        pointsSumDisplayed: rec.pointsSumDisplayed,
+        officialProgramGiftPts: officialGiftPts,
+        roomCount: rooms.length
+      });
+      showNorthStarLane('giftHistory');
+      anyShown = true;
+    } else {
+      paintGiftThrowsPanelLV('');
+      hideNorthStarLane('giftHistory');
+    }
+  }
+
+  // live-view では storage から取れない他レーン(イベント系・番組累計pt は履歴ヘッダに統合済)は静かに畳む。
+  for (const laneId of ['programPoints', 'eventRank', 'eventScore', 'eventBroadcasters', 'eventVotingSupporters']) {
     hideNorthStarLane(laneId);
   }
 
