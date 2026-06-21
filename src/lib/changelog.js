@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.884',
+    date: '2026-06-21',
+    summary: '応援ライブビューの応援者ランキングを本物の描画に統一',
+    items: Object.freeze([
+      '応援ライブビューの応援者ランキングを、ポップアップと同じ「本物の描画」に直しました。これまでライブビュー用に似せて作り直していた部分(順位タイル・配信者タイル)を撤回し、ポップアップが使っているのと同じ部品で描くようにしたので、見た目がポップアップと揃います。表示専用で記録には影響しません。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.883',
     date: '2026-06-21',
     summary: '会場モードの読み上げが止まったまま戻らない不具合を修正',
