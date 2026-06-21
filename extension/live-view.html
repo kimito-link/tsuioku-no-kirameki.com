@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>応援ライブビュー — 君斗りんくの追憶のきらめき</title>
+    <style>
+      :root {
+        --bg: #0e1117;
+        --card: #161b22;
+        --line: #2a3340;
+        --text: #e6edf3;
+        --muted: #9aa7b5;
+        --accent: #ec4899;
+        --hot: #f97316;
+        --blaze: #ef4444;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        font-family: system-ui, -apple-system, "Segoe UI", "Hiragino Kaku Gothic ProN", Meiryo, sans-serif;
+        line-height: 1.6;
+      }
+      .wrap { max-width: 760px; margin: 0 auto; padding: 18px 16px 60px; }
+      header.lv-head {
+        display: flex;
+        gap: 14px;
+        align-items: flex-start;
+        margin-bottom: 16px;
+      }
+      .lv-thumb {
+        flex: 0 0 auto;
+        width: 160px;
+        height: 90px;
+        border-radius: 10px;
+        overflow: hidden;
+        background: var(--line);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .lv-thumb img { width: 100%; height: 100%; object-fit: cover; }
+      .lv-title { font-size: 18px; font-weight: 700; }
+      .lv-broadcaster { color: var(--muted); font-size: 14px; }
+      .lv-meta { margin-top: 6px; font-size: 14px; color: var(--text); }
+      .lv-meta span { margin-right: 12px; }
+
+      /* 盛り上がりメーター(脈打つ) */
+      .heat {
+        margin: 14px 0 18px;
+        padding: 14px 16px;
+        border-radius: 12px;
+        border: 1px solid var(--line);
+        background: var(--card);
+      }
+      .heat-label { font-size: 14px; color: var(--muted); margin-bottom: 8px; }
+      .heat-value { font-size: 30px; font-weight: 800; letter-spacing: 0.5px; }
+      .heat-bar-track {
+        margin-top: 10px;
+        height: 14px;
+        border-radius: 999px;
+        background: #20262e;
+        overflow: hidden;
+      }
+      .heat-bar-fill {
+        height: 100%;
+        width: 0%;
+        border-radius: 999px;
+        background: linear-gradient(90deg, var(--accent), var(--hot), var(--blaze));
+        transition: width 0.6s ease;
+      }
+      .pulse { animation: pulse 1.2s ease-in-out infinite; }
+      @keyframes pulse {
+        0%, 100% { transform: scale(1); }
+        50% { transform: scale(1.04); }
+      }
+
+      section.panel {
+        margin: 16px 0;
+        padding: 14px 16px;
+        border-radius: 12px;
+        border: 1px solid var(--line);
+        background: var(--card);
+      }
+      section.panel h2 { font-size: 15px; margin: 0 0 10px; }
+      .rank-row {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 6px 0;
+        border-bottom: 1px solid var(--line);
+      }
+      .rank-row:last-child { border-bottom: none; }
+      .rank-badge { flex: 0 0 auto; width: 28px; text-align: center; font-size: 16px; }
+      .rank-name { flex: 1 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      .rank-count { flex: 0 0 auto; color: var(--muted); font-variant-numeric: tabular-nums; }
+      .empty { color: var(--muted); }
+      .updated { color: var(--muted); font-size: 12px; margin-top: 16px; }
+      .live-dot {
+        display: inline-block;
+        width: 8px; height: 8px; border-radius: 50%;
+        background: #22c55e; margin-right: 6px;
+        animation: pulse 1.2s ease-in-out infinite;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <header class="lv-head">
+        <div class="lv-thumb" id="lvThumb"><span style="font-size:28px;opacity:.6">🎥</span></div>
+        <div>
+          <div class="lv-title" id="lvTitle">読み込み中…</div>
+          <div class="lv-broadcaster" id="lvBroadcaster"></div>
+          <div class="lv-meta" id="lvMeta"></div>
+        </div>
+      </header>
+
+      <div class="heat" id="heatBox">
+        <div class="heat-label">🔥 盛り上がり(コメントの勢い)</div>
+        <div class="heat-value" id="heatValue">—</div>
+        <div class="heat-bar-track"><div class="heat-bar-fill" id="heatFill"></div></div>
+      </div>
+
+      <section class="panel">
+        <h2>🏆 応援者ランキング</h2>
+        <div id="rankBody" class="empty">読み込み中…</div>
+      </section>
+
+      <div class="updated"><span class="live-dot"></span><span id="updatedAt">—</span></div>
+    </div>
+    <script src="dist/live-view.js"></script>
+  </body>
+</html>

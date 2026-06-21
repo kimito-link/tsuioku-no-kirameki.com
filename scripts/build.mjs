@@ -102,6 +102,14 @@ const targets = [
     define: statusDefine
   },
   {
+    // v0.1.871: 応援ライブビュー(live-view.html)。ちくらんカードのクリックで新規タブで開く「リアルタイムで
+    //   盛り上がってる感」の専用ページ。chrome.storage 購読で2秒ごとに盛り上がり🔥/応援者🏆/コメント数を
+    //   再描画。データ取得を createLiveViewDataSource に隔離=将来サーバー公開版へ移植可能(描画は不変)。
+    entryPoints: ['src/extension/live-view-entry.js'],
+    outfile: 'extension/dist/live-view.js',
+    target: 'chrome100'
+  },
+  {
     // v0.1.652: 独自コメビュ「KIRAMEKI Comment View」(comeview.html)。読みやすい普段使いの
     //   独立コメビュ。status と同じく chrome.storage.local の軽量キー(cdb_summary.recent / tail)を
     //   リードオンリーで読み新着だけ append。popup と独立・SW を起こさない。?obs=1 で透過。

@@ -216,6 +216,16 @@
       <div class="fpaths"><code class="path">src/lib/reportPreview.js</code><code class="path">src/lib/reportPreviewKey.js</code><code class="path">src/lib/reportPreviewPublish.js</code><code class="path">src/extension/popup-entry.js</code><code class="path">src/extension/status-entry.js</code></div>
     </section>
 <section class="feat">
+      <div class="fhead"><span class="fname">応援ライブビュー(リアルタイム盛り上がり・新規タブ)</span> <span class="tag">表示</span><span class="tag">リアルタイム</span><span class="tag">レポート</span></div>
+      <div class="fdesc">ちくらんカードの「🔥応援ライブビューを開く」で live-view.html?lv=... を新規タブで開く(chrome.runtime.getURL)。chrome.storage を2秒購読し盛り上がり🔥(分速→computeHeatLevel)/応援者🏆/コメント数/来場をリアルタイム再描画・hot/blazing でバー脈打つ。データ取得を createLiveViewDataSource に隔離=将来サーバー公開版(拡張不要で URL 閲覧)へ移植可能(描画は不変)。Web/iOS/Android への土台(v0.1.871)</div>
+      <div class="fpaths"><code class="path dead">extension/live-view.html ⚠️ 見つからない</code><code class="path dead">src/extension/live-view-entry.js ⚠️ 見つからない</code><code class="path dead">src/lib/heatLevel.js ⚠️ 見つからない</code></div>
+    </section>
+<section class="feat">
+      <div class="fhead"><span class="fname">盛り上がり判定(熱量・移植可能な純関数)</span> <span class="tag">リアルタイム</span><span class="tag">集計</span><span class="tag">表示</span></div>
+      <div class="fdesc">分速コメントから盛り上がり段階(idle/warm/hot/blazing)+スコア(バー幅%)を出す純関数 computeHeatLevel。拡張API非依存=Web/モバイルでそのまま再利用。閾値 8/30/100 per 分・score=min(100,cpm/2)。負/NaN は idle(v0.1.871)</div>
+      <div class="fpaths"><code class="path dead">src/lib/heatLevel.js ⚠️ 見つからない</code></div>
+    </section>
+<section class="feat">
       <div class="fhead"><span class="fname">診断/ちくらん タブ+カードクリックで応援者展開</span> <span class="tag">診断</span><span class="tag">表示</span><span class="tag">ナビ</span></div>
       <div class="fdesc">状態ページ【上部ナビ(.map-nav・地図リンクと同列)】に「📊診断/🏆ちくらん」切替を統合(v0.1.870)。body.tab-chikuran で診断系レーンを CSS 非表示・配信カードに集中。各配信カードに details「🏆応援者ランキングを見る」=クリックで topSupporters を🥇🥈🥉展開。応援者データは popup で開いている配信ぶんだけ(reportPreview.liveId 一致)=その配信は展開・他は popup で開く案内(死にリンクにしない)。signature に reportPreview を含めて応援者到着時にカード再構築。将来の Kimito Link ランキングの入口(v0.1.869)</div>
       <div class="fpaths"><code class="path">src/extension/status-entry.js</code><code class="path">extension/status.html</code><code class="path">src/lib/supporterRanking.js</code></div>
