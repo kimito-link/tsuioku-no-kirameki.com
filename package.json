@@ -16,6 +16,8 @@
     "setup:claude": "node scripts/setup-claude-code.mjs",
     "build": "node scripts/build.mjs",
     "build:watch": "node scripts/build-watch.mjs",
+    "copy:ext": "node scripts/copy-ext.mjs",
+    "build:copy": "node scripts/build.mjs && node scripts/copy-ext.mjs",
     "feature-map": "node scripts/feature-map.mjs",
     "feature-map:check": "node scripts/feature-map.mjs --check",
     "impact-check": "node scripts/impact-check.mjs",
