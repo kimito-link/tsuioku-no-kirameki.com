@@ -515,6 +515,7 @@
 | `src/lib/watchContext.js` | 1 | 記録エンジン(watchページ常駐) |
 | `src/lib/watchFrameCommentPostGate.js` | 1 | 記録エンジン(watchページ常駐) |
 | `src/lib/watchFrameRank.js` | 1 | ポップアップ(応援レーン) |
+| `src/lib/watchLink.js` | 1 | 状態速報ページ |
 | `src/lib/watchMetaCardStateGate.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/watchPageViewerProfile.js` | 1 | 記録エンジン(watchページ常駐) |
 | `src/lib/watchPopupCelebrationGuard.js` | 1 | ポップアップ(応援レーン) |
