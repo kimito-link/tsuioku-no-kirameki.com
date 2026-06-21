@@ -109,9 +109,14 @@ export function buildLiveBlockText(live) {
  * v0.1.791(ユーザー要望「追いつく途中で壊れてると不安になる・告知があれば親切」):
  *   配信【放送中】に取得率が低いのは、過去ログを遡って取得中(バックフィル)の【正常な途中経過】で
  *   あって異常ではない。なのに従来は終了済みの「取りこぼし」と同じ 🔴 を出していて不安にさせた。
- *   そこで放送中(endedAt 無し)×低%は 🔴 でなく「⏳ 追いつき中」にし、後ろに「(過去のコメントを
+ *   そこで放送中(endedAt 無し)×低%は 🔴 でなく「⏳ 取り込み中」にし、後ろに「(過去のコメントを
  *   取得中)」の一言を添える。放送終了済み(endedAt あり)×低%は本当の取りこぼしなので従来どおり
  *   🔴 のまま(=ここは不安になって正しい)。endedAt 未指定なら従来挙動(後方互換)。
+ *
+ * v0.1.886(ユーザー要望「一気に取れる前提=100%未満は進捗を見せろ。緑で隠すな・赤で不安にするな」):
+ *   放送中×低%の「⏳ 取り込み中」に【あと約M件(M=公式-記録)】を添えて進捗を明示する。
+ *   これで低率を『緑(隠す)でも赤(不安)でもなく、青の進捗』として正直に見せる。公式件数が未取得
+ *   (off==null)のときは差が出せないので「あと約」は付けない(過大/憶測の数字を出さない)。
  *
  * @param {{ recordedCount?: number, officialCommentCount?: number|null,
  *   officialRatePct?: number|null, endedAt?: number|null }} live
@@ -132,12 +137,15 @@ export function buildCaptureRateLine(live) {
   // 放送中かどうか: endedAt が無い(=まだ配信中)なら、低%は追いつき途中の正常状態。
   const isLive = !(live && live.endedAt);
   // 状態ラベル: 100%到達=✅完了 / 80%+=もう少し / 40%+=取得中。
-  //   40%未満は、放送中なら「⏳ 追いつき中」(正常)・終了済みなら「🔴 取得中」(取りこぼし)。
+  //   40%未満は、放送中なら「⏳ 取り込み中」(正常)・終了済みなら「🔴 取得中」(取りこぼし)。
   if (p >= 100) return `✅ 取得完了 ${p}% (${counts})`;
   if (p >= 80) return `🟢 ほぼ取得 ${p}% (${counts})`;
   if (p >= 40) return `🟡 取得中 ${p}% (${counts})`;
   if (isLive) {
-    return `⏳ 追いつき中 ${p}% (${counts})・過去のコメントを取得中`;
+    // v0.1.886: あと約M件(M=公式-記録)を添えて進捗を明示。公式未取得 or 既に追い越し(差<=0)なら省く。
+    const remain = off != null ? Math.max(0, Number(off) - rec) : null;
+    const remainText = remain && remain > 0 ? `・あと約 ${remain.toLocaleString('ja-JP')} 件` : '';
+    return `⏳ 取り込み中 ${p}% (${counts})${remainText}・過去のコメントを取得中`;
   }
   return `🔴 取得中 ${p}% (${counts})`;
 }

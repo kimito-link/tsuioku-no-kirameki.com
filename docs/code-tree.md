@@ -241,7 +241,7 @@
   - `gen-loading-thumbs.py`
   - `impact-check.mjs` — 星野ロミ式「規律を自動ゲートに」(2026-06-18・COUNCIL の次の一手)。
   - `inspect-nicolive-watch-stats.mjs` — ニコ生 watch ページの HTML から、来場・同接まわりの数値がどう埋め込まれているかを CLI で確認する。
-  - `meeting.mjs` — 会議ハーネス: 同じ問いを「無料クラウド4系統 + ローカル ollama 数体」に並列で投げ、
+  - `meeting.mjs` — 会議ハーネス: 同じ問いを「無料クラウド4系統 + ローカル ollama 数体」に投げ、
   - `repo-tree-map.mjs` — リポジトリのディレクトリツリー＋各ディレクトリの「役割」を自動生成する(2026-06-18 ユーザー提案)。
   - `resize-marketing-html-avatars.ps1`
   - `run-e2e.mjs` — SKIP_E2E=1 のときは成功終了（CI などディスプレイなし環境用）。

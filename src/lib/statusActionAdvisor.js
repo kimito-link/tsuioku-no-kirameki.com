@@ -111,6 +111,24 @@ export function buildStatusActions(data) {
         action: 'この配信タブを前面にして数分待つ → 改善しなければ watch タブを F5。記録自体(IndexedDB)は失われません',
         fixableHere: 'partly'
       });
+      continue;
+    }
+    // v0.1.886: 放送中(endedAt 無し)の低%は通常『追いつき中=正常な途中』だが、本当に取り込みが
+    //   止まった(最終取り込みから長く経っている)なら誠実に🟡で出す。判定は lastIngestAgoMs が
+    //   【明示的に大きい】ときだけ=値が無い(undefined)配信は従来どおり追いつき中とみなして出さない
+    //   (放送中の低%を一律に黄にしない=過去要望「取得中は全部グリーン」を壊さない)。別 id にして
+    //   capture-low(終了配信)と混ざらないようにする。STALE_INGEST_MS は trend の stalled と同オーダ。
+    const STALE_INGEST_MS = 180000; // 3分=NDGR/backfill が生きていれば必ず更新される間隔を大きく超える
+    const ago = num(lv?.lastIngestAgoMs);
+    if (!lv?.endedAt && pct < 100 && ago != null && ago >= STALE_INGEST_MS) {
+      add({
+        id: `capture-stalled-${lv.liveId || ''}`,
+        severity: 'warn',
+        symptom: `放送中なのに取り込みが止まっています(${pct}% / 最終取り込み ${Math.round(ago / 1000)}秒前 / 配信 ${lv.liveId || ''})`,
+        cause: '放送中で過去ログ取得(backfill)が途中のはずなのに、しばらくコメントが取り込まれていません(SW 停止/ネットワーク断/タブ休眠の可能性)',
+        action: 'この配信の watch タブを前面にして数十秒待つ → 戻らなければ watch タブを F5。記録自体(IndexedDB)は失われません',
+        fixableHere: 'partly'
+      });
     }
   }
 

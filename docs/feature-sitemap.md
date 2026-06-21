@@ -605,7 +605,7 @@
 - `scripts/cws-publish.mjs` — Chrome Web Store Publish API で ZIP をアップロード(+任意で公開申請)する。
 - `scripts/delete-dead-lib.mjs` — scripts/delete-dead-lib.mjs — 死蔵lib実装ファイルとそのテストを削除
 - `scripts/fix-src-images-mojibake.mjs` — Normalizes known mojibake paths under src/images (mirrored from kimito-link).
-- `scripts/meeting.mjs` — 会議ハーネス: 同じ問いを「無料クラウド4系統 + ローカル ollama 数体」に並列で投げ、
+- `scripts/meeting.mjs` — 会議ハーネス: 同じ問いを「無料クラウド4系統 + ローカル ollama 数体」に投げ、
 - `scripts/repo-tree-map.mjs` — リポジトリのディレクトリツリー＋各ディレクトリの「役割」を自動生成する(2026-06-18 ユーザー提案)。
 - `scripts/run-e2e.mjs` — SKIP_E2E=1 のときは成功終了（CI などディスプレイなし環境用）。
 - `scripts/scan-dead-lib.mjs` — scripts/scan-dead-lib.mjs — lib/ の死蔵ファイルを entry から到達性スキャンして報告
@@ -693,7 +693,7 @@
 
 ## 🧬 修正系譜マップ(この系統のバグを過去にどう直したか)
 
-> changelog 全 222 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
+> changelog 全 223 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
 
 ### 💾 記録件数 (32版)
 - `v0.1.877` 2026-06-21 — 応援ライブビューを popup の本物のHTML/CSSで完全コピー
@@ -729,7 +729,8 @@
 - `v0.1.672` 2026-06-10 — コメビュの二重表示の残りを根治
 - `v0.1.665` 2026-06-10 — 長い配信が7割等で止まったままになるのを根治
 
-### 📥 コメント取得 (106版)
+### 📥 コメント取得 (107版)
+- `v0.1.886` 2026-06-22 — 取り込み中を「あと約◯件」の進捗で表示
 - `v0.1.885` 2026-06-22 — 取得中の配信に「取得率が低い」の黄色を出さないように
 - `v0.1.882` 2026-06-21 — 公式値レーン(貢献度/広告)を開いた瞬間に出るよう高速化
 - `v0.1.881` 2026-06-21 — 応援ライブビューを本物の描画関数で完全コピーに

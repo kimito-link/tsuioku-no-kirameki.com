@@ -307,15 +307,18 @@ describe('buildHealthCells v0.1.845 進行中=processing(青)・見た瞬間ほ�
 });
 
 describe('summarizeHealthVerdict v0.1.846 満点=「異常ゼロ」(進行中/対象外は正常)', () => {
-  it('warn も bad も無ければ「異常なし ✓」(ok)=満点。進行中があれば順調表示', () => {
+  it('v0.1.846/886: warn も bad も無ければ ok=満点。進行中があれば「取り込み中」と中立表示(順調と言い切らない)', () => {
     const cells = [
       { id: 'a', label: 'A', level: 'ok' }, { id: 'b', label: 'B', level: 'processing' },
       { id: 'c', label: 'C', level: 'na' }
     ];
     const v = summarizeHealthVerdict(cells);
-    expect(v.level).toBe('ok');
-    expect(v.text).toContain('異常なし');
-    expect(v.text).toContain('順調に取得中'); // processing があるので添える。
+    expect(v.level).toBe('ok'); // 異常ゼロ=満点(level は ok のまま)。
+    // v0.1.886: processing があるときは「順調に取得中」と言い切らず「取り込み中」と出す
+    //   (低率の配信を緑で隠したように見えないため)。
+    expect(v.text).toContain('取り込み中');
+    expect(v.text).not.toContain('順調に取得中');
+    expect(v.text).not.toContain('異常なし'); // 進行中があるときは「異常なし」と言い切らない。
     expect(v.processingCount).toBe(1);
   });
 
@@ -360,7 +363,8 @@ describe('summarizeHealthVerdict v0.1.846 満点=「異常ゼロ」(進行中/�
       } }
     });
     const v = summarizeHealthVerdict(cells);
-    expect(v.level).toBe('ok'); // 進行中だらけでも異常ゼロ=満点。
-    expect(v.text).toContain('異常なし');
+    expect(v.level).toBe('ok'); // 進行中だらけでも異常ゼロ=満点(level は ok)。
+    // v0.1.886: 進行中があるので文言は「取り込み中」(緑で隠さない=正直に取得中だと示す)。
+    expect(v.text).toContain('取り込み中');
   });
 });

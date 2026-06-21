@@ -267,7 +267,8 @@ export function summarizeHealthVerdict(cells) {
   if (warnLabels.length > 0) {
     return { level: 'warn', text: `注意: ${warnLabels.join('・')}`, badLabels, warnLabels, processingCount };
   }
-  // 異常ゼロ=満点。進行中があれば「順調に取得中」を添える(待てば埋まる=正常)。
-  const text = processingCount > 0 ? '異常なし ✓(順調に取得中)' : '異常なし ✓';
+  // 異常ゼロ=満点。進行中があれば「取り込み中」と中立に出す(待てば埋まる=正常だが「順調」と
+  //   言い切ると低率の配信を緑で隠したように見える=v0.1.886 ユーザー要望で『取り込み中』へ)。
+  const text = processingCount > 0 ? '取り込み中 ✓（取得を進めています）' : '異常なし ✓';
   return { level: 'ok', text, badLabels, warnLabels, processingCount };
 }

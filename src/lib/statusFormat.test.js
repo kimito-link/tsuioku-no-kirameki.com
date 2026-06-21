@@ -247,11 +247,19 @@ describe('buildCaptureRateLine（%主役・状態ラベル）', () => {
     ).toBe('🟡 取得中 50% (記録 50 / 公式 100)');
   });
 
-  it('v0.1.791: 放送中(endedAt無し)の40%未満は ⏳ 追いつき中(過去ログ取得中の正常状態)', () => {
+  it('v0.1.791/886: 放送中(endedAt無し)の40%未満は ⏳ 取り込み中 + あと約M件(取得中の正常状態を進捗で明示)', () => {
     // 配信中の低%は、過去ログを遡って取得中(バックフィル)の途中=異常でない。
+    //   v0.1.886: あと約M件(M=公式-記録=557-97=460)を添えて進捗を見せる(緑で隠さない/赤で煽らない)。
     expect(
       buildCaptureRateLine({ recordedCount: 97, officialCommentCount: 557, officialRatePct: 17 })
-    ).toBe('⏳ 追いつき中 17% (記録 97 / 公式 557)・過去のコメントを取得中');
+    ).toBe('⏳ 取り込み中 17% (記録 97 / 公式 557)・あと約 460 件・過去のコメントを取得中');
+  });
+
+  it('v0.1.886: 放送中×低%でも公式未取得(officialCommentCount=null)なら「あと約」を出さない(憶測の数字を出さない)', () => {
+    // pct は来ているが off が無い=差が出せない=「あと約」を省く(従来どおりの本文+取り込み中ラベル)。
+    expect(
+      buildCaptureRateLine({ recordedCount: 97, officialCommentCount: null, officialRatePct: 17 })
+    ).toBe('⏳ 取り込み中 17% (記録 97)・過去のコメントを取得中');
   });
 
   it('🔴退行検出: 放送終了済み(endedAtあり)の40%未満は 🔴 取得中(本当の取りこぼし)', () => {
