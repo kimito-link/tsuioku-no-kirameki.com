@@ -18,6 +18,7 @@ import { buildGiftThrowerLaneEntries } from '../lib/userLaneMergeGiftThrowers.js
 import { buildNiconicoDefaultUserIconUrl } from '../lib/reportUserThumb.js';
 import { aggregateMarketingReport } from '../lib/marketingAggregate.js';
 import { buildSupporterRanking } from '../lib/supporterRanking.js';
+import { topSupportRankLineModels } from '../lib/topSupportRankStripLines.js';
 import {
   isCommentDbAvailable,
   openCommentDb,
@@ -30,6 +31,9 @@ const WATCH_SNAPSHOT_PREFIX = 'nls_watch_snapshot_';
 const KEY_REPORT_PREVIEW = 'nls_report_preview_v1';
 const GIFT_USERS_PREFIX = 'nls_gift_users_';
 const REFRESH_MS = 2000;
+// popup と同じ「ゆっくり画像」フォールバック(STORY_GRID_DEFAULT_TILE_IMG・拡張内相対パス)。
+const STORY_GRID_DEFAULT_TILE_IMG =
+  'images/yukkuri-charactore-english/link/link-yukkuri-half-eyes-mouth-closed.png';
 
 /** URL の ?lv= から live id を取り出す(検証付き)。 */
 function liveIdFromUrl() {
@@ -141,6 +145,88 @@ function updateCpm(recorded, nowMs) {
 /** @param {string} id */
 const $ = (id) => /** @type {HTMLElement} */ (document.getElementById(id));
 
+// v0.1.877: popup の renderTopSupportRankStrip と同じ1行(タイル)DOM を作る。クラスは popup と完全一致。
+//   model=topSupportRankLineModels の戻り(placeNumber/count/thumbSrc/idShort/nameLine/isUnknown/userKey)。
+/** @param {any} m */
+function buildRankLineEl(m) {
+  const isLinkable = !m.isUnknown && !/^a:/i.test(String(m.userKey || '')) && /^\d{5,14}$/.test(String(m.userKey || ''));
+  const el = document.createElement(isLinkable ? 'a' : 'div');
+  el.className = 'nl-top-support-rank__line' + (isLinkable ? ' nl-top-support-rank__line--linkable' : '') + (m.isUnknown ? ' nl-top-support-rank__line--unknown' : '');
+  el.setAttribute('role', 'listitem');
+  if (m.fullLabelForTitle) el.setAttribute('title', String(m.fullLabelForTitle));
+  if (isLinkable) {
+    el.setAttribute('href', `https://www.nicovideo.jp/user/${encodeURIComponent(String(m.userKey))}`);
+    el.setAttribute('target', '_blank');
+    el.setAttribute('rel', 'noopener noreferrer');
+  }
+  const place = document.createElement('span');
+  place.className = 'nl-top-support-rank__place' + (m.placeNumber != null ? '' : ' nl-top-support-rank__place--empty');
+  place.setAttribute('aria-hidden', 'true');
+  if (m.placeNumber != null) place.textContent = String(m.placeNumber);
+  el.appendChild(place);
+  const wrap = document.createElement('span');
+  wrap.className = 'nl-top-support-rank__thumb-wrap';
+  const img = document.createElement('img');
+  img.className = 'nl-top-support-rank__thumb';
+  img.src = String(m.thumbSrc || STORY_GRID_DEFAULT_TILE_IMG);
+  img.alt = String(m.nameLine || '');
+  img.decoding = 'async';
+  if (/^https?:/i.test(String(m.thumbSrc || ''))) img.referrerPolicy = 'no-referrer';
+  img.addEventListener('error', () => { try { img.src = STORY_GRID_DEFAULT_TILE_IMG; } catch { /* no-op */ } });
+  wrap.appendChild(img);
+  el.appendChild(wrap);
+  const cnt = document.createElement('span');
+  cnt.className = 'nl-top-support-rank__count';
+  cnt.textContent = `${Number(m.count || 0).toLocaleString('ja-JP')}件`;
+  el.appendChild(cnt);
+  const name = document.createElement('span');
+  name.className = 'nl-top-support-rank__name';
+  name.textContent = String(m.nameLine || '');
+  el.appendChild(name);
+  if (String(m.idShort || '').trim()) {
+    const id = document.createElement('span');
+    id.className = 'nl-top-support-rank__id';
+    if (!m.isUnknown && m.idTitle) id.setAttribute('title', String(m.idTitle));
+    id.textContent = String(m.idShort);
+    el.appendChild(id);
+  }
+  return el;
+}
+
+// v0.1.877: 配信者タイル(popup の topSupportRankStripCasterTileHtml 相当・先頭固定)。snapshot から。
+/** @param {any} snap */
+function buildCasterTileEl(snap) {
+  const name = String(snap?.broadcasterName || '').trim();
+  if (!name) return null;
+  const icon = String(snap?.broadcasterIconUrl || '').trim();
+  const page = String(snap?.broadcasterPageUrl || '').trim();
+  const el = document.createElement(page ? 'a' : 'div');
+  el.className = 'nl-top-support-rank__caster';
+  if (page) { el.setAttribute('href', page); el.setAttribute('target', '_blank'); el.setAttribute('rel', 'noopener'); }
+  const lab = document.createElement('span');
+  lab.className = 'nl-top-support-rank__caster-label';
+  lab.textContent = '配信者';
+  el.appendChild(lab);
+  const img = document.createElement('img');
+  img.className = 'nl-top-support-rank__caster-thumb';
+  img.src = icon || STORY_GRID_DEFAULT_TILE_IMG;
+  img.alt = name;
+  if (/^https?:/i.test(icon)) img.referrerPolicy = 'no-referrer';
+  img.addEventListener('error', () => { try { img.src = STORY_GRID_DEFAULT_TILE_IMG; } catch { /* no-op */ } });
+  el.appendChild(img);
+  const nm = document.createElement('span');
+  nm.className = 'nl-top-support-rank__caster-name';
+  nm.textContent = name;
+  el.appendChild(nm);
+  if (page) {
+    const f = document.createElement('span');
+    f.className = 'nl-top-support-rank__caster-follow';
+    f.textContent = 'プロフィール';
+    el.appendChild(f);
+  }
+  return el;
+}
+
 /**
  * データを受け取って DOM を更新する(副作用は DOM のみ・将来 Web/モバイルでも同型)。
  * @param {string} lv @param {any} data @param {number} nowMs
@@ -202,91 +288,30 @@ function renderLiveView(lv, data, nowMs) {
   const rows = Array.isArray(data?.supporters) && data.supporters.length ? data.supporters : rpRows;
   const body = $('rankBody');
   if (rows && rows.length) {
-    body.className = 'rank-grid';
+    // v0.1.877: popup の renderTopSupportRankStrip と【同じ】純関数+同じHTML/クラスで描く(完全コピー)。
+    //   topSupporters(rank/name/avatarUrl/count/userId)を TopSupportRankRoom に写し、topSupportRankLineModels で
+    //   モデル化(thumb 解決/順位/匿名 fallback は popup と同一ロジック)。
+    const stripRooms = rows.slice(0, 30).map((/** @type {any} */ r) => ({
+      userKey: String(r.userId || ''),
+      nickname: String(r.name || ''),
+      count: Number(r.count || 0),
+      avatarUrl: String(r.avatarUrl || '')
+    }));
+    const models = topSupportRankLineModels(stripRooms, {
+      defaultThumbSrc: STORY_GRID_DEFAULT_TILE_IMG,
+      anonymousFallbackThumbSrc: STORY_GRID_DEFAULT_TILE_IMG,
+      colorScheme: 'light'
+    });
+    body.className = '';
     body.innerHTML = '';
-
-    // v0.1.873: popup と同じく先頭に「配信者タイル」(ラベル+アイコン+名前+フォロー)。snapshot から。
-    const casterName = broadcaster;
-    const casterIcon = String(snap.broadcasterIconUrl || '').trim();
-    const casterPage = String(snap.broadcasterPageUrl || '').trim();
-    if (casterName) {
-      const ct = document.createElement('div');
-      ct.className = 'rank-tile caster-tile';
-      const lab = document.createElement('div');
-      lab.className = 'tile-caster-label';
-      lab.textContent = '配信者';
-      ct.appendChild(lab);
-      const cav = document.createElement('div');
-      cav.className = 'tile-av';
-      if (casterIcon) {
-        const img = document.createElement('img');
-        img.src = casterIcon;
-        img.alt = '';
-        img.referrerPolicy = 'no-referrer';
-        img.addEventListener('error', () => { try { img.remove(); cav.textContent = '🎤'; } catch { /* no-op */ } });
-        cav.appendChild(img);
-      } else {
-        cav.textContent = '🎤';
-      }
-      ct.appendChild(cav);
-      const cn = document.createElement('div');
-      cn.className = 'tile-name';
-      cn.textContent = casterName;
-      ct.appendChild(cn);
-      if (casterPage) {
-        const f = document.createElement('a');
-        f.className = 'tile-follow';
-        f.href = casterPage;
-        f.target = '_blank';
-        f.rel = 'noopener';
-        f.textContent = 'プロフィール';
-        ct.appendChild(f);
-      }
-      body.appendChild(ct);
-    }
-
-    const medals = ['🥇', '🥈', '🥉'];
-    for (const r of rows.slice(0, 30)) {
-      // v0.1.872: popup の応援者タイル(アイコン+名前+件数+userId)を live-view に再現。
-      const tile = document.createElement('div');
-      tile.className = 'rank-tile';
-
-      const badge = document.createElement('span');
-      badge.className = 'tile-rank';
-      badge.textContent = medals[r.rank - 1] || `${r.rank}`;
-      tile.appendChild(badge);
-
-      const av = document.createElement('div');
-      av.className = 'tile-av';
-      if (r.avatarUrl) {
-        const img = document.createElement('img');
-        img.src = r.avatarUrl;
-        img.alt = '';
-        img.referrerPolicy = 'no-referrer';
-        img.addEventListener('error', () => { try { img.remove(); av.textContent = r.isAnonymous ? '👤' : '🙂'; } catch { /* no-op */ } });
-        av.appendChild(img);
-      } else {
-        av.textContent = r.isAnonymous ? '👤' : '🙂';
-      }
-      tile.appendChild(av);
-
-      const name = document.createElement('div');
-      name.className = 'tile-name';
-      name.textContent = String(r.name || '');
-      tile.appendChild(name);
-
-      const cnt = document.createElement('div');
-      cnt.className = 'tile-count';
-      cnt.textContent = `${Number(r.count || 0).toLocaleString('ja-JP')}件`;
-      tile.appendChild(cnt);
-
-      const uid = document.createElement('div');
-      uid.className = 'tile-uid';
-      uid.textContent = r.isAnonymous ? '匿名' : String(r.userId || '');
-      tile.appendChild(uid);
-
-      body.appendChild(tile);
-    }
+    const list = document.createElement('div');
+    list.className = 'nl-top-support-rank__list';
+    list.setAttribute('role', 'list');
+    // 先頭=配信者タイル(popup と同じ位置・クラス)。
+    const casterEl = buildCasterTileEl(snap);
+    if (casterEl) list.appendChild(casterEl);
+    for (const m of models) list.appendChild(buildRankLineEl(m));
+    body.appendChild(list);
   } else {
     body.className = 'empty';
     body.textContent = '応援コメントを集計中です…(記録が貯まると順位が出ます)';
