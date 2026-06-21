@@ -86,6 +86,17 @@ let _refreshPausedByUser = false;
 let _statusLastErrorText = '';
 /** 自動更新タイマー ID。 */
 let _refreshTimerId = /** @type {number|null} */ (null);
+// v0.1.868: 「スムーズじゃない」対策。追加データ(reportPreview/watchTabMap/trend)は 2 秒ごとに毎回
+//   storage を読むと重い=12 秒間引きでキャッシュし、間は前回値を再利用(コア表示は毎回更新のまま)。
+const EXTRAS_REFETCH_MS = 12000;
+let _extrasCacheAt = 0;
+let _extrasCache = /** @type {{reportPreview:any, watchTabMap:any, trendFindings:any[]}} */ ({
+  reportPreview: null,
+  watchTabMap: new Map(),
+  trendFindings: []
+});
+/** v0.1.868: 配信カードの再構築 skip 判定用 signature(変化なしなら innerHTML を作り直さない)。 */
+let _lastLivesSig = '';
 /** 直近 render の結果(コピー/ダウンロード用)。 */
 let _lastRenderedBundle = /** @type {{ overview: string, lives: object[], textBlob: string, jsonBlob: object }|null} */ (
   null
@@ -168,36 +179,40 @@ async function refresh(opts = {}) {
     : 8000;
   let step = 'init';
   try {
-    // v0.1.867: 重さ/開けない対策。従来は 9 個のストレージ/タブ取得を直列 await していて、記録中
-    //   (複数配信)でストレージが混むと初期 timeout(1500ms)を超えて画面が真っ白になっていた。
-    //   依存の無いものは Promise.all で並行化(直列 9 段→ lvList→[並行]の 2 段)=実時間を大幅短縮。
+    // v0.1.868: chrome.storage.local は単一 LevelDB で【並行 read で stall する】(storageOpTimeout.js の
+    //   背景コメント参照)。v0.1.867 で Promise.all 並行化したら逆に複数 read が競合して timeout 多発→
+    //   fastDiag={}・記録0 と空表示になる退行を出した(ユーザー実機で確認)。並行化を撤回し【直列】に戻す。
+    //   「重い/開かない」の本来の対策は別=コア(配信一覧+summaries+fastDiag)を先に描き、重い追加データ
+    //   (reportPreview/トレンド/watchTabMap)は失敗しても握って空で描く(画面を白くしない)。
     step = 'enumerateActiveLives';
     const lvList = await runStorageOpWithTimeout(() => enumerateActiveLives(), tmo);
-    step = 'loadAll(並行)';
-    const [
-      summaries,
-      fastDiag,
-      popupDiag,
-      backfillProgress,
-      voiceDiag,
-      reportPreview,
-      watchTabMap
-    ] = await Promise.all([
-      runStorageOpWithTimeout(() => loadAllSummaries(lvList), tmo).catch(() => ({})),
-      runStorageOpWithTimeout(() => loadFastDiagSafe(), tmo).catch(() => null),
-      runStorageOpWithTimeout(() => loadPopupDiagSafe(), tmo).catch(() => null),
-      runStorageOpWithTimeout(() => loadBackfillProgressSafe(), tmo).catch(() => null),
-      runStorageOpWithTimeout(() => loadVoiceDiagSafe(), tmo).catch(() => null),
-      runStorageOpWithTimeout(() => loadReportPreviewSafe(), tmo).catch(() => null),
-      runStorageOpWithTimeout(() => queryWatchTabMap(), tmo).catch(() => new Map())
-    ]);
-    // 時系列トレンドは summaries に依存するので並行群の後。書き込みは throttle(純関数側・30秒間引き)。
-    //   失敗は握る=他の表示を妨げない(トレンドだけのために画面を白くしない)。
-    step = 'recordAndAnalyzeTrend';
-    const trendFindings = await runStorageOpWithTimeout(
-      () => recordAndAnalyzeTrendSafe(lvList, summaries),
-      tmo
-    ).catch(() => []);
+    step = `loadAllSummaries(${lvList.length}件)`;
+    const summaries = await runStorageOpWithTimeout(() => loadAllSummaries(lvList), tmo);
+    step = 'loadFastDiagSafe';
+    const fastDiag = await runStorageOpWithTimeout(() => loadFastDiagSafe(), tmo);
+    step = 'loadPopupDiagSafe';
+    const popupDiag = await runStorageOpWithTimeout(() => loadPopupDiagSafe(), tmo);
+    step = 'loadBackfillProgress';
+    const backfillProgress = await runStorageOpWithTimeout(() => loadBackfillProgressSafe(), tmo);
+    step = 'loadVoiceDiagSafe';
+    const voiceDiag = await runStorageOpWithTimeout(() => loadVoiceDiagSafe(), tmo);
+    // 以下 3 つは「追加データ」=失敗しても他の表示と記録を妨げない(空で描く)。12 秒間引きでキャッシュ
+    //   再利用=2 秒ごとの storage read を減らして「スムーズじゃない」を改善(コア表示は毎回更新のまま)。
+    const extrasStale = Date.now() - _extrasCacheAt >= EXTRAS_REFETCH_MS;
+    if (extrasStale) {
+      step = 'loadReportPreviewSafe';
+      const reportPreview = await runStorageOpWithTimeout(() => loadReportPreviewSafe(), tmo).catch(() => null);
+      step = 'queryWatchTabMap';
+      const watchTabMap = await runStorageOpWithTimeout(() => queryWatchTabMap(), tmo).catch(() => new Map());
+      step = 'recordAndAnalyzeTrend';
+      const trendFindings = await runStorageOpWithTimeout(
+        () => recordAndAnalyzeTrendSafe(lvList, summaries),
+        tmo
+      ).catch(() => []);
+      _extrasCache = { reportPreview, watchTabMap, trendFindings };
+      _extrasCacheAt = Date.now();
+    }
+    const { reportPreview, watchTabMap, trendFindings } = _extrasCache;
     step = 'renderAll';
     renderAll({ lvList, summaries, fastDiag, popupDiag, backfillProgress, voiceDiag, reportPreview, trendFindings, watchTabMap });
     updateLastUpdateMeta();
@@ -610,10 +625,19 @@ function renderAll({ lvList, summaries, fastDiag, popupDiag, backfillProgress, v
   const livesEl = document.getElementById('livesBody');
   if (livesEl) {
     if (!livesData.length) {
+      _lastLivesSig = '';
       livesEl.className = 'empty-note';
       livesEl.textContent =
         '視聴中の配信が見つかりませんでした。ニコ生 watch ページを開いてから戻ってきてください。';
     } else {
+      // v0.1.868: 「スムーズじゃない」対策。配信カードは 2 秒ごとに innerHTML 全再構築+<img>再生成で
+      //   サムネが毎回チラつき重い。表示に効く値だけの軽い signature を作り、変化が無ければ再構築を
+      //   丸ごと skip(描画/画像再取得を止める)。値が動いた時だけ作り直す。
+      const sig = livesData
+        .map((l) => `${l.lv}|${l.recordedCount}|${l.officialCommentCount}|${l.watchCount}|${l.giftPoints}|${l.elapsedSec}|${l.endedAt ? 1 : 0}|${l.thumbnailUrl ? 1 : 0}`)
+        .join('~');
+      if (sig === _lastLivesSig) return; // 変化なし=再描画しない(チラつき/重さの主因を除去)。
+      _lastLivesSig = sig;
       // 画面が広いとき方眼紙のように横へ並べるグリッド(狭いと1列)。
       livesEl.className = '';
       livesEl.style.display = 'grid';
