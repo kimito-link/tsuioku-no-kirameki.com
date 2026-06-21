@@ -20,6 +20,13 @@ import { aggregateMarketingReport } from '../lib/marketingAggregate.js';
 import { buildSupporterRanking } from '../lib/supporterRanking.js';
 import { topSupportRankLineModels } from '../lib/topSupportRankStripLines.js';
 import { anonymousIdenticonDataUrl } from '../lib/anonymousIdenticon.js';
+// v0.1.879: popup の公式値レーン(北極星レーン)を完全コピーするための純関数。
+//   貢献度ランキングの3経路(Koken API / DOM bundle / iframe storage)優先解決と、公式行→strip room 変換。
+//   popup-entry.js の resolveOfficialContributionRankingRows / officialDomRankingRowsToStripRooms と同一。
+import { resolveContributionRankingRowsFromSources } from '../lib/officialContributionRankingResolver.js';
+import { officialDomRankingRowsToStripRooms } from '../lib/officialDomRankingRowsToStripRooms.js';
+import { escapeHtml, escapeAttr } from '../shared/html/escape.js';
+import { isHttpOrHttpsUrl, isAnonymousStyleNicoUserId } from '../lib/supportGrowthTileSrc.js';
 import {
   isCommentDbAvailable,
   openCommentDb,
@@ -31,6 +38,10 @@ const PANEL_SUMMARY_PREFIX = 'nls_panel_summary_';
 const WATCH_SNAPSHOT_PREFIX = 'nls_watch_snapshot_';
 const KEY_REPORT_PREVIEW = 'nls_report_preview_v1';
 const GIFT_USERS_PREFIX = 'nls_gift_users_';
+// v0.1.879: 公式値レーン(北極星レーン)の storage キー(popup-entry.js と同一の正本)。
+const KOKEN_CONTRIB_PREFIX = 'nls_koken_api_contrib_'; // 貢献度ランキング(Koken API)
+const IFRAME_OFFICIAL_DOM_PREFIX = 'nls_iframe_official_dom_'; // 貢献度ランキング(iframe relay フォールバック)
+const NICOAD_API_RANKING_PREFIX = 'nls_nicoad_api_ranking_'; // 広告ランキング(nicoad API)
 const REFRESH_MS = 2000;
 // popup と同じ「ゆっくり画像」フォールバック(STORY_GRID_DEFAULT_TILE_IMG・拡張内相対パス)。
 const STORY_GRID_DEFAULT_TILE_IMG =
@@ -59,16 +70,26 @@ function createLiveViewDataSource(lv) {
         PANEL_SUMMARY_PREFIX + lv,
         WATCH_SNAPSHOT_PREFIX + lv,
         KEY_REPORT_PREVIEW,
-        GIFT_USERS_PREFIX + lv
+        GIFT_USERS_PREFIX + lv,
+        // v0.1.879: 公式値レーン(北極星レーン)。popup と同じ storage 由来=popup 非依存で再現。
+        KOKEN_CONTRIB_PREFIX + lv,
+        IFRAME_OFFICIAL_DOM_PREFIX + lv,
+        NICOAD_API_RANKING_PREFIX + lv
       ]);
       return {
         summary: bag?.[PANEL_SUMMARY_PREFIX + lv] || null,
         snapshot: bag?.[WATCH_SNAPSHOT_PREFIX + lv] || null,
         reportPreview: bag?.[KEY_REPORT_PREVIEW] || null,
-        giftUsers: bag?.[GIFT_USERS_PREFIX + lv] || null
+        giftUsers: bag?.[GIFT_USERS_PREFIX + lv] || null,
+        kokenContrib: bag?.[KOKEN_CONTRIB_PREFIX + lv] || null,
+        iframeOfficialDom: bag?.[IFRAME_OFFICIAL_DOM_PREFIX + lv] || null,
+        nicoadApiRanking: bag?.[NICOAD_API_RANKING_PREFIX + lv] || null
       };
     } catch {
-      return { summary: null, snapshot: null, reportPreview: null, giftUsers: null };
+      return {
+        summary: null, snapshot: null, reportPreview: null, giftUsers: null,
+        kokenContrib: null, iframeOfficialDom: null, nicoadApiRanking: null
+      };
     }
   };
 }
@@ -366,6 +387,9 @@ function renderLiveView(lv, data, nowMs) {
   // v0.1.875: popup の全レーンを再現。①りんく列(数値ID+個人サムネ) ②ギフト列(ギフト投げた人)。
   renderLanes(lv, data, rows);
 
+  // v0.1.879: popup の公式値レーン(北極星レーン=貢献度/広告ランキング)を完全コピーで再現。
+  renderNorthStarLanes(lv, data);
+
   const d = new Date(nowMs);
   $('updatedAt').textContent = `最終更新 ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}:${String(d.getSeconds()).padStart(2, '0')}`;
 }
@@ -438,6 +462,169 @@ function renderLanes(lv, data, supporters) {
       giftSec.hidden = true;
     }
   }
+}
+
+// ============================================================================
+// v0.1.879: 公式値レーン(北極星レーン)。popup-entry.js の完全コピー。
+//   描画(paintNorthStarStripInto)は popup の paintTopSupportRankStyleIntoElement と
+//   【同じHTML/クラス】を生成(同じ純関数 topSupportRankLineModels + 同じ escape + 同じ
+//   nl-top-support-rank__* クラス)。レーンの開閉も popup と同じ(rows>0 で show・空は hide)。
+//   データは storage(nls_koken_api_contrib_/nls_iframe_official_dom_/nls_nicoad_api_ranking_)由来
+//   =popup を開いていなくても再現できる。アレンジは一切足さない。
+// ============================================================================
+
+/**
+ * popup の paintTopSupportRankStyleIntoElement と同じ HTML をレーン body に流し込む。
+ * 北極星 body 用に nl-top-support-rank / --below-cards クラスを付け、data-lane-state=ok にする。
+ * @param {HTMLElement} body `#northStarLaneBody-<laneId>`
+ * @param {{ userKey: string; nickname: string; count: number; avatarUrl?: string }[]} rooms
+ * @param {{ noteText: string; unitSuffix: string; ariaLabel: string }} opts
+ */
+function paintNorthStarStripInto(body, rooms, opts) {
+  const { noteText, unitSuffix, ariaLabel } = opts;
+  if (!(body instanceof HTMLElement)) return;
+  body.setAttribute('data-lane-state', 'ok');
+  // popup と同じ: 横カード列(--below-cards)で見せる。
+  body.classList.add('nl-top-support-rank', 'nl-top-support-rank--below-cards');
+  body.hidden = false;
+  body.removeAttribute('aria-hidden');
+  body.setAttribute('aria-label', ariaLabel);
+  // popup の paintTopSupportRankStyleIntoElement と同じモデル化(light 配色・匿名 identicon)。
+  const models = topSupportRankLineModels(rooms, {
+    defaultThumbSrc: STORY_GRID_DEFAULT_TILE_IMG,
+    anonymousFallbackThumbSrc: STORY_GRID_DEFAULT_TILE_IMG,
+    colorScheme: 'light',
+    anonymousIdenticonResolver: (/** @type {string} */ uid) => anonymousIdenticonDataUrl(uid, 64)
+  });
+  const html = models
+    .map((m) => {
+      const placeHtml =
+        m.placeNumber != null
+          ? `<span class="nl-top-support-rank__place" aria-hidden="true">${m.placeNumber}</span>`
+          : `<span class="nl-top-support-rank__place nl-top-support-rank__place--empty" aria-hidden="true"></span>`;
+      const full = escapeAttr(m.fullLabelForTitle);
+      const displayThumb = String(m.thumbSrc || STORY_GRID_DEFAULT_TILE_IMG);
+      const thumbRp = isHttpOrHttpsUrl(displayThumb) ? ' referrerpolicy="no-referrer"' : '';
+      const idText = escapeHtml(m.idShort);
+      const nameText = escapeHtml(m.nameLine);
+      const idTitle = m.isUnknown ? '' : escapeAttr(m.idTitle);
+      let lineClass = `nl-top-support-rank__line${m.isUnknown ? ' nl-top-support-rank__line--unknown' : ''}`;
+      let lineStyle = '';
+      if (m.hasAccent && m.accentColorCss) {
+        lineClass += ' nl-top-support-rank__line--has-accent';
+        lineStyle = ` style="--nl-rank-accent:${escapeAttr(m.accentColorCss)}"`;
+      }
+      const isLinkable = !m.isUnknown && !isAnonymousStyleNicoUserId(m.userKey);
+      const linkHref = isLinkable ? `https://www.nicovideo.jp/user/${escapeAttr(m.userKey)}` : '';
+      const idBlock =
+        String(m.idShort || '').trim() === ''
+          ? ''
+          : `<span class="nl-top-support-rank__id" title="${idTitle}">${idText}</span>`;
+      const inner = `${placeHtml}
+        <span class="nl-top-support-rank__count">${m.count}${escapeHtml(unitSuffix)}</span>
+        <span class="nl-top-support-rank__thumb-wrap">
+          <img class="nl-top-support-rank__thumb" src="${escapeAttr(displayThumb)}" alt="${nameText}" decoding="async"${thumbRp} />
+        </span>
+        ${idBlock}
+        <span class="nl-top-support-rank__name">${nameText}</span>`;
+      return isLinkable
+        ? `<a class="${lineClass} nl-top-support-rank__line--linkable"${lineStyle} role="listitem" title="${full}" href="${linkHref}" target="_blank" rel="noopener noreferrer">${inner}</a>`
+        : `<div class="${lineClass}"${lineStyle} role="listitem" title="${full}">${inner}</div>`;
+    })
+    .join('');
+  const nextHtml =
+    `<p class="nl-top-support-rank__note">${escapeHtml(noteText)}。</p>` +
+    `<div class="nl-top-support-rank__list" role="list">${html}</div>`;
+  const tpl = document.createElement('template');
+  tpl.innerHTML = nextHtml;
+  body.replaceChildren(tpl.content);
+  // 壊れ画像はゆっくり画像へ(popup の bindOnErrorHandlersWithin 相当の最小版)。
+  for (const img of body.querySelectorAll('img.nl-top-support-rank__thumb')) {
+    img.addEventListener('error', () => {
+      try { /** @type {HTMLImageElement} */ (img).src = STORY_GRID_DEFAULT_TILE_IMG; } catch { /* no-op */ }
+    });
+  }
+}
+
+/** 北極星レーンを畳む(rows が無い時=popup と同じ「静かに隠す」)。 @param {string} laneId */
+function hideNorthStarLane(laneId) {
+  const lane = document.querySelector(`.nl-north-star-lane[data-lane="${laneId}"]`);
+  if (lane instanceof HTMLElement) lane.hidden = true;
+}
+
+/** 北極星レーンを表示(rows が来た時)。 @param {string} laneId */
+function showNorthStarLane(laneId) {
+  const lane = document.querySelector(`.nl-north-star-lane[data-lane="${laneId}"]`);
+  if (lane instanceof HTMLElement) lane.hidden = false;
+}
+
+// v0.1.879: 公式値レーンを storage から描画(popup の refreshNorthStar*Lane 相当)。
+//   貢献度=3経路優先解決→officialDomRankingRowsToStripRooms→paint。広告=nicoad API rows。
+//   北極星セクション全体は、何か1レーンでも出れば show・全部空なら hide。
+/** @param {string} lv @param {any} data */
+function renderNorthStarLanes(lv, data) {
+  const section = $('northStarLanes');
+  let anyShown = false;
+
+  // ① 貢献度ランキング(Koken API → DOM bundle → iframe storage の優先解決・popup と同一)。
+  {
+    const body = document.getElementById('northStarLaneBody-contributionRanking');
+    const ranking = resolveContributionRankingRowsFromSources({
+      kokenStorage: data?.kokenContrib || null,
+      domBundle: null, // live-view は DOM bundle を持たない(storage 経由のみ)。
+      iframeStorage: data?.iframeOfficialDom || null,
+      liveId: lv
+    });
+    if (body && Array.isArray(ranking) && ranking.length > 0) {
+      // popup と同じ: 10 位まで・officialDomRankingRowsToStripRooms で room 化(userKeyKind=contrib)。
+      const top10 = ranking.slice(0, 10);
+      const rooms = officialDomRankingRowsToStripRooms(top10, { userKeyKind: 'contrib' });
+      paintNorthStarStripInto(body, rooms, {
+        noteText: '公式の貢献度ランキング（niconico の表示に準拠）',
+        unitSuffix: '貢',
+        ariaLabel: '貢献度ランキング'
+      });
+      showNorthStarLane('contributionRanking');
+      anyShown = true;
+    } else {
+      hideNorthStarLane('contributionRanking');
+    }
+  }
+
+  // ② 広告ランキング(nicoad API rows・popup と同一の検証)。
+  {
+    const body = document.getElementById('northStarLaneBody-adRanking');
+    const apiVal = data?.nicoadApiRanking;
+    const adRows =
+      apiVal &&
+      typeof apiVal === 'object' &&
+      String(apiVal.liveId || '').trim().toLowerCase() === lv &&
+      Array.isArray(apiVal.rows) &&
+      apiVal.rows.length > 0
+        ? apiVal.rows
+        : null;
+    if (body && adRows) {
+      const rooms = officialDomRankingRowsToStripRooms(adRows, { userKeyKind: 'ad' });
+      paintNorthStarStripInto(body, rooms, {
+        noteText:
+          'ニコニ広告の貢献度ランキング（公式ページ相当）。画面上部の累計ptなどと、各行の「貢」は指標や期間が異なり一致しないことがあります',
+        unitSuffix: '貢',
+        ariaLabel: '広告ランキング'
+      });
+      showNorthStarLane('adRanking');
+      anyShown = true;
+    } else {
+      hideNorthStarLane('adRanking');
+    }
+  }
+
+  // live-view では storage から取れない他レーン(ギフト履歴の个別投げ・イベント系)は静かに畳む。
+  for (const laneId of ['giftHistory', 'programPoints', 'eventRank', 'eventScore', 'eventBroadcasters', 'eventVotingSupporters']) {
+    hideNorthStarLane(laneId);
+  }
+
+  // 何も出ない時はセクションごと隠す(死んだ見出しを残さない=star-romi 失敗体験の除去)。
+  if (section instanceof HTMLElement) section.hidden = !anyShown;
 }
 
 function start() {
