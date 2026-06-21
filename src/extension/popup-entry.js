@@ -509,6 +509,9 @@ import {
 import { escapeHtml, escapeAttr } from '../lib/htmlEscape.js';
 import { buildEventSelfStatusHeaderHtml } from '../lib/eventSelfStatusHeaderHtml.js';
 import { topSupportRankLineModels } from '../lib/topSupportRankStripLines.js';
+// v0.1.881: 応援帯/公式値レーンの描画本体を共有 lib に抽出(live-view と完全コピー共有)。popup は
+//   本物のローカル依存(guard/identicon/北極星DOM同期/待機UI teardown)を opts で渡す薄いラッパに。
+import { renderTopSupportRankStripInto } from '../lib/paintTopSupportRankStyleIntoElement.js';
 import { TOP_SUPPORT_RANK_STRIP_MAX } from '../lib/topSupportRankStripConfig.js';
 import { topSupportRankStripStableKey } from '../lib/topSupportRankStripStableKey.js';
 import {
@@ -9479,141 +9482,41 @@ async function computeGiftHistoryNorthStarRoomsContext(liveId, opts = {}) {
  * }} opts
  */
 /**
- * v0.1.618(改修A+差分): paintTopSupportRankStyleIntoElement が最後に流し込んだ本体 HTML を
- * 要素ごとに覚えておく。ポーリング(3s/30s)で同じデータを毎回 innerHTML 全置換すると、
- * 既存ノードが一瞬破棄され「白くなる/出たり消えたり」が起きる(ディープリサーチ web.dev/MDN)。
- * 前回と同一 HTML なら DOM を一切触らずスキップする(=ちらつき源を断つ)。
- * @type {WeakMap<HTMLElement, string>}
+ * 応援帯・公式値レーン（貢献度等）で共通の `nl-top-support-rank` ブロック描画。
+ *
+ * v0.1.881: 描画本体は共有 lib(renderTopSupportRankStripInto)へ抽出済(live-view と完全コピー共有)。
+ *   ここは popup 固有の本物のローカル依存(guard/identicon/北極星DOM同期/待機UI teardown)を opts で
+ *   注入する薄いラッパ。**挙動は従来と 1mm も変わらない**(全部 popup の本物を渡している)。
+ *   既存の 7 呼び出し箇所(応援帯1+北極星6)はシグネチャ不変なので一切触らない。
+ *
+ * @param {HTMLElement} el
+ * @param {{ userKey: string; nickname: string; count: number; avatarUrl?: string }[]} rooms
+ * @param {{
+ *   noteText: string; unitSuffix: string; ariaLabel: string;
+ *   prependHtml?: string; beforeNoteHtml?: string; isNorthStarBody?: boolean;
+ *   freshnessNote?: string; pointsSumAll?: number; pointsSumDisplayed?: number;
+ *   officialProgramGiftPts?: number|null;
+ * }} opts
  */
-const _topSupportRankLastHtmlByEl = new WeakMap();
-
 function paintTopSupportRankStyleIntoElement(el, rooms, opts) {
-  const {
-    noteText,
-    unitSuffix,
-    ariaLabel,
-    prependHtml = '',
-    beforeNoteHtml = '',
-    isNorthStarBody = false,
-    freshnessNote = '',
-    officialProgramGiftPts = null
-  } = opts;
-  if (!(el instanceof HTMLElement)) return;
-  if (isNorthStarBody) {
-    teardownNorthStarLaneWaitingUi(el);
-    el.setAttribute('data-lane-state', 'ok');
-    // v0.1.619: データ(rows)が来たので、空のとき畳んでいた hidden を必ず外して表示する
-    //   (NORTH_STAR_API_DIRECT_HIDE_WHEN_EMPTY_LANES の畳みからの復帰)。lane id は body id 由来。
-    {
-      const laneIdFromBody = String(el.id || '').replace(/^northStarLaneBody-/, '');
-      if (laneIdFromBody) setNorthStarLaneHidden(laneIdFromBody, false);
-    }
-    // 応援／ギフト帯と同じ「横スクロールのカード列」見せ方（#topSupportRankStrip と同型クラス）
-    // 北極星は .nl-north-star-lane__shell が grid（左ガジェット | 本体 | 右レール）。
-    // span-cards は grid-column:1/-1 で本体だけ全幅化し、aside が次段へ落ちて
-    // 縦レールが「本体直下のダンプ」に見えるため付けない（--below-cards だけで横カード列）。
-    el.classList.add('nl-top-support-rank', 'nl-top-support-rank--below-cards');
-    if (el.id === 'northStarLaneBody-giftHistory') {
-      el.classList.add('nl-gift-rank-strip');
-      el.dataset.nlGiftRankMetric = unitSuffix === '回' ? 'throws' : 'points';
-    }
-  }
-  el.hidden = false;
-  el.removeAttribute('aria-hidden');
-  el.setAttribute('aria-label', ariaLabel);
-  const rankScheme = getStoryColorScheme();
-  const models = topSupportRankLineModels(rooms, {
+  renderTopSupportRankStripInto(el, rooms, {
+    ...opts,
+    // popup の本物の依存をそのまま注入(スタブは作らない=挙動ズレが起きない)。
+    colorScheme: getStoryColorScheme(),
     defaultThumbSrc: STORY_GRID_DEFAULT_TILE_IMG,
     anonymousFallbackThumbSrc: STORY_REMOTE_FAILED_PLACEHOLDER_IMG,
-    colorScheme: rankScheme,
     anonymousIdenticonResolver: anonymousIdenticonRuntimeEnabled
       ? (uid) => getCachedAnonymousIdenticonDataUrl(uid)
-      : undefined
+      : undefined,
+    avatarLoadGuard: storyAvatarLoadGuard,
+    teardownWaitingUi: teardownNorthStarLaneWaitingUi,
+    setLaneHidden: setNorthStarLaneHidden,
+    syncLaneGadget: syncNorthStarLaneGadgetFromBodyState,
+    clearVerticalRail: clearNorthStarVerticalRailForBody,
+    bindOnErrorHandlersWithin,
+    upgradeAnonymousAvatarImageFromFallback,
+    paintGiftHistorySummaryGadget: paintNorthStarGiftHistorySummaryGadget
   });
-  const html = models
-    .map((m) => {
-      const placeHtml =
-        m.placeNumber != null
-          ? `<span class="nl-top-support-rank__place" aria-hidden="true">${m.placeNumber}</span>`
-          : `<span class="nl-top-support-rank__place nl-top-support-rank__place--empty" aria-hidden="true"></span>`;
-      const full = escapeAttr(m.fullLabelForTitle);
-      const displayThumb = storyAvatarLoadGuard.pickDisplaySrc(m.thumbSrc);
-      const thumbRp = isHttpOrHttpsUrl(displayThumb)
-        ? ' referrerpolicy="no-referrer"'
-        : '';
-      const idText = escapeHtml(m.idShort);
-      const nameText = escapeHtml(m.nameLine);
-      const idTitle = m.isUnknown ? '' : escapeAttr(m.idTitle);
-      let lineClass = `nl-top-support-rank__line${m.isUnknown ? ' nl-top-support-rank__line--unknown' : ''}`;
-      let lineStyle = '';
-      if (m.hasAccent && m.accentColorCss) {
-        lineClass += ' nl-top-support-rank__line--has-accent';
-        lineStyle = ` style="--nl-rank-accent:${escapeAttr(m.accentColorCss)}"`;
-      }
-      const isLinkable = !m.isUnknown && !isAnonymousStyleNicoUserId(m.userKey);
-      const linkHref = isLinkable
-        ? `https://www.nicovideo.jp/user/${escapeAttr(m.userKey)}`
-        : '';
-      const idBlock =
-        String(m.idShort || '').trim() === ''
-          ? ''
-          : `<span class="nl-top-support-rank__id" title="${idTitle}">${idText}</span>`;
-      const inner = `${placeHtml}
-        <span class="nl-top-support-rank__count">${m.count}${escapeHtml(unitSuffix)}</span>
-        <span class="nl-top-support-rank__thumb-wrap">
-          <img class="nl-top-support-rank__thumb" src="${escapeAttr(displayThumb)}" alt="${nameText}" decoding="async"${thumbRp} />
-        </span>
-        ${idBlock}
-        <span class="nl-top-support-rank__name">${nameText}</span>`;
-      return isLinkable
-        ? `<a class="${lineClass} nl-top-support-rank__line--linkable"${lineStyle} role="listitem" title="${full}" href="${linkHref}" target="_blank" rel="noopener noreferrer">${inner}</a>`
-        : `<div class="${lineClass}"${lineStyle} role="listitem" title="${full}">${inner}</div>`;
-    })
-    .join('');
-  const freshnessHtml = freshnessNote
-    ? `<p class="nl-top-support-rank__freshness" aria-live="polite">🕒 ${escapeHtml(freshnessNote)}</p>`
-    : '';
-  const nextHtml =
-    prependHtml +
-    (beforeNoteHtml || '') +
-    `<p class="nl-top-support-rank__note">${escapeHtml(noteText)}。</p>` +
-    freshnessHtml +
-    `<div class="nl-top-support-rank__list" role="list">${html}</div>`;
-  // v0.1.618(改修A+差分): 前回と同一 HTML なら本体 DOM を触らずスキップ(ちらつき源を断つ)。
-  //   変化があるときだけ、<template> でメモリ上に組んでから replaceChildren で**アトミックに
-  //   差し替え**る。innerHTML 全置換と違い「一瞬空(白)」の中間状態が画面に出ない
-  //   (ディープリサーチ: MDN replaceChildren / web.dev)。XSS 安全性は従来同様、生成側の
-  //   escapeHtml/escapeAttr に依存(template.innerHTML はパースのみで実行されない)。
-  //   本体 DOM を貼り替えた時だけ画像 guard を再バインド(貼り替えていないなら不要)。
-  const bodyChanged = !(_topSupportRankLastHtmlByEl.get(el) === nextHtml && el.firstChild);
-  if (bodyChanged) {
-    const tpl = document.createElement('template');
-    tpl.innerHTML = nextHtml;
-    el.replaceChildren(tpl.content);
-    _topSupportRankLastHtmlByEl.set(el, nextHtml);
-    bindOnErrorHandlersWithin(el);
-    const thumbs = el.querySelectorAll('img.nl-top-support-rank__thumb');
-    models.forEach((m, i) => {
-      const img = thumbs[i];
-      if (!(img instanceof HTMLImageElement)) return;
-      if (isHttpOrHttpsUrl(m.thumbSrc)) {
-        storyAvatarLoadGuard.noteRemoteAttempt(img, m.thumbSrc);
-      }
-      upgradeAnonymousAvatarImageFromFallback(img, m.userKey, m.thumbSrc, 64);
-    });
-  }
-  if (isNorthStarBody) {
-    syncNorthStarLaneGadgetFromBodyState(el);
-    // 横カードに順位が含まれるため、右列の縦レールで同データを二重表示しない
-    clearNorthStarVerticalRailForBody(el);
-    if (el.id === 'northStarLaneBody-giftHistory') {
-      paintNorthStarGiftHistorySummaryGadget(el, rooms, unitSuffix, {
-        pointsSumAll: Number(opts.pointsSumAll),
-        pointsSumDisplayed: Number(opts.pointsSumDisplayed),
-        officialProgramGiftPts
-      });
-    }
-  }
 }
 
 /**

@@ -405,6 +405,7 @@
 | `src/lib/openingFiveMinuteCorrelation.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/ownPostedUserIdSet.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/paintPerfLog.js` | 1 | ポップアップ(応援レーン) |
+| `src/lib/paintTopSupportRankStyleIntoElement.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/parseEmbeddedDataViewerInfo.js` | 1 | 記録エンジン(watchページ常駐) |
 | `src/lib/parseInterestArrivalComment.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/persistableCommentRow.js` | 1 | 記録エンジン(watchページ常駐) |

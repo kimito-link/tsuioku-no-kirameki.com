@@ -25,8 +25,8 @@ import { anonymousIdenticonDataUrl } from '../lib/anonymousIdenticon.js';
 //   popup-entry.js の resolveOfficialContributionRankingRows / officialDomRankingRowsToStripRooms と同一。
 import { resolveContributionRankingRowsFromSources } from '../lib/officialContributionRankingResolver.js';
 import { officialDomRankingRowsToStripRooms } from '../lib/officialDomRankingRowsToStripRooms.js';
-import { escapeHtml, escapeAttr } from '../shared/html/escape.js';
-import { isHttpOrHttpsUrl, isAnonymousStyleNicoUserId } from '../lib/supportGrowthTileSrc.js';
+// v0.1.881: popup と【同じ本物の描画関数】を使う(自作の再現を撤回=完全コピー)。会議結論。
+import { renderTopSupportRankStripInto } from '../lib/paintTopSupportRankStyleIntoElement.js';
 // v0.1.880: ギフト履歴レーン(北極星)を popup と完全コピーで移植するための純関数。
 //   buildGiftHistoryNorthStarViewModel = popup の computeGiftHistoryNorthStarRoomsContext と同じ VM。
 import { buildGiftHistoryNorthStarViewModel } from '../lib/giftHistoryViewModel.js';
@@ -38,8 +38,11 @@ import {
   isCommentDbAvailable,
   openCommentDb,
   countCommentsForLive,
-  readAllCommentsForLive
+  readAllCommentsForLive as readAllCommentsFromDb
 } from '../lib/commentDb.js';
+// v0.1.881: popup と同じ多段ソース(IDB→storageチャンク→テール)でコメントを読む共有リーダ。
+//   IDB に無いだけ(=chrome.storage チャンクに在る)で応援者ランキングが空になる退行を断つ。
+import { readAllCommentsForLive } from '../lib/readAllCommentsForLive.js';
 
 const PANEL_SUMMARY_PREFIX = 'nls_panel_summary_';
 const WATCH_SNAPSHOT_PREFIX = 'nls_watch_snapshot_';
@@ -109,31 +112,48 @@ function createLiveViewDataSource(lv) {
 }
 
 // v0.1.876: 応援者ランキングを popup 非依存で自前集計。reportPreview は popup を開いた時しか来ないため、
-//   live-view 自身が IDB(commentDb)から全コメントを読み aggregateMarketingReport→buildSupporterRanking で
-//   topSupporters を作る(popup と同じ純関数=同じ結果)。重いので 15 秒間引きキャッシュ。これで popup を
-//   開いていなくても応援者が出る=「完全再現」。将来サーバー版はこの IDB 読みを fetch に差し替えるだけ。
+//   live-view 自身が popup と同じ多段ソース(IDB→chrome.storage チャンク→テール)で全コメントを読み、
+//   aggregateMarketingReport→buildSupporterRanking で topSupporters を作る(popup と同じ純関数=同じ結果)。
+//   v0.1.881: IDB のみ読みだと「IDB に無いだけ(=storage チャンクに在る)」で空になっていた退行を、
+//   popup の本物のリーダ(readAllCommentsForLive)を共有して根治。重いので 15 秒間引きキャッシュ。
 let _supCacheAt = 0;
 let _supCache = /** @type {any[]} */ ([]);
-/** @param {string} lv @param {number} nowMs @param {string} broadcasterUserId */
-async function computeSupportersFromDb(lv, nowMs, broadcasterUserId) {
-  if (nowMs - _supCacheAt < 15000) return _supCache; // 15秒間引き(全件集計は重い)。
-  _supCacheAt = nowMs;
-  if (!isCommentDbAvailable()) return _supCache;
+
+/** 拡張オリジン IDB から全件(無ければ null)。popup の readAllCommentsFromCommentDb と同型。 @param {string} lv */
+async function readAllFromCommentDbForLiveView(lv) {
+  if (!isCommentDbAvailable()) return null;
   let db = null;
   try {
     db = await openCommentDb();
     const cnt = await countCommentsForLive(db, lv);
-    if (!Number.isFinite(cnt) || cnt <= 0) { _supCache = []; return _supCache; }
-    const comments = await readAllCommentsForLive(db, lv);
-    const mkt = aggregateMarketingReport(Array.isArray(comments) ? comments : [], lv, {
+    if (!Number.isFinite(cnt) || cnt <= 0) return null;
+    return await readAllCommentsFromDb(db, lv);
+  } catch {
+    return null;
+  } finally {
+    try { if (db) db.close(); } catch { /* no-op */ }
+  }
+}
+
+/** @param {string} lv @param {number} nowMs @param {string} broadcasterUserId */
+async function computeSupportersFromDb(lv, nowMs, broadcasterUserId) {
+  if (nowMs - _supCacheAt < 15000) return _supCache; // 15秒間引き(全件集計は重い)。
+  _supCacheAt = nowMs;
+  try {
+    // popup と同じ多段ソース: IDB → chrome.storage チャンク → テール。
+    const comments = await readAllCommentsForLive(lv, {
+      readAllFromCommentDb: readAllFromCommentDbForLiveView,
+      getMany: (keys) => chrome.storage.local.get(keys),
+      nowMs
+    });
+    if (!Array.isArray(comments) || comments.length === 0) { _supCache = []; return _supCache; }
+    const mkt = aggregateMarketingReport(comments, lv, {
       broadcasterUserId: String(broadcasterUserId || '')
     });
     _supCache = buildSupporterRanking(mkt?.topUsers, { limit: 80 });
     return _supCache;
   } catch {
     return _supCache;
-  } finally {
-    try { if (db) db.close(); } catch { /* no-op */ }
   }
 }
 
@@ -488,76 +508,23 @@ function renderLanes(lv, data, supporters) {
 // ============================================================================
 
 /**
- * popup の paintTopSupportRankStyleIntoElement と同じ HTML をレーン body に流し込む。
- * 北極星 body 用に nl-top-support-rank / --below-cards クラスを付け、data-lane-state=ok にする。
+ * v0.1.881: popup と【同じ本物の描画関数 renderTopSupportRankStripInto】に委譲する薄いラッパ。
+ *   自作の再現(旧 paintNorthStarStripInto)は撤回。live-view 固有の値だけ注入(ライト配色・
+ *   ゆっくり画像フォールバック・匿名 identicon)。北極星レーンの DOM 同期/待機UI teardown は
+ *   live-view に無いので省略(既定 no-op)=popup と 1px 違わない描画になる。
  * @param {HTMLElement} body `#northStarLaneBody-<laneId>`
  * @param {{ userKey: string; nickname: string; count: number; avatarUrl?: string }[]} rooms
- * @param {{ noteText: string; unitSuffix: string; ariaLabel: string }} opts
+ * @param {{ noteText: string; unitSuffix: string; ariaLabel: string; pointsSumAll?: number; pointsSumDisplayed?: number; officialProgramGiftPts?: number|null }} opts
  */
 function paintNorthStarStripInto(body, rooms, opts) {
-  const { noteText, unitSuffix, ariaLabel } = opts;
-  if (!(body instanceof HTMLElement)) return;
-  body.setAttribute('data-lane-state', 'ok');
-  // popup と同じ: 横カード列(--below-cards)で見せる。
-  body.classList.add('nl-top-support-rank', 'nl-top-support-rank--below-cards');
-  body.hidden = false;
-  body.removeAttribute('aria-hidden');
-  body.setAttribute('aria-label', ariaLabel);
-  // popup の paintTopSupportRankStyleIntoElement と同じモデル化(light 配色・匿名 identicon)。
-  const models = topSupportRankLineModels(rooms, {
+  renderTopSupportRankStripInto(body, rooms, {
+    ...opts,
+    isNorthStarBody: true,
+    colorScheme: 'light',
     defaultThumbSrc: STORY_GRID_DEFAULT_TILE_IMG,
     anonymousFallbackThumbSrc: STORY_GRID_DEFAULT_TILE_IMG,
-    colorScheme: 'light',
     anonymousIdenticonResolver: (/** @type {string} */ uid) => anonymousIdenticonDataUrl(uid, 64)
   });
-  const html = models
-    .map((m) => {
-      const placeHtml =
-        m.placeNumber != null
-          ? `<span class="nl-top-support-rank__place" aria-hidden="true">${m.placeNumber}</span>`
-          : `<span class="nl-top-support-rank__place nl-top-support-rank__place--empty" aria-hidden="true"></span>`;
-      const full = escapeAttr(m.fullLabelForTitle);
-      const displayThumb = String(m.thumbSrc || STORY_GRID_DEFAULT_TILE_IMG);
-      const thumbRp = isHttpOrHttpsUrl(displayThumb) ? ' referrerpolicy="no-referrer"' : '';
-      const idText = escapeHtml(m.idShort);
-      const nameText = escapeHtml(m.nameLine);
-      const idTitle = m.isUnknown ? '' : escapeAttr(m.idTitle);
-      let lineClass = `nl-top-support-rank__line${m.isUnknown ? ' nl-top-support-rank__line--unknown' : ''}`;
-      let lineStyle = '';
-      if (m.hasAccent && m.accentColorCss) {
-        lineClass += ' nl-top-support-rank__line--has-accent';
-        lineStyle = ` style="--nl-rank-accent:${escapeAttr(m.accentColorCss)}"`;
-      }
-      const isLinkable = !m.isUnknown && !isAnonymousStyleNicoUserId(m.userKey);
-      const linkHref = isLinkable ? `https://www.nicovideo.jp/user/${escapeAttr(m.userKey)}` : '';
-      const idBlock =
-        String(m.idShort || '').trim() === ''
-          ? ''
-          : `<span class="nl-top-support-rank__id" title="${idTitle}">${idText}</span>`;
-      const inner = `${placeHtml}
-        <span class="nl-top-support-rank__count">${m.count}${escapeHtml(unitSuffix)}</span>
-        <span class="nl-top-support-rank__thumb-wrap">
-          <img class="nl-top-support-rank__thumb" src="${escapeAttr(displayThumb)}" alt="${nameText}" decoding="async"${thumbRp} />
-        </span>
-        ${idBlock}
-        <span class="nl-top-support-rank__name">${nameText}</span>`;
-      return isLinkable
-        ? `<a class="${lineClass} nl-top-support-rank__line--linkable"${lineStyle} role="listitem" title="${full}" href="${linkHref}" target="_blank" rel="noopener noreferrer">${inner}</a>`
-        : `<div class="${lineClass}"${lineStyle} role="listitem" title="${full}">${inner}</div>`;
-    })
-    .join('');
-  const nextHtml =
-    `<p class="nl-top-support-rank__note">${escapeHtml(noteText)}。</p>` +
-    `<div class="nl-top-support-rank__list" role="list">${html}</div>`;
-  const tpl = document.createElement('template');
-  tpl.innerHTML = nextHtml;
-  body.replaceChildren(tpl.content);
-  // 壊れ画像はゆっくり画像へ(popup の bindOnErrorHandlersWithin 相当の最小版)。
-  for (const img of body.querySelectorAll('img.nl-top-support-rank__thumb')) {
-    img.addEventListener('error', () => {
-      try { /** @type {HTMLImageElement} */ (img).src = STORY_GRID_DEFAULT_TILE_IMG; } catch { /* no-op */ }
-    });
-  }
 }
 
 /** 北極星レーンを畳む(rows が無い時=popup と同じ「静かに隠す」)。 @param {string} laneId */
