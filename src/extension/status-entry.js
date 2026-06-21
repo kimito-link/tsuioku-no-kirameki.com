@@ -36,6 +36,7 @@ import {
 import { appendTrendSample, analyzeTrend } from '../lib/statusTrend.js';
 import { KEY_STATUS_TREND } from '../lib/statusTrendKey.js';
 import { pickOpenAction } from '../lib/watchLink.js';
+import { buildChikuranCardModel } from '../lib/chikuranCard.js';
 import {
   buildOverviewText,
   buildLiveBlockText,
@@ -635,7 +636,10 @@ function renderAll({ lvList, summaries, fastDiag, popupDiag, backfillProgress, v
           'padding:10px 12px;border-radius:8px;' +
           `border:1px solid var(--nl-border);border-left:4px solid ${accent};background:${bg};`;
 
-        // 健康チェック(5段階・●○)を上部に。数値を読まなくても状態が一目で分かる。
+        // v0.1.866: ちくらん風ヘッダー(サムネ+配信者名+タイトル+経過/来場/コメント/ギフト)を最上部に。
+        card.appendChild(buildChikuranHeaderEl(live));
+
+        // 健康チェック(5段階・●○)。数値を読まなくても状態が一目で分かる。
         card.appendChild(buildHealthCheckEl(live));
 
         const pre = document.createElement('pre');
@@ -914,6 +918,76 @@ function buildWatchLinkButton(live, watchTabMap) {
 }
 
 /**
+ * v0.1.866: ちくらん風ヘッダー。サムネ + 配信者名/タイトル + 経過/来場/コメント/ギフト を1段に並べる。
+ *   表示モデルは純関数 buildChikuranCardModel が正本。取れない値は出さない(空欄を0と偽らない)。textContent
+ *   で安全に組む。サムネは img の onerror で消す(壊れた画像を残さない=失敗体験の除去)。
+ * @param {object} live
+ * @returns {HTMLElement}
+ */
+function buildChikuranHeaderEl(live) {
+  const m = buildChikuranCardModel(live);
+  const head = document.createElement('div');
+  if (!m) return head;
+  head.style.cssText = 'display:flex;gap:10px;align-items:flex-start;margin-bottom:8px;';
+
+  // サムネ(無ければプレースホルダの枠)。比率 16:9 で小さく。
+  const thumbWrap = document.createElement('div');
+  thumbWrap.style.cssText =
+    'flex:0 0 auto;width:96px;height:54px;border-radius:6px;overflow:hidden;' +
+    'background:var(--nl-border);display:flex;align-items:center;justify-content:center;';
+  if (m.thumbnailUrl) {
+    const img = document.createElement('img');
+    img.src = m.thumbnailUrl;
+    img.alt = '';
+    img.loading = 'lazy';
+    img.referrerPolicy = 'no-referrer';
+    img.style.cssText = 'width:100%;height:100%;object-fit:cover;';
+    // 壊れた画像は枠だけにして残さない(失敗体験の除去)。
+    img.addEventListener('error', () => { try { img.remove(); } catch { /* no-op */ } });
+    thumbWrap.appendChild(img);
+  } else {
+    const ph = document.createElement('span');
+    ph.textContent = '🎥';
+    ph.style.cssText = 'font-size:20px;opacity:0.6;';
+    thumbWrap.appendChild(ph);
+  }
+  head.appendChild(thumbWrap);
+
+  // 右側: 配信者名 + タイトル + メトリクス行。
+  const right = document.createElement('div');
+  right.style.cssText = 'flex:1 1 auto;min-width:0;display:flex;flex-direction:column;gap:2px;';
+
+  const nameRow = document.createElement('div');
+  nameRow.textContent = (m.ended ? '⏹ ' : '') + (m.broadcasterName || '(配信者名 不明)');
+  nameRow.style.cssText = 'font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;';
+  right.appendChild(nameRow);
+
+  if (m.title) {
+    const titleRow = document.createElement('div');
+    titleRow.textContent = m.title;
+    titleRow.style.cssText =
+      'font-size:12px;color:var(--nl-text-soft);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;';
+    right.appendChild(titleRow);
+  }
+
+  // メトリクス: 経過 / 来場 / コメント / ギフト(取れた値だけ)。
+  const metrics = [];
+  if (m.elapsedText) metrics.push(`⏱ ${m.elapsedText}`);
+  if (m.watchCount != null) metrics.push(`👤 ${m.watchCount.toLocaleString('ja-JP')}`);
+  if (m.commentCount != null) metrics.push(`💬 ${m.commentCount.toLocaleString('ja-JP')}`);
+  if (m.giftPoints != null && m.giftPoints > 0) metrics.push(`🎁 ${m.giftPoints.toLocaleString('ja-JP')}`);
+  if (metrics.length) {
+    const metaRow = document.createElement('div');
+    metaRow.textContent = metrics.join('  ');
+    metaRow.style.cssText = 'font-size:12px;color:var(--nl-text);margin-top:2px;';
+    right.appendChild(metaRow);
+  }
+
+  head.appendChild(right);
+  return head;
+}
+
+/**
  * 健康チェック(5段階 ●○)の DOM を作る。
  *   取得率 / 描画(白化リスク) / 鮮度 / スクロール軽さ の4指標。
  *   スコアが低いほど赤め、高いほど緑めに色づけして一目で分かるようにする。
@@ -994,10 +1068,13 @@ function summarizeOneLive(lv, summary, snapshot, perfDiag, endedFlag) {
       ? Math.round((recordedCount / officialCommentCount) * 100)
       : null;
 
+  // v0.1.866: ちくらん風レイアウト用にサムネ URL も渡す(snapshot.thumbnailUrl=og:image/channel thumb)。
+  const thumbnailUrl = String(snap?.thumbnailUrl || '').trim();
   return {
     lv,
     broadcasterName,
     title,
+    thumbnailUrl,
     recordedCount,
     officialCommentCount,
     officialRatePct,

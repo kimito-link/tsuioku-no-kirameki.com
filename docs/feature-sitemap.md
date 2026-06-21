@@ -252,7 +252,7 @@
   - `src/lib/giftThrowProjectile.js`
 - **吹き出し寿命管理** — 会場の吹き出しの表示上限・追い出し(eviction)ライフサイクル
   - `src/lib/venueBubbleLifecycle.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 152</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 151</summary>
 
 - `scripts/encode-marketing-html-avatars.mjs` — extension/images/marketing-html-avatars/*.png を data URI にし、
 - `scripts/split-avatar-parts.mjs` — 偽市松背景の除去 + パーツ切り出し(one-off アセットパイプライン)
@@ -266,7 +266,6 @@
 - `src/domain/user/avatar.js` — ユーザーのアバター観測信号と表示 URL を 1 箇所で組み立てる純関数。
 - `src/domain/user/avatarResolver.js` — アバター解決の単一エントリポイント（Hoshino-Romi 流 single component）。
 - `src/domain/user/nickname.js` — 表示名（ニックネーム）の「強弱」判定。
-- `src/extension/content-entry.js` — watch ページ常駐の記録エンジン本体。コメント取得(NDGR+DOM)・記録・バックフィル・パネル描画の中枢。
 - `src/extension/story/renderStoryUserLaneDom.js` — 応援ユーザーレーン DOM の同期（popup-entry から切り出し・状態は引数で受け取る）。
 - `src/extension/venue-entry.js` — 会場モード(standalone)のエントリ。venueBar をページに mount するだけの薄い起動点。
 - `src/extension/venueBar.js` — 会場モード UI 本体。観客の席割り・群衆・吹き出し・ギフト演出・読み上げ連動を描く。
@@ -560,6 +559,10 @@
   - `src/lib/reportPreviewPublish.js`
   - `src/extension/popup-entry.js`
   - `src/extension/status-entry.js`
+- **ちくらん風 配信カード(サムネ+来場+コメント+ギフト)** — ニコ生公式「注目番組ランキング(ちくらん)」風に、状態ページの配信カード上部へ サムネ画像+配信者名+タイトル+経過/来場/コメント/ギフト を1段表示。表示モデルは純関数 buildChikuranCardModel が正本(取れない値は null=空欄を0と偽らない・サムネ無しは枠+🎥・img onerror で壊れ画像を消す)。サムネ URL は snapshot.thumbnailUrl(og:image/channel thumb・summarizeOneLive が中継)。CSP は img-src 無指定で nicovideo CDN 画像を許可(既存 avatar と同じ)。健康チェック/詳細/放送ボタンは下に残す(v0.1.866)
+  - `src/lib/chikuranCard.js`
+  - `src/extension/status-entry.js`
+  - `src/extension/content-entry.js`
 - **応援者ランキング(ちくらん風・将来の Kimito Link ランキング)** — 視聴中1配信の「コメントした人」を件数順に🥇🥈🥉付きで表示(段階A)。aggregateMarketingReport.topUsers(件数順・既存)を整形=新規取得ゼロ。匿名(a:hash/anon:/空)は「(匿名)」と明記し過大を予告(信頼度メーターと同方針)。0件除外。reportPreview の record に topSupporters として同梱し popup→storage→status の既存ブリッジに乗る(新規キー無し)。将来は複数配信横断の累計(段階B)へ拡張する土台(v0.1.865)
   - `src/lib/supporterRanking.js`
   - `src/lib/reportPreview.js`
@@ -677,7 +680,7 @@
 
 ## 🧬 修正系譜マップ(この系統のバグを過去にどう直したか)
 
-> changelog 全 202 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
+> changelog 全 203 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
 
 ### 💾 記録件数 (28版)
 - `v0.1.865` 2026-06-21 — 診断画面に応援者ランキング(ちくらん風)を追加
@@ -835,7 +838,8 @@
 - `v0.1.668` 2026-06-10 — パネルに「💬コメビュ」ボタンを追加
 - `v0.1.667` 2026-06-10 — コメビュに匿名OKのニックネーム・ラベル・メモ
 
-### 🏟 会場・席 (80版)
+### 🏟 会場・席 (81版)
+- `v0.1.866` 2026-06-21 — 診断の配信カードをちくらん風(サムネ+来場+コメント+ギフト)に
 - `v0.1.862` 2026-06-21 — 時系列トレンドで記録停止/取得率低下を時間変化で検知
 - `v0.1.861` 2026-06-21 — 数字に信頼度の注釈を付けて意味の取り違えを防ぐ
 - `v0.1.859` 2026-06-21 — レポートの「コメントした人」を正本に統一+数字の食い違いを自動検知
@@ -944,7 +948,8 @@
 - `v0.1.713` 2026-06-13 — 会場モードを明るくして発言を吹き出し表示
 - `v0.1.711` 2026-06-13 — 会場モードで発言を吹き出し表示
 
-### 🎁 ギフト (33版)
+### 🎁 ギフト (34版)
+- `v0.1.866` 2026-06-21 — 診断の配信カードをちくらん風(サムネ+来場+コメント+ギフト)に
 - `v0.1.863` 2026-06-21 — 公式値のDOM↔NDGR食い違いも自己矛盾検知に追加
 - `v0.1.860` 2026-06-21 — 匿名主体の偽の赤と「既知0を空」表示を解消(診断の正直化)
 - `v0.1.845` 2026-06-20 — 健全度パネル: 取得中は青で「順調」に
@@ -1054,7 +1059,8 @@
 - `v0.1.673` 2026-06-10 — コメビュの名前をパネルと同じ情報源で補完
 - `v0.1.670` 2026-06-10 — コメビュのアイコンを本家と同じサムネに
 
-### 🩺 診断・状態速報 (44版)
+### 🩺 診断・状態速報 (45版)
+- `v0.1.866` 2026-06-21 — 診断の配信カードをちくらん風(サムネ+来場+コメント+ギフト)に
 - `v0.1.865` 2026-06-21 — 診断画面に応援者ランキング(ちくらん風)を追加
 - `v0.1.864` 2026-06-21 — 診断ページの各配信から放送へ行けるボタンを追加
 - `v0.1.860` 2026-06-21 — 匿名主体の偽の赤と「既知0を空」表示を解消(診断の正直化)
