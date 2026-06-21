@@ -17,6 +17,7 @@ graph LR
   n_status --> n_src_lib_aiSharePopupDiagKey_js["lib/aiSharePopupDiagKey.js"]:::shared
   n_status --> n_src_lib_broadcasterReputationKeywords_js["lib/broadcasterReputationKeywords.js"]
   n_status --> n_src_lib_broadcasterReputationView_js["lib/broadcasterReputationView.js"]
+  n_status --> n_src_lib_chikuranCard_js["lib/chikuranCard.js"]
   n_status --> n_src_lib_googleSuggest_js["lib/googleSuggest.js"]
   n_status --> n_src_lib_healthCells_js["lib/healthCells.js"]
   n_status --> n_src_lib_htmlEscape_js["lib/htmlEscape.js"]:::shared

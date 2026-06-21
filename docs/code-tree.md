@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 1 / 520 件
+## ⚠️ 役割コメントが無いソース 1 / 521 件
 - `src/lib/reportPreviewPublish.js`
 
 ## 全ファイルツリー
@@ -254,7 +254,7 @@
   - `vendor-visual-explainer.mjs` — Vendors nicobailon/visual-explainer (MIT) into .cursor/skills/visual-explainer/
   - `verify-bump.mjs` — extension bump 後の整合性チェッカー
   - `write-extension-placeholder-icons.mjs` — リポジトリに 256px アイコンしか無い環境向け: manifest 用の小さめ PNG を生成する。
-- 📁 **src/** (1127)
+- 📁 **src/** (1129)
   - 📁 **data/** (6)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -512,7 +512,7 @@
         - `logo_funlink_white_RGB_maru_black.png`
       - `logo_guide_funlink_ol.pdf`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (917)
+  - 📁 **lib/** (919)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -1295,6 +1295,8 @@
     - `supporterChikuranScore.test.js`
     - `supporterPowerScoring.js` — 応援者パワー診断スコアリング（OSINT Phase 2-A・v0.1.609）。
     - `supporterPowerScoring.test.js`
+    - `supporterRanking.js` — 「この配信の応援者ランキング(ちくらん風)」の純ロジック(v0.1.865)。
+    - `supporterRanking.test.js`
     - `swBackfillStaging.js` — Service Worker backfill の取り置きペイロードを扱う純関数群。
     - `swBackfillStaging.test.js`
     - `swBackfillTrigger.js` — SW backfill モード(実験)の起動判定純関数。
