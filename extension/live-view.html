@@ -134,6 +134,27 @@
         text-overflow: ellipsis;
         white-space: nowrap;
       }
+      /* v0.1.873: 配信者タイル(popup と同じくアクセント枠・先頭)。 */
+      .caster-tile {
+        border-color: color-mix(in srgb, var(--accent) 45%, var(--line));
+        background: color-mix(in srgb, var(--accent) 12%, #11161d);
+      }
+      .tile-caster-label {
+        font-size: 10px;
+        font-weight: 700;
+        color: var(--accent);
+        margin-bottom: 2px;
+      }
+      .tile-follow {
+        display: inline-block;
+        margin-top: 4px;
+        padding: 2px 10px;
+        border-radius: 999px;
+        font-size: 11px;
+        text-decoration: none;
+        color: #fff;
+        background: var(--accent);
+      }
       .empty { color: var(--muted); }
       .updated { color: var(--muted); font-size: 12px; margin-top: 16px; }
       .live-dot {

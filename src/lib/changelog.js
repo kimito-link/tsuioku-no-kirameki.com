@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.873',
+    date: '2026-06-21',
+    summary: '応援ライブビュー先頭に配信者タイル(popup と同じ見た目)',
+    items: Object.freeze([
+      '応援ライブビューの応援者ランキングの先頭に「配信者タイル」を追加し、拡張ポップアップと同じ見た目に近づけました。配信者のアイコン・名前・「配信者」ラベル・プロフィールへのリンクが、アクセント色の枠付きタイルで応援者タイルの前に並びます。配信者アイコンが取れない時は🎤マークで表示します。表示専用で記録・取得には影響しません。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.872',
     date: '2026-06-21',
     summary: '応援ライブビューの応援者をpopup風タイル(アイコン+件数)に',
