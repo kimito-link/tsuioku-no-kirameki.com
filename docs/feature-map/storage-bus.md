@@ -20,7 +20,6 @@
 - 🟠 **fn:chunkMigratedKey** — 書く人だけ（読む経路が無い疑い）: src/extension/content-entry.js
 - 🟠 **fn:comeviewPinStorageKey** — 書く人だけ（読む経路が無い疑い）: src/extension/comeview-entry.js
 - 🟠 **fn:eventDomStorageKey** — 書く人だけ（読む経路が無い疑い）: src/extension/content-entry.js
-- 🟠 **fn:giftSubAppHistoryStorageKey** — 書く人だけ（読む経路が無い疑い）: src/extension/content-entry.js
 - 🟠 **fn:perfDiagStorageKey** — 書く人だけ（読む経路が無い疑い）: src/extension/popup-entry.js
 - 🟠 **fn:tailStorageKey** — 書く人だけ（読む経路が無い疑い）: src/extension/content-entry.js
 - 🔵 **KEY_AI_SHARE_POPUP_DIAG** — 読む人だけ（書く経路が無い疑い）: src/extension/status-entry.js
@@ -54,6 +53,7 @@
 - 🔵 **KEY_THUMB_AUTO** — 読む人だけ（書く経路が無い疑い）: src/extension/content-entry.js, src/extension/popup-entry.js
 - 🔵 **KEY_THUMB_INTERVAL_MS** — 読む人だけ（書く経路が無い疑い）: src/extension/content-entry.js, src/extension/popup-entry.js
 - 🔵 **fn:commentDbSummaryKey** — 読む人だけ（書く経路が無い疑い）: src/extension/popup-entry.js
+- 🔵 **fn:giftHistoryThrowsStorageKey** — 読む人だけ（書く経路が無い疑い）: src/extension/live-view-entry.js
 - 🔵 **fn:watchSnapshotStorageKey** — 読む人だけ（書く経路が無い疑い）: src/extension/popup-entry.js
 - 🔵 **nls_backfill_progress_v1** — 読む人だけ（書く経路が無い疑い）: src/extension/status-entry.js
 - 🔵 **nls_mcp_live_latest_v1** — 読む人だけ（書く経路が無い疑い）: src/extension/popup-entry.js
@@ -125,7 +125,8 @@
 | `fn:comeviewPinStorageKey` | extension/comeview-entry.js | — |
 | `fn:commentDbSummaryKey` | — | extension/popup-entry.js |
 | `fn:eventDomStorageKey` | extension/content-entry.js | — |
-| `fn:giftSubAppHistoryStorageKey` | extension/content-entry.js | — |
+| `fn:giftHistoryThrowsStorageKey` | — | extension/live-view-entry.js |
+| `fn:giftSubAppHistoryStorageKey` | extension/content-entry.js | extension/live-view-entry.js |
 | `fn:perfDiagStorageKey` | extension/popup-entry.js | — |
 | `fn:tailStorageKey` | extension/content-entry.js | — |
 | `fn:watchSnapshotStorageKey` | — | extension/popup-entry.js |
