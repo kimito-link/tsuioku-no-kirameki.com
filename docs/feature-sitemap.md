@@ -106,7 +106,7 @@
   - `src/lib/monotonicCommentCount.js`
 - **storage キー定義** — chrome.storage のキー名の正本(nls_comments_<lv> 等)
   - `src/lib/storageKeys.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 26</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 27</summary>
 
 - `src/lib/autoBackupState.js` — v0.1.808(星野ロミ式コンポーネント化・第1弾): content-entry.js の巨大化を抑えるため、
 - `src/lib/blobDownload.js` — Blob を指定ファイル名で保存する。
@@ -127,6 +127,7 @@
 - `src/lib/persistThrottle.js` — v0.1.431: 連続フラッシュの合間にイベントループへ制御を返す既定の yield。
 - `src/lib/popupWatchSnapshotPersist.js` — 取得した watch snapshot を generation を超えて永続化するためのヘルパ。
 - `src/lib/prunableStorageKeys.js` — v0.1.419: storage.local の「定期 prune 対象キー」だけを prefix で絞り込む純関数。
+- `src/lib/readAllCommentsForLive.js` — 放送の全コメントを「IndexedDB(SW集約書きの正本) → chrome.storage チャンク → テール」の
 - `src/lib/recordingStallWatchdog.js` — 記録停止ウォッチドッグの純粋判定ロジック。
 - `src/lib/recordRate.js` — 取得スピード(records/sec)の算出と健康スコア化(純ロジック)。
 - `src/lib/storageOpTimeout.js` — v0.1.502: 単発の非同期処理（主に chrome.storage.local の get/set/remove）を
@@ -252,7 +253,7 @@
   - `src/lib/giftThrowProjectile.js`
 - **吹き出し寿命管理** — 会場の吹き出しの表示上限・追い出し(eviction)ライフサイクル
   - `src/lib/venueBubbleLifecycle.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 149</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 150</summary>
 
 - `scripts/encode-marketing-html-avatars.mjs` — extension/images/marketing-html-avatars/*.png を data URI にし、
 - `scripts/split-avatar-parts.mjs` — 偽市松背景の除去 + パーツ切り出し(one-off アセットパイプライン)
@@ -345,6 +346,7 @@
 - `src/lib/northStarLaneWaitingUi.js` — 北極星「公式値レーン」の取得待ち（not_yet / iframe_unrendered）用 UI 断片。
 - `src/lib/officialEventBannerDom.js` — niconico の watch ページに描画される「○○さんが参加しています！」グリーンバナーから
 - `src/lib/paintPerfLog.js` — v0.1.725: 描画(paint)コストの軽量リングバッファ記録(純関数)。
+- `src/lib/paintTopSupportRankStyleIntoElement.js` — 応援帯・公式値レーン（貢献度等）で共通の `nl-top-support-rank` ブロック描画。
 - `src/lib/parseGiftComment.js` — ニコ生のギフトコメント文字列をパースする純粋関数。
 - `src/lib/popupAvatarResolver.js` — v0.1.206 Phase B: popup 表示の avatar URL を統一的に解決する純関数。
 - `src/lib/popupCelebrationGate.js` — popup / watch 埋め込みパネル再描画時の応援演出ゲート（単一の開幕判定）。
@@ -690,7 +692,7 @@
 
 ## 🧬 修正系譜マップ(この系統のバグを過去にどう直したか)
 
-> changelog 全 218 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
+> changelog 全 219 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
 
 ### 💾 記録件数 (32版)
 - `v0.1.877` 2026-06-21 — 応援ライブビューを popup の本物のHTML/CSSで完全コピー
@@ -726,7 +728,8 @@
 - `v0.1.672` 2026-06-10 — コメビュの二重表示の残りを根治
 - `v0.1.665` 2026-06-10 — 長い配信が7割等で止まったままになるのを根治
 
-### 📥 コメント取得 (104版)
+### 📥 コメント取得 (105版)
+- `v0.1.882` 2026-06-21 — 公式値レーン(貢献度/広告)を開いた瞬間に出るよう高速化
 - `v0.1.881` 2026-06-21 — 応援ライブビューを本物の描画関数で完全コピーに
 - `v0.1.880` 2026-06-21 — 応援ライブビューにギフト履歴レーンを追加(完全コピー)
 - `v0.1.879` 2026-06-21 — 応援ライブビューに公式値レーンを追加(完全コピー)
@@ -1059,7 +1062,8 @@
 - `v0.1.699` 2026-06-12 — 読み上げの名前ON/OFF切替を追加
 - `v0.1.698` 2026-06-12 — コメビュにユーザー別の声で読み上げ機能を追加
 
-### 🪟 応援レーン・タイル (41版)
+### 🪟 応援レーン・タイル (42版)
+- `v0.1.882` 2026-06-21 — 公式値レーン(貢献度/広告)を開いた瞬間に出るよう高速化
 - `v0.1.880` 2026-06-21 — 応援ライブビューにギフト履歴レーンを追加(完全コピー)
 - `v0.1.879` 2026-06-21 — 応援ライブビューに公式値レーンを追加(完全コピー)
 - `v0.1.877` 2026-06-21 — 応援ライブビューを popup の本物のHTML/CSSで完全コピー

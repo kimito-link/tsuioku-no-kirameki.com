@@ -10736,6 +10736,13 @@ function renderUserRooms(entries, liveId = '', renderOpts = {}) {
   };
   void (async () => {
     try {
+      // v0.1.882: 公式値レーン(貢献度/広告/ギフト履歴)を【bundle/gift帯の await より前】に即描画する。
+      //   貢献度=nls_koken_api_contrib_/広告=nls_nicoad_api_ranking_ は storage に既に rows があるので、
+      //   bundle 読み(refreshOfficialEventDomBundle ~500-1000ms)+gift帯読み(refreshGiftRankStrip)の
+      //   逐次 await を待たずに storage から直接出せる=「開いた瞬間に出る」(従来は両 await の後に発火=
+      //   ~1.5-2秒遅れていた)。one-shot(renderNorthStarLanesOnce)を早回しするだけ=二重描画にならない。
+      //   bundle が新鮮になった後の再描画は通常ポーリング(3s/30s)で走る(paint は diff-skip で同一なら no-op)。
+      void renderNorthStarLanesOnce();
       // 案1b: bundle 取得失敗が後段（塗装〜hide）を巻き込まないよう個別に握る。
       try {
         await refreshOfficialEventDomBundle(liveId);
