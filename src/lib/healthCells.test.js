@@ -103,7 +103,7 @@ describe('buildHealthCells', () => {
     expect(cellById(cells, 'uid-rate').level).toBe('bad');
   });
 
-  it('userId付き保存: NDGR接続中でも高率(60%)は通常評価で ok(匿名 na 化は<50%のみ)', () => {
+  it('userId付き保存: NDGR接続中の高率(>=90)は通常評価で ok(記名主体は緑を残す)', () => {
     const cells = buildHealthCells({
       fastDiag: {
         content: {
@@ -113,6 +113,21 @@ describe('buildHealthCells', () => {
       }
     });
     expect(cellById(cells, 'uid-rate').level).toBe('ok');
+  });
+
+  it('userId付き保存: NDGR接続中の中間帯(54.3%・匿名が半分)は na=🟡を出さない(v0.1.885 自己矛盾の根治)', () => {
+    // 実機 lv350803140: withUidPercent 54.3% / NDGR connected。<50 でないため従来は🟡warn だったが、
+    //   対処カード(advisor uid-low は <50 のみ・50〜90 は何も出さない=正常扱い)と食い違っていた。
+    //   匿名が半分くらい居るだけ=仕様であり異常でない → na に揃える。
+    const cells = buildHealthCells({
+      fastDiag: {
+        content: {
+          networkErrorProbe: { ndgrConnectStatus: 'connected' },
+          giftDiagnostics: { commentObservability: { savedCommentsUidStats: { totalSaved: 210, withUid: 114, withUidPercent: 54.3 } } }
+        }
+      }
+    });
+    expect(cellById(cells, 'uid-rate').level).toBe('na');
   });
 
   it('実機相当(健全配信)= 赤(bad)が出ない', () => {
