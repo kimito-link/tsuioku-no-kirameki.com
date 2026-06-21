@@ -677,6 +677,10 @@ function renderAll({ lvList, summaries, fastDiag, popupDiag, backfillProgress, v
         pre.style.margin = '0';
         card.appendChild(pre);
 
+        // v0.1.871: 応援ライブビューを新規タブで開くボタン(Chrome 体験・リアルタイムで盛り上がり表示)。
+        const liveBtn = buildLiveViewButton(live);
+        if (liveBtn) card.appendChild(liveBtn);
+
         // v0.1.864: 放送導線。状態別ボタン(切替/新規タブ/アーカイブ)。lv 不正なら出さない。
         const watchBtn = buildWatchLinkButton(live, watchTabMap);
         if (watchBtn) card.appendChild(watchBtn);
@@ -903,6 +907,30 @@ function setAllMindDetails(open) {
 /* ============================================================================
  * 集計/整形ヘルパ(純関数寄り・テスト容易)
  * ========================================================================== */
+
+// v0.1.871: 「🔥 応援ライブビューを開く」ボタン。クリックで live-view.html?lv=... を新規タブで開く
+//   (Chrome 体験・リアルタイムで盛り上がり🔥/応援者🏆/コメント数を脈打たせる)。lv 不正なら出さない。
+//   chrome.runtime.getURL で拡張内ページURLを作る=確実に到達(死にリンクにしない)。将来サーバー公開版は
+//   ここの URL を公開 URL に差し替えるだけ。
+function buildLiveViewButton(live) {
+  const lv = String(live?.lv || '').trim().toLowerCase();
+  if (!/^lv\d{1,15}$/.test(lv)) return null;
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.textContent = '🔥 応援ライブビューを開く';
+  btn.style.cssText =
+    'margin-top:8px;margin-right:6px;padding:5px 12px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600;' +
+    'border:1px solid var(--nl-accent);background:var(--nl-accent);color:#fff;';
+  btn.addEventListener('click', () => {
+    try {
+      const url = chrome.runtime.getURL(`live-view.html?lv=${encodeURIComponent(lv)}`);
+      chrome.tabs.create({ url });
+    } catch {
+      /* context 切れ=無視(次の更新で復帰) */
+    }
+  });
+  return btn;
+}
 
 // v0.1.869: 配信カードの「応援者ランキングを見る」展開(将来の Kimito Link ランキング)。
 //   応援者データ(reportPreview.topSupporters)は popup で開いている配信ぶんだけ取れる=その配信
