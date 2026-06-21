@@ -447,16 +447,25 @@ async function recordAndAnalyzeTrendSafe(lvList, summaries) {
     let official = 0;
     let watch = 0;
     let hasWatch = false;
+    let catchingUp = false; // v0.1.887: 放送中×追いつき中(率<100)の配信が1つでもあるか。
     for (const lv of lvs) {
       const s = summaries[PANEL_SUMMARY_PREFIX + lv];
       const snap = summaries[WATCH_SNAPSHOT_PREFIX + lv];
-      recorded += Number(s?.recordedCount) || 0;
-      official += Number(s?.officialCount ?? snap?.officialCommentCount) || 0;
+      const rec = Number(s?.recordedCount) || 0;
+      const off = Number(s?.officialCount ?? snap?.officialCommentCount) || 0;
+      recorded += rec;
+      official += off;
       const w = Number(snap?.viewerCountFromDom);
       if (Number.isFinite(w)) { watch += w; hasWatch = true; }
+      // 追いつき中判定は buildBackfillProgressLine の正本(放送中×記録あり×率<100)に揃える。
+      //   この時点に追いつき中があれば、全体の取得率が見かけ上下がるのは正常=trend の rate-declining を抑止。
+      const endedFlag = summaries[LIVE_ENDED_PREFIX + lv];
+      const ended = isLiveEndedFlag(endedFlag) ? endedFlag.endedAt : null;
+      const livePct = off > 0 ? (rec / off) * 100 : null;
+      if (!ended && rec > 0 && (livePct == null || livePct < 100)) catchingUp = true;
     }
     const ratePct = official > 0 ? Math.round((recorded / official) * 100) : null;
-    const kpi = { recorded, official, ratePct, watch: hasWatch ? watch : null };
+    const kpi = { recorded, official, ratePct, watch: hasWatch ? watch : null, catchingUp };
 
     const bag = await chrome.storage.local.get(KEY_STATUS_TREND);
     const prev = bag?.[KEY_STATUS_TREND] || null;

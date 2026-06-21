@@ -104,6 +104,33 @@ describe('analyzeTrend', () => {
     expect(f.message).toContain('100%→77%');
   });
 
+  it('v0.1.887: 同じ下落でも追いつき中(catchingUp)の点が含まれるなら rate-declining を出さない(新配信を開いた正常な下落)', () => {
+    // L91 と同じ単調低下だが、各点に catchingUp:true を付ける=放送中×率<100 の配信があった。
+    //   新配信を途中参加で開くと分母が判明して 100%→低% に落ちるのは正常=偽陽性を抑止する。
+    const pts = [
+      { recorded: 100, official: 100, ratePct: 100, catchingUp: true },
+      { recorded: 105, official: 112, ratePct: 94, catchingUp: true },
+      { recorded: 110, official: 128, ratePct: 86, catchingUp: true },
+      { recorded: 112, official: 145, ratePct: 77, catchingUp: true }
+    ];
+    const log = series(pts);
+    expect(analyzeTrend(log, T0 + 3 * 30_000).find((x) => x.id === 'rate-declining')).toBeUndefined();
+  });
+
+  it('v0.1.887: 追いつき中が解消済み(catchingUp:false)で単調低下なら rate-declining は従来どおり出す(本当の劣化)', () => {
+    // 全配信が終了/100%済み(catchingUp:false)なのに取得率が単調低下=本当の取りこぼし劣化。
+    const pts = [
+      { recorded: 100, official: 100, ratePct: 100, catchingUp: false },
+      { recorded: 105, official: 112, ratePct: 94, catchingUp: false },
+      { recorded: 110, official: 128, ratePct: 86, catchingUp: false },
+      { recorded: 112, official: 145, ratePct: 77, catchingUp: false }
+    ];
+    const log = series(pts);
+    const f = analyzeTrend(log, T0 + 3 * 30_000).find((x) => x.id === 'rate-declining');
+    expect(f).toBeTruthy();
+    expect(f.severity).toBe('warn');
+  });
+
   it('取得率が安定/上下に揺れるだけなら rate-declining は出さない', () => {
     const pts = [
       { recorded: 100, official: 100, ratePct: 100 },
