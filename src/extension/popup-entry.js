@@ -9523,12 +9523,15 @@ function paintTopSupportRankStyleIntoElement(el, rooms, opts) {
  * 北極星 +α 広告ランキング。`adContributionRanking` を応援帯と同型のランキングで表示し、
  * 無いときは鏡 HTML → reason 判定の順。
  */
-async function refreshNorthStarAdRankingLane() {
+async function refreshNorthStarAdRankingLane(liveId) {
   const bundle = _lastOfficialEventDomBundle;
   const snap = watchMetaCache.snapshot;
   const body = document.getElementById('northStarLaneBody-adRanking');
   const adRows = Array.isArray(bundle?.adContributionRanking) ? bundle.adContributionRanking : [];
-  const lid = watchPopupLastPaintedLiveId;
+  // v0.1.888: liveId を引数で受ける(他レーンと同じ作り)。連鎖の早回し時に
+  //   グローバル watchPopupLastPaintedLiveId がまだ空だと storage を読まず空描画(apiRows=4でも count=0)に
+  //   なっていた真因対策。引数があればそれを正本にし、無ければ従来どおりグローバルへフォールバック。
+  const lid = String(liveId || watchPopupLastPaintedLiveId || '').trim().toLowerCase();
   if (adRows.length > 0 && body instanceof HTMLElement) {
     trackAdAdvertiserCountForCelebration(lid, adRows.length);
     const rooms = officialDomRankingRowsToStripRooms(adRows, { userKeyKind: 'ad' });
@@ -10590,17 +10593,24 @@ async function refreshAllNorthStarMirrorLanes(liveId) {
         /* best-effort */
       });
     _northStarRenderProbe.lastReachedLane = 'after_gift_sync';
-    await refreshNorthStarContributionRankingLaneAsync(lid);
-    _northStarRenderProbe.lastReachedLane = 'after_contrib';
-    await refreshNorthStarGiftHistoryLaneAsync(lid);
-    _northStarRenderProbe.lastReachedLane = 'after_gift_history';
+    // v0.1.888: 各レーンを直列 await から【独立並列発火】に変更(真因対策)。
+    //   従来は貢献度→ギフト履歴→広告→イベント…を直列 await していたため、前段の重い/詰まる
+    //   レーン(実機: ギフト履歴の computeGiftHistoryNorthStarRoomsContext)で止まると、後段の
+    //   広告・イベントレーンへ到達せず【全部出ない】(状態速報 lastReachedLane=after_contrib・
+    //   apiRows=4 なのに広告 count=0)。各レーンは別 DOM 要素を描画し共有可変 state を書かない
+    //   (_giftHistoryNorthStarPaintKey はギフト専用)ので、並列化しても競合しない=1本が詰まっても
+    //   他は出る・全体の体感も「最も遅い1本」だけになる(直列の合算より速い)。
+    //   allSettled で1本の reject が他を巻き込まないよう二重に保険(各関数も内部 try/catch を持つ)。
     refreshNorthStarProgramPointsLane();
-    await refreshNorthStarAdRankingLane();
-    _northStarRenderProbe.lastReachedLane = 'after_ad';
-    await refreshNorthStarEventCurrentRankLaneAsync(lid);
     refreshNorthStarEventCumulativeScoreLane();
-    await refreshNorthStarEventBroadcastersLaneAsync(lid);
-    await refreshNorthStarEventVotingSupportersLaneAsync(lid);
+    await Promise.allSettled([
+      refreshNorthStarContributionRankingLaneAsync(lid),
+      refreshNorthStarGiftHistoryLaneAsync(lid),
+      refreshNorthStarAdRankingLane(lid),
+      refreshNorthStarEventCurrentRankLaneAsync(lid),
+      refreshNorthStarEventBroadcastersLaneAsync(lid),
+      refreshNorthStarEventVotingSupportersLaneAsync(lid)
+    ]);
     _northStarRenderProbe.lastReachedLane = 'after_event_lanes';
     // v0.1.617: 北極星レーン(ランキング系)の確定描画はここで完了とみなす。
     //   応援タイムライン / ギフト祝祭は「別DOM領域」で、かつ refreshSupportActivityTimeline は
