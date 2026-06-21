@@ -160,6 +160,47 @@ function renderLiveView(lv, data, nowMs) {
   if (rows && rows.length) {
     body.className = 'rank-grid';
     body.innerHTML = '';
+
+    // v0.1.873: popup と同じく先頭に「配信者タイル」(ラベル+アイコン+名前+フォロー)。snapshot から。
+    const casterName = broadcaster;
+    const casterIcon = String(snap.broadcasterIconUrl || '').trim();
+    const casterPage = String(snap.broadcasterPageUrl || '').trim();
+    if (casterName) {
+      const ct = document.createElement('div');
+      ct.className = 'rank-tile caster-tile';
+      const lab = document.createElement('div');
+      lab.className = 'tile-caster-label';
+      lab.textContent = '配信者';
+      ct.appendChild(lab);
+      const cav = document.createElement('div');
+      cav.className = 'tile-av';
+      if (casterIcon) {
+        const img = document.createElement('img');
+        img.src = casterIcon;
+        img.alt = '';
+        img.referrerPolicy = 'no-referrer';
+        img.addEventListener('error', () => { try { img.remove(); cav.textContent = '🎤'; } catch { /* no-op */ } });
+        cav.appendChild(img);
+      } else {
+        cav.textContent = '🎤';
+      }
+      ct.appendChild(cav);
+      const cn = document.createElement('div');
+      cn.className = 'tile-name';
+      cn.textContent = casterName;
+      ct.appendChild(cn);
+      if (casterPage) {
+        const f = document.createElement('a');
+        f.className = 'tile-follow';
+        f.href = casterPage;
+        f.target = '_blank';
+        f.rel = 'noopener';
+        f.textContent = 'プロフィール';
+        ct.appendChild(f);
+      }
+      body.appendChild(ct);
+    }
+
     const medals = ['🥇', '🥈', '🥉'];
     for (const r of rows.slice(0, 30)) {
       // v0.1.872: popup の応援者タイル(アイコン+名前+件数+userId)を live-view に再現。
