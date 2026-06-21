@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.878',
+    date: '2026-06-21',
+    summary: '匿名アイコンを本物identiconに+統計カードを追加(完全コピー)',
+    items: Object.freeze([
+      '応援ライブビューの残っていたアレンジを直し、ポップアップにさらに近づけました。①匿名コメントのアイコンが全部同じ絵になっていたのを、ポップアップと同じ「ユーザーごとに違う色のキャラ画像(identicon)」が出るようにしました。②ポップアップ上部にある統計カード(記録・来場・本家コメ・経過・広告pt・ギフトpt)をライブビューにも追加しました。これでポップアップのパネルがライブビューでも揃います。表示専用で記録・取得には影響しません。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.877',
     date: '2026-06-21',
     summary: '応援ライブビューを popup の本物のHTML/CSSで完全コピー',

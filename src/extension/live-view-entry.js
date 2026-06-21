@@ -19,6 +19,7 @@ import { buildNiconicoDefaultUserIconUrl } from '../lib/reportUserThumb.js';
 import { aggregateMarketingReport } from '../lib/marketingAggregate.js';
 import { buildSupporterRanking } from '../lib/supporterRanking.js';
 import { topSupportRankLineModels } from '../lib/topSupportRankStripLines.js';
+import { anonymousIdenticonDataUrl } from '../lib/anonymousIdenticon.js';
 import {
   isCommentDbAvailable,
   openCommentDb,
@@ -144,6 +145,41 @@ function updateCpm(recorded, nowMs) {
 
 /** @param {string} id */
 const $ = (id) => /** @type {HTMLElement} */ (document.getElementById(id));
+
+// v0.1.878: popup の統計カード(記録/来場/本家コメ/経過/広告pt/ギフトpt)を再現。値が無い項目は「—」。
+/** @param {{recorded:number|null, watch:number|null, official:number|null, elapsedText:string|null, adPt:number|null, giftPt:number|null}} v */
+function renderStatCards(v) {
+  const el = $('statCards');
+  if (!el) return;
+  const fmt = (/** @type {number|null} */ n) => (n == null ? '—' : Number(n).toLocaleString('ja-JP'));
+  const cards = [
+    ['記録', fmt(v.recorded), '応援コメント'],
+    ['来場', fmt(v.watch), '人'],
+    ['本家コメ', fmt(v.official), '公式'],
+    ['経過', v.elapsedText || '—', ''],
+    ['広告pt', fmt(v.adPt), ''],
+    ['ギフトpt', fmt(v.giftPt), '']
+  ];
+  el.innerHTML = '';
+  for (const [label, value, sub] of cards) {
+    const c = document.createElement('div');
+    c.className = 'stat-card';
+    const l = document.createElement('div');
+    l.className = 'stat-label';
+    l.textContent = label;
+    const val = document.createElement('div');
+    val.className = 'stat-value';
+    val.textContent = value;
+    c.append(l, val);
+    if (sub) {
+      const sb = document.createElement('div');
+      sb.className = 'stat-sub';
+      sb.textContent = sub;
+      c.appendChild(sb);
+    }
+    el.appendChild(c);
+  }
+}
 
 // v0.1.877: popup の renderTopSupportRankStrip と同じ1行(タイル)DOM を作る。クラスは popup と完全一致。
 //   model=topSupportRankLineModels の戻り(placeNumber/count/thumbSrc/idShort/nameLine/isUnknown/userKey)。
@@ -271,6 +307,14 @@ function renderLiveView(lv, data, nowMs) {
     $('lvMeta').appendChild(sp);
   }
 
+  // v0.1.878: popup の統計カード(記録/来場/本家コメ/経過/広告pt/ギフトpt)を再現。値は summary/snapshot から。
+  const official = num(s.officialCount) ?? num(snap.officialCommentCount);
+  const adPt = num(snap.officialAdPointsNdgr) ?? num(s.adPoints);
+  const giftPt = num(snap.officialGiftPointsNdgr) ?? num(s.giftPoints);
+  renderStatCards({
+    recorded, watch, official, elapsedText: elapsedText(elSec), adPt, giftPt
+  });
+
   // 盛り上がりメーター(分速→熱量)。
   const cpm = updateCpm(recorded, nowMs);
   const heat = computeHeatLevel(cpm);
@@ -300,7 +344,9 @@ function renderLiveView(lv, data, nowMs) {
     const models = topSupportRankLineModels(stripRooms, {
       defaultThumbSrc: STORY_GRID_DEFAULT_TILE_IMG,
       anonymousFallbackThumbSrc: STORY_GRID_DEFAULT_TILE_IMG,
-      colorScheme: 'light'
+      colorScheme: 'light',
+      // popup と同じ: 匿名は userId から決定的な identicon(色違いキャラ)を生成=全部同じ画像にしない。
+      anonymousIdenticonResolver: (/** @type {string} */ uid) => anonymousIdenticonDataUrl(uid, 64)
     });
     body.className = '';
     body.innerHTML = '';
