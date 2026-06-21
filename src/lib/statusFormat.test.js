@@ -22,7 +22,7 @@ describe('buildLaneStatusLine (v0.1.766 概要にレーン状況)', () => {
     };
     const line = buildLaneStatusLine(lanes);
     expect(line).toContain('公式値レーン:');
-    expect(line).toContain('貢献度:✅10');
+    expect(line).toContain('ギフト貢献:✅10');
     expect(line).toContain('番組pt:✅3350');
     expect(line).toContain('E順位:⏳取得中');
     expect(line).toContain('広告:空'); // ok だが 0=空
@@ -64,7 +64,7 @@ describe('buildLaneStatusLine (v0.1.766 概要にレーン状況)', () => {
       '+α_広告ランキング': { state: 'iframe_unrendered' }
     };
     const line = buildLaneStatusLine(lanes);
-    expect(line).toBe('公式値レーン: 貢献度:⏳取得中 / 広告:⏳取得中');
+    expect(line).toBe('公式値レーン: ギフト貢献:⏳取得中 / 広告:⏳取得中');
   });
 
   it('null/不正/空オブジェクトは空文字(fail-safe)', () => {
@@ -76,7 +76,7 @@ describe('buildLaneStatusLine (v0.1.766 概要にレーン状況)', () => {
 
   it('想定外の state はそのまま ⚠ 付きで出す(気づけるように)', () => {
     const line = buildLaneStatusLine({ '1_貢献度ランキング': { state: 'weird_new_state' } });
-    expect(line).toContain('貢献度:⚠weird_new_state');
+    expect(line).toContain('ギフト貢献:⚠weird_new_state');
   });
 
   it('v0.1.844: apiRows(Koken/Nicoad実数)を最優先=DOM空でも API取得済なら ✅件数(「空」誤報の根治)', () => {
@@ -87,7 +87,7 @@ describe('buildLaneStatusLine (v0.1.766 概要にレーン状況)', () => {
       '+α_広告ランキング': { state: 'ok', count: 0, apiRows: 10, foundCountLifetime: 0 }
     };
     const line = buildLaneStatusLine(lanes);
-    expect(line).toContain('貢献度:✅13');
+    expect(line).toContain('ギフト貢献:✅13');
     expect(line).toContain('広告:✅10');
     expect(line).not.toContain('空');
   });
@@ -96,7 +96,7 @@ describe('buildLaneStatusLine (v0.1.766 概要にレーン状況)', () => {
     const line = buildLaneStatusLine({
       '1_貢献度ランキング': { state: 'ok', count: 0, apiRows: 0, foundCountLifetime: 0 }
     });
-    expect(line).toBe('公式値レーン: 貢献度:空');
+    expect(line).toBe('公式値レーン: ギフト貢献:空');
   });
 });
 
