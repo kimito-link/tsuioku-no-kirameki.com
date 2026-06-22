@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.892',
+    date: '2026-06-22',
+    summary: '過去ログ取得が進まない箇所の細分計器を追加',
+    items: Object.freeze([
+      '過去ログ取得(backfill)が「起動はしているのにセグメントが進まない」状態の、さらに詳しい切り分け計器を追加しました。状態速報の過去ログ取得の項目に、取得ループを何回回したか(genSteps)と、そのラウンドの開始からの経過時間(roundAgoMs)を出します。これで「起動直後の最初の取得で詰まっている」のか「もう取り終わっていて空回りしている」のかを実データで判別できます(前回の計器で当初の見立てが外れたと分かったため、もう一段細かく観測します)。数字を出すだけで取得や記録の動きは変えていません。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.891',
     date: '2026-06-22',
     summary: '過去ログ取得が始まらない原因の計器を追加(真因特定用)',
