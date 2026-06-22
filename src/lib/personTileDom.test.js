@@ -89,8 +89,9 @@ describe('buildPersonTileEl', () => {
     expect(img?.className).toBe('nl-story-userlane-avatar');
     expect(img?.getAttribute('alt')).toBe('');
     expect(img?.getAttribute('decoding')).toBe('async');
-    // 2026-06-22 会場「全員500人」: 画面外の顔画像は遅延ロード(500枚同時デコード回避)。
-    expect(img?.getAttribute('loading')).toBe('lazy');
+    // 2026-06-22 会場「全員500人」: loading="lazy" は会場の3D変形でサムネ未ロードを招いたため撤回。
+    //   即ロードに戻した(lazy 属性は付けない)。遅延化は会場側 IntersectionObserver で別途。
+    expect(img?.getAttribute('loading')).toBe(null);
     // 子は img → meta の順
     expect(cell.children[0]).toBe(img);
     expect(cell.children[1]).toBe(meta);
