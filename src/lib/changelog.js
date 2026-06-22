@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.906',
+    date: '2026-06-22',
+    summary: '会場・ポップアップの顔アイコンを遅延読み込みにして軽くした',
+    items: Object.freeze([
+      '会場モードやポップアップで、画面に映っていない顔アイコンの読み込みをブラウザに後回しさせるようにしました(遅延読み込み)。大人数の配信で何百枚もの顔画像を一度に読み込んで重くなるのを防ぎ、最初の表示が軽くなります。表示される顔の内容や並びは変わりません。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.905',
     date: '2026-06-22',
     summary: '会場モードに参加者全員を顔付きで並べる(最大500席・縦スクロール)',

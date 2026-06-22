@@ -84,6 +84,11 @@ export function buildPersonTileEl(p, io) {
   img.title = tip;
   cell.title = tip;
   img.decoding = 'async';
+  // 2026-06-22 会場「全員500人」(council/venue-all-faces-500): 画面外の顔画像はブラウザに
+  //   読み込みを遅延させ、500枚同時デコードによる初期描画の重さを避ける(白化リスクなし=
+  //   読み込みタイミングを遅らせるだけ・load guard のフォールバックとも競合しない)。popup の
+  //   アイコン列・会場の席の両方(本物タイル共有)が軽くなる方向にだけ働く。
+  img.loading = 'lazy';
   if (io.isHttpOrHttpsUrl(img.src)) {
     img.referrerPolicy = 'no-referrer';
   }
