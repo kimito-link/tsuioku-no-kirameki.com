@@ -2842,6 +2842,9 @@ export function mountVenueBarButton(options = {}) {
           aggList,
           liveId,
           broadcasterUid: _bcUidForExclude,
+          // 会場(見せる場): 配信者ID未確定でも数値IDの常連(りんく段の実顔)を出す。隠すと常連が
+          //   全員消えて匿名だらけになる(実機で却下)。broadcasterUid が取れた時だけ本人除外は効く。
+          allowNumericWhenBroadcasterUnknown: true,
           viewerUid: '', // 会場は自分(viewer)の uid を持たない=自分除外なしで許容(過剰除外を避ける)
           snapshot: {
             broadcasterUserId: _bcUidForExclude,
