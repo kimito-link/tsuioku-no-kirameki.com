@@ -4786,6 +4786,16 @@
       ]
     },
     {
+      "file": "src/lib/storyLaneAvatarSrc.js",
+      "featureCount": 1,
+      "features": [
+        "popup"
+      ],
+      "labels": [
+        "ポップアップ(応援レーン)"
+      ]
+    },
+    {
       "file": "src/lib/storyUserLaneBuckets.js",
       "featureCount": 1,
       "features": [
