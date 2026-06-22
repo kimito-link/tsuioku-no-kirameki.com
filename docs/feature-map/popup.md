@@ -17,13 +17,13 @@ graph LR
   n_popup --> n_src_data_sources_laneFromStoredComments_js["data/sources/laneFromStoredComments.js"]
   n_popup --> n_src_data_store_laneStore_js["data/store/laneStore.js"]
   n_popup --> n_src_domain_lane_aggregate_js["domain/lane/aggregate.js"]
-  n_popup --> n_src_domain_lane_columns_kontaPolicy_js["domain/lane/columns/kontaPolicy.js"]
-  n_popup --> n_src_domain_lane_columns_linkPolicy_js["domain/lane/columns/linkPolicy.js"]
-  n_popup --> n_src_domain_lane_columns_tanuPolicy_js["domain/lane/columns/tanuPolicy.js"]
-  n_popup --> n_src_domain_lane_tier_js["domain/lane/tier.js"]
+  n_popup --> n_src_domain_lane_columns_kontaPolicy_js["domain/lane/columns/kontaPolicy.js"]:::shared
+  n_popup --> n_src_domain_lane_columns_linkPolicy_js["domain/lane/columns/linkPolicy.js"]:::shared
+  n_popup --> n_src_domain_lane_columns_tanuPolicy_js["domain/lane/columns/tanuPolicy.js"]:::shared
+  n_popup --> n_src_domain_lane_tier_js["domain/lane/tier.js"]:::shared
   n_popup --> n_src_domain_user_avatar_js["domain/user/avatar.js"]
   n_popup --> n_src_domain_user_identity_js["domain/user/identity.js"]:::shared
-  n_popup --> n_src_domain_user_nickname_js["domain/user/nickname.js"]
+  n_popup --> n_src_domain_user_nickname_js["domain/user/nickname.js"]:::shared
   n_popup --> n_src_extension_story_renderStoryUserLaneDom_js["extension/story/renderStoryUserLaneDom.js"]
   n_popup --> n_src_lib_acquisitionDashboardChart_js["lib/acquisitionDashboardChart.js"]
   n_popup --> n_src_lib_adLanePicksFromRooms_js["lib/adLanePicksFromRooms.js"]
