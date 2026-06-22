@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.910',
+    date: '2026-06-22',
+    summary: '状態速報が重くなったのを修正(応援レーンセルの読込を間引きに)',
+    items: Object.freeze([
+      '前バージョンで状態速報ページに「応援レーン」セルを追加した際、毎回の読み込み処理を1つ増やしてしまい、ページが重くなっていました。この読み込みを他の補助データと同じ「12秒ごと」の間引きに移し、状態速報が会場モードを開く前から重くならないように戻しました。セル自体は引き続き表示されます。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.909',
     date: '2026-06-22',
     summary: '健全度パネルに応援レーンの人数整合セルを追加',
