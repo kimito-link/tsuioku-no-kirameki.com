@@ -124,6 +124,14 @@ bootstrap().catch((err) => {
 });
 
 async function bootstrap() {
+  // status-guard.js(「何があっても開く」保険)への合図: 本体が起動したことを伝え、
+  //   guard の起動見張り(BOOT_TIMEOUT_MS)を解除する。これより後の描画が重くても guard は黙る。
+  //   guard はこのフラグを読むだけ=本体の挙動には一切干渉しない(疎結合)。
+  try {
+    window.__NL_STATUS_BOOTED = true;
+  } catch {
+    /* no-op */
+  }
   // バージョン + ビルド ID 表示(popup と同じ `v<version>・build<id>`)。
   //   v0.1.642: ビルド番号だけだと「今どのバージョンか」が分からず紛らわしいので
   //   manifest の version も併記する(watch パネルの「ビルド v0.1.642・b...」と揃える)。

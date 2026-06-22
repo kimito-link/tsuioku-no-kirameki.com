@@ -1,6 +1,6 @@
 {
   "name": "nicolivelog",
-  "version": "0.1.903",
+  "version": "0.1.904",
   "private": true,
   "description": "ニコ生コメント記録プロトタイプ（拡張）",
   "type": "module",
@@ -35,6 +35,7 @@
     "test:e2e:lp": "npx playwright test --config=playwright.lp.config.js",
     "test:e2e:ci": "npx playwright test",
     "playwright:install": "playwright install chromium",
+    "council:cleanup": "node scripts/council-cleanup.mjs",
     "inspect:watch-stats": "node scripts/inspect-nicolive-watch-stats.mjs",
     "vendor:visual-explainer": "node scripts/vendor-visual-explainer.mjs",
     "gen:marketing-avatars": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/resize-marketing-html-avatars.ps1 && node scripts/encode-marketing-html-avatars.mjs",

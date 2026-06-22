@@ -79,7 +79,10 @@ export default [
     rules: { 'max-lines': ['error', { max: 17267, skipBlankLines: false, skipComments: false }] }
   },
   {
-    files: ['extension/background.js'],
+    // extension/ 直下の素のスクリプト(esbuild を通さず同梱する .js)。background.js と
+    //   status-guard.js(「何があっても開く」保険・v0.1.904)。dist/ の minified 出力とは別物で、
+    //   人が書く非モジュールのブラウザ用スクリプト。chrome.* と browser globals を許す。
+    files: ['extension/*.js'],
     languageOptions: {
       ecmaVersion: 2022,
       sourceType: 'script',
