@@ -5380,7 +5380,11 @@ function renderStoryUserLane() {
   }
 
   const laneDisplayedTotal = picked.length + buckets.gift.length + buckets.ad.length;
-  paintStoryUserLaneDomFilled(els, faces, buckets, laneDisplayedTotal, laneDomIo);
+  // 2026-06-22(council/lane-show-all-active): 素性が取れた候補総数(cap 前)を渡し、limit 48 で
+  //   切られたぶんを「ほか M人は会場モードで全員見られます」と誠実に併記する(黙って切らない)。
+  paintStoryUserLaneDomFilled(els, faces, buckets, laneDisplayedTotal, laneDomIo, {
+    totalCandidates: candidates.length
+  });
   setTimeout(() => {
     if (typeof window !== 'undefined' && window.__NLS_LANE_DIAG__) {
       window.__NLS_LANE_DIAG__();
@@ -5624,6 +5628,8 @@ async function paintStoryUserLaneCoalesced(liveId, displayEntries, storageRows) 
     officialDomRankingRowsToStripRooms(nicoadApiRows, { userKeyKind: 'ad' }),
     {
       yukkuriFaceFor: (key) => anonymousIdenticonDataUrl(String(key || ''), 64),
+      // 2026-06-22(council/lane-show-all-active): 数値ID付き広告主の個人サムネ導出は adLanePicksFromRooms
+      //   が内蔵(広告API が thumbnailUrl を返さなくても「ぱき」等サムネ持ちがゆっくり顔に化けない)。
       limit: giftLimit
     }
   );

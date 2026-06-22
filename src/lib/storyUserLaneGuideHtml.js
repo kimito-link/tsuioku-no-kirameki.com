@@ -65,23 +65,37 @@ export function buildStoryUserLaneGuideTanuHtml(faceTanu) {
   );
 }
 
-/** @param {number} displayCount */
-export function buildStoryUserLaneGuideFootHtml(displayCount) {
+/**
+ * @param {number} displayCount レーンに並べた件数(cap 後)
+ * @param {number} [totalCandidates] 素性が取れた候補の総数。displayCount より多ければ「ほか M人」を併記。
+ *   2026-06-22(council/lane-show-all-active): popup レーンは limit 48 で打ち切るため、48 を超える配信で
+ *   「素性が取れた人が他にもいるのに黙って切る」不誠実が起きていた(実機522人中48人しか出ず)。
+ *   何人いるかを正直に出し、全員は会場モードで見られると案内する。
+ */
+export function buildStoryUserLaneGuideFootHtml(displayCount, totalCandidates) {
   const n = Math.max(0, Math.floor(Number(displayCount) || 0));
-  return `<p class="nl-story-userlane-guide__foot" aria-live="polite">${escapeHtml(`いま ${n} 件を表示中`)}</p>`;
+  const total = Math.max(0, Math.floor(Number(totalCandidates) || 0));
+  const others = total > n ? total - n : 0;
+  const text =
+    others > 0
+      ? `いま ${n} 件を表示中（ほか ${others}人は会場モードで全員見られます）`
+      : `いま ${n} 件を表示中`;
+  return `<p class="nl-story-userlane-guide__foot" aria-live="polite">${escapeHtml(text)}</p>`;
 }
 
 /**
  * レーン直下の「表示枠」と「記録コメント総数」をつなぐ（診断ブロックの total と同じ数を渡すこと）。
  * @param {number} laneDisplayedSlots 三段レーンに並べた合計枠数（dedupe+cap 後）
  * @param {number|undefined|null} recordedCommentRowsTotal 当放送の記録コメント行数。未指定・非有限・0 以下なら第2文なし。
+ * @param {number} [totalCandidates] 素性が取れた候補の総数（cap 前）。表示枠より多ければ「ほか M人」を併記。
  * @returns {string}
  */
 export function buildStoryUserLaneGuideFootAndRecordedHtml(
   laneDisplayedSlots,
-  recordedCommentRowsTotal
+  recordedCommentRowsTotal,
+  totalCandidates
 ) {
-  const foot = buildStoryUserLaneGuideFootHtml(laneDisplayedSlots);
+  const foot = buildStoryUserLaneGuideFootHtml(laneDisplayedSlots, totalCandidates);
   if (
     recordedCommentRowsTotal == null ||
     !Number.isFinite(Number(recordedCommentRowsTotal))
