@@ -6364,6 +6364,8 @@ function buildAiShareFastDiagnosticsPayload() {
         manualEnabled: _backfillEnabled,
         triedLiveId: String(_backfillTriedLiveId || ''),
         lastSkip: String(_backfillLastSkipReason || ''), // v0.1.891: runNdgrBackfillOnce が抜けた理由(no_view_base 等)
+        genSteps: _backfillRoundDiag.genSteps, // v0.1.892: 起動後 gen.next() を回した回数(0=初回fetchで詰まる/>0=空区画を回している)
+        roundAgoMs: _backfillRoundDiag.roundStartedAt > 0 ? Date.now() - _backfillRoundDiag.roundStartedAt : null, // v0.1.892: このラウンド開始からの経過
         running: _backfillAbort != null,
         seg: _backfillProgress.seg,
         rows: _backfillProgress.rows,
@@ -8980,6 +8982,8 @@ function buildAiSharePageDiagnostics() {
         manualEnabled: _backfillEnabled,
         triedLiveId: String(_backfillTriedLiveId || ''),
         lastSkip: String(_backfillLastSkipReason || ''), // v0.1.891: runNdgrBackfillOnce が抜けた理由(no_view_base 等)
+        genSteps: _backfillRoundDiag.genSteps, // v0.1.892: 起動後 gen.next() を回した回数(0=初回fetchで詰まる/>0=空区画を回している)
+        roundAgoMs: _backfillRoundDiag.roundStartedAt > 0 ? Date.now() - _backfillRoundDiag.roundStartedAt : null, // v0.1.892: このラウンド開始からの経過
         running: _backfillAbort != null,
         seg: _backfillProgress.seg,
         rows: _backfillProgress.rows,
@@ -15417,6 +15421,11 @@ const NDGR_BACKFILL_TRANSIENT_RETRY_DELAY_MS = 20_000;
  * v0.1.692: errMsg を持つ。aborted の真因(crawl 例外メッセージ)を status 診断へ保全する。
  */
 const _backfillProgress = { seg: 0, rows: 0, done: 0, stopReason: '', errMsg: '' };
+/** v0.1.892: seg:0 で止まる箇所の細分計器(会議 backfill-stuck-seg0 の続き)。lastSkip:"started" の【先】=
+ *  crawlNdgrBackward 起動後に gen.next() を何回回したか(genSteps)・このラウンド開始からの経過(roundStartedAt)。
+ *  genSteps=0 のまま running=初回 gen.next() が pending(初回fetch/seek で詰まる)。genSteps>0 で seg:0=
+ *  空区画を回し続けている(完了済みで取るもの無し or seed 探索が空)。状態速報 romiDebug.backfill に出す(純観測)。 */
+const _backfillRoundDiag = { genSteps: 0, roundStartedAt: 0 };
 /** @type {number} バックフィル進捗が最後に動いた時刻 */
 let _backfillLastProgressAt = 0;
 /**
@@ -15801,8 +15810,13 @@ async function runNdgrBackfillOnce(ctx = {}) {
       signal: ac.signal
     });
 
+    // v0.1.892: このラウンドの観測リセット(seg:0 で止まる箇所の細分計器)。
+    _backfillRoundDiag.genSteps = 0;
+    _backfillRoundDiag.roundStartedAt = Date.now();
+
     for (;;) {
       const step = await gen.next();
+      _backfillRoundDiag.genSteps += 1; // v0.1.892: gen.next() を回した回数(初回 pending 切り分け用)。
       if (step.done) {
         // v0.1.415: generator の return 値（{ stopReason, ... }）を捕捉する。これまで捨てて
         //   いたため、time-out/混雑/入口なしで途中終了しても finally が一律 done=1 を立て、
