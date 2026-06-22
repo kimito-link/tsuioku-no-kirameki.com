@@ -319,10 +319,20 @@ const VENUE_CSS = `
     position: relative;
     z-index: 1;
     display: grid;
-    width: min(1500px, 100%);
+    /*
+     * 2026-06-22 会場スペース拡大(ユーザー要望「席を画面いっぱいに広げる」):
+     *   旧 width:min(1500px,100%);margin:0 auto は広い画面で左右に余白を残し、seatsHost の
+     *   clientWidth が 1500px で頭打ち→perRow(seatsPerRow)が伸びず席が画面端まで並ばなかった
+     *   (実機「会場スペースが狭い」不満の核)。全幅にすると seatsHost.clientWidth=実画面幅となり
+     *   perRow が自然に増え、resolveVisibleArenaCount(perRow×8段)で同時表示席が画面端まで埋まる。
+     *   「全員載せる」ロジック(buildVenueSeating の論理席/resolveDynamicArenaCap の人数連動上限)は
+     *   一切変えない=全幅化で『ほか N人』に回る人が減り、より多くが席に出る方向にだけ働く。
+     *   映像セーフエリア(上段 safe)は縦分割で守られるので全幅でも映像は覆わない。
+     */
+    width: 100%;
     height: 100%;
     min-height: 0;
-    margin: 0 auto;
+    margin: 0;
     grid-template-rows: minmax(0, 1fr) auto;
     grid-template-areas:
       "safe"
