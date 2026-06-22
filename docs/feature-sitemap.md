@@ -253,7 +253,7 @@
   - `src/lib/giftThrowProjectile.js`
 - **吹き出し寿命管理** — 会場の吹き出しの表示上限・追い出し(eviction)ライフサイクル
   - `src/lib/venueBubbleLifecycle.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 150</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 152</summary>
 
 - `scripts/encode-marketing-html-avatars.mjs` — extension/images/marketing-html-avatars/*.png を data URI にし、
 - `scripts/split-avatar-parts.mjs` — 偽市松背景の除去 + パーツ切り出し(one-off アセットパイプライン)
@@ -365,12 +365,14 @@
 - `src/lib/selfActionCelebration.js` — アプリから自分が操作した直後に返す軽量演出の spec。
 - `src/lib/sessionCommentCache.js` — v0.1.650: JSONキャッシュ即時表示の本丸。「開いた瞬間に全コメント表示・ローディングなし」。
 - `src/lib/storyAvatarDiagLine.js` — 応援グリッド用・診断表示（PII なし・件数のみ）。
+- `src/lib/storyAvatarTvFallbackClass.js` — 人物タイル/アイコンの「リモートサムネ取得失敗→ゆっくりTVスタイルへ落とす」class 付け外しの正本。
 - `src/lib/storyGrowthLimits.js` — りんく成長グリッド（story growth）の描画上限。
 - `src/lib/storyTileTvStyle.js` — ストーリータイル / レーンアバターで「ゆっくり風キャラ画像かどうか」を判定する純関数。
 - `src/lib/storyUserLaneBuckets.js` — 応援ユーザーレーン: ソート済み候補を tier（profileTier）別に上限付きで分割する。
 - `src/lib/storyUserLaneContaminationGuard.js` — 応援ユーザーレーン候補から、視聴者/配信者 UID の混入を除外する判定。
 - `src/lib/storyUserLaneDisplaySrc.js` — 応援ユーザーレーン（りんく・こん太・たぬ姉）のセル画像 URL。
 - `src/lib/storyUserLaneGuideHtml.js` — 応援ユーザーレーンの案内 HTML（ポップアップ・E2E と共有）
+- `src/lib/storyUserLaneMeta.js` — 応援ユーザーレーン(=popup「アイコン列・グリッド・診断」)の人物タイルに出す
 - `src/lib/storyUserLaneRowModel.js` — 応援ユーザーレーン: 1 ユーザー候補あたりの tier・サムネ・ソート用スコアを一箇所で組み立てる。
 - `src/lib/suggestInitialInlinePanelPlacement.js` — 新規インストール直後の「おすすめ」インライン配置（storage 未設定時のみ migrate が使う）。
 - `src/lib/supportCelebration.js` — 配信中のマイルストーン演出（コメント件数・イベント順位 UP・ギフト件数）の判定。
@@ -693,7 +695,7 @@
 
 ## 🧬 修正系譜マップ(この系統のバグを過去にどう直したか)
 
-> changelog 全 236 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
+> changelog 全 237 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
 
 ### 💾 記録件数 (34版)
 - `v0.1.895` 2026-06-22 — 読み上げが止まったまま戻らない固着を自動回復+停止位置の計器
@@ -884,7 +886,8 @@
 - `v0.1.668` 2026-06-10 — パネルに「💬コメビュ」ボタンを追加
 - `v0.1.667` 2026-06-10 — コメビュに匿名OKのニックネーム・ラベル・メモ
 
-### 🏟 会場・席 (90版)
+### 🏟 会場・席 (91版)
+- `v0.1.901` 2026-06-22 — 配信者本人を応援者一覧・会場の席から除外する
 - `v0.1.900` 2026-06-22 — 会場の席をポップアップの「アイコン列」と同じ本物の描画で表示する
 - `v0.1.899` 2026-06-22 — 会場モードの席を画面いっぱいに広げる(中央寄せの余白を撤廃)
 - `v0.1.898` 2026-06-22 — 会場モードの「壁で覆う」を撤回=映像とコメント欄を隠さない

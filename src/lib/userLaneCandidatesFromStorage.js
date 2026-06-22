@@ -124,6 +124,14 @@ export function userLaneCandidatesFromStorage(storedComments, liveId, opts) {
   /** @type {UserLaneCandidateFromStorage[]} */
   const built = [];
   for (const [userId, group] of byUid) {
+    // v0.1.901: 配信者本人(放送主)は「応援者(viewer)」ではないので席/レーンから除外する。
+    //   実機(lv350805294 peropanda)で本人が会場席に座っていた=既存 guard は「配信者アイコンが
+    //   他人に化けるのを剥がす」だけで【本人の候補そのものを落としていなかった】(真因)。
+    //   本人除外は uid 一致だけで判定できる(iconUrl は不要=アイコン化け防止用)ので、
+    //   broadcasterUid が取れていれば iconUrl の有無によらず本人を弾く。
+    if (broadcasterUid && userId === broadcasterUid) {
+      continue;
+    }
     const chronological = [...group].sort(
       (a, b) => rowCapturedAt(a) - rowCapturedAt(b)
     );

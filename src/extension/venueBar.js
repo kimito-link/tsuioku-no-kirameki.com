@@ -2697,10 +2697,22 @@ export function mountVenueBarButton(options = {}) {
         // broadcaster ctx が読めなくても会場は止めない(guard 無効のまま集計続行)。
       }
       const _bcUsable = isBroadcasterCtxUsableForGuard(_bcCtx, liveId);
+      // v0.1.901: 配信者【本人除外】は uid だけで効く(iconUrl 不要)。アイコン化け防止(iconUrl 必須)とは
+      //   別物なので、uid と配信が一致していれば iconUrl の有無によらず broadcasterUid を渡す。
+      //   これで iconUrl 未取得でも本人(放送主)が会場席に座るのを防ぐ。配信一致は
+      //   isBroadcasterCtxUsableForGuard と同じ規則(ctx.liveId 空は後方互換で許容)で判定する。
+      const _bcLiveMatches = (() => {
+        const cur = String(liveId ?? '').trim().toLowerCase();
+        const own = String(_bcCtx.liveId ?? '').trim().toLowerCase();
+        return !(cur && own && cur !== own);
+      })();
+      const _bcUidForExclude = _bcCtx.uid && _bcLiveMatches ? _bcCtx.uid : '';
       // v0.1.740: requireText:true で「実際にコメントした人(本文あり)」だけを参加者にする。
       const LANE_OPTS = {
         requireText: true,
-        broadcasterUid: _bcUsable ? _bcCtx.uid : '',
+        // 本人除外は uid だけで効くので _bcUidForExclude(iconUrl 不問)。アイコン化け防止の
+        //   broadcasterIconUrl は従来どおり両方そろった _bcUsable 時のみ(誤除外を避ける)。
+        broadcasterUid: _bcUidForExclude,
         broadcasterIconUrl: _bcUsable ? _bcCtx.iconUrl : ''
       };
       if (isChunkIndex(index, liveId) && Array.isArray(/** @type {any} */ (index).seqs)) {
