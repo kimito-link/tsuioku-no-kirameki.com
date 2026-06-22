@@ -7,7 +7,8 @@ import { shouldRescueEmptyResolvedWatch } from '../lib/popupContextBarModel.js';
 import { refreshTaskGuarded } from '../lib/refreshTaskGuard.js';
 import { decideVisibilityAction } from '../lib/popupVisibilityGate.js';
 import { executeScriptWithTimeout } from '../lib/executeScriptWithTimeout.js';
-import { formatNicknameWithUidFallback } from '../lib/giftDisplayNickname.js';
+// formatNicknameWithUidFallback は storyUserLaneMetaLines を lib 抽出した際に popup での
+//   直接利用が無くなった(storyUserLaneMeta.js が import する)。
 import { backfillRemoveGiftSystemMessages } from '../lib/backfillRemoveGiftSystemMessages.js';
 import {
   backfillRemoveRecommendedLivePollution,
@@ -118,10 +119,8 @@ import {
 import { northStarLaneGadgetCharaPathByTier } from '../lib/northStarLaneGadgetChara.js';
 import { buildNorthStarAdRankingStatsHtml } from '../lib/buildNorthStarAdRankingStatsHtml.js';
 import { shouldAssociateAvatarWithUser, isAvatarUrlForUserId } from '../lib/avatarBroadcasterGuard.js';
-import {
-  anonymousNicknameFallback,
-  compactNicoLaneUserId
-} from '../lib/nicoAnonymousDisplay.js';
+// anonymousNicknameFallback / compactNicoLaneUserId は storyUserLaneMetaLines を lib 抽出した際に
+//   popup での直接利用が無くなった(storyUserLaneMeta.js が import する)。
 import {
   KEY_INLINE_PANEL_WIDTH_MODE,
   KEY_INLINE_PANEL_PLACEMENT,
@@ -423,7 +422,6 @@ import { pickLatestCommentEntry } from '../lib/pickLatestComment.js';
 import {
   aggregateCommentsByUser,
   displayUserLabel,
-  shortUserKeyDisplay,
   UNKNOWN_USER_KEY
 } from '../lib/userRooms.js';
 import {
@@ -458,6 +456,8 @@ import {
   paintStoryUserLaneDomFilled,
   resetStoryUserLaneDom
 } from './story/renderStoryUserLaneDom.js';
+// 人物タイルの ID 行・名前行の正本(person-tile-unify 第3コミット)。popup と会場で共有。
+import { storyUserLaneMetaLines } from '../lib/storyUserLaneMeta.js';
 import { anonymousIdenticonDataUrl } from '../lib/anonymousIdenticon.js';
 import { upgradeAnonymousAvatarImage, upgradeAnonymousAvatarImageFromFallback, upgradeAnonymousAvatarImages } from '../lib/avatarPartsComposer.js';
 import { resolveReportUserThumbSrc } from '../lib/reportUserThumb.js';
@@ -500,6 +500,11 @@ import {
 } from '../lib/exportWaitNarration.js';
 import { playReportCompleteVoiceSequence } from '../lib/reportCompleteVoice.js';
 import { createSupportAvatarLoadGuard } from '../lib/supportGrowthAvatarLoad.js';
+// avatar load guard のコールバック(TV-fallback クラス付け外し)の正本。popup と会場で共有。
+import {
+  applyStoryAvatarTvFallbackClass,
+  removeStoryAvatarTvFallbackClass
+} from '../lib/storyAvatarTvFallbackClass.js';
 import { entriesRelatedForStoryDetail } from '../lib/storyDetailRelatedEntries.js';
 import { storageErrorRelevantToLiveId } from '../lib/storageErrorState.js';
 import {
@@ -3753,40 +3758,9 @@ const STORY_REMOTE_FAILED_PLACEHOLDER_IMG = NICONICO_OFFICIAL_DEFAULT_USERICON_H
 // 0.1.37 (AL): storyTileUsesYukkuriTvStyle を src/lib/storyTileTvStyle.js に
 // 切り出し済み。chrome / DOM 依存なしの純粋関数。
 
-/** @param {HTMLImageElement} img */
-function applyStoryAvatarTvFallbackClass(img) {
-  if (!(img instanceof HTMLImageElement)) return;
-  try {
-    const s = String(img.currentSrc || img.src || '');
-    if (/nicoaccount\/usericon\/defaults\//i.test(s)) return;
-  } catch {
-    // no-op
-  }
-  if (img.classList.contains('nl-story-userlane-avatar')) {
-    img.classList.add('nl-avatar--tv-fallback');
-    return;
-  }
-  if (img.classList.contains('nl-story-growth-icon')) {
-    img.classList.add('nl-story-growth-icon--tv-fallback');
-    return;
-  }
-  if (img.classList.contains('nl-story-detail-img')) {
-    img.classList.add('nl-story-detail-img--tv-fallback');
-  }
-}
-
-/** @param {HTMLImageElement} img */
-function removeStoryAvatarTvFallbackClass(img) {
-  if (!(img instanceof HTMLImageElement)) return;
-  img.classList.remove(
-    'nl-story-growth-icon--tv-fallback',
-    'nl-story-detail-img--tv-fallback',
-    'nl-avatar--tv-fallback'
-  );
-  if (isHttpOrHttpsUrl(img.src)) {
-    img.referrerPolicy = 'no-referrer';
-  }
-}
+// applyStoryAvatarTvFallbackClass / removeStoryAvatarTvFallbackClass は
+//   person-tile-unify 第3コミット(2026-06-22)で src/lib/storyAvatarTvFallbackClass.js に抽出し、
+//   popup と会場(venueBar.js)で同じ本物を avatar load guard のコールバックに渡す(上部で import)。
 
 const storyAvatarLoadGuard = createSupportAvatarLoadGuard({
   fallbackSrc: STORY_REMOTE_FAILED_PLACEHOLDER_IMG,
@@ -4637,58 +4611,9 @@ function storyGrowthTileSrcForEntry(entry, liveId, entries = STORY_SOURCE_STATE.
   return pickSupportGrowthTileForStory(entry?.userId, '');
 }
 
-/**
- * ユーザーレーンの ID 行・名前行（プランの文言ルール）
- * @param {PopupCommentEntry|null|undefined} entry
- * @param {unknown} httpCandidate storyGrowthAvatarSrcCandidate の戻り
- * @param {string} [userLaneDedupeKey] userLaneDedupeKey の戻り（t: / s: は userId 無しでも列に載る理由の表示用）
- */
-function storyUserLaneMetaLines(entry, httpCandidate, userLaneDedupeKey = '') {
-  const uid = String(entry?.userId || '').trim();
-  const nick = String(entry?.nickname || '').trim();
-  const hasHttp = isHttpOrHttpsUrl(httpCandidate);
-  const dk = String(userLaneDedupeKey || '');
-
-  if (!uid) {
-    if (dk.startsWith('t:')) {
-      return {
-        idLine: '—',
-        nameLine: 'ユーザーID未取得（サムネURLで区別）'
-      };
-    }
-    if (dk.startsWith('s:')) {
-      return {
-        idLine: '—',
-        nameLine: 'ユーザーID未取得（行IDで区別）'
-      };
-    }
-    return { idLine: '—', nameLine: 'ID未取得' };
-  }
-
-  if (isAnonymousStyleNicoUserId(uid)) {
-    const idLine = compactNicoLaneUserId(uid);
-    const nameLine = anonymousNicknameFallback(uid, nick);
-    return {
-      idLine: idLine || '—',
-      nameLine: nameLine || '—'
-    };
-  }
-
-  const idLine = shortUserKeyDisplay(uid) || uid;
-  const numeric = /^\d{5,14}$/.test(uid);
-  if (numeric && hasHttp && nick) {
-    return { idLine, nameLine: nick };
-  }
-  if (numeric && !nick) {
-    // 0.1.183: ニックネーム未取得の数値 ID は「（未取得）」より「u/<uid>」表示で
-    // ID として扱える形にする（avatar あり / nickname 空 のケース）
-    return { idLine, nameLine: formatNicknameWithUidFallback(uid, '') || '（未取得）' };
-  }
-  if (nick) {
-    return { idLine, nameLine: nick };
-  }
-  return { idLine, nameLine: formatNicknameWithUidFallback(uid, '') || '（未取得）' };
-}
+// storyUserLaneMetaLines は person-tile-unify 第3コミット(2026-06-22)で
+//   src/lib/storyUserLaneMeta.js に純関数抽出し、popup と会場(venueBar.js)で共有する正本に
+//   なった。挙動は1mm不変(同名 import を上部で追加)。会場の席を popup と同じ表記にするため。
 
 const STORY_HOP_STATE = {
   clearTimer: /** @type {ReturnType<typeof setTimeout>|null} */ (null)

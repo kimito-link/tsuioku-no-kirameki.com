@@ -74,6 +74,22 @@ import {
 import { enrichVenueRowsWithProfileAvatars } from '../lib/venueAvatar.js';
 import { nicoUserPageUrl, anonymousDisplayLabel } from '../lib/nicoUserPage.js';
 import { isNumericNicoUserId } from '../domain/user/identity.js';
+// person-tile-unify 第3コミット(2026-06-22): 会場の席タイルを popup の本物ビルダーで描く。
+//   独自DOM生成をやめ、popup「アイコン列・グリッド・診断」と同じ顔ぶれ・見た目にする。
+//   依存(io)も popup と同じ本物を会場が生成・import する(スタブ化しない)。
+import { buildPersonTileEl } from '../lib/personTileDom.js';
+import { createSupportAvatarLoadGuard } from '../lib/supportGrowthAvatarLoad.js';
+import {
+  applyStoryAvatarTvFallbackClass,
+  removeStoryAvatarTvFallbackClass
+} from '../lib/storyAvatarTvFallbackClass.js';
+import { storyTileUsesYukkuriTvStyle } from '../lib/storyTileTvStyle.js';
+import { upgradeAnonymousAvatarImage } from '../lib/avatarPartsComposer.js';
+import {
+  isHttpOrHttpsUrl,
+  NICONICO_OFFICIAL_DEFAULT_USERICON_HTTPS
+} from '../lib/supportGrowthTileSrc.js';
+import { storyUserLaneMetaLines } from '../lib/storyUserLaneMeta.js';
 import {
   seatsPerRow,
   resolveVisibleArenaCount,
@@ -153,6 +169,27 @@ const VENUE_LAYOUT_CLASSES = [
 
 /** ひな壇の段 DOM を用意する数。buildVenueTiers の最大段数(8)に一致させること。 */
 const VENUE_MAX_TIER_NODES = 8;
+
+/**
+ * 会場の席タイル(buildPersonTileEl)に渡す avatar load guard と I/O。
+ *   popup-entry.js の storyAvatarLoadGuard(L3793)と【同設定】で会場が自前に持つ。
+ *   コールバック(TV-fallback クラス付け外し)も popup と同じ本物を import(スタブ化しない)。
+ *   会場は content script の別レイヤー/別バンドルなので、popup のインスタンスは届かない=
+ *   同じ lib の本物から会場が同設定で生成する(live-view が io を自前で組むのと同型)。
+ */
+const venueAvatarLoadGuard = createSupportAvatarLoadGuard({
+  fallbackSrc: NICONICO_OFFICIAL_DEFAULT_USERICON_HTTPS,
+  onFallbackApplied: applyStoryAvatarTvFallbackClass,
+  onRemoteSuccess: removeStoryAvatarTvFallbackClass
+});
+
+/** buildPersonTileEl(p, io) の io 引数。popup の laneDomIo(popup-entry.js:5232)と同形。 */
+const venuePersonTileIo = {
+  storyAvatarLoadGuard: venueAvatarLoadGuard,
+  isHttpOrHttpsUrl,
+  storyTileUsesYukkuriTvStyle,
+  upgradeAnonymousAvatarImage
+};
 
 /**
  * 診断パネル等で表示名を innerHTML に差し込む前に HTML エスケープする。
@@ -780,16 +817,62 @@ const VENUE_CSS = `
     pointer-events: none;
     filter: blur(0.5px);
   }
-  .nlsb-seat.nlsb-is-empty .nlsb-icon {
-    background-color: rgba(255, 255, 255, 0.05);
-    border-color: transparent;
-    box-shadow: none;
-    background-image: 
-      radial-gradient(circle at 50% 35%, #fff 25%, transparent 26%),
-      radial-gradient(circle at 50% 120%, #fff 55%, transparent 56%);
+  /* person-tile-unify 第3コミット(2026-06-22): 席タイル本体は popup の本物 buildPersonTileEl が
+     描く .nl-story-userlane-cell(a/span > img.nl-story-userlane-avatar + span.nl-story-userlane-meta)。
+     会場は「大きい丸アバター+下に名前」の独自の見せ方を、本物タイルの【構造に被せる】CSS で再現する
+     (タイル本体の DOM/クラスは1バイトも変えない=personTileDom.js の設計どおり)。
+     ↓ 本物タイルを会場仕様に: 横並び(popup)→縦並び(会場)・アバターを大きい丸に。 */
+  .nlsb-seat .nl-story-userlane-cell {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    padding: 0;
+    border-radius: 0;
+    text-decoration: none;
+    color: inherit;
   }
-  .nlsb-seat.nlsb-is-empty .nlsb-name {
-    display: none;
+  /* アバター(丸): 会場の旧 .nlsb-icon の見た目を本物タイルの img に効かせる。 */
+  .nlsb-seat .nl-story-userlane-avatar {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 1px solid rgba(255, 255, 255, 0.35);
+    box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.12);
+    background: rgba(255, 255, 255, 0.05);
+    flex: 0 0 auto;
+  }
+  /* 名前/ID(meta): 会場の旧 .nlsb-name の見た目を本物タイルの meta に効かせる。 */
+  .nlsb-seat .nl-story-userlane-meta {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0;
+    max-width: 100%;
+    min-width: 0;
+    text-align: center;
+  }
+  .nlsb-seat .nl-story-userlane-meta__id,
+  .nlsb-seat .nl-story-userlane-meta__name {
+    max-width: 100%;
+    overflow: hidden;
+    color: rgba(255, 255, 255, 0.9);
+    font-size: 10px;
+    line-height: 1.2;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .nlsb-seat .nl-story-userlane-meta__id {
+    color: rgba(255, 255, 255, 0.6);
+    font-weight: 600;
+  }
+  .nlsb-seat.nlsb-is-empty .nl-story-userlane-cell {
+    visibility: hidden;
   }
   .nlsb-seats.nlsb-mode-packed .nlsb-seat {
     width: 68px;
@@ -808,7 +891,7 @@ const VENUE_CSS = `
      ノイズとして処理される(ユーザー実機「特別になってない」)→倍率の"断絶"を作る。
      会議7体一致=scale 1.45(28→約40px)で「大きい=重要」を本能で認識させる。金縁を太く
      はっきり+明るさ+12%。脈動は付けない(止まった大きさ=存在そのもの・上品さを保つ)。 */
-  .nlsb-seat.nlsb-seat-vip .nlsb-icon {
+  .nlsb-seat.nlsb-seat-vip .nl-story-userlane-avatar {
     transform: scale(1.45);
     filter: brightness(1.12);
     border-color: rgba(255, 220, 130, 1);
@@ -818,14 +901,14 @@ const VENUE_CSS = `
   /* 2026-06-14 星野アイデア会議2(VIP常連光らせ): 発言数+ギフトのスコアが高い「支えてる人」を
      金色オーラでやわらかく脈動させて引き立てる。実サムネ優遇(.nlsb-seat-vip)と独立=
      ゆっくり顔/匿名の常連でも光る。やりすぎない上品な範囲(2.4秒の緩い脈動)。 */
-  .nlsb-seat.nlsb-seat-regular .nlsb-icon {
+  .nlsb-seat.nlsb-seat-regular .nl-story-userlane-avatar {
     border-color: rgba(255, 226, 150, 0.95);
     box-shadow: 0 0 10px 2px rgba(255, 196, 84, 0.7), inset 0 0 0 1px rgba(0, 0, 0, 0.12);
     animation: nlsb-vip-glow 2.4s ease-in-out infinite;
     z-index: 3;
   }
   /* 実サムネ常連は両方付くので、scale はサムネ側(大きい方)を活かしつつ金オーラを重ねる。 */
-  .nlsb-seat.nlsb-seat-vip.nlsb-seat-regular .nlsb-icon {
+  .nlsb-seat.nlsb-seat-vip.nlsb-seat-regular .nl-story-userlane-avatar {
     transform: scale(1.45);
   }
   @keyframes nlsb-vip-glow {
@@ -838,14 +921,14 @@ const VENUE_CSS = `
     }
   }
   @media (prefers-reduced-motion: reduce) {
-    .nlsb-seat.nlsb-seat-regular .nlsb-icon {
+    .nlsb-seat.nlsb-seat-regular .nl-story-userlane-avatar {
       animation: none;
     }
   }
   /* v0.1.742 一緒に過ごしている感(co-presence): 誰かがコメントした瞬間、その人の席が
      ふわっと一度だけ反応する。吹き出しだけでなく「会場が一人ひとりの発言に反応する」ことで
      一緒にいる感を強める(星野式・摩擦ゼロ=自動・設定不要)。0.6秒で1回だけ・上品に。 */
-  .nlsb-seat.nlsb-seat-speaking .nlsb-icon {
+  .nlsb-seat.nlsb-seat-speaking .nl-story-userlane-avatar {
     animation: nlsb-seat-speak 0.6s ease-out;
   }
   @keyframes nlsb-seat-speak {
@@ -861,7 +944,7 @@ const VENUE_CSS = `
     }
   }
   @media (prefers-reduced-motion: reduce) {
-    .nlsb-seat.nlsb-seat-speaking .nlsb-icon {
+    .nlsb-seat.nlsb-seat-speaking .nl-story-userlane-avatar {
       animation: none;
     }
   }
@@ -870,81 +953,39 @@ const VENUE_CSS = `
      金色オーラ(.nlsb-seat-regular=支えてる人)とは別軸の「いま盛り上げてる人」を引き立てる。
      data-streak=1..4 を JS が席に付け、段階ごとに色の強さ/脈動速度が上がる。発言が途切れると
      prune で data-streak が外れて自然に消える。*/
-  .nlsb-seat[data-streak] .nlsb-icon {
+  .nlsb-seat[data-streak] .nl-story-userlane-avatar {
     box-shadow: 0 0 9px 2px rgba(255, 138, 92, 0.6), inset 0 0 0 1px rgba(0, 0, 0, 0.12);
     animation: nlsb-seat-streak 1.4s ease-in-out infinite;
     z-index: 4;
   }
-  .nlsb-seat[data-streak="2"] .nlsb-icon { box-shadow: 0 0 11px 3px rgba(255, 132, 86, 0.72), inset 0 0 0 1px rgba(0, 0, 0, 0.12); animation-duration: 1.2s; }
-  .nlsb-seat[data-streak="3"] .nlsb-icon { box-shadow: 0 0 13px 4px rgba(255, 120, 80, 0.82), inset 0 0 0 1px rgba(0, 0, 0, 0.12); animation-duration: 1.0s; }
-  .nlsb-seat[data-streak="4"] .nlsb-icon { box-shadow: 0 0 16px 5px rgba(255, 108, 74, 0.92), inset 0 0 0 1px rgba(0, 0, 0, 0.12); animation-duration: 0.85s; }
+  .nlsb-seat[data-streak="2"] .nl-story-userlane-avatar { box-shadow: 0 0 11px 3px rgba(255, 132, 86, 0.72), inset 0 0 0 1px rgba(0, 0, 0, 0.12); animation-duration: 1.2s; }
+  .nlsb-seat[data-streak="3"] .nl-story-userlane-avatar { box-shadow: 0 0 13px 4px rgba(255, 120, 80, 0.82), inset 0 0 0 1px rgba(0, 0, 0, 0.12); animation-duration: 1.0s; }
+  .nlsb-seat[data-streak="4"] .nl-story-userlane-avatar { box-shadow: 0 0 16px 5px rgba(255, 108, 74, 0.92), inset 0 0 0 1px rgba(0, 0, 0, 0.12); animation-duration: 0.85s; }
   @keyframes nlsb-seat-streak {
     0%, 100% { filter: brightness(1); }
     50% { filter: brightness(1.18); }
   }
   @media (prefers-reduced-motion: reduce) {
-    .nlsb-seat[data-streak] .nlsb-icon {
+    .nlsb-seat[data-streak] .nl-story-userlane-avatar {
       animation: none;
     }
   }
-  .nlsb-icon {
-    position: relative;
-    display: grid;
-    width: 28px;
-    height: 28px;
-    flex: 0 0 28px;
-    place-items: center;
-    border: 1px solid rgba(255, 255, 255, 0.35);
-    border-radius: 50%;
-    color: #fff;
-    box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.12);
-    font-size: 12px;
-    font-weight: 700;
-    line-height: 1;
-    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.45);
-    overflow: hidden;
-  }
-  .nlsb-avatar,
-  .nlsb-icon-fallback {
-    width: 100%;
-    height: 100%;
-    border-radius: inherit;
-  }
-  .nlsb-avatar {
-    display: block;
-    object-fit: cover;
-  }
-  .nlsb-avatar[hidden],
-  .nlsb-icon-fallback[hidden] {
-    display: none;
-  }
-  .nlsb-icon-fallback {
-    display: grid;
-    place-items: center;
-  }
-  .nlsb-name {
-    display: block;
-    max-width: 100%;
-    min-width: 0;
-    overflow: hidden;
-    color: rgba(255, 255, 255, 0.9);
-    font-size: 10px;
-    line-height: 1.2;
-    text-decoration: none;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-  /* 数値 ID 持ち=クリックでユーザーページへ飛べるリンク。会場は開時のみ操作可能。 */
+  /* 数値 ID 持ち=クリックでユーザーページへ飛べるリンク。会場は開時のみ操作可能。
+     リンク本体は本物タイルの a.nl-story-userlane-cell--linkable が持つので、ラッパー(.nlsb-seat-link)は
+     カーソルとヒットテスト透過だけを担う。 */
   a.nlsb-seat-link,
   .nlsb-seat.nlsb-seat-link {
     cursor: pointer;
     pointer-events: auto;
   }
-  .nlsb-seat-link:hover .nlsb-name {
+  .nlsb-seat .nl-story-userlane-cell {
+    pointer-events: auto;
+  }
+  .nlsb-seat-link:hover .nl-story-userlane-meta__name {
     color: #bfe1ff;
     text-decoration: underline;
   }
-  .nlsb-seat-link:hover .nlsb-icon {
+  .nlsb-seat-link:hover .nl-story-userlane-avatar {
     border-color: rgba(191, 225, 255, 0.6);
   }
   .nlsb-seat-link:focus-visible {
@@ -952,38 +993,28 @@ const VENUE_CSS = `
     outline-offset: 2px;
     border-radius: 3px;
   }
-  .nlsb-seats.nlsb-mode-vip .nlsb-icon {
+  /* モード別のアバターサイズ(会場の大きい客席感)。本物タイルの img に効かせる。 */
+  .nlsb-seats.nlsb-mode-vip .nl-story-userlane-avatar {
     width: clamp(96px, 11vw, 132px);
     height: clamp(96px, 11vw, 132px);
-    flex-basis: auto;
-    font-size: clamp(32px, 4vw, 44px);
   }
-  .nlsb-seats.nlsb-mode-vip .nlsb-name {
-    max-width: 100%;
+  .nlsb-seats.nlsb-mode-vip .nl-story-userlane-meta {
     font-size: 15px;
     font-weight: 700;
-    text-align: center;
   }
-  .nlsb-seats.nlsb-mode-normal .nlsb-icon {
+  .nlsb-seats.nlsb-mode-normal .nl-story-userlane-avatar {
     width: clamp(32px, 7vw, 92px);
     height: clamp(32px, 7vw, 92px);
-    flex-basis: auto;
-    font-size: clamp(14px, 3vw, 32px);
   }
-  .nlsb-seats.nlsb-mode-normal .nlsb-name {
-    max-width: 100%;
+  .nlsb-seats.nlsb-mode-normal .nl-story-userlane-meta {
     font-size: 12px;
-    text-align: center;
   }
-  .nlsb-seats.nlsb-mode-packed .nlsb-icon {
+  .nlsb-seats.nlsb-mode-packed .nl-story-userlane-avatar {
     width: 38px;
     height: 38px;
-    flex-basis: 38px;
-    font-size: 14px;
   }
-  .nlsb-seats.nlsb-mode-packed .nlsb-name {
+  .nlsb-seats.nlsb-mode-packed .nl-story-userlane-meta {
     max-width: 68px;
-    text-align: center;
   }
   /*
    * 会議確定A: 吹き出し専用の最上位レイヤー。席コンテナ(.nlsb-seats overflow:hidden)の
@@ -1141,14 +1172,12 @@ const VENUE_CSS = `
       width: 54px;
       flex-basis: 54px;
     }
-    .nlsb-seats.nlsb-mode-packed .nlsb-icon {
+    .nlsb-seats.nlsb-mode-packed .nl-story-userlane-avatar {
       width: 32px;
       height: 32px;
-      flex-basis: 32px;
-      font-size: 11px;
     }
-    .nlsb-seats.nlsb-mode-packed .nlsb-name,
-    .nlsb-seats.nlsb-mode-normal .nlsb-name {
+    .nlsb-seats.nlsb-mode-packed .nl-story-userlane-meta,
+    .nlsb-seats.nlsb-mode-normal .nl-story-userlane-meta {
       display: none;
     }
     .nlsb-seats.nlsb-mode-normal .nlsb-seat {
@@ -1186,20 +1215,8 @@ const VENUE_CSS = `
   }
 `;
 
-/**
- * 名前や userId から軽量アイコン用の色を安定生成する。
- * @param {string} key
- * @returns {string}
- */
-function colorFromKey(key) {
-  const value = String(key || 'venue');
-  let hash = 2166136261;
-  for (let i = 0; i < value.length; i += 1) {
-    hash ^= value.charCodeAt(i);
-    hash = Math.imul(hash, 16777619);
-  }
-  return `hsl(${(hash >>> 0) % 360}, 68%, 46%)`;
-}
+// colorFromKey(名前/IDから色生成)は person-tile-unify 第3コミットで不要になり削除。
+//   席タイルは本物 buildPersonTileEl が描き、アバター枠の背景は CSS(.nl-story-userlane-avatar)が担う。
 
 /** @type {string|null} */
 let _forcedLiveId = null;
@@ -1222,55 +1239,42 @@ function ensureVenueStyle() {
 }
 
 /**
+ * 席ノードを作る。person-tile-unify 第3コミット(2026-06-22): 席タイル本体は描かず、
+ *   演出(VIP/常連/発話/streak)を被せる【ラッパー】だけを用意する。タイル本体は renderSeats で
+ *   popup の本物 buildPersonTileEl を差し込む(顔ぶれ・見た目を popup「アイコン列」と一致)。
+ *
+ *   ラッパーは <div>(<a> ではない): リンク(クリックでユーザーページ)は本物タイルが自前で
+ *   <a href> を持つ(buildPersonTileEl が linkable 判定で生成)。ラッパーを <a> にすると <a>in<a>
+ *   入れ子になるため div にして、リンク判定は popup と同一基準(本物タイル)へ完全に委ねる。
+ *
  * @param {number} seatIndex
  */
 function createSeatNode(seatIndex) {
-  const seat = document.createElement('a');
+  const seat = document.createElement('div');
   seat.className = 'nlsb-seat nlsb-is-empty';
   seat.dataset.seatIndex = String(seatIndex);
   seat.setAttribute('aria-hidden', 'true');
-  seat.target = '_blank';
-  seat.rel = 'noopener noreferrer';
-  seat.style.textDecoration = 'none';
-  seat.style.color = 'inherit';
+  // tile: renderSeats が buildPersonTileEl で作る本物タイル要素(.nl-story-userlane-cell)。
+  //   座標測定(吹き出し/ギフト)は tile 内の .nl-story-userlane-avatar を基準にする。
+  return { seat, tile: /** @type {HTMLElement|null} */ (null) };
+}
 
-  const icon = document.createElement('div');
-  icon.className = 'nlsb-icon';
-  const avatar = document.createElement('img');
-  avatar.className = 'nlsb-avatar';
-  avatar.alt = '';
-  avatar.decoding = 'async';
-  avatar.referrerPolicy = 'no-referrer';
-  avatar.hidden = true;
-  const fallback = document.createElement('div');
-  fallback.className = 'nlsb-icon-fallback';
-  icon.append(avatar, fallback);
-  // 原則「サムネ・ハンドルネーム・ID アンカー必須」: 名前は span で持つ。
-  // 親の seat が <a> なので全体がリンクになる。
-  const name = document.createElement('span');
-  name.className = 'nlsb-name';
-  seat.append(icon, name);
-  avatar.addEventListener('load', () => {
-    if (avatar.dataset.avatar !== avatar.getAttribute('src')) return;
-    avatar.hidden = false;
-    fallback.hidden = true;
-  });
-  avatar.addEventListener('error', () => {
-    if (avatar.dataset.avatar !== avatar.getAttribute('src')) return;
-    // http サムネが読めない(設定なし/404)ときは、ニコニコ公式の「設定なし」アイコンを出す。
-    // ユーザー方針「サムネ設定なしはそのままだしたほうがいい」に基づく。
-    const face = 'https://secure-dcdn.cdn.nimg.jp/nicoaccount/usericon/defaults/blank.jpg';
-    if (avatar.getAttribute('src') !== face) {
-      avatar.dataset.avatar = face;
-      avatar.src = face;
-      avatar.hidden = false;
-      fallback.hidden = true;
-      return;
-    }
-    avatar.hidden = true;
-    fallback.hidden = false;
-  });
-  return { seat, icon, avatar, fallback, name };
+/**
+ * 席の「アイコン位置」基準要素を返す。person-tile-unify 第3コミット: 旧 node.icon の代替。
+ *   本物タイル内のアバター img(.nl-story-userlane-avatar)があればそれ、無ければタイル全体、
+ *   それも無ければラッパー(seat)。吹き出し・ギフトの座標起点に使う。
+ * @param {{ seat: HTMLElement, tile: HTMLElement|null }} node
+ * @returns {HTMLElement|null}
+ */
+function seatAnchorEl(node) {
+  if (!node) return null;
+  const tile = node.tile;
+  if (tile) {
+    const avatar = tile.querySelector('.nl-story-userlane-avatar');
+    if (avatar instanceof HTMLElement) return avatar;
+    return tile;
+  }
+  return node.seat || null;
 }
 
 /**
@@ -2037,10 +2041,12 @@ export function mountVenueBarButton(options = {}) {
   const giftThrowOriginForSpeaker = (speakerKey) => {
     const seatIndex = seatByKey.get(speakerKey);
     const node = typeof seatIndex === 'number' ? seatNodes[seatIndex] : null;
-    if (node && node.icon && node.icon.isConnected) {
+    // person-tile-unify 第3コミット: 旧 node.icon は廃止。本物タイルのアバター要素を起点に。
+    const anchorEl = node ? seatAnchorEl(node) : null;
+    if (anchorEl && anchorEl.isConnected) {
       try {
         const layerRect = bubbleLayer.getBoundingClientRect();
-        const r = node.icon.getBoundingClientRect();
+        const r = anchorEl.getBoundingClientRect();
         if (r.width > 0) {
           return { x: r.left - layerRect.left + r.width / 2, y: r.top - layerRect.top + r.height / 2 };
         }
@@ -2197,13 +2203,16 @@ export function mountVenueBarButton(options = {}) {
     if (node) {
       // 保険(PR3): 段の再描画中など席ノードが一瞬 DOM から外れていると getBoundingClientRect が
       //   0 を返し、吹き出しが画面外へ飛んで消えて見える。未接続なら座標計算せず一時的に隠す。
-      if (!node.seat.isConnected || !node.icon.isConnected) {
+      // person-tile-unify 第3コミット: 旧 node.icon は廃止。座標の基準は本物タイルのアバター要素
+      //   (.nl-story-userlane-avatar)・無ければタイル全体にフォールバック(seatAnchorEl)。
+      const anchorEl = seatAnchorEl(node);
+      if (!node.seat.isConnected || !anchorEl || !anchorEl.isConnected) {
         bubble.element.style.visibility = 'hidden';
         return;
       }
       bubble.element.style.visibility = '';
       const layerRect = bubbleLayer.getBoundingClientRect();
-      const seatRect = node.icon.getBoundingClientRect();
+      const seatRect = anchorEl.getBoundingClientRect();
       const rel = {
         left: seatRect.left - layerRect.left,
         top: seatRect.top - layerRect.top,
@@ -2554,55 +2563,41 @@ export function mountVenueBarButton(options = {}) {
         node.seat.dataset.tierIndex = String(tier.rowIndex);
         const i = entry.seatIndex;
         const uid = String(participant.userId || '').trim();
-        // リンク可否は domain 正本 isNumericNicoUserId(^\d{5,14}$=本登録)で判定し、popup 応援
-        // アイコン列(personTileDom.buildPersonTileEl)と同一基準にそろえる。nicoUserPageUrl は
-        // ^\d{1,18}$ と緩く、15桁以上/4桁以下も拾ってしまい popup と顔ぶれ・リンクがドリフトしていた。
-        const pageUrl = isNumericNicoUserId(uid) ? nicoUserPageUrl(uid) : '';
         // 名前: 本名があれば本名・無ければ匿名は「匿名NNN」で安定表示(顔だけにしない=原則)。
         const rawName = String(participant.name || '').trim();
         const displayName =
           rawName ||
           (uid ? anonymousDisplayLabel(uid) : anonymousDisplayLabel(participant.key || `会場${i + 1}`));
-        // 色は userId 優先で生成(同名の別人や匿名でも人ごとに色が変わる)。
-        const colorKey = participant.userId || participant.name || participant.key;
-        node.icon.style.backgroundColor = colorFromKey(colorKey);
-        node.fallback.textContent = Array.from(displayName)[0] || '会';
         const avatarUrl = String(participant.avatar || '').trim();
         const uidForFace = String(participant.userId || '').trim();
         const derivedAvatar = deriveNicoUserIconUrl(uidForFace);
         const yukkuriFace = uidForFace ? anonymousIdenticonDataUrl(uidForFace, 64) : '';
-        // http サムネが読めなかったときの差し替え先(ゆっくり顔)を席に持たせる。
-        node.avatar.dataset.fallbackFace = yukkuriFace;
+        // 表示サムネの解決順は従来どおり(http サムネ→数値ID由来→ゆっくり顔)。これを本物タイルの
+        //   displaySrc に渡す=avatar load guard(venuePersonTileIo)が読込失敗フォールバックを担う。
         const avatarSrc = avatarUrl || derivedAvatar || yukkuriFace;
-        if (avatarSrc) {
-          if (node.avatar.dataset.avatar !== avatarSrc) {
-            node.avatar.dataset.avatar = avatarSrc;
-            node.avatar.src = avatarSrc;
-            // data URL(ゆっくり顔)も http サムネも、まず即表示する。これで load イベントを
-            //   取り逃して(キャッシュ済み画像で load が来ない等)アバターが永久に隠れたまま
-            //   色フォールバックになる不具合を防ぐ。読み込みに失敗した http だけ error ハンドラが
-            //   フォールバックへ戻す。既にデコード済み(complete && naturalWidth>0)も確実に表示。
-            node.avatar.hidden = false;
-            node.fallback.hidden = true;
-          }
-        } else {
-          node.avatar.hidden = true;
-          node.fallback.hidden = false;
-          node.avatar.dataset.avatar = '';
-          node.avatar.removeAttribute('src');
-        }
-        node.name.textContent = displayName;
-        // 原則のリンク部分: 数値 ID があるときだけユーザーページへ飛べるアンカーにする。
-        //   匿名(ID なし)は href を外し、ただの文字として見せる(リンク偽装しない)。
-        if (pageUrl) {
-          node.seat.setAttribute('href', pageUrl);
-          node.seat.classList.add('nlsb-seat-link');
-          node.seat.title = `${displayName} のユーザーページを開く`;
-        } else {
-          node.seat.removeAttribute('href');
-          node.seat.classList.remove('nlsb-seat-link');
-          node.seat.title = displayName;
-        }
+        // ★person-tile-unify 第3コミット: 席タイル本体は popup の本物 buildPersonTileEl で描く。
+        //   meta(ID行・名前行)は popup と同じ正本 storyUserLaneMetaLines で表記をそろえる。
+        //   会場 participant(name/userId) を popup の entry 形(userId/nickname)に詰めて渡す。
+        const metaEntry = { userId: uid, nickname: rawName };
+        const meta = storyUserLaneMetaLines(metaEntry, avatarUrl, '');
+        const tileItem = {
+          displaySrc: avatarSrc,
+          title: displayName,
+          meta,
+          entry: { userId: uid }
+        };
+        const tileEl = buildPersonTileEl(tileItem, venuePersonTileIo);
+        // ラッパー(.nlsb-seat)の中身を本物タイルに差し替える。演出(VIP/常連/発話/streak)は
+        //   ラッパーに被せる=タイル本体は触らない(personTileDom.js の設計どおり)。
+        node.seat.replaceChildren(tileEl);
+        node.tile = tileEl;
+        // リンク(クリックでユーザーページ)は本物タイルが自前で <a href> を持つ(popup と同一基準)。
+        //   ラッパーには cursor 用の class だけ反映する(href はタイルが担うので付けない)。
+        node.seat.classList.toggle(
+          'nlsb-seat-link',
+          isNumericNicoUserId(uid) && nicoUserPageUrl(uid) !== ''
+        );
+        node.seat.title = displayName;
         node.seat.classList.remove('nlsb-is-empty');
         node.seat.setAttribute('aria-hidden', 'false');
         // 2026-06-14 会議(サムネ優遇強化): 実サムネ(http顔写真)持ちは少し大きく明るく見せて
