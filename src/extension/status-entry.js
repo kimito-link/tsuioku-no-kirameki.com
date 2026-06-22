@@ -94,10 +94,11 @@ let _refreshTimerId = /** @type {number|null} */ (null);
 //   storage を読むと重い=12 秒間引きでキャッシュし、間は前回値を再利用(コア表示は毎回更新のまま)。
 const EXTRAS_REFETCH_MS = 12000;
 let _extrasCacheAt = 0;
-let _extrasCache = /** @type {{reportPreview:any, watchTabMap:any, trendFindings:any[]}} */ ({
+let _extrasCache = /** @type {{reportPreview:any, watchTabMap:any, trendFindings:any[], laneDiag:any}} */ ({
   reportPreview: null,
   watchTabMap: new Map(),
-  trendFindings: []
+  trendFindings: [],
+  laneDiag: null
 });
 /** v0.1.868: 配信カードの再構築 skip 判定用 signature(変化なしなら innerHTML を作り直さない)。 */
 let _lastLivesSig = '';
@@ -234,11 +235,10 @@ async function refresh(opts = {}) {
     step = 'loadVenueSeatsDiagSafe';
     const venueSeatsDiag = await runStorageOpWithTimeout(() => loadVenueSeatsDiagSafe(), tmo);
     _mark('venueSeatsDiag');
-    step = 'loadLaneDiagSafe';
-    const laneDiag = await runStorageOpWithTimeout(() => loadLaneDiagSafe(), tmo);
-    _mark('laneDiag');
-    // 以下 3 つは「追加データ」=失敗しても他の表示と記録を妨げない(空で描く)。12 秒間引きでキャッシュ
+    // 以下は「追加データ」=失敗しても他の表示と記録を妨げない(空で描く)。12 秒間引きでキャッシュ
     //   再利用=2 秒ごとの storage read を減らして「スムーズじゃない」を改善(コア表示は毎回更新のまま)。
+    //   ★laneDiag(応援レーン人数整合セル)もここに含める=v0.1.909 で毎回の直列 read に足したら
+    //     診断ページが重くなった(ユーザー実機・会場前から重い)ため。診断は軽さ最優先=補助は間引き。
     const extrasStale = Date.now() - _extrasCacheAt >= EXTRAS_REFETCH_MS;
     if (extrasStale) {
       step = 'loadReportPreviewSafe';
@@ -250,11 +250,13 @@ async function refresh(opts = {}) {
         () => recordAndAnalyzeTrendSafe(lvList, summaries),
         tmo
       ).catch(() => []);
-      _extrasCache = { reportPreview, watchTabMap, trendFindings };
+      step = 'loadLaneDiagSafe';
+      const laneDiag = await runStorageOpWithTimeout(() => loadLaneDiagSafe(), tmo).catch(() => null);
+      _extrasCache = { reportPreview, watchTabMap, trendFindings, laneDiag };
       _extrasCacheAt = Date.now();
       _mark('extras');
     }
-    const { reportPreview, watchTabMap, trendFindings } = _extrasCache;
+    const { reportPreview, watchTabMap, trendFindings, laneDiag } = _extrasCache;
     step = 'renderAll';
     renderAll({ lvList, summaries, fastDiag, popupDiag, backfillProgress, voiceDiag, venueSeatsDiag, laneDiag, reportPreview, trendFindings, watchTabMap });
     _mark('render');
