@@ -14,6 +14,7 @@
 > それでも **今回の broadcaster バグのような「経路がそもそも無い」断線はここに出る**。
 > 1件ずつ実コードで確認すること(将来は `verify:map` で機械判定する=会議 Q4)。
 
+- 🟠 **KEY_LANE_MIRROR** — 書く人だけ（読む経路が無い疑い）: src/extension/popup-entry.js
 - 🟠 **KEY_PAINT_PERF_RING_V1** — 書く人だけ（読む経路が無い疑い）: src/extension/popup-entry.js
 - 🟠 **KEY_SW_PROGRESS** — 書く人だけ（読む経路が無い疑い）: src/extension/backfill-sw-entry.js
 - 🟠 **fn:backfillHeartbeatKey** — 書く人だけ（読む経路が無い疑い）: src/extension/content-entry.js
@@ -97,6 +98,7 @@
 | `KEY_INLINE_PANEL_VIEWPORT_WIDE_POLICY` | — | extension/content-entry.js<br>extension/popup-entry.js |
 | `KEY_INLINE_PANEL_WIDTH_MODE` | — | extension/content-entry.js<br>extension/popup-entry.js |
 | `KEY_LANE_DIAG` | extension/popup-entry.js | extension/status-entry.js |
+| `KEY_LANE_MIRROR` | extension/popup-entry.js | — |
 | `KEY_LAST_WATCH_URL` | — | extension/comeview-entry.js<br>extension/popup-entry.js<br>extension/status-entry.js |
 | `KEY_LIVE_BROADCASTER_CTX` | extension/content-entry.js | extension/venueBar.js |
 | `KEY_MARKETING_EXPORT_MASK_LABELS` | — | extension/popup-entry.js |

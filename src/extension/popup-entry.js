@@ -526,6 +526,8 @@ import { buildStoryUserLaneCandidateRow } from '../lib/storyUserLaneRowModel.js'
 // 2026-06-22(council/lane-show-all-active): 応援レーンの人数整合(素性 N/表示 M)を健全度パネルに載せる。
 import { KEY_LANE_DIAG } from '../lib/laneDiagKey.js';
 import { buildLaneDiagSnapshot } from '../lib/laneDiag.js';
+import { KEY_LANE_MIRROR } from '../lib/laneMirrorKey.js';
+import { buildLaneMirrorSnapshot } from '../lib/laneMirror.js';
 import { isAvatarObservedInCommentProfileMap } from '../lib/popupAvatarResolver.js';
 import {
   normalizeLv,
@@ -5353,6 +5355,15 @@ function renderStoryUserLane() {
   //   storage へ(素性が取れた人 candidates.length / レーンに出した人 picked.length / 上限 limit)。
   //   venueSeatsDiag と同型(min-gap・best-effort・記録/描画は触らない)。
   publishLaneDiag({ liveId, identified: candidates.length, laneShown: picked.length, limit });
+  // 応援レーンの「鏡」: 顔(avatar)含めてそっくり status へ映すための最小データを storage へ。
+  //   publishLaneDiag と同じ 3秒 min-gap・best-effort。buckets(りんく/こん太/広告/たぬ姉/ギフト)は
+  //   この時点で確定済み。会場には一切関係しない=popup と status だけ。描画は触らない(publish のみ)。
+  publishLaneMirror({
+    liveId,
+    buckets,
+    pickedLength: picked.length,
+    totalCandidates: candidates.length
+  });
   setTimeout(() => {
     if (typeof window !== 'undefined' && window.__NLS_LANE_DIAG__) {
       window.__NLS_LANE_DIAG__();
@@ -5370,6 +5381,23 @@ function publishLaneDiag(obs) {
     _laneDiagLastWriteAt = now;
     const snap = buildLaneDiagSnapshot({ ...obs, lastUpdateAt: now }, now);
     void chrome.storage.local.set({ [KEY_LANE_DIAG]: snap }).catch(() => {
+      /* best-effort: storage 不可・context 消失 */
+    });
+  } catch {
+    /* no-op */
+  }
+}
+
+/** 応援レーン鏡の storage 書き込み(min-gap 3秒・best-effort=popup を止めない・描画は触らない)。 */
+let _laneMirrorLastWriteAt = 0;
+/** @param {{ liveId: string, buckets: Record<string, unknown[]>, pickedLength: number, totalCandidates: number }} input */
+function publishLaneMirror(input) {
+  try {
+    const now = Date.now();
+    if (now - _laneMirrorLastWriteAt < 3000) return; // 3秒 min-gap(publishLaneDiag と同じ)。
+    _laneMirrorLastWriteAt = now;
+    const snap = buildLaneMirrorSnapshot(input, { cap: 48, nowMs: now });
+    void chrome.storage.local.set({ [KEY_LANE_MIRROR]: snap }).catch(() => {
       /* best-effort: storage 不可・context 消失 */
     });
   } catch {
