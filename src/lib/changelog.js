@@ -26,6 +26,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.896',
+    date: '2026-06-22',
+    summary: '操作ボタン群(HTML/コメビュ/読み上げ等)をパネル上部へ移動',
+    items: Object.freeze([
+      '操作ボタン群(HTML・マーケ・メディアキット・スクショ・再読み込み・コメビュ・読み上げ)を、これまでのコメント入力欄の下から【パネルの上の方】へ移動しました。スクロールしなくてもすぐ手が届きます。横付き表示でも下表示でも、パネルの上端付近に一貫して出ます。ボタンの動作は一切変えていません(配置だけ・会議 council/toolbar-top-placement で確定)。',
+      '会場モードボタンをこの操作列にも出すかは、現在の会場モードオーバーレイを開くか・応援ライブビューを開くかで意味が変わるため、別途確認のうえ追加します。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.895',
     date: '2026-06-22',
     summary: '読み上げが止まったまま戻らない固着を自動回復+停止位置の計器',
