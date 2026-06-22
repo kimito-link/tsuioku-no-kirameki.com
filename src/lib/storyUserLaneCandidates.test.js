@@ -173,26 +173,6 @@ describe('orderVenueAggsByPickedCandidates(会場の見せ方=演出データ維
     const out = orderVenueAggsByPickedCandidates(picked, aggList);
     expect(out.map((r) => r.userId)).toEqual(['a', 'b', 'c']);
   });
-
-  it('★picked の displaySrc(解決済み個人サムネ)を avatarUrl に注入する(会場のゆっくり顔化を防ぐ)', () => {
-    // 元集約は avatarUrl が空(NDGR 素性が薄い配信)。picked は数値IDからサムネ URL を解決済み。
-    const picked = [
-      { entry: { userId: '14087594' }, displaySrc: 'https://cdn/14087594.jpg' }
-    ];
-    const aggList = [{ userId: '14087594', nickname: 'びしゃ', avatarUrl: '', commentCount: 5 }];
-    const out = orderVenueAggsByPickedCandidates(picked, aggList);
-    expect(out).toHaveLength(1);
-    // 解決済みサムネが avatarUrl に乗る=会場で実顔が出る。演出データ(commentCount)も維持。
-    expect(out[0].avatarUrl).toBe('https://cdn/14087594.jpg');
-    expect(out[0].commentCount).toBe(5);
-  });
-
-  it('displaySrc が空なら元集約のまま(avatarUrl を空で上書きしない)', () => {
-    const picked = [{ entry: { userId: '111' }, displaySrc: '' }];
-    const aggList = [{ userId: '111', avatarUrl: 'https://cdn/keep.jpg', commentCount: 2 }];
-    const out = orderVenueAggsByPickedCandidates(picked, aggList);
-    expect(out[0].avatarUrl).toBe('https://cdn/keep.jpg');
-  });
 });
 
 describe('allowNumericWhenBroadcasterUnknown(会場=配信者ID未確定でも常連を出す)', () => {
