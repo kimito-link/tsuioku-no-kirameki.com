@@ -30,7 +30,17 @@ export function buildStoryUserLaneGuideGiftHtml(faceGift) {
   return storyUserLaneGuideLine(
     faceGift,
     escapeHtml(
-      'ギフト列: この放送でギフトや広告を投げた人を、数値ユーザーIDで記録できた順に並べるよ。個人サムネが取れている人はその画像、まだの人はゆっくり画像で表示するよ。'
+      'ギフト列: この放送でギフトを投げた人を、数値ユーザーIDで記録できた順に並べるよ。個人サムネが取れている人はその画像、まだの人はゆっくり画像で表示するよ。'
+    )
+  );
+}
+
+/** @param {string} faceAd 案内アイコン（広告投稿者列） */
+export function buildStoryUserLaneGuideAdHtml(faceAd) {
+  return storyUserLaneGuideLine(
+    faceAd,
+    escapeHtml(
+      '広告列: 公式のニコニ広告ランキング（この放送の貢献度順）から広告主を並べるよ。数値ユーザーIDが取れた人は個人サムネ（無ければゆっくり画像）で、ID無しの匿名広告も広告主名で表示するよ。'
     )
   );
 }
@@ -110,8 +120,8 @@ export function buildStoryUserLaneEmptyNoteLinkHtml() {
 /** ギフト投げ主段・件数 0 */
 export function buildStoryUserLaneEmptyNoteGiftHtml() {
   return storyUserLaneEmptyNoteTwoLines(
-    'この段は「ギフトや広告を投げた人」だけが並ぶよ。いまの記録では該当者がいません。',
-    'ギフトや広告が届くと、送り主の数値IDが取れた人から自動で増えます。'
+    'この段は「ギフトを投げた人」だけが並ぶよ。いまの記録では該当者がいません。',
+    'ギフトが届くと、送り主の数値IDが取れた人から自動で増えます。'
   );
 }
 

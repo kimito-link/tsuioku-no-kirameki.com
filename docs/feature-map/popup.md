@@ -26,6 +26,7 @@ graph LR
   n_popup --> n_src_domain_user_nickname_js["domain/user/nickname.js"]
   n_popup --> n_src_extension_story_renderStoryUserLaneDom_js["extension/story/renderStoryUserLaneDom.js"]
   n_popup --> n_src_lib_acquisitionDashboardChart_js["lib/acquisitionDashboardChart.js"]
+  n_popup --> n_src_lib_adLanePicksFromRooms_js["lib/adLanePicksFromRooms.js"]
   n_popup --> n_src_lib_aiShareDiagSchema_js["lib/aiShareDiagSchema.js"]
   n_popup --> n_src_lib_aiShareFastDiagKey_js["lib/aiShareFastDiagKey.js"]:::shared
   n_popup --> n_src_lib_aiSharePopupDiagKey_js["lib/aiSharePopupDiagKey.js"]:::shared
@@ -52,8 +53,7 @@ graph LR
   n_popup --> n_src_lib_broadcasterFollowTarget_js["lib/broadcasterFollowTarget.js"]
   n_popup --> n_src_lib_broadcasterProfileCard_js["lib/broadcasterProfileCard.js"]:::shared
   n_popup --> n_src_lib_buildNorthStarAdRankingStatsHtml_js["lib/buildNorthStarAdRankingStatsHtml.js"]
-  n_popup --> n_src_lib_buildWatchMetaCardAudienceViewModel_js["lib/buildWatchMetaCardAudienceViewModel.js"]
   classDef shared fill:#eee,stroke:#999,color:#666;
 ```
 
-> ほか 253 ファイル省略（全件は storage-bus.md / metafile 参照）。
+> ほか 254 ファイル省略（全件は storage-bus.md / metafile 参照）。
