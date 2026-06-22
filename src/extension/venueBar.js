@@ -298,15 +298,6 @@ const VENUE_CSS = `
     transition-delay: 0s;
   }
   /*
-   * 会場モード(全画面てこ・PR1): inline パネル(popup.html iframe)を全画面前面化する版では、
-   * 独自席(stage=ひな壇/3D/crowd canvas)は見せない=popup の中身をそっくり全画面で見せるのが正本
-   * (reference_venue_is_popup_panel_clone.md)。stage は削除せず display:none で止めるだけ
-   * (集計/読み上げは venueBar 側で継続=PR2 でこの演出を inline の手前に流用予定)。
-   */
-  .nlsb-root.nlsb-lever-fullscreen .nlsb-stage {
-    display: none !important;
-  }
-  /*
    * 後方ビネット(ライブ演出会議 確定①・プロの「空席を闇に沈める」術のWeb再現)。
    * ⚠️ユーザー方針「中央の配信映像にスモークをかけない」を厳守: 中央は大きく transparent で
    * くり抜き、暗くするのは【四隅】と【下端の席エリア後方】だけ。これで空席/隙間が闇に溶けて
@@ -3234,25 +3225,6 @@ export function mountVenueBarButton(options = {}) {
   };
 
   /**
-   * 会場(全画面てこ)API を取得する。content-entry(同一 content script)が watch ページで
-   * window.__nlsVenue.setFullscreen を公開している。standalone(venue.html)や未マウント時は null。
-   * @returns {{ setFullscreen: (on: boolean) => void }|null}
-   */
-  const venueFullscreenLeverApi = () => {
-    try {
-      const api = /** @type {{ setFullscreen?: unknown }|undefined} */ (
-        (/** @type {Record<string, unknown>} */ (/** @type {unknown} */ (window))).__nlsVenue
-      );
-      if (api && typeof api.setFullscreen === 'function') {
-        return /** @type {{ setFullscreen: (on: boolean) => void }} */ (api);
-      }
-    } catch {
-      // no-op
-    }
-    return null;
-  };
-
-  /**
    * @param {boolean} nextOpen
    * @param {boolean} persist
    */
@@ -3261,31 +3233,15 @@ export function mountVenueBarButton(options = {}) {
     root.classList.toggle('nlsb-is-open', open);
     toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
     stage.setAttribute('aria-hidden', open ? 'false' : 'true');
-    // 会場モード(全画面てこ): inline 版(watch ページ)では content-entry が公開する
-    //   window.__nlsVenue.setFullscreen で popup.html iframe を全画面前面化し、独自席は
-    //   CSS(.nlsb-lever-fullscreen)で隠す=popup の中身をそっくり全画面で見せる(正本)。
-    //   standalone(venue.html 別タブ)には content-entry が居ない=API 不在なので、
-    //   従来の独自席にフォールバックする(その別タブには inline host が存在しないため)。
-    const leverApi = venueFullscreenLeverApi();
-    const useLever = !isStandalone && !!leverApi;
-    root.classList.toggle('nlsb-lever-fullscreen', open && useLever);
     if (open) {
       addEscapeListener();
       addBubbleReflowListener();
       // 3キャラ常駐: 集計を待たず先に描く=開いた瞬間から必ず誰かが居る(無人に見せない)。
-      //   ★lever モードでも集計/読み上げ(記録/演出)は止めない=PR2 でこの演出を流用する。
-      //   隠すのは独自席の見た目(stage)だけで、データ収集や VOICEVOX は継続。
       renderResidents();
       renderCharFrame(); // v0.1.777 額縁フレーム(四辺を3キャラで囲む)
       startAggregation();
       startSpeechPolling();
-      if (useLever) {
-        try { leverApi.setFullscreen(true); } catch { /* no-op: 失敗時は独自席が見える */ }
-      }
     } else {
-      if (useLever) {
-        try { leverApi.setFullscreen(false); } catch { /* no-op */ }
-      }
       removeEscapeListener();
       removeBubbleReflowListener();
       stopAggregation();
@@ -3298,28 +3254,6 @@ export function mountVenueBarButton(options = {}) {
       // void chrome.storage.local.set({ [OPEN_STORAGE_KEY]: open }).catch(() => {});
     }
   };
-
-  // 会場(全画面てこ)が inline パネルの × ボタンで【外から】閉じられたとき、会場 open 状態を同期する。
-  //   content-entry の hidePageFrameOverlay → notifyVenueBarFullscreenClosed がこれを呼ぶ。
-  //   これを受けないと、root の nlsb-is-open / 集計が「開いたまま」になり状態がズレる。
-  if (!isStandalone) {
-    try {
-      const w = /** @type {Record<string, unknown>} */ (/** @type {unknown} */ (window));
-      const api = (w.__nlsVenue && typeof w.__nlsVenue === 'object')
-        ? /** @type {Record<string, unknown>} */ (w.__nlsVenue)
-        : {};
-      api.onFullscreenClosedExternally = () => {
-        if (!open) return;
-        userChangedOpen = true;
-        // setFullscreen(false) は content-entry 側で既に実行済み=ここでは独自席状態だけ戻す。
-        // setOpen(false) は leverApi.setFullscreen(false) を再度呼ぶが冪等(同状態で no-op)。
-        setOpen(false, false);
-      };
-      w.__nlsVenue = api;
-    } catch {
-      // no-op
-    }
-  }
 
   toggle.addEventListener('click', () => {
     userChangedOpen = true;
