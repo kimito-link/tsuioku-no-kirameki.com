@@ -6363,6 +6363,7 @@ function buildAiShareFastDiagnosticsPayload() {
         autoEnabled: _backfillAutoEnabled,
         manualEnabled: _backfillEnabled,
         triedLiveId: String(_backfillTriedLiveId || ''),
+        lastSkip: String(_backfillLastSkipReason || ''), // v0.1.891: runNdgrBackfillOnce が抜けた理由(no_view_base 等)
         running: _backfillAbort != null,
         seg: _backfillProgress.seg,
         rows: _backfillProgress.rows,
@@ -8978,6 +8979,7 @@ function buildAiSharePageDiagnostics() {
         autoEnabled: _backfillAutoEnabled,
         manualEnabled: _backfillEnabled,
         triedLiveId: String(_backfillTriedLiveId || ''),
+        lastSkip: String(_backfillLastSkipReason || ''), // v0.1.891: runNdgrBackfillOnce が抜けた理由(no_view_base 等)
         running: _backfillAbort != null,
         seg: _backfillProgress.seg,
         rows: _backfillProgress.rows,
@@ -15348,6 +15350,10 @@ let _backfillTriedLiveId = '';
  *  記録(コア機能)を守るため opt-in(明示 true のみ)に格下げ。true でハートビート書き込みも SW kick も復活。
  *  KEY_BACKFILL_BG_KICK_ENABLED の初期 storage 読み + onChanged で反映。 */
 let _backfillBgKickEnabled = false;
+/** v0.1.891: runNdgrBackfillOnce が最後に「どの early return で抜けたか/起動したか」。
+ *  '' | already_tried | disabled | not_recording | no_context | no_view_base | started。
+ *  状態速報(romiDebug.backfill.lastSkip)に出し、seg:0 で進まない真因を一発で切り分ける(純観測)。 */
+let _backfillLastSkipReason = '';
 /** PR1-b-3: SW backfill モード(実験・既定 OFF)。初期 storage 読み + onChanged で反映。 */
 let _backfillSwModeEnabled = false;
 /** @type {string} SW 起動メッセージ送信済みの liveId（ワンショット guard）。 */
@@ -15591,14 +15597,18 @@ async function runNdgrBackfillOnce(ctx = {}) {
     onProgress = null,              // null なら publishBackfillProgress() を呼ぶ
     onPersist = null,               // null なら persistCommentRows() を呼ぶ
   } = ctx;
-  if (_backfillTriedLiveId && _backfillTriedLiveId === liveIdOverride) return; // 二重起動防止
+  // v0.1.891: backfill が始まらない(seg:0 rows:0 triedLiveId:"")の真因切り分け計器(会議
+  //   council/backfill-stuck-seg0=仮説a『viewBase 受け渡し欠落で初回 fetch が走らない』が最有力)。
+  //   どの early return で抜けたかを _backfillLastSkipReason に記録=状態速報で一発特定(純観測)。
+  if (_backfillTriedLiveId && _backfillTriedLiveId === liveIdOverride) { _backfillLastSkipReason = 'already_tried'; return; } // 二重起動防止
   // v0.1.418: 手動ボタン押下（_backfillEnabled）か自動開始 ON（_backfillAutoEnabled・既定）の
   //   どちらかで起動する。両方 OFF（自動を切ってボタンも押していない）のときだけ起動しない。
-  if (!_backfillEnabled && !_backfillAutoEnabled) return;
-  if (!recording || !liveIdOverride || !locationAllowsCommentRecording()) return;
-  if (!hasExtensionContext()) return;
+  if (!_backfillEnabled && !_backfillAutoEnabled) { _backfillLastSkipReason = 'disabled'; return; }
+  if (!recording || !liveIdOverride || !locationAllowsCommentRecording()) { _backfillLastSkipReason = 'not_recording'; return; }
+  if (!hasExtensionContext()) { _backfillLastSkipReason = 'no_context'; return; }
   const viewBase = viewBaseOverride || readNdgrViewBaseUri();
-  if (!viewBase) return; // MAIN world がまだ view を観測していない（参加直後等）
+  if (!viewBase) { _backfillLastSkipReason = 'no_view_base'; return; } // MAIN world がまだ view を観測していない（参加直後等）
+  _backfillLastSkipReason = 'started';
   _backfillTriedLiveId = liveIdOverride;
 
   if (_backfillAbort) {
