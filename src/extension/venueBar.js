@@ -232,6 +232,13 @@ const VENUE_CSS = `
      */
     --nlsb-heat-color: rgb(120, 130, 200);
     --nlsb-heat-opacity: 0.12;
+    /*
+     * 本体 background は従来どおり【透明寄りの照明グラデ】を維持(映像/本家UIを透かす)。
+     * v0.1.897 ユーザー要望「配信画面じゃない部分を全部おおいつくす」(会議
+     * council/venue-fill-canvas・全員一致のハイブリッドマスキング)の【不透明の会場壁】は、本体でなく
+     * 穴あきの ::after に持たせる(本体に壁を入れると穴が無く映像を隠すため)。映像矩形だけ
+     * ::after の clip-path:polygon で穴を開けて素通し=過去方針「映像にスモークをかけない」を厳守。
+     */
     background:
       radial-gradient(ellipse 70% 24% at 50% 0%, rgba(120, 165, 224, 0.16), transparent 70%),
       radial-gradient(
@@ -239,6 +246,12 @@ const VENUE_CSS = `
         color-mix(in srgb, var(--nlsb-heat-color) calc(var(--nlsb-heat-opacity) * 100%), transparent),
         transparent 74%
       );
+    /* 穴(映像矩形)の四辺を % で持つ。JS が video の rect から viewport 比で更新。
+       既定は 0=穴なし(.nlsb-has-hole が付くまで ::after の壁は出ない=従来の透過)。 */
+    --nlsb-hole-left: 0%;
+    --nlsb-hole-right: 0%;
+    --nlsb-hole-top: 0%;
+    --nlsb-hole-bottom: 0%;
     opacity: 0;
     transform: translateY(18px);
     visibility: hidden;
@@ -256,6 +269,39 @@ const VENUE_CSS = `
     visibility: visible;
     pointer-events: auto;
     transition-delay: 0s;
+  }
+  /*
+   * v0.1.897 会場壁(配信画面以外を覆う)。映像矩形だけ clip-path:polygon で「穴」を開けて素通し。
+   * polygon は外周(画面四隅)→穴の四隅→外周へ戻る形=穴の内側だけ壁が描かれない=映像が見える。
+   * mask-composite を使わない(全ブラウザ対応・会議 diverge 案)。穴座標は JS が --nlsb-hole-* に更新。
+   * .nlsb-has-hole が付いたときだけ壁を出す(穴未確定=映像未検出時は壁無し=従来の透過にフォールバック)。
+   * pointer-events:none=映像/本家UIのクリックを邪魔しない(穴部分は元から透過)。
+   * z-index:0=席(stage-layout z1)/吹き出し(z5)/常駐(z6)より背面=会場の最背面の壁。
+   */
+  .nlsb-stage::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    display: none;
+    pointer-events: none;
+    background: linear-gradient(
+      160deg,
+      rgba(16, 14, 30, 0.96) 0%,
+      rgba(9, 9, 20, 0.98) 55%,
+      rgba(4, 5, 12, 0.99) 100%
+    );
+    clip-path: polygon(
+      0% 0%, 100% 0%, 100% 100%, 0% 100%, 0% 0%,
+      var(--nlsb-hole-left) var(--nlsb-hole-top),
+      var(--nlsb-hole-left) var(--nlsb-hole-bottom),
+      var(--nlsb-hole-right) var(--nlsb-hole-bottom),
+      var(--nlsb-hole-right) var(--nlsb-hole-top),
+      var(--nlsb-hole-left) var(--nlsb-hole-top)
+    );
+  }
+  .nlsb-root.nlsb-is-open .nlsb-stage.nlsb-has-hole::after {
+    display: block;
   }
   /*
    * 後方ビネット(ライブ演出会議 確定①・プロの「空席を闇に沈める」術のWeb再現)。
@@ -319,7 +365,11 @@ const VENUE_CSS = `
     position: relative;
     z-index: 1;
     display: grid;
-    width: min(1500px, 100%);
+    /* v0.1.897「配信画面以外を全部覆う」: 旧 min(1500px,100%) 中央寄せだと広い画面で左右に余白が
+       残り、そこから配信ページの白背景が透けて見えていた(ユーザー不満の主因)。全幅にして席・
+       装飾を画面端まで広げ、余白を会場で埋める。席の表示数は visibleSeats 制限(selectStableVisibleMembers)
+       が握るので全幅でも散らからない(会議の『散らからない』担保)。 */
+    width: 100%;
     height: 100%;
     min-height: 0;
     margin: 0 auto;
@@ -3097,6 +3147,50 @@ export function mountVenueBarButton(options = {}) {
     escapeListening = false;
   };
 
+  /*
+   * v0.1.897 映像穴の更新(配信画面以外を会場壁で覆う・会議 council/venue-fill-canvas)。
+   * video 要素の rect を取り、viewport 比(%)に変換して --nlsb-hole-* に書く=::after の壁(clip-path
+   * polygon)が映像矩形だけ穴を開ける。映像が見つからない/小さすぎる/画面外なら穴を作らず
+   * .nlsb-has-hole を外す=従来の透過にフォールバック(壊さない)。座標取得は content-entry と同じ
+   * querySelector('video').getBoundingClientRect() パターン(会場も content script 世界)。
+   */
+  const updateVideoHole = () => {
+    try {
+      const vw = window.innerWidth || document.documentElement.clientWidth || 0;
+      const vh = window.innerHeight || document.documentElement.clientHeight || 0;
+      if (!(vw > 0) || !(vh > 0)) { stage.classList.remove('nlsb-has-hole'); return; }
+      // 最大面積の video を映像とみなす(広告等の小 video を誤検出しない)。
+      let best = null;
+      let bestArea = 0;
+      const vids = document.querySelectorAll('video');
+      for (const v of vids) {
+        const r = v.getBoundingClientRect();
+        const area = Math.max(0, r.width) * Math.max(0, r.height);
+        // 画面内にあり、十分大きい(高さ100px超=本編映像)ものだけ候補に。
+        if (r.height >= 100 && r.width >= 100 && r.bottom > 0 && r.right > 0 && r.top < vh && r.left < vw && area > bestArea) {
+          best = r;
+          bestArea = area;
+        }
+      }
+      if (!best) { stage.classList.remove('nlsb-has-hole'); return; }
+      // viewport 比(%)。画面端でクリップ(0〜100)。
+      const clampPct = (/** @type {number} */ n) => Math.max(0, Math.min(100, n));
+      const left = clampPct((best.left / vw) * 100);
+      const right = clampPct((best.right / vw) * 100);
+      const top = clampPct((best.top / vh) * 100);
+      const bottom = clampPct((best.bottom / vh) * 100);
+      // 穴が潰れている(画面外スクロール等)なら壁を出さない(全面壁で映像を隠さない安全側)。
+      if (right - left < 2 || bottom - top < 2) { stage.classList.remove('nlsb-has-hole'); return; }
+      stage.style.setProperty('--nlsb-hole-left', left + '%');
+      stage.style.setProperty('--nlsb-hole-right', right + '%');
+      stage.style.setProperty('--nlsb-hole-top', top + '%');
+      stage.style.setProperty('--nlsb-hole-bottom', bottom + '%');
+      stage.classList.add('nlsb-has-hole');
+    } catch {
+      stage.classList.remove('nlsb-has-hole');
+    }
+  };
+
   // リサイズ/スクロールで席の座標が変わったら吹き出しを席頭上へ追従(rAF で間引き)。
   let reflowRaf = 0;
   let reflowListening = false;
@@ -3107,9 +3201,10 @@ export function mountVenueBarButton(options = {}) {
         ? requestAnimationFrame(() => {
             reflowRaf = 0;
             repositionAllBubbles();
+            updateVideoHole(); // v0.1.897: 映像位置の追従も同じ rAF 間引きに相乗り(新規リスナーゼロ)。
           })
         : 0;
-    if (!reflowRaf) repositionAllBubbles();
+    if (!reflowRaf) { repositionAllBubbles(); updateVideoHole(); }
   };
   const addBubbleReflowListener = () => {
     if (reflowListening) return;
@@ -3143,6 +3238,10 @@ export function mountVenueBarButton(options = {}) {
       renderCharFrame(); // v0.1.777 額縁フレーム(四辺を3キャラで囲む)
       startAggregation();
       startSpeechPolling();
+      // v0.1.897: 開いた瞬間に映像穴を計算(配信画面以外を壁で覆う)。レイアウト確定後にもう一度
+      //   rAF で計算し直す(開アニメ/グリッド確定前の rect ズレを防ぐ)。
+      updateVideoHole();
+      if (typeof requestAnimationFrame === 'function') requestAnimationFrame(updateVideoHole);
     } else {
       removeEscapeListener();
       removeBubbleReflowListener();
@@ -3150,6 +3249,7 @@ export function mountVenueBarButton(options = {}) {
       stopSpeechPolling();
       stopCrowdMotion();
       resetSpeechTracking();
+      stage.classList.remove('nlsb-has-hole'); // v0.1.897: 閉じたら壁を消す(次回開時に再計算)。
     }
     if (persist) {
       // ユーザー要望により状態を復元しなくなったため、保存も無効化する
