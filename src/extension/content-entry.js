@@ -2667,6 +2667,13 @@ const KEY_AI_SHARE_FAST_DIAG = 'nls_ai_share_fast_diag_v1';
 /** getElementById はツリー未接続ノードに効かないため、ホストは参照を保持する */
 /** @type {HTMLDivElement|null} */
 let nlsInlinePopupHostSingleton = null;
+/**
+ * 会場モード(全画面てこ): venueBar が会場を開いたら inline host(popup.html iframe)を
+ * CSS で全画面前面化する。iframe は再ロードも DOM 移動もしない=記録/状態を完全保持。
+ * 設計正本: council/venue-lever-iframe-SYNTHESIS.md / reference_venue_is_popup_panel_clone.md
+ * @type {boolean}
+ */
+let nlsVenueFullscreenMode = false;
 /** ensureInlinePopupIframe のフォールバック visibility タイマー（重複防止） */
 /** @type {ReturnType<typeof setTimeout>|null} */
 let inlineIframeVisibilityTimer = null;
@@ -3012,6 +3019,30 @@ function ensurePageFrameStyle() {
     }
     #${INLINE_POPUP_HOST_ID}.nls-inline-host--floating {
       -webkit-overflow-scrolling: touch;
+    }
+    /* 会場モード(全画面てこ): inline host(popup.html iframe)を画面いっぱいに前面化。
+       iframe は再ロード/移動しない=記録/読み上げ/スクロール状態を完全保持。
+       インラインスタイルでも全画面を確定済みだが、CSS でも二重化(SPA でクラスが
+       剥がれず残った場合の保険)。iframe の通常 height 制限(min(560px,58vh))を上書き。 */
+    #${INLINE_POPUP_HOST_ID}.nls-venue-fullscreen {
+      position: fixed !important;
+      inset: 0 !important;
+      width: 100vw !important;
+      height: 100vh !important;
+      max-width: 100vw !important;
+      max-height: 100vh !important;
+      margin: 0 !important;
+      border-radius: 0 !important;
+      box-shadow: none !important;
+      z-index: 2147483000;
+      overflow: hidden;
+      background: #0a0b0c;
+    }
+    #${INLINE_POPUP_HOST_ID}.nls-venue-fullscreen iframe {
+      width: 100% !important;
+      height: 100% !important;
+      min-height: 0 !important;
+      max-height: 100% !important;
     }
     #${INLINE_POPUP_HOST_ID}.nls-inline-host--dock-bottom {
       -webkit-overflow-scrolling: touch;
@@ -4975,9 +5006,117 @@ function renderInlineHostAnchoredToVideo(video) {
   maybeReconnectCommentMutationObserverAfterInlineLayout();
 }
 
+/**
+ * 会場モード(全画面): inline host(popup.html iframe)を画面いっぱいに前面化する。
+ * dock-bottom を手本に position:fixed; inset:0 で全画面。iframe は同一要素のまま=再ロードなし。
+ * placement(floating/below/beside/dock)に関係なく、会場フラグが立っている間はこれが最優先。
+ */
+function renderInlinePanelVenueFullscreenHost() {
+  const host = ensureInlinePopupHost();
+  clearInlineHostFloatingLayout(host);
+  host.classList.remove('nls-inline-host--floating', 'nls-inline-host--dock-bottom');
+  host.classList.add('nls-venue-fullscreen');
+  if (host.parentNode !== document.body) {
+    document.body.appendChild(host);
+  }
+  // インラインスタイルで全画面を確定(CSS クラスが SPA で剥がれても効くよう二重化)。
+  host.style.position = 'fixed';
+  host.style.inset = '0';
+  host.style.top = '0';
+  host.style.left = '0';
+  host.style.right = '0';
+  host.style.bottom = '0';
+  host.style.width = '100vw';
+  host.style.height = '100vh';
+  host.style.maxWidth = '100vw';
+  host.style.maxHeight = '100vh';
+  host.style.marginLeft = '0';
+  host.style.margin = '0';
+  host.style.overflow = 'hidden';
+  host.style.overflowX = 'hidden';
+  host.style.boxSizing = 'border-box';
+  host.style.zIndex = '2147483000';
+  host.style.borderRadius = '0';
+  host.style.boxShadow = 'none';
+  host.style.background = '#0a0b0c';
+  const iframe = /** @type {HTMLIFrameElement|null} */ (
+    host.querySelector(`#${INLINE_POPUP_IFRAME_ID}`)
+  );
+  if (iframe) {
+    iframe.style.width = '100%';
+    iframe.style.height = '100%';
+    iframe.style.maxHeight = '100%';
+    iframe.style.border = 'none';
+  }
+  host.style.pointerEvents = 'auto';
+  host.setAttribute('aria-hidden', 'false');
+  host.style.display = 'block';
+  host.style.opacity = '1';
+  // 会場の閉じる手段(floating/dock と同じ × ボタン)を出す。
+  ensureInlinePanelCloseButton(host);
+  maybeReconnectCommentMutationObserverAfterInlineLayout();
+}
+
+/**
+ * 会場モード(全画面てこ)のトグル。venueBar から window.__nlsVenue.setFullscreen 経由で呼ばれる。
+ * on=true: inline パネルを確実に開き(autoshow OFF でも)、全画面フラグを立てて即再描画。
+ * on=false: フラグを下ろし、通常 placement へ戻す(inline は開いたまま=従来表示に復帰)。
+ * iframe は一切再ロード/移動しない=記録・読み上げ・スクロール状態を完全保持(てこの原理)。
+ * @param {boolean} on
+ */
+function setNlsVenueFullscreen(on) {
+  if (!isWatchInlinePanelTopFrame()) return;
+  const next = on === true;
+  if (next === nlsVenueFullscreenMode) {
+    // 既に同状態でも、開へのトグルなら可視化を念押し(× で閉じた直後の再オープン安定化)。
+    if (next) {
+      toolbarInitiatedShowThisSession = true;
+      try { renderPageFrameOverlay(); } catch { /* no-op */ }
+    }
+    return;
+  }
+  nlsVenueFullscreenMode = next;
+  if (next) {
+    // NLS_FOCUS_INLINE_PANEL と同経路: このタブでは autoshow に関わらず inline を出す。
+    toolbarInitiatedShowThisSession = true;
+    try { showToolbarOpenInstantFeedback(); } catch { /* no-op */ }
+  } else {
+    // 全画面の残留スタイルを先に剥がしてから通常 placement を再計算させる。
+    const host =
+      nlsInlinePopupHostSingleton || document.getElementById(INLINE_POPUP_HOST_ID);
+    clearVenueFullscreenHostStyles(host);
+  }
+  try {
+    renderPageFrameOverlay();
+  } catch {
+    // no-op: 初回描画の例外は tick loop が回収
+  }
+}
+
+/**
+ * venueBar(同一 content script)から呼べる会場全画面 API を window に公開する。
+ * standalone(venue.html 別タブ)には content-entry が居ないので、この API も存在しない
+ * =venueBar 側は API 不在なら従来の独自席にフォールバックする(inline host が無いタブのため)。
+ */
+function exposeVenueFullscreenApi() {
+  try {
+    const w = /** @type {Record<string, unknown>} */ (window);
+    const existing = /** @type {Record<string, unknown>|undefined} */ (w.__nlsVenue);
+    const api = existing && typeof existing === 'object' ? existing : {};
+    /** @type {Record<string, unknown>} */ (api).setFullscreen = (/** @type {boolean} */ on) => {
+      setNlsVenueFullscreen(on);
+    };
+    w.__nlsVenue = api;
+  } catch {
+    // no-op
+  }
+}
+
 /** @param {HTMLElement} target */
 function renderInlinePopupHost(target) {
   if (!(target instanceof HTMLElement)) return;
+  // 会場モード(全画面てこ)の分岐は renderPageFrameOverlay 側に一本化済み(到達前に捕捉)。
+  // ここで再度分岐すると真実源が二重化しメンテ事故になるため置かない(code-review C1)。
   clearInlineHostFloatingLayout(ensureInlinePopupHost());
   const effPlacement = getEffectiveInlinePanelPlacement();
   if (effPlacement === INLINE_PANEL_PLACEMENT_FLOATING) {
@@ -5110,8 +5249,57 @@ function hidePageFrameOverlay() {
     host.style.pointerEvents = 'none';
     host.style.opacity = '0';
   }
+  // 会場(全画面てこ)が開いている最中に × で閉じられたら、会場フラグも下ろし、
+  // 全画面の残留インラインスタイルを剥がして次回の通常 placement を汚さない。
+  if (nlsVenueFullscreenMode) {
+    nlsVenueFullscreenMode = false;
+    clearVenueFullscreenHostStyles(host);
+    notifyVenueBarFullscreenClosed();
+  }
   stableFrameTarget = null;
   syncWatchPageDockBodyReserve();
+}
+
+/**
+ * 会場全画面で host に積んだインラインスタイル/クラスを剥がす。
+ * 次回の通常 placement(floating/below/beside/dock)が前モードの値で汚れないように。
+ * @param {Element|null} host
+ */
+function clearVenueFullscreenHostStyles(host) {
+  if (!(host instanceof HTMLElement)) return;
+  host.classList.remove('nls-venue-fullscreen');
+  for (const prop of [
+    'position', 'inset', 'top', 'left', 'right', 'bottom',
+    'width', 'height', 'max-width', 'max-height', 'margin',
+    'margin-left', 'overflow', 'overflow-x', 'box-sizing',
+    'z-index', 'border-radius', 'box-shadow', 'background'
+  ]) {
+    host.style.removeProperty(prop);
+  }
+  // iframe にも全画面用の width/height/max-height/border を積んでいる(renderInlinePanelVenueFullscreenHost)。
+  //   これを剥がさないと通常 placement 復帰時に iframe が残留高さで間延び/潰れる(#3 系の既知地雷)。
+  const iframe = /** @type {HTMLIFrameElement|null} */ (
+    host.querySelector(`#${INLINE_POPUP_IFRAME_ID}`)
+  );
+  if (iframe) {
+    for (const prop of ['width', 'height', 'max-height', 'border']) {
+      iframe.style.removeProperty(prop);
+    }
+  }
+}
+
+/** venueBar(同一 content script コンテキスト)へ「会場が外から閉じられた」と通知する。 */
+function notifyVenueBarFullscreenClosed() {
+  try {
+    const api = /** @type {{ onFullscreenClosedExternally?: () => void }} */ (
+      (/** @type {Record<string, unknown>} */ (window)).__nlsVenue
+    );
+    if (api && typeof api.onFullscreenClosedExternally === 'function') {
+      api.onFullscreenClosedExternally();
+    }
+  } catch {
+    // no-op: venueBar 未マウント/別コンテキストなら無視
+  }
 }
 
 function inlineHostLooksVisible() {
@@ -6850,10 +7038,14 @@ function renderPageFrameOverlay() {
    * ツールバークリックで toolbarInitiatedShowThisSession が立つと以降は通常どおり表示する。
    */
   if (
+    !nlsVenueFullscreenMode &&
     !inlinePanelAutoshowEnabled &&
     !toolbarInitiatedShowThisSession &&
     !inlinePanelAutoshowActivatedThisSession
   ) {
+    // 会場モード(全画面てこ)が開いている間は、autoshow OFF でも inline を出し続ける。
+    //   このガードが会場フラグより手前で hidePageFrameOverlay すると、会場が
+    //   ユーザー操作なしに突然閉じる(集計も停止)バグになる(code-review C-finding)。
     hidePageFrameOverlay();
     /*
      * try/finally に入らないため、ここでも監視ルートを取り直す。
@@ -6880,8 +7072,16 @@ function renderPageFrameOverlay() {
   try {
     const overlay = ensurePageFrameOverlay();
     overlay.style.display = 'none';
-    const effPlacement = getEffectiveInlinePanelPlacement();
-    if (effPlacement === INLINE_PANEL_PLACEMENT_FLOATING) {
+    // 会場モード(全画面てこ): フラグが立っている間は placement(floating/dock/below/beside)に
+    //   関わらず全画面化を最優先(独自の placement 分岐より手前で確定)。iframe は再ロードしない。
+    //   ★早期 return せず if/else チェーンに組み込む=finally 後の overlayDrain と
+    //     関数末尾 startPageFrameLoop() を通常パスと同じく必ず通す(code-review C2)。
+    const effPlacement = nlsVenueFullscreenMode
+      ? null
+      : getEffectiveInlinePanelPlacement();
+    if (nlsVenueFullscreenMode) {
+      renderInlinePanelVenueFullscreenHost();
+    } else if (effPlacement === INLINE_PANEL_PLACEMENT_FLOATING) {
       renderInlinePanelFloatingHost();
     } else if (effPlacement === INLINE_PANEL_PLACEMENT_DOCK_BOTTOM) {
       renderInlinePanelDockBottomHost();
@@ -6912,8 +7112,11 @@ function renderPageFrameOverlay() {
      * ここで dock_bottom 再描画に走ると `nls-inline-host--floating` クラスが剥がされ、
      * floating 表示契約（E2E inline-panel-align）を壊す。
      * 「意図した配置が floating or dock_bottom のとき」はフォールバックを skip する。
+     * ★会場モード(全画面てこ)も body 直下の固定パネルで同様=iframe 初回ロード中に
+     *   一時不可視に見えても dock へ落とすと全画面が壊れる=skip する(code-review)。
      */
     if (
+      !nlsVenueFullscreenMode &&
       !inlineHostLooksVisible() &&
       effPlacement !== INLINE_PANEL_PLACEMENT_FLOATING &&
       effPlacement !== INLINE_PANEL_PLACEMENT_DOCK_BOTTOM
@@ -12950,6 +13153,8 @@ function createDevMonitorOverlay() {
 async function start() {
   if (!hasExtensionContext()) return;
   if (!shouldRunWatchContentInThisFrame()) return;
+  // 会場(全画面てこ)API を venueBar マウント前に公開しておく(setOpen 初期化が即参照しても安全)。
+  if (isWatchInlinePanelTopFrame()) exposeVenueFullscreenApi();
   if (isWatchInlinePanelTopFrame()) _venueApi = mountVenueBarButton();
   recording = await readRecordingFlag();
   await readDeepHarvestQuietUiFromStorage();
