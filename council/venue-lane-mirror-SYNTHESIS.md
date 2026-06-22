@@ -1,7 +1,7 @@
 # 会場の席を popup レーンと同じ顔ぶれ・順序にする — 司令塔の収束 (2026-06-22)
 
 質問: `council/venue-lane-mirror-question.txt`
-正本: [reference_venue_is_popup_panel_clone.md](../memory/reference_venue_is_popup_panel_clone.md)
+正本: reference_venue_is_popup_panel_clone.md(auto-memory・C:\Users\info\.claude\projects\...\memory 配下)
 前提: 「会場の見せ方(席・3キャラ・吹き出し・VOICEVOX)は1mm 変えない」「並ぶ人の顔ぶれ・順序だけ popup レーンと一致」「bucket 順は popup と一緒・件数は会場を多く」(ユーザー確定)
 
 ## 会議(routed・design・成功2/4=gemma4 統括+deepseek 系。nvidia abort・groq 429)

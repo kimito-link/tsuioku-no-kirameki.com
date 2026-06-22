@@ -13,7 +13,12 @@
 ```mermaid
 graph LR
   n_content["記録エンジン(watchページ常駐)"]
+  n_content --> n_src_domain_lane_columns_kontaPolicy_js["domain/lane/columns/kontaPolicy.js"]:::shared
+  n_content --> n_src_domain_lane_columns_linkPolicy_js["domain/lane/columns/linkPolicy.js"]:::shared
+  n_content --> n_src_domain_lane_columns_tanuPolicy_js["domain/lane/columns/tanuPolicy.js"]:::shared
+  n_content --> n_src_domain_lane_tier_js["domain/lane/tier.js"]:::shared
   n_content --> n_src_domain_user_identity_js["domain/user/identity.js"]:::shared
+  n_content --> n_src_domain_user_nickname_js["domain/user/nickname.js"]:::shared
   n_content --> n_src_extension_venueBar_js["extension/venueBar.js"]:::shared
   n_content --> n_src_lib_anonymousIdenticon_js["lib/anonymousIdenticon.js"]:::shared
   n_content --> n_src_lib_auditionEventRankingApi_js["lib/auditionEventRankingApi.js"]:::shared
@@ -48,12 +53,7 @@ graph LR
   n_content --> n_src_lib_commentIngestLog_js["lib/commentIngestLog.js"]:::shared
   n_content --> n_src_lib_commentObservabilityDiag_js["lib/commentObservabilityDiag.js"]
   n_content --> n_src_lib_commentPanelHealthProbe_js["lib/commentPanelHealthProbe.js"]
-  n_content --> n_src_lib_commentPipelineLog_js["lib/commentPipelineLog.js"]
-  n_content --> n_src_lib_commentPostDom_js["lib/commentPostDom.js"]
-  n_content --> n_src_lib_commentProgressMonitor_js["lib/commentProgressMonitor.js"]
-  n_content --> n_src_lib_commentRecord_js["lib/commentRecord.js"]:::shared
-  n_content --> n_src_lib_commentSubmitConfirm_js["lib/commentSubmitConfirm.js"]
   classDef shared fill:#eee,stroke:#999,color:#666;
 ```
 
-> ほか 193 ファイル省略（全件は storage-bus.md / metafile 参照）。
+> ほか 204 ファイル省略（全件は storage-bus.md / metafile 参照）。
