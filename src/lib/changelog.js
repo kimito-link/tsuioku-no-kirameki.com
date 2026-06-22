@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.893',
+    date: '2026-06-22',
+    summary: '終了した配信が0%になる原因の切り分け計器を追加',
+    items: Object.freeze([
+      '終了した配信(タイムシフト)で取得率が0%のままになることがある原因を切り分けるための計器を追加しました。状態速報の過去ログ取得の項目に「配信の終了を検知できているか(endedDetected)」を出します。終了した配信は通常の過去ログ取得とは別の経路で取り込むため、終了の検知ができていないと取り込みが始まりません。これは数字を観測するだけで、取得や記録の動きは変えていません(原因を実データで確定してから直します)。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.892',
     date: '2026-06-22',
     summary: '過去ログ取得が進まない箇所の細分計器を追加',

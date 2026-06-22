@@ -1472,6 +1472,10 @@ let interceptReconcileTimer = null;
 let endedBulkHarvestTriggeredLiveId = '';
 /** 配信終了判定の最終チェック時刻 */
 let endedBulkHarvestLastCheckedAt = 0;
+/** v0.1.893: 終了配信が0%になる真因切り分け計器。detectWatchProgramEndedFromDom の直近結果。
+ *  終了配信は backfill でなく『終了検知→deep harvest』経路(maybeRunEndedBulkHarvest)。endedDetected=false の間は
+ *  deep harvest が走らない(shouldRunEndedBulkHarvest が endedDetected 必須)=0% の有力候補。状態速報に出す(純観測)。 */
+let _lastEndedDetected = false;
 /** ライブ中「公式−記録」ギャップ追い deep の最終発火時刻 */
 let lastOfficialGapDeepHarvestAt = 0;
 
@@ -1520,6 +1524,7 @@ function maybeRunEndedBulkHarvest() {
   if (now - endedBulkHarvestLastCheckedAt < ENDED_HARVEST_CHECK_MS) return;
   endedBulkHarvestLastCheckedAt = now;
   const endedDetected = detectWatchProgramEndedFromDom();
+  _lastEndedDetected = endedDetected; // v0.1.893: 計器(終了配信0%の切り分け)。
   // 配信終了を検知したら status / Web版向けに終了フラグを1回書く(タブを閉じない限り
   //   tabs.query には残るため、「視聴中」で更新が止まった終了枠を区別できるようにする)。
   if (endedDetected) {
@@ -6352,6 +6357,7 @@ function buildAiShareFastDiagnosticsPayload() {
         ? lastPersistGateFailures.slice(0, 8)
         : [],
       endedBulkHarvestTriggeredLiveId: String(endedBulkHarvestTriggeredLiveId || ''),
+      endedDetected: _lastEndedDetected, // v0.1.893: 終了配信0%の切り分け(false なら終了未検知で deep harvest が走らない)
       endedBulkHarvestLastCheckedAgo:
         endedBulkHarvestLastCheckedAt > 0
           ? Math.max(0, Date.now() - endedBulkHarvestLastCheckedAt)
@@ -8970,6 +8976,7 @@ function buildAiSharePageDiagnostics() {
         ? lastPersistGateFailures.slice(0, 8)
         : [],
       endedBulkHarvestTriggeredLiveId: String(endedBulkHarvestTriggeredLiveId || ''),
+      endedDetected: _lastEndedDetected, // v0.1.893: 終了配信0%の切り分け(false なら終了未検知で deep harvest が走らない)
       endedBulkHarvestLastCheckedAgo:
         endedBulkHarvestLastCheckedAt > 0
           ? Math.max(0, Date.now() - endedBulkHarvestLastCheckedAt)
