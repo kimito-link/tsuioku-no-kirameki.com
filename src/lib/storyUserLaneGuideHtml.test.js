@@ -49,6 +49,21 @@ describe('storyUserLaneGuideHtml', () => {
     expect(foot).toContain('nl-story-userlane-guide__foot');
   });
 
+  // 2026-06-22(council/lane-show-all-active): 48 で黙って切らず「ほか M人」を誠実に併記。
+  it('候補総数が表示数より多いとき「ほか M人は会場モードで」を併記する', () => {
+    const foot = buildStoryUserLaneGuideFootHtml(48, 522);
+    expect(foot).toContain('いま 48 件を表示中');
+    expect(foot).toContain('ほか 474人');
+    expect(foot).toContain('会場モード');
+  });
+
+  it('候補総数が表示数以下なら「ほか M人」は出さない(全員出ている)', () => {
+    expect(buildStoryUserLaneGuideFootHtml(20, 20)).not.toContain('ほか');
+    expect(buildStoryUserLaneGuideFootHtml(20, 5)).not.toContain('ほか');
+    // 第2引数なしは従来どおり(後方互換)
+    expect(buildStoryUserLaneGuideFootHtml(20)).toBe(buildStoryUserLaneGuideFootHtml(20, 0));
+  });
+
   it('フット＋記録件数は第2文でコメント総数とレーン枠の違いを説明する', () => {
     const html = buildStoryUserLaneGuideFootAndRecordedHtml(34, 220);
     expect(html).toContain('いま 34 件を表示中');

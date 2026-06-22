@@ -25,6 +25,18 @@ function numericUidFromRoomKey(userKey) {
 }
 
 /**
+ * 数値 userId から niconico アカウントアイコンの URL を導出する(venueSeats の deriveNicoUserIconUrl と
+ *   同式・依存を増やさないため広告列の純関数内に内蔵)。匿名/非数値は ''。
+ * @param {string} uid
+ * @returns {string}
+ */
+function nicoIconUrlForUid(uid) {
+  const s = String(uid || '').trim();
+  if (!/^\d{2,15}$/.test(s)) return '';
+  return `https://secure-dcdn.cdn.nimg.jp/nicoaccount/usericon/s/${Math.floor(Number(s) / 10000)}/${s}.jpg`;
+}
+
+/**
  * 広告 room 配列を PersonTileItem 配列に変換する。
  *
  * @param {ReadonlyArray<import('./officialDomRankingRowsToStripRooms.js').OfficialStripRoom>} rooms
@@ -52,9 +64,13 @@ export function adLanePicksFromRooms(rooms, io) {
     if (!name && !uid) continue;
 
     const avatarUrl = String(room.avatarUrl || '').trim();
-    // サムネが無ければゆっくり顔(uid 由来・無ければ合成キー由来で安定生成)。
+    // 解決順(他レーンと同一・2026-06-22 council/lane-show-all-active): ①公式API のサムネ →
+    //   ②数値ID由来の個人アイコン(広告API が thumbnailUrl を返さなくても数値IDがあれば個人サムネを出す。
+    //   「ぱき」のようにサムネ持ちの広告主がゆっくり顔に化けるのを防ぐ) → ③ゆっくり顔(安定生成)。
+    //   ②が 404 等でも本物タイルの load guard が③へフォールバックする=サムネ持ちは出る・無ければゆっくり。
     const faceKey = uid || String(room.userKey || `ad${i}`);
-    const displaySrc = avatarUrl || yukkuriFaceFor(faceKey);
+    const derivedIcon = uid ? nicoIconUrlForUid(uid) : '';
+    const displaySrc = avatarUrl || derivedIcon || yukkuriFaceFor(faceKey);
 
     // ID 行: 記名(uid あり)は短縮 ID を出さず広告主名を主役に(room.hideIdLine と同じ思想)。
     //   ID 無しは順位(#N)を idLine に出して「広告ランキングの何位か」を示す。

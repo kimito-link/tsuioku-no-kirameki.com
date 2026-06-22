@@ -28,12 +28,25 @@ describe('adLanePicksFromRooms', () => {
     expect(out[0].displaySrc).toBe('yukkuri:__anon_ad_1'); // サムネ無し→ゆっくり顔
   });
 
-  it('サムネが無い記名広告は uid 由来のゆっくり顔', () => {
+  // 2026-06-22(council/lane-show-all-active): 広告API が thumbnailUrl を返さなくても、数値ID付き
+  //   広告主は個人サムネ(usericon URL)を導出する。サムネ持ち(ぱき等)がゆっくり顔に化けるのを防ぐ。
+  it('サムネが無くても数値ID付き広告は個人サムネURLを導出する(ゆっくり顔に化けない)', () => {
     const out = adLanePicksFromRooms(
       [{ userKey: '115734569', nickname: 'しいたけ', count: 24634 }],
       io
     );
-    expect(out[0].displaySrc).toBe('yukkuri:115734569');
+    expect(out[0].displaySrc).toBe(
+      'https://secure-dcdn.cdn.nimg.jp/nicoaccount/usericon/s/11573/115734569.jpg'
+    );
+    expect(out[0].displaySrc).not.toContain('yukkuri'); // ゆっくり顔に落ちていない
+  });
+
+  it('公式API のサムネ(avatarUrl)があればそれを最優先(導出より公式が上)', () => {
+    const out = adLanePicksFromRooms(
+      [{ userKey: '115734569', nickname: 'しいたけ', count: 1, avatarUrl: 'https://cdn.test/real.png' }],
+      io
+    );
+    expect(out[0].displaySrc).toBe('https://cdn.test/real.png');
   });
 
   it('名前も uid も無い行は飛ばす', () => {

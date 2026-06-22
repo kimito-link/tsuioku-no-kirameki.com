@@ -159,7 +159,8 @@ function fillLaneTier(el, items, io) {
  * @param {{ link: unknown[], gift: unknown[], konta: unknown[], tanu: unknown[] }} buckets
  * @param {number} pickedLength
  * @param {StoryUserLaneDomIo} io
- * @param {{ recordedCommentRowsTotal?: number }} [opts] 診断の total と同じ記録件数（省略時はレーン直下の第2文なし）
+ * @param {{ recordedCommentRowsTotal?: number, totalCandidates?: number }} [opts] 診断の total と同じ記録件数
+ *   （省略時はレーン直下の第2文なし）。totalCandidates=素性が取れた候補総数（cap 前）で「ほか M人」併記用。
  */
 export function paintStoryUserLaneDomFilled(
   els,
@@ -279,6 +280,9 @@ export function paintStoryUserLaneDomFilled(
       pickedLength,
       opts && typeof opts.recordedCommentRowsTotal === 'number'
         ? opts.recordedCommentRowsTotal
+        : undefined,
+      opts && typeof opts.totalCandidates === 'number'
+        ? opts.totalCandidates
         : undefined
     );
   }
