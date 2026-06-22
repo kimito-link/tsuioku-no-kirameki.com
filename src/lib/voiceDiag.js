@@ -17,7 +17,9 @@
  *   lastSpokenBase: number,      // 最後に発話した時刻(epoch ms・0=未発話)
  *   lastSynthMs: number,         // 直近の合成所要 ms(-1=未計測)
  *   lastDepth: number,           // 直近の先読み深さ
- *   lastSpeedBoost: number       // 直近の速度ブースト
+ *   lastSpeedBoost: number,      // 直近の速度ブースト
+ *   lastPhase: string,           // v0.1.895: drainVoiceQueue が最後に到達したフェーズ(固着位置の計器)
+ *   lastPhaseAt: number          // v0.1.895: lastPhase に到達した時刻(epoch ms・0=未到達)
  * }} VoiceDiagState
  */
 
@@ -33,7 +35,9 @@ export function makeInitialVoiceDiag() {
     lastSpokenBase: 0,
     lastSynthMs: -1,
     lastDepth: 0,
-    lastSpeedBoost: 0
+    lastSpeedBoost: 0,
+    lastPhase: '',
+    lastPhaseAt: 0
   };
 }
 
@@ -63,6 +67,8 @@ export function buildVoiceDiagSnapshot(diag, nowMs) {
     lastSynthMs: num(d.lastSynthMs, base.lastSynthMs),
     lastDepth: num(d.lastDepth, base.lastDepth),
     lastSpeedBoost: num(d.lastSpeedBoost, base.lastSpeedBoost),
+    lastPhase: String(d.lastPhase || base.lastPhase),
+    lastPhaseAt: num(d.lastPhaseAt, base.lastPhaseAt),
     capturedAt: now
   };
 }
@@ -98,5 +104,13 @@ export function buildVoiceDiagLine(snap, nowMs) {
   }
   const synth = Number(snap.lastSynthMs);
   if (Number.isFinite(synth) && synth >= 0) parts.push(`合成${synth}ms`);
+  // v0.1.895: 固着の切り分け。最終発話が古い(沈黙)のに待機があるとき、drainVoiceQueue が
+  //   最後にどのフェーズまで進んだか(lastPhase)を出す=どこで止まったかを実データで確定する計器。
+  const lastPhase = String(snap.lastPhase || '');
+  const phaseAt = Number(snap.lastPhaseAt) || 0;
+  if (lastPhase && queueNow > 0 && base > 0 && now > 0 && now - base >= 8000) {
+    const phaseAgo = phaseAt > 0 ? Math.max(0, Math.round((now - phaseAt) / 1000)) : null;
+    parts.push(phaseAgo != null ? `停止位置=${lastPhase}(${phaseAgo}秒前)` : `停止位置=${lastPhase}`);
+  }
   return `会場読み上げ: ${parts.join(' / ')}`;
 }

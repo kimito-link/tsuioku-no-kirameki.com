@@ -417,25 +417,27 @@ describe('summarizeHealthVerdict v0.1.846 満点=「異常ゼロ」(進行中/�
       expect(cellById(cells, 'voice-timing').text).toContain('沈黙');
     });
 
-    it('再生watchdog発火(playbackTimeout>0)は固着の本物の異常で bad(最優先)', () => {
+    it('v0.1.895: 累計の再生TO/固着回復(playbackTimeout>0)でも、今読めていれば緑(永久赤にしない)', () => {
       const now = 1000000;
       const cells = buildHealthCells({
+        // 直近に発話済み(1秒前)=今は追従できている。過去に3回固着回復した記録だけ残る。
         voiceDiag: { enabled: true, spokenTotal: 10, queueNow: 6, queueMax: 8, lastSpokenBase: now - 1000, lastSynthMs: 0, staleDropTotal: 0, playbackTimeoutTotal: 3 },
         nowMs: now
       });
-      expect(cellById(cells, 'voice-timing').level).toBe('bad');
-      expect(cellById(cells, 'voice-timing').text).toContain('再生詰まり');
+      const c = cellById(cells, 'voice-timing');
+      expect(c.level).toBe('ok'); // 今読めている=緑。累計TOで永久赤にしない(全部グリーンを妨げない)。
+      expect(c.text).toContain('復帰3'); // 過去の回復回数は緑のまま補足表示。
     });
 
-    it('大量コメントで間引き(staleDrop>0)=抜け漏れを warn で件数表示', () => {
+    it('v0.1.895: 大量コメントの間引き(staleDrop>0)は正常なトレードオフ=na で件数表示(総合判定を汚さない)', () => {
       const now = 1000000;
       const cells = buildHealthCells({
         voiceDiag: { enabled: true, spokenTotal: 200, queueNow: 3, queueMax: 30, lastSpokenBase: now - 500, lastSynthMs: 200, staleDropTotal: 47, playbackTimeoutTotal: 0 },
         nowMs: now
       });
       const cov = cellById(cells, 'voice-coverage');
-      expect(cov.level).toBe('warn');
-      expect(cov.text).toContain('47');
+      expect(cov.level).toBe('na'); // 間引きは異常でない=na(黄にして永久に総合判定を汚さない)。
+      expect(cov.text).toContain('47'); // ただし件数(抜け漏れの事実)は隠さない。
     });
 
     it('合成が重い(2.5秒以上)は warn で予兆を見せる', () => {
