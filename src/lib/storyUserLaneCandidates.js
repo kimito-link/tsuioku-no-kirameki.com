@@ -222,10 +222,21 @@ export function orderVenueAggsByPickedCandidates(picked, aggList) {
   /** @type {unknown[]} */
   const out = [];
   for (const p of pickedList) {
-    const uid = String(/** @type {{ entry?: { userId?: unknown } }} */ (p)?.entry?.userId || '').trim();
+    const pc = /** @type {{ entry?: { userId?: unknown }, displaySrc?: unknown }} */ (p);
+    const uid = String(pc?.entry?.userId || '').trim();
     const agg = byUid.get(uid);
-    const row = agg !== undefined ? agg : /** @type {{ entry?: unknown }} */ (p)?.entry;
-    if (row) out.push(row);
+    const base = agg !== undefined ? agg : pc?.entry;
+    if (!base) continue;
+    // ★avatar は picked の displaySrc(=storyGrowthAvatarSrcCandidate で解決済み=数値IDから個人サムネを
+    //   導出した URL)を採用する。元集約の avatarUrl はコメント rows に焼き込まれた分だけで、NDGR 素性が
+    //   薄い配信(backfill 中)では空=会場が全員ゆっくり顔になる。popup は displaySrc を使うのでサムネが出る。
+    //   元集約の演出データ(commentCount/giftCount/_laneSortAt)は維持しつつ avatarUrl だけ解決済みに差し替える。
+    const resolvedAvatar = String(pc?.displaySrc || '').trim();
+    if (resolvedAvatar) {
+      out.push({ ...(/** @type {Record<string, unknown>} */ (base)), avatarUrl: resolvedAvatar });
+    } else {
+      out.push(base);
+    }
   }
   return out;
 }

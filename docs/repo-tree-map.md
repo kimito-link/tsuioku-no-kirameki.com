@@ -185,7 +185,7 @@ graph LR
 - `dist/`（1 件） — Web 版アプリのビルド成果物  〔ビルド成果物〕
 
 ## `council/` — 会議(COUNCIL)の問い・回答・統合(SYNTHESIS)。設計判断の根拠  〔会議 / 設計〕
-<sub>ファイル 54 件</sub>
+<sub>ファイル 55 件</sub>
 
 ## `docs/` — 設計正本・マインドマップ・フロー図・feature-map(AI/人間向け)  〔設計 / レポート〕
 <sub>ファイル 71 件</sub>
