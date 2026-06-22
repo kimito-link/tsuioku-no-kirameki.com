@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 1 / 527 件
+## ⚠️ 役割コメントが無いソース 1 / 529 件
 - `src/lib/reportPreviewPublish.js`
 
 ## 全ファイルツリー
@@ -256,7 +256,7 @@
   - `vendor-visual-explainer.mjs` — Vendors nicobailon/visual-explainer (MIT) into .cursor/skills/visual-explainer/
   - `verify-bump.mjs` — extension bump 後の整合性チェッカー
   - `write-extension-placeholder-icons.mjs` — リポジトリに 256px アイコンしか無い環境向け: manifest 用の小さめ PNG を生成する。
-- 📁 **src/** (1137)
+- 📁 **src/** (1140)
   - 📁 **data/** (6)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -515,7 +515,7 @@
         - `logo_funlink_white_RGB_maru_black.png`
       - `logo_guide_funlink_ol.pdf`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (926)
+  - 📁 **lib/** (929)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -1260,6 +1260,7 @@
     - `storedCommentDedupeMerge.js` — popup normalizeStoredCommentEntries 用: 同一キー重複行のマージ（PII を増やさずフラグのみ統合）
     - `storyAvatarDiagLine.js` — 応援グリッド用・診断表示（PII なし・件数のみ）。
     - `storyAvatarDiagLine.test.js`
+    - `storyAvatarTvFallbackClass.js` — 人物タイル/アイコンの「リモートサムネ取得失敗→ゆっくりTVスタイルへ落とす」class 付け外しの正本。
     - `storyDetailRelatedEntries.js` — ストーリー詳細／プレビュー脇の「同一ユーザーの直近」リスト用。
     - `storyDetailRelatedEntries.test.js`
     - `storyGrowthLimits.js` — りんく成長グリッド（story growth）の描画上限。
@@ -1273,6 +1274,8 @@
     - `storyUserLaneDisplaySrc.test.js`
     - `storyUserLaneGuideHtml.js` — 応援ユーザーレーンの案内 HTML（ポップアップ・E2E と共有）
     - `storyUserLaneGuideHtml.test.js`
+    - `storyUserLaneMeta.js` — 応援ユーザーレーン(=popup「アイコン列・グリッド・診断」)の人物タイルに出す
+    - `storyUserLaneMeta.test.js`
     - `storyUserLaneRowModel.js` — 応援ユーザーレーン: 1 ユーザー候補あたりの tier・サムネ・ソート用スコアを一箇所で組み立てる。
     - `storyUserLaneRowModel.test.js`
     - `suggestInitialInlinePanelPlacement.js` — 新規インストール直後の「おすすめ」インライン配置（storage 未設定時のみ migrate が使う）。

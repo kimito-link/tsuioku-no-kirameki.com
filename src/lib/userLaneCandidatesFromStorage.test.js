@@ -452,7 +452,11 @@ maybe('0.1.79: ギフト演出 DOM での broadcaster icon 取り違えガード
     expect(me?.avatarUrl).toBe(viewerPersonalIcon);
   });
 
-  it('broadcaster 本人のコメ記録の broadcaster icon は通す', () => {
+  // v0.1.901 方針転換: 配信者本人(放送主)は「応援者(viewer)」ではないので popup の応援列からも
+  //   会場の席からも除外する(実機で peropanda 本人が会場席に座っていた=ユーザー指摘)。
+  //   旧テスト「本人の broadcaster icon は通す」は本人を【列に残す】前提だったが、新方針では本人を
+  //   候補そのものから落とす。本人除外は uid 一致だけで効く(iconUrl は不要)。
+  it('broadcaster 本人(uid 一致)は候補から除外される', () => {
     const out = userLaneCandidatesFromStorage(
       [
         {
@@ -460,15 +464,41 @@ maybe('0.1.79: ギフト演出 DOM での broadcaster icon 取り違えガード
           nickname: '配信者',
           avatarUrl: broadcasterIconUrl,
           capturedAt: 1,
-          liveId: lvId
+          liveId: lvId,
+          text: 'こんばんは'
+        },
+        {
+          userId: viewerUid,
+          nickname: '君斗りんく',
+          avatarUrl: viewerPersonalIcon,
+          capturedAt: 2,
+          liveId: lvId,
+          text: 'おつ'
         }
       ],
       lvId,
       { broadcasterUid, broadcasterIconUrl }
     );
-    const broadcaster = out.find((c) => c.userId === broadcasterUid);
-    expect(broadcaster).toBeTruthy();
-    expect(broadcaster?.avatarUrl).toBe(broadcasterIconUrl);
+    // 本人は消える・viewer は残る
+    expect(out.find((c) => c.userId === broadcasterUid)).toBeFalsy();
+    expect(out.find((c) => c.userId === viewerUid)).toBeTruthy();
+  });
+
+  it('iconUrl が無くても broadcasterUid だけで本人は除外される', () => {
+    const out = userLaneCandidatesFromStorage(
+      [
+        {
+          userId: broadcasterUid,
+          nickname: '配信者',
+          capturedAt: 1,
+          liveId: lvId,
+          text: 'やあ'
+        }
+      ],
+      lvId,
+      { broadcasterUid } // iconUrl 無し=アイコン化けガードは無効だが本人除外は効く
+    );
+    expect(out.find((c) => c.userId === broadcasterUid)).toBeFalsy();
   });
 
   it('全コメが汚染データのみの viewer は avatarUrl 空（pickStrongestAvatarUrlForUser フォールバック）', () => {
