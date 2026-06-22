@@ -1458,16 +1458,24 @@ export function mountVenueBarButton(options = {}) {
   seatsHost.className = 'nlsb-seats nlsb-mode-empty';
   /** @type {HTMLDivElement[]} */
   const tierNodes = [];
-  // 2026-06-14 修正: buildVenueTiers の最大段数(8)ぶん tierNode を用意する。
-  //   以前は5個固定で、純関数を8段にしても6〜8段目が描画されず5段に詰め込まれて窮屈だった。
-  for (let i = 0; i < VENUE_MAX_TIER_NODES; i += 1) {
-    const tier = document.createElement('div');
-    tier.className = 'nlsb-tier';
-    tier.dataset.tierIndex = String(i);
-    tier.hidden = true;
-    tierNodes.push(tier);
-    seatsHost.appendChild(tier);
-  }
+  // 2026-06-14 修正: buildVenueTiers の段数ぶん tierNode を用意する(以前は5個固定で6〜8段目が
+  //   描画されず詰め込み窮屈化した)。
+  // 2026-06-22 会場「全員500人」: 段数が8を超えうる(全員ぶん段を積む)ため、固定数でなく
+  //   「必要な段数まで足りなければ作る」可変生成にする。ensureTierNodes(n) が n 段ぶん確保する。
+  //   ★MEMORY の教訓: 純関数(buildVenueTiers)の段数を増やしたら DOM(tierNodes)も必ず追随させる。
+  /** @param {number} need 必要な段数。足りなければ新規 .nlsb-tier を seatsHost に足す。 */
+  const ensureTierNodes = (need) => {
+    while (tierNodes.length < need) {
+      const tier = document.createElement('div');
+      tier.className = 'nlsb-tier';
+      tier.dataset.tierIndex = String(tierNodes.length);
+      tier.hidden = true;
+      tierNodes.push(tier);
+      seatsHost.appendChild(tier);
+    }
+  };
+  // 起動時は従来どおり最低 VENUE_MAX_TIER_NODES(8) 段ぶんを確保(少人数の初回描画を軽く保つ)。
+  ensureTierNodes(VENUE_MAX_TIER_NODES);
   /** @type {ReturnType<typeof createSeatNode>[]} */
   const seatNodes = [];
   for (let i = 0; i < VENUE_FULLSCREEN_MAX_SEATS; i += 1) {
@@ -2455,12 +2463,21 @@ export function mountVenueBarButton(options = {}) {
     const seatMinWidth =
       seating.layoutMode === 'vip' ? 158 : seating.layoutMode === 'normal' ? 92 : 76;
     const perRow = seatsPerRow(seatAreaWidth - 28, seatMinWidth);
-    // 2026-06-14 会議(満席感): hardCap を外し人数連動(resolveDynamicArenaCap)で上限を伸ばす。
-    //   段数も 6→8 に増やして大人数の客席を奥へ広げる。perRow*8 と動的cap の小さい方で頭打ち。
+    // 2026-06-22 会場「全員500人」(council/venue-all-faces-500): 旧実装は rows:8 + 動的cap(max150)で
+    //   同時表示を ~150 に頭打ちさせ、超過は点描逃げ=「482人なのに96人しか顔が出ない」の核だった。
+    //   全員を顔付きにするため、必要な段数(全員÷perRow)を maxRows として確保し、hardCap を席プール上限
+    //   (VENUE_FULLSCREEN_MAX_SEATS=500)まで開ける。8段超ぶんは seatsHost の overflow-y で縦スクロール。
+    //   ★resolveDynamicArenaCap は潰さず、ここで hardCap を明示する(他の呼び出し元/テストは不変)。
+    const neededRows = Math.max(1, Math.ceil(seating.seats.length / Math.max(1, perRow)));
+    const venueMaxRows = Math.min(
+      neededRows,
+      Math.ceil(VENUE_FULLSCREEN_MAX_SEATS / Math.max(1, perRow))
+    );
     const visibleSeatCount = resolveVisibleArenaCount({
       totalCount: seating.seats.length,
       perRow,
-      rows: 8
+      rows: venueMaxRows,
+      hardCap: VENUE_FULLSCREEN_MAX_SEATS
     });
     const visibleSeatsRaw = selectStableVisibleMembers(
       seating.seats,
@@ -2541,7 +2558,18 @@ export function mountVenueBarButton(options = {}) {
 
     // v0.1.737 実機修正: 各段が1行に収まる席数(perRow)を超えないよう maxPerRow を渡す。
     //   これが無いと後段が横にはみ出し overflow-x:hidden で見切れ、会場が埋まって見えない。
-    const tiers = buildVenueTiers(visibleSeats.length, { maxPerRow: perRow });
+    // 2026-06-22 会場「全員500人」: maxRows を渡し、8段で間引かず全員ぶん段を積む(縦スクロール)。
+    const tiers = buildVenueTiers(visibleSeats.length, {
+      maxPerRow: perRow,
+      maxRows: venueMaxRows
+    });
+    // 2026-06-22 会場「全員500人」: 段数が tierNodes の数を超えうる=必要なぶん DOM を確保する
+    //   (足りないと後段が描画されず詰め込み窮屈化=過去の失敗の再発防止)。
+    ensureTierNodes(tiers.length);
+    // 3D奥行き(translateZ/Y)は【手前 FRONT_3D_TIERS 段だけ】に効かせ、それ以降はフラットに積む。
+    //   500人で何十段も奥に縮めると最奥が極小+画面外になるため(会議結論「手前数段だけ3D・奥フラット」)。
+    //   scale は buildVenueTiers が minScale(>=0.5)で下限を守るのでそのまま使う(顔は潰れない)。
+    const FRONT_3D_TIERS = 8;
     for (let i = 0; i < tierNodes.length; i += 1) {
       const tierNode = tierNodes[i];
       const tier = tiers[i];
@@ -2552,8 +2580,10 @@ export function mountVenueBarButton(options = {}) {
         tierNode.style.removeProperty('--nlsb-tier-scale');
         continue;
       }
-      const translateY = -Math.round(tier.depth * 18);
-      const translateZ = -Math.round(tier.depth * 72);
+      // 手前 FRONT_3D_TIERS 段は従来の3D遠近、それ以降は depth を頭打ちにしてフラット(縦スクロールで全員)。
+      const flatDepth = tier.rowIndex < FRONT_3D_TIERS ? tier.depth : 0;
+      const translateY = -Math.round(flatDepth * 18);
+      const translateZ = -Math.round(flatDepth * 72);
       tierNode.style.setProperty('--nlsb-tier-y', `${translateY}px`);
       tierNode.style.setProperty('--nlsb-tier-z', `${translateZ}px`);
       tierNode.style.setProperty('--nlsb-tier-scale', String(tier.scale));

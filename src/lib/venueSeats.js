@@ -29,10 +29,14 @@
 export const VENUE_MAX_SEATS = 50;
 
 /**
- * 全画面会場モードのアリーナ最大席数(PR3)。全員は論理席だが DOM 化/描画はこの上限まで。
- * 会議確定「全員に論理席・表示は ~150 席」。超過は入れ替え制で吸収する。
+ * 全画面会場モードのアリーナ最大席数。全員は論理席だが DOM 化/描画はこの上限まで。
+ * 2026-06-22 会場「全員500人」(council/venue-all-faces-500・会議3体一致+司令塔裏取り):
+ *   ユーザー確定「とにかく全員・サムネ優先・500人並べば理想・SHOWROOM感」。旧 150 では
+ *   482人配信で~96人しか顔が出ず残りは点描逃げ。500 に上げ、段数(buildVenueTiers maxRows)・
+ *   DOM プール(venueBar)・縦スクロール(overflow-y)と整合させて全員を顔付きに。超過は入れ替え制で吸収。
+ *   ★resolveDynamicArenaCap は潰さず引数で max を上げる(テスト/高さ計算を壊さない漸進)。
  */
-export const VENUE_FULLSCREEN_MAX_SEATS = 150;
+export const VENUE_FULLSCREEN_MAX_SEATS = 500;
 
 /** 前列(リッチ canvas アバターを割り当てる)席数。残りは軽量アイコン。 */
 export const VENUE_FRONT_ROW_SEATS = 20;
@@ -721,9 +725,10 @@ export function resolveVenueTierMinScale(total) {
  * このファイルは数値モデルだけ(CSS/DOM 非依存)。実際の transform は venueBar 側が depth/scale から作る。
  *
  * @param {number} seatCount アリーナに座る参加者数(名前付き)
- * @param {{ minScale?: number, maxPerFrontRow?: number, maxPerRow?: number }} [opts]
+ * @param {{ minScale?: number, maxPerFrontRow?: number, maxPerRow?: number, maxRows?: number }} [opts]
  *   minScale=最奥段のスケール(既定0.62=ほどよく立体)、maxPerFrontRow=前列の最大人数(既定8)、
- *   maxPerRow=1段に入れる席数の上限(横はみ出し防止・既定 無制限。venueBar が seatsPerRow を渡す)
+ *   maxPerRow=1段に入れる席数の上限(横はみ出し防止・既定 無制限。venueBar が seatsPerRow を渡す)、
+ *   maxRows=段数の絶対上限(既定8=後方互換。venueBar が「全員ぶん段」を積むとき大きい値を渡す)
  * @returns {Array<{ rowIndex: number, count: number, scale: number, depth: number }>}
  *   段配列(手前=rowIndex 0)。count=その段の席数、scale=拡大率、depth=0(手前)..1(最奥)
  */
@@ -748,6 +753,11 @@ export function buildVenueTiers(seatCount, opts = {}) {
     Number.isFinite(opts.maxPerRow) && opts.maxPerRow > 0
       ? Math.floor(opts.maxPerRow)
       : Infinity;
+  // 2026-06-22 会場「全員500人」(council/venue-all-faces-500): 段数の絶対上限。既定8=従来動作
+  //   (後方互換)。venueBar が「全員ぶんの段」を作りたいとき大きい値を渡す=8段で間引かず縦に
+  //   積んで overflow-y スクロールで全員を顔付きに。奥段は minScale で潰れない範囲でフラット化。
+  const maxRows =
+    Number.isFinite(opts.maxRows) && opts.maxRows > 0 ? Math.floor(opts.maxRows) : 8;
 
   // 段数を人数で決める(~frontMax=1段, 倍々に近いペースで増やす)。
   // 2026-06-14 会議(満席感): 大人数で段を増やして奥に客席を広げる。上限 6→8 段。
@@ -760,12 +770,16 @@ export function buildVenueTiers(seatCount, opts = {}) {
   else if (n <= frontMax * 16) rowCount = 6;
   else if (n <= frontMax * 22) rowCount = 7;
   else rowCount = 8;
+  // maxRows を 8 より大きく許す場合、既定の段数表(最大8)を超えて「全員ぶんの段」を作れるよう、
+  //   maxPerRow が無くても frontMax 基準で段数を伸ばす(8段×frontMax を超える人数は段を足す)。
+  if (maxRows > 8 && !Number.isFinite(maxPerRow) && rowCount * frontMax < n) {
+    rowCount = Math.min(maxRows, Math.ceil(n / frontMax));
+  }
 
-  // maxPerRow がある場合: 全段(最大8)× maxPerRow に収まらないと横溢れする。
-  //   収まるよう段数を増やす(8段で頭打ち=それ以上は描画上限で間引かれている前提)。
-  const ROW_HARD_MAX = 8;
+  // maxPerRow がある場合: 全段 × maxPerRow に収まらないと横溢れする。収まるよう段数を増やす。
+  //   従来は8段で頭打ち=超過は間引かれる前提だったが、maxRows を上げると全員ぶん段を積める。
   if (Number.isFinite(maxPerRow)) {
-    while (rowCount < ROW_HARD_MAX && rowCount * maxPerRow < n) rowCount += 1;
+    while (rowCount < maxRows && rowCount * maxPerRow < n) rowCount += 1;
   }
 
   // 各段の「重み」: 奥ほど横に広い(後方客席が広がる)ので段が増えるごとに +25%。

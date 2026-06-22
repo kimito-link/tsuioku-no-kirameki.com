@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 1 / 532 件
+## ⚠️ 役割コメントが無いソース 1 / 533 件
 - `src/lib/reportPreviewPublish.js`
 
 ## 全ファイルツリー
@@ -115,7 +115,7 @@
   - `surechigai-lite-improvement-plan.md`
   - `ux-tdd-hypothesis-matrix.md`
   - `visual-explainer.md`
-- 📁 **extension/** (98)
+- 📁 **extension/** (99)
   - 📁 **images/** (87)
     - 📁 **avatar-parts/** (22)
       - `cheek-0.png`
@@ -223,6 +223,7 @@
   - `offscreen.html`
   - `popup.html`
   - `sidepanel.html`
+  - `status-guard.js` — 状態速報ページ(status.html)の「何があっても開く」保険。
   - `status.html`
   - `venue.html`
 - 📁 **scripts/** (29)
