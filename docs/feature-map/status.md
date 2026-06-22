@@ -6,7 +6,7 @@
 ## storage の出入り
 
 - 書くキー: `KEY_STATUS_TREND`
-- 読むキー: `KEY_AI_SHARE_FAST_DIAG`, `KEY_AI_SHARE_POPUP_DIAG`, `KEY_LAST_WATCH_URL`, `KEY_REPORT_PREVIEW`, `KEY_STATUS_TREND`, `KEY_VENUE_SEATS_DIAG`, `KEY_VOICE_DIAG`, `nls_backfill_progress_v1`
+- 読むキー: `KEY_AI_SHARE_FAST_DIAG`, `KEY_AI_SHARE_POPUP_DIAG`, `KEY_LANE_DIAG`, `KEY_LAST_WATCH_URL`, `KEY_REPORT_PREVIEW`, `KEY_STATUS_TREND`, `KEY_VENUE_SEATS_DIAG`, `KEY_VOICE_DIAG`, `nls_backfill_progress_v1`
 
 ## 構成ファイル（import 到達・最大40件表示）
 
@@ -21,6 +21,7 @@ graph LR
   n_status --> n_src_lib_googleSuggest_js["lib/googleSuggest.js"]
   n_status --> n_src_lib_healthCells_js["lib/healthCells.js"]
   n_status --> n_src_lib_htmlEscape_js["lib/htmlEscape.js"]:::shared
+  n_status --> n_src_lib_laneDiagKey_js["lib/laneDiagKey.js"]:::shared
   n_status --> n_src_lib_liveEndedFlag_js["lib/liveEndedFlag.js"]:::shared
   n_status --> n_src_lib_liveHealthScore_js["lib/liveHealthScore.js"]
   n_status --> n_src_lib_metricConfidence_js["lib/metricConfidence.js"]:::shared

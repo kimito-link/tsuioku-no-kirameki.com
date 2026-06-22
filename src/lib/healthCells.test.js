@@ -548,4 +548,36 @@ describe('summarizeHealthVerdict v0.1.846 満点=「異常ゼロ」(進行中/�
       expect(cellById(cells, 'venue-seats').text).toContain('更新');
     });
   });
+
+  // 2026-06-22(council/lane-show-all-active): 応援レーンの人数整合セル。
+  describe('応援レーン人数整合セル(laneDiag)', () => {
+    it('laneDiag 未指定/liveId 空=セルを足さない(死にセルにしない)', () => {
+      expect(cellById(buildHealthCells({ livesData: [] }), 'lane-count')).toBeUndefined();
+      expect(
+        cellById(buildHealthCells({ livesData: [], laneDiag: { liveId: '' } }), 'lane-count')
+      ).toBeUndefined();
+    });
+
+    it('素性 N > 表示 M のとき「表示M/素性N(他K)」を na で出す(48で黙って切らない)', () => {
+      const cells = buildHealthCells({
+        livesData: [],
+        laneDiag: { liveId: 'lv1', identified: 522, laneShown: 48, limit: 48 }
+      });
+      const c = cellById(cells, 'lane-count');
+      expect(c.level).toBe('na');
+      expect(c.text).toContain('表示48');
+      expect(c.text).toContain('素性522');
+      expect(c.text).toContain('474'); // 他 474 は会場で
+    });
+
+    it('素性 ≦ 表示 のとき「全員表示」を ok で出す', () => {
+      const cells = buildHealthCells({
+        livesData: [],
+        laneDiag: { liveId: 'lv1', identified: 20, laneShown: 20, limit: 48 }
+      });
+      const c = cellById(cells, 'lane-count');
+      expect(c.level).toBe('ok');
+      expect(c.text).toContain('全員');
+    });
+  });
 });

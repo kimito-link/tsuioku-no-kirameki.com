@@ -525,6 +525,9 @@ import {
   flattenStoryUserLaneBuckets
 } from '../lib/storyUserLaneBuckets.js';
 import { buildStoryUserLaneCandidateRow } from '../lib/storyUserLaneRowModel.js';
+// 2026-06-22(council/lane-show-all-active): 応援レーンの人数整合(素性 N/表示 M)を健全度パネルに載せる。
+import { KEY_LANE_DIAG } from '../lib/laneDiagKey.js';
+import { buildLaneDiagSnapshot } from '../lib/laneDiag.js';
 import { isAvatarObservedInCommentProfileMap } from '../lib/popupAvatarResolver.js';
 import {
   normalizeLv,
@@ -5385,11 +5388,32 @@ function renderStoryUserLane() {
   paintStoryUserLaneDomFilled(els, faces, buckets, laneDisplayedTotal, laneDomIo, {
     totalCandidates: candidates.length
   });
+  // 2026-06-22(council/lane-show-all-active): 健全度パネル「応援レーン」セル用に、人数整合の純観測値を
+  //   storage へ(素性が取れた人 candidates.length / レーンに出した人 picked.length / 上限 limit)。
+  //   venueSeatsDiag と同型(min-gap・best-effort・記録/描画は触らない)。
+  publishLaneDiag({ liveId, identified: candidates.length, laneShown: picked.length, limit });
   setTimeout(() => {
     if (typeof window !== 'undefined' && window.__NLS_LANE_DIAG__) {
       window.__NLS_LANE_DIAG__();
     }
   }, 3000);
+}
+
+/** 応援レーン診断の storage 書き込み(min-gap 3秒・best-effort=popup を止めない)。 */
+let _laneDiagLastWriteAt = 0;
+/** @param {{ liveId: string, identified: number, laneShown: number, limit: number }} obs */
+function publishLaneDiag(obs) {
+  try {
+    const now = Date.now();
+    if (now - _laneDiagLastWriteAt < 3000) return; // 3秒 min-gap。
+    _laneDiagLastWriteAt = now;
+    const snap = buildLaneDiagSnapshot({ ...obs, lastUpdateAt: now }, now);
+    void chrome.storage.local.set({ [KEY_LANE_DIAG]: snap }).catch(() => {
+      /* best-effort: storage 不可・context 消失 */
+    });
+  } catch {
+    /* no-op */
+  }
 }
 
 function renderStoryAvatarDiag() {

@@ -1168,6 +1168,18 @@
       ]
     },
     {
+      "file": "src/lib/laneDiagKey.js",
+      "featureCount": 2,
+      "features": [
+        "popup",
+        "status"
+      ],
+      "labels": [
+        "ポップアップ(応援レーン)",
+        "状態速報ページ"
+      ]
+    },
+    {
       "file": "src/lib/liveAudienceDom.js",
       "featureCount": 2,
       "features": [
@@ -3505,6 +3517,16 @@
     },
     {
       "file": "src/lib/kiramekiAwardsSectionHtml.js",
+      "featureCount": 1,
+      "features": [
+        "popup"
+      ],
+      "labels": [
+        "ポップアップ(応援レーン)"
+      ]
+    },
+    {
+      "file": "src/lib/laneDiag.js",
       "featureCount": 1,
       "features": [
         "popup"

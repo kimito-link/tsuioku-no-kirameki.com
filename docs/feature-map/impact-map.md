@@ -145,6 +145,7 @@
 | `src/lib/kokenContributionRankingApi.js` | 2 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) |
 | `src/lib/kokenGiftHistoryApi.js` | 2 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) |
 | `src/lib/kokenGiftHistoryFetchClient.js` | 2 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) |
+| `src/lib/laneDiagKey.js` | 2 | ポップアップ(応援レーン) / 状態速報ページ |
 | `src/lib/liveAudienceDom.js` | 2 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) |
 | `src/lib/liveEndedFlag.js` | 2 | 記録エンジン(watchページ常駐) / 状態速報ページ |
 | `src/lib/metricConfidence.js` | 2 | ポップアップ(応援レーン) / 状態速報ページ |
@@ -369,6 +370,7 @@
 | `src/lib/keyboardTypeDiagnostic.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/kiramekiAwards.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/kiramekiAwardsSectionHtml.js` | 1 | ポップアップ(応援レーン) |
+| `src/lib/laneDiag.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/liveCommenterStats.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/liveHealthScore.js` | 1 | 状態速報ページ |
 | `src/lib/livePersistInterval.js` | 1 | 記録エンジン(watchページ常駐) |
