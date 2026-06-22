@@ -10490,6 +10490,38 @@ function relocateSupportTimelineForStandaloneWindow() {
   //   インスタンスでは実害が無いため行わない（action popup は別プロセスで初期 DOM のまま）。
 }
 
+/**
+ * v0.1.896: 操作ボタン群(HTML/マーケ/メディアキット/スクショ/再読み込み/コメビュ/読み上げ)を
+ *   パネル上部へ昇格する。ユーザー要望「これらの操作要素は上の方にあった方がいい」+ 会議
+ *   (council/toolbar-top-placement-SYNTHESIS.md・星野ロミ式)で確定。
+ *
+ * 設計(最小ブラスト半径・会議でコード裏取り済):
+ *   - 操作群は `.nl-compose-quick-toolbar`(コメント送信ボタン直後=compose の中=popup のかなり下)。
+ *   - クリックは全て id(getElementById)束ね(popup-entry.js)=DOM をどこへ動かしても id 同一なら
+ *     全ハンドラ無傷。よって DOM 移動が安全(イベント委譲でも親依存でもない)。
+ *   - 移動先は `.nl-main` 直下の配信者バナー(nl-caster-banner)の直前=ヘッダー直下に最も近い実用位置。
+ *     バナーが無ければ統計カード(liveStatCards)の前。どちらも無ければ main 先頭。
+ *   - 横付き/下のどちらでもパネル内の上端付近に出る(画面の左右でなくパネル基準=モードでブレない=
+ *     critic の指摘『横付きで右寄り』を構造的に回避)。
+ *   - 冪等(既に目的位置の直前にあれば no-op)。元の compose にはコメント送信ボタンが残る(自然)。
+ */
+function hoistQuickToolbarToTop() {
+  const toolbar = /** @type {HTMLElement|null} */ (document.querySelector('.nl-compose-quick-toolbar'));
+  const main = /** @type {HTMLElement|null} */ (document.querySelector('.nl-main'));
+  if (!(toolbar instanceof HTMLElement) || !(main instanceof HTMLElement)) return;
+  // 移動先アンカー: 配信者バナー → 統計カード → main 先頭、の順で最初に見つかった main 直下要素。
+  const anchor =
+    /** @type {HTMLElement|null} */ (main.querySelector(':scope > .nl-caster-banner')) ||
+    /** @type {HTMLElement|null} */ (main.querySelector(':scope > #liveStatCards')) ||
+    /** @type {HTMLElement|null} */ (main.firstElementChild);
+  if (!anchor) return;
+  // 既に anchor の直前(=上部)に居れば冪等 no-op。
+  if (toolbar.parentElement === main && toolbar.nextElementSibling === anchor) return;
+  // 上端のツールバーだと分かるよう印を付ける(CSS で余白/区切りを足せる受け皿・既存挙動は不変)。
+  toolbar.dataset.nlHoisted = 'top';
+  main.insertBefore(toolbar, anchor);
+}
+
 /** popup 開時・北極星更新時の koken ギフト履歴同期（マーケ DL と同型）。 */
 /** content 側 koken ギフト API と同周期（履歴タブを開かず自動追従） */
 const KOKEN_GIFT_POPUP_SYNC_MIN_GAP_MS = 10_000;
@@ -18357,6 +18389,12 @@ async function initPopup() {
   }
   applyResponsivePopupLayout();
   bindNlMainScrollPerfHook();
+  // v0.1.896: 操作ボタン群をパネル上部へ昇格(ユーザー要望「上の方に」+ 会議確定)。冪等・id ハンドラ無傷。
+  try {
+    hoistQuickToolbarToTop();
+  } catch {
+    /* no-op: 昇格に失敗しても操作群は元位置に残る(機能は不変) */
+  }
   bridgeToolbarPopupToInlinePanel();
   attachCharaTrioSlotClickHandlers();
   attachWatchConcurrentCardCharaNorthStarJump();

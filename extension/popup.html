@@ -7914,6 +7914,16 @@
         margin-top: 6px;
       }
 
+      /* v0.1.896: パネル上部へ昇格した操作ツールバー(hoistQuickToolbarToTop)。
+         ヘッダー直下に出るので、上下に少し余白と下境界を付けて「操作のまとまり」として目立たせる。
+         compose 内に居たときの margin-top:6px を上書きし、上端での収まりを整える。
+         flex-wrap は継承=横付き/下のどちらでもパネル幅に応じて折り返す(右寄り偏りなし)。 */
+      .nl-compose-quick-toolbar[data-nl-hoisted='top'] {
+        margin: 2px 0 8px;
+        padding: 6px 0 8px;
+        border-bottom: 1px solid var(--nl-border, rgba(255, 255, 255, 0.12));
+      }
+
       .nl-comment-compose--primary .nl-compose-quick-toolbar #exportJson,
       .nl-comment-compose--primary .nl-compose-quick-toolbar #captureScreenshot,
       .nl-comment-compose--primary .nl-compose-quick-toolbar #reloadWatchTabBtn {
