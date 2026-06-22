@@ -641,7 +641,9 @@ describe('buildVenueSeating', () => {
   it('既定の上限と前列定数', () => {
     expect(VENUE_MAX_SEATS).toBe(50);
     expect(VENUE_FRONT_ROW_SEATS).toBe(20);
-    expect(VENUE_FULLSCREEN_MAX_SEATS).toBe(150);
+    // 2026-06-22 会場「全員500人」(council/venue-all-faces-500): 旧150 では大規模配信で大半が
+    //   点描逃げ=「全員出ない」核だったため 500 に引き上げ(段数 maxRows・DOMプール・縦スクロールと整合)。
+    expect(VENUE_FULLSCREEN_MAX_SEATS).toBe(500);
   });
 });
 
@@ -753,5 +755,32 @@ describe('buildVenueTiers', () => {
   it('minScale を指定できる', () => {
     const t = buildVenueTiers(30, { minScale: 0.4 });
     expect(t[t.length - 1].scale).toBeCloseTo(0.4, 5);
+  });
+
+  // 2026-06-22 会場「全員500人」(council/venue-all-faces-500)
+  it('maxRows 既定(8)は従来どおり最大8段で頭打ち(後方互換)', () => {
+    expect(buildVenueTiers(300).length).toBeLessThanOrEqual(8);
+    expect(buildVenueTiers(300, { maxPerRow: 10 }).length).toBeLessThanOrEqual(8);
+  });
+
+  it('maxRows>8 を渡すと8段を超えて全員ぶん段を積む(縦スクロール用・取りこぼしなし)', () => {
+    // maxPerRow あり: 500人を perRow=14 で全員収めるには ceil(500/14)=36 段必要。
+    const withPerRow = buildVenueTiers(500, { maxPerRow: 14, maxRows: 40 });
+    expect(withPerRow.length).toBeGreaterThan(8);
+    expect(withPerRow.length).toBeLessThanOrEqual(40);
+    const counts = withPerRow.map((t) => t.count);
+    expect(Math.max(...counts)).toBeLessThanOrEqual(14); // 横はみ出さない
+    expect(counts.reduce((a, b) => a + b, 0)).toBe(500); // 全員ぶん取りこぼしなし
+
+    // maxPerRow 無しでも maxRows>8 なら frontMax 基準で段を伸ばす。
+    const noPerRow = buildVenueTiers(500, { maxRows: 40 });
+    expect(noPerRow.length).toBeGreaterThan(8);
+    expect(noPerRow.reduce((a, t) => a + t.count, 0)).toBe(500);
+  });
+
+  it('maxRows>8 でも段数は maxRows と必要数の小さい方で頭打ち', () => {
+    // 500人を perRow=14 だと36段必要だが maxRows=12 で頭打ち=12段まで。
+    const capped = buildVenueTiers(500, { maxPerRow: 14, maxRows: 12 });
+    expect(capped.length).toBe(12);
   });
 });
