@@ -32,6 +32,22 @@ import { KEY_VOICE_DIAG } from '../lib/voiceDiagKey.js';
 import { KEY_VENUE_SEATS_DIAG } from '../lib/venueSeatsDiagKey.js';
 // 2026-06-22(council/lane-show-all-active): 応援レーンの人数整合(素性 N/表示 M)を健全度パネルに載せる。
 import { KEY_LANE_DIAG } from '../lib/laneDiagKey.js';
+// 応援レーン鏡: popup の応援レーン(りんく/こん太/広告/たぬ姉の段組み)を顔まで含めてそっくり映す。
+//   データは popup→storage(KEY_LANE_MIRROR)、status が読んで本物の描画関数で描く(会場とは無関係)。
+import { KEY_LANE_MIRROR } from '../lib/laneMirrorKey.js';
+import { restoreLaneMirrorBuckets } from '../lib/laneMirror.js';
+import {
+  paintStoryUserLaneDomFilled,
+  paintStoryUserLaneDomEmptyGuides
+} from './story/renderStoryUserLaneDom.js';
+import { createSupportAvatarLoadGuard } from '../lib/supportGrowthAvatarLoad.js';
+import { isHttpOrHttpsUrl, NICONICO_OFFICIAL_DEFAULT_USERICON_HTTPS } from '../lib/supportGrowthTileSrc.js';
+import { storyTileUsesYukkuriTvStyle } from '../lib/storyTileTvStyle.js';
+import { upgradeAnonymousAvatarImage } from '../lib/avatarPartsComposer.js';
+import {
+  applyStoryAvatarTvFallbackClass,
+  removeStoryAvatarTvFallbackClass
+} from '../lib/storyAvatarTvFallbackClass.js';
 import { buildReportPreviewLines } from '../lib/reportPreview.js';
 import {
   KEY_REPORT_PREVIEW,
@@ -94,11 +110,12 @@ let _refreshTimerId = /** @type {number|null} */ (null);
 //   storage を読むと重い=12 秒間引きでキャッシュし、間は前回値を再利用(コア表示は毎回更新のまま)。
 const EXTRAS_REFETCH_MS = 12000;
 let _extrasCacheAt = 0;
-let _extrasCache = /** @type {{reportPreview:any, watchTabMap:any, trendFindings:any[], laneDiag:any}} */ ({
+let _extrasCache = /** @type {{reportPreview:any, watchTabMap:any, trendFindings:any[], laneDiag:any, laneMirror:any}} */ ({
   reportPreview: null,
   watchTabMap: new Map(),
   trendFindings: [],
-  laneDiag: null
+  laneDiag: null,
+  laneMirror: null
 });
 /** v0.1.868: 配信カードの再構築 skip 判定用 signature(変化なしなら innerHTML を作り直さない)。 */
 let _lastLivesSig = '';
@@ -107,6 +124,36 @@ let _lastHealthSig = '';
 /** v0.1.890: 対処カードの再構築 skip 判定用 signature。2秒ごとの全カード再生成を止める。
  *   初期値は実際の署名(空カード時の '' を含む)と絶対に一致しない sentinel=初回は必ず描画する。 */
 let _lastActionSig = ' init';
+/** 応援レーン鏡の再描画 skip 判定用 signature(配信カードと同型)。`liveId|capturedAt|...` が
+ *   前回と同じなら paint を skip=img 再生成のチラつき・重さを防ぐ。sentinel で初回は必ず描画。 */
+let _lastLaneMirrorSig = ' init';
+/**
+ * 応援レーン鏡のアバター読み込みガード(popup と同設定の本物=createSupportAvatarLoadGuard)。
+ *   popup-entry.js:3770 と同じく fallback を先に出してプローブ成功時だけ差し替え=404 フリッカー防止。
+ *   io は popup の laneDomIo(popup-entry.js:5135)と同じ4点。status は popup と独立プロセスなので
+ *   ここで status 専用に1つ作る(状態=成功/失敗 URL セットは status の鏡描画ぶんだけ保持)。
+ */
+const _laneMirrorAvatarLoadGuard = createSupportAvatarLoadGuard({
+  fallbackSrc: NICONICO_OFFICIAL_DEFAULT_USERICON_HTTPS,
+  onFallbackApplied: applyStoryAvatarTvFallbackClass,
+  onRemoteSuccess: removeStoryAvatarTvFallbackClass
+});
+/** 本物 buildPersonTileEl に渡す I/O(popup の laneDomIo と同じ4点)。 */
+const _laneMirrorDomIo = {
+  storyAvatarLoadGuard: _laneMirrorAvatarLoadGuard,
+  isHttpOrHttpsUrl,
+  storyTileUsesYukkuriTvStyle,
+  upgradeAnonymousAvatarImage
+};
+/** レーン案内(ガイド行)の顔。popup-entry.js:3750-3757 と同じ相対パス=status.html も extension ルート
+ *   なので解決する(faceAd は popup と同じくこん太アイコンを流用=popup-entry.js:5130)。 */
+const _LANE_MIRROR_FACES = {
+  faceLink: 'images/yukkuri-charactore-english/link/link-yukkuri-half-eyes-mouth-closed.png',
+  faceGift: 'images/yukkuri-charactore-english/konta/kitsune-yukkuri-half-eyes-mouth-closed.png',
+  faceAd: 'images/yukkuri-charactore-english/konta/kitsune-yukkuri-half-eyes-mouth-closed.png',
+  faceKonta: 'images/yukkuri-charactore-english/konta/kitsune-yukkuri-half-eyes-mouth-closed.png',
+  faceTanu: 'images/yukkuri-charactore-english/tanunee/tanuki-yukkuri-half-eyes-mouth-closed.png'
+};
 /** 直近 render の結果(コピー/ダウンロード用)。 */
 let _lastRenderedBundle = /** @type {{ overview: string, lives: object[], textBlob: string, jsonBlob: object }|null} */ (
   null
@@ -252,13 +299,16 @@ async function refresh(opts = {}) {
       ).catch(() => []);
       step = 'loadLaneDiagSafe';
       const laneDiag = await runStorageOpWithTimeout(() => loadLaneDiagSafe(), tmo).catch(() => null);
-      _extrasCache = { reportPreview, watchTabMap, trendFindings, laneDiag };
+      // 応援レーン鏡(顔込み)も extras に同梱=毎回の直列 read を増やさず12秒間引きで読む(診断は軽さ最優先)。
+      step = 'loadLaneMirrorSafe';
+      const laneMirror = await runStorageOpWithTimeout(() => loadLaneMirrorSafe(), tmo).catch(() => null);
+      _extrasCache = { reportPreview, watchTabMap, trendFindings, laneDiag, laneMirror };
       _extrasCacheAt = Date.now();
       _mark('extras');
     }
-    const { reportPreview, watchTabMap, trendFindings, laneDiag } = _extrasCache;
+    const { reportPreview, watchTabMap, trendFindings, laneDiag, laneMirror } = _extrasCache;
     step = 'renderAll';
-    renderAll({ lvList, summaries, fastDiag, popupDiag, backfillProgress, voiceDiag, venueSeatsDiag, laneDiag, reportPreview, trendFindings, watchTabMap });
+    renderAll({ lvList, summaries, fastDiag, popupDiag, backfillProgress, voiceDiag, venueSeatsDiag, laneDiag, laneMirror, reportPreview, trendFindings, watchTabMap });
     _mark('render');
     const _totalMs = Math.round((typeof performance !== 'undefined' ? performance.now() : Date.now()) - _t0);
     updateLastUpdateMeta({ totalMs: _totalMs, stepMs: _stepMs });
@@ -507,6 +557,18 @@ async function loadVenueSeatsDiagSafe() {
   }
 }
 
+// 応援レーン鏡(KEY_LANE_MIRROR)を読む。popup が renderStoryUserLane の最後で書く=popup を
+//   一度も開いていなければ null=鏡セクションは hidden のまま(死にリンクにしない)。例外時も null。
+//   ★毎回の直列 read は増やさない=この loader は extras(12秒間引き)からだけ呼ぶ(MEMORY 鉄則)。
+async function loadLaneMirrorSafe() {
+  try {
+    const bag = await chrome.storage.local.get(KEY_LANE_MIRROR);
+    return bag?.[KEY_LANE_MIRROR] || null;
+  } catch {
+    return null;
+  }
+}
+
 // v0.1.858: レポート(HTML/マーケ/メディアキット)の DL前 主要KPI を読む。popup が
 //   KEY_REPORT_PREVIEW へ定期(15秒)に書く。古い snapshot(2分超)や popup 未起動なら null=表示しない。
 async function loadReportPreviewSafe() {
@@ -608,7 +670,7 @@ function reportPreviewCtxFromFastDiag(fastDiag, backfillProgress) {
   };
 }
 
-function renderAll({ lvList, summaries, fastDiag, popupDiag, backfillProgress, voiceDiag, venueSeatsDiag, laneDiag, reportPreview, trendFindings, watchTabMap }) {
+function renderAll({ lvList, summaries, fastDiag, popupDiag, backfillProgress, voiceDiag, venueSeatsDiag, laneDiag, laneMirror, reportPreview, trendFindings, watchTabMap }) {
   // v0.1.847: 各描画セクションを独立 try/catch で隔離するヘルパ。1つが throw しても他のセクションと
   //   最終更新メタを巻き込まない=「セルが全部消える/最終更新—のまま固まる」を根治。落ちた場所は
   //   console と AI 共有欄に出して真因を追えるようにする(star-romi 失敗体験の除去)。
@@ -798,6 +860,10 @@ function renderAll({ lvList, summaries, fastDiag, popupDiag, backfillProgress, v
   //   v0.1.894: 会場モード読み上げセル(タイミング・抜け漏れ)を出すため voiceDiag も渡す。
   safeSection('健全度パネル', () => renderHealthCells({ livesData, fastDiag, voiceDiag, venueSeatsDiag, laneDiag }));
 
+  // 応援レーン鏡(popup の段組みを顔込みでそっくり映す・健全度パネルとは別の独立セクション)。
+  //   try/catch(safeSection)で囲み、鏡が壊れても概要・配信カードを巻き込まない。
+  safeSection('応援レーン鏡', () => renderLaneMirror(laneMirror));
+
   // 全体マインドマップ(折りたたみツリー・ここを見れば全部わかる)
   safeSection('マインドマップ', () => renderMindmap({ overviewText, livesData, fastDiag, popupDiag }));
 
@@ -881,6 +947,103 @@ function renderHealthCells(data) {
     div.appendChild(val);
     host.appendChild(div);
   }
+}
+
+/**
+ * 応援レーン鏡: popup の応援レーン(りんく/こん太/広告/たぬ姉の段組み)を顔(avatar)込みで
+ *   そっくり描く。popup と同じ本物の paintStoryUserLaneDomFilled + buildPersonTileEl を使う
+ *   (似せて自作しない)。データは KEY_LANE_MIRROR(popup→storage)を restoreLaneMirrorBuckets で
+ *   paint が受ける buckets 形に復元したもの。会場(venue)とは無関係=popup と status だけ。
+ *   ★signature ガード: 2秒ループで毎回 paint すると img 再生成でチラつき重い=`liveId|capturedAt|
+ *     各段件数|pickedLength` が前回と同じなら paint を skip。
+ * @param {{ liveId?: string, capturedAt?: number, link?: any[], gift?: any[], ad?: any[],
+ *   konta?: any[], tanu?: any[], pickedLength?: number, totalCandidates?: number }|null} snap
+ */
+function renderLaneMirror(snap) {
+  const section = document.getElementById('laneMirrorLane');
+  if (!section) return;
+  // popup を一度も開いていない/まだ書かれていない=スナップショット無し=セクションごと隠す(死にリンク回避)。
+  if (!snap || typeof snap !== 'object') {
+    section.hidden = true;
+    _lastLaneMirrorSig = ' init';
+    return;
+  }
+
+  // popup と同じ id で els を集める(status.html に同じ DOM を静的に置いてある)。
+  //   1つでも欠けていれば paint は何もしない=安全側(stack/各段が無いと描けない)。
+  const $id = (/** @type {string} */ id) => /** @type {HTMLElement|null} */ (document.getElementById(id));
+  const els = {
+    stack: $id('sceneStoryUserLaneStack'),
+    laneLink: $id('sceneStoryUserLaneLink'),
+    laneGift: $id('sceneStoryUserLaneGift'),
+    laneAd: $id('sceneStoryUserLaneAd'),
+    laneKonta: $id('sceneStoryUserLaneKonta'),
+    laneTanu: $id('sceneStoryUserLaneTanu'),
+    hintLink: $id('sceneStoryUserLaneLinkHint'),
+    linkWrap: $id('sceneStoryUserLaneLinkWrap'),
+    giftWrap: $id('sceneStoryUserLaneGiftWrap'),
+    adWrap: $id('sceneStoryUserLaneAdWrap'),
+    guideTop: $id('sceneStoryUserLaneGuideTop'),
+    guideLinesTop: $id('sceneStoryUserLaneGuideLinesTop'),
+    guideMidGift: $id('sceneStoryUserLaneGuideMidGift'),
+    guideLinesMidGift: $id('sceneStoryUserLaneGuideLinesMidGift'),
+    guideMidAd: $id('sceneStoryUserLaneGuideMidAd'),
+    guideLinesMidAd: $id('sceneStoryUserLaneGuideLinesMidAd'),
+    guideMidKonta: $id('sceneStoryUserLaneGuideMidKonta'),
+    guideLinesMidKonta: $id('sceneStoryUserLaneGuideLinesMidKonta'),
+    guideMidTanu: $id('sceneStoryUserLaneGuideMidTanu'),
+    guideLinesMidTanu: $id('sceneStoryUserLaneGuideLinesMidTanu'),
+    guideBottom: $id('sceneStoryUserLaneGuideBottom'),
+    guideLinesBottom: $id('sceneStoryUserLaneGuideLinesBottom')
+  };
+  if (!els.stack || !els.laneLink || !els.laneGift || !els.laneKonta || !els.laneTanu) {
+    section.hidden = true;
+    return;
+  }
+
+  const buckets = restoreLaneMirrorBuckets(snap);
+  const pickedLength = Math.max(
+    0,
+    Math.floor(Number(snap.pickedLength) || 0) ||
+      buckets.link.length + buckets.gift.length + buckets.ad.length + buckets.konta.length + buckets.tanu.length
+  );
+  const totalCandidates = Math.max(0, Math.floor(Number(snap.totalCandidates) || 0));
+  const totalCells =
+    buckets.link.length + buckets.gift.length + buckets.ad.length + buckets.konta.length + buckets.tanu.length;
+
+  // signature ガード: 表示に効く値だけで署名し、変化が無ければ paint を丸ごと skip(チラつき/重さ防止)。
+  const sig =
+    `${String(snap.liveId || '')}|${Number(snap.capturedAt) || 0}|` +
+    `${buckets.link.length}|${buckets.gift.length}|${buckets.ad.length}|${buckets.konta.length}|${buckets.tanu.length}|` +
+    `${pickedLength}|${totalCandidates}`;
+  if (sig === _lastLaneMirrorSig) {
+    section.hidden = false; // skip しても表示状態は維持(初回描画後に隠れない)。
+    return;
+  }
+  _lastLaneMirrorSig = sig;
+
+  section.hidden = false;
+
+  // 概要メタ(何件映しているか・何人が会場で見られるか)。popup の guideFoot とは別に status 側で1行。
+  const metaEl = document.getElementById('laneMirrorMeta');
+  if (metaEl) {
+    if (totalCells > 0) {
+      const otherTxt =
+        totalCandidates > pickedLength ? `（ほか ${totalCandidates - pickedLength}人は会場モードで全員見られます）` : '';
+      metaEl.textContent = `いま ${pickedLength}人を表示中${otherTxt}`;
+    } else {
+      metaEl.textContent = 'popup を開いている配信があれば、ここに応援レーンがそのまま映ります。';
+    }
+  }
+
+  // 本物の描画関数で paint。候補ゼロでもスナップショットがあれば段ガイドだけ出す(popup と同じ畳み方)。
+  if (totalCells === 0) {
+    paintStoryUserLaneDomEmptyGuides(els, _LANE_MIRROR_FACES);
+    return;
+  }
+  paintStoryUserLaneDomFilled(els, _LANE_MIRROR_FACES, buckets, pickedLength, _laneMirrorDomIo, {
+    totalCandidates
+  });
 }
 
 /**

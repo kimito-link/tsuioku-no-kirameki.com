@@ -14,6 +14,13 @@
         --nl-card-bg: #ffffff;
         --nl-accent: #ec4899;
         --nl-mono: ui-monospace, 'SFMono-Regular', 'Menlo', 'Consolas', monospace;
+        /* 応援レーン鏡(.nl-story-userlane-*)が参照する変数。popup.html から移植。
+           無いと color-mix/背景/枠が壊れて装飾無し(裸要素)になる(v0.1.900 で踏んだ)。
+           --nl-user-accent は popup では動的設定=status に無いので --nl-accent と同じ固定値で代替。 */
+        --nl-surface: #ffffff;
+        --nl-text-sub: #4b5563;
+        --nl-muted: #5b6475;
+        --nl-user-accent: #ec4899;
       }
       @media (prefers-color-scheme: dark) {
         :root {
@@ -22,6 +29,11 @@
           --nl-text-soft: #9ca3af;
           --nl-border: #374151;
           --nl-card-bg: #1f2937;
+          /* 応援レーン鏡の dark 値(popup.html から)。--nl-user-accent は固定値を維持。 */
+          --nl-surface: #161d27;
+          --nl-text-sub: #cbd5e1;
+          --nl-muted: #8d9bb5;
+          --nl-user-accent: #ec4899;
         }
       }
       * {
@@ -445,6 +457,213 @@
       .hv-ok { color: #2f9e57; border-color: rgba(47, 125, 74, 0.35); background: rgba(47, 125, 74, 0.06); }
       .hv-warn { color: #c8861f; border-color: #e0a93f; background: rgba(224, 169, 63, 0.08); }
       .hv-bad { color: #d4495f; border-color: #d4495f; background: rgba(212, 73, 95, 0.10); }
+
+      /* ============================================================================
+       * 応援レーン鏡(りんく/こん太/広告/たぬ姉の段組み)= popup.html の .nl-story-userlane-*
+       *   ルールを【そっくり移植】。本物の buildPersonTileEl / paintStoryUserLaneDomFilled が
+       *   生成する DOM を status でも装飾付きで描くため(裸要素化を防ぐ・v0.1.900 の教訓)。
+       *   ★popup.html にしか無い CSS なので status へ持ってくる必要がある。挙動・見た目は popup と同一。
+       *   html.nl-inline 限定の拡大ルールは status に nl-inline が無いので省略=既定(小)サイズで描く。
+       * ========================================================================== */
+      .nl-story-userlane-stack {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        overflow-x: hidden;
+        overflow-y: visible;
+        margin: 0 0 4px;
+        min-height: 0;
+      }
+      .nl-story-userlane-tier-wrap {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        min-width: 0;
+      }
+      .nl-story-userlane-tier-wrap--gift {
+        padding: 6px 6px 4px;
+        border-radius: 10px;
+        background: color-mix(in srgb, var(--nl-surface) 82%, #e8b84a 18%);
+        border: 1px solid color-mix(in srgb, var(--nl-border) 70%, #d4a017 30%);
+      }
+      .nl-story-userlane-tier-hint {
+        margin: 0;
+        padding: 4px 6px;
+        font-size: 10px;
+        font-weight: 700;
+        line-height: 1.4;
+        color: var(--nl-text-sub);
+        border-radius: 8px;
+        background: color-mix(in srgb, var(--nl-surface) 88%, #b8a06a 12%);
+        border: 1px solid color-mix(in srgb, var(--nl-border) 75%, #c9a227 25%);
+      }
+      .nl-story-userlane {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        align-content: flex-start;
+        gap: 6px 8px;
+        margin: 0;
+        min-height: 0;
+        max-height: none;
+        overflow-x: auto;
+        overflow-y: visible;
+        -webkit-overflow-scrolling: touch;
+      }
+      .nl-story-userlane-stack > .nl-story-userlane,
+      .nl-story-userlane-stack .nl-story-userlane-tier-wrap .nl-story-userlane {
+        max-height: none;
+        overflow-y: visible;
+      }
+      .nl-story-userlane-cell {
+        display: inline-flex;
+        flex-direction: row;
+        align-items: center;
+        justify-content: flex-start;
+        gap: 6px;
+        flex-shrink: 0;
+        max-width: 100%;
+        min-width: 0;
+        border-radius: 999px;
+        padding-right: 6px;
+      }
+      .nl-story-userlane-cell--accent {
+        padding: 3px 5px 3px 3px;
+        background: color-mix(in srgb, var(--nl-user-accent) 20%, transparent);
+        box-shadow: 0 0 0 2px color-mix(in srgb, var(--nl-user-accent) 48%, transparent);
+      }
+      a.nl-story-userlane-cell--linkable {
+        text-decoration: none;
+        color: inherit;
+        cursor: pointer;
+        transition: background-color 0.12s;
+      }
+      a.nl-story-userlane-cell--linkable:hover {
+        background-color: color-mix(in srgb, var(--nl-border) 40%, transparent);
+      }
+      .nl-story-userlane-tier-break {
+        flex: 0 0 100%;
+        width: 100%;
+        height: 0;
+        margin: 0;
+        padding: 0;
+        overflow: hidden;
+        pointer-events: none;
+      }
+      .nl-story-userlane-meta {
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        gap: 1px;
+        min-width: 0;
+        max-width: min(118px, 30vw);
+        font-size: 10px;
+        line-height: 1.22;
+        text-align: left;
+      }
+      .nl-story-userlane-meta__id,
+      .nl-story-userlane-meta__name {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .nl-story-userlane-meta__id {
+        color: var(--nl-text-sub);
+        font-weight: 600;
+      }
+      .nl-story-userlane-meta__name {
+        color: var(--nl-text);
+        font-weight: 500;
+      }
+      .nl-story-userlane-avatar {
+        width: 32px;
+        height: 32px;
+        border-radius: 999px;
+        object-fit: cover;
+        object-position: center;
+        border: 1.5px solid color-mix(in srgb, var(--nl-border) 82%, #fff 18%);
+        box-shadow: 0 1px 3px rgb(2 17 31 / 22%);
+        background: var(--nl-surface);
+        flex-shrink: 0;
+      }
+      .nl-story-userlane-avatar.nl-avatar--tv-fallback {
+        object-fit: contain;
+        padding: 3px;
+        background: linear-gradient(180deg, #efebe9, #d7ccc8);
+        border-color: color-mix(in srgb, #8d6e63 55%, var(--nl-border) 45%);
+      }
+      .nl-story-userlane-guide {
+        display: flex;
+        flex-direction: column;
+        align-items: stretch;
+        gap: 5px;
+        margin: 0 0 6px;
+        min-width: 0;
+      }
+      .nl-story-userlane-guide__lines {
+        display: flex;
+        flex-direction: column;
+        gap: 5px;
+        min-width: 0;
+      }
+      .nl-story-userlane-guide__line {
+        display: flex;
+        align-items: flex-start;
+        gap: 7px;
+        padding: 5px 8px;
+        border-radius: 10px;
+        background: linear-gradient(180deg, #fffaf0, #fff4db);
+        border: 1px solid #f5d28d;
+        color: #6b4f18;
+        font-size: 10px;
+        font-weight: 700;
+        line-height: 1.38;
+        box-shadow: 0 1px 5px rgb(148 101 14 / 9%);
+        min-width: 0;
+      }
+      .nl-story-userlane-guide__face {
+        width: 24px;
+        height: 24px;
+        border-radius: 999px;
+        object-fit: cover;
+        object-position: center;
+        border: 1px solid color-mix(in srgb, var(--nl-border) 82%, #fff 18%);
+        background: var(--nl-surface);
+        flex: 0 0 auto;
+      }
+      .nl-story-userlane-guide__text {
+        flex: 1 1 auto;
+        min-width: 0;
+      }
+      .nl-story-userlane-guide__foot {
+        margin: 2px 0 0;
+        padding: 0 2px;
+        font-size: 10px;
+        font-weight: 800;
+        color: var(--nl-muted);
+        line-height: 1.35;
+      }
+      .nl-story-userlane__empty-note {
+        margin: 4px 0 2px;
+        padding: 8px 10px;
+        font-size: clamp(10px, 2.4vw, 11px);
+        line-height: 1.45;
+        font-weight: 600;
+        color: var(--nl-text-sub);
+        border-radius: 10px;
+        background: color-mix(in srgb, var(--nl-surface) 92%, var(--nl-border) 8%);
+        border: 1px solid color-mix(in srgb, var(--nl-border) 70%, transparent);
+      }
+      .nl-story-userlane__empty-note-p {
+        margin: 0 0 6px;
+      }
+      .nl-story-userlane__empty-note-p:last-child {
+        margin-bottom: 0;
+      }
+      .nl-story-userlane-guide__count {
+        color: #9a6f12;
+        font-weight: 800;
+      }
     </style>
     <!--
       status-guard.js: 「何があっても開く」保険(2026-06-22)。dist/status.js より前に読む。
@@ -480,6 +699,139 @@
     <section class="health-panel" id="healthPanel" aria-label="健全度パネル">
       <div class="health-verdict hv-ok" id="healthVerdict" aria-live="polite"></div>
       <div class="health-cells" id="healthCells"></div>
+    </section>
+
+    <!--
+      応援レーン鏡: popup の応援レーン(りんく/こん太/広告/たぬ姉の段組み)を【顔=avatar 含めて
+      そっくり】映す。データは popup→storage(nls_lane_mirror_v1)、status が読んで本物の
+      paintStoryUserLaneDomFilled + buildPersonTileEl で描く。会場(venue)とは無関係=popup と status だけ。
+      DOM の id は popup.html と完全一致(同じ getElementById で els を集めて本物描画関数に渡すため)。
+      popup を一度も開いていない/まだ書かれていない時はセクションごと hidden(死にリンクにしない)。
+    -->
+    <section class="lane" id="laneMirrorLane" hidden>
+      <h2>🪞 応援レーン（popup の段組みをそっくり映す）</h2>
+      <div class="status-meta" style="margin-bottom: 8px">
+        popup を開いている配信の応援レーン(りんく/こん太/広告/たぬ姉)を、顔(アイコン)まで含めてそのまま映します。会場に並べるべき「顔ぶれ」の正本です。
+      </div>
+      <div id="laneMirrorMeta" class="status-meta" style="margin-bottom: 8px"></div>
+      <div id="sceneStoryUserLaneGuideTop" class="nl-story-userlane-guide" hidden>
+        <div
+          id="sceneStoryUserLaneGuideLinesTop"
+          class="nl-story-userlane-guide__lines"
+          aria-label="応援ユーザーレーンの説明（りんく）"
+        ></div>
+      </div>
+      <div
+        id="sceneStoryUserLaneStack"
+        class="nl-story-userlane-stack"
+        aria-label="最近の応援ユーザーサムネイル（りんく・こん太・たぬ姉の三段）"
+        title="応援ユーザーを、プロフィールの揃い具合の三段に分けて並べています"
+        hidden
+      >
+        <div
+          id="sceneStoryUserLaneLinkWrap"
+          class="nl-story-userlane-tier-wrap"
+        >
+          <div
+            id="sceneStoryUserLaneLink"
+            class="nl-story-userlane nl-story-userlane--link"
+            aria-label="優先1・個人サムネと表示名がそろったユーザー"
+            hidden
+          ></div>
+          <p
+            id="sceneStoryUserLaneLinkHint"
+            class="nl-story-userlane-tier-hint"
+            hidden
+          >
+            この段は「表示名と個人サムネがそろった人」だけ。いまの記録では該当者がいないので、下の段に並んでいます。
+          </p>
+        </div>
+        <div
+          id="sceneStoryUserLaneGiftWrap"
+          class="nl-story-userlane-tier-wrap nl-story-userlane-tier-wrap--gift"
+        >
+          <div
+            id="sceneStoryUserLaneGuideMidGift"
+            class="nl-story-userlane-guide nl-story-userlane-guide--mid"
+            hidden
+          >
+            <div
+              id="sceneStoryUserLaneGuideLinesMidGift"
+              class="nl-story-userlane-guide__lines"
+              aria-label="応援ユーザーレーンの説明（ギフト・広告投げ主）"
+            ></div>
+          </div>
+          <div
+            id="sceneStoryUserLaneGift"
+            class="nl-story-userlane nl-story-userlane--gift"
+            aria-label="ギフトを投げたユーザー"
+            hidden
+          ></div>
+        </div>
+        <div
+          id="sceneStoryUserLaneAdWrap"
+          class="nl-story-userlane-tier-wrap nl-story-userlane-tier-wrap--ad"
+        >
+          <div
+            id="sceneStoryUserLaneGuideMidAd"
+            class="nl-story-userlane-guide nl-story-userlane-guide--mid"
+            hidden
+          >
+            <div
+              id="sceneStoryUserLaneGuideLinesMidAd"
+              class="nl-story-userlane-guide__lines"
+              aria-label="応援ユーザーレーンの説明（広告投稿者）"
+            ></div>
+          </div>
+          <div
+            id="sceneStoryUserLaneAd"
+            class="nl-story-userlane nl-story-userlane--ad"
+            aria-label="広告を投げた広告主"
+            hidden
+          ></div>
+        </div>
+        <div
+          id="sceneStoryUserLaneGuideMidKonta"
+          class="nl-story-userlane-guide nl-story-userlane-guide--mid"
+          hidden
+        >
+          <div
+            id="sceneStoryUserLaneGuideLinesMidKonta"
+            class="nl-story-userlane-guide__lines"
+            aria-label="応援ユーザーレーンの説明（こん太・この段の前）"
+          ></div>
+        </div>
+        <div
+          id="sceneStoryUserLaneKonta"
+          class="nl-story-userlane nl-story-userlane--konta"
+          aria-label="優先2・表示名かサムネのどちらかが取れているユーザー"
+          hidden
+        ></div>
+        <div
+          id="sceneStoryUserLaneGuideMidTanu"
+          class="nl-story-userlane-guide nl-story-userlane-guide--mid"
+          hidden
+        >
+          <div
+            id="sceneStoryUserLaneGuideLinesMidTanu"
+            class="nl-story-userlane-guide__lines"
+            aria-label="応援ユーザーレーンの説明（たぬ姉・この段の前）"
+          ></div>
+        </div>
+        <div
+          id="sceneStoryUserLaneTanu"
+          class="nl-story-userlane nl-story-userlane--tanu"
+          aria-label="優先3・取得が薄いユーザー"
+          hidden
+        ></div>
+      </div>
+      <div id="sceneStoryUserLaneGuideBottom" class="nl-story-userlane-guide" hidden>
+        <div
+          id="sceneStoryUserLaneGuideLinesBottom"
+          class="nl-story-userlane-guide__lines"
+          aria-label="応援ユーザーレーンの表示件数"
+        ></div>
+      </div>
     </section>
 
     <section class="guidepost">
