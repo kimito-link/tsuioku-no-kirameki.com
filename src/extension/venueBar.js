@@ -1444,7 +1444,8 @@ export function mountVenueBarButton(options = {}) {
 
   const note = document.createElement('div');
   note.className = 'nlsb-note';
-  note.textContent = '全コメント集計・最大150席';
+  // 2026-06-22 会場「全員500人」: 席上限の表示も実定数に追従させる(150 固定の取り残しを是正)。
+  note.textContent = `全コメント集計・最大${VENUE_FULLSCREEN_MAX_SEATS}席`;
   // v0.1.772: 閉じるボタンをヘッダー右端に並べる(会場の操作ボタンを一箇所に集約)。
   //   OBS キャプチャ時は close.style.display='none' 済みなので append しても表示されない。
   if (venueWindowBtn) {

@@ -84,11 +84,10 @@ export function buildPersonTileEl(p, io) {
   img.title = tip;
   cell.title = tip;
   img.decoding = 'async';
-  // 2026-06-22 会場「全員500人」(council/venue-all-faces-500): 画面外の顔画像はブラウザに
-  //   読み込みを遅延させ、500枚同時デコードによる初期描画の重さを避ける(白化リスクなし=
-  //   読み込みタイミングを遅らせるだけ・load guard のフォールバックとも競合しない)。popup の
-  //   アイコン列・会場の席の両方(本物タイル共有)が軽くなる方向にだけ働く。
-  img.loading = 'lazy';
+  // 2026-06-22 会場「全員500人」: 当初 loading="lazy" を入れたが【撤回】。会場の席は段(tier)が
+  //   CSS 3D変形(translateZ/scale)で動くため、ブラウザの「ビューポート内」判定が崩れ lazy 画像が
+  //   ロードされず【サムネが出ない】実機症状を招いた(状態速報で確認)。正しい遅延化は会場側の
+  //   IntersectionObserver(会議PR・3D変形を考慮した可視判定)で別途行う=ここでは即ロードに戻す。
   if (io.isHttpOrHttpsUrl(img.src)) {
     img.referrerPolicy = 'no-referrer';
   }
