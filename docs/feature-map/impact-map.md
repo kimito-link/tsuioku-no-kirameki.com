@@ -219,6 +219,7 @@
 | `src/extension/story/renderStoryUserLaneDom.js` | 1 | ポップアップ(応援レーン) |
 | `src/extension/venue-entry.js` | 1 | 会場モード(standalone) |
 | `src/lib/acquisitionDashboardChart.js` | 1 | ポップアップ(応援レーン) |
+| `src/lib/adLanePicksFromRooms.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/aiShareDiagSchema.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/audienceEngagementGap.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/autoBackupState.js` | 1 | 記録エンジン(watchページ常駐) |

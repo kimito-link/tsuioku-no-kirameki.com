@@ -8,6 +8,7 @@ import {
   buildStoryUserLaneEmptyNoteKontaHtml,
   buildStoryUserLaneEmptyNoteLinkHtml,
   buildStoryUserLaneEmptyNoteTanuHtml,
+  buildStoryUserLaneGuideAdHtml,
   buildStoryUserLaneGuideFootAndRecordedHtml,
   buildStoryUserLaneGuideGiftHtml,
   buildStoryUserLaneGuideKontaHtml,
@@ -81,15 +82,19 @@ export function resetStoryUserLaneDom(els) {
     stack,
     laneLink,
     laneGift,
+    laneAd,
     laneKonta,
     laneTanu,
     hintLink,
     linkWrap,
     giftWrap,
+    adWrap,
     guideTop,
     guideLinesTop,
     guideMidGift,
     guideLinesMidGift,
+    guideMidAd,
+    guideLinesMidAd,
     guideMidKonta,
     guideLinesMidKonta,
     guideMidTanu,
@@ -100,17 +105,22 @@ export function resetStoryUserLaneDom(els) {
   removeStoryUserLaneEmptyNotesUnder(stack);
   laneLink.innerHTML = '';
   laneGift.innerHTML = '';
+  if (laneAd) laneAd.innerHTML = '';
   laneKonta.innerHTML = '';
   laneTanu.innerHTML = '';
   laneLink.hidden = true;
   laneGift.hidden = true;
+  if (laneAd) laneAd.hidden = true;
   laneKonta.hidden = true;
   laneTanu.hidden = true;
   if (hintLink) hintLink.hidden = true;
   if (linkWrap) linkWrap.hidden = true;
   if (giftWrap) giftWrap.hidden = true;
+  if (adWrap) adWrap.hidden = true;
   if (guideMidGift) guideMidGift.hidden = true;
   if (guideLinesMidGift) guideLinesMidGift.innerHTML = '';
+  if (guideMidAd) guideMidAd.hidden = true;
+  if (guideLinesMidAd) guideLinesMidAd.innerHTML = '';
   if (guideMidKonta) guideMidKonta.hidden = true;
   if (guideLinesMidKonta) guideLinesMidKonta.innerHTML = '';
   if (guideMidTanu) guideMidTanu.hidden = true;
@@ -163,15 +173,19 @@ export function paintStoryUserLaneDomFilled(
     stack,
     laneLink,
     laneGift,
+    laneAd,
     laneKonta,
     laneTanu,
     hintLink,
     linkWrap,
     giftWrap,
+    adWrap,
     guideTop,
     guideLinesTop,
     guideMidGift,
     guideLinesMidGift,
+    guideMidAd,
+    guideLinesMidAd,
     guideMidKonta,
     guideLinesMidKonta,
     guideMidTanu,
@@ -182,6 +196,7 @@ export function paintStoryUserLaneDomFilled(
 
   fillLaneTier(laneLink, buckets.link, io);
   fillLaneTier(laneGift, buckets.gift, io);
+  if (laneAd) fillLaneTier(laneAd, buckets.ad || [], io);
   fillLaneTier(laneKonta, buckets.konta, io);
   fillLaneTier(laneTanu, buckets.tanu, io);
 
@@ -224,6 +239,16 @@ export function paintStoryUserLaneDomFilled(
         laneGift.nextElementSibling?.classList?.contains('nl-story-userlane__empty-note')
       );
     giftWrap.hidden = !showGiftWrap;
+  }
+  // 広告段: 広告投稿者がいるときだけ出す(いなければ wrap ごと隠す=空段で場所を取らない)。
+  if (laneAd && adWrap) {
+    const hasAd = (buckets.ad || []).length > 0;
+    if (hasAd) laneAd.hidden = false;
+    adWrap.hidden = !hasAd;
+    if (guideMidAd) guideMidAd.hidden = !hasAd;
+    if (hasAd && guideLinesMidAd) {
+      guideLinesMidAd.innerHTML = buildStoryUserLaneGuideAdHtml(faces.faceAd);
+    }
   }
 
   stack.setAttribute('aria-label', buildStoryUserLaneStackAriaLabel(pickedLength));
@@ -271,11 +296,13 @@ export function paintStoryUserLaneDomEmptyGuides(els, faces, opts) {
     stack,
     laneLink,
     laneGift,
+    laneAd,
     laneKonta,
     laneTanu,
     hintLink,
     linkWrap,
     giftWrap,
+    adWrap,
     guideTop,
     guideLinesTop,
     guideMidGift,
@@ -290,15 +317,19 @@ export function paintStoryUserLaneDomEmptyGuides(els, faces, opts) {
   removeStoryUserLaneEmptyNotesUnder(stack);
   laneLink.innerHTML = '';
   laneGift.innerHTML = '';
+  if (laneAd) laneAd.innerHTML = '';
   laneKonta.innerHTML = '';
   laneTanu.innerHTML = '';
   laneLink.hidden = true;
   laneGift.hidden = true;
+  if (laneAd) laneAd.hidden = true;
   laneKonta.hidden = true;
   laneTanu.hidden = true;
   if (hintLink) hintLink.hidden = true;
   if (linkWrap) linkWrap.hidden = true;
   if (giftWrap) giftWrap.hidden = false;
+  // 広告段: picked が空のガイド状態では出さない(広告主がいないので段ごと畳む)。
+  if (adWrap) adWrap.hidden = true;
   stack.hidden = false;
   if (guideLinesTop) {
     guideLinesTop.innerHTML = buildStoryUserLaneGuideTopHtml(faces.faceLink);

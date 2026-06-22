@@ -106,6 +106,7 @@ import {
 } from '../lib/northStarLaneReason.js';
 import { shouldShowNorthStarLane } from '../lib/northStarLaneVisibility.js';
 import { officialDomRankingRowsToStripRooms } from '../lib/officialDomRankingRowsToStripRooms.js';
+import { adLanePicksFromRooms } from '../lib/adLanePicksFromRooms.js';
 import {
   isNorthStarLaneWaitingState,
   isNorthStarEventLaneWaitTimedOut,
@@ -4827,8 +4828,10 @@ const STORY_SOURCE_STATE = {
   storageRowsForCurrentLive: /** @type {PopupCommentEntry[]} */ ([]),
   /** userLaneCandidatesFromStorage の戻り（イミュータブル配列） */
   laneAggregates: /** @type {readonly unknown[]} */ (Object.freeze([])),
-  /** ギフト・広告投げ主専用列（りんく列とは別） */
-  giftThrowerPicks: /** @type {readonly unknown[]} */ (Object.freeze([]))
+  /** ギフト投げ主専用列（りんく列とは別） */
+  giftThrowerPicks: /** @type {readonly unknown[]} */ (Object.freeze([])),
+  /** 広告投稿者専用列（公式ニコニ広告ランキング由来・ギフト列とは別段） */
+  adThrowerPicks: /** @type {readonly unknown[]} */ (Object.freeze([]))
 };
 
 /** initPopup の途中失敗後も DevTools から呼べるよう、読み込み直後に束縛する（観測のみ） */
@@ -5114,6 +5117,10 @@ function renderStoryUserLane() {
   const hintLink = /** @type {HTMLElement|null} */ ($('sceneStoryUserLaneLinkHint'));
   const linkWrap = /** @type {HTMLElement|null} */ ($('sceneStoryUserLaneLinkWrap'));
   const giftWrap = /** @type {HTMLElement|null} */ ($('sceneStoryUserLaneGiftWrap'));
+  const laneAd = /** @type {HTMLElement|null} */ ($('sceneStoryUserLaneAd'));
+  const adWrap = /** @type {HTMLElement|null} */ ($('sceneStoryUserLaneAdWrap'));
+  const guideMidAd = /** @type {HTMLElement|null} */ ($('sceneStoryUserLaneGuideMidAd'));
+  const guideLinesMidAd = /** @type {HTMLElement|null} */ ($('sceneStoryUserLaneGuideLinesMidAd'));
   const guideTop = /** @type {HTMLElement|null} */ ($('sceneStoryUserLaneGuideTop'));
   const guideLinesTop = /** @type {HTMLElement|null} */ ($('sceneStoryUserLaneGuideLinesTop'));
   const guideMidGift = /** @type {HTMLElement|null} */ ($('sceneStoryUserLaneGuideMidGift'));
@@ -5130,15 +5137,19 @@ function renderStoryUserLane() {
     stack,
     laneLink,
     laneGift,
+    laneAd,
     laneKonta,
     laneTanu,
     hintLink,
     linkWrap,
     giftWrap,
+    adWrap,
     guideTop,
     guideLinesTop,
     guideMidGift,
     guideLinesMidGift,
+    guideMidAd,
+    guideLinesMidAd,
     guideMidKonta,
     guideLinesMidKonta,
     guideMidTanu,
@@ -5150,6 +5161,7 @@ function renderStoryUserLane() {
   const faces = {
     faceLink: STORY_GUIDE_FACE_LINK,
     faceGift: STORY_GUIDE_FACE_GIFT,
+    faceAd: STORY_GUIDE_FACE_GIFT,
     faceKonta: STORY_GUIDE_FACE_KONTA,
     faceTanu: STORY_GUIDE_FACE_TANU
   };
@@ -5344,12 +5356,17 @@ function renderStoryUserLane() {
     ? STORY_SOURCE_STATE.giftThrowerPicks
     : [];
   buckets.gift = [...giftPicks];
+  // 広告列(ギフト列の隣・別段): 公式ニコニ広告ランキング(この放送の貢献度順)の広告主。
+  const adPicks = Array.isArray(STORY_SOURCE_STATE.adThrowerPicks)
+    ? STORY_SOURCE_STATE.adThrowerPicks
+    : [];
+  buckets.ad = [...adPicks];
 
   const laneSig = storyUserLaneRenderSignature(
     liveId,
     laneScheme,
     picked,
-    giftPicks,
+    [...giftPicks, ...adPicks],
     entries.length
   );
   if (laneSig === storyUserLaneLastRenderSig) {
@@ -5362,7 +5379,7 @@ function renderStoryUserLane() {
     return;
   }
 
-  const laneDisplayedTotal = picked.length + buckets.gift.length;
+  const laneDisplayedTotal = picked.length + buckets.gift.length + buckets.ad.length;
   paintStoryUserLaneDomFilled(els, faces, buckets, laneDisplayedTotal, laneDomIo);
   setTimeout(() => {
     if (typeof window !== 'undefined' && window.__NLS_LANE_DIAG__) {
@@ -5568,13 +5585,26 @@ async function paintStoryUserLaneCoalesced(liveId, displayEntries, storageRows) 
   }
 
   let giftUsers = [];
+  // 広告列(別段)用: 公式ニコニ広告ランキング(この放送・nls_nicoad_api_ranking_<lid>)の行。
+  let nicoadApiRows = [];
   if (lid) {
     try {
       const gk = giftUsersStorageKey(lid);
-      const bag = await chrome.storage.local.get(gk);
+      const adKey = `nls_nicoad_api_ranking_${lid}`;
+      const bag = await chrome.storage.local.get([gk, adKey]);
       giftUsers = Array.isArray(bag[gk]) ? bag[gk] : [];
+      const adVal = bag[adKey];
+      if (
+        adVal &&
+        typeof adVal === 'object' &&
+        String(adVal.liveId || '').trim().toLowerCase() === lid &&
+        Array.isArray(adVal.rows)
+      ) {
+        nicoadApiRows = adVal.rows;
+      }
     } catch {
       giftUsers = [];
+      nicoadApiRows = [];
     }
   }
 
@@ -5587,6 +5617,15 @@ async function paintStoryUserLaneCoalesced(liveId, displayEntries, storageRows) 
     lid,
     storageRows,
     giftLimit
+  );
+  // 広告列: 広告ランキング行→room(本物 officialDomRankingRowsToStripRooms)→PersonTileItem。
+  //   ID無し広告も広告主名で載せる(会議確定)。サムネ無しは uid 由来のゆっくり顔。
+  STORY_SOURCE_STATE.adThrowerPicks = adLanePicksFromRooms(
+    officialDomRankingRowsToStripRooms(nicoadApiRows, { userKeyKind: 'ad' }),
+    {
+      yukkuriFaceFor: (key) => anonymousIdenticonDataUrl(String(key || ''), 64),
+      limit: giftLimit
+    }
   );
   renderStoryUserLane();
   renderStoryAvatarDiag();
@@ -5631,6 +5670,7 @@ function syncStorySourceEntries(liveId, displayList, storageRowsForLane) {
     : Object.freeze([]);
 
   STORY_SOURCE_STATE.giftThrowerPicks = Object.freeze([]);
+  STORY_SOURCE_STATE.adThrowerPicks = Object.freeze([]);
   if (nextLiveId) {
     void paintStoryUserLaneCoalesced(
       nextLiveId,
