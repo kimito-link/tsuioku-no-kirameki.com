@@ -95,8 +95,79 @@ function northStarLevel(state, laneKind = 'other') {
 }
 
 /**
+ * v0.1.894: 会場モード読み上げの健全度セルを作る純関数(ユーザー要望「マップに読み上げ特化の
+ *   セルを入れて・タイミングや大量コメントでも抜け漏れなく全部読めるか分かるように」)。
+ *
+ * 既存の voiceDiag(comeview が KEY_VOICE_DIAG へ書く純観測値)を【%/色セル】に再表示するだけ=
+ *   新規集計ゼロ・hot path に触れない(healthCells 全体の設計と同じ)。読み上げ未使用なら空配列を
+ *   返す=死にセル(na の—)でファーストビューを埋めない(既存セルの na 方針と整合)。
+ *
+ * ユーザーの2つの関心に1セルずつ対応:
+ *   ①「タイミング」(リアルタイムで出るか)= voice-timing セル:
+ *      最終発話からの経過・直近合成ms・再生watchdog発火(固着)から level を決める。
+ *      止まっている(最終発話が古い)/合成が重い/再生TO発生 を黄〜赤で一目に。
+ *   ②「大量コメントでも抜け漏れなく全部読むか」= voice-coverage セル:
+ *      staleDropTotal(鮮度切れで読まずに捨てた累計)=まさに「抜け漏れ」。
+ *      0=全部読めている(緑)・出ていれば件数を黄で見せる(リアルタイム維持で間引いた=正常な
+ *      トレードオフだが「全部は読めていない」事実は隠さない)。
+ *
+ * @param {(import('./voiceDiag.js').VoiceDiagState & { capturedAt?: number })|null|undefined} voiceDiag
+ * @param {number} nowMs 最終発話 ago の算出用(現在時刻)
+ * @returns {HealthCell[]}
+ */
+function buildVoiceHealthCells(voiceDiag, nowMs) {
+  const snap = voiceDiag && typeof voiceDiag === 'object' ? voiceDiag : null;
+  if (!snap) return [];
+  const enabled = !!snap.enabled;
+  const spoken = num(snap.spokenTotal) || 0;
+  const queueMax = num(snap.queueMax) || 0;
+  // 一度も ON にも発話にもなっていない=会場モード未使用=セルを足さない(死にセルで埋めない)。
+  if (!enabled && spoken === 0 && queueMax === 0) return [];
+
+  /** @type {HealthCell[]} */
+  const out = [];
+  const now = Number.isFinite(Number(nowMs)) ? Number(nowMs) : 0;
+  const lastBase = num(snap.lastSpokenBase) || 0;
+  const sinceSpokenMs = lastBase > 0 && now > 0 ? Math.max(0, now - lastBase) : null;
+  const synthMs = num(snap.lastSynthMs);
+  const pbTimeout = num(snap.playbackTimeoutTotal) || 0;
+  const drop = num(snap.staleDropTotal) || 0;
+  const queueNow = num(snap.queueNow) || 0;
+
+  // ① 読み上げ追従(タイミング)。OFF なら na(色を付けない=未使用は異常でない)。
+  if (!enabled) {
+    out.push(stateCell('voice-timing', '読み上げ追従', 'na', 'OFF'));
+  } else if (pbTimeout > 0) {
+    // 再生 watchdog 発火=ended/error が来ず固着しかけた本物の異常(v0.1.883)。最優先で赤。
+    out.push(stateCell('voice-timing', '読み上げ追従', 'bad', `再生詰まり${pbTimeout}件`));
+  } else if (sinceSpokenMs != null && queueNow > 0 && sinceSpokenMs >= 30000) {
+    // 待機があるのに30秒以上発話していない=止まっている疑い(リアルタイムで出ていない)。
+    out.push(stateCell('voice-timing', '読み上げ追従', 'bad', `${Math.round(sinceSpokenMs / 1000)}秒沈黙`));
+  } else if (sinceSpokenMs != null && queueNow > 0 && sinceSpokenMs >= 8000) {
+    out.push(stateCell('voice-timing', '読み上げ追従', 'warn', `${Math.round(sinceSpokenMs / 1000)}秒待ち`));
+  } else if (Number.isFinite(synthMs) && synthMs >= 2500) {
+    // 合成が重い=遅れの主因(VOICEVOX 詰まり)。発話は進んでいても黄で予兆を見せる。
+    out.push(stateCell('voice-timing', '読み上げ追従', 'warn', `合成${synthMs}ms`));
+  } else {
+    out.push(stateCell('voice-timing', '読み上げ追従', 'ok', '追従中'));
+  }
+
+  // ② 読み上げ漏れ(大量コメントでも全部読めているか)。staleDropTotal=読まずに捨てた累計。
+  //   0=全部読めている(緑)。出ていれば件数を黄で(間引きは正常なトレードオフだが事実は隠さない)。
+  if (!enabled) {
+    out.push(stateCell('voice-coverage', '読み上げ漏れ', 'na', '—'));
+  } else if (drop <= 0) {
+    out.push(stateCell('voice-coverage', '読み上げ漏れ', 'ok', '漏れ無し'));
+  } else {
+    out.push(stateCell('voice-coverage', '読み上げ漏れ', 'warn', `間引き${drop}件`));
+  }
+
+  return out;
+}
+
+/**
  * 健全度セル配列を作る。
- * @param {{ livesData?: any[], fastDiag?: any }} data
+ * @param {{ livesData?: any[], fastDiag?: any, voiceDiag?: any, nowMs?: number }} data
  * @returns {HealthCell[]}
  */
 export function buildHealthCells(data) {
@@ -259,7 +330,21 @@ export function buildHealthCells(data) {
   const rates = livesData.map((lv) => num(lv?.officialRatePct)).filter((x) => x != null);
   cells.push(pctCell('match', '記録↔公式一致', rates.length ? Math.min(...rates) : null, { okAt: 90, warnAt: 60, processing: ratesInProgress }));
 
+  // 19-20. 会場モード読み上げ(タイミング・抜け漏れ)。voiceDiag 未使用なら空=セルを足さない。
+  //   nowMs は ago 算出用(テスト固定可能なように引数で受ける・未指定は実行時刻)。
+  const nowMs = Number.isFinite(Number(data?.nowMs)) ? Number(data.nowMs) : safeNow();
+  for (const c of buildVoiceHealthCells(data?.voiceDiag, nowMs)) cells.push(c);
+
   return cells;
+}
+
+/** テスト/SSR でも壊れない現在時刻(Date.now が無い環境のフォールバック)。 */
+function safeNow() {
+  try {
+    return Date.now();
+  } catch {
+    return 0;
+  }
 }
 
 /**

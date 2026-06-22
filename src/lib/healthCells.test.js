@@ -380,4 +380,82 @@ describe('summarizeHealthVerdict v0.1.846 満点=「異常ゼロ」(進行中/�
     // v0.1.886: 進行中があるので文言は「取り込み中」(緑で隠さない=正直に取得中だと示す)。
     expect(v.text).toContain('取り込み中');
   });
+
+  // v0.1.894: 会場モード読み上げセル(タイミング・抜け漏れ)。
+  describe('読み上げセル(voiceDiag)', () => {
+    it('voiceDiag 未指定なら読み上げセルは出ない(後方互換)', () => {
+      const cells = buildHealthCells({ livesData: [], fastDiag: {} });
+      expect(cellById(cells, 'voice-timing')).toBeUndefined();
+      expect(cellById(cells, 'voice-coverage')).toBeUndefined();
+    });
+
+    it('会場モード未使用(enabled=false・発話0・ピーク0)はセルを足さない(死にセルで埋めない)', () => {
+      const cells = buildHealthCells({
+        voiceDiag: { enabled: false, spokenTotal: 0, queueMax: 0 },
+        nowMs: 1000000
+      });
+      expect(cellById(cells, 'voice-timing')).toBeUndefined();
+    });
+
+    it('読み上げON・追従中(発話直後・待機あり)は ok', () => {
+      const now = 1000000;
+      const cells = buildHealthCells({
+        voiceDiag: { enabled: true, spokenTotal: 50, queueNow: 2, queueMax: 5, lastSpokenBase: now - 1000, lastSynthMs: 300, staleDropTotal: 0, playbackTimeoutTotal: 0 },
+        nowMs: now
+      });
+      expect(cellById(cells, 'voice-timing').level).toBe('ok');
+      expect(cellById(cells, 'voice-coverage').level).toBe('ok'); // 間引き0=漏れ無し。
+    });
+
+    it('待機があるのに30秒以上沈黙=止まっている疑いで bad', () => {
+      const now = 1000000;
+      const cells = buildHealthCells({
+        voiceDiag: { enabled: true, spokenTotal: 10, queueNow: 6, queueMax: 8, lastSpokenBase: now - 40000, lastSynthMs: 0, staleDropTotal: 0, playbackTimeoutTotal: 0 },
+        nowMs: now
+      });
+      expect(cellById(cells, 'voice-timing').level).toBe('bad');
+      expect(cellById(cells, 'voice-timing').text).toContain('沈黙');
+    });
+
+    it('再生watchdog発火(playbackTimeout>0)は固着の本物の異常で bad(最優先)', () => {
+      const now = 1000000;
+      const cells = buildHealthCells({
+        voiceDiag: { enabled: true, spokenTotal: 10, queueNow: 6, queueMax: 8, lastSpokenBase: now - 1000, lastSynthMs: 0, staleDropTotal: 0, playbackTimeoutTotal: 3 },
+        nowMs: now
+      });
+      expect(cellById(cells, 'voice-timing').level).toBe('bad');
+      expect(cellById(cells, 'voice-timing').text).toContain('再生詰まり');
+    });
+
+    it('大量コメントで間引き(staleDrop>0)=抜け漏れを warn で件数表示', () => {
+      const now = 1000000;
+      const cells = buildHealthCells({
+        voiceDiag: { enabled: true, spokenTotal: 200, queueNow: 3, queueMax: 30, lastSpokenBase: now - 500, lastSynthMs: 200, staleDropTotal: 47, playbackTimeoutTotal: 0 },
+        nowMs: now
+      });
+      const cov = cellById(cells, 'voice-coverage');
+      expect(cov.level).toBe('warn');
+      expect(cov.text).toContain('47');
+    });
+
+    it('合成が重い(2.5秒以上)は warn で予兆を見せる', () => {
+      const now = 1000000;
+      const cells = buildHealthCells({
+        voiceDiag: { enabled: true, spokenTotal: 30, queueNow: 1, queueMax: 4, lastSpokenBase: now - 1000, lastSynthMs: 3200, staleDropTotal: 0, playbackTimeoutTotal: 0 },
+        nowMs: now
+      });
+      expect(cellById(cells, 'voice-timing').level).toBe('warn');
+      expect(cellById(cells, 'voice-timing').text).toContain('合成');
+    });
+
+    it('OFF だが過去に発話あり=セルは出るが na(OFF は異常でない)', () => {
+      const now = 1000000;
+      const cells = buildHealthCells({
+        voiceDiag: { enabled: false, spokenTotal: 80, queueMax: 10, lastSpokenBase: now - 5000, staleDropTotal: 2 },
+        nowMs: now
+      });
+      expect(cellById(cells, 'voice-timing').level).toBe('na');
+      expect(cellById(cells, 'voice-coverage').level).toBe('na');
+    });
+  });
 });
