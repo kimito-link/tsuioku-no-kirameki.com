@@ -117,6 +117,7 @@
 | `KEY_THUMB_AUTO` | — | extension/content-entry.js<br>extension/popup-entry.js |
 | `KEY_THUMB_INTERVAL_MS` | — | extension/content-entry.js<br>extension/popup-entry.js |
 | `KEY_USER_COMMENT_PROFILE_CACHE` | extension/content-entry.js | extension/comeview-entry.js<br>extension/content-entry.js<br>extension/popup-entry.js<br>extension/venueBar.js |
+| `KEY_VENUE_SEATS_DIAG` | extension/venueBar.js | extension/status-entry.js |
 | `KEY_VOICE_DIAG` | extension/comeview-entry.js | extension/status-entry.js |
 | `KEY_VOICE_INPUT_DEVICE` | extension/popup-entry.js | extension/popup-entry.js |
 | `fn:backfillHeartbeatKey` | extension/content-entry.js | — |

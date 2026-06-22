@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.902',
+    date: '2026-06-22',
+    summary: '健全度パネルに会場座席セル(配信者混入・会場の固まり検知)を追加',
+    items: Object.freeze([
+      '状態速報の健全度パネルに「会場座席」と「配信者混入」のセルを追加しました。会場モードを開いているとき、配信者本人が席に交ざっていないか(交ざっていれば赤)、会場の表示が固まっていないか(更新が止まると黄)を一目で確認できます。これにより、会場まわりの不具合を AI も人間も見つけやすくなります。会場モードを使っていないときはセルは出ません。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.901',
     date: '2026-06-22',
     summary: '配信者本人を応援者一覧・会場の席から除外する',

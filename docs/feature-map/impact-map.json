@@ -636,6 +636,20 @@
       ]
     },
     {
+      "file": "src/lib/venueSeatsDiagKey.js",
+      "featureCount": 3,
+      "features": [
+        "content",
+        "status",
+        "venue"
+      ],
+      "labels": [
+        "記録エンジン(watchページ常駐)",
+        "状態速報ページ",
+        "会場モード(standalone)"
+      ]
+    },
+    {
       "file": "src/lib/voiceAgeGate.js",
       "featureCount": 3,
       "features": [
@@ -1647,6 +1661,18 @@
     },
     {
       "file": "src/lib/venueSeats.js",
+      "featureCount": 2,
+      "features": [
+        "content",
+        "venue"
+      ],
+      "labels": [
+        "記録エンジン(watchページ常駐)",
+        "会場モード(standalone)"
+      ]
+    },
+    {
+      "file": "src/lib/venueSeatsDiag.js",
       "featureCount": 2,
       "features": [
         "content",

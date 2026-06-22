@@ -460,4 +460,92 @@ describe('summarizeHealthVerdict v0.1.846 満点=「異常ゼロ」(進行中/�
       expect(cellById(cells, 'voice-coverage').level).toBe('na');
     });
   });
+
+  describe('v0.1.902: 会場座席セル(配信者混入・固着)', () => {
+    it('venueSeatsDiag 未指定=セルを足さない', () => {
+      const cells = buildHealthCells({});
+      expect(cellById(cells, 'venue-seats')).toBeUndefined();
+      expect(cellById(cells, 'venue-broadcaster')).toBeUndefined();
+    });
+
+    it('会場モード未使用(enabled=false)=死にセルを足さない', () => {
+      const cells = buildHealthCells({
+        venueSeatsDiag: { enabled: false, seatsShown: 0, participantCount: 0 }
+      });
+      expect(cellById(cells, 'venue-seats')).toBeUndefined();
+      expect(cellById(cells, 'venue-broadcaster')).toBeUndefined();
+    });
+
+    it('配信者本人が席に混入=bad(除外漏れの即検知)', () => {
+      const now = 1000000;
+      const cells = buildHealthCells({
+        venueSeatsDiag: {
+          enabled: true,
+          seatsShown: 50,
+          participantCount: 120,
+          otherCount: 70,
+          broadcasterInSeats: true,
+          broadcasterKnown: true,
+          lastUpdateAt: now - 500
+        },
+        nowMs: now
+      });
+      expect(cellById(cells, 'venue-broadcaster').level).toBe('bad');
+      expect(cellById(cells, 'venue-broadcaster').text).toBe('混入');
+    });
+
+    it('混入なし=ok・座席数と参加者数を添える', () => {
+      const now = 1000000;
+      const cells = buildHealthCells({
+        venueSeatsDiag: {
+          enabled: true,
+          seatsShown: 50,
+          participantCount: 120,
+          otherCount: 70,
+          broadcasterInSeats: false,
+          broadcasterKnown: true,
+          lastUpdateAt: now - 500
+        },
+        nowMs: now
+      });
+      expect(cellById(cells, 'venue-broadcaster').level).toBe('ok');
+      expect(cellById(cells, 'venue-broadcaster').text).toBe('なし');
+      expect(cellById(cells, 'venue-seats').level).toBe('ok');
+      expect(cellById(cells, 'venue-seats').text).toContain('50席');
+      expect(cellById(cells, 'venue-seats').text).toContain('他70');
+    });
+
+    it('配信者 uid 未取得=混入判定不能で na(赤にしない)', () => {
+      const now = 1000000;
+      const cells = buildHealthCells({
+        venueSeatsDiag: {
+          enabled: true,
+          seatsShown: 10,
+          participantCount: 12,
+          broadcasterInSeats: false,
+          broadcasterKnown: false,
+          lastUpdateAt: now - 500
+        },
+        nowMs: now
+      });
+      expect(cellById(cells, 'venue-broadcaster').level).toBe('na');
+    });
+
+    it('座席更新が60秒以上前=会場固着の兆候で warn', () => {
+      const now = 1000000;
+      const cells = buildHealthCells({
+        venueSeatsDiag: {
+          enabled: true,
+          seatsShown: 30,
+          participantCount: 40,
+          broadcasterInSeats: false,
+          broadcasterKnown: true,
+          lastUpdateAt: now - 65000
+        },
+        nowMs: now
+      });
+      expect(cellById(cells, 'venue-seats').level).toBe('warn');
+      expect(cellById(cells, 'venue-seats').text).toContain('更新');
+    });
+  });
 });

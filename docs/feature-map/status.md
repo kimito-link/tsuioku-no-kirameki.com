@@ -6,7 +6,7 @@
 ## storage の出入り
 
 - 書くキー: `KEY_STATUS_TREND`
-- 読むキー: `KEY_AI_SHARE_FAST_DIAG`, `KEY_AI_SHARE_POPUP_DIAG`, `KEY_LAST_WATCH_URL`, `KEY_REPORT_PREVIEW`, `KEY_STATUS_TREND`, `KEY_VOICE_DIAG`, `nls_backfill_progress_v1`
+- 読むキー: `KEY_AI_SHARE_FAST_DIAG`, `KEY_AI_SHARE_POPUP_DIAG`, `KEY_LAST_WATCH_URL`, `KEY_REPORT_PREVIEW`, `KEY_STATUS_TREND`, `KEY_VENUE_SEATS_DIAG`, `KEY_VOICE_DIAG`, `nls_backfill_progress_v1`
 
 ## 構成ファイル（import 到達・最大40件表示）
 
@@ -38,6 +38,7 @@ graph LR
   n_status --> n_src_lib_statusTrendKey_js["lib/statusTrendKey.js"]
   n_status --> n_src_lib_storageOpTimeout_js["lib/storageOpTimeout.js"]:::shared
   n_status --> n_src_lib_supporterRanking_js["lib/supporterRanking.js"]:::shared
+  n_status --> n_src_lib_venueSeatsDiagKey_js["lib/venueSeatsDiagKey.js"]:::shared
   n_status --> n_src_lib_voiceDiag_js["lib/voiceDiag.js"]:::shared
   n_status --> n_src_lib_voiceDiagKey_js["lib/voiceDiagKey.js"]:::shared
   n_status --> n_src_lib_watchLink_js["lib/watchLink.js"]
