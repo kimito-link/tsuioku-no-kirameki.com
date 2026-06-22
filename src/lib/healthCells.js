@@ -171,8 +171,67 @@ function buildVoiceHealthCells(voiceDiag, nowMs) {
 }
 
 /**
+ * v0.1.902: 会場モードの座席健全度セルを作る純関数(ユーザー要望「会場座席情報も健全度パネルに
+ *   載せれば AI も人間もミス(配信者本人の混入・顔ぶれずれ・会場の固着)を一目で発見できる」)。
+ *
+ * 会場が KEY_VENUE_SEATS_DIAG へ書く純観測値(venueSeatsDiag)を【色セル】に再表示するだけ=
+ *   新規集計ゼロ・hot path に触れない(healthCells 全体の設計と同じ)。会場未使用なら空配列を
+ *   返す=死にセル(na の—)でファーストビューを埋めない(voice セルと同じ作法)。
+ *
+ * ユーザーの関心に対応:
+ *   ①「配信者本人が席に混ざっていないか」= venue-broadcaster セル:
+ *      broadcasterInSeats=true(除外漏れ=v0.1.901 の本人除外が効いていない)なら bad。
+ *      配信者 uid 不明(broadcasterKnown=false)は判定不能なので na(赤にしない)。
+ *   ②「会場が固まっていないか」= venue-seats セル:
+ *      座席更新が古い(lastUpdateAt が一定以上前)なら warn(会場が止まっている兆候)。
+ *      更新できていれば ok(表示席数/参加者数を添える)。
+ *
+ * @param {(import('./venueSeatsDiag.js').VenueSeatsDiagState & { capturedAt?: number })|null|undefined} venueSeatsDiag
+ * @param {number} nowMs 更新 ago の算出用(現在時刻)
+ * @returns {HealthCell[]}
+ */
+function buildVenueSeatsHealthCells(venueSeatsDiag, nowMs) {
+  const snap = venueSeatsDiag && typeof venueSeatsDiag === 'object' ? venueSeatsDiag : null;
+  if (!snap) return [];
+  const enabled = !!snap.enabled;
+  // 会場モードが一度も開かれていない=未使用=セルを足さない(死にセルで埋めない)。
+  if (!enabled) return [];
+
+  /** @type {HealthCell[]} */
+  const out = [];
+  const now = Number.isFinite(Number(nowMs)) ? Number(nowMs) : 0;
+  const seatsShown = num(snap.seatsShown) || 0;
+  const participants = num(snap.participantCount) || 0;
+  const otherCount = num(snap.otherCount) || 0;
+  const lastUpdateAt = num(snap.lastUpdateAt) || 0;
+  const sinceUpdateMs = lastUpdateAt > 0 && now > 0 ? Math.max(0, now - lastUpdateAt) : null;
+  const broadcasterInSeats = !!snap.broadcasterInSeats;
+  const broadcasterKnown = !!snap.broadcasterKnown;
+
+  // ① 配信者混入(v0.1.901 の本人除外が効いているか)。混入していたら bad=除外漏れの即検知。
+  if (!broadcasterKnown) {
+    // 配信者 uid 未取得=混入判定ができない(赤にしない・対象外)。
+    out.push(stateCell('venue-broadcaster', '配信者混入', 'na', 'ID未取得'));
+  } else if (broadcasterInSeats) {
+    out.push(stateCell('venue-broadcaster', '配信者混入', 'bad', '混入'));
+  } else {
+    out.push(stateCell('venue-broadcaster', '配信者混入', 'ok', 'なし'));
+  }
+
+  // ② 会場座席(固着検出+稼働状況)。更新が古い=会場が止まっている兆候。
+  const otherSuffix = otherCount > 0 ? `+他${otherCount}` : '';
+  if (sinceUpdateMs != null && sinceUpdateMs >= 60000) {
+    out.push(stateCell('venue-seats', '会場座席', 'warn', `更新${Math.round(sinceUpdateMs / 1000)}秒前`));
+  } else {
+    out.push(stateCell('venue-seats', '会場座席', 'ok', `${seatsShown}席/${participants}人${otherSuffix}`));
+  }
+
+  return out;
+}
+
+/**
  * 健全度セル配列を作る。
- * @param {{ livesData?: any[], fastDiag?: any, voiceDiag?: any, nowMs?: number }} data
+ * @param {{ livesData?: any[], fastDiag?: any, voiceDiag?: any, venueSeatsDiag?: any, nowMs?: number }} data
  * @returns {HealthCell[]}
  */
 export function buildHealthCells(data) {
@@ -339,6 +398,9 @@ export function buildHealthCells(data) {
   //   nowMs は ago 算出用(テスト固定可能なように引数で受ける・未指定は実行時刻)。
   const nowMs = Number.isFinite(Number(data?.nowMs)) ? Number(data.nowMs) : safeNow();
   for (const c of buildVoiceHealthCells(data?.voiceDiag, nowMs)) cells.push(c);
+
+  // 21-22. 会場モード座席(配信者混入・固着)。venueSeatsDiag 未使用なら空=セルを足さない。
+  for (const c of buildVenueSeatsHealthCells(data?.venueSeatsDiag, nowMs)) cells.push(c);
 
   return cells;
 }

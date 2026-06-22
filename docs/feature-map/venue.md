@@ -5,7 +5,7 @@
 
 ## storage の出入り
 
-- 書くキー: (なし)
+- 書くキー: `KEY_VENUE_SEATS_DIAG`
 - 読むキー: `KEY_LIVE_BROADCASTER_CTX`, `KEY_USER_COMMENT_PROFILE_CACHE`
 
 ## 構成ファイル（import 到達・最大40件表示）
@@ -56,4 +56,4 @@ graph LR
   classDef shared fill:#eee,stroke:#999,color:#666;
 ```
 
-> ほか 19 ファイル省略（全件は storage-bus.md / metafile 参照）。
+> ほか 21 ファイル省略（全件は storage-bus.md / metafile 参照）。

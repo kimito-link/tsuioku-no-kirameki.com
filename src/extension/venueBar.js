@@ -90,6 +90,9 @@ import {
   NICONICO_OFFICIAL_DEFAULT_USERICON_HTTPS
 } from '../lib/supportGrowthTileSrc.js';
 import { storyUserLaneMetaLines } from '../lib/storyUserLaneMeta.js';
+// v0.1.902: 会場座席の健全度を健全度パネルに載せる(配信者混入・固着を AI/人間が一目で発見)。
+import { KEY_VENUE_SEATS_DIAG } from '../lib/venueSeatsDiagKey.js';
+import { buildVenueSeatsDiagSnapshot } from '../lib/venueSeatsDiag.js';
 import {
   seatsPerRow,
   resolveVisibleArenaCount,
@@ -1698,6 +1701,12 @@ export function mountVenueBarButton(options = {}) {
   /** @type {{ allSeats: any[], visibleSeats: any[], audienceCount: number }} */
   let lastRosterInput = { allSeats: [], visibleSeats: [], audienceCount: 0 };
 
+  // v0.1.902: 健全度パネル「会場座席」セル用。集約関数が掴んだ配信者 uid を renderSeats から
+  //   参照して「配信者本人が席に混入していないか(v0.1.901 除外の回帰検出)」を観測する。
+  /** @type {string} 直近の配信者 uid(''=未取得=混入判定不能)。 */
+  let _lastBroadcasterUid = '';
+  let _venueSeatsDiagLastWriteAt = 0;
+
   // 診断パネルの描画/開閉。buildVenueRoster(純関数・テスト済)で誰が顔付き席/点描かを表にする。
   const renderRosterPanel = () => {
     const roster = buildVenueRoster(lastRosterInput);
@@ -2641,6 +2650,44 @@ export function mountVenueBarButton(options = {}) {
       repositionAllBubbles();
       updatePanAffordance();
     }
+
+    // v0.1.902: 健全度パネル「会場座席」セル用の純観測値を storage へ(min-gap で間引き)。
+    //   配信者混入=v0.1.901 の本人除外が効いているかの回帰検出。visibleSeats に配信者 uid を
+    //   持つ席があれば混入(本来あってはならない)。配信者 uid 未取得時は判定不能(broadcasterKnown=false)。
+    const bcUid = String(_lastBroadcasterUid || '').trim();
+    const broadcasterInSeats =
+      bcUid !== '' &&
+      visibleSeats.some(
+        (entry) => String(entry?.participant?.userId || '').trim() === bcUid
+      );
+    publishVenueSeatsDiag({
+      enabled: open,
+      seatsShown: visibleSeats.length,
+      participantCount: seating.participantCount,
+      otherCount: totalAnonymous,
+      broadcasterInSeats,
+      broadcasterKnown: bcUid !== ''
+    });
+  };
+
+  /**
+   * 会場座席の観測値を storage へ書く(min-gap で間引き=描画 hot path を汚さない)。
+   *   失敗は握る=会場を止めない(publishVoiceDiag と同型)。
+   * @param {Partial<import('../lib/venueSeatsDiag.js').VenueSeatsDiagState>} obs
+   */
+  const publishVenueSeatsDiag = (obs) => {
+    try {
+      const now = nowMs();
+      if (now - _venueSeatsDiagLastWriteAt < 3000) return; // 3秒 min-gap。
+      _venueSeatsDiagLastWriteAt = now;
+      const snap = buildVenueSeatsDiagSnapshot({ ...obs, lastUpdateAt: now }, now);
+      if (!hasVenueExtensionContext()) return;
+      chrome.storage.local.set({ [KEY_VENUE_SEATS_DIAG]: snap }).catch(() => {
+        /* best-effort: storage 不可・context 消失 */
+      });
+    } catch {
+      /* no-op */
+    }
   };
 
   const aggregateParticipants = async () => {
@@ -2707,6 +2754,9 @@ export function mountVenueBarButton(options = {}) {
         return !(cur && own && cur !== own);
       })();
       const _bcUidForExclude = _bcCtx.uid && _bcLiveMatches ? _bcCtx.uid : '';
+      // v0.1.902: 健全度パネルの「配信者混入」セル用に、判明している配信者 uid を保持する。
+      //   renderSeats が visibleSeats とこの uid を突合し、除外漏れ(本人が席に座る)を検知する。
+      _lastBroadcasterUid = _bcUidForExclude;
       // v0.1.740: requireText:true で「実際にコメントした人(本文あり)」だけを参加者にする。
       const LANE_OPTS = {
         requireText: true,
