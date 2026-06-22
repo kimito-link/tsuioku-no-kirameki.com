@@ -446,6 +446,12 @@
       .hv-warn { color: #c8861f; border-color: #e0a93f; background: rgba(224, 169, 63, 0.08); }
       .hv-bad { color: #d4495f; border-color: #d4495f; background: rgba(212, 73, 95, 0.10); }
     </style>
+    <!--
+      status-guard.js: 「何があっても開く」保険(2026-06-22)。dist/status.js より前に読む。
+      esbuild を通さない素のファイル=本体バンドルがどう壊れても・重くても、この保険だけは先に動く。
+      CSP(script-src 'self')のためインライン不可=同梱の独立 .js を defer なしで早期実行。
+    -->
+    <script src="status-guard.js"></script>
   </head>
   <body>
     <header class="status-header">
