@@ -50,6 +50,7 @@ export function laneUidSortRank(uidRaw) {
  *   aggList: readonly unknown[],
  *   liveId: string,
  *   broadcasterUid: string,
+ *   allowNumericWhenBroadcasterUnknown?: boolean,
  *   viewerUid: string,
  *   snapshot: import('./storyLaneAvatarSrc.js').StoryLaneAvatarSnapshot|null|undefined,
  *   pickCtxBase: { yukkuriSrc: string, tvSrc: string, anonymousIdenticonEnabled: boolean },
@@ -65,6 +66,10 @@ export function buildStoryUserLaneCandidates(input) {
   const aggList = Array.isArray(input?.aggList) ? input.aggList : [];
   const liveId = String(input?.liveId || '');
   const broadcasterUid = String(input?.broadcasterUid || '').trim();
+  // 会場(見せる場)向け: 配信者ID未確定でも数値IDの常連を出す(council/venue-numeric-id-skip 全員一致)。
+  //   既定 false=popup の従来挙動(未確定なら数値IDを匿名段に倒す)を1mm 変えない。会場だけ true。
+  //   「本人が1人混じる」より「常連が0人になる」方が致命的=常連データ(動いてるもの)を活かす(星野ロミ)。
+  const allowNumericWhenBroadcasterUnknown = input?.allowNumericWhenBroadcasterUnknown === true;
   const viewerUid = String(input?.viewerUid || '').trim();
   const snapshot = input?.snapshot;
   const isOwnPosted = typeof input?.isOwnPosted === 'function' ? input.isOwnPosted : () => false;
@@ -94,7 +99,16 @@ export function buildStoryUserLaneCandidates(input) {
     const ownPostedForUid = isOwnPosted(/** @type {Record<string, unknown>} */ (agg));
     // 配信者ID未確定で numeric userId 段を出すと配信者/周辺ユーザーを誤表示するので匿名段に倒す。
     //   own-posted(=自分)は確実に本人なので numeric でも通す。
-    if (!broadcasterUid && !ownPostedForUid && /^\d{5,14}$/.test(uidRaw)) continue;
+    //   ★会場(allowNumericWhenBroadcasterUnknown=true)は未確定でも数値IDの常連を出す=
+    //     『常連が0人になる』方が『本人が1人混じる』より致命的(会場は見せる場・council 全員一致)。
+    if (
+      !broadcasterUid &&
+      !ownPostedForUid &&
+      !allowNumericWhenBroadcasterUnknown &&
+      /^\d{5,14}$/.test(uidRaw)
+    ) {
+      continue;
+    }
 
     /** @type {Record<string, unknown>} */
     const e = {
