@@ -98,7 +98,10 @@ const STORAGE_DISCONNECT_BASELINE = new Set([
   'fn:watchSnapshotStorageKey', 'nls_backfill_progress_v1', 'nls_mcp_live_latest_v1',
   // popup が optional-chaining + computed key で set するため producer を静的解析が取りこぼす偽陽性
   // (実書込は popup-entry.js:collectAiShareDevMonitorPayloadBundle・status-entry.js が読む。2026-06-18 確認)
-  'KEY_AI_SHARE_POPUP_DIAG'
+  'KEY_AI_SHARE_POPUP_DIAG',
+  // 応援レーンの鏡(2026-06-23): PR1 で popup が producer のみ。status の consumer は後続 PR で繋ぐ
+  //   (POP に並ぶべきものを診断にそっくり映す土台)。繋いだらこの行を外す。
+  'KEY_LANE_MIRROR'
 ]);
 
 /**
