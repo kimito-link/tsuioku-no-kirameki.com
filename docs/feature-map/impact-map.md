@@ -496,6 +496,7 @@
 | `src/lib/storyAvatarDiagLine.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/storyDetailRelatedEntries.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/storyGrowthLimits.js` | 1 | ポップアップ(応援レーン) |
+| `src/lib/storyLaneAvatarSrc.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/storyUserLaneBuckets.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/storyUserLaneContaminationGuard.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/storyUserLaneDisplaySrc.js` | 1 | ポップアップ(応援レーン) |

@@ -119,7 +119,6 @@ import {
 } from '../lib/northStarAcquisitionGauge.js';
 import { northStarLaneGadgetCharaPathByTier } from '../lib/northStarLaneGadgetChara.js';
 import { buildNorthStarAdRankingStatsHtml } from '../lib/buildNorthStarAdRankingStatsHtml.js';
-import { shouldAssociateAvatarWithUser, isAvatarUrlForUserId } from '../lib/avatarBroadcasterGuard.js';
 // anonymousNicknameFallback / compactNicoLaneUserId は storyUserLaneMetaLines を lib 抽出した際に
 //   popup での直接利用が無くなった(storyUserLaneMeta.js が import する)。
 import {
@@ -441,7 +440,6 @@ import {
   upsertUserCommentProfileFromIntercept
 } from '../lib/userCommentProfileCache.js';
 import {
-  resolveSupportGrowthTileSrc,
   commentEnrichmentAvatarScore,
   isHttpOrHttpsUrl,
   isAnonymousStyleNicoUserId,
@@ -671,6 +669,7 @@ import { prioritizeWatchFramesForWatchUrl } from '../lib/watchFrameRank.js';
 import { storyTileUsesYukkuriTvStyle } from '../lib/storyTileTvStyle.js';
 import { withCommentSendTroubleshootHint } from '../lib/commentSendTroubleshootHint.js';
 import { avatarCompareKey, isSameAvatarUrl } from '../lib/avatarUrlCompare.js';
+import { resolveStoryLaneAvatarSrc } from '../lib/storyLaneAvatarSrc.js';
 import { pickAvatarUrlForUid } from '../lib/deriveAvatarUrlFromUid.js';
 import { runPopupAiDiagnosis } from '../lib/popupAiDiagOrchestrator.js';
 import {
@@ -4553,52 +4552,14 @@ function buildDisplayCommentEntries(entries, liveId) {
  * @returns {string} user icon URL。無ければ空
  */
 function storyGrowthAvatarSrcCandidate(entry, liveId, entries = STORY_SOURCE_STATE.entries) {
-  const snap = watchMetaCache.snapshot;
-  const own = isOwnPostedSupportComment(entry, String(liveId || ''), entries);
-  const bc = String(snap?.broadcasterUserId || '').trim();
-  const broadcasterIconUrl = String(snap?.broadcasterIconUrl || '').trim();
+  // 解決ロジック本体は src/lib/storyLaneAvatarSrc.js の純関数(会場と共有=顔ぶれ・順序一致の正本)。
+  //   popup 固有 state(own-posted 判定・remembered avatar)だけここで計算して注入する=挙動1mm不変。
   const entUid = String(entry?.userId || '').trim();
-  const avatarUrl = String(entry?.avatarUrl || '').trim();
-  const viewerAvatarUrl = String(snap?.viewerAvatarUrl || '').trim();
-  const mistakenBroadcaster =
-    !own && Boolean(bc && entUid && bc === entUid);
-
-  // 0.1.81/0.1.83: avatar 取り違えガード
-  //   - 0.1.83 普遍ルール: URL 埋め込み uid とエントリ uid の不一致は必ず弾く
-  //   - 0.1.81 broadcaster ガード: 上記で uid 抽出不能だった場合の補助
-  // (0.1.85 で resolver 化したが 0.1.90 で revert: 切り分け)
-  const guardAv = (av) => {
-    if (!av) return '';
-    if (!isAvatarUrlForUserId(av, entUid)) return '';
-    return shouldAssociateAvatarWithUser({
-      uid: entUid,
-      av,
-      broadcasterUid: bc,
-      broadcasterIconUrl
-    })
-      ? av
-      : '';
-  };
-  const guardedRememberedAvatar = guardAv(rememberedAvatarUrlForUserId(entUid));
-  const guardedAvatarUrl = guardAv(avatarUrl);
-
-  const fallbackAvatar =
-    mistakenBroadcaster ||
-    (viewerAvatarUrl && isSameAvatarUrl(guardedAvatarUrl, viewerAvatarUrl) && !own)
-      ? ''
-      : guardedRememberedAvatar;
-  const effectiveAvatar =
-    viewerAvatarUrl && isSameAvatarUrl(guardedAvatarUrl, viewerAvatarUrl) && !own
-      ? ''
-      : guardedAvatarUrl;
-  const src = resolveSupportGrowthTileSrc({
-    entryAvatarUrl: effectiveAvatar || fallbackAvatar,
-    userId: mistakenBroadcaster ? null : entry?.userId ?? null,
-    isOwnPosted: own,
-    viewerAvatarUrl: snap?.viewerAvatarUrl,
-    defaultSrc: ''
+  return resolveStoryLaneAvatarSrc(entry, {
+    snapshot: watchMetaCache.snapshot,
+    isOwnPosted: isOwnPostedSupportComment(entry, String(liveId || ''), entries),
+    rememberedAvatar: rememberedAvatarUrlForUserId(entUid)
   });
-  return isHttpOrHttpsUrl(src) ? src : '';
 }
 
 /**

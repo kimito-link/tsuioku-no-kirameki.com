@@ -1,0 +1,32 @@
+会場モードの席に並ぶ「人」を、popup の応援レーン(アイコン列)と完全に一致させたい。設計を固めたい。
+
+## 絶対前提(ユーザー確定・変更不可)
+- 会場の「見せ方」(席・観客・3キャラの世界観・吹き出し・VOICEVOX 読み上げ)は【今のまま維持】。1mm も変えない。これを消すのは過去2回叱責された違反。
+- 変えるのは「会場の席に並ぶ人の【顔ぶれと順序】」だけ。これを popup レーンと一致させる。
+- ユーザー方針: bucket 振り分け順(りんく/こん太/たぬ姉)は popup と一緒・件数上限だけ会場用に多く(会場は全画面で広く見せる場)。
+
+## 真因(実コードで確定済み)
+- popup(renderStoryUserLane・popup-entry.js:5238-5366): aggList → 各行を前処理して candidates を組み立て → bucketStoryUserLanePicks(candidates, limit=48) → flattenStoryUserLaneBuckets で「りんく(tier3)→こん太(tier2)→たぬ姉(tier1)」順に整列・48件で絞る。
+- 会場(venueBar.js:2820/2832): userLaneCandidatesFromStorage の candidates をそのまま venueRowsFromUserLaneCandidates(candidates) に渡す=userId を持つ人を【全員・bucket なし・整列なし】席にする。
+- → だから会場と popup で顔ぶれ・順序が違う。
+
+## 実装の足場(すべて src/lib の純関数に抽出済み・実コードで確認)
+- buildStoryUserLaneCandidateRow (storyUserLaneRowModel.js) = 各候補行(profileTier/thumbScore/displaySrc 等)を作る純関数
+- explainSupportGridDisplayTier (supportGridDisplayTier.js) = tier 判定
+- shouldSkipStoryUserLaneCandidateByContamination (storyUserLaneContaminationGuard.js) = 汚染除外(viewer/broadcaster)
+- bucketStoryUserLanePicks / flattenStoryUserLaneBuckets (storyUserLaneBuckets.js) = tier 別振り分け+件数絞り(純関数)
+- ★ただし popup-entry.js:5238-5366 の「candidates を組み立てる手順全体」(own-posted 判定・broadcaster guard・dedup・profileTier 付与・sort)は popup-entry に【インラインで】書かれている。会場が同じ顔ぶれ・順序を得るには、この手順を1つの共有純関数に抽出して両方が呼ぶ必要がある(v0.1.900 でタイル描画を共有 lib に抽出したのと同型)。
+
+## 制約・落とし穴(過去の実績から)
+- popup-entry の candidates 生成は ownPostedUidSet・viewerUid・broadcasterUid・popupUserCommentProfileMap・storageCtx など popup 固有の前提に依存する箇所がある。会場(content script/standalone)から呼ぶとき、これらの入力をどう渡すか(または会場では一部を空/既定にするか)を決める必要がある。会場は chrome.tabs/scripting に依存できない(popup-entry の関数まるごとは呼べない=過去 live-view クローンで踏んだ壁)。
+- 会場の席数 cap(venueSeats の論理席 cap・段数・visibleSeats)が、bucket で絞った後にさらに律速しないか。件数を会場用に多くするとき、この cap 群との整合。
+- 会場は content.js と venue.js(standalone)の二重バンドル。standalone は popup 固有入力(viewerUid 等)が取れない可能性。
+- 見せ方(席・吹き出し・3キャラ)は touch しない=baseRows を作る経路だけ差し替える。venueRowsFromUserLaneCandidates の出力形(userId/name/avatar/preCount/preHasGift/preGiftCount)は維持し、その「入力候補」を bucket 済みに変える。
+
+## 問いたいこと
+1. popup-entry.js:5238-5366 の candidates 生成手順を共有純関数に抽出する設計。関数シグネチャ(入力=aggList/viewerUid/broadcasterUid/ownPostedUidSet/profileMap 等、出力=整列済み candidates)。popup と会場で渡せる入力の差(特に会場/standalone で取れないもの)をどう吸収するか。
+2. 会場の baseRows 経路(venueBar.js:2820/2832)を、抽出した共有関数→bucket→flatten→venueRowsFromUserLaneCandidates に差し替える具体案。件数上限を会場用に大きくする値(150? 会場の席 cap に合わせる?)。
+3. 壊してはいけない不変条件: 会場の見せ方(席/吹き出し/3キャラ/VOICEVOX)・popup の現挙動(1mm 変えない)・席数 cap 群・二重バンドル・standalone。最小ブラスト半径で、各段で実機確認しながら進める PR 分割。
+4. ★この設計の穴・リスク(実装前に潰すべき点)。特に「popup 固有入力が会場で取れない→顔ぶれがやはりズレる」リスクの回避策。
+
+簡潔に。実装可能な具体案を。推測で「不可能なこと(時刻捏造等)」を提案しない。
