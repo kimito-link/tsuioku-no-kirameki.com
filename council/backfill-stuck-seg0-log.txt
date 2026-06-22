@@ -1,0 +1,60 @@
+
+分類: category=design  by=groq/llama-3.3-70b  (設計判断・アーキテクチャ・技術選定・トレードオフ)
+  分類器の生出力: {"category":"design"}
+召集 3体（最大4）: local/deepseek-r1:14b[批判・詰め（推論特化）], nvidia/qwen3.5-122b[発散アイデア（推論強）], groq/llama-3.3-70b[爆速の視点]
+
+[ルーティング選抜・design] 3体に問い合わせ中: local/deepseek-r1:14b, nvidia/qwen3.5-122b, groq/llama-3.3-70b
+
+########################################################################
+# ルーティング選抜・design
+########################################################################
+
+========================================================================
+### local/deepseek-r1:14b  [批判・詰め（推論特化）]  (117640ms)
+========================================================================
+## 結論
+backfill が running:true・seg:0・rows:0・triedLiveId:"" で進まない最有力の真因は、(a) viewBase を crawlNdgrBackward に渡す経路が途中参加配信で欠落し、初回 view fetch が走らないことである。初回 view fetch が走らないため、セグメントの取得ができず、seg:0 のままになる。
+
+## 根拠
+1. 初回 view fetch が行われないと、セグメントの取得が始まりません。
+2. `triedLiveId` が空であることから、backfill がどの配信を遡るかを確定できていない可能性があります。
+3. `ndgrViewBaseObserved` が true であるため、viewBase は取得されていますが、それを backward crawl に渡す経路に問題があると考えられます。
+
+## 反論・リスク
+1. (b) 初回 view fetch は成功するが、ChunkedEntry の backward URI が空や decode 失敗で即 done(backward_exhausted)になり seg:0 のまま完走扱い→再起動ループ:
+   - この場合、seg:0 のままになる前に、少なくとも 1 回はセグメントの取得が試行されるはずです。
+2. (c) SW の keepalive(20秒)で初回 fetch 完了前に SW が落ち、毎回ゼロからやり直して進まない:
+   - このリスクはあるかもしれませんが、keepalive 時間を延ばすことで軽減可能です。
+
+## 具体案
+1. `crawlNdgrBackward` 関数の入力経路を確認し、viewBase が正しく渡されているかを調査します。
+2. 初回 view fetch 成功フラグを追加し、seg:0 で止まる原因を特定します。
+3. SW keepalive 時間を延ばすことで初回 fetch 完了前に落ちるリスクを軽減します。
+
+========================================================================
+### nvidia/qwen3.5-122b  [発散アイデア（推論強）]  (0ms)  [FAILED: HTTP 400 {"status":400,"title":"Bad Request","detail":"Function id 'e8d66c85-ab6a-4066-b2f3-6c03134faf14': DEGRADED function cann]
+========================================================================
+(no answer)
+
+========================================================================
+### groq/llama-3.3-70b  [爆速の視点]  (2233ms)
+========================================================================
+## 結論
+backfill が running:true・seg:0・rows:0・triedLiveId:"" で進まない最有力の真因は、(a) viewBase は ndgrViewBaseObserved:true だが、それを crawlNdgrBackward に渡す経路が途中参加配信で欠落し初回 view fetch が走らないことである。初回 view fetch が走らないと、セグメントの取得ができず、seg:0 のままになる。
+
+## 根拠
+初回 view fetch が走らないと、セグメントの取得ができず、seg:0 のままになる。また、triedLiveId が空のままであることから、backfill が「どの配信を遡るか」を確定できていない可能性が高い。さらに、ndgrViewBaseObserved が true であることから、ndgrViewBase が取得できていることがわかり、viewBase の取得に問題がないことがわかる。
+
+## 反論・リスク
+一つの可能性として、(b) 初回 view fetch は走るが ChunkedEntry の backward URI が空/decode 失敗で即 done(backward_exhausted) になり seg:0 のまま完走扱い→再起動ループが考えられる。しかし、この場合、seg:0 のままになる前に、少なくとも 1 回はセグメントの取得が試行されるはずである。また、(c) SW の keepalive(20秒)で初回 fetch 完了前に SW が落ち、毎回ゼロからやり直して進まないという可能性もあるが、この場合、SW のログでエラーが発生しているはずである。
+
+## 具体案
+まず、seg:0 で止まる箇所を一発で切り分ける観測値を設計する必要がある。次の計器を追加することが有効である。
+- stopReason: backfill が止まった理由を記録する。初回 view fetch の成否、ステータス、viewBase の有無、gen が yield した回数、done に至った理由などを記録する。
+- viewBase 受け渡し修正: viewBase を crawlNdgrBackward に渡す経路を修正する。途中参加配信で viewBase が取得できない場合は、別の方法で viewBase を取得する必要がある。
+- 初回 fetch リトライ: 初回 view fetch が失敗した場合、一定回数リトライするようにする。
+- SW keepalive 延命: SW の keepalive を延長することで、初回 fetch が完了する前に SW が落ちることを防ぐことができる。ただし、BAN リスクを考慮して、throttle 緩和や並列増強は禁止とする。
+--- [ルーティング選抜・design] 成功 2/3 ---
+
+=== 完了 118174ms ===
+保存: council/backfill-stuck-seg0-answers.json

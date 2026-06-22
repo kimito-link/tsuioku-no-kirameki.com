@@ -1,0 +1,31 @@
+{
+  "question": "お題: Chrome拡張(MV3・ニコ生コメント記録)で、過去ログ取得(backfill)が「走っている表示(running:true)なのに1セグメントも1件も進まない(seg:0・rows:0)」配信がある。ユーザーは「一気に全部取れる前提が崩れている」と訴えている。この真因究明と、安全(BAN回避)な範囲での対策を設計したい。\n\n== 実コードで裏取り済みの事実 ==\n\n[アーキテクチャ]\n- backfill は SW(service worker)で走る。crawlNdgrBackward(src/lib/ndgrBackfillCrawl.js)という純ジェネレータが、NDGR(mpn.live.nicovideo.jp・watchと別オリジン)の view エンドポイントを叩き、ChunkedEntry の `backward` URI を辿って過去へ遡り、各 `segment` URI を fetch して実コメントを yield する。\n- backfill-sw-entry.js の for(;;) ループが gen.next() を回し、ev.segmentsFetched で state.seg を、ndgrChatsToMergeRows(ev.chats) の長さで state.rows を更新する。\n- fetch は credentials:'omit' 必須・CORS *・SW の特権 fetch。throttle は backward hop 間 15ms(NDGR_BACKFILL_MIN_GAP)。cap は segments:20000 / elapsedMs:900000(15分) / bytes:60MB / rows:100000。これらは「BAN回避のため意図的に保守的」と設計コメントに明記。並列度は1(直列)。\n- 「雑に並列増強/throttle緩和すると BAN リスク」が過去の引き継ぎ警告。backfill は既に慎重設計。\n\n[実機の動かぬ証拠(状態速報 romiDebug.backfill)]\n配信 lv350804432(6:55開始を経過2:06で途中参加・公式761コメント・記録153=20%):\n  running: true, rows: 0, seg: 0, done: 0\n  fullSweepForced: true, ndgrViewBaseObserved: true, resumeFromVpos: null, gapRearmCount: 1\n  triedLiveId: \"\"  ← 空(注目)\n- NDGR はリアルタイム接続は生きている(ndgrLastReceivedAgo: 13930ms・networkErrorProbe.ndgrConnectStatus: \"connected\")。\n- 記録153件の内訳(commentIngestBySource): backfill:0 / deep:131 / mutation:147 / ndgr:2 / visible:307。→ backfill 由来は0件。deep harvest と mutation/visible(画面スクロール由来)だけで153件。\n- つまり「過去ログ遡り(backfill)」が実質1件も寄与していない。20%は NDGR接続後の新規分 + deep harvest(画面に見えている範囲)だけ。\n\n[注目点]\n- seg:0 = crawlNdgrBackward が【最初のセグメントを yield する前】で止まっている(view fetch か decode か backward 取得の初手で詰まっている)。\n- triedLiveId:\"\" が空 = backfill が「どの配信を遡るか」を確定できていない可能性。fullSweepForced:true・ndgrViewBaseObserved:true なのに triedLiveId が空なのは不整合の疑い。\n- running:true のまま seg:0 が続く = ループに入る前(viewBase 解決待ち/初回fetch待ち)で pending、または毎回 backward_exhausted で即終了して再起動を繰り返している、のどちらか。\n\n== 問い ==\n1. backfill が running:true・seg:0・rows:0・triedLiveId:\"\" で進まない最有力の真因は何か。候補:\n   (a) viewBase は ndgrViewBaseObserved:true だが、それを crawlNdgrBackward に渡す経路が途中参加配信で欠落し初回 view fetch が走らない\n   (b) 初回 view fetch(?at={unixtime})は走るが ChunkedEntry の backward URI が空/decode 失敗で即 done(backward_exhausted)になり seg:0 のまま完走扱い→再起動ループ\n   (c) SW の keepalive(20秒)で初回 fetch 完了前に SW が落ち、毎回ゼロからやり直して進まない\n   (d) その他\n2. それぞれの仮説を「次にどの計器(状態速報に出す値)を足せば実データで確定できるか」。コードを推測で直す前に、seg:0 で止まる箇所を一発で切り分ける観測値を設計せよ(stopReason・初回fetchの成否/ステータス・viewBase の有無・gen が yield した回数・done に至った理由)。\n3. 安全(BAN ゼロ)に直せる範囲はどこまでか。throttle緩和や並列増強は禁止(BANリスク)。計器で真因が「初手で詰まる」と分かった場合、初手だけを堅牢化する(viewBase 受け渡し修正・初回fetchリトライ・SW keepalive 延命)のは安全か。\n\n評価軸: ①ユーザーの「一気に取れる/100%」体感に効くか ②MV3 SW・ニコ生サーバ負荷・BANリスクの安全性 ③実装/保守コストと回帰リスク ④self-verifying(嘘で緑にしない・推測でコアをいじらない=まず計器で真因確定)との整合。\n\n各メンバーは『結論 → 根拠 → 反論・リスク → 具体案(どのファイル/値をどう触るか・段階)』の4ブロックで。批判役は必ず穴を1つ指摘。司令塔(Claude)が最後に統合・裏取りして1案に収束させる。最優先は「コアをいじる前に、seg:0 で止まる箇所を確定できる計器を入れる」設計。\n",
+  "mode": "routed",
+  "category": "design",
+  "classifier": "groq/llama-3.3-70b",
+  "rounds": {
+    "routed": [
+      {
+        "label": "local/deepseek-r1:14b",
+        "role": "critic",
+        "ms": 117640,
+        "answer": "## 結論\nbackfill が running:true・seg:0・rows:0・triedLiveId:\"\" で進まない最有力の真因は、(a) viewBase を crawlNdgrBackward に渡す経路が途中参加配信で欠落し、初回 view fetch が走らないことである。初回 view fetch が走らないため、セグメントの取得ができず、seg:0 のままになる。\n\n## 根拠\n1. 初回 view fetch が行われないと、セグメントの取得が始まりません。\n2. `triedLiveId` が空であることから、backfill がどの配信を遡るかを確定できていない可能性があります。\n3. `ndgrViewBaseObserved` が true であるため、viewBase は取得されていますが、それを backward crawl に渡す経路に問題があると考えられます。\n\n## 反論・リスク\n1. (b) 初回 view fetch は成功するが、ChunkedEntry の backward URI が空や decode 失敗で即 done(backward_exhausted)になり seg:0 のまま完走扱い→再起動ループ:\n   - この場合、seg:0 のままになる前に、少なくとも 1 回はセグメントの取得が試行されるはずです。\n2. (c) SW の keepalive(20秒)で初回 fetch 完了前に SW が落ち、毎回ゼロからやり直して進まない:\n   - このリスクはあるかもしれませんが、keepalive 時間を延ばすことで軽減可能です。\n\n## 具体案\n1. `crawlNdgrBackward` 関数の入力経路を確認し、viewBase が正しく渡されているかを調査します。\n2. 初回 view fetch 成功フラグを追加し、seg:0 で止まる原因を特定します。\n3. SW keepalive 時間を延ばすことで初回 fetch 完了前に落ちるリスクを軽減します。",
+        "rebutted": true
+      },
+      {
+        "label": "nvidia/qwen3.5-122b",
+        "role": "diverge",
+        "ms": 0,
+        "answer": "",
+        "error": "HTTP 400 {\"status\":400,\"title\":\"Bad Request\",\"detail\":\"Function id 'e8d66c85-ab6a-4066-b2f3-6c03134faf14': DEGRADED function cann"
+      },
+      {
+        "label": "groq/llama-3.3-70b",
+        "role": "fast",
+        "ms": 2233,
+        "answer": "## 結論\nbackfill が running:true・seg:0・rows:0・triedLiveId:\"\" で進まない最有力の真因は、(a) viewBase は ndgrViewBaseObserved:true だが、それを crawlNdgrBackward に渡す経路が途中参加配信で欠落し初回 view fetch が走らないことである。初回 view fetch が走らないと、セグメントの取得ができず、seg:0 のままになる。\n\n## 根拠\n初回 view fetch が走らないと、セグメントの取得ができず、seg:0 のままになる。また、triedLiveId が空のままであることから、backfill が「どの配信を遡るか」を確定できていない可能性が高い。さらに、ndgrViewBaseObserved が true であることから、ndgrViewBase が取得できていることがわかり、viewBase の取得に問題がないことがわかる。\n\n## 反論・リスク\n一つの可能性として、(b) 初回 view fetch は走るが ChunkedEntry の backward URI が空/decode 失敗で即 done(backward_exhausted) になり seg:0 のまま完走扱い→再起動ループが考えられる。しかし、この場合、seg:0 のままになる前に、少なくとも 1 回はセグメントの取得が試行されるはずである。また、(c) SW の keepalive(20秒)で初回 fetch 完了前に SW が落ち、毎回ゼロからやり直して進まないという可能性もあるが、この場合、SW のログでエラーが発生しているはずである。\n\n## 具体案\nまず、seg:0 で止まる箇所を一発で切り分ける観測値を設計する必要がある。次の計器を追加することが有効である。\n- stopReason: backfill が止まった理由を記録する。初回 view fetch の成否、ステータス、viewBase の有無、gen が yield した回数、done に至った理由などを記録する。\n- viewBase 受け渡し修正: viewBase を crawlNdgrBackward に渡す経路を修正する。途中参加配信で viewBase が取得できない場合は、別の方法で viewBase を取得する必要がある。\n- 初回 fetch リトライ: 初回 view fetch が失敗した場合、一定回数リトライするようにする。\n- SW keepalive 延命: SW の keepalive を延長することで、初回 fetch が完了する前に SW が落ちることを防ぐことができる。ただし、BAN リスクを考慮して、throttle 緩和や並列増強は禁止とする。"
+      }
+    ]
+  },
+  "at": "2026-06-22T00:04:59.637Z"
+}
