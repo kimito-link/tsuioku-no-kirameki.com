@@ -342,77 +342,7 @@
       ]
     },
     {
-      "file": "src/domain/lane/columns/kontaPolicy.js",
-      "featureCount": 3,
-      "features": [
-        "content",
-        "popup",
-        "venue"
-      ],
-      "labels": [
-        "記録エンジン(watchページ常駐)",
-        "ポップアップ(応援レーン)",
-        "会場モード(standalone)"
-      ]
-    },
-    {
-      "file": "src/domain/lane/columns/linkPolicy.js",
-      "featureCount": 3,
-      "features": [
-        "content",
-        "popup",
-        "venue"
-      ],
-      "labels": [
-        "記録エンジン(watchページ常駐)",
-        "ポップアップ(応援レーン)",
-        "会場モード(standalone)"
-      ]
-    },
-    {
-      "file": "src/domain/lane/columns/tanuPolicy.js",
-      "featureCount": 3,
-      "features": [
-        "content",
-        "popup",
-        "venue"
-      ],
-      "labels": [
-        "記録エンジン(watchページ常駐)",
-        "ポップアップ(応援レーン)",
-        "会場モード(standalone)"
-      ]
-    },
-    {
-      "file": "src/domain/lane/tier.js",
-      "featureCount": 3,
-      "features": [
-        "content",
-        "popup",
-        "venue"
-      ],
-      "labels": [
-        "記録エンジン(watchページ常駐)",
-        "ポップアップ(応援レーン)",
-        "会場モード(standalone)"
-      ]
-    },
-    {
       "file": "src/domain/user/identity.js",
-      "featureCount": 3,
-      "features": [
-        "content",
-        "popup",
-        "venue"
-      ],
-      "labels": [
-        "記録エンジン(watchページ常駐)",
-        "ポップアップ(応援レーン)",
-        "会場モード(standalone)"
-      ]
-    },
-    {
-      "file": "src/domain/user/nickname.js",
       "featureCount": 3,
       "features": [
         "content",
@@ -622,20 +552,6 @@
       ]
     },
     {
-      "file": "src/lib/storyLaneAvatarSrc.js",
-      "featureCount": 3,
-      "features": [
-        "content",
-        "popup",
-        "venue"
-      ],
-      "labels": [
-        "記録エンジン(watchページ常駐)",
-        "ポップアップ(応援レーン)",
-        "会場モード(standalone)"
-      ]
-    },
-    {
       "file": "src/lib/storyTileTvStyle.js",
       "featureCount": 3,
       "features": [
@@ -650,63 +566,7 @@
       ]
     },
     {
-      "file": "src/lib/storyUserLaneBuckets.js",
-      "featureCount": 3,
-      "features": [
-        "content",
-        "popup",
-        "venue"
-      ],
-      "labels": [
-        "記録エンジン(watchページ常駐)",
-        "ポップアップ(応援レーン)",
-        "会場モード(standalone)"
-      ]
-    },
-    {
-      "file": "src/lib/storyUserLaneContaminationGuard.js",
-      "featureCount": 3,
-      "features": [
-        "content",
-        "popup",
-        "venue"
-      ],
-      "labels": [
-        "記録エンジン(watchページ常駐)",
-        "ポップアップ(応援レーン)",
-        "会場モード(standalone)"
-      ]
-    },
-    {
-      "file": "src/lib/storyUserLaneDisplaySrc.js",
-      "featureCount": 3,
-      "features": [
-        "content",
-        "popup",
-        "venue"
-      ],
-      "labels": [
-        "記録エンジン(watchページ常駐)",
-        "ポップアップ(応援レーン)",
-        "会場モード(standalone)"
-      ]
-    },
-    {
       "file": "src/lib/storyUserLaneMeta.js",
-      "featureCount": 3,
-      "features": [
-        "content",
-        "popup",
-        "venue"
-      ],
-      "labels": [
-        "記録エンジン(watchページ常駐)",
-        "ポップアップ(応援レーン)",
-        "会場モード(standalone)"
-      ]
-    },
-    {
-      "file": "src/lib/storyUserLaneRowModel.js",
       "featureCount": 3,
       "features": [
         "content",
@@ -1584,18 +1444,6 @@
       ]
     },
     {
-      "file": "src/lib/storyUserLaneCandidates.js",
-      "featureCount": 2,
-      "features": [
-        "content",
-        "venue"
-      ],
-      "labels": [
-        "記録エンジン(watchページ常駐)",
-        "会場モード(standalone)"
-      ]
-    },
-    {
       "file": "src/lib/supportActivityTimeline.js",
       "featureCount": 2,
       "features": [
@@ -2018,7 +1866,57 @@
       ]
     },
     {
+      "file": "src/domain/lane/columns/kontaPolicy.js",
+      "featureCount": 1,
+      "features": [
+        "popup"
+      ],
+      "labels": [
+        "ポップアップ(応援レーン)"
+      ]
+    },
+    {
+      "file": "src/domain/lane/columns/linkPolicy.js",
+      "featureCount": 1,
+      "features": [
+        "popup"
+      ],
+      "labels": [
+        "ポップアップ(応援レーン)"
+      ]
+    },
+    {
+      "file": "src/domain/lane/columns/tanuPolicy.js",
+      "featureCount": 1,
+      "features": [
+        "popup"
+      ],
+      "labels": [
+        "ポップアップ(応援レーン)"
+      ]
+    },
+    {
+      "file": "src/domain/lane/tier.js",
+      "featureCount": 1,
+      "features": [
+        "popup"
+      ],
+      "labels": [
+        "ポップアップ(応援レーン)"
+      ]
+    },
+    {
       "file": "src/domain/user/avatar.js",
+      "featureCount": 1,
+      "features": [
+        "popup"
+      ],
+      "labels": [
+        "ポップアップ(応援レーン)"
+      ]
+    },
+    {
+      "file": "src/domain/user/nickname.js",
       "featureCount": 1,
       "features": [
         "popup"
@@ -4888,7 +4786,57 @@
       ]
     },
     {
+      "file": "src/lib/storyLaneAvatarSrc.js",
+      "featureCount": 1,
+      "features": [
+        "popup"
+      ],
+      "labels": [
+        "ポップアップ(応援レーン)"
+      ]
+    },
+    {
+      "file": "src/lib/storyUserLaneBuckets.js",
+      "featureCount": 1,
+      "features": [
+        "popup"
+      ],
+      "labels": [
+        "ポップアップ(応援レーン)"
+      ]
+    },
+    {
+      "file": "src/lib/storyUserLaneContaminationGuard.js",
+      "featureCount": 1,
+      "features": [
+        "popup"
+      ],
+      "labels": [
+        "ポップアップ(応援レーン)"
+      ]
+    },
+    {
+      "file": "src/lib/storyUserLaneDisplaySrc.js",
+      "featureCount": 1,
+      "features": [
+        "popup"
+      ],
+      "labels": [
+        "ポップアップ(応援レーン)"
+      ]
+    },
+    {
       "file": "src/lib/storyUserLaneGuideHtml.js",
+      "featureCount": 1,
+      "features": [
+        "popup"
+      ],
+      "labels": [
+        "ポップアップ(応援レーン)"
+      ]
+    },
+    {
+      "file": "src/lib/storyUserLaneRowModel.js",
       "featureCount": 1,
       "features": [
         "popup"

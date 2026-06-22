@@ -13,12 +13,7 @@
 ```mermaid
 graph LR
   n_venue["会場モード(standalone)"]
-  n_venue --> n_src_domain_lane_columns_kontaPolicy_js["domain/lane/columns/kontaPolicy.js"]:::shared
-  n_venue --> n_src_domain_lane_columns_linkPolicy_js["domain/lane/columns/linkPolicy.js"]:::shared
-  n_venue --> n_src_domain_lane_columns_tanuPolicy_js["domain/lane/columns/tanuPolicy.js"]:::shared
-  n_venue --> n_src_domain_lane_tier_js["domain/lane/tier.js"]:::shared
   n_venue --> n_src_domain_user_identity_js["domain/user/identity.js"]:::shared
-  n_venue --> n_src_domain_user_nickname_js["domain/user/nickname.js"]:::shared
   n_venue --> n_src_extension_venueBar_js["extension/venueBar.js"]:::shared
   n_venue --> n_src_lib_anonymousIdenticon_js["lib/anonymousIdenticon.js"]:::shared
   n_venue --> n_src_lib_avatarBroadcasterGuard_js["lib/avatarBroadcasterGuard.js"]:::shared
@@ -44,16 +39,21 @@ graph LR
   n_venue --> n_src_lib_storageKeys_js["lib/storageKeys.js"]:::shared
   n_venue --> n_src_lib_storageOpTimeout_js["lib/storageOpTimeout.js"]:::shared
   n_venue --> n_src_lib_storyAvatarTvFallbackClass_js["lib/storyAvatarTvFallbackClass.js"]:::shared
-  n_venue --> n_src_lib_storyLaneAvatarSrc_js["lib/storyLaneAvatarSrc.js"]:::shared
   n_venue --> n_src_lib_storyTileTvStyle_js["lib/storyTileTvStyle.js"]:::shared
-  n_venue --> n_src_lib_storyUserLaneBuckets_js["lib/storyUserLaneBuckets.js"]:::shared
-  n_venue --> n_src_lib_storyUserLaneCandidates_js["lib/storyUserLaneCandidates.js"]:::shared
-  n_venue --> n_src_lib_storyUserLaneContaminationGuard_js["lib/storyUserLaneContaminationGuard.js"]:::shared
-  n_venue --> n_src_lib_storyUserLaneDisplaySrc_js["lib/storyUserLaneDisplaySrc.js"]:::shared
   n_venue --> n_src_lib_storyUserLaneMeta_js["lib/storyUserLaneMeta.js"]:::shared
-  n_venue --> n_src_lib_storyUserLaneRowModel_js["lib/storyUserLaneRowModel.js"]:::shared
   n_venue --> n_src_lib_supportGridDisplayTier_js["lib/supportGridDisplayTier.js"]:::shared
+  n_venue --> n_src_lib_supportGrowthAvatarLoad_js["lib/supportGrowthAvatarLoad.js"]:::shared
+  n_venue --> n_src_lib_supportGrowthTileSrc_js["lib/supportGrowthTileSrc.js"]:::shared
+  n_venue --> n_src_lib_userIdPreference_js["lib/userIdPreference.js"]:::shared
+  n_venue --> n_src_lib_userLaneCandidatesFromStorage_js["lib/userLaneCandidatesFromStorage.js"]:::shared
+  n_venue --> n_src_lib_userRooms_js["lib/userRooms.js"]:::shared
+  n_venue --> n_src_lib_venueAvatar_js["lib/venueAvatar.js"]:::shared
+  n_venue --> n_src_lib_venueBubbleLayout_js["lib/venueBubbleLayout.js"]:::shared
+  n_venue --> n_src_lib_venueBubbleLifecycle_js["lib/venueBubbleLifecycle.js"]:::shared
+  n_venue --> n_src_lib_venueCharacterFrame_js["lib/venueCharacterFrame.js"]:::shared
+  n_venue --> n_src_lib_venueCrowdMotion_js["lib/venueCrowdMotion.js"]:::shared
+  n_venue --> n_src_lib_venueDisplayRows_js["lib/venueDisplayRows.js"]:::shared
   classDef shared fill:#eee,stroke:#999,color:#666;
 ```
 
-> ほか 32 ファイル省略（全件は storage-bus.md / metafile 参照）。
+> ほか 21 ファイル省略（全件は storage-bus.md / metafile 参照）。

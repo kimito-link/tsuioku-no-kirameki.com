@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 1 / 536 件
+## ⚠️ 役割コメントが無いソース 1 / 535 件
 - `src/lib/reportPreviewPublish.js`
 
 ## 全ファイルツリー
@@ -257,7 +257,7 @@
   - `vendor-visual-explainer.mjs` — Vendors nicobailon/visual-explainer (MIT) into .cursor/skills/visual-explainer/
   - `verify-bump.mjs` — extension bump 後の整合性チェッカー
   - `write-extension-placeholder-icons.mjs` — リポジトリに 256px アイコンしか無い環境向け: manifest 用の小さめ PNG を生成する。
-- 📁 **src/** (1149)
+- 📁 **src/** (1147)
   - 📁 **data/** (6)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -516,7 +516,7 @@
         - `logo_funlink_white_RGB_maru_black.png`
       - `logo_guide_funlink_ol.pdf`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (938)
+  - 📁 **lib/** (936)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -1270,8 +1270,6 @@
     - `storyDetailRelatedEntries.js` — ストーリー詳細／プレビュー脇の「同一ユーザーの直近」リスト用。
     - `storyDetailRelatedEntries.test.js`
     - `storyGrowthLimits.js` — りんく成長グリッド（story growth）の描画上限。
-    - `storyLaneAvatarSrc.js` — 応援レーン(アイコン列)のタイル画像 URL 解決（state 注入型の純関数）。
-    - `storyLaneAvatarSrc.test.js`
     - `storyTileTvStyle.js` — ストーリータイル / レーンアバターで「ゆっくり風キャラ画像かどうか」を判定する純関数。
     - `storyTileTvStyle.test.js`
     - `storyUserLaneBuckets.js` — 応援ユーザーレーン: ソート済み候補を tier（profileTier）別に上限付きで分割する。

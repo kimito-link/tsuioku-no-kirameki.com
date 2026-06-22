@@ -79,16 +79,6 @@ import { isNumericNicoUserId } from '../domain/user/identity.js';
 //   依存(io)も popup と同じ本物を会場が生成・import する(スタブ化しない)。
 import { buildPersonTileEl } from '../lib/personTileDom.js';
 import { createSupportAvatarLoadGuard } from '../lib/supportGrowthAvatarLoad.js';
-// 会場の席を popup レーンと同じ顔ぶれ・順序にする(2026-06-22・council/venue-lane-mirror)。
-//   popup と同じ候補生成(profileTier 付与・整列)+bucket 振り分け(りんく/こん太/たぬ姉)を通す。
-import {
-  buildStoryUserLaneCandidates,
-  orderVenueAggsByPickedCandidates
-} from '../lib/storyUserLaneCandidates.js';
-import {
-  bucketStoryUserLanePicks,
-  flattenStoryUserLaneBuckets
-} from '../lib/storyUserLaneBuckets.js';
 import {
   applyStoryAvatarTvFallbackClass,
   removeStoryAvatarTvFallbackClass
@@ -97,10 +87,8 @@ import { storyTileUsesYukkuriTvStyle } from '../lib/storyTileTvStyle.js';
 import { upgradeAnonymousAvatarImage } from '../lib/avatarPartsComposer.js';
 import {
   isHttpOrHttpsUrl,
-  isWeakNiconicoUserIconHttpUrl,
   NICONICO_OFFICIAL_DEFAULT_USERICON_HTTPS
 } from '../lib/supportGrowthTileSrc.js';
-import { isAvatarObservedInCommentProfileMap } from '../lib/popupAvatarResolver.js';
 import { storyUserLaneMetaLines } from '../lib/storyUserLaneMeta.js';
 // v0.1.902: 会場座席の健全度を健全度パネルに載せる(配信者混入・固着を AI/人間が一目で発見)。
 import { KEY_VENUE_SEATS_DIAG } from '../lib/venueSeatsDiagKey.js';
@@ -2808,64 +2796,6 @@ export function mountVenueBarButton(options = {}) {
         broadcasterUid: _bcUidForExclude,
         broadcasterIconUrl: _bcUsable ? _bcCtx.iconUrl : ''
       };
-
-      // 会場の席を popup レーンと同じ顔ぶれ・順序にする(council/venue-lane-mirror)。
-      //   profileMap(プロファイルキャッシュ)を bucket 変換の前に読む=popup の remembered avatar
-      //   と同じく avatar 付きで profileTier(りんく/こん太/たぬ姉)を判定するため。後段の
-      //   enrichVenueRowsWithProfileAvatars(席 row の avatar 補強)とは別目的なので両方残す。
-      const _laneProfileBag = await runStorageOpWithTimeout(
-        () => chrome.storage.local.get(KEY_USER_COMMENT_PROFILE_CACHE),
-        8000
-      );
-      if (!open || liveIdFromPathname() !== liveId) return;
-      const _laneProfileMap =
-        /** @type {Record<string, { avatarUrl?: unknown }>|null} */ (
-          _laneProfileBag?.[KEY_USER_COMMENT_PROFILE_CACHE] || null
-        );
-      // 会場(全画面)の席数枠=popup の確認用 48 でなく会場席 cap まで(ユーザー: 件数は会場を多く)。
-      const VENUE_LANE_LIMIT = VENUE_FULLSCREEN_MAX_SEATS;
-      // popup と同じ remembered avatar 解決(profileMap から http の個人 avatar を引く・弱アイコンは除外)。
-      //   entries 依存(popup の第2段階)は会場に entries が無いので無し=会場は profileMap が正本。
-      const resolveLaneRememberedAvatar = (/** @type {string} */ uid) => {
-        const fromCache = String(_laneProfileMap?.[uid]?.avatarUrl || '').trim();
-        if (fromCache && isHttpOrHttpsUrl(fromCache) && !isWeakNiconicoUserIconHttpUrl(fromCache)) {
-          return fromCache;
-        }
-        return '';
-      };
-      // userLaneCandidatesFromStorage の集約候補(aggList 相当)を popup と同じ手順で席 row にする。
-      //   buildStoryUserLaneCandidates(profileTier 付与・整列)→bucket(りんく/こん太/たぬ姉)→flatten
-      //   →venueRowsFromUserLaneCandidates(席 row・出力形は不変=見せ方は壊れない)。
-      const venueLaneRowsFromAggregates = (/** @type {readonly unknown[]} */ aggCandidates) => {
-        const aggList = Array.isArray(aggCandidates) ? aggCandidates : [];
-        const laneCandidates = buildStoryUserLaneCandidates({
-          aggList,
-          liveId,
-          broadcasterUid: _bcUidForExclude,
-          viewerUid: '', // 会場は自分(viewer)の uid を持たない=自分除外なしで許容(過剰除外を避ける)
-          snapshot: {
-            broadcasterUserId: _bcUidForExclude,
-            broadcasterIconUrl: _bcUsable ? _bcCtx.iconUrl : '',
-            viewerAvatarUrl: ''
-          },
-          pickCtxBase: {
-            yukkuriSrc: '',
-            tvSrc: '',
-            anonymousIdenticonEnabled: true
-          },
-          isOwnPosted: () => false,
-          resolveRememberedAvatar: resolveLaneRememberedAvatar,
-          resolveAnonymousIdenticon: (uid) => anonymousIdenticonDataUrl(uid, 64),
-          isAvatarObserved: (e) =>
-            isAvatarObservedInCommentProfileMap(String(e?.userId || ''), _laneProfileMap)
-        });
-        const buckets = bucketStoryUserLanePicks(laneCandidates, VENUE_LANE_LIMIT);
-        const picked = flattenStoryUserLaneBuckets(buckets);
-        // picked(popup と同じ顔ぶれ・順序)の userId で【元の集約候補】(commentCount/giftCount/
-        //   _laneSortAt 持ち=VIP/常連/着席順/吹き出しの演出に必要)を引いて席 row 化=見せ方を壊さない。
-        const orderedAggs = orderVenueAggsByPickedCandidates(picked, aggList);
-        return venueRowsFromUserLaneCandidates(orderedAggs);
-      };
       if (isChunkIndex(index, liveId) && Array.isArray(/** @type {any} */ (index).seqs)) {
         // --- チャンク化済み: 差分(新規 seq)だけ集約してマージ ---
         const allSeqs = /** @type {number[]} */ (/** @type {any} */ (index).seqs);
@@ -2887,7 +2817,7 @@ export function mountVenueBarButton(options = {}) {
           aggregatedCandidates = mergeUserLaneAggregates(aggregatedCandidates, newCandidates);
           aggregatedChunkSeqs = aggregatedChunkSeqs.concat(newSeqs);
         }
-        baseRows = venueLaneRowsFromAggregates(aggregatedCandidates);
+        baseRows = venueRowsFromUserLaneCandidates(aggregatedCandidates);
       } else {
         // --- 未チャンク化(従来 main・小規模/移行前): 従来どおり全件読み(件数が小さいので安全) ---
         const result = await runStorageOpWithTimeout(
@@ -2899,12 +2829,19 @@ export function mountVenueBarButton(options = {}) {
         );
         if (!open || liveIdFromPathname() !== liveId) return;
         const candidates = userLaneCandidatesFromStorage(result.rows, liveId, LANE_OPTS);
-        baseRows = venueLaneRowsFromAggregates(candidates);
+        baseRows = venueRowsFromUserLaneCandidates(candidates);
       }
       // パネルと同じ低頻度キャッシュで実サムネを補強し、会場だけ顔が欠ける差をなくす。
-      //   ★profileMap は上(bucket 変換の前)で既に読んだ _laneProfileMap を再利用する=storage read を
-      //     増やさない(MEMORY 鉄則: 会場/診断は毎回の直列 read を増やすな)。
-      baseRows = enrichVenueRowsWithProfileAvatars(baseRows, _laneProfileMap);
+      const profileBag = await runStorageOpWithTimeout(
+        () => chrome.storage.local.get(KEY_USER_COMMENT_PROFILE_CACHE),
+        8000
+      );
+      if (!open || liveIdFromPathname() !== liveId) return;
+      const profileMap =
+        /** @type {Record<string, { avatarUrl?: unknown }>|null} */ (
+          profileBag?.[KEY_USER_COMMENT_PROFILE_CACHE] || null
+        );
+      baseRows = enrichVenueRowsWithProfileAvatars(baseRows, profileMap);
       // commitDisplay 経由=空(0件)なら前回の非空表示を維持し、会場を空で再描画しない。
       commitDisplay(baseRows);
     } catch (err) {
