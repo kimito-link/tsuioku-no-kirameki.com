@@ -30,6 +30,8 @@ import { buildVoiceDiagLine } from '../lib/voiceDiag.js';
 import { KEY_VOICE_DIAG } from '../lib/voiceDiagKey.js';
 // v0.1.902: 会場座席の健全度(配信者混入・固着)を健全度パネルに載せる。
 import { KEY_VENUE_SEATS_DIAG } from '../lib/venueSeatsDiagKey.js';
+// 2026-06-22(council/lane-show-all-active): 応援レーンの人数整合(素性 N/表示 M)を健全度パネルに載せる。
+import { KEY_LANE_DIAG } from '../lib/laneDiagKey.js';
 import { buildReportPreviewLines } from '../lib/reportPreview.js';
 import {
   KEY_REPORT_PREVIEW,
@@ -232,6 +234,9 @@ async function refresh(opts = {}) {
     step = 'loadVenueSeatsDiagSafe';
     const venueSeatsDiag = await runStorageOpWithTimeout(() => loadVenueSeatsDiagSafe(), tmo);
     _mark('venueSeatsDiag');
+    step = 'loadLaneDiagSafe';
+    const laneDiag = await runStorageOpWithTimeout(() => loadLaneDiagSafe(), tmo);
+    _mark('laneDiag');
     // 以下 3 つは「追加データ」=失敗しても他の表示と記録を妨げない(空で描く)。12 秒間引きでキャッシュ
     //   再利用=2 秒ごとの storage read を減らして「スムーズじゃない」を改善(コア表示は毎回更新のまま)。
     const extrasStale = Date.now() - _extrasCacheAt >= EXTRAS_REFETCH_MS;
@@ -251,7 +256,7 @@ async function refresh(opts = {}) {
     }
     const { reportPreview, watchTabMap, trendFindings } = _extrasCache;
     step = 'renderAll';
-    renderAll({ lvList, summaries, fastDiag, popupDiag, backfillProgress, voiceDiag, venueSeatsDiag, reportPreview, trendFindings, watchTabMap });
+    renderAll({ lvList, summaries, fastDiag, popupDiag, backfillProgress, voiceDiag, venueSeatsDiag, laneDiag, reportPreview, trendFindings, watchTabMap });
     _mark('render');
     const _totalMs = Math.round((typeof performance !== 'undefined' ? performance.now() : Date.now()) - _t0);
     updateLastUpdateMeta({ totalMs: _totalMs, stepMs: _stepMs });
@@ -481,6 +486,16 @@ async function loadVoiceDiagSafe() {
 
 // v0.1.902: 会場モード(venueBar・別ページ)の座席診断を読む。会場が定期的に
 //   KEY_VENUE_SEATS_DIAG へ書く。会場モード未使用なら null=セルを出さない。
+async function loadLaneDiagSafe() {
+  try {
+    const bag = await chrome.storage.local.get(KEY_LANE_DIAG);
+    return bag?.[KEY_LANE_DIAG] || null;
+  } catch {
+    return null;
+  }
+}
+
+// 2026-06-22(council/lane-show-all-active): 会場モード(venueBar・別ページ)の座席診断を読む。
 async function loadVenueSeatsDiagSafe() {
   try {
     const bag = await chrome.storage.local.get(KEY_VENUE_SEATS_DIAG);
@@ -591,7 +606,7 @@ function reportPreviewCtxFromFastDiag(fastDiag, backfillProgress) {
   };
 }
 
-function renderAll({ lvList, summaries, fastDiag, popupDiag, backfillProgress, voiceDiag, venueSeatsDiag, reportPreview, trendFindings, watchTabMap }) {
+function renderAll({ lvList, summaries, fastDiag, popupDiag, backfillProgress, voiceDiag, venueSeatsDiag, laneDiag, reportPreview, trendFindings, watchTabMap }) {
   // v0.1.847: 各描画セクションを独立 try/catch で隔離するヘルパ。1つが throw しても他のセクションと
   //   最終更新メタを巻き込まない=「セルが全部消える/最終更新—のまま固まる」を根治。落ちた場所は
   //   console と AI 共有欄に出して真因を追えるようにする(star-romi 失敗体験の除去)。
@@ -779,7 +794,7 @@ function renderAll({ lvList, summaries, fastDiag, popupDiag, backfillProgress, v
 
   // 健全度パネル(ファーストビュー・正常100/異常だけ色・対象外は—)
   //   v0.1.894: 会場モード読み上げセル(タイミング・抜け漏れ)を出すため voiceDiag も渡す。
-  safeSection('健全度パネル', () => renderHealthCells({ livesData, fastDiag, voiceDiag, venueSeatsDiag }));
+  safeSection('健全度パネル', () => renderHealthCells({ livesData, fastDiag, voiceDiag, venueSeatsDiag, laneDiag }));
 
   // 全体マインドマップ(折りたたみツリー・ここを見れば全部わかる)
   safeSection('マインドマップ', () => renderMindmap({ overviewText, livesData, fastDiag, popupDiag }));
@@ -787,7 +802,7 @@ function renderAll({ lvList, summaries, fastDiag, popupDiag, backfillProgress, v
   // AI 共有用テキスト
   let fullText = '';
   safeSection('AI共有テキスト', () => {
-    fullText = buildAiShareFullText({ overviewText, livesData, fastDiag, popupDiag, voiceDiag, venueSeatsDiag, reportPreview, trendFindings });
+    fullText = buildAiShareFullText({ overviewText, livesData, fastDiag, popupDiag, voiceDiag, venueSeatsDiag, laneDiag, reportPreview, trendFindings });
     const ta = /** @type {HTMLTextAreaElement|null} */ (
       document.getElementById('aiShareText')
     );
@@ -1296,7 +1311,7 @@ function summarizeOneLive(lv, summary, snapshot, perfDiag, endedFlag) {
   };
 }
 
-function buildAiShareFullText({ overviewText, livesData, fastDiag, popupDiag, voiceDiag, venueSeatsDiag, reportPreview, trendFindings }) {
+function buildAiShareFullText({ overviewText, livesData, fastDiag, popupDiag, voiceDiag, venueSeatsDiag, laneDiag, reportPreview, trendFindings }) {
   const lines = [];
   lines.push('## 君斗りんくの追憶のきらめき 状態速報');
   lines.push(`生成: ${new Date().toISOString()}`);
@@ -1307,7 +1322,7 @@ function buildAiShareFullText({ overviewText, livesData, fastDiag, popupDiag, vo
     // v0.1.846: 総合判定を概要に1行併記。満点=「異常ゼロ」(進行中/対象外は正常扱い)。
     //   ユーザー要望「全部100%になるまで=修復いらないぐらい完全に」への回答=異常が無ければ満点。
     try {
-      const verdict = summarizeHealthVerdict(buildHealthCells({ livesData, fastDiag, voiceDiag, venueSeatsDiag }));
+      const verdict = summarizeHealthVerdict(buildHealthCells({ livesData, fastDiag, voiceDiag, venueSeatsDiag, laneDiag }));
       const vmark = verdict.level === 'ok' ? '🟢' : verdict.level === 'warn' ? '🟡' : '🔴';
       lines.push(`総合判定: ${vmark} ${verdict.text}`);
     } catch {

@@ -230,8 +230,39 @@ function buildVenueSeatsHealthCells(venueSeatsDiag, nowMs) {
 }
 
 /**
+ * 応援アイコン列(popup レーン)の人数整合セル。popup が書く laneDiag(純観測値)を色セルに再表示。
+ *   「素性が取れた人 N / レーンに出した人 M」を出し、N>M(表示上限で切れている)を可視化する。
+ *   2026-06-22 ユーザー要望「合わないとおかしいけど(計器で確認したい)」=self-verifying。
+ *   未観測(liveId 空)はセルを足さない(死にセルで埋めない)。
+ * @param {any} laneDiag
+ * @returns {HealthCell[]}
+ */
+function buildLaneHealthCells(laneDiag) {
+  const snap = laneDiag && typeof laneDiag === 'object' ? laneDiag : null;
+  if (!snap) return [];
+  const liveId = String(snap.liveId || '').trim();
+  if (!liveId) return [];
+
+  /** @type {HealthCell[]} */
+  const out = [];
+  const identified = num(snap.identified) || 0;
+  const laneShown = num(snap.laneShown) || 0;
+  const others = identified > laneShown ? identified - laneShown : 0;
+
+  // 素性が取れた人 N と レーン表示 M。N>M=表示上限で切れている(正常な仕様だが「他に何人いるか」を明示)。
+  //   黙って切る不誠実を避ける=切れていることを na(情報・総合判定を汚さない)で正直に出す。
+  if (others > 0) {
+    out.push(stateCell('lane-count', '応援レーン', 'na', `表示${laneShown}/素性${identified}(他${others}は会場)`));
+  } else {
+    out.push(stateCell('lane-count', '応援レーン', 'ok', `${laneShown}人 全員表示`));
+  }
+
+  return out;
+}
+
+/**
  * 健全度セル配列を作る。
- * @param {{ livesData?: any[], fastDiag?: any, voiceDiag?: any, venueSeatsDiag?: any, nowMs?: number }} data
+ * @param {{ livesData?: any[], fastDiag?: any, voiceDiag?: any, venueSeatsDiag?: any, laneDiag?: any, nowMs?: number }} data
  * @returns {HealthCell[]}
  */
 export function buildHealthCells(data) {
@@ -401,6 +432,9 @@ export function buildHealthCells(data) {
 
   // 21-22. 会場モード座席(配信者混入・固着)。venueSeatsDiag 未使用なら空=セルを足さない。
   for (const c of buildVenueSeatsHealthCells(data?.venueSeatsDiag, nowMs)) cells.push(c);
+
+  // 23. 応援レーン人数整合(素性 N / 表示 M)。laneDiag 未観測なら空=セルを足さない。
+  for (const c of buildLaneHealthCells(data?.laneDiag)) cells.push(c);
 
   return cells;
 }
