@@ -134,14 +134,15 @@ function buildVoiceHealthCells(voiceDiag, nowMs) {
   const drop = num(snap.staleDropTotal) || 0;
   const queueNow = num(snap.queueNow) || 0;
 
-  // ① 読み上げ追従(タイミング)。OFF なら na(色を付けない=未使用は異常でない)。
+  // ① 読み上げ追従(タイミング)。判定は【今の状態】を最優先にする(v0.1.895)。
+  //   重要: playbackTimeoutTotal は【累計】=一度でも再生TO/固着回復が起きると永久に増えたまま。
+  //   これを bad の最優先にすると、過去に1回回復しただけで永久に🔴=「全部グリーンにならない」。
+  //   固着の自動回復(v0.1.895 番犬)は正常動作なので、今読めていれば緑にする。今まさに止まって
+  //   いるか(待機ありで沈黙が続く)を最優先に判定し、累計TOは緑時の補足情報に格下げする。
   if (!enabled) {
     out.push(stateCell('voice-timing', '読み上げ追従', 'na', 'OFF'));
-  } else if (pbTimeout > 0) {
-    // 再生 watchdog 発火=ended/error が来ず固着しかけた本物の異常(v0.1.883)。最優先で赤。
-    out.push(stateCell('voice-timing', '読み上げ追従', 'bad', `再生詰まり${pbTimeout}件`));
   } else if (sinceSpokenMs != null && queueNow > 0 && sinceSpokenMs >= 30000) {
-    // 待機があるのに30秒以上発話していない=止まっている疑い(リアルタイムで出ていない)。
+    // 待機があるのに30秒以上発話していない=今まさに止まっている(番犬の回復前 or 回復不能)。
     out.push(stateCell('voice-timing', '読み上げ追従', 'bad', `${Math.round(sinceSpokenMs / 1000)}秒沈黙`));
   } else if (sinceSpokenMs != null && queueNow > 0 && sinceSpokenMs >= 8000) {
     out.push(stateCell('voice-timing', '読み上げ追従', 'warn', `${Math.round(sinceSpokenMs / 1000)}秒待ち`));
@@ -149,17 +150,21 @@ function buildVoiceHealthCells(voiceDiag, nowMs) {
     // 合成が重い=遅れの主因(VOICEVOX 詰まり)。発話は進んでいても黄で予兆を見せる。
     out.push(stateCell('voice-timing', '読み上げ追従', 'warn', `合成${synthMs}ms`));
   } else {
-    out.push(stateCell('voice-timing', '読み上げ追従', 'ok', '追従中'));
+    // 今は追従できている=緑。過去に固着回復があった場合だけ件数を添える(緑のまま・正常動作の記録)。
+    out.push(stateCell('voice-timing', '読み上げ追従', 'ok', pbTimeout > 0 ? `追従中(復帰${pbTimeout})` : '追従中'));
   }
 
-  // ② 読み上げ漏れ(大量コメントでも全部読めているか)。staleDropTotal=読まずに捨てた累計。
-  //   0=全部読めている(緑)。出ていれば件数を黄で(間引きは正常なトレードオフだが事実は隠さない)。
+  // ② 読み上げ漏れ(大量コメントでも全部読めているか)。staleDropTotal=読まずに捨てた【累計】。
+  //   間引きは大量コメント時にリアルタイムを保つための【正常なトレードオフ】=異常(黄)ではない。
+  //   v0.1.895: 累計を黄にすると一度でも間引いたら永久に🟡=「全部グリーンにならない」。なので件数は
+  //   見せる(抜け漏れの事実は隠さない=ユーザー要望)が、色は na(対象外・総合判定を汚さない)に。
+  //   0件なら ok「漏れ無し」(全部読めている達成感)。
   if (!enabled) {
     out.push(stateCell('voice-coverage', '読み上げ漏れ', 'na', '—'));
   } else if (drop <= 0) {
     out.push(stateCell('voice-coverage', '読み上げ漏れ', 'ok', '漏れ無し'));
   } else {
-    out.push(stateCell('voice-coverage', '読み上げ漏れ', 'warn', `間引き${drop}件`));
+    out.push(stateCell('voice-coverage', '読み上げ漏れ', 'na', `間引き${drop}件`));
   }
 
   return out;

@@ -206,6 +206,28 @@ let _initialVoicesPrimed = false;
 const _voiceDiag = makeInitialVoiceDiag(); // プロパティのみ更新(再代入しない)。
 let _voiceDiagLastWriteAt = 0;
 
+/**
+ * v0.1.895: drainVoiceQueue が今どのフェーズに居るかを記録する(固着位置の計器)。
+ *   合成1065ms(通過)なのに最終発話が伸び続ける(L647 未到達)= どこかの await が永久 pending。
+ *   再生側は v0.1.883 で watchdog 済みだが「合成待ち」「次ループ待ち」等で止まると無計器だった。
+ *   フェーズ名を残せば、次の状態速報で「停止位置=◯◯」が出て真因を一発で確定できる(推測で直さない)。
+ * @param {string} phase
+ */
+function markVoicePhase(phase) {
+  _voiceDiag.lastPhase = String(phase || '');
+  _voiceDiag.lastPhaseAt = Date.now();
+}
+
+/**
+ * v0.1.895: 読み上げループの固着自動回復(番犬)。drainVoiceQueue が _voicePlaying=true のまま
+ *   一定時間(VOICE_DRAIN_STUCK_MS)進まなくなったら、強制的に解放して再 drain する。真因(合成/
+ *   再生/その他のどこで await が永久 pending か)を問わず固着から自動回復する根治的安全網=
+ *   「最終発話が伸び続けて🔴のまま」を構造的に潰す。v0.1.883 の再生 watchdog を【ループ全体】へ拡張。
+ *   観測専用の lastPhase と併用=回復しつつ、どこで詰まったかも残す。
+ */
+const VOICE_DRAIN_STUCK_MS = 30000; // 1件の読み上げ(合成8秒+再生20秒上限)が連続してもこれは超えない。
+let _voiceDrainStuckTimer = null;
+
 /** _voiceDiag を storage へ(min-gap で間引き)。失敗は握る=発話を止めない。 */
 function publishVoiceDiag() {
   try {
@@ -498,6 +520,30 @@ function startVoicePrefetch(generation) {
 async function drainVoiceQueue() {
   if (_voicePlaying || !_voiceReadingEnabled || isObsMode()) return;
   _voicePlaying = true;
+  markVoicePhase('drain_enter');
+  // v0.1.895: 固着自動回復の番犬。このループが VOICE_DRAIN_STUCK_MS 進まないまま _voicePlaying=true で
+  //   居座ったら、世代を上げて(古いループの await が解決しても L568 の generation ガードで停止)強制解放し、
+  //   待機が残っていれば新しいループを起こす。真因(合成/再生/その他のどこで await が永久 pending か)を
+  //   問わず「発話が止まったまま」から復帰する=v0.1.883 の再生 watchdog を【ループ全体】へ拡張。
+  const drainGenerationAtStart = _voiceGeneration;
+  const armDrainWatchdog = () => {
+    if (_voiceDrainStuckTimer !== null) clearTimeout(_voiceDrainStuckTimer);
+    _voiceDrainStuckTimer = setTimeout(() => {
+      // まだ同じ世代で再生中=本当に固着している(正常進行なら直前にこのタイマーが張り直されている)。
+      if (_voicePlaying && _voiceGeneration === drainGenerationAtStart) {
+        markVoicePhase('stuck_recovered');
+        _voiceDiag.playbackTimeoutTotal += 1; // 固着回復も再生TOと同じ「安全網発火」として計上。
+        publishVoiceDiag();
+        _voiceGeneration += 1; // 古い固着ループを次の await 境界で停止させる。
+        _voicePrefetches.clear();
+        if (typeof _voiceStopCurrent === 'function') { try { _voiceStopCurrent(); } catch { /* no-op */ } }
+        _voiceStopCurrent = null;
+        _voicePlaying = false;
+        if (_voiceReadingEnabled && _voiceQueue.length) void drainVoiceQueue();
+      }
+    }, VOICE_DRAIN_STUCK_MS);
+  };
+  armDrainWatchdog();
   try {
     while (_voiceReadingEnabled && _voiceQueue.length) {
       // PR-V2: キュー一括フラッシュ (catch-up drop)
@@ -552,6 +598,7 @@ async function drainVoiceQueue() {
       const prefetch = _voicePrefetches.get(item);
       _voicePrefetches.delete(item);
       const _synthStart = Date.now(); // v0.1.852 観測: 合成所要(先読み済なら待ち時間=ほぼ0)。
+      markVoicePhase(prefetch ? 'await_prefetch' : 'await_synth'); // v0.1.895: 合成待ちで止まったか。
       const wav = prefetch
         ? await prefetch.promise
         : await synthesizeVoice(
@@ -562,18 +609,21 @@ async function drainVoiceQueue() {
             }
           );
       _voiceDiag.lastSynthMs = Math.max(0, Date.now() - _synthStart);
+      markVoicePhase('synth_done'); // v0.1.895: 合成は通過した(ここで止まれば下の continue/再生で詰まり)。
       if (
         !wav ||
         !_voiceReadingEnabled ||
         generation !== _voiceGeneration ||
         isObsMode()
       ) {
+        markVoicePhase('skip_after_synth'); // v0.1.895: 世代変更/無効化等で読まずにスキップした。
         continue;
       }
 
       startVoicePrefetch(generation);
       let objectUrl = '';
       try {
+        markVoicePhase('await_playback'); // v0.1.895: 再生待ちに入る(watchdog 付き)。
         objectUrl = URL.createObjectURL(new Blob([wav], { type: 'audio/wav' }));
         const audio = new Audio(objectUrl);
         await new Promise((resolve) => {
@@ -648,10 +698,15 @@ async function drainVoiceQueue() {
       _voiceDiag.lastSpokenBase = Date.now();
       _voiceDiag.queueNow = _voiceQueue.length;
       _voiceDiag.enabled = _voiceReadingEnabled;
+      markVoicePhase('spoke_done'); // v0.1.895: 1件読み上げ完了=正常進行(ここが最新なら固着していない)。
+      // v0.1.895: 1件読み上げるたびに番犬を張り直す(次の1件のための新しい窓)。進行している限り発火しない。
+      armDrainWatchdog();
       publishVoiceDiag();
     }
   } finally {
     _voicePlaying = false;
+    markVoicePhase('drain_exit'); // v0.1.895: ループ正常終了(キュー空 or 無効化)=固着でない。
+    if (_voiceDrainStuckTimer !== null) { clearTimeout(_voiceDrainStuckTimer); _voiceDrainStuckTimer = null; }
     if (_voiceReadingEnabled && _voiceQueue.length) void drainVoiceQueue();
   }
 }
