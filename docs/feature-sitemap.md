@@ -609,7 +609,7 @@
   - `src/lib/statusTrendKey.js`
   - `src/extension/status-entry.js`
   - `src/lib/statusActionAdvisor.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 93</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 94</summary>
 
 - `app/app.js` — スマホ閲覧用 status Web 版。
 - `extension/background.js` — MV3 Service Worker
@@ -629,6 +629,7 @@
 - `scripts/vendor-visual-explainer.mjs` — Vendors nicobailon/visual-explainer (MIT) into .cursor/skills/visual-explainer/
 - `scripts/write-extension-placeholder-icons.mjs` — リポジトリに 256px アイコンしか無い環境向け: manifest 用の小さめ PNG を生成する。
 - `src/extension/offscreen-entry.js` — feat/multitab-scale-globalcap（2026-05-31）: コメント IDB の「常駐・単一書き手」を担う
+- `src/lib/backgroundWatchTab.js` — 「Alt+Tab に出てこない裏 watch タブ(active:false)」の判定。
 - `src/lib/buildWatchMetaCardAudienceViewModel.js` — Watch メタカード「観客」ブロック用 ViewModel（DOM 非依存）。
 - `src/lib/classifyFeatureCategory.js` — ファイルを機能カテゴリへ自動分類する純関数(v0.1.840・マップ網羅化 第1)。
 - `src/lib/consoleErrorBuffer.js` — v0.1.201: window.error / unhandledrejection を捕捉する ring buffer。
@@ -709,7 +710,7 @@
 
 ## 🧬 修正系譜マップ(この系統のバグを過去にどう直したか)
 
-> changelog 全 262 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
+> changelog 全 263 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
 
 ### 💾 記録件数 (37版)
 - `v0.1.916` 2026-06-23 — status に popup をiframeで丸ごと埋め込み(試作)
@@ -1140,7 +1141,8 @@
 - `v0.1.699` 2026-06-12 — 読み上げの名前ON/OFF切替を追加
 - `v0.1.698` 2026-06-12 — コメビュにユーザー別の声で読み上げ機能を追加
 
-### 🪟 応援レーン・タイル (53版)
+### 🪟 応援レーン・タイル (54版)
+- `v0.1.927` 2026-06-23 — 配信していないのに状態速報に古い応援レーン・数字カードが残る問題を修正
 - `v0.1.924` 2026-06-23 — 状態速報ページが重い問題を改善(毎回の読み込みを削減)
 - `v0.1.914` 2026-06-23 — 応援レーン鏡のフッター件数をpopupと一致
 - `v0.1.913` 2026-06-23 — 応援ライブビューに応援レーン・数字カードの鏡を追加
@@ -1195,7 +1197,8 @@
 - `v0.1.673` 2026-06-10 — コメビュの名前をパネルと同じ情報源で補完
 - `v0.1.670` 2026-06-10 — コメビュのアイコンを本家と同じサムネに
 
-### 🩺 診断・状態速報 (73版)
+### 🩺 診断・状態速報 (74版)
+- `v0.1.927` 2026-06-23 — 配信していないのに状態速報に古い応援レーン・数字カードが残る問題を修正
 - `v0.1.926` 2026-06-23 — Alt+Tabに出ない「裏タブ」を状態速報で検知して閉じられるように
 - `v0.1.925` 2026-06-23 — 「視聴中の配信」の誤表示を修正+コメント送信の感度を診断に追加
 - `v0.1.924` 2026-06-23 — 状態速報ページが重い問題を改善(毎回の読み込みを削減)

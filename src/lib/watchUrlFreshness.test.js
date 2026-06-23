@@ -1,9 +1,49 @@
 import { describe, it, expect } from 'vitest';
-import { isLastWatchUrlFresh, LAST_WATCH_URL_FRESH_MS } from './watchUrlFreshness.js';
+import {
+  isLastWatchUrlFresh,
+  isEpochFresh,
+  LAST_WATCH_URL_FRESH_MS
+} from './watchUrlFreshness.js';
 
 describe('LAST_WATCH_URL_FRESH_MS', () => {
   it('3分（180000ms）である', () => {
     expect(LAST_WATCH_URL_FRESH_MS).toBe(180_000);
+  });
+});
+
+describe('isEpochFresh(汎用)', () => {
+  const now = 1_000_000_000;
+
+  it('maxAge 以内なら true（境界含む）', () => {
+    expect(isEpochFresh(now - 1000, now, 5000)).toBe(true);
+    expect(isEpochFresh(now - 5000, now, 5000)).toBe(true);
+  });
+
+  it('maxAge より古ければ false', () => {
+    expect(isEpochFresh(now - 5001, now, 5000)).toBe(false);
+  });
+
+  it('capturedAt が無い/壊れているなら false', () => {
+    expect(isEpochFresh(null, now, 5000)).toBe(false);
+    expect(isEpochFresh(undefined, now, 5000)).toBe(false);
+    expect(isEpochFresh(NaN, now, 5000)).toBe(false);
+    expect(isEpochFresh(-1, now, 5000)).toBe(false);
+  });
+
+  it('nowMs が壊れていれば false', () => {
+    expect(isEpochFresh(now, null, 5000)).toBe(false);
+    expect(isEpochFresh(now, undefined, 5000)).toBe(false);
+    expect(isEpochFresh(now, NaN, 5000)).toBe(false);
+  });
+
+  it('maxAgeMs が不正(0/負/NaN)なら false（呼び出し側が既定を決める責務）', () => {
+    expect(isEpochFresh(now, now, 0)).toBe(false);
+    expect(isEpochFresh(now, now, -5)).toBe(false);
+    expect(isEpochFresh(now, now, NaN)).toBe(false);
+  });
+
+  it('未来の capturedAt（時計ずれ）は古くないので true', () => {
+    expect(isEpochFresh(now + 5000, now, 5000)).toBe(true);
   });
 });
 

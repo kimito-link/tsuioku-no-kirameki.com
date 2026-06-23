@@ -92,7 +92,7 @@ import { pickBroadcasterNameForReputation } from '../lib/pickBroadcasterNameForR
 // 2026-06-23: status「視聴中の配信」に死んだタブの記録(last_watch_url)が居座る問題の鮮度ガード。
 //   panel_summary.updatedAt が古ければ「視聴中」に出さない（純関数で test 付き）。
 import { panelSummaryStorageKey } from '../lib/panelLiveSummary.js';
-import { isLastWatchUrlFresh } from '../lib/watchUrlFreshness.js';
+import { isLastWatchUrlFresh, isEpochFresh } from '../lib/watchUrlFreshness.js';
 // 2026-06-23: Alt+Tab に出ない裏 watch タブ(active:false・過去 autopatrol/古い重複拡張の遺物)を
 //   検出して手動クローズ導線を出す(council/orphan-tab-survivor-SYNTHESIS.md)。自動では閉じない。
 import { isBackgroundWatchTab } from '../lib/backgroundWatchTab.js';
@@ -1122,10 +1122,18 @@ function ensureStatusPopupIframe(lvList, laneMirror) {
 }
 
 /**
+ * popup→storage の鏡(応援レーン鏡 / 数字カード鏡)の鮮度しきい値(ミリ秒)。popup は描画している間
+ *   約3秒ごとに capturedAt を更新するので、3分は十分なマージン。これより古い鏡は「配信が終わった後の
+ *   残骸」とみなして隠す(last_watch_url の鮮度ガードと同じ思想・同じ閾値)。
+ */
+const MIRROR_FRESH_MS = 3 * 60 * 1000;
+
+/**
  * 応援レーン鏡: popup の応援レーン(りんく/こん太/広告/たぬ姉の段組み)を顔(avatar)込みで
  *   そっくり描く。popup と同じ本物の paintStoryUserLaneDomFilled + buildPersonTileEl を使う
  *   (似せて自作しない)。データは KEY_LANE_MIRROR(popup→storage)を restoreLaneMirrorBuckets で
  *   paint が受ける buckets 形に復元したもの。会場(venue)とは無関係=popup と status だけ。
+ *   ★鮮度ガード(2026-06-23): capturedAt が古ければ隠す=配信が無いのに古いレーンが残るのを防ぐ。
  *   ★signature ガード: 2秒ループで毎回 paint すると img 再生成でチラつき重い=`liveId|capturedAt|
  *     各段件数|pickedLength` が前回と同じなら paint を skip。
  * @param {{ liveId?: string, capturedAt?: number, link?: any[], gift?: any[], ad?: any[],
@@ -1138,6 +1146,14 @@ function renderLaneMirror(snap) {
   if (!snap || typeof snap !== 'object') {
     section.hidden = true;
     _lastLaneMirrorSig = ' init';
+    return;
+  }
+  // 2026-06-23: 鮮度ガード。popup は応援レーンを描画している間 約3秒ごとに capturedAt(epoch ms)を
+  //   更新し、popup を閉じる/配信が終わると更新が止まる。古い鏡(配信が無いのにレーンが残る)を出さない
+  //   ため、capturedAt が MIRROR_FRESH_MS より古ければセクションごと隠す([[watchUrlFreshness]])。
+  if (!isEpochFresh(Number(snap.capturedAt), Date.now(), MIRROR_FRESH_MS)) {
+    section.hidden = true;
+    _lastLaneMirrorSig = ' stale';
     return;
   }
 
@@ -1234,6 +1250,12 @@ function renderStatCardsMirror(snap) {
   if (!snap || typeof snap !== 'object') {
     section.hidden = true;
     _lastStatCardsMirrorSig = ' init';
+    return;
+  }
+  // 2026-06-23: 鮮度ガード(応援レーン鏡と同型)。capturedAt が古ければ「配信が終わった後の残骸」=隠す。
+  if (!isEpochFresh(Number(snap.capturedAt), Date.now(), MIRROR_FRESH_MS)) {
+    section.hidden = true;
+    _lastStatCardsMirrorSig = ' stale';
     return;
   }
 

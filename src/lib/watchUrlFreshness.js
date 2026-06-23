@@ -15,6 +15,10 @@
  *   このモジュールは「last_watch_url 由来の lv を視聴中として採用してよいか」を、
  *   panel_summary.updatedAt と現在時刻だけから決める副作用なしの純関数を提供する。
  *
+ *   2026-06-23: 同型の「producer が約数秒ごとに書く epoch ms を見て、古ければ表示しない」
+ *   問題が応援レーン鏡(KEY_LANE_MIRROR.capturedAt)にもあった(配信が終わっても古い鏡が status に
+ *   残る)。判定本体は producer 非依存の汎用関数 isEpochFresh に切り出し、両者がこれを使う。
+ *
  * @module watchUrlFreshness
  */
 
@@ -37,6 +41,28 @@ function finiteNonNegativeOrNull(value) {
 }
 
 /**
+ * 「producer が記録した epoch ms が、現在時刻から見て maxAgeMs 以内か」を判定する汎用純関数。
+ *
+ * capturedAt/updatedAt が取れない（過去に一度も書かれていない・破損）場合は false＝新鮮でない
+ * （= 表示しない/採用しない安全側）。nowMs が壊れていても false（null/undefined は Number 化で 0 に
+ * なるので明示的に弾く＝壊れた now で誤って「新鮮」と判定しない）。未来の値（時計ずれ）は古くないので true。
+ *
+ * @param {number|null|undefined} capturedAtMs  producer が書いた時刻（epoch ms）
+ * @param {number} nowMs  現在時刻（epoch ms）
+ * @param {number} maxAgeMs  鮮度しきい値（ms・正の有限値を要求）
+ * @returns {boolean}
+ */
+export function isEpochFresh(capturedAtMs, nowMs, maxAgeMs) {
+  const captured = finiteNonNegativeOrNull(capturedAtMs);
+  if (captured === null) return false;
+  if (nowMs === null || nowMs === undefined) return false;
+  const now = finiteNonNegativeOrNull(nowMs);
+  if (now === null) return false;
+  if (!Number.isFinite(maxAgeMs) || maxAgeMs <= 0) return false;
+  return now - captured <= maxAgeMs;
+}
+
+/**
  * last_watch_url 由来の lv を「視聴中」として採用してよいかを判定する純関数。
  *
  * panel_summary が読めない（過去にこの lv のサマリが一度も無い・破損・別 lv 等で
@@ -45,20 +71,11 @@ function finiteNonNegativeOrNull(value) {
  *
  * @param {number|null|undefined} updatedAt  panel_summary.updatedAt（epoch ms）
  * @param {number} nowMs  現在時刻（epoch ms）
- * @param {number} [maxAgeMs]  鮮度しきい値（既定 LAST_WATCH_URL_FRESH_MS）
+ * @param {number} [maxAgeMs]  鮮度しきい値（既定 LAST_WATCH_URL_FRESH_MS。不正値も既定にフォールバック）
  * @returns {boolean}  しきい値以内に更新されていれば true
  */
 export function isLastWatchUrlFresh(updatedAt, nowMs, maxAgeMs = LAST_WATCH_URL_FRESH_MS) {
-  const updated = finiteNonNegativeOrNull(updatedAt);
-  if (updated === null) return false;
-  // nowMs は呼び出し側が Date.now() を渡す前提。null/undefined（Number 化で 0 になる）を
-  // 弾いてから有限性を見る（壊れた now で誤って「新鮮」と判定しないため）。
-  if (nowMs === null || nowMs === undefined) return false;
-  const now = finiteNonNegativeOrNull(nowMs);
-  if (now === null) return false;
   const threshold =
     Number.isFinite(maxAgeMs) && maxAgeMs > 0 ? maxAgeMs : LAST_WATCH_URL_FRESH_MS;
-  const age = now - updated;
-  // 未来の updatedAt（時計ずれ）は古くないので採用、age が threshold 以内なら採用。
-  return age <= threshold;
+  return isEpochFresh(updatedAt, nowMs, threshold);
 }
