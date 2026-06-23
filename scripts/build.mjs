@@ -129,6 +129,15 @@ const targets = [
     entryPoints: ['app/app.js'],
     outfile: 'app/dist/app.js',
     target: 'es2020'
+  },
+  {
+    // 2026-06-23 純Web版 応援ライブビュー(app.tsuioku-no-kirameki.com/live-view?v=<token>)。
+    //   拡張が「スマホへ送信」で相乗りさせた応援レーン鏡を、popup と同じ本物の描画関数
+    //   (paintStoryUserLaneDomFilled + buildPersonTileEl)で描く=見た目そっくり。chrome 非依存。
+    //   council/liveview-web-public-SYNTHESIS.md(案1)。
+    entryPoints: ['app/live-view.js'],
+    outfile: 'app/dist/live-view.js',
+    target: 'es2020'
   }
 ];
 
