@@ -1078,6 +1078,18 @@
       ]
     },
     {
+      "file": "src/lib/formatOfficialStreamAgeMinutes.js",
+      "featureCount": 2,
+      "features": [
+        "popup",
+        "status"
+      ],
+      "labels": [
+        "ポップアップ(応援レーン)",
+        "状態速報ページ"
+      ]
+    },
+    {
       "file": "src/lib/giftEventStore.js",
       "featureCount": 2,
       "features": [
@@ -1390,6 +1402,18 @@
       ]
     },
     {
+      "file": "src/lib/officialNicoStatsStripDigest.js",
+      "featureCount": 2,
+      "features": [
+        "popup",
+        "status"
+      ],
+      "labels": [
+        "ポップアップ(応援レーン)",
+        "状態速報ページ"
+      ]
+    },
+    {
       "file": "src/lib/panelLiveSummary.js",
       "featureCount": 2,
       "features": [
@@ -1471,6 +1495,30 @@
       "labels": [
         "記録エンジン(watchページ常駐)",
         "ポップアップ(応援レーン)"
+      ]
+    },
+    {
+      "file": "src/lib/statCardsMirror.js",
+      "featureCount": 2,
+      "features": [
+        "popup",
+        "status"
+      ],
+      "labels": [
+        "ポップアップ(応援レーン)",
+        "状態速報ページ"
+      ]
+    },
+    {
+      "file": "src/lib/statCardsMirrorKey.js",
+      "featureCount": 2,
+      "features": [
+        "popup",
+        "status"
+      ],
+      "labels": [
+        "ポップアップ(応援レーン)",
+        "状態速報ページ"
       ]
     },
     {
@@ -3114,16 +3162,6 @@
       ]
     },
     {
-      "file": "src/lib/formatOfficialStreamAgeMinutes.js",
-      "featureCount": 1,
-      "features": [
-        "popup"
-      ],
-      "labels": [
-        "ポップアップ(応援レーン)"
-      ]
-    },
-    {
       "file": "src/lib/forwardReactivation.js",
       "featureCount": 1,
       "features": [
@@ -4091,16 +4129,6 @@
       ],
       "labels": [
         "記録エンジン(watchページ常駐)"
-      ]
-    },
-    {
-      "file": "src/lib/officialNicoStatsStripDigest.js",
-      "featureCount": 1,
-      "features": [
-        "popup"
-      ],
-      "labels": [
-        "ポップアップ(応援レーン)"
       ]
     },
     {

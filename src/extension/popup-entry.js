@@ -528,6 +528,8 @@ import { KEY_LANE_DIAG } from '../lib/laneDiagKey.js';
 import { buildLaneDiagSnapshot } from '../lib/laneDiag.js';
 import { KEY_LANE_MIRROR } from '../lib/laneMirrorKey.js';
 import { buildLaneMirrorSnapshot } from '../lib/laneMirror.js';
+import { KEY_STAT_CARDS_MIRROR } from '../lib/statCardsMirrorKey.js';
+import { buildStatCardsMirrorSnapshot } from '../lib/statCardsMirror.js';
 import { isAvatarObservedInCommentProfileMap } from '../lib/popupAvatarResolver.js';
 import {
   normalizeLv,
@@ -5405,6 +5407,29 @@ function publishLaneMirror(input) {
   }
 }
 
+/** 数字カード鏡の storage 書き込み(min-gap 3秒・best-effort・描画は触らない)。応援レーンの鏡と同型。 */
+let _statCardsMirrorLastWriteAt = 0;
+/**
+ * @param {{ liveId: string, recordsText: string, recordsIsPlaceholder: boolean,
+ *   recordsOfficialLine: string, recordsBreakdownLine: string, recordsIngestLine: string,
+ *   concurrent: { estText: string, estIsPlaceholder: boolean, subText: string },
+ *   visitor: { text: string, isPlaceholder: boolean },
+ *   snapshotForOfficial: unknown }} input
+ */
+function publishStatCardsMirror(input) {
+  try {
+    const now = Date.now();
+    if (now - _statCardsMirrorLastWriteAt < 3000) return; // 3秒 min-gap。
+    _statCardsMirrorLastWriteAt = now;
+    const snap = buildStatCardsMirrorSnapshot(input, { nowMs: now });
+    void chrome.storage.local.set({ [KEY_STAT_CARDS_MIRROR]: snap }).catch(() => {
+      /* best-effort: storage 不可・context 消失 */
+    });
+  } catch {
+    /* no-op */
+  }
+}
+
 function renderStoryAvatarDiag() {
   const el = /** @type {HTMLElement|null} */ ($('storyAvatarDiag'));
   const elDev = /** @type {HTMLElement|null} */ ($('storyAvatarDiagDevMonitor'));
@@ -7530,6 +7555,34 @@ function renderWatchMetaCard(rawSnapshot, commentEntries = []) {
   paintOfficialNicoStatsStrip(
     /** @type {Record<string, unknown>} */ (snapshot)
   );
+
+  // 数字カード鏡: 記録カード3枚+公式チップを status へそっくり映すため storage に書く(描画は触らない)。
+  //   records 系はこの瞬間の DOM 表示値を読む=popup と必ず一致。concurrent/visitor は確定済み audienceVm、
+  //   公式チップは snapshot を lib 内の digest に通して確定格納。会場には無関係=popup と status だけ。
+  try {
+    publishStatCardsMirror({
+      liveId: String(/** @type {{ liveId?: unknown }} */ (snapshot)?.liveId || ''),
+      recordsText: String($('liveStatComments')?.textContent || ''),
+      recordsIsPlaceholder: Boolean(
+        $('liveStatComments')?.classList?.contains('is-placeholder')
+      ),
+      recordsOfficialLine: String($('liveStatCommentsOfficial')?.textContent || ''),
+      recordsBreakdownLine: String($('liveStatCommentsBreakdown')?.textContent || ''),
+      recordsIngestLine: String($('liveStatCommentsIngest')?.textContent || ''),
+      concurrent: {
+        estText: String(audienceVm?.concurrent?.estText || ''),
+        estIsPlaceholder: audienceVm?.concurrent?.estIsPlaceholder === true,
+        subText: String(audienceVm?.concurrent?.subText || '')
+      },
+      visitor: {
+        text: String(audienceVm?.visitor?.text || ''),
+        isPlaceholder: audienceVm?.visitor?.isPlaceholder === true
+      },
+      snapshotForOfficial: snapshot
+    });
+  } catch {
+    /* no-op: 鏡は best-effort・popup を止めない */
+  }
 
   wrap.hidden = false;
   syncLiveStatThreeCardsCharLoadingOverlays();

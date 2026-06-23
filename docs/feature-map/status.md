@@ -6,7 +6,7 @@
 ## storage の出入り
 
 - 書くキー: `KEY_STATUS_TREND`
-- 読むキー: `KEY_AI_SHARE_FAST_DIAG`, `KEY_AI_SHARE_POPUP_DIAG`, `KEY_LANE_DIAG`, `KEY_LANE_MIRROR`, `KEY_LAST_WATCH_URL`, `KEY_REPORT_PREVIEW`, `KEY_STATUS_TREND`, `KEY_VENUE_SEATS_DIAG`, `KEY_VOICE_DIAG`, `nls_backfill_progress_v1`
+- 読むキー: `KEY_AI_SHARE_FAST_DIAG`, `KEY_AI_SHARE_POPUP_DIAG`, `KEY_LANE_DIAG`, `KEY_LANE_MIRROR`, `KEY_LAST_WATCH_URL`, `KEY_REPORT_PREVIEW`, `KEY_STATUS_TREND`, `KEY_STAT_CARDS_MIRROR`, `KEY_VENUE_SEATS_DIAG`, `KEY_VOICE_DIAG`, `nls_backfill_progress_v1`
 
 ## 構成ファイル（import 到達・最大40件表示）
 
@@ -22,6 +22,7 @@ graph LR
   n_status --> n_src_lib_broadcasterReputationKeywords_js["lib/broadcasterReputationKeywords.js"]
   n_status --> n_src_lib_broadcasterReputationView_js["lib/broadcasterReputationView.js"]
   n_status --> n_src_lib_chikuranCard_js["lib/chikuranCard.js"]
+  n_status --> n_src_lib_formatOfficialStreamAgeMinutes_js["lib/formatOfficialStreamAgeMinutes.js"]:::shared
   n_status --> n_src_lib_googleSuggest_js["lib/googleSuggest.js"]
   n_status --> n_src_lib_healthCells_js["lib/healthCells.js"]
   n_status --> n_src_lib_htmlEscape_js["lib/htmlEscape.js"]:::shared
@@ -33,6 +34,7 @@ graph LR
   n_status --> n_src_lib_metricConfidence_js["lib/metricConfidence.js"]:::shared
   n_status --> n_src_lib_nicoUserPage_js["lib/nicoUserPage.js"]:::shared
   n_status --> n_src_lib_numberConsistency_js["lib/numberConsistency.js"]
+  n_status --> n_src_lib_officialNicoStatsStripDigest_js["lib/officialNicoStatsStripDigest.js"]:::shared
   n_status --> n_src_lib_perfDiag_js["lib/perfDiag.js"]:::shared
   n_status --> n_src_lib_personTileDom_js["lib/personTileDom.js"]:::shared
   n_status --> n_src_lib_pickBroadcasterNameForReputation_js["lib/pickBroadcasterNameForReputation.js"]
@@ -40,6 +42,8 @@ graph LR
   n_status --> n_src_lib_reportPreview_js["lib/reportPreview.js"]:::shared
   n_status --> n_src_lib_reportPreviewKey_js["lib/reportPreviewKey.js"]:::shared
   n_status --> n_src_lib_resolveVisitorCount_js["lib/resolveVisitorCount.js"]
+  n_status --> n_src_lib_statCardsMirror_js["lib/statCardsMirror.js"]:::shared
+  n_status --> n_src_lib_statCardsMirrorKey_js["lib/statCardsMirrorKey.js"]:::shared
   n_status --> n_src_lib_statusActionAdvisor_js["lib/statusActionAdvisor.js"]
   n_status --> n_src_lib_statusFormat_js["lib/statusFormat.js"]:::shared
   n_status --> n_src_lib_statusMindmapModel_js["lib/statusMindmapModel.js"]
@@ -49,11 +53,7 @@ graph LR
   n_status --> n_src_lib_storyAvatarTvFallbackClass_js["lib/storyAvatarTvFallbackClass.js"]:::shared
   n_status --> n_src_lib_storyTileTvStyle_js["lib/storyTileTvStyle.js"]:::shared
   n_status --> n_src_lib_storyUserLaneGuideHtml_js["lib/storyUserLaneGuideHtml.js"]:::shared
-  n_status --> n_src_lib_supportGrowthAvatarLoad_js["lib/supportGrowthAvatarLoad.js"]:::shared
-  n_status --> n_src_lib_supportGrowthTileSrc_js["lib/supportGrowthTileSrc.js"]:::shared
-  n_status --> n_src_lib_supportVisualStoryCopy_js["lib/supportVisualStoryCopy.js"]:::shared
-  n_status --> n_src_lib_supporterRanking_js["lib/supporterRanking.js"]:::shared
   classDef shared fill:#eee,stroke:#999,color:#666;
 ```
 
-> ほか 5 ファイル省略（全件は storage-bus.md / metafile 参照）。
+> ほか 9 ファイル省略（全件は storage-bus.md / metafile 参照）。

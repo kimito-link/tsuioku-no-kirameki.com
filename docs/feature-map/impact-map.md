@@ -136,6 +136,7 @@
 | `src/lib/concurrentEstimate.js` | 2 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) |
 | `src/lib/crowdRasterizer.js` | 2 | 記録エンジン(watchページ常駐) / 会場モード(standalone) |
 | `src/lib/eventScoreRankingRelay.js` | 2 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) |
+| `src/lib/formatOfficialStreamAgeMinutes.js` | 2 | ポップアップ(応援レーン) / 状態速報ページ |
 | `src/lib/giftEventStore.js` | 2 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) |
 | `src/lib/giftRankingLaneOptIn.js` | 2 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) |
 | `src/lib/giftSubAppFrameSource.js` | 2 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) |
@@ -162,6 +163,7 @@
 | `src/lib/northStarLaneResult.js` | 2 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) |
 | `src/lib/officialContributionRankingResolver.js` | 2 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) |
 | `src/lib/officialEventBannerDom.js` | 2 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) |
+| `src/lib/officialNicoStatsStripDigest.js` | 2 | ポップアップ(応援レーン) / 状態速報ページ |
 | `src/lib/panelLiveSummary.js` | 2 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) |
 | `src/lib/panelMetricsExport.js` | 2 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) |
 | `src/lib/reportPreview.js` | 2 | ポップアップ(応援レーン) / 状態速報ページ |
@@ -169,6 +171,8 @@
 | `src/lib/scrapeGiftHistoryList.js` | 2 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) |
 | `src/lib/selfActionCelebration.js` | 2 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) |
 | `src/lib/selfPostedMatcher.js` | 2 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) |
+| `src/lib/statCardsMirror.js` | 2 | ポップアップ(応援レーン) / 状態速報ページ |
+| `src/lib/statCardsMirrorKey.js` | 2 | ポップアップ(応援レーン) / 状態速報ページ |
 | `src/lib/statusFormat.js` | 2 | 状態速報ページ / Web版 状態(スマホ) |
 | `src/lib/storageErrorState.js` | 2 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) |
 | `src/lib/storyUserLaneGuideHtml.js` | 2 | ポップアップ(応援レーン) / 状態速報ページ |
@@ -326,7 +330,6 @@
 | `src/lib/externalLinksSectionHtml.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/formatDateTime.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/formatGiftSubAppHistory.js` | 1 | ポップアップ(応援レーン) |
-| `src/lib/formatOfficialStreamAgeMinutes.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/forwardReactivation.js` | 1 | 記録エンジン(watchページ常駐) |
 | `src/lib/geminiNanoBridge.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/giftBahamutCelebration.js` | 1 | ポップアップ(応援レーン) |
@@ -424,7 +427,6 @@
 | `src/lib/observerTarget.js` | 1 | 記録エンジン(watchページ常駐) |
 | `src/lib/officialDomRankingRowsToStripRooms.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/officialEventDomBundle.js` | 1 | 記録エンジン(watchページ常駐) |
-| `src/lib/officialNicoStatsStripDigest.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/officialStatsWindow.js` | 1 | 記録エンジン(watchページ常駐) |
 | `src/lib/openingFiveMinuteCorrelation.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/ownPostedUserIdSet.js` | 1 | ポップアップ(応援レーン) |
