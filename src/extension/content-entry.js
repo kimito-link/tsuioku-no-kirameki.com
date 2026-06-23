@@ -14778,12 +14778,12 @@ let lastOfficialEventDomBundle = null;
 let _autoOpenGiftSidebarTriedLiveId = '';
 
 /**
- * 緊急停止フラグ(v0.1.918): ギフトサイドバー自動オープン(rank タブの合成クリック)を有効にするか。
- * false の間は tryAutoOpenGiftSidebarOnceForScrape が冒頭で即 return し、dispatchSyntheticActivation
- * (合成クリック)に一切到達しない。「watch 中に別配信が勝手に開く」症状の切り分け用。原因が別と判明
- * したら true に戻す(ユーザーが手でサイドバーを開けば従来どおり scrape は走るので記録は欠けない)。
+ * ギフトサイドバー自動オープン(rank タブの合成クリック)を有効にするか。
+ * v0.1.918 で「別配信が勝手に開く」症状の切り分けのため一時 false にしたが、真因は別(background.js の
+ * autopatrol=自動巡回がランキング由来の配信を裏タブで開いていた・v0.1.919 で停止)と確定したため true に戻す。
+ * この機構は sidebar 内に scope して rank タブだけを押すので、別配信オープンとは無関係だった。
  */
-const GIFT_SIDEBAR_AUTO_OPEN_ENABLED = false;
+const GIFT_SIDEBAR_AUTO_OPEN_ENABLED = true;
 
 /**
  * audition embed (https://audition.nicovideo.jp/embedded/richview/live?content_id=...) は

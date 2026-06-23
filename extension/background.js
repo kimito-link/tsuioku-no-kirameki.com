@@ -1122,7 +1122,21 @@ async function saveAutopatrolState(st) {
   }
 }
 
+/*
+ * 緊急停止フラグ(v0.1.919): 自動巡回(autopatrol)そのものを無効化する。
+ * 真因確定=「拡張を起動した瞬間に、毎回違う配信(ランキング由来)が裏で複数タブで開く」症状の
+ *   正体はこの autopatrol。resumeAutopatrolIfEnabled が起動/更新時に runAutopatrolTick を呼び、
+ *   openAutopatrolTab が chrome.tabs.create({active:false}) でランキングの lv を裏タブで開いていた。
+ *   既定 ON(v0.1.528)のためユーザーは意図せず動いていた。
+ * false にすると getAutopatrolEnabled が常に false を返す=runAutopatrolTick の停止パスを通り、
+ *   現存の巡回タブを閉じ・alarm を clear し・新規タブを一切開かなくなる(既存の正規停止処理を再利用)。
+ * 原因(なぜユーザーの意図と違って動いたか)を整理し、トグル UI で明示 OFF できる導線を用意してから
+ *   再開を検討する。記録(録画)や手動の視聴には影響しない。
+ */
+const AUTOPATROL_KILL_SWITCH = true;
+
 async function getAutopatrolEnabled() {
+  if (AUTOPATROL_KILL_SWITCH) return false;
   try {
     const bag = await chrome.storage.local.get(KEY_AUTOPATROL_ENABLED);
     // v0.1.528: 既定 ON。ユーザーが明示的に false を保存したときだけ OFF。
