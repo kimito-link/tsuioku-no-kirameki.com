@@ -21,8 +21,11 @@
  * @module status-entry
  */
 
-import { KEY_AI_SHARE_FAST_DIAG } from '../lib/aiShareFastDiagKey.js';
 import { KEY_AI_SHARE_POPUP_DIAG } from '../lib/aiSharePopupDiagKey.js';
+// 2026-06-23: status.html 軽量化。2秒ループで巨大 fastDiag(~40KB)を read+parse+JSON.stringify していたのが
+//   重さの真因(council/status-heavy-open-SYNTHESIS.md)。status が使う4フィールドだけの軽量ダイジェスト
+//   (content が同時に書く)を read する=read 回数同じ・サイズ ~40分の1。読み取りパスは full と同形。
+import { KEY_STATUS_FAST_DIAG_LITE } from '../lib/statusFastDiagLite.js';
 import { buildStatusMindmapModel } from '../lib/statusMindmapModel.js';
 import { buildStatusActions } from '../lib/statusActionAdvisor.js';
 import { buildHealthCells, summarizeHealthVerdict } from '../lib/healthCells.js';
@@ -286,9 +289,11 @@ async function refresh(opts = {}) {
     step = `loadAllSummaries(${lvList.length}件)`;
     const summaries = await runStorageOpWithTimeout(() => loadAllSummaries(lvList), tmo);
     _mark(`summaries×${lvList.length}`);
-    step = 'loadFastDiagSafe';
-    const fastDiag = await runStorageOpWithTimeout(() => loadFastDiagSafe(), tmo);
-    _mark('fastDiag');
+    // 2026-06-23: 2秒ループは full(~40KB)でなく軽量ダイジェスト(~1KB)を read=重さの真因を断つ。
+    //   読み取りパスは full と同形なので renderAll 以下の consumer は無変更(council/status-heavy-open-SYNTHESIS.md)。
+    step = 'loadStatusFastDiagLiteSafe';
+    const fastDiag = await runStorageOpWithTimeout(() => loadStatusFastDiagLiteSafe(), tmo);
+    _mark('fastDiagLite');
     step = 'loadPopupDiagSafe';
     const popupDiag = await runStorageOpWithTimeout(() => loadPopupDiagSafe(), tmo);
     _mark('popupDiag');
@@ -456,9 +461,10 @@ async function enumerateActiveLives() {
   }
   if (lvList.length > 0) return uniqLvSorted(lvList);
 
-  // 経路2: fastDiag.lives(視聴中タブ由来のキャッシュ)
+  // 経路2: fastDiag.lives(視聴中タブ由来のキャッシュ)。2026-06-23: 軽量ダイジェスト(lite)も .lives を
+  //   同形で持つ=full を読まずに lv を拾える(稀パスでも 40KB read しない)。
   try {
-    const fastDiag = await loadFastDiagSafe();
+    const fastDiag = await loadStatusFastDiagLiteSafe();
     const lives = Array.isArray(fastDiag?.lives) ? fastDiag.lives : [];
     for (const r of lives) {
       const lv = String(r?.liveId || r?.lv || '').trim().toLowerCase();
@@ -559,10 +565,13 @@ async function loadAllSummaries(lvList) {
   }
 }
 
-async function loadFastDiagSafe() {
+// 2026-06-23: 2秒ループ用の軽量 fastDiag(content が full と同時に書く ~1KB ダイジェスト)。
+//   読み取りパスは full と同形=renderAll 以下の consumer は無変更で動く。full(~40KB)は読まない
+//   =read+parse+stringify の重さを消す(council/status-heavy-open-SYNTHESIS.md)。
+async function loadStatusFastDiagLiteSafe() {
   try {
-    const bag = await chrome.storage.local.get(KEY_AI_SHARE_FAST_DIAG);
-    return bag?.[KEY_AI_SHARE_FAST_DIAG] || null;
+    const bag = await chrome.storage.local.get(KEY_STATUS_FAST_DIAG_LITE);
+    return bag?.[KEY_STATUS_FAST_DIAG_LITE] || null;
   } catch {
     return null;
   }

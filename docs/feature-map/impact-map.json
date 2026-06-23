@@ -818,18 +818,6 @@
       ]
     },
     {
-      "file": "src/lib/aiShareFastDiagKey.js",
-      "featureCount": 2,
-      "features": [
-        "popup",
-        "status"
-      ],
-      "labels": [
-        "ポップアップ(応援レーン)",
-        "状態速報ページ"
-      ]
-    },
-    {
       "file": "src/lib/aiSharePopupDiagKey.js",
       "featureCount": 2,
       "features": [
@@ -1526,6 +1514,18 @@
       ]
     },
     {
+      "file": "src/lib/statusFastDiagLite.js",
+      "featureCount": 2,
+      "features": [
+        "content",
+        "status"
+      ],
+      "labels": [
+        "記録エンジン(watchページ常駐)",
+        "状態速報ページ"
+      ]
+    },
+    {
       "file": "src/lib/statusFormat.js",
       "featureCount": 2,
       "features": [
@@ -2157,6 +2157,16 @@
     },
     {
       "file": "src/lib/aiShareDiagSchema.js",
+      "featureCount": 1,
+      "features": [
+        "popup"
+      ],
+      "labels": [
+        "ポップアップ(応援レーン)"
+      ]
+    },
+    {
+      "file": "src/lib/aiShareFastDiagKey.js",
       "featureCount": 1,
       "features": [
         "popup"

@@ -557,6 +557,9 @@ import { hydrateInterceptAvatarMapFromProfile } from '../lib/interceptAvatarHydr
 import { extractBroadcasterUserId } from '../lib/broadcasterUserId.js';
 import { resolveChannelBroadcasterMeta } from '../lib/channelBroadcasterMeta.js';
 import { decidePrewarmLeaseAction } from '../lib/prewarmCoordinator.js';
+// 2026-06-23: status.html 軽量化。status は fastDiag の4フィールドしか読まないのに毎回40KB read していた。
+//   full fastDiag を書くとき、status 用の軽量ダイジェスト(~1KB)を同時に書く(council/status-heavy-open-SYNTHESIS.md)。
+import { buildStatusFastDiagLite, KEY_STATUS_FAST_DIAG_LITE } from '../lib/statusFastDiagLite.js';
 import {
   KEY_COMMENT_PANEL_AUTO_RESTORE,
   LATEST_COMMENT_BUTTON_SELECTOR,
@@ -6657,7 +6660,13 @@ function persistAiShareFastDiagnostics() {
       resolvedTabUrl: sanitizeWatchUrlForDiag(window.location.href),
       persistedAt: new Date().toISOString()
     };
-    setStorageLocalSilent({ [KEY_AI_SHARE_FAST_DIAG]: payload });
+    // status.html 用の軽量ダイジェスト(~1KB)を同時に書く。status の2秒ループは full(~40KB)でなく
+    //   これを read する=read 回数を増やさずサイズだけ ~40分の1(council/status-heavy-open-SYNTHESIS.md)。
+    //   full は AI共有ボタン押下時だけ読まれる。set を1回にまとめる=write I/O も増やしすぎない。
+    setStorageLocalSilent({
+      [KEY_AI_SHARE_FAST_DIAG]: payload,
+      [KEY_STATUS_FAST_DIAG_LITE]: buildStatusFastDiagLite(payload)
+    });
   } catch {
     // no-op: payload 構築（buildAiShareFastDiagnosticsPayload 等）の同期失敗のみ
   }
