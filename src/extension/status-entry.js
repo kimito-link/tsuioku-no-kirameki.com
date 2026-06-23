@@ -115,13 +115,16 @@ let _refreshTimerId = /** @type {number|null} */ (null);
 //   storage を読むと重い=12 秒間引きでキャッシュし、間は前回値を再利用(コア表示は毎回更新のまま)。
 const EXTRAS_REFETCH_MS = 12000;
 let _extrasCacheAt = 0;
-let _extrasCache = /** @type {{reportPreview:any, watchTabMap:any, trendFindings:any[], laneDiag:any, laneMirror:any, statCardsMirror:any}} */ ({
+let _extrasCache = /** @type {{reportPreview:any, watchTabMap:any, trendFindings:any[], laneDiag:any, laneMirror:any, statCardsMirror:any, voiceDiag:any, venueSeatsDiag:any}} */ ({
   reportPreview: null,
   watchTabMap: new Map(),
   trendFindings: [],
   laneDiag: null,
   laneMirror: null,
-  statCardsMirror: null
+  statCardsMirror: null,
+  // v0.1.924: voiceDiag/venueSeatsDiag も毎回 read から 12秒間引きへ(下記の真因対応)。
+  voiceDiag: null,
+  venueSeatsDiag: null
 });
 /** v0.1.868: 配信カードの再構築 skip 判定用 signature(変化なしなら innerHTML を作り直さない)。 */
 let _lastLivesSig = '';
@@ -285,18 +288,20 @@ async function refresh(opts = {}) {
     step = 'loadBackfillProgress';
     const backfillProgress = await runStorageOpWithTimeout(() => loadBackfillProgressSafe(), tmo);
     _mark('backfill');
-    step = 'loadVoiceDiagSafe';
-    const voiceDiag = await runStorageOpWithTimeout(() => loadVoiceDiagSafe(), tmo);
-    _mark('voiceDiag');
-    step = 'loadVenueSeatsDiagSafe';
-    const venueSeatsDiag = await runStorageOpWithTimeout(() => loadVenueSeatsDiagSafe(), tmo);
-    _mark('venueSeatsDiag');
     // 以下は「追加データ」=失敗しても他の表示と記録を妨げない(空で描く)。12 秒間引きでキャッシュ
     //   再利用=2 秒ごとの storage read を減らして「スムーズじゃない」を改善(コア表示は毎回更新のまま)。
     //   ★laneDiag(応援レーン人数整合セル)もここに含める=v0.1.909 で毎回の直列 read に足したら
     //     診断ページが重くなった(ユーザー実機・会場前から重い)ため。診断は軽さ最優先=補助は間引き。
+    //   ★v0.1.924: voiceDiag(会場読み上げ診断)/venueSeatsDiag(会場座席診断)も毎回 read から
+    //     ここへ移動。真因=この2つが v0.1.902 以降ずっと毎回の直列 read で、laneDiag を間引いた後も
+    //     残っていたため診断ページが重いままだった(ユーザー実機「v0.1.923 を入れる前から遅い」)。
+    //     どちらも健全度パネルの色セル用の補助情報で、2秒ごとの即時更新は不要=laneDiag と同じ間引きへ。
     const extrasStale = Date.now() - _extrasCacheAt >= EXTRAS_REFETCH_MS;
     if (extrasStale) {
+      step = 'loadVoiceDiagSafe';
+      const voiceDiag = await runStorageOpWithTimeout(() => loadVoiceDiagSafe(), tmo).catch(() => null);
+      step = 'loadVenueSeatsDiagSafe';
+      const venueSeatsDiag = await runStorageOpWithTimeout(() => loadVenueSeatsDiagSafe(), tmo).catch(() => null);
       step = 'loadReportPreviewSafe';
       const reportPreview = await runStorageOpWithTimeout(() => loadReportPreviewSafe(), tmo).catch(() => null);
       step = 'queryWatchTabMap';
@@ -314,11 +319,11 @@ async function refresh(opts = {}) {
       // 数字カード鏡も extras に同梱=毎回の直列 read を増やさず12秒間引きで読む(診断は軽さ最優先)。
       step = 'loadStatCardsMirrorSafe';
       const statCardsMirror = await runStorageOpWithTimeout(() => loadStatCardsMirrorSafe(), tmo).catch(() => null);
-      _extrasCache = { reportPreview, watchTabMap, trendFindings, laneDiag, laneMirror, statCardsMirror };
+      _extrasCache = { reportPreview, watchTabMap, trendFindings, laneDiag, laneMirror, statCardsMirror, voiceDiag, venueSeatsDiag };
       _extrasCacheAt = Date.now();
       _mark('extras');
     }
-    const { reportPreview, watchTabMap, trendFindings, laneDiag, laneMirror, statCardsMirror } = _extrasCache;
+    const { reportPreview, watchTabMap, trendFindings, laneDiag, laneMirror, statCardsMirror, voiceDiag, venueSeatsDiag } = _extrasCache;
     step = 'renderAll';
     renderAll({ lvList, summaries, fastDiag, popupDiag, backfillProgress, voiceDiag, venueSeatsDiag, laneDiag, laneMirror, statCardsMirror, reportPreview, trendFindings, watchTabMap });
     _mark('render');
