@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "君斗りんくの追憶のきらめき",
-  "version": "0.1.915",
+  "version": "0.1.916",
   "description": "ニコニコ生放送の応援コメントをこのPCに記録し、応援の可視化につなげます（開発識別子: nicolivelog）。",
   "icons": {
     "16": "images/logo/konta-yukkuri-icon-16.png",
@@ -29,7 +29,7 @@
     "http://localhost:3456/*"
   ],
   "content_security_policy": {
-    "extension_pages": "script-src 'self'; object-src 'self'; frame-src https://*.nicovideo.jp;"
+    "extension_pages": "script-src 'self'; object-src 'self'; frame-src 'self' https://*.nicovideo.jp;"
   },
   "background": {
     "service_worker": "background.js"

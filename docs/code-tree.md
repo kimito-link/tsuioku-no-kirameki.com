@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 1 / 540 件
+## ⚠️ 役割コメントが無いソース 1 / 541 件
 - `src/lib/reportPreviewPublish.js`
 
 ## 全ファイルツリー
@@ -257,7 +257,7 @@
   - `vendor-visual-explainer.mjs` — Vendors nicobailon/visual-explainer (MIT) into .cursor/skills/visual-explainer/
   - `verify-bump.mjs` — extension bump 後の整合性チェッカー
   - `write-extension-placeholder-icons.mjs` — リポジトリに 256px アイコンしか無い環境向け: manifest 用の小さめ PNG を生成する。
-- 📁 **src/** (1155)
+- 📁 **src/** (1157)
   - 📁 **data/** (6)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -516,7 +516,7 @@
         - `logo_funlink_white_RGB_maru_black.png`
       - `logo_guide_funlink_ol.pdf`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (944)
+  - 📁 **lib/** (946)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -902,6 +902,8 @@
     - `inlineHostDockSizing.test.js`
     - `inlineHostLayoutReset.js` — インラインパネルの placement（below / beside / floating / dock_bottom）を切り替える際に、
     - `inlineHostLayoutReset.test.js`
+    - `inlineModeFlags.js` — popup.html の URL クエリから「どのモードで開かれた popup か」を判定する純関数。
+    - `inlineModeFlags.test.js`
     - `inlinePanelFocusGate.js` — インラインパネル host element が toolbar 起点の「前面化」操作を受けられる
     - `inlinePanelFocusGate.test.js`
     - `inlinePanelLayout.js` — 視聴ページに埋め込む nicolivelog パネルの幅・位置を、動画要素の表示矩形に合わせるための純関数。
