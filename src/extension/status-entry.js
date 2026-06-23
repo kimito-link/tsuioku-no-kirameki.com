@@ -997,10 +997,30 @@ let _lastStatusPopupEmbedSrc = '';
  * @param {string[]} lvList 視聴中 lv(優先)
  * @param {{ liveId?: string }|null|undefined} laneMirror 鏡 snapshot(フォールバック lv 源)
  */
+/**
+ * ★緊急停止フラグ(v0.1.917): false の間は popup 埋め込み iframe を【出さない】。
+ * 理由=埋め込んだ iframe 内 popup が「閉じても勝手に別配信タブを開く」実機症状の疑い(過去に backfill
+ * 環境を壊した『勝手なタブ操作』と同種)。被害を即止めるため一旦無効化し、原因特定後に true へ戻す。
+ * 無効中は下の「鏡」がフォールバックで表示を担保するので status は無事。
+ */
+const STATUS_POPUP_EMBED_ENABLED = false;
+
 function ensureStatusPopupIframe(lvList, laneMirror) {
   const section = document.getElementById('statusPopupEmbed');
   const host = document.getElementById('statusPopupEmbedHost');
   if (!section || !host) return;
+
+  // 緊急停止: iframe を出さない=section を隠し、既存 iframe があれば src を外して除去(中の popup を停止)。
+  if (!STATUS_POPUP_EMBED_ENABLED) {
+    const existing = host.querySelector('iframe');
+    if (existing) {
+      try { existing.setAttribute('src', 'about:blank'); } catch { /* no-op */ }
+      try { existing.remove(); } catch { /* no-op */ }
+    }
+    section.hidden = true;
+    _lastStatusPopupEmbedSrc = '';
+    return;
+  }
 
   // lv 解決: 開いている watch タブ(lvList) 優先 → 鏡 snapshot の liveId(=popup が最後に開いた配信)。
   const fromList = (Array.isArray(lvList) ? lvList : [])
