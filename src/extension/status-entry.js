@@ -1982,7 +1982,13 @@ async function uploadStatusSnapshot() {
     if (!res.ok) {
       return { ok: false, error: `送信失敗 (HTTP ${res.status})` };
     }
-    return { ok: true, url: `${appOrigin}/?v=${encodeURIComponent(viewToken)}` };
+    const v = encodeURIComponent(viewToken);
+    // 状態速報の Web 版(概要+配信一覧)と、応援ライブビューの Web 版(popup そっくりの応援レーン)の両方の URL を返す。
+    return {
+      ok: true,
+      url: `${appOrigin}/?v=${v}`,
+      liveViewUrl: `${appOrigin}/live-view?v=${v}`
+    };
   } catch (err) {
     return { ok: false, error: '通信エラー: ' + String(err?.message || err) };
   }
@@ -2229,7 +2235,10 @@ function setupButtons() {
         btnUpload.disabled = false;
         if (resultEl) {
           if (r.ok) {
-            resultEl.textContent = `✓ 送信しました。スマホで開く: ${r.url}`;
+            // 状態速報 Web と 応援ライブビュー Web の両 URL を案内(どちらも拡張なしで開ける)。
+            const lvLine = r.liveViewUrl ? `\n🪞 応援レーン(そっくり): ${r.liveViewUrl}` : '';
+            resultEl.textContent = `✓ 送信しました。\n📊 状態速報: ${r.url}${lvLine}`;
+            resultEl.style.whiteSpace = 'pre-wrap';
           } else {
             resultEl.textContent = `× ${r.error}`;
           }

@@ -181,9 +181,9 @@ graph LR
 <sub>ファイル 1 件</sub>
 
 ## `app/` — Web 版状態ページのアプリ(app.js + dist)  〔Web版〕
-<sub>ファイル 8 件</sub>
+<sub>ファイル 9 件</sub>
 
-- `dist/`（1 件） — Web 版アプリのビルド成果物  〔ビルド成果物〕
+- `dist/`（2 件） — Web 版アプリのビルド成果物  〔ビルド成果物〕
 - `images/`（3 件） — 純Web版 応援ライブビューの同梱画像(ゆっくり顔)  〔Web版 / 画像〕
 
 ## `council/` — 会議(COUNCIL)の問い・回答・統合(SYNTHESIS)。設計判断の根拠  〔会議 / 設計〕
