@@ -10,6 +10,11 @@
       "destination": "/app/index.html"
     },
     {
+      "source": "/live-view",
+      "has": [{ "type": "host", "value": "app.tsuioku-no-kirameki.com" }],
+      "destination": "/app/live-view.html"
+    },
+    {
       "source": "/",
       "missing": [{ "type": "host", "value": "app.tsuioku-no-kirameki.com" }],
       "destination": "/tsuioku-no-kirameki/index.html"

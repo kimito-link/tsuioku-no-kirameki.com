@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.932',
+    date: '2026-06-23',
+    summary: 'スマホ送信後に応援レーンWeb版のURLも案内',
+    items: Object.freeze([
+      '状態速報ページの「📱 スマホへ送信」を押した後に、これまでの「状態速報(Web版)」のURLに加えて、「応援レーン(そっくり)」のWeb版URLも一緒に表示するようにしました。拡張を入れていないPC/スマホのブラウザで、その応援レーンのURLを開くと、ポップアップと同じ見た目の応援レーンが見られます。あわせてサーバー側に /live-view の短いURLを通しました。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.931',
     date: '2026-06-23',
     summary: '応援レーンを拡張なしのWebでも見られるように(スマホ送信に相乗り)',
