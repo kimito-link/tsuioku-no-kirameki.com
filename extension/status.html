@@ -21,6 +21,9 @@
         --nl-text-sub: #4b5563;
         --nl-muted: #5b6475;
         --nl-user-accent: #ec4899;
+        /* 数字カード鏡(.nl-live-stat-card のグラデ終端)が参照する。これだけ status に無く
+           フォールバックも無い=裸化(v0.1.900 の轍)防止に light/dark 両方へ追加。popup.html から。 */
+        --nl-bg-soft: #eef8ff;
       }
       @media (prefers-color-scheme: dark) {
         :root {
@@ -34,6 +37,8 @@
           --nl-text-sub: #cbd5e1;
           --nl-muted: #8d9bb5;
           --nl-user-accent: #ec4899;
+          /* 数字カード鏡のグラデ終端(dark)。popup.html から。 */
+          --nl-bg-soft: #121820;
         }
       }
       * {
@@ -664,6 +669,176 @@
         color: #9a6f12;
         font-weight: 800;
       }
+
+      /* ============================================================
+         数字カード鏡(.nl-live-stat-*): popup 上部の3カード+公式チップを status へ
+         そっくり映す。popup.html から移植(似せて自作しない)。char-load 重ね/
+         ローディング幕は status では不要なので省略。参照変数(--nl-surface/--nl-border/
+         --nl-muted/--nl-text/--nl-bg-soft/--nl-accent/--nl-stat-card-*)は :root に在る
+         か fallback 付き=裸化(v0.1.900 の轍)しない。
+         ============================================================ */
+      .nl-live-stat-cards {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 6px;
+      }
+      .nl-official-nico-stats__row {
+        grid-column: 1 / -1;
+        display: grid;
+        grid-template-columns: repeat(5, minmax(0, 1fr));
+        gap: 5px;
+      }
+      .nl-official-nico-stats__chip {
+        min-width: 0;
+        padding: 4px 3px 5px;
+        border-radius: 9px;
+        border: 1px solid var(--nl-border);
+        background: color-mix(in srgb, var(--nl-surface) 88%, var(--nl-border) 12%);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+      }
+      .nl-official-nico-stats__label {
+        font-size: clamp(9px, 2.2vw, 10px);
+        color: var(--nl-muted);
+        font-weight: 600;
+        line-height: 1.2;
+      }
+      .nl-official-nico-stats__val {
+        margin-top: 2px;
+        font-size: clamp(11px, 2.9vw, 14px);
+        font-weight: 800;
+        color: var(--nl-text);
+        font-variant-numeric: tabular-nums;
+        line-height: 1.15;
+      }
+      .nl-official-nico-stats__val.is-placeholder {
+        font-size: clamp(10.5px, 2.6vw, 12px);
+        font-weight: 700;
+        color: var(--nl-muted);
+      }
+      .nl-live-stat-card {
+        position: relative;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+        padding: 7px 4px 6px;
+        border-radius: 12px;
+        border: 1px solid var(--nl-stat-card-border, var(--nl-border));
+        background: linear-gradient(
+          155deg,
+          var(--nl-stat-card-bg-start, var(--nl-surface)),
+          var(--nl-stat-card-bg-end, var(--nl-bg-soft))
+        );
+        box-shadow: var(--nl-stat-card-shadow, 0 2px 6px rgb(2 17 31 / 10%));
+        min-width: 0;
+      }
+      .nl-live-stat-card--comments {
+        border-color: var(--nl-border);
+      }
+      .nl-live-stat-card--concurrent {
+        border-color: var(--nl-border);
+      }
+      .nl-live-stat-card--visitors {
+        border-color: var(--nl-border);
+      }
+      .nl-live-stat-icon {
+        width: clamp(32px, 9vw, 44px);
+        height: clamp(32px, 9vw, 44px);
+        object-fit: contain;
+        border-radius: 999px;
+        background: rgb(255 255 255 / 60%);
+        border: 1px solid rgb(255 255 255 / 50%);
+        box-shadow: 0 1px 4px rgb(2 17 31 / 14%);
+        margin-bottom: 3px;
+        flex-shrink: 0;
+      }
+      .nl-live-stat-label {
+        font-size: clamp(8.5px, 2.2vw, 10.5px);
+        font-weight: 700;
+        color: var(--nl-muted);
+        line-height: 1.2;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        max-width: 100%;
+      }
+      .nl-live-stat-value {
+        font-size: clamp(16px, 4.5vw, 22px);
+        font-weight: 900;
+        color: var(--nl-text);
+        line-height: 1.15;
+        font-variant-numeric: tabular-nums;
+        margin: 1px 0;
+      }
+      .nl-live-stat-value.is-placeholder {
+        font-size: clamp(10.5px, 2.6vw, 13px);
+        font-weight: 700;
+        color: var(--nl-muted);
+        font-variant-numeric: normal;
+        line-height: 1.25;
+        white-space: normal;
+        word-break: keep-all;
+        overflow-wrap: anywhere;
+      }
+      .nl-live-stat-unit {
+        font-size: clamp(8px, 2vw, 10px);
+        font-weight: 600;
+        color: var(--nl-muted);
+        line-height: 1.2;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        max-width: 100%;
+      }
+      .nl-live-stat-sub {
+        margin-top: 2px;
+        font-size: clamp(7px, 1.85vw, 9px);
+        font-weight: 600;
+        color: var(--nl-muted);
+        line-height: 1.25;
+        text-align: center;
+        max-width: 100%;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .nl-live-stat-sub[hidden] {
+        display: none;
+      }
+      .nl-live-stat-sub--official {
+        white-space: normal;
+        overflow: hidden;
+        display: -webkit-box;
+        -webkit-box-orient: vertical;
+        -webkit-line-clamp: 2;
+        line-clamp: 2;
+        text-overflow: ellipsis;
+        hyphens: auto;
+        word-break: break-word;
+      }
+      .nl-live-stat-sub--ingest {
+        color: var(--nl-accent, #0f8fd8);
+        font-weight: 700;
+      }
+      .nl-concurrent-body {
+        width: 100%;
+        min-width: 0;
+        min-height: clamp(48px, 14vw, 58px);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+      }
+      .nl-concurrent-ready {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        width: 100%;
+        min-width: 0;
+      }
     </style>
     <!--
       status-guard.js: 「何があっても開く」保険(2026-06-22)。dist/status.js より前に読む。
@@ -831,6 +1006,96 @@
           class="nl-story-userlane-guide__lines"
           aria-label="応援ユーザーレーンの表示件数"
         ></div>
+      </div>
+    </section>
+
+    <!--
+      数字カード鏡: popup 上部の数字カード群(記録N件・推定同時接続・来場者数の3カード+公式統計
+      チップ)を【見た目そっくり】映す。データは popup→storage(nls_stat_cards_mirror_v1)、status が
+      読んで同じ id の DOM に値をセットするだけ(再計算しない)。会場(venue)とは無関係=popup と status だけ。
+      DOM の id は popup.html と完全一致。char-load 重ね/ローディング幕は status では不要=省略。
+      popup を一度も開いていない/まだ書かれていない時はセクションごと hidden(死にリンクにしない)。
+    -->
+    <section class="lane" id="statCardsMirror" hidden>
+      <h2>🔢 数字カード（popup 上部をそっくり映す）</h2>
+      <div class="status-meta" style="margin-bottom: 8px">
+        popup を開いている配信の「記録・推定同時接続・来場者数」と公式統計チップを、そのまま映します。
+      </div>
+      <div class="nl-live-stat-cards" id="liveStatCards">
+        <div class="nl-live-stat-card nl-live-stat-card--comments">
+          <img
+            class="nl-live-stat-icon"
+            src="images/yukkuri-charactore-english/link/link-yukkuri-smile-mouth-open.png"
+            alt=""
+            decoding="async"
+          />
+          <div class="nl-live-stat-label">記録</div>
+          <div class="nl-live-stat-value is-placeholder" id="liveStatComments">—</div>
+          <div class="nl-live-stat-unit">応援コメント</div>
+          <div
+            class="nl-live-stat-sub nl-live-stat-sub--official"
+            id="liveStatCommentsOfficial"
+            hidden
+          ></div>
+          <div
+            class="nl-live-stat-sub nl-live-stat-sub--ingest"
+            id="liveStatCommentsIngest"
+            hidden
+          ></div>
+          <div
+            class="nl-live-stat-sub nl-live-stat-sub--breakdown"
+            id="liveStatCommentsBreakdown"
+            hidden
+          ></div>
+        </div>
+        <div class="nl-live-stat-card nl-live-stat-card--concurrent">
+          <img
+            class="nl-live-stat-icon"
+            src="images/yukkuri-charactore-english/konta/kitsune-yukkuri-smile-mouth-open.png"
+            alt=""
+            decoding="async"
+          />
+          <div class="nl-live-stat-label">推定同時接続</div>
+          <div class="nl-concurrent-body">
+            <div class="nl-concurrent-ready">
+              <div class="nl-live-stat-value is-placeholder" id="watchConcurrentEst">—</div>
+              <div class="nl-live-stat-unit" id="watchConcurrentSub">人</div>
+            </div>
+          </div>
+        </div>
+        <div class="nl-live-stat-card nl-live-stat-card--visitors">
+          <img
+            class="nl-live-stat-icon"
+            src="images/yukkuri-charactore-english/tanunee/tanuki-yukkuri-smile-mouth-open.png"
+            alt=""
+            decoding="async"
+          />
+          <div class="nl-live-stat-label">来場者数</div>
+          <div class="nl-live-stat-value is-placeholder" id="watchViewerDom">—</div>
+          <div class="nl-live-stat-unit">人</div>
+        </div>
+        <div class="nl-official-nico-stats__row" id="statCardsMirrorOfficialRow" role="group" aria-label="公式視聴統計の一覧">
+          <div class="nl-official-nico-stats__chip">
+            <span class="nl-official-nico-stats__label">来場</span>
+            <span class="nl-official-nico-stats__val is-placeholder" id="officialStatNicoViewers">—</span>
+          </div>
+          <div class="nl-official-nico-stats__chip">
+            <span class="nl-official-nico-stats__label">本家コメ</span>
+            <span class="nl-official-nico-stats__val is-placeholder" id="officialStatNicoComments">—</span>
+          </div>
+          <div class="nl-official-nico-stats__chip">
+            <span class="nl-official-nico-stats__label">経過</span>
+            <span class="nl-official-nico-stats__val is-placeholder" id="officialStatNicoStreamAge">—</span>
+          </div>
+          <div class="nl-official-nico-stats__chip">
+            <span class="nl-official-nico-stats__label">広告pt</span>
+            <span class="nl-official-nico-stats__val is-placeholder" id="officialStatNicoAdPts">—</span>
+          </div>
+          <div class="nl-official-nico-stats__chip">
+            <span class="nl-official-nico-stats__label">ギフトpt</span>
+            <span class="nl-official-nico-stats__val is-placeholder" id="officialStatNicoGiftPts">—</span>
+          </div>
+        </div>
       </div>
     </section>
 

@@ -36,6 +36,11 @@ import { KEY_LANE_DIAG } from '../lib/laneDiagKey.js';
 //   データは popup→storage(KEY_LANE_MIRROR)、status が読んで本物の描画関数で描く(会場とは無関係)。
 import { KEY_LANE_MIRROR } from '../lib/laneMirrorKey.js';
 import { restoreLaneMirrorBuckets } from '../lib/laneMirror.js';
+// 数字カード鏡: popup 上部の数字カード群(記録/推定同時接続/来場者数+公式チップ)を status に
+//   そっくり映す。データは popup→storage(KEY_STAT_CARDS_MIRROR)、status が読んで同じ id へ値を入れる
+//   だけ(再計算しない=popup と必ず一致)。応援レーン鏡(KEY_LANE_MIRROR)と同思想・同構造。
+import { KEY_STAT_CARDS_MIRROR } from '../lib/statCardsMirrorKey.js';
+import { buildStatCardsMirrorSignature } from '../lib/statCardsMirror.js';
 import {
   paintStoryUserLaneDomFilled,
   paintStoryUserLaneDomEmptyGuides
@@ -110,12 +115,13 @@ let _refreshTimerId = /** @type {number|null} */ (null);
 //   storage を読むと重い=12 秒間引きでキャッシュし、間は前回値を再利用(コア表示は毎回更新のまま)。
 const EXTRAS_REFETCH_MS = 12000;
 let _extrasCacheAt = 0;
-let _extrasCache = /** @type {{reportPreview:any, watchTabMap:any, trendFindings:any[], laneDiag:any, laneMirror:any}} */ ({
+let _extrasCache = /** @type {{reportPreview:any, watchTabMap:any, trendFindings:any[], laneDiag:any, laneMirror:any, statCardsMirror:any}} */ ({
   reportPreview: null,
   watchTabMap: new Map(),
   trendFindings: [],
   laneDiag: null,
-  laneMirror: null
+  laneMirror: null,
+  statCardsMirror: null
 });
 /** v0.1.868: 配信カードの再構築 skip 判定用 signature(変化なしなら innerHTML を作り直さない)。 */
 let _lastLivesSig = '';
@@ -127,6 +133,9 @@ let _lastActionSig = ' init';
 /** 応援レーン鏡の再描画 skip 判定用 signature(配信カードと同型)。`liveId|capturedAt|...` が
  *   前回と同じなら paint を skip=img 再生成のチラつき・重さを防ぐ。sentinel で初回は必ず描画。 */
 let _lastLaneMirrorSig = ' init';
+/** 数字カード鏡の再描画 skip 判定用 signature(応援レーン鏡と同型)。前回と同じなら値セットを skip。
+ *   sentinel で初回は必ず描画する。 */
+let _lastStatCardsMirrorSig = ' init';
 /**
  * 応援レーン鏡のアバター読み込みガード(popup と同設定の本物=createSupportAvatarLoadGuard)。
  *   popup-entry.js:3770 と同じく fallback を先に出してプローブ成功時だけ差し替え=404 フリッカー防止。
@@ -302,13 +311,16 @@ async function refresh(opts = {}) {
       // 応援レーン鏡(顔込み)も extras に同梱=毎回の直列 read を増やさず12秒間引きで読む(診断は軽さ最優先)。
       step = 'loadLaneMirrorSafe';
       const laneMirror = await runStorageOpWithTimeout(() => loadLaneMirrorSafe(), tmo).catch(() => null);
-      _extrasCache = { reportPreview, watchTabMap, trendFindings, laneDiag, laneMirror };
+      // 数字カード鏡も extras に同梱=毎回の直列 read を増やさず12秒間引きで読む(診断は軽さ最優先)。
+      step = 'loadStatCardsMirrorSafe';
+      const statCardsMirror = await runStorageOpWithTimeout(() => loadStatCardsMirrorSafe(), tmo).catch(() => null);
+      _extrasCache = { reportPreview, watchTabMap, trendFindings, laneDiag, laneMirror, statCardsMirror };
       _extrasCacheAt = Date.now();
       _mark('extras');
     }
-    const { reportPreview, watchTabMap, trendFindings, laneDiag, laneMirror } = _extrasCache;
+    const { reportPreview, watchTabMap, trendFindings, laneDiag, laneMirror, statCardsMirror } = _extrasCache;
     step = 'renderAll';
-    renderAll({ lvList, summaries, fastDiag, popupDiag, backfillProgress, voiceDiag, venueSeatsDiag, laneDiag, laneMirror, reportPreview, trendFindings, watchTabMap });
+    renderAll({ lvList, summaries, fastDiag, popupDiag, backfillProgress, voiceDiag, venueSeatsDiag, laneDiag, laneMirror, statCardsMirror, reportPreview, trendFindings, watchTabMap });
     _mark('render');
     const _totalMs = Math.round((typeof performance !== 'undefined' ? performance.now() : Date.now()) - _t0);
     updateLastUpdateMeta({ totalMs: _totalMs, stepMs: _stepMs });
@@ -569,6 +581,19 @@ async function loadLaneMirrorSafe() {
   }
 }
 
+// 数字カード鏡(KEY_STAT_CARDS_MIRROR)を読む。popup が renderWatchMetaCard の最後で書く=popup を
+//   一度も開いていなければ null=鏡セクションは hidden のまま(死にリンクにしない)。例外時も null。
+//   ★毎回の直列 read は増やさない=この loader は extras(12秒間引き)からだけ呼ぶ(MEMORY 鉄則)。
+//   スナップショットは popup 側で確定済み(公式チップも digest 確定)=status はそのまま使う(restore 不要)。
+async function loadStatCardsMirrorSafe() {
+  try {
+    const bag = await chrome.storage.local.get(KEY_STAT_CARDS_MIRROR);
+    return bag?.[KEY_STAT_CARDS_MIRROR] || null;
+  } catch {
+    return null;
+  }
+}
+
 // v0.1.858: レポート(HTML/マーケ/メディアキット)の DL前 主要KPI を読む。popup が
 //   KEY_REPORT_PREVIEW へ定期(15秒)に書く。古い snapshot(2分超)や popup 未起動なら null=表示しない。
 async function loadReportPreviewSafe() {
@@ -670,7 +695,7 @@ function reportPreviewCtxFromFastDiag(fastDiag, backfillProgress) {
   };
 }
 
-function renderAll({ lvList, summaries, fastDiag, popupDiag, backfillProgress, voiceDiag, venueSeatsDiag, laneDiag, laneMirror, reportPreview, trendFindings, watchTabMap }) {
+function renderAll({ lvList, summaries, fastDiag, popupDiag, backfillProgress, voiceDiag, venueSeatsDiag, laneDiag, laneMirror, statCardsMirror, reportPreview, trendFindings, watchTabMap }) {
   // v0.1.847: 各描画セクションを独立 try/catch で隔離するヘルパ。1つが throw しても他のセクションと
   //   最終更新メタを巻き込まない=「セルが全部消える/最終更新—のまま固まる」を根治。落ちた場所は
   //   console と AI 共有欄に出して真因を追えるようにする(star-romi 失敗体験の除去)。
@@ -864,6 +889,10 @@ function renderAll({ lvList, summaries, fastDiag, popupDiag, backfillProgress, v
   //   try/catch(safeSection)で囲み、鏡が壊れても概要・配信カードを巻き込まない。
   safeSection('応援レーン鏡', () => renderLaneMirror(laneMirror));
 
+  // 数字カード鏡(popup 上部の数字カード群+公式チップをそっくり映す・独立セクション)。
+  //   try/catch(safeSection)で囲み、鏡が壊れても他セクションを巻き込まない。
+  safeSection('数字カード鏡', () => renderStatCardsMirror(statCardsMirror));
+
   // 全体マインドマップ(折りたたみツリー・ここを見れば全部わかる)
   safeSection('マインドマップ', () => renderMindmap({ overviewText, livesData, fastDiag, popupDiag }));
 
@@ -1044,6 +1073,95 @@ function renderLaneMirror(snap) {
   paintStoryUserLaneDomFilled(els, _LANE_MIRROR_FACES, buckets, pickedLength, _laneMirrorDomIo, {
     totalCandidates
   });
+}
+
+/**
+ * 数字カード鏡: popup 上部の数字カード群(記録/推定同時接続/来場者数+公式統計チップ)を status へ
+ *   そっくり映す。スナップショット(KEY_STAT_CARDS_MIRROR)は popup 側で確定済み(公式チップも digest
+ *   確定)=status は再計算せず同じ id へ値を入れるだけ(popup と必ず一致・似せて自作しない)。
+ *   応援レーン鏡(renderLaneMirror)と同型。会場(venue)とは無関係=popup と status だけ。
+ *   ★signature ガード: 2秒ループで毎回セットすると無駄=`liveId|capturedAt|主要テキスト` が前回と
+ *     同じなら値セットを skip(チラつき/重さ防止)。
+ * @param {import('../lib/statCardsMirror.js').StatCardsMirrorSnapshot|null|undefined} snap
+ */
+function renderStatCardsMirror(snap) {
+  const section = document.getElementById('statCardsMirror');
+  if (!section) return;
+  // popup を一度も開いていない/まだ書かれていない=スナップショット無し=セクションごと隠す(死にリンク回避)。
+  if (!snap || typeof snap !== 'object') {
+    section.hidden = true;
+    _lastStatCardsMirrorSig = ' init';
+    return;
+  }
+
+  // signature ガード: 変化が無ければ値セットを丸ごと skip(表示状態は維持)。popup と同じ確定済みデータ。
+  const sig = buildStatCardsMirrorSignature(snap);
+  if (sig === _lastStatCardsMirrorSig) {
+    section.hidden = false; // skip しても表示状態は維持(初回描画後に隠れない)。
+    return;
+  }
+  _lastStatCardsMirrorSig = sig;
+  section.hidden = false;
+
+  const $id = (/** @type {string} */ id) => /** @type {HTMLElement|null} */ (document.getElementById(id));
+  /** テキスト+is-placeholder トグル(popup の値セットと同じ作法・似せて自作しない)。 */
+  const setVal = (/** @type {string} */ id, /** @type {string} */ text, /** @type {boolean} */ isPlaceholder) => {
+    const el = $id(id);
+    if (!el) return;
+    if (el.textContent !== text) el.textContent = text;
+    el.classList.toggle('is-placeholder', isPlaceholder === true);
+  };
+  /** sub 行(公式行/取り込み/内訳): テキスト有なら表示・空なら hidden(popup と同じ畳み方)。 */
+  const setSub = (/** @type {string} */ id, /** @type {string} */ text) => {
+    const el = $id(id);
+    if (!el) return;
+    const t = String(text || '');
+    if (el.textContent !== t) el.textContent = t;
+    el.hidden = t.length === 0;
+  };
+
+  // 記録カード(値+プレースホルダ+3つの sub 行)。
+  setVal('liveStatComments', String(snap.recordsText || ''), snap.recordsIsPlaceholder === true);
+  setSub('liveStatCommentsOfficial', snap.recordsOfficialLine);
+  setSub('liveStatCommentsBreakdown', snap.recordsBreakdownLine);
+  setSub('liveStatCommentsIngest', snap.recordsIngestLine);
+
+  // 推定同時接続カード(値+プレースホルダ・単位 sub は任意)。
+  const conc = snap.concurrent && typeof snap.concurrent === 'object' ? snap.concurrent : {};
+  setVal('watchConcurrentEst', String(conc.estText || ''), conc.estIsPlaceholder === true);
+  const subEl = $id('watchConcurrentSub');
+  if (subEl && conc.subText) {
+    const t = String(conc.subText);
+    if (subEl.textContent !== t) subEl.textContent = t;
+  }
+
+  // 来場者数カード(値+プレースホルダ)。
+  const vis = snap.visitor && typeof snap.visitor === 'object' ? snap.visitor : {};
+  setVal('watchViewerDom', String(vis.text || ''), vis.isPlaceholder === true);
+
+  // 公式統計チップ(5つ)。popup の paintOfficialNicoStatsStrip(popup-entry.js:7121-7172)と同じ id・
+  //   同じ class トグルで適用。official が null のときは popup と同じく「—」プレースホルダに戻す。
+  const PH = { text: '—', isPlaceholder: true };
+  const off = snap.official;
+  const chip = off
+    ? {
+        officialStatNicoViewers: off.viewers,
+        officialStatNicoComments: off.comments,
+        officialStatNicoStreamAge: off.streamAge,
+        officialStatNicoAdPts: off.adPts,
+        officialStatNicoGiftPts: off.giftPts
+      }
+    : {
+        officialStatNicoViewers: PH,
+        officialStatNicoComments: PH,
+        officialStatNicoStreamAge: PH,
+        officialStatNicoAdPts: PH,
+        officialStatNicoGiftPts: PH
+      };
+  for (const id of Object.keys(chip)) {
+    const c = chip[id] || PH;
+    setVal(id, String(c.text || '—'), c.isPlaceholder === true);
+  }
 }
 
 /**
