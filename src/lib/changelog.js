@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.917',
+    date: '2026-06-23',
+    summary: 'status の popup埋め込みを緊急停止(タブ自動オープン疑い)',
+    items: Object.freeze([
+      '状態速報ページのポップアップ埋め込み(v0.1.916 の試作)を一旦停止しました。埋め込んだポップアップが「視聴タブを閉じても勝手に別の配信タブを開く」症状の疑いがあったため、安全のため埋め込みを無効化しています。状態速報の表示はこれまでの「鏡」に戻ります。原因を特定して安全を確認できたら埋め込みを再開します。会場モードや通常のポップアップ・視聴ページには影響しません。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.916',
     date: '2026-06-23',
     summary: 'status に popup をiframeで丸ごと埋め込み(試作)',
