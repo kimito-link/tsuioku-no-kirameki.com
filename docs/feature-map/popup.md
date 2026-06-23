@@ -28,7 +28,7 @@ graph LR
   n_popup --> n_src_lib_acquisitionDashboardChart_js["lib/acquisitionDashboardChart.js"]
   n_popup --> n_src_lib_adLanePicksFromRooms_js["lib/adLanePicksFromRooms.js"]
   n_popup --> n_src_lib_aiShareDiagSchema_js["lib/aiShareDiagSchema.js"]
-  n_popup --> n_src_lib_aiShareFastDiagKey_js["lib/aiShareFastDiagKey.js"]:::shared
+  n_popup --> n_src_lib_aiShareFastDiagKey_js["lib/aiShareFastDiagKey.js"]
   n_popup --> n_src_lib_aiSharePopupDiagKey_js["lib/aiSharePopupDiagKey.js"]:::shared
   n_popup --> n_src_lib_anonymousIdenticon_js["lib/anonymousIdenticon.js"]:::shared
   n_popup --> n_src_lib_audienceEngagementGap_js["lib/audienceEngagementGap.js"]

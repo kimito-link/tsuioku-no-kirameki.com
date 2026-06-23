@@ -6,7 +6,7 @@
 ## storage の出入り
 
 - 書くキー: `KEY_STATUS_TREND`
-- 読むキー: `KEY_AI_SHARE_FAST_DIAG`, `KEY_AI_SHARE_POPUP_DIAG`, `KEY_LANE_DIAG`, `KEY_LANE_MIRROR`, `KEY_LAST_WATCH_URL`, `KEY_REPORT_PREVIEW`, `KEY_STATUS_TREND`, `KEY_STAT_CARDS_MIRROR`, `KEY_VENUE_SEATS_DIAG`, `KEY_VOICE_DIAG`, `nls_backfill_progress_v1`
+- 読むキー: `KEY_AI_SHARE_POPUP_DIAG`, `KEY_LANE_DIAG`, `KEY_LANE_MIRROR`, `KEY_LAST_WATCH_URL`, `KEY_REPORT_PREVIEW`, `KEY_STATUS_FAST_DIAG_LITE`, `KEY_STATUS_TREND`, `KEY_STAT_CARDS_MIRROR`, `KEY_VENUE_SEATS_DIAG`, `KEY_VOICE_DIAG`, `nls_backfill_progress_v1`
 
 ## 構成ファイル（import 到達・最大40件表示）
 
@@ -15,7 +15,6 @@ graph LR
   n_status["状態速報ページ"]
   n_status --> n_src_domain_user_identity_js["domain/user/identity.js"]:::shared
   n_status --> n_src_extension_story_renderStoryUserLaneDom_js["extension/story/renderStoryUserLaneDom.js"]:::shared
-  n_status --> n_src_lib_aiShareFastDiagKey_js["lib/aiShareFastDiagKey.js"]:::shared
   n_status --> n_src_lib_aiSharePopupDiagKey_js["lib/aiSharePopupDiagKey.js"]:::shared
   n_status --> n_src_lib_anonymousIdenticon_js["lib/anonymousIdenticon.js"]:::shared
   n_status --> n_src_lib_avatarPartsComposer_js["lib/avatarPartsComposer.js"]:::shared
@@ -48,6 +47,7 @@ graph LR
   n_status --> n_src_lib_statCardsMirror_js["lib/statCardsMirror.js"]:::shared
   n_status --> n_src_lib_statCardsMirrorKey_js["lib/statCardsMirrorKey.js"]:::shared
   n_status --> n_src_lib_statusActionAdvisor_js["lib/statusActionAdvisor.js"]
+  n_status --> n_src_lib_statusFastDiagLite_js["lib/statusFastDiagLite.js"]:::shared
   n_status --> n_src_lib_statusFormat_js["lib/statusFormat.js"]:::shared
   n_status --> n_src_lib_statusMindmapModel_js["lib/statusMindmapModel.js"]
   n_status --> n_src_lib_statusTrend_js["lib/statusTrend.js"]

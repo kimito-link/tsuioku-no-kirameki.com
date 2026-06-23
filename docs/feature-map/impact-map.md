@@ -116,7 +116,6 @@
 | `src/shared/niconico/liveId.js` | 3 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 会場モード(standalone) |
 | `src/extension/story/renderStoryUserLaneDom.js` | 2 | ポップアップ(応援レーン) / 状態速報ページ |
 | `src/extension/venueBar.js` | 2 | 記録エンジン(watchページ常駐) / 会場モード(standalone) |
-| `src/lib/aiShareFastDiagKey.js` | 2 | ポップアップ(応援レーン) / 状態速報ページ |
 | `src/lib/aiSharePopupDiagKey.js` | 2 | ポップアップ(応援レーン) / 状態速報ページ |
 | `src/lib/auditionEventRankingApi.js` | 2 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) |
 | `src/lib/backfillCapturedAt.js` | 2 | バックフィル SW / 記録エンジン(watchページ常駐) |
@@ -175,6 +174,7 @@
 | `src/lib/selfPostedMatcher.js` | 2 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) |
 | `src/lib/statCardsMirror.js` | 2 | ポップアップ(応援レーン) / 状態速報ページ |
 | `src/lib/statCardsMirrorKey.js` | 2 | ポップアップ(応援レーン) / 状態速報ページ |
+| `src/lib/statusFastDiagLite.js` | 2 | 記録エンジン(watchページ常駐) / 状態速報ページ |
 | `src/lib/statusFormat.js` | 2 | 状態速報ページ / Web版 状態(スマホ) |
 | `src/lib/storageErrorState.js` | 2 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) |
 | `src/lib/storyUserLaneGuideHtml.js` | 2 | ポップアップ(応援レーン) / 状態速報ページ |
@@ -232,6 +232,7 @@
 | `src/lib/acquisitionDashboardChart.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/adLanePicksFromRooms.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/aiShareDiagSchema.js` | 1 | ポップアップ(応援レーン) |
+| `src/lib/aiShareFastDiagKey.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/audienceEngagementGap.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/autoBackupState.js` | 1 | 記録エンジン(watchページ常駐) |
 | `src/lib/backfillFlushThreshold.js` | 1 | 記録エンジン(watchページ常駐) |
