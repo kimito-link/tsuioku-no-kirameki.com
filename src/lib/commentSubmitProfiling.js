@@ -73,6 +73,133 @@ export function recordCommentSubmitTotal(label, elapsedMs) {
   }
 }
 
+/** 成功/失敗の集計を保持する globalThis キー。DevTools / fastDiag から読める。 */
+export const NLS_COMMENT_SUBMIT_OUTCOME_KEY = '__nlsCommentSubmitOutcome';
+/** 直近の失敗理由（errorCode）を保持する件数上限。 */
+export const NLS_COMMENT_SUBMIT_FAIL_REASONS_MAX = 5;
+
+/**
+ * v0.1.925: コメント送信の {ok, error} 文言を、安定した短い errorCode に分類する純関数。
+ * 文言は postCommentFromContentAsync の各 return に対応する。文言が変わっても
+ * 部分一致で拾えるよう特徴語で判定する（完全一致依存にしない）。
+ *
+ * @param {boolean} ok
+ * @param {string|null|undefined} error
+ * @returns {string} 'ok' | 'empty' | 'no_frame' | 'no_editor' | 'no_button' | 'unconfirmed' | 'exception' | 'unknown'
+ */
+export function classifyCommentSubmitError(ok, error) {
+  if (ok) return 'ok';
+  const msg = String(error || '');
+  if (!msg) return 'unknown';
+  if (msg.includes('コメントが空')) return 'empty';
+  if (msg.includes('watchフレーム')) return 'no_frame';
+  if (msg.includes('コメント入力欄')) return 'no_editor';
+  if (msg.includes('送信ボタン')) return 'no_button';
+  if (msg.includes('確認できませんでした')) return 'unconfirmed';
+  // 上記に当てはまらない短い英語コード（'post_failed' 等）は例外経路由来。
+  if (/^[a-z_]+$/.test(msg)) return 'exception';
+  return 'unknown';
+}
+
+/**
+ * v0.1.925: コメント送信の成否を軽量・常駐で集計する（storage は使わない＝軽さ維持）。
+ * globalThis に試行数/成功数/失敗数と直近の失敗理由（errorCode）を rolling 保持する。
+ * recordCommentSubmitTotal（所要 ms）と対になり、fastDiag が両方を読んで要約する。
+ *
+ * 副作用は globalThis 1 プロパティのみ。負荷 negligible。
+ *
+ * @param {boolean} ok
+ * @param {string|null|undefined} [error] 失敗時の文言（errorCode 分類に使う）
+ */
+export function recordCommentSubmitOutcome(ok, error) {
+  try {
+    const g = /** @type {Record<string, unknown>} */ (globalThis);
+    const prev = g[NLS_COMMENT_SUBMIT_OUTCOME_KEY];
+    /** @type {{total:number, ok:number, fail:number, recentFails:string[]}} */
+    const acc =
+      prev && typeof prev === 'object'
+        ? {
+            total: Number(/** @type {any} */ (prev).total) || 0,
+            ok: Number(/** @type {any} */ (prev).ok) || 0,
+            fail: Number(/** @type {any} */ (prev).fail) || 0,
+            recentFails: Array.isArray(/** @type {any} */ (prev).recentFails)
+              ? /** @type {any} */ (prev).recentFails.slice()
+              : []
+          }
+        : { total: 0, ok: 0, fail: 0, recentFails: [] };
+    acc.total += 1;
+    if (ok) {
+      acc.ok += 1;
+    } else {
+      acc.fail += 1;
+      const code = classifyCommentSubmitError(false, error);
+      acc.recentFails.push(code);
+      while (acc.recentFails.length > NLS_COMMENT_SUBMIT_FAIL_REASONS_MAX) {
+        acc.recentFails.shift();
+      }
+    }
+    g[NLS_COMMENT_SUBMIT_OUTCOME_KEY] = acc;
+  } catch {
+    /* ignore: 観測の失敗は無視 */
+  }
+}
+
+/**
+ * v0.1.925: コメント送信診断を fastDiag 用に要約する純関数。
+ * globalThis の rolling buffer（所要 ms）と outcome 集計から、試行数・成功数・
+ * 失敗数・成功率・直近所要の平均/最大・直近の失敗理由をまとめる。
+ *
+ * 集計が一度も無ければ null（fastDiag に出さない＝送信していないだけ）。
+ *
+ * @param {{ globals?: Record<string, unknown> }} [opts] テスト用に globalThis を差し替え可能
+ * @returns {{
+ *   attempts: number,
+ *   ok: number,
+ *   fail: number,
+ *   successRate: number|null,
+ *   avgMs: number|null,
+ *   maxMs: number|null,
+ *   recentFails: string[]
+ * }|null}
+ */
+export function summarizeCommentSubmitDiag(opts = {}) {
+  const g =
+    opts.globals && typeof opts.globals === 'object'
+      ? opts.globals
+      : /** @type {Record<string, unknown>} */ (globalThis);
+  const outcome = g[NLS_COMMENT_SUBMIT_OUTCOME_KEY];
+  const totals = g[NLS_COMMENT_SUBMIT_HISTORY_KEY];
+  const hasOutcome = Boolean(outcome && typeof outcome === 'object');
+  const msRows =
+    Array.isArray(totals) && totals.length
+      ? totals
+          .map((r) => Number(/** @type {any} */ (r)?.ms))
+          .filter((n) => Number.isFinite(n) && n >= 0)
+      : [];
+  if (!hasOutcome && msRows.length === 0) return null;
+
+  const o = /** @type {any} */ (outcome) || {};
+  const attempts = Number(o.total) || 0;
+  const ok = Number(o.ok) || 0;
+  const fail = Number(o.fail) || 0;
+  const successRate = attempts > 0 ? ok / attempts : null;
+  const recentFails = Array.isArray(o.recentFails)
+    ? o.recentFails
+        .map((/** @type {unknown} */ s) => String(s))
+        .slice(-NLS_COMMENT_SUBMIT_FAIL_REASONS_MAX)
+    : [];
+
+  let avgMs = null;
+  let maxMs = null;
+  if (msRows.length) {
+    const sum = msRows.reduce((a, b) => a + b, 0);
+    avgMs = Math.round(sum / msRows.length);
+    maxMs = Math.round(Math.max(...msRows));
+  }
+
+  return { attempts, ok, fail, successRate, avgMs, maxMs, recentFails };
+}
+
 /** @returns {boolean} */
 export function isCommentSubmitProfileEnabled() {
   try {

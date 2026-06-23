@@ -89,6 +89,10 @@ import {
   buildReputationAlertHtml
 } from '../lib/broadcasterReputationView.js';
 import { pickBroadcasterNameForReputation } from '../lib/pickBroadcasterNameForReputation.js';
+// 2026-06-23: status「視聴中の配信」に死んだタブの記録(last_watch_url)が居座る問題の鮮度ガード。
+//   panel_summary.updatedAt が古ければ「視聴中」に出さない（純関数で test 付き）。
+import { panelSummaryStorageKey } from '../lib/panelLiveSummary.js';
+import { isLastWatchUrlFresh } from '../lib/watchUrlFreshness.js';
 
 /** 自動更新間隔(ms)。 */
 const REFRESH_INTERVAL_MS = 2000;
@@ -425,7 +429,10 @@ function updateLastUpdateMeta(perf) {
  *
  *   - 経路1: chrome.tabs.query で live.nicovideo.jp/watch/lvXXX のタブから抽出 ← 最優先
  *   - 経路2: fastDiag.lives(視聴中フラグ付き)
- *   - 経路3: last_watch_url から 1 件(フォールバック)
+ *   - 経路3: last_watch_url から 1 件(フォールバック・鮮度ガード付き)
+ *
+ *   v0.1.925: 経路3は panel_summary.updatedAt が古い(3分超)なら採用しない。死んだ watch
+ *   タブの last_watch_url が「視聴中」に居座る誤表示を防ぐ([[watchUrlFreshness]])。
  * ========================================================================== */
 
 async function enumerateActiveLives() {
@@ -459,12 +466,29 @@ async function enumerateActiveLives() {
   }
   if (lvList.length > 0) return uniqLvSorted(lvList);
 
-  // 経路3: last_watch_url から lv 抽出
+  // 経路3: last_watch_url から lv 抽出（鮮度ガード付き）
+  //   last_watch_url は URL 文字列だけで時刻が無く、watch タブが死んでも誰もクリアしない。
+  //   無条件に拾うと「もう見ていない配信」が視聴中に居座る（数値が全て「—」の誤情報カード）。
+  //   → 拾った lv の panel_summary.updatedAt を 1 回だけ read し、鮮度が無ければ採用しない。
+  //   この追加 read は経路1/経路2が空＝watch タブ 0 の稀パスでだけ通る（軽さ鉄則を守る）。
   try {
     const bag = await chrome.storage.local.get(KEY_LAST_WATCH_URL);
     const url = String(bag?.[KEY_LAST_WATCH_URL] || '');
     const m = url.match(/lv\d{1,15}/);
-    if (m) lvList.push(m[0].toLowerCase());
+    if (m) {
+      const lv = m[0].toLowerCase();
+      let fresh = false;
+      try {
+        const pKey = panelSummaryStorageKey(lv);
+        const sbag = await chrome.storage.local.get(pKey);
+        const updatedAt = Number(sbag?.[pKey]?.updatedAt);
+        fresh = isLastWatchUrlFresh(updatedAt, Date.now());
+      } catch {
+        // panel_summary が読めない＝記録の形跡なし＝視聴中とは言えない（採用しない）。
+        fresh = false;
+      }
+      if (fresh) lvList.push(lv);
+    }
   } catch {
     /* fallthrough */
   }

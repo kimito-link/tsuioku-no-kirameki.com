@@ -22,6 +22,7 @@ graph LR
   n_status --> n_src_lib_broadcasterReputationKeywords_js["lib/broadcasterReputationKeywords.js"]
   n_status --> n_src_lib_broadcasterReputationView_js["lib/broadcasterReputationView.js"]
   n_status --> n_src_lib_chikuranCard_js["lib/chikuranCard.js"]
+  n_status --> n_src_lib_commentSummary_js["lib/commentSummary.js"]:::shared
   n_status --> n_src_lib_formatOfficialStreamAgeMinutes_js["lib/formatOfficialStreamAgeMinutes.js"]:::shared
   n_status --> n_src_lib_googleSuggest_js["lib/googleSuggest.js"]
   n_status --> n_src_lib_healthCells_js["lib/healthCells.js"]
@@ -35,6 +36,7 @@ graph LR
   n_status --> n_src_lib_nicoUserPage_js["lib/nicoUserPage.js"]:::shared
   n_status --> n_src_lib_numberConsistency_js["lib/numberConsistency.js"]
   n_status --> n_src_lib_officialNicoStatsStripDigest_js["lib/officialNicoStatsStripDigest.js"]:::shared
+  n_status --> n_src_lib_panelLiveSummary_js["lib/panelLiveSummary.js"]:::shared
   n_status --> n_src_lib_perfDiag_js["lib/perfDiag.js"]:::shared
   n_status --> n_src_lib_personTileDom_js["lib/personTileDom.js"]:::shared
   n_status --> n_src_lib_pickBroadcasterNameForReputation_js["lib/pickBroadcasterNameForReputation.js"]
@@ -51,9 +53,7 @@ graph LR
   n_status --> n_src_lib_statusTrendKey_js["lib/statusTrendKey.js"]
   n_status --> n_src_lib_storageOpTimeout_js["lib/storageOpTimeout.js"]:::shared
   n_status --> n_src_lib_storyAvatarTvFallbackClass_js["lib/storyAvatarTvFallbackClass.js"]:::shared
-  n_status --> n_src_lib_storyTileTvStyle_js["lib/storyTileTvStyle.js"]:::shared
-  n_status --> n_src_lib_storyUserLaneGuideHtml_js["lib/storyUserLaneGuideHtml.js"]:::shared
   classDef shared fill:#eee,stroke:#999,color:#666;
 ```
 
-> ほか 9 ファイル省略（全件は storage-bus.md / metafile 参照）。
+> ほか 12 ファイル省略（全件は storage-bus.md / metafile 参照）。
