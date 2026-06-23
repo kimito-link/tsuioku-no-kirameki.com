@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 1 / 541 件
+## ⚠️ 役割コメントが無いソース 1 / 542 件
 - `src/lib/reportPreviewPublish.js`
 
 ## 全ファイルツリー
@@ -257,7 +257,7 @@
   - `vendor-visual-explainer.mjs` — Vendors nicobailon/visual-explainer (MIT) into .cursor/skills/visual-explainer/
   - `verify-bump.mjs` — extension bump 後の整合性チェッカー
   - `write-extension-placeholder-icons.mjs` — リポジトリに 256px アイコンしか無い環境向け: manifest 用の小さめ PNG を生成する。
-- 📁 **src/** (1157)
+- 📁 **src/** (1159)
   - 📁 **data/** (6)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -516,7 +516,7 @@
         - `logo_funlink_white_RGB_maru_black.png`
       - `logo_guide_funlink_ol.pdf`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (946)
+  - 📁 **lib/** (948)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -1237,6 +1237,8 @@
     - `scrapeGiftHistoryList.test.js`
     - `scrapeTotalGiftCountList.js` — niconico ギフト sub-app の `total-dold-count-list` から種類別集計を抽出する純関数（v0.1.198）。
     - `scrapeTotalGiftCountList.test.js`
+    - `scrollWhiteoutProbe.js` — スクロール時の「白化(画面が一瞬白くなる)」を観測するための純判定。
+    - `scrollWhiteoutProbe.test.js`
     - `selfActionCelebration.js` — アプリから自分が操作した直後に返す軽量演出の spec。
     - `selfActionCelebration.test.js`
     - `selfPostedMatcher.js` — 自己投稿コメント（self-posted recents）と、保存済みコメント一覧の
