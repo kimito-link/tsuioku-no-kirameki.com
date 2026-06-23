@@ -5360,10 +5360,13 @@ function renderStoryUserLane() {
   // 応援レーンの「鏡」: 顔(avatar)含めてそっくり status へ映すための最小データを storage へ。
   //   publishLaneDiag と同じ 3秒 min-gap・best-effort。buckets(りんく/こん太/広告/たぬ姉/ギフト)は
   //   この時点で確定済み。会場には一切関係しない=popup と status だけ。描画は触らない(publish のみ)。
+  //   ★pickedLength は popup が paint に渡すのと同じ laneDisplayedTotal(全5段=りんく+ギフト+広告+
+  //     こん太+たぬ姉の合計枠)を渡す。picked.length(りんく/こん太/たぬ姉だけ)だと鏡のフッター
+  //     「いま N 件を表示中」が popup より小さくなり「ほか M人」が過大になる(数字の抜け漏れ)。
   publishLaneMirror({
     liveId,
     buckets,
-    pickedLength: picked.length,
+    pickedLength: laneDisplayedTotal,
     totalCandidates: candidates.length
   });
   setTimeout(() => {
