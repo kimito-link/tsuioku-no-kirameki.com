@@ -19,6 +19,11 @@ import { buildNiconicoDefaultUserIconUrl } from '../lib/reportUserThumb.js';
 import { aggregateMarketingReport } from '../lib/marketingAggregate.js';
 import { buildSupporterRanking } from '../lib/supporterRanking.js';
 import { anonymousIdenticonDataUrl } from '../lib/anonymousIdenticon.js';
+// v0.1.928: りんく列/ギフト列を popup と同じ本物の人物タイル(buildPersonTileEl)で描く。
+//   候補→PersonTileItem 変換は共有純関数 userLanePicksFromUsers(広告列 adLanePicksFromRooms と同型)。
+//   自作の buildLaneTile(独自 class・"👤" 代用)は撤廃=完全コピー(council/live-view-fullcopy-approach-SYNTHESIS.md)。
+import { buildPersonTileEl } from '../lib/personTileDom.js';
+import { userLanePicksFromUsers } from '../lib/userLanePicksFromUsers.js';
 // v0.1.879: popup の公式値レーン(北極星レーン)を完全コピーするための純関数。
 //   貢献度ランキングの3経路(Koken API / DOM bundle / iframe storage)優先解決と、公式行→strip room 変換。
 //   popup-entry.js の resolveOfficialContributionRankingRows / officialDomRankingRowsToStripRooms と同一。
@@ -411,74 +416,48 @@ function renderLiveView(lv, data, nowMs) {
   $('updatedAt').textContent = `最終更新 ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}:${String(d.getSeconds()).padStart(2, '0')}`;
 }
 
-/** ユーザー行({thumbSrc,userId,nickname,count?})からアイコンタイル DOM を作る(popup の人物タイル相当)。 @param {any} u */
-function buildLaneTile(u) {
-  const tile = document.createElement('div');
-  tile.className = 'lane-tile';
-  const av = document.createElement('div');
-  av.className = 'lane-av';
-  const src = String(u?.thumbSrc || u?.avatarUrl || '').trim();
-  if (src) {
-    const img = document.createElement('img');
-    img.src = src;
-    img.alt = '';
-    img.referrerPolicy = 'no-referrer';
-    img.addEventListener('error', () => { try { img.remove(); av.textContent = '👤'; } catch { /* no-op */ } });
-    av.appendChild(img);
-  } else {
-    av.textContent = '👤';
+/** userLanePicksFromUsers に渡す I/O(数値ID→個人アイコン・匿名→identicon)。popup の avatar 解決順と同一。 */
+const _userLanePickIo = {
+  numericIconUrlFor: (/** @type {string} */ uid) => buildNiconicoDefaultUserIconUrl(uid) || '',
+  anonymousIdenticonFor: (/** @type {string} */ uid) => anonymousIdenticonDataUrl(uid, 64)
+};
+
+/**
+ * レーン候補({userId,nickname,avatarUrl,count})を popup と同じ本物の人物タイルで body に描く。
+ *   userLanePicksFromUsers で PersonTileItem 化 → buildPersonTileEl(_laneMirrorDomIo)。"👤" 代用や独自
+ *   class は使わない=popup と 1px 違わない(.nl-story-userlane-cell)。空なら hidden(死にリンク回避)。
+ * @param {HTMLElement|null} sec @param {HTMLElement|null} body @param {any[]} users @param {number} limit
+ */
+function paintLaneWithRealTiles(sec, body, users, limit) {
+  if (!sec || !body) return;
+  const picks = userLanePicksFromUsers(users, { ..._userLanePickIo, limit });
+  if (!picks.length) {
+    sec.hidden = true;
+    return;
   }
-  tile.appendChild(av);
-  const name = document.createElement('div');
-  name.className = 'lane-name';
-  name.textContent = String(u?.nickname || u?.userId || '');
-  tile.appendChild(name);
-  const uid = document.createElement('div');
-  uid.className = 'lane-uid';
-  const c = Number(u?.count);
-  uid.textContent = Number.isFinite(c) && c > 0 ? `${String(u?.userId || '')} ・ ${c}件` : String(u?.userId || '');
-  tile.appendChild(uid);
-  return tile;
+  sec.hidden = false;
+  body.innerHTML = '';
+  for (const p of picks) body.appendChild(buildPersonTileEl(p, _laneMirrorDomIo));
 }
 
 /** りんく列・ギフト列を描画(popup の全レーン再現)。データが無ければそのレーンを隠す(死にリンクにしない)。 @param {string} lv @param {any} data @param {any[]|null} supporters 解決済み応援者(自前集計優先) */
 function renderLanes(lv, data, supporters) {
   // ① りんく列(数値ID+個人サムネが揃った応援だけ)。応援者を categorizeUsersForThumbGrid で振り分け。
-  const linkSec = $('linkLaneSec');
-  const linkBody = $('linkLaneBody');
-  if (linkSec && linkBody) {
-    const sup = Array.isArray(supporters) ? supporters : [];
-    // 応援者(rank/name/avatarUrl/count/userId)を RawThumbGridUser 形に。
-    const raw = sup.map((/** @type {any} */ r) => ({ userId: r.userId, nickname: r.name, avatarUrl: r.avatarUrl, count: r.count }));
-    const { numericIdUsers } = categorizeUsersForThumbGrid(raw, { maxNumeric: 80 });
-    if (numericIdUsers.length) {
-      linkSec.hidden = false;
-      linkBody.innerHTML = '';
-      for (const u of numericIdUsers) linkBody.appendChild(buildLaneTile(u));
-    } else {
-      linkSec.hidden = true;
-    }
-  }
+  const sup = Array.isArray(supporters) ? supporters : [];
+  // 応援者(rank/name/avatarUrl/count/userId)を RawThumbGridUser 形に。
+  const raw = sup.map((/** @type {any} */ r) => ({ userId: r.userId, nickname: r.name, avatarUrl: r.avatarUrl, count: r.count }));
+  const { numericIdUsers } = categorizeUsersForThumbGrid(raw, { maxNumeric: 80 });
+  paintLaneWithRealTiles($('linkLaneSec'), $('linkLaneBody'), numericIdUsers, 80);
+
   // ② ギフト列(この放送でギフト/広告を投げた人・数値IDで記録できた順)。storage の nls_gift_users_<lv>。
-  const giftSec = $('giftLaneSec');
-  const giftBody = $('giftLaneBody');
-  if (giftSec && giftBody) {
-    const entries = buildGiftThrowerLaneEntries(Array.isArray(data?.giftUsers) ? data.giftUsers : [], { liveId: lv });
-    if (entries.length) {
-      giftSec.hidden = false;
-      giftBody.innerHTML = '';
-      for (const e of entries.slice(0, 60)) {
-        // ギフト列は avatarUrl 空=数値IDの CDN アイコンで補う(popup と同じ「個人サムネ→ゆっくり画像」の前段)。
-        giftBody.appendChild(buildLaneTile({
-          userId: e.userId,
-          nickname: e.nickname,
-          thumbSrc: e.avatarUrl || buildNiconicoDefaultUserIconUrl(e.userId)
-        }));
-      }
-    } else {
-      giftSec.hidden = true;
-    }
-  }
+  const entries = buildGiftThrowerLaneEntries(Array.isArray(data?.giftUsers) ? data.giftUsers : [], { liveId: lv });
+  // ギフト列は entry.avatarUrl/nickname を持つ=そのまま渡す(avatar 空は _userLanePickIo が数値ID由来で補う)。
+  paintLaneWithRealTiles(
+    $('giftLaneSec'),
+    $('giftLaneBody'),
+    entries.map((/** @type {any} */ e) => ({ userId: e.userId, nickname: e.nickname, avatarUrl: e.avatarUrl })),
+    60
+  );
 }
 
 // ============================================================================
