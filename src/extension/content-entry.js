@@ -14778,6 +14778,14 @@ let lastOfficialEventDomBundle = null;
 let _autoOpenGiftSidebarTriedLiveId = '';
 
 /**
+ * 緊急停止フラグ(v0.1.918): ギフトサイドバー自動オープン(rank タブの合成クリック)を有効にするか。
+ * false の間は tryAutoOpenGiftSidebarOnceForScrape が冒頭で即 return し、dispatchSyntheticActivation
+ * (合成クリック)に一切到達しない。「watch 中に別配信が勝手に開く」症状の切り分け用。原因が別と判明
+ * したら true に戻す(ユーザーが手でサイドバーを開けば従来どおり scrape は走るので記録は欠けない)。
+ */
+const GIFT_SIDEBAR_AUTO_OPEN_ENABLED = false;
+
+/**
  * audition embed (https://audition.nicovideo.jp/embedded/richview/live?content_id=...) は
  * 番組単位で固定なので、bundle.eventBanner が未取得のときだけ 1 度 fetch する。
  * @type {string}
@@ -17445,6 +17453,18 @@ function dispatchSyntheticActivation(el) {
 }
 
 async function tryAutoOpenGiftSidebarOnceForScrape() {
+  // 緊急停止(v0.1.918): ギフトサイドバーの自動オープン(rankタブの合成クリック)を一旦無効化。
+  //   理由=「watch タブを開いている間に別配信が勝手に開く」実機症状の切り分け。この機構は
+  //   sidebar 内に scope して rank タブを dispatchSyntheticActivation で押すが、scope の穴で
+  //   ニコ生の「おすすめ生放送カード」リンク(target=_blank)を誤クリックすると別配信が新タブで
+  //   開く既知パターン(v0.1.228 で一度修正・コメント参照)が残っている疑い。false にして合成
+  //   クリックに一切到達させず、症状が止まるかをユーザーの🔄だけで切り分ける。原因確定後に戻す。
+  //   ※これは「ランキングを自動取得する利便」を一時的に犠牲にするだけ(ユーザーが手でサイドバーを
+  //     開けば従来どおり scrape は走る)=記録の心臓部(録画)には触れない安全な無効化。
+  if (!GIFT_SIDEBAR_AUTO_OPEN_ENABLED) {
+    setAutoOpenStatus('disabled-emergency-stop');
+    return;
+  }
   if (!hasExtensionContext()) {
     setAutoOpenStatus('no-context');
     return;
