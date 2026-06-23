@@ -1002,6 +1002,9 @@ chrome.runtime.onInstalled.addListener((details) => {
     if (details?.reason === 'update') {
       await migrateClearStaleSelfPostedOnce(details?.previousVersion);
     }
+    // v0.1.921: 過去 autopatrol が開いた孤児裏タブ(マーカーを失って復活し続ける)を先に掃除。
+    //   reload より前に消すことで「孤児を reload して延命」を避ける。前面/手動視聴タブは触らない。
+    await sweepOrphanAutopatrolTabsOnce();
     if (details?.reason === 'update') {
       await reloadExistingWatchTabs();
     } else {
@@ -1018,6 +1021,13 @@ chrome.runtime.onStartup.addListener(() => {
   void ensureMcpDiagDumpAlarm();
   void migrateFloatingPanelToDockProfileOnce();
   void migrateBelowPanelToDockProfileOnce();
+  // v0.1.921: ブラウザ起動時(セッション復元直後)に孤児巡回タブを掃除する。
+  //   セッション復元で素URLに化けて復活した過去の巡回裏タブを、ここで安全に閉じる。
+  //   復元が遅れて来るケースを拾うため、即時 + 3秒後の2回だけ走らせる(前面/手動視聴タブは不変)。
+  void sweepOrphanAutopatrolTabsOnce();
+  try {
+    setTimeout(() => { void sweepOrphanAutopatrolTabsOnce(); }, 3000);
+  } catch { /* no-op */ }
   void injectIntoExistingTabs();
   void resumeAutopatrolIfEnabled();
 });
@@ -1240,6 +1250,60 @@ async function closeAutopatrolTab(tabId, expectLiveId) {
     await chrome.tabs.remove(tabId);
   } catch {
     /* already closed */
+  }
+}
+
+/*
+ * v0.1.921: 「拡張リロード/ブラウザ再起動のたびに知らない配信タブが復活する」真因への対応。
+ * 真因(ユーザー実機で確定)=過去に autopatrol が #nls_autopatrol=1 付きで開いた裏タブを、
+ *   ニコ生の SPA が URL ハッシュ(#nls_autopatrol=1)を消して素の watch URL に正規化する。
+ *   その結果 closeAutopatrolTab の「マーカーが無いタブは閉じない」誤爆防止(L1238)に引っかかって
+ *   閉じられず孤児化し、Chrome のセッション復元が起動のたびに素URLで復活させ続けていた。
+ *   ユーザーが手で閉じて Chrome 完全再起動しても復活=セッション復元が焼き付いている状態。
+ * autopatrol を止めるだけでは既に居座る孤児タブは消えないので、起動時に1回だけ安全に掃除する。
+ *
+ * ★誤爆防止の絶対条件(ユーザーが自分で見ている配信は1つも閉じない)=以下を全て満たす裏タブだけ閉じる:
+ *   (1) live.nicovideo.jp/watch/<lv> の watch タブで
+ *   (2) その lv が autopatrol の visited 履歴に在る(=過去に拡張が自動で開いた・手動視聴は履歴に無い)で
+ *   (3) active:false(=今ユーザーが前面で見ていない裏タブ)
+ *   (4) #nls_autopatrol=1 マーカーが残っているタブも当然対象(マーカー有無どちらの孤児も拾う)。
+ * 手で開いた配信は visited に無いので閉じない。見ている配信は active:true なので閉じない。
+ */
+async function sweepOrphanAutopatrolTabsOnce() {
+  if (!AUTOPATROL_KILL_SWITCH) return; // 巡回が正規に動く版では掃除しない(通常の保持/回転に任せる)
+  let visitedSet;
+  try {
+    const st = await loadAutopatrolState();
+    visitedSet = new Set(
+      (Array.isArray(st.visited) ? st.visited : []).map((x) =>
+        String(x || '').trim().toLowerCase()
+      )
+    );
+  } catch {
+    return;
+  }
+  if (visitedSet.size === 0) return; // 過去に自動で開いた履歴が無ければ掃除対象も無い
+  let tabs = [];
+  try {
+    tabs = await chrome.tabs.query({ url: 'https://*.nicovideo.jp/watch/*' });
+  } catch {
+    return;
+  }
+  for (const tab of tabs || []) {
+    try {
+      if (!tab || typeof tab.id !== 'number') continue;
+      if (tab.active) continue; // 前面で見ているタブは絶対に閉じない
+      const url = String(tab.url || tab.pendingUrl || '');
+      const hasMarker = url.includes('nls_autopatrol');
+      const lvMatch = url.match(/\/watch\/(lv\d{1,15})/);
+      const lv = lvMatch ? lvMatch[1].toLowerCase() : '';
+      // マーカー有り=明確な巡回タブ / マーカー無しでも visited 履歴に在る裏タブ=孤児
+      const isOrphan = hasMarker || (lv && visitedSet.has(lv));
+      if (!isOrphan) continue;
+      await chrome.tabs.remove(tab.id);
+    } catch {
+      /* already closed / 1 件の失敗は他を止めない */
+    }
   }
 }
 
