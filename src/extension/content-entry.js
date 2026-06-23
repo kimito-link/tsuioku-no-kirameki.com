@@ -14779,14 +14779,13 @@ let _autoOpenGiftSidebarTriedLiveId = '';
 
 /**
  * ギフトサイドバー自動オープン(rank タブの合成クリック)を有効にするか。
- * v0.1.918 で false → v0.1.919 で true に戻したが、その後も「勝手に配信タブが開く」症状が
- * リロードで再発したため v0.1.920 で再び false に戻す(切り分け第2弾)。
- * v0.1.919 の「autopatrol が真因・gift auto open は無関係」という判定は実機でリロード再発が
- * 起きたことで覆った可能性がある。autopatrol(KILL_SWITCH=true) は引き続き停止中。
- * この停止で症状が止まれば「gift auto open の dispatchSyntheticActivation 誤クリック経路が
- * おすすめカードの <a target=_blank> を踏んでいた」が真因。止まらなければ第3の経路を探す。
+ * v0.1.918→920 で「勝手に配信タブが開く」症状の切り分けのため false にしていたが、
+ * v0.1.921 で真因が【同じ拡張の古い重複インストール v0.1.727 が裏で生きていた】と確定し
+ * (ユーザーが chrome://extensions で重複に気づき削除→停止)、この機構は無実だったため true に戻す。
+ * gift auto open は sidebar 内に scope して rank タブだけを押すので、別配信オープンとは無関係。
+ * autopatrol(KILL_SWITCH=true)は再発防止として引き続き停止のまま。
  */
-const GIFT_SIDEBAR_AUTO_OPEN_ENABLED = false;
+const GIFT_SIDEBAR_AUTO_OPEN_ENABLED = true;
 
 /**
  * audition embed (https://audition.nicovideo.jp/embedded/richview/live?content_id=...) は
