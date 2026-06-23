@@ -255,7 +255,7 @@
   - `src/lib/giftThrowProjectile.js`
 - **吹き出し寿命管理** — 会場の吹き出しの表示上限・追い出し(eviction)ライフサイクル
   - `src/lib/venueBubbleLifecycle.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 160</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 161</summary>
 
 - `scripts/encode-marketing-html-avatars.mjs` — extension/images/marketing-html-avatars/*.png を data URI にし、
 - `scripts/split-avatar-parts.mjs` — 偽市松背景の除去 + パーツ切り出し(one-off アセットパイプライン)
@@ -319,6 +319,7 @@
 - `src/lib/inlineHostBesideSizing.js` — beside（横付き）モードの inline panel の幅・高さを最適計算する純粋関数。
 - `src/lib/inlineHostDockSizing.js` — dock_bottom モードの inline panel 高さを viewport と player rect から最適計算する純粋関数。
 - `src/lib/inlineHostLayoutReset.js` — インラインパネルの placement（below / beside / floating / dock_bottom）を切り替える際に、
+- `src/lib/inlineModeFlags.js` — popup.html の URL クエリから「どのモードで開かれた popup か」を判定する純関数。
 - `src/lib/inlinePanelFocusGate.js` — インラインパネル host element が toolbar 起点の「前面化」操作を受けられる
 - `src/lib/inlinePanelLayout.js` — 視聴ページに埋め込む nicolivelog パネルの幅・位置を、動画要素の表示矩形に合わせるための純関数。
 - `src/lib/inlinePanelPlacementResolver.js` — インラインパネル配置の「単一の真実」コンポーネント。
@@ -706,9 +707,10 @@
 
 ## 🧬 修正系譜マップ(この系統のバグを過去にどう直したか)
 
-> changelog 全 251 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
+> changelog 全 252 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
 
-### 💾 記録件数 (36版)
+### 💾 記録件数 (37版)
+- `v0.1.916` 2026-06-23 — status に popup をiframeで丸ごと埋め込み(試作)
 - `v0.1.914` 2026-06-23 — 応援レーン鏡のフッター件数をpopupと一致
 - `v0.1.908` 2026-06-22 — レーンの件数を正直に表示+広告列のサムネ化け修正
 - `v0.1.895` 2026-06-22 — 読み上げが止まったまま戻らない固着を自動回復+停止位置の計器
@@ -746,7 +748,8 @@
 - `v0.1.672` 2026-06-10 — コメビュの二重表示の残りを根治
 - `v0.1.665` 2026-06-10 — 長い配信が7割等で止まったままになるのを根治
 
-### 📥 コメント取得 (114版)
+### 📥 コメント取得 (115版)
+- `v0.1.916` 2026-06-23 — status に popup をiframeで丸ごと埋め込み(試作)
 - `v0.1.915` 2026-06-23 — status埋め込み土台=受動popupモード追加
 - `v0.1.893` 2026-06-22 — 終了した配信が0%になる原因の切り分け計器を追加
 - `v0.1.892` 2026-06-22 — 過去ログ取得が進まない箇所の細分計器を追加
@@ -1175,7 +1178,8 @@
 - `v0.1.673` 2026-06-10 — コメビュの名前をパネルと同じ情報源で補完
 - `v0.1.670` 2026-06-10 — コメビュのアイコンを本家と同じサムネに
 
-### 🩺 診断・状態速報 (67版)
+### 🩺 診断・状態速報 (68版)
+- `v0.1.916` 2026-06-23 — status に popup をiframeで丸ごと埋め込み(試作)
 - `v0.1.915` 2026-06-23 — status埋め込み土台=受動popupモード追加
 - `v0.1.914` 2026-06-23 — 応援レーン鏡のフッター件数をpopupと一致
 - `v0.1.913` 2026-06-23 — 応援ライブビューに応援レーン・数字カードの鏡を追加

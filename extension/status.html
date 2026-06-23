@@ -877,11 +877,31 @@
     </section>
 
     <!--
+      popup 埋め込み(本物 iframe・v0.1.916 試作): popup.html?inline=1&dock=status&lv=<lv> を iframe で
+      丸ごと埋め込み「見た目も操作も popup そっくり」を本物のまま映す。dock=status=受動ビュー(popup-entry.js
+      INLINE_PASSIVE)=書かない・注入しない・fetch しない(会議 council w3237a6h6)。lv が取れない/iframe が
+      出ない時はセクションごと hidden=下の鏡(laneMirrorLane/statCardsMirror)がフォールバックで表示を担保。
+      JS は status-entry.js の ensureStatusPopupIframe(CSP script-src 'self'=インライン script 不可)。
+    -->
+    <section class="lane" id="statusPopupEmbed" hidden>
+      <h2>🪟 ポップアップそっくり（本物を埋め込み）</h2>
+      <div class="status-meta" style="margin-bottom: 8px">
+        いま開いている配信のポップアップを、見た目も操作もそのまま埋め込んで表示します。並び順・件数・要素はポップアップと完全に同じです（本物を映しています）。ポップアップを開いている watch タブが必要です。
+      </div>
+      <div
+        id="statusPopupEmbedHost"
+        style="width: 100%; height: 80vh; min-height: 480px; border: 1px solid var(--nl-border, #d5e3f5); border-radius: 12px; overflow: auto; background: transparent"
+      ></div>
+    </section>
+
+    <!--
       応援レーン鏡: popup の応援レーン(りんく/こん太/広告/たぬ姉の段組み)を【顔=avatar 含めて
       そっくり】映す。データは popup→storage(nls_lane_mirror_v1)、status が読んで本物の
       paintStoryUserLaneDomFilled + buildPersonTileEl で描く。会場(venue)とは無関係=popup と status だけ。
       DOM の id は popup.html と完全一致(同じ getElementById で els を集めて本物描画関数に渡すため)。
       popup を一度も開いていない/まだ書かれていない時はセクションごと hidden(死にリンクにしない)。
+      ★popup 埋め込み iframe が出ているときはこの鏡が二重表示になるが、iframe 失敗時の安全網として共存
+        させる(段階導入・v0.1.916 試作)。iframe が実機で完璧と確認後の別 PR で鏡側を畳む。
     -->
     <section class="lane" id="laneMirrorLane" hidden>
       <h2>🪞 応援レーン（popup の段組みをそっくり映す）</h2>

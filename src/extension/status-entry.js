@@ -885,6 +885,11 @@ function renderAll({ lvList, summaries, fastDiag, popupDiag, backfillProgress, v
   //   v0.1.894: 会場モード読み上げセル(タイミング・抜け漏れ)を出すため voiceDiag も渡す。
   safeSection('健全度パネル', () => renderHealthCells({ livesData, fastDiag, voiceDiag, venueSeatsDiag, laneDiag }));
 
+  // popup 埋め込み(本物 iframe・v0.1.916 試作): popup.html?inline=1&dock=status&lv=<lv> を iframe で
+  //   丸ごと出し「見た目も操作も popup そっくり」を本物のまま映す。下の鏡(間引き)より上に置き、出たら
+  //   鏡は安全網として共存。独立 try/catch=iframe が壊れても status コア・鏡を巻き込まない。
+  safeSection('popup埋め込み', () => ensureStatusPopupIframe(lvList, laneMirror));
+
   // 応援レーン鏡(popup の段組みを顔込みでそっくり映す・健全度パネルとは別の独立セクション)。
   //   try/catch(safeSection)で囲み、鏡が壊れても概要・配信カードを巻き込まない。
   safeSection('応援レーン鏡', () => renderLaneMirror(laneMirror));
@@ -975,6 +980,77 @@ function renderHealthCells(data) {
     div.appendChild(label);
     div.appendChild(val);
     host.appendChild(div);
+  }
+}
+
+/** popup 埋め込み iframe の再生成 skip 判定用 signature(同じ src なら作り直さない=チラつき防止)。 */
+let _lastStatusPopupEmbedSrc = '';
+
+/**
+ * popup 埋め込み(本物 iframe・v0.1.916 試作): popup.html?inline=1&dock=status&lv=<lv> を iframe で丸ごと
+ *   埋め込み「見た目も操作も popup そっくり」を本物のまま映す。鏡(間引き)の抜け漏れを根治する本筋。
+ *   dock=status=受動ビュー(popup-entry.js INLINE_PASSIVE)=書かない・注入しない・fetch しない。
+ *   lv は renderAll が既に持つ lvList(enumerateActiveLives 経路1=開いている watch タブ優先)を使う
+ *   =新規 storage read を増やさない(MEMORY 鉄則)。lvList 空なら laneMirror.liveId にフォールバック。
+ *   lv が取れない/iframe を出せない時は section ごと hidden=下の鏡がフォールバックで表示を担保。
+ *   会場(venue)とは無関係=popup と status だけ。
+ * @param {string[]} lvList 視聴中 lv(優先)
+ * @param {{ liveId?: string }|null|undefined} laneMirror 鏡 snapshot(フォールバック lv 源)
+ */
+function ensureStatusPopupIframe(lvList, laneMirror) {
+  const section = document.getElementById('statusPopupEmbed');
+  const host = document.getElementById('statusPopupEmbedHost');
+  if (!section || !host) return;
+
+  // lv 解決: 開いている watch タブ(lvList) 優先 → 鏡 snapshot の liveId(=popup が最後に開いた配信)。
+  const fromList = (Array.isArray(lvList) ? lvList : [])
+    .map((s) => String(s || '').trim().toLowerCase())
+    .find((s) => /^lv\d{1,15}$/.test(s));
+  const fromMirror = String(laneMirror?.liveId || '').trim().toLowerCase();
+  const lv = fromList || (/^lv\d{1,15}$/.test(fromMirror) ? fromMirror : '');
+
+  if (!lv) {
+    // どの放送も特定できない=iframe を出さず鏡フォールバック(死に画面にしない)。
+    section.hidden = true;
+    _lastStatusPopupEmbedSrc = '';
+    return;
+  }
+
+  // chrome-extension://<id>/popup.html?inline=1&dock=status&lv=<lv> を src に焼く。
+  //   dock=status で popup は受動ビュー(INLINE_PASSIVE)になり storage/fetch/注入を一切しない。
+  let src = '';
+  try {
+    const u = new URL(chrome.runtime.getURL('popup.html'));
+    u.searchParams.set('inline', '1');
+    u.searchParams.set('dock', 'status');
+    u.searchParams.set('lv', lv);
+    src = u.href;
+  } catch {
+    section.hidden = true;
+    return;
+  }
+
+  section.hidden = false;
+
+  // signature ガード: src(=lv)が前回と同じなら iframe を作り直さない(再ロードのチラつき/重さ防止)。
+  if (src === _lastStatusPopupEmbedSrc) {
+    if (host.querySelector('iframe')) return;
+  }
+  _lastStatusPopupEmbedSrc = src;
+
+  let iframe = /** @type {HTMLIFrameElement|null} */ (host.querySelector('iframe'));
+  if (!iframe) {
+    iframe = document.createElement('iframe');
+    iframe.setAttribute('title', 'nicolivelog popup embed');
+    iframe.setAttribute('allow', 'microphone');
+    iframe.style.width = '100%';
+    iframe.style.height = '100%';
+    iframe.style.border = '0';
+    iframe.style.backgroundColor = 'transparent';
+    host.appendChild(iframe);
+  }
+  if (iframe.getAttribute('src') !== src) {
+    iframe.setAttribute('src', src);
   }
 }
 
