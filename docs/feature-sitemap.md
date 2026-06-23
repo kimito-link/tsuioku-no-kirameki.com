@@ -255,7 +255,7 @@
   - `src/lib/giftThrowProjectile.js`
 - **吹き出し寿命管理** — 会場の吹き出しの表示上限・追い出し(eviction)ライフサイクル
   - `src/lib/venueBubbleLifecycle.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 163</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 162</summary>
 
 - `scripts/encode-marketing-html-avatars.mjs` — extension/images/marketing-html-avatars/*.png を data URI にし、
 - `scripts/split-avatar-parts.mjs` — 偽市松背景の除去 + パーツ切り出し(one-off アセットパイプライン)
@@ -396,7 +396,6 @@
 - `src/lib/userCommentProfileCache.js` — userId 単位で表示名・個人サムネ（弱い CDN 既定アイコン以外の http URL）を蓄積し、
 - `src/lib/userEntryAvatarResolve.js` — 1 ユーザーエントリーのアバター状態を組み立てる純関数レイヤ。
 - `src/lib/userLaneDiagSnapshot.js` — Popup DevTools 用: lane pipeline の観測スナップショット（PII を含めない）。
-- `src/lib/userLanePicksFromUsers.js` — レーンユーザー({userId,nickname,avatarUrl,count})を、popup/会場の人物タイル
 - `src/lib/userSupportGridAccent.js` — Paul Tol Bright に近い 8 色を OKLCH で表現（カテゴリ識別用）。
 - `src/lib/venueAvatar.js` — v0.1.712: 会場モードのアバター解決(サムネ補強)純関数。
 - `src/lib/venueBubbleLayout.js` — v0.1.717: 会場モードの吹き出し(セリフ)を「席の外の最上位レイヤー」に置くための配置純関数。
@@ -711,7 +710,7 @@
 
 ## 🧬 修正系譜マップ(この系統のバグを過去にどう直したか)
 
-> changelog 全 264 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
+> changelog 全 265 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
 
 ### 💾 記録件数 (37版)
 - `v0.1.916` 2026-06-23 — status に popup をiframeで丸ごと埋め込み(試作)
@@ -1336,7 +1335,8 @@
 - `v0.1.840` 2026-06-20 — 機能逆引き地図を全ファイル網羅に
 - `v0.1.835` 2026-06-20 — 自己検証ゲートを追加(版同期+診断文言)
 
-### その他 (12版)
+### その他 (13版)
+- `v0.1.929` 2026-06-23 — 応援ライブビューを拡張ポップアップそっくりそのままに(丸ごと埋め込み)
 - `v0.1.921` 2026-06-23 — 勝手に復活する配信タブの掃除(セッション復元の孤児タブ)
 - `v0.1.812` 2026-06-17 — 内部構造の整理(HTMLレポートの外部リンク欄を部品化)
 - `v0.1.811` 2026-06-17 — 内部構造の整理(HTMLレポートの次枠メモを部品化)
