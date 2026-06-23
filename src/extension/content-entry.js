@@ -229,7 +229,9 @@ import {
 } from '../lib/commentSubmitConfirm.js';
 import {
   createCommentSubmitProfiler,
-  recordCommentSubmitTotal
+  recordCommentSubmitTotal,
+  recordCommentSubmitOutcome,
+  summarizeCommentSubmitDiag
 } from '../lib/commentSubmitProfiling.js';
 import { shouldAcceptCommentPostInWatchFrame } from '../lib/watchFrameCommentPostGate.js';
 import { findCommentSubmitButton } from '../lib/commentPostDom.js';
@@ -6391,6 +6393,10 @@ function buildAiShareFastDiagnosticsPayload() {
     //   0 のままなら「スクロールで白化は観測されていない」=症状は inline panel/video 以外
     //   (ニコ生プレイヤー内部の描画等)を疑う切り分けになる。
     scrollWhiteoutDiag: summarizeWhiteoutDiag(_scrollWhiteoutState, Date.now()),
+    // v0.1.925: コメント送信の感度（試行数/成功数/失敗数/成功率/所要 ms の平均・最大/
+    //   直近の失敗理由）。globalThis 集計を読むだけ＝storage read を増やさない。送信が
+    //   一度も無ければ null（出さない）。失敗が続く・成功率が落ちる等を status で可視化する。
+    commentSubmitDiag: summarizeCommentSubmitDiag(),
     inlinePanel: {
       placementMode: inlinePanelPlacementMode,
       placementEffective: placementEffectiveFast,
@@ -7821,11 +7827,15 @@ async function confirmSubmittedCommentAsync(editor, rawText, opts = {}) {
  */
 async function postCommentFromContentAsync(rawText, opts = {}) {
   if (!canPostCommentInThisFrame()) {
-    return { ok: false, error: 'コメント欄のあるwatchフレームが見つかりません。' };
+    const r = { ok: false, error: 'コメント欄のあるwatchフレームが見つかりません。' };
+    recordCommentSubmitOutcome(r.ok, r.error);
+    return r;
   }
   const text = String(rawText || '').trim();
   if (!text) {
-    return { ok: false, error: 'コメントが空です。' };
+    const r = { ok: false, error: 'コメントが空です。' };
+    recordCommentSubmitOutcome(r.ok, r.error);
+    return r;
   }
   const fastSubmit = Boolean(opts.fastSubmit);
   const submitTiming = fastSubmit ? SUBMIT_TIMING_FAST : SUBMIT_TIMING;
@@ -7837,6 +7847,9 @@ async function postCommentFromContentAsync(rawText, opts = {}) {
   const prof = createCommentSubmitProfiler();
   // v0.1.604: フラグ OFF でも総所要を rolling 観測（800ms 超は console.warn）。
   const totalT0 = performance.now();
+  // v0.1.925: 送信の成否を finally で 1 回だけ outcome 集計に記録する（各 return を拾う）。
+  /** @type {{ok:boolean, error?:string}} */
+  let result = { ok: false, error: 'post_failed' };
   try {
     prof?.mark('T2-editor-poll-start');
     let editor = findCommentEditorElement();
@@ -7848,11 +7861,11 @@ async function postCommentFromContentAsync(rawText, opts = {}) {
     }
     prof?.mark('T2-editor-found');
     if (!editor) {
-      return {
+      return (result = {
         ok: false,
         error:
           'コメント入力欄が見つかりません。ページの再読み込み直後は数秒待ってから再度お試しください。'
-      };
+      });
     }
 
     try {
@@ -7883,11 +7896,11 @@ async function postCommentFromContentAsync(rawText, opts = {}) {
       };
 
       if (!(await submitOnce())) {
-        return {
+        return (result = {
           ok: false,
           error:
             '公式の送信ボタンを見つけられませんでした。watchページを再読み込みし、コメント欄が見える状態で再試行してください。'
-        };
+        });
       }
       prof?.mark('T4-after-submit-click');
 
@@ -7895,17 +7908,17 @@ async function postCommentFromContentAsync(rawText, opts = {}) {
         await confirmSubmittedCommentAsync(editor, text, { probeEndpointsMs: confirmProbes })
       ) {
         prof?.mark('T5-after-confirm-1');
-        return { ok: true };
+        return (result = { ok: true });
       }
       prof?.mark('T5-confirm-1-failed');
 
       if (!fastSubmit) {
         if (!(await submitOnce())) {
-          return {
+          return (result = {
             ok: false,
             error:
               'コメント送信を確認できませんでした。watchページを前面に出し、必要なら再読み込みしてから再試行してください。'
-          };
+          });
         }
         prof?.mark('T4b-after-second-submit');
 
@@ -7913,31 +7926,33 @@ async function postCommentFromContentAsync(rawText, opts = {}) {
           await confirmSubmittedCommentAsync(editor, text, { probeEndpointsMs: confirmProbes })
         ) {
           prof?.mark('T5-after-confirm-2');
-          return { ok: true };
+          return (result = { ok: true });
         }
         prof?.mark('T5-confirm-2-failed');
-        return {
+        return (result = {
           ok: false,
           error:
             'コメント送信を確認できませんでした。watchページを前面に出し、必要なら再読み込みしてから再試行してください。'
-        };
+        });
       }
 
-      return {
+      return (result = {
         ok: false,
         error:
           'コメント送信を確認できませんでした。watchページを前面に出し、必要なら再読み込みしてから再試行してください。'
-      };
+      });
     } catch (err) {
       const message =
         err && typeof err === 'object' && 'message' in err
           ? String(/** @type {{ message?: unknown }} */ (err).message || 'post_failed')
           : 'post_failed';
-      return { ok: false, error: message };
+      return (result = { ok: false, error: message });
     }
   } finally {
     prof?.finish('nls-cmt-content');
     recordCommentSubmitTotal('nls-cmt-content', Math.round(performance.now() - totalT0));
+    // v0.1.925: 成否を outcome 集計へ（成功率・直近の失敗理由を fastDiag に出す土台）。
+    recordCommentSubmitOutcome(result.ok, result.error);
   }
 }
 
@@ -8999,6 +9014,9 @@ function buildAiSharePageDiagnostics() {
     //   0 のままなら「スクロールで白化は観測されていない」=症状は inline panel/video 以外
     //   (ニコ生プレイヤー内部の描画等)を疑う切り分けになる。
     scrollWhiteoutDiag: summarizeWhiteoutDiag(_scrollWhiteoutState, Date.now()),
+    // v0.1.925: コメント送信の感度（試行数/成功数/失敗数/成功率/所要 ms の平均・最大/
+    //   直近の失敗理由）。globalThis 集計を読むだけ＝storage read を増やさない。
+    commentSubmitDiag: summarizeCommentSubmitDiag(),
     inlinePanel: {
       placementMode: inlinePanelPlacementMode,
       placementEffective,
