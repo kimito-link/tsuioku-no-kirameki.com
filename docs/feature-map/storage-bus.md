@@ -20,6 +20,7 @@
 - 🟠 **fn:chunkMigratedKey** — 書く人だけ（読む経路が無い疑い）: src/extension/content-entry.js
 - 🟠 **fn:comeviewPinStorageKey** — 書く人だけ（読む経路が無い疑い）: src/extension/comeview-entry.js
 - 🟠 **fn:eventDomStorageKey** — 書く人だけ（読む経路が無い疑い）: src/extension/content-entry.js
+- 🟠 **fn:giftSubAppHistoryStorageKey** — 書く人だけ（読む経路が無い疑い）: src/extension/content-entry.js
 - 🟠 **fn:perfDiagStorageKey** — 書く人だけ（読む経路が無い疑い）: src/extension/popup-entry.js
 - 🟠 **fn:tailStorageKey** — 書く人だけ（読む経路が無い疑い）: src/extension/content-entry.js
 - 🔵 **KEY_AI_SHARE_POPUP_DIAG** — 読む人だけ（書く経路が無い疑い）: src/extension/status-entry.js
@@ -53,7 +54,6 @@
 - 🔵 **KEY_THUMB_AUTO** — 読む人だけ（書く経路が無い疑い）: src/extension/content-entry.js, src/extension/popup-entry.js
 - 🔵 **KEY_THUMB_INTERVAL_MS** — 読む人だけ（書く経路が無い疑い）: src/extension/content-entry.js, src/extension/popup-entry.js
 - 🔵 **fn:commentDbSummaryKey** — 読む人だけ（書く経路が無い疑い）: src/extension/popup-entry.js
-- 🔵 **fn:giftHistoryThrowsStorageKey** — 読む人だけ（書く経路が無い疑い）: src/extension/live-view-entry.js
 - 🔵 **fn:watchSnapshotStorageKey** — 読む人だけ（書く経路が無い疑い）: src/extension/popup-entry.js
 - 🔵 **nls_backfill_progress_v1** — 読む人だけ（書く経路が無い疑い）: src/extension/status-entry.js
 - 🔵 **nls_mcp_live_latest_v1** — 読む人だけ（書く経路が無い疑い）: src/extension/popup-entry.js
@@ -97,7 +97,7 @@
 | `KEY_INLINE_PANEL_VIEWPORT_WIDE_POLICY` | — | extension/content-entry.js<br>extension/popup-entry.js |
 | `KEY_INLINE_PANEL_WIDTH_MODE` | — | extension/content-entry.js<br>extension/popup-entry.js |
 | `KEY_LANE_DIAG` | extension/popup-entry.js | extension/status-entry.js |
-| `KEY_LANE_MIRROR` | extension/popup-entry.js | extension/live-view-entry.js<br>extension/status-entry.js |
+| `KEY_LANE_MIRROR` | extension/popup-entry.js | extension/status-entry.js |
 | `KEY_LAST_WATCH_URL` | — | extension/comeview-entry.js<br>extension/popup-entry.js<br>extension/status-entry.js |
 | `KEY_LIVE_BROADCASTER_CTX` | extension/content-entry.js | extension/venueBar.js |
 | `KEY_MARKETING_EXPORT_MASK_LABELS` | — | extension/popup-entry.js |
@@ -109,10 +109,10 @@
 | `KEY_PROFILE_RESOLVE_STATE` | — | extension/content-entry.js |
 | `KEY_RECORDING` | — | extension/content-entry.js<br>extension/popup-entry.js |
 | `KEY_RECORDING_WATCHDOG` | extension/content-entry.js | extension/popup-entry.js |
-| `KEY_REPORT_PREVIEW` | lib/reportPreviewPublish.js | extension/live-view-entry.js<br>extension/status-entry.js |
+| `KEY_REPORT_PREVIEW` | lib/reportPreviewPublish.js | extension/status-entry.js |
 | `KEY_SELF_POSTED_RECENTS` | extension/content-entry.js | extension/content-entry.js<br>extension/popup-entry.js |
 | `KEY_STATUS_TREND` | extension/status-entry.js | extension/status-entry.js |
-| `KEY_STAT_CARDS_MIRROR` | extension/popup-entry.js | extension/live-view-entry.js<br>extension/status-entry.js |
+| `KEY_STAT_CARDS_MIRROR` | extension/popup-entry.js | extension/status-entry.js |
 | `KEY_STORAGE_WRITE_ERROR` | extension/content-entry.js<br>extension/popup-entry.js | extension/popup-entry.js |
 | `KEY_STORY_GROWTH_COLLAPSED` | — | extension/popup-entry.js |
 | `KEY_SUPPORT_CELEBRATION_STATE` | — | extension/popup-entry.js |
@@ -129,8 +129,7 @@
 | `fn:comeviewPinStorageKey` | extension/comeview-entry.js | — |
 | `fn:commentDbSummaryKey` | — | extension/popup-entry.js |
 | `fn:eventDomStorageKey` | extension/content-entry.js | — |
-| `fn:giftHistoryThrowsStorageKey` | — | extension/live-view-entry.js |
-| `fn:giftSubAppHistoryStorageKey` | extension/content-entry.js | extension/live-view-entry.js |
+| `fn:giftSubAppHistoryStorageKey` | extension/content-entry.js | — |
 | `fn:perfDiagStorageKey` | extension/popup-entry.js | — |
 | `fn:tailStorageKey` | extension/content-entry.js | — |
 | `fn:watchSnapshotStorageKey` | — | extension/popup-entry.js |

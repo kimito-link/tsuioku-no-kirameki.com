@@ -9,10 +9,10 @@ import { readInlineModeFlags } from './inlineModeFlags.js';
 describe('readInlineModeFlags', () => {
   it('空/未指定は全 false', () => {
     expect(readInlineModeFlags('')).toEqual({
-      inline: false, toolbar: false, embedWatch: false, sidePanel: false, passive: false
+      inline: false, toolbar: false, embedWatch: false, sidePanel: false, passive: false, embedLiveView: false
     });
     expect(readInlineModeFlags(undefined)).toEqual({
-      inline: false, toolbar: false, embedWatch: false, sidePanel: false, passive: false
+      inline: false, toolbar: false, embedWatch: false, sidePanel: false, passive: false, embedLiveView: false
     });
   });
 
@@ -29,6 +29,27 @@ describe('readInlineModeFlags', () => {
     expect(f.passive).toBe(true);
     expect(f.embedWatch).toBe(true); // dock!=='sidepanel' なので &lv= 解決経路は生きる
     expect(f.sidePanel).toBe(false);
+  });
+
+  it('?inline=1&dock=liveview = passive + embedLiveView。embedWatch も true(自タブ lv 解決のため)', () => {
+    const f = readInlineModeFlags('?inline=1&dock=liveview');
+    expect(f.passive).toBe(true); // status と同じ受動ビュー(書かない/注入しない/fetch しない)
+    expect(f.embedLiveView).toBe(true);
+    expect(f.embedWatch).toBe(true); // dock!=='sidepanel' なので &lv= 解決経路は生きる
+    expect(f.sidePanel).toBe(false);
+  });
+
+  it('dock=status は passive だが embedLiveView ではない(両者を取り違えない)', () => {
+    const f = readInlineModeFlags('?inline=1&dock=status');
+    expect(f.passive).toBe(true);
+    expect(f.embedLiveView).toBe(false);
+  });
+
+  it('dock=liveview でも inline=1 が無ければ passive/embedLiveView は false', () => {
+    const f = readInlineModeFlags('?dock=liveview');
+    expect(f.inline).toBe(false);
+    expect(f.passive).toBe(false);
+    expect(f.embedLiveView).toBe(false);
   });
 
   it('?inline=1&dock=sidepanel = sidePanel。embedWatch/passive は false', () => {

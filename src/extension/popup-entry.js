@@ -781,6 +781,9 @@ const TOOLBAR_POPUP = _inlineFlags.toolbar;
 const INLINE_EMBED_WATCH = _inlineFlags.embedWatch;
 const INLINE_SIDE_PANEL = _inlineFlags.sidePanel;
 const INLINE_PASSIVE = _inlineFlags.passive;
+// 2026-06-23: 応援ライブビュー専用タブに popup を全面 iframe 埋め込みするモード(dock=liveview)。
+//   挙動は INLINE_PASSIVE(受動ビュー)に集約済み=ここでは将来の全画面 CSS フック用のクラス付けにだけ使う。
+const INLINE_EMBED_LIVEVIEW = _inlineFlags.embedLiveView;
 
 /**
  * watch ページ内 iframe（INLINE_EMBED_WATCH）の自タブ liveId から構築した watch URL。
@@ -812,6 +815,9 @@ function applyResponsivePopupLayout() {
   body.classList.toggle('nl-inline', INLINE_MODE);
   root.classList.toggle('nl-inline-embed-watch', INLINE_EMBED_WATCH);
   body.classList.toggle('nl-inline-embed-watch', INLINE_EMBED_WATCH);
+  // 2026-06-23: 応援ライブビュー埋め込み(dock=liveview)用の全画面 CSS フック。
+  root.classList.toggle('nl-inline-embed-liveview', INLINE_EMBED_LIVEVIEW);
+  body.classList.toggle('nl-inline-embed-liveview', INLINE_EMBED_LIVEVIEW);
   /*
    * 0.1.51 (AG): popup window で dark テーマが消えない件の追跡修正。
    *   0.1.50 で `prefers-color-scheme: dark` 検出に切り替えたが、

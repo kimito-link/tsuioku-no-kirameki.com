@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 1 / 545 件
+## ⚠️ 役割コメントが無いソース 1 / 544 件
 - `src/lib/reportPreviewPublish.js`
 
 ## 全ファイルツリー
@@ -257,7 +257,7 @@
   - `vendor-visual-explainer.mjs` — Vendors nicobailon/visual-explainer (MIT) into .cursor/skills/visual-explainer/
   - `verify-bump.mjs` — extension bump 後の整合性チェッカー
   - `write-extension-placeholder-icons.mjs` — リポジトリに 256px アイコンしか無い環境向け: manifest 用の小さめ PNG を生成する。
-- 📁 **src/** (1165)
+- 📁 **src/** (1163)
   - 📁 **data/** (6)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -297,7 +297,7 @@
     - `backfill-sw-entry.js` — Service Worker 側の過去ログ取得(バックフィル)エンジン。NDGR を遡って取り込む。
     - `comeview-entry.js` — v0.1.652: 独自コメビュ「KIRAMEKI Comment View」(comeview.html)。
     - `content-entry.js` — watch ページ常駐の記録エンジン本体。コメント取得(NDGR+DOM)・記録・バックフィル・パネル描画の中枢。
-    - `live-view-entry.js` — 応援ライブビュー(live-view.html)のエントリ(v0.1.871)。
+    - `live-view-entry.js` — 応援ライブビュー(live-view.html)のエントリ。
     - `offscreen-entry.js` — feat/multitab-scale-globalcap（2026-05-31）: コメント IDB の「常駐・単一書き手」を担う
     - `page-intercept-entry.js` — MAIN world エントリ（esbuild で単一 IIFE にバンドルされる）
     - `popup-entry.js` — ポップアップ UI 本体。応援レーン描画・HTMLレポート生成・各種診断/共有のまとめ役。
@@ -516,7 +516,7 @@
         - `logo_funlink_white_RGB_maru_black.png`
       - `logo_guide_funlink_ol.pdf`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (954)
+  - 📁 **lib/** (952)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -1370,8 +1370,6 @@
     - `userLaneDiagSnapshot.test.js`
     - `userLaneMergeGiftThrowers.js` — ギフト／広告投げ主専用レーン用のエントリ一覧（りんく列とは別段）。
     - `userLaneMergeGiftThrowers.test.js`
-    - `userLanePicksFromUsers.js` — レーンユーザー({userId,nickname,avatarUrl,count})を、popup/会場の人物タイル
-    - `userLanePicksFromUsers.test.js`
     - `userProfileLinkHtml.js` — 応援コメントの各種 HTML 出力（マーケティング HTML・HTML 保存レポート等）で、
     - `userProfileLinkHtml.test.js`
     - `userRooms.js` — 保存済みコメントを「ユーザー＝ルーム」に集計（純関数）
