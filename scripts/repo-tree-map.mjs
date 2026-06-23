@@ -79,6 +79,7 @@ const ROLES = {
   'tools/mcp-nicolive': { role: 'ニコ生状態を読む MCP サーバ(司令塔の状態取得用)', tags: ['MCP', '診断'] },
   'app': { role: 'Web 版状態ページのアプリ(app.js + dist)', tags: ['Web版'] },
   'app/dist': { role: 'Web 版アプリのビルド成果物', tags: ['ビルド成果物'] },
+  'app/images': { role: '純Web版 応援ライブビューの同梱画像(ゆっくり顔)', tags: ['Web版', '画像'] },
   'api': { role: 'サーバレス API(status エンドポイント)', tags: ['API'] },
   'memory': { role: 'セッション横断の知見・引き継ぎ(AI のメモリ)。コミット対象外も混在', tags: ['メモリ', '知見'] },
   'memory/archive': { role: '過去セッションの引き継ぎ(HANDOFF)アーカイブ', tags: ['メモリ', '履歴'] },

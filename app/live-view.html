@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- ニコ生アバター(secure-dcdn.cdn.nimg.jp)を純Webから出すため referrer を送らない(hotlink 保護回避)。 -->
+    <meta name="referrer" content="no-referrer" />
+    <title>応援ライブビュー（Web版）</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        --nl-bg: #fffaf2;
+        --nl-text: #1f2937;
+        --nl-text-soft: #4b5563;
+        --nl-border: #e5e7eb;
+        --nl-card-bg: #ffffff;
+        --nl-accent: #ec4899;
+        /* 応援レーン鏡(.nl-story-userlane-*)が参照する変数。popup.html / status.html から移植。
+           無いと color-mix/背景/枠が壊れて裸要素になる(v0.1.900 の轍)。 */
+        --nl-surface: #ffffff;
+        --nl-text-sub: #4b5563;
+        --nl-muted: #5b6475;
+        --nl-user-accent: #ec4899;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --nl-bg: #111827;
+          --nl-text: #f3f4f6;
+          --nl-text-soft: #9ca3af;
+          --nl-border: #374151;
+          --nl-card-bg: #1f2937;
+          --nl-surface: #161d27;
+          --nl-text-sub: #cbd5e1;
+          --nl-muted: #8d9bb5;
+          --nl-user-accent: #ec4899;
+        }
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: var(--nl-bg);
+        color: var(--nl-text);
+        font-family:
+          -apple-system,
+          BlinkMacSystemFont,
+          'Segoe UI',
+          'Hiragino Kaku Gothic ProN',
+          'Noto Sans JP',
+          sans-serif;
+        line-height: 1.5;
+      }
+      /* ── レスポンシブの器 ──────────────────────────────────────────────
+         popup は狭い幅前提なので、PC では中央寄せ + 余白、スマホは全幅。
+         応援レーンのタイルは元々 flex-wrap なので幅に合わせて自然に折り返す。 */
+      .wrap {
+        width: 100%;
+        max-width: 720px;
+        margin: 0 auto;
+        padding: 14px 14px 40px;
+      }
+      header.lv-head {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 8px;
+        margin: 0 0 12px;
+      }
+      header.lv-head h1 {
+        font-size: 16px;
+        margin: 0;
+      }
+      #updatedAt {
+        font-size: 11px;
+        color: var(--nl-text-soft);
+        white-space: nowrap;
+      }
+      .lane {
+        background: var(--nl-card-bg);
+        border: 1px solid var(--nl-border);
+        border-radius: 14px;
+        padding: 14px;
+        margin: 0 0 14px;
+        box-shadow: 0 1px 8px rgb(2 17 31 / 5%);
+      }
+      .lane > h2 {
+        font-size: 14px;
+        margin: 0 0 8px;
+      }
+      .lane-note {
+        font-size: 11px;
+        color: var(--nl-text-soft);
+        margin: 0 0 8px;
+      }
+      #errorBox {
+        margin: 10px 0;
+        padding: 12px 14px;
+        border-radius: 12px;
+        background: color-mix(in srgb, var(--nl-accent) 12%, transparent);
+        border: 1px solid color-mix(in srgb, var(--nl-accent) 40%, transparent);
+        font-size: 13px;
+      }
+
+      /* ── 応援レーン鏡 CSS(popup.html / status.html から verbatim 移植・似せて自作しない) ── */
+      .nl-story-userlane-stack {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        overflow-x: hidden;
+        overflow-y: visible;
+        margin: 0 0 4px;
+        min-height: 0;
+      }
+      .nl-story-userlane-tier-wrap {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        min-width: 0;
+      }
+      .nl-story-userlane-tier-wrap--gift {
+        padding: 6px 6px 4px;
+        border-radius: 10px;
+        background: color-mix(in srgb, var(--nl-surface) 82%, #e8b84a 18%);
+        border: 1px solid color-mix(in srgb, var(--nl-border) 70%, #d4a017 30%);
+      }
+      .nl-story-userlane-tier-hint {
+        margin: 0;
+        padding: 4px 6px;
+        font-size: 10px;
+        font-weight: 700;
+        line-height: 1.4;
+        color: var(--nl-text-sub);
+        border-radius: 8px;
+        background: color-mix(in srgb, var(--nl-surface) 88%, #b8a06a 12%);
+        border: 1px solid color-mix(in srgb, var(--nl-border) 75%, #c9a227 25%);
+      }
+      .nl-story-userlane {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        align-content: flex-start;
+        gap: 6px 8px;
+        margin: 0;
+        min-height: 0;
+        max-height: none;
+        overflow-x: auto;
+        overflow-y: visible;
+        -webkit-overflow-scrolling: touch;
+      }
+      .nl-story-userlane-stack > .nl-story-userlane,
+      .nl-story-userlane-stack .nl-story-userlane-tier-wrap .nl-story-userlane {
+        max-height: none;
+        overflow-y: visible;
+      }
+      .nl-story-userlane-cell {
+        display: inline-flex;
+        flex-direction: row;
+        align-items: center;
+        justify-content: flex-start;
+        gap: 6px;
+        flex-shrink: 0;
+        max-width: 100%;
+        min-width: 0;
+        border-radius: 999px;
+        padding-right: 6px;
+      }
+      .nl-story-userlane-cell--accent {
+        padding: 3px 5px 3px 3px;
+        background: color-mix(in srgb, var(--nl-user-accent) 20%, transparent);
+        box-shadow: 0 0 0 2px color-mix(in srgb, var(--nl-user-accent) 48%, transparent);
+      }
+      a.nl-story-userlane-cell--linkable {
+        text-decoration: none;
+        color: inherit;
+        cursor: pointer;
+        transition: background-color 0.12s;
+      }
+      a.nl-story-userlane-cell--linkable:hover {
+        background-color: color-mix(in srgb, var(--nl-border) 40%, transparent);
+      }
+      .nl-story-userlane-tier-break {
+        flex: 0 0 100%;
+        width: 100%;
+        height: 0;
+        margin: 0;
+        padding: 0;
+        overflow: hidden;
+        pointer-events: none;
+      }
+      .nl-story-userlane-meta {
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        gap: 1px;
+        min-width: 0;
+        max-width: min(118px, 30vw);
+        font-size: 10px;
+        line-height: 1.22;
+        text-align: left;
+      }
+      .nl-story-userlane-meta__id,
+      .nl-story-userlane-meta__name {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .nl-story-userlane-meta__id {
+        color: var(--nl-text-sub);
+        font-weight: 600;
+      }
+      .nl-story-userlane-meta__name {
+        color: var(--nl-text);
+        font-weight: 500;
+      }
+      .nl-story-userlane-avatar {
+        width: 32px;
+        height: 32px;
+        border-radius: 999px;
+        object-fit: cover;
+        object-position: center;
+        border: 1.5px solid color-mix(in srgb, var(--nl-border) 82%, #fff 18%);
+        box-shadow: 0 1px 3px rgb(2 17 31 / 22%);
+        background: var(--nl-surface);
+        flex-shrink: 0;
+      }
+      .nl-story-userlane-avatar.nl-avatar--tv-fallback {
+        object-fit: contain;
+        padding: 3px;
+        background: linear-gradient(180deg, #efebe9, #d7ccc8);
+        border-color: color-mix(in srgb, #8d6e63 55%, var(--nl-border) 45%);
+      }
+      .nl-story-userlane-guide {
+        display: flex;
+        flex-direction: column;
+        align-items: stretch;
+        gap: 5px;
+        margin: 0 0 6px;
+        min-width: 0;
+      }
+      .nl-story-userlane-guide__lines {
+        display: flex;
+        flex-direction: column;
+        gap: 5px;
+        min-width: 0;
+      }
+      .nl-story-userlane-guide__line {
+        display: flex;
+        align-items: flex-start;
+        gap: 7px;
+        padding: 5px 8px;
+        border-radius: 10px;
+        background: linear-gradient(180deg, #fffaf0, #fff4db);
+        border: 1px solid #f5d28d;
+        color: #6b4f18;
+        font-size: 10px;
+        font-weight: 700;
+        line-height: 1.38;
+        box-shadow: 0 1px 5px rgb(148 101 14 / 9%);
+        min-width: 0;
+      }
+      .nl-story-userlane-guide__face {
+        width: 24px;
+        height: 24px;
+        border-radius: 999px;
+        object-fit: cover;
+        object-position: center;
+        border: 1px solid color-mix(in srgb, var(--nl-border) 82%, #fff 18%);
+        background: var(--nl-surface);
+        flex: 0 0 auto;
+      }
+      .nl-story-userlane-guide__text {
+        flex: 1 1 auto;
+        min-width: 0;
+      }
+      .nl-story-userlane-guide__foot {
+        margin: 2px 0 0;
+        padding: 0 2px;
+        font-size: 10px;
+        font-weight: 800;
+        color: var(--nl-muted);
+        line-height: 1.35;
+      }
+      .nl-story-userlane__empty-note {
+        margin: 4px 0 2px;
+        padding: 8px 10px;
+        font-size: clamp(10px, 2.4vw, 11px);
+        line-height: 1.45;
+        font-weight: 600;
+        color: var(--nl-text-sub);
+        border-radius: 10px;
+        background: color-mix(in srgb, var(--nl-surface) 92%, var(--nl-border) 8%);
+        border: 1px solid color-mix(in srgb, var(--nl-border) 70%, transparent);
+      }
+      .nl-story-userlane__empty-note-p {
+        margin: 0 0 6px;
+      }
+      .nl-story-userlane__empty-note-p:last-child {
+        margin-bottom: 0;
+      }
+      .nl-story-userlane-guide__count {
+        color: #9a6f12;
+        font-weight: 800;
+      }
+
+      /* PC の広い幅でタイルが横に伸びすぎないように、アバターを少しだけ大きく見せる微調整。 */
+      @media (min-width: 600px) {
+        .nl-story-userlane-avatar {
+          width: 36px;
+          height: 36px;
+        }
+        .nl-story-userlane-meta {
+          font-size: 11px;
+          max-width: 160px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <header class="lv-head">
+        <h1>🪞 応援ライブビュー</h1>
+        <span id="updatedAt"></span>
+      </header>
+
+      <div id="errorBox" hidden></div>
+
+      <!-- 応援レーン鏡: popup の段組み(りんく/こん太/広告/たぬ姉)を顔込みでそっくり。
+           DOM の id は popup.html / status.html と完全一致(本物の paintStoryUserLaneDomFilled が読む)。 -->
+      <section class="lane" id="laneMirrorLane" hidden>
+        <h2>応援レーン</h2>
+        <div class="lane-note">配信を応援している人を、ポップアップと同じ並び・同じ顔で映しています。</div>
+        <div id="laneMirrorMeta" class="lane-note"></div>
+        <div id="sceneStoryUserLaneGuideTop" class="nl-story-userlane-guide" hidden>
+          <div id="sceneStoryUserLaneGuideLinesTop" class="nl-story-userlane-guide__lines"></div>
+        </div>
+        <div id="sceneStoryUserLaneStack" class="nl-story-userlane-stack" hidden>
+          <div id="sceneStoryUserLaneLinkWrap" class="nl-story-userlane-tier-wrap">
+            <div id="sceneStoryUserLaneLink" class="nl-story-userlane nl-story-userlane--link" hidden></div>
+            <p id="sceneStoryUserLaneLinkHint" class="nl-story-userlane-tier-hint" hidden></p>
+          </div>
+          <div id="sceneStoryUserLaneGiftWrap" class="nl-story-userlane-tier-wrap nl-story-userlane-tier-wrap--gift">
+            <div id="sceneStoryUserLaneGuideMidGift" class="nl-story-userlane-guide nl-story-userlane-guide--mid" hidden>
+              <div id="sceneStoryUserLaneGuideLinesMidGift" class="nl-story-userlane-guide__lines"></div>
+            </div>
+            <div id="sceneStoryUserLaneGift" class="nl-story-userlane nl-story-userlane--gift" hidden></div>
+          </div>
+          <div id="sceneStoryUserLaneAdWrap" class="nl-story-userlane-tier-wrap nl-story-userlane-tier-wrap--ad">
+            <div id="sceneStoryUserLaneGuideMidAd" class="nl-story-userlane-guide nl-story-userlane-guide--mid" hidden>
+              <div id="sceneStoryUserLaneGuideLinesMidAd" class="nl-story-userlane-guide__lines"></div>
+            </div>
+            <div id="sceneStoryUserLaneAd" class="nl-story-userlane nl-story-userlane--ad" hidden></div>
+          </div>
+          <div id="sceneStoryUserLaneGuideMidKonta" class="nl-story-userlane-guide nl-story-userlane-guide--mid" hidden>
+            <div id="sceneStoryUserLaneGuideLinesMidKonta" class="nl-story-userlane-guide__lines"></div>
+          </div>
+          <div id="sceneStoryUserLaneKonta" class="nl-story-userlane nl-story-userlane--konta" hidden></div>
+          <div id="sceneStoryUserLaneGuideMidTanu" class="nl-story-userlane-guide nl-story-userlane-guide--mid" hidden>
+            <div id="sceneStoryUserLaneGuideLinesMidTanu" class="nl-story-userlane-guide__lines"></div>
+          </div>
+          <div id="sceneStoryUserLaneTanu" class="nl-story-userlane nl-story-userlane--tanu" hidden></div>
+        </div>
+        <div id="sceneStoryUserLaneGuideBottom" class="nl-story-userlane-guide" hidden>
+          <div id="sceneStoryUserLaneGuideLinesBottom" class="nl-story-userlane-guide__lines"></div>
+        </div>
+      </section>
+
+      <!-- データがまだ無い時の案内(死に画面にしない)。 -->
+      <div id="laneEmpty" class="lane" hidden>読み込み中…</div>
+    </div>
+
+    <script type="module" src="dist/live-view.js"></script>
+  </body>
+</html>

@@ -27,16 +27,26 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 1 / 545 件
+## ⚠️ 役割コメントが無いソース 1 / 546 件
 - `src/lib/reportPreviewPublish.js`
 
 ## 全ファイルツリー
 
 - 📁 **api/** (1)
   - `status.js` — status 受け口 Vercel Serverless Function。
-- 📁 **app/** (2)
+- 📁 **app/** (7)
+  - 📁 **images/** (3)
+    - 📁 **yukkuri/** (3)
+      - 📁 **konta/** (1)
+        - `kitsune-yukkuri-half-eyes-mouth-closed.png`
+      - 📁 **link/** (1)
+        - `link-yukkuri-half-eyes-mouth-closed.png`
+      - 📁 **tanunee/** (1)
+        - `tanuki-yukkuri-half-eyes-mouth-closed.png`
   - `app.js` — スマホ閲覧用 status Web 版。
   - `index.html`
+  - `live-view.html`
+  - `live-view.js` — 純Web版 応援ライブビュー(拡張なし・PC/スマホ共通レスポンシブ)。
 - 📁 **docs/** (71)
   - 📁 **article-assets/** (3)
     - `venue-mode-sound.mp4`

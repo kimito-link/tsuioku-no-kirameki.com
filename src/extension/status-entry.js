@@ -975,7 +975,13 @@ function renderAll({ lvList, summaries, fastDiag, popupDiag, backfillProgress, v
       generatedAt: new Date().toISOString(),
       overview: overviewText,
       lives: livesData,
-      fastDiag
+      fastDiag,
+      // 2026-06-23: 純Web版の応援ライブビュー(app/live-view)用。popup の応援レーン/数字カードの鏡
+      //   スナップショット(顔/名前込み・既存の純データ)を「スマホへ送信」のペイロードに相乗りさせる。
+      //   サーバー(api/status.js)は payload を丸ごと保存=無変更。純Webは本物の paintStoryUserLaneDomFilled
+      //   で描く(council/liveview-web-public-SYNTHESIS.md)。popup 未起動なら null=純Web側は空ガイドにフォールバック。
+      laneMirror: laneMirror || null,
+      statCardsMirror: statCardsMirror || null
     }
   };
 }
