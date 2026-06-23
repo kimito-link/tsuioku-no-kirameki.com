@@ -55,6 +55,28 @@ describe('buildLaneMirrorSnapshot', () => {
     }, { cap: 48, nowMs: 1 });
     expect(snap.link).toHaveLength(48);
   });
+
+  it('pickedLength は渡した値(=全5段合計 laneDisplayedTotal)をそのまま格納する(取り違え再発防止)', () => {
+    // popup は paint と publish に同じ laneDisplayedTotal(りんく+ギフト+広告+こん太+たぬ姉の合計枠)を
+    //   渡す。りんく段だけの picked.length を渡すとフッター「いま N 件を表示中」が popup より小さくなり
+    //   「ほか M人」が過大になる(数字の抜け漏れ)。鏡はこの値を加工せず格納することを固定する。
+    const laneDisplayedTotal = 3 /* link */ + 2 /* gift */ + 1 /* ad */; // = 6(=全5段の合計枠)
+    const snap = buildLaneMirrorSnapshot({
+      liveId: 'lv1',
+      buckets: {
+        link: [cell('1', 'https://cdn/1.jpg'), cell('2', 'https://cdn/2.jpg'), cell('3', 'https://cdn/3.jpg')],
+        gift: [cell('4', 'https://cdn/4.jpg'), cell('5', 'https://cdn/5.jpg')],
+        ad: [cell('6', 'https://cdn/6.jpg')],
+        konta: [],
+        tanu: []
+      },
+      pickedLength: laneDisplayedTotal,
+      totalCandidates: 9
+    }, { nowMs: 1 });
+    expect(snap.pickedLength).toBe(6);
+    // 「ほか M人」= totalCandidates - pickedLength は popup と同じ式(9 - 6 = 3)になる。
+    expect(snap.totalCandidates - snap.pickedLength).toBe(3);
+  });
 });
 
 describe('restoreLaneMirrorBuckets(round-trip)', () => {

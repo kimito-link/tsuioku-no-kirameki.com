@@ -19,6 +19,10 @@
  *   pickedLength: number,
  *   totalCandidates: number
  * }} LaneMirrorSnapshot
+ *
+ * ★pickedLength = popup が paint に渡す laneDisplayedTotal(全5段=りんく+ギフト+広告+こん太+たぬ姉の
+ *   合計枠)。フッター「いま N 件を表示中」「ほか M人」が popup と一致するための数=りんく段だけの
+ *   picked.length ではない(取り違え注意)。totalCandidates=素性が取れた候補総数(cap 前)で「ほか M人」用。
  */
 
 const LANE_MIRROR_TIERS = /** @type {const} */ (['link', 'gift', 'ad', 'konta', 'tanu']);
