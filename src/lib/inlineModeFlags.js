@@ -1,0 +1,43 @@
+/**
+ * popup.html の URL クエリから「どのモードで開かれた popup か」を判定する純関数。
+ *
+ * popup-entry.js は同じ window.location.search を 5 回別々の IIFE で読んでいた（INLINE_MODE /
+ *   TOOLBAR_POPUP / INLINE_EMBED_WATCH / INLINE_SIDE_PANEL / INLINE_PASSIVE）。同型の URLSearchParams
+ *   読みをこの 1 か所に集約し、popup-entry.js は destructuring で受けるだけにする（max-lines ラチェット内に
+ *   収め、status-entry.js も同じ判定を import で再利用できる）。chrome 非依存＝unit test で固定。
+ *
+ * モードの意味:
+ *   - inline      : `?inline=1`（watch ページ内 iframe / サイドパネル / status 埋め込みの総称）
+ *   - toolbar     : `?toolbar=1`（ツールバー default_popup の短命 popup）
+ *   - embedWatch  : inline かつ dock!=='sidepanel'（watch ページ埋め込み・自タブ lv を `&lv=` で受ける）
+ *   - sidePanel   : inline かつ dock==='sidepanel'
+ *   - passive     : inline かつ dock==='status'（status.html 埋め込みの受動ビュー＝書かない・注入しない・fetch しない）
+ *
+ * @typedef {{ inline: boolean, toolbar: boolean, embedWatch: boolean, sidePanel: boolean, passive: boolean }} InlineModeFlags
+ */
+
+/**
+ * @param {string} [search] window.location.search（省略時は空＝全 false）。`?` 付き/無しどちらも可。
+ * @returns {InlineModeFlags}
+ */
+export function readInlineModeFlags(search) {
+  let dock = '';
+  let inline = false;
+  let toolbar = false;
+  try {
+    const params = new URLSearchParams(String(search || ''));
+    inline = params.get('inline') === '1';
+    toolbar = params.get('toolbar') === '1';
+    dock = String(params.get('dock') || '');
+  } catch {
+    return { inline: false, toolbar: false, embedWatch: false, sidePanel: false, passive: false };
+  }
+  return {
+    inline,
+    toolbar,
+    // embedWatch は inline 時のみ意味を持つ。dock!=='sidepanel'（status/embed/未指定）で true。
+    embedWatch: inline && dock !== 'sidepanel',
+    sidePanel: inline && dock === 'sidepanel',
+    passive: inline && dock === 'status'
+  };
+}

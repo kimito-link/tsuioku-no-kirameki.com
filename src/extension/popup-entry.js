@@ -1,6 +1,7 @@
 // @ts-nocheck — popup UI; DOM/Chrome API が広く any 相当
 // popup-entry.js — ポップアップ UI 本体。応援レーン描画・HTMLレポート生成・各種診断/共有のまとめ役。
 import { extractLiveIdFromUrl, isNicoLiveWatchUrl, watchPageUrlsMatchForSnapshot } from '../lib/broadcastUrl.js';
+import { readInlineModeFlags } from '../lib/inlineModeFlags.js';
 import { pickWatchUrlFromMultipleSources } from '../lib/popupWatchUrlResolveMultiTab.js';
 import { shouldCloseStandalonePopupAfterNavigate } from '../lib/standalonePopupClose.js';
 import { shouldRescueEmptyResolvedWatch } from '../lib/popupContextBarModel.js';
@@ -767,42 +768,19 @@ function syncVoiceCommentButton() {
   }
 }
 
-const INLINE_MODE = (() => {
-  try {
-    return new URLSearchParams(window.location.search).get('inline') === '1';
-  } catch {
-    return false;
-  }
-})();
-
-/** ツールバーの default_popup 経由で開かれた短命 popup か。 */
-const TOOLBAR_POPUP = (() => {
-  try {
-    return new URLSearchParams(window.location.search).get('toolbar') === '1';
-  } catch {
-    return false;
-  }
-})();
-
-/** watch ページ埋め込み iframe（サイドパネル用 `dock=sidepanel` とは UI を分ける） */
-const INLINE_EMBED_WATCH = (() => {
-  if (!INLINE_MODE) return false;
-  try {
-    return new URLSearchParams(window.location.search).get('dock') !== 'sidepanel';
-  } catch {
-    return true;
-  }
-})();
-
-/** サイドパネル iframe（`popup.html?inline=1&dock=sidepanel`） */
-const INLINE_SIDE_PANEL = (() => {
-  if (!INLINE_MODE) return false;
-  try {
-    return new URLSearchParams(window.location.search).get('dock') === 'sidepanel';
-  } catch {
-    return false;
-  }
-})();
+// popup の起動モードフラグ（URL クエリ）を1か所(inlineModeFlags.js)で判定し destructuring で受ける。
+//   INLINE_MODE=?inline=1 / TOOLBAR_POPUP=?toolbar=1 / INLINE_EMBED_WATCH=inline&dock!=='sidepanel'(自タブ
+//   lv を &lv= で受ける) / INLINE_SIDE_PANEL=dock==='sidepanel' / INLINE_PASSIVE=dock==='status'。
+// ★INLINE_PASSIVE=status.html 埋め込みの受動ビュー(council w3237a6h6)=storage に書かず・watch へ注入せず・
+//   外部 fetch せず、描画は storage.onChanged で受動更新(書かずに映す)。ユーザー操作起点は生かす。
+const _inlineFlags = readInlineModeFlags(
+  typeof window !== 'undefined' ? window.location.search : ''
+);
+const INLINE_MODE = _inlineFlags.inline;
+const TOOLBAR_POPUP = _inlineFlags.toolbar;
+const INLINE_EMBED_WATCH = _inlineFlags.embedWatch;
+const INLINE_SIDE_PANEL = _inlineFlags.sidePanel;
+const INLINE_PASSIVE = _inlineFlags.passive;
 
 /**
  * watch ページ内 iframe（INLINE_EMBED_WATCH）の自タブ liveId から構築した watch URL。
@@ -1253,6 +1231,7 @@ function resolveWatchUrlForCelebrationRelay() {
  * @returns {Promise<boolean>}
  */
 async function relayCelebrationToWatchWindow(payload) {
+  if (INLINE_PASSIVE) return false; // 受動ビュー: watch へ演出中継しない(iframe 内 local 再生)
   if (!INLINE_EMBED_WATCH) return false;
   const watchUrl = resolveWatchUrlForCelebrationRelay();
   if (!watchUrl) return false;
@@ -1772,6 +1751,7 @@ function applyBroadcasterFollowerCountForCelebration(liveId, next) {
  * @param {string} [liveId]
  */
 async function pollBroadcasterFollowerCountForCelebration(liveId) {
+  if (INLINE_PASSIVE) return; // 受動ビュー: 外部プロフィール fetch/書込しない
   const lid = String(liveId || watchPopupLastPaintedLiveId || '').trim().toLowerCase();
   if (!lid || _broadcasterFollowerPollInFlight) return;
   const now = Date.now();
@@ -5380,6 +5360,7 @@ function renderStoryUserLane() {
 let _laneDiagLastWriteAt = 0;
 /** @param {{ liveId: string, identified: number, laneShown: number, limit: number }} obs */
 function publishLaneDiag(obs) {
+  if (INLINE_PASSIVE) return; // 受動ビュー: 鏡/診断 storage を上書きしない(本物 popup の鏡と競合させない)
   try {
     const now = Date.now();
     if (now - _laneDiagLastWriteAt < 3000) return; // 3秒 min-gap。
@@ -5397,6 +5378,7 @@ function publishLaneDiag(obs) {
 let _laneMirrorLastWriteAt = 0;
 /** @param {{ liveId: string, buckets: Record<string, unknown[]>, pickedLength: number, totalCandidates: number }} input */
 function publishLaneMirror(input) {
+  if (INLINE_PASSIVE) return; // 受動ビュー: 鏡を上書きしない
   try {
     const now = Date.now();
     if (now - _laneMirrorLastWriteAt < 3000) return; // 3秒 min-gap(publishLaneDiag と同じ)。
@@ -5420,6 +5402,7 @@ let _statCardsMirrorLastWriteAt = 0;
  *   snapshotForOfficial: unknown }} input
  */
 function publishStatCardsMirror(input) {
+  if (INLINE_PASSIVE) return; // 受動ビュー: 数字カード鏡を上書きしない
   try {
     const now = Date.now();
     if (now - _statCardsMirrorLastWriteAt < 3000) return; // 3秒 min-gap。
@@ -10580,6 +10563,7 @@ let _kokenGiftPopupSyncInFlight = false;
  * @param {{ force?: boolean }} [opts] storage 更新直後など gap を無視する
  */
 async function syncKokenGiftHistoryForPopup(liveId, opts = {}) {
+  if (INLINE_PASSIVE) return; // 受動ビュー: koken 外部 fetch/giftPersist 書込しない
   const lid = String(liveId || '').trim().toLowerCase();
   if (!/^lv\d{1,15}$/.test(lid)) return;
   const now = Date.now();
@@ -15109,6 +15093,7 @@ async function requestPanelMetricsFromWatchTabOnce(watchUrl, expectedLv) {
  * @returns {Promise<Record<string, unknown>|null>}
  */
 async function requestPanelMetricsFromWatchTab(watchUrl, expectedLv) {
+  if (INLINE_PASSIVE) return null; // 受動ビュー: watch タブへ注入しない(null→呼び出し側は storage 読みで描画)
   try {
     return await withTimeout(
       requestPanelMetricsFromWatchTabOnce(watchUrl, expectedLv),
@@ -15403,6 +15388,7 @@ async function resolveBroadcasterProfileModel(snapshot, liveId) {
  * @returns {Promise<boolean>} followMap を更新したか
  */
 async function backfillCommenterFollowProfilesForReport(report, followMap) {
+  if (INLINE_PASSIVE) return false; // 受動ビュー: 自動プロフィール fetch しない(操作起点 force… は生かす)
   const stats = (Array.isArray(report.allNumericCommenters) ? report.allNumericCommenters : [])
     .map((u) => String(u?.userId || '').trim())
     .filter((uid) => /^\d{1,18}$/.test(uid));
@@ -20888,6 +20874,8 @@ async function initPopup() {
   // を閉じない限り「early return するだけの空 tick」が永続的に走り続けて、
   // inline iframe では特にリソースを食う。
   let popupPollIntervalId = /** @type {number|null} */ (null);
+  // 受動ビュー(dock=status)は自律タイマー3本(polling/gift sync/鮮度)を張らない(council w3237a6h6)。
+  if (!INLINE_PASSIVE) {
   popupPollIntervalId = /** @type {number} */ (
     /** @type {unknown} */ (
       setInterval(() => {
@@ -20950,8 +20938,10 @@ async function initPopup() {
       formatCardFreshnessNote(_giftHistoryNorthStarCapturedAtMs, { autoRefreshing: true })
     );
   }, 30_000);
+  } // end if (!INLINE_PASSIVE)
 
-  if (INLINE_MODE || INLINE_SIDE_PANEL) {
+  // 受動ビュー(dock=status)は可視復帰 catch-up refresh も張らない(refresh→fetch を誘発するため)。
+  if ((INLINE_MODE || INLINE_SIDE_PANEL) && !INLINE_PASSIVE) {
     let lastVisibilityRefresh = 0;
     document.addEventListener('visibilitychange', () => {
       if (document.visibilityState !== 'visible') return;
@@ -20984,12 +20974,9 @@ if (document.readyState === 'loading') {
   initPopup();
 }
 
-// v0.1.828: popup を開いたら popup 固有診断を status へ自動集約(『AI診断コピー』押下を不要に)。
-//   初期描画を妨げないようアイドル遅延で1回だけ(schedulePopupDiagAutoPublish 内でガード)。
-try {
-  schedulePopupDiagAutoPublish();
-} catch {
-  // no-op(自動集約の失敗は popup 表示を妨げない)
+// v0.1.828: popup を開いたら popup 固有診断を status へ自動集約。受動ビュー(dock=status)は書込しない。
+if (!INLINE_PASSIVE) {
+  try { schedulePopupDiagAutoPublish(); } catch { /* no-op(自動集約失敗は表示を妨げない) */ }
 }
 
 // 安全網：万が一 initPopup が throw して initialRefreshDone が立たなくても、
