@@ -42,6 +42,25 @@ import {
 // v0.1.881: popup と同じ多段ソース(IDB→storageチャンク→テール)でコメントを読む共有リーダ。
 //   IDB に無いだけ(=chrome.storage チャンクに在る)で応援者ランキングが空になる退行を断つ。
 import { readAllCommentsForLive } from '../lib/readAllCommentsForLive.js';
+// 応援レーン鏡 / 数字カード鏡: popup の応援レーン(りんく/こん太/広告/たぬ姉の段組み)と上部の数字カード群を
+//   顔(avatar)まで含めてそっくり映す。データは popup→storage(KEY_LANE_MIRROR / KEY_STAT_CARDS_MIRROR)、
+//   live-view が読んで本物の描画関数で描く(会場とは無関係=popup と live-view だけ)。status-entry.js と同型。
+import { KEY_LANE_MIRROR } from '../lib/laneMirrorKey.js';
+import { restoreLaneMirrorBuckets } from '../lib/laneMirror.js';
+import { KEY_STAT_CARDS_MIRROR } from '../lib/statCardsMirrorKey.js';
+import { buildStatCardsMirrorSignature } from '../lib/statCardsMirror.js';
+import {
+  paintStoryUserLaneDomFilled,
+  paintStoryUserLaneDomEmptyGuides
+} from './story/renderStoryUserLaneDom.js';
+import { createSupportAvatarLoadGuard } from '../lib/supportGrowthAvatarLoad.js';
+import { isHttpOrHttpsUrl, NICONICO_OFFICIAL_DEFAULT_USERICON_HTTPS } from '../lib/supportGrowthTileSrc.js';
+import { storyTileUsesYukkuriTvStyle } from '../lib/storyTileTvStyle.js';
+import { upgradeAnonymousAvatarImage } from '../lib/avatarPartsComposer.js';
+import {
+  applyStoryAvatarTvFallbackClass,
+  removeStoryAvatarTvFallbackClass
+} from '../lib/storyAvatarTvFallbackClass.js';
 
 const PANEL_SUMMARY_PREFIX = 'nls_panel_summary_';
 const WATCH_SNAPSHOT_PREFIX = 'nls_watch_snapshot_';
@@ -56,6 +75,46 @@ const REFRESH_MS = 2000;
 // popup と同じ「ゆっくり画像」フォールバック(STORY_GRID_DEFAULT_TILE_IMG・拡張内相対パス)。
 const STORY_GRID_DEFAULT_TILE_IMG =
   'images/yukkuri-charactore-english/link/link-yukkuri-half-eyes-mouth-closed.png';
+
+// ============================================================================
+// 応援レーン鏡 / 数字カード鏡(status-entry.js と同型・似せて自作しない)。
+//   popup の応援レーン(りんく/こん太/広告/たぬ姉)と上部の数字カード群を、顔(avatar)込みで
+//   そっくり映す。データは popup→storage(KEY_LANE_MIRROR / KEY_STAT_CARDS_MIRROR)、live-view が
+//   読んで本物の paintStoryUserLaneDomFilled + buildPersonTileEl で描く(会場とは無関係)。
+//   ★2秒ループなので signature ガード必須(変化時だけ paint=img 再生成のチラつき・重さを防ぐ)。
+// ============================================================================
+
+/** 応援レーン鏡の再描画 skip 判定用 signature。`liveId|capturedAt|各段件数|pickedLength`
+ *   が前回と同じなら paint を skip。sentinel で初回は必ず描画する。 */
+let _lastLaneMirrorSig = ' init';
+/** 数字カード鏡の再描画 skip 判定用 signature(応援レーン鏡と同型)。 */
+let _lastStatCardsMirrorSig = ' init';
+/**
+ * 応援レーン鏡のアバター読み込みガード(popup と同設定の本物=createSupportAvatarLoadGuard)。
+ *   popup-entry.js:3770 と同じく fallback を先に出してプローブ成功時だけ差し替え=404 フリッカー防止。
+ *   live-view は popup と独立プロセスなので、ここで live-view 専用に1つ作る。
+ */
+const _laneMirrorAvatarLoadGuard = createSupportAvatarLoadGuard({
+  fallbackSrc: NICONICO_OFFICIAL_DEFAULT_USERICON_HTTPS,
+  onFallbackApplied: applyStoryAvatarTvFallbackClass,
+  onRemoteSuccess: removeStoryAvatarTvFallbackClass
+});
+/** 本物 buildPersonTileEl に渡す I/O(popup の laneDomIo と同じ4点)。 */
+const _laneMirrorDomIo = {
+  storyAvatarLoadGuard: _laneMirrorAvatarLoadGuard,
+  isHttpOrHttpsUrl,
+  storyTileUsesYukkuriTvStyle,
+  upgradeAnonymousAvatarImage
+};
+/** レーン案内(ガイド行)の顔。popup-entry.js:3750-3757 と同じ相対パス=live-view.html も extension
+ *   ルートなので解決する(faceAd は popup と同じくこん太アイコンを流用=popup-entry.js:5130)。 */
+const _LANE_MIRROR_FACES = {
+  faceLink: 'images/yukkuri-charactore-english/link/link-yukkuri-half-eyes-mouth-closed.png',
+  faceGift: 'images/yukkuri-charactore-english/konta/kitsune-yukkuri-half-eyes-mouth-closed.png',
+  faceAd: 'images/yukkuri-charactore-english/konta/kitsune-yukkuri-half-eyes-mouth-closed.png',
+  faceKonta: 'images/yukkuri-charactore-english/konta/kitsune-yukkuri-half-eyes-mouth-closed.png',
+  faceTanu: 'images/yukkuri-charactore-english/tanunee/tanuki-yukkuri-half-eyes-mouth-closed.png'
+};
 
 /** URL の ?lv= から live id を取り出す(検証付き)。 */
 function liveIdFromUrl() {
@@ -87,7 +146,11 @@ function createLiveViewDataSource(lv) {
         NICOAD_API_RANKING_PREFIX + lv,
         // v0.1.880: ギフト履歴レーン(送り主別累計pt+個別投げ一覧)。popup と同じ storage キー。
         giftSubAppHistoryStorageKey(lv),
-        giftHistoryThrowsStorageKey(lv)
+        giftHistoryThrowsStorageKey(lv),
+        // 応援レーン鏡 / 数字カード鏡(popup→storage のグローバルキー・lv を含まない=popup を開いている
+        //   配信ぶんが書かれる)。popup 未起動なら null=各鏡セクションは hidden(死にリンクにしない)。
+        KEY_LANE_MIRROR,
+        KEY_STAT_CARDS_MIRROR
       ]);
       return {
         summary: bag?.[PANEL_SUMMARY_PREFIX + lv] || null,
@@ -98,13 +161,16 @@ function createLiveViewDataSource(lv) {
         iframeOfficialDom: bag?.[IFRAME_OFFICIAL_DOM_PREFIX + lv] || null,
         nicoadApiRanking: bag?.[NICOAD_API_RANKING_PREFIX + lv] || null,
         giftSubAppHistory: bag?.[giftSubAppHistoryStorageKey(lv)] || null,
-        giftHistoryThrows: bag?.[giftHistoryThrowsStorageKey(lv)] || null
+        giftHistoryThrows: bag?.[giftHistoryThrowsStorageKey(lv)] || null,
+        laneMirror: bag?.[KEY_LANE_MIRROR] || null,
+        statCardsMirror: bag?.[KEY_STAT_CARDS_MIRROR] || null
       };
     } catch {
       return {
         summary: null, snapshot: null, reportPreview: null, giftUsers: null,
         kokenContrib: null, iframeOfficialDom: null, nicoadApiRanking: null,
-        giftSubAppHistory: null, giftHistoryThrows: null
+        giftSubAppHistory: null, giftHistoryThrows: null,
+        laneMirror: null, statCardsMirror: null
       };
     }
   };
@@ -334,6 +400,12 @@ function renderLiveView(lv, data, nowMs) {
 
   // v0.1.879: popup の公式値レーン(北極星レーン=貢献度/広告ランキング)を完全コピーで再現。
   renderNorthStarLanes(lv, data);
+
+  // 応援レーン鏡 / 数字カード鏡: popup の段組み+数字カードを顔込みでそっくり映す(status-entry.js と同型)。
+  //   既存セクション(統計カード/ランキング/りんく列/ギフト列/北極星)とは独立=壊さず別セクションで追加。
+  //   try/catch で囲み、鏡が壊れても live-view コアを巻き込まない。
+  try { renderLaneMirror(data?.laneMirror); } catch { /* best-effort: 次の tick で回復 */ }
+  try { renderStatCardsMirror(data?.statCardsMirror); } catch { /* best-effort: 次の tick で回復 */ }
 
   const d = new Date(nowMs);
   $('updatedAt').textContent = `最終更新 ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}:${String(d.getSeconds()).padStart(2, '0')}`;
@@ -687,6 +759,197 @@ function renderNorthStarLanes(lv, data) {
 
   // 何も出ない時はセクションごと隠す(死んだ見出しを残さない=star-romi 失敗体験の除去)。
   if (section instanceof HTMLElement) section.hidden = !anyShown;
+}
+
+// ============================================================================
+// 応援レーン鏡 / 数字カード鏡の描画(status-entry.js の renderLaneMirror /
+//   renderStatCardsMirror をそのまま移植・似せて自作しない)。
+// ============================================================================
+
+/**
+ * 応援レーン鏡: popup の応援レーン(りんく/こん太/広告/たぬ姉の段組み)を顔(avatar)込みで
+ *   そっくり描く。popup と同じ本物の paintStoryUserLaneDomFilled + buildPersonTileEl を使う。
+ *   データは KEY_LANE_MIRROR(popup→storage)を restoreLaneMirrorBuckets で paint が受ける
+ *   buckets 形に復元したもの。会場(venue)とは無関係=popup と live-view だけ。
+ *   ★signature ガード: 2秒ループで毎回 paint すると img 再生成でチラつき重い=`liveId|capturedAt|
+ *     各段件数|pickedLength` が前回と同じなら paint を skip。
+ * @param {{ liveId?: string, capturedAt?: number, link?: any[], gift?: any[], ad?: any[],
+ *   konta?: any[], tanu?: any[], pickedLength?: number, totalCandidates?: number }|null} snap
+ */
+function renderLaneMirror(snap) {
+  const section = document.getElementById('laneMirrorLane');
+  if (!section) return;
+  // popup を一度も開いていない/まだ書かれていない=スナップショット無し=セクションごと隠す(死にリンク回避)。
+  if (!snap || typeof snap !== 'object') {
+    section.hidden = true;
+    _lastLaneMirrorSig = ' init';
+    return;
+  }
+
+  // popup と同じ id で els を集める(live-view.html に同じ DOM を静的に置いてある)。
+  //   1つでも欠けていれば paint は何もしない=安全側(stack/各段が無いと描けない)。
+  const $id = (/** @type {string} */ id) => /** @type {HTMLElement|null} */ (document.getElementById(id));
+  const els = {
+    stack: $id('sceneStoryUserLaneStack'),
+    laneLink: $id('sceneStoryUserLaneLink'),
+    laneGift: $id('sceneStoryUserLaneGift'),
+    laneAd: $id('sceneStoryUserLaneAd'),
+    laneKonta: $id('sceneStoryUserLaneKonta'),
+    laneTanu: $id('sceneStoryUserLaneTanu'),
+    hintLink: $id('sceneStoryUserLaneLinkHint'),
+    linkWrap: $id('sceneStoryUserLaneLinkWrap'),
+    giftWrap: $id('sceneStoryUserLaneGiftWrap'),
+    adWrap: $id('sceneStoryUserLaneAdWrap'),
+    guideTop: $id('sceneStoryUserLaneGuideTop'),
+    guideLinesTop: $id('sceneStoryUserLaneGuideLinesTop'),
+    guideMidGift: $id('sceneStoryUserLaneGuideMidGift'),
+    guideLinesMidGift: $id('sceneStoryUserLaneGuideLinesMidGift'),
+    guideMidAd: $id('sceneStoryUserLaneGuideMidAd'),
+    guideLinesMidAd: $id('sceneStoryUserLaneGuideLinesMidAd'),
+    guideMidKonta: $id('sceneStoryUserLaneGuideMidKonta'),
+    guideLinesMidKonta: $id('sceneStoryUserLaneGuideLinesMidKonta'),
+    guideMidTanu: $id('sceneStoryUserLaneGuideMidTanu'),
+    guideLinesMidTanu: $id('sceneStoryUserLaneGuideLinesMidTanu'),
+    guideBottom: $id('sceneStoryUserLaneGuideBottom'),
+    guideLinesBottom: $id('sceneStoryUserLaneGuideLinesBottom')
+  };
+  if (!els.stack || !els.laneLink || !els.laneGift || !els.laneKonta || !els.laneTanu) {
+    section.hidden = true;
+    return;
+  }
+
+  const buckets = restoreLaneMirrorBuckets(snap);
+  const pickedLength = Math.max(
+    0,
+    Math.floor(Number(snap.pickedLength) || 0) ||
+      buckets.link.length + buckets.gift.length + buckets.ad.length + buckets.konta.length + buckets.tanu.length
+  );
+  const totalCandidates = Math.max(0, Math.floor(Number(snap.totalCandidates) || 0));
+  const totalCells =
+    buckets.link.length + buckets.gift.length + buckets.ad.length + buckets.konta.length + buckets.tanu.length;
+
+  // signature ガード: 表示に効く値だけで署名し、変化が無ければ paint を丸ごと skip(チラつき/重さ防止)。
+  const sig =
+    `${String(snap.liveId || '')}|${Number(snap.capturedAt) || 0}|` +
+    `${buckets.link.length}|${buckets.gift.length}|${buckets.ad.length}|${buckets.konta.length}|${buckets.tanu.length}|` +
+    `${pickedLength}|${totalCandidates}`;
+  if (sig === _lastLaneMirrorSig) {
+    section.hidden = false; // skip しても表示状態は維持(初回描画後に隠れない)。
+    return;
+  }
+  _lastLaneMirrorSig = sig;
+
+  section.hidden = false;
+
+  // 概要メタ(何件映しているか・何人が会場で見られるか)。popup の guideFoot とは別に live-view 側で1行。
+  const metaEl = document.getElementById('laneMirrorMeta');
+  if (metaEl) {
+    if (totalCells > 0) {
+      const otherTxt =
+        totalCandidates > pickedLength ? `（ほか ${totalCandidates - pickedLength}人は会場モードで全員見られます）` : '';
+      metaEl.textContent = `いま ${pickedLength}人を表示中${otherTxt}`;
+    } else {
+      metaEl.textContent = 'popup を開いている配信があれば、ここに応援レーンがそのまま映ります。';
+    }
+  }
+
+  // 本物の描画関数で paint。候補ゼロでもスナップショットがあれば段ガイドだけ出す(popup と同じ畳み方)。
+  if (totalCells === 0) {
+    paintStoryUserLaneDomEmptyGuides(els, _LANE_MIRROR_FACES);
+    return;
+  }
+  paintStoryUserLaneDomFilled(els, _LANE_MIRROR_FACES, buckets, pickedLength, _laneMirrorDomIo, {
+    totalCandidates
+  });
+}
+
+/**
+ * 数字カード鏡: popup 上部の数字カード群(記録/推定同時接続/来場者数+公式統計チップ)を live-view へ
+ *   そっくり映す。スナップショット(KEY_STAT_CARDS_MIRROR)は popup 側で確定済み(公式チップも digest
+ *   確定)=live-view は再計算せず同じ id へ値を入れるだけ(popup と必ず一致・似せて自作しない)。
+ *   応援レーン鏡(renderLaneMirror)と同型。会場(venue)とは無関係=popup と live-view だけ。
+ *   ★signature ガード: 2秒ループで毎回セットすると無駄=`liveId|capturedAt|主要テキスト` が前回と
+ *     同じなら値セットを skip(チラつき/重さ防止)。
+ * @param {import('../lib/statCardsMirror.js').StatCardsMirrorSnapshot|null|undefined} snap
+ */
+function renderStatCardsMirror(snap) {
+  const section = document.getElementById('statCardsMirror');
+  if (!section) return;
+  // popup を一度も開いていない/まだ書かれていない=スナップショット無し=セクションごと隠す(死にリンク回避)。
+  if (!snap || typeof snap !== 'object') {
+    section.hidden = true;
+    _lastStatCardsMirrorSig = ' init';
+    return;
+  }
+
+  // signature ガード: 変化が無ければ値セットを丸ごと skip(表示状態は維持)。popup と同じ確定済みデータ。
+  const sig = buildStatCardsMirrorSignature(snap);
+  if (sig === _lastStatCardsMirrorSig) {
+    section.hidden = false; // skip しても表示状態は維持(初回描画後に隠れない)。
+    return;
+  }
+  _lastStatCardsMirrorSig = sig;
+  section.hidden = false;
+
+  const $id = (/** @type {string} */ id) => /** @type {HTMLElement|null} */ (document.getElementById(id));
+  /** テキスト+is-placeholder トグル(popup の値セットと同じ作法・似せて自作しない)。 */
+  const setVal = (/** @type {string} */ id, /** @type {string} */ text, /** @type {boolean} */ isPlaceholder) => {
+    const el = $id(id);
+    if (!el) return;
+    if (el.textContent !== text) el.textContent = text;
+    el.classList.toggle('is-placeholder', isPlaceholder === true);
+  };
+  /** sub 行(公式行/取り込み/内訳): テキスト有なら表示・空なら hidden(popup と同じ畳み方)。 */
+  const setSub = (/** @type {string} */ id, /** @type {string} */ text) => {
+    const el = $id(id);
+    if (!el) return;
+    const t = String(text || '');
+    if (el.textContent !== t) el.textContent = t;
+    el.hidden = t.length === 0;
+  };
+
+  // 記録カード(値+プレースホルダ+3つの sub 行)。
+  setVal('liveStatComments', String(snap.recordsText || ''), snap.recordsIsPlaceholder === true);
+  setSub('liveStatCommentsOfficial', snap.recordsOfficialLine);
+  setSub('liveStatCommentsBreakdown', snap.recordsBreakdownLine);
+  setSub('liveStatCommentsIngest', snap.recordsIngestLine);
+
+  // 推定同時接続カード(値+プレースホルダ・単位 sub は任意)。
+  const conc = /** @type {any} */ (snap.concurrent && typeof snap.concurrent === 'object' ? snap.concurrent : {});
+  setVal('watchConcurrentEst', String(conc.estText || ''), conc.estIsPlaceholder === true);
+  const subEl = $id('watchConcurrentSub');
+  if (subEl && conc.subText) {
+    const t = String(conc.subText);
+    if (subEl.textContent !== t) subEl.textContent = t;
+  }
+
+  // 来場者数カード(値+プレースホルダ)。
+  const vis = /** @type {any} */ (snap.visitor && typeof snap.visitor === 'object' ? snap.visitor : {});
+  setVal('watchViewerDom', String(vis.text || ''), vis.isPlaceholder === true);
+
+  // 公式統計チップ(5つ)。popup の paintOfficialNicoStatsStrip(popup-entry.js:7121-7172)と同じ id・
+  //   同じ class トグルで適用。official が null のときは popup と同じく「—」プレースホルダに戻す。
+  const PH = { text: '—', isPlaceholder: true };
+  const off = snap.official;
+  const chip = /** @type {Record<string, any>} */ (off
+    ? {
+        officialStatNicoViewers: off.viewers,
+        officialStatNicoComments: off.comments,
+        officialStatNicoStreamAge: off.streamAge,
+        officialStatNicoAdPts: off.adPts,
+        officialStatNicoGiftPts: off.giftPts
+      }
+    : {
+        officialStatNicoViewers: PH,
+        officialStatNicoComments: PH,
+        officialStatNicoStreamAge: PH,
+        officialStatNicoAdPts: PH,
+        officialStatNicoGiftPts: PH
+      });
+  for (const id of Object.keys(chip)) {
+    const c = chip[id] || PH;
+    setVal(id, String(c.text || '—'), c.isPlaceholder === true);
+  }
 }
 
 function start() {

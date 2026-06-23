@@ -97,7 +97,7 @@
 | `KEY_INLINE_PANEL_VIEWPORT_WIDE_POLICY` | — | extension/content-entry.js<br>extension/popup-entry.js |
 | `KEY_INLINE_PANEL_WIDTH_MODE` | — | extension/content-entry.js<br>extension/popup-entry.js |
 | `KEY_LANE_DIAG` | extension/popup-entry.js | extension/status-entry.js |
-| `KEY_LANE_MIRROR` | extension/popup-entry.js | extension/status-entry.js |
+| `KEY_LANE_MIRROR` | extension/popup-entry.js | extension/live-view-entry.js<br>extension/status-entry.js |
 | `KEY_LAST_WATCH_URL` | — | extension/comeview-entry.js<br>extension/popup-entry.js<br>extension/status-entry.js |
 | `KEY_LIVE_BROADCASTER_CTX` | extension/content-entry.js | extension/venueBar.js |
 | `KEY_MARKETING_EXPORT_MASK_LABELS` | — | extension/popup-entry.js |
@@ -112,7 +112,7 @@
 | `KEY_REPORT_PREVIEW` | lib/reportPreviewPublish.js | extension/live-view-entry.js<br>extension/status-entry.js |
 | `KEY_SELF_POSTED_RECENTS` | extension/content-entry.js | extension/content-entry.js<br>extension/popup-entry.js |
 | `KEY_STATUS_TREND` | extension/status-entry.js | extension/status-entry.js |
-| `KEY_STAT_CARDS_MIRROR` | extension/popup-entry.js | extension/status-entry.js |
+| `KEY_STAT_CARDS_MIRROR` | extension/popup-entry.js | extension/live-view-entry.js<br>extension/status-entry.js |
 | `KEY_STORAGE_WRITE_ERROR` | extension/content-entry.js<br>extension/popup-entry.js | extension/popup-entry.js |
 | `KEY_STORY_GROWTH_COLLAPSED` | — | extension/popup-entry.js |
 | `KEY_SUPPORT_CELEBRATION_STATE` | — | extension/popup-entry.js |

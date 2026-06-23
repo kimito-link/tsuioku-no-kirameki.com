@@ -18,6 +18,9 @@
         --nl-accent: #0f8fd8;
         --nl-accent-hover: #0b73ad;
         --nl-rank-count: #0f766e;
+        /* 応援レーン鏡(.nl-story-userlane-*)が参照する変数。popup.html では動的設定=
+           live-view に無いので status.html と同じ固定値 #ec4899 で代替(裸要素化防止・v0.1.900 の轍)。 */
+        --nl-user-accent: #ec4899;
         /* レーン別 accent カラー(popup.html :root より verbatim・v0.1.879) */
         --nl-lane-accent-contrib: #ffd35c;
         --nl-lane-accent-gift: #ff8aa7;
@@ -1505,6 +1508,383 @@
         text-align: center;
         line-height: 1.25;
       }
+
+      /* ============================================================================
+       * 応援レーン鏡(りんく/こん太/広告/たぬ姉の段組み)= popup.html の .nl-story-userlane-*
+       *   ルールを【そっくり移植】(status.html と同一・似せて自作しない)。本物の
+       *   buildPersonTileEl / paintStoryUserLaneDomFilled が生成する DOM を live-view でも
+       *   装飾付きで描くため(裸要素化を防ぐ・v0.1.900 の教訓)。挙動・見た目は popup と同一。
+       *   html.nl-inline 限定の拡大ルールは live-view に nl-inline が無いので省略=既定(小)サイズ。
+       * ========================================================================== */
+      .nl-story-userlane-stack {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        overflow-x: hidden;
+        overflow-y: visible;
+        margin: 0 0 4px;
+        min-height: 0;
+      }
+      .nl-story-userlane-tier-wrap {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        min-width: 0;
+      }
+      .nl-story-userlane-tier-wrap--gift {
+        padding: 6px 6px 4px;
+        border-radius: 10px;
+        background: color-mix(in srgb, var(--nl-surface) 82%, #e8b84a 18%);
+        border: 1px solid color-mix(in srgb, var(--nl-border) 70%, #d4a017 30%);
+      }
+      .nl-story-userlane-tier-hint {
+        margin: 0;
+        padding: 4px 6px;
+        font-size: 10px;
+        font-weight: 700;
+        line-height: 1.4;
+        color: var(--nl-text-sub);
+        border-radius: 8px;
+        background: color-mix(in srgb, var(--nl-surface) 88%, #b8a06a 12%);
+        border: 1px solid color-mix(in srgb, var(--nl-border) 75%, #c9a227 25%);
+      }
+      .nl-story-userlane {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        align-content: flex-start;
+        gap: 6px 8px;
+        margin: 0;
+        min-height: 0;
+        max-height: none;
+        overflow-x: auto;
+        overflow-y: visible;
+        -webkit-overflow-scrolling: touch;
+      }
+      .nl-story-userlane-stack > .nl-story-userlane,
+      .nl-story-userlane-stack .nl-story-userlane-tier-wrap .nl-story-userlane {
+        max-height: none;
+        overflow-y: visible;
+      }
+      .nl-story-userlane-cell {
+        display: inline-flex;
+        flex-direction: row;
+        align-items: center;
+        justify-content: flex-start;
+        gap: 6px;
+        flex-shrink: 0;
+        max-width: 100%;
+        min-width: 0;
+        border-radius: 999px;
+        padding-right: 6px;
+      }
+      .nl-story-userlane-cell--accent {
+        padding: 3px 5px 3px 3px;
+        background: color-mix(in srgb, var(--nl-user-accent) 20%, transparent);
+        box-shadow: 0 0 0 2px color-mix(in srgb, var(--nl-user-accent) 48%, transparent);
+      }
+      a.nl-story-userlane-cell--linkable {
+        text-decoration: none;
+        color: inherit;
+        cursor: pointer;
+        transition: background-color 0.12s;
+      }
+      a.nl-story-userlane-cell--linkable:hover {
+        background-color: color-mix(in srgb, var(--nl-border) 40%, transparent);
+      }
+      .nl-story-userlane-tier-break {
+        flex: 0 0 100%;
+        width: 100%;
+        height: 0;
+        margin: 0;
+        padding: 0;
+        overflow: hidden;
+        pointer-events: none;
+      }
+      .nl-story-userlane-meta {
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        gap: 1px;
+        min-width: 0;
+        max-width: min(118px, 30vw);
+        font-size: 10px;
+        line-height: 1.22;
+        text-align: left;
+      }
+      .nl-story-userlane-meta__id,
+      .nl-story-userlane-meta__name {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .nl-story-userlane-meta__id {
+        color: var(--nl-text-sub);
+        font-weight: 600;
+      }
+      .nl-story-userlane-meta__name {
+        color: var(--nl-text);
+        font-weight: 500;
+      }
+      .nl-story-userlane-avatar {
+        width: 32px;
+        height: 32px;
+        border-radius: 999px;
+        object-fit: cover;
+        object-position: center;
+        border: 1.5px solid color-mix(in srgb, var(--nl-border) 82%, #fff 18%);
+        box-shadow: 0 1px 3px rgb(2 17 31 / 22%);
+        background: var(--nl-surface);
+        flex-shrink: 0;
+      }
+      .nl-story-userlane-avatar.nl-avatar--tv-fallback {
+        object-fit: contain;
+        padding: 3px;
+        background: linear-gradient(180deg, #efebe9, #d7ccc8);
+        border-color: color-mix(in srgb, #8d6e63 55%, var(--nl-border) 45%);
+      }
+      .nl-story-userlane-guide {
+        display: flex;
+        flex-direction: column;
+        align-items: stretch;
+        gap: 5px;
+        margin: 0 0 6px;
+        min-width: 0;
+      }
+      .nl-story-userlane-guide__lines {
+        display: flex;
+        flex-direction: column;
+        gap: 5px;
+        min-width: 0;
+      }
+      .nl-story-userlane-guide__line {
+        display: flex;
+        align-items: flex-start;
+        gap: 7px;
+        padding: 5px 8px;
+        border-radius: 10px;
+        background: linear-gradient(180deg, #fffaf0, #fff4db);
+        border: 1px solid #f5d28d;
+        color: #6b4f18;
+        font-size: 10px;
+        font-weight: 700;
+        line-height: 1.38;
+        box-shadow: 0 1px 5px rgb(148 101 14 / 9%);
+        min-width: 0;
+      }
+      .nl-story-userlane-guide__face {
+        width: 24px;
+        height: 24px;
+        border-radius: 999px;
+        object-fit: cover;
+        object-position: center;
+        border: 1px solid color-mix(in srgb, var(--nl-border) 82%, #fff 18%);
+        background: var(--nl-surface);
+        flex: 0 0 auto;
+      }
+      .nl-story-userlane-guide__text {
+        flex: 1 1 auto;
+        min-width: 0;
+      }
+      .nl-story-userlane-guide__foot {
+        margin: 2px 0 0;
+        padding: 0 2px;
+        font-size: 10px;
+        font-weight: 800;
+        color: var(--nl-muted);
+        line-height: 1.35;
+      }
+      .nl-story-userlane__empty-note {
+        margin: 4px 0 2px;
+        padding: 8px 10px;
+        font-size: clamp(10px, 2.4vw, 11px);
+        line-height: 1.45;
+        font-weight: 600;
+        color: var(--nl-text-sub);
+        border-radius: 10px;
+        background: color-mix(in srgb, var(--nl-surface) 92%, var(--nl-border) 8%);
+        border: 1px solid color-mix(in srgb, var(--nl-border) 70%, transparent);
+      }
+      .nl-story-userlane__empty-note-p {
+        margin: 0 0 6px;
+      }
+      .nl-story-userlane__empty-note-p:last-child {
+        margin-bottom: 0;
+      }
+      .nl-story-userlane-guide__count {
+        color: #9a6f12;
+        font-weight: 800;
+      }
+
+      /* ============================================================
+         数字カード鏡(.nl-live-stat-*): popup 上部の3カード+公式チップを live-view へ
+         そっくり映す。popup.html から移植(status.html と同一・似せて自作しない)。char-load
+         重ね/ローディング幕は live-view では不要なので省略。参照変数(--nl-surface/--nl-border/
+         --nl-muted/--nl-text/--nl-bg-soft/--nl-accent/--nl-stat-card-*)は :root に在るか
+         fallback 付き=裸化(v0.1.900 の轍)しない。
+         ============================================================ */
+      .nl-live-stat-cards {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 6px;
+      }
+      .nl-official-nico-stats__row {
+        grid-column: 1 / -1;
+        display: grid;
+        grid-template-columns: repeat(5, minmax(0, 1fr));
+        gap: 5px;
+      }
+      .nl-official-nico-stats__chip {
+        min-width: 0;
+        padding: 4px 3px 5px;
+        border-radius: 9px;
+        border: 1px solid var(--nl-border);
+        background: color-mix(in srgb, var(--nl-surface) 88%, var(--nl-border) 12%);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+      }
+      .nl-official-nico-stats__label {
+        font-size: clamp(9px, 2.2vw, 10px);
+        color: var(--nl-muted);
+        font-weight: 600;
+        line-height: 1.2;
+      }
+      .nl-official-nico-stats__val {
+        margin-top: 2px;
+        font-size: clamp(11px, 2.9vw, 14px);
+        font-weight: 800;
+        color: var(--nl-text);
+        font-variant-numeric: tabular-nums;
+        line-height: 1.15;
+      }
+      .nl-official-nico-stats__val.is-placeholder {
+        font-size: clamp(10.5px, 2.6vw, 12px);
+        font-weight: 700;
+        color: var(--nl-muted);
+      }
+      .nl-live-stat-card {
+        position: relative;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+        padding: 7px 4px 6px;
+        border-radius: 12px;
+        border: 1px solid var(--nl-stat-card-border, var(--nl-border));
+        background: linear-gradient(
+          155deg,
+          var(--nl-stat-card-bg-start, var(--nl-surface)),
+          var(--nl-stat-card-bg-end, var(--nl-bg-soft))
+        );
+        box-shadow: var(--nl-stat-card-shadow, 0 2px 6px rgb(2 17 31 / 10%));
+        min-width: 0;
+      }
+      .nl-live-stat-card--comments {
+        border-color: var(--nl-border);
+      }
+      .nl-live-stat-card--concurrent {
+        border-color: var(--nl-border);
+      }
+      .nl-live-stat-card--visitors {
+        border-color: var(--nl-border);
+      }
+      .nl-live-stat-icon {
+        width: clamp(32px, 9vw, 44px);
+        height: clamp(32px, 9vw, 44px);
+        object-fit: contain;
+        border-radius: 999px;
+        background: rgb(255 255 255 / 60%);
+        border: 1px solid rgb(255 255 255 / 50%);
+        box-shadow: 0 1px 4px rgb(2 17 31 / 14%);
+        margin-bottom: 3px;
+        flex-shrink: 0;
+      }
+      .nl-live-stat-label {
+        font-size: clamp(8.5px, 2.2vw, 10.5px);
+        font-weight: 700;
+        color: var(--nl-muted);
+        line-height: 1.2;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        max-width: 100%;
+      }
+      .nl-live-stat-value {
+        font-size: clamp(16px, 4.5vw, 22px);
+        font-weight: 900;
+        color: var(--nl-text);
+        line-height: 1.15;
+        font-variant-numeric: tabular-nums;
+        margin: 1px 0;
+      }
+      .nl-live-stat-value.is-placeholder {
+        font-size: clamp(10.5px, 2.6vw, 13px);
+        font-weight: 700;
+        color: var(--nl-muted);
+        font-variant-numeric: normal;
+        line-height: 1.25;
+        white-space: normal;
+        word-break: keep-all;
+        overflow-wrap: anywhere;
+      }
+      .nl-live-stat-unit {
+        font-size: clamp(8px, 2vw, 10px);
+        font-weight: 600;
+        color: var(--nl-muted);
+        line-height: 1.2;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        max-width: 100%;
+      }
+      .nl-live-stat-sub {
+        margin-top: 2px;
+        font-size: clamp(7px, 1.85vw, 9px);
+        font-weight: 600;
+        color: var(--nl-muted);
+        line-height: 1.25;
+        text-align: center;
+        max-width: 100%;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .nl-live-stat-sub[hidden] {
+        display: none;
+      }
+      .nl-live-stat-sub--official {
+        white-space: normal;
+        overflow: hidden;
+        display: -webkit-box;
+        -webkit-box-orient: vertical;
+        -webkit-line-clamp: 2;
+        line-clamp: 2;
+        text-overflow: ellipsis;
+        hyphens: auto;
+        word-break: break-word;
+      }
+      .nl-live-stat-sub--ingest {
+        color: var(--nl-accent, #0f8fd8);
+        font-weight: 700;
+      }
+      .nl-concurrent-body {
+        width: 100%;
+        min-width: 0;
+        min-height: clamp(48px, 14vw, 58px);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+      }
+      .nl-concurrent-ready {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        width: 100%;
+        min-width: 0;
+      }
     </style>
   </head>
   <body>
@@ -1530,6 +1910,229 @@
       <section class="panel">
         <h2>🏆 応援者ランキング</h2>
         <div id="rankBody" class="empty">読み込み中…</div>
+      </section>
+
+      <!--
+        応援レーン鏡: popup の応援レーン(りんく/こん太/広告/たぬ姉の段組み)を【顔(アイコン)まで含めて
+        そっくり】映す。データは popup→storage(nls_lane_mirror_v1)、live-view が読んで本物の
+        paintStoryUserLaneDomFilled + buildPersonTileEl で描く(再計算しない=popup と必ず一致)。
+        DOM の id は popup.html / status.html と完全一致。会場(venue)とは無関係=popup と live-view だけ。
+        popup を一度も開いていない/まだ書かれていない時はセクションごと hidden(死にリンクにしない)。
+      -->
+      <section class="panel" id="laneMirrorLane" hidden>
+        <h2>🪞 応援レーン（popup の段組みをそっくり映す）</h2>
+        <p class="lane-note">
+          popup を開いている配信の応援レーン(りんく/こん太/広告/たぬ姉)を、顔(アイコン)まで含めてそのまま映します。会場に並べるべき「顔ぶれ」の正本です。
+        </p>
+        <div id="laneMirrorMeta" class="lane-note" style="margin-bottom: 8px"></div>
+        <div id="sceneStoryUserLaneGuideTop" class="nl-story-userlane-guide" hidden>
+          <div
+            id="sceneStoryUserLaneGuideLinesTop"
+            class="nl-story-userlane-guide__lines"
+            aria-label="応援ユーザーレーンの説明（りんく）"
+          ></div>
+        </div>
+        <div
+          id="sceneStoryUserLaneStack"
+          class="nl-story-userlane-stack"
+          aria-label="最近の応援ユーザーサムネイル（りんく・こん太・たぬ姉の三段）"
+          title="応援ユーザーを、プロフィールの揃い具合の三段に分けて並べています"
+          hidden
+        >
+          <div
+            id="sceneStoryUserLaneLinkWrap"
+            class="nl-story-userlane-tier-wrap"
+          >
+            <div
+              id="sceneStoryUserLaneLink"
+              class="nl-story-userlane nl-story-userlane--link"
+              aria-label="優先1・個人サムネと表示名がそろったユーザー"
+              hidden
+            ></div>
+            <p
+              id="sceneStoryUserLaneLinkHint"
+              class="nl-story-userlane-tier-hint"
+              hidden
+            >
+              この段は「表示名と個人サムネがそろった人」だけ。いまの記録では該当者がいないので、下の段に並んでいます。
+            </p>
+          </div>
+          <div
+            id="sceneStoryUserLaneGiftWrap"
+            class="nl-story-userlane-tier-wrap nl-story-userlane-tier-wrap--gift"
+          >
+            <div
+              id="sceneStoryUserLaneGuideMidGift"
+              class="nl-story-userlane-guide nl-story-userlane-guide--mid"
+              hidden
+            >
+              <div
+                id="sceneStoryUserLaneGuideLinesMidGift"
+                class="nl-story-userlane-guide__lines"
+                aria-label="応援ユーザーレーンの説明（ギフト・広告投げ主）"
+              ></div>
+            </div>
+            <div
+              id="sceneStoryUserLaneGift"
+              class="nl-story-userlane nl-story-userlane--gift"
+              aria-label="ギフトを投げたユーザー"
+              hidden
+            ></div>
+          </div>
+          <div
+            id="sceneStoryUserLaneAdWrap"
+            class="nl-story-userlane-tier-wrap nl-story-userlane-tier-wrap--ad"
+          >
+            <div
+              id="sceneStoryUserLaneGuideMidAd"
+              class="nl-story-userlane-guide nl-story-userlane-guide--mid"
+              hidden
+            >
+              <div
+                id="sceneStoryUserLaneGuideLinesMidAd"
+                class="nl-story-userlane-guide__lines"
+                aria-label="応援ユーザーレーンの説明（広告投稿者）"
+              ></div>
+            </div>
+            <div
+              id="sceneStoryUserLaneAd"
+              class="nl-story-userlane nl-story-userlane--ad"
+              aria-label="広告を投げた広告主"
+              hidden
+            ></div>
+          </div>
+          <div
+            id="sceneStoryUserLaneGuideMidKonta"
+            class="nl-story-userlane-guide nl-story-userlane-guide--mid"
+            hidden
+          >
+            <div
+              id="sceneStoryUserLaneGuideLinesMidKonta"
+              class="nl-story-userlane-guide__lines"
+              aria-label="応援ユーザーレーンの説明（こん太・この段の前）"
+            ></div>
+          </div>
+          <div
+            id="sceneStoryUserLaneKonta"
+            class="nl-story-userlane nl-story-userlane--konta"
+            aria-label="優先2・表示名かサムネのどちらかが取れているユーザー"
+            hidden
+          ></div>
+          <div
+            id="sceneStoryUserLaneGuideMidTanu"
+            class="nl-story-userlane-guide nl-story-userlane-guide--mid"
+            hidden
+          >
+            <div
+              id="sceneStoryUserLaneGuideLinesMidTanu"
+              class="nl-story-userlane-guide__lines"
+              aria-label="応援ユーザーレーンの説明（たぬ姉・この段の前）"
+            ></div>
+          </div>
+          <div
+            id="sceneStoryUserLaneTanu"
+            class="nl-story-userlane nl-story-userlane--tanu"
+            aria-label="優先3・取得が薄いユーザー"
+            hidden
+          ></div>
+        </div>
+        <div id="sceneStoryUserLaneGuideBottom" class="nl-story-userlane-guide" hidden>
+          <div
+            id="sceneStoryUserLaneGuideLinesBottom"
+            class="nl-story-userlane-guide__lines"
+            aria-label="応援ユーザーレーンの表示件数"
+          ></div>
+        </div>
+      </section>
+
+      <!--
+        数字カード鏡: popup 上部の数字カード群(記録N件・推定同時接続・来場者数の3カード+公式統計
+        チップ)を【見た目そっくり】映す。データは popup→storage(nls_stat_cards_mirror_v1)、live-view が
+        読んで同じ id の DOM に値をセットするだけ(再計算しない)。会場(venue)とは無関係=popup と live-view だけ。
+        DOM の id は popup.html / status.html と完全一致。char-load 重ね/ローディング幕は不要=省略。
+        popup を一度も開いていない/まだ書かれていない時はセクションごと hidden(死にリンクにしない)。
+      -->
+      <section class="panel" id="statCardsMirror" hidden>
+        <h2>🔢 数字カード（popup 上部をそっくり映す）</h2>
+        <p class="lane-note">
+          popup を開いている配信の「記録・推定同時接続・来場者数」と公式統計チップを、そのまま映します。
+        </p>
+        <div class="nl-live-stat-cards" id="liveStatCards">
+          <div class="nl-live-stat-card nl-live-stat-card--comments">
+            <img
+              class="nl-live-stat-icon"
+              src="images/yukkuri-charactore-english/link/link-yukkuri-smile-mouth-open.png"
+              alt=""
+              decoding="async"
+            />
+            <div class="nl-live-stat-label">記録</div>
+            <div class="nl-live-stat-value is-placeholder" id="liveStatComments">—</div>
+            <div class="nl-live-stat-unit">応援コメント</div>
+            <div
+              class="nl-live-stat-sub nl-live-stat-sub--official"
+              id="liveStatCommentsOfficial"
+              hidden
+            ></div>
+            <div
+              class="nl-live-stat-sub nl-live-stat-sub--ingest"
+              id="liveStatCommentsIngest"
+              hidden
+            ></div>
+            <div
+              class="nl-live-stat-sub nl-live-stat-sub--breakdown"
+              id="liveStatCommentsBreakdown"
+              hidden
+            ></div>
+          </div>
+          <div class="nl-live-stat-card nl-live-stat-card--concurrent">
+            <img
+              class="nl-live-stat-icon"
+              src="images/yukkuri-charactore-english/konta/kitsune-yukkuri-smile-mouth-open.png"
+              alt=""
+              decoding="async"
+            />
+            <div class="nl-live-stat-label">推定同時接続</div>
+            <div class="nl-concurrent-body">
+              <div class="nl-concurrent-ready">
+                <div class="nl-live-stat-value is-placeholder" id="watchConcurrentEst">—</div>
+                <div class="nl-live-stat-unit" id="watchConcurrentSub">人</div>
+              </div>
+            </div>
+          </div>
+          <div class="nl-live-stat-card nl-live-stat-card--visitors">
+            <img
+              class="nl-live-stat-icon"
+              src="images/yukkuri-charactore-english/tanunee/tanuki-yukkuri-smile-mouth-open.png"
+              alt=""
+              decoding="async"
+            />
+            <div class="nl-live-stat-label">来場者数</div>
+            <div class="nl-live-stat-value is-placeholder" id="watchViewerDom">—</div>
+            <div class="nl-live-stat-unit">人</div>
+          </div>
+          <div class="nl-official-nico-stats__row" id="statCardsMirrorOfficialRow" role="group" aria-label="公式視聴統計の一覧">
+            <div class="nl-official-nico-stats__chip">
+              <span class="nl-official-nico-stats__label">来場</span>
+              <span class="nl-official-nico-stats__val is-placeholder" id="officialStatNicoViewers">—</span>
+            </div>
+            <div class="nl-official-nico-stats__chip">
+              <span class="nl-official-nico-stats__label">本家コメ</span>
+              <span class="nl-official-nico-stats__val is-placeholder" id="officialStatNicoComments">—</span>
+            </div>
+            <div class="nl-official-nico-stats__chip">
+              <span class="nl-official-nico-stats__label">経過</span>
+              <span class="nl-official-nico-stats__val is-placeholder" id="officialStatNicoStreamAge">—</span>
+            </div>
+            <div class="nl-official-nico-stats__chip">
+              <span class="nl-official-nico-stats__label">広告pt</span>
+              <span class="nl-official-nico-stats__val is-placeholder" id="officialStatNicoAdPts">—</span>
+            </div>
+            <div class="nl-official-nico-stats__chip">
+              <span class="nl-official-nico-stats__label">ギフトpt</span>
+              <span class="nl-official-nico-stats__val is-placeholder" id="officialStatNicoGiftPts">—</span>
+            </div>
+          </div>
+        </div>
       </section>
 
       <!-- v0.1.875: popup の「りんく列」(数値ID+個人サムネが揃った応援だけ)。 -->
