@@ -1,0 +1,193 @@
+
+分類: category=design  by=groq/llama-3.3-70b  (設計判断・アーキテクチャ・技術選定・トレードオフ)
+  分類器の生出力: {"category":"design"}
+召集 4体（最大4）: groq/qwen3-32b[批判・詰め（推論特化）], local/gemma4:latest[総合・統括（最大モデル）], nvidia/qwen3.5-122b[発散アイデア（推論強）], groq/llama-3.3-70b[爆速の視点]
+
+[ルーティング選抜・design] 4体に問い合わせ中: groq/qwen3-32b, local/gemma4:latest, nvidia/qwen3.5-122b, groq/llama-3.3-70b
+
+########################################################################
+# ルーティング選抜・design
+########################################################################
+
+========================================================================
+### groq/qwen3-32b  [批判・詰め（推論特化）]  〔反論〕  (17054ms)
+========================================================================
+<think>
+Okay, let's tackle this problem. The user wants to eliminate orphaned background tabs created by their Chrome extension, specifically those that were opened by a now-disabled autopatrol feature. The main challenge is to safely identify and close these tabs without accidentally closing tabs that the user manually opened and is actively viewing.
+
+First, I need to understand the existing solutions and their shortcomings. The current sweep logic uses URL markers and visited history, but these get lost due to SPA navigation and old extensions. The candidates provided (A-D) each have different approaches.
+
+Candidate A suggests using self-declaration from the content script. This means the content script would mark itself as an autopatrol tab, and the background can query this. The advantage here is that it avoids closing active tabs since only the self-declared ones are targeted. But I need to consider if this self-declaration is reliable. What if the marker gets lost or not set correctly? Also, how does the content script determine it's an autopatrol tab? If the URL marker is used, but the SPA removes it, then the self-declaration might not persist. That's a potential issue.
+
+Candidate B shifts the responsibility to the user by showing warnings and letting them close the tabs. This avoids errors but leaves the problem unsolved since the orphaned tabs still consume resources. The user might not know how to handle it, leading to a poor experience.
+
+Candidate C uses heuristics like checking if the tab's content is recording the same live video as the active tab. This could lead to false positives if the user is watching the same video in multiple tabs intentionally. Also, determining this might require complex logic and could still miss some cases.
+
+Candidate D is open-ended. Maybe there's a better approach. But the user asked to evaluate A-D and pick the best, so focusing on them is necessary.
+
+Looking at the existing answers from other models. Gemma suggests a hybrid approach with event-driven management, using A but checking during specific events. This reduces the risk of false positives by only checking when a tab becomes active or certain user actions occur. But how does this fit with MV3's service worker limitations? Event-driven is better than polling, but the service worker might not be active when the event happens unless there's a listener.
+
+Qwen3.5's idea of activity score based on user interaction is innovative. Monitoring mouse/keyboard events in the content script could help determine if a tab is actively used. However, implementing this might require more resources and could interfere with the user's experience. Also, tracking activity might not always work if the user isn't interacting directly with the tab but it's still in use via other means.
+
+Llama's support for Candidate A is straightforward but points out potential issues with communication between content script and background, and possible failures due to old extensions. They also mention using sessionStorage, which is temporary and might not persist across sessions.
+
+Now, evaluating Candidate A: The self-declaration approach relies on the content script marking itself. If the tab was created by the old extension, the marker might not be present. Also, if the SPA removes the URL marker, the content script might lose the self-declaration. However, if the content script can store this information in a more persistent way, like localStorage or a service worker's storage, it might survive. But the user mentioned that the old extension is already uninstalled, so maybe the existing orphaned tabs are from the old setup. Wait, the problem is that the current sweep logic can't detect them because the URL marker is gone and the visited history isn't shared between old and new extensions. So Candidate A would work if the content script can somehow retain the self-declaration even after the URL marker is removed. But how?
+
+Maybe the content script can set a flag in the tab's storage when it's created as an autopatrol tab. For example, when a tab is created with autopatrol, the content script writes a flag to localStorage or a persistent storage. Then, during sweep, the background can check this flag. However, for existing orphaned tabs that were created by the old extension, this flag wouldn't exist. So Candidate A might not handle those. But the user mentioned that the old extension is already removed, so maybe the existing orphaned tabs are the only issue now. Wait, no, the user says that the old extension is removed, but the problem is that those tabs were created by the old extension, so their content scripts wouldn't have the self-declaration. Therefore, Candidate A might not work for those existing tabs. That's a critical flaw.
+
+So, Candidate A's self-declaration would work for future tabs if the new extension creates tabs with autopatrol, but since autopatrol is disabled, maybe the problem is the existing tabs. Therefore, Candidate A might not address the current issue. But the user's problem is that the current orphaned tabs are from the old extension. Hence, self-declaration won't help here because those tabs don't have the marker and the new extension's visited history doesn't include them.
+
+This suggests that Candidate A is not sufficient for the current problem. The user needs a solution that can handle existing tabs without relying on markers that are already gone.
+
+Looking at Candidate D, maybe a better approach is needed. Perhaps combining some elements of the candidates. For example, using the activity score (Candidate B) to detect if a tab is active or not. But how to implement that in MV3 without constant polling.
+
+Another idea: Since the problem is that the current sweep logic can't detect those tabs because the URL marker is gone and the visited history is from a different extension, maybe the new sweep logic should check for the presence of the content script's behavior. For example, if the content script is running but the tab is not active and the user isn't interacting with it, maybe it's an orphan. But how to detect that without user interaction.
+
+Alternatively, since the content script is running, maybe the background can check if the tab is active or if there's any recent interaction. But again, this might be tricky.
+
+Wait, the user wants to avoid closing active tabs. So the key is to differentiate between active user tabs and background tabs. The current sweep logic closes tabs that are active (active: true) because they shouldn't be closed. But the problem is that the existing orphaned tabs are active: false, and the sweep logic can't identify them because they lack markers and history.
+
+Maybe a better approach is to track when a tab was opened and if it's been inactive for a certain period. For example, if a tab was opened by the extension and hasn't been interacted with for X minutes, close it. But how to track that in MV3 without constant monitoring.
+
+Another angle: The content script can report its status to the background periodically, but in MV3, the service worker is event-driven. So the content script could send a message when it initializes, indicating if it's an autopatrol tab. For existing tabs, this might not work if they were created by the old extension. But if the new extension's content script can somehow determine that it's an orphan based on other criteria, like the absence of any recent user interaction.
+
+Hmm. The core issue is that the existing orphaned tabs don't have markers and aren't in the visited history. So any solution must find another way to identify them. The only remaining clue might be that they are background tabs (active: false) and their content script is running but not being used. However, how to confirm that they're not being used.
+
+Maybe the content script can listen for user interactions (clicks, key presses) and report if it's been active. If it hasn't been active in a while, it's considered an orphan. But implementing this would require the content script to track activity
+
+========================================================================
+### local/gemma4:latest  [総合・統括（最大モデル）]  (36063ms)
+========================================================================
+## 結論（この問いへの答えを1〜2文で）
+最善の設計は、**候補Aをベースとしつつ、監視タイミングを限定した「イベントドリブンなライフサイクル管理」に移行すること**です。具体的には、タブがアクティブになった際や特定のユーザー操作が発生した際にのみ、そのタブの状態をチェックし、孤児と判断された場合にのみ警告・閉鎖の提案を行うフローに変更すべきです。
+
+## 根拠（なぜそう言えるか）
+問題の本質は「**状態（State）に基づく推測による自動クリーンアップが、ユーザーのアクション履歴と混ざり合い、誤爆リスクを増大させている点**」にあります。MV3のService Worker (SW) は常駐監視に向かないため、継続的なポーリングや全タブのスキャンは非効率かつ危険です。
+
+候補Aは「自己申告（Content Scriptからの情報提供）」を利用するため、手動視聴タブを誤爆するリスクが最も低いという点で優れています。しかし、単に閉じるだけでなく、「なぜ開いているか」の**ライフサイクル管理**を行うことで、より安全性が高まります。
+
+候補Bは確実ですが、根本的なリソース消費問題（孤児タブが生き残ること）を解決できていません。
+候補Cは「状況証拠」に頼るため、ノイズや誤判定のリスクが高く、実装の複雑さも増します。
+
+したがって、**信頼性の高い情報源（Content Script）からの能動的な報告に基づき、監視を最小限のイベントに絞り込むアプローチ**が最もバランスが良いと判断しました。
+
+## 反論・リスク（自分の案の弱点や、別の正解の可能性を最低1つ）
+**【反論/リスク】** 最も大きなリスクは、「Content Script側での自己申告ロジックの実装漏れ」です。もし Content Script がライフサイクルイベント（例：タブがフォーカスアウトした時など）での情報送信を忘れると、背景の SW は「このタブの状態を知る手段がない」という状態になり、結局何もできなくなります。また、ユーザー体験として、「なぜ今クリーンアップされるのか？」という理由付けが不明瞭だと、拡張機能への信頼性を損なう可能性があります。
+
+**【別の正解の可能性】** もしブラウザやプラットフォーム側で「このタブはバックグラウンドでの処理が完了したため安全に閉じても良い」といったAPI（例：`chrome.tabs.shouldClose(tabId)` のようなもの）が提供されれば、それが最も理想的です。しかし、現行の制約下では不可能です。
+
+## 具体案（実際に動く/作れる形で具体的に）
+「**ライフサイクルイベントトリガー型クリーンアップ機構**」を導入します。
+
+### 1. 設計フローの変更点
+*   **常時監視 $\rightarrow$ イベント駆動:** `chrome.tabs.onUpdated` または `chrome.tabs.onActivated` のリスナーのみを使用する。（ポーリングは廃止）
+*   **孤児判定ロジックの強化:** 「マーカー消失 ＋ visited履歴に無い」という過去のパターンマッチングを廃止し、代わりに「**コンテンツスクリプトが『私はもう必要ありません』と明示的に報告した場合のみクリーンアップ対象とする**」ルールに変更する。
+
+### 2. 各コンポーネントの実装案
+
+#### A. Content Script (監視対象タブ側)
+*   **役割:** タブのライフサイクル終焉を宣言する責任を持つ。
+*   **実装:**
+    1.  初期ロード時: `sessionStorage` に自身の「孤児判定用ID」を設定し、background SW がアクセスできるようにしておく（自己申告の起点）。
+    2.  視聴終了・自動巡回完了時: 処理が完全に終わった際（例：一定時間操作がない、または次のアクションを待つ必要がないと判断したとき）に、`chrome.runtime.sendMessage({ action: "SELF_DECOMMISSION", tabId: self.tabId })` を実行し、**自発的に「卒業」の合図を送る。**
+
+#### B. Background Service Worker (統括・決定権)
+*   **役割:** イベントを受け取り、クリーンアップの可否を判断する。
+*   **実装:**
+    1.  `chrome.runtime.onMessage.addListener`: Content Script から `SELF_DECOMMISSION` のメッセージを受信した際のみ動作を開始する。
+    2.  受信時: 受信した `tabId` について、以下のチェックを行う。
+        a. **最重要チェック（手動視聴保護）:** `chrome.tabs.get(tabId)` を実行し、**現在のユーザーがそのタブをアクティブにしているか？** (`active: true` かつフォーカスが当たっているか) $\rightarrow$ **もしそうなら、クリーンアップは即座に中止する（Abort）。**
+        b. **孤児判定:** 上記チェックをパスした場合のみ、「本当に閉じて良いか？」という再確認のプロンプト（UI表示）を表示するか、あるいは自動で `chrome.tabs.remove(tabId)` を実行する。
+
+### 3. まとめ：最小実装と安全性の両立
+この設計により、**「手動視聴タブを誤爆しない」**（アクティブチェックによる防御）、**「MV3 SWの制約下で動作する」**（イベントリスナーのみ使用）、**「実装が限定的である」**（メッセージングとライフサイクル宣言に絞る）という全ての要件を満たします。
+
+========================================================================
+### nvidia/qwen3.5-122b  [発散アイデア（推論強）]  (88019ms)
+========================================================================
+## 結論
+「裏タブかどうか」や「URL のマーカー」に依存せず、**「そのタブがユーザーの『意図的な操作（クリック・フォーカス）』に対して反応しているか」**という**行動履歴**で判定する「活動度スコア（Activity Score）」方式を採用する。
+具体的には、content script 側で「ユーザーが直接操作したか（マウス/キー入力）」を sessionStorage にフラグ持ちとし、background SW が「直近の操作がない裏タブ」かつ「特定の時間（例：30 分）経過した」もののみを「孤児」とみなして閉じる設計にします。
+
+## 根拠
+1.  **根本的な問題の再定義**:
+    既存のロジックは「このタブが『誰』が作ったか（履歴・マーカー）」を推測しようとしていますが、ユーザー環境の複雑さ（別拡張・SPA 遷移・URL 正規化）により、この「作成者推論」は破綻しています。
+    一方、「ユーザーが今、そのタブを『使っている』か」という事実は、URL や履歴に関わらず**「ユーザーの操作入力がそのタブに届いているか」**という物理的な事実で判定可能です。裏タブ（active:false）は、ユーザーが意図的に操作しない限り、マウスクリックやキーボード入力を受け付けません。
+
+2.  **MV3 Service Worker の制約との親和性**:
+    MV3 の SW は常駐できませんが、`chrome.tabs.onUpdated` や `chrome.tabs.onActivated` などのイベントは発火します。
+    「活動度スコア」方式は、イベントが来たらスコアをリセットし、イベントが来なければスコアを積算する**「受動的な監視」**で済みます。SW はイベント発生時のみ起動し、判定ロジックを実行してすぐに終了するため、常駐プロセスの負荷をかけずに「長期間放置された裏タブ」だけを特定できます。
+
+3.  **誤爆の排除**:
+    ユーザーが手動で開いたタブ（例：前のタブに戻って視聴している）は、ユーザーが操作している限り「活動度スコア」が常時リセットされ続けます。
+    逆に、自動巡回で開かれて放置された裏タブは、`active:false` のまま時間が経過し、ユーザー操作イベントが来ないため、スコアが閾値を超えて「孤児」と判定されます。URL が `#nls_autopatrol=1` を消去していても、ユーザーが操作していないという事実は変わらないため、解決します。
+
+## 反論・リスク
+*   **リスク 1: 裏で再生している「背景視聴」ユーザーへの誤爆**
+    ユーザーが「裏でニコ生を流しながら、別の作業（Alt+Tab での作業）をしている」場合、このタブは `active:false` ですが、ユーザーは「視聴中」を意図しています。この場合、操作イベントが来ないため、誤って閉じられてしまう恐れがあります。
+    *   **対策**: 「操作イベント」だけでなく、「Video 要素の再生状態（`video.paused === false`）」も活動度の一部に含める、あるいは「30 分〜1 時間」という**非常に長い閾値**を設定する（自動巡回で開かれたタブは通常、数分〜数十分で放置されるが、ユーザーが意図的に裏で流す場合は数時間単位であるため、時間差で区別可能）。
+*   **リスク 2: 手動視聴中のタブが、ユーザーが画面から離れている間に誤判定される**
+    ユーザーが手動視聴中、一時的に PC から離れ、30 分以上操作しない場合、誤って閉じられる可能性があります。
+    *   **対策**: 閾値を「1 時間」など、ユーザーが離席する時間の上限を超える設定にする、あるいは「ユーザーが手動で開いたタブ」であることを示す独自の Cookie や `sessionStorage` の永続フラグ（`user_initiated: true`）を、content script 起動時に `window.open` などのイベントから検知してセットする（これは少し複雑ですが、より確実です）。
+    *   **代替案**: 完全に自動閉じるのではなく、判定されたタブに対して「このタブは長期間操作されていません。閉じますか？」という通知（`chrome.notifications`）を送り、ユーザーの許可を得てから閉じる「半自動モード」にするのが最も安全です。
+
+## 具体案
+**設計名：「ユーザー操作依存型・放置孤児検出（User-Interaction Based Orphan Detection）」**
+
+### 1. Content Script 側の実装（`content.ts`）
+タブが読み込まれた際、以下のロジックを実行します。
+*   **セッションフラグの初期化**: `sessionStorage.setItem('nls_last_interaction', Date.now().toString())`
+*   **イベントリスナーの登録**: ユーザーがそのタブ内でマウスクリック、キー入力、スクロール、または Video 要素の操作（一時停止/再生）を行った時点で、`sessionStorage` のタイムスタンプを更新。
+    ```javascript
+    // 簡易実装イメージ
+    const updateInteraction = () => {
+      sessionStorage.setItem('nls_last_interaction', Date.now().toString());
+    };
+    window.addEventListener('click', updateInteraction);
+    window.addEventListener('keydown', updateInteraction);
+    window.addEventListener('scroll', updateInteraction);
+    // Video 要素の操作も監視
+    document.addEventListener('video_play', updateInteraction); 
+    document.addEventListener('video_pause', updateInteraction);
+    ```
+
+### 2. Background Service Worker 側の実装（`background.ts`）
+`chrome.tabs.onUpdated` または定期的なスリープ解除（`chrome.alarms`）で発火するロジック。
+
+*   **対象タブの取得**: `active: false` かつ `url` が `nicovideo.jp/watch` のタブを全取得。
+*   **判定ロジック**（各タブに対して `chrome.tabs.sendMessage` で問い合わせ）:
+    1.  `sessionStorage.getItem('nls_last_interaction')` を取得。
+    2.  現在時刻との差分（`diff`）を計算。
+    3.  **判定条件**:
+        *   `diff > 3600000` (1 時間) **かつ** `active === false`
+        *   **かつ** (オプション) `video.paused === true` (再生されていなければより確実)
+    4.  条件に合致した場合、そのタブを「孤児」と判定。
+
+### 3. 実行アクション（安全策）
+いきなり `chrome.tabs.remove()` せず、以下のフローを踏む。
+1.  **通知送信**: 判定されたタブに対して通知を送る（またはユーザー側のメインタブに通知）。
+    *   「この裏タブは 1 時間以上操作されていません。孤児タブとして削除しますか？」
+2.  **ユーザーの許可**: ユーザーが「はい」を選んだ場合のみ `chrome.tabs.remove(tabId)` を実行。
+    *   *※もし「自動閉じる」が必須要件であれば、このステップを「1 時間経過で自動
+
+========================================================================
+### groq/llama-3.3-70b  [爆速の視点]  (1901ms)
+========================================================================
+## 結論
+候補A: 「active:false かつ content script が autopatrol/孤児由来だと自己申告したタブ」だけ閉じることを推奨します。自己申告によって手動視聴タブを誤爆せずに、MV3 の service worker 制約にも適合する実装です。
+
+## 根拠
+候補A は、content script が起動時に自己申告することで、background がタブを閉じる際に誤爆を避けることができます。また、MV3 の service worker 制約にも適合し、実装の小ささも保てます。候補B は自動で閉じないため、CPU/storage 消費が続く可能性があります。候補C は状況証拠に頼るため、誤爆の可能性が残ります。
+
+## 反論・リスク
+候補A の実装では、content script が自己申告するために、sessionStorage 等を使用する必要があります。また、background が content script に問い合わせるために、追加の通信が必要になる可能性があります。さらに、古い重複インストールの影響で、自己申告が正しく機能しない可能性もあります。
+
+## 具体案
+1. content script で起動時に自己申告を実施します。sessionStorage 等に「自分は autopatrol タブか」という情報を保存します。
+2. background で sweepOrphanAutopatrolTabsOnce() を実施します。chrome.tabs.query() で watch タブを列挙し、各タブについて自己申告情報を問い合わせます。
+3. 自己申告情報がautopatrol/孤児由来である場合、タブを閉じます。
+4. 自己申告情報が手動視聴タブである場合、タブを閉じないようにします。
+--- [ルーティング選抜・design] 成功 4/4 ---
+
+=== 完了 93648ms ===
+保存: council/orphan-tab-survivor-answers.json

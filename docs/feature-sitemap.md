@@ -609,7 +609,7 @@
   - `src/lib/statusTrendKey.js`
   - `src/extension/status-entry.js`
   - `src/lib/statusActionAdvisor.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 92</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 93</summary>
 
 - `app/app.js` — スマホ閲覧用 status Web 版。
 - `extension/background.js` — MV3 Service Worker
@@ -694,6 +694,7 @@
 - `src/lib/watchProgramEndState.js` — 視聴ページ文言から「番組終了状態」を推定する。
 - `src/lib/watchSnapshotOfficialFields.js` — collectWatchPageSnapshot が返すオブジェクトのうち、公式統計・キャプチャ率まわり（DOM 非依存）。
 - `src/lib/watchSnapshotPartialMerge.js` — watchMetaCache.snapshot を更新する際の partial-merge 純粋関数。
+- `src/lib/watchUrlFreshness.js` — 「最後に視聴した URL（nls_last_watch_url）」フォールバックの鮮度判定。
 - `src/shared/niconico/liveId.js` — ニコ生 放送 ID（`lv…` / `ch…`（チャンネル枠））の正規化ユーティリティ。
 - `src/speech-recognition-globals.d.ts` — Web Speech API（Chrome は webkit 接頭辞のことがある）
 - `tests/e2e/constants.js` — E2E モック視聴ページ（playwright.config の webServer・manifest の host_permissions と一致させる）
@@ -708,7 +709,7 @@
 
 ## 🧬 修正系譜マップ(この系統のバグを過去にどう直したか)
 
-> changelog 全 261 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
+> changelog 全 262 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
 
 ### 💾 記録件数 (37版)
 - `v0.1.916` 2026-06-23 — status に popup をiframeで丸ごと埋め込み(試作)
@@ -1194,7 +1195,8 @@
 - `v0.1.673` 2026-06-10 — コメビュの名前をパネルと同じ情報源で補完
 - `v0.1.670` 2026-06-10 — コメビュのアイコンを本家と同じサムネに
 
-### 🩺 診断・状態速報 (72版)
+### 🩺 診断・状態速報 (73版)
+- `v0.1.926` 2026-06-23 — Alt+Tabに出ない「裏タブ」を状態速報で検知して閉じられるように
 - `v0.1.925` 2026-06-23 — 「視聴中の配信」の誤表示を修正+コメント送信の感度を診断に追加
 - `v0.1.924` 2026-06-23 — 状態速報ページが重い問題を改善(毎回の読み込みを削減)
 - `v0.1.923` 2026-06-23 — スクロール時の白化を診断で観測できるように

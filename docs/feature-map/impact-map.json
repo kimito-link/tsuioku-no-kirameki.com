@@ -2256,6 +2256,16 @@
       ]
     },
     {
+      "file": "src/lib/backgroundWatchTab.js",
+      "featureCount": 1,
+      "features": [
+        "status"
+      ],
+      "labels": [
+        "状態速報ページ"
+      ]
+    },
+    {
       "file": "src/lib/blobDownload.js",
       "featureCount": 1,
       "features": [

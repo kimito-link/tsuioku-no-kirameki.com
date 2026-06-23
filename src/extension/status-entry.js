@@ -93,6 +93,9 @@ import { pickBroadcasterNameForReputation } from '../lib/pickBroadcasterNameForR
 //   panel_summary.updatedAt が古ければ「視聴中」に出さない（純関数で test 付き）。
 import { panelSummaryStorageKey } from '../lib/panelLiveSummary.js';
 import { isLastWatchUrlFresh } from '../lib/watchUrlFreshness.js';
+// 2026-06-23: Alt+Tab に出ない裏 watch タブ(active:false・過去 autopatrol/古い重複拡張の遺物)を
+//   検出して手動クローズ導線を出す(council/orphan-tab-survivor-SYNTHESIS.md)。自動では閉じない。
+import { isBackgroundWatchTab } from '../lib/backgroundWatchTab.js';
 
 /** 自動更新間隔(ms)。 */
 const REFRESH_INTERVAL_MS = 2000;
@@ -499,12 +502,14 @@ function uniqLvSorted(arr) {
   return [...new Set(arr)].sort();
 }
 
-// v0.1.864: 放送導線用。今開いている watch タブの lv→{tabId,windowId} マップを作る(既存の
+// v0.1.864: 放送導線用。今開いている watch タブの lv→{tabId,windowId,active} マップを作る(既存の
 //   tabs.query を再利用・新規取得ゼロ)。これでカードの「この放送に切替」が既存タブへフォーカスできる。
 //   失敗(権限なし等)は空 Map=ボタンは「放送を開く(新規タブ)」に自然に落ちる(死にリンクにしない)。
-//   @returns {Promise<Map<string, {tabId:number, windowId:number}>>}
+//   v0.1.926: tab.active も持つ。active:false の watch タブ=「Alt+Tab に出ない裏タブ」(過去の autopatrol/
+//     古い重複拡張の遺物の可能性)を status が検出して手動クローズ導線を出すため([[backgroundWatchTab]])。
+//   @returns {Promise<Map<string, {tabId:number, windowId:number, active:boolean}>>}
 async function queryWatchTabMap() {
-  /** @type {Map<string, {tabId:number, windowId:number}>} */
+  /** @type {Map<string, {tabId:number, windowId:number, active:boolean}>} */
   const map = new Map();
   try {
     const tabs = await chrome.tabs.query({
@@ -515,7 +520,15 @@ async function queryWatchTabMap() {
       if (m && Number.isFinite(Number(tab?.id))) {
         const lv = m[1].toLowerCase();
         // 同 lv が複数タブにある時は最初の1つ(切替先は1つで十分)。
-        if (!map.has(lv)) map.set(lv, { tabId: Number(tab.id), windowId: Number(tab.windowId) });
+        //   ただし active:true(前面)のタブを優先採用する=同 lv に裏タブと前面タブが両方あるとき、
+        //   前面タブを代表にして「裏タブ扱い(=クローズ導線)」の誤爆を防ぐ。
+        const cur = map.get(lv);
+        const next = {
+          tabId: Number(tab.id),
+          windowId: Number(tab.windowId),
+          active: tab.active === true
+        };
+        if (!cur || (next.active && !cur.active)) map.set(lv, next);
       }
     }
   } catch {
@@ -894,6 +907,11 @@ function renderAll({ lvList, summaries, fastDiag, popupDiag, backfillProgress, v
         // v0.1.864: 放送導線。状態別ボタン(切替/新規タブ/アーカイブ)。lv 不正なら出さない。
         const watchBtn = buildWatchLinkButton(live, watchTabMap);
         if (watchBtn) card.appendChild(watchBtn);
+
+        // 2026-06-23: この配信が「Alt+Tab に出ない裏タブ(active:false)」のときだけ、警告 + 手動クローズ
+        //   ボタンを出す(過去 autopatrol/古い重複拡張の遺物対策・自動では閉じない=誤爆ゼロ)。
+        const bgTabNotice = buildBackgroundTabCloseNotice(live, watchTabMap);
+        if (bgTabNotice) card.appendChild(bgTabNotice);
 
         // v0.1.869: クリックで応援者ランキングを展開(将来の Kimito Link ランキング)。
         //   応援者データ(topSupporters)は popup で開いている配信ぶんだけ取れる=その配信は展開表示、
@@ -1541,6 +1559,62 @@ function buildWatchLinkButton(live, watchTabMap) {
     }
   });
   return btn;
+}
+
+/**
+ * 2026-06-23(council/orphan-tab-survivor): 「Alt+Tab に出ない裏 watch タブ」の警告 + 手動クローズボタン。
+ *   active:false の watch タブ=ユーザーが前面で見ていない=過去の autopatrol/古い重複拡張が開いた遺物の
+ *   可能性。だが「裏で流し見」している手動タブと観測上は区別できないため、【自動では閉じない】。
+ *   ユーザーがボタンを押したときだけ chrome.tabs.remove する(誤爆ゼロ)。active:true(前面)タブには出さない。
+ * @param {object} live
+ * @param {Map<string,{tabId:number,windowId:number,active:boolean}>|undefined} watchTabMap
+ * @returns {HTMLElement|null}
+ */
+function buildBackgroundTabCloseNotice(live, watchTabMap) {
+  const lv = String(live?.lv || '').trim().toLowerCase();
+  const tabEntry = watchTabMap instanceof Map ? watchTabMap.get(lv) || null : null;
+  if (!tabEntry) return null;
+  if (!isBackgroundWatchTab(tabEntry)) return null; // active:true / tabId 無効=出さない(手動視聴は誤爆しない)。
+
+  const wrap = document.createElement('div');
+  wrap.style.cssText =
+    'margin-top:8px;padding:8px 10px;border-radius:6px;font-size:12px;' +
+    'border:1px solid var(--nl-warn,#d97706);background:var(--nl-card-bg);color:var(--nl-text);';
+
+  const msg = document.createElement('div');
+  msg.textContent =
+    '⚠ このタブは Alt+Tab に出てこない「裏タブ」です(拡張が過去に自動で開いた遺物の可能性)。' +
+    '裏でこの配信を流し見していないなら、閉じても問題ありません。';
+  msg.style.cssText = 'margin-bottom:6px;line-height:1.5;';
+  wrap.appendChild(msg);
+
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.textContent = '🗙 この裏タブを閉じる';
+  btn.style.cssText =
+    'padding:5px 10px;border-radius:6px;cursor:pointer;font-size:12px;' +
+    'border:1px solid var(--nl-warn,#d97706);background:var(--nl-card-bg);color:var(--nl-warn,#d97706);';
+  const tabId = Number(tabEntry.tabId);
+  btn.addEventListener('click', () => {
+    btn.disabled = true;
+    btn.textContent = '閉じています…';
+    try {
+      chrome.tabs.remove(tabId).then(
+        () => {
+          btn.textContent = '✓ 閉じました(次の更新でカードが消えます)';
+        },
+        () => {
+          // 既に閉じられている等=次の更新で自然に消えるので静かに既済扱い。
+          btn.textContent = '✓ 閉じました(次の更新でカードが消えます)';
+        }
+      );
+    } catch {
+      btn.disabled = false;
+      btn.textContent = '🗙 この裏タブを閉じる';
+    }
+  });
+  wrap.appendChild(btn);
+  return wrap;
 }
 
 /**
