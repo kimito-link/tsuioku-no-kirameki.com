@@ -299,6 +299,10 @@ import {
 } from '../lib/commentHarvest.js';
 import { pickCommentMutationObserverRoot } from '../lib/observerTarget.js';
 import { probeRecommendedLiveSection } from '../lib/probeRecommendedLiveSection.js';
+import {
+  recordWhiteoutSample,
+  summarizeWhiteoutDiag
+} from '../lib/scrollWhiteoutProbe.js';
 import { probeWatchPageDomStructure } from '../lib/probeWatchPageDomStructure.js';
 import { summarizeGiftSubAppHistoryDiag } from '../lib/summarizeGiftSubAppHistoryDiag.js';
 import { createConsoleErrorBuffer } from '../lib/consoleErrorBuffer.js';
@@ -2660,6 +2664,19 @@ let lastWatchUrlTimer = null;
 
 const PAGE_FRAME_STYLE_ID = 'nls-watch-prikura-style';
 const PAGE_FRAME_OVERLAY_ID = 'nls-watch-prikura-frame';
+
+/**
+ * v0.1.923: 「スクロールを進めると画面が一瞬白くなる」症状の観測用ステート。
+ * judge/record/summarize は純関数(scrollWhiteoutProbe.js・test 済)。ここでは scroll に
+ * throttle で乗って video / inline panel host の高さを測り、「直前は可視→今回は消失」を白化候補として
+ * 数える。確証でなく観測が目的=status の fastDiag に whiteoutCount/最新サンプルを出して切り分ける。
+ * @type {{ count:number, samples:Array<object>, lastAtMs:number }}
+ */
+const _scrollWhiteoutState = { count: 0, samples: [], lastAtMs: 0 };
+/** 直前サンプルの高さ(要素種別ごと)。白化遷移(可視→消失)の判定に使う。 */
+const _scrollWhiteoutPrevH = { video: 0, host: 0 };
+let _scrollWhiteoutListenerRegistered = false;
+let _scrollWhiteoutLastSampleAt = 0;
 const INLINE_POPUP_HOST_ID = 'nls-inline-popup-host';
 const INLINE_POPUP_IFRAME_ID = 'nls-inline-popup-iframe';
 const KEY_AI_SHARE_FAST_DIAG = 'nls_ai_share_fast_diag_v1';
@@ -3904,6 +3921,66 @@ function ensureInlineHostReflowListener() {
 }
 
 /**
+ * v0.1.923: スクロール時の白化観測サンプラ。scroll に throttle(250ms)で乗り、video と inline panel
+ * host の高さを測って「直前は可視→今回は消失」を白化候補として数える(scrollWhiteoutProbe.js の純関数へ委譲)。
+ * 軽さ最優先=throttle で getBoundingClientRect を 250ms に1回まで・要素2つだけ・reflow とは別経路で疎結合。
+ * passive listener なのでスクロール自体は妨げない。観測専用で storage は触らない(fastDiag が読むだけ)。
+ */
+function ensureScrollWhiteoutSampler() {
+  if (_scrollWhiteoutListenerRegistered) return;
+  _scrollWhiteoutListenerRegistered = true;
+  const sample = () => {
+    const now = Date.now();
+    if (now - _scrollWhiteoutLastSampleAt < 250) return; // throttle
+    _scrollWhiteoutLastSampleAt = now;
+    try {
+      // video(プレイヤー本体)
+      const v = document.querySelector('video');
+      if (v instanceof HTMLVideoElement) {
+        const r = v.getBoundingClientRect();
+        const cs = window.getComputedStyle(v);
+        const visibleNow = cs.display !== 'none' && cs.visibility !== 'hidden';
+        recordWhiteoutSample(_scrollWhiteoutState, {
+          kind: 'video',
+          prevH: _scrollWhiteoutPrevH.video,
+          nowH: r.height,
+          visibleNow,
+          atMs: now
+        });
+        _scrollWhiteoutPrevH.video = visibleNow ? r.height : 0;
+      }
+      // inline panel host(popup 埋め込みの下地。reflow 再描画で一瞬消えうる)
+      const host =
+        nlsInlinePopupHostSingleton || document.getElementById(INLINE_POPUP_HOST_ID);
+      if (host instanceof HTMLElement) {
+        const r = host.getBoundingClientRect();
+        const cs = window.getComputedStyle(host);
+        const visibleNow = cs.display !== 'none' && cs.visibility !== 'hidden';
+        recordWhiteoutSample(_scrollWhiteoutState, {
+          kind: 'host',
+          prevH: _scrollWhiteoutPrevH.host,
+          nowH: r.height,
+          visibleNow,
+          atMs: now
+        });
+        _scrollWhiteoutPrevH.host = visibleNow ? r.height : 0;
+      }
+    } catch {
+      // no-op: 測定失敗は次の scroll で取り直す
+    }
+  };
+  try {
+    window.addEventListener('scroll', sample, { passive: true, capture: true });
+    const vv = window.visualViewport;
+    if (vv && typeof vv.addEventListener === 'function') {
+      vv.addEventListener('scroll', sample, { passive: true });
+    }
+  } catch {
+    // no-op: addEventListener が使えない環境（test 等）はスキップ
+  }
+}
+
+/**
  * video から親を辿り、プレイヤー列（映像＋公式コメント欄を含むブロック）相当の要素を選ぶ。
  * その要素の「直後」にホストを置くと、コメント入力バーの下〜列の下に自然に付く（video 直後だけだとバーの上に挟まることがある）。
  * body / documentElement は候補にしない（誤って最外に出さない）。
@@ -4972,6 +5049,8 @@ function renderInlineHostAnchoredToVideo(video) {
   );
   // 0.1.66 (AV): viewport / video rect 変化に追従
   ensureInlineHostReflowListener();
+  // v0.1.923: スクロール白化の観測サンプラを起動(inline panel 描画＝watch 確定後・冪等)。
+  ensureScrollWhiteoutSampler();
   maybeReconnectCommentMutationObserverAfterInlineLayout();
 }
 
@@ -6307,6 +6386,11 @@ function buildAiShareFastDiagnosticsPayload() {
       videoCount: document.querySelectorAll('video').length,
       frameTarget: targetBrief
     },
+    // v0.1.923: スクロール白化の観測値(whiteoutCount=可視→消失を検知した回数 /
+    //   lastWhiteoutAgoMs=最後にいつ / samples=どの要素[video|host]で起きたか)。
+    //   0 のままなら「スクロールで白化は観測されていない」=症状は inline panel/video 以外
+    //   (ニコ生プレイヤー内部の描画等)を疑う切り分けになる。
+    scrollWhiteoutDiag: summarizeWhiteoutDiag(_scrollWhiteoutState, Date.now()),
     inlinePanel: {
       placementMode: inlinePanelPlacementMode,
       placementEffective: placementEffectiveFast,
@@ -8910,6 +8994,11 @@ function buildAiSharePageDiagnostics() {
       videoCount: document.querySelectorAll('video').length,
       frameTarget: targetBrief
     },
+    // v0.1.923: スクロール白化の観測値(whiteoutCount=可視→消失を検知した回数 /
+    //   lastWhiteoutAgoMs=最後にいつ / samples=どの要素[video|host]で起きたか)。
+    //   0 のままなら「スクロールで白化は観測されていない」=症状は inline panel/video 以外
+    //   (ニコ生プレイヤー内部の描画等)を疑う切り分けになる。
+    scrollWhiteoutDiag: summarizeWhiteoutDiag(_scrollWhiteoutState, Date.now()),
     inlinePanel: {
       placementMode: inlinePanelPlacementMode,
       placementEffective,

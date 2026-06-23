@@ -490,6 +490,7 @@
 | `src/lib/sanitizeRoomAvatarsForBroadcaster.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/scrapeEventScoreRankingFromRichviewDom.js` | 1 | 記録エンジン(watchページ常駐) |
 | `src/lib/scrapeTotalGiftCountList.js` | 1 | 記録エンジン(watchページ常駐) |
+| `src/lib/scrollWhiteoutProbe.js` | 1 | 記録エンジン(watchページ常駐) |
 | `src/lib/sessionCommentCache.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/shouldRearmBackfillForOfficialGap.js` | 1 | 記録エンジン(watchページ常駐) |
 | `src/lib/shouldSkipDeepHarvest.js` | 1 | 記録エンジン(watchページ常駐) |
