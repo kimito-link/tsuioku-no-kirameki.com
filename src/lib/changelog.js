@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.920',
+    date: '2026-06-23',
+    summary: 'ギフト自動取得を再び緊急停止(切り分け第2弾)',
+    items: Object.freeze([
+      '前バージョン(v0.1.919)で「自動巡回(autopatrol)が真因・ギフト自動取得は無関係」と判定してギフト自動取得を再開しましたが、拡張リロード後に「別の配信タブが勝手に開く」症状が再発しました。引き続き原因を調べるため、ギフトサイドバーの自動オープン(ランキングタブの合成クリック)を再び停止します。自動巡回(autopatrol)は前バージョンから引き続き停止中です。ご自身でサイドバーを開けばランキングはこれまでどおり記録されます。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.919',
     date: '2026-06-23',
     summary: '自動巡回(裏で配信を勝手に開く)を停止+ギフト自動取得を再開',
