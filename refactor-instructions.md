@@ -12,15 +12,28 @@
 巨大化した2つの entry ファイルの **責務混在を解消** し、純関数を `src/lib` に抽出してテストで固める。
 これにより eslint `max-lines` ラチェットの圧力を下げ、将来の機能追加を可能にする。
 
-- `src/extension/popup-entry.js` — **21,230行 / 376 top-level 関数**(描画 + 集計 + storage + messaging + celebration 演出 が混在)
-- `src/extension/content-entry.js` — **17,325行 / 248 top-level 関数**(NDGR受信 + persist + backfill + DOM観測 が混在)
+- `src/extension/popup-entry.js` — **21,019行 / 374 top-level 関数**(描画 + 集計 + storage + messaging + celebration 演出 が混在。`chrome.*` 173箇所・lib import 157)
+- `src/extension/content-entry.js` — **18,045行 / 253 top-level 関数**(NDGR受信 + persist + backfill + DOM観測 が混在。lib import 90)
 
 **ゴールは「entry を薄くし、ロジックを `src/lib` の純関数 + テストへ移す」こと。** 振る舞いは完全に保つ。
 
 ### なぜ今これをやるのか
-- `src/lib` は既に **402 純関数 + 406 テスト(ほぼ1:1)** で、抽出の型は確立済み。良い前例が大量にある。
+- `src/lib` は既に **472 純関数モジュール + 474 テスト(ほぼ1:1)** で、抽出の型は確立済み。良い前例が大量にある(popup は 157、content は 90 の lib をすでに import 済み=移植先パターンは実証済み)。
 - entry 2本だけが取り残されて巨大化し、eslint `max-lines` で「これ以上増やせない」運用になっている(下記 §4)。
 - 機能追加(LiveStateStream・応援パワー診断・演出)が控えており、その前に土台を軽くしたい。
+
+---
+
+## 0.5 Project Understanding(証拠に基づく前提・着手前に把握)
+
+- **何をするか**: Chrome 拡張「君斗りんくの追憶のきらめき」(ID `cjbabignmmodaickpeckiojjabnlogdb`)。ニコ生(`*.nicovideo.jp`)の応援コメント/ギフトを `chrome.storage.local` に記録し、放送後に 3 レーン(りんく=配信者視点 / こん太=ファン視点 / たぬ姉=匿名ガイド)+活発度で振り返る。応援ライブビュー・会場モード・読み上げ・純Web版(`app.tsuioku-no-kirameki.com`)を持つ。(出典: AGENTS.md §1-3)
+- **主要エントリーポイント**(出典: scripts/build.mjs / wc -l): §4 の esbuild エントリ表。中核は popup-entry(21k)/content-entry(18k)/background.js(3.5k)/venueBar(3.3k)/status-entry(2.5k)。
+- **主要モジュールと責務**: `src/lib/`=472 純関数(色/速度/コメント整形/レーン集約/人物タイル/会場席/NDGR decode/レポート)。`src/domain/`=応援/集約/識別子。`src/data/`=コメント取得。`src/shared/`=共有アバター。
+- **データの流れ**: watch タブの content がコメント収穫→`chrome.storage.local`(単一 LevelDB)保存→popup が読み出して 3 レーン/数字カード描画。純Web版は status の「WEBサイトURLで見る」送信→`api/status.js`(Vercel+Upstash)→`app/*` が GET 再描画。**read を増やすと混雑で詰まる**のは既知。
+- **外部依存**(出典: package.json): 拡張本体はランタイム依存ゼロ。devDeps=esbuild/vitest/playwright/eslint/typescript/happy-dom/fake-indexeddb/husky。外部サービス=Vercel(api/status.js)+Upstash Redis、Cloudflare Pages(LP)。
+- **検証コマンド**(出典: package.json / run-verify-cc.mjs): `npm run verify:cc`= test:cc→lint→typecheck→build→tree-map:check→site-health:check→feature-map:check→verify:bump(1つでも失敗で停止)。
+- **tsconfig**: allowJs+checkJs+noImplicitAny(strict:false)。JS に JSDoc 型が付き型チェックされる。include=`src/**/*.js`+`extension/background.js`、exclude=dist/test。
+- **テスト分布**(重要): `src/lib/` に 474 テスト、`src/extension/`(=モノリス群)に実質 1 テスト。**抽出して lib に移すことがそのままテスト可能化になる**=本リファクタの中心的価値。
 
 ---
 
@@ -63,7 +76,8 @@
 | **persistCommentRows** | [content-entry.js:10718](src/extension/content-entry.js) / Impl:10876 | コメント取りこぼし・保存破損 | 計算(行整形・dedupe判定)は抽出可。**enqueue/flush/storage書込の本体は残す。** |
 | **NDGR 受信ループ** | content-entry.js(backfill本体) | 取得停止・二重取得 | 状態機械は残す。純粋なパース/判定のみ抽出可。 |
 | **backfill 制御** | content-entry.js / backfill-sw-entry.js | 一気取り破綻 | 既に `src/lib` に多数の純関数あり(backfillSlotPool等)。それに倣う。 |
-| **background.js (SW)** | [extension/background.js](extension/background.js)(3,085行・**bundle対象外**) | windows.create / 孤児popup掃除 / SWライフサイクル破綻 | **原則触らない。** import を足さない(bundleされないため別ファイルの関数を呼べない)。 |
+| **background.js (SW)** | [extension/background.js](extension/background.js)(3,478行・**bundle対象外**) | windows.create / 孤児popup掃除 / SWライフサイクル破綻 | **原則触らない。** import を足さない(bundleされないため別ファイルの関数を呼べない)。 |
+| **凍結/無効化コード(削除禁止)** | `KILL_SWITCH=true`(autopatrol・content-entry.js:14902付近) / `STATUS_POPUP_EMBED_ENABLED=false` / `KEY_BACKFILL_AUTO_DISABLED` 分岐 | 再発防止の喪失 | **デッドコードではなく意図的に無効化された生きた分岐。** 削除・有効化は §3 Stop And Ask。MEMORY に「再発防止として残す」明記。 |
 | **storageKeys** | [src/lib/storageKeys.js](src/lib/storageKeys.js)(98 export) | 保存済みデータ消失 | **キー文字列値は不変。** 参照の追加のみ可。 |
 
 ### Stop And Ask(必ず止まって司令塔に確認する)
@@ -77,20 +91,30 @@
 
 ---
 
-## 4. Baseline(現状の正確な事実 — 2026-06-14 実コード裏取り済み)
+## 4. Baseline(現状の正確な事実 — 2026-06-25 実コード裏取り更新)
 
 ```
-manifest version : 0.1.724
-ブランチ          : feature/broadcaster-reputation-check
-src/lib          : 402 純関数 + 406 テスト(ほぼ1:1)
-@ts-nocheck      : 11 ファイル(entry系6 + story1 + lib4: nicoliveDom/statusFormat/voicePlayer/watchCelebrationOverlay)
+manifest version : 0.1.936
+ブランチ          : master
+src/lib          : 472 純関数モジュール + 474 テスト(ほぼ1:1)
+@ts-nocheck      : 15 ファイル
+storageKeys      : 98 export(キー文字列値は不変・§2-4)
 ```
+
+### 着手前に必ず実行して結果を記録する Baseline Commands
+```
+git status                 # 既存の未コミット変更を把握(混ぜない。例: scripts/meeting.mjs 等が未コミットのことがある)
+git rev-parse HEAD         # 開始時の HEAD
+npm run verify:cc          # 緑であることを確認。最初から赤い項目はスコープ外として記録し緑化しようとしない
+wc -l src/extension/popup-entry.js src/extension/content-entry.js extension/background.js
+```
+- 既に未コミットの変更があれば**それに触れず**、自分の変更と混ぜない。可能なら作業ブランチを切る。
 
 ### esbuild エントリ(ソース = `src/extension/*-entry.js` → `extension/dist/*.js`)
 | ソース | 行数 | 成果物 |
 |---|---|---|
-| popup-entry.js | **21,230** | dist/popup.js |
-| content-entry.js | **17,325** | dist/content.js |
+| popup-entry.js | **21,019** | dist/popup.js |
+| content-entry.js | **18,045** | dist/content.js |
 | backfill-sw-entry.js | — | dist/backfill-sw.js |
 | status-entry.js | — | dist/status.js |
 | comeview-entry.js | — | dist/comeview.js |
@@ -98,12 +122,12 @@ src/lib          : 402 純関数 + 406 テスト(ほぼ1:1)
 | page-intercept-entry.js | — | dist/page-intercept.js |
 | offscreen-entry.js | — | dist/offscreen.js |
 | (app/app.js) | — | app/dist/app.js |
-| **extension/background.js** | **3,085** | **bundle対象外**(素のSW・`sourceType:'script'`) |
+| **extension/background.js** | **3,478** | **bundle対象外**(素のSW・`sourceType:'script'`) |
 
-### eslint max-lines ラチェット([eslint.config.js:62-71](eslint.config.js))
+### eslint max-lines ラチェット([eslint.config.js:74-79](eslint.config.js))
 ```
-popup-entry.js   : max 21230  ← 現状ピッタリ。1行も増やせない
-content-entry.js : max 17297  ← wc -l は 17325 だが eslint カウントでは収まっている
+popup-entry.js   : max 21028  ← 現状ピッタリ。1行も増やせない
+content-entry.js : max 17267  ← この上限で固定。増やせない
 ```
 **抽出して行が減ったら、この数値を新しい実数に下げること(コメント「抽出が進んだら数値を下げること」のとおり)。**
 
@@ -123,14 +147,23 @@ celebration / gift / milestone 演出が密集している(`playSupportCelebrati
   (`maybeCelebrateFrom*` の **判定部分**。DOM を触る `play*Dom` 本体は残す)。
 - **popup の集計/整形**: ランキング・統計カードの view-model 構築(既に `buildWatchMetaCardAudienceViewModel` 等の前例あり)。
 - **content のパース/判定**: NDGR ペイロードの純粋なパース、行整形、dedupe 判定。
+- **status の URL/結果整形**: 共有 URL 組み立て(`/?v=` `/live-view?v=`)・結果テキスト整形など純粋部分のみ(DOM・`chrome.tabs.create`・`uploadStatusSnapshot` はグルーに残す)。
+- **純粋性チェック(必須・抽出前)**: 対象関数本体に `chrome.` / `document` / `window` / モジュールスコープの可変変数参照が**無い**ことを Read で確認。1つでもあれば抽出しない。
+- **今実装してよいか**: ✅ **やってよい**(1関数=1抽出単位・抽出と同時にテスト)。
 
 ### Phase B — view-model 層の整理(中リスク)
 描画関数から「何を表示するか(データ)」と「どう DOM に書くか(副作用)」を分離。
 データ側を `src/lib` の純関数へ。entry には DOM 適用だけを残す。
+- **今実装してよいか**: ⚠️ **小さくなら可**。データ/副作用の境界が曖昧なら Phase C 扱いで提案に留める。見せ方(会場/レーン/数字カード)に関わる分離は §3 Stop And Ask(MEMORY に「実機未確認で直ったと言うな/似せて自作するな」の戒め多数)。
 
 ### Phase C — 心臓部(**実装しない・提案のみ**)
-persistCommentRows / NDGR 受信 / backfill 状態機械 / background.js。
+persistCommentRows / NDGR 受信 / backfill 状態機械 / background.js / モノリスの物理ファイル分割。
 **これらは指示書では “提案” に留める。** 実際に手を入れる場合は必ず別途会議 + 司令塔承認。
+- **今実装してよいか**: ❌ **提案のみ**。
+
+### 凍結/無効化コード(削除候補に見えるもの)
+autopatrol `KILL_SWITCH=true` / `STATUS_POPUP_EMBED_ENABLED=false` / `KEY_BACKFILL_AUTO_DISABLED`。
+- **今実装してよいか**: ❌ **触らない・提案もしない**(意図的に残された再発防止。§3 Danger Map 参照)。
 
 ---
 
