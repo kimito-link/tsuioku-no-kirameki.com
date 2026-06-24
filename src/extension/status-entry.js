@@ -859,8 +859,17 @@ function renderAll({ lvList, summaries, fastDiag, popupDiag, backfillProgress, v
     if (!livesData.length) {
       _lastLivesSig = '';
       livesEl.className = 'empty-note';
-      livesEl.textContent =
+      livesEl.textContent = '';
+      const note = document.createElement('div');
+      note.textContent =
         '視聴中の配信が見つかりませんでした。ニコ生 watch ページを開いてから戻ってきてください。';
+      livesEl.appendChild(note);
+      // 配信が無くても「WEBサイトURLで見る」を失わないフォールバック(送信→現状の概要URLを開く)。
+      const webUrlBtn = buildWebUrlButton();
+      if (webUrlBtn) {
+        webUrlBtn.style.marginRight = '0';
+        livesEl.appendChild(webUrlBtn);
+      }
     } else {
       // v0.1.868: 「スムーズじゃない」対策。配信カードは 2 秒ごとに innerHTML 全再構築+<img>再生成で
       //   サムネが毎回チラつき重い。表示に効く値だけの軽い signature を作り、変化が無ければ再構築を
@@ -916,6 +925,11 @@ function renderAll({ lvList, summaries, fastDiag, popupDiag, backfillProgress, v
         // v0.1.864: 放送導線。状態別ボタン(切替/新規タブ/アーカイブ)。lv 不正なら出さない。
         const watchBtn = buildWatchLinkButton(live, watchTabMap);
         if (watchBtn) card.appendChild(watchBtn);
+
+        // 2026-06-25: 共有導線「🌐 WEBサイトURLで見る」を同じ行に(UIUX: 上部の汎用バーから移設)。
+        //   送信→WEB状態速報URLを新規タブで開く。キー未設定ビルドでは null=出さない。
+        const webUrlBtn = buildWebUrlButton();
+        if (webUrlBtn) card.appendChild(webUrlBtn);
 
         // 2026-06-23: この配信が「Alt+Tab に出ない裏タブ(active:false)」のときだけ、警告 + 手動クローズ
         //   ボタンを出す(過去 autopatrol/古い重複拡張の遺物対策・自動では閉じない=誤爆ゼロ)。
@@ -1498,6 +1512,47 @@ function buildLiveViewButton(live) {
       chrome.tabs.create({ url });
     } catch {
       /* context 切れ=無視(次の更新で復帰) */
+    }
+  });
+  return btn;
+}
+
+// 2026-06-25: 配信カードの「🌐 WEBサイトURLで見る」。クリックで現状をサーバーに送信(uploadStatusSnapshot)し、
+//   成功したら WEB 状態速報 URL を新規タブで開く(UIUX: 共有導線は配信カードの行に置く=「応援ライブビューを
+//   開く/配信ページを開く」と同じ文脈)。結果(成功/失敗・両URL)は従来どおり上部 #uploadResult にも出す。
+//   キー未注入ビルドでは出さない(死にボタン回避)。多重送信防止に送信中はボタンを無効化。
+function buildWebUrlButton() {
+  const { ingestKey, viewToken } = getUploadConfig();
+  if (!ingestKey || !viewToken) return null; // キー未設定ビルド=出さない。
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.textContent = '🌐 WEBサイトURLで見る';
+  btn.style.cssText =
+    'margin-top:8px;margin-right:6px;padding:5px 12px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600;' +
+    'border:1px solid var(--nl-accent);background:var(--nl-card-bg);color:var(--nl-accent);';
+  btn.addEventListener('click', async () => {
+    const prev = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = '送信中...';
+    const r = await uploadStatusSnapshot();
+    btn.textContent = prev;
+    btn.disabled = false;
+    const resultEl = document.getElementById('uploadResult');
+    if (resultEl) {
+      if (r.ok) renderUploadResultLinks(resultEl, r);
+      else {
+        resultEl.replaceChildren();
+        resultEl.style.whiteSpace = '';
+        resultEl.textContent = `× ${r.error}`;
+      }
+    }
+    // 成功したら WEB 状態速報を新規タブで開く(ユーザー指定: 送信して URL を開く)。
+    if (r.ok && r.url) {
+      try {
+        chrome.tabs.create({ url: r.url });
+      } catch {
+        /* context 切れ等=無視(上部 #uploadResult にリンクは出ている) */
+      }
     }
   });
   return btn;
@@ -2252,36 +2307,8 @@ function setupButtons() {
   setupPatrolButtons();
   setupReputationCheck();
   setupStatusTabs();
-  const btnUpload = document.getElementById('btnUpload');
-  if (btnUpload) {
-    const { ingestKey, viewToken } = getUploadConfig();
-    const resultEl = document.getElementById('uploadResult');
-    if (!ingestKey || !viewToken) {
-      // キー未注入のビルドではボタンを無効化して誤操作を防ぐ。
-      btnUpload.disabled = true;
-      btnUpload.title = 'スマホ送信キーが未設定のビルドです';
-    } else {
-      btnUpload.addEventListener('click', async () => {
-        btnUpload.disabled = true;
-        const prev = btnUpload.textContent;
-        btnUpload.textContent = '送信中...';
-        const r = await uploadStatusSnapshot();
-        btnUpload.textContent = prev;
-        btnUpload.disabled = false;
-        if (resultEl) {
-          if (r.ok) {
-            // 状態速報 Web と 応援ライブビュー Web の両 URL を【クリック可能なアンカー】で案内。
-            //   textContent だと URL が貼られない(リンクにならない)ので DOM を組み立てる。
-            renderUploadResultLinks(resultEl, r);
-          } else {
-            resultEl.replaceChildren();
-            resultEl.style.whiteSpace = '';
-            resultEl.textContent = `× ${r.error}`;
-          }
-        }
-      });
-    }
-  }
+  // 「🌐 WEBサイトURLで見る」は配信カード内(buildWebUrlButton)へ移設済み(2026-06-25)。
+  //   上部の汎用ボタンバーからは撤去。送信ロジックは uploadStatusSnapshot + renderUploadResultLinks を共有。
   const btnSelect = document.getElementById('btnSelectAll');
   if (btnSelect) {
     btnSelect.addEventListener('click', () => {
