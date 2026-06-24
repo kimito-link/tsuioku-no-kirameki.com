@@ -26,6 +26,16 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.935',
+    date: '2026-06-25',
+    summary: '暖色パステルをWeb版にも展開+カードの枠を見やすく',
+    items: Object.freeze([
+      'Web版(拡張なしで見られる状態速報・応援ライブビュー)の配色も、診断ページと同じ明るい暖色パステルに統一しました。',
+      '健全度カードなどの枠が薄くて見えにくかったのを、暖色ベージュの少し濃い枠にして、1つ1つの境界がはっきり分かるようにしました。',
+      'Web版もパソコンがダークモードでも常に明るいクリーム色で表示します。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.934',
     date: '2026-06-25',
     summary: '診断ページを明るい暖色パステルに刷新(DESIGN.md 導入)',

@@ -7,32 +7,35 @@
     <meta name="referrer" content="no-referrer" />
     <title>応援ライブビュー（Web版）</title>
     <style>
+      /* 配色の正本は リポジトリ直下 DESIGN.md(Tsuioku Warm Pastel)。status.html と同じトークン。
+         明るい暖色パステル。常に明るく出す(OSダークでも暗転しない)。 */
       :root {
-        color-scheme: light dark;
-        --nl-bg: #fffaf2;
-        --nl-text: #1f2937;
-        --nl-text-soft: #4b5563;
-        --nl-border: #e5e7eb;
-        --nl-card-bg: #ffffff;
-        --nl-accent: #ec4899;
+        color-scheme: light;
+        --nl-bg: #fff7ec;          /* DESIGN.md colors.bg */
+        --nl-text: #4a3b34;        /* colors.text */
+        --nl-text-soft: #8a7568;   /* colors.textSoft */
+        --nl-border: #e3c9b5;      /* colors.border(地に溶けない濃さ) */
+        --nl-card-bg: #fffdf9;     /* colors.cardBg */
+        --nl-accent: #f06aa0;      /* colors.accent(桜ピンク) */
         /* 応援レーン鏡(.nl-story-userlane-*)が参照する変数。popup.html / status.html から移植。
            無いと color-mix/背景/枠が壊れて裸要素になる(v0.1.900 の轍)。 */
-        --nl-surface: #ffffff;
-        --nl-text-sub: #4b5563;
-        --nl-muted: #5b6475;
-        --nl-user-accent: #ec4899;
+        --nl-surface: #fffdf9;     /* colors.surface */
+        --nl-text-sub: #7a6458;    /* colors.textSub */
+        --nl-muted: #9c8678;       /* colors.muted */
+        --nl-user-accent: #f06aa0; /* colors.userAccent(popup 互換・固定) */
       }
+      /* OS がダークでも明るいクリームのまま(light と同値で上書きを無効化)。 */
       @media (prefers-color-scheme: dark) {
         :root {
-          --nl-bg: #111827;
-          --nl-text: #f3f4f6;
-          --nl-text-soft: #9ca3af;
-          --nl-border: #374151;
-          --nl-card-bg: #1f2937;
-          --nl-surface: #161d27;
-          --nl-text-sub: #cbd5e1;
-          --nl-muted: #8d9bb5;
-          --nl-user-accent: #ec4899;
+          --nl-bg: #fff7ec;
+          --nl-text: #4a3b34;
+          --nl-text-soft: #8a7568;
+          --nl-border: #e3c9b5;
+          --nl-card-bg: #fffdf9;
+          --nl-surface: #fffdf9;
+          --nl-text-sub: #7a6458;
+          --nl-muted: #9c8678;
+          --nl-user-accent: #f06aa0;
         }
       }
       * {
@@ -82,7 +85,7 @@
         border-radius: 14px;
         padding: 14px;
         margin: 0 0 14px;
-        box-shadow: 0 1px 8px rgb(2 17 31 / 5%);
+        box-shadow: 0 1px 8px rgba(120, 80, 50, 0.08);  /* 冷たい青影 → 暖色の影(DESIGN.md) */
       }
       .lane > h2 {
         font-size: 14px;

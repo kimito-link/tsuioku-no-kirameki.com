@@ -14,7 +14,7 @@
         --nl-bg: #fff7ec;          /* DESIGN.md colors.bg ── クリーム地 */
         --nl-text: #4a3b34;        /* colors.text ── 暖かいダークブラウン(冷たい黒を置換) */
         --nl-text-soft: #8a7568;   /* colors.textSoft */
-        --nl-border: #f0e0d2;      /* colors.border ── 地に溶けるベージュ枠 */
+        --nl-border: #e3c9b5;      /* colors.border ── 暖色ベージュ枠(薄すぎ #f0e0d2 から濃く=境界が見える) */
         --nl-card-bg: #fffdf9;     /* colors.cardBg ── クリーム白(純白を避ける) */
         --nl-accent: #f06aa0;      /* colors.accent ── 桜ピンク */
         --nl-mono: ui-monospace, 'SFMono-Regular', 'Menlo', 'Consolas', monospace;
@@ -37,7 +37,7 @@
           --nl-bg: #fff7ec;
           --nl-text: #4a3b34;
           --nl-text-soft: #8a7568;
-          --nl-border: #f0e0d2;
+          --nl-border: #e3c9b5;
           --nl-card-bg: #fffdf9;
           --nl-surface: #fffdf9;
           --nl-text-sub: #7a6458;
@@ -435,7 +435,8 @@
         gap: 6px;
       }
       .hc {
-        border: 1px solid var(--nl-border);
+        /* 健全度カードは数が多く地に溶けやすい=境界を borderStrong ではっきり見せる(DESIGN.md)。 */
+        border: 1px solid #d8b89f;
         border-radius: 9px;
         padding: 6px 8px;
         background: var(--nl-card-bg);
@@ -453,7 +454,7 @@
       .hc-warn .hc-val { color: #c8861f; }
       .hc-bad { border-color: #d4495f; background: rgba(212, 73, 95, 0.10); }
       .hc-bad .hc-val { color: #d4495f; }
-      .hc-na { opacity: 0.55; }
+      .hc-na { opacity: 0.72; }  /* 対象外セルも枠が消えない程度に(0.55 は薄すぎた)。 */
       .hc-na .hc-val { color: var(--nl-text-soft); font-weight: 400; }
       /* v0.1.856 ファーストビューの「原因が全部わかる共有」大ボタン(一番目立つ位置)。 */
       .share-hero { margin: 0 0 14px; }
