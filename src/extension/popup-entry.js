@@ -674,6 +674,8 @@ import { prioritizeWatchFramesForWatchUrl } from '../lib/watchFrameRank.js';
 import { storyTileUsesYukkuriTvStyle } from '../lib/storyTileTvStyle.js';
 import { withCommentSendTroubleshootHint } from '../lib/commentSendTroubleshootHint.js';
 import { avatarCompareKey, isSameAvatarUrl } from '../lib/avatarUrlCompare.js';
+// 一意アバター数の集計(純関数・挙動同値で popup-entry から切り出し)。
+import { countUniqueAvatarEntries } from '../lib/avatarEntryCounts.js';
 import { resolveStoryLaneAvatarSrc } from '../lib/storyLaneAvatarSrc.js';
 import { pickAvatarUrlForUid } from '../lib/deriveAvatarUrlFromUid.js';
 import { runPopupAiDiagnosis } from '../lib/popupAiDiagOrchestrator.js';
@@ -4319,15 +4321,6 @@ function countEntriesWithAvatar(entries) {
 }
 
 /** @param {PopupCommentEntry[]} entries */
-function countUniqueAvatarEntries(entries) {
-  const set = new Set();
-  for (const e of entries) {
-    const k = avatarCompareKey(String(e?.avatarUrl || '').trim());
-    if (k) set.add(k);
-  }
-  return set.size;
-}
-
 /**
  * userId から組み立てた URL も含め、実際に表示へ使える avatar 数を数える
  * @param {PopupCommentEntry[]|null|undefined} entries

@@ -451,7 +451,7 @@
 
 - **HTMLレポート生成** — マーケ/イベント順位/タイムライン等を1枚の HTML レポートに組み立てる(popup-entry 内)
   - `src/extension/popup-entry.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 30</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 31</summary>
 
 - `scripts/inspect-nicolive-watch-stats.mjs` — ニコ生 watch ページの HTML から、来場・同接まわりの数値がどう埋め込まれているかを CLI で確認する。
 - `src/lib/audienceEngagementGap.js` — 来場者数は多いがコメントが少ない状態を検出するローカル分析コア。
@@ -477,6 +477,7 @@
 - `src/lib/reportFriendlyMetaRowsHtml.js` — v0.1.635: HTML レポートの「やさしいメタ情報」テーブル行ビルダ + ラベル変換（純ロジック）。
 - `src/lib/reportHeadInfoRowsHtml.js` — HTML レポートの「head 情報」テーブル行（link / meta / script / noopener）を
 - `src/lib/reportNextMemoSectionHtml.js` — v0.1.811(星野ロミ式コンポーネント化・第4弾): popup-entry.js の buildHtmlReportDocument 内
+- `src/lib/reportPreviewCtx.js` — レポートプレビューの信頼度注釈に渡す「文脈」を fastDiag から組み立てる純関数。
 - `src/lib/reportSelfPostedRowsHtml.js` — v0.1.634: HTML レポートの「自分のコメント抜粋」テーブル行ビルダ（純ロジック）。
 - `src/lib/reportSilentError.js` — 内部エラーを静かに記録する純ロジック(context invalidated 等の判定・メッセージ正規化)。
 - `src/lib/reportThumbedUsersSectionHtml.js` — HTML レポートの「サムネ付きユーザー一覧」セクションを純粋に組み立てる。

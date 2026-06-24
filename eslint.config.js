@@ -71,8 +71,9 @@ export default [
     // 抽出が進んだら数値を下げること(増やすのは禁止)。
     // v0.1.858: レポートプレビュー機能のロジックは新規モジュール(reportPreview*.js)へ抽出済み。
     //   popup 側に残るのは「import + paint ループでの呼び出し」の最小フック3行のみ=21025→21028。
+    // 2026-06-25: countUniqueAvatarEntries を src/lib/avatarEntryCounts.js へ抽出=21028→21012 に下げ。
     files: ['src/extension/popup-entry.js'],
-    rules: { 'max-lines': ['error', { max: 21028, skipBlankLines: false, skipComments: false }] }
+    rules: { 'max-lines': ['error', { max: 21012, skipBlankLines: false, skipComments: false }] }
   },
   {
     files: ['src/extension/content-entry.js'],
