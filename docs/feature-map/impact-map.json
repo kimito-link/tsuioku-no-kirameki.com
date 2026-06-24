@@ -4676,6 +4676,16 @@
       ]
     },
     {
+      "file": "src/lib/reportPreviewCtx.js",
+      "featureCount": 1,
+      "features": [
+        "status"
+      ],
+      "labels": [
+        "状態速報ページ"
+      ]
+    },
+    {
       "file": "src/lib/reportPreviewPublish.js",
       "featureCount": 1,
       "features": [
