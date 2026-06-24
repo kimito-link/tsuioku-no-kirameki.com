@@ -50,10 +50,10 @@ graph LR
   n_status --> n_src_lib_statusFastDiagLite_js["lib/statusFastDiagLite.js"]:::shared
   n_status --> n_src_lib_statusFormat_js["lib/statusFormat.js"]:::shared
   n_status --> n_src_lib_statusMindmapModel_js["lib/statusMindmapModel.js"]
+  n_status --> n_src_lib_statusShareUrls_js["lib/statusShareUrls.js"]
   n_status --> n_src_lib_statusTrend_js["lib/statusTrend.js"]
   n_status --> n_src_lib_statusTrendKey_js["lib/statusTrendKey.js"]
-  n_status --> n_src_lib_storageOpTimeout_js["lib/storageOpTimeout.js"]:::shared
   classDef shared fill:#eee,stroke:#999,color:#666;
 ```
 
-> ほか 13 ファイル省略（全件は storage-bus.md / metafile 参照）。
+> ほか 14 ファイル省略（全件は storage-bus.md / metafile 参照）。

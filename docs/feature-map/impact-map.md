@@ -502,6 +502,7 @@
 | `src/lib/standalonePopupClose.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/statusActionAdvisor.js` | 1 | 状態速報ページ |
 | `src/lib/statusMindmapModel.js` | 1 | 状態速報ページ |
+| `src/lib/statusShareUrls.js` | 1 | 状態速報ページ |
 | `src/lib/statusTrend.js` | 1 | 状態速報ページ |
 | `src/lib/statusTrendKey.js` | 1 | 状態速報ページ |
 | `src/lib/storedCommentDedupeMerge.js` | 1 | ポップアップ(応援レーン) |
