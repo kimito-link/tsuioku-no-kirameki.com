@@ -5,23 +5,27 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>君斗りんく 状態(スマホ閲覧)</title>
     <style>
+      /* 配色の正本は リポジトリ直下 DESIGN.md(Tsuioku Warm Pastel)。status.html と同じトークン。
+         明るい暖色パステル(クリーム地・焦げ茶文字・桜ピンク)。常に明るく出す(OSダークでも暗転しない)。 */
       :root {
-        color-scheme: light dark;
-        --nl-bg: #fffaf2;
-        --nl-text: #1f2937;
-        --nl-text-soft: #4b5563;
-        --nl-border: #e5e7eb;
-        --nl-card-bg: #ffffff;
-        --nl-accent: #ec4899;
+        color-scheme: light;
+        --nl-bg: #fff7ec;          /* DESIGN.md colors.bg */
+        --nl-text: #4a3b34;        /* colors.text(暖かい焦げ茶) */
+        --nl-text-soft: #8a7568;   /* colors.textSoft */
+        --nl-border: #e3c9b5;      /* colors.border(地に溶けない濃さ) */
+        --nl-card-bg: #fffdf9;     /* colors.cardBg(純白を避ける) */
+        --nl-accent: #f06aa0;      /* colors.accent(桜ピンク) */
         --nl-mono: ui-monospace, 'SFMono-Regular', 'Menlo', 'Consolas', monospace;
       }
+      /* OS がダークでも明るいクリームのまま(light と同値で上書きを無効化)。 */
       @media (prefers-color-scheme: dark) {
         :root {
-          --nl-bg: #111827;
-          --nl-text: #f3f4f6;
-          --nl-text-soft: #9ca3af;
-          --nl-border: #374151;
-          --nl-card-bg: #1f2937;
+          --nl-bg: #fff7ec;
+          --nl-text: #4a3b34;
+          --nl-text-soft: #8a7568;
+          --nl-border: #e3c9b5;
+          --nl-card-bg: #fffdf9;
+          --nl-accent: #f06aa0;
         }
       }
       * {
@@ -64,9 +68,10 @@
       section.lane {
         background: var(--nl-card-bg);
         border: 1px solid var(--nl-border);
-        border-radius: 8px;
+        border-radius: 12px;                              /* DESIGN.md rounded.md */
         padding: 12px 14px;
         margin-bottom: 12px;
+        box-shadow: 0 1px 6px rgba(120, 80, 50, 0.08);    /* elevation.card ── 暖色の影 */
       }
       section.lane h2 {
         margin: 0 0 8px;
