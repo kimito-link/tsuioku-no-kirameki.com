@@ -235,6 +235,7 @@
 | `src/lib/aiShareFastDiagKey.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/audienceEngagementGap.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/autoBackupState.js` | 1 | 記録エンジン(watchページ常駐) |
+| `src/lib/avatarEntryCounts.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/backfillFlushThreshold.js` | 1 | 記録エンジン(watchページ常駐) |
 | `src/lib/backfillHeartbeat.js` | 1 | 記録エンジン(watchページ常駐) |
 | `src/lib/backfillRemoveGiftSystemMessages.js` | 1 | ポップアップ(応援レーン) |
