@@ -31,6 +31,8 @@ import { buildStatusActions } from '../lib/statusActionAdvisor.js';
 import { buildHealthCells, summarizeHealthVerdict } from '../lib/healthCells.js';
 import { buildVoiceDiagLine } from '../lib/voiceDiag.js';
 import { KEY_VOICE_DIAG } from '../lib/voiceDiagKey.js';
+// 共有 URL 組み立て(状態速報/応援ライブビュー/ingest)の純関数。挙動同値で uploadStatusSnapshot から切り出し。
+import { buildStatusShareUrls } from '../lib/statusShareUrls.js';
 // v0.1.902: 会場座席の健全度(配信者混入・固着)を健全度パネルに載せる。
 import { KEY_VENUE_SEATS_DIAG } from '../lib/venueSeatsDiagKey.js';
 // 2026-06-22(council/lane-show-all-active): 応援レーンの人数整合(素性 N/表示 M)を健全度パネルに載せる。
@@ -2028,8 +2030,10 @@ async function uploadStatusSnapshot() {
   if (!jsonBlob) {
     return { ok: false, error: 'まだ送信できる状態がありません' };
   }
+  // 共有 URL 組み立ては純関数 buildStatusShareUrls(src/lib)に抽出済み(挙動同値・テストで固定)。
+  const { statusUrl, liveViewUrl, ingestUrl } = buildStatusShareUrls(appOrigin, viewToken);
   try {
-    const res = await fetch(`${appOrigin}/api/status`, {
+    const res = await fetch(ingestUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-share-key': ingestKey },
       body: JSON.stringify({ ...jsonBlob, v: viewToken })
@@ -2037,12 +2041,11 @@ async function uploadStatusSnapshot() {
     if (!res.ok) {
       return { ok: false, error: `送信失敗 (HTTP ${res.status})` };
     }
-    const v = encodeURIComponent(viewToken);
     // 状態速報の Web 版(概要+配信一覧)と、応援ライブビューの Web 版(popup そっくりの応援レーン)の両方の URL を返す。
     return {
       ok: true,
-      url: `${appOrigin}/?v=${v}`,
-      liveViewUrl: `${appOrigin}/live-view?v=${v}`
+      url: statusUrl,
+      liveViewUrl
     };
   } catch (err) {
     return { ok: false, error: '通信エラー: ' + String(err?.message || err) };
