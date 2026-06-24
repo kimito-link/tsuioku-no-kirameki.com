@@ -26,6 +26,16 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.936',
+    date: '2026-06-25',
+    summary: 'WEBサイトURLで見るを配信カード内に移動(UIUX)',
+    items: Object.freeze([
+      '「🌐 WEBサイトURLで見る」を、上部のボタン群から配信カードの中(「応援ライブビューを開く」「配信ページを開く」と同じ行)に移しました。その配信を共有する操作がひとまとまりになり、押しやすくなります。',
+      'ボタンを押すと、これまでどおり現状をサーバーに送信し、WEB版の状態速報を新しいタブで開きます。',
+      '配信を見ていないとき(視聴中の配信なし)でも、その欄に「WEBサイトURLで見る」を残したので、いつでもWEB版を共有できます。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.935',
     date: '2026-06-25',
     summary: '暖色パステルをWeb版にも展開+カードの枠を見やすく',
