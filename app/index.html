@@ -96,6 +96,23 @@
         font-size: 13px;
         padding: 12px 0;
       }
+      /* 共有診断 → 応援ライブビュー(ちくらん)への導線。上部に目立つボタン風リンク。 */
+      .live-view-link {
+        display: block;
+        margin: 0 0 14px;
+        padding: 11px 14px;
+        border-radius: 10px;
+        background: color-mix(in srgb, var(--nl-accent) 14%, var(--nl-card-bg));
+        border: 1px solid color-mix(in srgb, var(--nl-accent) 45%, transparent);
+        color: var(--nl-accent);
+        font-size: 14px;
+        font-weight: 700;
+        text-align: center;
+        text-decoration: none;
+      }
+      .live-view-link:hover {
+        background: color-mix(in srgb, var(--nl-accent) 22%, var(--nl-card-bg));
+      }
     </style>
   </head>
   <body>
@@ -103,6 +120,10 @@
       <h1>君斗りんく 状態</h1>
       <span class="status-meta" id="metaLastUpdate">最終更新 —</span>
     </header>
+
+    <!-- 共有診断(この状態速報)から、同じ閲覧トークンで応援ライブビュー(ちくらん)へ飛べる導線。
+         href は app.js が ?v= から組み立てる(token が無ければ非表示)。 -->
+    <a id="liveViewLink" class="live-view-link" href="#" hidden>🪞 応援ライブビュー(そっくり)を見る →</a>
 
     <section class="lane" id="overviewLane">
       <h2>概要</h2>

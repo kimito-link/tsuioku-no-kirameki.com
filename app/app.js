@@ -24,8 +24,17 @@ function bootstrap() {
     showError('URL に閲覧トークン(?v=...)がありません。PC の拡張から「スマホへ送信」してください。');
     return;
   }
+  wireLiveViewLink(token);
   refresh(token);
   startPolling(token);
+}
+
+/** 共有診断から応援ライブビュー(ちくらん)へ飛ぶリンクを、同じ閲覧トークンで張る。 */
+function wireLiveViewLink(token) {
+  const link = document.getElementById('liveViewLink');
+  if (!link) return;
+  link.href = `/live-view?v=${encodeURIComponent(token)}`;
+  link.hidden = false;
 }
 
 function startPolling(token) {

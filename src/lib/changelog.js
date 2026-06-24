@@ -26,6 +26,16 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.933',
+    date: '2026-06-25',
+    summary: 'WEBサイトURL案内を押せるリンク化+応援ライブビュー導線',
+    items: Object.freeze([
+      '状態速報ページの送信ボタンの文言を「📱 スマホへ送信」から「🌐 WEBサイトURLで見る」に変えました。',
+      '送信したあとに出るURL(状態速報・応援ライブビュー)を、文字だけでなく【そのまま押せるリンク】にして、ボタンの上に表示するようにしました(押すとすぐ別タブで開きます)。',
+      '共有しているWeb版の状態速報ページの上部に「🪞 応援ライブビュー(そっくり)を見る」リンクを追加しました。同じURL(?v=)のまま、応援レーンのWeb版へワンタップで移動できます。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.932',
     date: '2026-06-23',
     summary: 'スマホ送信後に応援レーンWeb版のURLも案内',

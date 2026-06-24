@@ -1994,6 +1994,41 @@ async function uploadStatusSnapshot() {
   }
 }
 
+/**
+ * 送信成功時の WEBサイトURL 案内を、クリック可能なアンカーで描く。
+ *   - textContent だと URL がただの文字列で貼られない(リンクにならない)ため DOM を組み立てる。
+ *   - 状態速報(概要+配信一覧)と 応援ライブビュー(ちくらん・popup そっくり)の2本を出す。
+ *   - target=_blank + rel=noopener で別タブで開く(誤って status を離れない)。
+ * @param {HTMLElement} resultEl
+ * @param {{ url?: string, liveViewUrl?: string }} r
+ */
+function renderUploadResultLinks(resultEl, r) {
+  resultEl.replaceChildren();
+  resultEl.style.whiteSpace = 'normal';
+  const head = document.createElement('div');
+  head.textContent = '✓ 送信しました。WEBサイトURLで見られます:';
+  head.style.marginBottom = '6px';
+  resultEl.appendChild(head);
+
+  /** @param {string} emoji @param {string} label @param {string|undefined} href */
+  const addLinkRow = (emoji, label, href) => {
+    if (!href) return;
+    const row = document.createElement('div');
+    row.style.margin = '3px 0';
+    const a = document.createElement('a');
+    a.href = href;
+    a.target = '_blank';
+    a.rel = 'noopener noreferrer';
+    a.textContent = `${emoji} ${label}`;
+    a.style.wordBreak = 'break-all';
+    row.appendChild(a);
+    resultEl.appendChild(row);
+  };
+
+  addLinkRow('📊', '状態速報を見る', r.url);
+  addLinkRow('🪞', '応援ライブビュー(そっくり)を見る', r.liveViewUrl);
+}
+
 /** 自動巡回トグルボタンの文言を現在の有効状態に合わせる。 */
 async function refreshAutopatrolToggleLabel() {
   const btn = document.getElementById('btnAutopatrolToggle');
@@ -2235,11 +2270,12 @@ function setupButtons() {
         btnUpload.disabled = false;
         if (resultEl) {
           if (r.ok) {
-            // 状態速報 Web と 応援ライブビュー Web の両 URL を案内(どちらも拡張なしで開ける)。
-            const lvLine = r.liveViewUrl ? `\n🪞 応援レーン(そっくり): ${r.liveViewUrl}` : '';
-            resultEl.textContent = `✓ 送信しました。\n📊 状態速報: ${r.url}${lvLine}`;
-            resultEl.style.whiteSpace = 'pre-wrap';
+            // 状態速報 Web と 応援ライブビュー Web の両 URL を【クリック可能なアンカー】で案内。
+            //   textContent だと URL が貼られない(リンクにならない)ので DOM を組み立てる。
+            renderUploadResultLinks(resultEl, r);
           } else {
+            resultEl.replaceChildren();
+            resultEl.style.whiteSpace = '';
             resultEl.textContent = `× ${r.error}`;
           }
         }
