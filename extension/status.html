@@ -5,40 +5,45 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>君斗りんく 状態 (AI共有用)</title>
     <style>
+      /* 配色の正本は リポジトリ直下 DESIGN.md(Tsuioku Warm Pastel)。
+         明るい暖色パステル: クリーム地・焦げ茶文字・桜ピンクのアクセント。
+         純白/純黒/冷たい青グレーは使わない。値を変えるときは DESIGN.md を直してここに反映する。 */
       :root {
-        color-scheme: light dark;
-        --nl-bg: #fffaf2;
-        --nl-text: #1f2937;
-        --nl-text-soft: #4b5563;
-        --nl-border: #e5e7eb;
-        --nl-card-bg: #ffffff;
-        --nl-accent: #ec4899;
+        /* 常に明るく出す(ユーザー指定)。OS が dark でも status は明るいクリームパステル固定。 */
+        color-scheme: light;
+        --nl-bg: #fff7ec;          /* DESIGN.md colors.bg ── クリーム地 */
+        --nl-text: #4a3b34;        /* colors.text ── 暖かいダークブラウン(冷たい黒を置換) */
+        --nl-text-soft: #8a7568;   /* colors.textSoft */
+        --nl-border: #f0e0d2;      /* colors.border ── 地に溶けるベージュ枠 */
+        --nl-card-bg: #fffdf9;     /* colors.cardBg ── クリーム白(純白を避ける) */
+        --nl-accent: #f06aa0;      /* colors.accent ── 桜ピンク */
         --nl-mono: ui-monospace, 'SFMono-Regular', 'Menlo', 'Consolas', monospace;
         /* 応援レーン鏡(.nl-story-userlane-*)が参照する変数。popup.html から移植。
            無いと color-mix/背景/枠が壊れて装飾無し(裸要素)になる(v0.1.900 で踏んだ)。
            --nl-user-accent は popup では動的設定=status に無いので --nl-accent と同じ固定値で代替。 */
-        --nl-surface: #ffffff;
-        --nl-text-sub: #4b5563;
-        --nl-muted: #5b6475;
-        --nl-user-accent: #ec4899;
+        --nl-surface: #fffdf9;     /* colors.surface */
+        --nl-text-sub: #7a6458;    /* colors.textSub */
+        --nl-muted: #9c8678;       /* colors.muted */
+        --nl-user-accent: #f06aa0; /* colors.userAccent(popup 互換・固定) */
         /* 数字カード鏡(.nl-live-stat-card のグラデ終端)が参照する。これだけ status に無く
            フォールバックも無い=裸化(v0.1.900 の轍)防止に light/dark 両方へ追加。popup.html から。 */
-        --nl-bg-soft: #eef8ff;
+        --nl-bg-soft: #fff1f4;     /* colors.bgSoft ── 桜寄りの淡いピンク地 */
       }
+      /* ユーザー指定で status は常に明るく出す(color-scheme: light 固定)。
+         OS が dark でも暗転しないよう、dark メディアクエリでも light と同じ
+         明るいクリームパステル(DESIGN.md)を再宣言して上書きを無効化する。 */
       @media (prefers-color-scheme: dark) {
         :root {
-          --nl-bg: #111827;
-          --nl-text: #f3f4f6;
-          --nl-text-soft: #9ca3af;
-          --nl-border: #374151;
-          --nl-card-bg: #1f2937;
-          /* 応援レーン鏡の dark 値(popup.html から)。--nl-user-accent は固定値を維持。 */
-          --nl-surface: #161d27;
-          --nl-text-sub: #cbd5e1;
-          --nl-muted: #8d9bb5;
-          --nl-user-accent: #ec4899;
-          /* 数字カード鏡のグラデ終端(dark)。popup.html から。 */
-          --nl-bg-soft: #121820;
+          --nl-bg: #fff7ec;
+          --nl-text: #4a3b34;
+          --nl-text-soft: #8a7568;
+          --nl-border: #f0e0d2;
+          --nl-card-bg: #fffdf9;
+          --nl-surface: #fffdf9;
+          --nl-text-sub: #7a6458;
+          --nl-muted: #9c8678;
+          --nl-user-accent: #f06aa0;
+          --nl-bg-soft: #fff1f4;
         }
       }
       * {
@@ -80,11 +85,13 @@
       }
       /* みちしるべ: 知識のない人でもここから全部たどれる入口 + これから創る人への応援 */
       section.guidepost {
-        background: linear-gradient(135deg, rgba(236, 72, 153, 0.10), rgba(99, 102, 241, 0.10));
+        /* 冷たい indigo を外し、桜ピンク→やわらかオレンジの暖色グラデに(DESIGN.md)。 */
+        background: linear-gradient(135deg, rgba(240, 106, 160, 0.12), rgba(255, 176, 92, 0.12));
         border: 1px solid var(--nl-border);
-        border-radius: 12px;
+        border-radius: 16px;
         padding: 16px 18px;
         margin-bottom: 16px;
+        box-shadow: 0 1px 6px rgba(120, 80, 50, 0.08);
       }
       section.guidepost h2 {
         margin: 0 0 4px;
@@ -136,7 +143,8 @@
         align-self: center;
       }
       .y-row .bubble strong { color: var(--nl-accent); }
-      .y-row .bubble a { color: #7fa8e0; font-weight: 700; }
+      /* リンクは冷たい青(#7fa8e0)をやめ、暖色(テラコッタ寄りオレンジ)に。strong の桜ピンクと区別。 */
+      .y-row .bubble a { color: #d2733a; font-weight: 700; }
       /* 吹き出しのしっぽ(キャラ側へ三角) */
       .y-row:not(.reverse) .bubble::after {
         content: "";
@@ -181,9 +189,10 @@
       section.lane {
         background: var(--nl-card-bg);
         border: 1px solid var(--nl-border);
-        border-radius: 8px;
+        border-radius: 12px;                              /* DESIGN.md rounded.md */
         padding: 12px 14px;
         margin-bottom: 12px;
+        box-shadow: 0 1px 6px rgba(120, 80, 50, 0.08);    /* elevation.card ── 暖色の影 */
       }
       section.lane h2 {
         margin: 0 0 8px;
@@ -450,10 +459,12 @@
       .share-hero { margin: 0 0 14px; }
       .share-hero-btn {
         width: 100%; padding: 14px 16px; font-size: 16px; font-weight: 700;
-        color: #fff; background: #2f7dbf; border: 1px solid #2f7dbf;
-        border-radius: 10px; cursor: pointer; line-height: 1.4;
+        /* 冷たい青ボタンを桜ピンク→オレンジの暖色グラデに(DESIGN.md)。 */
+        color: #fff; background: linear-gradient(135deg, #f06aa0, #ff9d5c); border: none;
+        border-radius: 12px; cursor: pointer; line-height: 1.4;
+        box-shadow: 0 4px 16px rgba(240, 106, 160, 0.30);
       }
-      .share-hero-btn:hover { background: #2566a0; }
+      .share-hero-btn:hover { background: linear-gradient(135deg, #e85694, #ff8f45); }
       .share-hero-btn:active { transform: scale(0.99); }
       .share-hero-note { margin: 6px 2px 0; font-size: 12px; color: var(--nl-text-soft); line-height: 1.5; }
       /* v0.1.846 総合判定バッジ: 満点=「異常ゼロ」。進行中/対象外は正常扱い=緑。 */
