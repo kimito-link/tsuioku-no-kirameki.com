@@ -1164,12 +1164,16 @@
       </div>
     </section>
 
+    <!-- 送信結果(WEBサイトURL案内)はボタン群より上に置く=送信後すぐ目に入る位置。
+         app.js が成功時にクリック可能なアンカーを差し込む(空のときは余白を出さない)。 -->
+    <div class="status-meta" id="uploadResult" style="margin-bottom: 12px"></div>
+
     <div class="status-buttons">
       <button id="btnComeview" type="button">💬 コメビュを開く</button>
       <button id="btnReputationCheck" type="button">🔎 配信者の評判チェック</button>
       <button id="btnNextLive" type="button">⏭ 次の上位配信へ</button>
       <button id="btnAutopatrolToggle" type="button">🔁 自動巡回 OFF</button>
-      <button id="btnUpload" type="button">📱 スマホへ送信</button>
+      <button id="btnUpload" type="button">🌐 WEBサイトURLで見る</button>
       <button id="btnCodeMap" type="button" title="コードの全ファイルが何をするか＋データの流れを1枚で（別タブ）">🗺️ コードの地図を開く</button>
       <button id="btnSelectAll" type="button">全部選択 (Ctrl+A→Ctrl+C)</button>
       <button id="btnCopy" type="button">クリップボードへコピー</button>
@@ -1177,7 +1181,6 @@
       <button id="btnTogglePause" type="button">自動更新を一時停止</button>
     </div>
 
-    <div class="status-meta" id="uploadResult" style="margin-bottom: 12px"></div>
     <div class="status-meta" id="patrolResult" style="margin-bottom: 12px"></div>
 
     <section class="lane" id="actionLane">
