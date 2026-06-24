@@ -483,6 +483,7 @@
 | `src/lib/reportFriendlyMetaRowsHtml.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/reportHeadInfoRowsHtml.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/reportNextMemoSectionHtml.js` | 1 | ポップアップ(応援レーン) |
+| `src/lib/reportPreviewCtx.js` | 1 | 状態速報ページ |
 | `src/lib/reportPreviewPublish.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/reportSelfPostedRowsHtml.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/reportThumbedUsersSectionHtml.js` | 1 | ポップアップ(応援レーン) |

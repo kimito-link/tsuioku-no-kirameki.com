@@ -33,6 +33,8 @@ import { buildVoiceDiagLine } from '../lib/voiceDiag.js';
 import { KEY_VOICE_DIAG } from '../lib/voiceDiagKey.js';
 // 共有 URL 組み立て(状態速報/応援ライブビュー/ingest)の純関数。挙動同値で uploadStatusSnapshot から切り出し。
 import { buildStatusShareUrls } from '../lib/statusShareUrls.js';
+// レポートプレビュー信頼度注釈の文脈(fastDiag→ctx)の純関数。挙動同値で status-entry から切り出し。
+import { reportPreviewCtxFromFastDiag } from '../lib/reportPreviewCtx.js';
 // v0.1.902: 会場座席の健全度(配信者混入・固着)を健全度パネルに載せる。
 import { KEY_VENUE_SEATS_DIAG } from '../lib/venueSeatsDiagKey.js';
 // 2026-06-22(council/lane-show-all-active): 応援レーンの人数整合(素性 N/表示 M)を健全度パネルに載せる。
@@ -732,21 +734,8 @@ async function loadBackfillProgressSafe() {
  * レンダリング
  * ========================================================================== */
 
-// v0.1.861: レポートプレビューの信頼度注釈(匿名主体=推定寄り 等)の文脈を fastDiag から作る。
-//   NDGR 接続/userId 付き率/backfill 進行を渡すと metricConfidence が「コメントした人」等に注釈を付け、
-//   見る人が確定値と推定を取り違えない。文脈不明(fastDiag 無し)は注釈なしに倒れる(煽らない)。
-function reportPreviewCtxFromFastDiag(fastDiag, backfillProgress) {
-  const c = fastDiag?.content;
-  const obs = c?.giftDiagnostics?.commentObservability;
-  const uidPct = obs?.savedCommentsUidStats?.withUidPercent;
-  const ndgr = String(c?.networkErrorProbe?.ndgrConnectStatus || '');
-  return {
-    // 'connected'=true / 'disconnected'=false / 'unknown'等=undefined(不明は煽らない)
-    ndgrConnected: ndgr === 'connected' ? true : ndgr === 'disconnected' ? false : undefined,
-    withUidPercent: typeof uidPct === 'number' ? uidPct : null,
-    backfillRunning: !!(backfillProgress && backfillProgress.done === 0 && backfillProgress.stopReason === '')
-  };
-}
+// v0.1.861: レポートプレビューの信頼度注釈の文脈は純関数 reportPreviewCtxFromFastDiag(src/lib)に抽出済み
+//   (NDGR 接続/userId 付き率/backfill 進行 → 注釈ctx・挙動同値・テストで固定)。import は冒頭。
 
 function renderAll({ lvList, summaries, fastDiag, popupDiag, backfillProgress, voiceDiag, venueSeatsDiag, laneDiag, laneMirror, statCardsMirror, reportPreview, trendFindings, watchTabMap }) {
   // v0.1.847: 各描画セクションを独立 try/catch で隔離するヘルパ。1つが throw しても他のセクションと
