@@ -51,12 +51,10 @@ import { buildStatCardsMirrorSignature } from '../src/lib/statCardsMirror.js';
 import { isEpochFresh } from '../src/lib/watchUrlFreshness.js';
 import { buildChikuranCardModel } from '../src/lib/chikuranCard.js';
 import { buildChikuranHeaderDom } from '../src/lib/chikuranHeaderDom.js';
-import { buildSupporterRankingRows } from '../src/lib/supporterRankingDom.js';
-import { supporterRowToPersonTile } from '../src/lib/supporterRowToPersonTile.js';
-import { buildPersonTileEl } from '../src/lib/personTileDom.js';
-import { deriveAvatarUrlFromUid } from '../src/lib/deriveAvatarUrlFromUid.js';
 import { anonymousIdenticonDataUrl } from '../src/lib/anonymousIdenticon.js';
-import { storyUserLaneMetaLines } from '../src/lib/storyUserLaneMeta.js';
+// 公式値レーン(ギフト貢献度ランキング)を本物の strip 描画で出す。popup と同じ lib を再利用(似せて自作しない)。
+import { officialDomRankingRowsToStripRooms } from '../src/lib/officialDomRankingRowsToStripRooms.js';
+import { renderTopSupportRankStripInto } from '../src/lib/paintTopSupportRankStyleIntoElement.js';
 
 const POLL_INTERVAL_MS = 60_000;
 /** 鏡の鮮度ガード（status-entry.js の MIRROR_FRESH_MS と同値＝3分）。 */
@@ -237,17 +235,6 @@ const _LANE_FACES = {
   faceTanu: '/app/images/yukkuri-charactore-english/tanunee/tanuki-yukkuri-half-eyes-mouth-closed.thumb128.png'
 };
 
-const _supporterRankingDomIo = {
-  supporterRowToPersonTile,
-  buildPersonTileEl,
-  tileIo: {
-    deriveAvatarUrlFromUid: (uid) => deriveAvatarUrlFromUid(uid),
-    anonymousIdenticonDataUrl,
-    storyUserLaneMetaLines: (entry, http) => storyUserLaneMetaLines(entry, http)
-  },
-  domIo: _laneDomIo
-};
-
 /** 数字カード鏡: 本物 popup DOM の #liveStatCards 配下へ値を入れる（似せて自作しない）。 */
 function paintStatCardsMirror(snap) {
   if (!snap || typeof snap !== 'object') return;
@@ -308,19 +295,44 @@ function paintLaneMirror(snap) {
   paintStoryUserLaneDomFilled(els, _LANE_FACES, buckets, pickedLength, _laneDomIo, { totalCandidates });
 }
 
+/** strip 描画(公式値レーン/応援者ランキング)の共通 IO。popup と同じ本物 lib に渡す。 */
+const _STRIP_DEFAULT_THUMB = '/app/images/yukkuri-charactore-english/link/link-yukkuri-half-eyes-mouth-closed.png';
+const _stripIo = {
+  defaultThumbSrc: _STRIP_DEFAULT_THUMB,
+  anonymousFallbackThumbSrc: NICONICO_OFFICIAL_DEFAULT_USERICON_HTTPS,
+  anonymousIdenticonResolver: (uid) => anonymousIdenticonDataUrl(uid),
+  avatarLoadGuard: _laneDomIo.storyAvatarLoadGuard
+  // teardownWaitingUi/setLaneHidden/syncLaneGadget 等は lib 既定(no-op/安全動作)に委ねる(純Web相当)。
+};
+
 /**
  * 北極星レーン鏡（ギフト貢献度ランキング）。
- *   ★現状は本物 popup.js が自前で北極星レーンの骨格を描く（empty/fallback 含む）ので、ここでは塗らない。
- *   理由: northStarMirror の snapshot 形は `{ lanes: { contributionRanking: rows[] } }`（rows）だが、
- *     本物の rows→DOM ストリップ paint は chrome 非依存の再利用関数がまだ無く、ここで自作すると
- *     「セクションを独自に組み立てる」= ユーザーが否定した轍（reference 参照）になる。
- *   paintNorthStarLaneBody は mirrorHtml(文字列) を受ける関数で、rows をそのまま渡せない。
- *   → 鏡が mirrorHtml を運ぶようになった段階で、本物 sanitize 経路で塗る（follow-up）。
- *   現状の snapshot は northStarMirror=undefined（拡張がまだ送っていない）ため実害なし。
- * @param {any} _snap
+ *   snapshot は `{ lanes: { contributionRanking: rows[] } }`。popup と同じ本物経路で描く＝似せて自作しない:
+ *   rows → officialDomRankingRowsToStripRooms → renderTopSupportRankStripInto（popup の
+ *   refreshNorthStarContributionRankingLaneAsync と同じ recipe）。host は popup.html コピーの
+ *   #northStarLaneBody-contributionRanking。
+ * @param {any} snap northStarMirror スナップショット
  */
-function paintNorthStarMirror(_snap) {
-  // intentional no-op: 本物 popup の北極星レーン描画に委ねる（follow-up で mirrorHtml 経路を配線）。
+function paintNorthStarMirror(snap) {
+  const body = document.getElementById('northStarLaneBody-contributionRanking');
+  if (!body) return;
+  const rows =
+    (snap && snap.lanes && Array.isArray(snap.lanes.contributionRanking) && snap.lanes.contributionRanking) ||
+    (snap && Array.isArray(snap.contributionRanking) && snap.contributionRanking) ||
+    null;
+  if (!rows || !rows.length) return; // データ無し=popup の空状態のまま(死にリンクにしない)
+  try {
+    const rooms = officialDomRankingRowsToStripRooms(rows.slice(0, 10), { userKeyKind: 'contrib' });
+    renderTopSupportRankStripInto(body, rooms, {
+      noteText: '公式の貢献度ランキング（niconico の表示に準拠）',
+      unitSuffix: '貢',
+      ariaLabel: '貢献度ランキング',
+      isNorthStarBody: true,
+      ..._stripIo
+    });
+  } catch {
+    /* no-op: 北極星レーンは best-effort(壊れても他レーンを巻き込まない) */
+  }
 }
 
 /** 配信者カード（ちくらん風ヘッダー）: 本物 buildChikuranHeaderDom で popup の配信者ヘッダーへ。 */
@@ -342,15 +354,32 @@ function paintBroadcasterCard(live) {
   }
 }
 
-/** 応援者ランキング: 本物 buildSupporterRankingRows で🥇🥈🥉を顔つき描画（host があれば）。 */
+/** 応援者ランキング: popup の本物 host #topSupportRankStrip に、本物 strip 描画で🥇🥈🥉を顔つき表示。
+ *   送信 rows {userId,name,count,avatarUrl,isAnonymous} を strip-room {userKey,nickname,count,avatarUrl} に
+ *   変換して renderTopSupportRankStripInto（popup と同じ lib）で描く＝似せて自作しない。 */
 function paintSupporterRanking(topSupporters) {
-  const host = document.getElementById('supporterRankingHost');
-  if (!host) return; // popup.html 側に専用 host が無い場合は skip（北極星/レーンで足りる）
+  const strip = document.getElementById('topSupportRankStrip');
+  if (!strip) return;
   const rows = topSupporters && Array.isArray(topSupporters.rows) ? topSupporters.rows : null;
   if (!rows || !rows.length) return;
   try {
-    host.replaceChildren(buildSupporterRankingRows(rows, _supporterRankingDomIo));
-    host.hidden = false;
+    const rooms = rows
+      .map((r) => ({
+        userKey: String(r.userId || r.userKey || ''),
+        nickname: String(r.name || r.nickname || ''),
+        count: Number(r.count) || 0,
+        avatarUrl: String(r.avatarUrl || '')
+      }))
+      .filter((room) => room.userKey || room.nickname);
+    if (!rooms.length) return;
+    renderTopSupportRankStripInto(strip, rooms, {
+      noteText: '記録した応援コメントをユーザー別に数えた件数の多い順',
+      unitSuffix: '件',
+      ariaLabel: '記録した応援コメントをユーザー別に数えた件数の多い順',
+      ..._stripIo
+    });
+    strip.hidden = false;
+    strip.removeAttribute('aria-hidden');
   } catch {
     /* no-op */
   }
