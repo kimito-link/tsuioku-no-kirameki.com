@@ -26,6 +26,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.947',
+    date: '2026-06-25',
+    summary: 'WEB公開版に応援者ランキングとギフト貢献度を顔つきで表示',
+    items: Object.freeze([
+      '「WEBサイトURLで共有」で開く公開ページに、応援者ランキングとギフト貢献度ランキングが出ていなかったのを修正しました。送信済みのデータを、ポップアップと同じ本物の描画部品で顔つき・件数つきで表示します。',
+      '公開ページがポップアップ(拡張内の画面)により近づきました。描画は本物の共通部品を使っているので見た目が一致します。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.946',
     date: '2026-06-25',
     summary: '過去ログ取得の「ローディングが出ない/固まる」を改善',
