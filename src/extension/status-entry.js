@@ -56,6 +56,12 @@ import { createSupportAvatarLoadGuard } from '../lib/supportGrowthAvatarLoad.js'
 import { isHttpOrHttpsUrl, NICONICO_OFFICIAL_DEFAULT_USERICON_HTTPS } from '../lib/supportGrowthTileSrc.js';
 import { storyTileUsesYukkuriTvStyle } from '../lib/storyTileTvStyle.js';
 import { upgradeAnonymousAvatarImage } from '../lib/avatarPartsComposer.js';
+// 応援者ランキングを本物の人物タイル(サムネ・ID・名前・リンク)で出すための部品(§3.5)。
+import { buildPersonTileEl } from '../lib/personTileDom.js';
+import { supporterRowToPersonTile } from '../lib/supporterRowToPersonTile.js';
+import { deriveAvatarUrlFromUid } from '../lib/deriveAvatarUrlFromUid.js';
+import { anonymousIdenticonDataUrl } from '../lib/anonymousIdenticon.js';
+import { storyUserLaneMetaLines } from '../lib/storyUserLaneMeta.js';
 import {
   applyStoryAvatarTvFallbackClass,
   removeStoryAvatarTvFallbackClass
@@ -170,6 +176,12 @@ const _laneMirrorDomIo = {
   isHttpOrHttpsUrl,
   storyTileUsesYukkuriTvStyle,
   upgradeAnonymousAvatarImage
+};
+/** 応援者ランキング行 → 人物タイル入力の変換に渡す I/O(avatar 導出・meta 構築)。 */
+const _supporterTileIo = {
+  deriveAvatarUrlFromUid: (uid) => deriveAvatarUrlFromUid(uid),
+  anonymousIdenticonDataUrl,
+  storyUserLaneMetaLines: (entry, httpCandidate) => storyUserLaneMetaLines(entry, httpCandidate)
 };
 /** レーン案内(ガイド行)の顔。popup-entry.js:3750-3757 と同じ相対パス=status.html も extension ルート
  *   なので解決する(faceAd は popup と同じくこん太アイコンを流用=popup-entry.js:5130)。 */
@@ -1572,17 +1584,20 @@ function buildSupporterExpander(live, reportPreview) {
     const medals = ['🥇', '🥈', '🥉'];
     for (const r of rows.slice(0, 10)) {
       const row = document.createElement('div');
-      row.style.cssText = 'display:flex;align-items:center;gap:6px;padding:2px 0;';
+      row.style.cssText = 'display:flex;align-items:center;gap:8px;padding:3px 0;';
       const badge = document.createElement('span');
       badge.textContent = medals[r.rank - 1] || `${r.rank}.`;
       badge.style.cssText = 'flex:0 0 auto;width:22px;text-align:center;';
-      const name = document.createElement('span');
-      name.textContent = r.name + (r.isAnonymous ? '(匿名)' : '');
-      name.style.cssText = 'flex:1 1 auto;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;';
+      // §3.5: 名前+件数だけでなく、サムネ・ID・ハンドル名・リンクをセットで出す(応援者は主役・表彰)。
+      //   本物の buildPersonTileEl(応援レーンと同じ I/O)を再利用=似せて自作しない。匿名は identicon。
+      const tileItem = supporterRowToPersonTile(r, _supporterTileIo);
+      const tile = buildPersonTileEl(tileItem, _laneMirrorDomIo);
+      tile.style.flex = '1 1 auto';
+      tile.style.minWidth = '0';
       const cnt = document.createElement('span');
       cnt.textContent = `${Number(r.count || 0).toLocaleString('ja-JP')}件`;
-      cnt.style.cssText = 'flex:0 0 auto;color:var(--nl-text-soft);';
-      row.append(badge, name, cnt);
+      cnt.style.cssText = 'flex:0 0 auto;color:var(--nl-text-soft);font-variant-numeric:tabular-nums;';
+      row.append(badge, tile, cnt);
       body.appendChild(row);
     }
   } else {

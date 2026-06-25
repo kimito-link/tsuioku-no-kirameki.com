@@ -18,12 +18,15 @@ graph LR
   n_status --> n_src_lib_aiSharePopupDiagKey_js["lib/aiSharePopupDiagKey.js"]:::shared
   n_status --> n_src_lib_anonymousIdenticon_js["lib/anonymousIdenticon.js"]:::shared
   n_status --> n_src_lib_avatarPartsComposer_js["lib/avatarPartsComposer.js"]:::shared
+  n_status --> n_src_lib_backfillRemoveRecommendedLivePollution_js["lib/backfillRemoveRecommendedLivePollution.js"]:::shared
   n_status --> n_src_lib_backgroundWatchTab_js["lib/backgroundWatchTab.js"]
   n_status --> n_src_lib_broadcasterReputationKeywords_js["lib/broadcasterReputationKeywords.js"]
   n_status --> n_src_lib_broadcasterReputationView_js["lib/broadcasterReputationView.js"]
   n_status --> n_src_lib_chikuranCard_js["lib/chikuranCard.js"]
   n_status --> n_src_lib_commentSummary_js["lib/commentSummary.js"]:::shared
+  n_status --> n_src_lib_deriveAvatarUrlFromUid_js["lib/deriveAvatarUrlFromUid.js"]:::shared
   n_status --> n_src_lib_formatOfficialStreamAgeMinutes_js["lib/formatOfficialStreamAgeMinutes.js"]:::shared
+  n_status --> n_src_lib_giftDisplayNickname_js["lib/giftDisplayNickname.js"]:::shared
   n_status --> n_src_lib_googleSuggest_js["lib/googleSuggest.js"]
   n_status --> n_src_lib_healthCells_js["lib/healthCells.js"]
   n_status --> n_src_lib_htmlEscape_js["lib/htmlEscape.js"]:::shared
@@ -33,6 +36,7 @@ graph LR
   n_status --> n_src_lib_liveEndedFlag_js["lib/liveEndedFlag.js"]:::shared
   n_status --> n_src_lib_liveHealthScore_js["lib/liveHealthScore.js"]
   n_status --> n_src_lib_metricConfidence_js["lib/metricConfidence.js"]:::shared
+  n_status --> n_src_lib_nicoAnonymousDisplay_js["lib/nicoAnonymousDisplay.js"]:::shared
   n_status --> n_src_lib_nicoUserPage_js["lib/nicoUserPage.js"]:::shared
   n_status --> n_src_lib_numberConsistency_js["lib/numberConsistency.js"]
   n_status --> n_src_lib_officialNicoStatsStripDigest_js["lib/officialNicoStatsStripDigest.js"]:::shared
@@ -49,11 +53,7 @@ graph LR
   n_status --> n_src_lib_statCardsMirrorKey_js["lib/statCardsMirrorKey.js"]:::shared
   n_status --> n_src_lib_statusActionAdvisor_js["lib/statusActionAdvisor.js"]
   n_status --> n_src_lib_statusFastDiagLite_js["lib/statusFastDiagLite.js"]:::shared
-  n_status --> n_src_lib_statusFormat_js["lib/statusFormat.js"]:::shared
-  n_status --> n_src_lib_statusMindmapModel_js["lib/statusMindmapModel.js"]
-  n_status --> n_src_lib_statusShareUrls_js["lib/statusShareUrls.js"]
-  n_status --> n_src_lib_statusTrend_js["lib/statusTrend.js"]
   classDef shared fill:#eee,stroke:#999,color:#666;
 ```
 
-> ほか 15 ファイル省略（全件は storage-bus.md / metafile 参照）。
+> ほか 23 ファイル省略（全件は storage-bus.md / metafile 参照）。

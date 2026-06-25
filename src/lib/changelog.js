@@ -26,6 +26,16 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.937',
+    date: '2026-06-25',
+    summary: '応援者ランキングを顔つき(サムネ・ID・名前・リンク)で表示',
+    items: Object.freeze([
+      '診断ページの「🏆 応援者ランキングを見る」を、これまでの「名前+件数」だけの表示から、サムネイル・ユーザーID・ハンドル名・ユーザーページへのリンクをセットで出す「顔つき」表示にしました。応援してくれた人を、ポップアップの応援レーンと同じ見た目でちゃんと讃えます。',
+      '匿名の応援者も、グレーで潰さず識別アイコン(identicon)付きで表示します。',
+      'この表示は今までと同じデータを使うだけなので、ページが重くなることはありません。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.936',
     date: '2026-06-25',
     summary: 'WEBサイトURLで見るを配信カード内に移動(UIUX)',
