@@ -4880,6 +4880,16 @@
       ]
     },
     {
+      "file": "src/lib/statCardsMirrorDom.js",
+      "featureCount": 1,
+      "features": [
+        "status"
+      ],
+      "labels": [
+        "状態速報ページ"
+      ]
+    },
+    {
       "file": "src/lib/statusActionAdvisor.js",
       "featureCount": 1,
       "features": [

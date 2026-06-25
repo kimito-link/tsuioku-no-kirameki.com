@@ -50,10 +50,10 @@ graph LR
   n_status --> n_src_lib_reportPreviewKey_js["lib/reportPreviewKey.js"]:::shared
   n_status --> n_src_lib_resolveVisitorCount_js["lib/resolveVisitorCount.js"]
   n_status --> n_src_lib_statCardsMirror_js["lib/statCardsMirror.js"]:::shared
+  n_status --> n_src_lib_statCardsMirrorDom_js["lib/statCardsMirrorDom.js"]
   n_status --> n_src_lib_statCardsMirrorKey_js["lib/statCardsMirrorKey.js"]:::shared
   n_status --> n_src_lib_statusActionAdvisor_js["lib/statusActionAdvisor.js"]
-  n_status --> n_src_lib_statusFastDiagLite_js["lib/statusFastDiagLite.js"]:::shared
   classDef shared fill:#eee,stroke:#999,color:#666;
 ```
 
-> ほか 23 ファイル省略（全件は storage-bus.md / metafile 参照）。
+> ほか 24 ファイル省略（全件は storage-bus.md / metafile 参照）。
