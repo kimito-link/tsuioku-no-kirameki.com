@@ -149,7 +149,7 @@
 
 - **応援レーン集約(誰が候補か)** — 保存コメント行を userId 単位に畳み込みレーン候補を作る唯一の集約正本(popup/venue 共通)
   - `src/lib/userLaneCandidatesFromStorage.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 82</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 83</summary>
 
 - `src/domain/lane/aggregate.js` — 応援ユーザーレーンの per-row → per-user 集約（純関数）。
 - `src/domain/observations/observationStore.js` — observationStore - StatObservation のメモリ常駐リングバッファ。
@@ -223,6 +223,7 @@
 - `src/lib/summarizeDevMonitorGiftRanking.js` — v0.1.202 A-0: popup「詳しい状況（開発・切り分け用・折りたたみ）」の
 - `src/lib/supporterChikuranScore.js` — 「応援者ちくらん β」用のローカル集計コア。
 - `src/lib/supporterPowerScoring.js` — 応援者パワー診断スコアリング（OSINT Phase 2-A・v0.1.609）。
+- `src/lib/supporterRankingDom.js` — 応援者ランキングの行リスト DOM ビルダー(本物の人物タイルでそっくり)。
 - `src/lib/supportGrowthInsights.js` — マーケ分析 / HTML レポート向け「次回の行動提案」を既存集計データから組み立てる（純粋関数）。
 - `src/lib/timingConstants.js` — content-entry.js に散在していたマジックナンバーを集約した定数テーブル。
 - `src/lib/topSupportRankStripConfig.js` — ポップアップ「応援ランキング」ストリップに並べる行数の上限（aggregateCommentsByUser の1行＝1カード）。

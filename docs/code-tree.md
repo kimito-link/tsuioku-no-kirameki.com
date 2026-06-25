@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 1 / 552 件
+## ⚠️ 役割コメントが無いソース 1 / 553 件
 - `src/lib/reportPreviewPublish.js`
 
 ## 全ファイルツリー
@@ -361,7 +361,7 @@
   - `vendor-visual-explainer.mjs` — Vendors nicobailon/visual-explainer (MIT) into .cursor/skills/visual-explainer/
   - `verify-bump.mjs` — extension bump 後の整合性チェッカー
   - `write-extension-placeholder-icons.mjs` — リポジトリに 256px アイコンしか無い環境向け: manifest 用の小さめ PNG を生成する。
-- 📁 **src/** (1178)
+- 📁 **src/** (1180)
   - 📁 **data/** (6)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -620,7 +620,7 @@
         - `logo_funlink_white_RGB_maru_black.png`
       - `logo_guide_funlink_ol.pdf`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (967)
+  - 📁 **lib/** (969)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -1446,6 +1446,8 @@
     - `supporterPowerScoring.test.js`
     - `supporterRanking.js` — 「この配信の応援者ランキング(ちくらん風)」の純ロジック(v0.1.865)。
     - `supporterRanking.test.js`
+    - `supporterRankingDom.js` — 応援者ランキングの行リスト DOM ビルダー(本物の人物タイルでそっくり)。
+    - `supporterRankingDom.test.js`
     - `supporterRowToPersonTile.integration.test.js`
     - `supporterRowToPersonTile.js` — 応援者ランキングの行(SupporterRow)を、本物の人物タイル(buildPersonTileEl)が要求する
     - `supporterRowToPersonTile.test.js`
