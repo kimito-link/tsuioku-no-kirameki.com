@@ -26,6 +26,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.943',
+    date: '2026-06-25',
+    summary: 'WEBサイトURL共有でポップアップそっくりを開く',
+    items: Object.freeze([
+      '配信カードの「🔗 WEBサイトURLで共有」を押したとき、これまでは簡易版の状態速報ページが開いていましたが、ポップアップそっくりの「応援ライブビュー」のWeb版(まるごとコピー)が開くようにしました。共有相手にも、いつものポップアップと同じ画面が届きます。',
+      '送信後の案内リンクも、応援ライブビュー(そっくり)を先頭に並べ替えました。簡易版の状態速報も「簡易版」として下にリンクを残しています。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.942',
     date: '2026-06-25',
     summary: '共有URLのWeb版を、拡張のポップアップ「まるごとコピー」に作り直し',
