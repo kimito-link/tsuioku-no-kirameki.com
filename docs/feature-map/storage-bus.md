@@ -44,6 +44,7 @@
 - 🔵 **KEY_INLINE_PANEL_VIEWPORT_WIDE_POLICY** — 読む人だけ（書く経路が無い疑い）: src/extension/content-entry.js, src/extension/popup-entry.js
 - 🔵 **KEY_INLINE_PANEL_WIDTH_MODE** — 読む人だけ（書く経路が無い疑い）: src/extension/content-entry.js, src/extension/popup-entry.js
 - 🔵 **KEY_LAST_WATCH_URL** — 読む人だけ（書く経路が無い疑い）: src/extension/comeview-entry.js, src/extension/popup-entry.js, src/extension/status-entry.js
+- 🔵 **KEY_LIVEVIEW_PUBLISH_PAYLOAD** — 読む人だけ（書く経路が無い疑い）: src/extension/live-view-entry.js
 - 🔵 **KEY_MARKETING_EXPORT_MASK_LABELS** — 読む人だけ（書く経路が無い疑い）: src/extension/popup-entry.js
 - 🔵 **KEY_NDGR_DETERMINISTIC_BACKFILL** — 読む人だけ（書く経路が無い疑い）: src/extension/content-entry.js
 - 🔵 **KEY_NDGR_FORWARD_ENABLED** — 読む人だけ（書く経路が無い疑い）: src/extension/content-entry.js
@@ -99,6 +100,7 @@
 | `KEY_LANE_DIAG` | extension/popup-entry.js | extension/status-entry.js |
 | `KEY_LANE_MIRROR` | extension/popup-entry.js | extension/status-entry.js |
 | `KEY_LAST_WATCH_URL` | — | extension/comeview-entry.js<br>extension/popup-entry.js<br>extension/status-entry.js |
+| `KEY_LIVEVIEW_PUBLISH_PAYLOAD` | — | extension/live-view-entry.js |
 | `KEY_LIVE_BROADCASTER_CTX` | extension/content-entry.js | extension/venueBar.js |
 | `KEY_MARKETING_EXPORT_MASK_LABELS` | — | extension/popup-entry.js |
 | `KEY_NDGR_DETERMINISTIC_BACKFILL` | — | extension/content-entry.js |

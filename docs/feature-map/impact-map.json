@@ -72,6 +72,28 @@
       ]
     },
     {
+      "file": "src/lib/storageKeys.js",
+      "featureCount": 7,
+      "features": [
+        "backfill-sw",
+        "comeview",
+        "content",
+        "offscreen",
+        "popup",
+        "status",
+        "venue"
+      ],
+      "labels": [
+        "バックフィル SW",
+        "コメビュ(別窓)",
+        "記録エンジン(watchページ常駐)",
+        "コメント IDB 書き手",
+        "ポップアップ(応援レーン)",
+        "状態速報ページ",
+        "会場モード(standalone)"
+      ]
+    },
+    {
       "file": "src/lib/userIdPreference.js",
       "featureCount": 7,
       "features": [
@@ -111,26 +133,6 @@
         "記録エンジン(watchページ常駐)",
         "コメント IDB 書き手",
         "ページ傍受",
-        "ポップアップ(応援レーン)",
-        "会場モード(standalone)"
-      ]
-    },
-    {
-      "file": "src/lib/storageKeys.js",
-      "featureCount": 6,
-      "features": [
-        "backfill-sw",
-        "comeview",
-        "content",
-        "offscreen",
-        "popup",
-        "venue"
-      ],
-      "labels": [
-        "バックフィル SW",
-        "コメビュ(別窓)",
-        "記録エンジン(watchページ常駐)",
-        "コメント IDB 書き手",
         "ポップアップ(応援レーン)",
         "会場モード(standalone)"
       ]

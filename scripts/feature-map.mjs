@@ -101,7 +101,11 @@ const STORAGE_DISCONNECT_BASELINE = new Set([
   'KEY_AI_SHARE_POPUP_DIAG',
   // 応援レーンの鏡(2026-06-23): PR1 で popup が producer のみ。status の consumer は後続 PR で繋ぐ
   //   (POP に並ぶべきものを診断にそっくり映す土台)。繋いだらこの行を外す。
-  'KEY_LANE_MIRROR'
+  'KEY_LANE_MIRROR',
+  // 応援ライブビュー公開ペイロード(2026-06-25): producer=status-entry / consumer=live-view-entry の
+  //   【別バンドル間ハンドオフ】(status が書く→live-view が読んで POST)。静的解析はバンドルを跨げず
+  //   片側しか見えない偽陽性。経路自体は実機(ブラウザ)で click→POST→公開URL 表示を確認済み。
+  'KEY_LIVEVIEW_PUBLISH_PAYLOAD'
 ]);
 
 /**

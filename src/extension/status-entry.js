@@ -33,6 +33,8 @@ import { buildVoiceDiagLine } from '../lib/voiceDiag.js';
 import { KEY_VOICE_DIAG } from '../lib/voiceDiagKey.js';
 // 共有 URL 組み立て(状態速報/応援ライブビュー/ingest)の純関数。挙動同値で uploadStatusSnapshot から切り出し。
 import { buildStatusShareUrls } from '../lib/statusShareUrls.js';
+// 応援ライブビュー(拡張内)の「このURLをWEBでも公開する」用: status が組み立てた公開ペイロードを置くキー。
+import { KEY_LIVEVIEW_PUBLISH_PAYLOAD } from '../lib/storageKeys.js';
 // レポートプレビュー信頼度注釈の文脈(fastDiag→ctx)の純関数。挙動同値で status-entry から切り出し。
 import { reportPreviewCtxFromFastDiag } from '../lib/reportPreviewCtx.js';
 // v0.1.902: 会場座席の健全度(配信者混入・固着)を健全度パネルに載せる。
@@ -1039,6 +1041,34 @@ function renderAll({ lvList, summaries, fastDiag, popupDiag, backfillProgress, v
         : null
     }
   };
+  // 応援ライブビュー(拡張内 live-view.html)の「このURLをWEBでも公開する」用に、いま組み立てた
+  //   公開ペイロード(jsonBlob)+共有キーを storage へ置く。live-view ページは別ページで jsonBlob を
+  //   持たないため、再構築せず【これを読んで POST するだけ】=status が送るものと byte 一致(drift ゼロ)。
+  publishLiveViewPublishPayload(_lastRenderedBundle.jsonBlob);
+}
+
+/** 公開ペイロード書き込みの min-gap 計時(描画のたびに書くが頻度を抑える)。 */
+let _liveViewPublishPayloadLastWriteAt = 0;
+/**
+ * 応援ライブビュー(拡張内)から WEB 公開できるよう、最新の jsonBlob + 共有キーを storage へ置く。
+ *   best-effort(失敗しても status を止めない)・3秒 min-gap。キー未設定ビルドでは置かない。
+ * @param {object} jsonBlob
+ */
+function publishLiveViewPublishPayload(jsonBlob) {
+  try {
+    const { ingestKey, viewToken, appOrigin } = getUploadConfig();
+    if (!ingestKey || !viewToken || !jsonBlob) return; // キー未設定=公開不可=置かない
+    const now = Date.now();
+    if (now - _liveViewPublishPayloadLastWriteAt < 3000) return;
+    _liveViewPublishPayloadLastWriteAt = now;
+    void chrome.storage.local
+      .set({ [KEY_LIVEVIEW_PUBLISH_PAYLOAD]: { jsonBlob, ingestKey, viewToken, appOrigin, savedAt: now } })
+      .catch(() => {
+        /* best-effort: storage 不可・context 消失 */
+      });
+  } catch {
+    /* no-op */
+  }
 }
 
 /* ============================================================================

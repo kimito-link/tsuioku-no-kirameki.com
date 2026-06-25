@@ -26,6 +26,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.945',
+    date: '2026-06-25',
+    summary: '応援ライブビュー上に「WEBでも公開する」ボタン',
+    items: Object.freeze([
+      '「🔥 応援ライブビューを開く」で開いた画面の右下に「🌐 このURLをWEBでも公開する」ボタンを追加しました。押すと、いま見ているそっくりの画面を、拡張なしのスマホ/他人でも見られる公開URL(/live-view)にできます。「公開ページを開く」「URLをコピー」も出ます。',
+      '公開する内容は状態速報ページが作ったものをそのまま送るので、ポップアップそっくりの見た目で公開されます(作り直しによる食い違いなし)。実機(ブラウザ)でボタンの動作を確認済みです。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.944',
     date: '2026-06-25',
     summary: '共有を押すと「そっくりの画面URL」を大きく表示',
