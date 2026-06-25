@@ -1519,7 +1519,7 @@ function buildWebUrlButton() {
   const btn = document.createElement('button');
   btn.type = 'button';
   btn.textContent = '🔗 WEBサイトURLで共有';
-  btn.title = '拡張なしのスマホ/他人でも見られる共有URLを作って開きます(送信した時点のスナップショット)。リアルタイムで見るなら「応援ライブビューを開く」。';
+  btn.title = '拡張なしのスマホ/他人でも見られる共有URLを作って開きます(送信した時点のスナップショット)。開くのはポップアップそっくりの「応援ライブビュー」のWeb版です。';
   btn.style.cssText =
     'margin-top:8px;margin-right:6px;padding:5px 12px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600;' +
     'border:1px solid var(--nl-accent);background:var(--nl-card-bg);color:var(--nl-accent);';
@@ -1539,10 +1539,13 @@ function buildWebUrlButton() {
         resultEl.textContent = `× ${r.error}`;
       }
     }
-    // 成功したら WEB 状態速報を新規タブで開く(ユーザー指定: 送信して URL を開く)。
-    if (r.ok && r.url) {
+    // 成功したら新規タブで開く(ユーザー指定: 送信して URL を開く)。
+    //   2026-06-25: 主役は popup そっくりの応援ライブビュー(/live-view)。ユーザー確定=「WEBサイトURLで共有」=
+    //   popup そっくりのコピーを共有/表示する、が期待。liveViewUrl が無い時だけ状態速報(statusUrl)に落とす。
+    const openUrl = r.liveViewUrl || r.url;
+    if (r.ok && openUrl) {
       try {
-        chrome.tabs.create({ url: r.url });
+        chrome.tabs.create({ url: openUrl });
       } catch {
         /* context 切れ等=無視(上部 #uploadResult にリンクは出ている) */
       }
@@ -2006,8 +2009,9 @@ function renderUploadResultLinks(resultEl, r) {
     resultEl.appendChild(row);
   };
 
-  addLinkRow('📊', '状態速報を見る', r.url);
+  // 2026-06-25: 主役は popup そっくりの応援ライブビュー(/live-view)。状態速報は副次リンクとして残す(死にリンクにしない)。
   addLinkRow('🪞', '応援ライブビュー(そっくり)を見る', r.liveViewUrl);
+  addLinkRow('📊', '状態速報を見る(簡易版)', r.url);
 }
 
 /** 自動巡回トグルボタンの文言を現在の有効状態に合わせる。 */
