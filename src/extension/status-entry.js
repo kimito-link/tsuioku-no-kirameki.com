@@ -1987,31 +1987,76 @@ async function uploadStatusSnapshot() {
 function renderUploadResultLinks(resultEl, r) {
   resultEl.replaceChildren();
   resultEl.style.whiteSpace = 'normal';
+
+  // 2026-06-25: ユーザー要望「『これが そっくりの画面URLです』と出して」。
+  //   主役は popup そっくりの応援ライブビュー(/live-view)。URL 文字列そのものを大きく見せ、
+  //   開くボタン・コピーボタンを添える(リンク文字だけだと「URLが出た」と気づきにくい)。
+  const shareUrl = r.liveViewUrl || r.url || '';
+
   const head = document.createElement('div');
-  // 会議(案C): これは「拡張なしで他人に共有」用の URL(スナップショット)。本人がリアルタイムで
-  //   見るなら「応援ライブビューを開く」=取り違えないよう「共有URL」と明記。
-  head.textContent = '✓ 共有URLを作りました(拡張なしのスマホ/他人でも見られます):';
-  head.style.marginBottom = '6px';
+  head.textContent = '✓ これが そっくりの画面URLです（拡張なしのスマホ/他人でも見られます）:';
+  head.style.cssText = 'margin-bottom:6px;font-weight:700;color:var(--nl-accent);';
   resultEl.appendChild(head);
 
-  /** @param {string} emoji @param {string} label @param {string|undefined} href */
-  const addLinkRow = (emoji, label, href) => {
-    if (!href) return;
-    const row = document.createElement('div');
-    row.style.margin = '3px 0';
+  // URL 文字列そのもの(選択してコピーしやすいよう枠付きで大きく)。
+  const urlBox = document.createElement('div');
+  urlBox.textContent = shareUrl;
+  urlBox.style.cssText =
+    'margin:4px 0 8px;padding:8px 10px;border:1px solid var(--nl-accent);border-radius:6px;' +
+    'background:var(--nl-card-bg);font-size:13px;word-break:break-all;user-select:all;';
+  resultEl.appendChild(urlBox);
+
+  // 操作ボタン行(開く / コピー)。
+  const btnRow = document.createElement('div');
+  btnRow.style.cssText = 'display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px;';
+  const mkBtn = (/** @type {string} */ label) => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.textContent = label;
+    b.style.cssText =
+      'padding:5px 12px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600;' +
+      'border:1px solid var(--nl-accent);background:var(--nl-card-bg);color:var(--nl-accent);';
+    return b;
+  };
+  if (shareUrl) {
+    const openBtn = mkBtn('🪞 そっくりの画面を開く');
+    openBtn.addEventListener('click', () => {
+      try {
+        chrome.tabs.create({ url: shareUrl });
+      } catch {
+        window.open(shareUrl, '_blank', 'noopener');
+      }
+    });
+    btnRow.appendChild(openBtn);
+
+    const copyBtn = mkBtn('📋 URLをコピー');
+    copyBtn.addEventListener('click', async () => {
+      const prev = copyBtn.textContent;
+      try {
+        await navigator.clipboard.writeText(shareUrl);
+        copyBtn.textContent = '✓ コピーしました';
+      } catch {
+        copyBtn.textContent = '× コピー不可(手動で選択)';
+      }
+      setTimeout(() => { copyBtn.textContent = prev; }, 1800);
+    });
+    btnRow.appendChild(copyBtn);
+  }
+  resultEl.appendChild(btnRow);
+
+  // 簡易版(状態速報)は副次リンクとして小さく残す(死にリンクにしない)。
+  if (r.url && r.url !== shareUrl) {
+    const sub = document.createElement('div');
+    sub.style.cssText = 'margin-top:2px;font-size:12px;';
     const a = document.createElement('a');
-    a.href = href;
+    a.href = r.url;
     a.target = '_blank';
     a.rel = 'noopener noreferrer';
-    a.textContent = `${emoji} ${label}`;
+    a.textContent = '📊 簡易版(状態速報)を見る';
     a.style.wordBreak = 'break-all';
-    row.appendChild(a);
-    resultEl.appendChild(row);
-  };
-
-  // 2026-06-25: 主役は popup そっくりの応援ライブビュー(/live-view)。状態速報は副次リンクとして残す(死にリンクにしない)。
-  addLinkRow('🪞', '応援ライブビュー(そっくり)を見る', r.liveViewUrl);
-  addLinkRow('📊', '状態速報を見る(簡易版)', r.url);
+    sub.appendChild(a);
+    resultEl.appendChild(sub);
+  }
 }
 
 /** 自動巡回トグルボタンの文言を現在の有効状態に合わせる。 */

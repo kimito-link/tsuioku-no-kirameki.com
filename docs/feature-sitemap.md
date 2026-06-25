@@ -624,7 +624,7 @@
 - `app/live-view.js` — 純Web版 応援ライブビュー（拡張なし・PC/スマホ共通）。
 - `extension/background.js` — MV3 Service Worker
 - `scripts/build-watch.mjs` — watch では起動時刻を埋める（rebuild 毎に再 import される訳ではないので、
-- `scripts/build.mjs` — ビルド時刻（JST, MMDD-HHmmss）を返す。popup の `NL_BUILD_ID` に埋め込み、
+- `scripts/build.mjs` — .env を読み込む(status の共有キー NL_STATUS_INGEST_KEY / NL_STATUS_VIEW_TOKEN は .env から注入)。
 - `scripts/capture-store-screenshots.mjs` — Chrome ウェブストア用スクショ自動撮影
 - `scripts/copy-ext.mjs` — 拡張を「同期対象外フォルダ」へコピーする(Chrome の再読み込み固着の根治)。
 - `scripts/cws-publish.mjs` — Chrome Web Store Publish API で ZIP をアップロード(+任意で公開申請)する。
@@ -722,7 +722,7 @@
 
 ## 🧬 修正系譜マップ(この系統のバグを過去にどう直したか)
 
-> changelog 全 279 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
+> changelog 全 280 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
 
 ### 💾 記録件数 (38版)
 - `v0.1.937` 2026-06-25 — 応援者ランキングを顔つき(サムネ・ID・名前・リンク)で表示
@@ -1375,7 +1375,8 @@
 - `v0.1.840` 2026-06-20 — 機能逆引き地図を全ファイル網羅に
 - `v0.1.835` 2026-06-20 — 自己検証ゲートを追加(版同期+診断文言)
 
-### その他 (14版)
+### その他 (15版)
+- `v0.1.944` 2026-06-25 — 共有を押すと「そっくりの画面URL」を大きく表示
 - `v0.1.938` 2026-06-25 — 「応援ライブビュー」と「共有URL」のボタンを役割分け
 - `v0.1.929` 2026-06-23 — 応援ライブビューを拡張ポップアップそっくりそのままに(丸ごと埋め込み)
 - `v0.1.921` 2026-06-23 — 勝手に復活する配信タブの掃除(セッション復元の孤児タブ)
