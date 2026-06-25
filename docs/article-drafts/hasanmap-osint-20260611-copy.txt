@@ -1,0 +1,175 @@
+破産者マップは消えたのか
+3ドメインが18秒以内に同じ管理基盤へ切り替わった記録
+
+2026年6月11日現在、破産者マップの3つのドメインは、いずれもサイトを表示できない状態です。
+
+表面だけを見れば「閉鎖された」で終わる話かもしれません。しかし、DNSやRDAP、証明書透明性ログを確認すると、その直前からドメイン管理を大きく組み替える動きが続いていました。
+
+この記事で扱うのは、インターネット上に公開されているインフラ情報だけです。破産者本人の氏名や住所、地図データは取得・掲載しません。また、特定の個人を運営者と断定するものでもありません。
+
+今回もっとも重要なのは、hasanmap.org、hasanmap.top、hasanmap.ccの3ドメインが、短時間のうちに同じネームサーバーへ切り替わったことです。
+
+現在設定されているのは、次の3台です。
+
+1-ceci.njalla.do
+2-nest.pipe.ma
+3-pas.njalla.in
+
+変更前は、3ドメインともCloudflareのネームサーバーを利用していました。
+
+aurora.ns.cloudflare.com
+javon.ns.cloudflare.com
+
+レジストラ側のRDAP記録を時刻順に並べると、変更は2026年6月8日の日本時間18時05分58秒から18時06分16秒までに集中しています。
+
+hasanmap.top　18時05分58秒
+hasanmap.cc　18時06分06秒
+hasanmap.org　18時06分16秒
+
+3件の差はわずか18秒です。
+
+似た名前のドメインが偶然同じネームサーバーを選んだ、というだけでは説明しにくい動きです。同じ管理画面、または同じ管理主体によって続けて操作されたと考えるのが自然です。
+
+これは運営者の実名を示す証拠ではありません。しかし、3ドメインが同じ管理下に置かれていることを示す、かなり強いインフラ上の相関です。
+
+新しく現れたhasanmap.cc
+
+hasanmap.ccが登録されたのは、2026年6月7日16時17分20秒です。
+
+登録直後にはCloudflareを利用してサイトが公開され、hasanmap.orgのミラー案内ページにも「公式ミラーサイト」として掲載されていました。
+
+この時点で、hasanmap.orgとhasanmap.ccのデータファイルを本文を取得せずHEAD情報だけで比較すると、ファイルサイズ、ETag、更新時刻が一致していました。詳細取得APIのCORS設定にもhasanmap.org向けの記述が残っていました。
+
+単に名称をまねた第三者サイトではなく、本体側が用意したミラーと判断できる材料がそろっています。
+
+その後、Cloudflareから同じNjalla系ネームサーバーへ移されました。
+
+hasanmap.orgでは移管処理も進行
+
+2026年6月11日に確認したhasanmap.orgのレジストリRDAPには、pending transferと表示されています。
+
+これは別のレジストラへの移管要求が処理中であることを示す状態です。公開RDAPだけでは、移管先のレジストラや申請者までは分かりません。
+
+ただ、DNSを停止しただけではなく、ドメインの登録管理そのものを移そうとしていることは確認できます。
+
+現在の公開状態
+
+hasanmap.topはserver holdのままで、DNSでは名前解決できません。
+
+hasanmap.orgとhasanmap.ccには、Njalla系のネームサーバーとSOAは残っています。一方、Webサイトへ接続するためのA、AAAA、CNAMEレコードは確認できず、www付きの名前もNXDOMAINです。
+
+つまり、2026年6月11日現在、サイトは復活していません。
+
+ただし、ドメインを放棄した状態でもありません。3ドメインの管理先をそろえたうえで、公開に必要なDNSレコードを外している状態です。
+
+復活準備なのか
+
+ここから先は慎重に見る必要があります。
+
+確認できるのは、新しい.ccミラーが作られたこと、3ドメインが同じ管理基盤へ切り替わったこと、.orgでレジストラ移管が進んでいること、そして現在は公開用DNSレコードが外されていることです。
+
+これらは再公開の準備とも読めます。移管や設定変更が完了するまで一時的に止めている可能性もあります。
+
+一方で、ドメインを保有したまま撤退するための整理という可能性も残っています。管理先を変えたことと、復活することは同じではありません。
+
+現時点で「復活する」と断定することはできません。
+
+正確に言うなら、サイトは停止しているものの、3ドメインの管理が短時間で一括して組み替えられ、hasanmap.orgでは移管処理も進んでいる、という状態です。
+
+過去の決済・フォームの痕跡
+
+過去の公開ページとDNSには、運営アカウントへの照会に使える可能性がある識別子も残っていました。
+
+Cryptomusのドメイン認証識別子
+
+cryptomus=c4d7ea8e
+
+Blockonomicsのdata-uid
+
+687d4a0bb33041d7
+71fa06721c4440d6
+
+CryptPadのフォームID
+
+jOvqHP2pRPeu05ZXdsYYltMLk48338gSTlGD-t87rWQ
+
+BlockonomicsとCryptPadの識別子は、2022年9月27日に保存された削除申請ページでも確認できます。
+
+これらを完全一致で公開検索しましたが、現時点では本体以外のドメインでの再利用は確認できませんでした。
+
+検索で見つからないことは、過去に使われていないことの証明にはなりません。非公開ページや検索に登録されていないページまでは確認できないためです。
+
+運営者はどこまで特定できたのか
+
+公開情報から言えるのは、.org、.top、.ccが同じ管理主体によって操作されている可能性が非常に高い、というところまでです。
+
+実在個人の氏名、居住地、オリジンサーバーの生IPは特定できていません。
+
+RDAPに表示される国名や都市名についても、プライバシー保護や登録代行サービス側の情報である可能性があります。運営者の所在地を示す証拠として扱うことはできません。
+
+使用しているPHPやJavaScript、画面設計だけから、年齢や職業を断定することもできません。
+
+anti-hasanmap.orgとの関係
+
+anti-hasanmap.orgは、今回のNjalla系ネームサーバーへの移動には加わっていません。
+
+同ドメインはSquarespace Domains、Google系ネームサーバー、Google Sitesという別の構成です。登録日、証明書、DNS、ホスティングも本体3ドメインとは異なります。
+
+活動時期や広告導線を検証する余地はありますが、現在の公開情報だけで同一運営と断定できる証拠はありません。
+
+今後、確認するべきポイント
+
+一番分かりやすい変化は、hasanmap.orgのpending transferが解消された後に表示されるレジストラです。
+
+また、3ドメインのいずれかにA、AAAA、CNAMEが再設定された場合は、Web公開を再開する強い兆候になります。
+
+新しい証明書、新たなミラードメイン、MXやTXTレコードの追加も確認対象です。
+
+被害者や代理人、士業、公的機関が正式な手続きを検討する場合は、Cloudflare、Tucows/OpenSRS、Immaterialism LimitedやNjalla側、Cryptomus、Blockonomics、CryptPadなどが記録の保全先候補になります。
+
+特に2026年6月8日前後のDNS変更履歴、ログイン記録、API操作履歴、Auth Codeの発行・利用記録、レジストラ移管の申請記録は重要です。
+
+第三者がこれらの非公開情報を直接開示してもらえるわけではありません。まず記録の保全を求め、被害者本人、代理人、弁護士、公的機関による正式照会へつなげる必要があります。
+
+最後に
+
+この件で必要なのは、興味本位でサイトを探したり、被害者の個人情報を再拡散したりすることではありません。
+
+また、根拠のない人物や企業を運営者と決めつけることでもありません。
+
+サイトは現在停止しています。しかし、その直前と直後に、3ドメインの管理をまとめて移す具体的な操作がありました。
+
+何もせず消えたわけではありません。
+
+再公開の準備なのか、ドメインを守るための移管なのか、撤退のための整理なのか。今はまだ判断できません。
+
+追うべきなのは被害者の情報ではなく、DNS、RDAP、証明書、移管状態など、運営側が残した公開記録です。
+
+公開出典
+
+RDAP hasanmap.org
+https://rdap.org/domain/hasanmap.org
+
+RDAP hasanmap.top
+https://rdap.org/domain/hasanmap.top
+
+RDAP hasanmap.cc
+https://rdap.org/domain/hasanmap.cc
+
+Google Public DNS hasanmap.org NS
+https://dns.google/resolve?name=hasanmap.org&type=NS
+
+Google Public DNS hasanmap.cc NS
+https://dns.google/resolve?name=hasanmap.cc&type=NS
+
+Google Public DNS hasanmap.top A
+https://dns.google/resolve?name=hasanmap.top&type=A
+
+CertSpotter hasanmap.cc
+https://api.certspotter.com/v1/issuances?domain=hasanmap.cc&include_subdomains=true&expand=dns_names&expand=issuer
+
+2022年9月27日の削除申請ページ
+https://web.archive.org/web/20220927234546/https://www.hasanmap.org/pre-request.html
+
+ICANN EPPステータスコード
+https://www.icann.org/resources/pages/epp-status-codes-2014-06-16-en

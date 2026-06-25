@@ -34,15 +34,18 @@
 
 - 📁 **api/** (1)
   - `status.js` — status 受け口 Vercel Serverless Function。
-- 📁 **app/** (7)
-  - 📁 **images/** (3)
-    - 📁 **yukkuri/** (3)
-      - 📁 **konta/** (1)
+- 📁 **app/** (10)
+  - 📁 **images/** (6)
+    - 📁 **yukkuri/** (6)
+      - 📁 **konta/** (2)
         - `kitsune-yukkuri-half-eyes-mouth-closed.png`
-      - 📁 **link/** (1)
+        - `kitsune-yukkuri-smile-mouth-open.png`
+      - 📁 **link/** (2)
         - `link-yukkuri-half-eyes-mouth-closed.png`
-      - 📁 **tanunee/** (1)
+        - `link-yukkuri-smile-mouth-open.png`
+      - 📁 **tanunee/** (2)
         - `tanuki-yukkuri-half-eyes-mouth-closed.png`
+        - `tanuki-yukkuri-smile-mouth-open.png`
   - `app.js` — スマホ閲覧用 status Web 版。
   - `index.html`
   - `live-view.html`
