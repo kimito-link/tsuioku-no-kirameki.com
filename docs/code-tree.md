@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 1 / 551 件
+## ⚠️ 役割コメントが無いソース 1 / 552 件
 - `src/lib/reportPreviewPublish.js`
 
 ## 全ファイルツリー
@@ -361,7 +361,7 @@
   - `vendor-visual-explainer.mjs` — Vendors nicobailon/visual-explainer (MIT) into .cursor/skills/visual-explainer/
   - `verify-bump.mjs` — extension bump 後の整合性チェッカー
   - `write-extension-placeholder-icons.mjs` — リポジトリに 256px アイコンしか無い環境向け: manifest 用の小さめ PNG を生成する。
-- 📁 **src/** (1176)
+- 📁 **src/** (1178)
   - 📁 **data/** (6)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -620,7 +620,7 @@
         - `logo_funlink_white_RGB_maru_black.png`
       - `logo_guide_funlink_ol.pdf`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (965)
+  - 📁 **lib/** (967)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -757,6 +757,8 @@
     - `cheerPalette.test.js`
     - `chikuranCard.js` — 「ちくらん風」配信カードの表示モデル純関数(v0.1.866)。
     - `chikuranCard.test.js`
+    - `chikuranHeaderDom.js` — 「ちくらん風」配信者カードのヘッダー DOM ビルダー。
+    - `chikuranHeaderDom.test.js`
     - `classifyFeatureCategory.js` — ファイルを機能カテゴリへ自動分類する純関数(v0.1.840・マップ網羅化 第1)。
     - `classifyFeatureCategory.test.js`
     - `cleanNdgrChatRows.js` — NDGR チャット行の正規化純関数。

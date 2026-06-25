@@ -524,6 +524,7 @@
 | `src/lib/supportCelebration.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/supporterChikuranScore.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/supporterPowerScoring.js` | 1 | ポップアップ(応援レーン) |
+| `src/lib/supporterRankingDom.js` | 1 | 状態速報ページ |
 | `src/lib/supporterRowToPersonTile.js` | 1 | 状態速報ページ |
 | `src/lib/supportGrowthInsights.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/supportTimelineGuard.js` | 1 | ポップアップ(応援レーン) |
