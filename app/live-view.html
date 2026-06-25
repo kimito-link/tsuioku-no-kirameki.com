@@ -23,6 +23,8 @@
         --nl-text-sub: #7a6458;    /* colors.textSub */
         --nl-muted: #9c8678;       /* colors.muted */
         --nl-user-accent: #f06aa0; /* colors.userAccent(popup 互換・固定) */
+        /* 数字カード鏡(.nl-live-stat-card のグラデ終端)が参照。status.html から移植=裸要素化(v0.1.900)防止。 */
+        --nl-bg-soft: #fff1f4;     /* colors.bgSoft(桜寄りの淡いピンク地) */
       }
       /* OS がダークでも明るいクリームのまま(light と同値で上書きを無効化)。 */
       @media (prefers-color-scheme: dark) {
@@ -36,6 +38,7 @@
           --nl-text-sub: #7a6458;
           --nl-muted: #9c8678;
           --nl-user-accent: #f06aa0;
+          --nl-bg-soft: #fff1f4;
         }
       }
       * {
@@ -317,6 +320,170 @@
           max-width: 160px;
         }
       }
+
+      /* ── 数字カード鏡 CSS(status.html:692-853 から verbatim 移植・似せて自作しない) ── */
+      .nl-live-stat-cards {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 6px;
+      }
+      .nl-official-nico-stats__row {
+        grid-column: 1 / -1;
+        display: grid;
+        grid-template-columns: repeat(5, minmax(0, 1fr));
+        gap: 5px;
+      }
+      .nl-official-nico-stats__chip {
+        min-width: 0;
+        padding: 4px 3px 5px;
+        border-radius: 9px;
+        border: 1px solid var(--nl-border);
+        background: color-mix(in srgb, var(--nl-surface) 88%, var(--nl-border) 12%);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+      }
+      .nl-official-nico-stats__label {
+        font-size: clamp(9px, 2.2vw, 10px);
+        color: var(--nl-muted);
+        font-weight: 600;
+        line-height: 1.2;
+      }
+      .nl-official-nico-stats__val {
+        margin-top: 2px;
+        font-size: clamp(11px, 2.9vw, 14px);
+        font-weight: 800;
+        color: var(--nl-text);
+        font-variant-numeric: tabular-nums;
+        line-height: 1.15;
+      }
+      .nl-official-nico-stats__val.is-placeholder {
+        font-size: clamp(10.5px, 2.6vw, 12px);
+        font-weight: 700;
+        color: var(--nl-muted);
+      }
+      .nl-live-stat-card {
+        position: relative;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+        padding: 7px 4px 6px;
+        border-radius: 12px;
+        border: 1px solid var(--nl-stat-card-border, var(--nl-border));
+        background: linear-gradient(
+          155deg,
+          var(--nl-stat-card-bg-start, var(--nl-surface)),
+          var(--nl-stat-card-bg-end, var(--nl-bg-soft))
+        );
+        box-shadow: var(--nl-stat-card-shadow, 0 2px 6px rgb(2 17 31 / 10%));
+        min-width: 0;
+      }
+      .nl-live-stat-card--comments {
+        border-color: var(--nl-border);
+      }
+      .nl-live-stat-card--concurrent {
+        border-color: var(--nl-border);
+      }
+      .nl-live-stat-card--visitors {
+        border-color: var(--nl-border);
+      }
+      .nl-live-stat-icon {
+        width: clamp(32px, 9vw, 44px);
+        height: clamp(32px, 9vw, 44px);
+        object-fit: contain;
+        border-radius: 999px;
+        background: rgb(255 255 255 / 60%);
+        border: 1px solid rgb(255 255 255 / 50%);
+        box-shadow: 0 1px 4px rgb(2 17 31 / 14%);
+        margin-bottom: 3px;
+        flex-shrink: 0;
+      }
+      .nl-live-stat-label {
+        font-size: clamp(8.5px, 2.2vw, 10.5px);
+        font-weight: 700;
+        color: var(--nl-muted);
+        line-height: 1.2;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        max-width: 100%;
+      }
+      .nl-live-stat-value {
+        font-size: clamp(16px, 4.5vw, 22px);
+        font-weight: 900;
+        color: var(--nl-text);
+        line-height: 1.15;
+        font-variant-numeric: tabular-nums;
+        margin: 1px 0;
+      }
+      .nl-live-stat-value.is-placeholder {
+        font-size: clamp(10.5px, 2.6vw, 13px);
+        font-weight: 700;
+        color: var(--nl-muted);
+        font-variant-numeric: normal;
+        line-height: 1.25;
+        white-space: normal;
+        word-break: keep-all;
+        overflow-wrap: anywhere;
+      }
+      .nl-live-stat-unit {
+        font-size: clamp(8px, 2vw, 10px);
+        font-weight: 600;
+        color: var(--nl-muted);
+        line-height: 1.2;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        max-width: 100%;
+      }
+      .nl-live-stat-sub {
+        margin-top: 2px;
+        font-size: clamp(7px, 1.85vw, 9px);
+        font-weight: 600;
+        color: var(--nl-muted);
+        line-height: 1.25;
+        text-align: center;
+        max-width: 100%;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .nl-live-stat-sub[hidden] {
+        display: none;
+      }
+      .nl-live-stat-sub--official {
+        white-space: normal;
+        overflow: hidden;
+        display: -webkit-box;
+        -webkit-box-orient: vertical;
+        -webkit-line-clamp: 2;
+        line-clamp: 2;
+        text-overflow: ellipsis;
+        hyphens: auto;
+        word-break: break-word;
+      }
+      .nl-live-stat-sub--ingest {
+        color: var(--nl-accent, #0f8fd8);
+        font-weight: 700;
+      }
+      .nl-concurrent-body {
+        width: 100%;
+        min-width: 0;
+        min-height: clamp(48px, 14vw, 58px);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+      }
+      .nl-concurrent-ready {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        width: 100%;
+        min-width: 0;
+      }
     </style>
   </head>
   <body>
@@ -327,6 +494,64 @@
       </header>
 
       <div id="errorBox" hidden></div>
+
+      <!-- 数字カード鏡: popup 上部の「記録・推定同時接続・来場者数」+公式統計チップをそっくり。
+           DOM の id/class は status.html:1051-1132 と完全一致(本物 paintStatCardsMirrorValues が読む)。
+           アイコンは app/images/yukkuri/ 配下(拡張の相対パスでなく app 配下)。 -->
+      <section class="lane" id="statCardsMirror" hidden>
+        <h2>🔢 数字カード</h2>
+        <div class="lane-note">配信の「記録・推定同時接続・来場者数」と公式統計を、ポップアップと同じ数字で映しています。</div>
+        <div id="statCardsMirrorMeta" class="lane-note"></div>
+        <div class="nl-live-stat-cards" id="liveStatCards">
+          <div class="nl-live-stat-card nl-live-stat-card--comments">
+            <img class="nl-live-stat-icon" src="images/yukkuri/link/link-yukkuri-smile-mouth-open.png" alt="" decoding="async" />
+            <div class="nl-live-stat-label">記録</div>
+            <div class="nl-live-stat-value is-placeholder" id="liveStatComments">—</div>
+            <div class="nl-live-stat-unit">応援コメント</div>
+            <div class="nl-live-stat-sub nl-live-stat-sub--official" id="liveStatCommentsOfficial" hidden></div>
+            <div class="nl-live-stat-sub nl-live-stat-sub--ingest" id="liveStatCommentsIngest" hidden></div>
+            <div class="nl-live-stat-sub nl-live-stat-sub--breakdown" id="liveStatCommentsBreakdown" hidden></div>
+          </div>
+          <div class="nl-live-stat-card nl-live-stat-card--concurrent">
+            <img class="nl-live-stat-icon" src="images/yukkuri/konta/kitsune-yukkuri-smile-mouth-open.png" alt="" decoding="async" />
+            <div class="nl-live-stat-label">推定同時接続</div>
+            <div class="nl-concurrent-body">
+              <div class="nl-concurrent-ready">
+                <div class="nl-live-stat-value is-placeholder" id="watchConcurrentEst">—</div>
+                <div class="nl-live-stat-unit" id="watchConcurrentSub">人</div>
+              </div>
+            </div>
+          </div>
+          <div class="nl-live-stat-card nl-live-stat-card--visitors">
+            <img class="nl-live-stat-icon" src="images/yukkuri/tanunee/tanuki-yukkuri-smile-mouth-open.png" alt="" decoding="async" />
+            <div class="nl-live-stat-label">来場者数</div>
+            <div class="nl-live-stat-value is-placeholder" id="watchViewerDom">—</div>
+            <div class="nl-live-stat-unit">人</div>
+          </div>
+          <div class="nl-official-nico-stats__row" id="statCardsMirrorOfficialRow" role="group" aria-label="公式視聴統計の一覧">
+            <div class="nl-official-nico-stats__chip">
+              <span class="nl-official-nico-stats__label">来場</span>
+              <span class="nl-official-nico-stats__val is-placeholder" id="officialStatNicoViewers">—</span>
+            </div>
+            <div class="nl-official-nico-stats__chip">
+              <span class="nl-official-nico-stats__label">本家コメ</span>
+              <span class="nl-official-nico-stats__val is-placeholder" id="officialStatNicoComments">—</span>
+            </div>
+            <div class="nl-official-nico-stats__chip">
+              <span class="nl-official-nico-stats__label">経過</span>
+              <span class="nl-official-nico-stats__val is-placeholder" id="officialStatNicoStreamAge">—</span>
+            </div>
+            <div class="nl-official-nico-stats__chip">
+              <span class="nl-official-nico-stats__label">広告pt</span>
+              <span class="nl-official-nico-stats__val is-placeholder" id="officialStatNicoAdPts">—</span>
+            </div>
+            <div class="nl-official-nico-stats__chip">
+              <span class="nl-official-nico-stats__label">ギフトpt</span>
+              <span class="nl-official-nico-stats__val is-placeholder" id="officialStatNicoGiftPts">—</span>
+            </div>
+          </div>
+        </div>
+      </section>
 
       <!-- 応援レーン鏡: popup の段組み(りんく/こん太/広告/たぬ姉)を顔込みでそっくり。
            DOM の id は popup.html / status.html と完全一致(本物の paintStoryUserLaneDomFilled が読む)。 -->

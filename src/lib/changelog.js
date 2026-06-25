@@ -26,6 +26,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.939',
+    date: '2026-06-25',
+    summary: '共有URLのWeb版に「数字カード」をポップアップそっくり追加',
+    items: Object.freeze([
+      '「WEBサイトURLで共有」で開く共有ページ(拡張なしで見られるWeb版)に、ポップアップ上部の「記録・推定同時接続・来場者数」と公式統計(来場・本家コメ・経過・広告pt・ギフトpt)の数字カードを、ポップアップと同じ見た目・同じ数字で表示するようにしました。これまで応援レーンだけだったのを、ポップアップにより近づけています。',
+      '数字カードは本物のポップアップと同じ描画部品を共有しているので、勝手に作り直した別物ではなく、見た目と数字が一致します。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.938',
     date: '2026-06-25',
     summary: '「応援ライブビュー」と「共有URL」のボタンを役割分け',

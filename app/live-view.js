@@ -28,10 +28,17 @@ import {
   applyStoryAvatarTvFallbackClass,
   removeStoryAvatarTvFallbackClass
 } from '../src/lib/storyAvatarTvFallbackClass.js';
+// 数字カード鏡: status と同じ純DOMビルダー(本物)を再利用=似せて自作しない・popup と必ず一致。
+import { paintStatCardsMirrorValues } from '../src/lib/statCardsMirrorDom.js';
+import { buildStatCardsMirrorSignature } from '../src/lib/statCardsMirror.js';
+import { isEpochFresh } from '../src/lib/watchUrlFreshness.js';
 
 const POLL_INTERVAL_MS = 60_000;
+/** 数字カード鏡の鮮度ガード(status-entry.js の MIRROR_FRESH_MS と同値=3分)。 */
+const MIRROR_FRESH_MS = 3 * 60 * 1000;
 let _timerId = null;
 let _lastLaneSig = ' init';
+let _lastStatCardsSig = ' init';
 
 /**
  * 応援レーン鏡のアバター読み込みガード(popup/status と同設定の本物=createSupportAvatarLoadGuard)。
@@ -104,6 +111,7 @@ async function refresh(token) {
 /** @param {{ generatedAt?: string, laneMirror?: any, statCardsMirror?: any }} jsonBlob */
 function render(jsonBlob) {
   hideError();
+  renderStatCardsMirror(jsonBlob.statCardsMirror || null);
   renderLaneMirror(jsonBlob.laneMirror || null);
   const stamp = document.getElementById('updatedAt');
   if (stamp) {
@@ -112,6 +120,39 @@ function render(jsonBlob) {
       ? `最終送信 ${String(t.getHours()).padStart(2, '0')}:${String(t.getMinutes()).padStart(2, '0')}`
       : '';
   }
+}
+
+/**
+ * 数字カード鏡: popup 上部の「記録・推定同時接続・来場者数」+公式統計チップをそっくり描く。
+ *   status-entry.js#renderStatCardsMirror と同じ recipe(本物 paintStatCardsMirrorValues を再利用)。
+ *   ガード(null/鮮度/signature)も status と同型。データは拡張が送信した statCardsMirror スナップショット。
+ * @param {any} snap
+ */
+function renderStatCardsMirror(snap) {
+  const section = document.getElementById('statCardsMirror');
+  if (!section) return;
+  // popup 未起動/未送信=スナップショット無し=セクションごと隠す(死にリンク回避)。
+  if (!snap || typeof snap !== 'object') {
+    section.hidden = true;
+    _lastStatCardsSig = ' init';
+    return;
+  }
+  // 鮮度ガード: capturedAt が古ければ「配信が終わった後の残骸」=隠す(status と同型)。
+  if (!isEpochFresh(Number(snap.capturedAt), Date.now(), MIRROR_FRESH_MS)) {
+    section.hidden = true;
+    _lastStatCardsSig = ' stale';
+    return;
+  }
+  // signature ガード: 変化が無ければ値セットを skip(表示状態は維持)。
+  const sig = buildStatCardsMirrorSignature(snap);
+  if (sig === _lastStatCardsSig) {
+    section.hidden = false;
+    return;
+  }
+  _lastStatCardsSig = sig;
+  section.hidden = false;
+  // 値セットは本物 paintStatCardsMirrorValues(status と共有)=似せて自作しない・popup と必ず一致。
+  paintStatCardsMirrorValues(document, snap);
 }
 
 /**
