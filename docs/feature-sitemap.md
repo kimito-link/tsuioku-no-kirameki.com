@@ -257,7 +257,7 @@
   - `src/lib/giftThrowProjectile.js`
 - **吹き出し寿命管理** — 会場の吹き出しの表示上限・追い出し(eviction)ライフサイクル
   - `src/lib/venueBubbleLifecycle.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 164</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 165</summary>
 
 - `scripts/encode-marketing-html-avatars.mjs` — extension/images/marketing-html-avatars/*.png を data URI にし、
 - `scripts/split-avatar-parts.mjs` — 偽市松背景の除去 + パーツ切り出し(one-off アセットパイプライン)
@@ -350,6 +350,7 @@
 - `src/lib/nicoAnonymousDisplay.js` — ニコ生の匿名ユーザーID（a: で始まる内部ID）向けの表示補完。
 - `src/lib/nicoUserPage.js` — 汎用: ニコ生ユーザーの公開ページ URL / 表示名 を作る純関数。
 - `src/lib/nicoUserProfilePage.js` — www.nicovideo.jp/user/<id> のプロフィールページに表示されている
+- `src/lib/northStarLaneDom.js` — 北極星レーン(公式値レーン)の body へ mirrorHtml を sanitize して流し込むコア。
 - `src/lib/northStarLaneGadgetChara.js` — 北極星レーン左ガジェットのキャラ画像（拡張ルート相対）。
 - `src/lib/northStarLaneReason.js` — v0.1.244: 北極星「公式値レーン」の state 細分化用、reason 判定純関数。
 - `src/lib/northStarLaneResult.js` — 公式値レーン(Koken 貢献度 / Nicoad 広告)の「取得結果」を、純関数の state 判定が

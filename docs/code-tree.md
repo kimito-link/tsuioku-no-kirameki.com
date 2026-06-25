@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 1 / 553 件
+## ⚠️ 役割コメントが無いソース 1 / 554 件
 - `src/lib/reportPreviewPublish.js`
 
 ## 全ファイルツリー
@@ -361,7 +361,7 @@
   - `vendor-visual-explainer.mjs` — Vendors nicobailon/visual-explainer (MIT) into .cursor/skills/visual-explainer/
   - `verify-bump.mjs` — extension bump 後の整合性チェッカー
   - `write-extension-placeholder-icons.mjs` — リポジトリに 256px アイコンしか無い環境向け: manifest 用の小さめ PNG を生成する。
-- 📁 **src/** (1180)
+- 📁 **src/** (1182)
   - 📁 **data/** (6)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -620,7 +620,7 @@
         - `logo_funlink_white_RGB_maru_black.png`
       - `logo_guide_funlink_ol.pdf`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (969)
+  - 📁 **lib/** (971)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -1172,6 +1172,8 @@
     - `northStarCharaTrioConfig.test.js`
     - `northStarFallbackHtml.js` — v0.1.241: 北極星「鏡のように貼り付け」レーンの fallback HTML 生成。
     - `northStarFallbackHtml.test.js`
+    - `northStarLaneDom.js` — 北極星レーン(公式値レーン)の body へ mirrorHtml を sanitize して流し込むコア。
+    - `northStarLaneDom.test.js`
     - `northStarLaneGadgetChara.js` — 北極星レーン左ガジェットのキャラ画像（拡張ルート相対）。
     - `northStarLaneGadgetChara.test.js`
     - `northStarLaneReason.js` — v0.1.244: 北極星「公式値レーン」の state 細分化用、reason 判定純関数。
