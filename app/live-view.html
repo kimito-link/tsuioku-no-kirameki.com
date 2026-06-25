@@ -495,6 +495,13 @@
 
       <div id="errorBox" hidden></div>
 
+      <!-- 配信者カード(ちくらん風ヘッダー): サムネ+配信者名+タイトル+経過/来場/コメント/ギフト。
+           本物 buildChikuranHeaderDom(status と共有)が描く。データは lives[0](送信済み)。 -->
+      <section class="lane" id="broadcasterCardLane" hidden>
+        <h2>📺 視聴中の配信</h2>
+        <div id="broadcasterCardHost"></div>
+      </section>
+
       <!-- 数字カード鏡: popup 上部の「記録・推定同時接続・来場者数」+公式統計チップをそっくり。
            DOM の id/class は status.html:1051-1132 と完全一致(本物 paintStatCardsMirrorValues が読む)。
            アイコンは app/images/yukkuri/ 配下(拡張の相対パスでなく app 配下)。 -->

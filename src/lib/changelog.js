@@ -26,6 +26,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.940',
+    date: '2026-06-25',
+    summary: '共有URLのWeb版に「配信者カード」をポップアップそっくり追加',
+    items: Object.freeze([
+      '「WEBサイトURLで共有」で開く共有ページ(拡張なしで見られるWeb版)に、配信者カード(サムネイル・配信者名・タイトル・経過/来場/コメント/ギフト)を、ポップアップと同じ見た目で表示するようにしました。数字カードに続いて、ポップアップにより近づいています。',
+      '配信者カードも本物のポップアップと同じ描画部品を共有しているので、勝手に作り直した別物ではなく見た目が一致します。送信データは増やしていません(もともと送っている情報を使うだけ)。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.939',
     date: '2026-06-25',
     summary: '共有URLのWeb版に「数字カード」をポップアップそっくり追加',
