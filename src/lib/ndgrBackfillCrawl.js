@@ -527,6 +527,20 @@ export async function* crawlNdgrBackward(opts) {
    * @param {{ reachedStartChats?: import('./ndgrDecode.js').NdgrChat[], reachedStartPath?: 'main'|'side', crawl?: object, seek?: string[], cands?: number[] }} [diag]
    */
   const done = (reason, diag) => ({ stopReason: reason, ...summary(), diagnostics: diag || null });
+  // v0.1.946「ローディングが出ない/一気に取れない」根治(実データ lv350830520: genSteps:0/lastSkip:started):
+  //   初回の入口探索(?at=now + seedCandidates×最大20hop)は最初の chats を yield する【前】に直列で多数 fetch
+  //   する。その間 generator は一度も yield しないため consumer は genSteps=0 のまま=ローディングが出ず・
+  //   stall watchdog が誤発火しうる。reseed の bridging(v0.1.814)と同型で seed/seek 中も bridging を yield。
+  const seekingEvent = () => ({
+    chats: /** @type {import('./ndgrDecode.js').NdgrChat[]} */ ([]),
+    segmentsFetched,
+    rowsSeen,
+    bytesFetched,
+    minCommentNo: /** @type {number|null} */ (null),
+    minVposReached: globalMinVpos,
+    bridging: true,
+    seeking: true
+  });
 
   /** @type {{ nowBytes: number|null, nowNextAt: number|null }} v0.1.640 診断: crawl 入口の fetch/decode 結果。 */
   const _crawlDiag = { nowBytes: null, nowNextAt: null };
@@ -540,6 +554,9 @@ export async function* crawlNdgrBackward(opts) {
 
   // --- 1) ?at=now で現在地点ポインタ（nextAt）を得る ---
   if (isAborted(signal)) return done('aborted');
+  // v0.1.946: 入口探索の最初の fetch(?at=now)の前に bridging を1回出す=consumer の genSteps を即進めて
+  //   ローディングを出す(初回 fetch が遅くても「進捗イベントが来ない」を解消)。chats=0=記録不変。
+  yield seekingEvent();
   const nowRes = await fetchWithThrottle(ctx, buildViewAtUrl(viewBase, 'now'), true);
   // v0.1.640 診断: ?at=now の fetch 結果(ISOLATED world で fetch が通るか・何バイト返るか)。
   _crawlDiag.nowBytes = nowRes.bytes ? nowRes.bytes.length : (nowRes.rateLimited ? -429 : 0);
@@ -771,6 +788,9 @@ export async function* crawlNdgrBackward(opts) {
       lastSeedAtSec = cand;
       break;
     }
+    // v0.1.946: この候補は空振り=次の候補へ。seek は1候補で最大20hop fetch するので、橋渡し中を
+    //   consumer に伝えて genSteps を進める(ローディング維持+watchdog 抑止)。chats=0=記録不変。
+    yield seekingEvent();
   }
   if (!initialBackwardUri) return done('backward_exhausted', { crawl: _crawlDiag, seek: _seekDiag.slice(0, 30), cands: seedCandidates.slice(0, 10) });
 
@@ -1117,6 +1137,18 @@ export async function* crawlNdgrBackwardDeterministic(opts) {
     ...summary(),
     diagnostics: /** @type {object|null} */ (null)
   });
+  // v0.1.946: seed/seek フェーズの「生存中」軽量イベント(chats=0・bridging)。最初の chats を yield する
+  //   前(入口探索)に出して genSteps を進める=ローディング表示+stall watchdog 誤発火の抑止。記録/件数は不変。
+  const seekingEvent = () => ({
+    chats: /** @type {import('./ndgrDecode.js').NdgrChat[]} */ ([]),
+    segmentsFetched,
+    rowsSeen,
+    bytesFetched,
+    minCommentNo: /** @type {number|null} */ (null),
+    minVposReached: globalMinVpos,
+    bridging: true,
+    seeking: true
+  });
 
   if (!viewBase) return done('no_view_base');
   if (typeof fetchBinary !== 'function') return done('no_view_base');
@@ -1218,6 +1250,10 @@ export async function* crawlNdgrBackwardDeterministic(opts) {
     return { entry: null, stopReason: '' };
   };
 
+  // v0.1.946: 入口探索の最初の fetch(?at=now)の【前】に bridging を1回出す=consumer の genSteps を
+  //   即進めてローディングを出す(初回 fetch が遅くても「進捗イベントが来ない」を解消)。chats=0=記録不変。
+  yield seekingEvent();
+
   const nowRes = await fetchWithThrottle(ctx, buildViewAtUrl(viewBase, 'now'), true);
   if (nowRes.rateLimited) return done('rate_limited');
   if (isAborted(signal)) return done('aborted');
@@ -1314,6 +1350,14 @@ export async function* crawlNdgrBackwardDeterministic(opts) {
     return '';
   };
 
+  // v0.1.946「ローディングが出ない/一気に取れない」根治(実データ lv350830520: genSteps:0/lastSkip:started/
+  //   rows:0 で固着に見える):
+  //   ★初回の入口探索(?at=now + seedCandidates×最大20hop の seek)は、最初の chats を yield する【前】に
+  //   最大で十数〜数百 fetch を直列に行う。その間 generator は一度も yield しないため、consumer 側は
+  //   genSteps=0 のまま=「進捗イベントが来ない」=ローディングが出ず・stall watchdog が誤発火しうる。
+  //   → reseed 中の bridging(v0.1.814)と同型で、seed/seek フェーズでも bridging を yield して
+  //   『生きて入口を探している』を consumer に伝える(chats=0=記録/件数は不変・取りこぼし無し)。
+  //   seekingEvent は generator 冒頭で定義済み。?at=now の前で既に1回 yield 済み。
   let seeded = false;
   for (const cand of seedCandidates) {
     if (cand <= 0) continue;
@@ -1324,6 +1368,8 @@ export async function* crawlNdgrBackwardDeterministic(opts) {
       seeded = true;
       break;
     }
+    // この候補が空振り=次の候補へ。橋渡し中であることを consumer に伝える(seek は1候補=最大20hop fetch)。
+    yield seekingEvent();
   }
   if (!seeded) return done('backward_exhausted');
 
