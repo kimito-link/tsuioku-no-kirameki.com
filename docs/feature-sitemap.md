@@ -255,7 +255,7 @@
   - `src/lib/giftThrowProjectile.js`
 - **吹き出し寿命管理** — 会場の吹き出しの表示上限・追い出し(eviction)ライフサイクル
   - `src/lib/venueBubbleLifecycle.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 162</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 163</summary>
 
 - `scripts/encode-marketing-html-avatars.mjs` — extension/images/marketing-html-avatars/*.png を data URI にし、
 - `scripts/split-avatar-parts.mjs` — 偽市松背景の除去 + パーツ切り出し(one-off アセットパイプライン)
@@ -275,6 +275,7 @@
 - `src/lib/adLanePicksFromRooms.js` — 広告ランキング行(officialDomRankingRowsToStripRooms の room)を、popup/会場の人物タイル
 - `src/lib/anonymousIdenticon.js` — 匿名 userId 向けの決定論的アバター（SVG data URL）。
 - `src/lib/avatarBroadcasterGuard.js` — 配信者アイコン取り違え防止ガード（純粋関数）。
+- `src/lib/avatarEntryCounts.js` — コメントエントリ配列から avatar の数を数える純関数。
 - `src/lib/avatarPartsComposer.js` — 匿名ユーザー用アバターのパーツ(髪/目/口など)定義と組み合わせ合成。
 - `src/lib/avatarUrlCompare.js` — アバター URL の比較用ヘルパ（純粋関数）。
 - `src/lib/cardFreshnessNote.js` — カードの「鮮度」表示（最終更新からの経過）を作る純関数。

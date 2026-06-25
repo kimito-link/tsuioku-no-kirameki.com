@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 1 / 546 件
+## ⚠️ 役割コメントが無いソース 1 / 549 件
 - `src/lib/reportPreviewPublish.js`
 
 ## 全ファイルツリー
@@ -267,7 +267,7 @@
   - `vendor-visual-explainer.mjs` — Vendors nicobailon/visual-explainer (MIT) into .cursor/skills/visual-explainer/
   - `verify-bump.mjs` — extension bump 後の整合性チェッカー
   - `write-extension-placeholder-icons.mjs` — リポジトリに 256px アイコンしか無い環境向け: manifest 用の小さめ PNG を生成する。
-- 📁 **src/** (1165)
+- 📁 **src/** (1171)
   - 📁 **data/** (6)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -526,7 +526,7 @@
         - `logo_funlink_white_RGB_maru_black.png`
       - `logo_guide_funlink_ol.pdf`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (954)
+  - 📁 **lib/** (960)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -561,6 +561,8 @@
     - `autoBackupState.test.js`
     - `avatarBroadcasterGuard.js` — 配信者アイコン取り違え防止ガード（純粋関数）。
     - `avatarBroadcasterGuard.test.js`
+    - `avatarEntryCounts.js` — コメントエントリ配列から avatar の数を数える純関数。
+    - `avatarEntryCounts.test.js`
     - `avatarPartsComposer.js` — 匿名ユーザー用アバターのパーツ(髪/目/口など)定義と組み合わせ合成。
     - `avatarPartsComposer.test.js`
     - `avatarUrlCompare.js` — アバター URL の比較用ヘルパ（純粋関数）。
@@ -1221,6 +1223,8 @@
     - `reportNextMemoSectionHtml.test.js`
     - `reportPreview.js` — HTML/マーケ/メディアキットレポートで「ダウンロードして初めて見られる」主要集計を、
     - `reportPreview.test.js`
+    - `reportPreviewCtx.js` — レポートプレビューの信頼度注釈に渡す「文脈」を fastDiag から組み立てる純関数。
+    - `reportPreviewCtx.test.js`
     - `reportPreviewKey.js` — レポート中身プレビュー(保存前の主要KPI)の storage キー正本。
     - `reportPreviewKey.test.js`
     - `reportPreviewPublish.js` — ⚠️ 役割コメント無し
@@ -1278,6 +1282,8 @@
     - `statusFormat.test.js`
     - `statusMindmapModel.js` — status.html「全体マインドマップ」のツリーモデルを組み立てる純関数(2026-06-18 ユーザー要望)。
     - `statusMindmapModel.test.js`
+    - `statusShareUrls.js` — 状態速報の共有 URL を組み立てる純関数。
+    - `statusShareUrls.test.js`
     - `statusTrend.js` — 状態速報の主要KPIを時系列で記録し、「スナップショットでは見えない劣化」を検知する純関数(v0.1.862)。
     - `statusTrend.test.js`
     - `statusTrendKey.js` — 状態トレンド(時系列KPI)の storage キー正本。status が自分で読み書きする(producer=consumer=status)。
