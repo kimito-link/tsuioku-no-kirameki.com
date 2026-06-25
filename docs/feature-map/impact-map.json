@@ -2,6 +2,30 @@
   "generatedBy": "scripts/feature-map.mjs",
   "files": [
     {
+      "file": "src/lib/nicoAnonymousDisplay.js",
+      "featureCount": 8,
+      "features": [
+        "backfill-sw",
+        "comeview",
+        "content",
+        "offscreen",
+        "page-intercept",
+        "popup",
+        "status",
+        "venue"
+      ],
+      "labels": [
+        "バックフィル SW",
+        "コメビュ(別窓)",
+        "記録エンジン(watchページ常駐)",
+        "コメント IDB 書き手",
+        "ページ傍受",
+        "ポップアップ(応援レーン)",
+        "状態速報ページ",
+        "会場モード(standalone)"
+      ]
+    },
+    {
       "file": "src/lib/supportGrowthTileSrc.js",
       "featureCount": 8,
       "features": [
@@ -27,28 +51,6 @@
     },
     {
       "file": "src/lib/commentRecord.js",
-      "featureCount": 7,
-      "features": [
-        "backfill-sw",
-        "comeview",
-        "content",
-        "offscreen",
-        "page-intercept",
-        "popup",
-        "venue"
-      ],
-      "labels": [
-        "バックフィル SW",
-        "コメビュ(別窓)",
-        "記録エンジン(watchページ常駐)",
-        "コメント IDB 書き手",
-        "ページ傍受",
-        "ポップアップ(応援レーン)",
-        "会場モード(standalone)"
-      ]
-    },
-    {
-      "file": "src/lib/nicoAnonymousDisplay.js",
       "featureCount": 7,
       "features": [
         "backfill-sw",
@@ -170,6 +172,42 @@
       ]
     },
     {
+      "file": "src/lib/deriveAvatarUrlFromUid.js",
+      "featureCount": 5,
+      "features": [
+        "comeview",
+        "content",
+        "popup",
+        "status",
+        "venue"
+      ],
+      "labels": [
+        "コメビュ(別窓)",
+        "記録エンジン(watchページ常駐)",
+        "ポップアップ(応援レーン)",
+        "状態速報ページ",
+        "会場モード(standalone)"
+      ]
+    },
+    {
+      "file": "src/lib/giftDisplayNickname.js",
+      "featureCount": 5,
+      "features": [
+        "comeview",
+        "content",
+        "popup",
+        "status",
+        "venue"
+      ],
+      "labels": [
+        "コメビュ(別窓)",
+        "記録エンジン(watchページ常駐)",
+        "ポップアップ(応援レーン)",
+        "状態速報ページ",
+        "会場モード(standalone)"
+      ]
+    },
+    {
       "file": "src/lib/nicoUserPage.js",
       "featureCount": 5,
       "features": [
@@ -206,6 +244,24 @@
       ]
     },
     {
+      "file": "src/lib/supportGridDisplayTier.js",
+      "featureCount": 5,
+      "features": [
+        "comeview",
+        "content",
+        "popup",
+        "status",
+        "venue"
+      ],
+      "labels": [
+        "コメビュ(別窓)",
+        "記録エンジン(watchページ常駐)",
+        "ポップアップ(応援レーン)",
+        "状態速報ページ",
+        "会場モード(standalone)"
+      ]
+    },
+    {
       "file": "src/domain/user/identity.js",
       "featureCount": 4,
       "features": [
@@ -234,6 +290,22 @@
         "コメビュ(別窓)",
         "記録エンジン(watchページ常駐)",
         "ポップアップ(応援レーン)",
+        "会場モード(standalone)"
+      ]
+    },
+    {
+      "file": "src/lib/backfillRemoveRecommendedLivePollution.js",
+      "featureCount": 4,
+      "features": [
+        "content",
+        "popup",
+        "status",
+        "venue"
+      ],
+      "labels": [
+        "記録エンジン(watchページ常駐)",
+        "ポップアップ(応援レーン)",
+        "状態速報ページ",
         "会場モード(standalone)"
       ]
     },
@@ -271,38 +343,6 @@
     },
     {
       "file": "src/lib/commentTailBuffer.js",
-      "featureCount": 4,
-      "features": [
-        "comeview",
-        "content",
-        "popup",
-        "venue"
-      ],
-      "labels": [
-        "コメビュ(別窓)",
-        "記録エンジン(watchページ常駐)",
-        "ポップアップ(応援レーン)",
-        "会場モード(standalone)"
-      ]
-    },
-    {
-      "file": "src/lib/deriveAvatarUrlFromUid.js",
-      "featureCount": 4,
-      "features": [
-        "comeview",
-        "content",
-        "popup",
-        "venue"
-      ],
-      "labels": [
-        "コメビュ(別窓)",
-        "記録エンジン(watchページ常駐)",
-        "ポップアップ(応援レーン)",
-        "会場モード(standalone)"
-      ]
-    },
-    {
-      "file": "src/lib/giftDisplayNickname.js",
       "featureCount": 4,
       "features": [
         "comeview",
@@ -382,23 +422,39 @@
       ]
     },
     {
-      "file": "src/lib/supportGridDisplayTier.js",
+      "file": "src/lib/storyUserLaneMeta.js",
       "featureCount": 4,
       "features": [
-        "comeview",
         "content",
         "popup",
+        "status",
         "venue"
       ],
       "labels": [
-        "コメビュ(別窓)",
         "記録エンジン(watchページ常駐)",
         "ポップアップ(応援レーン)",
+        "状態速報ページ",
         "会場モード(standalone)"
       ]
     },
     {
       "file": "src/lib/supportGrowthAvatarLoad.js",
+      "featureCount": 4,
+      "features": [
+        "content",
+        "popup",
+        "status",
+        "venue"
+      ],
+      "labels": [
+        "記録エンジン(watchページ常駐)",
+        "ポップアップ(応援レーン)",
+        "状態速報ページ",
+        "会場モード(standalone)"
+      ]
+    },
+    {
+      "file": "src/lib/userRooms.js",
       "featureCount": 4,
       "features": [
         "content",
@@ -431,20 +487,6 @@
     },
     {
       "file": "src/lib/avatarUrlCompare.js",
-      "featureCount": 3,
-      "features": [
-        "content",
-        "popup",
-        "venue"
-      ],
-      "labels": [
-        "記録エンジン(watchページ常駐)",
-        "ポップアップ(応援レーン)",
-        "会場モード(standalone)"
-      ]
-    },
-    {
-      "file": "src/lib/backfillRemoveRecommendedLivePollution.js",
       "featureCount": 3,
       "features": [
         "content",
@@ -626,20 +668,6 @@
       ]
     },
     {
-      "file": "src/lib/storyUserLaneMeta.js",
-      "featureCount": 3,
-      "features": [
-        "content",
-        "popup",
-        "venue"
-      ],
-      "labels": [
-        "記録エンジン(watchページ常駐)",
-        "ポップアップ(応援レーン)",
-        "会場モード(standalone)"
-      ]
-    },
-    {
       "file": "src/lib/userCommentProfileCache.js",
       "featureCount": 3,
       "features": [
@@ -655,20 +683,6 @@
     },
     {
       "file": "src/lib/userLaneCandidatesFromStorage.js",
-      "featureCount": 3,
-      "features": [
-        "content",
-        "popup",
-        "venue"
-      ],
-      "labels": [
-        "記録エンジン(watchページ常駐)",
-        "ポップアップ(応援レーン)",
-        "会場モード(standalone)"
-      ]
-    },
-    {
-      "file": "src/lib/userRooms.js",
       "featureCount": 3,
       "features": [
         "content",
@@ -5063,6 +5077,16 @@
       ],
       "labels": [
         "ポップアップ(応援レーン)"
+      ]
+    },
+    {
+      "file": "src/lib/supporterRowToPersonTile.js",
+      "featureCount": 1,
+      "features": [
+        "status"
+      ],
+      "labels": [
+        "状態速報ページ"
       ]
     },
     {
