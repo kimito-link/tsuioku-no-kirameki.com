@@ -535,6 +535,16 @@ export function normalizeMarketingExportMaskLabels(raw) {
 /** 開発監視トレンド（liveId ごと・chrome.storage.local） */
 export const KEY_DEV_MONITOR_TREND_PREFIX = 'nls_dm_tr:';
 
+/**
+ * 応援ライブビュー(拡張内 live-view.html)から「このURLをWEBでも公開する」を押せるように、
+ * status が描画のたびに【最新の公開ペイロード+共有キー】をここへ書く。
+ *   - live-view ページは status が持つ jsonBlob を持たない(別ページ)。再構築すると drift するので、
+ *     status が組み立てた jsonBlob を丸ごとここへ置き、live-view はそれを読んで POST するだけ(再構築しない)。
+ *   - 形: { jsonBlob, ingestKey, viewToken, appOrigin, savedAt }。
+ *   - ユーザー導線は「status で応援ライブビューを開く」→直前に status が描画済み=このキーは新鮮。
+ */
+export const KEY_LIVEVIEW_PUBLISH_PAYLOAD = 'nls_liveview_publish_payload_v1';
+
 /** @param {string} liveId */
 export function devMonitorTrendStorageKey(liveId) {
   return `${KEY_DEV_MONITOR_TREND_PREFIX}${String(liveId || '').trim() || '_'}`;
