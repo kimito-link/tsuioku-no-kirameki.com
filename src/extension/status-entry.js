@@ -1506,6 +1506,9 @@ function buildLiveViewButton(live) {
   const btn = document.createElement('button');
   btn.type = 'button';
   btn.textContent = '🔥 応援ライブビューを開く';
+  // ★会議(案C)で役割明確化: これが「ポップアップそっくりの同一画面・リアルタイム・本人用」。
+  //   共有したいときは隣の「🔗 WEBサイトURLで共有」。取り違え防止のため tooltip で一言。
+  btn.title = 'このポップアップそっくりの画面をリアルタイムで別タブに開きます(本人用)。拡張なしで他人に共有するなら「WEBサイトURLで共有」。';
   btn.style.cssText =
     'margin-top:8px;margin-right:6px;padding:5px 12px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600;' +
     'border:1px solid var(--nl-accent);background:var(--nl-accent);color:#fff;';
@@ -1520,16 +1523,20 @@ function buildLiveViewButton(live) {
   return btn;
 }
 
-// 2026-06-25: 配信カードの「🌐 WEBサイトURLで見る」。クリックで現状をサーバーに送信(uploadStatusSnapshot)し、
-//   成功したら WEB 状態速報 URL を新規タブで開く(UIUX: 共有導線は配信カードの行に置く=「応援ライブビューを
-//   開く/配信ページを開く」と同じ文脈)。結果(成功/失敗・両URL)は従来どおり上部 #uploadResult にも出す。
+// 2026-06-25: 配信カードの共有ボタン。クリックで現状をサーバーに送信(uploadStatusSnapshot)し、
+//   成功したら WEB 状態速報 URL を新規タブで開く。
+//   ★会議(council/webview-equals-liveview-SYNTHESIS.md・案C)で用途を明確化=このボタンは
+//     「拡張なしで他人に共有(スナップショット)」専用。「応援ライブビューを開く」(本人・リアルタイム・
+//     popup そっくり)とは役割が別。文言を「共有」と明記してユーザーの取り違えを無くす(誠実な設計)。
+//   結果(成功/失敗・両URL)は従来どおり上部 #uploadResult にも出す。
 //   キー未注入ビルドでは出さない(死にボタン回避)。多重送信防止に送信中はボタンを無効化。
 function buildWebUrlButton() {
   const { ingestKey, viewToken } = getUploadConfig();
   if (!ingestKey || !viewToken) return null; // キー未設定ビルド=出さない。
   const btn = document.createElement('button');
   btn.type = 'button';
-  btn.textContent = '🌐 WEBサイトURLで見る';
+  btn.textContent = '🔗 WEBサイトURLで共有';
+  btn.title = '拡張なしのスマホ/他人でも見られる共有URLを作って開きます(送信した時点のスナップショット)。リアルタイムで見るなら「応援ライブビューを開く」。';
   btn.style.cssText =
     'margin-top:8px;margin-right:6px;padding:5px 12px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600;' +
     'border:1px solid var(--nl-accent);background:var(--nl-card-bg);color:var(--nl-accent);';
@@ -2068,7 +2075,9 @@ function renderUploadResultLinks(resultEl, r) {
   resultEl.replaceChildren();
   resultEl.style.whiteSpace = 'normal';
   const head = document.createElement('div');
-  head.textContent = '✓ 送信しました。WEBサイトURLで見られます:';
+  // 会議(案C): これは「拡張なしで他人に共有」用の URL(スナップショット)。本人がリアルタイムで
+  //   見るなら「応援ライブビューを開く」=取り違えないよう「共有URL」と明記。
+  head.textContent = '✓ 共有URLを作りました(拡張なしのスマホ/他人でも見られます):';
   head.style.marginBottom = '6px';
   resultEl.appendChild(head);
 
