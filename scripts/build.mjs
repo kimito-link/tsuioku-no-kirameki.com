@@ -1,5 +1,15 @@
 import * as esbuild from 'esbuild';
 
+// .env を読み込む(status の共有キー NL_STATUS_INGEST_KEY / NL_STATUS_VIEW_TOKEN は .env から注入)。
+//   ★これが無いと `npm run build` が空キービルドになり、status の「WEBサイトURLで共有」ボタンが
+//   出ない/効かない(getUploadConfig が空を返す)。過去に踏んだ轍の再発防止。
+//   Node 20.6+ の process.loadEnvFile を使用(.env が無い等の失敗は無視=CI/release は環境変数で渡す)。
+try {
+  if (typeof process.loadEnvFile === 'function') process.loadEnvFile();
+} catch {
+  /* .env が無い/読めない時は無視(CI/release は環境変数で渡す想定) */
+}
+
 /**
  * ビルド時刻（JST, MMDD-HHmmss）を返す。popup の `NL_BUILD_ID` に埋め込み、
  * 「chrome://extensions の更新を押したら本当に新しい bundle が反映されたか」を

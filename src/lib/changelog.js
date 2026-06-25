@@ -26,6 +26,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.944',
+    date: '2026-06-25',
+    summary: '共有を押すと「そっくりの画面URL」を大きく表示',
+    items: Object.freeze([
+      '「🔗 WEBサイトURLで共有」を押した後、「✓ これが そっくりの画面URLです」と見出しを出し、URL本文を枠付きで大きく表示するようにしました。「🪞 そっくりの画面を開く」「📋 URLをコピー」のボタンも添えています(押しても何が起きたか分からない、を解消)。',
+      'ビルドが共有キー(.env)を確実に読み込むようにしました。以前はビルドの仕方によってキーが空になり、共有ボタンが出ない/効かないことがありました。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.943',
     date: '2026-06-25',
     summary: 'WEBサイトURL共有でポップアップそっくりを開く',
