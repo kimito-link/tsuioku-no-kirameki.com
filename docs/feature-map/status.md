@@ -23,6 +23,7 @@ graph LR
   n_status --> n_src_lib_broadcasterReputationKeywords_js["lib/broadcasterReputationKeywords.js"]
   n_status --> n_src_lib_broadcasterReputationView_js["lib/broadcasterReputationView.js"]
   n_status --> n_src_lib_chikuranCard_js["lib/chikuranCard.js"]
+  n_status --> n_src_lib_chikuranHeaderDom_js["lib/chikuranHeaderDom.js"]
   n_status --> n_src_lib_commentSummary_js["lib/commentSummary.js"]:::shared
   n_status --> n_src_lib_deriveAvatarUrlFromUid_js["lib/deriveAvatarUrlFromUid.js"]:::shared
   n_status --> n_src_lib_formatOfficialStreamAgeMinutes_js["lib/formatOfficialStreamAgeMinutes.js"]:::shared
@@ -52,8 +53,7 @@ graph LR
   n_status --> n_src_lib_statCardsMirror_js["lib/statCardsMirror.js"]:::shared
   n_status --> n_src_lib_statCardsMirrorDom_js["lib/statCardsMirrorDom.js"]
   n_status --> n_src_lib_statCardsMirrorKey_js["lib/statCardsMirrorKey.js"]:::shared
-  n_status --> n_src_lib_statusActionAdvisor_js["lib/statusActionAdvisor.js"]
   classDef shared fill:#eee,stroke:#999,color:#666;
 ```
 
-> ほか 24 ファイル省略（全件は storage-bus.md / metafile 参照）。
+> ほか 25 ファイル省略（全件は storage-bus.md / metafile 参照）。

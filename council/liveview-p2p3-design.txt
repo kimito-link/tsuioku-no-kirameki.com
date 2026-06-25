@@ -1,0 +1,48 @@
+お題: 純Web /live-view?v= を popup そっくりにする TDD 実装の P2(配信者カード)と P3(応援者ランキング)を、最小・確実・ミスなく実装する方式を1つに決めたい。P0/P1(数字カード)は完了済み・実機確認済み。
+
+== 確定済みの事実(実コードで裏取り済み・推測しないこと) ==
+【送信データ jsonBlob の内訳】
+- 送信される jsonBlob = generatedAt / overview / lives / fastDiag / laneMirror / statCardsMirror の6フィールド。
+- api/status.js は payload を v 削除のみで丸ごと保存=新フィールド追加はサーバー無変更。
+- lives[0] の16フィールド = lv, broadcasterName, title, thumbnailUrl, recordedCount, officialCommentCount,
+  officialRatePct, watchCount, adPoints, giftPoints, elapsedSec, capturedAt, lastIngestAgoMs, perfDiag, endedAt, recording。
+
+【P2 配信者カードの新発見(調査の partially-wrong を訂正)】
+- 拡張内 popup/status の配信者カードは buildChikuranHeaderEl(status-entry.js:1679) が描く。
+- その入力は buildChikuranCardModel(live)=【src/lib/chikuranCard.js の純関数・chrome 非依存】。
+- buildChikuranCardModel が読むフィールド(broadcasterName/title/thumbnailUrl/watchCount/giftPoints/elapsedSec/
+  recordedCount/endedAt 等)は【全部 lives[0] に既にある】=★P2 は新規送信データ追加が【不要】。lives[0] を使えばよい。
+- ただし buildChikuranHeaderEl 自体は status-entry.js 内のローカル関数(DOM 生成・chrome 非依存だが lib に未抽出)。
+  純Web から再利用するには、P0 と同じく DOM ビルダーを共有 lib に無挙動抽出する必要がある。
+
+【P3 応援者ランキング】
+- 応援者ランキング(顔つき)は v0.1.937 で status に実装済み= reportPreview.topSupporters →
+  supporterRowToPersonTile(純関数)→ buildPersonTileEl(純関数・chrome 非依存)。
+- ★reportPreview は jsonBlob に【含まれていない】(KEY_REPORT_PREVIEW で storage 経由・15秒 throttle)。
+  =P3 は topSupporters(上位10件・rank/userId/name/avatarUrl/count/isAnonymous)を jsonBlob に【送信追加が必要】。
+- 送信は status-entry.js の jsonBlob 組み立て(991行付近)に1フィールド足す+鮮度のため capturedAt/liveId 同梱。
+
+== 論点(ここを決める) ==
+P2:
+- (P2-a) buildChikuranHeaderEl を src/lib/chikuranHeaderDom.js に無挙動抽出し、status と純Webで共有再利用するか?
+  (P0 と同じ流儀=似せて自作しない・popup と一致)。それとも純Web側で別途軽い配信者ヘッダを書くか(=アレンジ риск)?
+- 配信者カードのサムネ(thumbnailUrl)は外部CDN。純Webで referrerPolicy=no-referrer で出るか(personTileのアバターと同じ)?
+P3:
+- (P3-a) jsonBlob に topSupporters を相乗りするとき、容量(上位10件 cap)と鮮度(capturedAt)の扱い。
+  laneMirror/statCardsMirror で 512KB cap 半減の既知リスクがある=ランキング追加で payload 肥大しないか?
+- (P3-b) 純Web側の描画は status の buildSupporterExpander と同じ supporterRowToPersonTile→buildPersonTileEl を
+  共有 lib 経由で再利用するか(=v0.1.937 と同一見た目)。匿名 identicon は chrome.runtime.getURL 非依存の displaySrc をそのまま。
+- 個人情報(数値IDユーザーを公開URLに出す)は OSINT 範囲で既に公開可([[project_liveview_web_public]])=確認不要。
+
+== 各メンバーへ: この型で答えてほしい(P2 と P3 を分けて) ==
+- 結論: P2/P3 それぞれ、どの方式か・1行で
+- 根拠: なぜそれが最小・確実・ミスなく popup そっくりを満たすか
+- 反論・リスク: 送信追加の要否/payload 肥大/サムネ CDN/「似せて自作」化/storage read増/鮮度取り違え を正直に
+- 具体案: 触る画面・TDD の順(テスト先行→実装→verify)・検証方法
+
+== 制約(過剰実装を避ける) ==
+- 単純だが確実に。本物の描画関数を共有 lib に抽出して再利用(似せて自作しない)を最優先。
+- P0/P1 で確立した型(純DOMビルダーを lib に抽出→status と純Web で共有→特性テスト+ネガコン→verify:cc 緑→実機目視)を踏襲。
+- 純Web の画像は絶対 /app/ パス(P1 の轍=relative は /images/ で404)。
+- storage read を増やす案・payload を肥大させる案は反論欄で自己申告。
+- 拡張内 live-view(iframe)・popup 本体・会場・既存の応援レーン/数字カードを壊さない。

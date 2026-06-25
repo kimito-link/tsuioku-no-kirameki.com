@@ -50,11 +50,102 @@
   - `index.html`
   - `live-view.html`
   - `live-view.js` — 純Web版 応援ライブビュー(拡張なし・PC/スマホ共通レスポンシブ)。
-- 📁 **docs/** (71)
-  - 📁 **article-assets/** (3)
+- 📁 **docs/** (157)
+  - 📁 **article-assets/** (87)
+    - 📁 **venue-frames/** (12)
+      - `f01.png`
+      - `f02.png`
+      - `f03.png`
+      - `f04.png`
+      - `f05.png`
+      - `f06.png`
+      - `f07.png`
+      - `f08.png`
+      - `f09.png`
+      - `f10.png`
+      - `f11.png`
+      - `f12.png`
+    - 📁 **venue-frames-v743/** (66)
+      - 📁 **streak/** (2)
+        - `s00-crop.png`
+        - `s00.png`
+      - `_concat.txt`
+      - `_fwd.mp4`
+      - `_gconcat.txt`
+      - `_gfwd.mp4`
+      - `_grev.mp4`
+      - `_rev.mp4`
+      - `_vconcat.txt`
+      - `_vfwd.mp4`
+      - `_vrev.mp4`
+      - `bubble-fix.jpeg`
+      - `f00.png`
+      - `f01.png`
+      - `f02.png`
+      - `f03.png`
+      - `f04.png`
+      - `f05.png`
+      - `f06.png`
+      - `f07.png`
+      - `f08.png`
+      - `f09.png`
+      - `f10.png`
+      - `f11.png`
+      - `f12.png`
+      - `f13.png`
+      - `f14.png`
+      - `f15.png`
+      - `film-check-crop.png`
+      - `film-check.jpeg`
+      - `g00.png`
+      - `g01.png`
+      - `g02.png`
+      - `g03.png`
+      - `g04.png`
+      - `g05.png`
+      - `g06.png`
+      - `g07.png`
+      - `g08.png`
+      - `g09.png`
+      - `g10.png`
+      - `g11.png`
+      - `g12.png`
+      - `g13.png`
+      - `g14.png`
+      - `g15.png`
+      - `out-crowd-a.png`
+      - `out-crowd-b.png`
+      - `ov-a.png`
+      - `ov-b.png`
+      - `probe-crop.png`
+      - `probe-crop2.png`
+      - `probe-cropZoom.png`
+      - `probe.png`
+      - `residents-crop.png`
+      - `residents-crop2.png`
+      - `residents-edges.jpeg`
+      - `residents.jpeg`
+      - `venue-living-crowd.mp4`
+      - `venue-living-overview.mp4`
+      - `venue-living-vip.mp4`
+      - `vip-check-crop.png`
+      - `vip-check.png`
+      - `vip-check2-crop.png`
+      - `vip-check2.png`
+      - `vip-frame.png`
+    - 📁 **voice/** (5)
+      - `line1.wav`
+      - `line2.wav`
+      - `line3.wav`
+      - `line4.wav`
+      - `venue-voice-track.wav`
+    - `hasanmap-osint-20260611.png`
     - `venue-mode-sound.mp4`
     - `venue-mode.gif`
     - `venue-mode.mp4`
+  - 📁 **article-drafts/** (2)
+    - `hasanmap-osint-20260611-copy.txt`
+    - `hasanmap-osint-20260611.md`
   - 📁 **feature-map/** (13)
     - `backfill-sw.md`
     - `comeview.md`

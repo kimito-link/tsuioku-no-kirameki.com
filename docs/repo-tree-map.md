@@ -23,11 +23,12 @@ graph LR
   ROOT --> d2["council/ 〔会議/設計〕"]
   ROOT --> d3["docs/ 〔設計/レポート〕"]
   d3 --> d3_0["article-assets/ 〔記事/画像〕"]
-  d3 --> d3_1["feature-map/ 〔依存図/自動生成〕"]
-  d3 --> d3_2["policies/ 〔方針〕"]
-  d3 --> d3_3["releases/ 〔リリース〕"]
-  d3 --> d3_4["research/ 〔調査/レポート〕"]
-  d3 --> d3_5["workflows/ 〔ワークフロー〕"]
+  d3 --> d3_1["article-drafts/"]
+  d3 --> d3_2["feature-map/ 〔依存図/自動生成〕"]
+  d3 --> d3_3["policies/ 〔方針〕"]
+  d3 --> d3_4["releases/ 〔リリース〕"]
+  d3 --> d3_5["research/ 〔調査/レポート〕"]
+  d3 --> d3_6["workflows/ 〔ワークフロー〕"]
   ROOT --> d4["extension/ 〔配布/manifest〕"]
   d4 --> d4_0["dist/ 〔ビルド成果物〕"]
   d4 --> d4_1["images/ 〔画像〕"]
@@ -190,9 +191,10 @@ graph LR
 <sub>ファイル 64 件</sub>
 
 ## `docs/` — 設計正本・マインドマップ・フロー図・feature-map(AI/人間向け)  〔設計 / レポート〕
-<sub>ファイル 71 件</sub>
+<sub>ファイル 157 件</sub>
 
-- `article-assets/`（3 件） — 記事用の画像・動画・音声アセット  〔記事 / 画像〕
+- `article-assets/`（87 件） — 記事用の画像・動画・音声アセット  〔記事 / 画像〕
+- `article-drafts/`（2 件） — ⚠️ 未記入（ROLES に追記）
 - `feature-map/`（13 件） — 機能ごと依存図(自動生成)。誰が storage を書き/読むか  〔依存図 / 自動生成〕
 - `policies/`（1 件） — 運用方針メモ(統計の失敗モード等)  〔方針〕
 - `releases/`（4 件） — リリース関連メモ(CWS 公開 API 設定・版ごとの記事下書き)  〔リリース〕
@@ -478,4 +480,8 @@ esbuild の import 到達グラフを逆引きし「このファイルを変え�
 
 ---
 
-✅ すべてのディレクトリに役割が記入済み。
+## ⚠️ 役割が未記入のディレクトリ（1）
+
+以下は `ROLES` 辞書に説明が無い。`scripts/repo-tree-map.mjs` の `ROLES` に1行足してから再生成すること。
+
+- `docs/article-drafts/`

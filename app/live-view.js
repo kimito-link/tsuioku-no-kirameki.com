@@ -32,6 +32,9 @@ import {
 import { paintStatCardsMirrorValues } from '../src/lib/statCardsMirrorDom.js';
 import { buildStatCardsMirrorSignature } from '../src/lib/statCardsMirror.js';
 import { isEpochFresh } from '../src/lib/watchUrlFreshness.js';
+// 配信者カード(ちくらん風ヘッダー): status と同じ本物 buildChikuranHeaderDom を再利用。データは lives[0]。
+import { buildChikuranCardModel } from '../src/lib/chikuranCard.js';
+import { buildChikuranHeaderDom } from '../src/lib/chikuranHeaderDom.js';
 
 const POLL_INTERVAL_MS = 60_000;
 /** 数字カード鏡の鮮度ガード(status-entry.js の MIRROR_FRESH_MS と同値=3分)。 */
@@ -110,9 +113,10 @@ async function refresh(token) {
   }
 }
 
-/** @param {{ generatedAt?: string, laneMirror?: any, statCardsMirror?: any }} jsonBlob */
+/** @param {{ generatedAt?: string, lives?: any[], laneMirror?: any, statCardsMirror?: any }} jsonBlob */
 function render(jsonBlob) {
   hideError();
+  renderBroadcasterCard(Array.isArray(jsonBlob.lives) ? jsonBlob.lives[0] : null);
   renderStatCardsMirror(jsonBlob.statCardsMirror || null);
   renderLaneMirror(jsonBlob.laneMirror || null);
   const stamp = document.getElementById('updatedAt');
@@ -122,6 +126,33 @@ function render(jsonBlob) {
       ? `最終送信 ${String(t.getHours()).padStart(2, '0')}:${String(t.getMinutes()).padStart(2, '0')}`
       : '';
   }
+}
+
+/**
+ * 配信者カード: popup 上部の配信者ヘッダー(サムネ+名前+タイトル+メトリクス)をそっくり描く。
+ *   status-entry.js#buildChikuranHeaderEl と同じ recipe(本物 buildChikuranCardModel→buildChikuranHeaderDom)。
+ *   データは送信済みの lives[0]。lv が無い(配信無し)なら hidden。鮮度ガードは lives[].capturedAt で。
+ * @param {any} live lives[0]
+ */
+function renderBroadcasterCard(live) {
+  const section = document.getElementById('broadcasterCardLane');
+  const host = document.getElementById('broadcasterCardHost');
+  if (!section || !host) return;
+  const model = buildChikuranCardModel(live);
+  if (!model) {
+    section.hidden = true;
+    host.replaceChildren();
+    return;
+  }
+  // 鮮度ガード(数字カードと同型): capturedAt が古い=配信終了後の残骸=隠す。
+  const capturedAt = Number(live && live.capturedAt);
+  if (capturedAt && !isEpochFresh(capturedAt, Date.now(), MIRROR_FRESH_MS)) {
+    section.hidden = true;
+    host.replaceChildren();
+    return;
+  }
+  section.hidden = false;
+  host.replaceChildren(buildChikuranHeaderDom(model));
 }
 
 /**

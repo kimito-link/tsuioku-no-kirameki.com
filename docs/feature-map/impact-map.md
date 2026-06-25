@@ -268,6 +268,7 @@
 | `src/lib/channelBroadcasterMeta.js` | 1 | 記録エンジン(watchページ常駐) |
 | `src/lib/cheerPalette.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/chikuranCard.js` | 1 | 状態速報ページ |
+| `src/lib/chikuranHeaderDom.js` | 1 | 状態速報ページ |
 | `src/lib/cleanNdgrChatRows.js` | 1 | 記録エンジン(watchページ常駐) |
 | `src/lib/comeviewActions.js` | 1 | コメビュ(別窓) |
 | `src/lib/comeviewInstantRender.js` | 1 | コメビュ(別窓) |
