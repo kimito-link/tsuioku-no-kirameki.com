@@ -531,6 +531,9 @@ import { KEY_LANE_MIRROR } from '../lib/laneMirrorKey.js';
 import { buildLaneMirrorSnapshot } from '../lib/laneMirror.js';
 import { KEY_STAT_CARDS_MIRROR } from '../lib/statCardsMirrorKey.js';
 import { buildStatCardsMirrorSnapshot } from '../lib/statCardsMirror.js';
+// 北極星レーン鏡(公式値レーン)を status→純Web へ送るための publish(laneMirror/statCardsMirror と同じ轍)。
+import { KEY_NORTH_STAR_MIRROR } from '../lib/northStarMirrorKey.js';
+import { buildNorthStarMirrorSnapshot } from '../lib/northStarMirror.js';
 import { isAvatarObservedInCommentProfileMap } from '../lib/popupAvatarResolver.js';
 import {
   normalizeLv,
@@ -5415,6 +5418,29 @@ function publishStatCardsMirror(input) {
   }
 }
 
+/** 北極星レーン鏡の publish min-gap 計時。 */
+let _northStarMirrorLastWriteAt = 0;
+/**
+ * 北極星レーン鏡(まず contributionRanking=ギフト貢献度)を status→純Web 用に publish する。
+ *   publishStatCardsMirror と同型: 受動ビュー(INLINE_PASSIVE)では書かない・3秒 min-gap・best-effort・描画不変。
+ *   popup が既に計算済みの rows を渡すだけ(再解決しない)。
+ * @param {{ liveId?: string, contributionRanking?: any[] }} input
+ */
+function publishNorthStarMirror(input) {
+  if (INLINE_PASSIVE) return; // 受動ビュー: 北極星レーン鏡を上書きしない
+  try {
+    const now = Date.now();
+    if (now - _northStarMirrorLastWriteAt < 3000) return; // 3秒 min-gap。
+    _northStarMirrorLastWriteAt = now;
+    const snap = buildNorthStarMirrorSnapshot(input, now);
+    void chrome.storage.local.set({ [KEY_NORTH_STAR_MIRROR]: snap }).catch(() => {
+      /* best-effort: storage 不可・context 消失 */
+    });
+  } catch {
+    /* no-op */
+  }
+}
+
 function renderStoryAvatarDiag() {
   const el = /** @type {HTMLElement|null} */ ($('storyAvatarDiag'));
   const elDev = /** @type {HTMLElement|null} */ ($('storyAvatarDiagDevMonitor'));
@@ -9702,6 +9728,8 @@ async function refreshNorthStarContributionRankingLaneAsync(liveId) {
       isNorthStarBody: true,
       freshnessNote
     });
+    // 北極星レーン鏡を status→純Web 用に publish(popup が描いた top10 をそのまま・描画不変・best-effort)。
+    publishNorthStarMirror({ liveId: String(liveId || '').trim().toLowerCase(), contributionRanking: top10 });
     return;
   }
   // ranking 取れない時は既存 host class を付け直して reason 経由 placeholder へ。

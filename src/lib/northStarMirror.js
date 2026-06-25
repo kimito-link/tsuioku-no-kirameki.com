@@ -19,26 +19,37 @@
 const NORTH_STAR_LANE_ROW_CAP = 10;
 
 /**
- * @typedef {{ rank: number, userId: string, name: string, avatarUrl: string, count: number }} NorthStarMirrorRow
+ * ★row の正本フィールドは officialDomRankingRowsToStripRooms(src/lib)が読むものに【完全一致】させる。
+ *   そこは name(+alt) / contribution / thumbnailUrl / rank / isAnonymous / userPageUrl を読む。
+ *   勝手に count/avatarUrl にリネームすると純Web の描画が popup とズレる(=似せて自作の轍)。
+ *   だから「そのまま間引く(必要フィールドだけ verbatim 抽出)」=純Web で同じ関数に渡せば byte 一致。
+ * @typedef {{ rank?: number, name?: string, contribution?: number, thumbnailUrl?: string, isAnonymous?: boolean, userPageUrl?: string }} NorthStarMirrorRow
  * @typedef {{ liveId: string, capturedAt: number, lanes: { contributionRanking: NorthStarMirrorRow[] } }} NorthStarMirrorSnapshot
  */
 
-/** 1 row を paint が必要とするフィールドだけに絞る(JSON-safe)。 */
-function toMirrorRow(/** @type {any} */ r, /** @type {number} */ i) {
-  return {
-    rank: Number(r?.rank) || i + 1,
-    userId: String(r?.userId || '').trim(),
-    // 表示名は name 優先・無ければ nickname(officialDomRankingRowsToStripRooms と同じ拾い方)。
-    name: String(r?.name || r?.nickname || '').trim(),
-    avatarUrl: String(r?.avatarUrl || r?.thumbnailUrl || '').trim(),
-    count: Number(r?.count) || 0
-  };
+/** 1 row を officialDomRankingRowsToStripRooms が読むフィールドだけに絞る(verbatim・JSON-safe)。 */
+function toMirrorRow(/** @type {any} */ r) {
+  const row = r && typeof r === 'object' ? r : {};
+  const out = /** @type {NorthStarMirrorRow} */ ({});
+  // officialDomRankingRowsToStripRooms / pickOfficialRankDisplayName が読むフィールドを verbatim 保持。
+  if (typeof row.rank === 'number' && Number.isFinite(row.rank)) out.rank = row.rank;
+  out.contribution = Number(row.contribution) || 0;
+  out.thumbnailUrl = String(row.thumbnailUrl ?? '').trim();
+  out.isAnonymous = Boolean(row.isAnonymous);
+  const upu = String(row.userPageUrl ?? '').trim();
+  if (upu) out.userPageUrl = upu;
+  // 表示名: name + alt フォールバック群(pickOfficialRankDisplayName と同じ)を拾える分だけ。
+  for (const f of ['name', 'thumbnailAltName', 'thumbnailAlt', 'avatarAlt', 'imageAlt', 'alt']) {
+    const s = String(row[f] == null ? '' : row[f]).trim();
+    if (s) { out.name = s; break; }
+  }
+  return out;
 }
 
 /** @param {unknown} rows @returns {NorthStarMirrorRow[]} */
 function capRows(rows) {
   const list = Array.isArray(rows) ? rows : [];
-  return list.slice(0, NORTH_STAR_LANE_ROW_CAP).map(toMirrorRow);
+  return list.slice(0, NORTH_STAR_LANE_ROW_CAP).map((r) => toMirrorRow(r));
 }
 
 /**
