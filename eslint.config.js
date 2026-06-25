@@ -72,8 +72,10 @@ export default [
     // v0.1.858: レポートプレビュー機能のロジックは新規モジュール(reportPreview*.js)へ抽出済み。
     //   popup 側に残るのは「import + paint ループでの呼び出し」の最小フック3行のみ=21025→21028。
     // 2026-06-25: countUniqueAvatarEntries を src/lib/avatarEntryCounts.js へ抽出=21028→21012 に下げ。
+    // 2026-06-25: 北極星レーン鏡を純Webへ送る publishNorthStarMirror(chrome.storage I/O グルー=lib抽出不可)を
+    //   追加=21012→21040(意図した機能追加・レビュー済み例外)。純関数 buildNorthStarMirrorSnapshot は lib 側。
     files: ['src/extension/popup-entry.js'],
-    rules: { 'max-lines': ['error', { max: 21012, skipBlankLines: false, skipComments: false }] }
+    rules: { 'max-lines': ['error', { max: 21040, skipBlankLines: false, skipComments: false }] }
   },
   {
     files: ['src/extension/content-entry.js'],

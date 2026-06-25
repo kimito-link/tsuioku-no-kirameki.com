@@ -50,6 +50,8 @@ import { KEY_STAT_CARDS_MIRROR } from '../lib/statCardsMirrorKey.js';
 import { buildStatCardsMirrorSignature } from '../lib/statCardsMirror.js';
 // 数字カード鏡の値セット(純DOMビルダー)。status と 純Web(app/live-view)で共有=似せて自作しない。
 import { paintStatCardsMirrorValues } from '../lib/statCardsMirrorDom.js';
+// 北極星レーン鏡(公式値レーン): popup→storage(KEY_NORTH_STAR_MIRROR)を status が読んで純Webへ相乗り送信。
+import { KEY_NORTH_STAR_MIRROR } from '../lib/northStarMirrorKey.js';
 import {
   paintStoryUserLaneDomFilled,
   paintStoryUserLaneDomEmptyGuides
@@ -141,13 +143,14 @@ let _refreshTimerId = /** @type {number|null} */ (null);
 //   storage を読むと重い=12 秒間引きでキャッシュし、間は前回値を再利用(コア表示は毎回更新のまま)。
 const EXTRAS_REFETCH_MS = 12000;
 let _extrasCacheAt = 0;
-let _extrasCache = /** @type {{reportPreview:any, watchTabMap:any, trendFindings:any[], laneDiag:any, laneMirror:any, statCardsMirror:any, voiceDiag:any, venueSeatsDiag:any}} */ ({
+let _extrasCache = /** @type {{reportPreview:any, watchTabMap:any, trendFindings:any[], laneDiag:any, laneMirror:any, statCardsMirror:any, northStarMirror:any, voiceDiag:any, venueSeatsDiag:any}} */ ({
   reportPreview: null,
   watchTabMap: new Map(),
   trendFindings: [],
   laneDiag: null,
   laneMirror: null,
   statCardsMirror: null,
+  northStarMirror: null,
   // v0.1.924: voiceDiag/venueSeatsDiag も毎回 read から 12秒間引きへ(下記の真因対応)。
   voiceDiag: null,
   venueSeatsDiag: null
@@ -360,13 +363,16 @@ async function refresh(opts = {}) {
       // 数字カード鏡も extras に同梱=毎回の直列 read を増やさず12秒間引きで読む(診断は軽さ最優先)。
       step = 'loadStatCardsMirrorSafe';
       const statCardsMirror = await runStorageOpWithTimeout(() => loadStatCardsMirrorSafe(), tmo).catch(() => null);
-      _extrasCache = { reportPreview, watchTabMap, trendFindings, laneDiag, laneMirror, statCardsMirror, voiceDiag, venueSeatsDiag };
+      // 北極星レーン鏡(公式値レーン)も extras に同梱=毎回の直列 read を増やさず12秒間引きで読む。
+      step = 'loadNorthStarMirrorSafe';
+      const northStarMirror = await runStorageOpWithTimeout(() => loadNorthStarMirrorSafe(), tmo).catch(() => null);
+      _extrasCache = { reportPreview, watchTabMap, trendFindings, laneDiag, laneMirror, statCardsMirror, northStarMirror, voiceDiag, venueSeatsDiag };
       _extrasCacheAt = Date.now();
       _mark('extras');
     }
-    const { reportPreview, watchTabMap, trendFindings, laneDiag, laneMirror, statCardsMirror, voiceDiag, venueSeatsDiag } = _extrasCache;
+    const { reportPreview, watchTabMap, trendFindings, laneDiag, laneMirror, statCardsMirror, northStarMirror, voiceDiag, venueSeatsDiag } = _extrasCache;
     step = 'renderAll';
-    renderAll({ lvList, summaries, fastDiag, popupDiag, backfillProgress, voiceDiag, venueSeatsDiag, laneDiag, laneMirror, statCardsMirror, reportPreview, trendFindings, watchTabMap });
+    renderAll({ lvList, summaries, fastDiag, popupDiag, backfillProgress, voiceDiag, venueSeatsDiag, laneDiag, laneMirror, statCardsMirror, northStarMirror, reportPreview, trendFindings, watchTabMap });
     _mark('render');
     const _totalMs = Math.round((typeof performance !== 'undefined' ? performance.now() : Date.now()) - _t0);
     updateLastUpdateMeta({ totalMs: _totalMs, stepMs: _stepMs });
@@ -674,6 +680,16 @@ async function loadStatCardsMirrorSafe() {
   }
 }
 
+/** 北極星レーン鏡(公式値レーン)を読む。popup が KEY_NORTH_STAR_MIRROR へ publish。extras(12秒)で読む。 */
+async function loadNorthStarMirrorSafe() {
+  try {
+    const bag = await chrome.storage.local.get(KEY_NORTH_STAR_MIRROR);
+    return bag?.[KEY_NORTH_STAR_MIRROR] || null;
+  } catch {
+    return null;
+  }
+}
+
 // v0.1.858: レポート(HTML/マーケ/メディアキット)の DL前 主要KPI を読む。popup が
 //   KEY_REPORT_PREVIEW へ定期(15秒)に書く。古い snapshot(2分超)や popup 未起動なら null=表示しない。
 async function loadReportPreviewSafe() {
@@ -762,7 +778,7 @@ async function loadBackfillProgressSafe() {
 // v0.1.861: レポートプレビューの信頼度注釈の文脈は純関数 reportPreviewCtxFromFastDiag(src/lib)に抽出済み
 //   (NDGR 接続/userId 付き率/backfill 進行 → 注釈ctx・挙動同値・テストで固定)。import は冒頭。
 
-function renderAll({ lvList, summaries, fastDiag, popupDiag, backfillProgress, voiceDiag, venueSeatsDiag, laneDiag, laneMirror, statCardsMirror, reportPreview, trendFindings, watchTabMap }) {
+function renderAll({ lvList, summaries, fastDiag, popupDiag, backfillProgress, voiceDiag, venueSeatsDiag, laneDiag, laneMirror, statCardsMirror, northStarMirror, reportPreview, trendFindings, watchTabMap }) {
   // v0.1.847: 各描画セクションを独立 try/catch で隔離するヘルパ。1つが throw しても他のセクションと
   //   最終更新メタを巻き込まない=「セルが全部消える/最終更新—のまま固まる」を根治。落ちた場所は
   //   console と AI 共有欄に出して真因を追えるようにする(star-romi 失敗体験の除去)。
@@ -1012,6 +1028,9 @@ function renderAll({ lvList, summaries, fastDiag, popupDiag, backfillProgress, v
       //   で描く(council/liveview-web-public-SYNTHESIS.md)。popup 未起動なら null=純Web側は空ガイドにフォールバック。
       laneMirror: laneMirror || null,
       statCardsMirror: statCardsMirror || null,
+      // 2026-06-25(C1): 北極星レーン鏡(公式値レーン・まず contributionRanking=ギフト貢献度)を純Webへ相乗り。
+      //   popup が KEY_NORTH_STAR_MIRROR へ publish→status が extras(12秒)で読む→純Web が本物 paint で描く。
+      northStarMirror: northStarMirror || null,
       // 2026-06-25(P3): 応援者ランキング(顔つき)を純Webにも出すため、reportPreview の上位応援者を相乗り送信。
       //   liveId 同梱で鮮度/対象配信を判定。reportPreview が無い(popup 未起動等)なら null=純Web側は hidden。
       //   上位10件 cap で小さい(payload 実測131KB=512KB cap の25%・肥大しない)。

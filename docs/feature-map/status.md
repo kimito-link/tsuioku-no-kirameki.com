@@ -6,7 +6,7 @@
 ## storage の出入り
 
 - 書くキー: `KEY_STATUS_TREND`
-- 読むキー: `KEY_AI_SHARE_POPUP_DIAG`, `KEY_LANE_DIAG`, `KEY_LANE_MIRROR`, `KEY_LAST_WATCH_URL`, `KEY_REPORT_PREVIEW`, `KEY_STATUS_FAST_DIAG_LITE`, `KEY_STATUS_TREND`, `KEY_STAT_CARDS_MIRROR`, `KEY_VENUE_SEATS_DIAG`, `KEY_VOICE_DIAG`, `nls_backfill_progress_v1`
+- 読むキー: `KEY_AI_SHARE_POPUP_DIAG`, `KEY_LANE_DIAG`, `KEY_LANE_MIRROR`, `KEY_LAST_WATCH_URL`, `KEY_NORTH_STAR_MIRROR`, `KEY_REPORT_PREVIEW`, `KEY_STATUS_FAST_DIAG_LITE`, `KEY_STATUS_TREND`, `KEY_STAT_CARDS_MIRROR`, `KEY_VENUE_SEATS_DIAG`, `KEY_VOICE_DIAG`, `nls_backfill_progress_v1`
 
 ## 構成ファイル（import 到達・最大40件表示）
 
@@ -39,6 +39,7 @@ graph LR
   n_status --> n_src_lib_metricConfidence_js["lib/metricConfidence.js"]:::shared
   n_status --> n_src_lib_nicoAnonymousDisplay_js["lib/nicoAnonymousDisplay.js"]:::shared
   n_status --> n_src_lib_nicoUserPage_js["lib/nicoUserPage.js"]:::shared
+  n_status --> n_src_lib_northStarMirrorKey_js["lib/northStarMirrorKey.js"]:::shared
   n_status --> n_src_lib_numberConsistency_js["lib/numberConsistency.js"]
   n_status --> n_src_lib_officialNicoStatsStripDigest_js["lib/officialNicoStatsStripDigest.js"]:::shared
   n_status --> n_src_lib_panelLiveSummary_js["lib/panelLiveSummary.js"]:::shared
@@ -52,8 +53,7 @@ graph LR
   n_status --> n_src_lib_resolveVisitorCount_js["lib/resolveVisitorCount.js"]
   n_status --> n_src_lib_statCardsMirror_js["lib/statCardsMirror.js"]:::shared
   n_status --> n_src_lib_statCardsMirrorDom_js["lib/statCardsMirrorDom.js"]
-  n_status --> n_src_lib_statCardsMirrorKey_js["lib/statCardsMirrorKey.js"]:::shared
   classDef shared fill:#eee,stroke:#999,color:#666;
 ```
 
-> ほか 26 ファイル省略（全件は storage-bus.md / metafile 参照）。
+> ほか 27 ファイル省略（全件は storage-bus.md / metafile 参照）。

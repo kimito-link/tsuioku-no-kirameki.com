@@ -53,5 +53,21 @@ api/status.js は payload を v 削除のみで丸ごと保存=新フィール�
 - リアルタイム vs スナップショット取り違え: 純Webは既存の「最終送信 HH:MM」表示で明示。
 - 個人情報の公開: OSINT 範囲で公開可([[project_liveview_web_public]] で確定済み)。
 
+## 実装進捗
+
+- ✅ **P0 完了**(v0.1.938 内・dbc相当): renderStatCardsMirror の値セットを src/lib/statCardsMirrorDom.js
+  (paintStatCardsMirrorValues・純DOM・chrome非依存)へ無挙動抽出。特性テスト7本。status は import して使う。
+- ✅ **P1 完了**(v0.1.939・89c88fd0 + 画像パス修正 47772278): 純Web /live-view に数字カードを描画。
+  status.html の DOM/CSS を verbatim 移植・本物 paintStatCardsMirrorValues 再利用・鮮度/signature ガード同型。
+  ★実機確認済(deploy 後・記録1,959/同接~261/来場1,527/公式チップ5つ・キャラアイコン3枚)。
+  ★画像パス問題=relative `images/yukkuri/` は /live-view(ルート)で /images/ に解決され404→絶対 /app/images/ に修正。
+  これで数字カードアイコンも pre-existing の応援レーン顔割れも両方直った(naturalWidth 0→1500 実機確認)。
+- ⏭ **P2 未着手**: 配信者カード(broadcasterCard を jsonBlob に送信+純Web描画)。
+- ⏭ **P3 未着手**: 応援者ランキング(reportPreview.topSupporters を jsonBlob に送信+純Web描画)。
+- ⏭ **P4 未着手**: 整合・無駄送信掃除。
+
+★教訓(P1)=純Web(vercel rewrite 配下・/live-view=ルート)の画像/スクリプトは必ず絶対 /app/ パス。
+relative は /images/ /dist/ に解決され 404。dist/app.js を /app/dist/ にした v0.1.932 と同じ轍。
+
 ---
-*ultracode 調査+設計: 2026-06-25 / Claude Opus 統合 / 実装は P0 から TDD で着手*
+*ultracode 調査+設計: 2026-06-25 / Claude Opus 統合 / P0+P1 完了(実機確認済)・P2-P4 は次セッション*
