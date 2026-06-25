@@ -47,3 +47,6 @@ tmp-video-frames/
 新しいフォルダー */
 test-results/
 playwright-report/
+
+.vercel
+.env*.local
