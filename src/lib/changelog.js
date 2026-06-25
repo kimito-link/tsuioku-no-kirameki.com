@@ -26,6 +26,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.941',
+    date: '2026-06-25',
+    summary: '共有URLのWeb版に「応援者ランキング」を顔つきで追加',
+    items: Object.freeze([
+      '「WEBサイトURLで共有」で開く共有ページ(拡張なしで見られるWeb版)に、応援者ランキング(🥇🥈🥉)を、サムネイル・ID・ハンドル名・リンク付きの「顔つき」で表示するようにしました。配信者カード・数字カードに続き、ポップアップにかなり近づきました。',
+      'ランキングは本物のポップアップと同じ描画部品を共有しているので見た目が一致します。匿名の応援者も識別アイコン付きで出します。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.940',
     date: '2026-06-25',
     summary: '共有URLのWeb版に「配信者カード」をポップアップそっくり追加',

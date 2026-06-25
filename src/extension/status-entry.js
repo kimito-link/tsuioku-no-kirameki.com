@@ -61,6 +61,8 @@ import { upgradeAnonymousAvatarImage } from '../lib/avatarPartsComposer.js';
 // 応援者ランキングを本物の人物タイル(サムネ・ID・名前・リンク)で出すための部品(§3.5)。
 import { buildPersonTileEl } from '../lib/personTileDom.js';
 import { supporterRowToPersonTile } from '../lib/supporterRowToPersonTile.js';
+// 応援者ランキングの行リスト(本物タイル・status と純Web で共有=似せて自作しない)。
+import { buildSupporterRankingRows } from '../lib/supporterRankingDom.js';
 import { deriveAvatarUrlFromUid } from '../lib/deriveAvatarUrlFromUid.js';
 import { anonymousIdenticonDataUrl } from '../lib/anonymousIdenticon.js';
 import { storyUserLaneMetaLines } from '../lib/storyUserLaneMeta.js';
@@ -186,6 +188,13 @@ const _supporterTileIo = {
   deriveAvatarUrlFromUid: (uid) => deriveAvatarUrlFromUid(uid),
   anonymousIdenticonDataUrl,
   storyUserLaneMetaLines: (entry, httpCandidate) => storyUserLaneMetaLines(entry, httpCandidate)
+};
+/** 応援者ランキングの行リスト DOM ビルダーに渡す I/O(本物 supporterRowToPersonTile→buildPersonTileEl)。 */
+const _supporterRankingDomIo = {
+  supporterRowToPersonTile,
+  buildPersonTileEl,
+  tileIo: _supporterTileIo,
+  domIo: _laneMirrorDomIo
 };
 /** レーン案内(ガイド行)の顔。popup-entry.js:3750-3757 と同じ相対パス=status.html も extension ルート
  *   なので解決する(faceAd は popup と同じくこん太アイコンを流用=popup-entry.js:5130)。 */
@@ -1002,7 +1011,13 @@ function renderAll({ lvList, summaries, fastDiag, popupDiag, backfillProgress, v
       //   サーバー(api/status.js)は payload を丸ごと保存=無変更。純Webは本物の paintStoryUserLaneDomFilled
       //   で描く(council/liveview-web-public-SYNTHESIS.md)。popup 未起動なら null=純Web側は空ガイドにフォールバック。
       laneMirror: laneMirror || null,
-      statCardsMirror: statCardsMirror || null
+      statCardsMirror: statCardsMirror || null,
+      // 2026-06-25(P3): 応援者ランキング(顔つき)を純Webにも出すため、reportPreview の上位応援者を相乗り送信。
+      //   liveId 同梱で鮮度/対象配信を判定。reportPreview が無い(popup 未起動等)なら null=純Web側は hidden。
+      //   上位10件 cap で小さい(payload 実測131KB=512KB cap の25%・肥大しない)。
+      topSupporters: reportPreview && Array.isArray(reportPreview.topSupporters)
+        ? { liveId: String(reportPreview.liveId || ''), rows: reportPreview.topSupporters.slice(0, 10) }
+        : null
     }
   };
 }
@@ -1537,25 +1552,9 @@ function buildSupporterExpander(live, reportPreview) {
   const body = document.createElement('div');
   body.style.cssText = 'margin-top:6px;font-size:13px;';
   if (rows && rows.length) {
-    const medals = ['🥇', '🥈', '🥉'];
-    for (const r of rows.slice(0, 10)) {
-      const row = document.createElement('div');
-      row.style.cssText = 'display:flex;align-items:center;gap:8px;padding:3px 0;';
-      const badge = document.createElement('span');
-      badge.textContent = medals[r.rank - 1] || `${r.rank}.`;
-      badge.style.cssText = 'flex:0 0 auto;width:22px;text-align:center;';
-      // §3.5: 名前+件数だけでなく、サムネ・ID・ハンドル名・リンクをセットで出す(応援者は主役・表彰)。
-      //   本物の buildPersonTileEl(応援レーンと同じ I/O)を再利用=似せて自作しない。匿名は identicon。
-      const tileItem = supporterRowToPersonTile(r, _supporterTileIo);
-      const tile = buildPersonTileEl(tileItem, _laneMirrorDomIo);
-      tile.style.flex = '1 1 auto';
-      tile.style.minWidth = '0';
-      const cnt = document.createElement('span');
-      cnt.textContent = `${Number(r.count || 0).toLocaleString('ja-JP')}件`;
-      cnt.style.cssText = 'flex:0 0 auto;color:var(--nl-text-soft);font-variant-numeric:tabular-nums;';
-      row.append(badge, tile, cnt);
-      body.appendChild(row);
-    }
+    // 行描画は純DOMビルダー buildSupporterRankingRows(src/lib)に抽出済み(挙動同値・テストで固定)。
+    //   純Web(app/live-view)も同じ io(本物 supporterRowToPersonTile→buildPersonTileEl)で再利用=似せて自作しない。
+    body.appendChild(buildSupporterRankingRows(rows, _supporterRankingDomIo));
   } else {
     const hint = document.createElement('div');
     hint.textContent = 'この配信を拡張ポップアップで開くと、応援者ランキングがここに出ます。';

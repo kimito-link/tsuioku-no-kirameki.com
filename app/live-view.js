@@ -35,6 +35,13 @@ import { isEpochFresh } from '../src/lib/watchUrlFreshness.js';
 // 配信者カード(ちくらん風ヘッダー): status と同じ本物 buildChikuranHeaderDom を再利用。データは lives[0]。
 import { buildChikuranCardModel } from '../src/lib/chikuranCard.js';
 import { buildChikuranHeaderDom } from '../src/lib/chikuranHeaderDom.js';
+// 応援者ランキング(顔つき): status と同じ本物の行ビルダー+タイル変換を再利用。データは送信された topSupporters。
+import { buildSupporterRankingRows } from '../src/lib/supporterRankingDom.js';
+import { supporterRowToPersonTile } from '../src/lib/supporterRowToPersonTile.js';
+import { buildPersonTileEl } from '../src/lib/personTileDom.js';
+import { deriveAvatarUrlFromUid } from '../src/lib/deriveAvatarUrlFromUid.js';
+import { anonymousIdenticonDataUrl } from '../src/lib/anonymousIdenticon.js';
+import { storyUserLaneMetaLines } from '../src/lib/storyUserLaneMeta.js';
 
 const POLL_INTERVAL_MS = 60_000;
 /** 数字カード鏡の鮮度ガード(status-entry.js の MIRROR_FRESH_MS と同値=3分)。 */
@@ -68,6 +75,19 @@ const _LANE_FACES = {
   faceAd: '/app/images/yukkuri/konta/kitsune-yukkuri-half-eyes-mouth-closed.png',
   faceKonta: '/app/images/yukkuri/konta/kitsune-yukkuri-half-eyes-mouth-closed.png',
   faceTanu: '/app/images/yukkuri/tanunee/tanuki-yukkuri-half-eyes-mouth-closed.png'
+};
+
+/** 応援者ランキングの行ビルダーに渡す I/O(本物再利用)。tileIo は avatar 導出/meta、domIo は _laneDomIo を流用
+ *   (匿名 identicon は displaySrc をそのまま=upgradeAnonymousAvatarImage を渡さない純Web方針)。 */
+const _supporterRankingDomIo = {
+  supporterRowToPersonTile,
+  buildPersonTileEl,
+  tileIo: {
+    deriveAvatarUrlFromUid: (uid) => deriveAvatarUrlFromUid(uid),
+    anonymousIdenticonDataUrl,
+    storyUserLaneMetaLines: (entry, http) => storyUserLaneMetaLines(entry, http)
+  },
+  domIo: _laneDomIo
 };
 
 bootstrap();
@@ -119,6 +139,7 @@ function render(jsonBlob) {
   renderBroadcasterCard(Array.isArray(jsonBlob.lives) ? jsonBlob.lives[0] : null);
   renderStatCardsMirror(jsonBlob.statCardsMirror || null);
   renderLaneMirror(jsonBlob.laneMirror || null);
+  renderSupporterRanking(jsonBlob.topSupporters || null);
   const stamp = document.getElementById('updatedAt');
   if (stamp) {
     const t = jsonBlob.generatedAt ? new Date(jsonBlob.generatedAt) : null;
@@ -153,6 +174,26 @@ function renderBroadcasterCard(live) {
   }
   section.hidden = false;
   host.replaceChildren(buildChikuranHeaderDom(model));
+}
+
+/**
+ * 応援者ランキング: popup/status と同じ本物の行ビルダー(buildSupporterRankingRows)で🥇🥈🥉を顔つき描画。
+ *   データは送信された topSupporters({ liveId, rows })。rows が空/未送信なら hidden。
+ *   ★status の buildSupporterExpander と同一見た目(v0.1.937)・supporterRowToPersonTile→buildPersonTileEl 再利用。
+ * @param {{ liveId?: string, rows?: any[] }|null} topSupporters
+ */
+function renderSupporterRanking(topSupporters) {
+  const section = document.getElementById('supporterRankingLane');
+  const host = document.getElementById('supporterRankingHost');
+  if (!section || !host) return;
+  const rows = topSupporters && Array.isArray(topSupporters.rows) ? topSupporters.rows : null;
+  if (!rows || !rows.length) {
+    section.hidden = true;
+    host.replaceChildren();
+    return;
+  }
+  section.hidden = false;
+  host.replaceChildren(buildSupporterRankingRows(rows, _supporterRankingDomIo));
 }
 
 /**
