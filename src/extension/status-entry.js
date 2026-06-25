@@ -48,6 +48,8 @@ import { restoreLaneMirrorBuckets } from '../lib/laneMirror.js';
 //   だけ(再計算しない=popup と必ず一致)。応援レーン鏡(KEY_LANE_MIRROR)と同思想・同構造。
 import { KEY_STAT_CARDS_MIRROR } from '../lib/statCardsMirrorKey.js';
 import { buildStatCardsMirrorSignature } from '../lib/statCardsMirror.js';
+// 数字カード鏡の値セット(純DOMビルダー)。status と 純Web(app/live-view)で共有=似せて自作しない。
+import { paintStatCardsMirrorValues } from '../lib/statCardsMirrorDom.js';
 import {
   paintStoryUserLaneDomFilled,
   paintStoryUserLaneDomEmptyGuides
@@ -1300,65 +1302,10 @@ function renderStatCardsMirror(snap) {
   _lastStatCardsMirrorSig = sig;
   section.hidden = false;
 
-  const $id = (/** @type {string} */ id) => /** @type {HTMLElement|null} */ (document.getElementById(id));
-  /** テキスト+is-placeholder トグル(popup の値セットと同じ作法・似せて自作しない)。 */
-  const setVal = (/** @type {string} */ id, /** @type {string} */ text, /** @type {boolean} */ isPlaceholder) => {
-    const el = $id(id);
-    if (!el) return;
-    if (el.textContent !== text) el.textContent = text;
-    el.classList.toggle('is-placeholder', isPlaceholder === true);
-  };
-  /** sub 行(公式行/取り込み/内訳): テキスト有なら表示・空なら hidden(popup と同じ畳み方)。 */
-  const setSub = (/** @type {string} */ id, /** @type {string} */ text) => {
-    const el = $id(id);
-    if (!el) return;
-    const t = String(text || '');
-    if (el.textContent !== t) el.textContent = t;
-    el.hidden = t.length === 0;
-  };
-
-  // 記録カード(値+プレースホルダ+3つの sub 行)。
-  setVal('liveStatComments', String(snap.recordsText || ''), snap.recordsIsPlaceholder === true);
-  setSub('liveStatCommentsOfficial', snap.recordsOfficialLine);
-  setSub('liveStatCommentsBreakdown', snap.recordsBreakdownLine);
-  setSub('liveStatCommentsIngest', snap.recordsIngestLine);
-
-  // 推定同時接続カード(値+プレースホルダ・単位 sub は任意)。
-  const conc = snap.concurrent && typeof snap.concurrent === 'object' ? snap.concurrent : {};
-  setVal('watchConcurrentEst', String(conc.estText || ''), conc.estIsPlaceholder === true);
-  const subEl = $id('watchConcurrentSub');
-  if (subEl && conc.subText) {
-    const t = String(conc.subText);
-    if (subEl.textContent !== t) subEl.textContent = t;
-  }
-
-  // 来場者数カード(値+プレースホルダ)。
-  const vis = snap.visitor && typeof snap.visitor === 'object' ? snap.visitor : {};
-  setVal('watchViewerDom', String(vis.text || ''), vis.isPlaceholder === true);
-
-  // 公式統計チップ(5つ)。popup の paintOfficialNicoStatsStrip(popup-entry.js:7121-7172)と同じ id・
-  //   同じ class トグルで適用。official が null のときは popup と同じく「—」プレースホルダに戻す。
-  const PH = { text: '—', isPlaceholder: true };
-  const off = snap.official;
-  const chip = off
-    ? {
-        officialStatNicoViewers: off.viewers,
-        officialStatNicoComments: off.comments,
-        officialStatNicoStreamAge: off.streamAge,
-        officialStatNicoAdPts: off.adPts,
-        officialStatNicoGiftPts: off.giftPts
-      }
-    : {
-        officialStatNicoViewers: PH,
-        officialStatNicoComments: PH,
-        officialStatNicoStreamAge: PH,
-        officialStatNicoAdPts: PH,
-        officialStatNicoGiftPts: PH
-      };
-  for (const id of Object.keys(chip)) {
-    const c = chip[id] || PH;
-    setVal(id, String(c.text || '—'), c.isPlaceholder === true);
-  }
+  // 値セットは純DOMビルダー paintStatCardsMirrorValues(src/lib)に抽出済み(挙動同値・テストで固定)。
+  //   鮮度ガード/signature ガード/section.hidden の出し入れは status 側(ここ)が持つ。純Web(app/live-view)も
+  //   同じ painter を再利用する=似せて自作しない・popup と必ず一致。
+  paintStatCardsMirrorValues(document, snap);
 }
 
 /**
