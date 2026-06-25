@@ -131,13 +131,17 @@ const targets = [
     target: 'es2020'
   },
   {
-    // 2026-06-23 純Web版 応援ライブビュー(app.tsuioku-no-kirameki.com/live-view?v=<token>)。
-    //   拡張が「スマホへ送信」で相乗りさせた応援レーン鏡を、popup と同じ本物の描画関数
-    //   (paintStoryUserLaneDomFilled + buildPersonTileEl)で描く=見た目そっくり。chrome 非依存。
-    //   council/liveview-web-public-SYNTHESIS.md(案1)。
+    // 2026-06-25 純Web版 応援ライブビュー(app.tsuioku-no-kirameki.com/live-view?v=<token>)。
+    //   ★方針: 本物 popup.html を丸ごとコピー(app/live-view.html)+本物 popup-entry を chrome シムで
+    //   純Webでも起動させる「コピー」(reference_liveview_popup_wholesale_copy.md)。
+    //   このエントリは popup-entry を dynamic import するので、popup と同じ define
+    //   (NL_BUILD_ID / NL_DEV_HOTRELOAD / NL_RELEASE)を注入しないと ReferenceError になる。
+    //   format は dynamic import を扱える esm にする(iife だとトップレベル await/動的 import が不可)。
     entryPoints: ['app/live-view.js'],
     outfile: 'app/dist/live-view.js',
-    target: 'es2020'
+    target: 'es2020',
+    format: 'esm',
+    define: popupDefine
   }
 ];
 
