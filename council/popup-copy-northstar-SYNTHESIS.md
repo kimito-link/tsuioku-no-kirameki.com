@@ -61,5 +61,29 @@ P0-P3 で既に成立している方式を北極星レーンに広げるだけ�
 
 - コピー範囲=8レーン全部(ユーザー確定)。trio 取得率も含める(ユーザー確定)。
 
+## 実装中の精緻化(C0 後の深掘りで判明)
+
+★北極星8レーンは描画パスが3種=一括でなくレーン単位で進める(ユーザー確定: 見えるレーンから段階的に):
+- mirrorHtml 系(adRanking/eventScore/eventRank/programPoints): C0 の paintNorthStarLaneBody で描ける。送信=各 mirrorHtml。
+- rows-as-tiles 系(contributionRanking=ギフト貢献度/giftHistory=ギフト履歴): 純関数 officialDomRankingRowsToStripRooms
+  (chrome-free)→ paintTopSupportRankStyleIntoElement(chrome-free)で描く。送信=ranking rows(上位10件・P3と同型)。
+- eventBroadcasters/eventVotingSupporters: 別パス・ほぼ非表示=後段。
+
+★C0 完了(0162c898): paintNorthStarLaneBody 抽出(テスト7本)。popup 無変更。
+
+### ★C1 の設計確定(contributionRanking=スクショで見えてた「ギフト貢献度」を最優先)
+
+- 真因: status-entry は contribution rows を【今は読んでいない】。data は popup が読む storage キー
+  (kokenContribStorageKey(lid)/iframe key/DOM bundle)に在る。
+- ★アーキ整合の正しい設計= popup が【北極星ミラーを publish】する(publishLaneMirror/publishStatCardsMirror と同じ轍)。
+  popup は既に rows/mirrorHtml を計算済み=それを KEY_NORTH_STAR_MIRROR に publish → status が extras(12秒)で読む
+  → jsonBlob に相乗り → 純Web が本物 officialDomRankingRowsToStripRooms→paintTopSupportRankStyleIntoElement で描く。
+  status-entry が koken/DOM を再解決しない(popup の仕事を二重化しない・read を増やさない)。
+- これは storage/messaging を跨ぐ多段変更=AGENTS.md §12.1 Plan 先行。C1 を更に小分け:
+  - C1a: KEY_NORTH_STAR_MIRROR + buildNorthStarMirrorSnapshot(純関数・rows/mirrorHtml を間引き・テスト先行)。
+  - C1b: popup-entry が publishNorthStarMirror(3秒 min-gap・best-effort・描画不変・INLINE_PASSIVE では publish しない=受動)。
+  - C1c: status-entry が extras で読み jsonBlob に相乗り(12秒・サイズ計測)。
+  - C2: 純Web DOM/CSS 逐語コピー(contribution レーン枠+CSS)。C3: 純Web 描画。C4: 実機。
+
 ---
-*ultracode 調査+設計: 2026-06-25 / Claude Opus 統合(実コード裏取り) / C0 から TDD 実装*
+*ultracode 調査+設計: 2026-06-25 / Claude Opus 統合(実コード裏取り) / C0 完了・C1 は popup北極星ミラー publish 方式で確定*
