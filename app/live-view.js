@@ -56,13 +56,15 @@ const _laneDomIo = {
   //   (buildPersonTileEl 側で optional=typeof チェック。匿名は displaySrc の identicon をそのまま出す)。
 };
 
-/** レーン案内(ガイド行)の顔。app/images/yukkuri/ に同梱(拡張の相対パスではなく app 配下)。 */
+/** レーン案内(ガイド行)の顔。app/images/yukkuri/ に同梱。
+ *   ★絶対パス /app/images/ にする(ページURLは /live-view=ルートなので相対 images/ は /images/ に解決され 404。
+ *   dist/app.js の script src を /app/dist/ にしたのと同じ理由。これで pre-existing の顔割れも直る)。 */
 const _LANE_FACES = {
-  faceLink: 'images/yukkuri/link/link-yukkuri-half-eyes-mouth-closed.png',
-  faceGift: 'images/yukkuri/konta/kitsune-yukkuri-half-eyes-mouth-closed.png',
-  faceAd: 'images/yukkuri/konta/kitsune-yukkuri-half-eyes-mouth-closed.png',
-  faceKonta: 'images/yukkuri/konta/kitsune-yukkuri-half-eyes-mouth-closed.png',
-  faceTanu: 'images/yukkuri/tanunee/tanuki-yukkuri-half-eyes-mouth-closed.png'
+  faceLink: '/app/images/yukkuri/link/link-yukkuri-half-eyes-mouth-closed.png',
+  faceGift: '/app/images/yukkuri/konta/kitsune-yukkuri-half-eyes-mouth-closed.png',
+  faceAd: '/app/images/yukkuri/konta/kitsune-yukkuri-half-eyes-mouth-closed.png',
+  faceKonta: '/app/images/yukkuri/konta/kitsune-yukkuri-half-eyes-mouth-closed.png',
+  faceTanu: '/app/images/yukkuri/tanunee/tanuki-yukkuri-half-eyes-mouth-closed.png'
 };
 
 bootstrap();
