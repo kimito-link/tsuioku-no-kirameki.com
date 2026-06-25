@@ -211,15 +211,25 @@ describe('crawlNdgrBackward（過去ログ backward 巡回エンジン）', () =
     const { sleep } = makeNoopSleep();
     const gen = crawlNdgrBackward({ viewBase: VIEW_BASE, fetchBinary, sleep, now: () => 1_000_000 });
 
-    // 1個目の event(BK0)を受け取る。
-    const first = await gen.next();
+    // v0.1.946: 入口探索中の bridging/seeking イベント(chats=0)を読み飛ばして最初の chats を取る。
+    const nextChats = async () => {
+      for (;;) {
+        const step = await gen.next();
+        if (step.done) return step;
+        if (step.value && step.value.bridging) continue; // seeking/bridging はスキップ
+        return step;
+      }
+    };
+
+    // 1個目の chats event(BK0)を受け取る。
+    const first = await nextChats();
     expect(first.done).toBe(false);
     expect(first.value.chats.map((c) => c.no)).toEqual([50]);
     // ⚡ 先読みの証拠: BK0 を受け取った【この時点】で BK1 は既に fetch 済み(yield 前に起動した)。
     expect(calls).toContain(BK1);
 
     // 2個目(BK1)を受け取ると、その時点で BK2 も先読み済み。
-    const second = await gen.next();
+    const second = await nextChats();
     expect(second.value.chats.map((c) => c.no)).toEqual([30]);
     expect(calls).toContain(BK2);
 
@@ -228,6 +238,37 @@ describe('crawlNdgrBackward（過去ログ backward 巡回エンジン）', () =
     expect(rest.result.stopReason).toBe('backward_exhausted');
     const allNos = [50, 30].concat(rest.chatsAll.map((c) => c.no));
     expect(allNos).toEqual([50, 30, 10]);
+  });
+
+  // v0.1.946「ローディングが出ない/一気に取れない」根治: 入口探索(?at=now + seed)中に bridging を yield し、
+  //   最初の chats より【前】に進捗イベントが consumer に届く(genSteps が即進む=ローディング表示+watchdog 抑止)。
+  it('最初の chats を yield する前に bridging(seeking) イベントを出す(genSteps を即進める)', async () => {
+    const BK0 = `https://mpn.live.nicovideo.jp/data/backward/v4/BK0`;
+    const map = new Map();
+    map.set(atUrl('now'), nowEntryBytes(1000));
+    map.set(ENTRY_AT, viewEntryBytes({ backwardUri: BK0 }));
+    map.set(BK0, packedSegmentBytes([{ no: 7, content: 'x', name: 'u' }])); // next 無し
+    const { fetchBinary } = makeFetchFromMap(map);
+    const { sleep } = makeNoopSleep();
+    const gen = crawlNdgrBackward({ viewBase: VIEW_BASE, fetchBinary, sleep, now: () => 1_000_000 });
+
+    // 1個目の yield は chats=0 の bridging(seeking)=入口探索が始まったことを即座に consumer へ伝える。
+    const first = await gen.next();
+    expect(first.done).toBe(false);
+    expect(first.value.bridging).toBe(true);
+    expect(first.value.chats.length).toBe(0);
+
+    // その後に本物の chats(BK0)が来る(bridging を読み飛ばして到達)。取りこぼし無し。
+    let chatsEvent = null;
+    for (;;) {
+      const step = await gen.next();
+      if (step.done) break;
+      if (step.value && step.value.bridging) continue;
+      chatsEvent = step.value;
+      break;
+    }
+    expect(chatsEvent).not.toBeNull();
+    expect(chatsEvent.chats.map((c) => c.no)).toEqual([7]);
   });
 
   it('同一 backward URI に戻されても無限ループせず安全に停止し、1 回だけ取り込む', async () => {
