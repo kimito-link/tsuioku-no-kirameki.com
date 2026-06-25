@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="48" height="48" aria-hidden="true">
+  <defs>
+    <linearGradient id="nlTvPhGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#bcaaa4"/>
+      <stop offset="100%" stop-color="#8d6e63"/>
+    </linearGradient>
+  </defs>
+  <rect x="4" y="11" width="40" height="29" rx="4" fill="url(#nlTvPhGrad)" stroke="#5d4037" stroke-width="1.2"/>
+  <rect x="7.5" y="14.5" width="33" height="22" rx="2.5" fill="#4e342e"/>
+  <rect x="10" y="17" width="28" height="17" rx="1.5" fill="#0d1f12"/>
+  <rect x="11" y="18" width="26" height="4" rx="0.5" fill="#1b3d24" opacity="0.85"/>
+  <rect x="11" y="24" width="26" height="3" rx="0.5" fill="#1b3d24" opacity="0.55"/>
+  <rect x="11" y="29" width="18" height="2.5" rx="0.5" fill="#1b3d24" opacity="0.4"/>
+  <circle cx="36.5" cy="33" r="3" fill="#ff6f00"/>
+  <circle cx="36.5" cy="33" r="1.6" fill="#ffe0b2"/>
+  <rect x="8" y="8" width="2" height="5" rx="0.5" fill="#6d4c41"/>
+  <rect x="14" y="6.5" width="2" height="6.5" rx="0.5" fill="#6d4c41"/>
+</svg>

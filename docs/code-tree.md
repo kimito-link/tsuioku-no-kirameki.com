@@ -34,8 +34,58 @@
 
 - 📁 **api/** (1)
   - `status.js` — status 受け口 Vercel Serverless Function。
-- 📁 **app/** (10)
-  - 📁 **images/** (6)
+- 📁 **app/** (97)
+  - 📁 **images/** (93)
+    - 📁 **avatar-parts/** (22)
+      - `cheek-0.png`
+      - `cheek-1.png`
+      - `eyes-jito.png`
+      - `eyes-open.png`
+      - `eyes-sleepy.png`
+      - `eyes-smile.png`
+      - `eyes-sparkle.png`
+      - `eyes-surprised.png`
+      - `hair-bob.png`
+      - `hair-center-part.png`
+      - `hair-long.png`
+      - `hair-mushroom.png`
+      - `hair-ponytail.png`
+      - `hair-short-flip.png`
+      - `hair-twintail.png`
+      - `hair-wolf.png`
+      - `mouth-mu.png`
+      - `mouth-omega.png`
+      - `mouth-open.png`
+      - `mouth-pokan.png`
+      - `mouth-smile.png`
+      - `mouth-smirk.png`
+    - 📁 **creator/** (1)
+      - `character.png`
+    - 📁 **logo/** (17)
+      - `kimito-link-color.png`
+      - `kimito-link-ginga-color.png`
+      - `kimito-maru-black.png`
+      - `kimito-rinku-app-icon-128.png`
+      - `kimito-rinku-app-icon-16.png`
+      - `kimito-rinku-app-icon-2048.png`
+      - `kimito-rinku-app-icon-256.png`
+      - `kimito-rinku-app-icon-32.png`
+      - `kimito-rinku-app-icon-48.png`
+      - `kimito-rinku-app-icon-512.png`
+      - `konta-yukkuri-icon-128.png`
+      - `konta-yukkuri-icon-16.png`
+      - `konta-yukkuri-icon-256.png`
+      - `konta-yukkuri-icon-32.png`
+      - `konta-yukkuri-icon-48.png`
+      - `konta-yukkuri-icon-512.png`
+      - `nc321221_creatorcross.png`
+    - 📁 **lp/** (2)
+      - `sample-circle-icon.png`
+      - `twitter-icon.png`
+    - 📁 **marketing-html-avatars/** (3)
+      - `konta-72.png`
+      - `rink-72.png`
+      - `tanu-72.png`
     - 📁 **yukkuri/** (6)
       - 📁 **konta/** (2)
         - `kitsune-yukkuri-half-eyes-mouth-closed.png`
@@ -46,10 +96,56 @@
       - 📁 **tanunee/** (2)
         - `tanuki-yukkuri-half-eyes-mouth-closed.png`
         - `tanuki-yukkuri-smile-mouth-open.png`
+    - 📁 **yukkuri-charactore-english/** (40)
+      - 📁 **konta/** (12)
+        - `kitsune-yukkuri-blink-mouth-closed.png`
+        - `kitsune-yukkuri-blink-mouth-closed.thumb128.png`
+        - `kitsune-yukkuri-blink-mouth-open.png`
+        - `kitsune-yukkuri-half-eyes-mouth-closed.png`
+        - `kitsune-yukkuri-half-eyes-mouth-closed.thumb128.png`
+        - `kitsune-yukkuri-half-eyes-mouth-open.png`
+        - `kitsune-yukkuri-mouth-closed.png`
+        - `kitsune-yukkuri-normal.png`
+        - `kitsune-yukkuri-normal.thumb128.png`
+        - `kitsune-yukkuri-smile-mouth-closed.png`
+        - `kitsune-yukkuri-smile-mouth-open.png`
+        - `kitsune-yukkuri-smile-mouth-open.thumb128.png`
+      - 📁 **link/** (15)
+        - `link-normal.png`
+        - `link-yukkuri-blink-mouth-closed.png`
+        - `link-yukkuri-blink-mouth-closed.thumb128.png`
+        - `link-yukkuri-blink-mouth-open.png`
+        - `link-yukkuri-fuji-background.png`
+        - `link-yukkuri-half-eyes-mouth-closed.png`
+        - `link-yukkuri-half-eyes-mouth-closed.thumb128.png`
+        - `link-yukkuri-half-eyes-mouth-open.png`
+        - `link-yukkuri-normal-mouth-closed.png`
+        - `link-yukkuri-normal-mouth-closed.thumb128.png`
+        - `link-yukkuri-normal-mouth-open.png`
+        - `link-yukkuri-normal-mouth-open.thumb128.png`
+        - `link-yukkuri-smile-mouth-closed.png`
+        - `link-yukkuri-smile-mouth-open.png`
+        - `link-yukkuri-smile-mouth-open.thumb128.png`
+      - 📁 **tanunee/** (13)
+        - `tanuki-yukkuri-blink-mouth-closed.png`
+        - `tanuki-yukkuri-blink-mouth-closed.thumb128.png`
+        - `tanuki-yukkuri-blink-mouth-open.png`
+        - `tanuki-yukkuri-half-eyes-mouth-closed.png`
+        - `tanuki-yukkuri-half-eyes-mouth-closed.thumb128.png`
+        - `tanuki-yukkuri-half-eyes-mouth-open.png`
+        - `tanuki-yukkuri-normal-mouth-closed.png`
+        - `tanuki-yukkuri-normal-mouth-closed.thumb128.png`
+        - `tanuki-yukkuri-normal-mouth-open.png`
+        - `tanuki-yukkuri-normal-mouth-open.thumb128.png`
+        - `tanuki-yukkuri-smile-mouth-closed.png`
+        - `tanuki-yukkuri-smile-mouth-open.png`
+        - `tanuki-yukkuri-smile-mouth-open.thumb128.png`
+    - `nico-retro-tv-placeholder.svg`
+    - `toumeilink.png`
   - `app.js` — スマホ閲覧用 status Web 版。
   - `index.html`
   - `live-view.html`
-  - `live-view.js` — 純Web版 応援ライブビュー(拡張なし・PC/スマホ共通レスポンシブ)。
+  - `live-view.js` — 純Web版 応援ライブビュー（拡張なし・PC/スマホ共通）。
 - 📁 **docs/** (157)
   - 📁 **article-assets/** (87)
     - 📁 **venue-frames/** (12)

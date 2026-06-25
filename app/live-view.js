@@ -1,18 +1,36 @@
 // @ts-nocheck
 /**
- * 純Web版 応援ライブビュー(拡張なし・PC/スマホ共通レスポンシブ)。
+ * 純Web版 応援ライブビュー（拡張なし・PC/スマホ共通）。
  *
- *   - URL の ?v=<token> を読み、GET /api/status?v=<token> で jsonBlob を取得。
- *   - jsonBlob.laneMirror / jsonBlob.statCardsMirror(拡張が「スマホへ送信」で相乗りさせた鏡
- *     スナップショット)を、popup と同じ【本物の描画関数】で描く=見た目そっくり(似せて自作しない)。
- *   - 拡張に依存しない純 Web。chrome.* は一切使わない。データは PC 拡張が送信した時点のスナップショット。
- *   - 60 秒ポーリングで自動更新(document.hidden 時は休む)。app/app.js と同じデータフロー。
+ * ★方針（reference_liveview_popup_wholesale_copy.md）= 拡張内 応援ライブビュー
+ *   （popup.html を iframe で丸ごと出す＝完璧）と「まったく同じ＝コピー」にする。
+ *   セクションを1個ずつ独自に組み立てて足すのは【禁止・ユーザーが何度も否定】。
  *
- * 設計: council/liveview-web-public-SYNTHESIS.md(案1=鏡スナップショット送信+純Web再描画)。
+ * このエントリは:
+ *   1) `globalThis.chrome` を【本物 popup-entry を import する前に】シムとして設置する。
+ *      - storage.local.get … 設定キーの既定値＋鏡キー（snapshot 由来）を返す（受動モード）。
+ *      - runtime.getURL … `/app/<path>` へ（純Web配下のアセット）。
+ *      - runtime.id … truthy（popup の hasExtensionContext() を満たす）。
+ *      - storage.set/remove・onChanged・tabs/windows/scripting 等 … no-op スタブ。
+ *   2) `?v=<token>` の snapshot を GET し、鏡（laneMirror/statCardsMirror/northStarMirror）を
+ *      popup が読む storage キーに載せる。
+ *   3) 本物 `popup-entry.js` を dynamic import で起動する（dock=liveview=受動ビュー：
+ *      書かない/注入しない/外部 fetch しない）。popup.js 自身が初回ロード幕を外し・利用規約
+ *      ゲートを隠し・hidden セクションを reveal する＝本物そっくりの骨格になる。
+ *   4) popup が（生データ無しのため）空に描いた応援レーン/数字カード/北極星レーン/配信者カード/
+ *      応援者ランキングを、本物の paint 関数で snapshot の鏡から塗り直す（似せて自作しない）。
+ *   5) 60 秒ポーリングで snapshot を再取得し鏡を塗り直す（popup 本体は受動＝自律 refresh しない）。
+ *
+ * URL は popup と同じく `?inline=1&dock=liveview&lv=<lv>` 相当を満たす必要がある。
+ *   実際の閲覧 URL は `/live-view?v=<token>`。lv は snapshot 由来で location に焼く（下記 seedLocationParams）。
  *
  * @module live-view-web
  */
 
+// ── 本物の描画関数（chrome 非依存・全て再利用＝似せて自作しない）─────────────
+import { KEY_LANE_MIRROR } from '../src/lib/laneMirrorKey.js';
+import { KEY_STAT_CARDS_MIRROR } from '../src/lib/statCardsMirrorKey.js';
+import { KEY_NORTH_STAR_MIRROR } from '../src/lib/northStarMirrorKey.js';
 import { restoreLaneMirrorBuckets } from '../src/lib/laneMirror.js';
 import {
   paintStoryUserLaneDomFilled,
@@ -28,14 +46,11 @@ import {
   applyStoryAvatarTvFallbackClass,
   removeStoryAvatarTvFallbackClass
 } from '../src/lib/storyAvatarTvFallbackClass.js';
-// 数字カード鏡: status と同じ純DOMビルダー(本物)を再利用=似せて自作しない・popup と必ず一致。
 import { paintStatCardsMirrorValues } from '../src/lib/statCardsMirrorDom.js';
 import { buildStatCardsMirrorSignature } from '../src/lib/statCardsMirror.js';
 import { isEpochFresh } from '../src/lib/watchUrlFreshness.js';
-// 配信者カード(ちくらん風ヘッダー): status と同じ本物 buildChikuranHeaderDom を再利用。データは lives[0]。
 import { buildChikuranCardModel } from '../src/lib/chikuranCard.js';
 import { buildChikuranHeaderDom } from '../src/lib/chikuranHeaderDom.js';
-// 応援者ランキング(顔つき): status と同じ本物の行ビルダー+タイル変換を再利用。データは送信された topSupporters。
 import { buildSupporterRankingRows } from '../src/lib/supporterRankingDom.js';
 import { supporterRowToPersonTile } from '../src/lib/supporterRowToPersonTile.js';
 import { buildPersonTileEl } from '../src/lib/personTileDom.js';
@@ -44,16 +59,164 @@ import { anonymousIdenticonDataUrl } from '../src/lib/anonymousIdenticon.js';
 import { storyUserLaneMetaLines } from '../src/lib/storyUserLaneMeta.js';
 
 const POLL_INTERVAL_MS = 60_000;
-/** 数字カード鏡の鮮度ガード(status-entry.js の MIRROR_FRESH_MS と同値=3分)。 */
+/** 鏡の鮮度ガード（status-entry.js の MIRROR_FRESH_MS と同値＝3分）。 */
 const MIRROR_FRESH_MS = 3 * 60 * 1000;
+
 let _timerId = null;
-let _lastLaneSig = ' init';
+let _bootStarted = false;
 let _lastStatCardsSig = ' init';
+let _lastLaneSig = ' init';
+/** 直近 snapshot（popup boot 後の塗り直し・onChanged 橋渡しで使う）。 */
+let _latestSnapshot = null;
+/** シムの合成 storage（popup が get で読む）。鏡キーをここに載せる。 */
+const _shimStore = Object.create(null);
+/** onChanged リスナ（popup が登録。snapshot 更新時に発火させて受動再描画を促す）。 */
+const _onChangedListeners = [];
+
+/* ───────────────────────── chrome シム ───────────────────────── */
 
 /**
- * 応援レーン鏡のアバター読み込みガード(popup/status と同設定の本物=createSupportAvatarLoadGuard)。
- *   fallback を先に出してプローブ成功時だけ差し替え=404 フリッカー防止。純Webでも同じ挙動。
+ * popup の設定キー既定値（dock=liveview 受動ビューで読むだけ。書かない）。
+ *   無いと undefined でも popup 側は normalize で既定に倒すが、明示で安定させる。
+ *   ★ここは「設定の見た目」だけ＝鏡（実データ）は別途 _shimStore に載せる。
  */
+const _CONFIG_DEFAULTS = {
+  nls_recording_enabled: false,
+  nls_anonymous_identicon_enabled_v1: true
+};
+
+/** get の3シグネチャ（string / array / object-defaults / null=全件）を満たして合成 storage を返す。 */
+function shimStorageGet(keys) {
+  const out = Object.create(null);
+  const pick = (k) => {
+    if (k in _shimStore) out[k] = _shimStore[k];
+    else if (k in _CONFIG_DEFAULTS) out[k] = _CONFIG_DEFAULTS[k];
+  };
+  if (keys == null) {
+    // get(null)=全件。合成 storage と既定をまとめて返す。
+    for (const k of Object.keys(_CONFIG_DEFAULTS)) out[k] = _CONFIG_DEFAULTS[k];
+    for (const k of Object.keys(_shimStore)) out[k] = _shimStore[k];
+  } else if (typeof keys === 'string') {
+    pick(keys);
+  } else if (Array.isArray(keys)) {
+    for (const k of keys) pick(k);
+  } else if (typeof keys === 'object') {
+    // object-defaults: 既定値を出発点に、合成 storage で上書き。
+    for (const k of Object.keys(keys)) {
+      out[k] = k in _shimStore ? _shimStore[k] : keys[k];
+    }
+  }
+  return Promise.resolve(out);
+}
+
+/** chrome.runtime.getURL: 拡張内相対パス → 純Web `/app/<path>`。 */
+function shimGetURL(path) {
+  const rel = String(path || '').replace(/^[./]+/, '');
+  return `/app/${rel}`;
+}
+
+/** 本物 popup-entry を import する【前に】グローバル chrome を設置する。 */
+function installChromeShim() {
+  const noop = () => {};
+  const okPromise = () => Promise.resolve();
+  const shim = {
+    // hasExtensionContext() は runtime.id && storage.local を見る（popup-entry.js:2795）。
+    runtime: {
+      id: 'tsuioku-liveview-web',
+      getURL: shimGetURL,
+      getManifest: () => ({ version: '0.0.0-web' }),
+      lastError: undefined,
+      sendMessage: () => Promise.resolve(undefined),
+      onMessage: { addListener: noop, removeListener: noop },
+      connect: () => ({ postMessage: noop, onMessage: { addListener: noop }, disconnect: noop })
+    },
+    storage: {
+      local: {
+        get: (keys) => shimStorageGet(keys),
+        set: okPromise, // 受動ビュー：呼ばれても no-op（INLINE_PASSIVE で基本呼ばれない）
+        remove: okPromise,
+        clear: okPromise
+      },
+      session: {
+        get: () => Promise.resolve(Object.create(null)),
+        set: okPromise,
+        remove: okPromise
+      },
+      onChanged: {
+        addListener: (fn) => { if (typeof fn === 'function') _onChangedListeners.push(fn); },
+        removeListener: (fn) => {
+          const i = _onChangedListeners.indexOf(fn);
+          if (i >= 0) _onChangedListeners.splice(i, 1);
+        }
+      }
+    },
+    // 受動ビューでは触られない領域（INLINE_PASSIVE ガード）。万一呼ばれても落とさない no-op。
+    tabs: {
+      query: () => Promise.resolve([]),
+      sendMessage: () => Promise.resolve(undefined),
+      reload: okPromise,
+      create: () => Promise.resolve({}),
+      update: () => Promise.resolve({})
+    },
+    windows: {
+      create: () => Promise.resolve({}),
+      getCurrent: () => Promise.resolve({}),
+      getLastFocused: () => Promise.resolve(null),
+      update: () => Promise.resolve({}),
+      remove: okPromise
+    },
+    scripting: { executeScript: () => Promise.resolve([]) },
+    downloads: { download: () => Promise.resolve(0) },
+    webNavigation: { getAllFrames: () => Promise.resolve([]) }
+  };
+  // ★Chrome ブラウザは通常ページでも `window.chrome`（runtime/storage 無しのスタブ）を生やす。
+  //   そのため「未定義なら設置」だと素通りしてシムが入らず、popup が storage を読めない（全部 — のまま）。
+  //   本物の拡張 context（runtime.id がある）でない限り、シムで上書きする。
+  const existing = globalThis.chrome;
+  const isRealExtensionContext = !!(existing && existing.runtime && existing.runtime.id && existing.storage && existing.storage.local);
+  if (!isRealExtensionContext) {
+    globalThis.chrome = shim;
+  }
+}
+
+/**
+ * popup が `?inline=1&dock=liveview&lv=<lv>` を読むので、閲覧 URL（`/live-view?v=token`）に
+ *   不足パラメータを足す（history.replaceState＝リロードなし）。lv は snapshot から焼く。
+ * @param {string} lv
+ */
+function seedLocationParams(lv) {
+  try {
+    const u = new URL(location.href);
+    u.searchParams.set('inline', '1');
+    u.searchParams.set('dock', 'liveview');
+    if (lv) u.searchParams.set('lv', lv);
+    if (u.href !== location.href) history.replaceState(null, '', u.href);
+  } catch {
+    /* no-op */
+  }
+}
+
+/** snapshot の鏡を popup が読む storage キーに載せ、onChanged を発火（受動再描画を促す）。 */
+function seedMirrorsIntoStore(jsonBlob) {
+  const changes = Object.create(null);
+  const put = (key, val) => {
+    const oldValue = _shimStore[key];
+    _shimStore[key] = val;
+    changes[key] = { oldValue, newValue: val };
+  };
+  if (jsonBlob && jsonBlob.laneMirror) put(KEY_LANE_MIRROR, jsonBlob.laneMirror);
+  if (jsonBlob && jsonBlob.statCardsMirror) put(KEY_STAT_CARDS_MIRROR, jsonBlob.statCardsMirror);
+  if (jsonBlob && jsonBlob.northStarMirror) put(KEY_NORTH_STAR_MIRROR, jsonBlob.northStarMirror);
+  // popup が登録済みの onChanged を発火（純Webでは本物 storage が無いので手動橋渡し）。
+  if (Object.keys(changes).length && _onChangedListeners.length) {
+    for (const fn of _onChangedListeners.slice()) {
+      try { fn(changes, 'local'); } catch { /* no-op */ }
+    }
+  }
+}
+
+/* ───────────────── 鏡 → 本物 paint（popup の DOM へ）───────────────── */
+
 const _laneDomIo = {
   storyAvatarLoadGuard: createSupportAvatarLoadGuard({
     fallbackSrc: NICONICO_OFFICIAL_DEFAULT_USERICON_HTTPS,
@@ -62,23 +225,18 @@ const _laneDomIo = {
   }),
   isHttpOrHttpsUrl,
   storyTileUsesYukkuriTvStyle
-  // ★upgradeAnonymousAvatarImage は chrome.runtime.getURL に依存するため純Webでは渡さない
-  //   (buildPersonTileEl 側で optional=typeof チェック。匿名は displaySrc の identicon をそのまま出す)。
+  // upgradeAnonymousAvatarImage は chrome.runtime.getURL 依存＝純Webでは渡さない（匿名は identicon を直出し）。
 };
 
-/** レーン案内(ガイド行)の顔。app/images/yukkuri/ に同梱。
- *   ★絶対パス /app/images/ にする(ページURLは /live-view=ルートなので相対 images/ は /images/ に解決され 404。
- *   dist/app.js の script src を /app/dist/ にしたのと同じ理由。これで pre-existing の顔割れも直る)。 */
+/** 応援レーン案内（ガイド行）の顔。popup と同じ画像を /app/images/ から。 */
 const _LANE_FACES = {
-  faceLink: '/app/images/yukkuri/link/link-yukkuri-half-eyes-mouth-closed.png',
-  faceGift: '/app/images/yukkuri/konta/kitsune-yukkuri-half-eyes-mouth-closed.png',
-  faceAd: '/app/images/yukkuri/konta/kitsune-yukkuri-half-eyes-mouth-closed.png',
-  faceKonta: '/app/images/yukkuri/konta/kitsune-yukkuri-half-eyes-mouth-closed.png',
-  faceTanu: '/app/images/yukkuri/tanunee/tanuki-yukkuri-half-eyes-mouth-closed.png'
+  faceLink: '/app/images/yukkuri-charactore-english/link/link-yukkuri-half-eyes-mouth-closed.thumb128.png',
+  faceGift: '/app/images/yukkuri-charactore-english/konta/kitsune-yukkuri-half-eyes-mouth-closed.thumb128.png',
+  faceAd: '/app/images/yukkuri-charactore-english/konta/kitsune-yukkuri-half-eyes-mouth-closed.thumb128.png',
+  faceKonta: '/app/images/yukkuri-charactore-english/konta/kitsune-yukkuri-half-eyes-mouth-closed.thumb128.png',
+  faceTanu: '/app/images/yukkuri-charactore-english/tanunee/tanuki-yukkuri-half-eyes-mouth-closed.thumb128.png'
 };
 
-/** 応援者ランキングの行ビルダーに渡す I/O(本物再利用)。tileIo は avatar 導出/meta、domIo は _laneDomIo を流用
- *   (匿名 identicon は displaySrc をそのまま=upgradeAnonymousAvatarImage を渡さない純Web方針)。 */
 const _supporterRankingDomIo = {
   supporterRowToPersonTile,
   buildPersonTileEl,
@@ -90,165 +248,19 @@ const _supporterRankingDomIo = {
   domIo: _laneDomIo
 };
 
-bootstrap();
-
-function bootstrap() {
-  const token = new URLSearchParams(location.search).get('v') || '';
-  if (!token) {
-    showError('URL に閲覧トークン(?v=...)がありません。PC の拡張の状態速報ページから「📱 スマホへ送信」してください。');
-    return;
-  }
-  refresh(token);
-  startPolling(token);
-}
-
-function startPolling(token) {
-  if (_timerId) clearInterval(_timerId);
-  _timerId = setInterval(() => {
-    if (typeof document !== 'undefined' && document.hidden) return;
-    refresh(token);
-  }, POLL_INTERVAL_MS);
-}
-
-async function refresh(token) {
-  try {
-    const res = await fetch(`/api/status?v=${encodeURIComponent(token)}`, { cache: 'no-store' });
-    if (res.status === 404) {
-      showError('まだデータがありません。PC の拡張で「📱 スマホへ送信」を押してください。');
-      return;
-    }
-    if (!res.ok) {
-      showError(`取得に失敗しました (HTTP ${res.status})`);
-      return;
-    }
-    const json = await res.json();
-    const data = json?.data;
-    if (!data || typeof data !== 'object') {
-      showError('データの形式が不正です。');
-      return;
-    }
-    render(data);
-  } catch (err) {
-    showError('通信エラー: ' + String((err && err.message) || err));
-  }
-}
-
-/** @param {{ generatedAt?: string, lives?: any[], laneMirror?: any, statCardsMirror?: any }} jsonBlob */
-function render(jsonBlob) {
-  hideError();
-  renderBroadcasterCard(Array.isArray(jsonBlob.lives) ? jsonBlob.lives[0] : null);
-  renderStatCardsMirror(jsonBlob.statCardsMirror || null);
-  renderLaneMirror(jsonBlob.laneMirror || null);
-  renderSupporterRanking(jsonBlob.topSupporters || null);
-  const stamp = document.getElementById('updatedAt');
-  if (stamp) {
-    const t = jsonBlob.generatedAt ? new Date(jsonBlob.generatedAt) : null;
-    stamp.textContent = t
-      ? `最終送信 ${String(t.getHours()).padStart(2, '0')}:${String(t.getMinutes()).padStart(2, '0')}`
-      : '';
-  }
-}
-
-/**
- * 配信者カード: popup 上部の配信者ヘッダー(サムネ+名前+タイトル+メトリクス)をそっくり描く。
- *   status-entry.js#buildChikuranHeaderEl と同じ recipe(本物 buildChikuranCardModel→buildChikuranHeaderDom)。
- *   データは送信済みの lives[0]。lv が無い(配信無し)なら hidden。鮮度ガードは lives[].capturedAt で。
- * @param {any} live lives[0]
- */
-function renderBroadcasterCard(live) {
-  const section = document.getElementById('broadcasterCardLane');
-  const host = document.getElementById('broadcasterCardHost');
-  if (!section || !host) return;
-  const model = buildChikuranCardModel(live);
-  if (!model) {
-    section.hidden = true;
-    host.replaceChildren();
-    return;
-  }
-  // 鮮度ガード(数字カードと同型): capturedAt が古い=配信終了後の残骸=隠す。
-  const capturedAt = Number(live && live.capturedAt);
-  if (capturedAt && !isEpochFresh(capturedAt, Date.now(), MIRROR_FRESH_MS)) {
-    section.hidden = true;
-    host.replaceChildren();
-    return;
-  }
-  section.hidden = false;
-  host.replaceChildren(buildChikuranHeaderDom(model));
-}
-
-/**
- * 応援者ランキング: popup/status と同じ本物の行ビルダー(buildSupporterRankingRows)で🥇🥈🥉を顔つき描画。
- *   データは送信された topSupporters({ liveId, rows })。rows が空/未送信なら hidden。
- *   ★status の buildSupporterExpander と同一見た目(v0.1.937)・supporterRowToPersonTile→buildPersonTileEl 再利用。
- * @param {{ liveId?: string, rows?: any[] }|null} topSupporters
- */
-function renderSupporterRanking(topSupporters) {
-  const section = document.getElementById('supporterRankingLane');
-  const host = document.getElementById('supporterRankingHost');
-  if (!section || !host) return;
-  const rows = topSupporters && Array.isArray(topSupporters.rows) ? topSupporters.rows : null;
-  if (!rows || !rows.length) {
-    section.hidden = true;
-    host.replaceChildren();
-    return;
-  }
-  section.hidden = false;
-  host.replaceChildren(buildSupporterRankingRows(rows, _supporterRankingDomIo));
-}
-
-/**
- * 数字カード鏡: popup 上部の「記録・推定同時接続・来場者数」+公式統計チップをそっくり描く。
- *   status-entry.js#renderStatCardsMirror と同じ recipe(本物 paintStatCardsMirrorValues を再利用)。
- *   ガード(null/鮮度/signature)も status と同型。データは拡張が送信した statCardsMirror スナップショット。
- * @param {any} snap
- */
-function renderStatCardsMirror(snap) {
-  const section = document.getElementById('statCardsMirror');
-  if (!section) return;
-  // popup 未起動/未送信=スナップショット無し=セクションごと隠す(死にリンク回避)。
-  if (!snap || typeof snap !== 'object') {
-    section.hidden = true;
-    _lastStatCardsSig = ' init';
-    return;
-  }
-  // 鮮度ガード: capturedAt が古ければ「配信が終わった後の残骸」=隠す(status と同型)。
-  if (!isEpochFresh(Number(snap.capturedAt), Date.now(), MIRROR_FRESH_MS)) {
-    section.hidden = true;
-    _lastStatCardsSig = ' stale';
-    return;
-  }
-  // signature ガード: 変化が無ければ値セットを skip(表示状態は維持)。
+/** 数字カード鏡: 本物 popup DOM の #liveStatCards 配下へ値を入れる（似せて自作しない）。 */
+function paintStatCardsMirror(snap) {
+  if (!snap || typeof snap !== 'object') return;
+  if (!isEpochFresh(Number(snap.capturedAt), Date.now(), MIRROR_FRESH_MS)) return;
   const sig = buildStatCardsMirrorSignature(snap);
-  if (sig === _lastStatCardsSig) {
-    section.hidden = false;
-    return;
-  }
+  if (sig === _lastStatCardsSig) return;
   _lastStatCardsSig = sig;
-  section.hidden = false;
-  // 値セットは本物 paintStatCardsMirrorValues(status と共有)=似せて自作しない・popup と必ず一致。
   paintStatCardsMirrorValues(document, snap);
 }
 
-/**
- * 応援レーン鏡: popup の応援レーン(りんく/こん太/広告/たぬ姉)を顔(avatar)込みでそっくり描く。
- *   status-entry.js / 拡張 live-view と同じ recipe(本物 paintStoryUserLaneDomFilled + buildPersonTileEl)。
- *   データは拡張が送った laneMirror スナップショット → restoreLaneMirrorBuckets で paint が受ける形に復元。
- * @param {any} snap
- */
-function renderLaneMirror(snap) {
-  const section = document.getElementById('laneMirrorLane');
-  const empty = document.getElementById('laneEmpty');
-  if (!section) return;
-  if (!snap || typeof snap !== 'object') {
-    section.hidden = true;
-    if (empty) {
-      empty.hidden = false;
-      empty.textContent = 'まだ応援レーンのデータがありません。PC の拡張で配信を開いてから「📱 スマホへ送信」してください。';
-    }
-    _lastLaneSig = ' init';
-    return;
-  }
-
+/** 応援レーン鏡: 本物 popup DOM の #sceneStoryUserLane* へ顔つきで描く（似せて自作しない）。 */
+function paintLaneMirror(snap) {
+  if (!snap || typeof snap !== 'object') return;
   const $id = (id) => document.getElementById(id);
   const els = {
     stack: $id('sceneStoryUserLaneStack'),
@@ -274,39 +286,20 @@ function renderLaneMirror(snap) {
     guideBottom: $id('sceneStoryUserLaneGuideBottom'),
     guideLinesBottom: $id('sceneStoryUserLaneGuideLinesBottom')
   };
-  if (!els.stack || !els.laneLink || !els.laneGift || !els.laneKonta || !els.laneTanu) {
-    section.hidden = true;
-    return;
-  }
+  if (!els.stack || !els.laneLink || !els.laneGift || !els.laneKonta || !els.laneTanu) return;
 
   const buckets = restoreLaneMirrorBuckets(snap);
   const totalCells =
     buckets.link.length + buckets.gift.length + buckets.ad.length + buckets.konta.length + buckets.tanu.length;
-  const pickedLength = Math.max(
-    0,
-    Math.floor(Number(snap.pickedLength) || 0) || totalCells
-  );
+  const pickedLength = Math.max(0, Math.floor(Number(snap.pickedLength) || 0) || totalCells);
   const totalCandidates = Math.max(0, Math.floor(Number(snap.totalCandidates) || 0));
 
   const sig =
     `${String(snap.liveId || '')}|${Number(snap.capturedAt) || 0}|` +
     `${buckets.link.length}|${buckets.gift.length}|${buckets.ad.length}|${buckets.konta.length}|${buckets.tanu.length}|` +
     `${pickedLength}|${totalCandidates}`;
-  if (sig === _lastLaneSig) {
-    section.hidden = false;
-    if (empty) empty.hidden = true;
-    return;
-  }
+  if (sig === _lastLaneSig) return;
   _lastLaneSig = sig;
-
-  section.hidden = false;
-  if (empty) empty.hidden = true;
-
-  const metaEl = document.getElementById('laneMirrorMeta');
-  if (metaEl) {
-    metaEl.textContent =
-      totalCells > 0 ? `いま ${pickedLength}人を表示中` : 'この配信ではまだ応援レーンに出る人がいません。';
-  }
 
   if (totalCells === 0) {
     paintStoryUserLaneDomEmptyGuides(els, _LANE_FACES);
@@ -315,15 +308,257 @@ function renderLaneMirror(snap) {
   paintStoryUserLaneDomFilled(els, _LANE_FACES, buckets, pickedLength, _laneDomIo, { totalCandidates });
 }
 
-function showError(msg) {
-  const el = document.getElementById('errorBox');
-  if (el) {
-    el.hidden = false;
-    el.textContent = msg;
+/**
+ * 北極星レーン鏡（ギフト貢献度ランキング）。
+ *   ★現状は本物 popup.js が自前で北極星レーンの骨格を描く（empty/fallback 含む）ので、ここでは塗らない。
+ *   理由: northStarMirror の snapshot 形は `{ lanes: { contributionRanking: rows[] } }`（rows）だが、
+ *     本物の rows→DOM ストリップ paint は chrome 非依存の再利用関数がまだ無く、ここで自作すると
+ *     「セクションを独自に組み立てる」= ユーザーが否定した轍（reference 参照）になる。
+ *   paintNorthStarLaneBody は mirrorHtml(文字列) を受ける関数で、rows をそのまま渡せない。
+ *   → 鏡が mirrorHtml を運ぶようになった段階で、本物 sanitize 経路で塗る（follow-up）。
+ *   現状の snapshot は northStarMirror=undefined（拡張がまだ送っていない）ため実害なし。
+ * @param {any} _snap
+ */
+function paintNorthStarMirror(_snap) {
+  // intentional no-op: 本物 popup の北極星レーン描画に委ねる（follow-up で mirrorHtml 経路を配線）。
+}
+
+/** 配信者カード（ちくらん風ヘッダー）: 本物 buildChikuranHeaderDom で popup の配信者ヘッダーへ。 */
+function paintBroadcasterCard(live) {
+  const host =
+    document.getElementById('broadcasterCardHost') ||
+    document.querySelector('#casterBanner');
+  if (!host) return;
+  const model = buildChikuranCardModel(live);
+  if (!model) return;
+  const capturedAt = Number(live && live.capturedAt);
+  if (capturedAt && !isEpochFresh(capturedAt, Date.now(), MIRROR_FRESH_MS)) return;
+  try {
+    host.replaceChildren(buildChikuranHeaderDom(model));
+    if (host.hidden) host.hidden = false;
+    host.style.removeProperty('display');
+  } catch {
+    /* no-op */
   }
 }
 
+/** 応援者ランキング: 本物 buildSupporterRankingRows で🥇🥈🥉を顔つき描画（host があれば）。 */
+function paintSupporterRanking(topSupporters) {
+  const host = document.getElementById('supporterRankingHost');
+  if (!host) return; // popup.html 側に専用 host が無い場合は skip（北極星/レーンで足りる）
+  const rows = topSupporters && Array.isArray(topSupporters.rows) ? topSupporters.rows : null;
+  if (!rows || !rows.length) return;
+  try {
+    host.replaceChildren(buildSupporterRankingRows(rows, _supporterRankingDomIo));
+    host.hidden = false;
+  } catch {
+    /* no-op */
+  }
+}
+
+/** snapshot の全鏡を本物 paint で popup DOM に塗る（signature ガード有効＝変化時のみ）。 */
+function paintAllMirrors(jsonBlob) {
+  if (!jsonBlob || typeof jsonBlob !== 'object') return;
+  paintBroadcasterCard(Array.isArray(jsonBlob.lives) ? jsonBlob.lives[0] : null);
+  paintStatCardsMirror(jsonBlob.statCardsMirror || null);
+  paintLaneMirror(jsonBlob.laneMirror || null);
+  paintNorthStarMirror(jsonBlob.northStarMirror || null);
+  paintSupporterRanking(jsonBlob.topSupporters || null);
+}
+
+/**
+ * signature ガードを無視して全鏡を塗り直す。
+ *   popup の空描画が私の paint を上書きした後だと、signature が同じため通常 paint は skip される。
+ *   clobber に勝つには signature をリセットして強制再描画する必要がある（settle repaint / poll で使う）。
+ */
+function forcePaintAllMirrors() {
+  _lastStatCardsSig = ' force';
+  _lastLaneSig = ' force';
+  const wasPainting = _painting;
+  _painting = true; // 自分の paint 由来の mutation を observer に無視させる
+  try {
+    paintAllMirrors(_latestSnapshot);
+  } finally {
+    if (!wasPainting) setTimeout(() => { _painting = false; }, 0);
+  }
+}
+
+/* ───────────────────────── データ取得 ───────────────────────── */
+
+function liveIdFromSnapshot(jsonBlob) {
+  try {
+    const fromLane = String(jsonBlob?.laneMirror?.liveId || '').trim().toLowerCase();
+    if (/^lv\d{1,15}$/.test(fromLane)) return fromLane;
+    const fromLive = String(jsonBlob?.lives?.[0]?.liveId || jsonBlob?.lives?.[0]?.lv || '')
+      .trim()
+      .toLowerCase();
+    if (/^lv\d{1,15}$/.test(fromLive)) return fromLive;
+  } catch {
+    /* no-op */
+  }
+  return '';
+}
+
+async function fetchSnapshot(token) {
+  const res = await fetch(`/api/status?v=${encodeURIComponent(token)}`, { cache: 'no-store' });
+  if (res.status === 404) {
+    showError('まだデータがありません。PC の拡張で「📱 スマホへ送信」を押してください。');
+    return null;
+  }
+  if (!res.ok) {
+    showError(`取得に失敗しました (HTTP ${res.status})`);
+    return null;
+  }
+  const json = await res.json();
+  const data = json?.data;
+  if (!data || typeof data !== 'object') {
+    showError('データの形式が不正です。');
+    return null;
+  }
+  return data;
+}
+
+/** 初回: snapshot を取得→鏡を storage へ→lv を URL に焼く→本物 popup を起動。 */
+async function bootWithSnapshot(token) {
+  const jsonBlob = await fetchSnapshot(token);
+  if (!jsonBlob) return;
+  hideError();
+  _latestSnapshot = jsonBlob;
+  seedMirrorsIntoStore(jsonBlob);
+  seedLocationParams(liveIdFromSnapshot(jsonBlob));
+
+  if (!_bootStarted) {
+    _bootStarted = true;
+    // ★本物 popup-entry を起動（chrome シムは設置済み）。dock=liveview=受動ビュー。
+    //   import 後、popup の initPopup が DOMContentLoaded で走り、初回ロード幕を外す。
+    await import('../src/extension/popup-entry.js');
+    // ★popup は生コメントデータを持たないので、応援レーン/数字カードを「空」に塗り直す。
+    //   その空描画が【私の鏡 paint を上書き（clobber）する】。clobber は (a) 初回 refresh と
+    //   (b) ユーザーが <details> を開く等で起きる再描画、の両方で発生する。
+    //   → MutationObserver で「popup がレーン/カードを触ったら鏡を塗り直す」自己修復に統一する
+    //     （settle 窓だけだと、窓を過ぎた後のユーザー操作 clobber を取りこぼす）。
+    startSelfHealingRepaint();
+  } else {
+    forcePaintAllMirrors();
+  }
+}
+
+/** 自己修復 repaint の二重発火を抑える（自分の paint で observer が再発火するのを無視するフラグ）。 */
+let _painting = false;
+let _healScheduled = false;
+let _observer = null;
+
+/**
+ * popup の再描画（初回 refresh・<details> 開閉など）でレーン/数字カードが空に戻されたら、鏡を塗り直す。
+ *   - MutationObserver: 監視対象が変化したら、自分の paint 由来でなければ force 再描画を1回スケジュール。
+ *   - _painting フラグ: 自分の paint 中の mutation は無視（無限ループ防止）。
+ *   - 保険の低頻度 tick: observer が取りこぼしても 2.5 秒ごとに必ず塗り直す（passive popup は重くない）。
+ */
+function startSelfHealingRepaint() {
+  const healNow = () => {
+    _painting = true;
+    try { forcePaintAllMirrors(); } catch { /* no-op */ }
+    // microtask 後にフラグを下ろす（自分の DOM 変更が observer に拾われ終わってから）。
+    setTimeout(() => { _painting = false; }, 0);
+  };
+  const scheduleHeal = () => {
+    if (_healScheduled) return;
+    _healScheduled = true;
+    setTimeout(() => { _healScheduled = false; healNow(); }, 60);
+  };
+
+  // 監視対象: 応援レーンのスタックと数字カード（popup が空に塗り直す要素）。
+  const targets = ['sceneStoryUserLaneStack', 'liveStatCards', 'casterBanner']
+    .map((id) => document.getElementById(id))
+    .filter(Boolean);
+  try {
+    _observer = new MutationObserver(() => {
+      if (_painting) return; // 自分の paint 由来は無視
+      scheduleHeal();
+    });
+    for (const t of targets) {
+      _observer.observe(t, { childList: true, subtree: true, characterData: true });
+    }
+  } catch {
+    /* MutationObserver 不可環境: 低頻度 tick だけで担保 */
+  }
+
+  // 初回の settle（observer 登録前の描画も拾う）+ 保険の低頻度 tick。
+  healNow();
+  setInterval(() => {
+    if (typeof document !== 'undefined' && document.hidden) return;
+    healNow();
+  }, 2500);
+}
+
+async function refresh(token) {
+  const jsonBlob = await fetchSnapshot(token);
+  if (!jsonBlob) return;
+  hideError();
+  _latestSnapshot = jsonBlob;
+  seedMirrorsIntoStore(jsonBlob); // onChanged 橋渡しで popup の受動再描画も促す
+  forcePaintAllMirrors(); // poll でも clobber を踏み消して鏡を確実に出す
+}
+
+function startPolling(token) {
+  if (_timerId) clearInterval(_timerId);
+  _timerId = setInterval(() => {
+    if (typeof document !== 'undefined' && document.hidden) return;
+    refresh(token).catch(() => {});
+  }, POLL_INTERVAL_MS);
+}
+
+/* ───────────────────────── エラー表示 ───────────────────────── */
+
+/** popup.html には専用 errorBox が無いので、無ければ動的に1つ用意（最小・死に画面回避）。 */
+function ensureErrorBox() {
+  let el = document.getElementById('lvWebErrorBox');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'lvWebErrorBox';
+    el.setAttribute('role', 'alert');
+    el.style.cssText =
+      'position:fixed;left:50%;top:14px;transform:translateX(-50%);z-index:99999;max-width:90vw;' +
+      'padding:10px 14px;border-radius:10px;background:#fff3f3;color:#9a2c2c;border:1px solid #f0c0c0;' +
+      'font:13px/1.6 system-ui,sans-serif;box-shadow:0 4px 16px rgba(0,0,0,.12);';
+    el.hidden = true;
+    (document.body || document.documentElement).appendChild(el);
+  }
+  return el;
+}
+
+function showError(msg) {
+  const el = ensureErrorBox();
+  el.hidden = false;
+  el.textContent = msg;
+}
+
 function hideError() {
-  const el = document.getElementById('errorBox');
+  const el = document.getElementById('lvWebErrorBox');
   if (el) el.hidden = true;
+}
+
+/* ───────────────────────── 起動 ───────────────────────── */
+
+function bootstrap() {
+  // ★最優先: 本物 popup-entry を import する前に chrome シムを設置。
+  installChromeShim();
+
+  const token = new URLSearchParams(location.search).get('v') || '';
+  if (!token) {
+    showError('URL に閲覧トークン（?v=...）がありません。PC の拡張の状態速報ページから「📱 スマホへ送信」してください。');
+    return;
+  }
+  bootWithSnapshot(token).catch((err) => {
+    showError('通信エラー: ' + String((err && err.message) || err));
+  });
+  startPolling(token);
+}
+
+if (typeof document !== 'undefined') {
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', bootstrap, { once: true });
+  } else {
+    bootstrap();
+  }
 }
