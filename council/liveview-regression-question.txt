@@ -1,0 +1,54 @@
+# 会議: 応援プレビュー(拡張内 live-view)の「ローディングなし・一気どり・爆速」退行の正体と戻し方
+
+## ユーザーの訴え(正本・最優先)
+「ローディングなし・いっきにとれる・爆速は実現したことあったのに、それが逆行して悪化しつづけているのに何度も無視されているのが実情。これを忘れすぎ」
+- 過去に実現できていた「ローディングなし・一気どり・爆速」が退行している。
+- 上段3カード(記録/推定同接/来場者数)が「—」のままローディングが出続け、一気に取れない。
+- 上段3カードは「見ている配信のPC拡張が記録した値(本物 popup と同じ)」を出すべき。
+- この退行が何度も無視されてきた。今度こそ正体を固めて戻す。
+
+## 確定している事実(git/実コードで裏取り済み・会議の前提)
+1. 応援プレビュー=拡張内 extension/live-view.html。現在は190行の薄いシェルで、本物 popup.html を
+   `iframe src=popup.html?inline=1&dock=liveview&lv=<lv>` で全面起動する(v0.1.929 ca22636a で転換)。
+2. dock=liveview = INLINE_PASSIVE(受動ビュー)= storage に書かない/watch に注入しない/外部 fetch しない。
+3. ★退行の機械的な真因(確定): 上段3カード(記録/同接/来場)を storage の panel_summary_<lv> から
+   埋める関数 applyLightweightPanelSummaryCards()(v0.1.606 から実績あり)は、popup-entry.js の
+   polling ループ内の1箇所からしか呼ばれない。その polling は `if(!INLINE_PASSIVE)` でガードされ、
+   passive(=プレビュー)では一度も張られない=この関数が一度も呼ばれない=上段3カードが永遠に「—」+
+   syncLiveStatThreeCardsCharLoadingOverlays が数値未確定とみなしローディングを出し続ける。
+4. ★方式の退行タイムライン: 〜v0.1.913 は独自描画(live-view-entry.js が984行)で数字カード/応援レーン/
+   応援者ランキングを storage の鏡から自前で描いていた=ローディングなし・即時。v0.1.929 で iframe+本物
+   popup(passive) 方式に全面転換し、passive が数字カードを埋めないため退行した。
+5. コメント本体の即時表示(別レイヤー)は v0.1.650 で chrome.storage.session 全件キャッシュにより実現済
+   (reference_json_cache_instant_display_meeting.md)=「一度取れば即」。これは生きている。今壊れているのは
+   上段3カードの即時表示(passive 経路)。
+6. 過去2回(v0.1.948)、テスト緑でも実機で外して却下された地雷=「popup の refresh() の read path を触る」
+   「毎paintで重い処理」。今回も refresh/paint・記録の心臓部(content)には触れない制約。
+
+## 論点(会議で裁定してほしいこと)
+A. 退行の正体は「iframe+passive 方式そのもの」か、「passive が数字カードを埋める経路を持たないだけ」か。
+   - もし後者なら、passive 専用に applyLightweightPanelSummaryCards() を初回+低頻度tickで呼ぶ最小修正で
+     ローディングが消え数字が即出る(storage read のみ・fetch しない・書かない=passive 原則を守る)。
+   - もし前者なら、独自描画(v0.1.913 方式)に戻す/ハイブリッドにする等の大きな判断が要る。
+B. 「爆速・一気どり」をプレビューで実現する最短かつ後退しない設計は何か。
+   - storage の panel_summary は content が常時更新している=passive でも read だけで即値が取れるはず。
+   - watch タブ問い合わせ(fetch)無しで、storage read だけで上段3カードを即埋められるか。埋められない
+     値(同接の実測など)は何で、その場合「—」を隠すべきか公式値で代替すべきか。
+C. iframe 方式を保つ場合の懸念: プレビューは本物 popup を丸ごと起動するため重い(別件で診断と storage 競合)。
+   passive で polling を張らない設計は「軽さ」のためだった。数字カード経路を足すと重さが戻らないか。
+   storage read 1本(低頻度)なら許容範囲か。
+D. 「何度も無視された」を繰り返さないための検証ゲート。pure test 緑では完了報告しない(MEMORY 規約)。
+   実機で「プレビューを開いた瞬間、上段3カードに記録/同接/来場が即出る・ローディングが出ない」を
+   どう確認させるか(ユーザー実機手順)。
+
+## 制約(触らない)
+- popup の refresh()/paint の read path は触らない(v0.1.948 で2回却下された地雷)。
+- 記録の心臓部 content-entry.js は触らない。
+- passive 原則(書かない/watch 注入しない/外部 fetch しない)は守る。storage read は可。
+- 純Web版(app/live-view.js)は別エントリ。今回の対象は拡張内プレビュー(live-view-entry.js + popup-entry の passive 分岐)。
+
+## 出してほしいアウトプット
+- 退行の正体の裁定(A)。
+- 戻すべき設計(最小修正 or 方式戻し)と、その PR 分割。
+- 「触らない」を守りつつ上段3カードを即時に出す具体的な実装接点(関数名・呼ぶ場所)。
+- 実機検証手順(D)。

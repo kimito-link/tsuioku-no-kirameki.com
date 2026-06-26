@@ -74,8 +74,11 @@ export default [
     // 2026-06-25: countUniqueAvatarEntries を src/lib/avatarEntryCounts.js へ抽出=21028→21012 に下げ。
     // 2026-06-25: 北極星レーン鏡を純Webへ送る publishNorthStarMirror(chrome.storage I/O グルー=lib抽出不可)を
     //   追加=21012→21040(意図した機能追加・レビュー済み例外)。純関数 buildNorthStarMirrorSnapshot は lib 側。
+    // 2026-06-26: 応援プレビュー(passive)の上段3カード退行修正=passive 専用の
+    //   applyLightweightPanelSummaryCards 初回+onChanged 配線(INLINE_PASSIVE/lv 状態に依存=lib抽出不可の
+    //   storage グルー)を追加=21040→21067(council/liveview-regression-SYNTHESIS.md・レビュー済み例外)。
     files: ['src/extension/popup-entry.js'],
-    rules: { 'max-lines': ['error', { max: 21040, skipBlankLines: false, skipComments: false }] }
+    rules: { 'max-lines': ['error', { max: 21067, skipBlankLines: false, skipComments: false }] }
   },
   {
     files: ['src/extension/content-entry.js'],

@@ -20986,6 +20986,33 @@ async function initPopup() {
       safeRefresh();
     });
   }
+
+  // ★2026-06-26: 受動ビュー(dock=liveview/status)で上段3カード(記録/同接/来場)を埋める軽量経路。
+  //   退行の真因(council/liveview-regression-SYNTHESIS.md)= 記録/同接/来場は
+  //   applyPanelMetricsFromContent(=requestPanelMetricsFromWatchTab 由来=passive で null)でしか
+  //   塗られず、passive では一度も埋まらず「—」のままローディングが出続けていた(過去は出ていた=退行)。
+  //   → panel_summary_<lv>(content が常時 storage 更新)を read だけして埋める
+  //     applyLightweightPanelSummaryCards()(v0.1.606 実績・内部で overlay も畳む)を
+  //     polling と無関係に【初回1回 + onChanged 駆動】で呼ぶ。storage read のみ=passive 原則を守る
+  //     (書かない/注入しない/fetch しない)。popup の refresh()/paint には触れない(v0.1.948 地雷回避)。
+  if (INLINE_PASSIVE) {
+    setTimeout(() => { if (hasExtensionContext()) void applyLightweightPanelSummaryCards(); }, 250);
+    try {
+      chrome.storage.onChanged.addListener((changes, area) => {
+        if (area !== 'local' || !hasExtensionContext()) return;
+        if (typeof document !== 'undefined' && document.hidden) return; // 裏タブでは動かさない(競合/電池)
+        // 表示中の配信(lv)の panel_summary / watch_snapshot 変化時だけ埋め直す(キー完全一致)。
+        const lid = String(watchPopupLastPaintedLiveId || '').trim().toLowerCase();
+        if (!/^lv\d{1,15}$/.test(lid)) return;
+        const watchKeys = [panelSummaryStorageKey(lid), watchSnapshotStorageKey(lid)];
+        if (Object.keys(changes).some((k) => watchKeys.includes(k))) {
+          void applyLightweightPanelSummaryCards();
+        }
+      });
+    } catch {
+      /* onChanged 不可環境: 初回1回ぶんだけ反映(後退しない) */
+    }
+  }
 }
 
 // ローディング幕のキャラ演出を即開始（初回 paint と同時に動かす）。
