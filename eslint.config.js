@@ -104,8 +104,13 @@ export default [
     //   refreshAllNorthStarMirrorLanes の allSettled 後 1 回 flush(後着レーンが 3秒min-gap で落ちるのを断つ・
     //   合流タイミングのグルー=lib抽出不可)を追加=21385→21395(council/three-views-parity-SYNTHESIS.md・レビュー済み例外)。
     //   合流ロジック本体 mergeNorthStarMirrorLanes は src/lib/northStarMirror.js(test付き)に抽出済み(コピー漏れ不変条件を固定)。
+    // 2026-06-27: ローディング幕の「描画済みなのに継続」誤検知修正(3画面パリティ P2)=CSS フェイルセーフ(15秒)終了の
+    //   animationend で nl-init-shade--done を付け、クラスと視覚の乖離(=shadeActive 永続 true の誤検知)を断つ
+    //   ensureInitShadeFailsafeClassSync(DOM イベント配線グルー=lib抽出不可)+import を追加=21395→21442
+    //   (council/loading-overlay-stuck-SYNTHESIS.md・レビュー済み例外)。判定 shouldMarkInitShadeDoneOnAnimationEnd は
+    //   src/lib/initShadeFailsafe.js(test付き)に抽出済み。
     files: ['src/extension/popup-entry.js'],
-    rules: { 'max-lines': ['error', { max: 21395, skipBlankLines: false, skipComments: false }] }
+    rules: { 'max-lines': ['error', { max: 21442, skipBlankLines: false, skipComments: false }] }
   },
   {
     files: ['src/extension/content-entry.js'],

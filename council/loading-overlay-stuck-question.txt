@@ -1,0 +1,69 @@
+【会議の主題】
+P2: 状態速報が「応援レーンは描画済み(11件)なのにローディング表示が終わりません(overlay バグ)」と警告する。
+ユーザー体感「動いてない・壊れてる」の主因候補。これが【本物のバグ】か【診断の誤検知】かを切り分け、
+本物なら最小修正を、誤検知なら診断側を直す方針を固める。3画面パリティ会議の第2段。
+
+【実機の事実(状態速報 lv350833724・配信は10:11:00=10時間超 経過)】
+- storyUserLaneRenderProbe: domTilesPainted=11 / lastReachedStep="done" / completed=1 / activePath="heavy"(=watchタブ本体・embedded=true)
+  → 応援レーンの描画は完了している。
+- 状態速報の警告: 「描画済みなのにローディング表示が続く(ローディングを畳むバグの疑い)」
+- ユーザー提供スクショ: パネルは完全に描画済み(カード・ボタン・コメントティッカー本文が見えている)。
+  ローディングの幕(全画面カーテン)は【見えていない】。
+
+【司令塔が実コードで確証した事実】
+1. 警告の発火条件(status-entry.js:1798-1806):
+   - laneRenderDiag が painted(11件・done) かつ
+   - watching.perfDiag.shadeActive === true
+   の両方が true のとき「描画済みなのにローディング継続」を症状カードに昇格。
+
+2. shadeActive の定義(popup-entry.js:1063-1068・2秒ごとに perfDiag へ書く):
+   const sh = document.getElementById('nlInitialLoadShade');
+   shadeActive = sh instanceof HTMLElement && !sh.classList.contains('nl-init-shade--done');
+   = 「幕要素が DOM にあり、かつ nl-init-shade--done クラスが付いていない」を true とする。
+   ★これは「クラスの有無」で判定=「実際に画面に見えているか(opacity/visibility)」は見ていない。
+
+3. 幕を畳む JS 経路(popup-entry.js):
+   - dismissInitialLoadShade()(18042): shade に nl-init-shade--done を付ける(min-visible 経過後)。
+   - dismissInlineShadeWhenDataReady(18132): inlineWatchPanelHasRealDataForShade() が true なら畳む+10秒 fallback。
+   - 安全網: initPopup 内 18743 に setTimeout(dismissInitialLoadShade, INLINE_SHADE_DATA_FALLBACK_MS+2000≒12秒)=
+     refresh 完了に依存しない最後の砦。init 末尾 21369 にも 5秒網(INLINE は dismissInlineShadeWhenDataReady)。
+
+4. CSS フェイルセーフ(extension/popup.html:83-96, 156-160, 195-198):
+   .nl-init-shade { animation: nl-init-shade-css-failsafe 15s ease-out forwards; }
+   @keyframes nl-init-shade-css-failsafe {
+     0%,93% { opacity:1; visibility:visible; pointer-events:auto; }
+     100%   { opacity:0; visibility:hidden; pointer-events:none; }
+   }
+   .nl-init-shade--done { opacity:0; pointer-events:none; animation:none; }
+   ★CSS フェイルセーフは 15秒で幕を【視覚的に】完全に消す(opacity:0/visibility:hidden/pointer-events:none)が、
+     nl-init-shade--done クラスは【付けない】。幕要素は DOM に残る。
+
+【司令塔の真因仮説(最有力)】
+CSS フェイルセーフ(15秒)が幕を視覚的に消すが --done クラスを付けないため、shadeActive(クラス判定)が永遠に true。
+=「ユーザーには幕が見えていないのに、診断だけが『ローディング継続』と言い続ける」=診断の誤検知。
+10時間超の配信で shadeActive=true=本物の幕が10時間残るはずがない(JS安全網12秒/CSS15秒で必ず消える)=
+クラスが付かなかっただけ、という状況証拠とも一致。
+
+ただし副次の本物バグも疑う: JS の畳む安全網(12秒)が --done を付けていれば shadeActive は false のはず。
+true ということは、この popup インスタンスで JS の畳む経路が --done を付けられていない(走っていない/別経路)可能性。
+
+【会議で詰めたい論点】
+1. 司令塔仮説(CSS フェイルセーフが --done を付けない→shadeActive 永続 true→誤検知)は本当に唯一/主因か。
+   他に「幕が DOM に --done なしで残り続ける」経路はないか(dismiss が早期 return する条件・別 popup インスタンス・
+   inlineWatchPanelHasRealDataForShade が永遠に false で poll し続ける等)。
+2. JS の畳む安全網(18743 の 12秒 setTimeout)が --done を付けるはずなのに shadeActive=true なのはなぜか。
+   この net が走らない/効かない条件はあるか(initPopup が throw・embedded で別経路・INLINE_PASSIVE 等)。
+3. 修正方針(最小・低リスク・地雷ゼロ):
+   (a) 診断 shadeActive を「クラス判定」でなく「実際に見えているか」で判定する
+       (computed opacity/visibility or --done どちらかで畳まれていれば false)=誤検知を消す。
+   (b) CSS フェイルセーフが消すのと同時に JS でも --done を付ける/animationend で --done を付ける
+       =クラスと視覚を一致させる(診断とも整合)。
+   (c) 両方(診断を視覚ベースに+animationend で --done 付与)。
+   ★地雷回避: popup の refresh()/paint の read path 改変は禁止(2回 revert)。content/会場 不触。
+     幕を「早く消しすぎて空白チラ見え」させない(幕の本来の役割=hidden 要素のガタつき隠しは保つ)。
+4. ②応援ライブビュー/③純Web 側にこの幕/診断はあるか(3画面パリティとして揃える必要があるか)。
+
+【出力してほしいもの】
+- 司令塔仮説の是非(実コード根拠)と、見落としている「幕が --done なしで残る」他経路。
+- 第1段の最小修正案(上記3から1つ)と、それが地雷を踏まない理由・単体テスト方針。
+- これは「本物のバグ」か「診断の誤検知」かの最終判定(ユーザーに正直に伝えるため)。
