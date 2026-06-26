@@ -60,7 +60,10 @@ import {
 } from '../lib/storyUserLaneRenderProbe.js';
 // 数字の出どころ(council/comment-count-provenance-question.txt): 「記録>本家コメ」等の食い違いに対し、
 //   各数字が何を・どこから・いつ数えているかを事実として状態速報に出す(判定はしない=誤検知ゼロ)。
-import { formatCommentCountProvenanceLines } from '../lib/commentCountProvenance.js';
+import {
+  formatCommentCountProvenanceLines,
+  commentCountProvenanceToActionCards
+} from '../lib/commentCountProvenance.js';
 import { buildHealthCells, summarizeHealthVerdict } from '../lib/healthCells.js';
 import { buildVoiceDiagLine } from '../lib/voiceDiag.js';
 import { KEY_VOICE_DIAG } from '../lib/voiceDiagKey.js';
@@ -1843,6 +1846,8 @@ function buildAiShareFullText({ overviewText, livesData, fastDiag, popupDiag, vo
     if (laneRenderDiag) {
       try { actions.push(...storyUserLaneRenderDiagToActionCards(laneRenderDiag, { loadingActive: laneLoadingActive })); } catch { /* no-op */ }
     }
+    // 数字の食い違い「要確認(記録が本家を大幅超=別配信混入/二重計上の疑い)」を症状カードに昇格(ok/normal は出さない)。
+    try { actions.push(...commentCountProvenanceToActionCards(livesData)); } catch { /* no-op */ }
     lines.push('### 検知された対処候補(症状→原因→次の一手)');
     if (!actions.length) {
       lines.push('- 既知パターンに該当する問題は検知されませんでした(未知の症状なら下の診断 JSON を参照)。');
