@@ -1,0 +1,263 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <title>「重い・固まる・開かないと出ない」の根は1つ ― データを作る人と見せる人を分ける設計 ― 君斗りんくの追憶のきらめき</title>
+
+    <link rel="icon" href="../images/favicon.ico" sizes="any">
+    <link rel="icon" type="image/png" sizes="32x32" href="../images/favicon-32.png">
+
+    <meta name="description" content="Chrome 拡張で「開いた瞬間に重い」「画面を開かないとデータが出ない」が別々のバグに見えて根は1つ＝役割の配置ミス。データを作る人(常時動く側)と見せる人(画面)を分け、重い処理は前段で1回、画面は貼るだけにする設計を、storage ベース拡張への翻訳と実例つきで解説。">
+    <meta name="theme-color" content="#f7f1e7">
+    <meta name="robots" content="index,follow">
+    <link rel="canonical" href="https://tsuioku-no-kirameki.com/articles/role-separation-design.html">
+
+    <meta property="og:type" content="article">
+    <meta property="og:url" content="https://tsuioku-no-kirameki.com/articles/role-separation-design.html">
+    <meta property="og:title" content="「重い・固まる・開かないと出ない」の根は1つ ― データを作る人と見せる人を分ける設計">
+    <meta property="og:description" content="別々のバグに見える不具合の根は「役割の配置ミス」。重い処理を前段に寄せ、画面は貼るだけにする設計を storage ベース拡張への翻訳つきで。">
+    <meta property="og:site_name" content="君斗りんくの追憶のきらめき">
+    <meta property="og:locale" content="ja_JP">
+    <meta property="article:published_time" content="2026-06-27T00:00:00+09:00">
+    <meta property="article:author" content="君斗りんく / Kimito-Link Project">
+
+    <script type="application/ld+json">
+      {"@context":"https://schema.org","@type":"TechArticle","headline":"「重い・固まる・開かないと出ない」の根は1つ ― データを作る人と見せる人を分ける設計","datePublished":"2026-06-27","dateModified":"2026-06-27","author":{"@type":"Organization","name":"Kimito-Link Project","url":"https://kimito-link.com/"},"publisher":{"@type":"Organization","name":"Kimito-Link Project","url":"https://kimito-link.com/"},"url":"https://tsuioku-no-kirameki.com/articles/role-separation-design.html","inLanguage":"ja-JP","license":"https://opensource.org/licenses/MIT"}
+    </script>
+
+    <style>
+      :root{--bg1:#f7f1e7;--bg2:#e8dac4;--paper:rgba(255,251,245,.94);--ink:#2c2117;--muted:#4f4338;--line:rgba(88,62,28,.12);--gold:#c98e2b;--blue:#255d9b;--brown:#8a3d19;--shadow:0 18px 44px rgba(70,49,20,.12);--r2:24px;--r3:18px;--maxw:880px;--space-sm:16px;--space-md:24px;--space-lg:32px;--space-xl:48px;--space-2xl:64px;--shell-pad:16px;--lh-body:1.82;--lh-heading:1.22;--anchor-offset:56px;--code-bg:rgba(45,33,23,.05);}
+      @media (min-width:480px){:root{--shell-pad:clamp(16px,3.2vw,28px)}}
+      *{box-sizing:border-box}html{scroll-behavior:smooth;overflow-x:hidden}
+      body{margin:0;color:var(--ink);font-family:"BIZ UDPGothic","Hiragino Sans","Yu Gothic UI",sans-serif;line-height:var(--lh-body);background:radial-gradient(ellipse 70% 48% at 98% 4%,rgba(255,210,228,.35),transparent 46%),radial-gradient(circle at top right,rgba(132,184,207,.4),transparent 28%),linear-gradient(180deg,var(--bg1),#f1e7da 46%,var(--bg2));min-height:100vh}
+      a{color:var(--blue);text-underline-offset:3px}a:hover{color:var(--brown)}
+      .shell{width:min(calc(100% - 2 * var(--shell-pad)),var(--maxw));margin:0 auto}
+      .topbar{position:sticky;top:0;z-index:50;background:rgba(250,244,235,.88);backdrop-filter:blur(16px);border-bottom:1px solid rgba(88,62,28,.07);}
+      .topbar-inner{display:flex;justify-content:space-between;align-items:center;gap:12px;min-height:44px;padding:8px 0}
+      .topbar__logo{display:flex;align-items:center;text-decoration:none;color:inherit}
+      .topbar__logo img{height:34px;width:auto}
+      .topbar__back{display:inline-flex;align-items:center;gap:6px;padding:8px 14px;border-radius:999px;font-size:.85rem;font-weight:600;text-decoration:none;color:var(--ink);background:rgba(255,252,247,.94);border:1px solid var(--line);}
+      .topbar__back:hover{background:#fff;border-color:rgba(88,62,28,.22);color:var(--brown)}
+      header.page{padding:var(--space-xl) 0 var(--space-lg)}
+      header.page .breadcrumb{font-size:.82rem;color:var(--muted);margin:0 0 var(--space-sm)}
+      header.page .breadcrumb a{color:var(--muted)}
+      header.page h1{font-size:clamp(1.55rem,4.2vw,2.15rem);line-height:var(--lh-heading);margin:0 0 var(--space-sm);color:#1a1208}
+      header.page .lead{color:var(--muted);font-size:1rem;margin:0 0 var(--space-md)}
+      header.page .meta{font-size:.84rem;color:var(--muted);display:flex;flex-wrap:wrap;gap:14px;padding:var(--space-sm) 0;border-top:1px solid var(--line);border-bottom:1px solid var(--line);}
+      header.page .meta strong{color:var(--ink)}
+      main{padding-bottom:var(--space-2xl)}
+      section.box{background:var(--paper);border:1px solid var(--line);border-radius:var(--r2);padding:var(--space-lg);margin:0 0 var(--space-lg);box-shadow:var(--shadow);scroll-margin-top:var(--anchor-offset);}
+      section.box h2{font-size:1.2rem;margin:0 0 var(--space-md);color:#1a1208}
+      section.box h2 .num{display:inline-block;min-width:1.8em;color:var(--gold);font-weight:800;margin-right:.2em}
+      section.box h3{font-size:1rem;margin:var(--space-md) 0 8px;color:var(--ink);font-weight:700}
+      section.box p{margin:0 0 var(--space-sm)}
+      section.box ul,section.box ol{margin:0 0 var(--space-sm);padding-left:1.4em}
+      section.box li{margin-bottom:6px}section.box li::marker{color:var(--gold)}
+      nav.toc{background:rgba(255,251,245,.72);border:1px solid var(--line);border-radius:var(--r3);padding:16px 20px;margin:0 0 var(--space-lg)}
+      nav.toc h2{font-size:.95rem;margin:0 0 8px;color:var(--muted);font-weight:700}
+      nav.toc ol{margin:0;padding-left:1.6em;font-size:.92rem;line-height:1.65}
+      nav.toc a{text-decoration:none;color:var(--ink)}nav.toc a:hover{color:var(--brown);text-decoration:underline}
+      .digest{padding:18px 22px;border-radius:var(--r3);background:linear-gradient(160deg,rgba(243,170,37,.1),rgba(15,94,79,.06));border:1px solid var(--line);margin:0 0 var(--space-lg)}
+      .digest h3{margin:0 0 6px;font-size:1rem;color:var(--ink)}
+      .digest ul{margin:0;padding-left:1.4em}.digest li{margin-bottom:4px;font-size:.94rem}
+      .note{font-size:.86rem;color:var(--muted);background:rgba(255,255,255,.55);border-left:3px solid var(--gold);padding:10px 14px;border-radius:8px;margin:var(--space-sm) 0}
+      .note b{color:var(--brown);font-weight:700}
+      code,kbd{font-family:"Menlo","Consolas",monospace;font-size:.92em;background:var(--code-bg);padding:1px 6px;border-radius:4px}
+      pre.code{margin:var(--space-sm) 0;padding:14px 18px;background:#1f1d1a;color:#e8e0d2;border-radius:var(--r3);overflow-x:auto;font-family:"Menlo","Consolas",monospace;font-size:.84rem;line-height:1.6;border:1px solid rgba(0,0,0,.3)}
+      pre.code code{background:transparent;padding:0;color:inherit;font-size:1em}
+      table.cmp{width:100%;border-collapse:collapse;margin:var(--space-sm) 0;font-size:.88rem}
+      table.cmp th,table.cmp td{border:1px solid var(--line);padding:8px 10px;text-align:left;vertical-align:top}
+      table.cmp th{background:rgba(243,170,37,.08);font-weight:700;color:var(--ink)}
+      figure.fig{margin:var(--space-md) 0;text-align:center}
+      figure.fig svg{width:100%;height:auto;max-width:760px;border:1px solid var(--line);border-radius:var(--r3);background:rgba(255,253,248,.6)}
+      figure.fig figcaption{font-size:.82rem;color:var(--muted);margin-top:8px}
+      footer.page{margin-top:var(--space-xl);padding:var(--space-lg) 0 var(--space-2xl);text-align:center;font-size:.85rem;color:var(--muted);border-top:1px solid var(--line)}
+      footer.page a{color:var(--muted)}footer.page a:hover{color:var(--brown)}
+      @media(max-width:520px){section.box{padding:var(--space-md)}pre.code{padding:12px 14px;font-size:.78rem}table.cmp{font-size:.78rem}}
+    </style>
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="shell topbar-inner">
+        <a class="topbar__logo" href="../"><img src="../../extension/images/logo/kimito-link-color.png" width="160" height="34" alt="Kimito-Link Project"></a>
+        <a class="topbar__back" href="./">← 記事一覧へ</a>
+      </div>
+    </header>
+
+    <header class="page">
+      <div class="shell">
+        <p class="breadcrumb"><a href="../">トップ</a> ／ <a href="./">技術記事</a> ／ データを作る人と見せる人を分ける設計</p>
+        <h1>「重い・固まる・開かないと出ない」の根は1つ<br>― データを作る人と見せる人を分ける設計</h1>
+        <p class="lead">Chrome 拡張で何度も出た「<strong>開いた瞬間に重い</strong>」「<strong>画面を開かないとデータが出ない</strong>」。別々のバグに見えて、根は1つ＝<strong>役割の配置ミス</strong>だった。データを<strong>作る人（常に裏で動く側）</strong>と<strong>見せる人（画面）</strong>を分け、重い処理は前段で1回、画面は貼るだけにする。配置を直すと、別々の悩みが同時に消える。</p>
+        <div class="meta">
+          <span>公開日: <strong>2026-06-27</strong></span>
+          <span>著者: <strong>君斗りんく / Kimito-Link Project</strong></span>
+          <span>ライセンス: <strong>MIT</strong></span>
+          <span>対象: <strong>複雑なステートを持つ Chrome 拡張 / Web 開発者</strong></span>
+        </div>
+      </div>
+    </header>
+
+    <main>
+      <div class="shell">
+        <aside class="digest">
+          <h3>3 行要約</h3>
+          <ul>
+            <li><strong>「重い」「開かないと出ない」は別々のバグでなく、同じ1つの根＝役割の配置ミス。</strong>1つの画面に「集める・集計する・描く」を全部やらせると、両方が起きるべくして起きる。</li>
+            <li><strong>役割を分ける。</strong>集める（常駐側）→ 集計する（前段で1回）→ 置く（共通の置き場）→ 見せる（貼るだけ）。重い処理を前段に寄せ、画面は軽くする。</li>
+            <li><strong>機能を足すより、役割をどこに置くか。</strong>配置を直すと、別々だと思っていた不具合が同時に消える。本記事は storage ベース拡張への翻訳と実例つき。</li>
+          </ul>
+        </aside>
+
+        <nav class="toc"><h2>目次</h2>
+          <ol>
+            <li><a href="#problem">1. 症状 ― 別々に見えて、実は同じ根</a></li>
+            <li><a href="#principle">2. 原則 ― 作る人と見せる人を分ける</a></li>
+            <li><a href="#figure">3. 図 ― 変更前と変更後</a></li>
+            <li><a href="#translate">4. storage ベース拡張への翻訳（効くもの・効かないもの）</a></li>
+            <li><a href="#example">5. 実例 ― 「ポップアップを開かなくても出る」</a></li>
+            <li><a href="#pitfalls">6. 落とし穴 ― やってはいけない直し方</a></li>
+            <li><a href="#checklist">7. チェックリスト ― 次に設計するとき</a></li>
+          </ol>
+        </nav>
+
+        <section class="box" id="problem">
+          <h2><span class="num">1</span>症状 ― 別々に見えて、実は同じ根</h2>
+          <p>ライブ配信のコメントを記録・可視化する拡張を作っていて、別々の不具合として何度も潰していた症状がある。</p>
+          <ul>
+            <li><strong>開いた瞬間に重い・タブ全体が固まる</strong> ― 画面（ポップアップ）を開くと、その画面が数万件のコメントを全部読み込んで集計しようとして詰まる。</li>
+            <li><strong>画面を開かないとデータが出ない</strong> ― データの生成が「画面を描いたとき」に紐づいていて、画面を閉じると止まる。</li>
+          </ul>
+          <p>直しても直しても次が出る。モグラ叩きだった。だが一歩引くと、<strong>この2つは同じ1つの設計に起因していた</strong>。1つの画面（クライアント）に「データを読む・集計する・描く」を全部やらせ、しかも「開いたときだけ」動かしていた。だから「開くと重い」も「開かないと出ない」も、起きるべくして起きていた。</p>
+          <p class="note">この気づきは、すれちがい通信アプリのソース（ご本人提供）を読んだことがきっかけだった。そのアプリは「データを作る側」と「見せる側」を完全に分けていて、画面を誰も開いていなくてもサーバ側の定期処理がデータを作り続けていた。</p>
+        </section>
+
+        <section class="box" id="principle">
+          <h2><span class="num">2</span>原則 ― 作る人と見せる人を分ける</h2>
+          <p>一言でいうと、<strong>「データを作る人と見せる人を分け、重い処理は前段で1回だけやり、画面は軽く受け取って貼るだけにする」</strong>。役割を4つに分ける。</p>
+          <table class="cmp">
+            <tr><th>役割</th><th>担当</th><th>すること</th></tr>
+            <tr><td><strong>集める</strong></td><td>常に裏で動く側</td><td>データを集める。表示クライアントの有無に依存しない</td></tr>
+            <tr><td><strong>集計する</strong></td><td>定期ジョブ / 常駐プロセス</td><td>重い集計を1回だけ。誰も画面を開いていなくても進む</td></tr>
+            <tr><td><strong>置く</strong></td><td>共通の置き場</td><td>集計済みを保管。これが正本</td></tr>
+            <tr><td><strong>見せる</strong></td><td>画面（クライアント）</td><td>置いてあるものを貼るだけ。重い読み込み・計算を持たない</td></tr>
+          </table>
+          <p>なぜ強いか。<strong>重い処理を前段に逃がせば、画面は軽い受け取りだけになる（＝開いた瞬間が軽い）。データ生成を裏側に置けば、画面を開いていなくても溜まり続ける（＝開かなくても出る）。</strong>2つの悩みが同じ1つの配置で消える。</p>
+        </section>
+
+        <section class="box" id="figure">
+          <h2><span class="num">3</span>図 ― 変更前と変更後</h2>
+          <p>「今の作り（役割が画面に集中）」と「役割を分けた形」を1枚で対比する。</p>
+          <figure class="fig">
+            <svg viewBox="0 0 760 470" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="役割が画面に集中した今の作りと、役割を4つに分けた形の対比図">
+              <defs><marker id="ar" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#8a7d6f"/></marker></defs>
+              <text x="28" y="32" font-size="16" font-weight="700" fill="#1a1208" font-family="inherit">今の作り ― 1つの画面に全部やらせる</text>
+              <rect x="28" y="48" width="704" height="84" rx="14" fill="#fbeede" stroke="#c98e2b" stroke-width="1.5"/>
+              <rect x="296" y="66" width="168" height="48" rx="10" fill="#fffdf9" stroke="#c98e2b" stroke-width="1.5"/>
+              <text x="380" y="88" text-anchor="middle" font-size="13.5" font-weight="700" fill="#1a1208" font-family="inherit">画面（クライアント）</text>
+              <text x="380" y="106" text-anchor="middle" font-size="11.5" fill="#8a3d19" font-family="inherit">集める・集計・表示を全部</text>
+              <text x="44" y="152" font-size="12" fill="#8a3d19" font-family="inherit">→ 開いた瞬間に全件を読む＝重い・固まる ／ 画面を開かないとデータが出ない</text>
+              <line x1="380" y1="170" x2="380" y2="200" stroke="#8a7d6f" stroke-width="1.5" marker-end="url(#ar)"/>
+              <text x="394" y="190" font-size="12" fill="#56534e" font-family="inherit">役割を分ける</text>
+              <text x="28" y="228" font-size="16" font-weight="700" fill="#1a1208" font-family="inherit">役割を4つに分ける</text>
+              <g font-family="inherit">
+                <rect x="28" y="244" width="166" height="72" rx="12" fill="#e3f0ec" stroke="#0f5e4f" stroke-width="1.5"/>
+                <text x="111" y="270" text-anchor="middle" font-size="13.5" font-weight="700" fill="#1a1208">集める</text>
+                <text x="111" y="289" text-anchor="middle" font-size="11" fill="#0f5e4f">常に裏で動く側</text>
+                <text x="111" y="305" text-anchor="middle" font-size="11" fill="#0f5e4f">（記録の心臓部）</text>
+                <rect x="208" y="244" width="166" height="72" rx="12" fill="#e3f0ec" stroke="#0f5e4f" stroke-width="1.5"/>
+                <text x="291" y="270" text-anchor="middle" font-size="13.5" font-weight="700" fill="#1a1208">集計する</text>
+                <text x="291" y="289" text-anchor="middle" font-size="11" fill="#0f5e4f">定期/常駐で1回</text>
+                <text x="291" y="305" text-anchor="middle" font-size="11" fill="#0f5e4f">不在でも進む</text>
+                <rect x="388" y="244" width="166" height="72" rx="12" fill="#e3f0ec" stroke="#0f5e4f" stroke-width="1.5"/>
+                <text x="471" y="270" text-anchor="middle" font-size="13.5" font-weight="700" fill="#1a1208">置く</text>
+                <text x="471" y="289" text-anchor="middle" font-size="11" fill="#0f5e4f">集計済みの置き場</text>
+                <text x="471" y="305" text-anchor="middle" font-size="11" fill="#0f5e4f">正本はここ</text>
+                <rect x="568" y="244" width="164" height="72" rx="12" fill="#e3f0ec" stroke="#0f5e4f" stroke-width="1.5"/>
+                <text x="650" y="270" text-anchor="middle" font-size="13.5" font-weight="700" fill="#1a1208">見せる</text>
+                <text x="650" y="289" text-anchor="middle" font-size="11" fill="#0f5e4f">画面は貼るだけ</text>
+                <text x="650" y="305" text-anchor="middle" font-size="11" fill="#0f5e4f">軽い・常に出る</text>
+                <line x1="194" y1="280" x2="206" y2="280" stroke="#8a7d6f" stroke-width="1.5" marker-end="url(#ar)"/>
+                <line x1="374" y1="280" x2="386" y2="280" stroke="#8a7d6f" stroke-width="1.5" marker-end="url(#ar)"/>
+                <line x1="554" y1="280" x2="566" y2="280" stroke="#8a7d6f" stroke-width="1.5" marker-end="url(#ar)"/>
+              </g>
+              <rect x="28" y="344" width="704" height="44" rx="12" fill="#e3f0ec" stroke="#0f5e4f" stroke-width="1.5"/>
+              <text x="44" y="371" font-size="13" fill="#1a1208" font-family="inherit">効果：開いた瞬間が軽い ＋ 画面を開かなくてもデータが出る（別々の悩みが同じ1つの配置で消える）</text>
+              <text x="28" y="420" font-size="11.5" fill="#56534e" font-family="inherit">橙＝役割が集中した今の作り　／　緑＝役割を分けた形</text>
+            </svg>
+            <figcaption>図：1つの画面に集中（橙）と、集める・集計・置く・見せるに分けた形（緑）の対比。</figcaption>
+          </figure>
+        </section>
+
+        <section class="box" id="translate">
+          <h2><span class="num">4</span>storage ベース拡張への翻訳（効くもの・効かないもの）</h2>
+          <p>元になったすれちがいアプリは「サーバ＋RDB＋cron」だが、この拡張は「サーバ DB なし・<code>chrome.storage</code> 中心」。<strong>思想はそのまま使えるが、実装テクは翻訳が要る。</strong></p>
+          <h3>この拡張に効くもの</h3>
+          <ul>
+            <li><strong>常駐タスクがデータを作る</strong> ― 「画面を開いたとき」でなく「常に動く側」が生成する。これが「集める＝常駐側」の実装形。</li>
+            <li><strong>二段フィルタ</strong> ― 重い正確な処理の前に、安い近似で候補を激減させる。</li>
+            <li><strong>受け手単位で集約</strong> ― 警告/通知をイベントごとでなく受信者ごとに1つに束ねる（ノイズを防ぐ）。</li>
+            <li><strong>動的キャップ</strong> ― 1回の処理量を流量に反比例させる。混んでいる時ほど軽く。</li>
+            <li><strong>冪等な述語で都度計算</strong> ― 達成・判定などの派生状態は保存せず、元データから読み出し時に導出。「更新忘れの不整合」を構造的に無くす。</li>
+          </ul>
+          <h3>効かない／過剰なもの</h3>
+          <ul>
+            <li><strong>DB トランザクション前提のテク（集合 UPDATE・CASE 原子更新）</strong> ― <code>chrome.storage.local</code> は ACID を保証しないので、SQL 前提の冪等化はそのまま持ち込めない。考え方（最新の1枚で持つ・置換で書く）だけ流用する。</li>
+            <li><strong>リアルタイム性を全部捨てるバッチ化</strong> ― コメントは即時で見たいので、全面バッチは合わない。「即時性を捨てられる所だけ」間引く。</li>
+          </ul>
+          <p class="note"><b>大事な区別。</b>「集計済みを最新の1枚で置き場に持ち、画面はそれを <code>storage.onChanged</code> で受けて貼るだけ」にするのが、storage ベースでの責務分離の核心。画面はポーリングも全件読み込みもしない。</p>
+        </section>
+
+        <section class="box" id="example">
+          <h2><span class="num">5</span>実例 ― 「ポップアップを開かなくても出る」</h2>
+          <p>実際にこの拡張で起きていたこと。コメントの「流れ（タイムライン）」を見せる鏡データを、<strong>ポップアップが描画したときだけ</strong>作っていた。だからポップアップを開いている時しか「コメントが進む」が見えなかった。</p>
+          <p>直し方は素直だった。<strong>記録の心臓部（配信ページで常時動いている側）が、手元にある直近コメントから鏡を作って置く</strong>ようにした。これで画面を開いていなくても鏡が更新され、別画面（プレビューや公開ページ）はそれを貼るだけで「コメントが進む」ようになる。</p>
+          <pre class="code"><code>// 記録側（常に裏で動く）が、定期保存のついでに「鏡」を作って置くだけ
+// ★既に手元にある配列を最新N件に間引くだけ＝重い計算ゼロ・記録を妨げない
+async function persistPanelSummaryIfDue() {
+  await storage.set(panelSummaryKey, summary);     // 既存の軽い定期保存
+  void publishCommentMirrorFromRecorder();         // ← 相乗りで鏡も置く
+}
+
+async function publishCommentMirrorFromRecorder() {
+  const ring = recentCommentRing;                  // 記録済みの直近コメント（手元にある）
+  if (!ring.length) return;
+  const snap = buildMirror({ comments: ring, cap: 60 });  // 最新60件にslice
+  await storage.set(COMMENT_MIRROR_KEY, snap);     // best-effort（失敗で記録を止めない）
+}</code></pre>
+          <p>ポイントは <strong>「画面（見せる人）」でなく「記録（作る人）」が鏡を置く</strong>こと。これが原則「集める＝常に裏で動く側」の、storage ベースでの実装形だ。次の段では、画面側の「開いた瞬間に全件読み込み」も外して、鏡から貼るだけにする（＝開いた瞬間も軽くする）。</p>
+        </section>
+
+        <section class="box" id="pitfalls">
+          <h2><span class="num">6</span>落とし穴 ― やってはいけない直し方</h2>
+          <p>この設計に寄せる過程で、実機で却下になった失敗がある。<strong>「重さ」を直そうとして、かえって壊した</strong>例ばかりだ。</p>
+          <ul>
+            <li><strong>画面の描画パス自体に手を入れる</strong> ― 「軽くするため」に表示更新の読み取り経路をキャッシュで包んだら、全カードがちらついた。<strong>読み取りを増やす/包むのでなく、減らす</strong>のが正解だった。</li>
+            <li><strong>画面まるごとを毎回コピーする</strong> ― 「そっくり同じにするため」に画面の DOM 全体を毎回別ページへ複製したら、数千件規模で重くて却下。<strong>丸ごとでなく、最小の鏡データ（最新N件・必要な項目だけ）</strong>を置くのが軽い。</li>
+            <li><strong>「作る人（記録の心臓部）」に集計ロジックを足す</strong> ― 記録側を複雑にすると、記録そのものの信頼性が落ちる。<strong>作る人は薄く保つ。</strong>重い集計が要るなら、記録とは別の常駐処理に分ける。</li>
+          </ul>
+          <p class="note"><b>共通する教訓。</b>「役割分担」は<strong>設計の問い</strong>であって、コードをそのまま貼る話ではない。各テクは「いつ効くか」を見て、自分の環境に翻訳し、<strong>1つずつ検証して</strong>入れる。一気に全部入れると、別の所を壊す。</p>
+        </section>
+
+        <section class="box" id="checklist">
+          <h2><span class="num">7</span>チェックリスト ― 次に設計するとき</h2>
+          <p>新しいプログラムを設計するとき、この順で問う。</p>
+          <ol>
+            <li><strong>役割分担</strong> ― 生成・集計・保管・表示を分けたか。重い処理は前段か。画面は貼るだけか。</li>
+            <li><strong>即時性</strong> ― 本当にリアルタイムが要るか。一部はバッチ/定期で足りないか。</li>
+            <li><strong>引き算</strong> ― 何を作らないか。公開する情報は最小・明示オプトインか。</li>
+            <li><strong>局所化</strong> ― 複雑なルールを1箇所（1つの純関数/層）に閉じ込めたか。</li>
+            <li><strong>冪等性</strong> ― リトライ/多重実行に強いか。最新の1枚で持っているか。</li>
+            <li><strong>現実確認</strong> ― ドキュメントの「実装済み」を鵜呑みにせず、実コードで前提を立てたか。</li>
+          </ol>
+          <p>機能を足すより、役割をどこに置くか。<strong>設計は配置で決まる。</strong>「重い」「固まる」「開かないと出ない」――個別の不具合に見えるものの多くは、役割の配置ミスが根。配置を直せば、複数の不具合が同時に消える。</p>
+        </section>
+      </div>
+    </main>
+
+    <footer class="page">
+      <div class="shell"><p>&copy; Kimito-Link Project ― <a href="../">トップへ戻る</a> ／ <a href="./">技術記事一覧</a> ／ <a href="../privacy.html">プライバシーポリシー</a></p></div>
+    </footer>
+  </body>
+</html>
