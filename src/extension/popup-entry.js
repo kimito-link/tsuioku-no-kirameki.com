@@ -548,7 +548,7 @@ import { KEY_STAT_CARDS_MIRROR } from '../lib/statCardsMirrorKey.js';
 import { buildStatCardsMirrorSnapshot } from '../lib/statCardsMirror.js';
 // 北極星レーン鏡(公式値レーン)を status→純Web へ送るための publish(laneMirror/statCardsMirror と同じ轍)。
 import { KEY_NORTH_STAR_MIRROR } from '../lib/northStarMirrorKey.js';
-import { buildNorthStarMirrorSnapshot } from '../lib/northStarMirror.js';
+import { buildNorthStarMirrorSnapshot, mergeNorthStarMirrorLanes } from '../lib/northStarMirror.js';
 import { isAvatarObservedInCommentProfileMap } from '../lib/popupAvatarResolver.js';
 import {
   normalizeLv,
@@ -5645,26 +5645,27 @@ let _northStarMirrorLanes = { liveId: '', contributionRanking: [], adRanking: []
  *   publishStatCardsMirror と同型: 受動ビュー(INLINE_PASSIVE)では書かない・3秒 min-gap・best-effort・描画不変。
  *   popup が既に計算済みの rows を渡すだけ(再解決しない)。レーンは部分指定可=与えたレーンだけ更新し、
  *   未指定レーンは合流バッファの直近値を温存する(★1個ずつ自作で似せない=popup の rows を丸ごと積む)。
- * @param {{ liveId?: string, contributionRanking?: any[], adRanking?: any[] }} input
+ *
+ *   ★v0.1.963(council/three-views-parity-SYNTHESIS.md P0): deferWrite。
+ *   貢献度と広告は refreshAllNorthStarMirrorLanes の同じ Promise.allSettled バーストで back-to-back に
+ *   resolve し、両方がここを呼ぶ。従来は「合流バッファ更新の【後】に 3秒 min-gap return」だったため、
+ *   先着レーンが write を勝ち取り、後着レーンは min-gap で return=バッファだけ更新され永続化されず、
+ *   3秒間そのレーンが鏡に出ない(=①にはあるのに②③に出ない『コピー漏れ』)。解決順は非決定的なので
+ *   貢献度が落ちる時も広告が落ちる時もあった(実機 lv350833724 で貢献度6→鏡0)。
+ *   → 個別呼び出しは deferWrite:true でバッファ合流だけ行い write しない。allSettled 完了後に
+ *     deferWrite なしで 1 回だけ呼ぶと、両レーン揃った合流バッファが確実に 1 snapshot として書かれる。
+ *     min-gap 自体は温存(全体 refresh は数秒周期=write 頻度は不変)。
+ * @param {{ liveId?: string, contributionRanking?: any[], adRanking?: any[], deferWrite?: boolean }} input
  */
 function publishNorthStarMirror(input) {
   if (INLINE_PASSIVE) return; // 受動ビュー: 北極星レーン鏡を上書きしない
   try {
     const src = input && typeof input === 'object' ? input : {};
-    const lid = String(src.liveId || '').trim().toLowerCase();
-    // 配信が変わったら合流バッファをリセット(古いレーンを持ち越さない)。
-    if (lid && lid !== _northStarMirrorLanes.liveId) {
-      _northStarMirrorLanes = { liveId: lid, contributionRanking: [], adRanking: [] };
-    } else if (lid) {
-      _northStarMirrorLanes.liveId = lid;
-    }
-    // 与えられたレーンだけ合流バッファに反映(未指定は温存)。
-    if (Array.isArray(src.contributionRanking)) {
-      _northStarMirrorLanes.contributionRanking = src.contributionRanking;
-    }
-    if (Array.isArray(src.adRanking)) {
-      _northStarMirrorLanes.adRanking = src.adRanking;
-    }
+    // 合流ロジックは純関数 mergeNorthStarMirrorLanes に集約(テストで不変条件を固定=コピー漏れ再発防止)。
+    _northStarMirrorLanes = mergeNorthStarMirrorLanes(_northStarMirrorLanes, src);
+    // バースト中の個別呼び出しは合流だけして write しない(後着レーンが min-gap で落ちるのを防ぐ)。
+    //   実際の write は refreshAllNorthStarMirrorLanes の allSettled 完了後の 1 回(deferWrite なし)が担う。
+    if (src.deferWrite) return;
 
     const now = Date.now();
     if (now - _northStarMirrorLastWriteAt < 3000) return; // 3秒 min-gap。
@@ -9860,8 +9861,8 @@ async function refreshNorthStarAdRankingLane(liveId) {
       isNorthStarBody: true,
       freshnessNote
     });
-    // 北極星レーン鏡(広告)を status→純Web 用に publish(popup が描いた rows をそのまま・描画不変・best-effort)。
-    publishNorthStarMirror({ liveId: lid, adRanking: adRows });
+    // 北極星レーン鏡(広告)を合流バッファに積む(deferWrite=バースト中は write しない・後着レーン落ち防止)。
+    publishNorthStarMirror({ liveId: lid, adRanking: adRows, deferWrite: true });
     return;
   }
   const mirrorHtml = typeof bundle?.adRankingMirrorHtml === 'string' ? bundle.adRankingMirrorHtml : null;
@@ -9928,8 +9929,8 @@ async function refreshNorthStarAdRankingLane(liveId) {
       isNorthStarBody: true,
       freshnessNote: formatCardFreshnessNote(nicoadApiCapturedAt, { autoRefreshing: true })
     });
-    // 北極星レーン鏡(広告・nicoad API 直読み経路)を publish(描画不変・best-effort)。
-    publishNorthStarMirror({ liveId: lid, adRanking: nicoadApiRows });
+    // 北極星レーン鏡(広告・nicoad API 直読み経路)を合流バッファに積む(deferWrite=バースト中は write しない)。
+    publishNorthStarMirror({ liveId: lid, adRanking: nicoadApiRows, deferWrite: true });
     return;
   }
   const state = determineNorthStarLaneState('adRanking', { bundle, snap, nicoadApiRows });
@@ -9976,8 +9977,8 @@ async function refreshNorthStarContributionRankingLaneAsync(liveId) {
       isNorthStarBody: true,
       freshnessNote
     });
-    // 北極星レーン鏡を status→純Web 用に publish(popup が描いた top10 をそのまま・描画不変・best-effort)。
-    publishNorthStarMirror({ liveId: String(liveId || '').trim().toLowerCase(), contributionRanking: top10 });
+    // 北極星レーン鏡(貢献度)を合流バッファに積む(deferWrite=バースト中は write しない・後着レーン落ち防止)。
+    publishNorthStarMirror({ liveId: String(liveId || '').trim().toLowerCase(), contributionRanking: top10, deferWrite: true });
     return;
   }
   // ranking 取れない時は既存 host class を付け直して reason 経由 placeholder へ。
@@ -10975,6 +10976,15 @@ async function refreshAllNorthStarMirrorLanes(liveId) {
       northStarLaneTasks.splice(1, 0, refreshNorthStarGiftHistoryLaneAsync(lid));
     }
     await Promise.allSettled(northStarLaneTasks);
+    // ★v0.1.963(council/three-views-parity-SYNTHESIS.md P0): バースト中の個別 publish は deferWrite で
+    //   合流だけしていた。両レーン(貢献度/広告)が揃ったここで 1 回だけ write=後着レーンが min-gap で
+    //   落ちる『コピー漏れ』を断つ(①にあるのに②③に出ない、の根)。合流バッファの最終状態を書くので
+    //   解決順が非決定的でも常に両レーン揃う。INLINE_PASSIVE は publishNorthStarMirror 内で早期 return=無害。
+    publishNorthStarMirror({
+      liveId: lid,
+      contributionRanking: _northStarMirrorLanes.contributionRanking,
+      adRanking: _northStarMirrorLanes.adRanking
+    });
     _northStarRenderProbe.lastReachedLane = 'after_event_lanes';
     // v0.1.617: 北極星レーン(ランキング系)の確定描画はここで完了とみなす。
     //   応援タイムライン / ギフト祝祭は「別DOM領域」で、かつ refreshSupportActivityTimeline は

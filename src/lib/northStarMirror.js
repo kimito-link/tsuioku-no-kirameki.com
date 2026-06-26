@@ -77,6 +77,43 @@ export function buildNorthStarMirrorSnapshot(input, nowMs) {
 }
 
 /**
+ * 北極星レーンの合流バッファに 1 レーン分の部分更新を適用する純関数。
+ *
+ * ★v0.1.963(council/three-views-parity-SYNTHESIS.md P0): 貢献度と広告は別タイミングで resolve するが、
+ *   同じ 1 snapshot に両方入って初めて純Web(②③)が①と一致する。popup-entry.js の publishNorthStarMirror が
+ *   持っていた「liveId 単位で合流・与えたレーンだけ更新・未指定は温存・配信切替でリセット」のロジックを
+ *   純関数として切り出してテスト可能にした(コピー漏れの再発防止=不変条件を単体で固定する)。
+ *
+ *   不変条件: 配信(liveId)が変わらない限り、各レーンへの部分更新を順不同で何回適用しても、
+ *   最終バッファは「最後に与えられた各レーンの値」を両方保持する(後着が先着を消さない)。
+ *
+ * @param {{ liveId: string, contributionRanking: any[], adRanking: any[] }} buffer 現在の合流バッファ
+ * @param {{ liveId?: string, contributionRanking?: any[], adRanking?: any[] }} patch 1 レーン分の部分更新
+ * @returns {{ liveId: string, contributionRanking: any[], adRanking: any[] }} 更新後の新しいバッファ
+ */
+export function mergeNorthStarMirrorLanes(buffer, patch) {
+  const base =
+    buffer && typeof buffer === 'object'
+      ? buffer
+      : { liveId: '', contributionRanking: [], adRanking: [] };
+  const src = patch && typeof patch === 'object' ? patch : {};
+  const lid = String(src.liveId || '').trim().toLowerCase();
+  // 配信が変わったら合流バッファを作り直す(古いレーンを持ち越さない)。
+  const next =
+    lid && lid !== base.liveId
+      ? { liveId: lid, contributionRanking: [], adRanking: [] }
+      : {
+          liveId: lid || base.liveId,
+          contributionRanking: Array.isArray(base.contributionRanking) ? base.contributionRanking : [],
+          adRanking: Array.isArray(base.adRanking) ? base.adRanking : []
+        };
+  // 与えられたレーンだけ反映(未指定は温存)。
+  if (Array.isArray(src.contributionRanking)) next.contributionRanking = src.contributionRanking;
+  if (Array.isArray(src.adRanking)) next.adRanking = src.adRanking;
+  return next;
+}
+
+/**
  * スナップショットから指定レーンの rows を取り出す(純Web の paint に渡す)。
  * @param {NorthStarMirrorSnapshot|null|undefined} snap
  * @param {string} laneId

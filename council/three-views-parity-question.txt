@@ -1,0 +1,56 @@
+【会議の主題】
+①watch本体popup ＝ ②応援ライブビュー(拡張内プレビュー・passive) ＝ ③このURLをWEBで公開(純Web) の3画面が
+「同じ1つの真実」を寸分違わず映す鏡でなければならない、というユーザーの設計要求。いま3画面がバラバラに見える。
+個別バグ潰しでなく「3画面が同じにならない構造的な根」を全部洗い出して、優先順に直す方針を固めたい。
+
+【ユーザーの言葉(正本)】
+「本物の watchtab診断 ＝ 応援ライブビュー ＝ このURLをWEBで公開 は 全部おなじじゃないとだめです」
+星野ロミ型「データを作る人(①が記録)と見せる人(②③)を分ける」の到達点 = 見せる側はどれも同じ鏡を見るので全部同じになるはず。
+
+【司令塔が実コードで確証した事実(推測でなく実装の棚卸し)】
+
+A) 3画面の描画ソース(実コード)
+- ① watch本体popup: refresh() の heavy 全件 read + 各レーンを自前描画(本物の計算経路)。同時に各鏡を publish する側。
+- ② 応援ライブビュー: extension/live-view.html → iframe で本物popupを INLINE_PASSIVE 起動。鏡(laneMirror/northStarMirror/
+     statCardsMirror/commentTimelineMirror)を read して本物paint関数で描く。v0.1.962 で heavy read は走らせない。
+- ③ 純Web: app/live-view.js。status が POST した jsonBlob(=各鏡の集約)を /api/status から GET して同じ本物paint関数で描く。
+  → ②と③は「①が publish した鏡」を見ているだけ。だから鏡が真実を全部運べば①②③は一致するはず。
+
+B) 実機状態速報で出た「①と②③の食い違い」(lv350833724)
+- 北極星 貢献度: 拡張(①生データ) apiRows=6 / 鏡(②③) 0  🔴不一致(コピー漏れ)
+- 北極星 広告:   拡張 apiRows=10 / 鏡 10  ✅一致
+- 純Web公開送信: まだ一度も押していない(③は空=これは正常・別問題)
+- ⚠ローディング継続: ①で11件描画済みなのに overlay が畳まれずローディングが終わらない(overlayバグ・別問題)
+
+C) 貢献度コピー漏れの真因(司令塔が実コードで特定・最有力)
+- publishNorthStarMirror(popup-entry.js:5650) は contributionRanking と adRanking を _northStarMirrorLanes に
+  「liveId単位で合流」してから1枚 publish する設計(片方が他方を消さないため)。
+- しかし合流バッファ更新の【後】に `if (now - _northStarMirrorLastWriteAt < 3000) return;`(3秒 min-gap)がある。
+  → 合流バッファは更新されるが storage write はスキップされる。
+- 貢献度(9966)と広告(9967)は refreshAllNorthStarMirrorLanes の【同じ Promise.allSettled バースト】で back-to-back に走り、
+  両方が publishNorthStarMirror を呼ぶ。先に呼んだ方が write、後に呼んだ方は min-gap で write されない。
+  → 後に解決したレーンのデータはバッファに乗るが永続化されず、次の publish(3秒+後)まで鏡に出ない。
+  → 実機では広告が write を勝ち取り、貢献度が落ちた(apiRows=6 なのに鏡=0)。解決順は非決定的なので、
+     貢献度が落ちる時も広告が落ちる時もある。これが「①と②③が違う」の構造原因の一本。
+
+【会議で詰めたい論点】
+1. 上記Cの「3秒min-gap×合流バッファ後returnで、後発レーンの永続化が落ちる」は本当に貢献度コピー漏れの根か?
+   他にコピー漏れを起こす経路はないか(例: status が jsonBlob を組む時に鏡を読む鮮度判定で落とす / liveId 不一致 /
+   buildNorthStarMirrorSnapshot の cap や整形で落とす)。
+2. 最小・低リスクの直し方は? 候補:
+   (a) min-gap の return を「バッファ更新後に write も保証する」形に変える(例: 落とした write を遅延 flush する /
+       両レーンが揃ってから1回 publish する / min-gap 中の最後の状態を trailing-edge で必ず書く debounce)。
+   (b) refreshAll が両レーンを resolve し終えてから publishNorthStarMirror を1回だけ呼ぶ(バースト中の個別 publish をやめる)。
+   (c) min-gap を撤廃 or 短縮(書き込み頻度とのトレードオフ)。
+   ★地雷回避: popup の refresh()/paint の read path には触れない(過去2回 revert)。content/会場 不触。
+     鏡 publish は best-effort(描画を止めない)。INLINE_PASSIVE は鏡を書かない原則を守る。
+3. 「①と②③が同じにならない根」は貢献度コピー漏れ以外に何があるか(網羅的に・優先順位つきで)。
+   - ローディング overlay が①で畳まれない(描画済みなのに)= ②③では出ない問題か / ①固有か。
+   - イベント順位/ギフト履歴が state=iframe_unrendered で②③に出ない(passive で iframe 描けない)= 構造的にどう揃えるか。
+   - 数字カード/コメントティッカーは既に鏡経路で揃っているか(v0.1.956/960/962)。
+4. 段階方針(第1段で何を直し、第2段以降に何を回すか)。実機で「①②③が同じに見える」までを到達条件にする。
+
+【出力してほしいもの】
+- Cの真因仮説の是非(実コード根拠つき)と、見落としている他のコピー漏れ経路。
+- 第1段の最小修正の具体案(上記2の候補から1つ、地雷を踏まない理由つき)と、その単体テスト方針。
+- 「3画面が同じにならない根」の網羅リスト(優先順)と段階方針。

@@ -1,5 +1,9 @@
 import { describe, it, expect } from 'vitest';
-import { buildNorthStarMirrorSnapshot, restoreNorthStarMirrorRows } from './northStarMirror.js';
+import {
+  buildNorthStarMirrorSnapshot,
+  restoreNorthStarMirrorRows,
+  mergeNorthStarMirrorLanes
+} from './northStarMirror.js';
 import { officialDomRankingRowsToStripRooms } from './officialDomRankingRowsToStripRooms.js';
 
 /**
@@ -131,5 +135,53 @@ describe('restoreNorthStarMirrorRows', () => {
   it('ネガコン: snap=null/未知レーンで空配列', () => {
     expect(restoreNorthStarMirrorRows(null, 'contributionRanking')).toEqual([]);
     expect(restoreNorthStarMirrorRows({ lanes: {} }, 'unknownLane')).toEqual([]);
+  });
+});
+
+/**
+ * P0 コピー漏れの不変条件(council/three-views-parity-SYNTHESIS.md):
+ *   貢献度と広告は別タイミングで resolve するが、最終バッファは両方を保持しなければならない
+ *   (後着レーンが先着を消さない=①にあるのに②③に出ない『コピー漏れ』の再発防止)。
+ */
+describe('mergeNorthStarMirrorLanes', () => {
+  const EMPTY = { liveId: '', contributionRanking: [], adRanking: [] };
+  const CONTRIB = [{ rank: 1, name: '貢献A', contribution: 9 }];
+  const AD = [{ rank: 1, name: '広告A', contribution: 5 }];
+
+  it('貢献度→広告の順に部分更新しても両レーンが揃う', () => {
+    let buf = mergeNorthStarMirrorLanes(EMPTY, { liveId: 'lv1', contributionRanking: CONTRIB });
+    buf = mergeNorthStarMirrorLanes(buf, { liveId: 'lv1', adRanking: AD });
+    expect(buf.contributionRanking).toEqual(CONTRIB);
+    expect(buf.adRanking).toEqual(AD);
+    expect(buf.liveId).toBe('lv1');
+  });
+
+  it('広告→貢献度の【逆順】でも両レーンが揃う(解決順は非決定的)', () => {
+    let buf = mergeNorthStarMirrorLanes(EMPTY, { liveId: 'lv1', adRanking: AD });
+    buf = mergeNorthStarMirrorLanes(buf, { liveId: 'lv1', contributionRanking: CONTRIB });
+    expect(buf.contributionRanking).toEqual(CONTRIB);
+    expect(buf.adRanking).toEqual(AD);
+  });
+
+  it('未指定レーンは温存する(片方だけの更新で他方を消さない)', () => {
+    let buf = mergeNorthStarMirrorLanes(EMPTY, { liveId: 'lv1', contributionRanking: CONTRIB, adRanking: AD });
+    // 貢献度だけ新しい値で更新→広告は前回値を温存。
+    const CONTRIB2 = [{ rank: 1, name: '貢献B', contribution: 8 }];
+    buf = mergeNorthStarMirrorLanes(buf, { liveId: 'lv1', contributionRanking: CONTRIB2 });
+    expect(buf.contributionRanking).toEqual(CONTRIB2);
+    expect(buf.adRanking).toEqual(AD); // 温存
+  });
+
+  it('配信(liveId)が変わったら合流バッファをリセットする(古いレーンを持ち越さない)', () => {
+    let buf = mergeNorthStarMirrorLanes(EMPTY, { liveId: 'lv1', contributionRanking: CONTRIB, adRanking: AD });
+    buf = mergeNorthStarMirrorLanes(buf, { liveId: 'lv2', contributionRanking: CONTRIB });
+    expect(buf.liveId).toBe('lv2');
+    expect(buf.contributionRanking).toEqual(CONTRIB);
+    expect(buf.adRanking).toEqual([]); // lv1 の広告は持ち越さない
+  });
+
+  it('ネガコン: buffer/patch が null でも落ちず空バッファを返す', () => {
+    const buf = mergeNorthStarMirrorLanes(null, null);
+    expect(buf).toEqual({ liveId: '', contributionRanking: [], adRanking: [] });
   });
 });

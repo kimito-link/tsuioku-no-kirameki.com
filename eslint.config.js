@@ -100,8 +100,12 @@ export default [
     //   storage read グルー=lib抽出不可)+初回/onChanged 配線+restoreCommentTimelineRows import を追加=21312→21385
     //   (council/liveview-open-heavy-SYNTHESIS.md・レビュー済み例外)。純データ復元 restoreCommentTimelineRows は
     //   src/lib/commentTimelineMirror.js(test付き)に隔離済み。
+    // 2026-06-27: 北極星レーン鏡の貢献度コピー漏れ修正(3画面パリティ P0)=publishNorthStarMirror の deferWrite と
+    //   refreshAllNorthStarMirrorLanes の allSettled 後 1 回 flush(後着レーンが 3秒min-gap で落ちるのを断つ・
+    //   合流タイミングのグルー=lib抽出不可)を追加=21385→21395(council/three-views-parity-SYNTHESIS.md・レビュー済み例外)。
+    //   合流ロジック本体 mergeNorthStarMirrorLanes は src/lib/northStarMirror.js(test付き)に抽出済み(コピー漏れ不変条件を固定)。
     files: ['src/extension/popup-entry.js'],
-    rules: { 'max-lines': ['error', { max: 21385, skipBlankLines: false, skipComments: false }] }
+    rules: { 'max-lines': ['error', { max: 21395, skipBlankLines: false, skipComments: false }] }
   },
   {
     files: ['src/extension/content-entry.js'],
