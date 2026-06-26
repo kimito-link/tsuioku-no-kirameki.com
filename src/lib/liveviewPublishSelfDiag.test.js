@@ -83,9 +83,9 @@ describe('buildLiveviewPublishSelfDiag', () => {
     expect(d.mirrors.lane.ageSec).toBe(240);
   });
 
-  it('整合チェック: fastDiag apiRows と鏡件数を突合（一致）', () => {
+  it('整合チェック: 拡張が確定状態(ok/no_ranking_data)かつ鏡が新鮮なら突合（一致）', () => {
     const fastDiag = { content: { giftDiagnostics: { '北極星レーン': {
-      '1_貢献度ランキング': { apiRows: 2 }, '+α_広告ランキング': { apiRows: 0 }
+      '1_貢献度ランキング': { apiRows: 2, state: 'ok' }, '+α_広告ランキング': { apiRows: 0, state: 'no_ranking_data' }
     } } } };
     const d = buildLiveviewPublishSelfDiag({ jsonBlob: fullBlob(), fastDiag, currentLiveId: 'lv1', publishKeys: {}, nowMs: NOW });
     expect(d.consistency).toHaveLength(2);
@@ -93,12 +93,34 @@ describe('buildLiveviewPublishSelfDiag', () => {
     expect(d.consistency[1]).toMatchObject({ lane: '北極星 広告', extRows: 0, mirrorRows: 0, match: true });
   });
 
-  it('整合チェック: 不一致を検知（コピー漏れ）', () => {
+  it('整合チェック: 確定状態で件数がズレると不一致(コピー漏れ)', () => {
     const fastDiag = { content: { giftDiagnostics: { '北極星レーン': {
-      '1_貢献度ランキング': { apiRows: 6 } // 拡張は6件あるのに鏡は2件
+      '1_貢献度ランキング': { apiRows: 6, state: 'ok' } // 拡張は確定6件なのに鏡は2件
     } } } };
     const d = buildLiveviewPublishSelfDiag({ jsonBlob: fullBlob(), fastDiag, currentLiveId: 'lv1', publishKeys: {}, nowMs: NOW });
     expect(d.consistency[0]).toMatchObject({ extRows: 6, mirrorRows: 2, match: false });
+  });
+
+  it('整合チェック: 拡張が not_yet(取得中)なら突合せず保留=誤検知しない', () => {
+    // ★実機で踏んだ誤検知: 拡張 apiRows=0/state=not_yet だが鏡には過去値6件。突合すると「拡張0≠鏡6」を
+    //   コピー漏れと誤判定していた。確定状態でないので保留(skipped)にすべき。
+    const fastDiag = { content: { giftDiagnostics: { '北極星レーン': {
+      '1_貢献度ランキング': { apiRows: 0, state: 'not_yet' }
+    } } } };
+    const d = buildLiveviewPublishSelfDiag({ jsonBlob: fullBlob(), fastDiag, currentLiveId: 'lv1', publishKeys: {}, nowMs: NOW });
+    expect(d.consistency[0]).toMatchObject({ skipped: true, match: null });
+    expect(d.consistency[0].reason).toContain('取得中');
+  });
+
+  it('整合チェック: 鏡が古い(>3分)なら確定状態でも突合せず保留', () => {
+    const blob = fullBlob();
+    blob.northStarMirror.capturedAt = NOW - 4 * 60 * 1000; // 北極星鏡が4分前
+    const fastDiag = { content: { giftDiagnostics: { '北極星レーン': {
+      '1_貢献度ランキング': { apiRows: 99, state: 'ok' }
+    } } } };
+    const d = buildLiveviewPublishSelfDiag({ jsonBlob: blob, fastDiag, currentLiveId: 'lv1', publishKeys: {}, nowMs: NOW });
+    expect(d.consistency[0]).toMatchObject({ skipped: true, match: null });
+    expect(d.consistency[0].reason).toContain('古い');
   });
 
   it('fastDiag が無ければ整合チェックは空（フェイルソフト）', () => {
@@ -124,7 +146,7 @@ describe('buildLiveviewPublishSelfDiag', () => {
 describe('formatLiveviewPublishSelfDiagLines', () => {
   it('完全な診断をテキスト行に整形', () => {
     const fastDiag = { content: { giftDiagnostics: { '北極星レーン': {
-      '1_貢献度ランキング': { apiRows: 2 }, '+α_広告ランキング': { apiRows: 0 }
+      '1_貢献度ランキング': { apiRows: 2, state: 'ok' }, '+α_広告ランキング': { apiRows: 0, state: 'no_ranking_data' }
     } } } };
     const d = buildLiveviewPublishSelfDiag({
       jsonBlob: fullBlob(), fastDiag, currentLiveId: 'lv1',
@@ -189,7 +211,7 @@ describe('liveviewPublishSelfDiagToActionCards', () => {
   });
 
   it('件数不一致で warn カード', () => {
-    const fastDiag = { content: { giftDiagnostics: { '北極星レーン': { '1_貢献度ランキング': { apiRows: 6 } } } } };
+    const fastDiag = { content: { giftDiagnostics: { '北極星レーン': { '1_貢献度ランキング': { apiRows: 6, state: 'ok' } } } } };
     const d = buildLiveviewPublishSelfDiag({
       jsonBlob: fullBlob(), fastDiag, currentLiveId: 'lv1',
       publishKeys: { ingestKey: 'k', viewToken: 'v' }, lastPost: { everSent: true, lastOk: true }, nowMs: NOW
@@ -209,7 +231,7 @@ describe('liveviewPublishSelfDiagToActionCards', () => {
 
   it('全部正常ならカードゼロ', () => {
     const fastDiag = { content: { giftDiagnostics: { '北極星レーン': {
-      '1_貢献度ランキング': { apiRows: 2 }, '+α_広告ランキング': { apiRows: 0 }
+      '1_貢献度ランキング': { apiRows: 2, state: 'ok' }, '+α_広告ランキング': { apiRows: 0, state: 'no_ranking_data' }
     } } } };
     const d = buildLiveviewPublishSelfDiag({
       jsonBlob: fullBlob(), fastDiag, currentLiveId: 'lv1',
