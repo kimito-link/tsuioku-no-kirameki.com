@@ -5465,18 +5465,51 @@ function publishStatCardsMirror(input) {
 /** 北極星レーン鏡の publish min-gap 計時。 */
 let _northStarMirrorLastWriteAt = 0;
 /**
- * 北極星レーン鏡(まず contributionRanking=ギフト貢献度)を status→純Web 用に publish する。
+ * 北極星レーン鏡のレーン合流バッファ。
+ *   貢献度(refreshNorthStarContributionRankingLaneAsync)と広告(refreshNorthStarAdRankingLane)は
+ *   別関数で別タイミングに描画されるため、各々が partial(自分のレーンだけ)を publish しても、
+ *   ここで liveId 単位に合流して【両レーンが同じ snapshot に入る】ようにする(片方が他方を消さない)。
+ *   liveId が変われば(配信切替)バッファを作り直す=古い配信のレーンを持ち越さない。
+ * @type {{ liveId: string, contributionRanking: any[], adRanking: any[] }}
+ */
+let _northStarMirrorLanes = { liveId: '', contributionRanking: [], adRanking: [] };
+/**
+ * 北極星レーン鏡(contributionRanking=ギフト貢献度 / adRanking=ニコニ広告)を status→純Web 用に publish する。
  *   publishStatCardsMirror と同型: 受動ビュー(INLINE_PASSIVE)では書かない・3秒 min-gap・best-effort・描画不変。
- *   popup が既に計算済みの rows を渡すだけ(再解決しない)。
- * @param {{ liveId?: string, contributionRanking?: any[] }} input
+ *   popup が既に計算済みの rows を渡すだけ(再解決しない)。レーンは部分指定可=与えたレーンだけ更新し、
+ *   未指定レーンは合流バッファの直近値を温存する(★1個ずつ自作で似せない=popup の rows を丸ごと積む)。
+ * @param {{ liveId?: string, contributionRanking?: any[], adRanking?: any[] }} input
  */
 function publishNorthStarMirror(input) {
   if (INLINE_PASSIVE) return; // 受動ビュー: 北極星レーン鏡を上書きしない
   try {
+    const src = input && typeof input === 'object' ? input : {};
+    const lid = String(src.liveId || '').trim().toLowerCase();
+    // 配信が変わったら合流バッファをリセット(古いレーンを持ち越さない)。
+    if (lid && lid !== _northStarMirrorLanes.liveId) {
+      _northStarMirrorLanes = { liveId: lid, contributionRanking: [], adRanking: [] };
+    } else if (lid) {
+      _northStarMirrorLanes.liveId = lid;
+    }
+    // 与えられたレーンだけ合流バッファに反映(未指定は温存)。
+    if (Array.isArray(src.contributionRanking)) {
+      _northStarMirrorLanes.contributionRanking = src.contributionRanking;
+    }
+    if (Array.isArray(src.adRanking)) {
+      _northStarMirrorLanes.adRanking = src.adRanking;
+    }
+
     const now = Date.now();
     if (now - _northStarMirrorLastWriteAt < 3000) return; // 3秒 min-gap。
     _northStarMirrorLastWriteAt = now;
-    const snap = buildNorthStarMirrorSnapshot(input, now);
+    const snap = buildNorthStarMirrorSnapshot(
+      {
+        liveId: _northStarMirrorLanes.liveId,
+        contributionRanking: _northStarMirrorLanes.contributionRanking,
+        adRanking: _northStarMirrorLanes.adRanking
+      },
+      now
+    );
     void chrome.storage.local.set({ [KEY_NORTH_STAR_MIRROR]: snap }).catch(() => {
       /* best-effort: storage 不可・context 消失 */
     });
@@ -9660,6 +9693,8 @@ async function refreshNorthStarAdRankingLane(liveId) {
       isNorthStarBody: true,
       freshnessNote
     });
+    // 北極星レーン鏡(広告)を status→純Web 用に publish(popup が描いた rows をそのまま・描画不変・best-effort)。
+    publishNorthStarMirror({ liveId: lid, adRanking: adRows });
     return;
   }
   const mirrorHtml = typeof bundle?.adRankingMirrorHtml === 'string' ? bundle.adRankingMirrorHtml : null;
@@ -9726,6 +9761,8 @@ async function refreshNorthStarAdRankingLane(liveId) {
       isNorthStarBody: true,
       freshnessNote: formatCardFreshnessNote(nicoadApiCapturedAt, { autoRefreshing: true })
     });
+    // 北極星レーン鏡(広告・nicoad API 直読み経路)を publish(描画不変・best-effort)。
+    publishNorthStarMirror({ liveId: lid, adRanking: nicoadApiRows });
     return;
   }
   const state = determineNorthStarLaneState('adRanking', { bundle, snap, nicoadApiRows });

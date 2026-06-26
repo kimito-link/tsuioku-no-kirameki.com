@@ -71,6 +71,55 @@ describe('buildNorthStarMirrorSnapshot', () => {
   });
 });
 
+// ── adRanking(ニコニ広告の貢献度ランキング)レーンも contributionRanking と同型で持つ ──
+// nicoad API 由来 row(officialDomRankingRowsToStripRooms が読む同じフィールド)。
+const AD_ROWS = Array.from({ length: 12 }, (_, i) => ({
+  rank: i + 1,
+  name: `広告主${i + 1}`,
+  contribution: 5000 - i * 100,
+  thumbnailUrl: `https://cdn/ad${i}.jpg`,
+  isAnonymous: false,
+  userPageUrl: `https://www.nicovideo.jp/user/${20000000 + i}`,
+  extraNonSerializable: () => 1
+}));
+
+describe('buildNorthStarMirrorSnapshot adRanking', () => {
+  it('contributionRanking と独立に adRanking を持つ(両方同梱)', () => {
+    const snap = buildNorthStarMirrorSnapshot(
+      { liveId: 'lv9', contributionRanking: CONTRIB_ROWS, adRanking: AD_ROWS },
+      1700000000000
+    );
+    expect(Array.isArray(snap.lanes.adRanking)).toBe(true);
+    expect(snap.lanes.contributionRanking.length).toBe(10);
+    expect(snap.lanes.adRanking.length).toBe(10); // cap 10
+  });
+
+  it('adRanking 無しでも空配列(後方互換・投げない)', () => {
+    const snap = buildNorthStarMirrorSnapshot({ liveId: 'lv1', contributionRanking: CONTRIB_ROWS }, 1);
+    expect(snap.lanes.adRanking).toEqual([]);
+  });
+
+  it('JSON-safe(関数等を持ち込まない)', () => {
+    const snap = buildNorthStarMirrorSnapshot({ liveId: 'lv1', adRanking: AD_ROWS }, 1);
+    const round = JSON.parse(JSON.stringify(snap));
+    expect(round.lanes.adRanking[0].extraNonSerializable).toBeUndefined();
+    expect(round.lanes.adRanking[0].contribution).toBe(5000);
+  });
+
+  // ★byte一致: restore→officialDomRankingRowsToStripRooms('ad') が元 rows と同じ rooms を生む。
+  it('round-trip 一致(ad): 元 rows と restore 後 rows が同じ rooms を生む', () => {
+    const top10 = AD_ROWS.slice(0, 10);
+    const direct = officialDomRankingRowsToStripRooms(top10, { userKeyKind: 'ad' });
+    const snap = JSON.parse(
+      JSON.stringify(buildNorthStarMirrorSnapshot({ liveId: 'lv1', adRanking: AD_ROWS }, 1))
+    );
+    const restored = restoreNorthStarMirrorRows(snap, 'adRanking');
+    const viaMirror = officialDomRankingRowsToStripRooms(restored, { userKeyKind: 'ad' });
+    expect(viaMirror.map((x) => [x.nickname, x.count, x.avatarUrl, x.userKey]))
+      .toEqual(direct.map((x) => [x.nickname, x.count, x.avatarUrl, x.userKey]));
+  });
+});
+
 describe('restoreNorthStarMirrorRows', () => {
   it('スナップショットから指定レーンの rows を取り出す', () => {
     const snap = buildNorthStarMirrorSnapshot({ liveId: 'lv1', contributionRanking: CONTRIB_ROWS }, 1);

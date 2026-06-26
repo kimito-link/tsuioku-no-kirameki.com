@@ -81,8 +81,13 @@ export default [
     //   applyLaneMirrorForPassive + getStoryUserLaneEls 切り出し + 北極星ギフト履歴を passive で畳む
     //   collapseNorthStarGiftHistoryLaneForPassive(DOM 参照+storage read グルー=lib抽出不可)を追加
     //   =21067→21150(council/liveview-all-lanes-SYNTHESIS.md・レビュー済み例外)。
+    // 2026-06-26: 純Web /live-view を拡張内プレビューと同じ全レーンにする修正=広告ランキングも鏡に積むため
+    //   publishNorthStarMirror をレーン合流式に変更(_northStarMirrorLanes バッファ+contribution/ad 部分 publish の
+    //   合流。INLINE_PASSIVE/liveId 状態に依存する storage I/O グルー=lib抽出不可)+ refreshNorthStarAdRankingLane の
+    //   filled/nicoadAPI 経路で adRanking publish 2行を追加=21150→21187
+    //   (council/liveview-web-same-as-ext-SYNTHESIS.md・レビュー済み例外)。純関数 buildNorthStarMirrorSnapshot は lib 側。
     files: ['src/extension/popup-entry.js'],
-    rules: { 'max-lines': ['error', { max: 21150, skipBlankLines: false, skipComments: false }] }
+    rules: { 'max-lines': ['error', { max: 21187, skipBlankLines: false, skipComments: false }] }
   },
   {
     files: ['src/extension/content-entry.js'],
