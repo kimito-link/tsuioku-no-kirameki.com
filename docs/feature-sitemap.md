@@ -621,7 +621,7 @@
   - `src/lib/statusTrendKey.js`
   - `src/extension/status-entry.js`
   - `src/lib/statusActionAdvisor.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 97</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 98</summary>
 
 - `app/app.js` — スマホ閲覧用 status Web 版。
 - `app/live-view.js` — 純Web版 応援ライブビュー（拡張なし・PC/スマホ共通）。
@@ -662,6 +662,7 @@
 - `src/lib/isInsideRecommendedLiveSection.js` — v0.1.200: ニコ生 watch ページの「おすすめ生放送」セクション内 DOM を識別する純関数。
 - `src/lib/lengthDelimitedStream.js` — length-delimited（varint 長 + ペイロード）の連続を分割する。
 - `src/lib/liveEndedFlag.js` — 配信終了フラグ。
+- `src/lib/liveviewSnapshotFreshness.js` — 純Web応援ライブビューの「スナップショット丸ごと1枚の鮮度」判定（council/liveview-wholesale-root-SYNTHESIS.md 第1段）。
 - `src/lib/mcpBridge/buildMcpMismatchReasons.js` — MCP L1 snapshot の `diag.mismatchReasons` を組み立てる純関数。
 - `src/lib/mcpBridge/mergeLiveMcpSnapshot.js` — Canonical Snapshot のマージ（Deterministic + Monotonic Sequence）。
 - `src/lib/mcpBridge/schema.js` — L1 Canonical Snapshot の schema 定義（MCP Bridge から AI に返す正準形）。
@@ -725,9 +726,10 @@
 
 ## 🧬 修正系譜マップ(この系統のバグを過去にどう直したか)
 
-> changelog 全 292 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
+> changelog 全 293 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
 
-### 💾 記録件数 (42版)
+### 💾 記録件数 (43版)
+- `v0.1.957` 2026-06-26 — 状態速報に「数字の出どころ」を追加
 - `v0.1.954` 2026-06-26 — 純Web公開コピーの自己診断の「コピー漏れ」誤検知を修正
 - `v0.1.953` 2026-06-26 — 状態速報に純Web公開コピーの自己診断を追加
 - `v0.1.947` 2026-06-25 — WEB公開版に応援者ランキングとギフト貢献度を顔つきで表示
@@ -1244,7 +1246,8 @@
 - `v0.1.673` 2026-06-10 — コメビュの名前をパネルと同じ情報源で補完
 - `v0.1.670` 2026-06-10 — コメビュのアイコンを本家と同じサムネに
 
-### 🩺 診断・状態速報 (89版)
+### 🩺 診断・状態速報 (90版)
+- `v0.1.957` 2026-06-26 — 状態速報に「数字の出どころ」を追加
 - `v0.1.955` 2026-06-26 — 状態速報に「応援レーン描画の自己診断」を追加
 - `v0.1.954` 2026-06-26 — 純Web公開コピーの自己診断の「コピー漏れ」誤検知を修正
 - `v0.1.953` 2026-06-26 — 状態速報に純Web公開コピーの自己診断を追加
