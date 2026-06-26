@@ -363,6 +363,7 @@
 | `src/lib/htmlReportConceptGuide.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/iframeOfficialDomFromRelay.js` | 1 | 記録エンジン(watchページ常駐) |
 | `src/lib/inferBroadcasterUserIdFromComments.js` | 1 | ポップアップ(応援レーン) |
+| `src/lib/initShadeFailsafe.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/inlineBelowWideRowInsert.js` | 1 | 記録エンジン(watchページ常駐) |
 | `src/lib/inlineFirstPaintGate.js` | 1 | 記録エンジン(watchページ常駐) |
 | `src/lib/inlineHostAnchorScoring.js` | 1 | 記録エンジン(watchページ常駐) |

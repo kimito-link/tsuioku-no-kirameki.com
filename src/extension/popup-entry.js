@@ -259,6 +259,7 @@ import {
   playSelfActionCelebrationShower,
   playGiftBahamutCelebration
 } from '../lib/watchCelebrationOverlay.js';
+import { shouldMarkInitShadeDoneOnAnimationEnd } from '../lib/initShadeFailsafe.js';
 import {
   normalizeCommenterFollowMap,
   normalizeCommenterFollowLiveSnapshot,
@@ -17830,6 +17831,8 @@ function initShadeScheduleBlink(who) {
 }
 
 function startInitShadeCharCycle() {
+  // CSS フェイルセーフ(15秒)終了時に --done を付ける hook を1回張る(クラスと視覚の乖離=診断の誤検知を断つ)。
+  ensureInitShadeFailsafeClassSync();
   if (initShadeCharCycleTimer != null) return;
   const speaker = document.getElementById('nlInitShadeSpeaker');
   const serif = document.getElementById('nlInitShadeSerif');
@@ -18037,6 +18040,49 @@ function hideExportWaitPanel() {
 function setExportWaitTechStatus(text) {
   const techEl = document.getElementById('nlExportWaitTech');
   if (techEl) techEl.textContent = String(text || '').trim();
+}
+
+/**
+ * ★v0.1.964(council/loading-overlay-stuck-SYNTHESIS.md): CSS フェイルセーフとクラスの乖離を断つ。
+ *   .nl-init-shade は popup.html の CSS で 15 秒後に nl-init-shade-css-failsafe アニメで【視覚的に】
+ *   opacity:0/visibility:hidden になるが、JS の dismissInitialLoadShade が呼ばれない最悪系(refresh が
+ *   throw / INLINE_MODE のタイマー競合)では nl-init-shade--done クラスが付かない。すると診断の shadeActive
+ *   (popup-entry.js:1068=クラス判定)が永続 true になり、状態速報が「描画済みなのにローディング継続」を
+ *   【誤検知】し続ける(実機 lv350833724・幕は画面から消えているのに警告だけ残る)。
+ *   → CSS アニメ終了(animationend)に hook して、まだ --done が無ければ付ける。これでクラスと視覚が必ず一致。
+ *   ★通常系(JS 安全網 12 秒が先に --done を付与)では animationend 時点で既に --done=何もしない=二重付与なし。
+ *   ★幕の視覚タイミングは CSS が確定済=ここでは何も【見た目】を変えない(クラスを揃えるだけ)=空白チラ見えゼロ。
+ *   冪等(_initShadeFailsafeSyncWired で二重配線防止)。
+ */
+let _initShadeFailsafeSyncWired = false;
+function ensureInitShadeFailsafeClassSync() {
+  if (_initShadeFailsafeSyncWired) return;
+  const shade = document.getElementById('nlInitialLoadShade');
+  if (!(shade instanceof HTMLElement)) return;
+  _initShadeFailsafeSyncWired = true;
+  try {
+    // ★once は使わない: 幕の子要素(顔)は nl-init-shade-bob 等の【無限】アニメで animationend を出さないが、
+    //   将来 finite な子アニメが増えても誤って先に once を消費しないよう、自前で「フェイルセーフ終了」だけに
+    //   反応し、その時だけ自分を外す(animationName ガード=shouldMarkInitShadeDoneOnAnimationEnd)。
+    const onAnimEnd = (/** @type {Event} */ e) => {
+      const name = e instanceof AnimationEvent ? e.animationName : '';
+      if (
+        shouldMarkInitShadeDoneOnAnimationEnd(
+          name,
+          shade.classList.contains('nl-init-shade--done')
+        )
+      ) {
+        shade.classList.add('nl-init-shade--done');
+      }
+      // フェイルセーフ終了の回だけ後始末(他アニメの animationend では何もせず張り続ける)。
+      if (String(name) === 'nl-init-shade-css-failsafe') {
+        shade.removeEventListener('animationend', onAnimEnd);
+      }
+    };
+    shade.addEventListener('animationend', onAnimEnd);
+  } catch {
+    /* no-op: 古い環境で AnimationEvent 不可でも CSS は視覚的に幕を消す(後退ゼロ) */
+  }
 }
 
 function dismissInitialLoadShade() {
