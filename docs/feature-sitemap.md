@@ -259,7 +259,7 @@
   - `src/lib/giftThrowProjectile.js`
 - **吹き出し寿命管理** — 会場の吹き出しの表示上限・追い出し(eviction)ライフサイクル
   - `src/lib/venueBubbleLifecycle.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 165</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 166</summary>
 
 - `scripts/encode-marketing-html-avatars.mjs` — extension/images/marketing-html-avatars/*.png を data URI にし、
 - `scripts/split-avatar-parts.mjs` — 偽市松背景の除去 + パーツ切り出し(one-off アセットパイプライン)
@@ -389,6 +389,7 @@
 - `src/lib/storyUserLaneDisplaySrc.js` — 応援ユーザーレーン（りんく・こん太・たぬ姉）のセル画像 URL。
 - `src/lib/storyUserLaneGuideHtml.js` — 応援ユーザーレーンの案内 HTML（ポップアップ・E2E と共有）
 - `src/lib/storyUserLaneMeta.js` — 応援ユーザーレーン(=popup「アイコン列・グリッド・診断」)の人物タイルに出す
+- `src/lib/storyUserLaneRenderProbe.js` — 応援レーン描画の自己診断（council/lane-render-self-diag-SYNTHESIS.md）。
 - `src/lib/storyUserLaneRowModel.js` — 応援ユーザーレーン: 1 ユーザー候補あたりの tier・サムネ・ソート用スコアを一箇所で組み立てる。
 - `src/lib/suggestInitialInlinePanelPlacement.js` — 新規インストール直後の「おすすめ」インライン配置（storage 未設定時のみ migrate が使う）。
 - `src/lib/supportCelebration.js` — 配信中のマイルストーン演出（コメント件数・イベント順位 UP・ギフト件数）の判定。
@@ -724,7 +725,7 @@
 
 ## 🧬 修正系譜マップ(この系統のバグを過去にどう直したか)
 
-> changelog 全 291 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
+> changelog 全 292 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
 
 ### 💾 記録件数 (42版)
 - `v0.1.954` 2026-06-26 — 純Web公開コピーの自己診断の「コピー漏れ」誤検知を修正
@@ -1175,7 +1176,8 @@
 - `v0.1.699` 2026-06-12 — 読み上げの名前ON/OFF切替を追加
 - `v0.1.698` 2026-06-12 — コメビュにユーザー別の声で読み上げ機能を追加
 
-### 🪟 応援レーン・タイル (65版)
+### 🪟 応援レーン・タイル (66版)
+- `v0.1.956` 2026-06-26 — 純Web応援ライブビューの全レーンを揃えて表示
 - `v0.1.955` 2026-06-26 — 状態速報に「応援レーン描画の自己診断」を追加
 - `v0.1.951` 2026-06-26 — 応援プレビューに応援レーンと貢献度/広告ランキングを表示
 - `v0.1.948` 2026-06-26 — 状態速報を軽量化(鏡を撤去・配信ごとに表示)

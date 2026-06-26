@@ -1006,8 +1006,21 @@ function renderAll({ lvList, summaries, fastDiag, popupDiag, backfillProgress, v
 
   // 純Web公開ペイロード(jsonBlob)を先に組み立てる=自己診断(buildAiShareFullText)が「純Webに送る当の
   //   データ」を読めるようにする。従来は buildAiShareFullText の後に組んでいたため自己診断ができなかった。
+  // 第1段(council/liveview-wholesale-root-SYNTHESIS.md): 全鏡は【この1回の描画ループ】で束ねて1枚にする。
+  //   純Web側が「全レーン揃って・1回だけ鮮度判定」できるよう、統合スナップショットの基準時刻を1つ明示で打つ。
+  //   ★基準時刻は now ではなく【各鏡 capturedAt の最大(=最も新しく popup が描いた瞬間)】にする。now にすると
+  //     popup を17分開いていなくても「常に新鮮」と偽ってしまう。最大なら「データが本当はいつのものか」を誠実に表す。
+  const _snapshotCapturedAt = Math.max(
+    0,
+    Number(laneMirror?.capturedAt) || 0,
+    Number(statCardsMirror?.capturedAt) || 0,
+    Number(northStarMirror?.capturedAt) || 0
+  );
   const jsonBlob = {
     generatedAt: new Date().toISOString(),
+    // 純Web(app/live-view)が per-section ではなく「丸ごと1枚」で鮮度判定するための統合基準時刻
+    //   (鏡がまだ一度も無いなら 0=純Web側は「時刻不明=とりあえず出す」にフォールバック)。
+    snapshotMeta: { capturedAt: _snapshotCapturedAt },
     overview: overviewText,
     lives: livesData,
     fastDiag,
