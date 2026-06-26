@@ -528,7 +528,7 @@ import { buildStoryUserLaneCandidateRow } from '../lib/storyUserLaneRowModel.js'
 import { KEY_LANE_DIAG } from '../lib/laneDiagKey.js';
 import { buildLaneDiagSnapshot } from '../lib/laneDiag.js';
 import { KEY_LANE_MIRROR } from '../lib/laneMirrorKey.js';
-import { buildLaneMirrorSnapshot } from '../lib/laneMirror.js';
+import { buildLaneMirrorSnapshot, restoreLaneMirrorBuckets } from '../lib/laneMirror.js';
 import { KEY_STAT_CARDS_MIRROR } from '../lib/statCardsMirrorKey.js';
 import { buildStatCardsMirrorSnapshot } from '../lib/statCardsMirror.js';
 // 北極星レーン鏡(公式値レーン)を status→純Web へ送るための publish(laneMirror/statCardsMirror と同じ轍)。
@@ -5058,55 +5058,49 @@ function storyUserLaneRenderSignature(
   return `${lid}|${scheme}|${picked.length}\u001e${parts.join('\u001e')}${giftSeg}`;
 }
 
-function renderStoryUserLane() {
+/**
+ * 応援レーンの DOM 要素一式(#sceneStoryUserLane*)を集める。renderStoryUserLane と passive 鏡描画
+ *   (applyLaneMirrorForPassive)が同じ参照を使う=似せて自作しない。stack/4段が無ければ null。
+ * @returns {Record<string, HTMLElement|null>|null}
+ */
+function getStoryUserLaneEls() {
   const stack = /** @type {HTMLElement|null} */ ($('sceneStoryUserLaneStack'));
   const laneLink = /** @type {HTMLElement|null} */ ($('sceneStoryUserLaneLink'));
   const laneGift = /** @type {HTMLElement|null} */ ($('sceneStoryUserLaneGift'));
   const laneKonta = /** @type {HTMLElement|null} */ ($('sceneStoryUserLaneKonta'));
   const laneTanu = /** @type {HTMLElement|null} */ ($('sceneStoryUserLaneTanu'));
-  const hintLink = /** @type {HTMLElement|null} */ ($('sceneStoryUserLaneLinkHint'));
-  const linkWrap = /** @type {HTMLElement|null} */ ($('sceneStoryUserLaneLinkWrap'));
-  const giftWrap = /** @type {HTMLElement|null} */ ($('sceneStoryUserLaneGiftWrap'));
-  const laneAd = /** @type {HTMLElement|null} */ ($('sceneStoryUserLaneAd'));
-  const adWrap = /** @type {HTMLElement|null} */ ($('sceneStoryUserLaneAdWrap'));
-  const guideMidAd = /** @type {HTMLElement|null} */ ($('sceneStoryUserLaneGuideMidAd'));
-  const guideLinesMidAd = /** @type {HTMLElement|null} */ ($('sceneStoryUserLaneGuideLinesMidAd'));
-  const guideTop = /** @type {HTMLElement|null} */ ($('sceneStoryUserLaneGuideTop'));
-  const guideLinesTop = /** @type {HTMLElement|null} */ ($('sceneStoryUserLaneGuideLinesTop'));
-  const guideMidGift = /** @type {HTMLElement|null} */ ($('sceneStoryUserLaneGuideMidGift'));
-  const guideLinesMidGift = /** @type {HTMLElement|null} */ ($('sceneStoryUserLaneGuideLinesMidGift'));
-  const guideMidKonta = /** @type {HTMLElement|null} */ ($('sceneStoryUserLaneGuideMidKonta'));
-  const guideLinesMidKonta = /** @type {HTMLElement|null} */ ($('sceneStoryUserLaneGuideLinesMidKonta'));
-  const guideMidTanu = /** @type {HTMLElement|null} */ ($('sceneStoryUserLaneGuideMidTanu'));
-  const guideLinesMidTanu = /** @type {HTMLElement|null} */ ($('sceneStoryUserLaneGuideLinesMidTanu'));
-  const guideBottom = /** @type {HTMLElement|null} */ ($('sceneStoryUserLaneGuideBottom'));
-  const guideLinesBottom = /** @type {HTMLElement|null} */ ($('sceneStoryUserLaneGuideLinesBottom'));
-  if (!stack || !laneLink || !laneGift || !laneKonta || !laneTanu) return;
-
-  const els = {
+  if (!stack || !laneLink || !laneGift || !laneKonta || !laneTanu) return null;
+  return {
     stack,
     laneLink,
     laneGift,
-    laneAd,
+    laneAd: /** @type {HTMLElement|null} */ ($('sceneStoryUserLaneAd')),
     laneKonta,
     laneTanu,
-    hintLink,
-    linkWrap,
-    giftWrap,
-    adWrap,
-    guideTop,
-    guideLinesTop,
-    guideMidGift,
-    guideLinesMidGift,
-    guideMidAd,
-    guideLinesMidAd,
-    guideMidKonta,
-    guideLinesMidKonta,
-    guideMidTanu,
-    guideLinesMidTanu,
-    guideBottom,
-    guideLinesBottom
+    hintLink: /** @type {HTMLElement|null} */ ($('sceneStoryUserLaneLinkHint')),
+    linkWrap: /** @type {HTMLElement|null} */ ($('sceneStoryUserLaneLinkWrap')),
+    giftWrap: /** @type {HTMLElement|null} */ ($('sceneStoryUserLaneGiftWrap')),
+    adWrap: /** @type {HTMLElement|null} */ ($('sceneStoryUserLaneAdWrap')),
+    guideTop: /** @type {HTMLElement|null} */ ($('sceneStoryUserLaneGuideTop')),
+    guideLinesTop: /** @type {HTMLElement|null} */ ($('sceneStoryUserLaneGuideLinesTop')),
+    guideMidGift: /** @type {HTMLElement|null} */ ($('sceneStoryUserLaneGuideMidGift')),
+    guideLinesMidGift: /** @type {HTMLElement|null} */ ($('sceneStoryUserLaneGuideLinesMidGift')),
+    guideMidAd: /** @type {HTMLElement|null} */ ($('sceneStoryUserLaneGuideMidAd')),
+    guideLinesMidAd: /** @type {HTMLElement|null} */ ($('sceneStoryUserLaneGuideLinesMidAd')),
+    guideMidKonta: /** @type {HTMLElement|null} */ ($('sceneStoryUserLaneGuideMidKonta')),
+    guideLinesMidKonta: /** @type {HTMLElement|null} */ ($('sceneStoryUserLaneGuideLinesMidKonta')),
+    guideMidTanu: /** @type {HTMLElement|null} */ ($('sceneStoryUserLaneGuideMidTanu')),
+    guideLinesMidTanu: /** @type {HTMLElement|null} */ ($('sceneStoryUserLaneGuideLinesMidTanu')),
+    guideBottom: /** @type {HTMLElement|null} */ ($('sceneStoryUserLaneGuideBottom')),
+    guideLinesBottom: /** @type {HTMLElement|null} */ ($('sceneStoryUserLaneGuideLinesBottom'))
   };
+}
+
+function renderStoryUserLane() {
+  const els = getStoryUserLaneEls();
+  if (!els) return;
+  // 本体で直接触るガード要素だけ分割代入(stack/4段は els 経由で paintStoryUserLaneDomFilled へ渡る)。
+  const { guideTop, guideLinesTop, guideBottom, guideLinesBottom } = els;
 
   const faces = {
     faceLink: STORY_GUIDE_FACE_LINK,
@@ -5356,6 +5350,56 @@ function renderStoryUserLane() {
       window.__NLS_LANE_DIAG__();
     }
   }, 3000);
+}
+
+/** passive 鏡描画の再描画 skip 用 signature(変化が無ければ paint しない)。 */
+let _laneMirrorPassiveSig = '';
+
+/**
+ * ★2026-06-26: 受動ビュー(応援プレビュー dock=liveview)で応援レーン(りんく/こん太/広告/たぬ姉)を
+ *   【鏡】から描く。passive は heavy comments を完走できず STORY_SOURCE_STATE.entries が空=
+ *   renderStoryUserLane が即 return して応援レーンが出ない真因(council/liveview-all-lanes-SYNTHESIS.md)。
+ *   → 本物 popup(watch タブ)が publishLaneMirror で書いた KEY_LANE_MIRROR を read だけして、
+ *     restoreLaneMirrorBuckets→paintStoryUserLaneDomFilled(本物の描画関数・似せて自作しない)で描く。
+ *     status-entry が v0.1.948 まで・app/live-view.js が現在やっているのと同じ経路。
+ *   storage read のみ=passive 原則を守る(書かない/注入しない/fetch しない)。重い heavy read に依存しない=軽い。
+ */
+async function applyLaneMirrorForPassive() {
+  if (!INLINE_PASSIVE || !hasExtensionContext()) return;
+  const els = getStoryUserLaneEls();
+  if (!els) return;
+  let snap = null;
+  try {
+    const bag = await chrome.storage.local.get(KEY_LANE_MIRROR);
+    snap = bag && bag[KEY_LANE_MIRROR];
+  } catch {
+    return;
+  }
+  if (!snap || typeof snap !== 'object') return;
+  const buckets = restoreLaneMirrorBuckets(snap);
+  const totalCells =
+    buckets.link.length + buckets.gift.length + buckets.ad.length + buckets.konta.length + buckets.tanu.length;
+  const pickedLength = Math.max(0, Math.floor(Number(snap.pickedLength) || 0) || totalCells);
+  const totalCandidates = Math.max(0, Math.floor(Number(snap.totalCandidates) || 0));
+  const sig =
+    `${String(snap.liveId || '')}|${Number(snap.capturedAt) || 0}|` +
+    `${buckets.link.length}|${buckets.gift.length}|${buckets.ad.length}|${buckets.konta.length}|${buckets.tanu.length}|` +
+    `${pickedLength}|${totalCandidates}`;
+  if (sig === _laneMirrorPassiveSig) return;
+  _laneMirrorPassiveSig = sig;
+  const faces = {
+    faceLink: STORY_GUIDE_FACE_LINK,
+    faceGift: STORY_GUIDE_FACE_GIFT,
+    faceAd: STORY_GUIDE_FACE_GIFT,
+    faceKonta: STORY_GUIDE_FACE_KONTA,
+    faceTanu: STORY_GUIDE_FACE_TANU
+  };
+  if (totalCells === 0) {
+    paintStoryUserLaneDomEmptyGuides(els, faces);
+    return;
+  }
+  const laneDomIo = { storyAvatarLoadGuard, isHttpOrHttpsUrl, storyTileUsesYukkuriTvStyle, upgradeAnonymousAvatarImage };
+  paintStoryUserLaneDomFilled(els, faces, buckets, pickedLength, laneDomIo, { totalCandidates });
 }
 
 /** 応援レーン診断の storage 書き込み(min-gap 3秒・best-effort=popup を止めない)。 */
@@ -10105,6 +10149,24 @@ function paintNorthStarGiftThrowsPanel(html) {
 }
 
 /**
+ * ★2026-06-26: 受動ビュー(応援プレビュー dock=liveview)用に、ギフト履歴レーンを「待たずに畳む」。
+ *   ギフト履歴は koken/sub-app の iframe 描画に依存し passive では描けず(診断 state=iframe_unrendered)、
+ *   その Promise が解決しないため北極星 refreshAll の allSettled 全体を pending させ【北極星レーン全部が
+ *   出ない・止まる】真因だった(council/liveview-all-lanes-SYNTHESIS.md)。passive ではこのレーンを畳んで
+ *   待機UIを撤去し、他レーン(貢献度/広告)を確実に出す。storage read もしない=完全同期で即返る。
+ */
+function collapseNorthStarGiftHistoryLaneForPassive() {
+  try {
+    const body = document.getElementById('northStarLaneBody-giftHistory');
+    if (body instanceof HTMLElement) {
+      hideAndClearNorthStarEventLane('giftHistory', body);
+    }
+  } catch {
+    /* best-effort: 畳み失敗は他レーンを妨げない */
+  }
+}
+
+/**
  * 北極星 レーン 2 (この番組へのギフト履歴)。履歴起点の集計をランキング表示。
  */
 async function refreshNorthStarGiftHistoryLaneAsync(liveId) {
@@ -10686,14 +10748,24 @@ async function refreshAllNorthStarMirrorLanes(liveId) {
     //   allSettled で1本の reject が他を巻き込まないよう二重に保険(各関数も内部 try/catch を持つ)。
     refreshNorthStarProgramPointsLane();
     refreshNorthStarEventCumulativeScoreLane();
-    await Promise.allSettled([
+    // ★2026-06-26: 受動ビュー(応援プレビュー dock=liveview)では、ギフト履歴レーンは koken/sub-app の
+    //   iframe 描画に依存し passive で描けず(診断 state=iframe_unrendered)、その Promise が解決しないため
+    //   この allSettled 全体が pending し【北極星レーン全部(貢献度/広告)が出ない・止まる】真因になっていた
+    //   (council/liveview-all-lanes-SYNTHESIS.md・refreshAllStarted=1/Completed=0/lastReachedLane=after_gift_sync)。
+    //   → passive ではギフト履歴レーンを allSettled に入れず畳む(待たない)。他レーンは即出る。
+    const northStarLaneTasks = [
       refreshNorthStarContributionRankingLaneAsync(lid),
-      refreshNorthStarGiftHistoryLaneAsync(lid),
       refreshNorthStarAdRankingLane(lid),
       refreshNorthStarEventCurrentRankLaneAsync(lid),
       refreshNorthStarEventBroadcastersLaneAsync(lid),
       refreshNorthStarEventVotingSupportersLaneAsync(lid)
-    ]);
+    ];
+    if (INLINE_PASSIVE) {
+      collapseNorthStarGiftHistoryLaneForPassive();
+    } else {
+      northStarLaneTasks.splice(1, 0, refreshNorthStarGiftHistoryLaneAsync(lid));
+    }
+    await Promise.allSettled(northStarLaneTasks);
     _northStarRenderProbe.lastReachedLane = 'after_event_lanes';
     // v0.1.617: 北極星レーン(ランキング系)の確定描画はここで完了とみなす。
     //   応援タイムライン / ギフト祝祭は「別DOM領域」で、かつ refreshSupportActivityTimeline は
@@ -20996,17 +21068,28 @@ async function initPopup() {
   //     polling と無関係に【初回1回 + onChanged 駆動】で呼ぶ。storage read のみ=passive 原則を守る
   //     (書かない/注入しない/fetch しない)。popup の refresh()/paint には触れない(v0.1.948 地雷回避)。
   if (INLINE_PASSIVE) {
-    setTimeout(() => { if (hasExtensionContext()) void applyLightweightPanelSummaryCards(); }, 250);
+    // 初回: 上段3カード(panel_summary)と応援レーン(KEY_LANE_MIRROR 鏡)を read だけして即描く。
+    setTimeout(() => {
+      if (!hasExtensionContext()) return;
+      void applyLightweightPanelSummaryCards();
+      void applyLaneMirrorForPassive();
+    }, 250);
     try {
       chrome.storage.onChanged.addListener((changes, area) => {
         if (area !== 'local' || !hasExtensionContext()) return;
         if (typeof document !== 'undefined' && document.hidden) return; // 裏タブでは動かさない(競合/電池)
-        // 表示中の配信(lv)の panel_summary / watch_snapshot 変化時だけ埋め直す(キー完全一致)。
+        const changedKeys = Object.keys(changes);
+        // 表示中の配信(lv)の panel_summary / watch_snapshot 変化時だけ上段3カードを埋め直す(キー完全一致)。
         const lid = String(watchPopupLastPaintedLiveId || '').trim().toLowerCase();
-        if (!/^lv\d{1,15}$/.test(lid)) return;
-        const watchKeys = [panelSummaryStorageKey(lid), watchSnapshotStorageKey(lid)];
-        if (Object.keys(changes).some((k) => watchKeys.includes(k))) {
-          void applyLightweightPanelSummaryCards();
+        if (/^lv\d{1,15}$/.test(lid)) {
+          const watchKeys = [panelSummaryStorageKey(lid), watchSnapshotStorageKey(lid)];
+          if (changedKeys.some((k) => watchKeys.includes(k))) {
+            void applyLightweightPanelSummaryCards();
+          }
+        }
+        // 応援レーン鏡(本物 popup が watch タブで publish)が更新されたら鏡から描き直す。
+        if (changedKeys.includes(KEY_LANE_MIRROR)) {
+          void applyLaneMirrorForPassive();
         }
       });
     } catch {

@@ -77,8 +77,12 @@ export default [
     // 2026-06-26: 応援プレビュー(passive)の上段3カード退行修正=passive 専用の
     //   applyLightweightPanelSummaryCards 初回+onChanged 配線(INLINE_PASSIVE/lv 状態に依存=lib抽出不可の
     //   storage グルー)を追加=21040→21067(council/liveview-regression-SYNTHESIS.md・レビュー済み例外)。
+    // 2026-06-26: 応援プレビュー(passive)で他レーンを出す修正=応援レーンを鏡(KEY_LANE_MIRROR)から描く
+    //   applyLaneMirrorForPassive + getStoryUserLaneEls 切り出し + 北極星ギフト履歴を passive で畳む
+    //   collapseNorthStarGiftHistoryLaneForPassive(DOM 参照+storage read グルー=lib抽出不可)を追加
+    //   =21067→21150(council/liveview-all-lanes-SYNTHESIS.md・レビュー済み例外)。
     files: ['src/extension/popup-entry.js'],
-    rules: { 'max-lines': ['error', { max: 21067, skipBlankLines: false, skipComments: false }] }
+    rules: { 'max-lines': ['error', { max: 21150, skipBlankLines: false, skipComments: false }] }
   },
   {
     files: ['src/extension/content-entry.js'],

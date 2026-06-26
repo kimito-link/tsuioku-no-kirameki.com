@@ -1,0 +1,63 @@
+# 会議: 応援プレビュー(拡張内 live-view=passive)で「他のレーンが全く出ない・重い」を直す設計
+
+## 状況(ユーザー実機・v0.1.950)
+- ★上段3カード(記録/同接/来場)は出るようになった(panel_summary read で修正済・直前の v0.1.950)。
+- ★しかし「他のレーン(応援レーン=りんく/こん太/たぬ姉、応援者ランキング、北極星レーン)が全く出ない・重い」。
+- ユーザー「瞬間0にはなるけどごっそり取れる、ただ他のレーンなどが全く出ておらず重い」。
+- この領域(会場/レーンの passive 描画)は過去に何度も推測修正で外してユーザーに叱責された=会議で固めてから実装する。
+
+## 環境
+- 応援プレビュー=extension/live-view.html が本物 popup.html を
+  `iframe src=popup.html?inline=1&dock=liveview&lv=<lv>` で全面起動(v0.1.929〜)。
+- dock=liveview = INLINE_PASSIVE(受動ビュー)= storage に書かない/watch に注入しない/外部 fetch しない。
+- watch タブ(本物の記録中 popup)と別タブで、同じ拡張の単一 chrome.storage.local / 拡張 IDB を共有。
+
+## 実コードで確定した事実(会議の前提・推測でない)
+1. 応援レーン描画経路: refresh → heavyDataPromise.then(14133) → watchPopupHeavyCommentsSettled=true(14163)
+   → paintWatchPopupUi(14169) → syncStorySourceEntries → paintStoryUserLaneCoalesced → renderStoryUserLane。
+   = 応援レーンは【heavy comments 全件配列】に依存する。
+2. heavy read 本体(readAllCommentsFromCommentDb / readChunkedComments・13607)は INLINE_PASSIVE ガード無し
+   =passive でも走る【はず】。だが実機診断は「コメント 567」(記録 14,878 件に対して極小)=heavy read が
+   完走していない。原因候補=多タブで watch タブ(本物 popup)と IDB/storage を奪い合い timeout、
+   または直前 v0.1.949(裏タブで iframe src を空→復元)で iframe リロードが heavy read を中断。
+3. 北極星レーンの refreshAll(10657〜)は after_gift_sync(10678)の次の
+   `await Promise.allSettled([貢献度/ギフト履歴/広告/イベント現順位/イベント配信者/投票supporters の6本])`(10689)で
+   止まっている。診断: lastReachedLane="after_gift_sync" / refreshAllStarted=1 / refreshAllCompleted=0 /
+   lastGiftSyncMs=-1(ギフト同期未完了) / lastRunAgoMs=619。allSettled は全 reject でも resolve するので
+   「返らない」=6本のうち1本が永遠に pending(await が返らない)。passive で外部 fetch/iframe を待ち続けている疑い。
+4. 北極星レーンの各 state(診断): 貢献度=ok apiRows5 count0 / 広告=ok apiRows10 count0 / ギフト履歴=iframe_unrendered /
+   番組pt=ok 2270 / Eスコア=event_present_unscrapable / E順位=event_present_unscrapable。
+   =API rows は取れているのに count=0(描画されていない)。ギフト履歴は iframe 未描画。
+5. 応援者ランキング(renderTopSupportRankStrip・11034)も heavy comments(displayEntries)依存
+   =heavy 未完走なら provisional のまま出ない。
+6. withUidPercent=100(この配信は UID 付きコメントが揃っている=応援レーンに出せる人はいる)。
+
+## 論点(会議で裁定してほしい)
+A. 「他のレーンが出ない」の主因は (a)heavy comments read が passive プレビューで完走しない(=応援レーン/
+   応援者ランキングが出ない) か (b)北極星 refreshAll が after_gift_sync の allSettled で1本 pending して
+   止まる(=北極星レーンが出ない) か、両方か。それぞれ独立か連動か。
+B. heavy read が「567件で止まる」真因。多タブ IDB 競合か、iframe リロード中断(v0.1.949)か、passive 固有の
+   別ガードか。567 件は summary/recent 由来の短い arr の可能性(cdbSummary.recent)=heavy 全件に未到達では。
+C. 北極星 refreshAll の allSettled で pending する1本を特定する方法。passive では外部 fetch しない設計なのに
+   なぜ待つのか。ギフト履歴 iframe(iframe_unrendered)が passive で描画できず Promise が解決しない疑い。
+   passive ではギフト履歴 iframe レーンを「最初から畳む(待たない)」べきか。
+D. 「重い」の正体。本物 popup を iframe 全面起動する方式が、watch タブと storage/IDB を奪い合う構造的重さ。
+   応援プレビューで全レーンを出すと、watch タブの記録(心臓部)を巻き込んで重くしないか。トレードオフの線引き。
+E. 設計の選択肢:
+   - (1)passive のまま、heavy read を完走させ+北極星の pending 1本を畳む最小修正で全レーン出す。
+   - (2)応援レーン/応援者ランキングは status と同じ「鏡(KEY_LANE_MIRROR)」を読んで本物 paint で描く
+     (heavy read 不要=軽い・status で実績あり)。北極星も鏡経路。iframe popup の重い描画に依存しない。
+   - (3)重いレーン(heavy 全件が要るもの)はプレビューに出さず、本物 popup で見る割り切り。
+
+## 制約(触らない)
+- popup の refresh()/paint の read path は触らない(v0.1.948 で2回却下された地雷)。
+- 記録の心臓部 content-entry.js は触らない。watch タブの記録を巻き込まない。
+- passive 原則(書かない/watch 注入しない/外部 fetch しない)を守る。storage/IDB read は可。
+- 過去 v0.1.911-913 で会場レーンを3回実機未確認で外した=テスト緑でも実機確認まで「直った」と言わない。
+
+## 出してほしいアウトプット
+- A〜D の裁定(主因の切り分け)。
+- 全レーンを出す設計の選択(E の (1)/(2)/(3) or 別案)と理由。特に「鏡経路で軽く出す(2)」は status で実績が
+  あるので有力では。iframe popup の heavy 描画に依存せず、storage 鏡 read だけで応援レーン/ランキングを出せるか。
+- 実装の PR 分割と具体的な接点(関数名・呼ぶ場所)。
+- 実機検証手順(全レーンが出る・重くない・watch タブの記録を壊さない)。
