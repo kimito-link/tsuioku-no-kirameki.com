@@ -24,7 +24,7 @@ const NORTH_STAR_LANE_ROW_CAP = 10;
  *   勝手に count/avatarUrl にリネームすると純Web の描画が popup とズレる(=似せて自作の轍)。
  *   だから「そのまま間引く(必要フィールドだけ verbatim 抽出)」=純Web で同じ関数に渡せば byte 一致。
  * @typedef {{ rank?: number, name?: string, contribution?: number, thumbnailUrl?: string, isAnonymous?: boolean, userPageUrl?: string }} NorthStarMirrorRow
- * @typedef {{ liveId: string, capturedAt: number, lanes: { contributionRanking: NorthStarMirrorRow[] } }} NorthStarMirrorSnapshot
+ * @typedef {{ liveId: string, capturedAt: number, lanes: { contributionRanking: NorthStarMirrorRow[], adRanking: NorthStarMirrorRow[] } }} NorthStarMirrorSnapshot
  */
 
 /** 1 row を officialDomRankingRowsToStripRooms が読むフィールドだけに絞る(verbatim・JSON-safe)。 */
@@ -54,7 +54,13 @@ function capRows(rows) {
 
 /**
  * 北極星レーン鏡スナップショットを作る。
- * @param {{ liveId?: string, contributionRanking?: any[] }|null|undefined} input popup が持つ各レーンの rows
+ *
+ * ★レーンは「キーを足すだけ」で増やす設計(=星野ロミ理論の丸ごと: popup が既に描画用に持つ rows を
+ *   そのまま間引いて積む。1個ずつ自作で似せない)。contributionRanking(ギフト貢献度)に加えて
+ *   adRanking(ニコニ広告の貢献度ランキング)も verbatim 保持する=純Web側で officialDomRankingRowsToStripRooms
+ *   に渡せば popup と byte 一致。
+ *
+ * @param {{ liveId?: string, contributionRanking?: any[], adRanking?: any[] }|null|undefined} input popup が持つ各レーンの rows
  * @param {number} nowMs capturedAt(epoch ms)
  * @returns {NorthStarMirrorSnapshot}
  */
@@ -64,7 +70,8 @@ export function buildNorthStarMirrorSnapshot(input, nowMs) {
     liveId: String(src.liveId || '').trim(),
     capturedAt: Number(nowMs) || 0,
     lanes: {
-      contributionRanking: capRows(src.contributionRanking)
+      contributionRanking: capRows(src.contributionRanking),
+      adRanking: capRows(src.adRanking)
     }
   };
 }

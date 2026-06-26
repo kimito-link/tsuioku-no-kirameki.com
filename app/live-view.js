@@ -52,9 +52,11 @@ import { isEpochFresh } from '../src/lib/watchUrlFreshness.js';
 import { buildChikuranCardModel } from '../src/lib/chikuranCard.js';
 import { buildChikuranHeaderDom } from '../src/lib/chikuranHeaderDom.js';
 import { anonymousIdenticonDataUrl } from '../src/lib/anonymousIdenticon.js';
-// 公式値レーン(ギフト貢献度ランキング)を本物の strip 描画で出す。popup と同じ lib を再利用(似せて自作しない)。
+// 公式値レーン(ギフト貢献度ランキング/広告ランキング)を本物の strip 描画で出す。popup と同じ lib を再利用(似せて自作しない)。
 import { officialDomRankingRowsToStripRooms } from '../src/lib/officialDomRankingRowsToStripRooms.js';
 import { renderTopSupportRankStripInto } from '../src/lib/paintTopSupportRankStyleIntoElement.js';
+import { buildNorthStarAdRankingStatsHtml } from '../src/lib/buildNorthStarAdRankingStatsHtml.js';
+import { restoreNorthStarMirrorRows } from '../src/lib/northStarMirror.js';
 
 const POLL_INTERVAL_MS = 60_000;
 /** 鏡の鮮度ガード（status-entry.js の MIRROR_FRESH_MS と同値＝3分）。 */
@@ -313,13 +315,13 @@ const _stripIo = {
  *   #northStarLaneBody-contributionRanking。
  * @param {any} snap northStarMirror スナップショット
  */
-function paintNorthStarMirror(snap) {
+function paintNorthStarContributionMirror(snap) {
   const body = document.getElementById('northStarLaneBody-contributionRanking');
   if (!body) return;
   const rows =
-    (snap && snap.lanes && Array.isArray(snap.lanes.contributionRanking) && snap.lanes.contributionRanking) ||
-    (snap && Array.isArray(snap.contributionRanking) && snap.contributionRanking) ||
-    null;
+    restoreNorthStarMirrorRows(snap, 'contributionRanking').length
+      ? restoreNorthStarMirrorRows(snap, 'contributionRanking')
+      : (snap && Array.isArray(snap.contributionRanking) && snap.contributionRanking) || null;
   if (!rows || !rows.length) return; // データ無し=popup の空状態のまま(死にリンクにしない)
   try {
     const rooms = officialDomRankingRowsToStripRooms(rows.slice(0, 10), { userKeyKind: 'contrib' });
@@ -333,6 +335,57 @@ function paintNorthStarMirror(snap) {
   } catch {
     /* no-op: 北極星レーンは best-effort(壊れても他レーンを巻き込まない) */
   }
+}
+
+/**
+ * 北極星レーン鏡（ニコニ広告の貢献度ランキング）。
+ *   snapshot は `{ lanes: { adRanking: rows[] } }`。popup の refreshNorthStarAdRankingLane の filled 経路と
+ *   同じ recipe で描く＝似せて自作しない: rows → officialDomRankingRowsToStripRooms('ad') →
+ *   renderTopSupportRankStripInto + buildNorthStarAdRankingStatsHtml の beforeNote。host は
+ *   popup.html コピーの #northStarLaneBody-adRanking。
+ *   ★累計pt(programAdPts)は鏡に持たないので null＝統計行は「—」表示（popup でも未取得時は同じ表示＝ズレない）。
+ * @param {any} snap northStarMirror スナップショット
+ */
+function paintNorthStarAdMirror(snap) {
+  const body = document.getElementById('northStarLaneBody-adRanking');
+  if (!body) return;
+  const rows = restoreNorthStarMirrorRows(snap, 'adRanking');
+  if (!rows || !rows.length) return; // データ無し=popup の空状態のまま(死にリンクにしない)
+  try {
+    const adRows = rows.slice(0, 10);
+    const rooms = officialDomRankingRowsToStripRooms(adRows, { userKeyKind: 'ad' });
+    let rankingSum = 0;
+    for (const row of adRows) {
+      const c = Number(row?.contribution);
+      if (Number.isFinite(c) && c > 0) rankingSum += c;
+    }
+    const beforeNoteHtml = buildNorthStarAdRankingStatsHtml({
+      programAdPts: null, // 累計pt は鏡に無い＝popup の未取得時と同じ「—」
+      rankingContributionSum: rankingSum,
+      rankingRowCount: adRows.length
+    });
+    renderTopSupportRankStripInto(body, rooms, {
+      noteText:
+        'ニコニ広告の貢献度ランキング（公式ページ相当）。画面上部の累計ptなどと、各行の「貢」は指標や期間が異なり一致しないことがあります',
+      unitSuffix: '貢',
+      ariaLabel: '広告ランキング',
+      beforeNoteHtml,
+      isNorthStarBody: true,
+      ..._stripIo
+    });
+  } catch {
+    /* no-op: 北極星レーンは best-effort(壊れても他レーンを巻き込まない) */
+  }
+}
+
+/**
+ * 北極星レーン鏡を全レーン塗る（貢献度＋広告）。レーンは「キーを足すだけ」で増やす設計＝
+ *   星野ロミ理論の丸ごと（拡張内プレビューと同じ全レーンを純Webにも出す）。
+ * @param {any} snap northStarMirror スナップショット
+ */
+function paintNorthStarMirror(snap) {
+  paintNorthStarContributionMirror(snap);
+  paintNorthStarAdMirror(snap);
 }
 
 /** 配信者カード（ちくらん風ヘッダー）: 本物 buildChikuranHeaderDom で popup の配信者ヘッダーへ。 */
