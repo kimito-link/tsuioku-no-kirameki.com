@@ -118,6 +118,11 @@ import {
   buildPanelLiveSummary,
   panelSummaryStorageKey
 } from '../lib/panelLiveSummary.js';
+// コメントタイムライン鏡(council/liveview-wholesale-root + 星野ロミ型 役割分担): popup を開かなくても
+//   純Web/プレビューで「コメントが進む」よう、記録の心臓部=content が手元の recentCommentRing から
+//   最新N件の鏡を publish する。popup の描画に依存しない=star Romi の「cron がクライアント不在でも生成」型。
+import { buildCommentTimelineMirrorSnapshot } from '../lib/commentTimelineMirror.js';
+import { KEY_COMMENT_TIMELINE_MIRROR } from '../lib/commentTimelineMirrorKey.js';
 import {
   buildPanelMetricsResponse,
   PANEL_METRICS_MESSAGE_TYPE
@@ -10443,6 +10448,35 @@ async function persistPanelLiveSummaryIfDue(force = false) {
   try {
     await runStorageOpWithTimeout(
       () => chrome.storage.local.set({ [pKey]: payload }),
+      INGEST_TIMING.persistWriteTimeoutMs
+    );
+  } catch (err) {
+    if (err !== STORAGE_OP_TIMED_OUT) throw err;
+  }
+  // 星野ロミ型(役割分担): popup を開かなくても純Web/プレビューで「コメントが進む」よう、content が
+  //   手元の recentCommentRing から最新N件の鏡を併せて publish(best-effort・記録を止めない)。
+  //   ★既に手元にある配列を間引くだけ=重い計算ゼロ。panel_summary と同じ cadence に相乗り。
+  void publishCommentTimelineMirrorFromContent(now);
+}
+
+/** content からコメントタイムライン鏡を publish(best-effort=記録を妨げない)。 */
+async function publishCommentTimelineMirrorFromContent(nowMs) {
+  try {
+    const lid = String(liveId || '').trim().toLowerCase();
+    if (!/^lv\d{1,15}$/.test(lid)) return;
+    const ring = Array.isArray(recentCommentRing) ? recentCommentRing : [];
+    if (!ring.length) return;
+    const snap = buildCommentTimelineMirrorSnapshot({
+      liveId: lid,
+      comments: ring,
+      capturedAt: nowMs,
+      // content の行は nickname を持たない=表示名は userId 由来の最小ラベル。顔は記録済み avatarUrl のみ。
+      resolveName: (c) => (c && c.userId ? String(c.userId) : ''),
+      resolveAvatar: (c) => (c && c.avatarUrl ? String(c.avatarUrl) : '')
+    });
+    if (!snap) return;
+    await runStorageOpWithTimeout(
+      () => chrome.storage.local.set({ [KEY_COMMENT_TIMELINE_MIRROR]: snap }),
       INGEST_TIMING.persistWriteTimeoutMs
     );
   } catch (err) {

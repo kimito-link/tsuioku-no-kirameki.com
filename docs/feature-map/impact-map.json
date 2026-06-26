@@ -544,6 +544,20 @@
       ]
     },
     {
+      "file": "src/lib/commentTimelineMirrorKey.js",
+      "featureCount": 3,
+      "features": [
+        "content",
+        "popup",
+        "status"
+      ],
+      "labels": [
+        "記録エンジン(watchページ常駐)",
+        "ポップアップ(応援レーン)",
+        "状態速報ページ"
+      ]
+    },
+    {
       "file": "src/lib/htmlEscape.js",
       "featureCount": 3,
       "features": [
@@ -1038,15 +1052,15 @@
       ]
     },
     {
-      "file": "src/lib/commentTimelineMirrorKey.js",
+      "file": "src/lib/commentTimelineMirror.js",
       "featureCount": 2,
       "features": [
-        "popup",
-        "status"
+        "content",
+        "popup"
       ],
       "labels": [
-        "ポップアップ(応援レーン)",
-        "状態速報ページ"
+        "記録エンジン(watchページ常駐)",
+        "ポップアップ(応援レーン)"
       ]
     },
     {
@@ -2795,16 +2809,6 @@
     },
     {
       "file": "src/lib/commentTickerLatestHtml.js",
-      "featureCount": 1,
-      "features": [
-        "popup"
-      ],
-      "labels": [
-        "ポップアップ(応援レーン)"
-      ]
-    },
-    {
-      "file": "src/lib/commentTimelineMirror.js",
       "featureCount": 1,
       "features": [
         "popup"

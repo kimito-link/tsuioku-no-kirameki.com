@@ -107,7 +107,7 @@
   - `src/lib/monotonicCommentCount.js`
 - **storage キー定義** — chrome.storage のキー名の正本(nls_comments_<lv> 等)
   - `src/lib/storageKeys.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 32</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 33</summary>
 
 - `src/lib/autoBackupState.js` — v0.1.808(星野ロミ式コンポーネント化・第1弾): content-entry.js の巨大化を抑えるため、
 - `src/lib/blobDownload.js` — Blob を指定ファイル名で保存する。
@@ -119,6 +119,7 @@
 - `src/lib/commentRecord.js` — コメント1件の形・重複排除・マージ（純関数）
 - `src/lib/commentRecordBreakdown.js` — v0.1.627: コメント記録カードの「内訳」表示用・純関数。
 - `src/lib/commentTailBuffer.js` — v0.1.505: コメント保存の「テールバッファ（追記式チャンク）」純関数群。
+- `src/lib/commentTimelineMirrorKey.js` — コメントタイムライン鏡の storage キー正本（council/liveview-wholesale-root-SYNTHESIS.md 第2段）。
 - `src/lib/devMonitorTrendSession.js` — 開発監視トレンド: sessionStorage（セッション）+ chrome.storage.local（永続・最大7日）
 - `src/lib/displayRecordedCount.js` — 「画面に出す記録件数」の正本を1つに固定する純関数(v0.1.839・第1)。
 - `src/lib/giftRecord.js` — ギフト/広告ユーザーの永続化（純関数）
@@ -624,7 +625,7 @@
   - `src/lib/statusTrendKey.js`
   - `src/extension/status-entry.js`
   - `src/lib/statusActionAdvisor.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 98</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 99</summary>
 
 - `app/app.js` — スマホ閲覧用 status Web 版。
 - `app/live-view.js` — 純Web版 応援ライブビュー（拡張なし・PC/スマホ共通）。
@@ -649,6 +650,7 @@
 - `src/lib/buildWatchMetaCardAudienceViewModel.js` — Watch メタカード「観客」ブロック用 ViewModel（DOM 非依存）。
 - `src/lib/chikuranHeaderDom.js` — 「ちくらん風」配信者カードのヘッダー DOM ビルダー。
 - `src/lib/classifyFeatureCategory.js` — ファイルを機能カテゴリへ自動分類する純関数(v0.1.840・マップ網羅化 第1)。
+- `src/lib/commentTimelineMirror.js` — コメントタイムラインの「鏡」スナップショット純関数（council/liveview-wholesale-root-SYNTHESIS.md 第2段）。
 - `src/lib/consoleErrorBuffer.js` — v0.1.201: window.error / unhandledrejection を捕捉する ring buffer。
 - `src/lib/devMonitorDebugSubset.js` — ポップアップ「開発・テスト用 監視」用: watch スナップショット _debug から
 - `src/lib/devReloadSignal.js` — 開発用ホットリロードのシグナル判定（純関数）。
@@ -729,7 +731,7 @@
 
 ## 🧬 修正系譜マップ(この系統のバグを過去にどう直したか)
 
-> changelog 全 296 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
+> changelog 全 297 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
 
 ### 💾 記録件数 (43版)
 - `v0.1.957` 2026-06-26 — 状態速報に「数字の出どころ」を追加
@@ -1364,7 +1366,8 @@
 - `v0.1.806` 2026-06-17 — HTML保存の失敗を根治+完了音声を追加
 - `v0.1.785` 2026-06-16 — 状態ページのタイムアウト警告を拡張エラー欄に出さない
 
-### ⚡ 描画・性能 (48版)
+### ⚡ 描画・性能 (49版)
+- `v0.1.961` 2026-06-26 — ポップアップを開かなくてもコメントが進むように
 - `v0.1.960` 2026-06-26 — 純Web応援ライブビューでコメントが進むように
 - `v0.1.958` 2026-06-26 — 状態速報の冒頭に「この診断の信頼性」を追加
 - `v0.1.955` 2026-06-26 — 状態速報に「応援レーン描画の自己診断」を追加
