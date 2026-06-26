@@ -182,6 +182,19 @@
           <h2>記事一覧</h2>
           <ul class="article-list">
             <li>
+              <a class="article-card" href="role-separation-design.html">
+                <div class="article-card__date">2026-06-27 公開</div>
+                <div class="article-card__title">「重い・固まる・開かないと出ない」の根は1つ ― データを作る人と見せる人を分ける設計</div>
+                <p class="article-card__sub">Chrome 拡張で別々のバグに見えた「開いた瞬間に重い」「画面を開かないとデータが出ない」が、実は同じ1つの根＝役割の配置ミスだった。データを作る人（常に裏で動く側）と見せる人（画面）を分け、重い処理は前段で1回、画面は貼るだけにする設計。サーバ＋RDB 前提の手法を storage ベースの拡張へ翻訳（効くもの・効かないもの）し、「ポップアップを開かなくてもコメントが進む」実例と、実機で却下になった落とし穴も併記。</p>
+                <div class="article-card__tags">
+                  <span class="article-card__tag">chrome extension</span>
+                  <span class="article-card__tag">architecture</span>
+                  <span class="article-card__tag">separation of concerns</span>
+                  <span class="article-card__tag">performance</span>
+                </div>
+              </a>
+            </li>
+            <li>
               <a class="article-card" href="dom-comment-harvest-identity-gate.html">
                 <div class="article-card__date">2026-06-18 公開</div>
                 <div class="article-card__title">消えた DOM マーカーに依存しないコメント収穫 ― 「番号」ではなく「身元＋本文」で受理する構造ゲート</div>
