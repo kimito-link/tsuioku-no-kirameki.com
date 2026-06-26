@@ -86,8 +86,13 @@ export default [
     //   合流。INLINE_PASSIVE/liveId 状態に依存する storage I/O グルー=lib抽出不可)+ refreshNorthStarAdRankingLane の
     //   filled/nicoadAPI 経路で adRanking publish 2行を追加=21150→21187
     //   (council/liveview-web-same-as-ext-SYNTHESIS.md・レビュー済み例外)。純関数 buildNorthStarMirrorSnapshot は lib 側。
+    // 2026-06-26: 応援レーン描画の自己診断=renderStoryUserLane/applyLaneMirrorForPassive の入口/分岐/出口を
+    //   _storyUserLaneRenderProbe に記録(DOM 参照+描画関数フックのグルー=lib抽出不可)+ countStoryUserLaneDomTiles
+    //   + 診断JSON への storyUserLaneRenderProbe 露出を追加=21187→21271
+    //   (council/lane-render-self-diag-SYNTHESIS.md・レビュー済み例外)。純データの build/format/cards は
+    //   src/lib/storyUserLaneRenderProbe.js(test付き)に隔離済み。
     files: ['src/extension/popup-entry.js'],
-    rules: { 'max-lines': ['error', { max: 21187, skipBlankLines: false, skipComments: false }] }
+    rules: { 'max-lines': ['error', { max: 21271, skipBlankLines: false, skipComments: false }] }
   },
   {
     files: ['src/extension/content-entry.js'],

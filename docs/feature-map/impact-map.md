@@ -173,6 +173,7 @@
 | `src/lib/statusFastDiagLite.js` | 2 | 記録エンジン(watchページ常駐) / 状態速報ページ |
 | `src/lib/statusFormat.js` | 2 | 状態速報ページ / Web版 状態(スマホ) |
 | `src/lib/storageErrorState.js` | 2 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) |
+| `src/lib/storyUserLaneRenderProbe.js` | 2 | ポップアップ(応援レーン) / 状態速報ページ |
 | `src/lib/supportActivityTimeline.js` | 2 | コメビュ(別窓) / ポップアップ(応援レーン) |
 | `src/lib/supporterRanking.js` | 2 | ポップアップ(応援レーン) / 状態速報ページ |
 | `src/lib/supportTimelineHtml.js` | 2 | コメビュ(別窓) / ポップアップ(応援レーン) |

@@ -41,6 +41,13 @@ import {
   recordLiveviewPublishOutcome,
   summarizeLiveviewPublishOutcome
 } from '../lib/liveviewPublishOutcome.js';
+// 応援レーン描画の自己診断(council/lane-render-self-diag-SYNTHESIS.md): 「鏡にはあるのに画面に出ない/
+//   ローディングが終わらない」を状態速報で切り分ける。popup の storyUserLaneRenderProbe を読むだけ。
+import {
+  buildStoryUserLaneRenderDiag,
+  formatStoryUserLaneRenderDiagLines,
+  storyUserLaneRenderDiagToActionCards
+} from '../lib/storyUserLaneRenderProbe.js';
 import { buildHealthCells, summarizeHealthVerdict } from '../lib/healthCells.js';
 import { buildVoiceDiagLine } from '../lib/voiceDiag.js';
 import { KEY_VOICE_DIAG } from '../lib/voiceDiagKey.js';
@@ -1711,6 +1718,21 @@ function buildAiShareFullText({ overviewText, livesData, fastDiag, popupDiag, vo
   } catch {
     publishSelfDiag = null;
   }
+  // 応援レーン描画の自己診断(popup の storyUserLaneRenderProbe から)。「鏡にはあるのに画面に出ない/
+  //   ローディングが終わらない」を切り分ける。popupDiag.popup 経由(northStarRenderProbe と同じ場所)。
+  let laneRenderDiag = null;
+  // 「描画済みなのにローディングが終わらない」検知用: 視聴中の配信の perfDiag.shadeActive(ローディング幕)。
+  let laneLoadingActive = false;
+  try {
+    const probeSnap = (popupDiag?.popup ?? popupDiag)?.storyUserLaneRenderProbe || null;
+    laneRenderDiag = buildStoryUserLaneRenderDiag(probeSnap);
+    const watching = Array.isArray(livesData)
+      ? livesData.find((l) => l && l.recording && l.perfDiag) || livesData.find((l) => l && l.perfDiag)
+      : null;
+    laneLoadingActive = Boolean(watching && watching.perfDiag && watching.perfDiag.shadeActive === true);
+  } catch {
+    laneRenderDiag = null;
+  }
   if (overviewText) {
     lines.push('### 概要');
     lines.push(overviewText);
@@ -1750,6 +1772,10 @@ function buildAiShareFullText({ overviewText, livesData, fastDiag, popupDiag, vo
     if (publishSelfDiag) {
       try { actions.push(...liveviewPublishSelfDiagToActionCards(publishSelfDiag)); } catch { /* no-op */ }
     }
+    // 応援レーン描画の致命(鏡にはあるのに画面0件/例外/描画済みなのにローディング継続)を症状カードに昇格。
+    if (laneRenderDiag) {
+      try { actions.push(...storyUserLaneRenderDiagToActionCards(laneRenderDiag, { loadingActive: laneLoadingActive })); } catch { /* no-op */ }
+    }
     lines.push('### 検知された対処候補(症状→原因→次の一手)');
     if (!actions.length) {
       lines.push('- 既知パターンに該当する問題は検知されませんでした(未知の症状なら下の診断 JSON を参照)。');
@@ -1779,6 +1805,16 @@ function buildAiShareFullText({ overviewText, livesData, fastDiag, popupDiag, vo
     try {
       const selfLines = formatLiveviewPublishSelfDiagLines(publishSelfDiag);
       if (selfLines.length) { for (const l of selfLines) lines.push(l); lines.push(''); }
+    } catch {
+      /* no-op: 自己診断の失敗は状態速報を壊さない */
+    }
+  }
+  // 応援レーン描画の自己診断(鏡N件 → 画面M件描画/止まった step/描画済みなのにローディング継続)。
+  //   「鏡にはあるのに画面に出ない」を状態速報だけで切り分けられるようにする(スクショ往復ゼロ)。
+  if (laneRenderDiag && laneRenderDiag.present) {
+    try {
+      const laneLines = formatStoryUserLaneRenderDiagLines(laneRenderDiag, { loadingActive: laneLoadingActive });
+      if (laneLines.length) { for (const l of laneLines) lines.push(l); lines.push(''); }
     } catch {
       /* no-op: 自己診断の失敗は状態速報を壊さない */
     }
