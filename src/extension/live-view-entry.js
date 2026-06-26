@@ -175,9 +175,51 @@ function bootstrap() {
   if (frame.getAttribute('src') !== src) frame.setAttribute('src', src);
   frame.hidden = false;
 
+  // ★2026-06-26: このタブが裏に回っている間は iframe(本物 popup を全面起動)を止める。
+  //   応援プレビューは重い popup-entry を丸ごと iframe で起動するため、タブを閉じずに診断
+  //   (status)タブへ切り替えると、裏で生きた popup が同じ拡張の単一 LevelDB(chrome.storage.local)を
+  //   診断と奪い合い「診断が重くて開かない」を招く(記録の心臓部の I/O 競合)。
+  //   → document.hidden になったら iframe の src を空にして popup-entry を停止し、可視復帰で復元する。
+  //     lv は URL に保持されているので復元は安全(状態は popup 側が storage/snapshot から再構成)。
+  //   この変更は live-view タブ内で完結=popup の refresh/paint・status には一切触れない。
+  setupPreviewVisibilityPause(frame, src);
+
   // 配信が出るときだけ「このURLをWEBでも公開する」を配線+表示。
   if (publishBar) publishBar.hidden = false;
   setupPublishButton();
+}
+
+/** setupPreviewVisibilityPause の二重登録防止(bootstrap が複数回呼ばれても1回だけ配線)。 */
+let _previewVisibilityWired = false;
+
+/**
+ * プレビュータブが裏に回ったら iframe(本物 popup の全面起動)を止め、表に戻ったら復元する。
+ *   - 裏(document.hidden): src を空にして popup-entry を破棄=storage を触らせない(診断との競合解消)。
+ *   - 表(visible): 保存しておいた src を再セット=popup-entry を再起動(lv は URL 保持で安全)。
+ *   - 受動ビュー(dock=liveview)なので停止/再起動しても watch や storage を壊さない。
+ * @param {HTMLIFrameElement} frame
+ * @param {string} liveSrc iframe の本来の src(復元用)
+ */
+function setupPreviewVisibilityPause(frame, liveSrc) {
+  if (_previewVisibilityWired) return;
+  _previewVisibilityWired = true;
+  const apply = () => {
+    try {
+      if (typeof document === 'undefined') return;
+      if (document.hidden) {
+        // 裏に回った: 本物 popup を止める(src を空に)。hidden は維持しない(表に戻れば復元する)。
+        if (frame.getAttribute('src')) frame.setAttribute('src', '');
+      } else {
+        // 表に戻った: src を復元して popup-entry を再起動。
+        if (frame.getAttribute('src') !== liveSrc) frame.setAttribute('src', liveSrc);
+      }
+    } catch {
+      /* no-op: 復元失敗は次の visibilitychange で再試行される */
+    }
+  };
+  document.addEventListener('visibilitychange', apply);
+  // 初期状態が hidden(別タブで開かれた直後など)なら即適用して、裏起動の重さを抑える。
+  if (typeof document !== 'undefined' && document.hidden) apply();
 }
 
 if (typeof document !== 'undefined') {
