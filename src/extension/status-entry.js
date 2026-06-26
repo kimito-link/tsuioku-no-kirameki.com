@@ -44,20 +44,12 @@ import { KEY_LANE_DIAG } from '../lib/laneDiagKey.js';
 // 応援レーン鏡: popup の応援レーン(りんく/こん太/広告/たぬ姉の段組み)を顔まで含めてそっくり映す。
 //   データは popup→storage(KEY_LANE_MIRROR)、status が読んで本物の描画関数で描く(会場とは無関係)。
 import { KEY_LANE_MIRROR } from '../lib/laneMirrorKey.js';
-import { restoreLaneMirrorBuckets } from '../lib/laneMirror.js';
-// 数字カード鏡: popup 上部の数字カード群(記録/推定同時接続/来場者数+公式チップ)を status に
-//   そっくり映す。データは popup→storage(KEY_STAT_CARDS_MIRROR)、status が読んで同じ id へ値を入れる
-//   だけ(再計算しない=popup と必ず一致)。応援レーン鏡(KEY_LANE_MIRROR)と同思想・同構造。
+// 2026-06-26: restoreLaneMirrorBuckets / paintStoryUserLaneDom* の import は応援レーン鏡撤去で不要になり削除。
+// 数字カード鏡: v0.1.948 で status への描画は撤去。KEY_STAT_CARDS_MIRROR は
+//   loadStatCardsMirrorSafe→jsonBlob 経由で純Web /live-view に継続送信する。
 import { KEY_STAT_CARDS_MIRROR } from '../lib/statCardsMirrorKey.js';
-import { buildStatCardsMirrorSignature } from '../lib/statCardsMirror.js';
-// 数字カード鏡の値セット(純DOMビルダー)。status と 純Web(app/live-view)で共有=似せて自作しない。
-import { paintStatCardsMirrorValues } from '../lib/statCardsMirrorDom.js';
 // 北極星レーン鏡(公式値レーン): popup→storage(KEY_NORTH_STAR_MIRROR)を status が読んで純Webへ相乗り送信。
 import { KEY_NORTH_STAR_MIRROR } from '../lib/northStarMirrorKey.js';
-import {
-  paintStoryUserLaneDomFilled,
-  paintStoryUserLaneDomEmptyGuides
-} from './story/renderStoryUserLaneDom.js';
 import { createSupportAvatarLoadGuard } from '../lib/supportGrowthAvatarLoad.js';
 import { isHttpOrHttpsUrl, NICONICO_OFFICIAL_DEFAULT_USERICON_HTTPS } from '../lib/supportGrowthTileSrc.js';
 import { storyTileUsesYukkuriTvStyle } from '../lib/storyTileTvStyle.js';
@@ -115,7 +107,7 @@ import { pickBroadcasterNameForReputation } from '../lib/pickBroadcasterNameForR
 // 2026-06-23: status「視聴中の配信」に死んだタブの記録(last_watch_url)が居座る問題の鮮度ガード。
 //   panel_summary.updatedAt が古ければ「視聴中」に出さない（純関数で test 付き）。
 import { panelSummaryStorageKey } from '../lib/panelLiveSummary.js';
-import { isLastWatchUrlFresh, isEpochFresh } from '../lib/watchUrlFreshness.js';
+import { isLastWatchUrlFresh } from '../lib/watchUrlFreshness.js';
 // 2026-06-23: Alt+Tab に出ない裏 watch タブ(active:false・過去 autopatrol/古い重複拡張の遺物)を
 //   検出して手動クローズ導線を出す(council/orphan-tab-survivor-SYNTHESIS.md)。自動では閉じない。
 import { isBackgroundWatchTab } from '../lib/backgroundWatchTab.js';
@@ -164,12 +156,7 @@ let _lastHealthSig = '';
 /** v0.1.890: 対処カードの再構築 skip 判定用 signature。2秒ごとの全カード再生成を止める。
  *   初期値は実際の署名(空カード時の '' を含む)と絶対に一致しない sentinel=初回は必ず描画する。 */
 let _lastActionSig = ' init';
-/** 応援レーン鏡の再描画 skip 判定用 signature(配信カードと同型)。`liveId|capturedAt|...` が
- *   前回と同じなら paint を skip=img 再生成のチラつき・重さを防ぐ。sentinel で初回は必ず描画。 */
-let _lastLaneMirrorSig = ' init';
-/** 数字カード鏡の再描画 skip 判定用 signature(応援レーン鏡と同型)。前回と同じなら値セットを skip。
- *   sentinel で初回は必ず描画する。 */
-let _lastStatCardsMirrorSig = ' init';
+// _lastStatCardsMirrorSig は v0.1.948 で数字カード鏡 status 描画撤去により削除。
 /**
  * 応援レーン鏡のアバター読み込みガード(popup と同設定の本物=createSupportAvatarLoadGuard)。
  *   popup-entry.js:3770 と同じく fallback を先に出してプローブ成功時だけ差し替え=404 フリッカー防止。
@@ -200,15 +187,6 @@ const _supporterRankingDomIo = {
   buildPersonTileEl,
   tileIo: _supporterTileIo,
   domIo: _laneMirrorDomIo
-};
-/** レーン案内(ガイド行)の顔。popup-entry.js:3750-3757 と同じ相対パス=status.html も extension ルート
- *   なので解決する(faceAd は popup と同じくこん太アイコンを流用=popup-entry.js:5130)。 */
-const _LANE_MIRROR_FACES = {
-  faceLink: 'images/yukkuri-charactore-english/link/link-yukkuri-half-eyes-mouth-closed.png',
-  faceGift: 'images/yukkuri-charactore-english/konta/kitsune-yukkuri-half-eyes-mouth-closed.png',
-  faceAd: 'images/yukkuri-charactore-english/konta/kitsune-yukkuri-half-eyes-mouth-closed.png',
-  faceKonta: 'images/yukkuri-charactore-english/konta/kitsune-yukkuri-half-eyes-mouth-closed.png',
-  faceTanu: 'images/yukkuri-charactore-english/tanunee/tanuki-yukkuri-half-eyes-mouth-closed.png'
 };
 /** 直近 render の結果(コピー/ダウンロード用)。 */
 let _lastRenderedBundle = /** @type {{ overview: string, lives: object[], textBlob: string, jsonBlob: object }|null} */ (
@@ -994,13 +972,14 @@ function renderAll({ lvList, summaries, fastDiag, popupDiag, backfillProgress, v
   //   鏡は安全網として共存。独立 try/catch=iframe が壊れても status コア・鏡を巻き込まない。
   safeSection('popup埋め込み', () => ensureStatusPopupIframe(lvList, laneMirror));
 
-  // 応援レーン鏡(popup の段組みを顔込みでそっくり映す・健全度パネルとは別の独立セクション)。
-  //   try/catch(safeSection)で囲み、鏡が壊れても概要・配信カードを巻き込まない。
-  safeSection('応援レーン鏡', () => renderLaneMirror(laneMirror));
+  // 2026-06-26: 応援レーン鏡は status 画面から【撤去】(ユーザー実機「ちくらん画面に応援レーンがあると遅い」)。
+  //   status は2秒ループ再描画で、顔つきレーンの毎回 paint が重さ/「—」固まりの一因。応援レーンは各配信カードの
+  //   「🔥 応援ライブビューを開く」(buildLiveViewButton→live-view.html?lv=)で必要時だけ別タブに描く。
+  //   laneMirror は純Web /live-view 用に publish/jsonBlob 相乗りは継続(status に描かないだけ)。
 
-  // 数字カード鏡(popup 上部の数字カード群+公式チップをそっくり映す・独立セクション)。
-  //   try/catch(safeSection)で囲み、鏡が壊れても他セクションを巻き込まない。
-  safeSection('数字カード鏡', () => renderStatCardsMirror(statCardsMirror));
+  // 数字カード鏡: v0.1.948 で status 描画を撤去。
+  //   データ(statCardsMirror)は loadStatCardsMirrorSafe→jsonBlob 経由で純Web /live-view に継続送信。
+  //   閲覧は配信カードの「🔥 応援ライブビューを開く」(buildLiveViewButton→live-view.html?lv=)から。
 
   // 全体マインドマップ(折りたたみツリー・ここを見れば全部わかる)
   safeSection('マインドマップ', () => renderMindmap({ overviewText, livesData, fastDiag, popupDiag }));
@@ -1221,158 +1200,7 @@ function ensureStatusPopupIframe(lvList, laneMirror) {
   }
 }
 
-/**
- * popup→storage の鏡(応援レーン鏡 / 数字カード鏡)の鮮度しきい値(ミリ秒)。popup は描画している間
- *   約3秒ごとに capturedAt を更新するので、3分は十分なマージン。これより古い鏡は「配信が終わった後の
- *   残骸」とみなして隠す(last_watch_url の鮮度ガードと同じ思想・同じ閾値)。
- */
-const MIRROR_FRESH_MS = 3 * 60 * 1000;
-
-/**
- * 応援レーン鏡: popup の応援レーン(りんく/こん太/広告/たぬ姉の段組み)を顔(avatar)込みで
- *   そっくり描く。popup と同じ本物の paintStoryUserLaneDomFilled + buildPersonTileEl を使う
- *   (似せて自作しない)。データは KEY_LANE_MIRROR(popup→storage)を restoreLaneMirrorBuckets で
- *   paint が受ける buckets 形に復元したもの。会場(venue)とは無関係=popup と status だけ。
- *   ★鮮度ガード(2026-06-23): capturedAt が古ければ隠す=配信が無いのに古いレーンが残るのを防ぐ。
- *   ★signature ガード: 2秒ループで毎回 paint すると img 再生成でチラつき重い=`liveId|capturedAt|
- *     各段件数|pickedLength` が前回と同じなら paint を skip。
- * @param {{ liveId?: string, capturedAt?: number, link?: any[], gift?: any[], ad?: any[],
- *   konta?: any[], tanu?: any[], pickedLength?: number, totalCandidates?: number }|null} snap
- */
-function renderLaneMirror(snap) {
-  const section = document.getElementById('laneMirrorLane');
-  if (!section) return;
-  // popup を一度も開いていない/まだ書かれていない=スナップショット無し=セクションごと隠す(死にリンク回避)。
-  if (!snap || typeof snap !== 'object') {
-    section.hidden = true;
-    _lastLaneMirrorSig = ' init';
-    return;
-  }
-  // 2026-06-23: 鮮度ガード。popup は応援レーンを描画している間 約3秒ごとに capturedAt(epoch ms)を
-  //   更新し、popup を閉じる/配信が終わると更新が止まる。古い鏡(配信が無いのにレーンが残る)を出さない
-  //   ため、capturedAt が MIRROR_FRESH_MS より古ければセクションごと隠す([[watchUrlFreshness]])。
-  if (!isEpochFresh(Number(snap.capturedAt), Date.now(), MIRROR_FRESH_MS)) {
-    section.hidden = true;
-    _lastLaneMirrorSig = ' stale';
-    return;
-  }
-
-  // popup と同じ id で els を集める(status.html に同じ DOM を静的に置いてある)。
-  //   1つでも欠けていれば paint は何もしない=安全側(stack/各段が無いと描けない)。
-  const $id = (/** @type {string} */ id) => /** @type {HTMLElement|null} */ (document.getElementById(id));
-  const els = {
-    stack: $id('sceneStoryUserLaneStack'),
-    laneLink: $id('sceneStoryUserLaneLink'),
-    laneGift: $id('sceneStoryUserLaneGift'),
-    laneAd: $id('sceneStoryUserLaneAd'),
-    laneKonta: $id('sceneStoryUserLaneKonta'),
-    laneTanu: $id('sceneStoryUserLaneTanu'),
-    hintLink: $id('sceneStoryUserLaneLinkHint'),
-    linkWrap: $id('sceneStoryUserLaneLinkWrap'),
-    giftWrap: $id('sceneStoryUserLaneGiftWrap'),
-    adWrap: $id('sceneStoryUserLaneAdWrap'),
-    guideTop: $id('sceneStoryUserLaneGuideTop'),
-    guideLinesTop: $id('sceneStoryUserLaneGuideLinesTop'),
-    guideMidGift: $id('sceneStoryUserLaneGuideMidGift'),
-    guideLinesMidGift: $id('sceneStoryUserLaneGuideLinesMidGift'),
-    guideMidAd: $id('sceneStoryUserLaneGuideMidAd'),
-    guideLinesMidAd: $id('sceneStoryUserLaneGuideLinesMidAd'),
-    guideMidKonta: $id('sceneStoryUserLaneGuideMidKonta'),
-    guideLinesMidKonta: $id('sceneStoryUserLaneGuideLinesMidKonta'),
-    guideMidTanu: $id('sceneStoryUserLaneGuideMidTanu'),
-    guideLinesMidTanu: $id('sceneStoryUserLaneGuideLinesMidTanu'),
-    guideBottom: $id('sceneStoryUserLaneGuideBottom'),
-    guideLinesBottom: $id('sceneStoryUserLaneGuideLinesBottom')
-  };
-  if (!els.stack || !els.laneLink || !els.laneGift || !els.laneKonta || !els.laneTanu) {
-    section.hidden = true;
-    return;
-  }
-
-  const buckets = restoreLaneMirrorBuckets(snap);
-  const pickedLength = Math.max(
-    0,
-    Math.floor(Number(snap.pickedLength) || 0) ||
-      buckets.link.length + buckets.gift.length + buckets.ad.length + buckets.konta.length + buckets.tanu.length
-  );
-  const totalCandidates = Math.max(0, Math.floor(Number(snap.totalCandidates) || 0));
-  const totalCells =
-    buckets.link.length + buckets.gift.length + buckets.ad.length + buckets.konta.length + buckets.tanu.length;
-
-  // signature ガード: 表示に効く値だけで署名し、変化が無ければ paint を丸ごと skip(チラつき/重さ防止)。
-  const sig =
-    `${String(snap.liveId || '')}|${Number(snap.capturedAt) || 0}|` +
-    `${buckets.link.length}|${buckets.gift.length}|${buckets.ad.length}|${buckets.konta.length}|${buckets.tanu.length}|` +
-    `${pickedLength}|${totalCandidates}`;
-  if (sig === _lastLaneMirrorSig) {
-    section.hidden = false; // skip しても表示状態は維持(初回描画後に隠れない)。
-    return;
-  }
-  _lastLaneMirrorSig = sig;
-
-  section.hidden = false;
-
-  // 概要メタ(何件映しているか・何人が会場で見られるか)。popup の guideFoot とは別に status 側で1行。
-  const metaEl = document.getElementById('laneMirrorMeta');
-  if (metaEl) {
-    if (totalCells > 0) {
-      const otherTxt =
-        totalCandidates > pickedLength ? `（ほか ${totalCandidates - pickedLength}人は会場モードで全員見られます）` : '';
-      metaEl.textContent = `いま ${pickedLength}人を表示中${otherTxt}`;
-    } else {
-      metaEl.textContent = 'popup を開いている配信があれば、ここに応援レーンがそのまま映ります。';
-    }
-  }
-
-  // 本物の描画関数で paint。候補ゼロでもスナップショットがあれば段ガイドだけ出す(popup と同じ畳み方)。
-  if (totalCells === 0) {
-    paintStoryUserLaneDomEmptyGuides(els, _LANE_MIRROR_FACES);
-    return;
-  }
-  paintStoryUserLaneDomFilled(els, _LANE_MIRROR_FACES, buckets, pickedLength, _laneMirrorDomIo, {
-    totalCandidates
-  });
-}
-
-/**
- * 数字カード鏡: popup 上部の数字カード群(記録/推定同時接続/来場者数+公式統計チップ)を status へ
- *   そっくり映す。スナップショット(KEY_STAT_CARDS_MIRROR)は popup 側で確定済み(公式チップも digest
- *   確定)=status は再計算せず同じ id へ値を入れるだけ(popup と必ず一致・似せて自作しない)。
- *   応援レーン鏡(renderLaneMirror)と同型。会場(venue)とは無関係=popup と status だけ。
- *   ★signature ガード: 2秒ループで毎回セットすると無駄=`liveId|capturedAt|主要テキスト` が前回と
- *     同じなら値セットを skip(チラつき/重さ防止)。
- * @param {import('../lib/statCardsMirror.js').StatCardsMirrorSnapshot|null|undefined} snap
- */
-function renderStatCardsMirror(snap) {
-  const section = document.getElementById('statCardsMirror');
-  if (!section) return;
-  // popup を一度も開いていない/まだ書かれていない=スナップショット無し=セクションごと隠す(死にリンク回避)。
-  if (!snap || typeof snap !== 'object') {
-    section.hidden = true;
-    _lastStatCardsMirrorSig = ' init';
-    return;
-  }
-  // 2026-06-23: 鮮度ガード(応援レーン鏡と同型)。capturedAt が古ければ「配信が終わった後の残骸」=隠す。
-  if (!isEpochFresh(Number(snap.capturedAt), Date.now(), MIRROR_FRESH_MS)) {
-    section.hidden = true;
-    _lastStatCardsMirrorSig = ' stale';
-    return;
-  }
-
-  // signature ガード: 変化が無ければ値セットを丸ごと skip(表示状態は維持)。popup と同じ確定済みデータ。
-  const sig = buildStatCardsMirrorSignature(snap);
-  if (sig === _lastStatCardsMirrorSig) {
-    section.hidden = false; // skip しても表示状態は維持(初回描画後に隠れない)。
-    return;
-  }
-  _lastStatCardsMirrorSig = sig;
-  section.hidden = false;
-
-  // 値セットは純DOMビルダー paintStatCardsMirrorValues(src/lib)に抽出済み(挙動同値・テストで固定)。
-  //   鮮度ガード/signature ガード/section.hidden の出し入れは status 側(ここ)が持つ。純Web(app/live-view)も
-  //   同じ painter を再利用する=似せて自作しない・popup と必ず一致。
-  paintStatCardsMirrorValues(document, snap);
-}
+// MIRROR_FRESH_MS は v0.1.948 で応援レーン鏡/数字カード鏡の status 描画を撤去したため削除。
 
 /**
  * @param {{ livesData?: any[], fastDiag?: any, popupDiag?: any }} data
