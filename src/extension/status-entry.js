@@ -28,6 +28,19 @@ import { KEY_AI_SHARE_POPUP_DIAG } from '../lib/aiSharePopupDiagKey.js';
 import { KEY_STATUS_FAST_DIAG_LITE } from '../lib/statusFastDiagLite.js';
 import { buildStatusMindmapModel } from '../lib/statusMindmapModel.js';
 import { buildStatusActions } from '../lib/statusActionAdvisor.js';
+// 純Web公開コピーの自己診断(council/status-self-diagnoses-SYNTHESIS.md): 状態速報1枚で「純Webに何が
+//   送られ・何件で・古くないか・拡張と一致するか」が分かるようにする。jsonBlob と引数だけから組む純関数
+//   =新規 storage read ゼロ。致命は症状カードにも昇格する。
+import {
+  buildLiveviewPublishSelfDiag,
+  formatLiveviewPublishSelfDiagLines,
+  liveviewPublishSelfDiagToActionCards
+} from '../lib/liveviewPublishSelfDiag.js';
+// 直近の公開送信(POST)結果を globalThis に集計(read を増やさない)→自己診断が「未送信/失敗」を検知できる。
+import {
+  recordLiveviewPublishOutcome,
+  summarizeLiveviewPublishOutcome
+} from '../lib/liveviewPublishOutcome.js';
 import { buildHealthCells, summarizeHealthVerdict } from '../lib/healthCells.js';
 import { buildVoiceDiagLine } from '../lib/voiceDiag.js';
 import { KEY_VOICE_DIAG } from '../lib/voiceDiagKey.js';
@@ -984,10 +997,39 @@ function renderAll({ lvList, summaries, fastDiag, popupDiag, backfillProgress, v
   // 全体マインドマップ(折りたたみツリー・ここを見れば全部わかる)
   safeSection('マインドマップ', () => renderMindmap({ overviewText, livesData, fastDiag, popupDiag }));
 
+  // 純Web公開ペイロード(jsonBlob)を先に組み立てる=自己診断(buildAiShareFullText)が「純Webに送る当の
+  //   データ」を読めるようにする。従来は buildAiShareFullText の後に組んでいたため自己診断ができなかった。
+  const jsonBlob = {
+    generatedAt: new Date().toISOString(),
+    overview: overviewText,
+    lives: livesData,
+    fastDiag,
+    // 2026-06-23: 純Web版の応援ライブビュー(app/live-view)用。popup の応援レーン/数字カードの鏡
+    //   スナップショット(顔/名前込み・既存の純データ)を「スマホへ送信」のペイロードに相乗りさせる。
+    //   サーバー(api/status.js)は payload を丸ごと保存=無変更。純Webは本物の paintStoryUserLaneDomFilled
+    //   で描く(council/liveview-web-public-SYNTHESIS.md)。popup 未起動なら null=純Web側は空ガイドにフォールバック。
+    laneMirror: laneMirror || null,
+    statCardsMirror: statCardsMirror || null,
+    // 2026-06-25(C1): 北極星レーン鏡(公式値レーン・まず contributionRanking=ギフト貢献度)を純Webへ相乗り。
+    //   popup が KEY_NORTH_STAR_MIRROR へ publish→status が extras(12秒)で読む→純Web が本物 paint で描く。
+    northStarMirror: northStarMirror || null,
+    // 2026-06-25(P3): 応援者ランキング(顔つき)を純Webにも出すため、reportPreview の上位応援者を相乗り送信。
+    //   liveId 同梱で鮮度/対象配信を判定。reportPreview が無い(popup 未起動等)なら null=純Web側は hidden。
+    //   上位10件 cap で小さい(payload 実測131KB=512KB cap の25%・肥大しない)。
+    topSupporters: reportPreview && Array.isArray(reportPreview.topSupporters)
+      ? { liveId: String(reportPreview.liveId || ''), rows: reportPreview.topSupporters.slice(0, 10) }
+      : null
+  };
+  // 自己診断の「いま視聴中の lv」= 鏡(北極星/lane/数字)の liveId を優先採用(read を増やさない)。
+  const currentLiveId = String(
+    northStarMirror?.liveId || laneMirror?.liveId || statCardsMirror?.liveId || ''
+  );
+  const publishKeys = getUploadConfig();
+
   // AI 共有用テキスト
   let fullText = '';
   safeSection('AI共有テキスト', () => {
-    fullText = buildAiShareFullText({ overviewText, livesData, fastDiag, popupDiag, voiceDiag, venueSeatsDiag, laneDiag, reportPreview, trendFindings });
+    fullText = buildAiShareFullText({ overviewText, livesData, fastDiag, popupDiag, voiceDiag, venueSeatsDiag, laneDiag, reportPreview, trendFindings, jsonBlob, currentLiveId, publishKeys });
     const ta = /** @type {HTMLTextAreaElement|null} */ (
       document.getElementById('aiShareText')
     );
@@ -998,27 +1040,7 @@ function renderAll({ lvList, summaries, fastDiag, popupDiag, backfillProgress, v
     overview: overviewText,
     lives: livesData,
     textBlob: fullText,
-    jsonBlob: {
-      generatedAt: new Date().toISOString(),
-      overview: overviewText,
-      lives: livesData,
-      fastDiag,
-      // 2026-06-23: 純Web版の応援ライブビュー(app/live-view)用。popup の応援レーン/数字カードの鏡
-      //   スナップショット(顔/名前込み・既存の純データ)を「スマホへ送信」のペイロードに相乗りさせる。
-      //   サーバー(api/status.js)は payload を丸ごと保存=無変更。純Webは本物の paintStoryUserLaneDomFilled
-      //   で描く(council/liveview-web-public-SYNTHESIS.md)。popup 未起動なら null=純Web側は空ガイドにフォールバック。
-      laneMirror: laneMirror || null,
-      statCardsMirror: statCardsMirror || null,
-      // 2026-06-25(C1): 北極星レーン鏡(公式値レーン・まず contributionRanking=ギフト貢献度)を純Webへ相乗り。
-      //   popup が KEY_NORTH_STAR_MIRROR へ publish→status が extras(12秒)で読む→純Web が本物 paint で描く。
-      northStarMirror: northStarMirror || null,
-      // 2026-06-25(P3): 応援者ランキング(顔つき)を純Webにも出すため、reportPreview の上位応援者を相乗り送信。
-      //   liveId 同梱で鮮度/対象配信を判定。reportPreview が無い(popup 未起動等)なら null=純Web側は hidden。
-      //   上位10件 cap で小さい(payload 実測131KB=512KB cap の25%・肥大しない)。
-      topSupporters: reportPreview && Array.isArray(reportPreview.topSupporters)
-        ? { liveId: String(reportPreview.liveId || ''), rows: reportPreview.topSupporters.slice(0, 10) }
-        : null
-    }
+    jsonBlob
   };
   // 応援ライブビュー(拡張内 live-view.html)の「このURLをWEBでも公開する」用に、いま組み立てた
   //   公開ペイロード(jsonBlob)+共有キーを storage へ置く。live-view ページは別ページで jsonBlob を
@@ -1669,11 +1691,26 @@ function summarizeOneLive(lv, summary, snapshot, perfDiag, endedFlag) {
   };
 }
 
-function buildAiShareFullText({ overviewText, livesData, fastDiag, popupDiag, voiceDiag, venueSeatsDiag, laneDiag, reportPreview, trendFindings }) {
+function buildAiShareFullText({ overviewText, livesData, fastDiag, popupDiag, voiceDiag, venueSeatsDiag, laneDiag, reportPreview, trendFindings, jsonBlob, currentLiveId, publishKeys }) {
   const lines = [];
   lines.push('## 君斗りんくの追憶のきらめき 状態速報');
   lines.push(`生成: ${new Date().toISOString()}`);
   lines.push('');
+  // 純Web公開コピーの自己診断を1回組む(read なし=渡された jsonBlob/引数だけ)。対処候補カード結合と
+  //   専用セクション描画の両方で使い回す。失敗しても状態速報を壊さない。
+  let publishSelfDiag = null;
+  try {
+    publishSelfDiag = buildLiveviewPublishSelfDiag({
+      jsonBlob: jsonBlob || null,
+      fastDiag,
+      currentLiveId: String(currentLiveId || ''),
+      publishKeys: publishKeys || {},
+      lastPost: summarizeLiveviewPublishOutcome(Date.now()),
+      nowMs: Date.now()
+    });
+  } catch {
+    publishSelfDiag = null;
+  }
   if (overviewText) {
     lines.push('### 概要');
     lines.push(overviewText);
@@ -1709,6 +1746,10 @@ function buildAiShareFullText({ overviewText, livesData, fastDiag, popupDiag, vo
   // 検知された対処候補(症状→原因→次の一手)。AI が「何を直すか」を先頭で掴めるように上に置く。
   try {
     const actions = buildStatusActions({ livesData, fastDiag, popupDiag, reportPreview, trendFindings });
+    // 純Web公開コピーの致命(キー未設定/未送信/送信失敗/件数不一致/liveId 不一致)を症状カードに昇格して結合。
+    if (publishSelfDiag) {
+      try { actions.push(...liveviewPublishSelfDiagToActionCards(publishSelfDiag)); } catch { /* no-op */ }
+    }
     lines.push('### 検知された対処候補(症状→原因→次の一手)');
     if (!actions.length) {
       lines.push('- 既知パターンに該当する問題は検知されませんでした(未知の症状なら下の診断 JSON を参照)。');
@@ -1730,6 +1771,16 @@ function buildAiShareFullText({ overviewText, livesData, fastDiag, popupDiag, vo
     for (const live of livesData) {
       lines.push(buildLiveBlockText(live));
       lines.push('');
+    }
+  }
+  // 純Web公開コピーの自己診断(これを見れば「純Webに何が送られ・何件で・古くないか・拡張と一致するか」が
+  //   一目で分かる=スクショ往復が不要になる)。fastDiag JSON の直前=「データの羅列」の前に「コピーの健全性」。
+  if (publishSelfDiag) {
+    try {
+      const selfLines = formatLiveviewPublishSelfDiagLines(publishSelfDiag);
+      if (selfLines.length) { for (const l of selfLines) lines.push(l); lines.push(''); }
+    } catch {
+      /* no-op: 自己診断の失敗は状態速報を壊さない */
     }
   }
   lines.push('### 診断 JSON (fastDiag)');
@@ -1821,8 +1872,11 @@ async function uploadStatusSnapshot() {
       body: JSON.stringify({ ...jsonBlob, v: viewToken })
     });
     if (!res.ok) {
+      // POST 失敗を globalThis に記録=自己診断が「純Webが古い snapshot を見続けている」を検知できる。
+      recordLiveviewPublishOutcome({ ok: false, httpStatus: res.status, error: `送信失敗 (HTTP ${res.status})`, at: Date.now() });
       return { ok: false, error: `送信失敗 (HTTP ${res.status})` };
     }
+    recordLiveviewPublishOutcome({ ok: true, httpStatus: res.status, at: Date.now() });
     // 状態速報の Web 版(概要+配信一覧)と、応援ライブビューの Web 版(popup そっくりの応援レーン)の両方の URL を返す。
     return {
       ok: true,
@@ -1830,6 +1884,7 @@ async function uploadStatusSnapshot() {
       liveViewUrl
     };
   } catch (err) {
+    recordLiveviewPublishOutcome({ ok: false, httpStatus: null, error: '通信エラー: ' + String(err?.message || err), at: Date.now() });
     return { ok: false, error: '通信エラー: ' + String(err?.message || err) };
   }
 }

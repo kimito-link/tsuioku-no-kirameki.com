@@ -386,6 +386,8 @@
 | `src/lib/liveHealthScore.js` | 1 | 状態速報ページ |
 | `src/lib/livePersistInterval.js` | 1 | 記録エンジン(watchページ常駐) |
 | `src/lib/liveStatValuePlaceholder.js` | 1 | ポップアップ(応援レーン) |
+| `src/lib/liveviewPublishOutcome.js` | 1 | 状態速報ページ |
+| `src/lib/liveviewPublishSelfDiag.js` | 1 | 状態速報ページ |
 | `src/lib/loadLastBroadcastSummary.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/longTaskTracker.js` | 1 | 記録エンジン(watchページ常駐) |
 | `src/lib/mangaBroadcastSummary.js` | 1 | ポップアップ(応援レーン) |
