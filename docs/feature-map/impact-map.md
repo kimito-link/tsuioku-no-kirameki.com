@@ -269,6 +269,7 @@
 | `src/lib/comeviewActions.js` | 1 | コメビュ(別窓) |
 | `src/lib/comeviewInstantRender.js` | 1 | コメビュ(別窓) |
 | `src/lib/commentComposeShortcuts.js` | 1 | ポップアップ(応援レーン) |
+| `src/lib/commentCountProvenance.js` | 1 | 状態速報ページ |
 | `src/lib/commentEchoDetector.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/commenterCulturalAnalytics.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/commenterFollowAnalytics.js` | 1 | ポップアップ(応援レーン) |

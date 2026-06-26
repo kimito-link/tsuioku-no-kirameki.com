@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 1 / 559 件
+## ⚠️ 役割コメントが無いソース 1 / 560 件
 - `src/lib/reportPreviewPublish.js`
 
 ## 全ファイルツリー
@@ -457,7 +457,7 @@
   - `vendor-visual-explainer.mjs` — Vendors nicobailon/visual-explainer (MIT) into .cursor/skills/visual-explainer/
   - `verify-bump.mjs` — extension bump 後の整合性チェッカー
   - `write-extension-placeholder-icons.mjs` — リポジトリに 256px アイコンしか無い環境向け: manifest 用の小さめ PNG を生成する。
-- 📁 **src/** (1191)
+- 📁 **src/** (1193)
   - 📁 **data/** (6)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -716,7 +716,7 @@
         - `logo_funlink_white_RGB_maru_black.png`
       - `logo_guide_funlink_ol.pdf`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (980)
+  - 📁 **lib/** (982)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -1174,6 +1174,8 @@
     - `liveviewPublishOutcome.test.js`
     - `liveviewPublishSelfDiag.js` — 純Web公開コピーの自己診断（council/status-self-diagnoses-SYNTHESIS.md）。
     - `liveviewPublishSelfDiag.test.js`
+    - `liveviewSnapshotFreshness.js` — 純Web応援ライブビューの「スナップショット丸ごと1枚の鮮度」判定（council/liveview-wholesale-root-SYNTHESIS.md 第1段）。
+    - `liveviewSnapshotFreshness.test.js`
     - `loadLastBroadcastSummary.js` — 0.1.69 (AY): empty state（配信なし）popup で「前回の配信」cards を復元するために、
     - `loadLastBroadcastSummary.test.js`
     - `longTaskTracker.js` — メインスレッドを長時間ブロックした「Long Task」を有界に記録する純関数群。

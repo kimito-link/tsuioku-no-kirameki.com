@@ -48,6 +48,9 @@ import {
   formatStoryUserLaneRenderDiagLines,
   storyUserLaneRenderDiagToActionCards
 } from '../lib/storyUserLaneRenderProbe.js';
+// 数字の出どころ(council/comment-count-provenance-question.txt): 「記録>本家コメ」等の食い違いに対し、
+//   各数字が何を・どこから・いつ数えているかを事実として状態速報に出す(判定はしない=誤検知ゼロ)。
+import { formatCommentCountProvenanceLines } from '../lib/commentCountProvenance.js';
 import { buildHealthCells, summarizeHealthVerdict } from '../lib/healthCells.js';
 import { buildVoiceDiagLine } from '../lib/voiceDiag.js';
 import { KEY_VOICE_DIAG } from '../lib/voiceDiagKey.js';
@@ -1811,6 +1814,14 @@ function buildAiShareFullText({ overviewText, livesData, fastDiag, popupDiag, vo
       lines.push(buildLiveBlockText(live));
       lines.push('');
     }
+  }
+  // 数字の出どころ(council/comment-count-provenance-question.txt): 「記録>本家コメ」のような食い違いに対し、
+  //   各数字が何を・どこから・いつ数えているかを【事実として】出す(判定はしない=誤検知ゼロ)。
+  try {
+    const provLines = formatCommentCountProvenanceLines(livesData);
+    if (provLines.length) { for (const l of provLines) lines.push(l); lines.push(''); }
+  } catch {
+    /* no-op: 出どころ表示の失敗は状態速報を壊さない */
   }
   // 純Web公開コピーの自己診断(これを見れば「純Webに何が送られ・何件で・古くないか・拡張と一致するか」が
   //   一目で分かる=スクショ往復が不要になる)。fastDiag JSON の直前=「データの羅列」の前に「コピーの健全性」。
