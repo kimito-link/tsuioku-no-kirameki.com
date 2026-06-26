@@ -106,7 +106,7 @@
   - `src/lib/monotonicCommentCount.js`
 - **storage キー定義** — chrome.storage のキー名の正本(nls_comments_<lv> 等)
   - `src/lib/storageKeys.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 31</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 32</summary>
 
 - `src/lib/autoBackupState.js` — v0.1.808(星野ロミ式コンポーネント化・第1弾): content-entry.js の巨大化を抑えるため、
 - `src/lib/blobDownload.js` — Blob を指定ファイル名で保存する。
@@ -122,6 +122,7 @@
 - `src/lib/displayRecordedCount.js` — 「画面に出す記録件数」の正本を1つに固定する純関数(v0.1.839・第1)。
 - `src/lib/giftRecord.js` — ギフト/広告ユーザーの永続化（純関数）
 - `src/lib/livePersistInterval.js` — v0.1.498〜501: ライブ記録の保存（コアレッサ）最小間隔を決める純粋関数。フリーズ対策 A。
+- `src/lib/liveviewPublishOutcome.js` — 純Web公開（応援ライブビューの /api/status への POST）の直近結果を記録・要約する。
 - `src/lib/longTaskTracker.js` — メインスレッドを長時間ブロックした「Long Task」を有界に記録する純関数群。
 - `src/lib/northStarMirrorKey.js` — 北極星レーン鏡(公式値レーン)の storage キー。
 - `src/lib/persistableCommentRow.js` — v0.1.362: DOM ハーベスト経路で拾ったコメント行を `nls_comments_<lv>` に保存して
@@ -521,7 +522,7 @@
 - **影響範囲ゲート(規律を自動化)** — 星野ロミ式「規律を自動ゲートに」。diff から影響大(複数機能波及)の変更ファイルを検出し波及先機能を列挙。警告のみ(摩擦ゼロ)・--strict で exit1。AGENTS.md §10 のルールを diff 発火に
   - `scripts/impact-check.mjs`
   - `docs/feature-map/impact-map.json`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 33</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 34</summary>
 
 - `api/status.js` — status 受け口 Vercel Serverless Function。
 - `extension/status-guard.js` — 状態速報ページ(status.html)の「何があっても開く」保険。
@@ -548,6 +549,7 @@
 - `src/lib/healthCells.js` — status ファーストビューの「健全度セル」を作る純関数(v0.1.843)。
 - `src/lib/keyboardTypeDiagnostic.js` — L12: キーボード型診断（コメンターを 5 つの型に分類）。
 - `src/lib/liveHealthScore.js` — 配信ごとの「健康チェック」5段階評価(純関数)。
+- `src/lib/liveviewPublishSelfDiag.js` — 純Web公開コピーの自己診断（council/status-self-diagnoses-SYNTHESIS.md）。
 - `src/lib/popupAiDiagOrchestrator.js` — v0.1.211: popup「AI 診断」ボタンのオーケストレータ純関数。
 - `src/lib/popupDiagAutoPublish.js` — popup を開いたとき popup 固有診断を status へ自動集約するスケジューラ(純ロジック)。
 - `src/lib/statusFastDiagLite.js` — status.html 用「軽量 fastDiag ダイジェスト」。
@@ -722,9 +724,10 @@
 
 ## 🧬 修正系譜マップ(この系統のバグを過去にどう直したか)
 
-> changelog 全 289 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
+> changelog 全 290 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
 
-### 💾 記録件数 (41版)
+### 💾 記録件数 (42版)
+- `v0.1.954` 2026-06-26 — 純Web公開コピーの自己診断の「コピー漏れ」誤検知を修正
 - `v0.1.953` 2026-06-26 — 状態速報に純Web公開コピーの自己診断を追加
 - `v0.1.947` 2026-06-25 — WEB公開版に応援者ランキングとギフト貢献度を顔つきで表示
 - `v0.1.946` 2026-06-25 — 過去ログ取得の「ローディングが出ない/固まる」を改善
@@ -767,7 +770,8 @@
 - `v0.1.672` 2026-06-10 — コメビュの二重表示の残りを根治
 - `v0.1.665` 2026-06-10 — 長い配信が7割等で止まったままになるのを根治
 
-### 📥 コメント取得 (120版)
+### 📥 コメント取得 (121版)
+- `v0.1.954` 2026-06-26 — 純Web公開コピーの自己診断の「コピー漏れ」誤検知を修正
 - `v0.1.946` 2026-06-25 — 過去ログ取得の「ローディングが出ない/固まる」を改善
 - `v0.1.922` 2026-06-23 — ギフト参加者ランキングの自動取得を再開
 - `v0.1.920` 2026-06-23 — ギフト自動取得を再び緊急停止(切り分け第2弾)
@@ -1236,7 +1240,8 @@
 - `v0.1.673` 2026-06-10 — コメビュの名前をパネルと同じ情報源で補完
 - `v0.1.670` 2026-06-10 — コメビュのアイコンを本家と同じサムネに
 
-### 🩺 診断・状態速報 (87版)
+### 🩺 診断・状態速報 (88版)
+- `v0.1.954` 2026-06-26 — 純Web公開コピーの自己診断の「コピー漏れ」誤検知を修正
 - `v0.1.953` 2026-06-26 — 状態速報に純Web公開コピーの自己診断を追加
 - `v0.1.949` 2026-06-26 — 応援プレビューを裏タブで一時停止して診断を軽く
 - `v0.1.948` 2026-06-26 — 状態速報を軽量化(鏡を撤去・配信ごとに表示)

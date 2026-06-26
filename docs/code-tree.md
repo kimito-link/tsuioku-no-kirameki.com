@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 1 / 556 件
+## ⚠️ 役割コメントが無いソース 1 / 558 件
 - `src/lib/reportPreviewPublish.js`
 
 ## 全ファイルツリー
@@ -457,7 +457,7 @@
   - `vendor-visual-explainer.mjs` — Vendors nicobailon/visual-explainer (MIT) into .cursor/skills/visual-explainer/
   - `verify-bump.mjs` — extension bump 後の整合性チェッカー
   - `write-extension-placeholder-icons.mjs` — リポジトリに 256px アイコンしか無い環境向け: manifest 用の小さめ PNG を生成する。
-- 📁 **src/** (1185)
+- 📁 **src/** (1189)
   - 📁 **data/** (6)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -716,7 +716,7 @@
         - `logo_funlink_white_RGB_maru_black.png`
       - `logo_guide_funlink_ol.pdf`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (974)
+  - 📁 **lib/** (978)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -1170,6 +1170,10 @@
     - `livePersistInterval.test.js`
     - `liveStatValuePlaceholder.js` — `.nl-live-stat-value` 向け: 数字表示かプレースホルダー文言かを判定（0.1.68 の極太フォント切替と共通）。
     - `liveStatValuePlaceholder.test.js`
+    - `liveviewPublishOutcome.js` — 純Web公開（応援ライブビューの /api/status への POST）の直近結果を記録・要約する。
+    - `liveviewPublishOutcome.test.js`
+    - `liveviewPublishSelfDiag.js` — 純Web公開コピーの自己診断（council/status-self-diagnoses-SYNTHESIS.md）。
+    - `liveviewPublishSelfDiag.test.js`
     - `loadLastBroadcastSummary.js` — 0.1.69 (AY): empty state（配信なし）popup で「前回の配信」cards を復元するために、
     - `loadLastBroadcastSummary.test.js`
     - `longTaskTracker.js` — メインスレッドを長時間ブロックした「Long Task」を有界に記録する純関数群。

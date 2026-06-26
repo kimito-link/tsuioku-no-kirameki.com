@@ -44,12 +44,24 @@ function ageSecOf(epochMs, nowMs) {
   return Math.max(0, Math.round((now - at) / 1000));
 }
 
-/** fastDiag の北極星レーンから apiRows（取れなければ null）。 */
-function apiRowsOf(northLane, key) {
+/**
+ * fastDiag の北極星レーンから { apiRows, state }（取れなければ apiRows=null）。
+ * ★state を返す理由（誤検知の根治）= 拡張側が 'not_yet'/'iframe_unrendered' のように【まだ取得中／確定して
+ *   いない】とき apiRows は 0 になるが、これは「データが無い」ではなく「まだ取れていない」だけ。鏡には過去に
+ *   取れた件数が残っているので、ここで突合すると「拡張0 ≠ 鏡6」を誤って『コピー漏れ』と断じてしまう。
+ *   突合は拡張側が確定状態（'ok' / 'no_ranking_data' / 'no_program_gift'）のときだけに限定する。
+ */
+function laneStateOf(northLane, key) {
   const lane = northLane && typeof northLane === 'object' ? northLane[key] : null;
-  if (!lane || typeof lane !== 'object') return null;
+  if (!lane || typeof lane !== 'object') return { apiRows: null, state: '' };
   const n = Number(lane.apiRows);
-  return Number.isFinite(n) ? n : null;
+  return { apiRows: Number.isFinite(n) ? n : null, state: String(lane.state || '') };
+}
+
+/** 拡張側のレーン state が「確定」しているか（確定時だけ件数突合してよい）。 */
+const SETTLED_LANE_STATES = new Set(['ok', 'no_ranking_data', 'no_program_gift', 'no_event']);
+function isSettledLaneState(state) {
+  return SETTLED_LANE_STATES.has(String(state || ''));
 }
 
 /**
@@ -131,23 +143,29 @@ export function buildLiveviewPublishSelfDiag(args) {
   try { sizeBytes = JSON.stringify(blob).length; } catch { sizeBytes = 0; }
   const sizeCap = 512 * 1024;
 
-  // 整合チェック（拡張の生データ vs 鏡）。fastDiag が取れたときだけ突合。
+  // 整合チェック（拡張の生データ vs 鏡）。
+  // ★誤検知の根治: 突合してよいのは「拡張側が確定状態(ok/no_ranking_data 等)」かつ「鏡が新鮮」のときだけ。
+  //   拡張が not_yet(まだ取得中)だと apiRows=0 だが鏡には過去値が残り「拡張0 ≠ 鏡6」を誤って『コピー漏れ』
+  //   と断じてしまう。鏡が古い(>3分)場合も別の瞬間の比較になるので突合しない（保留として理由を出す）。
   const northLane = a.fastDiag?.content?.giftDiagnostics?.['北極星レーン'] || null;
-  const contribApiRows = apiRowsOf(northLane, '1_貢献度ランキング');
-  const adApiRows = apiRowsOf(northLane, '+α_広告ランキング');
+  const northMirrorAgeSec = freshOf(north);
+  const northMirrorStale = northMirrorAgeSec != null && northMirrorAgeSec * 1000 > FRESH_MS;
   const consistency = [];
-  if (contribApiRows != null) {
-    consistency.push({
-      lane: '北極星 貢献度', extRows: contribApiRows, mirrorRows: contribCount,
-      match: contribApiRows === contribCount
-    });
-  }
-  if (adApiRows != null) {
-    consistency.push({
-      lane: '北極星 広告', extRows: adApiRows, mirrorRows: adCount,
-      match: adApiRows === adCount
-    });
-  }
+  const pushConsistency = (lane, key, mirrorRows) => {
+    const { apiRows, state } = laneStateOf(northLane, key);
+    if (apiRows == null) return; // fastDiag にレーンが無い＝突合不能（沈黙）
+    if (!isSettledLaneState(state)) {
+      consistency.push({ lane, extRows: apiRows, mirrorRows, match: null, skipped: true, reason: `拡張側が取得中(${state || '不明'})` });
+      return;
+    }
+    if (northMirrorStale) {
+      consistency.push({ lane, extRows: apiRows, mirrorRows, match: null, skipped: true, reason: `鏡が古い(${northMirrorAgeSec}秒前)` });
+      return;
+    }
+    consistency.push({ lane, extRows: apiRows, mirrorRows, match: apiRows === mirrorRows });
+  };
+  pushConsistency('北極星 貢献度', '1_貢献度ランキング', contribCount);
+  pushConsistency('北極星 広告', '+α_広告ランキング', adCount);
 
   const post = a.lastPost && typeof a.lastPost === 'object' ? a.lastPost : null;
 
@@ -272,6 +290,10 @@ export function formatLiveviewPublishSelfDiagLines(diag) {
   if (cons.length) {
     lines.push('整合チェック（拡張の生データ vs 鏡）:');
     for (const c of cons) {
+      if (c.skipped) {
+        lines.push(`- ${c.lane}: 拡張 apiRows=${c.extRows} / 鏡 ${c.mirrorRows}  ⏳保留(${c.reason})`);
+        continue;
+      }
       const mark = c.match ? '✅一致' : '🔴不一致(コピー漏れ疑い)';
       const note = c.match && c.extRows === 0 ? '（元データ無し＝純Webに出なくて正常）' : '';
       lines.push(`- ${c.lane}: 拡張 apiRows=${c.extRows} / 鏡 ${c.mirrorRows}  ${mark}${note}`);
@@ -335,10 +357,10 @@ export function liveviewPublishSelfDiagToActionCards(diag) {
     }
   }
 
-  // 件数不一致（コピー漏れ／積み忘れ）
+  // 件数不一致（コピー漏れ／積み忘れ）。★skipped(保留)や match:null は出さない＝確定した不一致(match===false)のみ。
   const cons = Array.isArray(d.consistency) ? d.consistency : [];
   for (const c of cons) {
-    if (!c.match) {
+    if (c.match === false && !c.skipped) {
       cards.push({
         id: `liveview-mirror-count-mismatch-${c.lane}`,
         severity: 'warn',
