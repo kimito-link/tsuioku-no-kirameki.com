@@ -33,6 +33,8 @@ graph LR
   n_status --> n_src_lib_laneMirrorKey_js["lib/laneMirrorKey.js"]:::shared
   n_status --> n_src_lib_liveEndedFlag_js["lib/liveEndedFlag.js"]:::shared
   n_status --> n_src_lib_liveHealthScore_js["lib/liveHealthScore.js"]
+  n_status --> n_src_lib_liveviewPublishOutcome_js["lib/liveviewPublishOutcome.js"]
+  n_status --> n_src_lib_liveviewPublishSelfDiag_js["lib/liveviewPublishSelfDiag.js"]
   n_status --> n_src_lib_metricConfidence_js["lib/metricConfidence.js"]:::shared
   n_status --> n_src_lib_nicoAnonymousDisplay_js["lib/nicoAnonymousDisplay.js"]:::shared
   n_status --> n_src_lib_nicoUserPage_js["lib/nicoUserPage.js"]:::shared
@@ -51,9 +53,7 @@ graph LR
   n_status --> n_src_lib_statusActionAdvisor_js["lib/statusActionAdvisor.js"]
   n_status --> n_src_lib_statusFastDiagLite_js["lib/statusFastDiagLite.js"]:::shared
   n_status --> n_src_lib_statusFormat_js["lib/statusFormat.js"]:::shared
-  n_status --> n_src_lib_statusMindmapModel_js["lib/statusMindmapModel.js"]
-  n_status --> n_src_lib_statusShareUrls_js["lib/statusShareUrls.js"]
   classDef shared fill:#eee,stroke:#999,color:#666;
 ```
 
-> ほか 20 ファイル省略（全件は storage-bus.md / metafile 参照）。
+> ほか 22 ファイル省略（全件は storage-bus.md / metafile 参照）。
