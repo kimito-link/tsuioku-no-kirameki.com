@@ -56,6 +56,10 @@ import { officialDomRankingRowsToStripRooms } from '../src/lib/officialDomRankin
 import { renderTopSupportRankStripInto } from '../src/lib/paintTopSupportRankStyleIntoElement.js';
 import { buildNorthStarAdRankingStatsHtml } from '../src/lib/buildNorthStarAdRankingStatsHtml.js';
 import { restoreNorthStarMirrorRows } from '../src/lib/northStarMirror.js';
+// 第2段(council/liveview-wholesale-root-SYNTHESIS.md): コメントタイムライン鏡(最新N件)を純Webで描いて
+//   「コメントが進む動き」を出す。popup と同じ本物 lib を再利用(似せて自作しない)。
+import { restoreCommentTimelineRows } from '../src/lib/commentTimelineMirror.js';
+import { buildCommentTickerLatestHtml } from '../src/lib/commentTickerLatestHtml.js';
 // 第1段(council/liveview-wholesale-root-SYNTHESIS.md): スナップショット丸ごと1枚の鮮度を【1回だけ】判定し、
 //   全レーンを一斉に出す/一斉に「古い」とする。per-section の個別鮮度ドロップ(=レーンがバラバラに消える)を廃止。
 import {
@@ -442,6 +446,38 @@ function paintSupporterRanking(topSupporters) {
   }
 }
 
+/** 第2段: コメントタイムライン鏡の最新1件を本物 popup のティッカー DOM(#commentTickerSegA)に塗る。
+ *   poll/onChanged のたびに最新行が変わる=純Webでも「コメントが進む動き」が見える。本物 lib
+ *   buildCommentTickerLatestHtml を再利用(似せて自作しない)。 */
+let _lastTimelineSig = ' init';
+function paintCommentTimelineMirror(snap) {
+  const segA = document.getElementById('commentTickerSegA');
+  const segB = document.getElementById('commentTickerSegB');
+  const scroll = document.getElementById('commentTickerScroll');
+  const viewport = document.getElementById('commentTickerViewport');
+  if (!segA) return;
+  const rows = restoreCommentTimelineRows(snap);
+  if (!rows.length) return; // データ無し=popup の空状態(placeholder)のまま(死に画面にしない)
+  const latest = rows[rows.length - 1]; // restore は古→新=末尾が最新
+  const sig = `${String(snap?.liveId || '')}|${Number(snap?.capturedAt) || 0}|${rows.length}|${String(latest.text || '')}`;
+  if (sig === _lastTimelineSig) return;
+  _lastTimelineSig = sig;
+  try {
+    if (scroll) scroll.classList.add('is-paused', 'is-latest-only');
+    if (segB) segB.innerHTML = '';
+    if (viewport) viewport.classList.remove('is-empty');
+    // 匿名(a:)や数値IDのリンクは純Webでは付けない(referrer 露出を避ける)=span のまま。
+    segA.innerHTML = buildCommentTickerLatestHtml({
+      label: String(latest.name || ''),
+      avatarSrc: String(latest.avatarUrl || ''),
+      textShown: String(latest.text || '').slice(0, 72),
+      userPageHref: ''
+    });
+  } catch {
+    /* no-op: ティッカーは best-effort(壊れても他レーンを巻き込まない) */
+  }
+}
+
 /** snapshot の全鏡を本物 paint で popup DOM に塗る（signature ガード有効＝変化時のみ）。
  *   ★第1段(council/liveview-wholesale-root-SYNTHESIS.md): スナップショット丸ごとの鮮度を【1回だけ】判定し、
  *     新鮮なら全レーンを一斉に塗る・古ければ1枚バナーで知らせる(per-section でバラバラに消さない=全レーンが揃う)。 */
@@ -457,6 +493,7 @@ function paintAllMirrors(jsonBlob) {
   paintLaneMirror(jsonBlob.laneMirror || null);
   paintNorthStarMirror(jsonBlob.northStarMirror || null);
   paintSupporterRanking(jsonBlob.topSupporters || null);
+  paintCommentTimelineMirror(jsonBlob.commentTimelineMirror || null);
 }
 
 /**
@@ -467,6 +504,7 @@ function paintAllMirrors(jsonBlob) {
 function forcePaintAllMirrors() {
   _lastStatCardsSig = ' force';
   _lastLaneSig = ' force';
+  _lastTimelineSig = ' force';
   const wasPainting = _painting;
   _painting = true; // 自分の paint 由来の mutation を observer に無視させる
   try {

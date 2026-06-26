@@ -91,8 +91,12 @@ export default [
     //   + 診断JSON への storyUserLaneRenderProbe 露出を追加=21187→21271
     //   (council/lane-render-self-diag-SYNTHESIS.md・レビュー済み例外)。純データの build/format/cards は
     //   src/lib/storyUserLaneRenderProbe.js(test付き)に隔離済み。
+    // 2026-06-26: 純Webでコメントが進む(第2段)=publishCommentTimelineMirror(displayEntries 最新N件を鏡に publish・
+    //   INLINE_PASSIVE/min-gap/storage I/O グルー=lib抽出不可)+import を追加=21271→21312
+    //   (council/liveview-wholesale-root-SYNTHESIS.md・レビュー済み例外)。純データ整形 buildCommentTimelineMirrorSnapshot は
+    //   src/lib/commentTimelineMirror.js(test付き)に隔離済み。
     files: ['src/extension/popup-entry.js'],
-    rules: { 'max-lines': ['error', { max: 21271, skipBlankLines: false, skipComments: false }] }
+    rules: { 'max-lines': ['error', { max: 21312, skipBlankLines: false, skipComments: false }] }
   },
   {
     files: ['src/extension/content-entry.js'],

@@ -86,6 +86,8 @@ import { KEY_LANE_MIRROR } from '../lib/laneMirrorKey.js';
 import { KEY_STAT_CARDS_MIRROR } from '../lib/statCardsMirrorKey.js';
 // 北極星レーン鏡(公式値レーン): popup→storage(KEY_NORTH_STAR_MIRROR)を status が読んで純Webへ相乗り送信。
 import { KEY_NORTH_STAR_MIRROR } from '../lib/northStarMirrorKey.js';
+// コメントタイムライン鏡(第2段): 純Webで「コメントが進む」ため popup が publish した最新N件を jsonBlob に相乗り。
+import { KEY_COMMENT_TIMELINE_MIRROR } from '../lib/commentTimelineMirrorKey.js';
 import { createSupportAvatarLoadGuard } from '../lib/supportGrowthAvatarLoad.js';
 import { isHttpOrHttpsUrl, NICONICO_OFFICIAL_DEFAULT_USERICON_HTTPS } from '../lib/supportGrowthTileSrc.js';
 import { storyTileUsesYukkuriTvStyle } from '../lib/storyTileTvStyle.js';
@@ -185,7 +187,9 @@ let _extrasCache = /** @type {{reportPreview:any, watchTabMap:any, trendFindings
   voiceDiag: null,
   venueSeatsDiag: null,
   // 根2対策: 送信結果(ページ横断 storage)。どのページで送っても status が「送信済み」を読める。
-  publishOutcomeRec: null
+  publishOutcomeRec: null,
+  // 第2段: コメントタイムライン鏡(最新N件)。純Webで「コメントが進む」ため jsonBlob に相乗り。
+  commentTimelineMirror: null
 });
 /** v0.1.868: 配信カードの再構築 skip 判定用 signature(変化なしなら innerHTML を作り直さない)。 */
 let _lastLivesSig = '';
@@ -387,13 +391,16 @@ async function refresh(opts = {}) {
       // 根2対策: 送信結果(ページ横断 storage)を 12秒間引きで読む(新規の重い read を増やさない)。
       step = 'loadPublishOutcome';
       const publishOutcomeRec = await runStorageOpWithTimeout(() => loadLiveviewPublishOutcomeSafe(), tmo).catch(() => null);
-      _extrasCache = { reportPreview, watchTabMap, trendFindings, laneDiag, laneMirror, statCardsMirror, northStarMirror, voiceDiag, venueSeatsDiag, publishOutcomeRec };
+      // 第2段: コメントタイムライン鏡も extras に同梱(12秒間引き)。
+      step = 'loadCommentTimelineMirror';
+      const commentTimelineMirror = await runStorageOpWithTimeout(() => loadCommentTimelineMirrorSafe(), tmo).catch(() => null);
+      _extrasCache = { reportPreview, watchTabMap, trendFindings, laneDiag, laneMirror, statCardsMirror, northStarMirror, voiceDiag, venueSeatsDiag, publishOutcomeRec, commentTimelineMirror };
       _extrasCacheAt = Date.now();
       _mark('extras');
     }
-    const { reportPreview, watchTabMap, trendFindings, laneDiag, laneMirror, statCardsMirror, northStarMirror, voiceDiag, venueSeatsDiag, publishOutcomeRec } = _extrasCache;
+    const { reportPreview, watchTabMap, trendFindings, laneDiag, laneMirror, statCardsMirror, northStarMirror, voiceDiag, venueSeatsDiag, publishOutcomeRec, commentTimelineMirror } = _extrasCache;
     step = 'renderAll';
-    renderAll({ lvList, summaries, fastDiag, popupDiag, backfillProgress, voiceDiag, venueSeatsDiag, laneDiag, laneMirror, statCardsMirror, northStarMirror, reportPreview, trendFindings, watchTabMap, publishOutcomeRec });
+    renderAll({ lvList, summaries, fastDiag, popupDiag, backfillProgress, voiceDiag, venueSeatsDiag, laneDiag, laneMirror, statCardsMirror, northStarMirror, reportPreview, trendFindings, watchTabMap, publishOutcomeRec, commentTimelineMirror });
     _mark('render');
     const _totalMs = Math.round((typeof performance !== 'undefined' ? performance.now() : Date.now()) - _t0);
     updateLastUpdateMeta({ totalMs: _totalMs, stepMs: _stepMs });
@@ -721,6 +728,16 @@ async function loadLiveviewPublishOutcomeSafe() {
   }
 }
 
+/** コメントタイムライン鏡(最新N件)を読む。popup が KEY_COMMENT_TIMELINE_MIRROR へ publish。extras(12秒)で読む。 */
+async function loadCommentTimelineMirrorSafe() {
+  try {
+    const bag = await chrome.storage.local.get(KEY_COMMENT_TIMELINE_MIRROR);
+    return bag?.[KEY_COMMENT_TIMELINE_MIRROR] || null;
+  } catch {
+    return null;
+  }
+}
+
 // v0.1.858: レポート(HTML/マーケ/メディアキット)の DL前 主要KPI を読む。popup が
 //   KEY_REPORT_PREVIEW へ定期(15秒)に書く。古い snapshot(2分超)や popup 未起動なら null=表示しない。
 async function loadReportPreviewSafe() {
@@ -809,7 +826,7 @@ async function loadBackfillProgressSafe() {
 // v0.1.861: レポートプレビューの信頼度注釈の文脈は純関数 reportPreviewCtxFromFastDiag(src/lib)に抽出済み
 //   (NDGR 接続/userId 付き率/backfill 進行 → 注釈ctx・挙動同値・テストで固定)。import は冒頭。
 
-function renderAll({ lvList, summaries, fastDiag, popupDiag, backfillProgress, voiceDiag, venueSeatsDiag, laneDiag, laneMirror, statCardsMirror, northStarMirror, reportPreview, trendFindings, watchTabMap, publishOutcomeRec }) {
+function renderAll({ lvList, summaries, fastDiag, popupDiag, backfillProgress, voiceDiag, venueSeatsDiag, laneDiag, laneMirror, statCardsMirror, northStarMirror, reportPreview, trendFindings, watchTabMap, publishOutcomeRec, commentTimelineMirror }) {
   // v0.1.847: 各描画セクションを独立 try/catch で隔離するヘルパ。1つが throw しても他のセクションと
   //   最終更新メタを巻き込まない=「セルが全部消える/最終更新—のまま固まる」を根治。落ちた場所は
   //   console と AI 共有欄に出して真因を追えるようにする(star-romi 失敗体験の除去)。
@@ -1045,7 +1062,8 @@ function renderAll({ lvList, summaries, fastDiag, popupDiag, backfillProgress, v
     0,
     Number(laneMirror?.capturedAt) || 0,
     Number(statCardsMirror?.capturedAt) || 0,
-    Number(northStarMirror?.capturedAt) || 0
+    Number(northStarMirror?.capturedAt) || 0,
+    Number(commentTimelineMirror?.capturedAt) || 0
   );
   const jsonBlob = {
     generatedAt: new Date().toISOString(),
@@ -1069,7 +1087,10 @@ function renderAll({ lvList, summaries, fastDiag, popupDiag, backfillProgress, v
     //   上位10件 cap で小さい(payload 実測131KB=512KB cap の25%・肥大しない)。
     topSupporters: reportPreview && Array.isArray(reportPreview.topSupporters)
       ? { liveId: String(reportPreview.liveId || ''), rows: reportPreview.topSupporters.slice(0, 10) }
-      : null
+      : null,
+    // 第2段(council/liveview-wholesale-root-SYNTHESIS.md): コメントタイムライン鏡(最新N件)。純Webで
+    //   「コメントが進む動き」を出す。popup が KEY_COMMENT_TIMELINE_MIRROR へ publish→ここで相乗り→純Webが貼る。
+    commentTimelineMirror: commentTimelineMirror || null
   };
   // 自己診断の「いま視聴中の lv」= 鏡(北極星/lane/数字)の liveId を優先採用(read を増やさない)。
   const currentLiveId = String(
