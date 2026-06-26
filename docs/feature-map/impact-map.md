@@ -313,6 +313,7 @@
 | `src/lib/diagnosticErrorRing.js` | 1 | 記録エンジン(watchページ常駐) |
 | `src/lib/diagnosticRedact.js` | 1 | 記録エンジン(watchページ常駐) |
 | `src/lib/diagnosticRingStore.js` | 1 | 記録エンジン(watchページ常駐) |
+| `src/lib/diagnosticsTrust.js` | 1 | 状態速報ページ |
 | `src/lib/diagPaintDeferGate.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/diagWarnings.js` | 1 | 記録エンジン(watchページ常駐) |
 | `src/lib/displayRecordedCount.js` | 1 | ポップアップ(応援レーン) |
@@ -389,6 +390,7 @@
 | `src/lib/livePersistInterval.js` | 1 | 記録エンジン(watchページ常駐) |
 | `src/lib/liveStatValuePlaceholder.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/liveviewPublishOutcome.js` | 1 | 状態速報ページ |
+| `src/lib/liveviewPublishOutcomeKey.js` | 1 | 状態速報ページ |
 | `src/lib/liveviewPublishSelfDiag.js` | 1 | 状態速報ページ |
 | `src/lib/loadLastBroadcastSummary.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/longTaskTracker.js` | 1 | 記録エンジン(watchページ常駐) |
