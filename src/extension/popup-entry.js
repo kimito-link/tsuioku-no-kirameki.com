@@ -456,6 +456,14 @@ import {
   paintStoryUserLaneDomFilled,
   resetStoryUserLaneDom
 } from './story/renderStoryUserLaneDom.js';
+// 応援レーン描画の自己診断(council/lane-render-self-diag-SYNTHESIS.md): 「鏡はあるのに画面に出ない/
+//   ローディングが終わらない」を状態速報で抜け漏れなく捕まえる。北極星の _northStarRenderProbe と同形。
+import {
+  STORY_USER_LANE_STEPS,
+  createStoryUserLaneRenderProbe,
+  recordStoryUserLaneStep,
+  snapshotStoryUserLaneRenderProbe
+} from '../lib/storyUserLaneRenderProbe.js';
 // 人物タイルの ID 行・名前行の正本(person-tile-unify 第3コミット)。popup と会場で共有。
 import { storyUserLaneMetaLines } from '../lib/storyUserLaneMeta.js';
 import { anonymousIdenticonDataUrl } from '../lib/anonymousIdenticon.js';
@@ -5096,6 +5104,20 @@ function getStoryUserLaneEls() {
   };
 }
 
+/**
+ * 自己診断用: 応援レーン4段に実際に描かれた顔タイルの総数（paint 直後の純観測）。
+ * paint の read path を触らない＝childElementCount を数えるだけ。els が無ければ -1。
+ */
+function countStoryUserLaneDomTiles(els) {
+  if (!els) return -1;
+  const lanes = [els.laneLink, els.laneGift, els.laneAd, els.laneKonta, els.laneTanu];
+  let n = 0;
+  for (const lane of lanes) {
+    if (lane && typeof lane.childElementCount === 'number') n += lane.childElementCount;
+  }
+  return n;
+}
+
 function renderStoryUserLane() {
   const els = getStoryUserLaneEls();
   if (!els) return;
@@ -5122,6 +5144,12 @@ function renderStoryUserLane() {
   const entries = Array.isArray(STORY_SOURCE_STATE.entries)
     ? STORY_SOURCE_STATE.entries
     : [];
+  // 自己診断: heavy 経路の描画開始を記録（entries 件数も）。
+  recordStoryUserLaneStep(_storyUserLaneRenderProbe, STORY_USER_LANE_STEPS.START, {
+    activePath: 'heavy',
+    entriesLen: entries.length,
+    nowMs: Date.now()
+  });
   let aggList = Array.isArray(STORY_SOURCE_STATE.laneAggregates)
     ? STORY_SOURCE_STATE.laneAggregates
     : [];
@@ -5129,6 +5157,11 @@ function renderStoryUserLane() {
     ? STORY_SOURCE_STATE.storageRowsForCurrentLive
     : entries;
   if (!entries.length) {
+    // 自己診断: コメント全件読みが未完走で entries が空＝即 return（passive で踏みやすい既知地雷）。
+    recordStoryUserLaneStep(_storyUserLaneRenderProbe, STORY_USER_LANE_STEPS.ENTRIES_EMPTY_RETURN, {
+      entriesLen: 0,
+      domTilesPainted: 0
+    });
     storyUserLaneLastRenderSig = '';
     STORY_AVATAR_DIAG_STATE.userLaneDeduped = 0;
     STORY_AVATAR_DIAG_STATE.userLaneTier3 = 0;
@@ -5314,12 +5347,21 @@ function renderStoryUserLane() {
     entries.length
   );
   if (laneSig === storyUserLaneLastRenderSig) {
+    // 自己診断: 内容に変化なし＝再 paint しないが、DOM は前回の描画済み状態（=完了扱い・現 DOM 件数を記録）。
+    //   ここで done を記録しないと、skip のたびに「started>completed」になり誤って未完走に見える。
+    recordStoryUserLaneStep(_storyUserLaneRenderProbe, STORY_USER_LANE_STEPS.DONE, {
+      domTilesPainted: countStoryUserLaneDomTiles(els)
+    });
     return;
   }
   storyUserLaneLastRenderSig = laneSig;
 
   if (!picked.length) {
     paintStoryUserLaneDomEmptyGuides(els, faces);
+    // 自己診断: りんく/こん太/たぬ姉の候補が無く空ガイド＝完了（描画ロジックは不変・観測のみ）。
+    recordStoryUserLaneStep(_storyUserLaneRenderProbe, STORY_USER_LANE_STEPS.DONE, {
+      domTilesPainted: countStoryUserLaneDomTiles(els)
+    });
     return;
   }
 
@@ -5329,6 +5371,11 @@ function renderStoryUserLane() {
   paintStoryUserLaneDomFilled(els, faces, buckets, laneDisplayedTotal, laneDomIo, {
     totalCandidates: candidates.length
   });
+  // 自己診断: paint 直後に DOM 顔タイル総数を記録（観測のみ・描画は変えない）→ 完了。
+  recordStoryUserLaneStep(_storyUserLaneRenderProbe, STORY_USER_LANE_STEPS.PAINTED, {
+    domTilesPainted: countStoryUserLaneDomTiles(els)
+  });
+  recordStoryUserLaneStep(_storyUserLaneRenderProbe, STORY_USER_LANE_STEPS.DONE);
   // 2026-06-22(council/lane-show-all-active): 健全度パネル「応援レーン」セル用に、人数整合の純観測値を
   //   storage へ(素性が取れた人 candidates.length / レーンに出した人 picked.length / 上限 limit)。
   //   venueSeatsDiag と同型(min-gap・best-effort・記録/描画は触らない)。
@@ -5379,13 +5426,25 @@ async function applyLaneMirrorForPassive() {
   const buckets = restoreLaneMirrorBuckets(snap);
   const totalCells =
     buckets.link.length + buckets.gift.length + buckets.ad.length + buckets.konta.length + buckets.tanu.length;
+  // 自己診断: mirror 経路の描画開始を記録（鏡の非null件数も）。
+  recordStoryUserLaneStep(_storyUserLaneRenderProbe, STORY_USER_LANE_STEPS.START, {
+    activePath: 'mirror',
+    mirrorCells: totalCells,
+    nowMs: Date.now()
+  });
   const pickedLength = Math.max(0, Math.floor(Number(snap.pickedLength) || 0) || totalCells);
   const totalCandidates = Math.max(0, Math.floor(Number(snap.totalCandidates) || 0));
   const sig =
     `${String(snap.liveId || '')}|${Number(snap.capturedAt) || 0}|` +
     `${buckets.link.length}|${buckets.gift.length}|${buckets.ad.length}|${buckets.konta.length}|${buckets.tanu.length}|` +
     `${pickedLength}|${totalCandidates}`;
-  if (sig === _laneMirrorPassiveSig) return;
+  if (sig === _laneMirrorPassiveSig) {
+    // 自己診断: 鏡に変化なし＝再 paint しないが DOM は前回の描画済み（=完了扱い・現 DOM 件数）。
+    recordStoryUserLaneStep(_storyUserLaneRenderProbe, STORY_USER_LANE_STEPS.DONE, {
+      domTilesPainted: countStoryUserLaneDomTiles(els)
+    });
+    return;
+  }
   _laneMirrorPassiveSig = sig;
   const faces = {
     faceLink: STORY_GUIDE_FACE_LINK,
@@ -5396,10 +5455,21 @@ async function applyLaneMirrorForPassive() {
   };
   if (totalCells === 0) {
     paintStoryUserLaneDomEmptyGuides(els, faces);
+    // 自己診断: 鏡が0件＝空ガイドのみ（供給0＝出なくて正常）→ 完了。
+    recordStoryUserLaneStep(_storyUserLaneRenderProbe, STORY_USER_LANE_STEPS.MIRROR_EMPTY, {
+      mirrorCells: 0,
+      domTilesPainted: 0
+    });
+    recordStoryUserLaneStep(_storyUserLaneRenderProbe, STORY_USER_LANE_STEPS.DONE, { domTilesPainted: 0 });
     return;
   }
   const laneDomIo = { storyAvatarLoadGuard, isHttpOrHttpsUrl, storyTileUsesYukkuriTvStyle, upgradeAnonymousAvatarImage };
   paintStoryUserLaneDomFilled(els, faces, buckets, pickedLength, laneDomIo, { totalCandidates });
+  // 自己診断: paint 直後に DOM 顔タイル総数を記録（観測のみ）→ 完了。
+  recordStoryUserLaneStep(_storyUserLaneRenderProbe, STORY_USER_LANE_STEPS.PAINTED, {
+    domTilesPainted: countStoryUserLaneDomTiles(els)
+  });
+  recordStoryUserLaneStep(_storyUserLaneRenderProbe, STORY_USER_LANE_STEPS.DONE);
 }
 
 /** 応援レーン診断の storage 書き込み(min-gap 3秒・best-effort=popup を止めない)。 */
@@ -10748,6 +10818,11 @@ const _northStarRenderProbe = {
   lastError: '',
   lastRunAtBase: 0
 };
+
+// 応援レーン（りんく/こん太/たぬ姉/ギフト/広告）描画の自己診断。北極星と違い、こちらには従来プローブが
+//   無く「鏡にはあるのに画面に出ない/ローディングが終わらない」を状態速報から知る術が無かった（盲点）。
+//   renderStoryUserLane（heavy経路）/applyLaneMirrorForPassive（mirror経路）の入口/分岐/出口を記録する。
+const _storyUserLaneRenderProbe = createStoryUserLaneRenderProbe();
 
 /** 北極星 6 レーンを一括再描画（bundle / snapshot / storage の現在値を使用）。 */
 async function refreshAllNorthStarMirrorLanes(liveId) {
@@ -18093,6 +18168,15 @@ async function collectAiShareDevMonitorPayloadBundle(watchUrl) {
                 ? Math.max(0, Date.now() - _northStarRenderProbe.lastRunAtBase)
                 : null
           };
+        } catch {
+          return null;
+        }
+      })(),
+      // 応援レーン（りんく/こん太/たぬ姉/ギフト/広告）描画の自己診断。状態速報で「鏡にはあるのに
+      //   画面に出ない/ローディングが終わらない」を切り分ける（council/lane-render-self-diag-SYNTHESIS.md）。
+      storyUserLaneRenderProbe: (() => {
+        try {
+          return snapshotStoryUserLaneRenderProbe(_storyUserLaneRenderProbe, Date.now());
         } catch {
           return null;
         }

@@ -1,0 +1,39 @@
+# 会議: 応援レーン描画の自己診断（状態速報で「鏡はあるのに画面に出ない／ローディングが終わらない」を抜け漏れなく捕まえる）
+
+## 背景（実コードで裏取り済み）
+- ユーザー実機: 拡張の応援タイムライン（コメント＋ギフト）でアイコン列が空＋ローディングバーが回ったまま。
+  コメントは2,985件取れているのに、りんく/こん太/たぬ姉の顔つきレーンが「いっきに」出てこない。
+- 同時刻の状態速報では「鏡 たぬ姉5 / 北極星 貢献度7 / 応援者ランキング10件」と全部新鮮・liveId一致で出ていた。
+  → 鏡にはデータがあるのに画面に出ない、という食い違いを状態速報が一切捉えていない。
+- ユーザーの叱責: 「診断で全部わかるっていう前提がまた壊れている」（v0.1.953 の自己診断の盲点の再発）。
+
+## 実コードの事実
+- 応援レーンの描画経路は2つ:
+  1. renderStoryUserLane()（popup-entry.js:5099）= STORY_SOURCE_STATE.entries（heavy comments 全件由来）に依存。
+     entries.length===0 なら 5131 で即 return（resetStoryUserLaneDom で空に）。
+  2. applyLaneMirrorForPassive()（popup-entry.js:5367）= INLINE_PASSIVE 時、KEY_LANE_MIRROR を read して
+     restoreLaneMirrorBuckets→paintStoryUserLaneDomFilled。totalCells===0 なら空ガイドのみ。
+- 北極星レーンには _northStarRenderProbe（popup-entry.js:10741）があり、refreshAllStarted/Completed/
+  lastReachedLane/lastError/lastGiftSyncMs/lastRunAgoMs を診断JSON(popup.northStarRenderProbe)に出している。
+  → 応援レーン（りんく/こん太/たぬ姉）には【同等のプローブが無い】。だから「描画が走ったか・止まったか・
+     なぜ空か」を状態速報から知る術が無い。
+- 状態速報は status-entry が fastDiag(popup.* を含む)を read して出している。新規 storage read は増やさない方針。
+
+## 問い
+状態速報（AI共有テキスト）を1回コピーして渡すだけで、「応援レーンが鏡にはあるのに画面に出ない／
+ローディングが終わらない」の原因が抜け漏れなく分かるようにするには、応援レーン描画の自己診断に
+【何を】載せるべきか。最小で最大の切り分け力を持つフィールド集合を決めよ。
+
+具体的に切り分けたいシナリオ:
+- (A) 鏡が空（データが本当に無い）→ 出ないのは正常
+- (B) 鏡にはN件あるのに DOM に0件しか描けていない（描画関数が呼ばれていない or 早期 return）
+- (C) 描画は走ったが entries 由来（renderStoryUserLane）で entries が空（heavy 未完走）= passive で踏む既知地雷
+- (D) ローディング overlay が終わらない（描画完了したのに overlay を畳んでいない）
+- (E) どちらの経路（heavy/mirror）が今アクティブなのか不明
+
+## 制約（MEMORY 鉄則・絶対）
+- 新規 storage read を増やさない（globalThis 集計 or 既に手元の値だけ。北極星プローブと同方式）。
+- popup の refresh()/paint の read path を改変しない（v0.1.948 で2回却下された地雷）。
+- 推測でレーン描画ロジックを直さない（まず診断を直す＝事実を出す）。
+- 純関数は lib に隔離してテスト。status-entry を太らせない。
+- キー値・個人情報は出さない（件数と state のみ）。
