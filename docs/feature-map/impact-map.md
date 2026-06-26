@@ -133,6 +133,7 @@
 | `src/lib/commentIngestLog.js` | 2 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) |
 | `src/lib/commentSubmitProfiling.js` | 2 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) |
 | `src/lib/commentTickerNameLink.js` | 2 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) |
+| `src/lib/commentTimelineMirrorKey.js` | 2 | ポップアップ(応援レーン) / 状態速報ページ |
 | `src/lib/concurrentCalibrationLog.js` | 2 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) |
 | `src/lib/concurrentEstimate.js` | 2 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) |
 | `src/lib/crowdRasterizer.js` | 2 | 記録エンジン(watchページ常駐) / 会場モード(standalone) |
@@ -294,6 +295,7 @@
 | `src/lib/commentSubmitConfirm.js` | 1 | 記録エンジン(watchページ常駐) |
 | `src/lib/commentSubmitSteps.js` | 1 | 記録エンジン(watchページ常駐) |
 | `src/lib/commentTickerLatestHtml.js` | 1 | ポップアップ(応援レーン) |
+| `src/lib/commentTimelineMirror.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/commentVelocityTimeline.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/commentVelocityWindow.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/concurrentCalibrationFit.js` | 1 | ポップアップ(応援レーン) |

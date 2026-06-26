@@ -390,6 +390,10 @@ import { resolveBroadcasterFollowTarget } from '../lib/broadcasterFollowTarget.j
 import { retrySnapshotRequestUntilReady } from '../lib/popupWatchSnapshotRetry.js';
 import { buildCommentTickerNameHref } from '../lib/commentTickerNameLink.js';
 import { buildCommentTickerLatestHtml } from '../lib/commentTickerLatestHtml.js';
+// コメントタイムライン鏡(council/liveview-wholesale-root-SYNTHESIS.md 第2段): 純Webで「コメントが進む動き」を
+//   出すため、popup が手元に持つ displayEntries の最新N件を鏡として publish→status 経由で純Webへ。
+import { buildCommentTimelineMirrorSnapshot } from '../lib/commentTimelineMirror.js';
+import { KEY_COMMENT_TIMELINE_MIRROR } from '../lib/commentTimelineMirrorKey.js';
 import { buildUserProfileLinkedLabelHtml } from '../lib/userProfileLinkHtml.js';
 import { buildEventRankingSectionHtml } from '../lib/eventRankingSectionHtml.js';
 import { buildReportNextMemoSectionHtml } from '../lib/reportNextMemoSectionHtml.js';
@@ -5525,6 +5529,41 @@ function publishStatCardsMirror(input) {
     _statCardsMirrorLastWriteAt = now;
     const snap = buildStatCardsMirrorSnapshot(input, { nowMs: now });
     void chrome.storage.local.set({ [KEY_STAT_CARDS_MIRROR]: snap }).catch(() => {
+      /* best-effort: storage 不可・context 消失 */
+    });
+  } catch {
+    /* no-op */
+  }
+}
+
+/** コメントタイムライン鏡の publish min-gap 計時。 */
+let _commentTimelineMirrorLastWriteAt = 0;
+/**
+ * コメントタイムライン鏡(最新N件)を status→純Web 用に publish する(第2段=純Webでコメントが進む)。
+ *   publishStatCardsMirror と同型: 受動ビュー(INLINE_PASSIVE)では書かない・3秒 min-gap・best-effort・描画不変。
+ *   popup が既に手元に持つ comments 配列(displayEntries)から最新N件を間引くだけ=重い計算ゼロ・名寄せ/fetch しない。
+ * @param {{ liveId: string, comments: any[] }} input
+ */
+function publishCommentTimelineMirror(input) {
+  if (INLINE_PASSIVE) return; // 受動ビュー: コメント鏡を上書きしない(本物 popup の鏡と競合させない)
+  try {
+    const now = Date.now();
+    if (now - _commentTimelineMirrorLastWriteAt < 3000) return; // 3秒 min-gap。
+    _commentTimelineMirrorLastWriteAt = now;
+    const src = input && typeof input === 'object' ? input : {};
+    const lid = String(src.liveId || '').trim().toLowerCase();
+    const comments = Array.isArray(src.comments) ? src.comments : [];
+    if (!/^lv\d{1,15}$/.test(lid) || !comments.length) return;
+    const snap = buildCommentTimelineMirrorSnapshot({
+      liveId: lid,
+      comments,
+      capturedAt: now,
+      // 既に手元で解決済みの表示名/顔を使う(新規名寄せ・fetch しない=軽い・似せて自作しない)。
+      resolveName: (c) => commentTickerDisplayLabel(c, lid, comments),
+      resolveAvatar: (c) => storyGrowthTileSrcForEntry(c, lid, comments)
+    });
+    if (!snap) return;
+    void chrome.storage.local.set({ [KEY_COMMENT_TIMELINE_MIRROR]: snap }).catch(() => {
       /* best-effort: storage 不可・context 消失 */
     });
   } catch {
@@ -14173,6 +14212,8 @@ async function refresh() {
     });
     void updateIngestHeartbeatDisplay(lv);
     renderCommentTicker(/** @type {PopupCommentEntry[]} */ (displayEntries));
+    // 第2段: 純Webで「コメントが進む」ため、いま手元の displayEntries を鏡として publish(受動では書かない・3秒間引き)。
+    publishCommentTimelineMirror({ liveId: lv, comments: displayEntries });
     exportBtn.disabled = false;
     exportBtn.dataset.liveId = lv;
     exportBtn.dataset.storageKey = key;
