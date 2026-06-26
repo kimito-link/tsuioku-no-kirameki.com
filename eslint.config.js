@@ -109,8 +109,13 @@ export default [
     //   ensureInitShadeFailsafeClassSync(DOM イベント配線グルー=lib抽出不可)+import を追加=21395→21442
     //   (council/loading-overlay-stuck-SYNTHESIS.md・レビュー済み例外)。判定 shouldMarkInitShadeDoneOnAnimationEnd は
     //   src/lib/initShadeFailsafe.js(test付き)に抽出済み。
+    // 2026-06-27: 応援プレビュー(passive)で北極星(貢献度/広告)を鏡から描く=星野ロミ型「見せる側は同じ鏡を読むだけ」を
+    //   北極星にも適用(council/single-source-of-truth-SYNTHESIS.md 第1段)。applyNorthStarMirrorForPassive(KEY_NORTH_STAR_MIRROR
+    //   を read→本物 paintTopSupportRankStyleIntoElement で描画・DOM/storage read グルー=lib抽出不可)+初回/onChanged 配線+
+    //   restoreNorthStarMirrorRows import を追加=21442→21515(レビュー済み例外)。純データ復元 restoreNorthStarMirrorRows は
+    //   src/lib/northStarMirror.js(test付き)に隔離済み。
     files: ['src/extension/popup-entry.js'],
-    rules: { 'max-lines': ['error', { max: 21442, skipBlankLines: false, skipComments: false }] }
+    rules: { 'max-lines': ['error', { max: 21515, skipBlankLines: false, skipComments: false }] }
   },
   {
     files: ['src/extension/content-entry.js'],
