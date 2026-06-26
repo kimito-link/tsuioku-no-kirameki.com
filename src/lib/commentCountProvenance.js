@@ -37,10 +37,18 @@ function agoLabel(ms) {
   return sec < 90 ? `${sec}秒前` : `${Math.round(sec / 60)}分前`;
 }
 
+/** 記録>本家 が「正常(遅延のせい)」とみなせる上限率。これを超えると要確認(二重計上/別配信混入の疑い)。 */
+export const RECORD_OVER_OFFICIAL_NORMAL_MAX_PCT = 130;
+/** 本家コメ値が「遅延中(=記録が先行して当然)」とみなす経過。これより新しいのに記録が大幅超なら異常寄り。 */
+const OFFICIAL_FRESH_MS = 60 * 1000;
+
 /**
- * 1配信ぶんの「数字の出どころ」を組む。判定はせず事実だけを構造化する。
+ * 1配信ぶんの「数字の出どころ」を組む。事実に加え【3段階の判定】も持つ(v0.1.959)。
+ *   判定: ok(記録≤本家=正常) / normal(記録>本家だが遅延で説明可=正常) / check(記録が本家を大幅超=要確認)。
+ *   ★誤検知防止: 「記録>本家」は記録(即時単調) vs 本家(NDGR遅延)の構造で一時的に起きるのが正常。
+ *     本家が遅延中(>60秒前) なら 130% までは normal。本家が新鮮(≤60秒前)なのに大幅超 or 率が 130% 超のときだけ check。
  * @param {object} lv summarizeOneLive の戻り(recordedCount/officialCommentCount/officialRatePct/lastIngestAgoMs/lv 等)
- * @returns {object|null} 出どころ事実(数字が無ければ null)
+ * @returns {object|null} 出どころ事実+判定(数字が無ければ null)
  */
 export function buildCommentCountProvenance(lv) {
   const o = lv && typeof lv === 'object' ? lv : null;
@@ -53,6 +61,30 @@ export function buildCommentCountProvenance(lv) {
     recorded != null && official != null && official > 0
       ? Math.round((recorded / official) * 100)
       : null;
+  const recordedExceedsOfficial = recorded != null && official != null && recorded > official;
+  const officialAgeMs = Number(o.lastIngestAgoMs);
+  const officialIsFresh = Number.isFinite(officialAgeMs) && officialAgeMs >= 0 && officialAgeMs <= OFFICIAL_FRESH_MS;
+
+  // 3段階判定(誤検知防止のため、判定できる材料が揃ったときだけ ok/normal/check を出す)。
+  let verdict = 'unknown';
+  let verdictReason = '';
+  if (recorded != null && official != null && official > 0 && ratePct != null) {
+    if (!recordedExceedsOfficial) {
+      verdict = 'ok';
+      verdictReason = '記録は本家コメ以下＝正常（記録は本家の一部）';
+    } else if (ratePct > RECORD_OVER_OFFICIAL_NORMAL_MAX_PCT) {
+      // 130% 超は遅延では説明しにくい=要確認(別配信混入/二重計上の疑い)。
+      verdict = 'check';
+      verdictReason = `記録が本家コメを大きく上回っています(${ratePct}%)。本家の遅延だけでは説明しにくく、別配信の混入か二重計上の疑いがあります`;
+    } else if (officialIsFresh) {
+      // 本家が新鮮(60秒以内)なのに記録超=遅延で説明できない=要確認。
+      verdict = 'check';
+      verdictReason = `本家コメが新鮮(${agoLabel(officialAgeMs)})なのに記録が上回っています(${ratePct}%)。遅延では説明しにくいので要確認です`;
+    } else {
+      verdict = 'normal';
+      verdictReason = '記録が本家コメをやや上回るのは、記録が即時・単調／本家が遅延値のため＝正常範囲です';
+    }
+  }
 
   return {
     lv: String(o.lv || o.liveId || ''),
@@ -69,9 +101,34 @@ export function buildCommentCountProvenance(lv) {
       ageLabel: agoLabel(o.lastIngestAgoMs)
     },
     ratePct,
-    // 逆転は「事実」として記すだけ(警告にはしない=今回は判定しない)。
-    recordedExceedsOfficial: recorded != null && official != null && recorded > official
+    recordedExceedsOfficial,
+    verdict,
+    verdictReason
   };
+}
+
+/**
+ * 「要確認(check)」の配信を症状カードに昇格する(buildStatusActions の結果に結合)。
+ *   ★ok/normal/unknown は出さない=誤検知ゼロ(構造的に正常な逆転は警告しない)。
+ * @param {object[]} livesData
+ * @returns {Array<{id:string,severity:string,symptom:string,cause:string,action:string,fixableHere:string}>}
+ */
+export function commentCountProvenanceToActionCards(livesData) {
+  const lives = Array.isArray(livesData) ? livesData : [];
+  const cards = [];
+  for (const lv of lives) {
+    const p = buildCommentCountProvenance(lv);
+    if (!p || p.verdict !== 'check') continue;
+    cards.push({
+      id: `comment-count-check-${p.lv || 'unknown'}`,
+      severity: 'warn',
+      symptom: `記録と本家コメの食い違いが大きいです（${p.lv}: 記録${ja(p.recorded.value)} / 本家${ja(p.official.value)}＝${p.ratePct}%）`,
+      cause: p.verdictReason,
+      action: 'この状態速報を開発者(Claude)に共有してください。別配信の混入か二重計上かを実コードで切り分けます。',
+      fixableHere: 'no'
+    });
+  }
+  return cards;
 }
 
 /**
@@ -86,7 +143,7 @@ export function formatCommentCountProvenanceLines(livesData) {
 
   const lines = [];
   lines.push('### 数字の出どころ（何を数えているか）');
-  lines.push('（各数字が「何を・どこから・いつ」数えているかの事実です。判定はしていません）');
+  lines.push('（各数字が「何を・どこから・いつ」数えているか＋正常/要確認の判定です）');
   for (const p of provs) {
     if (p.lv) lines.push(`[${p.lv}]`);
     if (p.recorded.value != null) {
@@ -99,12 +156,11 @@ export function formatCommentCountProvenanceLines(livesData) {
     if (p.ratePct != null) {
       lines.push(`- 一致度: 記録/本家 = ${p.ratePct}%`);
     }
-    if (p.recordedExceedsOfficial) {
-      // 事実＋構造的な理由の注記(警告ではない)。
-      lines.push(
-        '  ※ 記録が本家コメより多いことがあります。記録は「即時・単調（減らない）」、本家コメは「公式の遅延値」' +
-          'なので、配信中は記録が一時的に上回るのは仕組み上ふつうです（数え方が違うだけで壊れてはいません）。'
-      );
+    // 3段階判定(v0.1.959)。ok/normal は🟢、check は🟡要確認。
+    if (p.verdict === 'ok' || p.verdict === 'normal') {
+      lines.push(`- 判定: 🟢 正常 — ${p.verdictReason}`);
+    } else if (p.verdict === 'check') {
+      lines.push(`- 判定: 🟡 要確認 — ${p.verdictReason}`);
     }
   }
   return lines;

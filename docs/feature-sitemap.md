@@ -12,7 +12,7 @@
 - **コメント送信(確認/プロファイル)** — 拡張から watch のコメント欄へ送信し、入力欄の変化で成功を推定。送信経路の手元プロファイルも
   - `src/lib/commentSubmitConfirm.js`
   - `src/lib/commentSubmitProfiling.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 9</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 10</summary>
 
 - `src/lib/commentComposeShortcuts.js` — コメント欄の Enter 系キーで送信するか／既定動作に任せるか。
 - `src/lib/commentKindnessNudge.js` — 送信前コメントの攻撃的表現を検知し「やさしく一言」確認を促す純ロジック。
@@ -21,6 +21,7 @@
 - `src/lib/commentPostUi.js` — ポップアップのコメント送信 UI を、watch 接続状態と入力状態から一貫して決める。
 - `src/lib/commentSendTroubleshootHint.js` — コメント送信エラー文に「再読み込み案内」を 1 回だけ追加する純関数。
 - `src/lib/commentSubmitSteps.js` — コメント送信パイプラインの純粋な判定ロジック。
+- `src/lib/liveviewPublishOutcomeKey.js` — 純Web公開送信(POST /api/status)結果の【ページ横断】記録キー（council/diagnostics-completeness-root-SYNTHESIS.md 第3段）。
 - `src/lib/ownPostedUserIdSet.js` — v0.1.773: 「自分が投稿した userId」の集合を1パスで作る純関数。
 - `src/lib/selfPostedMatcher.js` — 自己投稿コメント（self-posted recents）と、保存済みコメント一覧の
 
@@ -523,7 +524,7 @@
 - **影響範囲ゲート(規律を自動化)** — 星野ロミ式「規律を自動ゲートに」。diff から影響大(複数機能波及)の変更ファイルを検出し波及先機能を列挙。警告のみ(摩擦ゼロ)・--strict で exit1。AGENTS.md §10 のルールを diff 発火に
   - `scripts/impact-check.mjs`
   - `docs/feature-map/impact-map.json`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 35</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 36</summary>
 
 - `api/status.js` — status 受け口 Vercel Serverless Function。
 - `extension/status-guard.js` — 状態速報ページ(status.html)の「何があっても開く」保険。
@@ -544,6 +545,7 @@
 - `src/lib/diagnosticErrorRing.js` — chrome.storage.local に保存する診断エラーリング（純粋・マージのみ）。
 - `src/lib/diagnosticRedact.js` — AI共有・診断バンドル向けの URL / 文字列のサニタイズ（純粋関数）。
 - `src/lib/diagnosticRingStore.js` — 診断エラーリングを chrome.storage.local に追記（拡張コンテキスト専用）。
+- `src/lib/diagnosticsTrust.js` — 「この診断の信頼性」メタ診断（council/diagnostics-completeness-root-SYNTHESIS.md 第1段）。
 - `src/lib/diagWarnings.js` — v0.1.201: 診断 JSON の現在値から「なぜ取れていないか」を導出する純関数群。
 - `src/lib/diagWordingGuard.js` — ユーザー向け診断カードの「実害を示唆する語」を検出する純関数(v0.1.835)。
 - `src/lib/errorAutoDiagnosis.js` — v0.1.205 Phase D: 既存の診断データ（consoleErrors / networkErrors / diagWarnings）から
@@ -727,7 +729,7 @@
 
 ## 🧬 修正系譜マップ(この系統のバグを過去にどう直したか)
 
-> changelog 全 294 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
+> changelog 全 295 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
 
 ### 💾 記録件数 (43版)
 - `v0.1.957` 2026-06-26 — 状態速報に「数字の出どころ」を追加
@@ -1248,7 +1250,8 @@
 - `v0.1.673` 2026-06-10 — コメビュの名前をパネルと同じ情報源で補完
 - `v0.1.670` 2026-06-10 — コメビュのアイコンを本家と同じサムネに
 
-### 🩺 診断・状態速報 (91版)
+### 🩺 診断・状態速報 (92版)
+- `v0.1.959` 2026-06-26 — 「数字の出どころ」に正常/要確認の判定を追加
 - `v0.1.958` 2026-06-26 — 状態速報の冒頭に「この診断の信頼性」を追加
 - `v0.1.957` 2026-06-26 — 状態速報に「数字の出どころ」を追加
 - `v0.1.955` 2026-06-26 — 状態速報に「応援レーン描画の自己診断」を追加
