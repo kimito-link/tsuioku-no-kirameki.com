@@ -1,0 +1,54 @@
+# 会議: 診断が「全ての不具合を漏れなく出せる」ための根本（根を直せば全部直る）
+
+## ユーザー要求（最重要）
+「とにかく診断ですべての不具合が出せないと同じことの繰り返しになる。すべてを網羅するには（で会議）。
+全部でしょ。でも『出てないのと、根幹を直せば全部直る』っていう根の部分がいい。」
+= 個別診断のモグラ叩きをやめ、診断が不具合を取りこぼす【共通の根】を直す。根を直せば②③④含め芋づるで直る。
+
+## 司令塔が2エージェントで実コード棚卸し→確定した「2つの根」
+
+### 根1: 「1回だけ集約・以後更新なし」
+- popup 固有診断(northStarRenderProbe / storyUserLaneRenderProbe / avatarLoadDiag / 鏡の一部)は
+  popupDiagAutoPublish.js:30 で published=true により【popup を開いた idle 時に1回だけ】storage 書き込み。
+  popup を開き直しても再集約しない。
+- 帰結: 描画が後で直っても古い probe のまま / started:0 のまま固着 / 別配信に切り替えても前の値。
+  (前回 storyUserLaneRenderProbe started:0 誤報の正体)
+
+### 根2: 「ページ/プロセスをまたぐと読めない(globalThis と storage の非対称)」
+- 6コンテキスト(content / page-intercept / popup / status / live-view / 純Web)は globalThis が別物。
+- globalThis 集計診断(liveviewPublishOutcome / commentSubmitDiag 等)は記録したページでしか読めない。
+- liveviewPublishOutcome は live-view-entry.js:118 の公開ボタンから記録されない+status の globalThis に
+  溜まらない=「押したのに未送信」と誤報。
+
+### 派生する全症状(この2根から芋づる)
+- started:0 誤報 / 未送信誤報 / popupDiag が別配信の古い値(liveId 照合なし) / 鏡が古い(17分前) /
+  snapshotMeta が1つの古い鏡に引っ張られる / watch タブで popup を開かないと半分の診断が空。
+
+### 既に判明している個別の弱点(根の現れ)
+- popupDiag に liveId 照合が無い(別配信混入を検知できない)。
+- popupDiag に persistedAt の鮮度チェックが無い(古くても「最新」扱い・reportPreview には isFresh あり=対比)。
+- snapshotCapturedAt = 各鏡 capturedAt の max(1つ古いと…の懸念。ただし第1段で max 採用済み)。
+
+## 問い
+診断が「全ての不具合を漏れなく・古くなく・誤検知なく出せる」ようにするには、2つの根をどう直すべきか。
+最小の変更で最大の網羅性を得る設計を決めよ。さらに「網羅できているかを自動で点検する仕組み(=診断の
+メタ診断)」を持つべきか。
+
+司令塔の叩き台(会議で増減・修正してよい):
+- (A) 根1対策: popupDiagAutoPublish を「1回だけ」から「変化検知ごと(or 低頻度の定期再集約)」に変える。
+      ★懸念: 過去に「popup refresh/paint の read path 改変」「重い再集約」で2回 revert した地雷。
+      idle + 低頻度 + storage write のみ(read path 不改変)で安全にできるか。
+- (B) 根2対策: globalThis 集計を「両ページが読める storage に1件記録」へ寄せる(liveviewPublishOutcome を
+      storage 化し、live-view 公開ボタンからも記録)。
+      ★懸念: storage write 増=多タブ競合。best-effort min-gap で吸収できるか。
+- (C) 鮮度の正直化: 全 popup 診断に capturedAt + liveId を必須で持たせ、status は「N秒前・liveId 一致」を
+      必ず表示+古い/別配信なら⏳保留(liveviewPublishSelfDiag と同方式に統一)。
+- (D) メタ診断: 状態速報の冒頭に「この診断はどこまで信頼できるか」(watch タブ有無/popup 鮮度/各経路の
+      最終更新)を1ブロックで出す=「出てない/古い」をユーザーが即わかる。"診断の自己点検"。
+
+## 制約(MEMORY 鉄則・絶対)
+- popup の refresh()/paint の read path を改変しない(2回 revert した最重要地雷)。
+- content(記録の心臓部)・会場読み上げに触らない。
+- 「重い同期処理を毎paint」は厳禁。再集約は idle+低頻度+storage write のみ。
+- 純関数は lib に隔離してテスト。段階リリース(1コミット=1検証単位)。
+- 件数/step/時刻のみ(個人情報なし)。実機検証はユーザー。実機OKまで「直った」と言わない。

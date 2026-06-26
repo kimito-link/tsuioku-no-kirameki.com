@@ -20,6 +20,26 @@
 
 import { KEY_LIVEVIEW_PUBLISH_PAYLOAD } from '../lib/storageKeys.js';
 import { buildStatusShareUrls } from '../lib/statusShareUrls.js';
+// 根2対策(council/diagnostics-completeness-root-SYNTHESIS.md 第3段): この公開ボタンの送信結果を【storage】に
+//   記録する。従来 status の自己診断は globalThis 集計しか見ず、ここ(別ページ=別 globalThis)で送っても
+//   「押したのに未送信」と誤報していた。storage に1件書けば status から読める。
+import {
+  KEY_LIVEVIEW_PUBLISH_OUTCOME,
+  buildLiveviewPublishOutcomeRecord
+} from '../lib/liveviewPublishOutcomeKey.js';
+
+/** 送信結果を storage に1件記録(best-effort)。status / live-view どちらから送っても status が読める。
+ * @param {{ ok: boolean, httpStatus?: number|null, error?: string, liveId?: string }} outcome */
+function recordPublishOutcomeToStorage(outcome) {
+  try {
+    const local = globalThis.chrome?.storage?.local;
+    if (!local) return;
+    const rec = buildLiveviewPublishOutcomeRecord({ ...outcome, at: Date.now() });
+    void local.set({ [KEY_LIVEVIEW_PUBLISH_OUTCOME]: rec });
+  } catch {
+    /* best-effort: 記録失敗は送信を妨げない */
+  }
+}
 
 /** URL の ?lv= から live id を取り出す(検証付き)。不正なら ''。 */
 function liveIdFromUrl() {
@@ -129,17 +149,23 @@ function setupPublishButton() {
         return;
       }
       const { ingestUrl, liveViewUrl } = buildStatusShareUrls(payload.appOrigin, payload.viewToken);
+      // 送信した snapshot の対象 lv(鏡 liveId 優先)=送信結果記録に添える(status の自己診断が別配信判定に使う)。
+      const jb = /** @type {any} */ (payload.jsonBlob || {});
+      const sentLiveId = String(jb?.northStarMirror?.liveId || jb?.laneMirror?.liveId || jb?.statCardsMirror?.liveId || '');
       const res = await fetch(ingestUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'x-share-key': payload.ingestKey },
         body: JSON.stringify({ ...payload.jsonBlob, v: payload.viewToken })
       });
       if (!res.ok) {
+        recordPublishOutcomeToStorage({ ok: false, httpStatus: res.status, error: `送信失敗 (HTTP ${res.status})`, liveId: sentLiveId });
         showError(`送信失敗 (HTTP ${res.status})`);
         return;
       }
+      recordPublishOutcomeToStorage({ ok: true, httpStatus: res.status, liveId: sentLiveId });
       showSuccess(liveViewUrl);
     } catch (err) {
+      recordPublishOutcomeToStorage({ ok: false, httpStatus: null, error: '通信エラー: ' + String((err && err.message) || err) });
       showError('通信エラー: ' + String((err && err.message) || err));
     } finally {
       btn.textContent = prev;

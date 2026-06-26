@@ -41,6 +41,16 @@ import {
   recordLiveviewPublishOutcome,
   summarizeLiveviewPublishOutcome
 } from '../lib/liveviewPublishOutcome.js';
+// 根2対策(council/diagnostics-completeness-root-SYNTHESIS.md 第3段): 送信結果を【ページ横断 storage】にも記録。
+//   globalThis はページごと別物=拡張内 live-view の公開ボタンで送っても status から読めず「押したのに未送信」
+//   誤報になっていた。storage に1件記録すれば、どのページで送っても status が読める。
+import {
+  KEY_LIVEVIEW_PUBLISH_OUTCOME,
+  buildLiveviewPublishOutcomeRecord,
+  summarizeLiveviewPublishOutcomeRecord
+} from '../lib/liveviewPublishOutcomeKey.js';
+// 「この診断の信頼性」メタ診断(第1段): 状態速報の冒頭に「どこが信頼でき・どこが空/古いか」を出す。
+import { buildDiagnosticsTrust, formatDiagnosticsTrustLines } from '../lib/diagnosticsTrust.js';
 // 応援レーン描画の自己診断(council/lane-render-self-diag-SYNTHESIS.md): 「鏡にはあるのに画面に出ない/
 //   ローディングが終わらない」を状態速報で切り分ける。popup の storyUserLaneRenderProbe を読むだけ。
 import {
@@ -170,7 +180,9 @@ let _extrasCache = /** @type {{reportPreview:any, watchTabMap:any, trendFindings
   northStarMirror: null,
   // v0.1.924: voiceDiag/venueSeatsDiag も毎回 read から 12秒間引きへ(下記の真因対応)。
   voiceDiag: null,
-  venueSeatsDiag: null
+  venueSeatsDiag: null,
+  // 根2対策: 送信結果(ページ横断 storage)。どのページで送っても status が「送信済み」を読める。
+  publishOutcomeRec: null
 });
 /** v0.1.868: 配信カードの再構築 skip 判定用 signature(変化なしなら innerHTML を作り直さない)。 */
 let _lastLivesSig = '';
@@ -369,13 +381,16 @@ async function refresh(opts = {}) {
       // 北極星レーン鏡(公式値レーン)も extras に同梱=毎回の直列 read を増やさず12秒間引きで読む。
       step = 'loadNorthStarMirrorSafe';
       const northStarMirror = await runStorageOpWithTimeout(() => loadNorthStarMirrorSafe(), tmo).catch(() => null);
-      _extrasCache = { reportPreview, watchTabMap, trendFindings, laneDiag, laneMirror, statCardsMirror, northStarMirror, voiceDiag, venueSeatsDiag };
+      // 根2対策: 送信結果(ページ横断 storage)を 12秒間引きで読む(新規の重い read を増やさない)。
+      step = 'loadPublishOutcome';
+      const publishOutcomeRec = await runStorageOpWithTimeout(() => loadLiveviewPublishOutcomeSafe(), tmo).catch(() => null);
+      _extrasCache = { reportPreview, watchTabMap, trendFindings, laneDiag, laneMirror, statCardsMirror, northStarMirror, voiceDiag, venueSeatsDiag, publishOutcomeRec };
       _extrasCacheAt = Date.now();
       _mark('extras');
     }
-    const { reportPreview, watchTabMap, trendFindings, laneDiag, laneMirror, statCardsMirror, northStarMirror, voiceDiag, venueSeatsDiag } = _extrasCache;
+    const { reportPreview, watchTabMap, trendFindings, laneDiag, laneMirror, statCardsMirror, northStarMirror, voiceDiag, venueSeatsDiag, publishOutcomeRec } = _extrasCache;
     step = 'renderAll';
-    renderAll({ lvList, summaries, fastDiag, popupDiag, backfillProgress, voiceDiag, venueSeatsDiag, laneDiag, laneMirror, statCardsMirror, northStarMirror, reportPreview, trendFindings, watchTabMap });
+    renderAll({ lvList, summaries, fastDiag, popupDiag, backfillProgress, voiceDiag, venueSeatsDiag, laneDiag, laneMirror, statCardsMirror, northStarMirror, reportPreview, trendFindings, watchTabMap, publishOutcomeRec });
     _mark('render');
     const _totalMs = Math.round((typeof performance !== 'undefined' ? performance.now() : Date.now()) - _t0);
     updateLastUpdateMeta({ totalMs: _totalMs, stepMs: _stepMs });
@@ -693,6 +708,16 @@ async function loadNorthStarMirrorSafe() {
   }
 }
 
+/** 送信結果(ページ横断 storage)を読む。status / live-view どちらの公開ボタンで送ってもここに残る(根2対策)。 */
+async function loadLiveviewPublishOutcomeSafe() {
+  try {
+    const bag = await chrome.storage.local.get(KEY_LIVEVIEW_PUBLISH_OUTCOME);
+    return bag?.[KEY_LIVEVIEW_PUBLISH_OUTCOME] || null;
+  } catch {
+    return null;
+  }
+}
+
 // v0.1.858: レポート(HTML/マーケ/メディアキット)の DL前 主要KPI を読む。popup が
 //   KEY_REPORT_PREVIEW へ定期(15秒)に書く。古い snapshot(2分超)や popup 未起動なら null=表示しない。
 async function loadReportPreviewSafe() {
@@ -781,7 +806,7 @@ async function loadBackfillProgressSafe() {
 // v0.1.861: レポートプレビューの信頼度注釈の文脈は純関数 reportPreviewCtxFromFastDiag(src/lib)に抽出済み
 //   (NDGR 接続/userId 付き率/backfill 進行 → 注釈ctx・挙動同値・テストで固定)。import は冒頭。
 
-function renderAll({ lvList, summaries, fastDiag, popupDiag, backfillProgress, voiceDiag, venueSeatsDiag, laneDiag, laneMirror, statCardsMirror, northStarMirror, reportPreview, trendFindings, watchTabMap }) {
+function renderAll({ lvList, summaries, fastDiag, popupDiag, backfillProgress, voiceDiag, venueSeatsDiag, laneDiag, laneMirror, statCardsMirror, northStarMirror, reportPreview, trendFindings, watchTabMap, publishOutcomeRec }) {
   // v0.1.847: 各描画セクションを独立 try/catch で隔離するヘルパ。1つが throw しても他のセクションと
   //   最終更新メタを巻き込まない=「セルが全部消える/最終更新—のまま固まる」を根治。落ちた場所は
   //   console と AI 共有欄に出して真因を追えるようにする(star-romi 失敗体験の除去)。
@@ -1052,7 +1077,7 @@ function renderAll({ lvList, summaries, fastDiag, popupDiag, backfillProgress, v
   // AI 共有用テキスト
   let fullText = '';
   safeSection('AI共有テキスト', () => {
-    fullText = buildAiShareFullText({ overviewText, livesData, fastDiag, popupDiag, voiceDiag, venueSeatsDiag, laneDiag, reportPreview, trendFindings, jsonBlob, currentLiveId, publishKeys });
+    fullText = buildAiShareFullText({ overviewText, livesData, fastDiag, popupDiag, voiceDiag, venueSeatsDiag, laneDiag, reportPreview, trendFindings, jsonBlob, currentLiveId, publishKeys, publishOutcomeRec });
     const ta = /** @type {HTMLTextAreaElement|null} */ (
       document.getElementById('aiShareText')
     );
@@ -1714,11 +1739,20 @@ function summarizeOneLive(lv, summary, snapshot, perfDiag, endedFlag) {
   };
 }
 
-function buildAiShareFullText({ overviewText, livesData, fastDiag, popupDiag, voiceDiag, venueSeatsDiag, laneDiag, reportPreview, trendFindings, jsonBlob, currentLiveId, publishKeys }) {
+function buildAiShareFullText({ overviewText, livesData, fastDiag, popupDiag, voiceDiag, venueSeatsDiag, laneDiag, reportPreview, trendFindings, jsonBlob, currentLiveId, publishKeys, publishOutcomeRec }) {
   const lines = [];
   lines.push('## 君斗りんくの追憶のきらめき 状態速報');
   lines.push(`生成: ${new Date().toISOString()}`);
   lines.push('');
+  // 送信結果(根2対策): storage 記録(ページ横断=live-view からの送信も拾う)を優先し、無ければ globalThis 集計。
+  //   どちらの公開ボタンで送っても「送信済み」を status が読める。
+  const nowMsForPublish = Date.now();
+  const outcomeFromStorage = publishOutcomeRec
+    ? summarizeLiveviewPublishOutcomeRecord(publishOutcomeRec, nowMsForPublish)
+    : null;
+  const outcomeFromGlobal = summarizeLiveviewPublishOutcome(nowMsForPublish);
+  const publishOutcome =
+    outcomeFromStorage && outcomeFromStorage.everSent ? outcomeFromStorage : outcomeFromGlobal;
   // 純Web公開コピーの自己診断を1回組む(read なし=渡された jsonBlob/引数だけ)。対処候補カード結合と
   //   専用セクション描画の両方で使い回す。失敗しても状態速報を壊さない。
   let publishSelfDiag = null;
@@ -1728,7 +1762,7 @@ function buildAiShareFullText({ overviewText, livesData, fastDiag, popupDiag, vo
       fastDiag,
       currentLiveId: String(currentLiveId || ''),
       publishKeys: publishKeys || {},
-      lastPost: summarizeLiveviewPublishOutcome(Date.now()),
+      lastPost: publishOutcome,
       nowMs: Date.now()
     });
   } catch {
@@ -1748,6 +1782,23 @@ function buildAiShareFullText({ overviewText, livesData, fastDiag, popupDiag, vo
     laneLoadingActive = Boolean(watching && watching.perfDiag && watching.perfDiag.shadeActive === true);
   } catch {
     laneRenderDiag = null;
+  }
+  // 「この診断の信頼性」メタ診断(根本治療): 状態速報の冒頭に「どこが信頼でき・どこが空/古いか」を出す。
+  //   個々の診断を取りこぼしても【取りこぼしている事実】が必ず最初に出る=同じループが構造的に止まる。
+  try {
+    const hasWatchTab = Array.isArray(livesData) && livesData.some((l) => l && l.recording);
+    const trust = buildDiagnosticsTrust({
+      hasWatchTab,
+      currentLiveId: String(currentLiveId || ''),
+      popupDiag: popupDiag || null,
+      jsonBlob: jsonBlob || null,
+      publishOutcome,
+      nowMs: Date.now()
+    });
+    const trustLines = formatDiagnosticsTrustLines(trust);
+    if (trustLines.length) { for (const l of trustLines) lines.push(l); lines.push(''); }
+  } catch {
+    /* no-op: 信頼性ブロックの失敗は状態速報を壊さない */
   }
   if (overviewText) {
     lines.push('### 概要');
@@ -1860,10 +1911,19 @@ function buildAiShareFullText({ overviewText, livesData, fastDiag, popupDiag, vo
     const persistedAt = String(popupDiag.persistedAt || '').trim();
     if (persistedAt) {
       const ageMs = Date.now() - Date.parse(persistedAt);
-      const ageStr = Number.isFinite(ageMs)
-        ? `(約${Math.max(0, Math.round(ageMs / 1000))}秒前にpopupで取得)`
-        : '';
+      const ageSec = Number.isFinite(ageMs) ? Math.max(0, Math.round(ageMs / 1000)) : null;
+      const ageStr = ageSec != null ? `(約${ageSec}秒前にpopupで取得)` : '';
       lines.push(`取得時刻: ${persistedAt} ${ageStr}`);
+      // 第2段(鮮度の正直化): 3分超なら「古い」を明示(根1=1回だけ集約で固着するため)。
+      if (Number.isFinite(ageMs) && ageMs > 3 * 60 * 1000) {
+        lines.push('⚠ この popup 診断は古いです(3分超)。下の応援レーン描画/北極星 probe は現状と違う可能性があります。watch タブで popup を開き直すと新鮮化します。');
+      }
+      // liveId 照合: popup 診断の対象配信が現配信と違えば「別配信の古い値」を警告(根=liveId 照合欠如)。
+      const popupLid = String(popupDiag?.popup?.watchSnapshotMeta?.liveId || '').trim().toLowerCase();
+      const curLid = String(currentLiveId || '').trim().toLowerCase();
+      if (popupLid && curLid && popupLid !== curLid) {
+        lines.push(`🔴 この popup 診断は別配信(${popupLid})のものです。現在の配信(${curLid})とは一致しません=下の probe を現配信の診断として読まないでください。`);
+      }
     } else {
       lines.push('取得時刻: 不明(popup を一度開くと更新されます)');
     }
@@ -1914,6 +1974,22 @@ function getUploadConfig() {
  *   - 成功時は閲覧 URL を返す。
  * @returns {Promise<{ ok: boolean, url?: string, error?: string }>}
  */
+/**
+ * 送信結果を【ページ横断 storage】に1件記録(best-effort)。globalThis 記録(recordLiveviewPublishOutcome)と
+ *   併用し、status だけでなく拡張内 live-view から送ってもどちらのページからも読めるようにする(根2対策)。
+ * @param {{ ok: boolean, httpStatus?: number|null, error?: string, liveId?: string }} outcome
+ */
+function persistLiveviewPublishOutcome(outcome) {
+  try {
+    const local = globalThis.chrome?.storage?.local;
+    if (!local) return;
+    const rec = buildLiveviewPublishOutcomeRecord({ ...outcome, at: Date.now() });
+    void local.set({ [KEY_LIVEVIEW_PUBLISH_OUTCOME]: rec });
+  } catch {
+    /* best-effort: 記録失敗は送信を妨げない */
+  }
+}
+
 async function uploadStatusSnapshot() {
   const { ingestKey, viewToken, appOrigin } = getUploadConfig();
   if (!ingestKey || !viewToken) {
@@ -1923,6 +1999,10 @@ async function uploadStatusSnapshot() {
   if (!jsonBlob) {
     return { ok: false, error: 'まだ送信できる状態がありません' };
   }
+  // 送信した snapshot の対象 lv(鏡 liveId 優先)=送信結果記録に添える(別配信判定用)。
+  const sentLiveId = String(
+    jsonBlob?.northStarMirror?.liveId || jsonBlob?.laneMirror?.liveId || jsonBlob?.statCardsMirror?.liveId || ''
+  );
   // 共有 URL 組み立ては純関数 buildStatusShareUrls(src/lib)に抽出済み(挙動同値・テストで固定)。
   const { statusUrl, liveViewUrl, ingestUrl } = buildStatusShareUrls(appOrigin, viewToken);
   try {
@@ -1932,11 +2012,13 @@ async function uploadStatusSnapshot() {
       body: JSON.stringify({ ...jsonBlob, v: viewToken })
     });
     if (!res.ok) {
-      // POST 失敗を globalThis に記録=自己診断が「純Webが古い snapshot を見続けている」を検知できる。
+      // POST 失敗を globalThis + storage 両方に記録=どのページからも「純Webが古い」を検知できる。
       recordLiveviewPublishOutcome({ ok: false, httpStatus: res.status, error: `送信失敗 (HTTP ${res.status})`, at: Date.now() });
+      persistLiveviewPublishOutcome({ ok: false, httpStatus: res.status, error: `送信失敗 (HTTP ${res.status})`, liveId: sentLiveId });
       return { ok: false, error: `送信失敗 (HTTP ${res.status})` };
     }
     recordLiveviewPublishOutcome({ ok: true, httpStatus: res.status, at: Date.now() });
+    persistLiveviewPublishOutcome({ ok: true, httpStatus: res.status, liveId: sentLiveId });
     // 状態速報の Web 版(概要+配信一覧)と、応援ライブビューの Web 版(popup そっくりの応援レーン)の両方の URL を返す。
     return {
       ok: true,
@@ -1945,6 +2027,7 @@ async function uploadStatusSnapshot() {
     };
   } catch (err) {
     recordLiveviewPublishOutcome({ ok: false, httpStatus: null, error: '通信エラー: ' + String(err?.message || err), at: Date.now() });
+    persistLiveviewPublishOutcome({ ok: false, httpStatus: null, error: '通信エラー: ' + String(err?.message || err), liveId: sentLiveId });
     return { ok: false, error: '通信エラー: ' + String(err?.message || err) };
   }
 }

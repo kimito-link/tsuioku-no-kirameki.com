@@ -105,7 +105,11 @@ const STORAGE_DISCONNECT_BASELINE = new Set([
   // 応援ライブビュー公開ペイロード(2026-06-25): producer=status-entry / consumer=live-view-entry の
   //   【別バンドル間ハンドオフ】(status が書く→live-view が読んで POST)。静的解析はバンドルを跨げず
   //   片側しか見えない偽陽性。経路自体は実機(ブラウザ)で click→POST→公開URL 表示を確認済み。
-  'KEY_LIVEVIEW_PUBLISH_PAYLOAD'
+  'KEY_LIVEVIEW_PUBLISH_PAYLOAD',
+  // 送信結果のページ横断記録(2026-06-26・diagnostics-completeness 第3段): producer=status-entry +
+  //   live-view-entry の両方が書く / consumer=status-entry が読む。根2(globalThis ページ別)の根治で
+  //   storage に1件記録=どのページの公開ボタンで送っても status が「送信済み」を読める。意図的な構造。
+  'KEY_LIVEVIEW_PUBLISH_OUTCOME'
 ]);
 
 /**
