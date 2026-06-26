@@ -119,6 +119,7 @@
             <li><a href="#example">5. 実例 ― 「ポップアップを開かなくても出る」</a></li>
             <li><a href="#pitfalls">6. 落とし穴 ― やってはいけない直し方</a></li>
             <li><a href="#checklist">7. チェックリスト ― 次に設計するとき</a></li>
+            <li><a href="#now-building">8. いま作っているところ ― 頂いたソースの活かし方</a></li>
           </ol>
         </nav>
 
@@ -252,6 +253,43 @@ async function publishCommentMirrorFromRecorder() {
             <li><strong>現実確認</strong> ― ドキュメントの「実装済み」を鵜呑みにせず、実コードで前提を立てたか。</li>
           </ol>
           <p>機能を足すより、役割をどこに置くか。<strong>設計は配置で決まる。</strong>「重い」「固まる」「開かないと出ない」――個別の不具合に見えるものの多くは、役割の配置ミスが根。配置を直せば、複数の不具合が同時に消える。</p>
+        </section>
+
+        <section class="box" id="now-building">
+          <h2><span class="num">8</span>いま作っているところ ― 頂いたソースが、こう活かされています</h2>
+          <p>ここまでの設計思想は、机上の理論ではありません。<strong>星野ロミ氏ご本人から頂いたソースコード（すれちがい通信のアプリ）を土台に、いま別プロダクトとして形にしている最中です。</strong></p>
+          <figure class="fig">
+            <svg viewBox="0 0 760 380" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="制作中のすれ違い通信アプリ v1.0.0 のヒーロー画面イメージ">
+              <rect x="0" y="0" width="760" height="380" rx="16" fill="#0a0a0a"/>
+              <g fill="#1f2937"><circle cx="70" cy="60" r="2.2"/><circle cx="150" cy="40" r="1.6"/><circle cx="230" cy="80" r="1.8"/><circle cx="640" cy="50" r="2"/><circle cx="700" cy="110" r="1.6"/><circle cx="120" cy="300" r="1.6"/><circle cx="660" cy="320" r="2"/></g>
+              <path d="M120 250 L180 200 L240 260 L300 210" stroke="#1e293b" stroke-width="2" fill="none"/>
+              <text x="380" y="92" text-anchor="middle" font-size="30" font-weight="800" fill="#f3f4f6" font-family="inherit">君斗りんくの</text>
+              <text x="380" y="130" text-anchor="middle" font-size="30" font-weight="800" fill="#f3f4f6" font-family="inherit">すれ違ひ通信 <tspan fill="#34d399">v1.0.0</tspan></text>
+              <text x="380" y="156" text-anchor="middle" font-size="12" letter-spacing="3" fill="#6b7280" font-family="inherit">SURECHIGAI TSUSHIN</text>
+              <rect x="250" y="180" width="260" height="74" rx="12" fill="#0f1115" stroke="#1f2937" stroke-width="1.5"/>
+              <text x="380" y="204" text-anchor="middle" font-size="10" letter-spacing="2" fill="#34d399" font-family="inherit">CORE SIGNAL</text>
+              <text x="380" y="228" text-anchor="middle" font-size="19" font-weight="800" fill="#f3f4f6" font-family="inherit">会いたい君がいる</text>
+              <text x="380" y="248" text-anchor="middle" font-size="16" font-weight="800" fill="#34d399" font-family="inherit">現在地</text>
+              <rect x="276" y="282" width="208" height="44" rx="22" fill="#0fb88f"/>
+              <text x="380" y="304" text-anchor="middle" font-size="14" font-weight="800" fill="#04201a" font-family="inherit">X（Twitter）ではじめる</text>
+              <text x="380" y="319" text-anchor="middle" font-size="9.5" fill="#063b30" font-family="inherit">無料・1タップ / 新規登録もこちら</text>
+              <g font-family="inherit"><circle cx="650" cy="120" r="16" fill="#3b2a4a" stroke="#a78bfa" stroke-width="1.5"/><text x="650" y="150" text-anchor="middle" font-size="9" fill="#cbd5e1">りんく</text>
+              <circle cx="90" cy="320" r="15" fill="#3b2a4a" stroke="#a78bfa" stroke-width="1.5"/><text x="90" y="348" text-anchor="middle" font-size="9" fill="#cbd5e1">こん太</text>
+              <circle cx="300" cy="320" r="15" fill="#3b2a4a" stroke="#a78bfa" stroke-width="1.5"/><text x="300" y="348" text-anchor="middle" font-size="9" fill="#cbd5e1">たぬ姉</text></g>
+            </svg>
+            <figcaption>制作中の「すれ違い通信 v1.0.0 ― 会いたい君がいる現在地」。位置の足あとを正確な場所として残し、交流は X へ寄せる設計。</figcaption>
+          </figure>
+          <p>頂いたソースは「捨てて作り直す」のではなく、<strong>設計思想を土台に、責務ごとの純粋な部品へ再編成し、さらに発展</strong>させています。実際のコードには <code>移植元: surechigai-nico/server/src/cron/matcher.ts</code> のような出自コメントを残し、リスペクトと履歴を辿れるようにしています。</p>
+          <table class="cmp">
+            <tr><th>頂いたソースの要素</th><th>いまのプロダクトでの活かし方（＋発展）</th></tr>
+            <tr><td>cron マッチング（matcher.ts）</td><td>DB・認証・通信に非依存の<strong>純粋TSモジュール</strong>（<code>core/matching.ts</code>）へ再編成。テスト可能な部品に。</td></tr>
+            <tr><td>ティア制（500m / 3km / 10km / 50km）</td><td>そのまま継承しつつ、<strong>H3 地理インデックス（res 8/7/6/5）と k 値</strong>を足してより緻密に（<code>core/tiers.ts</code>）。</td></tr>
+            <tr><td>分身（おさんぽ）= ティア5</td><td><strong>「タイムシフト」へ再設計</strong>（訪れたエリアの同セルで時間を超えてすれ違う）。</td></tr>
+            <tr><td>位置の 500m グリッド丸め（toGrid）</td><td><strong>H3 res8 セル＋自宅マスク</strong>（最頻セルは「ひみつの場所」に置換）へ発展（<code>core/privacy.ts</code>）。</td></tr>
+            <tr><td>ブロック・通報・公開最小（opt-in）</td><td><code>core/moderation.ts</code> として独立。<strong>交流は X に寄せ、アプリ内は一方向の合図に留める</strong>方針を継承。</td></tr>
+            <tr><td>三層モデル（users / locations / encounters）</td><td>feature-sliced（<code>modules/encounter/{api,core,db}</code>）に整理。レポートで推奨された「縦スライス再編成」を実践。</td></tr>
+          </table>
+          <p class="note"><b>この記事自体が、その実践の記録です。</b>§1〜§7 の「役割分担」は、頂いたソースから学び、別プロダクト（この拡張・すれ違い通信）の両方で<strong>いま現在進行形で形にしている</strong>設計です。学びをくれた星野ロミ氏に感謝します。</p>
         </section>
       </div>
     </main>
