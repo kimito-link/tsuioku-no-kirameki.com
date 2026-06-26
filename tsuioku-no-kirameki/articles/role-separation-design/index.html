@@ -3,27 +3,34 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-    <title>「重い・固まる・開かないと出ない」の根は1つ ― データを作る人と見せる人を分ける設計 ― 君斗りんくの追憶のきらめき</title>
+    <title>星野ロミさんから頂いたソースコードがかなり学びになった ― データを作る人と見せる人を分ける設計 ― 君斗りんくの追憶のきらめき</title>
 
-    <link rel="icon" href="../images/favicon.ico" sizes="any">
-    <link rel="icon" type="image/png" sizes="32x32" href="../images/favicon-32.png">
+    <link rel="icon" href="../../images/favicon.ico" sizes="any">
+    <link rel="icon" type="image/png" sizes="32x32" href="../../images/favicon-32.png">
 
-    <meta name="description" content="Chrome 拡張で「開いた瞬間に重い」「画面を開かないとデータが出ない」が別々のバグに見えて根は1つ＝役割の配置ミス。データを作る人(常時動く側)と見せる人(画面)を分け、重い処理は前段で1回、画面は貼るだけにする設計を、storage ベース拡張への翻訳と実例つきで解説。">
+    <meta name="description" content="星野ロミ氏から頂いたソースコードがかなり学びになった。「開いた瞬間に重い」「画面を開かないとデータが出ない」が別々のバグに見えて根は1つ＝役割の配置ミス。データを作る人(常時動く側)と見せる人(画面)を分け、重い処理は前段で1回、画面は貼るだけにする設計を、頂いたソースの実例つきで解説。">
     <meta name="theme-color" content="#f7f1e7">
     <meta name="robots" content="index,follow">
-    <link rel="canonical" href="https://tsuioku-no-kirameki.com/articles/role-separation-design.html">
+    <link rel="canonical" href="https://tsuioku-no-kirameki.com/articles/role-separation-design/">
 
     <meta property="og:type" content="article">
-    <meta property="og:url" content="https://tsuioku-no-kirameki.com/articles/role-separation-design.html">
-    <meta property="og:title" content="「重い・固まる・開かないと出ない」の根は1つ ― データを作る人と見せる人を分ける設計">
-    <meta property="og:description" content="別々のバグに見える不具合の根は「役割の配置ミス」。重い処理を前段に寄せ、画面は貼るだけにする設計を storage ベース拡張への翻訳つきで。">
+    <meta property="og:url" content="https://tsuioku-no-kirameki.com/articles/role-separation-design/">
+    <meta property="og:title" content="星野ロミさんから頂いたソースコードがかなり学びになった ― データを作る人と見せる人を分ける設計">
+    <meta property="og:description" content="星野ロミ氏から頂いたソースがかなり学びになった。別々のバグに見える不具合の根は「役割の配置ミス」。重い処理を前段に寄せ、画面は貼るだけにする設計を、頂いたソースの実例つきで。">
     <meta property="og:site_name" content="君斗りんくの追憶のきらめき">
     <meta property="og:locale" content="ja_JP">
+    <meta property="og:image" content="https://tsuioku-no-kirameki.com/articles/role-separation-design/img/surechigai-hero.png">
+    <meta property="og:image:alt" content="制作中の「すれ違ひ通信 v1.0.0 ― 会いたい君がいる現在地」の画面">
     <meta property="article:published_time" content="2026-06-27T00:00:00+09:00">
     <meta property="article:author" content="君斗りんく / Kimito-Link Project">
 
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="星野ロミさんから頂いたソースコードがかなり学びになった ― データを作る人と見せる人を分ける設計">
+    <meta name="twitter:description" content="星野ロミ氏から頂いたソースがかなり学びになった。別々のバグの根は「役割の配置ミス」。重い処理を前段に寄せ、画面は貼るだけにする設計を実例つきで。">
+    <meta name="twitter:image" content="https://tsuioku-no-kirameki.com/articles/role-separation-design/img/surechigai-hero.png">
+
     <script type="application/ld+json">
-      {"@context":"https://schema.org","@type":"TechArticle","headline":"「重い・固まる・開かないと出ない」の根は1つ ― データを作る人と見せる人を分ける設計","datePublished":"2026-06-27","dateModified":"2026-06-27","author":{"@type":"Organization","name":"Kimito-Link Project","url":"https://kimito-link.com/"},"publisher":{"@type":"Organization","name":"Kimito-Link Project","url":"https://kimito-link.com/"},"url":"https://tsuioku-no-kirameki.com/articles/role-separation-design.html","inLanguage":"ja-JP","license":"https://opensource.org/licenses/MIT"}
+      {"@context":"https://schema.org","@type":"TechArticle","headline":"星野ロミさんから頂いたソースコードがかなり学びになった ― データを作る人と見せる人を分ける設計","datePublished":"2026-06-27","dateModified":"2026-06-27","image":"https://tsuioku-no-kirameki.com/articles/role-separation-design/img/surechigai-hero.png","author":{"@type":"Organization","name":"Kimito-Link Project","url":"https://kimito-link.com/"},"publisher":{"@type":"Organization","name":"Kimito-Link Project","url":"https://kimito-link.com/"},"url":"https://tsuioku-no-kirameki.com/articles/role-separation-design/","inLanguage":"ja-JP","license":"https://opensource.org/licenses/MIT"}
     </script>
 
     <style>
@@ -80,16 +87,16 @@
   <body>
     <header class="topbar">
       <div class="shell topbar-inner">
-        <a class="topbar__logo" href="../"><img src="../../extension/images/logo/kimito-link-color.png" width="160" height="34" alt="Kimito-Link Project"></a>
-        <a class="topbar__back" href="./">← 記事一覧へ</a>
+        <a class="topbar__logo" href="../../"><img src="../../../extension/images/logo/kimito-link-color.png" width="160" height="34" alt="Kimito-Link Project"></a>
+        <a class="topbar__back" href="../">← 記事一覧へ</a>
       </div>
     </header>
 
     <header class="page">
       <div class="shell">
-        <p class="breadcrumb"><a href="../">トップ</a> ／ <a href="./">技術記事</a> ／ データを作る人と見せる人を分ける設計</p>
-        <h1>「重い・固まる・開かないと出ない」の根は1つ<br>― データを作る人と見せる人を分ける設計</h1>
-        <p class="lead">Chrome 拡張で何度も出た「<strong>開いた瞬間に重い</strong>」「<strong>画面を開かないとデータが出ない</strong>」。別々のバグに見えて、根は1つ＝<strong>役割の配置ミス</strong>だった。データを<strong>作る人（常に裏で動く側）</strong>と<strong>見せる人（画面）</strong>を分け、重い処理は前段で1回、画面は貼るだけにする。配置を直すと、別々の悩みが同時に消える。</p>
+        <p class="breadcrumb"><a href="../../">トップ</a> ／ <a href="../">技術記事</a> ／ 星野ロミさんから頂いたソースコードがかなり学びになった</p>
+        <h1>星野ロミさんから頂いたソースコードが<br>かなり学びになった<br><span style="font-size:.62em;color:var(--muted);font-weight:700">― データを作る人と見せる人を分ける設計</span></h1>
+        <p class="lead">星野ロミ氏ご本人から頂いたソースコードが、<strong>かなり学びになった</strong>。Chrome 拡張で何度も出た「<strong>開いた瞬間に重い</strong>」「<strong>画面を開かないとデータが出ない</strong>」――別々のバグに見えて、根は1つ＝<strong>役割の配置ミス</strong>だった。データを<strong>作る人（常に裏で動く側）</strong>と<strong>見せる人（画面）</strong>を分け、重い処理は前段で1回、画面は貼るだけにする。頂いたソースから学んだこの設計を、実例つきで解説する。</p>
         <div class="meta">
           <span>公開日: <strong>2026-06-27</strong></span>
           <span>著者: <strong>君斗りんく / Kimito-Link Project</strong></span>
@@ -259,25 +266,8 @@ async function publishCommentMirrorFromRecorder() {
           <h2><span class="num">8</span>いま作っているところ ― 頂いたソースが、こう活かされています</h2>
           <p>ここまでの設計思想は、机上の理論ではありません。<strong>星野ロミ氏ご本人から頂いたソースコード（すれちがい通信のアプリ）を土台に、いま別プロダクトとして形にしている最中です。</strong></p>
           <figure class="fig">
-            <svg viewBox="0 0 760 380" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="制作中のすれ違い通信アプリ v1.0.0 のヒーロー画面イメージ">
-              <rect x="0" y="0" width="760" height="380" rx="16" fill="#0a0a0a"/>
-              <g fill="#1f2937"><circle cx="70" cy="60" r="2.2"/><circle cx="150" cy="40" r="1.6"/><circle cx="230" cy="80" r="1.8"/><circle cx="640" cy="50" r="2"/><circle cx="700" cy="110" r="1.6"/><circle cx="120" cy="300" r="1.6"/><circle cx="660" cy="320" r="2"/></g>
-              <path d="M120 250 L180 200 L240 260 L300 210" stroke="#1e293b" stroke-width="2" fill="none"/>
-              <text x="380" y="92" text-anchor="middle" font-size="30" font-weight="800" fill="#f3f4f6" font-family="inherit">君斗りんくの</text>
-              <text x="380" y="130" text-anchor="middle" font-size="30" font-weight="800" fill="#f3f4f6" font-family="inherit">すれ違ひ通信 <tspan fill="#34d399">v1.0.0</tspan></text>
-              <text x="380" y="156" text-anchor="middle" font-size="12" letter-spacing="3" fill="#6b7280" font-family="inherit">SURECHIGAI TSUSHIN</text>
-              <rect x="250" y="180" width="260" height="74" rx="12" fill="#0f1115" stroke="#1f2937" stroke-width="1.5"/>
-              <text x="380" y="204" text-anchor="middle" font-size="10" letter-spacing="2" fill="#34d399" font-family="inherit">CORE SIGNAL</text>
-              <text x="380" y="228" text-anchor="middle" font-size="19" font-weight="800" fill="#f3f4f6" font-family="inherit">会いたい君がいる</text>
-              <text x="380" y="248" text-anchor="middle" font-size="16" font-weight="800" fill="#34d399" font-family="inherit">現在地</text>
-              <rect x="276" y="282" width="208" height="44" rx="22" fill="#0fb88f"/>
-              <text x="380" y="304" text-anchor="middle" font-size="14" font-weight="800" fill="#04201a" font-family="inherit">X（Twitter）ではじめる</text>
-              <text x="380" y="319" text-anchor="middle" font-size="9.5" fill="#063b30" font-family="inherit">無料・1タップ / 新規登録もこちら</text>
-              <g font-family="inherit"><circle cx="650" cy="120" r="16" fill="#3b2a4a" stroke="#a78bfa" stroke-width="1.5"/><text x="650" y="150" text-anchor="middle" font-size="9" fill="#cbd5e1">りんく</text>
-              <circle cx="90" cy="320" r="15" fill="#3b2a4a" stroke="#a78bfa" stroke-width="1.5"/><text x="90" y="348" text-anchor="middle" font-size="9" fill="#cbd5e1">こん太</text>
-              <circle cx="300" cy="320" r="15" fill="#3b2a4a" stroke="#a78bfa" stroke-width="1.5"/><text x="300" y="348" text-anchor="middle" font-size="9" fill="#cbd5e1">たぬ姉</text></g>
-            </svg>
-            <figcaption>制作中の「すれ違い通信 v1.0.0 ― 会いたい君がいる現在地」。位置の足あとを正確な場所として残し、交流は X へ寄せる設計。</figcaption>
+            <img src="img/surechigai-hero.png" width="1889" height="2045" loading="lazy" alt="制作中のすれ違い通信アプリ v1.0.0 のヒーロー画面。「君斗りんくのすれ違ひ通信 v1.0.0 ― 会いたい君がいる現在地」と、りんく・こん太・たぬ姉が日本地図上に配置されている。">
+            <figcaption>制作中の「すれ違ひ通信 v1.0.0 ― 会いたい君がいる現在地」（実画面）。位置の足あとを正確な場所として残し、交流は X へ寄せる設計。</figcaption>
           </figure>
           <p>頂いたソースは「捨てて作り直す」のではなく、<strong>設計思想を土台に、責務ごとの純粋な部品へ再編成し、さらに発展</strong>させています。実際のコードには <code>移植元: surechigai-nico/server/src/cron/matcher.ts</code> のような出自コメントを残し、リスペクトと履歴を辿れるようにしています。</p>
           <table class="cmp">
@@ -295,7 +285,7 @@ async function publishCommentMirrorFromRecorder() {
     </main>
 
     <footer class="page">
-      <div class="shell"><p>&copy; Kimito-Link Project ― <a href="../">トップへ戻る</a> ／ <a href="./">技術記事一覧</a> ／ <a href="../privacy.html">プライバシーポリシー</a></p></div>
+      <div class="shell"><p>&copy; Kimito-Link Project ― <a href="../../">トップへ戻る</a> ／ <a href="../">技術記事一覧</a> ／ <a href="../../privacy.html">プライバシーポリシー</a></p></div>
     </footer>
   </body>
 </html>
