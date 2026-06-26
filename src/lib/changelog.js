@@ -26,6 +26,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.948',
+    date: '2026-06-26',
+    summary: '状態速報を軽量化(鏡を撤去・配信ごとに表示)',
+    items: Object.freeze([
+      '状態速報ページが重い・カードが「—」で固まる一因だった「応援レーン(顔つき)・数字カードを状態速報の画面に毎回描く」処理を撤去し、ページを軽くしました。',
+      '応援レーン・数字カードは、ちくらん(配信カード)の各配信にある「🔥 応援ライブビューを開く」から、その配信のプレビューとして別タブで見られます(必要なときだけ描画=軽い)。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.947',
     date: '2026-06-25',
     summary: 'WEB公開版に応援者ランキングとギフト貢献度を顔つきで表示',

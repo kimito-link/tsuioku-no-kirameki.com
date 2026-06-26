@@ -810,18 +810,6 @@
       ]
     },
     {
-      "file": "src/extension/story/renderStoryUserLaneDom.js",
-      "featureCount": 2,
-      "features": [
-        "popup",
-        "status"
-      ],
-      "labels": [
-        "ポップアップ(応援レーン)",
-        "状態速報ページ"
-      ]
-    },
-    {
       "file": "src/extension/venueBar.js",
       "featureCount": 2,
       "features": [
@@ -1098,18 +1086,6 @@
       ]
     },
     {
-      "file": "src/lib/formatOfficialStreamAgeMinutes.js",
-      "featureCount": 2,
-      "features": [
-        "popup",
-        "status"
-      ],
-      "labels": [
-        "ポップアップ(応援レーン)",
-        "状態速報ページ"
-      ]
-    },
-    {
       "file": "src/lib/giftEventStore.js",
       "featureCount": 2,
       "features": [
@@ -1231,18 +1207,6 @@
     },
     {
       "file": "src/lib/laneDiagKey.js",
-      "featureCount": 2,
-      "features": [
-        "popup",
-        "status"
-      ],
-      "labels": [
-        "ポップアップ(応援レーン)",
-        "状態速報ページ"
-      ]
-    },
-    {
-      "file": "src/lib/laneMirror.js",
       "featureCount": 2,
       "features": [
         "popup",
@@ -1434,18 +1398,6 @@
       ]
     },
     {
-      "file": "src/lib/officialNicoStatsStripDigest.js",
-      "featureCount": 2,
-      "features": [
-        "popup",
-        "status"
-      ],
-      "labels": [
-        "ポップアップ(応援レーン)",
-        "状態速報ページ"
-      ]
-    },
-    {
       "file": "src/lib/panelMetricsExport.js",
       "featureCount": 2,
       "features": [
@@ -1518,18 +1470,6 @@
       ]
     },
     {
-      "file": "src/lib/statCardsMirror.js",
-      "featureCount": 2,
-      "features": [
-        "popup",
-        "status"
-      ],
-      "labels": [
-        "ポップアップ(応援レーン)",
-        "状態速報ページ"
-      ]
-    },
-    {
       "file": "src/lib/statCardsMirrorKey.js",
       "featureCount": 2,
       "features": [
@@ -1578,18 +1518,6 @@
       ]
     },
     {
-      "file": "src/lib/storyUserLaneGuideHtml.js",
-      "featureCount": 2,
-      "features": [
-        "popup",
-        "status"
-      ],
-      "labels": [
-        "ポップアップ(応援レーン)",
-        "状態速報ページ"
-      ]
-    },
-    {
       "file": "src/lib/supportActivityTimeline.js",
       "featureCount": 2,
       "features": [
@@ -1623,18 +1551,6 @@
       "labels": [
         "コメビュ(別窓)",
         "ポップアップ(応援レーン)"
-      ]
-    },
-    {
-      "file": "src/lib/supportVisualStoryCopy.js",
-      "featureCount": 2,
-      "features": [
-        "popup",
-        "status"
-      ],
-      "labels": [
-        "ポップアップ(応援レーン)",
-        "状態速報ページ"
       ]
     },
     {
@@ -2151,6 +2067,16 @@
       ],
       "labels": [
         "状態速報ページ"
+      ]
+    },
+    {
+      "file": "src/extension/story/renderStoryUserLaneDom.js",
+      "featureCount": 1,
+      "features": [
+        "popup"
+      ],
+      "labels": [
+        "ポップアップ(応援レーン)"
       ]
     },
     {
@@ -3234,6 +3160,16 @@
       ]
     },
     {
+      "file": "src/lib/formatOfficialStreamAgeMinutes.js",
+      "featureCount": 1,
+      "features": [
+        "popup"
+      ],
+      "labels": [
+        "ポップアップ(応援レーン)"
+      ]
+    },
+    {
       "file": "src/lib/forwardReactivation.js",
       "featureCount": 1,
       "features": [
@@ -3715,6 +3651,16 @@
     },
     {
       "file": "src/lib/laneDiag.js",
+      "featureCount": 1,
+      "features": [
+        "popup"
+      ],
+      "labels": [
+        "ポップアップ(応援レーン)"
+      ]
+    },
+    {
+      "file": "src/lib/laneMirror.js",
       "featureCount": 1,
       "features": [
         "popup"
@@ -4221,6 +4167,16 @@
       ],
       "labels": [
         "記録エンジン(watchページ常駐)"
+      ]
+    },
+    {
+      "file": "src/lib/officialNicoStatsStripDigest.js",
+      "featureCount": 1,
+      "features": [
+        "popup"
+      ],
+      "labels": [
+        "ポップアップ(応援レーン)"
       ]
     },
     {
@@ -4914,13 +4870,13 @@
       ]
     },
     {
-      "file": "src/lib/statCardsMirrorDom.js",
+      "file": "src/lib/statCardsMirror.js",
       "featureCount": 1,
       "features": [
-        "status"
+        "popup"
       ],
       "labels": [
-        "状態速報ページ"
+        "ポップアップ(応援レーン)"
       ]
     },
     {
@@ -5054,6 +5010,16 @@
       ]
     },
     {
+      "file": "src/lib/storyUserLaneGuideHtml.js",
+      "featureCount": 1,
+      "features": [
+        "popup"
+      ],
+      "labels": [
+        "ポップアップ(応援レーン)"
+      ]
+    },
+    {
       "file": "src/lib/storyUserLaneRowModel.js",
       "featureCount": 1,
       "features": [
@@ -5165,6 +5131,16 @@
     },
     {
       "file": "src/lib/supportVisualExpanded.js",
+      "featureCount": 1,
+      "features": [
+        "popup"
+      ],
+      "labels": [
+        "ポップアップ(応援レーン)"
+      ]
+    },
+    {
+      "file": "src/lib/supportVisualStoryCopy.js",
       "featureCount": 1,
       "features": [
         "popup"
