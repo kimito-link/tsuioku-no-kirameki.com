@@ -549,7 +549,11 @@ import { KEY_STAT_CARDS_MIRROR } from '../lib/statCardsMirrorKey.js';
 import { buildStatCardsMirrorSnapshot } from '../lib/statCardsMirror.js';
 // 北極星レーン鏡(公式値レーン)を status→純Web へ送るための publish(laneMirror/statCardsMirror と同じ轍)。
 import { KEY_NORTH_STAR_MIRROR } from '../lib/northStarMirrorKey.js';
-import { buildNorthStarMirrorSnapshot, mergeNorthStarMirrorLanes } from '../lib/northStarMirror.js';
+import {
+  buildNorthStarMirrorSnapshot,
+  mergeNorthStarMirrorLanes,
+  restoreNorthStarMirrorRows
+} from '../lib/northStarMirror.js';
 import { isAvatarObservedInCommentProfileMap } from '../lib/popupAvatarResolver.js';
 import {
   normalizeLv,
@@ -5532,6 +5536,69 @@ async function applyCommentTimelineMirrorForPassive() {
     }
   } catch {
     /* no-op: ティッカーは best-effort(壊れても他レーンを巻き込まない) */
+  }
+}
+
+/** passive 北極星鏡描画の再描画 skip 用 signature。 */
+let _northStarMirrorPassiveSig = '';
+/**
+ * ★v0.1.965(council/single-source-of-truth-SYNTHESIS.md 第1段): 受動ビュー(応援プレビュー dock=liveview)で
+ *   北極星レーン(貢献度ランキング/広告ランキング)を【鏡】(KEY_NORTH_STAR_MIRROR=本物 popup が watch タブで
+ *   publishNorthStarMirror した行)から描く。応援レーン(applyLaneMirrorForPassive)・コメント
+ *   (applyCommentTimelineMirrorForPassive)は鏡経路があったのに、北極星だけ apply 関数が無く=
+ *   passive で北極星の描画関数が一度も呼ばれず(diag activePath="" / refreshAllStarted=0)=
+ *   「見せる側は同じ鏡を読むだけ」の星野ロミ型から漏れていた(ユーザー指摘の核心)。
+ *   → 純Web app/live-view.js:paintNorthStarMirror と同型・本物 paintTopSupportRankStyleIntoElement を再利用(似せて自作しない)。
+ *   storage read のみ=passive 原則を守る(書かない/注入しない/fetch しない)。重い refreshAll に依存しない=軽い。
+ */
+async function applyNorthStarMirrorForPassive() {
+  if (!INLINE_PASSIVE || !hasExtensionContext()) return;
+  const contribBody = document.getElementById('northStarLaneBody-contributionRanking');
+  const adBody = document.getElementById('northStarLaneBody-adRanking');
+  if (!(contribBody instanceof HTMLElement) && !(adBody instanceof HTMLElement)) return;
+  let snap = null;
+  try {
+    const bag = await chrome.storage.local.get(KEY_NORTH_STAR_MIRROR);
+    snap = bag && bag[KEY_NORTH_STAR_MIRROR];
+  } catch {
+    return;
+  }
+  if (!snap || typeof snap !== 'object') return;
+  const contribRows = restoreNorthStarMirrorRows(snap, 'contributionRanking');
+  const adRows = restoreNorthStarMirrorRows(snap, 'adRanking');
+  const sig =
+    `${String(snap.liveId || '')}|${Number(snap.capturedAt) || 0}|${contribRows.length}|${adRows.length}`;
+  if (sig === _northStarMirrorPassiveSig) return;
+  _northStarMirrorPassiveSig = sig;
+  // 貢献度レーン: 本物 popup の描画経路(officialDomRankingRowsToStripRooms→paintTopSupportRankStyleIntoElement)を再利用。
+  if (contribBody instanceof HTMLElement && contribRows.length) {
+    try {
+      const rooms = officialDomRankingRowsToStripRooms(contribRows.slice(0, 10), { userKeyKind: 'contrib' });
+      contribBody.classList.remove('nl-contrib-ranking-list-host');
+      paintTopSupportRankStyleIntoElement(contribBody, rooms, {
+        noteText: '公式の貢献度ランキング（niconico の表示に準拠）',
+        unitSuffix: '貢',
+        ariaLabel: '貢献度ランキング',
+        isNorthStarBody: true
+      });
+    } catch {
+      /* no-op: 北極星レーンは best-effort(壊れても他レーンを巻き込まない) */
+    }
+  }
+  // 広告ランキングレーン: 同じく本物経路を再利用。
+  if (adBody instanceof HTMLElement && adRows.length) {
+    try {
+      const rooms = officialDomRankingRowsToStripRooms(adRows.slice(0, 10), { userKeyKind: 'ad' });
+      paintTopSupportRankStyleIntoElement(adBody, rooms, {
+        noteText:
+          'ニコニ広告の貢献度ランキング（公式ページ相当）。画面上部の累計ptなどと、各行の「貢」は指標や期間が異なり一致しないことがあります',
+        unitSuffix: '貢',
+        ariaLabel: '広告ランキング',
+        isNorthStarBody: true
+      });
+    } catch {
+      /* no-op */
+    }
   }
 }
 
@@ -21360,6 +21427,8 @@ async function initPopup() {
       void applyLaneMirrorForPassive();
       // v0.1.962: heavy read を走らせない代わりにティッカーを鏡から描く(council/liveview-open-heavy 第1段)。
       void applyCommentTimelineMirrorForPassive();
+      // v0.1.965: 北極星レーン(貢献度/広告)も鏡から描く=星野ロミ型「見せる側は同じ鏡を読むだけ」を北極星にも適用。
+      void applyNorthStarMirrorForPassive();
     }, 250);
     try {
       chrome.storage.onChanged.addListener((changes, area) => {
@@ -21381,6 +21450,10 @@ async function initPopup() {
         // コメントティッカー鏡が更新されたら鏡から最新コメントを描き直す(=コメントが進む)。
         if (changedKeys.includes(KEY_COMMENT_TIMELINE_MIRROR)) {
           void applyCommentTimelineMirrorForPassive();
+        }
+        // 北極星レーン鏡(貢献度/広告)が更新されたら鏡から描き直す。
+        if (changedKeys.includes(KEY_NORTH_STAR_MIRROR)) {
+          void applyNorthStarMirrorForPassive();
         }
       });
     } catch {
