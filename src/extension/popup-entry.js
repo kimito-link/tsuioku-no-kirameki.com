@@ -392,7 +392,10 @@ import { buildCommentTickerNameHref } from '../lib/commentTickerNameLink.js';
 import { buildCommentTickerLatestHtml } from '../lib/commentTickerLatestHtml.js';
 // コメントタイムライン鏡(council/liveview-wholesale-root-SYNTHESIS.md 第2段): 純Webで「コメントが進む動き」を
 //   出すため、popup が手元に持つ displayEntries の最新N件を鏡として publish→status 経由で純Webへ。
-import { buildCommentTimelineMirrorSnapshot } from '../lib/commentTimelineMirror.js';
+import {
+  buildCommentTimelineMirrorSnapshot,
+  restoreCommentTimelineRows
+} from '../lib/commentTimelineMirror.js';
 import { KEY_COMMENT_TIMELINE_MIRROR } from '../lib/commentTimelineMirrorKey.js';
 import { buildUserProfileLinkedLabelHtml } from '../lib/userProfileLinkHtml.js';
 import { buildEventRankingSectionHtml } from '../lib/eventRankingSectionHtml.js';
@@ -5405,6 +5408,8 @@ function renderStoryUserLane() {
 
 /** passive 鏡描画の再描画 skip 用 signature(変化が無ければ paint しない)。 */
 let _laneMirrorPassiveSig = '';
+/** passive コメントティッカー鏡描画の再描画 skip 用 signature。 */
+let _commentTimelineMirrorPassiveSig = '';
 
 /**
  * ★2026-06-26: 受動ビュー(応援プレビュー dock=liveview)で応援レーン(りんく/こん太/広告/たぬ姉)を
@@ -5474,6 +5479,59 @@ async function applyLaneMirrorForPassive() {
     domTilesPainted: countStoryUserLaneDomTiles(els)
   });
   recordStoryUserLaneStep(_storyUserLaneRenderProbe, STORY_USER_LANE_STEPS.DONE);
+}
+
+/**
+ * ★v0.1.962(council/liveview-open-heavy-SYNTHESIS.md 第1段): 受動ビュー(応援プレビュー dock=liveview)で
+ *   コメントティッカーを【鏡】(commentTimelineMirror=本物 popup が watch タブで publish した最新N件)から描く。
+ *   passive は heavy comments(32,080件・246KB の IDB cursor read)を【走らせない】ようにしたので、
+ *   ティッカーの源を鏡に揃える(応援レーン/数字カード/北極星と同じく storage read のみの鏡経路に一貫化)。
+ *   描画は app/live-view.js:paintCommentTimelineMirror と同型=本物 buildCommentTickerLatestHtml を再利用(似せて自作しない)。
+ *   storage read のみ=passive 原則を守る(書かない/注入しない/fetch しない)。重い heavy read に依存しない=軽い。
+ */
+async function applyCommentTimelineMirrorForPassive() {
+  if (!INLINE_PASSIVE || !hasExtensionContext()) return;
+  const segA = $('commentTickerSegA');
+  if (!segA) return;
+  let snap = null;
+  try {
+    const bag = await chrome.storage.local.get(KEY_COMMENT_TIMELINE_MIRROR);
+    snap = bag && bag[KEY_COMMENT_TIMELINE_MIRROR];
+  } catch {
+    return;
+  }
+  const rows = restoreCommentTimelineRows(snap);
+  if (!rows.length) return; // データ無し=popup の空状態(placeholder)のまま(死に画面にしない)
+  const latest = rows[rows.length - 1]; // restore は古→新=末尾が最新。
+  const sig =
+    `${String(snap && snap.liveId ? snap.liveId : '')}|${Number(snap && snap.capturedAt) || 0}|` +
+    `${rows.length}|${String(latest.text || '')}`;
+  if (sig === _commentTimelineMirrorPassiveSig) return;
+  _commentTimelineMirrorPassiveSig = sig;
+  const segB = $('commentTickerSegB');
+  const scroll = /** @type {HTMLElement|null} */ ($('commentTickerScroll'));
+  const viewport = /** @type {HTMLElement|null} */ ($('commentTickerViewport'));
+  try {
+    if (scroll) scroll.classList.add('is-paused', 'is-latest-only');
+    if (segB) segB.innerHTML = '';
+    if (viewport) viewport.classList.remove('is-empty');
+    // 数値 ID のユーザーは niconico ユーザーページへリンク(匿名/ハッシュ風は '' で span のまま)。
+    const userPageHref = buildCommentTickerNameHref(latest.userId);
+    segA.innerHTML = buildCommentTickerLatestHtml({
+      label: String(latest.name || ''),
+      avatarSrc: String(latest.avatarUrl || ''),
+      textShown: String(latest.text || '').slice(0, 72),
+      userPageHref
+    });
+    const avatar = /** @type {HTMLImageElement|null} */ (
+      segA.querySelector('.nl-ticker-latest__avatar')
+    );
+    if (avatar && isHttpOrHttpsUrl(String(latest.avatarUrl || ''))) {
+      avatar.referrerPolicy = 'no-referrer';
+    }
+  } catch {
+    /* no-op: ティッカーは best-effort(壊れても他レーンを巻き込まない) */
+  }
 }
 
 /** 応援レーン診断の storage 書き込み(min-gap 3秒・best-effort=popup を止めない)。 */
@@ -13841,7 +13899,15 @@ async function refresh() {
         )
           .then((r) => (Array.isArray(r.rows) ? r.rows : []))
           .catch(() => null);
-  const heavyDataPromise = canReuseHeavyChunkRead
+  // v0.1.962(council/liveview-open-heavy): 応援ライブビュー(INLINE_PASSIVE)は「見るだけ」=
+  //   コメントは commentTimelineMirror(鏡)から描くので、開いた瞬間に 32,080件・246KB の
+  //   全件 IDB cursor read(readHeavyFromStore=tab を固める storage I/O)を【走らせない】。
+  //   read を減らすだけ(増やさない/キャッシュで包まない=過去2回 revert した地雷の逆)。
+  //   ティッカーは summaryDisplayRows(直近N件)+applyCommentTimelineMirrorForPassive で埋まる。
+  //   ★watch タブの本物 popup は不変(heavy read はそちらが担う=記録・描画に影響なし)。
+  const heavyDataPromise = INLINE_PASSIVE
+    ? Promise.resolve(/** @type {unknown[]|null} */ (null))
+    : canReuseHeavyChunkRead
     ? Promise.resolve(/** @type {unknown[]} */ (cachedHeavy.arr))
     : sessionCachePromise.then((sessArr) =>
         Array.isArray(sessArr) && sessArr.length > 0 ? sessArr : readHeavyFromStore()
@@ -21230,11 +21296,14 @@ async function initPopup() {
   //     polling と無関係に【初回1回 + onChanged 駆動】で呼ぶ。storage read のみ=passive 原則を守る
   //     (書かない/注入しない/fetch しない)。popup の refresh()/paint には触れない(v0.1.948 地雷回避)。
   if (INLINE_PASSIVE) {
-    // 初回: 上段3カード(panel_summary)と応援レーン(KEY_LANE_MIRROR 鏡)を read だけして即描く。
+    // 初回: 上段3カード(panel_summary)・応援レーン(KEY_LANE_MIRROR 鏡)・コメントティッカー
+    //   (KEY_COMMENT_TIMELINE_MIRROR 鏡)を read だけして即描く。
     setTimeout(() => {
       if (!hasExtensionContext()) return;
       void applyLightweightPanelSummaryCards();
       void applyLaneMirrorForPassive();
+      // v0.1.962: heavy read を走らせない代わりにティッカーを鏡から描く(council/liveview-open-heavy 第1段)。
+      void applyCommentTimelineMirrorForPassive();
     }, 250);
     try {
       chrome.storage.onChanged.addListener((changes, area) => {
@@ -21252,6 +21321,10 @@ async function initPopup() {
         // 応援レーン鏡(本物 popup が watch タブで publish)が更新されたら鏡から描き直す。
         if (changedKeys.includes(KEY_LANE_MIRROR)) {
           void applyLaneMirrorForPassive();
+        }
+        // コメントティッカー鏡が更新されたら鏡から最新コメントを描き直す(=コメントが進む)。
+        if (changedKeys.includes(KEY_COMMENT_TIMELINE_MIRROR)) {
+          void applyCommentTimelineMirrorForPassive();
         }
       });
     } catch {

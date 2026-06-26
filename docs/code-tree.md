@@ -1810,8 +1810,12 @@
     - `store.mjs` — NicoLive Local MCP Bridge - Snapshot Store.
   - `audit-lp-overflow.mjs` — One-off LP overflow audit (run: node tools/audit-lp-overflow.mjs)
   - `render-og.js` — 追憶の煌めき LP 用 OG 画像（1200×630）を生成する。
-- 📁 **tsuioku-no-kirameki/** (38)
-  - 📁 **articles/** (12)
+- 📁 **tsuioku-no-kirameki/** (40)
+  - 📁 **articles/** (14)
+    - 📁 **role-separation-design/** (2)
+      - 📁 **img/** (1)
+        - `surechigai-hero.png`
+      - `index.html`
     - `comment-echo-detection.html`
     - `comment-silence-zones.html`
     - `comment-waveform-fingerprint.html`

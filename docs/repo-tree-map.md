@@ -188,7 +188,7 @@ graph LR
 - `images/`（93 件） — 純Web版 応援ライブビューの同梱画像(ゆっくり顔)  〔Web版 / 画像〕
 
 ## `council/` — 会議(COUNCIL)の問い・回答・統合(SYNTHESIS)。設計判断の根拠  〔会議 / 設計〕
-<sub>ファイル 80 件</sub>
+<sub>ファイル 82 件</sub>
 
 ## `docs/` — 設計正本・マインドマップ・フロー図・feature-map(AI/人間向け)  〔設計 / レポート〕
 <sub>ファイル 157 件</sub>
@@ -243,9 +243,9 @@ graph LR
 - `mcp-nicolive/`（3 件） — ニコ生状態を読む MCP サーバ(司令塔の状態取得用)  〔MCP / 診断〕
 
 ## `tsuioku-no-kirameki/` — 本番 LP の配信ディレクトリ(Cloudflare Pages へ deploy)  〔LP / 公開〕
-<sub>ファイル 38 件</sub>
+<sub>ファイル 40 件</sub>
 
-- `articles/`（12 件） — 技術記事(防御的公開)。手法を再利用可能な形で解説  〔記事 / 公開〕
+- `articles/`（14 件） — 技術記事(防御的公開)。手法を再利用可能な形で解説  〔記事 / 公開〕
 - `images/`（17 件） — LP 用の favicon・OG 画像等  〔画像〕
 - `sound/`（1 件） — LP 公開用の音声素材(エール音等)  〔音声 / 公開〕
 

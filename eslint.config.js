@@ -95,8 +95,13 @@ export default [
     //   INLINE_PASSIVE/min-gap/storage I/O グルー=lib抽出不可)+import を追加=21271→21312
     //   (council/liveview-wholesale-root-SYNTHESIS.md・レビュー済み例外)。純データ整形 buildCommentTimelineMirrorSnapshot は
     //   src/lib/commentTimelineMirror.js(test付き)に隔離済み。
+    // 2026-06-27: 応援プレビュー(passive)を開いた瞬間の重さ解消(第1段)=passive で heavy comments 全件 IDB read を
+    //   走らせない短絡(read を減らすだけ)+ティッカーを鏡から描く applyCommentTimelineMirrorForPassive(DOM 参照+
+    //   storage read グルー=lib抽出不可)+初回/onChanged 配線+restoreCommentTimelineRows import を追加=21312→21385
+    //   (council/liveview-open-heavy-SYNTHESIS.md・レビュー済み例外)。純データ復元 restoreCommentTimelineRows は
+    //   src/lib/commentTimelineMirror.js(test付き)に隔離済み。
     files: ['src/extension/popup-entry.js'],
-    rules: { 'max-lines': ['error', { max: 21312, skipBlankLines: false, skipComments: false }] }
+    rules: { 'max-lines': ['error', { max: 21385, skipBlankLines: false, skipComments: false }] }
   },
   {
     files: ['src/extension/content-entry.js'],
