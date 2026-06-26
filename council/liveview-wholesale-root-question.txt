@@ -1,0 +1,59 @@
+# 会議: 純Web応援ライブビューを「そっくり丸ごと」にする方式の根本再設計
+
+## ユーザーの根本要求（一貫して同じ）
+「最初からずっとコピー・1個ずつ足す発想がダメ・同じものでないとひどい」。
+拡張内プレビュー（左）と純Web（右）が【全く同じ画面・同じ動き】であってほしい。
+今: 純Webは①コメントが進む動きが見えない ②ranking などレーンが出ない ③ビルド番号も別物。
+
+## 実コードで確定した事実（司令塔が2エージェントで棚卸し済み）
+
+### 拡張内プレビュー（完璧）
+- extension/live-view.html が本物 popup.html を `iframe src=popup.html?inline=1&dock=liveview&lv=` で全面埋め込み（drift ゼロ）。
+- dock=liveview = INLINE_PASSIVE（書かない/注入しない/fetch しない）。
+- passive は heavy comments を完走できないので、応援レーン/数字カードは鏡(storage read)から本物 paint で描く
+  （applyLaneMirrorForPassive / applyLightweightPanelSummaryCards）。コメントタイムライン(renderCommentTicker)は
+  heavy comments 由来＝passive では空＝placeholder。
+
+### 純Web（app/live-view）＝ここが問題
+- chrome シム(storage.local 代替)を設置→popup-entry を import→**per-section paint**(数字カード/応援レーン/北極星/
+  応援者ランキングを個別関数で描く)。MutationObserver+2.5秒tickで空描画を踏み消す自己修復。
+- ビルド表記 v0.0.0-web = chrome シムの getManifest() 静的戻り値（拡張と別系統）。
+- 鏡は別々のタイミング・別々の鮮度(3分)で publish される＝統合時点で永久にズレる
+  （数字カード17分前で鮮度切れ・応援者ランキングは別タイミング…）。
+- **コメントタイムライン(流れる動き)は鏡に一切含まれない**＝純Webでコメントが進まないのは構造上当然。
+- 送信は「公開ボタンを押した瞬間だけ」。定期再送信なし。純Web POLL=60秒で同じ古い1枚を再GETするだけ。
+- サーバ api/status.js は payload を丸ごと保存(最新1枚)。
+
+### 過去に検討・却下された案（地雷マップ）
+- 案B1=HTML丸ごとクローン(popup.html を別ファイルに複製)→却下「12,263行の二重メンテで必ず drift」。
+- 案B2=iframe で本物 popup.html を埋め込む→採用(拡張内プレビューはこれ)。status でも ensureStatusPopupIframe 実績。
+- 丸ごとDOM鏡(.nl-main の outerHTML を sanitize して publish→純Webで貼るだけ)→v0.1.948 で一度実装したが
+  **実機で却下→revert**。理由=「毎 paint で 6,510件規模の全DOMを同期 sanitize=メインスレッドで重く popup が詰まる」
+  +「診断ページが重すぎて開かない」。reference_liveview_popup_wholesale_copy.md の「実装完了」節は【却下済み】。
+  ※liveviewDomMirror.js / sanitizeFullHtml.js は現存しない(revert 済)。MEMORY の「実装完了」記述は誤り。
+
+## 問い
+純Web応援ライブビューを、拡張内プレビュー(iframe)と【同じ画面・同じ動き(コメントが進む)】にする方式を、
+過去の地雷(B1のdrift / 丸ごとDOM鏡の重さ)を踏まずに実現するには、どの方式が最善か。
+
+検討すべき選択肢(司令塔の叩き台。会議で増減・修正してよい):
+- (1) iframe を純Webでも使う = app 側に「popup.html 相当」を1本ビルドして、純Web live-view が
+      `iframe src=<webpopup>?dock=liveview&lv=` で埋め込む。鏡(storage)の代わりに「サーバから取った鏡を
+      chrome シムの storage.local に流し込む」。拡張内 iframe 方式とコードを共有でき drift しない。
+      ★懸念: chrome.* シムの完全性・webpopup のビルド・コメントタイムラインのデータ源。
+- (2) 鏡を1枚に統合 = 別々の per-section 鏡をやめ、popup が「1スナップショット」で全鏡を同時 publish
+      (同一 capturedAt・同一 liveId)。純Webはその1枚を貼る。鮮度ズレが消える。
+      ★懸念: コメントタイムラインを鏡に含めるか(件数 cap・容量)。
+- (3) コメントが進む動きを足す = 鏡にコメントタイムライン(最新N件・cap)を含め、PCが status を開いている間
+      定期再送信(15-20秒)。純Web POLL も短縮。これで「動き」が出る。
+      ★懸念: 容量(Upstash/Vercel 上限)・再送信の重さ(過去に重さで2回 revert した教訓)。
+- (4) 丸ごとDOM鏡を「重さを克服して」再挑戦 = requestIdleCallback+大幅間引き+差分のみ。
+      ★懸念: 過去に実機で却下された本命。重さの克服が証明できるか。
+
+## 制約（MEMORY 鉄則・絶対）
+- popup の refresh()/paint の read path を改変しない(v0.1.948 で2回 revert した最重要地雷)。
+- 記録の心臓部(content)・会場読み上げには触らない。
+- 「毎paintで重い同期処理」は厳禁(丸ごとDOM鏡の revert 理由)。
+- 似せて自作しない=本物の描画関数/lib を再利用する。
+- 純関数は lib に隔離してテスト。段階リリース(1コミット=1検証可能単位)。
+- 実機検証はユーザー(chrome-extension:// は開けない)。実機OKまで「できた」と言わない。

@@ -48,7 +48,6 @@ import {
 } from '../src/lib/storyAvatarTvFallbackClass.js';
 import { paintStatCardsMirrorValues } from '../src/lib/statCardsMirrorDom.js';
 import { buildStatCardsMirrorSignature } from '../src/lib/statCardsMirror.js';
-import { isEpochFresh } from '../src/lib/watchUrlFreshness.js';
 import { buildChikuranCardModel } from '../src/lib/chikuranCard.js';
 import { buildChikuranHeaderDom } from '../src/lib/chikuranHeaderDom.js';
 import { anonymousIdenticonDataUrl } from '../src/lib/anonymousIdenticon.js';
@@ -57,6 +56,12 @@ import { officialDomRankingRowsToStripRooms } from '../src/lib/officialDomRankin
 import { renderTopSupportRankStripInto } from '../src/lib/paintTopSupportRankStyleIntoElement.js';
 import { buildNorthStarAdRankingStatsHtml } from '../src/lib/buildNorthStarAdRankingStatsHtml.js';
 import { restoreNorthStarMirrorRows } from '../src/lib/northStarMirror.js';
+// 第1段(council/liveview-wholesale-root-SYNTHESIS.md): スナップショット丸ごと1枚の鮮度を【1回だけ】判定し、
+//   全レーンを一斉に出す/一斉に「古い」とする。per-section の個別鮮度ドロップ(=レーンがバラバラに消える)を廃止。
+import {
+  evaluateSnapshotFreshness,
+  formatSnapshotStalenessBanner
+} from '../src/lib/liveviewSnapshotFreshness.js';
 
 const POLL_INTERVAL_MS = 60_000;
 /** 鏡の鮮度ガード（status-entry.js の MIRROR_FRESH_MS と同値＝3分）。 */
@@ -237,10 +242,10 @@ const _LANE_FACES = {
   faceTanu: '/app/images/yukkuri-charactore-english/tanunee/tanuki-yukkuri-half-eyes-mouth-closed.thumb128.png'
 };
 
-/** 数字カード鏡: 本物 popup DOM の #liveStatCards 配下へ値を入れる（似せて自作しない）。 */
+/** 数字カード鏡: 本物 popup DOM の #liveStatCards 配下へ値を入れる（似せて自作しない）。
+ *   ★第1段: 個別の鮮度ドロップは廃止(全レーンを揃えて出すため鮮度判定はスナップショット丸ごと1回に集約)。 */
 function paintStatCardsMirror(snap) {
   if (!snap || typeof snap !== 'object') return;
-  if (!isEpochFresh(Number(snap.capturedAt), Date.now(), MIRROR_FRESH_MS)) return;
   const sig = buildStatCardsMirrorSignature(snap);
   if (sig === _lastStatCardsSig) return;
   _lastStatCardsSig = sig;
@@ -396,8 +401,7 @@ function paintBroadcasterCard(live) {
   if (!host) return;
   const model = buildChikuranCardModel(live);
   if (!model) return;
-  const capturedAt = Number(live && live.capturedAt);
-  if (capturedAt && !isEpochFresh(capturedAt, Date.now(), MIRROR_FRESH_MS)) return;
+  // ★第1段: 個別の鮮度ドロップは廃止(鮮度判定はスナップショット丸ごと1回=paintAllMirrors 側で実施)。
   try {
     host.replaceChildren(buildChikuranHeaderDom(model));
     if (host.hidden) host.hidden = false;
@@ -438,9 +442,16 @@ function paintSupporterRanking(topSupporters) {
   }
 }
 
-/** snapshot の全鏡を本物 paint で popup DOM に塗る（signature ガード有効＝変化時のみ）。 */
+/** snapshot の全鏡を本物 paint で popup DOM に塗る（signature ガード有効＝変化時のみ）。
+ *   ★第1段(council/liveview-wholesale-root-SYNTHESIS.md): スナップショット丸ごとの鮮度を【1回だけ】判定し、
+ *     新鮮なら全レーンを一斉に塗る・古ければ1枚バナーで知らせる(per-section でバラバラに消さない=全レーンが揃う)。 */
 function paintAllMirrors(jsonBlob) {
   if (!jsonBlob || typeof jsonBlob !== 'object') return;
+  const fresh = evaluateSnapshotFreshness(jsonBlob, Date.now(), MIRROR_FRESH_MS);
+  const banner = formatSnapshotStalenessBanner(fresh);
+  if (banner) showStaleBanner(banner);
+  else hideStaleBanner();
+  // 古くても「全レーンを揃えて」塗る(バラバラに消すより、古い旨を1枚で伝えた上で丸ごと見せる方が誠実)。
   paintBroadcasterCard(Array.isArray(jsonBlob.lives) ? jsonBlob.lives[0] : null);
   paintStatCardsMirror(jsonBlob.statCardsMirror || null);
   paintLaneMirror(jsonBlob.laneMirror || null);
@@ -617,6 +628,34 @@ function showError(msg) {
 
 function hideError() {
   const el = document.getElementById('lvWebErrorBox');
+  if (el) el.hidden = true;
+}
+
+/** 「この画面は N 秒前の状態です」バナー(鮮度切れを1箇所で・エラーではないので穏やかな配色)。 */
+function ensureStaleBanner() {
+  let el = document.getElementById('lvWebStaleBox');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'lvWebStaleBox';
+    el.setAttribute('role', 'status');
+    el.style.cssText =
+      'position:fixed;left:50%;top:14px;transform:translateX(-50%);z-index:99998;max-width:90vw;' +
+      'padding:8px 14px;border-radius:10px;background:#fff8e8;color:#7a5a18;border:1px solid #f0dca0;' +
+      'font:13px/1.6 system-ui,sans-serif;box-shadow:0 4px 16px rgba(0,0,0,.10);';
+    el.hidden = true;
+    (document.body || document.documentElement).appendChild(el);
+  }
+  return el;
+}
+
+function showStaleBanner(msg) {
+  const el = ensureStaleBanner();
+  el.hidden = false;
+  el.textContent = msg;
+}
+
+function hideStaleBanner() {
+  const el = document.getElementById('lvWebStaleBox');
   if (el) el.hidden = true;
 }
 
