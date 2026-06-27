@@ -529,6 +529,7 @@ import {
 } from '../lib/commentPanelStatus.js';
 import { escapeHtml, escapeAttr } from '../lib/htmlEscape.js';
 import { buildRoomCardInnerHtml } from '../lib/roomCardInnerHtml.js';
+import { buildSessionSummaryCompareTableHtml } from '../lib/sessionSummaryCompareTableHtml.js';
 import { buildEventSelfStatusHeaderHtml } from '../lib/eventSelfStatusHeaderHtml.js';
 import { topSupportRankLineModels } from '../lib/topSupportRankStripLines.js';
 // v0.1.881: 応援帯/公式値レーンの描画本体を共有 lib に抽出(live-view と完全コピー共有)。popup は
@@ -3138,25 +3139,9 @@ async function renderSessionSummaryComparePanel(liveId) {
         '<p class="nl-sub">まだサンプルがありません（更新が進むと溜まります）。</p>';
       return;
     }
-    const header =
-      '<table class="nl-session-summary-table"><thead><tr>' +
-      '<th>時刻</th><th>記録コメント</th><th>ユニークUID</th><th>ギフトユーザー</th><th>同接推定</th><th>公式コメ</th>' +
-      '</tr></thead><tbody>';
-    const body = rows
-      .map((r) => {
-        const t = new Date(r.capturedAt).toLocaleString('ja-JP');
-        const peak =
-          r.peakConcurrentEstimate != null && Number.isFinite(r.peakConcurrentEstimate)
-            ? String(r.peakConcurrentEstimate)
-            : '—';
-        const oc =
-          r.officialCommentCount != null && Number.isFinite(r.officialCommentCount)
-            ? String(r.officialCommentCount)
-            : '—';
-        return `<tr><td>${escapeHtml(t)}</td><td>${r.commentStorageCount}</td><td>${r.uniqueKnownCommenters}</td><td>${r.giftUserCount}</td><td>${escapeHtml(peak)}</td><td>${escapeHtml(oc)}</td></tr>`;
-      })
-      .join('');
-    mount.innerHTML = `${header}${body}</tbody></table>`;
+    // C-7 pure refactor: rows→テーブル HTML 組み立ては sessionSummaryCompareTableHtml.js に抽出
+    //   （挙動不変・test 済）。IDB read・空状態文言・innerHTML 代入は popup に残す。
+    mount.innerHTML = buildSessionSummaryCompareTableHtml(rows);
   } catch {
     mount.innerHTML =
       '<p class="nl-sub">IndexedDB の読み込みに失敗しました。</p>';
