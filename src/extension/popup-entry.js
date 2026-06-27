@@ -532,6 +532,7 @@ import { buildRoomCardInnerHtml } from '../lib/roomCardInnerHtml.js';
 import { buildSessionSummaryCompareTableHtml } from '../lib/sessionSummaryCompareTableHtml.js';
 import { buildTopSupportRankLinesHtml } from '../lib/topSupportRankLinesHtml.js';
 import { buildDevMonitorVizHtml } from '../lib/devMonitorVizHtml.js';
+import { buildGiftSubAppHistoryBlocksHtml } from '../lib/giftSubAppHistoryBlocksHtml.js';
 import { buildEventSelfStatusHeaderHtml } from '../lib/eventSelfStatusHeaderHtml.js';
 import { topSupportRankLineModels } from '../lib/topSupportRankStripLines.js';
 // v0.1.881: 応援帯/公式値レーンの描画本体を共有 lib に抽出(live-view と完全コピー共有)。popup は
@@ -3223,56 +3224,12 @@ async function renderGiftSubAppHistoryPanel(liveId) {
       '<p class="nl-sub">koken 公式 API からギフト履歴を自動取得中です（記録開始後、数十秒以内に表示されます）。公式サイドバーの「履歴」タブを開くと、一覧の追記が速くなる場合があります。</p>';
     return;
   }
-  const history = Array.isArray(payload?.history) ? /** @type {any[]} */ (payload.history) : [];
-  const totalCounts = Array.isArray(payload?.totalCounts)
-    ? /** @type {any[]} */ (payload.totalCounts)
-    : [];
-  /** @type {string[]} */
-  const blocks = [];
-  // 種類別集計（カウント降順）
-  if (totalCounts.length > 0) {
-    const sortedCounts = [...totalCounts].sort(
-      (a, b) => (Number(b?.count) || 0) - (Number(a?.count) || 0)
-    );
-    const countsHtml = sortedCounts
-      .slice(0, 50)
-      .map((c) => {
-        const name = escapeHtml(String(c?.itemName || '').trim() || '(unknown)');
-        const cnt = escapeHtml(String(Number(c?.count) || 0));
-        return `<li><span class="nl-gift-nick">${name}</span> <code class="nl-gift-uid">×${cnt}</code></li>`;
-      })
-      .join('');
-    blocks.push(
-      `<p class="nl-sub">アイテム種類別の合計（${sortedCounts.length} 種類）</p>` +
-        `<ul class="nl-gift-quick-list">${countsHtml}</ul>`
-    );
-  }
-  // 個別ギフト履歴（最新順、最大 60 件）
-  if (history.length > 0) {
-    const top = history.slice(0, 60);
-    const histHtml = top
-      .map((it) => {
-        const item = escapeHtml(String(it?.itemName || '').trim() || '(unknown)');
-        const sender = escapeHtml(String(it?.senderName || '').trim() || '(noname)');
-        const time = escapeHtml(String(it?.time || '').trim());
-        const pointsRaw = String(it?.pointsRaw || '').trim();
-        const pointsNum = Number(it?.points) || 0;
-        const ptsLabel = pointsRaw || String(pointsNum);
-        return (
-          `<li><span class="nl-gift-nick">${sender}</span> ` +
-          `<code class="nl-gift-uid">${item}</code> ` +
-          `<code class="nl-gift-uid">${escapeHtml(ptsLabel)} pt</code>` +
-          (time ? ` <small>${time}</small>` : '') +
-          `</li>`
-        );
-      })
-      .join('');
-    blocks.push(
-      `<p class="nl-sub">個別ギフト履歴（${history.length} 件中、最新 ${top.length} 件）</p>` +
-        `<ul class="nl-gift-quick-list">${histHtml}</ul>`
-    );
-  }
-  mount.innerHTML = blocks.join('');
+  // C-7 pure refactor: history/totalCounts→ブロック HTML 組み立ては giftSubAppHistoryBlocksHtml.js に
+  //   抽出（挙動不変・test 済）。storage read・summary ラベル・空状態・innerHTML 代入は popup に残す。
+  mount.innerHTML = buildGiftSubAppHistoryBlocksHtml({
+    history: payload?.history,
+    totalCounts: payload?.totalCounts
+  });
 }
 
 /**
