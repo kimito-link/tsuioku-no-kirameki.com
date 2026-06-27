@@ -26,6 +26,16 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.967',
+    date: '2026-06-28',
+    summary: '内部整理: 応援カード描画をlib抽出',
+    items: Object.freeze([
+      '応援ルームカードの見た目を組み立てる処理を、テストしやすい小さな部品に切り出しました(内部整理のみ)。',
+      '画面の表示・動作は一切変わりません。抽出前と1文字も違わない出力であることを自動テストで確認済みです。',
+      'popup の巨大ファイルを少しずつ部品化して、退化しにくく・直しやすくする取り組みの一環です。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.966',
     date: '2026-06-27',
     summary: 'ランキング件数の「拡張≠鏡」1件差の誤警告を解消',
