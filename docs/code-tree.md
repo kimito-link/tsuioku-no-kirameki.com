@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 1 / 570 件
+## ⚠️ 役割コメントが無いソース 1 / 571 件
 - `src/lib/reportPreviewPublish.js`
 
 ## 全ファイルツリー
@@ -457,7 +457,7 @@
   - `vendor-visual-explainer.mjs` — Vendors nicobailon/visual-explainer (MIT) into .cursor/skills/visual-explainer/
   - `verify-bump.mjs` — extension bump 後の整合性チェッカー
   - `write-extension-placeholder-icons.mjs` — リポジトリに 256px アイコンしか無い環境向け: manifest 用の小さめ PNG を生成する。
-- 📁 **src/** (1212)
+- 📁 **src/** (1214)
   - 📁 **data/** (6)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -716,7 +716,7 @@
         - `logo_funlink_white_RGB_maru_black.png`
       - `logo_guide_funlink_ol.pdf`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1001)
+  - 📁 **lib/** (1003)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -1071,6 +1071,8 @@
     - `giftSidebarRankTabPick.test.js`
     - `giftSubAppFrameSource.js` — v0.1.230: iframe relay の送信元 frame URL を意味のあるカテゴリに分類する純関数群。
     - `giftSubAppFrameSource.test.js`
+    - `giftSubAppHistoryBlocksHtml.js` — ギフトサブアプリ履歴パネル（renderGiftSubAppHistoryPanel の本体ブロック群）の HTML を組む純関数。
+    - `giftSubAppHistoryBlocksHtml.test.js`
     - `giftSubAppIframeDomShape.js` — gift sub-app iframe（gift/koken/audition.nicovideo.jp）内の scrape が 0 件の
     - `giftSubAppIframeDomShape.test.js`
     - `giftSubAppRelayDiag.js` — v0.1.226: ギフトサイドバー cross-origin iframe relay 経路の生存確認用 純関数。

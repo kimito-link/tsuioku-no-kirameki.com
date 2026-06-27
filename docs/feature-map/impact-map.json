@@ -2938,6 +2938,16 @@
       ]
     },
     {
+      "file": "src/lib/devMonitorGiftRankingExtrasHtml.js",
+      "featureCount": 1,
+      "features": [
+        "popup"
+      ],
+      "labels": [
+        "ポップアップ(応援レーン)"
+      ]
+    },
+    {
       "file": "src/lib/devMonitorPaintGate.js",
       "featureCount": 1,
       "features": [

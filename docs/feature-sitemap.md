@@ -262,7 +262,7 @@
   - `src/lib/giftThrowProjectile.js`
 - **吹き出し寿命管理** — 会場の吹き出しの表示上限・追い出し(eviction)ライフサイクル
   - `src/lib/venueBubbleLifecycle.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 166</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 167</summary>
 
 - `scripts/encode-marketing-html-avatars.mjs` — extension/images/marketing-html-avatars/*.png を data URI にし、
 - `scripts/split-avatar-parts.mjs` — 偽市松背景の除去 + パーツ切り出し(one-off アセットパイプライン)
@@ -319,6 +319,7 @@
 - `src/lib/giftSenderObservation.js` — v0.1.214: anonymous gift（userId 空）も nickname を bucket key にして
 - `src/lib/giftSidebarRankTabPick.js` — ギフトサイドバー内から「貢献度ランキング」タブ相当の要素を選ぶ。
 - `src/lib/giftSubAppFrameSource.js` — v0.1.230: iframe relay の送信元 frame URL を意味のあるカテゴリに分類する純関数群。
+- `src/lib/giftSubAppHistoryBlocksHtml.js` — ギフトサブアプリ履歴パネル（renderGiftSubAppHistoryPanel の本体ブロック群）の HTML を組む純関数。
 - `src/lib/giftSubAppIframeDomShape.js` — gift sub-app iframe（gift/koken/audition.nicovideo.jp）内の scrape が 0 件の
 - `src/lib/giftThrowLedgerTableHtml.js` — ギフト投げ一覧テーブル HTML（マーケ #mkt-gift-ledger と同型・popup 用 nl- クラス）。
 - `src/lib/inlineBelowWideRowInsert.js` — below 配置でインラインホストを「動画列の内側」から外すための挿入点解決。
@@ -736,7 +737,7 @@
 
 ## 🧬 修正系譜マップ(この系統のバグを過去にどう直したか)
 
-> changelog 全 307 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
+> changelog 全 308 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
 
 ### 💾 記録件数 (45版)
 - `v0.1.969` 2026-06-28 — 内部整理: 応援ランク行の生成をlib抽出
@@ -785,7 +786,8 @@
 - `v0.1.672` 2026-06-10 — コメビュの二重表示の残りを根治
 - `v0.1.665` 2026-06-10 — 長い配信が7割等で止まったままになるのを根治
 
-### 📥 コメント取得 (123版)
+### 📥 コメント取得 (124版)
+- `v0.1.972` 2026-06-28 — 内部整理: 取得状況サマリの生成をlib抽出
 - `v0.1.966` 2026-06-27 — ランキング件数の「拡張≠鏡」1件差の誤警告を解消
 - `v0.1.963` 2026-06-27 — 貢献度ランキングが公開版・プレビューで欠ける不具合を修正
 - `v0.1.954` 2026-06-26 — 純Web公開コピーの自己診断の「コピー漏れ」誤検知を修正
@@ -1265,7 +1267,8 @@
 - `v0.1.673` 2026-06-10 — コメビュの名前をパネルと同じ情報源で補完
 - `v0.1.670` 2026-06-10 — コメビュのアイコンを本家と同じサムネに
 
-### 🩺 診断・状態速報 (95版)
+### 🩺 診断・状態速報 (96版)
+- `v0.1.972` 2026-06-28 — 内部整理: 取得状況サマリの生成をlib抽出
 - `v0.1.970` 2026-06-28 — 内部整理: 診断グラフの組立をlib抽出
 - `v0.1.966` 2026-06-27 — ランキング件数の「拡張≠鏡」1件差の誤警告を解消
 - `v0.1.964` 2026-06-27 — 「描画済みなのにローディング継続」の誤検知を解消
