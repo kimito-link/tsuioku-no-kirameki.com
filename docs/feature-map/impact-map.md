@@ -502,6 +502,7 @@
 | `src/lib/reportUserThumb.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/resolveKiramekiReturningAndFirstTimeUserKeys.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/resolveVisitorCount.js` | 1 | 状態速報ページ |
+| `src/lib/roomCardInnerHtml.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/sameOriginContribRankingDomShape.js` | 1 | 記録エンジン(watchページ常駐) |
 | `src/lib/sanitizeRoomAvatarsForBroadcaster.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/scrapeEventScoreRankingFromRichviewDom.js` | 1 | 記録エンジン(watchページ常駐) |

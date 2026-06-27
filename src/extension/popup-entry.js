@@ -528,6 +528,7 @@ import {
   parseCommentPanelStatusPayload
 } from '../lib/commentPanelStatus.js';
 import { escapeHtml, escapeAttr } from '../lib/htmlEscape.js';
+import { buildRoomCardInnerHtml } from '../lib/roomCardInnerHtml.js';
 import { buildEventSelfStatusHeaderHtml } from '../lib/eventSelfStatusHeaderHtml.js';
 import { topSupportRankLineModels } from '../lib/topSupportRankStripLines.js';
 // v0.1.881: 応援帯/公式値レーンの描画本体を共有 lib に抽出(live-view と完全コピー共有)。popup は
@@ -11404,40 +11405,20 @@ function renderUserRooms(entries, liveId = '', renderOpts = {}) {
     const uidForThumb = isUnknown ? '' : r.userKey;
     const thumbSrc = pickSupportGrowthTileForStory(uidForThumb, r.avatarUrl);
     const displayThumb = storyAvatarLoadGuard.pickDisplaySrc(thumbSrc);
-    const thumbRp = isHttpOrHttpsUrl(displayThumb)
-      ? ' referrerpolicy="no-referrer"'
-      : '';
-    const avatarImgHtml = `<img class="nl-ticker-latest__avatar room-card__avatar" alt="" src="${escapeAttr(displayThumb)}" decoding="async" data-on-error-fallback="blank"${thumbRp}>`;
-    // 原則「サムネ・ハンドル・ID はひとかたまり」: 数値 ID はサムネ+名前を同じアンカーで括る。
-    const roomLinkable = !isUnknown && /^\d{1,18}$/.test(String(r.userKey || ''));
-    const aOpen = (cls) => `<a class="${cls}" href="https://www.nicovideo.jp/user/${encodeURIComponent(String(r.userKey))}" target="_blank" rel="noopener noreferrer" title="${escapeHtml(label)} のユーザーページを開く">`;
-    const avatarHtml = roomLinkable ? `${aOpen('room-card__id-link')}${avatarImgHtml}</a>` : avatarImgHtml;
-    const nameHtml = roomLinkable
-      ? `${aOpen('room-card__id-link room-name')}${escapeHtml(label)}</a>`
-      : `<span class="room-name" title="${escapeHtml(r.userKey)}">${escapeHtml(label)}</span>`;
-    const totalPercent = Math.max(6, Math.min(100, (r.count / maxTotal) * 100));
-    const recentPercent =
-      r.recentCount > 0 ? Math.max(4, Math.min(100, (r.recentCount / maxRecent) * 100)) : 0;
-    const deltaLabel = r.recentCount > 0 ? `+${r.recentCount} / 5分` : '±0 / 5分';
-    const hint = isUnknown
-      ? '<div class="room-hint">投稿者ID未取得のコメントをここにまとめています。</div>'
-      : '';
-    // compact/full は「棒グラフ行の有無」だけ違う。共通部(アバター+名前+プレビュー+hint)を共有。
-    const barRowHtml = compactRooms
-      ? ''
-      : `<div class="room-bar-row"><div class="room-bar-track"><div class="room-bar-total" style="width:${totalPercent.toFixed(2)}%"></div><div class="room-bar-recent" style="width:${recentPercent.toFixed(2)}%"></div></div><span class="room-delta ${r.recentCount > 0 ? 'up' : ''}">${deltaLabel}</span></div>`;
-    const previewHtml = r.lastText ? `<div class="room-preview">${escapeHtml(r.lastText)}</div>` : '';
-    li.innerHTML = `
-      <div class="room-card__row">
-        ${avatarHtml}
-        <div class="room-main">
-          <div class="room-name-row">${nameHtml}</div>
-          ${barRowHtml}
-          ${previewHtml}
-          ${hint}
-        </div>
-      </div>
-    `;
+    // C-7 pure refactor: 「確定値 → カード inner HTML」部分は roomCardInnerHtml.js に抽出（挙動不変・test 済）。
+    //   サムネ解決(pickSupportGrowthTileForStory / load guard)と生成後の DOM 配線は popup に残す。
+    li.innerHTML = buildRoomCardInnerHtml({
+      userKey: r.userKey,
+      label,
+      displayThumb,
+      count: r.count,
+      recentCount: r.recentCount,
+      lastText: r.lastText,
+      isUnknown,
+      maxTotal,
+      maxRecent,
+      compactRooms
+    });
     ul.appendChild(li);
     const avImg = li.querySelector('img.room-card__avatar');
     if (avImg instanceof HTMLImageElement && isHttpOrHttpsUrl(thumbSrc)) {
