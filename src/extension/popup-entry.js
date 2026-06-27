@@ -530,6 +530,7 @@ import {
 import { escapeHtml, escapeAttr } from '../lib/htmlEscape.js';
 import { buildRoomCardInnerHtml } from '../lib/roomCardInnerHtml.js';
 import { buildSessionSummaryCompareTableHtml } from '../lib/sessionSummaryCompareTableHtml.js';
+import { buildTopSupportRankLinesHtml } from '../lib/topSupportRankLinesHtml.js';
 import { buildEventSelfStatusHeaderHtml } from '../lib/eventSelfStatusHeaderHtml.js';
 import { topSupportRankLineModels } from '../lib/topSupportRankStripLines.js';
 // v0.1.881: 応援帯/公式値レーンの描画本体を共有 lib に抽出(live-view と完全コピー共有)。popup は
@@ -8080,47 +8081,11 @@ function renderTopSupportRankStrip(stripRooms) {
       ? (uid) => getCachedAnonymousIdenticonDataUrl(uid)
       : undefined
   });
-  const html = models
-    .map((m) => {
-      const placeHtml =
-        m.placeNumber != null
-          ? `<span class="nl-top-support-rank__place" aria-hidden="true">${m.placeNumber}</span>`
-          : `<span class="nl-top-support-rank__place nl-top-support-rank__place--empty" aria-hidden="true"></span>`;
-      const full = escapeAttr(m.fullLabelForTitle);
-      const displayThumb = storyAvatarLoadGuard.pickDisplaySrc(m.thumbSrc);
-      const thumbRp = isHttpOrHttpsUrl(displayThumb)
-        ? ' referrerpolicy="no-referrer"'
-        : '';
-      const idText = escapeHtml(m.idShort);
-      const nameText = escapeHtml(m.nameLine);
-      const idTitle = m.isUnknown ? '' : escapeAttr(m.idTitle);
-      const idBlock =
-        String(m.idShort || '').trim() === ''
-          ? ''
-          : `<span class="nl-top-support-rank__id" title="${idTitle}">${idText}</span>`;
-      let lineClass = `nl-top-support-rank__line${m.isUnknown ? ' nl-top-support-rank__line--unknown' : ''}`;
-      let lineStyle = '';
-      if (m.hasAccent && m.accentColorCss) {
-        lineClass += ' nl-top-support-rank__line--has-accent';
-        lineStyle = ` style="--nl-rank-accent:${escapeAttr(m.accentColorCss)}"`;
-      }
-      // 数値 ID（非匿名）のユーザーはニコニコのユーザーページにリンクする
-      const isLinkable = !m.isUnknown && !isAnonymousStyleNicoUserId(m.userKey);
-      const linkHref = isLinkable
-        ? `https://www.nicovideo.jp/user/${escapeAttr(m.userKey)}`
-        : '';
-      const innerHtml = `${placeHtml}
-        <span class="nl-top-support-rank__count">${m.count}件</span>
-        <span class="nl-top-support-rank__thumb-wrap">
-          <img class="nl-top-support-rank__thumb" src="${escapeAttr(displayThumb)}" alt="${nameText}" decoding="async"${thumbRp} />
-        </span>
-        ${idBlock}
-        <span class="nl-top-support-rank__name">${nameText}</span>`;
-      return isLinkable
-        ? `<a class="${lineClass} nl-top-support-rank__line--linkable"${lineStyle} role="listitem" title="${full}" href="${linkHref}" target="_blank" rel="noopener noreferrer">${innerHtml}</a>`
-        : `<div class="${lineClass}"${lineStyle} role="listitem" title="${full}">${innerHtml}</div>`;
-    })
-    .join('');
+  // C-7 pure refactor: models→行 HTML 組み立ては topSupportRankLinesHtml.js に抽出（挙動不変・test 済）。
+  //   サムネ表示 src 解決(storyAvatarLoadGuard.pickDisplaySrc)は注入し、生成後の DOM 配線は popup に残す。
+  const html = buildTopSupportRankLinesHtml(models, {
+    resolveDisplayThumb: (src) => storyAvatarLoadGuard.pickDisplaySrc(src)
+  });
   /*
    * v0.1.305: 配信者タイルを**先頭（左）**に置く（ユーザー要望）。配信者は基準点なので
    * 一番左に固定する方が視線の起点として自然。caster の img は別クラス

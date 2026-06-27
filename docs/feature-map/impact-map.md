@@ -549,6 +549,7 @@
 | `src/lib/thumbFifo.js` | 1 | 記録エンジン(watchページ常駐) |
 | `src/lib/tokenBucket.js` | 1 | 記録エンジン(watchページ常駐) |
 | `src/lib/topSupportRankAnonymousFold.js` | 1 | ポップアップ(応援レーン) |
+| `src/lib/topSupportRankLinesHtml.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/topSupportRankStripConfig.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/topSupportRankStripLines.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/topSupportRankStripStableKey.js` | 1 | ポップアップ(応援レーン) |

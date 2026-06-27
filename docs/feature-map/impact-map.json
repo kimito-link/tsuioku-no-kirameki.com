@@ -5338,6 +5338,16 @@
       ]
     },
     {
+      "file": "src/lib/topSupportRankLinesHtml.js",
+      "featureCount": 1,
+      "features": [
+        "popup"
+      ],
+      "labels": [
+        "ポップアップ(応援レーン)"
+      ]
+    },
+    {
       "file": "src/lib/topSupportRankStripConfig.js",
       "featureCount": 1,
       "features": [
