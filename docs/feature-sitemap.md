@@ -628,7 +628,7 @@
   - `src/lib/statusTrendKey.js`
   - `src/extension/status-entry.js`
   - `src/lib/statusActionAdvisor.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 100</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 101</summary>
 
 - `app/app.js` — スマホ閲覧用 status Web 版。
 - `app/live-view.js` — 純Web版 応援ライブビュー（拡張なし・PC/スマホ共通）。
@@ -656,6 +656,7 @@
 - `src/lib/commentTimelineMirror.js` — コメントタイムラインの「鏡」スナップショット純関数（council/liveview-wholesale-root-SYNTHESIS.md 第2段）。
 - `src/lib/consoleErrorBuffer.js` — v0.1.201: window.error / unhandledrejection を捕捉する ring buffer。
 - `src/lib/devMonitorDebugSubset.js` — ポップアップ「開発・テスト用 監視」用: watch スナップショット _debug から
+- `src/lib/devMonitorVizHtml.js` — dev monitor セカンダリ可視化（renderDevMonitorSecondaryViz の <div class="nl-dev-monitor-viz">）の
 - `src/lib/devReloadSignal.js` — 開発用ホットリロードのシグナル判定（純関数）。
 - `src/lib/embeddedDataExtract.js` — ニコ生 watch ページの `#embedded-data[data-props]` から初期メタ情報を抽出する純関数。
 - `src/lib/eventParticipationProgramsApi.js` — ニコ生「企画イベント参加番組一覧」公式 JSON API の URL 組立 & 正規化（純関数）。
@@ -735,7 +736,7 @@
 
 ## 🧬 修正系譜マップ(この系統のバグを過去にどう直したか)
 
-> changelog 全 306 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
+> changelog 全 307 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
 
 ### 💾 記録件数 (45版)
 - `v0.1.969` 2026-06-28 — 内部整理: 応援ランク行の生成をlib抽出
@@ -1092,7 +1093,8 @@
 - `v0.1.713` 2026-06-13 — 会場モードを明るくして発言を吹き出し表示
 - `v0.1.711` 2026-06-13 — 会場モードで発言を吹き出し表示
 
-### 🎁 ギフト (52版)
+### 🎁 ギフト (53版)
+- `v0.1.971` 2026-06-28 — 内部整理: ギフト履歴表示の生成をlib抽出
 - `v0.1.955` 2026-06-26 — 状態速報に「応援レーン描画の自己診断」を追加
 - `v0.1.951` 2026-06-26 — 応援プレビューに応援レーンと貢献度/広告ランキングを表示
 - `v0.1.947` 2026-06-25 — WEB公開版に応援者ランキングとギフト貢献度を顔つきで表示

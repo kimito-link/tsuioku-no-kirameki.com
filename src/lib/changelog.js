@@ -26,6 +26,16 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.971',
+    date: '2026-06-28',
+    summary: '内部整理: ギフト履歴表示の生成をlib抽出',
+    items: Object.freeze([
+      'ギフトサイドバー履歴パネルの一覧を組み立てる処理を、テストしやすい小さな部品に切り出しました(内部整理のみ)。',
+      '画面の表示・動作は一切変わりません。抽出前と1文字も違わない出力であることを自動テストで確認済みです。',
+      'popup の巨大ファイルを少しずつ部品化して、退化しにくく・直しやすくする取り組みの続きです。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.970',
     date: '2026-06-28',
     summary: '内部整理: 診断グラフの組立をlib抽出',

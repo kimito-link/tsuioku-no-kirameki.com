@@ -3368,6 +3368,16 @@
       ]
     },
     {
+      "file": "src/lib/giftSubAppHistoryBlocksHtml.js",
+      "featureCount": 1,
+      "features": [
+        "popup"
+      ],
+      "labels": [
+        "ポップアップ(応援レーン)"
+      ]
+    },
+    {
       "file": "src/lib/giftSubAppIframeDomShape.js",
       "featureCount": 1,
       "features": [
