@@ -312,6 +312,7 @@
 | `src/lib/devMonitorPaintGate.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/devMonitorTrendSession.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/devMonitorViz.js` | 1 | ポップアップ(応援レーン) |
+| `src/lib/devMonitorVizHtml.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/devReloadSignal.js` | 1 | 記録エンジン(watchページ常駐) |
 | `src/lib/diagnosticErrorRing.js` | 1 | 記録エンジン(watchページ常駐) |
 | `src/lib/diagnosticRedact.js` | 1 | 記録エンジン(watchページ常駐) |

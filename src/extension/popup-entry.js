@@ -531,6 +531,7 @@ import { escapeHtml, escapeAttr } from '../lib/htmlEscape.js';
 import { buildRoomCardInnerHtml } from '../lib/roomCardInnerHtml.js';
 import { buildSessionSummaryCompareTableHtml } from '../lib/sessionSummaryCompareTableHtml.js';
 import { buildTopSupportRankLinesHtml } from '../lib/topSupportRankLinesHtml.js';
+import { buildDevMonitorVizHtml } from '../lib/devMonitorVizHtml.js';
 import { buildEventSelfStatusHeaderHtml } from '../lib/eventSelfStatusHeaderHtml.js';
 import { topSupportRankLineModels } from '../lib/topSupportRankStripLines.js';
 // v0.1.881: 応援帯/公式値レーンの描画本体を共有 lib に抽出(live-view と完全コピー共有)。popup は
@@ -594,9 +595,7 @@ import {
   appendTrendPoint,
   persistTrendPointChrome,
   readMergedTrendSeries,
-  readTrendSeries,
-  trendHasCountSamples,
-  trendToSparklineArrays
+  readTrendSeries
 } from '../lib/devMonitorTrendSession.js';
 import { aggregateMarketingReport } from '../lib/marketingAggregate.js';
 import { analyzeAudienceEngagementGap } from '../lib/audienceEngagementGap.js';
@@ -642,20 +641,7 @@ import {
   renderMangaBroadcastPanelsHtml,
   mangaBroadcastSummaryEmbeddedCss
 } from '../lib/mangaBroadcastSummary.js';
-import {
-  buildDevMonitorDlChartsHtml,
-  commentTypeDistribution,
-  htmlAcquisitionSparklines,
-  htmlCaptureRatioBar,
-  htmlCommentTypeBars,
-  htmlDualCountSparklines,
-  htmlOfficialVsRecordedBar,
-  htmlProfileGapBars,
-  htmlWsStalenessBar,
-  officialVsRecordedBarState,
-  profileGapBarSeries,
-  wsStalenessState
-} from '../lib/devMonitorViz.js';
+import { buildDevMonitorDlChartsHtml } from '../lib/devMonitorViz.js';
 import {
   buildStoryAvatarDiagHtml,
   buildStoryAvatarDiagVerboseHtml
@@ -12263,63 +12249,16 @@ function renderDevMonitorSecondaryViz(p, opts = {}) {
     opts.mergedTrend != null ? opts.mergedTrend : readTrendSeries(win, liveId);
   const persisted = Boolean(opts.mergedTrend);
 
-  const snap = p.snapshot;
-  const oc =
-    snap &&
-    typeof snap.officialCommentCount === 'number' &&
-    Number.isFinite(snap.officialCommentCount)
-      ? snap.officialCommentCount
-      : null;
-
-  /** @type {string[]} */
-  const parts = [];
-  parts.push(
-    htmlOfficialVsRecordedBar(
-      officialVsRecordedBarState({
-        displayCount: p.displayCount,
-        officialCount: oc
-      })
-    )
-  );
-  if (
-    snap &&
-    typeof snap.officialCaptureRatio === 'number' &&
-    Number.isFinite(snap.officialCaptureRatio)
-  ) {
-    parts.push(htmlCaptureRatioBar(snap.officialCaptureRatio));
-  }
-  const gaps = p.profileGaps;
-  if (gaps && p.storageCount > 0) {
-    parts.push(htmlProfileGapBars(profileGapBarSeries(gaps)));
-  }
-  const dbg =
-    snap?._debug && typeof snap._debug === 'object'
-      ? /** @type {Record<string, unknown>} */ (snap._debug)
-      : null;
-  if (
-    dbg &&
-    dbg.commentTypeVisibleSample != null &&
-    typeof dbg.commentTypeVisibleSample === 'object'
-  ) {
-    parts.push(
-      htmlCommentTypeBars(
-        commentTypeDistribution(
-          /** @type {Record<string, unknown>} */ (dbg.commentTypeVisibleSample)
-        )
-      )
-    );
-  }
-  if (dbg && typeof dbg.wsAge === 'number') {
-    parts.push(htmlWsStalenessBar(wsStalenessState(dbg.wsAge)));
-  }
-  if (trend.length >= 1) {
-    const series = trendToSparklineArrays(trend);
-    parts.push(htmlAcquisitionSparklines(series, { persisted }));
-    if (trendHasCountSamples(trend)) {
-      parts.push(htmlDualCountSparklines(series.displaySeries, series.storageSeries));
-    }
-  }
-  vizHost.innerHTML = `<div class="nl-dev-monitor-viz">${parts.filter(Boolean).join('')}</div>`;
+  // C-7 pure refactor: snapshot/件数/trend→viz HTML 組み立ては devMonitorVizHtml.js に抽出
+  //   （挙動不変・test 済）。DOM 取得・trend 読み出し・空 liveId early return は popup に残す。
+  vizHost.innerHTML = buildDevMonitorVizHtml({
+    snapshot: p.snapshot,
+    displayCount: p.displayCount,
+    storageCount: p.storageCount,
+    profileGaps: p.profileGaps,
+    trend,
+    persisted
+  });
 }
 
 /**

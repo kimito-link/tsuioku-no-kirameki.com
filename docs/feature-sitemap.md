@@ -462,7 +462,7 @@
 
 - **HTMLレポート生成** — マーケ/イベント順位/タイムライン等を1枚の HTML レポートに組み立てる(popup-entry 内)
   - `src/extension/popup-entry.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 32</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 33</summary>
 
 - `scripts/inspect-nicolive-watch-stats.mjs` — ニコ生 watch ページの HTML から、来場・同接まわりの数値がどう埋め込まれているかを CLI で確認する。
 - `src/lib/audienceEngagementGap.js` — 来場者数は多いがコメントが少ない状態を検出するローカル分析コア。
@@ -495,6 +495,7 @@
 - `src/lib/reportUserRoomTableHtml.js` — v0.1.636: HTML レポートの「ユーザー別集計テーブル」行ビルダ（純ロジック）。
 - `src/lib/roomCardInnerHtml.js` — 応援ルームカード（renderUserRooms の各 <li class="room-card">）の inner HTML を組む純関数。
 - `src/lib/supportTimelineHtml.js` — 応援タイムラインの行 HTML を純粋に組み立てる（v0.1.340）。
+- `src/lib/topSupportRankLinesHtml.js` — 応援ランクストリップの各行（renderTopSupportRankStrip の <a>/<div> 行群）の HTML を組む純関数。
 - `src/shared/html/escape.js` — ユーザー由来文字列を HTML 断片に埋め込む前にエスケープする（XSS 対策の共通実装）。
 
 </details>
@@ -734,7 +735,7 @@
 
 ## 🧬 修正系譜マップ(この系統のバグを過去にどう直したか)
 
-> changelog 全 305 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
+> changelog 全 306 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
 
 ### 💾 記録件数 (45版)
 - `v0.1.969` 2026-06-28 — 内部整理: 応援ランク行の生成をlib抽出
@@ -1262,7 +1263,8 @@
 - `v0.1.673` 2026-06-10 — コメビュの名前をパネルと同じ情報源で補完
 - `v0.1.670` 2026-06-10 — コメビュのアイコンを本家と同じサムネに
 
-### 🩺 診断・状態速報 (94版)
+### 🩺 診断・状態速報 (95版)
+- `v0.1.970` 2026-06-28 — 内部整理: 診断グラフの組立をlib抽出
 - `v0.1.966` 2026-06-27 — ランキング件数の「拡張≠鏡」1件差の誤警告を解消
 - `v0.1.964` 2026-06-27 — 「描画済みなのにローディング継続」の誤検知を解消
 - `v0.1.959` 2026-06-26 — 「数字の出どころ」に正常/要確認の判定を追加

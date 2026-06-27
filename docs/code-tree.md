@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 1 / 568 件
+## ⚠️ 役割コメントが無いソース 1 / 569 件
 - `src/lib/reportPreviewPublish.js`
 
 ## 全ファイルツリー
@@ -457,7 +457,7 @@
   - `vendor-visual-explainer.mjs` — Vendors nicobailon/visual-explainer (MIT) into .cursor/skills/visual-explainer/
   - `verify-bump.mjs` — extension bump 後の整合性チェッカー
   - `write-extension-placeholder-icons.mjs` — リポジトリに 256px アイコンしか無い環境向け: manifest 用の小さめ PNG を生成する。
-- 📁 **src/** (1208)
+- 📁 **src/** (1210)
   - 📁 **data/** (6)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -716,7 +716,7 @@
         - `logo_funlink_white_RGB_maru_black.png`
       - `logo_guide_funlink_ol.pdf`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (997)
+  - 📁 **lib/** (999)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -1594,6 +1594,8 @@
     - `tokenBucket.test.js`
     - `topSupportRankAnonymousFold.js` — userKey: string,
     - `topSupportRankAnonymousFold.test.js`
+    - `topSupportRankLinesHtml.js` — 応援ランクストリップの各行（renderTopSupportRankStrip の <a>/<div> 行群）の HTML を組む純関数。
+    - `topSupportRankLinesHtml.test.js`
     - `topSupportRankStripConfig.js` — ポップアップ「応援ランキング」ストリップに並べる行数の上限（aggregateCommentsByUser の1行＝1カード）。
     - `topSupportRankStripConfig.test.js`
     - `topSupportRankStripLines.js` — 応援ランキング上位ストリップの各行(サムネ/色アクセント/リンク)を組み立てる純ロジック。
