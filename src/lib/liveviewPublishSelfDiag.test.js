@@ -101,6 +101,35 @@ describe('buildLiveviewPublishSelfDiag', () => {
     expect(d.consistency[0]).toMatchObject({ extRows: 6, mirrorRows: 2, match: false });
   });
 
+  it('整合チェック(第2段): 拡張>鏡 が許容幅以内(1件差)は鮮度差=normal で警告しない', () => {
+    // ★実機 v0.1.964: 拡張 apiRows=7 ≠ 鏡6(1件差)。koken 30秒自動更新の鮮度差=コピー漏れではない。
+    const blob = fullBlob();
+    blob.northStarMirror.lanes.contributionRanking = [
+      { name: 'a', contribution: 7 }, { name: 'b', contribution: 6 }, { name: 'c', contribution: 5 },
+      { name: 'd', contribution: 4 }, { name: 'e', contribution: 3 }, { name: 'f', contribution: 2 }
+    ]; // 鏡6件
+    const fastDiag = { content: { giftDiagnostics: { '北極星レーン': {
+      '1_貢献度ランキング': { apiRows: 7, state: 'ok' } // 拡張は今7件
+    } } } };
+    const d = buildLiveviewPublishSelfDiag({ jsonBlob: blob, fastDiag, currentLiveId: 'lv1', publishKeys: {}, nowMs: NOW });
+    expect(d.consistency[0]).toMatchObject({ extRows: 7, mirrorRows: 6, match: null, skipped: true, normal: true });
+    expect(d.consistency[0].reason).toContain('鮮度差');
+    // ★normal は警告カードに昇格しない(誤検知ゼロ)。
+    const cards = liveviewPublishSelfDiagToActionCards(d);
+    expect(cards.some((c) => c.id.startsWith('liveview-mirror-count-mismatch'))).toBe(false);
+  });
+
+  it('整合チェック(第2段): 鏡が空(0)なのに拡張に実データ=完全欠落は許容幅と無関係に🔴不一致', () => {
+    // 1件でも鏡=0 は鮮度差でなく本物のコピー漏れ(完全欠落)。
+    const blob = fullBlob();
+    blob.northStarMirror.lanes.contributionRanking = []; // 鏡0件
+    const fastDiag = { content: { giftDiagnostics: { '北極星レーン': {
+      '1_貢献度ランキング': { apiRows: 1, state: 'ok' }
+    } } } };
+    const d = buildLiveviewPublishSelfDiag({ jsonBlob: blob, fastDiag, currentLiveId: 'lv1', publishKeys: {}, nowMs: NOW });
+    expect(d.consistency[0]).toMatchObject({ extRows: 1, mirrorRows: 0, match: false });
+  });
+
   it('整合チェック: 拡張が not_yet(取得中)なら突合せず保留=誤検知しない', () => {
     // ★実機で踏んだ誤検知: 拡張 apiRows=0/state=not_yet だが鏡には過去値6件。突合すると「拡張0≠鏡6」を
     //   コピー漏れと誤判定していた。確定状態でないので保留(skipped)にすべき。

@@ -65,6 +65,38 @@ function isSettledLaneState(state) {
 }
 
 /**
+ * ★v0.1.966(council/single-source-of-truth-SYNTHESIS.md 第2段): 鮮度差の許容幅。
+ *   整合チェックは「content の生 apiRows(koken 直読み・今この瞬間)」と「popup の鏡(2分前に焼いた)」という
+ *   二系統を突合している(=二人の作る人を比べている)。koken API は約30秒間隔で自動更新されるため、
+ *   content の今の件数と鏡を焼いた時点の件数が数件ズレるのは構造上正常(コピー漏れではない)。
+ *   → 拡張>鏡 の差が この許容幅以内 かつ 鏡が空でない なら『鮮度差で説明可能(normal)』として警告しない。
+ *   本物のコピー漏れ(鏡=0 なのに拡張>0=完全欠落、or 許容幅を超える大差)だけを🔴不一致(check)にする。
+ *   v0.1.959 commentCountProvenance の ok/normal/check 3段階判定と同じ思想(誤検知ゼロ最優先)。 */
+const NORTH_STAR_STALENESS_TOLERANCE_ROWS = 2;
+
+/**
+ * 確定状態・新鮮な鏡のときの件数突合の3段階判定(純粋な数値判定)。
+ * @param {number} apiRows  拡張側の生件数(content koken 直読み)
+ * @param {number} mirrorRows 鏡の件数(popup が焼いた)
+ * @returns {{ verdict: 'match'|'normal'|'mismatch', reason: string }}
+ */
+function judgeNorthStarConsistency(apiRows, mirrorRows) {
+  const ext = Math.max(0, Math.floor(Number(apiRows) || 0));
+  const mir = Math.max(0, Math.floor(Number(mirrorRows) || 0));
+  if (ext === mir) return { verdict: 'match', reason: '' };
+  // 鏡が空なのに拡張に実データがある=完全欠落=本物のコピー漏れ。
+  if (mir === 0 && ext > 0) {
+    return { verdict: 'mismatch', reason: `鏡が空(${mir})なのに拡張に${ext}件=鏡publishの取りこぼし` };
+  }
+  // 拡張>鏡 が許容幅以内=koken 30秒自動更新の鮮度差で説明可能=正常。
+  if (ext > mir && ext - mir <= NORTH_STAR_STALENESS_TOLERANCE_ROWS) {
+    return { verdict: 'normal', reason: `差${ext - mir}件は koken の自動更新による鮮度差で説明可能(拡張=今/鏡=数十秒前)` };
+  }
+  // 鏡>拡張(鏡に余分)や、許容幅を超える大差=要確認。
+  return { verdict: 'mismatch', reason: `拡張${ext} / 鏡${mir} の差が大きく鮮度差で説明しにくい` };
+}
+
+/**
  * 純Web公開コピーの自己診断オブジェクトを組む。read なし・副作用なし。
  *
  * @param {object} args
@@ -162,7 +194,16 @@ export function buildLiveviewPublishSelfDiag(args) {
       consistency.push({ lane, extRows: apiRows, mirrorRows, match: null, skipped: true, reason: `鏡が古い(${northMirrorAgeSec}秒前)` });
       return;
     }
-    consistency.push({ lane, extRows: apiRows, mirrorRows, match: apiRows === mirrorRows });
+    // ★第2段: 二系統(content apiRows vs popup 鏡)の鮮度差を3段階判定=1件差を誤って『コピー漏れ』にしない。
+    const { verdict, reason } = judgeNorthStarConsistency(apiRows, mirrorRows);
+    if (verdict === 'match') {
+      consistency.push({ lane, extRows: apiRows, mirrorRows, match: true });
+    } else if (verdict === 'normal') {
+      // 鮮度差で説明可能=保留(警告しない)。理由を出して透明性は保つ。
+      consistency.push({ lane, extRows: apiRows, mirrorRows, match: null, skipped: true, normal: true, reason });
+    } else {
+      consistency.push({ lane, extRows: apiRows, mirrorRows, match: false, reason });
+    }
   };
   pushConsistency('北極星 貢献度', '1_貢献度ランキング', contribCount);
   pushConsistency('北極星 広告', '+α_広告ランキング', adCount);
@@ -291,7 +332,9 @@ export function formatLiveviewPublishSelfDiagLines(diag) {
     lines.push('整合チェック（拡張の生データ vs 鏡）:');
     for (const c of cons) {
       if (c.skipped) {
-        lines.push(`- ${c.lane}: 拡張 apiRows=${c.extRows} / 鏡 ${c.mirrorRows}  ⏳保留(${c.reason})`);
+        // 鮮度差で説明可能(normal)は🟢、取得中/古い等の保留は⏳で区別する。
+        const tag = c.normal ? '🟢鮮度差で正常' : '⏳保留';
+        lines.push(`- ${c.lane}: 拡張 apiRows=${c.extRows} / 鏡 ${c.mirrorRows}  ${tag}(${c.reason})`);
         continue;
       }
       const mark = c.match ? '✅一致' : '🔴不一致(コピー漏れ疑い)';
