@@ -533,6 +533,7 @@ import { buildSessionSummaryCompareTableHtml } from '../lib/sessionSummaryCompar
 import { buildTopSupportRankLinesHtml } from '../lib/topSupportRankLinesHtml.js';
 import { buildDevMonitorVizHtml } from '../lib/devMonitorVizHtml.js';
 import { buildGiftSubAppHistoryBlocksHtml } from '../lib/giftSubAppHistoryBlocksHtml.js';
+import { buildDevMonitorGiftRankingExtrasHtml } from '../lib/devMonitorGiftRankingExtrasHtml.js';
 import { buildEventSelfStatusHeaderHtml } from '../lib/eventSelfStatusHeaderHtml.js';
 import { topSupportRankLineModels } from '../lib/topSupportRankStripLines.js';
 // v0.1.881: 応援帯/公式値レーンの描画本体を共有 lib に抽出(live-view と完全コピー共有)。popup は
@@ -12486,20 +12487,12 @@ async function renderDevMonitorGiftRankingExtras() {
       extrasEl.innerHTML = '';
       return;
     }
-    const headerHtml =
-      '<div class="nl-dev-monitor__row" style="opacity:0.7;font-size:0.85em;margin-top:6px;">' +
-      '<dt>── 取得状況サマリ（AI 共有診断と同じ raw data） ──</dt><dd></dd></div>';
+    // C-7 pure refactor: rows→ヘッダ+行 HTML 組み立ては devMonitorGiftRankingExtrasHtml.js に
+    //   抽出（挙動不変・test 済）。storage read・空時 early return・handler 付与は popup に残す。
     // v0.1.483: 「AI 診断（Gemini Nano）」ボタンはユーザー要望で UI から撤去。
     //   ハンドラ（attachAiDiagButtonHandler）は呼び出して delegated listener を維持するが、
     //   対応するボタンを描画しないため発火しない（関数は将来の再利用・lint 用に残置）。
-    extrasEl.innerHTML =
-      headerHtml +
-      rows
-        .map(
-          ([dt, dd]) =>
-            `<div class="nl-dev-monitor__row"><dt>${escapeHtml(dt)}</dt><dd>${escapeHtml(dd)}</dd></div>`
-        )
-        .join('');
+    extrasEl.innerHTML = buildDevMonitorGiftRankingExtrasHtml(rows);
     attachAiDiagButtonHandler(fastCache);
   } catch {
     extrasEl.innerHTML = '';

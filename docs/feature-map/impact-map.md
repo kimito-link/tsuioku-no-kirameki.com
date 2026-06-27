@@ -309,6 +309,7 @@
 | `src/lib/deepHarvestReason.js` | 1 | 記録エンジン(watchページ常駐) |
 | `src/lib/devMonitorAvatarStats.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/devMonitorDebugSubset.js` | 1 | ポップアップ(応援レーン) |
+| `src/lib/devMonitorGiftRankingExtrasHtml.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/devMonitorPaintGate.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/devMonitorTrendSession.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/devMonitorViz.js` | 1 | ポップアップ(応援レーン) |
