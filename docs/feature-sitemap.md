@@ -107,7 +107,7 @@
   - `src/lib/monotonicCommentCount.js`
 - **storage キー定義** — chrome.storage のキー名の正本(nls_comments_<lv> 等)
   - `src/lib/storageKeys.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 33</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 34</summary>
 
 - `src/lib/autoBackupState.js` — v0.1.808(星野ロミ式コンポーネント化・第1弾): content-entry.js の巨大化を抑えるため、
 - `src/lib/blobDownload.js` — Blob を指定ファイル名で保存する。
@@ -134,6 +134,7 @@
 - `src/lib/readAllCommentsForLive.js` — 放送の全コメントを「IndexedDB(SW集約書きの正本) → chrome.storage チャンク → テール」の
 - `src/lib/recordingStallWatchdog.js` — 記録停止ウォッチドッグの純粋判定ロジック。
 - `src/lib/recordRate.js` — 取得スピード(records/sec)の算出と健康スコア化(純ロジック)。
+- `src/lib/sessionSummaryCompareTableHtml.js` — セッションサマリ推移テーブル（renderSessionSummaryComparePanel の <table>）の HTML を組む純関数。
 - `src/lib/statCardsMirror.js` — 数字カード鏡のスナップショット純関数。popup 上部の数字カード(記録N件・推定同時接続・来場者数)と
 - `src/lib/statCardsMirrorDom.js` — 数字カード鏡(記録/推定同時接続/来場者数+公式統計チップ)の【値セット部分】を、
 - `src/lib/statCardsMirrorKey.js` — popup 上部の数字カード群(記録N件・推定同時接続・来場者数・公式統計チップ)を status.html に
@@ -733,9 +734,10 @@
 
 ## 🧬 修正系譜マップ(この系統のバグを過去にどう直したか)
 
-> changelog 全 304 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
+> changelog 全 305 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
 
-### 💾 記録件数 (44版)
+### 💾 記録件数 (45版)
+- `v0.1.969` 2026-06-28 — 内部整理: 応援ランク行の生成をlib抽出
 - `v0.1.966` 2026-06-27 — ランキング件数の「拡張≠鏡」1件差の誤警告を解消
 - `v0.1.957` 2026-06-26 — 状態速報に「数字の出どころ」を追加
 - `v0.1.954` 2026-06-26 — 純Web公開コピーの自己診断の「コピー漏れ」誤検知を修正
