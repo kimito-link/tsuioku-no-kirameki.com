@@ -117,7 +117,13 @@ export function buildStoryUserLaneRenderDiag(probeSnap) {
   let reason = '';
   if (started === 0) {
     verdict = 'not_started';
-    reason = '描画関数が一度も呼ばれていません';
+    // v0.1.980: 「未起動」のとき次の一手を文言に含める(状態速報1枚で原因と対処が分かるように)。
+    //   v0.1.976〜979 で描画は重い処理(heavy refresh)非依存の独立トリガから起動するようにした。
+    //   それでも started=0 なら、拡張に新コードがまだ乗っていない(リロード前)か、popup を開いてから
+    //   時間が経っておらず独立トリガ(初回400ms/1500ms+周期)が回る前=拡張🔄リロード→watch F5→
+    //   popup を数秒開いたままにして再取得、で起動するはず。
+    reason =
+      '描画関数が一度も呼ばれていません（対処: 拡張を🔄リロード→watch を F5→popup を数秒開いたままにして再度コピー。v0.1.976〜979 で重い処理を待たず独立して描画を起動するようにしています）';
   } else if (s.lastError) {
     verdict = 'errored';
     reason = `描画中に例外: ${s.lastError}`;
