@@ -121,7 +121,10 @@ export function buildDiagnosticsTrust(args) {
       present: !!pd,
       ageMs: popupAgeMs,
       fresh: popupFresh,
-      lidMatch: popupLidMatch
+      lidMatch: popupLidMatch,
+      // v0.1.984: popup が動かしていた拡張バージョン/ビルド(新コード未ロード判定用)。
+      extVersion: pd?.popup?.extensionVersion ? String(pd.popup.extensionVersion) : '',
+      buildId: pd?.popup?.buildId ? String(pd.popup.buildId) : ''
     },
     mirrors,
     publish,
@@ -173,7 +176,9 @@ export function formatDiagnosticsTrustLines(trust) {
   if (t.popup.present) {
     const fresh = t.popup.fresh === false ? `🟡${agoLabel(t.popup.ageMs)}(古い)` : agoLabel(t.popup.ageMs);
     const lid = t.popup.lidMatch === false ? ' 🔴別配信' : t.popup.lidMatch === true ? ' ✅現配信' : '';
-    lines.push(`- popup 固有診断（応援レーン描画/北極星/avatar）: ✅あり ${fresh}${lid}`.trimEnd());
+    // v0.1.984: popup が動かしていた版を併記=新コード未ロード(古い版)を一目で判別できる。
+    const ver = t.popup.extVersion ? ` 〔v${t.popup.extVersion}〕` : '';
+    lines.push(`- popup 固有診断（応援レーン描画/北極星/avatar）: ✅あり ${fresh}${lid}${ver}`.trimEnd());
   } else {
     lines.push('- popup 固有診断（応援レーン描画/北極星/avatar）: 🔴 未取得（watch タブで popup を開くと埋まる）');
   }
