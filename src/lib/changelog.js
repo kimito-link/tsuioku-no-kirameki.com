@@ -26,6 +26,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.978',
+    date: '2026-06-28',
+    summary: '貢献度・広告ランキングを開いた直後に表示',
+    items: Object.freeze([
+      '貢献度・広告ランキング（北極星レーン）が、ポップアップを開いた直後に素早く表示されるようにしました（周期待ちをせず初回を早回し）。',
+      'データが取れていれば、重いコメント処理の最中でも数字が出ます。3つの画面（ツール内・応援プレビュー・WEB公開）が同じ最新の値で揃います。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.977',
     date: '2026-06-28',
     summary: '貢献度・広告ランキングを重い処理待ちせず表示',
