@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 1 / 572 件
+## ⚠️ 役割コメントが無いソース 1 / 573 件
 - `src/lib/reportPreviewPublish.js`
 
 ## 全ファイルツリー
@@ -457,7 +457,7 @@
   - `vendor-visual-explainer.mjs` — Vendors nicobailon/visual-explainer (MIT) into .cursor/skills/visual-explainer/
   - `verify-bump.mjs` — extension bump 後の整合性チェッカー
   - `write-extension-placeholder-icons.mjs` — リポジトリに 256px アイコンしか無い環境向け: manifest 用の小さめ PNG を生成する。
-- 📁 **src/** (1216)
+- 📁 **src/** (1218)
   - 📁 **data/** (6)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -716,7 +716,7 @@
         - `logo_funlink_white_RGB_maru_black.png`
       - `logo_guide_funlink_ol.pdf`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1005)
+  - 📁 **lib/** (1007)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -1060,6 +1060,8 @@
     - `giftHistoryViewModel.test.js`
     - `giftMomentumAnalytics.js` — HTML マーケ分析向けのギフト深掘り集計。
     - `giftMomentumAnalytics.test.js`
+    - `giftQuickStatsHtml.js` — ギフト/広告ユーザーのクイック統計（renderGiftQuickStatsPanel の本体）の HTML を組む純関数。
+    - `giftQuickStatsHtml.test.js`
     - `giftRankStripConfig.js` — ギフト貢献／応援ストリップに並べる行の上限。
     - `giftRankingLaneOptIn.js` — v0.1.228: ギフトランキングレーンの opt-in 判定 純関数群。
     - `giftRankingLaneOptIn.test.js`

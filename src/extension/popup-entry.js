@@ -535,6 +535,7 @@ import { buildDevMonitorVizHtml } from '../lib/devMonitorVizHtml.js';
 import { buildGiftSubAppHistoryBlocksHtml } from '../lib/giftSubAppHistoryBlocksHtml.js';
 import { buildDevMonitorGiftRankingExtrasHtml } from '../lib/devMonitorGiftRankingExtrasHtml.js';
 import { buildGiftQuickStatsHtml } from '../lib/giftQuickStatsHtml.js';
+import { buildStoryUserLaneRenderSignature } from '../lib/storyUserLaneRenderSignature.js';
 import { buildEventSelfStatusHeaderHtml } from '../lib/eventSelfStatusHeaderHtml.js';
 import { topSupportRankLineModels } from '../lib/topSupportRankStripLines.js';
 // v0.1.881: 応援帯/公式値レーンの描画本体を共有 lib に抽出(live-view と完全コピー共有)。popup は
@@ -4966,37 +4967,16 @@ function storyUserLaneRenderSignature(
   giftPicks,
   sourceEntryCount
 ) {
-  const lid = String(liveId || '').trim().toLowerCase();
-  const scheme = String(colorScheme || 'light');
-  const gifts = Array.isArray(giftPicks) ? giftPicks : [];
-  const giftParts = gifts.map((p) => {
-    const row = /** @type {{ displaySrc?: unknown, meta?: { idLine?: unknown, nameLine?: unknown }, entry?: PopupCommentEntry }} */ (
-      p
-    );
-    const sid = commentStableId(row.entry);
-    return [
-      sid,
-      String(row.displaySrc || ''),
-      String(row.meta?.idLine || ''),
-      String(row.meta?.nameLine || '')
-    ].join('\u001f');
+  // C-7 pure refactor: signature 組み立ては storyUserLaneRenderSignature.js に抽出(挙動不変・test 済)。
+  //   entry->stableId 解決は popup ローカルなので commentStableId を注入する。
+  return buildStoryUserLaneRenderSignature({
+    liveId,
+    colorScheme,
+    picked,
+    giftPicks,
+    sourceEntryCount,
+    stableIdOf: commentStableId
   });
-  const giftSeg = giftParts.length ? `\u001eG:${giftParts.join('\u001e')}` : '|G:0';
-  if (!picked.length) {
-    const n = Math.max(0, Math.floor(Number(sourceEntryCount) || 0));
-    return `${lid}|${scheme}|0|src:${n}${giftSeg}`;
-  }
-  const parts = picked.map((p) => {
-    const sid = commentStableId(p.entry);
-    return [
-      sid,
-      p.displaySrc,
-      p.meta.idLine,
-      p.meta.nameLine,
-      String(p.profileTier)
-    ].join('\u001f');
-  });
-  return `${lid}|${scheme}|${picked.length}\u001e${parts.join('\u001e')}${giftSeg}`;
 }
 
 /**

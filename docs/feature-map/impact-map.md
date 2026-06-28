@@ -533,6 +533,7 @@
 | `src/lib/storyUserLaneContaminationGuard.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/storyUserLaneDisplaySrc.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/storyUserLaneGuideHtml.js` | 1 | ポップアップ(応援レーン) |
+| `src/lib/storyUserLaneRenderSignature.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/storyUserLaneRowModel.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/suggestInitialInlinePanelPlacement.js` | 1 | 記録エンジン(watchページ常駐) |
 | `src/lib/summarizeDevMonitorGiftRanking.js` | 1 | ポップアップ(応援レーン) |
