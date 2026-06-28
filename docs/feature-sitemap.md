@@ -154,7 +154,7 @@
 
 - **応援レーン集約(誰が候補か)** — 保存コメント行を userId 単位に畳み込みレーン候補を作る唯一の集約正本(popup/venue 共通)
   - `src/lib/userLaneCandidatesFromStorage.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 83</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 84</summary>
 
 - `src/domain/lane/aggregate.js` — 応援ユーザーレーンの per-row → per-user 集約（純関数）。
 - `src/domain/observations/observationStore.js` — observationStore - StatObservation のメモリ常駐リングバッファ。
@@ -192,6 +192,7 @@
 - `src/lib/concurrentPeakAnalysis.js` — 同接推移カーブから「ピーク到達 / 終了時保持率 / 半減点」を求める純粋関数。
 - `src/lib/concurrentResolvedFromSnapshot.js` — watch スナップショット（content-entry の collectWatchPageSnapshot 戻り、popup へ送るのと
 - `src/lib/concurrentTimelineSeries.js` — 同接推移カーブ（視聴維持率の核）の時系列データを純粋関数で構築する。
+- `src/lib/devMonitorGiftRankingExtrasHtml.js` — dev monitor「取得状況サマリ」(#devMonitorGiftRankingExtras)の HTML を組む純関数。
 - `src/lib/eventRankingReportModel.js` — イベントランキングの「レポート用 正規化モデル」純関数（Phase A・2026-05-26 会議）。
 - `src/lib/eventRankingSectionHtml.js` — v0.1.810(星野ロミ式コンポーネント化・第3弾): popup-entry.js の巨大 HTML ビルダー
 - `src/lib/eventScoreRankingRelay.js` — audition richview 由来のイベント💎順位リストを親へ relay するときの
@@ -737,7 +738,7 @@
 
 ## 🧬 修正系譜マップ(この系統のバグを過去にどう直したか)
 
-> changelog 全 308 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
+> changelog 全 309 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
 
 ### 💾 記録件数 (45版)
 - `v0.1.969` 2026-06-28 — 内部整理: 応援ランク行の生成をlib抽出
@@ -1095,7 +1096,8 @@
 - `v0.1.713` 2026-06-13 — 会場モードを明るくして発言を吹き出し表示
 - `v0.1.711` 2026-06-13 — 会場モードで発言を吹き出し表示
 
-### 🎁 ギフト (53版)
+### 🎁 ギフト (54版)
+- `v0.1.973` 2026-06-28 — 内部整理: ギフトユーザー一覧の生成をlib抽出
 - `v0.1.971` 2026-06-28 — 内部整理: ギフト履歴表示の生成をlib抽出
 - `v0.1.955` 2026-06-26 — 状態速報に「応援レーン描画の自己診断」を追加
 - `v0.1.951` 2026-06-26 — 応援プレビューに応援レーンと貢献度/広告ランキングを表示

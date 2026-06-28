@@ -348,6 +348,7 @@
 | `src/lib/giftHistorySourcePreference.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/giftHistoryViewModel.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/giftMomentumAnalytics.js` | 1 | ポップアップ(応援レーン) |
+| `src/lib/giftQuickStatsHtml.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/giftRankStripConfig.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/giftRecord.js` | 1 | 記録エンジン(watchページ常駐) |
 | `src/lib/giftRelayStorageLiveId.js` | 1 | 記録エンジン(watchページ常駐) |

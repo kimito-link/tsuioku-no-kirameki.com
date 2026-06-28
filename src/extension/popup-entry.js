@@ -534,6 +534,7 @@ import { buildTopSupportRankLinesHtml } from '../lib/topSupportRankLinesHtml.js'
 import { buildDevMonitorVizHtml } from '../lib/devMonitorVizHtml.js';
 import { buildGiftSubAppHistoryBlocksHtml } from '../lib/giftSubAppHistoryBlocksHtml.js';
 import { buildDevMonitorGiftRankingExtrasHtml } from '../lib/devMonitorGiftRankingExtrasHtml.js';
+import { buildGiftQuickStatsHtml } from '../lib/giftQuickStatsHtml.js';
 import { buildEventSelfStatusHeaderHtml } from '../lib/eventSelfStatusHeaderHtml.js';
 import { topSupportRankLineModels } from '../lib/topSupportRankStripLines.js';
 // v0.1.881: 応援帯/公式値レーンの描画本体を共有 lib に抽出(live-view と完全コピー共有)。popup は
@@ -3164,20 +3165,9 @@ async function renderGiftQuickStatsPanel(liveId) {
         '<p class="nl-sub">まだギフト・広告ユーザーが記録されていません。</p>';
       return;
     }
-    const sorted = [...users].sort(
-      (a, b) => (b.capturedAt || 0) - (a.capturedAt || 0)
-    );
-    const top = sorted.slice(0, 15);
-    mount.innerHTML =
-      `<p class="nl-sub">${users.length} 名を記録中（直近順に最大15件）</p><ul class="nl-gift-quick-list">` +
-      top
-        .map((u) => {
-          const nick = escapeHtml(String(u.nickname || '').trim() || '(noname)');
-          const uid = escapeHtml(String(u.userId || '').trim());
-          return `<li><span class="nl-gift-nick">${nick}</span> <code class="nl-gift-uid">${uid}</code></li>`;
-        })
-        .join('') +
-      '</ul>';
+    // C-7 pure refactor: users→見出し+リスト HTML 組み立ては giftQuickStatsHtml.js に抽出
+    //   （挙動不変・test 済）。storage read・空状態文言・innerHTML 代入は popup に残す。
+    mount.innerHTML = buildGiftQuickStatsHtml(users);
   } catch {
     mount.textContent = '読み込みに失敗しました。';
   }

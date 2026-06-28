@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 1 / 571 件
+## ⚠️ 役割コメントが無いソース 1 / 572 件
 - `src/lib/reportPreviewPublish.js`
 
 ## 全ファイルツリー
@@ -457,7 +457,7 @@
   - `vendor-visual-explainer.mjs` — Vendors nicobailon/visual-explainer (MIT) into .cursor/skills/visual-explainer/
   - `verify-bump.mjs` — extension bump 後の整合性チェッカー
   - `write-extension-placeholder-icons.mjs` — リポジトリに 256px アイコンしか無い環境向け: manifest 用の小さめ PNG を生成する。
-- 📁 **src/** (1214)
+- 📁 **src/** (1216)
   - 📁 **data/** (6)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -716,7 +716,7 @@
         - `logo_funlink_white_RGB_maru_black.png`
       - `logo_guide_funlink_ol.pdf`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1003)
+  - 📁 **lib/** (1005)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -973,6 +973,8 @@
     - `devMonitorAvatarStats.test.js`
     - `devMonitorDebugSubset.js` — ポップアップ「開発・テスト用 監視」用: watch スナップショット _debug から
     - `devMonitorDebugSubset.test.js`
+    - `devMonitorGiftRankingExtrasHtml.js` — dev monitor「取得状況サマリ」(#devMonitorGiftRankingExtras)の HTML を組む純関数。
+    - `devMonitorGiftRankingExtrasHtml.test.js`
     - `devMonitorPaintGate.js` — v0.1.637: 開発者診断パネル(dev monitor)の重い集計を「パネルが開いているときだけ」走らせる
     - `devMonitorPaintGate.test.js`
     - `devMonitorTrendSession.js` — 開発監視トレンド: sessionStorage（セッション）+ chrome.storage.local（永続・最大7日）
