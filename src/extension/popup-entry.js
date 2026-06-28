@@ -21184,13 +21184,18 @@ async function initPopup() {
    *   refreshAllNorthStarMirrorLanes は idempotent(各レーン diff-skip・内部 try/catch・並列発火)なので
    *   heavy 経路と二重に走っても同一なら no-op=競合しない。read path にキャッシュは足さない(§6 地雷回避)。
    */
-  setInterval(() => {
+  const tickIndependentNorthStar = () => {
     if (!hasExtensionContext()) return;
     if (typeof document !== 'undefined' && document.hidden) return;
     const lid = String(watchPopupLastPaintedLiveId || '').trim().toLowerCase();
     if (!/^lv\d{1,15}$/.test(lid)) return;
     void refreshAllNorthStarMirrorLanes(lid);
-  }, NORTH_STAR_INDEPENDENT_REFRESH_MS);
+  };
+  setInterval(tickIndependentNorthStar, NORTH_STAR_INDEPENDENT_REFRESH_MS);
+  // v0.1.978: 初回は interval(6s)を待たず素早く起動(lid は refresh 早期に set される)。
+  //   複数回試行で「refresh 早期 paint で lid 確定 → すぐ北極星が出る」を確実にする。
+  setTimeout(tickIndependentNorthStar, 400);
+  setTimeout(tickIndependentNorthStar, 1500);
 
   /** 鮮度注記だけ 30 秒ごとに更新（カード列は触らない） */
   setInterval(() => {
