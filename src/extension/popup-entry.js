@@ -5388,6 +5388,62 @@ async function applyLaneMirrorForPassive() {
 }
 
 /**
+ * v0.1.979(council/render-not-firing-SYNTHESIS.md・記事 role-separation-design §5):
+ *   メインPOP(非passive)が、重い refresh の完走を待たずに応援レーンを【鏡】から描く【フォールバック】。
+ *   heavy refresh が詰まると renderStoryUserLane(heavy 経路)に到達せず応援レーンが空のまま=
+ *   started=0(状態速報の症状)。passive(applyLaneMirrorForPassive)と同じ鏡 read だが、メインPOP は
+ *   鏡の publisher でもあるため【厳格ガード】で安全化:
+ *     (1) 現在 DOM のレーンが空のときだけ描く=heavy の良い描画を上書きしない。
+ *     (2) 鏡の liveId が現配信と一致のときだけ=別配信の古い鏡を貼らない(critic 指摘)。
+ *   storage read のみ・既存 paintStoryUserLaneDomFilled 再利用(似せて自作しない)。read path にキャッシュ無し。
+ */
+async function applyLaneMirrorForMainPopupFallback() {
+  if (INLINE_PASSIVE || !hasExtensionContext()) return; // passive は専用経路がある
+  const lid = String(watchPopupLastPaintedLiveId || '').trim().toLowerCase();
+  if (!/^lv\d{1,15}$/.test(lid)) return;
+  const els = getStoryUserLaneEls();
+  if (!els) return;
+  // (1) heavy が既にレーンを描いていたら何もしない(良い描画を鏡で上書きしない)。
+  if (countStoryUserLaneDomTiles(els) > 0) return;
+  let snap = null;
+  try {
+    const bag = await chrome.storage.local.get(KEY_LANE_MIRROR);
+    snap = bag && bag[KEY_LANE_MIRROR];
+  } catch {
+    return;
+  }
+  if (!snap || typeof snap !== 'object') return;
+  // (2) 別配信の古い鏡は貼らない。
+  if (String(snap.liveId || '').trim().toLowerCase() !== lid) return;
+  const buckets = restoreLaneMirrorBuckets(snap);
+  const totalCells =
+    buckets.link.length + buckets.gift.length + buckets.ad.length + buckets.konta.length + buckets.tanu.length;
+  if (totalCells === 0) return; // 供給0=出すものが無い(空ガイドは heavy 経路に委ねる)
+  // 再チェック: await 中に heavy が描いていたら譲る。
+  if (countStoryUserLaneDomTiles(els) > 0) return;
+  const faces = {
+    faceLink: STORY_GUIDE_FACE_LINK,
+    faceGift: STORY_GUIDE_FACE_GIFT,
+    faceAd: STORY_GUIDE_FACE_GIFT,
+    faceKonta: STORY_GUIDE_FACE_KONTA,
+    faceTanu: STORY_GUIDE_FACE_TANU
+  };
+  const pickedLength = Math.max(0, Math.floor(Number(snap.pickedLength) || 0) || totalCells);
+  const totalCandidates = Math.max(0, Math.floor(Number(snap.totalCandidates) || 0));
+  const laneDomIo = { storyAvatarLoadGuard, isHttpOrHttpsUrl, storyTileUsesYukkuriTvStyle, upgradeAnonymousAvatarImage };
+  recordStoryUserLaneStep(_storyUserLaneRenderProbe, STORY_USER_LANE_STEPS.START, {
+    activePath: 'mirror',
+    mirrorCells: totalCells,
+    nowMs: Date.now()
+  });
+  paintStoryUserLaneDomFilled(els, faces, buckets, pickedLength, laneDomIo, { totalCandidates });
+  recordStoryUserLaneStep(_storyUserLaneRenderProbe, STORY_USER_LANE_STEPS.PAINTED, {
+    domTilesPainted: countStoryUserLaneDomTiles(els)
+  });
+  recordStoryUserLaneStep(_storyUserLaneRenderProbe, STORY_USER_LANE_STEPS.DONE);
+}
+
+/**
  * ★v0.1.962(council/liveview-open-heavy-SYNTHESIS.md 第1段): 受動ビュー(応援プレビュー dock=liveview)で
  *   コメントティッカーを【鏡】(commentTimelineMirror=本物 popup が watch タブで publish した最新N件)から描く。
  *   passive は heavy comments(32,080件・246KB の IDB cursor read)を【走らせない】ようにしたので、
@@ -21190,6 +21246,8 @@ async function initPopup() {
     const lid = String(watchPopupLastPaintedLiveId || '').trim().toLowerCase();
     if (!/^lv\d{1,15}$/.test(lid)) return;
     void refreshAllNorthStarMirrorLanes(lid);
+    // v0.1.979: 応援レーンも heavy が詰まったときだけ鏡から描く(厳格ガード=空のときだけ/現配信のみ)。
+    void applyLaneMirrorForMainPopupFallback();
   };
   setInterval(tickIndependentNorthStar, NORTH_STAR_INDEPENDENT_REFRESH_MS);
   // v0.1.978: 初回は interval(6s)を待たず素早く起動(lid は refresh 早期に set される)。
