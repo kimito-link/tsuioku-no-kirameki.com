@@ -5851,6 +5851,15 @@ async function paintStoryUserLaneCoalesced(liveId, displayEntries, storageRows) 
     );
   }
 
+  // v0.1.976(council/render-not-firing-SYNTHESIS.md・記事 role-separation-design §5): 「見せる人」を
+  //   重い storage read の後ろで餓死させない。コメント由来レーン(りんく/こん太/たぬ姉)は entries+
+  //   laneAggregates(既に手元にある)だけで描けるので、ギフト/広告列の await の【前】に1回描く。
+  //   これで render probe started>0・開いた瞬間に最初の1枚が出る。ギフト/広告列は await 解決後の
+  //   2回目の描画で載る(後段で埋まる=進行的)。read path にキャッシュは足さない(§6 地雷回避)。
+  if (lid && String(STORY_SOURCE_STATE.liveId || '').trim().toLowerCase() === lid) {
+    renderStoryUserLane();
+  }
+
   let giftUsers = [];
   // 広告列(別段)用: 公式ニコニ広告ランキング(この放送・nls_nicoad_api_ranking_<lid>)の行。
   let nicoadApiRows = [];
