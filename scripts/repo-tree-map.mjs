@@ -468,6 +468,9 @@ const NAV_CSS = `
   .map-nav .nav-here{ color:#fff; font-weight:700; border-bottom:2px solid var(--accent,#ec4899);
     border-radius:6px 6px 0 0; }
   .map-nav .nav-ext{ color:#7fa8e0; }
+  .map-nav .nav-back{ cursor:pointer; background:rgba(255,255,255,.04); color:#cfe0ff;
+    border:1px solid var(--line); border-radius:7px; padding:3px 10px; font:inherit; font-size:12.5px; }
+  .map-nav .nav-back:hover{ border-color:var(--accent,#ec4899); color:#fff; }
   .map-nav .nav-note{ font-size:11.5px; color:var(--muted); margin-left:auto; white-space:nowrap; }
   @media (max-width:520px){ .map-nav .nav-note{ margin-left:0; flex-basis:100%; } }`;
 
@@ -485,7 +488,14 @@ function navHeaderHtml(active) {
       ? `<span class="nav-item nav-here" aria-current="page">${escapeHtml(label)}</span>`
       : `<a class="nav-item" href="${href}">${escapeHtml(label)}</a>`
   ).join('');
-  return `<nav class="map-nav" aria-label="地図ナビ">${items}`
+  // v0.1.983: 共通ヘッダーに「← 戻る」を常設(要望: 地図を押すと元の場所に戻れない)。
+  //   地図→地図と辿った後でも history.back() で1つ前へ。履歴が無い(直接/新規タブで開いた)ときは
+  //   何も起きないと迷うので、その場合は MAP 入口へフォールバック移動する。どの地図でも同じ位置に出す。
+  const backBtn =
+    `<button type="button" class="nav-item nav-back" `
+    + `onclick="if(history.length>1){history.back()}else{location.href='MAP.md'}" `
+    + `title="1つ前のページに戻る(無ければ入口へ)">← 戻る</button>`;
+  return `<nav class="map-nav" aria-label="地図ナビ">${backBtn}${items}`
     + `<a class="nav-item nav-ext" href="MAP.md">🗺️ 入口(MAP)</a>`
     + `<a class="nav-item nav-ext" href="https://github.com/kimito-link/tsuioku-no-kirameki.com" target="_blank" rel="noopener">📦 ソース</a>`
     + `<span class="nav-note" title="状態ページは拡張のアイコンから開けます">📊 状態は拡張アイコンから</span></nav>`;
