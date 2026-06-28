@@ -26,6 +26,16 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.975',
+    date: '2026-06-28',
+    summary: 'コピーが効かない問題を根治',
+    items: Object.freeze([
+      '状態速報の「コピー」ボタンを押しても何もコピーされないことがある問題を直しました。ブラウザの新しいコピー方式が使えないときも、確実にコピーする方式に自動で切り替えます。',
+      '従来は失敗すると「文章を選択するだけ」で止まり、自分でCtrl+Cを押さないと入らなかったため「コピーされない」と感じる原因でした。',
+      'まだ読み込み中で本文が空のときは、まとめが出来るのを待ってからコピーします（無反応で終わらせない）。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.974',
     date: '2026-06-28',
     summary: '内部整理: 応援レーン再描画判定をlib抽出',
