@@ -263,7 +263,7 @@
   - `src/lib/giftThrowProjectile.js`
 - **吹き出し寿命管理** — 会場の吹き出しの表示上限・追い出し(eviction)ライフサイクル
   - `src/lib/venueBubbleLifecycle.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 167</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 168</summary>
 
 - `scripts/encode-marketing-html-avatars.mjs` — extension/images/marketing-html-avatars/*.png を data URI にし、
 - `scripts/split-avatar-parts.mjs` — 偽市松背景の除去 + パーツ切り出し(one-off アセットパイプライン)
@@ -316,6 +316,7 @@
 - `src/lib/giftHistoryOfficialReconcile.js` — 北極星ギフト履歴: 公式番組累計 pt と履歴 API 合計の表示整合（v0.1.581）。
 - `src/lib/giftHistorySourcePreference.js` — ギフト履歴レーンの「どのデータ源を表示するか」を決める純関数（v0.1.395）。
 - `src/lib/giftHistoryViewModel.js` — 北極星ギフト履歴レーン用 ViewModel（送り主集計 + 個別投げ一覧）。
+- `src/lib/giftQuickStatsHtml.js` — ギフト/広告ユーザーのクイック統計（renderGiftQuickStatsPanel の本体）の HTML を組む純関数。
 - `src/lib/giftRankStripConfig.js` — ギフト貢献／応援ストリップに並べる行の上限。
 - `src/lib/giftSenderObservation.js` — v0.1.214: anonymous gift（userId 空）も nickname を bucket key にして
 - `src/lib/giftSidebarRankTabPick.js` — ギフトサイドバー内から「貢献度ランキング」タブ相当の要素を選ぶ。
@@ -738,7 +739,7 @@
 
 ## 🧬 修正系譜マップ(この系統のバグを過去にどう直したか)
 
-> changelog 全 309 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
+> changelog 全 310 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
 
 ### 💾 記録件数 (45版)
 - `v0.1.969` 2026-06-28 — 内部整理: 応援ランク行の生成をlib抽出
@@ -1197,7 +1198,8 @@
 - `v0.1.699` 2026-06-12 — 読み上げの名前ON/OFF切替を追加
 - `v0.1.698` 2026-06-12 — コメビュにユーザー別の声で読み上げ機能を追加
 
-### 🪟 応援レーン・タイル (70版)
+### 🪟 応援レーン・タイル (71版)
+- `v0.1.974` 2026-06-28 — 内部整理: 応援レーン再描画判定をlib抽出
 - `v0.1.965` 2026-06-27 — 応援プレビューでも貢献度・広告ランキングを鏡から表示
 - `v0.1.964` 2026-06-27 — 「描画済みなのにローディング継続」の誤検知を解消
 - `v0.1.962` 2026-06-27 — 応援プレビューを開いた瞬間の重さを解消(コメントは鏡から描く)
@@ -1387,7 +1389,8 @@
 - `v0.1.806` 2026-06-17 — HTML保存の失敗を根治+完了音声を追加
 - `v0.1.785` 2026-06-16 — 状態ページのタイムアウト警告を拡張エラー欄に出さない
 
-### ⚡ 描画・性能 (55版)
+### ⚡ 描画・性能 (56版)
+- `v0.1.974` 2026-06-28 — 内部整理: 応援レーン再描画判定をlib抽出
 - `v0.1.967` 2026-06-28 — 内部整理: 応援カード描画をlib抽出
 - `v0.1.966` 2026-06-27 — ランキング件数の「拡張≠鏡」1件差の誤警告を解消
 - `v0.1.965` 2026-06-27 — 応援プレビューでも貢献度・広告ランキングを鏡から表示

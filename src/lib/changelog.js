@@ -26,6 +26,16 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.974',
+    date: '2026-06-28',
+    summary: '内部整理: 応援レーン再描画判定をlib抽出',
+    items: Object.freeze([
+      '応援レーンの「見た目が同じなら描き直さない」判定キーを作る処理を、テストしやすい小さな部品に切り出しました(内部整理のみ)。',
+      '画面の表示・動作は一切変わりません。抽出前と1文字も違わない出力であることを自動テストで確認済みです。',
+      'popup の巨大ファイルを少しずつ部品化して、退化しにくく・直しやすくする取り組みの続きです。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.973',
     date: '2026-06-28',
     summary: '内部整理: ギフトユーザー一覧の生成をlib抽出',
