@@ -27,6 +27,7 @@ import { KEY_AI_SHARE_POPUP_DIAG } from '../lib/aiSharePopupDiagKey.js';
 //   (content が同時に書く)を read する=read 回数同じ・サイズ ~40分の1。読み取りパスは full と同形。
 import { KEY_STATUS_FAST_DIAG_LITE } from '../lib/statusFastDiagLite.js';
 import { buildStatusMindmapModel } from '../lib/statusMindmapModel.js';
+import { copyTextWithFallback } from '../lib/copyTextWithFallback.js';
 import { buildStatusActions } from '../lib/statusActionAdvisor.js';
 // 純Web公開コピーの自己診断(council/status-self-diagnoses-SYNTHESIS.md): 状態速報1枚で「純Webに何が
 //   送られ・何件で・古くないか・拡張と一致するか」が分かるようにする。jsonBlob と引数だけから組む純関数
@@ -2114,12 +2115,12 @@ function renderUploadResultLinks(resultEl, r) {
     const copyBtn = mkBtn('📋 URLをコピー');
     copyBtn.addEventListener('click', async () => {
       const prev = copyBtn.textContent;
-      try {
-        await navigator.clipboard.writeText(shareUrl);
-        copyBtn.textContent = '✓ コピーしました';
-      } catch {
-        copyBtn.textContent = '× コピー不可(手動で選択)';
-      }
+      // v0.1.975: navigator.clipboard 失敗時も execCommand('copy') で実際にコピーする。
+      const outcome = await copyTextWithFallback(shareUrl);
+      copyBtn.textContent =
+        outcome === 'clipboard' || outcome === 'execCommand'
+          ? '✓ コピーしました'
+          : '× コピー不可(手動で選択)';
       setTimeout(() => { copyBtn.textContent = prev; }, 1800);
     });
     btnRow.appendChild(copyBtn);
@@ -2385,21 +2386,30 @@ function setupButtons() {
     const btn = document.getElementById(id);
     if (!btn) return;
     btn.addEventListener('click', async () => {
-      const text = _lastRenderedBundle?.textBlob || '';
-      if (!text) return;
       const flash = (msg, ms) => {
         btn.textContent = msg;
         setTimeout(() => { btn.textContent = label; }, ms);
       };
-      try {
-        await navigator.clipboard.writeText(text);
+      const text = _lastRenderedBundle?.textBlob || '';
+      if (!text) {
+        // v0.1.975: 従来は無反応(if(!text) return)で「押しても何も起きない」と感じさせた。
+        //   初回 refresh 前でも詰ませないよう、待ってから再取得する。
+        flash('まとめ中…', 1200);
+        try { await refresh({ timeoutMs: 12000 }); } catch { /* best-effort */ }
+        const retry = _lastRenderedBundle?.textBlob || '';
+        if (!retry) { flash('まだ読み込み中…もう一度押してください', 2500); return; }
+      }
+      const body = _lastRenderedBundle?.textBlob || '';
+      // v0.1.975: navigator.clipboard 失敗時に「選択するだけ」で終わらず execCommand('copy') で
+      //   実際にコピーする(council なし=実コードで原因特定: フォールバックが select 止まりだった)。
+      const ta = /** @type {HTMLTextAreaElement|null} */ (document.getElementById('aiShareText'));
+      const outcome = await copyTextWithFallback(body, { selectEl: ta });
+      if (outcome === 'clipboard' || outcome === 'execCommand') {
         flash('コピーしました ✓', 1500);
-      } catch (err) {
-        console.warn('[status] clipboard failed:', err);
-        // フォールバック: テキストを選択状態にして「あとは Ctrl+C」まで持っていく。
-        const ta = /** @type {HTMLTextAreaElement|null} */ (document.getElementById('aiShareText'));
-        if (ta) { ta.focus(); ta.select(); }
+      } else if (outcome === 'selected') {
         flash('選択しました→Ctrl+C', 2000);
+      } else {
+        flash('コピーできませんでした', 2000);
       }
     });
   };
@@ -2429,13 +2439,15 @@ function setupButtons() {
           heroFlash('まだ読み込み中…もう一度押してください', 2500);
           return;
         }
-        try {
-          await navigator.clipboard.writeText(text);
+        // v0.1.975: navigator.clipboard 失敗時も execCommand('copy') で実際にコピーする。
+        const ta = /** @type {HTMLTextAreaElement|null} */ (document.getElementById('aiShareText'));
+        const outcome = await copyTextWithFallback(text, { selectEl: ta });
+        if (outcome === 'clipboard' || outcome === 'execCommand') {
           heroFlash('コピーしました ✓ そのまま貼ってください', 2500);
-        } catch {
-          const ta = /** @type {HTMLTextAreaElement|null} */ (document.getElementById('aiShareText'));
-          if (ta) { ta.focus(); ta.select(); }
+        } else if (outcome === 'selected') {
           heroFlash('選択しました→Ctrl+C', 2500);
+        } else {
+          heroFlash('コピーできませんでした', 2500);
         }
       });
     }
