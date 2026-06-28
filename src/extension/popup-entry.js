@@ -552,6 +552,7 @@ import { buildStoryUserLaneCandidateRow } from '../lib/storyUserLaneRowModel.js'
 import { KEY_LANE_DIAG } from '../lib/laneDiagKey.js';
 import { buildLaneDiagSnapshot } from '../lib/laneDiag.js';
 import { KEY_LANE_MIRROR } from '../lib/laneMirrorKey.js';
+import { KEY_PREVIEW_RENDER_ACK, buildPreviewRenderAck } from '../lib/previewRenderAckKey.js';
 import { buildLaneMirrorSnapshot, restoreLaneMirrorBuckets } from '../lib/laneMirror.js';
 import { KEY_STAT_CARDS_MIRROR } from '../lib/statCardsMirrorKey.js';
 import { buildStatCardsMirrorSnapshot } from '../lib/statCardsMirror.js';
@@ -5394,6 +5395,17 @@ async function applyLaneMirrorForPassive() {
     domTilesPainted: countStoryUserLaneDomTiles(els)
   });
   recordStoryUserLaneStep(_storyUserLaneRenderProbe, STORY_USER_LANE_STEPS.DONE);
+  // v0.1.985(council/parity-diagnose): ②応援プレビューが「描画できた」を status へ伝える ack を
+  //   【専用キー】(本物の鏡とは別・passive だけが書く片方向)に best-effort で書く。3画面パリティ判定の
+  //   ②描画OK 観測に使う。本物の鏡(KEY_LANE_MIRROR)は上書きしない=passive の不可侵原則を守る。
+  if (countStoryUserLaneDomTiles(els) > 0) {
+    try {
+      const ackLid = String(snap.liveId || '').trim().toLowerCase();
+      void chrome.storage.local.set({
+        [KEY_PREVIEW_RENDER_ACK]: buildPreviewRenderAck({ ready: true, liveId: ackLid, nowMs: Date.now() })
+      }).catch(() => { /* best-effort: ack 失敗は描画を妨げない */ });
+    } catch { /* no-op */ }
+  }
 }
 
 /**

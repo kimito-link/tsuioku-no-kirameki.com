@@ -6,7 +6,7 @@
 ## storage の出入り
 
 - 書くキー: `KEY_STATUS_TREND`
-- 読むキー: `KEY_AI_SHARE_POPUP_DIAG`, `KEY_COMMENT_TIMELINE_MIRROR`, `KEY_LANE_DIAG`, `KEY_LANE_MIRROR`, `KEY_LAST_WATCH_URL`, `KEY_LIVEVIEW_PUBLISH_OUTCOME`, `KEY_NORTH_STAR_MIRROR`, `KEY_REPORT_PREVIEW`, `KEY_STATUS_FAST_DIAG_LITE`, `KEY_STATUS_TREND`, `KEY_STAT_CARDS_MIRROR`, `KEY_VENUE_SEATS_DIAG`, `KEY_VOICE_DIAG`, `nls_backfill_progress_v1`
+- 読むキー: `KEY_AI_SHARE_POPUP_DIAG`, `KEY_COMMENT_TIMELINE_MIRROR`, `KEY_LANE_DIAG`, `KEY_LANE_MIRROR`, `KEY_LAST_WATCH_URL`, `KEY_LIVEVIEW_PUBLISH_OUTCOME`, `KEY_NORTH_STAR_MIRROR`, `KEY_PREVIEW_RENDER_ACK`, `KEY_REPORT_PREVIEW`, `KEY_STATUS_FAST_DIAG_LITE`, `KEY_STATUS_TREND`, `KEY_STAT_CARDS_MIRROR`, `KEY_VENUE_SEATS_DIAG`, `KEY_VOICE_DIAG`, `nls_backfill_progress_v1`
 
 ## 構成ファイル（import 到達・最大40件表示）
 
@@ -46,14 +46,14 @@ graph LR
   n_status --> n_src_lib_northStarMirrorKey_js["lib/northStarMirrorKey.js"]:::shared
   n_status --> n_src_lib_numberConsistency_js["lib/numberConsistency.js"]
   n_status --> n_src_lib_panelLiveSummary_js["lib/panelLiveSummary.js"]:::shared
+  n_status --> n_src_lib_parityVerdict_js["lib/parityVerdict.js"]
   n_status --> n_src_lib_perfDiag_js["lib/perfDiag.js"]:::shared
   n_status --> n_src_lib_personTileDom_js["lib/personTileDom.js"]:::shared
   n_status --> n_src_lib_pickBroadcasterNameForReputation_js["lib/pickBroadcasterNameForReputation.js"]
+  n_status --> n_src_lib_previewRenderAckKey_js["lib/previewRenderAckKey.js"]:::shared
   n_status --> n_src_lib_rankingPatrolMessages_js["lib/rankingPatrolMessages.js"]
   n_status --> n_src_lib_reportPreview_js["lib/reportPreview.js"]:::shared
-  n_status --> n_src_lib_reportPreviewCtx_js["lib/reportPreviewCtx.js"]
-  n_status --> n_src_lib_reportPreviewKey_js["lib/reportPreviewKey.js"]:::shared
   classDef shared fill:#eee,stroke:#999,color:#666;
 ```
 
-> ほか 28 ファイル省略（全件は storage-bus.md / metafile 参照）。
+> ほか 30 ファイル省略（全件は storage-bus.md / metafile 参照）。

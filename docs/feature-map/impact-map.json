@@ -1436,6 +1436,18 @@
       ]
     },
     {
+      "file": "src/lib/previewRenderAckKey.js",
+      "featureCount": 2,
+      "features": [
+        "popup",
+        "status"
+      ],
+      "labels": [
+        "ポップアップ(応援レーン)",
+        "状態速報ページ"
+      ]
+    },
+    {
       "file": "src/lib/reportPreview.js",
       "featureCount": 2,
       "features": [
@@ -4375,6 +4387,16 @@
       ],
       "labels": [
         "ポップアップ(応援レーン)"
+      ]
+    },
+    {
+      "file": "src/lib/parityVerdict.js",
+      "featureCount": 1,
+      "features": [
+        "status"
+      ],
+      "labels": [
+        "状態速報ページ"
       ]
     },
     {

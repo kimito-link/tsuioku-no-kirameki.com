@@ -52,6 +52,8 @@ import {
 } from '../lib/liveviewPublishOutcomeKey.js';
 // 「この診断の信頼性」メタ診断(第1段): 状態速報の冒頭に「どこが信頼でき・どこが空/古いか」を出す。
 import { buildDiagnosticsTrust, formatDiagnosticsTrustLines } from '../lib/diagnosticsTrust.js';
+import { buildParityVerdict, formatParityVerdictLine } from '../lib/parityVerdict.js';
+import { KEY_PREVIEW_RENDER_ACK } from '../lib/previewRenderAckKey.js';
 // 応援レーン描画の自己診断(council/lane-render-self-diag-SYNTHESIS.md): 「鏡にはあるのに画面に出ない/
 //   ローディングが終わらない」を状態速報で切り分ける。popup の storyUserLaneRenderProbe を読むだけ。
 import {
@@ -395,13 +397,19 @@ async function refresh(opts = {}) {
       // 第2段: コメントタイムライン鏡も extras に同梱(12秒間引き)。
       step = 'loadCommentTimelineMirror';
       const commentTimelineMirror = await runStorageOpWithTimeout(() => loadCommentTimelineMirrorSafe(), tmo).catch(() => null);
-      _extrasCache = { reportPreview, watchTabMap, trendFindings, laneDiag, laneMirror, statCardsMirror, northStarMirror, voiceDiag, venueSeatsDiag, publishOutcomeRec, commentTimelineMirror };
+      // v0.1.985: ②応援プレビューの描画 ack(専用キー)も extras に同梱(12秒間引き)=3画面パリティ判定の②描画OKに使う。
+      step = 'loadPreviewRenderAck';
+      const previewRenderAck = await runStorageOpWithTimeout(
+        () => chrome.storage.local.get(KEY_PREVIEW_RENDER_ACK).then((b) => b?.[KEY_PREVIEW_RENDER_ACK] || null),
+        tmo
+      ).catch(() => null);
+      _extrasCache = { reportPreview, watchTabMap, trendFindings, laneDiag, laneMirror, statCardsMirror, northStarMirror, voiceDiag, venueSeatsDiag, publishOutcomeRec, commentTimelineMirror, previewRenderAck };
       _extrasCacheAt = Date.now();
       _mark('extras');
     }
-    const { reportPreview, watchTabMap, trendFindings, laneDiag, laneMirror, statCardsMirror, northStarMirror, voiceDiag, venueSeatsDiag, publishOutcomeRec, commentTimelineMirror } = _extrasCache;
+    const { reportPreview, watchTabMap, trendFindings, laneDiag, laneMirror, statCardsMirror, northStarMirror, voiceDiag, venueSeatsDiag, publishOutcomeRec, commentTimelineMirror, previewRenderAck } = _extrasCache;
     step = 'renderAll';
-    renderAll({ lvList, summaries, fastDiag, popupDiag, backfillProgress, voiceDiag, venueSeatsDiag, laneDiag, laneMirror, statCardsMirror, northStarMirror, reportPreview, trendFindings, watchTabMap, publishOutcomeRec, commentTimelineMirror });
+    renderAll({ lvList, summaries, fastDiag, popupDiag, backfillProgress, voiceDiag, venueSeatsDiag, laneDiag, laneMirror, statCardsMirror, northStarMirror, reportPreview, trendFindings, watchTabMap, publishOutcomeRec, commentTimelineMirror, previewRenderAck });
     _mark('render');
     const _totalMs = Math.round((typeof performance !== 'undefined' ? performance.now() : Date.now()) - _t0);
     updateLastUpdateMeta({ totalMs: _totalMs, stepMs: _stepMs });
@@ -827,7 +835,7 @@ async function loadBackfillProgressSafe() {
 // v0.1.861: レポートプレビューの信頼度注釈の文脈は純関数 reportPreviewCtxFromFastDiag(src/lib)に抽出済み
 //   (NDGR 接続/userId 付き率/backfill 進行 → 注釈ctx・挙動同値・テストで固定)。import は冒頭。
 
-function renderAll({ lvList, summaries, fastDiag, popupDiag, backfillProgress, voiceDiag, venueSeatsDiag, laneDiag, laneMirror, statCardsMirror, northStarMirror, reportPreview, trendFindings, watchTabMap, publishOutcomeRec, commentTimelineMirror }) {
+function renderAll({ lvList, summaries, fastDiag, popupDiag, backfillProgress, voiceDiag, venueSeatsDiag, laneDiag, laneMirror, statCardsMirror, northStarMirror, reportPreview, trendFindings, watchTabMap, publishOutcomeRec, commentTimelineMirror, previewRenderAck }) {
   // v0.1.847: 各描画セクションを独立 try/catch で隔離するヘルパ。1つが throw しても他のセクションと
   //   最終更新メタを巻き込まない=「セルが全部消える/最終更新—のまま固まる」を根治。落ちた場所は
   //   console と AI 共有欄に出して真因を追えるようにする(star-romi 失敗体験の除去)。
@@ -1102,7 +1110,7 @@ function renderAll({ lvList, summaries, fastDiag, popupDiag, backfillProgress, v
   // AI 共有用テキスト
   let fullText = '';
   safeSection('AI共有テキスト', () => {
-    fullText = buildAiShareFullText({ overviewText, livesData, fastDiag, popupDiag, voiceDiag, venueSeatsDiag, laneDiag, reportPreview, trendFindings, jsonBlob, currentLiveId, publishKeys, publishOutcomeRec });
+    fullText = buildAiShareFullText({ overviewText, livesData, fastDiag, popupDiag, voiceDiag, venueSeatsDiag, laneDiag, reportPreview, trendFindings, jsonBlob, currentLiveId, publishKeys, publishOutcomeRec, previewRenderAck });
     const ta = /** @type {HTMLTextAreaElement|null} */ (
       document.getElementById('aiShareText')
     );
@@ -1764,7 +1772,7 @@ function summarizeOneLive(lv, summary, snapshot, perfDiag, endedFlag) {
   };
 }
 
-function buildAiShareFullText({ overviewText, livesData, fastDiag, popupDiag, voiceDiag, venueSeatsDiag, laneDiag, reportPreview, trendFindings, jsonBlob, currentLiveId, publishKeys, publishOutcomeRec }) {
+function buildAiShareFullText({ overviewText, livesData, fastDiag, popupDiag, voiceDiag, venueSeatsDiag, laneDiag, reportPreview, trendFindings, jsonBlob, currentLiveId, publishKeys, publishOutcomeRec, previewRenderAck }) {
   const lines = [];
   lines.push('## 君斗りんくの追憶のきらめき 状態速報');
   lines.push(`生成: ${new Date().toISOString()}`);
@@ -1820,6 +1828,26 @@ function buildAiShareFullText({ overviewText, livesData, fastDiag, popupDiag, vo
       publishOutcome,
       nowMs: Date.now()
     });
+    // v0.1.985(council/parity-diagnose-SYNTHESIS.md): 状態速報の最先頭に「3画面パリティ」総合判定1行。
+    //   ①POP=②応援プレビュー=③WEB が同一で完全か(✅/🟡保留/🔴不一致)+次の一手。既存指標の roll-up=観測のみ。
+    //   誤検知根絶: 取得不能(watch無/未ロード/未publish 等)は必ず保留(×にしない)。
+    try {
+      const nsProbe = (popupDiag?.popup ?? popupDiag)?.northStarRenderProbe || null;
+      const previewAck = previewRenderAck || null;
+      const parity = buildParityVerdict({
+        trust,
+        publishSelfDiag,
+        laneRenderDiag,
+        northStarProbe: nsProbe,
+        previewAck,
+        currentLiveId: String(currentLiveId || ''),
+        nowMs: Date.now()
+      });
+      lines.push(formatParityVerdictLine(parity));
+      lines.push('');
+    } catch {
+      /* no-op: パリティ判定の失敗は状態速報を壊さない */
+    }
     const trustLines = formatDiagnosticsTrustLines(trust);
     if (trustLines.length) { for (const l of trustLines) lines.push(l); lines.push(''); }
   } catch {
