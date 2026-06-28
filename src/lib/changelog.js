@@ -26,6 +26,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.980',
+    date: '2026-06-28',
+    summary: '状態速報に「描画が出ない時の対処」を明記',
+    items: Object.freeze([
+      '状態速報で「応援レーンの描画関数が一度も呼ばれていません」と出たときに、対処（拡張をリロード→watch を F5→ポップアップを数秒開いたまま再取得）を文章で添えるようにしました。',
+      '状態速報1枚で原因と次の一手が分かるようにする改善です（数字や描画の挙動は変えていません）。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.979',
     date: '2026-06-28',
     summary: '応援レーンも重い処理待ちせず鏡から表示',
