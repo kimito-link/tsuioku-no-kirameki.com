@@ -26,6 +26,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.983',
+    date: '2026-06-28',
+    summary: '地図ページに「← 戻る」を共通設置',
+    items: Object.freeze([
+      '機能マップ・コードの地図・逆引き索引の各ページの上部に、共通の「← 戻る」ボタンを付けました。地図を開いたあと元の場所に戻れない問題の対処です。',
+      '1つ前のページに戻ります（地図から地図へ辿った後も戻れます）。履歴がないときは入口（MAP）へ移動します。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.982',
     date: '2026-06-28',
     summary: '白くなる状態を状態速報で一発表示',
