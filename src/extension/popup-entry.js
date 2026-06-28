@@ -21118,6 +21118,8 @@ async function initPopup() {
   //   見送る（遅い回線で fetch が重なってメッセージが積み上がるのを防ぐ）。
   const POLL_INTERVAL_MS = INLINE_MODE || INLINE_SIDE_PANEL ? 3_000 : 30_000;
   const GIFT_HISTORY_AUTO_SYNC_MS = 10_000;
+  // v0.1.977: 北極星レーンを heavy refresh に依存せず独立して描く cadence(埋め込み3s/通常6s)。
+  const NORTH_STAR_INDEPENDENT_REFRESH_MS = INLINE_MODE || INLINE_SIDE_PANEL ? 3_000 : 6_000;
   // setInterval の id を保持し、拡張 context invalidated（chrome://extensions の
   // 再読み込みなど）後はループから抜けて clearInterval する。これがないと、popup
   // を閉じない限り「early return するだけの空 tick」が永続的に走り続けて、
@@ -21171,6 +21173,24 @@ async function initPopup() {
     if (!/^lv\d{1,15}$/.test(lid)) return;
     void syncKokenGiftHistoryForPopup(lid);
   }, GIFT_HISTORY_AUTO_SYNC_MS);
+
+  /**
+   * v0.1.977(council/render-not-firing-SYNTHESIS.md・記事 role-separation-design):
+   *   北極星レーン(貢献度/広告/番組pt/イベント)を【重い refresh() の完走に依存せず】content が
+   *   storage に置いた集計済み(nls_koken_api_contrib_/nls_nicoad_api_ranking_ 等)から独立して描く。
+   *   従来は refreshAllNorthStarMirrorLanes が renderUserRooms(heavy refresh の末尾)内でしか呼ばれず、
+   *   重いコメント全件読みが詰まると北極星まで到達せず refreshAllStarted=0=「データはあるのに出ない」。
+   *   → 「見せる側は集計済みの置き場から貼るだけ」に従い、軽い専用 cadence で起動する。
+   *   refreshAllNorthStarMirrorLanes は idempotent(各レーン diff-skip・内部 try/catch・並列発火)なので
+   *   heavy 経路と二重に走っても同一なら no-op=競合しない。read path にキャッシュは足さない(§6 地雷回避)。
+   */
+  setInterval(() => {
+    if (!hasExtensionContext()) return;
+    if (typeof document !== 'undefined' && document.hidden) return;
+    const lid = String(watchPopupLastPaintedLiveId || '').trim().toLowerCase();
+    if (!/^lv\d{1,15}$/.test(lid)) return;
+    void refreshAllNorthStarMirrorLanes(lid);
+  }, NORTH_STAR_INDEPENDENT_REFRESH_MS);
 
   /** 鮮度注記だけ 30 秒ごとに更新（カード列は触らない） */
   setInterval(() => {
