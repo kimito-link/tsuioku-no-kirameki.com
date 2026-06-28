@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 1 / 574 件
+## ⚠️ 役割コメントが無いソース 1 / 575 件
 - `src/lib/reportPreviewPublish.js`
 
 ## 全ファイルツリー
@@ -457,7 +457,7 @@
   - `vendor-visual-explainer.mjs` — Vendors nicobailon/visual-explainer (MIT) into .cursor/skills/visual-explainer/
   - `verify-bump.mjs` — extension bump 後の整合性チェッカー
   - `write-extension-placeholder-icons.mjs` — リポジトリに 256px アイコンしか無い環境向け: manifest 用の小さめ PNG を生成する。
-- 📁 **src/** (1220)
+- 📁 **src/** (1222)
   - 📁 **data/** (6)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -716,7 +716,7 @@
         - `logo_funlink_white_RGB_maru_black.png`
       - `logo_guide_funlink_ol.pdf`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1009)
+  - 📁 **lib/** (1011)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -961,6 +961,8 @@
     - `consoleErrorBuffer.js` — v0.1.201: window.error / unhandledrejection を捕捉する ring buffer。
     - `consoleErrorBuffer.test.js`
     - `contentViewerNicoadCelebration.js` — watch ページ（content）上で、自分のニコニ広告を DOM から即検知して演出する。
+    - `copyTextWithFallback.js` — テキストを「確実に」クリップボードへ入れるためのフォールバック付きコピー。
+    - `copyTextWithFallback.test.js`
     - `crowdRasterizer.js` — 人数ラスタライザ Canvas (Antigravity Enhanced Version)
     - `crowdRasterizer.test.js`
     - `deepExportPolicy.js` — popup からの deep export 要求時に、仮想リスト走査を行うかを判定する。
