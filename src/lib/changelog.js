@@ -26,6 +26,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.984',
+    date: '2026-06-29',
+    summary: '状態速報に拡張バージョンを表示',
+    items: Object.freeze([
+      '状態速報の「popup 固有診断」の行に、ポップアップが動かしていた拡張のバージョンを〔v0.1.xxx〕と表示するようにしました。',
+      'これで「描画が起動しない」と出たとき、それが古い拡張（リロード前）で取った診断なのか、最新版でも起きているのかを一目で区別できます。原因の切り分けを速くするための表示です。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.983',
     date: '2026-06-28',
     summary: '地図ページに「← 戻る」を共通設置',

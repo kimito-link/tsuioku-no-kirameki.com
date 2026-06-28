@@ -18219,6 +18219,15 @@ async function collectAiShareDevMonitorPayloadBundle(watchUrl) {
       embedded: (() => {
         try { return window.self !== window.top; } catch { return true; }
       })(),
+      // v0.1.984: popup が実際に動かしている拡張バージョン/ビルドを診断に含める。
+      //   「probe=0 は新コード未ロードか、ロード済みでも 0 か」を状態速報1枚で確定できるようにする
+      //   (リロード前の古い拡張で取った診断を新版と取り違えない)。
+      extensionVersion: (() => {
+        try { return String(chrome.runtime.getManifest()?.version || '?'); } catch { return '?'; }
+      })(),
+      buildId: (() => {
+        try { return typeof NL_BUILD_ID !== 'undefined' && NL_BUILD_ID ? String(NL_BUILD_ID) : 'dev'; } catch { return 'dev'; }
+      })(),
       watchSnapshotMeta: (() => {
         const snap = watchMetaCache?.snapshot;
         if (!snap || typeof snap !== 'object') return null;
