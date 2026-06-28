@@ -21243,6 +21243,12 @@ async function initPopup() {
   const tickIndependentNorthStar = () => {
     if (!hasExtensionContext()) return;
     if (typeof document !== 'undefined' && document.hidden) return;
+    // v0.1.981(回帰修正): スクロール中は重い再描画を見送る。独立 tick(v0.1.977/979)が
+    //   shouldDeferHeavyPopupPaintNow を無視して北極星/応援レーンを 3〜6s ごとに作り直していたため、
+    //   メインをスクロールすると描画が割り込んで白化し操作不能(コピーボタンも押せない)になっていた。
+    //   既存の paint defer 原則(スクロール後 400ms は heavy paint しない)に揃える=スクロールが
+    //   止まれば次の tick で出る(機能後退ゼロ)。
+    if (shouldDeferHeavyPopupPaintNow()) return;
     const lid = String(watchPopupLastPaintedLiveId || '').trim().toLowerCase();
     if (!/^lv\d{1,15}$/.test(lid)) return;
     void refreshAllNorthStarMirrorLanes(lid);
