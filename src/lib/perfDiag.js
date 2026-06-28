@@ -116,7 +116,8 @@ export function buildPerfDiagLine(diag, nowMs = Date.now()) {
   //   panelPainted===false かつ コメントがある=パネルが白(未描画)。shadeActive===true=幕が残っている。
   //   どちらも『本当におかしい時だけ』出す(描画済/幕無しなら出さない=ノイズにしない)。
   if (diag.panelPainted === false && (diag.commentCount == null || diag.commentCount > 0)) {
-    parts.push('⚠パネル未描画(白)');
+    // v0.1.982: スクロール見送り中の白化は別メッセージにして「スクロールで白くなる」と一発で分かるように。
+    parts.push(diag.deferActive ? '⚠スクロール中に白くなっています(描画見送り)' : '⚠パネル未描画(白)');
   }
   if (diag.shadeActive === true) parts.push('⚠ローディング継続');
   if (diag.lastPaintAt != null && Number.isFinite(nowMs)) {

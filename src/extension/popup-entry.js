@@ -1061,7 +1061,16 @@ function recordPerfDiagThrottled(liveId, paintMs, commentCount, deferActive) {
   let panelPainted = null, shadeActive = null;
   try {
     const ul = /** @type {HTMLElement|null} */ ($('userRoomList'));
-    panelPainted = !!ul && ul.childElementCount > 0;
+    // v0.1.982: 「白くなる」は userRoomList だけでなく、コメント送信の下の大きな領域=応援レーン4段
+    //   (sceneStoryUserLane*)の空も含む。userRoomList に子があっても応援レーンが空だと下半分が白く
+    //   見えるのに panelPainted=true で「未描画(白)」警告が出ず、状態速報で白化が分からなかった。
+    //   → どちらかが描けていれば painted、両方とも空なら未描画(白)とみなす(スクロールで踏みやすい)。
+    const laneStack = document.getElementById('sceneStoryUserLaneStack');
+    const laneHasTiles =
+      laneStack instanceof HTMLElement &&
+      laneStack.querySelectorAll('img, .nl-ticker-latest__avatar, [class*="rank"]').length > 0;
+    const userRoomsHasChildren = !!ul && ul.childElementCount > 0;
+    panelPainted = userRoomsHasChildren || laneHasTiles;
     const sh = document.getElementById('nlInitialLoadShade');
     shadeActive = sh instanceof HTMLElement && !sh.classList.contains('nl-init-shade--done');
   } catch { /* null */ }

@@ -98,4 +98,20 @@ describe('buildPerfDiagLine', () => {
     const diag = buildPerfDiag({ liveId: 'lv1', lastPaintMs: 5, commentCount: 0, panelPainted: false });
     expect(buildPerfDiagLine(diag, 0)).not.toContain('パネル未描画');
   });
+
+  it('v0.1.982 スクロール見送り中の白化は「スクロール中に白くなっています」と出す', () => {
+    const diag = buildPerfDiag({
+      liveId: 'lv1', lastPaintMs: 5, commentCount: 8000, panelPainted: false, deferActive: true
+    });
+    const line = buildPerfDiagLine(diag, 0);
+    expect(line).toContain('⚠スクロール中に白くなっています(描画見送り)');
+    expect(line).not.toContain('⚠パネル未描画(白)'); // 通常版とは出し分ける
+  });
+
+  it('v0.1.982 スクロールでなく(deferActive:false)白化なら従来の パネル未描画(白)', () => {
+    const diag = buildPerfDiag({
+      liveId: 'lv1', lastPaintMs: 5, commentCount: 8000, panelPainted: false, deferActive: false
+    });
+    expect(buildPerfDiagLine(diag, 0)).toContain('⚠パネル未描画(白)');
+  });
 });
