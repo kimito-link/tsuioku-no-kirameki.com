@@ -2840,6 +2840,16 @@
       ]
     },
     {
+      "file": "src/lib/commentTimelineReport.js",
+      "featureCount": 1,
+      "features": [
+        "status"
+      ],
+      "labels": [
+        "状態速報ページ"
+      ]
+    },
+    {
       "file": "src/lib/commentVelocityTimeline.js",
       "featureCount": 1,
       "features": [
