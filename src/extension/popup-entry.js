@@ -5480,6 +5480,49 @@ async function applyLaneMirrorForMainPopupFallback(resolvedLid = '') {
 }
 
 /**
+ * v0.1.991(council/render-not-firing 続き・最後の根): 応援レーン(アイコン列グリッド)を、重い全件
+ *   コメント読み(heavy refresh の syncStorySourceEntries)を待たずに【現配信の軽いコメント源】から起動する。
+ *   真因(実機 v0.1.990): 北極星は独立 tick で揃うのに、応援レーン renderStoryUserLane は
+ *   STORY_SOURCE_STATE.entries(heavy 経路でしか populate されない)依存=heavy が詰まると started=0 のまま。
+ *   KEY_LANE_MIRROR は単一グローバルキー=別配信が最後に書くと「🔴別配信」で fallback が正しく拒否→現配信が出ない。
+ *   → applyLightweightPanelSummaryCards と同型: nls_csummary_<lv>(content 維持・per-live・直近N件)を読み、
+ *     buildDisplayCommentEntries で表示行を組み、syncStorySourceEntries に渡す=現配信のレーンを描き、
+ *     その末尾で現配信の lane mirror も publish される(chicken-and-egg を断つ)。storage read のみ・現配信限定。
+ *   ⚠renderStoryUserLane/STORY_SOURCE_STATE は触らない(既存関数に軽い entries を渡すだけ=#1 地雷回避)。
+ * @param {string} lid 現配信(独立 tick が解決済み)
+ */
+async function renderStoryUserLaneFromLightCommentsForCurrentLive(lid) {
+  if (INLINE_PASSIVE || !hasExtensionContext()) return; // passive は専用経路
+  const live = String(lid || '').trim().toLowerCase();
+  if (!/^lv\d{1,15}$/.test(live)) return;
+  const els = getStoryUserLaneEls();
+  if (!els) return;
+  // 既に現配信のレーンが描けているなら何もしない(heavy の良い描画を上書きしない・冪等)。
+  if (countStoryUserLaneDomTiles(els) > 0 &&
+      String(STORY_SOURCE_STATE.liveId || '').trim().toLowerCase() === live) return;
+  let summaryRaw = null;
+  let tailRaw = null;
+  try {
+    const bag = await chrome.storage.local.get([summaryStorageKey(live), tailStorageKey(live)]);
+    summaryRaw = bag[summaryStorageKey(live)];
+    tailRaw = bag[tailStorageKey(live)];
+  } catch {
+    return;
+  }
+  // 現配信の直近コメント(summary.recent + tail)を表示行へ。heavy の light path と同じ整形を流用。
+  const recent = isCommentSummary(summaryRaw, live) && Array.isArray(summaryRaw.recent)
+    ? normalizeTailRowsForDisplay(summaryRaw.recent, live)
+    : [];
+  const tail = normalizeTailRowsForDisplay(tailRaw, live);
+  const merged = recent.concat(tail);
+  if (!merged.length) return; // 現配信の軽い源がまだ無い=出すものが無い(heavy/onChanged の次回に委ねる)
+  const entries = buildDisplayCommentEntries(merged, live);
+  if (!entries.length) return;
+  // 既存の描画トリガに軽い entries を渡す=renderStoryUserLane が走り、末尾で現配信 lane mirror も publish。
+  syncStorySourceEntries(live, entries, entries);
+}
+
+/**
  * ★v0.1.962(council/liveview-open-heavy-SYNTHESIS.md 第1段): 受動ビュー(応援プレビュー dock=liveview)で
  *   コメントティッカーを【鏡】(commentTimelineMirror=本物 popup が watch タブで publish した最新N件)から描く。
  *   passive は heavy comments(32,080件・246KB の IDB cursor read)を【走らせない】ようにしたので、
@@ -21322,6 +21365,9 @@ async function initPopup() {
     void refreshAllNorthStarMirrorLanes(lid);
     // v0.1.979: 応援レーンも heavy が詰まったときだけ鏡から描く(厳格ガード=空のときだけ/現配信のみ)。
     void applyLaneMirrorForMainPopupFallback(lid);
+    // v0.1.991(最後の根): 応援レーン(アイコン列グリッド)を現配信の軽いコメント源から起動=heavy 非依存。
+    //   北極星は揃うのにアイコン列だけ started=0 だった真因を断つ(現配信のレーンを描き lane mirror も publish)。
+    void renderStoryUserLaneFromLightCommentsForCurrentLive(lid);
   };
   setInterval(tickIndependentNorthStar, NORTH_STAR_INDEPENDENT_REFRESH_MS);
   // v0.1.978: 初回は interval(6s)を待たず素早く起動(lid は refresh 早期に set される)。

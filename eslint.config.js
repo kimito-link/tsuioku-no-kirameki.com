@@ -114,8 +114,12 @@ export default [
     //   を read→本物 paintTopSupportRankStyleIntoElement で描画・DOM/storage read グルー=lib抽出不可)+初回/onChanged 配線+
     //   restoreNorthStarMirrorRows import を追加=21442→21515(レビュー済み例外)。純データ復元 restoreNorthStarMirrorRows は
     //   src/lib/northStarMirror.js(test付き)に隔離済み。
+    //   v0.1.991: renderStoryUserLaneFromLightCommentsForCurrentLive 追加=21515→21533。応援レーン(アイコン列)を
+    //   heavy 全件読み非依存で現配信の軽い源(nls_csummary_)から起動する DOM/storage グルー(syncStorySourceEntries・
+    //   getStoryUserLaneEls は popup ローカル=lib抽出不可)。北極星 publish 詰まり根治(v0.1.990)後に残った最後の
+    //   「アイコン列だけ started=0」を断つ(council/render-not-firing 続き・実機実証済)。レビュー済み例外。
     files: ['src/extension/popup-entry.js'],
-    rules: { 'max-lines': ['error', { max: 21515, skipBlankLines: false, skipComments: false }] }
+    rules: { 'max-lines': ['error', { max: 21533, skipBlankLines: false, skipComments: false }] }
   },
   {
     files: ['src/extension/content-entry.js'],

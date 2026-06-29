@@ -17,5 +17,5 @@
 
 ## データの流れ・影響範囲
 
-- [storage データバス図](storage-bus.md) — 全 79 キーの producer/consumer と断線検出
+- [storage データバス図](storage-bus.md) — 全 80 キーの producer/consumer と断線検出
 - [影響範囲マップ](impact-map.md) — このファイルを変えたら何が壊れるか(波及機能の逆引き)
