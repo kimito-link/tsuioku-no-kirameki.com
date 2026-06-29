@@ -19,6 +19,14 @@
  * @module storyUserLaneRenderProbe
  */
 
+/**
+ * v0.1.1006: 「匿名主体の配信」とみなす userId 付き率(%)の上限。これ以下なら、コメントは供給されても
+ *   顔タイルに乗れる人(userId 解決可)がほぼ居ない=heavy 経路の 0 タイルは正常(描画停止でない)。
+ *   匿名184はDOMにも識別子が無く userId 解決不能=応援レーンに出ないのは仕様(対処カードの説明と同旨)。
+ *   10% = 実機 lv350860018(2.6%)のような匿名主体を拾い、userId付きが一定数ある配信は誤って正常化しない。
+ */
+export const LANE_ANON_DOMINATED_MAX_PCT = 10;
+
 /** 描画経路で到達しうる step（lastReachedStep に入る値の正本）。 */
 export const STORY_USER_LANE_STEPS = Object.freeze({
   START: 'start',
@@ -97,7 +105,7 @@ export function snapshotStoryUserLaneRenderProbe(probe, nowMs) {
  * @param {object|null} probeSnap snapshotStoryUserLaneRenderProbe の戻り（fastDiag.popup.storyUserLaneRenderProbe）
  * @returns {object}
  */
-export function buildStoryUserLaneRenderDiag(probeSnap) {
+export function buildStoryUserLaneRenderDiag(probeSnap, ctx) {
   const s = probeSnap && typeof probeSnap === 'object' ? probeSnap : null;
   if (!s) return { present: false };
 
@@ -108,6 +116,14 @@ export function buildStoryUserLaneRenderDiag(probeSnap) {
   const step = s.lastReachedStep || '';
   const started = s.started || 0;
   const completed = s.completed || 0;
+  // ★v0.1.1006 誤検知の根治: 応援レーンの顔タイルは userId(識別子)を持つ人しか乗らない(匿名184は
+  //   DOM にも識別子が無く userId 解決不能=仕様)。匿名主体の配信は「コメントは供給されているが
+  //   乗れる人がいない」ので 0 タイルが正常。withUidPercent(記録のうち userId 付き率)が極端に低いとき
+  //   heavy 経路の 0 タイルを🔴(描画停止)と誤報しないため、しきい値で「匿名主体=正常」に倒す。
+  const c = ctx && typeof ctx === 'object' ? ctx : {};
+  const withUidPercent = Number(c.withUidPercent);
+  const anonymousDominated =
+    Number.isFinite(withUidPercent) && withUidPercent >= 0 && withUidPercent <= LANE_ANON_DOMINATED_MAX_PCT;
 
   // 「期待件数」= 経路に応じた供給件数（mirror なら鏡、heavy なら entries）。
   const expected = path === 'mirror' ? mirror : path === 'heavy' ? entries : Math.max(mirror, entries, -1);
@@ -130,6 +146,11 @@ export function buildStoryUserLaneRenderDiag(probeSnap) {
   } else if (expected === 0) {
     verdict = 'empty_source';
     reason = '元データ（鏡/コメント）が0件＝出なくて正常';
+  } else if (expected > 0 && dom === 0 && path === 'heavy' && anonymousDominated) {
+    // ★v0.1.1006: 匿名主体(userId付き率が極低)の配信は、コメントは供給されても顔タイルに乗れる人が
+    //   いない=0タイルが正常。🔴(描画停止)でなく正常扱いにして誤報を消す。
+    verdict = 'empty_source_anonymous';
+    reason = `供給${expected}件は匿名主体(userId付き率${Math.round(withUidPercent * 10) / 10}%)で顔タイルに乗れる人がいない＝0件で正常（匿名は識別子が無く応援レーンに出ないのは仕様）`;
   } else if (expected > 0 && dom === 0) {
     verdict = 'source_but_no_dom';
     reason = `供給${expected}件あるのに画面0件＝描画が止まっています（最後の到達=${step || '不明'}）`;
@@ -184,7 +205,11 @@ export function formatStoryUserLaneRenderDiagLines(diag, ctx) {
         ? `コメント${d.entriesLen >= 0 ? d.entriesLen : '?'}件`
         : `供給${d.expected >= 0 ? d.expected : '?'}件`;
   const mark =
-    d.verdict === 'ok' ? '✅' : d.verdict === 'empty_source' ? '✅' : d.verdict === 'unknown' ? '' : '🔴';
+    d.verdict === 'ok' || d.verdict === 'empty_source' || d.verdict === 'empty_source_anonymous'
+      ? '✅'
+      : d.verdict === 'unknown'
+        ? ''
+        : '🔴';
   lines.push(
     `応援レーン描画: 経路=${pathLabel(d.path)} / ${supply} → 画面${dom} ${mark}` +
       (d.lastReachedStep ? ` / 最後の到達=${d.lastReachedStep}` : '') +

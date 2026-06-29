@@ -108,6 +108,36 @@ describe('buildStoryUserLaneRenderDiag', () => {
     });
     expect(d.verdict).toBe('painted_not_completed');
   });
+
+  // ★v0.1.1006: 匿名主体(userId付き率が極低)の配信は heavy 経路 0 タイルが正常=🔴にしない。
+  it('匿名主体(withUidPercent極低)で heavy 0タイル＝empty_source_anonymous(正常・実機lv350860018型)', () => {
+    const d = buildStoryUserLaneRenderDiag(
+      { activePath: 'heavy', started: 2, completed: 2, entriesLen: 2, domTilesPainted: 0, lastReachedStep: 'done' },
+      { withUidPercent: 2.6 }
+    );
+    expect(d.verdict).toBe('empty_source_anonymous');
+    expect(d.reason).toContain('匿名主体');
+    expect(d.reason).toContain('仕様');
+    // 🔴 症状カードに昇格しない。
+    expect(storyUserLaneRenderDiagToActionCards(d).some((c) => c.id === 'story-user-lane-no-dom')).toBe(false);
+    // 表示行は ✅(🔴 でない)。
+    expect(formatStoryUserLaneRenderDiagLines(d).join('\n')).toContain('✅');
+  });
+
+  it('userId付きが一定数ある配信(withUidPercent高)で 0タイルなら従来どおり source_but_no_dom(本物は隠さない)', () => {
+    const d = buildStoryUserLaneRenderDiag(
+      { activePath: 'heavy', started: 1, completed: 0, entriesLen: 5, domTilesPainted: 0, lastReachedStep: 'done' },
+      { withUidPercent: 100 }
+    );
+    expect(d.verdict).toBe('source_but_no_dom');
+  });
+
+  it('withUidPercent 未指定なら従来どおり判定(後方互換=匿名特例を発動しない)', () => {
+    const d = buildStoryUserLaneRenderDiag({
+      activePath: 'heavy', started: 1, completed: 0, entriesLen: 5, domTilesPainted: 0, lastReachedStep: 'done'
+    });
+    expect(d.verdict).toBe('source_but_no_dom');
+  });
 });
 
 describe('formatStoryUserLaneRenderDiagLines', () => {
