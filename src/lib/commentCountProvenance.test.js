@@ -122,6 +122,43 @@ describe('formatCommentCountProvenanceLines', () => {
     expect(text).toContain('[lv1]');
     expect(text).toContain('[lv2]');
   });
+
+  // v0.1.1001: 要確認(check)のとき fastDiag から commentNo 欠落割合の内訳を出す。
+  it('要確認のとき fastDiag があれば commentNo 欠落の内訳を併記する', () => {
+    const fastDiag = {
+      content: { giftDiagnostics: { commentObservability: { savedCommentsUidStats: {
+        totalSaved: 9757, commentNoLess: 9757, commentNoLessPercent: 100, withUidPercent: 0
+      } } } }
+    };
+    const text = formatCommentCountProvenanceLines([
+      // 本家が新鮮(5秒前)なのに記録超=check
+      { lv: 'lv1', recordedCount: 9757, officialCommentCount: 9420, lastIngestAgoMs: 5000 }
+    ], fastDiag).join('\n');
+    expect(text).toContain('判定: 🟡 要確認');
+    expect(text).toContain('内訳(計器)');
+    expect(text).toContain('commentNo 欠落行 9,757件 (100%)');
+  });
+
+  it('正常(🟢)のときは内訳を出さない(fastDiag があっても)', () => {
+    const fastDiag = {
+      content: { giftDiagnostics: { commentObservability: { savedCommentsUidStats: {
+        totalSaved: 100, commentNoLess: 100, commentNoLessPercent: 100
+      } } } }
+    };
+    const text = formatCommentCountProvenanceLines([
+      { lv: 'lv1', recordedCount: 800, officialCommentCount: 926, lastIngestAgoMs: 5000 }
+    ], fastDiag).join('\n');
+    expect(text).toContain('判定: 🟢 正常');
+    expect(text).not.toContain('内訳(計器)');
+  });
+
+  it('fastDiag が無ければ要確認でも内訳は出さない(後方互換)', () => {
+    const text = formatCommentCountProvenanceLines([
+      { lv: 'lv1', recordedCount: 1400, officialCommentCount: 926, lastIngestAgoMs: 5 * 60 * 1000 }
+    ]).join('\n');
+    expect(text).toContain('判定: 🟡 要確認');
+    expect(text).not.toContain('内訳(計器)');
+  });
 });
 
 describe('commentCountProvenanceToActionCards', () => {

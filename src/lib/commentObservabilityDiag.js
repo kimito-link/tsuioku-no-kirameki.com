@@ -140,30 +140,45 @@ export function analyzeNdgrChatRejection(chats) {
  *   totalSaved: number,
  *   withUid: number,
  *   withoutUid: number,
- *   withUidPercent: number
+ *   withUidPercent: number,
+ *   commentNoLess: number,
+ *   commentNoLessPercent: number
  * }} SavedCommentsUidStats
  */
 
 /**
- * 保存済 entry を userId あり/なしで集計。
- * @param {ReadonlyArray<{ userId?: string|null }>|null|undefined} entries
+ * 保存済 entry を userId あり/なし・commentNo あり/なしで集計（同一 walk・副作用なし）。
+ *
+ * v0.1.1001 計器(記録>本家 104% の切り分け): commentNo を持たない行(匿名184主体)は
+ *   dedup キーが `liveId||text|sec|uid` の capturedAt 秒依存フォールバックになり、ライブと
+ *   backfill で capturedAt 導出が違うと二重計上し得る(commentRecord.js:75-84)。
+ *   「記録のうち何%が commentNo 欠落か」を状態速報に出せば、104% の内訳が「二重計上の温床
+ *   (欠落行が多い)」か「本家統計の数え方差(欠落行は少ない)」かをスクショ1枚で切り分けられる。
+ *
+ * @param {ReadonlyArray<{ userId?: string|null, commentNo?: string|number|null }>|null|undefined} entries
  * @returns {SavedCommentsUidStats}
  */
 export function aggregateSavedCommentsUidStats(entries) {
   const list = Array.isArray(entries) ? entries : [];
   let withUid = 0;
+  let noLess = 0;
   for (const e of list) {
     const uid = e?.userId ? String(e.userId).trim() : '';
     if (uid) withUid += 1;
+    const no = e?.commentNo != null ? String(e.commentNo).trim() : '';
+    if (!no) noLess += 1;
   }
   const total = list.length;
   const without = total - withUid;
   const percent = total > 0 ? Math.round((withUid / total) * 1000) / 10 : 0;
+  const noLessPercent = total > 0 ? Math.round((noLess / total) * 1000) / 10 : 0;
   return {
     totalSaved: total,
     withUid,
     withoutUid: without,
-    withUidPercent: percent
+    withUidPercent: percent,
+    commentNoLess: noLess,
+    commentNoLessPercent: noLessPercent
   };
 }
 
