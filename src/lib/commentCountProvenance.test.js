@@ -77,6 +77,42 @@ describe('buildCommentCountProvenance 3段階判定', () => {
     expect(p.verdict).toBe('check');
     expect(p.verdictReason).toContain('新鮮');
   });
+
+  // ★v0.1.1003: 鮮度判定は公式統計の更新時刻(officialCommentStatsAgeMs)で測る。
+  it('公式統計が古い(>60秒)なら、コメント取り込みが0秒前でも normal(遅延で説明可能)', () => {
+    // 実機 lv350859008 型: lastIngestAgoMs=0(コメは毎秒来る)だが公式統計は3分前=遅延。
+    //   従来は lastIngest を見て「0秒前=新鮮」→誤って check。新クロックで normal に。
+    const p = buildCommentCountProvenance({
+      recordedCount: 5974,
+      officialCommentCount: 5633,
+      lastIngestAgoMs: 0,
+      officialCommentStatsAgeMs: 3 * 60 * 1000
+    });
+    expect(p.ratePct).toBe(106);
+    expect(p.verdict).toBe('normal');
+  });
+
+  it('公式統計が本当に新鮮(60秒以内)で記録超なら check のまま(本物の食い違いは見逃さない)', () => {
+    const p = buildCommentCountProvenance({
+      recordedCount: 1005,
+      officialCommentCount: 926,
+      lastIngestAgoMs: 0,
+      officialCommentStatsAgeMs: 5 * 1000
+    });
+    expect(p.verdict).toBe('check');
+    expect(p.verdictReason).toContain('新鮮');
+  });
+
+  it('公式統計が古くても130%超は check のまま(別配信混入/二重計上の疑いは遅延では消さない)', () => {
+    const p = buildCommentCountProvenance({
+      recordedCount: 1400,
+      officialCommentCount: 926,
+      lastIngestAgoMs: 0,
+      officialCommentStatsAgeMs: 10 * 60 * 1000
+    });
+    expect(p.verdict).toBe('check');
+    expect(p.verdictReason).toContain('別配信');
+  });
 });
 
 describe('formatCommentCountProvenanceLines', () => {

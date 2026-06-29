@@ -1729,6 +1729,17 @@ function summarizeOneLive(lv, summary, snapshot, perfDiag, endedFlag) {
     numOrNull(snap?.officialStatsUpdatedAt);
   const lastIngestAgoMs =
     capturedAt && capturedAt > 0 ? Math.max(0, Date.now() - capturedAt) : null;
+  // v0.1.1003 ★記録>本家の誤検知根治: 「本家コメ(statistics.comments)が新鮮か」の判定には、
+  //   コメント取り込み時刻(lastIngestAgoMs)ではなく【公式統計が最後に更新された時刻】を使う。
+  //   両者は別クロック=コメントは毎秒来る(lastIngest=0秒前)が公式統計は遅延更新で数分古いことが
+  //   あり、従来は「0秒前=新鮮」と誤認して『遅延では説明できない』要確認を誤発火していた。
+  //   snapshot.officialCommentStatsUpdatedAt(content の stats.comments 更新時刻)から齢を出す。
+  const officialCommentStatsUpdatedAt =
+    numOrNull(s?.officialCommentStatsUpdatedAt) ?? numOrNull(snap?.officialCommentStatsUpdatedAt);
+  const officialCommentStatsAgeMs =
+    officialCommentStatsUpdatedAt && officialCommentStatsUpdatedAt > 0
+      ? Math.max(0, Date.now() - officialCommentStatsUpdatedAt)
+      : null;
   const officialRatePct =
     recordedCount > 0 && officialCommentCount && officialCommentCount > 0
       ? Math.round((recordedCount / officialCommentCount) * 100)
@@ -1750,6 +1761,8 @@ function summarizeOneLive(lv, summary, snapshot, perfDiag, endedFlag) {
     elapsedSec,
     capturedAt,
     lastIngestAgoMs,
+    // v0.1.1003: 公式統計の鮮度(本家コメが新鮮か=遅延で記録超を説明できるかの正しいクロック)。
+    officialCommentStatsAgeMs,
     perfDiag: diag,
     endedAt,
     // v0.1.855: マインドマップ「記録中の配信」は lv.recording を数えるが、従来 summarizeOneLive は
