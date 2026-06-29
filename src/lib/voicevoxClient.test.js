@@ -182,6 +182,30 @@ describe('synthesizeVoice', () => {
     expect(fetchFn).toHaveBeenCalledTimes(2);
   });
 
+  // ★v0.1.1004: synthesis は 200 OK だが body 読み取り(arrayBuffer)が永遠 pending=
+  //   読み上げが await_prefetch 固着する真因。body 読み取りもタイムアウトして null にする。
+  it('synthesis は OK でも arrayBuffer() が永遠 pending ならタイムアウトで null(固着の根治)', async () => {
+    vi.useFakeTimers();
+    const fetchFn = vi
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ pitchScale: 0, speedScale: 1 })
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        arrayBuffer: () => new Promise(() => {}) // 永遠に解決しない body 読み取り
+      });
+    const pending = synthesizeVoice(
+      '本文',
+      { styleId: 3 },
+      { fetchFn, synthesisTimeoutMs: 10 }
+    );
+    await vi.advanceTimersByTimeAsync(10);
+    await expect(pending).resolves.toBeNull();
+    expect(fetchFn).toHaveBeenCalledTimes(2);
+  });
+
   it('空本文は fetch せず null', async () => {
     const fetchFn = vi.fn();
     await expect(
