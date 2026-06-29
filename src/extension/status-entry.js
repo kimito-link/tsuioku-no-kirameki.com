@@ -1769,6 +1769,11 @@ function summarizeOneLive(lv, summary, snapshot, perfDiag, endedFlag) {
     lastIngestAgoMs,
     // v0.1.1003: 公式統計の鮮度(本家コメが新鮮か=遅延で記録超を説明できるかの正しいクロック)。
     officialCommentStatsAgeMs,
+    // v0.1.1007: 記録>本家(要確認)の「焼き付き vs 本家遅延」を時系列で切り分ける材料(panel_summary に既にある)。
+    //   窓内で 本家Δ ≈ 記録Δ なら母数差/遅延、本家Δ≪記録Δ なら記録の過剰増(二重)。新規 read ゼロ。
+    officialStatisticsCommentsDelta: numOrNull(s?.officialStatisticsCommentsDelta),
+    officialReceivedCommentsDelta: numOrNull(s?.officialReceivedCommentsDelta),
+    officialCommentSampleWindowMs: numOrNull(s?.officialCommentSampleWindowMs),
     perfDiag: diag,
     endedAt,
     // v0.1.855: マインドマップ「記録中の配信」は lv.recording を数えるが、従来 summarizeOneLive は
