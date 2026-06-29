@@ -222,7 +222,7 @@ export function buildAiShareFullText({ overviewText, livesData, fastDiag, popupD
   // 数字の出どころ(council/comment-count-provenance-question.txt): 「記録>本家コメ」のような食い違いに対し、
   //   各数字が何を・どこから・いつ数えているかを【事実として】出す(判定はしない=誤検知ゼロ)。
   try {
-    const provLines = formatCommentCountProvenanceLines(livesData);
+    const provLines = formatCommentCountProvenanceLines(livesData, fastDiag);
     if (provLines.length) { for (const l of provLines) lines.push(l); lines.push(''); }
   } catch {
     /* no-op: 出どころ表示の失敗は状態速報を壊さない */

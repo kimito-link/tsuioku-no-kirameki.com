@@ -188,6 +188,42 @@ describe('aggregateSavedCommentsUidStats', () => {
     ]);
     expect(r.withUidPercent).toBe(33.3);
   });
+
+  // v0.1.1001: commentNo 欠落割合の計器(記録>本家104%の内訳切り分け用)。
+  it('commentNo 欠落行を数えて割合を出す', () => {
+    const r = aggregateSavedCommentsUidStats([
+      { userId: 'a', commentNo: '101' }, // no あり
+      { userId: 'b', commentNo: '' }, // no 無し
+      { userId: 'c' }, // no 無し(欠落)
+      { userId: 'd', commentNo: null } // no 無し
+    ]);
+    expect(r.commentNoLess).toBe(3);
+    expect(r.commentNoLessPercent).toBe(75);
+  });
+
+  it('匿名主体(全件 no 無し) → 100%（二重計上の温床が大きいサイン）', () => {
+    const r = aggregateSavedCommentsUidStats([
+      { userId: 'a:xxx' },
+      { userId: 'a:yyy', commentNo: '' }
+    ]);
+    expect(r.commentNoLess).toBe(2);
+    expect(r.commentNoLessPercent).toBe(100);
+  });
+
+  it('全件 no あり → 0%（欠落由来の二重計上は起きにくい）', () => {
+    const r = aggregateSavedCommentsUidStats([
+      { userId: 'a', commentNo: '1' },
+      { userId: 'b', commentNo: '2' }
+    ]);
+    expect(r.commentNoLess).toBe(0);
+    expect(r.commentNoLessPercent).toBe(0);
+  });
+
+  it('空配列 → commentNoLess も 0', () => {
+    const r = aggregateSavedCommentsUidStats([]);
+    expect(r.commentNoLess).toBe(0);
+    expect(r.commentNoLessPercent).toBe(0);
+  });
 });
 
 describe('parseInterceptFetchLog', () => {

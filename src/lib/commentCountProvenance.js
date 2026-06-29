@@ -132,15 +132,39 @@ export function commentCountProvenanceToActionCards(livesData) {
 }
 
 /**
+ * v0.1.1001 計器: fastDiag から「記録のうち commentNo 欠落行の割合」を取り出す。
+ *   記録>本家(check)の内訳が「二重計上の温床(欠落行が多い)」か「本家統計の数え方差(欠落行は
+ *   少ない)」かをスクショ1枚で切り分けるため。欠落行は dedup キーが capturedAt 秒依存で
+ *   ライブ/backfill 間で二重しうる(commentRecord.js:75-84)。取れなければ null。
+ * @param {object|null|undefined} fastDiag
+ * @returns {{ percent: number, count: number, total: number }|null}
+ */
+function commentNoLessStatsFromFastDiag(fastDiag) {
+  try {
+    const s = fastDiag?.content?.giftDiagnostics?.commentObservability?.savedCommentsUidStats;
+    if (!s || typeof s !== 'object') return null;
+    const percent = Number(s.commentNoLessPercent);
+    const count = Number(s.commentNoLess);
+    const total = Number(s.totalSaved);
+    if (!Number.isFinite(percent)) return null;
+    return { percent, count: Number.isFinite(count) ? count : 0, total: Number.isFinite(total) ? total : 0 };
+  } catch {
+    return null;
+  }
+}
+
+/**
  * 状態速報に載せるテキスト行配列。判定はせず「何を数えているか」を並べる。
  * @param {object[]} livesData summarizeOneLive の配列
+ * @param {object|null} [fastDiag] commentNo 欠落割合の計器(記録>本家の内訳切り分け用・省略可)
  * @returns {string[]}
  */
-export function formatCommentCountProvenanceLines(livesData) {
+export function formatCommentCountProvenanceLines(livesData, fastDiag = null) {
   const lives = Array.isArray(livesData) ? livesData : [];
   const provs = lives.map(buildCommentCountProvenance).filter(Boolean);
   if (!provs.length) return [];
 
+  const noLess = commentNoLessStatsFromFastDiag(fastDiag);
   const lines = [];
   lines.push('### 数字の出どころ（何を数えているか）');
   lines.push('（各数字が「何を・どこから・いつ」数えているか＋正常/要確認の判定です）');
@@ -161,6 +185,14 @@ export function formatCommentCountProvenanceLines(livesData) {
       lines.push(`- 判定: 🟢 正常 — ${p.verdictReason}`);
     } else if (p.verdict === 'check') {
       lines.push(`- 判定: 🟡 要確認 — ${p.verdictReason}`);
+      // v0.1.1001 計器: 記録>本家(要確認)のとき、commentNo 欠落行の割合を内訳として出す。
+      //   高い(例 90%+)=匿名184主体=二重計上の温床が大きい。低い=本家統計の数え方差の疑い。
+      if (noLess) {
+        lines.push(
+          `- 内訳(計器): 記録のうち commentNo 欠落行 ${ja(noLess.count)}件 (${noLess.percent}%)` +
+            ` — 高いほど匿名主体で二重計上が起きやすい/低いほど本家統計の数え方差の疑い`
+        );
+      }
     }
   }
   return lines;
