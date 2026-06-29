@@ -533,7 +533,7 @@
 - **影響範囲ゲート(規律を自動化)** — 星野ロミ式「規律を自動ゲートに」。diff から影響大(複数機能波及)の変更ファイルを検出し波及先機能を列挙。警告のみ(摩擦ゼロ)・--strict で exit1。AGENTS.md §10 のルールを diff 発火に
   - `scripts/impact-check.mjs`
   - `docs/feature-map/impact-map.json`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 36</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 37</summary>
 
 - `api/status.js` — status 受け口 Vercel Serverless Function。
 - `extension/status-guard.js` — 状態速報ページ(status.html)の「何があっても開く」保険。
@@ -542,6 +542,7 @@
 - `scripts/verify-bump.mjs` — extension bump 後の整合性チェッカー
 - `src/lib/aiShareDiagSchema.js` — AI 共有診断バンドル（popup が組み立てる JSON / storage の nls_ai_share_fast_diag_v1）の
 - `src/lib/aiShareFastDiagKey.js` — v0.1.629: AI 共有 fastDiag キャッシュの storage key を popup と status ページで共有。
+- `src/lib/aiShareFullText.js` — 状態速報(AI共有)本文ビルダー。②応援ライブビュー/③WEB が同一の status-report builder を
 - `src/lib/captureAuditionRichviewEventScoreDiagProbe.js` — audition.nicovideo.jp `/embedded/richview/live` 向けの診断ペイロード（PR1）。
 - `src/lib/changelog-archive.js` — 追憶のきらめき 更新履歴アーカイブ（v0.1.663 以前）。
 - `src/lib/changelog.js` — 拡張の更新履歴データと semver 比較ヘルパ。
@@ -743,7 +744,7 @@
 
 ## 🧬 修正系譜マップ(この系統のバグを過去にどう直したか)
 
-> changelog 全 329 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
+> changelog 全 330 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
 
 ### 💾 記録件数 (45版)
 - `v0.1.969` 2026-06-28 — 内部整理: 応援ランク行の生成をlib抽出
@@ -1295,7 +1296,8 @@
 - `v0.1.673` 2026-06-10 — コメビュの名前をパネルと同じ情報源で補完
 - `v0.1.670` 2026-06-10 — コメビュのアイコンを本家と同じサムネに
 
-### 🩺 診断・状態速報 (103版)
+### 🩺 診断・状態速報 (104版)
+- `v0.1.994` 2026-06-29 — 応援ライブビュー・WEBにも状態速報
 - `v0.1.993` 2026-06-29 — 内部整理: 状態速報の生成を共有部品に
 - `v0.1.988` 2026-06-29 — 複数配信視聴時のレーン未描画と誤診断を修正
 - `v0.1.985` 2026-06-29 — 状態速報の先頭に「3画面パリティ」総合判定

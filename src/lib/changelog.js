@@ -26,6 +26,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.994',
+    date: '2026-06-29',
+    summary: '応援ライブビュー・WEBにも状態速報',
+    items: Object.freeze([
+      '応援ライブビュー(②)と純Web版(③)でも、ツールのポップアップ(①)と全く同じフル状態速報(診断)を「🩺 状態速報(診断)を開く」から見られるようにしました。',
+      '本文はポップアップが組み立てたものをそのまま貼るだけ=①とバイト一致。①を直せば②③も自動で揃います。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.993',
     date: '2026-06-29',
     summary: '内部整理: 状態速報の生成を共有部品に',
