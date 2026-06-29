@@ -1096,6 +1096,10 @@ function renderAll({ lvList, summaries, fastDiag, popupDiag, backfillProgress, v
     if (ta && ta.value !== fullText) ta.value = fullText;
   });
 
+  // ②応援ライブビュー/③WEB に①と【全く同じフル状態速報】を出すため、status が組み立てた本文(fullText)を
+  //   jsonBlob に1フィールド同梱する。②③は再構築せず【これを貼るだけ】=①とバイト一致(drift ゼロ)。
+  //   2026-06-29(HANDOFF-resume-0629 §3 (A)(B)): 描画だけでなく自己診断まで②③で見せるのがゴール。
+  jsonBlob.statusReport = fullText;
   _lastRenderedBundle = {
     overview: overviewText,
     lives: livesData,

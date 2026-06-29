@@ -174,6 +174,59 @@ function setupPublishButton() {
   });
 }
 
+/**
+ * 状態速報パネルに本文を貼る(無ければ hidden)。①POP の本文と byte 一致(再構築しない)。
+ * @param {string|null|undefined} reportText
+ */
+function paintStatusReportPanel(reportText) {
+  const panel = document.getElementById('lvStatusReport');
+  const pre = document.getElementById('lvStatusReportText');
+  if (!panel || !pre) return;
+  const text = typeof reportText === 'string' ? reportText.trim() : '';
+  if (!text) {
+    panel.hidden = true;
+    return;
+  }
+  if (pre.textContent !== text) pre.textContent = text;
+  panel.hidden = false;
+}
+
+/**
+ * ①POP と【全く同じフル状態速報】を②応援ライブビューに出す。
+ *   status が KEY_LIVEVIEW_PUBLISH_PAYLOAD.jsonBlob.statusReport に置いた本文を読んで貼るだけ
+ *   (再構築しない=①とバイト一致)。status の再描画(=再 publish)に storage.onChanged で追従する。
+ *   読むだけ=受動ビューの不可侵原則(書かない)を守る。
+ */
+function setupStatusReportPanel() {
+  const readAndPaint = async () => {
+    try {
+      const local = globalThis.chrome?.storage?.local;
+      if (!local) return;
+      const bag = await local.get(KEY_LIVEVIEW_PUBLISH_PAYLOAD);
+      const payload = /** @type {{ jsonBlob?: { statusReport?: string } }|undefined} */ (
+        bag && bag[KEY_LIVEVIEW_PUBLISH_PAYLOAD]
+      );
+      const report = payload && payload.jsonBlob ? payload.jsonBlob.statusReport : '';
+      paintStatusReportPanel(report);
+    } catch {
+      /* best-effort: 読めなくても応援ライブビュー本体は壊さない */
+    }
+  };
+  void readAndPaint();
+  try {
+    globalThis.chrome?.storage?.onChanged?.addListener((changes, area) => {
+      if (area !== 'local' || !changes || !changes[KEY_LIVEVIEW_PUBLISH_PAYLOAD]) return;
+      const next = /** @type {{ jsonBlob?: { statusReport?: string } }|undefined} */ (
+        changes[KEY_LIVEVIEW_PUBLISH_PAYLOAD].newValue
+      );
+      const report = next && next.jsonBlob ? next.jsonBlob.statusReport : '';
+      paintStatusReportPanel(report);
+    });
+  } catch {
+    /* best-effort: onChanged 登録不可でも初回 read で1枚は出る */
+  }
+}
+
 function bootstrap() {
   const frame = /** @type {HTMLIFrameElement|null} */ (document.getElementById('lvPopupFrame'));
   const noLive = document.getElementById('lvNoLive');
@@ -213,6 +266,9 @@ function bootstrap() {
   // 配信が出るときだけ「このURLをWEBでも公開する」を配線+表示。
   if (publishBar) publishBar.hidden = false;
   setupPublishButton();
+
+  // ①POP と同一のフル状態速報を貼る(読むだけ・storage.onChanged で追従)。
+  setupStatusReportPanel();
 }
 
 /** setupPreviewVisibilityPause の二重登録防止(bootstrap が複数回呼ばれても1回だけ配線)。 */

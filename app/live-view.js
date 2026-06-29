@@ -494,6 +494,50 @@ function paintAllMirrors(jsonBlob) {
   paintNorthStarMirror(jsonBlob.northStarMirror || null);
   paintSupporterRanking(jsonBlob.topSupporters || null);
   paintCommentTimelineMirror(jsonBlob.commentTimelineMirror || null);
+  // 2026-06-29(HANDOFF-resume-0629 §3 (B)): ①POP と【全く同じフル状態速報】を③WEB でも出す。
+  //   status が jsonBlob.statusReport に①の本文(buildAiShareFullText の結果)を同梱する=ここは貼るだけ。
+  paintStatusReport(jsonBlob.statusReport || null);
+}
+
+/* ───────────────────────── 状態速報(①と同一本文) ───────────────────────── */
+
+/** ③WEB に①と同一のフル状態速報を出す折りたたみパネル。無ければ動的に1つ用意(死に画面回避)。 */
+function ensureStatusReportPanel() {
+  let el = document.getElementById('lvWebStatusReport');
+  if (!el) {
+    el = document.createElement('details');
+    el.id = 'lvWebStatusReport';
+    el.style.cssText =
+      'position:fixed;left:8px;right:8px;bottom:8px;z-index:99997;max-width:920px;margin:0 auto;' +
+      'border-radius:10px;background:#fbfbfe;color:#2a2a33;border:1px solid #d8d8e4;' +
+      'font:12px/1.6 system-ui,sans-serif;box-shadow:0 4px 16px rgba(0,0,0,.10);overflow:hidden;';
+    const sum = document.createElement('summary');
+    sum.textContent = '🩺 状態速報(診断)を開く';
+    sum.style.cssText =
+      'cursor:pointer;padding:8px 12px;font-weight:600;color:#3a3a55;user-select:none;list-style:none;';
+    const pre = document.createElement('pre');
+    pre.id = 'lvWebStatusReportText';
+    pre.style.cssText =
+      'margin:0;padding:10px 12px;max-height:50vh;overflow:auto;white-space:pre-wrap;word-break:break-word;' +
+      'border-top:1px solid #e6e6ef;background:#fff;font:12px/1.55 ui-monospace,SFMono-Regular,Menlo,monospace;';
+    el.appendChild(sum);
+    el.appendChild(pre);
+    el.hidden = true;
+    (document.body || document.documentElement).appendChild(el);
+  }
+  return el;
+}
+
+function paintStatusReport(reportText) {
+  const text = typeof reportText === 'string' ? reportText.trim() : '';
+  const el = ensureStatusReportPanel();
+  if (!text) {
+    el.hidden = true;
+    return;
+  }
+  const pre = document.getElementById('lvWebStatusReportText');
+  if (pre && pre.textContent !== text) pre.textContent = text;
+  el.hidden = false;
 }
 
 /**
