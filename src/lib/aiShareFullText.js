@@ -37,14 +37,40 @@ import { buildStatusActions } from './statusActionAdvisor.js';
 import { buildLaneStatusLine, buildLiveBlockText } from './statusFormat.js';
 
 /**
+ * v0.1.1005: 状態速報の更新所要(計器)を1行に整形する純関数。
+ *   「診断ページが重い」を共有時にスクショ無しで切り分けるため、画面ヘッダーの
+ *   「更新 Nms(重いステップ top2)」と同じ値を本文にも出す。材料が無ければ ''。
+ * @param {{ totalMs?: number|null, stepMs?: Array<[string, number]> }|null|undefined} refreshPerf
+ * @returns {string}
+ */
+export function formatRefreshPerfLine(refreshPerf) {
+  const p = refreshPerf && typeof refreshPerf === 'object' ? refreshPerf : null;
+  const total = p && Number.isFinite(Number(p.totalMs)) ? Number(p.totalMs) : null;
+  if (total == null) return '';
+  const steps = Array.isArray(p.stepMs) ? p.stepMs.slice() : [];
+  steps.sort((a, b) => (Number(b?.[1]) || 0) - (Number(a?.[1]) || 0));
+  const top = steps
+    .slice(0, 3)
+    .filter((s) => (Number(s?.[1]) || 0) > 0)
+    .map((s) => `${s[0]} ${s[1]}ms`)
+    .join(' / ');
+  return `更新所要(計器): ${total}ms${top ? `(重い順: ${top})` : ''} — 小さいほど更新は軽い(体感が重いなら初期ロード/スクロール側)`;
+}
+
+/**
  * 状態速報(AI共有)の本文を組み立てる。status-entry.js から挙動同値で切り出し。
  * @param {any} args
  * @returns {string}
  */
-export function buildAiShareFullText({ overviewText, livesData, fastDiag, popupDiag, voiceDiag, venueSeatsDiag, laneDiag, reportPreview, trendFindings, jsonBlob, currentLiveId, publishKeys, publishOutcomeRec, previewRenderAck }) {
+export function buildAiShareFullText({ overviewText, livesData, fastDiag, popupDiag, voiceDiag, venueSeatsDiag, laneDiag, reportPreview, trendFindings, jsonBlob, currentLiveId, publishKeys, publishOutcomeRec, previewRenderAck, refreshPerf }) {
   const lines = [];
   lines.push('## 君斗りんくの追憶のきらめき 状態速報');
   lines.push(`生成: ${new Date().toISOString()}`);
+  // v0.1.1005: 「診断ページが重い」を共有時にスクショ無しで切り分けられるよう、更新所要(計器)を本文にも出す。
+  //   画面ヘッダーの「更新 Nms(重いステップ top2)」と同じ値。これが小さい(数ms)なら更新処理は軽い=
+  //   体感の重さは初期ロード/スクロール側、という切り分けが状態速報1枚で分かる。
+  const perfLine = formatRefreshPerfLine(refreshPerf);
+  if (perfLine) lines.push(perfLine);
   lines.push('');
   // 送信結果(根2対策): storage 記録(ページ横断=live-view からの送信も拾う)を優先し、無ければ globalThis 集計。
   //   どちらの公開ボタンで送っても「送信済み」を status が読める。
