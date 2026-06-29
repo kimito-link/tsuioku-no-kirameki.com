@@ -378,6 +378,17 @@ export function buildHealthCells(data) {
   const stale = !!gift?.multiTabDiag?.staleDomBundleSuspected;
   cells.push(stateCell('stale', '多タブ名残', stale ? 'warn' : 'ok', stale ? '履歴あり' : 'なし'));
 
+  // 8b. スクロール白化(重い・一瞬白くなって遅れて描画)。content-entry が scrollWhiteoutProbe で観測した
+  //   fastDiag.content.scrollWhiteoutDiag を色セルに再表示(新規集計ゼロ)。count=0=観測されていない=ok、
+  //   count>0=白化が起きている=warn(実害は「重い・遅延」で記録は壊れない=赤にしない)。未観測(diag無し)は na。
+  const wo = fast?.scrollWhiteoutDiag;
+  if (wo && typeof wo === 'object') {
+    const woCount = num(wo.whiteoutCount) || 0;
+    cells.push(stateCell('scroll-whiteout', 'スクロール白化', woCount > 0 ? 'warn' : 'ok', woCount > 0 ? `${woCount}回` : 'なし'));
+  } else {
+    cells.push(stateCell('scroll-whiteout', 'スクロール白化', 'na', '—'));
+  }
+
   // 9-14. 北極星6レーン。
   //   v0.1.889: 「貢献度ランキング」→「ギフト貢献度」にラベル変更(正体は koken の /gift/ ランキング=
   //   広告貢献度とは別系統)。laneKind を渡して no_ranking_data の文言を「まだギフト無し/まだ広告無し」と

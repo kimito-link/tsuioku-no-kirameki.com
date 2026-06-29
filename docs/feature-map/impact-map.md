@@ -302,6 +302,7 @@
 | `src/lib/commentTimelineReport.js` | 1 | 状態速報ページ |
 | `src/lib/commentVelocityTimeline.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/commentVelocityWindow.js` | 1 | ポップアップ(応援レーン) |
+| `src/lib/completenessScore.js` | 1 | 状態速報ページ |
 | `src/lib/concurrentCalibrationFit.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/concurrentPeakAnalysis.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/concurrentResolvedFromSnapshot.js` | 1 | 記録エンジン(watchページ常駐) |
@@ -319,6 +320,7 @@
 | `src/lib/devMonitorViz.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/devMonitorVizHtml.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/devReloadSignal.js` | 1 | 記録エンジン(watchページ常駐) |
+| `src/lib/diagnosisRegistry.js` | 1 | 状態速報ページ |
 | `src/lib/diagnosticErrorRing.js` | 1 | 記録エンジン(watchページ常駐) |
 | `src/lib/diagnosticRedact.js` | 1 | 記録エンジン(watchページ常駐) |
 | `src/lib/diagnosticRingStore.js` | 1 | 記録エンジン(watchページ常駐) |
@@ -517,6 +519,7 @@
 | `src/lib/scrapeEventScoreRankingFromRichviewDom.js` | 1 | 記録エンジン(watchページ常駐) |
 | `src/lib/scrapeTotalGiftCountList.js` | 1 | 記録エンジン(watchページ常駐) |
 | `src/lib/scrollWhiteoutProbe.js` | 1 | 記録エンジン(watchページ常駐) |
+| `src/lib/scrollWhiteoutReport.js` | 1 | 状態速報ページ |
 | `src/lib/sessionCommentCache.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/sessionSummaryCompareTableHtml.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/shouldRearmBackfillForOfficialGap.js` | 1 | 記録エンジン(watchページ常駐) |

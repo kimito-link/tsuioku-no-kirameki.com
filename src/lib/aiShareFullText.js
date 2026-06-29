@@ -21,7 +21,15 @@ import {
 } from './commentCountProvenance.js';
 // 応援コメント(最新N件・本文)を状態速報にも載せる(jsonBlob 同梱の鏡を貼るだけ=新規 read なし)。
 import { formatCommentTimelineReportLines } from './commentTimelineReport.js';
+// スクロール白化(重い・一瞬白くなる)を状態速報の読める所に出す(fastDiag に既にある値を貼るだけ)。
+import {
+  formatScrollWhiteoutReportLines,
+  scrollWhiteoutToActionCards
+} from './scrollWhiteoutReport.js';
 import { buildHealthCells, summarizeHealthVerdict } from './healthCells.js';
+// 網羅的完全性診断(PageSpeed 型・council/completeness-diagnosis-SYNTHESIS.md): healthCells を
+//   diagnosisRegistry の category/weight/mandatory で集計し「カテゴリ別スコア+完璧判定」を出す。
+import { buildCompletenessScore, formatCompletenessScoreLines } from './completenessScore.js';
 import { buildVoiceDiagLine } from './voiceDiag.js';
 import { reportPreviewCtxFromFastDiag } from './reportPreviewCtx.js';
 import { buildReportPreviewLines } from './reportPreview.js';
@@ -111,6 +119,16 @@ export function buildAiShareFullText({ overviewText, livesData, fastDiag, popupD
     }
     const trustLines = formatDiagnosticsTrustLines(trust);
     if (trustLines.length) { for (const l of trustLines) lines.push(l); lines.push(''); }
+    // 網羅的完全性診断(PageSpeed 型): 全観点をレジストリで網羅し、カテゴリ別スコア+✅完璧判定+
+    //   完璧まであと何項目+対象外N項目を出す。観点追加=diagnosisRegistry に1行=抜けが構造的に出ない。
+    try {
+      const cells = buildHealthCells({ livesData, fastDiag, voiceDiag, venueSeatsDiag, laneDiag, nowMs: Date.now() });
+      const score = buildCompletenessScore(cells);
+      const scoreLines = formatCompletenessScoreLines(score);
+      if (scoreLines.length) { for (const l of scoreLines) lines.push(l); lines.push(''); }
+    } catch {
+      /* no-op: 完全性スコアの失敗は状態速報を壊さない */
+    }
   } catch {
     /* no-op: 信頼性ブロックの失敗は状態速報を壊さない */
   }
@@ -159,6 +177,8 @@ export function buildAiShareFullText({ overviewText, livesData, fastDiag, popupD
     }
     // 数字の食い違い「要確認(記録が本家を大幅超=別配信混入/二重計上の疑い)」を症状カードに昇格(ok/normal は出さない)。
     try { actions.push(...commentCountProvenanceToActionCards(livesData)); } catch { /* no-op */ }
+    // スクロール白化(重い・一瞬白くなって遅れて描画)を症状カードに昇格(count>0 のときだけ)。
+    try { actions.push(...scrollWhiteoutToActionCards(fastDiag)); } catch { /* no-op */ }
     lines.push('### 検知された対処候補(症状→原因→次の一手)');
     if (!actions.length) {
       lines.push('- 既知パターンに該当する問題は検知されませんでした(未知の症状なら下の診断 JSON を参照)。');
@@ -190,6 +210,14 @@ export function buildAiShareFullText({ overviewText, livesData, fastDiag, popupD
     if (ctLines.length) { for (const l of ctLines) lines.push(l); lines.push(''); }
   } catch {
     /* no-op: コメント本文表示の失敗は状態速報を壊さない */
+  }
+  // スクロール白化(重い・一瞬白くなって遅れて描画される): ユーザーが何度も報告・観測値は fastDiag に
+  //   あったが状態速報の読める所に出ていなかった。ここで読める行に昇格する(新規 read なし)。
+  try {
+    const woLines = formatScrollWhiteoutReportLines(fastDiag);
+    if (woLines.length) { for (const l of woLines) lines.push(l); lines.push(''); }
+  } catch {
+    /* no-op: 白化表示の失敗は状態速報を壊さない */
   }
   // 数字の出どころ(council/comment-count-provenance-question.txt): 「記録>本家コメ」のような食い違いに対し、
   //   各数字が何を・どこから・いつ数えているかを【事実として】出す(判定はしない=誤検知ゼロ)。
