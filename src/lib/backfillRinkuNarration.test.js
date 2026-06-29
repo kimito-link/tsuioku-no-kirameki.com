@@ -6,6 +6,7 @@ import {
   backfillRecordCardHint,
   backfillRecordCardHintDomState,
   backfillStuckDiagnosticsSuffix,
+  backfillThroughputLine,
   resolveOfficialComparisonDisplay,
   BACKFILL_RECORD_HINT_NEAR_COMPLETE_TEXT
 } from './backfillRinkuNarration.js';
@@ -731,5 +732,33 @@ describe('resolveOfficialComparisonDisplay（v0.1.763: 中途半端な％をや�
       // recordingActive 無し
     });
     expect(r.mode).toBe('hidden');
+  });
+});
+
+describe('backfillThroughputLine（スループット計器・v0.1.999）', () => {
+  it('経過・区画・再シードから「約1区画◯ms」を出す', () => {
+    const s = backfillThroughputLine({ seg: 420, elapsedMs: 12_300, reseeds: 8 });
+    expect(s).toBe('⏱ 取得速度: 経過12.3秒・区画420・再シード8回 → 約1区画29ms');
+  });
+
+  it('再シード0なら再シード部分を出さない', () => {
+    const s = backfillThroughputLine({ seg: 100, elapsedMs: 5_000, reseeds: 0 });
+    expect(s).toBe('⏱ 取得速度: 経過5.0秒・区画100 → 約1区画50ms');
+  });
+
+  it('elapsedMs が無い/0 なら空文字（観測前は出さない）', () => {
+    expect(backfillThroughputLine({ seg: 100, elapsedMs: 0, reseeds: 5 })).toBe('');
+    expect(backfillThroughputLine({ seg: 100 })).toBe('');
+  });
+
+  it('seg が無い/0 なら空文字（割れない）', () => {
+    expect(backfillThroughputLine({ seg: 0, elapsedMs: 5_000 })).toBe('');
+    expect(backfillThroughputLine({ elapsedMs: 5_000 })).toBe('');
+  });
+
+  it('大きい値は3桁区切りで出す', () => {
+    const s = backfillThroughputLine({ seg: 4200, elapsedMs: 120_000, reseeds: 1500 });
+    expect(s).toContain('区画4,200');
+    expect(s).toContain('再シード1,500回');
   });
 });

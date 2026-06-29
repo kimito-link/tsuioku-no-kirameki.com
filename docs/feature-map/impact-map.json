@@ -456,6 +456,22 @@
       ]
     },
     {
+      "file": "src/lib/timingConstants.js",
+      "featureCount": 4,
+      "features": [
+        "content",
+        "popup",
+        "status",
+        "web-status"
+      ],
+      "labels": [
+        "記録エンジン(watchページ常駐)",
+        "ポップアップ(応援レーン)",
+        "状態速報ページ",
+        "Web版 状態(スマホ)"
+      ]
+    },
+    {
       "file": "src/lib/userRooms.js",
       "featureCount": 4,
       "features": [
@@ -499,6 +515,20 @@
         "記録エンジン(watchページ常駐)",
         "ポップアップ(応援レーン)",
         "会場モード(standalone)"
+      ]
+    },
+    {
+      "file": "src/lib/backfillRinkuNarration.js",
+      "featureCount": 3,
+      "features": [
+        "popup",
+        "status",
+        "web-status"
+      ],
+      "labels": [
+        "ポップアップ(応援レーン)",
+        "状態速報ページ",
+        "Web版 状態(スマホ)"
       ]
     },
     {
@@ -1628,18 +1658,6 @@
       ]
     },
     {
-      "file": "src/lib/timingConstants.js",
-      "featureCount": 2,
-      "features": [
-        "content",
-        "popup"
-      ],
-      "labels": [
-        "記録エンジン(watchページ常駐)",
-        "ポップアップ(応援レーン)"
-      ]
-    },
-    {
       "file": "src/lib/userProfileLinkHtml.js",
       "featureCount": 2,
       "features": [
@@ -2241,16 +2259,6 @@
     },
     {
       "file": "src/lib/backfillRemoveGiftSystemMessages.js",
-      "featureCount": 1,
-      "features": [
-        "popup"
-      ],
-      "labels": [
-        "ポップアップ(応援レーン)"
-      ]
-    },
-    {
-      "file": "src/lib/backfillRinkuNarration.js",
       "featureCount": 1,
       "features": [
         "popup"

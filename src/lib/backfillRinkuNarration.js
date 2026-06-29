@@ -411,6 +411,33 @@ export function backfillStuckDiagnosticsSuffix(progress, opts = {}) {
 }
 
 /**
+ * v0.1.999: backfill のスループット計器を1行に整形する純関数（状態速報の診断用）。
+ *
+ * 狙い（「推測で直さない」原則・reference_backfill_speed_meeting）: 「取り込みが遅い」の真の
+ *   律速が seek（入口さがし）か否かを、ユーザーのスクショ1枚で確定できるようにする。現状の
+ *   診断は stopReason/seg/rows は出すが【経過時間・再シード回数】が無く「1区画あたり何ms」を
+ *   計算できなかった。この行で「経過Xs・区画Y・再シードZ回 → 約1区画Wms」を出す。
+ *
+ * 出力条件: elapsedMs と seg が意味を持つ値のときだけ（観測前/0 のときは空文字＝出さない）。
+ * 計器のみ＝取り込み内容・順序・件数には一切触れない。
+ *
+ * @param {{ seg?: number, elapsedMs?: number, reseeds?: number }} progress
+ * @returns {string} 例: 「⏱ 取得速度: 経過12.3秒・区画420・再シード8回 → 約1区画29ms」／材料不足なら ''
+ */
+export function backfillThroughputLine(progress) {
+  const seg = Number(progress && progress.seg);
+  const elapsedMs = Number(progress && progress.elapsedMs);
+  const reseeds = Number(progress && progress.reseeds);
+  if (!Number.isFinite(elapsedMs) || elapsedMs <= 0) return '';
+  if (!Number.isFinite(seg) || seg <= 0) return '';
+  const sec = (elapsedMs / 1000).toFixed(1);
+  const perSegMs = Math.round(elapsedMs / seg);
+  const reseedPart =
+    Number.isFinite(reseeds) && reseeds > 0 ? `・再シード${reseeds.toLocaleString('ja-JP')}回` : '';
+  return `⏱ 取得速度: 経過${sec}秒・区画${seg.toLocaleString('ja-JP')}${reseedPart} → 約1区画${perSegMs.toLocaleString('ja-JP')}ms`;
+}
+
+/**
  * v0.1.450: 「もう一度ためす」ボタン押下直後に短時間だけ表示する確認文言の長さ（ms）。
  *
  * 背景（2026-05-29 会議）: ボタン下の `#backfillFetchPrompt` を廃止して記録カード内

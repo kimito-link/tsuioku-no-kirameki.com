@@ -800,7 +800,11 @@ async function loadBackfillProgressSafe() {
       done: Number(p.done) || 0,
       stopReason: String(p.stopReason || ''),
       // v0.1.692: aborted の真因(crawl 例外メッセージ)。content 側 publishBackfillProgress が保全する。
-      errMsg: String(p.errMsg || '')
+      errMsg: String(p.errMsg || ''),
+      // v0.1.999 スループット計器: 状態速報の「⏱ 取得速度」行が使う(観測値・取り込みには影響しない)。
+      seg: Number(p.seg) || 0,
+      elapsedMs: Number(p.elapsedMs) || 0,
+      reseeds: Number(p.reseeds) || 0
     };
   } catch {
     return null;

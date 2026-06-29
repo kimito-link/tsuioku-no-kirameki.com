@@ -321,6 +321,29 @@ describe('buildBackfillProgressLine（v0.1.692 過去ログ取得の診断行）
     ).toBe('過去ログ取得: [lv9] 完了・取得5件・停止理由=reached_start');
   });
 
+  // v0.1.999: スループット計器（経過/区画/再シード）が揃うと別行で「⏱ 取得速度」を併記。
+  it('seg と elapsedMs が揃うと取得速度の行を別行で併記する', () => {
+    const line = buildBackfillProgressLine({
+      lid: 'lv5',
+      rows: 100,
+      done: 1,
+      stopReason: 'cap_elapsed',
+      seg: 420,
+      elapsedMs: 12_300,
+      reseeds: 8
+    });
+    expect(line).toBe(
+      '過去ログ取得: [lv5] 完了・取得100件・停止理由=cap_elapsed\n' +
+        '⏱ 取得速度: 経過12.3秒・区画420・再シード8回 → 約1区画29ms'
+    );
+  });
+
+  it('elapsedMs/seg が無い従来の進捗オブジェクトでは取得速度行を出さない（後方互換）', () => {
+    expect(buildBackfillProgressLine({ lid: 'lv6', rows: 7, done: 0 })).toBe(
+      '過去ログ取得: [lv6] 取得中・取得7件'
+    );
+  });
+
   // v0.1.794: 進捗キーが null(走行中/完走前)でも記録中なら「取り込み中…」を出すフォールバック。
   it('bp=null でも catchingUp=true なら「取り込み中…」を出す（status と popup の対称化）', () => {
     expect(buildBackfillProgressLine(null, { catchingUp: true })).toBe(

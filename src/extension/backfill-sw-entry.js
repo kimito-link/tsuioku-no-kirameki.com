@@ -200,6 +200,10 @@ async function runCrawl({
       const step = await gen.next();
       if (step.done) {
         stopReason = String(step.value?.stopReason || '');
+        // v0.1.999 計器: 完走時の経過時間・入口さがし回数を state へ拾う（状態速報で
+        //   「経過Xs・区画Y・再シードZ回 → 約1区画Wms」を出して seek 律速を実機で確定）。
+        state.elapsedMs = Number(step.value?.elapsedMs) || 0;
+        state.reseeds = Number(step.value?.reseeds) || 0;
         break;
       }
       const ev = step.value;
@@ -258,6 +262,9 @@ async function runCrawl({
           rows: state.rows,
           done: 1,
           stopReason,
+          // v0.1.999 スループット計器（観測値・取り込みには影響しない）。
+          elapsedMs: state.elapsedMs,
+          reseeds: state.reseeds,
           src: 'sw',
           ...(stagingMode ? { staged: true } : {}),
           ts: Date.now()
@@ -270,6 +277,8 @@ async function runCrawl({
                 rows: state.rows,
                 done: 1,
                 stopReason,
+                elapsedMs: state.elapsedMs,
+                reseeds: state.reseeds,
                 ts: Date.now()
               }
             }
@@ -381,6 +390,9 @@ function startSwCrawl(crawlArgs) {
     lid,
     rows: 0,
     seg: 0,
+    // v0.1.999 スループット計器: crawl の done 値から拾う（取り込みには影響しない観測値）。
+    elapsedMs: 0,
+    reseeds: 0,
     ac: new AbortController()
   };
   const normalizedArgs = { ...crawlArgs, lid, viewBase };

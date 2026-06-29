@@ -508,6 +508,14 @@ export async function* crawlNdgrBackward(opts) {
   /** @type {number|null} これまでに遡れた最古コメントの vpos（センチ秒）。再シード判定用。 */
   let globalMinVpos = null;
 
+  // v0.1.999 スループット計器: 「経過時間 × 再シード回数」を summary に含め、状態速報で
+  //   「経過Xs・区画Y・再シードZ回 → 約1区画Wms」を出して seek が律速かを実機スクショ1枚で
+  //   確定できるようにする（推測で直さない原則）。取り込み内容・順序・件数には触れない計器のみ。
+  //   t0 は下の本体で now() を代入する（早期 return では 0 のまま＝elapsedMs 0 として無害）。
+  let t0 = 0;
+  /** @type {number} 外側の reseed ループで張り直した独立チェーンの本数（入口さがしの回数）。 */
+  let reseeds = 0;
+
   // v0.1.456 レジューム: この巡回で到達した最古コメント vpos を呼び出し側へ返すため
   //   summary に含める。呼び出し側（content-entry runNdgrBackfillOnce）はこれを per-liveId
   //   storage に保存し、「もう一度」押下や自動リトライ時に opts.resumeFromVpos として渡す。
@@ -517,7 +525,10 @@ export async function* crawlNdgrBackward(opts) {
     segmentsFetched,
     rowsSeen,
     bytesFetched,
-    minVposReached: globalMinVpos
+    minVposReached: globalMinVpos,
+    // v0.1.999 スループット計器（純粋な観測値・取り込みには影響しない）。
+    elapsedMs: t0 > 0 ? Math.max(0, now() - t0) : 0,
+    reseeds
   });
   /**
    * v0.1.443: `reached_start` 発火時に、どんな chats(vpos 一覧)が判定の根拠だったかを
@@ -575,7 +586,7 @@ export async function* crawlNdgrBackward(opts) {
   //   bwd=Y を確認）。そこで現在より NDGR_BACKFILL_SEED_LAG_SEC 秒前を起点に View を読み、
   //   backward が無ければ next を辿って探す。出たら過去への入口。以降は Backward API
   //   （PackedSegment・下記 3）を辿る。直近 lag 秒ぶんは RT 記録が拾うので取りこぼさない。
-  const t0 = now();
+  t0 = now(); // v0.1.999: 上で let 宣言済み（summary の elapsedMs 計器が参照）。
   /** @type {Set<string>} 再訪防止（backward URI / at URL を一意キーに） */
   const visited = new Set();
   const nowSec = Math.floor(t0 / 1000);
@@ -799,6 +810,9 @@ export async function* crawlNdgrBackward(opts) {
   //   約60%で打ち切られた真因）。終端しても配信開始でなければ、これまでの最古 vpos から
   //   さらに前の ?at で再シードして次の区画を取りに行く。新しく遡れなくなったら終了。===
   for (let reseed = 0; reseed < NDGR_BACKFILL_MAX_RESEEDS; reseed += 1) {
+    // v0.1.999 計器: 入口さがし（seekBackwardUri）が走る reseed>=1 の回数を summary へ反映。
+    //   reseed===0 は初回 seed（探索済み）なので入口さがし回数には数えない。
+    reseeds = reseed;
     if (isAborted(signal)) return done('aborted');
     if (now() - t0 >= caps.elapsedMs) return done('cap_elapsed');
 
