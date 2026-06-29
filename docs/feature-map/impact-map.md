@@ -233,6 +233,7 @@
 | `src/lib/adLanePicksFromRooms.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/aiShareDiagSchema.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/aiShareFastDiagKey.js` | 1 | ポップアップ(応援レーン) |
+| `src/lib/aiShareFullText.js` | 1 | 状態速報ページ |
 | `src/lib/audienceEngagementGap.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/autoBackupState.js` | 1 | 記録エンジン(watchページ常駐) |
 | `src/lib/avatarEntryCounts.js` | 1 | ポップアップ(応援レーン) |

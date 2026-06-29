@@ -26,6 +26,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.993',
+    date: '2026-06-29',
+    summary: '内部整理: 状態速報の生成を共有部品に',
+    items: Object.freeze([
+      '状態速報(共有テキスト)を組み立てる処理を共有部品に切り出しました(内部整理のみ)。応援ライブビュー・WEB版でも同じ診断を出せるようにするための土台です。',
+      '状態速報の中身・表示は変わりません(抽出前と1文字も違わない出力であることを確認済み)。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.992',
     date: '2026-06-29',
     summary: '記録・同接・来場の数字カードを確実に表示',
