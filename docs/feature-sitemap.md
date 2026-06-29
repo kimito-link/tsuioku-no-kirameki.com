@@ -263,7 +263,7 @@
   - `src/lib/giftThrowProjectile.js`
 - **吹き出し寿命管理** — 会場の吹き出しの表示上限・追い出し(eviction)ライフサイクル
   - `src/lib/venueBubbleLifecycle.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 169</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 170</summary>
 
 - `scripts/encode-marketing-html-avatars.mjs` — extension/images/marketing-html-avatars/*.png を data URI にし、
 - `scripts/split-avatar-parts.mjs` — 偽市松背景の除去 + パーツ切り出し(one-off アセットパイプライン)
@@ -375,6 +375,7 @@
 - `src/lib/popupMainScrollDefer.js` — 拡張ポップアップ `.nl-main` スクロール中に重い DOM 更新を見送るかどうか。
 - `src/lib/popupStorageRefreshCoalesce.js` — popup / inline のコメント再描画スケジューラ。
 - `src/lib/popupVisibilityGate.js` — popup / inline コメント再描画の可視性ゲート（v0.1.440）。
+- `src/lib/previewRenderAckKey.js` — ②応援プレビュー(INLINE_PASSIVE)が「自分が描画できた」を status へ伝えるための専用 ack キー。
 - `src/lib/privacyDisplay.js` — 共有・掲載向けに表示ラベルを短く伏せる（完全一致検索を難しくする程度。暗号化や匿名化ではない）。
 - `src/lib/provisionalLaneCommentRows.js` — heavy read 完了前に応援ランキングへ載せる暫定コメント行の合成（0 秒表示用）。
 - `src/lib/reportUserThumb.js` — HTML レポート / マーケ分析の各ユーザー行に「最低サムネ」を必ず出すための
@@ -632,7 +633,7 @@
   - `src/lib/statusTrendKey.js`
   - `src/extension/status-entry.js`
   - `src/lib/statusActionAdvisor.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 102</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 103</summary>
 
 - `app/app.js` — スマホ閲覧用 status Web 版。
 - `app/live-view.js` — 純Web版 応援ライブビュー（拡張なし・PC/スマホ共通）。
@@ -694,6 +695,7 @@
 - `src/lib/officialStatsWindow.js` — at?: number|null,
 - `src/lib/openingFiveMinuteCorrelation.js` — L13: 冒頭 5 分の予兆 → ピーク CPM 相関（散布図用）。
 - `src/lib/panelLiveSummary.js` — パネルカード用の超軽量サマリ（多タブ時の snapshot / 巨大配列 read 待ちを避ける）。
+- `src/lib/parityVerdict.js` — 3画面パリティ「①POP=②応援プレビュー=③WEBプレビュー が同一で完全か」の総合判定(純関数)。
 - `src/lib/parseEmbeddedDataViewerInfo.js` — v0.1.203 Patch 3: niconico watch ページの `<script id="embedded-data" data-props='{...}'>`
 - `src/lib/parseInterestArrivalComment.js` — ニコ生の興味タグ来場システムコメントをパースする純関数。
 - `src/lib/pickLatestComment.js` — ストレージ上のコメント配列の並びは一定でないため、
@@ -741,7 +743,7 @@
 
 ## 🧬 修正系譜マップ(この系統のバグを過去にどう直したか)
 
-> changelog 全 321 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
+> changelog 全 322 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
 
 ### 💾 記録件数 (45版)
 - `v0.1.969` 2026-06-28 — 内部整理: 応援ランク行の生成をlib抽出
@@ -790,7 +792,8 @@
 - `v0.1.672` 2026-06-10 — コメビュの二重表示の残りを根治
 - `v0.1.665` 2026-06-10 — 長い配信が7割等で止まったままになるのを根治
 
-### 📥 コメント取得 (126版)
+### 📥 コメント取得 (127版)
+- `v0.1.986` 2026-06-29 — レーンが出ない真因を根治(配信IDの解決)
 - `v0.1.980` 2026-06-28 — 状態速報に「描画が出ない時の対処」を明記
 - `v0.1.977` 2026-06-28 — 貢献度・広告ランキングを重い処理待ちせず表示
 - `v0.1.972` 2026-06-28 — 内部整理: 取得状況サマリの生成をlib抽出
@@ -1203,7 +1206,8 @@
 - `v0.1.699` 2026-06-12 — 読み上げの名前ON/OFF切替を追加
 - `v0.1.698` 2026-06-12 — コメビュにユーザー別の声で読み上げ機能を追加
 
-### 🪟 応援レーン・タイル (77版)
+### 🪟 応援レーン・タイル (78版)
+- `v0.1.986` 2026-06-29 — レーンが出ない真因を根治(配信IDの解決)
 - `v0.1.982` 2026-06-28 — 白くなる状態を状態速報で一発表示
 - `v0.1.980` 2026-06-28 — 状態速報に「描画が出ない時の対処」を明記
 - `v0.1.979` 2026-06-28 — 応援レーンも重い処理待ちせず鏡から表示
@@ -1406,7 +1410,8 @@
 - `v0.1.806` 2026-06-17 — HTML保存の失敗を根治+完了音声を追加
 - `v0.1.785` 2026-06-16 — 状態ページのタイムアウト警告を拡張エラー欄に出さない
 
-### ⚡ 描画・性能 (65版)
+### ⚡ 描画・性能 (66版)
+- `v0.1.986` 2026-06-29 — レーンが出ない真因を根治(配信IDの解決)
 - `v0.1.985` 2026-06-29 — 状態速報の先頭に「3画面パリティ」総合判定
 - `v0.1.984` 2026-06-29 — 状態速報に拡張バージョンを表示
 - `v0.1.982` 2026-06-28 — 白くなる状態を状態速報で一発表示
