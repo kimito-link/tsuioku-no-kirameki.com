@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 1 / 575 件
+## ⚠️ 役割コメントが無いソース 1 / 577 件
 - `src/lib/reportPreviewPublish.js`
 
 ## 全ファイルツリー
@@ -457,7 +457,7 @@
   - `vendor-visual-explainer.mjs` — Vendors nicobailon/visual-explainer (MIT) into .cursor/skills/visual-explainer/
   - `verify-bump.mjs` — extension bump 後の整合性チェッカー
   - `write-extension-placeholder-icons.mjs` — リポジトリに 256px アイコンしか無い環境向け: manifest 用の小さめ PNG を生成する。
-- 📁 **src/** (1222)
+- 📁 **src/** (1226)
   - 📁 **data/** (6)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -716,7 +716,7 @@
         - `logo_funlink_white_RGB_maru_black.png`
       - `logo_guide_funlink_ol.pdf`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1011)
+  - 📁 **lib/** (1015)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -1339,6 +1339,8 @@
     - `panelLiveSummary.test.js`
     - `panelMetricsExport.js` — パネル向け速報メトリクス（content メモリ → popup 直結、storage バイパス）。
     - `panelMetricsExport.test.js`
+    - `parityVerdict.js` — 3画面パリティ「①POP=②応援プレビュー=③WEBプレビュー が同一で完全か」の総合判定(純関数)。
+    - `parityVerdict.test.js`
     - `parseEmbeddedDataViewerInfo.js` — v0.1.203 Patch 3: niconico watch ページの `<script id="embedded-data" data-props='{...}'>`
     - `parseEmbeddedDataViewerInfo.test.js`
     - `parseGiftComment.js` — ニコ生のギフトコメント文字列をパースする純粋関数。
@@ -1402,6 +1404,8 @@
     - `popupWatchUrlResolveMultiTab.test.js`
     - `popupWindowEmptyHeight.js` — 0.1.71 (BA): popup window の高さを「state（active watch / empty+history /
     - `popupWindowEmptyHeight.test.js`
+    - `previewRenderAckKey.js` — ②応援プレビュー(INLINE_PASSIVE)が「自分が描画できた」を status へ伝えるための専用 ack キー。
+    - `previewRenderAckKey.test.js`
     - `prewarmCoordinator.js` — 複数 watch タブで popup.html の prewarm が同時に走るのを防ぐ
     - `prewarmCoordinator.test.js`
     - `privacyDisplay.js` — 共有・掲載向けに表示ラベルを短く伏せる（完全一致検索を難しくする程度。暗号化や匿名化ではない）。

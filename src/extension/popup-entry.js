@@ -5418,9 +5418,11 @@ async function applyLaneMirrorForPassive() {
  *     (2) 鏡の liveId が現配信と一致のときだけ=別配信の古い鏡を貼らない(critic 指摘)。
  *   storage read のみ・既存 paintStoryUserLaneDomFilled 再利用(似せて自作しない)。read path にキャッシュ無し。
  */
-async function applyLaneMirrorForMainPopupFallback() {
+async function applyLaneMirrorForMainPopupFallback(resolvedLid = '') {
   if (INLINE_PASSIVE || !hasExtensionContext()) return; // passive は専用経路がある
-  const lid = String(watchPopupLastPaintedLiveId || '').trim().toLowerCase();
+  // v0.1.986: lid は呼び出し側(独立 tick)が解決した値を優先(refresh 未完走でも &lv= 等から取れる)。
+  let lid = String(resolvedLid || '').trim().toLowerCase();
+  if (!/^lv\d{1,15}$/.test(lid)) lid = String(watchPopupLastPaintedLiveId || '').trim().toLowerCase();
   if (!/^lv\d{1,15}$/.test(lid)) return;
   const els = getStoryUserLaneEls();
   if (!els) return;
@@ -21279,11 +21281,23 @@ async function initPopup() {
     //   既存の paint defer 原則(スクロール後 400ms は heavy paint しない)に揃える=スクロールが
     //   止まれば次の tick で出る(機能後退ゼロ)。
     if (shouldDeferHeavyPopupPaintNow()) return;
-    const lid = String(watchPopupLastPaintedLiveId || '').trim().toLowerCase();
+    // v0.1.986(真因修正): lid を watchPopupLastPaintedLiveId だけに頼らない。embedded watch panel では
+    //   refresh() が heavy で詰まると watchPopupLastPaintedLiveId が '' のまま=独立 tick が発火せず probe=0
+    //   が残っていた(実機 v0.1.985 で確認)。URL の &lv=(INLINE_OWN_WATCH_URL)・snapshot.liveId も候補にして、
+    //   refresh の完走を待たずに lid を解決する=「重い処理を待たず描画」を本当に成立させる。
+    let lid = String(watchPopupLastPaintedLiveId || '').trim().toLowerCase();
+    if (!/^lv\d{1,15}$/.test(lid)) {
+      const m = String(INLINE_OWN_WATCH_URL || '').match(/lv\d{1,15}/);
+      if (m) lid = m[0].toLowerCase();
+    }
+    if (!/^lv\d{1,15}$/.test(lid)) {
+      const snapLv = String(watchMetaCache?.snapshot?.liveId || '').trim().toLowerCase();
+      if (/^lv\d{1,15}$/.test(snapLv)) lid = snapLv;
+    }
     if (!/^lv\d{1,15}$/.test(lid)) return;
     void refreshAllNorthStarMirrorLanes(lid);
     // v0.1.979: 応援レーンも heavy が詰まったときだけ鏡から描く(厳格ガード=空のときだけ/現配信のみ)。
-    void applyLaneMirrorForMainPopupFallback();
+    void applyLaneMirrorForMainPopupFallback(lid);
   };
   setInterval(tickIndependentNorthStar, NORTH_STAR_INDEPENDENT_REFRESH_MS);
   // v0.1.978: 初回は interval(6s)を待たず素早く起動(lid は refresh 早期に set される)。
