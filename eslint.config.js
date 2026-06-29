@@ -118,8 +118,10 @@ export default [
     //   heavy 全件読み非依存で現配信の軽い源(nls_csummary_)から起動する DOM/storage グルー(syncStorySourceEntries・
     //   getStoryUserLaneEls は popup ローカル=lib抽出不可)。北極星 publish 詰まり根治(v0.1.990)後に残った最後の
     //   「アイコン列だけ started=0」を断つ(council/render-not-firing 続き・実機実証済)。レビュー済み例外。
+    //   v0.1.992: 独立 tick に applyLightweightPanelSummaryCards(lid) 呼び出し+lid 引数化+コメント=21533→21539。
+    //   記録/同接/来場の数字カードを heavy 非依存で panel_summary から埋める(embed_watch で「—」のまま根治)。
     files: ['src/extension/popup-entry.js'],
-    rules: { 'max-lines': ['error', { max: 21533, skipBlankLines: false, skipComments: false }] }
+    rules: { 'max-lines': ['error', { max: 21539, skipBlankLines: false, skipComments: false }] }
   },
   {
     files: ['src/extension/content-entry.js'],

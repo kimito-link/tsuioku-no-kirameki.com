@@ -7706,8 +7706,10 @@ function applyPanelMetricsFromContent(summary, lv) {
 /**
  * snapshot fetch 中でも panel サマリだけ読んで記録/来場/同接カードを更新する。
  */
-async function applyLightweightPanelSummaryCards() {
-  const lid = String(watchPopupLastPaintedLiveId || '').trim().toLowerCase();
+async function applyLightweightPanelSummaryCards(resolvedLid = '') {
+  // v0.1.992: lid は呼び出し側(独立 tick)が解決した値を優先(embed_watch で refresh 未完走でも &lv= から取れる)。
+  let lid = String(resolvedLid || '').trim().toLowerCase();
+  if (!/^lv\d{1,15}$/.test(lid)) lid = String(watchPopupLastPaintedLiveId || '').trim().toLowerCase();
   if (!/^lv\d{1,15}$/.test(lid)) return;
   if (!hasExtensionContext()) return;
   const pKey = panelSummaryStorageKey(lid);
@@ -21368,6 +21370,10 @@ async function initPopup() {
     // v0.1.991(最後の根): 応援レーン(アイコン列グリッド)を現配信の軽いコメント源から起動=heavy 非依存。
     //   北極星は揃うのにアイコン列だけ started=0 だった真因を断つ(現配信のレーンを描き lane mirror も publish)。
     void renderStoryUserLaneFromLightCommentsForCurrentLive(lid);
+    // v0.1.992(数字カード根治): 記録/推定同接/来場の上段3カードも heavy 非依存で埋める。embed_watch で
+    //   refresh が詰まると北極星/レーンは出るのに数字カードが「—」のまま(実機 v0.1.991 で確認)。
+    //   content が常時更新する panel_summary(per-live)を read だけして setCountDisplay/renderWatchMetaCard で塗る。
+    void applyLightweightPanelSummaryCards(lid);
   };
   setInterval(tickIndependentNorthStar, NORTH_STAR_INDEPENDENT_REFRESH_MS);
   // v0.1.978: 初回は interval(6s)を待たず素早く起動(lid は refresh 早期に set される)。
