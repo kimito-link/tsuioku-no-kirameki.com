@@ -128,6 +128,30 @@ async function fetchWithTimeout(fetchFn, url, init, timeoutMs) {
 }
 
 /**
+ * v0.1.1004 ★読み上げ固着(await_prefetch)の根治: Response の body 読み取り
+ *   (arrayBuffer())には Fetch 仕様上タイムアウト機構が無い。fetchWithTimeout は
+ *   【リクエスト】に AbortSignal タイムアウトを掛けるが、ヘッダ受信後(200 OK)に本体配信が
+ *   途中で止まると arrayBuffer() は【永遠に pending】になる。すると drainVoiceQueue が
+ *   `await prefetch.promise`(comeview-entry.js:603)で固着し一度も発話しない
+ *   (実機: 停止位置=await_prefetch・合成0ms・最終発話が伸び続ける)。ここで body 読み取りも
+ *   レースで打ち切り、超過時は null(=この1件は捨てて次へ)にして固着を構造的に潰す。
+ * @param {{ arrayBuffer: () => Promise<ArrayBuffer> }} res
+ * @param {number} timeoutMs
+ * @returns {Promise<ArrayBuffer|null>}
+ */
+async function arrayBufferWithTimeout(res, timeoutMs) {
+  let timer = 0;
+  const timeout = new Promise((_, reject) => {
+    timer = setTimeout(() => reject(new Error('voicevox_body_timeout')), timeoutMs);
+  });
+  try {
+    return /** @type {ArrayBuffer} */ (await Promise.race([res.arrayBuffer(), timeout]));
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/**
  * VOICEVOX 生存確認のデフォルトタイムアウトを文脈で決める。
  *
  * 2026-06-14 真因(3モデル会議全員一致+実コード検証): 会場モード下端バーは
@@ -284,7 +308,12 @@ export async function synthesizeVoice(text, voice, opts = {}) {
       positiveTimeout(opts.synthesisTimeoutMs, 8000)
     );
     if (!synthesisRes || synthesisRes.ok === false) return null;
-    return await synthesisRes.arrayBuffer();
+    // v0.1.1004: body 読み取りもタイムアウト保護(リクエストのみの保護では本体配信途中停止で
+    //   永遠 pending → 読み上げが await_prefetch 固着する)。超過/失敗時は catch で null=この1件を捨てる。
+    return await arrayBufferWithTimeout(
+      synthesisRes,
+      positiveTimeout(opts.synthesisTimeoutMs, 8000)
+    );
   } catch {
     return null;
   }

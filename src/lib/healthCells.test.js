@@ -407,14 +407,46 @@ describe('summarizeHealthVerdict v0.1.846 満点=「異常ゼロ」(進行中/�
       expect(cellById(cells, 'voice-coverage').level).toBe('ok'); // 間引き0=漏れ無し。
     });
 
-    it('待機があるのに30秒以上沈黙=止まっている疑いで bad', () => {
+    it('待機があるのに30秒以上沈黙=止まっている疑いで bad(diag が新鮮なとき)', () => {
       const now = 1000000;
       const cells = buildHealthCells({
-        voiceDiag: { enabled: true, spokenTotal: 10, queueNow: 6, queueMax: 8, lastSpokenBase: now - 40000, lastSynthMs: 0, staleDropTotal: 0, playbackTimeoutTotal: 0 },
+        // capturedAt が新鮮(0秒前)=会場が今稼働中で実際に止まっている。
+        voiceDiag: { enabled: true, spokenTotal: 10, queueNow: 6, queueMax: 8, lastSpokenBase: now - 40000, lastSynthMs: 0, staleDropTotal: 0, playbackTimeoutTotal: 0, capturedAt: now },
         nowMs: now
       });
       expect(cellById(cells, 'voice-timing').level).toBe('bad');
       expect(cellById(cells, 'voice-timing').text).toContain('沈黙');
+    });
+
+    // ★v0.1.1004: voiceDiag が古い(会場非稼働)なら、待機/沈黙が残っていても🔴にせず na(会場休止中)。
+    it('voiceDiag が古い(capturedAt が90秒超前)なら、待機8・5.5日沈黙でも na(会場休止中)=🔴誤発火しない', () => {
+      const now = 1000000000000;
+      const cells = buildHealthCells({
+        // 実機 lv350859008 型: 過去セッションの待機8/沈黙5.5日が残存・capturedAt は古い。
+        voiceDiag: {
+          enabled: true, spokenTotal: 0, queueNow: 8, queueMax: 8,
+          lastSpokenBase: now - 477691 * 1000, lastSynthMs: 0, staleDropTotal: 13,
+          playbackTimeoutTotal: 0, lastPhase: 'await_prefetch',
+          capturedAt: now - 5 * 60 * 1000 // 5分前=stale
+        },
+        nowMs: now
+      });
+      const c = cellById(cells, 'voice-timing');
+      expect(c.level).toBe('na');
+      expect(c.text).toContain('会場休止中');
+    });
+
+    it('voiceDiag が新鮮で実際に止まっていれば bad のまま(stale ゲートで本物の固着を隠さない)', () => {
+      const now = 1000000000000;
+      const cells = buildHealthCells({
+        voiceDiag: {
+          enabled: true, spokenTotal: 10, queueNow: 6, queueMax: 8,
+          lastSpokenBase: now - 40000, lastSynthMs: 0, staleDropTotal: 0,
+          playbackTimeoutTotal: 0, capturedAt: now - 1000 // 1秒前=新鮮
+        },
+        nowMs: now
+      });
+      expect(cellById(cells, 'voice-timing').level).toBe('bad');
     });
 
     it('v0.1.895: 累計の再生TO/固着回復(playbackTimeout>0)でも、今読めていれば緑(永久赤にしない)', () => {

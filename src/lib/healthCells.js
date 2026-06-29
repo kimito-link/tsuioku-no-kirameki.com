@@ -27,6 +27,14 @@ function num(x) {
 }
 
 /**
+ * v0.1.1004: voiceDiag(会場読み上げ観測値)が「今の状態」と見なせる鮮度上限(ms)。
+ *   会場が稼働中は comeview が頻繁に publishVoiceDiag するので capturedAt は新しい。これより古ければ
+ *   会場非稼働(watch タブ無し/会場閉じた)=過去セッションの待機/沈黙が残存しているだけ=live 固着判定を
+ *   しない(stale な「待機8・最終発話5.5日前」で🔴を誤発火しないため)。90秒=数十秒間隔の publish に余裕。
+ */
+const VOICE_DIAG_FRESH_MS = 90 * 1000;
+
+/**
  * % セル: value(0-100) と 80/40 閾値で level。value=null は na('—')。
  * v0.1.845: opts.processing=true なら閾値評価をせず level='processing'(青・進行中=正常な途中)。
  *   数値(value)はそのまま保持=嘘をつかない(率70%は70%のまま色だけ青)。
@@ -133,6 +141,12 @@ function buildVoiceHealthCells(voiceDiag, nowMs) {
   const pbTimeout = num(snap.playbackTimeoutTotal) || 0;
   const drop = num(snap.staleDropTotal) || 0;
   const queueNow = num(snap.queueNow) || 0;
+  // ★v0.1.1004 stale 誤検知の根治: voiceDiag が古い(comeview が長く書いていない=会場非稼働/
+  //   watch タブ無し)ときは、queueNow/lastSpokenBase が過去セッションの値のまま残り「待機8・
+  //   最終発話5.5日前」で🔴を誤発火する(番犬は発火していない=今まさに固着ではない)。
+  //   capturedAt が VOICE_DIAG_FRESH_MS より古ければ「今の状態は不明」として live 固着判定をしない。
+  const capturedAt = num(snap.capturedAt) || 0;
+  const diagFresh = capturedAt > 0 && now > 0 ? now - capturedAt <= VOICE_DIAG_FRESH_MS : true;
 
   // ① 読み上げ追従(タイミング)。判定は【今の状態】を最優先にする(v0.1.895)。
   //   重要: playbackTimeoutTotal は【累計】=一度でも再生TO/固着回復が起きると永久に増えたまま。
@@ -141,6 +155,10 @@ function buildVoiceHealthCells(voiceDiag, nowMs) {
   //   いるか(待機ありで沈黙が続く)を最優先に判定し、累計TOは緑時の補足情報に格下げする。
   if (!enabled) {
     out.push(stateCell('voice-timing', '読み上げ追従', 'na', 'OFF'));
+  } else if (!diagFresh) {
+    // ★v0.1.1004: voiceDiag が古い=会場が今稼働していない(過去セッションの待機/沈黙が残存)。
+    //   「今まさに固着」ではないので🔴にせず、判定対象外(na)にして総合判定を汚さない。
+    out.push(stateCell('voice-timing', '読み上げ追従', 'na', '会場休止中'));
   } else if (sinceSpokenMs != null && queueNow > 0 && sinceSpokenMs >= 30000) {
     // 待機があるのに30秒以上発話していない=今まさに止まっている(番犬の回復前 or 回復不能)。
     out.push(stateCell('voice-timing', '読み上げ追従', 'bad', `${Math.round(sinceSpokenMs / 1000)}秒沈黙`));
