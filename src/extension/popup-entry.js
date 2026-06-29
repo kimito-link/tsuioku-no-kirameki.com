@@ -5299,6 +5299,13 @@ function renderStoryUserLane() {
     domTilesPainted: countStoryUserLaneDomTiles(els)
   });
   recordStoryUserLaneStep(_storyUserLaneRenderProbe, STORY_USER_LANE_STEPS.DONE);
+  // v0.1.987(状態速報「描画済みなのにローディング継続」の根治): レーンが実際にタイルを描けた瞬間=
+  //   「中身が画面に出た」確定シグナル。従来の幕撤去は inlineWatchPanelHasRealDataForShade/失敗時タイマー
+  //   依存で、heavy 経路が詰まり気味だと幕が残ることがあった(実機 perfDiag.shadeActive=true・painted)。
+  //   描画完了に直結して幕を畳む=「描けたのにローディング」を構造的に消す。best-effort・冪等。
+  if (countStoryUserLaneDomTiles(els) > 0) {
+    try { dismissInitialLoadShade(); } catch { /* no-op */ }
+  }
   // 2026-06-22(council/lane-show-all-active): 健全度パネル「応援レーン」セル用に、人数整合の純観測値を
   //   storage へ(素性が取れた人 candidates.length / レーンに出した人 picked.length / 上限 limit)。
   //   venueSeatsDiag と同型(min-gap・best-effort・記録/描画は触らない)。
@@ -5405,6 +5412,8 @@ async function applyLaneMirrorForPassive() {
         [KEY_PREVIEW_RENDER_ACK]: buildPreviewRenderAck({ ready: true, liveId: ackLid, nowMs: Date.now() })
       }).catch(() => { /* best-effort: ack 失敗は描画を妨げない */ });
     } catch { /* no-op */ }
+    // v0.1.987: 鏡経路で描けたら幕も畳む(描けたのにローディングを構造的に消す)。冪等・幕が無ければ no-op。
+    try { dismissInitialLoadShade(); } catch { /* no-op */ }
   }
 }
 
@@ -5464,6 +5473,10 @@ async function applyLaneMirrorForMainPopupFallback(resolvedLid = '') {
     domTilesPainted: countStoryUserLaneDomTiles(els)
   });
   recordStoryUserLaneStep(_storyUserLaneRenderProbe, STORY_USER_LANE_STEPS.DONE);
+  // v0.1.987: 鏡フォールバックで描けたら幕も畳む(描けたのにローディングを構造的に消す)。冪等。
+  if (countStoryUserLaneDomTiles(els) > 0) {
+    try { dismissInitialLoadShade(); } catch { /* no-op */ }
+  }
 }
 
 /**
