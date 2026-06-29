@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 1 / 579 件
+## ⚠️ 役割コメントが無いソース 1 / 582 件
 - `src/lib/reportPreviewPublish.js`
 
 ## 全ファイルツリー
@@ -457,7 +457,7 @@
   - `vendor-visual-explainer.mjs` — Vendors nicobailon/visual-explainer (MIT) into .cursor/skills/visual-explainer/
   - `verify-bump.mjs` — extension bump 後の整合性チェッカー
   - `write-extension-placeholder-icons.mjs` — リポジトリに 256px アイコンしか無い環境向け: manifest 用の小さめ PNG を生成する。
-- 📁 **src/** (1229)
+- 📁 **src/** (1234)
   - 📁 **data/** (6)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -716,7 +716,7 @@
         - `logo_funlink_white_RGB_maru_black.png`
       - `logo_guide_funlink_ol.pdf`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1018)
+  - 📁 **lib/** (1023)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -949,6 +949,8 @@
     - `commenterHistoricalAnalytics.test.js`
     - `commenterSurvivalCurve.js` — コメンター生存曲線（B6）。
     - `commenterSurvivalCurve.test.js`
+    - `completenessScore.js` — 状態速報「網羅的完全性診断(PageSpeed 型)」のスコア集計(純関数)。
+    - `completenessScore.test.js`
     - `concurrentCalibrationFit.js` — 較正フィット（蓄積した較正サンプルから係数の「推奨値」を導く純関数）。
     - `concurrentCalibrationFit.test.js`
     - `concurrentCalibrationLog.js` — 同接推定の較正データロガー（しおりのようにストレージへサンプルが積まれる）。
@@ -996,6 +998,7 @@
     - `diagWarnings.test.js`
     - `diagWordingGuard.js` — ユーザー向け診断カードの「実害を示唆する語」を検出する純関数(v0.1.835)。
     - `diagWordingGuard.test.js`
+    - `diagnosisRegistry.js` — 状態速報「網羅的完全性診断」の【真実の源泉(Source of Truth)】。
     - `diagnosticErrorRing.js` — chrome.storage.local に保存する診断エラーリング（純粋・マージのみ）。
     - `diagnosticErrorRing.test.js`
     - `diagnosticRedact.js` — AI共有・診断バンドル向けの URL / 文字列のサニタイズ（純粋関数）。
@@ -1488,6 +1491,8 @@
     - `scrapeTotalGiftCountList.test.js`
     - `scrollWhiteoutProbe.js` — スクロール時の「白化(画面が一瞬白くなる)」を観測するための純判定。
     - `scrollWhiteoutProbe.test.js`
+    - `scrollWhiteoutReport.js` — スクロール白化(下にスクロールすると重く・一瞬白くなって・遅れて描画される)を状態速報の
+    - `scrollWhiteoutReport.test.js`
     - `selfActionCelebration.js` — アプリから自分が操作した直後に返す軽量演出の spec。
     - `selfActionCelebration.test.js`
     - `selfPostedMatcher.js` — 自己投稿コメント（self-posted recents）と、保存済みコメント一覧の

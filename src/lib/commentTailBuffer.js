@@ -36,6 +36,14 @@ export const TAIL_COMPACT_INTERVAL_MS = 10_000;
 export const TAIL_MAX_ROWS = 2_000;
 
 /**
+ * v0.1.998: tail 内の commentNo 欠落行がこの件数に達したら早めに畳み込む（表示カウントの
+ * 一時二重の窓を短くする）。欠落行は cheap dedupe できず畳み込み時の loneDedupe が最終判定
+ * のため、「畳み込みを早める」ことが唯一の安全な是正（capturedAt スタンプは loneDedupe を壊す
+ * ので不可＝commentTailBuffer.js の不変条件）。小さめに取り、巨大メイン時は別ロジックで無効。
+ */
+export const COMMENT_NO_LESS_COMPACT_MIN = 20;
+
+/**
  * v0.1.696: この行数以上のバッチはテールを経由させずチャンク追記へ直行させるしきい値。
  * テールは「小さな高頻度RTバッチ」の O(N) 緩和装置で、backfill の数千行バーストを通すと
  * TAIL_MAX_ROWS クランプで古い行が黙って消える(=「一気に取れない」38〜43%損失の真因・
@@ -171,6 +179,31 @@ export function appendToTail(currentTail, freshRows) {
 }
 
 /**
+ * v0.1.998: commentNo 欠落行が tail に何件あるかを数える純関数。
+ *
+ * 背景（「記録>本家コメ」101% 二次バグの根治）: commentNo を持つ行は seed/append 時に
+ *   `tailKnownCommentNoKeys`（liveId|no|text）で cheap dedupe され、main に既存なら tail へ
+ *   再追記されない。しかし commentNo 欠落行はキーが capturedAt 秒に依存し、incoming は
+ *   capturedAt 未スタンプのため cheap dedupe できない（selectNewTailRows は欠落行を素通し）。
+ *   このため「main に既にある欠落コメントが再到来 → tail に再追記 → 表示カウント
+ *   `tailMainCount + tailRowsBuffer.length` が畳み込みまで二重」になり、単調ゲートが
+ *   膨れたピークを焼き付けると「記録>本家」が居座る。最終 dedupe は畳み込み時の
+ *   loneDedupe(text|uid|sec) が必ず行う＝「畳み込みを早める」だけで表示は正される。
+ *   この関数は「畳み込みを早めるべきか」の入力（tail 内の欠落行の有無）を純粋に数える。
+ *
+ * @param {Array<{ commentNo?: string }>|unknown} rows
+ * @returns {number} commentNo を持たない行の件数
+ */
+export function countCommentNoLessRows(rows) {
+  if (!Array.isArray(rows)) return 0;
+  let n = 0;
+  for (const r of rows) {
+    if (!String(r?.commentNo ?? '').trim()) n += 1;
+  }
+  return n;
+}
+
+/**
  * テールをメインへ畳み込むべきか判定する純関数。
  *
  * @param {{
@@ -178,7 +211,8 @@ export function appendToTail(currentTail, freshRows) {
  *   sinceLastCompactMs?: number,
  *   mainCount?: number,
  *   hidden?: boolean,
- *   force?: boolean
+ *   force?: boolean,
+ *   commentNoLessInTail?: number
  * }} opts
  * @returns {boolean}
  */
@@ -192,8 +226,15 @@ export function shouldCompactTail(opts = {}) {
   //   使わない（＝重いクローンの頻度を最小化）。新着はテール（常時永続）が表示を担うので
   //   データも鮮度も守られる。
   if (mainCount >= BIG_MAIN_THRESHOLD) {
+    // 巨大メインでは畳み込みコストが支配的なので、欠落行があっても従来の BIG しきい値を維持する
+    //   （表示カウントは元々近似で、頻繁な畳み込みのフリーズリスクを優先回避）。
     return tailLength >= TAIL_COMPACT_COUNT_BIG;
   }
+  // v0.1.998: commentNo 欠落行が tail にあるときは、表示カウントの一時二重を最小化するため
+  //   早めに畳み込む（loneDedupe で正される）。巨大メインでない＝クローンは安いので、
+  //   欠落行が溜まり始めた段階（COMMENT_NO_LESS_COMPACT_MIN 件以上）で畳み込む。
+  const noLess = Math.max(0, Number(opts.commentNoLessInTail) || 0);
+  if (noLess >= COMMENT_NO_LESS_COMPACT_MIN) return true;
   // 小〜中規模: 従来どおり（クローンが安いので頻繁でも問題ない）。
   // タブ非表示／離脱時はテールが空でなければ畳み込んでおく（次回読み込みで取りこぼさない）。
   if (opts.hidden === true) return true;
