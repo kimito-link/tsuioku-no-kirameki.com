@@ -124,7 +124,10 @@ export function buildDiagnosticsTrust(args) {
       lidMatch: popupLidMatch,
       // v0.1.984: popup が動かしていた拡張バージョン/ビルド(新コード未ロード判定用)。
       extVersion: pd?.popup?.extensionVersion ? String(pd.popup.extensionVersion) : '',
-      buildId: pd?.popup?.buildId ? String(pd.popup.buildId) : ''
+      buildId: pd?.popup?.buildId ? String(pd.popup.buildId) : '',
+      // v0.1.988: 診断の出自(passive/embed_watch/toolbar/popup)。パリティ判定が passive 由来の
+      //   heavy probe=0 を「①POP未描画」と誤診しないために使う。
+      viewKind: pd?.popup?.viewKind ? String(pd.popup.viewKind) : ''
     },
     mirrors,
     publish,

@@ -88,6 +88,24 @@ describe('buildParityVerdict — 不一致(本物の×だけ)', () => {
   });
 });
 
+describe('buildParityVerdict — passive 由来は heavy probe=0 を誤診しない(v0.1.988)', () => {
+  it('passive 診断で started=0/refreshAllStarted=0 でも ①POP未描画にしない', () => {
+    const i = okInput();
+    i.trust.popup.viewKind = 'passive';
+    i.laneRenderDiag = { started: 0, verdict: 'not_started' }; // passive では正常
+    i.northStarProbe = { refreshAllStarted: 0 };               // passive では正常
+    const v = buildParityVerdict(i);
+    // ①の heavy 判定をスキップ→他(整合/publish/ack)が全部OKなら ok
+    expect(v.verdict).toBe('ok');
+  });
+  it('embed_watch 診断なら started=0 は ①POP未描画(従来どおり)', () => {
+    const i = okInput();
+    i.trust.popup.viewKind = 'embed_watch';
+    i.laneRenderDiag = { started: 0, verdict: 'not_started' };
+    expect(buildParityVerdict(i).code).toBe('pop_lane_not_started');
+  });
+});
+
 describe('buildParityVerdict — 合格', () => {
   it('全部そろって ok', () => {
     const v = buildParityVerdict(okInput());
