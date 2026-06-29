@@ -103,7 +103,11 @@ export function buildAiShareFullText({ overviewText, livesData, fastDiag, popupD
   let laneLoadingActive = false;
   try {
     const probeSnap = (popupDiag?.popup ?? popupDiag)?.storyUserLaneRenderProbe || null;
-    laneRenderDiag = buildStoryUserLaneRenderDiag(probeSnap);
+    // v0.1.1006: 匿名主体(userId付き率が極低)の配信は heavy 経路 0 タイルが正常=🔴誤報を消すため、
+    //   withUidPercent を診断に渡す(fastDiag に既にある値・新規 read ゼロ)。
+    const withUidPercent =
+      fastDiag?.content?.giftDiagnostics?.commentObservability?.savedCommentsUidStats?.withUidPercent;
+    laneRenderDiag = buildStoryUserLaneRenderDiag(probeSnap, { withUidPercent });
     const watching = Array.isArray(livesData)
       ? livesData.find((l) => l && l.recording && l.perfDiag) || livesData.find((l) => l && l.perfDiag)
       : null;
