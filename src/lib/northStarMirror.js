@@ -15,8 +15,10 @@
  * @module northStarMirror
  */
 
-/** 1レーンあたりの上限件数(ニコ生本体表示と揃え 1-10 位が正本)。 */
-const NORTH_STAR_LANE_ROW_CAP = 10;
+/** 1レーンあたりの上限件数(ニコ生本体表示と揃え 1-10 位が正本)。
+ *  ★鏡は設計上ここで頭打ち=整合チェック(liveviewPublishSelfDiag)も同じ上限で apiRows を
+ *    クランプしてから突合する(生API深度20件 vs 鏡10件 を『コピー漏れ』と誤検知しないため)。 */
+export const NORTH_STAR_LANE_ROW_CAP = 10;
 
 /**
  * ★row の正本フィールドは officialDomRankingRowsToStripRooms(src/lib)が読むものに【完全一致】させる。

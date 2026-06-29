@@ -101,6 +101,40 @@ describe('buildLiveviewPublishSelfDiag', () => {
     expect(d.consistency[0]).toMatchObject({ extRows: 6, mirrorRows: 2, match: false });
   });
 
+  it('整合チェック: 生API深度>鏡上限(42→鏡10)は設計通りの cap=一致(誤検知の根治・実機lv350857956 v0.1.1000)', () => {
+    // koken API は rank=20 で取るが鏡は 1-10 位で頭打ち(NORTH_STAR_LANE_ROW_CAP)。生42と鏡10を
+    //   そのまま突合すると「コピー漏れ🔴」と誤検知する。apiRows を上限でクランプして突合=一致にする。
+    const blob = fullBlob();
+    blob.northStarMirror.lanes.contributionRanking = Array.from({ length: 10 }, (_, i) => ({
+      name: `u${i}`,
+      contribution: 100 - i
+    })); // 鏡は満杯の10件
+    const fastDiag = { content: { giftDiagnostics: { '北極星レーン': {
+      '1_貢献度ランキング': { apiRows: 42, state: 'ok' } // 生API深度は42(11位以降は鏡に載らない設計)
+    } } } };
+    const d = buildLiveviewPublishSelfDiag({ jsonBlob: blob, fastDiag, currentLiveId: 'lv1', publishKeys: {}, nowMs: NOW });
+    // extRows は生値(42)を保持しつつ、判定は上限クランプ後で match=true。
+    expect(d.consistency[0]).toMatchObject({ extRows: 42, mirrorRows: 10, match: true });
+    // コピー漏れカードに昇格しない(誤検知ゼロ)。
+    const cards = liveviewPublishSelfDiagToActionCards(d);
+    expect(cards.some((c) => c.id.startsWith('liveview-mirror-count-mismatch'))).toBe(false);
+  });
+
+  it('整合チェック: 上限クランプ後でも本物の欠落(鏡<min(api,cap))は🔴不一致のまま', () => {
+    // 生42→クランプ10、だが鏡は3件しか無い=本物のコピー漏れ→引き続き mismatch。
+    const blob = fullBlob();
+    blob.northStarMirror.lanes.contributionRanking = [
+      { name: 'a', contribution: 9 }, { name: 'b', contribution: 8 }, { name: 'c', contribution: 7 }
+    ]; // 鏡3件
+    const fastDiag = { content: { giftDiagnostics: { '北極星レーン': {
+      '1_貢献度ランキング': { apiRows: 42, state: 'ok' }
+    } } } };
+    const d = buildLiveviewPublishSelfDiag({ jsonBlob: blob, fastDiag, currentLiveId: 'lv1', publishKeys: {}, nowMs: NOW });
+    expect(d.consistency[0]).toMatchObject({ extRows: 42, mirrorRows: 3, match: false });
+    // メッセージに生件数(42)を併記して透明性を保つ。
+    expect(d.consistency[0].reason).toContain('生42');
+  });
+
   it('整合チェック(第2段): 拡張>鏡 が許容幅以内(1件差)は鮮度差=normal で警告しない', () => {
     // ★実機 v0.1.964: 拡張 apiRows=7 ≠ 鏡6(1件差)。koken 30秒自動更新の鮮度差=コピー漏れではない。
     const blob = fullBlob();

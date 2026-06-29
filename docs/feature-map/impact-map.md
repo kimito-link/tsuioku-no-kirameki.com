@@ -167,6 +167,7 @@
 | `src/lib/nlsInterceptAuth.js` | 2 | 記録エンジン(watchページ常駐) / ページ傍受 |
 | `src/lib/northStarLaneReason.js` | 2 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) |
 | `src/lib/northStarLaneResult.js` | 2 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) |
+| `src/lib/northStarMirror.js` | 2 | ポップアップ(応援レーン) / 状態速報ページ |
 | `src/lib/northStarMirrorKey.js` | 2 | ポップアップ(応援レーン) / 状態速報ページ |
 | `src/lib/officialContributionRankingResolver.js` | 2 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) |
 | `src/lib/officialEventBannerDom.js` | 2 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) |
@@ -448,7 +449,6 @@
 | `src/lib/northStarLaneGadgetChara.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/northStarLaneVisibility.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/northStarLaneWaitingUi.js` | 1 | ポップアップ(応援レーン) |
-| `src/lib/northStarMirror.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/numberConsistency.js` | 1 | 状態速報ページ |
 | `src/lib/objectUrlRevokeQueue.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/observerTarget.js` | 1 | 記録エンジン(watchページ常駐) |

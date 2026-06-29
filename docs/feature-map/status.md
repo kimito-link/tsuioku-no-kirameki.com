@@ -48,12 +48,12 @@ graph LR
   n_status --> n_src_lib_metricConfidence_js["lib/metricConfidence.js"]:::shared
   n_status --> n_src_lib_nicoAnonymousDisplay_js["lib/nicoAnonymousDisplay.js"]:::shared
   n_status --> n_src_lib_nicoUserPage_js["lib/nicoUserPage.js"]:::shared
+  n_status --> n_src_lib_northStarMirror_js["lib/northStarMirror.js"]:::shared
   n_status --> n_src_lib_northStarMirrorKey_js["lib/northStarMirrorKey.js"]:::shared
   n_status --> n_src_lib_numberConsistency_js["lib/numberConsistency.js"]
   n_status --> n_src_lib_panelLiveSummary_js["lib/panelLiveSummary.js"]:::shared
   n_status --> n_src_lib_parityVerdict_js["lib/parityVerdict.js"]
-  n_status --> n_src_lib_perfDiag_js["lib/perfDiag.js"]:::shared
   classDef shared fill:#eee,stroke:#999,color:#666;
 ```
 
-> ほか 37 ファイル省略（全件は storage-bus.md / metafile 参照）。
+> ほか 38 ファイル省略（全件は storage-bus.md / metafile 参照）。

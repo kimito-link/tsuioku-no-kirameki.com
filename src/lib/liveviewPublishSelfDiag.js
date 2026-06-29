@@ -18,6 +18,8 @@
  * @module liveviewPublishSelfDiag
  */
 
+import { NORTH_STAR_LANE_ROW_CAP } from './northStarMirror.js';
+
 const FRESH_MS = 3 * 60 * 1000; // 3分超＝古い＝popup未起動疑い（status の MIRROR_FRESH_MS と同値）
 
 function lc(v) {
@@ -81,19 +83,28 @@ const NORTH_STAR_STALENESS_TOLERANCE_ROWS = 2;
  * @returns {{ verdict: 'match'|'normal'|'mismatch', reason: string }}
  */
 function judgeNorthStarConsistency(apiRows, mirrorRows) {
-  const ext = Math.max(0, Math.floor(Number(apiRows) || 0));
+  // ★v0.1.1000 誤検知の根治: 鏡は設計上 1 レーン NORTH_STAR_LANE_ROW_CAP(=10)件で頭打ち
+  //   (ニコ生本体の 1-10 位表示に合わせる・northStarMirror.js)。一方 apiRows は koken API の
+  //   生取得深度(例: rank=20 で 20 件、診断由来で 42 等)で、鏡には載らない 11 位以降を含む。
+  //   この上限でクランプせず生 42 と鏡 10 を突合すると「コピー漏れ」と誤検知する(実機 lv350857956)。
+  //   → apiRows を鏡の上限でクランプしてから突合する。これで「20→10 は設計通り=一致」、
+  //     「鏡=0 や 鏡<min(api,cap) の本物の欠落」は引き続き 🔴 に出す。
+  const extRaw = Math.max(0, Math.floor(Number(apiRows) || 0));
+  const ext = Math.min(extRaw, NORTH_STAR_LANE_ROW_CAP);
   const mir = Math.max(0, Math.floor(Number(mirrorRows) || 0));
   if (ext === mir) return { verdict: 'match', reason: '' };
   // 鏡が空なのに拡張に実データがある=完全欠落=本物のコピー漏れ。
   if (mir === 0 && ext > 0) {
-    return { verdict: 'mismatch', reason: `鏡が空(${mir})なのに拡張に${ext}件=鏡publishの取りこぼし` };
+    return { verdict: 'mismatch', reason: `鏡が空(${mir})なのに拡張に${extRaw}件=鏡publishの取りこぼし` };
   }
   // 拡張>鏡 が許容幅以内=koken 30秒自動更新の鮮度差で説明可能=正常。
   if (ext > mir && ext - mir <= NORTH_STAR_STALENESS_TOLERANCE_ROWS) {
     return { verdict: 'normal', reason: `差${ext - mir}件は koken の自動更新による鮮度差で説明可能(拡張=今/鏡=数十秒前)` };
   }
   // 鏡>拡張(鏡に余分)や、許容幅を超える大差=要確認。
-  return { verdict: 'mismatch', reason: `拡張${ext} / 鏡${mir} の差が大きく鮮度差で説明しにくい` };
+  //   拡張は上限クランプ後の ext で判定するが、生件数(extRaw)が違えばメッセージに併記して透明性を保つ。
+  const extLabel = extRaw !== ext ? `拡張${ext}(生${extRaw})` : `拡張${ext}`;
+  return { verdict: 'mismatch', reason: `${extLabel} / 鏡${mir} の差が大きく鮮度差で説明しにくい` };
 }
 
 /**
