@@ -62,7 +62,15 @@ export function buildCommentCountProvenance(lv) {
       ? Math.round((recorded / official) * 100)
       : null;
   const recordedExceedsOfficial = recorded != null && official != null && recorded > official;
-  const officialAgeMs = Number(o.lastIngestAgoMs);
+  // ★v0.1.1003 誤検知根治: 「本家コメが新鮮か」は公式統計(statistics.comments)が最後に更新された
+  //   時刻で測る(officialCommentStatsAgeMs)。これが無い旧経路だけ lastIngestAgoMs(コメント取り込み
+  //   時刻)にフォールバック。両者は別クロックで、コメントは毎秒来る(lastIngest=0秒前)が公式統計は
+  //   遅延更新で数分古いことがあり、従来は「0秒前=新鮮」と誤認して『遅延では説明できない』要確認を
+  //   誤発火していた(実機 lv350859008 102→106% が公式遅延だった疑い)。
+  const officialStatsAge = Number(o.officialCommentStatsAgeMs);
+  const officialAgeMs = Number.isFinite(officialStatsAge) && officialStatsAge >= 0
+    ? officialStatsAge
+    : Number(o.lastIngestAgoMs);
   const officialIsFresh = Number.isFinite(officialAgeMs) && officialAgeMs >= 0 && officialAgeMs <= OFFICIAL_FRESH_MS;
 
   // 3段階判定(誤検知防止のため、判定できる材料が揃ったときだけ ok/normal/check を出す)。
