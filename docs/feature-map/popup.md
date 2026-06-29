@@ -40,7 +40,7 @@ graph LR
   n_popup --> n_src_lib_backfillOptIn_js["lib/backfillOptIn.js"]:::shared
   n_popup --> n_src_lib_backfillRemoveGiftSystemMessages_js["lib/backfillRemoveGiftSystemMessages.js"]
   n_popup --> n_src_lib_backfillRemoveRecommendedLivePollution_js["lib/backfillRemoveRecommendedLivePollution.js"]:::shared
-  n_popup --> n_src_lib_backfillRinkuNarration_js["lib/backfillRinkuNarration.js"]
+  n_popup --> n_src_lib_backfillRinkuNarration_js["lib/backfillRinkuNarration.js"]:::shared
   n_popup --> n_src_lib_blobDownload_js["lib/blobDownload.js"]
   n_popup --> n_src_lib_broadcastCrossCompare_js["lib/broadcastCrossCompare.js"]
   n_popup --> n_src_lib_broadcastDurationLabel_js["lib/broadcastDurationLabel.js"]

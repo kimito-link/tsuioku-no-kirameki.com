@@ -15602,7 +15602,7 @@ const NDGR_BACKFILL_TRANSIENT_RETRY_DELAY_MS = 20_000;
  *   popup 側（backfillRinkuNarration）が区別し、嘘の達成宣言をしないため。
  * v0.1.692: errMsg を持つ。aborted の真因(crawl 例外メッセージ)を status 診断へ保全する。
  */
-const _backfillProgress = { seg: 0, rows: 0, done: 0, stopReason: '', errMsg: '' };
+const _backfillProgress = { seg: 0, rows: 0, done: 0, stopReason: '', errMsg: '', elapsedMs: 0, reseeds: 0 };
 /** v0.1.892: seg:0 で止まる箇所の細分計器(会議 backfill-stuck-seg0 の続き)。lastSkip:"started" の【先】=
  *  crawlNdgrBackward 起動後に gen.next() を何回回したか(genSteps)・このラウンド開始からの経過(roundStartedAt)。
  *  genSteps=0 のまま running=初回 gen.next() が pending(初回fetch/seek で詰まる)。genSteps>0 で seg:0=
@@ -15653,6 +15653,9 @@ function publishBackfillProgress() {
           stopReason: _backfillProgress.stopReason || '',
           // v0.1.692: aborted の真因(例外メッセージ)を status 診断へ橋渡し(画面文言には出さない)。
           errMsg: _backfillProgress.stopReason === 'aborted' ? String(_backfillProgress.errMsg || '') : '',
+          // v0.1.999 スループット計器（観測値・取り込みには影響しない）。
+          elapsedMs: Number(_backfillProgress.elapsedMs) || 0,
+          reseeds: Number(_backfillProgress.reseeds) || 0,
           ts: Date.now()
         }
       },
@@ -16010,6 +16013,11 @@ async function runNdgrBackfillOnce(ctx = {}) {
         if (!(genReason === 'aborted' && _backfillProgress.stopReason)) {
           _backfillProgress.stopReason = genReason;
         }
+        // v0.1.999 スループット計器: crawl の経過時間・入口さがし回数を進捗へ拾う（観測値・
+        //   取り込みには影響しない）。状態速報で「経過Xs・区画Y・再シードZ回 → 約1区画Wms」を出し、
+        //   seek（入口さがし）が律速かを実機スクショ1枚で確定する。
+        _backfillProgress.elapsedMs = Number(step.value?.elapsedMs) || 0;
+        _backfillProgress.reseeds = Number(step.value?.reseeds) || 0;
         // v0.1.456 レジューム: 終了時に最古到達 vpos を保存（次回「もう一度」で続きから）。
         //   reached_start（配信開始まで到達）で完了したら resume をクリア＝次回はゼロから。
         //   それ以外（no_progress/cap_*/aborted/rate_limited 等）は続きから再開できるよう残す。

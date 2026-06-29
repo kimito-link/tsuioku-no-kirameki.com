@@ -19,6 +19,7 @@ graph LR
   n_status --> n_src_lib_anonymousIdenticon_js["lib/anonymousIdenticon.js"]:::shared
   n_status --> n_src_lib_avatarPartsComposer_js["lib/avatarPartsComposer.js"]:::shared
   n_status --> n_src_lib_backfillRemoveRecommendedLivePollution_js["lib/backfillRemoveRecommendedLivePollution.js"]:::shared
+  n_status --> n_src_lib_backfillRinkuNarration_js["lib/backfillRinkuNarration.js"]:::shared
   n_status --> n_src_lib_backgroundWatchTab_js["lib/backgroundWatchTab.js"]
   n_status --> n_src_lib_broadcasterReputationKeywords_js["lib/broadcasterReputationKeywords.js"]
   n_status --> n_src_lib_broadcasterReputationView_js["lib/broadcasterReputationView.js"]
@@ -52,8 +53,7 @@ graph LR
   n_status --> n_src_lib_panelLiveSummary_js["lib/panelLiveSummary.js"]:::shared
   n_status --> n_src_lib_parityVerdict_js["lib/parityVerdict.js"]
   n_status --> n_src_lib_perfDiag_js["lib/perfDiag.js"]:::shared
-  n_status --> n_src_lib_personTileDom_js["lib/personTileDom.js"]:::shared
   classDef shared fill:#eee,stroke:#999,color:#666;
 ```
 
-> ほか 35 ファイル省略（全件は storage-bus.md / metafile 参照）。
+> ほか 37 ファイル省略（全件は storage-bus.md / metafile 参照）。

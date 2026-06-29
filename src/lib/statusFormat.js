@@ -17,6 +17,7 @@
  */
 
 import { buildPerfDiagLine } from './perfDiag.js';
+import { backfillThroughputLine } from './backfillRinkuNarration.js';
 
 /**
  * 概要テキスト(配信数・累計記録・公式累計・取得率)を組み立てる。
@@ -172,11 +173,14 @@ export function buildCaptureRateLine(live) {
  */
 export function buildBackfillProgressLine(bp, opts) {
   if (bp && bp.lid) {
-    return (
+    const base =
       `過去ログ取得: [${bp.lid}] ${Number(bp.done) === 1 ? '完了' : '取得中'}・取得${Number(bp.rows) || 0}件` +
       (bp.stopReason ? `・停止理由=${bp.stopReason}` : '') +
-      (bp.errMsg ? `・エラー: ${bp.errMsg}` : '')
-    );
+      (bp.errMsg ? `・エラー: ${bp.errMsg}` : '');
+    // v0.1.999 スループット計器: 「経過Xs・区画Y・再シードZ回 → 約1区画Wms」を別行で併記
+    //   （材料が揃ったときだけ・seek 律速の実機確定用）。
+    const tput = backfillThroughputLine(bp);
+    return tput ? `${base}\n${tput}` : base;
   }
   // 進捗キーがまだ書かれていない(走行中/完走前)が、記録中×放送中×未達の配信があるなら、
   //   「黙って空」でなく「取り込み中」と伝える(数字は出さない=不安にさせない・v0.1.791 と同思想)。
