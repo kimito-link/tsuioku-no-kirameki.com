@@ -106,12 +106,21 @@ export function buildCommentCountProvenance(lv) {
       value: official,
       what: 'ニコ生公式のコメント総数',
       source: 'NDGR 公式統計（遅延して届く）',
-      ageLabel: agoLabel(o.lastIngestAgoMs)
+      // v0.1.1007: 本家コメ齢は公式統計の更新時刻(officialCommentStatsAgeMs)を優先(v0.1.1003 と同じ正しいクロック)。
+      ageLabel: agoLabel(
+        Number.isFinite(officialStatsAge) && officialStatsAge >= 0 ? officialStatsAge : o.lastIngestAgoMs
+      )
     },
     ratePct,
     recordedExceedsOfficial,
     verdict,
-    verdictReason
+    verdictReason,
+    // v0.1.1007: 焼き付き vs 本家遅延の時系列材料(panel_summary 由来・窓内の本家Δ/記録Δ)。
+    timeSeries: {
+      officialDelta: num(o.officialStatisticsCommentsDelta),
+      recordedDelta: num(o.officialReceivedCommentsDelta),
+      windowMs: num(o.officialCommentSampleWindowMs)
+    }
   };
 }
 
@@ -200,6 +209,23 @@ export function formatCommentCountProvenanceLines(livesData, fastDiag = null) {
           `- 内訳(計器): 記録のうち commentNo 欠落行 ${ja(noLess.count)}件 (${noLess.percent}%)` +
             ` — 高いほど匿名主体で二重計上が起きやすい/低いほど本家統計の数え方差の疑い`
         );
+      }
+      // v0.1.1007 時系列計器: 焼き付き vs 本家遅延の切り分け。直近の窓で「本家がどれだけ増えたか(本家Δ)」と
+      //   「記録がどれだけ増えたか(記録Δ)」を並べる。本家Δ≈記録Δ なら母数差/本家遅延(=記録が正しく先行)、
+      //   本家Δ≪記録Δ なら記録の過剰増(二重計上の疑い)。panel_summary に既にある値=新規 read ゼロ。
+      const ts = p.timeSeries;
+      if (ts && (ts.officialDelta != null || ts.recordedDelta != null)) {
+        const winSec = ts.windowMs != null ? Math.round(ts.windowMs / 1000) : null;
+        const winLabel = winSec != null && winSec > 0 ? `直近${winSec}秒で ` : '直近窓で ';
+        const od = ts.officialDelta != null ? `本家+${ja(ts.officialDelta)}` : '本家+?';
+        const rd = ts.recordedDelta != null ? `記録+${ja(ts.recordedDelta)}` : '記録+?';
+        const hint =
+          ts.officialDelta != null && ts.recordedDelta != null
+            ? ts.recordedDelta - ts.officialDelta > Math.max(2, Math.round(ts.officialDelta * 0.2))
+              ? ' — 記録Δが本家Δを上回る＝記録の過剰増(二重計上)寄り'
+              : ' — 本家Δ≈記録Δ＝母数差/本家の遅延寄り(記録が正しく先行)'
+            : '';
+        lines.push(`- 時系列(計器): ${winLabel}${od} / ${rd}${hint}`);
       }
     }
   }
