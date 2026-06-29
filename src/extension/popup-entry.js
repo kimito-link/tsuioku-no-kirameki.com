@@ -21325,8 +21325,25 @@ async function initPopup() {
   setInterval(tickIndependentNorthStar, NORTH_STAR_INDEPENDENT_REFRESH_MS);
   // v0.1.978: 初回は interval(6s)を待たず素早く起動(lid は refresh 早期に set される)。
   //   複数回試行で「refresh 早期 paint で lid 確定 → すぐ北極星が出る」を確実にする。
+  // v0.1.989(真因対策): 実機 embed_watch で probe=0 が残るのは、重い watch ページ内 iframe で
+  //   setTimeout/setInterval コールバックがメインスレッド枯渇により遅延・取り残されるため(クリーン環境では
+  //   再現せず実機のみ=タイマー starvation)。タイマー任せにせず init 末尾で【同期的に1回】起動し、
+  //   さらに storage.onChanged(content が contrib/ad/コメントを書くたび)でも起動して、タイマーが詰まっても
+  //   描画が必ず1回は走るようにする。idempotent(diff-skip)なので多重起動は no-op=安全。
+  try { tickIndependentNorthStar(); } catch { /* no-op */ }
   setTimeout(tickIndependentNorthStar, 400);
   setTimeout(tickIndependentNorthStar, 1500);
+  setTimeout(tickIndependentNorthStar, 4000);
+  try {
+    chrome.storage.onChanged.addListener((changes, area) => {
+      if (area !== 'local' || !hasExtensionContext()) return;
+      const keys = Object.keys(changes);
+      // content が北極星の生データ/コメントを書いた=描けるようになった合図。タイマー非依存で起動。
+      if (keys.some((k) => /^nls_(koken_api_contrib|nicoad_api_ranking|comments|cdb_summary|csummary|panel_summary)_/.test(k))) {
+        tickIndependentNorthStar();
+      }
+    });
+  } catch { /* onChanged 不可環境: タイマーだけで動く(後退しない) */ }
 
   /** 鮮度注記だけ 30 秒ごとに更新（カード列は触らない） */
   setInterval(() => {
