@@ -28,8 +28,10 @@ graph LR
   n_status --> n_src_lib_commentSummary_js["lib/commentSummary.js"]:::shared
   n_status --> n_src_lib_commentTimelineMirrorKey_js["lib/commentTimelineMirrorKey.js"]:::shared
   n_status --> n_src_lib_commentTimelineReport_js["lib/commentTimelineReport.js"]
+  n_status --> n_src_lib_completenessScore_js["lib/completenessScore.js"]
   n_status --> n_src_lib_copyTextWithFallback_js["lib/copyTextWithFallback.js"]
   n_status --> n_src_lib_deriveAvatarUrlFromUid_js["lib/deriveAvatarUrlFromUid.js"]:::shared
+  n_status --> n_src_lib_diagnosisRegistry_js["lib/diagnosisRegistry.js"]
   n_status --> n_src_lib_diagnosticsTrust_js["lib/diagnosticsTrust.js"]
   n_status --> n_src_lib_giftDisplayNickname_js["lib/giftDisplayNickname.js"]:::shared
   n_status --> n_src_lib_googleSuggest_js["lib/googleSuggest.js"]
@@ -51,9 +53,7 @@ graph LR
   n_status --> n_src_lib_parityVerdict_js["lib/parityVerdict.js"]
   n_status --> n_src_lib_perfDiag_js["lib/perfDiag.js"]:::shared
   n_status --> n_src_lib_personTileDom_js["lib/personTileDom.js"]:::shared
-  n_status --> n_src_lib_pickBroadcasterNameForReputation_js["lib/pickBroadcasterNameForReputation.js"]
-  n_status --> n_src_lib_previewRenderAckKey_js["lib/previewRenderAckKey.js"]:::shared
   classDef shared fill:#eee,stroke:#999,color:#666;
 ```
 
-> ほか 32 ファイル省略（全件は storage-bus.md / metafile 参照）。
+> ほか 35 ファイル省略（全件は storage-bus.md / metafile 参照）。
