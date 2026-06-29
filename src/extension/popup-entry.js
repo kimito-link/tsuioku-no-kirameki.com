@@ -10965,12 +10965,13 @@ async function refreshAllNorthStarMirrorLanes(liveId) {
   _northStarRenderProbe.lastReachedLane = 'start';
   _northStarRenderProbe.lastError = '';
   try {
-    // v0.1.617: イベント系2レーンの「非参加なら即・確実に畳む」を連鎖の**最初**に行う。
-    //   重いギフト同期(実機9.4秒)や後続レーンの storage 読みで連鎖が遅延/中断しても、
-    //   イベント非参加レーンが「ニコニコの公式から問い合わせ中」を出し続ける問題を断つ。
-    //   イベント参加シグナルが無ければ event 2レーンを hide+待機UI撤去。参加中(rows あり/
-    //   bundle.eventBanner 等)なら従来の描画関数に委ねる(ここでは触らない)。
-    await hideNorthStarEventLanesIfNotParticipating(lid);
+    // v0.1.617: イベント系2レーンの「非参加なら即・確実に畳む」。
+    // ★v0.1.990(真因修正): これを await すると、内部の chrome.storage.local.get が重い配信(大量
+    //   backfill 中)で遅延/詰まったとき、連鎖が先頭(lastReachedLane="start")で止まり、後段の
+    //   貢献度/広告レーン描画と【鏡 publish に到達しない】=鏡が空のまま(実機 v0.1.989: started 11/
+    //   completed 2・拡張4≠鏡0)。イベント2レーンの hide は貢献度/広告の publish に不要なので、
+    //   await せず非ブロックで投げる(fire-and-forget)。重い read が遅れても貢献度/広告は即描画・publish される。
+    void hideNorthStarEventLanesIfNotParticipating(lid).catch(() => { /* best-effort */ });
     const giftSyncStart = Date.now();
     // v0.1.617: ギフト履歴の SW 全ページ取得(実機9.4秒)はレーン描画をブロックしない。
     //   非ブロック(fire-and-forget)にして、ギフト履歴レーンは storage を別途読む既存経路に委ねる。
