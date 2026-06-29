@@ -18246,6 +18246,11 @@ async function collectAiShareDevMonitorPayloadBundle(watchUrl) {
       embedded: (() => {
         try { return window.self !== window.top; } catch { return true; }
       })(),
+      // v0.1.988: この診断を出している popup が受動ビュー(応援プレビュー dock=liveview/status)か。
+      //   passive は heavy 経路(renderStoryUserLane/refreshAllNorthStarMirrorLanes)を走らせず鏡から描く=
+      //   storyUserLaneRenderProbe.started / northStarRenderProbe.refreshAllStarted が 0 でも【正常】。
+      //   パリティ判定が passive 由来の 0 を「①POP未描画」と誤診しないための出自フラグ。
+      viewKind: INLINE_PASSIVE ? 'passive' : (INLINE_EMBED_WATCH ? 'embed_watch' : (TOOLBAR_POPUP ? 'toolbar' : 'popup')),
       // v0.1.984: popup が実際に動かしている拡張バージョン/ビルドを診断に含める。
       //   「probe=0 は新コード未ロードか、ロード済みでも 0 か」を状態速報1枚で確定できるようにする
       //   (リロード前の古い拡張で取った診断を新版と取り違えない)。
@@ -21294,18 +21299,23 @@ async function initPopup() {
     //   既存の paint defer 原則(スクロール後 400ms は heavy paint しない)に揃える=スクロールが
     //   止まれば次の tick で出る(機能後退ゼロ)。
     if (shouldDeferHeavyPopupPaintNow()) return;
-    // v0.1.986(真因修正): lid を watchPopupLastPaintedLiveId だけに頼らない。embedded watch panel では
-    //   refresh() が heavy で詰まると watchPopupLastPaintedLiveId が '' のまま=独立 tick が発火せず probe=0
-    //   が残っていた(実機 v0.1.985 で確認)。URL の &lv=(INLINE_OWN_WATCH_URL)・snapshot.liveId も候補にして、
-    //   refresh の完走を待たずに lid を解決する=「重い処理を待たず描画」を本当に成立させる。
-    let lid = String(watchPopupLastPaintedLiveId || '').trim().toLowerCase();
-    if (!/^lv\d{1,15}$/.test(lid)) {
-      const m = String(INLINE_OWN_WATCH_URL || '').match(/lv\d{1,15}/);
-      if (m) lid = m[0].toLowerCase();
+    // v0.1.988(複数配信タブの真因修正): lid の優先順位を見直す。
+    //   embedded watch panel は【自タブの &lv=(INLINE_OWN_WATCH_URL)が確定的な真実】=最優先。
+    //   v0.1.986 は watchPopupLastPaintedLiveId を最優先にしていたが、複数配信を同時視聴すると
+    //   この値が【別タブの配信】で揺れ、embedded panel が自分の lv で描かず probe=0 のまま残った
+    //   (実機 v0.1.987・2配信視聴で再現: watchSnapshotMeta=しすたー なのに probe 全0)。
+    //   解決順: ①自タブ &lv=(embedded) → ②自タブ snapshot.liveId → ③watchPopupLastPaintedLiveId(standalone popup)。
+    let lid = '';
+    {
+      const ownM = String(INLINE_OWN_WATCH_URL || '').match(/lv\d{1,15}/);
+      if (ownM) lid = ownM[0].toLowerCase();
     }
     if (!/^lv\d{1,15}$/.test(lid)) {
       const snapLv = String(watchMetaCache?.snapshot?.liveId || '').trim().toLowerCase();
       if (/^lv\d{1,15}$/.test(snapLv)) lid = snapLv;
+    }
+    if (!/^lv\d{1,15}$/.test(lid)) {
+      lid = String(watchPopupLastPaintedLiveId || '').trim().toLowerCase();
     }
     if (!/^lv\d{1,15}$/.test(lid)) return;
     void refreshAllNorthStarMirrorLanes(lid);

@@ -56,16 +56,24 @@ export function buildParityVerdict(input) {
     return pend('popup 診断が古い', 'popup を開き直して数秒待つ', 'popup_stale');
   }
 
-  // 3. ①POP 描画(応援レーン+北極星)が起動しているか
-  const laneStarted = laneDiag ? (Number(laneDiag.started) > 0 || laneDiag.verdict === 'ok') : null;
-  const nsStarted = nsProbe ? Number(nsProbe.refreshAllStarted) > 0 : null;
-  // 応援レーンが空ソース(供給0=出なくて正常)は false 扱いにしない。
-  const laneEmptyNormal = laneDiag && laneDiag.verdict === 'empty_source';
-  if (laneStarted === false && !laneEmptyNormal) {
-    return fail('①POPの応援レーン描画が起動していない(a)', '拡張を🔄リロード→watch F5→popupを数秒開く', 'pop_lane_not_started');
-  }
-  if (nsStarted === false) {
-    return fail('①POPの北極星描画が起動していない(a)', '拡張を🔄リロード→watch F5→popupを数秒開く', 'pop_northstar_not_started');
+  // 3. ①POP 描画(応援レーン+北極星)が起動しているか。
+  //   ★v0.1.988: 診断の出自(viewKind)が passive(応援プレビュー)のときは、heavy 経路の probe
+  //     (started/refreshAllStarted)が 0 でも正常=passive は鏡から描く別経路。①POP の起動判定は
+  //     heavy popup(embed_watch/toolbar/popup)由来の診断のときだけ行う。passive 由来なら
+  //     ①の起動は「鏡が現配信で新鮮(下の mirrors/consistency)」で代替評価する(誤診回避)。
+  const viewKind = String(popup.viewKind || '').trim();
+  const diagFromHeavyPopup = viewKind === '' || viewKind === 'embed_watch' || viewKind === 'toolbar' || viewKind === 'popup';
+  if (diagFromHeavyPopup) {
+    const laneStarted = laneDiag ? (Number(laneDiag.started) > 0 || laneDiag.verdict === 'ok') : null;
+    const nsStarted = nsProbe ? Number(nsProbe.refreshAllStarted) > 0 : null;
+    // 応援レーンが空ソース(供給0=出なくて正常)は false 扱いにしない。
+    const laneEmptyNormal = laneDiag && laneDiag.verdict === 'empty_source';
+    if (laneStarted === false && !laneEmptyNormal) {
+      return fail('①POPの応援レーン描画が起動していない(a)', '拡張を🔄リロード→watch F5→popupを数秒開く', 'pop_lane_not_started');
+    }
+    if (nsStarted === false) {
+      return fail('①POPの北極星描画が起動していない(a)', '拡張を🔄リロード→watch F5→popupを数秒開く', 'pop_northstar_not_started');
+    }
   }
 
   // 4. データ整合(拡張 apiRows ≒ 鏡件数・現配信)。consistency に mismatch があれば 🔴。
