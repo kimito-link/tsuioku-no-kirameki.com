@@ -104,10 +104,12 @@ import {
   selectNewTailRows,
   appendToTail,
   shouldCompactTail,
+  countCommentNoLessRows,
   collectCommentNoKeys,
   BIG_MAIN_THRESHOLD,
   TAIL_MAX_ROWS,
-  TAIL_BULK_BYPASS_MIN_ROWS
+  TAIL_BULK_BYPASS_MIN_ROWS,
+  COMMENT_NO_LESS_COMPACT_MIN
 } from '../lib/commentTailBuffer.js';
 import {
   summaryStorageKey,
@@ -10860,15 +10862,28 @@ async function flushBatchViaTail(batch) {
   } catch {
     /* no-op */
   }
+  // v0.1.998: commentNo 欠落行が tail に溜まると、main 既存の同一コメント再到来で
+  //   表示カウント(tailMainCount + tail長)が畳み込みまで一時的に二重になり、単調ゲートが
+  //   膨れたピークを焼き付けて「記録>本家」が居座る。欠落行が一定数あれば早めに畳み込み、
+  //   loneDedupe(text|uid|sec)で正す（capturedAt スタンプは loneDedupe を壊すので不可）。
+  const commentNoLessInTail = countCommentNoLessRows(tailRowsBuffer);
   if (
     shouldCompactTail({
       tailLength: tailRowsBuffer.length,
       sinceLastCompactMs: Date.now() - lastTailCompactAt,
       mainCount: tailMainCount,
-      hidden
+      hidden,
+      commentNoLessInTail
     })
   ) {
-    await compactTailIntoMain({ reason: hidden ? 'compact_hidden' : 'compact' });
+    await compactTailIntoMain({
+      reason:
+        commentNoLessInTail >= COMMENT_NO_LESS_COMPACT_MIN
+          ? 'compact_noless'
+          : hidden
+            ? 'compact_hidden'
+            : 'compact'
+    });
   }
 }
 

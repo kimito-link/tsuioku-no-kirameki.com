@@ -6,11 +6,13 @@ import {
   selectNewTailRows,
   appendToTail,
   shouldCompactTail,
+  countCommentNoLessRows,
   TAIL_COMPACT_COUNT,
   TAIL_COMPACT_INTERVAL_MS,
   TAIL_MAX_ROWS,
   BIG_MAIN_THRESHOLD,
-  TAIL_COMPACT_COUNT_BIG
+  TAIL_COMPACT_COUNT_BIG,
+  COMMENT_NO_LESS_COMPACT_MIN
 } from './commentTailBuffer.js';
 import { buildDedupeKey } from './commentRecord.js';
 
@@ -230,5 +232,58 @@ describe('shouldCompactTail', () => {
     it('BIG しきい値は TAIL_MAX_ROWS 未満（満杯前に必ず畳み込める）', () => {
       expect(TAIL_COMPACT_COUNT_BIG).toBeLessThan(TAIL_MAX_ROWS);
     });
+  });
+
+  describe('commentNo 欠落行（v0.1.998: 記録>本家 101% 二次バグ）', () => {
+    it('欠落行が COMMENT_NO_LESS_COMPACT_MIN 件以上なら早めに畳み込む', () => {
+      expect(
+        shouldCompactTail({
+          tailLength: COMMENT_NO_LESS_COMPACT_MIN, // 件数しきい値(200)未満
+          sinceLastCompactMs: 0,
+          commentNoLessInTail: COMMENT_NO_LESS_COMPACT_MIN
+        })
+      ).toBe(true);
+    });
+
+    it('欠落行が COMMENT_NO_LESS_COMPACT_MIN 未満なら従来判定のまま（早期畳み込みしない）', () => {
+      expect(
+        shouldCompactTail({
+          tailLength: COMMENT_NO_LESS_COMPACT_MIN - 1,
+          sinceLastCompactMs: 0,
+          commentNoLessInTail: COMMENT_NO_LESS_COMPACT_MIN - 1
+        })
+      ).toBe(false);
+    });
+
+    it('巨大メインでは欠落行があっても BIG しきい値を維持（フリーズ回避優先）', () => {
+      expect(
+        shouldCompactTail({
+          tailLength: COMMENT_NO_LESS_COMPACT_MIN,
+          mainCount: BIG_MAIN_THRESHOLD,
+          commentNoLessInTail: COMMENT_NO_LESS_COMPACT_MIN
+        })
+      ).toBe(false);
+    });
+  });
+});
+
+describe('countCommentNoLessRows', () => {
+  it('commentNo を持たない行だけ数える', () => {
+    const rows = [
+      { commentNo: '1', text: 'a' },
+      { text: 'b', userId: 'u' }, // 欠落
+      { commentNo: '  ', text: 'c' }, // 空白のみ=欠落扱い
+      { commentNo: '2', text: 'd' }
+    ];
+    expect(countCommentNoLessRows(rows)).toBe(2);
+  });
+
+  it('全部 commentNo 付きなら 0', () => {
+    expect(countCommentNoLessRows([{ commentNo: '1' }, { commentNo: '2' }])).toBe(0);
+  });
+
+  it('非配列は 0', () => {
+    expect(countCommentNoLessRows(null)).toBe(0);
+    expect(countCommentNoLessRows(undefined)).toBe(0);
   });
 });

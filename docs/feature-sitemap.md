@@ -154,7 +154,7 @@
 
 - **応援レーン集約(誰が候補か)** — 保存コメント行を userId 単位に畳み込みレーン候補を作る唯一の集約正本(popup/venue 共通)
   - `src/lib/userLaneCandidatesFromStorage.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 84</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 85</summary>
 
 - `src/domain/lane/aggregate.js` — 応援ユーザーレーンの per-row → per-user 集約（純関数）。
 - `src/domain/observations/observationStore.js` — observationStore - StatObservation のメモリ常駐リングバッファ。
@@ -186,6 +186,7 @@
 - `src/lib/commentSilenceZones.js` — コメントの沈黙ゾーン検出（連続 X 秒以上のコメ無し区間）+ L2 沈黙の質判定。
 - `src/lib/commentVelocityTimeline.js` — コメントの時系列粒度集計と「笑い密度（L4 笑いの瞬間検出）」を純粋関数で計算する。
 - `src/lib/commentVelocityWindow.js` — 直近ウィンドウ内のコメント件数と「件/分」換算（純関数）
+- `src/lib/completenessScore.js` — 状態速報「網羅的完全性診断(PageSpeed 型)」のスコア集計(純関数)。
 - `src/lib/concurrentCalibrationFit.js` — 較正フィット（蓄積した較正サンプルから係数の「推奨値」を導く純関数）。
 - `src/lib/concurrentCalibrationLog.js` — 同接推定の較正データロガー（しおりのようにストレージへサンプルが積まれる）。
 - `src/lib/concurrentEstimate.js` — 複合シグナルによる同時接続数推定モジュール。
@@ -263,7 +264,7 @@
   - `src/lib/giftThrowProjectile.js`
 - **吹き出し寿命管理** — 会場の吹き出しの表示上限・追い出し(eviction)ライフサイクル
   - `src/lib/venueBubbleLifecycle.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 170</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 171</summary>
 
 - `scripts/encode-marketing-html-avatars.mjs` — extension/images/marketing-html-avatars/*.png を data URI にし、
 - `scripts/split-avatar-parts.mjs` — 偽市松背景の除去 + パーツ切り出し(one-off アセットパイプライン)
@@ -384,6 +385,7 @@
 - `src/lib/scrapeGiftHistoryList.js` — niconico ギフト sub-app の `gift-history-list` から個別ギフトを抽出する純関数（v0.1.198）。
 - `src/lib/scrapeTotalGiftCountList.js` — niconico ギフト sub-app の `total-dold-count-list` から種類別集計を抽出する純関数（v0.1.198）。
 - `src/lib/scrollWhiteoutProbe.js` — スクロール時の「白化(画面が一瞬白くなる)」を観測するための純判定。
+- `src/lib/scrollWhiteoutReport.js` — スクロール白化(下にスクロールすると重く・一瞬白くなって・遅れて描画される)を状態速報の
 - `src/lib/selfActionCelebration.js` — アプリから自分が操作した直後に返す軽量演出の spec。
 - `src/lib/sessionCommentCache.js` — v0.1.650: JSONキャッシュ即時表示の本丸。「開いた瞬間に全コメント表示・ローディングなし」。
 - `src/lib/storyAvatarDiagLine.js` — 応援グリッド用・診断表示（PII なし・件数のみ）。
@@ -534,7 +536,7 @@
 - **影響範囲ゲート(規律を自動化)** — 星野ロミ式「規律を自動ゲートに」。diff から影響大(複数機能波及)の変更ファイルを検出し波及先機能を列挙。警告のみ(摩擦ゼロ)・--strict で exit1。AGENTS.md §10 のルールを diff 発火に
   - `scripts/impact-check.mjs`
   - `docs/feature-map/impact-map.json`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 37</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 38</summary>
 
 - `api/status.js` — status 受け口 Vercel Serverless Function。
 - `extension/status-guard.js` — 状態速報ページ(status.html)の「何があっても開く」保険。
@@ -553,6 +555,7 @@
 - `src/lib/commentPanelHealthProbe.js` — ニコ生の watch ページでコメント欄が「見えない／届かない」状態を検出し、
 - `src/lib/commentPanelStatus.js` — コメントパネル検出失敗（DOM 変更等）をポップアップ向けに解釈する純関数
 - `src/lib/commentPostStatusPresentation.js` — コメント送信 UI の「最終ステータス表示」と aria-describedby を決める純関数群。
+- `src/lib/diagnosisRegistry.js` — 状態速報「網羅的完全性診断」の【真実の源泉(Source of Truth)】。
 - `src/lib/diagnosticErrorRing.js` — chrome.storage.local に保存する診断エラーリング（純粋・マージのみ）。
 - `src/lib/diagnosticRedact.js` — AI共有・診断バンドル向けの URL / 文字列のサニタイズ（純粋関数）。
 - `src/lib/diagnosticRingStore.js` — 診断エラーリングを chrome.storage.local に追記（拡張コンテキスト専用）。
@@ -745,9 +748,10 @@
 
 ## 🧬 修正系譜マップ(この系統のバグを過去にどう直したか)
 
-> changelog 全 333 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
+> changelog 全 334 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
 
-### 💾 記録件数 (46版)
+### 💾 記録件数 (47版)
+- `v0.1.998` 2026-06-29 — 記録>本家コメの一時的な水増しを是正
 - `v0.1.995` 2026-06-29 — 状態速報に応援コメントの本文を表示
 - `v0.1.969` 2026-06-28 — 内部整理: 応援ランク行の生成をlib抽出
 - `v0.1.966` 2026-06-27 — ランキング件数の「拡張≠鏡」1件差の誤警告を解消
