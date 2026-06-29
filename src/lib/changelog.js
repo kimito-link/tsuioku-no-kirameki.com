@@ -26,6 +26,16 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.992',
+    date: '2026-06-29',
+    summary: '記録・同接・来場の数字カードを確実に表示',
+    items: Object.freeze([
+      'ツール内パネルで、上段の「記録／推定同時接続／来場者数」カードが「—」のまま埋まらないことがある不具合を直しました。',
+      '北極星レーンや応援レーンと同じく、重いコメント処理の完了を待たず、常時更新される軽い集計から数字カードを埋めるようにしました(現在の配信ID基準)。',
+      '読み取りのみで、記録や取得の動きは変えていません。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.991',
     date: '2026-06-29',
     summary: '応援レーン(アイコン列)を重い処理待ちせず表示',
