@@ -61,6 +61,14 @@ export function buildStatusFastDiagLite(payload) {
 
   const withUidPercent =
     typeof uidStats.withUidPercent === 'number' ? uidStats.withUidPercent : null;
+  // v0.1.1002: commentNo 欠落割合の計器(記録>本家の内訳切り分け)も lite に通す。
+  //   ★ここに足さないと status の provenance「内訳(計器)」が出ない(lite が full を間引くため)。
+  const commentNoLess =
+    typeof uidStats.commentNoLess === 'number' ? uidStats.commentNoLess : null;
+  const commentNoLessPercent =
+    typeof uidStats.commentNoLessPercent === 'number' ? uidStats.commentNoLessPercent : null;
+  const totalSaved =
+    typeof uidStats.totalSaved === 'number' ? uidStats.totalSaved : null;
 
   // lives は enumerateActiveLives 経路2でしか使わず、各要素は liveId/lv だけ見る=最小化して持つ。
   const lives = Array.isArray(p.lives)
@@ -79,7 +87,7 @@ export function buildStatusFastDiagLite(payload) {
       giftDiagnostics: {
         '北極星レーン': gift['北極星レーン'] ?? null,
         commentObservability: {
-          savedCommentsUidStats: { withUidPercent }
+          savedCommentsUidStats: { withUidPercent, commentNoLess, commentNoLessPercent, totalSaved }
         }
       },
       networkErrorProbe: {

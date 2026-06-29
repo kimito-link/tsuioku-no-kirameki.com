@@ -10,7 +10,7 @@ function makeFullPayload() {
       giftDiagnostics: {
         '北極星レーン': { '4_番組累計ポイント': { value: 21370, state: 'ok' } },
         commentObservability: {
-          savedCommentsUidStats: { totalSaved: 3370, withUid: 3370, withUidPercent: 100, withoutUid: 0 },
+          savedCommentsUidStats: { totalSaved: 3370, withUid: 3370, withUidPercent: 100, withoutUid: 0, commentNoLess: 1200, commentNoLessPercent: 35.6 },
           interceptFetchLog: new Array(20).fill('/some/long/url [application/json]'),
           ndgrMessageIdDedupe: { accepted: 398, droppedDuplicate: 54 }
         },
@@ -47,6 +47,11 @@ describe('buildStatusFastDiagLite', () => {
     expect(
       lite.content.giftDiagnostics.commentObservability.savedCommentsUidStats.withUidPercent
     ).toBe(100);
+    // 3b) v0.1.1002: commentNo 欠落割合の計器も同形パスで通す(provenance 内訳が出るため必須)。
+    const us = lite.content.giftDiagnostics.commentObservability.savedCommentsUidStats;
+    expect(us.commentNoLess).toBe(1200);
+    expect(us.commentNoLessPercent).toBe(35.6);
+    expect(us.totalSaved).toBe(3370);
     // 4) ndgrConnectStatus(同形パス)
     expect(lite.content.networkErrorProbe.ndgrConnectStatus).toBe('connected');
   });
