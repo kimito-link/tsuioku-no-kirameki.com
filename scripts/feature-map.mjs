@@ -92,6 +92,9 @@ const STORAGE_DISCONNECT_BASELINE = new Set([
   'KEY_SUPPORT_CELEBRATION_STATE', 'KEY_SW_PROGRESS', 'KEY_THUMB_AUTO', 'KEY_THUMB_INTERVAL_MS',
   'fn:backfillHeartbeatKey', 'fn:chunkMigratedKey', 'fn:comeviewPinStorageKey', 'fn:commentDbSummaryKey',
   'fn:eventDomStorageKey', 'fn:giftSubAppHistoryStorageKey', 'fn:perfDiagStorageKey', 'fn:tailStorageKey',
+  // v0.1.991: 応援レーン(アイコン列)を heavy 非依存で起動する renderStoryUserLaneFromLightCommentsForCurrentLive が
+  //   nls_csummary_<lv> を read。producer は content-entry.js(記録のたびに書く)=popup は consumer のみ=意図的な分離。
+  'fn:summaryStorageKey',
   // content の producer は literal(`nls_gift_history_throws_${lid}`)で書くため、関数名キーの静的解析が
   // producer を取りこぼす偽陽性(実書込は content-entry.js・popup/live-view が読む。2026-06-21 確認)。
   'fn:giftHistoryThrowsStorageKey',
