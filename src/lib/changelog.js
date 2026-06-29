@@ -26,6 +26,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.995',
+    date: '2026-06-29',
+    summary: '状態速報に応援コメントの本文を表示',
+    items: Object.freeze([
+      '状態速報(診断)に「応援コメント(最新の本文)」を追加しました。これまで件数や診断だけで、実際に流れているコメントの中身が見られませんでしたが、最新の本文がそのまま読めるようになりました。',
+      '応援ライブビューが表示している当のコメント(鏡)を貼るだけなので、ツールのポップアップ・応援ライブビュー・WEB版すべてに同じコメント本文が出ます(新たな読み込みは増えません)。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.994',
     date: '2026-06-29',
     summary: '応援ライブビュー・WEBにも状態速報',

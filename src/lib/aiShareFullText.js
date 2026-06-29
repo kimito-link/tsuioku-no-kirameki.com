@@ -19,6 +19,8 @@ import {
   formatCommentCountProvenanceLines,
   commentCountProvenanceToActionCards
 } from './commentCountProvenance.js';
+// 応援コメント(最新N件・本文)を状態速報にも載せる(jsonBlob 同梱の鏡を貼るだけ=新規 read なし)。
+import { formatCommentTimelineReportLines } from './commentTimelineReport.js';
 import { buildHealthCells, summarizeHealthVerdict } from './healthCells.js';
 import { buildVoiceDiagLine } from './voiceDiag.js';
 import { reportPreviewCtxFromFastDiag } from './reportPreviewCtx.js';
@@ -179,6 +181,15 @@ export function buildAiShareFullText({ overviewText, livesData, fastDiag, popupD
       lines.push(buildLiveBlockText(live));
       lines.push('');
     }
+  }
+  // 応援コメント(最新N件・本文): ユーザー指摘「配信の実コメントが診断ページに載っていない」を解消。
+  //   応援ライブビューが描いている当の鏡(commentTimelineMirror)を貼るだけ=数字でなく本文が読める。
+  //   jsonBlob に同梱済 → ①POP/②応援ライブビュー/③WEB すべてに同じコメント本文が出る(新規 read なし)。
+  try {
+    const ctLines = formatCommentTimelineReportLines(jsonBlob?.commentTimelineMirror || null, Date.now());
+    if (ctLines.length) { for (const l of ctLines) lines.push(l); lines.push(''); }
+  } catch {
+    /* no-op: コメント本文表示の失敗は状態速報を壊さない */
   }
   // 数字の出どころ(council/comment-count-provenance-question.txt): 「記録>本家コメ」のような食い違いに対し、
   //   各数字が何を・どこから・いつ数えているかを【事実として】出す(判定はしない=誤検知ゼロ)。
