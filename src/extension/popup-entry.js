@@ -11043,19 +11043,19 @@ async function refreshAllNorthStarMirrorLanes(liveId) {
     //   この allSettled 全体が pending し【北極星レーン全部(貢献度/広告)が出ない・止まる】真因になっていた
     //   (council/liveview-all-lanes-SYNTHESIS.md・refreshAllStarted=1/Completed=0/lastReachedLane=after_gift_sync)。
     //   → passive ではギフト履歴レーンを allSettled に入れず畳む(待たない)。他レーンは即出る。
-    const northStarLaneTasks = [
-      refreshNorthStarContributionRankingLaneAsync(lid),
-      refreshNorthStarAdRankingLane(lid),
-      refreshNorthStarEventCurrentRankLaneAsync(lid),
-      refreshNorthStarEventBroadcastersLaneAsync(lid),
-      refreshNorthStarEventVotingSupportersLaneAsync(lid)
-    ];
+    // ★v0.1.1014(真因修正): publish が要るのは貢献度/広告の2レーンだけ(下の引数参照)。従来は全レーンを同じ
+    //   allSettled で await してから publish したため、embed_watch でギフト履歴レーンが永久 pending→after_gift_sync
+    //   で停止→publish 未到達で鏡が空(v0.1.1013 実機:貢献度13/広告10 なのに鏡0)。→2レーンだけ await して即 publish。
+    const publishCriticalTasks = [refreshNorthStarContributionRankingLaneAsync(lid), refreshNorthStarAdRankingLane(lid)];
+    const decorativeLaneTasks = [refreshNorthStarEventCurrentRankLaneAsync(lid), refreshNorthStarEventBroadcastersLaneAsync(lid), refreshNorthStarEventVotingSupportersLaneAsync(lid)];
     if (INLINE_PASSIVE) {
       collapseNorthStarGiftHistoryLaneForPassive();
     } else {
-      northStarLaneTasks.splice(1, 0, refreshNorthStarGiftHistoryLaneAsync(lid));
+      // embed_watch でも描画は従来通り試みる(描けるなら描く)。pending しても publish は無傷(2レーンのみ待つ)。
+      decorativeLaneTasks.push(refreshNorthStarGiftHistoryLaneAsync(lid));
     }
-    await Promise.allSettled(northStarLaneTasks);
+    void Promise.allSettled(decorativeLaneTasks); // publish をブロックしない(各関数内に try/catch)。
+    await Promise.allSettled(publishCriticalTasks); // 詰まる decorative に依存せず必ず到達。
     // ★v0.1.963(council/three-views-parity-SYNTHESIS.md P0): バースト中の個別 publish は deferWrite で
     //   合流だけしていた。両レーン(貢献度/広告)が揃ったここで 1 回だけ write=後着レーンが min-gap で
     //   落ちる『コピー漏れ』を断つ(①にあるのに②③に出ない、の根)。合流バッファの最終状態を書くので
