@@ -294,6 +294,11 @@ export async function readChunkedComments(liveId, mainKey, getMany) {
       if (Array.isArray(part)) rows = rows.concat(part);
       else complete = false; // ★非配列(read失敗/未flush)=部分読み。seed を信用させない。
     }
+    // ★v0.1.1013 追加ガード: 全チャンクが配列で読めても、合計件数がインデックスの total に満たないなら
+    //   (古い空配列/未 flush で件数が欠ける)部分読みとみなす=dedup seed を信用させない(二重計上の温床)。
+    //   実機 lv350861390 で 40秒 記録+1765 の二重再発=本家+36 と桁違い=ほぼ全件再記録=不完全 seed の疑い。
+    const expectedTotal = Math.max(0, Math.floor(Number(/** @type {any} */ (index).total) || 0));
+    if (complete && expectedTotal > 0 && rows.length < expectedTotal) complete = false;
     return { rows, fromChunks: true, index: /** @type {object} */ (index), complete };
   }
   const mainBag = await getMany([mainKey]);

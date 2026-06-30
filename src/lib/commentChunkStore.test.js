@@ -197,6 +197,28 @@ describe('readChunkedComments', () => {
     expect(res.rows).toEqual([{ no: 1 }, { no: 2 }]); // 読めた分だけ(これで seed すると二重の温床)
   });
 
+  // ★v0.1.1013: 全チャンクが配列でも合計件数 < index.total なら部分読み(古い空配列/未flush)=complete:false。
+  it('合計件数がインデックスの total に満たないなら complete:false(二重再発の根治)', async () => {
+    const store = {
+      nls_cchunk_index_lv1: buildChunkIndex('lv1', { seqs: [0, 1], total: 3, maxPerChunk: 2 }),
+      nls_cchunk_lv1_0: [{ no: 1 }, { no: 2 }],
+      nls_cchunk_lv1_1: [] // 配列だが空(古い/未flush)→合計2 < total 3
+    };
+    const res = await readChunkedComments('lv1', 'nls_comments_lv1', makeGetMany(store));
+    expect(res.complete).toBe(false);
+    expect(res.rows.length).toBe(2);
+  });
+
+  it('合計件数 === total なら complete:true', async () => {
+    const store = {
+      nls_cchunk_index_lv1: buildChunkIndex('lv1', { seqs: [0, 1], total: 3, maxPerChunk: 2 }),
+      nls_cchunk_lv1_0: [{ no: 1 }, { no: 2 }],
+      nls_cchunk_lv1_1: [{ no: 3 }]
+    };
+    const res = await readChunkedComments('lv1', 'nls_comments_lv1', makeGetMany(store));
+    expect(res.complete).toBe(true);
+  });
+
   it('seqs 空のインデックスは complete:true(0件は完全)', async () => {
     const store = {
       nls_cchunk_index_lv1: buildChunkIndex('lv1', { seqs: [], total: 0, maxPerChunk: 2 })
