@@ -10488,6 +10488,12 @@ async function persistPanelLiveSummaryIfDue(force = false) {
   void publishCommentTimelineMirrorFromContent(now);
 }
 
+/** v0.1.1013: コメントタイムライン鏡の「無変化 set スキップ」用 署名(liveId→sig)。
+ *   3配信同時+backfill で単一 LevelDB が詰まる(更新11694ms)。この鏡は ~2秒 cadence で毎回
+ *   最新N件を set していたが、内容が変わっていなければ書く必要がない。署名(liveId|件数|最新行id)が
+ *   前回と同じなら set を省いて書込競合を減らす(記録/取り込みには触らない・鏡の鮮度は変化時に追従)。 */
+const _lastTimelineMirrorSigByLive = new Map();
+
 /** content からコメントタイムライン鏡を publish(best-effort=記録を妨げない)。 */
 async function publishCommentTimelineMirrorFromContent(nowMs) {
   try {
@@ -10504,10 +10510,16 @@ async function publishCommentTimelineMirrorFromContent(nowMs) {
       resolveAvatar: (c) => (c && c.avatarUrl ? String(c.avatarUrl) : '')
     });
     if (!snap) return;
+    // v0.1.1013: 無変化なら set 省略(capturedAt は毎回変わるので署名には含めない=内容ベース)。
+    const rows = Array.isArray(snap.rows) ? snap.rows : [];
+    const last = rows.length ? rows[rows.length - 1] : null;
+    const sig = `${snap.liveId}|${Number(snap.totalSeen) || 0}|${rows.length}|${String(last?.id || last?.at || '')}`;
+    if (_lastTimelineMirrorSigByLive.get(lid) === sig) return; // 内容変化なし=書込スキップ
     await runStorageOpWithTimeout(
       () => chrome.storage.local.set({ [KEY_COMMENT_TIMELINE_MIRROR]: snap }),
       INGEST_TIMING.persistWriteTimeoutMs
     );
+    _lastTimelineMirrorSigByLive.set(lid, sig);
   } catch (err) {
     if (err !== STORAGE_OP_TIMED_OUT) throw err;
   }
