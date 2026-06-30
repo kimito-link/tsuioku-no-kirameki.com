@@ -134,3 +134,45 @@ export function formatParityVerdictLine(v) {
   const tail = d.nextAction ? ` → ${d.nextAction}` : '';
   return `## 3画面パリティ: ${mark} — ${d.reason}${tail}`;
 }
+
+/**
+ * v0.1.1015: ②応援プレビュー画面の最上部に出す「パリティ・バッジ」用の整形済みデータ(純関数)。
+ *   狙い(ユーザー要望 2026-07-01「説明不要・コピーせず一発で分かる」): 今は①POP=②=③WEB の判定が
+ *   フル状態速報テキストの中に1行埋もれていて、②プレビューを開いてもパッと見では食い違いが分からない。
+ *   この純関数で verdict→{色/見出し/理由/次の一手} の構造化バッジ材料を1か所で組み、②が色付きで大きく出す。
+ *   観測のみ=判定そのもの(buildParityVerdict)は一切変えない。整形と色割り当てだけ。
+ *
+ * @param {{ verdict?: string, reason?: string, nextAction?: string, code?: string }|null|undefined} v
+ * @returns {{ tone: 'ok'|'pending'|'mismatch', icon: string, title: string, reason: string, nextAction: string }}
+ */
+export function buildParityBadge(v) {
+  const d = v && typeof v === 'object' ? v : { verdict: 'pending', reason: '', nextAction: '', code: '' };
+  const verdict = d.verdict === 'ok' || d.verdict === 'mismatch' ? d.verdict : 'pending';
+  const reason = typeof d.reason === 'string' ? d.reason : '';
+  const nextAction = typeof d.nextAction === 'string' ? d.nextAction : '';
+  if (verdict === 'ok') {
+    return {
+      tone: 'ok',
+      icon: '✅',
+      title: '①POP・②この画面・③WEB は同一です',
+      reason: '3画面とも同じ内容で、新鮮に揃っています。',
+      nextAction: ''
+    };
+  }
+  if (verdict === 'mismatch') {
+    return {
+      tone: 'mismatch',
+      icon: '🔴',
+      title: '①POP・②この画面・③WEB が食い違っています',
+      reason,
+      nextAction
+    };
+  }
+  return {
+    tone: 'pending',
+    icon: '🟡',
+    title: '①POP・②この画面・③WEB が揃っていません（保留）',
+    reason,
+    nextAction
+  };
+}

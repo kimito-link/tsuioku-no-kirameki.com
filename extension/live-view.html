@@ -123,6 +123,55 @@
         background: #fff3f3;
         color: #9a2c2c;
       }
+      /* v0.1.1015: 3画面パリティ・バッジ。iframe の上・画面上部中央に固定で重ねる(ぱっと見で分かる)。
+         ①POP=②この画面=③WEB が同一か(✅/🟡保留/🔴不一致)を、コピーせず一発で見せる。初期は hidden。 */
+      #lvParityBadge {
+        position: fixed;
+        top: 10px;
+        left: 50%;
+        transform: translateX(-50%);
+        z-index: 2147483647;
+        max-width: min(94vw, 640px);
+        padding: 8px 14px;
+        border-radius: 10px;
+        border: 1px solid #d8d8e4;
+        background: #fbfbfe;
+        color: #2a2a33;
+        box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18);
+        font:
+          13px/1.5 system-ui,
+          "Segoe UI",
+          sans-serif;
+      }
+      #lvParityBadge .lv-parity-title {
+        font-weight: 700;
+        display: flex;
+        align-items: baseline;
+        gap: 6px;
+      }
+      #lvParityBadge .lv-parity-reason {
+        margin-top: 2px;
+        opacity: 0.85;
+      }
+      #lvParityBadge .lv-parity-next {
+        margin-top: 3px;
+        font-weight: 600;
+      }
+      #lvParityBadge.is-ok {
+        border-color: #b7e0c2;
+        background: #f0fbf3;
+        color: #1f6b39;
+      }
+      #lvParityBadge.is-pending {
+        border-color: #f0dca0;
+        background: #fffbef;
+        color: #8a6a1a;
+      }
+      #lvParityBadge.is-mismatch {
+        border-color: #f0b8b8;
+        background: #fff3f3;
+        color: #9a2c2c;
+      }
       /* 状態速報(①POP と同一本文)の折りたたみパネル。iframe の上に重ねる固定オーバーレイ(左下)。 */
       #lvStatusReport {
         position: fixed;
@@ -179,6 +228,13 @@
       <button id="lvPublishBtn" type="button">🌐 このURLをWEBでも公開する</button>
       <div id="lvPublishResult" hidden></div>
     </div>
+
+    <!--
+      v0.1.1015: 3画面パリティ・バッジ(画面上部中央)。①POP=②この画面=③WEB が同一かを、状態速報を
+        開かなくても一発で見せる。status が jsonBlob.parityVerdict に置いた構造化結果を読んで色付きで描く
+        (再判定しない=①とバイト一致)。材料が無いうちは hidden。
+    -->
+    <div id="lvParityBadge" hidden></div>
 
     <!--
       2026-06-29(HANDOFF-resume-0629 §3 (A)): ①POP と【全く同じフル状態速報】を②応援ライブビューでも出す。

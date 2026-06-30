@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildParityVerdict, formatParityVerdictLine } from './parityVerdict.js';
+import { buildParityVerdict, formatParityVerdictLine, buildParityBadge } from './parityVerdict.js';
 
 // 決定木を固定。誤検知根絶(取得不能は必ず pending・×にしない)を最重視で検証。
 
@@ -131,5 +131,33 @@ describe('formatParityVerdictLine', () => {
   });
   it('pending 行', () => {
     expect(formatParityVerdictLine({ verdict: 'pending', reason: 'Z', nextAction: '' })).toContain('🟡 保留');
+  });
+});
+
+describe('buildParityBadge — ②応援プレビューの色付きバッジ材料(v0.1.1015)', () => {
+  it('ok は緑トーン+✅+理由は固定文(nextAction 無し)', () => {
+    const b = buildParityBadge({ verdict: 'ok', reason: '', nextAction: '', code: 'ok' });
+    expect(b.tone).toBe('ok');
+    expect(b.icon).toBe('✅');
+    expect(b.title).toContain('同一');
+    expect(b.nextAction).toBe('');
+  });
+  it('mismatch は赤トーン+🔴+理由と次の一手をそのまま通す', () => {
+    const b = buildParityBadge({ verdict: 'mismatch', reason: '食い違い X', nextAction: '開発者に共有', code: 'data_mismatch' });
+    expect(b.tone).toBe('mismatch');
+    expect(b.icon).toBe('🔴');
+    expect(b.reason).toBe('食い違い X');
+    expect(b.nextAction).toBe('開発者に共有');
+  });
+  it('③WEB が古い(web_stale)は pending 黄トーン+🟡+再公開を促す', () => {
+    const b = buildParityBadge({ verdict: 'pending', reason: '③WEBの送信が古い(再公開で新鮮化)', nextAction: '「🌐このURLをWEBでも公開する」を再度押す', code: 'web_stale' });
+    expect(b.tone).toBe('pending');
+    expect(b.icon).toBe('🟡');
+    expect(b.reason).toContain('③WEB');
+    expect(b.nextAction).toContain('公開');
+  });
+  it('不正入力(null/未知 verdict)は pending にフォールバック(死なない)', () => {
+    expect(buildParityBadge(null).tone).toBe('pending');
+    expect(buildParityBadge({ verdict: 'weird' }).tone).toBe('pending');
   });
 });
