@@ -181,6 +181,29 @@ describe('readChunkedComments', () => {
     const res = await readChunkedComments('lv1', 'nls_comments_lv1', makeGetMany(store));
     expect(res.fromChunks).toBe(true);
     expect(res.rows).toEqual([{ no: 1 }, { no: 2 }, { no: 3 }]);
+    expect(res.complete).toBe(true); // 全チャンク読めた=完全
+  });
+
+  // ★v0.1.1012: 一部チャンクが読めない(競合で非配列)=部分読み=complete:false(dedup seed を信用させない)。
+  it('一部チャンクが欠落(非配列)なら complete:false(二重計上の根治)', async () => {
+    const store = {
+      nls_cchunk_index_lv1: buildChunkIndex('lv1', { seqs: [0, 1], total: 3, maxPerChunk: 2 }),
+      nls_cchunk_lv1_0: [{ no: 1 }, { no: 2 }],
+      // nls_cchunk_lv1_1 は欠落(read 失敗を模す)
+      nls_comments_lv1: [{ stale: true }]
+    };
+    const res = await readChunkedComments('lv1', 'nls_comments_lv1', makeGetMany(store));
+    expect(res.complete).toBe(false);
+    expect(res.rows).toEqual([{ no: 1 }, { no: 2 }]); // 読めた分だけ(これで seed すると二重の温床)
+  });
+
+  it('seqs 空のインデックスは complete:true(0件は完全)', async () => {
+    const store = {
+      nls_cchunk_index_lv1: buildChunkIndex('lv1', { seqs: [], total: 0, maxPerChunk: 2 })
+    };
+    const res = await readChunkedComments('lv1', 'nls_comments_lv1', makeGetMany(store));
+    expect(res.complete).toBe(true);
+    expect(res.rows).toEqual([]);
   });
 
   it('index が無ければ従来 main にフォールバック', async () => {
@@ -188,12 +211,14 @@ describe('readChunkedComments', () => {
     const res = await readChunkedComments('lv1', 'nls_comments_lv1', makeGetMany(store));
     expect(res.fromChunks).toBe(false);
     expect(res.rows).toEqual([{ no: 1 }]);
+    expect(res.complete).toBe(true);
   });
 
-  it('何も無ければ空配列', async () => {
+  it('何も無ければ空配列(main 欠落=complete:true=従来運用)', async () => {
     const res = await readChunkedComments('lv1', 'nls_comments_lv1', makeGetMany({}));
     expect(res.rows).toEqual([]);
     expect(res.fromChunks).toBe(false);
+    expect(res.complete).toBe(true);
   });
 
   it('migrate→append→read の往復で総件数と順序が保たれる', async () => {

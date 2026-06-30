@@ -10179,6 +10179,16 @@ async function ensureLiveDedupeStateSeeded(lid, mainKey) {
     if (err === STORAGE_OP_TIMED_OUT) return { ok: false };
     throw err;
   }
+  // ★v0.1.1012 二重計上の根治: チャンク read が【部分失敗】(競合で一部チャンクが非配列=未読)なら、
+  //   不完全な keySet で dedup すると【読めなかったチャンクのコメントが再到来時に keySet 不在=新規誤判定
+  //   →二重記録】になる。seed を作らず requeue=「読めないなら書かない」(既存 timeout 時の方針と同じ)。
+  //   実機 lv350854400(backfill 1505件/秒走行中・本家+0/記録+189 の過剰増)の真因を断つ。
+  if (chunkRead.complete === false) {
+    console.debug(formatPipelinePhase('dedupe_seed_partial_requeue', {
+      readRows: Array.isArray(chunkRead.rows) ? chunkRead.rows.length : 0
+    }));
+    return { ok: false };
+  }
   const existingRows = Array.isArray(chunkRead.rows) ? chunkRead.rows : [];
   if (chunkRead.index && isChunkIndex(chunkRead.index, lid)) {
     liveChunkIndex = /** @type {any} */ (chunkRead.index);
@@ -10222,7 +10232,10 @@ async function seedTailFromMain(lid) {
     if (isChunkIndex(idx, lid)) {
       // 既にチャンク化済み: チャンクから本体を復元する。
       const read = await readChunkedComments(lid, mainKey, chunkGetMany);
-      main = Array.isArray(read.rows) ? read.rows : [];
+      // ★v0.1.1012: 部分読み(競合で一部チャンク未読)なら main を不完全な keys の seed に使わない。
+      //   main=null で下の approx 経路へ倒す(tailKnownCommentNoKeys を空にして、欠けた行は畳み込み時の
+      //   mergeNewComments が最終 dedup する=不完全な keys で tail 再追記して二重にしない)。
+      main = read.complete === false ? null : Array.isArray(read.rows) ? read.rows : [];
       liveChunkIndex = /** @type {any} */ (idx);
       liveChunkMigrated = true;
     } else if (metaBag[chunkMigratedKey(lid)] === true) {
