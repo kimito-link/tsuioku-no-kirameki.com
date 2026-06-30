@@ -260,6 +260,7 @@ import {
 import {
   probeCommentRowDataAttributes,
   aggregateSavedCommentsUidStats,
+  accumulateSavedCommentsUidStats,
   parseInterceptFetchLog,
   snapshotCommentIngestCounters
 } from '../lib/commentObservabilityDiag.js';
@@ -10038,6 +10039,12 @@ let _lastSavedCommentsUidStats = {
   withoutUid: 0,
   withUidPercent: 0
 };
+// v0.1.1011: チャンクモードで「記録全件の uid/commentNo 集計」を O(追加分) で正しく保つ running 集計。
+//   seed 時(seedTailFromMain で全件 main を読めたとき)に1回だけ全件集計で初期化し、以後は
+//   incrementalAdded を accumulateSavedCommentsUidStats で加算する。null=未 seed(=従来の差分集計に
+//   フォールバック)。これが無いと incrementalMode の next=新規行だけで totalSaved:0 と誤集計していた。
+/** @type {ReturnType<typeof aggregateSavedCommentsUidStats>|null} */
+let _savedCommentsUidStatsRunning = null;
 
 // v0.1.505: コメント保存テールバッファ（追記式チャンク）
 // 巨大メイン配列の全件 set を避け、新規分を nls_ctail_<lv> へ追記して低頻度で畳み込む。
@@ -10264,11 +10271,18 @@ async function seedTailFromMain(lid) {
   if (main) {
     tailMainCount = main.length;
     tailKnownCommentNoKeys = collectCommentNoKeys(lid, main);
+    // v0.1.1011: 記録全件(main + テール)の uid/commentNo 集計を1回だけ作って running を seed する。
+    //   以後の incrementalMode は accumulateSavedCommentsUidStats で added だけ加算=母数を全件に保つ
+    //   (チャンクモードで totalSaved:0 と誤集計していたのを根治)。
+    _savedCommentsUidStatsRunning = aggregateSavedCommentsUidStats(main.concat(persistedTail));
+    _lastSavedCommentsUidStats = { ..._savedCommentsUidStatsRunning };
   } else {
     // メイン件数は近似（content 側の interval 計算・ログ用途のみ。表示は popup の直読みが担う）。
     const approx = Number(observedRecordedCommentCount) || 0;
     tailMainCount = Math.max(0, approx - persistedTail.length);
     tailKnownCommentNoKeys = new Set();
+    // 全件 main を読めなかった(timeout 等)= running を seed できない=null にして従来の差分集計へフォールバック。
+    _savedCommentsUidStatsRunning = null;
   }
   for (const k of collectCommentNoKeys(lid, persistedTail)) {
     tailKnownCommentNoKeys.add(k);
@@ -11533,7 +11547,18 @@ async function persistCommentRowsImpl(rows, opts = {}) {
     // v0.1.420 perf: これは診断専用の O(N) 集計。今回 next が変わっていない（profile も
     //   added も無い）フラッシュでは前回値が正確なまま＝再集計を skip しても診断は不変。
     if (cacheTouched || added.length > 0 || storageTouched) {
-      _lastSavedCommentsUidStats = aggregateSavedCommentsUidStats(next);
+      // v0.1.1011: チャンクモード(incrementalMode)は next=新規行だけなので全件集計にならない。
+      //   seed 済みの running があれば added を加算して母数を「記録全件」に保つ(totalSaved:0 根治)。
+      //   running 未 seed(全件 read timeout 等) or 非チャンクモードは従来どおり next(=全件 or 差分)を集計。
+      if (incrementalMode && _savedCommentsUidStatsRunning) {
+        _savedCommentsUidStatsRunning = accumulateSavedCommentsUidStats(
+          _savedCommentsUidStatsRunning,
+          added
+        );
+        _lastSavedCommentsUidStats = { ..._savedCommentsUidStatsRunning };
+      } else {
+        _lastSavedCommentsUidStats = aggregateSavedCommentsUidStats(next);
+      }
     }
     const profileKeysBefore = Object.keys(profileMap).length;
     profileMap = pruneUserCommentProfileMap(profileMap);

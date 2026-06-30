@@ -26,6 +26,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1011',
+    date: '2026-06-30',
+    summary: '大きい配信で集計が0件になる不具合を修正',
+    items: Object.freeze([
+      '記録が数千件ある大きい配信で、状態速報の「コメントに識別子(userId)が付く率」「記録>本家の内訳(欠落割合)」の集計が、母数0件(totalSaved:0)になって正しく出ないことがあったのを直しました。大きい配信は内部でコメントを分割保存しており、集計が「全件」でなく「直前に増えた分だけ」を見ていたためです。',
+      '分割保存でも記録の全件を母数として集計するようにしました(性能のため、増えた分だけを足し込む方式です)。記録する内容は変えていません。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1010',
     date: '2026-06-30',
     summary: '取り込み中の状態速報の更新を所要比例で間引き',

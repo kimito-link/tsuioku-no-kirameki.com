@@ -183,6 +183,50 @@ export function aggregateSavedCommentsUidStats(entries) {
 }
 
 /**
+ * v0.1.1011: チャンクモードの「記録全件の uid/commentNo 集計」を O(追加分) で正しく保つ純関数。
+ *
+ * 背景(totalSaved:0 の根治): チャンクモードでは aggregateSavedCommentsUidStats に渡る next が
+ *   【そのフラッシュの新規行だけ】になり、新規0件のフラッシュで totalSaved:0 と誤集計していた
+ *   (記録は全件あるのに母数が直近差分)。毎フラッシュ全件 read は重い(O(N))ので不可。そこで
+ *   seed 時に1回 aggregateSavedCommentsUidStats(全件 main) で running を作り、以後は incremental
+ *   に added 行だけ加算する=母数を「記録全件」に保ちつつ O(追加分)。
+ *
+ * @param {ReturnType<typeof aggregateSavedCommentsUidStats>|null|undefined} running 直前の running(seed 由来)
+ * @param {ReadonlyArray<{ userId?: string|null, commentNo?: string|number|null }>|null|undefined} added 新規行
+ * @returns {ReturnType<typeof aggregateSavedCommentsUidStats>} 加算後の running(% も再計算済み)
+ */
+export function accumulateSavedCommentsUidStats(running, added) {
+  const base =
+    running && typeof running === 'object'
+      ? {
+          totalSaved: Number(running.totalSaved) || 0,
+          withUid: Number(running.withUid) || 0,
+          withoutUid: Number(running.withoutUid) || 0,
+          commentNoLess: Number(running.commentNoLess) || 0
+        }
+      : { totalSaved: 0, withUid: 0, withoutUid: 0, commentNoLess: 0 };
+  const rows = Array.isArray(added) ? added : [];
+  for (const e of rows) {
+    const uid = e?.userId ? String(e.userId).trim() : '';
+    if (uid) base.withUid += 1;
+    else base.withoutUid += 1;
+    const no = e?.commentNo != null ? String(e.commentNo).trim() : '';
+    if (!no) base.commentNoLess += 1;
+    base.totalSaved += 1;
+  }
+  /** @param {number} n */
+  const pct = (n) => (base.totalSaved > 0 ? Math.round((n / base.totalSaved) * 1000) / 10 : 0);
+  return {
+    totalSaved: base.totalSaved,
+    withUid: base.withUid,
+    withoutUid: base.withoutUid,
+    withUidPercent: pct(base.withUid),
+    commentNoLess: base.commentNoLess,
+    commentNoLessPercent: pct(base.commentNoLess)
+  };
+}
+
+/**
  * page-intercept-entry.js が `data-nls-fetch-log` 属性に `' | '` 区切りで蓄積する
  * fetch hit 履歴（最新 20 件、URL pathname と Content-Type の短縮形）を配列化。
  * @param {string|null|undefined} attrValue
