@@ -276,16 +276,39 @@ async function bootstrap() {
  * リフレッシュサイクル
  * ========================================================================== */
 
+/** v0.1.1009: refresh が実行中か(再入防止)。前回が終わる前に次の tick を走らせない。 */
+let _refreshInFlight = false;
+/** v0.1.1009: storage 混雑時に次の tick を何回スキップするか(残り回数)。 */
+let _refreshBackoffTicks = 0;
+/** v0.1.1009: この所要(ms)を超えたら storage 混雑とみなして次の数 tick を間引く。 */
+const REFRESH_SLOW_MS = 500;
+
 function startRefreshLoop() {
   if (_refreshTimerId != null) return;
   _refreshTimerId = window.setInterval(() => {
     if (_refreshPausedByUser) return;
     if (document.hidden) return;
+    // ★v0.1.1009「過去ログ取り込み中に状態速報が重い(1819ms)」の緩和: backfill SW/content が
+    //   単一 LevelDB に大きな staged 書込(最大2000行/2.5秒)をしている間、status の read がそれと
+    //   競合して 1 refresh が数百ms〜2秒に膨れる(実機 backfill 640ms/summaries 439ms/popupDiag 391ms)。
+    //   そこで (a)前回の refresh が終わるまで次を走らせない(再入防止=ピックの積み上がりを断つ)、
+    //   (b)前回が REFRESH_SLOW_MS 超なら次の数 tick を間引いて書込と競合する頻度を下げる(負荷適応)。
+    //   コア表示の鮮度は通常時(軽い)は2秒のまま=取り込み中だけ自動で控えめになる。記録/取り込みには触らない。
+    if (_refreshInFlight) return;
+    if (_refreshBackoffTicks > 0) { _refreshBackoffTicks -= 1; return; }
+    _refreshInFlight = true;
     // v0.1.785: storage stall(storage_op_timeout)は status の自己診断 UI に画面表示済みで
     //   グレースフルに degrade する想定内の事象。console.warn は chrome://extensions のエラー欄に
     //   収集され「これ見てどうすればいいの?」を生むため console.debug に下げる(v0.1.776 と同方針=
     //   行動につながらない警告を目立つ場所に出さない)。実エラーは画面の概要欄/AI共有欄で確認できる。
-    refresh().catch((err) => console.debug('[status] refresh err', err));
+    refresh()
+      .catch((err) => console.debug('[status] refresh err', err))
+      .finally(() => {
+        _refreshInFlight = false;
+        // 直近 refresh が重ければ、混雑とみなして次の数 tick を間引く(2秒×N の控えめ更新へ)。
+        const lastMs = Number(_lastRefreshPerf?.totalMs);
+        _refreshBackoffTicks = Number.isFinite(lastMs) && lastMs > REFRESH_SLOW_MS ? 2 : 0;
+      });
   }, REFRESH_INTERVAL_MS);
 }
 
