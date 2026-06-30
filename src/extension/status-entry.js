@@ -49,6 +49,8 @@ import { KEY_PREVIEW_RENDER_ACK } from '../lib/previewRenderAckKey.js';
 import { buildHealthCells, summarizeHealthVerdict } from '../lib/healthCells.js';
 import { buildVoiceDiagLine } from '../lib/voiceDiag.js';
 import { KEY_VOICE_DIAG } from '../lib/voiceDiagKey.js';
+// v0.1.1010: 取り込み中の更新激重(7071ms)を所要比例の間引きで緩和する純関数。
+import { computeRefreshBackoffTicks } from '../lib/statusRefreshBackoff.js';
 // 共有 URL 組み立て(状態速報/応援ライブビュー/ingest)の純関数。挙動同値で uploadStatusSnapshot から切り出し。
 import { buildStatusShareUrls } from '../lib/statusShareUrls.js';
 // 応援ライブビュー(拡張内)の「このURLをWEBでも公開する」用: status が組み立てた公開ペイロードを置くキー。
@@ -280,20 +282,20 @@ async function bootstrap() {
 let _refreshInFlight = false;
 /** v0.1.1009: storage 混雑時に次の tick を何回スキップするか(残り回数)。 */
 let _refreshBackoffTicks = 0;
-/** v0.1.1009: この所要(ms)を超えたら storage 混雑とみなして次の数 tick を間引く。 */
-const REFRESH_SLOW_MS = 500;
 
 function startRefreshLoop() {
   if (_refreshTimerId != null) return;
   _refreshTimerId = window.setInterval(() => {
     if (_refreshPausedByUser) return;
     if (document.hidden) return;
-    // ★v0.1.1009「過去ログ取り込み中に状態速報が重い(1819ms)」の緩和: backfill SW/content が
-    //   単一 LevelDB に大きな staged 書込(最大2000行/2.5秒)をしている間、status の read がそれと
-    //   競合して 1 refresh が数百ms〜2秒に膨れる(実機 backfill 640ms/summaries 439ms/popupDiag 391ms)。
-    //   そこで (a)前回の refresh が終わるまで次を走らせない(再入防止=ピックの積み上がりを断つ)、
-    //   (b)前回が REFRESH_SLOW_MS 超なら次の数 tick を間引いて書込と競合する頻度を下げる(負荷適応)。
-    //   コア表示の鮮度は通常時(軽い)は2秒のまま=取り込み中だけ自動で控えめになる。記録/取り込みには触らない。
+    // ★v0.1.1009/1010「過去ログ取り込み中に状態速報が重い(1819→7071ms)」の緩和: backfill SW/content が
+    //   単一 LevelDB に大きな staged 書込(最大2000行/2.5秒)を、2配信同時記録中はさらに倍で出すため、
+    //   status の read がそれと競合して 1 refresh が数百ms〜7秒に膨れる(実機 backfill 1918ms/
+    //   fastDiagLite 1749ms/summaries 1724ms=小さな read すら競合で待たされる)。
+    //   そこで (a)前回の refresh が終わるまで次を走らせない(再入防止=積み上がりを断つ)、
+    //   (b)前回の所要に【比例して】次の tick を間引く(v0.1.1010・computeRefreshBackoffTicks)=
+    //      重いほど控えめにして書込が drain する余地を作る。通常時(軽い)は2秒のまま=鮮度不変。
+    //   記録/取り込みには触らない(status の更新頻度だけ)。
     if (_refreshInFlight) return;
     if (_refreshBackoffTicks > 0) { _refreshBackoffTicks -= 1; return; }
     _refreshInFlight = true;
@@ -305,9 +307,8 @@ function startRefreshLoop() {
       .catch((err) => console.debug('[status] refresh err', err))
       .finally(() => {
         _refreshInFlight = false;
-        // 直近 refresh が重ければ、混雑とみなして次の数 tick を間引く(2秒×N の控えめ更新へ)。
-        const lastMs = Number(_lastRefreshPerf?.totalMs);
-        _refreshBackoffTicks = Number.isFinite(lastMs) && lastMs > REFRESH_SLOW_MS ? 2 : 0;
+        // 直近 refresh の所要に比例して次の数 tick を間引く(重いほど大きく控える)。
+        _refreshBackoffTicks = computeRefreshBackoffTicks(Number(_lastRefreshPerf?.totalMs));
       });
   }, REFRESH_INTERVAL_MS);
 }
