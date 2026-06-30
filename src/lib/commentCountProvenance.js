@@ -73,6 +73,18 @@ export function buildCommentCountProvenance(lv) {
     : Number(o.lastIngestAgoMs);
   const officialIsFresh = Number.isFinite(officialAgeMs) && officialAgeMs >= 0 && officialAgeMs <= OFFICIAL_FRESH_MS;
 
+  // ★v0.1.1008 誤検知根治: 時系列で「記録の過剰増(二重計上)が起きていない」なら、本家が新鮮でも
+  //   要確認にしない。直近窓の 本家Δ/記録Δ を比べ、記録Δが本家Δを有意に上回らなければ、101% 等の
+  //   小さな超過は本家統計の遅延/母数差(記録が正しく先行)で説明できる=正常。実機 lv350859704
+  //   (本家+0/記録+0=終了配信で固定・101%)が「新鮮なのに超過」で🟡居座っていたのを消す。
+  //   時系列の材料が無いとき(null)は従来どおり(ガードしない=後方互換)。本物の二重(記録Δ≫本家Δ)は素通し。
+  const tsOfficialDelta = num(o.officialStatisticsCommentsDelta);
+  const tsRecordedDelta = num(o.officialReceivedCommentsDelta);
+  const timeSeriesShowsNoOverRecording =
+    tsOfficialDelta != null &&
+    tsRecordedDelta != null &&
+    tsRecordedDelta - tsOfficialDelta <= Math.max(2, Math.round(tsOfficialDelta * 0.2));
+
   // 3段階判定(誤検知防止のため、判定できる材料が揃ったときだけ ok/normal/check を出す)。
   let verdict = 'unknown';
   let verdictReason = '';
@@ -81,13 +93,18 @@ export function buildCommentCountProvenance(lv) {
       verdict = 'ok';
       verdictReason = '記録は本家コメ以下＝正常（記録は本家の一部）';
     } else if (ratePct > RECORD_OVER_OFFICIAL_NORMAL_MAX_PCT) {
-      // 130% 超は遅延では説明しにくい=要確認(別配信混入/二重計上の疑い)。
+      // 130% 超は遅延では説明しにくい=要確認(別配信混入/二重計上の疑い)。時系列で過剰増が無くても、
+      //   この大差は遅延だけでは説明しにくいので check のまま(本物の取りこぼし/混入を見逃さない)。
       verdict = 'check';
       verdictReason = `記録が本家コメを大きく上回っています(${ratePct}%)。本家の遅延だけでは説明しにくく、別配信の混入か二重計上の疑いがあります`;
-    } else if (officialIsFresh) {
-      // 本家が新鮮(60秒以内)なのに記録超=遅延で説明できない=要確認。
+    } else if (officialIsFresh && !timeSeriesShowsNoOverRecording) {
+      // 本家が新鮮(60秒以内)なのに記録超 かつ 時系列で過剰増あり(or 材料無し)=遅延で説明できない=要確認。
       verdict = 'check';
       verdictReason = `本家コメが新鮮(${agoLabel(officialAgeMs)})なのに記録が上回っています(${ratePct}%)。遅延では説明しにくいので要確認です`;
+    } else if (officialIsFresh && timeSeriesShowsNoOverRecording) {
+      // 本家は新鮮だが時系列で記録の過剰増が無い=小さな超過は本家統計の遅延/母数差で説明可能=正常。
+      verdict = 'normal';
+      verdictReason = `記録が本家コメをやや上回りますが、直近で記録の過剰増(二重計上)は見られず＝本家統計の遅延/母数差で説明できる正常範囲です(${ratePct}%)`;
     } else {
       verdict = 'normal';
       verdictReason = '記録が本家コメをやや上回るのは、記録が即時・単調／本家が遅延値のため＝正常範囲です';
