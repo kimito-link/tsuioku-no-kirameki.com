@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 1 / 582 件
+## ⚠️ 役割コメントが無いソース 1 / 583 件
 - `src/lib/reportPreviewPublish.js`
 
 ## 全ファイルツリー
@@ -457,7 +457,7 @@
   - `vendor-visual-explainer.mjs` — Vendors nicobailon/visual-explainer (MIT) into .cursor/skills/visual-explainer/
   - `verify-bump.mjs` — extension bump 後の整合性チェッカー
   - `write-extension-placeholder-icons.mjs` — リポジトリに 256px アイコンしか無い環境向け: manifest 用の小さめ PNG を生成する。
-- 📁 **src/** (1235)
+- 📁 **src/** (1237)
   - 📁 **data/** (6)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -716,7 +716,7 @@
         - `logo_funlink_white_RGB_maru_black.png`
       - `logo_guide_funlink_ol.pdf`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1024)
+  - 📁 **lib/** (1026)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -1525,6 +1525,8 @@
     - `statusFormat.test.js`
     - `statusMindmapModel.js` — status.html「全体マインドマップ」のツリーモデルを組み立てる純関数(2026-06-18 ユーザー要望)。
     - `statusMindmapModel.test.js`
+    - `statusRefreshBackoff.js` — v0.1.1010: 状態速報(status.html)の自動更新を「直近 refresh の所要に比例して間引く」純関数。
+    - `statusRefreshBackoff.test.js`
     - `statusShareUrls.js` — 状態速報の共有 URL を組み立てる純関数。
     - `statusShareUrls.test.js`
     - `statusTrend.js` — 状態速報の主要KPIを時系列で記録し、「スナップショットでは見えない劣化」を検知する純関数(v0.1.862)。

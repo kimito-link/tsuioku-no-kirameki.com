@@ -4,6 +4,7 @@ import {
   probeCommentRowDataAttributes,
   analyzeNdgrChatRejection,
   aggregateSavedCommentsUidStats,
+  accumulateSavedCommentsUidStats,
   parseInterceptFetchLog,
   snapshotCommentIngestCounters
 } from './commentObservabilityDiag.js';
@@ -223,6 +224,46 @@ describe('aggregateSavedCommentsUidStats', () => {
     const r = aggregateSavedCommentsUidStats([]);
     expect(r.commentNoLess).toBe(0);
     expect(r.commentNoLessPercent).toBe(0);
+  });
+});
+
+describe('accumulateSavedCommentsUidStats（v0.1.1011: チャンクモードの totalSaved:0 根治）', () => {
+  it('seed(全件)で running を作り、added を加算しても母数は記録全件のまま', () => {
+    // seed: 既存3223件相当(ここでは縮小: uid有2/欠落1)
+    const seed = aggregateSavedCommentsUidStats([
+      { userId: 'a', commentNo: '1' },
+      { userId: 'b', commentNo: '2' },
+      { userId: '', commentNo: '' } // uid無・no無
+    ]);
+    expect(seed.totalSaved).toBe(3);
+    // フラッシュ1: 新規2件(uid有1/uid無1・どちらも no有)
+    const r1 = accumulateSavedCommentsUidStats(seed, [
+      { userId: 'c', commentNo: '4' },
+      { userId: '', commentNo: '5' }
+    ]);
+    expect(r1.totalSaved).toBe(5); // 3 + 2 = 母数は全件
+    expect(r1.withUid).toBe(3);
+    expect(r1.commentNoLess).toBe(1);
+    // フラッシュ2: 新規0件 → 母数は5のまま(totalSaved:0 にならない=根治の核心)
+    const r2 = accumulateSavedCommentsUidStats(r1, []);
+    expect(r2.totalSaved).toBe(5);
+    expect(r2.withUidPercent).toBe(60); // 3/5
+  });
+
+  it('running が null でも空 seed として動く(added だけ積む)', () => {
+    const r = accumulateSavedCommentsUidStats(null, [
+      { userId: 'a', commentNo: '1' },
+      { userId: '', commentNo: '' }
+    ]);
+    expect(r.totalSaved).toBe(2);
+    expect(r.withUid).toBe(1);
+    expect(r.commentNoLess).toBe(1);
+  });
+
+  it('added が空/非配列なら running をそのまま返す(% 再計算込み)', () => {
+    const seed = aggregateSavedCommentsUidStats([{ userId: 'a', commentNo: '1' }]);
+    expect(accumulateSavedCommentsUidStats(seed, []).totalSaved).toBe(1);
+    expect(accumulateSavedCommentsUidStats(seed, null).totalSaved).toBe(1);
   });
 });
 
