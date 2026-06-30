@@ -265,10 +265,16 @@ export function planRewriteAllChunks(liveId, array, opts = {}) {
  * チャンク（またはフォールバックで従来 main）から本体配列を読み出す async orchestration。
  * getMany(keys) は `{ [key]: value }` を返す関数（chrome.storage.local.get 相当・テスト可能）。
  *
+ * ★v0.1.1012: 返り値に complete を追加。インデックスが指す全チャンクが配列として読めたら true。
+ *   いずれかのチャンクが非配列(storage 競合で timeout/部分失敗・未 flush)なら false=部分読み。
+ *   呼び出し側(dedup の seed)は complete=false のとき【不完全な keySet で照合せず requeue】する。
+ *   これが無いと、競合下で読めなかったチャンクのコメントが keySet に入らず、再到来で二重記録される
+ *   (実機 lv350854400・backfill 1505件/秒走行中に 本家+0/記録+189 の過剰増=本物の二重計上の真因)。
+ *
  * @param {string} liveId
  * @param {string} mainKey 従来の `nls_comments_<lv>` キー（フォールバック用）
  * @param {(keys: string[]) => Promise<Record<string, unknown>>} getMany
- * @returns {Promise<{ rows: Array<unknown>, fromChunks: boolean, index: object|null }>}
+ * @returns {Promise<{ rows: Array<unknown>, fromChunks: boolean, index: object|null, complete: boolean }>}
  */
 export async function readChunkedComments(liveId, mainKey, getMany) {
   const idxKey = chunkIndexKey(liveId);
@@ -277,18 +283,26 @@ export async function readChunkedComments(liveId, mainKey, getMany) {
   if (isChunkIndex(index, liveId) && Array.isArray(/** @type {any} */ (index).seqs)) {
     const keys = chunkKeysFromIndex(liveId, /** @type {any} */ (index));
     if (keys.length === 0) {
-      return { rows: [], fromChunks: true, index: /** @type {object} */ (index) };
+      return { rows: [], fromChunks: true, index: /** @type {object} */ (index), complete: true };
     }
     const bag = await getMany(keys);
     /** @type {Array<unknown>} */
     let rows = [];
+    let complete = true;
     for (const key of keys) {
       const part = bag ? bag[key] : null;
       if (Array.isArray(part)) rows = rows.concat(part);
+      else complete = false; // ★非配列(read失敗/未flush)=部分読み。seed を信用させない。
     }
-    return { rows, fromChunks: true, index: /** @type {object} */ (index) };
+    return { rows, fromChunks: true, index: /** @type {object} */ (index), complete };
   }
   const mainBag = await getMany([mainKey]);
   const main = mainBag ? mainBag[mainKey] : null;
-  return { rows: Array.isArray(main) ? main : [], fromChunks: false, index: null };
+  // フォールバック(従来 main): 配列なら complete、欠落なら不完全。
+  return {
+    rows: Array.isArray(main) ? main : [],
+    fromChunks: false,
+    index: null,
+    complete: Array.isArray(main) || main == null
+  };
 }
