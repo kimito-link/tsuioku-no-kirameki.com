@@ -113,6 +113,41 @@ describe('buildCommentCountProvenance 3段階判定', () => {
     expect(p.verdict).toBe('check');
     expect(p.verdictReason).toContain('別配信');
   });
+
+  // ★v0.1.1008: 本家新鮮でも、時系列で記録の過剰増が無ければ normal(遅延/母数差で説明可)。
+  it('本家新鮮+時系列フラット(本家0/記録0)で101%=normal(実機lv350859704型・🟡誤報を消す)', () => {
+    const p = buildCommentCountProvenance({
+      recordedCount: 1179,
+      officialCommentCount: 1169,
+      officialCommentStatsAgeMs: 16 * 1000, // 本家新鮮
+      officialStatisticsCommentsDelta: 0,
+      officialReceivedCommentsDelta: 0,
+      officialCommentSampleWindowMs: 60000
+    });
+    expect(p.ratePct).toBe(101);
+    expect(p.verdict).toBe('normal');
+    expect(p.verdictReason).toContain('過剰増');
+  });
+
+  it('本家新鮮+時系列で記録Δが本家Δを大きく上回る=check のまま(本物の二重は見逃さない)', () => {
+    const p = buildCommentCountProvenance({
+      recordedCount: 1100,
+      officialCommentCount: 1000,
+      officialCommentStatsAgeMs: 5 * 1000,
+      officialStatisticsCommentsDelta: 10,
+      officialReceivedCommentsDelta: 60, // 記録だけ過剰増
+      officialCommentSampleWindowMs: 60000
+    });
+    expect(p.verdict).toBe('check');
+    expect(p.verdictReason).toContain('新鮮');
+  });
+
+  it('時系列の材料が無ければ従来どおり(本家新鮮で超過=check・後方互換)', () => {
+    const p = buildCommentCountProvenance({
+      recordedCount: 1005, officialCommentCount: 926, officialCommentStatsAgeMs: 5 * 1000
+    });
+    expect(p.verdict).toBe('check');
+  });
 });
 
 describe('formatCommentCountProvenanceLines', () => {
@@ -136,22 +171,24 @@ describe('formatCommentCountProvenanceLines', () => {
     expect(text).toContain('判定: 🟡 要確認');
   });
 
-  // ★v0.1.1007 時系列計器: 焼き付き vs 本家遅延の切り分けを check 時に出す。
-  it('要確認のとき、本家Δ≈記録Δ なら「本家の遅延寄り」を出す', () => {
+  // ★v0.1.1008: 本家Δ≈記録Δ(過剰増なし)は v0.1.1008 の時系列ガードで normal に倒れる=🟡を出さない。
+  //   (v0.1.1007 ではここで check+時系列行を出していたが、遅延型を正常判定するのが正しい挙動)。
+  it('本家Δ≈記録Δ(過剰増なし)なら 🟢 正常(時系列ガードで🟡を出さない)', () => {
     const text = formatCommentCountProvenanceLines([
       {
         lv: 'lv1', recordedCount: 1178, officialCommentCount: 1169,
-        officialCommentStatsAgeMs: 5000, // 本家新鮮=check
-        officialStatisticsCommentsDelta: 50, officialReceivedCommentsDelta: 51,
+        officialCommentStatsAgeMs: 5000, // 本家新鮮だが…
+        officialStatisticsCommentsDelta: 50, officialReceivedCommentsDelta: 51, // 過剰増なし
         officialCommentSampleWindowMs: 60000
       }
     ]).join('\n');
-    expect(text).toContain('判定: 🟡 要確認');
-    expect(text).toContain('時系列(計器): 直近60秒で 本家+50 / 記録+51');
-    expect(text).toContain('母数差/本家の遅延寄り');
+    expect(text).toContain('判定: 🟢 正常');
+    expect(text).not.toContain('判定: 🟡 要確認');
+    // 時系列行は check のときだけ出す=正常では出さない。
+    expect(text).not.toContain('時系列(計器)');
   });
 
-  it('要確認のとき、記録Δが本家Δを大きく上回るなら「二重計上寄り」を出す', () => {
+  it('要確認(記録Δが本家Δを大きく上回る)のとき、時系列で「二重計上寄り」を出す', () => {
     const text = formatCommentCountProvenanceLines([
       {
         lv: 'lv1', recordedCount: 1300, officialCommentCount: 1000,
