@@ -1,0 +1,29 @@
+お題: popup の応援レーン(特に「たぬ姉レーン」=匿名の応援)が、記録7,262件・コメントした人440人もいるのに【4人しか出ない】。応援レーン描画に渡る入力が【10件だけ】(entriesLen:10)。実機の状態速報で「描画済みなのにローディングが終わらない」警告も同時に出る。慎重に真因を詰めてから直したい。
+
+# 実コードで裏取りした現状(これが前提・覆さない)
+- 応援レーンは STORY_SOURCE_STATE.entries / laneAggregates から描く(popup-entry.js renderStoryUserLane)。laneAggregates は syncStorySourceEntries が storageRowsForLane(=laneFeedPick.entries)から userLaneCandidatesFromStorage で集約。
+- heavy 経路の入力選択: popup-entry.js:14414 selectLaneFeedCommentRows({ heavySettled: watchPopupHeavyCommentsSettled, ... })。
+  - src/lib/provisionalLaneCommentRows.js:57-61: heavySettled===true なら primary(全件) を返す。false なら panelSummary.recent/commentSummary.recent 等の【直近N件(暫定)】だけ返す(provisional=true)。
+- つまり entriesLen:10 = watchPopupHeavyCommentsSettled が false のまま = 全件集約がレーンに渡らず、直近10件の暫定表示で固着 → たぬ姉レーンに匿名が4人しか出ない。
+- watchPopupHeavyCommentsSettled を true にするのは popup-entry.js:14559(heavy コメント読み完了コールバック内)一箇所のみ。だが手前に早期 return が複数ある:
+  - 14530: watchMetaCache.key !== snapshotKey(スナップショット変化)
+  - 14531: !Array.isArray(nextArr)(heavy が null)
+  - 14532: refreshGen !== watchPopupRefreshGeneration(より新しい refresh に追い越された)
+  - 14542: !nextArr.length && arr.length && arrCoversTotal(空 heavy resp だが arr が total の8割超)
+- refreshGen は refresh のたびに ++watchPopupRefreshGeneration(:13325)で増える。watchPopupHeavyCommentsSettled は refresh 関数内のローカル(:13967)で、canReuseHeavyChunkRead(:13957)から初期化。総数が増え続ける配信ではチャンク total が変わり canReuseHeavyChunkRead=false になりやすい=毎 refresh で heavy を読み直す。
+- 実機の負荷: 状態速報で「更新所要 5.2秒(backfill 1254ms / fastDiagLite 1149ms)」「診断が重い」。7,262件の重い配信で heavy read が遅く、完了前に次の refresh が来て refreshGen が進む→14532 で早期 return→settled されない、が有力仮説。
+
+# この症状は既知(コードに地雷として記録済み・繰り返し防止)
+- popup-entry.js:5493 のコメント: 「応援レーンは STORY_SOURCE_STATE.entries(heavy 経路でしか populate されない)依存=heavy が詰まると started=0 のまま」。救済として renderStoryUserLaneFromLightCommentsForCurrentLive(直近コメントの軽い源)が入っているが、これは【10件程度の暫定】を出すだけで全件集約ではない。今回の症状はこの暫定で固着している状態。
+
+# 問い(これに答えて)
+1. 真因はどれか。(A)refreshGen レース(heavy 完了前に次 refresh が追い越し 14532 で return→settled されない) (B)canReuseHeavyChunkRead が効かず毎回 heavy 読み直しで永遠に間に合わない (C)14542 の arrCoversTotal 早期 return が settled を素通り (D)別の見落とし。実機値(entriesLen:10・更新5.2秒・7262件・started:2/completed:2/done)から最有力を1つ。
+2. 直し方の射程。星野ロミ式(既存データ活かす・過剰実装回避・落とさない・恥をかかせない)で。(A)heavy が追い越されても「最後に成功した全件 arr」を保持して次 refresh で settled=true にできるようにする (B)settled を refresh ローカルでなく per-live で持ち越す (C)refresh を throttle して heavy 完了を待つ (D)provisional でも全件集約を試みる。最小で効くのは?退化(空応援帯・別配信混入・ちらつき再発)を出さない線引き。
+3. 「描画済みなのにローディングが終わらない」overlay の畳み漏れは、settled されない事と同根か別か。settled=false のまま描画は暫定で走る→ローディング overlay を畳む条件が settled 依存なら、settled されないと永遠にローディング。overlay を畳む正しい条件は何か(描画完了 or settled or entries>0)。
+4. 検証で何を見るか。実機で watchPopupHeavyCommentsSettled が true になるか(ならないなら14530-14542 のどれで return しているか)を観測する計器はあるか(storyUserLaneRenderProbe に settled/reachedStep がある)。軽い配信・重い配信でどう違うか。
+5. やってはいけない過剰実装/退化を1つ以上(批判役は必ず穴を指摘): 例=refresh を止めて他の描画を遅らせる/settled を安易に true 固定して別配信のデータを混ぜる/heavy read を毎回強制full にして重い配信を更に重くする/provisional を全件化して0秒表示の軽さを殺す/会場(venueBar・別系統)に手を出して今直したちらつきを再発させる。
+
+# 制約(星野ロミ式)
+記録本体不可侵・hot path(描画/refresh)を重くしない・落とさない(匿名も人として全員出す)・既存データ活かす(provisional/heavy/summary は既にある)・過剰実装回避・恥をかかせない(空応援帯・永遠ローディングを作らない)・検証ファースト(実機で settled が立つか先に観測)。⚠️今回直したばかりの会場(venueBar)には触らない(別系統・ちらつき再発防止)。
+
+出力は『結論 → 根拠 → 反論・リスク → 具体案』の4ブロックで。具体案は「まず実機/計器で何を確認するか」と「直すなら最小のファイル:関数(どこで settled を立てる/保持するか)」まで。

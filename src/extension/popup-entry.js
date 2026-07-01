@@ -470,8 +470,10 @@ import {
 //   ローディングが終わらない」を状態速報で抜け漏れなく捕まえる。北極星の _northStarRenderProbe と同形。
 import {
   STORY_USER_LANE_STEPS,
+  STORY_USER_LANE_HEAVY_SETTLE,
   createStoryUserLaneRenderProbe,
   recordStoryUserLaneStep,
+  recordStoryUserLaneHeavySettle,
   snapshotStoryUserLaneRenderProbe
 } from '../lib/storyUserLaneRenderProbe.js';
 // 人物タイルの ID 行・名前行の正本(person-tile-unify 第3コミット)。popup と会場で共有。
@@ -14527,9 +14529,10 @@ async function refresh() {
   // 重いコメント配列（全チャンク連結 or 従来 main）の読み取りが後から完了したら、
   //   同一 liveId のときだけ再描画。v0.1.509: heavyDataPromise は配列 or null を resolve する。
   void heavyDataPromise.then(async (nextArr) => {
-    if (watchMetaCache.key !== snapshotKey) return;
-    if (!Array.isArray(nextArr)) return;
-    if (refreshGen !== watchPopupRefreshGeneration) return;
+    const bailHeavy = (state) => { recordStoryUserLaneHeavySettle(_storyUserLaneRenderProbe, state); }; // v0.1.1033 計器
+    if (watchMetaCache.key !== snapshotKey) return bailHeavy(STORY_USER_LANE_HEAVY_SETTLE.STALE_SNAPSHOT);
+    if (!Array.isArray(nextArr)) return bailHeavy(STORY_USER_LANE_HEAVY_SETTLE.NULL_RESP);
+    if (refreshGen !== watchPopupRefreshGeneration) return bailHeavy(STORY_USER_LANE_HEAVY_SETTLE.RACE);
     // v0.1.625: nextArr が空でも、現 arr が currentChunkTotal を満たしていない
     //   (cached が短い arr で固まっている)なら skip しない(=空応援帯固まり防止)。
     //   元の `!nextArr.length && arr.length` ガードは「heavy 経路の一時的な空 resp で
@@ -14539,7 +14542,7 @@ async function refresh() {
       currentChunkTotal == null ||
       currentChunkTotal === 0 ||
       arr.length >= Math.floor(currentChunkTotal * 0.8);
-    if (!nextArr.length && arr.length && arrCoversTotal) return;
+    if (!nextArr.length && arr.length && arrCoversTotal) return bailHeavy(STORY_USER_LANE_HEAVY_SETTLE.EMPTY_COVERED);
     const wasHeavyPending = !watchPopupHeavyCommentsSettled;
     readCommentsOk = true;
     commentReadState = 'storage_ok';
@@ -14557,6 +14560,7 @@ async function refresh() {
       arr = /** @type {unknown[]} */ (arr).concat(tailDisplayRows);
     }
     watchPopupHeavyCommentsSettled = true;
+    recordStoryUserLaneHeavySettle(_storyUserLaneRenderProbe, STORY_USER_LANE_HEAVY_SETTLE.SETTLED);
     if (wasHeavyPending) {
       _giftBahamutSeededLiveId = '';
       _giftBahamutSeededEntryCountByLive.delete(lv);

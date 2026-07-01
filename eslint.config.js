@@ -142,8 +142,11 @@ export default [
     //   下のアイコングリッドが揺れていた。一度実データを描いたら一瞬の空では畳まない)。DOM判定は popup 依存=lib抽出不可。
     //   v0.1.1028: ②応援者ランキングの匿名の顔崩れ根治=21624→21629(①POP(8208)と同じ anonymousIdenticonResolver 等を
     //   ②の applyTopSupportersMirrorForPassive に注入。無いと匿名の顔が identicon にならず blank.jpg で崩れる)。
+    //   v0.1.1033: 応援レーンの「たぬ姉が少なすぎる」真因(refreshGen レースで heavy が settled に到達しない)を
+    //   状態速報から観測する計器を heavy 完了コールバックの early-return 4分岐に配線=21629→21633。純関数は
+    //   storyUserLaneRenderProbe.js(テスト付)に隔離済みで、popup 側は callback 内の記録1行ずつのみ(lib抽出不可)。
     files: ['src/extension/popup-entry.js'],
-    rules: { 'max-lines': ['error', { max: 21629, skipBlankLines: false, skipComments: false }] }
+    rules: { 'max-lines': ['error', { max: 21633, skipBlankLines: false, skipComments: false }] }
   },
   {
     files: ['src/extension/content-entry.js'],

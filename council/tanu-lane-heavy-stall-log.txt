@@ -1,0 +1,193 @@
+[実在チェック] groq/gemini を照合。全メンバー実在OK
+
+分類: category=code  by=groq/llama-3.3-70b  (コード生成・実装・デバッグ・リファクタ)
+  分類器の生出力: {"category":"code"}
+[③多視点] 2体目の批判役として groq/gpt-oss-120b を追加
+召集 4体（最大4）: groq/qwen3-32b[批判・詰め（推論特化）], groq/qwen3.6-27b[発散アイデア（推論強）], groq/llama-3.3-70b[爆速の視点], groq/gpt-oss-120b[批判・詰め（推論特化）]
+
+[ルーティング選抜・code] 4体に問い合わせ中: groq/qwen3-32b, groq/qwen3.6-27b, groq/llama-3.3-70b, groq/gpt-oss-120b（各2回サンプリング）
+[ルーティング選抜・code] ①2巡目: 2体が批判を受けて修正
+[ルーティング選抜・code] ②統合: groq/qwen3-32b が1案に束ねる
+
+########################################################################
+# ルーティング選抜・code
+########################################################################
+
+========================================================================
+### groq/qwen3-32b  [批判・詰め（推論特化）]  (4159ms)
+========================================================================
+**結論**  
+真因は**(A)refreshGen レース(heavy 完了前に次 refresh が追い越し 14532 で return→settled されない)**。**直し方は**(A)「最後に成功した全件 arr」を保持して次 refresh で settled=true にできるようにする**が最適。overlay 畳み漏れは同根で、正しい条件は**settled=true**。検証は**storyUserLaneRenderProbe**で settled 状態と reachedStep を観測。過剰実装のリスクは**heavy read を full 化する**こと。
+
+---
+
+**根拠**  
+1. **refreshGenレースの証拠**  
+   - 実機値から「更新所要5.2秒」「refreshGen が ++ されるたびに heavy が再読」が判明。  
+   - 14532の「refreshGen !== watchPopupRefreshGeneration」は、heavy読了前のrefreshで早期returnの直接証。  
+   - 7,262件のheavy readが5秒かかるが、配信中継は高速refreshが頻発するため、必然的にレースが発生。  
+
+2. **(A)選定の理由**  
+   - 「最後に成功した全件arr」を保持することで、heavy読了前のrefreshでも既存データを再利用可能。  
+   - 既存の**provisional値を上書きせず、全件データの再利用**がロミ式「既存データ活かす」に合致。  
+   - (B)settledをper-live持ち越すは、配信終了後のclean-upが難しく、配信途中の再利用に不適。  
+
+3. **overlay畳み漏れは同根**  
+   - 描画完了≠ローディング終了。**settled=false**のままprovisional表示→ローディングoverlayが残る。  
+   - 正しい条件は**settled=true OR heavy読了後**。entries>0は10件でも成り立つが、プロダクションでは「全件未読了」が原因。  
+
+4. **検証計器の有効性**  
+   - **storyUserLaneRenderProbe**は既存でsettled/reachedStepを記録しており、14530-14542のreturn経路の観測が可能。  
+   - 軽配信では14542の「arrCoversTotal」が成立し、重配信ではrefreshGenレースが支配的。  
+
+---
+
+**反論・リスク**  
+- **反論**「(A)は過去の失敗と同様」「7,262件を保持するメモリ増加はないか？」  
+  → 保持するのは**最後の成功した全件arr**で、1回限りの保持。メモリ増加は配信終了まで1回分に限る。  
+- **リスク**「別配信のデータ混入」  
+  → snapshotKeyの検証(14530)により、スナップショット変化時は保持値を破棄。配信間のデータ混入を防ぐ。  
+
+---
+
+**具体案**  
+1. **検証ステップ**  
+   - **storyUserLaneRenderProbe**で以下を観測：  
+     - `watchPopupHeavyCommentsSettled`がtrueになるか？  
+     - 14530-14542のreturnした`reachedStep`は？  
+   - 重配信では`reachedStep: "refreshGenRace"`、軽配信では`reachedStep: "arrCoversTotal"`が観測される。  
+
+2. **直し方の最小実装**  
+   - **ファイル**: `popup-entry.js`  
+   - **関数**: `selectLaneFeedCommentRows`  
+   - **変更点**:  
+     ```javascript
+     // 最後に成功した全件arrを保持
+     let lastSuccessfulHeavyArr = null;
+     ...
+     // 14559: heavy読了後のsettled=trueの前で保持
+     lastSuccessfulHeavyArr = nextArr;
+     ...
+     // provisionale=trueの時でもlastSuccessfulHeavyArrが存在すれば使用
+     if (provisional && lastSuccessfulHeavyArr) {
+       return lastSuccessfulHeavyArr;
+     }
+     ```
+   - **根拠**: 既存の`provisional`フラグを流用し、全件データの再利用を最小実装で実現。  
+
+3. **落とし穴回避**  
+   - 忘却ロジック: 保持値は`watchMetaCache.key`変化時(14530)に破棄。配信終了後はキャッシュクリア。
+
+========================================================================
+### groq/qwen3.6-27b  [発散アイデア（推論強）]  (3526ms)
+========================================================================
+<think>
+Here's a thinking process:
+
+1.  **Analyze User Input:**
+    *   **Role:** Divergent thinker. Provide unconventional, non-obvious solutions. Offer multiple distinct angles. Not just safe/standard answers.
+    *   **Topic:** A "support lane" (応援レーン) in a popup, specifically the "Tanu-ne Lane" (匿名の応援/anonymous support), has 7,262 records and 440 commenters, but only shows 4 users. The input to the rendering function is only 10 entries (`entriesLen: 10`). There's a warning: "Drawing completed but loading doesn't finish."
+    *   **Code Context (Premises):**
+        *   Rendering uses `STORY_SOURCE_STATE.entries` / `laneAggregates`.
+        *   `laneAggregates` comes from `syncStorySourceEntries` -> `storageRowsForLane` -> `userLaneCandidatesFromStorage`.
+        *   Heavy path input selection: `selectLaneFeedCommentRows({ heavySettled: watchPopupHeavyCommentsSettled, ... })`.
+        *   If `heavySettled === true`, returns all (primary). If `false`, returns recent N (provisional).
+        *   `entriesLen: 10` means `watchPopupHeavyCommentsSettled` is stuck at `false`.
+        *   `watchPopupHeavyCommentsSettled` is set to `true` only in one place (`popup-entry.js:14559`) inside the heavy comment load callback.
+        *   Early returns before setting `true`:
+            *   14530: `watchMetaCache.key !== snapshotKey`
+            *   14531: `!Array.isArray(nextArr)`
+            *   14532: `refreshGen !== watchPopupRefreshGeneration` (Race condition: newer refresh overtook)
+            *   14542: `!nextArr.length && arr.length && arrCoversTotal` (Empty heavy resp but existing arr covers 80%+)
+        *   `refreshGen` increments on each refresh. `watchPopupHeavyCommentsSettled` is local to `refresh` function, initialized from `canReuseHeavyChunkRead`. In heavy streams, `total` keeps changing, `canReuseHeavyChunkRead` is often false -> forces re-read every refresh.
+        *   Device load: "Update took 5.2s (backfill 1254ms / fastDiagLite 1149ms)", "Diagnosis is heavy". 7,262 entries. Heavy read is slow. Next refresh comes before completion -> `refreshGen` advances -> 14532 early return -> `settled` never set. This is the leading hypothesis.
+    *   **Known Issues/Comments:**
+        *   `popup-entry.js:5493` comment: Support lane depends on `STORY_SOURCE_STATE.entries` (only populated via heavy path). If heavy stalls, `started=0`. Fallback `renderStoryUserLaneFromLightCommentsForCurrentLive` exists but only shows ~10 provisional entries. Current symptom is stuck on this provisional state.
+    *   **Questions:**
+        1.  Root cause? (A) refreshGen race, (B) canReuseHeavyChunkRead inefficiency, (C) 14542 early return, (D) other. Pick 1 based on device data.
+        2.  Fix scope/approach (Hoshino Romi style: leverage existing data, avoid over-engineering, don't break, don't cause shame). Options: (A) Keep last successful full arr, (B) Move settled out of refresh to per-live, (C) Throttle refresh, (D) Make provisional fetch all. Pick min effective, avoid degradation.
+        3.  Is "loading overlay doesn't close" same root as `settled` stuck? If yes, what's the correct condition to close overlay? (draw complete, settled, entries>0?)
+        4.  Verification: How to check if `watchPopupHeavyCommentsSettled` becomes true? Which early return triggers? Instrumentation exists? Difference between light/heavy streams?
+        5.  What NOT to do (over-engineering/degradation)? Give 1+ examples.
+    *   **Constraints:** Hoshino Romi style. Don't touch record body. Don't block hot path. Don't drop anonymous users. Leverage existing data. Avoid over-engineering. Verification first. Don't touch `venueBar`.
+    *   **Output Format:** 結論 → 根拠 → 反論・リスク → 具体案 (4 blocks). Specific plan must include "what to verify on device/instrumentation first" and "minimal file:function to fix".
+
+2.  **Deconstruct & Brainstorm (Divergent Thinking):**
+    *   *Question 1: Root Cause.* The data strongly points to (A) refreshGen race condition. Heavy read takes 5.2s. Refresh likely triggers every 1-2s (or on new comments). `refreshGen` increments. Callback arrives late, sees `refreshGen !== watchPopupRefreshGeneration`, returns early. `settled` stays false. `entriesLen: 10` confirms provisional fallback is active. (B) is a contributing factor but (A) is the direct trigger for the state lock. (C) is unlikely because `nextArr` wouldn't be empty if heavy read actually succeeded with data. (D) could be related to how `watchPopupHeavyCommentsSettled` is scoped (local to refresh), which exacerbates (A). I'll go with **(A) refreshGen レース** as the primary, with local scoping as the amplifier.
+    *   *Question 2: Fix Approach.* Standard fix would be to fix the race condition or change scoping. But "Hoshino Romi style" means pragmatic, minimal, leveraging existing structures, avoiding heavy refactors.
+        *   Option A: Keep last successful arr. Good, but needs state management.
+        *   Option B: Per-live settled state. Changes architecture slightly.
+        *   Option C: Throttle refresh. Bad for UX, breaks real-time feel.
+        *   Option D: Provisional -> all. Breaks performance.
+        *   *Divergent Angle:* Instead of fighting the race condition or changing scoping drastically, what if we decouple `settled` from the *exact* refresh that triggered the fetch? Or use a "graceful degradation/promotion" mechanism? If heavy read completes *after* the refresh that requested it, we can still mark it as settled for the *current* live state, as long as we validate it's not stale. Or, we can use the existing `arrCoversTotal` (14542) logic but invert/adjust it: if we have a heavy response that covers a significant portion (e.g., >90% or matches total snapshot), we can force `settled=true` even if `refreshGen` mismatched, provided we add a staleness check. Actually, a better divergent approach: **Use a "Settled Promise/Deferred" pattern per lane, independent of refreshGen, but gated by a max-age or snapshot match.** Or simpler: **Move `watchPopupHeavyCommentsSettled` to a module-level or live-scoped variable
+
+========================================================================
+### groq/llama-3.3-70b  [爆速の視点]  (2396ms)
+========================================================================
+### 結論
+真因は、**(A)refreshGen レース(heavy 完了前に次 refresh が追い越し 14532 で return→settled されない)** であると考えられる。実機の状態速報で「更新所要 5.2秒」という遅延のある更新と、重い配信の場合に heavy read が遅く、次の refresh が来て refreshGen が進む前に heavy が完了しないという状況が、この仮説を裏付ける。
+
+### 根拠
+- 実機の負荷と更新所要時間が長いことから、heavy read が遅いことが推測され、次の refresh が来る前に heavy が完了しない可能性が高い。
+- 14532 の早期 return 条件が refreshGen の進みに応じて発生し、watchPopupHeavyCommentsSettled が true になる前に return されることが考えられる。
+
+### 反論・リスク
+- 他の条件 (B, C, D) も考えられるが、 refreshGen の進みと heavy read の遅れが最も実機の状況と一致する。
+- refreshGen の進みを止めるなどの対策を講じないと、settled が true になる前に次の refresh が発生し、heavy が詰まる可能性がある。
+
+### 具体案
+1. **まず実機/計器で何を確認するか**: storyUserLaneRenderProbe に settled/reachedStep があるということから、このプローブを使用して、実機で watchPopupHeavyCommentsSettled が true になるか、ならないなら 14530-14542 のどれで return しているかを観測する。
+2. **直すなら最小のファイル:関数**: `popup-entry.js` の `selectLaneFeedCommentRows` 関数内で、heavy が追い越されても「最後に成功した全件 arr」を保持して次の refresh で settled=true にできるようにする。
+   - 例えば、`watchPopupHeavyCommentsSettled` を refresh ローカルでなく、per-live で持ち越すことで、heavy の読み込み完了を待つことができる。
+   - または、refresh を throttle して heavy 完了を待つようにする。
+   - これらの対策は、既存のデータ構造とロジックを活かしながら、最小限の変更で実現できる。
+
+========================================================================
+### groq/gpt-oss-120b  [批判・詰め（推論特化）]  (4102ms)
+========================================================================
+**結論**  
+1. **最有力の真因は (A) 「refreshGen レース」** ― heavy コメントの取得が完了する前に次の refresh が走り、`refreshGen` が進んでしまうため `watchPopupHeavyCommentsSettled` が `false` のまま early‑return（14532）され、全件集約がレーンに渡らない。  
+2. **最小で確実に効く修正は (A)「heavy が追い越されても最後に成功した全件配列を保持し、次の refresh で `settled=true` にできるようにする」**。これにより、レーンは過去に取得した完全データを再利用でき、`entriesLen` が 10 に固定される事態を防げる。  
+3. 「描画済みなのにローディングが終わらない」 overlay は **settled が立たないことと同根** である。ローディングは `settled === true && entries.length > 0` を条件に畳む実装なので、settled が false のまま描画が走ると overlay が永遠に残る。正しい条件は **「全件 heavy 取得が完了（settled）かつ描画対象エントリが 1 件以上」** とすべき。  
+4. **検証で見るべき指標** は `storyUserLaneRenderProbe.settled` と `reachedStep`、および `watchPopupHeavyCommentsSettled` が true になるかどうか。軽い配信では 14530‑14542 のどれもヒットせず true になるが、重い配信では 14532 が頻発するはず。これらをコンソール/telemetry に出力すれば原因が確定できる。  
+5. **やってはいけない過剰実装**：`settled` を安易に `true` に固定して別配信の heavy データを混入させること。これにより匿名応援が不正確に増え、他ライブのデータ漏洩・UI ちらつきが再発する。
+
+---
+
+### 根拠  
+
+| 項目 | 観測値・コード | 理由 |
+|------|----------------|------|
+| **entriesLen = 10** | `popup-entry.js` → `selectLaneFeedCommentRows` が `provisional=true` で直近 N 件だけ返す | `watchPopupHeavyCommentsSettled` が false のままなので heavy 経路が通らず暫定 10 件に固定 |
+| **refreshGen 進行** | `watchPopupRefreshGeneration` が refresh 毎に `++` され、heavy 完了前に次 refresh が走ると `refreshGen !== watchPopupRefreshGeneration` が true → 14532 early‑return | 重い配信で heavy read が数秒かかり、5.2 s の更新遅延が発生 |
+| **heavy 完了判定** | `canReuseHeavyChunkRead` が `total` 変化で false → 毎回 heavy 再読 | 配信が伸び続けると total が変わり続け、再読が常態化 |
+| **overlay 条件** | `popup-entry.js` のローディング overlay は `!watchPopupHeavyCommentsSettled || entriesLen===0` で表示 | settled が false のまま描画が走ると overlay が残る |
+| **既知コメント** | `popup-entry.js:5493` に「heavy が詰まると started=0 のまま」記載 | 事実上のコード地雷で、今回の症状と一致 |
+
+これらを総合すると、**heavy が完了する前に次 refresh が介入し、`watchPopupHeavyCommentsSettled` が立たない** ことが根本原因であると判断できる。
+
+---
+
+### 反論・リスク  
+
+| 仮説 | 反論 | 残るリスク |
+|------|------|------------|
+| **B** (canReuseHeavyChunkRead が毎回 false) | たしかに heavy 再読は頻発するが、`canReuseHeavyChunkRead` が false でも `watchPopupHeavyCommentsSettled` が true になるケースはある（heavy が完了すれば）。実機で `settled` が true にならないのは 14532 が先に走っている方が確実。 | もし heavy 再読が極端に遅くて常にタイムアウトになると、`settled` が true にならないままになる可能性は残る。対策としては **heavy 完了待ちのタイムアウト上限** を設けても良いが、まずはレース回避が優先。 |
+| **C** (14542 の arrCoversTotal) | 14542 は *空 heavy* かつ *既に 80% 超* の場合にだけ発火。今回の heavy は大量かつ遅延しているため、`nextArr` が null ではなくデータが存在するはず。 | 例外的に heavy が途中で 0 件返すケースはあるが、頻度は低く、現象の再現性からは外れる。 |
+| **D** (別の見落とし) | 他の early‑return (14530,14531) はスナップショット変化や型不一致で起きるが、実機のスナップショットは安定している。 | もしスナップショットが頻繁に変わっているなら 14530 が関与するが、現象は「重い配信でだけ」起きている点からレースが主因と考えられる。 |
+
+---
+
+### 具体案  
+
+#### 1. 実機/計器でまず確認すべきこと  
+
+| 計測項目 | 方法 | 期待結果 |
+|----------|------|----------|
+| `watchPopupHeavyCommentsSettled` の遷移 | `storyUserLaneRenderProbe.settled` に `console.log('[probe] settled:', value, 'gen', watchPopupRefreshGeneration)` を一時的に埋め込む。 | 重い配信で `false → true` が **起きない**、かつ `refreshGen` が増えていることが確認できる。 |
+| 14532 がヒットした回数 | `if (refreshGen !== watchPopupRefreshGeneration) { console.warn('early‑return 14532', {refreshGen, watchPopupRefreshGeneration}); return; }` を追加。 | 5 s 更新中に何度も警告が出る → レースが頻発している証拠。 |
+| heavy read の完了タイミング | `heavyReadPromise.then(() => console.log('heavy done', Date.now()))` を `selectLaneFeedCommentRows` 前後に配置。 | heavy が完了した時点が描画開始より
+--- [ルーティング選抜・code] 成功 4/4 ---
+
+=== 完了 5691ms ===
+保存: council/tanu-lane-heavy-stall-answers.json
