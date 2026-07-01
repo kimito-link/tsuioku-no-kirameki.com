@@ -136,8 +136,10 @@ export default [
     //   refresh 経由でしか描かれない応援者ランキングが②で空になったのを、①publish→②鏡描画で埋める回帰修正)。
     //   publish/passive描画は DOM/storage 操作=lib抽出不可。純関数(cells正規化/sig)は topSupportersMirror.js へ
     //   抽出しテスト済み。lane/northStar/statCards 鏡と同じ轍。レビュー済み例外。
+    //   v0.1.1025: ②の実描画件数(応援者ランキング行数)を ack に載せる=21616→21619(嘘の✅根治。parity が①鏡と
+    //   突合し②の描画欠落を🔴に。DOM件数取得は popup 依存=lib抽出不可)。レビュー済み例外。
     files: ['src/extension/popup-entry.js'],
-    rules: { 'max-lines': ['error', { max: 21616, skipBlankLines: false, skipComments: false }] }
+    rules: { 'max-lines': ['error', { max: 21619, skipBlankLines: false, skipComments: false }] }
   },
   {
     files: ['src/extension/content-entry.js'],

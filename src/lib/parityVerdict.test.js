@@ -161,3 +161,29 @@ describe('buildParityBadge — ②応援プレビューの色付きバッジ材�
     expect(buildParityBadge({ verdict: 'weird' }).tone).toBe('pending');
   });
 });
+
+describe('buildParityVerdict — ②の実描画突合(嘘の✅根治・v0.1.1025)', () => {
+  const withSupporters = (supMirrorCount, ackSupporterRows) => {
+    const i = okInput();
+    i.publishSelfDiag.mirrors = { supporters: { present: true, count: supMirrorCount } };
+    i.previewAck = { ready: true, ts: 1000, liveId: 'lv1', supporterRows: ackSupporterRows };
+    return i;
+  };
+  it('①鏡に応援者ランキングがあるのに②が0件=mismatch(嘘の✅を出さない)', () => {
+    const v = buildParityVerdict(withSupporters(10, 0));
+    expect(v.verdict).toBe('mismatch');
+    expect(v.code).toBe('preview_supporters_missing');
+    expect(v.reason).toContain('①鏡10件');
+    expect(v.reason).toContain('②画面0件');
+  });
+  it('①鏡=10・②も10件描けている=ok', () => {
+    expect(buildParityVerdict(withSupporters(10, 10)).verdict).toBe('ok');
+  });
+  it('①鏡に応援者ランキングが無い(count0)なら②0でも ok(突合しない)', () => {
+    expect(buildParityVerdict(withSupporters(0, 0)).verdict).toBe('ok');
+  });
+  it('ack に supporterRows が無い旧形式でも①鏡0なら ok(後方互換)', () => {
+    const i = okInput(); // mirrors 無し=supMirrorCount0
+    expect(buildParityVerdict(i).verdict).toBe('ok');
+  });
+});
