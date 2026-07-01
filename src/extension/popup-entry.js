@@ -13237,6 +13237,11 @@ async function refresh() {
     return;
   }
   renderExtensionContextBanner(false);
+  // v0.1.1023(②応援プレビュー激重・真っ白の根治): 受動ビュー(INLINE_PASSIVE)は refresh() の重い本体
+  //   (全件コメント処理/tabs.query/paintWatchPopupUi)を走らせない。②の描画は鏡経路(21458〜)で完結し
+  //   cloak 解除も最終安全網(21532〜・window load 後800ms)が保証=refresh 非依存。②が①と同じ storage を
+  //   全件処理で奪い合い診断が27秒/真っ白になっていたのを断つ。
+  if (INLINE_PASSIVE) return;
   // 以前は 1200ms の保険だけに頼っていたが、初回描画が途中で止まった時だけ
   // fallback するように変更。CSS 側の auto-reveal も含めて「最悪でも一定時間で
   // 見える」保険は維持する。
