@@ -144,6 +144,17 @@ export function buildAiShareFullText({ overviewText, livesData, fastDiag, popupD
       });
       lines.push(formatParityVerdictLine(parity));
       lines.push('');
+      // v0.1.1015: ②応援プレビューの画面最上部に「パリティ・バッジ」を色付きで出すための構造化結果を
+      //   jsonBlob に1個だけ相乗りさせる(新規 storage キーを増やさない=②③は statusReport と同じ経路で読む)。
+      //   本文テキスト(戻り値)は一切変えない=①とバイト一致(drift ゼロ)。②はこれを読んでバッジ描画するだけ。
+      if (jsonBlob && typeof jsonBlob === 'object') {
+        jsonBlob.parityVerdict = {
+          verdict: parity.verdict,
+          reason: parity.reason,
+          nextAction: parity.nextAction,
+          code: parity.code
+        };
+      }
     } catch {
       /* no-op: パリティ判定の失敗は状態速報を壊さない */
     }
