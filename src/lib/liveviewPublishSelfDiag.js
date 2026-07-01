@@ -19,6 +19,8 @@
  */
 
 import { NORTH_STAR_LANE_ROW_CAP } from './northStarMirror.js';
+// v0.1.1017: コメント鏡の「③WEB に実際に載る描画可能件数」を数えるため(rows のうち本文/名前/顔があるもの)。
+import { restoreCommentTimelineRows } from './commentTimelineMirror.js';
 
 const FRESH_MS = 3 * 60 * 1000; // 3分超＝古い＝popup未起動疑い（status の MIRROR_FRESH_MS と同値）
 
@@ -107,6 +109,55 @@ function judgeNorthStarConsistency(apiRows, mirrorRows) {
   return { verdict: 'mismatch', reason: `${extLabel} / 鏡${mir} の差が大きく鮮度差で説明しにくい` };
 }
 
+/** コメント鏡が「流れ」を見せるのに載せる上限(commentTimelineMirror.TIMELINE_MIRROR_CAP と揃える)。 */
+export const COMMENT_MIRROR_CAP = 60;
+
+/**
+ * v0.1.1017: 応援レーン鏡の「①POP が描いた総枠(pickedLength) vs ③WEB 鏡に実際に載った非null件数(mirrorTotal)」を突合する純関数。
+ *   両者は同じ buckets 由来(popup-entry.js:5294 描画 / 5319 publish が同一 buckets)なので一致が正常。
+ *   ズレる=鏡セルが displaySrc 無し等で捨てられた=③WEB でレーンが欠ける「フルコピーでない」状態。
+ * @param {number} pickedLength ①POP が paint に渡した総枠(laneDisplayedTotal)
+ * @param {number} mirrorTotal  ③WEB 鏡の非null実件数(laneTotal)
+ * @returns {{ verdict: 'match'|'mismatch', reason: string }}
+ */
+export function judgeLaneMirrorConsistency(pickedLength, mirrorTotal) {
+  const picked = Math.max(0, Math.floor(Number(pickedLength) || 0));
+  const mir = Math.max(0, Math.floor(Number(mirrorTotal) || 0));
+  // 完全一致=①と③が同じ件数=フルコピー。
+  if (picked === mir) return { verdict: 'match', reason: '' };
+  // 鏡が①より少ない=③WEBでレーンが欠けている(本物の欠落)。
+  if (mir < picked) {
+    return { verdict: 'mismatch', reason: `①POP ${picked}件 → ③WEB鏡 ${mir}件(${picked - mir}件が③に載っていない=顔/表示名の解決漏れでセルが捨てられた疑い)` };
+  }
+  // 鏡が①より多い=鏡に余分(通常は起きない)。透明性のため出す。
+  return { verdict: 'mismatch', reason: `①POP ${picked}件 < ③WEB鏡 ${mir}件(鏡に余分)` };
+}
+
+/**
+ * v0.1.1017: コメント鏡の「①POP ティッカーの母数(totalSeen) vs ③WEB に載る描画可能件数(rowsRenderable)」を突合する純関数。
+ *   cap(60)で頭打ちされるのは正常(totalSeen>cap のとき rows=cap)。だが totalSeen 自体が
+ *   ①ティッカー母数(displayEntries 由来)から大きく目減りしていれば、鏡化(toTimelineRow)で本文/名前/顔が
+ *   全部無い行が捨てられている=③WEB のコメントが薄い「コメントが進まない」状態。
+ * @param {number} totalSeen      鏡バッチの母数(commentTimelineMirror.totalSeen)
+ * @param {number} rowsRenderable ③WEB に実際に載る描画可能な rows 件数
+ * @param {number} [cap]          鏡の上限(既定 COMMENT_MIRROR_CAP)
+ * @returns {{ verdict: 'match'|'capped'|'mismatch', reason: string }}
+ */
+export function judgeCommentMirrorConsistency(totalSeen, rowsRenderable, cap = COMMENT_MIRROR_CAP) {
+  const seen = Math.max(0, Math.floor(Number(totalSeen) || 0));
+  const rows = Math.max(0, Math.floor(Number(rowsRenderable) || 0));
+  const c = Math.max(1, Math.floor(Number(cap) || COMMENT_MIRROR_CAP));
+  // 母数が cap 以下で rows と一致=全部載っている=フルコピー。
+  if (seen <= c && rows === seen) return { verdict: 'match', reason: '' };
+  // 母数が cap 超で rows が cap 到達=上限による正常な頭打ち(欠落ではない)。
+  if (seen > c && rows >= c) return { verdict: 'capped', reason: `最新${c}件を表示中(母数${seen}件・上限による頭打ち=正常)` };
+  // rows が cap 未満かつ母数より少ない=本文/名前/顔が無い行が捨てられて薄くなっている。
+  if (rows < Math.min(seen, c)) {
+    return { verdict: 'mismatch', reason: `③WEBに載るコメントが ${rows}件(母数${seen}件)=大半が③に載っていない(顔/表示名/本文の解決漏れでコメントが薄い疑い)` };
+  }
+  return { verdict: 'match', reason: '' };
+}
+
 /**
  * 純Web公開コピーの自己診断オブジェクトを組む。read なし・副作用なし。
  *
@@ -135,6 +186,9 @@ export function buildLiveviewPublishSelfDiag(args) {
   const stat = blob.statCardsMirror && typeof blob.statCardsMirror === 'object' ? blob.statCardsMirror : null;
   const north = blob.northStarMirror && typeof blob.northStarMirror === 'object' ? blob.northStarMirror : null;
   const sup = blob.topSupporters && typeof blob.topSupporters === 'object' ? blob.topSupporters : null;
+  // v0.1.1017: コメント鏡(①POP のティッカーと同じ displayEntries を最新N件に間引いたもの)。
+  //   ①POP が描いた件数(totalSeen=鏡バッチの母数)と ③WEB へ載った件数(rows)を突合するのに使う。
+  const comment = blob.commentTimelineMirror && typeof blob.commentTimelineMirror === 'object' ? blob.commentTimelineMirror : null;
 
   // 応援レーン（非null件数）
   const laneBuckets = ['link', 'gift', 'ad', 'konta', 'tanu'];
@@ -218,6 +272,39 @@ export function buildLiveviewPublishSelfDiag(args) {
   };
   pushConsistency('北極星 貢献度', '1_貢献度ランキング', contribCount);
   pushConsistency('北極星 広告', '+α_広告ランキング', adCount);
+
+  // v0.1.1017: 応援レーンの ①POP(pickedLength=描いた総枠) vs ③WEB鏡(laneTotal=非null実件数) 突合。
+  //   同じ buckets 由来なので一致が正常。ズレたら③WEBでレーンが欠けている=フルコピーでない=🔴。
+  //   鏡が古い/別配信のときは突合しない(別の瞬間/別配信の比較になる=誤検知)。
+  const laneStale = lane && freshOf(lane) != null && freshOf(lane) * 1000 > FRESH_MS;
+  const lanePicked = lane ? Math.max(0, Math.floor(Number(lane.pickedLength) || 0)) : null;
+  if (lane && lidMatch(lane) !== false && !laneStale && lanePicked != null && lanePicked > 0) {
+    const { verdict, reason } = judgeLaneMirrorConsistency(lanePicked, laneTotal);
+    if (verdict === 'match') {
+      consistency.push({ lane: '応援レーン(全段)', extRows: lanePicked, mirrorRows: laneTotal, match: true, srcLabel: '①POP', dstLabel: '③WEB鏡' });
+    } else {
+      consistency.push({ lane: '応援レーン(全段)', extRows: lanePicked, mirrorRows: laneTotal, match: false, reason, srcLabel: '①POP', dstLabel: '③WEB鏡' });
+    }
+  }
+
+  // v0.1.1017: コメント鏡の ①POP(totalSeen=ティッカー母数) vs ③WEB(描画可能rows) 突合。
+  //   cap60 による頭打ちは正常(capped)。rows が母数より大きく目減り=顔/名前/本文の解決漏れでコメントが薄い=🔴。
+  const commentStale = comment && freshOf(comment) != null && freshOf(comment) * 1000 > FRESH_MS;
+  const commentLidMatch = comment ? (currentLid && lc(comment.liveId) ? lc(comment.liveId) === currentLid : null) : null;
+  if (comment && commentLidMatch !== false && !commentStale) {
+    const totalSeen = Math.max(0, Math.floor(Number(comment.totalSeen) || 0));
+    const rowsRenderable = restoreCommentTimelineRows(comment).length;
+    if (totalSeen > 0) {
+      const { verdict, reason } = judgeCommentMirrorConsistency(totalSeen, rowsRenderable);
+      if (verdict === 'mismatch') {
+        consistency.push({ lane: 'コメント', extRows: totalSeen, mirrorRows: rowsRenderable, match: false, reason, srcLabel: '①POP', dstLabel: '③WEB鏡' });
+      } else if (verdict === 'capped') {
+        consistency.push({ lane: 'コメント', extRows: totalSeen, mirrorRows: rowsRenderable, match: null, skipped: true, normal: true, reason, srcLabel: '①POP', dstLabel: '③WEB鏡' });
+      } else {
+        consistency.push({ lane: 'コメント', extRows: totalSeen, mirrorRows: rowsRenderable, match: true, srcLabel: '①POP', dstLabel: '③WEB鏡' });
+      }
+    }
+  }
 
   const post = a.lastPost && typeof a.lastPost === 'object' ? a.lastPost : null;
 
@@ -340,17 +427,24 @@ export function formatLiveviewPublishSelfDiagLines(diag) {
   // 整合チェック
   const cons = Array.isArray(d.consistency) ? d.consistency : [];
   if (cons.length) {
-    lines.push('整合チェック（拡張の生データ vs 鏡）:');
+    lines.push('整合チェック（①POP=②応援プレビュー=③WEB が同一か）:');
     for (const c of cons) {
+      // v0.1.1017: レーン/コメントは「①POP N / ③WEB M」表記、北極星は従来の「拡張 apiRows / 鏡」表記。
+      const src = c.srcLabel || '拡張 apiRows=';
+      const dst = c.dstLabel || '鏡';
+      const pair = c.srcLabel
+        ? `${src} ${c.extRows} / ${dst} ${c.mirrorRows}`
+        : `${src}${c.extRows} / ${dst} ${c.mirrorRows}`;
       if (c.skipped) {
         // 鮮度差で説明可能(normal)は🟢、取得中/古い等の保留は⏳で区別する。
-        const tag = c.normal ? '🟢鮮度差で正常' : '⏳保留';
-        lines.push(`- ${c.lane}: 拡張 apiRows=${c.extRows} / 鏡 ${c.mirrorRows}  ${tag}(${c.reason})`);
+        const tag = c.normal ? '🟢正常' : '⏳保留';
+        lines.push(`- ${c.lane}: ${pair}  ${tag}(${c.reason})`);
         continue;
       }
-      const mark = c.match ? '✅一致' : '🔴不一致(コピー漏れ疑い)';
+      const mark = c.match ? '✅一致' : '🔴不一致(フルコピーでない)';
       const note = c.match && c.extRows === 0 ? '（元データ無し＝純Webに出なくて正常）' : '';
-      lines.push(`- ${c.lane}: 拡張 apiRows=${c.extRows} / 鏡 ${c.mirrorRows}  ${mark}${note}`);
+      const reasonTail = !c.match && c.reason ? ` ${c.reason}` : '';
+      lines.push(`- ${c.lane}: ${pair}  ${mark}${note}${reasonTail}`);
     }
   }
 
