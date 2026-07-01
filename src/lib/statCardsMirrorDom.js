@@ -96,3 +96,31 @@ export function paintStatCardsMirrorValues(root, snap) {
     setVal(id, String(c.text || '—'), c.isPlaceholder === true);
   }
 }
+
+/**
+ * v0.1.1019(フルコピー根治): 数字カード鏡スナップショットの再描画 skip 用 signature を組む純関数。
+ *   liveId+capturedAt+記録テキストが変わったときだけ paint し直す(②応援プレビューの無駄再描画を抑える)。
+ * @param {any} snap
+ * @returns {string}
+ */
+export function statCardsMirrorSig(snap) {
+  const s = snap && typeof snap === 'object' ? snap : {};
+  return `${String(s.liveId || '')}|${Number(s.capturedAt) || 0}|${String(s.recordsText || '')}`;
+}
+
+/**
+ * v0.1.1019: sig ガード付きの数字カード鏡ペインター(状態を内部に閉じ込め=popup 側の変数/検証を増やさない)。
+ *   ②応援プレビューが①の焼いた statCardsMirror 鏡を read して paint するだけ=①=②=③を同一値に。
+ * @param {DomRoot} root document 互換
+ * @returns {(snap: any) => void}
+ */
+export function createStatCardsMirrorPassivePainter(root) {
+  let sig = '';
+  return (snap) => {
+    if (!snap || typeof snap !== 'object') return;
+    const next = statCardsMirrorSig(snap);
+    if (next === sig) return;
+    sig = next;
+    try { paintStatCardsMirrorValues(root, snap); } catch { /* no-op */ }
+  };
+}

@@ -1,6 +1,10 @@
 /** @vitest-environment happy-dom */
 import { describe, it, expect } from 'vitest';
-import { paintStatCardsMirrorValues } from './statCardsMirrorDom.js';
+import {
+  paintStatCardsMirrorValues,
+  statCardsMirrorSig,
+  createStatCardsMirrorPassivePainter
+} from './statCardsMirrorDom.js';
 
 /**
  * P0 退行ガード(characterization): status-entry.js#renderStatCardsMirror の【値セット部分】を
@@ -113,5 +117,51 @@ describe('paintStatCardsMirrorValues', () => {
     document.body.replaceChildren(root);
     expect(() => paintStatCardsMirrorValues(document, FULL_SNAP)).not.toThrow();
     expect($('liveStatComments').textContent).toBe('1,962');
+  });
+});
+
+describe('statCardsMirrorSig — 再描画skip用sig(v0.1.1019)', () => {
+  it('liveId/capturedAt/recordsText で決まる', () => {
+    expect(statCardsMirrorSig({ liveId: 'lv1', capturedAt: 100, recordsText: '150' })).toBe('lv1|100|150');
+  });
+  it('記録テキストが変われば sig も変わる(150→129)', () => {
+    const a = statCardsMirrorSig({ liveId: 'lv1', capturedAt: 100, recordsText: '150' });
+    const b = statCardsMirrorSig({ liveId: 'lv1', capturedAt: 100, recordsText: '129' });
+    expect(a).not.toBe(b);
+  });
+  it('null/非object でも落ちない', () => {
+    expect(statCardsMirrorSig(null)).toBe('|0|');
+  });
+});
+
+describe('createStatCardsMirrorPassivePainter — sigガード付きペインター(v0.1.1019)', () => {
+  function buildMin() {
+    const root = document.createElement('div');
+    root.innerHTML = '<div id="liveStatComments"></div>';
+    document.body.replaceChildren(root);
+    return root;
+  }
+  it('同じ snap を2回渡すと2回目は paint skip(sig一致)', () => {
+    buildMin();
+    const paint = createStatCardsMirrorPassivePainter(document);
+    const snap = { liveId: 'lv1', capturedAt: 100, recordsText: '150' };
+    paint(snap);
+    expect(document.getElementById('liveStatComments').textContent).toBe('150');
+    // 値を外部から書き換え、同一 snap を再度渡す=sig一致で paint されない(書き換えが残る)。
+    document.getElementById('liveStatComments').textContent = 'XXX';
+    paint(snap);
+    expect(document.getElementById('liveStatComments').textContent).toBe('XXX');
+  });
+  it('記録テキストが変わった snap は再 paint される(150→129)', () => {
+    buildMin();
+    const paint = createStatCardsMirrorPassivePainter(document);
+    paint({ liveId: 'lv1', capturedAt: 100, recordsText: '150' });
+    paint({ liveId: 'lv1', capturedAt: 200, recordsText: '129' });
+    expect(document.getElementById('liveStatComments').textContent).toBe('129');
+  });
+  it('null snap は no-op(落ちない)', () => {
+    buildMin();
+    const paint = createStatCardsMirrorPassivePainter(document);
+    expect(() => paint(null)).not.toThrow();
   });
 });
