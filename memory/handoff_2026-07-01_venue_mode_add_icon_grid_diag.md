@@ -51,13 +51,24 @@ person-tile 統一(council/person-tile-unify-SYNTHESIS.md)は**完了済み**:
 6. **max-lines**: popup-entry.js は max-lines ラチェット上限ギリギリ(v1028 で 21629)。会場は venueBar.js だが、
    純関数は src/lib に切り出してテストする(popup-entry を太らせない・[[extension-reflected-only-after-copy-ext]])。
 
-## 4. 段階導入(推奨)
-- Phase 1: このドキュメントで現状把握(コード不変)。
-- Phase 2(グリッド・2-3コミット): venueUserThumbGrid.js(新・userThumbGrid を venue 向けに cap+増分)、venueBar に
-  グリッドバー配線(Option A)、実機で高さ安定・揺れなしを確認。
-- Phase 3(診断・1コミット): venueAvatarDiagLine.js(新・storyAvatarDiagLine 流儀の venue 版)、会場バーに折りたたみ配線、
-  計器テスト verify:cc 緑。
-- Phase 4(統合・退化確認): memory に完了 handoff、実機で「重い配信でも揺れない・遅延なし・人数増でも重くならない」を確認。
+## 4. 段階導入(進捗)
+- Phase 1: 現状把握(コード不変) — 完了。
+- ⭐ **会議 2026-07-01(council/venue-grid-diag-SYNTHESIS.md)で Phase 2 を上書き**: 独立グリッドバー(Option A)は
+  「席=既に全員が座っている」ので二重表示で冗長・高さ振動リスク増、と critic/fast が指摘。**まず席タイルに
+  上位N人の強調を入れ、独立バーは"席で埋もれる"と実機で分かってから**(検証ファースト・過剰実装回避)に方針変更。
+- Phase 2a(席の順位バッジ)— **完了 v0.1.1029(commit 3233c3cd, branch feat/venue-rank-badge)**。
+  - ⭐ **非自明な発見**: 会場は既に貢献度スコア上位8人を金色オーラ(nlsb-seat-regular)で強調済みだった
+    (venueSeats.js selectVenueVipRegularKeys=内部でスコア順ソート済みなのに Set で順序を捨てていた)。
+    = 新規グリッド実装は不要で「順位の可視化」だけが欠けていた。venueUserThumbGrid.js は作らなかった。
+  - やったこと: venueSeats.js に rankVenueContributors(順位の正本)を切り出し、光らせ判定と順位が同一スコア源を
+    共有(drift 無)。selectVenueTopRankKeys + buildVenueSeating の seat.venueRank。venueBar は data-venue-rank →
+    CSS ::after で🥇🥈🥉を席右上に絶対配置(高さ不変=v1026 振動を踏まない)。
+  - ⭐ **ユーザー指示**: ピカピカ光る演出は不要 → 金色オーラ(nlsb-seat-regular glow)は廃止(vipRegular:false)。
+    順位バッジのみで上位を示す。
+- Phase 2b(独立グリッドバー・条件付き): 2a を実機で見て「上位が席で埋もれる」なら追加。埋もれないなら不要(過剰実装回避)。
+- Phase 3(診断・未着手): venueAvatarDiagLine.js(新・storyAvatarDiagLine 流儀の venue 版=席数/参加者総数/超過eviction/
+  吹き出し・読み上げ・ギフト状態を venueSeats 参照で件数のみ)、会場バー下部の折りたたみ「🩺 会場の状態」、verify:cc 緑。
+- Phase 4(統合・退化確認): 実機で「重い配信でも揺れない・遅延なし・人数増でも重くならない」を確認。
 
 ## 5. 参照資料(実在確認済み)
 - council/person-tile-unify-SYNTHESIS.md: 人物タイル正本化・段階導入(第3コミットで venue 席組込み完了・グリッド/診断は未)。
