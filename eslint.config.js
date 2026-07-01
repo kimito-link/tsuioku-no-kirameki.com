@@ -125,8 +125,12 @@ export default [
     //   ①=②=③同一鏡値に揃える)。sig ガード付きペインターは lib(statCardsMirrorDom.js)へ抽出済み。残る +8 は
     //   chrome.storage read が popup ローカル=lib抽出不可のグルー(既存 applyLaneMirrorForPassive 等と同型)。
     //   同時に②の生panel独自読み(setTimeout/onChanged)を廃止=鏡一本化。レビュー済み例外。
+    //   v0.1.1021: renderStoryUserLane の re-render skip 経路(sig一致 early return)にも幕畳み
+    //   dismissInitialLoadShade を追加=21547→21549(「描画済みなのにローディングが終わらない」根治。独立tick高頻度で
+    //   2回目以降が sig 一致で early return し、幕畳み(5308)に到達せず残っていた)。dismiss は popup DOM/タイマー
+    //   操作=lib抽出不可。5308 と同じ1行パターン+コメント1行。レビュー済み例外。
     files: ['src/extension/popup-entry.js'],
-    rules: { 'max-lines': ['error', { max: 21547, skipBlankLines: false, skipComments: false }] }
+    rules: { 'max-lines': ['error', { max: 21549, skipBlankLines: false, skipComments: false }] }
   },
   {
     files: ['src/extension/content-entry.js'],
