@@ -120,6 +120,9 @@ const SYNTH = process.env.COUNCIL_SYNTH === '1' || QUALITY;
 const DEFAULT_FORMAT_HINT = '「結論／根拠／反論・リスク／具体案」';
 
 const G = process.env.GROQ_API_KEY, N = process.env.NVIDIA_API_KEY, O = process.env.OPENROUTER_API_KEY, E = process.env.GEMINI_API_KEY;
+// Cloudflare Workers AI（OpenAI互換）。トークン1つ＋アカウントID(公開情報)で叩ける無料枠。
+// 2026-06-27 実機確認: glm-5.2 / nemotron-3-120b / kimi-k2.7-code が 200＋本文で返ることを裏取り済み。
+const CF = process.env.CLOUDFLARE_API_TOKEN, CF_ACC = process.env.CLOUDFLARE_ACCOUNT_ID;
 // OLLAMA_HOST は "0.0.0.0:11434" のようにスキームなしのことがある → 補う。127.0.0.1 で叩く。
 let OLLAMA = process.env.OLLAMA_HOST || 'http://127.0.0.1:11434';
 if (!/^https?:\/\//.test(OLLAMA)) OLLAMA = 'http://' + OLLAMA;
@@ -236,24 +239,45 @@ const allMembers = [];
 const GROQ = 'https://api.groq.com/openai/v1/chat/completions';
 const NV = 'https://integrate.api.nvidia.com/v1/chat/completions';
 const OR = 'https://openrouter.ai/api/v1/chat/completions';
-const push = (label, kind, run) => allMembers.push({ label, role: roleOf(label), kind, run });
+// Cloudflare Workers AI の OpenAI 互換エンドポイント（アカウントIDをパスに含む）。
+const CF_URL = CF_ACC ? `https://api.cloudflare.com/client/v4/accounts/${CF_ACC}/ai/v1/chat/completions` : '';
+// rawId = プロバイダ側の実モデルID（起動時ライブ実在チェックで /models と突き合わせる用。任意）。
+// provider = 実在チェックのグループ（'groq'|'gemini' のみ検証対象。他は listing が無い/不安定なので素通し）。
+const push = (label, kind, run, rawId = '', provider = '') =>
+  allMembers.push({ label, role: roleOf(label), kind, run, rawId, provider });
 
-if (G) push('groq/gpt-oss-120b', 'cloud', (p, s) => openaiChat(GROQ, G, 'openai/gpt-oss-120b', p, s, { reasoning_effort: 'low' }));
-if (G) push('groq/llama-3.3-70b', 'cloud', (p, s) => openaiChat(GROQ, G, 'llama-3.3-70b-versatile', p, s));
+if (G) push('groq/gpt-oss-120b', 'cloud', (p, s) => openaiChat(GROQ, G, 'openai/gpt-oss-120b', p, s, { reasoning_effort: 'low' }), 'openai/gpt-oss-120b', 'groq');
+if (G) push('groq/llama-3.3-70b', 'cloud', (p, s) => openaiChat(GROQ, G, 'llama-3.3-70b-versatile', p, s), 'llama-3.3-70b-versatile', 'groq');
 // 2026-06-22 追加（実機で応答確認済み・無料枠）:
 //  - qwen3-32b: thinking付き推論モデル → 批判(critic)。ローカル deepseek の重さ無しで鋭い批判が出せる。
 //  - llama-4-scout: 軽快な新顔 → 速い視点(fast)。
 // ※ groq/kimi-k2 は同日プローブで access 無し（未開放/要申請）→ 不採用。
-if (G) push('groq/qwen3-32b', 'cloud', (p, s) => openaiChat(GROQ, G, 'qwen/qwen3-32b', p, s));
-if (G) push('groq/llama-4-scout', 'cloud', (p, s) => openaiChat(GROQ, G, 'meta-llama/llama-4-scout-17b-16e-instruct', p, s));
+if (G) push('groq/qwen3-32b', 'cloud', (p, s) => openaiChat(GROQ, G, 'qwen/qwen3-32b', p, s), 'qwen/qwen3-32b', 'groq');
+if (G) push('groq/llama-4-scout', 'cloud', (p, s) => openaiChat(GROQ, G, 'meta-llama/llama-4-scout-17b-16e-instruct', p, s), 'meta-llama/llama-4-scout-17b-16e-instruct', 'groq');
+// 2026-07-01 追加（司令塔Claudeがライブ /models で実在裏取り）:
+//  - groq/compound: Web検索を内蔵したエージェント型（Groq無料枠）。fact裏取りの「会議内で最新を取りに行く」担当。
+//    エージェント型ゆえ通常チャットより遅い/長い → タイムアウトを広め(150s)に。役割は roleOf で generalist。
+//  - groq/compound-mini: その速い版。軽い fact 確認向け。
+//  ※ 同日、会議が推した "Mistral-7B-Instruct" / "Llama-3-8b-Instruct" は Groq のライブ一覧に無く【幻覚】→ 不採用。
+if (G) push('groq/compound', 'cloud', (p, s) => openaiChat(GROQ, G, 'groq/compound', p, s, {}, 180000), 'groq/compound', 'groq');
+if (G) push('groq/compound-mini', 'cloud', (p, s) => openaiChat(GROQ, G, 'groq/compound-mini', p, s, {}, 150000), 'groq/compound-mini', 'groq');
 // 2026-06-25 追加（会議ハーネス自身で採否を合議→司令塔Claudeが実機裏取り）:
 //  - qwen3.6-27b: Groq の新世代 thinking モデル。発散(diverge)。実機で <think>…</think>＋本文を返す
 //    （strip後「東京」を確認済み）。openaiChat 側で <think> を除去するので本文だけが会議に乗る。
 //  ※ 会議は「llama-3.3-70b-instant」を批判/速い視点に推したが【実在しない幻覚】。70Bは -versatile のみ。
 //    8B級の -instant は llama-3.1-8b-instant だけ（実機で確認）。幻覚IDは採用しない。
-if (G) push('groq/qwen3.6-27b', 'cloud', (p, s) => openaiChat(GROQ, G, 'qwen/qwen3.6-27b', p, s));
+if (G) push('groq/qwen3.6-27b', 'cloud', (p, s) => openaiChat(GROQ, G, 'qwen/qwen3.6-27b', p, s), 'qwen/qwen3.6-27b', 'groq');
+// Cloudflare Workers AI（2026-06-27 実機で 200＋本文を裏取りして採用。X 一覧は鵜呑みにせず叩いて確認）。
+//  - 採用基準: 会議に「無い能力」を足すものだけ。gpt-oss-120b / llama-3.3-70b は Groq 等で既出なので CF では足さない。
+//  - nemotron-3-120b: どこにも無い大型の別頭脳 → 汎用(generalist)。/ai/models/search で実在確認済み。
+//  - glm-5.2:        reasoning_content を別フィールドで返す強い推論 → 批判(critic)。content は既にクリーンなので stripThinking で十分。
+//  - kimi-k2.7-code: コード特化 → 実装(implement)。
+//  ※ いずれも openaiChat 流用可（OpenAI互換）。役割は council-roles の roleOf が label から自動付与（glm/kimi+code 用に1行追記済）。
+if (CF && CF_ACC) push('cloudflare/nemotron-120b', 'cloud', (p, s) => openaiChat(CF_URL, CF, '@cf/nvidia/nemotron-3-120b-a12b', p, s));
+if (CF && CF_ACC) push('cloudflare/glm-5.2', 'cloud', (p, s) => openaiChat(CF_URL, CF, '@cf/zai-org/glm-5.2', p, s));
+if (CF && CF_ACC) push('cloudflare/kimi-k2.7-code', 'cloud', (p, s) => openaiChat(CF_URL, CF, '@cf/moonshotai/kimi-k2.7-code', p, s));
 if (N) push('nvidia/qwen3.5-122b', 'cloud', (p, s) => openaiChat(NV, N, 'qwen/qwen3.5-122b-a10b', p, s, { chat_template_kwargs: { thinking: false } }));
-if (E) push('gemini-2.5-flash', 'cloud', (p, s) => geminiChat('gemini-2.5-flash', p, s));
+if (E) push('gemini-2.5-flash', 'cloud', (p, s) => geminiChat('gemini-2.5-flash', p, s), 'gemini-2.5-flash', 'gemini');
 // OpenRouter は無料枠で 429 が出やすい=予備の1票(reference-free-cloud-llm-apis.md)。
 if (O) push('openrouter/gpt-oss-120b', 'cloud', (p, s) => openaiChat(OR, O, 'openai/gpt-oss-120b:free', p, s, { reasoning_effort: 'low' }));
 // 司令塔 Claude(Opus 4.8) を会議の最強メンバー(統括/批判)として自動参加させる。
@@ -277,6 +301,59 @@ const localModels = (process.env.MEETING_LOCAL_MODELS || LOCAL_DEFAULT.join(',')
   .split(',').map((s) => s.trim()).filter(Boolean);
 for (const m of localModels) {
   push(`local/${m}`, 'local', (p, s) => ollamaChat(m, p, s));
+}
+
+// ── 起動時ライブ実在チェック（2026-07-01 追加）────────────────────────────────
+// 背景: HOWTO の最大の運用コストは「会議が幻覚モデル名を提案し、人間が毎回 /models で確認」。
+//   実例2026-07-01: 会議は "Mistral-7B" / "Llama-3-8b" を Groq に足せと推したが両方とも実在せず。
+// 対策: 起動時に検証可能プロバイダ(groq/gemini)の /models を1回だけ叩き、live 一覧に無い rawId の
+//   クラウドメンバーを警告して除外する。listing の無い/不安定な CF・OpenRouter・NVIDIA は素通し。
+//   ネットワーク不調で一覧が取れなかったプロバイダは「検証不能」として除外しない（会議は止めない）。
+// 退避弁: COUNCIL_VERIFY_MODELS=0 で無効化（従来動作＝一切チェックしない）。
+const VERIFY_MODELS = process.env.COUNCIL_VERIFY_MODELS !== '0';
+/** groq/gemini の実在モデルID集合を取得。取れなければ null（=検証不能・除外しない）。 */
+async function fetchLiveModelIds(provider) {
+  try {
+    if (provider === 'groq') {
+      const r = await fetch('https://api.groq.com/openai/v1/models', {
+        headers: { 'Authorization': 'Bearer ' + G }, signal: AbortSignal.timeout(12000),
+      });
+      if (!r.ok) return null;
+      const j = await r.json();
+      return new Set((j.data || []).map(m => m.id));
+    }
+    if (provider === 'gemini') {
+      const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${E}`,
+        { signal: AbortSignal.timeout(12000) });
+      if (!r.ok) return null;
+      const j = await r.json();
+      // name は "models/gemini-2.5-flash" 形式 → 末尾だけ取る。
+      return new Set((j.models || []).map(m => String(m.name).replace(/^models\//, '')));
+    }
+  } catch { return null; }
+  return null;
+}
+/** allMembers から、live 一覧に無い(=幻覚/廃止)クラウドメンバーを警告除去する。 */
+async function verifyLiveModels() {
+  if (!VERIFY_MODELS) return;
+  const providers = [...new Set(allMembers.map(m => m.provider).filter(Boolean))];
+  const live = new Map();
+  await Promise.all(providers.map(async p => { live.set(p, await fetchLiveModelIds(p)); }));
+  let removed = 0;
+  for (let i = allMembers.length - 1; i >= 0; i--) {
+    const m = allMembers[i];
+    const set = m.provider && live.get(m.provider);
+    if (!set) continue; // 検証不能 or 対象外 → 残す
+    if (m.rawId && !set.has(m.rawId)) {
+      console.error(`[実在チェック] ${m.label}（${m.rawId}）は ${m.provider} のライブ一覧に無い→除外（幻覚/廃止の可能性）`);
+      allMembers.splice(i, 1);
+      removed++;
+    }
+  }
+  const okProviders = providers.filter(p => live.get(p));
+  if (okProviders.length) {
+    console.error(`[実在チェック] ${okProviders.join('/')} を照合。${removed ? removed + '体を除外' : '全メンバー実在OK'}`);
+  }
 }
 
 /** あるメンバーに、役割注入込みの prompt/system を作って1回実行する。 */
@@ -359,6 +436,84 @@ if (!allMembers.length) {
   process.exit(1);
 }
 
+// 幻覚/廃止モデルを起動時に自動除去（groq/gemini のみ・検証不能なら素通し・COUNCIL_VERIFY_MODELS=0で無効）。
+await verifyLiveModels();
+if (!allMembers.length) {
+  console.error('実在チェック後に利用可能なメンバーが0体になりました。ネットワーク/キーを確認してください。');
+  process.exit(1);
+}
+
+// ── 回答の重複排除（2026-07-01 追加・費用ゼロの質向上）──────────────────────
+// 背景: 会議で別モデルが「ほぼ同一の回答」を出すことがある（実例 2026-07-01: groq/gpt-oss-120b と
+//   groq/llama-3.3-70b が同一の表を出力）。多様性の死んだ重複に統合コストを払うのは無駄なので、
+//   統合(SYNTH)・表示の前に近すぎる回答を1つへ畳む。畳んだ件数は必ずログに出す（黙って消さない）。
+// 方針: エラー/統合(synthesis)/批判往復済みの重要行は畳まない。素の初回回答どうしだけを比較する。
+//   類似は「正規化して単語集合の Jaccard」で測る。既定閾値0.82（保守的＝本当にそっくりな時だけ束ねる）。
+// 退避弁: COUNCIL_DEDUP=0 で無効化（従来動作）。COUNCIL_DEDUP_THRESHOLD=0.9 等で厳しく/緩く。
+const DEDUP_ON = process.env.COUNCIL_DEDUP !== '0';
+const DEDUP_THRESHOLD = Math.min(1, Math.max(0.5, Number(process.env.COUNCIL_DEDUP_THRESHOLD) || 0.82));
+/**
+ * 回答テキストを「文字bigramの集合(Set)」にする。日本語は空白で区切られない＝単語split では
+ * ほぼ一致せず類似度が過小評価される（実測: 単語splitだと near-dup でも 0.31 しか出ない）。
+ * 文字bigram(シングル)なら日英どちらでも効き、near-dup が 0.9 台、別物が 0 近くと綺麗に分かれる
+ * （2026-07-01 実データで検証）。空白・記号・全半角のゆれは正規化で吸収する。
+ */
+function tokenSet(text) {
+  const norm = String(text || '')
+    .toLowerCase()
+    .normalize('NFKC')                 // 全角→半角など統一
+    .replace(/[\s#>*`|:_\-—–・･。、,.()[\]{}!?！？「」【】]/g, ''); // 空白・記号を除去
+  const s = new Set();
+  for (let i = 0; i < norm.length - 1; i++) s.add(norm.slice(i, i + 2));
+  return s;
+}
+/** 2つの集合の Jaccard 類似度（0..1）。 */
+function jaccard(a, b) {
+  if (!a.size || !b.size) return 0;
+  let inter = 0;
+  for (const w of a) if (b.has(w)) inter++;
+  return inter / (a.size + b.size - inter);
+}
+/**
+ * 近すぎる素の回答を畳む。畳まれた側は表示から外し、残す代表行に dupOf を記録してログ。
+ * synthesis/error 行は対象外（重要なので常に残す）。長い回答を代表として残す。
+ * @param {any[]} results
+ * @param {string} label ログ用の会議ラベル
+ * @returns {any[]} 表示・記録に使う配列（畳んだぶんは除去済み）
+ */
+function dedupResults(results, label) {
+  if (!DEDUP_ON) return results;
+  const eligible = results.filter(r => !r.error && !r.synthesis && (r.answer || '').trim());
+  if (eligible.length < 2) return results;
+  const sets = new Map(eligible.map(r => [r, tokenSet(r.answer)]));
+  const dropped = new Set();
+  const folds = []; // { keep, gone } ログ用
+  for (let i = 0; i < eligible.length; i++) {
+    const a = eligible[i];
+    if (dropped.has(a)) continue;
+    for (let j = i + 1; j < eligible.length; j++) {
+      const b = eligible[j];
+      if (dropped.has(b)) continue;
+      if (jaccard(sets.get(a), sets.get(b)) >= DEDUP_THRESHOLD) {
+        // 長い方(=中身が多い方)を代表として残し、短い方を畳む。
+        const [keep, gone] = (a.answer.length >= b.answer.length) ? [a, b] : [b, a];
+        dropped.add(gone);
+        folds.push({ keep: keep.label, gone: gone.label });
+        if (gone === a) break; // a 自体が畳まれたら以降の比較は無意味
+      }
+    }
+  }
+  if (!folds.length) return results;
+  for (const f of folds) console.error(`[dedup] ${f.gone} は ${f.keep} とほぼ同一(≥${DEDUP_THRESHOLD})→統合前に畳む`);
+  console.error(`[dedup] ${label}: ${folds.length}件を重複として畳んだ（残 ${results.length - dropped.size}/${results.length}）`);
+  // 代表行に「畳んだ相手」を注記（記録に残す）。
+  for (const f of folds) {
+    const k = results.find(r => r.label === f.keep);
+    if (k) k.dedupFolded = [...(k.dedupFolded || []), f.gone];
+  }
+  return results.filter(r => !dropped.has(r));
+}
+
 /** 結果配列を「■ ラベル（役割）の結論: …」のダイジェストに畳む（プロンプト同梱用）。 */
 function digestOf(results, cap = 700) {
   return results.filter(r => !r.error && (r.answer || '').trim())
@@ -404,28 +559,31 @@ async function council(members, label, key) {
     }
   }
 
+  // 回答dedup: 統合・表示の前に「ほぼ同一の素回答」を畳む（費用ゼロの質向上・黙って消さずログ）。
+  const shown = dedupResults(first, label);
+
   // ② 統括(lead)が全回答を読んで1案へ統合する。lead不在なら最速の生存メンバーに代行させる。
   if (SYNTH) {
-    let synth = members.find(m => m.role === 'lead' && first.some(r => r.label === m.label && !r.error));
-    if (!synth) synth = members.find(m => first.some(r => r.label === m.label && !r.error));
+    let synth = members.find(m => m.role === 'lead' && shown.some(r => r.label === m.label && !r.error));
+    if (!synth) synth = members.find(m => shown.some(r => r.label === m.label && !r.error));
     if (synth) {
       console.error(`[${label}] ②統合: ${synth.label} が1案に束ねる`);
-      const all = digestOf(first, 900);
+      const all = digestOf(shown, 900); // 重複を畳んだ後の回答で統合（ノイズ・重複を統括に見せない）
       const sres = await runRound([{ ...synth, role: 'lead' }], question, () =>
         `【会議メンバー全員の回答（批判・修正済み）】\n${all}\n\n` +
         `あなたは統括役。上の議論を統合し、対立点はどちらを採るか理由付きで決め、` +
         `優先順位を付けた「最終1案」を ${DEFAULT_FORMAT_HINT} の形で示すこと。あれもこれもにしない。`);
       if (sres[0] && !sres[0].error) {
-        first.push({ ...sres[0], label: synth.label + ' [統合]', role: 'lead', ms: sres[0].ms, synthesis: true });
+        shown.push({ ...sres[0], label: synth.label + ' [統合]', role: 'lead', ms: sres[0].ms, synthesis: true });
       }
     }
   }
 
-  printResults(label, first);
-  record.rounds[key] = first;
-  const ok = first.filter(r => !r.error).length;
-  console.error(`--- [${label}] 成功 ${ok}/${first.length} ---`);
-  return first;
+  printResults(label, shown);
+  record.rounds[key] = shown;
+  const ok = shown.filter(r => !r.error).length;
+  console.error(`--- [${label}] 成功 ${ok}/${shown.length} ---`);
+  return shown;
 }
 
 /**
