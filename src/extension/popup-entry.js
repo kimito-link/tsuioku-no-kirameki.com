@@ -10084,6 +10084,11 @@ async function refreshNorthStarAdRankingLane(liveId) {
     publishNorthStarMirror({ liveId: lid, adRanking: nicoadApiRows, deferWrite: true });
     return;
   }
+  // v0.1.1026(広告列の出たり消えたりチカチカ根治): ポーリングで storage read が一瞬空になるたび広告列を畳む→再表示を
+  //   繰り返し、高さ振動で下のアイコングリッドが揺れていた。一度実データ(rank行)を描いていれば一瞬の空では畳まない
+  //   (配信切替は refresh が新lidの実データで上書き)。
+  const adBody = body instanceof HTMLElement ? body : document.getElementById('northStarLaneBody-adRanking');
+  if (adBody instanceof HTMLElement && adBody.querySelector('[role="listitem"]')) return;
   const state = determineNorthStarLaneState('adRanking', { bundle, snap, nicoadApiRows });
   renderNorthStarLane('adRanking', null, state);
 }

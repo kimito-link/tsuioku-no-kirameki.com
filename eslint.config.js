@@ -138,8 +138,10 @@ export default [
     //   抽出しテスト済み。lane/northStar/statCards 鏡と同じ轍。レビュー済み例外。
     //   v0.1.1025: ②の実描画件数(応援者ランキング行数)を ack に載せる=21616→21619(嘘の✅根治。parity が①鏡と
     //   突合し②の描画欠落を🔴に。DOM件数取得は popup 依存=lib抽出不可)。レビュー済み例外。
+    //   v0.1.1026: 広告列の空畳み振動を抑制=21619→21624(ポーリングで一瞬空になるたび広告列を畳む→再表示の高さ振動で
+    //   下のアイコングリッドが揺れていた。一度実データを描いたら一瞬の空では畳まない)。DOM判定は popup 依存=lib抽出不可。
     files: ['src/extension/popup-entry.js'],
-    rules: { 'max-lines': ['error', { max: 21619, skipBlankLines: false, skipComments: false }] }
+    rules: { 'max-lines': ['error', { max: 21624, skipBlankLines: false, skipComments: false }] }
   },
   {
     files: ['src/extension/content-entry.js'],

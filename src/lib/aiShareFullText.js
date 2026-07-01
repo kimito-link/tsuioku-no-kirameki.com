@@ -36,6 +36,8 @@ import { buildVoiceDiagLine } from './voiceDiag.js';
 import { reportPreviewCtxFromFastDiag } from './reportPreviewCtx.js';
 import { buildReportPreviewLines } from './reportPreview.js';
 import { buildStatusActions } from './statusActionAdvisor.js';
+// v0.1.1026: アイコン画像(usericon)のロード失敗を状態速報で名指し(画像が壊れて見える理由=CDN側404を説明)。
+import { avatarLoadDiagToActionCards } from './avatarLoadReport.js';
 import { buildLaneStatusLine, buildLiveBlockText } from './statusFormat.js';
 
 /**
@@ -228,6 +230,8 @@ export function buildAiShareFullText({ overviewText, livesData, fastDiag, popupD
     try { actions.push(...commentCountProvenanceToActionCards(livesData)); } catch { /* no-op */ }
     // スクロール白化(重い・一瞬白くなって遅れて描画)を症状カードに昇格(count>0 のときだけ)。
     try { actions.push(...scrollWhiteoutToActionCards(fastDiag)); } catch { /* no-op */ }
+    // v0.1.1026: アイコン画像のロード失敗(usericon 404/削除済み=画像が壊れて見える)を名指し(失敗0なら出さない)。
+    try { actions.push(...avatarLoadDiagToActionCards((popupDiag?.popup ?? popupDiag)?.avatarLoadDiag)); } catch { /* no-op */ }
     lines.push('### 検知された対処候補(症状→原因→次の一手)');
     if (!actions.length) {
       lines.push('- 既知パターンに該当する問題は検知されませんでした(未知の症状なら下の診断 JSON を参照)。');
