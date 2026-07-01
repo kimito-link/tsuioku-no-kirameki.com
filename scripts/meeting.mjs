@@ -462,7 +462,7 @@ function tokenSet(text) {
   const norm = String(text || '')
     .toLowerCase()
     .normalize('NFKC')                 // 全角→半角など統一
-    .replace(/[\s#>*`|:_\-—–・･。、,.()\[\]{}!?！？「」【】]/g, ''); // 空白・記号を除去
+    .replace(/[\s#>*`|:_\-—–・･。、,.()[\]{}!?！？「」【】]/g, ''); // 空白・記号を除去
   const s = new Set();
   for (let i = 0; i < norm.length - 1; i++) s.add(norm.slice(i, i + 2));
   return s;
@@ -560,7 +560,7 @@ async function council(members, label, key) {
   }
 
   // 回答dedup: 統合・表示の前に「ほぼ同一の素回答」を畳む（費用ゼロの質向上・黙って消さずログ）。
-  let shown = dedupResults(first, label);
+  const shown = dedupResults(first, label);
 
   // ② 統括(lead)が全回答を読んで1案へ統合する。lead不在なら最速の生存メンバーに代行させる。
   if (SYNTH) {
