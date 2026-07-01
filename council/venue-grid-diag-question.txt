@@ -1,0 +1,29 @@
+お題: popup の応援コメント可視化ブロック「アイコン列・グリッド・診断」のうち【グリッド(応援者ランキング)】と【診断(userId率・アバター解決率等)】を、会場モード(venue・ひな壇/500席)の人表示にも加える。person-tile 統一は完了済(会場の席は popup と同じ buildPersonTileEl を使う=顔ぶれ/見た目は既に一致)。加えるのはグリッドと診断の2つだけ。慎重にやりたいので設計を詰めたい。
+
+# 実コードで裏取りした現状(これが前提・覆さない)
+- 会場描画: src/extension/venueBar.js renderSeats → buildPersonTileEl(src/lib/personTileDom.js)。毎フレーム走る hot path。
+- 会場は userThumbGrid も storyAvatarDiag も未使用(venueBar.js を grep して0件で確認)= グリッドと診断が会場に未実装 = これが今回の作業。
+- グリッド正本: src/lib/userThumbGrid.js categorizeUsersForThumbGrid(数値ID/匿名を分けて並べる純関数・DOM非依存) + personTileDom.js buildPersonTileEl。popup では popup-entry.js renderUserRooms が呼ぶ。
+- 診断正本: src/lib/storyAvatarDiagLine.js formatStoryAvatarDiagLine / buildStoryAvatarDiagHtml。total/withUid/withAvatar/resolvedAvatar/userLaneTier* 等の件数のみ(PII なし・折りたたみ)。
+- 共通入口: src/lib/userLaneCandidatesFromStorage.js = popup も会場も使える。rows+liveId+opts → userId単位で集約済み候補配列。これをグリッドと診断の入力に再利用できる(新規集約を書かない)。
+- 会場の参加者集約正本: src/lib/venueSeats.js collectVenueParticipants(匿名 a:xxx も数値IDも全員が主役・最大500席・入れ替え制)。
+- 会場固有の診断ブロックは今は無い(人物タイルだけ)。
+
+# 直近の地雷(実際に踏んだ・繰り返し防止)
+1. 会場×グリッドの高さ振動: v0.1.1026(4962209e)で「広告列が出たり消えたりでアイコングリッドが揺れる」を root で直したばかり。グリッドが非同期でアイコン解決/データ遅延すると高さが 0↔本体で振動し、下の席が揺れる。対策既知=(a)一度データを描いたら一瞬の空では畳まない(実データ有無で判定)、(b)グリッド高さを css で固定、(c)sig ガードに capturedAt(時刻)を入れない(v0.1.1022 明滅根治の教訓=時刻で再描画しない)。
+2. 描画 opts の渡し忘れ=匿名の顔崩れ: v0.1.1024→1028 で②応援プレビューを鏡化した際、anonymousIdenticonResolver / defaultThumbSrc / anonymousFallbackThumbSrc を渡し忘れ匿名の顔が blank.jpg に崩れた。会場グリッドでも popup と同じ opts を全部渡さないと再発。
+3. drift(会場と popup の追従漏れ): グリッド/診断ロジックを会場に独自実装すると popup と食い違う(person-tile統一前の失敗の再来)。src/lib に集約し会場は read-only 参照が鉄則。
+4. popup-entry.js は max-lines ラチェット上限ギリギリ(v1028 で 21629)。純関数は src/lib に切り出す(popup-entry を太らせない)。
+5. hot path の重さ: renderSeats は毎フレーム。グリッド/診断を足すと DOM 走査/計算が増える。上位N人 cap、診断は1回計算→sig 照合で無変化 skip、増分更新(venueBar は mergeUserLaneAggregates を既に持つ)。
+
+# 問い(これに答えて)
+1. グリッドの置き場(seam)。候補=(A)ひな壇の【上】に固定高バーで「応援者ランキング」上位10-20人 cap・高さ固定(推奨として引き継がれている)、(B)右サイド固定(マルチモニタ前提・優先度低とされた)、(C)そもそも会場にグリッドは冗長で不要(席=既にアイコン列相当だから、ランキング序列だけ席の演出で表現すれば足りる)。星野ロミ式(既存データ活かす/過剰実装回避/落とさない/恥をかかせない)で、A/B/C のどれが筋か。C(不要)の目を最初に潰すか残すか。
+2. 会場の「グリッド」は popup と何がどう違うべきか。popup のグリッドは userThumbGrid の数値/匿名カテゴリ分け。会場は既に500席で全員(匿名含む)が座っている。上に出す「応援者ランキング」は席と何が違うのか(=席は入れ替え制の"今アクティブ"、ランキングは"貢献度上位の固定"?)。二重表示(同じ人が席にもランキングにも)は冗長か、むしろ「上位は目立たせる」で有用か。表記の明確化(来場PV延べ ≠ 応援者ランキング)。
+3. 診断ブロックの中身と置き場。storyAvatarDiagLine の件数(userId率/アバター解決率)をそのまま会場に出すか、会場固有(席数/参加者総数/超過eviction数/吹き出し発動/読み上げ/ギフト履歴状態)を足した venue 版(venueAvatarDiagLine.js 新規)にするか。折りたたみ「🩺 会場の状態」を会場バー下部に置く案の是非。診断は開発者向けか一般ユーザー向けか(PII なし件数のみは維持)。
+4. 高さ振動を再発させない具体設計。グリッドバーを「実データを一度でも描いたら空で畳まない」+「高さ固定」+「capturedAt を sig に入れない」で足りるか。会場は席の入れ替えが常時走る=グリッドも常時更新されうる。sig(無変化 skip)は何をキーにすべきか(userId 集合 + count か、それとも上位N人の並びか)。増分更新 mergeUserLaneAggregates を流用できるか。
+5. やってはいけない過剰実装を1つ以上(批判役は必ず穴を指摘): 例=会場に独自集計を書いて popup と drift させる/席ロジック(満席維持・eviction)に手を入れて退化させる/診断を毎フレーム再計算して hot path を重くする/グリッドを右サイド固定にしてシングルモニタで破綻/opts 渡し忘れで匿名の顔崩れ再発/popup-entry を太らせて max-lines 超過。
+
+# 制約(星野ロミ式)
+記録本体不可侵・新storage書込み増やさない・hot path(描画/席割り)重くしない・落とさない(匿名も人として出す)・既存データ活かす(userLaneCandidatesFromStorage/userThumbGrid/storyAvatarDiagLine は既にある)・過剰実装回避・恥をかかせない(死にリンク/空バーの明滅を作らない)。検証ファースト(実機で高さ安定・揺れなしを先に見る)。純関数は src/lib に集約し会場は read-only 参照(drift 防止)。
+
+出力は『結論 → 根拠 → 反論・リスク → 具体案』の4ブロックで。具体案は「まず実機で何を確認するか(観測項目)」と「直すなら最小のファイル:関数(新規なら venueUserThumbGrid.js / venueAvatarDiagLine.js の役割分担)」まで。

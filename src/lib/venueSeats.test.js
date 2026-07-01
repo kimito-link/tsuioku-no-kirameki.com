@@ -19,6 +19,9 @@ import {
   participantHasEffectiveThumbnail,
   resolveVenueRegularScore,
   selectVenueVipRegularKeys,
+  rankVenueContributors,
+  selectVenueTopRankKeys,
+  VENUE_TOP_RANK_MAX,
   VENUE_VIP_REGULAR_SCORE_THRESHOLD,
   VENUE_VIP_REGULAR_MAX,
   VENUE_MAX_SEATS,
@@ -286,6 +289,73 @@ describe('buildVenueSeating の isVipRegular フラグ', () => {
     }
     const r = buildVenueSeating(rows, { isGenericName: isGeneric, vipRegular: false });
     expect(r.seats.every((s) => s.isVipRegular === false)).toBe(true);
+  });
+});
+
+describe('rankVenueContributors / selectVenueTopRankKeys(応援者ランキング順位)', () => {
+  /** score 上位の並びを作る: A(多発言+ギフト) > B(多発言) > C(中) > D(1回)。 */
+  const buildRankRows = () => {
+    const rows = [];
+    for (let i = 0; i < 20; i += 1) rows.push({ userId: 'A', name: 'A', text: `a${i}`, capturedAt: i, isGift: i === 0 });
+    for (let i = 0; i < 15; i += 1) rows.push({ userId: 'B', name: 'B', text: `b${i}`, capturedAt: 100 + i });
+    for (let i = 0; i < 5; i += 1) rows.push({ userId: 'C', name: 'C', text: `c${i}`, capturedAt: 200 + i });
+    rows.push({ userId: 'D', name: 'D', text: 'd0', capturedAt: 300 });
+    return rows;
+  };
+
+  it('rankVenueContributors は score 降順(A>B>C>D)で並ぶ', () => {
+    const parts = collectVenueParticipants(buildRankRows(), { isGenericName: isGeneric });
+    const ranked = rankVenueContributors(parts);
+    expect(ranked.map((r) => r.key)).toEqual(['u:A', 'u:B', 'u:C', 'u:D']);
+    // 降順であること(単調非増加)。
+    for (let i = 1; i < ranked.length; i += 1) {
+      expect(ranked[i - 1].score).toBeGreaterThanOrEqual(ranked[i].score);
+    }
+  });
+
+  it('selectVenueTopRankKeys は上位3位のみ key→順位(1..3)を返す', () => {
+    const parts = collectVenueParticipants(buildRankRows(), { isGenericName: isGeneric });
+    const rankMap = selectVenueTopRankKeys(parts);
+    expect(rankMap.get('u:A')).toBe(1);
+    expect(rankMap.get('u:B')).toBe(2);
+    expect(rankMap.get('u:C')).toBe(3);
+    expect(rankMap.has('u:D')).toBe(false); // 4位は付かない
+    expect(rankMap.size).toBe(VENUE_TOP_RANK_MAX);
+  });
+
+  it('topN を絞れる(上位1位だけ)', () => {
+    const parts = collectVenueParticipants(buildRankRows(), { isGenericName: isGeneric });
+    const rankMap = selectVenueTopRankKeys(parts, { topN: 1 });
+    expect(rankMap.get('u:A')).toBe(1);
+    expect(rankMap.size).toBe(1);
+  });
+
+  it('光らせ判定(selectVenueVipRegularKeys)と順位は同一スコア源で drift しない', () => {
+    const parts = collectVenueParticipants(buildRankRows(), { isGenericName: isGeneric });
+    const vip = selectVenueVipRegularKeys(parts, { max: 3 });
+    const rankMap = selectVenueTopRankKeys(parts, { topN: 3 });
+    // 上位3の集合が完全一致(順位バッジと金枠候補が食い違わない)。
+    expect(new Set(rankMap.keys())).toEqual(vip);
+  });
+
+  it('buildVenueSeating が席に venueRank(1..3)を載せ、4位以下は 0', () => {
+    const r = buildVenueSeating(buildRankRows(), { isGenericName: isGeneric });
+    const rankOf = (key) => r.seats.find((s) => s.participant.key === key)?.venueRank;
+    expect(rankOf('u:A')).toBe(1);
+    expect(rankOf('u:B')).toBe(2);
+    expect(rankOf('u:C')).toBe(3);
+    expect(rankOf('u:D')).toBe(0);
+  });
+
+  it('topRank<=0 で順位無効化(全席 venueRank=0)', () => {
+    const r = buildVenueSeating(buildRankRows(), { isGenericName: isGeneric, topRank: 0 });
+    expect(r.seats.every((s) => s.venueRank === 0)).toBe(true);
+  });
+
+  it('参加者ゼロでも落ちない(空 Map / 空配列)', () => {
+    expect(rankVenueContributors([])).toEqual([]);
+    expect(selectVenueTopRankKeys([]).size).toBe(0);
+    expect(selectVenueTopRankKeys(null).size).toBe(0);
   });
 });
 

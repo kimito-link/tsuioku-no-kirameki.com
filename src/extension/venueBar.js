@@ -901,33 +901,26 @@ const VENUE_CSS = `
     box-shadow: 0 0 0 2px rgba(255, 206, 96, 0.95), 0 0 12px 2px rgba(255, 190, 70, 0.85), inset 0 0 0 1px rgba(0, 0, 0, 0.14);
     z-index: 5;
   }
-  /* 2026-06-14 星野アイデア会議2(VIP常連光らせ): 発言数+ギフトのスコアが高い「支えてる人」を
-     金色オーラでやわらかく脈動させて引き立てる。実サムネ優遇(.nlsb-seat-vip)と独立=
-     ゆっくり顔/匿名の常連でも光る。やりすぎない上品な範囲(2.4秒の緩い脈動)。 */
-  .nlsb-seat.nlsb-seat-regular .nl-story-userlane-avatar {
-    border-color: rgba(255, 226, 150, 0.95);
-    box-shadow: 0 0 10px 2px rgba(255, 196, 84, 0.7), inset 0 0 0 1px rgba(0, 0, 0, 0.12);
-    animation: nlsb-vip-glow 2.4s ease-in-out infinite;
-    z-index: 3;
+  /* 2026-07-01 会議(venue-grid-diag): 応援者ランキング上位3位の席に順位バッジを重ねる。
+     旧「金色オーラで脈動」はユーザー要望で廃止(ピカピカ演出なし)。バッジは席の右上に
+     絵文字(🥇🥈🥉)を絶対配置で重ねるだけ=高さ・レイアウトを一切変えない(v0.1.1026 の
+     高さ振動を原理的に踏まない)。脈動・アニメーションは付けない(上品さ・静けさを保つ)。 */
+  .nlsb-seat[data-venue-rank] {
+    position: relative;
   }
-  /* 実サムネ常連は両方付くので、scale はサムネ側(大きい方)を活かしつつ金オーラを重ねる。 */
-  .nlsb-seat.nlsb-seat-vip.nlsb-seat-regular .nl-story-userlane-avatar {
-    transform: scale(1.45);
+  .nlsb-seat[data-venue-rank]::after {
+    position: absolute;
+    top: -2px;
+    right: -2px;
+    z-index: 6;
+    font-size: 0.9em;
+    line-height: 1;
+    pointer-events: none;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.55);
   }
-  @keyframes nlsb-vip-glow {
-    0%,
-    100% {
-      box-shadow: 0 0 8px 1px rgba(255, 196, 84, 0.55), inset 0 0 0 1px rgba(0, 0, 0, 0.12);
-    }
-    50% {
-      box-shadow: 0 0 14px 4px rgba(255, 210, 110, 0.92), inset 0 0 0 1px rgba(0, 0, 0, 0.12);
-    }
-  }
-  @media (prefers-reduced-motion: reduce) {
-    .nlsb-seat.nlsb-seat-regular .nl-story-userlane-avatar {
-      animation: none;
-    }
-  }
+  .nlsb-seat[data-venue-rank='1']::after { content: '🥇'; }
+  .nlsb-seat[data-venue-rank='2']::after { content: '🥈'; }
+  .nlsb-seat[data-venue-rank='3']::after { content: '🥉'; }
   /* v0.1.742 一緒に過ごしている感(co-presence): 誰かがコメントした瞬間、その人の席が
      ふわっと一度だけ反応する。吹き出しだけでなく「会場が一人ひとりの発言に反応する」ことで
      一緒にいる感を強める(星野式・摩擦ゼロ=自動・設定不要)。0.6秒で1回だけ・上品に。 */
@@ -2440,7 +2433,9 @@ export function mountVenueBarButton(options = {}) {
       maxSeats: VENUE_FULLSCREEN_MAX_SEATS,
       prevSeatByKey: seatByKey,
       isGenericName: isGenericComeviewName,
-      promoteUserIds: spokenUserIds
+      promoteUserIds: spokenUserIds,
+      // 光らせ演出(金色オーラ)はユーザー要望で無効。上位貢献者は順位バッジ(venueRank)で示す。
+      vipRegular: false
     });
     if (seating.participantCount > 0) hasRenderedNonEmpty = true;
     seatByKey = seating.seatByKey;
@@ -2552,6 +2547,7 @@ export function mountVenueBarButton(options = {}) {
       node.seat.setAttribute('aria-hidden', 'true');
       node.seat.removeAttribute('title');
       delete node.seat.dataset.tierIndex;
+      delete node.seat.dataset.venueRank; // 空席に順位バッジ(🥇)が残らないよう毎回クリア。
       if (node.seat.parentElement) {
         node.seat.parentElement.removeChild(node.seat);
       }
@@ -2648,10 +2644,16 @@ export function mountVenueBarButton(options = {}) {
           'nlsb-seat-vip',
           hasRealThumbnail(avatarUrl) || hasRealThumbnail(derivedAvatar)
         );
-        // 2026-06-14 星野アイデア会議2(VIP常連光らせ): 発言数+ギフトで算出した会場ローカルの
-        //   常連・応援スコアが高い席を金色オーラで光らせる。実サムネ有無(.nlsb-seat-vip)とは
-        //   独立=「顔がある人」でなく「支えてる人」を引き立てる。上限つきで特別感を保つ。
-        node.seat.classList.toggle('nlsb-seat-regular', !!entry.isVipRegular);
+        // 2026-07-01 会議(venue-grid-diag): 応援者ランキング上位3位に順位バッジ(🥇🥈🥉)を付ける。
+        //   光らせ演出(旧 .nlsb-seat-regular 金色オーラ)はユーザー要望で廃止=順位バッジのみで
+        //   「支えてる人」を示す。スコア源は venueSeats.js の rankVenueContributors 一本(光/順位で
+        //   drift しない)。高さは変えない(バッジは席内に重ねる=v0.1.1026 の高さ振動を踏まない)。
+        node.seat.classList.remove('nlsb-seat-regular');
+        if (entry.venueRank >= 1 && entry.venueRank <= 3) {
+          node.seat.dataset.venueRank = String(entry.venueRank);
+        } else {
+          delete node.seat.dataset.venueRank;
+        }
         // v0.1.743 「会話の連鎖」: 連続発言中の人の席は段階的に輝く。renderSeats は席を作り直す
         //   ので、ストリーク状態(speechStreaks=正本)から段階を復元して data-streak に反映する。
         //   これで再描画をまたいでも「溜まっていく感」が消えない。発言が途切れたら prune で消える。
