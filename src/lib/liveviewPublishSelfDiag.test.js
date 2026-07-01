@@ -2,7 +2,9 @@ import { describe, it, expect } from 'vitest';
 import {
   buildLiveviewPublishSelfDiag,
   formatLiveviewPublishSelfDiagLines,
-  liveviewPublishSelfDiagToActionCards
+  liveviewPublishSelfDiagToActionCards,
+  judgeLaneMirrorConsistency,
+  judgeCommentMirrorConsistency
 } from './liveviewPublishSelfDiag.js';
 
 const NOW = 1_000_000_000_000;
@@ -303,5 +305,46 @@ describe('liveviewPublishSelfDiagToActionCards', () => {
     });
     const cards = liveviewPublishSelfDiagToActionCards(d);
     expect(cards).toEqual([]);
+  });
+});
+
+describe('judgeLaneMirrorConsistency — ①POP vs ③WEB鏡のレーン突合(v0.1.1017)', () => {
+  it('①=③ 完全一致は match', () => {
+    expect(judgeLaneMirrorConsistency(44, 44)).toEqual({ verdict: 'match', reason: '' });
+  });
+  it('③鏡が①より少ない=欠落は mismatch(理由に件数差)', () => {
+    const r = judgeLaneMirrorConsistency(44, 30);
+    expect(r.verdict).toBe('mismatch');
+    expect(r.reason).toContain('①POP 44件');
+    expect(r.reason).toContain('③WEB鏡 30件');
+    expect(r.reason).toContain('14件');
+  });
+  it('③鏡が①より多い(余分)も mismatch', () => {
+    expect(judgeLaneMirrorConsistency(10, 12).verdict).toBe('mismatch');
+  });
+  it('0/0 は一致', () => {
+    expect(judgeLaneMirrorConsistency(0, 0).verdict).toBe('match');
+  });
+});
+
+describe('judgeCommentMirrorConsistency — ①POP vs ③WEBのコメント突合(v0.1.1017)', () => {
+  it('母数がcap以下で全部載る=match', () => {
+    expect(judgeCommentMirrorConsistency(30, 30, 60).verdict).toBe('match');
+  });
+  it('母数がcap超でrowsがcap到達=capped(正常な頭打ち)', () => {
+    const r = judgeCommentMirrorConsistency(808, 60, 60);
+    expect(r.verdict).toBe('capped');
+    expect(r.reason).toContain('最新60件');
+    expect(r.reason).toContain('母数808件');
+  });
+  it('rowsが母数から大きく目減り=mismatch(コメントが薄い)', () => {
+    // 母数808だが③に載るのが30だけ=778件が捨てられた=薄い。
+    const r = judgeCommentMirrorConsistency(808, 30, 60);
+    expect(r.verdict).toBe('mismatch');
+    expect(r.reason).toContain('30件');
+    expect(r.reason).toContain('808件');
+  });
+  it('母数=rows=0 は match(何も無いだけ)', () => {
+    expect(judgeCommentMirrorConsistency(0, 0, 60).verdict).toBe('match');
   });
 });
