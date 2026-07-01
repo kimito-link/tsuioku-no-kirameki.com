@@ -360,6 +360,22 @@
       ]
     },
     {
+      "file": "src/lib/htmlEscape.js",
+      "featureCount": 4,
+      "features": [
+        "content",
+        "popup",
+        "status",
+        "venue"
+      ],
+      "labels": [
+        "記録エンジン(watchページ常駐)",
+        "ポップアップ(応援レーン)",
+        "状態速報ページ",
+        "会場モード(standalone)"
+      ]
+    },
+    {
       "file": "src/lib/personTileDom.js",
       "featureCount": 4,
       "features": [
@@ -504,6 +520,22 @@
       ]
     },
     {
+      "file": "src/shared/html/escape.js",
+      "featureCount": 4,
+      "features": [
+        "content",
+        "popup",
+        "status",
+        "venue"
+      ],
+      "labels": [
+        "記録エンジン(watchページ常駐)",
+        "ポップアップ(応援レーン)",
+        "状態速報ページ",
+        "会場モード(standalone)"
+      ]
+    },
+    {
       "file": "src/lib/avatarUrlCompare.js",
       "featureCount": 3,
       "features": [
@@ -589,20 +621,6 @@
     },
     {
       "file": "src/lib/commentTimelineMirrorKey.js",
-      "featureCount": 3,
-      "features": [
-        "content",
-        "popup",
-        "status"
-      ],
-      "labels": [
-        "記録エンジン(watchページ常駐)",
-        "ポップアップ(応援レーン)",
-        "状態速報ページ"
-      ]
-    },
-    {
-      "file": "src/lib/htmlEscape.js",
       "featureCount": 3,
       "features": [
         "content",
@@ -837,20 +855,6 @@
         "コメビュ(別窓)",
         "記録エンジン(watchページ常駐)",
         "会場モード(standalone)"
-      ]
-    },
-    {
-      "file": "src/shared/html/escape.js",
-      "featureCount": 3,
-      "features": [
-        "content",
-        "popup",
-        "status"
-      ],
-      "labels": [
-        "記録エンジン(watchページ常駐)",
-        "ポップアップ(応援レーン)",
-        "状態速報ページ"
       ]
     },
     {
@@ -1685,6 +1689,18 @@
     },
     {
       "file": "src/lib/venueAvatar.js",
+      "featureCount": 2,
+      "features": [
+        "content",
+        "venue"
+      ],
+      "labels": [
+        "記録エンジン(watchページ常駐)",
+        "会場モード(standalone)"
+      ]
+    },
+    {
+      "file": "src/lib/venueAvatarDiagLine.js",
       "featureCount": 2,
       "features": [
         "content",

@@ -1,0 +1,192 @@
+[実在チェック] groq/gemini を照合。全メンバー実在OK
+
+分類: category=code  by=groq/llama-3.3-70b  (コード生成・実装・デバッグ・リファクタ)
+  分類器の生出力: {"category":"code"}
+[③多視点] 2体目の批判役として groq/gpt-oss-120b を追加
+召集 4体（最大4）: groq/qwen3-32b[批判・詰め（推論特化）], groq/qwen3.6-27b[発散アイデア（推論強）], groq/llama-3.3-70b[爆速の視点], groq/gpt-oss-120b[批判・詰め（推論特化）]
+
+[ルーティング選抜・code] 4体に問い合わせ中: groq/qwen3-32b, groq/qwen3.6-27b, groq/llama-3.3-70b, groq/gpt-oss-120b（各2回サンプリング）
+[ルーティング選抜・code] ①2巡目: 2体が批判を受けて修正
+[ルーティング選抜・code] ②統合: groq/qwen3-32b が1案に束ねる
+
+########################################################################
+# ルーティング選抜・code
+########################################################################
+
+========================================================================
+### groq/qwen3-32b  [批判・詰め（推論特化）]  (4395ms)
+========================================================================
+### 結論  
+会場診断の実装は現状の設計では「**既存データと計算ロジックの不整合リスク**」と「**モバイルでのUI収まりの不確実性**」を孕んでおり、特にアバター解決率の導入は現行コードとの分離が不十分でドリフトを生じる可能性が高い。
+
+---
+
+### 根拠  
+1. **ドリフトリスクの具体化**  
+   - 会場診断を `storyAvatarDiagLine.js` に依存させると、`venueSeats.js` の `participant` データ構造（`userId`, `avatar` 等）と `storyAvatarDiagLine` の `StoryAvatar` タイプの差異が生じる（例: `hasGift` や `giftPoints` の存在）。  
+   - 純関数の再利用が不可能な場合、会場固有の診断ロジックを `venueAvatarDiagLine.js` に移植する必要があるが、この設計が明記されていない。（※現状は「storyAvatarDiagLine を会場からも read-only 参照」案が提案されているが、現実的ではない）  
+
+2. **モバイルにおける高さ振動の再現**  
+   - 折りたたみセクションを会場バー下部に配置した場合、モバイルの横長画面で「🩺 会場の状態」を開くと、席表示領域を押し上げてスクロールが発生する（v0.1.1026 の広告列問題と同様の要因）。  
+   - `position: absolute` や `z-index` でレイヤー分離する案は検討されているが、`venueBar` の `max-lines` 制約と競合する可能性がある。  
+
+3. **過剰実装の隠れた穴**  
+   - `KEY_VENUE_SEATS_DIAG` の更新頻度を3秒に固定しているが、アバター解決率の集計は1フレームごとに行う必要がある（`renderSeats` が hot path）。この計算を `sig` でスキップするロジックが未設計なため、現行の `min-gap` が適用されずパフォーマンスに影響する。  
+
+---
+
+### 反論・リスク  
+- **「アバター解決率を導入しない方が良い」の反論**  
+  「会場の持つ `participantCount` と `otherCount` だけで十分」という主張は、視聴者参加度の可視化が目的なら成り立つが、応援コメントの「ユーザーID解決率」は配信者の信頼性指標として重要（例: ハニートラップ対策）。この省略は「恥をかかせない」原則に反する。  
+
+- **「既存 storage キーを流用する」のリスク**  
+  `KEY_VENUE_SEATS_DIAG` にアバター解決率のサブキーを追加すると、popup と venue のデータ構造が分岐する。将来的なバージョンアップで `VenueSeatsDiagState` の型定義が不整合を生じる可能性がある（例: popup が新フィールドを無視する）。  
+
+---
+
+### 具体案  
+1. **まず実機で確認すべき点**  
+   - モバイル環境で「🩺 会場の状態」を開いた際、席表示領域が押し上げられず、`venueBar` の `max-lines` 超過をトリガーしないか。  
+   - `venueAvatarDiagLine.js` の `buildVenueAvatarDiagVerboseHtml` 関数を新規実装し、`participant` データから `withUid`, `resolvedAvatar` を抽出する処理を `vitest` で検証（例: 500件中300件が `userId` 有りの場合の計算コスト）。  
+
+2. **最小限のファイル・関数設計**  
+   - 新規ファイル: `src/lib/venueAvatarDiagLine.js`  
+     ```js
+     // venueAvatarDiagLine.js
+     export function buildVenueAvatarDiagVerboseHtml(participants
+
+========================================================================
+### groq/qwen3.6-27b  [発散アイデア（推論強）]  (3502ms)
+========================================================================
+<think>
+Here's a thinking process:
+
+1.  **Analyze User Input:**
+    - **Role:** Divergent thinker (発散). Must provide unconventional, non-obvious angles. Can offer 2+ distinct options.
+    - **Topic:** Adding a "Diagnosis Block" to the Venue Mode (500-seat platform/hinadan). It's Phase 3 (final phase) of handoff. Needs to visualize popup-style support comments diagnostics (userId acquisition rate, avatar resolution rate, etc.) adapted for the venue. Must be carefully designed.
+    - **Current State (Code-backed):**
+        - Popup diag source: `src/lib/storyAvatarDiagLine.js`. Functions: `formatStoryAvatarDiagLine` (dev 1-liner), `buildStoryAvatarDiagVerboseHtml` (user-friendly verbose). PII-free, inside a collapsible.
+        - Venue already collects metrics: `src/lib/venueSeatsDiag.js` `VenueSeatsDiagState = { enabled, seatsShown, participantCount, otherCount, broadcasterInSeats, broadcasterKnown, lastUpdateAt }`. `venueBar.js` `publishVenueSeatsDiag` writes to storage every 3s min-gap. Status panel reads it for color cells.
+        - Venue participant aggregation: `src/lib/venueSeats.js` `collectVenueParticipants` (max 500, replaces). Each participant: `{ key, userId, name, avatar, count, giftPoints, hasGift }`.
+        - `renderSeats` is a hot path (runs every frame). Recalculating diag every frame is heavy.
+    - **Recent Pitfalls (Must Avoid):**
+        1. Height vibration (v0.1.1026): Collapsible diag changing height 0↔content causes seat grid to shake.
+        2. Drift: Venue-specific aggregation vs popup discrepancy. Pure functions in `src/lib`, venue is read-only.
+        3. Hot path weight: `renderSeats` every frame. Diag needs 1-calc → sig check → skip if unchanged, respect 3s min-gap.
+        4. Line limits: `popup-entry`/`venueBar` near max-lines. Pure functions must be in `src/lib`.
+        5. `capturedAt` in sig/re-render key causes flickering (v0.1.1022 lesson).
+    - **Questions to Answer:**
+        1. **Content:** Venue-specific metrics vs popup-style avatar/uid rates vs both? Prioritize per "Hoshino Romi style" (use existing data, avoid over-engineering, don't embarrass). `venueSeatsDiag` exists, so don't add new aggregation.
+        2. **Placement & Toggle:** New collapsible "🩺 会場の状態" below venue bar? Venue is fullscreen immersive UI, so always showing breaks immersion. Default collapsed? Open? Mobile (landscape) fit? Status panel already shows color cells for same metrics. Is duplicating redundant or valuable for "instant visibility"?
+        3. **Anti-Height-Vibration Design:** Separate layer from `seatsHost`? Overlay? Outside seat area? Prevent height change when empty. Sig key? (seatsShown+participantCount+otherCount, NO capturedAt).
+        4. **Anti-Drift Implementation:** New `venueAvatarDiagLine.js` (src/lib) following `storyAvatarDiagLine` style? OR reuse `storyAvatarDiagLine` read-only and add thin venue-specific layer? Where to put pure conversion function? Test with vitest.
+        5. **Over-engineering to Avoid:** Must point out at least one. Examples given: venue-specific aggregation, per-frame calc, height shake, constant debug UI, new storage keys, bloating venueBar.
+    - **Constraints (Hoshino Romi Style):**
+        - Core records immutable.
+        - No new storage writes (use existing `KEY_VENUE_SEATS_DIAG`).
+        - Don't bloat hot path.
+        - Use existing data.
+        - Avoid over-engineering/embarrassment.
+        - Pure functions in `src/lib`, venue read-only.
+        - Verification first.
+    - **Output Format:** `結論 → 根拠 → 反論・リスク → 具体案` (4 blocks). Concrete plan must include "what to verify on device first" and "minimal file:function to fix/create".
+
+2.  **Deconstruct & Brainstorm (Divergent Thinking):**
+    *Goal:* Provide 2+ distinct, unconventional angles that strictly adhere to constraints while answering the 5 questions. Focus on architectural elegance, performance, and UX immersion.
+
+    *Angle 1: The "Ghost Overlay" (非侵入型・コンテキスト依存表示)*
+    - **Concept:** Instead of a permanent collapsible below the bar, make the diagnosis block a *context-aware, non-blocking overlay* that only appears when explicitly requested or when a specific state threshold is crossed (e.g., `broadcasterInSeats=true` or `otherCount > threshold`). It floats over the empty space below seats or uses a dedicated "debug/ops" layer that doesn't affect DOM flow.
+    - **Content:** Merge venue metrics + popup-style avatar/uid rates. Calculate avatar/uid rates *once* from `collectVenueParticipants` output, pass to a pure function in `src/lib/venueAvatarDiagLine.js`. Sig = hash of `(seatsShown, participantCount, otherCount, withAvatarCount, withUidCount)`. No `capturedAt`.
+    - **Placement:** CSS `position: absolute; bottom: 0; left: 0; right: 0; pointer-events: none;` (or `auto` when interactive). Default: `visibility: hidden` or `opacity: 0`. Toggle via a subtle "🩺" icon on the venue bar. On mobile landscape, it collapses into a single-line summary that doesn't push seats.
+    - **Anti-Drift:** `src/lib/venueAvatarDiagLine.js` exports `buildVenueDiagLine(participants, diagState)`. It reads `participants` (already collected) and `diagState`. Pure. Venue just calls it, caches result, compares sig.
+    - **Verification:** Check DOM flow impact, hot path frame rate, sig stability.
+
+    *Angle 2: The "Seat-Embedded Telemetry" (座席内蔵・空間可視化)*
+    - **Concept:** Instead of a separate block, encode the diagnosis *into the seat grid itself* or the empty space. Use the "otherCount" and "broadcasterInSeats" to subtly color the background or add a micro-badge to the first/last seat. Avatar/uid rates become a tooltip on hover/tap. This keeps the UI immersive and zero-height-vibration.
+    - **Content:** Focus on venue-specific metrics + aggregated rates. The "diagnosis" is the *state of the seats*. Low rates = subtle warning tint on empty seats. High `otherCount` = "＋N" badge glows.
+    - **Placement:** No new DOM block. Uses existing seat container. Diagnosis is rendered as a `::after` pseudo-element or a separate `<canvas>`/`<svg>` overlay that sits behind/around seats.
+    - **Anti-Drift:** Same pure function approach. Rates calculated from `participants`. Sig based on metric counts.
+    - **Verification:** Performance of overlay rendering, accessibility, clarity.
+
+========================================================================
+### groq/llama-3.3-70b  [爆速の視点]  (1982ms)
+========================================================================
+**結論**
+会場モードに診断ブロックを追加するために、既存のデータと関数を活用し、過剰実装を避けるべきである。会場固有の情報と、アバター解決率を組み合わせた診断を実装する。
+
+**根拠**
+既存の `venueSeatsDiag` と `collectVenueParticipants` を活用することで、重複した実装を避けることができる。また、`storyAvatarDiagLine` の流儀に従うことで、診断の実装を統一することができる。
+
+**反論・リスク**
+会場モードの特性を考慮して、診断ブロックの実装を検討する必要がある。たとえば、会場モードでは毎フレーム renderSeats が走る hot path があるため、診断の計算を毎フレーム実行すると重くなり、パフォーマンスに影響を与える可能性がある。
+
+**具体案**
+まず、実機で以下の点を確認する。
+- 会場モードで診断ブロックを追加した場合のパフォーマンスへの影響
+- 診断ブロックの開閉が席の高さに与える影響
+次に、以下のファイルと関数を修正する。
+- `venueAvatarDiagLine.js` (新規): 会場モード用の診断ブロックを実装する
+- `storyAvatarDiagLine.js`: 診断ブロックの実装を統一するために、既存の関数を修正する
+- `venueSeats.js`: 会場の参加者集約関数を修正して、診断ブロックに必要な情報を提供する
+具体的な修正点は以下の通りである。
+- `venueAvatarDiagLine.js`: 会場固有の情報と、アバター解決率を組み合わせた診断ブロックを実装する
+- `storyAvatarDiagLine.js`: 診断ブロックの実装を統一するために、既存の関数を修正する
+- `venueSeats.js`: 会場の参加者集約関数を修正して、診断ブロックに必要な情報を提供する
+
+========================================================================
+### groq/gpt-oss-120b  [批判・詰め（推論特化）]  (3967ms)
+========================================================================
+**結論**  
+1. **診断の中身は「会場固有情報」だけに留め、ポップアップと同様のアバター解決率は *追加しない*。**  
+2. **折りたたみ可能な「🩺 会場の状態」パネルは、デフォルトで **畳んだ状態** にし、ユーザーが明示的に開くときだけオーバーレイで表示する。**  
+3. **高さ振動を防ぐ設計は、パネルを座席エリアの外側レイヤーに置き、`seatsHost` のレイアウトに一切影響しないようにする。シグナルキーは `seatsShown|participantCount|otherCount|broadcasterInSeats|lastUpdateAt` の **5 つの数値** のハッシュだけにする（`capturedAt` は除外）。**  
+4. **実装分担は「純関数はすべて `src/lib` に置く」方針を徹底し、`venueAvatarDiagLine.js` を新規作成して `storyAvatarDiagLine` のロジックを流用しつつ会場固有のデータだけを受け取る形にする。**  
+5. **過剰実装例：**「会場側で毎フレーム `participants` を走査してアバター解決率を再計算し、`renderSeats` の hot‑path に組み込む」ことは絶対にやらない。
+
+---
+
+### 根拠  
+
+| 項目 | 根拠 |
+|------|------|
+| **診断のスコープ** | `venueSeatsDiag` ですでに `enabled, seatsShown, participantCount, otherCount, broadcasterInSeats, lastUpdateAt` が収集・ストレージ化されている。追加で `withAvatar / resolvedAvatar / withUid` を算出すると、`collectVenueParticipants` → `participants` の走査が必要になり、**フレーム単位での計算コストが増大**。星野ロミ式の「過剰実装回避」‑「既存データ活かす」方針に反する。 |
+| **UI の没入感** | 会場はフルスクリーンでの没入 UI が前提。常時表示すると **没入感が減衰** し、過去に「高さ振動」や「明滅」でユーザー体験が劣化した実績がある。デフォルトで折りたたむことで UI のシンプルさを保てる。 |
+| **高さ振動防止** | 既存の `renderSeats` は `seatsHost` の高さに依存している。折りたたみが `seatsHost` の子要素になると、`seatsShown` が 0 → N に変わるたびに **レイアウト再計算** が走り、振動が再発。レイヤーを分離すれば `seatsHost` の高さは常に一定。 |
+| **シグナル設計** | `capturedAt` は時間依存で **常に変化** するため、`sig` が毎回変わり **再描画が止まらない**。数値集合だけにすれば、実際に変化があったときだけ再描画。 |
+| **実装分担** | `storyAvatarDiagLine` は **ポップアップ専用** の純関数で、`src/lib` に置かれている。会場側で同様のロジックを別ファイルに書くと **drift** が起きやすい。共通ロジックはそのまま流用し、会場固有の変換だけを新ファイルでラップすれば **単一真実の源** が保たれる。 |
+
+---
+
+### 反論・リスク  
+
+| 反論 | リスク | 対策 |
+|------|--------|------|
+| **「アバター解決率も欲しい」** → ユーザーが会場全体の表示品質を把握できる | 計算コストが増大し、フレームレート低下やサーバー側のストレージ書き込み頻度増加につながる。 | 代替案として **3 秒ごとのバッチ集計** を別ジョブで走らせ、結果を `KEY_VENUE_SEATS_DIAG` に **同梱** する（ただし実装は別タスク）。 |
+| **「常時表示でデバッグしやすい」** → 開発者がすぐに状態を確認できる | ユーザー側の UI が煩雑化し、**没入感が失われる**。 | デバッグモードフラグ (`process.env.DEBUG_VENUE_DIAG`) を導入し、開発ビルドだけで常時表示させる。 |
+| **「シグナルに `capturedAt` を入れた方が最新情報が保証できる」** | 毎フレーム変化し、**無駄な再描画** が頻発。 | `capturedAt` は **内部ロジック** のみで使用し、外部シグナルには含めない。 |
+
+---
+
+### 具体案  
+
+#### 1. 診断内容の実装  
+- **対象**: `enabled, seatsShown, participantCount, otherCount, broadcasterInSeats, lastUpdateAt`（既存 `VenueSeatsDiagState`）  
+- **除外**: `withAvatar / resolvedAvatar / withUid`（アバター解決率）  
+
+#### 2. UI 配置と開閉ロジック  
+- **場所**: `venueBar` の下部、`<div id="venueDiagOverlay" class="overlay hidden">` として **オーバーレイ** で実装。  
+- **デフォルト**: `hidden`（折りたたみ）  
+- **トリガー**: 右上の小さなアイコン（🩺）をクリック → `toggleVenueDiag()` → `classList.toggle('hidden')`  
+- **モバイル対応**: 画面幅 < 600px で `overlay` が **フル幅のスライドアップ** とし、スクロール可能に。  
+
+#### 3. 高さ振動防止設計  
+- **レイアウト**: `#seatsHost` の直下に `#venueDiagOverlay` を **position: fixed; bottom: 0; width: 100%;** と配置。  
+- **シグナルキー**:  
+  ```js
+  const venueDiagSig = `${state.seatsShown}|${state.participantCount}|${state.otherCount}|${state.broadcasterInSeats}|${state.lastUpdateAt}`;
+  ```
+- **更新ロジック**: `publishVenueSeatsDiag` が 3 秒ごとに呼ばれたら、
+--- [ルーティング選抜・code] 成功 4/4 ---
+
+=== 完了 5597ms ===
+保存: council/venue-diag-answers.json

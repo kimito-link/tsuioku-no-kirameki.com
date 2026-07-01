@@ -94,6 +94,11 @@ import { storyUserLaneMetaLines } from '../lib/storyUserLaneMeta.js';
 import { KEY_VENUE_SEATS_DIAG } from '../lib/venueSeatsDiagKey.js';
 import { buildVenueSeatsDiagSnapshot } from '../lib/venueSeatsDiag.js';
 import {
+  computeVenueParticipantAvatarCounts,
+  venueDiagSig,
+  buildVenueDiagHtml
+} from '../lib/venueAvatarDiagLine.js';
+import {
   seatsPerRow,
   resolveVisibleArenaCount,
   resolveVenueMaxHeightVh,
@@ -814,6 +819,23 @@ const VENUE_CSS = `
     text-align: center;
     color: #99a2b0;
   }
+  /* 2026-07-01 会議(venue-diag): 「🩺 会場の状態」パネルの中身。roster と同じ overlay 枠を流用し、
+     内側の文章だけをここで整える。件数のみ・PII なし(純関数 venueAvatarDiagLine.js が組む)。 */
+  .nl-venue-diag {
+    padding: 12px 14px 14px;
+    line-height: 1.7;
+    font-size: 13px;
+    color: #d7dce6;
+  }
+  .nl-venue-diag p { margin: 0 0 8px; }
+  .nl-venue-diag p:last-child { margin-bottom: 0; }
+  .nl-venue-diag strong { color: #fff; }
+  .nl-venue-diag__warn { color: #ffcf7a; }
+  .nl-venue-diag__ok { color: #9fe6af; }
+  .nl-venue-diag__foot {
+    font-size: 11px;
+    color: #99a2b0;
+  }
   .nlsb-seat.nlsb-is-empty {
     /* display: none; */
     opacity: 0.12;
@@ -1389,6 +1411,14 @@ export function mountVenueBarButton(options = {}) {
   rosterBtn.textContent = '👥 一覧';
   rosterBtn.title = '今この会場にいるメンバーの一覧(診断)を開く';
   rosterBtn.addEventListener('click', () => toggleRosterPanel());
+  // 2026-07-01 会議(venue-diag): 会場の状態(参加者/席/アバター解決率/配信者混入)を平易に出す
+  //   折りたたみ診断。既定は畳む(没入 UI を邪魔しない)。overlay なので席の高さを侵さない。
+  const diagBtn = document.createElement('button');
+  diagBtn.type = 'button';
+  diagBtn.className = 'nlsb-comeview-btn';
+  diagBtn.textContent = '🩺 状態';
+  diagBtn.title = '会場の状態(参加者数・アバター解決率など)を開く';
+  diagBtn.addEventListener('click', () => toggleDiagPanel());
   const comeviewBtn = document.createElement('button');
   comeviewBtn.type = 'button';
   comeviewBtn.className = 'nlsb-comeview-btn';
@@ -1442,9 +1472,9 @@ export function mountVenueBarButton(options = {}) {
   // v0.1.772: 閉じるボタンをヘッダー右端に並べる(会場の操作ボタンを一箇所に集約)。
   //   OBS キャプチャ時は close.style.display='none' 済みなので append しても表示されない。
   if (venueWindowBtn) {
-    headerRight.append(rosterBtn, comeviewBtn, voiceBtn, voiceStatus, venueWindowBtn, note, close);
+    headerRight.append(rosterBtn, diagBtn, comeviewBtn, voiceBtn, voiceStatus, venueWindowBtn, note, close);
   } else {
-    headerRight.append(rosterBtn, comeviewBtn, voiceBtn, voiceStatus, note, close);
+    headerRight.append(rosterBtn, diagBtn, comeviewBtn, voiceBtn, voiceStatus, note, close);
   }
   header.append(title, headerRight);
 
@@ -1566,7 +1596,11 @@ export function mountVenueBarButton(options = {}) {
   const rosterPanel = document.createElement('div');
   rosterPanel.className = 'nlsb-roster-panel';
   rosterPanel.hidden = true;
-  stage.append(stageLayout, bubbleLayer, rosterPanel);
+  // 2026-07-01 会議(venue-diag): 「🩺 会場の状態」パネル。roster と同じ overlay 流儀=席の高さを侵さない。
+  const diagPanel = document.createElement('div');
+  diagPanel.className = 'nlsb-roster-panel nlsb-venue-diag-panel';
+  diagPanel.hidden = true;
+  stage.append(stageLayout, bubbleLayer, rosterPanel, diagPanel);
   root.append(toggle, stage);
   parent.appendChild(root);
 
@@ -1765,6 +1799,59 @@ export function mountVenueBarButton(options = {}) {
       }, 0);
     } else {
       stage.removeEventListener('click', onRosterOutsideClick);
+    }
+  };
+
+  // 2026-07-01 会議(venue-diag): 「🩺 会場の状態」パネルの描画/開閉。
+  //   純ロジック(件数計算/HTML)は src/lib/venueAvatarDiagLine.js(テスト済)。ここは薄い配線だけ。
+  //   renderSeats が毎回書き込む _lastVenueSeatsDiagObs(席数/参加者/ほかN/配信者混入)と、
+  //   その場で participants から数えたアバター解決率を合わせて出す。sig 無変化なら DOM を触らない。
+  /** @type {Partial<import('../lib/venueSeatsDiag.js').VenueSeatsDiagState>} */
+  let _lastVenueSeatsDiagObs = {};
+  let _lastVenueDiagSig = '';
+  const renderDiagPanel = () => {
+    const participants = (lastRosterInput.allSeats || []).map((s) => s && s.participant).filter(Boolean);
+    const counts = computeVenueParticipantAvatarCounts(participants);
+    const seatsDiag = _lastVenueSeatsDiagObs || {};
+    const sig = venueDiagSig(counts, seatsDiag);
+    // 無変化(件数が同じ)なら本文は触らない=明滅しない。閉じてる間の再計算も避ける。
+    if (sig === _lastVenueDiagSig && diagPanel.querySelector('.nl-venue-diag')) return;
+    _lastVenueDiagSig = sig;
+    const updatedAgoMs =
+      Number.isFinite(Number(seatsDiag.lastUpdateAt)) && Number(seatsDiag.lastUpdateAt) > 0
+        ? Math.max(0, nowMs() - Number(seatsDiag.lastUpdateAt))
+        : -1;
+    const body = buildVenueDiagHtml({ counts, seatsDiag, updatedAgoMs });
+    diagPanel.innerHTML =
+      `<div class="nlsb-roster-head">` +
+      `<strong>🩺 会場の状態</strong>` +
+      `<button type="button" class="nlsb-roster-close" aria-label="閉じる">×</button>` +
+      `</div>` +
+      body;
+    const closeBtn = diagPanel.querySelector('.nlsb-roster-close');
+    if (closeBtn) closeBtn.addEventListener('click', () => toggleDiagPanel(false));
+  };
+  /** @param {MouseEvent} event */
+  const onDiagOutsideClick = (event) => {
+    if (diagPanel.hidden) return;
+    const target = /** @type {Node|null} */ (event.target);
+    if (target && diagPanel.contains(target)) return;
+    toggleDiagPanel(false);
+  };
+  /** @param {boolean} [force] */
+  const toggleDiagPanel = (force) => {
+    const next = typeof force === 'boolean' ? force : diagPanel.hidden;
+    if (next) {
+      _lastVenueDiagSig = ''; // 開くたびに最新を1回描く(前回 sig を無視)。
+      renderDiagPanel();
+    }
+    diagPanel.hidden = !next;
+    if (next) {
+      setTimeout(() => {
+        if (!diagPanel.hidden) stage.addEventListener('click', onDiagOutsideClick);
+      }, 0);
+    } else {
+      stage.removeEventListener('click', onDiagOutsideClick);
     }
   };
   // ユーザー方針「しゃべった匿名もアリーナに出して吹かせる」: 発言した userId を蓄積し、
@@ -2693,14 +2780,20 @@ export function mountVenueBarButton(options = {}) {
       visibleSeats.some(
         (entry) => String(entry?.participant?.userId || '').trim() === bcUid
       );
-    publishVenueSeatsDiag({
+    const seatsDiagObs = {
       enabled: open,
       seatsShown: visibleSeats.length,
       participantCount: seating.participantCount,
       otherCount: totalAnonymous,
       broadcasterInSeats,
-      broadcasterKnown: bcUid !== ''
-    });
+      broadcasterKnown: bcUid !== '',
+      lastUpdateAt: nowMs()
+    };
+    publishVenueSeatsDiag(seatsDiagObs);
+    // 2026-07-01 会議(venue-diag): 「🩺 会場の状態」パネル用に最新の観測値を保持。
+    //   パネルが開いている時だけ再描画(sig 無変化なら DOM を触らない=hot path を汚さない)。
+    _lastVenueSeatsDiagObs = seatsDiagObs;
+    if (!diagPanel.hidden) renderDiagPanel();
   };
 
   /**

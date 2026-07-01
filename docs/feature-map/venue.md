@@ -30,6 +30,7 @@ graph LR
   n_venue --> n_src_lib_deriveAvatarUrlFromUid_js["lib/deriveAvatarUrlFromUid.js"]:::shared
   n_venue --> n_src_lib_giftDisplayNickname_js["lib/giftDisplayNickname.js"]:::shared
   n_venue --> n_src_lib_giftThrowProjectile_js["lib/giftThrowProjectile.js"]:::shared
+  n_venue --> n_src_lib_htmlEscape_js["lib/htmlEscape.js"]:::shared
   n_venue --> n_src_lib_nicoAnonymousDisplay_js["lib/nicoAnonymousDisplay.js"]:::shared
   n_venue --> n_src_lib_nicoUserPage_js["lib/nicoUserPage.js"]:::shared
   n_venue --> n_src_lib_parseGiftComment_js["lib/parseGiftComment.js"]:::shared
@@ -48,12 +49,11 @@ graph LR
   n_venue --> n_src_lib_userLaneCandidatesFromStorage_js["lib/userLaneCandidatesFromStorage.js"]:::shared
   n_venue --> n_src_lib_userRooms_js["lib/userRooms.js"]:::shared
   n_venue --> n_src_lib_venueAvatar_js["lib/venueAvatar.js"]:::shared
+  n_venue --> n_src_lib_venueAvatarDiagLine_js["lib/venueAvatarDiagLine.js"]:::shared
   n_venue --> n_src_lib_venueBubbleLayout_js["lib/venueBubbleLayout.js"]:::shared
   n_venue --> n_src_lib_venueBubbleLifecycle_js["lib/venueBubbleLifecycle.js"]:::shared
   n_venue --> n_src_lib_venueCharacterFrame_js["lib/venueCharacterFrame.js"]:::shared
-  n_venue --> n_src_lib_venueCrowdMotion_js["lib/venueCrowdMotion.js"]:::shared
-  n_venue --> n_src_lib_venueDisplayRows_js["lib/venueDisplayRows.js"]:::shared
   classDef shared fill:#eee,stroke:#999,color:#666;
 ```
 
-> ほか 21 ファイル省略（全件は storage-bus.md / metafile 参照）。
+> ほか 24 ファイル省略（全件は storage-bus.md / metafile 参照）。
