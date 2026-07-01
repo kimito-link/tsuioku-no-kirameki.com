@@ -120,17 +120,27 @@ describe('paintStatCardsMirrorValues', () => {
   });
 });
 
-describe('statCardsMirrorSig — 再描画skip用sig(v0.1.1019)', () => {
-  it('liveId/capturedAt/recordsText で決まる', () => {
-    expect(statCardsMirrorSig({ liveId: 'lv1', capturedAt: 100, recordsText: '150' })).toBe('lv1|100|150');
+describe('statCardsMirrorSig — 再描画skip用sig(v0.1.1019/1022)', () => {
+  it('liveId+記録+同接+来場 で決まる(capturedAt は含めない)', () => {
+    expect(statCardsMirrorSig({ liveId: 'lv1', capturedAt: 100, recordsText: '150', concurrent: { estText: '~9' }, visitor: { text: '30' } })).toBe('lv1|150|~9|30');
+  });
+  it('v0.1.1022 明滅根治: capturedAt だけ変わっても sig は不変(再描画しない)', () => {
+    const a = statCardsMirrorSig({ liveId: 'lv1', capturedAt: 100, recordsText: '150' });
+    const b = statCardsMirrorSig({ liveId: 'lv1', capturedAt: 999, recordsText: '150' });
+    expect(a).toBe(b);
   });
   it('記録テキストが変われば sig も変わる(150→129)', () => {
-    const a = statCardsMirrorSig({ liveId: 'lv1', capturedAt: 100, recordsText: '150' });
-    const b = statCardsMirrorSig({ liveId: 'lv1', capturedAt: 100, recordsText: '129' });
+    const a = statCardsMirrorSig({ liveId: 'lv1', recordsText: '150' });
+    const b = statCardsMirrorSig({ liveId: 'lv1', recordsText: '129' });
+    expect(a).not.toBe(b);
+  });
+  it('同接/来場が変わっても sig は変わる', () => {
+    const a = statCardsMirrorSig({ liveId: 'lv1', recordsText: '150', concurrent: { estText: '~9' } });
+    const b = statCardsMirrorSig({ liveId: 'lv1', recordsText: '150', concurrent: { estText: '~10' } });
     expect(a).not.toBe(b);
   });
   it('null/非object でも落ちない', () => {
-    expect(statCardsMirrorSig(null)).toBe('|0|');
+    expect(statCardsMirrorSig(null)).toBe('|||');
   });
 });
 

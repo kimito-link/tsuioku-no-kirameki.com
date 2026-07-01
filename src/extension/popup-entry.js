@@ -5370,10 +5370,9 @@ async function applyLaneMirrorForPassive() {
   });
   const pickedLength = Math.max(0, Math.floor(Number(snap.pickedLength) || 0) || totalCells);
   const totalCandidates = Math.max(0, Math.floor(Number(snap.totalCandidates) || 0));
-  const sig =
-    `${String(snap.liveId || '')}|${Number(snap.capturedAt) || 0}|` +
-    `${buckets.link.length}|${buckets.gift.length}|${buckets.ad.length}|${buckets.konta.length}|${buckets.tanu.length}|` +
-    `${pickedLength}|${totalCandidates}`;
+  // v0.1.1022(②プレビュー明滅の根治): sig から capturedAt を外す。①が3秒ごと再publishで capturedAt だけ変わり
+  //   中身同じでも再描画→innerHTML='' で要素が一瞬消えてチカチカしていた。件数だけで中身変化は検知できる。
+  const sig = `${String(snap.liveId || '')}|${buckets.link.length}|${buckets.gift.length}|${buckets.ad.length}|${buckets.konta.length}|${buckets.tanu.length}|${pickedLength}|${totalCandidates}`;
   if (sig === _laneMirrorPassiveSig) {
     // 自己診断: 鏡に変化なし＝再 paint しないが DOM は前回の描画済み（=完了扱い・現 DOM 件数）。
     recordStoryUserLaneStep(_storyUserLaneRenderProbe, STORY_USER_LANE_STEPS.DONE, {
@@ -5548,9 +5547,8 @@ async function applyCommentTimelineMirrorForPassive() {
   const rows = restoreCommentTimelineRows(snap);
   if (!rows.length) return; // データ無し=popup の空状態(placeholder)のまま(死に画面にしない)
   const latest = rows[rows.length - 1]; // restore は古→新=末尾が最新。
-  const sig =
-    `${String(snap && snap.liveId ? snap.liveId : '')}|${Number(snap && snap.capturedAt) || 0}|` +
-    `${rows.length}|${String(latest.text || '')}`;
+  // v0.1.1022(明滅根治): sig から capturedAt を外す(件数+最新本文で中身変化は検知・新着で変わる)。
+  const sig = `${String(snap && snap.liveId ? snap.liveId : '')}|${rows.length}|${String(latest.text || '')}`;
   if (sig === _commentTimelineMirrorPassiveSig) return;
   _commentTimelineMirrorPassiveSig = sig;
   const segB = $('commentTickerSegB');
@@ -5608,8 +5606,8 @@ async function applyNorthStarMirrorForPassive() {
   if (!snap || typeof snap !== 'object') return;
   const contribRows = restoreNorthStarMirrorRows(snap, 'contributionRanking');
   const adRows = restoreNorthStarMirrorRows(snap, 'adRanking');
-  const sig =
-    `${String(snap.liveId || '')}|${Number(snap.capturedAt) || 0}|${contribRows.length}|${adRows.length}`;
+  // v0.1.1022(明滅根治): sig から capturedAt を外す(先頭行の名前も入れ順位入れ替わりを検知・時刻では再描画しない)。
+  const sig = `${String(snap.liveId || '')}|${contribRows.length}|${adRows.length}|${String((contribRows[0] && contribRows[0].name) || '')}|${String((adRows[0] && adRows[0].name) || '')}`;
   if (sig === _northStarMirrorPassiveSig) return;
   _northStarMirrorPassiveSig = sig;
   // 貢献度レーン: 本物 popup の描画経路(officialDomRankingRowsToStripRooms→paintTopSupportRankStyleIntoElement)を再利用。
