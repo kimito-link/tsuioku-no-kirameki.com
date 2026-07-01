@@ -98,14 +98,18 @@ export function paintStatCardsMirrorValues(root, snap) {
 }
 
 /**
- * v0.1.1019(フルコピー根治): 数字カード鏡スナップショットの再描画 skip 用 signature を組む純関数。
- *   liveId+capturedAt+記録テキストが変わったときだけ paint し直す(②応援プレビューの無駄再描画を抑える)。
+ * 数字カード鏡スナップショットの再描画 skip 用 signature を組む純関数。
+ *   v0.1.1019 で導入(フルコピー用)。v0.1.1022(明滅根治): capturedAt を【外し】、記録+同接+来場の
+ *   3値で「中身が変わったか」を判定する。①が3秒ごとに鏡を再publishしても capturedAt だけの変化では
+ *   再描画しない(時刻は中身の変化ではない)。数字カードは差分更新なので明滅しないが、無駄再描画を無くす。
  * @param {any} snap
  * @returns {string}
  */
 export function statCardsMirrorSig(snap) {
   const s = snap && typeof snap === 'object' ? snap : {};
-  return `${String(s.liveId || '')}|${Number(s.capturedAt) || 0}|${String(s.recordsText || '')}`;
+  const conc = s.concurrent && typeof s.concurrent === 'object' ? s.concurrent : {};
+  const vis = s.visitor && typeof s.visitor === 'object' ? s.visitor : {};
+  return `${String(s.liveId || '')}|${String(s.recordsText || '')}|${String(conc.estText || '')}|${String(vis.text || '')}`;
 }
 
 /**
