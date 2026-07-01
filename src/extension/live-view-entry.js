@@ -20,6 +20,7 @@
 
 import { KEY_LIVEVIEW_PUBLISH_PAYLOAD } from '../lib/storageKeys.js';
 import { buildStatusShareUrls } from '../lib/statusShareUrls.js';
+import { buildParityBadge } from '../lib/parityVerdict.js';
 // 根2対策(council/diagnostics-completeness-root-SYNTHESIS.md 第3段): この公開ボタンの送信結果を【storage】に
 //   記録する。従来 status の自己診断は globalThis 集計しか見ず、ここ(別ページ=別 globalThis)で送っても
 //   「押したのに未送信」と誤報していた。storage に1件書けば status から読める。
@@ -192,6 +193,43 @@ function paintStatusReportPanel(reportText) {
 }
 
 /**
+ * v0.1.1015: 3画面パリティ・バッジを画面上部に描く。①POP=②この画面=③WEB が同一かを、状態速報を
+ *   開かなくても一発で見せる(ユーザー要望「説明不要・コピーせず一発で分かる」)。
+ *   status が組んだ jsonBlob.parityVerdict(構造化結果)を読み、buildParityBadge で整形するだけ
+ *   (②側で再判定しない=①とバイト一致)。材料が無ければ hidden(死に表示にしない)。
+ * @param {{ verdict?: string, reason?: string, nextAction?: string, code?: string }|null|undefined} parityVerdict
+ */
+function paintParityBadge(parityVerdict) {
+  const el = document.getElementById('lvParityBadge');
+  if (!el) return;
+  if (!parityVerdict || typeof parityVerdict !== 'object') {
+    el.hidden = true;
+    return;
+  }
+  const badge = buildParityBadge(parityVerdict);
+  el.classList.remove('is-ok', 'is-pending', 'is-mismatch');
+  el.classList.add(`is-${badge.tone}`);
+  el.replaceChildren();
+  const title = document.createElement('div');
+  title.className = 'lv-parity-title';
+  title.textContent = `${badge.icon} ${badge.title}`;
+  el.appendChild(title);
+  if (badge.reason) {
+    const reason = document.createElement('div');
+    reason.className = 'lv-parity-reason';
+    reason.textContent = badge.reason;
+    el.appendChild(reason);
+  }
+  if (badge.nextAction) {
+    const next = document.createElement('div');
+    next.className = 'lv-parity-next';
+    next.textContent = `→ ${badge.nextAction}`;
+    el.appendChild(next);
+  }
+  el.hidden = false;
+}
+
+/**
  * ①POP と【全く同じフル状態速報】を②応援ライブビューに出す。
  *   status が KEY_LIVEVIEW_PUBLISH_PAYLOAD.jsonBlob.statusReport に置いた本文を読んで貼るだけ
  *   (再構築しない=①とバイト一致)。status の再描画(=再 publish)に storage.onChanged で追従する。
@@ -203,11 +241,12 @@ function setupStatusReportPanel() {
       const local = globalThis.chrome?.storage?.local;
       if (!local) return;
       const bag = await local.get(KEY_LIVEVIEW_PUBLISH_PAYLOAD);
-      const payload = /** @type {{ jsonBlob?: { statusReport?: string } }|undefined} */ (
+      const payload = /** @type {{ jsonBlob?: { statusReport?: string, parityVerdict?: object } }|undefined} */ (
         bag && bag[KEY_LIVEVIEW_PUBLISH_PAYLOAD]
       );
       const report = payload && payload.jsonBlob ? payload.jsonBlob.statusReport : '';
       paintStatusReportPanel(report);
+      paintParityBadge(payload && payload.jsonBlob ? payload.jsonBlob.parityVerdict : null);
     } catch {
       /* best-effort: 読めなくても応援ライブビュー本体は壊さない */
     }
@@ -216,11 +255,12 @@ function setupStatusReportPanel() {
   try {
     globalThis.chrome?.storage?.onChanged?.addListener((changes, area) => {
       if (area !== 'local' || !changes || !changes[KEY_LIVEVIEW_PUBLISH_PAYLOAD]) return;
-      const next = /** @type {{ jsonBlob?: { statusReport?: string } }|undefined} */ (
+      const next = /** @type {{ jsonBlob?: { statusReport?: string, parityVerdict?: object } }|undefined} */ (
         changes[KEY_LIVEVIEW_PUBLISH_PAYLOAD].newValue
       );
       const report = next && next.jsonBlob ? next.jsonBlob.statusReport : '';
       paintStatusReportPanel(report);
+      paintParityBadge(next && next.jsonBlob ? next.jsonBlob.parityVerdict : null);
     });
   } catch {
     /* best-effort: onChanged 登録不可でも初回 read で1枚は出る */
