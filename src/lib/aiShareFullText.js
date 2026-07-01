@@ -10,6 +10,8 @@ import { summarizeLiveviewPublishOutcome } from './liveviewPublishOutcome.js';
 import { summarizeLiveviewPublishOutcomeRecord } from './liveviewPublishOutcomeKey.js';
 import { buildDiagnosticsTrust, formatDiagnosticsTrustLines } from './diagnosticsTrust.js';
 import { buildParityVerdict, formatParityVerdictLine } from './parityVerdict.js';
+// v0.1.1020: 「応援プレビューを開いている間は診断更新が重い」を名指しする純関数(refreshPerf×previewAck 突合)。
+import { buildPreviewHeavyHint } from './previewHeavyHint.js';
 import {
   buildStoryUserLaneRenderDiag,
   formatStoryUserLaneRenderDiagLines,
@@ -71,6 +73,12 @@ export function buildAiShareFullText({ overviewText, livesData, fastDiag, popupD
   //   体感の重さは初期ロード/スクロール側、という切り分けが状態速報1枚で分かる。
   const perfLine = formatRefreshPerfLine(refreshPerf);
   if (perfLine) lines.push(perfLine);
+  // v0.1.1020: 更新所要が重い×②応援プレビューが開いている(ack 新鮮)を突合し「②が重さの原因」を名指しする。
+  //   ユーザー実機「応援プレビュー出すとめちゃ重い」への対応=体感でなく状態速報1枚で原因が分かる。
+  try {
+    const heavyHint = buildPreviewHeavyHint(refreshPerf, previewRenderAck, Date.now());
+    if (heavyHint.line) lines.push(heavyHint.line);
+  } catch { /* no-op: ヒントの失敗は状態速報を壊さない */ }
   lines.push('');
   // 送信結果(根2対策): storage 記録(ページ横断=live-view からの送信も拾う)を優先し、無ければ globalThis 集計。
   //   どちらの公開ボタンで送っても「送信済み」を status が読める。
