@@ -94,6 +94,11 @@ import { storyUserLaneMetaLines } from '../lib/storyUserLaneMeta.js';
 import { KEY_VENUE_SEATS_DIAG } from '../lib/venueSeatsDiagKey.js';
 import { buildVenueSeatsDiagSnapshot } from '../lib/venueSeatsDiag.js';
 import {
+  computeVenueParticipantAvatarCounts,
+  venueDiagSig,
+  buildVenueDiagHtml
+} from '../lib/venueAvatarDiagLine.js';
+import {
   seatsPerRow,
   resolveVisibleArenaCount,
   resolveVenueMaxHeightVh,
@@ -193,6 +198,35 @@ const venuePersonTileIo = {
   storyTileUsesYukkuriTvStyle,
   upgradeAnonymousAvatarImage
 };
+
+/**
+ * 会場の participant から人物タイル要素(buildPersonTileEl)を作る共通ヘルパ。
+ *
+ * 席ループと「応援者トップNバー」で【同じ描画】を使うために切り出した(2026-07-01 会議
+ * venue-role-separation フェーズ2)。avatar 解決順(http→数値ID由来→ゆっくり顔)・meta 表記・
+ * 匿名の顔(identicon)は popup と同じ正本を通す=バー側で opts を渡し忘れて匿名の顔が崩れる
+ * (handoff 地雷#3)を構造的に防ぐ。タイル本体は buildPersonTileEl(personTileDom.js)一本。
+ *
+ * @param {{ userId?: string, name?: string, avatar?: string, key?: string }} participant
+ * @param {string} [fallbackLabel] userId も key も無いときの表示名(席番号など)
+ * @returns {HTMLElement}
+ */
+function buildVenuePersonTile(participant, fallbackLabel = '会場') {
+  const p = participant && typeof participant === 'object' ? participant : {};
+  const uid = String(p.userId || '').trim();
+  const rawName = String(p.name || '').trim();
+  const displayName =
+    rawName || (uid ? anonymousDisplayLabel(uid) : anonymousDisplayLabel(String(p.key || fallbackLabel)));
+  const avatarUrl = String(p.avatar || '').trim();
+  const derivedAvatar = deriveNicoUserIconUrl(uid);
+  const yukkuriFace = uid ? anonymousIdenticonDataUrl(uid, 64) : '';
+  const avatarSrc = avatarUrl || derivedAvatar || yukkuriFace;
+  const meta = storyUserLaneMetaLines({ userId: uid, nickname: rawName }, avatarUrl, '');
+  return buildPersonTileEl(
+    { displaySrc: avatarSrc, title: displayName, meta, entry: { userId: uid } },
+    venuePersonTileIo
+  );
+}
 
 /**
  * 診断パネル等で表示名を innerHTML に差し込む前に HTML エスケープする。
@@ -430,8 +464,9 @@ const VENUE_CSS = `
     box-sizing: border-box;
     grid-template-areas:
       "header"
+      "topbar"
       "seats";
-    grid-template-rows: auto minmax(0, 1fr);
+    grid-template-rows: auto auto minmax(0, 1fr);
     overflow: hidden;
     position: relative; /* 3キャラ常駐レイヤー(.nlsb-residents)の絶対配置の基準 */
     border: 1px solid rgba(255, 255, 255, 0.1);
@@ -585,6 +620,88 @@ const VENUE_CSS = `
     border-bottom: 1px solid rgba(255, 255, 255, 0.08);
     background: rgba(14, 19, 27, 0.55);
   }
+  /* 2026-07-01 会議(venue-role-separation フェーズ2): ひな壇上部「応援者トップNバー」。
+     密集会場でも上位が必ず大きく見える。高さ固定=下の席を揺らさない(v0.1.1026 高さ振動対策)。 */
+  .nlsb-topbar {
+    grid-area: topbar;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    box-sizing: border-box;
+    height: 72px;
+    padding: 4px 14px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    background: linear-gradient(180deg, rgba(255, 210, 110, 0.10), rgba(14, 19, 27, 0.0));
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    scrollbar-width: thin;
+  }
+  .nlsb-topbar[hidden] { display: none; }
+  .nlsb-topbar-label {
+    flex: 0 0 auto;
+    font-size: 11px;
+    font-weight: 700;
+    color: #ffd88a;
+    letter-spacing: 0.04em;
+    writing-mode: vertical-rl;
+    text-orientation: upright;
+    line-height: 1;
+    opacity: 0.9;
+  }
+  .nlsb-topbar-list {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+  .nlsb-topbar-cell {
+    position: relative;
+    flex: 0 0 auto;
+    width: 56px;
+  }
+  /* トップバーのアバターは席より大きく主役感を出す(顔=買った本物タイル buildPersonTileEl 流用)。 */
+  .nlsb-topbar-cell .nl-story-userlane-cell {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    width: 100%;
+  }
+  .nlsb-topbar-cell .nl-story-userlane-avatar {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 2px solid rgba(255, 255, 255, 0.25);
+  }
+  .nlsb-topbar-cell .nl-story-userlane-meta {
+    max-width: 56px;
+    overflow: hidden;
+    font-size: 9px;
+    line-height: 1.15;
+    text-align: center;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+  /* 上位3位は金・銀・銅の縁 + 順位バッジ(席と同じ🥇🥈🥉)。静的=ピカピカしない。 */
+  .nlsb-topbar-cell[data-venue-rank] .nl-story-userlane-avatar { border-width: 3px; }
+  .nlsb-topbar-cell[data-venue-rank='1'] .nl-story-userlane-avatar { border-color: #ffcf5a; }
+  .nlsb-topbar-cell[data-venue-rank='2'] .nl-story-userlane-avatar { border-color: #d8dde6; }
+  .nlsb-topbar-cell[data-venue-rank='3'] .nl-story-userlane-avatar { border-color: #e0a878; }
+  .nlsb-topbar-cell[data-venue-rank]::after {
+    position: absolute;
+    top: -4px;
+    right: 2px;
+    z-index: 2;
+    font-size: 15px;
+    line-height: 1;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.55);
+    pointer-events: none;
+  }
+  .nlsb-topbar-cell[data-venue-rank='1']::after { content: '🥇'; }
+  .nlsb-topbar-cell[data-venue-rank='2']::after { content: '🥈'; }
+  .nlsb-topbar-cell[data-venue-rank='3']::after { content: '🥉'; }
   .nlsb-title {
     overflow: hidden;
     font-size: 13px;
@@ -814,6 +931,23 @@ const VENUE_CSS = `
     text-align: center;
     color: #99a2b0;
   }
+  /* 2026-07-01 会議(venue-diag): 「🩺 会場の状態」パネルの中身。roster と同じ overlay 枠を流用し、
+     内側の文章だけをここで整える。件数のみ・PII なし(純関数 venueAvatarDiagLine.js が組む)。 */
+  .nl-venue-diag {
+    padding: 12px 14px 14px;
+    line-height: 1.7;
+    font-size: 13px;
+    color: #d7dce6;
+  }
+  .nl-venue-diag p { margin: 0 0 8px; }
+  .nl-venue-diag p:last-child { margin-bottom: 0; }
+  .nl-venue-diag strong { color: #fff; }
+  .nl-venue-diag__warn { color: #ffcf7a; }
+  .nl-venue-diag__ok { color: #9fe6af; }
+  .nl-venue-diag__foot {
+    font-size: 11px;
+    color: #99a2b0;
+  }
   .nlsb-seat.nlsb-is-empty {
     /* display: none; */
     opacity: 0.12;
@@ -901,33 +1035,26 @@ const VENUE_CSS = `
     box-shadow: 0 0 0 2px rgba(255, 206, 96, 0.95), 0 0 12px 2px rgba(255, 190, 70, 0.85), inset 0 0 0 1px rgba(0, 0, 0, 0.14);
     z-index: 5;
   }
-  /* 2026-06-14 星野アイデア会議2(VIP常連光らせ): 発言数+ギフトのスコアが高い「支えてる人」を
-     金色オーラでやわらかく脈動させて引き立てる。実サムネ優遇(.nlsb-seat-vip)と独立=
-     ゆっくり顔/匿名の常連でも光る。やりすぎない上品な範囲(2.4秒の緩い脈動)。 */
-  .nlsb-seat.nlsb-seat-regular .nl-story-userlane-avatar {
-    border-color: rgba(255, 226, 150, 0.95);
-    box-shadow: 0 0 10px 2px rgba(255, 196, 84, 0.7), inset 0 0 0 1px rgba(0, 0, 0, 0.12);
-    animation: nlsb-vip-glow 2.4s ease-in-out infinite;
-    z-index: 3;
+  /* 2026-07-01 会議(venue-grid-diag): 応援者ランキング上位3位の席に順位バッジを重ねる。
+     旧「金色オーラで脈動」はユーザー要望で廃止(ピカピカ演出なし)。バッジは席の右上に
+     絵文字(🥇🥈🥉)を絶対配置で重ねるだけ=高さ・レイアウトを一切変えない(v0.1.1026 の
+     高さ振動を原理的に踏まない)。脈動・アニメーションは付けない(上品さ・静けさを保つ)。 */
+  .nlsb-seat[data-venue-rank] {
+    position: relative;
   }
-  /* 実サムネ常連は両方付くので、scale はサムネ側(大きい方)を活かしつつ金オーラを重ねる。 */
-  .nlsb-seat.nlsb-seat-vip.nlsb-seat-regular .nl-story-userlane-avatar {
-    transform: scale(1.45);
+  .nlsb-seat[data-venue-rank]::after {
+    position: absolute;
+    top: -2px;
+    right: -2px;
+    z-index: 6;
+    font-size: 0.9em;
+    line-height: 1;
+    pointer-events: none;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.55);
   }
-  @keyframes nlsb-vip-glow {
-    0%,
-    100% {
-      box-shadow: 0 0 8px 1px rgba(255, 196, 84, 0.55), inset 0 0 0 1px rgba(0, 0, 0, 0.12);
-    }
-    50% {
-      box-shadow: 0 0 14px 4px rgba(255, 210, 110, 0.92), inset 0 0 0 1px rgba(0, 0, 0, 0.12);
-    }
-  }
-  @media (prefers-reduced-motion: reduce) {
-    .nlsb-seat.nlsb-seat-regular .nl-story-userlane-avatar {
-      animation: none;
-    }
-  }
+  .nlsb-seat[data-venue-rank='1']::after { content: '🥇'; }
+  .nlsb-seat[data-venue-rank='2']::after { content: '🥈'; }
+  .nlsb-seat[data-venue-rank='3']::after { content: '🥉'; }
   /* v0.1.742 一緒に過ごしている感(co-presence): 誰かがコメントした瞬間、その人の席が
      ふわっと一度だけ反応する。吹き出しだけでなく「会場が一人ひとりの発言に反応する」ことで
      一緒にいる感を強める(星野式・摩擦ゼロ=自動・設定不要)。0.6秒で1回だけ・上品に。 */
@@ -1396,6 +1523,14 @@ export function mountVenueBarButton(options = {}) {
   rosterBtn.textContent = '👥 一覧';
   rosterBtn.title = '今この会場にいるメンバーの一覧(診断)を開く';
   rosterBtn.addEventListener('click', () => toggleRosterPanel());
+  // 2026-07-01 会議(venue-diag): 会場の状態(参加者/席/アバター解決率/配信者混入)を平易に出す
+  //   折りたたみ診断。既定は畳む(没入 UI を邪魔しない)。overlay なので席の高さを侵さない。
+  const diagBtn = document.createElement('button');
+  diagBtn.type = 'button';
+  diagBtn.className = 'nlsb-comeview-btn';
+  diagBtn.textContent = '🩺 状態';
+  diagBtn.title = '会場の状態(参加者数・アバター解決率など)を開く';
+  diagBtn.addEventListener('click', () => toggleDiagPanel());
   const comeviewBtn = document.createElement('button');
   comeviewBtn.type = 'button';
   comeviewBtn.className = 'nlsb-comeview-btn';
@@ -1449,11 +1584,26 @@ export function mountVenueBarButton(options = {}) {
   // v0.1.772: 閉じるボタンをヘッダー右端に並べる(会場の操作ボタンを一箇所に集約)。
   //   OBS キャプチャ時は close.style.display='none' 済みなので append しても表示されない。
   if (venueWindowBtn) {
-    headerRight.append(rosterBtn, comeviewBtn, voiceBtn, voiceStatus, venueWindowBtn, note, close);
+    headerRight.append(rosterBtn, diagBtn, comeviewBtn, voiceBtn, voiceStatus, venueWindowBtn, note, close);
   } else {
-    headerRight.append(rosterBtn, comeviewBtn, voiceBtn, voiceStatus, note, close);
+    headerRight.append(rosterBtn, diagBtn, comeviewBtn, voiceBtn, voiceStatus, note, close);
   }
   header.append(title, headerRight);
+
+  // 2026-07-01 会議(venue-role-separation フェーズ2 = 可視性回復): ひな壇の【上】に固定高の
+  //   「応援者トップN」バー。868人の密集会場でも上位が必ず大きく見える(席の🥇🥈🥉が小さすぎる
+  //   問題への回答)。データは席と同じ rankVenueContributors(順位バッジとスコア源を共有=drift なし)、
+  //   描画は席と同じ buildVenuePersonTile(匿名も含む=会場の「全員主役」を壊さない)。
+  //   高さは CSS 固定 + 「一度描いたら空では畳まない」で下の席を揺らさない(v0.1.1026 高さ振動対策)。
+  const topBar = document.createElement('div');
+  topBar.className = 'nlsb-topbar';
+  topBar.hidden = true; // 上位が居ない(全員無言)間は出さない。一度出たら空で畳まない(下記 sig ガード)。
+  const topBarLabel = document.createElement('div');
+  topBarLabel.className = 'nlsb-topbar-label';
+  topBarLabel.textContent = '応援者トップ';
+  const topBarList = document.createElement('div');
+  topBarList.className = 'nlsb-topbar-list';
+  topBar.append(topBarLabel, topBarList);
 
   const seatsHost = document.createElement('div');
   seatsHost.className = 'nlsb-seats nlsb-mode-empty';
@@ -1559,7 +1709,7 @@ export function mountVenueBarButton(options = {}) {
   charFrameLayer.setAttribute('aria-hidden', 'true');
 
   // seating は下端のひな壇だけ(header + seats)。
-  seating.append(header, seatsHost);
+  seating.append(header, topBar, seatsHost);
   // center は CSS で display:none(撤去)だが、互換のため DOM には残す。
   // 3キャラ常駐は配信画面の「まわり(左右の縁)」に出す(会場の席とは重ねない=邪魔にしない)。
   //   stageLayout 基準=映像セーフエリアの高さに合わせて左右に配置できる。
@@ -1573,7 +1723,11 @@ export function mountVenueBarButton(options = {}) {
   const rosterPanel = document.createElement('div');
   rosterPanel.className = 'nlsb-roster-panel';
   rosterPanel.hidden = true;
-  stage.append(stageLayout, bubbleLayer, rosterPanel);
+  // 2026-07-01 会議(venue-diag): 「🩺 会場の状態」パネル。roster と同じ overlay 流儀=席の高さを侵さない。
+  const diagPanel = document.createElement('div');
+  diagPanel.className = 'nlsb-roster-panel nlsb-venue-diag-panel';
+  diagPanel.hidden = true;
+  stage.append(stageLayout, bubbleLayer, rosterPanel, diagPanel);
   root.append(toggle, stage);
   parent.appendChild(root);
 
@@ -1706,6 +1860,9 @@ export function mountVenueBarButton(options = {}) {
   let lastGoodRows = [];
   // 一度でも非空を描いたか(renderSeats の保険ガード用)。配信切替の意図的クリアと区別する。
   let hasRenderedNonEmpty = false;
+  // 応援者トップNバーの状態(renderTopBar / clearDisplay が触る・宣言はここ=TDZ 回避)。
+  let _lastTopBarSig = '';
+  let _topBarShownOnce = false;
   // 診断シート(メンバー一覧ボタン)用: renderSeats が最新の席割りをここに保存する。
   /** @type {{ allSeats: any[], visibleSeats: any[], audienceCount: number }} */
   let lastRosterInput = { allSeats: [], visibleSeats: [], audienceCount: 0 };
@@ -1772,6 +1929,59 @@ export function mountVenueBarButton(options = {}) {
       }, 0);
     } else {
       stage.removeEventListener('click', onRosterOutsideClick);
+    }
+  };
+
+  // 2026-07-01 会議(venue-diag): 「🩺 会場の状態」パネルの描画/開閉。
+  //   純ロジック(件数計算/HTML)は src/lib/venueAvatarDiagLine.js(テスト済)。ここは薄い配線だけ。
+  //   renderSeats が毎回書き込む _lastVenueSeatsDiagObs(席数/参加者/ほかN/配信者混入)と、
+  //   その場で participants から数えたアバター解決率を合わせて出す。sig 無変化なら DOM を触らない。
+  /** @type {Partial<import('../lib/venueSeatsDiag.js').VenueSeatsDiagState>} */
+  let _lastVenueSeatsDiagObs = {};
+  let _lastVenueDiagSig = '';
+  const renderDiagPanel = () => {
+    const participants = (lastRosterInput.allSeats || []).map((s) => s && s.participant).filter(Boolean);
+    const counts = computeVenueParticipantAvatarCounts(participants);
+    const seatsDiag = _lastVenueSeatsDiagObs || {};
+    const sig = venueDiagSig(counts, seatsDiag);
+    // 無変化(件数が同じ)なら本文は触らない=明滅しない。閉じてる間の再計算も避ける。
+    if (sig === _lastVenueDiagSig && diagPanel.querySelector('.nl-venue-diag')) return;
+    _lastVenueDiagSig = sig;
+    const updatedAgoMs =
+      Number.isFinite(Number(seatsDiag.lastUpdateAt)) && Number(seatsDiag.lastUpdateAt) > 0
+        ? Math.max(0, nowMs() - Number(seatsDiag.lastUpdateAt))
+        : -1;
+    const body = buildVenueDiagHtml({ counts, seatsDiag, updatedAgoMs });
+    diagPanel.innerHTML =
+      `<div class="nlsb-roster-head">` +
+      `<strong>🩺 会場の状態</strong>` +
+      `<button type="button" class="nlsb-roster-close" aria-label="閉じる">×</button>` +
+      `</div>` +
+      body;
+    const closeBtn = diagPanel.querySelector('.nlsb-roster-close');
+    if (closeBtn) closeBtn.addEventListener('click', () => toggleDiagPanel(false));
+  };
+  /** @param {MouseEvent} event */
+  const onDiagOutsideClick = (event) => {
+    if (diagPanel.hidden) return;
+    const target = /** @type {Node|null} */ (event.target);
+    if (target && diagPanel.contains(target)) return;
+    toggleDiagPanel(false);
+  };
+  /** @param {boolean} [force] */
+  const toggleDiagPanel = (force) => {
+    const next = typeof force === 'boolean' ? force : diagPanel.hidden;
+    if (next) {
+      _lastVenueDiagSig = ''; // 開くたびに最新を1回描く(前回 sig を無視)。
+      renderDiagPanel();
+    }
+    diagPanel.hidden = !next;
+    if (next) {
+      setTimeout(() => {
+        if (!diagPanel.hidden) stage.addEventListener('click', onDiagOutsideClick);
+      }, 0);
+    } else {
+      stage.removeEventListener('click', onDiagOutsideClick);
     }
   };
   // ユーザー方針「しゃべった匿名もアリーナに出して吹かせる」: 発言した userId を蓄積し、
@@ -2368,6 +2578,11 @@ export function mountVenueBarButton(options = {}) {
   const clearDisplay = () => {
     lastGoodRows = [];
     hasRenderedNonEmpty = false;
+    // 配信切替は意図的クリア=トップNバーも畳んで前配信の応援者を持ち越さない。
+    _topBarShownOnce = false;
+    _lastTopBarSig = '';
+    topBar.hidden = true;
+    topBarList.replaceChildren();
     renderSeats([]);
   };
 
@@ -2426,6 +2641,35 @@ export function mountVenueBarButton(options = {}) {
     charFrameRendered = true;
   };
 
+  // 2026-07-01 会議(venue-role-separation フェーズ2): 応援者トップNバーの描画。
+  //   sig(上位の userId+順位)が無変化なら DOM を触らない=毎フレーム作り直さない(hot path 保護)。
+  //   一度でも非空を描いたら、一瞬の空(データ遅延)では畳まない=高さ振動を作らない(v0.1.1026)。
+  //   状態フラグは clearDisplay(先に定義)からも触るため、宣言は関数より前(下の hasRenderedNonEmpty 付近)。
+  /** @param {Array<{ rank:number, participant:{ key?:string, userId?:string } }>} topSupporters */
+  const renderTopBar = (topSupporters) => {
+    const list = Array.isArray(topSupporters) ? topSupporters : [];
+    // 空入力でも、一度出したバーは畳まない(前回の顔を残す=明滅/高さ振動を防ぐ)。
+    if (list.length === 0) {
+      if (!_topBarShownOnce) topBar.hidden = true;
+      return;
+    }
+    // sig=上位の key と順位の並び(capturedAt など時刻は入れない=v0.1.1022 明滅の教訓)。
+    const sig = list.map((x) => `${x.rank}:${x.participant?.key || ''}`).join('|');
+    if (sig === _lastTopBarSig && _topBarShownOnce) return;
+    _lastTopBarSig = sig;
+    const frag = document.createDocumentFragment();
+    for (const item of list) {
+      const cell = document.createElement('div');
+      cell.className = 'nlsb-topbar-cell';
+      if (item.rank >= 1 && item.rank <= 3) cell.dataset.venueRank = String(item.rank);
+      cell.appendChild(buildVenuePersonTile(item.participant, '応援者'));
+      frag.appendChild(cell);
+    }
+    topBarList.replaceChildren(frag);
+    topBar.hidden = false;
+    _topBarShownOnce = true;
+  };
+
   /**
    * @param {VenueRow[]} rows
    */
@@ -2440,10 +2684,14 @@ export function mountVenueBarButton(options = {}) {
       maxSeats: VENUE_FULLSCREEN_MAX_SEATS,
       prevSeatByKey: seatByKey,
       isGenericName: isGenericComeviewName,
-      promoteUserIds: spokenUserIds
+      promoteUserIds: spokenUserIds,
+      // 光らせ演出(金色オーラ)はユーザー要望で無効。上位貢献者は順位バッジ(venueRank)で示す。
+      vipRegular: false
     });
     if (seating.participantCount > 0) hasRenderedNonEmpty = true;
     seatByKey = seating.seatByKey;
+    // 応援者トップNバー(ひな壇上部)。席と同じ seating 結果から描く=二重集計しない(drift なし)。
+    renderTopBar(seating.topSupporters);
     seatsHost.classList.remove(...VENUE_LAYOUT_CLASSES);
     seatsHost.classList.add(`nlsb-mode-${seating.layoutMode}`);
     // 2026-06-14 会議(表示領域拡大): 会場の最大高さを人数連動で注入。少人数は低く映像を広く、
@@ -2552,6 +2800,7 @@ export function mountVenueBarButton(options = {}) {
       node.seat.setAttribute('aria-hidden', 'true');
       node.seat.removeAttribute('title');
       delete node.seat.dataset.tierIndex;
+      delete node.seat.dataset.venueRank; // 空席に順位バッジ(🥇)が残らないよう毎回クリア。
       if (node.seat.parentElement) {
         node.seat.parentElement.removeChild(node.seat);
       }
@@ -2603,30 +2852,16 @@ export function mountVenueBarButton(options = {}) {
         node.seat.dataset.tierIndex = String(tier.rowIndex);
         const i = entry.seatIndex;
         const uid = String(participant.userId || '').trim();
-        // 名前: 本名があれば本名・無ければ匿名は「匿名NNN」で安定表示(顔だけにしない=原則)。
         const rawName = String(participant.name || '').trim();
+        const avatarUrl = String(participant.avatar || '').trim();
+        const derivedAvatar = deriveNicoUserIconUrl(uid); // VIP(サムネ持ち)優遇の判定に使う。
         const displayName =
           rawName ||
           (uid ? anonymousDisplayLabel(uid) : anonymousDisplayLabel(participant.key || `会場${i + 1}`));
-        const avatarUrl = String(participant.avatar || '').trim();
-        const uidForFace = String(participant.userId || '').trim();
-        const derivedAvatar = deriveNicoUserIconUrl(uidForFace);
-        const yukkuriFace = uidForFace ? anonymousIdenticonDataUrl(uidForFace, 64) : '';
-        // 表示サムネの解決順は従来どおり(http サムネ→数値ID由来→ゆっくり顔)。これを本物タイルの
-        //   displaySrc に渡す=avatar load guard(venuePersonTileIo)が読込失敗フォールバックを担う。
-        const avatarSrc = avatarUrl || derivedAvatar || yukkuriFace;
         // ★person-tile-unify 第3コミット: 席タイル本体は popup の本物 buildPersonTileEl で描く。
-        //   meta(ID行・名前行)は popup と同じ正本 storyUserLaneMetaLines で表記をそろえる。
-        //   会場 participant(name/userId) を popup の entry 形(userId/nickname)に詰めて渡す。
-        const metaEntry = { userId: uid, nickname: rawName };
-        const meta = storyUserLaneMetaLines(metaEntry, avatarUrl, '');
-        const tileItem = {
-          displaySrc: avatarSrc,
-          title: displayName,
-          meta,
-          entry: { userId: uid }
-        };
-        const tileEl = buildPersonTileEl(tileItem, venuePersonTileIo);
+        //   avatar 解決順・meta 表記・匿名の顔は buildVenuePersonTile(共通ヘルパ)一本で、
+        //   応援者トップNバーと同じ描画を通す(drift/opts 渡し忘れを構造的に防ぐ)。
+        const tileEl = buildVenuePersonTile(participant, `会場${i + 1}`);
         // ラッパー(.nlsb-seat)の中身を本物タイルに差し替える。演出(VIP/常連/発話/streak)は
         //   ラッパーに被せる=タイル本体は触らない(personTileDom.js の設計どおり)。
         node.seat.replaceChildren(tileEl);
@@ -2648,10 +2883,16 @@ export function mountVenueBarButton(options = {}) {
           'nlsb-seat-vip',
           hasRealThumbnail(avatarUrl) || hasRealThumbnail(derivedAvatar)
         );
-        // 2026-06-14 星野アイデア会議2(VIP常連光らせ): 発言数+ギフトで算出した会場ローカルの
-        //   常連・応援スコアが高い席を金色オーラで光らせる。実サムネ有無(.nlsb-seat-vip)とは
-        //   独立=「顔がある人」でなく「支えてる人」を引き立てる。上限つきで特別感を保つ。
-        node.seat.classList.toggle('nlsb-seat-regular', !!entry.isVipRegular);
+        // 2026-07-01 会議(venue-grid-diag): 応援者ランキング上位3位に順位バッジ(🥇🥈🥉)を付ける。
+        //   光らせ演出(旧 .nlsb-seat-regular 金色オーラ)はユーザー要望で廃止=順位バッジのみで
+        //   「支えてる人」を示す。スコア源は venueSeats.js の rankVenueContributors 一本(光/順位で
+        //   drift しない)。高さは変えない(バッジは席内に重ねる=v0.1.1026 の高さ振動を踏まない)。
+        node.seat.classList.remove('nlsb-seat-regular');
+        if (entry.venueRank >= 1 && entry.venueRank <= 3) {
+          node.seat.dataset.venueRank = String(entry.venueRank);
+        } else {
+          delete node.seat.dataset.venueRank;
+        }
         // v0.1.743 「会話の連鎖」: 連続発言中の人の席は段階的に輝く。renderSeats は席を作り直す
         //   ので、ストリーク状態(speechStreaks=正本)から段階を復元して data-streak に反映する。
         //   これで再描画をまたいでも「溜まっていく感」が消えない。発言が途切れたら prune で消える。
@@ -2691,14 +2932,20 @@ export function mountVenueBarButton(options = {}) {
       visibleSeats.some(
         (entry) => String(entry?.participant?.userId || '').trim() === bcUid
       );
-    publishVenueSeatsDiag({
+    const seatsDiagObs = {
       enabled: open,
       seatsShown: visibleSeats.length,
       participantCount: seating.participantCount,
       otherCount: totalAnonymous,
       broadcasterInSeats,
-      broadcasterKnown: bcUid !== ''
-    });
+      broadcasterKnown: bcUid !== '',
+      lastUpdateAt: nowMs()
+    };
+    publishVenueSeatsDiag(seatsDiagObs);
+    // 2026-07-01 会議(venue-diag): 「🩺 会場の状態」パネル用に最新の観測値を保持。
+    //   パネルが開いている時だけ再描画(sig 無変化なら DOM を触らない=hot path を汚さない)。
+    _lastVenueSeatsDiagObs = seatsDiagObs;
+    if (!diagPanel.hidden) renderDiagPanel();
   };
 
   /**

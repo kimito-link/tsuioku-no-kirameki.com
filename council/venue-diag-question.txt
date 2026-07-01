@@ -1,0 +1,26 @@
+お題: 会場モード(venue・ひな壇/500席)に「診断ブロック」を加える(handoff の Phase 3・最終フェーズ)。popup の応援コメント可視化にある診断(userId取得率・アバター解決率等)の会場版。慎重に詰めたい。Phase 2a(席に応援者ランキング上位3位の🥇🥈🥉順位バッジ)は完了済み(v0.1.1029)。
+
+# 実コードで裏取りした現状(前提・覆さない)
+- popup の診断正本: src/lib/storyAvatarDiagLine.js。formatStoryAvatarDiagLine(開発者向け1行・技術)+ buildStoryAvatarDiagVerboseHtml(一般ユーザー向け「記録している応援コメント N件のうち、アイコンまで表示 R件、userId 付き W件」)。PII なし件数のみ・折りたたみ内。
+- 会場は既に観測値を集めている: src/lib/venueSeatsDiag.js VenueSeatsDiagState = { enabled, seatsShown(同時表示席数), participantCount(会場参加者=実コメント者), otherCount(席に出しきれない「ほかN人」), broadcasterInSeats(配信者本人の混入=異常), broadcasterKnown, lastUpdateAt(固着検知) }。venueBar.js publishVenueSeatsDiag が 3秒 min-gap で storage(KEY_VENUE_SEATS_DIAG)へ書き、健全度パネル(status)が読んで色セルで再表示する既存経路がある。
+- 会場の参加者集約正本: src/lib/venueSeats.js collectVenueParticipants(匿名 a:xxx も数値IDも全員・最大500席・入れ替え制)。各 participant は { key, userId, name, avatar, count, giftPoints, hasGift }。
+- 会場は毎フレーム renderSeats が走る hot path。診断を毎フレーム再計算すると重い。
+
+# 直近の地雷(実際に踏んだ・繰り返し防止)
+1. 高さ振動: v0.1.1026 で「広告列が出たり消えたりでアイコングリッドが揺れる」を root 修正。折りたたみ診断が開閉/データ有無で高さ 0↔本体に振動すると席が揺れる。
+2. drift: 会場に独自集計を書くと popup と食い違う。純関数は src/lib に集約し会場は read-only 参照が鉄則。
+3. hot path の重さ: renderSeats は毎フレーム。診断は1回計算→sig 照合で無変化 skip、min-gap(既存 publishVenueSeatsDiag は3秒 gap)を踏襲。
+4. popup-entry / venueBar は max-lines ラチェット上限ギリギリ。純関数は src/lib に切り出す。
+5. capturedAt(時刻)を sig/再描画キーに入れない(v0.1.1022 明滅根治の教訓)。
+
+# 問い(これに答えて)
+1. 診断の中身。会場固有(seatsShown/participantCount/otherCount/broadcasterInSeats/固着=lastUpdateAt の古さ)を出すか、popup と同じアバター解決率(participants から withAvatar/resolvedAvatar/withUid を数える)も足すか、両方か。星野ロミ式(既存データ活かす・過剰実装回避・恥をかかせない)で優先順位を。venueSeatsDiag は既にあるので新規集計を増やさない線引き。
+2. 置き場と開閉。会場バー下部に折りたたみ「🩺 会場の状態」を新設する案の是非。会場はフルスクリーン没入 UI=常時見せると没入を削ぐ。既定は畳む?開く?モバイル(会場は横長想定)での収まり。既に status(健全度パネル)が同じ観測値を色セルで出しているなら、会場内にも二重で出すのは冗長か、むしろ「その場で見える」価値があるか。
+3. 高さ振動を出さない設計。折りたたみは席(seatsHost)と別レイヤに置き、開いても席の高さを侵さない(position/overlay か、席エリアの外か)。空データ時に畳んで高さが変わるのを防ぐ設計。sig は何をキーにすべきか(seatsShown+participantCount+otherCount の件数集合、capturedAt は入れない)。
+4. drift を出さない実装分担。venueAvatarDiagLine.js(新・src/lib)を storyAvatarDiagLine の流儀で作るべきか、それとも storyAvatarDiagLine を会場からも read-only 参照して会場固有だけ薄く足すか。会場の participants → 診断入力への変換純関数をどこに置くか(venueSeats.js? 新ファイル?)。テスト(vitest)で件数を固定検証。
+5. やってはいけない過剰実装を1つ以上(批判役は必ず穴を指摘): 例=会場に独自集計を書いて status/popup と drift/診断を毎フレーム再計算して hot path を重く/折りたたみ開閉で席の高さを揺らす/没入 UI に常時デバッグ情報を出して興を削ぐ/新 storage キーを増やす/venueBar を太らせて max-lines 超過。
+
+# 制約(星野ロミ式)
+記録本体不可侵・新storage書込み増やさない(既存 KEY_VENUE_SEATS_DIAG を使う)・hot path(描画/席割り)重くしない・落とさない・既存データ活かす(venueSeatsDiag/collectVenueParticipants/storyAvatarDiagLine は既にある)・過剰実装回避・恥をかかせない(空バーの明滅・没入を削ぐ常時表示を作らない)。純関数は src/lib に集約し会場は read-only 参照(drift 防止)。検証ファースト。
+
+出力は『結論 → 根拠 → 反論・リスク → 具体案』の4ブロックで。具体案は「まず実機で何を確認するか」と「直すなら最小のファイル:関数(新規なら venueAvatarDiagLine.js の役割・既存流用なら storyAvatarDiagLine のどの関数)」まで。

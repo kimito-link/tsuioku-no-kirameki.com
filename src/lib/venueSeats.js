@@ -294,11 +294,26 @@ export const VENUE_VIP_REGULAR_MIN_SCORE = 1;
  * @returns {Set<string>} 光らせる参加者の key 集合(相対評価・上位 max 人)
  */
 export function selectVenueVipRegularKeys(participants, opts = {}) {
-  const list = Array.isArray(participants) ? participants : [];
   const max =
     Number.isFinite(opts.max) && opts.max > 0
       ? Math.floor(opts.max)
       : VENUE_VIP_REGULAR_MAX;
+  return new Set(rankVenueContributors(participants, opts).slice(0, max).map((s) => s.key));
+}
+
+/**
+ * 会場参加者を「応援者ランキング」として貢献度スコア降順に並べた配列を返す純関数。
+ *
+ * selectVenueVipRegularKeys(=金色オーラの候補集合)と【同じスコア・同じ並び順】を使う
+ * 単一の正本。順位表示(1位/2位/3位バッジ)と光らせ判定が別々にスコアを持つと drift する
+ * (会議 2026-07-01 venue-grid-diag の最重要指摘)ため、両者はここを共有する。
+ *
+ * @param {ReturnType<typeof collectVenueParticipants>} participants
+ * @param {{ minScore?: number, commentCap?: number, giftPointsCap?: number, threshold?: number }} [opts]
+ * @returns {Array<{ key: string, score: number, count: number }>} score 降順(deterministic)
+ */
+export function rankVenueContributors(participants, opts = {}) {
+  const list = Array.isArray(participants) ? participants : [];
   // 後方互換: 旧 threshold 指定は最低バーとして扱う(テスト/絶対運用の互換)。
   const minScore =
     Number.isFinite(opts.minScore) && opts.minScore >= 0
@@ -314,13 +329,43 @@ export function selectVenueVipRegularKeys(participants, opts = {}) {
       scored.push({ key: p.key, score, count: Number(p.count) || 0 });
     }
   }
-  // score 降順 → 同点は発言数降順 → key で deterministic に。上位 max 人を採用(相対評価)。
+  // score 降順 → 同点は発言数降順 → key で deterministic に(相対評価)。
   scored.sort((a, b) => {
     if (b.score !== a.score) return b.score - a.score;
     if (b.count !== a.count) return b.count - a.count;
     return a.key < b.key ? -1 : a.key > b.key ? 1 : 0;
   });
-  return new Set(scored.slice(0, max).map((s) => s.key));
+  return scored;
+}
+
+/** 席に付ける「応援者ランキング」順位バッジの既定上限(上位 topN 位まで=🥇🥈🥉)。 */
+export const VENUE_TOP_RANK_MAX = 3;
+
+/** ひな壇上部「応援者トップNバー」に大きく並べる既定人数(密集会場でも上位が一目で分かる)。 */
+export const VENUE_TOP_SUPPORTERS_BAR = 8;
+
+/**
+ * 会場参加者のうち「応援者ランキング上位 topN 位」を key→順位(1始まり)で返す純関数。
+ *
+ * 会議 2026-07-01(venue-grid-diag)の結論=独立グリッドバーは冗長なので、まず席タイル本体に
+ * 順位バッジを重ねて上位貢献者を可視化する。光らせ演出(selectVenueVipRegularKeys)とは
+ * 別軸で、スコア源(rankVenueContributors)だけを共有して drift を避ける。
+ *
+ * @param {ReturnType<typeof collectVenueParticipants>} participants
+ * @param {{ topN?: number, minScore?: number, commentCap?: number, giftPointsCap?: number }} [opts]
+ * @returns {Map<string, number>} key → 順位(1..topN)
+ */
+export function selectVenueTopRankKeys(participants, opts = {}) {
+  const topN =
+    Number.isFinite(opts.topN) && opts.topN > 0
+      ? Math.floor(opts.topN)
+      : VENUE_TOP_RANK_MAX;
+  const ranked = rankVenueContributors(participants, opts);
+  const out = new Map();
+  for (let i = 0; i < ranked.length && i < topN; i += 1) {
+    out.set(ranked[i].key, i + 1);
+  }
+  return out;
 }
 
 /**
@@ -606,10 +651,13 @@ export function collectAudienceFaceUserIds(rows, opts = {}) {
  *   vipRegularThreshold?: number,
  *   vipRegularMax?: number,
  *   vipRegularCommentCap?: number,
- *   vipRegularGiftPointsCap?: number
+ *   vipRegularGiftPointsCap?: number,
+ *   topRank?: number,
+ *   topSupporters?: number
  * }} [opts]
  * @returns {{
- *   seats: Array<{ seatIndex: number, isFrontRow: boolean, isVipRegular: boolean, participant: ReturnType<typeof collectVenueParticipants>[number] }>,
+ *   seats: Array<{ seatIndex: number, isFrontRow: boolean, isVipRegular: boolean, venueRank: number, participant: ReturnType<typeof collectVenueParticipants>[number] }>,
+ *   topSupporters: Array<{ rank: number, score: number, participant: ReturnType<typeof collectVenueParticipants>[number] }>,
  *   seatByKey: Map<string, number>,
  *   participantCount: number,
  *   anonymousCount: number,
@@ -640,12 +688,43 @@ export function buildVenueSeating(rows, opts = {}) {
           commentCap: opts.vipRegularCommentCap,
           giftPointsCap: opts.vipRegularGiftPointsCap
         });
+  // 応援者ランキング上位 topRank 位に順位(1始まり)を付ける(席タイルの順位バッジ用)。
+  //   topRank<=0 で無効化(後方互換=既定は付ける)。スコア源は光らせ判定と共有(drift 回避)。
+  const topRankN =
+    Number.isFinite(opts.topRank) ? Math.floor(opts.topRank) : VENUE_TOP_RANK_MAX;
+  const rankByKey =
+    topRankN > 0
+      ? selectVenueTopRankKeys(participants, {
+          topN: topRankN,
+          commentCap: opts.vipRegularCommentCap,
+          giftPointsCap: opts.vipRegularGiftPointsCap
+        })
+      : new Map();
+  // 「応援者トップNバー」用に、貢献度スコア降順の participant を topSupporters 件だけ返す。
+  //   スコア源は席の順位バッジ(rankByKey)と共有(rankVenueContributors)=drift しない。
+  //   topSupporters<=0 で無効(既定は出す)。匿名も含む(会場の「全員主役」を壊さない)。
+  const topSupportersN =
+    Number.isFinite(opts.topSupporters) ? Math.floor(opts.topSupporters) : VENUE_TOP_SUPPORTERS_BAR;
+  /** @type {Array<{ rank: number, score: number, participant: any }>} */
+  let topSupporters = [];
+  if (topSupportersN > 0) {
+    const byKey = new Map(participants.map((p) => [p.key, p]));
+    topSupporters = rankVenueContributors(participants, {
+      commentCap: opts.vipRegularCommentCap,
+      giftPointsCap: opts.vipRegularGiftPointsCap
+    })
+      .slice(0, topSupportersN)
+      .map((r, idx) => ({ rank: idx + 1, participant: byKey.get(r.key), score: r.score }))
+      .filter((x) => x.participant);
+  }
   return {
     seats: seats.map((s) => ({
       ...s,
       isFrontRow: s.seatIndex < frontRow,
-      isVipRegular: vipRegularKeys.has(s.participant.key)
+      isVipRegular: vipRegularKeys.has(s.participant.key),
+      venueRank: rankByKey.get(s.participant.key) || 0
     })),
+    topSupporters,
     seatByKey,
     participantCount: participants.length,
     anonymousCount: countAnonymousParticipants(rows, opts.isGenericName, promoteUserIds),

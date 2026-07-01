@@ -17,6 +17,8 @@ graph LR
   n_status --> n_src_lib_aiShareFullText_js["lib/aiShareFullText.js"]
   n_status --> n_src_lib_aiSharePopupDiagKey_js["lib/aiSharePopupDiagKey.js"]:::shared
   n_status --> n_src_lib_anonymousIdenticon_js["lib/anonymousIdenticon.js"]:::shared
+  n_status --> n_src_lib_autoPublishDecision_js["lib/autoPublishDecision.js"]
+  n_status --> n_src_lib_avatarLoadReport_js["lib/avatarLoadReport.js"]
   n_status --> n_src_lib_avatarPartsComposer_js["lib/avatarPartsComposer.js"]:::shared
   n_status --> n_src_lib_backfillRemoveRecommendedLivePollution_js["lib/backfillRemoveRecommendedLivePollution.js"]:::shared
   n_status --> n_src_lib_backfillRinkuNarration_js["lib/backfillRinkuNarration.js"]:::shared
@@ -27,6 +29,7 @@ graph LR
   n_status --> n_src_lib_chikuranHeaderDom_js["lib/chikuranHeaderDom.js"]
   n_status --> n_src_lib_commentCountProvenance_js["lib/commentCountProvenance.js"]
   n_status --> n_src_lib_commentSummary_js["lib/commentSummary.js"]:::shared
+  n_status --> n_src_lib_commentTimelineMirror_js["lib/commentTimelineMirror.js"]:::shared
   n_status --> n_src_lib_commentTimelineMirrorKey_js["lib/commentTimelineMirrorKey.js"]:::shared
   n_status --> n_src_lib_commentTimelineReport_js["lib/commentTimelineReport.js"]
   n_status --> n_src_lib_completenessScore_js["lib/completenessScore.js"]
@@ -50,10 +53,7 @@ graph LR
   n_status --> n_src_lib_nicoUserPage_js["lib/nicoUserPage.js"]:::shared
   n_status --> n_src_lib_northStarMirror_js["lib/northStarMirror.js"]:::shared
   n_status --> n_src_lib_northStarMirrorKey_js["lib/northStarMirrorKey.js"]:::shared
-  n_status --> n_src_lib_numberConsistency_js["lib/numberConsistency.js"]
-  n_status --> n_src_lib_panelLiveSummary_js["lib/panelLiveSummary.js"]:::shared
-  n_status --> n_src_lib_parityVerdict_js["lib/parityVerdict.js"]
   classDef shared fill:#eee,stroke:#999,color:#666;
 ```
 
-> ほか 39 ファイル省略（全件は storage-bus.md / metafile 参照）。
+> ほか 43 ファイル省略（全件は storage-bus.md / metafile 参照）。

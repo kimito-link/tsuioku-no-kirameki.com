@@ -51,13 +51,52 @@ person-tile 統一(council/person-tile-unify-SYNTHESIS.md)は**完了済み**:
 6. **max-lines**: popup-entry.js は max-lines ラチェット上限ギリギリ(v1028 で 21629)。会場は venueBar.js だが、
    純関数は src/lib に切り出してテストする(popup-entry を太らせない・[[extension-reflected-only-after-copy-ext]])。
 
-## 4. 段階導入(推奨)
-- Phase 1: このドキュメントで現状把握(コード不変)。
-- Phase 2(グリッド・2-3コミット): venueUserThumbGrid.js(新・userThumbGrid を venue 向けに cap+増分)、venueBar に
-  グリッドバー配線(Option A)、実機で高さ安定・揺れなしを確認。
-- Phase 3(診断・1コミット): venueAvatarDiagLine.js(新・storyAvatarDiagLine 流儀の venue 版)、会場バーに折りたたみ配線、
-  計器テスト verify:cc 緑。
-- Phase 4(統合・退化確認): memory に完了 handoff、実機で「重い配信でも揺れない・遅延なし・人数増でも重くならない」を確認。
+## 4. 段階導入(進捗)
+- Phase 1: 現状把握(コード不変) — 完了。
+- ⭐ **会議 2026-07-01(council/venue-grid-diag-SYNTHESIS.md)で Phase 2 を上書き**: 独立グリッドバー(Option A)は
+  「席=既に全員が座っている」ので二重表示で冗長・高さ振動リスク増、と critic/fast が指摘。**まず席タイルに
+  上位N人の強調を入れ、独立バーは"席で埋もれる"と実機で分かってから**(検証ファースト・過剰実装回避)に方針変更。
+- Phase 2a(席の順位バッジ)— **完了 v0.1.1029(commit 3233c3cd, branch feat/venue-rank-badge)**。
+  - ⭐ **非自明な発見**: 会場は既に貢献度スコア上位8人を金色オーラ(nlsb-seat-regular)で強調済みだった
+    (venueSeats.js selectVenueVipRegularKeys=内部でスコア順ソート済みなのに Set で順序を捨てていた)。
+    = 新規グリッド実装は不要で「順位の可視化」だけが欠けていた。venueUserThumbGrid.js は作らなかった。
+  - やったこと: venueSeats.js に rankVenueContributors(順位の正本)を切り出し、光らせ判定と順位が同一スコア源を
+    共有(drift 無)。selectVenueTopRankKeys + buildVenueSeating の seat.venueRank。venueBar は data-venue-rank →
+    CSS ::after で🥇🥈🥉を席右上に絶対配置(高さ不変=v1026 振動を踏まない)。
+  - ⭐ **ユーザー指示**: ピカピカ光る演出は不要 → 金色オーラ(nlsb-seat-regular glow)は廃止(vipRegular:false)。
+    順位バッジのみで上位を示す。
+- Phase 2b(独立グリッドバー)— **完了 v0.1.1031(commit e6759612)として実装**。実機868人で席の🥇🥈🥉が
+  小さすぎて見えず「会場が変わってない」評価→ひな壇上部に「応援者トップN」固定高バー(顔を大きく並べる)で可視性回復。
+  - ⭐ **重要な会議(council/venue-role-separation-SYNTHESIS.md・5体ほぼ完全一致)**: ユーザーが「popup のアイコン列・
+    グリッド・診断をそのまま会場へ運ぶのは大丈夫か」「星野ロミ記事(作る人/見せる人を分ける)の思想は入っているか」を問うた。
+    答え=(Q1)**そのまま運ばない(C案)**。popup=匿名除外・数値ID+サムネ揃いだけ上段/会場=匿名も全員主役 で思想衝突。
+    (Q2)分離は**半分だけ**達成(診断の鏡 venueSeatsDiag と"レーン正本を映す"経路は分離済み・順位/アバター率は見せる側計算)。
+    **完全分離は過剰**(会場はリアルタイム描画ループ)。目指すのは「計算1回→sig→貼る」の役割分担。可視性は分離と別問題。
+  - やったこと: venueSeats.js buildVenueSeating が topSupporters(スコア降順・順位付き・匿名含む・rankVenueContributors
+    共有=drift なし)を返す。venueBar に .nlsb-topbar(固定高72px・grid 行・上位3は🥇🥈🥉+金銀銅縁・静的)。sig 無変化 skip・
+    一度出したら空で畳まない(高さ振動対策)。席タイル生成を buildVenuePersonTile 共通ヘルパに切り出し席とバーで同じ描画
+    (匿名の顔崩れ=地雷#3 を構造的に防止)。テスト+3。
+  - ⛔ **フェーズ1(renderSeats 全体の sig スキップ)は v0.1.1032 で一度実装→実機でちらつき再現→撤回(revert 2c9eb89c)**。
+    ⭐⭐ **地雷(繰り返し禁止)**: renderSeats に「入力 sig が前回と同一なら丸ごと早期 return」を足したら、**popup のアイコン列
+    (watch 埋め込み・embed_watch)がちらつく**回帰が実機で出た。実機bisectで v1029/1030/1031 は無問題・v1032 だけ再現と確定。
+    機序は diff 精読でも未特定(私の変更は会場のみ・popup lane のコードは呼ばない・CSS も .nlsb スコープ内・共有 lib 無傷 なのに
+    ちらつく=venueBar と popup lane が同じ content-entry バンドル/同フレームに同居することによる何らかの干渉と推測)。
+    軽量化の効果自体も実機未確認だった。→ **効果未確認×確実な退化=割に合わないので丸ごと撤回**。
+    再挑戦するなら必ず**実機 console でちらつきの機序(どの再描画/rAF/レイアウトが乱れるか)を先に特定**してから。
+    盲目的な「sig スキップで軽くする」は禁止。会議も「完全分離は過剰・退化リスク」と釘を刺していた(SYNTHESIS 参照)。
+- Phase 3(診断)— **完了 v0.1.1030(commit 7a77c862, branch feat/venue-rank-badge)**。
+  - 会議 council/venue-diag-SYNTHESIS.md に収束: 席の【外】の overlay(既存 .nlsb-roster-panel 流用)・既定畳む・🩺ボタンで開く。
+    sig は件数のみ(capturedAt 抜き)。storyAvatarDiagLine は popup 別 typedef で型不整合=流用不可→新規 venueAvatarDiagLine.js。
+  - やったこと: src/lib/venueAvatarDiagLine.js(computeVenueParticipantAvatarCounts=サムネ判定は席描画と同じ
+    participantHasEffectiveThumbnail で drift なし / venueDiagSig=件数のみ / buildVenueDiagHtml=PIIなし件数)。
+    venueBar に🩺状態ボタン + overlay パネル。開いてる時だけ sig 無変化なら DOM 触らず(hot path 無汚染)。
+    新 storage キー増やさず既存 KEY_VENUE_SEATS_DIAG 相乗り。テスト12件。
+  - ⭐ **レビューで見つけた drift(修正済)**: lead は participantCount(全参加者・上限なし)、faceLine は total
+    (=seats.length・上限 VENUE_FULLSCREEN_MAX_SEATS=500)で母集団が違う。500人超配信で「N人参加なのに応援は500人だけ?」と
+    矛盾表示になる。→ faceLine を「席にご案内できた N 人のうち…」と席ベース明示に変更し母集団を分離。再発防止テスト追加。
+- Phase 4(統合・退化確認)— **完了**: verify:cc 全緑・code-reviewer 独立レビュー済(高さ振動/hot path/drift/capturedAt/
+  TDZ/リスナー対 すべて OK、drift 1件のみ指摘→修正)。残る実機確認は「500人超配信で🩺の lead と faceLine が
+  矛盾して見えないか」だけ(静的には安全)。**Phase 2b(独立バー)のみ実機判断待ちで棚上げ**。
 
 ## 5. 参照資料(実在確認済み)
 - council/person-tile-unify-SYNTHESIS.md: 人物タイル正本化・段階導入(第3コミットで venue 席組込み完了・グリッド/診断は未)。
