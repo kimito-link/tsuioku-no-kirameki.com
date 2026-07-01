@@ -398,6 +398,7 @@ import {
   restoreCommentTimelineRows
 } from '../lib/commentTimelineMirror.js';
 import { KEY_COMMENT_TIMELINE_MIRROR } from '../lib/commentTimelineMirrorKey.js';
+import { createCommentMirrorPublishGate } from '../lib/commentMirrorPublishGate.js';
 import { buildUserProfileLinkedLabelHtml } from '../lib/userProfileLinkHtml.js';
 import { buildEventRankingSectionHtml } from '../lib/eventRankingSectionHtml.js';
 import { buildReportNextMemoSectionHtml } from '../lib/reportNextMemoSectionHtml.js';
@@ -5698,24 +5699,20 @@ function publishStatCardsMirror(input) {
   }
 }
 
-/** コメントタイムライン鏡の publish min-gap 計時。 */
-let _commentTimelineMirrorLastWriteAt = 0;
+/** v0.1.1018: liveId検証・provisionalガード(暫定30件で全件鏡を潰さない)・min-gap を1個で判定する gate。 */
+const _commentMirrorGate = createCommentMirrorPublishGate();
 /**
- * コメントタイムライン鏡(最新N件)を status→純Web 用に publish する(第2段=純Webでコメントが進む)。
- *   publishStatCardsMirror と同型: 受動ビュー(INLINE_PASSIVE)では書かない・3秒 min-gap・best-effort・描画不変。
- *   popup が既に手元に持つ comments 配列(displayEntries)から最新N件を間引くだけ=重い計算ゼロ・名寄せ/fetch しない。
- * @param {{ liveId: string, comments: any[] }} input
+ * コメント鏡を status→純Web 用に publish。INLINE_PASSIVE は書かない・3秒間引き。
+ * @param {{ liveId: string, comments: any[], provisional?: boolean }} input
  */
 function publishCommentTimelineMirror(input) {
-  if (INLINE_PASSIVE) return; // 受動ビュー: コメント鏡を上書きしない(本物 popup の鏡と競合させない)
+  if (INLINE_PASSIVE) return; // 受動: 本物 popup の鏡と競合させない
   try {
     const now = Date.now();
-    if (now - _commentTimelineMirrorLastWriteAt < 3000) return; // 3秒 min-gap。
-    _commentTimelineMirrorLastWriteAt = now;
     const src = input && typeof input === 'object' ? input : {};
     const lid = String(src.liveId || '').trim().toLowerCase();
     const comments = Array.isArray(src.comments) ? src.comments : [];
-    if (!/^lv\d{1,15}$/.test(lid) || !comments.length) return;
+    if (!_commentMirrorGate.decide({ liveId: lid, hasComments: comments.length > 0, provisional: src.provisional === true, nowMs: now })) return;
     const snap = buildCommentTimelineMirrorSnapshot({
       liveId: lid,
       comments,
@@ -14293,8 +14290,8 @@ async function refresh() {
     });
     void updateIngestHeartbeatDisplay(lv);
     renderCommentTicker(/** @type {PopupCommentEntry[]} */ (displayEntries));
-    // 第2段: 純Webで「コメントが進む」ため、いま手元の displayEntries を鏡として publish(受動では書かない・3秒間引き)。
-    publishCommentTimelineMirror({ liveId: lv, comments: displayEntries });
+    // 純Webで「コメントが進む」ため鏡に publish。v0.1.1018: 多タブ飽和のサマリ30件は provisional で全件鏡を潰さない。
+    publishCommentTimelineMirror({ liveId: lv, comments: displayEntries, provisional: commentReadState === 'summary' });
     exportBtn.disabled = false;
     exportBtn.dataset.liveId = lv;
     exportBtn.dataset.storageKey = key;
