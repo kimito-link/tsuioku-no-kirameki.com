@@ -65,10 +65,20 @@ person-tile 統一(council/person-tile-unify-SYNTHESIS.md)は**完了済み**:
     CSS ::after で🥇🥈🥉を席右上に絶対配置(高さ不変=v1026 振動を踏まない)。
   - ⭐ **ユーザー指示**: ピカピカ光る演出は不要 → 金色オーラ(nlsb-seat-regular glow)は廃止(vipRegular:false)。
     順位バッジのみで上位を示す。
-- Phase 2b(独立グリッドバー・条件付き): 2a を実機で見て「上位が席で埋もれる」なら追加。埋もれないなら不要(過剰実装回避)。
-- Phase 3(診断・未着手): venueAvatarDiagLine.js(新・storyAvatarDiagLine 流儀の venue 版=席数/参加者総数/超過eviction/
-  吹き出し・読み上げ・ギフト状態を venueSeats 参照で件数のみ)、会場バー下部の折りたたみ「🩺 会場の状態」、verify:cc 緑。
-- Phase 4(統合・退化確認): 実機で「重い配信でも揺れない・遅延なし・人数増でも重くならない」を確認。
+- Phase 2b(独立グリッドバー・条件付き): 2a を実機で見て「上位が席で埋もれる」なら追加。埋もれないなら不要(過剰実装回避)。**未着手=実機判断待ち**。
+- Phase 3(診断)— **完了 v0.1.1030(commit 7a77c862, branch feat/venue-rank-badge)**。
+  - 会議 council/venue-diag-SYNTHESIS.md に収束: 席の【外】の overlay(既存 .nlsb-roster-panel 流用)・既定畳む・🩺ボタンで開く。
+    sig は件数のみ(capturedAt 抜き)。storyAvatarDiagLine は popup 別 typedef で型不整合=流用不可→新規 venueAvatarDiagLine.js。
+  - やったこと: src/lib/venueAvatarDiagLine.js(computeVenueParticipantAvatarCounts=サムネ判定は席描画と同じ
+    participantHasEffectiveThumbnail で drift なし / venueDiagSig=件数のみ / buildVenueDiagHtml=PIIなし件数)。
+    venueBar に🩺状態ボタン + overlay パネル。開いてる時だけ sig 無変化なら DOM 触らず(hot path 無汚染)。
+    新 storage キー増やさず既存 KEY_VENUE_SEATS_DIAG 相乗り。テスト12件。
+  - ⭐ **レビューで見つけた drift(修正済)**: lead は participantCount(全参加者・上限なし)、faceLine は total
+    (=seats.length・上限 VENUE_FULLSCREEN_MAX_SEATS=500)で母集団が違う。500人超配信で「N人参加なのに応援は500人だけ?」と
+    矛盾表示になる。→ faceLine を「席にご案内できた N 人のうち…」と席ベース明示に変更し母集団を分離。再発防止テスト追加。
+- Phase 4(統合・退化確認)— **完了**: verify:cc 全緑・code-reviewer 独立レビュー済(高さ振動/hot path/drift/capturedAt/
+  TDZ/リスナー対 すべて OK、drift 1件のみ指摘→修正)。残る実機確認は「500人超配信で🩺の lead と faceLine が
+  矛盾して見えないか」だけ(静的には安全)。**Phase 2b(独立バー)のみ実機判断待ちで棚上げ**。
 
 ## 5. 参照資料(実在確認済み)
 - council/person-tile-unify-SYNTHESIS.md: 人物タイル正本化・段階導入(第3コミットで venue 席組込み完了・グリッド/診断は未)。
