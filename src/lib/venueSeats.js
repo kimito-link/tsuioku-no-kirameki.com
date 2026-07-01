@@ -345,6 +345,55 @@ export const VENUE_TOP_RANK_MAX = 3;
 export const VENUE_TOP_SUPPORTERS_BAR = 8;
 
 /**
+ * 会場の再描画スキップ判定用シグネチャ(純関数・O(n) 一発)。
+ *
+ * 2026-07-01 会議(venue-role-separation フェーズ1 = hot path 防御):
+ *   renderSeats は commit/poll のたびに buildVenueSeating(集約+順位+席割り)を走らせる。
+ *   入力(rows)も付随状態(発言ストリーク・昇格 userId 集合)も前回と同じなら、描画結果は同一なので
+ *   丸ごとスキップしてよい。ここはその「同一判定キー」を安く作る純関数。
+ *
+ *   何を入れるか(=これが変わったら再描画すべきもの):
+ *     - 各行の userId|count|gift|avatar 有無(席割り/順位/サムネ優遇が変わる素)
+ *     - streakSig(発言ストリークの段階。decay で席のグローが消えるので入れる)
+ *     - spokenCount(昇格 userId 集合の増減。匿名が席に昇格する)
+ *   何を入れないか: capturedAt など時刻(v0.1.1022 明滅の教訓=時刻で再描画しない)。
+ *
+ * ★フィールドは collectVenueParticipants が実際に読む素と一致させること(2026-07-01 レビュー指摘):
+ *   会場 rows(venueRowsFromUserLaneCandidates / rosterToVenueRows)は count/isGift ではなく
+ *   preCount / preHasGift / preGiftCount を持つ。sig がこれを見ないと、コメント数やギフトが増えても
+ *   sig 不変=スキップ=順位バッジ/トップNバーが古いまま(stale)になる。collectVenueParticipants の
+ *   preCount(:140)・preHasGift(:141)・preGiftCount(:142)と素を揃える。
+ *
+ * @param {ReadonlyArray<{ userId?: string, lvId?: string, name?: string, avatar?: string, count?: number, preCount?: number, isGift?: boolean, preHasGift?: boolean, giftPoints?: number, preGiftCount?: number }>} rows
+ * @param {{ streakSig?: string, spokenCount?: number }} [state]
+ * @returns {string}
+ */
+export function venueSeatsInputSig(rows, state = {}) {
+  const list = Array.isArray(rows) ? rows : [];
+  const parts = new Array(list.length);
+  for (let i = 0; i < list.length; i += 1) {
+    const r = list[i] || {};
+    const uid = String(r.userId || '').trim();
+    const name = uid ? '' : String(r.name || '').trim(); // uid 無しは名前でキー化(collectVenueParticipants と同じ素)
+    // 発言数: 集約経路は preCount、生コメント経路は行=1(count があれば使う)。どちらでも実数を拾う。
+    const cnt = Number.isFinite(Number(r.preCount))
+      ? Math.max(0, Math.floor(Number(r.preCount)))
+      : Math.max(0, Math.floor(Number(r.count) || 0));
+    // ギフト: preHasGift/preGiftCount(集約)と isGift/giftPoints(生)の両方を見る=rank スコア(+0.30)に効く。
+    const giftCount = Math.max(0, Math.floor(Number(r.preGiftCount) || 0));
+    const gift =
+      r.preHasGift === true || r.isGift === true || giftCount > 0 || (Number(r.giftPoints) || 0) > 0
+        ? `g${giftCount}`
+        : '';
+    const av = /^https?:\/\//i.test(String(r.avatar || '').trim()) ? 'a' : '';
+    parts[i] = `${uid || 'n:' + name}#${cnt}${gift}${av}`;
+  }
+  const streakSig = String(state.streakSig || '');
+  const spoken = Math.max(0, Math.floor(Number(state.spokenCount) || 0));
+  return `${list.length}|${parts.join(',')}|s:${streakSig}|p:${spoken}`;
+}
+
+/**
  * 会場参加者のうち「応援者ランキング上位 topN 位」を key→順位(1始まり)で返す純関数。
  *
  * 会議 2026-07-01(venue-grid-diag)の結論=独立グリッドバーは冗長なので、まず席タイル本体に
