@@ -76,8 +76,14 @@ person-tile 統一(council/person-tile-unify-SYNTHESIS.md)は**完了済み**:
     共有=drift なし)を返す。venueBar に .nlsb-topbar(固定高72px・grid 行・上位3は🥇🥈🥉+金銀銅縁・静的)。sig 無変化 skip・
     一度出したら空で畳まない(高さ振動対策)。席タイル生成を buildVenuePersonTile 共通ヘルパに切り出し席とバーで同じ描画
     (匿名の顔崩れ=地雷#3 を構造的に防止)。テスト+3。
-  - ⭐ **未着手(会議の残タスク)**: フェーズ1(hot path 防御=renderSeats 全体に sig スキップを広げる)は未実装。
-    今は診断/トップバー個別に sig を持つのみ。renderSeats 本体の毎フレーム集計はまだ。実機で重ければ着手。
+  - ⛔ **フェーズ1(renderSeats 全体の sig スキップ)は v0.1.1032 で一度実装→実機でちらつき再現→撤回(revert 2c9eb89c)**。
+    ⭐⭐ **地雷(繰り返し禁止)**: renderSeats に「入力 sig が前回と同一なら丸ごと早期 return」を足したら、**popup のアイコン列
+    (watch 埋め込み・embed_watch)がちらつく**回帰が実機で出た。実機bisectで v1029/1030/1031 は無問題・v1032 だけ再現と確定。
+    機序は diff 精読でも未特定(私の変更は会場のみ・popup lane のコードは呼ばない・CSS も .nlsb スコープ内・共有 lib 無傷 なのに
+    ちらつく=venueBar と popup lane が同じ content-entry バンドル/同フレームに同居することによる何らかの干渉と推測)。
+    軽量化の効果自体も実機未確認だった。→ **効果未確認×確実な退化=割に合わないので丸ごと撤回**。
+    再挑戦するなら必ず**実機 console でちらつきの機序(どの再描画/rAF/レイアウトが乱れるか)を先に特定**してから。
+    盲目的な「sig スキップで軽くする」は禁止。会議も「完全分離は過剰・退化リスク」と釘を刺していた(SYNTHESIS 参照)。
 - Phase 3(診断)— **完了 v0.1.1030(commit 7a77c862, branch feat/venue-rank-badge)**。
   - 会議 council/venue-diag-SYNTHESIS.md に収束: 席の【外】の overlay(既存 .nlsb-roster-panel 流用)・既定畳む・🩺ボタンで開く。
     sig は件数のみ(capturedAt 抜き)。storyAvatarDiagLine は popup 別 typedef で型不整合=流用不可→新規 venueAvatarDiagLine.js。
