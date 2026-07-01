@@ -34,6 +34,8 @@ import { buildStatusActions } from '../lib/statusActionAdvisor.js';
 //   =新規 storage read ゼロ。致命は症状カードにも昇格する。
 // AI共有(状態速報)本文ビルダーを lib に切り出し(②応援ライブビュー/③WEB で再利用)。挙動同値。
 import { buildAiShareFullText } from '../lib/aiShareFullText.js';
+// v0.1.1016: ③WEB が古くなる前に自動で再 publish すべきかの判定(手動ボタンの往復を無くす)。
+import { shouldAutoPublish } from '../lib/autoPublishDecision.js';
 // 直近の公開送信(POST)結果を globalThis に集計(read を増やさない)→送信時の記録に使う。
 import {
   recordLiveviewPublishOutcome
@@ -43,7 +45,8 @@ import {
 //   誤報になっていた。storage に1件記録すれば、どのページで送っても status が読める。
 import {
   KEY_LIVEVIEW_PUBLISH_OUTCOME,
-  buildLiveviewPublishOutcomeRecord
+  buildLiveviewPublishOutcomeRecord,
+  summarizeLiveviewPublishOutcomeRecord
 } from '../lib/liveviewPublishOutcomeKey.js';
 import { KEY_PREVIEW_RENDER_ACK } from '../lib/previewRenderAckKey.js';
 import { buildHealthCells, summarizeHealthVerdict } from '../lib/healthCells.js';
@@ -1144,10 +1147,51 @@ function renderAll({ lvList, summaries, fastDiag, popupDiag, backfillProgress, v
   //   公開ペイロード(jsonBlob)+共有キーを storage へ置く。live-view ページは別ページで jsonBlob を
   //   持たないため、再構築せず【これを読んで POST するだけ】=status が送るものと byte 一致(drift ゼロ)。
   publishLiveViewPublishPayload(_lastRenderedBundle.jsonBlob);
+
+  // v0.1.1016: ③WEB を古くする前に自動で再 publish(手動ボタンの往復を無くす)。
+  //   ①POP・②応援プレビューは鏡が数秒ごとに新鮮化されるのに ③WEB だけ手押しで、押し忘れると常に 🟡 保留に
+  //   なる。配信中(watch有)で最新 jsonBlob が組めているこの拍子に、古くなりかけたら1回だけ POST して 🟢 を保つ。
+  //   判定は純関数 shouldAutoPublish(誤発射しない・無駄打ちしない)。実 POST は既存の uploadStatusSnapshot を再利用。
+  maybeAutoPublishStatusSnapshot(livesData, publishOutcomeRec);
+}
+
+/**
+ * v0.1.1016: 自動 publish の一手。判定(shouldAutoPublish)に通れば uploadStatusSnapshot を fire-and-forget で1回呼ぶ。
+ *   - watch 有・キー有・payload 有・非送信中で、前回送信から一定時間経過(or 未送信)のときだけ送る。
+ *   - 送信結果は uploadStatusSnapshot 内で globalThis+storage に記録される=次回の判定材料になる。
+ *   - best-effort: 失敗しても status を止めない(次の描画ループで再試行される)。
+ * @param {any[]} livesData
+ * @param {{ at?: number }|null|undefined} publishOutcomeRec
+ */
+function maybeAutoPublishStatusSnapshot(livesData, publishOutcomeRec) {
+  try {
+    const { ingestKey, viewToken } = getUploadConfig();
+    const hasWatchTab = Array.isArray(livesData) && livesData.some((l) => l && l.recording);
+    const outcome = summarizeLiveviewPublishOutcomeRecord(publishOutcomeRec || null, Date.now());
+    const decision = shouldAutoPublish({
+      hasKeys: Boolean(ingestKey && viewToken),
+      hasPayload: Boolean(_lastRenderedBundle?.jsonBlob),
+      hasWatchTab,
+      inFlight: _autoPublishInFlight,
+      everSent: outcome.everSent,
+      lastSentAtMs: publishOutcomeRec && Number(publishOutcomeRec.at) > 0 ? Number(publishOutcomeRec.at) : 0,
+      nowMs: Date.now()
+    });
+    if (!decision.publish) return;
+    _autoPublishInFlight = true;
+    void uploadStatusSnapshot().finally(() => {
+      _autoPublishInFlight = false;
+    });
+  } catch {
+    _autoPublishInFlight = false;
+    /* best-effort: 自動 publish の失敗は status を止めない */
+  }
 }
 
 /** 公開ペイロード書き込みの min-gap 計時(描画のたびに書くが頻度を抑える)。 */
 let _liveViewPublishPayloadLastWriteAt = 0;
+/** v0.1.1016: 自動 publish の多重送信防止フラグ(同時に2本 POST しない)。 */
+let _autoPublishInFlight = false;
 /**
  * 応援ライブビュー(拡張内)から WEB 公開できるよう、最新の jsonBlob + 共有キーを storage へ置く。
  *   best-effort(失敗しても status を止めない)・3秒 min-gap。キー未設定ビルドでは置かない。
