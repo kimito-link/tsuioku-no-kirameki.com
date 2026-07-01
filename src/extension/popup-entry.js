@@ -5277,6 +5277,8 @@ function renderStoryUserLane() {
     recordStoryUserLaneStep(_storyUserLaneRenderProbe, STORY_USER_LANE_STEPS.DONE, {
       domTilesPainted: countStoryUserLaneDomTiles(els)
     });
+    // v0.1.1021: re-render skip でも描画済みなら幕を畳む(独立tick高頻度の sig 一致で幕畳みに到達せず残るのを根治)。
+    if (countStoryUserLaneDomTiles(els) > 0) { try { dismissInitialLoadShade(); } catch { /* no-op */ } }
     return;
   }
   storyUserLaneLastRenderSig = laneSig;
