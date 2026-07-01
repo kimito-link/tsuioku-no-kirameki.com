@@ -198,6 +198,7 @@ import {
   KEY_COMMENTER_FOLLOW_CACHE,
   KEY_COMMENTER_FOLLOWING_LIST_CACHE,
   KEY_SUPPORT_CELEBRATION_STATE,
+  KEY_TOP_SUPPORTERS_MIRROR,
   broadcasterProfileStorageKey,
   commenterFollowLiveStorageKey
 } from '../lib/storageKeys.js';
@@ -542,6 +543,7 @@ import { topSupportRankLineModels } from '../lib/topSupportRankStripLines.js';
 // v0.1.881: 応援帯/公式値レーンの描画本体を共有 lib に抽出(live-view と完全コピー共有)。popup は
 //   本物のローカル依存(guard/identicon/北極星DOM同期/待機UI teardown)を opts で渡す薄いラッパに。
 import { renderTopSupportRankStripInto } from '../lib/paintTopSupportRankStyleIntoElement.js';
+import { buildTopSupportersMirrorCells, topSupportersMirrorSig } from '../lib/topSupportersMirror.js';
 import { TOP_SUPPORT_RANK_STRIP_MAX } from '../lib/topSupportRankStripConfig.js';
 import { topSupportRankStripStableKey } from '../lib/topSupportRankStripStableKey.js';
 import {
@@ -5654,6 +5656,37 @@ async function applyStatCardsMirrorForPassive() {
   } catch { /* no-op */ }
 }
 
+/** passive 応援者ランキング鏡描画の再描画 skip 用 sig(capturedAt は入れない=v0.1.1022の明滅根治)。 */
+let _topSupportersMirrorPassiveSig = '';
+/**
+ * v0.1.1024(②応援者ランキング空の根治): ②応援プレビューは refresh を走らせない(v0.1.1023)ため、応援者ランキング
+ *   (🥇🥈🥉)を①が焼いた鏡から描く。③WEB(app/live-view.js:paintSupporterRanking)と同じ本物 lib で描く。
+ */
+async function applyTopSupportersMirrorForPassive() {
+  if (!INLINE_PASSIVE || !hasExtensionContext()) return;
+  const strip = document.getElementById('topSupportRankStrip');
+  if (!(strip instanceof HTMLElement)) return;
+  let snap = null;
+  try {
+    const bag = await chrome.storage.local.get(KEY_TOP_SUPPORTERS_MIRROR);
+    snap = bag && bag[KEY_TOP_SUPPORTERS_MIRROR];
+  } catch { return; }
+  const rooms = snap && Array.isArray(snap.rooms) ? snap.rooms : [];
+  if (!rooms.length) return;
+  const sig = topSupportersMirrorSig(snap);
+  if (sig === _topSupportersMirrorPassiveSig) return;
+  _topSupportersMirrorPassiveSig = sig;
+  try {
+    renderTopSupportRankStripInto(strip, rooms, {
+      noteText: '記録した応援コメントをユーザー別に数えた件数の多い順',
+      unitSuffix: '件',
+      ariaLabel: '記録した応援コメントをユーザー別に数えた件数の多い順'
+    });
+    strip.hidden = false;
+    strip.removeAttribute('aria-hidden');
+  } catch { /* no-op */ }
+}
+
 /** 応援レーン診断の storage 書き込み(min-gap 3秒・best-effort=popup を止めない)。 */
 let _laneDiagLastWriteAt = 0;
 /** @param {{ liveId: string, identified: number, laneShown: number, limit: number }} obs */
@@ -5709,6 +5742,30 @@ function publishStatCardsMirror(input) {
     void chrome.storage.local.set({ [KEY_STAT_CARDS_MIRROR]: snap }).catch(() => {
       /* best-effort: storage 不可・context 消失 */
     });
+  } catch {
+    /* no-op */
+  }
+}
+
+/** 応援者ランキング鏡 publish の min-gap 計時。 */
+let _topSupportersMirrorLastWriteAt = 0;
+/**
+ * v0.1.1024: 応援者ランキング(🥇🥈🥉)の鏡を publish。①(watch popup)が描いた strip rooms を②が読んで
+ *   同じ本物 lib(renderTopSupportRankStripInto)で描く。INLINE_PASSIVE は書かない・3秒間引き・上位10件。
+ * @param {string} liveId
+ * @param {any[]} rooms strip rooms({userKey,nickname,count,avatarUrl})
+ */
+function publishTopSupportersMirror(liveId, rooms) {
+  if (INLINE_PASSIVE) return; // 受動ビュー: 鏡を上書きしない
+  try {
+    const now = Date.now();
+    if (now - _topSupportersMirrorLastWriteAt < 3000) return; // 3秒 min-gap。
+    const lid = String(liveId || '').trim().toLowerCase();
+    const arr = Array.isArray(rooms) ? rooms : [];
+    if (!/^lv\d{1,15}$/.test(lid) || !arr.length) return;
+    _topSupportersMirrorLastWriteAt = now;
+    const cells = buildTopSupportersMirrorCells(arr);
+    void chrome.storage.local.set({ [KEY_TOP_SUPPORTERS_MIRROR]: { liveId: lid, capturedAt: now, rooms: cells } }).catch(() => {});
   } catch {
     /* no-op */
   }
@@ -11415,6 +11472,9 @@ function renderUserRooms(entries, liveId = '', renderOpts = {}) {
   if (stripKey !== _lastTopSupportRankStripStableKey) {
     _lastTopSupportRankStripStableKey = stripKey;
     renderTopSupportRankStrip(stripSlice);
+    // v0.1.1024: ②応援プレビューは refresh を走らせない(v0.1.1023)ため、応援者ランキングを鏡から描く。
+    //   ①が描いた strip rooms を鏡に publish→②が読んで同じ本物 lib で描く(lane/northStar 鏡と同じ轍)。
+    publishTopSupportersMirror(liveId, stripSlice);
   }
   const visibleRooms = rankedRooms.slice(0, MAX_VISIBLE_ROOMS);
   const maxTotal = Math.max(1, ...visibleRooms.map((v) => v.count));
@@ -21472,6 +21532,8 @@ async function initPopup() {
       void applyCommentTimelineMirrorForPassive();
       // v0.1.965: 北極星レーン(貢献度/広告)も鏡から描く=星野ロミ型「見せる側は同じ鏡を読むだけ」を北極星にも適用。
       void applyNorthStarMirrorForPassive();
+      // v0.1.1024: 応援者ランキング(🥇🥈🥉)も鏡から描く(refresh 非依存の②で refresh 経由描画が空になっていたのを埋める)。
+      void applyTopSupportersMirrorForPassive();
     }, 250);
     try {
       chrome.storage.onChanged.addListener((changes, area) => {
@@ -21493,6 +21555,8 @@ async function initPopup() {
         }
         // v0.1.1019: 数字カード鏡が更新されたら②も鏡値に揃える=フルコピー(生panelの独自読みは廃止)。
         if (changedKeys.includes(KEY_STAT_CARDS_MIRROR)) void applyStatCardsMirrorForPassive();
+        // v0.1.1024: 応援者ランキング鏡が更新されたら②も鏡から描き直す。
+        if (changedKeys.includes(KEY_TOP_SUPPORTERS_MIRROR)) void applyTopSupportersMirrorForPassive();
       });
     } catch {
       /* onChanged 不可環境: 初回1回ぶんだけ反映(後退しない) */
