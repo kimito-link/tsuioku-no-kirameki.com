@@ -557,6 +557,7 @@ import { KEY_PREVIEW_RENDER_ACK, buildPreviewRenderAck } from '../lib/previewRen
 import { buildLaneMirrorSnapshot, restoreLaneMirrorBuckets } from '../lib/laneMirror.js';
 import { KEY_STAT_CARDS_MIRROR } from '../lib/statCardsMirrorKey.js';
 import { buildStatCardsMirrorSnapshot } from '../lib/statCardsMirror.js';
+import { createStatCardsMirrorPassivePainter } from '../lib/statCardsMirrorDom.js';
 // 北極星レーン鏡(公式値レーン)を status→純Web へ送るための publish(laneMirror/statCardsMirror と同じ轍)。
 import { KEY_NORTH_STAR_MIRROR } from '../lib/northStarMirrorKey.js';
 import {
@@ -5578,6 +5579,8 @@ async function applyCommentTimelineMirrorForPassive() {
 
 /** passive 北極星鏡描画の再描画 skip 用 signature。 */
 let _northStarMirrorPassiveSig = '';
+// v0.1.1019: passive 数字カード鏡のペインター(sig ガード込み・状態は lib 内)。
+const _statCardsMirrorPassivePaint = createStatCardsMirrorPassivePainter(typeof document !== 'undefined' ? document : { getElementById: () => null });
 /**
  * ★v0.1.965(council/single-source-of-truth-SYNTHESIS.md 第1段): 受動ビュー(応援プレビュー dock=liveview)で
  *   北極星レーン(貢献度ランキング/広告ランキング)を【鏡】(KEY_NORTH_STAR_MIRROR=本物 popup が watch タブで
@@ -5637,6 +5640,18 @@ async function applyNorthStarMirrorForPassive() {
       /* no-op */
     }
   }
+}
+
+/**
+ * v0.1.1019(フルコピー根治): ②応援プレビューの数字カード(記録/同接/来場)を①が焼いた statCardsMirror 鏡から描く
+ *   (従来は生 panel を①と別タイミングで読み ①150 vs ②129 とズレた)。③WEB と同じ paintStatCardsMirrorValues。
+ */
+async function applyStatCardsMirrorForPassive() {
+  if (!INLINE_PASSIVE || !hasExtensionContext()) return;
+  try {
+    const bag = await chrome.storage.local.get(KEY_STAT_CARDS_MIRROR);
+    _statCardsMirrorPassivePaint(bag && bag[KEY_STAT_CARDS_MIRROR]);
+  } catch { /* no-op */ }
 }
 
 /** 応援レーン診断の storage 書き込み(min-gap 3秒・best-effort=popup を止めない)。 */
@@ -21445,7 +21460,8 @@ async function initPopup() {
     //   (KEY_COMMENT_TIMELINE_MIRROR 鏡)を read だけして即描く。
     setTimeout(() => {
       if (!hasExtensionContext()) return;
-      void applyLightweightPanelSummaryCards();
+      // v0.1.1019: 数字カードは①が焼いた statCardsMirror 鏡から描く=①=②を同一値に(生panelの独自読みは廃止)。
+      void applyStatCardsMirrorForPassive();
       void applyLaneMirrorForPassive();
       // v0.1.962: heavy read を走らせない代わりにティッカーを鏡から描く(council/liveview-open-heavy 第1段)。
       void applyCommentTimelineMirrorForPassive();
@@ -21458,13 +21474,6 @@ async function initPopup() {
         if (typeof document !== 'undefined' && document.hidden) return; // 裏タブでは動かさない(競合/電池)
         const changedKeys = Object.keys(changes);
         // 表示中の配信(lv)の panel_summary / watch_snapshot 変化時だけ上段3カードを埋め直す(キー完全一致)。
-        const lid = String(watchPopupLastPaintedLiveId || '').trim().toLowerCase();
-        if (/^lv\d{1,15}$/.test(lid)) {
-          const watchKeys = [panelSummaryStorageKey(lid), watchSnapshotStorageKey(lid)];
-          if (changedKeys.some((k) => watchKeys.includes(k))) {
-            void applyLightweightPanelSummaryCards();
-          }
-        }
         // 応援レーン鏡(本物 popup が watch タブで publish)が更新されたら鏡から描き直す。
         if (changedKeys.includes(KEY_LANE_MIRROR)) {
           void applyLaneMirrorForPassive();
@@ -21477,6 +21486,8 @@ async function initPopup() {
         if (changedKeys.includes(KEY_NORTH_STAR_MIRROR)) {
           void applyNorthStarMirrorForPassive();
         }
+        // v0.1.1019: 数字カード鏡が更新されたら②も鏡値に揃える=フルコピー(生panelの独自読みは廃止)。
+        if (changedKeys.includes(KEY_STAT_CARDS_MIRROR)) void applyStatCardsMirrorForPassive();
       });
     } catch {
       /* onChanged 不可環境: 初回1回ぶんだけ反映(後退しない) */
