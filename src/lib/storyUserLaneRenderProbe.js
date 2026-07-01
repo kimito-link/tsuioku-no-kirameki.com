@@ -50,8 +50,34 @@ export function createStoryUserLaneRenderProbe() {
     domTilesPainted: -1, // paint 直後の DOM 顔タイル総数（-1=未計測）
     mirrorCells: -1, // mirror 経路の鏡 非null件数（-1=未計測）
     entriesLen: -1, // heavy 経路の STORY_SOURCE_STATE.entries 件数（-1=未計測）
+    // v0.1.1033: heavy 完了コールバックが settled=true に到達したか/どの early-return で抜けたか。
+    //   「たぬ姉レーンが暫定(直近N件)で固着」の真因(refreshGen レース)を状態速報から観測する。
+    heavySettleState: '', // '' | 'settled' | 'race' | 'stale-snapshot' | 'null-resp' | 'empty-covered'
+    heavyRaceReturns: 0, // 14532(refreshGen レース)で早期 return した累計回数(多い=レース支配的)
     lastRunAtBase: 0 // 最終実行 epoch ms（lastRunAgoMs 算出用）
   };
+}
+
+/** heavy 完了コールバックの結末コード(heavySettleState に入る値の正本)。 */
+export const STORY_USER_LANE_HEAVY_SETTLE = Object.freeze({
+  SETTLED: 'settled', // watchPopupHeavyCommentsSettled=true に到達(=全件がレーンに乗る正常)
+  RACE: 'race', // 14532 refreshGen !== gen で早期 return(次 refresh に追い越された)
+  STALE_SNAPSHOT: 'stale-snapshot', // 14530 snapshotKey 不一致で早期 return
+  NULL_RESP: 'null-resp', // 14531 heavy が null
+  EMPTY_COVERED: 'empty-covered' // 14542 空 resp だが arr が total の8割超
+});
+
+/**
+ * heavy 完了コールバックの結末を記録する(pure・popup-entry が1行で呼ぶ)。
+ * @param {object} probe
+ * @param {string} state STORY_USER_LANE_HEAVY_SETTLE のいずれか
+ */
+export function recordStoryUserLaneHeavySettle(probe, state) {
+  if (!probe || typeof probe !== 'object') return;
+  probe.heavySettleState = String(state || '');
+  if (state === STORY_USER_LANE_HEAVY_SETTLE.RACE) {
+    probe.heavyRaceReturns = (Number(probe.heavyRaceReturns) || 0) + 1;
+  }
 }
 
 /**
@@ -95,6 +121,8 @@ export function snapshotStoryUserLaneRenderProbe(probe, nowMs) {
     domTilesPainted: Number.isFinite(probe.domTilesPainted) ? probe.domTilesPainted : -1,
     mirrorCells: Number.isFinite(probe.mirrorCells) ? probe.mirrorCells : -1,
     entriesLen: Number.isFinite(probe.entriesLen) ? probe.entriesLen : -1,
+    heavySettleState: probe.heavySettleState || '',
+    heavyRaceReturns: Number(probe.heavyRaceReturns) || 0,
     lastRunAgoMs: probe.lastRunAtBase > 0 && now > 0 ? Math.max(0, now - probe.lastRunAtBase) : null
   };
 }
@@ -173,6 +201,8 @@ export function buildStoryUserLaneRenderDiag(probeSnap, ctx) {
     mirrorCells: mirror,
     entriesLen: entries,
     expected,
+    heavySettleState: String(s.heavySettleState || ''),
+    heavyRaceReturns: Number(s.heavyRaceReturns) || 0,
     lastRunAgoMs: s.lastRunAgoMs ?? null,
     verdict,
     reason
@@ -219,6 +249,16 @@ export function formatStoryUserLaneRenderDiagLines(diag, ctx) {
   // 描画済みなのにローディングが終わらない＝overlay バグ（status-entry が overlay 状態を渡したときだけ）。
   if (c.loadingActive === true && d.domTilesPainted > 0) {
     lines.push('  → ⚠ 画面に描画済みなのにローディング表示が続いています（ローディングを畳むバグの疑い）');
+  }
+  // v0.1.1033: heavy 完了が settled に到達したか。race 多発=たぬ姉レーンが暫定(直近N件)で固着の真因。
+  if (d.heavySettleState) {
+    const settleLabel =
+      d.heavySettleState === 'settled'
+        ? '✅ settled(全件がレーンに乗る正常)'
+        : d.heavySettleState === 'race'
+          ? `⚠ race(refreshに追い越され未settle・累計${d.heavyRaceReturns}回)=たぬ姉が暫定固着の疑い`
+          : d.heavySettleState;
+    lines.push(`  → heavy 完了: ${settleLabel}`);
   }
   return lines;
 }

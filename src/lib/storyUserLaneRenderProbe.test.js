@@ -1,8 +1,10 @@
 import { describe, it, expect } from 'vitest';
 import {
   STORY_USER_LANE_STEPS,
+  STORY_USER_LANE_HEAVY_SETTLE,
   createStoryUserLaneRenderProbe,
   recordStoryUserLaneStep,
+  recordStoryUserLaneHeavySettle,
   snapshotStoryUserLaneRenderProbe,
   buildStoryUserLaneRenderDiag,
   formatStoryUserLaneRenderDiagLines,
@@ -220,5 +222,46 @@ describe('storyUserLaneRenderDiagToActionCards', () => {
 
   it('present:false ならカードゼロ', () => {
     expect(storyUserLaneRenderDiagToActionCards({ present: false })).toEqual([]);
+  });
+});
+
+describe('recordStoryUserLaneHeavySettle(refreshGen レース観測・v0.1.1033)', () => {
+  it('settled を記録する', () => {
+    const p = createStoryUserLaneRenderProbe();
+    recordStoryUserLaneHeavySettle(p, STORY_USER_LANE_HEAVY_SETTLE.SETTLED);
+    expect(p.heavySettleState).toBe('settled');
+    expect(p.heavyRaceReturns).toBe(0);
+  });
+
+  it('race は heavyRaceReturns を累積する(多発=固着の証拠)', () => {
+    const p = createStoryUserLaneRenderProbe();
+    recordStoryUserLaneHeavySettle(p, STORY_USER_LANE_HEAVY_SETTLE.RACE);
+    recordStoryUserLaneHeavySettle(p, STORY_USER_LANE_HEAVY_SETTLE.RACE);
+    expect(p.heavySettleState).toBe('race');
+    expect(p.heavyRaceReturns).toBe(2);
+  });
+
+  it('snapshot / diag に heavySettleState と heavyRaceReturns が乗る', () => {
+    const p = createStoryUserLaneRenderProbe();
+    recordStoryUserLaneStep(p, STORY_USER_LANE_STEPS.START, { activePath: 'heavy', entriesLen: 10, nowMs: NOW });
+    recordStoryUserLaneHeavySettle(p, STORY_USER_LANE_HEAVY_SETTLE.RACE);
+    const snap = snapshotStoryUserLaneRenderProbe(p, NOW);
+    expect(snap.heavySettleState).toBe('race');
+    expect(snap.heavyRaceReturns).toBe(1);
+    const d = buildStoryUserLaneRenderDiag(snap, {});
+    expect(d.heavySettleState).toBe('race');
+    expect(d.heavyRaceReturns).toBe(1);
+  });
+
+  it('report 行に race の警告文が出る', () => {
+    const p = createStoryUserLaneRenderProbe();
+    recordStoryUserLaneStep(p, STORY_USER_LANE_STEPS.START, { activePath: 'heavy', entriesLen: 10, nowMs: NOW });
+    recordStoryUserLaneStep(p, STORY_USER_LANE_STEPS.PAINTED, { domTilesPainted: 4 });
+    recordStoryUserLaneStep(p, STORY_USER_LANE_STEPS.DONE);
+    recordStoryUserLaneHeavySettle(p, STORY_USER_LANE_HEAVY_SETTLE.RACE);
+    const snap = snapshotStoryUserLaneRenderProbe(p, NOW);
+    const d = buildStoryUserLaneRenderDiag(snap, {});
+    const text = formatStoryUserLaneRenderDiagLines(d, {}).join('\n');
+    expect(text).toContain('heavy 完了: ⚠ race');
   });
 });
