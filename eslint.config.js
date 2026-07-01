@@ -132,8 +132,12 @@ export default [
     //   v0.1.1023: refresh() 冒頭に INLINE_PASSIVE 早期return を追加=21549→21552(②応援プレビュー激重・真っ白の
     //   根治。②は refresh の重い本体を走らせず鏡経路で描く=①と storage を奪い合わない)。refresh は popup 本体の
     //   巨大関数=lib抽出不可。ガード1行+裏取り根拠コメント。実行時はむしろ軽くなる。レビュー済み例外。
+    //   v0.1.1024: 応援者ランキング(🥇🥈🥉)の②鏡描画を追加=21552→21616(v0.1.1023 で②が refresh を止めた副作用で
+    //   refresh 経由でしか描かれない応援者ランキングが②で空になったのを、①publish→②鏡描画で埋める回帰修正)。
+    //   publish/passive描画は DOM/storage 操作=lib抽出不可。純関数(cells正規化/sig)は topSupportersMirror.js へ
+    //   抽出しテスト済み。lane/northStar/statCards 鏡と同じ轍。レビュー済み例外。
     files: ['src/extension/popup-entry.js'],
-    rules: { 'max-lines': ['error', { max: 21552, skipBlankLines: false, skipComments: false }] }
+    rules: { 'max-lines': ['error', { max: 21616, skipBlankLines: false, skipComments: false }] }
   },
   {
     files: ['src/extension/content-entry.js'],
