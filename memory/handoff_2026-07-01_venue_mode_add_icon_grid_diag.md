@@ -65,7 +65,19 @@ person-tile 統一(council/person-tile-unify-SYNTHESIS.md)は**完了済み**:
     CSS ::after で🥇🥈🥉を席右上に絶対配置(高さ不変=v1026 振動を踏まない)。
   - ⭐ **ユーザー指示**: ピカピカ光る演出は不要 → 金色オーラ(nlsb-seat-regular glow)は廃止(vipRegular:false)。
     順位バッジのみで上位を示す。
-- Phase 2b(独立グリッドバー・条件付き): 2a を実機で見て「上位が席で埋もれる」なら追加。埋もれないなら不要(過剰実装回避)。**未着手=実機判断待ち**。
+- Phase 2b(独立グリッドバー)— **完了 v0.1.1031(commit e6759612)として実装**。実機868人で席の🥇🥈🥉が
+  小さすぎて見えず「会場が変わってない」評価→ひな壇上部に「応援者トップN」固定高バー(顔を大きく並べる)で可視性回復。
+  - ⭐ **重要な会議(council/venue-role-separation-SYNTHESIS.md・5体ほぼ完全一致)**: ユーザーが「popup のアイコン列・
+    グリッド・診断をそのまま会場へ運ぶのは大丈夫か」「星野ロミ記事(作る人/見せる人を分ける)の思想は入っているか」を問うた。
+    答え=(Q1)**そのまま運ばない(C案)**。popup=匿名除外・数値ID+サムネ揃いだけ上段/会場=匿名も全員主役 で思想衝突。
+    (Q2)分離は**半分だけ**達成(診断の鏡 venueSeatsDiag と"レーン正本を映す"経路は分離済み・順位/アバター率は見せる側計算)。
+    **完全分離は過剰**(会場はリアルタイム描画ループ)。目指すのは「計算1回→sig→貼る」の役割分担。可視性は分離と別問題。
+  - やったこと: venueSeats.js buildVenueSeating が topSupporters(スコア降順・順位付き・匿名含む・rankVenueContributors
+    共有=drift なし)を返す。venueBar に .nlsb-topbar(固定高72px・grid 行・上位3は🥇🥈🥉+金銀銅縁・静的)。sig 無変化 skip・
+    一度出したら空で畳まない(高さ振動対策)。席タイル生成を buildVenuePersonTile 共通ヘルパに切り出し席とバーで同じ描画
+    (匿名の顔崩れ=地雷#3 を構造的に防止)。テスト+3。
+  - ⭐ **未着手(会議の残タスク)**: フェーズ1(hot path 防御=renderSeats 全体に sig スキップを広げる)は未実装。
+    今は診断/トップバー個別に sig を持つのみ。renderSeats 本体の毎フレーム集計はまだ。実機で重ければ着手。
 - Phase 3(診断)— **完了 v0.1.1030(commit 7a77c862, branch feat/venue-rank-badge)**。
   - 会議 council/venue-diag-SYNTHESIS.md に収束: 席の【外】の overlay(既存 .nlsb-roster-panel 流用)・既定畳む・🩺ボタンで開く。
     sig は件数のみ(capturedAt 抜き)。storyAvatarDiagLine は popup 別 typedef で型不整合=流用不可→新規 venueAvatarDiagLine.js。
