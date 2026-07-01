@@ -120,8 +120,13 @@ export default [
     //   「アイコン列だけ started=0」を断つ(council/render-not-firing 続き・実機実証済)。レビュー済み例外。
     //   v0.1.992: 独立 tick に applyLightweightPanelSummaryCards(lid) 呼び出し+lid 引数化+コメント=21533→21539。
     //   記録/同接/来場の数字カードを heavy 非依存で panel_summary から埋める(embed_watch で「—」のまま根治)。
+    //   v0.1.1019: ②応援プレビューの数字カードを①が焼いた statCardsMirror 鏡から描く applyStatCardsMirrorForPassive
+    //   追加=21539→21547(フルコピー根治: ②が生panelを①と別タイミングで読み ①150 vs ②129 とズレていたのを、
+    //   ①=②=③同一鏡値に揃える)。sig ガード付きペインターは lib(statCardsMirrorDom.js)へ抽出済み。残る +8 は
+    //   chrome.storage read が popup ローカル=lib抽出不可のグルー(既存 applyLaneMirrorForPassive 等と同型)。
+    //   同時に②の生panel独自読み(setTimeout/onChanged)を廃止=鏡一本化。レビュー済み例外。
     files: ['src/extension/popup-entry.js'],
-    rules: { 'max-lines': ['error', { max: 21539, skipBlankLines: false, skipComments: false }] }
+    rules: { 'max-lines': ['error', { max: 21547, skipBlankLines: false, skipComments: false }] }
   },
   {
     files: ['src/extension/content-entry.js'],
