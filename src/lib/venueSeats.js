@@ -341,6 +341,9 @@ export function rankVenueContributors(participants, opts = {}) {
 /** 席に付ける「応援者ランキング」順位バッジの既定上限(上位 topN 位まで=🥇🥈🥉)。 */
 export const VENUE_TOP_RANK_MAX = 3;
 
+/** ひな壇上部「応援者トップNバー」に大きく並べる既定人数(密集会場でも上位が一目で分かる)。 */
+export const VENUE_TOP_SUPPORTERS_BAR = 8;
+
 /**
  * 会場参加者のうち「応援者ランキング上位 topN 位」を key→順位(1始まり)で返す純関数。
  *
@@ -649,10 +652,12 @@ export function collectAudienceFaceUserIds(rows, opts = {}) {
  *   vipRegularMax?: number,
  *   vipRegularCommentCap?: number,
  *   vipRegularGiftPointsCap?: number,
- *   topRank?: number
+ *   topRank?: number,
+ *   topSupporters?: number
  * }} [opts]
  * @returns {{
  *   seats: Array<{ seatIndex: number, isFrontRow: boolean, isVipRegular: boolean, venueRank: number, participant: ReturnType<typeof collectVenueParticipants>[number] }>,
+ *   topSupporters: Array<{ rank: number, score: number, participant: ReturnType<typeof collectVenueParticipants>[number] }>,
  *   seatByKey: Map<string, number>,
  *   participantCount: number,
  *   anonymousCount: number,
@@ -695,6 +700,23 @@ export function buildVenueSeating(rows, opts = {}) {
           giftPointsCap: opts.vipRegularGiftPointsCap
         })
       : new Map();
+  // 「応援者トップNバー」用に、貢献度スコア降順の participant を topSupporters 件だけ返す。
+  //   スコア源は席の順位バッジ(rankByKey)と共有(rankVenueContributors)=drift しない。
+  //   topSupporters<=0 で無効(既定は出す)。匿名も含む(会場の「全員主役」を壊さない)。
+  const topSupportersN =
+    Number.isFinite(opts.topSupporters) ? Math.floor(opts.topSupporters) : VENUE_TOP_SUPPORTERS_BAR;
+  /** @type {Array<{ rank: number, score: number, participant: any }>} */
+  let topSupporters = [];
+  if (topSupportersN > 0) {
+    const byKey = new Map(participants.map((p) => [p.key, p]));
+    topSupporters = rankVenueContributors(participants, {
+      commentCap: opts.vipRegularCommentCap,
+      giftPointsCap: opts.vipRegularGiftPointsCap
+    })
+      .slice(0, topSupportersN)
+      .map((r, idx) => ({ rank: idx + 1, participant: byKey.get(r.key), score: r.score }))
+      .filter((x) => x.participant);
+  }
   return {
     seats: seats.map((s) => ({
       ...s,
@@ -702,6 +724,7 @@ export function buildVenueSeating(rows, opts = {}) {
       isVipRegular: vipRegularKeys.has(s.participant.key),
       venueRank: rankByKey.get(s.participant.key) || 0
     })),
+    topSupporters,
     seatByKey,
     participantCount: participants.length,
     anonymousCount: countAnonymousParticipants(rows, opts.isGenericName, promoteUserIds),

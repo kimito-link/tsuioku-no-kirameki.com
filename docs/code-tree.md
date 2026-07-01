@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 1 / 589 件
+## ⚠️ 役割コメントが無いソース 1 / 590 件
 - `src/lib/reportPreviewPublish.js`
 
 ## 全ファイルツリー
@@ -458,7 +458,7 @@
   - `vendor-visual-explainer.mjs` — Vendors nicobailon/visual-explainer (MIT) into .cursor/skills/visual-explainer/
   - `verify-bump.mjs` — extension bump 後の整合性チェッカー
   - `write-extension-placeholder-icons.mjs` — リポジトリに 256px アイコンしか無い環境向け: manifest 用の小さめ PNG を生成する。
-- 📁 **src/** (1247)
+- 📁 **src/** (1249)
   - 📁 **data/** (6)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -717,7 +717,7 @@
         - `logo_funlink_white_RGB_maru_black.png`
       - `logo_guide_funlink_ol.pdf`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1036)
+  - 📁 **lib/** (1038)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -1665,6 +1665,8 @@
     - `userThumbGrid.test.js`
     - `venueAvatar.js` — v0.1.712: 会場モードのアバター解決(サムネ補強)純関数。
     - `venueAvatar.test.js`
+    - `venueAvatarDiagLine.js` — 会場モード(venueBar.js)の「🩺 会場の状態」診断ブロックを組み立てる純関数群。
+    - `venueAvatarDiagLine.test.js`
     - `venueBubbleLayout.js` — v0.1.717: 会場モードの吹き出し(セリフ)を「席の外の最上位レイヤー」に置くための配置純関数。
     - `venueBubbleLayout.test.js`
     - `venueBubbleLifecycle.js` — 吹き出しの寿命を「読み上げ(TTS)」に連動させる純関数群。

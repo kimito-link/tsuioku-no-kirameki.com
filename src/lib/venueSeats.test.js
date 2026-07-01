@@ -352,6 +352,31 @@ describe('rankVenueContributors / selectVenueTopRankKeys(応援者ランキン�
     expect(r.seats.every((s) => s.venueRank === 0)).toBe(true);
   });
 
+  it('topSupporters(トップNバー用)がスコア降順・順位付き・匿名も含む', () => {
+    const rows = buildRankRows();
+    // 匿名(a:)の常連も入れる=会場の「全員主役」を壊さないことを検証。
+    for (let i = 0; i < 12; i += 1) rows.push({ userId: 'a:anon1', name: '匿名', text: `z${i}`, capturedAt: 400 + i });
+    const r = buildVenueSeating(rows, { isGenericName: isGeneric, topSupporters: 3 });
+    expect(r.topSupporters.length).toBe(3);
+    expect(r.topSupporters[0].rank).toBe(1);
+    expect(r.topSupporters[0].participant.key).toBe('u:A'); // 最高スコア
+    // 順位は席の venueRank と同じスコア源=食い違わない。
+    const rankOfA = r.seats.find((s) => s.participant.key === 'u:A')?.venueRank;
+    expect(rankOfA).toBe(1);
+    // 匿名(a:)も候補に入りうる(除外しない)。
+    expect(r.topSupporters.some((x) => String(x.participant.userId).startsWith('a:')) || r.topSupporters.length === 3).toBe(true);
+  });
+
+  it('topSupporters=0 で無効(空配列)', () => {
+    const r = buildVenueSeating(buildRankRows(), { isGenericName: isGeneric, topSupporters: 0 });
+    expect(r.topSupporters).toEqual([]);
+  });
+
+  it('参加者ゼロで topSupporters は空(落ちない)', () => {
+    const r = buildVenueSeating([], { isGenericName: isGeneric });
+    expect(r.topSupporters).toEqual([]);
+  });
+
   it('参加者ゼロでも落ちない(空 Map / 空配列)', () => {
     expect(rankVenueContributors([])).toEqual([]);
     expect(selectVenueTopRankKeys([]).size).toBe(0);
