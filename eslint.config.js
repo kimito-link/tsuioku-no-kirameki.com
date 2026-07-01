@@ -140,8 +140,10 @@ export default [
     //   突合し②の描画欠落を🔴に。DOM件数取得は popup 依存=lib抽出不可)。レビュー済み例外。
     //   v0.1.1026: 広告列の空畳み振動を抑制=21619→21624(ポーリングで一瞬空になるたび広告列を畳む→再表示の高さ振動で
     //   下のアイコングリッドが揺れていた。一度実データを描いたら一瞬の空では畳まない)。DOM判定は popup 依存=lib抽出不可。
+    //   v0.1.1028: ②応援者ランキングの匿名の顔崩れ根治=21624→21629(①POP(8208)と同じ anonymousIdenticonResolver 等を
+    //   ②の applyTopSupportersMirrorForPassive に注入。無いと匿名の顔が identicon にならず blank.jpg で崩れる)。
     files: ['src/extension/popup-entry.js'],
-    rules: { 'max-lines': ['error', { max: 21624, skipBlankLines: false, skipComments: false }] }
+    rules: { 'max-lines': ['error', { max: 21629, skipBlankLines: false, skipComments: false }] }
   },
   {
     files: ['src/extension/content-entry.js'],
