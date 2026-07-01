@@ -116,6 +116,19 @@ export function buildParityVerdict(input) {
     return pend('②応援プレビューの描画が古い', '応援プレビューを開き直す', 'preview_stale');
   }
 
+  // 7. v0.1.1025(嘘の✅根治): ②が【実際に描いた件数】を①(鏡)と突合する。従来は ack.ready/liveId/ts だけで
+  //   「②が同じ配信を最近描いた」しか見ず、②で応援者ランキングが空でも「✅同一」と誤表示していた。
+  //   ①に応援者ランキング(鏡)があるのに②が1件も描けていない=②の描画欠落=フルコピーでない=🔴。
+  const supMirror = selfDiag?.mirrors?.supporters;
+  const supMirrorCount = supMirror && supMirror.present ? Math.max(0, Math.floor(Number(supMirror.count) || 0)) : 0;
+  const ackSupporterRows = Math.max(0, Math.floor(Number(ack.supporterRows) || 0));
+  if (supMirrorCount > 0 && ackSupporterRows === 0) {
+    return fail(
+      `②応援プレビューで応援者ランキングが描けていません(①鏡${supMirrorCount}件 → ②画面0件)`,
+      '応援プレビューを開き直す→直らなければこの状態速報を開発者に共有', 'preview_supporters_missing'
+    );
+  }
+
   // すべて必須クリア。
   return { verdict: 'ok', reason: '①POP=②応援プレビュー=③WEB が同一で完全', nextAction: '', code: 'ok' };
 }

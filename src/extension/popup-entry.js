@@ -5413,8 +5413,11 @@ async function applyLaneMirrorForPassive() {
   if (countStoryUserLaneDomTiles(els) > 0) {
     try {
       const ackLid = String(snap.liveId || '').trim().toLowerCase();
+      // v0.1.1025(嘘の✅根治): ②が実際に描いた件数を ack に載せ parity が①鏡と突合(②欠落で🔴=嘘の✅を防ぐ)。
+      const supEl = document.getElementById('topSupportRankStrip');
+      const supporterRows = supEl instanceof HTMLElement && !supEl.hidden ? supEl.querySelectorAll('[role="listitem"]').length : 0;
       void chrome.storage.local.set({
-        [KEY_PREVIEW_RENDER_ACK]: buildPreviewRenderAck({ ready: true, liveId: ackLid, nowMs: Date.now() })
+        [KEY_PREVIEW_RENDER_ACK]: buildPreviewRenderAck({ ready: true, liveId: ackLid, nowMs: Date.now(), laneTiles: countStoryUserLaneDomTiles(els), supporterRows })
       }).catch(() => { /* best-effort: ack 失敗は描画を妨げない */ });
     } catch { /* no-op */ }
     // v0.1.987: 鏡経路で描けたら幕も畳む(描けたのにローディングを構造的に消す)。冪等・幕が無ければ no-op。
