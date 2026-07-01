@@ -234,6 +234,11 @@ export const KEY_ANONYMOUS_IDENTICON_ENABLED = 'nls_anonymous_identicon_enabled_
  */
 export const KEY_FOLD_ANONYMOUS_IN_RANK_STRIP = 'nls_fold_anonymous_in_rank_strip_v1';
 
+/** v0.1.1024: 応援者ランキング(🥇🥈🥉)の鏡。①(watch popup)が描いた strip rooms を②応援プレビューが
+ *   読んで同じ本物 lib で描くための鏡(lane/northStar/statCards 鏡と同じ轍)。②は refresh を走らせない
+ *   (v0.1.1023)ため、refresh 経由でしか描けなかった応援者ランキングが②で空になっていたのを鏡経路で埋める。 */
+export const KEY_TOP_SUPPORTERS_MIRROR = 'nls_top_supporters_mirror_v1';
+
 /** 応援ビジュアル詳細（ユーザーレーン・グリッド・診断ブロック）を開いているか */
 export const KEY_SUPPORT_VISUAL_EXPANDED = 'nls_support_visual_expanded';
 
