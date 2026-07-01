@@ -14535,7 +14535,13 @@ async function refresh() {
     const bailHeavy = (state) => { recordStoryUserLaneHeavySettle(_storyUserLaneRenderProbe, state); }; // v0.1.1033 計器
     if (watchMetaCache.key !== snapshotKey) return bailHeavy(STORY_USER_LANE_HEAVY_SETTLE.STALE_SNAPSHOT);
     if (!Array.isArray(nextArr)) return bailHeavy(STORY_USER_LANE_HEAVY_SETTLE.NULL_RESP);
-    if (refreshGen !== watchPopupRefreshGeneration) return bailHeavy(STORY_USER_LANE_HEAVY_SETTLE.RACE);
+    if (refreshGen !== watchPopupRefreshGeneration) {
+      // v0.1.1035(レビュー指摘=初回レース残存): 追い越された古い callback でも snapshotKey は一致(上)=nextArr は現配信の
+      //   有効な全件。stale 描画はせず、キャッシュだけ最新化→次 refresh が v0.1.1034 の80%再利用で settled で始まれる
+      //   (初回が何度追い越されても「一度読めた全件」が次に活きる=自己修復の起点)。
+      if (nextArr.length > 0) watchMetaCache.lastCommentsArr = { lv, arr: nextArr, chunkTotal: idbMode || commentsChunked ? currentChunkTotal : null };
+      return bailHeavy(STORY_USER_LANE_HEAVY_SETTLE.RACE);
+    }
     // v0.1.625: nextArr が空でも、現 arr が currentChunkTotal を満たしていない
     //   (cached が短い arr で固まっている)なら skip しない(=空応援帯固まり防止)。
     //   元の `!nextArr.length && arr.length` ガードは「heavy 経路の一時的な空 resp で

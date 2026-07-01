@@ -147,8 +147,10 @@ export default [
     //   storyUserLaneRenderProbe.js(テスト付)に隔離済みで、popup 側は callback 内の記録1行ずつのみ(lib抽出不可)。
     //   v0.1.1034: 上の race を根治=heavy 再利用条件を chunkTotal 完全一致から 80%カバー(cachedHeavyCoverageOk)へ緩め、
     //   heavyDataPromise を即 resolve させてレース窓を消す=21633→21636(条件式の inline 変更・lib抽出不可)。
+    //   v0.1.1035: レビュー指摘の初回レース残存を塞ぐ=heavy callback が refreshGen で bail する時も、snapshotKey 一致の
+    //   有効な全件をキャッシュだけ最新化(stale 描画はしない)→次 refresh が 1034 の再利用に乗り settled で始まれる=21636→21642。
     files: ['src/extension/popup-entry.js'],
-    rules: { 'max-lines': ['error', { max: 21636, skipBlankLines: false, skipComments: false }] }
+    rules: { 'max-lines': ['error', { max: 21642, skipBlankLines: false, skipComments: false }] }
   },
   {
     files: ['src/extension/content-entry.js'],
