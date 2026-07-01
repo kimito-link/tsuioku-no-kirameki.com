@@ -145,8 +145,10 @@ export default [
     //   v0.1.1033: 応援レーンの「たぬ姉が少なすぎる」真因(refreshGen レースで heavy が settled に到達しない)を
     //   状態速報から観測する計器を heavy 完了コールバックの early-return 4分岐に配線=21629→21633。純関数は
     //   storyUserLaneRenderProbe.js(テスト付)に隔離済みで、popup 側は callback 内の記録1行ずつのみ(lib抽出不可)。
+    //   v0.1.1034: 上の race を根治=heavy 再利用条件を chunkTotal 完全一致から 80%カバー(cachedHeavyCoverageOk)へ緩め、
+    //   heavyDataPromise を即 resolve させてレース窓を消す=21633→21636(条件式の inline 変更・lib抽出不可)。
     files: ['src/extension/popup-entry.js'],
-    rules: { 'max-lines': ['error', { max: 21633, skipBlankLines: false, skipComments: false }] }
+    rules: { 'max-lines': ['error', { max: 21636, skipBlankLines: false, skipComments: false }] }
   },
   {
     files: ['src/extension/content-entry.js'],

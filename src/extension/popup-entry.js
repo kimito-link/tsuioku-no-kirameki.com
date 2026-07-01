@@ -13956,12 +13956,15 @@ async function refresh() {
     (currentChunkTotal == null ||
       currentChunkTotal === 0 ||
       cachedHeavy.arr.length >= Math.floor(currentChunkTotal * 0.8));
+  // v0.1.1034(council/tanu-lane-heavy-stall・実機 heavySettleState:race 6回で確認): 旧 chunkTotal【完全一致】は
+  //   総数が増え続ける重い配信で毎回不一致=heavy 全件再読み→完了(5秒)前に次 refresh に追い越され settled が永遠に
+  //   立たず、応援レーンが途中件数で固着(たぬ姉少ない/数字増えない/全員出ない)。→ 完全一致をやめ cachedHeavyCoverageOk
+  //   (現 total の80%以上をカバー)なら再利用=heavyDataPromise が即 resolve→レース窓が消え settled 継続(不足分は次 heavy+テール)。
   const canReuseHeavyChunkRead =
     (idbMode || commentsChunked) &&
     currentChunkTotal != null &&
     cachedHeavy &&
     cachedHeavy.lv === lv &&
-    Number(cachedHeavy.chunkTotal) === currentChunkTotal &&
     Array.isArray(cachedHeavy.arr) &&
     cachedHeavy.arr.length > 0 &&
     cachedHeavyCoverageOk;
