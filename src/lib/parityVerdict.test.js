@@ -169,12 +169,12 @@ describe('buildParityVerdict — ②の実描画突合(嘘の✅根治・v0.1.10
     i.previewAck = { ready: true, ts: 1000, liveId: 'lv1', supporterRows: ackSupporterRows };
     return i;
   };
-  it('①鏡に応援者ランキングがあるのに②が0件=mismatch(嘘の✅を出さない)', () => {
+  it('①鏡に応援者ランキングがあるのに②が0件=pending(v0.1.1027: 誤検知回避で🔴でなく保留・嘘の✅も嘘の🔴も出さない)', () => {
     const v = buildParityVerdict(withSupporters(10, 0));
-    expect(v.verdict).toBe('mismatch');
-    expect(v.code).toBe('preview_supporters_missing');
+    expect(v.verdict).toBe('pending');
+    expect(v.code).toBe('preview_supporters_pending');
     expect(v.reason).toContain('①鏡10件');
-    expect(v.reason).toContain('②画面0件');
+    expect(v.reason).toContain('未確認');
   });
   it('①鏡=10・②も10件描けている=ok', () => {
     expect(buildParityVerdict(withSupporters(10, 10)).verdict).toBe('ok');
