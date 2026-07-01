@@ -129,8 +129,11 @@ export default [
     //   dismissInitialLoadShade を追加=21547→21549(「描画済みなのにローディングが終わらない」根治。独立tick高頻度で
     //   2回目以降が sig 一致で early return し、幕畳み(5308)に到達せず残っていた)。dismiss は popup DOM/タイマー
     //   操作=lib抽出不可。5308 と同じ1行パターン+コメント1行。レビュー済み例外。
+    //   v0.1.1023: refresh() 冒頭に INLINE_PASSIVE 早期return を追加=21549→21552(②応援プレビュー激重・真っ白の
+    //   根治。②は refresh の重い本体を走らせず鏡経路で描く=①と storage を奪い合わない)。refresh は popup 本体の
+    //   巨大関数=lib抽出不可。ガード1行+裏取り根拠コメント。実行時はむしろ軽くなる。レビュー済み例外。
     files: ['src/extension/popup-entry.js'],
-    rules: { 'max-lines': ['error', { max: 21549, skipBlankLines: false, skipComments: false }] }
+    rules: { 'max-lines': ['error', { max: 21552, skipBlankLines: false, skipComments: false }] }
   },
   {
     files: ['src/extension/content-entry.js'],
