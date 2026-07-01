@@ -21,7 +21,6 @@ import {
   selectVenueVipRegularKeys,
   rankVenueContributors,
   selectVenueTopRankKeys,
-  venueSeatsInputSig,
   VENUE_TOP_RANK_MAX,
   VENUE_VIP_REGULAR_SCORE_THRESHOLD,
   VENUE_VIP_REGULAR_MAX,
@@ -382,64 +381,6 @@ describe('rankVenueContributors / selectVenueTopRankKeys(応援者ランキン�
     expect(rankVenueContributors([])).toEqual([]);
     expect(selectVenueTopRankKeys([]).size).toBe(0);
     expect(selectVenueTopRankKeys(null).size).toBe(0);
-  });
-});
-
-describe('venueSeatsInputSig(hot path 再描画スキップ判定)', () => {
-  // ★実データ形状で検証する: 会場 rows は count/isGift でなく preCount/preHasGift/preGiftCount を持つ
-  //   (venueRowsFromUserLaneCandidates / rosterToVenueRows)。テストが直接 count/isGift を注入すると
-  //   本番のフィールド不一致(sig が実フィールドを見ていない drift)を隠す(2026-07-01 レビュー指摘)。
-  const rows = [
-    { userId: '111', preCount: 3, avatar: 'https://x/a.jpg' },
-    { userId: '222', preCount: 1, preHasGift: true, preGiftCount: 1 },
-    { name: '匿名', preCount: 2 } // uid 無し=名前でキー化
-  ];
-
-  it('同じ入力・同じ状態なら同じ sig(スキップされる)', () => {
-    expect(venueSeatsInputSig(rows)).toBe(venueSeatsInputSig(rows.map((r) => ({ ...r }))));
-  });
-
-  it('preCount(実発言数)が変われば sig が変わる(発言が増えたら再描画)', () => {
-    const changed = rows.map((r, i) => (i === 0 ? { ...r, preCount: 4 } : r));
-    expect(venueSeatsInputSig(rows)).not.toBe(venueSeatsInputSig(changed));
-  });
-
-  it('preHasGift/preGiftCount(実ギフト)が変われば sig が変わる(ギフトは rank に効く)', () => {
-    // ギフト flag が付く(0→1)。コメント数(preCount)は据え置き=旧実装の穴を突く回帰テスト。
-    const giftFlag = rows.map((r, i) => (i === 2 ? { ...r, preHasGift: true, preGiftCount: 1 } : r));
-    expect(venueSeatsInputSig(rows)).not.toBe(venueSeatsInputSig(giftFlag));
-    // ギフト件数が増える(1→3)。
-    const giftMore = rows.map((r, i) => (i === 1 ? { ...r, preGiftCount: 3 } : r));
-    expect(venueSeatsInputSig(rows)).not.toBe(venueSeatsInputSig(giftMore));
-  });
-
-  it('生コメント経路(count/isGift)でも拾う(後方互換)', () => {
-    const raw = [{ userId: 'x', count: 2 }];
-    expect(venueSeatsInputSig(raw)).not.toBe(venueSeatsInputSig([{ userId: 'x', count: 3 }]));
-    expect(venueSeatsInputSig(raw)).not.toBe(venueSeatsInputSig([{ userId: 'x', count: 2, isGift: true }]));
-  });
-
-  it('サムネ有無が変われば sig が変わる', () => {
-    const av = rows.map((r, i) => (i === 1 ? { ...r, avatar: 'https://y/b.jpg' } : r));
-    expect(venueSeatsInputSig(rows)).not.toBe(venueSeatsInputSig(av));
-  });
-
-  it('人数が変われば sig が変わる(新規参加/退出)', () => {
-    expect(venueSeatsInputSig(rows)).not.toBe(venueSeatsInputSig(rows.slice(0, 2)));
-  });
-
-  it('ストリーク段階・昇格数が変われば sig が変わる(席のグロー/昇格を反映)', () => {
-    expect(venueSeatsInputSig(rows, { streakSig: 'u:111:2;' })).not.toBe(
-      venueSeatsInputSig(rows, { streakSig: 'u:111:3;' })
-    );
-    expect(venueSeatsInputSig(rows, { spokenCount: 1 })).not.toBe(
-      venueSeatsInputSig(rows, { spokenCount: 2 })
-    );
-  });
-
-  it('空配列/非配列で落ちない', () => {
-    expect(typeof venueSeatsInputSig([])).toBe('string');
-    expect(typeof venueSeatsInputSig(null)).toBe('string');
   });
 });
 

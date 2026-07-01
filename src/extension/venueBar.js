@@ -7,8 +7,7 @@ import {
   hasRealThumbnail,
   deriveNicoUserIconUrl,
   VENUE_FULLSCREEN_MAX_SEATS,
-  venueRowsFromUserLaneCandidates,
-  venueSeatsInputSig
+  venueRowsFromUserLaneCandidates
 } from '../lib/venueSeats.js';
 import { userLaneCandidatesFromStorage } from '../lib/userLaneCandidatesFromStorage.js';
 import {
@@ -1864,9 +1863,6 @@ export function mountVenueBarButton(options = {}) {
   // 応援者トップNバーの状態(renderTopBar / clearDisplay が触る・宣言はここ=TDZ 回避)。
   let _lastTopBarSig = '';
   let _topBarShownOnce = false;
-  // 会議フェーズ1(hot path 防御): 入力(rows+ストリーク+昇格)が前回と同一なら renderSeats を丸ごと
-  //   スキップする sig。clearDisplay で '' にリセット(配信切替後は必ず1回描く)。
-  let _lastSeatsSig = '';
   // 診断シート(メンバー一覧ボタン)用: renderSeats が最新の席割りをここに保存する。
   /** @type {{ allSeats: any[], visibleSeats: any[], audienceCount: number }} */
   let lastRosterInput = { allSeats: [], visibleSeats: [], audienceCount: 0 };
@@ -2585,7 +2581,6 @@ export function mountVenueBarButton(options = {}) {
     // 配信切替は意図的クリア=トップNバーも畳んで前配信の応援者を持ち越さない。
     _topBarShownOnce = false;
     _lastTopBarSig = '';
-    _lastSeatsSig = ''; // sig もリセット=切替後の空描画/初回描画を必ず通す(skip で固着しない)。
     topBar.hidden = true;
     topBarList.replaceChildren();
     renderSeats([]);
@@ -2685,22 +2680,6 @@ export function mountVenueBarButton(options = {}) {
     if (incomingRows.length === 0 && hasRenderedNonEmpty) {
       return;
     }
-    // 会議フェーズ1(hot path 防御): 入力が前回と同一なら集約+席割り+描画を丸ごとスキップする。
-    //   ストリーク段階(decay で席のグローが消える)と昇格 userId 数も sig に含める=見た目が変わる時は必ず再描画。
-    //   時刻(capturedAt)は入れない(v0.1.1022 明滅の教訓)。空描画(clearDisplay)は _lastSeatsSig='' で必ず通す。
-    let _streakSig = '';
-    for (const [k, v] of speechStreaks) {
-      const stage = v ? streakGlowStage(v.count) : 0;
-      if (stage > 0) _streakSig += `${k}:${stage};`;
-    }
-    const seatsSig = venueSeatsInputSig(incomingRows, {
-      streakSig: _streakSig,
-      spokenCount: spokenUserIds.size
-    });
-    if (seatsSig === _lastSeatsSig && hasRenderedNonEmpty) {
-      return; // 前回と同一=描き直す必要なし(hot path を毎回走らせない)。
-    }
-    _lastSeatsSig = seatsSig;
     const seating = buildVenueSeating(incomingRows, {
       maxSeats: VENUE_FULLSCREEN_MAX_SEATS,
       prevSeatByKey: seatByKey,
@@ -3477,24 +3456,15 @@ export function mountVenueBarButton(options = {}) {
         : 0;
     if (!reflowRaf) repositionAllBubbles();
   };
-  // 会議フェーズ1(sig スキップ)がリサイズ追従を殺さないための保険: リサイズは席の再レイアウト
-  //   (perRow=clientWidth 依存)が要るので、sig を無効化して新幅で席を1回引き直す。スクロールは
-  //   席レイアウトに影響しない(吹き出し追従だけでよい)ので onBubbleReflow のまま=ここには含めない。
-  const onVenueResize = () => {
-    _lastSeatsSig = '';
-    if (hasRenderedNonEmpty && lastGoodRows.length > 0) renderSeats(lastGoodRows);
-  };
   const addBubbleReflowListener = () => {
     if (reflowListening) return;
     window.addEventListener('resize', onBubbleReflow);
-    window.addEventListener('resize', onVenueResize); // 席の再レイアウト(sig 無効化)。
     window.addEventListener('scroll', onBubbleReflow, true);
     reflowListening = true;
   };
   const removeBubbleReflowListener = () => {
     if (!reflowListening) return;
     window.removeEventListener('resize', onBubbleReflow);
-    window.removeEventListener('resize', onVenueResize);
     window.removeEventListener('scroll', onBubbleReflow, true);
     if (reflowRaf && typeof cancelAnimationFrame === 'function') cancelAnimationFrame(reflowRaf);
     reflowRaf = 0;
