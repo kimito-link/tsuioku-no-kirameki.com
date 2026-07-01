@@ -5683,7 +5683,12 @@ async function applyTopSupportersMirrorForPassive() {
     renderTopSupportRankStripInto(strip, rooms, {
       noteText: '記録した応援コメントをユーザー別に数えた件数の多い順',
       unitSuffix: '件',
-      ariaLabel: '記録した応援コメントをユーザー別に数えた件数の多い順'
+      ariaLabel: '記録した応援コメントをユーザー別に数えた件数の多い順',
+      // v0.1.1028(②応援者ランキングの匿名の顔崩れ根治): ①POP(renderTopSupportRankStrip:8208)と同じ resolver を注入。
+      //   これが無いと匿名(a:形式)の顔が identicon(ゆっくり顔)にならず blank.jpg(灰色/崩れ)になる。①と完全コピーに。
+      defaultThumbSrc: STORY_GRID_DEFAULT_TILE_IMG,
+      anonymousFallbackThumbSrc: STORY_REMOTE_FAILED_PLACEHOLDER_IMG,
+      anonymousIdenticonResolver: anonymousIdenticonRuntimeEnabled ? (uid) => getCachedAnonymousIdenticonDataUrl(uid) : undefined
     });
     strip.hidden = false;
     strip.removeAttribute('aria-hidden');
