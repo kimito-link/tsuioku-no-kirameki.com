@@ -7,6 +7,7 @@ import {
   backfillRecordCardHintDomState,
   backfillStuckDiagnosticsSuffix,
   backfillThroughputLine,
+  backfillLiveThroughputLine,
   resolveOfficialComparisonDisplay,
   BACKFILL_RECORD_HINT_NEAR_COMPLETE_TEXT
 } from './backfillRinkuNarration.js';
@@ -760,5 +761,49 @@ describe('backfillThroughputLine（スループット計器・v0.1.999）', () =
     const s = backfillThroughputLine({ seg: 4200, elapsedMs: 120_000, reseeds: 1500 });
     expect(s).toContain('区画4,200');
     expect(s).toContain('再シード1,500回');
+  });
+});
+
+describe('backfillLiveThroughputLine（走行中スループット計器・v0.1.1045 段1）', () => {
+  it('経過・実区画・橋渡し・yield・fg から「約1区画◯ms」を出す', () => {
+    const s = backfillLiveThroughputLine({
+      running: 1, seg: 420, dataSegs: 420, bridgingSteps: 380,
+      yields: 66, yieldWaitMsTotal: 3200, elapsedMs: 12_300, fg: 1
+    });
+    expect(s).toBe('⏱ 取得速度(走行中): 経過12.3秒・実区画420・橋渡し380・yield66回(計3,200ms)・fg=1 → 約1区画29ms');
+  });
+
+  it('約1区画は【実区画(dataSegs)】で割る（橋渡しを分母に混ぜない=退行の見える化）', () => {
+    // dataSegs=100・elapsedMs=5000 → 50ms。bridgingSteps が多くても perSeg は実区画基準。
+    const s = backfillLiveThroughputLine({
+      running: 1, seg: 100, dataSegs: 100, bridgingSteps: 900,
+      yields: 30, yieldWaitMsTotal: 1500, elapsedMs: 5_000, fg: 1
+    });
+    expect(s).toContain('→ 約1区画50ms');
+    expect(s).toContain('実区画100');
+    expect(s).toContain('橋渡し900');
+  });
+
+  it('fg=0（裏タブペース）を明示する', () => {
+    const s = backfillLiveThroughputLine({
+      running: 1, dataSegs: 50, bridgingSteps: 10, yields: 8, yieldWaitMsTotal: 40, elapsedMs: 10_000, fg: 0
+    });
+    expect(s).toContain('fg=0');
+  });
+
+  it('elapsedMs が無い/0 なら空文字（観測前は出さない）', () => {
+    expect(backfillLiveThroughputLine({ dataSegs: 100, elapsedMs: 0 })).toBe('');
+    expect(backfillLiveThroughputLine({ dataSegs: 100 })).toBe('');
+  });
+
+  it('dataSegs が無い/0 なら空文字（割れない=橋渡しだけの初期は出さない）', () => {
+    expect(backfillLiveThroughputLine({ dataSegs: 0, bridgingSteps: 50, elapsedMs: 5_000 })).toBe('');
+    expect(backfillLiveThroughputLine({ elapsedMs: 5_000 })).toBe('');
+  });
+
+  it('null/非オブジェクトでも throw せず空文字', () => {
+    expect(backfillLiveThroughputLine(null)).toBe('');
+    expect(backfillLiveThroughputLine(undefined)).toBe('');
+    expect(backfillLiveThroughputLine('x')).toBe('');
   });
 });

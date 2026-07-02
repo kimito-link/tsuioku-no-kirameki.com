@@ -45,6 +45,7 @@ import {
   KEY_BACKFILL_ENABLED,
   KEY_BACKFILL_AUTO_DISABLED,
   KEY_BACKFILL_PROGRESS,
+  KEY_BACKFILL_LIVE_METRIC,
   KEY_NDGR_DETERMINISTIC_BACKFILL,
   KEY_NDGR_FORWARD_ENABLED,
   KEY_INCREMENTAL_DEDUP_ENABLED,
@@ -15716,6 +15717,51 @@ function publishBackfillProgress() {
   }
 }
 
+/** v0.1.1045 段1: 走行中スループット計器の storage 書き込み min-gap(1Hz)。前回書込時刻。 */
+let _lastLiveMetricWroteAt = 0;
+
+/**
+ * v0.1.1045 段1: 走行中スループット計器を KEY_BACKFILL_LIVE_METRIC へ書く(観測のみ・1Hz間引き)。
+ *
+ * ⚠️ KEY_BACKFILL_PROGRESS には【一切触れない】。popup 実況(v0.1.657 で完走時だけに絞った)を
+ *   再開させないための構造的分離(storageKeys.js の KEY_BACKFILL_LIVE_METRIC JSDoc 参照)。
+ *   status(状態速報)だけがこのキーを読む。content はこのキーを読まない=制御分岐に使わない=観測のみ。
+ *
+ * @param {{ lid: string, running: 0|1, seg: number, rows: number, genSteps: number,
+ *   dataSegs: number, bridgingSteps: number, yields: number, yieldWaitMsTotal: number,
+ *   elapsedMs: number, fg: 0|1, force?: boolean }} m force=true で min-gap 無視(finally の締め用)。
+ */
+function publishBackfillLiveMetric(m) {
+  try {
+    const now = Date.now();
+    if (!m || !m.force) {
+      if (now - _lastLiveMetricWroteAt < 1000) return; // 1Hz min-gap(storage 書込多発=固まり史の主犯)。
+    }
+    _lastLiveMetricWroteAt = now;
+    setStorageLocalSilent(
+      {
+        [KEY_BACKFILL_LIVE_METRIC]: {
+          lid: String(m.lid || ''),
+          running: m.running ? 1 : 0,
+          seg: Number(m.seg) || 0,
+          rows: Number(m.rows) || 0,
+          genSteps: Number(m.genSteps) || 0,
+          dataSegs: Number(m.dataSegs) || 0,
+          bridgingSteps: Number(m.bridgingSteps) || 0,
+          yields: Number(m.yields) || 0,
+          yieldWaitMsTotal: Number(m.yieldWaitMsTotal) || 0,
+          elapsedMs: Number(m.elapsedMs) || 0,
+          fg: m.fg ? 1 : 0,
+          ts: now
+        }
+      },
+      { warn: false }
+    );
+  } catch {
+    /* best-effort: 計器は取り込みに影響させない */
+  }
+}
+
 /**
  * PR1 で MAIN world が露出した NDGR view ベース URL（`?at=` 前）を content から読む。
  * @returns {string}
@@ -15997,6 +16043,15 @@ async function runNdgrBackfillOnce(ctx = {}) {
   /** @type {ParsedCommentRow[]} */
   let pendingBackfillRows = [];
   let segmentsSinceYield = 0;
+  // v0.1.1045 段1: 走行中スループット計器のカウンタ(観測のみ・取り込みに非依存)。
+  //   dataSegs=chats>0 の実データ区画数 / bridgingSteps=空chat(橋渡し)ステップ数 /
+  //   liveYields=backfillYieldToPage を呼んだ回数 / liveYieldWaitMsTotal=yield 復帰待ち累計ms。
+  //   律速仮説(yield bridging / reseed / fetch / 裏タブ)を実機1枚で切り分けるため。
+  let _liveDataSegs = 0;
+  let _liveBridgingSteps = 0;
+  let _liveYields = 0;
+  let _liveYieldWaitMsTotal = 0;
+  let _liveFg = 0; // finally(try外)から締めの計器に載せるため、最後の前面判定を退避。
   // v0.1.654「一気に取れない」根治: 最後に pending を storage へ吐いた時刻。crawl が高速で
   //   大量取得しても、件数閾値(computeBackfillFlushThreshold)に届く前にこの間隔を超えたら
   //   時間ベースで必ず flush し、storage に落ちていない pending を最小化する。これで watch
@@ -16031,6 +16086,7 @@ async function runNdgrBackfillOnce(ctx = {}) {
       typeof document === 'undefined' ||
       typeof document.hasFocus !== 'function' ||
       (document.hasFocus() && document.visibilityState !== 'hidden');
+    _liveFg = isForegroundWatchTab ? 1 : 0; // 段1計器: finally の締めにも前面判定を載せる。
     const gen = crawlBackward({
       viewBase,
       fetchBinary: backfillFetchBinary,
@@ -16129,6 +16185,14 @@ async function runNdgrBackfillOnce(ctx = {}) {
       const ev = step.value;
       _backfillProgress.seg = ev.segmentsFetched;
       _backfillLastProgressAt = Date.now();
+      // v0.1.1045 段1計器(観測のみ): このステップが実データ区画か橋渡し(空chat)かを数える。
+      //   判定は「chats に実体があるか」= 実データ yield は必ず chats.length>0(ndgrBackfillCrawl.js
+      //   :710/:968/:1422/:1469 で裏取り)、seek/空reseed の橋渡しは chats 空 or bridging フラグ。
+      //   ★段1では segmentsSinceYield の加算ロジックは変えない(それは段2)。ここは数えるだけ。
+      const _isBridgingStep =
+        ev.bridging === true || !(Array.isArray(ev.chats) && ev.chats.length > 0);
+      if (_isBridgingStep) _liveBridgingSteps += 1;
+      else _liveDataSegs += 1;
       // ev.chats は生 NdgrChat[]。ndgrChatsToMergeRows で gift guard + vpos 保持の
       // 行に整形し、各行に過去コメント実時刻 capturedAt を付与する。
       const rows = ndgrChatsToMergeRows(ev.chats);
@@ -16153,6 +16217,23 @@ async function runNdgrBackfillOnce(ctx = {}) {
         _backfillLastProgressAt = Date.now();
       }
       onProgress ? onProgress({ ..._backfillProgress }) : publishBackfillProgress();
+      // v0.1.1045 段1: 走行中スループット計器を別キーへ(1Hz間引き・観測のみ・popup非依存)。
+      //   KEY_BACKFILL_PROGRESS には触れない=popup 実況は完走時だけのまま(v0.1.657 維持)。
+      publishBackfillLiveMetric({
+        lid: String(liveId || ''),
+        running: 1,
+        seg: _backfillProgress.seg,
+        rows: _backfillProgress.rows,
+        genSteps: _backfillRoundDiag.genSteps,
+        dataSegs: _liveDataSegs,
+        bridgingSteps: _liveBridgingSteps,
+        yields: _liveYields,
+        yieldWaitMsTotal: _liveYieldWaitMsTotal,
+        elapsedMs: _backfillRoundDiag.roundStartedAt
+          ? Date.now() - _backfillRoundDiag.roundStartedAt
+          : 0,
+        fg: isForegroundWatchTab ? 1 : 0
+      });
       // 一定行たまったら 1 回だけ persist（フラッシュ回数を激減＝固まり緩和）。
       // v0.1.xxx: 閾値を「保存済み件数」に応じて動的に引き上げる（computeBackfillFlushThreshold）。
       //   固定 800 行だと巨大放送ほど flush 回数が増え、full-array の read-merge-write（O(N)）が
@@ -16182,7 +16263,11 @@ async function runNdgrBackfillOnce(ctx = {}) {
         segmentsSinceYield = 0;
         const yieldStart = Date.now();
         await backfillYieldToPage();
-        updateBackfillThrottleState(_backfillThrottleState, Date.now() - yieldStart);
+        const _waitMs = Date.now() - yieldStart;
+        // v0.1.1045 段1計器(観測のみ): yield 回数と復帰待ち累計を数える(律速が yield かの判別材料)。
+        _liveYields += 1;
+        _liveYieldWaitMsTotal += _waitMs;
+        updateBackfillThrottleState(_backfillThrottleState, _waitMs);
       }
     }
   } catch (e) {
@@ -16194,6 +16279,28 @@ async function runNdgrBackfillOnce(ctx = {}) {
     try { _backfillProgress.errMsg = String(e?.message || e || '').slice(0, 120); } catch { /* no-op */ }
   } finally {
     clearTimeout(rotationTid);
+    // v0.1.1045 段1: 走行終了を計器で締める(running:0・force で min-gap 無視)。status の
+    //   「⏱ 取得速度(走行中)」は running:0 or ts 古で自動的に消える=固着時に嘘の走行中を残さない。
+    try {
+      publishBackfillLiveMetric({
+        lid: String(liveId || ''),
+        running: 0,
+        seg: _backfillProgress.seg,
+        rows: _backfillProgress.rows,
+        genSteps: _backfillRoundDiag.genSteps,
+        dataSegs: _liveDataSegs,
+        bridgingSteps: _liveBridgingSteps,
+        yields: _liveYields,
+        yieldWaitMsTotal: _liveYieldWaitMsTotal,
+        elapsedMs: _backfillRoundDiag.roundStartedAt
+          ? Date.now() - _backfillRoundDiag.roundStartedAt
+          : 0,
+        fg: _liveFg,
+        force: true
+      });
+    } catch {
+      /* no-op */
+    }
     // v0.1.431: 正常終了・abort・例外いずれの抜け方でも、バッファに残った取り込み済み行を
     //   必ず吐き出す（per-segment persist をやめてバッチ化したぶん、ここで取りこぼし防止）。
     flushPendingBackfillRows();

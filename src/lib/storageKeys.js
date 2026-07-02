@@ -109,6 +109,18 @@ export const KEY_BACKFILL_AUTO_DISABLED = 'nls_backfill_auto_disabled';
 export const KEY_BACKFILL_PROGRESS = 'nls_backfill_progress_v1';
 
 /**
+ * v0.1.1045 段1: 過去ログ取得(backfill)の【走行中スループット計器】(観測のみ)。
+ *   content が走行中に seg/実区画/橋渡し/yield回数/待ち累計/経過/fg を書き、status(状態速報)だけが
+ *   読んで「⏱ 取得速度(走行中)」を出す。yield bridging が律速か・裏タブペース(fg=0)かを実機1枚で確定する。
+ *
+ * ⚠️【重要・v0.1.657 の実況殺しを維持する構造的分離】このキーは KEY_BACKFILL_PROGRESS とは別物。
+ *   popup(popup-entry.js)は絶対にこのキーを読まない・import しない。KEY_BACKFILL_PROGRESS へ相乗り
+ *   させると popup のリスナー(changes[KEY_BACKFILL_PROGRESS] の存在だけで発火)が done=0 でも実況を
+ *   再開し、v0.1.657「完成だけドンと出す」体験が壊れる。読み手は status-entry.js のみ。
+ */
+export const KEY_BACKFILL_LIVE_METRIC = 'nls_backfill_live_metric_v1';
+
+/**
  * B案: NDGR 過去ログバックフィルを、vpos ヒューリスティックではなく backward /
  * previous ポインタ枯渇で完了判定する決定論エンジンへ切り替えるフラグ。
  * 検証中につき既定 OFF（旧 crawlNdgrBackward）。明示 true のときだけ新エンジンを使う opt-in。

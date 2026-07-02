@@ -438,6 +438,49 @@ export function backfillThroughputLine(progress) {
 }
 
 /**
+ * v0.1.1045 段1: 【走行中】スループット計器を1行に整形する純関数(観測のみ)。
+ *
+ * 狙い(HANDOFF-backfill-instant-restore.md): backfillThroughputLine は完走時 summary(bp)からしか
+ *   出ないため、途中参加の走行中は計器が出ず「yield bridging が律速か / 裏タブペース(fg=0)か」を
+ *   実機で確定できなかった。本関数は KEY_BACKFILL_LIVE_METRIC(走行中に content が書く)から出す。
+ *
+ * 律速の読み方(1行で判別):
+ *   - yield bridging 律速 → 橋渡しZ ≈ 実区画Y かつ (計Vms)/経過 が大
+ *   - reseed/seek 律速   → 橋渡しZ ≫ 実区画Y なのに (計Vms) は小
+ *   - fetch 律速         → 経過は伸びるのに 実区画Y が増えない(genSteps 停滞)
+ *   - 裏タブペース        → fg=0(document.hasFocus()=false→gap15/pause150 で約6倍遅い)
+ *
+ * 表示条件(呼び出し側 or ここで担保): running===1 かつ ts が新しい(古い走行中の残存で嘘を出さない)。
+ *   ここでは「材料が揃うか」だけ判定し、鮮度(ts)は呼び出し側が渡す前に確認する。
+ *
+ * @param {{ running?: number, seg?: number, dataSegs?: number, bridgingSteps?: number,
+ *   yields?: number, yieldWaitMsTotal?: number, elapsedMs?: number, fg?: number }} m
+ * @returns {string} 例: 「⏱ 取得速度(走行中): 経過12.3秒・実区画420・橋渡し380・yield66回(計3200ms)・fg=1 → 約1区画29ms」／材料不足なら ''
+ */
+export function backfillLiveThroughputLine(m) {
+  const o = m && typeof m === 'object' ? m : {};
+  const elapsedMs = Number(o.elapsedMs);
+  const dataSegs = Number(o.dataSegs);
+  if (!Number.isFinite(elapsedMs) || elapsedMs <= 0) return '';
+  if (!Number.isFinite(dataSegs) || dataSegs <= 0) return '';
+  const sec = (elapsedMs / 1000).toFixed(1);
+  const perSegMs = Math.round(elapsedMs / dataSegs);
+  const bridging = Number(o.bridgingSteps);
+  const yields = Number(o.yields);
+  const waitMs = Number(o.yieldWaitMsTotal);
+  const fg = Number(o.fg);
+  const bridgePart = Number.isFinite(bridging) && bridging >= 0
+    ? `・橋渡し${bridging.toLocaleString('ja-JP')}`
+    : '';
+  const yieldPart =
+    Number.isFinite(yields) && yields >= 0
+      ? `・yield${yields.toLocaleString('ja-JP')}回${Number.isFinite(waitMs) && waitMs >= 0 ? `(計${Math.round(waitMs).toLocaleString('ja-JP')}ms)` : ''}`
+      : '';
+  const fgPart = Number.isFinite(fg) ? `・fg=${fg ? 1 : 0}` : '';
+  return `⏱ 取得速度(走行中): 経過${sec}秒・実区画${dataSegs.toLocaleString('ja-JP')}${bridgePart}${yieldPart}${fgPart} → 約1区画${perSegMs.toLocaleString('ja-JP')}ms`;
+}
+
+/**
  * v0.1.450: 「もう一度ためす」ボタン押下直後に短時間だけ表示する確認文言の長さ（ms）。
  *
  * 背景（2026-05-29 会議）: ボタン下の `#backfillFetchPrompt` を廃止して記録カード内
