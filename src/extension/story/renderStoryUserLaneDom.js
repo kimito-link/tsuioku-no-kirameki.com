@@ -60,6 +60,26 @@ import { buildPersonTileEl } from '../../lib/personTileDom.js';
 const _laneTierLastKey = new WeakMap();
 
 /**
+ * ★v0.1.1040(計器・観測のみ): 段(lane名)ごとに「実際に replaceChildren した回数(=DOM churn)」を数える。
+ *   ちらつきの真因(どの段が・何回・どの経路で貼り替わるか)を状態速報から確定するため。件数のみ・PIIなし。
+ *   lane 名は el.id 由来(sceneStoryUserLane{Link,Gift,Ad,Konta,Tanu})。read path は変えない=paint 直後に +1 するだけ。
+ * @type {Record<string, number>}
+ */
+const _laneTierRepaintCount = { link: 0, gift: 0, ad: 0, konta: 0, tanu: 0, unknown: 0 };
+
+/** el.id から段名を引く(sceneStoryUserLaneKonta → konta)。 */
+function laneNameOfEl(el) {
+  const id = String((el && el.id) || '');
+  const m = /sceneStoryUserLane(Link|Gift|Ad|Konta|Tanu)/.exec(id);
+  return m ? m[1].toLowerCase() : 'unknown';
+}
+
+/** 計器の現在値(状態速報が読む・スナップショット)。 */
+export function getStoryLaneRepaintCounts() {
+  return { ...(_laneTierRepaintCount) };
+}
+
+/**
  * 段の items から「見た目が同じなら再描画不要」を判定する安定 key。
  *   ★時刻や guard 非同期差替後の src は入れない(v1022 型の毎回変化回避)= item 由来の確定フィールドのみ。
  * @param {Array<{ displaySrc?: any, title?: any, meta?: { idLine?: any, nameLine?: any }, entry?: { userId?: any } }>} items
@@ -191,6 +211,9 @@ function fillLaneTier(el, items, io) {
   el.replaceChildren(frag);
   el.hidden = false;
   _laneTierLastKey.set(el, key);
+  // 計器(観測のみ): 実際に貼り替えた段を数える=churn の実測。
+  const laneName = laneNameOfEl(el);
+  _laneTierRepaintCount[laneName] = (_laneTierRepaintCount[laneName] || 0) + 1;
 }
 
 /**
