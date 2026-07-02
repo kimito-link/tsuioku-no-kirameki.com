@@ -458,7 +458,7 @@
   - `vendor-visual-explainer.mjs` — Vendors nicobailon/visual-explainer (MIT) into .cursor/skills/visual-explainer/
   - `verify-bump.mjs` — extension bump 後の整合性チェッカー
   - `write-extension-placeholder-icons.mjs` — リポジトリに 256px アイコンしか無い環境向け: manifest 用の小さめ PNG を生成する。
-- 📁 **src/** (1254)
+- 📁 **src/** (1255)
   - 📁 **data/** (6)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -717,7 +717,7 @@
         - `logo_funlink_white_RGB_maru_black.png`
       - `logo_guide_funlink_ol.pdf`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1043)
+  - 📁 **lib/** (1044)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -1354,6 +1354,7 @@
     - `paintPerfLog.js` — v0.1.725: 描画(paint)コストの軽量リングバッファ記録(純関数)。
     - `paintPerfLog.test.js`
     - `paintTopSupportRankStyleIntoElement.js` — 応援帯・公式値レーン（貢献度等）で共通の `nl-top-support-rank` ブロック描画。
+    - `paintTopSupportRankStyleIntoElement.test.js`
     - `panelLiveSummary.js` — パネルカード用の超軽量サマリ（多タブ時の snapshot / 巨大配列 read 待ちを避ける）。
     - `panelLiveSummary.test.js`
     - `panelMetricsExport.js` — パネル向け速報メトリクス（content メモリ → popup 直結、storage バイパス）。
