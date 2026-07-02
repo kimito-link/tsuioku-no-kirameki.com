@@ -221,6 +221,11 @@ function buildVenueSeatsHealthCells(venueSeatsDiag, nowMs) {
   const seatsShown = num(snap.seatsShown) || 0;
   const participants = num(snap.participantCount) || 0;
   const otherCount = num(snap.otherCount) || 0;
+  const perRow = num(snap.perRow) || 0;
+  const venueMaxRows = num(snap.venueMaxRows) || 0;
+  const seatAreaWidth = num(snap.seatAreaWidth) || 0;
+  const capReason =
+    typeof snap.visibleCapReason === 'string' ? snap.visibleCapReason : '';
   const lastUpdateAt = num(snap.lastUpdateAt) || 0;
   const sinceUpdateMs = lastUpdateAt > 0 && now > 0 ? Math.max(0, now - lastUpdateAt) : null;
   const broadcasterInSeats = !!snap.broadcasterInSeats;
@@ -242,6 +247,34 @@ function buildVenueSeatsHealthCells(venueSeatsDiag, nowMs) {
     out.push(stateCell('venue-seats', '会場座席', 'warn', `更新${Math.round(sinceUpdateMs / 1000)}秒前`));
   } else {
     out.push(stateCell('venue-seats', '会場座席', 'ok', `${seatsShown}席/${participants}人${otherSuffix}`));
+  }
+
+  // ③ v0.1.1043: 「参加者は居るのに席に描画されていない」を計器で可視化(全員着席の真因切り分け)。
+  //   参加者>0 かつ 描画席が参加者を大きく下回る=絞られている。理由(participant/grid/hardCap)と
+  //   perRow/段/幅を添えて、状態速報のコピペだけで真因(画面幅・レイアウト・上限)を特定できるようにする。
+  //   幅=0px は clientWidth 未確定の事故。理由=grid は列数×段数で頭打ち。理由=participant は絞られていない。
+  if (participants > 0 && (perRow > 0 || seatAreaWidth > 0)) {
+    const reasonLabel =
+      capReason === 'participant'
+        ? '全員可視'
+        : capReason === 'grid'
+          ? '列×段で頭打ち'
+          : capReason === 'hardCap'
+            ? '500上限で頭打ち'
+            : '不明';
+    const detail = `理由=${reasonLabel}・perRow=${perRow}・段=${venueMaxRows}・幅=${seatAreaWidth}px`;
+    // 描画席が参加者の8割未満に絞られている(かつ全員可視でない)ときだけ warn で目立たせる。
+    const starved = seatsShown < participants * 0.8 && capReason !== 'participant';
+    // 幅=0px はレイアウト未確定=事故の強い兆候なので bad 寄りの warn。
+    const widthBroken = seatAreaWidth <= 0;
+    out.push(
+      stateCell(
+        'venue-seats-visible',
+        '会場席の網羅',
+        starved || widthBroken ? 'warn' : 'ok',
+        `${seatsShown}/${participants}描画（${detail}）`
+      )
+    );
   }
 
   return out;
