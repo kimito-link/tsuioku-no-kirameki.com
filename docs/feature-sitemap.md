@@ -643,7 +643,7 @@
   - `src/lib/statusTrendKey.js`
   - `src/extension/status-entry.js`
   - `src/lib/statusActionAdvisor.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 106</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 107</summary>
 
 - `app/app.js` — スマホ閲覧用 status Web 版。
 - `app/live-view.js` — 純Web版 応援ライブビュー（拡張なし・PC/スマホ共通）。
@@ -697,6 +697,7 @@
 - `src/lib/mcpBridge/schema.js` — L1 Canonical Snapshot の schema 定義（MCP Bridge から AI に返す正準形）。
 - `src/lib/mcpBridge/validateLiveMcpSnapshot.js` — Canonical Snapshot の構造検証。schema.js の isCanonicalLiveSnapshot より詳細な
 - `src/lib/mergeProgramStatsWatchIntoWatchMetaSnapshot.js` — 公式 DOM bundle の programStats.watchCount（累計来場）を snapshot に補完する。
+- `src/lib/mirrorBundle.js` — 5種類の「鏡」を同一 tick の 1 バンドルとして扱うための合流バッファ純関数。
 - `src/lib/mirrorSanitize.js` — v0.1.237: 北極星「鏡のように貼り付け」用の自前最小サニタイザ。
 - `src/lib/nicoCommentPanelAssetLauncher.js` — ニコ生 watch のコメント欄付近から「ギフト / アイテム / スタンプ」等の起動ボタンを推定する。
 - `src/lib/northStarCharaTrioConfig.js` — 北極星 3 キャラ trio（りんく / こん太 / たぬ姉）の slot 構成と tier 連動 src 解決。
@@ -756,9 +757,10 @@
 
 ## 🧬 修正系譜マップ(この系統のバグを過去にどう直したか)
 
-> changelog 全 370 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
+> changelog 全 371 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
 
-### 💾 記録件数 (57版)
+### 💾 記録件数 (58版)
+- `v0.1.1036` 2026-07-02 — 応援プレビュー/WEBの数字ズレを同一tick化で根治
 - `v0.1.1034` 2026-07-01 — 重い配信で応援レーンに全員が出ない不具合を根治
 - `v0.1.1033` 2026-07-01 — 応援レーンが少なすぎる原因を状態速報で分かるようにした(計器)
 - `v0.1.1025` 2026-07-01 — 応援プレビューが空でも「同一」と誤表示する嘘を根治
@@ -1266,7 +1268,8 @@
 - `v0.1.699` 2026-06-12 — 読み上げの名前ON/OFF切替を追加
 - `v0.1.698` 2026-06-12 — コメビュにユーザー別の声で読み上げ機能を追加
 
-### 🪟 応援レーン・タイル (96版)
+### 🪟 応援レーン・タイル (97版)
+- `v0.1.1036` 2026-07-02 — 応援プレビュー/WEBの数字ズレを同一tick化で根治
 - `v0.1.1035` 2026-07-01 — 応援レーンの全員表示を「開いた初回」から効くようにした
 - `v0.1.1034` 2026-07-01 — 重い配信で応援レーンに全員が出ない不具合を根治
 - `v0.1.1033` 2026-07-01 — 応援レーンが少なすぎる原因を状態速報で分かるようにした(計器)

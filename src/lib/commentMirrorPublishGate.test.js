@@ -46,4 +46,14 @@ describe('createCommentMirrorPublishGate — 状態込みゲート(v0.1.1018)', 
     const g = createCommentMirrorPublishGate();
     expect(g.decide({ liveId: 'lv1', hasComments: true, provisional: true, nowMs: 100000 })).toBe(true);
   });
+  // ★min-gap 無効化(v0.1.1036・鏡バンドル統合): minGapMs:0 を明示すると min-gap を切る。
+  //   flush スケジューラに min-gap を一元化するとき、gate 側の二重ゲートで gap 窓のコメントを捨てない(F-1 再来防止)。
+  it('minGapMs:0 明示で min-gap を無効化(連続 publish でも provisional でなければ通す)', () => {
+    const g = createCommentMirrorPublishGate({ minGapMs: 0 });
+    expect(g.decide({ liveId: 'lv1', hasComments: true, provisional: false, nowMs: 100000 })).toBe(true);
+    // gap を待たずに直後でも通る(全件由来)=gap で捨てない。
+    expect(g.decide({ liveId: 'lv1', hasComments: true, provisional: false, nowMs: 100100 })).toBe(true);
+    // provisional ガード(全件鏡が最近ある)は min-gap とは独立に効き続ける。
+    expect(g.decide({ liveId: 'lv1', hasComments: true, provisional: true, nowMs: 100200 })).toBe(false);
+  });
 });

@@ -42,18 +42,22 @@
 - 🔵 **KEY_INLINE_PANEL_PLACEMENT_USER_EXPLICIT** — 読む人だけ（書く経路が無い疑い）: src/extension/content-entry.js, src/extension/popup-entry.js
 - 🔵 **KEY_INLINE_PANEL_VIEWPORT_WIDE_POLICY** — 読む人だけ（書く経路が無い疑い）: src/extension/content-entry.js, src/extension/popup-entry.js
 - 🔵 **KEY_INLINE_PANEL_WIDTH_MODE** — 読む人だけ（書く経路が無い疑い）: src/extension/content-entry.js, src/extension/popup-entry.js
+- 🔵 **KEY_LANE_MIRROR** — 読む人だけ（書く経路が無い疑い）: src/extension/popup-entry.js, src/extension/status-entry.js
 - 🔵 **KEY_LAST_WATCH_URL** — 読む人だけ（書く経路が無い疑い）: src/extension/comeview-entry.js, src/extension/popup-entry.js, src/extension/status-entry.js
 - 🔵 **KEY_LIVEVIEW_PUBLISH_OUTCOME** — 読む人だけ（書く経路が無い疑い）: src/extension/status-entry.js
 - 🔵 **KEY_LIVEVIEW_PUBLISH_PAYLOAD** — 読む人だけ（書く経路が無い疑い）: src/extension/live-view-entry.js
 - 🔵 **KEY_MARKETING_EXPORT_MASK_LABELS** — 読む人だけ（書く経路が無い疑い）: src/extension/popup-entry.js
 - 🔵 **KEY_NDGR_DETERMINISTIC_BACKFILL** — 読む人だけ（書く経路が無い疑い）: src/extension/content-entry.js
 - 🔵 **KEY_NDGR_FORWARD_ENABLED** — 読む人だけ（書く経路が無い疑い）: src/extension/content-entry.js
+- 🔵 **KEY_NORTH_STAR_MIRROR** — 読む人だけ（書く経路が無い疑い）: src/extension/popup-entry.js, src/extension/status-entry.js
 - 🔵 **KEY_PROFILE_RESOLVE_STATE** — 読む人だけ（書く経路が無い疑い）: src/extension/content-entry.js
 - 🔵 **KEY_RECORDING** — 読む人だけ（書く経路が無い疑い）: src/extension/content-entry.js, src/extension/popup-entry.js
+- 🔵 **KEY_STAT_CARDS_MIRROR** — 読む人だけ（書く経路が無い疑い）: src/extension/popup-entry.js, src/extension/status-entry.js
 - 🔵 **KEY_STORY_GROWTH_COLLAPSED** — 読む人だけ（書く経路が無い疑い）: src/extension/popup-entry.js
 - 🔵 **KEY_SUPPORT_CELEBRATION_STATE** — 読む人だけ（書く経路が無い疑い）: src/extension/popup-entry.js
 - 🔵 **KEY_THUMB_AUTO** — 読む人だけ（書く経路が無い疑い）: src/extension/content-entry.js, src/extension/popup-entry.js
 - 🔵 **KEY_THUMB_INTERVAL_MS** — 読む人だけ（書く経路が無い疑い）: src/extension/content-entry.js, src/extension/popup-entry.js
+- 🔵 **KEY_TOP_SUPPORTERS_MIRROR** — 読む人だけ（書く経路が無い疑い）: src/extension/popup-entry.js
 - 🔵 **fn:commentDbSummaryKey** — 読む人だけ（書く経路が無い疑い）: src/extension/popup-entry.js
 - 🔵 **fn:summaryStorageKey** — 読む人だけ（書く経路が無い疑い）: src/extension/popup-entry.js
 - 🔵 **fn:watchSnapshotStorageKey** — 読む人だけ（書く経路が無い疑い）: src/extension/popup-entry.js
@@ -85,7 +89,7 @@
 | `KEY_COMMENT_INGEST_LOG` | extension/content-entry.js<br>extension/popup-entry.js | extension/content-entry.js<br>extension/popup-entry.js |
 | `KEY_COMMENT_PANEL_AUTO_RESTORE` | — | extension/content-entry.js |
 | `KEY_COMMENT_PANEL_STATUS` | extension/content-entry.js | extension/popup-entry.js |
-| `KEY_COMMENT_TIMELINE_MIRROR` | extension/content-entry.js<br>extension/popup-entry.js | extension/popup-entry.js<br>extension/status-entry.js |
+| `KEY_COMMENT_TIMELINE_MIRROR` | extension/content-entry.js | extension/popup-entry.js<br>extension/status-entry.js |
 | `KEY_CONCURRENT_CALIBRATION_RING_V1` | extension/content-entry.js<br>extension/popup-entry.js | extension/content-entry.js<br>extension/popup-entry.js |
 | `KEY_DEEP_HARVEST_QUIET_UI` | — | extension/content-entry.js<br>extension/popup-entry.js |
 | `KEY_DIAGNOSTICS_ERROR_RING_V1` | lib/diagnosticRingStore.js | lib/diagnosticRingStore.js |
@@ -100,7 +104,7 @@
 | `KEY_INLINE_PANEL_VIEWPORT_WIDE_POLICY` | — | extension/content-entry.js<br>extension/popup-entry.js |
 | `KEY_INLINE_PANEL_WIDTH_MODE` | — | extension/content-entry.js<br>extension/popup-entry.js |
 | `KEY_LANE_DIAG` | extension/popup-entry.js | extension/status-entry.js |
-| `KEY_LANE_MIRROR` | extension/popup-entry.js | extension/popup-entry.js<br>extension/status-entry.js |
+| `KEY_LANE_MIRROR` | — | extension/popup-entry.js<br>extension/status-entry.js |
 | `KEY_LAST_WATCH_URL` | — | extension/comeview-entry.js<br>extension/popup-entry.js<br>extension/status-entry.js |
 | `KEY_LIVEVIEW_PUBLISH_OUTCOME` | — | extension/status-entry.js |
 | `KEY_LIVEVIEW_PUBLISH_PAYLOAD` | — | extension/live-view-entry.js |
@@ -108,7 +112,7 @@
 | `KEY_MARKETING_EXPORT_MASK_LABELS` | — | extension/popup-entry.js |
 | `KEY_NDGR_DETERMINISTIC_BACKFILL` | — | extension/content-entry.js |
 | `KEY_NDGR_FORWARD_ENABLED` | — | extension/content-entry.js |
-| `KEY_NORTH_STAR_MIRROR` | extension/popup-entry.js | extension/popup-entry.js<br>extension/status-entry.js |
+| `KEY_NORTH_STAR_MIRROR` | — | extension/popup-entry.js<br>extension/status-entry.js |
 | `KEY_PAINT_PERF_RING_V1` | extension/popup-entry.js | — |
 | `KEY_POPUP_FRAME` | extension/popup-entry.js | extension/content-entry.js<br>extension/popup-entry.js |
 | `KEY_POPUP_FRAME_CUSTOM` | extension/popup-entry.js | extension/content-entry.js<br>extension/popup-entry.js |
@@ -120,14 +124,14 @@
 | `KEY_SELF_POSTED_RECENTS` | extension/content-entry.js | extension/content-entry.js<br>extension/popup-entry.js |
 | `KEY_STATUS_FAST_DIAG_LITE` | extension/content-entry.js | extension/status-entry.js |
 | `KEY_STATUS_TREND` | extension/status-entry.js | extension/status-entry.js |
-| `KEY_STAT_CARDS_MIRROR` | extension/popup-entry.js | extension/popup-entry.js<br>extension/status-entry.js |
+| `KEY_STAT_CARDS_MIRROR` | — | extension/popup-entry.js<br>extension/status-entry.js |
 | `KEY_STORAGE_WRITE_ERROR` | extension/content-entry.js<br>extension/popup-entry.js | extension/popup-entry.js |
 | `KEY_STORY_GROWTH_COLLAPSED` | — | extension/popup-entry.js |
 | `KEY_SUPPORT_CELEBRATION_STATE` | — | extension/popup-entry.js |
 | `KEY_SW_PROGRESS` | extension/backfill-sw-entry.js | — |
 | `KEY_THUMB_AUTO` | — | extension/content-entry.js<br>extension/popup-entry.js |
 | `KEY_THUMB_INTERVAL_MS` | — | extension/content-entry.js<br>extension/popup-entry.js |
-| `KEY_TOP_SUPPORTERS_MIRROR` | extension/popup-entry.js | extension/popup-entry.js |
+| `KEY_TOP_SUPPORTERS_MIRROR` | — | extension/popup-entry.js |
 | `KEY_USER_COMMENT_PROFILE_CACHE` | extension/content-entry.js | extension/comeview-entry.js<br>extension/content-entry.js<br>extension/popup-entry.js<br>extension/venueBar.js |
 | `KEY_VENUE_SEATS_DIAG` | extension/venueBar.js | extension/status-entry.js |
 | `KEY_VOICE_DIAG` | extension/comeview-entry.js | extension/status-entry.js |
