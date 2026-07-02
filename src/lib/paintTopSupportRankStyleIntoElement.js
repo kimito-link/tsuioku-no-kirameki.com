@@ -34,6 +34,34 @@ const DEFAULT_AVATAR_LOAD_GUARD = {
   noteRemoteAttempt: (_img, _src) => {}
 };
 
+/**
+ * ★v0.1.1038: freshness 注記("🕒 N秒前")だけを in-place 更新する(本体 list は触らない=churn ゼロ)。
+ *   diff-skip キーから freshness を抜いたので、本体不変時はここで textContent だけ差分更新する。
+ *   textContent 代入は自動エスケープ=XSS 安全。note 空なら `<p>` を除去。`<p>` 無ければ note の直後に作る
+ *   (aria-live=polite・gift-history の patchNorthStarGiftHistoryFreshnessNote と同一位置・同一属性)。
+ * @param {HTMLElement} el
+ * @param {string} freshnessNote
+ */
+function patchFreshnessNoteInPlace(el, freshnessNote) {
+  if (!(el instanceof HTMLElement)) return;
+  const note = String(freshnessNote || '').trim();
+  let p = el.querySelector('.nl-top-support-rank__freshness');
+  if (!note) {
+    if (p) p.remove();
+    return;
+  }
+  const text = `🕒 ${note}`;
+  if (!(p instanceof HTMLElement)) {
+    p = document.createElement('p');
+    p.className = 'nl-top-support-rank__freshness';
+    p.setAttribute('aria-live', 'polite');
+    const anchor = el.querySelector('.nl-top-support-rank__note');
+    if (anchor?.parentNode) anchor.insertAdjacentElement('afterend', p);
+    else el.appendChild(p);
+  }
+  if (p.textContent !== text) p.textContent = text;
+}
+
 /** OS の配色(prefers-color-scheme)。popup は従来これをインラインで使っていた。純粋。 */
 function defaultColorScheme() {
   if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return 'light';
@@ -166,24 +194,32 @@ export function renderTopSupportRankStripInto(el, rooms, opts) {
   const freshnessHtml = freshnessNote
     ? `<p class="nl-top-support-rank__freshness" aria-live="polite">🕒 ${escapeHtml(freshnessNote)}</p>`
     : '';
-  const nextHtml =
+  // ★v0.1.1038(churn 根治): diff-skip キーは【本体(rows 由来)だけ】にし、freshness は除外する。
+  //   freshnessNote は formatCardFreshnessNote の相対経過("3秒前"→"6秒前")で毎 paint 変わるため、
+  //   これを diff-skip キーに含めると rows 同一でも毎回 replaceChildren=全 list 貼り替え churn になっていた
+  //   (既知地雷 v1022=sig に時刻を入れると明滅と同型)。freshness は本体不変時 textContent だけ in-place 更新する
+  //   (gift-history レーンが patchNorthStarGiftHistoryFreshnessNote で既に実証済みのパターンを lib に一般化)。
+  const bodyKey =
     prependHtml +
     (beforeNoteHtml || '') +
     `<p class="nl-top-support-rank__note">${escapeHtml(noteText)}。</p>` +
-    freshnessHtml +
     `<div class="nl-top-support-rank__list" role="list">${html}</div>`;
-  // v0.1.618(改修A+差分): 前回と同一 HTML なら本体 DOM を触らずスキップ(ちらつき源を断つ)。
+  // v0.1.618(改修A+差分): 前回と同一 本体 なら DOM を触らずスキップ(ちらつき源を断つ)。
   //   変化があるときだけ、<template> でメモリ上に組んでから replaceChildren で**アトミックに
-  //   差し替え**る。innerHTML 全置換と違い「一瞬空(白)」の中間状態が画面に出ない
-  //   (ディープリサーチ: MDN replaceChildren / web.dev)。XSS 安全性は従来同様、生成側の
-  //   escapeHtml/escapeAttr に依存(template.innerHTML はパースのみで実行されない)。
-  //   本体 DOM を貼り替えた時だけ画像 guard を再バインド(貼り替えていないなら不要)。
-  const bodyChanged = !(_topSupportRankLastHtmlByEl.get(el) === nextHtml && el.firstChild);
+  //   差し替え**る。innerHTML 全置換と違い「一瞬空(白)」の中間状態が画面に出ない。
+  //   XSS 安全性は従来同様、生成側の escapeHtml/escapeAttr に依存。本体貼り替え時だけ画像 guard 再バインド。
+  const bodyChanged = !(_topSupportRankLastHtmlByEl.get(el) === bodyKey && el.firstChild);
   if (bodyChanged) {
     const tpl = document.createElement('template');
-    tpl.innerHTML = nextHtml;
+    // 本体貼り替え時は freshness も本体 HTML に含めて 1 回で組む(貼り替え直後に freshness が消えない)。
+    tpl.innerHTML =
+      prependHtml +
+      (beforeNoteHtml || '') +
+      `<p class="nl-top-support-rank__note">${escapeHtml(noteText)}。</p>` +
+      freshnessHtml +
+      `<div class="nl-top-support-rank__list" role="list">${html}</div>`;
     el.replaceChildren(tpl.content);
-    _topSupportRankLastHtmlByEl.set(el, nextHtml);
+    _topSupportRankLastHtmlByEl.set(el, bodyKey);
     if (typeof bindOnError === 'function') bindOnError(el);
     const thumbs = el.querySelectorAll('img.nl-top-support-rank__thumb');
     models.forEach((m, i) => {
@@ -194,6 +230,9 @@ export function renderTopSupportRankStripInto(el, rooms, opts) {
       }
       if (typeof upgradeAnon === 'function') upgradeAnon(img, m.userKey, m.thumbSrc, 64);
     });
+  } else {
+    // 本体は不変=list を貼り替えない(churn ゼロ)。freshness の "N秒前" だけ textContent で in-place 更新。
+    patchFreshnessNoteInPlace(el, freshnessNote);
   }
   if (isNorthStarBody) {
     if (typeof syncLaneGadget === 'function') syncLaneGadget(el);
