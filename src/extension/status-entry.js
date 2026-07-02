@@ -109,6 +109,7 @@ import {
   buildLaneStatusLine,
   sumRecordedFromLives
 } from '../lib/statusFormat.js';
+import { backfillLiveThroughputLine } from '../lib/backfillRinkuNarration.js';
 import { resolveVisitorCount } from '../lib/resolveVisitorCount.js';
 import { PERF_DIAG_PREFIX, isPerfDiag } from '../lib/perfDiag.js';
 import { LIVE_ENDED_PREFIX, isLiveEndedFlag } from '../lib/liveEndedFlag.js';
@@ -365,6 +366,8 @@ async function refresh(opts = {}) {
     _mark('popupDiag');
     step = 'loadBackfillProgress';
     const backfillProgress = await runStorageOpWithTimeout(() => loadBackfillProgressSafe(), tmo);
+    // v0.1.1045 段1: 走行中スループット計器(別キー・観測のみ)。backfillProgress と同じ軽い read に並べる。
+    const backfillLiveMetric = await runStorageOpWithTimeout(() => loadBackfillLiveMetricSafe(), tmo).catch(() => null);
     _mark('backfill');
     // 以下は「追加データ」=失敗しても他の表示と記録を妨げない(空で描く)。12 秒間引きでキャッシュ
     //   再利用=2 秒ごとの storage read を減らして「スムーズじゃない」を改善(コア表示は毎回更新のまま)。
@@ -419,7 +422,7 @@ async function refresh(opts = {}) {
     const { reportPreview, watchTabMap, trendFindings, laneDiag, laneMirror, statCardsMirror, northStarMirror, voiceDiag, venueSeatsDiag, publishOutcomeRec, commentTimelineMirror, previewRenderAck } = _extrasCache;
     step = 'renderAll';
     // v0.1.1005: 前サイクルの所要計器をコピー本文へ渡す(画面ヘッダーだけでなく AI共有テキストにも出す)。
-    renderAll({ lvList, summaries, fastDiag, popupDiag, backfillProgress, voiceDiag, venueSeatsDiag, laneDiag, laneMirror, statCardsMirror, northStarMirror, reportPreview, trendFindings, watchTabMap, publishOutcomeRec, commentTimelineMirror, previewRenderAck, refreshPerf: _lastRefreshPerf });
+    renderAll({ lvList, summaries, fastDiag, popupDiag, backfillProgress, backfillLiveMetric, voiceDiag, venueSeatsDiag, laneDiag, laneMirror, statCardsMirror, northStarMirror, reportPreview, trendFindings, watchTabMap, publishOutcomeRec, commentTimelineMirror, previewRenderAck, refreshPerf: _lastRefreshPerf });
     _mark('render');
     const _totalMs = Math.round((typeof performance !== 'undefined' ? performance.now() : Date.now()) - _t0);
     updateLastUpdateMeta({ totalMs: _totalMs, stepMs: _stepMs });
@@ -844,6 +847,36 @@ async function loadBackfillProgressSafe() {
   }
 }
 
+/**
+ * v0.1.1045 段1: 走行中スループット計器(KEY_BACKFILL_LIVE_METRIC)を読む(観測のみ)。
+ *   content が走行中に 1Hz で書く。yield bridging が律速か・裏タブペース(fg=0)かを実機で確定する材料。
+ *   ⚠️ KEY_BACKFILL_PROGRESS とは別キー。popup は絶対に読まない(v0.1.657 実況殺しの維持)。
+ * @returns {{lid:string, running:number, seg:number, rows:number, genSteps:number, dataSegs:number, bridgingSteps:number, yields:number, yieldWaitMsTotal:number, elapsedMs:number, fg:number, ts:number}|null}
+ */
+async function loadBackfillLiveMetricSafe() {
+  try {
+    const bag = await chrome.storage.local.get('nls_backfill_live_metric_v1');
+    const m = bag?.['nls_backfill_live_metric_v1'];
+    if (!m || typeof m !== 'object') return null;
+    return {
+      lid: String(m.lid || ''),
+      running: Number(m.running) || 0,
+      seg: Number(m.seg) || 0,
+      rows: Number(m.rows) || 0,
+      genSteps: Number(m.genSteps) || 0,
+      dataSegs: Number(m.dataSegs) || 0,
+      bridgingSteps: Number(m.bridgingSteps) || 0,
+      yields: Number(m.yields) || 0,
+      yieldWaitMsTotal: Number(m.yieldWaitMsTotal) || 0,
+      elapsedMs: Number(m.elapsedMs) || 0,
+      fg: Number(m.fg) || 0,
+      ts: Number(m.ts) || 0
+    };
+  } catch {
+    return null;
+  }
+}
+
 /* ============================================================================
  * レンダリング
  * ========================================================================== */
@@ -851,7 +884,7 @@ async function loadBackfillProgressSafe() {
 // v0.1.861: レポートプレビューの信頼度注釈の文脈は純関数 reportPreviewCtxFromFastDiag(src/lib)に抽出済み
 //   (NDGR 接続/userId 付き率/backfill 進行 → 注釈ctx・挙動同値・テストで固定)。import は冒頭。
 
-function renderAll({ lvList, summaries, fastDiag, popupDiag, backfillProgress, voiceDiag, venueSeatsDiag, laneDiag, laneMirror, statCardsMirror, northStarMirror, reportPreview, trendFindings, watchTabMap, publishOutcomeRec, commentTimelineMirror, previewRenderAck, refreshPerf }) {
+function renderAll({ lvList, summaries, fastDiag, popupDiag, backfillProgress, backfillLiveMetric, voiceDiag, venueSeatsDiag, laneDiag, laneMirror, statCardsMirror, northStarMirror, reportPreview, trendFindings, watchTabMap, publishOutcomeRec, commentTimelineMirror, previewRenderAck, refreshPerf }) {
   // v0.1.847: 各描画セクションを独立 try/catch で隔離するヘルパ。1つが throw しても他のセクションと
   //   最終更新メタを巻き込まない=「セルが全部消える/最終更新—のまま固まる」を根治。落ちた場所は
   //   console と AI 共有欄に出して真因を追えるようにする(star-romi 失敗体験の除去)。
@@ -929,6 +962,18 @@ function renderAll({ lvList, summaries, fastDiag, popupDiag, backfillProgress, v
     );
     const bpLine = buildBackfillProgressLine(backfillProgress, { catchingUp });
     backfillLine = bpLine ? `\n${bpLine}` : '';
+    // v0.1.1045 段1: 走行中スループット計器(別キー・観測のみ)。running=1 かつ新鮮(15秒以内)の
+    //   ときだけ「⏱ 取得速度(走行中)」を出す=固着で止まった過去の走行中を残さない(self-verifying)。
+    //   yield bridging が律速か・裏タブペース(fg=0)かを実機1枚で確定するための行。
+    if (
+      backfillLiveMetric &&
+      backfillLiveMetric.running === 1 &&
+      backfillLiveMetric.ts > 0 &&
+      Date.now() - backfillLiveMetric.ts < 15000
+    ) {
+      const liveTput = backfillLiveThroughputLine(backfillLiveMetric);
+      if (liveTput) backfillLine += `\n${liveTput}`;
+    }
     // v0.1.766(ユーザー要望「概要にレーン状況も入れたい」): 公式値レーン(北極星レーン)の状況を
     //   概要に併記。「レーンが出ていない時」を status を見るだけで分かる。視聴中の配信のみ取得可能
     //   (fastDiag.content.giftDiagnostics の「北極星レーン」)なので、取れたときだけ1行足す。
