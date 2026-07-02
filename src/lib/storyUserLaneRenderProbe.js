@@ -204,6 +204,8 @@ export function buildStoryUserLaneRenderDiag(probeSnap, ctx) {
     heavySettleState: String(s.heavySettleState || ''),
     heavyRaceReturns: Number(s.heavyRaceReturns) || 0,
     lastRunAgoMs: s.lastRunAgoMs ?? null,
+    // v0.1.1040 計器: 段ごとの実 replaceChildren 回数(churn 実測)をそのまま持ち越す。
+    laneRepaintCounts: s.laneRepaintCounts && typeof s.laneRepaintCounts === 'object' ? s.laneRepaintCounts : null,
     verdict,
     reason
   };
@@ -249,6 +251,14 @@ export function formatStoryUserLaneRenderDiagLines(diag, ctx) {
   // 描画済みなのにローディングが終わらない＝overlay バグ（status-entry が overlay 状態を渡したときだけ）。
   if (c.loadingActive === true && d.domTilesPainted > 0) {
     lines.push('  → ⚠ 画面に描画済みなのにローディング表示が続いています（ローディングを畳むバグの疑い）');
+  }
+  // v0.1.1040 計器: 段ごとの実 replaceChildren 回数(churn 実測)。特定の段だけ回数が突出=その段が churn 源。
+  if (d.laneRepaintCounts && typeof d.laneRepaintCounts === 'object') {
+    const r = d.laneRepaintCounts;
+    lines.push(
+      `  → 段別 再描画回数(累計): りんく${r.link || 0} / こん太${r.konta || 0} / たぬ姉${r.tanu || 0} / ギフト${r.gift || 0} / 広告${r.ad || 0}` +
+        '（特定の段だけ突出＝その段が churn 源）'
+    );
   }
   // v0.1.1033: heavy 完了が settled に到達したか。race 多発=たぬ姉レーンが暫定(直近N件)で固着の真因。
   if (d.heavySettleState) {

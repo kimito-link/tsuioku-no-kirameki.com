@@ -464,7 +464,7 @@ import { userLaneHttpForTilePick } from '../lib/storyUserLaneDisplaySrc.js';
 import {
   paintStoryUserLaneDomEmptyGuides,
   paintStoryUserLaneDomFilled,
-  resetStoryUserLaneDom
+  resetStoryUserLaneDom, getStoryLaneRepaintCounts
 } from './story/renderStoryUserLaneDom.js';
 // 応援レーン描画の自己診断(council/lane-render-self-diag-SYNTHESIS.md): 「鏡はあるのに画面に出ない/
 //   ローディングが終わらない」を状態速報で抜け漏れなく捕まえる。北極星の _northStarRenderProbe と同形。
@@ -18458,10 +18458,10 @@ async function collectAiShareDevMonitorPayloadBundle(watchUrl) {
       //   画面に出ない/ローディングが終わらない」を切り分ける（council/lane-render-self-diag-SYNTHESIS.md）。
       storyUserLaneRenderProbe: (() => {
         try {
-          return snapshotStoryUserLaneRenderProbe(_storyUserLaneRenderProbe, Date.now());
-        } catch {
-          return null;
-        }
+          const snap = snapshotStoryUserLaneRenderProbe(_storyUserLaneRenderProbe, Date.now());
+          if (snap) snap.laneRepaintCounts = getStoryLaneRepaintCounts(); // v0.1.1040 計器: 段別 churn 実測
+          return snap;
+        } catch { return null; }
       })()
     },
     content: null,
