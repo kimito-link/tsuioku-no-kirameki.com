@@ -180,7 +180,9 @@ let _extrasCache = /** @type {{reportPreview:any, watchTabMap:any, trendFindings
   // 根2対策: 送信結果(ページ横断 storage)。どのページで送っても status が「送信済み」を読める。
   publishOutcomeRec: null,
   // 第2段: コメントタイムライン鏡(最新N件)。純Webで「コメントが進む」ため jsonBlob に相乗り。
-  commentTimelineMirror: null
+  commentTimelineMirror: null,
+  // v0.1.1046: 走行中スループット計器(過去ログ取得の律速切り分け)。extras 側=毎回の直列 read に足さない。
+  backfillLiveMetric: null
 });
 /** v0.1.868: 配信カードの再構築 skip 判定用 signature(変化なしなら innerHTML を作り直さない)。 */
 let _lastLivesSig = '';
@@ -366,8 +368,6 @@ async function refresh(opts = {}) {
     _mark('popupDiag');
     step = 'loadBackfillProgress';
     const backfillProgress = await runStorageOpWithTimeout(() => loadBackfillProgressSafe(), tmo);
-    // v0.1.1045 段1: 走行中スループット計器(別キー・観測のみ)。backfillProgress と同じ軽い read に並べる。
-    const backfillLiveMetric = await runStorageOpWithTimeout(() => loadBackfillLiveMetricSafe(), tmo).catch(() => null);
     _mark('backfill');
     // 以下は「追加データ」=失敗しても他の表示と記録を妨げない(空で描く)。12 秒間引きでキャッシュ
     //   再利用=2 秒ごとの storage read を減らして「スムーズじゃない」を改善(コア表示は毎回更新のまま)。
@@ -415,11 +415,16 @@ async function refresh(opts = {}) {
         () => chrome.storage.local.get(KEY_PREVIEW_RENDER_ACK).then((b) => b?.[KEY_PREVIEW_RENDER_ACK] || null),
         tmo
       ).catch(() => null);
-      _extrasCache = { reportPreview, watchTabMap, trendFindings, laneDiag, laneMirror, statCardsMirror, northStarMirror, voiceDiag, venueSeatsDiag, publishOutcomeRec, commentTimelineMirror, previewRenderAck };
+      // v0.1.1046: 走行中スループット計器も extras(12秒間引き)へ。★毎回の直列 read に足したら
+      //   大配信で状態速報が固まった(v0.1.909 と同型の地雷=補助 read はコアに足さない)。計器は補助情報
+      //   なので12秒間引きで十分(走行中の目安が取れれば律速切り分けに足りる)。
+      step = 'loadBackfillLiveMetric';
+      const backfillLiveMetric = await runStorageOpWithTimeout(() => loadBackfillLiveMetricSafe(), tmo).catch(() => null);
+      _extrasCache = { reportPreview, watchTabMap, trendFindings, laneDiag, laneMirror, statCardsMirror, northStarMirror, voiceDiag, venueSeatsDiag, publishOutcomeRec, commentTimelineMirror, previewRenderAck, backfillLiveMetric };
       _extrasCacheAt = Date.now();
       _mark('extras');
     }
-    const { reportPreview, watchTabMap, trendFindings, laneDiag, laneMirror, statCardsMirror, northStarMirror, voiceDiag, venueSeatsDiag, publishOutcomeRec, commentTimelineMirror, previewRenderAck } = _extrasCache;
+    const { reportPreview, watchTabMap, trendFindings, laneDiag, laneMirror, statCardsMirror, northStarMirror, voiceDiag, venueSeatsDiag, publishOutcomeRec, commentTimelineMirror, previewRenderAck, backfillLiveMetric } = _extrasCache;
     step = 'renderAll';
     // v0.1.1005: 前サイクルの所要計器をコピー本文へ渡す(画面ヘッダーだけでなく AI共有テキストにも出す)。
     renderAll({ lvList, summaries, fastDiag, popupDiag, backfillProgress, backfillLiveMetric, voiceDiag, venueSeatsDiag, laneDiag, laneMirror, statCardsMirror, northStarMirror, reportPreview, trendFindings, watchTabMap, publishOutcomeRec, commentTimelineMirror, previewRenderAck, refreshPerf: _lastRefreshPerf });
