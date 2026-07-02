@@ -2939,7 +2939,14 @@ export function mountVenueBarButton(options = {}) {
       otherCount: totalAnonymous,
       broadcasterInSeats,
       broadcasterKnown: bcUid !== '',
-      lastUpdateAt: nowMs()
+      lastUpdateAt: nowMs(),
+      // v0.1.1043: 「なぜ全員出ないか」を状態速報で数値切り分けするための計器。
+      //   既に算出済みの値を載せるだけ(新規計算/再描画を足さない=churn 源にしない)。
+      //   perRow*venueMaxRows と participantCount と 500 のどれで可視席が頭打ちかを status が判定。
+      perRow,
+      venueMaxRows,
+      seatAreaWidth,
+      hardCap: VENUE_FULLSCREEN_MAX_SEATS
     };
     publishVenueSeatsDiag(seatsDiagObs);
     // 2026-07-01 会議(venue-diag): 「🩺 会場の状態」パネル用に最新の観測値を保持。
