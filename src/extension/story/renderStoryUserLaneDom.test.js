@@ -2,7 +2,8 @@
 import { describe, it, expect } from 'vitest';
 import {
   paintStoryUserLaneDomFilled,
-  resetStoryUserLaneDom
+  resetStoryUserLaneDom,
+  shouldKeepStoryUserLaneTilesOnEmpty
 } from './renderStoryUserLaneDom.js';
 
 /**
@@ -99,5 +100,32 @@ describe('fillLaneTier 段単位 diff-skip — churn 根治', () => {
     // reset 後に同一 items を描くと、cache 無効化で確実に再描画される(空のまま残らない)。
     paint(els, { link: LINK, gift: [], ad: [], konta: [], tanu: TANU });
     expect(els.laneTanu.children.length).toBe(2);
+  });
+});
+
+/**
+ * ★v0.1.1041「タイル出入り」根治: 同一配信 backfill 谷間で picked/entries が一瞬空になっても、
+ *   既にタイルがあれば畳まない判定。配信切替や真の空では畳む。
+ */
+describe('shouldKeepStoryUserLaneTilesOnEmpty', () => {
+  function elsWithTanu(n) {
+    const els = makeEls();
+    for (let i = 0; i < n; i += 1) els.laneTanu.appendChild(document.createElement('div'));
+    return els;
+  }
+  it('同一 liveId でタイルがあれば keep=true(畳まない)', () => {
+    expect(shouldKeepStoryUserLaneTilesOnEmpty(elsWithTanu(2), 'lv1', 'lv1')).toBe(true);
+  });
+  it('配信切替(liveId 不一致)なら keep=false(畳む=古い配信を残さない)', () => {
+    expect(shouldKeepStoryUserLaneTilesOnEmpty(elsWithTanu(2), 'lv2', 'lv1')).toBe(false);
+  });
+  it('タイルが1つも無ければ keep=false(真の空は畳む)', () => {
+    expect(shouldKeepStoryUserLaneTilesOnEmpty(makeEls(), 'lv1', 'lv1')).toBe(false);
+  });
+  it('一度も描いていない(lastTiledLid 空)なら keep=false', () => {
+    expect(shouldKeepStoryUserLaneTilesOnEmpty(elsWithTanu(2), 'lv1', '')).toBe(false);
+  });
+  it('大文字小文字/前後空白を正規化して比較', () => {
+    expect(shouldKeepStoryUserLaneTilesOnEmpty(elsWithTanu(1), ' LV1 ', 'lv1')).toBe(true);
   });
 });

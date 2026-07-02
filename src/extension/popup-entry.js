@@ -464,7 +464,7 @@ import { userLaneHttpForTilePick } from '../lib/storyUserLaneDisplaySrc.js';
 import {
   paintStoryUserLaneDomEmptyGuides,
   paintStoryUserLaneDomFilled,
-  resetStoryUserLaneDom, getStoryLaneRepaintCounts
+  resetStoryUserLaneDom, getStoryLaneRepaintCounts, shouldKeepStoryUserLaneTilesOnEmpty
 } from './story/renderStoryUserLaneDom.js';
 // 応援レーン描画の自己診断(council/lane-render-self-diag-SYNTHESIS.md): 「鏡はあるのに画面に出ない/
 //   ローディングが終わらない」を状態速報で抜け漏れなく捕まえる。北極星の _northStarRenderProbe と同形。
@@ -4796,6 +4796,8 @@ const STORY_AVATAR_DIAG_STATE = {
 
 /** renderStoryUserLane の見た目が同じなら DOM を付け直さない（高流量時のちらつき抑制） */
 let storyUserLaneLastRenderSig = '';
+/** v0.1.1041: 最後に実タイルを描いた liveId。同一配信 backfill 谷間の一瞬空でタイルを畳まない判定の基準(shouldKeepStoryUserLaneTilesOnEmpty)。 */
+let _storyUserLaneLastTiledLid = '';
 /** renderStoryAvatarDiag の同内容再描画を抑止（診断パネルのチカつき抑制） */
 let storyAvatarDiagLastRenderSig = '';
 
@@ -5091,18 +5093,14 @@ function renderStoryUserLane() {
     ? STORY_SOURCE_STATE.storageRowsForCurrentLive
     : entries;
   if (!entries.length) {
-    // 自己診断: コメント全件読みが未完走で entries が空＝即 return（passive で踏みやすい既知地雷）。
+    // ★v1041: 同一配信 backfill 谷間の一瞬空では既存タイルを畳まない(タイル出入り根治・判定は lib 集約)。
+    if (shouldKeepStoryUserLaneTilesOnEmpty(els, STORY_SOURCE_STATE.liveId, _storyUserLaneLastTiledLid)) { recordStoryUserLaneStep(_storyUserLaneRenderProbe, STORY_USER_LANE_STEPS.DONE, { domTilesPainted: countStoryUserLaneDomTiles(els) }); return; }
     recordStoryUserLaneStep(_storyUserLaneRenderProbe, STORY_USER_LANE_STEPS.ENTRIES_EMPTY_RETURN, {
       entriesLen: 0,
       domTilesPainted: 0
     });
     storyUserLaneLastRenderSig = '';
-    STORY_AVATAR_DIAG_STATE.userLaneDeduped = 0;
-    STORY_AVATAR_DIAG_STATE.userLaneTier3 = 0;
-    STORY_AVATAR_DIAG_STATE.userLaneTier2 = 0;
-    STORY_AVATAR_DIAG_STATE.userLaneTier1 = 0;
-    STORY_AVATAR_DIAG_STATE.userLaneStrongNick = 0;
-    STORY_AVATAR_DIAG_STATE.userLanePersonalThumb = 0;
+    Object.assign(STORY_AVATAR_DIAG_STATE, { userLaneDeduped: 0, userLaneTier3: 0, userLaneTier2: 0, userLaneTier1: 0, userLaneStrongNick: 0, userLanePersonalThumb: 0 });
     resetStoryUserLaneDom(els);
     if (guideTop) guideTop.hidden = true;
     if (guideLinesTop) guideLinesTop.innerHTML = '';
@@ -5293,6 +5291,8 @@ function renderStoryUserLane() {
   storyUserLaneLastRenderSig = laneSig;
 
   if (!picked.length) {
+    // ★v0.1.1041: 同一配信 backfill 谷間で picked が一瞬空でも既存タイルを畳まない(判定は lib に集約)。
+    if (shouldKeepStoryUserLaneTilesOnEmpty(els, liveId, _storyUserLaneLastTiledLid)) { recordStoryUserLaneStep(_storyUserLaneRenderProbe, STORY_USER_LANE_STEPS.DONE, { domTilesPainted: countStoryUserLaneDomTiles(els) }); return; }
     paintStoryUserLaneDomEmptyGuides(els, faces);
     // 自己診断: りんく/こん太/たぬ姉の候補が無く空ガイド＝完了（描画ロジックは不変・観測のみ）。
     recordStoryUserLaneStep(_storyUserLaneRenderProbe, STORY_USER_LANE_STEPS.DONE, {
@@ -5307,6 +5307,7 @@ function renderStoryUserLane() {
   paintStoryUserLaneDomFilled(els, faces, buckets, laneDisplayedTotal, laneDomIo, {
     totalCandidates: candidates.length
   });
+  if (countStoryUserLaneDomTiles(els) > 0) _storyUserLaneLastTiledLid = String(liveId || '').trim().toLowerCase(); // v1041: 実タイルを描いた lid を記録
   // 自己診断: paint 直後に DOM 顔タイル総数を記録（観測のみ・描画は変えない）→ 完了。
   recordStoryUserLaneStep(_storyUserLaneRenderProbe, STORY_USER_LANE_STEPS.PAINTED, {
     domTilesPainted: countStoryUserLaneDomTiles(els)
@@ -5720,9 +5721,8 @@ function publishLaneDiag(obs) {
   }
 }
 
-// ★v0.1.1036(鏡バンドル統合): 5鏡を「別tick・別キー・別min-gap」でなく合流バッファ→trailing-edge で【旧5キーを1回の
-//   atomic set】に統合(②③が別 get で読んでも相互一貫=「①150 vs ②129」根治)。min-gap は scheduler 一元(gap 中の更新も
-//   次 flush で必ず載る=F-1 根治)。読み手は旧5キー無変更。KEY_MIRROR_BUNDLE の実書き込みは後続フェーズ(読み手対応とセット)。
+// ★v0.1.1036(鏡バンドル統合): 5鏡を合流バッファ→trailing-edge で旧5キーを1回の atomic set に統合(②③が別 get で読んでも
+//   相互一貫=「①150 vs ②129」根治)。min-gap は scheduler 一元(gap 中の更新も次 flush で載る=F-1 根治)。KEY_MIRROR_BUNDLE は後続。
 const _mirrorFlushScheduler = createMirrorBundleFlushScheduler();
 let _mirrorFlushTimer = null;
 /** 合流バッファに 1 鏡を反映し、trailing-edge(~400ms)で旧5キーを 1 回の set に統合して書く。描画は触らない。 */

@@ -80,6 +80,27 @@ export function getStoryLaneRepaintCounts() {
 }
 
 /**
+ * ★v0.1.1041: 「picked/entries が一瞬空になったとき、既存タイルを畳まず残すべきか」を判定する。
+ *   同一配信(liveId が最後にタイルを描いた lid と一致)で、かつ現在レーンに実タイルがあるときだけ true。
+ *   backfill の谷間で候補が一瞬0になっても前回タイルを残す=「タイルが出たり消えたり」の根治
+ *   (v1026 の広告列「一度実データを描いたら一瞬の空では畳まない」と同戦略)。配信切替や一度も描いていない時は false=畳む。
+ * @param {StoryUserLaneDomElements} els
+ * @param {unknown} currentLiveId
+ * @param {unknown} lastTiledLid 最後に実タイルを描いた liveId
+ * @returns {boolean}
+ */
+export function shouldKeepStoryUserLaneTilesOnEmpty(els, currentLiveId, lastTiledLid) {
+  const cur = String(currentLiveId || '').trim().toLowerCase();
+  const last = String(lastTiledLid || '').trim().toLowerCase();
+  if (!cur || cur !== last) return false; // 配信切替 or 未描画=畳んでよい
+  const lanes = els ? [els.laneLink, els.laneGift, els.laneAd, els.laneKonta, els.laneTanu] : [];
+  for (const lane of lanes) {
+    if (lane && typeof lane.childElementCount === 'number' && lane.childElementCount > 0) return true;
+  }
+  return false; // 実タイルが1つも無い=畳んでよい(真の空)
+}
+
+/**
  * 段の items から「見た目が同じなら再描画不要」を判定する安定 key。
  *   ★時刻や guard 非同期差替後の src は入れない(v1022 型の毎回変化回避)= item 由来の確定フィールドのみ。
  * @param {Array<{ displaySrc?: any, title?: any, meta?: { idLine?: any, nameLine?: any }, entry?: { userId?: any } }>} items
