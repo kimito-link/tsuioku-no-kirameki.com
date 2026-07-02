@@ -41,12 +41,20 @@ const DEFAULT_MIN_GAP_MS = 3000;
  * 状態(最後の全件publish時刻・最後の書込時刻)を内部に閉じ込めたゲート。popup-entry はこれ1個を持ち、
  *   decide() 1回で「liveId検証・provisionalガード・min-gap」をまとめて判定+状態更新する
  *   (popup 側の変数宣言と分岐を増やさない=max-lines ラチェットを守る)。
+ *
+ * ★min-gap の外し方(v0.1.1036・鏡バンドル統合): `minGapMs: 0` を明示で渡すと min-gap を無効化する
+ *   (0 を「未指定=既定3秒」に丸めない)。鏡バンドル統合後は min-gap を flush スケジューラに一元化するため、
+ *   ここでは min-gap を切って provisional ガード+liveId 検証だけを担わせる。min-gap を残したまま flush 側にも
+ *   置くと『gate が gap 窓のコメントを捨てる→次 flush でも載らない』二重ゲートで、まさに潰したい取りこぼしを
+ *   コメントに再導入するため(F-1 の再来)。
  * @param {{ guardMs?: number, minGapMs?: number }} [opts]
  * @returns {{ decide: (p: {liveId: string, hasComments: boolean, provisional: boolean, nowMs: number}) => boolean }}
  */
 export function createCommentMirrorPublishGate(opts = {}) {
   const guardMs = Number(opts?.guardMs) > 0 ? Number(opts.guardMs) : DEFAULT_GUARD_MS;
-  const minGapMs = Number(opts?.minGapMs) > 0 ? Number(opts.minGapMs) : DEFAULT_MIN_GAP_MS;
+  // minGapMs は「明示 0 = 無効化」を許す(未指定 undefined のときだけ既定へ)。
+  const rawGap = Number(opts?.minGapMs);
+  const minGapMs = opts && opts.minGapMs != null && Number.isFinite(rawGap) && rawGap >= 0 ? rawGap : DEFAULT_MIN_GAP_MS;
   let lastFull = { liveId: '', at: 0 };
   let lastWriteAt = 0;
   return {
@@ -57,7 +65,7 @@ export function createCommentMirrorPublishGate(opts = {}) {
       if (!/^lv\d{1,15}$/.test(lid) || p?.hasComments !== true) return false;
       const provisional = p?.provisional === true;
       if (shouldSkipProvisionalCommentMirror({ provisional, liveId: lid, lastFull, nowMs: now, guardMs })) return false;
-      if (now - lastWriteAt < minGapMs) return false;
+      if (minGapMs > 0 && now - lastWriteAt < minGapMs) return false;
       lastWriteAt = now;
       if (!provisional) lastFull = { liveId: lid, at: now };
       return true;

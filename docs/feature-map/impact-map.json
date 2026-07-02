@@ -4198,6 +4198,26 @@
       ]
     },
     {
+      "file": "src/lib/mirrorBundle.js",
+      "featureCount": 1,
+      "features": [
+        "popup"
+      ],
+      "labels": [
+        "ポップアップ(応援レーン)"
+      ]
+    },
+    {
+      "file": "src/lib/mirrorBundleFlushScheduler.js",
+      "featureCount": 1,
+      "features": [
+        "popup"
+      ],
+      "labels": [
+        "ポップアップ(応援レーン)"
+      ]
+    },
+    {
       "file": "src/lib/mirrorSanitize.js",
       "featureCount": 1,
       "features": [

@@ -116,7 +116,12 @@ const STORAGE_DISCONNECT_BASELINE = new Set([
   // コメントタイムライン鏡(2026-06-26・liveview-wholesale 第2段): producer=popup-entry / consumer=status-entry が
   //   jsonBlob に相乗り→純Web(app/live-view)が貼る。別バンドル間ハンドオフで静的解析は片側しか見えない偽陽性。
   //   純Webで「コメントが進む動き」を出すための最新N件鏡。経路は実機で確認予定。
-  'KEY_COMMENT_TIMELINE_MIRROR'
+  'KEY_COMMENT_TIMELINE_MIRROR',
+  // 鏡バンドル統合(2026-07-02・v0.1.1036): 5鏡を1回の atomic set にまとめる mirrorBundleFlushScheduler の
+  //   legacyPayload(動的キーのマップ)経由で書くようにしたため、popup-entry の literal `set({[KEY_X]:...})` が消え、
+  //   静的解析が producer を取りこぼす偽陽性。実書込は popup-entry:mergeAndScheduleFlush(scheduler.legacyPayload を
+  //   chrome.storage.local.set)・consumer は popup(②apply)/status/app。経路は同一 tick 一貫化のための意図的な間接化。
+  'KEY_STAT_CARDS_MIRROR', 'KEY_TOP_SUPPORTERS_MIRROR', 'KEY_NORTH_STAR_MIRROR'
 ]);
 
 /**

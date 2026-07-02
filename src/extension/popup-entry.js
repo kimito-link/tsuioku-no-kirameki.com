@@ -559,6 +559,7 @@ import { buildLaneDiagSnapshot } from '../lib/laneDiag.js';
 import { KEY_LANE_MIRROR } from '../lib/laneMirrorKey.js';
 import { KEY_PREVIEW_RENDER_ACK, buildPreviewRenderAck } from '../lib/previewRenderAckKey.js';
 import { buildLaneMirrorSnapshot, restoreLaneMirrorBuckets } from '../lib/laneMirror.js';
+import { createMirrorBundleFlushScheduler } from '../lib/mirrorBundleFlushScheduler.js';
 import { KEY_STAT_CARDS_MIRROR } from '../lib/statCardsMirrorKey.js';
 import { buildStatCardsMirrorSnapshot } from '../lib/statCardsMirror.js';
 import { createStatCardsMirrorPassivePainter } from '../lib/statCardsMirrorDom.js';
@@ -5715,26 +5716,44 @@ function publishLaneDiag(obs) {
   }
 }
 
-/** 応援レーン鏡の storage 書き込み(min-gap 3秒・best-effort=popup を止めない・描画は触らない)。 */
-let _laneMirrorLastWriteAt = 0;
-/** @param {{ liveId: string, buckets: Record<string, unknown[]>, pickedLength: number, totalCandidates: number }} input */
-function publishLaneMirror(input) {
-  if (INLINE_PASSIVE) return; // 受動ビュー: 鏡を上書きしない
+// ★v0.1.1036(鏡バンドル統合): 5鏡(lane/statCards/topSupporters/northStar/commentTimeline)を「別tick・別キー・
+//   別 min-gap」で書くのをやめ、1つの合流バッファに反映→trailing-edge で【1回の atomic set】に統合する。
+//   これで②③が別 get で読んでも中身が相互一貫になる(=「①150 vs ②129」の同一tick根治)。min-gap は
+//   スケジューラに一元化(gap 中の更新はバッファに残り次 flush で必ず載る=取りこぼし F-1 根治)。
+//   読み手は旧5キーのまま無変更(同梱書き込み)。KEY_MIRROR_BUNDLE の実書き込みは後続フェーズ(読み手対応とセット)。
+const _mirrorFlushScheduler = createMirrorBundleFlushScheduler();
+let _mirrorFlushTimer = null;
+/** 合流バッファに 1 鏡を反映し、trailing-edge(~400ms)で旧5キーを 1 回の set に統合して書く。描画は触らない。 */
+function mergeAndScheduleFlush(sectionKey, snapshot, liveId, nowMs) {
+  if (INLINE_PASSIVE) return; // 受動ビュー: 鏡を書かない(②の不可侵原則)
   try {
-    const now = Date.now();
-    if (now - _laneMirrorLastWriteAt < 3000) return; // 3秒 min-gap(publishLaneDiag と同じ)。
-    _laneMirrorLastWriteAt = now;
-    const snap = buildLaneMirrorSnapshot(input, { cap: 48, nowMs: now });
-    void chrome.storage.local.set({ [KEY_LANE_MIRROR]: snap }).catch(() => {
-      /* best-effort: storage 不可・context 消失 */
-    });
+    _mirrorFlushScheduler.reflect(sectionKey, snapshot, { liveId, nowMs });
+    if (_mirrorFlushTimer) return; // 合流窓が既に張られている=次の flush でまとめて出す
+    _mirrorFlushTimer = setTimeout(() => {
+      _mirrorFlushTimer = null;
+      try {
+        const out = _mirrorFlushScheduler.takeFlushPayload(Date.now());
+        if (!out) { if (_mirrorFlushScheduler.isDirty()) mergeAndScheduleFlush(sectionKey, null, liveId, Date.now()); return; }
+        void chrome.storage.local.set(out.legacyPayload).catch(() => { /* best-effort */ });
+      } catch { /* no-op */ }
+    }, 400);
   } catch {
     /* no-op */
   }
 }
 
-/** 数字カード鏡の storage 書き込み(min-gap 3秒・best-effort・描画は触らない)。応援レーンの鏡と同型。 */
-let _statCardsMirrorLastWriteAt = 0;
+/** @param {{ liveId: string, buckets: Record<string, unknown[]>, pickedLength: number, totalCandidates: number }} input */
+function publishLaneMirror(input) {
+  if (INLINE_PASSIVE) return; // 受動ビュー: 鏡を上書きしない
+  try {
+    const now = Date.now();
+    const snap = buildLaneMirrorSnapshot(input, { cap: 48, nowMs: now });
+    mergeAndScheduleFlush('lane', snap, snap && snap.liveId, now);
+  } catch {
+    /* no-op */
+  }
+}
+
 /**
  * @param {{ liveId: string, recordsText: string, recordsIsPlaceholder: boolean,
  *   recordsOfficialLine: string, recordsBreakdownLine: string, recordsIngestLine: string,
@@ -5746,22 +5765,16 @@ function publishStatCardsMirror(input) {
   if (INLINE_PASSIVE) return; // 受動ビュー: 数字カード鏡を上書きしない
   try {
     const now = Date.now();
-    if (now - _statCardsMirrorLastWriteAt < 3000) return; // 3秒 min-gap。
-    _statCardsMirrorLastWriteAt = now;
     const snap = buildStatCardsMirrorSnapshot(input, { nowMs: now });
-    void chrome.storage.local.set({ [KEY_STAT_CARDS_MIRROR]: snap }).catch(() => {
-      /* best-effort: storage 不可・context 消失 */
-    });
+    mergeAndScheduleFlush('statCards', snap, snap && snap.liveId, now);
   } catch {
     /* no-op */
   }
 }
 
-/** 応援者ランキング鏡 publish の min-gap 計時。 */
-let _topSupportersMirrorLastWriteAt = 0;
 /**
  * v0.1.1024: 応援者ランキング(🥇🥈🥉)の鏡を publish。①(watch popup)が描いた strip rooms を②が読んで
- *   同じ本物 lib(renderTopSupportRankStripInto)で描く。INLINE_PASSIVE は書かない・3秒間引き・上位10件。
+ *   同じ本物 lib(renderTopSupportRankStripInto)で描く。INLINE_PASSIVE は書かない・上位10件。
  * @param {string} liveId
  * @param {any[]} rooms strip rooms({userKey,nickname,count,avatarUrl})
  */
@@ -5769,22 +5782,22 @@ function publishTopSupportersMirror(liveId, rooms) {
   if (INLINE_PASSIVE) return; // 受動ビュー: 鏡を上書きしない
   try {
     const now = Date.now();
-    if (now - _topSupportersMirrorLastWriteAt < 3000) return; // 3秒 min-gap。
     const lid = String(liveId || '').trim().toLowerCase();
     const arr = Array.isArray(rooms) ? rooms : [];
     if (!/^lv\d{1,15}$/.test(lid) || !arr.length) return;
-    _topSupportersMirrorLastWriteAt = now;
     const cells = buildTopSupportersMirrorCells(arr);
-    void chrome.storage.local.set({ [KEY_TOP_SUPPORTERS_MIRROR]: { liveId: lid, capturedAt: now, rooms: cells } }).catch(() => {});
+    mergeAndScheduleFlush('topSupporters', { liveId: lid, capturedAt: now, rooms: cells }, lid, now);
   } catch {
     /* no-op */
   }
 }
 
-/** v0.1.1018: liveId検証・provisionalガード(暫定30件で全件鏡を潰さない)・min-gap を1個で判定する gate。 */
-const _commentMirrorGate = createCommentMirrorPublishGate();
+/** v0.1.1018: liveId検証・provisionalガード(暫定30件で全件鏡を潰さない)を判定する gate。
+ *  ★v0.1.1036: min-gap はバンドル flush に一元化したので gate 側は無効化(minGapMs:0)=二重ゲートで
+ *    gap 窓のコメントを捨てない(F-1 再来防止・commentMirrorPublishGate.js のコメント参照)。 */
+const _commentMirrorGate = createCommentMirrorPublishGate({ minGapMs: 0 });
 /**
- * コメント鏡を status→純Web 用に publish。INLINE_PASSIVE は書かない・3秒間引き。
+ * コメント鏡を status→純Web 用に publish。INLINE_PASSIVE は書かない。
  * @param {{ liveId: string, comments: any[], provisional?: boolean }} input
  */
 function publishCommentTimelineMirror(input) {
@@ -5804,16 +5817,12 @@ function publishCommentTimelineMirror(input) {
       resolveAvatar: (c) => storyGrowthTileSrcForEntry(c, lid, comments)
     });
     if (!snap) return;
-    void chrome.storage.local.set({ [KEY_COMMENT_TIMELINE_MIRROR]: snap }).catch(() => {
-      /* best-effort: storage 不可・context 消失 */
-    });
+    mergeAndScheduleFlush('commentTimeline', snap, lid, now);
   } catch {
     /* no-op */
   }
 }
 
-/** 北極星レーン鏡の publish min-gap 計時。 */
-let _northStarMirrorLastWriteAt = 0;
 /**
  * 北極星レーン鏡のレーン合流バッファ。
  *   貢献度(refreshNorthStarContributionRankingLaneAsync)と広告(refreshNorthStarAdRankingLane)は
@@ -5825,34 +5834,26 @@ let _northStarMirrorLastWriteAt = 0;
 let _northStarMirrorLanes = { liveId: '', contributionRanking: [], adRanking: [] };
 /**
  * 北極星レーン鏡(contributionRanking=ギフト貢献度 / adRanking=ニコニ広告)を status→純Web 用に publish する。
- *   publishStatCardsMirror と同型: 受動ビュー(INLINE_PASSIVE)では書かない・3秒 min-gap・best-effort・描画不変。
- *   popup が既に計算済みの rows を渡すだけ(再解決しない)。レーンは部分指定可=与えたレーンだけ更新し、
- *   未指定レーンは合流バッファの直近値を温存する(★1個ずつ自作で似せない=popup の rows を丸ごと積む)。
+ *   受動ビュー(INLINE_PASSIVE)では書かない・best-effort・描画不変。popup が既に計算済みの rows を渡すだけ。
+ *   レーンは部分指定可=与えたレーンだけ更新し、未指定レーンは合流バッファの直近値を温存する。
  *
- *   ★v0.1.963(council/three-views-parity-SYNTHESIS.md P0): deferWrite。
- *   貢献度と広告は refreshAllNorthStarMirrorLanes の同じ Promise.allSettled バーストで back-to-back に
- *   resolve し、両方がここを呼ぶ。従来は「合流バッファ更新の【後】に 3秒 min-gap return」だったため、
- *   先着レーンが write を勝ち取り、後着レーンは min-gap で return=バッファだけ更新され永続化されず、
- *   3秒間そのレーンが鏡に出ない(=①にはあるのに②③に出ない『コピー漏れ』)。解決順は非決定的なので
- *   貢献度が落ちる時も広告が落ちる時もあった(実機 lv350833724 で貢献度6→鏡0)。
- *   → 個別呼び出しは deferWrite:true でバッファ合流だけ行い write しない。allSettled 完了後に
- *     deferWrite なしで 1 回だけ呼ぶと、両レーン揃った合流バッファが確実に 1 snapshot として書かれる。
- *     min-gap 自体は温存(全体 refresh は数秒周期=write 頻度は不変)。
+ *   ★v0.1.963(council/three-views-parity-SYNTHESIS.md P0): deferWrite。貢献度と広告は
+ *   refreshAllNorthStarMirrorLanes の allSettled バーストで back-to-back に resolve し両方ここを呼ぶ。
+ *   個別呼び出しは deferWrite:true で【北極星セクション内】の合流だけ行い write しない。allSettled 完了後に
+ *   deferWrite なしで 1 回だけ呼ぶと、両レーン揃った合流を 1 snapshot として鏡バンドルへ反映する。
+ *   ★v0.1.1036: write は鏡バンドル flush に一元化(min-gap もそちら)。ここは northStar セクションを
+ *   バンドルへ反映するだけ=他4鏡と同一 tick に atomic set される(northStar だけ別 tick 退行を構造的に排除)。
  * @param {{ liveId?: string, contributionRanking?: any[], adRanking?: any[], deferWrite?: boolean }} input
  */
 function publishNorthStarMirror(input) {
   if (INLINE_PASSIVE) return; // 受動ビュー: 北極星レーン鏡を上書きしない
   try {
     const src = input && typeof input === 'object' ? input : {};
-    // 合流ロジックは純関数 mergeNorthStarMirrorLanes に集約(テストで不変条件を固定=コピー漏れ再発防止)。
+    // 北極星セクション内の合流は純関数 mergeNorthStarMirrorLanes に集約(貢献度/広告のコピー漏れ再発防止)。
     _northStarMirrorLanes = mergeNorthStarMirrorLanes(_northStarMirrorLanes, src);
-    // バースト中の個別呼び出しは合流だけして write しない(後着レーンが min-gap で落ちるのを防ぐ)。
-    //   実際の write は refreshAllNorthStarMirrorLanes の allSettled 完了後の 1 回(deferWrite なし)が担う。
-    if (src.deferWrite) return;
+    if (src.deferWrite) return; // バースト中は合流だけ(write は allSettled 後の 1 回が担う)。
 
     const now = Date.now();
-    if (now - _northStarMirrorLastWriteAt < 3000) return; // 3秒 min-gap。
-    _northStarMirrorLastWriteAt = now;
     const snap = buildNorthStarMirrorSnapshot(
       {
         liveId: _northStarMirrorLanes.liveId,
@@ -5861,9 +5862,7 @@ function publishNorthStarMirror(input) {
       },
       now
     );
-    void chrome.storage.local.set({ [KEY_NORTH_STAR_MIRROR]: snap }).catch(() => {
-      /* best-effort: storage 不可・context 消失 */
-    });
+    mergeAndScheduleFlush('northStar', snap, _northStarMirrorLanes.liveId, now);
   } catch {
     /* no-op */
   }
