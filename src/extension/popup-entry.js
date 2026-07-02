@@ -2960,7 +2960,8 @@ function renderExtensionContextBanner(visible) {
  *   snapshot: WatchPageSnapshot|null,
  *   fetchInflight: boolean,
  *   fetchError: string,
- *   snapshotFetchActive: boolean
+ *   snapshotFetchActive: boolean,
+ *   heavyReadActive: boolean
  * }}
  */
 // 0.1.31 (AF): blob URL の revoke を queue 管理。15 秒で revoke / 同時 3 個まで。
@@ -2978,6 +2979,9 @@ const watchMetaCache = {
   // v0.1.392: stale snapshot の有無に関わらず、実際の snapshot fetch が走っている間 true。
   //   3 秒 polling で fetch が重なるのを防ぐためのガード（fetchInflight とは別目的）。
   snapshotFetchActive: false,
+  // v0.1.1037: heavy 全件読み(readHeavyFromStore)進行中 true。embed_watch の3秒 polling が重い配信で heavy read を
+  //   追い越す refreshGen レース(応援レーンちかちか)を防ぐ in-flight ガード(snapshotFetchActive 同型・read を減らす方向)。
+  heavyReadActive: false,
   // v0.1.481: 読み取り成功時の最新コメント配列を { lv, arr } で退避する。多タブで
   //   chrome.storage.local.get がタイムアウトして {} が返ったとき、空配列で描画して全カードを
   //   「—」固定にしてしまう穴（v0.1.336/437 のガードは「固まり防止」止まりで空塗りつぶしは残存）を
@@ -5716,11 +5720,9 @@ function publishLaneDiag(obs) {
   }
 }
 
-// ★v0.1.1036(鏡バンドル統合): 5鏡(lane/statCards/topSupporters/northStar/commentTimeline)を「別tick・別キー・
-//   別 min-gap」で書くのをやめ、1つの合流バッファに反映→trailing-edge で【1回の atomic set】に統合する。
-//   これで②③が別 get で読んでも中身が相互一貫になる(=「①150 vs ②129」の同一tick根治)。min-gap は
-//   スケジューラに一元化(gap 中の更新はバッファに残り次 flush で必ず載る=取りこぼし F-1 根治)。
-//   読み手は旧5キーのまま無変更(同梱書き込み)。KEY_MIRROR_BUNDLE の実書き込みは後続フェーズ(読み手対応とセット)。
+// ★v0.1.1036(鏡バンドル統合): 5鏡を「別tick・別キー・別min-gap」でなく合流バッファ→trailing-edge で【旧5キーを1回の
+//   atomic set】に統合(②③が別 get で読んでも相互一貫=「①150 vs ②129」根治)。min-gap は scheduler 一元(gap 中の更新も
+//   次 flush で必ず載る=F-1 根治)。読み手は旧5キー無変更。KEY_MIRROR_BUNDLE の実書き込みは後続フェーズ(読み手対応とセット)。
 const _mirrorFlushScheduler = createMirrorBundleFlushScheduler();
 let _mirrorFlushTimer = null;
 /** 合流バッファに 1 鏡を反映し、trailing-edge(~400ms)で旧5キーを 1 回の set に統合して書く。描画は触らない。 */
@@ -5737,9 +5739,7 @@ function mergeAndScheduleFlush(sectionKey, snapshot, liveId, nowMs) {
         void chrome.storage.local.set(out.legacyPayload).catch(() => { /* best-effort */ });
       } catch { /* no-op */ }
     }, 400);
-  } catch {
-    /* no-op */
-  }
+  } catch { /* no-op */ }
 }
 
 /** @param {{ liveId: string, buckets: Record<string, unknown[]>, pickedLength: number, totalCandidates: number }} input */
@@ -5824,11 +5824,8 @@ function publishCommentTimelineMirror(input) {
 }
 
 /**
- * 北極星レーン鏡のレーン合流バッファ。
- *   貢献度(refreshNorthStarContributionRankingLaneAsync)と広告(refreshNorthStarAdRankingLane)は
- *   別関数で別タイミングに描画されるため、各々が partial(自分のレーンだけ)を publish しても、
- *   ここで liveId 単位に合流して【両レーンが同じ snapshot に入る】ようにする(片方が他方を消さない)。
- *   liveId が変われば(配信切替)バッファを作り直す=古い配信のレーンを持ち越さない。
+ * 北極星レーン鏡の合流バッファ。貢献度/広告は別関数・別タイミングで partial publish されるため、liveId 単位に
+ *   合流して両レーンを同 snapshot に入れる(片方が他方を消さない)。liveId 変化でバッファ作り直し(古い配信を持ち越さない)。
  * @type {{ liveId: string, contributionRanking: any[], adRanking: any[] }}
  */
 let _northStarMirrorLanes = { liveId: '', contributionRanking: [], adRanking: [] };
@@ -5837,12 +5834,9 @@ let _northStarMirrorLanes = { liveId: '', contributionRanking: [], adRanking: []
  *   受動ビュー(INLINE_PASSIVE)では書かない・best-effort・描画不変。popup が既に計算済みの rows を渡すだけ。
  *   レーンは部分指定可=与えたレーンだけ更新し、未指定レーンは合流バッファの直近値を温存する。
  *
- *   ★v0.1.963(council/three-views-parity-SYNTHESIS.md P0): deferWrite。貢献度と広告は
- *   refreshAllNorthStarMirrorLanes の allSettled バーストで back-to-back に resolve し両方ここを呼ぶ。
- *   個別呼び出しは deferWrite:true で【北極星セクション内】の合流だけ行い write しない。allSettled 完了後に
- *   deferWrite なしで 1 回だけ呼ぶと、両レーン揃った合流を 1 snapshot として鏡バンドルへ反映する。
- *   ★v0.1.1036: write は鏡バンドル flush に一元化(min-gap もそちら)。ここは northStar セクションを
- *   バンドルへ反映するだけ=他4鏡と同一 tick に atomic set される(northStar だけ別 tick 退行を構造的に排除)。
+ *   ★deferWrite(v0.1.963): 貢献度/広告は allSettled バーストで両方ここを呼ぶ。個別呼び出しは deferWrite:true で
+ *   北極星セクション内の合流だけ行い、allSettled 完了後の deferWrite なし 1 回で両レーン揃った合流を鏡バンドルへ反映。
+ *   ★v0.1.1036: write は鏡バンドル flush に一元化=他4鏡と同一 tick に atomic set(northStar だけ別 tick 退行を排除)。
  * @param {{ liveId?: string, contributionRanking?: any[], adRanking?: any[], deferWrite?: boolean }} input
  */
 function publishNorthStarMirror(input) {
@@ -14014,13 +14008,18 @@ async function refresh() {
   //   read を減らすだけ(増やさない/キャッシュで包まない=過去2回 revert した地雷の逆)。
   //   ティッカーは summaryDisplayRows(直近N件)+applyCommentTimelineMirrorForPassive で埋まる。
   //   ★watch タブの本物 popup は不変(heavy read はそちらが担う=記録・描画に影響なし)。
+  // v0.1.1037: heavy read を実呼びする時だけ in-flight フラグを立て(canReuse/session hit は read しないので立てない)、
+  //   withTimeout(15s)で必ず settle=永久 true 固着(heavy read 全停止でレーン固着)を防ぐ。次 poll の追い越しレース(ちかちか)を断つ。
+  const readHeavyFromStoreGuarded = () => {
+    watchMetaCache.heavyReadActive = true;
+    return withTimeout(Promise.resolve(readHeavyFromStore()), 15_000, 'heavy_read_timeout')
+      .catch(() => /** @type {unknown[]|null} */ (null)).finally(() => { watchMetaCache.heavyReadActive = false; });
+  };
   const heavyDataPromise = INLINE_PASSIVE
     ? Promise.resolve(/** @type {unknown[]|null} */ (null))
     : canReuseHeavyChunkRead
     ? Promise.resolve(/** @type {unknown[]} */ (cachedHeavy.arr))
-    : sessionCachePromise.then((sessArr) =>
-        Array.isArray(sessArr) && sessArr.length > 0 ? sessArr : readHeavyFromStore()
-      );
+    : sessionCachePromise.then((sessArr) => (Array.isArray(sessArr) && sessArr.length > 0 ? sessArr : readHeavyFromStoreGuarded()));
   // v0.1.650: heavy 全件配列を chrome.storage.session に mirror して popup 再オープンを
   //   跨がせる(「開いた瞬間に全部」の本体)。paint の世代チェック(refreshGen)や再描画の
   //   early-return とは独立に、heavy 配列が取れた時点で必ず1回 persist する(描画経路に
@@ -21409,6 +21408,8 @@ async function initPopup() {
           }
           return;
         }
+        // v0.1.1037: heavy 全件読み進行中は refresh 見送り(追い越しレース=ちかちか防止)。数字カードは軽量 panel で継続。
+        if (watchMetaCache.heavyReadActive) { void applyLightweightPanelSummaryCards(); return; }
         // 0.1.92: stale-while-revalidate パターン。
         //   key だけ無効化して fetch を促し、snapshot 自体は保持して
         //   fetch 中も古い数値を表示し続ける（loading 状態の点滅を防ぐ）。

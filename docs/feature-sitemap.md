@@ -107,7 +107,7 @@
   - `src/lib/monotonicCommentCount.js`
 - **storage キー定義** — chrome.storage のキー名の正本(nls_comments_<lv> 等)
   - `src/lib/storageKeys.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 34</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 35</summary>
 
 - `src/lib/autoBackupState.js` — v0.1.808(星野ロミ式コンポーネント化・第1弾): content-entry.js の巨大化を抑えるため、
 - `src/lib/blobDownload.js` — Blob を指定ファイル名で保存する。
@@ -126,6 +126,7 @@
 - `src/lib/livePersistInterval.js` — v0.1.498〜501: ライブ記録の保存（コアレッサ）最小間隔を決める純粋関数。フリーズ対策 A。
 - `src/lib/liveviewPublishOutcome.js` — 純Web公開（応援ライブビューの /api/status への POST）の直近結果を記録・要約する。
 - `src/lib/longTaskTracker.js` — メインスレッドを長時間ブロックした「Long Task」を有界に記録する純関数群。
+- `src/lib/mirrorBundleKey.js` — 鏡バンドルの storage キー。
 - `src/lib/northStarMirrorKey.js` — 北極星レーン鏡(公式値レーン)の storage キー。
 - `src/lib/persistableCommentRow.js` — v0.1.362: DOM ハーベスト経路で拾ったコメント行を `nls_comments_<lv>` に保存して
 - `src/lib/persistThrottle.js` — v0.1.431: 連続フラッシュの合間にイベントループへ制御を返す既定の yield。
@@ -643,7 +644,7 @@
   - `src/lib/statusTrendKey.js`
   - `src/extension/status-entry.js`
   - `src/lib/statusActionAdvisor.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 107</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 108</summary>
 
 - `app/app.js` — スマホ閲覧用 status Web 版。
 - `app/live-view.js` — 純Web版 応援ライブビュー（拡張なし・PC/スマホ共通）。
@@ -698,6 +699,7 @@
 - `src/lib/mcpBridge/validateLiveMcpSnapshot.js` — Canonical Snapshot の構造検証。schema.js の isCanonicalLiveSnapshot より詳細な
 - `src/lib/mergeProgramStatsWatchIntoWatchMetaSnapshot.js` — 公式 DOM bundle の programStats.watchCount（累計来場）を snapshot に補完する。
 - `src/lib/mirrorBundle.js` — 5種類の「鏡」を同一 tick の 1 バンドルとして扱うための合流バッファ純関数。
+- `src/lib/mirrorBundleFlushScheduler.js` — 鏡バンドルの flush スケジューラ(状態を内部に閉じた純ロジック・タイマー非依存)。
 - `src/lib/mirrorSanitize.js` — v0.1.237: 北極星「鏡のように貼り付け」用の自前最小サニタイザ。
 - `src/lib/nicoCommentPanelAssetLauncher.js` — ニコ生 watch のコメント欄付近から「ギフト / アイテム / スタンプ」等の起動ボタンを推定する。
 - `src/lib/northStarCharaTrioConfig.js` — 北極星 3 キャラ trio（りんく / こん太 / たぬ姉）の slot 構成と tier 連動 src 解決。
@@ -757,7 +759,7 @@
 
 ## 🧬 修正系譜マップ(この系統のバグを過去にどう直したか)
 
-> changelog 全 371 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
+> changelog 全 372 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
 
 ### 💾 記録件数 (58版)
 - `v0.1.1036` 2026-07-02 — 応援プレビュー/WEBの数字ズレを同一tick化で根治
@@ -1268,7 +1270,8 @@
 - `v0.1.699` 2026-06-12 — 読み上げの名前ON/OFF切替を追加
 - `v0.1.698` 2026-06-12 — コメビュにユーザー別の声で読み上げ機能を追加
 
-### 🪟 応援レーン・タイル (97版)
+### 🪟 応援レーン・タイル (98版)
+- `v0.1.1037` 2026-07-02 — 重い配信で応援レーンがちかちかするのを根治
 - `v0.1.1036` 2026-07-02 — 応援プレビュー/WEBの数字ズレを同一tick化で根治
 - `v0.1.1035` 2026-07-01 — 応援レーンの全員表示を「開いた初回」から効くようにした
 - `v0.1.1034` 2026-07-01 — 重い配信で応援レーンに全員が出ない不具合を根治
@@ -1367,7 +1370,8 @@
 - `v0.1.673` 2026-06-10 — コメビュの名前をパネルと同じ情報源で補完
 - `v0.1.670` 2026-06-10 — コメビュのアイコンを本家と同じサムネに
 
-### 🩺 診断・状態速報 (126版)
+### 🩺 診断・状態速報 (127版)
+- `v0.1.1037` 2026-07-02 — 重い配信で応援レーンがちかちかするのを根治
 - `v0.1.1033` 2026-07-01 — 応援レーンが少なすぎる原因を状態速報で分かるようにした(計器)
 - `v0.1.1030` 2026-07-01 — 会場モードに「🩺 会場の状態」診断パネルを追加した
 - `v0.1.1027` 2026-07-01 — 「同一でない」の誤検知(嘘の🔴)を保留に格下げして根治
@@ -1517,7 +1521,8 @@
 - `v0.1.806` 2026-06-17 — HTML保存の失敗を根治+完了音声を追加
 - `v0.1.785` 2026-06-16 — 状態ページのタイムアウト警告を拡張エラー欄に出さない
 
-### ⚡ 描画・性能 (90版)
+### ⚡ 描画・性能 (91版)
+- `v0.1.1037` 2026-07-02 — 重い配信で応援レーンがちかちかするのを根治
 - `v0.1.1035` 2026-07-01 — 応援レーンの全員表示を「開いた初回」から効くようにした
 - `v0.1.1034` 2026-07-01 — 重い配信で応援レーンに全員が出ない不具合を根治
 - `v0.1.1033` 2026-07-01 — 応援レーンが少なすぎる原因を状態速報で分かるようにした(計器)
