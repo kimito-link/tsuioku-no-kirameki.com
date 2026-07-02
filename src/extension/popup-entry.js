@@ -6131,6 +6131,8 @@ function syncStorySourceEntries(liveId, displayList, storageRowsForLane) {
     STORY_GROWTH_STATE.pinnedCommentId = null;
     STORY_GROWTH_STATE.hoverPreviewCommentId = null;
     cancelStoryHoverClearTimer();
+    // ★v0.1.1042: gift/ad picks の [] リセットは配信切替時のみ(旧:毎poll)。毎poll [] だと2段paint で gift/ad 段が空↔充填し「ギフトタイル出入り」churn になっていた(同一配信は前値保持=出入り消滅・Phase-2 が同poll内で最新に上書き)。
+    STORY_SOURCE_STATE.giftThrowerPicks = Object.freeze([]); STORY_SOURCE_STATE.adThrowerPicks = Object.freeze([]);
   }
 
   STORY_SOURCE_STATE.entries = list;
@@ -6154,8 +6156,6 @@ function syncStorySourceEntries(liveId, displayList, storageRowsForLane) {
       )
     : Object.freeze([]);
 
-  STORY_SOURCE_STATE.giftThrowerPicks = Object.freeze([]);
-  STORY_SOURCE_STATE.adThrowerPicks = Object.freeze([]);
   if (nextLiveId) {
     void paintStoryUserLaneCoalesced(
       nextLiveId,
