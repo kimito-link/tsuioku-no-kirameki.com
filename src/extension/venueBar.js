@@ -2939,6 +2939,9 @@ export function mountVenueBarButton(options = {}) {
       otherCount: totalAnonymous,
       broadcasterInSeats,
       broadcasterKnown: bcUid !== '',
+      // ★これは会場パネル renderDiagPanel が nowMs()(相対)と引き算する用の相対時計。
+      //   storage(状態速報)へ出す lastUpdateAt は publishVenueSeatsDiag が Date.now()(壁時計)で
+      //   上書きするので、ここは相対のまま=会場パネルの「更新◯秒前」は相対同士で正しく出る。
       lastUpdateAt: nowMs(),
       // v0.1.1043: 「なぜ全員出ないか」を状態速報で数値切り分けするための計器。
       //   既に算出済みの値を載せるだけ(新規計算/再描画を足さない=churn 源にしない)。
@@ -2962,10 +2965,15 @@ export function mountVenueBarButton(options = {}) {
    */
   const publishVenueSeatsDiag = (obs) => {
     try {
-      const now = nowMs();
-      if (now - _venueSeatsDiagLastWriteAt < 3000) return; // 3秒 min-gap。
-      _venueSeatsDiagLastWriteAt = now;
-      const snap = buildVenueSeatsDiagSnapshot({ ...obs, lastUpdateAt: now }, now);
+      // min-gap 判定は単調増加の相対時計(nowMs=performance.now)でよい。
+      const monotonic = nowMs();
+      if (monotonic - _venueSeatsDiagLastWriteAt < 3000) return; // 3秒 min-gap。
+      _venueSeatsDiagLastWriteAt = monotonic;
+      // ★lastUpdateAt/capturedAt は storage 経由で状態速報の Date.now() と引き算される=【壁時計】でなければ
+      //   ならない(相対時計 performance.now を混ぜると「更新 17億秒前=約56年前」の異常表示になる)。
+      //   nowMs()(相対)と Date.now()(epoch)のクロック取り違えが会場座席セルの誤表示の真因。
+      const wallNow = Date.now();
+      const snap = buildVenueSeatsDiagSnapshot({ ...obs, lastUpdateAt: wallNow }, wallNow);
       if (!hasVenueExtensionContext()) return;
       chrome.storage.local.set({ [KEY_VENUE_SEATS_DIAG]: snap }).catch(() => {
         /* best-effort: storage 不可・context 消失 */
