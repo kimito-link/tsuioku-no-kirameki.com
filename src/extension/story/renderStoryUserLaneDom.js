@@ -67,11 +67,15 @@ const _laneTierLastKey = new WeakMap();
  */
 const _laneTierRepaintCount = { link: 0, gift: 0, ad: 0, konta: 0, tanu: 0, unknown: 0 };
 
-/** el.id から段名を引く(sceneStoryUserLaneKonta → konta)。 */
+/** el.id から段名を引く(sceneStoryUserLaneKonta → konta)。会場DOMは data-lane-name を使う。 */
 function laneNameOfEl(el) {
   const id = String((el && el.id) || '');
   const m = /sceneStoryUserLane(Link|Gift|Ad|Konta|Tanu)/.exec(id);
-  return m ? m[1].toLowerCase() : 'unknown';
+  if (m) return m[1].toLowerCase();
+  const dataLaneName = String((el && el.dataset && el.dataset.laneName) || '').trim().toLowerCase();
+  return Object.prototype.hasOwnProperty.call(_laneTierRepaintCount, dataLaneName)
+    ? dataLaneName
+    : 'unknown';
 }
 
 /** 計器の現在値(状態速報が読む・スナップショット)。 */
@@ -207,8 +211,9 @@ export function resetStoryUserLaneDom(els) {
  * @param {HTMLElement} el
  * @param {Array<{ displaySrc: string, title: string, meta: { idLine: string, nameLine: string }, entry: { userId?: string } }>} items
  * @param {StoryUserLaneDomIo} io
+ * @param {(tileEl: HTMLElement, item: unknown, index: number) => HTMLElement} [wrapTileEl]
  */
-function fillLaneTier(el, items, io) {
+function fillLaneTier(el, items, io, wrapTileEl) {
   if (!items.length) {
     // 空段は毎回同じ結末(key='')。既に空(前回も空)なら DOM を触らない=無駄な再描画/巻き添えを避ける。
     if (_laneTierLastKey.get(el) === '' && !el.firstChild) { el.hidden = true; return; }
@@ -224,10 +229,12 @@ function fillLaneTier(el, items, io) {
     return;
   }
   const frag = document.createDocumentFragment();
-  for (const p of items) {
+  for (let i = 0; i < items.length; i += 1) {
+    const p = items[i];
     // タイル本体の生成は人物タイル正本(buildPersonTileEl)に集約。
     // ループ・hidden 制御(=レイアウト)はここに残す。全消しでなく変化時だけ replaceChildren で一括差替。
-    frag.appendChild(buildPersonTileEl(p, io));
+    const tileEl = buildPersonTileEl(p, io);
+    frag.appendChild(typeof wrapTileEl === 'function' ? wrapTileEl(tileEl, p, i) : tileEl);
   }
   el.replaceChildren(frag);
   el.hidden = false;
@@ -243,7 +250,7 @@ function fillLaneTier(el, items, io) {
  * @param {{ link: unknown[], gift: unknown[], konta: unknown[], tanu: unknown[] }} buckets
  * @param {number} pickedLength
  * @param {StoryUserLaneDomIo} io
- * @param {{ recordedCommentRowsTotal?: number, totalCandidates?: number }} [opts] 診断の total と同じ記録件数
+ * @param {{ recordedCommentRowsTotal?: number, totalCandidates?: number, wrapTileEl?: (tileEl: HTMLElement, item: unknown, index: number) => HTMLElement }} [opts] 診断の total と同じ記録件数
  *   （省略時はレーン直下の第2文なし）。totalCandidates=素性が取れた候補総数（cap 前）で「ほか M人」併記用。
  */
 export function paintStoryUserLaneDomFilled(
@@ -279,11 +286,12 @@ export function paintStoryUserLaneDomFilled(
     guideLinesBottom
   } = els;
 
-  fillLaneTier(laneLink, buckets.link, io);
-  fillLaneTier(laneGift, buckets.gift, io);
-  if (laneAd) fillLaneTier(laneAd, buckets.ad || [], io);
-  fillLaneTier(laneKonta, buckets.konta, io);
-  fillLaneTier(laneTanu, buckets.tanu, io);
+  const wrapTileEl = opts && typeof opts.wrapTileEl === 'function' ? opts.wrapTileEl : undefined;
+  fillLaneTier(laneLink, buckets.link, io, wrapTileEl);
+  fillLaneTier(laneGift, buckets.gift, io, wrapTileEl);
+  if (laneAd) fillLaneTier(laneAd, buckets.ad || [], io, wrapTileEl);
+  fillLaneTier(laneKonta, buckets.konta, io, wrapTileEl);
+  fillLaneTier(laneTanu, buckets.tanu, io, wrapTileEl);
 
   syncStoryUserLaneTierEmptyNote(
     laneLink,

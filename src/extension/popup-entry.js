@@ -552,6 +552,7 @@ import {
   bucketStoryUserLanePicks,
   flattenStoryUserLaneBuckets
 } from '../lib/storyUserLaneBuckets.js';
+import { compareStoryUserLaneCandidates } from '../lib/storyUserLaneSort.js';
 import { buildStoryUserLaneCandidateRow } from '../lib/storyUserLaneRowModel.js';
 // 2026-06-22(council/lane-show-all-active): 応援レーンの人数整合(素性 N/表示 M)を健全度パネルに載せる。
 import { KEY_LANE_DIAG } from '../lib/laneDiagKey.js';
@@ -5240,24 +5241,7 @@ function renderStoryUserLane() {
   STORY_AVATAR_DIAG_STATE.userLaneStrongNick = laneDiagStrongNick;
   STORY_AVATAR_DIAG_STATE.userLanePersonalThumb = laneDiagPersonalThumb;
 
-  const laneUidSortRank = (uidRaw) => {
-    const s = String(uidRaw || '').trim();
-    if (/^\d{5,14}$/.test(s)) return 0;
-    if (/^a:/i.test(s)) return 1;
-    return 2;
-  };
-
-  candidates.sort((a, b) => {
-    if (b.profileTier !== a.profileTier) return b.profileTier - a.profileTier;
-    if (b.thumbScore !== a.thumbScore) return b.thumbScore - a.thumbScore;
-    const ua = String(a.entry?.userId || '').trim();
-    const ub = String(b.entry?.userId || '').trim();
-    const ra = laneUidSortRank(ua);
-    const rb = laneUidSortRank(ub);
-    if (ra !== rb) return ra - rb;
-    if (ua !== ub) return ua < ub ? -1 : ua > ub ? 1 : 0;
-    return b.entryIndex - a.entryIndex;
-  });
+  candidates.sort(compareStoryUserLaneCandidates);
 
   const buckets = bucketStoryUserLanePicks(candidates, limit);
   const picked = flattenStoryUserLaneBuckets(buckets);
