@@ -57,7 +57,10 @@ import { computeRefreshBackoffTicks } from '../lib/statusRefreshBackoff.js';
 // 共有 URL 組み立て(状態速報/応援ライブビュー/ingest)の純関数。挙動同値で uploadStatusSnapshot から切り出し。
 import { buildStatusShareUrls } from '../lib/statusShareUrls.js';
 // 応援ライブビュー(拡張内)の「このURLをWEBでも公開する」用: status が組み立てた公開ペイロードを置くキー。
-import { KEY_LIVEVIEW_PUBLISH_PAYLOAD } from '../lib/storageKeys.js';
+import {
+  KEY_BACKFILL_LIVE_METRIC,
+  KEY_LIVEVIEW_PUBLISH_PAYLOAD
+} from '../lib/storageKeys.js';
 // レポートプレビュー信頼度注釈の文脈(fastDiag→ctx)の純関数。挙動同値で status-entry から切り出し。
 import { reportPreviewCtxFromFastDiag } from '../lib/reportPreviewCtx.js';
 // v0.1.902: 会場座席の健全度(配信者混入・固着)を健全度パネルに載せる。
@@ -860,8 +863,8 @@ async function loadBackfillProgressSafe() {
  */
 async function loadBackfillLiveMetricSafe() {
   try {
-    const bag = await chrome.storage.local.get('nls_backfill_live_metric_v1');
-    const m = bag?.['nls_backfill_live_metric_v1'];
+    const bag = await chrome.storage.local.get(KEY_BACKFILL_LIVE_METRIC);
+    const m = bag?.[KEY_BACKFILL_LIVE_METRIC];
     if (!m || typeof m !== 'object') return null;
     return {
       lid: String(m.lid || ''),

@@ -1,6 +1,7 @@
 /** @vitest-environment happy-dom */
 import { describe, it, expect } from 'vitest';
 import {
+  getStoryLaneRepaintCounts,
   paintStoryUserLaneDomFilled,
   resetStoryUserLaneDom,
   shouldKeepStoryUserLaneTilesOnEmpty
@@ -50,6 +51,55 @@ function paint(els, buckets) {
 }
 
 describe('fillLaneTier 段単位 diff-skip — churn 根治', () => {
+  it('wrapTileEl 未指定なら従来どおり cell が段直下に入る', () => {
+    const els = makeEls();
+    paint(els, { link: LINK, gift: [], ad: [], konta: [], tanu: [] });
+
+    expect(els.laneLink.children.length).toBe(1);
+    expect(els.laneLink.firstElementChild?.classList.contains('nl-story-userlane-cell')).toBe(true);
+    expect(els.laneLink.firstElementChild?.classList.contains('nlsb-seat')).toBe(false);
+  });
+
+  it('wrapTileEl 指定時は生成済み人物タイルを外側ラッパーに入れられる', () => {
+    const els = makeEls();
+    /** @type {Array<{ userId: string, index: number }>} */
+    const calls = [];
+    paintStoryUserLaneDomFilled(
+      els,
+      FACES,
+      { link: LINK, gift: [], ad: [], konta: [], tanu: [] },
+      1,
+      IO,
+      {
+        wrapTileEl: (tileEl, item, index) => {
+          const wrap = document.createElement('div');
+          wrap.className = 'nlsb-seat';
+          wrap.dataset.seatIndex = String(index);
+          wrap.appendChild(tileEl);
+          calls.push({ userId: String(item.entry?.userId || ''), index });
+          return wrap;
+        }
+      }
+    );
+
+    const wrap = els.laneLink.firstElementChild;
+    expect(calls).toEqual([{ userId: '12345', index: 0 }]);
+    expect(wrap?.classList.contains('nlsb-seat')).toBe(true);
+    expect(wrap?.querySelector('.nl-story-userlane-cell')).toBeTruthy();
+  });
+
+  it('id の無い会場段でも data-lane-name で repaint 計器を分類する', () => {
+    const els = makeEls();
+    els.laneLink.id = '';
+    els.laneLink.dataset.laneName = 'link';
+    const before = getStoryLaneRepaintCounts();
+    paint(els, { link: LINK, gift: [], ad: [], konta: [], tanu: [] });
+    const after = getStoryLaneRepaintCounts();
+
+    expect(after.link).toBe(before.link + 1);
+    expect(after.unknown).toBe(before.unknown);
+  });
+
   it('同一 items で2回描いても各段の cell ノードを温存する(img 破棄しない=churn しない)', () => {
     const els = makeEls();
     paint(els, { link: LINK, gift: [], ad: [], konta: [], tanu: TANU });

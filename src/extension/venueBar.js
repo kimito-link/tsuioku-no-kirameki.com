@@ -2,7 +2,6 @@
 import { isGenericComeviewName } from '../lib/comeviewRows.js';
 import {
   buildVenueSeating,
-  buildVenueTiers,
   collectAudienceFaceUserIds,
   hasRealThumbnail,
   deriveNicoUserIconUrl,
@@ -90,6 +89,11 @@ import {
   NICONICO_OFFICIAL_DEFAULT_USERICON_HTTPS
 } from '../lib/supportGrowthTileSrc.js';
 import { storyUserLaneMetaLines } from '../lib/storyUserLaneMeta.js';
+import { bucketVenueLaneSeats, flattenVenueLaneBuckets } from '../lib/venueLaneBuckets.js';
+import {
+  paintStoryUserLaneDomFilled,
+  resetStoryUserLaneDom
+} from './story/renderStoryUserLaneDom.js';
 // v0.1.902: 会場座席の健全度を健全度パネルに載せる(配信者混入・固着を AI/人間が一目で発見)。
 import { KEY_VENUE_SEATS_DIAG } from '../lib/venueSeatsDiagKey.js';
 import { buildVenueSeatsDiagSnapshot } from '../lib/venueSeatsDiag.js';
@@ -175,9 +179,6 @@ const VENUE_LAYOUT_CLASSES = [
   'nlsb-mode-packed'
 ];
 
-/** ひな壇の段 DOM を用意する数。buildVenueTiers の最大段数(8)に一致させること。 */
-const VENUE_MAX_TIER_NODES = 8;
-
 /**
  * 会場の席タイル(buildPersonTileEl)に渡す avatar load guard と I/O。
  *   popup-entry.js の storyAvatarLoadGuard(L3793)と【同設定】で会場が自前に持つ。
@@ -198,6 +199,30 @@ const venuePersonTileIo = {
   storyTileUsesYukkuriTvStyle,
   upgradeAnonymousAvatarImage
 };
+
+const STORY_GUIDE_FACE_LINK =
+  'images/yukkuri-charactore-english/link/link-yukkuri-half-eyes-mouth-closed.png';
+const STORY_GUIDE_FACE_KONTA =
+  'images/yukkuri-charactore-english/konta/kitsune-yukkuri-half-eyes-mouth-closed.png';
+const STORY_GUIDE_FACE_GIFT = STORY_GUIDE_FACE_KONTA;
+const STORY_GUIDE_FACE_TANU =
+  'images/yukkuri-charactore-english/tanunee/tanuki-yukkuri-half-eyes-mouth-closed.png';
+
+/**
+ * @param {string} rel
+ * @returns {string}
+ */
+function resolveVenueAssetUrl(rel) {
+  try {
+    return typeof chrome !== 'undefined' &&
+      chrome.runtime &&
+      typeof chrome.runtime.getURL === 'function'
+      ? chrome.runtime.getURL(rel)
+      : rel;
+  } catch {
+    return rel;
+  }
+}
 
 /**
  * 会場の participant から人物タイル要素(buildPersonTileEl)を作る共通ヘルパ。
@@ -748,14 +773,17 @@ const VENUE_CSS = `
   .nlsb-seats {
     grid-area: seats;
     position: relative;
-    display: flex;
-    flex-direction: column-reverse;
-    align-items: stretch;
-    justify-content: flex-end;
+    display: block;
     gap: clamp(0px, 0.2vh, 4px);
     min-height: 0;
     box-sizing: border-box;
     padding: clamp(10px, 2vh, 22px) 14px;
+    --nl-surface: rgba(255, 255, 255, 0.96);
+    --nl-border: rgba(78, 109, 148, 0.26);
+    --nl-text: #243244;
+    --nl-text-sub: #56687d;
+    --nl-muted: #6f7c8b;
+    --nl-user-accent: #5aa7ff;
     /*
      * 横スクロールバー根絶(ユーザー不満「位置がずれてスクロールバーが出て変な動きで
      * 見えなくなる」): 同時表示人数は selectStableVisibleMembers で行に収まる数に制限済み
@@ -773,61 +801,206 @@ const VENUE_CSS = `
     background:
       radial-gradient(ellipse at 50% 100%, rgba(102, 144, 190, 0.16), transparent 62%);
     overscroll-behavior: contain;
-    perspective: clamp(680px, 75vw, 1200px);
-    perspective-origin: 50% 12%;
-    transform-style: preserve-3d;
     contain: layout paint;
-  }
-  /*
-   * 前列を下、後列を上に積むひな壇。段数と人数は buildVenueTiers が決め、
-   * transform は奥行きの補助だけにするため reduced-motion でも段組みは崩れない。
-   */
-  .nlsb-tier {
-    display: flex;
-    width: 100%;
-    max-width: 100%;
-    flex: 0 1 auto;
-    /* 縦溢れ防止(見切れ根絶): wrapさせず縮小させて1段に収め、SHOWROOM的な密集感を出す */
-    flex-wrap: nowrap;
-    align-items: flex-end;
-    justify-content: center;
-    box-sizing: border-box;
-    transform-origin: 50% 100%;
-    transform-style: preserve-3d;
-    transform:
-      translateY(var(--nlsb-tier-y, 0))
-      translateZ(var(--nlsb-tier-z, 0))
-      scale(var(--nlsb-tier-scale, 1));
-  }
-  .nlsb-tier[hidden] {
-    display: none;
-  }
-  .nlsb-seats.nlsb-mode-normal .nlsb-tier {
-    gap: clamp(0px, 0.5vw, 8px);
-  }
-  .nlsb-seats.nlsb-mode-vip .nlsb-tier {
-    gap: clamp(18px, 3vw, 52px);
-  }
-  .nlsb-seats.nlsb-mode-normal .nlsb-seat {
-    width: clamp(48px, 8vw, 100px);
-    flex: 0 1 auto;
-    /* justify-content: center で左右余白ができるので、詰める場合はマイナスマージンで重ねるのも手 */
-  }
-  .nlsb-seats.nlsb-mode-packed .nlsb-tier {
-    gap: 8px;
   }
   .nlsb-seats.nlsb-mode-empty {
     display: grid;
     place-items: center;
   }
+  /* LANE_CSS_SYNC_BEGIN popup.html:829-1067 */
+  .nlsb-venue-lane-stack.nl-story-userlane-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    overflow-x: hidden;
+    overflow-y: visible;
+    margin: 0 0 4px;
+    min-height: 0;
+  }
+  .nlsb-venue-lane-stack .nl-story-userlane-tier-wrap {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
+  }
+  .nlsb-venue-lane-stack .nl-story-userlane-tier-wrap--gift {
+    padding: 6px 6px 4px;
+    border-radius: 10px;
+    background: color-mix(in srgb, var(--nl-surface) 82%, #e8b84a 18%);
+    border: 1px solid color-mix(in srgb, var(--nl-border) 70%, #d4a017 30%);
+  }
+  .nlsb-venue-lane-stack .nl-story-userlane-tier-hint {
+    margin: 0;
+    padding: 4px 6px;
+    font-size: 10px;
+    font-weight: 700;
+    line-height: 1.4;
+    color: var(--nl-text-sub);
+    border-radius: 8px;
+    background: color-mix(in srgb, var(--nl-surface) 88%, #b8a06a 12%);
+    border: 1px solid color-mix(in srgb, var(--nl-border) 75%, #c9a227 25%);
+  }
+  .nlsb-venue-lane-stack .nl-story-userlane {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    align-content: flex-start;
+    gap: 6px 8px;
+    margin: 0;
+    min-height: 0;
+    max-height: none;
+    overflow-x: auto;
+    overflow-y: visible;
+    -webkit-overflow-scrolling: touch;
+  }
+  .nlsb-venue-lane-stack .nl-story-userlane-cell {
+    display: inline-flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 6px;
+    flex-shrink: 0;
+    max-width: 100%;
+    min-width: 0;
+    border-radius: 999px;
+    padding-right: 6px;
+  }
+  .nlsb-venue-lane-stack .nl-story-userlane-cell--accent {
+    padding: 3px 5px 3px 3px;
+    background: color-mix(in srgb, var(--nl-user-accent) 20%, transparent);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--nl-user-accent) 48%, transparent);
+  }
+  .nlsb-venue-lane-stack a.nl-story-userlane-cell--linkable {
+    text-decoration: none;
+    color: inherit;
+    cursor: pointer;
+    transition: background-color 0.12s;
+  }
+  .nlsb-venue-lane-stack a.nl-story-userlane-cell--linkable:hover {
+    background-color: color-mix(in srgb, var(--nl-border) 40%, transparent);
+  }
+  .nlsb-venue-lane-stack .nl-story-userlane-meta {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 1px;
+    min-width: 0;
+    max-width: min(118px, 30vw);
+    font-size: 10px;
+    line-height: 1.22;
+    text-align: left;
+  }
+  .nlsb-venue-lane-stack .nl-story-userlane-meta__id,
+  .nlsb-venue-lane-stack .nl-story-userlane-meta__name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .nlsb-venue-lane-stack .nl-story-userlane-meta__id {
+    color: var(--nl-text-sub);
+    font-weight: 600;
+  }
+  .nlsb-venue-lane-stack .nl-story-userlane-meta__name {
+    color: var(--nl-text);
+    font-weight: 500;
+  }
+  .nlsb-venue-lane-stack .nl-story-userlane-avatar {
+    width: 38px;
+    height: 38px;
+    border-radius: 999px;
+    object-fit: cover;
+    object-position: center;
+    border: 1.5px solid color-mix(in srgb, var(--nl-border) 82%, #fff 18%);
+    box-shadow: 0 1px 3px rgb(2 17 31 / 22%);
+    background: var(--nl-surface);
+    flex-shrink: 0;
+  }
+  .nlsb-venue-lane-stack .nl-story-userlane-avatar.nl-avatar--tv-fallback {
+    object-fit: contain;
+    padding: 3px;
+    background: linear-gradient(180deg, #efebe9, #d7ccc8);
+    border-color: color-mix(in srgb, #8d6e63 55%, var(--nl-border) 45%);
+  }
+  .nlsb-venue-lane-stack .nl-story-userlane-guide {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 5px;
+    margin: 0 0 6px;
+    min-width: 0;
+  }
+  .nlsb-venue-lane-stack .nl-story-userlane-guide__lines {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    min-width: 0;
+  }
+  .nlsb-venue-lane-stack .nl-story-userlane-guide__line {
+    display: flex;
+    align-items: flex-start;
+    gap: 7px;
+    padding: 5px 8px;
+    border-radius: 10px;
+    background: linear-gradient(180deg, #fffaf0, #fff4db);
+    border: 1px solid #f5d28d;
+    color: #6b4f18;
+    font-size: 10px;
+    font-weight: 700;
+    line-height: 1.38;
+    box-shadow: 0 1px 5px rgb(148 101 14 / 9%);
+    min-width: 0;
+  }
+  .nlsb-venue-lane-stack .nl-story-userlane-guide__face {
+    width: 24px;
+    height: 24px;
+    border-radius: 999px;
+    object-fit: cover;
+    object-position: center;
+    border: 1px solid color-mix(in srgb, var(--nl-border) 82%, #fff 18%);
+    background: var(--nl-surface);
+    flex: 0 0 auto;
+  }
+  .nlsb-venue-lane-stack .nl-story-userlane-guide__text {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+  .nlsb-venue-lane-stack .nl-story-userlane-guide__foot {
+    margin: 2px 0 0;
+    padding: 0 2px;
+    font-size: 10px;
+    font-weight: 800;
+    color: var(--nl-muted);
+    line-height: 1.35;
+  }
+  .nlsb-venue-lane-stack .nl-story-userlane__empty-note {
+    margin: 4px 0 2px;
+    padding: 8px 10px;
+    font-size: clamp(10px, 2.4vw, 11px);
+    line-height: 1.45;
+    font-weight: 600;
+    color: var(--nl-text-sub);
+    border-radius: 10px;
+    background: color-mix(in srgb, var(--nl-surface) 92%, var(--nl-border) 8%);
+    border: 1px solid color-mix(in srgb, var(--nl-border) 70%, transparent);
+  }
+  .nlsb-venue-lane-stack .nl-story-userlane__empty-note-p {
+    margin: 0 0 6px;
+  }
+  .nlsb-venue-lane-stack .nl-story-userlane__empty-note-p:last-child {
+    margin-bottom: 0;
+  }
+  .nlsb-venue-lane-stack .nl-story-userlane-guide__count {
+    color: #9a6f12;
+    font-weight: 800;
+  }
+  /* LANE_CSS_SYNC_END */
   .nlsb-seat {
     position: relative;
-    display: flex;
+    display: inline-flex;
     min-width: 0;
-    flex-direction: column;
+    flex: 0 0 auto;
     align-items: center;
     justify-content: center;
-    gap: 6px;
     overflow: visible;
   }
   .nlsb-seats.nlsb-can-pan {
@@ -949,90 +1122,19 @@ const VENUE_CSS = `
     color: #99a2b0;
   }
   .nlsb-seat.nlsb-is-empty {
-    /* display: none; */
+    display: none;
     opacity: 0.12;
     pointer-events: none;
     filter: blur(0.5px);
-  }
-  /* person-tile-unify 第3コミット(2026-06-22): 席タイル本体は popup の本物 buildPersonTileEl が
-     描く .nl-story-userlane-cell(a/span > img.nl-story-userlane-avatar + span.nl-story-userlane-meta)。
-     会場は「大きい丸アバター+下に名前」の独自の見せ方を、本物タイルの【構造に被せる】CSS で再現する
-     (タイル本体の DOM/クラスは1バイトも変えない=personTileDom.js の設計どおり)。
-     ↓ 本物タイルを会場仕様に: 横並び(popup)→縦並び(会場)・アバターを大きい丸に。 */
-  .nlsb-seat .nl-story-userlane-cell {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 6px;
-    width: 100%;
-    max-width: 100%;
-    min-width: 0;
-    padding: 0;
-    border-radius: 0;
-    text-decoration: none;
-    color: inherit;
-  }
-  /* アバター(丸): 会場の旧 .nlsb-icon の見た目を本物タイルの img に効かせる。 */
-  .nlsb-seat .nl-story-userlane-avatar {
-    width: 28px;
-    height: 28px;
-    border-radius: 50%;
-    object-fit: cover;
-    border: 1px solid rgba(255, 255, 255, 0.35);
-    box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.12);
-    background: rgba(255, 255, 255, 0.05);
-    flex: 0 0 auto;
-  }
-  /* 名前/ID(meta): 会場の旧 .nlsb-name の見た目を本物タイルの meta に効かせる。 */
-  .nlsb-seat .nl-story-userlane-meta {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 0;
-    max-width: 100%;
-    min-width: 0;
-    text-align: center;
-  }
-  .nlsb-seat .nl-story-userlane-meta__id,
-  .nlsb-seat .nl-story-userlane-meta__name {
-    max-width: 100%;
-    overflow: hidden;
-    color: rgba(255, 255, 255, 0.9);
-    font-size: 10px;
-    line-height: 1.2;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-  .nlsb-seat .nl-story-userlane-meta__id {
-    color: rgba(255, 255, 255, 0.6);
-    font-weight: 600;
-  }
-  .nlsb-seat.nlsb-is-empty .nl-story-userlane-cell {
-    visibility: hidden;
-  }
-  .nlsb-seats.nlsb-mode-packed .nlsb-seat {
-    width: 68px;
-    flex: 0 0 68px;
-    gap: 4px;
-  }
-  /* VIP(≤8人): 特大アバターでゆったり=主役感。 */
-  .nlsb-seats.nlsb-mode-vip .nlsb-seat {
-    width: clamp(120px, 14vw, 168px);
-  }
-  /* 通常(≤30人): 大きめアバターを画面いっぱいに敷き詰める。はみ出し時は縮小させる */
-  .nlsb-seats.nlsb-mode-normal .nlsb-seat {
-    width: clamp(48px, 9vw, 120px);
   }
   /* 2026-06-15 星野ロミ会議(サムネ優遇を"一目で特別"に): 1.12倍では脳が比較を要求し
      ノイズとして処理される(ユーザー実機「特別になってない」)→倍率の"断絶"を作る。
      会議7体一致=scale 1.45(28→約40px)で「大きい=重要」を本能で認識させる。金縁を太く
      はっきり+明るさ+12%。脈動は付けない(止まった大きさ=存在そのもの・上品さを保つ)。 */
   .nlsb-seat.nlsb-seat-vip .nl-story-userlane-avatar {
-    transform: scale(1.45);
     filter: brightness(1.12);
     border-color: rgba(255, 220, 130, 1);
-    box-shadow: 0 0 0 2px rgba(255, 206, 96, 0.95), 0 0 12px 2px rgba(255, 190, 70, 0.85), inset 0 0 0 1px rgba(0, 0, 0, 0.14);
+    box-shadow: 0 0 0 2px rgba(255, 206, 96, 0.55), 0 0 10px 1px rgba(255, 190, 70, 0.42), 0 1px 3px rgb(2 17 31 / 22%);
     z-index: 5;
   }
   /* 2026-07-01 会議(venue-grid-diag): 応援者ランキング上位3位の席に順位バッジを重ねる。
@@ -1122,29 +1224,6 @@ const VENUE_CSS = `
     outline: 2px solid #8dc8ff;
     outline-offset: 2px;
     border-radius: 3px;
-  }
-  /* モード別のアバターサイズ(会場の大きい客席感)。本物タイルの img に効かせる。 */
-  .nlsb-seats.nlsb-mode-vip .nl-story-userlane-avatar {
-    width: clamp(96px, 11vw, 132px);
-    height: clamp(96px, 11vw, 132px);
-  }
-  .nlsb-seats.nlsb-mode-vip .nl-story-userlane-meta {
-    font-size: 15px;
-    font-weight: 700;
-  }
-  .nlsb-seats.nlsb-mode-normal .nl-story-userlane-avatar {
-    width: clamp(32px, 7vw, 92px);
-    height: clamp(32px, 7vw, 92px);
-  }
-  .nlsb-seats.nlsb-mode-normal .nl-story-userlane-meta {
-    font-size: 12px;
-  }
-  .nlsb-seats.nlsb-mode-packed .nl-story-userlane-avatar {
-    width: 38px;
-    height: 38px;
-  }
-  .nlsb-seats.nlsb-mode-packed .nl-story-userlane-meta {
-    max-width: 68px;
   }
   /*
    * 会議確定A: 吹き出し専用の最上位レイヤー。席コンテナ(.nlsb-seats overflow:hidden)の
@@ -1295,24 +1374,6 @@ const VENUE_CSS = `
       padding-right: 10px;
       padding-left: 10px;
     }
-    .nlsb-seats.nlsb-mode-packed .nlsb-tier {
-      gap: 4px;
-    }
-    .nlsb-seats.nlsb-mode-packed .nlsb-seat {
-      width: 54px;
-      flex-basis: 54px;
-    }
-    .nlsb-seats.nlsb-mode-packed .nl-story-userlane-avatar {
-      width: 32px;
-      height: 32px;
-    }
-    .nlsb-seats.nlsb-mode-packed .nl-story-userlane-meta,
-    .nlsb-seats.nlsb-mode-normal .nl-story-userlane-meta {
-      display: none;
-    }
-    .nlsb-seats.nlsb-mode-normal .nlsb-seat {
-      min-width: 44px;
-    }
   }
   @media (max-height: 560px) {
     .nlsb-stage {
@@ -1335,9 +1396,6 @@ const VENUE_CSS = `
     .nlsb-seat,
     .nlsb-bubble {
       transition: none;
-    }
-    .nlsb-tier {
-      transform: none;
     }
     .nlsb-bubble {
       animation: none;
@@ -1387,6 +1445,95 @@ function createSeatNode(seatIndex) {
   // tile: renderSeats が buildPersonTileEl で作る本物タイル要素(.nl-story-userlane-cell)。
   //   座標測定(吹き出し/ギフト)は tile 内の .nl-story-userlane-avatar を基準にする。
   return { seat, tile: /** @type {HTMLElement|null} */ (null) };
+}
+
+/**
+ * 会場用の応援レーンDOM骨格を組む。
+ * popup/status/live-view と同じ共有 renderer に渡すための要素セットだけを作る。
+ * @returns {any}
+ */
+function createVenueStoryLaneDom() {
+  const stack = document.createElement('div');
+  stack.className = 'nl-story-userlane-stack nlsb-venue-lane-stack';
+  stack.hidden = true;
+
+  const makeGuide = () => {
+    const guide = document.createElement('div');
+    guide.className = 'nl-story-userlane-guide';
+    const lines = document.createElement('div');
+    lines.className = 'nl-story-userlane-guide__lines';
+    guide.appendChild(lines);
+    return { guide, lines };
+  };
+  /** @param {string} laneName */
+  const makeLane = (laneName) => {
+    const lane = document.createElement('div');
+    lane.className = 'nl-story-userlane';
+    lane.dataset.laneName = laneName;
+    lane.hidden = true;
+    return lane;
+  };
+  const makeWrap = (className = '') => {
+    const wrap = document.createElement('div');
+    wrap.className = `nl-story-userlane-tier-wrap${className ? ` ${className}` : ''}`;
+    return wrap;
+  };
+
+  const top = makeGuide();
+  const giftGuide = makeGuide();
+  const adGuide = makeGuide();
+  const kontaGuide = makeGuide();
+  const tanuGuide = makeGuide();
+  const bottom = makeGuide();
+
+  const linkWrap = makeWrap();
+  const giftWrap = makeWrap('nl-story-userlane-tier-wrap--gift');
+  const adWrap = makeWrap('nl-story-userlane-tier-wrap--gift');
+  const kontaWrap = makeWrap();
+  const tanuWrap = makeWrap();
+
+  const laneLink = makeLane('link');
+  const laneGift = makeLane('gift');
+  const laneAd = makeLane('ad');
+  const laneKonta = makeLane('konta');
+  const laneTanu = makeLane('tanu');
+
+  const hintLink = document.createElement('div');
+  hintLink.className = 'nl-story-userlane-tier-hint';
+  hintLink.textContent = 'りんく候補はまだ少なめです。下の段も会場の応援者です。';
+  hintLink.hidden = true;
+
+  linkWrap.append(laneLink, hintLink);
+  giftWrap.append(giftGuide.guide, laneGift);
+  adWrap.append(adGuide.guide, laneAd);
+  kontaWrap.append(kontaGuide.guide, laneKonta);
+  tanuWrap.append(tanuGuide.guide, laneTanu);
+  stack.append(top.guide, linkWrap, giftWrap, adWrap, kontaWrap, tanuWrap, bottom.guide);
+
+  return {
+    stack,
+    laneLink,
+    laneGift,
+    laneAd,
+    laneKonta,
+    laneTanu,
+    hintLink,
+    linkWrap,
+    giftWrap,
+    adWrap,
+    guideTop: top.guide,
+    guideLinesTop: top.lines,
+    guideMidGift: giftGuide.guide,
+    guideLinesMidGift: giftGuide.lines,
+    guideMidAd: adGuide.guide,
+    guideLinesMidAd: adGuide.lines,
+    guideMidKonta: kontaGuide.guide,
+    guideLinesMidKonta: kontaGuide.lines,
+    guideMidTanu: tanuGuide.guide,
+    guideLinesMidTanu: tanuGuide.lines,
+    guideBottom: bottom.guide,
+    guideLinesBottom: bottom.lines
+  };
 }
 
 /**
@@ -1607,32 +1754,20 @@ export function mountVenueBarButton(options = {}) {
 
   const seatsHost = document.createElement('div');
   seatsHost.className = 'nlsb-seats nlsb-mode-empty';
-  /** @type {HTMLDivElement[]} */
-  const tierNodes = [];
-  // 2026-06-14 修正: buildVenueTiers の段数ぶん tierNode を用意する(以前は5個固定で6〜8段目が
-  //   描画されず詰め込み窮屈化した)。
-  // 2026-06-22 会場「全員500人」: 段数が8を超えうる(全員ぶん段を積む)ため、固定数でなく
-  //   「必要な段数まで足りなければ作る」可変生成にする。ensureTierNodes(n) が n 段ぶん確保する。
-  //   ★MEMORY の教訓: 純関数(buildVenueTiers)の段数を増やしたら DOM(tierNodes)も必ず追随させる。
-  /** @param {number} need 必要な段数。足りなければ新規 .nlsb-tier を seatsHost に足す。 */
-  const ensureTierNodes = (need) => {
-    while (tierNodes.length < need) {
-      const tier = document.createElement('div');
-      tier.className = 'nlsb-tier';
-      tier.dataset.tierIndex = String(tierNodes.length);
-      tier.hidden = true;
-      tierNodes.push(tier);
-      seatsHost.appendChild(tier);
-    }
+  const venueLaneEls = createVenueStoryLaneDom();
+  const venueStoryFaces = {
+    faceLink: resolveVenueAssetUrl(STORY_GUIDE_FACE_LINK),
+    faceGift: resolveVenueAssetUrl(STORY_GUIDE_FACE_GIFT),
+    faceAd: resolveVenueAssetUrl(STORY_GUIDE_FACE_GIFT),
+    faceKonta: resolveVenueAssetUrl(STORY_GUIDE_FACE_KONTA),
+    faceTanu: resolveVenueAssetUrl(STORY_GUIDE_FACE_TANU)
   };
-  // 起動時は従来どおり最低 VENUE_MAX_TIER_NODES(8) 段ぶんを確保(少人数の初回描画を軽く保つ)。
-  ensureTierNodes(VENUE_MAX_TIER_NODES);
+  seatsHost.appendChild(venueLaneEls.stack);
   /** @type {ReturnType<typeof createSeatNode>[]} */
   const seatNodes = [];
   for (let i = 0; i < VENUE_FULLSCREEN_MAX_SEATS; i += 1) {
     const node = createSeatNode(i);
     seatNodes.push(node);
-    tierNodes[0].appendChild(node.seat);
   }
 
   const emptyMessage = document.createElement('div');
@@ -2795,115 +2930,92 @@ export function mountVenueBarButton(options = {}) {
       stopCrowdMotion();
     }
 
-    for (const node of seatNodes) {
+    const visibleSeatIndexSet = new Set(visibleSeats.map((entry) => entry.seatIndex));
+    const entryBySeatIndex = new Map(visibleSeats.map((entry) => [entry.seatIndex, entry]));
+    for (let i = 0; i < seatNodes.length; i += 1) {
+      const node = seatNodes[i];
       node.seat.classList.add('nlsb-is-empty');
+      node.seat.classList.remove(
+        'nlsb-seat-link',
+        'nlsb-seat-vip',
+        'nlsb-seat-regular'
+      );
       node.seat.setAttribute('aria-hidden', 'true');
       node.seat.removeAttribute('title');
       delete node.seat.dataset.tierIndex;
-      delete node.seat.dataset.venueRank; // 空席に順位バッジ(🥇)が残らないよう毎回クリア。
-      if (node.seat.parentElement) {
-        node.seat.parentElement.removeChild(node.seat);
+      delete node.seat.dataset.venueRank;
+      delete node.seat.dataset.streak;
+      if (!visibleSeatIndexSet.has(i)) {
+        if (node.seat.parentElement) node.seat.parentElement.removeChild(node.seat);
+        node.seat.replaceChildren();
+        node.tile = null;
       }
     }
 
-    // v0.1.737 実機修正: 各段が1行に収まる席数(perRow)を超えないよう maxPerRow を渡す。
-    //   これが無いと後段が横にはみ出し overflow-x:hidden で見切れ、会場が埋まって見えない。
-    // 2026-06-22 会場「全員500人」: maxRows を渡し、8段で間引かず全員ぶん段を積む(縦スクロール)。
-    const tiers = buildVenueTiers(visibleSeats.length, {
-      maxPerRow: perRow,
-      maxRows: venueMaxRows
-    });
-    // 2026-06-22 会場「全員500人」: 段数が tierNodes の数を超えうる=必要なぶん DOM を確保する
-    //   (足りないと後段が描画されず詰め込み窮屈化=過去の失敗の再発防止)。
-    ensureTierNodes(tiers.length);
-    // 3D奥行き(translateZ/Y)は【手前 FRONT_3D_TIERS 段だけ】に効かせ、それ以降はフラットに積む。
-    //   500人で何十段も奥に縮めると最奥が極小+画面外になるため(会議結論「手前数段だけ3D・奥フラット」)。
-    //   scale は buildVenueTiers が minScale(>=0.5)で下限を守るのでそのまま使う(顔は潰れない)。
-    const FRONT_3D_TIERS = 8;
-    for (let i = 0; i < tierNodes.length; i += 1) {
-      const tierNode = tierNodes[i];
-      const tier = tiers[i];
-      tierNode.hidden = !tier;
-      if (!tier) {
-        tierNode.style.removeProperty('--nlsb-tier-y');
-        tierNode.style.removeProperty('--nlsb-tier-z');
-        tierNode.style.removeProperty('--nlsb-tier-scale');
-        continue;
-      }
-      // 手前 FRONT_3D_TIERS 段は従来の3D遠近、それ以降は depth を頭打ちにしてフラット(縦スクロールで全員)。
-      const flatDepth = tier.rowIndex < FRONT_3D_TIERS ? tier.depth : 0;
-      const translateY = -Math.round(flatDepth * 18);
-      const translateZ = -Math.round(flatDepth * 72);
-      tierNode.style.setProperty('--nlsb-tier-y', `${translateY}px`);
-      tierNode.style.setProperty('--nlsb-tier-z', `${translateZ}px`);
-      tierNode.style.setProperty('--nlsb-tier-scale', String(tier.scale));
+    const laneBuckets = bucketVenueLaneSeats(visibleSeats, { maxTotal: visibleSeats.length });
+    const visibleLaneItems = flattenVenueLaneBuckets(laneBuckets);
+    emptyMessage.hidden = visibleLaneItems.length > 0;
+    if (visibleLaneItems.length === 0) {
+      resetStoryUserLaneDom(venueLaneEls);
+    } else {
+      paintStoryUserLaneDomFilled(
+        venueLaneEls,
+        venueStoryFaces,
+        laneBuckets,
+        visibleLaneItems.length,
+        venuePersonTileIo,
+        {
+          recordedCommentRowsTotal: seating.participantCount,
+          totalCandidates: seating.participantCount,
+          wrapTileEl: (tileEl, item) => {
+            const laneItem = /** @type {{ _venueSeatIndex?: unknown }} */ (item || {});
+            const seatIndex = Math.max(0, Math.floor(Number(laneItem._venueSeatIndex) || 0));
+            const node = seatNodes[seatIndex];
+            if (!node) return tileEl;
+            node.seat.replaceChildren(tileEl);
+            node.tile = tileEl;
+            return node.seat;
+          }
+        }
+      );
     }
 
-    let seatCursor = 0;
-    for (const tier of tiers) {
-      const tierNode = tierNodes[tier.rowIndex];
-      for (let tierSeatIndex = 0; tierSeatIndex < tier.count; tierSeatIndex += 1) {
-        const entry = visibleSeats[seatCursor];
-        seatCursor += 1;
-        if (!entry) continue;
-        const node = seatNodes[entry.seatIndex];
-        const participant = entry.participant;
-        tierNode.appendChild(node.seat);
-        node.seat.dataset.tierIndex = String(tier.rowIndex);
-        const i = entry.seatIndex;
-        const uid = String(participant.userId || '').trim();
-        const rawName = String(participant.name || '').trim();
-        const avatarUrl = String(participant.avatar || '').trim();
-        const derivedAvatar = deriveNicoUserIconUrl(uid); // VIP(サムネ持ち)優遇の判定に使う。
-        const displayName =
-          rawName ||
-          (uid ? anonymousDisplayLabel(uid) : anonymousDisplayLabel(participant.key || `会場${i + 1}`));
-        // ★person-tile-unify 第3コミット: 席タイル本体は popup の本物 buildPersonTileEl で描く。
-        //   avatar 解決順・meta 表記・匿名の顔は buildVenuePersonTile(共通ヘルパ)一本で、
-        //   応援者トップNバーと同じ描画を通す(drift/opts 渡し忘れを構造的に防ぐ)。
-        const tileEl = buildVenuePersonTile(participant, `会場${i + 1}`);
-        // ラッパー(.nlsb-seat)の中身を本物タイルに差し替える。演出(VIP/常連/発話/streak)は
-        //   ラッパーに被せる=タイル本体は触らない(personTileDom.js の設計どおり)。
-        node.seat.replaceChildren(tileEl);
-        node.tile = tileEl;
-        // リンク(クリックでユーザーページ)は本物タイルが自前で <a href> を持つ(popup と同一基準)。
-        //   ラッパーには cursor 用の class だけ反映する(href はタイルが担うので付けない)。
-        node.seat.classList.toggle(
-          'nlsb-seat-link',
-          isNumericNicoUserId(uid) && nicoUserPageUrl(uid) !== ''
-        );
-        node.seat.title = displayName;
-        node.seat.classList.remove('nlsb-is-empty');
-        node.seat.setAttribute('aria-hidden', 'false');
-        // 2026-06-14 会議(サムネ優遇強化): 実サムネ(http顔写真)持ちは少し大きく明るく見せて
-        //   常連さんを引き立てる。ゆっくり顔/匿名は通常表示。CSS .nlsb-seat-vip が適用。
-        //   v0.1.735: stored avatar だけでなく数値userId由来アイコンも「サムネ持ち」扱い
-        //   (席ではアイコンが出てるのに優遇されない不整合を解消・診断の数とも一致)。
-        node.seat.classList.toggle(
-          'nlsb-seat-vip',
-          hasRealThumbnail(avatarUrl) || hasRealThumbnail(derivedAvatar)
-        );
-        // 2026-07-01 会議(venue-grid-diag): 応援者ランキング上位3位に順位バッジ(🥇🥈🥉)を付ける。
-        //   光らせ演出(旧 .nlsb-seat-regular 金色オーラ)はユーザー要望で廃止=順位バッジのみで
-        //   「支えてる人」を示す。スコア源は venueSeats.js の rankVenueContributors 一本(光/順位で
-        //   drift しない)。高さは変えない(バッジは席内に重ねる=v0.1.1026 の高さ振動を踏まない)。
-        node.seat.classList.remove('nlsb-seat-regular');
-        if (entry.venueRank >= 1 && entry.venueRank <= 3) {
-          node.seat.dataset.venueRank = String(entry.venueRank);
-        } else {
-          delete node.seat.dataset.venueRank;
-        }
-        // v0.1.743 「会話の連鎖」: 連続発言中の人の席は段階的に輝く。renderSeats は席を作り直す
-        //   ので、ストリーク状態(speechStreaks=正本)から段階を復元して data-streak に反映する。
-        //   これで再描画をまたいでも「溜まっていく感」が消えない。発言が途切れたら prune で消える。
-        const speakerKey = uid ? `u:${uid}` : rawName ? `n:${rawName}` : '';
-        const streakEntry = speakerKey ? speechStreaks.get(speakerKey) : null;
-        const seatStreakStage = streakEntry ? streakGlowStage(streakEntry.count) : 0;
-        if (seatStreakStage > 0) {
-          node.seat.dataset.streak = String(seatStreakStage);
-        } else {
-          delete node.seat.dataset.streak;
-        }
+    for (const item of visibleLaneItems) {
+      const seatIndex = Math.max(0, Math.floor(Number(item?._venueSeatIndex) || 0));
+      const node = seatNodes[seatIndex];
+      const entry = entryBySeatIndex.get(seatIndex);
+      if (!node || !entry) continue;
+      const participant = entry.participant || {};
+      const uid = String(participant.userId || '').trim();
+      const rawName = String(participant.name || '').trim();
+      const displayName =
+        String(item?.title || '').trim() ||
+        rawName ||
+        (uid ? anonymousDisplayLabel(uid) : anonymousDisplayLabel(participant.key || `会場${seatIndex + 1}`));
+      const tile = node.seat.querySelector('.nl-story-userlane-cell');
+      if (tile instanceof HTMLElement) node.tile = tile;
+      node.seat.classList.toggle(
+        'nlsb-seat-link',
+        isNumericNicoUserId(uid) && nicoUserPageUrl(uid) !== ''
+      );
+      node.seat.title = displayName;
+      node.seat.classList.remove('nlsb-is-empty');
+      node.seat.setAttribute('aria-hidden', 'false');
+      node.seat.classList.toggle('nlsb-seat-vip', item?._venueIsVip === true);
+      node.seat.classList.remove('nlsb-seat-regular');
+      const venueRank = Math.max(0, Math.floor(Number(entry.venueRank || item?._venueRank) || 0));
+      if (venueRank >= 1 && venueRank <= 3) {
+        node.seat.dataset.venueRank = String(venueRank);
+      } else {
+        delete node.seat.dataset.venueRank;
+      }
+      const speakerKey = uid ? `u:${uid}` : rawName ? `n:${rawName}` : '';
+      const streakEntry = speakerKey ? speechStreaks.get(speakerKey) : null;
+      const seatStreakStage = streakEntry ? streakGlowStage(streakEntry.count) : 0;
+      if (seatStreakStage > 0) {
+        node.seat.dataset.streak = String(seatStreakStage);
+      } else {
+        delete node.seat.dataset.streak;
       }
     }
     // 席が動いた(段の再描画/表示人数変化)後、表示中の吹き出しを席頭上へ追従させる。
