@@ -987,6 +987,29 @@
         height: 38px;
       }
 
+      /* ★v0.1.1049: サムネ持ち=大(現状維持) / 匿名(実サムネ無し)=小・ぎゅうぎゅう詰め。
+         data-thumb は renderStoryUserLaneDom.js が付与(displaySrc が http か)。
+         大きくするのでなく匿名を縮めて相対差を作る=既存レイアウトへの影響を最小化。
+         セレクタは [data-thumb="0"] 側のみ=属性が付かない旧タイルは既定(大)で安全に倒れる。 */
+      .nl-story-userlane-cell[data-thumb="0"] .nl-story-userlane-avatar {
+        width: 20px;
+        height: 20px;
+        border-width: 1px;
+        box-shadow: none;
+      }
+      html.nl-inline body .nl-story-userlane-cell[data-thumb="0"] .nl-story-userlane-avatar {
+        width: 22px;
+        height: 22px;
+      }
+      .nl-story-userlane-cell[data-thumb="0"] {
+        gap: 4px;
+        padding-right: 4px;
+      }
+      .nl-story-userlane-cell[data-thumb="0"] .nl-story-userlane-meta {
+        font-size: 9px;
+        max-width: 72px;
+      }
+
       .nl-story-userlane-guide {
         display: flex;
         flex-direction: column;
