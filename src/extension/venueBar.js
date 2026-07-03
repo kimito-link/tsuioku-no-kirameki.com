@@ -3063,6 +3063,9 @@ export function mountVenueBarButton(options = {}) {
       );
     const seatsDiagObs = {
       enabled: open,
+      // ★v0.1.1050: 会場が観測した配信ID。パリティ突合で status が「現配信か」を判定し、前配信の
+      //   残骸(古いスナップショット)を現配信と突き合わせて嘘の🔴を出さないためのガード(観測のみ)。
+      liveId: String(activeLiveId || liveIdFromPathname() || ''),
       seatsShown: visibleSeats.length,
       participantCount: seating.participantCount,
       otherCount: totalAnonymous,

@@ -7,6 +7,7 @@
  *
  * @typedef {{
  *   enabled: boolean,            // 会場モードが開いているか
+ *   liveId: string,              // ★v0.1.1050: 会場が観測した配信ID(空=未観測)。パリティ突合で別配信の残骸を弾くガード
  *   seatsShown: number,          // 同時表示している席数(visibleSeats の数)
  *   participantCount: number,    // 会場参加者数(buildVenueSeating の論理席=実コメントした人)
  *   otherCount: number,          // 席に表示しきれなかった「ほか N 人」
@@ -24,6 +25,7 @@
 export function makeInitialVenueSeatsDiag() {
   return {
     enabled: false,
+    liveId: '',
     seatsShown: 0,
     participantCount: 0,
     otherCount: 0,
@@ -98,6 +100,7 @@ export function buildVenueSeatsDiagSnapshot(diag, nowMs) {
         });
   return {
     enabled: !!d.enabled,
+    liveId: String(d.liveId || base.liveId),
     seatsShown: num(d.seatsShown, base.seatsShown),
     participantCount,
     otherCount: num(d.otherCount, base.otherCount),
