@@ -11,6 +11,7 @@
  *   identified: number,       // 素性(userId)が取れた候補の総数(cap 前)= bucketStoryUserLanePicks 入力数
  *   laneShown: number,        // popup レーンに実際に並べた数(cap 後・gift/ad 除く)
  *   limit: number,            // その時点の表示上限(INLINE_MODE?48:24)
+ *   paintMs: number,          // ★v0.1.1048 Phase0: renderStoryUserLane 1回の所要ms(全員表示の重さ判定用・0=未計測)
  *   lastUpdateAt: number      // 最後にレーンを描いた時刻(epoch ms・0=未更新)
  * }} LaneDiagState
  */
@@ -22,6 +23,7 @@ export function makeInitialLaneDiag() {
     identified: 0,
     laneShown: 0,
     limit: 0,
+    paintMs: 0,
     lastUpdateAt: 0
   };
 }
@@ -46,6 +48,7 @@ export function buildLaneDiagSnapshot(diag, nowMs) {
     identified: num(d.identified, base.identified),
     laneShown: num(d.laneShown, base.laneShown),
     limit: num(d.limit, base.limit),
+    paintMs: num(d.paintMs, base.paintMs),
     lastUpdateAt: num(d.lastUpdateAt, base.lastUpdateAt),
     capturedAt: now
   };
