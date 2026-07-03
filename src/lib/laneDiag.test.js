@@ -8,6 +8,7 @@ describe('laneDiag', () => {
       identified: 0,
       laneShown: 0,
       limit: 0,
+      paintMs: 0,
       lastUpdateAt: 0
     });
   });
@@ -22,9 +23,18 @@ describe('laneDiag', () => {
       identified: 522,
       laneShown: 48,
       limit: 48,
+      paintMs: 0,
       lastUpdateAt: 1000,
       capturedAt: 2000
     });
+  });
+
+  it('paintMs(Phase0 計器)を snapshot に写す', () => {
+    const snap = buildLaneDiagSnapshot(
+      { liveId: 'lv2', identified: 200, laneShown: 200, limit: 500, paintMs: 24.5, lastUpdateAt: 5 },
+      9
+    );
+    expect(snap.paintMs).toBe(24.5);
   });
 
   it('不正/欠落は初期値にフォールバック(壊れない)', () => {

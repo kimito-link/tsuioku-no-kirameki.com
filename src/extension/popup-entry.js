@@ -5056,6 +5056,9 @@ function countStoryUserLaneDomTiles(els) {
 }
 
 function renderStoryUserLane() {
+  // ★v0.1.1048 Phase0(全員表示の重さ判定・観測のみ): この関数1回の所要msを計測して laneDiag に載せる。
+  //   candidates 全件走査+sort+bucket+paint の合計。全員表示(limit撤廃)で重くなるかの実機ベースライン。
+  const _laneRenderT0 = typeof performance !== 'undefined' ? performance.now() : Date.now();
   const els = getStoryUserLaneEls();
   if (!els) return;
   // 本体で直接触るガード要素だけ分割代入(stack/4段は els 経由で paintStoryUserLaneDomFilled へ渡る)。
@@ -5307,7 +5310,16 @@ function renderStoryUserLane() {
   // 2026-06-22(council/lane-show-all-active): 健全度パネル「応援レーン」セル用に、人数整合の純観測値を
   //   storage へ(素性が取れた人 candidates.length / レーンに出した人 picked.length / 上限 limit)。
   //   venueSeatsDiag と同型(min-gap・best-effort・記録/描画は触らない)。
-  publishLaneDiag({ liveId, identified: candidates.length, laneShown: picked.length, limit });
+  publishLaneDiag({
+    liveId,
+    identified: candidates.length,
+    laneShown: picked.length,
+    limit,
+    // ★v0.1.1048 Phase0: この描画1回の所要ms(全員表示の重さ判定用・観測のみ)。
+    paintMs: Math.round(
+      ((typeof performance !== 'undefined' ? performance.now() : Date.now()) - _laneRenderT0) * 10
+    ) / 10
+  });
   // 応援レーンの「鏡」: 顔(avatar)含めてそっくり status へ映すための最小データを storage へ。
   //   publishLaneDiag と同じ 3秒 min-gap・best-effort。buckets(りんく/こん太/広告/たぬ姉/ギフト)は
   //   この時点で確定済み。会場には一切関係しない=popup と status だけ。描画は触らない(publish のみ)。

@@ -308,6 +308,21 @@ function buildLaneHealthCells(laneDiag) {
     out.push(stateCell('lane-count', '応援レーン', 'ok', `${laneShown}人 全員表示`));
   }
 
+  // ★v0.1.1048 Phase0(全員表示の重さ判定・観測のみ): レーン描画1回の所要ms。
+  //   全員表示(limit撤廃)で重くなるかを実機1枚で確定するベースライン。33ms(30fps相当)超で warn。
+  //   0=未計測はセルを足さない(死にセルで埋めない)。
+  const paintMs = num(snap.paintMs) || 0;
+  if (paintMs > 0) {
+    out.push(
+      stateCell(
+        'lane-paint',
+        'レーン描画速度',
+        paintMs > 33 ? 'warn' : 'ok',
+        `${paintMs}ms/回(表示${laneShown})`
+      )
+    );
+  }
+
   return out;
 }
 
