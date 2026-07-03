@@ -883,9 +883,13 @@
         overflow-y: visible;
       }
 
+      /* v0.1.1051 Step C(全員表示 Phase1): limit 48→200 で段が長くなるため、embed_watch(INLINE)は
+       * 会場 seatsHost と同型の縦スクロール枠にする(器の高さだけ違える・描画データ/ロジックは3面同一)。
+       * HANDOFF-show-all-participants.md Phase1。 */
       html.nl-inline body .nl-story-userlane-stack .nl-story-userlane {
-        max-height: none;
-        overflow-y: visible;
+        max-height: 40vh;
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
       }
 
       /* 識別色はラッパー背景・外枠のみ（既定のリンクゆっくり画像の見え方は変えない） */

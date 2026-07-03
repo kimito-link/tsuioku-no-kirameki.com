@@ -5113,7 +5113,10 @@ function renderStoryUserLane() {
     return;
   }
 
-  const limit = INLINE_MODE ? 48 : 24;
+  // v0.1.1051 Step C(全員表示 Phase1): 48→200へ引き上げ(HANDOFF-show-all-participants.md)。
+  //   候補組み立ては limit と無関係に既に全件走査(このファイル内 bucketStoryUserLanePicks 手前まで)、
+  //   diff-skip も件数と無関係に効くため、200 化で churn/重さは増えない設計(Fable裏取り済み)。
+  const limit = INLINE_MODE ? 200 : 24;
   const seen = new Set();
   const liveId = String(STORY_SOURCE_STATE.liveId || '');
   const laneScheme = getStoryColorScheme();
@@ -5289,8 +5292,9 @@ function renderStoryUserLane() {
   }
 
   const laneDisplayedTotal = picked.length + buckets.gift.length + buckets.ad.length;
-  // 2026-06-22(council/lane-show-all-active): 素性が取れた候補総数(cap 前)を渡し、limit 48 で
-  //   切られたぶんを「ほか M人は会場モードで全員見られます」と誠実に併記する(黙って切らない)。
+  // 2026-06-22(council/lane-show-all-active) → v0.1.1051 Step Cで limit 48→200 に更新。
+  //   素性が取れた候補総数(cap 前)を渡し、limit 200 で切られたぶんを「ほか M人は会場モードで
+  //   全員見られます」と誠実に併記する(黙って切らない)。
   paintStoryUserLaneDomFilled(els, faces, buckets, laneDisplayedTotal, laneDomIo, {
     totalCandidates: candidates.length
   });

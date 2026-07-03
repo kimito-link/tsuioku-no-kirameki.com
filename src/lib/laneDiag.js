@@ -5,6 +5,8 @@
  * 目的(2026-06-22 ユーザー要望): 「素性が取れた人 N / レーンに出した人 M / 会場の席 K」が合っているかを
  *   健全度パネルで一目で確認できるようにする。実機で interceptMapSize=522 なのに popup レーンが
  *   limit 48 で打ち切り=474人が黙って隠れていた不整合を、計器で即検知できるようにする(self-verifying)。
+ *   v0.1.1051 Step C: limit を 48→200 に引き上げ(HANDOFF-show-all-participants.md)。この診断自体は
+ *   limit 値と無関係に動くため構造変更なし。
  *
  * @typedef {{
  *   liveId: string,           // 観測した配信(空=未観測)
