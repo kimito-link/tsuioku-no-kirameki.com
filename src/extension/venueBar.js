@@ -921,6 +921,23 @@ const VENUE_CSS = `
     background: linear-gradient(180deg, #efebe9, #d7ccc8);
     border-color: color-mix(in srgb, #8d6e63 55%, var(--nl-border) 45%);
   }
+  /* ★v0.1.1049: サムネ持ち=大(現状38px維持) / 匿名(実サムネ無し)=小・ぎゅうぎゅう詰め。
+     popup.html と同じ規約([data-thumb="0"] 側のみ・displaySrc が http か)を会場にも。
+     VIP金縁/streak/順位バッジは border/box-shadow を触るだけ=サイズ非依存で競合しない。 */
+  .nlsb-venue-lane-stack .nl-story-userlane-cell[data-thumb="0"] .nl-story-userlane-avatar {
+    width: 22px;
+    height: 22px;
+    border-width: 1px;
+    box-shadow: none;
+  }
+  .nlsb-venue-lane-stack .nl-story-userlane-cell[data-thumb="0"] {
+    gap: 4px;
+    padding-right: 4px;
+  }
+  .nlsb-venue-lane-stack .nl-story-userlane-cell[data-thumb="0"] .nl-story-userlane-meta {
+    font-size: 9px;
+    max-width: 72px;
+  }
   .nlsb-venue-lane-stack .nl-story-userlane-guide {
     display: flex;
     flex-direction: column;

@@ -88,6 +88,17 @@ describe('fillLaneTier 段単位 diff-skip — churn 根治', () => {
     expect(wrap?.querySelector('.nl-story-userlane-cell')).toBeTruthy();
   });
 
+  it('data-thumb: 実サムネ(http)は "1"・匿名(identicon)は "0"(サムネ持ち=大/匿名=小の出し分け)', () => {
+    const els = makeEls();
+    // link=http displaySrc / tanu=identicon(非http) displaySrc
+    paint(els, { link: LINK, gift: [], ad: [], konta: [], tanu: TANU });
+    const linkCell = els.laneLink.firstElementChild;
+    expect(linkCell?.getAttribute('data-thumb')).toBe('1');
+    for (const tanuCell of Array.from(els.laneTanu.children)) {
+      expect(tanuCell.getAttribute('data-thumb')).toBe('0');
+    }
+  });
+
   it('id の無い会場段でも data-lane-name で repaint 計器を分類する', () => {
     const els = makeEls();
     els.laneLink.id = '';

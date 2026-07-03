@@ -234,6 +234,14 @@ function fillLaneTier(el, items, io, wrapTileEl) {
     // タイル本体の生成は人物タイル正本(buildPersonTileEl)に集約。
     // ループ・hidden 制御(=レイアウト)はここに残す。全消しでなく変化時だけ replaceChildren で一括差替。
     const tileEl = buildPersonTileEl(p, io);
+    // ★v0.1.1049: サムネ持ち=大 / 匿名=小(ぎゅうぎゅう詰め)の CSS 出し分け用フラグ。
+    //   判定は displaySrc が http(s) か【のみ】(=実サムネ)。thumbScore は匿名でも 2 になり得る
+    //   (identicon 顔なのに大タイル)ため使わない。displaySrc は storyLaneTierBodyKey に含まれるので、
+    //   サイズが変わる瞬間=key が変わって再描画される瞬間が一致=diff-skip に余計な key 揺れを作らない。
+    //   personTileDom.js(タイル正本・凍結)は不触=ここ(呼び出し側)で属性を付ける。
+    try {
+      tileEl.dataset.thumb = io.isHttpOrHttpsUrl(String(p && p.displaySrc || '')) ? '1' : '0';
+    } catch { /* io 未注入等でも描画は止めない */ }
     frag.appendChild(typeof wrapTileEl === 'function' ? wrapTileEl(tileEl, p, i) : tileEl);
   }
   el.replaceChildren(frag);
