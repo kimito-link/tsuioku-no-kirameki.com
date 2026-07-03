@@ -5747,7 +5747,10 @@ function publishLaneMirror(input) {
   if (INLINE_PASSIVE) return; // 受動ビュー: 鏡を上書きしない
   try {
     const now = Date.now();
-    const snap = buildLaneMirrorSnapshot(input, { cap: 48, nowMs: now });
+    // v0.1.1052 Step C追補: popup表示limitを48→200に上げたのに鏡capが48のままだと
+    //   ①POP≠③WEB鏡のパリティ不一致になる(実機で担張211≠鏡99を確認)。鏡capもlimitに合わせる。
+    //   容量超過時はlaneMirror.js側の自衛(512KB超でcap半減・最大2回)が引き続き効く。
+    const snap = buildLaneMirrorSnapshot(input, { cap: 200, nowMs: now });
     mergeAndScheduleFlush('lane', snap, snap && snap.liveId, now);
   } catch {
     /* no-op */
