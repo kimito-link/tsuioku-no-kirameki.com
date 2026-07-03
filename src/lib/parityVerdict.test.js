@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildParityVerdict, formatParityVerdictLine, buildParityBadge } from './parityVerdict.js';
+import { buildParityVerdict, formatParityVerdictLine, buildParityBadge, judgeVenuePopulationParity } from './parityVerdict.js';
 
 // 決定木を固定。誤検知根絶(取得不能は必ず pending・×にしない)を最重視で検証。
 
@@ -185,5 +185,62 @@ describe('buildParityVerdict — ②の実描画突合(嘘の✅根治・v0.1.10
   it('ack に supporterRows が無い旧形式でも①鏡0なら ok(後方互換)', () => {
     const i = okInput(); // mirrors 無し=supMirrorCount0
     expect(buildParityVerdict(i).verdict).toBe('ok');
+  });
+});
+
+describe('judgeVenuePopulationParity — ④会場と①応援レーンの人数突合(v0.1.1050)', () => {
+  it('会場未起動は pending(mismatch にしない=オプション面)', () => {
+    const r = judgeVenuePopulationParity({ enabled: false, liveId: 'lv1', participantCount: 187 }, { identified: 56 }, 'lv1');
+    expect(r.state).toBe('pending');
+    expect(r.code).toBe('venue_off');
+  });
+  it('会場の liveId が空(旧スナップショット)は pending(嘘の🔴を出さない)', () => {
+    const r = judgeVenuePopulationParity({ enabled: true, liveId: '', participantCount: 187 }, { identified: 56 }, 'lv1');
+    expect(r.state).toBe('pending');
+    expect(r.code).toBe('venue_other_live');
+  });
+  it('会場の liveId が別配信は pending', () => {
+    const r = judgeVenuePopulationParity({ enabled: true, liveId: 'lvOLD', participantCount: 187 }, { identified: 56 }, 'lv1');
+    expect(r.state).toBe('pending');
+    expect(r.code).toBe('venue_other_live');
+  });
+  it('人数一致は match', () => {
+    const r = judgeVenuePopulationParity({ enabled: true, liveId: 'lv1', participantCount: 100 }, { identified: 100 }, 'lv1');
+    expect(r.state).toBe('match');
+  });
+  it('差が許容幅(5人)以内は explained(母集合差)', () => {
+    const r = judgeVenuePopulationParity({ enabled: true, liveId: 'lv1', participantCount: 103 }, { identified: 100 }, 'lv1');
+    expect(r.state).toBe('explained');
+    expect(r.reason).toContain('母集合差');
+  });
+  it('差が許容超は mismatch(本物のズレ・POP56 vs 会場187 型)', () => {
+    const r = judgeVenuePopulationParity({ enabled: true, liveId: 'lv1', participantCount: 187 }, { identified: 56 }, 'lv1');
+    expect(r.state).toBe('mismatch');
+    expect(r.reason).toContain('56');
+    expect(r.reason).toContain('187');
+  });
+});
+
+describe('buildParityVerdict — ④会場突合の統合(v0.1.1050)', () => {
+  const withVenue = (venueParticipant, identified) => ({
+    ...okInput(),
+    venueSeatsDiag: { enabled: true, liveId: 'lv1', participantCount: venueParticipant, seatsShown: Math.min(venueParticipant, 48) },
+    laneDiagCounts: { identified, laneShown: Math.min(identified, 48), limit: 48 }
+  });
+  it('①56 vs ④187 の大きなズレ=mismatch(今回の実機ケース)', () => {
+    const v = buildParityVerdict(withVenue(187, 56));
+    expect(v.verdict).toBe('mismatch');
+    expect(v.code).toBe('venue_population_mismatch');
+  });
+  it('①100=④103(母集合差)=ok だが reason に意図差と件数を明記(嘘の緑を出さない)', () => {
+    const v = buildParityVerdict(withVenue(103, 100));
+    expect(v.verdict).toBe('ok');
+    expect(v.code).toBe('ok_venue_explained');
+    expect(v.reason).toContain('意図差');
+  });
+  it('会場未観測(venueSeatsDiag 無し)でも①②③が揃えば ok(会場は overall を劣化させない)', () => {
+    const v = buildParityVerdict(okInput());
+    expect(v.verdict).toBe('ok');
+    expect(v.code).toBe('ok');
   });
 });

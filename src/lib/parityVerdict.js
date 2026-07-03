@@ -11,12 +11,71 @@
 const DEFAULT_FRESH_MS = 180_000; // 3分。これより古い観測は鮮度不足として保留寄りに扱う。
 
 /**
+ * ★v0.1.1050: ④会場座席と①応援レーンの人数を突合する純関数(観測のみ・新規readなし=既存値のroll-up)。
+ *
+ * 基準(真値宣言): 外部真値は無いので「①identified(応援レーンが素性を取れた総数・cap前)」と
+ *   「④participantCount(会場の論理席=実コメントした人)」を突き合わせる。どちらも cap 前の論理人数。
+ *   laneShown(48等) vs seatsShown を直接比べない=それは cap の比較で内容の比較でないため。
+ *
+ * 判定(嘘の🔴/嘘の緑を出さない):
+ *   - 会場未起動/未観測/liveId不一致/旧スナップショット → 'pending'(unobserved)。mismatch にしない。
+ *     ④はオプション面なので pending は overall を劣化させない(呼び出し側で扱う)。
+ *   - identified と participantCount の差が許容幅(絶対5人 or 相対5%の大)以内 → 'explained'(母集合差:
+ *     popup は配信者ID未確定時に数値ID候補を落とす+汚染ガード/会場は落とさない、の既知の意図差)。
+ *   - それ超 → 'mismatch'(本物のズレ)。
+ *
+ * @param {{ enabled?: boolean, liveId?: string, participantCount?: number, seatsShown?: number }|null} venue
+ * @param {{ identified?: number, laneShown?: number, limit?: number }|null} laneCounts
+ * @param {string} curLid 現配信ID(小文字)
+ * @returns {{ state:'match'|'explained'|'mismatch'|'pending', reason:string, code:string, pop:number, venue:number }}
+ */
+export function judgeVenuePopulationParity(venue, laneCounts, curLid) {
+  const v = venue && typeof venue === 'object' ? venue : null;
+  const lc = laneCounts && typeof laneCounts === 'object' ? laneCounts : null;
+  const pop = lc ? Math.max(0, Math.floor(Number(lc.identified) || 0)) : -1;
+  const ven = v ? Math.max(0, Math.floor(Number(v.participantCount) || 0)) : -1;
+
+  // 会場未起動/未観測 → pending(mismatch にしない・④はオプション)。
+  if (!v || v.enabled !== true) {
+    return { state: 'pending', reason: '④会場は未起動(突合対象外)', code: 'venue_off', pop, venue: ven };
+  }
+  const venLid = String(v.liveId || '').trim().toLowerCase();
+  // 旧スナップショット(liveId 空)や別配信の残骸 → pending(嘘の🔴を出さないガード)。
+  if (!venLid || (curLid && venLid !== curLid)) {
+    return { state: 'pending', reason: '④会場の観測が別配信/古い(突合対象外)', code: 'venue_other_live', pop, venue: ven };
+  }
+  if (pop < 0) {
+    return { state: 'pending', reason: '①応援レーンの人数が未観測', code: 'lane_unobserved', pop, venue: ven };
+  }
+  // 許容幅: 絶対5人 or 相対5% の大きい方(母集合差=数人オーダー+鮮度差を吸収)。
+  const tolerance = Math.max(5, Math.ceil(Math.max(pop, ven) * 0.05));
+  const diff = Math.abs(pop - ven);
+  if (diff === 0) {
+    return { state: 'match', reason: '①応援レーンと④会場の人数が一致', code: 'venue_match', pop, venue: ven };
+  }
+  if (diff <= tolerance) {
+    return {
+      state: 'explained',
+      reason: `①${pop}人/④${ven}人(差${diff}=数値ID落とし等の既知の母集合差)`,
+      code: 'venue_population_explained', pop, venue: ven
+    };
+  }
+  return {
+    state: 'mismatch',
+    reason: `①応援レーン${pop}人 ≠ ④会場${ven}人(差${diff})`,
+    code: 'venue_population_mismatch', pop, venue: ven
+  };
+}
+
+/**
  * @param {{
  *   trust?: any,                  // buildDiagnosticsTrust の戻り(hasWatchTab/popup/verdict/popupTrustable)
  *   publishSelfDiag?: any,        // buildLiveviewPublishSelfDiag の戻り(consistency/publish/lastPost/mirrors)
  *   laneRenderDiag?: any,         // buildStoryUserLaneRenderDiag の戻り(verdict/started/...)=①応援レーン描画
  *   northStarProbe?: any,         // popupDiag.popup.northStarRenderProbe(refreshAllStarted)=①北極星描画
  *   previewAck?: any,             // ②応援プレビューの描画 ack(別キー: { ready, ts, liveId })
+ *   venueSeatsDiag?: any,         // ★v0.1.1050: ④会場座席の観測値({ enabled, liveId, seatsShown, participantCount, ... })
+ *   laneDiagCounts?: any,         // ★v0.1.1050: ①応援レーンの人数観測({ identified, laneShown, limit })=会場突合の基準側
  *   currentLiveId?: string,
  *   nowMs?: number,
  *   freshMs?: number
@@ -30,6 +89,8 @@ export function buildParityVerdict(input) {
   const laneDiag = a.laneRenderDiag && typeof a.laneRenderDiag === 'object' ? a.laneRenderDiag : null;
   const nsProbe = a.northStarProbe && typeof a.northStarProbe === 'object' ? a.northStarProbe : null;
   const ack = a.previewAck && typeof a.previewAck === 'object' ? a.previewAck : null;
+  const venue = a.venueSeatsDiag && typeof a.venueSeatsDiag === 'object' ? a.venueSeatsDiag : null;
+  const laneCounts = a.laneDiagCounts && typeof a.laneDiagCounts === 'object' ? a.laneDiagCounts : null;
   const nowMs = Number(a.nowMs) || 0;
   const freshMs = Number(a.freshMs) > 0 ? Number(a.freshMs) : DEFAULT_FRESH_MS;
   const curLid = String(a.currentLiveId || '').trim().toLowerCase();
@@ -130,7 +191,25 @@ export function buildParityVerdict(input) {
     );
   }
 
-  // すべて必須クリア。
+  // 8. ★v0.1.1050: ④会場との人数突合(新規readなし=既存値のroll-up)。①②③が揃った後に会場を照合する。
+  //   会場は「片方未観測」を mismatch にしない(pending は overall を劣化させない=オプション面)。
+  //   本物のズレ(許容超)だけ 🔴。意図差(母集合差)は ✅ だが件数差を必ず reason に明記=嘘をつかない。
+  const venueParity = judgeVenuePopulationParity(venue, laneCounts, curLid);
+  if (venueParity.state === 'mismatch') {
+    return fail(
+      `①応援レーンと④会場の人数が食い違い: ${venueParity.reason}`,
+      'この状態速報を開発者に共有(①と④の母集合突合)', 'venue_population_mismatch'
+    );
+  }
+
+  // すべて必須クリア。④が意図差(explained)なら ✅ だが件数差を1行に明記する(嘘の緑を出さない)。
+  if (venueParity.state === 'explained') {
+    return {
+      verdict: 'ok',
+      reason: `①POP=②応援プレビュー=③WEB が同一で完全(④会場は意図差あり: ${venueParity.reason})`,
+      nextAction: '', code: 'ok_venue_explained'
+    };
+  }
   return { verdict: 'ok', reason: '①POP=②応援プレビュー=③WEB が同一で完全', nextAction: '', code: 'ok' };
 }
 

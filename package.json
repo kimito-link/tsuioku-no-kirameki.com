@@ -1,6 +1,6 @@
 {
   "name": "nicolivelog",
-  "version": "0.1.1049",
+  "version": "0.1.1050",
   "private": true,
   "description": "ニコ生コメント記録プロトタイプ（拡張）",
   "type": "module",

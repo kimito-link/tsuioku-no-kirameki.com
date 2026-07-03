@@ -149,6 +149,9 @@ export function buildAiShareFullText({ overviewText, livesData, fastDiag, popupD
         laneRenderDiag,
         northStarProbe: nsProbe,
         previewAck,
+        // ★v0.1.1050: ④会場と①応援レーンの人数突合を追加(新規readなし=既にこの関数の引数に来ている値の roll-up)。
+        venueSeatsDiag: venueSeatsDiag || null,
+        laneDiagCounts: laneDiag || null,
         currentLiveId: String(currentLiveId || ''),
         nowMs: Date.now()
       });
