@@ -165,11 +165,74 @@ function buildTierVariations(tmpDir) {
   return true;
 }
 
+/**
+ * v0.1.1068: パチンコ電子音の直接合成(実試聴「パチンコっぽさが全然ない」への回答)。
+ *   素材ミックスをやめ、ffmpeg aevalsrc で「きゅいん(上昇チャープ+トレモロ)」「コインベル」
+ *   「大当たりベルカスケード」を生成する。完全に決定論・ライセンスフリー(自作)。
+ *   バリエーション n=1..3 は基準周波数を±6%ずらして作る(乱数不使用)。
+ */
+const SYNTH_LOUDNORM = 'loudnorm=I=-6:TP=-0.3:LRA=9'; // ベロシティ強め=音圧-6LUFS
+
+function synthToDest(inputs, filterComplex, dest, tmpDir) {
+  const wav = join(tmpDir, `synth-${dest.split(/[\\/]/).pop()}.wav`);
+  const args = [];
+  for (const i of inputs) { args.push('-f', 'lavfi', '-i', i); }
+  args.push('-filter_complex', filterComplex, '-map', '[out]', wav);
+  ffmpeg(args);
+  ffmpeg(['-i', wav, '-af', SYNTH_LOUDNORM, '-ar', '44100', '-q:a', '2', dest]);
+}
+
+function buildSynthPachinkoTiers(tmpDir) {
+  mkdirSync(TIERS_OUT_DIR, { recursive: true });
+  for (let n = 1; n <= 3; n++) {
+    const k = 1 + 0.06 * (n - 2); // 変奏: -6%/0/+6%
+    // small: コイン2連ベル(チン+チン)0.3秒
+    synthToDest(
+      [
+        `aevalsrc=(sin(2*PI*${2093 * k}*t)+0.5*sin(2*PI*${3136 * k}*t))*exp(-22*t):s=44100:d=0.3`,
+        `aevalsrc=(sin(2*PI*${2637 * k}*t)+0.5*sin(2*PI*${3951 * k}*t))*exp(-22*t):s=44100:d=0.3`
+      ],
+      '[1:a]adelay=80|80[b];[0:a][b]amix=inputs=2:normalize=0:duration=longest,alimiter=limit=0.95[out]',
+      join(TIERS_OUT_DIR, `gift-small-${n}.mp3`), tmpDir
+    );
+    // medium: きゅいん短(チャープ0.4秒+トレモロ)
+    synthToDest(
+      [`aevalsrc=(sin(2*PI*(${500 * k}*t+${2400 * k}*t*t))+0.4*sin(4*PI*(${500 * k}*t+${2400 * k}*t*t)))*exp(-2.8*t):s=44100:d=0.45`],
+      '[0:a]tremolo=f=32:d=0.75,aecho=0.6:0.35:55:0.3,alimiter=limit=0.95[out]',
+      join(TIERS_OUT_DIR, `gift-medium-${n}.mp3`), tmpDir
+    );
+    // large: きゅいーん(長めチャープ+強トレモロ+締めベル)0.7秒
+    synthToDest(
+      [
+        `aevalsrc=(sin(2*PI*(${350 * k}*t+${2900 * k}*t*t))+0.45*sin(4*PI*(${350 * k}*t+${2900 * k}*t*t)))*exp(-1.6*t):s=44100:d=0.62`,
+        `aevalsrc=(sin(2*PI*${2794 * k}*t)+0.5*sin(2*PI*${4186 * k}*t))*exp(-16*t):s=44100:d=0.35`
+      ],
+      '[0:a]tremolo=f=28:d=0.8[c];[1:a]adelay=430|430[b];[c][b]amix=inputs=2:normalize=0:duration=longest,aecho=0.65:0.4:70:0.35,alimiter=limit=0.95[out]',
+      join(TIERS_OUT_DIR, `gift-large-${n}.mp3`), tmpDir
+    );
+    // mega: 大当たり=きゅいん+ベルカスケード3連 1.1秒
+    synthToDest(
+      [
+        `aevalsrc=(sin(2*PI*(${300 * k}*t+${3200 * k}*t*t))+0.5*sin(4*PI*(${300 * k}*t+${3200 * k}*t*t)))*exp(-1.4*t):s=44100:d=0.6`,
+        `aevalsrc=(sin(2*PI*${2093 * k}*t)+0.5*sin(2*PI*${3136 * k}*t))*exp(-13*t):s=44100:d=0.45`,
+        `aevalsrc=(sin(2*PI*${2637 * k}*t)+0.5*sin(2*PI*${3951 * k}*t))*exp(-13*t):s=44100:d=0.45`,
+        `aevalsrc=(sin(2*PI*${3136 * k}*t)+0.5*sin(2*PI*${4699 * k}*t))*exp(-11*t):s=44100:d=0.5`
+      ],
+      '[0:a]tremolo=f=26:d=0.8[c];[1:a]adelay=450|450[b1];[2:a]adelay=600|600[b2];[3:a]adelay=750|750[b3];' +
+        '[c][b1][b2][b3]amix=inputs=4:normalize=0:duration=longest,aecho=0.7:0.45:80:0.4,alimiter=limit=0.95[out]',
+      join(TIERS_OUT_DIR, `gift-mega-${n}.mp3`), tmpDir
+    );
+  }
+  console.log('[build-sounds] ギフト12ファイルをパチンコ合成音(きゅいん/コインベル)で生成しました。');
+}
+
 function main() {
   const tmpDir = mkdtempSync(join(tmpdir(), 'nls-sound-build-'));
   try {
     const built = buildGiftSound(tmpDir);
     const tiersBuilt = buildTierVariations(tmpDir);
+    // v0.1.1068: ギフトのtierはパチンコ合成音で上書き(素材ミックスは他カテゴリのみ)。
+    buildSynthPachinkoTiers(tmpDir);
     if (process.argv.includes('--normalize-all')) {
       normalizeExistingEffects(tmpDir);
     }
