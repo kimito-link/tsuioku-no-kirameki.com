@@ -16,7 +16,6 @@
 
 - 🟠 **KEY_PAINT_PERF_RING_V1** — 書く人だけ（読む経路が無い疑い）: src/extension/popup-entry.js
 - 🟠 **KEY_SW_PROGRESS** — 書く人だけ（読む経路が無い疑い）: src/extension/backfill-sw-entry.js
-- 🟠 **KEY_VENUE_EFFECT_SOUND_PRESENCE** — 書く人だけ（読む経路が無い疑い）: src/extension/venueBar.js
 - 🟠 **fn:backfillHeartbeatKey** — 書く人だけ（読む経路が無い疑い）: src/extension/content-entry.js
 - 🟠 **fn:chunkMigratedKey** — 書く人だけ（読む経路が無い疑い）: src/extension/content-entry.js
 - 🟠 **fn:comeviewPinStorageKey** — 書く人だけ（読む経路が無い疑い）: src/extension/comeview-entry.js
@@ -141,9 +140,10 @@
 | `KEY_THUMB_INTERVAL_MS` | — | extension/content-entry.js<br>extension/popup-entry.js |
 | `KEY_TOP_SUPPORTERS_MIRROR` | — | extension/popup-entry.js |
 | `KEY_USER_COMMENT_PROFILE_CACHE` | extension/content-entry.js | extension/comeview-entry.js<br>extension/content-entry.js<br>extension/popup-entry.js<br>extension/venueBar.js |
-| `KEY_VENUE_EFFECT_SOUND_PRESENCE` | extension/venueBar.js | — |
+| `KEY_VENUE_EFFECT_SOUND_PRESENCE` | extension/venueBar.js | extension/popup-entry.js |
 | `KEY_VENUE_SEATS_DIAG` | extension/venueBar.js | extension/status-entry.js |
 | `KEY_VOICE_DIAG` | extension/comeview-entry.js<br>extension/venueBar.js | extension/status-entry.js |
+| `KEY_VOICE_EFFECT_DIAG` | extension/popup-entry.js<br>extension/venueBar.js | extension/status-entry.js |
 | `KEY_VOICE_INPUT_DEVICE` | extension/popup-entry.js | extension/popup-entry.js |
 | `fn:backfillHeartbeatKey` | extension/content-entry.js | — |
 | `fn:chunkIndexKey` | extension/content-entry.js | extension/popup-entry.js |

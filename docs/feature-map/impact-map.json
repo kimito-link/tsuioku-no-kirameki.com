@@ -568,6 +568,38 @@
       ]
     },
     {
+      "file": "src/lib/voiceEffectDiag.js",
+      "featureCount": 4,
+      "features": [
+        "content",
+        "popup",
+        "status",
+        "venue"
+      ],
+      "labels": [
+        "記録エンジン(watchページ常駐)",
+        "ポップアップ(応援レーン)",
+        "状態速報ページ",
+        "会場モード(standalone)"
+      ]
+    },
+    {
+      "file": "src/lib/voiceEffectDiagKey.js",
+      "featureCount": 4,
+      "features": [
+        "content",
+        "popup",
+        "status",
+        "venue"
+      ],
+      "labels": [
+        "記録エンジン(watchページ常駐)",
+        "ポップアップ(応援レーン)",
+        "状態速報ページ",
+        "会場モード(standalone)"
+      ]
+    },
+    {
       "file": "src/shared/avatar/avatarUrlGuard.js",
       "featureCount": 4,
       "features": [
@@ -988,6 +1020,20 @@
       "labels": [
         "コメビュ(別窓)",
         "記録エンジン(watchページ常駐)",
+        "会場モード(standalone)"
+      ]
+    },
+    {
+      "file": "src/lib/voiceDirector.js",
+      "featureCount": 3,
+      "features": [
+        "content",
+        "popup",
+        "venue"
+      ],
+      "labels": [
+        "記録エンジン(watchページ常駐)",
+        "ポップアップ(応援レーン)",
         "会場モード(standalone)"
       ]
     },

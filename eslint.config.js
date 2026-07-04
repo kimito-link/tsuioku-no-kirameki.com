@@ -157,8 +157,12 @@ export default [
     //   (initCustomSoundRuntimeOnce/buildEffectSoundDeps・chrome.storage I/Oグルー=lib抽出不可。
     //   純関数/IDB操作本体は src/lib/customSoundStore.js・customSoundPreset.js にテスト付きで隔離済み)
     //   を追加=19974→20082(council/pachinko-ultimate-SYNTHESIS.md §6 Phase A)。
+    //   Phase B(2026-07-05・v0.1.1073): パチンコボイス演出の発火配線(tryPlayVoicePopup/突破・大当たり
+    //   チェーンのsetTimeout直列実行・会場優先プレゼンス判定=chrome.storage/タイマーのグルー=lib抽出不可。
+    //   歯止め判定本体(voiceGate)と診断整形は src/lib/voiceDirector.js・voiceEffectDiag.js に
+    //   テスト付きで隔離済み)を追加=20082→20254。ラチェットは実測+50の20304へ。
     files: ['src/extension/popup-entry.js'],
-    rules: { 'max-lines': ['error', { max: 20082, skipBlankLines: false, skipComments: false }] }
+    rules: { 'max-lines': ['error', { max: 20304, skipBlankLines: false, skipComments: false }] }
   },
   {
     files: ['src/extension/popup/**/*.js'],
