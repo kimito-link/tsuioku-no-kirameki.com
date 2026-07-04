@@ -103,3 +103,38 @@ describe('giftEffectDiagToActionCards', () => {
     expect(giftEffectDiagToActionCards(null)).toEqual([]);
   });
 });
+
+describe('v0.1.1061: バースト置換(giftSoundCoalesced)の勘定', () => {
+  it('初期stateは giftSoundCoalesced=0', () => {
+    expect(makeInitialGiftEffectDiag().giftSoundCoalesced).toBe(0);
+  });
+
+  it('旧スナップショット(フィールド無し)は0扱い=従来と同じ判定', () => {
+    const snap = buildGiftEffectDiagSnapshot({ giftDetected: 3, giftThrown: 3, giftSoundPlayed: 3 }, 1000);
+    expect(snap.giftSoundCoalesced).toBe(0);
+    const lines = buildGiftEffectDiagLines(snap, 1000);
+    expect(lines.some((l) => l.includes('音3 ✅'))).toBe(true);
+  });
+
+  it('置換された分は「鳴っていない」と誤診断しない(投擲5=音1+置換4で✅)', () => {
+    const snap = buildGiftEffectDiagSnapshot(
+      { giftDetected: 5, giftThrown: 5, giftSoundPlayed: 1, giftSoundCoalesced: 4 },
+      1000
+    );
+    const lines = buildGiftEffectDiagLines(snap, 1000);
+    const giftLine = lines.find((l) => l.includes('ギフト:'));
+    expect(giftLine).toContain('音1(+置換4) ✅');
+    expect(giftLine).not.toContain('⚠');
+    expect(giftEffectDiagToActionCards(snap).some((c) => c.id === 'gift-effect-sound-missing-gift')).toBe(false);
+  });
+
+  it('置換を差し引いても足りない分だけ⚠にする(投擲5=音1+置換2→⚠2件)', () => {
+    const snap = buildGiftEffectDiagSnapshot(
+      { giftDetected: 5, giftThrown: 5, giftSoundPlayed: 1, giftSoundCoalesced: 2 },
+      1000
+    );
+    const lines = buildGiftEffectDiagLines(snap, 1000);
+    expect(lines.some((l) => l.includes('⚠2件鳴っていない'))).toBe(true);
+    expect(giftEffectDiagToActionCards(snap).some((c) => c.id === 'gift-effect-sound-missing-gift')).toBe(true);
+  });
+});

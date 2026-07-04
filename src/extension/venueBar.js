@@ -63,6 +63,7 @@ import {
   isEffectSoundEnabled
 } from '../lib/storageKeys.js';
 import { EFFECT_SOUND_KINDS, playEffectSound, effectSoundKindForGiftTier } from '../lib/effectSoundPlayer.js';
+import { directHit, makeInitialComboState, GIFT_TIER_LADDER } from '../lib/effectDirector.js';
 import { KEY_GIFT_EFFECT_DIAG } from '../lib/giftEffectDiagKey.js';
 import { makeInitialGiftEffectDiag, buildGiftEffectDiagSnapshot } from '../lib/giftEffectDiag.js';
 import { anonymousIdenticonDataUrl } from '../lib/anonymousIdenticon.js';
@@ -2064,6 +2065,48 @@ export function mountVenueBarButton(options = {}) {
     void chrome.storage.local.set({ [KEY_GIFT_EFFECT_DIAG]: snap }).catch(() => {});
   };
 
+  // v0.1.1061: ギフト音のバースト置換+着弾同期(実試聴フィードバック「出ない・ずれる」の根治)。
+  //   従来は 1 ギフト=1 playEffectSound 即時呼びだったため、storage 経由でまとめて届くバーストでは
+  //   (a)同ティア連続が 600ms ガードに食われ2発目以降が無音=「出ないときがある」
+  //   (b)音が投げた瞬間・見た目の着弾は飛翔時間後=「ずれる」
+  //   になっていた。演出ディレクター(effectDirector)の「コンボは加算でなく置換」で、
+  //   飛翔中に届いた分は予約済みの1本をティア昇格させるだけにし、着弾タイミングで1本だけ鳴らす。
+  //   ギフトのコンボ窓は10秒(30秒だと安定した連続ギフトが常時megaに張り付くため・決定論)。
+  const GIFT_COMBO_WINDOW_MS = 10_000;
+  let _giftComboState = makeInitialComboState();
+  let _pendingGiftSound = /** @type {{ kind: string, timer: number }|null} */ (null);
+  /**
+   * ギフト1件ぶんの音をディレクター経由で予約する。
+   * @param {string|undefined} tier 'small'|'medium'|'large'|'mega'
+   * @param {number} flightMs 投擲アニメの飛翔時間(ms)=着弾までの遅延
+   * @returns {'scheduled'|'coalesced'|'off'}
+   */
+  const scheduleGiftSound = (tier, flightMs) => {
+    if (!_effectSoundEnabledCache) return 'off';
+    const baseKind = effectSoundKindForGiftTier(tier);
+    _giftComboState = directHit(_giftComboState, baseKind, Date.now(), {
+      ladder: GIFT_TIER_LADDER,
+      windowMs: GIFT_COMBO_WINDOW_MS
+    });
+    const kind = _giftComboState.kind || baseKind;
+    if (_pendingGiftSound) {
+      // 置換: 予約済みの1本を昇格させるだけ(音を積み増ししない=太鼓の達人式)。
+      _pendingGiftSound.kind = kind;
+      return 'coalesced';
+    }
+    const pending = { kind, timer: 0 };
+    pending.timer = window.setTimeout(() => {
+      _pendingGiftSound = null;
+      // 「鳴らした」時だけ数える(戻り値を見ずに数えると診断が嘘をつく・v0.1.1057と同じ教訓)。
+      if (playEffectSound(pending.kind) === 'played') {
+        _giftEffectDiagCounters.giftSoundPlayed += 1;
+        publishGiftEffectDiag();
+      }
+    }, Math.max(0, Math.round(Number(flightMs) || 0)));
+    _pendingGiftSound = pending;
+    return 'scheduled';
+  };
+
   // 診断パネルの描画/開閉。buildVenueRoster(純関数・テスト済)で誰が顔付き席/点描かを表にする。
   const renderRosterPanel = () => {
     const roster = buildVenueRoster(lastRosterInput);
@@ -2579,10 +2622,9 @@ export function mountVenueBarButton(options = {}) {
         //   なって giftThrown が実態より過大(=取りこぼしを過小報告)していた。
         if (launchGiftThrow(speech.speakerKey, p)) {
           _giftEffectDiagCounters.giftThrown += 1;
-          if (_effectSoundEnabledCache) {
-            // v0.1.1059: 金額帯(tier)ごとにバリエーションのある音からランダムに1本鳴らす。
-            playEffectSound(effectSoundKindForGiftTier(p.tier));
-            _giftEffectDiagCounters.giftSoundPlayed += 1;
+          // v0.1.1061: 即時再生をやめ、着弾タイミングに1本だけ予約(バーストは置換昇格)。
+          if (scheduleGiftSound(p.tier, p.durationMs) === 'coalesced') {
+            _giftEffectDiagCounters.giftSoundCoalesced += 1;
           }
         }
       }
@@ -2639,10 +2681,9 @@ export function mountVenueBarButton(options = {}) {
       if (proj) {
         launchGiftThrow(uid ? `u:${uid}` : '', proj);
         _giftEffectDiagCounters.giftThrown += 1;
-        if (_effectSoundEnabledCache) {
-          // v0.1.1059: 金額帯(tier)ごとにバリエーションのある音からランダムに1本鳴らす。
-          playEffectSound(effectSoundKindForGiftTier(proj.tier));
-          _giftEffectDiagCounters.giftSoundPlayed += 1;
+        // v0.1.1061: 即時再生をやめ、着弾タイミングに1本だけ予約(バーストは置換昇格)。
+        if (scheduleGiftSound(proj.tier, proj.durationMs) === 'coalesced') {
+          _giftEffectDiagCounters.giftSoundCoalesced += 1;
         }
       }
       publishGiftEffectDiag();

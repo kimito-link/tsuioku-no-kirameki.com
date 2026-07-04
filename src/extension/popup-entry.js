@@ -1288,8 +1288,9 @@ function maybePlayMilestoneEffectSound(spec) {
   }
   const kind = effectSoundKindForPikaTier(pikaTierForSupportCelebration(spec));
   if (kind) {
-    playEffectSound(kind);
-    if (isCommentMilestone) _milestoneEffectDiagCounters.milestoneSoundPlayed += 1;
+    // v0.1.1061: 「試みた」でなく戻り値'played'(実際に鳴らした)だけ数える=診断が嘘をつかない。
+    const result = playEffectSound(kind);
+    if (isCommentMilestone && result === 'played') _milestoneEffectDiagCounters.milestoneSoundPlayed += 1;
   }
   if (isCommentMilestone) publishMilestoneEffectDiag();
 }

@@ -104,6 +104,19 @@ export function resolveEffectSoundPath(kind, deps = {}) {
 /** 同じ種類の効果音を連打しないための多重再生ガード間隔(ms)。 */
 export const EFFECT_SOUND_GUARD_MS = 600;
 
+/** 既定の再生音量。 */
+export const EFFECT_SOUND_DEFAULT_VOLUME = 0.7;
+
+/**
+ * v0.1.1061: 種類ごとの既定音量。ギフト系は実試聴で「しょぼすぎてよくわからない」
+ *   (配信音声の下に埋もれる)ため 1.0。その他は従来どおり 0.7。
+ * @param {string} kind
+ * @returns {number}
+ */
+export function defaultVolumeForEffectSoundKind(kind) {
+  return String(kind || '').startsWith('gift') ? 1.0 : EFFECT_SOUND_DEFAULT_VOLUME;
+}
+
 /**
  * 多重再生ガード判定(純関数・テスト可能)。reportCompleteVoice.js と同じ形。
  * @param {number} lastAtMs 直近にこの種類を鳴らした時刻(ms)。未再生は 0。
@@ -135,6 +148,27 @@ export function shouldSkipEffectSoundForVenuePresence(venuePresenceAtMs, nowMs, 
 const _lastPlayedAt = Object.create(null);
 
 /**
+ * v0.1.1061: 実環境用の Audio 要素キャッシュ(path→要素)。従来は再生のたびに new Audio を
+ *   作り捨てており、ギフトのバースト時にデコードと生成が積み上がって重さ・出音の遅れの一因に
+ *   なっていた。同じファイルは1要素を使い回す(再生中に再要求されたら頭出し=置換思想)。
+ *   テストで audioFactory を注入した場合はキャッシュを通らない(テスト間の状態漏れ防止)。
+ */
+const _audioCache = new Map();
+const AUDIO_CACHE_MAX = 48; // 全効果音ファイル数(現在30前後)より十分大きい安全弁
+
+/** @param {string} url @returns {HTMLAudioElement} */
+function cachedAudioFactory(url) {
+  const cached = _audioCache.get(url);
+  if (cached) {
+    try { cached.currentTime = 0; } catch { /* 未ロード時などは無視 */ }
+    return cached;
+  }
+  const audio = new Audio(url);
+  if (_audioCache.size < AUDIO_CACHE_MAX) _audioCache.set(url, audio);
+  return audio;
+}
+
+/**
  * 効果音を1つ再生する。存在しない種類・ガード未通過・再生失敗は全て静かに no-op。
  * @param {string} kind EFFECT_SOUND_KINDS のいずれか(またはEFFECT_SOUND_VARIANT_PATHSのキー)
  * @param {{
@@ -147,18 +181,19 @@ const _lastPlayedAt = Object.create(null);
  *   variantPaths?: Record<string, string[]>,
  *   rng?: () => number
  * }} [deps] テスト用に時刻・Audio 生成・URL 解決・ファイルパス・乱数を差し替え可能(既定は実環境)。
- * @returns {void}
+ * @returns {'played'|'guarded'|'no-path'|'error'} 実際に鳴らしたか(v0.1.1061: 呼び出し元が
+ *   「試みた」でなく「鳴らした」を数えられるように=診断が嘘をつかないための戻り値)。
  */
 export function playEffectSound(kind, deps = {}) {
   try {
     // v0.1.1059: バリエーションがある種類はランダムに1本選ぶ(パチンコ台的に毎回違う音)。
     //   無い種類は従来どおり EFFECT_SOUND_PATHS の単一パス(後方互換)。
     const path = resolveEffectSoundPath(kind, deps);
-    if (!path) return;
+    if (!path) return 'no-path';
 
     const nowMs = typeof deps.nowMs === 'number' ? deps.nowMs : Date.now();
     const guardMs = typeof deps.guardMs === 'number' ? deps.guardMs : EFFECT_SOUND_GUARD_MS;
-    if (!shouldPlayEffectSound(_lastPlayedAt[kind] || 0, nowMs, guardMs)) return;
+    if (!shouldPlayEffectSound(_lastPlayedAt[kind] || 0, nowMs, guardMs)) return 'guarded';
     _lastPlayedAt[kind] = nowMs;
 
     const getUrl =
@@ -167,15 +202,21 @@ export function playEffectSound(kind, deps = {}) {
         typeof chrome !== 'undefined' && chrome.runtime?.getURL
           ? chrome.runtime.getURL(p)
           : p);
-    const audioFactory = deps.audioFactory || ((url) => new Audio(url));
-    const volume = typeof deps.volume === 'number' ? Math.max(0, Math.min(1, deps.volume)) : 0.7;
+    // v0.1.1061: 実環境は Audio をキャッシュして使い回す(作り捨てによる重さ/遅れの解消)。
+    const audioFactory = deps.audioFactory || cachedAudioFactory;
+    const volume =
+      typeof deps.volume === 'number'
+        ? Math.max(0, Math.min(1, deps.volume))
+        : defaultVolumeForEffectSoundKind(kind);
 
     const audio = audioFactory(getUrl(path));
     if (audio && typeof audio.volume === 'number') audio.volume = volume;
     const p = audio.play && audio.play();
     if (p && typeof p.catch === 'function') p.catch(() => { /* 再生失敗は静かに諦める */ });
+    return 'played';
   } catch {
     /* 音は出なくても本来の機能(ギフト演出/ランキング表示)には一切影響させない */
+    return 'error';
   }
 }
 
