@@ -2487,12 +2487,15 @@ export function mountVenueBarButton(options = {}) {
     return { x: lr.width / 2, y: lr.height * 0.4 };
   };
   /**
+   * v0.1.1057: 診断カウンタ(giftThrown)が「実際に投げたか」を正しく数えられるよう、
+   *   早期return(上限超過/会場閉時)かどうかを呼び出し元へ返す(観測のみ・演出ロジックは不変)。
    * @param {string} speakerKey
    * @param {{ kind:string, emoji:string, label:string, durationMs:number, imageUrl?:string }} proj
+   * @returns {boolean} true=実際に投擲DOMを生成した / false=上限超過・会場閉等で捨てた
    */
   const launchGiftThrow = (speakerKey, proj) => {
-    if (!proj || !open) return;
-    if (!canLaunchGiftThrow(giftProjActive)) return; // 上限超過は捨てる(性能最優先)
+    if (!proj || !open) return false;
+    if (!canLaunchGiftThrow(giftProjActive)) return false; // 上限超過は捨てる(性能最優先)
     const el = giftProjPool.pop() || (() => {
       const d = document.createElement('div');
       d.className = 'nlsb-gift-proj';
@@ -2559,6 +2562,7 @@ export function mountVenueBarButton(options = {}) {
     // reflow を挟んでから is-flying(アニメ再起動の確実化)。
     void el.offsetWidth;
     el.classList.add('is-flying');
+    return true;
   };
   /** speech.text からギフト/広告を検出して投げる。 @param {{ text?: unknown, speakerKey?: string }} speech */
   const maybeThrowGiftFromSpeech = (speech) => {
@@ -2570,11 +2574,15 @@ export function mountVenueBarButton(options = {}) {
       _giftEffectDiagCounters.lastEventAt = Date.now();
       const p = resolveGiftProjectile(gift, 'gift');
       if (p) {
-        launchGiftThrow(speech.speakerKey, p);
-        _giftEffectDiagCounters.giftThrown += 1;
-        if (_effectSoundEnabledCache) {
-          playEffectSound(EFFECT_SOUND_KINDS.GIFT);
-          _giftEffectDiagCounters.giftSoundPlayed += 1;
+        // v0.1.1057: launchGiftThrow の戻り値(実際に投げたか)を見てからカウントする。
+        //   従来は呼び出し直後に無条件加算しており、上限超過等の早期returnも「投げた」扱いに
+        //   なって giftThrown が実態より過大(=取りこぼしを過小報告)していた。
+        if (launchGiftThrow(speech.speakerKey, p)) {
+          _giftEffectDiagCounters.giftThrown += 1;
+          if (_effectSoundEnabledCache) {
+            playEffectSound(EFFECT_SOUND_KINDS.GIFT);
+            _giftEffectDiagCounters.giftSoundPlayed += 1;
+          }
         }
       }
       publishGiftEffectDiag();
@@ -2586,11 +2594,12 @@ export function mountVenueBarButton(options = {}) {
       _giftEffectDiagCounters.lastEventAt = Date.now();
       const p = resolveGiftProjectile(ad, 'ad');
       if (p) {
-        launchGiftThrow(speech.speakerKey, p);
-        _giftEffectDiagCounters.adThrown += 1;
-        if (_effectSoundEnabledCache) {
-          playEffectSound(EFFECT_SOUND_KINDS.AD);
-          _giftEffectDiagCounters.adSoundPlayed += 1;
+        if (launchGiftThrow(speech.speakerKey, p)) {
+          _giftEffectDiagCounters.adThrown += 1;
+          if (_effectSoundEnabledCache) {
+            playEffectSound(EFFECT_SOUND_KINDS.AD);
+            _giftEffectDiagCounters.adSoundPlayed += 1;
+          }
         }
       }
       publishGiftEffectDiag();

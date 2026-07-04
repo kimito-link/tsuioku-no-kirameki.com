@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1057',
+    date: '2026-07-04',
+    summary: 'ギフト診断の対処候補への統合漏れを修正+内部構造の整理',
+    items: Object.freeze([
+      '状態速報の「対処候補」欄に、ギフト/広告の演出取りこぼし診断が表示されていなかった不具合を修正しました(健全度パネルには出ていましたが、対処候補には配線が漏れていました)。あわせて、拡張機能内部の巨大なファイル(ポップアップ本体)から、HTMLレポート出力機能を専用のファイルに切り出しました。見た目や操作に変更はなく、将来の保守をしやすくするための内部整理です。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1056',
     date: '2026-07-04',
     summary: '①POPと②応援プレビューの数値ズレを世代番号で検知',
