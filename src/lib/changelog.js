@@ -26,6 +26,17 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1063',
+    date: '2026-07-04',
+    summary: '読み上げの音声合成を約30%高速化(テンポ改善)',
+    items: Object.freeze([
+      '「読み上げがテンポよく出てない」への対応です。VOICEVOXでの音声合成の出力を16kHzモノラルに' +
+      '変更し、1コメントあたりの合成時間を実測で約30%短縮しました(1.5秒→1.0秒程度)。読み上げの' +
+      '音質は実用上変わりません。合成が速くなるぶん、コメントが届いてから声が出るまでの間と、' +
+      'コメント間の不自然な空白が縮まります。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1062',
     date: '2026-07-04',
     summary: '大配信で状態ページがPC全体を重くする問題を緩和',

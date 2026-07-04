@@ -130,6 +130,21 @@ describe('synthesizeVoice', () => {
     });
   });
 
+  it('v0.1.1063: 出力は16kHzモノラル固定(合成30%高速化の実測に基づく)', async () => {
+    const wav = new Uint8Array([1]).buffer;
+    const fetchFn = vi
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ pitchScale: 0, speedScale: 1, outputSamplingRate: 24000, outputStereo: true })
+      })
+      .mockResolvedValueOnce({ ok: true, arrayBuffer: async () => wav });
+    await synthesizeVoice('本文', { styleId: 3 }, { fetchFn });
+    const body = JSON.parse(fetchFn.mock.calls[1][1].body);
+    expect(body.outputSamplingRate).toBe(16000);
+    expect(body.outputStereo).toBe(false);
+  });
+
   it('audio_query 失敗時は synthesis を呼ばず null', async () => {
     const fetchFn = vi.fn().mockResolvedValue({ ok: false });
     await expect(
