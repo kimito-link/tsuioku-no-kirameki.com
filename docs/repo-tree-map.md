@@ -38,24 +38,26 @@ graph LR
   d5 --> d5_1["avatar-parts/ 〔アバター/画像〕"]
   ROOT --> d6["scripts/ 〔ビルド/自動生成〕"]
   d6 --> d6_0["xserver/ 〔デプロイ/webhook〕"]
-  ROOT --> d7["src/ 〔ソース〕"]
-  d7 --> d7_0["data/ 〔コメント/取得〕"]
-  d7 --> d7_1["domain/ 〔応援/集約/識別子〕"]
-  d7 --> d7_2["extension/ 〔entry/記録/会場/応援〕"]
-  d7 --> d7_3["fixtures/ 〔テスト〕"]
-  d7 --> d7_4["images/ 〔画像〕"]
-  d7 --> d7_5["lib/ 〔色/速度/コメント/レポート/純粋関数〕"]
-  d7 --> d7_6["shared/ 〔共有/アバター〕"]
-  d7 --> d7_7["sound/ 〔音声〕"]
-  ROOT --> d8["tests/ 〔テスト〕"]
-  d8 --> d8_0["contract/ 〔テスト/契約〕"]
-  d8 --> d8_1["e2e/ 〔テスト/E2E/描画〕"]
-  ROOT --> d9["tools/ 〔ツール〕"]
-  d9 --> d9_0["mcp-nicolive/ 〔MCP/診断〕"]
-  ROOT --> d10["tsuioku-no-kirameki/ 〔LP/公開〕"]
-  d10 --> d10_0["articles/ 〔記事/公開〕"]
-  d10 --> d10_1["images/ 〔画像〕"]
-  d10 --> d10_2["sound/ 〔音声/公開〕"]
+  ROOT --> d7["sound-src/"]
+  d7 --> d7_0["tiers/"]
+  ROOT --> d8["src/ 〔ソース〕"]
+  d8 --> d8_0["data/ 〔コメント/取得〕"]
+  d8 --> d8_1["domain/ 〔応援/集約/識別子〕"]
+  d8 --> d8_2["extension/ 〔entry/記録/会場/応援〕"]
+  d8 --> d8_3["fixtures/ 〔テスト〕"]
+  d8 --> d8_4["images/ 〔画像〕"]
+  d8 --> d8_5["lib/ 〔色/速度/コメント/レポート/純粋関数〕"]
+  d8 --> d8_6["shared/ 〔共有/アバター〕"]
+  d8 --> d8_7["sound/ 〔音声〕"]
+  ROOT --> d9["tests/ 〔テスト〕"]
+  d9 --> d9_0["contract/ 〔テスト/契約〕"]
+  d9 --> d9_1["e2e/ 〔テスト/E2E/描画〕"]
+  ROOT --> d10["tools/ 〔ツール〕"]
+  d10 --> d10_0["mcp-nicolive/ 〔MCP/診断〕"]
+  ROOT --> d11["tsuioku-no-kirameki/ 〔LP/公開〕"]
+  d11 --> d11_0["articles/ 〔記事/公開〕"]
+  d11 --> d11_1["images/ 〔画像〕"]
+  d11 --> d11_2["sound/ 〔音声/公開〕"]
 ```
 
 ### 機能逆引き（機能 → 担当ファイル）
@@ -188,7 +190,7 @@ graph LR
 - `images/`（93 件） — 純Web版 応援ライブビューの同梱画像(ゆっくり顔)  〔Web版 / 画像〕
 
 ## `council/` — 会議(COUNCIL)の問い・回答・統合(SYNTHESIS)。設計判断の根拠  〔会議 / 設計〕
-<sub>ファイル 116 件</sub>
+<sub>ファイル 118 件</sub>
 
 ## `docs/` — 設計正本・マインドマップ・フロー図・feature-map(AI/人間向け)  〔設計 / レポート〕
 <sub>ファイル 157 件</sub>
@@ -202,11 +204,11 @@ graph LR
 - `workflows/`（1 件） — 開発ワークフロー設計(TDD/UI-UX ロードマップ等)  〔ワークフロー〕
 
 ## `extension/` — 拡張本体の配布版ソース(ここを編集)。manifest/background/各 html  〔配布 / manifest〕
-<sub>ファイル 117 件</sub>
+<sub>ファイル 140 件</sub>
 
 - `dist/`（10 件） — ビルド成果物(content/popup/status 等の bundle)。build が生成  〔ビルド成果物〕
 - `images/`（87 件） — アイコン・ロゴのマスター画像  〔画像〕
-- `sound/`（10 件） — 読み上げ・完了音などの音声素材  〔音声〕
+- `sound/`（33 件） — 読み上げ・完了音などの音声素材  〔音声〕
 
 ## `memory/` — セッション横断の知見・引き継ぎ(AI のメモリ)。コミット対象外も混在  〔メモリ / 知見〕
 <sub>ファイル 78 件</sub>
@@ -215,9 +217,14 @@ graph LR
 - `avatar-parts/`（26 件） — アバター素材(顔シート等)の参考画像  〔アバター / 画像〕
 
 ## `scripts/` — ビルド・検証・自動生成スクリプト(build/feature-map/repo-tree-map 等)  〔ビルド / 自動生成〕
-<sub>ファイル 31 件</sub>
+<sub>ファイル 32 件</sub>
 
 - `xserver/`（2 件） — Xserver 向け webhook(git pull デプロイ)スクリプト  〔デプロイ / webhook〕
+
+## `sound-src/` — ⚠️ 未記入（ROLES に追記）
+<sub>ファイル 27 件</sub>
+
+- `tiers/`（23 件） — ⚠️ 未記入（ROLES に追記）
 
 ## `src/` — LP 側 + 純粋関数ライブラリの源  〔ソース〕
 <sub>ファイル 1275 件</sub>
@@ -480,8 +487,10 @@ esbuild の import 到達グラフを逆引きし「このファイルを変え�
 
 ---
 
-## ⚠️ 役割が未記入のディレクトリ（1）
+## ⚠️ 役割が未記入のディレクトリ（3）
 
 以下は `ROLES` 辞書に説明が無い。`scripts/repo-tree-map.mjs` の `ROLES` に1行足してから再生成すること。
 
 - `docs/article-drafts/`
+- `sound-src/`
+- `sound-src/tiers/`

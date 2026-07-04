@@ -2,8 +2,12 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   EFFECT_SOUND_KINDS,
   EFFECT_SOUND_GUARD_MS,
+  EFFECT_SOUND_PATHS,
+  EFFECT_SOUND_VARIANT_PATHS,
   shouldPlayEffectSound,
   shouldSkipEffectSoundForVenuePresence,
+  resolveEffectSoundPath,
+  effectSoundKindForGiftTier,
   playEffectSound,
   _resetEffectSoundGuardForTest
 } from './effectSoundPlayer.js';
@@ -33,6 +37,54 @@ describe('shouldSkipEffectSoundForVenuePresence', () => {
 
   it('会場プレゼンスが無い(0)ならスキップしない', () => {
     expect(shouldSkipEffectSoundForVenuePresence(0, 1000, 8000)).toBe(false);
+  });
+});
+
+describe('resolveEffectSoundPath', () => {
+  it('バリエーションが無い種類は EFFECT_SOUND_PATHS の単一パスを返す(後方互換)', () => {
+    expect(resolveEffectSoundPath(EFFECT_SOUND_KINDS.GIFT)).toBe(EFFECT_SOUND_PATHS[EFFECT_SOUND_KINDS.GIFT]);
+    expect(resolveEffectSoundPath(EFFECT_SOUND_KINDS.AD)).toBe(EFFECT_SOUND_PATHS[EFFECT_SOUND_KINDS.AD]);
+  });
+
+  it('バリエーションがある種類は候補一覧の中からrngで選ぶ', () => {
+    const variants = EFFECT_SOUND_VARIANT_PATHS[EFFECT_SOUND_KINDS.MILESTONE_SOFT];
+    expect(resolveEffectSoundPath(EFFECT_SOUND_KINDS.MILESTONE_SOFT, { rng: () => 0 })).toBe(variants[0]);
+    expect(resolveEffectSoundPath(EFFECT_SOUND_KINDS.MILESTONE_SOFT, { rng: () => 0.999 })).toBe(variants[2]);
+  });
+
+  it('rng未指定でも候補一覧のいずれかを返す(Math.randomフォールバック)', () => {
+    const variants = EFFECT_SOUND_VARIANT_PATHS[EFFECT_SOUND_KINDS.MILESTONE_JACKPOT];
+    const result = resolveEffectSoundPath(EFFECT_SOUND_KINDS.MILESTONE_JACKPOT);
+    expect(variants).toContain(result);
+  });
+
+  it('未知の種類はundefinedを返す', () => {
+    expect(resolveEffectSoundPath('nonexistent_kind')).toBeUndefined();
+  });
+
+  it('gift_small/medium/large/megaのバリエーションが3件ずつ定義されている', () => {
+    for (const key of ['gift_small', 'gift_medium', 'gift_large', 'gift_mega']) {
+      expect(EFFECT_SOUND_VARIANT_PATHS[key]).toHaveLength(3);
+    }
+  });
+
+  it('reachのバリエーションが2件定義されている', () => {
+    expect(EFFECT_SOUND_VARIANT_PATHS.reach).toHaveLength(2);
+  });
+});
+
+describe('effectSoundKindForGiftTier', () => {
+  it('small/medium/large/megaをそれぞれ対応するキーに変換する', () => {
+    expect(effectSoundKindForGiftTier('small')).toBe('gift_small');
+    expect(effectSoundKindForGiftTier('medium')).toBe('gift_medium');
+    expect(effectSoundKindForGiftTier('large')).toBe('gift_large');
+    expect(effectSoundKindForGiftTier('mega')).toBe('gift_mega');
+  });
+
+  it('未知/未指定のtierは既定のgiftキーにフォールバックする', () => {
+    expect(effectSoundKindForGiftTier(undefined)).toBe(EFFECT_SOUND_KINDS.GIFT);
+    expect(effectSoundKindForGiftTier(null)).toBe(EFFECT_SOUND_KINDS.GIFT);
+    expect(effectSoundKindForGiftTier('unknown')).toBe(EFFECT_SOUND_KINDS.GIFT);
   });
 });
 
