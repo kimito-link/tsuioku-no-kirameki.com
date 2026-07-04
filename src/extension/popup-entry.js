@@ -9,6 +9,7 @@ import {
 } from './popup/report/htmlReportDocument.js';
 import { makeInitialMilestoneEffectDiag, buildMilestoneEffectDiagSnapshot } from '../lib/milestoneEffectDiag.js';
 import { KEY_MILESTONE_EFFECT_DIAG } from '../lib/milestoneEffectDiagKey.js';
+import { directHit, makeInitialComboState } from '../lib/effectDirector.js';
 import { readInlineModeFlags } from '../lib/inlineModeFlags.js';
 import { pickWatchUrlFromMultipleSources } from '../lib/popupWatchUrlResolveMultiTab.js';
 import { shouldCloseStandalonePopupAfterNavigate } from '../lib/standalonePopupClose.js';
@@ -917,6 +918,9 @@ let _prevMilestoneCommentHighWater = null;
 //   giftEffectDiag.js と同型の3段階カウンタ(検知→演出→音)で埋める(観測のみ・演出は変えない)。
 const _milestoneEffectDiagCounters = makeInitialMilestoneEffectDiag();
 let _milestoneEffectDiagLastWriteAt = 0;
+// v0.1.1060(パチンコPhase1): 演出ディレクターのコンボ state(コンボ窓30秒・soft→hard→jackpot昇格)。
+//   Phase1は判定を計上するだけで、鳴らす音はまだ変えない(検知→director→演出→音の4段計器を先に通す)。
+let _milestoneComboState = makeInitialComboState();
 function publishMilestoneEffectDiag() {
   const now = Date.now();
   if (now - _milestoneEffectDiagLastWriteAt < 3000) return; // 3秒 min-gap(他の診断と同型)。
@@ -1677,6 +1681,13 @@ async function maybeCelebrateFromCommentCount(liveId, prev, next) {
   if (spec) {
     _milestoneEffectDiagCounters.milestoneDetected += 1;
     _milestoneEffectDiagCounters.lastEventAt = Date.now();
+    // v0.1.1060(パチンコPhase1): 検知を演出ディレクターに通す(コンボ判定+ティア昇格の決定)。
+    //   判定は計上のみで、実際に鳴らす音の差し替えはPhase3(畳み掛け)で行う。
+    try {
+      const baseKind = effectSoundKindForPikaTier(pikaTierForSupportCelebration(spec));
+      _milestoneComboState = directHit(_milestoneComboState, baseKind || '', Date.now());
+      _milestoneEffectDiagCounters.milestoneDirected = (Number(_milestoneEffectDiagCounters.milestoneDirected) || 0) + 1;
+    } catch { /* director段の失敗は計上されない=diffで検知できる */ }
     publishMilestoneEffectDiag();
     await maybePlaySupportCelebration(liveId, spec);
   }

@@ -356,6 +356,7 @@
 | `src/lib/diagWarnings.js` | 1 | 記録エンジン(watchページ常駐) |
 | `src/lib/displayRecordedCount.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/domHarvestScrollDefer.js` | 1 | 記録エンジン(watchページ常駐) |
+| `src/lib/effectDirector.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/embeddedDataExtract.js` | 1 | 記録エンジン(watchページ常駐) |
 | `src/lib/enrichmentAvatarFallback.js` | 1 | 記録エンジン(watchページ常駐) |
 | `src/lib/errorAutoDiagnosis.js` | 1 | ポップアップ(応援レーン) |

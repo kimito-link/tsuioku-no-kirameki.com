@@ -620,16 +620,21 @@ function buildMilestoneEffectHealthCells(milestoneEffectDiag) {
   if (detected === 0) return []; // 未観測=このセッションでマイルストーン到達が無かった
 
   const soundEnabled = snap.soundEnabled !== false;
+  // v0.1.1060: director段(effectDirector)の計器。数値でなければ旧スナップショット=未計測(⚠を出さない)。
+  const directedRaw = /** @type {any} */ (snap).milestoneDirected;
+  // raw==null を先に弾く(Number(null)=0 で「未計測」が「0件計測」に化ける罠)。
+  const directed = directedRaw == null || !Number.isFinite(Number(directedRaw)) ? null : Number(directedRaw);
   const thrown = num(snap.milestoneThrown) || 0;
   const soundPlayed = num(snap.milestoneSoundPlayed) || 0;
 
-  const throwMissing = Math.max(0, detected - thrown);
+  const directorMissing = directed == null ? 0 : Math.max(0, detected - directed);
+  const throwMissing = Math.max(0, (directed == null ? detected : directed) - thrown);
   const soundMissing = soundEnabled ? Math.max(0, thrown - soundPlayed) : 0;
 
-  const missing = throwMissing + soundMissing;
+  const missing = directorMissing + throwMissing + soundMissing;
   const detail =
     missing > 0
-      ? `演出漏れ${throwMissing}件・音漏れ${soundMissing}件`
+      ? `${directorMissing > 0 ? `director判定漏れ${directorMissing}件・` : ''}演出漏れ${throwMissing}件・音漏れ${soundMissing}件`
       : `検知${detected}件 全て演出/音まで到達`;
   return [stateCell('milestone-effect', 'マイルストーン演出/効果音', missing > 0 ? 'warn' : 'ok', detail)];
 }
