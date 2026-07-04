@@ -141,7 +141,7 @@
 | `KEY_USER_COMMENT_PROFILE_CACHE` | extension/content-entry.js | extension/comeview-entry.js<br>extension/content-entry.js<br>extension/popup-entry.js<br>extension/venueBar.js |
 | `KEY_VENUE_EFFECT_SOUND_PRESENCE` | extension/venueBar.js | — |
 | `KEY_VENUE_SEATS_DIAG` | extension/venueBar.js | extension/status-entry.js |
-| `KEY_VOICE_DIAG` | extension/comeview-entry.js | extension/status-entry.js |
+| `KEY_VOICE_DIAG` | extension/comeview-entry.js<br>extension/venueBar.js | extension/status-entry.js |
 | `KEY_VOICE_INPUT_DEVICE` | extension/popup-entry.js | extension/popup-entry.js |
 | `fn:backfillHeartbeatKey` | extension/content-entry.js | — |
 | `fn:chunkIndexKey` | extension/content-entry.js | extension/popup-entry.js |

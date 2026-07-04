@@ -37,6 +37,7 @@ graph LR
   n_status --> n_src_lib_deriveAvatarUrlFromUid_js["lib/deriveAvatarUrlFromUid.js"]:::shared
   n_status --> n_src_lib_diagnosisRegistry_js["lib/diagnosisRegistry.js"]
   n_status --> n_src_lib_diagnosticsTrust_js["lib/diagnosticsTrust.js"]
+  n_status --> n_src_lib_effectSoundPlayer_js["lib/effectSoundPlayer.js"]:::shared
   n_status --> n_src_lib_giftDisplayNickname_js["lib/giftDisplayNickname.js"]:::shared
   n_status --> n_src_lib_giftEffectDiag_js["lib/giftEffectDiag.js"]:::shared
   n_status --> n_src_lib_giftEffectDiagKey_js["lib/giftEffectDiagKey.js"]:::shared
@@ -52,8 +53,7 @@ graph LR
   n_status --> n_src_lib_liveviewPublishSelfDiag_js["lib/liveviewPublishSelfDiag.js"]
   n_status --> n_src_lib_metricConfidence_js["lib/metricConfidence.js"]:::shared
   n_status --> n_src_lib_milestoneEffectDiag_js["lib/milestoneEffectDiag.js"]:::shared
-  n_status --> n_src_lib_milestoneEffectDiagKey_js["lib/milestoneEffectDiagKey.js"]:::shared
   classDef shared fill:#eee,stroke:#999,color:#666;
 ```
 
-> ほか 47 ファイル省略（全件は storage-bus.md / metafile 参照）。
+> ほか 48 ファイル省略（全件は storage-bus.md / metafile 参照）。

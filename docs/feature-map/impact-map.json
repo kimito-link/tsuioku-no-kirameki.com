@@ -360,6 +360,22 @@
       ]
     },
     {
+      "file": "src/lib/effectSoundPlayer.js",
+      "featureCount": 4,
+      "features": [
+        "content",
+        "popup",
+        "status",
+        "venue"
+      ],
+      "labels": [
+        "記録エンジン(watchページ常駐)",
+        "ポップアップ(応援レーン)",
+        "状態速報ページ",
+        "会場モード(standalone)"
+      ]
+    },
+    {
       "file": "src/lib/htmlEscape.js",
       "featureCount": 4,
       "features": [
@@ -499,6 +515,38 @@
       "labels": [
         "記録エンジン(watchページ常駐)",
         "ポップアップ(応援レーン)",
+        "状態速報ページ",
+        "会場モード(standalone)"
+      ]
+    },
+    {
+      "file": "src/lib/voiceDiag.js",
+      "featureCount": 4,
+      "features": [
+        "comeview",
+        "content",
+        "status",
+        "venue"
+      ],
+      "labels": [
+        "コメビュ(別窓)",
+        "記録エンジン(watchページ常駐)",
+        "状態速報ページ",
+        "会場モード(standalone)"
+      ]
+    },
+    {
+      "file": "src/lib/voiceDiagKey.js",
+      "featureCount": 4,
+      "features": [
+        "comeview",
+        "content",
+        "status",
+        "venue"
+      ],
+      "labels": [
+        "コメビュ(別窓)",
+        "記録エンジン(watchページ常駐)",
         "状態速報ページ",
         "会場モード(standalone)"
       ]
@@ -649,20 +697,6 @@
     },
     {
       "file": "src/lib/effectDirector.js",
-      "featureCount": 3,
-      "features": [
-        "content",
-        "popup",
-        "venue"
-      ],
-      "labels": [
-        "記録エンジン(watchページ常駐)",
-        "ポップアップ(応援レーン)",
-        "会場モード(standalone)"
-      ]
-    },
-    {
-      "file": "src/lib/effectSoundPlayer.js",
       "featureCount": 3,
       "features": [
         "content",
@@ -2087,30 +2121,6 @@
       "labels": [
         "記録エンジン(watchページ常駐)",
         "ポップアップ(応援レーン)"
-      ]
-    },
-    {
-      "file": "src/lib/voiceDiag.js",
-      "featureCount": 2,
-      "features": [
-        "comeview",
-        "status"
-      ],
-      "labels": [
-        "コメビュ(別窓)",
-        "状態速報ページ"
-      ]
-    },
-    {
-      "file": "src/lib/voiceDiagKey.js",
-      "featureCount": 2,
-      "features": [
-        "comeview",
-        "status"
-      ],
-      "labels": [
-        "コメビュ(別窓)",
-        "状態速報ページ"
       ]
     },
     {
