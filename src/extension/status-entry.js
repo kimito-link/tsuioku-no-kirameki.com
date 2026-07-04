@@ -298,6 +298,20 @@ async function bootstrap() {
 let _refreshInFlight = false;
 /** v0.1.1009: storage 混雑時に次の tick を何回スキップするか(残り回数)。 */
 let _refreshBackoffTicks = 0;
+/** v0.1.1062: この所要(ms)を超えた更新は「混雑」とみなし、次回の各readを短いtimeoutで有界化する。 */
+const REFRESH_CONGESTED_MS = 10_000;
+/** v0.1.1062: 混雑時の各read timeout(通常8000ms)。62秒級のマラソン更新を素早いdegradeに変える。 */
+const CONGESTED_TIMEOUT_MS = 3_000;
+
+/** v0.1.1062: 実効的な自動更新間隔を正直に表示する(2秒と書いたまま実際は90秒、を作らない)。 */
+function updateAutoRefreshMeta() {
+  const meta = document.getElementById('metaAutoRefresh');
+  if (!meta) return;
+  if (_refreshPausedByUser) { meta.textContent = '自動更新: 停止中'; return; }
+  if (_refreshBackoffTicks <= 0) { meta.textContent = '自動更新: 2秒'; return; }
+  const waitSec = Math.round(((_refreshBackoffTicks + 1) * REFRESH_INTERVAL_MS) / 1000);
+  meta.textContent = `自動更新: 混雑中→約${waitSec}秒に自動調整`;
+}
 
 function startRefreshLoop() {
   if (_refreshTimerId != null) return;
@@ -319,12 +333,17 @@ function startRefreshLoop() {
     //   グレースフルに degrade する想定内の事象。console.warn は chrome://extensions のエラー欄に
     //   収集され「これ見てどうすればいいの?」を生むため console.debug に下げる(v0.1.776 と同方針=
     //   行動につながらない警告を目立つ場所に出さない)。実エラーは画面の概要欄/AI共有欄で確認できる。
-    refresh()
+    // v0.1.1062: 前回が混雑(10秒超)なら、次回は各readを3秒で有界化して素早くdegradeする
+    //   (62秒級のマラソン更新がstorageを占有し続け、Chrome全体を固める実機事象への対応)。
+    const prevTotalMs = Number(_lastRefreshPerf?.totalMs);
+    const congested = Number.isFinite(prevTotalMs) && prevTotalMs > REFRESH_CONGESTED_MS;
+    refresh(congested ? { timeoutMs: CONGESTED_TIMEOUT_MS } : {})
       .catch((err) => console.debug('[status] refresh err', err))
       .finally(() => {
         _refreshInFlight = false;
         // 直近 refresh の所要に比例して次の数 tick を間引く(重いほど大きく控える)。
         _refreshBackoffTicks = computeRefreshBackoffTicks(Number(_lastRefreshPerf?.totalMs));
+        updateAutoRefreshMeta();
       });
   }, REFRESH_INTERVAL_MS);
 }
@@ -2465,10 +2484,7 @@ function setupButtons() {
       btnPause.textContent = _refreshPausedByUser
         ? '自動更新を再開'
         : '自動更新を一時停止';
-      const meta = document.getElementById('metaAutoRefresh');
-      if (meta) {
-        meta.textContent = _refreshPausedByUser ? '自動更新: 停止中' : '自動更新: 2秒';
-      }
+      updateAutoRefreshMeta();
     });
   }
   hideDevDiagnosticsIfRelease();

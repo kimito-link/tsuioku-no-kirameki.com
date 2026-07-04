@@ -26,6 +26,11 @@ describe('computeRefreshBackoffTicks（v0.1.1010: 所要比例の間引き）', 
     expect(computeRefreshBackoffTicks(999999)).toBe(REFRESH_BACKOFF_TICKS_MAX);
   });
 
+  it('v0.1.1062実機ケース: 62秒かかる更新は62秒休む(旧天井30秒では読みっぱなしだった)', () => {
+    // 62026ms → ceil(62026/2000)=32tick=64秒休み ≒ 占有率50%以下
+    expect(computeRefreshBackoffTicks(62026)).toBe(32);
+  });
+
   it('SLOW 直後(501ms 等)は最低1tick', () => {
     expect(computeRefreshBackoffTicks(REFRESH_SLOW_MS + 1)).toBe(1);
   });
@@ -45,6 +50,6 @@ describe('computeRefreshBackoffTicks（v0.1.1010: 所要比例の間引き）', 
   it('基準間隔・しきい値・上限の既定が想定値', () => {
     expect(REFRESH_INTERVAL_MS).toBe(2000);
     expect(REFRESH_SLOW_MS).toBe(500);
-    expect(REFRESH_BACKOFF_TICKS_MAX).toBe(15);
+    expect(REFRESH_BACKOFF_TICKS_MAX).toBe(60);
   });
 });
