@@ -1,6 +1,9 @@
 // voicevoxClient.js — ローカル VOICEVOX エンジン(127.0.0.1:50021)へ音声合成をリクエストするクライアント。
 export const VOICEVOX_BASE_URL = 'http://127.0.0.1:50021';
 
+/** v0.1.1063: 読み上げWAVの出力サンプリングレート(Hz)。16kで合成約30%高速・それ以下は速くならない(実測)。 */
+export const VOICEVOX_OUTPUT_SAMPLING_RATE = 16000;
+
 /**
  * fetch 互換関数。プロキシ経由の buffer 取得は Response 風オブジェクト
  * ({ ok, status, arrayBuffer }) を返すため、戻り値はそれも許容する。
@@ -293,6 +296,11 @@ export async function synthesizeVoice(text, voice, opts = {}) {
     const speedScale = Number(audioQuery.speedScale);
     audioQuery.pitchScale = (Number.isFinite(pitchScale) ? pitchScale : 0) + pitchOffset;
     audioQuery.speedScale = (Number.isFinite(speedScale) ? speedScale : 1) + speedOffset;
+    // v0.1.1063: 出力を16kHzモノラルに固定。実測(2026-07-04)で合成が約30%速くなり
+    //   (1465→1025ms)WAVも約33%小さくなる=読み上げのテンポ改善(12kHzはこれ以上速くならず
+    //   音質だけ落ちるので16kが最適点)。コメント読み上げ用途では音質差は実用上分からない。
+    audioQuery.outputSamplingRate = VOICEVOX_OUTPUT_SAMPLING_RATE;
+    audioQuery.outputStereo = false;
 
     const synthesisRes = await fetchWithTimeout(
       fetchBufferFn,
