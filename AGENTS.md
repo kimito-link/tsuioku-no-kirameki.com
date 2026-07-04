@@ -225,6 +225,7 @@ build/                 ← .gitignore 対象。CWS 提出用 ZIP + 生成アセ�
 | コードレビュー | Claude Code `/code-review` + Codex/Cursor BugBot 経由 | 司令塔から両方走らせて結果統合 | 多視点レビューで品質UP |
 | PR運用（commit/push/PR作成） | Claude Code 本体 | `gh` CLI（Bash） | 既に確立した運用 |
 | 実機検証（ブラウザ操作） | **Claude Code（Claude-in-Chrome MCP）** | MCP 経由 | **代替不可**（他ツールには無い機能） |
+| **リアルタイム状態把握（診断コピー不要）** | Claude Code 本体 | `npm run status:live`（Bash） | v0.1.1016 自動publish済みの状態速報を GET で取得。status.html がタブで開いていれば既定120秒間隔で新鮮化。`--json`/`--watch N` あり |
 | MEMORY/reference 更新 | **Claude Code 本体専用** | `Edit` | **他ツールに渡さない**（食い違い防止） |
 
 ### 11.3 ツール起動の技術詳細
