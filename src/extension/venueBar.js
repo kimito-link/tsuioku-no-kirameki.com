@@ -60,10 +60,27 @@ import {
   KEY_USER_COMMENT_PROFILE_CACHE,
   KEY_EFFECT_SOUND_ENABLED,
   KEY_VENUE_EFFECT_SOUND_PRESENCE,
+  KEY_CUSTOM_SOUND_REV,
   isEffectSoundEnabled
 } from '../lib/storageKeys.js';
-import { EFFECT_SOUND_KINDS, playEffectSound, effectSoundKindForGiftTier } from '../lib/effectSoundPlayer.js';
+import {
+  EFFECT_SOUND_KINDS,
+  playEffectSound,
+  effectSoundKindForGiftTier,
+  EFFECT_SOUND_VARIANT_PATHS,
+  EFFECT_SOUND_PATHS,
+  defaultVolumeForEffectSoundKind
+} from '../lib/effectSoundPlayer.js';
 import { directHit, makeInitialComboState, GIFT_TIER_LADDER } from '../lib/effectDirector.js';
+// Phase A(2026-07-05): マイ効果音差し替え(IndexedDB取込+割当)。起動時+customSoundRev変化時に
+//   customVariantPaths を再構築し、playEffectSound の deps(variantPaths/paths/getUrl/rng/volume)へ
+//   カスタム優先で注入する。effectSoundPlayer.js 自体は無改変。
+import {
+  loadCustomSoundRuntimeState,
+  mergeVariantPaths,
+  getUrlForCustomSound,
+  rotationRngFor
+} from '../lib/customSoundStore.js';
 import { KEY_GIFT_EFFECT_DIAG } from '../lib/giftEffectDiagKey.js';
 import { makeInitialGiftEffectDiag, buildGiftEffectDiagSnapshot } from '../lib/giftEffectDiag.js';
 import { anonymousIdenticonDataUrl } from '../lib/anonymousIdenticon.js';
@@ -2057,6 +2074,41 @@ export function mountVenueBarButton(options = {}) {
     _effectSoundEnabledCache = isEffectSoundEnabled(changes[KEY_EFFECT_SOUND_ENABLED].newValue);
   });
 
+  // Phase A(2026-07-05): マイ効果音(IndexedDB取込+割当)。起動時+customSoundRev変化時に
+  //   customVariantPaths/gainForを再構築する。effectSoundPlayer.js は無改変・deps注入のみで差し替わる。
+  /** @type {{ customVariantPaths: Record<string, string[]>, gainFor: (kind: string) => number, urlsById: Map<string, string> }} */
+  let _customSoundState = { customVariantPaths: {}, gainFor: () => 1.0, urlsById: new Map() };
+  const refreshCustomSoundState = () => {
+    void loadCustomSoundRuntimeState({ previousUrlsById: _customSoundState.urlsById }).then((state) => {
+      _customSoundState = state;
+    }).catch(() => {});
+  };
+  refreshCustomSoundState();
+  chrome.storage.onChanged?.addListener?.((changes, area) => {
+    if (area !== 'local' || !changes[KEY_CUSTOM_SOUND_REV]) return;
+    refreshCustomSoundState();
+  });
+  /**
+   * playEffectSound呼び出し共通のdeps組み立て(カスタム優先マージ+決定論順繰りrng+gain反映)。
+   * @param {string} kind
+   * @returns {Parameters<typeof playEffectSound>[1]}
+   */
+  const buildEffectSoundDeps = (kind) => {
+    const variantPaths = mergeVariantPaths(EFFECT_SOUND_VARIANT_PATHS, _customSoundState.customVariantPaths);
+    const variants = variantPaths[String(kind)];
+    const n = Array.isArray(variants) ? variants.length : 1;
+    return {
+      // playEffectSound の deps 型は Record<string, string[]>(可変)だが、実体は
+      //   EFFECT_SOUND_VARIANT_PATHS 由来の Object.freeze 配列を含みうる(effectSoundPlayer.js は
+      //   resolveEffectSoundPath 内で読むだけで変更しないため実害なし)。型注釈だけの相違。
+      variantPaths: /** @type {Record<string, string[]>} */ (variantPaths),
+      paths: EFFECT_SOUND_PATHS,
+      getUrl: (p) => getUrlForCustomSound(p, (q) => chrome.runtime.getURL(q)),
+      rng: rotationRngFor(kind, n),
+      volume: _customSoundState.gainFor(kind) * defaultVolumeForEffectSoundKind(kind)
+    };
+  };
+
   // v0.1.1053: 会場windowが生存している間、3秒間隔でプレゼンスを書く(popup側の二重再生防止用)。
   //   既存の3秒 min-gap タイマーと相乗りせず独立させる(この機能のためだけに他の計測を巻き込まない)。
   let _venueEffectSoundPresenceLastWriteAt = 0;
@@ -2115,7 +2167,7 @@ export function mountVenueBarButton(options = {}) {
     pending.timer = window.setTimeout(() => {
       _pendingGiftSound = null;
       // 「鳴らした」時だけ数える(戻り値を見ずに数えると診断が嘘をつく・v0.1.1057と同じ教訓)。
-      if (playEffectSound(pending.kind) === 'played') {
+      if (playEffectSound(pending.kind, buildEffectSoundDeps(pending.kind)) === 'played') {
         _giftEffectDiagCounters.giftSoundPlayed += 1;
         publishGiftEffectDiag();
       }
@@ -2657,7 +2709,7 @@ export function mountVenueBarButton(options = {}) {
         if (launchGiftThrow(speech.speakerKey, p)) {
           _giftEffectDiagCounters.adThrown += 1;
           if (_effectSoundEnabledCache) {
-            playEffectSound(EFFECT_SOUND_KINDS.AD);
+            playEffectSound(EFFECT_SOUND_KINDS.AD, buildEffectSoundDeps(EFFECT_SOUND_KINDS.AD));
             _giftEffectDiagCounters.adSoundPlayed += 1;
           }
         }

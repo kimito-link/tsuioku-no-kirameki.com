@@ -6,7 +6,7 @@
 ## storage の出入り
 
 - 書くキー: `KEY_STATUS_TREND`
-- 読むキー: `KEY_AI_SHARE_POPUP_DIAG`, `KEY_BACKFILL_LIVE_METRIC`, `KEY_COMMENT_TIMELINE_MIRROR`, `KEY_GIFT_EFFECT_DIAG`, `KEY_LANE_DIAG`, `KEY_LANE_MIRROR`, `KEY_LAST_WATCH_URL`, `KEY_LIVEVIEW_PUBLISH_OUTCOME`, `KEY_MILESTONE_EFFECT_DIAG`, `KEY_NORTH_STAR_MIRROR`, `KEY_PREVIEW_RENDER_ACK`, `KEY_REPORT_PREVIEW`, `KEY_STATUS_FAST_DIAG_LITE`, `KEY_STATUS_TREND`, `KEY_STAT_CARDS_MIRROR`, `KEY_VENUE_SEATS_DIAG`, `KEY_VOICE_DIAG`, `nls_backfill_progress_v1`
+- 読むキー: `KEY_AI_SHARE_POPUP_DIAG`, `KEY_BACKFILL_LIVE_METRIC`, `KEY_COMMENT_TIMELINE_MIRROR`, `KEY_CUSTOM_SOUND_REV`, `KEY_GIFT_EFFECT_DIAG`, `KEY_LANE_DIAG`, `KEY_LANE_MIRROR`, `KEY_LAST_WATCH_URL`, `KEY_LIVEVIEW_PUBLISH_OUTCOME`, `KEY_MILESTONE_EFFECT_DIAG`, `KEY_NORTH_STAR_MIRROR`, `KEY_PREVIEW_RENDER_ACK`, `KEY_REPORT_PREVIEW`, `KEY_STATUS_FAST_DIAG_LITE`, `KEY_STATUS_TREND`, `KEY_STAT_CARDS_MIRROR`, `KEY_VENUE_SEATS_DIAG`, `KEY_VOICE_DIAG`, `nls_backfill_progress_v1`
 
 ## 構成ファイル（import 到達・最大40件表示）
 
@@ -34,6 +34,8 @@ graph LR
   n_status --> n_src_lib_commentTimelineReport_js["lib/commentTimelineReport.js"]
   n_status --> n_src_lib_completenessScore_js["lib/completenessScore.js"]
   n_status --> n_src_lib_copyTextWithFallback_js["lib/copyTextWithFallback.js"]
+  n_status --> n_src_lib_customSoundPreset_js["lib/customSoundPreset.js"]
+  n_status --> n_src_lib_customSoundStore_js["lib/customSoundStore.js"]:::shared
   n_status --> n_src_lib_deriveAvatarUrlFromUid_js["lib/deriveAvatarUrlFromUid.js"]:::shared
   n_status --> n_src_lib_diagnosisRegistry_js["lib/diagnosisRegistry.js"]
   n_status --> n_src_lib_diagnosticsTrust_js["lib/diagnosticsTrust.js"]
@@ -51,9 +53,7 @@ graph LR
   n_status --> n_src_lib_liveviewPublishOutcome_js["lib/liveviewPublishOutcome.js"]
   n_status --> n_src_lib_liveviewPublishOutcomeKey_js["lib/liveviewPublishOutcomeKey.js"]
   n_status --> n_src_lib_liveviewPublishSelfDiag_js["lib/liveviewPublishSelfDiag.js"]
-  n_status --> n_src_lib_metricConfidence_js["lib/metricConfidence.js"]:::shared
-  n_status --> n_src_lib_milestoneEffectDiag_js["lib/milestoneEffectDiag.js"]:::shared
   classDef shared fill:#eee,stroke:#999,color:#666;
 ```
 
-> ほか 48 ファイル省略（全件は storage-bus.md / metafile 参照）。
+> ほか 50 ファイル省略（全件は storage-bus.md / metafile 参照）。

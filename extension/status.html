@@ -1263,6 +1263,26 @@
       <div id="soundPreviewList" style="padding:8px 4px"></div>
     </details>
 
+    <!-- Phase A(2026-07-05) 開発用: マイ効果音差し替え(IndexedDB取込+割当)。音声データはIndexedDBのみ・
+         リポジトリ/ストアには一切同梱しない。releaseビルドでは hideDevDiagnosticsIfRelease が隠す -->
+    <details id="myCustomSoundPanel" class="status-section">
+      <summary>🎛️ マイ効果音(開発用)</summary>
+      <div style="padding:8px 4px">
+        <div class="status-meta" style="margin-bottom: 8px">
+          手持ちの音声ファイル(audiostock_&lt;No.&gt;を含むファイル名)を一括選択すると、
+          プリセット表に従って自動で割り当てます。音声データはこの端末のブラウザ内(IndexedDB)にのみ
+          保存され、リポジトリやストアには一切含まれません。
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:8px">
+          <label for="myCustomSoundFileInput" class="status-meta">音声ファイルを一括選択:</label>
+          <input id="myCustomSoundFileInput" type="file" multiple accept="audio/*" />
+        </div>
+        <div id="myCustomSoundImportResult" class="empty-note">まだ何も取り込んでいません。</div>
+        <div id="myCustomSoundStats" class="status-meta" style="margin:6px 0"></div>
+        <div id="myCustomSoundList" style="padding:4px 0"></div>
+      </div>
+    </details>
+
     <footer class="status-footer">
       <div>このページの URL: <span id="statusPageUrl">—</span></div>
       <div>

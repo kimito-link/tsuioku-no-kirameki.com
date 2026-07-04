@@ -582,6 +582,14 @@ export function isEffectSoundEnabled(raw) {
  */
 export const KEY_VENUE_EFFECT_SOUND_PRESENCE = 'nls_venue_effect_sound_presence_v1';
 
+/**
+ * v0.1.1071(Phase A): マイ効果音(customSoundStore.js)の割り当て世代カウンタ。
+ *   IndexedDBのBlob自体はstorageに載せない(サイズ地雷)。割り当て変更のたびに+1し、
+ *   他コンテキスト(venueBar/popup)は storage.onChanged でこのキーの変化だけ見て
+ *   customVariantPaths を再構築する(値は単調増加の数値のみ・PII無し)。
+ */
+export const KEY_CUSTOM_SOUND_REV = 'nls_custom_sound_rev_v1';
+
 /** @param {string} liveId lv123 */
 export function commentsStorageKey(liveId) {
   const id = String(liveId || '').trim().toLowerCase();

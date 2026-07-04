@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1071',
+    date: '2026-07-05',
+    summary: 'マイ効果音差し替え(IndexedDB取込+割当)',
+    items: Object.freeze([
+      '手持ちの音声ファイルを効果音として使えるようになりました。診断ページの「マイ効果音」タブでファイルを一括選択すると、ギフト・節目・広告など各場面にあらかじめ用意した割り当て表で自動的に振り分けられます。音声データはお使いの端末のブラウザ内にのみ保存され、外部やストアには一切送信・同梱されません。設定しない場合は今までどおりの合成音で鳴ります。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1070',
     date: '2026-07-04',
     summary: '拡張リロード後の古いタブのエラー表示を抑止',

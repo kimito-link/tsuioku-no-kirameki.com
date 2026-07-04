@@ -153,8 +153,12 @@ export default [
     //   src/extension/popup/report/htmlReportDocument.js へ切り出し=21764→19974。ラチェットを
     //   実測値+50(緊急hotfix用の呼吸代)へ下げる。10年後も楽できる設計の第一歩(popup-entry.js
     //   のcomposition root化)。新モジュール側にも max-lines: 800 の予防ラチェットを設置。
+    //   Phase A(2026-07-05): マイ効果音差し替え(IndexedDB取込+割当)のdeps注入配線
+    //   (initCustomSoundRuntimeOnce/buildEffectSoundDeps・chrome.storage I/Oグルー=lib抽出不可。
+    //   純関数/IDB操作本体は src/lib/customSoundStore.js・customSoundPreset.js にテスト付きで隔離済み)
+    //   を追加=19974→20082(council/pachinko-ultimate-SYNTHESIS.md §6 Phase A)。
     files: ['src/extension/popup-entry.js'],
-    rules: { 'max-lines': ['error', { max: 20024, skipBlankLines: false, skipComments: false }] }
+    rules: { 'max-lines': ['error', { max: 20082, skipBlankLines: false, skipComments: false }] }
   },
   {
     files: ['src/extension/popup/**/*.js'],

@@ -129,7 +129,14 @@ const STORAGE_DISCONNECT_BASELINE = new Set([
   //   legacyPayload(動的キーのマップ)経由で書くようにしたため、popup-entry の literal `set({[KEY_X]:...})` が消え、
   //   静的解析が producer を取りこぼす偽陽性。実書込は popup-entry:mergeAndScheduleFlush(scheduler.legacyPayload を
   //   chrome.storage.local.set)・consumer は popup(②apply)/status/app。経路は同一 tick 一貫化のための意図的な間接化。
-  'KEY_STAT_CARDS_MIRROR', 'KEY_TOP_SUPPORTERS_MIRROR', 'KEY_NORTH_STAR_MIRROR'
+  'KEY_STAT_CARDS_MIRROR', 'KEY_TOP_SUPPORTERS_MIRROR', 'KEY_NORTH_STAR_MIRROR',
+  // マイ効果音の割当世代カウンタ(2026-07-05・Phase A・council/pachinko-ultimate-SYNTHESIS.md §1.2):
+  //   producer は src/lib/customSoundStore.js#bumpCustomSoundRev が引数の storageLocal.set({[KEY]:...})
+  //   経由で書く(chrome.storage.local を直接リテラルで触らない=テスト用にDI可能にした設計)ため、
+  //   静的解析が producer を取りこぼす偽陽性。consumer は venueBar.js/popup-entry.js の
+  //   storage.onChanged + status-entry.js の chrome.storage.local.get(直読み)。経路は実在
+  //   (customSoundStore.test.js の bumpCustomSoundRev テストで確認済み)。
+  'KEY_CUSTOM_SOUND_REV'
 ]);
 
 /**

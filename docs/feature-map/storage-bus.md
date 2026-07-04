@@ -35,6 +35,7 @@
 - 🔵 **KEY_COMMENTER_FOLLOWING_LIST_CACHE** — 読む人だけ（書く経路が無い疑い）: src/extension/content-entry.js
 - 🔵 **KEY_COMMENT_IDB_ENABLED** — 読む人だけ（書く経路が無い疑い）: src/extension/content-entry.js
 - 🔵 **KEY_COMMENT_PANEL_AUTO_RESTORE** — 読む人だけ（書く経路が無い疑い）: src/extension/content-entry.js
+- 🔵 **KEY_CUSTOM_SOUND_REV** — 読む人だけ（書く経路が無い疑い）: src/extension/status-entry.js
 - 🔵 **KEY_DEEP_HARVEST_QUIET_UI** — 読む人だけ（書く経路が無い疑い）: src/extension/content-entry.js, src/extension/popup-entry.js
 - 🔵 **KEY_EFFECT_SOUND_ENABLED** — 読む人だけ（書く経路が無い疑い）: src/extension/venueBar.js
 - 🔵 **KEY_FOLD_ANONYMOUS_IN_RANK_STRIP** — 読む人だけ（書く経路が無い疑い）: src/extension/popup-entry.js
@@ -94,6 +95,7 @@
 | `KEY_COMMENT_PANEL_STATUS` | extension/content-entry.js | extension/popup-entry.js |
 | `KEY_COMMENT_TIMELINE_MIRROR` | extension/content-entry.js | extension/popup-entry.js<br>extension/status-entry.js |
 | `KEY_CONCURRENT_CALIBRATION_RING_V1` | extension/content-entry.js<br>extension/popup-entry.js | extension/content-entry.js<br>extension/popup-entry.js |
+| `KEY_CUSTOM_SOUND_REV` | — | extension/status-entry.js |
 | `KEY_DEEP_HARVEST_QUIET_UI` | — | extension/content-entry.js<br>extension/popup-entry.js |
 | `KEY_DIAGNOSTICS_ERROR_RING_V1` | lib/diagnosticRingStore.js | lib/diagnosticRingStore.js |
 | `KEY_EFFECT_SOUND_ENABLED` | — | extension/venueBar.js |
