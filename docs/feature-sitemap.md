@@ -654,7 +654,7 @@
   - `src/lib/statusTrendKey.js`
   - `src/extension/status-entry.js`
   - `src/lib/statusActionAdvisor.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 111</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 113</summary>
 
 - `app/app.js` — スマホ閲覧用 status Web 版。
 - `app/live-view.js` — 純Web版 応援ライブビュー（拡張なし・PC/スマホ共通）。
@@ -686,6 +686,8 @@
 - `src/lib/commentTimelineMirror.js` — コメントタイムラインの「鏡」スナップショット純関数（council/liveview-wholesale-root-SYNTHESIS.md 第2段）。
 - `src/lib/consoleErrorBuffer.js` — v0.1.201: window.error / unhandledrejection を捕捉する ring buffer。
 - `src/lib/copyTextWithFallback.js` — テキストを「確実に」クリップボードへ入れるためのフォールバック付きコピー。
+- `src/lib/customSoundPreset.js` — council/pachinko-ultimate-SYNTHESIS.md §2 の「85素材の完全割り当て表」をそのままJSON化した
+- `src/lib/customSoundStore.js` — council/pachinko-ultimate-SYNTHESIS.md §1.2/§1.4/§1.5(Phase A)の実装。
 - `src/lib/devMonitorDebugSubset.js` — ポップアップ「開発・テスト用 監視」用: watch スナップショット _debug から
 - `src/lib/devMonitorVizHtml.js` — dev monitor セカンダリ可視化（renderDevMonitorSecondaryViz の <div class="nl-dev-monitor-viz">）の
 - `src/lib/devReloadSignal.js` — 開発用ホットリロードのシグナル判定（純関数）。
@@ -772,9 +774,10 @@
 
 ## 🧬 修正系譜マップ(この系統のバグを過去にどう直したか)
 
-> changelog 全 406 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
+> changelog 全 407 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
 
-### 💾 記録件数 (61版)
+### 💾 記録件数 (62版)
+- `v0.1.1072` 2026-07-05 — マイ効果音計器をextrasに追加
 - `v0.1.1050` 2026-07-03 — 状態速報のパリティ判定に会場(④)を追加=POPと会場の人数ズレを検知
 - `v0.1.1048` 2026-07-03 — 応援レーン描画の所要時間を状態速報に計測(全員表示の準備・観測のみ)
 - `v0.1.1038` 2026-07-02 — 応援者/広告ランキングの中身ちらつきを根治
@@ -1434,7 +1437,8 @@
 - `v0.1.673` 2026-06-10 — コメビュの名前をパネルと同じ情報源で補完
 - `v0.1.670` 2026-06-10 — コメビュのアイコンを本家と同じサムネに
 
-### 🩺 診断・状態速報 (146版)
+### 🩺 診断・状態速報 (147版)
+- `v0.1.1072` 2026-07-05 — マイ効果音計器をextrasに追加
 - `v0.1.1071` 2026-07-05 — マイ効果音差し替え(IndexedDB取込+割当)
 - `v0.1.1069` 2026-07-04 — パチンコ文法準拠へ効果音を全面刷新
 - `v0.1.1068` 2026-07-04 — ギフト音をパチンコ電子音(きゅいん)に一新+即発音
