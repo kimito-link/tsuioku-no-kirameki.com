@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1070',
+    date: '2026-07-04',
+    summary: '拡張リロード後の古いタブのエラー表示を抑止',
+    items: Object.freeze([
+      '拡張を🔄リロードすると、リロード前から開いていたニコ生の視聴ページで「拡張の接続が切れました」という趣旨のエラーが chrome://extensions のエラー欄に赤く表示されることがありました。古いタブが自然に役目を終える際の無害な現象なので、今後は静かに処理して目立つ場所には出さないようにしました。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1069',
     date: '2026-07-04',
     summary: 'パチンコ文法準拠へ効果音を全面刷新',

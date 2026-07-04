@@ -163,3 +163,61 @@ describe('install: context invalidated の unhandledrejection 抑止', () => {
     expect(snap.recentErrors[0].message).toContain('TypeError');
   });
 });
+
+describe('install: context invalidated の window.error（uncaught exception）抑止', () => {
+  /** addEventListener を捕まえる簡易 target */
+  function makeTarget() {
+    /** @type {Record<string, Function>} */
+    const listeners = {};
+    return {
+      addEventListener: (type, fn) => {
+        listeners[type] = fn;
+      },
+      removeEventListener: () => {},
+      fireError: (message, error) => {
+        let prevented = false;
+        const e = {
+          message,
+          error,
+          preventDefault: () => {
+            prevented = true;
+          }
+        };
+        listeners.error?.(e);
+        return prevented;
+      }
+    };
+  }
+
+  // v0.1.1070: 拡張リロード後の古いタブが投げる同期 throw（uncaught exception）は
+  //   unhandledrejection と同じ「実害なしの古いタブの正常な廃棄」。preventDefault で
+  //   chrome://extensions のエラー欄に赤く積まれるのを防ぐ。
+  it('context invalidated の uncaught exception は preventDefault され、ring buffer に載らない（ignored）', () => {
+    const buf = createConsoleErrorBuffer();
+    const target = makeTarget();
+    buf.install(target);
+    const prevented = target.fireError(
+      'Uncaught Error: Extension context invalidated.',
+      new Error('Extension context invalidated.')
+    );
+    expect(prevented).toBe(true);
+    const snap = buf.snapshot();
+    expect(snap.totalCount).toBe(0);
+    expect(snap.ignoredCount).toBe(1);
+    expect(snap.recentErrors).toHaveLength(0);
+  });
+
+  it('通常の uncaught exception は preventDefault されず、ring buffer に載る', () => {
+    const buf = createConsoleErrorBuffer();
+    const target = makeTarget();
+    buf.install(target);
+    const prevented = target.fireError(
+      'Uncaught TypeError: foo is not a function',
+      new Error('TypeError: foo is not a function')
+    );
+    expect(prevented).toBe(false);
+    const snap = buf.snapshot();
+    expect(snap.totalCount).toBe(1);
+    expect(snap.recentErrors[0].message).toContain('TypeError');
+  });
+});
