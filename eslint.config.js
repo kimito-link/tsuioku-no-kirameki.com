@@ -161,8 +161,12 @@ export default [
     //   チェーンのsetTimeout直列実行・会場優先プレゼンス判定=chrome.storage/タイマーのグルー=lib抽出不可。
     //   歯止め判定本体(voiceGate)と診断整形は src/lib/voiceDirector.js・voiceEffectDiag.js に
     //   テスト付きで隔離済み)を追加=20082→20254。ラチェットは実測+50の20304へ。
+    //   Phase C(2026-07-05・v0.1.1074): BGM/フェーズディレクター配線(advancePhaseDirectorPopup・
+    //   フィーバーBGM開始/終了・ボイスR条件トリガ・トグル配線=chrome.storage/タイマー/DOMのグルー=
+    //   lib抽出不可。純関数本体は src/lib/phaseDirector.js・bgmDirector.js・bgmPhaseDiag.js に
+    //   テスト付きで隔離済み)を追加=20254→20519。ラチェットは実測+50の20569へ。
     files: ['src/extension/popup-entry.js'],
-    rules: { 'max-lines': ['error', { max: 20304, skipBlankLines: false, skipComments: false }] }
+    rules: { 'max-lines': ['error', { max: 20569, skipBlankLines: false, skipComments: false }] }
   },
   {
     files: ['src/extension/popup/**/*.js'],

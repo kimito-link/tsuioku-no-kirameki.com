@@ -1257,6 +1257,34 @@
       ></textarea>
     </section>
 
+    <!-- Phase C(2026-07-05・council/pachinko-ultimate-SYNTHESIS.md §5.1): BGM(リーチ/フィーバーループ)。
+         既定OFF(オプトイン)。開発用パネルではないのでrelease非表示の対象外。 -->
+    <details id="bgmSettingsPanel" class="status-section">
+      <summary>🎵 パチンコBGM設定</summary>
+      <div style="padding:8px 4px">
+        <div class="status-meta" style="margin-bottom: 8px">
+          リーチ中・大当たり後フィーバー中に短いループBGMを鳴らします。既定はOFFです(オプトイン)。
+          マイ効果音でbgm_reach_loop/bgm_fever_loop等を割り当てていない場合は音が出ません。
+        </div>
+        <label style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+          <input type="checkbox" id="bgmEnabledToggle" aria-label="パチンコBGMを鳴らす" />
+          <span>パチンコBGM(リーチ/フィーバー)を鳴らす</span>
+        </label>
+        <div style="display:flex;flex-direction:column;gap:6px;max-width:360px">
+          <label style="display:flex;align-items:center;gap:8px">
+            <span style="min-width:8em">リーチ音量</span>
+            <input type="range" id="bgmVolumeReachSlider" min="0" max="0.30" step="0.01" aria-label="リーチBGM音量" />
+            <span id="bgmVolumeReachValue" class="status-meta"></span>
+          </label>
+          <label style="display:flex;align-items:center;gap:8px">
+            <span style="min-width:8em">フィーバー音量</span>
+            <input type="range" id="bgmVolumeFeverSlider" min="0" max="0.30" step="0.01" aria-label="フィーバーBGM音量" />
+            <span id="bgmVolumeFeverValue" class="status-meta"></span>
+          </label>
+        </div>
+      </div>
+    </details>
+
     <!-- v0.1.1067 開発用: 効果音の試聴パネル(releaseビルドでは hideDevDiagnosticsIfRelease が隠す) -->
     <details id="soundPreviewPanel" class="status-section">
       <summary>🔊 効果音試聴(開発用)</summary>

@@ -61,7 +61,12 @@ import {
   KEY_EFFECT_SOUND_ENABLED,
   KEY_VENUE_EFFECT_SOUND_PRESENCE,
   KEY_CUSTOM_SOUND_REV,
-  isEffectSoundEnabled
+  isEffectSoundEnabled,
+  // Phase C(2026-07-05): BGM(リーチ/フィーバーループ)の既定OFFトグル+グループ別音量。
+  KEY_BGM_ENABLED,
+  KEY_BGM_VOLUME_REACH,
+  KEY_BGM_VOLUME_FEVER,
+  isBgmEnabled
 } from '../lib/storageKeys.js';
 import {
   EFFECT_SOUND_KINDS,
@@ -89,6 +94,36 @@ import { makeInitialGiftEffectDiag, buildGiftEffectDiagSnapshot } from '../lib/g
 import { makeInitialVoiceGateState, voiceGate, planJackpotChain } from '../lib/voiceDirector.js';
 import { makeInitialVoiceEffectDiag, buildVoiceEffectDiagSnapshot, voiceSkipFieldForGateReason } from '../lib/voiceEffectDiag.js';
 import { KEY_VOICE_EFFECT_DIAG } from '../lib/voiceEffectDiagKey.js';
+// Phase C(2026-07-05): 物語弧の完成(council/pachinko-ultimate-SYNTHESIS.md §3/§5/§6)。
+//   meterStateFor(既存M)→baselineFor(B)→R→phaseForの決定論ステートマシンでフェーズを進め、
+//   遷移の瞬間だけR条件ボイス/BGMを発火する。effectSoundPlayer.js/voiceDirector.jsは無改変。
+import { meterStateFor, makeInitialExcitementMeter } from '../lib/effectDirector.js';
+import {
+  baselineFor,
+  rWithWarmup,
+  phaseFor,
+  makeInitialBaselineState,
+  makeInitialPhaseState,
+  PHASE
+} from '../lib/phaseDirector.js';
+import {
+  createBgmRuntime,
+  reachBgmDecision,
+  makeInitialReachBgmState,
+  feverBgmStart,
+  feverBgmExtend,
+  feverBgmShouldEnd,
+  feverBgmStop,
+  makeInitialFeverBgmState,
+  reachLoopVariantIndex,
+  feverLoopVariantIndex,
+  clampBgmVolume,
+  BGM_REACH_DEFAULT_VOLUME,
+  BGM_FEVER_DEFAULT_VOLUME,
+  FADE_MS
+} from '../lib/bgmDirector.js';
+import { makeInitialBgmPhaseDiag, buildBgmPhaseDiagSnapshot } from '../lib/bgmPhaseDiag.js';
+import { KEY_BGM_PHASE_DIAG } from '../lib/bgmPhaseDiagKey.js';
 import { anonymousIdenticonDataUrl } from '../lib/anonymousIdenticon.js';
 import { tailStorageKey } from '../lib/commentTailBuffer.js';
 import { pickNewVenueSpeech, mergeSpeakersIntoVenueRows, liveFeedSpeechRows } from '../lib/venueSpeech.js';
@@ -772,6 +807,25 @@ const VENUE_CSS = `
     font-size: 10px;
     white-space: nowrap;
   }
+  /* Phase C(council/pachinko-ultimate-SYNTHESIS.md §6): 盛り上がりフェーズの色替えチップ。
+     一度作ったDOM要素はremoveしない(churn地雷対策)。クラス切替のみで進行を表す。 */
+  .nlsb-phase-meter {
+    flex: 0 0 auto;
+    padding: 2px 10px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    white-space: nowrap;
+    background: rgba(255, 255, 255, 0.08);
+    color: rgba(255, 255, 255, 0.55);
+    transition: background-color 0.4s ease, color 0.4s ease;
+  }
+  .nlsb-phase-meter--atsui { background: rgba(255, 196, 0, 0.22); color: #ffd76a; }
+  .nlsb-phase-meter--reach { background: rgba(255, 122, 0, 0.28); color: #ffab5c; }
+  .nlsb-phase-meter--breakthrough,
+  .nlsb-phase-meter--jackpot { background: rgba(255, 64, 64, 0.32); color: #ff8a8a; }
+  .nlsb-phase-meter--payout { background: rgba(255, 213, 79, 0.35); color: #ffe58a; }
   .nlsb-header-right {
     display: flex;
     align-items: center;
@@ -1709,6 +1763,14 @@ export function mountVenueBarButton(options = {}) {
   const title = document.createElement('div');
   title.className = 'nlsb-title';
   title.textContent = '会場参加者 0人';
+  // Phase C(2026-07-05・council/pachinko-ultimate-SYNTHESIS.md §6): 盛り上がりフェーズの色替え
+  //   チップ。一度作ったら絶対remove/再生成しない(churn地雷対策)。CSSクラス切替とtextContent
+  //   更新だけで進行する(paintPhaseMeterDom)。id固定でHTML側からも参照できるようにする。
+  const phaseMeter = document.createElement('div');
+  phaseMeter.id = 'nlsbPhaseMeter';
+  phaseMeter.className = 'nlsb-phase-meter nlsb-phase-meter--normal';
+  phaseMeter.textContent = '通常';
+  phaseMeter.setAttribute('aria-label', '盛り上がりフェーズ: 通常');
   // ヘッダー右側: コメビュ起動ボタン + 集計メモ。
   const headerRight = document.createElement('div');
   headerRight.className = 'nlsb-header-right';
@@ -1784,7 +1846,7 @@ export function mountVenueBarButton(options = {}) {
   } else {
     headerRight.append(rosterBtn, diagBtn, comeviewBtn, voiceBtn, voiceStatus, note, close);
   }
-  header.append(title, headerRight);
+  header.append(title, phaseMeter, headerRight);
 
   // 2026-07-01 会議(venue-role-separation フェーズ2 = 可視性回復): ひな壇の【上】に固定高の
   //   「応援者トップN」バー。868人の密集会場でも上位が必ず大きく見える(席の🥇🥈🥉が小さすぎる
@@ -2277,8 +2339,236 @@ export function mountVenueBarButton(options = {}) {
       }
     }, 0); // v0.1.1068: 即発音(同一バーストの統合はsetTimeout(0)がループ後に走ることで維持)
     _pendingGiftSound = pending;
+    // Phase C(2026-07-05): 盛り上がりメーター(M)にギフト重みを加算(§3.2: small/medium/large/mega=4/8/16/32)。
+    //   comboStreakはギフトの連続コンボ数(effectDirector.directHit)=§3.3「コンボ2連中/3連目」条件。
+    advancePhaseDirector({
+      addWeight: meterWeightForGiftTier(tier),
+      giftLargeOrAbove: kind === 'gift_large' || kind === 'gift_mega',
+      giftMega: kind === 'gift_mega',
+      comboStreak: _giftComboState.comboCount
+    });
     return 'scheduled';
   };
+
+  /* ==========================================================================
+   * Phase C(2026-07-05): 物語弧の完成(council/pachinko-ultimate-SYNTHESIS.md §3/§5/§6)。
+   *   meterStateFor(既存M・effectDirector.js)→baselineFor(B)→R→phaseFor の決定論
+   *   ステートマシンでフェーズを進め、遷移の瞬間だけR条件ボイス/BGMを発火する。
+   *   effectSoundPlayer.js/voiceDirector.js/effectDirector.jsは無改変(deps注入+関数呼び出しのみ)。
+   * ======================================================================== */
+
+  /** メーター重み(§3.2表そのもの)。コメント+1・広告+8・ギフトは帯別。
+   *   節目到達+10はコメント数マイルストーン検知(popup-entry.js専属)側で加算する
+   *   (venueBar.jsはコメント数マイルストーンを扱わない=comment_milestone_effect_diagはpopup専用)。 */
+  const METER_WEIGHT_COMMENT = 1;
+  const METER_WEIGHT_AD = 8;
+  /** @type {Readonly<Record<string, number>>} */
+  const METER_WEIGHT_FOR_GIFT_TIER = Object.freeze({ small: 4, medium: 8, large: 16, mega: 32 });
+  /** @param {string|undefined} tier @returns {number} */
+  const meterWeightForGiftTier = (tier) => METER_WEIGHT_FOR_GIFT_TIER[String(tier || 'small')] ?? METER_WEIGHT_FOR_GIFT_TIER.small;
+
+  let _meterState = makeInitialExcitementMeter();
+  let _baselineState = makeInitialBaselineState();
+  /** @type {import('../lib/phaseDirector.js').PhaseState} */
+  let _phaseState = makeInitialPhaseState(Date.now());
+  /** 配信検知時刻(ウォームアップ3分の起点・§3.2)。0=未検知。 */
+  let _streamDetectedAtMs = 0;
+  let _reachBgmState = makeInitialReachBgmState();
+  let _feverBgmState = makeInitialFeverBgmState();
+  let _bgmEnabledCache = false; // 既定OFF(オプトイン・§5.1)
+  let _bgmVolumeReach = BGM_REACH_DEFAULT_VOLUME;
+  let _bgmVolumeFever = BGM_FEVER_DEFAULT_VOLUME;
+  const _bgmRuntime = createBgmRuntime();
+  void chrome.storage.local.get([KEY_BGM_ENABLED, KEY_BGM_VOLUME_REACH, KEY_BGM_VOLUME_FEVER]).then((bag) => {
+    _bgmEnabledCache = isBgmEnabled(bag?.[KEY_BGM_ENABLED]);
+    if (Number.isFinite(Number(bag?.[KEY_BGM_VOLUME_REACH]))) _bgmVolumeReach = clampBgmVolume(Number(bag[KEY_BGM_VOLUME_REACH]));
+    if (Number.isFinite(Number(bag?.[KEY_BGM_VOLUME_FEVER]))) _bgmVolumeFever = clampBgmVolume(Number(bag[KEY_BGM_VOLUME_FEVER]));
+  }).catch(() => {});
+  chrome.storage.onChanged?.addListener?.((changes, area) => {
+    if (area !== 'local') return;
+    if (changes[KEY_BGM_ENABLED]) _bgmEnabledCache = isBgmEnabled(changes[KEY_BGM_ENABLED].newValue);
+    if (changes[KEY_BGM_VOLUME_REACH] && Number.isFinite(Number(changes[KEY_BGM_VOLUME_REACH].newValue))) {
+      _bgmVolumeReach = clampBgmVolume(Number(changes[KEY_BGM_VOLUME_REACH].newValue));
+    }
+    if (changes[KEY_BGM_VOLUME_FEVER] && Number.isFinite(Number(changes[KEY_BGM_VOLUME_FEVER].newValue))) {
+      _bgmVolumeFever = clampBgmVolume(Number(changes[KEY_BGM_VOLUME_FEVER].newValue));
+    }
+  });
+
+  const _bgmPhaseDiagCounters = makeInitialBgmPhaseDiag();
+  let _bgmPhaseDiagLastWriteAt = 0;
+  const publishBgmPhaseDiag = () => {
+    const now = Date.now();
+    if (now - _bgmPhaseDiagLastWriteAt < 3000) return; // 3秒 min-gap(他の診断と同型)。
+    _bgmPhaseDiagLastWriteAt = now;
+    _bgmPhaseDiagCounters.bgmEnabled = _bgmEnabledCache;
+    const snap = buildBgmPhaseDiagSnapshot(_bgmPhaseDiagCounters, now);
+    void chrome.storage.local.set({ [KEY_BGM_PHASE_DIAG]: snap }).catch(() => {});
+  };
+
+  /**
+   * カスタム割当済みBGM URLを1本選ぶ(§5.3決定論ローテーション)。未割当キーはno-path扱い(空文字)
+   *   =bgmDirector.createBgmRuntime().start()側で「urlが無ければ何もしない」の安全側フォールバックに乗る。
+   * @param {string} key bgm_reach_loop/bgm_fever_loop/bgm_jingle_stage/bgm_jingle_win
+   * @param {number} [variantIndex]
+   * @returns {string}
+   */
+  const resolveBgmUrl = (key, variantIndex) => {
+    const variants = _customSoundState.customVariantPaths[key];
+    if (!Array.isArray(variants) || variants.length === 0) return '';
+    const idx = Number.isFinite(Number(variantIndex)) ? Math.max(0, Number(variantIndex)) % variants.length : 0;
+    return getUrlForCustomSound(variants[idx], (q) => chrome.runtime.getURL(q));
+  };
+
+  /** フィーバー終了(§5.2「アウト3.0秒→bgm_jingle_win」)。 */
+  const endFeverBgm = () => {
+    _bgmRuntime.stop(FADE_MS.feverOut, () => {
+      const winUrl = resolveBgmUrl('bgm_jingle_win', 0);
+      if (winUrl) playEffectSound('bgm_jingle_win', { ...buildEffectSoundDeps('bgm_jingle_win'), getUrl: () => winUrl });
+    });
+    _feverBgmState = feverBgmStop(_feverBgmState);
+    _bgmPhaseDiagCounters.feverOutCount += 1;
+    _bgmPhaseDiagCounters.lastEventAt = Date.now();
+    publishBgmPhaseDiag();
+  };
+
+  /** フィーバー開始(payoutチェーン完了合図)。bgm_jingle_stage(直列)→ループイン(§3.3/§5.2)。 */
+  const startFeverBgm = () => {
+    const startDecision = feverBgmStart(_feverBgmState, Date.now(), { bgmEnabled: _bgmEnabledCache });
+    if (startDecision.action !== 'start') return;
+    _feverBgmState = startDecision.nextState;
+    const stageUrl = resolveBgmUrl('bgm_jingle_stage', (_feverBgmState.loopIndex - 1) % 2);
+    if (stageUrl) playEffectSound('bgm_jingle_stage', { ...buildEffectSoundDeps('bgm_jingle_stage'), getUrl: () => stageUrl });
+    const loopUrl = resolveBgmUrl('bgm_fever_loop', feverLoopVariantIndex(_feverBgmState.loopIndex));
+    _bgmRuntime.start(loopUrl, _bgmVolumeFever, FADE_MS.feverIn);
+    _bgmPhaseDiagCounters.feverInCount += 1;
+    _bgmPhaseDiagCounters.lastEventAt = Date.now();
+    publishBgmPhaseDiag();
+    // Phase C: フィーバーBGMイン時のR条件ボイス(§4.1 voice_stage)。
+    tryPlayVoice('voice_stage');
+  };
+
+  /**
+   * リーチBGMのin/out判定を1歩進める(§5.2)。
+   * @param {string} phase
+   * @param {number} R
+   * @param {number} nowMs
+   */
+  const tickReachBgm = (phase, R, nowMs) => {
+    const decision = reachBgmDecision(_reachBgmState, phase, R, nowMs, { bgmEnabled: _bgmEnabledCache });
+    _reachBgmState = decision.nextState;
+    if (decision.action === 'start') {
+      const url = resolveBgmUrl('bgm_reach_loop', reachLoopVariantIndex(_reachBgmState.loopIndex));
+      _bgmRuntime.start(url, _bgmVolumeReach, decision.fadeMs);
+      _bgmPhaseDiagCounters.reachInCount += 1;
+      _bgmPhaseDiagCounters.lastEventAt = Date.now();
+      publishBgmPhaseDiag();
+    } else if (decision.action === 'stop') {
+      _bgmRuntime.stop(decision.fadeMs);
+      _bgmPhaseDiagCounters.reachOutCount += 1;
+      _bgmPhaseDiagCounters.lastEventAt = Date.now();
+      publishBgmPhaseDiag();
+    }
+  };
+
+  /**
+   * フェーズディレクターを1歩進める(§6 Phase C の核)。M(メーター)更新→B更新→R算出→
+   *   phaseFor遷移→R条件ボイス/BGM/hold_lampの発火まで一括で行う。
+   *   呼び出し頻度: ギフト/広告イベント時(即時=既存イベント直結層と同じ即応性)+12秒相当の
+   *   受動tick(コメントのみの配信でも減衰・降格・リーチタイムアウトが進むように)。
+   * @param {{ addWeight?: number, milestoneApproach?: boolean, milestoneHit500?: boolean,
+   *   milestoneHit1000Plus?: boolean, giftLargeOrAbove?: boolean, giftMega?: boolean, comboStreak?: number }} [events]
+   */
+  const advancePhaseDirector = (events = {}) => {
+    const now = Date.now();
+    if (_streamDetectedAtMs === 0) _streamDetectedAtMs = now;
+    const dtMs = _meterState.updatedAt > 0 ? now - _meterState.updatedAt : 0;
+    _meterState = meterStateFor(_meterState, now, Math.max(0, Number(events.addWeight) || 0));
+    _baselineState = baselineFor(_baselineState, _meterState.value, dtMs);
+    const r = rWithWarmup(_meterState.value, _baselineState.value, now - _streamDetectedAtMs);
+    const prevPhase = _phaseState.phase;
+    const prevHighestR = Number(_phaseState.highestR) || 0;
+    const result = phaseFor(_phaseState, r, events, now);
+    _phaseState = result.nextState;
+    _bgmPhaseDiagCounters.phase = result.phase;
+    _bgmPhaseDiagCounters.r = r;
+    _bgmPhaseDiagCounters.b = _baselineState.value;
+    _bgmPhaseDiagCounters.lastEventAt = now;
+
+    if (result.holdLampFired && _effectSoundEnabledCache) {
+      playEffectSound('hold_lamp', buildEffectSoundDeps('hold_lamp'));
+    }
+
+    if (result.changed && !result.silent) {
+      if (prevPhase === PHASE.NORMAL && result.phase === PHASE.ATSUI) {
+        tryPlayVoice('voice_chance');
+      } else if (result.phase === PHASE.REACH) {
+        if (_effectSoundEnabledCache) playEffectSound('reach', buildEffectSoundDeps('reach'));
+        tryPlayVoice('voice_atsui');
+      } else if (result.phase === PHASE.PAYOUT && prevPhase === PHASE.JACKPOT) {
+        // 大当たり→払い出し: payout SE 1本(§3.3)。BGM ONならフィーバーイン。
+        if (_effectSoundEnabledCache) playEffectSound('payout', buildEffectSoundDeps('payout'));
+        startFeverBgm();
+      } else if (result.phase === PHASE.NORMAL && prevPhase === PHASE.PAYOUT) {
+        // フィーバー終了→通常(§3.3「払い出し→通常」)。BGM ONならジングルでシメ済み(endFeverBgmが担当)。
+      }
+    }
+
+    // R自己最高更新かつR>=6.0でvoice_max(§4.1)。
+    if (r >= 6.0 && r > prevHighestR) {
+      tryPlayVoice('voice_max');
+    }
+
+    tickReachBgm(result.phase, r, now);
+    if (_feverBgmState.playing) {
+      if (events.giftMega || events.milestoneHit1000Plus) _feverBgmState = feverBgmExtend(_feverBgmState);
+      if (feverBgmShouldEnd(_feverBgmState, now)) {
+        endFeverBgm();
+        // フィーバー終了はフェーズ層にも伝える(払い出し→通常・§3.3)。
+        _phaseState = phaseFor(_phaseState, r, { payoutChainDone: true }, now).nextState;
+      }
+    }
+    publishBgmPhaseDiag();
+    paintPhaseMeterDom(result.phase, r);
+  };
+
+  // Phase C: (a) フィーバー中の音量ダック(VOICEVOX発話中50%・§5.2)。既存の発話中判定を再利用する
+  //   (voicePlayer自体は無改変・読み取り専用参照)。(b) イベントが無い間も減衰/降格/リーチ120秒上限/
+  //   フィーバー終了判定を進める受動tick(§3.3の時間依存の遷移はイベント駆動だけでは進まないため)。
+  //   新規のstorage/直列readは増やさない(純粋な時間計算のみ・MEMORY鉄則)。
+  window.setInterval(() => {
+    if (_bgmRuntime.isPlaying()) {
+      if (isNarratingNow()) _bgmRuntime.duck();
+      else _bgmRuntime.unduck();
+    }
+    if (_streamDetectedAtMs > 0) advancePhaseDirector({});
+  }, 1000);
+
+  /** @type {Readonly<Record<string, string>>} */
+  const PHASE_METER_LABEL = Object.freeze({
+    normal: '通常', atsui: '煽り', reach: 'リーチ', breakthrough: '突破', jackpot: '大当たり', payout: '払い出し'
+  });
+  let _lastPaintedPhaseMeterSig = '';
+  /**
+   * 会場画面のメーターDOM(#nlsbPhaseMeter)へフェーズ色+ラベルを反映する。
+   *   一度作ったDOMはremoveしない(churn地雷対策・council §6 Phase C手順書)。要素が無ければ何もしない
+   *   (HTML側未対応でも安全に動く)。
+   * @param {string} phase
+   * @param {number} r
+   */
+  function paintPhaseMeterDom(phase, r) {
+    const el = document.getElementById('nlsbPhaseMeter');
+    if (!el) return;
+    const label = PHASE_METER_LABEL[phase] || phase;
+    const sig = `${phase}|${label}`;
+    if (sig !== _lastPaintedPhaseMeterSig) {
+      _lastPaintedPhaseMeterSig = sig;
+      el.className = `nlsb-phase-meter nlsb-phase-meter--${phase}`;
+      el.textContent = label;
+      el.setAttribute('aria-label', `盛り上がりフェーズ: ${label}`);
+    }
+    el.dataset.r = r.toFixed(2);
+  }
 
   // 診断パネルの描画/開閉。buildVenueRoster(純関数・テスト済)で誰が顔付き席/点描かを表にする。
   const renderRosterPanel = () => {
@@ -2816,6 +3106,8 @@ export function mountVenueBarButton(options = {}) {
             playEffectSound(EFFECT_SOUND_KINDS.AD, buildEffectSoundDeps(EFFECT_SOUND_KINDS.AD));
             _giftEffectDiagCounters.adSoundPlayed += 1;
           }
+          // Phase C(§3.2): 広告+8をメーターへ加算。
+          advancePhaseDirector({ addWeight: METER_WEIGHT_AD });
         }
       }
       publishGiftEffectDiag();
@@ -3666,6 +3958,11 @@ export function mountVenueBarButton(options = {}) {
         baseRows = mergeSpeakersIntoVenueRows(baseRows, result.speeches, nowMs);
         commitDisplay(baseRows);
       }
+    }
+    // Phase C(§3.2): コメント+1をメーターへ加算(件数ぶんまとめて1回のtickで進める=毎発言ごとに
+    //   B/フェーズ計算をN回走らせない。減衰の連続性はmeterStateForの経過時間ベース計算で保たれる)。
+    if (result.speeches.length > 0) {
+      advancePhaseDirector({ addWeight: METER_WEIGHT_COMMENT * result.speeches.length });
     }
     for (const speech of result.speeches) {
       // 吹き出しは「しゃべった瞬間」に必ず出す。音声(VOICEVOX)とは切り離す。

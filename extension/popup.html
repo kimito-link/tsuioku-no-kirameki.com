@@ -10973,6 +10973,22 @@
               </span>
             </label>
           </div>
+          <!-- Phase C(2026-07-05・council/pachinko-ultimate-SYNTHESIS.md §5.1): パチンコBGM（既定OFF＝
+               オプトイン）。マイ効果音でbgm_reach_loop/bgm_fever_loop等を割り当てていない場合は無音。 -->
+          <div class="nl-record-sub">
+            <label for="bgmEnabledToggle" class="nl-record-sub__label">
+              <input
+                type="checkbox"
+                id="bgmEnabledToggle"
+                aria-label="パチンコBGM（リーチ・フィーバー）を鳴らす"
+              />
+              <span>
+                パチンコBGM（リーチ・フィーバー）を鳴らす
+                <span class="nl-record-sub__hint"
+                  >既定はOFFです。ONにするとリーチ中・大当たり後フィーバー中に短いループBGMを鳴らします。音量は診断ページで調整できます。</span>
+              </span>
+            </label>
+          </div>
           <!-- v0.1.418: 過去ログ自動取り込み（既定 ON）。OFF にすると手動ボタンのみ。
                v0.1.450 (PR4): 動機説明（なぜ取り込むか）と手動 trigger の案内をここに統合。
                以前は下の #backfillFetchPrompt（コメント入力直下）にあった説明文を、ボタン廃止に

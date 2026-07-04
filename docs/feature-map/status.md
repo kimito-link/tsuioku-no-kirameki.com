@@ -5,8 +5,8 @@
 
 ## storage の出入り
 
-- 書くキー: `KEY_STATUS_TREND`
-- 読むキー: `KEY_AI_SHARE_POPUP_DIAG`, `KEY_BACKFILL_LIVE_METRIC`, `KEY_COMMENT_TIMELINE_MIRROR`, `KEY_CUSTOM_SOUND_REV`, `KEY_GIFT_EFFECT_DIAG`, `KEY_LANE_DIAG`, `KEY_LANE_MIRROR`, `KEY_LAST_WATCH_URL`, `KEY_LIVEVIEW_PUBLISH_OUTCOME`, `KEY_MILESTONE_EFFECT_DIAG`, `KEY_NORTH_STAR_MIRROR`, `KEY_PREVIEW_RENDER_ACK`, `KEY_REPORT_PREVIEW`, `KEY_STATUS_FAST_DIAG_LITE`, `KEY_STATUS_TREND`, `KEY_STAT_CARDS_MIRROR`, `KEY_VENUE_SEATS_DIAG`, `KEY_VOICE_DIAG`, `KEY_VOICE_EFFECT_DIAG`, `nls_backfill_progress_v1`
+- 書くキー: `KEY_BGM_ENABLED`, `KEY_BGM_VOLUME_FEVER`, `KEY_BGM_VOLUME_REACH`, `KEY_STATUS_TREND`
+- 読むキー: `KEY_AI_SHARE_POPUP_DIAG`, `KEY_BACKFILL_LIVE_METRIC`, `KEY_BGM_ENABLED`, `KEY_BGM_PHASE_DIAG`, `KEY_BGM_VOLUME_FEVER`, `KEY_BGM_VOLUME_REACH`, `KEY_COMMENT_TIMELINE_MIRROR`, `KEY_CUSTOM_SOUND_REV`, `KEY_GIFT_EFFECT_DIAG`, `KEY_LANE_DIAG`, `KEY_LANE_MIRROR`, `KEY_LAST_WATCH_URL`, `KEY_LIVEVIEW_PUBLISH_OUTCOME`, `KEY_MILESTONE_EFFECT_DIAG`, `KEY_NORTH_STAR_MIRROR`, `KEY_PREVIEW_RENDER_ACK`, `KEY_REPORT_PREVIEW`, `KEY_STATUS_FAST_DIAG_LITE`, `KEY_STATUS_TREND`, `KEY_STAT_CARDS_MIRROR`, `KEY_VENUE_SEATS_DIAG`, `KEY_VOICE_DIAG`, `KEY_VOICE_EFFECT_DIAG`, `nls_backfill_progress_v1`
 
 ## 構成ファイル（import 到達・最大40件表示）
 
@@ -23,6 +23,8 @@ graph LR
   n_status --> n_src_lib_backfillRemoveRecommendedLivePollution_js["lib/backfillRemoveRecommendedLivePollution.js"]:::shared
   n_status --> n_src_lib_backfillRinkuNarration_js["lib/backfillRinkuNarration.js"]:::shared
   n_status --> n_src_lib_backgroundWatchTab_js["lib/backgroundWatchTab.js"]
+  n_status --> n_src_lib_bgmPhaseDiag_js["lib/bgmPhaseDiag.js"]:::shared
+  n_status --> n_src_lib_bgmPhaseDiagKey_js["lib/bgmPhaseDiagKey.js"]:::shared
   n_status --> n_src_lib_broadcasterReputationKeywords_js["lib/broadcasterReputationKeywords.js"]
   n_status --> n_src_lib_broadcasterReputationView_js["lib/broadcasterReputationView.js"]
   n_status --> n_src_lib_chikuranCard_js["lib/chikuranCard.js"]
@@ -51,9 +53,7 @@ graph LR
   n_status --> n_src_lib_laneMirrorKey_js["lib/laneMirrorKey.js"]:::shared
   n_status --> n_src_lib_liveEndedFlag_js["lib/liveEndedFlag.js"]:::shared
   n_status --> n_src_lib_liveHealthScore_js["lib/liveHealthScore.js"]
-  n_status --> n_src_lib_liveviewPublishOutcome_js["lib/liveviewPublishOutcome.js"]
-  n_status --> n_src_lib_liveviewPublishOutcomeKey_js["lib/liveviewPublishOutcomeKey.js"]
   classDef shared fill:#eee,stroke:#999,color:#666;
 ```
 
-> ほか 53 ファイル省略（全件は storage-bus.md / metafile 参照）。
+> ほか 55 ファイル省略（全件は storage-bus.md / metafile 参照）。

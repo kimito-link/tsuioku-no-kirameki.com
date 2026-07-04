@@ -312,6 +312,38 @@
       ]
     },
     {
+      "file": "src/lib/bgmPhaseDiag.js",
+      "featureCount": 4,
+      "features": [
+        "content",
+        "popup",
+        "status",
+        "venue"
+      ],
+      "labels": [
+        "記録エンジン(watchページ常駐)",
+        "ポップアップ(応援レーン)",
+        "状態速報ページ",
+        "会場モード(standalone)"
+      ]
+    },
+    {
+      "file": "src/lib/bgmPhaseDiagKey.js",
+      "featureCount": 4,
+      "features": [
+        "content",
+        "popup",
+        "status",
+        "venue"
+      ],
+      "labels": [
+        "記録エンジン(watchページ常駐)",
+        "ポップアップ(応援レーン)",
+        "状態速報ページ",
+        "会場モード(standalone)"
+      ]
+    },
+    {
       "file": "src/lib/comeviewRows.js",
       "featureCount": 4,
       "features": [
@@ -674,6 +706,20 @@
       ]
     },
     {
+      "file": "src/lib/bgmDirector.js",
+      "featureCount": 3,
+      "features": [
+        "content",
+        "popup",
+        "venue"
+      ],
+      "labels": [
+        "記録エンジン(watchページ常駐)",
+        "ポップアップ(応援レーン)",
+        "会場モード(standalone)"
+      ]
+    },
+    {
       "file": "src/lib/celebrationCharaAssets.js",
       "featureCount": 3,
       "features": [
@@ -853,6 +899,20 @@
         "ポップアップ(応援レーン)",
         "状態速報ページ",
         "Web版 状態(スマホ)"
+      ]
+    },
+    {
+      "file": "src/lib/phaseDirector.js",
+      "featureCount": 3,
+      "features": [
+        "content",
+        "popup",
+        "venue"
+      ],
+      "labels": [
+        "記録エンジン(watchページ常駐)",
+        "ポップアップ(応援レーン)",
+        "会場モード(standalone)"
       ]
     },
     {
