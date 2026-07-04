@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "君斗りんくの追憶のきらめき",
-  "version": "0.1.1053",
+  "version": "0.1.1054",
   "description": "ニコニコ生放送の応援コメントをこのPCに記録し、応援の可視化につなげます（開発識別子: nicolivelog）。",
   "icons": {
     "16": "images/logo/konta-yukkuri-icon-16.png",
@@ -92,7 +92,10 @@
         "sound/effect-gift.mp3",
         "sound/effect-ad.mp3",
         "sound/effect-rank-up.mp3",
-        "sound/effect-rank-down.mp3"
+        "sound/effect-rank-down.mp3",
+        "sound/effect-milestone-soft.mp3",
+        "sound/effect-milestone-hard.mp3",
+        "sound/effect-milestone-jackpot.mp3"
       ],
       "matches": [
         "https://*.nicovideo.jp/*",

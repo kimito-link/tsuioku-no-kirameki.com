@@ -63,6 +63,8 @@ import {
   isEffectSoundEnabled
 } from '../lib/storageKeys.js';
 import { EFFECT_SOUND_KINDS, playEffectSound } from '../lib/effectSoundPlayer.js';
+import { KEY_GIFT_EFFECT_DIAG } from '../lib/giftEffectDiagKey.js';
+import { makeInitialGiftEffectDiag, buildGiftEffectDiagSnapshot } from '../lib/giftEffectDiag.js';
 import { anonymousIdenticonDataUrl } from '../lib/anonymousIdenticon.js';
 import { tailStorageKey } from '../lib/commentTailBuffer.js';
 import { pickNewVenueSpeech, mergeSpeakersIntoVenueRows, liveFeedSpeechRows } from '../lib/venueSpeech.js';
@@ -2049,6 +2051,19 @@ export function mountVenueBarButton(options = {}) {
     void chrome.storage.local.set({ [KEY_VENUE_EFFECT_SOUND_PRESENCE]: now }).catch(() => {});
   };
 
+  // v0.1.1054: 「ギフトがちゃんと飛ぶか・タイミングよく音が出るか」を状態速報1枚で確認できる
+  //   ようにする計器(検知→演出→音の3段階カウンタ・観測のみ・描画/演出は変えない)。
+  const _giftEffectDiagCounters = makeInitialGiftEffectDiag();
+  let _giftEffectDiagLastWriteAt = 0;
+  const publishGiftEffectDiag = () => {
+    const now = Date.now();
+    if (now - _giftEffectDiagLastWriteAt < 3000) return; // 3秒 min-gap(他の診断と同型)。
+    _giftEffectDiagLastWriteAt = now;
+    _giftEffectDiagCounters.soundEnabled = _effectSoundEnabledCache;
+    const snap = buildGiftEffectDiagSnapshot(_giftEffectDiagCounters, now);
+    void chrome.storage.local.set({ [KEY_GIFT_EFFECT_DIAG]: snap }).catch(() => {});
+  };
+
   // 診断パネルの描画/開閉。buildVenueRoster(純関数・テスト済)で誰が顔付き席/点描かを表にする。
   const renderRosterPanel = () => {
     const roster = buildVenueRoster(lastRosterInput);
@@ -2551,20 +2566,34 @@ export function mountVenueBarButton(options = {}) {
     if (!text) return;
     const gift = parseGiftCommentText(text);
     if (gift) {
+      _giftEffectDiagCounters.giftDetected += 1;
+      _giftEffectDiagCounters.lastEventAt = Date.now();
       const p = resolveGiftProjectile(gift, 'gift');
       if (p) {
         launchGiftThrow(speech.speakerKey, p);
-        if (_effectSoundEnabledCache) playEffectSound(EFFECT_SOUND_KINDS.GIFT);
+        _giftEffectDiagCounters.giftThrown += 1;
+        if (_effectSoundEnabledCache) {
+          playEffectSound(EFFECT_SOUND_KINDS.GIFT);
+          _giftEffectDiagCounters.giftSoundPlayed += 1;
+        }
       }
+      publishGiftEffectDiag();
       return;
     }
     const ad = parseNicoadCommentText(text);
     if (ad) {
+      _giftEffectDiagCounters.adDetected += 1;
+      _giftEffectDiagCounters.lastEventAt = Date.now();
       const p = resolveGiftProjectile(ad, 'ad');
       if (p) {
         launchGiftThrow(speech.speakerKey, p);
-        if (_effectSoundEnabledCache) playEffectSound(EFFECT_SOUND_KINDS.AD);
+        _giftEffectDiagCounters.adThrown += 1;
+        if (_effectSoundEnabledCache) {
+          playEffectSound(EFFECT_SOUND_KINDS.AD);
+          _giftEffectDiagCounters.adSoundPlayed += 1;
+        }
       }
+      publishGiftEffectDiag();
     }
   };
 
@@ -2592,13 +2621,20 @@ export function mountVenueBarButton(options = {}) {
         thrownGiftEventKeys.clear();
         for (const k of arr.slice(-200)) thrownGiftEventKeys.add(k);
       }
+      _giftEffectDiagCounters.giftDetected += 1;
+      _giftEffectDiagCounters.lastEventAt = Date.now();
       const proj = resolveGiftProjectile({ item, point, itemId }, 'gift');
       // 起点: 席キーは venueSpeakerKey/venueParticipantKey と同じ `u:${uid}` 形にする
       //   (raw uid だと seatByKey に当たらず常に crowdBubbleAnchor へ落ちる)。
       if (proj) {
         launchGiftThrow(uid ? `u:${uid}` : '', proj);
-        if (_effectSoundEnabledCache) playEffectSound(EFFECT_SOUND_KINDS.GIFT);
+        _giftEffectDiagCounters.giftThrown += 1;
+        if (_effectSoundEnabledCache) {
+          playEffectSound(EFFECT_SOUND_KINDS.GIFT);
+          _giftEffectDiagCounters.giftSoundPlayed += 1;
+        }
       }
+      publishGiftEffectDiag();
     }
   };
 

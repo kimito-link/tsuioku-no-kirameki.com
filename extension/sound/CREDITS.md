@@ -15,6 +15,16 @@
 
 CC BY 4.0 につきクレジット表記が必須。ユーザー向け表示は `popup.html` フッター(OtoLogic へのリンク)で満たす。
 
+## v0.1.1054 で追加(コメント数マイルストーン=パチンコ演出の効果音)
+
+出典: [OtoLogic](https://otologic.jp/)（フリー効果音素材・[CC BY 4.0](https://creativecommons.org/licenses/by/4.0/deed.ja)）
+
+| ファイル | 元素材名 | 用途 |
+|---|---|---|
+| `effect-milestone-soft.mp3` | Phrase01-1 | コメント数が100/200件に到達したとき |
+| `effect-milestone-hard.mp3` | Winning_Bell01-05(Gentle) | コメント数が500件に到達したとき |
+| `effect-milestone-jackpot.mp3` | Winning_Bell01-01(Strong) | コメント数が1000件以上に到達したとき(大当たり) |
+
 ## 既存(v0.1.806〜)
 
 `voice-complete.mp3` / `voice-watch.mp3` — 出典未記録(過去実装分、要調査)。

@@ -7,12 +7,18 @@
 //   両方で音が鳴ると二重再生になる。会場を優先し、popup側は会場のプレゼンス(KEY_VENUE_EFFECT_SOUND_PRESENCE)
 //   が新鮮なら鳴らさない(shouldSkipEffectSoundForVenuePresence)。
 
+/** @typedef {'gift'|'ad'|'rank_up'|'rank_down'|'milestone_soft'|'milestone_hard'|'milestone_jackpot'} EffectSoundKind */
+
 /** 効果音の種類(ファイル名は呼び出し側がユーザー用意のmp3を extension/sound/ に置いて渡す)。 */
 export const EFFECT_SOUND_KINDS = Object.freeze({
   GIFT: 'gift',
   AD: 'ad',
   RANK_UP: 'rank_up',
-  RANK_DOWN: 'rank_down'
+  RANK_DOWN: 'rank_down',
+  // v0.1.1054: コメント数マイルストーン(パチンコ演出)。節目の大きさで3段階(Fable設計)。
+  MILESTONE_SOFT: 'milestone_soft', // 100/200件
+  MILESTONE_HARD: 'milestone_hard', // 500件
+  MILESTONE_JACKPOT: 'milestone_jackpot' // 1000件以上(大当たり)
 });
 
 /** 種類ごとの既定ファイルパス(manifest の web_accessible_resources に一致させること)。 */
@@ -20,7 +26,10 @@ export const EFFECT_SOUND_PATHS = Object.freeze({
   [EFFECT_SOUND_KINDS.GIFT]: 'sound/effect-gift.mp3',
   [EFFECT_SOUND_KINDS.AD]: 'sound/effect-ad.mp3',
   [EFFECT_SOUND_KINDS.RANK_UP]: 'sound/effect-rank-up.mp3',
-  [EFFECT_SOUND_KINDS.RANK_DOWN]: 'sound/effect-rank-down.mp3'
+  [EFFECT_SOUND_KINDS.RANK_DOWN]: 'sound/effect-rank-down.mp3',
+  [EFFECT_SOUND_KINDS.MILESTONE_SOFT]: 'sound/effect-milestone-soft.mp3',
+  [EFFECT_SOUND_KINDS.MILESTONE_HARD]: 'sound/effect-milestone-hard.mp3',
+  [EFFECT_SOUND_KINDS.MILESTONE_JACKPOT]: 'sound/effect-milestone-jackpot.mp3'
 });
 
 /** 同じ種類の効果音を連打しないための多重再生ガード間隔(ms)。 */

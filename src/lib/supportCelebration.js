@@ -18,7 +18,10 @@
  * @property {'standard'|'rinku_deluge'} [dropVariant]
  */
 
-export const COMMENT_MILESTONES = Object.freeze([10, 25, 50, 100, 200, 500, 1000]);
+// v0.1.1054: 1000件で打ち止めだったのを延長(実配信で2,866件等1000超が普通に出るため)。
+//   1000以上は dropCountForCommentMilestone/commentMilestoneDurationMs が既に `>= 1000` で
+//   まとめて扱う設計なので、この配列を伸ばすだけで新規ロジック無しに追従する。
+export const COMMENT_MILESTONES = Object.freeze([10, 25, 50, 100, 200, 500, 1000, 2000, 3000, 5000, 10000]);
 
 export const GIFT_MILESTONES = Object.freeze([1, 5, 10, 25, 50, 100]);
 

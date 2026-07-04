@@ -71,3 +71,17 @@ export function pikaBurstCountForTier(tier) {
   if (tier === 'soft') return 1;
   return 0;
 }
+
+/**
+ * v0.1.1054: pika tier(視覚のフラッシュ段階)を効果音の種類にそのまま対応させる。
+ *   'none' は無音(10/25/50件などの小さい節目・うるささ回避)。tier 判定自体は既存の
+ *   pikaTierForSupportCelebration/pikaTierForGiftBahamut を流用し、ここでは音への変換のみ行う。
+ * @param {CelebrationPikaTier} tier
+ * @returns {import('./effectSoundPlayer.js').EffectSoundKind|null}
+ */
+export function effectSoundKindForPikaTier(tier) {
+  if (tier === 'jackpot') return 'milestone_jackpot';
+  if (tier === 'hard') return 'milestone_hard';
+  if (tier === 'soft') return 'milestone_soft';
+  return null;
+}
