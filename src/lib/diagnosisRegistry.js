@@ -61,11 +61,19 @@ export const DIAGNOSIS_REGISTRY = Object.freeze([
   reg('ns-erank', 'イベント順位', 'northstar', 1, false),
   reg('avatar', 'アバター解決', 'northstar', 1, false),
   reg('lane-count', '応援レーン', 'northstar', 1, false),
+  // v0.1.1054: レジストリ・ドリフト是正(healthCells.js にはv1048から実装済みだったがここへの
+  //   登録漏れで completenessScore.js:76 の `if (!meta) continue` により黙って集計対象外だった。
+  //   completenessScore.test.js の網羅性テストが両セルを発生させる入力を渡していなかったため
+  //   見逃されていた=「網羅を強制するテスト」自体に穴があった実例)。
+  reg('lane-paint', 'レーン描画速度', 'northstar', 1, false),
+  // v0.1.1054: ギフト/広告の「検知→演出→効果音」整合(giftEffectDiag)。
+  reg('gift-effect', 'ギフト演出/効果音', 'northstar', 1, false),
   // ⑤ 会場・読み上げ(使用時のみセルが出る)。
   reg('voice-timing', '読み上げ追従', 'venue', 1, false),
   reg('voice-coverage', '読み上げ漏れ', 'venue', 1, false),
   reg('venue-broadcaster', '配信者混入', 'venue', 1, false),
-  reg('venue-seats', '会場座席', 'venue', 1, false)
+  reg('venue-seats', '会場座席', 'venue', 1, false),
+  reg('venue-seats-visible', '会場席の網羅', 'venue', 1, false)
 ]);
 
 /** id → 観点 の索引(集計で O(1) 参照)。 */

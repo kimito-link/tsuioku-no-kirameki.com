@@ -328,7 +328,7 @@ function buildLaneHealthCells(laneDiag) {
 
 /**
  * 健全度セル配列を作る。
- * @param {{ livesData?: any[], fastDiag?: any, voiceDiag?: any, venueSeatsDiag?: any, laneDiag?: any, nowMs?: number }} data
+ * @param {{ livesData?: any[], fastDiag?: any, voiceDiag?: any, venueSeatsDiag?: any, laneDiag?: any, giftEffectDiag?: any, nowMs?: number }} data
  * @returns {HealthCell[]}
  */
 export function buildHealthCells(data) {
@@ -513,7 +513,43 @@ export function buildHealthCells(data) {
   // 23. 応援レーン人数整合(素性 N / 表示 M)。laneDiag 未観測なら空=セルを足さない。
   for (const c of buildLaneHealthCells(data?.laneDiag)) cells.push(c);
 
+  // 24. v0.1.1054: ギフト/広告の「検知→演出→効果音」整合(giftEffectDiag 未観測なら空)。
+  for (const c of buildGiftEffectHealthCells(data?.giftEffectDiag)) cells.push(c);
+
   return cells;
+}
+
+/**
+ * ギフト/広告の検知はしたが投擲演出/効果音が出ていない取りこぼしを健全度セルに反映する。
+ *   これまで aiShareFullText(文章の対処カード)にだけ統合されており、completenessScore(数値の
+ *   達成率)には反映されない「片翼統合」だった(v0.1.1054 全機能診断監査で発見)。
+ * @param {import('./giftEffectDiag.js').GiftEffectDiagState|null|undefined} giftEffectDiag
+ * @returns {HealthCell[]}
+ */
+function buildGiftEffectHealthCells(giftEffectDiag) {
+  const snap = giftEffectDiag && typeof giftEffectDiag === 'object' ? giftEffectDiag : null;
+  if (!snap) return [];
+  const giftDetected = num(snap.giftDetected) || 0;
+  const adDetected = num(snap.adDetected) || 0;
+  if (giftDetected === 0 && adDetected === 0) return []; // 未観測=このセッションでギフト/広告が無かった
+
+  const soundEnabled = snap.soundEnabled !== false;
+  const giftThrown = num(snap.giftThrown) || 0;
+  const giftSoundPlayed = num(snap.giftSoundPlayed) || 0;
+  const adThrown = num(snap.adThrown) || 0;
+  const adSoundPlayed = num(snap.adSoundPlayed) || 0;
+
+  const throwMissing = Math.max(0, giftDetected - giftThrown) + Math.max(0, adDetected - adThrown);
+  const soundMissing = soundEnabled
+    ? Math.max(0, giftThrown - giftSoundPlayed) + Math.max(0, adThrown - adSoundPlayed)
+    : 0; // 効果音OFFは鳴らないのが正常=不合格にしない(誤診断防止)
+
+  const missing = throwMissing + soundMissing;
+  const detail =
+    missing > 0
+      ? `演出漏れ${throwMissing}件・音漏れ${soundMissing}件`
+      : `検知${giftDetected + adDetected}件 全て演出/音まで到達`;
+  return [stateCell('gift-effect', 'ギフト演出/効果音', missing > 0 ? 'warn' : 'ok', detail)];
 }
 
 /** テスト/SSR でも壊れない現在時刻(Date.now が無い環境のフォールバック)。 */

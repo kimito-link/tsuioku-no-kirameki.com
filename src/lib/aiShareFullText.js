@@ -177,7 +177,7 @@ export function buildAiShareFullText({ overviewText, livesData, fastDiag, popupD
     // 網羅的完全性診断(PageSpeed 型): 全観点をレジストリで網羅し、カテゴリ別スコア+✅完璧判定+
     //   完璧まであと何項目+対象外N項目を出す。観点追加=diagnosisRegistry に1行=抜けが構造的に出ない。
     try {
-      const cells = buildHealthCells({ livesData, fastDiag, voiceDiag, venueSeatsDiag, laneDiag, nowMs: Date.now() });
+      const cells = buildHealthCells({ livesData, fastDiag, voiceDiag, venueSeatsDiag, laneDiag, giftEffectDiag, nowMs: Date.now() });
       const score = buildCompletenessScore(cells);
       const scoreLines = formatCompletenessScoreLines(score);
       if (scoreLines.length) { for (const l of scoreLines) lines.push(l); lines.push(''); }
@@ -193,7 +193,7 @@ export function buildAiShareFullText({ overviewText, livesData, fastDiag, popupD
     // v0.1.846: 総合判定を概要に1行併記。満点=「異常ゼロ」(進行中/対象外は正常扱い)。
     //   ユーザー要望「全部100%になるまで=修復いらないぐらい完全に」への回答=異常が無ければ満点。
     try {
-      const verdict = summarizeHealthVerdict(buildHealthCells({ livesData, fastDiag, voiceDiag, venueSeatsDiag, laneDiag }));
+      const verdict = summarizeHealthVerdict(buildHealthCells({ livesData, fastDiag, voiceDiag, venueSeatsDiag, laneDiag, giftEffectDiag }));
       const vmark = verdict.level === 'ok' ? '🟢' : verdict.level === 'warn' ? '🟡' : '🔴';
       lines.push(`総合判定: ${vmark} ${verdict.text}`);
     } catch {
