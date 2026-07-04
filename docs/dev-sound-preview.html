@@ -1,0 +1,58 @@
+<!doctype html><html lang="ja"><head><meta charset="utf-8">
+<title>効果音 試聴(開発用)</title>
+<style>
+body{font-family:sans-serif;max-width:860px;margin:24px auto;padding:0 12px;background:#1b1b22;color:#eee}
+h1{font-size:18px} .note{color:#aaa;font-size:12px}
+table{border-collapse:collapse;width:100%} td,th{border-bottom:1px solid #333;padding:6px 8px;font-size:13px;text-align:left}
+button{font-size:15px;padding:2px 12px;cursor:pointer;border-radius:6px;border:1px solid #555;background:#2c2c38;color:#eee}
+button:hover{background:#3a3a4c} .u{color:#9fd} .d{color:#fd9;text-align:right}
+</style></head><body>
+<h1>効果音 試聴ページ(開発用・拡張には同梱しない)</h1>
+<p class="note">実再生と同じ音量(ギフト系1.0/その他0.7)で鳴ります。file:// でこのまま開けます。音源を差し替えたら <code>npm run sound:preview</code> で再生成。生成: 2026-07-04T10:45:57.522Z</p>
+<table><tr><th></th><th>ファイル</th><th>用途</th><th>長さ</th></tr>
+<tr><td><button data-src="../extension/sound/effect-ad.mp3" data-vol="0.7">▶</button></td><td>effect-ad.mp3</td><td class="u">広告・音量0.7</td><td class="d" data-dur="../extension/sound/effect-ad.mp3">…</td></tr>
+<tr><td><button data-src="../extension/sound/effect-gift.mp3" data-vol="1">▶</button></td><td>effect-gift.mp3</td><td class="u">ギフト(ティア不明時のフォールバック)・音量1.0</td><td class="d" data-dur="../extension/sound/effect-gift.mp3">…</td></tr>
+<tr><td><button data-src="../extension/sound/effect-milestone-hard.mp3" data-vol="0.7">▶</button></td><td>effect-milestone-hard.mp3</td><td class="u">(旧)節目単一音・音量0.7</td><td class="d" data-dur="../extension/sound/effect-milestone-hard.mp3">…</td></tr>
+<tr><td><button data-src="../extension/sound/effect-milestone-jackpot.mp3" data-vol="0.7">▶</button></td><td>effect-milestone-jackpot.mp3</td><td class="u">(旧)節目単一音・音量0.7</td><td class="d" data-dur="../extension/sound/effect-milestone-jackpot.mp3">…</td></tr>
+<tr><td><button data-src="../extension/sound/effect-milestone-soft.mp3" data-vol="0.7">▶</button></td><td>effect-milestone-soft.mp3</td><td class="u">(旧)節目単一音・音量0.7</td><td class="d" data-dur="../extension/sound/effect-milestone-soft.mp3">…</td></tr>
+<tr><td><button data-src="../extension/sound/effect-rank-down.mp3" data-vol="0.7">▶</button></td><td>effect-rank-down.mp3</td><td class="u">イベント順位DOWN・音量0.7</td><td class="d" data-dur="../extension/sound/effect-rank-down.mp3">…</td></tr>
+<tr><td><button data-src="../extension/sound/effect-rank-up.mp3" data-vol="0.7">▶</button></td><td>effect-rank-up.mp3</td><td class="u">イベント順位UP・音量0.7</td><td class="d" data-dur="../extension/sound/effect-rank-up.mp3">…</td></tr>
+<tr><td><button data-src="../extension/sound/voice-complete.mp3" data-vol="0.7">▶</button></td><td>voice-complete.mp3</td><td class="u"></td><td class="d" data-dur="../extension/sound/voice-complete.mp3">…</td></tr>
+<tr><td><button data-src="../extension/sound/voice-watch.mp3" data-vol="0.7">▶</button></td><td>voice-watch.mp3</td><td class="u"></td><td class="d" data-dur="../extension/sound/voice-watch.mp3">…</td></tr>
+<tr><td><button data-src="../extension/sound/tiers/gift-large-1.mp3" data-vol="1">▶</button></td><td>gift-large-1.mp3</td><td class="u">ギフト大・音量1.0</td><td class="d" data-dur="../extension/sound/tiers/gift-large-1.mp3">…</td></tr>
+<tr><td><button data-src="../extension/sound/tiers/gift-large-2.mp3" data-vol="1">▶</button></td><td>gift-large-2.mp3</td><td class="u">ギフト大・音量1.0</td><td class="d" data-dur="../extension/sound/tiers/gift-large-2.mp3">…</td></tr>
+<tr><td><button data-src="../extension/sound/tiers/gift-large-3.mp3" data-vol="1">▶</button></td><td>gift-large-3.mp3</td><td class="u">ギフト大・音量1.0</td><td class="d" data-dur="../extension/sound/tiers/gift-large-3.mp3">…</td></tr>
+<tr><td><button data-src="../extension/sound/tiers/gift-medium-1.mp3" data-vol="1">▶</button></td><td>gift-medium-1.mp3</td><td class="u">ギフト中・音量1.0</td><td class="d" data-dur="../extension/sound/tiers/gift-medium-1.mp3">…</td></tr>
+<tr><td><button data-src="../extension/sound/tiers/gift-medium-2.mp3" data-vol="1">▶</button></td><td>gift-medium-2.mp3</td><td class="u">ギフト中・音量1.0</td><td class="d" data-dur="../extension/sound/tiers/gift-medium-2.mp3">…</td></tr>
+<tr><td><button data-src="../extension/sound/tiers/gift-medium-3.mp3" data-vol="1">▶</button></td><td>gift-medium-3.mp3</td><td class="u">ギフト中・音量1.0</td><td class="d" data-dur="../extension/sound/tiers/gift-medium-3.mp3">…</td></tr>
+<tr><td><button data-src="../extension/sound/tiers/gift-mega-1.mp3" data-vol="1">▶</button></td><td>gift-mega-1.mp3</td><td class="u">ギフト特大・音量1.0</td><td class="d" data-dur="../extension/sound/tiers/gift-mega-1.mp3">…</td></tr>
+<tr><td><button data-src="../extension/sound/tiers/gift-mega-2.mp3" data-vol="1">▶</button></td><td>gift-mega-2.mp3</td><td class="u">ギフト特大・音量1.0</td><td class="d" data-dur="../extension/sound/tiers/gift-mega-2.mp3">…</td></tr>
+<tr><td><button data-src="../extension/sound/tiers/gift-mega-3.mp3" data-vol="1">▶</button></td><td>gift-mega-3.mp3</td><td class="u">ギフト特大・音量1.0</td><td class="d" data-dur="../extension/sound/tiers/gift-mega-3.mp3">…</td></tr>
+<tr><td><button data-src="../extension/sound/tiers/gift-small-1.mp3" data-vol="1">▶</button></td><td>gift-small-1.mp3</td><td class="u">ギフト小(〜100pt級)・音量1.0</td><td class="d" data-dur="../extension/sound/tiers/gift-small-1.mp3">…</td></tr>
+<tr><td><button data-src="../extension/sound/tiers/gift-small-2.mp3" data-vol="1">▶</button></td><td>gift-small-2.mp3</td><td class="u">ギフト小(〜100pt級)・音量1.0</td><td class="d" data-dur="../extension/sound/tiers/gift-small-2.mp3">…</td></tr>
+<tr><td><button data-src="../extension/sound/tiers/gift-small-3.mp3" data-vol="1">▶</button></td><td>gift-small-3.mp3</td><td class="u">ギフト小(〜100pt級)・音量1.0</td><td class="d" data-dur="../extension/sound/tiers/gift-small-3.mp3">…</td></tr>
+<tr><td><button data-src="../extension/sound/tiers/milestone-hard-1.mp3" data-vol="0.7">▶</button></td><td>milestone-hard-1.mp3</td><td class="u">コメント節目500件・音量0.7</td><td class="d" data-dur="../extension/sound/tiers/milestone-hard-1.mp3">…</td></tr>
+<tr><td><button data-src="../extension/sound/tiers/milestone-hard-2.mp3" data-vol="0.7">▶</button></td><td>milestone-hard-2.mp3</td><td class="u">コメント節目500件・音量0.7</td><td class="d" data-dur="../extension/sound/tiers/milestone-hard-2.mp3">…</td></tr>
+<tr><td><button data-src="../extension/sound/tiers/milestone-hard-3.mp3" data-vol="0.7">▶</button></td><td>milestone-hard-3.mp3</td><td class="u">コメント節目500件・音量0.7</td><td class="d" data-dur="../extension/sound/tiers/milestone-hard-3.mp3">…</td></tr>
+<tr><td><button data-src="../extension/sound/tiers/milestone-jackpot-1.mp3" data-vol="0.7">▶</button></td><td>milestone-jackpot-1.mp3</td><td class="u">コメント節目1000件+(大当たり)・音量0.7</td><td class="d" data-dur="../extension/sound/tiers/milestone-jackpot-1.mp3">…</td></tr>
+<tr><td><button data-src="../extension/sound/tiers/milestone-jackpot-2.mp3" data-vol="0.7">▶</button></td><td>milestone-jackpot-2.mp3</td><td class="u">コメント節目1000件+(大当たり)・音量0.7</td><td class="d" data-dur="../extension/sound/tiers/milestone-jackpot-2.mp3">…</td></tr>
+<tr><td><button data-src="../extension/sound/tiers/milestone-jackpot-3.mp3" data-vol="0.7">▶</button></td><td>milestone-jackpot-3.mp3</td><td class="u">コメント節目1000件+(大当たり)・音量0.7</td><td class="d" data-dur="../extension/sound/tiers/milestone-jackpot-3.mp3">…</td></tr>
+<tr><td><button data-src="../extension/sound/tiers/milestone-soft-1.mp3" data-vol="0.7">▶</button></td><td>milestone-soft-1.mp3</td><td class="u">コメント節目100/200件・音量0.7</td><td class="d" data-dur="../extension/sound/tiers/milestone-soft-1.mp3">…</td></tr>
+<tr><td><button data-src="../extension/sound/tiers/milestone-soft-2.mp3" data-vol="0.7">▶</button></td><td>milestone-soft-2.mp3</td><td class="u">コメント節目100/200件・音量0.7</td><td class="d" data-dur="../extension/sound/tiers/milestone-soft-2.mp3">…</td></tr>
+<tr><td><button data-src="../extension/sound/tiers/milestone-soft-3.mp3" data-vol="0.7">▶</button></td><td>milestone-soft-3.mp3</td><td class="u">コメント節目100/200件・音量0.7</td><td class="d" data-dur="../extension/sound/tiers/milestone-soft-3.mp3">…</td></tr>
+<tr><td><button data-src="../extension/sound/tiers/reach-1.mp3" data-vol="0.7">▶</button></td><td>reach-1.mp3</td><td class="u">リーチ(Phase2で配線予定)・音量0.7</td><td class="d" data-dur="../extension/sound/tiers/reach-1.mp3">…</td></tr>
+<tr><td><button data-src="../extension/sound/tiers/reach-2.mp3" data-vol="0.7">▶</button></td><td>reach-2.mp3</td><td class="u">リーチ(Phase2で配線予定)・音量0.7</td><td class="d" data-dur="../extension/sound/tiers/reach-2.mp3">…</td></tr>
+</table>
+<script>
+let cur=null;
+document.querySelectorAll('button[data-src]').forEach(b=>{
+  b.addEventListener('click',()=>{
+    if(cur){try{cur.pause()}catch(e){}}
+    const a=new Audio(b.dataset.src); a.volume=Number(b.dataset.vol)||0.7; cur=a; a.play();
+  });
+});
+document.querySelectorAll('td[data-dur]').forEach(td=>{
+  const a=new Audio(td.dataset.dur);
+  a.addEventListener('loadedmetadata',()=>{td.textContent=a.duration.toFixed(2)+'s';});
+});
+</script></body></html>
