@@ -32,6 +32,75 @@ export const EFFECT_SOUND_PATHS = Object.freeze({
   [EFFECT_SOUND_KINDS.MILESTONE_JACKPOT]: 'sound/effect-milestone-jackpot.mp3'
 });
 
+/**
+ * v0.1.1059(パチンコ台的バリエーション): 種類ごとに複数バリエーションを持つ場合の候補一覧。
+ *   ユーザー要望「1つだけじゃなくパチンコみたいにたくさん欲しい」への対応。同じイベントでも
+ *   毎回違う音が鳴るよう、ここに列挙したファイルからランダムに1本を選んで再生する。
+ *   ここに載っていない種類(gift/ad/rank_up/rank_down)は従来どおり EFFECT_SOUND_PATHS の
+ *   単一ファイルにフォールバックする(後方互換・破壊的変更なし)。
+ * @type {Readonly<Record<string, ReadonlyArray<string>>>}
+ */
+export const EFFECT_SOUND_VARIANT_PATHS = Object.freeze({
+  [EFFECT_SOUND_KINDS.MILESTONE_SOFT]: Object.freeze([
+    'sound/tiers/milestone-soft-1.mp3',
+    'sound/tiers/milestone-soft-2.mp3',
+    'sound/tiers/milestone-soft-3.mp3'
+  ]),
+  [EFFECT_SOUND_KINDS.MILESTONE_HARD]: Object.freeze([
+    'sound/tiers/milestone-hard-1.mp3',
+    'sound/tiers/milestone-hard-2.mp3',
+    'sound/tiers/milestone-hard-3.mp3'
+  ]),
+  [EFFECT_SOUND_KINDS.MILESTONE_JACKPOT]: Object.freeze([
+    'sound/tiers/milestone-jackpot-1.mp3',
+    'sound/tiers/milestone-jackpot-2.mp3',
+    'sound/tiers/milestone-jackpot-3.mp3'
+  ]),
+  // v0.1.1059: ギフト金額帯別バリエーション(既存の単一 gift 種別とは別に、point 帯を
+  //   意識する呼び出し元が使える追加の種類。giftThrowProjectile.js の tier(small/medium/large/mega)
+  //   と対応させる想定・呼び出し元の配線は別実装で行う)。
+  gift_small: Object.freeze(['sound/tiers/gift-small-1.mp3', 'sound/tiers/gift-small-2.mp3', 'sound/tiers/gift-small-3.mp3']),
+  gift_medium: Object.freeze(['sound/tiers/gift-medium-1.mp3', 'sound/tiers/gift-medium-2.mp3', 'sound/tiers/gift-medium-3.mp3']),
+  gift_large: Object.freeze(['sound/tiers/gift-large-1.mp3', 'sound/tiers/gift-large-2.mp3', 'sound/tiers/gift-large-3.mp3']),
+  gift_mega: Object.freeze(['sound/tiers/gift-mega-1.mp3', 'sound/tiers/gift-mega-2.mp3', 'sound/tiers/gift-mega-3.mp3']),
+  reach: Object.freeze(['sound/tiers/reach-1.mp3', 'sound/tiers/reach-2.mp3'])
+});
+
+/**
+ * v0.1.1059: ギフトの金額帯(giftThrowProjectile.js の tier)を、対応する効果音バリエーション
+ *   カテゴリのキーに変換する純関数。tier が不明/未対応なら既定の 'gift'(単一ファイル)を返す。
+ * @param {string|undefined|null} tier 'small'|'medium'|'large'|'mega'
+ * @returns {string}
+ */
+export function effectSoundKindForGiftTier(tier) {
+  switch (tier) {
+    case 'small': return 'gift_small';
+    case 'medium': return 'gift_medium';
+    case 'large': return 'gift_large';
+    case 'mega': return 'gift_mega';
+    default: return EFFECT_SOUND_KINDS.GIFT;
+  }
+}
+
+/**
+ * 種類に対応するバリエーション一覧からランダムに1本のパスを選ぶ純関数(テスト用に rng を注入可能)。
+ * バリエーションが無い種類は EFFECT_SOUND_PATHS の単一パスにフォールバックする。
+ * @param {string} kind
+ * @param {{ variantPaths?: Readonly<Record<string, ReadonlyArray<string>>>, paths?: Record<string, string>, rng?: () => number }} [deps]
+ * @returns {string|undefined}
+ */
+export function resolveEffectSoundPath(kind, deps = {}) {
+  const variantPaths = /** @type {Record<string, ReadonlyArray<string>>} */ (deps.variantPaths || EFFECT_SOUND_VARIANT_PATHS);
+  const variants = variantPaths[String(kind)];
+  if (Array.isArray(variants) && variants.length > 0) {
+    const rng = typeof deps.rng === 'function' ? deps.rng : Math.random;
+    const idx = Math.floor(rng() * variants.length) % variants.length;
+    return variants[idx];
+  }
+  const paths = /** @type {Record<string, string>} */ (deps.paths || EFFECT_SOUND_PATHS);
+  return paths[String(kind)];
+}
+
 /** 同じ種類の効果音を連打しないための多重再生ガード間隔(ms)。 */
 export const EFFECT_SOUND_GUARD_MS = 600;
 
@@ -67,21 +136,24 @@ const _lastPlayedAt = Object.create(null);
 
 /**
  * 効果音を1つ再生する。存在しない種類・ガード未通過・再生失敗は全て静かに no-op。
- * @param {string} kind EFFECT_SOUND_KINDS のいずれか
+ * @param {string} kind EFFECT_SOUND_KINDS のいずれか(またはEFFECT_SOUND_VARIANT_PATHSのキー)
  * @param {{
  *   nowMs?: number,
  *   volume?: number,
  *   audioFactory?: (url: string) => HTMLAudioElement,
  *   getUrl?: (path: string) => string,
  *   guardMs?: number,
- *   paths?: Record<string, string>
- * }} [deps] テスト用に時刻・Audio 生成・URL 解決・ファイルパスを差し替え可能(既定は実環境)。
+ *   paths?: Record<string, string>,
+ *   variantPaths?: Record<string, string[]>,
+ *   rng?: () => number
+ * }} [deps] テスト用に時刻・Audio 生成・URL 解決・ファイルパス・乱数を差し替え可能(既定は実環境)。
  * @returns {void}
  */
 export function playEffectSound(kind, deps = {}) {
   try {
-    const paths = /** @type {Record<string, string>} */ (deps.paths || EFFECT_SOUND_PATHS);
-    const path = paths[String(kind)];
+    // v0.1.1059: バリエーションがある種類はランダムに1本選ぶ(パチンコ台的に毎回違う音)。
+    //   無い種類は従来どおり EFFECT_SOUND_PATHS の単一パス(後方互換)。
+    const path = resolveEffectSoundPath(kind, deps);
     if (!path) return;
 
     const nowMs = typeof deps.nowMs === 'number' ? deps.nowMs : Date.now();

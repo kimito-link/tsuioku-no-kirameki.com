@@ -62,7 +62,7 @@ import {
   KEY_VENUE_EFFECT_SOUND_PRESENCE,
   isEffectSoundEnabled
 } from '../lib/storageKeys.js';
-import { EFFECT_SOUND_KINDS, playEffectSound } from '../lib/effectSoundPlayer.js';
+import { EFFECT_SOUND_KINDS, playEffectSound, effectSoundKindForGiftTier } from '../lib/effectSoundPlayer.js';
 import { KEY_GIFT_EFFECT_DIAG } from '../lib/giftEffectDiagKey.js';
 import { makeInitialGiftEffectDiag, buildGiftEffectDiagSnapshot } from '../lib/giftEffectDiag.js';
 import { anonymousIdenticonDataUrl } from '../lib/anonymousIdenticon.js';
@@ -2580,7 +2580,8 @@ export function mountVenueBarButton(options = {}) {
         if (launchGiftThrow(speech.speakerKey, p)) {
           _giftEffectDiagCounters.giftThrown += 1;
           if (_effectSoundEnabledCache) {
-            playEffectSound(EFFECT_SOUND_KINDS.GIFT);
+            // v0.1.1059: 金額帯(tier)ごとにバリエーションのある音からランダムに1本鳴らす。
+            playEffectSound(effectSoundKindForGiftTier(p.tier));
             _giftEffectDiagCounters.giftSoundPlayed += 1;
           }
         }
@@ -2639,7 +2640,8 @@ export function mountVenueBarButton(options = {}) {
         launchGiftThrow(uid ? `u:${uid}` : '', proj);
         _giftEffectDiagCounters.giftThrown += 1;
         if (_effectSoundEnabledCache) {
-          playEffectSound(EFFECT_SOUND_KINDS.GIFT);
+          // v0.1.1059: 金額帯(tier)ごとにバリエーションのある音からランダムに1本鳴らす。
+          playEffectSound(effectSoundKindForGiftTier(proj.tier));
           _giftEffectDiagCounters.giftSoundPlayed += 1;
         }
       }

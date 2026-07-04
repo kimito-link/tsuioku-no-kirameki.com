@@ -652,11 +652,12 @@
   - `src/lib/statusTrendKey.js`
   - `src/extension/status-entry.js`
   - `src/lib/statusActionAdvisor.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 110</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 111</summary>
 
 - `app/app.js` — スマホ閲覧用 status Web 版。
 - `app/live-view.js` — 純Web版 応援ライブビュー（拡張なし・PC/スマホ共通）。
 - `extension/background.js` — MV3 Service Worker
+- `scripts/build-sounds.mjs` — sound-src/(CC0原素材)から extension/sound/ の効果音mp3を組み立てる。
 - `scripts/build-watch.mjs` — watch では起動時刻を埋める（rebuild 毎に再 import される訳ではないので、
 - `scripts/build.mjs` — .env を読み込む(status の共有キー NL_STATUS_INGEST_KEY / NL_STATUS_VIEW_TOKEN は .env から注入)。
 - `scripts/capture-store-screenshots.mjs` — Chrome ウェブストア用スクショ自動撮影
@@ -769,7 +770,7 @@
 
 ## 🧬 修正系譜マップ(この系統のバグを過去にどう直したか)
 
-> changelog 全 393 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
+> changelog 全 394 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
 
 ### 💾 記録件数 (61版)
 - `v0.1.1050` 2026-07-03 — 状態速報のパリティ判定に会場(④)を追加=POPと会場の人数ズレを検知
@@ -1189,7 +1190,8 @@
 - `v0.1.713` 2026-06-13 — 会場モードを明るくして発言を吹き出し表示
 - `v0.1.711` 2026-06-13 — 会場モードで発言を吹き出し表示
 
-### 🎁 ギフト (69版)
+### 🎁 ギフト (70版)
+- `v0.1.1059` 2026-07-04 — ギフト効果音を刷新+毎回違う音のバリエーションを追加
 - `v0.1.1058` 2026-07-04 — ギフト取りこぼし修正+コメント数マイルストーン診断を新設
 - `v0.1.1057` 2026-07-04 — ギフト診断の対処候補への統合漏れを修正+内部構造の整理
 - `v0.1.1055` 2026-07-04 — 診断シートの網羅漏れ2件を修正+ギフト診断を数値化

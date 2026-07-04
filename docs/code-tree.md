@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 2 / 604 件
+## ⚠️ 役割コメントが無いソース 2 / 605 件
 - `src/lib/reportPreviewPublish.js`
 - `src/lib/venueLaneBuckets.js`
 
@@ -316,7 +316,7 @@
   - `surechigai-lite-improvement-plan.md`
   - `ux-tdd-hypothesis-matrix.md`
   - `visual-explainer.md`
-- 📁 **extension/** (107)
+- 📁 **extension/** (130)
   - 📁 **images/** (87)
     - 📁 **avatar-parts/** (22)
       - `cheek-0.png`
@@ -414,7 +414,31 @@
         - `tanuki-yukkuri-smile-mouth-open.thumb128.png`
     - `nico-retro-tv-placeholder.svg`
     - `toumeilink.png`
-  - 📁 **sound/** (10)
+  - 📁 **sound/** (33)
+    - 📁 **tiers/** (23)
+      - `gift-large-1.mp3`
+      - `gift-large-2.mp3`
+      - `gift-large-3.mp3`
+      - `gift-medium-1.mp3`
+      - `gift-medium-2.mp3`
+      - `gift-medium-3.mp3`
+      - `gift-mega-1.mp3`
+      - `gift-mega-2.mp3`
+      - `gift-mega-3.mp3`
+      - `gift-small-1.mp3`
+      - `gift-small-2.mp3`
+      - `gift-small-3.mp3`
+      - `milestone-hard-1.mp3`
+      - `milestone-hard-2.mp3`
+      - `milestone-hard-3.mp3`
+      - `milestone-jackpot-1.mp3`
+      - `milestone-jackpot-2.mp3`
+      - `milestone-jackpot-3.mp3`
+      - `milestone-soft-1.mp3`
+      - `milestone-soft-2.mp3`
+      - `milestone-soft-3.mp3`
+      - `reach-1.mp3`
+      - `reach-2.mp3`
     - `CREDITS.md`
     - `effect-ad.mp3`
     - `effect-gift.mp3`
@@ -435,10 +459,11 @@
   - `status-guard.js` — 状態速報ページ(status.html)の「何があっても開く」保険。
   - `status.html`
   - `venue.html`
-- 📁 **scripts/** (31)
+- 📁 **scripts/** (32)
   - 📁 **xserver/** (2)
     - `github-webhook-pull.php.example`
     - `webhook-git-pull-for-upload.php`
+  - `build-sounds.mjs` — sound-src/(CC0原素材)から extension/sound/ の効果音mp3を組み立てる。
   - `build-watch.mjs` — watch では起動時刻を埋める（rebuild 毎に再 import される訳ではないので、
   - `build.mjs` — .env を読み込む(status の共有キー NL_STATUS_INGEST_KEY / NL_STATUS_VIEW_TOKEN は .env から注入)。
   - `capture-store-screenshots.mjs` — Chrome ウェブストア用スクショ自動撮影
@@ -468,6 +493,35 @@
   - `vendor-visual-explainer.mjs` — Vendors nicobailon/visual-explainer (MIT) into .cursor/skills/visual-explainer/
   - `verify-bump.mjs` — extension bump 後の整合性チェッカー
   - `write-extension-placeholder-icons.mjs` — リポジトリに 256px アイコンしか無い環境向け: manifest 用の小さめ PNG を生成する。
+- 📁 **sound-src/** (27)
+  - 📁 **tiers/** (23)
+    - `gift-large-1.mp3`
+    - `gift-large-2.mp3`
+    - `gift-large-3.mp3`
+    - `gift-medium-1.mp3`
+    - `gift-medium-2.mp3`
+    - `gift-medium-3.mp3`
+    - `gift-mega-1.mp3`
+    - `gift-mega-2.mp3`
+    - `gift-mega-3.mp3`
+    - `gift-small-1.mp3`
+    - `gift-small-2.mp3`
+    - `gift-small-3.mp3`
+    - `milestone-hard-1.mp3`
+    - `milestone-hard-2.mp3`
+    - `milestone-hard-3.mp3`
+    - `milestone-jackpot-1.mp3`
+    - `milestone-jackpot-2.mp3`
+    - `milestone-jackpot-3.mp3`
+    - `milestone-soft-1.mp3`
+    - `milestone-soft-2.mp3`
+    - `milestone-soft-3.mp3`
+    - `reach-1.mp3`
+    - `reach-2.mp3`
+  - `SOURCES.md`
+  - `gift-impact.mp3`
+  - `gift-sparkle.mp3`
+  - `gift-whoosh.mp3`
 - 📁 **src/** (1275)
   - 📁 **data/** (6)
     - 📁 **acquirers/** (2)
