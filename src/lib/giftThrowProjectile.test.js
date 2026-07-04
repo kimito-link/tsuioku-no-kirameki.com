@@ -24,8 +24,14 @@ describe('resolveGiftProjectile', () => {
     expect(resolveGiftProjectile({ sender: 'B', point: 0 }, 'ad')).toBeNull();
   });
 
-  it('item 空のギフトは null(無効)', () => {
-    expect(resolveGiftProjectile({ sender: 'A', item: '', point: 10 }, 'gift')).toBeNull();
+  it('v0.1.1058: item 空のギフトは汎用ラベル「ギフト」で投げる(itemName欠落でも取りこぼさない)', () => {
+    const p = resolveGiftProjectile({ sender: 'A', item: '', point: 10 }, 'gift');
+    expect(p).toMatchObject({ kind: 'gift', emoji: '🎁', label: 'ギフト', point: 10, tier: 'small' });
+  });
+
+  it('v0.1.1058: item 未指定のギフトも汎用ラベル「ギフト」で投げる', () => {
+    const p = resolveGiftProjectile({ sender: 'A', point: 10 }, 'gift');
+    expect(p).toMatchObject({ kind: 'gift', emoji: '🎁', label: 'ギフト' });
   });
 
   it('帯の閾値: 50/500/5000 で medium/large/mega', () => {

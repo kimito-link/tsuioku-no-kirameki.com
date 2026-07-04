@@ -96,12 +96,14 @@ export function resolveGiftProjectile(parsed, kind) {
     };
   }
   // gift
+  // v0.1.1058: NDGR構造化イベントは itemName が実測約50%欠落する(ワイヤーレベルの部分欠落・
+  //   ndgrDecode.js の実機診断コメント参照)。itemName が空でも「反応した」ことが太鼓の達人的な
+  //   応答性の核であるため、汎用ラベル「ギフト」で投げる(検知と演出の一致率を優先・Fable推奨)。
   const item = String(parsed.item || '').trim();
-  if (!item) return null;
   return {
     kind: 'gift',
     emoji: '🎁',
-    label: clampLabel(item),
+    label: item ? clampLabel(item) : 'ギフト',
     point,
     tier,
     durationMs,

@@ -71,6 +71,10 @@ export const DIAGNOSIS_REGISTRY = Object.freeze([
   // v0.1.1056: パリティ根本修正(①②の世代同期)自体が動いているかの自己診断。
   reg('mirror-gen-stamp', '鏡世代スタンプ', 'render', 1, false),
   reg('preview-gen-sync', '②世代同期', 'render', 1, false),
+  // v0.1.1058: コメント数マイルストーンの「検知→演出→効果音」整合(milestoneEffectDiag)。
+  //   giftEffectDiag(v0.1.1054)と同型の片翼統合を繰り返さないよう、healthCells.js への
+  //   セル追加と同時にここへも登録する。
+  reg('milestone-effect', 'マイルストーン演出/効果音', 'northstar', 1, false),
   // ⑤ 会場・読み上げ(使用時のみセルが出る)。
   reg('voice-timing', '読み上げ追従', 'venue', 1, false),
   reg('voice-coverage', '読み上げ漏れ', 'venue', 1, false),

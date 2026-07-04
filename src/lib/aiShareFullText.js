@@ -34,6 +34,7 @@ import { buildHealthCells, summarizeHealthVerdict } from './healthCells.js';
 import { buildCompletenessScore, formatCompletenessScoreLines } from './completenessScore.js';
 import { buildVoiceDiagLine } from './voiceDiag.js';
 import { buildGiftEffectDiagLines, giftEffectDiagToActionCards } from './giftEffectDiag.js';
+import { buildMilestoneEffectDiagLines, milestoneEffectDiagToActionCards } from './milestoneEffectDiag.js';
 import { reportPreviewCtxFromFastDiag } from './reportPreviewCtx.js';
 import { buildReportPreviewLines } from './reportPreview.js';
 import { buildStatusActions } from './statusActionAdvisor.js';
@@ -67,7 +68,7 @@ export function formatRefreshPerfLine(refreshPerf) {
  * @param {any} args
  * @returns {string}
  */
-export function buildAiShareFullText({ overviewText, livesData, fastDiag, popupDiag, voiceDiag, venueSeatsDiag, laneDiag, laneMirror, reportPreview, trendFindings, jsonBlob, currentLiveId, publishKeys, publishOutcomeRec, previewRenderAck, refreshPerf, giftEffectDiag }) {
+export function buildAiShareFullText({ overviewText, livesData, fastDiag, popupDiag, voiceDiag, venueSeatsDiag, laneDiag, laneMirror, reportPreview, trendFindings, jsonBlob, currentLiveId, publishKeys, publishOutcomeRec, previewRenderAck, refreshPerf, giftEffectDiag, milestoneEffectDiag }) {
   const lines = [];
   lines.push('## 君斗りんくの追憶のきらめき 状態速報');
   lines.push(`生成: ${new Date().toISOString()}`);
@@ -179,7 +180,7 @@ export function buildAiShareFullText({ overviewText, livesData, fastDiag, popupD
     // 網羅的完全性診断(PageSpeed 型): 全観点をレジストリで網羅し、カテゴリ別スコア+✅完璧判定+
     //   完璧まであと何項目+対象外N項目を出す。観点追加=diagnosisRegistry に1行=抜けが構造的に出ない。
     try {
-      const cells = buildHealthCells({ livesData, fastDiag, voiceDiag, venueSeatsDiag, laneDiag, giftEffectDiag, previewRenderAck, laneMirror, nowMs: Date.now() });
+      const cells = buildHealthCells({ livesData, fastDiag, voiceDiag, venueSeatsDiag, laneDiag, giftEffectDiag, milestoneEffectDiag, previewRenderAck, laneMirror, nowMs: Date.now() });
       const score = buildCompletenessScore(cells);
       const scoreLines = formatCompletenessScoreLines(score);
       if (scoreLines.length) { for (const l of scoreLines) lines.push(l); lines.push(''); }
@@ -195,7 +196,7 @@ export function buildAiShareFullText({ overviewText, livesData, fastDiag, popupD
     // v0.1.846: 総合判定を概要に1行併記。満点=「異常ゼロ」(進行中/対象外は正常扱い)。
     //   ユーザー要望「全部100%になるまで=修復いらないぐらい完全に」への回答=異常が無ければ満点。
     try {
-      const verdict = summarizeHealthVerdict(buildHealthCells({ livesData, fastDiag, voiceDiag, venueSeatsDiag, laneDiag, giftEffectDiag, previewRenderAck, laneMirror }));
+      const verdict = summarizeHealthVerdict(buildHealthCells({ livesData, fastDiag, voiceDiag, venueSeatsDiag, laneDiag, giftEffectDiag, milestoneEffectDiag, previewRenderAck, laneMirror }));
       const vmark = verdict.level === 'ok' ? '🟢' : verdict.level === 'warn' ? '🟡' : '🔴';
       lines.push(`総合判定: ${vmark} ${verdict.text}`);
     } catch {
@@ -215,6 +216,13 @@ export function buildAiShareFullText({ overviewText, livesData, fastDiag, popupD
     try {
       const gLines = buildGiftEffectDiagLines(giftEffectDiag, Date.now());
       for (const l of gLines) lines.push(l);
+    } catch {
+      /* no-op */
+    }
+    // v0.1.1058: コメント数マイルストーンの「検知→演出→効果音」整合診断(使用時のみ)。
+    try {
+      const mLines = buildMilestoneEffectDiagLines(milestoneEffectDiag, Date.now());
+      for (const l of mLines) lines.push(l);
     } catch {
       /* no-op */
     }
@@ -247,6 +255,8 @@ export function buildAiShareFullText({ overviewText, livesData, fastDiag, popupD
     try { actions.push(...avatarLoadDiagToActionCards((popupDiag?.popup ?? popupDiag)?.avatarLoadDiag)); } catch { /* no-op */ }
     // v0.1.1054: ギフト/広告の検知はしたが投擲演出/効果音が出ていない取りこぼしを症状カードに昇格。
     try { actions.push(...giftEffectDiagToActionCards(giftEffectDiag)); } catch { /* no-op */ }
+    // v0.1.1058: コメント数マイルストーンの検知はしたが演出/効果音が出ていない取りこぼしを症状カードに昇格。
+    try { actions.push(...milestoneEffectDiagToActionCards(milestoneEffectDiag)); } catch { /* no-op */ }
     lines.push('### 検知された対処候補(症状→原因→次の一手)');
     if (!actions.length) {
       lines.push('- 既知パターンに該当する問題は検知されませんでした(未知の症状なら下の診断 JSON を参照)。');

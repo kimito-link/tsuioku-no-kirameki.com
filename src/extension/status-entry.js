@@ -67,6 +67,9 @@ import { reportPreviewCtxFromFastDiag } from '../lib/reportPreviewCtx.js';
 import { KEY_VENUE_SEATS_DIAG } from '../lib/venueSeatsDiagKey.js';
 import { KEY_GIFT_EFFECT_DIAG } from '../lib/giftEffectDiagKey.js';
 import { buildGiftEffectDiagLines, giftEffectDiagToActionCards } from '../lib/giftEffectDiag.js';
+// v0.1.1058: コメント数マイルストーン(検知→演出→音)の取りこぼしを状態速報で確認できるようにする。
+import { KEY_MILESTONE_EFFECT_DIAG } from '../lib/milestoneEffectDiagKey.js';
+import { buildMilestoneEffectDiagLines, milestoneEffectDiagToActionCards } from '../lib/milestoneEffectDiag.js';
 // 2026-06-22(council/lane-show-all-active): 応援レーンの人数整合(素性 N/表示 M)を健全度パネルに載せる。
 import { KEY_LANE_DIAG } from '../lib/laneDiagKey.js';
 // 応援レーン鏡: popup の応援レーン(りんく/こん太/広告/たぬ姉の段組み)を顔まで含めてそっくり映す。
@@ -430,14 +433,17 @@ async function refresh(opts = {}) {
       // v0.1.1054: ギフト/広告の検知→演出→効果音 整合診断も extras(12秒間引き)へ(補助情報・コアに足さない)。
       step = 'loadGiftEffectDiag';
       const giftEffectDiag = await runStorageOpWithTimeout(() => loadGiftEffectDiagSafe(), tmo).catch(() => null);
-      _extrasCache = { reportPreview, watchTabMap, trendFindings, laneDiag, laneMirror, statCardsMirror, northStarMirror, voiceDiag, venueSeatsDiag, publishOutcomeRec, commentTimelineMirror, previewRenderAck, backfillLiveMetric, giftEffectDiag };
+      // v0.1.1058: コメント数マイルストーンの検知→演出→効果音 整合診断も同様に extras へ。
+      step = 'loadMilestoneEffectDiag';
+      const milestoneEffectDiag = await runStorageOpWithTimeout(() => loadMilestoneEffectDiagSafe(), tmo).catch(() => null);
+      _extrasCache = { reportPreview, watchTabMap, trendFindings, laneDiag, laneMirror, statCardsMirror, northStarMirror, voiceDiag, venueSeatsDiag, publishOutcomeRec, commentTimelineMirror, previewRenderAck, backfillLiveMetric, giftEffectDiag, milestoneEffectDiag };
       _extrasCacheAt = Date.now();
       _mark('extras');
     }
-    const { reportPreview, watchTabMap, trendFindings, laneDiag, laneMirror, statCardsMirror, northStarMirror, voiceDiag, venueSeatsDiag, publishOutcomeRec, commentTimelineMirror, previewRenderAck, backfillLiveMetric, giftEffectDiag } = _extrasCache;
+    const { reportPreview, watchTabMap, trendFindings, laneDiag, laneMirror, statCardsMirror, northStarMirror, voiceDiag, venueSeatsDiag, publishOutcomeRec, commentTimelineMirror, previewRenderAck, backfillLiveMetric, giftEffectDiag, milestoneEffectDiag } = _extrasCache;
     step = 'renderAll';
     // v0.1.1005: 前サイクルの所要計器をコピー本文へ渡す(画面ヘッダーだけでなく AI共有テキストにも出す)。
-    renderAll({ lvList, summaries, fastDiag, popupDiag, backfillProgress, backfillLiveMetric, voiceDiag, venueSeatsDiag, laneDiag, laneMirror, statCardsMirror, northStarMirror, reportPreview, trendFindings, watchTabMap, publishOutcomeRec, commentTimelineMirror, previewRenderAck, refreshPerf: _lastRefreshPerf, giftEffectDiag });
+    renderAll({ lvList, summaries, fastDiag, popupDiag, backfillProgress, backfillLiveMetric, voiceDiag, venueSeatsDiag, laneDiag, laneMirror, statCardsMirror, northStarMirror, reportPreview, trendFindings, watchTabMap, publishOutcomeRec, commentTimelineMirror, previewRenderAck, refreshPerf: _lastRefreshPerf, giftEffectDiag, milestoneEffectDiag });
     _mark('render');
     const _totalMs = Math.round((typeof performance !== 'undefined' ? performance.now() : Date.now()) - _t0);
     updateLastUpdateMeta({ totalMs: _totalMs, stepMs: _stepMs });
@@ -733,6 +739,17 @@ async function loadGiftEffectDiagSafe() {
   }
 }
 
+// v0.1.1058: popup-entry.js が書く「コメント数マイルストーンの検知→演出→効果音」整合診断を読む。
+//   マイルストーン未到達の配信なら null=行を出さない(giftEffectDiag/voiceDiag と同方針)。
+async function loadMilestoneEffectDiagSafe() {
+  try {
+    const bag = await chrome.storage.local.get(KEY_MILESTONE_EFFECT_DIAG);
+    return bag?.[KEY_MILESTONE_EFFECT_DIAG] || null;
+  } catch {
+    return null;
+  }
+}
+
 // 応援レーン鏡(KEY_LANE_MIRROR)を読む。popup が renderStoryUserLane の最後で書く=popup を
 //   一度も開いていなければ null=鏡セクションは hidden のまま(死にリンクにしない)。例外時も null。
 //   ★毎回の直列 read は増やさない=この loader は extras(12秒間引き)からだけ呼ぶ(MEMORY 鉄則)。
@@ -910,7 +927,7 @@ async function loadBackfillLiveMetricSafe() {
 // v0.1.861: レポートプレビューの信頼度注釈の文脈は純関数 reportPreviewCtxFromFastDiag(src/lib)に抽出済み
 //   (NDGR 接続/userId 付き率/backfill 進行 → 注釈ctx・挙動同値・テストで固定)。import は冒頭。
 
-function renderAll({ lvList, summaries, fastDiag, popupDiag, backfillProgress, backfillLiveMetric, voiceDiag, venueSeatsDiag, laneDiag, laneMirror, statCardsMirror, northStarMirror, reportPreview, trendFindings, watchTabMap, publishOutcomeRec, commentTimelineMirror, previewRenderAck, refreshPerf, giftEffectDiag }) {
+function renderAll({ lvList, summaries, fastDiag, popupDiag, backfillProgress, backfillLiveMetric, voiceDiag, venueSeatsDiag, laneDiag, laneMirror, statCardsMirror, northStarMirror, reportPreview, trendFindings, watchTabMap, publishOutcomeRec, commentTimelineMirror, previewRenderAck, refreshPerf, giftEffectDiag, milestoneEffectDiag }) {
   // v0.1.847: 各描画セクションを独立 try/catch で隔離するヘルパ。1つが throw しても他のセクションと
   //   最終更新メタを巻き込まない=「セルが全部消える/最終更新—のまま固まる」を根治。落ちた場所は
   //   console と AI 共有欄に出して真因を追えるようにする(star-romi 失敗体験の除去)。
@@ -1027,11 +1044,18 @@ function renderAll({ lvList, summaries, fastDiag, popupDiag, backfillProgress, b
     const gLines = buildGiftEffectDiagLines(giftEffectDiag, Date.now());
     giftEffectLine = gLines.length ? `\n${gLines.join('\n')}` : '';
   });
+  // v0.1.1058: コメント数マイルストーンの「検知→演出→効果音」整合診断も概要に併記
+  //   (マイルストーン未到達の配信なら空=ノイズにしない)。
+  let milestoneEffectLine = '';
+  safeSection('マイルストーン効果音診断', () => {
+    const mLines = buildMilestoneEffectDiagLines(milestoneEffectDiag, Date.now());
+    milestoneEffectLine = mLines.length ? `\n${mLines.join('\n')}` : '';
+  });
   const overviewEl = document.getElementById('overviewBody');
   if (overviewEl) {
     overviewEl.textContent =
       (overviewText || '視聴中の配信はありません。') +
-      backfillLine + laneLine + voiceLine + reportPreviewLine + giftEffectLine;
+      backfillLine + laneLine + voiceLine + reportPreviewLine + giftEffectLine + milestoneEffectLine;
     overviewEl.classList.toggle('empty-note', !overviewText);
   }
 
@@ -1132,11 +1156,11 @@ function renderAll({ lvList, summaries, fastDiag, popupDiag, backfillProgress, b
   });
 
   // 🩹 いま気になる点と対処(症状→原因→次の一手・最上部)
-  safeSection('対処候補', () => renderActionCards({ livesData, fastDiag, popupDiag, reportPreview, trendFindings, giftEffectDiag }));
+  safeSection('対処候補', () => renderActionCards({ livesData, fastDiag, popupDiag, reportPreview, trendFindings, giftEffectDiag, milestoneEffectDiag }));
 
   // 健全度パネル(ファーストビュー・正常100/異常だけ色・対象外は—)
   //   v0.1.894: 会場モード読み上げセル(タイミング・抜け漏れ)を出すため voiceDiag も渡す。
-  safeSection('健全度パネル', () => renderHealthCells({ livesData, fastDiag, voiceDiag, venueSeatsDiag, laneDiag, giftEffectDiag, previewRenderAck, laneMirror }));
+  safeSection('健全度パネル', () => renderHealthCells({ livesData, fastDiag, voiceDiag, venueSeatsDiag, laneDiag, giftEffectDiag, milestoneEffectDiag, previewRenderAck, laneMirror }));
 
   // popup 埋め込み(本物 iframe・v0.1.916 試作): popup.html?inline=1&dock=status&lv=<lv> を iframe で
   //   丸ごと出し「見た目も操作も popup そっくり」を本物のまま映す。下の鏡(間引き)より上に置き、出たら
@@ -1204,7 +1228,7 @@ function renderAll({ lvList, summaries, fastDiag, popupDiag, backfillProgress, b
   // AI 共有用テキスト
   let fullText = '';
   safeSection('AI共有テキスト', () => {
-    fullText = buildAiShareFullText({ overviewText, livesData, fastDiag, popupDiag, voiceDiag, venueSeatsDiag, laneDiag, laneMirror, reportPreview, trendFindings, jsonBlob, currentLiveId, publishKeys, publishOutcomeRec, previewRenderAck, refreshPerf, giftEffectDiag });
+    fullText = buildAiShareFullText({ overviewText, livesData, fastDiag, popupDiag, voiceDiag, venueSeatsDiag, laneDiag, laneMirror, reportPreview, trendFindings, jsonBlob, currentLiveId, publishKeys, publishOutcomeRec, previewRenderAck, refreshPerf, giftEffectDiag, milestoneEffectDiag });
     const ta = /** @type {HTMLTextAreaElement|null} */ (
       document.getElementById('aiShareText')
     );
@@ -1456,6 +1480,8 @@ function renderActionCards(data) {
     // v0.1.1054: ギフト/広告の検知はしたが投擲演出/効果音が出ていない取りこぼしを症状カードに昇格。
     //   aiShareFullText.js には既に配線済みだったが、status画面の対処候補パネル側は漏れていた(片翼統合)。
     try { cards.push(...giftEffectDiagToActionCards(data.giftEffectDiag)); } catch { /* no-op */ }
+    // v0.1.1058: コメント数マイルストーンの検知はしたが演出/効果音が出ていない取りこぼしも同様に昇格。
+    try { cards.push(...milestoneEffectDiagToActionCards(data.milestoneEffectDiag)); } catch { /* no-op */ }
   } catch (err) {
     // 星野メソッド: 失敗を空白で終わらせない。必ず「次の一手」を出す(下の AI共有まとめは常に動く)。
     _lastActionSig = ''; // エラー後は次の成功で必ず再構築させる。
