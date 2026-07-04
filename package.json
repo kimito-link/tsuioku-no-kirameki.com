@@ -17,6 +17,7 @@
     "build": "node scripts/build.mjs",
     "build:watch": "node scripts/build-watch.mjs",
     "copy:ext": "node scripts/copy-ext.mjs",
+    "status:live": "node scripts/status-live.mjs",
     "build:copy": "node scripts/build.mjs && node scripts/copy-ext.mjs",
     "feature-map": "node scripts/feature-map.mjs",
     "feature-map:check": "node scripts/feature-map.mjs --check",
