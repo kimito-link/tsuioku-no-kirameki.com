@@ -13,8 +13,11 @@
 export const REFRESH_INTERVAL_MS = 2000;
 /** この所要(ms)以下なら通常時とみなし間引かない(0 tick)。 */
 export const REFRESH_SLOW_MS = 500;
-/** backoff tick の上限(2秒×15=最大30秒間隔まで控える)。激重時の天井。 */
-export const REFRESH_BACKOFF_TICKS_MAX = 15;
+/** backoff tick の上限。激重時の天井。
+ *  v0.1.1062: 15(30秒)→60(120秒)へ。実機で1回の更新が62秒かかる大配信のとき、天井30秒では
+ *  「62秒読む→30秒休む」=読みっぱなしに近い占有率(67%)になり、storage輻輳でChrome全体が固まる
+ *  一因だった(2026-07-04実機・9,400コメント配信)。天井120秒なら62秒読→62秒休=占有率50%以下。 */
+export const REFRESH_BACKOFF_TICKS_MAX = 60;
 
 /**
  * 直近 refresh の所要(ms)から「次に何 tick 間引くか」を決める。
