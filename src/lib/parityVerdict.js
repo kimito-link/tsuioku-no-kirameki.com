@@ -68,6 +68,73 @@ export function judgeVenuePopulationParity(venue, laneCounts, curLid) {
 }
 
 /**
+ * v0.1.1056(パリティ根本修正 Phase3): ①(鏡バンドル)が書いた世代(bundleGen)と②(応援プレビュー)が
+ *   ack した世代(gen)を突合する純関数。値の食い違いでなく「同じ瞬間のデータを見ているか」を
+ *   世代番号で判定する(mirrors-written-per-key-per-tick 問題の根治=①は3秒ごとに新しい世代を
+ *   flush するため、②がその最新世代を読めているかを見る)。
+ *
+ * 判定:
+ *   - 鏡が旧形式(bundleGen 未スタンプ=このマイルストーン未反映のビルド) → pending(gen_unstamped)。
+ *   - ack が無い/gen フィールドを持たない旧形式 → pending(gen_no_ack)。
+ *   - 別配信の ack → pending(gen_other_live)。
+ *   - ack が鮮度切れ(freshMs 超) → pending(gen_ack_stale)。
+ *   - 差が「①のflush間隔(3秒)ぶんの遅れ」以内 → lag(flight中=正常。ack取得からの経過時間で許容幅を広げる)。
+ *   - 差が0または1 → match。
+ *   - それ超 → mismatch(本物のズレ=②が鏡の更新に追従できていない)。
+ *
+ * @param {{ ready?: boolean, liveId?: string, ts?: number, gen?: number }|null} previewAck
+ * @param {{ liveId?: string, bundleGen?: number }|null} laneMirror
+ * @param {string} curLid 現配信ID(小文字)
+ * @param {number} nowMs
+ * @param {{ freshMs?: number, flushIntervalMs?: number }} [opts]
+ * @returns {{ state:'match'|'lag'|'mismatch'|'pending', code:string, reason:string, writtenGen:number, ackGen:number, delta:number }}
+ */
+export function judgePreviewGenerationParity(previewAck, laneMirror, curLid, nowMs, opts = {}) {
+  const ack = previewAck && typeof previewAck === 'object' ? previewAck : null;
+  const mirror = laneMirror && typeof laneMirror === 'object' ? laneMirror : null;
+  const freshMs = Number(opts?.freshMs) > 0 ? Number(opts.freshMs) : DEFAULT_FRESH_MS;
+  const flushIntervalMs = Number(opts?.flushIntervalMs) > 0 ? Number(opts.flushIntervalMs) : 3000;
+
+  const writtenGen = mirror && Number.isFinite(Number(mirror.bundleGen)) ? Math.max(0, Math.floor(Number(mirror.bundleGen))) : -1;
+  if (writtenGen < 0) {
+    return { state: 'pending', code: 'gen_unstamped', reason: '鏡が旧形式(世代未スタンプ)', writtenGen: -1, ackGen: -1, delta: 0 };
+  }
+  if (!ack || ack.ready !== true || !Number.isFinite(Number(ack.gen))) {
+    return { state: 'pending', code: 'gen_no_ack', reason: '②の世代ackが未確認', writtenGen, ackGen: -1, delta: 0 };
+  }
+  const ackLid = String(ack.liveId || '').trim().toLowerCase();
+  if (curLid && ackLid !== curLid) {
+    return { state: 'pending', code: 'gen_other_live', reason: '②の世代ackが別配信', writtenGen, ackGen: -1, delta: 0 };
+  }
+  const ackTs = Number(ack.ts) || 0;
+  const ackAgeMs = ackTs > 0 && nowMs > 0 ? Math.max(0, nowMs - ackTs) : 0;
+  if (ackTs > 0 && nowMs > 0 && ackAgeMs > freshMs) {
+    return { state: 'pending', code: 'gen_ack_stale', reason: '②の世代ackが古い', writtenGen, ackGen: -1, delta: 0 };
+  }
+  const ackGen = Math.max(0, Math.floor(Number(ack.gen)));
+  const delta = writtenGen - ackGen;
+  if (delta <= 1) {
+    return { state: 'match', code: 'gen_match', reason: `①世代${writtenGen}=②世代${ackGen}`, writtenGen, ackGen, delta };
+  }
+  // flight中の許容: ack 取得からの経過時間分、①がさらに flush を重ねている可能性を吸収する。
+  const toleratedDelta = 1 + Math.ceil(ackAgeMs / flushIntervalMs);
+  if (delta <= toleratedDelta) {
+    return {
+      state: 'lag',
+      code: 'gen_lag',
+      reason: `②が①世代${writtenGen}に追従中(②世代${ackGen}・遅れ${delta}世代=flight中)`,
+      writtenGen, ackGen, delta
+    };
+  }
+  return {
+    state: 'mismatch',
+    code: 'gen_mismatch',
+    reason: `①世代${writtenGen} ≠ ②世代${ackGen}(差${delta}・②が更新に追従できていない)`,
+    writtenGen, ackGen, delta
+  };
+}
+
+/**
  * @param {{
  *   trust?: any,                  // buildDiagnosticsTrust の戻り(hasWatchTab/popup/verdict/popupTrustable)
  *   publishSelfDiag?: any,        // buildLiveviewPublishSelfDiag の戻り(consistency/publish/lastPost/mirrors)
@@ -76,6 +143,7 @@ export function judgeVenuePopulationParity(venue, laneCounts, curLid) {
  *   previewAck?: any,             // ②応援プレビューの描画 ack(別キー: { ready, ts, liveId })
  *   venueSeatsDiag?: any,         // ★v0.1.1050: ④会場座席の観測値({ enabled, liveId, seatsShown, participantCount, ... })
  *   laneDiagCounts?: any,         // ★v0.1.1050: ①応援レーンの人数観測({ identified, laneShown, limit })=会場突合の基準側
+ *   laneMirror?: any,             // ★v0.1.1056: ①が書いた鏡バンドル({ liveId, bundleGen, ... })=②との世代突合の基準側
  *   currentLiveId?: string,
  *   nowMs?: number,
  *   freshMs?: number
@@ -91,6 +159,7 @@ export function buildParityVerdict(input) {
   const ack = a.previewAck && typeof a.previewAck === 'object' ? a.previewAck : null;
   const venue = a.venueSeatsDiag && typeof a.venueSeatsDiag === 'object' ? a.venueSeatsDiag : null;
   const laneCounts = a.laneDiagCounts && typeof a.laneDiagCounts === 'object' ? a.laneDiagCounts : null;
+  const laneMirror = a.laneMirror && typeof a.laneMirror === 'object' ? a.laneMirror : null;
   const nowMs = Number(a.nowMs) || 0;
   const freshMs = Number(a.freshMs) > 0 ? Number(a.freshMs) : DEFAULT_FRESH_MS;
   const curLid = String(a.currentLiveId || '').trim().toLowerCase();
@@ -188,6 +257,17 @@ export function buildParityVerdict(input) {
     return pend(
       `②応援プレビューの応援者ランキングが未確認(①鏡${supMirrorCount}件・②はまだ描画前か未起動の可能性)`,
       '応援プレビューを開いて数秒待つ(既に開いていれば正常なことが多い)', 'preview_supporters_pending'
+    );
+  }
+
+  // 7.5. ★v0.1.1056: ①(鏡)と②(応援プレビュー)が同じ世代のデータを見ているかを突合(新規readなし=
+  //   既に読んでいる laneMirror/ack から gen を見るだけ)。mismatch(②が更新に追従できていない)だけ
+  //   fail にする。lag(flight中)/pending(旧形式・未ack等)は既存判定を劣化させない(嘘の🔴を出さない)。
+  const genParity = judgePreviewGenerationParity(ack, laneMirror, curLid, nowMs);
+  if (genParity.state === 'mismatch') {
+    return fail(
+      `②応援プレビューが①の更新に追従できていない: ${genParity.reason}`,
+      '応援プレビューを開き直す(それでも直らなければ開発者に共有)', 'preview_gen_mismatch'
     );
   }
 

@@ -39,16 +39,32 @@ const SECTION_TO_LEGACY_KEY = /** @type {const} */ ({
 /**
  * 合流バッファから「1 回の chrome.storage.local.set に渡す旧キー同梱ペイロード」を組む純関数。
  *   null セクション(まだ一度も来ていない鏡)は同梱しない=既存の storage 値を消さない。
+ *
+ * v0.1.1056(パリティ根本修正 Phase1): 各 snapshot に bundle の「封筒」(gen/capturedAt/liveId)を
+ *   スタンプする。従来は bundle.gen が読み手(②/status)に一切公開されず、①と②が「同じ瞬間の
+ *   データを見ているか」を構造的に検証できなかった(値の食い違いを見るしかなく、世代のズレを
+ *   見られなかった)。shallow copy でスタンプするため元の snapshot オブジェクト(バッファ内)は
+ *   不変=既存の参照共有ロジックに影響しない。読み手は未知フィールドを無視するので後方互換。
  * @param {import('./mirrorBundle.js').MirrorBundle} bundle
  * @returns {Record<string, unknown>} storage.set にそのまま渡せる {キー: snapshot} マップ
  */
 export function buildLegacyMirrorSetPayload(bundle) {
   const sections = bundle && bundle.sections && typeof bundle.sections === 'object' ? bundle.sections : {};
+  const gen = Number(bundle?.gen) || 0;
+  const capturedAt = Number(bundle?.capturedAt) || 0;
+  const liveId = String(bundle?.liveId || '');
   /** @type {Record<string, unknown>} */
   const payload = {};
   for (const section of Object.keys(SECTION_TO_LEGACY_KEY)) {
     const snap = /** @type {Record<string, any>} */ (sections)[section];
-    if (snap != null) payload[/** @type {Record<string,string>} */ (SECTION_TO_LEGACY_KEY)[section]] = snap;
+    if (snap != null) {
+      payload[/** @type {Record<string,string>} */ (SECTION_TO_LEGACY_KEY)[section]] = {
+        ...snap,
+        bundleGen: gen,
+        bundleCapturedAt: capturedAt,
+        bundleLiveId: liveId
+      };
+    }
   }
   return payload;
 }

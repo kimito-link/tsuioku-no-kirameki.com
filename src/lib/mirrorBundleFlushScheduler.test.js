@@ -23,8 +23,9 @@ describe('buildLegacyMirrorSetPayload', () => {
     sched.reflect('lane', LANE, { liveId: 'lv1', nowMs: 100 });
     sched.reflect('statCards', STAT, { liveId: 'lv1', nowMs: 101 });
     const payload = buildLegacyMirrorSetPayload(sched.peekBundle());
-    expect(payload[KEY_LANE_MIRROR]).toBe(LANE);
-    expect(payload[KEY_STAT_CARDS_MIRROR]).toBe(STAT);
+    // v0.1.1056: bundleGen/bundleCapturedAt/bundleLiveId がスタンプされるため参照は変わる(shallow copy)。
+    expect(payload[KEY_LANE_MIRROR]).toMatchObject(LANE);
+    expect(payload[KEY_STAT_CARDS_MIRROR]).toMatchObject(STAT);
     // 未反映のセクションはキー自体が無い(=set しない=既存を消さない)。
     expect(KEY_TOP_SUPPORTERS_MIRROR in payload).toBe(false);
     expect(KEY_NORTH_STAR_MIRROR in payload).toBe(false);
@@ -34,6 +35,18 @@ describe('buildLegacyMirrorSetPayload', () => {
   it('bundle が空/不正でも空ペイロード(投げない)', () => {
     expect(buildLegacyMirrorSetPayload(null)).toEqual({});
     expect(buildLegacyMirrorSetPayload({})).toEqual({});
+  });
+
+  it('v0.1.1056: 各 snapshot に bundle の gen/capturedAt/liveId がスタンプされる(パリティ根本修正)', () => {
+    const sched = createMirrorBundleFlushScheduler({ minGapMs: 0 });
+    sched.reflect('lane', LANE, { liveId: 'lv1', nowMs: 100 });
+    const out = sched.takeFlushPayload(100);
+    const stamped = out.legacyPayload[KEY_LANE_MIRROR];
+    expect(stamped.bundleGen).toBe(out.bundle.gen);
+    expect(stamped.bundleCapturedAt).toBe(out.bundle.capturedAt);
+    expect(stamped.bundleLiveId).toBe('lv1');
+    // 元の snapshot オブジェクトは不変(shallow copy)。
+    expect(LANE.bundleGen).toBeUndefined();
   });
 });
 
@@ -47,9 +60,9 @@ describe('createMirrorBundleFlushScheduler', () => {
     const out = sched.takeFlushPayload(103);
     expect(out).not.toBeNull();
     expect(out.bundle.gen).toBe(1); // flush で gen+1
-    expect(out.legacyPayload[KEY_LANE_MIRROR]).toBe(LANE);
-    expect(out.legacyPayload[KEY_STAT_CARDS_MIRROR]).toBe(STAT);
-    expect(out.legacyPayload[KEY_NORTH_STAR_MIRROR]).toBe(NS);
+    expect(out.legacyPayload[KEY_LANE_MIRROR]).toMatchObject(LANE);
+    expect(out.legacyPayload[KEY_STAT_CARDS_MIRROR]).toMatchObject(STAT);
+    expect(out.legacyPayload[KEY_NORTH_STAR_MIRROR]).toMatchObject(NS);
   });
 
   it('dirty でなければ flush しない(null)', () => {
@@ -76,7 +89,7 @@ describe('createMirrorBundleFlushScheduler', () => {
     // gap 経過後の flush で「gap 中に来た最新」が確実に載る。
     const out = sched.takeFlushPayload(103000);
     expect(out).not.toBeNull();
-    expect(out.legacyPayload[KEY_LANE_MIRROR]).toBe(lane2);
+    expect(out.legacyPayload[KEY_LANE_MIRROR]).toMatchObject(lane2);
   });
 
   it('gen は flush のたびに単調増加する', () => {
@@ -101,7 +114,7 @@ describe('createMirrorBundleFlushScheduler', () => {
     expect(out.bundle.gen).toBe(2); // 巻き戻さない
     // 旧配信 statCards は持ち越さない=同梱ペイロードに無い。
     expect(KEY_STAT_CARDS_MIRROR in out.legacyPayload).toBe(false);
-    expect(out.legacyPayload[KEY_LANE_MIRROR]).toBe(lv2Lane);
+    expect(out.legacyPayload[KEY_LANE_MIRROR]).toMatchObject(lv2Lane);
   });
 
   it('ネガコン: null 反映は無視(dirty にしない)', () => {

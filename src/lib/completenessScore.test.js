@@ -1,4 +1,7 @@
 import { describe, it, expect } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { dirname, join } from 'node:path';
 import { buildHealthCells } from './healthCells.js';
 import {
   DIAGNOSIS_REGISTRY,
@@ -6,6 +9,8 @@ import {
   DIAGNOSIS_CATEGORY_IDS
 } from './diagnosisRegistry.js';
 import { buildCompletenessScore, formatCompletenessScoreLines } from './completenessScore.js';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
 
 describe('diagnosisRegistry の網羅性(これが「抜けを構造的に無くす」核心)', () => {
   it('全 healthCell id がレジストリに存在する(ズレ=網羅の穴)', () => {
@@ -38,11 +43,38 @@ describe('diagnosisRegistry の網羅性(これが「抜けを構造的に無く
       laneDiag: { liveId: 'lv1', identified: 3, laneShown: 3, paintMs: 10 },
       // v0.1.1054: giftDetected>0 を渡して gift-effect も発生させる(同上・登録漏れ再発防止)。
       giftEffectDiag: { giftDetected: 1, giftThrown: 1, giftSoundPlayed: 1, soundEnabled: true },
+      // v0.1.1056: bundleGen を渡して mirror-gen-stamp/preview-gen-sync も発生させる(同上・登録漏れ再発防止)。
+      laneMirror: { liveId: 'lv1', bundleGen: 5, bundleCapturedAt: 900 },
+      previewRenderAck: { ready: true, liveId: 'lv1', ts: 990, gen: 5 },
       nowMs: 1000
     });
     const ids = cells.map((c) => c.id);
     const missing = ids.filter((id) => !DIAGNOSIS_BY_ID[id]);
     expect(missing).toEqual([]); // レジストリに無いセルがあれば、ここで落ちる=追加漏れの番犬
+  });
+
+  it('v0.1.1056: healthCells.js のソースを静的解析した全セルid がレジストリに存在する(実行条件に依存しない番犬)', () => {
+    // 前段のテストは「fixture がそのセルを発生させる入力を作れているか」に依存するため、
+    //   v0.1.1054(venue-seats-visible/lane-paint)のように「実装済みだが fixture が発生条件を
+    //   満たさない」ケースをすり抜けた実績がある。ソースを正規表現で静的解析し、fixture の
+    //   実行条件と無関係に全セルidを抽出してレジストリと突合する(構造的な番犬)。
+    const src = readFileSync(join(__dirname, 'healthCells.js'), 'utf8');
+    const idPattern = /(?:stateCell|pctCell)\(\s*'([a-z0-9-]+)'/g;
+    /** @type {Set<string>} */
+    const foundIds = new Set();
+    let m;
+    while ((m = idPattern.exec(src))) foundIds.add(m[1]);
+    // 北極星6レーンは配列(NS タプル)経由で id が動的に組まれるため正規表現に乗らない。
+    //   既知の除外リストとして明示し、意図せぬ検出漏れと区別する。
+    const KNOWN_DYNAMIC_IDS = new Set([
+      'ns-contrib', 'ns-ad', 'ns-gift-hist', 'ns-escore', 'ns-prog-pt', 'ns-erank'
+    ]);
+    const missing = [...foundIds].filter((id) => !DIAGNOSIS_BY_ID[id] && !KNOWN_DYNAMIC_IDS.has(id));
+    expect(missing).toEqual([]); // healthCells.js に実装があるのにレジストリ未登録=ここで落ちる
+    // 逆方向: 既知動的id自体がレジストリから漏れていないかも確認(北極星レーンの登録漏れ防止)。
+    for (const id of KNOWN_DYNAMIC_IDS) {
+      expect(DIAGNOSIS_BY_ID[id]).toBeTruthy();
+    }
   });
 
   it('レジストリの category は5カテゴリのいずれか(1観点1カテゴリ)', () => {

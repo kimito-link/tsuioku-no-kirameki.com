@@ -67,7 +67,7 @@ export function formatRefreshPerfLine(refreshPerf) {
  * @param {any} args
  * @returns {string}
  */
-export function buildAiShareFullText({ overviewText, livesData, fastDiag, popupDiag, voiceDiag, venueSeatsDiag, laneDiag, reportPreview, trendFindings, jsonBlob, currentLiveId, publishKeys, publishOutcomeRec, previewRenderAck, refreshPerf, giftEffectDiag }) {
+export function buildAiShareFullText({ overviewText, livesData, fastDiag, popupDiag, voiceDiag, venueSeatsDiag, laneDiag, laneMirror, reportPreview, trendFindings, jsonBlob, currentLiveId, publishKeys, publishOutcomeRec, previewRenderAck, refreshPerf, giftEffectDiag }) {
   const lines = [];
   lines.push('## 君斗りんくの追憶のきらめき 状態速報');
   lines.push(`生成: ${new Date().toISOString()}`);
@@ -153,6 +153,8 @@ export function buildAiShareFullText({ overviewText, livesData, fastDiag, popupD
         // ★v0.1.1050: ④会場と①応援レーンの人数突合を追加(新規readなし=既にこの関数の引数に来ている値の roll-up)。
         venueSeatsDiag: venueSeatsDiag || null,
         laneDiagCounts: laneDiag || null,
+        // ★v0.1.1056: ①②の世代パリティ突合(新規readなし=既にこの関数の引数に来ている laneMirror の roll-up)。
+        laneMirror: laneMirror || null,
         currentLiveId: String(currentLiveId || ''),
         nowMs: Date.now()
       });
@@ -177,7 +179,7 @@ export function buildAiShareFullText({ overviewText, livesData, fastDiag, popupD
     // 網羅的完全性診断(PageSpeed 型): 全観点をレジストリで網羅し、カテゴリ別スコア+✅完璧判定+
     //   完璧まであと何項目+対象外N項目を出す。観点追加=diagnosisRegistry に1行=抜けが構造的に出ない。
     try {
-      const cells = buildHealthCells({ livesData, fastDiag, voiceDiag, venueSeatsDiag, laneDiag, giftEffectDiag, nowMs: Date.now() });
+      const cells = buildHealthCells({ livesData, fastDiag, voiceDiag, venueSeatsDiag, laneDiag, giftEffectDiag, previewRenderAck, laneMirror, nowMs: Date.now() });
       const score = buildCompletenessScore(cells);
       const scoreLines = formatCompletenessScoreLines(score);
       if (scoreLines.length) { for (const l of scoreLines) lines.push(l); lines.push(''); }
@@ -193,7 +195,7 @@ export function buildAiShareFullText({ overviewText, livesData, fastDiag, popupD
     // v0.1.846: 総合判定を概要に1行併記。満点=「異常ゼロ」(進行中/対象外は正常扱い)。
     //   ユーザー要望「全部100%になるまで=修復いらないぐらい完全に」への回答=異常が無ければ満点。
     try {
-      const verdict = summarizeHealthVerdict(buildHealthCells({ livesData, fastDiag, voiceDiag, venueSeatsDiag, laneDiag, giftEffectDiag }));
+      const verdict = summarizeHealthVerdict(buildHealthCells({ livesData, fastDiag, voiceDiag, venueSeatsDiag, laneDiag, giftEffectDiag, previewRenderAck, laneMirror }));
       const vmark = verdict.level === 'ok' ? '🟢' : verdict.level === 'warn' ? '🟡' : '🔴';
       lines.push(`総合判定: ${vmark} ${verdict.text}`);
     } catch {
