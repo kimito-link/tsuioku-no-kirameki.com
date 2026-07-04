@@ -37,6 +37,8 @@ import { buildGiftEffectDiagLines, giftEffectDiagToActionCards } from './giftEff
 import { buildMilestoneEffectDiagLines, milestoneEffectDiagToActionCards } from './milestoneEffectDiag.js';
 // v0.1.1072: マイ効果音(customSoundStore.js)の取込状況(extras 12秒間引き)をAI共有本文にも併記。
 import { buildCustomSoundDiagLine } from './customSoundDiag.js';
+// Phase B(v0.1.1073): パチンコボイス演出の発火/スキップ内訳(extras 12秒間引き)をAI共有本文にも併記。
+import { buildVoiceEffectDiagLines } from './voiceEffectDiag.js';
 import { reportPreviewCtxFromFastDiag } from './reportPreviewCtx.js';
 import { buildReportPreviewLines } from './reportPreview.js';
 import { buildStatusActions } from './statusActionAdvisor.js';
@@ -70,7 +72,7 @@ export function formatRefreshPerfLine(refreshPerf) {
  * @param {any} args
  * @returns {string}
  */
-export function buildAiShareFullText({ overviewText, livesData, fastDiag, popupDiag, voiceDiag, venueSeatsDiag, laneDiag, laneMirror, reportPreview, trendFindings, jsonBlob, currentLiveId, publishKeys, publishOutcomeRec, previewRenderAck, refreshPerf, giftEffectDiag, milestoneEffectDiag, customSoundDiag }) {
+export function buildAiShareFullText({ overviewText, livesData, fastDiag, popupDiag, voiceDiag, venueSeatsDiag, laneDiag, laneMirror, reportPreview, trendFindings, jsonBlob, currentLiveId, publishKeys, publishOutcomeRec, previewRenderAck, refreshPerf, giftEffectDiag, milestoneEffectDiag, customSoundDiag, voiceEffectDiag }) {
   const lines = [];
   lines.push('## 君斗りんくの追憶のきらめき 状態速報');
   lines.push(`生成: ${new Date().toISOString()}`);
@@ -240,6 +242,13 @@ export function buildAiShareFullText({ overviewText, livesData, fastDiag, popupD
     try {
       const cStr = buildCustomSoundDiagLine(customSoundDiag);
       if (cStr) lines.push(cStr);
+    } catch {
+      /* no-op */
+    }
+    // Phase B(v0.1.1073): パチンコボイスの発火/スキップ内訳(未観測なら空=ノイズにしない)。
+    try {
+      const vLines = buildVoiceEffectDiagLines(voiceEffectDiag, Date.now());
+      for (const l of vLines) lines.push(l);
     } catch {
       /* no-op */
     }

@@ -206,14 +206,28 @@ import {
   broadcasterProfileStorageKey,
   KEY_EFFECT_SOUND_ENABLED,
   KEY_CUSTOM_SOUND_REV,
+  KEY_VENUE_EFFECT_SOUND_PRESENCE,
   isEffectSoundEnabled
 } from '../lib/storageKeys.js';
 import {
   playEffectSound,
   EFFECT_SOUND_VARIANT_PATHS,
   EFFECT_SOUND_PATHS,
-  defaultVolumeForEffectSoundKind
+  defaultVolumeForEffectSoundKind,
+  shouldSkipEffectSoundForVenuePresence
 } from '../lib/effectSoundPlayer.js';
+// Phase B(2026-07-05): パチンコボイス演出+歯止め(council/pachinko-ultimate-SYNTHESIS.md §4/§6)。
+//   voiceGate=事象履歴の純関数(個別CD/上限+グローバル45秒CD+1配信20回)。popup側はVOICEVOX
+//   読み上げが走らないコンテキストのため isNarrating は常に false。会場優先プレゼンスで譲る。
+import {
+  makeInitialVoiceGateState,
+  voiceGate,
+  planBreakthroughChain,
+  planJackpotChain,
+  MILESTONE_HARD_TO_BREAKTHROUGH_MS
+} from '../lib/voiceDirector.js';
+import { makeInitialVoiceEffectDiag, buildVoiceEffectDiagSnapshot, voiceSkipFieldForGateReason } from '../lib/voiceEffectDiag.js';
+import { KEY_VOICE_EFFECT_DIAG } from '../lib/voiceEffectDiagKey.js';
 import { maybePlayEventRankChangeSound } from '../lib/officialEventRankSoundEffect.js';
 // Phase A(2026-07-05): マイ効果音差し替え(IndexedDB取込+割当)。起動時+customSoundRev変化時に
 //   customVariantPaths を再構築し、playEffectSound の deps へカスタム優先で注入する
@@ -943,6 +957,144 @@ function publishMilestoneEffectDiag() {
   _milestoneEffectDiagCounters.soundEnabled = _effectSoundEnabledCache;
   const snap = buildMilestoneEffectDiagSnapshot(_milestoneEffectDiagCounters, now);
   void chrome.storage.local.set({ [KEY_MILESTONE_EFFECT_DIAG]: snap }).catch(() => {});
+}
+
+// Phase B(2026-07-05): パチンコボイス演出+歯止め(council/pachinko-ultimate-SYNTHESIS.md §4/§6)。
+//   popup側のトリガはコメント数マイルストーン(節目500=突破チェーン・節目1000+=大当たりチェーン・
+//   コンボ昇格=上乗せボイス)。本Phaseはイベント直結のみ(メーターR条件はPhase C)。
+let _voiceGateState = makeInitialVoiceGateState();
+const _voiceEffectDiagCounters = makeInitialVoiceEffectDiag();
+let _voiceEffectDiagLastWriteAt = 0;
+function publishVoiceEffectDiag() {
+  const now = Date.now();
+  if (now - _voiceEffectDiagLastWriteAt < 3000) return; // 3秒 min-gap(他の診断と同型)。
+  _voiceEffectDiagLastWriteAt = now;
+  _voiceEffectDiagCounters.soundEnabled = _effectSoundEnabledCache;
+  const snap = { ...buildVoiceEffectDiagSnapshot(_voiceEffectDiagCounters, now), source: 'popup' };
+  void chrome.storage.local.set({ [KEY_VOICE_EFFECT_DIAG]: snap }).catch(() => {});
+}
+/**
+ * 会場window(venueBar)が開いていれば popup 側のボイスは譲る(二重再生防止・会場優先。
+ *   officialEventRankSoundEffect.js の shouldPopupSkipEffectSoundForVenue と同じ判定)。
+ * @returns {Promise<boolean>} true=popup側はスキップすべき(会場側の演出に任せる)
+ */
+async function popupShouldSkipVoiceForVenue() {
+  try {
+    const bag = await chrome.storage.local.get(KEY_VENUE_EFFECT_SOUND_PRESENCE);
+    return shouldSkipEffectSoundForVenuePresence(Number(bag?.[KEY_VENUE_EFFECT_SOUND_PRESENCE]) || 0, Date.now());
+  } catch {
+    return false; // 判定不能なら鳴らす側に倒す(無音になり続けるより安全)
+  }
+}
+/**
+ * ボイス1本をゲート(個別CD/上限・グローバル45秒CD・1配信20回)経由で鳴らす(popup側)。
+ *   popupではVOICEVOX読み上げが走らないため isNarrating は常に false。
+ * @param {string} key voice_* のいずれか
+ * @returns {'played'|'off'|string} 'played'=実際に鳴らした。それ以外はスキップ理由等。
+ */
+function tryPlayVoicePopup(key) {
+  if (!_effectSoundEnabledCache) return 'off';
+  const gate = voiceGate(_voiceGateState, key, Date.now(), {
+    liveId: watchPopupLastPaintedLiveId,
+    isNarrating: false
+  });
+  _voiceGateState = gate.nextState;
+  _voiceEffectDiagCounters.lastEventAt = Date.now();
+  if (!gate.allowed) {
+    const field = voiceSkipFieldForGateReason(gate.reason);
+    if (field) _voiceEffectDiagCounters[field] += 1;
+    publishVoiceEffectDiag();
+    return gate.reason;
+  }
+  // 「鳴らした」時だけ数える(戻り値を見ずに数えると診断が嘘をつく・v0.1.1057と同じ教訓)。
+  const result = playEffectSound(key, buildEffectSoundDeps(key));
+  if (result === 'played') {
+    _voiceEffectDiagCounters.fired += 1;
+    _voiceEffectDiagCounters.lastKey = key;
+  }
+  publishVoiceEffectDiag();
+  return result;
+}
+/**
+ * 突破チェーン(§3.3「リーチ→突破」・節目500到達): breakthrough SE → (300ms) → voice_breakthrough。
+ *   イベント側SE(milestone_hard)と重ねないよう、チェーン全体をMILESTONE_HARD_TO_BREAKTHROUGH_MSだけ
+ *   後ろへずらして直列にする。会場windowが開いていれば譲る(二重再生防止)。
+ */
+async function scheduleBreakthroughVoiceChainPopup() {
+  if (!_effectSoundEnabledCache) return;
+  if (await popupShouldSkipVoiceForVenue()) {
+    _voiceEffectDiagCounters.skippedVenue += 1;
+    _voiceEffectDiagCounters.lastEventAt = Date.now();
+    publishVoiceEffectDiag();
+    return;
+  }
+  // ボイスのゲートを先に判定(§4)。SE(breakthrough)はボイスゲートの対象外だが、ボイスが
+  //   通らないときもSEは1本だけ鳴らす(§3.3のリーチ→突破はSEが主役・ボイスは添え物)。
+  const gate = voiceGate(_voiceGateState, 'voice_breakthrough', Date.now(), {
+    liveId: watchPopupLastPaintedLiveId,
+    isNarrating: false
+  });
+  _voiceGateState = gate.nextState;
+  _voiceEffectDiagCounters.lastEventAt = Date.now();
+  // planBreakthroughChain の delayMs は「直前ステップからの遅延」= 累積して直列にスケジュールする。
+  let atMs = MILESTONE_HARD_TO_BREAKTHROUGH_MS;
+  for (const step of planBreakthroughChain()) {
+    atMs += step.delayMs;
+    if (step.kind === 'voice_breakthrough' && !gate.allowed) continue; // 声だけ諦める(遅延再生禁止)
+    window.setTimeout(() => {
+      const result = playEffectSound(step.kind, buildEffectSoundDeps(step.kind));
+      if (step.kind === 'voice_breakthrough' && result === 'played') {
+        _voiceEffectDiagCounters.fired += 1;
+        _voiceEffectDiagCounters.lastKey = 'voice_breakthrough';
+      }
+      publishVoiceEffectDiag();
+    }, atMs);
+  }
+  if (!gate.allowed) {
+    const field = voiceSkipFieldForGateReason(gate.reason);
+    if (field) _voiceEffectDiagCounters[field] += 1;
+  }
+  publishVoiceEffectDiag();
+}
+/**
+ * 大当たりチェーン(§3.3「突破→大当たり」「大当たり→払い出し」・節目1000+/コンボ昇格jackpot):
+ *   (イベント側 milestone_jackpot SE) → voice_jackpot → payout SE 1本 の直列。
+ *   チェーン全体を voice_jackpot のゲート(300秒CD/1配信3回)に従属させる=payoutだけ連発する
+ *   積み増しを構造的に防ぐ(§7)。会場windowが開いていれば譲る(二重再生防止)。
+ */
+async function scheduleJackpotVoiceChainPopup() {
+  if (!_effectSoundEnabledCache) return;
+  if (await popupShouldSkipVoiceForVenue()) {
+    _voiceEffectDiagCounters.skippedVenue += 1;
+    _voiceEffectDiagCounters.lastEventAt = Date.now();
+    publishVoiceEffectDiag();
+    return;
+  }
+  const gate = voiceGate(_voiceGateState, 'voice_jackpot', Date.now(), {
+    liveId: watchPopupLastPaintedLiveId,
+    isNarrating: false
+  });
+  _voiceGateState = gate.nextState;
+  _voiceEffectDiagCounters.lastEventAt = Date.now();
+  if (!gate.allowed) {
+    const field = voiceSkipFieldForGateReason(gate.reason);
+    if (field) _voiceEffectDiagCounters[field] += 1;
+    publishVoiceEffectDiag();
+    return;
+  }
+  let atMs = 0;
+  for (const step of planJackpotChain()) {
+    atMs += step.delayMs;
+    window.setTimeout(() => {
+      const result = playEffectSound(step.kind, buildEffectSoundDeps(step.kind));
+      if (step.kind === 'voice_jackpot' && result === 'played') {
+        _voiceEffectDiagCounters.fired += 1;
+        _voiceEffectDiagCounters.lastKey = 'voice_jackpot';
+      }
+      publishVoiceEffectDiag();
+    }, atMs);
+  }
+  publishVoiceEffectDiag();
 }
 
 /** @type {number|null} */
@@ -1703,6 +1855,26 @@ async function maybeCelebrateFromCommentCount(liveId, prev, next) {
       const baseKind = effectSoundKindForPikaTier(pikaTierForSupportCelebration(spec));
       _milestoneComboState = directHit(_milestoneComboState, baseKind || '', Date.now());
       _milestoneEffectDiagCounters.milestoneDirected = (Number(_milestoneEffectDiagCounters.milestoneDirected) || 0) + 1;
+      // Phase B(2026-07-05): パチンコボイス(イベント直結・§3.3)。トリガはここ1箇所に集約する
+      //   (SE再生側 maybePlayMilestoneEffectSound にも置くと、コンボ昇格jackpotで突破チェーンと
+      //   大当たりチェーンが同一イベントから二重起動するため)。優先度は§4.3:
+      //   P1大当たりチェーン(節目1000+/昇格jackpot) > P3突破チェーン(節目500) > P2上乗せボイス。
+      const comboKind = String(_milestoneComboState.kind || '');
+      if (baseKind === 'milestone_jackpot' || comboKind === 'milestone_jackpot') {
+        void scheduleJackpotVoiceChainPopup();
+      } else if (baseKind === 'milestone_hard') {
+        void scheduleBreakthroughVoiceChainPopup();
+      } else if (_milestoneComboState.promotedSteps >= 1) {
+        void popupShouldSkipVoiceForVenue().then((skip) => {
+          if (skip) {
+            _voiceEffectDiagCounters.skippedVenue += 1;
+            _voiceEffectDiagCounters.lastEventAt = Date.now();
+            publishVoiceEffectDiag();
+            return;
+          }
+          tryPlayVoicePopup('voice_kamitsumi');
+        });
+      }
     } catch { /* director段の失敗は計上されない=diffで検知できる */ }
     publishMilestoneEffectDiag();
     await maybePlaySupportCelebration(liveId, spec);

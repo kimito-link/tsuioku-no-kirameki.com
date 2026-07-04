@@ -93,6 +93,10 @@ import {
   bumpCustomSoundRev
 } from '../lib/customSoundStore.js';
 import { buildMilestoneEffectDiagLines, milestoneEffectDiagToActionCards } from '../lib/milestoneEffectDiag.js';
+// Phase B(2026-07-05): パチンコボイス演出(voiceDirector.js)の発火/スキップ内訳を extras(12秒間引き)で
+//   読む。venueBar/popup が書く純観測値=歯止め(個別CD/上限/45秒CD/読み上げ中スキップ)の動作証明。
+import { buildVoiceEffectDiagLines } from '../lib/voiceEffectDiag.js';
+import { KEY_VOICE_EFFECT_DIAG } from '../lib/voiceEffectDiagKey.js';
 // v0.1.1072: マイ効果音(customSoundStore.js・Phase A)の取込状況を extras(12秒間引き)で計測する。
 //   コアreadには足さない(既知の地雷=v1045/v1046)。IDBが開けない環境では静かに「-」表示。
 import { buildCustomSoundDiagSnapshot, buildCustomSoundDiagLine } from '../lib/customSoundDiag.js';
@@ -220,7 +224,9 @@ let _extrasCache = /** @type {{reportPreview:any, watchTabMap:any, trendFindings
   // v0.1.1054: ギフト/広告の「検知→演出→効果音」整合診断。他の観測系と同じく12秒間引きへ。
   giftEffectDiag: null,
   // v0.1.1072: マイ効果音(customSoundStore.js)の取込状況。IDB readのため12秒間引き必須。
-  customSoundDiag: null
+  customSoundDiag: null,
+  // Phase B(v0.1.1073): パチンコボイス演出の発火/スキップ内訳。補助情報=extras(12秒間引き)のみ。
+  voiceEffectDiag: null
 });
 /** v0.1.868: 配信カードの再構築 skip 判定用 signature(変化なしなら innerHTML を作り直さない)。 */
 let _lastLivesSig = '';
@@ -491,14 +497,18 @@ async function refresh(opts = {}) {
       const customSoundDiag = await runStorageOpWithTimeout(() => loadCustomSoundDiagSafe(), tmo).catch(() =>
         buildCustomSoundDiagSnapshot({ dbAvailable: false })
       );
-      _extrasCache = { reportPreview, watchTabMap, trendFindings, laneDiag, laneMirror, statCardsMirror, northStarMirror, voiceDiag, venueSeatsDiag, publishOutcomeRec, commentTimelineMirror, previewRenderAck, backfillLiveMetric, giftEffectDiag, milestoneEffectDiag, customSoundDiag };
+      // Phase B(v0.1.1073): パチンコボイス演出の発火/スキップ内訳も extras(12秒間引き)へ
+      //   (補助情報・コアreadに足さない=既知の地雷)。
+      step = 'loadVoiceEffectDiag';
+      const voiceEffectDiag = await runStorageOpWithTimeout(() => loadVoiceEffectDiagSafe(), tmo).catch(() => null);
+      _extrasCache = { reportPreview, watchTabMap, trendFindings, laneDiag, laneMirror, statCardsMirror, northStarMirror, voiceDiag, venueSeatsDiag, publishOutcomeRec, commentTimelineMirror, previewRenderAck, backfillLiveMetric, giftEffectDiag, milestoneEffectDiag, customSoundDiag, voiceEffectDiag };
       _extrasCacheAt = Date.now();
       _mark('extras');
     }
-    const { reportPreview, watchTabMap, trendFindings, laneDiag, laneMirror, statCardsMirror, northStarMirror, voiceDiag, venueSeatsDiag, publishOutcomeRec, commentTimelineMirror, previewRenderAck, backfillLiveMetric, giftEffectDiag, milestoneEffectDiag, customSoundDiag } = _extrasCache;
+    const { reportPreview, watchTabMap, trendFindings, laneDiag, laneMirror, statCardsMirror, northStarMirror, voiceDiag, venueSeatsDiag, publishOutcomeRec, commentTimelineMirror, previewRenderAck, backfillLiveMetric, giftEffectDiag, milestoneEffectDiag, customSoundDiag, voiceEffectDiag } = _extrasCache;
     step = 'renderAll';
     // v0.1.1005: 前サイクルの所要計器をコピー本文へ渡す(画面ヘッダーだけでなく AI共有テキストにも出す)。
-    renderAll({ lvList, summaries, fastDiag, popupDiag, backfillProgress, backfillLiveMetric, voiceDiag, venueSeatsDiag, laneDiag, laneMirror, statCardsMirror, northStarMirror, reportPreview, trendFindings, watchTabMap, publishOutcomeRec, commentTimelineMirror, previewRenderAck, refreshPerf: _lastRefreshPerf, giftEffectDiag, milestoneEffectDiag, customSoundDiag });
+    renderAll({ lvList, summaries, fastDiag, popupDiag, backfillProgress, backfillLiveMetric, voiceDiag, venueSeatsDiag, laneDiag, laneMirror, statCardsMirror, northStarMirror, reportPreview, trendFindings, watchTabMap, publishOutcomeRec, commentTimelineMirror, previewRenderAck, refreshPerf: _lastRefreshPerf, giftEffectDiag, milestoneEffectDiag, customSoundDiag, voiceEffectDiag });
     _mark('render');
     const _totalMs = Math.round((typeof performance !== 'undefined' ? performance.now() : Date.now()) - _t0);
     updateLastUpdateMeta({ totalMs: _totalMs, stepMs: _stepMs });
@@ -805,6 +815,17 @@ async function loadMilestoneEffectDiagSafe() {
   }
 }
 
+// Phase B(v0.1.1073): venueBar/popup が書く「パチンコボイスの発火/スキップ内訳」を読む。
+//   ボイストリガが一度も無い配信なら null=行を出さない(giftEffectDiag と同方針)。
+async function loadVoiceEffectDiagSafe() {
+  try {
+    const bag = await chrome.storage.local.get(KEY_VOICE_EFFECT_DIAG);
+    return bag?.[KEY_VOICE_EFFECT_DIAG] || null;
+  } catch {
+    return null;
+  }
+}
+
 // v0.1.1072: マイ効果音(customSoundStore.js)の取込状況を読む。status ページ自身が IndexedDB を
 //   直接開いて件数を数える(他ページの publish を待たない=診断ページの統計行と同じ読み方)。
 //   IDBが開けない環境(indexedDB未定義・open失敗)では dbAvailable:false で静かに「-」表示にする。
@@ -1008,7 +1029,7 @@ async function loadBackfillLiveMetricSafe() {
 // v0.1.861: レポートプレビューの信頼度注釈の文脈は純関数 reportPreviewCtxFromFastDiag(src/lib)に抽出済み
 //   (NDGR 接続/userId 付き率/backfill 進行 → 注釈ctx・挙動同値・テストで固定)。import は冒頭。
 
-function renderAll({ lvList, summaries, fastDiag, popupDiag, backfillProgress, backfillLiveMetric, voiceDiag, venueSeatsDiag, laneDiag, laneMirror, statCardsMirror, northStarMirror, reportPreview, trendFindings, watchTabMap, publishOutcomeRec, commentTimelineMirror, previewRenderAck, refreshPerf, giftEffectDiag, milestoneEffectDiag, customSoundDiag }) {
+function renderAll({ lvList, summaries, fastDiag, popupDiag, backfillProgress, backfillLiveMetric, voiceDiag, venueSeatsDiag, laneDiag, laneMirror, statCardsMirror, northStarMirror, reportPreview, trendFindings, watchTabMap, publishOutcomeRec, commentTimelineMirror, previewRenderAck, refreshPerf, giftEffectDiag, milestoneEffectDiag, customSoundDiag, voiceEffectDiag }) {
   // v0.1.847: 各描画セクションを独立 try/catch で隔離するヘルパ。1つが throw しても他のセクションと
   //   最終更新メタを巻き込まない=「セルが全部消える/最終更新—のまま固まる」を根治。落ちた場所は
   //   console と AI 共有欄に出して真因を追えるようにする(star-romi 失敗体験の除去)。
@@ -1139,11 +1160,18 @@ function renderAll({ lvList, summaries, fastDiag, popupDiag, backfillProgress, b
     const cStr = buildCustomSoundDiagLine(customSoundDiag);
     customSoundLine = cStr ? `\n${cStr}` : '';
   });
+  // Phase B(v0.1.1073): パチンコボイスの発火/スキップ内訳を概要に併記(ボイストリガが一度も
+  //   無い配信なら空=ノイズにしない)。歯止め(§4)の動作証明を状態速報1枚で確認できる。
+  let voiceEffectLine = '';
+  safeSection('パチンコボイス計器', () => {
+    const vLines = buildVoiceEffectDiagLines(voiceEffectDiag, Date.now());
+    voiceEffectLine = vLines.length ? `\n${vLines.join('\n')}` : '';
+  });
   const overviewEl = document.getElementById('overviewBody');
   if (overviewEl) {
     overviewEl.textContent =
       (overviewText || '視聴中の配信はありません。') +
-      backfillLine + laneLine + voiceLine + reportPreviewLine + giftEffectLine + milestoneEffectLine + customSoundLine;
+      backfillLine + laneLine + voiceLine + reportPreviewLine + giftEffectLine + milestoneEffectLine + customSoundLine + voiceEffectLine;
     overviewEl.classList.toggle('empty-note', !overviewText);
   }
 
@@ -1316,7 +1344,7 @@ function renderAll({ lvList, summaries, fastDiag, popupDiag, backfillProgress, b
   // AI 共有用テキスト
   let fullText = '';
   safeSection('AI共有テキスト', () => {
-    fullText = buildAiShareFullText({ overviewText, livesData, fastDiag, popupDiag, voiceDiag, venueSeatsDiag, laneDiag, laneMirror, reportPreview, trendFindings, jsonBlob, currentLiveId, publishKeys, publishOutcomeRec, previewRenderAck, refreshPerf, giftEffectDiag, milestoneEffectDiag, customSoundDiag });
+    fullText = buildAiShareFullText({ overviewText, livesData, fastDiag, popupDiag, voiceDiag, venueSeatsDiag, laneDiag, laneMirror, reportPreview, trendFindings, jsonBlob, currentLiveId, publishKeys, publishOutcomeRec, previewRenderAck, refreshPerf, giftEffectDiag, milestoneEffectDiag, customSoundDiag, voiceEffectDiag });
     const ta = /** @type {HTMLTextAreaElement|null} */ (
       document.getElementById('aiShareText')
     );

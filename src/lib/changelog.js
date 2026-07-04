@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1073',
+    date: '2026-07-05',
+    summary: 'パチンコボイス演出+頻度ゲート追加',
+    items: Object.freeze([
+      'コメント数の節目(500/1000件〜)や大きなギフト・コンボ昇格の瞬間に、パチンコ台風のボイス演出(チャンス・突破・大当たり等)が鳴るようになりました。「マイ効果音」でボイス素材を割り当てた場合のみ鳴ります(未割り当てなら無音のまま)。うるさくならないよう、ボイス同士は45秒以上あける・1配信合計20回まで・読み上げ音声の最中は鳴らさない、の3重の歯止め付きです。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1072',
     date: '2026-07-05',
     summary: 'マイ効果音計器をextrasに追加',

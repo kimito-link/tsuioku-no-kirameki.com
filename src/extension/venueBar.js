@@ -83,6 +83,12 @@ import {
 } from '../lib/customSoundStore.js';
 import { KEY_GIFT_EFFECT_DIAG } from '../lib/giftEffectDiagKey.js';
 import { makeInitialGiftEffectDiag, buildGiftEffectDiagSnapshot } from '../lib/giftEffectDiag.js';
+// Phase B(2026-07-05): パチンコボイス演出+歯止め(council/pachinko-ultimate-SYNTHESIS.md §4/§6)。
+//   voiceGate=事象履歴の純関数(個別CD/上限+グローバル45秒CD+1配信20回+VOICEVOX発話中スキップ)。
+//   再生は既存 playEffectSound+buildEffectSoundDeps 経由(カスタム未割当キーは no-path 無音=安全)。
+import { makeInitialVoiceGateState, voiceGate, planJackpotChain } from '../lib/voiceDirector.js';
+import { makeInitialVoiceEffectDiag, buildVoiceEffectDiagSnapshot, voiceSkipFieldForGateReason } from '../lib/voiceEffectDiag.js';
+import { KEY_VOICE_EFFECT_DIAG } from '../lib/voiceEffectDiagKey.js';
 import { anonymousIdenticonDataUrl } from '../lib/anonymousIdenticon.js';
 import { tailStorageKey } from '../lib/commentTailBuffer.js';
 import { pickNewVenueSpeech, mergeSpeakersIntoVenueRows, liveFeedSpeechRows } from '../lib/venueSpeech.js';
@@ -2132,6 +2138,95 @@ export function mountVenueBarButton(options = {}) {
     void chrome.storage.local.set({ [KEY_GIFT_EFFECT_DIAG]: snap }).catch(() => {});
   };
 
+  // Phase B(2026-07-05): パチンコボイス演出+歯止め(council/pachinko-ultimate-SYNTHESIS.md §4/§6)。
+  //   本Phaseはイベント直結トリガのみ(メーターR条件のボイスはPhase C)。
+  //   voiceGate は事象履歴の純関数=決定論(乱数なし)。state はコンテキスト内メモリで持ち回す。
+  let _voiceGateState = makeInitialVoiceGateState();
+  const _voiceEffectDiagCounters = makeInitialVoiceEffectDiag();
+  let _voiceEffectDiagLastWriteAt = 0;
+  const publishVoiceEffectDiag = () => {
+    const now = Date.now();
+    if (now - _voiceEffectDiagLastWriteAt < 3000) return; // 3秒 min-gap(他の診断と同型)。
+    _voiceEffectDiagLastWriteAt = now;
+    _voiceEffectDiagCounters.soundEnabled = _effectSoundEnabledCache;
+    const snap = { ...buildVoiceEffectDiagSnapshot(_voiceEffectDiagCounters, now), source: 'venue' };
+    void chrome.storage.local.set({ [KEY_VOICE_EFFECT_DIAG]: snap }).catch(() => {});
+  };
+  // VOICEVOX発話中判定(§4.3)。読み上げ側(voicePlayer)は改変せず、再生中フラグと待機キュー長を
+  //   読み取り専用で参照するだけ。発話中(またはキュー2件以上)は voice_* をスキップして諦める
+  //   (遅延再生禁止=文脈がズレた頃に鳴る事故の禁止)。
+  const isNarratingNow = () => {
+    try {
+      return voicePlayer.playing === true || (Array.isArray(voicePlayer.queue) && voicePlayer.queue.length >= 2);
+    } catch {
+      return false;
+    }
+  };
+  /**
+   * ボイス1本をゲート(個別CD/上限・グローバル45秒CD・1配信20回・VOICEVOXスキップ)経由で鳴らす。
+   * @param {string} key voice_* のいずれか
+   * @returns {'played'|'off'|string} 'played'=実際に鳴らした。それ以外はスキップ理由等。
+   */
+  const tryPlayVoice = (key) => {
+    if (!_effectSoundEnabledCache) return 'off';
+    const gate = voiceGate(_voiceGateState, key, Date.now(), {
+      liveId: speechLiveId,
+      isNarrating: isNarratingNow()
+    });
+    _voiceGateState = gate.nextState;
+    _voiceEffectDiagCounters.lastEventAt = Date.now();
+    if (!gate.allowed) {
+      const field = voiceSkipFieldForGateReason(gate.reason);
+      if (field) _voiceEffectDiagCounters[field] += 1;
+      publishVoiceEffectDiag();
+      return gate.reason;
+    }
+    // 「鳴らした」時だけ数える(戻り値を見ずに数えると診断が嘘をつく・v0.1.1057と同じ教訓)。
+    const result = playEffectSound(key, buildEffectSoundDeps(key));
+    if (result === 'played') {
+      _voiceEffectDiagCounters.fired += 1;
+      _voiceEffectDiagCounters.lastKey = key;
+    }
+    publishVoiceEffectDiag();
+    return result;
+  };
+  /**
+   * 大当たりチェーン(§3.3「突破→大当たり」「大当たり→払い出し」のイベント駆動分)。
+   *   (イベント側 gift_mega SE=scheduleGiftSound が既に予約) → voice_jackpot → payout SE 1本 の直列。
+   *   チェーン全体を voice_jackpot のゲート(300秒CD/1配信3回)に従属させる=バースト時に payout だけ
+   *   連発する積み増しを構造的に防ぐ(§7 音の積み増し禁止)。ゲートが通らなければ何も足さない
+   *   (イベント側SEは鳴っているので演出は欠落しない)。
+   */
+  const scheduleJackpotVoiceChain = () => {
+    if (!_effectSoundEnabledCache) return;
+    const gate = voiceGate(_voiceGateState, 'voice_jackpot', Date.now(), {
+      liveId: speechLiveId,
+      isNarrating: isNarratingNow() // voice_jackpot は§4.3の唯一の例外=narrating では拒否されない
+    });
+    _voiceGateState = gate.nextState;
+    _voiceEffectDiagCounters.lastEventAt = Date.now();
+    if (!gate.allowed) {
+      const field = voiceSkipFieldForGateReason(gate.reason);
+      if (field) _voiceEffectDiagCounters[field] += 1;
+      publishVoiceEffectDiag();
+      return;
+    }
+    // planJackpotChain の delayMs は「直前ステップからの遅延」= 累積して直列にスケジュールする。
+    let atMs = 0;
+    for (const step of planJackpotChain()) {
+      atMs += step.delayMs;
+      window.setTimeout(() => {
+        const result = playEffectSound(step.kind, buildEffectSoundDeps(step.kind));
+        if (step.kind === 'voice_jackpot' && result === 'played') {
+          _voiceEffectDiagCounters.fired += 1;
+          _voiceEffectDiagCounters.lastKey = 'voice_jackpot';
+        }
+        publishVoiceEffectDiag();
+      }, atMs);
+    }
+    publishVoiceEffectDiag();
+  };
+
   // v0.1.1061: ギフト音のバースト置換+着弾同期(実試聴フィードバック「出ない・ずれる」の根治)。
   //   従来は 1 ギフト=1 playEffectSound 即時呼びだったため、storage 経由でまとめて届くバーストでは
   //   (a)同ティア連続が 600ms ガードに食われ2発目以降が無音=「出ないときがある」
@@ -2156,6 +2251,15 @@ export function mountVenueBarButton(options = {}) {
       windowMs: GIFT_COMBO_WINDOW_MS
     });
     const kind = _giftComboState.kind || baseKind;
+    // Phase B(2026-07-05): パチンコボイス(イベント直結・council/pachinko-ultimate-SYNTHESIS.md §3.3)。
+    //   優先度は§4.3: P1大当たりチェーン > P2ボイス。gift_mega(直撃/コンボ昇格の結果)は
+    //   voice_jackpot→payoutチェーン、それ以外の昇格(promotedSteps≥1)は「上乗せ」ボイス。
+    //   連打はvoiceGate(個別CD+グローバル45秒CD)が自然に間引く=45秒CDで1回だけ鳴る。
+    if (kind === 'gift_mega') {
+      scheduleJackpotVoiceChain();
+    } else if (_giftComboState.promotedSteps >= 1) {
+      tryPlayVoice('voice_kamitsumi');
+    }
     if (_pendingGiftSound) {
       // 置換: 予約済みの1本を昇格させるだけ(音を積み増ししない=太鼓の達人式)。
       _pendingGiftSound.kind = kind;
