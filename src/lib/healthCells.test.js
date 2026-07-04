@@ -612,4 +612,45 @@ describe('summarizeHealthVerdict v0.1.846 満点=「異常ゼロ」(進行中/�
       expect(c.text).toContain('全員');
     });
   });
+
+  // v0.1.1054: ギフト/広告の「検知→演出→効果音」整合セル。
+  describe('ギフト演出/効果音整合セル(giftEffectDiag)', () => {
+    it('giftEffectDiag 未指定/未観測(検知0件)=セルを足さない(死にセルにしない)', () => {
+      expect(cellById(buildHealthCells({ livesData: [] }), 'gift-effect')).toBeUndefined();
+      expect(
+        cellById(
+          buildHealthCells({ livesData: [], giftEffectDiag: { giftDetected: 0, adDetected: 0 } }),
+          'gift-effect'
+        )
+      ).toBeUndefined();
+    });
+
+    it('全て演出/音まで到達していれば ok', () => {
+      const cells = buildHealthCells({
+        livesData: [],
+        giftEffectDiag: { giftDetected: 3, giftThrown: 3, giftSoundPlayed: 3, soundEnabled: true }
+      });
+      const c = cellById(cells, 'gift-effect');
+      expect(c.level).toBe('ok');
+    });
+
+    it('演出/音の取りこぼしがあれば warn', () => {
+      const cells = buildHealthCells({
+        livesData: [],
+        giftEffectDiag: { giftDetected: 5, giftThrown: 3, giftSoundPlayed: 3, soundEnabled: true }
+      });
+      const c = cellById(cells, 'gift-effect');
+      expect(c.level).toBe('warn');
+      expect(c.text).toContain('演出漏れ2件');
+    });
+
+    it('効果音OFFなら音0件でも warn にしない(誤診断防止)', () => {
+      const cells = buildHealthCells({
+        livesData: [],
+        giftEffectDiag: { giftDetected: 5, giftThrown: 5, giftSoundPlayed: 0, soundEnabled: false }
+      });
+      const c = cellById(cells, 'gift-effect');
+      expect(c.level).toBe('ok');
+    });
+  });
 });

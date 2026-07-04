@@ -20,8 +20,24 @@ describe('diagnosisRegistry の網羅性(これが「抜けを構造的に無く
         }
       },
       voiceDiag: { enabled: true, spokenTotal: 5, lastSpokenBase: 1, staleDropTotal: 0 },
-      venueSeatsDiag: { enabled: true, broadcasterKnown: true, broadcasterInSeats: false, seatsShown: 8, participantCount: 8, lastUpdateAt: 1 },
-      laneDiag: { liveId: 'lv1', identified: 3, laneShown: 3 },
+      // v0.1.1054: perRow/seatAreaWidth を渡して venue-seats-visible も発生させる
+      //   (この2フィールドが無いとセルが生まれず、レジストリ登録漏れがテストをすり抜ける実例だった)。
+      venueSeatsDiag: {
+        enabled: true,
+        broadcasterKnown: true,
+        broadcasterInSeats: false,
+        seatsShown: 8,
+        participantCount: 8,
+        lastUpdateAt: 1,
+        perRow: 4,
+        venueMaxRows: 2,
+        seatAreaWidth: 800,
+        hardCap: 500
+      },
+      // v0.1.1054: paintMs を渡して lane-paint も発生させる(同上・登録漏れ再発防止)。
+      laneDiag: { liveId: 'lv1', identified: 3, laneShown: 3, paintMs: 10 },
+      // v0.1.1054: giftDetected>0 を渡して gift-effect も発生させる(同上・登録漏れ再発防止)。
+      giftEffectDiag: { giftDetected: 1, giftThrown: 1, giftSoundPlayed: 1, soundEnabled: true },
       nowMs: 1000
     });
     const ids = cells.map((c) => c.id);
