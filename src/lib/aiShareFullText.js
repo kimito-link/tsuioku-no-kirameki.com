@@ -39,6 +39,7 @@ import { buildMilestoneEffectDiagLines, milestoneEffectDiagToActionCards } from 
 import { buildCustomSoundDiagLine } from './customSoundDiag.js';
 // Phase B(v0.1.1073): パチンコボイス演出の発火/スキップ内訳(extras 12秒間引き)をAI共有本文にも併記。
 import { buildVoiceEffectDiagLines } from './voiceEffectDiag.js';
+import { buildBgmPhaseDiagLines } from './bgmPhaseDiag.js';
 import { reportPreviewCtxFromFastDiag } from './reportPreviewCtx.js';
 import { buildReportPreviewLines } from './reportPreview.js';
 import { buildStatusActions } from './statusActionAdvisor.js';
@@ -72,7 +73,7 @@ export function formatRefreshPerfLine(refreshPerf) {
  * @param {any} args
  * @returns {string}
  */
-export function buildAiShareFullText({ overviewText, livesData, fastDiag, popupDiag, voiceDiag, venueSeatsDiag, laneDiag, laneMirror, reportPreview, trendFindings, jsonBlob, currentLiveId, publishKeys, publishOutcomeRec, previewRenderAck, refreshPerf, giftEffectDiag, milestoneEffectDiag, customSoundDiag, voiceEffectDiag }) {
+export function buildAiShareFullText({ overviewText, livesData, fastDiag, popupDiag, voiceDiag, venueSeatsDiag, laneDiag, laneMirror, reportPreview, trendFindings, jsonBlob, currentLiveId, publishKeys, publishOutcomeRec, previewRenderAck, refreshPerf, giftEffectDiag, milestoneEffectDiag, customSoundDiag, voiceEffectDiag, bgmPhaseDiag }) {
   const lines = [];
   lines.push('## 君斗りんくの追憶のきらめき 状態速報');
   lines.push(`生成: ${new Date().toISOString()}`);
@@ -249,6 +250,13 @@ export function buildAiShareFullText({ overviewText, livesData, fastDiag, popupD
     try {
       const vLines = buildVoiceEffectDiagLines(voiceEffectDiag, Date.now());
       for (const l of vLines) lines.push(l);
+    } catch {
+      /* no-op */
+    }
+    // Phase C(v0.1.1074): BGM in/out・現在フェーズ・R値・B値(未観測なら空=ノイズにしない)。
+    try {
+      const bLines = buildBgmPhaseDiagLines(bgmPhaseDiag, Date.now());
+      for (const l of bLines) lines.push(l);
     } catch {
       /* no-op */
     }

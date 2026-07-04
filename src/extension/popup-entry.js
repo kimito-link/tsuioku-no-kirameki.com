@@ -207,7 +207,11 @@ import {
   KEY_EFFECT_SOUND_ENABLED,
   KEY_CUSTOM_SOUND_REV,
   KEY_VENUE_EFFECT_SOUND_PRESENCE,
-  isEffectSoundEnabled
+  isEffectSoundEnabled,
+  KEY_BGM_ENABLED,
+  KEY_BGM_VOLUME_REACH,
+  KEY_BGM_VOLUME_FEVER,
+  isBgmEnabled
 } from '../lib/storageKeys.js';
 import {
   playEffectSound,
@@ -228,6 +232,36 @@ import {
 } from '../lib/voiceDirector.js';
 import { makeInitialVoiceEffectDiag, buildVoiceEffectDiagSnapshot, voiceSkipFieldForGateReason } from '../lib/voiceEffectDiag.js';
 import { KEY_VOICE_EFFECT_DIAG } from '../lib/voiceEffectDiagKey.js';
+// Phase C(2026-07-05): 物語弧の完成(council/pachinko-ultimate-SYNTHESIS.md §3/§5/§6)。
+//   meterStateFor(既存M)→baselineFor(B)→R→phaseForの決定論ステートマシンでフェーズを進め、
+//   遷移の瞬間だけR条件ボイス/BGMを発火する。venueBar.jsと同型の配線(会場優先で二重発音しない)。
+import { meterStateFor, makeInitialExcitementMeter } from '../lib/effectDirector.js';
+import {
+  baselineFor,
+  rWithWarmup,
+  phaseFor,
+  makeInitialBaselineState,
+  makeInitialPhaseState,
+  PHASE
+} from '../lib/phaseDirector.js';
+import {
+  createBgmRuntime,
+  reachBgmDecision,
+  makeInitialReachBgmState,
+  feverBgmStart,
+  feverBgmExtend,
+  feverBgmShouldEnd,
+  feverBgmStop,
+  makeInitialFeverBgmState,
+  reachLoopVariantIndex,
+  feverLoopVariantIndex,
+  clampBgmVolume,
+  BGM_REACH_DEFAULT_VOLUME,
+  BGM_FEVER_DEFAULT_VOLUME,
+  FADE_MS
+} from '../lib/bgmDirector.js';
+import { makeInitialBgmPhaseDiag, buildBgmPhaseDiagSnapshot } from '../lib/bgmPhaseDiag.js';
+import { KEY_BGM_PHASE_DIAG } from '../lib/bgmPhaseDiagKey.js';
 import { maybePlayEventRankChangeSound } from '../lib/officialEventRankSoundEffect.js';
 // Phase A(2026-07-05): マイ効果音差し替え(IndexedDB取込+割当)。起動時+customSoundRev変化時に
 //   customVariantPaths を再構築し、playEffectSound の deps へカスタム優先で注入する
@@ -1097,6 +1131,180 @@ async function scheduleJackpotVoiceChainPopup() {
   publishVoiceEffectDiag();
 }
 
+/* ============================================================================
+ * Phase C(2026-07-05): 物語弧の完成(council/pachinko-ultimate-SYNTHESIS.md §3/§5/§6)。
+ *   meterStateFor(既存M)→baselineFor(B)→R→phaseFor の決定論ステートマシンでフェーズを進め、
+ *   遷移の瞬間だけR条件ボイス/BGMを発火する。popup側は会場windowが開いていれば譲る(二重再生防止)。
+ * ========================================================================== */
+
+/** メーター重み(§3.2表・popup側で観測できる範囲): コメント+1・節目到達+10。 */
+const METER_WEIGHT_COMMENT_POPUP = 1;
+const METER_WEIGHT_MILESTONE_POPUP = 10;
+
+let _meterStatePopup = makeInitialExcitementMeter();
+let _baselineStatePopup = makeInitialBaselineState();
+let _phaseStatePopup = makeInitialPhaseState(Date.now());
+/** 配信検知時刻(ウォームアップ3分の起点・liveId切替でリセット)。0=未検知。 */
+let _streamDetectedAtMsPopup = 0;
+let _phaseLiveIdPopup = '';
+let _reachBgmStatePopup = makeInitialReachBgmState();
+let _feverBgmStatePopup = makeInitialFeverBgmState();
+let _bgmEnabledCachePopup = false; // 既定OFF(オプトイン・§5.1)
+let _bgmVolumeReachCache = BGM_REACH_DEFAULT_VOLUME;
+let _bgmVolumeFeverCache = BGM_FEVER_DEFAULT_VOLUME;
+const _bgmRuntimePopup = createBgmRuntime();
+void chrome.storage.local.get([KEY_BGM_ENABLED, KEY_BGM_VOLUME_REACH, KEY_BGM_VOLUME_FEVER]).then((bag) => {
+  _bgmEnabledCachePopup = isBgmEnabled(bag?.[KEY_BGM_ENABLED]);
+  if (Number.isFinite(Number(bag?.[KEY_BGM_VOLUME_REACH]))) _bgmVolumeReachCache = clampBgmVolume(Number(bag[KEY_BGM_VOLUME_REACH]));
+  if (Number.isFinite(Number(bag?.[KEY_BGM_VOLUME_FEVER]))) _bgmVolumeFeverCache = clampBgmVolume(Number(bag[KEY_BGM_VOLUME_FEVER]));
+}).catch(() => {});
+
+const _bgmPhaseDiagCountersPopup = makeInitialBgmPhaseDiag();
+let _bgmPhaseDiagLastWriteAtPopup = 0;
+function publishBgmPhaseDiagPopup() {
+  const now = Date.now();
+  if (now - _bgmPhaseDiagLastWriteAtPopup < 3000) return; // 3秒 min-gap(他の診断と同型)。
+  _bgmPhaseDiagLastWriteAtPopup = now;
+  _bgmPhaseDiagCountersPopup.bgmEnabled = _bgmEnabledCachePopup;
+  const snap = buildBgmPhaseDiagSnapshot(_bgmPhaseDiagCountersPopup, now);
+  void chrome.storage.local.set({ [KEY_BGM_PHASE_DIAG]: snap }).catch(() => {});
+}
+
+/**
+ * カスタム割当済みBGM URLを1本選ぶ(§5.3決定論ローテーション)。未割当キーは空文字(no-path扱い=
+ *   bgmDirector.createBgmRuntime().start()が「urlが無ければ何もしない」で安全側に倒す)。
+ * @param {string} key
+ * @param {number} [variantIndex]
+ * @returns {string}
+ */
+function resolveBgmUrlPopup(key, variantIndex) {
+  const variants = _customSoundState.customVariantPaths[key];
+  if (!Array.isArray(variants) || variants.length === 0) return '';
+  const idx = Number.isFinite(Number(variantIndex)) ? Math.max(0, Number(variantIndex)) % variants.length : 0;
+  return getUrlForCustomSound(variants[idx], (q) => chrome.runtime.getURL(q));
+}
+
+/** フィーバー終了(§5.2「アウト3.0秒→bgm_jingle_win」)。 */
+function endFeverBgmPopup() {
+  _bgmRuntimePopup.stop(FADE_MS.feverOut, () => {
+    const winUrl = resolveBgmUrlPopup('bgm_jingle_win', 0);
+    if (winUrl) playEffectSound('bgm_jingle_win', { ...buildEffectSoundDeps('bgm_jingle_win'), getUrl: () => winUrl });
+  });
+  _feverBgmStatePopup = feverBgmStop(_feverBgmStatePopup);
+  _bgmPhaseDiagCountersPopup.feverOutCount += 1;
+  _bgmPhaseDiagCountersPopup.lastEventAt = Date.now();
+  publishBgmPhaseDiagPopup();
+}
+
+/** フィーバー開始(payoutチェーン完了合図)。bgm_jingle_stage(直列)→ループイン(§3.3/§5.2)。 */
+async function startFeverBgmPopup() {
+  if (await popupShouldSkipVoiceForVenue()) return; // 会場優先(二重再生防止)。
+  const startDecision = feverBgmStart(_feverBgmStatePopup, Date.now(), { bgmEnabled: _bgmEnabledCachePopup });
+  if (startDecision.action !== 'start') return;
+  _feverBgmStatePopup = startDecision.nextState;
+  const stageUrl = resolveBgmUrlPopup('bgm_jingle_stage', (_feverBgmStatePopup.loopIndex - 1) % 2);
+  if (stageUrl) playEffectSound('bgm_jingle_stage', { ...buildEffectSoundDeps('bgm_jingle_stage'), getUrl: () => stageUrl });
+  const loopUrl = resolveBgmUrlPopup('bgm_fever_loop', feverLoopVariantIndex(_feverBgmStatePopup.loopIndex));
+  _bgmRuntimePopup.start(loopUrl, _bgmVolumeFeverCache, FADE_MS.feverIn);
+  _bgmPhaseDiagCountersPopup.feverInCount += 1;
+  _bgmPhaseDiagCountersPopup.lastEventAt = Date.now();
+  publishBgmPhaseDiagPopup();
+  tryPlayVoicePopup('voice_stage');
+}
+
+/** リーチBGMのin/out判定を1歩進める(§5.2)。 */
+function tickReachBgmPopup(phase, R, nowMs) {
+  const decision = reachBgmDecision(_reachBgmStatePopup, phase, R, nowMs, { bgmEnabled: _bgmEnabledCachePopup });
+  _reachBgmStatePopup = decision.nextState;
+  if (decision.action === 'start') {
+    const url = resolveBgmUrlPopup('bgm_reach_loop', reachLoopVariantIndex(_reachBgmStatePopup.loopIndex));
+    _bgmRuntimePopup.start(url, _bgmVolumeReachCache, decision.fadeMs);
+    _bgmPhaseDiagCountersPopup.reachInCount += 1;
+    _bgmPhaseDiagCountersPopup.lastEventAt = Date.now();
+    publishBgmPhaseDiagPopup();
+  } else if (decision.action === 'stop') {
+    _bgmRuntimePopup.stop(decision.fadeMs);
+    _bgmPhaseDiagCountersPopup.reachOutCount += 1;
+    _bgmPhaseDiagCountersPopup.lastEventAt = Date.now();
+    publishBgmPhaseDiagPopup();
+  }
+}
+
+/**
+ * フェーズディレクターを1歩進める(§6 Phase C の核)。popup側の呼び出し元は
+ *   noteCommentMilestoneHighWater(コメント数delta)+maybeCelebrateFromCommentCount(節目到達)。
+ *   会場windowが開いていればボイス/BGMは譲る(二重再生防止・メーター計算自体は各コンテキストで独立)。
+ * @param {{ addWeight?: number, milestoneApproach?: boolean, milestoneHit500?: boolean,
+ *   milestoneHit1000Plus?: boolean, giftLargeOrAbove?: boolean, giftMega?: boolean, comboStreak?: number }} [events]
+ */
+async function advancePhaseDirectorPopup(events = {}) {
+  const now = Date.now();
+  const lid = String(watchPopupLastPaintedLiveId || '');
+  if (_phaseLiveIdPopup !== lid) {
+    // liveId切替: フェーズ関連stateを全リセット(ウォームアップも仕切り直し・§3.2)。
+    _phaseLiveIdPopup = lid;
+    _meterStatePopup = makeInitialExcitementMeter();
+    _baselineStatePopup = makeInitialBaselineState();
+    _phaseStatePopup = makeInitialPhaseState(now);
+    _streamDetectedAtMsPopup = now;
+    _reachBgmStatePopup = makeInitialReachBgmState();
+  }
+  if (_streamDetectedAtMsPopup === 0) _streamDetectedAtMsPopup = now;
+  const dtMs = _meterStatePopup.updatedAt > 0 ? now - _meterStatePopup.updatedAt : 0;
+  _meterStatePopup = meterStateFor(_meterStatePopup, now, Math.max(0, Number(events.addWeight) || 0));
+  _baselineStatePopup = baselineFor(_baselineStatePopup, _meterStatePopup.value, dtMs);
+  const r = rWithWarmup(_meterStatePopup.value, _baselineStatePopup.value, now - _streamDetectedAtMsPopup);
+  const prevPhase = _phaseStatePopup.phase;
+  const prevHighestR = Number(_phaseStatePopup.highestR) || 0;
+  const result = phaseFor(_phaseStatePopup, r, events, now);
+  _phaseStatePopup = result.nextState;
+  _bgmPhaseDiagCountersPopup.phase = result.phase;
+  _bgmPhaseDiagCountersPopup.r = r;
+  _bgmPhaseDiagCountersPopup.b = _baselineStatePopup.value;
+  _bgmPhaseDiagCountersPopup.lastEventAt = now;
+
+  const skipForVenue = await popupShouldSkipVoiceForVenue();
+
+  if (result.holdLampFired && _effectSoundEnabledCache && !skipForVenue) {
+    playEffectSound('hold_lamp', buildEffectSoundDeps('hold_lamp'));
+  }
+
+  if (result.changed && !result.silent && !skipForVenue) {
+    if (prevPhase === PHASE.NORMAL && result.phase === PHASE.ATSUI) {
+      tryPlayVoicePopup('voice_chance');
+    } else if (result.phase === PHASE.REACH) {
+      if (_effectSoundEnabledCache) playEffectSound('reach', buildEffectSoundDeps('reach'));
+      tryPlayVoicePopup('voice_atsui');
+    } else if (result.phase === PHASE.PAYOUT && prevPhase === PHASE.JACKPOT) {
+      if (_effectSoundEnabledCache) playEffectSound('payout', buildEffectSoundDeps('payout'));
+      void startFeverBgmPopup();
+    }
+  }
+
+  if (!skipForVenue && r >= 6.0 && r > prevHighestR) {
+    tryPlayVoicePopup('voice_max');
+  }
+
+  if (!skipForVenue) {
+    tickReachBgmPopup(result.phase, r, now);
+    if (_feverBgmStatePopup.playing) {
+      if (events.giftMega || events.milestoneHit1000Plus) _feverBgmStatePopup = feverBgmExtend(_feverBgmStatePopup);
+      if (feverBgmShouldEnd(_feverBgmStatePopup, now)) {
+        endFeverBgmPopup();
+        _phaseStatePopup = phaseFor(_phaseStatePopup, r, { payoutChainDone: true }, now).nextState;
+      }
+    }
+  }
+  publishBgmPhaseDiagPopup();
+}
+
+// Phase C: フィーバー中の音量ダック(VOICEVOX読み上げはpopup文脈に無いため常時unduck扱い)+
+//   受動tick(イベントが無い間も減衰/降格/リーチ120秒上限/フィーバー終了判定を進める)。
+//   新規のstorage/直列readは増やさない(純粋な時間計算のみ)。
+window.setInterval(() => {
+  if (_streamDetectedAtMsPopup > 0) void advancePhaseDirectorPopup({});
+}, 1000);
+
 /** @type {number|null} */
 let _prevEventBannerRank = null;
 
@@ -1834,6 +2042,8 @@ function noteCommentMilestoneHighWater(liveId, appRecordCount) {
   const next = Math.floor(appRecordCount);
   const prev = _prevMilestoneCommentHighWater;
   if (prev != null && next > prev) {
+    // Phase C(§3.2): コメント+1をメーターへ加算(delta分まとめて1回のtickで進める)。
+    void advancePhaseDirectorPopup({ addWeight: METER_WEIGHT_COMMENT_POPUP * (next - prev) });
     void maybeCelebrateFromCommentCount(lid, prev, next);
   }
   _prevMilestoneCommentHighWater = next;
@@ -1860,7 +2070,8 @@ async function maybeCelebrateFromCommentCount(liveId, prev, next) {
       //   大当たりチェーンが同一イベントから二重起動するため)。優先度は§4.3:
       //   P1大当たりチェーン(節目1000+/昇格jackpot) > P3突破チェーン(節目500) > P2上乗せボイス。
       const comboKind = String(_milestoneComboState.kind || '');
-      if (baseKind === 'milestone_jackpot' || comboKind === 'milestone_jackpot') {
+      const isJackpotMilestone = baseKind === 'milestone_jackpot' || comboKind === 'milestone_jackpot';
+      if (isJackpotMilestone) {
         void scheduleJackpotVoiceChainPopup();
       } else if (baseKind === 'milestone_hard') {
         void scheduleBreakthroughVoiceChainPopup();
@@ -1875,6 +2086,13 @@ async function maybeCelebrateFromCommentCount(liveId, prev, next) {
           tryPlayVoicePopup('voice_kamitsumi');
         });
       }
+      // Phase C(§3.2/§3.3): 節目到達+10をメーターへ加算し、節目500/1000+をフェーズ層へ伝える。
+      void advancePhaseDirectorPopup({
+        addWeight: METER_WEIGHT_MILESTONE_POPUP,
+        milestoneHit500: baseKind === 'milestone_hard',
+        milestoneHit1000Plus: isJackpotMilestone,
+        comboStreak: _milestoneComboState.comboCount
+      });
     } catch { /* director段の失敗は計上されない=diffで検知できる */ }
     publishMilestoneEffectDiag();
     await maybePlaySupportCelebration(liveId, spec);
@@ -7531,6 +7749,26 @@ function initCustomSoundRuntimeOnce() {
       refreshCustomSoundState();
     });
   }
+}
+
+// Phase C(2026-07-05): BGM設定(トグル/音量)を別ページ(status.html)で変えても、開きっぱなしの
+//   popupに反映されるようにする(effectSoundEnabledには同種の即時反映が無いが、BGMは常時鳴る
+//   ループのため反映漏れが体感に直結しやすい・opt-in設計の安全側)。
+if (typeof chrome !== 'undefined' && chrome.storage?.onChanged?.addListener) {
+  chrome.storage.onChanged.addListener((changes, area) => {
+    if (area !== 'local') return;
+    if (changes[KEY_BGM_ENABLED]) {
+      _bgmEnabledCachePopup = isBgmEnabled(changes[KEY_BGM_ENABLED].newValue);
+      const el = /** @type {HTMLInputElement|null} */ ($('bgmEnabledToggle'));
+      if (el) el.checked = _bgmEnabledCachePopup;
+    }
+    if (changes[KEY_BGM_VOLUME_REACH] && Number.isFinite(Number(changes[KEY_BGM_VOLUME_REACH].newValue))) {
+      _bgmVolumeReachCache = clampBgmVolume(Number(changes[KEY_BGM_VOLUME_REACH].newValue));
+    }
+    if (changes[KEY_BGM_VOLUME_FEVER] && Number.isFinite(Number(changes[KEY_BGM_VOLUME_FEVER].newValue))) {
+      _bgmVolumeFeverCache = clampBgmVolume(Number(changes[KEY_BGM_VOLUME_FEVER].newValue));
+    }
+  });
 }
 /**
  * playEffectSound呼び出し共通のdeps組み立て(カスタム優先マージ+決定論順繰りrng+gain反映)。
@@ -13765,6 +14003,20 @@ async function refresh() {
     effectSoundEl.disabled = false;
   }
 
+  // Phase C(2026-07-05): パチンコBGM ON/OFF(既定OFF)。
+  _bgmEnabledCachePopup = isBgmEnabled(openBag[KEY_BGM_ENABLED]);
+  const bgmEnabledEl = /** @type {HTMLInputElement|null} */ ($('bgmEnabledToggle'));
+  if (bgmEnabledEl) {
+    bgmEnabledEl.checked = _bgmEnabledCachePopup;
+    bgmEnabledEl.disabled = false;
+  }
+  if (Number.isFinite(Number(openBag[KEY_BGM_VOLUME_REACH]))) {
+    _bgmVolumeReachCache = clampBgmVolume(Number(openBag[KEY_BGM_VOLUME_REACH]));
+  }
+  if (Number.isFinite(Number(openBag[KEY_BGM_VOLUME_FEVER]))) {
+    _bgmVolumeFeverCache = clampBgmVolume(Number(openBag[KEY_BGM_VOLUME_FEVER]));
+  }
+
   // 視聴ページでインラインパネルを自動表示するかどうか。
   // 既定 true（従来動作）。OFF にするとツールバーアイコンを押すまで出てこない。
   const inlinePanelAutoshowEl = /** @type {HTMLInputElement|null} */ (
@@ -18449,6 +18701,19 @@ async function initPopup() {
       const ok = await storageSetSafe({ [KEY_EFFECT_SOUND_ENABLED]: effectSoundToggle.checked });
       if (!ok) return;
       _effectSoundEnabledCache = effectSoundToggle.checked;
+    } catch {
+      //
+    }
+  });
+
+  // Phase C(2026-07-05・council/pachinko-ultimate-SYNTHESIS.md §5.1): パチンコBGM(既定OFF)。
+  const bgmEnabledToggle = /** @type {HTMLInputElement|null} */ ($('bgmEnabledToggle'));
+  if (bgmEnabledToggle) bgmEnabledToggle.checked = _bgmEnabledCachePopup;
+  bgmEnabledToggle?.addEventListener('change', async () => {
+    try {
+      const ok = await storageSetSafe({ [KEY_BGM_ENABLED]: bgmEnabledToggle.checked });
+      if (!ok) return;
+      _bgmEnabledCachePopup = bgmEnabledToggle.checked;
     } catch {
       //
     }

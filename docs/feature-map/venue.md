@@ -5,8 +5,8 @@
 
 ## storage の出入り
 
-- 書くキー: `KEY_GIFT_EFFECT_DIAG`, `KEY_VENUE_EFFECT_SOUND_PRESENCE`, `KEY_VENUE_SEATS_DIAG`, `KEY_VOICE_DIAG`, `KEY_VOICE_EFFECT_DIAG`
-- 読むキー: `KEY_EFFECT_SOUND_ENABLED`, `KEY_LIVE_BROADCASTER_CTX`, `KEY_USER_COMMENT_PROFILE_CACHE`
+- 書くキー: `KEY_BGM_PHASE_DIAG`, `KEY_GIFT_EFFECT_DIAG`, `KEY_VENUE_EFFECT_SOUND_PRESENCE`, `KEY_VENUE_SEATS_DIAG`, `KEY_VOICE_DIAG`, `KEY_VOICE_EFFECT_DIAG`
+- 読むキー: `KEY_BGM_ENABLED`, `KEY_BGM_VOLUME_FEVER`, `KEY_BGM_VOLUME_REACH`, `KEY_EFFECT_SOUND_ENABLED`, `KEY_LIVE_BROADCASTER_CTX`, `KEY_USER_COMMENT_PROFILE_CACHE`
 
 ## 構成ファイル（import 到達・最大40件表示）
 
@@ -21,6 +21,9 @@ graph LR
   n_venue --> n_src_lib_avatarPartsComposer_js["lib/avatarPartsComposer.js"]:::shared
   n_venue --> n_src_lib_avatarUrlCompare_js["lib/avatarUrlCompare.js"]:::shared
   n_venue --> n_src_lib_backfillRemoveRecommendedLivePollution_js["lib/backfillRemoveRecommendedLivePollution.js"]:::shared
+  n_venue --> n_src_lib_bgmDirector_js["lib/bgmDirector.js"]:::shared
+  n_venue --> n_src_lib_bgmPhaseDiag_js["lib/bgmPhaseDiag.js"]:::shared
+  n_venue --> n_src_lib_bgmPhaseDiagKey_js["lib/bgmPhaseDiagKey.js"]:::shared
   n_venue --> n_src_lib_broadcastContext_js["lib/broadcastContext.js"]:::shared
   n_venue --> n_src_lib_celebrationCharaAssets_js["lib/celebrationCharaAssets.js"]:::shared
   n_venue --> n_src_lib_comeviewRows_js["lib/comeviewRows.js"]:::shared
@@ -41,6 +44,7 @@ graph LR
   n_venue --> n_src_lib_nicoUserPage_js["lib/nicoUserPage.js"]:::shared
   n_venue --> n_src_lib_parseGiftComment_js["lib/parseGiftComment.js"]:::shared
   n_venue --> n_src_lib_personTileDom_js["lib/personTileDom.js"]:::shared
+  n_venue --> n_src_lib_phaseDirector_js["lib/phaseDirector.js"]:::shared
   n_venue --> n_src_lib_popupAvatarResolver_js["lib/popupAvatarResolver.js"]:::shared
   n_venue --> n_src_lib_reportSilentError_js["lib/reportSilentError.js"]:::shared
   n_venue --> n_src_lib_storageKeys_js["lib/storageKeys.js"]:::shared
@@ -49,11 +53,7 @@ graph LR
   n_venue --> n_src_lib_storyTileTvStyle_js["lib/storyTileTvStyle.js"]:::shared
   n_venue --> n_src_lib_storyUserLaneBuckets_js["lib/storyUserLaneBuckets.js"]:::shared
   n_venue --> n_src_lib_storyUserLaneGuideHtml_js["lib/storyUserLaneGuideHtml.js"]:::shared
-  n_venue --> n_src_lib_storyUserLaneMeta_js["lib/storyUserLaneMeta.js"]:::shared
-  n_venue --> n_src_lib_storyUserLaneSort_js["lib/storyUserLaneSort.js"]:::shared
-  n_venue --> n_src_lib_supportGridDisplayTier_js["lib/supportGridDisplayTier.js"]:::shared
-  n_venue --> n_src_lib_supportGrowthAvatarLoad_js["lib/supportGrowthAvatarLoad.js"]:::shared
   classDef shared fill:#eee,stroke:#999,color:#666;
 ```
 
-> ほか 40 ファイル省略（全件は storage-bus.md / metafile 参照）。
+> ほか 44 ファイル省略（全件は storage-bus.md / metafile 参照）。

@@ -590,6 +590,24 @@ export const KEY_VENUE_EFFECT_SOUND_PRESENCE = 'nls_venue_effect_sound_presence_
  */
 export const KEY_CUSTOM_SOUND_REV = 'nls_custom_sound_rev_v1';
 
+/**
+ * Phase C(2026-07-05・council/pachinko-ultimate-SYNTHESIS.md §5.1): BGM(リーチ/フィーバーループ)を
+ *   鳴らすか。既定OFF(オプトイン)。effectSoundEnabled(ギフト/広告等の単発効果音)とは別設定
+ *   =BGMは「常時鳴ると配信の邪魔」への最終防衛としてユーザーの明示ONを要求する。
+ */
+export const KEY_BGM_ENABLED = 'nls_bgm_enabled_v1';
+
+/** @param {unknown} raw */
+export function isBgmEnabled(raw) {
+  return raw === true; // 既定OFF(effectSoundEnabledと逆の既定値)
+}
+
+/** BGM音量上限クランプ(§7絶対制約)。bgmDirector.js の BGM_VOLUME_MAX と同値をここにも複製しない
+ *   ため、格納値のクランプ自体は呼び出し側(bgmDirector.clampBgmVolume)に委ねる。ここはキーのみ。 */
+export const KEY_BGM_VOLUME_REACH = 'nls_bgm_volume_reach_v1';
+/** フィーバーループの音量(既定0.15・§5.2)。 */
+export const KEY_BGM_VOLUME_FEVER = 'nls_bgm_volume_fever_v1';
+
 /** @param {string} liveId lv123 */
 export function commentsStorageKey(liveId) {
   const id = String(liveId || '').trim().toLowerCase();

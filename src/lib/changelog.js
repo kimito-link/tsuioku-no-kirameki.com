@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1074',
+    date: '2026-07-05',
+    summary: 'BGMディレクター+盛り上がり相対閾値',
+    items: Object.freeze([
+      'その配信自身の盛り上がり平常値と比べて「今どれくらい熱いか」でフェーズ(通常→煽り→リーチ→突破→大当たり→払い出し)が進む仕組みを追加しました。過疎気味の配信でも自分なりの盛り上がりでリーチに到達します。リーチ中や大当たり後フィーバー中に鳴らせる短いBGMも用意しましたが、既定はOFFです(popup設定または診断ページでON・音量調整可能)。「マイ効果音」でBGM素材を割り当てていない場合は音は出ません。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1073',
     date: '2026-07-05',
     summary: 'パチンコボイス演出+頻度ゲート追加',

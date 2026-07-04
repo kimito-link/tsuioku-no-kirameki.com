@@ -83,6 +83,10 @@
 | `KEY_BACKFILL_LIVE_METRIC` | extension/content-entry.js | extension/status-entry.js |
 | `KEY_BACKFILL_PROGRESS` | extension/backfill-sw-entry.js<br>extension/content-entry.js<br>extension/popup-entry.js | extension/popup-entry.js |
 | `KEY_BACKFILL_SW_MODE` | — | extension/content-entry.js |
+| `KEY_BGM_ENABLED` | extension/status-entry.js | extension/popup-entry.js<br>extension/status-entry.js<br>extension/venueBar.js |
+| `KEY_BGM_PHASE_DIAG` | extension/popup-entry.js<br>extension/venueBar.js | extension/status-entry.js |
+| `KEY_BGM_VOLUME_FEVER` | extension/status-entry.js | extension/popup-entry.js<br>extension/status-entry.js<br>extension/venueBar.js |
+| `KEY_BGM_VOLUME_REACH` | extension/status-entry.js | extension/popup-entry.js<br>extension/status-entry.js<br>extension/venueBar.js |
 | `KEY_CALM_PANEL_MOTION` | — | extension/popup-entry.js |
 | `KEY_CDB_OFFSCREEN_ENABLED` | — | extension/content-entry.js |
 | `KEY_CHEER_RECENT_V1` | extension/popup-entry.js | extension/popup-entry.js |
