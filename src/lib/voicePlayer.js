@@ -42,6 +42,22 @@ export class VoicePlayer {
     this.generation = 0;
     this.stopCurrent = null;
     this.skipTimer = null;
+    // v0.1.1065: 会場読み上げの計器。comeview(KEY_VOICE_DIAG)と同形のカウンタを持ち、
+    //   onDiag(注入)経由で呼び出し元がstorageへ書く。従来この経路は完全に無計器で、
+    //   状態速報の「会場読み上げ」行が別経路(comeview)の化石を表示し続けていた。
+    this.onDiag = deps.onDiag || (() => {});
+    this.diag = {
+      enabled: false, queueNow: 0, queueMax: 0, spokenTotal: 0, staleDropTotal: 0,
+      playbackTimeoutTotal: 0, lastSpokenBase: 0, lastSynthMs: -1, lastDepth: 0,
+      lastSpeedBoost: 0, lastPhase: '', lastPhaseAt: 0
+    };
+  }
+
+  _emitDiag() {
+    this.diag.enabled = this.enabled;
+    this.diag.queueNow = this.queue.length;
+    if (this.queue.length > this.diag.queueMax) this.diag.queueMax = this.queue.length;
+    try { this.onDiag(this.diag); } catch { /* 計器は本体の再生を妨げない */ }
   }
 
   get VOICE_READING_ENABLED_KEY() { return 'nls_voice_reading_enabled_v1'; }
@@ -253,7 +269,11 @@ export class VoicePlayer {
             this._notifyDropped(d); // v0.1.799: 鳴らず破棄→吹き出しを unvoiced へ
           }
           this.queue = [newest];
-          if (dropped.length > 0) this._showSkipped(dropped.length);
+          if (dropped.length > 0) {
+            this._showSkipped(dropped.length);
+            this.diag.staleDropTotal += dropped.length;
+            this._emitDiag();
+          }
           // newest はこの後の通常フロー(下の shift→合成→再生)で必ず再生される。
           //   その際の age-gate は queueLength=1 で評価される(下で再取得)ので通常しきい値が効く。
         }
@@ -272,6 +292,8 @@ export class VoicePlayer {
           if (typeof item.onPlayStart === 'function') item.onPlayStart();
           this._notifyDropped(item); // v0.1.799: stale で鳴らず破棄→吹き出しを unvoiced へ
           this._showSkipped(1);
+          this.diag.staleDropTotal += 1;
+          this._emitDiag();
           this.prefetches.delete(item);
           continue;
         }
@@ -282,6 +304,7 @@ export class VoicePlayer {
         // 先頭は _startPrefetch で必ず先読み起動済み(深さ>=1)。その in-flight を再利用する。
         const pf = this.prefetches.get(item);
         this.prefetches.delete(item);
+        const _synthStart = Date.now(); // v0.1.1065計器: 合成待ち(先読み済ならほぼ0)。
         const wav = pf
           ? await pf.promise
           : await this.fetchSynthesizeVoice(
@@ -291,6 +314,8 @@ export class VoicePlayer {
                 speedOffset: assigned.speedOffset + congestion.speedBoost
               }
             );
+        this.diag.lastSynthMs = Math.max(0, Date.now() - _synthStart);
+        this.diag.lastSpeedBoost = congestion.speedBoost;
 
         if (!wav || !this.enabled || generation !== this.generation || this.isObsMode()) {
           if (typeof item.onPlayStart === 'function') item.onPlayStart();
@@ -310,9 +335,17 @@ export class VoicePlayer {
           
           await new Promise((resolve) => {
             let settled = false;
+            // v0.1.1065: 再生watchdog(comeview v0.1.883の移植)。'ended'/'error'が一度も来ない
+            //   ケース(裏タブ中断・音声デバイス切替・blob再生stall)でawaitが永久pendingになると
+            //   この経路は無計器のまま全読み上げが止まり「テンポよく出ない」になる。20秒で強制解放。
+            const _watchdog = setTimeout(() => {
+              this.diag.playbackTimeoutTotal += 1;
+              finish();
+            }, 20000);
             const finish = () => {
               if (settled) return;
               settled = true;
+              clearTimeout(_watchdog);
               audio.removeEventListener('ended', finish);
               audio.removeEventListener('error', finish);
               if (objectUrl) this.revokeObjectURL(objectUrl);
@@ -355,6 +388,10 @@ export class VoicePlayer {
           this._notifyDropped(item);
           if (objectUrl) this.revokeObjectURL(objectUrl);
         }
+        // v0.1.1065計器: 1件完了(comeviewと同じくcatch経路も含む)。
+        this.diag.spokenTotal += 1;
+        this.diag.lastSpokenBase = Date.now();
+        this._emitDiag();
       }
     } finally {
       this.playing = false;
@@ -423,7 +460,11 @@ export class VoicePlayer {
       }
     }
     
-    if (droppedCount > 0) this._showSkipped(droppedCount);
+    if (droppedCount > 0) {
+      this._showSkipped(droppedCount);
+      this.diag.staleDropTotal += droppedCount; // 件数ゲート(最古drop)も間引きとして計上。
+    }
+    this._emitDiag();
     // v0.1.800「吹き出しと読み上げを同時に」(会議 案B): enqueue した瞬間にキュー先頭の合成を
     //   即起動して、再生開始までの待ち(Δ)を縮める。再生中(playing)でも prefetch は並走できる
     //   (_drainQueue は playing なら return するが prefetch は別)。順序は変えない(FIFO 不変=
