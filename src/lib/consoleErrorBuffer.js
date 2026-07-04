@@ -136,8 +136,19 @@ export function createConsoleErrorBuffer(opts = {}) {
     /** @param {ErrorEvent} e */
     const errorListener = (e) => {
       try {
+        const message = String(e?.message || (e?.error && e.error.message) || '');
+        // v0.1.1070: 拡張更新後の古いタブ（stale content script）では、周期処理の
+        //   入口ガードで取り切れなかった同期 throw が "Extension context invalidated"
+        //   として window.error（uncaught exception）まで飛んでくることがある。
+        //   unhandledrejection は v0.1.354 で preventDefault 済みだったが、こちらは
+        //   record のみで素通りしていたため chrome://extensions のエラー欄に赤く積まれて
+        //   いた。同じ判定で preventDefault し、"Uncaught Error" のコンソール出力も抑止する。
+        //   古いタブの正常な廃棄であり実害はないので、他のエラーは一切握らない。
+        if (/Extension context invalidated/.test(message) && typeof e?.preventDefault === 'function') {
+          e.preventDefault();
+        }
         record({
-          message: String(e?.message || (e?.error && e.error.message) || ''),
+          message,
           stack: e?.error?.stack ? String(e.error.stack) : undefined,
           source: 'window.error',
           timestamp: Date.now()

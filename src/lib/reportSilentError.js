@@ -17,6 +17,30 @@ export function isContextInvalidatedError(err) {
 }
 
 /**
+ * 拡張の runtime context が現在も有効かどうかを判定する。
+ * v0.1.1070: content-entry.js に散在していた `hasExtensionContext()` を
+ * 純関数として抽出。拡張がリロード/更新されると、古いタブに残った content
+ * script からは `chrome.runtime.id` が undefined になる（storage/runtime API が
+ * 使えなくなる合図）。周期処理・イベントハンドラの入口でこれを見て、無効なら
+ * 以後の chrome.* 呼び出しを止める（＝黙って引退する）ためのガード。
+ *
+ * @param {{ runtime?: { id?: unknown }, storage?: { local?: unknown } }} [chromeRef]
+ *   省略時は globalThis.chrome を見る（content script 実行環境向け）。
+ * @returns {boolean}
+ */
+export function isExtensionContextAlive(chromeRef) {
+  try {
+    const c =
+      chromeRef !== undefined
+        ? chromeRef
+        : /** @type {any} */ (typeof chrome !== 'undefined' ? chrome : undefined);
+    return Boolean(c?.runtime?.id && c?.storage?.local);
+  } catch {
+    return false;
+  }
+}
+
+/**
  * サイレントエラーを構造化ペイロードに変換する純関数。
  * catch(() => {}) を置き換えるための統一レポーター。
  *

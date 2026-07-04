@@ -1,7 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import {
   isContextInvalidatedError,
-  buildSilentErrorPayload
+  buildSilentErrorPayload,
+  isExtensionContextAlive
 } from './reportSilentError.js';
 
 describe('isContextInvalidatedError', () => {
@@ -75,5 +76,43 @@ describe('buildSilentErrorPayload', () => {
   it('liveId なしだと payload に liveId がない', () => {
     const p = buildSilentErrorPayload('persist', new Error('fail'));
     expect(p.liveId).toBeUndefined();
+  });
+});
+
+describe('isExtensionContextAlive', () => {
+  it('runtime.id と storage.local が揃っていれば true', () => {
+    const chromeRef = { runtime: { id: 'abc123' }, storage: { local: {} } };
+    expect(isExtensionContextAlive(chromeRef)).toBe(true);
+  });
+
+  it('runtime.id が undefined（拡張リロード後の古いタブ）→ false', () => {
+    const chromeRef = { runtime: { id: undefined }, storage: { local: {} } };
+    expect(isExtensionContextAlive(chromeRef)).toBe(false);
+  });
+
+  it('runtime 自体が存在しない → false', () => {
+    expect(isExtensionContextAlive({})).toBe(false);
+  });
+
+  it('storage.local が存在しない → false', () => {
+    const chromeRef = { runtime: { id: 'abc123' }, storage: {} };
+    expect(isExtensionContextAlive(chromeRef)).toBe(false);
+  });
+
+  it('null/undefined を渡しても crash しない → false', () => {
+    expect(isExtensionContextAlive(null)).toBe(false);
+  });
+
+  it('アクセスで例外を投げるオブジェクトでも crash しない → false', () => {
+    const chromeRef = {
+      get runtime() {
+        throw new Error('boom');
+      }
+    };
+    expect(isExtensionContextAlive(chromeRef)).toBe(false);
+  });
+
+  it('引数省略時は globalThis.chrome が無ければ false（Node/test環境）', () => {
+    expect(isExtensionContextAlive()).toBe(false);
   });
 });

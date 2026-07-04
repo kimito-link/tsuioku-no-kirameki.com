@@ -495,7 +495,11 @@ import { isInsideRecommendedLiveSection } from '../lib/isInsideRecommendedLiveSe
 import { resolveUserEntryAvatarSignals } from '../lib/userEntryAvatarResolve.js';
 import { recordDiagnosticException } from '../lib/diagnosticRingStore.js';
 import { isPersistableHarvestedCommentRow } from '../lib/persistableCommentRow.js';
-import { buildSilentErrorPayload, isContextInvalidatedError as isCtxInvalidated } from '../lib/reportSilentError.js';
+import {
+  buildSilentErrorPayload,
+  isContextInvalidatedError as isCtxInvalidated,
+  isExtensionContextAlive
+} from '../lib/reportSilentError.js';
 import { cleanNdgrChatRows } from '../lib/cleanNdgrChatRows.js';
 import { ndgrFlushDedupKey } from '../lib/ndgrFlushDedupKey.js';
 import {
@@ -7527,11 +7531,9 @@ function prewarmInlinePopupIframe() {
 }
 
 function hasExtensionContext() {
-  try {
-    return Boolean(chrome?.runtime?.id && chrome?.storage?.local);
-  } catch {
-    return false;
-  }
+  // v0.1.1070: 実体は src/lib/reportSilentError.js の純関数に集約（テスト対象化）。
+  // content-entry.js 内 72 箇所の既存呼び出しは変えずにそのまま委譲する。
+  return isExtensionContextAlive();
 }
 
 /** @param {unknown} err */
