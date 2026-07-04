@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1066',
+    date: '2026-07-04',
+    summary: 'ギフト音の出だし遅れを解消(最大0.2秒)',
+    items: Object.freeze([
+      '「ギフト音のタイミングが遅れている」への対応です。投擲の飛翔時間(最長1秒超)を待ってから鳴らす方式をやめ、投げた瞬間からほぼ即時(最大0.2秒)に鳴るようにしました。連続ギフトを1本の音にまとめる仕組みはそのまま維持しています。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1065',
     date: '2026-07-04',
     summary: '会場読み上げに計器と固着回復を追加',

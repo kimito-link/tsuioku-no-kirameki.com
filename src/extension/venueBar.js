@@ -2109,6 +2109,8 @@ export function mountVenueBarButton(options = {}) {
       _pendingGiftSound.kind = kind;
       return 'coalesced';
     }
+    // v0.1.1066: 実試聴「タイミングが遅れてる」→飛翔時間まるごと待つのをやめ、最大200msに短縮。
+    //   (投げた瞬間に音が出始める方が体感が良い。200msはバースト統合の窓として最低限残す)
     const pending = { kind, timer: 0 };
     pending.timer = window.setTimeout(() => {
       _pendingGiftSound = null;
@@ -2117,7 +2119,7 @@ export function mountVenueBarButton(options = {}) {
         _giftEffectDiagCounters.giftSoundPlayed += 1;
         publishGiftEffectDiag();
       }
-    }, Math.max(0, Math.round(Number(flightMs) || 0)));
+    }, Math.min(200, Math.max(0, Math.round(Number(flightMs) || 0))));
     _pendingGiftSound = pending;
     return 'scheduled';
   };
