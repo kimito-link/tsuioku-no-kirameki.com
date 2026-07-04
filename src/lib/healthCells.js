@@ -590,12 +590,14 @@ function buildGiftEffectHealthCells(giftEffectDiag) {
   const soundEnabled = snap.soundEnabled !== false;
   const giftThrown = num(snap.giftThrown) || 0;
   const giftSoundPlayed = num(snap.giftSoundPlayed) || 0;
+  // v0.1.1061: バースト置換(意図的な統合)は取りこぼしに数えない。
+  const giftSoundCoalesced = num(/** @type {any} */ (snap).giftSoundCoalesced) || 0;
   const adThrown = num(snap.adThrown) || 0;
   const adSoundPlayed = num(snap.adSoundPlayed) || 0;
 
   const throwMissing = Math.max(0, giftDetected - giftThrown) + Math.max(0, adDetected - adThrown);
   const soundMissing = soundEnabled
-    ? Math.max(0, giftThrown - giftSoundPlayed) + Math.max(0, adThrown - adSoundPlayed)
+    ? Math.max(0, giftThrown - giftSoundPlayed - giftSoundCoalesced) + Math.max(0, adThrown - adSoundPlayed)
     : 0; // 効果音OFFは鳴らないのが正常=不合格にしない(誤診断防止)
 
   const missing = throwMissing + soundMissing;

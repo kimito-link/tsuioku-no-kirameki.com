@@ -10,7 +10,8 @@
  * @typedef {{
  *   giftDetected: number,      // ギフトを検知した回数(resolveGiftProjectile 呼び出し前)
  *   giftThrown: number,        // ギフトの投擲演出(launchGiftThrow)が実際に走った回数
- *   giftSoundPlayed: number,   // ギフト効果音の再生を試みた回数(ガード通過後)
+ *   giftSoundPlayed: number,   // ギフト効果音を実際に鳴らした回数(v0.1.1061: 「試みた」でなく戻り値'played'のみ)
+ *   giftSoundCoalesced: number, // v0.1.1061: バースト置換で予約済みの1本に統合(昇格)された件数=意図的な統合であり取りこぼしではない
  *   adDetected: number,        // 広告を検知した回数
  *   adThrown: number,          // 広告の投擲演出が実際に走った回数
  *   adSoundPlayed: number,     // 広告効果音の再生を試みた回数
@@ -25,6 +26,7 @@ export function makeInitialGiftEffectDiag() {
     giftDetected: 0,
     giftThrown: 0,
     giftSoundPlayed: 0,
+    giftSoundCoalesced: 0,
     adDetected: 0,
     adThrown: 0,
     adSoundPlayed: 0,
@@ -52,6 +54,7 @@ export function buildGiftEffectDiagSnapshot(diag, nowMs) {
     giftDetected: num(d.giftDetected, base.giftDetected),
     giftThrown: num(d.giftThrown, base.giftThrown),
     giftSoundPlayed: num(d.giftSoundPlayed, base.giftSoundPlayed),
+    giftSoundCoalesced: num(d.giftSoundCoalesced, base.giftSoundCoalesced),
     adDetected: num(d.adDetected, base.adDetected),
     adThrown: num(d.adThrown, base.adThrown),
     adSoundPlayed: num(d.adSoundPlayed, base.adSoundPlayed),
@@ -66,12 +69,13 @@ export function buildGiftEffectDiagSnapshot(diag, nowMs) {
  * @param {number} detected
  * @param {number} thrown
  * @param {number} soundPlayed
+ * @param {number} [soundCoalesced] バースト置換で統合された件数(意図的=取りこぼしに数えない)
  * @returns {{ throwMissing: number, soundMissing: number }}
  */
-function diffCounts(detected, thrown, soundPlayed) {
+function diffCounts(detected, thrown, soundPlayed, soundCoalesced = 0) {
   return {
     throwMissing: Math.max(0, detected - thrown),
-    soundMissing: Math.max(0, thrown - soundPlayed)
+    soundMissing: Math.max(0, thrown - soundPlayed - Math.max(0, soundCoalesced))
   };
 }
 
@@ -97,11 +101,14 @@ export function buildGiftEffectDiagLines(snap, nowMs) {
   if (giftDetected > 0) {
     const giftThrown = Number(snap.giftThrown) || 0;
     const giftSoundPlayed = Number(snap.giftSoundPlayed) || 0;
-    const { throwMissing, soundMissing } = diffCounts(giftDetected, giftThrown, giftSoundPlayed);
+    const giftSoundCoalesced = Number(snap.giftSoundCoalesced) || 0;
+    const { throwMissing, soundMissing } = diffCounts(giftDetected, giftThrown, giftSoundPlayed, giftSoundCoalesced);
     const throwMark = throwMissing > 0 ? `⚠${throwMissing}件飛んでいない` : '✅';
     // 効果音 OFF は鳴らないのが正常=🔴にしない(誤診断防止)。ON なのに鳴っていない時だけ警告。
     const soundMark = !soundEnabled ? '(OFF)' : soundMissing > 0 ? `⚠${soundMissing}件鳴っていない` : '✅';
-    lines.push(`  → ギフト: 検知${giftDetected} → 演出${giftThrown} ${throwMark} → 音${giftSoundPlayed} ${soundMark}`);
+    // v0.1.1061: 置換(バースト統合)は意図した動きなので件数を明記しつつ⚠にしない=嘘をつかない。
+    const coalescedText = giftSoundCoalesced > 0 ? `(+置換${giftSoundCoalesced})` : '';
+    lines.push(`  → ギフト: 検知${giftDetected} → 演出${giftThrown} ${throwMark} → 音${giftSoundPlayed}${coalescedText} ${soundMark}`);
   }
   if (adDetected > 0) {
     const adThrown = Number(snap.adThrown) || 0;
@@ -124,9 +131,9 @@ export function giftEffectDiagToActionCards(snap) {
   const soundEnabled = snap.soundEnabled !== false;
   /** @type {Array<{id:string,severity:string,symptom:string,cause:string,action:string,fixableHere:string}>} */
   const cards = [];
-  /** @param {'gift'|'ad'} kind @param {number} detected @param {number} thrown @param {number} soundPlayed */
-  const check = (kind, detected, thrown, soundPlayed) => {
-    const { throwMissing, soundMissing } = diffCounts(detected, thrown, soundPlayed);
+  /** @param {'gift'|'ad'} kind @param {number} detected @param {number} thrown @param {number} soundPlayed @param {number} [soundCoalesced] */
+  const check = (kind, detected, thrown, soundPlayed, soundCoalesced = 0) => {
+    const { throwMissing, soundMissing } = diffCounts(detected, thrown, soundPlayed, soundCoalesced);
     if (throwMissing > 0) {
       cards.push({
         id: `gift-effect-throw-missing-${kind}`,
@@ -148,7 +155,7 @@ export function giftEffectDiagToActionCards(snap) {
       });
     }
   };
-  check('gift', Number(snap.giftDetected) || 0, Number(snap.giftThrown) || 0, Number(snap.giftSoundPlayed) || 0);
+  check('gift', Number(snap.giftDetected) || 0, Number(snap.giftThrown) || 0, Number(snap.giftSoundPlayed) || 0, Number(snap.giftSoundCoalesced) || 0);
   check('ad', Number(snap.adDetected) || 0, Number(snap.adThrown) || 0, Number(snap.adSoundPlayed) || 0);
   return cards;
 }

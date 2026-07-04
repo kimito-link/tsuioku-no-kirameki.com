@@ -9,6 +9,8 @@ import {
   resolveEffectSoundPath,
   effectSoundKindForGiftTier,
   playEffectSound,
+  defaultVolumeForEffectSoundKind,
+  EFFECT_SOUND_DEFAULT_VOLUME,
   _resetEffectSoundGuardForTest
 } from './effectSoundPlayer.js';
 
@@ -134,5 +136,37 @@ describe('playEffectSound', () => {
     const audioFactory = vi.fn(() => audio);
     playEffectSound(EFFECT_SOUND_KINDS.GIFT, { audioFactory, nowMs: 1000, volume: 5 });
     expect(audio.volume).toBe(1);
+  });
+});
+
+describe('v0.1.1061: 種類別の既定音量と正直な戻り値', () => {
+  it('ギフト系(gift/gift_small〜mega)の既定音量は1.0・その他は0.7', () => {
+    expect(defaultVolumeForEffectSoundKind('gift')).toBe(1.0);
+    expect(defaultVolumeForEffectSoundKind('gift_small')).toBe(1.0);
+    expect(defaultVolumeForEffectSoundKind('gift_mega')).toBe(1.0);
+    expect(defaultVolumeForEffectSoundKind('milestone_soft')).toBe(EFFECT_SOUND_DEFAULT_VOLUME);
+    expect(defaultVolumeForEffectSoundKind('ad')).toBe(EFFECT_SOUND_DEFAULT_VOLUME);
+    expect(defaultVolumeForEffectSoundKind('')).toBe(EFFECT_SOUND_DEFAULT_VOLUME);
+  });
+
+  it('volume 未指定ならギフトは1.0で鳴る(配信音声に埋もれない)', () => {
+    _resetEffectSoundGuardForTest();
+    const audio = { volume: 0, play: vi.fn(() => Promise.resolve()) };
+    playEffectSound(EFFECT_SOUND_KINDS.GIFT, { audioFactory: () => audio, nowMs: 1000 });
+    expect(audio.volume).toBe(1.0);
+  });
+
+  it('鳴らしたら played・ガードに食われたら guarded・不明種別は no-path を返す', () => {
+    _resetEffectSoundGuardForTest();
+    const audioFactory = vi.fn(() => ({ volume: 0, play: vi.fn(() => Promise.resolve()) }));
+    expect(playEffectSound(EFFECT_SOUND_KINDS.AD, { audioFactory, nowMs: 1000 })).toBe('played');
+    expect(playEffectSound(EFFECT_SOUND_KINDS.AD, { audioFactory, nowMs: 1100 })).toBe('guarded');
+    expect(playEffectSound('unknown_kind', { audioFactory, nowMs: 1000 })).toBe('no-path');
+  });
+
+  it('audioFactory の例外は error を返す(伝播しない)', () => {
+    _resetEffectSoundGuardForTest();
+    const audioFactory = vi.fn(() => { throw new Error('boom'); });
+    expect(playEffectSound(EFFECT_SOUND_KINDS.GIFT, { audioFactory, nowMs: 1000 })).toBe('error');
   });
 });
