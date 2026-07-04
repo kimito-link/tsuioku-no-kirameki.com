@@ -200,8 +200,17 @@ import {
   KEY_SUPPORT_CELEBRATION_STATE,
   KEY_TOP_SUPPORTERS_MIRROR,
   broadcasterProfileStorageKey,
-  commenterFollowLiveStorageKey
+  commenterFollowLiveStorageKey,
+  KEY_EFFECT_SOUND_ENABLED,
+  KEY_VENUE_EFFECT_SOUND_PRESENCE,
+  isEffectSoundEnabled
 } from '../lib/storageKeys.js';
+import { detectOfficialEventRankChange } from '../lib/officialEventRankChange.js';
+import {
+  EFFECT_SOUND_KINDS,
+  playEffectSound,
+  shouldSkipEffectSoundForVenuePresence
+} from '../lib/effectSoundPlayer.js';
 import {
   pickCommentMilestoneCelebration,
   pickEventRankUpCelebration,
@@ -7291,6 +7300,47 @@ function clearWatchMetaCard(opts = {}) {
  */
 let _lastOfficialEventDomBundle = null;
 
+// v0.1.1053: 配信者が参加中のニコニコイベント順位が上下したら効果音(rank_up/rank_down)を鳴らす。
+//   liveId ごとに前回rankを持つ(配信切替で誤検知しない)。効果音のON/OFFは KEY_EFFECT_SOUND_ENABLED。
+//   会場window(venueBar.js)が開いていれば popup 側は鳴らさない(二重再生防止・会場優先)。
+/** @type {Map<string, number>} liveId → 直近の eventBanner.rank */
+const _lastEventRankByLiveId = new Map();
+let _effectSoundEnabledCache = true;
+
+/** 会場windowが開いている(=効果音を鳴らしている)かを popup 側から見るための判定。 */
+async function shouldPopupSkipEffectSoundForVenue() {
+  try {
+    const bag = await chrome.storage.local.get(KEY_VENUE_EFFECT_SOUND_PRESENCE);
+    return shouldSkipEffectSoundForVenuePresence(Number(bag?.[KEY_VENUE_EFFECT_SOUND_PRESENCE]) || 0, Date.now());
+  } catch {
+    return false; // 判定不能なら鳴らす側に倒す(無音になり続けるより安全)
+  }
+}
+
+/**
+ * 配信者のイベント順位変動を検知し、条件が揃えば効果音を鳴らす(observe-and-play・描画は変えない)。
+ * @param {string} liveId
+ * @param {import('../lib/officialEventDomBundle.js').OfficialEventDomBundle|null} bundle
+ */
+async function maybePlayEventRankChangeSound(liveId, bundle) {
+  try {
+    const lid = String(liveId || '').trim().toLowerCase();
+    if (!lid) return;
+    const rankRaw = bundle?.eventBanner?.rank;
+    const currentRank =
+      typeof rankRaw === 'number' && Number.isFinite(rankRaw) && rankRaw > 0 ? Math.floor(rankRaw) : null;
+    const prevRank = _lastEventRankByLiveId.has(lid) ? _lastEventRankByLiveId.get(lid) : null;
+    if (currentRank != null) _lastEventRankByLiveId.set(lid, currentRank);
+    if (!_effectSoundEnabledCache) return;
+    const change = detectOfficialEventRankChange(prevRank, currentRank);
+    if (change === 'none') return;
+    if (await shouldPopupSkipEffectSoundForVenue()) return;
+    playEffectSound(change === 'up' ? EFFECT_SOUND_KINDS.RANK_UP : EFFECT_SOUND_KINDS.RANK_DOWN);
+  } catch {
+    /* 効果音は観測専用の付加機能。失敗してもイベント順位表示自体には影響させない */
+  }
+}
+
 /**
  * niconico 公式バナー「○○さんが参加しています！現在 N 位 X」をネイティブに描画する。
  * iframe で audition embed を載せると配信者ログイン状態では管理 UI（参加中のイベント
@@ -7536,6 +7586,7 @@ async function refreshOfficialEventDomBundle(liveId) {
   if (ap != null) {
     await primeAdPointsCelebrationsFromOfficialTotal(liveId, ap);
   }
+  void maybePlayEventRankChangeSound(liveId, _lastOfficialEventDomBundle);
 }
 
 /**
@@ -13515,6 +13566,14 @@ async function refresh() {
       openBag[KEY_DEEP_HARVEST_QUIET_UI]
     );
     deepHarvestQuietEl.disabled = false;
+  }
+
+  // v0.1.1053: ギフト/広告/イベント順位変動の効果音 ON/OFF。
+  _effectSoundEnabledCache = isEffectSoundEnabled(openBag[KEY_EFFECT_SOUND_ENABLED]);
+  const effectSoundEl = /** @type {HTMLInputElement|null} */ ($('effectSoundToggle'));
+  if (effectSoundEl) {
+    effectSoundEl.checked = _effectSoundEnabledCache;
+    effectSoundEl.disabled = false;
   }
 
   // 視聴ページでインラインパネルを自動表示するかどうか。
@@ -19840,6 +19899,17 @@ async function initPopup() {
         [KEY_DEEP_HARVEST_QUIET_UI]: deepHarvestQuietToggle.checked
       });
       if (!ok) return;
+    } catch {
+      //
+    }
+  });
+
+  const effectSoundToggle = /** @type {HTMLInputElement|null} */ ($('effectSoundToggle'));
+  effectSoundToggle?.addEventListener('change', async () => {
+    try {
+      const ok = await storageSetSafe({ [KEY_EFFECT_SOUND_ENABLED]: effectSoundToggle.checked });
+      if (!ok) return;
+      _effectSoundEnabledCache = effectSoundToggle.checked;
     } catch {
       //
     }
