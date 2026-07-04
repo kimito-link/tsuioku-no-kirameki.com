@@ -43,6 +43,8 @@ describe('diagnosisRegistry の網羅性(これが「抜けを構造的に無く
       laneDiag: { liveId: 'lv1', identified: 3, laneShown: 3, paintMs: 10 },
       // v0.1.1054: giftDetected>0 を渡して gift-effect も発生させる(同上・登録漏れ再発防止)。
       giftEffectDiag: { giftDetected: 1, giftThrown: 1, giftSoundPlayed: 1, soundEnabled: true },
+      // v0.1.1058: milestoneDetected>0 を渡して milestone-effect も発生させる(同上・登録漏れ再発防止)。
+      milestoneEffectDiag: { milestoneDetected: 1, milestoneThrown: 1, milestoneSoundPlayed: 1, soundEnabled: true },
       // v0.1.1056: bundleGen を渡して mirror-gen-stamp/preview-gen-sync も発生させる(同上・登録漏れ再発防止)。
       laneMirror: { liveId: 'lv1', bundleGen: 5, bundleCapturedAt: 900 },
       previewRenderAck: { ready: true, liveId: 'lv1', ts: 990, gen: 5 },

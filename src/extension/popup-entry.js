@@ -7,6 +7,8 @@ import {
   attachCommenterFollowToReport,
   buildHtmlReportDocument
 } from './popup/report/htmlReportDocument.js';
+import { makeInitialMilestoneEffectDiag, buildMilestoneEffectDiagSnapshot } from '../lib/milestoneEffectDiag.js';
+import { KEY_MILESTONE_EFFECT_DIAG } from '../lib/milestoneEffectDiagKey.js';
 import { readInlineModeFlags } from '../lib/inlineModeFlags.js';
 import { pickWatchUrlFromMultipleSources } from '../lib/popupWatchUrlResolveMultiTab.js';
 import { shouldCloseStandalonePopupAfterNavigate } from '../lib/standalonePopupClose.js';
@@ -911,6 +913,19 @@ const _monotonicCommentCountState = createMonotonicCommentCountState();
 /** @type {number|null} */
 let _prevMilestoneCommentHighWater = null;
 
+// v0.1.1058: 「コメント数マイルストーンが発火したか外部から確認する手段がゼロ」だった穴を
+//   giftEffectDiag.js と同型の3段階カウンタ(検知→演出→音)で埋める(観測のみ・演出は変えない)。
+const _milestoneEffectDiagCounters = makeInitialMilestoneEffectDiag();
+let _milestoneEffectDiagLastWriteAt = 0;
+function publishMilestoneEffectDiag() {
+  const now = Date.now();
+  if (now - _milestoneEffectDiagLastWriteAt < 3000) return; // 3秒 min-gap(他の診断と同型)。
+  _milestoneEffectDiagLastWriteAt = now;
+  _milestoneEffectDiagCounters.soundEnabled = _effectSoundEnabledCache;
+  const snap = buildMilestoneEffectDiagSnapshot(_milestoneEffectDiagCounters, now);
+  void chrome.storage.local.set({ [KEY_MILESTONE_EFFECT_DIAG]: snap }).catch(() => {});
+}
+
 /** @type {number|null} */
 let _prevEventBannerRank = null;
 
@@ -1259,9 +1274,20 @@ function playSupportCelebrationDomLocal(spec) {
  * @param {import('../lib/supportCelebration.js').SupportCelebrationSpec} spec
  */
 function maybePlayMilestoneEffectSound(spec) {
-  if (!_effectSoundEnabledCache) return;
+  const isCommentMilestone = spec?.kind === 'comment_milestone';
+  if (isCommentMilestone) {
+    _milestoneEffectDiagCounters.milestoneThrown += 1;
+  }
+  if (!_effectSoundEnabledCache) {
+    if (isCommentMilestone) publishMilestoneEffectDiag();
+    return;
+  }
   const kind = effectSoundKindForPikaTier(pikaTierForSupportCelebration(spec));
-  if (kind) playEffectSound(kind);
+  if (kind) {
+    playEffectSound(kind);
+    if (isCommentMilestone) _milestoneEffectDiagCounters.milestoneSoundPlayed += 1;
+  }
+  if (isCommentMilestone) publishMilestoneEffectDiag();
 }
 
 /**
@@ -1648,7 +1674,12 @@ function noteCommentMilestoneHighWater(liveId, appRecordCount) {
  */
 async function maybeCelebrateFromCommentCount(liveId, prev, next) {
   const spec = pickCommentMilestoneCelebration(prev, next);
-  if (spec) await maybePlaySupportCelebration(liveId, spec);
+  if (spec) {
+    _milestoneEffectDiagCounters.milestoneDetected += 1;
+    _milestoneEffectDiagCounters.lastEventAt = Date.now();
+    publishMilestoneEffectDiag();
+    await maybePlaySupportCelebration(liveId, spec);
+  }
 }
 
 /**

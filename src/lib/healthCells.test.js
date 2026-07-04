@@ -653,4 +653,45 @@ describe('summarizeHealthVerdict v0.1.846 満点=「異常ゼロ」(進行中/�
       expect(c.level).toBe('ok');
     });
   });
+
+  // v0.1.1058: コメント数マイルストーンの「検知→演出→効果音」整合セル。
+  describe('マイルストーン演出/効果音整合セル(milestoneEffectDiag)', () => {
+    it('milestoneEffectDiag 未指定/未観測(検知0件)=セルを足さない(死にセルにしない)', () => {
+      expect(cellById(buildHealthCells({ livesData: [] }), 'milestone-effect')).toBeUndefined();
+      expect(
+        cellById(
+          buildHealthCells({ livesData: [], milestoneEffectDiag: { milestoneDetected: 0 } }),
+          'milestone-effect'
+        )
+      ).toBeUndefined();
+    });
+
+    it('全て演出/音まで到達していれば ok', () => {
+      const cells = buildHealthCells({
+        livesData: [],
+        milestoneEffectDiag: { milestoneDetected: 3, milestoneThrown: 3, milestoneSoundPlayed: 3, soundEnabled: true }
+      });
+      const c = cellById(cells, 'milestone-effect');
+      expect(c.level).toBe('ok');
+    });
+
+    it('演出/音の取りこぼしがあれば warn', () => {
+      const cells = buildHealthCells({
+        livesData: [],
+        milestoneEffectDiag: { milestoneDetected: 5, milestoneThrown: 3, milestoneSoundPlayed: 3, soundEnabled: true }
+      });
+      const c = cellById(cells, 'milestone-effect');
+      expect(c.level).toBe('warn');
+      expect(c.text).toContain('演出漏れ2件');
+    });
+
+    it('効果音OFFなら音0件でも warn にしない(誤診断防止)', () => {
+      const cells = buildHealthCells({
+        livesData: [],
+        milestoneEffectDiag: { milestoneDetected: 5, milestoneThrown: 5, milestoneSoundPlayed: 0, soundEnabled: false }
+      });
+      const c = cellById(cells, 'milestone-effect');
+      expect(c.level).toBe('ok');
+    });
+  });
 });

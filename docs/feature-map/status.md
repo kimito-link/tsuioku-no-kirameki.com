@@ -6,7 +6,7 @@
 ## storage の出入り
 
 - 書くキー: `KEY_STATUS_TREND`
-- 読むキー: `KEY_AI_SHARE_POPUP_DIAG`, `KEY_BACKFILL_LIVE_METRIC`, `KEY_COMMENT_TIMELINE_MIRROR`, `KEY_GIFT_EFFECT_DIAG`, `KEY_LANE_DIAG`, `KEY_LANE_MIRROR`, `KEY_LAST_WATCH_URL`, `KEY_LIVEVIEW_PUBLISH_OUTCOME`, `KEY_NORTH_STAR_MIRROR`, `KEY_PREVIEW_RENDER_ACK`, `KEY_REPORT_PREVIEW`, `KEY_STATUS_FAST_DIAG_LITE`, `KEY_STATUS_TREND`, `KEY_STAT_CARDS_MIRROR`, `KEY_VENUE_SEATS_DIAG`, `KEY_VOICE_DIAG`, `nls_backfill_progress_v1`
+- 読むキー: `KEY_AI_SHARE_POPUP_DIAG`, `KEY_BACKFILL_LIVE_METRIC`, `KEY_COMMENT_TIMELINE_MIRROR`, `KEY_GIFT_EFFECT_DIAG`, `KEY_LANE_DIAG`, `KEY_LANE_MIRROR`, `KEY_LAST_WATCH_URL`, `KEY_LIVEVIEW_PUBLISH_OUTCOME`, `KEY_MILESTONE_EFFECT_DIAG`, `KEY_NORTH_STAR_MIRROR`, `KEY_PREVIEW_RENDER_ACK`, `KEY_REPORT_PREVIEW`, `KEY_STATUS_FAST_DIAG_LITE`, `KEY_STATUS_TREND`, `KEY_STAT_CARDS_MIRROR`, `KEY_VENUE_SEATS_DIAG`, `KEY_VOICE_DIAG`, `nls_backfill_progress_v1`
 
 ## 構成ファイル（import 到達・最大40件表示）
 
@@ -51,9 +51,9 @@ graph LR
   n_status --> n_src_lib_liveviewPublishOutcomeKey_js["lib/liveviewPublishOutcomeKey.js"]
   n_status --> n_src_lib_liveviewPublishSelfDiag_js["lib/liveviewPublishSelfDiag.js"]
   n_status --> n_src_lib_metricConfidence_js["lib/metricConfidence.js"]:::shared
-  n_status --> n_src_lib_nicoAnonymousDisplay_js["lib/nicoAnonymousDisplay.js"]:::shared
-  n_status --> n_src_lib_nicoUserPage_js["lib/nicoUserPage.js"]:::shared
+  n_status --> n_src_lib_milestoneEffectDiag_js["lib/milestoneEffectDiag.js"]:::shared
+  n_status --> n_src_lib_milestoneEffectDiagKey_js["lib/milestoneEffectDiagKey.js"]:::shared
   classDef shared fill:#eee,stroke:#999,color:#666;
 ```
 
-> ほか 45 ファイル省略（全件は storage-bus.md / metafile 参照）。
+> ほか 47 ファイル省略（全件は storage-bus.md / metafile 参照）。

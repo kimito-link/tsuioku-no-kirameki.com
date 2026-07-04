@@ -332,7 +332,7 @@ function buildLaneHealthCells(laneDiag) {
 
 /**
  * 健全度セル配列を作る。
- * @param {{ livesData?: any[], fastDiag?: any, voiceDiag?: any, venueSeatsDiag?: any, laneDiag?: any, giftEffectDiag?: any, previewRenderAck?: any, laneMirror?: any, nowMs?: number }} data
+ * @param {{ livesData?: any[], fastDiag?: any, voiceDiag?: any, venueSeatsDiag?: any, laneDiag?: any, giftEffectDiag?: any, milestoneEffectDiag?: any, previewRenderAck?: any, laneMirror?: any, nowMs?: number }} data
  * @returns {HealthCell[]}
  */
 export function buildHealthCells(data) {
@@ -523,6 +523,9 @@ export function buildHealthCells(data) {
   // 25-26. v0.1.1056: パリティ根本修正(①②の世代同期)自体が動いているかの自己診断。
   for (const c of buildPreviewGenSyncHealthCells(data?.previewRenderAck, data?.laneMirror, nowMs)) cells.push(c);
 
+  // 27. v0.1.1058: コメント数マイルストーンの「検知→演出→効果音」整合(milestoneEffectDiag 未観測なら空)。
+  for (const c of buildMilestoneEffectHealthCells(data?.milestoneEffectDiag)) cells.push(c);
+
   return cells;
 }
 
@@ -601,6 +604,34 @@ function buildGiftEffectHealthCells(giftEffectDiag) {
       ? `演出漏れ${throwMissing}件・音漏れ${soundMissing}件`
       : `検知${giftDetected + adDetected}件 全て演出/音まで到達`;
   return [stateCell('gift-effect', 'ギフト演出/効果音', missing > 0 ? 'warn' : 'ok', detail)];
+}
+
+/**
+ * コメント数マイルストーンの検知はしたが演出/効果音が出ていない取りこぼしを健全度セルに反映する。
+ *   giftEffectDiag と同じ「片翼統合」を繰り返さないよう、healthCells + diagnosisRegistry の
+ *   両方へ同時に登録する(v0.1.1054/1055の教訓)。
+ * @param {import('./milestoneEffectDiag.js').MilestoneEffectDiagState|null|undefined} milestoneEffectDiag
+ * @returns {HealthCell[]}
+ */
+function buildMilestoneEffectHealthCells(milestoneEffectDiag) {
+  const snap = milestoneEffectDiag && typeof milestoneEffectDiag === 'object' ? milestoneEffectDiag : null;
+  if (!snap) return [];
+  const detected = num(snap.milestoneDetected) || 0;
+  if (detected === 0) return []; // 未観測=このセッションでマイルストーン到達が無かった
+
+  const soundEnabled = snap.soundEnabled !== false;
+  const thrown = num(snap.milestoneThrown) || 0;
+  const soundPlayed = num(snap.milestoneSoundPlayed) || 0;
+
+  const throwMissing = Math.max(0, detected - thrown);
+  const soundMissing = soundEnabled ? Math.max(0, thrown - soundPlayed) : 0;
+
+  const missing = throwMissing + soundMissing;
+  const detail =
+    missing > 0
+      ? `演出漏れ${throwMissing}件・音漏れ${soundMissing}件`
+      : `検知${detected}件 全て演出/音まで到達`;
+  return [stateCell('milestone-effect', 'マイルストーン演出/効果音', missing > 0 ? 'warn' : 'ok', detail)];
 }
 
 /** テスト/SSR でも壊れない現在時刻(Date.now が無い環境のフォールバック)。 */

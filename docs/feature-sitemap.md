@@ -475,9 +475,10 @@
 
 - **HTMLレポート生成** — マーケ/イベント順位/タイムライン等を1枚の HTML レポートに組み立てる(popup-entry 内)
   - `src/extension/popup-entry.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 34</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 35</summary>
 
 - `scripts/inspect-nicolive-watch-stats.mjs` — ニコ生 watch ページの HTML から、来場・同接まわりの数値がどう埋め込まれているかを CLI で確認する。
+- `src/extension/popup/report/htmlReportDocument.js` — HTMLレポート(振り返り用の保存HTML)組み立てクラスタ。
 - `src/lib/audienceEngagementGap.js` — 来場者数は多いがコメントが少ない状態を検出するローカル分析コア。
 - `src/lib/broadcastNarrativeBuilder.js` — コメント本文だけから「配信内容の流れ」を再構成する純粋関数。
 - `src/lib/broadcastReportSummary.js` — HTML レポート / マーケ分析の双方で使う「放送全体の純粋集計」。
@@ -542,7 +543,7 @@
 - **影響範囲ゲート(規律を自動化)** — 星野ロミ式「規律を自動ゲートに」。diff から影響大(複数機能波及)の変更ファイルを検出し波及先機能を列挙。警告のみ(摩擦ゼロ)・--strict で exit1。AGENTS.md §10 のルールを diff 発火に
   - `scripts/impact-check.mjs`
   - `docs/feature-map/impact-map.json`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 43</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 45</summary>
 
 - `api/status.js` — status 受け口 Vercel Serverless Function。
 - `extension/status-guard.js` — 状態速報ページ(status.html)の「何があっても開く」保険。
@@ -577,6 +578,8 @@
 - `src/lib/keyboardTypeDiagnostic.js` — L12: キーボード型診断（コメンターを 5 つの型に分類）。
 - `src/lib/liveHealthScore.js` — 配信ごとの「健康チェック」5段階評価(純関数)。
 - `src/lib/liveviewPublishSelfDiag.js` — 純Web公開コピーの自己診断（council/status-self-diagnoses-SYNTHESIS.md）。
+- `src/lib/milestoneEffectDiag.js` — コメント数マイルストーン(100/200/500/1000/2000/3000/5000/10000件)の
+- `src/lib/milestoneEffectDiagKey.js` — コメント数マイルストーンの「検知→演出→効果音」が揃っているかの観測値を popup-entry.js が
 - `src/lib/popupAiDiagOrchestrator.js` — v0.1.211: popup「AI 診断」ボタンのオーケストレータ純関数。
 - `src/lib/popupDiagAutoPublish.js` — popup を開いたとき popup 固有診断を status へ自動集約するスケジューラ(純ロジック)。
 - `src/lib/previewHeavyHint.js` — 「応援プレビュー(②)を開いている間は診断更新が重い」を状態速報で名指しする純関数(v0.1.1020)。
@@ -649,7 +652,7 @@
   - `src/lib/statusTrendKey.js`
   - `src/extension/status-entry.js`
   - `src/lib/statusActionAdvisor.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 109</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 110</summary>
 
 - `app/app.js` — スマホ閲覧用 status Web 版。
 - `app/live-view.js` — 純Web版 応援ライブビュー（拡張なし・PC/スマホ共通）。
@@ -713,6 +716,7 @@
 - `src/lib/observerTarget.js` — MutationObserver の監視ルートを決める（ニコ生コメントパネル優先）
 - `src/lib/officialEventDomBundle.js` — watch ページの DOM から「配信者の番組周辺の正本値」を 1 関数で総取りするオーケストレータ。
 - `src/lib/officialEventRankChange.js` — 配信者が参加しているニコニコイベント(audition)の現在順位(scrapeOfficialEventBannerFromDom の rank)を
+- `src/lib/officialEventRankSoundEffect.js` — v0.1.1053: 配信者が参加中のニコニコイベント順位が上下したら効果音(rank_up/rank_down)を鳴らす。
 - `src/lib/officialNicoStatsStripDigest.js` — text: string,
 - `src/lib/officialStatsWindow.js` — at?: number|null,
 - `src/lib/openingFiveMinuteCorrelation.js` — L13: 冒頭 5 分の予兆 → ピーク CPM 相関（散布図用）。
@@ -765,7 +769,7 @@
 
 ## 🧬 修正系譜マップ(この系統のバグを過去にどう直したか)
 
-> changelog 全 392 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
+> changelog 全 393 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
 
 ### 💾 記録件数 (61版)
 - `v0.1.1050` 2026-07-03 — 状態速報のパリティ判定に会場(④)を追加=POPと会場の人数ズレを検知
@@ -830,7 +834,8 @@
 - `v0.1.672` 2026-06-10 — コメビュの二重表示の残りを根治
 - `v0.1.665` 2026-06-10 — 長い配信が7割等で止まったままになるのを根治
 
-### 📥 コメント取得 (145版)
+### 📥 コメント取得 (146版)
+- `v0.1.1058` 2026-07-04 — ギフト取りこぼし修正+コメント数マイルストーン診断を新設
 - `v0.1.1057` 2026-07-04 — ギフト診断の対処候補への統合漏れを修正+内部構造の整理
 - `v0.1.1046` 2026-07-03 — 大きめ配信で状態速報が固まる不具合を修正(計器readを間引き側へ)
 - `v0.1.1045` 2026-07-03 — 過去ログ取得が遅い真因を切り分ける走行中計器を追加(観測のみ)
@@ -1184,7 +1189,8 @@
 - `v0.1.713` 2026-06-13 — 会場モードを明るくして発言を吹き出し表示
 - `v0.1.711` 2026-06-13 — 会場モードで発言を吹き出し表示
 
-### 🎁 ギフト (68版)
+### 🎁 ギフト (69版)
+- `v0.1.1058` 2026-07-04 — ギフト取りこぼし修正+コメント数マイルストーン診断を新設
 - `v0.1.1057` 2026-07-04 — ギフト診断の対処候補への統合漏れを修正+内部構造の整理
 - `v0.1.1055` 2026-07-04 — 診断シートの網羅漏れ2件を修正+ギフト診断を数値化
 - `v0.1.1054` 2026-07-04 — コメント数の節目に効果音を追加+診断シート強化
@@ -1413,7 +1419,8 @@
 - `v0.1.673` 2026-06-10 — コメビュの名前をパネルと同じ情報源で補完
 - `v0.1.670` 2026-06-10 — コメビュのアイコンを本家と同じサムネに
 
-### 🩺 診断・状態速報 (139版)
+### 🩺 診断・状態速報 (140版)
+- `v0.1.1058` 2026-07-04 — ギフト取りこぼし修正+コメント数マイルストーン診断を新設
 - `v0.1.1057` 2026-07-04 — ギフト診断の対処候補への統合漏れを修正+内部構造の整理
 - `v0.1.1056` 2026-07-04 — ①POPと②応援プレビューの数値ズレを世代番号で検知
 - `v0.1.1055` 2026-07-04 — 診断シートの網羅漏れ2件を修正+ギフト診断を数値化

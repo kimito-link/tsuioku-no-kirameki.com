@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 2 / 600 件
+## ⚠️ 役割コメントが無いソース 2 / 604 件
 - `src/lib/reportPreviewPublish.js`
 - `src/lib/venueLaneBuckets.js`
 
@@ -468,7 +468,7 @@
   - `vendor-visual-explainer.mjs` — Vendors nicobailon/visual-explainer (MIT) into .cursor/skills/visual-explainer/
   - `verify-bump.mjs` — extension bump 後の整合性チェッカー
   - `write-extension-placeholder-icons.mjs` — リポジトリに 256px アイコンしか無い環境向け: manifest 用の小さめ PNG を生成する。
-- 📁 **src/** (1268)
+- 📁 **src/** (1275)
   - 📁 **data/** (6)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -502,7 +502,11 @@
       - `avatarResolver.test.js`
       - `identity.js` — ニコ生ユーザー ID の「匿名性」判定と関連アイデンティティ・ユーティリティ。
       - `nickname.js` — 表示名（ニックネーム）の「強弱」判定。
-  - 📁 **extension/** (13)
+  - 📁 **extension/** (15)
+    - 📁 **popup/** (2)
+      - 📁 **report/** (2)
+        - `htmlReportDocument.js` — HTMLレポート(振り返り用の保存HTML)組み立てクラスタ。
+        - `htmlReportDocument.test.js`
     - 📁 **story/** (2)
       - `renderStoryUserLaneDom.js` — 応援ユーザーレーン DOM の同期（popup-entry から切り出し・状態は引数で受け取る）。
       - `renderStoryUserLaneDom.test.js`
@@ -728,7 +732,7 @@
         - `logo_funlink_white_RGB_maru_black.png`
       - `logo_guide_funlink_ol.pdf`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1056)
+  - 📁 **lib/** (1061)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -1275,6 +1279,9 @@
     - `migrateInlinePanelFloatToDock.test.js`
     - `migrateSuggestInitialInlinePanelPlacement.js` — 新規インストール時のみ、インライン配置キーが未保存なら画面幅で既定を一度書き込む。
     - `migrateSuggestInitialInlinePanelPlacement.test.js`
+    - `milestoneEffectDiag.js` — コメント数マイルストーン(100/200/500/1000/2000/3000/5000/10000件)の
+    - `milestoneEffectDiag.test.js`
+    - `milestoneEffectDiagKey.js` — コメント数マイルストーンの「検知→演出→効果音」が揃っているかの観測値を popup-entry.js が
     - `mirrorBundle.js` — 5種類の「鏡」を同一 tick の 1 バンドルとして扱うための合流バッファ純関数。
     - `mirrorBundle.test.js`
     - `mirrorBundleFlushScheduler.js` — 鏡バンドルの flush スケジューラ(状態を内部に閉じた純ロジック・タイマー非依存)。
@@ -1361,6 +1368,8 @@
     - `officialEventDomBundle.test.js`
     - `officialEventRankChange.js` — 配信者が参加しているニコニコイベント(audition)の現在順位(scrapeOfficialEventBannerFromDom の rank)を
     - `officialEventRankChange.test.js`
+    - `officialEventRankSoundEffect.js` — v0.1.1053: 配信者が参加中のニコニコイベント順位が上下したら効果音(rank_up/rank_down)を鳴らす。
+    - `officialEventRankSoundEffect.test.js`
     - `officialNicoStatsStripDigest.js` — text: string,
     - `officialNicoStatsStripDigest.test.js`
     - `officialStatsWindow.js` — at?: number|null,

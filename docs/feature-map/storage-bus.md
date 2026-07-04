@@ -115,6 +115,7 @@
 | `KEY_LIVEVIEW_PUBLISH_PAYLOAD` | — | extension/live-view-entry.js |
 | `KEY_LIVE_BROADCASTER_CTX` | extension/content-entry.js | extension/venueBar.js |
 | `KEY_MARKETING_EXPORT_MASK_LABELS` | — | extension/popup-entry.js |
+| `KEY_MILESTONE_EFFECT_DIAG` | extension/popup-entry.js | extension/status-entry.js |
 | `KEY_NDGR_DETERMINISTIC_BACKFILL` | — | extension/content-entry.js |
 | `KEY_NDGR_FORWARD_ENABLED` | — | extension/content-entry.js |
 | `KEY_NORTH_STAR_MIRROR` | — | extension/popup-entry.js<br>extension/status-entry.js |
