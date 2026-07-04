@@ -10,8 +10,11 @@ export const KEY_PREVIEW_RENDER_ACK = 'nls_preview_render_ack_v1';
 
 /**
  * ack スナップショットを組む(純関数)。
- * @param {{ ready?: boolean, liveId?: string, nowMs?: number, laneTiles?: number, supporterRows?: number }} input
- * @returns {{ ready: boolean, ts: number, liveId: string, laneTiles: number, supporterRows: number }}
+ *   v0.1.1056(パリティ根本修正 Phase2): gen を追加。②が読んだ鏡バンドルの世代(bundleGen)を
+ *   ここに載せることで、parityVerdict が「①が書いた世代」と「②が読んで描いた世代」を突合できる
+ *   ようになる(値の食い違いでなく世代のズレで判定=mirrors-written-per-key-per-tick 問題の根治)。
+ * @param {{ ready?: boolean, liveId?: string, nowMs?: number, laneTiles?: number, supporterRows?: number, gen?: number }} input
+ * @returns {{ ready: boolean, ts: number, liveId: string, laneTiles: number, supporterRows: number, gen: number }}
  */
 export function buildPreviewRenderAck(input = {}) {
   const ready = input.ready === true;
@@ -19,5 +22,6 @@ export function buildPreviewRenderAck(input = {}) {
   const liveId = String(input.liveId || '').trim().toLowerCase();
   const laneTiles = Math.max(0, Math.floor(Number(input.laneTiles) || 0));
   const supporterRows = Math.max(0, Math.floor(Number(input.supporterRows) || 0));
-  return { ready, ts, liveId, laneTiles, supporterRows };
+  const gen = Math.max(0, Math.floor(Number(input.gen) || 0));
+  return { ready, ts, liveId, laneTiles, supporterRows, gen };
 }

@@ -5369,6 +5369,11 @@ function renderStoryUserLane() {
 
 /** passive 鏡描画の再描画 skip 用 signature(変化が無ければ paint しない)。 */
 let _laneMirrorPassiveSig = '';
+// v0.1.1056(パリティ根本修正 Phase2): sig 一致(中身不変)で再描画を skip するときも、①は3秒ごとに
+//   flush して gen が進み続けるため、ack を書き直さないと gen 差が無限に開いて世代パリティが常に
+//   「大きくズレている」と誤判定される(定常状態での嘘の🔴)。gen のみの軽量更新を min-gap で行う。
+let _lastPreviewAckGenWriteAt = 0;
+const PREVIEW_ACK_GEN_REFRESH_MS = 10000;
 /** passive コメントティッカー鏡描画の再描画 skip 用 signature。 */
 let _commentTimelineMirrorPassiveSig = '';
 
@@ -5412,6 +5417,32 @@ async function applyLaneMirrorForPassive() {
     recordStoryUserLaneStep(_storyUserLaneRenderProbe, STORY_USER_LANE_STEPS.DONE, {
       domTilesPainted: countStoryUserLaneDomTiles(els)
     });
+    // v0.1.1056: 中身不変でも gen だけは①が3秒ごとに進める。ack の gen を追従させないと定常状態で
+    //   gen 差が開き続け世代パリティが誤ってmismatchになるため、min-gap(10秒)で軽量更新する。
+    const nowForGen = Date.now();
+    if (
+      countStoryUserLaneDomTiles(els) > 0 &&
+      nowForGen - _lastPreviewAckGenWriteAt >= PREVIEW_ACK_GEN_REFRESH_MS
+    ) {
+      _lastPreviewAckGenWriteAt = nowForGen;
+      const ackLid = String(snap.liveId || '').trim().toLowerCase();
+      void chrome.storage.local.get(KEY_PREVIEW_RENDER_ACK).then((bag) => {
+        const prevAck = bag && bag[KEY_PREVIEW_RENDER_ACK];
+        const supEl = document.getElementById('topSupportRankStrip');
+        const supporterRows =
+          supEl instanceof HTMLElement && !supEl.hidden ? supEl.querySelectorAll('[role="listitem"]').length : 0;
+        return chrome.storage.local.set({
+          [KEY_PREVIEW_RENDER_ACK]: buildPreviewRenderAck({
+            ready: true,
+            liveId: ackLid,
+            nowMs: nowForGen,
+            laneTiles: Number(prevAck?.laneTiles) || countStoryUserLaneDomTiles(els),
+            supporterRows,
+            gen: Number(snap.bundleGen) || 0
+          })
+        });
+      }).catch(() => { /* best-effort: ack 失敗は描画を妨げない */ });
+    }
     return;
   }
   _laneMirrorPassiveSig = sig;
@@ -5448,9 +5479,12 @@ async function applyLaneMirrorForPassive() {
       // v0.1.1025(嘘の✅根治): ②が実際に描いた件数を ack に載せ parity が①鏡と突合(②欠落で🔴=嘘の✅を防ぐ)。
       const supEl = document.getElementById('topSupportRankStrip');
       const supporterRows = supEl instanceof HTMLElement && !supEl.hidden ? supEl.querySelectorAll('[role="listitem"]').length : 0;
+      // v0.1.1056(パリティ根本修正 Phase2): ①が鏡に焼き込んだ世代(bundleGen)を ack にも転記する。
+      //   parityVerdict が「①が書いた世代」と「②が読んで描いた世代」を突合できるようにする。
       void chrome.storage.local.set({
-        [KEY_PREVIEW_RENDER_ACK]: buildPreviewRenderAck({ ready: true, liveId: ackLid, nowMs: Date.now(), laneTiles: countStoryUserLaneDomTiles(els), supporterRows })
+        [KEY_PREVIEW_RENDER_ACK]: buildPreviewRenderAck({ ready: true, liveId: ackLid, nowMs: Date.now(), laneTiles: countStoryUserLaneDomTiles(els), supporterRows, gen: Number(snap.bundleGen) || 0 })
       }).catch(() => { /* best-effort: ack 失敗は描画を妨げない */ });
+      _lastPreviewAckGenWriteAt = Date.now();
     } catch { /* no-op */ }
     // v0.1.987: 鏡経路で描けたら幕も畳む(描けたのにローディングを構造的に消す)。冪等・幕が無ければ no-op。
     try { dismissInitialLoadShade(); } catch { /* no-op */ }

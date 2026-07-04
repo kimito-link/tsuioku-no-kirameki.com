@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildParityVerdict, formatParityVerdictLine, buildParityBadge, judgeVenuePopulationParity } from './parityVerdict.js';
+import { buildParityVerdict, formatParityVerdictLine, buildParityBadge, judgeVenuePopulationParity, judgePreviewGenerationParity } from './parityVerdict.js';
 
 // 決定木を固定。誤検知根絶(取得不能は必ず pending・×にしない)を最重視で検証。
 
@@ -242,5 +242,81 @@ describe('buildParityVerdict — ④会場突合の統合(v0.1.1050)', () => {
     const v = buildParityVerdict(okInput());
     expect(v.verdict).toBe('ok');
     expect(v.code).toBe('ok');
+  });
+});
+
+describe('judgePreviewGenerationParity — ①②の世代同期(パリティ根本修正 v0.1.1056)', () => {
+  it('鏡が旧形式(bundleGen未スタンプ)は pending(gen_unstamped)', () => {
+    const r = judgePreviewGenerationParity({ ready: true, gen: 5 }, { liveId: 'lv1' }, 'lv1', 1000);
+    expect(r.state).toBe('pending');
+    expect(r.code).toBe('gen_unstamped');
+  });
+  it('ack が無い/gen を持たない旧形式は pending(gen_no_ack)', () => {
+    const r = judgePreviewGenerationParity(null, { liveId: 'lv1', bundleGen: 5 }, 'lv1', 1000);
+    expect(r.state).toBe('pending');
+    expect(r.code).toBe('gen_no_ack');
+  });
+  it('ack が別配信は pending(gen_other_live)', () => {
+    const r = judgePreviewGenerationParity(
+      { ready: true, liveId: 'lv2', gen: 5, ts: 1000 },
+      { liveId: 'lv1', bundleGen: 5 }, 'lv1', 1000
+    );
+    expect(r.state).toBe('pending');
+    expect(r.code).toBe('gen_other_live');
+  });
+  it('ack が鮮度切れ(180秒超)は pending(gen_ack_stale)', () => {
+    const r = judgePreviewGenerationParity(
+      { ready: true, liveId: 'lv1', gen: 5, ts: 1000 },
+      { liveId: 'lv1', bundleGen: 5 }, 'lv1', 1000 + 200_000
+    );
+    expect(r.state).toBe('pending');
+    expect(r.code).toBe('gen_ack_stale');
+  });
+  it('世代が一致(差0-1)は match', () => {
+    const r = judgePreviewGenerationParity(
+      { ready: true, liveId: 'lv1', gen: 5, ts: 1000 },
+      { liveId: 'lv1', bundleGen: 5 }, 'lv1', 1000
+    );
+    expect(r.state).toBe('match');
+    expect(r.code).toBe('gen_match');
+  });
+  it('世代差がflight中の許容内(ack取得から時間経過)は lag(正常な追従中)', () => {
+    // ackAgeMs=6000(6秒経過)→ toleratedDelta=1+ceil(6000/3000)=3。差2はmatch圏(<=1)を超えつつ
+    //   許容内=①がack後さらに2回flush(3秒間隔)している間に②がまだ追いついていない正常な遅れ。
+    const r = judgePreviewGenerationParity(
+      { ready: true, liveId: 'lv1', gen: 5, ts: 1000 },
+      { liveId: 'lv1', bundleGen: 7 }, 'lv1', 7000
+    );
+    expect(r.state).toBe('lag');
+    expect(r.code).toBe('gen_lag');
+  });
+  it('世代差が許容を大きく超える(②が更新に追従できていない)は mismatch', () => {
+    const r = judgePreviewGenerationParity(
+      { ready: true, liveId: 'lv1', gen: 1, ts: 1000 },
+      { liveId: 'lv1', bundleGen: 20 }, 'lv1', 1000
+    );
+    expect(r.state).toBe('mismatch');
+    expect(r.code).toBe('gen_mismatch');
+    expect(r.delta).toBe(19);
+  });
+});
+
+describe('buildParityVerdict — 世代パリティの統合(パリティ根本修正 v0.1.1056)', () => {
+  it('laneMirror 未指定(旧形式)は既存のok判定を劣化させない(後方互換)', () => {
+    const v = buildParityVerdict(okInput());
+    expect(v.verdict).toBe('ok');
+  });
+  it('世代mismatchは fail(preview_gen_mismatch)', () => {
+    const i = { ...okInput(), laneMirror: { liveId: 'lv1', bundleGen: 20 } };
+    i.previewAck = { ready: true, ts: 1000, liveId: 'lv1', gen: 1 };
+    const v = buildParityVerdict(i);
+    expect(v.verdict).toBe('mismatch');
+    expect(v.code).toBe('preview_gen_mismatch');
+  });
+  it('世代が一致していれば ok のまま(既存判定と両立)', () => {
+    const i = { ...okInput(), laneMirror: { liveId: 'lv1', bundleGen: 5 } };
+    i.previewAck = { ready: true, ts: 1000, liveId: 'lv1', gen: 5 };
+    const v = buildParityVerdict(i);
+    expect(v.verdict).toBe('ok');
   });
 });

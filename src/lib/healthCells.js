@@ -1,3 +1,7 @@
+// v0.1.1056: パリティ根本修正 Phase4(この修正自体が動いているかを診断シートで検証可能にする)。
+//   parityVerdict.js の世代パリティ判定を再利用(一方向 import・循環なし)。
+import { judgePreviewGenerationParity } from './parityVerdict.js';
+
 /**
  * healthCells.js — status ファーストビューの「健全度セル」を作る純関数(v0.1.843)。
  *
@@ -328,7 +332,7 @@ function buildLaneHealthCells(laneDiag) {
 
 /**
  * 健全度セル配列を作る。
- * @param {{ livesData?: any[], fastDiag?: any, voiceDiag?: any, venueSeatsDiag?: any, laneDiag?: any, giftEffectDiag?: any, nowMs?: number }} data
+ * @param {{ livesData?: any[], fastDiag?: any, voiceDiag?: any, venueSeatsDiag?: any, laneDiag?: any, giftEffectDiag?: any, previewRenderAck?: any, laneMirror?: any, nowMs?: number }} data
  * @returns {HealthCell[]}
  */
 export function buildHealthCells(data) {
@@ -516,7 +520,54 @@ export function buildHealthCells(data) {
   // 24. v0.1.1054: ギフト/広告の「検知→演出→効果音」整合(giftEffectDiag 未観測なら空)。
   for (const c of buildGiftEffectHealthCells(data?.giftEffectDiag)) cells.push(c);
 
+  // 25-26. v0.1.1056: パリティ根本修正(①②の世代同期)自体が動いているかの自己診断。
+  for (const c of buildPreviewGenSyncHealthCells(data?.previewRenderAck, data?.laneMirror, nowMs)) cells.push(c);
+
   return cells;
+}
+
+/**
+ * v0.1.1056(パリティ根本修正 Phase4): ①(鏡バンドル)に世代(bundleGen)がスタンプされているか、
+ *   ②(応援プレビュー)がその世代を追従できているかを健全度セルに反映する。
+ *   この修正自体(gen スタンプの仕組み)が正しく機能しているかを診断シートで検証できるようにする
+ *   (ユーザー明示要件: 修正を入れるだけでなく、その修正が動いているかを状態速報で確認できること)。
+ * @param {{ ready?: boolean, liveId?: string, ts?: number, gen?: number }|null|undefined} previewRenderAck
+ * @param {{ liveId?: string, bundleGen?: number, capturedAt?: number }|null|undefined} laneMirror
+ * @param {number} nowMs
+ * @returns {HealthCell[]}
+ */
+function buildPreviewGenSyncHealthCells(previewRenderAck, laneMirror, nowMs) {
+  const mirror = laneMirror && typeof laneMirror === 'object' ? laneMirror : null;
+  if (!mirror) return []; // 鏡が一度も無い=popup未起動=セルを足さない(死にセルにしない)
+
+  /** @type {HealthCell[]} */
+  const out = [];
+  const hasGenStamp = Number.isFinite(Number(mirror.bundleGen));
+  // ① 鏡世代スタンプ自体が乗っているか(=この修正が反映されたビルドで動いているか)。
+  out.push(
+    hasGenStamp
+      ? stateCell('mirror-gen-stamp', '鏡世代スタンプ', 'ok', `gen=${Number(mirror.bundleGen)}`)
+      : stateCell('mirror-gen-stamp', '鏡世代スタンプ', 'warn', '旧形式(gen未スタンプ・反映3手順を確認)')
+  );
+
+  // ② ②(応援プレビュー)がその世代に追従できているか(旧形式時は判定できないので na)。
+  if (!hasGenStamp) {
+    out.push(stateCell('preview-gen-sync', '②世代同期', 'na', '鏡が旧形式のため判定不可'));
+    return out;
+  }
+  const ack = previewRenderAck && typeof previewRenderAck === 'object' ? previewRenderAck : null;
+  const curLid = String(mirror.liveId || '').trim().toLowerCase();
+  const genParity = judgePreviewGenerationParity(ack, mirror, curLid, nowMs);
+  if (genParity.state === 'pending') {
+    out.push(stateCell('preview-gen-sync', '②世代同期', 'na', genParity.reason));
+  } else if (genParity.state === 'lag') {
+    out.push(stateCell('preview-gen-sync', '②世代同期', 'processing', genParity.reason));
+  } else if (genParity.state === 'mismatch') {
+    out.push(stateCell('preview-gen-sync', '②世代同期', 'warn', genParity.reason));
+  } else {
+    out.push(stateCell('preview-gen-sync', '②世代同期', 'ok', genParity.reason));
+  }
+  return out;
 }
 
 /**
