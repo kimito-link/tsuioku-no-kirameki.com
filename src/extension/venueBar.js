@@ -2119,7 +2119,7 @@ export function mountVenueBarButton(options = {}) {
         _giftEffectDiagCounters.giftSoundPlayed += 1;
         publishGiftEffectDiag();
       }
-    }, Math.min(200, Math.max(0, Math.round(Number(flightMs) || 0))));
+    }, 0); // v0.1.1068: 即発音(同一バーストの統合はsetTimeout(0)がループ後に走ることで維持)
     _pendingGiftSound = pending;
     return 'scheduled';
   };
