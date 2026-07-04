@@ -138,3 +138,55 @@ describe('milestoneEffectDiagToActionCards', () => {
     expect(milestoneEffectDiagToActionCards(null)).toEqual([]);
   });
 });
+
+describe('director段の4段化(v0.1.1060・パチンコPhase1)', () => {
+  it('初期stateは milestoneDirected=0(新セッションは計測される)', () => {
+    expect(makeInitialMilestoneEffectDiag().milestoneDirected).toBe(0);
+  });
+
+  it('旧スナップショット(directorフィールド無し)は null=未計測として保つ', () => {
+    const snap = buildMilestoneEffectDiagSnapshot({ milestoneDetected: 3 }, 1000);
+    expect(snap.milestoneDirected).toBeNull();
+  });
+
+  it('未計測(null)なら従来の3段表示のまま・director⚠を出さない(嘘の警告防止)', () => {
+    const snap = buildMilestoneEffectDiagSnapshot(
+      { milestoneDetected: 3, milestoneThrown: 3, milestoneSoundPlayed: 3 },
+      1000
+    );
+    const lines = buildMilestoneEffectDiagLines(snap, 1000);
+    expect(lines.some((l) => l.includes('director'))).toBe(false);
+    expect(milestoneEffectDiagToActionCards(snap).some((c) => c.id === 'milestone-effect-director-missing')).toBe(false);
+  });
+
+  it('計測されていれば4段表示(検知→director→演出→音)', () => {
+    const snap = buildMilestoneEffectDiagSnapshot(
+      { milestoneDetected: 3, milestoneDirected: 3, milestoneThrown: 3, milestoneSoundPlayed: 3 },
+      1000
+    );
+    const lines = buildMilestoneEffectDiagLines(snap, 1000);
+    expect(lines.some((l) => l.includes('検知3 → director3 ✅ → 演出3 ✅ → 音3 ✅'))).toBe(true);
+  });
+
+  it('director判定漏れがあれば⚠件数を明記しカードも出す', () => {
+    const snap = buildMilestoneEffectDiagSnapshot(
+      { milestoneDetected: 5, milestoneDirected: 3, milestoneThrown: 3, milestoneSoundPlayed: 3 },
+      1000
+    );
+    const lines = buildMilestoneEffectDiagLines(snap, 1000);
+    expect(lines.some((l) => l.includes('⚠2件判定漏れ'))).toBe(true);
+    const cards = milestoneEffectDiagToActionCards(snap);
+    expect(cards.some((c) => c.id === 'milestone-effect-director-missing')).toBe(true);
+  });
+
+  it('計測時の演出漏れは director→演出 の差で数える(検知との差ではない)', () => {
+    const snap = buildMilestoneEffectDiagSnapshot(
+      { milestoneDetected: 5, milestoneDirected: 4, milestoneThrown: 2, milestoneSoundPlayed: 2 },
+      1000
+    );
+    const lines = buildMilestoneEffectDiagLines(snap, 1000);
+    expect(lines.some((l) => l.includes('⚠2件出ていない'))).toBe(true); // 4-2=2 (5-2=3ではない)
+    const card = milestoneEffectDiagToActionCards(snap).find((c) => c.id === 'milestone-effect-throw-missing');
+    expect(card?.symptom).toContain('director4件 → 演出2件');
+  });
+});

@@ -9,6 +9,7 @@
  *
  * @typedef {{
  *   milestoneDetected: number,     // コメント数マイルストーンを検知した回数(pickCommentMilestoneCelebrationがspecを返した回数)
+ *   milestoneDirected: number|null, // 演出ディレクター(effectDirector.directHit)が判定を出した回数(v0.1.1060の4段化)。null=旧バージョンのスナップショットで未計測(⚠を出さない)
  *   milestoneThrown: number,       // 演出(playSupportCelebrationDom)が実際に走った回数
  *   milestoneSoundPlayed: number,  // 効果音の再生を試みた回数(ガード通過後)
  *   soundEnabled: boolean,         // 効果音設定がONか(OFFなら鳴らないのが正常=誤診断防止)
@@ -20,11 +21,23 @@
 export function makeInitialMilestoneEffectDiag() {
   return {
     milestoneDetected: 0,
+    milestoneDirected: 0,
     milestoneThrown: 0,
     milestoneSoundPlayed: 0,
     soundEnabled: true,
     lastEventAt: 0
   };
+}
+
+/**
+ * director 段の計測値を取り出す。数値でなければ null(=未計測・旧スナップショット互換)。
+ * @param {unknown} raw
+ * @returns {number|null}
+ */
+function directedCountOf(raw) {
+  if (raw == null) return null; // Number(null)=0 の罠を踏まない(null=未計測を0件計測と混同しない)
+  const n = Number(raw);
+  return Number.isFinite(n) ? n : null;
 }
 
 /**
@@ -44,6 +57,8 @@ export function buildMilestoneEffectDiagSnapshot(diag, nowMs) {
   const now = Number.isFinite(Number(nowMs)) ? Number(nowMs) : 0;
   return {
     milestoneDetected: num(d.milestoneDetected, base.milestoneDetected),
+    // director 段だけは「無ければ0」でなく null(未計測)を保つ=旧データに嘘の⚠を出さない。
+    milestoneDirected: directedCountOf(d.milestoneDirected),
     milestoneThrown: num(d.milestoneThrown, base.milestoneThrown),
     milestoneSoundPlayed: num(d.milestoneSoundPlayed, base.milestoneSoundPlayed),
     soundEnabled: d.soundEnabled !== false,
@@ -53,15 +68,20 @@ export function buildMilestoneEffectDiagSnapshot(diag, nowMs) {
 }
 
 /**
- * 取りこぼし判定。
+ * 取りこぼし判定。directed が計測されていれば4段(検知→director→演出→音)、
+ * 未計測(null)なら従来の3段(検知→演出→音)で段間の差を取る。
  * @param {number} detected
+ * @param {number|null} directed
  * @param {number} thrown
  * @param {number} soundPlayed
- * @returns {{ throwMissing: number, soundMissing: number }}
+ * @returns {{ directorMissing: number, throwMissing: number, soundMissing: number }}
  */
-function diffCounts(detected, thrown, soundPlayed) {
+function diffCounts(detected, directed, thrown, soundPlayed) {
+  const directorMissing = directed == null ? 0 : Math.max(0, detected - directed);
+  const throwBase = directed == null ? detected : directed;
   return {
-    throwMissing: Math.max(0, detected - thrown),
+    directorMissing,
+    throwMissing: Math.max(0, throwBase - thrown),
     soundMissing: Math.max(0, thrown - soundPlayed)
   };
 }
@@ -81,15 +101,21 @@ export function buildMilestoneEffectDiagLines(snap, nowMs) {
   const now = Number.isFinite(Number(nowMs)) ? Number(nowMs) : 0;
   const lastAt = Number(snap.lastEventAt) || 0;
   const agoText = lastAt > 0 && now > 0 ? ` / 最終${Math.max(0, Math.round((now - lastAt) / 1000))}秒前` : '';
+  const directed = directedCountOf(snap.milestoneDirected);
   const thrown = Number(snap.milestoneThrown) || 0;
   const soundPlayed = Number(snap.milestoneSoundPlayed) || 0;
-  const { throwMissing, soundMissing } = diffCounts(detected, thrown, soundPlayed);
+  const { directorMissing, throwMissing, soundMissing } = diffCounts(detected, directed, thrown, soundPlayed);
   const throwMark = throwMissing > 0 ? `⚠${throwMissing}件出ていない` : '✅';
   // 効果音 OFF は鳴らないのが正常=🔴にしない(誤診断防止)。ON なのに鳴っていない時だけ警告。
   const soundMark = !soundEnabled ? '(OFF)' : soundMissing > 0 ? `⚠${soundMissing}件鳴っていない` : '✅';
+  // director 段は計測されている時だけ表示(旧スナップショットは従来の3段のまま=嘘の⚠を出さない)。
+  const directorPart =
+    directed == null
+      ? ''
+      : ` → director${directed} ${directorMissing > 0 ? `⚠${directorMissing}件判定漏れ` : '✅'}`;
   return [
     `コメント数マイルストーン演出・効果音: 効果音設定=${soundEnabled ? 'ON' : 'OFF'}${agoText}`,
-    `  → 検知${detected} → 演出${thrown} ${throwMark} → 音${soundPlayed} ${soundMark}`
+    `  → 検知${detected}${directorPart} → 演出${thrown} ${throwMark} → 音${soundPlayed} ${soundMark}`
   ];
 }
 
@@ -103,16 +129,27 @@ export function milestoneEffectDiagToActionCards(snap) {
   const detected = Number(snap.milestoneDetected) || 0;
   if (detected === 0) return [];
   const soundEnabled = snap.soundEnabled !== false;
+  const directed = directedCountOf(snap.milestoneDirected);
   const thrown = Number(snap.milestoneThrown) || 0;
   const soundPlayed = Number(snap.milestoneSoundPlayed) || 0;
-  const { throwMissing, soundMissing } = diffCounts(detected, thrown, soundPlayed);
+  const { directorMissing, throwMissing, soundMissing } = diffCounts(detected, directed, thrown, soundPlayed);
   /** @type {Array<{id:string,severity:string,symptom:string,cause:string,action:string,fixableHere:string}>} */
   const cards = [];
+  if (directorMissing > 0) {
+    cards.push({
+      id: 'milestone-effect-director-missing',
+      severity: 'warn',
+      symptom: `コメント数マイルストーンを検知したのに演出ディレクターの判定が出ていません(検知${detected}件 → director${directed}件)`,
+      cause: 'effectDirector.directHit の呼び出し漏れ、または判定前の例外で落ちている疑いです。',
+      action: 'この状態速報を開発者(Claude)に共有してください。director段の呼び出し漏れを実コードで特定して直します。',
+      fixableHere: 'no'
+    });
+  }
   if (throwMissing > 0) {
     cards.push({
       id: 'milestone-effect-throw-missing',
       severity: 'warn',
-      symptom: `コメント数マイルストーンを検知したのに演出が出ていません(検知${detected}件 → 演出${thrown}件)`,
+      symptom: `コメント数マイルストーンを検知したのに演出が出ていません(${directed == null ? `検知${detected}` : `director${directed}`}件 → 演出${thrown}件)`,
       cause: 'popupCelebrationGate のブロック判定、または dedupe(同一マイルストーンの二重発火防止)で捨てられている疑いです。',
       action: 'この状態速報を開発者(Claude)に共有してください。取りこぼし箇所を実コードで特定して直します。',
       fixableHere: 'no'
