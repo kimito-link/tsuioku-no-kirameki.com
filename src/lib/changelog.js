@@ -26,6 +26,16 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1064',
+    date: '2026-07-04',
+    summary: 'ギフト音を短く歯切れよく調整',
+    items: Object.freeze([
+      '「短く歯切れよいほうがいい」というご感想を受けて、ギフト効果音を全金額帯で短くしました' +
+      '(小0.45秒/中0.6秒/大0.9秒/特大1.3秒)。きらめきの余韻を絞ってアタック主体のパンチのある' +
+      '音になり、ギフトが連続しても音が残りません。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1063',
     date: '2026-07-04',
     summary: '読み上げの音声合成を約30%高速化(テンポ改善)',

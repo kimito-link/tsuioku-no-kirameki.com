@@ -96,10 +96,12 @@ function normalizeExistingEffects(tmpDir) {
  *   数値はティアごとの重み(決定論・乱数なし)。
  */
 const GIFT_TIER_BODY = Object.freeze({
-  small: { impact: 0.5, sparkle: 0.5, durSec: 0.9 },
-  medium: { impact: 0.65, sparkle: 0.6, durSec: 1.2 },
-  large: { impact: 0.85, sparkle: 0.7, durSec: 1.6 },
-  mega: { impact: 1.0, sparkle: 0.85, durSec: 2.2 }
+  // v0.1.1064: 実試聴フィードバック「短く歯切れよいほうが」→ 全ティアを短縮し、
+  //   キラの尾(sparkle)を絞ってアタック主体のパンチある音へ(フェードも0.3→0.15秒)。
+  small: { impact: 0.55, sparkle: 0.3, durSec: 0.45 },
+  medium: { impact: 0.7, sparkle: 0.35, durSec: 0.6 },
+  large: { impact: 0.9, sparkle: 0.45, durSec: 0.9 },
+  mega: { impact: 1.0, sparkle: 0.6, durSec: 1.3 }
 });
 
 /**
@@ -113,7 +115,7 @@ function buildGiftTierSound(src, dest, body, tmpDir) {
   const impact = join(SRC_DIR, 'gift-impact.mp3');
   const sparkle = join(SRC_DIR, 'gift-sparkle.mp3');
   const mixed = join(tmpDir, `mix-${dest.split(/[\\/]/).pop()}.wav`);
-  const fadeStart = Math.max(0.1, body.durSec - 0.3);
+  const fadeStart = Math.max(0.1, body.durSec - 0.15);
   ffmpeg([
     '-i', src,
     '-i', impact,
@@ -121,9 +123,9 @@ function buildGiftTierSound(src, dest, body, tmpDir) {
     '-filter_complex',
     '[0:a]adelay=0|0,volume=1.0[a0];' +
       `[1:a]adelay=30|30,volume=${body.impact}[a1];` +
-      `[2:a]adelay=120|120,volume=${body.sparkle}[a2];` +
+      `[2:a]adelay=90|90,volume=${body.sparkle}[a2];` +
       '[a0][a1][a2]amix=inputs=3:duration=longest:dropout_transition=0:normalize=0,' +
-      `atrim=0:${body.durSec},afade=t=out:st=${fadeStart}:d=0.3,alimiter=limit=0.95[out]`,
+      `atrim=0:${body.durSec},afade=t=out:st=${fadeStart}:d=0.15,alimiter=limit=0.95[out]`,
     '-map', '[out]',
     mixed
   ]);
