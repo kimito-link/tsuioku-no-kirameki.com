@@ -28,7 +28,12 @@ async function shouldPopupSkipEffectSoundForVenue(storageLocal) {
  * 配信者のイベント順位変動を検知し、条件が揃えば効果音を鳴らす(observe-and-play・描画は変えない)。
  * @param {string} liveId
  * @param {import('./officialEventDomBundle.js').OfficialEventDomBundle|null} bundle
- * @param {{ storageLocal: { get(keys: string): Promise<Record<string, unknown>> }, effectSoundEnabled: boolean }} deps
+ * @param {{
+ *   storageLocal: { get(keys: string): Promise<Record<string, unknown>> },
+ *   effectSoundEnabled: boolean,
+ *   buildEffectSoundDeps?: (kind: string) => Record<string, unknown>
+ * }} deps Phase A(2026-07-05): buildEffectSoundDeps を渡すとマイ効果音(カスタム優先variantPaths等)
+ *   が反映される。未指定時は従来どおり playEffectSound の既定(合成音)で鳴る(後方互換)。
  */
 export async function maybePlayEventRankChangeSound(liveId, bundle, deps) {
   try {
@@ -43,7 +48,13 @@ export async function maybePlayEventRankChangeSound(liveId, bundle, deps) {
     const change = detectOfficialEventRankChange(prevRank, currentRank);
     if (change === 'none') return;
     if (await shouldPopupSkipEffectSoundForVenue(deps.storageLocal)) return;
-    playEffectSound(change === 'up' ? EFFECT_SOUND_KINDS.RANK_UP : EFFECT_SOUND_KINDS.RANK_DOWN);
+    const kind = change === 'up' ? EFFECT_SOUND_KINDS.RANK_UP : EFFECT_SOUND_KINDS.RANK_DOWN;
+    // buildEffectSoundDeps 未指定時は引数1個のまま呼ぶ(既存呼び出し・テストとの互換を保つ)。
+    if (typeof deps.buildEffectSoundDeps === 'function') {
+      playEffectSound(kind, deps.buildEffectSoundDeps(kind));
+    } else {
+      playEffectSound(kind);
+    }
   } catch {
     /* 効果音は観測専用の付加機能。失敗してもイベント順位表示自体には影響させない */
   }

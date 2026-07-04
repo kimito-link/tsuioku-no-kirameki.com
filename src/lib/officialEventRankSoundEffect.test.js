@@ -73,6 +73,17 @@ describe('maybePlayEventRankChangeSound', () => {
     expect(playEffectSoundMock).toHaveBeenCalledWith(EFFECT_SOUND_KINDS.RANK_UP);
   });
 
+  it('buildEffectSoundDeps を渡すとその戻り値がplayEffectSoundのdepsに使われる(Phase A マイ効果音注入)', async () => {
+    const storageLocal = { get: vi.fn().mockResolvedValue({}) };
+    const customDeps = { variantPaths: { rank_up: ['blob:custom'] } };
+    const buildEffectSoundDeps = vi.fn().mockReturnValue(customDeps);
+    const deps = { storageLocal, effectSoundEnabled: true, buildEffectSoundDeps };
+    await maybePlayEventRankChangeSound('lv-custom', makeBundle(5), deps);
+    await maybePlayEventRankChangeSound('lv-custom', makeBundle(3), deps);
+    expect(buildEffectSoundDeps).toHaveBeenCalledWith(EFFECT_SOUND_KINDS.RANK_UP);
+    expect(playEffectSoundMock).toHaveBeenCalledWith(EFFECT_SOUND_KINDS.RANK_UP, customDeps);
+  });
+
   it('storage.get が失敗しても例外を投げない', async () => {
     const storageLocal = { get: vi.fn().mockRejectedValue(new Error('boom')) };
     await expect(

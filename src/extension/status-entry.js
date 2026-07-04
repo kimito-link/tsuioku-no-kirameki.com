@@ -59,7 +59,8 @@ import { buildStatusShareUrls } from '../lib/statusShareUrls.js';
 // 応援ライブビュー(拡張内)の「このURLをWEBでも公開する」用: status が組み立てた公開ペイロードを置くキー。
 import {
   KEY_BACKFILL_LIVE_METRIC,
-  KEY_LIVEVIEW_PUBLISH_PAYLOAD
+  KEY_LIVEVIEW_PUBLISH_PAYLOAD,
+  KEY_CUSTOM_SOUND_REV
 } from '../lib/storageKeys.js';
 // レポートプレビュー信頼度注釈の文脈(fastDiag→ctx)の純関数。挙動同値で status-entry から切り出し。
 import { reportPreviewCtxFromFastDiag } from '../lib/reportPreviewCtx.js';
@@ -71,6 +72,26 @@ import { buildGiftEffectDiagLines, giftEffectDiagToActionCards } from '../lib/gi
 import { KEY_MILESTONE_EFFECT_DIAG } from '../lib/milestoneEffectDiagKey.js';
 // v0.1.1067 開発用: 効果音試聴パネル(音源の正本リストと実再生音量をそのまま使う)。
 import { EFFECT_SOUND_PATHS, EFFECT_SOUND_VARIANT_PATHS, defaultVolumeForEffectSoundKind } from '../lib/effectSoundPlayer.js';
+// Phase A(2026-07-05) 開発用: マイ効果音差し替え(IndexedDB取込+割当)。取込UIは診断ページに置く
+//   (試聴パネルと同じ扱い=release非表示)。プリセット表(§2のJSON化)で自動割当する。
+import {
+  CUSTOM_SOUND_PRESET,
+  CUSTOM_SOUND_PRESET_KEYS,
+  parseAudiostockNoFromFilename,
+  presetIdForNo,
+  buildPresetNoIndex
+} from '../lib/customSoundPreset.js';
+import {
+  openCustomSoundDb,
+  putSoundBlob,
+  getSoundBlob,
+  listSoundBlobs,
+  getAssignment,
+  setAssignment,
+  clearAssignment,
+  listAssignments,
+  bumpCustomSoundRev
+} from '../lib/customSoundStore.js';
 import { buildMilestoneEffectDiagLines, milestoneEffectDiagToActionCards } from '../lib/milestoneEffectDiag.js';
 // 2026-06-22(council/lane-show-all-active): 応援レーンの人数整合(素性 N/表示 M)を健全度パネルに載せる。
 import { KEY_LANE_DIAG } from '../lib/laneDiagKey.js';
@@ -284,6 +305,7 @@ async function bootstrap() {
   setupVisibilityHandler();
   setupStorageChangeListener();
   setupSoundPreviewPanel();
+  setupMyCustomSoundPanel();
 
   // v0.1.797「status が重くて開かない」根治: 初回は短い timeout(1500ms)で走らせ、storage が
   //   混雑していても最大 ~1.5秒で degrade 表示に切り替える(=「開かない」を作らない)。await せず
@@ -2537,12 +2559,216 @@ function setupSoundPreviewPanel() {
   }
 }
 
+/**
+ * Phase A(2026-07-05) 開発用: マイ効果音差し替えパネル。
+ *   council/pachinko-ultimate-SYNTHESIS.md §1.3 の取込UIを実装する:
+ *     1. ファイル一括選択→ファイル名から No. をパース→プリセット表で自動割当(1クリック)。
+ *     2. キーごとの割り当てリスト+▶試聴(実再生と同じ経路=blob URL)+gainスライダー。
+ *     3. 「既定に戻す」=assignments の該当キー削除(合成音フォールバックへ)。
+ *   トリム/加工UIは作らない(素材をそのまま鳴らす・設計書の絶対制約)。
+ *   IndexedDB自体は release でも使えて構わない(音声データは常にユーザー端末内のみ)が、
+ *   取込UI自体は開発用パネル扱い(hideDevDiagnosticsIfRelease が丸ごと隠す・既存踏襲)。
+ */
+function setupMyCustomSoundPanel() {
+  const fileInput = document.getElementById('myCustomSoundFileInput');
+  const importResult = document.getElementById('myCustomSoundImportResult');
+  const statsEl = document.getElementById('myCustomSoundStats');
+  const listEl = document.getElementById('myCustomSoundList');
+  if (!fileInput || !listEl) return;
+  if (typeof indexedDB === 'undefined') {
+    if (importResult) importResult.textContent = 'この環境では IndexedDB が使えないため、マイ効果音は利用できません。';
+    return;
+  }
+
+  /** @type {HTMLAudioElement|null} 試聴中の1本(切替時に前の再生を止める)。 */
+  let curPreviewAudio = null;
+  /** @type {Map<string, string>} 割当済みblobの表示用URL(パネルを開いている間だけ保持・リロードで消えてよい)。 */
+  const previewUrlCache = new Map();
+
+  const getDb = () => openCustomSoundDb();
+
+  /** 統計行(取込件数/割当キー数/rev)を再描画する。診断ページ内の表示専用(extras計器はstatus側で別途集計)。 */
+  async function renderStats() {
+    if (!statsEl) return;
+    try {
+      const db = await getDb();
+      const blobs = await listSoundBlobs(db);
+      const assignments = await listAssignments(db);
+      const bag = await chrome.storage.local.get(KEY_CUSTOM_SOUND_REV);
+      const rev = Number(bag?.[KEY_CUSTOM_SOUND_REV]) || 0;
+      statsEl.textContent = `取込済み: ${blobs.length}本 / 割当済みキー: ${assignments.length}/${CUSTOM_SOUND_PRESET_KEYS.length} / 世代(rev): ${rev}`;
+    } catch {
+      statsEl.textContent = '';
+    }
+  }
+
+  /** キーごとの割り当てリストを再描画する(一度作ったDOMは使い回さず毎回作り直す=このパネルはON/OFF操作が主で高頻度更新ではないため許容)。 */
+  async function renderList() {
+    listEl.innerHTML = '';
+    let db;
+    try {
+      db = await getDb();
+    } catch {
+      listEl.textContent = 'IndexedDB を開けませんでした。';
+      return;
+    }
+    for (const key of CUSTOM_SOUND_PRESET_KEYS) {
+      const preset = CUSTOM_SOUND_PRESET[key] || [];
+      let assignment = null;
+      try {
+        assignment = await getAssignment(db, key);
+      } catch {
+        assignment = null;
+      }
+      const row = document.createElement('div');
+      row.style.cssText = 'padding:6px 4px;border-top:1px solid rgba(128,128,128,0.25);font-size:12px';
+
+      const head = document.createElement('div');
+      head.style.cssText = 'display:flex;gap:8px;align-items:center;flex-wrap:wrap';
+      const title = document.createElement('strong');
+      title.textContent = key;
+      const state = document.createElement('span');
+      const assignedIds = Array.isArray(assignment?.ids) ? assignment.ids : [];
+      state.textContent = assignedIds.length > 0
+        ? `カスタム${assignedIds.length}本割当中`
+        : `未割当(既定=${preset.length}本のプリセット候補あり)`;
+      head.append(title, state);
+      row.appendChild(head);
+
+      if (assignedIds.length > 0) {
+        const gainRow = document.createElement('div');
+        gainRow.style.cssText = 'display:flex;gap:6px;align-items:center;margin-top:4px';
+        const gainLabel = document.createElement('span');
+        const gain = typeof assignment?.gain === 'number' ? assignment.gain : 1.0;
+        gainLabel.textContent = `音量 ${gain.toFixed(2)}`;
+        const gainSlider = document.createElement('input');
+        gainSlider.type = 'range';
+        gainSlider.min = '0';
+        gainSlider.max = '1';
+        gainSlider.step = '0.05';
+        gainSlider.value = String(gain);
+        gainSlider.addEventListener('change', () => {
+          void (async () => {
+            const d = await getDb();
+            await setAssignment(d, key, assignedIds, Number(gainSlider.value));
+            await bumpCustomSoundRev(chrome.storage.local);
+            gainLabel.textContent = `音量 ${Number(gainSlider.value).toFixed(2)}`;
+          })();
+        });
+        gainRow.append(gainLabel, gainSlider);
+        row.appendChild(gainRow);
+
+        for (const id of assignedIds) {
+          const btnRow = document.createElement('div');
+          btnRow.style.cssText = 'display:flex;gap:6px;align-items:center;margin-top:2px';
+          const btn = document.createElement('button');
+          btn.type = 'button';
+          btn.textContent = '▶';
+          btn.addEventListener('click', () => {
+            void (async () => {
+              try {
+                let url = previewUrlCache.get(id);
+                if (!url) {
+                  const d = await getDb();
+                  const rec = await getSoundBlob(d, id);
+                  if (!rec?.blob) return;
+                  url = URL.createObjectURL(rec.blob);
+                  previewUrlCache.set(id, url);
+                }
+                if (curPreviewAudio) { try { curPreviewAudio.pause(); } catch { /* no-op */ } }
+                const a = new Audio(url);
+                a.volume = typeof assignment?.gain === 'number' ? assignment.gain : 1.0;
+                curPreviewAudio = a;
+                void a.play().catch(() => {});
+              } catch { /* 試聴失敗は無害 */ }
+            })();
+          });
+          const idLabel = document.createElement('span');
+          idLabel.textContent = id;
+          btnRow.append(btn, idLabel);
+          row.appendChild(btnRow);
+        }
+
+        const resetBtn = document.createElement('button');
+        resetBtn.type = 'button';
+        resetBtn.textContent = '既定に戻す';
+        resetBtn.style.marginTop = '4px';
+        resetBtn.addEventListener('click', () => {
+          void (async () => {
+            const d = await getDb();
+            await clearAssignment(d, key);
+            await bumpCustomSoundRev(chrome.storage.local);
+            await renderList();
+            await renderStats();
+          })();
+        });
+        row.appendChild(resetBtn);
+      }
+
+      listEl.appendChild(row);
+    }
+  }
+
+  /** ファイル選択→No.パース→プリセット自動割当(1クリック)。 */
+  fileInput.addEventListener('change', () => {
+    void (async () => {
+      const files = Array.from(fileInput.files || []);
+      if (files.length === 0) return;
+      if (importResult) importResult.textContent = '取込中…';
+      const noIndex = buildPresetNoIndex();
+      /** @type {Map<string, string[]>} key → 変奏順に並べたid配列(insert中に組み立てる) */
+      const byKey = new Map();
+      let imported = 0;
+      let unmatched = 0;
+      try {
+        const db = await getDb();
+        for (const file of files) {
+          const no = parseAudiostockNoFromFilename(file.name);
+          if (no == null || !noIndex.has(no)) {
+            unmatched += 1;
+            continue;
+          }
+          const meta = noIndex.get(no);
+          const id = presetIdForNo(no);
+          await putSoundBlob(db, { id, blob: file, name: file.name, bytes: file.size, importedAt: Date.now() });
+          const list = byKey.get(meta.key) || [];
+          list[meta.variantIndex] = id;
+          byKey.set(meta.key, list);
+          imported += 1;
+        }
+        // 既存割当とマージ(同じ取込を2回に分けて行った場合でも欠番が埋まるように)。
+        for (const [key, ids] of byKey.entries()) {
+          const existing = await getAssignment(db, key);
+          const merged = Array.isArray(existing?.ids) ? existing.ids.slice() : [];
+          ids.forEach((id, idx) => { if (id) merged[idx] = id; });
+          const compact = merged.filter((v) => typeof v === 'string' && v);
+          await setAssignment(db, key, compact, existing?.gain);
+        }
+        if (byKey.size > 0) await bumpCustomSoundRev(chrome.storage.local);
+        if (importResult) {
+          importResult.textContent = `取込完了: ${imported}本を${byKey.size}キーに自動割当しました` +
+            (unmatched > 0 ? `(未対応${unmatched}本はファイル名からNo.を特定できませんでした)` : '');
+        }
+      } catch {
+        if (importResult) importResult.textContent = '取込中にエラーが発生しました。';
+      }
+      fileInput.value = '';
+      await renderList();
+      await renderStats();
+    })();
+  });
+
+  void renderList();
+  void renderStats();
+}
+
 function hideDevDiagnosticsIfRelease() {
   const isRelease = typeof NL_RELEASE !== 'undefined' && NL_RELEASE === true;
   if (!isRelease) return;
   // 共有エクスポート系(ID/URL を含む生データ)だけ隠す。健全度パネルは残す。
   const devOnlyIds = [
     'soundPreviewPanel', // 🔊 効果音試聴(開発用・v0.1.1067)
+    'myCustomSoundPanel', // 🎛️ マイ効果音差し替え(開発用・Phase A・2026-07-05)
     'aiShareLane',   // 🤖 AI に貼る用テキスト(全文・生JSON含む)+まるごとコピー
     'btnShareAll',   // 🔎 これを共有すれば原因が全部わかる(全文コピー)
     'btnCopy',       // クリップボードへコピー(全文)

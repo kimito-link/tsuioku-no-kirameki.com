@@ -205,10 +205,25 @@ import {
   KEY_TOP_SUPPORTERS_MIRROR,
   broadcasterProfileStorageKey,
   KEY_EFFECT_SOUND_ENABLED,
+  KEY_CUSTOM_SOUND_REV,
   isEffectSoundEnabled
 } from '../lib/storageKeys.js';
-import { playEffectSound } from '../lib/effectSoundPlayer.js';
+import {
+  playEffectSound,
+  EFFECT_SOUND_VARIANT_PATHS,
+  EFFECT_SOUND_PATHS,
+  defaultVolumeForEffectSoundKind
+} from '../lib/effectSoundPlayer.js';
 import { maybePlayEventRankChangeSound } from '../lib/officialEventRankSoundEffect.js';
+// Phase A(2026-07-05): マイ効果音差し替え(IndexedDB取込+割当)。起動時+customSoundRev変化時に
+//   customVariantPaths を再構築し、playEffectSound の deps へカスタム優先で注入する
+//   (effectSoundPlayer.js は無改変)。
+import {
+  loadCustomSoundRuntimeState,
+  mergeVariantPaths,
+  getUrlForCustomSound,
+  rotationRngFor
+} from '../lib/customSoundStore.js';
 import {
   pickCommentMilestoneCelebration,
   pickEventRankUpCelebration,
@@ -1289,7 +1304,7 @@ function maybePlayMilestoneEffectSound(spec) {
   const kind = effectSoundKindForPikaTier(pikaTierForSupportCelebration(spec));
   if (kind) {
     // v0.1.1061: 「試みた」でなく戻り値'played'(実際に鳴らした)だけ数える=診断が嘘をつかない。
-    const result = playEffectSound(kind);
+    const result = playEffectSound(kind, buildEffectSoundDeps(kind));
     if (isCommentMilestone && result === 'played') _milestoneEffectDiagCounters.milestoneSoundPlayed += 1;
   }
   if (isCommentMilestone) publishMilestoneEffectDiag();
@@ -7323,6 +7338,50 @@ let _lastOfficialEventDomBundle = null;
 //   src/lib/officialEventRankSoundEffect.js に切り出し(v0.1.1057・max-linesラチェット対応)。
 let _effectSoundEnabledCache = true;
 
+// Phase A(2026-07-05): マイ効果音(IndexedDB取込+割当)。起動時+customSoundRev変化時に
+//   customVariantPaths/gainForを再構築する(venueBar.js と同じ形)。
+/** @type {{ customVariantPaths: Record<string, string[]>, gainFor: (kind: string) => number, urlsById: Map<string, string> }} */
+let _customSoundState = { customVariantPaths: {}, gainFor: () => 1.0, urlsById: new Map() };
+let _customSoundListenerBound = false;
+function refreshCustomSoundState() {
+  void loadCustomSoundRuntimeState({ previousUrlsById: _customSoundState.urlsById }).then((state) => {
+    _customSoundState = state;
+  }).catch(() => {});
+}
+/** 初回1回だけ呼ぶ: 状態読み込み+storage.onChangedでのrev監視をbindする。 */
+function initCustomSoundRuntimeOnce() {
+  if (_customSoundListenerBound) return;
+  _customSoundListenerBound = true;
+  refreshCustomSoundState();
+  if (typeof chrome !== 'undefined' && chrome.storage?.onChanged?.addListener) {
+    chrome.storage.onChanged.addListener((changes, area) => {
+      if (area !== 'local' || !changes[KEY_CUSTOM_SOUND_REV]) return;
+      refreshCustomSoundState();
+    });
+  }
+}
+/**
+ * playEffectSound呼び出し共通のdeps組み立て(カスタム優先マージ+決定論順繰りrng+gain反映)。
+ *   venueBar.js の buildEffectSoundDeps と同じ形(挙動を揃える)。
+ * @param {string} kind
+ * @returns {Parameters<typeof playEffectSound>[1]}
+ */
+function buildEffectSoundDeps(kind) {
+  const variantPaths = mergeVariantPaths(EFFECT_SOUND_VARIANT_PATHS, _customSoundState.customVariantPaths);
+  const variants = variantPaths[String(kind)];
+  const n = Array.isArray(variants) ? variants.length : 1;
+  return {
+    // playEffectSound の deps 型は Record<string, string[]>(可変)だが、実体は
+    //   EFFECT_SOUND_VARIANT_PATHS 由来の Object.freeze 配列を含みうる(effectSoundPlayer.js は
+    //   resolveEffectSoundPath 内で読むだけで変更しないため実害なし)。型注釈だけの相違。
+    variantPaths: /** @type {Record<string, string[]>} */ (variantPaths),
+    paths: EFFECT_SOUND_PATHS,
+    getUrl: (p) => getUrlForCustomSound(p, (q) => chrome.runtime.getURL(q)),
+    rng: rotationRngFor(kind, n),
+    volume: _customSoundState.gainFor(kind) * defaultVolumeForEffectSoundKind(kind)
+  };
+}
+
 /**
  * niconico 公式バナー「○○さんが参加しています！現在 N 位 X」をネイティブに描画する。
  * iframe で audition embed を載せると配信者ログイン状態では管理 UI（参加中のイベント
@@ -7542,7 +7601,8 @@ async function refreshOfficialEventDomBundle(liveId) {
   }
   void maybePlayEventRankChangeSound(liveId, _lastOfficialEventDomBundle, {
     storageLocal: chrome.storage.local,
-    effectSoundEnabled: _effectSoundEnabledCache
+    effectSoundEnabled: _effectSoundEnabledCache,
+    buildEffectSoundDeps
   });
 }
 
@@ -17262,6 +17322,11 @@ async function initPopup() {
     paintVersionBadge();
   } catch {
     /* no-op */
+  }
+  try {
+    initCustomSoundRuntimeOnce();
+  } catch {
+    /* no-op: マイ効果音の初期化に失敗しても合成音フォールバックで通常どおり鳴る */
   }
   void loadLastCommentPostFramesFromSession();
   // feat/multitab-scale-globalcap: 絶対フェイルセーフ。初回 refresh が（多タブで描画スレッドが
