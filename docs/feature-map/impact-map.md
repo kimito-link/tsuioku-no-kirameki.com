@@ -5,7 +5,7 @@
 > **波及機能数(blast radius)が多いファイルほど、変更時の影響が大きい**(共有部品)。
 > 実装前にここで「触るファイルが何に波及するか」を確認すると誤前提を潰せる。
 
-## ⚠️ 影響大（3機能以上に波及・62 ファイル）
+## ⚠️ 影響大（3機能以上に波及・63 ファイル）
 
 ここを変えると複数の実行コンテキストに影響する。変更時は各 feature の動作確認を。
 
@@ -47,6 +47,7 @@
 - `src/lib/commentSummary.js` → **3 機能**: 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 状態速報ページ
 - `src/lib/commentTimelineMirror.js` → **3 機能**: 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 状態速報ページ
 - `src/lib/commentTimelineMirrorKey.js` → **3 機能**: 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 状態速報ページ
+- `src/lib/effectDirector.js` → **3 機能**: 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 会場モード(standalone)
 - `src/lib/effectSoundPlayer.js` → **3 機能**: 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 会場モード(standalone)
 - `src/lib/giftEffectDiag.js` → **3 機能**: 記録エンジン(watchページ常駐) / 状態速報ページ / 会場モード(standalone)
 - `src/lib/giftEffectDiagKey.js` → **3 機能**: 記録エンジン(watchページ常駐) / 状態速報ページ / 会場モード(standalone)
@@ -114,6 +115,7 @@
 | `src/lib/commentSummary.js` | 3 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 状態速報ページ |
 | `src/lib/commentTimelineMirror.js` | 3 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 状態速報ページ |
 | `src/lib/commentTimelineMirrorKey.js` | 3 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 状態速報ページ |
+| `src/lib/effectDirector.js` | 3 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 会場モード(standalone) |
 | `src/lib/effectSoundPlayer.js` | 3 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 会場モード(standalone) |
 | `src/lib/giftEffectDiag.js` | 3 | 記録エンジン(watchページ常駐) / 状態速報ページ / 会場モード(standalone) |
 | `src/lib/giftEffectDiagKey.js` | 3 | 記録エンジン(watchページ常駐) / 状態速報ページ / 会場モード(standalone) |
@@ -356,7 +358,6 @@
 | `src/lib/diagWarnings.js` | 1 | 記録エンジン(watchページ常駐) |
 | `src/lib/displayRecordedCount.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/domHarvestScrollDefer.js` | 1 | 記録エンジン(watchページ常駐) |
-| `src/lib/effectDirector.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/embeddedDataExtract.js` | 1 | 記録エンジン(watchページ常駐) |
 | `src/lib/enrichmentAvatarFallback.js` | 1 | 記録エンジン(watchページ常駐) |
 | `src/lib/errorAutoDiagnosis.js` | 1 | ポップアップ(応援レーン) |

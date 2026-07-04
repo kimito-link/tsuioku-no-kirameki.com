@@ -29,6 +29,7 @@ graph LR
   n_venue --> n_src_lib_commentTailBuffer_js["lib/commentTailBuffer.js"]:::shared
   n_venue --> n_src_lib_crowdRasterizer_js["lib/crowdRasterizer.js"]:::shared
   n_venue --> n_src_lib_deriveAvatarUrlFromUid_js["lib/deriveAvatarUrlFromUid.js"]:::shared
+  n_venue --> n_src_lib_effectDirector_js["lib/effectDirector.js"]:::shared
   n_venue --> n_src_lib_effectSoundPlayer_js["lib/effectSoundPlayer.js"]:::shared
   n_venue --> n_src_lib_giftDisplayNickname_js["lib/giftDisplayNickname.js"]:::shared
   n_venue --> n_src_lib_giftEffectDiag_js["lib/giftEffectDiag.js"]:::shared
@@ -52,8 +53,7 @@ graph LR
   n_venue --> n_src_lib_supportGridDisplayTier_js["lib/supportGridDisplayTier.js"]:::shared
   n_venue --> n_src_lib_supportGrowthAvatarLoad_js["lib/supportGrowthAvatarLoad.js"]:::shared
   n_venue --> n_src_lib_supportGrowthTileSrc_js["lib/supportGrowthTileSrc.js"]:::shared
-  n_venue --> n_src_lib_supportVisualStoryCopy_js["lib/supportVisualStoryCopy.js"]:::shared
   classDef shared fill:#eee,stroke:#999,color:#666;
 ```
 
-> ほか 33 ファイル省略（全件は storage-bus.md / metafile 参照）。
+> ほか 34 ファイル省略（全件は storage-bus.md / metafile 参照）。
