@@ -33,6 +33,7 @@ import { buildHealthCells, summarizeHealthVerdict } from './healthCells.js';
 //   diagnosisRegistry の category/weight/mandatory で集計し「カテゴリ別スコア+完璧判定」を出す。
 import { buildCompletenessScore, formatCompletenessScoreLines } from './completenessScore.js';
 import { buildVoiceDiagLine } from './voiceDiag.js';
+import { buildGiftEffectDiagLines, giftEffectDiagToActionCards } from './giftEffectDiag.js';
 import { reportPreviewCtxFromFastDiag } from './reportPreviewCtx.js';
 import { buildReportPreviewLines } from './reportPreview.js';
 import { buildStatusActions } from './statusActionAdvisor.js';
@@ -66,7 +67,7 @@ export function formatRefreshPerfLine(refreshPerf) {
  * @param {any} args
  * @returns {string}
  */
-export function buildAiShareFullText({ overviewText, livesData, fastDiag, popupDiag, voiceDiag, venueSeatsDiag, laneDiag, reportPreview, trendFindings, jsonBlob, currentLiveId, publishKeys, publishOutcomeRec, previewRenderAck, refreshPerf }) {
+export function buildAiShareFullText({ overviewText, livesData, fastDiag, popupDiag, voiceDiag, venueSeatsDiag, laneDiag, reportPreview, trendFindings, jsonBlob, currentLiveId, publishKeys, publishOutcomeRec, previewRenderAck, refreshPerf, giftEffectDiag }) {
   const lines = [];
   lines.push('## 君斗りんくの追憶のきらめき 状態速報');
   lines.push(`生成: ${new Date().toISOString()}`);
@@ -208,6 +209,13 @@ export function buildAiShareFullText({ overviewText, livesData, fastDiag, popupD
     } catch {
       /* no-op */
     }
+    // v0.1.1054: ギフト/広告の「検知→演出→効果音」整合診断(使用時のみ)。「ちゃんと飛ぶか・音が出るか」を共有に載せる。
+    try {
+      const gLines = buildGiftEffectDiagLines(giftEffectDiag, Date.now());
+      for (const l of gLines) lines.push(l);
+    } catch {
+      /* no-op */
+    }
     // v0.1.858: レポート(DL前)の主要KPI(本文N/コメントした人/来場と応援参加…)。保存せず中身を共有できる。
     // v0.1.861: 信頼度注釈の文脈を fastDiag から作って渡す(匿名主体=推定寄り 等)。
     try {
@@ -235,6 +243,8 @@ export function buildAiShareFullText({ overviewText, livesData, fastDiag, popupD
     try { actions.push(...scrollWhiteoutToActionCards(fastDiag)); } catch { /* no-op */ }
     // v0.1.1026: アイコン画像のロード失敗(usericon 404/削除済み=画像が壊れて見える)を名指し(失敗0なら出さない)。
     try { actions.push(...avatarLoadDiagToActionCards((popupDiag?.popup ?? popupDiag)?.avatarLoadDiag)); } catch { /* no-op */ }
+    // v0.1.1054: ギフト/広告の検知はしたが投擲演出/効果音が出ていない取りこぼしを症状カードに昇格。
+    try { actions.push(...giftEffectDiagToActionCards(giftEffectDiag)); } catch { /* no-op */ }
     lines.push('### 検知された対処候補(症状→原因→次の一手)');
     if (!actions.length) {
       lines.push('- 既知パターンに該当する問題は検知されませんでした(未知の症状なら下の診断 JSON を参照)。');

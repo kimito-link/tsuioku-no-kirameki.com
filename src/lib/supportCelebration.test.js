@@ -41,6 +41,16 @@ describe('supportCelebration', () => {
     expect(spec?.dropVariant).toBe('rinku_deluge');
   });
 
+  it('v0.1.1054: 1000件超も節目として検知する(2000/3000/5000/10000へ延長)', () => {
+    expect(COMMENT_MILESTONES).toContain(2000);
+    expect(COMMENT_MILESTONES).toContain(10000);
+    const spec2000 = pickCommentMilestoneCelebration(1980, 2005);
+    expect(spec2000?.dedupeKey).toBe('comment_2000');
+    // >=1000 分岐を1000超でも共有するため、演出強度は1000と同じ(新規分岐を増やさない設計)。
+    expect(dropCountForCommentMilestone(10000)).toBe(180);
+    expect(commentMilestoneDurationMs(10000)).toBeGreaterThanOrEqual(6500);
+  });
+
   it('イベント順位 UP（数値が小さくなる）を検知する', () => {
     const spec = pickEventRankUpCelebration(7, 5);
     expect(spec?.kind).toBe('event_rank_up');

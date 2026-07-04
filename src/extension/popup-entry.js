@@ -256,7 +256,8 @@ import {
 } from '../lib/celebrationFlyText.js';
 import {
   pikaTierForSupportCelebration,
-  pikaTierForGiftBahamut
+  pikaTierForGiftBahamut,
+  effectSoundKindForPikaTier
 } from '../lib/celebrationPika.js';
 import {
   RINKU_IMGS,
@@ -1326,9 +1327,23 @@ function playSupportCelebrationDomLocal(spec) {
 }
 
 /**
+ * v0.1.1054: コメント数マイルストーン(パチンコ演出)の効果音。視覚(pikaTier)と同じ判定基準を
+ *   使うことで「音が鳴るタイミング=フラッシュが光るタイミング」を一致させる(Fable設計)。
+ *   中継(relay)成功/失敗/非INLINEのいずれの経路でも playSupportCelebrationDom を1回しか
+ *   通らないため、ここに1箇所置くだけで二重再生を作らない。
+ * @param {import('../lib/supportCelebration.js').SupportCelebrationSpec} spec
+ */
+function maybePlayMilestoneEffectSound(spec) {
+  if (!_effectSoundEnabledCache) return;
+  const kind = effectSoundKindForPikaTier(pikaTierForSupportCelebration(spec));
+  if (kind) playEffectSound(kind);
+}
+
+/**
  * @param {import('../lib/supportCelebration.js').SupportCelebrationSpec} spec
  */
 function playSupportCelebrationDom(spec) {
+  maybePlayMilestoneEffectSound(spec);
   if (INLINE_EMBED_WATCH) {
     void (async () => {
       const ok = await relayCelebrationToWatchWindow({

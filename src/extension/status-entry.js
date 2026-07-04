@@ -65,6 +65,8 @@ import {
 import { reportPreviewCtxFromFastDiag } from '../lib/reportPreviewCtx.js';
 // v0.1.902: 会場座席の健全度(配信者混入・固着)を健全度パネルに載せる。
 import { KEY_VENUE_SEATS_DIAG } from '../lib/venueSeatsDiagKey.js';
+import { KEY_GIFT_EFFECT_DIAG } from '../lib/giftEffectDiagKey.js';
+import { buildGiftEffectDiagLines, giftEffectDiagToActionCards } from '../lib/giftEffectDiag.js';
 // 2026-06-22(council/lane-show-all-active): 応援レーンの人数整合(素性 N/表示 M)を健全度パネルに載せる。
 import { KEY_LANE_DIAG } from '../lib/laneDiagKey.js';
 // 応援レーン鏡: popup の応援レーン(りんく/こん太/広告/たぬ姉の段組み)を顔まで含めてそっくり映す。
@@ -185,7 +187,9 @@ let _extrasCache = /** @type {{reportPreview:any, watchTabMap:any, trendFindings
   // 第2段: コメントタイムライン鏡(最新N件)。純Webで「コメントが進む」ため jsonBlob に相乗り。
   commentTimelineMirror: null,
   // v0.1.1046: 走行中スループット計器(過去ログ取得の律速切り分け)。extras 側=毎回の直列 read に足さない。
-  backfillLiveMetric: null
+  backfillLiveMetric: null,
+  // v0.1.1054: ギフト/広告の「検知→演出→効果音」整合診断。他の観測系と同じく12秒間引きへ。
+  giftEffectDiag: null
 });
 /** v0.1.868: 配信カードの再構築 skip 判定用 signature(変化なしなら innerHTML を作り直さない)。 */
 let _lastLivesSig = '';
@@ -423,14 +427,17 @@ async function refresh(opts = {}) {
       //   なので12秒間引きで十分(走行中の目安が取れれば律速切り分けに足りる)。
       step = 'loadBackfillLiveMetric';
       const backfillLiveMetric = await runStorageOpWithTimeout(() => loadBackfillLiveMetricSafe(), tmo).catch(() => null);
-      _extrasCache = { reportPreview, watchTabMap, trendFindings, laneDiag, laneMirror, statCardsMirror, northStarMirror, voiceDiag, venueSeatsDiag, publishOutcomeRec, commentTimelineMirror, previewRenderAck, backfillLiveMetric };
+      // v0.1.1054: ギフト/広告の検知→演出→効果音 整合診断も extras(12秒間引き)へ(補助情報・コアに足さない)。
+      step = 'loadGiftEffectDiag';
+      const giftEffectDiag = await runStorageOpWithTimeout(() => loadGiftEffectDiagSafe(), tmo).catch(() => null);
+      _extrasCache = { reportPreview, watchTabMap, trendFindings, laneDiag, laneMirror, statCardsMirror, northStarMirror, voiceDiag, venueSeatsDiag, publishOutcomeRec, commentTimelineMirror, previewRenderAck, backfillLiveMetric, giftEffectDiag };
       _extrasCacheAt = Date.now();
       _mark('extras');
     }
-    const { reportPreview, watchTabMap, trendFindings, laneDiag, laneMirror, statCardsMirror, northStarMirror, voiceDiag, venueSeatsDiag, publishOutcomeRec, commentTimelineMirror, previewRenderAck, backfillLiveMetric } = _extrasCache;
+    const { reportPreview, watchTabMap, trendFindings, laneDiag, laneMirror, statCardsMirror, northStarMirror, voiceDiag, venueSeatsDiag, publishOutcomeRec, commentTimelineMirror, previewRenderAck, backfillLiveMetric, giftEffectDiag } = _extrasCache;
     step = 'renderAll';
     // v0.1.1005: 前サイクルの所要計器をコピー本文へ渡す(画面ヘッダーだけでなく AI共有テキストにも出す)。
-    renderAll({ lvList, summaries, fastDiag, popupDiag, backfillProgress, backfillLiveMetric, voiceDiag, venueSeatsDiag, laneDiag, laneMirror, statCardsMirror, northStarMirror, reportPreview, trendFindings, watchTabMap, publishOutcomeRec, commentTimelineMirror, previewRenderAck, refreshPerf: _lastRefreshPerf });
+    renderAll({ lvList, summaries, fastDiag, popupDiag, backfillProgress, backfillLiveMetric, voiceDiag, venueSeatsDiag, laneDiag, laneMirror, statCardsMirror, northStarMirror, reportPreview, trendFindings, watchTabMap, publishOutcomeRec, commentTimelineMirror, previewRenderAck, refreshPerf: _lastRefreshPerf, giftEffectDiag });
     _mark('render');
     const _totalMs = Math.round((typeof performance !== 'undefined' ? performance.now() : Date.now()) - _t0);
     updateLastUpdateMeta({ totalMs: _totalMs, stepMs: _stepMs });
@@ -715,6 +722,17 @@ async function loadVenueSeatsDiagSafe() {
   }
 }
 
+// v0.1.1054: 会場モード(venueBar)が書く「ギフト/広告の検知→演出→効果音」整合診断を読む。
+//   会場モード未使用/ギフト無し配信なら null=行を出さない(voiceDiag/venueSeatsDiag と同方針)。
+async function loadGiftEffectDiagSafe() {
+  try {
+    const bag = await chrome.storage.local.get(KEY_GIFT_EFFECT_DIAG);
+    return bag?.[KEY_GIFT_EFFECT_DIAG] || null;
+  } catch {
+    return null;
+  }
+}
+
 // 応援レーン鏡(KEY_LANE_MIRROR)を読む。popup が renderStoryUserLane の最後で書く=popup を
 //   一度も開いていなければ null=鏡セクションは hidden のまま(死にリンクにしない)。例外時も null。
 //   ★毎回の直列 read は増やさない=この loader は extras(12秒間引き)からだけ呼ぶ(MEMORY 鉄則)。
@@ -892,7 +910,7 @@ async function loadBackfillLiveMetricSafe() {
 // v0.1.861: レポートプレビューの信頼度注釈の文脈は純関数 reportPreviewCtxFromFastDiag(src/lib)に抽出済み
 //   (NDGR 接続/userId 付き率/backfill 進行 → 注釈ctx・挙動同値・テストで固定)。import は冒頭。
 
-function renderAll({ lvList, summaries, fastDiag, popupDiag, backfillProgress, backfillLiveMetric, voiceDiag, venueSeatsDiag, laneDiag, laneMirror, statCardsMirror, northStarMirror, reportPreview, trendFindings, watchTabMap, publishOutcomeRec, commentTimelineMirror, previewRenderAck, refreshPerf }) {
+function renderAll({ lvList, summaries, fastDiag, popupDiag, backfillProgress, backfillLiveMetric, voiceDiag, venueSeatsDiag, laneDiag, laneMirror, statCardsMirror, northStarMirror, reportPreview, trendFindings, watchTabMap, publishOutcomeRec, commentTimelineMirror, previewRenderAck, refreshPerf, giftEffectDiag }) {
   // v0.1.847: 各描画セクションを独立 try/catch で隔離するヘルパ。1つが throw しても他のセクションと
   //   最終更新メタを巻き込まない=「セルが全部消える/最終更新—のまま固まる」を根治。落ちた場所は
   //   console と AI 共有欄に出して真因を追えるようにする(star-romi 失敗体験の除去)。
@@ -1002,11 +1020,18 @@ function renderAll({ lvList, summaries, fastDiag, popupDiag, backfillProgress, b
     const rStr = buildReportPreviewLines(reportPreview, reportPreviewCtxFromFastDiag(fastDiag, backfillProgress));
     reportPreviewLine = rStr ? `\n${rStr}` : '';
   });
+  // v0.1.1054: ギフト/広告の「検知→演出→効果音」整合診断を概要に併記(会場モード未使用/
+  //   ギフト無し配信なら空=ノイズにしない)。「ギフトがちゃんと飛ぶか・音が出るか」を目視せず確認できる。
+  let giftEffectLine = '';
+  safeSection('ギフト効果音診断', () => {
+    const gLines = buildGiftEffectDiagLines(giftEffectDiag, Date.now());
+    giftEffectLine = gLines.length ? `\n${gLines.join('\n')}` : '';
+  });
   const overviewEl = document.getElementById('overviewBody');
   if (overviewEl) {
     overviewEl.textContent =
       (overviewText || '視聴中の配信はありません。') +
-      backfillLine + laneLine + voiceLine + reportPreviewLine;
+      backfillLine + laneLine + voiceLine + reportPreviewLine + giftEffectLine;
     overviewEl.classList.toggle('empty-note', !overviewText);
   }
 
@@ -1179,7 +1204,7 @@ function renderAll({ lvList, summaries, fastDiag, popupDiag, backfillProgress, b
   // AI 共有用テキスト
   let fullText = '';
   safeSection('AI共有テキスト', () => {
-    fullText = buildAiShareFullText({ overviewText, livesData, fastDiag, popupDiag, voiceDiag, venueSeatsDiag, laneDiag, reportPreview, trendFindings, jsonBlob, currentLiveId, publishKeys, publishOutcomeRec, previewRenderAck, refreshPerf });
+    fullText = buildAiShareFullText({ overviewText, livesData, fastDiag, popupDiag, voiceDiag, venueSeatsDiag, laneDiag, reportPreview, trendFindings, jsonBlob, currentLiveId, publishKeys, publishOutcomeRec, previewRenderAck, refreshPerf, giftEffectDiag });
     const ta = /** @type {HTMLTextAreaElement|null} */ (
       document.getElementById('aiShareText')
     );
