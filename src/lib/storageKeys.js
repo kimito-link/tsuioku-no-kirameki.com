@@ -567,6 +567,21 @@ export function devMonitorTrendStorageKey(liveId) {
   return `${KEY_DEV_MONITOR_TREND_PREFIX}${String(liveId || '').trim() || '_'}`;
 }
 
+/** ギフト/広告/順位変動の効果音を鳴らすか(既定 true=ON)。 */
+export const KEY_EFFECT_SOUND_ENABLED = 'nls_effect_sound_enabled_v1';
+
+/** @param {unknown} raw */
+export function isEffectSoundEnabled(raw) {
+  return raw !== false;
+}
+
+/**
+ * 会場window(venueBar.js)が生存している間、3秒間隔以内で更新し続けるプレゼンスキー。
+ *   popup側(popup-entry.js)はこれの新鮮さ(既定8秒以内)を見て、会場が開いていれば効果音を鳴らさない
+ *   (会場が優先=同じギフト/広告に対して2画面で二重に鳴るのを避ける)。値は epoch ms の数値のみ(PII無し)。
+ */
+export const KEY_VENUE_EFFECT_SOUND_PRESENCE = 'nls_venue_effect_sound_presence_v1';
+
 /** @param {string} liveId lv123 */
 export function commentsStorageKey(liveId) {
   const id = String(liveId || '').trim().toLowerCase();

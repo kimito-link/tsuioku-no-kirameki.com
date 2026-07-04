@@ -10956,6 +10956,23 @@
               </span>
             </label>
           </div>
+          <!-- v0.1.1053: ギフト/広告/イベント順位変動の効果音（既定 ON）。会場windowが開いていれば
+               popup 側は鳴らさない(会場優先・二重再生防止)。 -->
+          <div class="nl-record-sub">
+            <label for="effectSoundToggle" class="nl-record-sub__label">
+              <input
+                type="checkbox"
+                id="effectSoundToggle"
+                checked
+                aria-label="ギフト・広告・イベント順位変動の効果音を鳴らす"
+              />
+              <span>
+                ギフト・広告・順位変動の効果音を鳴らす
+                <span class="nl-record-sub__hint"
+                  >ギフトやニコニ広告、参加中イベントの順位が上下したときに短い効果音を鳴らします。会場モードを開いている間はそちらだけで鳴ります。</span>
+              </span>
+            </label>
+          </div>
           <!-- v0.1.418: 過去ログ自動取り込み（既定 ON）。OFF にすると手動ボタンのみ。
                v0.1.450 (PR4): 動機説明（なぜ取り込むか）と手動 trigger の案内をここに統合。
                以前は下の #backfillFetchPrompt（コメント入力直下）にあった説明文を、ボタン廃止に
@@ -12281,6 +12298,28 @@
           />
         </a>
       </footer>
+
+      <!-- v0.1.1053: 効果音素材のクレジット表記(CC BY 4.0の表示義務)。
+           効果音(ギフト・広告・順位変動)は OtoLogic (https://otologic.jp/) の
+           フリー効果音素材(CC BY 4.0)を使用しています。 -->
+      <p
+        class="nl-record-sub__hint"
+        data-nl-toolbar-only
+        style="text-align: center; padding: 4px 8px 8px;"
+      >
+        効果音素材:
+        <a
+          href="https://otologic.jp/"
+          target="_blank"
+          rel="noopener noreferrer license"
+          >OtoLogic</a
+        >（<a
+          href="https://creativecommons.org/licenses/by/4.0/deed.ja"
+          target="_blank"
+          rel="noopener noreferrer license"
+          >CC BY 4.0</a
+        >）
+      </p>
       </div>
 
     </div>

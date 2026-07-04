@@ -57,8 +57,12 @@ import { buildVenueResidents } from '../lib/venueResidents.js';
 import {
   commentDbSummaryKey,
   commentsStorageKey,
-  KEY_USER_COMMENT_PROFILE_CACHE
+  KEY_USER_COMMENT_PROFILE_CACHE,
+  KEY_EFFECT_SOUND_ENABLED,
+  KEY_VENUE_EFFECT_SOUND_PRESENCE,
+  isEffectSoundEnabled
 } from '../lib/storageKeys.js';
+import { EFFECT_SOUND_KINDS, playEffectSound } from '../lib/effectSoundPlayer.js';
 import { anonymousIdenticonDataUrl } from '../lib/anonymousIdenticon.js';
 import { tailStorageKey } from '../lib/commentTailBuffer.js';
 import { pickNewVenueSpeech, mergeSpeakersIntoVenueRows, liveFeedSpeechRows } from '../lib/venueSpeech.js';
@@ -2025,6 +2029,26 @@ export function mountVenueBarButton(options = {}) {
   let _lastBroadcasterUid = '';
   let _venueSeatsDiagLastWriteAt = 0;
 
+  // v0.1.1053: ギフト/広告の効果音 ON/OFF(既定 true)。popup と同じ設定キーを共有する。
+  let _effectSoundEnabledCache = true;
+  void chrome.storage.local.get(KEY_EFFECT_SOUND_ENABLED).then((bag) => {
+    _effectSoundEnabledCache = isEffectSoundEnabled(bag?.[KEY_EFFECT_SOUND_ENABLED]);
+  }).catch(() => {});
+  chrome.storage.onChanged?.addListener?.((changes, area) => {
+    if (area !== 'local' || !changes[KEY_EFFECT_SOUND_ENABLED]) return;
+    _effectSoundEnabledCache = isEffectSoundEnabled(changes[KEY_EFFECT_SOUND_ENABLED].newValue);
+  });
+
+  // v0.1.1053: 会場windowが生存している間、3秒間隔でプレゼンスを書く(popup側の二重再生防止用)。
+  //   既存の3秒 min-gap タイマーと相乗りせず独立させる(この機能のためだけに他の計測を巻き込まない)。
+  let _venueEffectSoundPresenceLastWriteAt = 0;
+  const writeVenueEffectSoundPresence = () => {
+    const now = Date.now();
+    if (now - _venueEffectSoundPresenceLastWriteAt < 3000) return;
+    _venueEffectSoundPresenceLastWriteAt = now;
+    void chrome.storage.local.set({ [KEY_VENUE_EFFECT_SOUND_PRESENCE]: now }).catch(() => {});
+  };
+
   // 診断パネルの描画/開閉。buildVenueRoster(純関数・テスト済)で誰が顔付き席/点描かを表にする。
   const renderRosterPanel = () => {
     const roster = buildVenueRoster(lastRosterInput);
@@ -2528,13 +2552,19 @@ export function mountVenueBarButton(options = {}) {
     const gift = parseGiftCommentText(text);
     if (gift) {
       const p = resolveGiftProjectile(gift, 'gift');
-      if (p) launchGiftThrow(speech.speakerKey, p);
+      if (p) {
+        launchGiftThrow(speech.speakerKey, p);
+        if (_effectSoundEnabledCache) playEffectSound(EFFECT_SOUND_KINDS.GIFT);
+      }
       return;
     }
     const ad = parseNicoadCommentText(text);
     if (ad) {
       const p = resolveGiftProjectile(ad, 'ad');
-      if (p) launchGiftThrow(speech.speakerKey, p);
+      if (p) {
+        launchGiftThrow(speech.speakerKey, p);
+        if (_effectSoundEnabledCache) playEffectSound(EFFECT_SOUND_KINDS.AD);
+      }
     }
   };
 
@@ -2565,7 +2595,10 @@ export function mountVenueBarButton(options = {}) {
       const proj = resolveGiftProjectile({ item, point, itemId }, 'gift');
       // 起点: 席キーは venueSpeakerKey/venueParticipantKey と同じ `u:${uid}` 形にする
       //   (raw uid だと seatByKey に当たらず常に crowdBubbleAnchor へ落ちる)。
-      if (proj) launchGiftThrow(uid ? `u:${uid}` : '', proj);
+      if (proj) {
+        launchGiftThrow(uid ? `u:${uid}` : '', proj);
+        if (_effectSoundEnabledCache) playEffectSound(EFFECT_SOUND_KINDS.GIFT);
+      }
     }
   };
 
@@ -3088,6 +3121,8 @@ export function mountVenueBarButton(options = {}) {
     //   パネルが開いている時だけ再描画(sig 無変化なら DOM を触らない=hot path を汚さない)。
     _lastVenueSeatsDiagObs = seatsDiagObs;
     if (!diagPanel.hidden) renderDiagPanel();
+    // v0.1.1053: 会場が生きている間だけプレゼンスを書く(popup側の効果音二重再生防止・3秒min-gap内蔵)。
+    if (open) writeVenueEffectSoundPresence();
   };
 
   /**
