@@ -27,8 +27,9 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 1 / 593 件
+## ⚠️ 役割コメントが無いソース 2 / 600 件
 - `src/lib/reportPreviewPublish.js`
+- `src/lib/venueLaneBuckets.js`
 
 ## 全ファイルツリー
 
@@ -315,7 +316,7 @@
   - `surechigai-lite-improvement-plan.md`
   - `ux-tdd-hypothesis-matrix.md`
   - `visual-explainer.md`
-- 📁 **extension/** (99)
+- 📁 **extension/** (107)
   - 📁 **images/** (87)
     - 📁 **avatar-parts/** (22)
       - `cheek-0.png`
@@ -413,7 +414,15 @@
         - `tanuki-yukkuri-smile-mouth-open.thumb128.png`
     - `nico-retro-tv-placeholder.svg`
     - `toumeilink.png`
-  - 📁 **sound/** (2)
+  - 📁 **sound/** (10)
+    - `CREDITS.md`
+    - `effect-ad.mp3`
+    - `effect-gift.mp3`
+    - `effect-milestone-hard.mp3`
+    - `effect-milestone-jackpot.mp3`
+    - `effect-milestone-soft.mp3`
+    - `effect-rank-down.mp3`
+    - `effect-rank-up.mp3`
     - `voice-complete.mp3`
     - `voice-watch.mp3`
   - `background.js` — MV3 Service Worker
@@ -426,7 +435,7 @@
   - `status-guard.js` — 状態速報ページ(status.html)の「何があっても開く」保険。
   - `status.html`
   - `venue.html`
-- 📁 **scripts/** (30)
+- 📁 **scripts/** (31)
   - 📁 **xserver/** (2)
     - `github-webhook-pull.php.example`
     - `webhook-git-pull-for-upload.php`
@@ -454,11 +463,12 @@
   - `split-avatar-parts.mjs` — 偽市松背景の除去 + パーツ切り出し(one-off アセットパイプライン)
   - `split-changelog.mjs` — scripts/split-changelog.mjs — changelog.js を直近20版(本体)と旧版(archive)に分割
   - `stage-submission.py`
+  - `status-live.mjs` — 状態速報(status.html の「AI共有」全文)を、コピー&貼り付けせずにターミナルへ取得する CLI。
   - `sync-lp-twitter-icon.mjs` — LP 右端コラボ用: src/images/icon/twitter-icon.png → extension/images/lp/twitter-icon.png
   - `vendor-visual-explainer.mjs` — Vendors nicobailon/visual-explainer (MIT) into .cursor/skills/visual-explainer/
   - `verify-bump.mjs` — extension bump 後の整合性チェッカー
   - `write-extension-placeholder-icons.mjs` — リポジトリに 256px アイコンしか無い環境向け: manifest 用の小さめ PNG を生成する。
-- 📁 **src/** (1256)
+- 📁 **src/** (1268)
   - 📁 **data/** (6)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -718,7 +728,7 @@
         - `logo_funlink_white_RGB_maru_black.png`
       - `logo_guide_funlink_ol.pdf`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1044)
+  - 📁 **lib/** (1056)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -1019,6 +1029,8 @@
     - `displayRecordedCount.test.js`
     - `domHarvestScrollDefer.js` — 「ユーザーが今まさにスクロール中か」を判定して、コメントの DOM ハーベスト
     - `domHarvestScrollDefer.test.js`
+    - `effectSoundPlayer.js` — ギフト/広告/応援者ランキング順位変動に鳴らす短い効果音の再生ロジック(純関数+再生本体)。
+    - `effectSoundPlayer.test.js`
     - `embeddedDataExtract.js` — ニコ生 watch ページの `#embedded-data[data-props]` から初期メタ情報を抽出する純関数。
     - `embeddedDataExtract.test.js`
     - `enrichmentAvatarFallback.js` — enrichRowsWithInterceptedUserIds 内で、全ソースにアバターURLがない場合に
@@ -1064,6 +1076,9 @@
     - `giftBahamutCelebration.test.js`
     - `giftDisplayNickname.js` — NDGR ギフト protobuf から拾いがちな「内部用ラベル」を表示名から除外する。
     - `giftDisplayNickname.test.js`
+    - `giftEffectDiag.js` — ギフト/広告の「検知→演出(投擲)→効果音」が揃っているかの純観測値を組み立てる純関数群。
+    - `giftEffectDiag.test.js`
+    - `giftEffectDiagKey.js` — ギフト/広告の「検知→演出(投擲)→効果音」が揃っているかの観測値を venueBar.js が書き、
     - `giftEventStore.js` — v0.1.206 Phase A: NDGR gift event の時系列ストア（純関数）。
     - `giftEventStore.test.js`
     - `giftHistoryNorthStarPaintKey.js` — 北極星ギフト履歴レーンの再描画スキップ用キー（v0.1.582）。
@@ -1110,7 +1125,7 @@
     - `globalFetchRateLimiter.test.js`
     - `googleSuggest.js` — Google サジェスト取得の契約 (URL組み立て + レスポンスパース + message type)
     - `googleSuggest.test.js`
-    - `healthCells.js` — status ファーストビューの「健全度セル」を作る純関数(v0.1.843)。
+    - `healthCells.js` — v0.1.1056: パリティ根本修正 Phase4(この修正自体が動いているかを診断シートで検証可能にする)。
     - `healthCells.test.js`
     - `heatLevel.js` — 「盛り上がり(熱量)」を判定する純関数(v0.1.871)。
     - `heatLevel.test.js`
@@ -1344,6 +1359,8 @@
     - `officialEventBannerDom.test.js`
     - `officialEventDomBundle.js` — watch ページの DOM から「配信者の番組周辺の正本値」を 1 関数で総取りするオーケストレータ。
     - `officialEventDomBundle.test.js`
+    - `officialEventRankChange.js` — 配信者が参加しているニコニコイベント(audition)の現在順位(scrapeOfficialEventBannerFromDom の rank)を
+    - `officialEventRankChange.test.js`
     - `officialNicoStatsStripDigest.js` — text: string,
     - `officialNicoStatsStripDigest.test.js`
     - `officialStatsWindow.js` — at?: number|null,
@@ -1581,6 +1598,8 @@
     - `storyUserLaneRenderSignature.test.js`
     - `storyUserLaneRowModel.js` — 応援ユーザーレーン: 1 ユーザー候補あたりの tier・サムネ・ソート用スコアを一箇所で組み立てる。
     - `storyUserLaneRowModel.test.js`
+    - `storyUserLaneSort.js` — 応援ユーザーレーンの候補ソート正本。
+    - `storyUserLaneSort.test.js`
     - `suggestInitialInlinePanelPlacement.js` — 新規インストール直後の「おすすめ」インライン配置（storage 未設定時のみ migrate が使う）。
     - `suggestInitialInlinePanelPlacement.test.js`
     - `summarizeDevMonitorGiftRanking.js` — v0.1.202 A-0: popup「詳しい状況（開発・切り分け用・折りたたみ）」の
@@ -1690,6 +1709,8 @@
     - `venueHeat.test.js`
     - `venueIncrementalAggregate.js` — v0.1.754 会場の3時間安定化(会議6体ほぼ全会一致の最大ボトルネック根治): 参加者集計を
     - `venueIncrementalAggregate.test.js`
+    - `venueLaneBuckets.js` — ⚠️ 役割コメント無し
+    - `venueLaneBuckets.test.js`
     - `venueLiveRoster.js` — v0.1.754 会場の3時間安定化(星野ロミ・メソッド会議の本質解・6体ほぼ全会一致):
     - `venueLiveRoster.test.js`
     - `venueResidents.js` — 会場モードの常駐3キャラ(りんく・こん太・たぬ姉)の描画モデル(純関数)。
@@ -1699,6 +1720,7 @@
     - `venueSeats.js` — v0.1.707: ライブ会場モードの「座席モデル」純関数。
     - `venueSeats.test.js`
     - `venueSeatsDiag.js` — 会場モード(venueBar.js)の「座席健全度」診断。会場が描いている席の純観測値を組み立てる純関数群。
+    - `venueSeatsDiag.test.js`
     - `venueSeatsDiagKey.js` — 会場モードの「座席健全度」観測値を会場(venueBar.js)が書き、status が読む storage キー。
     - `venueSpeech.js` — v0.1.711: ライブ会場モードの「発言→吹き出し」純関数。
     - `venueSpeech.test.js`

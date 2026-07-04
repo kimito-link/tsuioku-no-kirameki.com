@@ -536,6 +536,20 @@
       ]
     },
     {
+      "file": "src/extension/story/renderStoryUserLaneDom.js",
+      "featureCount": 3,
+      "features": [
+        "content",
+        "popup",
+        "venue"
+      ],
+      "labels": [
+        "記録エンジン(watchページ常駐)",
+        "ポップアップ(応援レーン)",
+        "会場モード(standalone)"
+      ]
+    },
+    {
       "file": "src/lib/avatarUrlCompare.js",
       "featureCount": 3,
       "features": [
@@ -631,6 +645,48 @@
         "記録エンジン(watchページ常駐)",
         "ポップアップ(応援レーン)",
         "状態速報ページ"
+      ]
+    },
+    {
+      "file": "src/lib/effectSoundPlayer.js",
+      "featureCount": 3,
+      "features": [
+        "content",
+        "popup",
+        "venue"
+      ],
+      "labels": [
+        "記録エンジン(watchページ常駐)",
+        "ポップアップ(応援レーン)",
+        "会場モード(standalone)"
+      ]
+    },
+    {
+      "file": "src/lib/giftEffectDiag.js",
+      "featureCount": 3,
+      "features": [
+        "content",
+        "status",
+        "venue"
+      ],
+      "labels": [
+        "記録エンジン(watchページ常駐)",
+        "状態速報ページ",
+        "会場モード(standalone)"
+      ]
+    },
+    {
+      "file": "src/lib/giftEffectDiagKey.js",
+      "featureCount": 3,
+      "features": [
+        "content",
+        "status",
+        "venue"
+      ],
+      "labels": [
+        "記録エンジン(watchページ常駐)",
+        "状態速報ページ",
+        "会場モード(standalone)"
       ]
     },
     {
@@ -733,6 +789,62 @@
     },
     {
       "file": "src/lib/reportSilentError.js",
+      "featureCount": 3,
+      "features": [
+        "content",
+        "popup",
+        "venue"
+      ],
+      "labels": [
+        "記録エンジン(watchページ常駐)",
+        "ポップアップ(応援レーン)",
+        "会場モード(standalone)"
+      ]
+    },
+    {
+      "file": "src/lib/storyUserLaneBuckets.js",
+      "featureCount": 3,
+      "features": [
+        "content",
+        "popup",
+        "venue"
+      ],
+      "labels": [
+        "記録エンジン(watchページ常駐)",
+        "ポップアップ(応援レーン)",
+        "会場モード(standalone)"
+      ]
+    },
+    {
+      "file": "src/lib/storyUserLaneGuideHtml.js",
+      "featureCount": 3,
+      "features": [
+        "content",
+        "popup",
+        "venue"
+      ],
+      "labels": [
+        "記録エンジン(watchページ常駐)",
+        "ポップアップ(応援レーン)",
+        "会場モード(standalone)"
+      ]
+    },
+    {
+      "file": "src/lib/storyUserLaneSort.js",
+      "featureCount": 3,
+      "features": [
+        "content",
+        "popup",
+        "venue"
+      ],
+      "labels": [
+        "記録エンジン(watchページ常駐)",
+        "ポップアップ(応援レーン)",
+        "会場モード(standalone)"
+      ]
+    },
+    {
+      "file": "src/lib/supportVisualStoryCopy.js",
       "featureCount": 3,
       "features": [
         "content",
@@ -1808,6 +1920,18 @@
       ]
     },
     {
+      "file": "src/lib/venueLaneBuckets.js",
+      "featureCount": 2,
+      "features": [
+        "content",
+        "venue"
+      ],
+      "labels": [
+        "記録エンジン(watchページ常駐)",
+        "会場モード(standalone)"
+      ]
+    },
+    {
       "file": "src/lib/venueLiveRoster.js",
       "featureCount": 2,
       "features": [
@@ -2158,6 +2282,16 @@
       ]
     },
     {
+      "file": "src/extension/popup/report/htmlReportDocument.js",
+      "featureCount": 1,
+      "features": [
+        "popup"
+      ],
+      "labels": [
+        "ポップアップ(応援レーン)"
+      ]
+    },
+    {
       "file": "src/extension/status-entry.js",
       "featureCount": 1,
       "features": [
@@ -2165,16 +2299,6 @@
       ],
       "labels": [
         "状態速報ページ"
-      ]
-    },
-    {
-      "file": "src/extension/story/renderStoryUserLaneDom.js",
-      "featureCount": 1,
-      "features": [
-        "popup"
-      ],
-      "labels": [
-        "ポップアップ(応援レーン)"
       ]
     },
     {
@@ -4448,6 +4572,26 @@
       ]
     },
     {
+      "file": "src/lib/officialEventRankChange.js",
+      "featureCount": 1,
+      "features": [
+        "popup"
+      ],
+      "labels": [
+        "ポップアップ(応援レーン)"
+      ]
+    },
+    {
+      "file": "src/lib/officialEventRankSoundEffect.js",
+      "featureCount": 1,
+      "features": [
+        "popup"
+      ],
+      "labels": [
+        "ポップアップ(応援レーン)"
+      ]
+    },
+    {
       "file": "src/lib/officialNicoStatsStripDigest.js",
       "featureCount": 1,
       "features": [
@@ -5328,16 +5472,6 @@
       ]
     },
     {
-      "file": "src/lib/storyUserLaneBuckets.js",
-      "featureCount": 1,
-      "features": [
-        "popup"
-      ],
-      "labels": [
-        "ポップアップ(応援レーン)"
-      ]
-    },
-    {
       "file": "src/lib/storyUserLaneContaminationGuard.js",
       "featureCount": 1,
       "features": [
@@ -5349,16 +5483,6 @@
     },
     {
       "file": "src/lib/storyUserLaneDisplaySrc.js",
-      "featureCount": 1,
-      "features": [
-        "popup"
-      ],
-      "labels": [
-        "ポップアップ(応援レーン)"
-      ]
-    },
-    {
-      "file": "src/lib/storyUserLaneGuideHtml.js",
       "featureCount": 1,
       "features": [
         "popup"
@@ -5489,16 +5613,6 @@
     },
     {
       "file": "src/lib/supportVisualExpanded.js",
-      "featureCount": 1,
-      "features": [
-        "popup"
-      ],
-      "labels": [
-        "ポップアップ(応援レーン)"
-      ]
-    },
-    {
-      "file": "src/lib/supportVisualStoryCopy.js",
       "featureCount": 1,
       "features": [
         "popup"

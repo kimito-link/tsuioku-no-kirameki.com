@@ -92,6 +92,14 @@ const STORAGE_DISCONNECT_BASELINE = new Set([
   'KEY_SUPPORT_CELEBRATION_STATE', 'KEY_SW_PROGRESS', 'KEY_THUMB_AUTO', 'KEY_THUMB_INTERVAL_MS',
   'fn:backfillHeartbeatKey', 'fn:chunkMigratedKey', 'fn:comeviewPinStorageKey', 'fn:commentDbSummaryKey',
   'fn:eventDomStorageKey', 'fn:giftSubAppHistoryStorageKey', 'fn:perfDiagStorageKey', 'fn:tailStorageKey',
+  // v0.1.1057: イベント順位変動→効果音の判定ロジックを popup-entry.js から
+  //   src/lib/officialEventRankSoundEffect.js へ切り出したところ、producer(venueBar.js)/
+  //   consumer(officialEventRankSoundEffect.js経由でpopup-entry.jsから到達)が別ファイルに
+  //   分散し、静的解析がエントリ→lib への間接到達を追えず偽陽性で断線扱いになった。
+  //   経路自体は実在(officialEventRankSoundEffect.test.js 8件緑・popup-entry.js:208で
+  //   import済み)。KEY_EFFECT_SOUND_ENABLED は producer=popup-entry.js/consumer=venueBar.js、
+  //   KEY_VENUE_EFFECT_SOUND_PRESENCE は producer=venueBar.js/consumer=officialEventRankSoundEffect.js。
+  'KEY_EFFECT_SOUND_ENABLED', 'KEY_VENUE_EFFECT_SOUND_PRESENCE',
   // v0.1.991: 応援レーン(アイコン列)を heavy 非依存で起動する renderStoryUserLaneFromLightCommentsForCurrentLive が
   //   nls_csummary_<lv> を read。producer は content-entry.js(記録のたびに書く)=popup は consumer のみ=意図的な分離。
   'fn:summaryStorageKey',

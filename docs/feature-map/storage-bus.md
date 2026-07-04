@@ -16,6 +16,7 @@
 
 - 🟠 **KEY_PAINT_PERF_RING_V1** — 書く人だけ（読む経路が無い疑い）: src/extension/popup-entry.js
 - 🟠 **KEY_SW_PROGRESS** — 書く人だけ（読む経路が無い疑い）: src/extension/backfill-sw-entry.js
+- 🟠 **KEY_VENUE_EFFECT_SOUND_PRESENCE** — 書く人だけ（読む経路が無い疑い）: src/extension/venueBar.js
 - 🟠 **fn:backfillHeartbeatKey** — 書く人だけ（読む経路が無い疑い）: src/extension/content-entry.js
 - 🟠 **fn:chunkMigratedKey** — 書く人だけ（読む経路が無い疑い）: src/extension/content-entry.js
 - 🟠 **fn:comeviewPinStorageKey** — 書く人だけ（読む経路が無い疑い）: src/extension/comeview-entry.js
@@ -35,6 +36,7 @@
 - 🔵 **KEY_COMMENT_IDB_ENABLED** — 読む人だけ（書く経路が無い疑い）: src/extension/content-entry.js
 - 🔵 **KEY_COMMENT_PANEL_AUTO_RESTORE** — 読む人だけ（書く経路が無い疑い）: src/extension/content-entry.js
 - 🔵 **KEY_DEEP_HARVEST_QUIET_UI** — 読む人だけ（書く経路が無い疑い）: src/extension/content-entry.js, src/extension/popup-entry.js
+- 🔵 **KEY_EFFECT_SOUND_ENABLED** — 読む人だけ（書く経路が無い疑い）: src/extension/venueBar.js
 - 🔵 **KEY_FOLD_ANONYMOUS_IN_RANK_STRIP** — 読む人だけ（書く経路が無い疑い）: src/extension/popup-entry.js
 - 🔵 **KEY_INCREMENTAL_DEDUP_ENABLED** — 読む人だけ（書く経路が無い疑い）: src/extension/content-entry.js
 - 🔵 **KEY_INLINE_FLOATING_ANCHOR** — 読む人だけ（書く経路が無い疑い）: src/extension/content-entry.js, src/extension/popup-entry.js
@@ -60,7 +62,7 @@
 - 🔵 **KEY_TOP_SUPPORTERS_MIRROR** — 読む人だけ（書く経路が無い疑い）: src/extension/popup-entry.js
 - 🔵 **fn:commentDbSummaryKey** — 読む人だけ（書く経路が無い疑い）: src/extension/popup-entry.js
 - 🔵 **fn:summaryStorageKey** — 読む人だけ（書く経路が無い疑い）: src/extension/popup-entry.js
-- 🔵 **fn:watchSnapshotStorageKey** — 読む人だけ（書く経路が無い疑い）: src/extension/popup-entry.js
+- 🔵 **fn:watchSnapshotStorageKey** — 読む人だけ（書く経路が無い疑い）: src/extension/popup/report/htmlReportDocument.js
 - 🔵 **nls_backfill_progress_v1** — 読む人だけ（書く経路が無い疑い）: src/extension/status-entry.js
 - 🔵 **nls_mcp_live_latest_v1** — 読む人だけ（書く経路が無い疑い）: src/extension/popup-entry.js
 
@@ -78,13 +80,14 @@
 | `KEY_BACKFILL_BG_KICK_ENABLED` | — | extension/content-entry.js |
 | `KEY_BACKFILL_ENABLED` | extension/popup-entry.js | extension/content-entry.js |
 | `KEY_BACKFILL_HEARTBEAT_INDEX` | extension/content-entry.js | extension/content-entry.js |
+| `KEY_BACKFILL_LIVE_METRIC` | extension/content-entry.js | extension/status-entry.js |
 | `KEY_BACKFILL_PROGRESS` | extension/backfill-sw-entry.js<br>extension/content-entry.js<br>extension/popup-entry.js | extension/popup-entry.js |
 | `KEY_BACKFILL_SW_MODE` | — | extension/content-entry.js |
 | `KEY_CALM_PANEL_MOTION` | — | extension/popup-entry.js |
 | `KEY_CDB_OFFSCREEN_ENABLED` | — | extension/content-entry.js |
 | `KEY_CHEER_RECENT_V1` | extension/popup-entry.js | extension/popup-entry.js |
 | `KEY_COMMENTER_FOLLOWING_LIST_CACHE` | — | extension/content-entry.js |
-| `KEY_COMMENTER_FOLLOW_CACHE` | extension/popup-entry.js | extension/content-entry.js<br>extension/popup-entry.js |
+| `KEY_COMMENTER_FOLLOW_CACHE` | extension/popup/report/htmlReportDocument.js<br>extension/popup-entry.js | extension/content-entry.js<br>extension/popup-entry.js |
 | `KEY_COMMENT_IDB_ENABLED` | — | extension/content-entry.js |
 | `KEY_COMMENT_INGEST_LOG` | extension/content-entry.js<br>extension/popup-entry.js | extension/content-entry.js<br>extension/popup-entry.js |
 | `KEY_COMMENT_PANEL_AUTO_RESTORE` | — | extension/content-entry.js |
@@ -93,7 +96,9 @@
 | `KEY_CONCURRENT_CALIBRATION_RING_V1` | extension/content-entry.js<br>extension/popup-entry.js | extension/content-entry.js<br>extension/popup-entry.js |
 | `KEY_DEEP_HARVEST_QUIET_UI` | — | extension/content-entry.js<br>extension/popup-entry.js |
 | `KEY_DIAGNOSTICS_ERROR_RING_V1` | lib/diagnosticRingStore.js | lib/diagnosticRingStore.js |
+| `KEY_EFFECT_SOUND_ENABLED` | — | extension/venueBar.js |
 | `KEY_FOLD_ANONYMOUS_IN_RANK_STRIP` | — | extension/popup-entry.js |
+| `KEY_GIFT_EFFECT_DIAG` | extension/venueBar.js | extension/status-entry.js |
 | `KEY_GIFT_RANKING_LANE_ENABLED` | extension/popup-entry.js | extension/content-entry.js<br>extension/popup-entry.js |
 | `KEY_INCREMENTAL_DEDUP_ENABLED` | — | extension/content-entry.js |
 | `KEY_INLINE_FLOATING_ANCHOR` | — | extension/content-entry.js<br>extension/popup-entry.js |
@@ -116,7 +121,7 @@
 | `KEY_PAINT_PERF_RING_V1` | extension/popup-entry.js | — |
 | `KEY_POPUP_FRAME` | extension/popup-entry.js | extension/content-entry.js<br>extension/popup-entry.js |
 | `KEY_POPUP_FRAME_CUSTOM` | extension/popup-entry.js | extension/content-entry.js<br>extension/popup-entry.js |
-| `KEY_PREVIEW_RENDER_ACK` | extension/popup-entry.js | extension/status-entry.js |
+| `KEY_PREVIEW_RENDER_ACK` | extension/popup-entry.js | extension/popup-entry.js<br>extension/status-entry.js |
 | `KEY_PROFILE_RESOLVE_STATE` | — | extension/content-entry.js |
 | `KEY_RECORDING` | — | extension/content-entry.js<br>extension/popup-entry.js |
 | `KEY_RECORDING_WATCHDOG` | extension/content-entry.js | extension/popup-entry.js |
@@ -133,6 +138,7 @@
 | `KEY_THUMB_INTERVAL_MS` | — | extension/content-entry.js<br>extension/popup-entry.js |
 | `KEY_TOP_SUPPORTERS_MIRROR` | — | extension/popup-entry.js |
 | `KEY_USER_COMMENT_PROFILE_CACHE` | extension/content-entry.js | extension/comeview-entry.js<br>extension/content-entry.js<br>extension/popup-entry.js<br>extension/venueBar.js |
+| `KEY_VENUE_EFFECT_SOUND_PRESENCE` | extension/venueBar.js | — |
 | `KEY_VENUE_SEATS_DIAG` | extension/venueBar.js | extension/status-entry.js |
 | `KEY_VOICE_DIAG` | extension/comeview-entry.js | extension/status-entry.js |
 | `KEY_VOICE_INPUT_DEVICE` | extension/popup-entry.js | extension/popup-entry.js |
@@ -146,6 +152,6 @@
 | `fn:perfDiagStorageKey` | extension/popup-entry.js | — |
 | `fn:summaryStorageKey` | — | extension/popup-entry.js |
 | `fn:tailStorageKey` | extension/content-entry.js | extension/popup-entry.js |
-| `fn:watchSnapshotStorageKey` | — | extension/popup-entry.js |
+| `fn:watchSnapshotStorageKey` | — | extension/popup/report/htmlReportDocument.js |
 | `nls_backfill_progress_v1` | — | extension/status-entry.js |
 | `nls_mcp_live_latest_v1` | — | extension/popup-entry.js |

@@ -1132,7 +1132,7 @@ function renderAll({ lvList, summaries, fastDiag, popupDiag, backfillProgress, b
   });
 
   // 🩹 いま気になる点と対処(症状→原因→次の一手・最上部)
-  safeSection('対処候補', () => renderActionCards({ livesData, fastDiag, popupDiag, reportPreview, trendFindings }));
+  safeSection('対処候補', () => renderActionCards({ livesData, fastDiag, popupDiag, reportPreview, trendFindings, giftEffectDiag }));
 
   // 健全度パネル(ファーストビュー・正常100/異常だけ色・対象外は—)
   //   v0.1.894: 会場モード読み上げセル(タイミング・抜け漏れ)を出すため voiceDiag も渡す。
@@ -1453,6 +1453,9 @@ function renderActionCards(data) {
   let cards;
   try {
     cards = buildStatusActions(data);
+    // v0.1.1054: ギフト/広告の検知はしたが投擲演出/効果音が出ていない取りこぼしを症状カードに昇格。
+    //   aiShareFullText.js には既に配線済みだったが、status画面の対処候補パネル側は漏れていた(片翼統合)。
+    try { cards.push(...giftEffectDiagToActionCards(data.giftEffectDiag)); } catch { /* no-op */ }
   } catch (err) {
     // 星野メソッド: 失敗を空白で終わらせない。必ず「次の一手」を出す(下の AI共有まとめは常に動く)。
     _lastActionSig = ''; // エラー後は次の成功で必ず再構築させる。
