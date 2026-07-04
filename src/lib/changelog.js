@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1072',
+    date: '2026-07-05',
+    summary: 'マイ効果音計器をextrasに追加',
+    items: Object.freeze([
+      '状態速報に「マイ効果音」の取込件数・割当キー数・世代番号を表示するようになりました(12秒間引きの補助情報)。設定状況を目視で確認できます。表示のみの変更で、音の鳴り方には影響しません。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1071',
     date: '2026-07-05',
     summary: 'マイ効果音差し替え(IndexedDB取込+割当)',

@@ -35,6 +35,8 @@ import { buildCompletenessScore, formatCompletenessScoreLines } from './complete
 import { buildVoiceDiagLine } from './voiceDiag.js';
 import { buildGiftEffectDiagLines, giftEffectDiagToActionCards } from './giftEffectDiag.js';
 import { buildMilestoneEffectDiagLines, milestoneEffectDiagToActionCards } from './milestoneEffectDiag.js';
+// v0.1.1072: マイ効果音(customSoundStore.js)の取込状況(extras 12秒間引き)をAI共有本文にも併記。
+import { buildCustomSoundDiagLine } from './customSoundDiag.js';
 import { reportPreviewCtxFromFastDiag } from './reportPreviewCtx.js';
 import { buildReportPreviewLines } from './reportPreview.js';
 import { buildStatusActions } from './statusActionAdvisor.js';
@@ -68,7 +70,7 @@ export function formatRefreshPerfLine(refreshPerf) {
  * @param {any} args
  * @returns {string}
  */
-export function buildAiShareFullText({ overviewText, livesData, fastDiag, popupDiag, voiceDiag, venueSeatsDiag, laneDiag, laneMirror, reportPreview, trendFindings, jsonBlob, currentLiveId, publishKeys, publishOutcomeRec, previewRenderAck, refreshPerf, giftEffectDiag, milestoneEffectDiag }) {
+export function buildAiShareFullText({ overviewText, livesData, fastDiag, popupDiag, voiceDiag, venueSeatsDiag, laneDiag, laneMirror, reportPreview, trendFindings, jsonBlob, currentLiveId, publishKeys, publishOutcomeRec, previewRenderAck, refreshPerf, giftEffectDiag, milestoneEffectDiag, customSoundDiag }) {
   const lines = [];
   lines.push('## 君斗りんくの追憶のきらめき 状態速報');
   lines.push(`生成: ${new Date().toISOString()}`);
@@ -231,6 +233,13 @@ export function buildAiShareFullText({ overviewText, livesData, fastDiag, popupD
     try {
       const rStr = buildReportPreviewLines(reportPreview, reportPreviewCtxFromFastDiag(fastDiag));
       if (rStr) lines.push(rStr);
+    } catch {
+      /* no-op */
+    }
+    // v0.1.1072: マイ効果音(取込件数/割当キー数/rev)。IDBが開けない環境では静かに「-」表示。
+    try {
+      const cStr = buildCustomSoundDiagLine(customSoundDiag);
+      if (cStr) lines.push(cStr);
     } catch {
       /* no-op */
     }

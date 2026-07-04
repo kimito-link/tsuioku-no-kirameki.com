@@ -34,6 +34,7 @@ graph LR
   n_status --> n_src_lib_commentTimelineReport_js["lib/commentTimelineReport.js"]
   n_status --> n_src_lib_completenessScore_js["lib/completenessScore.js"]
   n_status --> n_src_lib_copyTextWithFallback_js["lib/copyTextWithFallback.js"]
+  n_status --> n_src_lib_customSoundDiag_js["lib/customSoundDiag.js"]
   n_status --> n_src_lib_customSoundPreset_js["lib/customSoundPreset.js"]
   n_status --> n_src_lib_customSoundStore_js["lib/customSoundStore.js"]:::shared
   n_status --> n_src_lib_deriveAvatarUrlFromUid_js["lib/deriveAvatarUrlFromUid.js"]:::shared
@@ -52,8 +53,7 @@ graph LR
   n_status --> n_src_lib_liveHealthScore_js["lib/liveHealthScore.js"]
   n_status --> n_src_lib_liveviewPublishOutcome_js["lib/liveviewPublishOutcome.js"]
   n_status --> n_src_lib_liveviewPublishOutcomeKey_js["lib/liveviewPublishOutcomeKey.js"]
-  n_status --> n_src_lib_liveviewPublishSelfDiag_js["lib/liveviewPublishSelfDiag.js"]
   classDef shared fill:#eee,stroke:#999,color:#666;
 ```
 
-> ほか 50 ファイル省略（全件は storage-bus.md / metafile 参照）。
+> ほか 51 ファイル省略（全件は storage-bus.md / metafile 参照）。
