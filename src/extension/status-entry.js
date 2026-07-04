@@ -69,6 +69,8 @@ import { KEY_GIFT_EFFECT_DIAG } from '../lib/giftEffectDiagKey.js';
 import { buildGiftEffectDiagLines, giftEffectDiagToActionCards } from '../lib/giftEffectDiag.js';
 // v0.1.1058: コメント数マイルストーン(検知→演出→音)の取りこぼしを状態速報で確認できるようにする。
 import { KEY_MILESTONE_EFFECT_DIAG } from '../lib/milestoneEffectDiagKey.js';
+// v0.1.1067 開発用: 効果音試聴パネル(音源の正本リストと実再生音量をそのまま使う)。
+import { EFFECT_SOUND_PATHS, EFFECT_SOUND_VARIANT_PATHS, defaultVolumeForEffectSoundKind } from '../lib/effectSoundPlayer.js';
 import { buildMilestoneEffectDiagLines, milestoneEffectDiagToActionCards } from '../lib/milestoneEffectDiag.js';
 // 2026-06-22(council/lane-show-all-active): 応援レーンの人数整合(素性 N/表示 M)を健全度パネルに載せる。
 import { KEY_LANE_DIAG } from '../lib/laneDiagKey.js';
@@ -281,6 +283,7 @@ async function bootstrap() {
   setupButtons();
   setupVisibilityHandler();
   setupStorageChangeListener();
+  setupSoundPreviewPanel();
 
   // v0.1.797「status が重くて開かない」根治: 初回は短い timeout(1500ms)で走らせ、storage が
   //   混雑していても最大 ~1.5秒で degrade 表示に切り替える(=「開かない」を作らない)。await せず
@@ -2494,11 +2497,52 @@ function setupButtons() {
 //   これらは自分の viewerUserId・配信URL を含む開発用エクスポートなので本番ユーザーには出さない
 //   (ユーザー方針「そもそも開発用なので release時は出さない」)。健全度パネル・総合判定・対処カードは
 //   ID を漏らさずユーザーに有用なので残す。NL_RELEASE は esbuild define(NL_DEV_HOTRELOAD と同方式)。
+/**
+ * v0.1.1067 開発用: 効果音試聴パネル。EFFECT_SOUND_VARIANT_PATHS/EFFECT_SOUND_PATHS(正本)を
+ *   そのまま列挙し、実再生と同じ音量(defaultVolumeForEffectSoundKind)で鳴らす。release では
+ *   hideDevDiagnosticsIfRelease が丸ごと隠す。
+ */
+function setupSoundPreviewPanel() {
+  const list = document.getElementById('soundPreviewList');
+  if (!list) return;
+  /** @type {Array<[string, string]>} kind, path */
+  const entries = [];
+  for (const [kind, paths] of Object.entries(EFFECT_SOUND_VARIANT_PATHS)) {
+    for (const p of paths) entries.push([kind, p]);
+  }
+  for (const [kind, p] of Object.entries(EFFECT_SOUND_PATHS)) {
+    if (!entries.some(([, q]) => q === p)) entries.push([kind, p]);
+  }
+  /** @type {HTMLAudioElement|null} */
+  let cur = null;
+  for (const [kind, path] of entries) {
+    const row = document.createElement('div');
+    row.style.cssText = 'display:flex;gap:8px;align-items:center;padding:2px 0;font-size:12px';
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.textContent = '▶';
+    btn.addEventListener('click', () => {
+      try {
+        if (cur) { try { cur.pause(); } catch { /* no-op */ } }
+        const a = new Audio(chrome.runtime.getURL(path));
+        a.volume = defaultVolumeForEffectSoundKind(kind);
+        cur = a;
+        void a.play().catch(() => {});
+      } catch { /* 試聴失敗は無害 */ }
+    });
+    const label = document.createElement('span');
+    label.textContent = `${path.replace('sound/', '')} 〔${kind}・音量${defaultVolumeForEffectSoundKind(kind)}〕`;
+    row.append(btn, label);
+    list.appendChild(row);
+  }
+}
+
 function hideDevDiagnosticsIfRelease() {
   const isRelease = typeof NL_RELEASE !== 'undefined' && NL_RELEASE === true;
   if (!isRelease) return;
   // 共有エクスポート系(ID/URL を含む生データ)だけ隠す。健全度パネルは残す。
   const devOnlyIds = [
+    'soundPreviewPanel', // 🔊 効果音試聴(開発用・v0.1.1067)
     'aiShareLane',   // 🤖 AI に貼る用テキスト(全文・生JSON含む)+まるごとコピー
     'btnShareAll',   // 🔎 これを共有すれば原因が全部わかる(全文コピー)
     'btnCopy',       // クリップボードへコピー(全文)

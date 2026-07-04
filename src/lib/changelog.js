@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1067',
+    date: '2026-07-04',
+    summary: '診断ページに効果音の試聴パネルを追加(開発用)',
+    items: Object.freeze([
+      '診断ページ(状態速報)の下部に「効果音試聴(開発用)」パネルを追加しました。全効果音を実際の再生と同じ音量でその場で聴けます。音の差し替え相談の際に「どのファイルが不満か」をここで確認できます。配布ビルドでは表示されません。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1066',
     date: '2026-07-04',
     summary: 'ギフト音の出だし遅れを解消(最大0.2秒)',
