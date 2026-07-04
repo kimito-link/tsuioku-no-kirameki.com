@@ -2093,10 +2093,10 @@ export function mountVenueBarButton(options = {}) {
   /**
    * ギフト1件ぶんの音をディレクター経由で予約する。
    * @param {string|undefined} tier 'small'|'medium'|'large'|'mega'
-   * @param {number} flightMs 投擲アニメの飛翔時間(ms)=着弾までの遅延
+   * @param {number} _flightMs 投擲アニメの飛翔時間(ms)。v0.1.1066で待機をやめ未使用化(呼び出し側の互換のため引数は維持)
    * @returns {'scheduled'|'coalesced'|'off'}
    */
-  const scheduleGiftSound = (tier, flightMs) => {
+  const scheduleGiftSound = (tier, _flightMs) => {
     if (!_effectSoundEnabledCache) return 'off';
     const baseKind = effectSoundKindForGiftTier(tier);
     _giftComboState = directHit(_giftComboState, baseKind, Date.now(), {

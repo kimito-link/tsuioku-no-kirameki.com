@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 2 / 606 件
+## ⚠️ 役割コメントが無いソース 2 / 607 件
 - `src/lib/reportPreviewPublish.js`
 - `src/lib/venueLaneBuckets.js`
 
@@ -147,7 +147,7 @@
   - `index.html`
   - `live-view.html`
   - `live-view.js` — 純Web版 応援ライブビュー（拡張なし・PC/スマホ共通）。
-- 📁 **docs/** (157)
+- 📁 **docs/** (158)
   - 📁 **article-assets/** (87)
     - 📁 **venue-frames/** (12)
       - `f01.png`
@@ -287,6 +287,7 @@
   - `comment-metadata-pipeline-notes.md`
   - `comment-number-rescue-flow.html`
   - `cursor-handoff-direct-concurrent-viewers.md`
+  - `dev-sound-preview.html`
   - `diagnostics-strengthening-log.md`
   - `extension-bump-checklist.md`
   - `feature-sitemap.html`
@@ -459,10 +460,11 @@
   - `status-guard.js` — 状態速報ページ(status.html)の「何があっても開く」保険。
   - `status.html`
   - `venue.html`
-- 📁 **scripts/** (32)
+- 📁 **scripts/** (33)
   - 📁 **xserver/** (2)
     - `github-webhook-pull.php.example`
     - `webhook-git-pull-for-upload.php`
+  - `build-sound-preview.mjs` — 開発用: extension/sound/ 配下の全効果音を1枚のHTMLで試聴できるページを生成する。
   - `build-sounds.mjs` — sound-src/(CC0原素材)から extension/sound/ の効果音mp3を組み立てる。
   - `build-watch.mjs` — watch では起動時刻を埋める（rebuild 毎に再 import される訳ではないので、
   - `build.mjs` — .env を読み込む(status の共有キー NL_STATUS_INGEST_KEY / NL_STATUS_VIEW_TOKEN は .env から注入)。
