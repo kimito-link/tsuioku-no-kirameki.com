@@ -166,10 +166,10 @@ function buildTierVariations(tmpDir) {
 }
 
 /**
- * v0.1.1068: パチンコ電子音の直接合成(実試聴「パチンコっぽさが全然ない」への回答)。
- *   素材ミックスをやめ、ffmpeg aevalsrc で「きゅいん(上昇チャープ+トレモロ)」「コインベル」
- *   「大当たりベルカスケード」を生成する。完全に決定論・ライセンスフリー(自作)。
- *   バリエーション n=1..3 は基準周波数を±6%ずらして作る(乱数不使用)。
+ * v0.1.1069: パチンコ音の文法(保留→きゅいん→リーチ煽り→大当たり→払い出し)に基づく
+ *   全音源フルセット合成(council/pachinko-sound-max-SYNTHESIS.md 正本)。
+ *   ffmpeg aevalsrc の直接合成のみを使う(素材ミックスは他カテゴリのみ)。完全に決定論・
+ *   ライセンスフリー(自作)。バリエーション n=1..3 は基準周波数を±6%ずらして作る(乱数不使用)。
  */
 const SYNTH_LOUDNORM = 'loudnorm=I=-6:TP=-0.3:LRA=9'; // ベロシティ強め=音圧-6LUFS
 
@@ -182,48 +182,133 @@ function synthToDest(inputs, filterComplex, dest, tmpDir) {
   ffmpeg(['-i', wav, '-af', SYNTH_LOUDNORM, '-ar', '44100', '-q:a', '2', dest]);
 }
 
-function buildSynthPachinkoTiers(tmpDir) {
+// 払い出しジャラジャラ(素数ms間隔3系統・完全決定論で乱雑=物量感を作る・設計書§2.4)。
+// カンマ回避のため mod(t,P) でなく floor 形 (t-P*floor(t/P)) を使う(lavfiパーサ地雷)。
+const jara = (k, dur = 0.9, periods = [0.073, 0.097, 0.113]) =>
+  `aevalsrc=(0.55*(sin(2*PI*${2489 * k}*t)+0.5*sin(2*PI*${4978 * k}*t))*exp(-70*(t-${periods[0]}*floor(t/${periods[0]})))` +
+  `+0.45*(sin(2*PI*${3322 * k}*t)+0.5*sin(2*PI*${6644 * k}*t))*exp(-65*(t-${periods[1]}*floor(t/${periods[1]})))` +
+  `+0.4*(sin(2*PI*${4186 * k}*t)+0.4*sin(2*PI*${8372 * k}*t))*exp(-60*(t-${periods[2]}*floor(t/${periods[2]}))))` +
+  `*exp(-1.8*t):s=44100:d=${dur}`;
+
+// 変奏ごとのジャラジャラ周期(全て素数ms・設計書§2.10「変奏2/3で周期自体を差し替え」)。
+const JARA_PERIODS_BY_VARIANT = Object.freeze({
+  1: [0.073, 0.097, 0.113],
+  2: [0.079, 0.101, 0.127],
+  3: [0.083, 0.103, 0.131]
+});
+
+function buildSynthPachinkoSuite(tmpDir) {
   mkdirSync(TIERS_OUT_DIR, { recursive: true });
   for (let n = 1; n <= 3; n++) {
     const k = 1 + 0.06 * (n - 2); // 変奏: -6%/0/+6%
-    // small: コイン2連ベル(チン+チン)0.3秒
+    const periods = JARA_PERIODS_BY_VARIANT[n];
+
+    // small: 保留入賞「チン・チン」コインベル2連(0.32秒・部分音 1:2.0:2.76)
     synthToDest(
       [
-        `aevalsrc=(sin(2*PI*${2093 * k}*t)+0.5*sin(2*PI*${3136 * k}*t))*exp(-22*t):s=44100:d=0.3`,
-        `aevalsrc=(sin(2*PI*${2637 * k}*t)+0.5*sin(2*PI*${3951 * k}*t))*exp(-22*t):s=44100:d=0.3`
+        `aevalsrc=(sin(2*PI*${2093 * k}*t)+0.5*sin(2*PI*${4186 * k}*t)+0.3*sin(2*PI*${5777 * k}*t))*exp(-25*t):s=44100:d=0.25`,
+        `aevalsrc=(sin(2*PI*${2637 * k}*t)+0.5*sin(2*PI*${5274 * k}*t)+0.3*sin(2*PI*${7278 * k}*t))*exp(-25*t):s=44100:d=0.25`
       ],
-      '[1:a]adelay=80|80[b];[0:a][b]amix=inputs=2:normalize=0:duration=longest,alimiter=limit=0.95[out]',
+      '[1:a]adelay=70|70[b];[0:a][b]amix=inputs=2:normalize=0:duration=longest,highpass=f=800,alimiter=limit=0.95[out]',
       join(TIERS_OUT_DIR, `gift-small-${n}.mp3`), tmpDir
     );
-    // medium: きゅいん短(チャープ0.4秒+トレモロ)
+
+    // medium: きゅいん(500→2900Hzチャープ+トレモロ31Hz)+終端チン(0.62秒)
     synthToDest(
-      [`aevalsrc=(sin(2*PI*(${500 * k}*t+${2400 * k}*t*t))+0.4*sin(4*PI*(${500 * k}*t+${2400 * k}*t*t)))*exp(-2.8*t):s=44100:d=0.45`],
-      '[0:a]tremolo=f=32:d=0.75,aecho=0.6:0.35:55:0.3,alimiter=limit=0.95[out]',
+      [
+        `aevalsrc=(sin(2*PI*(${500 * k}*t+${3000 * k}*t*t))+0.45*sin(4*PI*(${500 * k}*t+${3000 * k}*t*t)))*exp(-2.2*t):s=44100:d=0.42`,
+        `aevalsrc=(sin(2*PI*${5274 * k}*t)+0.5*sin(2*PI*${7902 * k}*t))*exp(-28*t):s=44100:d=0.22`
+      ],
+      '[0:a]tremolo=f=31:d=0.75[c];[1:a]adelay=400|400[b];' +
+        '[c][b]amix=inputs=2:normalize=0:duration=longest,aecho=0.55:0.3:55:0.28,highpass=f=700,alimiter=limit=0.95[out]',
       join(TIERS_OUT_DIR, `gift-medium-${n}.mp3`), tmpDir
     );
-    // large: きゅいーん(長めチャープ+強トレモロ+締めベル)0.7秒
+
+    // large: きゅいーん(350→3400Hz)+締めベル2連(G7→C8)0.95秒
     synthToDest(
       [
-        `aevalsrc=(sin(2*PI*(${350 * k}*t+${2900 * k}*t*t))+0.45*sin(4*PI*(${350 * k}*t+${2900 * k}*t*t)))*exp(-1.6*t):s=44100:d=0.62`,
-        `aevalsrc=(sin(2*PI*${2794 * k}*t)+0.5*sin(2*PI*${4186 * k}*t))*exp(-16*t):s=44100:d=0.35`
+        `aevalsrc=(sin(2*PI*(${350 * k}*t+${2650 * k}*t*t))+0.45*sin(4*PI*(${350 * k}*t+${2650 * k}*t*t)))*exp(-1.6*t):s=44100:d=0.58`,
+        `aevalsrc=(sin(2*PI*${3136 * k}*t)+0.5*sin(2*PI*${6272 * k}*t)+0.3*sin(2*PI*${8655 * k}*t))*exp(-18*t):s=44100:d=0.3`,
+        `aevalsrc=(sin(2*PI*${4186 * k}*t)+0.5*sin(2*PI*${8372 * k}*t))*exp(-16*t):s=44100:d=0.35`
       ],
-      '[0:a]tremolo=f=28:d=0.8[c];[1:a]adelay=430|430[b];[c][b]amix=inputs=2:normalize=0:duration=longest,aecho=0.65:0.4:70:0.35,alimiter=limit=0.95[out]',
+      '[0:a]tremolo=f=27:d=0.85[c];[1:a]adelay=560|560[b1];[2:a]adelay=680|680[b2];' +
+        '[c][b1][b2]amix=inputs=3:normalize=0:duration=longest,aecho=0.6:0.35:70:0.32,highpass=f=700,alimiter=limit=0.95[out]',
       join(TIERS_OUT_DIR, `gift-large-${n}.mp3`), tmpDir
     );
-    // mega: 大当たり=きゅいん+ベルカスケード3連 1.1秒
+
+    // mega: 大当たり=きゅいん→カスケード4連(C7-E7-G7-C8)→ジャラ尾0.6秒(1.5秒)
     synthToDest(
       [
-        `aevalsrc=(sin(2*PI*(${300 * k}*t+${3200 * k}*t*t))+0.5*sin(4*PI*(${300 * k}*t+${3200 * k}*t*t)))*exp(-1.4*t):s=44100:d=0.6`,
-        `aevalsrc=(sin(2*PI*${2093 * k}*t)+0.5*sin(2*PI*${3136 * k}*t))*exp(-13*t):s=44100:d=0.45`,
-        `aevalsrc=(sin(2*PI*${2637 * k}*t)+0.5*sin(2*PI*${3951 * k}*t))*exp(-13*t):s=44100:d=0.45`,
-        `aevalsrc=(sin(2*PI*${3136 * k}*t)+0.5*sin(2*PI*${4699 * k}*t))*exp(-11*t):s=44100:d=0.5`
+        `aevalsrc=(sin(2*PI*(${300 * k}*t+${3000 * k}*t*t))+0.5*sin(4*PI*(${300 * k}*t+${3000 * k}*t*t)))*exp(-1.4*t):s=44100:d=0.55`,
+        `aevalsrc=(sin(2*PI*${2093 * k}*t)+0.5*sin(2*PI*${4186 * k}*t))*exp(-13*t):s=44100:d=0.45`,
+        `aevalsrc=(sin(2*PI*${2637 * k}*t)+0.5*sin(2*PI*${5274 * k}*t))*exp(-13*t):s=44100:d=0.45`,
+        `aevalsrc=(sin(2*PI*${3136 * k}*t)+0.5*sin(2*PI*${6272 * k}*t))*exp(-12*t):s=44100:d=0.5`,
+        `aevalsrc=(sin(2*PI*${4186 * k}*t)+0.5*sin(2*PI*${8372 * k}*t))*exp(-11*t):s=44100:d=0.55`,
+        jara(k, 0.6, periods)
       ],
-      '[0:a]tremolo=f=26:d=0.8[c];[1:a]adelay=450|450[b1];[2:a]adelay=600|600[b2];[3:a]adelay=750|750[b3];' +
-        '[c][b1][b2][b3]amix=inputs=4:normalize=0:duration=longest,aecho=0.7:0.45:80:0.4,alimiter=limit=0.95[out]',
+      '[0:a]tremolo=f=26:d=0.8[c];[1:a]adelay=430|430[b1];[2:a]adelay=550|550[b2];[3:a]adelay=670|670[b3];[4:a]adelay=790|790[b4];' +
+        '[5:a]adelay=850|850,volume=0.35[j];' +
+        '[c][b1][b2][b3][b4][j]amix=inputs=6:normalize=0:duration=longest,aecho=0.7:0.45:80:0.4,highpass=f=700,alimiter=limit=0.95[out]',
       join(TIERS_OUT_DIR, `gift-mega-${n}.mp3`), tmpDir
     );
+
+    // milestone-soft: 保留ポポン(G6→C7・奇数倍音3倍のチップ音色)0.3秒
+    synthToDest(
+      [
+        `aevalsrc=(sin(2*PI*${1568 * k}*t)+0.33*sin(6*PI*${1568 * k}*t))*exp(-18*t):s=44100:d=0.18`,
+        `aevalsrc=(sin(2*PI*${2093 * k}*t)+0.33*sin(6*PI*${2093 * k}*t))*exp(-18*t):s=44100:d=0.2`
+      ],
+      '[1:a]adelay=90|90[b];[0:a][b]amix=inputs=2:normalize=0:duration=longest,highpass=f=800,alimiter=limit=0.95[out]',
+      join(TIERS_OUT_DIR, `milestone-soft-${n}.mp3`), tmpDir
+    );
+
+    // milestone-hard: リーチ煽り(スイープ600→1300Hz+3連上昇ブリップ・未解決終止)0.75秒
+    synthToDest(
+      [
+        `aevalsrc=(sin(2*PI*(${600 * k}*t+${500 * k}*t*t))+0.3*sin(6*PI*(${600 * k}*t+${500 * k}*t*t)))*exp(-1.2*t):s=44100:d=0.7`,
+        `aevalsrc=(sin(2*PI*${1046 * k}*t)+0.33*sin(6*PI*${1046 * k}*t))*exp(-14*t):s=44100:d=0.2`,
+        `aevalsrc=(sin(2*PI*${1318 * k}*t)+0.33*sin(6*PI*${1318 * k}*t))*exp(-14*t):s=44100:d=0.2`,
+        `aevalsrc=(sin(2*PI*${1568 * k}*t)+0.33*sin(6*PI*${1568 * k}*t))*exp(-12*t):s=44100:d=0.25`
+      ],
+      '[0:a]tremolo=f=18:d=0.6[c];[1:a]adelay=0|0[b1];[2:a]adelay=110|110[b2];[3:a]adelay=220|220[b3];' +
+        '[c][b1][b2][b3]amix=inputs=4:normalize=0:duration=longest,aecho=0.5:0.3:60:0.25,highpass=f=700,alimiter=limit=0.95[out]',
+      join(TIERS_OUT_DIR, `milestone-hard-${n}.mp3`), tmpDir
+    );
+
+    // milestone-jackpot: 大当たりファンファーレ+払い出しジャラ0.9秒(1.8秒・確変=最長)
+    synthToDest(
+      [
+        `aevalsrc=(sin(2*PI*(${300 * k}*t+${3300 * k}*t*t))+0.5*sin(4*PI*(${300 * k}*t+${3300 * k}*t*t)))*exp(-1.3*t):s=44100:d=0.55`,
+        `aevalsrc=(sin(2*PI*${2093 * k}*t)+0.5*sin(2*PI*${4186 * k}*t))*exp(-13*t):s=44100:d=0.45`,
+        `aevalsrc=(sin(2*PI*${2637 * k}*t)+0.5*sin(2*PI*${5274 * k}*t))*exp(-13*t):s=44100:d=0.45`,
+        `aevalsrc=(sin(2*PI*${3136 * k}*t)+0.5*sin(2*PI*${6272 * k}*t))*exp(-12*t):s=44100:d=0.5`,
+        `aevalsrc=(sin(2*PI*${4186 * k}*t)+0.5*sin(2*PI*${8372 * k}*t))*exp(-11*t):s=44100:d=0.55`,
+        jara(k, 0.9, periods)
+      ],
+      '[0:a]tremolo=f=26:d=0.8[c];[1:a]adelay=420|420[b1];[2:a]adelay=540|540[b2];[3:a]adelay=660|660[b3];[4:a]adelay=780|780[b4];' +
+        '[5:a]adelay=700|700,volume=0.5[j];' +
+        '[c][b1][b2][b3][b4][j]amix=inputs=6:normalize=0:duration=longest,aecho=0.7:0.45:80:0.4,highpass=f=700,alimiter=limit=0.95[out]',
+      join(TIERS_OUT_DIR, `milestone-jackpot-${n}.mp3`), tmpDir
+    );
   }
-  console.log('[build-sounds] ギフト12ファイルをパチンコ合成音(きゅいん/コインベル)で生成しました。');
+
+  // reach: リーチ煽りロング(5度上昇パルス3連+導音保持・未解決終止)1.0秒・変奏2本
+  // n=1: k=1.0, gap=240 / n=2: k=1.06, gap=200 (加速変奏)
+  for (const [n, k, gap] of [[1, 1.0, 240], [2, 1.06, 200]]) {
+    synthToDest(
+      [
+        `aevalsrc=(sin(2*PI*(${600 * k}*t+${682 * k}*t*t))+0.35*sin(4*PI*(${600 * k}*t+${682 * k}*t*t)))*exp(-6*t):s=44100:d=0.22`,
+        `aevalsrc=(sin(2*PI*(${900 * k}*t+${1023 * k}*t*t))+0.35*sin(4*PI*(${900 * k}*t+${1023 * k}*t*t)))*exp(-6*t):s=44100:d=0.22`,
+        `aevalsrc=(sin(2*PI*(${1350 * k}*t+${1534 * k}*t*t))+0.35*sin(4*PI*(${1350 * k}*t+${1534 * k}*t*t)))*exp(-6*t):s=44100:d=0.22`,
+        `aevalsrc=sin(2*PI*${1976 * k}*t+6*sin(2*PI*6.5*t))*exp(-3.5*t):s=44100:d=0.45`
+      ],
+      `[1:a]adelay=${gap}|${gap}[b1];[2:a]adelay=${gap * 2}|${gap * 2}[b2];[3:a]adelay=${gap * 2 + 180}|${gap * 2 + 180}[b3];` +
+        '[0:a][b1][b2][b3]amix=inputs=4:normalize=0:duration=longest,aecho=0.5:0.28:65:0.25,highpass=f=700,alimiter=limit=0.95[out]',
+      join(TIERS_OUT_DIR, `reach-${n}.mp3`), tmpDir
+    );
+  }
+
+  console.log('[build-sounds] パチンコ文法準拠の合成音22ファイル(gift12/milestone9/reach2)を生成しました。');
 }
 
 function main() {
@@ -231,8 +316,9 @@ function main() {
   try {
     const built = buildGiftSound(tmpDir);
     const tiersBuilt = buildTierVariations(tmpDir);
-    // v0.1.1068: ギフトのtierはパチンコ合成音で上書き(素材ミックスは他カテゴリのみ)。
-    buildSynthPachinkoTiers(tmpDir);
+    // v0.1.1069: ギフト/マイルストーン/リーチのtierはパチンコ文法準拠の合成音で上書き
+    //   (素材ミックスは他カテゴリのみ・council/pachinko-sound-max-SYNTHESIS.md 正本)。
+    buildSynthPachinkoSuite(tmpDir);
     if (process.argv.includes('--normalize-all')) {
       normalizeExistingEffects(tmpDir);
     }
