@@ -167,13 +167,21 @@ export const CUSTOM_SOUND_PRESET = Object.freeze({
   // ---- §5.1 新設操作音キー(op_*・Phase D1・視聴イベントキーと不共有) ----
   // council/operation-sound-SYNTHESIS.md §5.1: 既存85本の同一No.を複数キーから参照する
   //   (IndexedDB assignments は同じ blob id を別キーに割り当て可能=重複購入ゼロ)。
-  //   op_shot_1〜3・op_handle・op_toggle_on/off の専用素材はFreesound CC0で新規調達予定
-  //   (§5.2・凍結解禁待ちではなく当面の調達先)だが、未調達の間はプリセット候補ゼロ=
-  //   マイ効果音UIでは「未割当」表示のまま(音自体は鳴らない=no-path・安全側)。
-  op_handle: Object.freeze([]), // §5.2: mechanical button click short 等(Freesound CC0・未調達)
-  op_shot_1: Object.freeze([]), // §5.2: pinball plunger 等(Freesound CC0・未調達)
-  op_shot_2: Object.freeze([]), // §5.2: pinball launcher 等(Freesound CC0・未調達)
-  op_shot_3: Object.freeze([]), // §5.2: slot machine lever pull 等(Freesound CC0・未調達)
+  // v0.1.1079: op_handle/op_shot_1〜3 は D1 実装時に Audiostock 定額で5本追加DL済み
+  //   (計90本)だったのにプリセット配線が漏れて「永遠に未割当=無音」だった修正。
+  //   役割は §5.2 の意図(接触クリック/軽い単発/バネ発射/重厚メカ)に対応させた。
+  op_handle: Object.freeze([
+    Object.freeze({ id: 'as_861221', no: 861221, title: 'ピコリン(操作の接触クリック)' })
+  ]),
+  op_shot_1: Object.freeze([
+    Object.freeze({ id: 'as_1652750', no: 1652750, title: 'メダル投入(軽い単発)' })
+  ]),
+  op_shot_2: Object.freeze([
+    Object.freeze({ id: 'as_1260384', no: 1260384, title: '玉発射(バネの打ち出し)' })
+  ]),
+  op_shot_3: Object.freeze([
+    Object.freeze({ id: 'as_258054', no: 258054, title: 'リール変動開始(重厚メカ)' })
+  ]),
   op_shot_4: Object.freeze([
     Object.freeze({ id: 'as_970774', no: 970774, title: 'カキーン(スロット確定音)' })
   ]),
@@ -187,7 +195,9 @@ export const CUSTOM_SOUND_PRESET = Object.freeze({
     Object.freeze({ id: 'as_224302', no: 224302, title: 'ピコン(タップ・通知音)' })
   ]),
   op_panel_open: Object.freeze([
-    Object.freeze({ id: 'as_141839', no: 141839, title: 'タッチ,クリック音(ピコン)' })
+    Object.freeze({ id: 'as_141839', no: 141839, title: 'タッチ,クリック音(ピコン)' }),
+    // v0.1.1079: D1追加DL分の5本目。「扉」音はパネルopenの意味に合うため変奏2で順繰り。
+    Object.freeze({ id: 'as_108443', no: 108443, title: 'ガチャ扉(パネル開)' })
   ]),
   op_panel_close: Object.freeze([
     Object.freeze({ id: 'as_224302', no: 224302, title: 'ピコン(タップ・通知音)' })
