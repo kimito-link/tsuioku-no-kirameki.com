@@ -52,6 +52,7 @@
 - 🔵 **KEY_NDGR_DETERMINISTIC_BACKFILL** — 読む人だけ（書く経路が無い疑い）: src/extension/content-entry.js
 - 🔵 **KEY_NDGR_FORWARD_ENABLED** — 読む人だけ（書く経路が無い疑い）: src/extension/content-entry.js
 - 🔵 **KEY_NORTH_STAR_MIRROR** — 読む人だけ（書く経路が無い疑い）: src/extension/popup-entry.js, src/extension/status-entry.js
+- 🔵 **KEY_OP_SOUND_ENABLED** — 読む人だけ（書く経路が無い疑い）: src/extension/popup-entry.js
 - 🔵 **KEY_PROFILE_RESOLVE_STATE** — 読む人だけ（書く経路が無い疑い）: src/extension/content-entry.js
 - 🔵 **KEY_RECORDING** — 読む人だけ（書く経路が無い疑い）: src/extension/content-entry.js, src/extension/popup-entry.js
 - 🔵 **KEY_STAT_CARDS_MIRROR** — 読む人だけ（書く経路が無い疑い）: src/extension/popup-entry.js, src/extension/status-entry.js
@@ -124,6 +125,8 @@
 | `KEY_NDGR_DETERMINISTIC_BACKFILL` | — | extension/content-entry.js |
 | `KEY_NDGR_FORWARD_ENABLED` | — | extension/content-entry.js |
 | `KEY_NORTH_STAR_MIRROR` | — | extension/popup-entry.js<br>extension/status-entry.js |
+| `KEY_OP_SOUND_EFFECT_DIAG` | extension/popup-entry.js | extension/status-entry.js |
+| `KEY_OP_SOUND_ENABLED` | — | extension/popup-entry.js |
 | `KEY_PAINT_PERF_RING_V1` | extension/popup-entry.js | — |
 | `KEY_POPUP_FRAME` | extension/popup-entry.js | extension/content-entry.js<br>extension/popup-entry.js |
 | `KEY_POPUP_FRAME_CUSTOM` | extension/popup-entry.js | extension/content-entry.js<br>extension/popup-entry.js |

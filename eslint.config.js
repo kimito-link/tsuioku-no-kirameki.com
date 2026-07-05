@@ -165,8 +165,12 @@ export default [
     //   フィーバーBGM開始/終了・ボイスR条件トリガ・トグル配線=chrome.storage/タイマー/DOMのグルー=
     //   lib抽出不可。純関数本体は src/lib/phaseDirector.js・bgmDirector.js・bgmPhaseDiag.js に
     //   テスト付きで隔離済み)を追加=20254→20519。ラチェットは実測+50の20569へ。
+    //   Phase D1(2026-07-05): 操作音配線(triggerOpSound/triggerOpSoundHandlePress/
+    //   triggerOpSoundShotSuccess・submitComment/トグル/コピー/公開ボタンへの1行フック=
+    //   chrome.storage/DOMのグルー=lib抽出不可。純関数本体は src/lib/opSoundDirector.js・
+    //   opSoundEffectDiag.js にテスト付きで隔離済み)を追加=20519→20663。ラチェットは実測+50の20713へ。
     files: ['src/extension/popup-entry.js'],
-    rules: { 'max-lines': ['error', { max: 20569, skipBlankLines: false, skipComments: false }] }
+    rules: { 'max-lines': ['error', { max: 20713, skipBlankLines: false, skipComments: false }] }
   },
   {
     files: ['src/extension/popup/**/*.js'],

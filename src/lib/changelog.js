@@ -26,6 +26,22 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1076',
+    date: '2026-07-05',
+    summary: 'コメント投稿の打ち出し操作音を追加',
+    items: Object.freeze([
+      'コメント送信ボタンを押した瞬間と、送信できた瞬間に、パチンコの打ち出しのような短い操作音を鳴らせるようになりました(popup設定「操作音」・既定ON)。送信を重ねるほど音が育ち、5/10/25/50/100件到達では特別な音が鳴ります。送信できなかったときは音が鳴りません。「マイ効果音」で音源を割り当てていない場合はまだ無音です。'
+    ])
+  }),
+  Object.freeze({
+    version: '0.1.1075',
+    date: '2026-07-05',
+    summary: 'パチンコBGMを既定ONに変更',
+    items: Object.freeze([
+      'リーチ中/フィーバー中のBGMを既定ONに変更しました(従来は既定OFF)。止めたい場合はpopup設定または診断ページのトグルでOFFにできます。BGM素材を「マイ効果音」で割り当てていない場合は従来どおり音は出ません。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1074',
     date: '2026-07-05',
     summary: 'BGMディレクター+盛り上がり相対閾値',

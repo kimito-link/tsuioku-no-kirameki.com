@@ -1778,6 +1778,30 @@
       ]
     },
     {
+      "file": "src/lib/opSoundEffectDiag.js",
+      "featureCount": 2,
+      "features": [
+        "popup",
+        "status"
+      ],
+      "labels": [
+        "ポップアップ(応援レーン)",
+        "状態速報ページ"
+      ]
+    },
+    {
+      "file": "src/lib/opSoundEffectDiagKey.js",
+      "featureCount": 2,
+      "features": [
+        "popup",
+        "status"
+      ],
+      "labels": [
+        "ポップアップ(応援レーン)",
+        "状態速報ページ"
+      ]
+    },
+    {
       "file": "src/lib/panelMetricsExport.js",
       "featureCount": 2,
       "features": [
@@ -4803,6 +4827,16 @@
     },
     {
       "file": "src/lib/openingFiveMinuteCorrelation.js",
+      "featureCount": 1,
+      "features": [
+        "popup"
+      ],
+      "labels": [
+        "ポップアップ(応援レーン)"
+      ]
+    },
+    {
+      "file": "src/lib/opSoundDirector.js",
       "featureCount": 1,
       "features": [
         "popup"

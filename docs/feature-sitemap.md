@@ -548,7 +548,7 @@
 - **影響範囲ゲート(規律を自動化)** — 星野ロミ式「規律を自動ゲートに」。diff から影響大(複数機能波及)の変更ファイルを検出し波及先機能を列挙。警告のみ(摩擦ゼロ)・--strict で exit1。AGENTS.md §10 のルールを diff 発火に
   - `scripts/impact-check.mjs`
   - `docs/feature-map/impact-map.json`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 46</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 48</summary>
 
 - `api/status.js` — status 受け口 Vercel Serverless Function。
 - `extension/status-guard.js` — 状態速報ページ(status.html)の「何があっても開く」保険。
@@ -559,6 +559,8 @@
 - `src/lib/aiShareDiagSchema.js` — AI 共有診断バンドル（popup が組み立てる JSON / storage の nls_ai_share_fast_diag_v1）の
 - `src/lib/aiShareFastDiagKey.js` — v0.1.629: AI 共有 fastDiag キャッシュの storage key を popup と status ページで共有。
 - `src/lib/aiShareFullText.js` — 状態速報(AI共有)本文ビルダー。②応援ライブビュー/③WEB が同一の status-report builder を
+- `src/lib/bgmPhaseDiag.js` — BGMディレクター(bgmDirector.js)+フェーズディレクター(phaseDirector.js)の観測値を組み立てる
+- `src/lib/bgmPhaseDiagKey.js` — BGMディレクター(bgmDirector.js)+フェーズディレクター(phaseDirector.js・Phase C)の
 - `src/lib/captureAuditionRichviewEventScoreDiagProbe.js` — audition.nicovideo.jp `/embedded/richview/live` 向けの診断ペイロード（PR1）。
 - `src/lib/changelog-archive.js` — 追憶のきらめき 更新履歴アーカイブ（v0.1.663 以前）。
 - `src/lib/changelog.js` — 拡張の更新履歴データと semver 比較ヘルパ。
@@ -658,7 +660,7 @@
   - `src/lib/statusTrendKey.js`
   - `src/extension/status-entry.js`
   - `src/lib/statusActionAdvisor.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 113</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 115</summary>
 
 - `app/app.js` — スマホ閲覧用 status Web 版。
 - `app/live-view.js` — 純Web版 応援ライブビュー（拡張なし・PC/スマホ共通）。
@@ -683,6 +685,7 @@
 - `src/extension/offscreen-entry.js` — feat/multitab-scale-globalcap（2026-05-31）: コメント IDB の「常駐・単一書き手」を担う
 - `src/lib/autoPublishDecision.js` — ③WEB(純Web公開コピー)が古くなる前に自動で再 publish すべきかを判定する純関数(v0.1.1016)。
 - `src/lib/backgroundWatchTab.js` — 「Alt+Tab に出てこない裏 watch タブ(active:false)」の判定。
+- `src/lib/bgmDirector.js` — council/pachinko-ultimate-SYNTHESIS.md §5(BGM設計)+§6 Phase C の実装。
 - `src/lib/buildWatchMetaCardAudienceViewModel.js` — Watch メタカード「観客」ブロック用 ViewModel（DOM 非依存）。
 - `src/lib/chikuranHeaderDom.js` — 「ちくらん風」配信者カードのヘッダー DOM ビルダー。
 - `src/lib/classifyFeatureCategory.js` — ファイルを機能カテゴリへ自動分類する純関数(v0.1.840・マップ網羅化 第1)。
@@ -733,6 +736,7 @@
 - `src/lib/parityVerdict.js` — 3画面パリティ「①POP=②応援プレビュー=③WEBプレビュー が同一で完全か」の総合判定(純関数)。
 - `src/lib/parseEmbeddedDataViewerInfo.js` — v0.1.203 Patch 3: niconico watch ページの `<script id="embedded-data" data-props='{...}'>`
 - `src/lib/parseInterestArrivalComment.js` — ニコ生の興味タグ来場システムコメントをパースする純関数。
+- `src/lib/phaseDirector.js` — council/pachinko-ultimate-SYNTHESIS.md §3(物語弧=決定論ステートマシン)+§6 Phase C の実装。
 - `src/lib/pickLatestComment.js` — ストレージ上のコメント配列の並びは一定でないため、
 - `src/lib/pollUntil.js` — 再読み込み直後など DOM が遅れて現れるまで待つ（純粋な間隔ポーリング）
 - `src/lib/popupBooleanSettingController.js` — popup のブール設定 1 件を管理する純粋コントローラ。
@@ -778,7 +782,7 @@
 
 ## 🧬 修正系譜マップ(この系統のバグを過去にどう直したか)
 
-> changelog 全 409 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
+> changelog 全 411 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
 
 ### 💾 記録件数 (62版)
 - `v0.1.1072` 2026-07-05 — マイ効果音計器をextrasに追加
@@ -1443,7 +1447,8 @@
 - `v0.1.673` 2026-06-10 — コメビュの名前をパネルと同じ情報源で補完
 - `v0.1.670` 2026-06-10 — コメビュのアイコンを本家と同じサムネに
 
-### 🩺 診断・状態速報 (148版)
+### 🩺 診断・状態速報 (149版)
+- `v0.1.1075` 2026-07-05 — パチンコBGMを既定ONに変更
 - `v0.1.1074` 2026-07-05 — BGMディレクター+盛り上がり相対閾値
 - `v0.1.1072` 2026-07-05 — マイ効果音計器をextrasに追加
 - `v0.1.1071` 2026-07-05 — マイ効果音差し替え(IndexedDB取込+割当)
@@ -1722,7 +1727,8 @@
 - `v0.1.840` 2026-06-20 — 機能逆引き地図を全ファイル網羅に
 - `v0.1.835` 2026-06-20 — 自己検証ゲートを追加(版同期+診断文言)
 
-### その他 (17版)
+### その他 (18版)
+- `v0.1.1076` 2026-07-05 — コメント投稿の打ち出し操作音を追加
 - `v0.1.1070` 2026-07-04 — 拡張リロード後の古いタブのエラー表示を抑止
 - `v0.1.968` 2026-06-28 — 内部整理: サマリ推移表の生成をlib抽出
 - `v0.1.944` 2026-06-25 — 共有を押すと「そっくりの画面URL」を大きく表示

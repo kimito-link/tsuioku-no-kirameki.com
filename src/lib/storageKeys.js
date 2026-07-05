@@ -592,14 +592,15 @@ export const KEY_CUSTOM_SOUND_REV = 'nls_custom_sound_rev_v1';
 
 /**
  * Phase C(2026-07-05・council/pachinko-ultimate-SYNTHESIS.md §5.1): BGM(リーチ/フィーバーループ)を
- *   鳴らすか。既定OFF(オプトイン)。effectSoundEnabled(ギフト/広告等の単発効果音)とは別設定
- *   =BGMは「常時鳴ると配信の邪魔」への最終防衛としてユーザーの明示ONを要求する。
+ *   鳴らすか。v0.1.1075: 既定ON(ユーザー明示指示 2026-07-05「常にONにしておいて」)。
+ *   §5.1の「既定OFF」は会議判断だったが、同節の原則「最終防衛はユーザーの意思」に従い
+ *   所有者の意思=ONを既定とする。OFFにしたい場合だけトグルで明示OFF(falseのみ無効)。
  */
 export const KEY_BGM_ENABLED = 'nls_bgm_enabled_v1';
 
 /** @param {unknown} raw */
 export function isBgmEnabled(raw) {
-  return raw === true; // 既定OFF(effectSoundEnabledと逆の既定値)
+  return raw !== false; // 既定ON(明示的にOFFへ倒した時だけ止まる・effectSoundEnabledと同じ向き)
 }
 
 /** BGM音量上限クランプ(§7絶対制約)。bgmDirector.js の BGM_VOLUME_MAX と同値をここにも複製しない
@@ -607,6 +608,19 @@ export function isBgmEnabled(raw) {
 export const KEY_BGM_VOLUME_REACH = 'nls_bgm_volume_reach_v1';
 /** フィーバーループの音量(既定0.15・§5.2)。 */
 export const KEY_BGM_VOLUME_FEVER = 'nls_bgm_volume_fever_v1';
+
+/**
+ * Phase D1(2026-07-05・council/operation-sound-SYNTHESIS.md §4.2): 操作音(op_*・
+ *   コメント投稿の打ち出し音等)を鳴らすか。既定ON(操作音はユーザー自身のジェスチャ起点で
+ *   autoplay制約もなく、確認音を兼ねるため既定ONが妥当。うるさければ1タップでOFF)。
+ *   effectSoundEnabled/isBgmEnabled と同じ向き(明示的にOFFへ倒した時だけ止まる)。
+ */
+export const KEY_OP_SOUND_ENABLED = 'nls_op_sound_enabled_v1';
+
+/** @param {unknown} raw */
+export function isOpSoundEnabled(raw) {
+  return raw !== false; // 既定ON
+}
 
 /** @param {string} liveId lv123 */
 export function commentsStorageKey(liveId) {

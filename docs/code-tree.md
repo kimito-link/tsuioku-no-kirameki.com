@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 2 / 613 件
+## ⚠️ 役割コメントが無いソース 2 / 617 件
 - `src/lib/reportPreviewPublish.js`
 - `src/lib/venueLaneBuckets.js`
 
@@ -524,7 +524,7 @@
   - `gift-impact.mp3`
   - `gift-sparkle.mp3`
   - `gift-whoosh.mp3`
-- 📁 **src/** (1288)
+- 📁 **src/** (1295)
   - 📁 **data/** (6)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -788,7 +788,7 @@
         - `logo_funlink_white_RGB_maru_black.png`
       - `logo_guide_funlink_ol.pdf`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1074)
+  - 📁 **lib/** (1081)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -864,6 +864,11 @@
     - `backfillVisibilityRearm.test.js`
     - `backgroundWatchTab.js` — 「Alt+Tab に出てこない裏 watch タブ(active:false)」の判定。
     - `backgroundWatchTab.test.js`
+    - `bgmDirector.js` — council/pachinko-ultimate-SYNTHESIS.md §5(BGM設計)+§6 Phase C の実装。
+    - `bgmDirector.test.js`
+    - `bgmPhaseDiag.js` — BGMディレクター(bgmDirector.js)+フェーズディレクター(phaseDirector.js)の観測値を組み立てる
+    - `bgmPhaseDiag.test.js`
+    - `bgmPhaseDiagKey.js` — BGMディレクター(bgmDirector.js)+フェーズディレクター(phaseDirector.js・Phase C)の
     - `blobDownload.js` — Blob を指定ファイル名で保存する。
     - `blobDownload.test.js`
     - `broadcastContext.js` — v0.1.793: 「この配信の配信者(broadcaster)情報」を 1 か所で型定義し、storage キー・
@@ -1468,6 +1473,8 @@
     - `personProfiles.test.js`
     - `personTileDom.js` — 人物タイル(丸サムネ＋ID＋ニックネーム)の DOM ビルダー（person-tile-unify 第2コミット・2026-06-17）。
     - `personTileDom.test.js`
+    - `phaseDirector.js` — council/pachinko-ultimate-SYNTHESIS.md §3(物語弧=決定論ステートマシン)+§6 Phase C の実装。
+    - `phaseDirector.test.js`
     - `pickBroadcasterNameForReputation.js` — 評判チェック用に「配信者名」を解決する純関数 (PR R4)
     - `pickBroadcasterNameForReputation.test.js`
     - `pickCommentsForExport.js` — HTML/メディアキットレポート用のコメント集合を選ぶ純関数。

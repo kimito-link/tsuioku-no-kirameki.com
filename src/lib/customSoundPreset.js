@@ -162,6 +162,44 @@ export const CUSTOM_SOUND_PRESET = Object.freeze({
   ]),
   bgm_jingle_win: Object.freeze([
     Object.freeze({ id: 'as_1576401', no: 1576401, title: 'エレキギター勝利ジングル' })
+  ]),
+
+  // ---- §5.1 新設操作音キー(op_*・Phase D1・視聴イベントキーと不共有) ----
+  // council/operation-sound-SYNTHESIS.md §5.1: 既存85本の同一No.を複数キーから参照する
+  //   (IndexedDB assignments は同じ blob id を別キーに割り当て可能=重複購入ゼロ)。
+  //   op_shot_1〜3・op_handle・op_toggle_on/off の専用素材はFreesound CC0で新規調達予定
+  //   (§5.2・凍結解禁待ちではなく当面の調達先)だが、未調達の間はプリセット候補ゼロ=
+  //   マイ効果音UIでは「未割当」表示のまま(音自体は鳴らない=no-path・安全側)。
+  op_handle: Object.freeze([]), // §5.2: mechanical button click short 等(Freesound CC0・未調達)
+  op_shot_1: Object.freeze([]), // §5.2: pinball plunger 等(Freesound CC0・未調達)
+  op_shot_2: Object.freeze([]), // §5.2: pinball launcher 等(Freesound CC0・未調達)
+  op_shot_3: Object.freeze([]), // §5.2: slot machine lever pull 等(Freesound CC0・未調達)
+  op_shot_4: Object.freeze([
+    Object.freeze({ id: 'as_970774', no: 970774, title: 'カキーン(スロット確定音)' })
+  ]),
+  op_self_milestone: Object.freeze([
+    Object.freeze({ id: 'as_371385', no: 371385, title: '特殊シンボル払い出し音' })
+  ]),
+  op_toggle_on: Object.freeze([
+    Object.freeze({ id: 'as_141689', no: 141689, title: 'コインやアイテムなどの獲得音.02' })
+  ]),
+  op_toggle_off: Object.freeze([
+    Object.freeze({ id: 'as_224302', no: 224302, title: 'ピコン(タップ・通知音)' })
+  ]),
+  op_panel_open: Object.freeze([
+    Object.freeze({ id: 'as_141839', no: 141839, title: 'タッチ,クリック音(ピコン)' })
+  ]),
+  op_panel_close: Object.freeze([
+    Object.freeze({ id: 'as_224302', no: 224302, title: 'ピコン(タップ・通知音)' })
+  ]),
+  op_seat: Object.freeze([
+    Object.freeze({ id: 'as_476302', no: 476302, title: 'ピコーン(診断・ボタン音)' })
+  ]),
+  op_copy: Object.freeze([
+    Object.freeze({ id: 'as_134475', no: 134475, title: 'コイン、アイテム獲得 かわいいシンセ' })
+  ]),
+  op_publish: Object.freeze([
+    Object.freeze({ id: 'as_104491', no: 104491, title: 'レジスターの清算音(昭和レジスター)' })
   ])
 });
 
