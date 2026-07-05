@@ -10,7 +10,8 @@ import {
   BASELINE_FLOOR,
   BASELINE_HALF_LIFE_MS,
   WARMUP_MS,
-  REACH_MAX_DWELL_MS
+  REACH_MAX_DWELL_MS,
+  PAYOUT_MAX_DWELL_MS
 } from './phaseDirector.js';
 
 const T = 1_000_000;
@@ -125,6 +126,32 @@ describe('phaseFor 基本遷移', () => {
     expect(stayed.phase).toBe(PHASE.PAYOUT);
     const r = phaseFor(s, 0, { payoutChainDone: true }, T + 100);
     expect(r.phase).toBe(PHASE.NORMAL);
+  });
+
+  // 修正2: BGM OFF/フィーバー未開始/voice_jackpotゲート不通過でpayoutChainDone合図が
+  //   永遠に来ないケースの保険(リーチ120秒上限と同型)。
+  describe('払い出し滞在60秒の無音タイムアウト保険(修正2)', () => {
+    it('payoutChainDoneが来なくても60秒でタイムアウトし通常へ無音降格する', () => {
+      const s = { phase: PHASE.PAYOUT, enteredAt: T, belowOutThresholdSinceMs: 0, highestR: 0, holdLampBand: 0, holdLampBandAtMs: 0 };
+      const r = phaseFor(s, 0, {}, T + PAYOUT_MAX_DWELL_MS);
+      expect(r.phase).toBe(PHASE.NORMAL);
+      expect(r.changed).toBe(true);
+      expect(r.silent).toBe(true); // 偽の解決音を鳴らさない(§7絶対制約)。
+    });
+
+    it('60秒未満はタイムアウトせず留まる', () => {
+      const s = { phase: PHASE.PAYOUT, enteredAt: T, belowOutThresholdSinceMs: 0, highestR: 0, holdLampBand: 0, holdLampBandAtMs: 0 };
+      const r = phaseFor(s, 0, {}, T + PAYOUT_MAX_DWELL_MS - 1);
+      expect(r.phase).toBe(PHASE.PAYOUT);
+      expect(r.changed).toBe(false);
+    });
+
+    it('タイムアウト前にpayoutChainDoneが来れば通常の(非silentな)遷移が優先される', () => {
+      const s = { phase: PHASE.PAYOUT, enteredAt: T, belowOutThresholdSinceMs: 0, highestR: 0, holdLampBand: 0, holdLampBandAtMs: 0 };
+      const r = phaseFor(s, 0, { payoutChainDone: true }, T + PAYOUT_MAX_DWELL_MS);
+      expect(r.phase).toBe(PHASE.NORMAL);
+      expect(r.silent).toBe(false);
+    });
   });
 });
 

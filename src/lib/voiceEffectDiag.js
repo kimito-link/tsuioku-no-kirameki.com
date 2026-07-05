@@ -13,6 +13,7 @@
  *   skippedCap: number,        // キー別上限/1配信合計20回上限でスキップした回数
  *   skippedNarrating: number,  // VOICEVOX発話中スキップの回数(voice_jackpot以外)
  *   skippedVenue: number,      // popup側が会場優先プレゼンスで譲った回数(二重再生ガード)
+ *   skippedUnassigned: number, // 修正1: カスタム未割当キーでゲートstateを消費せず諦めた回数
  *   soundEnabled: boolean,     // 効果音設定が ON か(OFF なら鳴らないのが正常=誤診断防止)
  *   lastKey: string,           // 最後に鳴らした(または鳴らそうとした)ボイスキー
  *   lastEventAt: number        // 最後にボイス発火判定が走った時刻(epoch ms・0=未判定)
@@ -27,6 +28,7 @@ export function makeInitialVoiceEffectDiag() {
     skippedCap: 0,
     skippedNarrating: 0,
     skippedVenue: 0,
+    skippedUnassigned: 0,
     soundEnabled: true,
     lastKey: '',
     lastEventAt: 0
@@ -67,6 +69,7 @@ export function buildVoiceEffectDiagSnapshot(diag, nowMs) {
     skippedCap: num(d.skippedCap, base.skippedCap),
     skippedNarrating: num(d.skippedNarrating, base.skippedNarrating),
     skippedVenue: num(d.skippedVenue, base.skippedVenue),
+    skippedUnassigned: num(d.skippedUnassigned, base.skippedUnassigned),
     soundEnabled: d.soundEnabled !== false,
     lastKey: String(d.lastKey || ''),
     lastEventAt: num(d.lastEventAt, base.lastEventAt),
@@ -88,7 +91,8 @@ export function buildVoiceEffectDiagLines(snap, nowMs) {
   const skippedCap = Number(snap.skippedCap) || 0;
   const skippedNarrating = Number(snap.skippedNarrating) || 0;
   const skippedVenue = Number(snap.skippedVenue) || 0;
-  const total = fired + skippedCooldown + skippedCap + skippedNarrating + skippedVenue;
+  const skippedUnassigned = Number(snap.skippedUnassigned) || 0;
+  const total = fired + skippedCooldown + skippedCap + skippedNarrating + skippedVenue + skippedUnassigned;
   if (total === 0) return []; // 未観測=このセッションでボイストリガが無かった
   const soundEnabled = snap.soundEnabled !== false;
   const now = Number.isFinite(Number(nowMs)) ? Number(nowMs) : 0;
@@ -98,9 +102,12 @@ export function buildVoiceEffectDiagLines(snap, nowMs) {
   const lines = [];
   lines.push(`パチンコボイス: 効果音設定=${soundEnabled ? 'ON' : 'OFF'}${agoText}${lastKeyText}`);
   // スキップの内訳は歯止め(§4)が働いた証拠なので⚠にしない(意図した動き=嘘をつかない)。
+  // 修正1: 未割当は「一度も鳴っていないのにCDスキップ」という嘘を防ぐため別枠で明示する
+  //   (ゲートstateを消費していない=歯止めの動作証明ではなく、単に音源が無いだけ)。
   lines.push(
     `  → 発火${fired} / スキップ CD:${skippedCooldown} 上限:${skippedCap} 読み上げ中:${skippedNarrating}` +
-    (skippedVenue > 0 ? ` 会場優先:${skippedVenue}` : '')
+    (skippedVenue > 0 ? ` 会場優先:${skippedVenue}` : '') +
+    ` / 未割当:${skippedUnassigned}`
   );
   return lines;
 }
