@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1079',
+    date: '2026-07-05',
+    summary: '操作音4種の音源配線漏れを修正',
+    items: Object.freeze([
+      'コメント送信の押下音・打ち出し音(1〜3段)がダウンロード済みなのに鳴らないままだった配線漏れを直しました(ピコリン/メダル投入/玉発射/リール変動開始)。パネルを開く操作にはガチャ扉の音を追加しました。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1078',
     date: '2026-07-05',
     summary: '実物音源のローカル自動同梱+自動割当',

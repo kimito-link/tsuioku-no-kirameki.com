@@ -48,15 +48,18 @@ describe('CUSTOM_SOUND_PRESET(85素材の完全割り当て表)', () => {
     expect(new Set(nos).size).toBe(nos.length);
   });
 
-  it('op_* キーが載っているアセットのNo.は元の85本表に実在する(流用元の裏取り)', () => {
+  it('op_* キーのNo.は元の85本表への流用か、D1追加DL済み5本のどちらかに限られる(裏取り)', () => {
     const originalNos = new Set();
     for (const key of ORIGINAL_85_KEYS) {
       for (const asset of CUSTOM_SOUND_PRESET[key]) originalNos.add(asset.no);
     }
+    // v0.1.1079: D1実装時に Audiostock 定額で追加DLされた操作音5本(計90本)。
+    //   D1でプリセット配線が漏れて無音だったのを修正した際にここへ登録。
+    const d1DownloadedNos = new Set([861221, 1652750, 1260384, 258054, 108443]);
     const opKeys = Object.keys(CUSTOM_SOUND_PRESET).filter((k) => k.startsWith('op_'));
     for (const key of opKeys) {
       for (const asset of CUSTOM_SOUND_PRESET[key]) {
-        expect(originalNos.has(asset.no)).toBe(true);
+        expect(originalNos.has(asset.no) || d1DownloadedNos.has(asset.no)).toBe(true);
       }
     }
   });
@@ -111,19 +114,22 @@ describe('CUSTOM_SOUND_PRESET(85素材の完全割り当て表)', () => {
     }
   });
 
-  it('op_shot_1〜3・op_handle・op_toggle_on/off専用素材は未調達(空配列=no-path・安全側)', () => {
-    for (const key of ['op_handle', 'op_shot_1', 'op_shot_2', 'op_shot_3']) {
-      expect(CUSTOM_SOUND_PRESET[key]).toHaveLength(0);
-    }
+  it('op_handle/op_shot_1〜3はD1追加DL分が配線済み(v0.1.1079の配線漏れ修正を固定)', () => {
+    expect(CUSTOM_SOUND_PRESET.op_handle.map((a) => a.no)).toEqual([861221]);
+    expect(CUSTOM_SOUND_PRESET.op_shot_1.map((a) => a.no)).toEqual([1652750]);
+    expect(CUSTOM_SOUND_PRESET.op_shot_2.map((a) => a.no)).toEqual([1260384]);
+    expect(CUSTOM_SOUND_PRESET.op_shot_3.map((a) => a.no)).toEqual([258054]);
   });
 
-  it('op_shot_4・op_self_milestone・op_toggle_on/off・op_panel_*・op_seat・op_copy・op_publishは既存No.流用で1件ずつ割当済み', () => {
+  it('op_shot_4・op_self_milestone・op_toggle_on/off・op_panel_close・op_seat・op_copy・op_publishは既存No.流用で1件ずつ割当済み', () => {
     for (const key of [
       'op_shot_4', 'op_self_milestone', 'op_toggle_on', 'op_toggle_off',
-      'op_panel_open', 'op_panel_close', 'op_seat', 'op_copy', 'op_publish'
+      'op_panel_close', 'op_seat', 'op_copy', 'op_publish'
     ]) {
       expect(CUSTOM_SOUND_PRESET[key]).toHaveLength(1);
     }
+    // op_panel_open は既存流用+ガチャ扉(D1追加DL)の2変奏(順繰り)。
+    expect(CUSTOM_SOUND_PRESET.op_panel_open.map((a) => a.no)).toEqual([141839, 108443]);
   });
 });
 
@@ -153,10 +159,11 @@ describe('presetIdForNo', () => {
 });
 
 describe('buildPresetNoIndex', () => {
-  it('全85件のNo.が逆引きできる', () => {
+  it('全90件のNo.が逆引きできる(85本+D1追加DL5本・v0.1.1079)', () => {
     const idx = buildPresetNoIndex();
-    expect(idx.size).toBe(85);
+    expect(idx.size).toBe(90);
     expect(idx.get(204361)).toMatchObject({ key: 'gift_large', title: '【キュイーン】パチンコの演出に', id: 'as_204361' });
+    expect(idx.get(1260384)).toMatchObject({ key: 'op_shot_2', id: 'as_1260384' });
   });
 
   it('variantIndexは配列内の宣言順(変奏順)と一致する', () => {
