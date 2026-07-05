@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1085',
+    date: '2026-07-06',
+    summary: 'perf(status): extras読取を1バッチget化',
+    items: Object.freeze([
+      '診断ページ(状態速報)がさらに軽くなりました。補助的な計器データ(17項目)を1件ずつ順番に読み込んでいた処理を、1回のまとめ読みに変更しました。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1084',
     date: '2026-07-06',
     summary: 'perf(status): マイ効果音計器のBlob全件走査を廃止',

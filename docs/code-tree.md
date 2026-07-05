@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 2 / 629 件
+## ⚠️ 役割コメントが無いソース 2 / 630 件
 - `src/lib/reportPreviewPublish.js`
 - `src/lib/venueLaneBuckets.js`
 
@@ -527,7 +527,7 @@
   - `gift-impact.mp3`
   - `gift-sparkle.mp3`
   - `gift-whoosh.mp3`
-- 📁 **src/** (1313)
+- 📁 **src/** (1315)
   - 📁 **data/** (6)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -791,7 +791,7 @@
         - `logo_funlink_white_RGB_maru_black.png`
       - `logo_guide_funlink_ol.pdf`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1099)
+  - 📁 **lib/** (1101)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -1649,6 +1649,8 @@
     - `statCardsMirrorKey.js` — popup 上部の数字カード群(記録N件・推定同時接続・来場者数・公式統計チップ)を status.html に
     - `statusActionAdvisor.js` — status.html「🩹 いま気になる点と対処」解決カードを組み立てる純関数(2026-06-18・COUNCIL status-allinone)。
     - `statusActionAdvisor.test.js`
+    - `statusExtrasBatch.js` — 状態速報「重さ根治 P2」: status-entry.js の extras ブロック(12秒間引き)が単一キー get だけの
+    - `statusExtrasBatch.test.js`
     - `statusFastDiagLite.js` — status.html 用「軽量 fastDiag ダイジェスト」。
     - `statusFastDiagLite.test.js`
     - `statusFormat.js` — status 整形の純関数群。
