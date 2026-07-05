@@ -13,6 +13,7 @@ describe('makeInitialCustomSoundDiag', () => {
     expect(s.totalKeyCount).toBe(0);
     expect(s.rev).toBe(0);
     expect(s.dbAvailable).toBe(false);
+    expect(s.localBundledCount).toBe(0);
   });
 });
 
@@ -55,15 +56,16 @@ describe('buildCustomSoundDiagLine', () => {
     expect(line).toBe('マイ効果音: -(IndexedDB利用不可)');
   });
 
-  it('取込件数/割当キー数/revを1行で表示する', () => {
+  it('ローカル同梱本数/取込件数/割当キー数/revを1行で表示する', () => {
     const snap = buildCustomSoundDiagSnapshot({
+      localBundledCount: 90,
       blobCount: 12,
       assignedKeyCount: 3,
       totalKeyCount: 24,
       rev: 5,
       dbAvailable: true
     });
-    expect(buildCustomSoundDiagLine(snap)).toBe('マイ効果音: 取込12本 / 割当3/24キー / rev5');
+    expect(buildCustomSoundDiagLine(snap)).toBe('マイ効果音: ローカル同梱90本 / IDB取込12本 / 割当3/24キー / rev5');
   });
 
   it('totalKeyCountが0のときは分母を省略する', () => {
@@ -74,6 +76,6 @@ describe('buildCustomSoundDiagLine', () => {
       rev: 0,
       dbAvailable: true
     });
-    expect(buildCustomSoundDiagLine(snap)).toBe('マイ効果音: 取込0本 / 割当0キー / rev0');
+    expect(buildCustomSoundDiagLine(snap)).toBe('マイ効果音: ローカル同梱0本 / IDB取込0本 / 割当0キー / rev0');
   });
 });

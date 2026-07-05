@@ -14,7 +14,9 @@ export default defineConfig({
       'src/**/*.test.js',
       // アーキテクチャレベルの不変条件（レイヤ依存など）は
       // docs/lane-architecture-redesign.md §5 Phase 0 で導入。
-      'tests/contract/**/*.test.js'
+      'tests/contract/**/*.test.js',
+      // scripts/ 配下の純関数テスト(2026-07-05: install-local-sounds.mjs の選別ロジック等)。
+      'scripts/**/*.test.js'
     ]
   }
 });

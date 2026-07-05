@@ -1,6 +1,6 @@
 {
   "name": "nicolivelog",
-  "version": "0.1.1077",
+  "version": "0.1.1078",
   "private": true,
   "description": "ニコ生コメント記録プロトタイプ（拡張）",
   "type": "module",
@@ -16,7 +16,8 @@
     "setup:claude": "node scripts/setup-claude-code.mjs",
     "build": "node scripts/build.mjs",
     "build:watch": "node scripts/build-watch.mjs",
-    "copy:ext": "node scripts/copy-ext.mjs",
+    "copy:ext": "node scripts/copy-ext.mjs && node scripts/install-local-sounds.mjs",
+    "sounds:install": "node scripts/install-local-sounds.mjs",
     "status:live": "node scripts/status-live.mjs",
     "sound:build": "node scripts/build-sounds.mjs",
     "sound:build:all": "node scripts/build-sounds.mjs --normalize-all",

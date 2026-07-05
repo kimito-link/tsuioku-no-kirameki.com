@@ -37,7 +37,7 @@ graph LR
   n_status --> n_src_lib_completenessScore_js["lib/completenessScore.js"]
   n_status --> n_src_lib_copyTextWithFallback_js["lib/copyTextWithFallback.js"]
   n_status --> n_src_lib_customSoundDiag_js["lib/customSoundDiag.js"]
-  n_status --> n_src_lib_customSoundPreset_js["lib/customSoundPreset.js"]
+  n_status --> n_src_lib_customSoundPreset_js["lib/customSoundPreset.js"]:::shared
   n_status --> n_src_lib_customSoundStore_js["lib/customSoundStore.js"]:::shared
   n_status --> n_src_lib_deriveAvatarUrlFromUid_js["lib/deriveAvatarUrlFromUid.js"]:::shared
   n_status --> n_src_lib_diagnosisRegistry_js["lib/diagnosisRegistry.js"]

@@ -26,6 +26,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1078',
+    date: '2026-07-05',
+    summary: '実物音源のローカル自動同梱+自動割当',
+    items: Object.freeze([
+      '手持ちの効果音ファイルを毎回自分で取り込まなくても、この端末上のローカル展開先に置いた音源を自動検出して割り当てるようにしました(取込UIは上書きしたいときだけ使えば十分です)。',
+      '診断ページの「マイ効果音」パネルと状態速報に、ローカル同梱で検出した本数を表示するようにしました。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1077',
     date: '2026-07-05',
     summary: 'ボイス空振り消費とpayout張り付き修正',

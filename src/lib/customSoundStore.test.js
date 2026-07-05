@@ -26,7 +26,9 @@ import {
   buildCustomVariantPathsFromAssignments,
   rotationRngFor,
   _resetRotationCountersForTest,
-  loadCustomSoundRuntimeState
+  loadCustomSoundRuntimeState,
+  loadLocalBundledSoundManifest,
+  buildLocalVariantPaths
 } from './customSoundStore.js';
 
 beforeEach(() => {
@@ -257,5 +259,145 @@ describe('loadCustomSoundRuntimeState(統合ローダ)', () => {
     await loadCustomSoundRuntimeState({ previousUrlsById: previous });
     expect(revokeSpy).toHaveBeenCalledWith('blob:old-url');
     revokeSpy.mockRestore();
+  });
+});
+
+describe('loadLocalBundledSoundManifest(ローカル自動同梱manifestのfetch)', () => {
+  it('fetch成功→id→ファイル名マップを返す', async () => {
+    const fetchImpl = vi.fn(async () => ({
+      ok: true,
+      json: async () => ({ files: { as_204361: 'audiostock_204361.mp3', as_1: 'a.wav' }, count: 2 })
+    }));
+    const getUrl = vi.fn((p) => `chrome-extension://x/${p}`);
+    const result = await loadLocalBundledSoundManifest({ getUrl, fetchImpl });
+    expect(getUrl).toHaveBeenCalledWith('sound/custom/manifest.json');
+    expect(result).toEqual({ as_204361: 'audiostock_204361.mp3', as_1: 'a.wav' });
+  });
+
+  it('fetch失敗(例外)→null', async () => {
+    const fetchImpl = vi.fn(async () => { throw new Error('network error'); });
+    const result = await loadLocalBundledSoundManifest({ getUrl: (p) => p, fetchImpl });
+    expect(result).toBeNull();
+  });
+
+  it('404(ok:false)→null', async () => {
+    const fetchImpl = vi.fn(async () => ({ ok: false }));
+    const result = await loadLocalBundledSoundManifest({ getUrl: (p) => p, fetchImpl });
+    expect(result).toBeNull();
+  });
+
+  it('files欠損の不正JSON→null', async () => {
+    const fetchImpl = vi.fn(async () => ({ ok: true, json: async () => ({ count: 0 }) }));
+    const result = await loadLocalBundledSoundManifest({ getUrl: (p) => p, fetchImpl });
+    expect(result).toBeNull();
+  });
+
+  it('fetch関数が無い環境(fetchImpl未注入・グローバルfetchも無い)→null', async () => {
+    const originalFetch = globalThis.fetch;
+    delete globalThis.fetch;
+    try {
+      const result = await loadLocalBundledSoundManifest({ getUrl: (p) => p });
+      expect(result).toBeNull();
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+});
+
+describe('buildLocalVariantPaths(プリセット×manifest→sound/custom/相対パス)', () => {
+  it('全キーがmanifestで解決できる場合、sound/custom/配下のパス配列になる', () => {
+    const preset = {
+      gift_medium: [{ id: 'as_812926' }, { id: 'as_1587171' }]
+    };
+    const manifestFiles = {
+      as_812926: 'audiostock_812926.mp3',
+      as_1587171: 'audiostock_1587171.wav'
+    };
+    expect(buildLocalVariantPaths(preset, manifestFiles)).toEqual({
+      gift_medium: ['sound/custom/audiostock_812926.mp3', 'sound/custom/audiostock_1587171.wav']
+    });
+  });
+
+  it('manifestに無いid(欠番)は詰めて配列に含めない', () => {
+    const preset = {
+      gift_medium: [{ id: 'as_812926' }, { id: 'as_missing' }, { id: 'as_1587171' }]
+    };
+    const manifestFiles = {
+      as_812926: 'audiostock_812926.mp3',
+      as_1587171: 'audiostock_1587171.wav'
+    };
+    expect(buildLocalVariantPaths(preset, manifestFiles)).toEqual({
+      gift_medium: ['sound/custom/audiostock_812926.mp3', 'sound/custom/audiostock_1587171.wav']
+    });
+  });
+
+  it('キーの全idが未解決なら、そのキー自体を出力に含めない', () => {
+    const preset = { ad: [{ id: 'as_104491' }] };
+    expect(buildLocalVariantPaths(preset, {})).toEqual({});
+  });
+
+  it('manifestFilesがnullなら空オブジェクト(呼び出し側で基底/IDBへフォールバック)', () => {
+    const preset = { gift_medium: [{ id: 'as_812926' }] };
+    expect(buildLocalVariantPaths(preset, null)).toEqual({});
+  });
+});
+
+describe('loadCustomSoundRuntimeState 優先度マージ(IDB割当 > ローカル同梱 > フォールバック)', () => {
+  it('ローカル同梱のみ(manifestあり・IDB割当なし)→ローカル同梱パスが使われ、gainは既定値', async () => {
+    const fetchImpl = vi.fn(async () => ({
+      ok: true,
+      json: async () => ({ files: { as_812926: 'audiostock_812926.mp3', as_1587171: 'audiostock_1587171.wav' } })
+    }));
+    const state = await loadCustomSoundRuntimeState({ getUrl: (p) => p, fetchImpl });
+    expect(state.customVariantPaths.gift_medium).toEqual([
+      'sound/custom/audiostock_812926.mp3',
+      'sound/custom/audiostock_1587171.wav'
+    ]);
+    expect(state.gainFor('gift_medium')).toBe(CUSTOM_SOUND_DEFAULT_GAIN);
+    expect(state.localBundledCount).toBe(2);
+  });
+
+  it('IDB割当がある場合はローカル同梱より優先される(同じキー)', async () => {
+    const db = await openCustomSoundDb();
+    await putSoundBlob(db, { id: 'as_204361', blob: new Blob(['a'], { type: 'audio/mpeg' }), name: 'audiostock_204361.mp3' });
+    await setAssignment(db, 'gift_medium', ['as_204361'], 0.5);
+
+    const fetchImpl = vi.fn(async () => ({
+      ok: true,
+      json: async () => ({ files: { as_812926: 'audiostock_812926.mp3', as_1587171: 'audiostock_1587171.wav' } })
+    }));
+    const state = await loadCustomSoundRuntimeState({ getUrl: (p) => p, fetchImpl });
+    // gift_medium は IDB割当(blob:...)が勝つ。ローカル同梱の sound/custom/... ではない。
+    expect(state.customVariantPaths.gift_medium).toHaveLength(1);
+    expect(state.customVariantPaths.gift_medium[0]).toMatch(/^blob:/);
+    expect(state.gainFor('gift_medium')).toBe(0.5);
+  });
+
+  it('IDB未割当キーはローカル同梱にフォールバックし、gainは既定値のまま', async () => {
+    const db = await openCustomSoundDb();
+    // 別キー(ad)だけIDB割当。gift_mediumはIDB未割当。
+    await putSoundBlob(db, { id: 'as_104491', blob: new Blob(['a']), name: 'a.mp3' });
+    await setAssignment(db, 'ad', ['as_104491'], 0.2);
+
+    const fetchImpl = vi.fn(async () => ({
+      ok: true,
+      json: async () => ({ files: { as_812926: 'audiostock_812926.mp3' } })
+    }));
+    const state = await loadCustomSoundRuntimeState({ getUrl: (p) => p, fetchImpl });
+    expect(state.customVariantPaths.gift_medium).toEqual(['sound/custom/audiostock_812926.mp3']);
+    expect(state.gainFor('gift_medium')).toBe(CUSTOM_SOUND_DEFAULT_GAIN);
+    expect(state.gainFor('ad')).toBe(0.2);
+  });
+
+  it('manifest取得失敗(fetch例外)でもIDB割当は従来どおり機能する', async () => {
+    const db = await openCustomSoundDb();
+    await putSoundBlob(db, { id: 'as_1', blob: new Blob(['a']), name: 'a.mp3' });
+    await setAssignment(db, 'ad', ['as_1'], 0.9);
+    const fetchImpl = vi.fn(async () => { throw new Error('boom'); });
+
+    const state = await loadCustomSoundRuntimeState({ getUrl: (p) => p, fetchImpl });
+    expect(state.localBundledCount).toBe(0);
+    expect(state.customVariantPaths.ad).toHaveLength(1);
+    expect(state.gainFor('ad')).toBe(0.9);
   });
 });

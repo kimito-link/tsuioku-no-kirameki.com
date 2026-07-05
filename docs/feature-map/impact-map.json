@@ -392,6 +392,22 @@
       ]
     },
     {
+      "file": "src/lib/customSoundPreset.js",
+      "featureCount": 4,
+      "features": [
+        "content",
+        "popup",
+        "status",
+        "venue"
+      ],
+      "labels": [
+        "記録エンジン(watchページ常駐)",
+        "ポップアップ(応援レーン)",
+        "状態速報ページ",
+        "会場モード(standalone)"
+      ]
+    },
+    {
       "file": "src/lib/customSoundStore.js",
       "featureCount": 4,
       "features": [
@@ -3337,16 +3353,6 @@
     },
     {
       "file": "src/lib/customSoundDiag.js",
-      "featureCount": 1,
-      "features": [
-        "status"
-      ],
-      "labels": [
-        "状態速報ページ"
-      ]
-    },
-    {
-      "file": "src/lib/customSoundPreset.js",
       "featureCount": 1,
       "features": [
         "status"
