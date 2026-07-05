@@ -431,6 +431,7 @@
 | `src/lib/htmlReportConceptGuide.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/iframeOfficialDomFromRelay.js` | 1 | 記録エンジン(watchページ常駐) |
 | `src/lib/inferBroadcasterUserIdFromComments.js` | 1 | ポップアップ(応援レーン) |
+| `src/lib/inFlightGuard.js` | 1 | 状態速報ページ |
 | `src/lib/initShadeFailsafe.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/inlineBelowWideRowInsert.js` | 1 | 記録エンジン(watchページ常駐) |
 | `src/lib/inlineFirstPaintGate.js` | 1 | 記録エンジン(watchページ常駐) |
@@ -464,6 +465,7 @@
 | `src/lib/liveviewPublishOutcome.js` | 1 | 状態速報ページ |
 | `src/lib/liveviewPublishOutcomeKey.js` | 1 | 状態速報ページ |
 | `src/lib/liveviewPublishSelfDiag.js` | 1 | 状態速報ページ |
+| `src/lib/liveViewPublishSignature.js` | 1 | 状態速報ページ |
 | `src/lib/loadLastBroadcastSummary.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/longTaskTracker.js` | 1 | 記録エンジン(watchページ常駐) |
 | `src/lib/mangaBroadcastSummary.js` | 1 | ポップアップ(応援レーン) |

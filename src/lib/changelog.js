@@ -26,6 +26,22 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1087',
+    date: '2026-07-06',
+    summary: 'perf(status): 変化なしpublishのset省略',
+    items: Object.freeze([
+      '診断ページ(状態速報)から純Web版へ送るデータが前回と同じ内容のときは、無駄な書き込みをしないようにしました。'
+    ])
+  }),
+  Object.freeze({
+    version: '0.1.1086',
+    date: '2026-07-06',
+    summary: 'perf(status): 幽霊read抑止のin-flightガード',
+    items: Object.freeze([
+      '診断ページ(状態速報)の裏側で、時間切れになった読み込みが裏で残り続けて次の更新と重なる問題を防ぐガードを追加しました。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1085',
     date: '2026-07-06',
     summary: 'perf(status): extras読取を1バッチget化',
