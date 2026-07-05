@@ -115,6 +115,13 @@ const DEMOTE_HOLD_MS = 60_000;
 export const REACH_MAX_DWELL_MS = 120_000;
 
 /**
+ * 払い出し(PAYOUT)滞在の無音タイムアウト(ms)。BGM無効時/フィーバー未開始時、または
+ *   voice_jackpotゲートが通らずチェーン自体が走らなかった場合、payoutChainDone合図が
+ *   永遠に来ずPAYOUTへ張り付く不具合の保険(リーチ120秒上限と同型・§3.3「払い出し→通常」)。
+ */
+export const PAYOUT_MAX_DWELL_MS = 60_000;
+
+/**
  * @typedef {{
  *   phase: string,                 // PHASE.* のいずれか
  *   enteredAt: number,             // 現フェーズに入った時刻(epoch ms)
@@ -246,6 +253,9 @@ export function phaseFor(state, R, events, nowMs) {
   // 払い出し→通常: 呼び出し側がpayoutChainDone合図を明示するまで留まる(BGM/フィーバー管理はbgmDirector側)。
   if (phase === PHASE.PAYOUT) {
     if (ev.payoutChainDone) return transition(PHASE.NORMAL, false); // フィーバー終了=通常へ(音は呼び出し側が§5で鳴らす)
+    // 保険: BGM OFF/フィーバー未開始やvoice_jackpotゲート不通過でチェーンが走らず合図が
+    //   永遠に来ないケースの無音タイムアウト(リーチ120秒上限と同型)。
+    if (now - enteredAt >= PAYOUT_MAX_DWELL_MS) return transition(PHASE.NORMAL, true);
     return stay();
   }
 

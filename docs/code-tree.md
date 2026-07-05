@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 2 / 617 件
+## ⚠️ 役割コメントが無いソース 2 / 620 件
 - `src/lib/reportPreviewPublish.js`
 - `src/lib/venueLaneBuckets.js`
 
@@ -524,7 +524,7 @@
   - `gift-impact.mp3`
   - `gift-sparkle.mp3`
   - `gift-whoosh.mp3`
-- 📁 **src/** (1295)
+- 📁 **src/** (1300)
   - 📁 **data/** (6)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -788,7 +788,7 @@
         - `logo_funlink_white_RGB_maru_black.png`
       - `logo_guide_funlink_ol.pdf`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1081)
+  - 📁 **lib/** (1086)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -1443,6 +1443,11 @@
     - `officialNicoStatsStripDigest.test.js`
     - `officialStatsWindow.js` — at?: number|null,
     - `officialStatsWindow.test.js`
+    - `opSoundDirector.js` — 操作音(パチンコの「玉の打ち出し」比喩・council/operation-sound-SYNTHESIS.md Phase D1)の
+    - `opSoundDirector.test.js`
+    - `opSoundEffectDiag.js` — 操作音(opSoundDirector.js・Phase D1)の「押下→成功→発音」観測値を組み立てる純関数群。
+    - `opSoundEffectDiag.test.js`
+    - `opSoundEffectDiagKey.js` — 操作音(opSoundDirector.js・Phase D1)の「押下/成功/発音」観測値を
     - `openingFiveMinuteCorrelation.js` — L13: 冒頭 5 分の予兆 → ピーク CPM 相関（散布図用）。
     - `openingFiveMinuteCorrelation.test.js`
     - `ownPostedUserIdSet.js` — v0.1.773: 「自分が投稿した userId」の集合を1パスで作る純関数。

@@ -43,6 +43,24 @@ export const VOICE_KEY_LIMITS = Object.freeze({
 export const VOICE_NARRATING_EXEMPT_KEY = 'voice_jackpot';
 
 /**
+ * 修正1(状態速報で確定した不具合): voice_*キーは effectSoundPlayer.js に同梱の合成音フォールバック
+ *   を持たない新設キー(customSoundPreset.js経由のマイ効果音でのみ鳴る)。従来はvoiceGateが
+ *   allowedを返してCD/カウンタを消費した後、playEffectSoundが'no-path'(未割当)で無音に終わって
+ *   いた=「一度も鳴っていないのにCDスキップ30」という嘘の状態を生む根本原因だった。
+ *   ゲート判定の前にこの関数でキーが割当済みかを確認し、未割当ならゲートstateを一切消費せず
+ *   早期returnする(呼び出し側の責務・§本体)。
+ * @param {string} key voice_*等のキー
+ * @param {Readonly<Record<string, ReadonlyArray<string>>>|null|undefined} customVariantPaths
+ *   customSoundStore.loadCustomSoundRuntimeState() が返す customVariantPaths(割当済みキーのみ含む)。
+ * @returns {boolean} true=このキーはカスタム未割当(鳴らせない=ゲートを消費せず諦めるべき)
+ */
+export function isUnassignedVoiceKey(key, customVariantPaths) {
+  const paths = customVariantPaths && typeof customVariantPaths === 'object' ? customVariantPaths : {};
+  const variants = paths[String(key)];
+  return !(Array.isArray(variants) && variants.length > 0);
+}
+
+/**
  * @typedef {{
  *   liveId: string,                          // このstateが対象にしているliveId('' = 未設定)
  *   totalFired: number,                      // この配信で鳴らした合計回数(1配信20回上限用)

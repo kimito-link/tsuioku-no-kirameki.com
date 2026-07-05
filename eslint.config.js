@@ -169,8 +169,13 @@ export default [
     //   triggerOpSoundShotSuccess・submitComment/トグル/コピー/公開ボタンへの1行フック=
     //   chrome.storage/DOMのグルー=lib抽出不可。純関数本体は src/lib/opSoundDirector.js・
     //   opSoundEffectDiag.js にテスト付きで隔離済み)を追加=20519→20663。ラチェットは実測+50の20713へ。
+    //   v0.1.1077: 状態速報で確定した不具合の修正(ボイスゲート空振り消費防止/payout張り付き
+    //   フォールバック/フェーズチップ追加=isUnassignedVoiceKey判定・schedulePayoutFallbackPopup・
+    //   paintPhaseMeterPopup/triggerPhaseMeterPulsePopup。DOM/タイマー/chrome.storageのグルーで
+    //   lib抽出不可。純関数本体はvoiceDirector.js・phaseDirector.jsにテスト付きで隔離済み)を
+    //   追加=20663→20789。ラチェットは実測+50の20839へ。
     files: ['src/extension/popup-entry.js'],
-    rules: { 'max-lines': ['error', { max: 20713, skipBlankLines: false, skipComments: false }] }
+    rules: { 'max-lines': ['error', { max: 20839, skipBlankLines: false, skipComments: false }] }
   },
   {
     files: ['src/extension/popup/**/*.js'],

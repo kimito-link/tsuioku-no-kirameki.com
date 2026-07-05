@@ -14,6 +14,7 @@ describe('makeInitialVoiceEffectDiag', () => {
     expect(d.skippedCap).toBe(0);
     expect(d.skippedNarrating).toBe(0);
     expect(d.skippedVenue).toBe(0);
+    expect(d.skippedUnassigned).toBe(0);
     expect(d.soundEnabled).toBe(true);
     expect(d.lastKey).toBe('');
     expect(d.lastEventAt).toBe(0);
@@ -100,5 +101,20 @@ describe('buildVoiceEffectDiagLines', () => {
     const snap = buildVoiceEffectDiagSnapshot({ fired: 1, soundEnabled: false }, 1);
     const lines = buildVoiceEffectDiagLines(snap, 1);
     expect(lines[0]).toContain('OFF');
+  });
+
+  // 修正1: 未割当は「一度も鳴っていないのにCDスキップ」という嘘を防ぐため常に内訳へ表示する。
+  it('未割当が有る時は内訳に「未割当:N」を出す(発火0でも未観測扱いにしない)', () => {
+    const snap = buildVoiceEffectDiagSnapshot({ skippedUnassigned: 30 }, 1000);
+    const lines = buildVoiceEffectDiagLines(snap, 1000);
+    expect(lines).toHaveLength(2);
+    expect(lines[1]).toContain('発火0');
+    expect(lines[1]).toContain('未割当:30');
+  });
+
+  it('未割当が0の時も「未割当:0」を明記する(嘘をつかない=省略しない)', () => {
+    const snap = buildVoiceEffectDiagSnapshot({ fired: 2 }, 1000);
+    const lines = buildVoiceEffectDiagLines(snap, 1000);
+    expect(lines[1]).toContain('未割当:0');
   });
 });

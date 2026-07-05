@@ -7,7 +7,8 @@ import {
   planJackpotChain,
   VOICE_GLOBAL_COOLDOWN_MS,
   VOICE_GLOBAL_CAP_PER_LIVE,
-  VOICE_KEY_LIMITS
+  VOICE_KEY_LIMITS,
+  isUnassignedVoiceKey
 } from './voiceDirector.js';
 
 describe('makeInitialVoiceGateState', () => {
@@ -241,5 +242,36 @@ describe('チェーン計画関数(直列であること)', () => {
       expect(typeof step.kind).toBe('string');
       expect(Number.isFinite(step.delayMs)).toBe(true);
     }
+  });
+});
+
+// 修正1(状態速報で確定した不具合): voice_*はマイ効果音でのみ鳴る新設キー(effectSoundPlayer.js
+//   同梱の合成音フォールバックを持たない)。未割当キーはゲートを消費せず諦めるべき(§本体)。
+describe('isUnassignedVoiceKey(修正1)', () => {
+  it('customVariantPathsにキーが無ければ未割当(true)', () => {
+    expect(isUnassignedVoiceKey('voice_chance', {})).toBe(true);
+    expect(isUnassignedVoiceKey('voice_chance', null)).toBe(true);
+    expect(isUnassignedVoiceKey('voice_chance', undefined)).toBe(true);
+  });
+
+  it('空配列は未割当扱い(安全側)', () => {
+    expect(isUnassignedVoiceKey('voice_chance', { voice_chance: [] })).toBe(true);
+  });
+
+  it('1件以上の配列があれば割当済み(false)', () => {
+    expect(isUnassignedVoiceKey('voice_chance', { voice_chance: ['blob:abc'] })).toBe(false);
+  });
+
+  it('他キーの割当は無関係(該当キーだけを見る)', () => {
+    expect(isUnassignedVoiceKey('voice_jackpot', { voice_chance: ['blob:abc'] })).toBe(true);
+  });
+});
+
+describe('voiceGate自体はunassigned判定を持たない(呼び出し側の責務であることの確認)', () => {
+  it('voiceGateはcustomVariantPathsを見ないので、未割当でも通常どおりallowedを返す', () => {
+    // 呼び出し側(venueBar.js/popup-entry.js)がisUnassignedVoiceKeyで先に諦めることで
+    //   ゲートstateの消費を防ぐ構造(voiceGate自体は音源の有無を知らない決定論の純関数のまま)。
+    const r = voiceGate(makeInitialVoiceGateState(), 'voice_jackpot', 1000, { liveId: 'lv1' });
+    expect(r.allowed).toBe(true);
   });
 });

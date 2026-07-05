@@ -3,7 +3,8 @@ import {
   makeInitialGiftEffectDiag,
   buildGiftEffectDiagSnapshot,
   buildGiftEffectDiagLines,
-  giftEffectDiagToActionCards
+  giftEffectDiagToActionCards,
+  giftSoundDiagFieldForPlayResult
 } from './giftEffectDiag.js';
 
 describe('makeInitialGiftEffectDiag', () => {
@@ -136,5 +137,66 @@ describe('v0.1.1061: バースト置換(giftSoundCoalesced)の勘定', () => {
     const lines = buildGiftEffectDiagLines(snap, 1000);
     expect(lines.some((l) => l.includes('⚠2件鳴っていない'))).toBe(true);
     expect(giftEffectDiagToActionCards(snap).some((c) => c.id === 'gift-effect-sound-missing-gift')).toBe(true);
+  });
+});
+
+// 修正3: guarded(同種600msガード)/noPath(未割当)/error(再生失敗)の内訳で
+//   「⚠N件鳴っていない」の内訳不明を解消する。
+describe('修正3: giftSoundDiagFieldForPlayResult', () => {
+  it('guarded/no-path/error をそれぞれのフィールド名に変換する', () => {
+    expect(giftSoundDiagFieldForPlayResult('guarded')).toBe('giftSoundGuarded');
+    expect(giftSoundDiagFieldForPlayResult('no-path')).toBe('giftSoundNoPath');
+    expect(giftSoundDiagFieldForPlayResult('error')).toBe('giftSoundError');
+  });
+  it('played/未知の値はnull(呼び出し側が別枠で扱う・数えない)', () => {
+    expect(giftSoundDiagFieldForPlayResult('played')).toBeNull();
+    expect(giftSoundDiagFieldForPlayResult('unknown')).toBeNull();
+    expect(giftSoundDiagFieldForPlayResult(undefined)).toBeNull();
+  });
+});
+
+describe('修正3: guarded/noPath/errorの内訳で取りこぼしを説明する', () => {
+  it('初期stateは3フィールドとも0', () => {
+    const s = makeInitialGiftEffectDiag();
+    expect(s.giftSoundGuarded).toBe(0);
+    expect(s.giftSoundNoPath).toBe(0);
+    expect(s.giftSoundError).toBe(0);
+  });
+
+  it('ガード4件で説明できれば⚠にせず内訳「ガード4」を表示する(投擲27=音27相当のケース)', () => {
+    // ユーザー報告の症状: 検知48→演出48→音27(+置換17)⚠4件鳴っていない、を再現。
+    //   27+17+4=48で内訳が揃う=ガードの4件が原因と特定できるケース。
+    const snap = buildGiftEffectDiagSnapshot(
+      { giftDetected: 48, giftThrown: 48, giftSoundPlayed: 27, giftSoundCoalesced: 17, giftSoundGuarded: 4 },
+      1000
+    );
+    const lines = buildGiftEffectDiagLines(snap, 1000);
+    const giftLine = lines.find((l) => l.includes('ギフト:'));
+    expect(giftLine).toContain('音27(+置換17) ✅');
+    expect(giftLine).toContain('ガード4');
+    expect(giftLine).not.toContain('⚠');
+    expect(giftEffectDiagToActionCards(snap).some((c) => c.id === 'gift-effect-sound-missing-gift')).toBe(false);
+  });
+
+  it('noPath/errorも内訳として明記される', () => {
+    const snap = buildGiftEffectDiagSnapshot(
+      { giftDetected: 10, giftThrown: 10, giftSoundPlayed: 7, giftSoundNoPath: 2, giftSoundError: 1 },
+      1000
+    );
+    const lines = buildGiftEffectDiagLines(snap, 1000);
+    const giftLine = lines.find((l) => l.includes('ギフト:'));
+    expect(giftLine).toContain('未割当2');
+    expect(giftLine).toContain('エラー1');
+    expect(giftLine).not.toContain('⚠');
+  });
+
+  it('内訳で説明できない残りがあれば⚠は消えない(件数が本当に合わない時だけ警告)', () => {
+    // 検知/演出10・音5・ガード2 → 説明できるのは5+2=7、残り3件は不明=⚠のまま。
+    const snap = buildGiftEffectDiagSnapshot(
+      { giftDetected: 10, giftThrown: 10, giftSoundPlayed: 5, giftSoundGuarded: 2 },
+      1000
+    );
+    const lines = buildGiftEffectDiagLines(snap, 1000);
+    expect(lines.some((l) => l.includes('⚠3件鳴っていない'))).toBe(true);
   });
 });
