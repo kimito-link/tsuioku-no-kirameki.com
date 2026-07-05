@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1081',
+    date: '2026-07-06',
+    summary: 'コミット漏れimport検査を追加',
+    items: Object.freeze([
+      '開発品質の改善(不具合の再発防止): リリース前チェックを強化しました。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1080',
     date: '2026-07-05',
     summary: '拡張リロード後の旧タブ黙過ガード追加',
