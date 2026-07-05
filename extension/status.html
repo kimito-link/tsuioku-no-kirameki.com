@@ -427,6 +427,24 @@
       body.tab-chikuran .guidepost,
       body.tab-chikuran .share-hero { display: none; }
       /* 診断タブ時はちくらん見出しの「全画面」感を出さない(通常レーン)。livesLane は両方で表示。 */
+      /* リリース工程ガード「版混在検知」バナー(2026-07-06): popup.html の
+         .nl-extension-context-banner と同じ見た目(色/枠)を status.html にも用意する。
+         status.html は popup.html の CSS を継承しないため、ここで最小限だけ複製する。 */
+      .nl-extension-context-banner {
+        display: none;
+        margin: 0 0 12px;
+        padding: 10px 12px;
+        font-size: 13px;
+        line-height: 1.5;
+        color: #1e3a5f;
+        background: #e8f2ff;
+        border: 1px solid #93c5fd;
+        border-radius: 8px;
+        word-break: break-word;
+      }
+      .nl-extension-context-banner:not([hidden]) {
+        display: block;
+      }
       /* 健全度パネル: 正常は淡い緑、異常(黄/赤)だけ目を引く。対象外は灰の「—」。 */
       section.health-panel { margin: 0 0 14px; }
       .health-cells {
@@ -866,6 +884,20 @@
       <span class="status-meta" id="metaLastUpdate">最終更新 —</span>
       <span class="status-meta" id="metaAutoRefresh">自動更新: 2秒</span>
     </header>
+
+    <!--
+      版混在検知バナー(2026-07-06): 未パック拡張は「本体(manifest/SW)=リロード時のまま、
+      このページ=ディスクの新ファイルを都度読む」ため、配信中に copy:ext でディスクを
+      差し替えると新旧混在ランタイムになる。DOM は一度作ったら remove せず hidden 切替
+      (status-guard.js の流儀に倣う)。
+    -->
+    <div
+      id="nlVersionMismatchBanner"
+      class="nl-extension-context-banner"
+      role="alert"
+      aria-live="assertive"
+      hidden
+    ></div>
 
     <nav class="map-nav" aria-label="地図ナビ">
       <a class="nav-item" href="https://htmlpreview.github.io/?https://raw.githubusercontent.com/kimito-link/tsuioku-no-kirameki.com/master/docs/feature-sitemap.html" target="_blank" rel="noopener">🧠 機能マップ</a>

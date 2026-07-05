@@ -10237,6 +10237,19 @@
           >このパネルを再読み込み</button>
         </p>
       </div>
+      <!--
+        版混在検知バナー(2026-07-06): 未パック拡張は「本体(manifest/SW)=リロード時のまま、
+        このページ=ディスクの新ファイルを都度読む」ため、配信中に copy:ext でディスクを
+        差し替えると新旧混在ランタイムになる(実測: 本体1077+ページ1080でコメント送信不可)。
+        DOM は一度作ったら remove せず hidden 切替(status-guard.js の流儀に倣う)。
+      -->
+      <div
+        id="nlVersionMismatchBanner"
+        class="nl-extension-context-banner"
+        role="alert"
+        aria-live="assertive"
+        hidden
+      ></div>
 
       <!--
         旧配置: stat card 群の上に full-width 帯として配信者情報（icon + name + フォロー）を出していた。

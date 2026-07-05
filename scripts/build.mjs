@@ -1,4 +1,7 @@
 import * as esbuild from 'esbuild';
+import { readFileSync } from 'node:fs';
+import { resolve, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 // .env を読み込む(status の共有キー NL_STATUS_INGEST_KEY / NL_STATUS_VIEW_TOKEN は .env から注入)。
 //   ★これが無いと `npm run build` が空キービルドになり、status の「WEBサイトURLで共有」ボタンが
@@ -27,6 +30,14 @@ function buildIdJst() {
 
 const BUILD_ID = buildIdJst();
 
+// リリース工程ガード「版混在の実行時検知」(2026-07-06): 未パック拡張は「本体(manifest/SW/
+//   content script)=リロード時のまま、拡張ページ/iframe=ディスクの新ファイルを都度読む」ため、
+//   配信中に copy:ext でディスクを差し替えると新旧混在ランタイムになる(実測: 本体1077+ページ1080)。
+//   package.json の version をそのままバンドルへ焼き込み、実行時に chrome.runtime.getManifest()
+//   の version と突合できるようにする(src/lib/versionMismatch.js)。
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const PKG_VERSION = JSON.parse(readFileSync(resolve(__dirname, '..', 'package.json'), 'utf8')).version;
+
 const common = {
   bundle: true,
   format: 'iife',
@@ -42,7 +53,12 @@ const common = {
   // NL_DEV_HOTRELOAD: 本番ビルドは false 固定。content の dev ホットリロード/記録監視
   //   コードは `if (NL_DEV_HOTRELOAD)` ガード内にあり、false 注入で esbuild が dead-code
   //   除去するため、配布版には一切含まれない（dev 専用機能の混入防止）。
-  define: { NL_BUILD_ID: JSON.stringify(BUILD_ID), NL_DEV_HOTRELOAD: 'false' }
+  // NL_BUNDLE_VERSION: このバンドルをビルドした時点の package.json version(版混在検知用)。
+  define: {
+    NL_BUILD_ID: JSON.stringify(BUILD_ID),
+    NL_DEV_HOTRELOAD: 'false',
+    NL_BUNDLE_VERSION: JSON.stringify(PKG_VERSION)
+  }
 };
 
 // v0.1.857: NL_RELEASE。配布(release)ビルドでは status の「生診断JSON/全文共有ボタン/AI共有欄」
@@ -53,7 +69,8 @@ const IS_RELEASE = process.env.NL_RELEASE === '1' || process.env.NL_RELEASE === 
 const popupDefine = {
   NL_BUILD_ID: JSON.stringify(BUILD_ID),
   NL_DEV_HOTRELOAD: 'false',
-  NL_RELEASE: JSON.stringify(IS_RELEASE)
+  NL_RELEASE: JSON.stringify(IS_RELEASE),
+  NL_BUNDLE_VERSION: JSON.stringify(PKG_VERSION)
 };
 
 // status ページのアップロード機能に渡すキー。ソース直書きを避け、環境変数(.env)から注入。
