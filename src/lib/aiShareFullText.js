@@ -41,6 +41,8 @@ import { buildCustomSoundDiagLine } from './customSoundDiag.js';
 import { buildVoiceEffectDiagLines } from './voiceEffectDiag.js';
 import { buildBgmPhaseDiagLines } from './bgmPhaseDiag.js';
 import { buildOpSoundEffectDiagLines } from './opSoundEffectDiag.js';
+// 感度パッチ(2026-07-06): コメント送信(所要ms/結果/フレーム試行回数)計器(extras 12秒間引き)をAI共有本文にも併記。
+import { buildCommentPostDiagLines } from './commentPostDiag.js';
 import { reportPreviewCtxFromFastDiag } from './reportPreviewCtx.js';
 import { buildReportPreviewLines } from './reportPreview.js';
 import { buildStatusActions } from './statusActionAdvisor.js';
@@ -74,7 +76,7 @@ export function formatRefreshPerfLine(refreshPerf) {
  * @param {any} args
  * @returns {string}
  */
-export function buildAiShareFullText({ overviewText, livesData, fastDiag, popupDiag, voiceDiag, venueSeatsDiag, laneDiag, laneMirror, reportPreview, trendFindings, jsonBlob, currentLiveId, publishKeys, publishOutcomeRec, previewRenderAck, refreshPerf, giftEffectDiag, milestoneEffectDiag, customSoundDiag, voiceEffectDiag, bgmPhaseDiag, opSoundEffectDiag }) {
+export function buildAiShareFullText({ overviewText, livesData, fastDiag, popupDiag, voiceDiag, venueSeatsDiag, laneDiag, laneMirror, reportPreview, trendFindings, jsonBlob, currentLiveId, publishKeys, publishOutcomeRec, previewRenderAck, refreshPerf, giftEffectDiag, milestoneEffectDiag, customSoundDiag, voiceEffectDiag, bgmPhaseDiag, opSoundEffectDiag, commentPostDiag }) {
   const lines = [];
   lines.push('## 君斗りんくの追憶のきらめき 状態速報');
   lines.push(`生成: ${new Date().toISOString()}`);
@@ -265,6 +267,13 @@ export function buildAiShareFullText({ overviewText, livesData, fastDiag, popupD
     try {
       const oLines = buildOpSoundEffectDiagLines(opSoundEffectDiag, Date.now());
       for (const l of oLines) lines.push(l);
+    } catch {
+      /* no-op */
+    }
+    // 感度パッチ(2026-07-06): コメント送信(所要ms/結果/フレーム試行回数)観測値(未観測なら空=ノイズにしない)。
+    try {
+      const cpLines = buildCommentPostDiagLines(commentPostDiag, Date.now());
+      for (const l of cpLines) lines.push(l);
     } catch {
       /* no-op */
     }

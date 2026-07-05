@@ -12,10 +12,11 @@
 - **コメント送信(確認/プロファイル)** — 拡張から watch のコメント欄へ送信し、入力欄の変化で成功を推定。送信経路の手元プロファイルも
   - `src/lib/commentSubmitConfirm.js`
   - `src/lib/commentSubmitProfiling.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 10</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 11</summary>
 
 - `src/lib/commentComposeShortcuts.js` — コメント欄の Enter 系キーで送信するか／既定動作に任せるか。
 - `src/lib/commentKindnessNudge.js` — 送信前コメントの攻撃的表現を検知し「やさしく一言」確認を促す純ロジック。
+- `src/lib/commentPostDeadline.js` — コメント送信(requestPostCommentToOpenTab)全体を総締切で有界化する純関数。
 - `src/lib/commentPostDom.js` — コメント送信ボタン探索を、同一フォーム/近傍スコープを優先して行う。
 - `src/lib/commentPostRetriable.js` — popup のコメント送信で、別 frameId を試す価値があるか（8s 走査を避ける判定）。
 - `src/lib/commentPostUi.js` — ポップアップのコメント送信 UI を、watch 接続状態と入力状態から一貫して決める。
@@ -548,7 +549,7 @@
 - **影響範囲ゲート(規律を自動化)** — 星野ロミ式「規律を自動ゲートに」。diff から影響大(複数機能波及)の変更ファイルを検出し波及先機能を列挙。警告のみ(摩擦ゼロ)・--strict で exit1。AGENTS.md §10 のルールを diff 発火に
   - `scripts/impact-check.mjs`
   - `docs/feature-map/impact-map.json`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 50</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 52</summary>
 
 - `api/status.js` — status 受け口 Vercel Serverless Function。
 - `extension/status-guard.js` — 状態速報ページ(status.html)の「何があっても開く」保険。
@@ -569,6 +570,8 @@
 - `src/lib/commentCountProvenance.js` — 「数字の出どころ（何を数えているか）」を状態速報に事実として出す（council/comment-count-provenance-question.txt）。
 - `src/lib/commentPanelHealthProbe.js` — ニコ生の watch ページでコメント欄が「見えない／届かない」状態を検出し、
 - `src/lib/commentPanelStatus.js` — コメントパネル検出失敗（DOM 変更等）をポップアップ向けに解釈する純関数
+- `src/lib/commentPostDiag.js` — コメント送信(requestPostCommentToOpenTab)の「所要ms/結果/リトライ回数」観測値を
+- `src/lib/commentPostDiagKey.js` — コメント送信(requestPostCommentToOpenTab)の「所要ms/結果/リトライ回数」観測値を
 - `src/lib/commentPostStatusPresentation.js` — コメント送信 UI の「最終ステータス表示」と aria-describedby を決める純関数群。
 - `src/lib/customSoundDiag.js` — 「マイ効果音」(customSoundStore.js・Phase A)の取込状況を状態速報 extras(12秒間引き)に
 - `src/lib/diagnosisRegistry.js` — 状態速報「網羅的完全性診断」の【真実の源泉(Source of Truth)】。
@@ -791,7 +794,7 @@
 
 ## 🧬 修正系譜マップ(この系統のバグを過去にどう直したか)
 
-> changelog 全 417 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
+> changelog 全 418 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
 
 ### 💾 記録件数 (63版)
 - `v0.1.1077` 2026-07-05 — ボイス空振り消費とpayout張り付き修正
@@ -1350,7 +1353,8 @@
 - `v0.1.699` 2026-06-12 — 読み上げの名前ON/OFF切替を追加
 - `v0.1.698` 2026-06-12 — コメビュにユーザー別の声で読み上げ機能を追加
 
-### 🪟 応援レーン・タイル (110版)
+### 🪟 応援レーン・タイル (111版)
+- `v0.1.1083` 2026-07-06 — fix(post): 送信5秒締切+自コメ取り消しの厳格化
 - `v0.1.1077` 2026-07-05 — ボイス空振り消費とpayout張り付き修正
 - `v0.1.1055` 2026-07-04 — 診断シートの網羅漏れ2件を修正+ギフト診断を数値化
 - `v0.1.1052` 2026-07-04 — 応援レーンの人数表示ズレ(埋め込み211人≠公開ページ99人)を修正
@@ -1630,7 +1634,8 @@
 - `v0.1.825` 2026-06-19 — 記録された内部エラーを状態速報の対処カードに集約
 - `v0.1.823` 2026-06-18 — 状態速報に全体マインドマップを追加(1枚で俯瞰)
 
-### 🧊 storage安定 (5版)
+### 🧊 storage安定 (6版)
+- `v0.1.1083` 2026-07-06 — fix(post): 送信5秒締切+自コメ取り消しの厳格化
 - `v0.1.1020` 2026-07-01 — 応援プレビューが原因で診断が重いことを自動で表示
 - `v0.1.955` 2026-06-26 — 状態速報に「応援レーン描画の自己診断」を追加
 - `v0.1.953` 2026-06-26 — 状態速報に純Web公開コピーの自己診断を追加

@@ -180,8 +180,12 @@ export default [
     //   リリース工程ガード「版混在の実行時検知」(2026-07-06): checkVersionMismatchBanner
     //   (chrome.runtime.getManifest()と突合するDOM反映グルー=lib抽出不可。純関数本体は
     //   src/lib/versionMismatch.jsにテスト付きで隔離済み)を追加=20789→20845。ラチェットは実測+50へ。
+    //   感度パッチ(2026-07-06・v0.1.1083): コメント送信の総締切配線(withCommentPostDeadline呼び出し・
+    //   revert厳格化条件・計器カウンタ更新=submitComment内のchrome.storage/DOMのグルー=lib抽出不可。
+    //   純関数本体はsrc/lib/commentPostDeadline.js・commentPostDiag.jsにテスト付きで隔離済み)を
+    //   追加=20845→20910。ラチェットは実測+50の20960へ。
     files: ['src/extension/popup-entry.js'],
-    rules: { 'max-lines': ['error', { max: 20895, skipBlankLines: false, skipComments: false }] }
+    rules: { 'max-lines': ['error', { max: 20960, skipBlankLines: false, skipComments: false }] }
   },
   {
     files: ['src/extension/popup/**/*.js'],

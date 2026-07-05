@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 2 / 626 件
+## ⚠️ 役割コメントが無いソース 2 / 629 件
 - `src/lib/reportPreviewPublish.js`
 - `src/lib/venueLaneBuckets.js`
 
@@ -527,7 +527,7 @@
   - `gift-impact.mp3`
   - `gift-sparkle.mp3`
   - `gift-whoosh.mp3`
-- 📁 **src/** (1308)
+- 📁 **src/** (1313)
   - 📁 **data/** (6)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -791,7 +791,7 @@
         - `logo_funlink_white_RGB_maru_black.png`
       - `logo_guide_funlink_ol.pdf`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1094)
+  - 📁 **lib/** (1099)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -985,6 +985,11 @@
     - `commentPanelStatus.test.js`
     - `commentPipelineLog.js` — コメント取り込みパイプラインの構造化デバッグログ（純関数フォーマッタ）。
     - `commentPipelineLog.test.js`
+    - `commentPostDeadline.js` — コメント送信(requestPostCommentToOpenTab)全体を総締切で有界化する純関数。
+    - `commentPostDeadline.test.js`
+    - `commentPostDiag.js` — コメント送信(requestPostCommentToOpenTab)の「所要ms/結果/リトライ回数」観測値を
+    - `commentPostDiag.test.js`
+    - `commentPostDiagKey.js` — コメント送信(requestPostCommentToOpenTab)の「所要ms/結果/リトライ回数」観測値を
     - `commentPostDom.js` — コメント送信ボタン探索を、同一フォーム/近傍スコープを優先して行う。
     - `commentPostDom.test.js`
     - `commentPostRetriable.js` — popup のコメント送信で、別 frameId を試す価値があるか（8s 走査を避ける判定）。

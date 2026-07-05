@@ -6,7 +6,7 @@
 ## storage の出入り
 
 - 書くキー: `KEY_BGM_ENABLED`, `KEY_BGM_VOLUME_FEVER`, `KEY_BGM_VOLUME_REACH`, `KEY_STATUS_TREND`
-- 読むキー: `KEY_AI_SHARE_POPUP_DIAG`, `KEY_BACKFILL_LIVE_METRIC`, `KEY_BGM_ENABLED`, `KEY_BGM_PHASE_DIAG`, `KEY_BGM_VOLUME_FEVER`, `KEY_BGM_VOLUME_REACH`, `KEY_COMMENT_TIMELINE_MIRROR`, `KEY_CUSTOM_SOUND_REV`, `KEY_GIFT_EFFECT_DIAG`, `KEY_LANE_DIAG`, `KEY_LANE_MIRROR`, `KEY_LAST_WATCH_URL`, `KEY_LIVEVIEW_PUBLISH_OUTCOME`, `KEY_MILESTONE_EFFECT_DIAG`, `KEY_NORTH_STAR_MIRROR`, `KEY_OP_SOUND_EFFECT_DIAG`, `KEY_PREVIEW_RENDER_ACK`, `KEY_REPORT_PREVIEW`, `KEY_STATUS_FAST_DIAG_LITE`, `KEY_STATUS_TREND`, `KEY_STAT_CARDS_MIRROR`, `KEY_VENUE_SEATS_DIAG`, `KEY_VOICE_DIAG`, `KEY_VOICE_EFFECT_DIAG`, `nls_backfill_progress_v1`
+- 読むキー: `KEY_AI_SHARE_POPUP_DIAG`, `KEY_BACKFILL_LIVE_METRIC`, `KEY_BGM_ENABLED`, `KEY_BGM_PHASE_DIAG`, `KEY_BGM_VOLUME_FEVER`, `KEY_BGM_VOLUME_REACH`, `KEY_COMMENT_POST_DIAG`, `KEY_COMMENT_TIMELINE_MIRROR`, `KEY_CUSTOM_SOUND_REV`, `KEY_GIFT_EFFECT_DIAG`, `KEY_LANE_DIAG`, `KEY_LANE_MIRROR`, `KEY_LAST_WATCH_URL`, `KEY_LIVEVIEW_PUBLISH_OUTCOME`, `KEY_MILESTONE_EFFECT_DIAG`, `KEY_NORTH_STAR_MIRROR`, `KEY_OP_SOUND_EFFECT_DIAG`, `KEY_PREVIEW_RENDER_ACK`, `KEY_REPORT_PREVIEW`, `KEY_STATUS_FAST_DIAG_LITE`, `KEY_STATUS_TREND`, `KEY_STAT_CARDS_MIRROR`, `KEY_VENUE_SEATS_DIAG`, `KEY_VOICE_DIAG`, `KEY_VOICE_EFFECT_DIAG`, `nls_backfill_progress_v1`
 
 ## 構成ファイル（import 到達・最大40件表示）
 
@@ -30,6 +30,8 @@ graph LR
   n_status --> n_src_lib_chikuranCard_js["lib/chikuranCard.js"]
   n_status --> n_src_lib_chikuranHeaderDom_js["lib/chikuranHeaderDom.js"]
   n_status --> n_src_lib_commentCountProvenance_js["lib/commentCountProvenance.js"]
+  n_status --> n_src_lib_commentPostDiag_js["lib/commentPostDiag.js"]:::shared
+  n_status --> n_src_lib_commentPostDiagKey_js["lib/commentPostDiagKey.js"]:::shared
   n_status --> n_src_lib_commentSummary_js["lib/commentSummary.js"]:::shared
   n_status --> n_src_lib_commentTimelineMirror_js["lib/commentTimelineMirror.js"]:::shared
   n_status --> n_src_lib_commentTimelineMirrorKey_js["lib/commentTimelineMirrorKey.js"]:::shared
@@ -51,9 +53,7 @@ graph LR
   n_status --> n_src_lib_htmlEscape_js["lib/htmlEscape.js"]:::shared
   n_status --> n_src_lib_laneDiagKey_js["lib/laneDiagKey.js"]:::shared
   n_status --> n_src_lib_laneMirrorKey_js["lib/laneMirrorKey.js"]:::shared
-  n_status --> n_src_lib_liveEndedFlag_js["lib/liveEndedFlag.js"]:::shared
-  n_status --> n_src_lib_liveHealthScore_js["lib/liveHealthScore.js"]
   classDef shared fill:#eee,stroke:#999,color:#666;
 ```
 
-> ほか 60 ファイル省略（全件は storage-bus.md / metafile 参照）。
+> ほか 62 ファイル省略（全件は storage-bus.md / metafile 参照）。
