@@ -183,6 +183,13 @@ import { PERF_DIAG_PREFIX, isPerfDiag } from '../lib/perfDiag.js';
 import { LIVE_ENDED_PREFIX, isLiveEndedFlag } from '../lib/liveEndedFlag.js';
 import { buildLiveHealth, scoreToDots } from '../lib/liveHealthScore.js';
 import { runStorageOpWithTimeout, STORAGE_OP_TIMED_OUT } from '../lib/storageOpTimeout.js';
+// 重さ根治 P3(2026-07-06): runStorageOpWithTimeout はタイムアウトしても opFn 自体は裏で生き続ける
+//   (Promise.race の性質)。次 tick が同じ opFn を再発行すると幽霊 read と多重競合するため、
+//   loadCustomSoundDiagSafe(IndexedDB open+count+fetch を伴う唯一の重い extras 処理)に
+//   in-flight ガードを掛けて新規発行を抑止する。popup-entry.js の heavyReadActive と同型。
+import { createInFlightGuard } from '../lib/inFlightGuard.js';
+// 重さ根治 P4(2026-07-06): publishLiveViewPublishPayload の dirty check(内容不変なら set 省略)用。
+import { buildLiveViewPublishSignature } from '../lib/liveViewPublishSignature.js';
 import {
   NEXT_LIVE_REQUEST_TYPE,
   AUTOPATROL_ENABLED_KEY
@@ -231,6 +238,9 @@ let _refreshTimerId = /** @type {number|null} */ (null);
 //   storage を読むと重い=12 秒間引きでキャッシュし、間は前回値を再利用(コア表示は毎回更新のまま)。
 const EXTRAS_REFETCH_MS = 12000;
 let _extrasCacheAt = 0;
+// 重さ根治 P3(2026-07-06): loadCustomSoundDiagSafe(IndexedDB open+count+fetch)の幽霊 read 対策。
+//   前回発行分が未解決の間は新規発行せず、直近スナップショット(fallback)を呼び出し側で渡す。
+const _customSoundDiagGuard = createInFlightGuard(() => loadCustomSoundDiagSafe(), { ceilingMs: 15000 });
 /** v0.1.1005: 直近 refresh の所要計器(totalMs と重いステップ)。コピー本文(AI共有)にも出すため保持。
  *   renderAll は当該 refresh の render 計測【前】に走るので、前サイクルの値を本文に載せる(代表値として十分)。 */
 let _lastRefreshPerf = /** @type {{ totalMs: number|null, stepMs: Array<[string, number]> }} */ ({ totalMs: null, stepMs: [] });
@@ -553,10 +563,16 @@ async function refresh(opts = {}) {
       ).catch(() => []);
       // v0.1.1072: マイ効果音(取込件数/割当キー数/rev)も extras(12秒間引き)へ。IDB read のため
       //   コアには絶対足さない(既知の地雷=v1045/v1046と同型)。失敗時は「-」表示スナップショットへ。
+      // 重さ根治 P3(2026-07-06): runStorageOpWithTimeout のタイムアウトは opFn 自体を止めない
+      //   (裏で生き続ける幽霊 read)ため、in-flight ガードで新規発行そのものを抑止する。
+      //   未解決中は直近キャッシュ(なければ dbAvailable:false スナップショット)を fallback として返す。
       step = 'loadCustomSoundDiag';
-      const customSoundDiag = await runStorageOpWithTimeout(() => loadCustomSoundDiagSafe(), tmo).catch(() =>
-        buildCustomSoundDiagSnapshot({ dbAvailable: false })
-      );
+      const customSoundDiagFallback =
+        _extrasCache.customSoundDiag || buildCustomSoundDiagSnapshot({ dbAvailable: false });
+      const customSoundDiag = await runStorageOpWithTimeout(
+        () => _customSoundDiagGuard.run(customSoundDiagFallback),
+        tmo
+      ).catch(() => customSoundDiagFallback);
       _extrasCache = { reportPreview, watchTabMap, trendFindings, laneDiag, laneMirror, statCardsMirror, northStarMirror, voiceDiag, venueSeatsDiag, publishOutcomeRec, commentTimelineMirror, previewRenderAck, backfillLiveMetric, giftEffectDiag, milestoneEffectDiag, customSoundDiag, voiceEffectDiag, bgmPhaseDiag, opSoundEffectDiag, commentPostDiag };
       _extrasCacheAt = Date.now();
       _mark('extras');
@@ -1568,9 +1584,14 @@ function maybeAutoPublishStatusSnapshot(livesData, publishOutcomeRec) {
 let _liveViewPublishPayloadLastWriteAt = 0;
 /** v0.1.1016: 自動 publish の多重送信防止フラグ(同時に2本 POST しない)。 */
 let _autoPublishInFlight = false;
+// 重さ根治 P4(2026-07-06): 直近 set 時のシグネチャ(buildLiveViewPublishSignature)。3秒 min-gap
+//   通過後、内容が前回 set と同じなら約131KB級の chrome.storage.local.set を省略する。
+let _liveViewPublishPayloadLastSig = '';
 /**
  * 応援ライブビュー(拡張内)から WEB 公開できるよう、最新の jsonBlob + 共有キーを storage へ置く。
  *   best-effort(失敗しても status を止めない)・3秒 min-gap。キー未設定ビルドでは置かない。
+ *   重さ根治 P4: min-gap 通過後、内容が前回 set と同じシグネチャなら set 自体を省略する
+ *   (min-gap 変数の更新条件・タイミングは無変更=set する分岐でのみ更新)。
  * @param {object} jsonBlob
  */
 function publishLiveViewPublishPayload(jsonBlob) {
@@ -1579,12 +1600,13 @@ function publishLiveViewPublishPayload(jsonBlob) {
     if (!ingestKey || !viewToken || !jsonBlob) return; // キー未設定=公開不可=置かない
     const now = Date.now();
     if (now - _liveViewPublishPayloadLastWriteAt < 3000) return;
+    const sig = buildLiveViewPublishSignature(jsonBlob);
+    if (sig && sig === _liveViewPublishPayloadLastSig) return; // 変化なし=set 省略(min-gap 計時は更新しない)
     _liveViewPublishPayloadLastWriteAt = now;
-    void chrome.storage.local
-      .set({ [KEY_LIVEVIEW_PUBLISH_PAYLOAD]: { jsonBlob, ingestKey, viewToken, appOrigin, savedAt: now } })
-      .catch(() => {
-        /* best-effort: storage 不可・context 消失 */
-      });
+    _liveViewPublishPayloadLastSig = sig;
+    void safeStorageLocalSet({
+      [KEY_LIVEVIEW_PUBLISH_PAYLOAD]: { jsonBlob, ingestKey, viewToken, appOrigin, savedAt: now }
+    });
   } catch {
     /* no-op */
   }
