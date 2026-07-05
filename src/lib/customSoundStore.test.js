@@ -13,11 +13,13 @@ import {
   putSoundBlob,
   getSoundBlob,
   listSoundBlobs,
+  countSoundBlobs,
   deleteSoundBlob,
   getAssignment,
   setAssignment,
   clearAssignment,
   listAssignments,
+  countAssignments,
   bumpCustomSoundRev,
   mergeVariantPaths,
   mergeSinglePaths,
@@ -77,6 +79,31 @@ describe('blobs ストア(IDB fake注入)', () => {
   });
 });
 
+describe('countSoundBlobs(重さ根治P1: count()化・診断計器用)', () => {
+  it('空ストアは0', async () => {
+    const db = await openCustomSoundDb();
+    expect(await countSoundBlobs(db)).toBe(0);
+  });
+
+  it('listSoundBlobsの件数と一致する', async () => {
+    const db = await openCustomSoundDb();
+    await putSoundBlob(db, { id: 'as_1', blob: new Blob(['a']), name: 'a.mp3' });
+    await putSoundBlob(db, { id: 'as_2', blob: new Blob(['b']), name: 'b.mp3' });
+    await putSoundBlob(db, { id: 'as_3', blob: new Blob(['c']), name: 'c.mp3' });
+    const [count, list] = await Promise.all([countSoundBlobs(db), listSoundBlobs(db)]);
+    expect(count).toBe(list.length);
+    expect(count).toBe(3);
+  });
+
+  it('deleteSoundBlob後は件数が減る', async () => {
+    const db = await openCustomSoundDb();
+    await putSoundBlob(db, { id: 'as_1', blob: new Blob(['a']), name: 'a.mp3' });
+    await putSoundBlob(db, { id: 'as_2', blob: new Blob(['b']), name: 'b.mp3' });
+    await deleteSoundBlob(db, 'as_1');
+    expect(await countSoundBlobs(db)).toBe(1);
+  });
+});
+
 describe('assignments ストア', () => {
   it('setAssignment→getAssignment で割当を保存・取得できる', async () => {
     const db = await openCustomSoundDb();
@@ -116,6 +143,30 @@ describe('assignments ストア', () => {
     await setAssignment(db, 'gift_medium', ['as_812926']);
     const list = await listAssignments(db);
     expect(list).toHaveLength(2);
+  });
+});
+
+describe('countAssignments(重さ根治P1: count()化・診断計器用)', () => {
+  it('空ストアは0', async () => {
+    const db = await openCustomSoundDb();
+    expect(await countAssignments(db)).toBe(0);
+  });
+
+  it('listAssignmentsの件数と一致する', async () => {
+    const db = await openCustomSoundDb();
+    await setAssignment(db, 'ad', ['as_104491']);
+    await setAssignment(db, 'gift_medium', ['as_812926']);
+    const [count, list] = await Promise.all([countAssignments(db), listAssignments(db)]);
+    expect(count).toBe(list.length);
+    expect(count).toBe(2);
+  });
+
+  it('clearAssignment後は件数が減る', async () => {
+    const db = await openCustomSoundDb();
+    await setAssignment(db, 'ad', ['as_104491']);
+    await setAssignment(db, 'gift_medium', ['as_812926']);
+    await clearAssignment(db, 'ad');
+    expect(await countAssignments(db)).toBe(1);
   });
 });
 

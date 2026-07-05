@@ -17,9 +17,9 @@
  * 純関数部(テスト可能)と副作用部(IndexedDB/fetch操作)を分離する:
  *   - 純関数: mergeVariantPaths / mergeSinglePaths / rotationRngFor / getUrlForCustomSound /
  *     gainForAssignment / buildCustomVariantPathsFromAssignments / buildLocalVariantPaths
- *   - 副作用: openCustomSoundDb / putSoundBlob / getSoundBlob / listSoundBlobs / deleteSoundBlob /
- *     getAssignment / setAssignment / clearAssignment / listAssignments / bumpCustomSoundRev /
- *     loadLocalBundledSoundManifest
+ *   - 副作用: openCustomSoundDb / putSoundBlob / getSoundBlob / listSoundBlobs / countSoundBlobs /
+ *     deleteSoundBlob / getAssignment / setAssignment / clearAssignment / listAssignments /
+ *     countAssignments / bumpCustomSoundRev / loadLocalBundledSoundManifest
  *
  * ストア構成(設計書§1.2):
  *   DB名 tk-custom-sounds / version 1
@@ -143,6 +143,22 @@ export function listSoundBlobs(db) {
 }
 
 /**
+ * 保存済みBlob件数だけをネイティブcount()で数える(診断計器用・Blob本体を読まない)。
+ *   listSoundBlobsとの違い: カーソル走査でBlob本体まで全件読み出すlistSoundBlobsに対し、
+ *   こちらはIDBObjectStore.count()に委譲し件数のみをO(1)相当で返す(件数比例で重くならない)。
+ * @param {IDBDatabase} db
+ * @returns {Promise<number>}
+ */
+export function countSoundBlobs(db) {
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(CUSTOM_SOUND_STORE_BLOBS, 'readonly');
+    const req = tx.objectStore(CUSTOM_SOUND_STORE_BLOBS).count();
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+/**
  * idを指定してBlobレコードを削除する。
  * @param {IDBDatabase} db
  * @param {string} id
@@ -251,6 +267,20 @@ export function listAssignments(db) {
       out.push(cursor.value);
       cursor.continue();
     };
+    req.onerror = () => reject(req.error);
+  });
+}
+
+/**
+ * 割当済みキー件数だけをネイティブcount()で数える(診断計器用)。
+ * @param {IDBDatabase} db
+ * @returns {Promise<number>}
+ */
+export function countAssignments(db) {
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(CUSTOM_SOUND_STORE_ASSIGNMENTS, 'readonly');
+    const req = tx.objectStore(CUSTOM_SOUND_STORE_ASSIGNMENTS).count();
+    req.onsuccess = () => resolve(req.result);
     req.onerror = () => reject(req.error);
   });
 }

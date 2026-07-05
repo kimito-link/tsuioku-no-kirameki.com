@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1084',
+    date: '2026-07-06',
+    summary: 'perf(status): マイ効果音計器のBlob全件走査を廃止',
+    items: Object.freeze([
+      '診断ページ(状態速報)が軽くなりました。マイ効果音の取込件数の数え方を、音声データ本体を毎回読み込む方式から、件数だけを直接数える方式に変更しました。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1083',
     date: '2026-07-06',
     summary: 'fix(post): 送信5秒締切+自コメ取り消しの厳格化',
