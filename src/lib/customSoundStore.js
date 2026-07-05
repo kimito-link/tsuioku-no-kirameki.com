@@ -6,11 +6,20 @@
  *   effectSoundPlayer.js の deps 注入(variantPaths/paths/getUrl/rng/volume)だけで
  *   差し替える機能。**effectSoundPlayer.js は無改変**(このファイルが deps を組み立てるだけ)。
  *
- * 純関数部(テスト可能)と副作用部(IndexedDB操作)を分離する:
+ * ローカル自動同梱(2026-07-05・「手動取込」を不要にする追加実装):
+ *   scripts/install-local-sounds.mjs が `npm run copy:ext` の一環で、ユーザーのPC上の音源
+ *   ソースディレクトリ(既定 D:\download)からプリセット該当分だけをローカル展開先
+ *   (リポジトリ外・既定 C:\nicolive-ext)の sound/custom/ へコピーし、manifest.json を生成する。
+ *   このファイルはその manifest.json を fetch して自動的に customVariantPaths へ組み込む
+ *   (loadLocalBundledSoundManifest / buildLocalVariantPaths)。IDB取込UIによる手動割当は
+ *   従来どおり最優先で温存(合成順: IDB割当 > ローカル同梱 > 呼び出し側の同梱合成音)。
+ *
+ * 純関数部(テスト可能)と副作用部(IndexedDB/fetch操作)を分離する:
  *   - 純関数: mergeVariantPaths / mergeSinglePaths / rotationRngFor / getUrlForCustomSound /
- *     gainForAssignment / buildCustomVariantPathsFromAssignments
+ *     gainForAssignment / buildCustomVariantPathsFromAssignments / buildLocalVariantPaths
  *   - 副作用: openCustomSoundDb / putSoundBlob / getSoundBlob / listSoundBlobs / deleteSoundBlob /
- *     getAssignment / setAssignment / clearAssignment / listAssignments / bumpCustomSoundRev
+ *     getAssignment / setAssignment / clearAssignment / listAssignments / bumpCustomSoundRev /
+ *     loadLocalBundledSoundManifest
  *
  * ストア構成(設計書§1.2):
  *   DB名 tk-custom-sounds / version 1
@@ -21,6 +30,7 @@
  */
 
 import { KEY_CUSTOM_SOUND_REV } from './storageKeys.js';
+import { CUSTOM_SOUND_PRESET } from './customSoundPreset.js';
 
 /** IndexedDB データベース名。 */
 export const CUSTOM_SOUND_DB_NAME = 'tk-custom-sounds';
@@ -394,6 +404,70 @@ export function _resetRotationCountersForTest() {
 }
 
 /* ============================================================================
+ * ローカル自動同梱(scripts/install-local-sounds.mjs が展開した sound/custom/manifest.json)
+ * ========================================================================== */
+
+/**
+ * `sound/custom/manifest.json` を fetch して id→ファイル名マップを返す(副作用部・注入可能)。
+ *   scripts/install-local-sounds.mjs が `npm run copy:ext` の一環でローカル展開先
+ *   (リポジトリ外・例 C:\nicolive-ext)にコピーした音源の一覧。未展開/取得失敗時は静かに null
+ *   (絶対制約: エラーにしない・ノイズにしない)。
+ * @param {{ getUrl?: (p: string) => string, fetchImpl?: typeof fetch }} [deps]
+ * @returns {Promise<Record<string, string>|null>}
+ */
+export async function loadLocalBundledSoundManifest(deps = {}) {
+  const getUrl = typeof deps.getUrl === 'function'
+    ? deps.getUrl
+    : (typeof chrome !== 'undefined' && chrome.runtime && typeof chrome.runtime.getURL === 'function'
+      ? /** @param {string} p */ (p) => chrome.runtime.getURL(p)
+      : /** @param {string} p */ (p) => p);
+  const fetchImpl = typeof deps.fetchImpl === 'function' ? deps.fetchImpl : (typeof fetch === 'function' ? fetch : null);
+  if (!fetchImpl) return null;
+  try {
+    const url = getUrl('sound/custom/manifest.json');
+    const res = await fetchImpl(url);
+    if (!res || !res.ok) return null;
+    const json = await res.json();
+    const files = json && typeof json === 'object' ? json.files : null;
+    if (!files || typeof files !== 'object') return null;
+    /** @type {Record<string, string>} */
+    const out = {};
+    for (const [id, filename] of Object.entries(files)) {
+      if (typeof filename === 'string' && filename) out[String(id)] = filename;
+    }
+    return out;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * プリセット(customSoundPreset.js の CUSTOM_SOUND_PRESET)の各キーの id 列を、ローカル同梱
+ *   manifest の id→ファイル名対応を使って `sound/custom/<ファイル名>` のパス列へ変換する純関数。
+ *   manifest に無い id(未展開・未調達)は欠番のまま詰める(=配列に含めない)。
+ *   manifest が null(未展開環境)なら空オブジェクトを返す(呼び出し側は基底/IDBへフォールバック)。
+ * @param {Readonly<Record<string, ReadonlyArray<{ id: string }>>>} preset CUSTOM_SOUND_PRESET
+ * @param {Record<string, string>|null} manifestFiles loadLocalBundledSoundManifest の戻り値
+ * @returns {Record<string, ReadonlyArray<string>>} キーごとの変奏パス配列(1件も解決できないキーは含めない)
+ */
+export function buildLocalVariantPaths(preset, manifestFiles) {
+  /** @type {Record<string, string[]>} */
+  const out = {};
+  if (!manifestFiles || typeof manifestFiles !== 'object') return out;
+  const p = preset && typeof preset === 'object' ? preset : {};
+  for (const [key, list] of Object.entries(p)) {
+    if (!Array.isArray(list)) continue;
+    const paths = [];
+    for (const asset of list) {
+      const filename = asset && asset.id ? manifestFiles[String(asset.id)] : undefined;
+      if (typeof filename === 'string' && filename) paths.push(`sound/custom/${filename}`);
+    }
+    if (paths.length > 0) out[key] = paths;
+  }
+  return out;
+}
+
+/* ============================================================================
  * 副作用部: venueBar.js / popup-entry.js 共通の再生時ランタイム状態構築(§1.4)
  * ========================================================================== */
 
@@ -402,16 +476,41 @@ export function _resetRotationCountersForTest() {
  *   割当済みBlobだけ URL.createObjectURL して customVariantPaths を組み立てる
  *   (割当済みBlobのみ=85本全量でも無条件に全部URL化しない・設計書§1.4)。
  *   旧URL集合を渡すと revokeObjectURL で解放する(呼び出し側が前回の戻り値の urlsById を渡す)。
- * @param {{ previousUrlsById?: Map<string, string> }} [opts]
+ *
+ * 合成順(優先度高→低): IDB割当(ユーザーが取込UIで明示指定) > ローカル同梱(install-local-sounds.mjs
+ *   が展開したmanifest由来・「手動取込なしで自動で鳴る」本実装の主目的) > 呼び出し側が持つ基底の
+ *   同梱合成音(EFFECT_SOUND_VARIANT_PATHS)。IDB割当キーのみ従来どおり assignments.gain を反映し、
+ *   ローカル同梱キーは gain=1.0(CUSTOM_SOUND_DEFAULT_GAIN)。
+ * @param {{ previousUrlsById?: Map<string, string>, getUrl?: (p: string) => string, fetchImpl?: typeof fetch }} [opts]
  * @returns {Promise<{
- *   customVariantPaths: Record<string, string[]>,
+ *   customVariantPaths: Record<string, ReadonlyArray<string>>,
  *   gainFor: (kind: string) => number,
- *   urlsById: Map<string, string>
+ *   urlsById: Map<string, string>,
+ *   localBundledCount: number
  * }>}
  */
 export async function loadCustomSoundRuntimeState(opts = {}) {
-  const empty = { customVariantPaths: {}, gainFor: () => CUSTOM_SOUND_DEFAULT_GAIN, urlsById: new Map() };
-  if (!isCustomSoundDbAvailable()) return empty;
+  /** @type {{ customVariantPaths: Record<string, ReadonlyArray<string>>, gainFor: () => number, urlsById: Map<string, string>, localBundledCount: number }} */
+  const empty = { customVariantPaths: {}, gainFor: () => CUSTOM_SOUND_DEFAULT_GAIN, urlsById: new Map(), localBundledCount: 0 };
+
+  // ローカル同梱は IndexedDB の有無に関係なく試す(manifest.jsonが無ければ静かに空)。
+  /** @type {Record<string, ReadonlyArray<string>>} */
+  let localVariantPaths = {};
+  let localBundledCount = 0;
+  try {
+    const manifestFiles = await loadLocalBundledSoundManifest({ getUrl: opts.getUrl, fetchImpl: opts.fetchImpl });
+    if (manifestFiles) {
+      localBundledCount = Object.keys(manifestFiles).length;
+      localVariantPaths = buildLocalVariantPaths(CUSTOM_SOUND_PRESET, manifestFiles);
+    }
+  } catch {
+    localVariantPaths = {};
+    localBundledCount = 0;
+  }
+
+  if (!isCustomSoundDbAvailable()) {
+    return { ...empty, customVariantPaths: localVariantPaths, localBundledCount };
+  }
   try {
     // 前回発行分のBlob URLは失効させる(§1.4「旧URLは割り当て変更時にrevokeObjectURL」)。
     if (opts.previousUrlsById instanceof Map) {
@@ -430,10 +529,17 @@ export async function loadCustomSoundRuntimeState(opts = {}) {
         if (rec?.blob instanceof Blob) urlsById.set(id, URL.createObjectURL(rec.blob));
       }
     }
-    const customVariantPaths = buildCustomVariantPathsFromAssignments(assignments, urlsById);
-    const gainFor = gainForAssignments(assignments);
-    return { customVariantPaths, gainFor, urlsById };
+    const idbVariantPaths = buildCustomVariantPathsFromAssignments(assignments, urlsById);
+    // IDB割当 > ローカル同梱 の優先度でマージ(mergeVariantPathsは第2引数=customを優先するため
+    //   base=ローカル同梱, custom=IDB割当 の順で呼ぶ)。
+    const customVariantPaths = mergeVariantPaths(localVariantPaths, idbVariantPaths);
+    const idbGainFor = gainForAssignments(assignments);
+    const assignedKeys = new Set(assignments.map((a) => String(a.key)));
+    // ローカル同梱キーは gain=1.0固定。IDB割当済みキーのみ assignments.gain を反映する。
+    /** @param {string} kind */
+    const gainFor = (kind) => (assignedKeys.has(String(kind)) ? idbGainFor(kind) : CUSTOM_SOUND_DEFAULT_GAIN);
+    return { customVariantPaths, gainFor, urlsById, localBundledCount };
   } catch {
-    return empty;
+    return { ...empty, customVariantPaths: localVariantPaths, localBundledCount };
   }
 }

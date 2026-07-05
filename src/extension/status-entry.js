@@ -94,7 +94,8 @@ import {
   setAssignment,
   clearAssignment,
   listAssignments,
-  bumpCustomSoundRev
+  bumpCustomSoundRev,
+  loadLocalBundledSoundManifest
 } from '../lib/customSoundStore.js';
 import { buildMilestoneEffectDiagLines, milestoneEffectDiagToActionCards } from '../lib/milestoneEffectDiag.js';
 // Phase B(2026-07-05): パチンコボイス演出(voiceDirector.js)の発火/スキップ内訳を extras(12秒間引き)で
@@ -875,8 +876,17 @@ async function loadOpSoundEffectDiagSafe() {
 //   直接開いて件数を数える(他ページの publish を待たない=診断ページの統計行と同じ読み方)。
 //   IDBが開けない環境(indexedDB未定義・open失敗)では dbAvailable:false で静かに「-」表示にする。
 async function loadCustomSoundDiagSafe() {
+  // ローカル同梱本数(sound/custom/manifest.json)は IndexedDB の有無に関係なく計測する
+  //   (install-local-sounds.mjs による自動同梱の実態を必ず出す・静かに0埋め)。
+  let localBundledCount = 0;
+  try {
+    const manifestFiles = await loadLocalBundledSoundManifest({ getUrl: (p) => chrome.runtime.getURL(p) });
+    localBundledCount = manifestFiles ? Object.keys(manifestFiles).length : 0;
+  } catch {
+    localBundledCount = 0;
+  }
   if (typeof indexedDB === 'undefined') {
-    return buildCustomSoundDiagSnapshot({ dbAvailable: false });
+    return buildCustomSoundDiagSnapshot({ dbAvailable: false, localBundledCount });
   }
   try {
     const db = await openCustomSoundDb();
@@ -890,10 +900,11 @@ async function loadCustomSoundDiagSafe() {
       assignedKeyCount: assignments.length,
       totalKeyCount: CUSTOM_SOUND_PRESET_KEYS.length,
       rev: Number(bag?.[KEY_CUSTOM_SOUND_REV]) || 0,
-      dbAvailable: true
+      dbAvailable: true,
+      localBundledCount
     });
   } catch {
-    return buildCustomSoundDiagSnapshot({ dbAvailable: false });
+    return buildCustomSoundDiagSnapshot({ dbAvailable: false, localBundledCount });
   }
 }
 
@@ -2751,6 +2762,19 @@ function setupMyCustomSoundPanel() {
   const importResult = document.getElementById('myCustomSoundImportResult');
   const statsEl = document.getElementById('myCustomSoundStats');
   const listEl = document.getElementById('myCustomSoundList');
+  const localNoteEl = document.getElementById('myCustomSoundLocalNote');
+  // 2026-07-05: ローカル自動同梱(scripts/install-local-sounds.mjs)の検出本数を注記する。
+  //   取込UIは「上書き用」であることを明示し、手動取込が必須ではないことを伝える。
+  if (localNoteEl) {
+    void loadLocalBundledSoundManifest({ getUrl: (p) => chrome.runtime.getURL(p) }).then((manifestFiles) => {
+      const n = manifestFiles ? Object.keys(manifestFiles).length : 0;
+      localNoteEl.textContent = n > 0
+        ? `ローカル同梱を検出(${n}本)。下の取込UIは上書き用です(未操作でも自動で鳴ります)。`
+        : 'ローカル同梱は未検出です(npm run copy:ext で自動生成されます)。下の取込UIで手動取込できます。';
+    }).catch(() => {
+      localNoteEl.textContent = '';
+    });
+  }
   if (!fileInput || !listEl) return;
   if (typeof indexedDB === 'undefined') {
     if (importResult) importResult.textContent = 'この環境では IndexedDB が使えないため、マイ効果音は利用できません。';

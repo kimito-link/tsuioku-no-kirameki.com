@@ -7965,7 +7965,7 @@ let _effectSoundEnabledCache = true;
 
 // Phase A(2026-07-05): マイ効果音(IndexedDB取込+割当)。起動時+customSoundRev変化時に
 //   customVariantPaths/gainForを再構築する(venueBar.js と同じ形)。
-/** @type {{ customVariantPaths: Record<string, string[]>, gainFor: (kind: string) => number, urlsById: Map<string, string> }} */
+/** @type {{ customVariantPaths: Record<string, ReadonlyArray<string>>, gainFor: (kind: string) => number, urlsById: Map<string, string>, localBundledCount?: number }} */
 let _customSoundState = { customVariantPaths: {}, gainFor: () => 1.0, urlsById: new Map() };
 let _customSoundListenerBound = false;
 function refreshCustomSoundState() {

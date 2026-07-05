@@ -2167,7 +2167,7 @@ export function mountVenueBarButton(options = {}) {
 
   // Phase A(2026-07-05): マイ効果音(IndexedDB取込+割当)。起動時+customSoundRev変化時に
   //   customVariantPaths/gainForを再構築する。effectSoundPlayer.js は無改変・deps注入のみで差し替わる。
-  /** @type {{ customVariantPaths: Record<string, string[]>, gainFor: (kind: string) => number, urlsById: Map<string, string> }} */
+  /** @type {{ customVariantPaths: Record<string, ReadonlyArray<string>>, gainFor: (kind: string) => number, urlsById: Map<string, string>, localBundledCount?: number }} */
   let _customSoundState = { customVariantPaths: {}, gainFor: () => 1.0, urlsById: new Map() };
   const refreshCustomSoundState = () => {
     void loadCustomSoundRuntimeState({ previousUrlsById: _customSoundState.urlsById }).then((state) => {
