@@ -95,11 +95,30 @@ const isCheck = process.argv.includes('--check');
 const all = trackedFiles();
 const trackedSet = new Set(all);
 const files = loadTargets(all);
-// exists は「git 追跡 or ディスク実在」で判定(新規作成直後の未追跡ファイルも実在扱い)
+// exists は「git 追跡 or ディスク実在」で判定(新規作成直後の未追跡ファイルも実在扱い)。
+//   これにより「ディスクにはあるが未追跡(=git add し忘れ)」のリンク先は broken 扱いにならない
+//   盲点がある(2026-07-06: check-tracked-imports.mjs と同型。src/lib/safeStorageLocal.js の
+//   コミット漏れ事故を参照)。主防壁は check-tracked-imports.mjs(JS import 用)側。ここでは
+//   既存の緑判定は変えず、「ディスクにあるが未追跡」のリンク先を検出したら警告だけ追加する。
 const exists = (repoPath) => trackedSet.has(repoPath) || existsSync(join(ROOT, repoPath));
 const broken = findBrokenInternalLinks(files, exists);
 const mismatches = findMetaUrlMismatches(files);
 const md = render(files, broken, mismatches);
+
+/** リンク先が「ディスクにはあるが git 未追跡」なら git add し忘れの疑いとして警告する。
+ *  findBrokenInternalLinks は exists() を候補ごとに呼ぶので、ここで渡す exists をラップして
+ *  「未追跡だがディスクにはあるので exists=true になった」パスだけ記録する(broken 判定は変えない)。
+ */
+const untrackedOnDiskWarnings = [];
+{
+  const warnExists = (repoPath) => {
+    const trackedOk = trackedSet.has(repoPath);
+    const diskOk = !trackedOk && existsSync(join(ROOT, repoPath));
+    if (diskOk) untrackedOnDiskWarnings.push(repoPath);
+    return trackedOk || diskOk;
+  };
+  findBrokenInternalLinks(files, warnExists);
+}
 
 if (isCheck) {
   let fail = false;
@@ -115,6 +134,9 @@ if (isCheck) {
   for (const m of mismatches) {
     fail = true;
     console.error(`[site-health] ${m.kind} 取り違え: ${m.from} が ${m.urlBasename}(自ファイルは ${m.fileBasename})`);
+  }
+  for (const p of new Set(untrackedOnDiskWarnings)) {
+    console.warn(`[site-health] 警告: リンク先 ${p} はディスクにはあるが git 未追跡(git add し忘れの疑い)。`);
   }
   if (fail) process.exit(1);
   console.log(`[site-health] OK(対象 ${files.length} ファイル・リンク切れ 0・URL取り違え 0)。`);
