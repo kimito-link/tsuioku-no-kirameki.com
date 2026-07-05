@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1080',
+    date: '2026-07-05',
+    summary: '拡張リロード後の旧タブ黙過ガード追加',
+    items: Object.freeze([
+      '拡張をリロードした直後、開きっぱなしの視聴タブでエラーが出ることがあった不具合を直しました(マイ効果音・ボイス・BGM・操作音の設定読み書き)。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1079',
     date: '2026-07-05',
     summary: '操作音4種の音源配線漏れを修正',

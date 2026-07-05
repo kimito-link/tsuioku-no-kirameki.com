@@ -22,6 +22,10 @@
  */
 
 import { KEY_AI_SHARE_POPUP_DIAG } from '../lib/aiSharePopupDiagKey.js';
+// v0.1.1080: BGM設定パネル(Phase C)が直接 chrome.storage.local を叩くと、status.html を
+//   タブに残したまま拡張をリロードした場合に同期 TypeError が uncaught で残る。
+//   唯一の安全な入口に集約する(popup-entry.js/venueBar.js と同じ helper を共有)。
+import { safeStorageLocalGet, safeStorageLocalSet, safeStorageLocalRef } from '../lib/safeStorageLocal.js';
 // 2026-06-23: status.html 軽量化。2秒ループで巨大 fastDiag(~40KB)を read+parse+JSON.stringify していたのが
 //   重さの真因(council/status-heavy-open-SYNTHESIS.md)。status が使う4フィールドだけの軽量ダイジェスト
 //   (content が同時に書く)を read する=read 回数同じ・サイズ ~40分の1。読み取りパスは full と同形。
@@ -2682,7 +2686,7 @@ function setupBgmSettingsPanel() {
     return Number.isFinite(n) ? Math.max(0, Math.min(BGM_VOLUME_MAX, n)) : fallback;
   };
 
-  void chrome.storage.local.get([KEY_BGM_ENABLED, KEY_BGM_VOLUME_REACH, KEY_BGM_VOLUME_FEVER]).then((bag) => {
+  void safeStorageLocalGet([KEY_BGM_ENABLED, KEY_BGM_VOLUME_REACH, KEY_BGM_VOLUME_FEVER]).then((bag) => {
     toggle.checked = isBgmEnabled(bag?.[KEY_BGM_ENABLED]);
     const reachV = clamp(bag?.[KEY_BGM_VOLUME_REACH], BGM_REACH_DEFAULT);
     const feverV = clamp(bag?.[KEY_BGM_VOLUME_FEVER], BGM_FEVER_DEFAULT);
@@ -2690,20 +2694,20 @@ function setupBgmSettingsPanel() {
     feverSlider.value = String(feverV);
     if (reachValueEl) reachValueEl.textContent = reachV.toFixed(2);
     if (feverValueEl) feverValueEl.textContent = feverV.toFixed(2);
-  }).catch(() => {});
+  });
 
   toggle.addEventListener('change', () => {
-    void chrome.storage.local.set({ [KEY_BGM_ENABLED]: toggle.checked }).catch(() => {});
+    void safeStorageLocalSet({ [KEY_BGM_ENABLED]: toggle.checked });
   });
   reachSlider.addEventListener('input', () => {
     const v = clamp(reachSlider.value, BGM_REACH_DEFAULT);
     if (reachValueEl) reachValueEl.textContent = v.toFixed(2);
-    void chrome.storage.local.set({ [KEY_BGM_VOLUME_REACH]: v }).catch(() => {});
+    void safeStorageLocalSet({ [KEY_BGM_VOLUME_REACH]: v });
   });
   feverSlider.addEventListener('input', () => {
     const v = clamp(feverSlider.value, BGM_FEVER_DEFAULT);
     if (feverValueEl) feverValueEl.textContent = v.toFixed(2);
-    void chrome.storage.local.set({ [KEY_BGM_VOLUME_FEVER]: v }).catch(() => {});
+    void safeStorageLocalSet({ [KEY_BGM_VOLUME_FEVER]: v });
   });
 }
 
@@ -2852,7 +2856,7 @@ function setupMyCustomSoundPanel() {
           void (async () => {
             const d = await getDb();
             await setAssignment(d, key, assignedIds, Number(gainSlider.value));
-            await bumpCustomSoundRev(chrome.storage.local);
+            await bumpCustomSoundRev(safeStorageLocalRef());
             gainLabel.textContent = `音量 ${Number(gainSlider.value).toFixed(2)}`;
           })();
         });
@@ -2898,7 +2902,7 @@ function setupMyCustomSoundPanel() {
           void (async () => {
             const d = await getDb();
             await clearAssignment(d, key);
-            await bumpCustomSoundRev(chrome.storage.local);
+            await bumpCustomSoundRev(safeStorageLocalRef());
             await renderList();
             await renderStats();
           })();
@@ -2945,7 +2949,7 @@ function setupMyCustomSoundPanel() {
           const compact = merged.filter((v) => typeof v === 'string' && v);
           await setAssignment(db, key, compact, existing?.gain);
         }
-        if (byKey.size > 0) await bumpCustomSoundRev(chrome.storage.local);
+        if (byKey.size > 0) await bumpCustomSoundRev(safeStorageLocalRef());
         if (importResult) {
           importResult.textContent = `取込完了: ${imported}本を${byKey.size}キーに自動割当しました` +
             (unmatched > 0 ? `(未対応${unmatched}本はファイル名からNo.を特定できませんでした)` : '');

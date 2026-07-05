@@ -138,6 +138,10 @@ import { anonymousIdenticonDataUrl } from '../lib/anonymousIdenticon.js';
 import { tailStorageKey } from '../lib/commentTailBuffer.js';
 import { pickNewVenueSpeech, mergeSpeakersIntoVenueRows, liveFeedSpeechRows } from '../lib/venueSpeech.js';
 import { isContextInvalidatedError } from '../lib/reportSilentError.js';
+// v0.1.1080: マイ効果音・ボイス/BGM計器が直接 chrome.storage.local を叩くと、拡張リロード後の
+//   古い会場レイヤーで同期 TypeError(chrome.storage が undefined)が uncaught のまま残る。
+//   唯一の安全な入口に集約する(popup-entry.js と同じ helper を共有)。
+import { safeStorageLocalGet, safeStorageLocalSet, safeStorageOnChangedAddListener } from '../lib/safeStorageLocal.js';
 import {
   updateSpeechStreak,
   pruneSpeechStreaks,
@@ -2091,6 +2095,9 @@ export function mountVenueBarButton(options = {}) {
   let aggregateInFlight = false;
   let speechTimer = 0;
   let speechInFlight = false;
+  // v0.1.1080: Phase C の受動tick(BGMダック+フェーズ進行)の id。拡張リロード後は
+  //   markContextInvalidated から clearInterval する(他の会場タイマーと同型)。
+  let bgmPhaseTickTimer = 0;
   let speechGeneration = 0;
   let speechLiveId = '';
   /** @type {{ seenKeys: Set<string>|null, primed: boolean }} */
@@ -2175,7 +2182,7 @@ export function mountVenueBarButton(options = {}) {
     }).catch(() => {});
   };
   refreshCustomSoundState();
-  chrome.storage.onChanged?.addListener?.((changes, area) => {
+  safeStorageOnChangedAddListener((changes, area) => {
     if (area !== 'local' || !changes[KEY_CUSTOM_SOUND_REV]) return;
     refreshCustomSoundState();
   });
@@ -2235,7 +2242,7 @@ export function mountVenueBarButton(options = {}) {
     _voiceEffectDiagLastWriteAt = now;
     _voiceEffectDiagCounters.soundEnabled = _effectSoundEnabledCache;
     const snap = { ...buildVoiceEffectDiagSnapshot(_voiceEffectDiagCounters, now), source: 'venue' };
-    void chrome.storage.local.set({ [KEY_VOICE_EFFECT_DIAG]: snap }).catch(() => {});
+    void safeStorageLocalSet({ [KEY_VOICE_EFFECT_DIAG]: snap });
   };
   // VOICEVOX発話中判定(§4.3)。読み上げ側(voicePlayer)は改変せず、再生中フラグと待機キュー長を
   //   読み取り専用で参照するだけ。発話中(またはキュー2件以上)は voice_* をスキップして諦める
@@ -2430,12 +2437,12 @@ export function mountVenueBarButton(options = {}) {
   let _bgmVolumeReach = BGM_REACH_DEFAULT_VOLUME;
   let _bgmVolumeFever = BGM_FEVER_DEFAULT_VOLUME;
   const _bgmRuntime = createBgmRuntime();
-  void chrome.storage.local.get([KEY_BGM_ENABLED, KEY_BGM_VOLUME_REACH, KEY_BGM_VOLUME_FEVER]).then((bag) => {
+  void safeStorageLocalGet([KEY_BGM_ENABLED, KEY_BGM_VOLUME_REACH, KEY_BGM_VOLUME_FEVER]).then((bag) => {
     _bgmEnabledCache = isBgmEnabled(bag?.[KEY_BGM_ENABLED]);
     if (Number.isFinite(Number(bag?.[KEY_BGM_VOLUME_REACH]))) _bgmVolumeReach = clampBgmVolume(Number(bag[KEY_BGM_VOLUME_REACH]));
     if (Number.isFinite(Number(bag?.[KEY_BGM_VOLUME_FEVER]))) _bgmVolumeFever = clampBgmVolume(Number(bag[KEY_BGM_VOLUME_FEVER]));
-  }).catch(() => {});
-  chrome.storage.onChanged?.addListener?.((changes, area) => {
+  });
+  safeStorageOnChangedAddListener((changes, area) => {
     if (area !== 'local') return;
     if (changes[KEY_BGM_ENABLED]) _bgmEnabledCache = isBgmEnabled(changes[KEY_BGM_ENABLED].newValue);
     if (changes[KEY_BGM_VOLUME_REACH] && Number.isFinite(Number(changes[KEY_BGM_VOLUME_REACH].newValue))) {
@@ -2454,7 +2461,7 @@ export function mountVenueBarButton(options = {}) {
     _bgmPhaseDiagLastWriteAt = now;
     _bgmPhaseDiagCounters.bgmEnabled = _bgmEnabledCache;
     const snap = buildBgmPhaseDiagSnapshot(_bgmPhaseDiagCounters, now);
-    void chrome.storage.local.set({ [KEY_BGM_PHASE_DIAG]: snap }).catch(() => {});
+    void safeStorageLocalSet({ [KEY_BGM_PHASE_DIAG]: snap });
   };
 
   /**
@@ -2630,7 +2637,10 @@ export function mountVenueBarButton(options = {}) {
   //   (voicePlayer自体は無改変・読み取り専用参照)。(b) イベントが無い間も減衰/降格/リーチ120秒上限/
   //   フィーバー終了判定を進める受動tick(§3.3の時間依存の遷移はイベント駆動だけでは進まないため)。
   //   新規のstorage/直列readは増やさない(純粋な時間計算のみ・MEMORY鉄則)。
-  window.setInterval(() => {
+  // v0.1.1080: 拡張リロード後は markContextInvalidated が clearInterval する(他の会場
+  //   タイマーと同型)。これが無いと advancePhaseDirector 経由の publishBgmPhaseDiag が
+  //   無効化された chrome.storage へ触り続け、タブを閉じない限り空 tick が走り続ける。
+  bgmPhaseTickTimer = window.setInterval(() => {
     if (_bgmRuntime.isPlaying()) {
       if (isNarratingNow()) _bgmRuntime.duck();
       else _bgmRuntime.unduck();
@@ -4257,6 +4267,8 @@ export function mountVenueBarButton(options = {}) {
     try { stopAggregation(); } catch { /* no-op */ }
     try { stopSpeechPolling(); } catch { /* no-op */ }
     try { stopCrowdMotion(); } catch { /* no-op */ }
+    // v0.1.1080: Phase C の受動tick(BGMダック+フェーズ進行)も他の会場タイマーと同型で止める。
+    if (bgmPhaseTickTimer) { clearInterval(bgmPhaseTickTimer); bgmPhaseTickTimer = 0; }
     try {
       title.textContent = '⚠ 拡張が更新されました。ページを再読み込み(F5)してください';
       title.style.color = '#ffcf66';
