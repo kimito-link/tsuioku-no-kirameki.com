@@ -26,6 +26,9 @@ import { existsSync, readFileSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
+// リリース工程ガード「版混在の実行時検知」(2026-07-06): コピー前後の BUILD_ID を出し、
+//   「Chrome をリロードするまで版混在の状態が続く」ことを毎回明示する。
+import { extractBundleBuildId } from '../src/lib/bundleBuildId.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(__dirname, '..');
@@ -47,12 +50,31 @@ function warnIfSynced(p) {
   }
 }
 
+/**
+ * コピー先(既存)の代表バンドルから NL_BUILD_ID を読む。コピー先が未作成/ファイルが無ければ '不明'。
+ *   リリース工程ガード「版混在の実行時検知」(2026-07-06)の一部: コピー前後で BUILD_ID がどう
+ *   変わったかを出し、「Chrome をリロードするまで版混在が続く」ことを毎回明示する。
+ * @param {string} dir extension ディレクトリ(コピー元/コピー先どちらにも使う)
+ * @returns {string}
+ */
+function readBuildIdFromDir(dir) {
+  try {
+    const text = readFileSync(resolve(dir, 'dist', 'popup.js'), 'utf8');
+    return extractBundleBuildId(text);
+  } catch {
+    return '不明';
+  }
+}
+
 async function main() {
   if (!existsSync(srcDir)) {
     console.error(`コピー元 extension/ が見つかりません: ${srcDir}`);
     process.exit(1);
   }
   warnIfSynced(destDir);
+
+  // コピー(robocopy /MIR)で上書きされる前に、コピー先(旧)の BUILD_ID を読んでおく。
+  const oldBuildId = readBuildIdFromDir(destDir);
 
   // Windows は robocopy で丸ごとミラー(/MIR=コピー先を完全同期・消し残し無し)。
   //   Node の fs.cpSync は Windows で大きめツリーをコピーすると native crash(0xC0000409)する個体が
@@ -83,9 +105,16 @@ async function main() {
     /* no-op */
   }
 
+  // コピー後(新)の BUILD_ID。コピー先はもう robocopy でコピー元と同じ内容になっている。
+  const newBuildId = readBuildIdFromDir(destDir);
+
   console.log(`\n✅ 拡張を同期外フォルダへコピーしました(v${version})`);
   console.log(`   コピー元: ${srcDir}`);
   console.log(`   コピー先: ${destDir}`);
+  console.log(`   BUILD_ID: ${oldBuildId} → ${newBuildId}`);
+  console.log(
+    '   ⚠ Chrome に反映するには chrome://extensions でリロードが必要です(それまで版混在の状態です)。'
+  );
   console.log('\n次の手順:');
   console.log('  初回だけ: chrome://extensions →「パッケージ化されていない拡張機能を読み込む」→ 上のコピー先を選ぶ');
   console.log('  2回目以降: chrome://extensions でこの拡張の更新ボタン(🔄)を押す');

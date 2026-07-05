@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1082',
+    date: '2026-07-06',
+    summary: '拡張の版混在を検知してリロード案内',
+    items: Object.freeze([
+      '更新が中途半端に当たっている状態(拡張本体とページのファイルの版がズレている状態)を検知して、画面上部にお知らせを出すようにしました。表示されたら chrome://extensions で拡張をリロードしてください。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1081',
     date: '2026-07-06',
     summary: 'コミット漏れimport検査を追加',

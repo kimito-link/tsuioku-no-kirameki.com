@@ -22,6 +22,10 @@
  */
 
 import { KEY_AI_SHARE_POPUP_DIAG } from '../lib/aiSharePopupDiagKey.js';
+// リリース工程ガード「版混在の実行時検知」(2026-07-06): NL_BUNDLE_VERSION(このバンドルの
+//   ビルド時 package.json version)と chrome.runtime.getManifest().version(実行時本体 version)を
+//   突合し、ズレていれば画面上部にバナーを出す。詳細は src/lib/versionMismatch.js の背景コメント参照。
+import { detectVersionMismatch } from '../lib/versionMismatch.js';
 // v0.1.1080: BGM設定パネル(Phase C)が直接 chrome.storage.local を叩くと、status.html を
 //   タブに残したまま拡張をリロードした場合に同期 TypeError が uncaught で残る。
 //   唯一の安全な入口に集約する(popup-entry.js/venueBar.js と同じ helper を共有)。
@@ -307,6 +311,32 @@ bootstrap().catch((err) => {
   console.error('[status] bootstrap failed:', err);
 });
 
+/**
+ * リリース工程ガード「版混在の実行時検知」(2026-07-06)。
+ *   このバンドル(status.js)をビルドした時点の package.json version(NL_BUNDLE_VERSION)と、
+ *   実行時に効いている本体 manifest の version を突合する。ズレていれば
+ *   #nlVersionMismatchBanner に文言を出す(DOM は一度作ったら remove せず hidden 切替=
+ *   status-guard.js の流儀に倣う)。
+ */
+function checkVersionMismatchBanner() {
+  const el = document.getElementById('nlVersionMismatchBanner');
+  if (!el) return;
+  let manifestVersion = '';
+  try {
+    manifestVersion = String(chrome.runtime.getManifest()?.version || '');
+  } catch {
+    manifestVersion = '';
+  }
+  const bundledVersion = typeof NL_BUNDLE_VERSION !== 'undefined' ? String(NL_BUNDLE_VERSION) : '';
+  const result = detectVersionMismatch(bundledVersion, manifestVersion);
+  if (result.mismatch) {
+    el.textContent = result.message;
+    el.removeAttribute('hidden');
+  } else {
+    el.setAttribute('hidden', '');
+  }
+}
+
 async function bootstrap() {
   // status-guard.js(「何があっても開く」保険)への合図: 本体が起動したことを伝え、
   //   guard の起動見張り(BOOT_TIMEOUT_MS)を解除する。これより後の描画が重くても guard は黙る。
@@ -332,6 +362,12 @@ async function bootstrap() {
   // 自分の URL を footer に
   const urlEl = document.getElementById('statusPageUrl');
   if (urlEl) urlEl.textContent = location.href;
+
+  try {
+    checkVersionMismatchBanner();
+  } catch {
+    /* no-op: バナー描画に失敗しても通常の初期化は続ける */
+  }
 
   setupButtons();
   setupVisibilityHandler();

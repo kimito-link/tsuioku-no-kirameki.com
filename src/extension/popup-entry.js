@@ -14,6 +14,10 @@ import { KEY_MILESTONE_EFFECT_DIAG } from '../lib/milestoneEffectDiagKey.js';
 //   同期 TypeError が uncaught のまま chrome://extensions に残る(.catch() は非同期 reject にしか
 //   効かない)。唯一の安全な入口に集約する(content-entry.js の setStorageLocalSilent と同型)。
 import { safeStorageLocalGet, safeStorageLocalSet } from '../lib/safeStorageLocal.js';
+// リリース工程ガード「版混在の実行時検知」(2026-07-06): NL_BUNDLE_VERSION(このバンドルの
+//   ビルド時 package.json version)と chrome.runtime.getManifest().version(実行時本体 version)を
+//   突合し、ズレていれば画面上部にバナーを出す。詳細は src/lib/versionMismatch.js の背景コメント参照。
+import { detectVersionMismatch } from '../lib/versionMismatch.js';
 import { directHit, makeInitialComboState } from '../lib/effectDirector.js';
 import { readInlineModeFlags } from '../lib/inlineModeFlags.js';
 import { pickWatchUrlFromMultipleSources } from '../lib/popupWatchUrlResolveMultiTab.js';
@@ -17475,6 +17479,32 @@ function paintVersionBadge() {
 }
 
 /**
+ * リリース工程ガード「版混在の実行時検知」(2026-07-06)。
+ *   このバンドル(popup.js)をビルドした時点の package.json version(NL_BUNDLE_VERSION)と、
+ *   実行時に効いている本体 manifest の version を突合する。ズレていれば
+ *   #nlVersionMismatchBanner に文言を出す(DOM は一度作ったら remove せず hidden 切替)。
+ *   chrome.runtime.getManifest() 自体は同期 API だが context invalidated 時に投げうるため try/catch。
+ */
+function checkVersionMismatchBanner() {
+  const el = /** @type {HTMLElement|null} */ ($('nlVersionMismatchBanner'));
+  if (!el) return;
+  let manifestVersion = '';
+  try {
+    manifestVersion = String(chrome.runtime.getManifest()?.version || '');
+  } catch {
+    manifestVersion = '';
+  }
+  const bundledVersion = typeof NL_BUNDLE_VERSION !== 'undefined' ? String(NL_BUNDLE_VERSION) : '';
+  const result = detectVersionMismatch(bundledVersion, manifestVersion);
+  if (result.mismatch) {
+    el.textContent = result.message;
+    el.removeAttribute('hidden');
+  } else {
+    el.setAttribute('hidden', '');
+  }
+}
+
+/**
  * content 側の高速診断キャッシュを採用してよいか。
  * 別放送 liveId の stale 診断を混ぜないため、watch URL がある場合は同一放送のみ許可する。
  *
@@ -18009,6 +18039,11 @@ async function initPopup() {
     paintVersionBadge();
   } catch {
     /* no-op */
+  }
+  try {
+    checkVersionMismatchBanner();
+  } catch {
+    /* no-op: バナー描画に失敗しても通常の初期化は続ける */
   }
   try {
     initCustomSoundRuntimeOnce();

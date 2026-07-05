@@ -52,6 +52,9 @@ export default [
         // esbuild --define で注入する release フラグ（NL_RELEASE=1 ビルドで true）。
         //   true のとき status の生診断JSON/全文共有ボタン/AI共有欄を隠す(v0.1.857)。
         NL_RELEASE: 'readonly',
+        // esbuild --define で注入する package.json version(版混在の実行時検知用・2026-07-06)。
+        //   chrome.runtime.getManifest().version と突合する(src/lib/versionMismatch.js)。
+        NL_BUNDLE_VERSION: 'readonly',
         // status の「スマホへ送信」用に esbuild --define で注入するアップロード設定
         //（.env から。未設定時は空文字 → ボタン無効）。
         NL_STATUS_INGEST_KEY: 'readonly',
@@ -174,8 +177,11 @@ export default [
     //   paintPhaseMeterPopup/triggerPhaseMeterPulsePopup。DOM/タイマー/chrome.storageのグルーで
     //   lib抽出不可。純関数本体はvoiceDirector.js・phaseDirector.jsにテスト付きで隔離済み)を
     //   追加=20663→20789。ラチェットは実測+50の20839へ。
+    //   リリース工程ガード「版混在の実行時検知」(2026-07-06): checkVersionMismatchBanner
+    //   (chrome.runtime.getManifest()と突合するDOM反映グルー=lib抽出不可。純関数本体は
+    //   src/lib/versionMismatch.jsにテスト付きで隔離済み)を追加=20789→20845。ラチェットは実測+50へ。
     files: ['src/extension/popup-entry.js'],
-    rules: { 'max-lines': ['error', { max: 20839, skipBlankLines: false, skipComments: false }] }
+    rules: { 'max-lines': ['error', { max: 20895, skipBlankLines: false, skipComments: false }] }
   },
   {
     files: ['src/extension/popup/**/*.js'],
