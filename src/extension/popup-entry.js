@@ -9,6 +9,11 @@ import {
 } from './popup/report/htmlReportDocument.js';
 import { makeInitialMilestoneEffectDiag, buildMilestoneEffectDiagSnapshot } from '../lib/milestoneEffectDiag.js';
 import { KEY_MILESTONE_EFFECT_DIAG } from '../lib/milestoneEffectDiagKey.js';
+// v0.1.1080: マイ効果音・ボイス/BGM/操作音の計器が直接 chrome.storage.local を叩くと、
+//   拡張リロード後の古い inline iframe で「Cannot read properties of undefined (reading 'local')」の
+//   同期 TypeError が uncaught のまま chrome://extensions に残る(.catch() は非同期 reject にしか
+//   効かない)。唯一の安全な入口に集約する(content-entry.js の setStorageLocalSilent と同型)。
+import { safeStorageLocalGet, safeStorageLocalSet } from '../lib/safeStorageLocal.js';
 import { directHit, makeInitialComboState } from '../lib/effectDirector.js';
 import { readInlineModeFlags } from '../lib/inlineModeFlags.js';
 import { pickWatchUrlFromMultipleSources } from '../lib/popupWatchUrlResolveMultiTab.js';
@@ -1010,7 +1015,7 @@ function publishMilestoneEffectDiag() {
   _milestoneEffectDiagLastWriteAt = now;
   _milestoneEffectDiagCounters.soundEnabled = _effectSoundEnabledCache;
   const snap = buildMilestoneEffectDiagSnapshot(_milestoneEffectDiagCounters, now);
-  void chrome.storage.local.set({ [KEY_MILESTONE_EFFECT_DIAG]: snap }).catch(() => {});
+  void safeStorageLocalSet({ [KEY_MILESTONE_EFFECT_DIAG]: snap });
 }
 
 // Phase B(2026-07-05): パチンコボイス演出+歯止め(council/pachinko-ultimate-SYNTHESIS.md §4/§6)。
@@ -1025,16 +1030,16 @@ function publishVoiceEffectDiag() {
   _voiceEffectDiagLastWriteAt = now;
   _voiceEffectDiagCounters.soundEnabled = _effectSoundEnabledCache;
   const snap = { ...buildVoiceEffectDiagSnapshot(_voiceEffectDiagCounters, now), source: 'popup' };
-  void chrome.storage.local.set({ [KEY_VOICE_EFFECT_DIAG]: snap }).catch(() => {});
+  void safeStorageLocalSet({ [KEY_VOICE_EFFECT_DIAG]: snap });
 }
 
 // Phase D1(2026-07-05): 操作音(council/operation-sound-SYNTHESIS.md)。
 //   「コメント送信=玉の打ち出し」の核。押下=op_handle・成功=op_shot(投稿成功数nで4段に育つ)。
 //   マスタートグルは既存の効果音設定(_effectSoundEnabledCache)と独立(§4.2・既定ON)。
 let _opSoundEnabledCache = true;
-void chrome.storage.local.get(KEY_OP_SOUND_ENABLED).then((bag) => {
+void safeStorageLocalGet(KEY_OP_SOUND_ENABLED).then((bag) => {
   _opSoundEnabledCache = isOpSoundEnabled(bag?.[KEY_OP_SOUND_ENABLED]);
-}).catch(() => {});
+});
 /** liveId → この配信での自分の投稿成功数(result.ok の回数)。liveId切替時は新規0から。 */
 const _opSoundSelfPostCountByLiveId = Object.create(null);
 let _opSoundGateState = makeInitialOpSoundGateState();
@@ -1047,7 +1052,7 @@ function publishOpSoundEffectDiag() {
   _opSoundEffectDiagLastWriteAt = now;
   _opSoundEffectDiagCounters.soundEnabled = _opSoundEnabledCache;
   const snap = { ...buildOpSoundEffectDiagSnapshot(_opSoundEffectDiagCounters, now), source: 'popup' };
-  void chrome.storage.local.set({ [KEY_OP_SOUND_EFFECT_DIAG]: snap }).catch(() => {});
+  void safeStorageLocalSet({ [KEY_OP_SOUND_EFFECT_DIAG]: snap });
 }
 
 /**
@@ -1294,11 +1299,11 @@ let _bgmEnabledCachePopup = true; // v0.1.1075: 既定ON(ユーザー明示指�
 let _bgmVolumeReachCache = BGM_REACH_DEFAULT_VOLUME;
 let _bgmVolumeFeverCache = BGM_FEVER_DEFAULT_VOLUME;
 const _bgmRuntimePopup = createBgmRuntime();
-void chrome.storage.local.get([KEY_BGM_ENABLED, KEY_BGM_VOLUME_REACH, KEY_BGM_VOLUME_FEVER]).then((bag) => {
+void safeStorageLocalGet([KEY_BGM_ENABLED, KEY_BGM_VOLUME_REACH, KEY_BGM_VOLUME_FEVER]).then((bag) => {
   _bgmEnabledCachePopup = isBgmEnabled(bag?.[KEY_BGM_ENABLED]);
   if (Number.isFinite(Number(bag?.[KEY_BGM_VOLUME_REACH]))) _bgmVolumeReachCache = clampBgmVolume(Number(bag[KEY_BGM_VOLUME_REACH]));
   if (Number.isFinite(Number(bag?.[KEY_BGM_VOLUME_FEVER]))) _bgmVolumeFeverCache = clampBgmVolume(Number(bag[KEY_BGM_VOLUME_FEVER]));
-}).catch(() => {});
+});
 
 const _bgmPhaseDiagCountersPopup = makeInitialBgmPhaseDiag();
 let _bgmPhaseDiagLastWriteAtPopup = 0;
@@ -1308,7 +1313,7 @@ function publishBgmPhaseDiagPopup() {
   _bgmPhaseDiagLastWriteAtPopup = now;
   _bgmPhaseDiagCountersPopup.bgmEnabled = _bgmEnabledCachePopup;
   const snap = buildBgmPhaseDiagSnapshot(_bgmPhaseDiagCountersPopup, now);
-  void chrome.storage.local.set({ [KEY_BGM_PHASE_DIAG]: snap }).catch(() => {});
+  void safeStorageLocalSet({ [KEY_BGM_PHASE_DIAG]: snap });
 }
 
 /**
@@ -1536,9 +1541,24 @@ async function advancePhaseDirectorPopup(events = {}) {
 // Phase C: フィーバー中の音量ダック(VOICEVOX読み上げはpopup文脈に無いため常時unduck扱い)+
 //   受動tick(イベントが無い間も減衰/降格/リーチ120秒上限/フィーバー終了判定を進める)。
 //   新規のstorage/直列readは増やさない(純粋な時間計算のみ)。
-window.setInterval(() => {
-  if (_streamDetectedAtMsPopup > 0) void advancePhaseDirectorPopup({});
-}, 1000);
+// v0.1.1080: 拡張リロード後は id を保持して clearInterval する(20530行付近の
+//   popupPollIntervalId と同型)。これが無いと、advancePhaseDirectorPopup 経由の
+//   publishBgmPhaseDiagPopup が無効化された chrome.storage へ触り続け、
+//   タブを閉じない限り「空 tick」が永続的に走り続ける。
+let _phaseDirectorPopupTickId = /** @type {number|null} */ (
+  /** @type {unknown} */ (
+    window.setInterval(() => {
+      if (!hasExtensionContext()) {
+        if (_phaseDirectorPopupTickId != null) {
+          clearInterval(_phaseDirectorPopupTickId);
+          _phaseDirectorPopupTickId = null;
+        }
+        return;
+      }
+      if (_streamDetectedAtMsPopup > 0) void advancePhaseDirectorPopup({});
+    }, 1000)
+  )
+);
 
 /** @type {number|null} */
 let _prevEventBannerRank = null;

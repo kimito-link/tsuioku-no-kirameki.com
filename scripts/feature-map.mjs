@@ -277,11 +277,18 @@ function extractStorageAccess(text) {
   //   - chrome.storage.local.get → consumer / set,remove → producer
   //   - setStorageLocalSilent(...) は content-entry.js 固有の set ラッパー → producer
   //     (これを拾わないと KEY_LIVE_BROADCASTER_CTX のように「書き手が見えない」誤検知が出る)
+  //   - safeStorageLocalGet/Set/Remove(...)(v0.1.1080・src/lib/safeStorageLocal.js)は
+  //     popup-entry.js/venueBar.js/status-entry.js 共通の context-invalidated 安全ラッパー。
+  //     これを拾わないと Phase A〜D1 で追加した診断キー(KEY_VOICE_EFFECT_DIAG 等)が軒並み
+  //     「書き手が見えない」誤検知になる(実際は producer/consumer とも実在)。
   /** @type {{ re: RegExp, role: 'producer'|'consumer' }[]} */
   const patterns = [
     { re: /chrome\.storage\.local\.get\s*\(/g, role: 'consumer' },
     { re: /chrome\.storage\.local\.(?:set|remove)\s*\(/g, role: 'producer' },
-    { re: /\bsetStorageLocalSilent\s*\(/g, role: 'producer' }
+    { re: /\bsetStorageLocalSilent\s*\(/g, role: 'producer' },
+    { re: /\bsafeStorageLocalGet\s*\(/g, role: 'consumer' },
+    { re: /\bsafeStorageLocalSet\s*\(/g, role: 'producer' },
+    { re: /\bsafeStorageLocalRemove\s*\(/g, role: 'producer' }
   ];
   for (const { re, role } of patterns) {
     const target = role === 'consumer' ? consumers : producers;

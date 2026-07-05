@@ -48,12 +48,12 @@ graph LR
   n_venue --> n_src_lib_phaseDirector_js["lib/phaseDirector.js"]:::shared
   n_venue --> n_src_lib_popupAvatarResolver_js["lib/popupAvatarResolver.js"]:::shared
   n_venue --> n_src_lib_reportSilentError_js["lib/reportSilentError.js"]:::shared
+  n_venue --> n_src_lib_safeStorageLocal_js["lib/safeStorageLocal.js"]:::shared
   n_venue --> n_src_lib_storageKeys_js["lib/storageKeys.js"]:::shared
   n_venue --> n_src_lib_storageOpTimeout_js["lib/storageOpTimeout.js"]:::shared
   n_venue --> n_src_lib_storyAvatarTvFallbackClass_js["lib/storyAvatarTvFallbackClass.js"]:::shared
   n_venue --> n_src_lib_storyTileTvStyle_js["lib/storyTileTvStyle.js"]:::shared
-  n_venue --> n_src_lib_storyUserLaneBuckets_js["lib/storyUserLaneBuckets.js"]:::shared
   classDef shared fill:#eee,stroke:#999,color:#666;
 ```
 
-> ほか 45 ファイル省略（全件は storage-bus.md / metafile 参照）。
+> ほか 46 ファイル省略（全件は storage-bus.md / metafile 参照）。
