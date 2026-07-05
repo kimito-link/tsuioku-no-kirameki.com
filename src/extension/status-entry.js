@@ -105,6 +105,10 @@ import { KEY_VOICE_EFFECT_DIAG } from '../lib/voiceEffectDiagKey.js';
 //   in/out回数・現在フェーズ・R値・B値を extras(12秒間引き)で読む。venueBar/popup が書く純観測値。
 import { buildBgmPhaseDiagLines } from '../lib/bgmPhaseDiag.js';
 import { KEY_BGM_PHASE_DIAG } from '../lib/bgmPhaseDiagKey.js';
+// Phase D1(2026-07-05): 操作音(opSoundDirector.js)の「押下→成功→発音」観測値を extras(12秒間引き)で
+//   読む。popup が書く純観測値=「押下は鳴るのに成功が無い/成功しているのに未割当」を1枚で見分ける。
+import { buildOpSoundEffectDiagLines } from '../lib/opSoundEffectDiag.js';
+import { KEY_OP_SOUND_EFFECT_DIAG } from '../lib/opSoundEffectDiagKey.js';
 // v0.1.1072: マイ効果音(customSoundStore.js・Phase A)の取込状況を extras(12秒間引き)で計測する。
 //   コアreadには足さない(既知の地雷=v1045/v1046)。IDBが開けない環境では静かに「-」表示。
 import { buildCustomSoundDiagSnapshot, buildCustomSoundDiagLine } from '../lib/customSoundDiag.js';
@@ -236,7 +240,9 @@ let _extrasCache = /** @type {{reportPreview:any, watchTabMap:any, trendFindings
   // Phase B(v0.1.1073): パチンコボイス演出の発火/スキップ内訳。補助情報=extras(12秒間引き)のみ。
   voiceEffectDiag: null,
   // Phase C(v0.1.1074): BGM in/out・現在フェーズ・R値・B値。補助情報=extras(12秒間引き)のみ。
-  bgmPhaseDiag: null
+  bgmPhaseDiag: null,
+  // Phase D1(2026-07-05): 操作音の押下→成功→発音観測値。補助情報=extras(12秒間引き)のみ。
+  opSoundEffectDiag: null
 });
 /** v0.1.868: 配信カードの再構築 skip 判定用 signature(変化なしなら innerHTML を作り直さない)。 */
 let _lastLivesSig = '';
@@ -515,14 +521,17 @@ async function refresh(opts = {}) {
       // Phase C(v0.1.1074): BGM/フェーズ計器も extras(12秒間引き)へ(補助情報・コアreadに足さない)。
       step = 'loadBgmPhaseDiag';
       const bgmPhaseDiag = await runStorageOpWithTimeout(() => loadBgmPhaseDiagSafe(), tmo).catch(() => null);
-      _extrasCache = { reportPreview, watchTabMap, trendFindings, laneDiag, laneMirror, statCardsMirror, northStarMirror, voiceDiag, venueSeatsDiag, publishOutcomeRec, commentTimelineMirror, previewRenderAck, backfillLiveMetric, giftEffectDiag, milestoneEffectDiag, customSoundDiag, voiceEffectDiag, bgmPhaseDiag };
+      // Phase D1(2026-07-05): 操作音(押下→成功→発音)計器も extras(12秒間引き)へ(補助情報・コアreadに足さない)。
+      step = 'loadOpSoundEffectDiag';
+      const opSoundEffectDiag = await runStorageOpWithTimeout(() => loadOpSoundEffectDiagSafe(), tmo).catch(() => null);
+      _extrasCache = { reportPreview, watchTabMap, trendFindings, laneDiag, laneMirror, statCardsMirror, northStarMirror, voiceDiag, venueSeatsDiag, publishOutcomeRec, commentTimelineMirror, previewRenderAck, backfillLiveMetric, giftEffectDiag, milestoneEffectDiag, customSoundDiag, voiceEffectDiag, bgmPhaseDiag, opSoundEffectDiag };
       _extrasCacheAt = Date.now();
       _mark('extras');
     }
-    const { reportPreview, watchTabMap, trendFindings, laneDiag, laneMirror, statCardsMirror, northStarMirror, voiceDiag, venueSeatsDiag, publishOutcomeRec, commentTimelineMirror, previewRenderAck, backfillLiveMetric, giftEffectDiag, milestoneEffectDiag, customSoundDiag, voiceEffectDiag, bgmPhaseDiag } = _extrasCache;
+    const { reportPreview, watchTabMap, trendFindings, laneDiag, laneMirror, statCardsMirror, northStarMirror, voiceDiag, venueSeatsDiag, publishOutcomeRec, commentTimelineMirror, previewRenderAck, backfillLiveMetric, giftEffectDiag, milestoneEffectDiag, customSoundDiag, voiceEffectDiag, bgmPhaseDiag, opSoundEffectDiag } = _extrasCache;
     step = 'renderAll';
     // v0.1.1005: 前サイクルの所要計器をコピー本文へ渡す(画面ヘッダーだけでなく AI共有テキストにも出す)。
-    renderAll({ lvList, summaries, fastDiag, popupDiag, backfillProgress, backfillLiveMetric, voiceDiag, venueSeatsDiag, laneDiag, laneMirror, statCardsMirror, northStarMirror, reportPreview, trendFindings, watchTabMap, publishOutcomeRec, commentTimelineMirror, previewRenderAck, refreshPerf: _lastRefreshPerf, giftEffectDiag, milestoneEffectDiag, customSoundDiag, voiceEffectDiag, bgmPhaseDiag });
+    renderAll({ lvList, summaries, fastDiag, popupDiag, backfillProgress, backfillLiveMetric, voiceDiag, venueSeatsDiag, laneDiag, laneMirror, statCardsMirror, northStarMirror, reportPreview, trendFindings, watchTabMap, publishOutcomeRec, commentTimelineMirror, previewRenderAck, refreshPerf: _lastRefreshPerf, giftEffectDiag, milestoneEffectDiag, customSoundDiag, voiceEffectDiag, bgmPhaseDiag, opSoundEffectDiag });
     _mark('render');
     const _totalMs = Math.round((typeof performance !== 'undefined' ? performance.now() : Date.now()) - _t0);
     updateLastUpdateMeta({ totalMs: _totalMs, stepMs: _stepMs });
@@ -851,6 +860,17 @@ async function loadBgmPhaseDiagSafe() {
   }
 }
 
+// Phase D1(2026-07-05): popup が書く「操作音(押下→成功→発音)」観測値を読む。
+//   投稿操作が一度も無い配信なら null=行を出さない(voiceEffectDiag と同方針)。
+async function loadOpSoundEffectDiagSafe() {
+  try {
+    const bag = await chrome.storage.local.get(KEY_OP_SOUND_EFFECT_DIAG);
+    return bag?.[KEY_OP_SOUND_EFFECT_DIAG] || null;
+  } catch {
+    return null;
+  }
+}
+
 // v0.1.1072: マイ効果音(customSoundStore.js)の取込状況を読む。status ページ自身が IndexedDB を
 //   直接開いて件数を数える(他ページの publish を待たない=診断ページの統計行と同じ読み方)。
 //   IDBが開けない環境(indexedDB未定義・open失敗)では dbAvailable:false で静かに「-」表示にする。
@@ -1054,7 +1074,7 @@ async function loadBackfillLiveMetricSafe() {
 // v0.1.861: レポートプレビューの信頼度注釈の文脈は純関数 reportPreviewCtxFromFastDiag(src/lib)に抽出済み
 //   (NDGR 接続/userId 付き率/backfill 進行 → 注釈ctx・挙動同値・テストで固定)。import は冒頭。
 
-function renderAll({ lvList, summaries, fastDiag, popupDiag, backfillProgress, backfillLiveMetric, voiceDiag, venueSeatsDiag, laneDiag, laneMirror, statCardsMirror, northStarMirror, reportPreview, trendFindings, watchTabMap, publishOutcomeRec, commentTimelineMirror, previewRenderAck, refreshPerf, giftEffectDiag, milestoneEffectDiag, customSoundDiag, voiceEffectDiag, bgmPhaseDiag }) {
+function renderAll({ lvList, summaries, fastDiag, popupDiag, backfillProgress, backfillLiveMetric, voiceDiag, venueSeatsDiag, laneDiag, laneMirror, statCardsMirror, northStarMirror, reportPreview, trendFindings, watchTabMap, publishOutcomeRec, commentTimelineMirror, previewRenderAck, refreshPerf, giftEffectDiag, milestoneEffectDiag, customSoundDiag, voiceEffectDiag, bgmPhaseDiag, opSoundEffectDiag }) {
   // v0.1.847: 各描画セクションを独立 try/catch で隔離するヘルパ。1つが throw しても他のセクションと
   //   最終更新メタを巻き込まない=「セルが全部消える/最終更新—のまま固まる」を根治。落ちた場所は
   //   console と AI 共有欄に出して真因を追えるようにする(star-romi 失敗体験の除去)。
@@ -1199,11 +1219,18 @@ function renderAll({ lvList, summaries, fastDiag, popupDiag, backfillProgress, b
     const bLines = buildBgmPhaseDiagLines(bgmPhaseDiag, Date.now());
     bgmPhaseLine = bLines.length ? `\n${bLines.join('\n')}` : '';
   });
+  // Phase D1(2026-07-05): 操作音(押下→成功→発音)計器を概要に併記(投稿操作が一度も
+  //   無い配信なら空=ノイズにしない)。「押下は鳴るのに成功が無い/成功しても未割当」を1枚で確認。
+  let opSoundEffectLine = '';
+  safeSection('操作音計器', () => {
+    const oLines = buildOpSoundEffectDiagLines(opSoundEffectDiag, Date.now());
+    opSoundEffectLine = oLines.length ? `\n${oLines.join('\n')}` : '';
+  });
   const overviewEl = document.getElementById('overviewBody');
   if (overviewEl) {
     overviewEl.textContent =
       (overviewText || '視聴中の配信はありません。') +
-      backfillLine + laneLine + voiceLine + reportPreviewLine + giftEffectLine + milestoneEffectLine + customSoundLine + voiceEffectLine + bgmPhaseLine;
+      backfillLine + laneLine + voiceLine + reportPreviewLine + giftEffectLine + milestoneEffectLine + customSoundLine + voiceEffectLine + bgmPhaseLine + opSoundEffectLine;
     overviewEl.classList.toggle('empty-note', !overviewText);
   }
 
@@ -1376,7 +1403,7 @@ function renderAll({ lvList, summaries, fastDiag, popupDiag, backfillProgress, b
   // AI 共有用テキスト
   let fullText = '';
   safeSection('AI共有テキスト', () => {
-    fullText = buildAiShareFullText({ overviewText, livesData, fastDiag, popupDiag, voiceDiag, venueSeatsDiag, laneDiag, laneMirror, reportPreview, trendFindings, jsonBlob, currentLiveId, publishKeys, publishOutcomeRec, previewRenderAck, refreshPerf, giftEffectDiag, milestoneEffectDiag, customSoundDiag, voiceEffectDiag, bgmPhaseDiag });
+    fullText = buildAiShareFullText({ overviewText, livesData, fastDiag, popupDiag, voiceDiag, venueSeatsDiag, laneDiag, laneMirror, reportPreview, trendFindings, jsonBlob, currentLiveId, publishKeys, publishOutcomeRec, previewRenderAck, refreshPerf, giftEffectDiag, milestoneEffectDiag, customSoundDiag, voiceEffectDiag, bgmPhaseDiag, opSoundEffectDiag });
     const ta = /** @type {HTMLTextAreaElement|null} */ (
       document.getElementById('aiShareText')
     );

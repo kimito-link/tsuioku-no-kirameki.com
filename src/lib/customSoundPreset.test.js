@@ -8,25 +8,57 @@ import {
   buildPresetNoIndex
 } from './customSoundPreset.js';
 
+// council/operation-sound-SYNTHESIS.md §5.1: op_* キー(Phase D1操作音)は既存85本の同一No.を
+//   複数キーから「意図的に」参照する(重複購入ゼロにするための設計)。よって id/No. の重複禁止は
+//   op_* を除いた元の85本表の中でのみ検証する(op_*での再参照は仕様どおりで異常ではない)。
+const ORIGINAL_85_KEYS = Object.keys(CUSTOM_SOUND_PRESET).filter((k) => !k.startsWith('op_'));
+
 describe('CUSTOM_SOUND_PRESET(85素材の完全割り当て表)', () => {
-  it('全85素材が割り当て済み(SE52+ボイス22+BGM11の検算)', () => {
-    expect(countPresetAssets()).toBe(85);
+  it('元の85素材が割り当て済み(SE52+ボイス22+BGM11の検算・op_*を除く)', () => {
+    const original85Count = ORIGINAL_85_KEYS.reduce(
+      (sum, key) => sum + CUSTOM_SOUND_PRESET[key].length,
+      0
+    );
+    expect(original85Count).toBe(85);
   });
 
-  it('id が重複しない', () => {
+  it('op_* を含む全キーの延べアセット数はcountPresetAssetsと一致する(op_*は既存Noの再参照ぶん加算)', () => {
+    const opKeys = Object.keys(CUSTOM_SOUND_PRESET).filter((k) => k.startsWith('op_'));
+    const opCount = opKeys.reduce((sum, key) => sum + CUSTOM_SOUND_PRESET[key].length, 0);
+    const original85Count = ORIGINAL_85_KEYS.reduce(
+      (sum, key) => sum + CUSTOM_SOUND_PRESET[key].length,
+      0
+    );
+    expect(countPresetAssets()).toBe(original85Count + opCount);
+  });
+
+  it('id が重複しない(op_*を除く元の85本表の中で)', () => {
     const ids = [];
-    for (const list of Object.values(CUSTOM_SOUND_PRESET)) {
-      for (const asset of list) ids.push(asset.id);
+    for (const key of ORIGINAL_85_KEYS) {
+      for (const asset of CUSTOM_SOUND_PRESET[key]) ids.push(asset.id);
     }
     expect(new Set(ids).size).toBe(ids.length);
   });
 
-  it('No. も重複しない', () => {
+  it('No. も重複しない(op_*を除く元の85本表の中で)', () => {
     const nos = [];
-    for (const list of Object.values(CUSTOM_SOUND_PRESET)) {
-      for (const asset of list) nos.push(asset.no);
+    for (const key of ORIGINAL_85_KEYS) {
+      for (const asset of CUSTOM_SOUND_PRESET[key]) nos.push(asset.no);
     }
     expect(new Set(nos).size).toBe(nos.length);
+  });
+
+  it('op_* キーが載っているアセットのNo.は元の85本表に実在する(流用元の裏取り)', () => {
+    const originalNos = new Set();
+    for (const key of ORIGINAL_85_KEYS) {
+      for (const asset of CUSTOM_SOUND_PRESET[key]) originalNos.add(asset.no);
+    }
+    const opKeys = Object.keys(CUSTOM_SOUND_PRESET).filter((k) => k.startsWith('op_'));
+    for (const key of opKeys) {
+      for (const asset of CUSTOM_SOUND_PRESET[key]) {
+        expect(originalNos.has(asset.no)).toBe(true);
+      }
+    }
   });
 
   it('全キーの id は as_<No.> 形式', () => {
@@ -65,6 +97,33 @@ describe('CUSTOM_SOUND_PRESET(85素材の完全割り当て表)', () => {
 
   it('bgm_jingle_win は固定1本', () => {
     expect(CUSTOM_SOUND_PRESET.bgm_jingle_win).toHaveLength(1);
+  });
+
+  it('Phase D1新設op_*キー(操作音)が視聴イベントキーと不共有の13種で含まれる', () => {
+    const opKeys = CUSTOM_SOUND_PRESET_KEYS.filter((k) => k.startsWith('op_'));
+    expect(opKeys).toHaveLength(13);
+    for (const key of [
+      'op_handle', 'op_shot_1', 'op_shot_2', 'op_shot_3', 'op_shot_4',
+      'op_self_milestone', 'op_toggle_on', 'op_toggle_off',
+      'op_panel_open', 'op_panel_close', 'op_seat', 'op_copy', 'op_publish'
+    ]) {
+      expect(opKeys).toContain(key);
+    }
+  });
+
+  it('op_shot_1〜3・op_handle・op_toggle_on/off専用素材は未調達(空配列=no-path・安全側)', () => {
+    for (const key of ['op_handle', 'op_shot_1', 'op_shot_2', 'op_shot_3']) {
+      expect(CUSTOM_SOUND_PRESET[key]).toHaveLength(0);
+    }
+  });
+
+  it('op_shot_4・op_self_milestone・op_toggle_on/off・op_panel_*・op_seat・op_copy・op_publishは既存No.流用で1件ずつ割当済み', () => {
+    for (const key of [
+      'op_shot_4', 'op_self_milestone', 'op_toggle_on', 'op_toggle_off',
+      'op_panel_open', 'op_panel_close', 'op_seat', 'op_copy', 'op_publish'
+    ]) {
+      expect(CUSTOM_SOUND_PRESET[key]).toHaveLength(1);
+    }
   });
 });
 

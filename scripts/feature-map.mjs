@@ -136,7 +136,15 @@ const STORAGE_DISCONNECT_BASELINE = new Set([
   //   静的解析が producer を取りこぼす偽陽性。consumer は venueBar.js/popup-entry.js の
   //   storage.onChanged + status-entry.js の chrome.storage.local.get(直読み)。経路は実在
   //   (customSoundStore.test.js の bumpCustomSoundRev テストで確認済み)。
-  'KEY_CUSTOM_SOUND_REV'
+  'KEY_CUSTOM_SOUND_REV',
+  // 操作音マスタートグル(2026-07-05・Phase D1・council/operation-sound-SYNTHESIS.md §4.2):
+  //   producer は popup-entry.js:storageSetSafe({[KEY_OP_SOUND_ENABLED]:...})(opSoundEnabledToggle
+  //   change ハンドラ)。storageSetSafe は引数の bag を chrome.storage.local.set(bag) に渡す薄いラッパー
+  //   (拡張context無効化を静かに吸収する設計)のため、set 呼び出し引数にキーリテラルが直接現れず
+  //   静的解析が producer を取りこぼす偽陽性。consumer は popup-entry.js の
+  //   chrome.storage.local.get(KEY_OP_SOUND_ENABLED)(起動時キャッシュ)+ openBag 経由(refresh時)。
+  //   経路は実在(storageKeys.test.js の isOpSoundEnabled テストで純関数側は確認済み)。
+  'KEY_OP_SOUND_ENABLED'
 ]);
 
 /**

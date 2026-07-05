@@ -10989,6 +10989,24 @@
               </span>
             </label>
           </div>
+          <!-- Phase D1(2026-07-05・council/operation-sound-SYNTHESIS.md §4.2): 操作音（コメント送信の
+               打ち出し音等・既定ON）。ユーザー自身のジェスチャ起点なのでautoplay制約が無く、
+               確認音を兼ねるため既定ONが妥当。 -->
+          <div class="nl-record-sub">
+            <label for="opSoundEnabledToggle" class="nl-record-sub__label">
+              <input
+                type="checkbox"
+                id="opSoundEnabledToggle"
+                checked
+                aria-label="コメント送信などの操作音を鳴らす"
+              />
+              <span>
+                操作音（コメント送信の打ち出し音など）を鳴らす
+                <span class="nl-record-sub__hint"
+                  >コメント送信ボタンを押したときや送信できたときに、パチンコの打ち出しのような短い操作音を鳴らします。送信を重ねるほど音が育ちます。</span>
+              </span>
+            </label>
+          </div>
           <!-- v0.1.418: 過去ログ自動取り込み（既定 ON）。OFF にすると手動ボタンのみ。
                v0.1.450 (PR4): 動機説明（なぜ取り込むか）と手動 trigger の案内をここに統合。
                以前は下の #backfillFetchPrompt（コメント入力直下）にあった説明文を、ボタン廃止に

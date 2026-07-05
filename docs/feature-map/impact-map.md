@@ -212,6 +212,8 @@
 | `src/lib/northStarMirrorKey.js` | 2 | ポップアップ(応援レーン) / 状態速報ページ |
 | `src/lib/officialContributionRankingResolver.js` | 2 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) |
 | `src/lib/officialEventBannerDom.js` | 2 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) |
+| `src/lib/opSoundEffectDiag.js` | 2 | ポップアップ(応援レーン) / 状態速報ページ |
+| `src/lib/opSoundEffectDiagKey.js` | 2 | ポップアップ(応援レーン) / 状態速報ページ |
 | `src/lib/panelMetricsExport.js` | 2 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) |
 | `src/lib/previewRenderAckKey.js` | 2 | ポップアップ(応援レーン) / 状態速報ページ |
 | `src/lib/reportPreview.js` | 2 | ポップアップ(応援レーン) / 状態速報ページ |
@@ -507,6 +509,7 @@
 | `src/lib/officialNicoStatsStripDigest.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/officialStatsWindow.js` | 1 | 記録エンジン(watchページ常駐) |
 | `src/lib/openingFiveMinuteCorrelation.js` | 1 | ポップアップ(応援レーン) |
+| `src/lib/opSoundDirector.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/ownPostedUserIdSet.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/paintPerfLog.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/paintTopSupportRankStyleIntoElement.js` | 1 | ポップアップ(応援レーン) |

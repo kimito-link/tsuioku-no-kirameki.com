@@ -28,6 +28,7 @@ import {
   giftSubAppHistoryStorageKey,
   isCommentEnterSendEnabled,
   isRecordingEnabled,
+  isOpSoundEnabled,
   isDeepHarvestQuietUiEnabled,
   isUsageTermsAcknowledged,
   normalizeInlinePanelWidthMode,
@@ -265,5 +266,12 @@ describe('storage key constants', () => {
     expect(isRecordingEnabled(null)).toBe(true);
     expect(isRecordingEnabled(true)).toBe(true);
     expect(isRecordingEnabled(false)).toBe(false);
+  });
+
+  it('isOpSoundEnabled は false のみ無効（未設定時は既定ON・Phase D1操作音マスタートグル）', () => {
+    expect(isOpSoundEnabled(undefined)).toBe(true);
+    expect(isOpSoundEnabled(null)).toBe(true);
+    expect(isOpSoundEnabled(true)).toBe(true);
+    expect(isOpSoundEnabled(false)).toBe(false);
   });
 });

@@ -211,7 +211,9 @@ import {
   KEY_BGM_ENABLED,
   KEY_BGM_VOLUME_REACH,
   KEY_BGM_VOLUME_FEVER,
-  isBgmEnabled
+  isBgmEnabled,
+  KEY_OP_SOUND_ENABLED,
+  isOpSoundEnabled
 } from '../lib/storageKeys.js';
 import {
   playEffectSound,
@@ -263,6 +265,22 @@ import {
 import { makeInitialBgmPhaseDiag, buildBgmPhaseDiagSnapshot } from '../lib/bgmPhaseDiag.js';
 import { KEY_BGM_PHASE_DIAG } from '../lib/bgmPhaseDiagKey.js';
 import { maybePlayEventRankChangeSound } from '../lib/officialEventRankSoundEffect.js';
+// Phase D1(2026-07-05): 操作音(council/operation-sound-SYNTHESIS.md)。コメント投稿=玉の打ち出し。
+//   検知点は拡張自身の投稿経路(押下=op_handle・成功=op_shot)。乱数ゼロ・全て決定論。
+import {
+  OP_SHOT_LADDER,
+  OP_SHOT_COMBO_WINDOW_MS,
+  shotKindForSelfPostCount,
+  opSelfMilestoneFor,
+  makeInitialOpSoundGateState,
+  opSoundGate
+} from '../lib/opSoundDirector.js';
+import {
+  makeInitialOpSoundEffectDiag,
+  opSoundDiagFieldForPlayResult,
+  buildOpSoundEffectDiagSnapshot
+} from '../lib/opSoundEffectDiag.js';
+import { KEY_OP_SOUND_EFFECT_DIAG } from '../lib/opSoundEffectDiagKey.js';
 // Phase A(2026-07-05): マイ効果音差し替え(IndexedDB取込+割当)。起動時+customSoundRev変化時に
 //   customVariantPaths を再構築し、playEffectSound の deps へカスタム優先で注入する
 //   (effectSoundPlayer.js は無改変)。
@@ -1007,6 +1025,97 @@ function publishVoiceEffectDiag() {
   const snap = { ...buildVoiceEffectDiagSnapshot(_voiceEffectDiagCounters, now), source: 'popup' };
   void chrome.storage.local.set({ [KEY_VOICE_EFFECT_DIAG]: snap }).catch(() => {});
 }
+
+// Phase D1(2026-07-05): 操作音(council/operation-sound-SYNTHESIS.md)。
+//   「コメント送信=玉の打ち出し」の核。押下=op_handle・成功=op_shot(投稿成功数nで4段に育つ)。
+//   マスタートグルは既存の効果音設定(_effectSoundEnabledCache)と独立(§4.2・既定ON)。
+let _opSoundEnabledCache = true;
+void chrome.storage.local.get(KEY_OP_SOUND_ENABLED).then((bag) => {
+  _opSoundEnabledCache = isOpSoundEnabled(bag?.[KEY_OP_SOUND_ENABLED]);
+}).catch(() => {});
+/** liveId → この配信での自分の投稿成功数(result.ok の回数)。liveId切替時は新規0から。 */
+const _opSoundSelfPostCountByLiveId = Object.create(null);
+let _opSoundGateState = makeInitialOpSoundGateState();
+let _opSoundComboState = makeInitialComboState();
+const _opSoundEffectDiagCounters = makeInitialOpSoundEffectDiag();
+let _opSoundEffectDiagLastWriteAt = 0;
+function publishOpSoundEffectDiag() {
+  const now = Date.now();
+  if (now - _opSoundEffectDiagLastWriteAt < 3000) return; // 3秒 min-gap(他の診断と同型)。
+  _opSoundEffectDiagLastWriteAt = now;
+  _opSoundEffectDiagCounters.soundEnabled = _opSoundEnabledCache;
+  const snap = { ...buildOpSoundEffectDiagSnapshot(_opSoundEffectDiagCounters, now), source: 'popup' };
+  void chrome.storage.local.set({ [KEY_OP_SOUND_EFFECT_DIAG]: snap }).catch(() => {});
+}
+
+/**
+ * 操作音1本を、決定論ゲート(opSoundGate)を通してから鳴らす共通ヘルパー。
+ *   playEffectSound の戻り値でだけ計上する(嘘をつかない・§7)。P1(大当たりチェーン)実行中は
+ *   自己応答レーン(op_handle/op_shot)以外を破棄する(§4.2 P4.5)。
+ * @param {string} key op_* のいずれか
+ * @param {{ isP1Active?: boolean }} [opts]
+ * @returns {'played'|'guarded'|'no-path'|'error'|'p1_active'|'off'}
+ */
+function triggerOpSound(key, opts = {}) {
+  if (!_opSoundEnabledCache) return 'off';
+  const now = Date.now();
+  const gate = opSoundGate(_opSoundGateState, key, now, { isP1Active: Boolean(opts.isP1Active) });
+  _opSoundGateState = gate.nextState;
+  if (!gate.allowed) {
+    _opSoundEffectDiagCounters.guardedCount += 1;
+    _opSoundEffectDiagCounters.lastEventAt = now;
+    publishOpSoundEffectDiag();
+    return gate.reason === 'p1_active' ? 'p1_active' : 'guarded';
+  }
+  const result = playEffectSound(key, buildEffectSoundDeps(key));
+  _opSoundEffectDiagCounters.lastKind = key;
+  _opSoundEffectDiagCounters.lastEventAt = now;
+  const field = opSoundDiagFieldForPlayResult(result);
+  if (field === 'fired') {
+    _opSoundEffectDiagCounters.handleFired += key === 'op_handle' ? 1 : 0;
+    _opSoundEffectDiagCounters.shotFired += OP_SHOT_LADDER.includes(key) ? 1 : 0;
+    _opSoundEffectDiagCounters.milestoneFired += key === 'op_self_milestone' ? 1 : 0;
+  } else if (field === 'guarded') {
+    _opSoundEffectDiagCounters.guardedCount += 1;
+  } else if (field === 'no-path') {
+    _opSoundEffectDiagCounters.noPathCount += 1;
+  }
+  publishOpSoundEffectDiag();
+  return result;
+}
+
+/**
+ * コメント送信ボタン押下/Enter送信/音声自動送信のいずれの経路でも submitComment() の
+ *   冒頭から呼ばれる。「操作を受け付けた」事実だけを鳴らす(送信成功は別トリガ)。
+ */
+function triggerOpSoundHandlePress() {
+  _opSoundEffectDiagCounters.handlePressed += 1;
+  triggerOpSound('op_handle');
+}
+
+/**
+ * コメント送信成功(result.ok)を受けて、この liveId での自分の投稿成功数 n を1つ進め、
+ *   育成段(shotKindForSelfPostCount)+60秒コンボ(directHit)+節目(opSelfMilestoneFor)を
+ *   決定論で判定し、対応する op_shot_* または op_self_milestone を1本だけ鳴らす(置換のみ)。
+ * @param {string} liveId
+ */
+function triggerOpSoundShotSuccess(liveId) {
+  const lid = String(liveId || '').trim().toLowerCase();
+  const prevCount = lid ? Number(_opSoundSelfPostCountByLiveId[lid]) || 0 : 0;
+  const n = prevCount + 1;
+  if (lid) _opSoundSelfPostCountByLiveId[lid] = n;
+  _opSoundEffectDiagCounters.shotSucceeded += 1;
+  _opSoundEffectDiagCounters.selfPostCount = n;
+
+  const baseKind = shotKindForSelfPostCount(n);
+  _opSoundComboState = directHit(_opSoundComboState, baseKind, Date.now(), {
+    ladder: OP_SHOT_LADDER,
+    windowMs: OP_SHOT_COMBO_WINDOW_MS
+  });
+  const kind = opSelfMilestoneFor(n) ? 'op_self_milestone' : _opSoundComboState.kind;
+  triggerOpSound(kind);
+}
+
 /**
  * 会場window(venueBar)が開いていれば popup 側のボイスは譲る(二重再生防止・会場優先。
  *   officialEventRankSoundEffect.js の shouldPopupSkipEffectSoundForVenue と同じ判定)。
@@ -1149,7 +1258,7 @@ let _streamDetectedAtMsPopup = 0;
 let _phaseLiveIdPopup = '';
 let _reachBgmStatePopup = makeInitialReachBgmState();
 let _feverBgmStatePopup = makeInitialFeverBgmState();
-let _bgmEnabledCachePopup = false; // 既定OFF(オプトイン・§5.1)
+let _bgmEnabledCachePopup = true; // v0.1.1075: 既定ON(ユーザー明示指示・isBgmEnabledと同じ向き)
 let _bgmVolumeReachCache = BGM_REACH_DEFAULT_VOLUME;
 let _bgmVolumeFeverCache = BGM_FEVER_DEFAULT_VOLUME;
 const _bgmRuntimePopup = createBgmRuntime();
@@ -14003,6 +14112,14 @@ async function refresh() {
     effectSoundEl.disabled = false;
   }
 
+  // Phase D1(2026-07-05): 操作音(コメント送信の打ち出し音等) ON/OFF(既定ON)。
+  _opSoundEnabledCache = isOpSoundEnabled(openBag[KEY_OP_SOUND_ENABLED]);
+  const opSoundEnabledEl = /** @type {HTMLInputElement|null} */ ($('opSoundEnabledToggle'));
+  if (opSoundEnabledEl) {
+    opSoundEnabledEl.checked = _opSoundEnabledCache;
+    opSoundEnabledEl.disabled = false;
+  }
+
   // Phase C(2026-07-05): パチンコBGM ON/OFF(既定OFF)。
   _bgmEnabledCachePopup = isBgmEnabled(openBag[KEY_BGM_ENABLED]);
   const bgmEnabledEl = /** @type {HTMLInputElement|null} */ ($('bgmEnabledToggle'));
@@ -18672,6 +18789,8 @@ async function initPopup() {
         toggle.checked = !next;
         return;
       }
+      // Phase D1(操作音・§1.2): 記録トグルON/OFF=コイン投入/返却の比喩。保存成功時のみ鳴らす。
+      triggerOpSound(next ? 'op_toggle_on' : 'op_toggle_off');
       safeRefresh();
     } catch {
       toggle.checked = !next;
@@ -18701,6 +18820,19 @@ async function initPopup() {
       const ok = await storageSetSafe({ [KEY_EFFECT_SOUND_ENABLED]: effectSoundToggle.checked });
       if (!ok) return;
       _effectSoundEnabledCache = effectSoundToggle.checked;
+    } catch {
+      //
+    }
+  });
+
+  // Phase D1(2026-07-05・council/operation-sound-SYNTHESIS.md §4.2): 操作音マスタートグル(既定ON)。
+  const opSoundEnabledToggle = /** @type {HTMLInputElement|null} */ ($('opSoundEnabledToggle'));
+  if (opSoundEnabledToggle) opSoundEnabledToggle.checked = _opSoundEnabledCache;
+  opSoundEnabledToggle?.addEventListener('change', async () => {
+    try {
+      const ok = await storageSetSafe({ [KEY_OP_SOUND_ENABLED]: opSoundEnabledToggle.checked });
+      if (!ok) return;
+      _opSoundEnabledCache = opSoundEnabledToggle.checked;
     } catch {
       //
     }
@@ -19147,6 +19279,8 @@ async function initPopup() {
       .then((ok) => {
         if (ok) {
           setFrameShareStatus('共有コードをコピーしました。', 'success');
+          // Phase D1(操作音・§1.2): コピー成功=コイン1枚獲得の比喩。失敗時は無音(嘘をつかない)。
+          triggerOpSound('op_copy');
           return;
         }
         setFrameShareStatus('コピーに失敗しました。', 'error');
@@ -19282,6 +19416,8 @@ async function initPopup() {
         }
       });
       playReportCompleteVoiceSequence(); // v0.1.806: 保存成功直後に完了音声(完成→ゆっくりみてね)
+      // Phase D1(操作音・§1.2): HTMLレポート保存成功=レジ精算(世に出す)の比喩。失敗時は無音。
+      triggerOpSound('op_publish');
     } catch (e) {
       const errMsg = String(
         e && typeof e === 'object' && 'message' in e
@@ -19377,6 +19513,9 @@ async function initPopup() {
     COMMENT_POST_UI_STATE.submitting = true;
     clearCommentPostNotice();
     paintCommentComposeUi();
+    // Phase D1(操作音): 「ハンドルに触れた」= 実際に送信処理へ進んだ瞬間(押下/Enter/音声自動送信の
+    //   3経路すべてがここを通る)。空欄・kindness警告での引っかかりは鳴らさない(操作の実行を待つ)。
+    triggerOpSoundHandlePress();
     try {
       if (lvPost && toggle.checked) {
         void appendSelfPostedComment(lvPost, text);
@@ -19401,6 +19540,9 @@ async function initPopup() {
             sessionDedupeKey: `self_comment_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
           })
         );
+        // Phase D1(操作音): 「玉の打ち出し」= 送信成功(result.ok)。育成段+コンボ+節目を決定論で
+        //   判定し op_shot_* または op_self_milestone を1本だけ鳴らす(送信失敗時は無音=嘘をつかない)。
+        triggerOpSoundShotSuccess(lvPost || watchPopupLastPaintedLiveId);
         setCommentPostNotice('コメントを送信しました。', 'success');
         const growthEl = /** @type {HTMLElement|null} */ ($('sceneStoryGrowth'));
         if (growthEl) patchStoryGrowthIconsFromSource(growthEl);
@@ -19503,6 +19645,8 @@ async function initPopup() {
       await storageSetSafe({
         [KEY_VOICE_AUTOSEND]: voiceAutoSend.checked
       });
+      // Phase D1(操作音・§1.2): 音声コメント自動送信トグルON/OFF=コイン投入/返却の比喩。
+      triggerOpSound(voiceAutoSend.checked ? 'op_toggle_on' : 'op_toggle_off');
     } catch {
       //
     }
