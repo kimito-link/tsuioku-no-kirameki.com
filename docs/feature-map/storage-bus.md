@@ -97,6 +97,7 @@
 | `KEY_COMMENT_INGEST_LOG` | extension/content-entry.js<br>extension/popup-entry.js | extension/content-entry.js<br>extension/popup-entry.js |
 | `KEY_COMMENT_PANEL_AUTO_RESTORE` | — | extension/content-entry.js |
 | `KEY_COMMENT_PANEL_STATUS` | extension/content-entry.js | extension/popup-entry.js |
+| `KEY_COMMENT_POST_DIAG` | extension/popup-entry.js | extension/status-entry.js |
 | `KEY_COMMENT_TIMELINE_MIRROR` | extension/content-entry.js | extension/popup-entry.js<br>extension/status-entry.js |
 | `KEY_CONCURRENT_CALIBRATION_RING_V1` | extension/content-entry.js<br>extension/popup-entry.js | extension/content-entry.js<br>extension/popup-entry.js |
 | `KEY_CUSTOM_SOUND_REV` | — | extension/status-entry.js |

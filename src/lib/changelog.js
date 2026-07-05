@@ -26,6 +26,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1083',
+    date: '2026-07-06',
+    summary: 'fix(post): 送信5秒締切+自コメ取り消しの厳格化',
+    items: Object.freeze([
+      'コメント送信で「送信中…」が長時間張り付くことがあった不具合を直しました(5秒で「届いている可能性があります」と表示してボタンを戻します)。',
+      '自分のコメントがレーンに一瞬表示されて消えることがあった不具合を、送信結果が「不明(タイムアウト)」のときは取り消さないよう修正しました。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1082',
     date: '2026-07-06',
     summary: '拡張の版混在を検知してリロード案内',

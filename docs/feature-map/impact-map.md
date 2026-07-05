@@ -181,6 +181,8 @@
 | `src/lib/commenterFollowCache.js` | 2 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) |
 | `src/lib/commenterFollowingListCache.js` | 2 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) |
 | `src/lib/commentIngestLog.js` | 2 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) |
+| `src/lib/commentPostDiag.js` | 2 | ポップアップ(応援レーン) / 状態速報ページ |
+| `src/lib/commentPostDiagKey.js` | 2 | ポップアップ(応援レーン) / 状態速報ページ |
 | `src/lib/commentSubmitProfiling.js` | 2 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) |
 | `src/lib/commentTickerNameLink.js` | 2 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) |
 | `src/lib/concurrentCalibrationLog.js` | 2 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) |
@@ -342,6 +344,7 @@
 | `src/lib/commentPanelHealthProbe.js` | 1 | 記録エンジン(watchページ常駐) |
 | `src/lib/commentPanelStatus.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/commentPipelineLog.js` | 1 | 記録エンジン(watchページ常駐) |
+| `src/lib/commentPostDeadline.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/commentPostDom.js` | 1 | 記録エンジン(watchページ常駐) |
 | `src/lib/commentPostRetriable.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/commentPostStatusPresentation.js` | 1 | ポップアップ(応援レーン) |

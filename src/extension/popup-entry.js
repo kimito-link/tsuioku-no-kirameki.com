@@ -728,6 +728,19 @@ import { prioritizeWatchTabCandidates } from '../lib/watchTabPrioritize.js';
 import { prioritizeWatchFramesForWatchUrl } from '../lib/watchFrameRank.js';
 import { storyTileUsesYukkuriTvStyle } from '../lib/storyTileTvStyle.js';
 import { withCommentSendTroubleshootHint } from '../lib/commentSendTroubleshootHint.js';
+// Phase(2026-07-06 感度パッチ): コメント送信の総締切+revert厳格化+計器。
+import {
+  withCommentPostDeadline,
+  shouldRevertOptimisticPost,
+  COMMENT_POST_DEADLINE_MS,
+  COMMENT_POST_TIMEOUT_MESSAGE
+} from '../lib/commentPostDeadline.js';
+import {
+  makeInitialCommentPostDiag,
+  commentPostOutcomeKindForResult,
+  buildCommentPostDiagSnapshot
+} from '../lib/commentPostDiag.js';
+import { KEY_COMMENT_POST_DIAG } from '../lib/commentPostDiagKey.js';
 import { avatarCompareKey, isSameAvatarUrl } from '../lib/avatarUrlCompare.js';
 // 一意アバター数の集計(純関数・挙動同値で popup-entry から切り出し)。
 import { countUniqueAvatarEntries } from '../lib/avatarEntryCounts.js';
@@ -1057,6 +1070,19 @@ function publishOpSoundEffectDiag() {
   _opSoundEffectDiagCounters.soundEnabled = _opSoundEnabledCache;
   const snap = { ...buildOpSoundEffectDiagSnapshot(_opSoundEffectDiagCounters, now), source: 'popup' };
   void safeStorageLocalSet({ [KEY_OP_SOUND_EFFECT_DIAG]: snap });
+}
+
+// 感度パッチ(2026-07-06): コメント送信の総所要ms・結果(ok/fail/timeout)・
+//   フレーム試行回数を extras 相乗りの計器として書く(opSoundEffectDiag と同方式)。
+//   目的: 「送信中…」張り付き・自コメ「一瞬載って消える」を状態速報1枚で切り分ける。
+const _commentPostDiagCounters = makeInitialCommentPostDiag();
+let _commentPostDiagLastWriteAt = 0;
+function publishCommentPostDiag() {
+  const now = Date.now();
+  if (now - _commentPostDiagLastWriteAt < 3000) return; // 3秒 min-gap(他の診断と同型)。
+  _commentPostDiagLastWriteAt = now;
+  const snap = { ...buildCommentPostDiagSnapshot(_commentPostDiagCounters, now), source: 'popup' };
+  void safeStorageLocalSet({ [KEY_COMMENT_POST_DIAG]: snap });
 }
 
 /**
@@ -16325,7 +16351,7 @@ async function requestPanelMetricsFromWatchTab(watchUrl, expectedLv) {
  *
  * @param {string} text
  * @param {string} watchUrl
- * @returns {Promise<{ ok: boolean, error: string }>}
+ * @returns {Promise<{ ok: boolean, error: string, frameAttempts?: number }>}
  */
 async function requestPostCommentToOpenTab(text, watchUrl) {
   const trimmed = String(text || '').trim();
@@ -16349,6 +16375,8 @@ async function requestPostCommentToOpenTab(text, watchUrl) {
 
   /** @type {string} */
   let lastDetail = '';
+  // 感度パッチ(2026-07-06): フレーム試行回数(tryPostOnFrame 呼び出し回数)を計器へ渡す。
+  let frameAttemptCount = 0;
 
   /**
    * @param {number} tabId
@@ -16356,6 +16384,7 @@ async function requestPostCommentToOpenTab(text, watchUrl) {
    * @returns {Promise<{ ok: boolean, error?: string }|null>}
    */
   async function tryPostOnFrame(tabId, frameId) {
+    frameAttemptCount += 1;
     try {
       prof?.mark(`T1-f${frameId}-send`);
       const res = await tabsSendMessageWithRetry(tabId, postPayload, {
@@ -16393,7 +16422,7 @@ async function requestPostCommentToOpenTab(text, watchUrl) {
           const res = await tryPostOnFrame(tabId, fid);
           if (res?.ok) {
             await persistLastCommentPostFrame(tabId, fid);
-            return { ok: true, error: '' };
+            return { ok: true, error: '', frameAttempts: frameAttemptCount };
           }
           if (res?.error) lastDetail = String(res.error);
           if (lastDetail && !commentPostErrorWarrantsFrameDiscovery(lastDetail)) {
@@ -16417,7 +16446,7 @@ async function requestPostCommentToOpenTab(text, watchUrl) {
           const res = await tryPostOnFrame(tabId, fid);
           if (res?.ok) {
             await persistLastCommentPostFrame(tabId, fid);
-            return { ok: true, error: '' };
+            return { ok: true, error: '', frameAttempts: frameAttemptCount };
           }
           if (res?.error) lastDetail = String(res.error);
           if (lastDetail && !commentPostErrorWarrantsFrameDiscovery(lastDetail)) {
@@ -16437,7 +16466,8 @@ async function requestPostCommentToOpenTab(text, watchUrl) {
       ok: false,
       error: lastDetail
         ? `コメント送信に失敗しました。（${lastDetail}）`
-        : 'コメント送信に失敗しました。放送タブを再読み込みして再試行してください。'
+        : 'コメント送信に失敗しました。放送タブを再読み込みして再試行してください。',
+      frameAttempts: frameAttemptCount
     };
   } finally {
     prof?.finish('nls-cmt-popup');
@@ -19707,7 +19737,29 @@ async function initPopup() {
         renderExtensionContextBanner(true);
         return;
       }
-      const result = await requestPostCommentToOpenTab(text, watchUrl);
+      // 感度パッチ(2026-07-06): 「送信中…」張り付き根治。requestPostCommentToOpenTab 全体を
+      //   5秒の総締切で有界化する。締切超過は{ok:false, timedOut:true}という「不明」を
+      //   区別できる形で返る(失敗と断定しない=嘘をつかない)。
+      const submitT0 = Date.now();
+      _commentPostDiagCounters.attempts += 1;
+      const result = await withCommentPostDeadline(
+        requestPostCommentToOpenTab(text, watchUrl),
+        COMMENT_POST_DEADLINE_MS
+      );
+      const submitElapsedMs = Date.now() - submitT0;
+      const outcomeKind = commentPostOutcomeKindForResult(result);
+      _commentPostDiagCounters.lastTotalMs = submitElapsedMs;
+      _commentPostDiagCounters.lastOutcome = outcomeKind;
+      _commentPostDiagCounters.lastEventAt = Date.now();
+      _commentPostDiagCounters.totalRetryAttempts += Number(result?.frameAttempts) || 0;
+      if (outcomeKind === 'ok') {
+        _commentPostDiagCounters.okCount += 1;
+      } else if (outcomeKind === 'timeout') {
+        _commentPostDiagCounters.timeoutCount += 1;
+      } else {
+        _commentPostDiagCounters.failCount += 1;
+      }
+      publishCommentPostDiag();
       if (!hasExtensionContext()) {
         renderExtensionContextBanner(true);
         return;
@@ -19729,14 +19781,22 @@ async function initPopup() {
         if (growthEl) patchStoryGrowthIconsFromSource(growthEl);
         return;
       }
-      if (optimisticLogged && lvPost) {
+      // 感度パッチ(2026-07-06): revert は「明確な失敗(ok===false かつ timedOutでない)」の
+      //   ときだけ行う。タイムアウト/応答不明では楽観表示を取り消さない(ニコ生には届いている
+      //   可能性があるコメントをレーンから消すと「一瞬載って消える」症状になるため)。
+      if (optimisticLogged && lvPost && shouldRevertOptimisticPost(result)) {
         await revertLastSelfPostedComment(lvPost, text);
+        _commentPostDiagCounters.revertCount += 1;
+        publishCommentPostDiag();
         optimisticLogged = false;
       }
-      // v0.1.396: requestPostCommentToOpenTab は context-invalidated を内部 catch して
-      //   {ok:false, error:'…Extension context invalidated…'} で返す。この場合は
-      //   通常の失敗文言でなく、ワンクリック復帰バナーを出す（送信中…固まりの根治）。
-      if (isExtensionContextInvalidatedError(result.error || '')) {
+      if (result.timedOut) {
+        // 「不明」を失敗と断定しない文言(既に withCommentPostDeadline が組み立て済み)。
+        setCommentPostNotice(result.error || COMMENT_POST_TIMEOUT_MESSAGE, 'idle');
+      } else if (isExtensionContextInvalidatedError(result.error || '')) {
+        // v0.1.396: requestPostCommentToOpenTab は context-invalidated を内部 catch して
+        //   {ok:false, error:'…Extension context invalidated…'} で返す。この場合は
+        //   通常の失敗文言でなく、ワンクリック復帰バナーを出す（送信中…固まりの根治）。
         renderExtensionContextBanner(true);
         setCommentPostNotice(
           '拡張が更新され接続が切れています。上の「このパネルを再読み込み」で直ります。',
@@ -19749,8 +19809,14 @@ async function initPopup() {
         );
       }
     } catch (e) {
+      _commentPostDiagCounters.failCount += 1;
+      _commentPostDiagCounters.lastOutcome = 'fail';
+      _commentPostDiagCounters.lastEventAt = Date.now();
+      publishCommentPostDiag();
       if (optimisticLogged && lvPost) {
         await revertLastSelfPostedComment(lvPost, text).catch(() => {});
+        _commentPostDiagCounters.revertCount += 1;
+        publishCommentPostDiag();
       }
       // v0.1.396: 拡張の接続が切れた（Extension context invalidated）ときは、
       //   「送信中…」のまま固まって見える（context 喪失で repaint も走らない）。
