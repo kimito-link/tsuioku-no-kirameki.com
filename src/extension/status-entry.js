@@ -98,10 +98,12 @@ import {
   putSoundBlob,
   getSoundBlob,
   listSoundBlobs,
+  countSoundBlobs,
   getAssignment,
   setAssignment,
   clearAssignment,
   listAssignments,
+  countAssignments,
   bumpCustomSoundRev,
   loadLocalBundledSoundManifest
 } from '../lib/customSoundStore.js';
@@ -936,6 +938,10 @@ async function loadCommentPostDiagSafe() {
 // v0.1.1072: マイ効果音(customSoundStore.js)の取込状況を読む。status ページ自身が IndexedDB を
 //   直接開いて件数を数える(他ページの publish を待たない=診断ページの統計行と同じ読み方)。
 //   IDBが開けない環境(indexedDB未定義・open失敗)では dbAvailable:false で静かに「-」表示にする。
+// v0.1.1084: 件数を数えるためだけにBlob本体込みで全件カーソル走査(listSoundBlobs)していたのを
+//   IDBObjectStore.count()ベースのcountSoundBlobs/countAssignmentsへ差し替え(重さ根治P1)。
+//   件数比例で重くなっていた大配信時のextras遅延を解消する(取込UI側のrenderList/renderStatsは
+//   一覧表示そのものが必要なためlistSoundBlobs/listAssignmentsのまま=無改修)。
 async function loadCustomSoundDiagSafe() {
   // ローカル同梱本数(sound/custom/manifest.json)は IndexedDB の有無に関係なく計測する
   //   (install-local-sounds.mjs による自動同梱の実態を必ず出す・静かに0埋め)。
@@ -951,14 +957,14 @@ async function loadCustomSoundDiagSafe() {
   }
   try {
     const db = await openCustomSoundDb();
-    const [blobs, assignments, bag] = await Promise.all([
-      listSoundBlobs(db),
-      listAssignments(db),
+    const [blobCount, assignedKeyCount, bag] = await Promise.all([
+      countSoundBlobs(db),
+      countAssignments(db),
       chrome.storage.local.get(KEY_CUSTOM_SOUND_REV)
     ]);
     return buildCustomSoundDiagSnapshot({
-      blobCount: blobs.length,
-      assignedKeyCount: assignments.length,
+      blobCount,
+      assignedKeyCount,
       totalKeyCount: CUSTOM_SOUND_PRESET_KEYS.length,
       rev: Number(bag?.[KEY_CUSTOM_SOUND_REV]) || 0,
       dbAvailable: true,
