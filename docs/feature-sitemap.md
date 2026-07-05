@@ -549,7 +549,7 @@
 - **影響範囲ゲート(規律を自動化)** — 星野ロミ式「規律を自動ゲートに」。diff から影響大(複数機能波及)の変更ファイルを検出し波及先機能を列挙。警告のみ(摩擦ゼロ)・--strict で exit1。AGENTS.md §10 のルールを diff 発火に
   - `scripts/impact-check.mjs`
   - `docs/feature-map/impact-map.json`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 52</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 53</summary>
 
 - `api/status.js` — status 受け口 Vercel Serverless Function。
 - `extension/status-guard.js` — 状態速報ページ(status.html)の「何があっても開く」保険。
@@ -596,6 +596,7 @@
 - `src/lib/popupAiDiagOrchestrator.js` — v0.1.211: popup「AI 診断」ボタンのオーケストレータ純関数。
 - `src/lib/popupDiagAutoPublish.js` — popup を開いたとき popup 固有診断を status へ自動集約するスケジューラ(純ロジック)。
 - `src/lib/previewHeavyHint.js` — 「応援プレビュー(②)を開いている間は診断更新が重い」を状態速報で名指しする純関数(v0.1.1020)。
+- `src/lib/statusExtrasBatch.js` — 状態速報「重さ根治 P2」: status-entry.js の extras ブロック(12秒間引き)が単一キー get だけの
 - `src/lib/statusFastDiagLite.js` — status.html 用「軽量 fastDiag ダイジェスト」。
 - `src/lib/statusRefreshBackoff.js` — v0.1.1010: 状態速報(status.html)の自動更新を「直近 refresh の所要に比例して間引く」純関数。
 - `src/lib/statusShareUrls.js` — 状態速報の共有 URL を組み立てる純関数。
@@ -794,7 +795,7 @@
 
 ## 🧬 修正系譜マップ(この系統のバグを過去にどう直したか)
 
-> changelog 全 419 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
+> changelog 全 420 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
 
 ### 💾 記録件数 (64版)
 - `v0.1.1084` 2026-07-06 — perf(status): マイ効果音計器のBlob全件走査を廃止
@@ -1468,7 +1469,8 @@
 - `v0.1.673` 2026-06-10 — コメビュの名前をパネルと同じ情報源で補完
 - `v0.1.670` 2026-06-10 — コメビュのアイコンを本家と同じサムネに
 
-### 🩺 診断・状態速報 (152版)
+### 🩺 診断・状態速報 (153版)
+- `v0.1.1085` 2026-07-06 — perf(status): extras読取を1バッチget化
 - `v0.1.1084` 2026-07-06 — perf(status): マイ効果音計器のBlob全件走査を廃止
 - `v0.1.1078` 2026-07-05 — 実物音源のローカル自動同梱+自動割当
 - `v0.1.1077` 2026-07-05 — ボイス空振り消費とpayout張り付き修正
@@ -1645,7 +1647,8 @@
 - `v0.1.806` 2026-06-17 — HTML保存の失敗を根治+完了音声を追加
 - `v0.1.785` 2026-06-16 — 状態ページのタイムアウト警告を拡張エラー欄に出さない
 
-### ⚡ 描画・性能 (101版)
+### ⚡ 描画・性能 (102版)
+- `v0.1.1085` 2026-07-06 — perf(status): extras読取を1バッチget化
 - `v0.1.1084` 2026-07-06 — perf(status): マイ効果音計器のBlob全件走査を廃止
 - `v0.1.1068` 2026-07-04 — ギフト音をパチンコ電子音(きゅいん)に一新+即発音
 - `v0.1.1062` 2026-07-04 — 大配信で状態ページがPC全体を重くする問題を緩和

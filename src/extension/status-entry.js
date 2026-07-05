@@ -56,7 +56,7 @@ import {
   buildLiveviewPublishOutcomeRecord,
   summarizeLiveviewPublishOutcomeRecord
 } from '../lib/liveviewPublishOutcomeKey.js';
-import { KEY_PREVIEW_RENDER_ACK } from '../lib/previewRenderAckKey.js';
+// KEY_PREVIEW_RENDER_ACK は statusExtrasBatch.js の1バッチ get 内で読む(重さ根治 P2・2026-07-06)。
 import { buildHealthCells, summarizeHealthVerdict } from '../lib/healthCells.js';
 import { buildVoiceDiagLine } from '../lib/voiceDiag.js';
 import { KEY_VOICE_DIAG } from '../lib/voiceDiagKey.js';
@@ -76,6 +76,9 @@ import {
 } from '../lib/storageKeys.js';
 // レポートプレビュー信頼度注釈の文脈(fastDiag→ctx)の純関数。挙動同値で status-entry から切り出し。
 import { reportPreviewCtxFromFastDiag } from '../lib/reportPreviewCtx.js';
+// 重さ根治 P2(2026-07-06): extras の単一キー get 項目(17個)を1回の get([...])へ統合する
+//   純粋部品(バッチ対象キー配列+bag からの取り出し)。詳細は statusExtrasBatch.js 冒頭コメント参照。
+import { EXTRAS_BATCH_KEYS, pickExtrasBatchValues } from '../lib/statusExtrasBatch.js';
 // v0.1.902: 会場座席の健全度(配信者混入・固着)を健全度パネルに載せる。
 import { KEY_VENUE_SEATS_DIAG } from '../lib/venueSeatsDiagKey.js';
 import { KEY_GIFT_EFFECT_DIAG } from '../lib/giftEffectDiagKey.js';
@@ -510,12 +513,37 @@ async function refresh(opts = {}) {
     //     どちらも健全度パネルの色セル用の補助情報で、2秒ごとの即時更新は不要=laneDiag と同じ間引きへ。
     const extrasStale = Date.now() - _extrasCacheAt >= EXTRAS_REFETCH_MS;
     if (extrasStale) {
-      step = 'loadVoiceDiagSafe';
-      const voiceDiag = await runStorageOpWithTimeout(() => loadVoiceDiagSafe(), tmo).catch(() => null);
-      step = 'loadVenueSeatsDiagSafe';
-      const venueSeatsDiag = await runStorageOpWithTimeout(() => loadVenueSeatsDiagSafe(), tmo).catch(() => null);
-      step = 'loadReportPreviewSafe';
-      const reportPreview = await runStorageOpWithTimeout(() => loadReportPreviewSafe(), tmo).catch(() => null);
+      // 重さ根治 P2(2026-07-06): 単一キー get のみの17項目(voiceDiag〜commentPostDiag)を
+      //   従来は個別に runStorageOpWithTimeout(=直列 await 17回)していたのを、1回の
+      //   chrome.storage.local.get([...]) へ統合する。混雑時の理論最悪(17×タイムアウト)を
+      //   1×タイムアウトへ縮める。純粋な取り出しロジックは src/lib/statusExtrasBatch.js(test付き)。
+      //   ★統合しないもの(意味が変わる/別APIのため個別 await のまま):
+      //     queryWatchTabMap(chrome.tabs.query)・recordAndAnalyzeTrendSafe(read+set混在)・
+      //     loadCustomSoundDiagSafe(IndexedDB open+count。P1(v0.1.1084)で別途 count() 化済み)。
+      step = 'loadExtrasBatch';
+      const extrasBag = await runStorageOpWithTimeout(
+        () => safeStorageLocalGet(EXTRAS_BATCH_KEYS),
+        tmo
+      ).catch(() => ({}));
+      const {
+        voiceDiag,
+        venueSeatsDiag,
+        reportPreview,
+        laneDiag,
+        laneMirror,
+        statCardsMirror,
+        northStarMirror,
+        publishOutcomeRec,
+        commentTimelineMirror,
+        previewRenderAck,
+        backfillLiveMetric,
+        giftEffectDiag,
+        milestoneEffectDiag,
+        voiceEffectDiag,
+        bgmPhaseDiag,
+        opSoundEffectDiag,
+        commentPostDiag
+      } = pickExtrasBatchValues(extrasBag, Date.now());
       step = 'queryWatchTabMap';
       const watchTabMap = await runStorageOpWithTimeout(() => queryWatchTabMap(), tmo).catch(() => new Map());
       step = 'recordAndAnalyzeTrend';
@@ -523,60 +551,12 @@ async function refresh(opts = {}) {
         () => recordAndAnalyzeTrendSafe(lvList, summaries),
         tmo
       ).catch(() => []);
-      step = 'loadLaneDiagSafe';
-      const laneDiag = await runStorageOpWithTimeout(() => loadLaneDiagSafe(), tmo).catch(() => null);
-      // 応援レーン鏡(顔込み)も extras に同梱=毎回の直列 read を増やさず12秒間引きで読む(診断は軽さ最優先)。
-      step = 'loadLaneMirrorSafe';
-      const laneMirror = await runStorageOpWithTimeout(() => loadLaneMirrorSafe(), tmo).catch(() => null);
-      // 数字カード鏡も extras に同梱=毎回の直列 read を増やさず12秒間引きで読む(診断は軽さ最優先)。
-      step = 'loadStatCardsMirrorSafe';
-      const statCardsMirror = await runStorageOpWithTimeout(() => loadStatCardsMirrorSafe(), tmo).catch(() => null);
-      // 北極星レーン鏡(公式値レーン)も extras に同梱=毎回の直列 read を増やさず12秒間引きで読む。
-      step = 'loadNorthStarMirrorSafe';
-      const northStarMirror = await runStorageOpWithTimeout(() => loadNorthStarMirrorSafe(), tmo).catch(() => null);
-      // 根2対策: 送信結果(ページ横断 storage)を 12秒間引きで読む(新規の重い read を増やさない)。
-      step = 'loadPublishOutcome';
-      const publishOutcomeRec = await runStorageOpWithTimeout(() => loadLiveviewPublishOutcomeSafe(), tmo).catch(() => null);
-      // 第2段: コメントタイムライン鏡も extras に同梱(12秒間引き)。
-      step = 'loadCommentTimelineMirror';
-      const commentTimelineMirror = await runStorageOpWithTimeout(() => loadCommentTimelineMirrorSafe(), tmo).catch(() => null);
-      // v0.1.985: ②応援プレビューの描画 ack(専用キー)も extras に同梱(12秒間引き)=3画面パリティ判定の②描画OKに使う。
-      step = 'loadPreviewRenderAck';
-      const previewRenderAck = await runStorageOpWithTimeout(
-        () => chrome.storage.local.get(KEY_PREVIEW_RENDER_ACK).then((b) => b?.[KEY_PREVIEW_RENDER_ACK] || null),
-        tmo
-      ).catch(() => null);
-      // v0.1.1046: 走行中スループット計器も extras(12秒間引き)へ。★毎回の直列 read に足したら
-      //   大配信で状態速報が固まった(v0.1.909 と同型の地雷=補助 read はコアに足さない)。計器は補助情報
-      //   なので12秒間引きで十分(走行中の目安が取れれば律速切り分けに足りる)。
-      step = 'loadBackfillLiveMetric';
-      const backfillLiveMetric = await runStorageOpWithTimeout(() => loadBackfillLiveMetricSafe(), tmo).catch(() => null);
-      // v0.1.1054: ギフト/広告の検知→演出→効果音 整合診断も extras(12秒間引き)へ(補助情報・コアに足さない)。
-      step = 'loadGiftEffectDiag';
-      const giftEffectDiag = await runStorageOpWithTimeout(() => loadGiftEffectDiagSafe(), tmo).catch(() => null);
-      // v0.1.1058: コメント数マイルストーンの検知→演出→効果音 整合診断も同様に extras へ。
-      step = 'loadMilestoneEffectDiag';
-      const milestoneEffectDiag = await runStorageOpWithTimeout(() => loadMilestoneEffectDiagSafe(), tmo).catch(() => null);
       // v0.1.1072: マイ効果音(取込件数/割当キー数/rev)も extras(12秒間引き)へ。IDB read のため
       //   コアには絶対足さない(既知の地雷=v1045/v1046と同型)。失敗時は「-」表示スナップショットへ。
       step = 'loadCustomSoundDiag';
       const customSoundDiag = await runStorageOpWithTimeout(() => loadCustomSoundDiagSafe(), tmo).catch(() =>
         buildCustomSoundDiagSnapshot({ dbAvailable: false })
       );
-      // Phase B(v0.1.1073): パチンコボイス演出の発火/スキップ内訳も extras(12秒間引き)へ
-      //   (補助情報・コアreadに足さない=既知の地雷)。
-      step = 'loadVoiceEffectDiag';
-      const voiceEffectDiag = await runStorageOpWithTimeout(() => loadVoiceEffectDiagSafe(), tmo).catch(() => null);
-      // Phase C(v0.1.1074): BGM/フェーズ計器も extras(12秒間引き)へ(補助情報・コアreadに足さない)。
-      step = 'loadBgmPhaseDiag';
-      const bgmPhaseDiag = await runStorageOpWithTimeout(() => loadBgmPhaseDiagSafe(), tmo).catch(() => null);
-      // Phase D1(2026-07-05): 操作音(押下→成功→発音)計器も extras(12秒間引き)へ(補助情報・コアreadに足さない)。
-      step = 'loadOpSoundEffectDiag';
-      const opSoundEffectDiag = await runStorageOpWithTimeout(() => loadOpSoundEffectDiagSafe(), tmo).catch(() => null);
-      // 感度パッチ(2026-07-06): コメント送信(所要ms/結果/フレーム試行回数)計器も extras(12秒間引き)へ
-      //   (補助情報・コアreadに足さない)。
-      step = 'loadCommentPostDiag';
-      const commentPostDiag = await runStorageOpWithTimeout(() => loadCommentPostDiagSafe(), tmo).catch(() => null);
       _extrasCache = { reportPreview, watchTabMap, trendFindings, laneDiag, laneMirror, statCardsMirror, northStarMirror, voiceDiag, venueSeatsDiag, publishOutcomeRec, commentTimelineMirror, previewRenderAck, backfillLiveMetric, giftEffectDiag, milestoneEffectDiag, customSoundDiag, voiceEffectDiag, bgmPhaseDiag, opSoundEffectDiag, commentPostDiag };
       _extrasCacheAt = Date.now();
       _mark('extras');
@@ -839,6 +819,9 @@ async function loadPopupDiagSafe() {
 
 // v0.1.852: 会場モード(comeview・別ページ)の読み上げ診断を読む。comeview が定期的に
 //   KEY_VOICE_DIAG(nls_voice_diag_v1)へ書く(発話/間引き時)。会場モード未使用なら null=表示しない。
+// 重さ根治 P2(2026-07-06): 呼び出し元は statusExtrasBatch.js の1バッチ get へ統合済み。
+//   本体は削除せず残置(別の掃除パッチ用)。
+// eslint-disable-next-line no-unused-vars
 async function loadVoiceDiagSafe() {
   try {
     const bag = await chrome.storage.local.get(KEY_VOICE_DIAG);
@@ -850,6 +833,8 @@ async function loadVoiceDiagSafe() {
 
 // v0.1.902: 会場モード(venueBar・別ページ)の座席診断を読む。会場が定期的に
 //   KEY_VENUE_SEATS_DIAG へ書く。会場モード未使用なら null=セルを出さない。
+// 重さ根治 P2(2026-07-06): 呼び出し元は statusExtrasBatch.js の1バッチ get へ統合済み(残置)。
+// eslint-disable-next-line no-unused-vars
 async function loadLaneDiagSafe() {
   try {
     const bag = await chrome.storage.local.get(KEY_LANE_DIAG);
@@ -860,6 +845,8 @@ async function loadLaneDiagSafe() {
 }
 
 // 2026-06-22(council/lane-show-all-active): 会場モード(venueBar・別ページ)の座席診断を読む。
+// 重さ根治 P2(2026-07-06): 呼び出し元は statusExtrasBatch.js の1バッチ get へ統合済み(残置)。
+// eslint-disable-next-line no-unused-vars
 async function loadVenueSeatsDiagSafe() {
   try {
     const bag = await chrome.storage.local.get(KEY_VENUE_SEATS_DIAG);
@@ -871,6 +858,8 @@ async function loadVenueSeatsDiagSafe() {
 
 // v0.1.1054: 会場モード(venueBar)が書く「ギフト/広告の検知→演出→効果音」整合診断を読む。
 //   会場モード未使用/ギフト無し配信なら null=行を出さない(voiceDiag/venueSeatsDiag と同方針)。
+// 重さ根治 P2(2026-07-06): 呼び出し元は statusExtrasBatch.js の1バッチ get へ統合済み(残置)。
+// eslint-disable-next-line no-unused-vars
 async function loadGiftEffectDiagSafe() {
   try {
     const bag = await chrome.storage.local.get(KEY_GIFT_EFFECT_DIAG);
@@ -882,6 +871,8 @@ async function loadGiftEffectDiagSafe() {
 
 // v0.1.1058: popup-entry.js が書く「コメント数マイルストーンの検知→演出→効果音」整合診断を読む。
 //   マイルストーン未到達の配信なら null=行を出さない(giftEffectDiag/voiceDiag と同方針)。
+// 重さ根治 P2(2026-07-06): 呼び出し元は statusExtrasBatch.js の1バッチ get へ統合済み(残置)。
+// eslint-disable-next-line no-unused-vars
 async function loadMilestoneEffectDiagSafe() {
   try {
     const bag = await chrome.storage.local.get(KEY_MILESTONE_EFFECT_DIAG);
@@ -893,6 +884,8 @@ async function loadMilestoneEffectDiagSafe() {
 
 // Phase B(v0.1.1073): venueBar/popup が書く「パチンコボイスの発火/スキップ内訳」を読む。
 //   ボイストリガが一度も無い配信なら null=行を出さない(giftEffectDiag と同方針)。
+// 重さ根治 P2(2026-07-06): 呼び出し元は statusExtrasBatch.js の1バッチ get へ統合済み(残置)。
+// eslint-disable-next-line no-unused-vars
 async function loadVoiceEffectDiagSafe() {
   try {
     const bag = await chrome.storage.local.get(KEY_VOICE_EFFECT_DIAG);
@@ -904,6 +897,8 @@ async function loadVoiceEffectDiagSafe() {
 
 // Phase C(v0.1.1074): venueBar/popup が書く「BGM in/out・現在フェーズ・R値・B値」を読む。
 //   フェーズ判定が一度も走っていない配信なら null=行を出さない(voiceEffectDiagと同方針)。
+// 重さ根治 P2(2026-07-06): 呼び出し元は statusExtrasBatch.js の1バッチ get へ統合済み(残置)。
+// eslint-disable-next-line no-unused-vars
 async function loadBgmPhaseDiagSafe() {
   try {
     const bag = await chrome.storage.local.get(KEY_BGM_PHASE_DIAG);
@@ -915,6 +910,8 @@ async function loadBgmPhaseDiagSafe() {
 
 // Phase D1(2026-07-05): popup が書く「操作音(押下→成功→発音)」観測値を読む。
 //   投稿操作が一度も無い配信なら null=行を出さない(voiceEffectDiag と同方針)。
+// 重さ根治 P2(2026-07-06): 呼び出し元は statusExtrasBatch.js の1バッチ get へ統合済み(残置)。
+// eslint-disable-next-line no-unused-vars
 async function loadOpSoundEffectDiagSafe() {
   try {
     const bag = await chrome.storage.local.get(KEY_OP_SOUND_EFFECT_DIAG);
@@ -926,6 +923,8 @@ async function loadOpSoundEffectDiagSafe() {
 
 // 感度パッチ(2026-07-06): popup が書く「コメント送信(所要ms/結果/フレーム試行回数)」
 //   観測値を読む。送信操作が一度も無い配信なら null=行を出さない(他の診断と同方針)。
+// 重さ根治 P2(2026-07-06): 呼び出し元は statusExtrasBatch.js の1バッチ get へ統合済み(残置)。
+// eslint-disable-next-line no-unused-vars
 async function loadCommentPostDiagSafe() {
   try {
     const bag = await chrome.storage.local.get(KEY_COMMENT_POST_DIAG);
@@ -978,6 +977,8 @@ async function loadCustomSoundDiagSafe() {
 // 応援レーン鏡(KEY_LANE_MIRROR)を読む。popup が renderStoryUserLane の最後で書く=popup を
 //   一度も開いていなければ null=鏡セクションは hidden のまま(死にリンクにしない)。例外時も null。
 //   ★毎回の直列 read は増やさない=この loader は extras(12秒間引き)からだけ呼ぶ(MEMORY 鉄則)。
+// 重さ根治 P2(2026-07-06): 呼び出し元は statusExtrasBatch.js の1バッチ get へ統合済み(残置)。
+// eslint-disable-next-line no-unused-vars
 async function loadLaneMirrorSafe() {
   try {
     const bag = await chrome.storage.local.get(KEY_LANE_MIRROR);
@@ -991,6 +992,8 @@ async function loadLaneMirrorSafe() {
 //   一度も開いていなければ null=鏡セクションは hidden のまま(死にリンクにしない)。例外時も null。
 //   ★毎回の直列 read は増やさない=この loader は extras(12秒間引き)からだけ呼ぶ(MEMORY 鉄則)。
 //   スナップショットは popup 側で確定済み(公式チップも digest 確定)=status はそのまま使う(restore 不要)。
+// 重さ根治 P2(2026-07-06): 呼び出し元は statusExtrasBatch.js の1バッチ get へ統合済み(残置)。
+// eslint-disable-next-line no-unused-vars
 async function loadStatCardsMirrorSafe() {
   try {
     const bag = await chrome.storage.local.get(KEY_STAT_CARDS_MIRROR);
@@ -1000,7 +1003,9 @@ async function loadStatCardsMirrorSafe() {
   }
 }
 
-/** 北極星レーン鏡(公式値レーン)を読む。popup が KEY_NORTH_STAR_MIRROR へ publish。extras(12秒)で読む。 */
+/** 北極星レーン鏡(公式値レーン)を読む。popup が KEY_NORTH_STAR_MIRROR へ publish。extras(12秒)で読む。
+ *  重さ根治 P2(2026-07-06): 呼び出し元は statusExtrasBatch.js の1バッチ get へ統合済み(残置)。 */
+// eslint-disable-next-line no-unused-vars
 async function loadNorthStarMirrorSafe() {
   try {
     const bag = await chrome.storage.local.get(KEY_NORTH_STAR_MIRROR);
@@ -1010,7 +1015,9 @@ async function loadNorthStarMirrorSafe() {
   }
 }
 
-/** 送信結果(ページ横断 storage)を読む。status / live-view どちらの公開ボタンで送ってもここに残る(根2対策)。 */
+/** 送信結果(ページ横断 storage)を読む。status / live-view どちらの公開ボタンで送ってもここに残る(根2対策)。
+ *  重さ根治 P2(2026-07-06): 呼び出し元は statusExtrasBatch.js の1バッチ get へ統合済み(残置)。 */
+// eslint-disable-next-line no-unused-vars
 async function loadLiveviewPublishOutcomeSafe() {
   try {
     const bag = await chrome.storage.local.get(KEY_LIVEVIEW_PUBLISH_OUTCOME);
@@ -1020,7 +1027,9 @@ async function loadLiveviewPublishOutcomeSafe() {
   }
 }
 
-/** コメントタイムライン鏡(最新N件)を読む。popup が KEY_COMMENT_TIMELINE_MIRROR へ publish。extras(12秒)で読む。 */
+/** コメントタイムライン鏡(最新N件)を読む。popup が KEY_COMMENT_TIMELINE_MIRROR へ publish。extras(12秒)で読む。
+ *  重さ根治 P2(2026-07-06): 呼び出し元は statusExtrasBatch.js の1バッチ get へ統合済み(残置)。 */
+// eslint-disable-next-line no-unused-vars
 async function loadCommentTimelineMirrorSafe() {
   try {
     const bag = await chrome.storage.local.get(KEY_COMMENT_TIMELINE_MIRROR);
@@ -1032,6 +1041,8 @@ async function loadCommentTimelineMirrorSafe() {
 
 // v0.1.858: レポート(HTML/マーケ/メディアキット)の DL前 主要KPI を読む。popup が
 //   KEY_REPORT_PREVIEW へ定期(15秒)に書く。古い snapshot(2分超)や popup 未起動なら null=表示しない。
+// 重さ根治 P2(2026-07-06): 呼び出し元は statusExtrasBatch.js の1バッチ get(鮮度判定込み)へ統合済み(残置)。
+// eslint-disable-next-line no-unused-vars
 async function loadReportPreviewSafe() {
   try {
     const bag = await chrome.storage.local.get(KEY_REPORT_PREVIEW);
@@ -1120,7 +1131,9 @@ async function loadBackfillProgressSafe() {
  *   content が走行中に 1Hz で書く。yield bridging が律速か・裏タブペース(fg=0)かを実機で確定する材料。
  *   ⚠️ KEY_BACKFILL_PROGRESS とは別キー。popup は絶対に読まない(v0.1.657 実況殺しの維持)。
  * @returns {{lid:string, running:number, seg:number, rows:number, genSteps:number, dataSegs:number, bridgingSteps:number, yields:number, yieldWaitMsTotal:number, elapsedMs:number, fg:number, ts:number}|null}
+ * 重さ根治 P2(2026-07-06): 呼び出し元は statusExtrasBatch.js の1バッチ get へ統合済み(残置)。
  */
+// eslint-disable-next-line no-unused-vars
 async function loadBackfillLiveMetricSafe() {
   try {
     const bag = await chrome.storage.local.get(KEY_BACKFILL_LIVE_METRIC);
