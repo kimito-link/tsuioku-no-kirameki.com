@@ -2632,6 +2632,18 @@ export function mountVenueBarButton(options = {}) {
     _bgmPhaseDiagCounters.b = _baselineState.value;
     _bgmPhaseDiagCounters.lastEventAt = now;
 
+    // 採点用フェーズ実績(§SC1・BGMトグルと無関係に数える。既存reachInCount等はBGM ON時のみ
+    //   動くため採点に使えない=設計書の重要発見)。liveId・rMax・持続率の分母も同じtickで進める。
+    _bgmPhaseDiagCounters.liveId = liveIdFromPathname();
+    _bgmPhaseDiagCounters.rMax = Math.max(Number(_bgmPhaseDiagCounters.rMax) || 0, r);
+    _bgmPhaseDiagCounters.elapsedMs = (Number(_bgmPhaseDiagCounters.elapsedMs) || 0) + dtMs;
+    if (r >= 1.5) _bgmPhaseDiagCounters.hotDwellMs = (Number(_bgmPhaseDiagCounters.hotDwellMs) || 0) + dtMs;
+    if (result.changed && !result.silent) {
+      if (result.phase === PHASE.REACH) _bgmPhaseDiagCounters.reachCount += 1;
+      else if (result.phase === PHASE.BREAKTHROUGH) _bgmPhaseDiagCounters.breakthroughCount += 1;
+      else if (result.phase === PHASE.JACKPOT) _bgmPhaseDiagCounters.jackpotCount += 1;
+    }
+
     if (result.holdLampFired && _effectSoundEnabledCache) {
       playEffectSound('hold_lamp', buildEffectSoundDeps('hold_lamp'));
     }

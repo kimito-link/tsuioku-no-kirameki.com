@@ -1540,6 +1540,8 @@ async function advancePhaseDirectorPopup(events = {}) {
   const lid = String(watchPopupLastPaintedLiveId || '');
   if (_phaseLiveIdPopup !== lid) {
     // liveId切替: フェーズ関連stateを全リセット(ウォームアップも仕切り直し・§3.2)。
+    //   採点用フェーズ実績カウンタ(§SC1)も同じliveId切替でリセットする
+    //   (resetVoiceGateStateForLiveIfChangedと同型・古い配信の実績を新しい配信へ持ち越さない)。
     _phaseLiveIdPopup = lid;
     _meterStatePopup = makeInitialExcitementMeter();
     _baselineStatePopup = makeInitialBaselineState();
@@ -1547,6 +1549,12 @@ async function advancePhaseDirectorPopup(events = {}) {
     _streamDetectedAtMsPopup = now;
     _reachBgmStatePopup = makeInitialReachBgmState();
     clearPayoutFallbackPopup();
+    _bgmPhaseDiagCountersPopup.reachCount = 0;
+    _bgmPhaseDiagCountersPopup.breakthroughCount = 0;
+    _bgmPhaseDiagCountersPopup.jackpotCount = 0;
+    _bgmPhaseDiagCountersPopup.rMax = 0;
+    _bgmPhaseDiagCountersPopup.hotDwellMs = 0;
+    _bgmPhaseDiagCountersPopup.elapsedMs = 0;
   }
   if (_streamDetectedAtMsPopup === 0) _streamDetectedAtMsPopup = now;
   const dtMs = _meterStatePopup.updatedAt > 0 ? now - _meterStatePopup.updatedAt : 0;
@@ -1561,6 +1569,19 @@ async function advancePhaseDirectorPopup(events = {}) {
   _bgmPhaseDiagCountersPopup.r = r;
   _bgmPhaseDiagCountersPopup.b = _baselineStatePopup.value;
   _bgmPhaseDiagCountersPopup.lastEventAt = now;
+
+  // 採点用フェーズ実績(§SC1・BGMトグルと無関係に数える・skipForVenueより前=会場優先で
+  //   譲っている間もこのpopup自身の観測は止めない。liveIdはlidを直接使う=liveIdFromPathname
+  //   相当の値が既にwatchPopupLastPaintedLiveId経由で確定済み)。
+  _bgmPhaseDiagCountersPopup.liveId = lid;
+  _bgmPhaseDiagCountersPopup.rMax = Math.max(Number(_bgmPhaseDiagCountersPopup.rMax) || 0, r);
+  _bgmPhaseDiagCountersPopup.elapsedMs = (Number(_bgmPhaseDiagCountersPopup.elapsedMs) || 0) + dtMs;
+  if (r >= 1.5) _bgmPhaseDiagCountersPopup.hotDwellMs = (Number(_bgmPhaseDiagCountersPopup.hotDwellMs) || 0) + dtMs;
+  if (result.changed && !result.silent) {
+    if (result.phase === PHASE.REACH) _bgmPhaseDiagCountersPopup.reachCount += 1;
+    else if (result.phase === PHASE.BREAKTHROUGH) _bgmPhaseDiagCountersPopup.breakthroughCount += 1;
+    else if (result.phase === PHASE.JACKPOT) _bgmPhaseDiagCountersPopup.jackpotCount += 1;
+  }
 
   const skipForVenue = await popupShouldSkipVoiceForVenue();
 
