@@ -27,6 +27,8 @@ graph LR
   n_status --> n_src_lib_bgmPhaseDiagKey_js["lib/bgmPhaseDiagKey.js"]:::shared
   n_status --> n_src_lib_broadcasterReputationKeywords_js["lib/broadcasterReputationKeywords.js"]
   n_status --> n_src_lib_broadcasterReputationView_js["lib/broadcasterReputationView.js"]
+  n_status --> n_src_lib_channelSwitchDiag_js["lib/channelSwitchDiag.js"]:::shared
+  n_status --> n_src_lib_channelSwitchDiagKey_js["lib/channelSwitchDiagKey.js"]:::shared
   n_status --> n_src_lib_chikuranCard_js["lib/chikuranCard.js"]
   n_status --> n_src_lib_chikuranHeaderDom_js["lib/chikuranHeaderDom.js"]
   n_status --> n_src_lib_commentCountProvenance_js["lib/commentCountProvenance.js"]
@@ -51,9 +53,7 @@ graph LR
   n_status --> n_src_lib_googleSuggest_js["lib/googleSuggest.js"]
   n_status --> n_src_lib_healthCells_js["lib/healthCells.js"]
   n_status --> n_src_lib_htmlEscape_js["lib/htmlEscape.js"]:::shared
-  n_status --> n_src_lib_inFlightGuard_js["lib/inFlightGuard.js"]
-  n_status --> n_src_lib_instantPushDiag_js["lib/instantPushDiag.js"]:::shared
   classDef shared fill:#eee,stroke:#999,color:#666;
 ```
 
-> ほか 67 ファイル省略（全件は storage-bus.md / metafile 参照）。
+> ほか 69 ファイル省略（全件は storage-bus.md / metafile 参照）。

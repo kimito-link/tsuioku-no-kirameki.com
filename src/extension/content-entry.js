@@ -503,6 +503,9 @@ import {
 } from '../lib/instantCommentPush.js';
 import { applyInstantPushDiagDelta } from '../lib/instantPushDiag.js';
 import { KEY_INSTANT_PUSH_DIAG } from '../lib/instantPushDiagKey.js';
+import { buildLiveChannelSwitchPayload } from '../lib/liveChannelSwitch.js';
+import { applyChannelSwitchDiagDelta } from '../lib/channelSwitchDiag.js';
+import { KEY_CHANNEL_SWITCH_DIAG } from '../lib/channelSwitchDiagKey.js';
 import {
   buildSilentErrorPayload,
   isContextInvalidatedError as isCtxInvalidated,
@@ -3537,6 +3540,41 @@ function attachInlineIframeRevealFallback(host, iframe) {
   }, 2000);
 }
 
+/**
+ * 2026-07-06: 2つの inline popup iframe src が「`lv=` クエリだけ違う」かを判定する純関数寄りヘルパ。
+ *   origin/pathname/inline/pn(即時プッシュ nonce)が完全一致し、lv だけ異なる場合に true を返す。
+ *   これが true のとき、ensureInlinePopupIframe は src を書き換えない(= iframe を再ロードしない)。
+ *   URL parse に失敗する不正な入力は false(安全側=通常の再ロード経路にフォールバック)。
+ * @param {string} prevSrc 既存 iframe の現在の src
+ * @param {string} nextSrc 新しく計算された expectedSrc
+ * @returns {boolean}
+ */
+function isLvOnlyIframeSrcDiff(prevSrc, nextSrc) {
+  if (!prevSrc || !nextSrc) return false;
+  try {
+    const a = new URL(prevSrc);
+    const b = new URL(nextSrc);
+    if (a.origin !== b.origin || a.pathname !== b.pathname) return false;
+    if (a.searchParams.get('inline') !== b.searchParams.get('inline')) return false;
+    if (
+      a.searchParams.get(NLS_LIVE_COMMENT_PUSH_NONCE_PARAM) !==
+      b.searchParams.get(NLS_LIVE_COMMENT_PUSH_NONCE_PARAM)
+    ) {
+      return false;
+    }
+    // lv 以外の全パラメータが一致すること(将来パラメータが増えても安全側に倒す)。
+    const aKeys = [...a.searchParams.keys()].filter((k) => k !== 'lv').sort();
+    const bKeys = [...b.searchParams.keys()].filter((k) => k !== 'lv').sort();
+    if (aKeys.length !== bKeys.length || aKeys.some((k, i) => k !== bKeys[i])) return false;
+    for (const k of aKeys) {
+      if (a.searchParams.get(k) !== b.searchParams.get(k)) return false;
+    }
+    return a.searchParams.get('lv') !== b.searchParams.get('lv');
+  } catch {
+    return false;
+  }
+}
+
 /** @param {HTMLDivElement} host */
 function ensureInlinePopupIframe(host) {
   if (!(host instanceof HTMLDivElement)) return;
@@ -3571,8 +3609,18 @@ function ensureInlinePopupIframe(host) {
   const srcTrim = String(existing?.getAttribute('src') || '').trim();
   const sameSrc =
     Boolean(expectedSrc) && Boolean(existing) && srcTrim === expectedSrc;
+  // 2026-07-06: 「別の配信へ移動(SPA遷移)するとパネルが壊れる」修正。
+  //   既存 iframe があり、差分が `lv=` クエリだけ(origin/pathname/inline/pn は同一)なら、
+  //   src を書き換えない = iframe を再ロードしない。lv の更新は
+  //   notifyInlineIframeOfChannelSwitch の postMessage(NLS_LIVE_CHANNEL_SWITCH)経由で
+  //   popup-entry.js 側の状態だけを in-place に切り替える(syncLiveIdFromLocation の
+  //   liveIdSwitched 分岐が担当)。ここで src を書き換えてしまうと、たとえ lv だけの差分でも
+  //   ブラウザが iframe を完全に再読み込みし、popup-entry.js の全モジュール state が
+  //   初期化される(送信ボタンの一瞬灰色化 + ローディング演出+全件再取得の実害)。
+  const lvOnlyDiff =
+    !sameSrc && Boolean(existing) && Boolean(expectedSrc) && isLvOnlyIframeSrcDiff(srcTrim, expectedSrc);
 
-  if (sameSrc && existing) {
+  if ((sameSrc || lvOnlyDiff) && existing) {
     try {
       existing.style.backgroundColor = 'transparent';
     } catch {
@@ -3683,6 +3731,64 @@ function noteInstantPushDiag(delta) {
     }).catch(() => { /* no-op: 診断専用・記録には影響させない */ });
   } catch {
     /* no-op */
+  }
+}
+
+/**
+ * 2026-07-06: 配信切替(SPA遷移で iframe を作り直さない in-place 切替)計器(送信側)。
+ * read-merge-write で他フィールド(受信側=popup-entry.js が書く)を潰さない・カウンタは加算
+ * (applyChannelSwitchDiagDelta)。fire-and-forget・失敗は黙過(診断専用・記録には影響させない)。
+ * @param {{ sentCount?: number, lastEventAt?: number }} delta
+ */
+function noteChannelSwitchDiag(delta) {
+  if (!hasExtensionContext()) return;
+  try {
+    chrome.storage.local.get(KEY_CHANNEL_SWITCH_DIAG).then((bag) => {
+      const prev = bag?.[KEY_CHANNEL_SWITCH_DIAG];
+      const next = applyChannelSwitchDiagDelta(prev, delta);
+      setStorageLocalSilent({ [KEY_CHANNEL_SWITCH_DIAG]: next }, { warn: false });
+    }).catch(() => { /* no-op: 診断専用・記録には影響させない */ });
+  } catch {
+    /* no-op */
+  }
+}
+
+/**
+ * 2026-07-06: 配信切替(SPA遷移・lv 変化)をインラインパネル iframe へ postMessage で通知する。
+ *
+ * 背景: 従来は ensureInlinePopupIframe が新 lv を検知するたびに iframe の `src` を
+ *   `lv=` 付きで作り直していた(iframe をまるごと再ロード)。これは popup-entry.js の
+ *   全モジュール state を初期化し、
+ *     (a) 送信ボタンが一瞬「watch ページなし」判定(灰色)に戻る
+ *     (b) 初回ロード同様のローディング演出+全件 storage 読み直しが走る
+ *   という実害を生んでいた(ユーザー確立ルール「切替時に前回状態を破棄して全件取得し直すのは
+ *   禁止」に違反)。
+ *
+ * この関数は iframe を触らず、既存の即時プッシュチャネル(instantCommentPush.js)と同じ
+ * nonce(iframe src の `pn=`)を使って `NLS_LIVE_CHANNEL_SWITCH { lv, nonce }` を postMessage
+ * するだけ。popup-entry.js 側が受信して INLINE_OWN_WATCH_URL 相当の内部状態を更新し、
+ * per-live キャッシュリセット+軽量再描画(ローディング幕なし)を行う。
+ *
+ * iframe 未生成/未ロード(contentWindow 不可)なら黙って何もしない(次の renderPageFrameOverlay
+ * サイクルで src の lv= が更新され、通常の非 SPA 経路で追いつく)。
+ * @param {string} lv 切替後の lv(`lv12345` 形式)
+ */
+function notifyInlineIframeOfChannelSwitch(lv) {
+  if (!isWatchInlinePanelTopFrame()) return;
+  const payload = buildLiveChannelSwitchPayload(lv, ensureInstantPushNonce());
+  if (!payload) return;
+  try {
+    const host = pickPrimaryInlinePopupHostFromDom() || nlsInlinePopupHostSingleton;
+    if (!host || !host.isConnected) return;
+    const iframe = /** @type {HTMLIFrameElement|null} */ (
+      host.querySelector(`#${INLINE_POPUP_IFRAME_ID}`)
+    );
+    const win = iframe?.contentWindow;
+    if (!win) return;
+    win.postMessage(payload, '*');
+    noteChannelSwitchDiag({ sentCount: 1, lastEventAt: Date.now() });
+  } catch {
+    /* no-op: ベストエフォート。失敗しても次の src 更新サイクルで追いつく */
   }
 }
 
@@ -12009,6 +12115,10 @@ function syncLiveIdFromLocation() {
       scheduleFlush();
       scheduleDeepHarvest(DEEP_HARVEST_REASONS.liveIdChange);
       applyThumbSchedule();
+      // 2026-07-06: SPA 遷移で別配信へ移動したことをインラインパネル iframe へ通知する。
+      //   iframe の src(lv=)は書き換えない(isLvOnlyIframeSrcDiff で再ロードを抑止済み)ため、
+      //   ここで postMessage しないと popup-entry.js 側は永久に旧 lv のまま固まる。
+      notifyInlineIframeOfChannelSwitch(ctx.liveId);
     } else {
       liveId = ctx.liveId;
       reconnectMutationObserver();

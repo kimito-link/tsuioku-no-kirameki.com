@@ -26,6 +26,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1094',
+    date: '2026-07-06',
+    summary: 'fix(inline): 配信切替に即追従(再ロード・一括取得なし)',
+    items: Object.freeze([
+      '同じタブでニコ生の別の配信へ移動したとき、視聴ページに埋め込んだパネルの送信欄が一瞬「watchページを開いてください」表示に戻ってしまう不具合を修正しました。',
+      '配信を切り替えた直後もパネルを作り直さず、前回の表示をそのまま活かして新しい配信の情報に切り替えるため、ローディング画面や全件の読み込み直しは発生しません。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1093',
     date: '2026-07-06',
     summary: 'fix(post): watchタブが開いていれば送信可能に',

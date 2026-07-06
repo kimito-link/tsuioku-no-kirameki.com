@@ -27,6 +27,14 @@ import {
 } from '../lib/instantCommentPush.js';
 import { applyInstantPushDiagDelta } from '../lib/instantPushDiag.js';
 import { KEY_INSTANT_PUSH_DIAG } from '../lib/instantPushDiagKey.js';
+// 2026-07-06: 「別の配信へ移動(SPA遷移)するとパネルが壊れる」修正。iframe を作り直さず
+//   postMessage で新 lv を通知する経路(content-entry.js の notifyInlineIframeOfChannelSwitch)。
+import {
+  isLiveChannelSwitchMessageValid,
+  extractSwitchedLiveIdFromMessage
+} from '../lib/liveChannelSwitch.js';
+import { applyChannelSwitchDiagDelta, computeChannelSwitchPaintGapAverage } from '../lib/channelSwitchDiag.js';
+import { KEY_CHANNEL_SWITCH_DIAG } from '../lib/channelSwitchDiagKey.js';
 // リリース工程ガード「版混在の実行時検知」(2026-07-06): NL_BUNDLE_VERSION(このバンドルの
 //   ビルド時 package.json version)と chrome.runtime.getManifest().version(実行時本体 version)を
 //   突合し、ズレていれば画面上部にバナーを出す。詳細は src/lib/versionMismatch.js の背景コメント参照。
@@ -871,6 +879,15 @@ const INLINE_PASSIVE = _inlineFlags.passive;
 const INLINE_EMBED_LIVEVIEW = _inlineFlags.embedLiveView;
 
 /**
+ * @param {string} lv
+ * @returns {string} `https://live.nicovideo.jp/watch/<lv>` 形式、不正な lv は空文字
+ */
+function buildInlineOwnWatchUrlFromLv(lv) {
+  const norm = String(lv || '').trim().toLowerCase();
+  return /^lv\d+$/.test(norm) ? `https://live.nicovideo.jp/watch/${norm}` : '';
+}
+
+/**
  * watch ページ内 iframe（INLINE_EMBED_WATCH）の自タブ liveId から構築した watch URL。
  *
  * 0.1.349: content script が iframe src に焼き込んだ `&lv=<id>` を読む。background
@@ -878,18 +895,39 @@ const INLINE_EMBED_LIVEVIEW = _inlineFlags.embedLiveView;
  *   ため、自タブ liveId を明示的に受け取って watch URL 解決の最優先ソースにする
  *   （多タブで一方のパネルが「—」/「(取得中...)」で永続的に固まる問題の根治）。
  *   sidepanel は静的 HTML で lv を持たないので空のまま（従来挙動）。
+ *
+ * 2026-07-06: 「別の配信へ移動(SPA遷移)するとパネルが壊れる」修正で `let` 化。従来は
+ *   モジュール読込時 1 回だけ決まる `const` で、iframe を作り直さない限り更新されなかった。
+ *   content-entry.js が SPA 遷移(lv 変化)のたびに iframe を再ロードしていたのは、この値を
+ *   最新化する手段が「iframe ごと作り直す」以外に無かったため。now: postMessage
+ *   (NLS_LIVE_CHANNEL_SWITCH)受信時に updateInlineOwnWatchUrlFromLv で in-place 更新する。
  */
-const INLINE_OWN_WATCH_URL = (() => {
+let INLINE_OWN_WATCH_URL = (() => {
   if (!INLINE_EMBED_WATCH) return '';
   try {
     const lv = (new URLSearchParams(window.location.search).get('lv') || '')
       .trim()
       .toLowerCase();
-    return /^lv\d+$/.test(lv) ? `https://live.nicovideo.jp/watch/${lv}` : '';
+    return buildInlineOwnWatchUrlFromLv(lv);
   } catch {
     return '';
   }
 })();
+
+/**
+ * NLS_LIVE_CHANNEL_SWITCH 受信時、INLINE_OWN_WATCH_URL を新 lv へ in-place 更新する。
+ * INLINE_EMBED_WATCH 以外(別窓 popup・会場・鏡・Web版)では呼ばれない想定(呼び出し側で
+ * イベント登録自体を INLINE_EMBED_WATCH 限定にしている)が、念のためここでも無害化する。
+ * @param {string} lv
+ * @returns {boolean} 実際に値が変わったか(呼び出し側が再描画要否を判断するのに使う)
+ */
+function updateInlineOwnWatchUrlFromLv(lv) {
+  if (!INLINE_EMBED_WATCH) return false;
+  const nextUrl = buildInlineOwnWatchUrlFromLv(lv);
+  if (!nextUrl || nextUrl === INLINE_OWN_WATCH_URL) return false;
+  INLINE_OWN_WATCH_URL = nextUrl;
+  return true;
+}
 
 function applyResponsivePopupLayout() {
   const root = document.documentElement;
@@ -5608,8 +5646,78 @@ function handleInstantCommentPushMessage(event) {
   repaintStoryUserLaneWithInstantPushBuffer();
 }
 
+/**
+ * 2026-07-06: 配信切替(SPA遷移)計器(受信側)。read-merge-write で他フィールド
+ * (送信側=content-entry.js が書く)を潰さない・カウンタは加算(applyChannelSwitchDiagDelta)。
+ * fire-and-forget・失敗は黙過(診断専用・表示には影響させない)。
+ * @param {{ receivedCount?: number, rejectedCount?: number, lastSwitchToPaintMs?: number,
+ *   avgSwitchToPaintMs?: number, lastEventAt?: number }} delta
+ */
+function noteChannelSwitchDiagReceived(delta) {
+  void safeStorageLocalGet(KEY_CHANNEL_SWITCH_DIAG)
+    .then((bag) => {
+      const prev = bag?.[KEY_CHANNEL_SWITCH_DIAG];
+      const next = applyChannelSwitchDiagDelta(prev, delta);
+      return safeStorageLocalSet({ [KEY_CHANNEL_SWITCH_DIAG]: next });
+    })
+    .catch(() => { /* no-op: 診断専用・表示には影響させない */ });
+}
+
+/**
+ * 2026-07-06: 「別の配信へ移動(SPA遷移)するとパネルが壊れる」修正の受信側本体。
+ * content-entry.js からの NLS_LIVE_CHANNEL_SWITCH(INLINE_EMBED_WATCH 専用)を受けて、
+ * iframe を作り直さず in-place で新 lv へ切り替える。
+ *
+ *   1. INLINE_OWN_WATCH_URL(watch URL 解決の最優先ソース)を新 lv へ更新
+ *   2. resetPerBroadcastPopupCachesIfLiveIdChanged で前配信の演出/差分キャッシュを破棄
+ *      (refresh() が通常の lv 変化検知時に呼ぶのと同じ関数=二重管理にしない)
+ *   3. commentPostUiContext を即座に新 lv へ更新 → 送信ボタンが「灰色」に戻らず新配信で有効なまま
+ *   4. refresh() を1回蹴る。既存の初回ロードシェード判定は initialRefreshDone 済みなら発火しない
+ *      (dismissInitialLoadShade 系はスキップ)ため、ここではローディング幕もフル再取得の見た目も
+ *      発生しない(refresh() 内部は storage 由来の表示更新であり、ユーザー確立ルール
+ *      「切替時に全件取得し直すのは禁止」に抵触しない=通常の poll 更新と同じ経路)。
+ *
+ * nonce 不一致・lv 形式不正は黙って破棄する(表示は次の src 更新サイクルで追いつく)。
+ */
+function handleLiveChannelSwitchMessage(event) {
+  if (!isLiveChannelSwitchMessageValid(event, _instantPushExpectedNonce)) {
+    if (_instantPushExpectedNonce && event?.data?.type === 'NLS_LIVE_CHANNEL_SWITCH') {
+      noteChannelSwitchDiagReceived({ rejectedCount: 1, lastEventAt: Date.now() });
+    }
+    return;
+  }
+  const lv = extractSwitchedLiveIdFromMessage(event);
+  if (!lv) {
+    noteChannelSwitchDiagReceived({ rejectedCount: 1, lastEventAt: Date.now() });
+    return;
+  }
+  const switchStartedAt = Date.now();
+  const changed = updateInlineOwnWatchUrlFromLv(lv);
+  if (!changed) return; // 同じ lv への通知(重複/多重送信)は無視
+  resetPerBroadcastPopupCachesIfLiveIdChanged(lv);
+  // 送信可否を即時反映(refresh() の完走を待たない=切替直後から新 lv で送信可能にする)。
+  updateCommentPostUiContext(INLINE_OWN_WATCH_URL, lv, COMMENT_POST_UI_STATE.panelStatusCode);
+  paintCommentComposeUi();
+  noteChannelSwitchDiagReceived({ receivedCount: 1, lastEventAt: Date.now() });
+  refresh()
+    .catch(() => { /* no-op: 失敗しても次の storage 変化 refresh で追いつく */ })
+    .finally(() => {
+      const paintMs = Math.max(0, Date.now() - switchStartedAt);
+      void safeStorageLocalGet(KEY_CHANNEL_SWITCH_DIAG).then((bag) => {
+        const prev = bag?.[KEY_CHANNEL_SWITCH_DIAG];
+        const avgMs = computeChannelSwitchPaintGapAverage(Number(prev?.avgSwitchToPaintMs), paintMs);
+        noteChannelSwitchDiagReceived({
+          lastSwitchToPaintMs: paintMs,
+          avgSwitchToPaintMs: avgMs,
+          lastEventAt: Date.now()
+        });
+      }).catch(() => { /* no-op */ });
+    });
+}
+
 if (INLINE_EMBED_WATCH && typeof window !== 'undefined') {
   window.addEventListener('message', handleInstantCommentPushMessage);
+  window.addEventListener('message', handleLiveChannelSwitchMessage);
 }
 
 /** initPopup の途中失敗後も DevTools から呼べるよう、読み込み直後に束縛する（観測のみ） */
