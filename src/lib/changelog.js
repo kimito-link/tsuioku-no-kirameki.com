@@ -26,6 +26,16 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1088',
+    date: '2026-07-06',
+    summary: 'feat(diag): 読み上げ/ギフトの体感遅延を実測計器化',
+    items: Object.freeze([
+      '会場読み上げの「コメント到着から声が出るまで」の実際の速さを状態速報で確認できるようにしました。',
+      'ギフト演出の「検知から音・着弾までの速さ」も同様に状態速報で確認できるようにしました。',
+      '演出や読み上げ自体の挙動は変えていません(観測用の計器のみ追加)。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1087',
     date: '2026-07-06',
     summary: 'perf(status): 変化なしpublishのset省略',

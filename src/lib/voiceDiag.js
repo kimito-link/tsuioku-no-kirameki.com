@@ -19,7 +19,10 @@
  *   lastDepth: number,           // 直近の先読み深さ
  *   lastSpeedBoost: number,      // 直近の速度ブースト
  *   lastPhase: string,           // v0.1.895: drainVoiceQueue が最後に到達したフェーズ(固着位置の計器)
- *   lastPhaseAt: number          // v0.1.895: lastPhase に到達した時刻(epoch ms・0=未到達)
+ *   lastPhaseAt: number,         // v0.1.895: lastPhase に到達した時刻(epoch ms・0=未到達)
+ *   lastE2eMs: number,           // v0.1.1088: 直近1件の「到着→発声」体感遅延ms(-1=未計測)
+ *   e2eAvgMs: number,            // v0.1.1088: 体感遅延のEMA平均ms(-1=未計測)
+ *   mergeTotal: number           // v0.1.1088: mergeRepeatedVoiceItem で吸収した累計(同文統合の実効計器)
  * }} VoiceDiagState
  */
 
@@ -37,7 +40,10 @@ export function makeInitialVoiceDiag() {
     lastDepth: 0,
     lastSpeedBoost: 0,
     lastPhase: '',
-    lastPhaseAt: 0
+    lastPhaseAt: 0,
+    lastE2eMs: -1,
+    e2eAvgMs: -1,
+    mergeTotal: 0
   };
 }
 
@@ -69,6 +75,9 @@ export function buildVoiceDiagSnapshot(diag, nowMs) {
     lastSpeedBoost: num(d.lastSpeedBoost, base.lastSpeedBoost),
     lastPhase: String(d.lastPhase || base.lastPhase),
     lastPhaseAt: num(d.lastPhaseAt, base.lastPhaseAt),
+    lastE2eMs: num(d.lastE2eMs, base.lastE2eMs),
+    e2eAvgMs: num(d.e2eAvgMs, base.e2eAvgMs),
+    mergeTotal: num(d.mergeTotal, base.mergeTotal),
     capturedAt: now
   };
 }
@@ -102,6 +111,20 @@ export function buildVoiceDiagLine(snap, nowMs) {
   if (base > 0 && now > 0) {
     parts.push(`最終発話${Math.max(0, Math.round((now - base) / 1000))}秒前`);
   }
+  // v0.1.1088計器(voice-tempo-realtime-SYNTHESIS §3 Phase 1): 「到着→発声」の体感遅延。
+  //   憶測でパラメータを触らないための土台(未計測=-1なら出さない・ノイズにしない)。
+  const lastE2e = Number(snap.lastE2eMs);
+  const avgE2e = Number(snap.e2eAvgMs);
+  if (Number.isFinite(lastE2e) && lastE2e >= 0) {
+    const lastSec = (lastE2e / 1000).toFixed(1);
+    if (Number.isFinite(avgE2e) && avgE2e >= 0) {
+      parts.push(`体感遅延${lastSec}秒(平均${(avgE2e / 1000).toFixed(1)}秒)`);
+    } else {
+      parts.push(`体感遅延${lastSec}秒`);
+    }
+  }
+  const mergeTotal = Number(snap.mergeTotal) || 0;
+  if (mergeTotal > 0) parts.push(`統合${mergeTotal}件`); // 同文まとめ(「ほか○件」)が効いている実測。
   const synth = Number(snap.lastSynthMs);
   if (Number.isFinite(synth) && synth >= 0) parts.push(`合成${synth}ms`);
   // v0.1.895: 固着の切り分け。最終発話が古い(沈黙)のに待機があるとき、drainVoiceQueue が

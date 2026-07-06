@@ -19,7 +19,11 @@
  *   adThrown: number,          // 広告の投擲演出が実際に走った回数
  *   adSoundPlayed: number,     // 広告効果音の再生を試みた回数
  *   soundEnabled: boolean,     // 効果音設定が ON か(OFF なら鳴らないのが正常=誤診断防止)
- *   lastEventAt: number        // 最後にギフト/広告いずれかを検知した時刻(epoch ms・0=未検知)
+ *   lastEventAt: number,       // 最後にギフト/広告いずれかを検知した時刻(epoch ms・0=未検知)
+ *   lastSoundGapMs: number,    // v0.1.1088: 直近1件の「検知→音」体感遅延ms(-1=未計測)
+ *   lastBurstGapMs: number,    // v0.1.1088: 直近1件の「検知→着弾演出」体感遅延ms(-1=未計測)
+ *   avgSoundGapMs: number,     // v0.1.1088: 検知→音のEMA平均ms(-1=未計測)
+ *   avgBurstGapMs: number      // v0.1.1088: 検知→着弾のEMA平均ms(-1=未計測)
  * }} GiftEffectDiagState
  */
 
@@ -37,8 +41,31 @@ export function makeInitialGiftEffectDiag() {
     adThrown: 0,
     adSoundPlayed: 0,
     soundEnabled: true,
-    lastEventAt: 0
+    lastEventAt: 0,
+    lastSoundGapMs: -1,
+    lastBurstGapMs: -1,
+    avgSoundGapMs: -1,
+    avgBurstGapMs: -1
   };
+}
+
+/**
+ * v0.1.1088計器: 「検知→音/着弾」のAVギャップをEMAで均す純関数。voicePlayer.js の
+ *   computeVoiceE2eAverage と同じ考え方(窓バッファ無し=メモリ有界・純粋)をギフト側にも適用。
+ * @param {unknown} prevAvgMs 直前の平均値(-1=未計測)
+ * @param {unknown} sampleMs 今回の実測値(ms)
+ * @param {number} [alpha] EMA係数(既定0.3)
+ * @returns {number} 更新後の平均値(ms・整数丸め)
+ */
+export function computeGiftGapAverage(prevAvgMs, sampleMs, alpha = 0.3) {
+  const sample = Number(sampleMs);
+  if (!Number.isFinite(sample) || sample < 0) {
+    const prev = Number(prevAvgMs);
+    return Number.isFinite(prev) ? prev : -1;
+  }
+  const prev = Number(prevAvgMs);
+  if (!Number.isFinite(prev) || prev < 0) return Math.round(sample);
+  return Math.round(prev + alpha * (sample - prev));
 }
 
 /**
@@ -85,6 +112,10 @@ export function buildGiftEffectDiagSnapshot(diag, nowMs) {
     adSoundPlayed: num(d.adSoundPlayed, base.adSoundPlayed),
     soundEnabled: d.soundEnabled !== false,
     lastEventAt: num(d.lastEventAt, base.lastEventAt),
+    lastSoundGapMs: num(d.lastSoundGapMs, base.lastSoundGapMs),
+    lastBurstGapMs: num(d.lastBurstGapMs, base.lastBurstGapMs),
+    avgSoundGapMs: num(d.avgSoundGapMs, base.avgSoundGapMs),
+    avgBurstGapMs: num(d.avgBurstGapMs, base.avgBurstGapMs),
     capturedAt: now
   };
 }
@@ -148,6 +179,21 @@ export function buildGiftEffectDiagLines(snap, nowMs) {
     if (giftSoundError > 0) explainedParts.push(`エラー${giftSoundError}`);
     const explainedText = explainedParts.length > 0 ? ` / ${explainedParts.join(' ')}` : '';
     lines.push(`  → ギフト: 検知${giftDetected} → 演出${giftThrown} ${throwMark} → 音${giftSoundPlayed}${coalescedText} ${soundMark}${explainedText}`);
+    // v0.1.1088計器: 「検知→音/着弾」の体感ギャップ(実測)。未計測(-1)なら出さない(ノイズにしない)。
+    const lastSoundGap = Number(snap.lastSoundGapMs);
+    const lastBurstGap = Number(snap.lastBurstGapMs);
+    const avgSoundGap = Number(snap.avgSoundGapMs);
+    const avgBurstGap = Number(snap.avgBurstGapMs);
+    const gapParts = [];
+    if (Number.isFinite(lastSoundGap) && lastSoundGap >= 0) {
+      const avgText = Number.isFinite(avgSoundGap) && avgSoundGap >= 0 ? `/平均${(avgSoundGap / 1000).toFixed(1)}秒` : '';
+      gapParts.push(`音+${(lastSoundGap / 1000).toFixed(1)}秒${avgText}`);
+    }
+    if (Number.isFinite(lastBurstGap) && lastBurstGap >= 0) {
+      const avgText = Number.isFinite(avgBurstGap) && avgBurstGap >= 0 ? `/平均${(avgBurstGap / 1000).toFixed(1)}秒` : '';
+      gapParts.push(`着弾+${(lastBurstGap / 1000).toFixed(1)}秒${avgText}`);
+    }
+    if (gapParts.length > 0) lines.push(`  → 体感遅延: ${gapParts.join(' / ')}`);
   }
   if (adDetected > 0) {
     const adThrown = Number(snap.adThrown) || 0;

@@ -203,6 +203,41 @@ describe('VoicePlayer', () => {
     expect(synthCalls.some((t) => t.includes('newest'))).toBe(true);
   });
 
+  describe('v0.1.1088計器(voice-tempo-realtime-SYNTHESIS §3 Phase 1): E2E/統合', () => {
+    it('実再生時にlastE2eMs/e2eAvgMsを計測する(到着→発声)', async () => {
+      await player.enable({ persist: false });
+      expect(player.diag.lastE2eMs).toBe(-1); // 未計測の初期値
+      player.enqueue([{ kind: 'comment', userId: 'e1', nickname: 'E', text: 'こんにちは' }]);
+      await new Promise((r) => setTimeout(r, 50));
+      expect(player.diag.lastE2eMs).toBeGreaterThanOrEqual(0);
+      expect(player.diag.e2eAvgMs).toBeGreaterThanOrEqual(0);
+    });
+
+    it('合成失敗(鳴らない)ときはE2Eを更新しない', async () => {
+      player.fetchSynthesizeVoice = vi.fn().mockResolvedValue(null);
+      await player.enable({ persist: false });
+      player.enqueue([{ kind: 'comment', userId: 'e2', nickname: 'E2', text: 'x' }]);
+      await new Promise((r) => setTimeout(r, 50));
+      expect(player.diag.lastE2eMs).toBe(-1); // 再生に到達しない=計測されない
+    });
+
+    it('mergeRepeatedVoiceItemで吸収された件数をmergeTotalへ累計する', async () => {
+      // 合成を保留させてdrainを止め、同文が確実にキューへ残っている間にmergeさせる。
+      let resolveSynth;
+      player.fetchSynthesizeVoice = vi.fn(() => new Promise((r) => { resolveSynth = r; }));
+      await player.enable({ persist: false });
+      expect(player.diag.mergeTotal).toBe(0);
+      player.enqueue([
+        { kind: 'comment', userId: 'm1', nickname: 'M1', text: '8888' },
+        { kind: 'comment', userId: 'm2', nickname: 'M2', text: '8888' },
+        { kind: 'comment', userId: 'm3', nickname: 'M3', text: '8888' }
+      ]);
+      await new Promise((r) => setTimeout(r, 10));
+      expect(player.diag.mergeTotal).toBe(2); // 先頭以外の2件が同文で吸収される
+      if (resolveSynth) resolveSynth(null);
+    });
+  });
+
   it('初回 alive-check 失敗でも1回リトライして成功すれば有効化する(SWコールド起床対策)', async () => {
     // 1回目 false(SW 寝てる)→ 2回目 true(SW 起きた)を模す。
     const aliveProbe = vi
@@ -290,6 +325,32 @@ describe('VoicePlayer', () => {
       expect(gated.maxConcurrent).toBeGreaterThanOrEqual(3);
 
       // 後始末: 保留中の合成を全て解決し、再生も全て ended にして drain を終わらせる。
+      for (const c of gated.calls) c.resolveFn();
+      while (endedHandlers.length) endedHandlers.shift()();
+      await new Promise((r) => setTimeout(r, 20));
+      for (const c of gated.calls) c.resolveFn?.();
+      while (endedHandlers.length) endedHandlers.shift()();
+    });
+
+    it('v0.1.1088計器: diag.lastDepth が実際の先読み深さに更新される(化石計器の修理)', async () => {
+      const gated = makeGatedSynth();
+      player.fetchSynthesizeVoice = gated.fn;
+      const endedHandlers = [];
+      mockAudio.addEventListener = vi.fn((event, cb) => {
+        if (event === 'ended') endedHandlers.push(cb);
+      });
+      await player.enable({ persist: false });
+      expect(player.diag.lastDepth).toBe(0); // 初期値(まだ何も積んでいない)
+
+      player.enqueue(
+        Array.from({ length: 6 }, (_, i) => ({
+          kind: 'comment', userId: `u${i}`, nickname: `n${i}`, text: `comment ${i}`
+        }))
+      );
+      await new Promise((r) => setTimeout(r, 20));
+      // 6件の詰まりなら resolveVoiceSynthDepth により深さ3(上限)が代入されているはず。
+      expect(player.diag.lastDepth).toBeGreaterThanOrEqual(1);
+
       for (const c of gated.calls) c.resolveFn();
       while (endedHandlers.length) endedHandlers.shift()();
       await new Promise((r) => setTimeout(r, 20));

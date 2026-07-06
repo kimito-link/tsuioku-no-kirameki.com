@@ -78,4 +78,68 @@ describe('buildVoiceDiagLine', () => {
     const line = buildVoiceDiagLine({ enabled: false, spokenTotal: 10, queueMax: 5, queueNow: 0 }, 1000);
     expect(line).toContain('読み上げ:OFF');
   });
+
+  describe('v0.1.1088計器(voice-tempo-realtime-SYNTHESIS §3 Phase 1): 体感遅延/統合', () => {
+    it('lastE2eMs/e2eAvgMsがあれば体感遅延を秒表示する', () => {
+      const line = buildVoiceDiagLine({
+        enabled: true, queueNow: 3, queueMax: 8, spokenTotal: 50,
+        lastE2eMs: 1800, e2eAvgMs: 2400
+      }, 1000);
+      expect(line).toContain('体感遅延1.8秒(平均2.4秒)');
+    });
+
+    it('平均が未計測(-1)なら直近値だけ表示する', () => {
+      const line = buildVoiceDiagLine({
+        enabled: true, queueNow: 1, queueMax: 1, spokenTotal: 1,
+        lastE2eMs: 900, e2eAvgMs: -1
+      }, 1000);
+      expect(line).toContain('体感遅延0.9秒');
+      expect(line).not.toContain('平均');
+    });
+
+    it('lastE2eMsが未計測(-1)なら体感遅延は出さない(ノイズにしない)', () => {
+      const line = buildVoiceDiagLine({
+        enabled: true, queueNow: 0, queueMax: 2, spokenTotal: 5,
+        lastE2eMs: -1, e2eAvgMs: -1
+      }, 1000);
+      expect(line).not.toContain('体感遅延');
+    });
+
+    it('mergeTotal>0なら統合件数を表示する', () => {
+      const line = buildVoiceDiagLine({
+        enabled: true, queueNow: 0, queueMax: 2, spokenTotal: 5, mergeTotal: 7
+      }, 1000);
+      expect(line).toContain('統合7件');
+    });
+
+    it('mergeTotal=0なら統合項目は出さない', () => {
+      const line = buildVoiceDiagLine({
+        enabled: true, queueNow: 0, queueMax: 2, spokenTotal: 5, mergeTotal: 0
+      }, 1000);
+      expect(line).not.toContain('統合');
+    });
+  });
+});
+
+describe('makeInitialVoiceDiag / buildVoiceDiagSnapshot: v0.1.1088計器の初期値・フォールバック', () => {
+  it('初期stateはlastE2eMs/e2eAvgMs=-1・mergeTotal=0', () => {
+    const d = makeInitialVoiceDiag();
+    expect(d.lastE2eMs).toBe(-1);
+    expect(d.e2eAvgMs).toBe(-1);
+    expect(d.mergeTotal).toBe(0);
+  });
+
+  it('スナップショットが欠損フィールドを初期値で埋める', () => {
+    const snap = buildVoiceDiagSnapshot({}, 0);
+    expect(snap.lastE2eMs).toBe(-1);
+    expect(snap.e2eAvgMs).toBe(-1);
+    expect(snap.mergeTotal).toBe(0);
+  });
+
+  it('実測値を保持する', () => {
+    const snap = buildVoiceDiagSnapshot({ lastE2eMs: 1234, e2eAvgMs: 2000, mergeTotal: 3 }, 0);
+    expect(snap.lastE2eMs).toBe(1234);
+    expect(snap.e2eAvgMs).toBe(2000);
+    expect(snap.mergeTotal).toBe(3);
+  });
 });
