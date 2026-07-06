@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 2 / 633 件
+## ⚠️ 役割コメントが無いソース 2 / 636 件
 - `src/lib/reportPreviewPublish.js`
 - `src/lib/venueLaneBuckets.js`
 
@@ -527,7 +527,7 @@
   - `gift-impact.mp3`
   - `gift-sparkle.mp3`
   - `gift-whoosh.mp3`
-- 📁 **src/** (1321)
+- 📁 **src/** (1326)
   - 📁 **data/** (6)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -791,7 +791,7 @@
         - `logo_funlink_white_RGB_maru_black.png`
       - `logo_guide_funlink_ol.pdf`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1107)
+  - 📁 **lib/** (1112)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -1262,6 +1262,11 @@
     - `inlinePopupHostPrimaryPick.test.js`
     - `inlinePopupIframeVisibilityPolicy.js` — `ensureInlinePopupIframe` の early-return 経路で iframe を再表示するか（DOM 非依存の判定部）。
     - `inlinePopupIframeVisibilityPolicy.test.js`
+    - `instantCommentPush.js` — 「コメント即時プッシュレーン(storage迂回)」の純関数部。
+    - `instantCommentPush.test.js`
+    - `instantPushDiag.js` — コメント即時プッシュレーン(storage迂回)の「送信N/受信N/表示遅延ms」観測値を
+    - `instantPushDiag.test.js`
+    - `instantPushDiagKey.js` — コメント即時プッシュレーン(storage迂回)の「送信N/受信N/表示遅延ms」観測値を
     - `interceptAvatarHydration.js` — profile cache の強い avatar を intercept avatar map へ補完する。
     - `interceptAvatarHydration.test.js`
     - `interceptBinaryTextExtract.js` — バイナリを UTF-8 として解釈した文字列から、近傍の commentNo とユーザー識別子の組を拾う（ヒューリスティック）。

@@ -115,6 +115,7 @@
 | `KEY_INLINE_PANEL_VIEWPORT_WIDE_ONCE_DONE` | extension/content-entry.js | extension/content-entry.js<br>extension/popup-entry.js |
 | `KEY_INLINE_PANEL_VIEWPORT_WIDE_POLICY` | — | extension/content-entry.js<br>extension/popup-entry.js |
 | `KEY_INLINE_PANEL_WIDTH_MODE` | — | extension/content-entry.js<br>extension/popup-entry.js |
+| `KEY_INSTANT_PUSH_DIAG` | extension/content-entry.js<br>extension/popup-entry.js | extension/content-entry.js<br>extension/popup-entry.js |
 | `KEY_LANE_DIAG` | extension/popup-entry.js | extension/status-entry.js |
 | `KEY_LANE_MIRROR` | — | extension/popup-entry.js<br>extension/status-entry.js |
 | `KEY_LAST_WATCH_URL` | — | extension/comeview-entry.js<br>extension/popup-entry.js<br>extension/status-entry.js |

@@ -35,10 +35,12 @@ import { KEY_VOICE_EFFECT_DIAG } from './voiceEffectDiagKey.js';
 import { KEY_BGM_PHASE_DIAG } from './bgmPhaseDiagKey.js';
 import { KEY_OP_SOUND_EFFECT_DIAG } from './opSoundEffectDiagKey.js';
 import { KEY_COMMENT_POST_DIAG } from './commentPostDiagKey.js';
+import { KEY_INSTANT_PUSH_DIAG } from './instantPushDiagKey.js';
 
 /**
- * 1回の chrome.storage.local.get で統合して読む17キー(いずれも単一キー get のみの項目)。
- *   v0.1.1083 で extras に追加された commentPostDiag(KEY_COMMENT_POST_DIAG)も含む。
+ * 1回の chrome.storage.local.get で統合して読む18キー(いずれも単一キー get のみの項目)。
+ *   v0.1.1083 で追加された commentPostDiag(KEY_COMMENT_POST_DIAG)、
+ *   v0.1.1092 で追加された instantPushDiag(KEY_INSTANT_PUSH_DIAG)も含む。
  *   status-entry.js 側は runStorageOpWithTimeout(() => safeStorageLocalGet(EXTRAS_BATCH_KEYS), tmo)
  *   のように1回だけ呼ぶ。
  */
@@ -59,7 +61,8 @@ export const EXTRAS_BATCH_KEYS = [
   KEY_VOICE_EFFECT_DIAG,
   KEY_BGM_PHASE_DIAG,
   KEY_OP_SOUND_EFFECT_DIAG,
-  KEY_COMMENT_POST_DIAG
+  KEY_COMMENT_POST_DIAG,
+  KEY_INSTANT_PUSH_DIAG
 ];
 
 /**
@@ -74,7 +77,8 @@ export const EXTRAS_BATCH_KEYS = [
  *   voiceDiag: any, venueSeatsDiag: any, reportPreview: any, laneDiag: any, laneMirror: any,
  *   statCardsMirror: any, northStarMirror: any, publishOutcomeRec: any, commentTimelineMirror: any,
  *   previewRenderAck: any, backfillLiveMetric: any, giftEffectDiag: any, milestoneEffectDiag: any,
- *   voiceEffectDiag: any, bgmPhaseDiag: any, opSoundEffectDiag: any, commentPostDiag: any
+ *   voiceEffectDiag: any, bgmPhaseDiag: any, opSoundEffectDiag: any, commentPostDiag: any,
+ *   instantPushDiag: any
  * }}
  */
 export function pickExtrasBatchValues(bag, nowMs) {
@@ -97,6 +101,7 @@ export function pickExtrasBatchValues(bag, nowMs) {
     voiceEffectDiag: b[KEY_VOICE_EFFECT_DIAG] || null,
     bgmPhaseDiag: b[KEY_BGM_PHASE_DIAG] || null,
     opSoundEffectDiag: b[KEY_OP_SOUND_EFFECT_DIAG] || null,
-    commentPostDiag: b[KEY_COMMENT_POST_DIAG] || null
+    commentPostDiag: b[KEY_COMMENT_POST_DIAG] || null,
+    instantPushDiag: b[KEY_INSTANT_PUSH_DIAG] || null
   };
 }

@@ -880,6 +880,34 @@
       ]
     },
     {
+      "file": "src/lib/instantPushDiag.js",
+      "featureCount": 3,
+      "features": [
+        "content",
+        "popup",
+        "status"
+      ],
+      "labels": [
+        "記録エンジン(watchページ常駐)",
+        "ポップアップ(応援レーン)",
+        "状態速報ページ"
+      ]
+    },
+    {
+      "file": "src/lib/instantPushDiagKey.js",
+      "featureCount": 3,
+      "features": [
+        "content",
+        "popup",
+        "status"
+      ],
+      "labels": [
+        "記録エンジン(watchページ常駐)",
+        "ポップアップ(応援レーン)",
+        "状態速報ページ"
+      ]
+    },
+    {
       "file": "src/lib/lengthDelimitedStream.js",
       "featureCount": 3,
       "features": [
@@ -919,6 +947,20 @@
         "バックフィル SW",
         "記録エンジン(watchページ常駐)",
         "ページ傍受"
+      ]
+    },
+    {
+      "file": "src/lib/nlsInterceptAuth.js",
+      "featureCount": 3,
+      "features": [
+        "content",
+        "page-intercept",
+        "popup"
+      ],
+      "labels": [
+        "記録エンジン(watchページ常駐)",
+        "ページ傍受",
+        "ポップアップ(応援レーン)"
       ]
     },
     {
@@ -1584,6 +1626,18 @@
       ]
     },
     {
+      "file": "src/lib/instantCommentPush.js",
+      "featureCount": 2,
+      "features": [
+        "content",
+        "popup"
+      ],
+      "labels": [
+        "記録エンジン(watchページ常駐)",
+        "ポップアップ(応援レーン)"
+      ]
+    },
+    {
       "file": "src/lib/kokenContributionRankingApi.js",
       "featureCount": 2,
       "features": [
@@ -1761,18 +1815,6 @@
       "labels": [
         "記録エンジン(watchページ常駐)",
         "ポップアップ(応援レーン)"
-      ]
-    },
-    {
-      "file": "src/lib/nlsInterceptAuth.js",
-      "featureCount": 2,
-      "features": [
-        "content",
-        "page-intercept"
-      ],
-      "labels": [
-        "記録エンジン(watchページ常駐)",
-        "ページ傍受"
       ]
     },
     {
