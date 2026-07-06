@@ -17,11 +17,12 @@ import { KEY_VOICE_EFFECT_DIAG } from './voiceEffectDiagKey.js';
 import { KEY_BGM_PHASE_DIAG } from './bgmPhaseDiagKey.js';
 import { KEY_OP_SOUND_EFFECT_DIAG } from './opSoundEffectDiagKey.js';
 import { KEY_COMMENT_POST_DIAG } from './commentPostDiagKey.js';
+import { KEY_INSTANT_PUSH_DIAG } from './instantPushDiagKey.js';
 
 describe('EXTRAS_BATCH_KEYS', () => {
-  // 会議設計時点の列挙(16キー)+ v0.1.1083 で extras に増えた commentPostDiag を足すと実際は17キー。
+  // 会議設計時点の列挙(16キー)+ v0.1.1083 の commentPostDiag + v0.1.1092 の instantPushDiag で実際は18キー。
   //   「漏れなく統合したか」を人力の数え間違いに頼らず固定するため、実装済みの全キーを列挙して突合する。
-  it('17キーすべてを含む(v0.1.1083 追加分の commentPostDiag も含む)', () => {
+  it('18キーすべてを含む(v0.1.1083 の commentPostDiag / v0.1.1092 の instantPushDiag も含む)', () => {
     const expectedKeys = [
       KEY_VOICE_DIAG,
       KEY_VENUE_SEATS_DIAG,
@@ -39,10 +40,11 @@ describe('EXTRAS_BATCH_KEYS', () => {
       KEY_VOICE_EFFECT_DIAG,
       KEY_BGM_PHASE_DIAG,
       KEY_OP_SOUND_EFFECT_DIAG,
-      KEY_COMMENT_POST_DIAG
+      KEY_COMMENT_POST_DIAG,
+      KEY_INSTANT_PUSH_DIAG
     ];
-    expect(expectedKeys).toHaveLength(17);
-    expect(EXTRAS_BATCH_KEYS).toHaveLength(17);
+    expect(expectedKeys).toHaveLength(18);
+    expect(EXTRAS_BATCH_KEYS).toHaveLength(18);
     expect(EXTRAS_BATCH_KEYS).toEqual(expect.arrayContaining(expectedKeys));
   });
 
@@ -72,7 +74,8 @@ describe('pickExtrasBatchValues', () => {
       [KEY_VOICE_EFFECT_DIAG]: { m: 14 },
       [KEY_BGM_PHASE_DIAG]: { n: 15 },
       [KEY_OP_SOUND_EFFECT_DIAG]: { o: 16 },
-      [KEY_COMMENT_POST_DIAG]: { p: 17 }
+      [KEY_COMMENT_POST_DIAG]: { p: 17 },
+      [KEY_INSTANT_PUSH_DIAG]: { q: 18 }
     };
     const picked = pickExtrasBatchValues(bag, NOW);
     expect(picked.voiceDiag).toEqual({ a: 1 });
@@ -92,6 +95,7 @@ describe('pickExtrasBatchValues', () => {
     expect(picked.bgmPhaseDiag).toEqual({ n: 15 });
     expect(picked.opSoundEffectDiag).toEqual({ o: 16 });
     expect(picked.commentPostDiag).toEqual({ p: 17 });
+    expect(picked.instantPushDiag).toEqual({ q: 18 });
   });
 
   it('欠損キーは null(各 loadXxxSafe の bag?.[KEY] || null と同値)', () => {
@@ -113,6 +117,7 @@ describe('pickExtrasBatchValues', () => {
     expect(picked.bgmPhaseDiag).toBeNull();
     expect(picked.opSoundEffectDiag).toBeNull();
     expect(picked.commentPostDiag).toBeNull();
+    expect(picked.instantPushDiag).toBeNull();
   });
 
   it('bag が undefined/null/非オブジェクトでも安全(全項目 null)', () => {

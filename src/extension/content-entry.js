@@ -497,6 +497,13 @@ import { resolveUserEntryAvatarSignals } from '../lib/userEntryAvatarResolve.js'
 import { recordDiagnosticException } from '../lib/diagnosticRingStore.js';
 import { isPersistableHarvestedCommentRow } from '../lib/persistableCommentRow.js';
 import {
+  NLS_LIVE_COMMENT_PUSH_TYPE,
+  NLS_LIVE_COMMENT_PUSH_NONCE_PARAM,
+  generateInstantPushNonce
+} from '../lib/instantCommentPush.js';
+import { applyInstantPushDiagDelta } from '../lib/instantPushDiag.js';
+import { KEY_INSTANT_PUSH_DIAG } from '../lib/instantPushDiagKey.js';
+import {
   buildSilentErrorPayload,
   isContextInvalidatedError as isCtxInvalidated,
   isExtensionContextAlive
@@ -2713,6 +2720,17 @@ const KEY_AI_SHARE_FAST_DIAG = 'nls_ai_share_fast_diag_v1';
 /** getElementById はツリー未接続ノードに効かないため、ホストは参照を保持する */
 /** @type {HTMLDivElement|null} */
 let nlsInlinePopupHostSingleton = null;
+/**
+ * v0.1.1092: コメント即時プッシュレーン(storage迂回)。iframe src の `pn=` に焼き込む
+ * nonce をタブごとに1つ保持し、popup 側(inline iframe)の照合値と一致させる。
+ * iframe を作り直しても同一タブなら同じ nonce を使い回す(src 変更で再照合が要らない)。
+ */
+let _instantPushNonce = '';
+/** @returns {string} */
+function ensureInstantPushNonce() {
+  if (!_instantPushNonce) _instantPushNonce = generateInstantPushNonce();
+  return _instantPushNonce;
+}
 /** ensureInlinePopupIframe のフォールバック visibility タイマー（重複防止） */
 /** @type {ReturnType<typeof setTimeout>|null} */
 let inlineIframeVisibilityTimer = null;
@@ -3539,6 +3557,9 @@ function ensureInlinePopupIframe(host) {
         .trim()
         .toLowerCase();
       if (/^lv\d+$/.test(ownLv)) u.searchParams.set('lv', ownLv);
+      // v0.1.1092: コメント即時プッシュレーン(storage迂回)の照合 nonce。lv と同じく
+      //   自タブ内で完結する経路で iframe へ渡す(postMessage 側は data.nonce で照合する)。
+      u.searchParams.set(NLS_LIVE_COMMENT_PUSH_NONCE_PARAM, ensureInstantPushNonce());
       return u.href;
     } catch {
       return '';
@@ -3644,6 +3665,71 @@ function ensureInlinePopupHost() {
   ensureInlinePopupIframe(host);
   nlsInlinePopupHostSingleton = host;
   return host;
+}
+
+/**
+ * v0.1.1092: コメント即時プッシュレーン計器(送信側)。read-merge-write で他フィールド
+ * (受信側=popup-entry.js が書く)を潰さない・カウンタは加算(applyInstantPushDiagDelta)。
+ * fire-and-forget・失敗は黙過(診断専用・記録には影響させない)。
+ * @param {{ sentCount?: number, sentRows?: number, lastEventAt?: number }} delta
+ */
+function noteInstantPushDiag(delta) {
+  if (!hasExtensionContext()) return;
+  try {
+    chrome.storage.local.get(KEY_INSTANT_PUSH_DIAG).then((bag) => {
+      const prev = bag?.[KEY_INSTANT_PUSH_DIAG];
+      const next = applyInstantPushDiagDelta(prev, delta);
+      setStorageLocalSilent({ [KEY_INSTANT_PUSH_DIAG]: next }, { warn: false });
+    }).catch(() => { /* no-op: 診断専用・記録には影響させない */ });
+  } catch {
+    /* no-op */
+  }
+}
+
+/**
+ * v0.1.1092: 新着コメント行を、自分が生成したインラインパネル iframe へ直接 postMessage する
+ * (chrome.storage を経由しない「表示の先出し」専用経路)。
+ *
+ * ★セキュリティ裁定(src/lib/instantCommentPush.js 冒頭コメント参照): この経路は完全には
+ *   偽装防止できない前提で、表示の先出し専用に限定する(記録/演出/音のトリガには使わない・
+ *   正規到着行で必ず置換される・行データは isValidChatRow 相当の shape 検証を通す)。
+ *
+ * INLINE_EMBED_WATCH 以外(別窓 popup・会場・鏡・Web版)には一切影響しない=完全無変更。
+ * iframe 未生成/未ロード(contentWindow 不可)なら黙って何もしない(次の storage 経由で届く)。
+ * @param {ReadonlyArray<{ commentNo?: string, text?: string, userId?: string|null }>} rows
+ */
+function pushInstantCommentRowsToInlineIframe(rows) {
+  if (!Array.isArray(rows) || !rows.length) return;
+  if (!isWatchInlinePanelTopFrame()) return;
+  try {
+    const host = pickPrimaryInlinePopupHostFromDom() || nlsInlinePopupHostSingleton;
+    if (!host || !host.isConnected) return;
+    const iframe = /** @type {HTMLIFrameElement|null} */ (
+      host.querySelector(`#${INLINE_POPUP_IFRAME_ID}`)
+    );
+    const win = iframe?.contentWindow;
+    if (!win) return;
+    win.postMessage(
+      {
+        type: NLS_LIVE_COMMENT_PUSH_TYPE,
+        nonce: ensureInstantPushNonce(),
+        sentAt: Date.now(),
+        rows: rows.map((r) => ({
+          commentNo: String(r?.commentNo || ''),
+          text: String(r?.text || ''),
+          userId: r?.userId != null ? String(r.userId) : null
+        }))
+      },
+      '*'
+    );
+    noteInstantPushDiag({
+      sentCount: 1,
+      sentRows: rows.length,
+      lastEventAt: Date.now()
+    });
+  } catch {
+    /* no-op: 表示の先出しはベストエフォート。失敗しても storage 経路が後で届く */
+  }
 }
 
 /**
@@ -11218,6 +11304,13 @@ function persistCommentRows(rows, opts = {}) {
     _venueApi?.onLiveComments?.(liveId, filtered);
   } catch {
     /* no-op: 会場通知の失敗はコメント記録に影響させない */
+  }
+  // v0.1.1092: インラインパネル(watch ページ埋め込み iframe)へ storage 非経由で即時プッシュ。
+  //   表示の先出し専用(記録/演出/音のトリガには使わない)。iframe 未生成時は黙って no-op。
+  try {
+    pushInstantCommentRowsToInlineIframe(filtered);
+  } catch {
+    /* no-op: 即時プッシュの失敗はコメント記録に影響させない(storage 経路が後で届く) */
   }
 }
 

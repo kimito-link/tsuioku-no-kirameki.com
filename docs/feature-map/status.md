@@ -52,8 +52,8 @@ graph LR
   n_status --> n_src_lib_healthCells_js["lib/healthCells.js"]
   n_status --> n_src_lib_htmlEscape_js["lib/htmlEscape.js"]:::shared
   n_status --> n_src_lib_inFlightGuard_js["lib/inFlightGuard.js"]
-  n_status --> n_src_lib_laneDiagKey_js["lib/laneDiagKey.js"]:::shared
+  n_status --> n_src_lib_instantPushDiag_js["lib/instantPushDiag.js"]:::shared
   classDef shared fill:#eee,stroke:#999,color:#666;
 ```
 
-> ほか 65 ファイル省略（全件は storage-bus.md / metafile 参照）。
+> ほか 67 ファイル省略（全件は storage-bus.md / metafile 参照）。

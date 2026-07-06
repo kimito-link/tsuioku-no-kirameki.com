@@ -184,8 +184,12 @@ export default [
     //   revert厳格化条件・計器カウンタ更新=submitComment内のchrome.storage/DOMのグルー=lib抽出不可。
     //   純関数本体はsrc/lib/commentPostDeadline.js・commentPostDiag.jsにテスト付きで隔離済み)を
     //   追加=20845→20910。ラチェットは実測+50の20960へ。
+    //   v0.1.1092: コメント即時プッシュレーン(storage迂回)の受信配線(window message リスナ・
+    //   STORY_SOURCE_STATE への合流・renderStoryUserLane 軽量再描画・計器カウンタ更新=DOM/
+    //   chrome.storageのグルーでlib抽出不可。純関数本体はsrc/lib/instantCommentPush.js・
+    //   instantPushDiag.jsにテスト付きで隔離済み)を追加=20910→21116。ラチェットは実測+50の21166へ。
     files: ['src/extension/popup-entry.js'],
-    rules: { 'max-lines': ['error', { max: 20960, skipBlankLines: false, skipComments: false }] }
+    rules: { 'max-lines': ['error', { max: 21166, skipBlankLines: false, skipComments: false }] }
   },
   {
     files: ['src/extension/popup/**/*.js'],

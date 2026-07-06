@@ -14,6 +14,19 @@ import { KEY_MILESTONE_EFFECT_DIAG } from '../lib/milestoneEffectDiagKey.js';
 //   同期 TypeError が uncaught のまま chrome://extensions に残る(.catch() は非同期 reject にしか
 //   効かない)。唯一の安全な入口に集約する(content-entry.js の setStorageLocalSilent と同型)。
 import { safeStorageLocalGet, safeStorageLocalSet } from '../lib/safeStorageLocal.js';
+// v0.1.1092: コメント即時プッシュレーン(storage迂回)。content-entry.js が自タブの inline iframe へ
+//   postMessage で直送した新着コメントを、nonce 照合の上で表示バッファへ合流する(表示の先出し専用)。
+import {
+  isInstantCommentPushValid,
+  sanitizeInstantPushRows,
+  toInstantPushDisplayEntry,
+  mergeInstantPushBuffer,
+  composeDisplayEntriesWithInstantPush,
+  computeInstantPushGapAverage,
+  NLS_LIVE_COMMENT_PUSH_NONCE_PARAM
+} from '../lib/instantCommentPush.js';
+import { applyInstantPushDiagDelta } from '../lib/instantPushDiag.js';
+import { KEY_INSTANT_PUSH_DIAG } from '../lib/instantPushDiagKey.js';
 // リリース工程ガード「版混在の実行時検知」(2026-07-06): NL_BUNDLE_VERSION(このバンドルの
 //   ビルド時 package.json version)と chrome.runtime.getManifest().version(実行時本体 version)を
 //   突合し、ズレていれば画面上部にバナーを出す。詳細は src/lib/versionMismatch.js の背景コメント参照。
@@ -5445,6 +5458,159 @@ const STORY_SOURCE_STATE = {
   adThrowerPicks: /** @type {readonly unknown[]} */ (Object.freeze([]))
 };
 
+/**
+ * v0.1.1092: コメント即時プッシュレーン(storage迂回)の「先出し」バッファ。content-entry.js から
+ * postMessage で届いた新着行(nonce 照合済み)を、storage 由来の正規行(STORY_SOURCE_STATE.entries)が
+ * 追いつくまで一時的に保持する。記録・鏡・集計・演出/音のトリガには使わない=表示専用(instantCommentPush.js
+ * 冒頭のセキュリティ裁定を参照)。正規到着で commentNo dedupe により自動的に用済みとなり除去される。
+ * @type {Record<string, unknown>[]}
+ */
+let _instantPushBuffer = [];
+/** 即時プッシュで受け取った行の push→表示合流 ms を計測するための sentAt 記録(commentNo キー)。 */
+const _instantPushSentAtByCommentNo = new Map();
+/** INLINE_EMBED_WATCH の自 iframe に content-entry.js が焼き込んだ照合用 nonce(`pn=`)。 */
+const _instantPushExpectedNonce = (() => {
+  try {
+    return String(
+      new URLSearchParams(typeof window !== 'undefined' ? window.location.search : '').get(
+        NLS_LIVE_COMMENT_PUSH_NONCE_PARAM
+      ) || ''
+    ).trim();
+  } catch {
+    return '';
+  }
+})();
+
+/**
+ * v0.1.1092: コメント即時プッシュレーン計器(受信側)。content-entry.js が書く sentCount/sentRows と
+ * read-merge-write で共存する(1キーを2プロセスが書く点は voiceEffectDiag と同型・診断専用なので
+ * 競合は許容)。fire-and-forget・失敗は黙過(表示には一切影響させない)。
+ * @param {{ receivedCount?: number, receivedRows?: number, rejectedCount?: number, paintedRows?: number,
+ *   lastGapMs?: number, avgGapMs?: number, lastEventAt?: number }} delta
+ */
+function noteInstantPushDiagReceived(delta) {
+  void safeStorageLocalGet(KEY_INSTANT_PUSH_DIAG)
+    .then((bag) => {
+      const prev = bag?.[KEY_INSTANT_PUSH_DIAG];
+      const next = applyInstantPushDiagDelta(prev, delta);
+      return safeStorageLocalSet({ [KEY_INSTANT_PUSH_DIAG]: next });
+    })
+    .catch(() => { /* no-op: 診断専用・表示には影響させない */ });
+}
+
+/**
+ * v0.1.1092: 即時プッシュバッファの内容を STORY_SOURCE_STATE へ合流し、レーンだけを軽量に再描画する。
+ *
+ * 通常の refresh()(重い・tabs.query/storage 全件読み込み)を待たず、既に手元にある
+ * STORY_SOURCE_STATE.entries/storageRowsForCurrentLive(直近の正規描画結果)にプッシュ行を足すだけ
+ * なので、追加の chrome.storage read は発生しない(コアread禁止を厳守)。gift/ad 列の storage read を
+ * 伴う paintStoryUserLaneCoalesced は呼ばない(renderStoryUserLane 単体の diff-skip 再描画に留める)。
+ */
+function repaintStoryUserLaneWithInstantPushBuffer() {
+  const liveId = String(STORY_SOURCE_STATE.liveId || '');
+  if (!liveId) return;
+  const baseEntries = Array.isArray(STORY_SOURCE_STATE.entries) ? STORY_SOURCE_STATE.entries : [];
+  const baseStorageRows = Array.isArray(STORY_SOURCE_STATE.storageRowsForCurrentLive)
+    ? STORY_SOURCE_STATE.storageRowsForCurrentLive
+    : [];
+  // 正規到着済み行は mergeInstantPushBuffer 側で既に間引かれているはずだが、呼び出しタイミングの
+  // ズレに備えてここでも confirmedEntries と突合してから合成する(冪等)。
+  _instantPushBuffer = mergeInstantPushBuffer(_instantPushBuffer, baseStorageRows, []);
+  if (!_instantPushBuffer.length) return;
+  const mergedEntries = composeDisplayEntriesWithInstantPush(baseEntries, _instantPushBuffer);
+  const mergedStorageRows = composeDisplayEntriesWithInstantPush(baseStorageRows, _instantPushBuffer);
+  if (mergedEntries === baseEntries && mergedStorageRows === baseStorageRows) return;
+  STORY_SOURCE_STATE.entries = mergedEntries;
+  STORY_SOURCE_STATE.storageRowsForCurrentLive = mergedStorageRows;
+  STORY_SOURCE_STATE.laneAggregates = userLaneCandidatesFromStorage(
+    STORY_SOURCE_STATE.storageRowsForCurrentLive,
+    liveId,
+    {
+      broadcasterUid: inferBroadcasterUserIdFromComments(
+        STORY_SOURCE_STATE.storageRowsForCurrentLive,
+        watchMetaCache.snapshot || {}
+      ),
+      broadcasterIconUrl: String(watchMetaCache.snapshot?.broadcasterIconUrl || '').trim(),
+      requireText: true
+    }
+  );
+  renderStoryUserLane();
+  // 表示反映できた行数を計器に積む(記録/演出/音には一切触れない・診断のみ)。
+  let paintedNow = 0;
+  let gapSampleMs = -1;
+  for (const e of _instantPushBuffer) {
+    const no = String(e?.commentNo || '').trim();
+    if (!no) continue;
+    paintedNow += 1;
+    const sentAt = _instantPushSentAtByCommentNo.get(no);
+    if (sentAt != null) {
+      gapSampleMs = Math.max(0, Date.now() - sentAt);
+      _instantPushSentAtByCommentNo.delete(no);
+    }
+  }
+  if (paintedNow > 0) {
+    void safeStorageLocalGet(KEY_INSTANT_PUSH_DIAG).then((bag) => {
+      const prev = bag?.[KEY_INSTANT_PUSH_DIAG];
+      const avgGapMs =
+        gapSampleMs >= 0
+          ? computeInstantPushGapAverage(Number(prev?.avgGapMs), gapSampleMs)
+          : Number(prev?.avgGapMs);
+      noteInstantPushDiagReceived({
+        paintedRows: paintedNow,
+        lastEventAt: Date.now(),
+        ...(gapSampleMs >= 0 ? { lastGapMs: gapSampleMs, avgGapMs } : {})
+      });
+    }).catch(() => { /* no-op */ });
+  }
+}
+
+/**
+ * v0.1.1092: content-entry.js からのコメント即時プッシュ受信(INLINE_EMBED_WATCH 専用)。
+ * nonce 不一致・型不正・自 iframe に nonce が焼き込まれていない(古いビルド等)は黙って破棄する
+ * (表示の先出しはベストエフォート=次の storage 経由 refresh で正規に届く)。
+ *
+ * orphan ガード(v0.1.1080 の流儀): 拡張 context invalidated 後もこのリスナ自体は DOM/window 起点で
+ * 動き続けるが、中で使う safeStorageLocalGet/Set は context invalidated を内部で黙過するため
+ * 素の chrome.storage 呼び出しによる同期 throw は起きない。追加の自己解除は不要。
+ */
+function handleInstantCommentPushMessage(event) {
+  if (!isInstantCommentPushValid(event, _instantPushExpectedNonce)) {
+    // nonce 未設定(自 iframe に pn= が無い=古いビルドの content script 等)のときは
+    // 「破棄」として計上しない(そもそも即時プッシュ機能が来ていないだけ=ノイズにしない)。
+    if (_instantPushExpectedNonce && event?.data?.type === 'NLS_LIVE_COMMENT_PUSH') {
+      noteInstantPushDiagReceived({ rejectedCount: 1, lastEventAt: Date.now() });
+    }
+    return;
+  }
+  const rows = sanitizeInstantPushRows(event.data.rows);
+  if (!rows) {
+    noteInstantPushDiagReceived({ rejectedCount: 1, lastEventAt: Date.now() });
+    return;
+  }
+  const liveId = String(STORY_SOURCE_STATE.liveId || watchPopupLastPaintedLiveId || '');
+  const sentAt = Number(event.data.sentAt);
+  const capturedAt = Number.isFinite(sentAt) ? sentAt : Date.now();
+  const displayEntries = rows.map((r) => toInstantPushDisplayEntry(r, liveId, capturedAt));
+  for (const e of displayEntries) {
+    const no = String(e?.commentNo || '').trim();
+    if (no) _instantPushSentAtByCommentNo.set(no, capturedAt);
+  }
+  const baseStorageRows = Array.isArray(STORY_SOURCE_STATE.storageRowsForCurrentLive)
+    ? STORY_SOURCE_STATE.storageRowsForCurrentLive
+    : [];
+  _instantPushBuffer = mergeInstantPushBuffer(_instantPushBuffer, baseStorageRows, displayEntries);
+  noteInstantPushDiagReceived({
+    receivedCount: 1,
+    receivedRows: rows.length,
+    lastEventAt: Date.now()
+  });
+  repaintStoryUserLaneWithInstantPushBuffer();
+}
+
+if (INLINE_EMBED_WATCH && typeof window !== 'undefined') {
+  window.addEventListener('message', handleInstantCommentPushMessage);
+}
+
 /** initPopup の途中失敗後も DevTools から呼べるよう、読み込み直後に束縛する（観測のみ） */
 if (typeof globalThis !== 'undefined') {
   globalThis.__NLS_LANE_DIAG__ = function () {
@@ -6867,12 +7033,24 @@ function syncStorySourceEntries(liveId, displayList, storageRowsForLane) {
     cancelStoryHoverClearTimer();
     // ★v0.1.1042: gift/ad picks の [] リセットは配信切替時のみ(旧:毎poll)。毎poll [] だと2段paint で gift/ad 段が空↔充填し「ギフトタイル出入り」churn になっていた(同一配信は前値保持=出入り消滅・Phase-2 が同poll内で最新に上書き)。
     STORY_SOURCE_STATE.giftThrowerPicks = Object.freeze([]); STORY_SOURCE_STATE.adThrowerPicks = Object.freeze([]);
+    // v0.1.1092: 配信切替では前の配信の先出しプッシュ行を持ち越さない(別配信のコメントが
+    //   新しい配信のレーンに混入するのを防ぐ)。同一配信内の poll では消さない(先出しの意味が無くなる)。
+    _instantPushBuffer = [];
+    _instantPushSentAtByCommentNo.clear();
   }
 
-  STORY_SOURCE_STATE.entries = list;
-  STORY_SOURCE_STATE.storageRowsForCurrentLive = Array.isArray(storageRowsForLane)
-    ? storageRowsForLane
-    : [];
+  const confirmedStorageRows = Array.isArray(storageRowsForLane) ? storageRowsForLane : [];
+  // v0.1.1092: 即時プッシュ(storage迂回)の先出しバッファを、今回の正規 refresh 結果と突合する。
+  //   正規到着済み(commentNo 一致)の先出し行はここで用済みとして間引かれる(mergeInstantPushBuffer)。
+  //   残った先出し行(まだ storage に届いていない分)は表示専用に list/storageRowsForLane の末尾へ
+  //   連結する(記録・鏡・集計・演出/音のトリガには使わない=composeDisplayEntriesWithInstantPush は
+  //   表示配列を組み立てるだけの純関数)。INLINE_EMBED_WATCH 以外はバッファが常に空なので無変更。
+  _instantPushBuffer = mergeInstantPushBuffer(_instantPushBuffer, confirmedStorageRows, []);
+  STORY_SOURCE_STATE.entries = composeDisplayEntriesWithInstantPush(list, _instantPushBuffer);
+  STORY_SOURCE_STATE.storageRowsForCurrentLive = composeDisplayEntriesWithInstantPush(
+    confirmedStorageRows,
+    _instantPushBuffer
+  );
   // 0.1.79: 4層目=集約時に broadcaster icon 取り違え除外。正本(2026-06-17): userLaneCandidatesFromStorage
   //   は会場(venueBar.js)と同一純関数=popup列と会場席は同じ集約を共有し顔ぶれ一致が正(「鏡映」設計・匿名a:含む)。
   STORY_SOURCE_STATE.laneAggregates = nextLiveId
@@ -6893,7 +7071,7 @@ function syncStorySourceEntries(liveId, displayList, storageRowsForLane) {
   if (nextLiveId) {
     void paintStoryUserLaneCoalesced(
       nextLiveId,
-      list,
+      STORY_SOURCE_STATE.entries,
       STORY_SOURCE_STATE.storageRowsForCurrentLive
     );
   } else {

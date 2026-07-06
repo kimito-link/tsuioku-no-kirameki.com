@@ -127,6 +127,9 @@ import { KEY_OP_SOUND_EFFECT_DIAG } from '../lib/opSoundEffectDiagKey.js';
 //   extras(12秒間引き)で読む。「送信中…」張り付き・自コメ「一瞬載って消える」の切り分け用。
 import { buildCommentPostDiagLines } from '../lib/commentPostDiag.js';
 import { KEY_COMMENT_POST_DIAG } from '../lib/commentPostDiagKey.js';
+// v0.1.1092: コメント即時プッシュレーン(storage迂回)の送信N/受信N/表示遅延msを
+//   extras(12秒間引き)で読む。「送っているのに受けていない/受けているのに表示に出ない」の切り分け用。
+import { buildInstantPushDiagLines } from '../lib/instantPushDiag.js';
 // v0.1.1072: マイ効果音(customSoundStore.js・Phase A)の取込状況を extras(12秒間引き)で計測する。
 //   コアreadには足さない(既知の地雷=v1045/v1046)。IDBが開けない環境では静かに「-」表示。
 import { buildCustomSoundDiagSnapshot, buildCustomSoundDiagLine } from '../lib/customSoundDiag.js';
@@ -272,7 +275,9 @@ let _extrasCache = /** @type {{reportPreview:any, watchTabMap:any, trendFindings
   // Phase D1(2026-07-05): 操作音の押下→成功→発音観測値。補助情報=extras(12秒間引き)のみ。
   opSoundEffectDiag: null,
   // 感度パッチ(2026-07-06): コメント送信の所要ms/結果/フレーム試行回数観測値。補助情報=extras(12秒間引き)のみ。
-  commentPostDiag: null
+  commentPostDiag: null,
+  // v0.1.1092: コメント即時プッシュレーン(storage迂回)の送信/受信/表示遅延観測値。補助情報=extras(12秒間引き)のみ。
+  instantPushDiag: null
 });
 /** v0.1.868: 配信カードの再構築 skip 判定用 signature(変化なしなら innerHTML を作り直さない)。 */
 let _lastLivesSig = '';
@@ -552,7 +557,8 @@ async function refresh(opts = {}) {
         voiceEffectDiag,
         bgmPhaseDiag,
         opSoundEffectDiag,
-        commentPostDiag
+        commentPostDiag,
+        instantPushDiag
       } = pickExtrasBatchValues(extrasBag, Date.now());
       step = 'queryWatchTabMap';
       const watchTabMap = await runStorageOpWithTimeout(() => queryWatchTabMap(), tmo).catch(() => new Map());
@@ -573,14 +579,14 @@ async function refresh(opts = {}) {
         () => _customSoundDiagGuard.run(customSoundDiagFallback),
         tmo
       ).catch(() => customSoundDiagFallback);
-      _extrasCache = { reportPreview, watchTabMap, trendFindings, laneDiag, laneMirror, statCardsMirror, northStarMirror, voiceDiag, venueSeatsDiag, publishOutcomeRec, commentTimelineMirror, previewRenderAck, backfillLiveMetric, giftEffectDiag, milestoneEffectDiag, customSoundDiag, voiceEffectDiag, bgmPhaseDiag, opSoundEffectDiag, commentPostDiag };
+      _extrasCache = { reportPreview, watchTabMap, trendFindings, laneDiag, laneMirror, statCardsMirror, northStarMirror, voiceDiag, venueSeatsDiag, publishOutcomeRec, commentTimelineMirror, previewRenderAck, backfillLiveMetric, giftEffectDiag, milestoneEffectDiag, customSoundDiag, voiceEffectDiag, bgmPhaseDiag, opSoundEffectDiag, commentPostDiag, instantPushDiag };
       _extrasCacheAt = Date.now();
       _mark('extras');
     }
-    const { reportPreview, watchTabMap, trendFindings, laneDiag, laneMirror, statCardsMirror, northStarMirror, voiceDiag, venueSeatsDiag, publishOutcomeRec, commentTimelineMirror, previewRenderAck, backfillLiveMetric, giftEffectDiag, milestoneEffectDiag, customSoundDiag, voiceEffectDiag, bgmPhaseDiag, opSoundEffectDiag, commentPostDiag } = _extrasCache;
+    const { reportPreview, watchTabMap, trendFindings, laneDiag, laneMirror, statCardsMirror, northStarMirror, voiceDiag, venueSeatsDiag, publishOutcomeRec, commentTimelineMirror, previewRenderAck, backfillLiveMetric, giftEffectDiag, milestoneEffectDiag, customSoundDiag, voiceEffectDiag, bgmPhaseDiag, opSoundEffectDiag, commentPostDiag, instantPushDiag } = _extrasCache;
     step = 'renderAll';
     // v0.1.1005: 前サイクルの所要計器をコピー本文へ渡す(画面ヘッダーだけでなく AI共有テキストにも出す)。
-    renderAll({ lvList, summaries, fastDiag, popupDiag, backfillProgress, backfillLiveMetric, voiceDiag, venueSeatsDiag, laneDiag, laneMirror, statCardsMirror, northStarMirror, reportPreview, trendFindings, watchTabMap, publishOutcomeRec, commentTimelineMirror, previewRenderAck, refreshPerf: _lastRefreshPerf, giftEffectDiag, milestoneEffectDiag, customSoundDiag, voiceEffectDiag, bgmPhaseDiag, opSoundEffectDiag, commentPostDiag });
+    renderAll({ lvList, summaries, fastDiag, popupDiag, backfillProgress, backfillLiveMetric, voiceDiag, venueSeatsDiag, laneDiag, laneMirror, statCardsMirror, northStarMirror, reportPreview, trendFindings, watchTabMap, publishOutcomeRec, commentTimelineMirror, previewRenderAck, refreshPerf: _lastRefreshPerf, giftEffectDiag, milestoneEffectDiag, customSoundDiag, voiceEffectDiag, bgmPhaseDiag, opSoundEffectDiag, commentPostDiag, instantPushDiag });
     _mark('render');
     const _totalMs = Math.round((typeof performance !== 'undefined' ? performance.now() : Date.now()) - _t0);
     updateLastUpdateMeta({ totalMs: _totalMs, stepMs: _stepMs });
@@ -1181,7 +1187,7 @@ async function loadBackfillLiveMetricSafe() {
 // v0.1.861: レポートプレビューの信頼度注釈の文脈は純関数 reportPreviewCtxFromFastDiag(src/lib)に抽出済み
 //   (NDGR 接続/userId 付き率/backfill 進行 → 注釈ctx・挙動同値・テストで固定)。import は冒頭。
 
-function renderAll({ lvList, summaries, fastDiag, popupDiag, backfillProgress, backfillLiveMetric, voiceDiag, venueSeatsDiag, laneDiag, laneMirror, statCardsMirror, northStarMirror, reportPreview, trendFindings, watchTabMap, publishOutcomeRec, commentTimelineMirror, previewRenderAck, refreshPerf, giftEffectDiag, milestoneEffectDiag, customSoundDiag, voiceEffectDiag, bgmPhaseDiag, opSoundEffectDiag, commentPostDiag }) {
+function renderAll({ lvList, summaries, fastDiag, popupDiag, backfillProgress, backfillLiveMetric, voiceDiag, venueSeatsDiag, laneDiag, laneMirror, statCardsMirror, northStarMirror, reportPreview, trendFindings, watchTabMap, publishOutcomeRec, commentTimelineMirror, previewRenderAck, refreshPerf, giftEffectDiag, milestoneEffectDiag, customSoundDiag, voiceEffectDiag, bgmPhaseDiag, opSoundEffectDiag, commentPostDiag, instantPushDiag }) {
   // v0.1.847: 各描画セクションを独立 try/catch で隔離するヘルパ。1つが throw しても他のセクションと
   //   最終更新メタを巻き込まない=「セルが全部消える/最終更新—のまま固まる」を根治。落ちた場所は
   //   console と AI 共有欄に出して真因を追えるようにする(star-romi 失敗体験の除去)。
@@ -1341,11 +1347,18 @@ function renderAll({ lvList, summaries, fastDiag, popupDiag, backfillProgress, b
     const cLines = buildCommentPostDiagLines(commentPostDiag, Date.now());
     commentPostLine = cLines.length ? `\n${cLines.join('\n')}` : '';
   });
+  // v0.1.1092: コメント即時プッシュレーン(storage迂回)の送信N/受信N/表示遅延msを概要に併記
+  //   (プッシュが一度も無い配信なら空=ノイズにしない)。埋め込みパネルが実際に即時反映できているかの切り分け用。
+  let instantPushLine = '';
+  safeSection('即時プッシュ計器', () => {
+    const iLines = buildInstantPushDiagLines(instantPushDiag, Date.now());
+    instantPushLine = iLines.length ? `\n${iLines.join('\n')}` : '';
+  });
   const overviewEl = document.getElementById('overviewBody');
   if (overviewEl) {
     overviewEl.textContent =
       (overviewText || '視聴中の配信はありません。') +
-      backfillLine + laneLine + voiceLine + reportPreviewLine + giftEffectLine + milestoneEffectLine + customSoundLine + voiceEffectLine + bgmPhaseLine + opSoundEffectLine + commentPostLine;
+      backfillLine + laneLine + voiceLine + reportPreviewLine + giftEffectLine + milestoneEffectLine + customSoundLine + voiceEffectLine + bgmPhaseLine + opSoundEffectLine + commentPostLine + instantPushLine;
     overviewEl.classList.toggle('empty-note', !overviewText);
   }
 
@@ -1518,7 +1531,7 @@ function renderAll({ lvList, summaries, fastDiag, popupDiag, backfillProgress, b
   // AI 共有用テキスト
   let fullText = '';
   safeSection('AI共有テキスト', () => {
-    fullText = buildAiShareFullText({ overviewText, livesData, fastDiag, popupDiag, voiceDiag, venueSeatsDiag, laneDiag, laneMirror, reportPreview, trendFindings, jsonBlob, currentLiveId, publishKeys, publishOutcomeRec, previewRenderAck, refreshPerf, giftEffectDiag, milestoneEffectDiag, customSoundDiag, voiceEffectDiag, bgmPhaseDiag, opSoundEffectDiag, commentPostDiag });
+    fullText = buildAiShareFullText({ overviewText, livesData, fastDiag, popupDiag, voiceDiag, venueSeatsDiag, laneDiag, laneMirror, reportPreview, trendFindings, jsonBlob, currentLiveId, publishKeys, publishOutcomeRec, previewRenderAck, refreshPerf, giftEffectDiag, milestoneEffectDiag, customSoundDiag, voiceEffectDiag, bgmPhaseDiag, opSoundEffectDiag, commentPostDiag, instantPushDiag });
     const ta = /** @type {HTMLTextAreaElement|null} */ (
       document.getElementById('aiShareText')
     );

@@ -43,6 +43,7 @@ import { buildBgmPhaseDiagLines } from './bgmPhaseDiag.js';
 import { buildOpSoundEffectDiagLines } from './opSoundEffectDiag.js';
 // 感度パッチ(2026-07-06): コメント送信(所要ms/結果/フレーム試行回数)計器(extras 12秒間引き)をAI共有本文にも併記。
 import { buildCommentPostDiagLines } from './commentPostDiag.js';
+import { buildInstantPushDiagLines } from './instantPushDiag.js';
 import { reportPreviewCtxFromFastDiag } from './reportPreviewCtx.js';
 import { buildReportPreviewLines } from './reportPreview.js';
 import { buildStatusActions } from './statusActionAdvisor.js';
@@ -76,7 +77,7 @@ export function formatRefreshPerfLine(refreshPerf) {
  * @param {any} args
  * @returns {string}
  */
-export function buildAiShareFullText({ overviewText, livesData, fastDiag, popupDiag, voiceDiag, venueSeatsDiag, laneDiag, laneMirror, reportPreview, trendFindings, jsonBlob, currentLiveId, publishKeys, publishOutcomeRec, previewRenderAck, refreshPerf, giftEffectDiag, milestoneEffectDiag, customSoundDiag, voiceEffectDiag, bgmPhaseDiag, opSoundEffectDiag, commentPostDiag }) {
+export function buildAiShareFullText({ overviewText, livesData, fastDiag, popupDiag, voiceDiag, venueSeatsDiag, laneDiag, laneMirror, reportPreview, trendFindings, jsonBlob, currentLiveId, publishKeys, publishOutcomeRec, previewRenderAck, refreshPerf, giftEffectDiag, milestoneEffectDiag, customSoundDiag, voiceEffectDiag, bgmPhaseDiag, opSoundEffectDiag, commentPostDiag, instantPushDiag }) {
   const lines = [];
   lines.push('## 君斗りんくの追憶のきらめき 状態速報');
   lines.push(`生成: ${new Date().toISOString()}`);
@@ -274,6 +275,13 @@ export function buildAiShareFullText({ overviewText, livesData, fastDiag, popupD
     try {
       const cpLines = buildCommentPostDiagLines(commentPostDiag, Date.now());
       for (const l of cpLines) lines.push(l);
+    } catch {
+      /* no-op */
+    }
+    // v0.1.1092: コメント即時プッシュレーン(storage迂回)の送信N/受信N/表示遅延ms(未観測なら空=ノイズにしない)。
+    try {
+      const ipLines = buildInstantPushDiagLines(instantPushDiag, Date.now());
+      for (const l of ipLines) lines.push(l);
     } catch {
       /* no-op */
     }
