@@ -26,6 +26,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1099',
+    date: '2026-07-06',
+    summary: 'feat(score): popupに採点パネル+ハイライト台帳',
+    items: Object.freeze([
+      'popup(応援レーン)に「配信採点(カラオケ採点風)」パネルを追加しました。開くと現在のスコア・ランク・感性ボーナス・講評レーダー・今回のハイライトが表示されます。',
+      'ギフト大波やコメント節目、リーチ/突破/大当たり到達など、実際に演出が出た瞬間だけをハイライトとして記録するようにしました。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1098',
     date: '2026-07-06',
     summary: 'feat(score): 配信採点モデルv2+フェーズ実績計器',

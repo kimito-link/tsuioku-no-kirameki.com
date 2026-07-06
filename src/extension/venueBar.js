@@ -137,6 +137,9 @@ import {
 } from '../lib/bgmDirector.js';
 import { makeInitialBgmPhaseDiag, buildBgmPhaseDiagSnapshot } from '../lib/bgmPhaseDiag.js';
 import { KEY_BGM_PHASE_DIAG } from '../lib/bgmPhaseDiagKey.js';
+// SC2(council/broadcast-scoring-SYNTHESIS.md §2.2): ハイライト台帳(実際に発火した演出だけ記録)。
+import { appendHighlight, isHighlightWorthyKind } from '../lib/highlightLedger.js';
+import { KEY_HIGHLIGHT_LEDGER } from '../lib/highlightLedgerKey.js';
 import { anonymousIdenticonDataUrl } from '../lib/anonymousIdenticon.js';
 import { tailStorageKey } from '../lib/commentTailBuffer.js';
 import { pickNewVenueSpeech, mergeSpeakersIntoVenueRows, liveFeedSpeechRows } from '../lib/venueSpeech.js';
@@ -2440,6 +2443,11 @@ export function mountVenueBarButton(options = {}) {
             _giftEffectDiagCounters.lastSoundGapMs = gap;
             _giftEffectDiagCounters.avgSoundGapMs = computeGiftGapAverage(_giftEffectDiagCounters.avgSoundGapMs, gap);
           }
+          // SC2(§2.2): 「実際に鳴った」瞬間のみ、gift_large以上をハイライト台帳へ記録する
+          //   (playEffectSoundの戻り値'played'を見て記録=見てない演出が結果に出る構造を防止)。
+          if (pending.kind === 'gift_large' || pending.kind === 'gift_mega') {
+            appendHighlightAndPublish(speechLiveId, pending.kind, Date.now());
+          }
         } else {
           const field = giftSoundDiagFieldForPlayResult(playResult);
           if (field) _giftEffectDiagCounters[field] += 1;
@@ -2519,6 +2527,18 @@ export function mountVenueBarButton(options = {}) {
     _bgmPhaseDiagCounters.bgmEnabled = _bgmEnabledCache;
     const snap = buildBgmPhaseDiagSnapshot(_bgmPhaseDiagCounters, now);
     void safeStorageLocalSet({ [KEY_BGM_PHASE_DIAG]: snap });
+  };
+
+  // SC2(council/broadcast-scoring-SYNTHESIS.md §2.2): ハイライト台帳(KEY_HIGHLIGHT_LEDGER)への
+  //   追記ヘルパ。popup-entry.jsのappendHighlightAndPublishPopupと同型。書き手は「実際に発火が
+  //   確定した演出だけ」相乗りする(新規writerを作らず既存の確定分岐に載せる・§6却下事項)。
+  /** @param {string} liveId @param {string} kind @param {number} atMs */
+  const appendHighlightAndPublish = (liveId, kind, atMs) => {
+    if (!isHighlightWorthyKind(kind)) return;
+    void safeStorageLocalGet(KEY_HIGHLIGHT_LEDGER).then((bag) => {
+      const next = appendHighlight(bag?.[KEY_HIGHLIGHT_LEDGER], { liveId, kind, atMs });
+      void safeStorageLocalSet({ [KEY_HIGHLIGHT_LEDGER]: next });
+    });
   };
 
   /**
@@ -2642,6 +2662,15 @@ export function mountVenueBarButton(options = {}) {
       if (result.phase === PHASE.REACH) _bgmPhaseDiagCounters.reachCount += 1;
       else if (result.phase === PHASE.BREAKTHROUGH) _bgmPhaseDiagCounters.breakthroughCount += 1;
       else if (result.phase === PHASE.JACKPOT) _bgmPhaseDiagCounters.jackpotCount += 1;
+      // SC2(council/broadcast-scoring-SYNTHESIS.md §2.2): フェーズ遷移(実際に画面のフェーズ
+      //   チップにも出ている確定事象)をハイライト台帳へ追記する。新規writerを作らず、
+      //   この確定分岐に相乗りする(popup-entry.jsのadvancePhaseDirectorPopupと同型)。
+      const highlightPhaseKind =
+        result.phase === PHASE.REACH ? 'phase_reach'
+        : result.phase === PHASE.BREAKTHROUGH ? 'phase_breakthrough'
+        : result.phase === PHASE.JACKPOT ? 'phase_jackpot'
+        : '';
+      if (highlightPhaseKind) appendHighlightAndPublish(_bgmPhaseDiagCounters.liveId, highlightPhaseKind, now);
     }
 
     if (result.holdLampFired && _effectSoundEnabledCache) {

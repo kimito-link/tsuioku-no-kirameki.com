@@ -41,4 +41,66 @@ describe('buildBroadcastScorePanelHtml', () => {
     expect(s).toContain('nl-score-rank--s');
     expect(d).toContain('nl-score-rank--d');
   });
+
+  it('SC2: v2スコア(base/bonus/bonusParts)があれば感性ボーナス行を出す', () => {
+    const v2Score = { ...sampleScore, base: 90, bonus: 12, bonusParts: { reach: 4, breakthrough: 3, jackpot: 5 } };
+    const html = buildBroadcastScorePanelHtml({ score: v2Score, isFinal: false, isFresh: true });
+    expect(html).toContain('broadcastScoreBonusRow');
+    expect(html).toContain('data-bonus="12"');
+    expect(html).toContain('+12');
+    expect(html).toContain('リーチ+4');
+    expect(html).toContain('突破+3');
+    expect(html).toContain('大当たり+5');
+  });
+
+  it('SC2: v1スコア(bonusなし)は感性ボーナス行を出さない', () => {
+    const html = buildBroadcastScorePanelHtml({ score: sampleScore, isFinal: false, isFresh: true });
+    expect(html).not.toContain('broadcastScoreBonusRow');
+  });
+
+  it('SC2: phaseChipがあれば現在フェーズ/Rを表示する', () => {
+    const html = buildBroadcastScorePanelHtml({
+      score: sampleScore,
+      isFinal: false,
+      isFresh: true,
+      phaseChip: { phase: 'reach', r: 1.75 }
+    });
+    expect(html).toContain('nl-score-phase-chip');
+    expect(html).toContain('リーチ');
+    expect(html).toContain('R=1.75');
+  });
+
+  it('SC2: phaseChipが無ければ何も出さない(未観測はノイズにしない)', () => {
+    const html = buildBroadcastScorePanelHtml({ score: sampleScore, isFinal: false, isFresh: true });
+    expect(html).not.toContain('nl-score-phase-chip');
+  });
+
+  it('SC2: radarがあれば講評レーダーSVGを含む', () => {
+    const radar = { axes: [{ key: 'commentDensity', label: 'コメント密度', value: 50 }] };
+    const html = buildBroadcastScorePanelHtml({ score: sampleScore, isFinal: false, isFresh: true, radar });
+    expect(html).toContain('broadcastScoreRadarSection');
+    expect(html).toContain('nl-score-radar-svg');
+  });
+
+  it('SC2: highlightsがあれば3選のラベルを表示する', () => {
+    const highlights = [
+      { at: 1, kind: 'phase_jackpot', label: '大当たり到達' },
+      { at: 2, kind: 'gift_large', label: 'ギフト大波(large)' }
+    ];
+    const html = buildBroadcastScorePanelHtml({ score: sampleScore, isFinal: false, isFresh: true, highlights });
+    expect(html).toContain('broadcastScoreHighlights');
+    expect(html).toContain('大当たり到達');
+    expect(html).toContain('ギフト大波(large)');
+  });
+
+  it('SC2: highlightsが空配列なら何も出さない', () => {
+    const html = buildBroadcastScorePanelHtml({ score: sampleScore, isFinal: false, isFresh: true, highlights: [] });
+    expect(html).not.toContain('broadcastScoreHighlights');
+  });
+
+  it('SC2: highlightsのlabelはHTMLエスケープされる', () => {
+    const highlights = [{ at: 1, kind: 'gift_large', label: '<script>x</script>' }];
+    const html = buildBroadcastScorePanelHtml({ score: sampleScore, isFinal: false, isFresh: true, highlights });
+    expect(html).not.toContain('<script>x</script>');
+  });
 });

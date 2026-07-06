@@ -9208,6 +9208,149 @@
         font-size: 10px;
       }
 
+      /* SC2(council/broadcast-scoring-SYNTHESIS.md §5): 配信採点パネル(カラオケ採点風)。
+         採点表示は控えめ(§1.3価値序列=派手演出はSC3の発表シーケンスまで取っておく)。 */
+      .nl-score-mount {
+        margin-top: 4px;
+      }
+
+      .nl-score-panel {
+        font-size: 11px;
+      }
+
+      .nl-score-title {
+        margin: 0 0 4px;
+        font-weight: 600;
+      }
+
+      .nl-score-total-row {
+        display: flex;
+        align-items: baseline;
+        gap: 4px;
+      }
+
+      .nl-score-total-num {
+        font-size: 28px;
+        font-weight: 700;
+        line-height: 1;
+      }
+
+      .nl-score-total-unit {
+        font-size: 12px;
+        color: var(--nl-muted);
+      }
+
+      .nl-score-rank {
+        margin-left: 6px;
+        padding: 1px 8px;
+        border-radius: 999px;
+        font-weight: 700;
+        font-size: 13px;
+      }
+
+      .nl-score-rank--s {
+        background: #ffd54a;
+        color: #5b3d00;
+      }
+
+      .nl-score-rank--a {
+        background: #ffb3c7;
+        color: #5b0022;
+      }
+
+      .nl-score-rank--b {
+        background: #9fd8ff;
+        color: #003a5b;
+      }
+
+      .nl-score-rank--c {
+        background: #c9e8b0;
+        color: #234500;
+      }
+
+      .nl-score-rank--d {
+        background: var(--nl-bg-soft);
+        color: var(--nl-muted);
+      }
+
+      .nl-score-parts {
+        margin: 6px 0 0;
+        padding-left: 1.1em;
+        font-size: 10px;
+      }
+
+      .nl-score-bonus-row {
+        margin-top: 4px;
+        font-size: 10px;
+        color: var(--nl-muted);
+      }
+
+      .nl-score-bonus-val {
+        font-weight: 700;
+        color: inherit;
+        margin: 0 4px;
+      }
+
+      .nl-score-phase-chip {
+        margin: 4px 0 0;
+        font-size: 10px;
+        color: var(--nl-muted);
+      }
+
+      .nl-score-radar-section {
+        margin-top: 6px;
+        max-width: 200px;
+      }
+
+      .nl-score-radar-svg {
+        width: 100%;
+        height: auto;
+      }
+
+      .nl-score-radar-grid {
+        fill: none;
+        stroke: var(--nl-border);
+        stroke-width: 1;
+      }
+
+      .nl-score-radar-axis-line {
+        stroke: var(--nl-border);
+        stroke-width: 1;
+      }
+
+      .nl-score-radar-data {
+        fill: rgba(255, 138, 101, 0.35);
+        stroke: #ff8a65;
+        stroke-width: 1.5;
+      }
+
+      .nl-score-radar-label {
+        font-size: 7px;
+        fill: var(--nl-muted);
+      }
+
+      .nl-score-highlights-section {
+        margin-top: 6px;
+      }
+
+      .nl-score-highlights-title {
+        margin: 0 0 2px;
+        font-size: 10px;
+        font-weight: 600;
+      }
+
+      .nl-score-highlights-list {
+        margin: 0;
+        padding-left: 1.1em;
+        font-size: 10px;
+      }
+
+      .nl-score-stale {
+        margin-top: 4px;
+        font-size: 10px;
+        color: var(--nl-muted);
+      }
+
       .room-bar-row {
         margin-top: 3px;
         display: flex;
@@ -9645,6 +9788,7 @@
       html.nl-empty-state body .nl-vdh-divider,
       html.nl-empty-state body .nl-session-summary-panel,
       html.nl-empty-state body .nl-gift-quick-panel,
+      html.nl-empty-state body .nl-score-panel-details,
       html.nl-empty-state body .nl-record-nav-hint,
       html.nl-empty-state body .nl-dev-monitor-details {
         display: none !important;
@@ -12343,6 +12487,13 @@
           </div>
         </details>
       </section>
+
+      <!-- SC2(council/broadcast-scoring-SYNTHESIS.md §5): 配信採点パネル。data-nl-toolbar-only を
+           付けない(embed_watchでも見たい=設計書§1.3の要件・HANDOFF確定要件1)。 -->
+      <details id="broadcastScoreDetails" class="nl-score-panel-details">
+        <summary>配信採点（カラオケ採点風）</summary>
+        <div id="broadcastScoreMount" class="nl-score-mount"></div>
+      </details>
 
       <details class="nl-session-summary-panel" data-nl-toolbar-only>
         <summary>記録サマリの推移（この放送）</summary>

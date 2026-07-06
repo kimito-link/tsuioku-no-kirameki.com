@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 2 / 643 件
+## ⚠️ 役割コメントが無いソース 2 / 650 件
 - `src/lib/reportPreviewPublish.js`
 - `src/lib/venueLaneBuckets.js`
 
@@ -527,7 +527,7 @@
   - `gift-impact.mp3`
   - `gift-sparkle.mp3`
   - `gift-whoosh.mp3`
-- 📁 **src/** (1340)
+- 📁 **src/** (1353)
   - 📁 **data/** (6)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -792,7 +792,7 @@
         - `logo_funlink_white_RGB_maru_black.png`
       - `logo_guide_funlink_ol.pdf`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1125)
+  - 📁 **lib/** (1138)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -887,6 +887,12 @@
     - `broadcastNarrativeBuilder.test.js`
     - `broadcastReportSummary.js` — HTML レポート / マーケ分析の双方で使う「放送全体の純粋集計」。
     - `broadcastReportSummary.test.js`
+    - `broadcastScore.js` — 配信スコアパネル(カラオケ採点/太鼓の達人風)の純粋なスコア化ロジック。
+    - `broadcastScore.test.js`
+    - `broadcastScoreHtml.js` — 配信スコアパネル(カラオケ採点風)の HTML を組む純関数。
+    - `broadcastScoreHtml.test.js`
+    - `broadcastScorePanelViewModel.js` — SC2(council/broadcast-scoring-SYNTHESIS.md §5)のpopupスコアパネル配線から、
+    - `broadcastScorePanelViewModel.test.js`
     - `broadcastSessionSummaryDb.js` — 配信セッション単位の軽量サマリ（ポップアップの IndexedDB）
     - `broadcastSessionSummaryFlush.js` — サマリ IndexedDB への間欠フラッシュ（ポップアップから呼ぶ）
     - `broadcastSessionSummaryFlush.test.js`
@@ -1228,6 +1234,9 @@
     - `hiddenOfficialIframeReinjectGate.test.js`
     - `hiddenTabExternalFetchGate.js` — v0.1.616: 非可視タブでも外部 API fetch（koken 貢献度 / nicoad 広告 / ギフト履歴 /
     - `hiddenTabExternalFetchGate.test.js`
+    - `highlightLedger.js` — 配信採点「発表演出」用のハイライト台帳(council/broadcast-scoring-SYNTHESIS.md §2.2・SC2)。
+    - `highlightLedger.test.js`
+    - `highlightLedgerKey.js` — 配信採点「発表演出」用のハイライト台帳(実際に画面に出た演出だけを記録する最小台帳)の
     - `htmlEscape.js` — 旧パス：`src/lib/htmlEscape.js`
     - `htmlEscape.test.js`
     - `htmlReportCommenterFollowSection.js` — HTML レポート向けコメンターフォロー分析ブロック。
@@ -1639,6 +1648,10 @@
     - `sameOriginContribRankingDomShape.test.js`
     - `sanitizeRoomAvatarsForBroadcaster.js` — 集計済み user room の avatarUrl から「broadcaster icon の取り違え」を除去する純粋関数。
     - `sanitizeRoomAvatarsForBroadcaster.test.js`
+    - `scoreCountUp.js` — 配信採点パネルの点数カウントアップ演出(council/broadcast-scoring-SYNTHESIS.md §5・SC2)。
+    - `scoreCountUp.test.js`
+    - `scoreRadar.js` — 配信採点の「講評レーダー」5軸(council/broadcast-scoring-SYNTHESIS.md §2.3)を組む純関数群。
+    - `scoreRadar.test.js`
     - `scrapeEventScoreRankingFromRichviewDom.js` — audition richview（イベント💎順位リスト想定）の DOM から順位つきスコア行を掬う純関数（PR2）。
     - `scrapeEventScoreRankingFromRichviewDom.test.js`
     - `scrapeGiftHistoryList.js` — niconico ギフト sub-app の `gift-history-list` から個別ギフトを抽出する純関数（v0.1.198）。

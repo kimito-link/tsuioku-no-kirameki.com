@@ -198,8 +198,14 @@ export default [
     //   advancePhaseDirectorPopup に追加=BGMトグルと無関係に数える必要がありphaseFor呼び出し点の
     //   chrome.storage計器グルーでlib抽出不可(council/broadcast-scoring-SYNTHESIS.md §1.2)。
     //   21252→21322。ラチェットは実測+50の21372へ。
+    //   SC2(2026-07-06・v0.1.1099): popup採点パネル配線(renderBroadcastScorePanel・
+    //   appendHighlightAndPublishPopup・フェーズ遷移/マイルストーン確定点へのハイライト台帳追記
+    //   フック=chrome.storage read/toggleリスナー配線のグルーでlib抽出不可。liveId突合・
+    //   スコア計算・レーダー計算・ハイライト選抜の合成本体は
+    //   src/lib/broadcastScorePanelViewModel.js(テスト付き)に隔離済み)を追加=21322→21440。
+    //   ラチェットは実測+50の21490へ。
     files: ['src/extension/popup-entry.js'],
-    rules: { 'max-lines': ['error', { max: 21372, skipBlankLines: false, skipComments: false }] }
+    rules: { 'max-lines': ['error', { max: 21490, skipBlankLines: false, skipComments: false }] }
   },
   {
     files: ['src/extension/popup/**/*.js'],

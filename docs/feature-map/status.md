@@ -52,8 +52,8 @@ graph LR
   n_status --> n_src_lib_giftEffectDiagKey_js["lib/giftEffectDiagKey.js"]:::shared
   n_status --> n_src_lib_googleSuggest_js["lib/googleSuggest.js"]
   n_status --> n_src_lib_healthCells_js["lib/healthCells.js"]
-  n_status --> n_src_lib_htmlEscape_js["lib/htmlEscape.js"]:::shared
+  n_status --> n_src_lib_highlightLedger_js["lib/highlightLedger.js"]:::shared
   classDef shared fill:#eee,stroke:#999,color:#666;
 ```
 
-> ほか 69 ファイル省略（全件は storage-bus.md / metafile 参照）。
+> ほか 71 ファイル省略（全件は storage-bus.md / metafile 参照）。
