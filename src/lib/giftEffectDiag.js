@@ -26,7 +26,12 @@
  *   avgSoundGapMs: number,     // v0.1.1088: 検知→音のEMA平均ms(-1=未計測)
  *   avgBurstGapMs: number,     // v0.1.1088: 検知→着弾のEMA平均ms(-1=未計測)
  *   deltaSynthesized: number,  // v0.1.1090: giftDeltaFallback.js の帳簿デルタで合成した件数(個別イベント欠落配信のフォールバック)
- *   deltaPoints: number        // v0.1.1090: デルタ合成で計上した累計pt(嘘をつかない=本物と区別して表示するための内訳)
+ *   deltaPoints: number,       // v0.1.1090: デルタ合成で計上した累計pt(嘘をつかない=本物と区別して表示するための内訳)
+ *   arrivalDetected: number,   // 2026-07-06: 来場システムメッセージを検知した回数(parseArrivalCommentText がヒットした回数)
+ *   arrivalThrown: number,     // 来場の入賞演出(launchGiftThrow)が実際に走った回数
+ *   arrivalSoundPlayed: number, // 来場効果音を実際に鳴らした回数(戻り値'played'のみ)
+ *   arrivalSkippedCd: number,  // 来場演出専用20秒CD中でスキップした回数(積み増し禁止=正常動作)
+ *   throwPointFallbackUsed: number // 2026-07-06: 投擲の起点/着弾座標が(0,0)/領域外/NaN等でresolveVisibleThrowPointの既定位置へ差し替わった回数(=「音は鳴るが飛翔が見えない」の元凶を可視の既定へ救済した回数)
  * }} GiftEffectDiagState
  */
 
@@ -51,7 +56,12 @@ export function makeInitialGiftEffectDiag() {
     avgSoundGapMs: -1,
     avgBurstGapMs: -1,
     deltaSynthesized: 0,
-    deltaPoints: 0
+    deltaPoints: 0,
+    arrivalDetected: 0,
+    arrivalThrown: 0,
+    arrivalSoundPlayed: 0,
+    arrivalSkippedCd: 0,
+    throwPointFallbackUsed: 0
   };
 }
 
@@ -125,6 +135,11 @@ export function buildGiftEffectDiagSnapshot(diag, nowMs) {
     avgBurstGapMs: num(d.avgBurstGapMs, base.avgBurstGapMs),
     deltaSynthesized: num(d.deltaSynthesized, base.deltaSynthesized),
     deltaPoints: num(d.deltaPoints, base.deltaPoints),
+    arrivalDetected: num(d.arrivalDetected, base.arrivalDetected),
+    arrivalThrown: num(d.arrivalThrown, base.arrivalThrown),
+    arrivalSoundPlayed: num(d.arrivalSoundPlayed, base.arrivalSoundPlayed),
+    arrivalSkippedCd: num(d.arrivalSkippedCd, base.arrivalSkippedCd),
+    throwPointFallbackUsed: num(d.throwPointFallbackUsed, base.throwPointFallbackUsed),
     capturedAt: now
   };
 }
@@ -159,13 +174,20 @@ export function buildGiftEffectDiagLines(snap, nowMs) {
   const giftDetected = Number(snap.giftDetected) || 0;
   const adDetected = Number(snap.adDetected) || 0;
   const deltaSynthesized = Number(snap.deltaSynthesized) || 0;
-  if (giftDetected === 0 && adDetected === 0 && deltaSynthesized === 0) return []; // 未観測=このセッションでギフト/広告が無かった
+  const arrivalDetected = Number(snap.arrivalDetected) || 0;
+  if (giftDetected === 0 && adDetected === 0 && deltaSynthesized === 0 && arrivalDetected === 0) return []; // 未観測=このセッションでギフト/広告/来場が無かった
   const soundEnabled = snap.soundEnabled !== false;
   const lines = [];
   const now = Number.isFinite(Number(nowMs)) ? Number(nowMs) : 0;
   const lastAt = Number(snap.lastEventAt) || 0;
   const agoText = lastAt > 0 && now > 0 ? ` / 最終${Math.max(0, Math.round((now - lastAt) / 1000))}秒前` : '';
   lines.push(`ギフト/広告演出・効果音: 効果音設定=${soundEnabled ? 'ON' : 'OFF'}${agoText}`);
+  // 2026-07-06: 投擲座標の既定フォールバック使用回数(嘘をつかない=救済したことも見えるようにする)。
+  //   0回なら出さない(ノイズにしない・他の行と同方針)。
+  const throwPointFallbackUsed = Number(snap.throwPointFallbackUsed) || 0;
+  if (throwPointFallbackUsed > 0) {
+    lines.push(`  → 投擲座標フォールバック: ${throwPointFallbackUsed}件(起点/着弾が未確定で既定位置へ救済)`);
+  }
 
   if (giftDetected > 0 || deltaSynthesized > 0) {
     const giftThrown = Number(snap.giftThrown) || 0;
@@ -220,6 +242,20 @@ export function buildGiftEffectDiagLines(snap, nowMs) {
     const throwMark = throwMissing > 0 ? `⚠${throwMissing}件飛んでいない` : '✅';
     const soundMark = !soundEnabled ? '(OFF)' : soundMissing > 0 ? `⚠${soundMissing}件鳴っていない` : '✅';
     lines.push(`  → 広告: 検知${adDetected} → 演出${adThrown} ${throwMark} → 音${adSoundPlayed} ${soundMark}`);
+  }
+  if (arrivalDetected > 0) {
+    // 2026-07-06: 来場入賞演出の内訳。CDスキップは意図した動き(積み増し禁止)なので取りこぼしに
+    //   数えず内訳として明記する(嘘をつかない=ギフト系のガード/未割当表示と同じ思想)。
+    const arrivalThrown = Number(snap.arrivalThrown) || 0;
+    const arrivalSoundPlayed = Number(snap.arrivalSoundPlayed) || 0;
+    const arrivalSkippedCd = Number(snap.arrivalSkippedCd) || 0;
+    const { throwMissing, soundMissing } = diffCounts(arrivalDetected, arrivalThrown, arrivalSoundPlayed, 0, 0);
+    // CDでスキップした分は「検知はしたが意図的に演出しなかった」= throwMissing から差し引く。
+    const explainedThrowMissing = Math.max(0, throwMissing - arrivalSkippedCd);
+    const throwMark = explainedThrowMissing > 0 ? `⚠${explainedThrowMissing}件飛んでいない` : '✅';
+    const soundMark = !soundEnabled ? '(OFF)' : soundMissing > 0 ? `⚠${soundMissing}件鳴っていない` : '✅';
+    const cdText = arrivalSkippedCd > 0 ? ` / CD中${arrivalSkippedCd}件スキップ` : '';
+    lines.push(`  → 来場入賞: 検知${arrivalDetected} → 演出${arrivalThrown} ${throwMark} → 音${arrivalSoundPlayed} ${soundMark}${cdText}`);
   }
   return lines;
 }

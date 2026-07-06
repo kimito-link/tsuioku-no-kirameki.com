@@ -412,3 +412,84 @@ describe('修正3: guarded/noPath/errorの内訳で取りこぼしを説明す�
     expect(lines.some((l) => l.includes('⚠3件鳴っていない'))).toBe(true);
   });
 });
+
+describe('2026-07-06: 来場入賞演出の計器(arrivalDetected/arrivalThrown/arrivalSoundPlayed/arrivalSkippedCd)', () => {
+  it('未観測(arrivalDetected0)でギフト/広告も無ければ空配列', () => {
+    expect(buildGiftEffectDiagLines(makeInitialGiftEffectDiag(), 1000)).toEqual([]);
+  });
+
+  it('来場だけ観測されていてもギフト/広告が0なら行が出る(来場単独でノイズ扱いしない)', () => {
+    const snap = buildGiftEffectDiagSnapshot(
+      { arrivalDetected: 2, arrivalThrown: 2, arrivalSoundPlayed: 2 },
+      1000
+    );
+    const lines = buildGiftEffectDiagLines(snap, 1000);
+    expect(lines.some((l) => l.includes('来場入賞: 検知2 → 演出2 ✅ → 音2 ✅'))).toBe(true);
+  });
+
+  it('CD中スキップは⚠にせず内訳として明記する(積み増し禁止=正常動作)', () => {
+    // 検知5・演出3・CDスキップ2 → throwMissing=2だがCDで説明できるので⚠にならない。
+    const snap = buildGiftEffectDiagSnapshot(
+      { arrivalDetected: 5, arrivalThrown: 3, arrivalSoundPlayed: 3, arrivalSkippedCd: 2 },
+      1000
+    );
+    const lines = buildGiftEffectDiagLines(snap, 1000);
+    const line = lines.find((l) => l.includes('来場入賞'));
+    expect(line).toContain('✅');
+    expect(line).not.toContain('⚠');
+    expect(line).toContain('CD中2件スキップ');
+  });
+
+  it('CDで説明できない演出漏れは⚠のまま', () => {
+    const snap = buildGiftEffectDiagSnapshot(
+      { arrivalDetected: 5, arrivalThrown: 2, arrivalSoundPlayed: 2, arrivalSkippedCd: 1 },
+      1000
+    );
+    const lines = buildGiftEffectDiagLines(snap, 1000);
+    const line = lines.find((l) => l.includes('来場入賞'));
+    expect(line).toContain('⚠2件飛んでいない');
+  });
+
+  it('音漏れがあれば⚠件数を明記', () => {
+    const snap = buildGiftEffectDiagSnapshot(
+      { arrivalDetected: 3, arrivalThrown: 3, arrivalSoundPlayed: 1 },
+      1000
+    );
+    const lines = buildGiftEffectDiagLines(snap, 1000);
+    const line = lines.find((l) => l.includes('来場入賞'));
+    expect(line).toContain('⚠2件鳴っていない');
+  });
+
+  it('効果音OFFなら(OFF)表示で⚠にしない', () => {
+    const snap = buildGiftEffectDiagSnapshot(
+      { arrivalDetected: 3, arrivalThrown: 3, arrivalSoundPlayed: 0, soundEnabled: false },
+      1000
+    );
+    const lines = buildGiftEffectDiagLines(snap, 1000);
+    const line = lines.find((l) => l.includes('来場入賞'));
+    expect(line).toContain('(OFF)');
+    expect(line).not.toContain('⚠');
+  });
+});
+
+describe('2026-07-06: 投擲座標フォールバック計器(throwPointFallbackUsed)', () => {
+  it('0件なら行を出さない(ノイズにしない)', () => {
+    const snap = buildGiftEffectDiagSnapshot({ giftDetected: 1, giftThrown: 1, giftSoundPlayed: 1 }, 1000);
+    const lines = buildGiftEffectDiagLines(snap, 1000);
+    expect(lines.some((l) => l.includes('投擲座標フォールバック'))).toBe(false);
+  });
+
+  it('1件以上なら件数を明記する行が出る', () => {
+    const snap = buildGiftEffectDiagSnapshot(
+      { giftDetected: 1, giftThrown: 1, giftSoundPlayed: 1, throwPointFallbackUsed: 3 },
+      1000
+    );
+    const lines = buildGiftEffectDiagLines(snap, 1000);
+    expect(lines.some((l) => l.includes('投擲座標フォールバック: 3件'))).toBe(true);
+  });
+
+  it('欠損フィールドは0で埋まる', () => {
+    const snap = buildGiftEffectDiagSnapshot({ giftDetected: 1 }, 1000);
+    expect(snap.throwPointFallbackUsed).toBe(0);
+  });
+});

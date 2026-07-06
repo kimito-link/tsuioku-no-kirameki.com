@@ -231,8 +231,24 @@ import { parseGiftCommentText, parseNicoadCommentText } from '../lib/parseGiftCo
 import {
   resolveGiftProjectile,
   resolveGiftThrowPath,
-  canLaunchGiftThrow
+  canLaunchGiftThrow,
+  resolveVisibleThrowPoint,
+  GIFT_THROW_DURATION_MS
 } from '../lib/giftThrowProjectile.js';
+// 2026-07-06: ニコ生「来場」システムメッセージをパチンコの入賞演出(保留玉が入る)として飛ばす。
+//   検知は parseArrivalComment.js(純関数・厳格regex)、ラベル/音/CD判定は arrivalEffect.js。
+//   演出自体は既存の launchGiftThrow(投げ銭風飛翔)を流用し、新規の投擲経路は増やさない。
+//   設計原則(ユーザー確定・最重要): 無料イベント(来場)を派手にすると有料ギフト演出の価値が
+//   下がる=演出強度は【来場 < gift_small < … < mega】の最下段固定(音は常にhold_lamp・昇格禁止)。
+import { parseArrivalCommentText } from '../lib/parseArrivalComment.js';
+import {
+  ARRIVAL_EFFECT_CD_MS,
+  ARRIVAL_EMOJI,
+  buildArrivalLabel,
+  arrivalSoundKindForCount,
+  shouldFireArrivalEffect,
+  arrivalMeterWeight
+} from '../lib/arrivalEffect.js';
 // v0.1.1090: 個別ギフトイベント欠落配信のフォールバック検知(集計ptデルタ)。
 //   合計ギフトpt(NDGR statistics)だけは取れるのに個別イベントが一切来ない配信(既知の仕様ムラ)
 //   向けに、帳簿方式で「まだ説明されていないpt」を1件のイベントとして合成する純関数。
@@ -2235,6 +2251,9 @@ export function mountVenueBarButton(options = {}) {
   // v0.1.1090: 個別ギフトイベント欠落配信のデルタ補完検知(帳簿state・配信=liveId単位で
   //   computeGiftDelta が内部でリセットする。ここでは1個の可変stateを持ち回すだけ)。
   let _giftDeltaState = makeInitialGiftDeltaState('');
+  // 2026-07-06: 来場入賞演出専用の20秒CD(積み増し禁止=CD中に来場が来ても待たせず単にスキップし
+  //   カウンタだけ計上する)。0=未発火(shouldFireArrivalEffectはlastAt=0/十分先のnowMsで発火可)。
+  let _lastArrivalEffectAtMs = 0;
   const publishGiftEffectDiag = () => {
     const now = Date.now();
     if (now - _giftEffectDiagLastWriteAt < 3000) return; // 3秒 min-gap(他の診断と同型)。
@@ -3174,8 +3193,24 @@ export function mountVenueBarButton(options = {}) {
       bubbleLayer.appendChild(d);
       return d;
     })();
-    const origin = giftThrowOriginForSpeaker(speakerKey);
-    const target = giftThrowTarget();
+    // 2026-07-06根治: 「デルタ補完/来場入賞(匿名speakerKey='')は音は鳴るが飛翔が見えない」の
+    //   修正。origin/target が (0,0)・領域外・NaN 等の「レイアウト未確定の失敗値」なら
+    //   resolveVisibleThrowPoint が可視の既定位置へ差し替える(純関数・giftThrowProjectile.js)。
+    //   bubbleLayer の実サイズが取れなければ既定サイズ(800x600想定)を最終手段に使う。
+    let layerSize = null;
+    try {
+      const lr = bubbleLayer.getBoundingClientRect();
+      layerSize = { width: lr.width, height: lr.height };
+    } catch { /* layerSize=null のまま resolveVisibleThrowPoint 側の既定にフォールバック */ }
+    const rawOrigin = giftThrowOriginForSpeaker(speakerKey);
+    const rawTarget = giftThrowTarget();
+    const originResolved = resolveVisibleThrowPoint(rawOrigin, layerSize, 'origin');
+    const targetResolved = resolveVisibleThrowPoint(rawTarget, layerSize, 'target');
+    if (originResolved.usedFallback || targetResolved.usedFallback) {
+      _giftEffectDiagCounters.throwPointFallbackUsed += 1;
+    }
+    const origin = { x: originResolved.x, y: originResolved.y };
+    const target = { x: targetResolved.x, y: targetResolved.y };
     const path = resolveGiftThrowPath(origin, target);
     el.innerHTML = '';
     // v0.1.783: item_id があれば実画像を投げ物に。読み込み失敗時は絵文字へフォールバック。
@@ -3294,6 +3329,59 @@ export function mountVenueBarButton(options = {}) {
       }
       publishGiftEffectDiag();
     }
+  };
+
+  /**
+   * 2026-07-06: 「来場」システムメッセージ(放送者の好み/大百科記事/好き/興味)を検知して
+   *   パチンコの入賞演出(保留玉が入る)として投げる。既存のギフト投擲(launchGiftThrow)を
+   *   流用し、新規の投擲経路は増やさない。v0.1.1095の教訓を踏襲: launchGiftThrow の戻り値
+   *   ゲート+ブロック全体try/catch+例外はerror計上(嘘をつかない全数計上)。
+   * @param {{ text?: unknown, speakerKey?: string }} speech
+   */
+  const maybeThrowArrivalFromSpeech = (speech) => {
+    const text = String(speech?.text || '');
+    if (!text) return;
+    const arrival = parseArrivalCommentText(text);
+    if (!arrival) return;
+    const _detectAt = Date.now();
+    _giftEffectDiagCounters.arrivalDetected += 1;
+    _giftEffectDiagCounters.lastEventAt = _detectAt;
+    try {
+      // 歯止め: 来場演出専用の20秒CD。CD中は演出をスキップしカウンタ計上のみ(積み増し禁止=
+      //   待たせて後で鳴らさない)。CD自体は検知カウンタとは独立に計上する。
+      if (!shouldFireArrivalEffect(_lastArrivalEffectAtMs, _detectAt, ARRIVAL_EFFECT_CD_MS)) {
+        _giftEffectDiagCounters.arrivalSkippedCd += 1;
+        publishGiftEffectDiag();
+        return;
+      }
+      const label = buildArrivalLabel(arrival);
+      const tier = 'small'; // 来場は常に軽量演出(設計原則: 無料イベントは有料ギフトより必ず控えめ。件数はラベルのみで表現し、音は常にhold_lamp固定=昇格しない)
+      const proj = {
+        kind: 'gift',
+        emoji: ARRIVAL_EMOJI,
+        label,
+        point: 0,
+        tier,
+        durationMs: GIFT_THROW_DURATION_MS[tier],
+        imageUrl: ''
+      };
+      if (launchGiftThrow('', proj, _detectAt)) {
+        _lastArrivalEffectAtMs = _detectAt;
+        _giftEffectDiagCounters.arrivalThrown += 1;
+        const soundKind = arrivalSoundKindForCount(arrival.totalCount);
+        const playResult = playEffectSound(soundKind, buildEffectSoundDeps(soundKind));
+        if (playResult === 'played') {
+          _giftEffectDiagCounters.arrivalSoundPlayed += 1;
+        }
+        // メーター連動: 実際に人が来た事実はコメント+1と同じ重みで加算(上限5・順位変動と違い許容対象)。
+        advancePhaseDirector({ addWeight: arrivalMeterWeight(arrival.totalCount) });
+      }
+    } catch {
+      // v0.1.1095と同じ「嘘をつかない」原則: この経路のどこかで想定外の例外が起きても、
+      //   内訳が全部ゼロなのに演出/音だけ消える事故を再発させない。
+      _giftEffectDiagCounters.giftSoundError += 1;
+    }
+    publishGiftEffectDiag();
   };
 
   // v0.1.778: NDGR構造化ギフトevent(StoredGiftEvent: {userId,itemName,point,capturedAt})からの投げ。
@@ -4219,6 +4307,8 @@ export function mountVenueBarButton(options = {}) {
       const bubble = showSpeechBubble(speech);
       // v0.1.778: ギフト/広告コメントなら投げ主のサムネから中央映像へアイテムを投げる。
       maybeThrowGiftFromSpeech(speech);
+      // 2026-07-06: 来場システムメッセージならパチンコ入賞演出(保留玉が入る)として投げる。
+      maybeThrowArrivalFromSpeech(speech);
       if (voicePlayer.enabled) {
         // v0.1.771: 吹き出しを読み上げに連動。実際に鳴り始めたら speaking(消さない)、鳴り終えたら done。
         // v0.1.799「読み上げとコメントがずれる」根治: 床を鮮度ゲート(8秒)に合わせたので、鳴らずに
