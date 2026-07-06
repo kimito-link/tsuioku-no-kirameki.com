@@ -356,6 +356,7 @@
 | `src/lib/commentPostRetriable.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/commentPostStatusPresentation.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/commentPostUi.js` | 1 | ポップアップ(応援レーン) |
+| `src/lib/commentPostWatchTarget.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/commentProgressMonitor.js` | 1 | 記録エンジン(watchページ常駐) |
 | `src/lib/commentRecordBreakdown.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/commentSendTroubleshootHint.js` | 1 | ポップアップ(応援レーン) |

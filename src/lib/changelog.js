@@ -26,6 +26,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1093',
+    date: '2026-07-06',
+    summary: 'fix(post): watchタブが開いていれば送信可能に',
+    items: Object.freeze([
+      'watchページ（ニコ生視聴ページ）のタブを開いているのに、拡張ポップアップのコメント送信欄が「watchページを開くとコメント送信できます」のまま押せなくなることがある不具合を修正しました。',
+      '応援者一覧などの表示は引き続き「今まさに見ている配信」だけを正しく映すようにしつつ、送信欄だけは開いているwatchタブを見つけて送れるようにしています。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1092',
     date: '2026-07-06',
     summary: 'feat(lane): コメント即時プッシュで重負荷でも表示即時',

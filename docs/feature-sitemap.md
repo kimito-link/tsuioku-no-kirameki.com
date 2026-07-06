@@ -270,7 +270,7 @@
   - `src/lib/giftThrowProjectile.js`
 - **吹き出し寿命管理** — 会場の吹き出しの表示上限・追い出し(eviction)ライフサイクル
   - `src/lib/venueBubbleLifecycle.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 176</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 177</summary>
 
 - `scripts/encode-marketing-html-avatars.mjs` — extension/images/marketing-html-avatars/*.png を data URI にし、
 - `scripts/split-avatar-parts.mjs` — 偽市松背景の除去 + パーツ切り出し(one-off アセットパイプライン)
@@ -306,6 +306,7 @@
 - `src/lib/comeviewRows.js` — v0.1.652: 独自コメビュ「KIRAMEKI Comment View」の表示行ロジック(純関数)。
 - `src/lib/comeviewUserNotes.js` — v0.1.667: コメビュのユーザー詳細(わんコメ式 ニックネーム/ラベル/メモ)の純ロジック。
 - `src/lib/commentKindnessDisplayModel.js` — やさしさナッジ（コメント送信前の言い換え促し）の「表示モデル」を導出する純関数。
+- `src/lib/commentPostWatchTarget.js` — コメント送信コンテキストだけを、表示用の「実質アクティブ watch」判定から分離して解決する。
 - `src/lib/commentSummary.js` — v0.1.508: コメント記録の「軽量サマリ（0 秒表示）」純関数群。
 - `src/lib/commentTickerLatestHtml.js` — コメントティッカー（最新 1 件）の表示 HTML を組み立てる純関数。
 - `src/lib/commentTickerNameLink.js` — 最新コメントティッカーの名前部分に、ニコ動ユーザーページへのリンクを張るかの判定。
@@ -801,7 +802,7 @@
 
 ## 🧬 修正系譜マップ(この系統のバグを過去にどう直したか)
 
-> changelog 全 427 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
+> changelog 全 428 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
 
 ### 💾 記録件数 (64版)
 - `v0.1.1084` 2026-07-06 — perf(status): マイ効果音計器のBlob全件走査を廃止
@@ -1779,7 +1780,8 @@
 - `v0.1.840` 2026-06-20 — 機能逆引き地図を全ファイル網羅に
 - `v0.1.835` 2026-06-20 — 自己検証ゲートを追加(版同期+診断文言)
 
-### その他 (21版)
+### その他 (22版)
+- `v0.1.1093` 2026-07-06 — fix(post): watchタブが開いていれば送信可能に
 - `v0.1.1082` 2026-07-06 — 拡張の版混在を検知してリロード案内
 - `v0.1.1081` 2026-07-06 — コミット漏れimport検査を追加
 - `v0.1.1079` 2026-07-05 — 操作音4種の音源配線漏れを修正
