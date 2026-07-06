@@ -26,6 +26,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1090',
+    date: '2026-07-06',
+    summary: 'feat(gift): 個別イベント欠落配信のデルタ補完検知',
+    items: Object.freeze([
+      'ギフトの個別通知が来ない配信でも、合計ポイントの変化から検知してギフト演出・効果音を鳴らせるようにしました。',
+      '本物のギフト通知が来ている配信では従来どおりで、二重に鳴ることはありません。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1089',
     date: '2026-07-06',
     summary: 'feat(diag): 自コメの実着までの感度を計測',

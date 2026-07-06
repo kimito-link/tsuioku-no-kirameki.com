@@ -228,6 +228,46 @@ describe('v0.1.1088計器: buildGiftEffectDiagLines の体感遅延行', () => {
   });
 });
 
+describe('v0.1.1090: デルタ補完(giftDeltaFallback.js)の計器', () => {
+  it('初期stateは deltaSynthesized/deltaPoints ともに0', () => {
+    const s = makeInitialGiftEffectDiag();
+    expect(s.deltaSynthesized).toBe(0);
+    expect(s.deltaPoints).toBe(0);
+  });
+
+  it('giftDetected=0でもdeltaSynthesized>0なら未観測扱いにしない(空配列を返さない)', () => {
+    const snap = buildGiftEffectDiagSnapshot(
+      { giftDetected: 0, giftThrown: 1, giftSoundPlayed: 1, deltaSynthesized: 1, deltaPoints: 18050 },
+      1000
+    );
+    const lines = buildGiftEffectDiagLines(snap, 1000);
+    expect(lines.length).toBeGreaterThan(0);
+    const giftLine = lines.find((l) => l.includes('ギフト:'));
+    expect(giftLine).toBeDefined();
+  });
+
+  it('デルタ補完件数とpt内訳を嘘をつかず明記する(本物と区別)', () => {
+    const snap = buildGiftEffectDiagSnapshot(
+      { giftDetected: 0, giftThrown: 1, giftSoundPlayed: 1, deltaSynthesized: 1, deltaPoints: 18050 },
+      1000
+    );
+    const lines = buildGiftEffectDiagLines(snap, 1000);
+    const giftLine = lines.find((l) => l.includes('ギフト:'));
+    expect(giftLine).toContain('うちデルタ補完1件');
+    expect(giftLine).toContain('18,050pt');
+  });
+
+  it('デルタ補完が無ければ内訳テキストを出さない(ノイズにしない)', () => {
+    const snap = buildGiftEffectDiagSnapshot(
+      { giftDetected: 3, giftThrown: 3, giftSoundPlayed: 3 },
+      1000
+    );
+    const lines = buildGiftEffectDiagLines(snap, 1000);
+    const giftLine = lines.find((l) => l.includes('ギフト:'));
+    expect(giftLine).not.toContain('デルタ補完');
+  });
+});
+
 describe('修正3: guarded/noPath/errorの内訳で取りこぼしを説明する', () => {
   it('初期stateは3フィールドとも0', () => {
     const s = makeInitialGiftEffectDiag();
