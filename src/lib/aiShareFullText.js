@@ -45,6 +45,9 @@ import { buildOpSoundEffectDiagLines } from './opSoundEffectDiag.js';
 import { buildCommentPostDiagLines } from './commentPostDiag.js';
 import { buildInstantPushDiagLines } from './instantPushDiag.js';
 import { buildChannelSwitchDiagLines } from './channelSwitchDiag.js';
+// SC2(council/broadcast-scoring-SYNTHESIS.md §2.2): ハイライト台帳(実際に発火した演出だけ記録)
+//   (extras 12秒間引き)をAI共有本文にも併記。
+import { buildHighlightLedgerDiagLines } from './highlightLedger.js';
 import { reportPreviewCtxFromFastDiag } from './reportPreviewCtx.js';
 import { buildReportPreviewLines } from './reportPreview.js';
 import { buildStatusActions } from './statusActionAdvisor.js';
@@ -78,7 +81,7 @@ export function formatRefreshPerfLine(refreshPerf) {
  * @param {any} args
  * @returns {string}
  */
-export function buildAiShareFullText({ overviewText, livesData, fastDiag, popupDiag, voiceDiag, venueSeatsDiag, laneDiag, laneMirror, reportPreview, trendFindings, jsonBlob, currentLiveId, publishKeys, publishOutcomeRec, previewRenderAck, refreshPerf, giftEffectDiag, milestoneEffectDiag, customSoundDiag, voiceEffectDiag, bgmPhaseDiag, opSoundEffectDiag, commentPostDiag, instantPushDiag, channelSwitchDiag }) {
+export function buildAiShareFullText({ overviewText, livesData, fastDiag, popupDiag, voiceDiag, venueSeatsDiag, laneDiag, laneMirror, reportPreview, trendFindings, jsonBlob, currentLiveId, publishKeys, publishOutcomeRec, previewRenderAck, refreshPerf, giftEffectDiag, milestoneEffectDiag, customSoundDiag, voiceEffectDiag, bgmPhaseDiag, opSoundEffectDiag, commentPostDiag, instantPushDiag, channelSwitchDiag, highlightLedger }) {
   const lines = [];
   lines.push('## 君斗りんくの追憶のきらめき 状態速報');
   lines.push(`生成: ${new Date().toISOString()}`);
@@ -291,6 +294,14 @@ export function buildAiShareFullText({ overviewText, livesData, fastDiag, popupD
     try {
       const csLines = buildChannelSwitchDiagLines(channelSwitchDiag, Date.now());
       for (const l of csLines) lines.push(l);
+    } catch {
+      /* no-op */
+    }
+    // SC2(council/broadcast-scoring-SYNTHESIS.md §2.2): 配信採点ハイライト台帳(件数/最終記録ago/
+    //   上位ラベル・未観測なら空=ノイズにしない)。
+    try {
+      const hlLines = buildHighlightLedgerDiagLines(highlightLedger, Date.now());
+      for (const l of hlLines) lines.push(l);
     } catch {
       /* no-op */
     }

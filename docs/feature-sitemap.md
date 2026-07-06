@@ -158,7 +158,7 @@
 
 - **応援レーン集約(誰が候補か)** — 保存コメント行を userId 単位に畳み込みレーン候補を作る唯一の集約正本(popup/venue 共通)
   - `src/lib/userLaneCandidatesFromStorage.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 90</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 93</summary>
 
 - `src/domain/lane/aggregate.js` — 応援ユーザーレーンの per-row → per-user 集約（純関数）。
 - `src/domain/observations/observationStore.js` — observationStore - StatObservation のメモリ常駐リングバッファ。
@@ -174,6 +174,9 @@
 - `src/lib/broadcasterReputationKeywords.js` — 配信者の評判チェック - ネガティブキーワード判定エンジン
 - `src/lib/broadcasterReputationView.js` — 配信者の評判チェック - 表示ビューモデル + アラート HTML (純関数)
 - `src/lib/broadcasterUserId.js` — 配信者 userId を embedded-data / DOM から純粋関数で抽出する。
+- `src/lib/broadcastScore.js` — 配信スコアパネル(カラオケ採点/太鼓の達人風)の純粋なスコア化ロジック。
+- `src/lib/broadcastScoreHtml.js` — 配信スコアパネル(カラオケ採点風)の HTML を組む純関数。
+- `src/lib/broadcastScorePanelViewModel.js` — SC2(council/broadcast-scoring-SYNTHESIS.md §5)のpopupスコアパネル配線から、
 - `src/lib/broadcastUrl.js` — ニコニコ生放送 URL / パスから lv ID を取り出す（純関数・DOM非依存）
 - `src/lib/broadcastWaveformFingerprint.js` — L3: コメ波形フィンガープリント。
 - `src/lib/buildNorthStarAdRankingStatsHtml.js` — 北極星「広告ランキング」レーン用: watch の番組統計と一覧の「貢」の内訳を短い HTML にする。
@@ -273,7 +276,7 @@
   - `src/lib/giftThrowProjectile.js`
 - **吹き出し寿命管理** — 会場の吹き出しの表示上限・追い出し(eviction)ライフサイクル
   - `src/lib/venueBubbleLifecycle.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 177</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 180</summary>
 
 - `scripts/encode-marketing-html-avatars.mjs` — extension/images/marketing-html-avatars/*.png を data URI にし、
 - `scripts/split-avatar-parts.mjs` — 偽市松背景の除去 + パーツ切り出し(one-off アセットパイプライン)
@@ -338,6 +341,8 @@
 - `src/lib/giftSubAppHistoryBlocksHtml.js` — ギフトサブアプリ履歴パネル（renderGiftSubAppHistoryPanel の本体ブロック群）の HTML を組む純関数。
 - `src/lib/giftSubAppIframeDomShape.js` — gift sub-app iframe（gift/koken/audition.nicovideo.jp）内の scrape が 0 件の
 - `src/lib/giftThrowLedgerTableHtml.js` — ギフト投げ一覧テーブル HTML（マーケ #mkt-gift-ledger と同型・popup 用 nl- クラス）。
+- `src/lib/highlightLedger.js` — 配信採点「発表演出」用のハイライト台帳(council/broadcast-scoring-SYNTHESIS.md §2.2・SC2)。
+- `src/lib/highlightLedgerKey.js` — 配信採点「発表演出」用のハイライト台帳(実際に画面に出た演出だけを記録する最小台帳)の
 - `src/lib/inlineBelowWideRowInsert.js` — below 配置でインラインホストを「動画列の内側」から外すための挿入点解決。
 - `src/lib/inlineFirstPaintGate.js` — 初回パネル表示ゲート（横付き）の純粋判定ロジック。
 - `src/lib/inlineHostAnchorScoring.js` — 埋め込みパネル（inline host）の挿入アンカー候補をスコアリングする純粋関数。
@@ -395,6 +400,7 @@
 - `src/lib/reportUserThumb.js` — HTML レポート / マーケ分析の各ユーザー行に「最低サムネ」を必ず出すための
 - `src/lib/resolveVisitorCount.js` — v0.1.646: 「来場(累計来場者数)」の単一定義。表示場所(popup / status / レポート)で
 - `src/lib/sanitizeRoomAvatarsForBroadcaster.js` — 集計済み user room の avatarUrl から「broadcaster icon の取り違え」を除去する純粋関数。
+- `src/lib/scoreCountUp.js` — 配信採点パネルの点数カウントアップ演出(council/broadcast-scoring-SYNTHESIS.md §5・SC2)。
 - `src/lib/scrapeGiftHistoryList.js` — niconico ギフト sub-app の `gift-history-list` から個別ギフトを抽出する純関数（v0.1.198）。
 - `src/lib/scrapeTotalGiftCountList.js` — niconico ギフト sub-app の `total-dold-count-list` から種類別集計を抽出する純関数（v0.1.198）。
 - `src/lib/scrollWhiteoutProbe.js` — スクロール時の「白化(画面が一瞬白くなる)」を観測するための純判定。
@@ -677,7 +683,7 @@
   - `src/lib/statusTrendKey.js`
   - `src/extension/status-entry.js`
   - `src/lib/statusActionAdvisor.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 124</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 125</summary>
 
 - `app/app.js` — スマホ閲覧用 status Web 版。
 - `app/live-view.js` — 純Web版 応援ライブビュー（拡張なし・PC/スマホ共通）。
@@ -774,6 +780,7 @@
 - `src/lib/refreshTaskGuard.js` — v0.1.437: popup の `refresh()` で chrome API が永久 pending になっても全カード「—」固定にしない
 - `src/lib/resolveKiramekiReturningAndFirstTimeUserKeys.js` — 「きらめきの賞」のかよい / はじまり判定用 userKey 分類（純関数）。
 - `src/lib/safeStorageLocal.js` — v0.1.1080: 拡張リロード後の古いタブ(stale content script / iframe)が
+- `src/lib/scoreRadar.js` — 配信採点の「講評レーダー」5軸(council/broadcast-scoring-SYNTHESIS.md §2.3)を組む純関数群。
 - `src/lib/standalonePopupClose.js` — v0.1.433: 別ウィンドウ POP（standalone popup window）を「配信に飛ばしたら閉じる」判定（純ロジック）。
 - `src/lib/storageErrorState.js` — ストレージ書き込みエラーをポップアップ向けにシリアライズする純関数
 - `src/lib/storedCommentDedupeMerge.js` — popup normalizeStoredCommentEntries 用: 同一キー重複行のマージ（PII を増やさずフラグのみ統合）
@@ -808,7 +815,7 @@
 
 ## 🧬 修正系譜マップ(この系統のバグを過去にどう直したか)
 
-> changelog 全 433 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
+> changelog 全 434 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
 
 ### 💾 記録件数 (64版)
 - `v0.1.1084` 2026-07-06 — perf(status): マイ効果音計器のBlob全件走査を廃止
@@ -1237,7 +1244,8 @@
 - `v0.1.713` 2026-06-13 — 会場モードを明るくして発言を吹き出し表示
 - `v0.1.711` 2026-06-13 — 会場モードで発言を吹き出し表示
 
-### 🎁 ギフト (85版)
+### 🎁 ギフト (86版)
+- `v0.1.1099` 2026-07-06 — feat(score): popupに採点パネル+ハイライト台帳
 - `v0.1.1097` 2026-07-06 — feat(venue): 来場が控えめな入賞演出になります
 - `v0.1.1095` 2026-07-06 — fix(gift): デルタ補完ギフトにも効果音を配線
 - `v0.1.1092` 2026-07-06 — feat(lane): コメント即時プッシュで重負荷でも表示即時
@@ -1380,7 +1388,8 @@
 - `v0.1.699` 2026-06-12 — 読み上げの名前ON/OFF切替を追加
 - `v0.1.698` 2026-06-12 — コメビュにユーザー別の声で読み上げ機能を追加
 
-### 🪟 応援レーン・タイル (112版)
+### 🪟 応援レーン・タイル (113版)
+- `v0.1.1099` 2026-07-06 — feat(score): popupに採点パネル+ハイライト台帳
 - `v0.1.1092` 2026-07-06 — feat(lane): コメント即時プッシュで重負荷でも表示即時
 - `v0.1.1083` 2026-07-06 — fix(post): 送信5秒締切+自コメ取り消しの厳格化
 - `v0.1.1077` 2026-07-05 — ボイス空振り消費とpayout張り付き修正

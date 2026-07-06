@@ -19,12 +19,13 @@ import { KEY_OP_SOUND_EFFECT_DIAG } from './opSoundEffectDiagKey.js';
 import { KEY_COMMENT_POST_DIAG } from './commentPostDiagKey.js';
 import { KEY_INSTANT_PUSH_DIAG } from './instantPushDiagKey.js';
 import { KEY_CHANNEL_SWITCH_DIAG } from './channelSwitchDiagKey.js';
+import { KEY_HIGHLIGHT_LEDGER } from './highlightLedgerKey.js';
 
 describe('EXTRAS_BATCH_KEYS', () => {
   // 会議設計時点の列挙(16キー)+ v0.1.1083 の commentPostDiag + v0.1.1092 の instantPushDiag +
-  //   2026-07-06 の channelSwitchDiag で実際は19キー。
+  //   2026-07-06 の channelSwitchDiag + SC2 の highlightLedger で実際は20キー。
   //   「漏れなく統合したか」を人力の数え間違いに頼らず固定するため、実装済みの全キーを列挙して突合する。
-  it('19キーすべてを含む(v0.1.1083 の commentPostDiag / v0.1.1092 の instantPushDiag / channelSwitchDiag も含む)', () => {
+  it('20キーすべてを含む(v0.1.1083 の commentPostDiag / v0.1.1092 の instantPushDiag / channelSwitchDiag / SC2 highlightLedger も含む)', () => {
     const expectedKeys = [
       KEY_VOICE_DIAG,
       KEY_VENUE_SEATS_DIAG,
@@ -44,10 +45,11 @@ describe('EXTRAS_BATCH_KEYS', () => {
       KEY_OP_SOUND_EFFECT_DIAG,
       KEY_COMMENT_POST_DIAG,
       KEY_INSTANT_PUSH_DIAG,
-      KEY_CHANNEL_SWITCH_DIAG
+      KEY_CHANNEL_SWITCH_DIAG,
+      KEY_HIGHLIGHT_LEDGER
     ];
-    expect(expectedKeys).toHaveLength(19);
-    expect(EXTRAS_BATCH_KEYS).toHaveLength(19);
+    expect(expectedKeys).toHaveLength(20);
+    expect(EXTRAS_BATCH_KEYS).toHaveLength(20);
     expect(EXTRAS_BATCH_KEYS).toEqual(expect.arrayContaining(expectedKeys));
   });
 
@@ -79,7 +81,8 @@ describe('pickExtrasBatchValues', () => {
       [KEY_OP_SOUND_EFFECT_DIAG]: { o: 16 },
       [KEY_COMMENT_POST_DIAG]: { p: 17 },
       [KEY_INSTANT_PUSH_DIAG]: { q: 18 },
-      [KEY_CHANNEL_SWITCH_DIAG]: { r: 19 }
+      [KEY_CHANNEL_SWITCH_DIAG]: { r: 19 },
+      [KEY_HIGHLIGHT_LEDGER]: { s: 20 }
     };
     const picked = pickExtrasBatchValues(bag, NOW);
     expect(picked.voiceDiag).toEqual({ a: 1 });
@@ -101,6 +104,7 @@ describe('pickExtrasBatchValues', () => {
     expect(picked.commentPostDiag).toEqual({ p: 17 });
     expect(picked.instantPushDiag).toEqual({ q: 18 });
     expect(picked.channelSwitchDiag).toEqual({ r: 19 });
+    expect(picked.highlightLedger).toEqual({ s: 20 });
   });
 
   it('欠損キーは null(各 loadXxxSafe の bag?.[KEY] || null と同値)', () => {
@@ -124,6 +128,7 @@ describe('pickExtrasBatchValues', () => {
     expect(picked.commentPostDiag).toBeNull();
     expect(picked.instantPushDiag).toBeNull();
     expect(picked.channelSwitchDiag).toBeNull();
+    expect(picked.highlightLedger).toBeNull();
   });
 
   it('bag が undefined/null/非オブジェクトでも安全(全項目 null)', () => {

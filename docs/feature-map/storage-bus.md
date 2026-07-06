@@ -105,8 +105,9 @@
 | `KEY_DIAGNOSTICS_ERROR_RING_V1` | lib/diagnosticRingStore.js | lib/diagnosticRingStore.js |
 | `KEY_EFFECT_SOUND_ENABLED` | — | extension/venueBar.js |
 | `KEY_FOLD_ANONYMOUS_IN_RANK_STRIP` | — | extension/popup-entry.js |
-| `KEY_GIFT_EFFECT_DIAG` | extension/venueBar.js | extension/status-entry.js |
+| `KEY_GIFT_EFFECT_DIAG` | extension/venueBar.js | extension/popup-entry.js<br>extension/status-entry.js |
 | `KEY_GIFT_RANKING_LANE_ENABLED` | extension/popup-entry.js | extension/content-entry.js<br>extension/popup-entry.js |
+| `KEY_HIGHLIGHT_LEDGER` | extension/popup-entry.js<br>extension/venueBar.js | extension/popup-entry.js<br>extension/venueBar.js |
 | `KEY_INCREMENTAL_DEDUP_ENABLED` | — | extension/content-entry.js |
 | `KEY_INLINE_FLOATING_ANCHOR` | — | extension/content-entry.js<br>extension/popup-entry.js |
 | `KEY_INLINE_PANEL_AUTOSHOW_ENABLED` | — | extension/content-entry.js<br>extension/popup-entry.js |
@@ -135,7 +136,7 @@
 | `KEY_PROFILE_RESOLVE_STATE` | — | extension/content-entry.js |
 | `KEY_RECORDING` | — | extension/content-entry.js<br>extension/popup-entry.js |
 | `KEY_RECORDING_WATCHDOG` | extension/content-entry.js | extension/popup-entry.js |
-| `KEY_REPORT_PREVIEW` | lib/reportPreviewPublish.js | extension/status-entry.js |
+| `KEY_REPORT_PREVIEW` | lib/reportPreviewPublish.js | extension/popup-entry.js<br>extension/status-entry.js |
 | `KEY_SELF_POSTED_RECENTS` | extension/content-entry.js | extension/content-entry.js<br>extension/popup-entry.js |
 | `KEY_STATUS_FAST_DIAG_LITE` | extension/content-entry.js | extension/status-entry.js |
 | `KEY_STATUS_TREND` | extension/status-entry.js | extension/status-entry.js |
@@ -150,7 +151,7 @@
 | `KEY_USER_COMMENT_PROFILE_CACHE` | extension/content-entry.js | extension/comeview-entry.js<br>extension/content-entry.js<br>extension/popup-entry.js<br>extension/venueBar.js |
 | `KEY_VENUE_EFFECT_SOUND_PRESENCE` | extension/venueBar.js | extension/popup-entry.js |
 | `KEY_VENUE_SEATS_DIAG` | extension/venueBar.js | extension/status-entry.js |
-| `KEY_VOICE_DIAG` | extension/comeview-entry.js<br>extension/venueBar.js | extension/status-entry.js |
+| `KEY_VOICE_DIAG` | extension/comeview-entry.js<br>extension/venueBar.js | extension/popup-entry.js<br>extension/status-entry.js |
 | `KEY_VOICE_EFFECT_DIAG` | extension/popup-entry.js<br>extension/venueBar.js | extension/status-entry.js |
 | `KEY_VOICE_INPUT_DEVICE` | extension/popup-entry.js | extension/popup-entry.js |
 | `fn:backfillHeartbeatKey` | extension/content-entry.js | — |

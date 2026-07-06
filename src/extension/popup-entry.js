@@ -298,6 +298,18 @@ import {
 } from '../lib/bgmDirector.js';
 import { makeInitialBgmPhaseDiag, buildBgmPhaseDiagSnapshot } from '../lib/bgmPhaseDiag.js';
 import { KEY_BGM_PHASE_DIAG } from '../lib/bgmPhaseDiagKey.js';
+// SC2(council/broadcast-scoring-SYNTHESIS.md §5): popup採点パネル配線。既存publish済み値
+//   (reportPreview/bgmPhaseDiag自身)だけを読む=新規の重い集計・新規コアreadゼロ。
+//   liveId突合・スコア計算・レーダー計算・ハイライト選抜の合成はbroadcastScorePanelViewModel.js
+//   (純関数・テスト済み)に集約し、ここではstorage readとinnerHTML代入だけを行う。
+import { buildBroadcastScorePanelHtml } from '../lib/broadcastScoreHtml.js';
+import { startScoreCountUp } from '../lib/scoreCountUp.js';
+import { appendHighlight, isHighlightWorthyKind } from '../lib/highlightLedger.js';
+import { KEY_HIGHLIGHT_LEDGER } from '../lib/highlightLedgerKey.js';
+import { buildBroadcastScorePanelViewModel, broadcastScorePanelSig } from '../lib/broadcastScorePanelViewModel.js';
+import { KEY_REPORT_PREVIEW } from '../lib/reportPreviewKey.js';
+import { KEY_GIFT_EFFECT_DIAG } from '../lib/giftEffectDiagKey.js';
+import { KEY_VOICE_DIAG } from '../lib/voiceDiagKey.js';
 import { maybePlayEventRankChangeSound } from '../lib/officialEventRankSoundEffect.js';
 // Phase D1(2026-07-05): 操作音(council/operation-sound-SYNTHESIS.md)。コメント投稿=玉の打ち出し。
 //   検知点は拡張自身の投稿経路(押下=op_handle・成功=op_shot)。乱数ゼロ・全て決定論。
@@ -1528,6 +1540,19 @@ function triggerPhaseMeterPulsePopup() {
   el.addEventListener('animationend', () => el.classList.remove('nl-phase-meter--pulse'), { once: true });
 }
 
+// SC2(council/broadcast-scoring-SYNTHESIS.md §2.2): ハイライト台帳(KEY_HIGHLIGHT_LEDGER)への
+//   追記ヘルパ。書き手はvenueBar.jsと同じ「実際に発火が確定した演出だけ」相乗りする
+//   (新規writerを作らず既存の確定分岐に載せる・§6却下事項)。read-modify-writeだが、追記頻度は
+//   フェーズ遷移/ギフト大波/マイルストーンの確定イベント時のみ(常時tickでは呼ばない)ため
+//   storage競合の心配はない(giftEffectDiagのRMWと同オーダー)。
+function appendHighlightAndPublishPopup(liveId, kind, atMs) {
+  if (!isHighlightWorthyKind(kind)) return;
+  void safeStorageLocalGet(KEY_HIGHLIGHT_LEDGER).then((bag) => {
+    const next = appendHighlight(bag?.[KEY_HIGHLIGHT_LEDGER], { liveId, kind, atMs });
+    void safeStorageLocalSet({ [KEY_HIGHLIGHT_LEDGER]: next });
+  });
+}
+
 /**
  * フェーズディレクターを1歩進める(§6 Phase C の核)。popup側の呼び出し元は
  *   noteCommentMilestoneHighWater(コメント数delta)+maybeCelebrateFromCommentCount(節目到達)。
@@ -1581,6 +1606,15 @@ async function advancePhaseDirectorPopup(events = {}) {
     if (result.phase === PHASE.REACH) _bgmPhaseDiagCountersPopup.reachCount += 1;
     else if (result.phase === PHASE.BREAKTHROUGH) _bgmPhaseDiagCountersPopup.breakthroughCount += 1;
     else if (result.phase === PHASE.JACKPOT) _bgmPhaseDiagCountersPopup.jackpotCount += 1;
+    // SC2(§2.2): フェーズ遷移(実際にフェーズが変わった=画面のフェーズチップにも出ている確定事象)を
+    //   ハイライト台帳へ追記する。「見てない演出が結果に出る」を防ぐため、この changed&&!silent の
+    //   確定分岐に相乗りする(新規writerを作らない・§6却下事項)。
+    const highlightPhaseKind =
+      result.phase === PHASE.REACH ? 'phase_reach'
+      : result.phase === PHASE.BREAKTHROUGH ? 'phase_breakthrough'
+      : result.phase === PHASE.JACKPOT ? 'phase_jackpot'
+      : '';
+    if (highlightPhaseKind) appendHighlightAndPublishPopup(lid, highlightPhaseKind, now);
   }
 
   const skipForVenue = await popupShouldSkipVoiceForVenue();
@@ -2026,6 +2060,11 @@ function maybePlayMilestoneEffectSound(spec) {
     // v0.1.1061: 「試みた」でなく戻り値'played'(実際に鳴らした)だけ数える=診断が嘘をつかない。
     const result = playEffectSound(kind, buildEffectSoundDeps(kind));
     if (isCommentMilestone && result === 'played') _milestoneEffectDiagCounters.milestoneSoundPlayed += 1;
+    // SC2(council/broadcast-scoring-SYNTHESIS.md §2.2): milestone_hard以上が「実際に鳴った」
+    //   瞬間だけハイライト台帳へ記録する(milestone_softはノイズが多いため対象外・isHighlightWorthyKindが自然に弾く)。
+    if (result === 'played' && (kind === 'milestone_hard' || kind === 'milestone_jackpot')) {
+      appendHighlightAndPublishPopup(watchPopupLastPaintedLiveId, kind, Date.now());
+    }
   }
   if (isCommentMilestone) publishMilestoneEffectDiag();
 }
@@ -3948,6 +3987,74 @@ async function renderGiftQuickStatsPanel(liveId) {
     // C-7 pure refactor: users→見出し+リスト HTML 組み立ては giftQuickStatsHtml.js に抽出
     //   （挙動不変・test 済）。storage read・空状態文言・innerHTML 代入は popup に残す。
     mount.innerHTML = buildGiftQuickStatsHtml(users);
+  } catch {
+    mount.textContent = '読み込みに失敗しました。';
+  }
+}
+
+// SC2(council/broadcast-scoring-SYNTHESIS.md §5): 直近に描画したスコアパネルの
+//   liveId+total の組(sig)。同じ値の再描画でカウントアップを毎回やり直さない
+//   (devMonitorDetailsと同じ「開いている間の再描画コスト」を意識した最小限のchurn防止)。
+let _lastPaintedScorePanelSig = '';
+/** SC2計器: renderBroadcastScorePanel の実行回数・最後に描画したliveId・ledger行数(extras相乗り用)。 */
+const _scoreDiagCounters = { renderCount: 0, lastRenderedLiveId: '', ledgerRows: 0 };
+
+/**
+ * SC2: popupスコアパネル(`<details id="broadcastScoreDetails">` open時のみ描画)。
+ *   既存 renderGiftQuickStatsPanel と同型: 単キーget→liveId突合(嘘の数字を出さない)→
+ *   純関数で組み立て→innerHTML代入。新規の重い集計・新規コアreadは行わない
+ *   (nls_report_preview_v1・bgmPhaseDiag自身・giftEffectDiag・voiceDiagは全て既存publish値)。
+ * @param {string} liveId
+ */
+async function renderBroadcastScorePanel(liveId) {
+  const details = /** @type {HTMLDetailsElement|null} */ ($('broadcastScoreDetails'));
+  const mount = $('broadcastScoreMount');
+  if (!mount) return;
+  const lid = String(liveId || '').trim().toLowerCase();
+  if (!lid) {
+    mount.innerHTML = '';
+    _lastPaintedScorePanelSig = '';
+    return;
+  }
+  // devMonitorDetailsパターン: <details>が閉じていれば計算・storage readごと丸ごとスキップ
+  //   (コストゼロ・視聴の邪魔をしない=設計書§1.3)。
+  if (!details || !details.open) return;
+  try {
+    const bag = await safeStorageLocalGet([KEY_REPORT_PREVIEW, KEY_GIFT_EFFECT_DIAG, KEY_VOICE_DIAG, KEY_HIGHLIGHT_LEDGER]);
+    const ledgerRaw = bag?.[KEY_HIGHLIGHT_LEDGER];
+    // phaseStats: このpopup自身が書いているカウンタをそのまま読む(新規readゼロ)。
+    //   liveId不一致(古い配信の残骸)は buildBroadcastScorePanelViewModel 側で弾く
+    //   (v1と同傾向に縮退・computeBroadcastScoreV2の設計どおり)。
+    const vm = buildBroadcastScorePanelViewModel({
+      liveId: lid,
+      nowMs: Date.now(),
+      previewRec: bag?.[KEY_REPORT_PREVIEW],
+      phaseStats: _bgmPhaseDiagCountersPopup,
+      giftDiag: bag?.[KEY_GIFT_EFFECT_DIAG],
+      voiceDiag: bag?.[KEY_VOICE_DIAG],
+      ledger: ledgerRaw && typeof ledgerRaw === 'object' ? ledgerRaw : null
+    });
+    if (!vm) {
+      mount.innerHTML = '<p class="nl-sub">まだスコアを計算できるデータがありません(コメントが記録され始めると表示されます)。</p>';
+      _lastPaintedScorePanelSig = '';
+      return;
+    }
+    _scoreDiagCounters.ledgerRows = Array.isArray(ledgerRaw?.rows) && String(ledgerRaw.liveId || '').trim().toLowerCase() === lid
+      ? ledgerRaw.rows.length
+      : 0;
+
+    const sig = broadcastScorePanelSig(lid, vm);
+    const isNewSig = sig !== _lastPaintedScorePanelSig;
+    _lastPaintedScorePanelSig = sig;
+    _scoreDiagCounters.renderCount += 1;
+    _scoreDiagCounters.lastRenderedLiveId = lid;
+
+    mount.innerHTML = buildBroadcastScorePanelHtml(vm);
+    // 新しい値のときだけカウントアップを再生する(同じ値の再描画では演出をやり直さない=churn抑制)。
+    if (isNewSig) {
+      const numEl = /** @type {HTMLElement|null} */ ($('broadcastScoreTotalNum'));
+      if (numEl) startScoreCountUp(numEl, vm.score.total, { durationMs: 1600 });
+    }
   } catch {
     mount.textContent = '読み込みに失敗しました。';
   }
@@ -14885,6 +14992,7 @@ async function refresh() {
     void updateIngestHeartbeatDisplay('');
     void renderSessionSummaryComparePanel('');
     void renderGiftQuickStatsPanel('');
+    void renderBroadcastScorePanel('');
     void renderGiftSubAppHistoryPanel('');
     // 応援レーンは「直近放送の保存」から暫定復元する。ただし niconico の
     // ユーザープロフィールページ上では、プロフィール本人やおすすめユーザーを
@@ -14973,6 +15081,7 @@ async function refresh() {
     void updateIngestHeartbeatDisplay('');
     void renderSessionSummaryComparePanel('');
     void renderGiftQuickStatsPanel('');
+    void renderBroadcastScorePanel('');
     void renderGiftSubAppHistoryPanel('');
     // lv が取り出せなかった場合も、同じ保存ベース fallback を試みる。
     // ただしユーザープロフィールページでは stale な応援者表示を出さない。
@@ -15715,6 +15824,7 @@ async function refresh() {
       /** @type {PopupCommentEntry[]} */ (displayEntries)
     );
     void renderGiftQuickStatsPanel(lv);
+    void renderBroadcastScorePanel(lv);
     void renderGiftSubAppHistoryPanel(lv);
   }
 
@@ -15965,6 +16075,7 @@ async function refresh() {
   });
   void renderSessionSummaryComparePanel(lv);
   void renderGiftQuickStatsPanel(lv);
+  void renderBroadcastScorePanel(lv);
   void renderGiftSubAppHistoryPanel(lv);
 
   void (async () => {
@@ -18672,6 +18783,13 @@ async function initPopup() {
   $('devMonitorDetails')?.addEventListener('toggle', () => {
     const det = /** @type {HTMLDetailsElement|null} */ ($('devMonitorDetails'));
     if (det?.open) safeRefresh();
+  });
+
+  // SC2(council/broadcast-scoring-SYNTHESIS.md §5): 配信採点パネルも devMonitorDetails と
+  //   同じ「開いた瞬間だけ即描画」パターン(閉時は計算・storage readごとスキップ=コストゼロ)。
+  $('broadcastScoreDetails')?.addEventListener('toggle', () => {
+    const det = /** @type {HTMLDetailsElement|null} */ ($('broadcastScoreDetails'));
+    if (det?.open) void renderBroadcastScorePanel(watchPopupLastPaintedLiveId);
   });
 
   // v0.1.608 Phase 1-C: コメンターのフォロー情報を強制再取得(キャッシュ無視)

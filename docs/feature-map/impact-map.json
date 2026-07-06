@@ -264,6 +264,24 @@
       ]
     },
     {
+      "file": "src/lib/voiceDiagKey.js",
+      "featureCount": 5,
+      "features": [
+        "comeview",
+        "content",
+        "popup",
+        "status",
+        "venue"
+      ],
+      "labels": [
+        "コメビュ(別窓)",
+        "記録エンジン(watchページ常駐)",
+        "ポップアップ(応援レーン)",
+        "状態速報ページ",
+        "会場モード(standalone)"
+      ]
+    },
+    {
       "file": "src/domain/user/identity.js",
       "featureCount": 4,
       "features": [
@@ -425,6 +443,54 @@
     },
     {
       "file": "src/lib/effectSoundPlayer.js",
+      "featureCount": 4,
+      "features": [
+        "content",
+        "popup",
+        "status",
+        "venue"
+      ],
+      "labels": [
+        "記録エンジン(watchページ常駐)",
+        "ポップアップ(応援レーン)",
+        "状態速報ページ",
+        "会場モード(standalone)"
+      ]
+    },
+    {
+      "file": "src/lib/giftEffectDiagKey.js",
+      "featureCount": 4,
+      "features": [
+        "content",
+        "popup",
+        "status",
+        "venue"
+      ],
+      "labels": [
+        "記録エンジン(watchページ常駐)",
+        "ポップアップ(応援レーン)",
+        "状態速報ページ",
+        "会場モード(standalone)"
+      ]
+    },
+    {
+      "file": "src/lib/highlightLedger.js",
+      "featureCount": 4,
+      "features": [
+        "content",
+        "popup",
+        "status",
+        "venue"
+      ],
+      "labels": [
+        "記録エンジン(watchページ常駐)",
+        "ポップアップ(応援レーン)",
+        "状態速報ページ",
+        "会場モード(standalone)"
+      ]
+    },
+    {
+      "file": "src/lib/highlightLedgerKey.js",
       "featureCount": 4,
       "features": [
         "content",
@@ -617,22 +683,6 @@
     },
     {
       "file": "src/lib/voiceDiag.js",
-      "featureCount": 4,
-      "features": [
-        "comeview",
-        "content",
-        "status",
-        "venue"
-      ],
-      "labels": [
-        "コメビュ(別窓)",
-        "記録エンジン(watchページ常駐)",
-        "状態速報ページ",
-        "会場モード(standalone)"
-      ]
-    },
-    {
-      "file": "src/lib/voiceDiagKey.js",
       "featureCount": 4,
       "features": [
         "comeview",
@@ -881,20 +931,6 @@
     },
     {
       "file": "src/lib/giftEffectDiag.js",
-      "featureCount": 3,
-      "features": [
-        "content",
-        "status",
-        "venue"
-      ],
-      "labels": [
-        "記録エンジン(watchページ常駐)",
-        "状態速報ページ",
-        "会場モード(standalone)"
-      ]
-    },
-    {
-      "file": "src/lib/giftEffectDiagKey.js",
       "featureCount": 3,
       "features": [
         "content",
@@ -2967,6 +3003,36 @@
     },
     {
       "file": "src/lib/broadcastReportSummary.js",
+      "featureCount": 1,
+      "features": [
+        "popup"
+      ],
+      "labels": [
+        "ポップアップ(応援レーン)"
+      ]
+    },
+    {
+      "file": "src/lib/broadcastScore.js",
+      "featureCount": 1,
+      "features": [
+        "popup"
+      ],
+      "labels": [
+        "ポップアップ(応援レーン)"
+      ]
+    },
+    {
+      "file": "src/lib/broadcastScoreHtml.js",
+      "featureCount": 1,
+      "features": [
+        "popup"
+      ],
+      "labels": [
+        "ポップアップ(応援レーン)"
+      ]
+    },
+    {
+      "file": "src/lib/broadcastScorePanelViewModel.js",
       "featureCount": 1,
       "features": [
         "popup"
@@ -5687,6 +5753,26 @@
     },
     {
       "file": "src/lib/sanitizeRoomAvatarsForBroadcaster.js",
+      "featureCount": 1,
+      "features": [
+        "popup"
+      ],
+      "labels": [
+        "ポップアップ(応援レーン)"
+      ]
+    },
+    {
+      "file": "src/lib/scoreCountUp.js",
+      "featureCount": 1,
+      "features": [
+        "popup"
+      ],
+      "labels": [
+        "ポップアップ(応援レーン)"
+      ]
+    },
+    {
+      "file": "src/lib/scoreRadar.js",
       "featureCount": 1,
       "features": [
         "popup"

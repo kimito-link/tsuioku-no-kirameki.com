@@ -37,12 +37,14 @@ import { KEY_OP_SOUND_EFFECT_DIAG } from './opSoundEffectDiagKey.js';
 import { KEY_COMMENT_POST_DIAG } from './commentPostDiagKey.js';
 import { KEY_INSTANT_PUSH_DIAG } from './instantPushDiagKey.js';
 import { KEY_CHANNEL_SWITCH_DIAG } from './channelSwitchDiagKey.js';
+import { KEY_HIGHLIGHT_LEDGER } from './highlightLedgerKey.js';
 
 /**
- * 1回の chrome.storage.local.get で統合して読む19キー(いずれも単一キー get のみの項目)。
+ * 1回の chrome.storage.local.get で統合して読む20キー(いずれも単一キー get のみの項目)。
  *   v0.1.1083 で追加された commentPostDiag(KEY_COMMENT_POST_DIAG)、
  *   v0.1.1092 で追加された instantPushDiag(KEY_INSTANT_PUSH_DIAG)、
- *   2026-07-06 で追加された channelSwitchDiag(KEY_CHANNEL_SWITCH_DIAG)も含む。
+ *   2026-07-06 で追加された channelSwitchDiag(KEY_CHANNEL_SWITCH_DIAG)、
+ *   SC2(2026-07-06)で追加された highlightLedger(KEY_HIGHLIGHT_LEDGER)も含む。
  *   status-entry.js 側は runStorageOpWithTimeout(() => safeStorageLocalGet(EXTRAS_BATCH_KEYS), tmo)
  *   のように1回だけ呼ぶ。
  */
@@ -65,7 +67,8 @@ export const EXTRAS_BATCH_KEYS = [
   KEY_OP_SOUND_EFFECT_DIAG,
   KEY_COMMENT_POST_DIAG,
   KEY_INSTANT_PUSH_DIAG,
-  KEY_CHANNEL_SWITCH_DIAG
+  KEY_CHANNEL_SWITCH_DIAG,
+  KEY_HIGHLIGHT_LEDGER
 ];
 
 /**
@@ -81,7 +84,7 @@ export const EXTRAS_BATCH_KEYS = [
  *   statCardsMirror: any, northStarMirror: any, publishOutcomeRec: any, commentTimelineMirror: any,
  *   previewRenderAck: any, backfillLiveMetric: any, giftEffectDiag: any, milestoneEffectDiag: any,
  *   voiceEffectDiag: any, bgmPhaseDiag: any, opSoundEffectDiag: any, commentPostDiag: any,
- *   instantPushDiag: any, channelSwitchDiag: any
+ *   instantPushDiag: any, channelSwitchDiag: any, highlightLedger: any
  * }}
  */
 export function pickExtrasBatchValues(bag, nowMs) {
@@ -106,6 +109,7 @@ export function pickExtrasBatchValues(bag, nowMs) {
     opSoundEffectDiag: b[KEY_OP_SOUND_EFFECT_DIAG] || null,
     commentPostDiag: b[KEY_COMMENT_POST_DIAG] || null,
     instantPushDiag: b[KEY_INSTANT_PUSH_DIAG] || null,
-    channelSwitchDiag: b[KEY_CHANNEL_SWITCH_DIAG] || null
+    channelSwitchDiag: b[KEY_CHANNEL_SWITCH_DIAG] || null,
+    highlightLedger: b[KEY_HIGHLIGHT_LEDGER] || null
   };
 }
