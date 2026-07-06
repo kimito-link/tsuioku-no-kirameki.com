@@ -97,6 +97,37 @@ describe('publishReportPreviewThrottled', () => {
     expect(captures).toHaveLength(2);
   });
 
+  it('force:true は minGap 以内でも即publishする(SC3: 配信終了検知時の確定値publish)', async () => {
+    const captures = installChromeSpy();
+    const baseDeps = {
+      resolveComments: async () => makeComments(3, 'lv1'),
+      getSnapshot: () => ({}),
+      now: () => t,
+      minGapMs: 15_000
+    };
+    publishReportPreviewThrottled('lv1', baseDeps);
+    await flush();
+    publishReportPreviewThrottled('lv1', { ...baseDeps, force: true }); // 同時刻でもforceで即publish
+    await flush();
+    expect(captures).toHaveLength(2);
+  });
+
+  it('force:true でも再入中(_busy)なら二重実行しない', async () => {
+    const captures = installChromeSpy();
+    let resolveFirst;
+    const slowDeps = {
+      resolveComments: () => new Promise((r) => { resolveFirst = r; }),
+      getSnapshot: () => ({}),
+      now: () => t,
+      minGapMs: 15_000
+    };
+    publishReportPreviewThrottled('lv1', slowDeps); // _busyになるが未解決のまま
+    publishReportPreviewThrottled('lv1', { ...slowDeps, force: true }); // _busy中は弾かれる
+    resolveFirst(makeComments(3, 'lv1'));
+    await flush();
+    expect(captures).toHaveLength(1);
+  });
+
   it('resolveComments が throw しても落ちない(best-effort)', async () => {
     const captures = installChromeSpy();
     expect(() =>

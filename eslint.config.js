@@ -204,8 +204,13 @@ export default [
     //   スコア計算・レーダー計算・ハイライト選抜の合成本体は
     //   src/lib/broadcastScorePanelViewModel.js(テスト付き)に隔離済み)を追加=21322→21440。
     //   ラチェットは実測+50の21490へ。
+    //   SC3(2026-07-06): 結果発表シーケンス配線(runScoreAnnounceSequence・runScoreAnnounceStep・
+    //   buildScoreAnnounceInputs・bindLiveEndedScoreListenerOnce・手動ボタン/P4破棄フック=
+    //   chrome.storage.onChanged購読・setTimeout直列実行・DOM演出クラス切替のグルーでlib抽出不可。
+    //   純関数プランナー本体は src/lib/scoreAnnounce.js・診断整形は src/lib/scoreAnnounceDiag.js に
+    //   テスト付きで隔離済み)を追加=21440→21693。ラチェットは実測+50の21743へ。
     files: ['src/extension/popup-entry.js'],
-    rules: { 'max-lines': ['error', { max: 21490, skipBlankLines: false, skipComments: false }] }
+    rules: { 'max-lines': ['error', { max: 21743, skipBlankLines: false, skipComments: false }] }
   },
   {
     files: ['src/extension/popup/**/*.js'],

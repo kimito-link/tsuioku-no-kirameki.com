@@ -210,6 +210,33 @@ export const CUSTOM_SOUND_PRESET = Object.freeze({
   ]),
   op_publish: Object.freeze([
     Object.freeze({ id: 'as_104491', no: 104491, title: 'レジスターの清算音(昭和レジスター)' })
+  ]),
+
+  // ---- SC3新設スコアキー(score_*・council/broadcast-scoring-SYNTHESIS.md §4・結果発表演出専用) ----
+  // 2026-07-06: Audiostock定額で追加DL済み(D2追加DL分・計6本)。scoreAnnounce.js の
+  //   結果発表シーケンス(ドラムロール→カウントアップ→ジャーン→拍手/Sジングル→ハイライト)で
+  //   buildEffectSoundDeps 経由(effectSoundPlayer.js無改変)で再生する。
+  score_drumroll: Object.freeze([
+    Object.freeze({ id: 'as_811438', no: 811438, title: 'ドラムロール(結果発表前)' }),
+    Object.freeze({ id: 'as_52577', no: 52577, title: 'ドラムロール(緊張感)' })
+  ]),
+  score_tick: Object.freeze([
+    Object.freeze({ id: 'as_57770', no: 57770, title: 'カウントアップ電子音(ピッ)' }),
+    Object.freeze({ id: 'as_174486', no: 174486, title: 'スコアカウント効果音' })
+  ]),
+  score_result: Object.freeze([
+    Object.freeze({ id: 'as_1511523', no: 1511523, title: '結果発表ジャーン(通常)' }),
+    Object.freeze({ id: 'as_233383', no: 233383, title: '発表ファンファーレ(短め)' })
+  ]),
+  score_applause: Object.freeze([
+    Object.freeze({ id: 'as_877975', no: 877975, title: '拍手歓声(スタジオ)' }),
+    Object.freeze({ id: 'as_53069', no: 53069, title: '観客拍手(短め)' })
+  ]),
+  score_swoosh: Object.freeze([
+    Object.freeze({ id: 'as_91798', no: 91798, title: 'スウィッシュ(画面切替)' })
+  ]),
+  score_jingle_s: Object.freeze([
+    Object.freeze({ id: 'as_1048482', no: 1048482, title: 'Sランク締めジングル(豪華ファンファーレ)' })
   ])
 });
 

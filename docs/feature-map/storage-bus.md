@@ -15,6 +15,7 @@
 > 1件ずつ実コードで確認すること(将来は `verify:map` で機械判定する=会議 Q4)。
 
 - 🟠 **KEY_PAINT_PERF_RING_V1** — 書く人だけ（読む経路が無い疑い）: src/extension/popup-entry.js
+- 🟠 **KEY_SCORE_ANNOUNCE_DIAG** — 書く人だけ（読む経路が無い疑い）: src/extension/popup-entry.js
 - 🟠 **KEY_SW_PROGRESS** — 書く人だけ（読む経路が無い疑い）: src/extension/backfill-sw-entry.js
 - 🟠 **fn:backfillHeartbeatKey** — 書く人だけ（読む経路が無い疑い）: src/extension/content-entry.js
 - 🟠 **fn:chunkMigratedKey** — 書く人だけ（読む経路が無い疑い）: src/extension/content-entry.js
@@ -137,6 +138,7 @@
 | `KEY_RECORDING` | — | extension/content-entry.js<br>extension/popup-entry.js |
 | `KEY_RECORDING_WATCHDOG` | extension/content-entry.js | extension/popup-entry.js |
 | `KEY_REPORT_PREVIEW` | lib/reportPreviewPublish.js | extension/popup-entry.js<br>extension/status-entry.js |
+| `KEY_SCORE_ANNOUNCE_DIAG` | extension/popup-entry.js | — |
 | `KEY_SELF_POSTED_RECENTS` | extension/content-entry.js | extension/content-entry.js<br>extension/popup-entry.js |
 | `KEY_STATUS_FAST_DIAG_LITE` | extension/content-entry.js | extension/status-entry.js |
 | `KEY_STATUS_TREND` | extension/status-entry.js | extension/status-entry.js |

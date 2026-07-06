@@ -986,6 +986,20 @@
       ]
     },
     {
+      "file": "src/lib/liveEndedFlag.js",
+      "featureCount": 3,
+      "features": [
+        "content",
+        "popup",
+        "status"
+      ],
+      "labels": [
+        "記録エンジン(watchページ常駐)",
+        "ポップアップ(応援レーン)",
+        "状態速報ページ"
+      ]
+    },
+    {
       "file": "src/lib/ndgrChatRows.js",
       "featureCount": 3,
       "features": [
@@ -1810,18 +1824,6 @@
       ]
     },
     {
-      "file": "src/lib/liveEndedFlag.js",
-      "featureCount": 2,
-      "features": [
-        "content",
-        "status"
-      ],
-      "labels": [
-        "記録エンジン(watchページ常駐)",
-        "状態速報ページ"
-      ]
-    },
-    {
       "file": "src/lib/metricConfidence.js",
       "featureCount": 2,
       "features": [
@@ -2063,6 +2065,30 @@
     },
     {
       "file": "src/lib/reportPreviewKey.js",
+      "featureCount": 2,
+      "features": [
+        "popup",
+        "status"
+      ],
+      "labels": [
+        "ポップアップ(応援レーン)",
+        "状態速報ページ"
+      ]
+    },
+    {
+      "file": "src/lib/scoreAnnounceDiag.js",
+      "featureCount": 2,
+      "features": [
+        "popup",
+        "status"
+      ],
+      "labels": [
+        "ポップアップ(応援レーン)",
+        "状態速報ページ"
+      ]
+    },
+    {
+      "file": "src/lib/scoreAnnounceDiagKey.js",
       "featureCount": 2,
       "features": [
         "popup",
@@ -5753,6 +5779,16 @@
     },
     {
       "file": "src/lib/sanitizeRoomAvatarsForBroadcaster.js",
+      "featureCount": 1,
+      "features": [
+        "popup"
+      ],
+      "labels": [
+        "ポップアップ(応援レーン)"
+      ]
+    },
+    {
+      "file": "src/lib/scoreAnnounce.js",
       "featureCount": 1,
       "features": [
         "popup"

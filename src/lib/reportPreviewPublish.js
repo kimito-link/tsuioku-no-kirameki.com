@@ -22,15 +22,19 @@ let _busy = false; // 重い全件集計の多重実行を防ぐ再入フラグ�
  *   resolveComments: (liveId:string) => Promise<any[]>,
  *   getSnapshot: () => any,
  *   now: () => number,
- *   minGapMs?: number
- * }} deps popup 固有の副作用(全件読み/snapshot/時刻)。
+ *   minGapMs?: number,
+ *   force?: boolean
+ * }} deps popup 固有の副作用(全件読み/snapshot/時刻)。SC3(council/broadcast-scoring-SYNTHESIS.md
+ *   §2.1): `force:true` は間引き(minGapMs)を無視して1回だけ即publishする(配信終了検知時に
+ *   確定値でカウントアップするため)。再入防止(_busy)はforceでも尊重する(全件集計の多重実行は防ぐ)。
  */
 export function publishReportPreviewThrottled(liveId, deps) {
   const lv = String(liveId || '').trim().toLowerCase();
   if (!lv) return;
   const minGapMs = Number.isFinite(deps.minGapMs) ? Number(deps.minGapMs) : 15_000;
   const t = deps.now();
-  if (t - _lastWriteAt < minGapMs || _busy) return;
+  if (_busy) return;
+  if (!deps.force && t - _lastWriteAt < minGapMs) return;
   _lastWriteAt = t;
   _busy = true;
   void (async () => {
