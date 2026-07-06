@@ -144,3 +144,52 @@ export function canLaunchGiftThrow(activeCount, max = GIFT_THROW_MAX_CONCURRENT)
   const cap = Number(max) || 0;
   return n < cap;
 }
+
+/**
+ * 2026-07-06: 「デルタ補完ギフトは音は鳴るが飛翔が見えない」実機バグの根治。
+ *
+ * 真因: デルタ補完/来場入賞は匿名(speakerKey='')経路で、起点(giftThrowOriginForSpeaker)は
+ *   crowdBubbleAnchor の決定論座標、着弾(giftThrowTarget)は safeArea 中心が基本だが、
+ *   safeArea/bubbleLayer のレイアウトがまだ確定していない(幅0)瞬間に呼ばれると、venueBar.js
+ *   側の「保険」フォールバックが bubbleLayer 自身の rect に依存してしまい、bubbleLayer も
+ *   幅0(またはレイヤーがまだ描画確定前)なら座標が (0,0) や NaN 相当(画面左上・映像の外)に
+ *   落ちる。(0,0) は視覚的には「見えない」わけではないが、多くの場合ステージの角に隠れる
+ *   要素(charFrameLayer 等)の裏や、視認しづらい四隅に着地して「見えない」と体感される。
+ *
+ * この純関数は、起点/着弾それぞれの候補座標を「使ってよいか」判定し、ダメなら
+ * レイヤーの既知サイズを基準にした可視の既定位置へ差し替える。
+ *   - 起点の既定: レイヤー下端中央寄り(客席位置の crowdBubbleAnchor 既定と同じ発想)。
+ *   - 着弾の既定: レイヤー中央よりやや上(中央映像の想定位置)。
+ * どちらも「レイヤーの幅/高さが未確定(0以下)」な場合は最終手段として固定値(800x600想定の
+ * 中央付近)を返す=それでも必ず有限の可視座標になる(NaN/undefinedは返さない)。
+ *
+ * @param {{x:number,y:number}|null|undefined} point 候補座標(レイヤーローカルpx)
+ * @param {{width:number,height:number}|null|undefined} layerSize bubbleLayerの既知サイズ
+ * @param {'origin'|'target'} kind どちらの既定位置を使うか
+ * @returns {{ x:number, y:number, usedFallback:boolean }}
+ */
+export function resolveVisibleThrowPoint(point, layerSize, kind) {
+  const w = Number(layerSize?.width) || 0;
+  const h = Number(layerSize?.height) || 0;
+  const px = Number(point?.x);
+  const py = Number(point?.y);
+  // 「使える」条件: 有限数であり、かつ原点(0,0)ちょうどではない(レイアウト未確定の
+  //   典型的な失敗値)。レイヤーサイズが分かっていれば、明確に領域外の値も棄却する。
+  const isFinitePoint = Number.isFinite(px) && Number.isFinite(py);
+  const isOriginZero = px === 0 && py === 0;
+  const hasKnownSize = w > 0 && h > 0;
+  const isOutOfBounds = hasKnownSize && (px < 0 || py < 0 || px > w || py > h);
+  const usable = isFinitePoint && !isOriginZero && !isOutOfBounds;
+  if (usable) {
+    return { x: px, y: py, usedFallback: false };
+  }
+  // 既定サイズ(レイヤーサイズが未確定な最終手段のみ使う一般的な会場ビューポート想定)。
+  const fw = hasKnownSize ? w : 800;
+  const fh = hasKnownSize ? h : 600;
+  if (kind === 'origin') {
+    // 客席帯(下端寄り・crowdBubbleAnchor既定と同じ発想=中央やや左寄りで発射元らしく見せる)。
+    return { x: Math.round(fw * 0.5), y: Math.max(40, fh - 80), usedFallback: true };
+  }
+  // target: 中央映像の想定位置(やや上寄り=giftThrowTargetの保険と同じ発想)。
+  return { x: Math.round(fw * 0.5), y: Math.round(fh * 0.4), usedFallback: true };
+}

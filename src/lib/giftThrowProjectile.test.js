@@ -4,6 +4,7 @@ import {
   resolveGiftThrowPath,
   resolveGiftImageUrl,
   canLaunchGiftThrow,
+  resolveVisibleThrowPoint,
   GIFT_THROW_MAX_CONCURRENT,
   GIFT_THROW_ARC_LIFT_PX,
   GIFT_THROW_DURATION_MS,
@@ -129,5 +130,59 @@ describe('canLaunchGiftThrow', () => {
   it('max を明示できる', () => {
     expect(canLaunchGiftThrow(3, 3)).toBe(false);
     expect(canLaunchGiftThrow(2, 3)).toBe(true);
+  });
+});
+
+describe('resolveVisibleThrowPoint (2026-07-06: デルタ補完/来場の飛翔が見えないバグの根治)', () => {
+  it('通常の有効な座標(レイヤー内)はそのまま使う', () => {
+    const r = resolveVisibleThrowPoint({ x: 200, y: 560 }, { width: 800, height: 600 }, 'origin');
+    expect(r).toEqual({ x: 200, y: 560, usedFallback: false });
+  });
+
+  it('原点(0,0)ちょうどはレイアウト未確定の典型値としてフォールバックする', () => {
+    const r = resolveVisibleThrowPoint({ x: 0, y: 0 }, { width: 800, height: 600 }, 'origin');
+    expect(r.usedFallback).toBe(true);
+    expect(r.x).toBeGreaterThan(0);
+    expect(r.y).toBeGreaterThan(0);
+  });
+
+  it('レイヤーサイズが既知の時、領域外の座標はフォールバックする', () => {
+    const r = resolveVisibleThrowPoint({ x: 9999, y: 9999 }, { width: 800, height: 600 }, 'target');
+    expect(r.usedFallback).toBe(true);
+    expect(r.x).toBeLessThanOrEqual(800);
+    expect(r.y).toBeLessThanOrEqual(600);
+  });
+
+  it('負の座標もフォールバックする', () => {
+    const r = resolveVisibleThrowPoint({ x: -10, y: -10 }, { width: 800, height: 600 }, 'origin');
+    expect(r.usedFallback).toBe(true);
+  });
+
+  it('NaN/undefined座標はフォールバックする(有限数でない)', () => {
+    expect(resolveVisibleThrowPoint({ x: NaN, y: 100 }, { width: 800, height: 600 }, 'origin').usedFallback).toBe(true);
+    expect(resolveVisibleThrowPoint(undefined, { width: 800, height: 600 }, 'origin').usedFallback).toBe(true);
+    expect(resolveVisibleThrowPoint(null, { width: 800, height: 600 }, 'target').usedFallback).toBe(true);
+  });
+
+  it('レイヤーサイズも未確定(幅/高さ0)なら固定の既定サイズを基準にフォールバックする(必ず有限座標)', () => {
+    const origin = resolveVisibleThrowPoint({ x: 0, y: 0 }, { width: 0, height: 0 }, 'origin');
+    const target = resolveVisibleThrowPoint(null, null, 'target');
+    expect(Number.isFinite(origin.x)).toBe(true);
+    expect(Number.isFinite(origin.y)).toBe(true);
+    expect(Number.isFinite(target.x)).toBe(true);
+    expect(Number.isFinite(target.y)).toBe(true);
+    expect(origin.usedFallback).toBe(true);
+    expect(target.usedFallback).toBe(true);
+  });
+
+  it('origin既定は下端寄り・target既定は中央よりやや上(見た目の役割が違う)', () => {
+    const origin = resolveVisibleThrowPoint({ x: 0, y: 0 }, { width: 800, height: 600 }, 'origin');
+    const target = resolveVisibleThrowPoint({ x: 0, y: 0 }, { width: 800, height: 600 }, 'target');
+    expect(origin.y).toBeGreaterThan(target.y); // originはtargetより下(客席帯)
+  });
+
+  it('境界値(0<=x<=width, 0<=y<=height)は使える(境界包含)', () => {
+    const r = resolveVisibleThrowPoint({ x: 800, y: 600 }, { width: 800, height: 600 }, 'origin');
+    expect(r.usedFallback).toBe(false);
   });
 });
