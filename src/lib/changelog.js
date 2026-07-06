@@ -26,6 +26,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1098',
+    date: '2026-07-06',
+    summary: 'feat(score): 配信採点モデルv2+フェーズ実績計器',
+    items: Object.freeze([
+      '配信の盛り上がりを点数化する「配信採点」の内部モデルを刷新する準備として、リーチ/突破/大当たりの到達回数から加点する仕組みを追加しました(まだ画面には出ません=次回以降のアップデートで表示予定です)。',
+      'この加点はBGM設定のON/OFFに関わらず正しく数えられるようにしています。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1097',
     date: '2026-07-06',
     summary: 'feat(venue): 来場が控えめな入賞演出になります',

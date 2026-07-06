@@ -193,8 +193,13 @@ export default [
     //   commentPostUiContext即時更新・refresh()軽量再描画・計器カウンタ更新=DOM/chrome.storageの
     //   グルーでlib抽出不可。純関数本体はsrc/lib/liveChannelSwitch.js・channelSwitchDiag.jsに
     //   テスト付きで隔離済み)を追加=21116→21252。ラチェットは実測+50の21302へ。
+    //   SC1(2026-07-06・v0.1.1098): 配信採点の感性ボーナス用フェーズ実績計器
+    //   (reachCount/breakthroughCount/jackpotCount/rMax/hotDwellMs/elapsedMs)を
+    //   advancePhaseDirectorPopup に追加=BGMトグルと無関係に数える必要がありphaseFor呼び出し点の
+    //   chrome.storage計器グルーでlib抽出不可(council/broadcast-scoring-SYNTHESIS.md §1.2)。
+    //   21252→21322。ラチェットは実測+50の21372へ。
     files: ['src/extension/popup-entry.js'],
-    rules: { 'max-lines': ['error', { max: 21302, skipBlankLines: false, skipComments: false }] }
+    rules: { 'max-lines': ['error', { max: 21372, skipBlankLines: false, skipComments: false }] }
   },
   {
     files: ['src/extension/popup/**/*.js'],

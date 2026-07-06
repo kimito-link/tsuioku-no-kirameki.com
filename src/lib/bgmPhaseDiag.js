@@ -13,7 +13,14 @@
  *   feverInCount: number,    // フィーバーBGMをinした回数
  *   feverOutCount: number,   // フィーバーBGMをoutした回数
  *   bgmEnabled: boolean,     // BGMトグルON/OFF(既定OFF=オプトイン)
- *   lastEventAt: number      // 最後に計器を更新した時刻(epoch ms・0=未観測)
+ *   lastEventAt: number,     // 最後に計器を更新した時刻(epoch ms・0=未観測)
+ *   liveId: string,          // スコア突合用(配信ID・空=未観測)
+ *   reachCount: number,      // リーチフェーズに入った回数(BGMトグルと無関係。採点用)
+ *   breakthroughCount: number, // 突破フェーズ到達回数(採点用)
+ *   jackpotCount: number,    // 大当たりフェーズ到達回数(採点用)
+ *   rMax: number,            // この配信の相対比Rの自己最高
+ *   hotDwellMs: number,      // R≥1.5(煽り以上)滞在の累計ms
+ *   elapsedMs: number        // フェーズ判定開始からの経過ms(持続率の分母)
  * }} BgmPhaseDiagState
  */
 
@@ -28,7 +35,14 @@ export function makeInitialBgmPhaseDiag() {
     feverInCount: 0,
     feverOutCount: 0,
     bgmEnabled: false,
-    lastEventAt: 0
+    lastEventAt: 0,
+    liveId: '',
+    reachCount: 0,
+    breakthroughCount: 0,
+    jackpotCount: 0,
+    rMax: 0,
+    hotDwellMs: 0,
+    elapsedMs: 0
   };
 }
 
@@ -57,6 +71,13 @@ export function buildBgmPhaseDiagSnapshot(diag, nowMs) {
     feverOutCount: num(d.feverOutCount, base.feverOutCount),
     bgmEnabled: d.bgmEnabled === true,
     lastEventAt: num(d.lastEventAt, base.lastEventAt),
+    liveId: String(d.liveId || base.liveId),
+    reachCount: num(d.reachCount, base.reachCount),
+    breakthroughCount: num(d.breakthroughCount, base.breakthroughCount),
+    jackpotCount: num(d.jackpotCount, base.jackpotCount),
+    rMax: num(d.rMax, base.rMax),
+    hotDwellMs: num(d.hotDwellMs, base.hotDwellMs),
+    elapsedMs: num(d.elapsedMs, base.elapsedMs),
     capturedAt: now
   };
 }
