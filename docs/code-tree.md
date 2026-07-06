@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 2 / 636 件
+## ⚠️ 役割コメントが無いソース 2 / 637 件
 - `src/lib/reportPreviewPublish.js`
 - `src/lib/venueLaneBuckets.js`
 
@@ -527,7 +527,7 @@
   - `gift-impact.mp3`
   - `gift-sparkle.mp3`
   - `gift-whoosh.mp3`
-- 📁 **src/** (1326)
+- 📁 **src/** (1328)
   - 📁 **data/** (6)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -791,7 +791,7 @@
         - `logo_funlink_white_RGB_maru_black.png`
       - `logo_guide_funlink_ol.pdf`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1112)
+  - 📁 **lib/** (1114)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -998,6 +998,8 @@
     - `commentPostStatusPresentation.test.js`
     - `commentPostUi.js` — ポップアップのコメント送信 UI を、watch 接続状態と入力状態から一貫して決める。
     - `commentPostUi.test.js`
+    - `commentPostWatchTarget.js` — コメント送信コンテキストだけを、表示用の「実質アクティブ watch」判定から分離して解決する。
+    - `commentPostWatchTarget.test.js`
     - `commentProgressMonitor.js` — 記録進捗の自動監視ロジック（純関数）。
     - `commentProgressMonitor.test.js`
     - `commentRecord.js` — コメント1件の形・重複排除・マージ（純関数）

@@ -34,6 +34,7 @@ import { detectVersionMismatch } from '../lib/versionMismatch.js';
 import { directHit, makeInitialComboState } from '../lib/effectDirector.js';
 import { readInlineModeFlags } from '../lib/inlineModeFlags.js';
 import { pickWatchUrlFromMultipleSources } from '../lib/popupWatchUrlResolveMultiTab.js';
+import { resolveCommentPostWatchTarget } from '../lib/commentPostWatchTarget.js';
 import { shouldCloseStandalonePopupAfterNavigate } from '../lib/standalonePopupClose.js';
 import { shouldRescueEmptyResolvedWatch } from '../lib/popupContextBarModel.js';
 import { refreshTaskGuarded } from '../lib/refreshTaskGuard.js';
@@ -14666,8 +14667,31 @@ async function refresh() {
       liveId: '',
       snapshot: null
     });
-    updateCommentPostUiContext('', '', '');
+    // 感度パッチ(2026-07-06): treatAsNoActiveWatch は「表示を別タブの記録に誤同期
+    //   させない」ための v0.1.424 の意図的判断（上のコメント参照）で、これ自体は
+    //   変えない。しかし送信可否は別の関心＝開いている watch タブが1件でもあれば
+    //   requestPostCommentToOpenTab は普通に送れる（collectWatchTabCandidates が
+    //   watchUrl 空でも全タブを見るため）。ここでコメント送信コンテキストだけを
+    //   実際に開いている watch タブから解決し直す（表示系のリセットは上のまま touch しない）。
+    //   candidates は collectWatchTabCandidates('') を再利用（新規 tabs.query を増やさない）。
+    let postTarget = { url: '', liveId: '' };
+    if (!INLINE_EMBED_WATCH) {
+      try {
+        const openCandidates = await collectWatchTabCandidates('');
+        postTarget = resolveCommentPostWatchTarget(
+          openCandidates,
+          exportBtn.dataset.liveId || ''
+        );
+      } catch {
+        /* best-effort: 失敗時は従来どおり no_watch */
+      }
+    }
+    if (!isFreshRefresh()) return;
+    updateCommentPostUiContext(postTarget.url, postTarget.liveId, '');
     paintCommentComposeUi();
+    if (postTarget.url) {
+      exportBtn.dataset.watchUrl = postTarget.url;
+    }
     setReloadWatchTabUiDisabled(true);
     renderUserRooms([], '');
     renderDevMonitorPanel({
