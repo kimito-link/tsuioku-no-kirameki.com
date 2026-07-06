@@ -782,6 +782,34 @@
       ]
     },
     {
+      "file": "src/lib/channelSwitchDiag.js",
+      "featureCount": 3,
+      "features": [
+        "content",
+        "popup",
+        "status"
+      ],
+      "labels": [
+        "記録エンジン(watchページ常駐)",
+        "ポップアップ(応援レーン)",
+        "状態速報ページ"
+      ]
+    },
+    {
+      "file": "src/lib/channelSwitchDiagKey.js",
+      "featureCount": 3,
+      "features": [
+        "content",
+        "popup",
+        "status"
+      ],
+      "labels": [
+        "記録エンジン(watchページ常駐)",
+        "ポップアップ(応援レーン)",
+        "状態速報ページ"
+      ]
+    },
+    {
       "file": "src/lib/commentDb.js",
       "featureCount": 3,
       "features": [
@@ -1699,6 +1727,18 @@
     },
     {
       "file": "src/lib/liveAudienceDom.js",
+      "featureCount": 2,
+      "features": [
+        "content",
+        "popup"
+      ],
+      "labels": [
+        "記録エンジン(watchページ常駐)",
+        "ポップアップ(応援レーン)"
+      ]
+    },
+    {
+      "file": "src/lib/liveChannelSwitch.js",
       "featureCount": 2,
       "features": [
         "content",

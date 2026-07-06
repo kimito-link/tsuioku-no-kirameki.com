@@ -158,7 +158,7 @@
 
 - **応援レーン集約(誰が候補か)** — 保存コメント行を userId 単位に畳み込みレーン候補を作る唯一の集約正本(popup/venue 共通)
   - `src/lib/userLaneCandidatesFromStorage.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 87</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 90</summary>
 
 - `src/domain/lane/aggregate.js` — 応援ユーザーレーンの per-row → per-user 集約（純関数）。
 - `src/domain/observations/observationStore.js` — observationStore - StatObservation のメモリ常駐リングバッファ。
@@ -179,6 +179,8 @@
 - `src/lib/buildNorthStarAdRankingStatsHtml.js` — 北極星「広告ランキング」レーン用: watch の番組統計と一覧の「貢」の内訳を短い HTML にする。
 - `src/lib/capCommentsForAnalytics.js` — マーケ分析・タイムライン用のコメント上限（heavy 時の全件再走査を防ぐ）
 - `src/lib/channelBroadcasterMeta.js` — 公式チャンネル放送（運営・業者）の broadcaster メタを embedded-data から
+- `src/lib/channelSwitchDiag.js` — 配信切替(SPA遷移)の「送信N/受信N/初描画ms」観測値を組み立てる純関数群。
+- `src/lib/channelSwitchDiagKey.js` — 配信切替(SPA遷移でパネルを作り直さず in-place 切替する経路)の「切替回数/初描画ms」観測値を
 - `src/lib/commentEchoDetector.js` — L1 コメ伝染 + L5 コメ被り瞬間検出。
 - `src/lib/commenterCulturalAnalytics.js` — L6 / L10 / L11 / L14 / L15 — 文化分析系の純粋関数を 1 ファイルに集約。
 - `src/lib/commenterFollowAnalytics.js` — 数値IDコメンターのフォロー情報を、マーケ分析HTMLで扱いやすい形へ整える純関数群。
@@ -212,6 +214,7 @@
 - `src/lib/kiramekiAwards.js` — 「きらめきの賞」判定ロジック（純関数）。
 - `src/lib/kiramekiAwardsSectionHtml.js` — HTMLレポートの「きらめき表彰」セクション(CSS+各賞カード)の組み立て。
 - `src/lib/kokenContributionRankingApi.js` — koken 公式「ギフト貢献度ランキング」無認証 JSON API の URL 組立 & 正規化（純関数）。
+- `src/lib/liveChannelSwitch.js` — 「別の配信へ移動(SPA遷移)するとパネルが壊れる」問題の修正(2026-07-06)。
 - `src/lib/liveCommenterStats.js` — 記録済みコメントから「ユニーク投稿者（推定）」用の集計（純関数）
 - `src/lib/loadLastBroadcastSummary.js` — 0.1.69 (AY): empty state（配信なし）popup で「前回の配信」cards を復元するために、
 - `src/lib/mangaBroadcastSummary.js` — 放送終了後の HTML レポート / マーケ分析の頭にくる「漫画読み体験」要約。
@@ -802,7 +805,7 @@
 
 ## 🧬 修正系譜マップ(この系統のバグを過去にどう直したか)
 
-> changelog 全 428 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
+> changelog 全 429 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
 
 ### 💾 記録件数 (64版)
 - `v0.1.1084` 2026-07-06 — perf(status): マイ効果音計器のBlob全件走査を廃止
@@ -870,7 +873,8 @@
 - `v0.1.672` 2026-06-10 — コメビュの二重表示の残りを根治
 - `v0.1.665` 2026-06-10 — 長い配信が7割等で止まったままになるのを根治
 
-### 📥 コメント取得 (147版)
+### 📥 コメント取得 (148版)
+- `v0.1.1094` 2026-07-06 — fix(inline): 配信切替に即追従(再ロード・一括取得なし)
 - `v0.1.1091` 2026-07-06 — ギフト音が静かに消える取りこぼしを根治
 - `v0.1.1058` 2026-07-04 — ギフト取りこぼし修正+コメント数マイルストーン診断を新設
 - `v0.1.1057` 2026-07-04 — ギフト診断の対処候補への統合漏れを修正+内部構造の整理

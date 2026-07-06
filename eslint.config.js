@@ -188,8 +188,13 @@ export default [
     //   STORY_SOURCE_STATE への合流・renderStoryUserLane 軽量再描画・計器カウンタ更新=DOM/
     //   chrome.storageのグルーでlib抽出不可。純関数本体はsrc/lib/instantCommentPush.js・
     //   instantPushDiag.jsにテスト付きで隔離済み)を追加=20910→21116。ラチェットは実測+50の21166へ。
+    //   2026-07-06: 「別の配信へ移動(SPA遷移)するとパネルが壊れる」修正=INLINE_OWN_WATCH_URL の
+    //   let化+in-place更新関数・NLS_LIVE_CHANNEL_SWITCH 受信配線(window message リスナ・
+    //   commentPostUiContext即時更新・refresh()軽量再描画・計器カウンタ更新=DOM/chrome.storageの
+    //   グルーでlib抽出不可。純関数本体はsrc/lib/liveChannelSwitch.js・channelSwitchDiag.jsに
+    //   テスト付きで隔離済み)を追加=21116→21252。ラチェットは実測+50の21302へ。
     files: ['src/extension/popup-entry.js'],
-    rules: { 'max-lines': ['error', { max: 21166, skipBlankLines: false, skipComments: false }] }
+    rules: { 'max-lines': ['error', { max: 21302, skipBlankLines: false, skipComments: false }] }
   },
   {
     files: ['src/extension/popup/**/*.js'],
