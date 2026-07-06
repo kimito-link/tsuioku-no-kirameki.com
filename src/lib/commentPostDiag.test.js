@@ -3,11 +3,12 @@ import {
   makeInitialCommentPostDiag,
   commentPostOutcomeKindForResult,
   buildCommentPostDiagSnapshot,
-  buildCommentPostDiagLines
+  buildCommentPostDiagLines,
+  computeCommentEchoAverage
 } from './commentPostDiag.js';
 
 describe('makeInitialCommentPostDiag', () => {
-  it('全カウンタ0・lastOutcome空の初期値', () => {
+  it('全カウンタ0・lastOutcome空・echoは-1(未計測)の初期値', () => {
     const s = makeInitialCommentPostDiag();
     expect(s.attempts).toBe(0);
     expect(s.okCount).toBe(0);
@@ -18,6 +19,31 @@ describe('makeInitialCommentPostDiag', () => {
     expect(s.lastTotalMs).toBe(0);
     expect(s.lastOutcome).toBe('');
     expect(s.lastEventAt).toBe(0);
+    expect(s.lastEchoMs).toBe(-1);
+    expect(s.avgEchoMs).toBe(-1);
+  });
+});
+
+describe('computeCommentEchoAverage(EMA・giftEffectDiag/voiceReadQueueと同方式)', () => {
+  it('未計測(-1)から最初のサンプルはそのまま丸めた値になる', () => {
+    expect(computeCommentEchoAverage(-1, 1000)).toBe(1000);
+  });
+
+  it('2回目以降はEMA(alpha=0.3既定)で均す', () => {
+    const avg1 = computeCommentEchoAverage(-1, 1000);
+    const avg2 = computeCommentEchoAverage(avg1, 2000);
+    expect(avg2).toBe(Math.round(1000 + 0.3 * (2000 - 1000)));
+  });
+
+  it('負値/非数のサンプルは直前の平均を素通しする(未計測を汚染しない)', () => {
+    expect(computeCommentEchoAverage(500, -1)).toBe(500);
+    expect(computeCommentEchoAverage(500, NaN)).toBe(500);
+    expect(computeCommentEchoAverage(-1, NaN)).toBe(-1);
+  });
+
+  it('alpha を指定できる', () => {
+    const avg = computeCommentEchoAverage(1000, 2000, 0.5);
+    expect(avg).toBe(1500);
   });
 });
 
@@ -79,7 +105,7 @@ describe('buildCommentPostDiagLines', () => {
     expect(buildCommentPostDiagLines(snap, 100)).toEqual([]);
   });
 
-  it('試行・成功・失敗・締切超過の内訳を2行で表示する', () => {
+  it('試行・成功・失敗・締切超過の内訳を2行で表示する(echo未計測なら送信応答のみ)', () => {
     const snap = buildCommentPostDiagSnapshot(
       {
         attempts: 5,
@@ -97,12 +123,13 @@ describe('buildCommentPostDiagLines', () => {
     const lines = buildCommentPostDiagLines(snap, 1000);
     expect(lines).toHaveLength(2);
     expect(lines[0]).toContain('試行5');
-    expect(lines[0]).toContain('成功3');
+    expect(lines[0]).toContain('ok3');
     expect(lines[0]).toContain('失敗1');
-    expect(lines[0]).toContain('締切超過1');
+    expect(lines[0]).toContain('締切1');
     expect(lines[0]).toContain('最終0秒前');
     expect(lines[0]).toContain('(timeout)');
-    expect(lines[1]).toBe('  → 直近所要1234ms / フレーム試行累計8 / 取消1');
+    expect(lines[1]).toBe('  → 送信応答 直近1.2秒 / フレーム試行累計8 / 取消1');
+    expect(lines[1]).not.toContain('echo');
   });
 
   it('締切超過が非0のときも表示に含まれる(嘘をつかない=不明を隠さない)', () => {
@@ -111,6 +138,27 @@ describe('buildCommentPostDiagLines', () => {
       1000
     );
     const lines = buildCommentPostDiagLines(snap, 1000);
-    expect(lines[0]).toContain('締切超過2');
+    expect(lines[0]).toContain('締切2');
+  });
+
+  it('echo計測済みなら送信応答の行にecho直近/平均を付記する', () => {
+    const snap = buildCommentPostDiagSnapshot(
+      {
+        attempts: 1,
+        okCount: 1,
+        lastTotalMs: 500,
+        lastEchoMs: 2500,
+        avgEchoMs: 2200
+      },
+      1000
+    );
+    const lines = buildCommentPostDiagLines(snap, 1000);
+    expect(lines[1]).toContain('画面実着(echo) 直近2.5秒(平均2.2秒)');
+  });
+
+  it('echo未計測(-1)なら送信応答の行にechoを出さない(ノイズにしない)', () => {
+    const snap = buildCommentPostDiagSnapshot({ attempts: 1, okCount: 1, lastTotalMs: 500 }, 1000);
+    const lines = buildCommentPostDiagLines(snap, 1000);
+    expect(lines[1]).not.toContain('画面実着');
   });
 });

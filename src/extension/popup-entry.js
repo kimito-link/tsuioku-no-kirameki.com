@@ -738,7 +738,8 @@ import {
 import {
   makeInitialCommentPostDiag,
   commentPostOutcomeKindForResult,
-  buildCommentPostDiagSnapshot
+  buildCommentPostDiagSnapshot,
+  computeCommentEchoAverage
 } from '../lib/commentPostDiag.js';
 import { KEY_COMMENT_POST_DIAG } from '../lib/commentPostDiagKey.js';
 import { avatarCompareKey, isSameAvatarUrl } from '../lib/avatarUrlCompare.js';
@@ -5083,7 +5084,7 @@ function matchSelfPostedRecentsToEntries(entries, liveId) {
  *
  * @param {PopupCommentEntry[]|null|undefined} entries
  * @param {string} liveId
- * @returns {{ next: PopupCommentEntry[], remaining: { liveId: string, at: number, textNorm: string }[], changed: boolean, pendingChanged: boolean }}
+ * @returns {{ next: PopupCommentEntry[], remaining: { liveId: string, at: number, textNorm: string }[], changed: boolean, pendingChanged: boolean, consumedAts: number[] }}
  */
 function reconcileStoredOwnPostedEntries(entries, liveId) {
   const list = Array.isArray(entries) ? entries : [];
@@ -5093,7 +5094,8 @@ function reconcileStoredOwnPostedEntries(entries, liveId) {
       next: list,
       remaining: selfPostedRecentsCache,
       changed: false,
-      pendingChanged: false
+      pendingChanged: false,
+      consumedAts: []
     };
   }
 
@@ -5104,7 +5106,8 @@ function reconcileStoredOwnPostedEntries(entries, liveId) {
       next: list,
       remaining: selfPostedRecentsCache,
       changed: false,
-      pendingChanged: false
+      pendingChanged: false,
+      consumedAts: []
     };
   }
 
@@ -5116,11 +5119,23 @@ function reconcileStoredOwnPostedEntries(entries, liveId) {
     return { ...entry, selfPosted: true };
   });
 
+  // 感度実測(2026-07-06): 照合成立=「押下→実フィード到着確定」の瞬間。consumedIndexes は
+  //   selfPostedRecentsCache 側の index なので、その .at(押下時刻)をここで拾って呼び出し側へ
+  //   渡す。revert/TTL失効で consumedIndexes に入らなかった pending は含まれない
+  //   (照合不成立では記録しない=嘘をつかない)。
+  /** @type {number[]} */
+  const consumedAts = [];
+  for (const i of consumedIndexes) {
+    const at = Number(selfPostedRecentsCache[i]?.at) || 0;
+    if (at > 0) consumedAts.push(at);
+  }
+
   return {
     next,
     remaining: selfPostedRecentsCache.filter((_, i) => !consumedIndexes.has(i)),
     changed,
-    pendingChanged: consumedIndexes.size > 0
+    pendingChanged: consumedIndexes.size > 0,
+    consumedAts
   };
 }
 
@@ -15664,6 +15679,23 @@ async function refresh() {
         STORY_AVATAR_DIAG_STATE.interceptWithAvatar = 0;
       }
       const reconciledOwnPosted = reconcileStoredOwnPostedEntries(arr, lv);
+      // 感度実測(2026-07-06): 照合成立=画面反映(echo)確定の瞬間。consumedAts は
+      //   押下時刻(appendSelfPostedComment 時点の Date.now())なので、ここで
+      //   echoMs = 今 - 押下時刻 を出す。複数件が同時に照合成立した場合は時刻昇順に
+      //   1件ずつ EMA へ通す(古いものから均す=直近値が最後に残る)。
+      if (reconciledOwnPosted.consumedAts.length > 0) {
+        const echoNow = Date.now();
+        const sortedAts = [...reconciledOwnPosted.consumedAts].sort((a, b) => a - b);
+        for (const at of sortedAts) {
+          const echoMs = Math.max(0, echoNow - at);
+          _commentPostDiagCounters.lastEchoMs = echoMs;
+          _commentPostDiagCounters.avgEchoMs = computeCommentEchoAverage(
+            _commentPostDiagCounters.avgEchoMs,
+            echoMs
+          );
+        }
+        publishCommentPostDiag();
+      }
       if (reconciledOwnPosted.changed || reconciledOwnPosted.pendingChanged) {
         arr = reconciledOwnPosted.next;
         selfPostedRecentsCache = reconciledOwnPosted.remaining;

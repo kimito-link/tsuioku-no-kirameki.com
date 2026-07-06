@@ -26,6 +26,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1089',
+    date: '2026-07-06',
+    summary: 'feat(diag): 自コメの実着までの感度を計測',
+    items: Object.freeze([
+      '自分で投稿したコメントが、押してから実際に画面へ反映されるまでの時間を状態速報で確認できるようにしました。',
+      '送信操作・表示自体の挙動は変えていません(観測用の計器のみ追加)。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1088',
     date: '2026-07-06',
     summary: 'feat(diag): 読み上げ/ギフトの体感遅延を実測計器化',
