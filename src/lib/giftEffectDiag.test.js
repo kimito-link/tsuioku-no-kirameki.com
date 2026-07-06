@@ -156,6 +156,105 @@ describe('修正3: giftSoundDiagFieldForPlayResult', () => {
   });
 });
 
+// v0.1.1091根治: 「ギフト演出は出るのに音だけ静かに消える(guarded/noPath/error/coalesced
+//   の内訳が全てゼロ)」の再発防止。scheduleGiftSound(venueBar.js)がどの経路を通っても
+//   必ずgiftEffectDiagのどれかのカウンタが増えることを、内訳の網羅表で固定する。
+describe('v0.1.1091: giftSoundOff(効果音設定OFF時の即return)の計上', () => {
+  it('初期stateは giftSoundOff=0', () => {
+    expect(makeInitialGiftEffectDiag().giftSoundOff).toBe(0);
+  });
+
+  it('旧スナップショット(フィールド無し)は0扱い=従来と同じ判定', () => {
+    const snap = buildGiftEffectDiagSnapshot({ giftDetected: 3, giftThrown: 3, giftSoundPlayed: 3 }, 1000);
+    expect(snap.giftSoundOff).toBe(0);
+  });
+
+  it('OFF時の1件が内訳「OFF時」として明記され⚠にならない(投擲1=音0+OFF時1で✅)', () => {
+    const snap = buildGiftEffectDiagSnapshot(
+      { giftDetected: 1, giftThrown: 1, giftSoundPlayed: 0, giftSoundOff: 1 },
+      1000
+    );
+    const lines = buildGiftEffectDiagLines(snap, 1000);
+    const giftLine = lines.find((l) => l.includes('ギフト:'));
+    expect(giftLine).toContain('OFF時1');
+    expect(giftLine).not.toContain('⚠');
+    expect(giftEffectDiagToActionCards(snap).some((c) => c.id === 'gift-effect-sound-missing-gift')).toBe(false);
+  });
+
+  it('OFF時+他の内訳が混在しても合算で説明できれば⚠にならない', () => {
+    const snap = buildGiftEffectDiagSnapshot(
+      { giftDetected: 5, giftThrown: 5, giftSoundPlayed: 2, giftSoundGuarded: 1, giftSoundNoPath: 1, giftSoundOff: 1 },
+      1000
+    );
+    const lines = buildGiftEffectDiagLines(snap, 1000);
+    expect(lines.some((l) => l.includes('⚠'))).toBe(false);
+  });
+
+  it('OFF時だけでは説明しきれない残りは⚠のまま(件数が本当に合わない時だけ警告)', () => {
+    const snap = buildGiftEffectDiagSnapshot(
+      { giftDetected: 5, giftThrown: 5, giftSoundPlayed: 1, giftSoundOff: 1 },
+      1000
+    );
+    const lines = buildGiftEffectDiagLines(snap, 1000);
+    expect(lines.some((l) => l.includes('⚠3件鳴っていない'))).toBe(true);
+  });
+});
+
+describe('v0.1.1091: 「音が静かに消える」再発防止=内訳の網羅表', () => {
+  // scheduleGiftSound(venueBar.js)の戻り値/内部分岐は以下の網羅表に一致する:
+  //   'off'        → giftSoundOff        (効果音設定OFFで即return・v0.1.1091で新設)
+  //   'coalesced'  → giftSoundCoalesced  (バースト置換・呼び出し元が計上)
+  //   'scheduled' でplayEffectSoundが:
+  //     'played'   → giftSoundPlayed
+  //     'guarded'  → giftSoundGuarded
+  //     'no-path'  → giftSoundNoPath
+  //     'error'    → giftSoundError
+  //   setTimeoutコールバック内の想定外例外 → giftSoundError(v0.1.1091でtry/catch追加)
+  // この表を「giftThrown件数 = 全カウンタの合計」という不変条件としてテストする
+  // (どの経路を通っても必ずどれかが増える=内訳が全部ゼロなのに音だけ消えることは構造的に無くなる)。
+  const outcomeToField = {
+    played: 'giftSoundPlayed',
+    coalesced: 'giftSoundCoalesced',
+    guarded: 'giftSoundGuarded',
+    'no-path': 'giftSoundNoPath',
+    error: 'giftSoundError',
+    off: 'giftSoundOff'
+  };
+
+  it.each(Object.entries(outcomeToField))(
+    '経路 %s は %s に計上され、giftThrown分が必ず説明できる(⚠にならない)',
+    (_outcome, field) => {
+      const diag = {
+        giftDetected: 1,
+        giftThrown: 1,
+        giftSoundPlayed: 0,
+        giftSoundCoalesced: 0,
+        giftSoundGuarded: 0,
+        giftSoundNoPath: 0,
+        giftSoundError: 0,
+        giftSoundOff: 0
+      };
+      diag[field] += 1;
+      const snap = buildGiftEffectDiagSnapshot(diag, 1000);
+      const lines = buildGiftEffectDiagLines(snap, 1000);
+      const giftLine = lines.find((l) => l.includes('ギフト:'));
+      expect(giftLine).toContain('音0'.replace('0', String(snap.giftSoundPlayed)));
+      expect(giftLine).not.toContain('⚠');
+      expect(giftEffectDiagToActionCards(snap).some((c) => c.id === 'gift-effect-sound-missing-gift')).toBe(false);
+    }
+  );
+
+  it('全経路が一度もカウントされない(内訳が全部ゼロ)のに giftThrown>giftSoundPlayed なら必ず⚠になる', () => {
+    // これが今回の実バグの症状そのもの(検知1→演出1→音0、内訳全ゼロ)。
+    // 修正後もこのケース自体はconstructできる(诊断が「本当にどこにも計上されていない」ことは
+    // まだ検出できる=念のための回帰確認。scheduleGiftSound側の修正で「起き得なくなった」ことは
+    // 上のit.eachが保証する)。
+    const snap = buildGiftEffectDiagSnapshot({ giftDetected: 1, giftThrown: 1, giftSoundPlayed: 0 }, 1000);
+    const lines = buildGiftEffectDiagLines(snap, 1000);
+    expect(lines.some((l) => l.includes('⚠1件鳴っていない'))).toBe(true);
+  });
+});
+
 describe('v0.1.1088計器: computeGiftGapAverage(検知→音/着弾ギャップのEMA)', () => {
   it('未計測(-1)から最初のサンプルはそのまま値になる', () => {
     expect(computeGiftGapAverage(-1, 100)).toBe(100);

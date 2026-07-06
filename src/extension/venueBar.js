@@ -2370,10 +2370,19 @@ export function mountVenueBarButton(options = {}) {
    * @param {string|undefined} tier 'small'|'medium'|'large'|'mega'
    * @param {number} _flightMs 投擲アニメの飛翔時間(ms)。v0.1.1066で待機をやめ未使用化(呼び出し側の互換のため引数は維持)
    * @param {number} [detectAt] v0.1.1088計器: このギフトの検知時刻(epoch ms)。未指定なら計測しない(既存呼び出し互換)。
-   * @returns {'scheduled'|'coalesced'|'off'}
+   * @returns {'scheduled'|'coalesced'|'off'} v0.1.1091: 'off'を含む全戻り値がgiftEffectDiagへ
+   *   直接計上される(呼び出し元が戻り値を見なくても取りこぼしが数字に残る)。
    */
   const scheduleGiftSound = (tier, _flightMs, detectAt) => {
-    if (!_effectSoundEnabledCache) return 'off';
+    if (!_effectSoundEnabledCache) {
+      // v0.1.1091根治: 従来はこの早期returnが呼び出し元でも無視され(呼び出し元は'coalesced'
+      //   しか見ていなかった)、guarded/noPath/error/coalescedの内訳が全てゼロなのに音が
+      //   1件だけ静かに消える「内訳で説明できない取りこぼし」を生んでいた(状態速報2回実測)。
+      //   ここで直接計上し、どの経路を通っても必ずどれかのカウンタが増えるようにする。
+      _giftEffectDiagCounters.giftSoundOff += 1;
+      publishGiftEffectDiag();
+      return 'off';
+    }
     const baseKind = effectSoundKindForGiftTier(tier);
     _giftComboState = directHit(_giftComboState, baseKind, Date.now(), {
       ladder: GIFT_TIER_LADDER,
@@ -2399,21 +2408,29 @@ export function mountVenueBarButton(options = {}) {
     const pending = { kind, timer: 0 };
     pending.timer = window.setTimeout(() => {
       _pendingGiftSound = null;
-      // 「鳴らした」時だけ数える(戻り値を見ずに数えると診断が嘘をつく・v0.1.1057と同じ教訓)。
-      // 修正3: playEffectSoundの戻り値がplayed以外(guarded/no-path/error)でも診断に内訳として
-      //   計上する(従来は無条件で捨てられ「⚠N件鳴っていない」の内訳不明の原因だった)。
-      const playResult = playEffectSound(pending.kind, buildEffectSoundDeps(pending.kind));
-      if (playResult === 'played') {
-        _giftEffectDiagCounters.giftSoundPlayed += 1;
-        // v0.1.1088計器: 「検知→音」の体感ギャップ(演出・音の挙動は不変・時刻記録のみ)。
-        if (Number.isFinite(Number(detectAt)) && Number(detectAt) > 0) {
-          const gap = Math.max(0, Date.now() - Number(detectAt));
-          _giftEffectDiagCounters.lastSoundGapMs = gap;
-          _giftEffectDiagCounters.avgSoundGapMs = computeGiftGapAverage(_giftEffectDiagCounters.avgSoundGapMs, gap);
+      try {
+        // 「鳴らした」時だけ数える(戻り値を見ずに数えると診断が嘘をつく・v0.1.1057と同じ教訓)。
+        // 修正3: playEffectSoundの戻り値がplayed以外(guarded/no-path/error)でも診断に内訳として
+        //   計上する(従来は無条件で捨てられ「⚠N件鳴っていない」の内訳不明の原因だった)。
+        const playResult = playEffectSound(pending.kind, buildEffectSoundDeps(pending.kind));
+        if (playResult === 'played') {
+          _giftEffectDiagCounters.giftSoundPlayed += 1;
+          // v0.1.1088計器: 「検知→音」の体感ギャップ(演出・音の挙動は不変・時刻記録のみ)。
+          if (Number.isFinite(Number(detectAt)) && Number(detectAt) > 0) {
+            const gap = Math.max(0, Date.now() - Number(detectAt));
+            _giftEffectDiagCounters.lastSoundGapMs = gap;
+            _giftEffectDiagCounters.avgSoundGapMs = computeGiftGapAverage(_giftEffectDiagCounters.avgSoundGapMs, gap);
+          }
+        } else {
+          const field = giftSoundDiagFieldForPlayResult(playResult);
+          if (field) _giftEffectDiagCounters[field] += 1;
         }
-      } else {
-        const field = giftSoundDiagFieldForPlayResult(playResult);
-        if (field) _giftEffectDiagCounters[field] += 1;
+      } catch {
+        // v0.1.1091根治: buildEffectSoundDeps等(カスタム音State構築)が想定外に投げても、
+        //   ここが「内訳が全部ゼロなのに音だけ消える」最後の抜け穴にならないようにする
+        //   (嘘をつかない診断の原則・playEffectSound自体は既に自前でtry/catch済みなので
+        //   ここに届く例外は deps 組み立て側に限られる)。
+        _giftEffectDiagCounters.giftSoundError += 1;
       }
       publishGiftEffectDiag();
     }, 0); // v0.1.1068: 即発音(同一バーストの統合はsetTimeout(0)がループ後に走ることで維持)
