@@ -26,6 +26,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1095',
+    date: '2026-07-06',
+    summary: 'fix(gift): デルタ補完ギフトにも効果音を配線',
+    items: Object.freeze([
+      '個別のギフト通知が来ない配信でも合計ギフト額の増分から検知していた「補完ギフト」の演出について、投げる絵は出るのに効果音だけ鳴らないことがある不具合を修正しました。',
+      '本物のギフト通知と同じ判定順序に揃え、想定外の不具合が起きても他のギフトの演出・音に影響しないようにしました。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1094',
     date: '2026-07-06',
     summary: 'fix(inline): 配信切替に即追従(再ロード・一括取得なし)',
