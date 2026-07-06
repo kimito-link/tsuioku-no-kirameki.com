@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1091',
+    date: '2026-07-06',
+    summary: 'ギフト音が静かに消える取りこぼしを根治',
+    items: Object.freeze([
+      'ギフトの演出は出るのに効果音だけ鳴らないことがまれにあった問題を修正しました。原因はごく短い時間だけ効果音設定がOFF扱いになる瞬間などに音の予約が数えられずに消えていたことで、今後はどんな経路でも診断に理由が残ります。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1090',
     date: '2026-07-06',
     summary: 'feat(gift): 個別イベント欠落配信のデルタ補完検知',

@@ -15,6 +15,7 @@
  *   giftSoundGuarded: number,  // 修正3: playEffectSoundが'guarded'(同種600msガード)を返した回数=正常動作
  *   giftSoundNoPath: number,   // 修正3: playEffectSoundが'no-path'(未割当/パス解決失敗)を返した回数
  *   giftSoundError: number,    // 修正3: playEffectSoundが'error'(再生失敗)を返した回数
+ *   giftSoundOff: number,      // v0.1.1091: 効果音設定OFFで即returnした回数。従来この'off'はどこにも計上されず「内訳が全部ゼロなのに音が消える」根因だった
  *   adDetected: number,        // 広告を検知した回数
  *   adThrown: number,          // 広告の投擲演出が実際に走った回数
  *   adSoundPlayed: number,     // 広告効果音の再生を試みた回数
@@ -39,6 +40,7 @@ export function makeInitialGiftEffectDiag() {
     giftSoundGuarded: 0,
     giftSoundNoPath: 0,
     giftSoundError: 0,
+    giftSoundOff: 0,
     adDetected: 0,
     adThrown: 0,
     adSoundPlayed: 0,
@@ -111,6 +113,7 @@ export function buildGiftEffectDiagSnapshot(diag, nowMs) {
     giftSoundGuarded: num(d.giftSoundGuarded, base.giftSoundGuarded),
     giftSoundNoPath: num(d.giftSoundNoPath, base.giftSoundNoPath),
     giftSoundError: num(d.giftSoundError, base.giftSoundError),
+    giftSoundOff: num(d.giftSoundOff, base.giftSoundOff),
     adDetected: num(d.adDetected, base.adDetected),
     adThrown: num(d.adThrown, base.adThrown),
     adSoundPlayed: num(d.adSoundPlayed, base.adSoundPlayed),
@@ -171,19 +174,23 @@ export function buildGiftEffectDiagLines(snap, nowMs) {
     const giftSoundGuarded = Number(snap.giftSoundGuarded) || 0;
     const giftSoundNoPath = Number(snap.giftSoundNoPath) || 0;
     const giftSoundError = Number(snap.giftSoundError) || 0;
-    const soundExplained = giftSoundGuarded + giftSoundNoPath + giftSoundError;
+    const giftSoundOff = Number(snap.giftSoundOff) || 0;
+    const soundExplained = giftSoundGuarded + giftSoundNoPath + giftSoundError + giftSoundOff;
     const { throwMissing, soundMissing } = diffCounts(giftDetected, giftThrown, giftSoundPlayed, giftSoundCoalesced, soundExplained);
     const throwMark = throwMissing > 0 ? `⚠${throwMissing}件飛んでいない` : '✅';
-    // 修正3: 内訳(guarded/noPath/error)で説明できる時は⚠にしない(意図した動き=嘘をつかない)。
+    // 修正3: 内訳(guarded/noPath/error/off)で説明できる時は⚠にしない(意図した動き=嘘をつかない)。
     //   説明できない残りがある時だけ⚠にする(件数が本当に合わない時)。
     const soundMark = !soundEnabled ? '(OFF)' : soundMissing > 0 ? `⚠${soundMissing}件鳴っていない` : '✅';
     // v0.1.1061: 置換(バースト統合)は意図した動きなので件数を明記しつつ⚠にしない=嘘をつかない。
     const coalescedText = giftSoundCoalesced > 0 ? `(+置換${giftSoundCoalesced})` : '';
     // 修正3: ガード(600ms同種ガード)は正常動作なので内訳を明記する。未割当/エラーも同様に内訳表示。
+    // v0.1.1091: off(効果音設定OFFの瞬間に鳴らそうとした)も同じ思想で内訳に明記する
+    //   (soundEnabled=ONの時にoff>0が出ることがある=設定が短時間OFF→ONだった痕跡)。
     const explainedParts = [];
     if (giftSoundGuarded > 0) explainedParts.push(`ガード${giftSoundGuarded}`);
     if (giftSoundNoPath > 0) explainedParts.push(`未割当${giftSoundNoPath}`);
     if (giftSoundError > 0) explainedParts.push(`エラー${giftSoundError}`);
+    if (giftSoundOff > 0) explainedParts.push(`OFF時${giftSoundOff}`);
     const explainedText = explainedParts.length > 0 ? ` / ${explainedParts.join(' ')}` : '';
     // v0.1.1090: 個別イベント欠落配信のデルタ補完検知(giftDeltaFallback.js)。本物と合成を
     //   区別して表示する(嘘をつかない=合成であることを隠さない)。
@@ -259,7 +266,7 @@ export function giftEffectDiagToActionCards(snap) {
     Number(snap.giftThrown) || 0,
     Number(snap.giftSoundPlayed) || 0,
     Number(snap.giftSoundCoalesced) || 0,
-    (Number(snap.giftSoundGuarded) || 0) + (Number(snap.giftSoundNoPath) || 0) + (Number(snap.giftSoundError) || 0)
+    (Number(snap.giftSoundGuarded) || 0) + (Number(snap.giftSoundNoPath) || 0) + (Number(snap.giftSoundError) || 0) + (Number(snap.giftSoundOff) || 0)
   );
   check('ad', Number(snap.adDetected) || 0, Number(snap.adThrown) || 0, Number(snap.adSoundPlayed) || 0);
   return cards;
