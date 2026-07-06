@@ -3349,6 +3349,16 @@ export function mountVenueBarButton(options = {}) {
    *   流す(handleNewGiftEvents と同じ launchGiftThrow/scheduleGiftSound を使う=演出/音の
    *   経路は増やさない)。送り主が特定できないため speakerKey は空(crowdBubbleAnchorへ
    *   フォールバック=既存の匿名ギフトと同じ扱い)。
+   * v0.1.1095根治: 従来は launchGiftThrow の戻り値を見ずに giftThrown を無条件加算し、
+   *   scheduleGiftSound 呼び出しも無条件で行っていた。handleNewGiftEvents/maybeThrowGiftFromSpeech
+   *   (本物経路)は「launchGiftThrow が実際に投げた(true)時だけ giftThrown+scheduleGiftSound」の
+   *   順序を守っており、デルタ経路だけこの順序が崩れていた(実質的には無条件呼びなのでこちら側が
+   *   鳴りやすい方向の非対称ではあるが、本物経路と完全に同一の配線にして仕様上の差異を無くす)。
+   *   さらに実配信2回で「検知1→演出1✅→音0(off/guarded/noPath/error/coalescedいずれも0)」が
+   *   観測された=scheduleGiftSound 呼び出し経路のどこかで例外が静かに飲まれ、v0.1.1091の
+   *   全数計上(嘘をつかない原則)が機能しない抜け道が残っていた疑いが濃い。1件ごとに
+   *   try/catch で囲み、例外時も giftSoundError へ計上してループ・以降のイベント処理・
+   *   publishGiftEffectDiag を継続させる(1件の異常が残りの合成イベントを道連れにしない)。
    * @param {number} aggregatePoints
    */
   const handleGiftPointsAggregate = (aggregatePoints) => {
@@ -3366,16 +3376,26 @@ export function mountVenueBarButton(options = {}) {
       _giftEffectDiagCounters.lastEventAt = _detectAt;
       _giftEffectDiagCounters.deltaSynthesized += 1;
       _giftEffectDiagCounters.deltaPoints += ev.points;
-      // 汎用ラベル(既存の itemName 欠落フォールバックと同じ思想=「反応した」ことを優先)。
-      //   匿名ギフト扱いなので送り主名は出さず、pt だけ明記する。🎁絵文字が種別を示すため
-      //   「ギフト」接頭辞は付けない(clampLabelの14文字上限で大きいptが崩れて見えるのを避ける)。
-      const proj = resolveGiftProjectile({ item: `+${ev.points.toLocaleString('ja-JP')}pt`, point: ev.points }, 'gift');
-      if (proj) {
-        launchGiftThrow('', proj, _detectAt);
-        _giftEffectDiagCounters.giftThrown += 1;
-        if (scheduleGiftSound(proj.tier, proj.durationMs, _detectAt) === 'coalesced') {
-          _giftEffectDiagCounters.giftSoundCoalesced += 1;
+      try {
+        // 汎用ラベル(既存の itemName 欠落フォールバックと同じ思想=「反応した」ことを優先)。
+        //   匿名ギフト扱いなので送り主名は出さず、pt だけ明記する。🎁絵文字が種別を示すため
+        //   「ギフト」接頭辞は付けない(clampLabelの14文字上限で大きいptが崩れて見えるのを避ける)。
+        const proj = resolveGiftProjectile({ item: `+${ev.points.toLocaleString('ja-JP')}pt`, point: ev.points }, 'gift');
+        if (proj) {
+          // v0.1.1095: handleNewGiftEvents/maybeThrowGiftFromSpeech と同じく、launchGiftThrow が
+          //   実際に投げた(true)時だけ giftThrown を加算し scheduleGiftSound を呼ぶ(本物経路と
+          //   完全に同一の順序・条件に揃える=演出/音の経路差異を無くす)。
+          if (launchGiftThrow('', proj, _detectAt)) {
+            _giftEffectDiagCounters.giftThrown += 1;
+            if (scheduleGiftSound(proj.tier, proj.durationMs, _detectAt) === 'coalesced') {
+              _giftEffectDiagCounters.giftSoundCoalesced += 1;
+            }
+          }
         }
+      } catch {
+        // v0.1.1095根治: この経路(投擲+音予約)のどこかで想定外の例外が起きても、「内訳が
+        //   全部ゼロなのに音だけ消える」を再発させない(v0.1.1091と同じ嘘をつかない原則)。
+        _giftEffectDiagCounters.giftSoundError += 1;
       }
       publishGiftEffectDiag();
     }

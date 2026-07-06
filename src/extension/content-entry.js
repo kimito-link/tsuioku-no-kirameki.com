@@ -2175,6 +2175,11 @@ function applyInterceptNdgrStatisticsFields(payload) {
     //   会場(venueBar.js・別ウィンドウ)が chrome.storage.onChanged で購読できるよう軽量に
     //   書き出す。個別イベントが一切来ない配信でも、この集計値だけは取れることがある
     //   (既知のニコ生仕様ムラ)。書き込みは fire-and-forget(記録を止めない)。
+    // 既知の制限(v0.1.1095調査で発見・スコープ外): liveId がまだ確定していない配信初期の
+    //   短い窓で NDGR statistics が届くと、この if で書き込みがスキップされ officialGiftPointsNdgr
+    //   だけが更新されて storage には反映されない(次に gp が変化するまでデルタ検知側は
+    //   気づけない)。実害は「配信最初の数秒分のギフトptがデルタ検知に乗るのが遅れる」程度
+    //   (無くなるわけではなく、次の統計更新で追いつく)ため、今回は未対応。
     if (liveId) {
       setStorageLocalSilent(
         { [officialGiftPointsAggregateStorageKey(liveId)]: officialGiftPointsNdgr },
