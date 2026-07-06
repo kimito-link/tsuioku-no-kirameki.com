@@ -1546,6 +1546,18 @@
       ]
     },
     {
+      "file": "src/lib/diagFlushThrottle.js",
+      "featureCount": 2,
+      "features": [
+        "content",
+        "popup"
+      ],
+      "labels": [
+        "記録エンジン(watchページ常駐)",
+        "ポップアップ(応援レーン)"
+      ]
+    },
+    {
       "file": "src/lib/eventScoreRankingRelay.js",
       "featureCount": 2,
       "features": [

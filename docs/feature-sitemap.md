@@ -556,7 +556,7 @@
 - **影響範囲ゲート(規律を自動化)** — 星野ロミ式「規律を自動ゲートに」。diff から影響大(複数機能波及)の変更ファイルを検出し波及先機能を列挙。警告のみ(摩擦ゼロ)・--strict で exit1。AGENTS.md §10 のルールを diff 発火に
   - `scripts/impact-check.mjs`
   - `docs/feature-map/impact-map.json`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 56</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 57</summary>
 
 - `api/status.js` — status 受け口 Vercel Serverless Function。
 - `extension/status-guard.js` — 状態速報ページ(status.html)の「何があっても開く」保険。
@@ -581,6 +581,7 @@
 - `src/lib/commentPostDiagKey.js` — コメント送信(requestPostCommentToOpenTab)の「所要ms/結果/リトライ回数」観測値を
 - `src/lib/commentPostStatusPresentation.js` — コメント送信 UI の「最終ステータス表示」と aria-describedby を決める純関数群。
 - `src/lib/customSoundDiag.js` — 「マイ効果音」(customSoundStore.js・Phase A)の取込状況を状態速報 extras(12秒間引き)に
+- `src/lib/diagFlushThrottle.js` — 2026-07-06: 即時プッシュ計器(instantPushDiag)が「コメント送信バッチ毎に
 - `src/lib/diagnosisRegistry.js` — 状態速報「網羅的完全性診断」の【真実の源泉(Source of Truth)】。
 - `src/lib/diagnosticErrorRing.js` — chrome.storage.local に保存する診断エラーリング（純粋・マージのみ）。
 - `src/lib/diagnosticRedact.js` — AI共有・診断バンドル向けの URL / 文字列のサニタイズ（純粋関数）。
@@ -805,7 +806,7 @@
 
 ## 🧬 修正系譜マップ(この系統のバグを過去にどう直したか)
 
-> changelog 全 430 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
+> changelog 全 431 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
 
 ### 💾 記録件数 (64版)
 - `v0.1.1084` 2026-07-06 — perf(status): マイ効果音計器のBlob全件走査を廃止
@@ -1672,7 +1673,8 @@
 - `v0.1.806` 2026-06-17 — HTML保存の失敗を根治+完了音声を追加
 - `v0.1.785` 2026-06-16 — 状態ページのタイムアウト警告を拡張エラー欄に出さない
 
-### ⚡ 描画・性能 (106版)
+### ⚡ 描画・性能 (107版)
+- `v0.1.1096` 2026-07-06 — perf(diag): 即時プッシュ計器の書込を10秒集約
 - `v0.1.1092` 2026-07-06 — feat(lane): コメント即時プッシュで重負荷でも表示即時
 - `v0.1.1088` 2026-07-06 — feat(diag): 読み上げ/ギフトの体感遅延を実測計器化
 - `v0.1.1087` 2026-07-06 — perf(status): 変化なしpublishのset省略

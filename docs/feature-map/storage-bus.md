@@ -90,7 +90,6 @@
 | `KEY_BGM_VOLUME_REACH` | extension/status-entry.js | extension/popup-entry.js<br>extension/status-entry.js<br>extension/venueBar.js |
 | `KEY_CALM_PANEL_MOTION` | — | extension/popup-entry.js |
 | `KEY_CDB_OFFSCREEN_ENABLED` | — | extension/content-entry.js |
-| `KEY_CHANNEL_SWITCH_DIAG` | extension/content-entry.js<br>extension/popup-entry.js | extension/content-entry.js<br>extension/popup-entry.js |
 | `KEY_CHEER_RECENT_V1` | extension/popup-entry.js | extension/popup-entry.js |
 | `KEY_COMMENTER_FOLLOWING_LIST_CACHE` | — | extension/content-entry.js |
 | `KEY_COMMENTER_FOLLOW_CACHE` | extension/popup/report/htmlReportDocument.js<br>extension/popup-entry.js | extension/content-entry.js<br>extension/popup-entry.js |
@@ -116,7 +115,6 @@
 | `KEY_INLINE_PANEL_VIEWPORT_WIDE_ONCE_DONE` | extension/content-entry.js | extension/content-entry.js<br>extension/popup-entry.js |
 | `KEY_INLINE_PANEL_VIEWPORT_WIDE_POLICY` | — | extension/content-entry.js<br>extension/popup-entry.js |
 | `KEY_INLINE_PANEL_WIDTH_MODE` | — | extension/content-entry.js<br>extension/popup-entry.js |
-| `KEY_INSTANT_PUSH_DIAG` | extension/content-entry.js<br>extension/popup-entry.js | extension/content-entry.js<br>extension/popup-entry.js |
 | `KEY_LANE_DIAG` | extension/popup-entry.js | extension/status-entry.js |
 | `KEY_LANE_MIRROR` | — | extension/popup-entry.js<br>extension/status-entry.js |
 | `KEY_LAST_WATCH_URL` | — | extension/comeview-entry.js<br>extension/popup-entry.js<br>extension/status-entry.js |

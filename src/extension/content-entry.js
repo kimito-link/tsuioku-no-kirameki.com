@@ -506,6 +506,7 @@ import { KEY_INSTANT_PUSH_DIAG } from '../lib/instantPushDiagKey.js';
 import { buildLiveChannelSwitchPayload } from '../lib/liveChannelSwitch.js';
 import { applyChannelSwitchDiagDelta } from '../lib/channelSwitchDiag.js';
 import { KEY_CHANNEL_SWITCH_DIAG } from '../lib/channelSwitchDiagKey.js';
+import { createThrottledDiagFlusher } from '../lib/diagFlushThrottle.js';
 import {
   buildSilentErrorPayload,
   isContextInvalidatedError as isCtxInvalidated,
@@ -3721,41 +3722,68 @@ function ensureInlinePopupHost() {
 }
 
 /**
- * v0.1.1092: コメント即時プッシュレーン計器(送信側)。read-merge-write で他フィールド
- * (受信側=popup-entry.js が書く)を潰さない・カウンタは加算(applyInstantPushDiagDelta)。
+ * v0.1.1096: 即時プッシュ計器/配信切替計器(送信側)を chrome.storage.local へ
+ * read-merge-write する共通フラッシャ。
+ *
+ * 背景: v0.1.1092 の noteInstantPushDiag はコメント送信バッチ「毎回」get+set していた。
+ * 実配信で 1,648回/セッション・滝の間は秒間数回に達し、表示のstorage迂回(即時プッシュ)
+ * そのものの意義を計器自身が損なう新たな書き込み輻輳源になっていた(診断ページが
+ * 「重くて開かない」一因)。createThrottledDiagFlusher によりメモリ上に差分を貯め、
+ * flushMs(既定10秒)に1回だけ read-merge-write する(変化が無ければ set も呼ばない)。
+ * pagehide/visibilitychange(非表示化)では即座に flush して取りこぼしを防ぐ。
+ *
+ * 計器の意味(累計値)は不変。flush 遅延で表示が最大 flushMs だけ古くなるだけ。
+ */
+const instantPushDiagFlusher = createThrottledDiagFlusher(
+  applyInstantPushDiagDelta,
+  KEY_INSTANT_PUSH_DIAG,
+  {
+    readStorage: (key) => chrome.storage.local.get(key),
+    writeStorage: (items) => chrome.storage.local.set(items),
+    isContextAlive: hasExtensionContext
+  }
+);
+
+const channelSwitchDiagFlusher = createThrottledDiagFlusher(
+  applyChannelSwitchDiagDelta,
+  KEY_CHANNEL_SWITCH_DIAG,
+  {
+    readStorage: (key) => chrome.storage.local.get(key),
+    writeStorage: (items) => chrome.storage.local.set(items),
+    isContextAlive: hasExtensionContext
+  }
+);
+
+/** 離脱/非表示イベントで、上記2計器の未flush差分をベストエフォートで即座に吐き出す。 */
+function flushDiagFlushersNow() {
+  if (!hasExtensionContext()) return;
+  void instantPushDiagFlusher.flush({ force: true }).catch(() => { /* no-op */ });
+  void channelSwitchDiagFlusher.flush({ force: true }).catch(() => { /* no-op */ });
+}
+
+window.addEventListener('pagehide', flushDiagFlushersNow);
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) flushDiagFlushersNow();
+});
+
+/**
+ * v0.1.1092: コメント即時プッシュレーン計器(送信側)。メモリ上に加算だけ行い、
+ * flushMs(既定10秒)に1回まとめて read-merge-write する(v0.1.1096・輻輳対策)。
  * fire-and-forget・失敗は黙過(診断専用・記録には影響させない)。
  * @param {{ sentCount?: number, sentRows?: number, lastEventAt?: number }} delta
  */
 function noteInstantPushDiag(delta) {
-  if (!hasExtensionContext()) return;
-  try {
-    chrome.storage.local.get(KEY_INSTANT_PUSH_DIAG).then((bag) => {
-      const prev = bag?.[KEY_INSTANT_PUSH_DIAG];
-      const next = applyInstantPushDiagDelta(prev, delta);
-      setStorageLocalSilent({ [KEY_INSTANT_PUSH_DIAG]: next }, { warn: false });
-    }).catch(() => { /* no-op: 診断専用・記録には影響させない */ });
-  } catch {
-    /* no-op */
-  }
+  instantPushDiagFlusher.note(delta);
 }
 
 /**
  * 2026-07-06: 配信切替(SPA遷移で iframe を作り直さない in-place 切替)計器(送信側)。
- * read-merge-write で他フィールド(受信側=popup-entry.js が書く)を潰さない・カウンタは加算
- * (applyChannelSwitchDiagDelta)。fire-and-forget・失敗は黙過(診断専用・記録には影響させない)。
+ * メモリ上に加算だけ行い、flushMs(既定10秒)に1回まとめて read-merge-write する
+ * (v0.1.1096・輻輳対策)。fire-and-forget・失敗は黙過(診断専用・記録には影響させない)。
  * @param {{ sentCount?: number, lastEventAt?: number }} delta
  */
 function noteChannelSwitchDiag(delta) {
-  if (!hasExtensionContext()) return;
-  try {
-    chrome.storage.local.get(KEY_CHANNEL_SWITCH_DIAG).then((bag) => {
-      const prev = bag?.[KEY_CHANNEL_SWITCH_DIAG];
-      const next = applyChannelSwitchDiagDelta(prev, delta);
-      setStorageLocalSilent({ [KEY_CHANNEL_SWITCH_DIAG]: next }, { warn: false });
-    }).catch(() => { /* no-op: 診断専用・記録には影響させない */ });
-  } catch {
-    /* no-op */
-  }
+  channelSwitchDiagFlusher.note(delta);
 }
 
 /**
