@@ -66,7 +66,9 @@ import {
   KEY_BGM_ENABLED,
   KEY_BGM_VOLUME_REACH,
   KEY_BGM_VOLUME_FEVER,
-  isBgmEnabled
+  isBgmEnabled,
+  // v0.1.1090: 個別ギフトイベント欠落配信のデルタ補完検知(giftDeltaFallback.js)向け。
+  officialGiftPointsAggregateStorageKey
 } from '../lib/storageKeys.js';
 import {
   EFFECT_SOUND_KINDS,
@@ -231,6 +233,14 @@ import {
   resolveGiftThrowPath,
   canLaunchGiftThrow
 } from '../lib/giftThrowProjectile.js';
+// v0.1.1090: 個別ギフトイベント欠落配信のフォールバック検知(集計ptデルタ)。
+//   合計ギフトpt(NDGR statistics)だけは取れるのに個別イベントが一切来ない配信(既知の仕様ムラ)
+//   向けに、帳簿方式で「まだ説明されていないpt」を1件のイベントとして合成する純関数。
+import {
+  computeGiftDelta,
+  accountRealGiftEvent,
+  makeInitialGiftDeltaState
+} from '../lib/giftDeltaFallback.js';
 import {
   isVoicevoxAlive,
   listVoicevoxStyleIds,
@@ -2222,6 +2232,9 @@ export function mountVenueBarButton(options = {}) {
   //   ようにする計器(検知→演出→音の3段階カウンタ・観測のみ・描画/演出は変えない)。
   const _giftEffectDiagCounters = makeInitialGiftEffectDiag();
   let _giftEffectDiagLastWriteAt = 0;
+  // v0.1.1090: 個別ギフトイベント欠落配信のデルタ補完検知(帳簿state・配信=liveId単位で
+  //   computeGiftDelta が内部でリセットする。ここでは1個の可変stateを持ち回すだけ)。
+  let _giftDeltaState = makeInitialGiftDeltaState('');
   const publishGiftEffectDiag = () => {
     const now = Date.now();
     if (now - _giftEffectDiagLastWriteAt < 3000) return; // 3秒 min-gap(他の診断と同型)。
@@ -3222,6 +3235,14 @@ export function mountVenueBarButton(options = {}) {
       const _detectAt = Date.now(); // v0.1.1088計器: 検知→音/着弾ギャップの起点。
       _giftEffectDiagCounters.giftDetected += 1;
       _giftEffectDiagCounters.lastEventAt = _detectAt;
+      // v0.1.1090: 本物の個別イベントを検知した=帳簿に「説明済み」として計上する
+      //   (このptぶんはデルタ合成が二重に投げないようにする)。
+      // 既知の限度: 同じギフトがコメント本文パースとNDGR構造化eventの両方から観測される配信では
+      //   (handleNewGiftEvents側は既存のthrownGiftEventKeysで重複投擲を防いでいるが、この経路には
+      //   同型のdedupが無い=既存の設計・v0.1.778コメント参照)accountedPointsが実際より過大になり
+      //   得る。帳簿は単調加算のため自己修復しないが、安全側(デルタ合成を過小評価するだけで
+      //   誤検知・二重発火は起きない)に倒れる。dedup自体は本パッチのスコープ外。
+      _giftDeltaState = accountRealGiftEvent(_giftDeltaState, Number(gift?.point) || 0, _detectAt);
       const p = resolveGiftProjectile(gift, 'gift');
       if (p) {
         // v0.1.1057: launchGiftThrow の戻り値(実際に投げたか)を見てからカウントする。
@@ -3285,6 +3306,8 @@ export function mountVenueBarButton(options = {}) {
       const _detectAt = Date.now(); // v0.1.1088計器: 検知→音/着弾ギャップの起点。
       _giftEffectDiagCounters.giftDetected += 1;
       _giftEffectDiagCounters.lastEventAt = _detectAt;
+      // v0.1.1090: 本物の個別イベントを検知した=帳簿に「説明済み」として計上する。
+      _giftDeltaState = accountRealGiftEvent(_giftDeltaState, point, _detectAt);
       const proj = resolveGiftProjectile({ item, point, itemId }, 'gift');
       // 起点: 席キーは venueSpeakerKey/venueParticipantKey と同じ `u:${uid}` 形にする
       //   (raw uid だと seatByKey に当たらず常に crowdBubbleAnchor へ落ちる)。
@@ -3292,6 +3315,47 @@ export function mountVenueBarButton(options = {}) {
         launchGiftThrow(uid ? `u:${uid}` : '', proj, _detectAt);
         _giftEffectDiagCounters.giftThrown += 1;
         // v0.1.1061: 即時再生をやめ、着弾タイミングに1本だけ予約(バーストは置換昇格)。
+        if (scheduleGiftSound(proj.tier, proj.durationMs, _detectAt) === 'coalesced') {
+          _giftEffectDiagCounters.giftSoundCoalesced += 1;
+        }
+      }
+      publishGiftEffectDiag();
+    }
+  };
+
+  /**
+   * v0.1.1090: 「ギフト個別イベント欠落配信」のフォールバック検知。
+   *   個別ギフトイベント(コメント本文/NDGR構造化event)が一切来ない配信でも、NDGR statistics
+   *   由来の合計ギフトpt(officialGiftPointsAggregateStorageKey・content-entry.js が書く)だけは
+   *   取れることがある(既知のニコ生仕様ムラ)。computeGiftDelta(帳簿方式・決定論)で
+   *   「まだ説明されていないpt」を検知し、あれば1件を匿名ギフトとして通常の投擲+効果音経路に
+   *   流す(handleNewGiftEvents と同じ launchGiftThrow/scheduleGiftSound を使う=演出/音の
+   *   経路は増やさない)。送り主が特定できないため speakerKey は空(crowdBubbleAnchorへ
+   *   フォールバック=既存の匿名ギフトと同じ扱い)。
+   * @param {number} aggregatePoints
+   */
+  const handleGiftPointsAggregate = (aggregatePoints) => {
+    if (!open) return;
+    const currentLiveId = liveIdFromPathname();
+    if (!currentLiveId) return;
+    const { events, nextState } = computeGiftDelta(_giftDeltaState, aggregatePoints, Date.now(), {
+      liveId: currentLiveId
+    });
+    _giftDeltaState = nextState;
+    if (events.length === 0) return;
+    for (const ev of events) {
+      const _detectAt = Date.now();
+      _giftEffectDiagCounters.giftDetected += 1;
+      _giftEffectDiagCounters.lastEventAt = _detectAt;
+      _giftEffectDiagCounters.deltaSynthesized += 1;
+      _giftEffectDiagCounters.deltaPoints += ev.points;
+      // 汎用ラベル(既存の itemName 欠落フォールバックと同じ思想=「反応した」ことを優先)。
+      //   匿名ギフト扱いなので送り主名は出さず、pt だけ明記する。🎁絵文字が種別を示すため
+      //   「ギフト」接頭辞は付けない(clampLabelの14文字上限で大きいptが崩れて見えるのを避ける)。
+      const proj = resolveGiftProjectile({ item: `+${ev.points.toLocaleString('ja-JP')}pt`, point: ev.points }, 'gift');
+      if (proj) {
+        launchGiftThrow('', proj, _detectAt);
+        _giftEffectDiagCounters.giftThrown += 1;
         if (scheduleGiftSound(proj.tier, proj.durationMs, _detectAt) === 'coalesced') {
           _giftEffectDiagCounters.giftSoundCoalesced += 1;
         }
@@ -4195,9 +4259,12 @@ export function mountVenueBarButton(options = {}) {
     const generation = speechGeneration;
     const tailKey = tailStorageKey(liveId);
     const summaryKey = commentDbSummaryKey(liveId);
+    // v0.1.1090: onChanged だけに頼らず、既存の定期ポーリングに相乗りして「会場を開いた時点で
+    //   既に貯まっている集計ギフトpt」も拾う(保険・tail/summaryと同じ方針)。
+    const giftPointsAggregateKey = officialGiftPointsAggregateStorageKey(liveId);
     speechInFlight = true;
     try {
-      const bag = await chrome.storage.local.get([tailKey, summaryKey]);
+      const bag = await chrome.storage.local.get([tailKey, summaryKey, giftPointsAggregateKey]);
       if (
         !open ||
         generation !== speechGeneration ||
@@ -4211,6 +4278,8 @@ export function mountVenueBarButton(options = {}) {
       const recentRows = Array.isArray(summary?.recent) ? summary.recent : [];
       const rows = tailRows.length > 0 ? tailRows : recentRows;
       processSpeechRows(rows);
+      const aggregatePoints = bag?.[giftPointsAggregateKey];
+      if (typeof aggregatePoints === 'number') handleGiftPointsAggregate(aggregatePoints);
     } catch (err) {
       // v0.1.753: context invalidated(拡張更新後の古いタブ)は恒久失敗→停止+案内。
       if (isContextInvalidatedError(err) || !hasVenueExtensionContext()) {
@@ -4245,6 +4314,13 @@ export function mountVenueBarButton(options = {}) {
     const giftEventsKey = `nls_gift_events_${liveId}`;
     if (changes[giftEventsKey] && Array.isArray(changes[giftEventsKey].newValue)) {
       handleNewGiftEvents(/** @type {Array<Record<string, any>>} */ (changes[giftEventsKey].newValue));
+    }
+    // v0.1.1090: 個別ギフトイベント欠落配信のフォールバック検知。content-entry.js が
+    //   NDGR statistics 由来の合計ギフトptをこのキーへ書く(officialGiftPointsAggregateStorageKey)。
+    //   個別イベントが一切来ない配信でも、集計だけは取れることがある(既知の仕様ムラ)。
+    const giftPointsAggregateKey = officialGiftPointsAggregateStorageKey(liveId);
+    if (changes[giftPointsAggregateKey] && typeof changes[giftPointsAggregateKey].newValue === 'number') {
+      handleGiftPointsAggregate(/** @type {number} */ (changes[giftPointsAggregateKey].newValue));
     }
     // v0.1.741 安定化: 参加者データはコメントチャンク(nls_cchunk_<lv>_*)に入る。
     //   以前は summaryKey 変化時しか再集計せず、チャンクだけ更新された時に会場が古いまま/空に

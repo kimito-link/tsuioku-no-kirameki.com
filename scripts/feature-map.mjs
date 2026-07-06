@@ -107,6 +107,12 @@ const STORAGE_DISCONNECT_BASELINE = new Set([
   // producer を取りこぼす偽陽性(実書込は content-entry.js・popup/live-view が読む。2026-06-21 確認)。
   'fn:giftHistoryThrowsStorageKey',
   'fn:watchSnapshotStorageKey', 'nls_backfill_progress_v1', 'nls_mcp_live_latest_v1',
+  // v0.1.1090: ギフト個別イベント欠落配信のデルタ補完検知(giftDeltaFallback.js)向け。
+  //   producer=content-entry.js(setStorageLocalSilentの引数内でofficialGiftPointsAggregateStorageKey(liveId)
+  //   を直接呼ぶ=検出対象)。consumer=venueBar.js は先に変数へ束ねてから chrome.storage.local.get([...])/
+  //   changes[key] で参照するため、fn:tailStorageKey/fn:commentDbSummaryKeyと同型の静的解析の
+  //   取りこぼし(呼び出しがget/set呼び出しの引数領域の外)。経路自体は実在。
+  'fn:officialGiftPointsAggregateStorageKey',
   // popup が optional-chaining + computed key で set するため producer を静的解析が取りこぼす偽陽性
   // (実書込は popup-entry.js:collectAiShareDevMonitorPayloadBundle・status-entry.js が読む。2026-06-18 確認)
   'KEY_AI_SHARE_POPUP_DIAG',

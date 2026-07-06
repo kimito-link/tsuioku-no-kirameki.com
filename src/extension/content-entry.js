@@ -54,6 +54,7 @@ import {
   KEY_CONCURRENT_CALIBRATION_RING_V1,
   commentsStorageKey,
   giftUsersStorageKey,
+  officialGiftPointsAggregateStorageKey,
   backfillResumeStorageKey,
   eventDomStorageKey,
   giftSubAppHistoryStorageKey,
@@ -2160,6 +2161,16 @@ function applyInterceptNdgrStatisticsFields(payload) {
   if (typeof gp === 'number' && Number.isFinite(gp) && gp >= 0) {
     officialGiftPointsNdgr = Math.floor(gp);
     touched = true;
+    // v0.1.1090: 個別ギフトイベント欠落配信のデルタ補完検知(giftDeltaFallback.js)向けに、
+    //   会場(venueBar.js・別ウィンドウ)が chrome.storage.onChanged で購読できるよう軽量に
+    //   書き出す。個別イベントが一切来ない配信でも、この集計値だけは取れることがある
+    //   (既知のニコ生仕様ムラ)。書き込みは fire-and-forget(記録を止めない)。
+    if (liveId) {
+      setStorageLocalSilent(
+        { [officialGiftPointsAggregateStorageKey(liveId)]: officialGiftPointsNdgr },
+        { warn: false }
+      );
+    }
   }
   const eg = payload?.eventGiftScore;
   if (typeof eg === 'number' && Number.isFinite(eg) && eg >= 0) {

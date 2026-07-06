@@ -23,7 +23,9 @@
  *   lastSoundGapMs: number,    // v0.1.1088: 直近1件の「検知→音」体感遅延ms(-1=未計測)
  *   lastBurstGapMs: number,    // v0.1.1088: 直近1件の「検知→着弾演出」体感遅延ms(-1=未計測)
  *   avgSoundGapMs: number,     // v0.1.1088: 検知→音のEMA平均ms(-1=未計測)
- *   avgBurstGapMs: number      // v0.1.1088: 検知→着弾のEMA平均ms(-1=未計測)
+ *   avgBurstGapMs: number,     // v0.1.1088: 検知→着弾のEMA平均ms(-1=未計測)
+ *   deltaSynthesized: number,  // v0.1.1090: giftDeltaFallback.js の帳簿デルタで合成した件数(個別イベント欠落配信のフォールバック)
+ *   deltaPoints: number        // v0.1.1090: デルタ合成で計上した累計pt(嘘をつかない=本物と区別して表示するための内訳)
  * }} GiftEffectDiagState
  */
 
@@ -45,7 +47,9 @@ export function makeInitialGiftEffectDiag() {
     lastSoundGapMs: -1,
     lastBurstGapMs: -1,
     avgSoundGapMs: -1,
-    avgBurstGapMs: -1
+    avgBurstGapMs: -1,
+    deltaSynthesized: 0,
+    deltaPoints: 0
   };
 }
 
@@ -116,6 +120,8 @@ export function buildGiftEffectDiagSnapshot(diag, nowMs) {
     lastBurstGapMs: num(d.lastBurstGapMs, base.lastBurstGapMs),
     avgSoundGapMs: num(d.avgSoundGapMs, base.avgSoundGapMs),
     avgBurstGapMs: num(d.avgBurstGapMs, base.avgBurstGapMs),
+    deltaSynthesized: num(d.deltaSynthesized, base.deltaSynthesized),
+    deltaPoints: num(d.deltaPoints, base.deltaPoints),
     capturedAt: now
   };
 }
@@ -149,7 +155,8 @@ export function buildGiftEffectDiagLines(snap, nowMs) {
   if (!snap || typeof snap !== 'object') return [];
   const giftDetected = Number(snap.giftDetected) || 0;
   const adDetected = Number(snap.adDetected) || 0;
-  if (giftDetected === 0 && adDetected === 0) return []; // 未観測=このセッションでギフト/広告が無かった
+  const deltaSynthesized = Number(snap.deltaSynthesized) || 0;
+  if (giftDetected === 0 && adDetected === 0 && deltaSynthesized === 0) return []; // 未観測=このセッションでギフト/広告が無かった
   const soundEnabled = snap.soundEnabled !== false;
   const lines = [];
   const now = Number.isFinite(Number(nowMs)) ? Number(nowMs) : 0;
@@ -157,7 +164,7 @@ export function buildGiftEffectDiagLines(snap, nowMs) {
   const agoText = lastAt > 0 && now > 0 ? ` / 最終${Math.max(0, Math.round((now - lastAt) / 1000))}秒前` : '';
   lines.push(`ギフト/広告演出・効果音: 効果音設定=${soundEnabled ? 'ON' : 'OFF'}${agoText}`);
 
-  if (giftDetected > 0) {
+  if (giftDetected > 0 || deltaSynthesized > 0) {
     const giftThrown = Number(snap.giftThrown) || 0;
     const giftSoundPlayed = Number(snap.giftSoundPlayed) || 0;
     const giftSoundCoalesced = Number(snap.giftSoundCoalesced) || 0;
@@ -178,7 +185,11 @@ export function buildGiftEffectDiagLines(snap, nowMs) {
     if (giftSoundNoPath > 0) explainedParts.push(`未割当${giftSoundNoPath}`);
     if (giftSoundError > 0) explainedParts.push(`エラー${giftSoundError}`);
     const explainedText = explainedParts.length > 0 ? ` / ${explainedParts.join(' ')}` : '';
-    lines.push(`  → ギフト: 検知${giftDetected} → 演出${giftThrown} ${throwMark} → 音${giftSoundPlayed}${coalescedText} ${soundMark}${explainedText}`);
+    // v0.1.1090: 個別イベント欠落配信のデルタ補完検知(giftDeltaFallback.js)。本物と合成を
+    //   区別して表示する(嘘をつかない=合成であることを隠さない)。
+    const deltaPoints = Number(snap.deltaPoints) || 0;
+    const deltaText = deltaSynthesized > 0 ? `(うちデルタ補完${deltaSynthesized}件・${deltaPoints.toLocaleString('ja-JP')}pt)` : '';
+    lines.push(`  → ギフト: 検知${giftDetected} → 演出${giftThrown} ${throwMark} → 音${giftSoundPlayed}${coalescedText} ${soundMark}${explainedText}${deltaText}`);
     // v0.1.1088計器: 「検知→音/着弾」の体感ギャップ(実測)。未計測(-1)なら出さない(ノイズにしない)。
     const lastSoundGap = Number(snap.lastSoundGapMs);
     const lastBurstGap = Number(snap.lastBurstGapMs);

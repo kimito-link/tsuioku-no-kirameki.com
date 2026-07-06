@@ -21,6 +21,7 @@
 - 🟠 **fn:comeviewPinStorageKey** — 書く人だけ（読む経路が無い疑い）: src/extension/comeview-entry.js
 - 🟠 **fn:eventDomStorageKey** — 書く人だけ（読む経路が無い疑い）: src/extension/content-entry.js
 - 🟠 **fn:giftSubAppHistoryStorageKey** — 書く人だけ（読む経路が無い疑い）: src/extension/content-entry.js
+- 🟠 **fn:officialGiftPointsAggregateStorageKey** — 書く人だけ（読む経路が無い疑い）: src/extension/content-entry.js
 - 🟠 **fn:perfDiagStorageKey** — 書く人だけ（読む経路が無い疑い）: src/extension/popup-entry.js
 - 🔵 **KEY_AI_SHARE_POPUP_DIAG** — 読む人だけ（書く経路が無い疑い）: src/extension/status-entry.js
 - 🔵 **KEY_ANONYMOUS_IDENTICON_ENABLED** — 読む人だけ（書く経路が無い疑い）: src/extension/popup-entry.js
@@ -159,6 +160,7 @@
 | `fn:commentDbSummaryKey` | — | extension/popup-entry.js |
 | `fn:eventDomStorageKey` | extension/content-entry.js | — |
 | `fn:giftSubAppHistoryStorageKey` | extension/content-entry.js | — |
+| `fn:officialGiftPointsAggregateStorageKey` | extension/content-entry.js | — |
 | `fn:perfDiagStorageKey` | extension/popup-entry.js | — |
 | `fn:summaryStorageKey` | — | extension/popup-entry.js |
 | `fn:tailStorageKey` | extension/content-entry.js | extension/popup-entry.js |

@@ -657,6 +657,19 @@ export function giftUsersStorageKey(liveId) {
 }
 
 /**
+ * v0.1.1090: NDGR statistics 由来の「番組累計ギフトpt」(ndgrDecode.js#decodeStatistics の
+ *   giftPoints・content-entry.js の officialGiftPointsNdgr)を、他ウィンドウ(venueBar.js の
+ *   会場/standalone)が chrome.storage.onChanged で購読できるよう軽量に書き出すキー。
+ *   個別ギフトイベントが一切来ない配信でも集計だけは取れることがある(既知のニコ生仕様ムラ)ため、
+ *   giftDeltaFallback.js の帳簿(computeGiftDelta)がこの値を入力にする。
+ * @param {string} liveId lv123
+ */
+export function officialGiftPointsAggregateStorageKey(liveId) {
+  const id = String(liveId || '').trim().toLowerCase();
+  return `nls_official_gift_points_${id}`;
+}
+
+/**
  * v0.1.456 レジューム: 配信ごとの「過去ログ巡回で前回到達した最古コメント vpos」を保存する
  * キー。「もう一度ためす」押下や自動リトライ時にこれを読んで crawlNdgrBackward の
  * resumeFromVpos に渡し、前回の続きから掘り始める（同じ区画の取り直し＝dedupe 弾きで
