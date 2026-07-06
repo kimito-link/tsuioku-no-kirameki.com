@@ -26,6 +26,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1096',
+    date: '2026-07-06',
+    summary: 'perf(diag): 即時プッシュ計器の書込を10秒集約',
+    items: Object.freeze([
+      'コメントが多い配信で、送受信の速報用の内部カウンタが毎回ブラウザの保存領域に書き込みに行っていたため、それ自体が重さの一因になっていました。カウンタはメモリ上でまとめ、10秒に一度だけ保存するように直しました。',
+      '表示される数字や意味合いは変わりません(最大10秒だけ反映が遅れることがあります)。タブを閉じる・非表示にするタイミングでは即座に保存します。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1095',
     date: '2026-07-06',
     summary: 'fix(gift): デルタ補完ギフトにも効果音を配線',

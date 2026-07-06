@@ -35,6 +35,7 @@ import {
 } from '../lib/liveChannelSwitch.js';
 import { applyChannelSwitchDiagDelta, computeChannelSwitchPaintGapAverage } from '../lib/channelSwitchDiag.js';
 import { KEY_CHANNEL_SWITCH_DIAG } from '../lib/channelSwitchDiagKey.js';
+import { createThrottledDiagFlusher } from '../lib/diagFlushThrottle.js';
 // リリース工程ガード「版混在の実行時検知」(2026-07-06): NL_BUNDLE_VERSION(このバンドルの
 //   ビルド時 package.json version)と chrome.runtime.getManifest().version(実行時本体 version)を
 //   突合し、ズレていれば画面上部にバナーを出す。詳細は src/lib/versionMismatch.js の背景コメント参照。
@@ -5521,21 +5522,67 @@ const _instantPushExpectedNonce = (() => {
 })();
 
 /**
- * v0.1.1092: コメント即時プッシュレーン計器(受信側)。content-entry.js が書く sentCount/sentRows と
- * read-merge-write で共存する(1キーを2プロセスが書く点は voiceEffectDiag と同型・診断専用なので
- * 競合は許容)。fire-and-forget・失敗は黙過(表示には一切影響させない)。
+ * v0.1.1096: 即時プッシュ計器/配信切替計器(受信側)を chrome.storage.local へ
+ * read-merge-write する共通フラッシャ。content-entry.js 側(送信側)と同じ設計。
+ *
+ * 背景: v0.1.1092 の noteInstantPushDiagReceived は受信バッチ「毎回」get+set していた
+ * (送信側と合わせて実配信で 1,648回/セッション規模の書き込み輻輳源になっていた)。
+ * createThrottledDiagFlusher によりメモリ上に差分を貯め、flushMs(既定10秒)に1回だけ
+ * read-merge-write する(変化が無ければ set も呼ばない)。pagehide/visibilitychange
+ * (非表示化)では即座に flush して取りこぼしを防ぐ。計器の意味(累計値)は不変。
+ */
+const instantPushDiagFlusherReceived = createThrottledDiagFlusher(
+  applyInstantPushDiagDelta,
+  KEY_INSTANT_PUSH_DIAG,
+  {
+    readStorage: (key) => safeStorageLocalGet(key),
+    writeStorage: (items) => safeStorageLocalSet(items),
+    isContextAlive: hasExtensionContext
+  }
+);
+
+const channelSwitchDiagFlusherReceived = createThrottledDiagFlusher(
+  applyChannelSwitchDiagDelta,
+  KEY_CHANNEL_SWITCH_DIAG,
+  {
+    readStorage: (key) => safeStorageLocalGet(key),
+    writeStorage: (items) => safeStorageLocalSet(items),
+    isContextAlive: hasExtensionContext
+  }
+);
+
+/** 離脱/非表示イベントで、上記2計器の未flush差分をベストエフォートで即座に吐き出す。 */
+function flushReceivedDiagFlushersNow() {
+  if (!hasExtensionContext()) return;
+  void instantPushDiagFlusherReceived.flush({ force: true }).catch(() => { /* no-op */ });
+  void channelSwitchDiagFlusherReceived.flush({ force: true }).catch(() => { /* no-op */ });
+}
+
+window.addEventListener('pagehide', flushReceivedDiagFlushersNow);
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) flushReceivedDiagFlushersNow();
+});
+
+/**
+ * v0.1.1092: コメント即時プッシュレーン計器(受信側)。メモリ上に加算だけ行い、
+ * flushMs(既定10秒)に1回まとめて read-merge-write する(v0.1.1096・輻輳対策)。
+ * fire-and-forget・失敗は黙過(表示には一切影響させない)。
  * @param {{ receivedCount?: number, receivedRows?: number, rejectedCount?: number, paintedRows?: number,
  *   lastGapMs?: number, avgGapMs?: number, lastEventAt?: number }} delta
  */
 function noteInstantPushDiagReceived(delta) {
-  void safeStorageLocalGet(KEY_INSTANT_PUSH_DIAG)
-    .then((bag) => {
-      const prev = bag?.[KEY_INSTANT_PUSH_DIAG];
-      const next = applyInstantPushDiagDelta(prev, delta);
-      return safeStorageLocalSet({ [KEY_INSTANT_PUSH_DIAG]: next });
-    })
-    .catch(() => { /* no-op: 診断専用・表示には影響させない */ });
+  instantPushDiagFlusherReceived.note(delta);
 }
+
+/**
+ * v0.1.1096: 表示遅延(gapMs)の EMA 平均をメモリ上だけで追跡するローカル状態。
+ * 従来は毎回 storage から prev.avgGapMs を読んで computeInstantPushGapAverage に渡していたが、
+ * 受信側が read-modify-write を毎回行う輻輳源そのものだったため撤去した。平均自体は
+ * 「このページのこのセッション」で追えれば診断としては十分(セッション跨ぎの継続は
+ * 求めない・記録/演出/音には一切影響しない計器値)。
+ * @type {number} -1=未計測
+ */
+let _instantPushAvgGapMsLocal = -1;
 
 /**
  * v0.1.1092: 即時プッシュバッファの内容を STORY_SOURCE_STATE へ合流し、レーンだけを軽量に再描画する。
@@ -5588,18 +5635,16 @@ function repaintStoryUserLaneWithInstantPushBuffer() {
     }
   }
   if (paintedNow > 0) {
-    void safeStorageLocalGet(KEY_INSTANT_PUSH_DIAG).then((bag) => {
-      const prev = bag?.[KEY_INSTANT_PUSH_DIAG];
-      const avgGapMs =
-        gapSampleMs >= 0
-          ? computeInstantPushGapAverage(Number(prev?.avgGapMs), gapSampleMs)
-          : Number(prev?.avgGapMs);
-      noteInstantPushDiagReceived({
-        paintedRows: paintedNow,
-        lastEventAt: Date.now(),
-        ...(gapSampleMs >= 0 ? { lastGapMs: gapSampleMs, avgGapMs } : {})
-      });
-    }).catch(() => { /* no-op */ });
+    // v0.1.1096: storage read をやめ、メモリ上の EMA(_instantPushAvgGapMsLocal)だけで
+    // 平均を更新する(輻輳対策・詳細は同変数のコメント参照)。
+    if (gapSampleMs >= 0) {
+      _instantPushAvgGapMsLocal = computeInstantPushGapAverage(_instantPushAvgGapMsLocal, gapSampleMs);
+    }
+    noteInstantPushDiagReceived({
+      paintedRows: paintedNow,
+      lastEventAt: Date.now(),
+      ...(gapSampleMs >= 0 ? { lastGapMs: gapSampleMs, avgGapMs: _instantPushAvgGapMsLocal } : {})
+    });
   }
 }
 
@@ -5647,21 +5692,25 @@ function handleInstantCommentPushMessage(event) {
 }
 
 /**
- * 2026-07-06: 配信切替(SPA遷移)計器(受信側)。read-merge-write で他フィールド
- * (送信側=content-entry.js が書く)を潰さない・カウンタは加算(applyChannelSwitchDiagDelta)。
- * fire-and-forget・失敗は黙過(診断専用・表示には影響させない)。
+ * 2026-07-06: 配信切替(SPA遷移)計器(受信側)。切替イベント自体が低頻度(配信を跨がない限り
+ * 発生しない)なので輻輳源にはならないが、送信側(content-entry.js)と同じ
+ * createThrottledDiagFlusher に揃えて実装を1本化する(v0.1.1096)。メモリ上に加算だけ行い、
+ * flushMs(既定10秒)に1回まとめて read-merge-write する。fire-and-forget・失敗は黙過
+ * (診断専用・表示には影響させない)。
  * @param {{ receivedCount?: number, rejectedCount?: number, lastSwitchToPaintMs?: number,
  *   avgSwitchToPaintMs?: number, lastEventAt?: number }} delta
  */
 function noteChannelSwitchDiagReceived(delta) {
-  void safeStorageLocalGet(KEY_CHANNEL_SWITCH_DIAG)
-    .then((bag) => {
-      const prev = bag?.[KEY_CHANNEL_SWITCH_DIAG];
-      const next = applyChannelSwitchDiagDelta(prev, delta);
-      return safeStorageLocalSet({ [KEY_CHANNEL_SWITCH_DIAG]: next });
-    })
-    .catch(() => { /* no-op: 診断専用・表示には影響させない */ });
+  channelSwitchDiagFlusherReceived.note(delta);
 }
+
+/**
+ * v0.1.1096: 配信切替(SPA遷移)の「切替受信→初描画完了」EMA 平均をメモリ上だけで追跡する。
+ * instantPushDiagFlusherReceived と同じ理由(storage read の輻輳回避・セッション跨ぎの
+ * 継続は求めない診断専用値)。
+ * @type {number} -1=未計測
+ */
+let _channelSwitchAvgSwitchToPaintMsLocal = -1;
 
 /**
  * 2026-07-06: 「別の配信へ移動(SPA遷移)するとパネルが壊れる」修正の受信側本体。
@@ -5703,15 +5752,15 @@ function handleLiveChannelSwitchMessage(event) {
     .catch(() => { /* no-op: 失敗しても次の storage 変化 refresh で追いつく */ })
     .finally(() => {
       const paintMs = Math.max(0, Date.now() - switchStartedAt);
-      void safeStorageLocalGet(KEY_CHANNEL_SWITCH_DIAG).then((bag) => {
-        const prev = bag?.[KEY_CHANNEL_SWITCH_DIAG];
-        const avgMs = computeChannelSwitchPaintGapAverage(Number(prev?.avgSwitchToPaintMs), paintMs);
-        noteChannelSwitchDiagReceived({
-          lastSwitchToPaintMs: paintMs,
-          avgSwitchToPaintMs: avgMs,
-          lastEventAt: Date.now()
-        });
-      }).catch(() => { /* no-op */ });
+      _channelSwitchAvgSwitchToPaintMsLocal = computeChannelSwitchPaintGapAverage(
+        _channelSwitchAvgSwitchToPaintMsLocal,
+        paintMs
+      );
+      noteChannelSwitchDiagReceived({
+        lastSwitchToPaintMs: paintMs,
+        avgSwitchToPaintMs: _channelSwitchAvgSwitchToPaintMsLocal,
+        lastEventAt: Date.now()
+      });
     });
 }
 
