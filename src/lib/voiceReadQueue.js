@@ -103,6 +103,26 @@ export function computeVoiceQueueSpeedBoost(queueLength) {
 }
 
 /**
+ * v0.1.1088計器(voice-tempo-realtime-SYNTHESIS §3 Phase 1): 「コメント到着(enqueuedAt)→
+ *   声が出る(onAudioStart)」までの体感遅延(E2E)を EMA で均す純関数。
+ *   窓バッファを持たない(直前の平均値だけを状態として持ち回す)=メモリ有界・純粋。
+ * @param {unknown} prevAvgMs 直前の平均値(-1=未計測)
+ * @param {unknown} sampleMs 今回の実測値(ms)
+ * @param {number} [alpha] EMA係数(既定0.3=直近を重視しつつ振れを均す)
+ * @returns {number} 更新後の平均値(ms・整数丸め)
+ */
+export function computeVoiceE2eAverage(prevAvgMs, sampleMs, alpha = 0.3) {
+  const sample = Number(sampleMs);
+  if (!Number.isFinite(sample) || sample < 0) {
+    const prev = Number(prevAvgMs);
+    return Number.isFinite(prev) ? prev : -1;
+  }
+  const prev = Number(prevAvgMs);
+  if (!Number.isFinite(prev) || prev < 0) return Math.round(sample);
+  return Math.round(prev + alpha * (sample - prev));
+}
+
+/**
  * 合成パイプラインの「先読み深さ」(再生中に何件先まで先行合成するか)を返す純関数。
  *
  * v0.1.768 リアルタイム最大化(2026-06-16 会議+実コード裏取り): 従来の drain ループは

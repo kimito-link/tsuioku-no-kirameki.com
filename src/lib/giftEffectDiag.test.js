@@ -4,7 +4,8 @@ import {
   buildGiftEffectDiagSnapshot,
   buildGiftEffectDiagLines,
   giftEffectDiagToActionCards,
-  giftSoundDiagFieldForPlayResult
+  giftSoundDiagFieldForPlayResult,
+  computeGiftGapAverage
 } from './giftEffectDiag.js';
 
 describe('makeInitialGiftEffectDiag', () => {
@@ -152,6 +153,78 @@ describe('修正3: giftSoundDiagFieldForPlayResult', () => {
     expect(giftSoundDiagFieldForPlayResult('played')).toBeNull();
     expect(giftSoundDiagFieldForPlayResult('unknown')).toBeNull();
     expect(giftSoundDiagFieldForPlayResult(undefined)).toBeNull();
+  });
+});
+
+describe('v0.1.1088計器: computeGiftGapAverage(検知→音/着弾ギャップのEMA)', () => {
+  it('未計測(-1)から最初のサンプルはそのまま値になる', () => {
+    expect(computeGiftGapAverage(-1, 100)).toBe(100);
+  });
+
+  it('EMA係数0.3で直前平均へ寄せる', () => {
+    expect(computeGiftGapAverage(1000, 2000)).toBe(1300);
+  });
+
+  it('サンプルが不正/負値なら直前平均を維持する', () => {
+    expect(computeGiftGapAverage(1000, -1)).toBe(1000);
+    expect(computeGiftGapAverage(1000, 'x')).toBe(1000);
+  });
+
+  it('直前平均もサンプルも不正なら-1', () => {
+    expect(computeGiftGapAverage(-1, -1)).toBe(-1);
+  });
+});
+
+describe('v0.1.1088計器: makeInitialGiftEffectDiag / buildGiftEffectDiagSnapshot のギャップ項目', () => {
+  it('初期stateはギャップ全て-1', () => {
+    const s = makeInitialGiftEffectDiag();
+    expect(s.lastSoundGapMs).toBe(-1);
+    expect(s.lastBurstGapMs).toBe(-1);
+    expect(s.avgSoundGapMs).toBe(-1);
+    expect(s.avgBurstGapMs).toBe(-1);
+  });
+
+  it('スナップショットは欠損を初期値(-1)で埋める', () => {
+    const snap = buildGiftEffectDiagSnapshot({ giftDetected: 1 }, 0);
+    expect(snap.lastSoundGapMs).toBe(-1);
+    expect(snap.avgBurstGapMs).toBe(-1);
+  });
+
+  it('実測値を保持する', () => {
+    const snap = buildGiftEffectDiagSnapshot(
+      { lastSoundGapMs: 100, lastBurstGapMs: 1400, avgSoundGapMs: 150, avgBurstGapMs: 1300 },
+      0
+    );
+    expect(snap.lastSoundGapMs).toBe(100);
+    expect(snap.lastBurstGapMs).toBe(1400);
+    expect(snap.avgSoundGapMs).toBe(150);
+    expect(snap.avgBurstGapMs).toBe(1300);
+  });
+});
+
+describe('v0.1.1088計器: buildGiftEffectDiagLines の体感遅延行', () => {
+  it('音/着弾ギャップが計測済みなら体感遅延行を出す', () => {
+    const snap = buildGiftEffectDiagSnapshot(
+      {
+        giftDetected: 1, giftThrown: 1, giftSoundPlayed: 1,
+        lastSoundGapMs: 100, lastBurstGapMs: 1400, avgSoundGapMs: 150, avgBurstGapMs: 1300
+      },
+      1000
+    );
+    const lines = buildGiftEffectDiagLines(snap, 1000);
+    const gapLine = lines.find((l) => l.includes('体感遅延'));
+    expect(gapLine).toBeDefined();
+    expect(gapLine).toContain('音+0.1秒');
+    expect(gapLine).toContain('着弾+1.4秒');
+  });
+
+  it('未計測(-1)なら体感遅延行を出さない(ノイズにしない)', () => {
+    const snap = buildGiftEffectDiagSnapshot(
+      { giftDetected: 1, giftThrown: 1, giftSoundPlayed: 1 },
+      1000
+    );
+    const lines = buildGiftEffectDiagLines(snap, 1000);
+    expect(lines.some((l) => l.includes('体感遅延'))).toBe(false);
   });
 });
 

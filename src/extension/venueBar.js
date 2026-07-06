@@ -90,7 +90,8 @@ import { KEY_GIFT_EFFECT_DIAG } from '../lib/giftEffectDiagKey.js';
 import {
   makeInitialGiftEffectDiag,
   buildGiftEffectDiagSnapshot,
-  giftSoundDiagFieldForPlayResult
+  giftSoundDiagFieldForPlayResult,
+  computeGiftGapAverage
 } from '../lib/giftEffectDiag.js';
 // Phase B(2026-07-05): パチンコボイス演出+歯止め(council/pachinko-ultimate-SYNTHESIS.md §4/§6)。
 //   voiceGate=事象履歴の純関数(個別CD/上限+グローバル45秒CD+1配信20回+VOICEVOX発話中スキップ)。
@@ -2355,9 +2356,10 @@ export function mountVenueBarButton(options = {}) {
    * ギフト1件ぶんの音をディレクター経由で予約する。
    * @param {string|undefined} tier 'small'|'medium'|'large'|'mega'
    * @param {number} _flightMs 投擲アニメの飛翔時間(ms)。v0.1.1066で待機をやめ未使用化(呼び出し側の互換のため引数は維持)
+   * @param {number} [detectAt] v0.1.1088計器: このギフトの検知時刻(epoch ms)。未指定なら計測しない(既存呼び出し互換)。
    * @returns {'scheduled'|'coalesced'|'off'}
    */
-  const scheduleGiftSound = (tier, _flightMs) => {
+  const scheduleGiftSound = (tier, _flightMs, detectAt) => {
     if (!_effectSoundEnabledCache) return 'off';
     const baseKind = effectSoundKindForGiftTier(tier);
     _giftComboState = directHit(_giftComboState, baseKind, Date.now(), {
@@ -2390,6 +2392,12 @@ export function mountVenueBarButton(options = {}) {
       const playResult = playEffectSound(pending.kind, buildEffectSoundDeps(pending.kind));
       if (playResult === 'played') {
         _giftEffectDiagCounters.giftSoundPlayed += 1;
+        // v0.1.1088計器: 「検知→音」の体感ギャップ(演出・音の挙動は不変・時刻記録のみ)。
+        if (Number.isFinite(Number(detectAt)) && Number(detectAt) > 0) {
+          const gap = Math.max(0, Date.now() - Number(detectAt));
+          _giftEffectDiagCounters.lastSoundGapMs = gap;
+          _giftEffectDiagCounters.avgSoundGapMs = computeGiftGapAverage(_giftEffectDiagCounters.avgSoundGapMs, gap);
+        }
       } else {
         const field = giftSoundDiagFieldForPlayResult(playResult);
         if (field) _giftEffectDiagCounters[field] += 1;
@@ -3124,9 +3132,10 @@ export function mountVenueBarButton(options = {}) {
    *   早期return(上限超過/会場閉時)かどうかを呼び出し元へ返す(観測のみ・演出ロジックは不変)。
    * @param {string} speakerKey
    * @param {{ kind:string, emoji:string, label:string, durationMs:number, imageUrl?:string }} proj
+   * @param {number} [detectAt] v0.1.1088計器: このギフトの検知時刻(epoch ms)。未指定なら計測しない。
    * @returns {boolean} true=実際に投擲DOMを生成した / false=上限超過・会場閉等で捨てた
    */
-  const launchGiftThrow = (speakerKey, proj) => {
+  const launchGiftThrow = (speakerKey, proj, detectAt) => {
     if (!proj || !open) return false;
     if (!canLaunchGiftThrow(giftProjActive)) return false; // 上限超過は捨てる(性能最優先)
     const el = giftProjPool.pop() || (() => {
@@ -3181,6 +3190,13 @@ export function mountVenueBarButton(options = {}) {
     giftProjActive += 1;
     const recycle = () => {
       el.removeEventListener('animationend', recycle);
+      // v0.1.1088計器: 「検知→着弾演出」の体感ギャップ(着弾=投擲アニメ完了の瞬間・演出は不変)。
+      if (Number.isFinite(Number(detectAt)) && Number(detectAt) > 0) {
+        const gap = Math.max(0, Date.now() - Number(detectAt));
+        _giftEffectDiagCounters.lastBurstGapMs = gap;
+        _giftEffectDiagCounters.avgBurstGapMs = computeGiftGapAverage(_giftEffectDiagCounters.avgBurstGapMs, gap);
+        publishGiftEffectDiag();
+      }
       // v0.1.783: is-flying と is-image を両方落とす(プール再利用時に画像用スタイルが残らないよう)。
       el.classList.remove('is-flying', 'is-image');
       el.style.cssText = '';
@@ -3203,17 +3219,18 @@ export function mountVenueBarButton(options = {}) {
     if (!text) return;
     const gift = parseGiftCommentText(text);
     if (gift) {
+      const _detectAt = Date.now(); // v0.1.1088計器: 検知→音/着弾ギャップの起点。
       _giftEffectDiagCounters.giftDetected += 1;
-      _giftEffectDiagCounters.lastEventAt = Date.now();
+      _giftEffectDiagCounters.lastEventAt = _detectAt;
       const p = resolveGiftProjectile(gift, 'gift');
       if (p) {
         // v0.1.1057: launchGiftThrow の戻り値(実際に投げたか)を見てからカウントする。
         //   従来は呼び出し直後に無条件加算しており、上限超過等の早期returnも「投げた」扱いに
         //   なって giftThrown が実態より過大(=取りこぼしを過小報告)していた。
-        if (launchGiftThrow(speech.speakerKey, p)) {
+        if (launchGiftThrow(speech.speakerKey, p, _detectAt)) {
           _giftEffectDiagCounters.giftThrown += 1;
           // v0.1.1061: 即時再生をやめ、着弾タイミングに1本だけ予約(バーストは置換昇格)。
-          if (scheduleGiftSound(p.tier, p.durationMs) === 'coalesced') {
+          if (scheduleGiftSound(p.tier, p.durationMs, _detectAt) === 'coalesced') {
             _giftEffectDiagCounters.giftSoundCoalesced += 1;
           }
         }
@@ -3265,16 +3282,17 @@ export function mountVenueBarButton(options = {}) {
         thrownGiftEventKeys.clear();
         for (const k of arr.slice(-200)) thrownGiftEventKeys.add(k);
       }
+      const _detectAt = Date.now(); // v0.1.1088計器: 検知→音/着弾ギャップの起点。
       _giftEffectDiagCounters.giftDetected += 1;
-      _giftEffectDiagCounters.lastEventAt = Date.now();
+      _giftEffectDiagCounters.lastEventAt = _detectAt;
       const proj = resolveGiftProjectile({ item, point, itemId }, 'gift');
       // 起点: 席キーは venueSpeakerKey/venueParticipantKey と同じ `u:${uid}` 形にする
       //   (raw uid だと seatByKey に当たらず常に crowdBubbleAnchor へ落ちる)。
       if (proj) {
-        launchGiftThrow(uid ? `u:${uid}` : '', proj);
+        launchGiftThrow(uid ? `u:${uid}` : '', proj, _detectAt);
         _giftEffectDiagCounters.giftThrown += 1;
         // v0.1.1061: 即時再生をやめ、着弾タイミングに1本だけ予約(バーストは置換昇格)。
-        if (scheduleGiftSound(proj.tier, proj.durationMs) === 'coalesced') {
+        if (scheduleGiftSound(proj.tier, proj.durationMs, _detectAt) === 'coalesced') {
           _giftEffectDiagCounters.giftSoundCoalesced += 1;
         }
       }

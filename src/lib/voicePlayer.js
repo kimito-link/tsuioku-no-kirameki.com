@@ -4,6 +4,7 @@ import { buildVoiceReadingText, buildMergedVoiceText } from './voicevoxClient.js
 import { isVoiceItemStale } from './voiceAgeGate.js';
 import {
   computeVoiceCongestion,
+  computeVoiceE2eAverage,
   mergeRepeatedVoiceItem,
   pushVoiceQueue,
   resolveVoiceSynthDepth
@@ -49,7 +50,11 @@ export class VoicePlayer {
     this.diag = {
       enabled: false, queueNow: 0, queueMax: 0, spokenTotal: 0, staleDropTotal: 0,
       playbackTimeoutTotal: 0, lastSpokenBase: 0, lastSynthMs: -1, lastDepth: 0,
-      lastSpeedBoost: 0, lastPhase: '', lastPhaseAt: 0
+      lastSpeedBoost: 0, lastPhase: '', lastPhaseAt: 0,
+      // v0.1.1088計器(voice-tempo-realtime-SYNTHESIS §3 Phase 1): 「到着→発声」の体感遅延。
+      //   lastE2eMs=直近1件・e2eAvgMs=EMA(係数0.3・窓バッファ無し=メモリ有界)。
+      //   mergeTotal=mergeRepeatedVoiceItem で吸収した累計(統合が効いているかの計器)。
+      lastE2eMs: -1, e2eAvgMs: -1, mergeTotal: 0
     };
   }
 
@@ -232,6 +237,9 @@ export class VoicePlayer {
     const depth = resolveVoiceSynthDepth(this.queue.length, {
       pending: this.queue.length
     });
+    // v0.1.1088計器(設計書§2): diag.lastDepth は宣言のみでどこからも代入されていなかった
+    //   化石計器。ここで実値を代入して修理する(先読み深さの実測)。
+    this.diag.lastDepth = depth;
     const wanted = new Set();
     for (let i = 0; i < depth && i < this.queue.length; i++) {
       const item = this.queue[i];
@@ -365,6 +373,15 @@ export class VoicePlayer {
             try {
               const playResult = audio.play();
               if (typeof item.onPlayStart === 'function') item.onPlayStart();
+              // v0.1.1088計器(設計書§3 Phase 1): 「到着(enqueuedAt)→声が出る(今)」のE2Eを計測。
+              //   item に enqueuedAt が無ければ0扱い(壊れず未計測相当のスパイクにしない配慮は
+              //   EMA側でなく Math.max(0, ...) で吸収)。再生ロジック自体には触れない(計測のみ)。
+              const _enqueuedAt = Number(item.enqueuedAt);
+              if (Number.isFinite(_enqueuedAt) && _enqueuedAt > 0) {
+                const e2e = Math.max(0, Date.now() - _enqueuedAt);
+                this.diag.lastE2eMs = e2e;
+                this.diag.e2eAvgMs = computeVoiceE2eAverage(this.diag.e2eAvgMs, e2e);
+              }
               // v0.1.771: 実際に再生が始まった瞬間だけ通知(drop/merge/失敗では呼ばれない)。
               //   吹き出しはここで speaking になり、onAudioEnd まで消えない。
               if (typeof item.onAudioStart === 'function') item.onAudioStart();
@@ -439,6 +456,7 @@ export class VoicePlayer {
       const merged = mergeRepeatedVoiceItem(this.queue, candidate);
       this.queue = merged.queue;
       if (merged.merged) {
+        this.diag.mergeTotal += 1; // v0.1.1088計器: 統合が効いているかの累計(無計器だった)。
         if (typeof candidate.onPlayStart === 'function') candidate.onPlayStart();
         this._notifyDropped(candidate); // v0.1.799: merge で吸収=この吹き出しは別途鳴らない→unvoiced へ
         continue;

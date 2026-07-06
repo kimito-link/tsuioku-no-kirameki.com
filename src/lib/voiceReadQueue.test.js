@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   computeVoiceCongestion,
+  computeVoiceE2eAverage,
   computeVoiceQueueSpeedBoost,
   isVoicePrefetchUsable,
   mergeRepeatedVoiceItem,
@@ -263,6 +264,37 @@ describe('resolveVoiceSynthDepth (v0.1.768 合成パイプライン深さ=詰ま
     expect(resolveVoiceSynthDepth(-5)).toBe(1);
     expect(resolveVoiceSynthDepth('invalid')).toBe(1);
     expect(resolveVoiceSynthDepth(Infinity)).toBe(1);
+  });
+});
+
+describe('computeVoiceE2eAverage (v0.1.1088 テンポ計器 Phase 1: E2E EMA)', () => {
+  it('未計測(-1)から最初のサンプルはそのまま値になる', () => {
+    expect(computeVoiceE2eAverage(-1, 2000)).toBe(2000);
+  });
+
+  it('EMA係数0.3で直前平均へ寄せる', () => {
+    // prev=2000, sample=4000, alpha=0.3 → 2000 + 0.3*(4000-2000) = 2600
+    expect(computeVoiceE2eAverage(2000, 4000)).toBe(2600);
+  });
+
+  it('alphaを指定できる', () => {
+    expect(computeVoiceE2eAverage(1000, 2000, 0.5)).toBe(1500);
+  });
+
+  it('サンプルが不正/負値なら直前平均を維持する', () => {
+    expect(computeVoiceE2eAverage(2000, -5)).toBe(2000);
+    expect(computeVoiceE2eAverage(2000, 'invalid')).toBe(2000);
+    expect(computeVoiceE2eAverage(2000, undefined)).toBe(2000);
+  });
+
+  it('直前平均が不正で新サンプルも不正なら-1', () => {
+    expect(computeVoiceE2eAverage(-1, -5)).toBe(-1);
+    expect(computeVoiceE2eAverage('invalid', 'invalid')).toBe(-1);
+  });
+
+  it('サンプル0(即応答)も正しく反映する', () => {
+    expect(computeVoiceE2eAverage(-1, 0)).toBe(0);
+    expect(computeVoiceE2eAverage(1000, 0)).toBe(700); // 1000 + 0.3*(0-1000) = 700
   });
 });
 
