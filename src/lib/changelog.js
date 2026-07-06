@@ -26,6 +26,16 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1100',
+    date: '2026-07-06',
+    summary: 'feat(score): 結果発表シーケンス+採点音割当',
+    items: Object.freeze([
+      '配信採点パネルに「結果発表シーケンス」を追加しました。ドラムロール→点数カウントアップ→ジャーン→(Aランク以上は拍手/Sランクは締めジングルも)→講評レーダー→ハイライト3選、の順で発表します。',
+      '配信終了を検知すると自動で1回だけ発表します。パネル内の「▶ 発表を再生」ボタンでいつでも見返せます。',
+      '発表演出専用の効果音6種(ドラムロール/カウント音/結果ジャーン/拍手/スウィッシュ/Sランクジングル)を追加しました。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1099',
     date: '2026-07-06',
     summary: 'feat(score): popupに採点パネル+ハイライト台帳',

@@ -11,7 +11,12 @@ import {
 // council/operation-sound-SYNTHESIS.md §5.1: op_* キー(Phase D1操作音)は既存85本の同一No.を
 //   複数キーから「意図的に」参照する(重複購入ゼロにするための設計)。よって id/No. の重複禁止は
 //   op_* を除いた元の85本表の中でのみ検証する(op_*での再参照は仕様どおりで異常ではない)。
-const ORIGINAL_85_KEYS = Object.keys(CUSTOM_SOUND_PRESET).filter((k) => !k.startsWith('op_'));
+// SC3(council/broadcast-scoring-SYNTHESIS.md §4)の score_* キーは元の85本表とは別枠の
+//   追加DL分(D2)なので、op_* と同様に「元の85本表」からは除外して検証する
+//   (v0.1.1079の d1DownloadedNos 方式を踏襲・別枠として許容リストで裏取りする)。
+const ORIGINAL_85_KEYS = Object.keys(CUSTOM_SOUND_PRESET).filter(
+  (k) => !k.startsWith('op_') && !k.startsWith('score_')
+);
 
 describe('CUSTOM_SOUND_PRESET(85素材の完全割り当て表)', () => {
   it('元の85素材が割り当て済み(SE52+ボイス22+BGM11の検算・op_*を除く)', () => {
@@ -22,14 +27,16 @@ describe('CUSTOM_SOUND_PRESET(85素材の完全割り当て表)', () => {
     expect(original85Count).toBe(85);
   });
 
-  it('op_* を含む全キーの延べアセット数はcountPresetAssetsと一致する(op_*は既存Noの再参照ぶん加算)', () => {
+  it('op_*・score_* を含む全キーの延べアセット数はcountPresetAssetsと一致する(op_*は既存Noの再参照ぶん、score_*はSC3追加DL6本ぶんを加算)', () => {
     const opKeys = Object.keys(CUSTOM_SOUND_PRESET).filter((k) => k.startsWith('op_'));
     const opCount = opKeys.reduce((sum, key) => sum + CUSTOM_SOUND_PRESET[key].length, 0);
+    const scoreKeys = Object.keys(CUSTOM_SOUND_PRESET).filter((k) => k.startsWith('score_'));
+    const scoreCount = scoreKeys.reduce((sum, key) => sum + CUSTOM_SOUND_PRESET[key].length, 0);
     const original85Count = ORIGINAL_85_KEYS.reduce(
       (sum, key) => sum + CUSTOM_SOUND_PRESET[key].length,
       0
     );
-    expect(countPresetAssets()).toBe(original85Count + opCount);
+    expect(countPresetAssets()).toBe(original85Count + opCount + scoreCount);
   });
 
   it('id が重複しない(op_*を除く元の85本表の中で)', () => {
@@ -131,6 +138,56 @@ describe('CUSTOM_SOUND_PRESET(85素材の完全割り当て表)', () => {
     // op_panel_open は既存流用+ガチャ扉(D1追加DL)の2変奏(順繰り)。
     expect(CUSTOM_SOUND_PRESET.op_panel_open.map((a) => a.no)).toEqual([141839, 108443]);
   });
+
+  it('SC3新設score_*キー(結果発表演出)が6種含まれる(council/broadcast-scoring-SYNTHESIS.md §4)', () => {
+    const scoreKeys = CUSTOM_SOUND_PRESET_KEYS.filter((k) => k.startsWith('score_'));
+    expect(scoreKeys).toHaveLength(6);
+    for (const key of [
+      'score_drumroll', 'score_tick', 'score_result',
+      'score_applause', 'score_swoosh', 'score_jingle_s'
+    ]) {
+      expect(scoreKeys).toContain(key);
+    }
+  });
+
+  it('score_* キーは全て実データ入り(空配列でない=未割当を偽らない)', () => {
+    for (const key of ['score_drumroll', 'score_tick', 'score_result', 'score_applause', 'score_swoosh', 'score_jingle_s']) {
+      expect(CUSTOM_SOUND_PRESET[key].length).toBeGreaterThan(0);
+    }
+  });
+
+  it('score_* キーのNo.は2026-07-06にAudiostock定額で追加DL済みの6本に固定される(実素材割当の裏取り)', () => {
+    // council/broadcast-scoring-SYNTHESIS.md §4 で指定された実No.(D2追加DL分・SC5相当を本patchで前倒し実装)。
+    const d2DownloadedNos = new Set([
+      811438, 52577, // score_drumroll
+      57770, 174486, // score_tick
+      1511523, 233383, // score_result
+      877975, 53069, // score_applause
+      91798, // score_swoosh
+      1048482 // score_jingle_s
+    ]);
+    expect(d2DownloadedNos.size).toBe(10);
+    const scoreKeys = CUSTOM_SOUND_PRESET_KEYS.filter((k) => k.startsWith('score_'));
+    for (const key of scoreKeys) {
+      for (const asset of CUSTOM_SOUND_PRESET[key]) {
+        expect(d2DownloadedNos.has(asset.no)).toBe(true);
+      }
+    }
+  });
+
+  it('score_* キーのNo.は元の85本表・op_*とも重複しない(重複購入ゼロの裏取り)', () => {
+    const otherNos = new Set();
+    for (const key of Object.keys(CUSTOM_SOUND_PRESET)) {
+      if (key.startsWith('score_')) continue;
+      for (const asset of CUSTOM_SOUND_PRESET[key]) otherNos.add(asset.no);
+    }
+    const scoreKeys = CUSTOM_SOUND_PRESET_KEYS.filter((k) => k.startsWith('score_'));
+    for (const key of scoreKeys) {
+      for (const asset of CUSTOM_SOUND_PRESET[key]) {
+        expect(otherNos.has(asset.no)).toBe(false);
+      }
+    }
+  });
 });
 
 describe('parseAudiostockNoFromFilename', () => {
@@ -159,11 +216,13 @@ describe('presetIdForNo', () => {
 });
 
 describe('buildPresetNoIndex', () => {
-  it('全90件のNo.が逆引きできる(85本+D1追加DL5本・v0.1.1079)', () => {
+  it('全100件のユニークNo.が逆引きできる(Mapキーのため重複Noは1件に畳まれる・85本+D1追加DL5本+SC3 score_*追加DL6本のうち重複分を除いた実数)', () => {
     const idx = buildPresetNoIndex();
-    expect(idx.size).toBe(90);
+    expect(idx.size).toBe(100);
     expect(idx.get(204361)).toMatchObject({ key: 'gift_large', title: '【キュイーン】パチンコの演出に', id: 'as_204361' });
     expect(idx.get(1260384)).toMatchObject({ key: 'op_shot_2', id: 'as_1260384' });
+    expect(idx.get(811438)).toMatchObject({ key: 'score_drumroll', id: 'as_811438' });
+    expect(idx.get(1048482)).toMatchObject({ key: 'score_jingle_s', id: 'as_1048482' });
   });
 
   it('variantIndexは配列内の宣言順(変奏順)と一致する', () => {

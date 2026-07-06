@@ -562,7 +562,7 @@
 - **影響範囲ゲート(規律を自動化)** — 星野ロミ式「規律を自動ゲートに」。diff から影響大(複数機能波及)の変更ファイルを検出し波及先機能を列挙。警告のみ(摩擦ゼロ)・--strict で exit1。AGENTS.md §10 のルールを diff 発火に
   - `scripts/impact-check.mjs`
   - `docs/feature-map/impact-map.json`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 57</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 59</summary>
 
 - `api/status.js` — status 受け口 Vercel Serverless Function。
 - `extension/status-guard.js` — 状態速報ページ(status.html)の「何があっても開く」保険。
@@ -613,6 +613,8 @@
 - `src/lib/popupAiDiagOrchestrator.js` — v0.1.211: popup「AI 診断」ボタンのオーケストレータ純関数。
 - `src/lib/popupDiagAutoPublish.js` — popup を開いたとき popup 固有診断を status へ自動集約するスケジューラ(純ロジック)。
 - `src/lib/previewHeavyHint.js` — 「応援プレビュー(②)を開いている間は診断更新が重い」を状態速報で名指しする純関数(v0.1.1020)。
+- `src/lib/scoreAnnounceDiag.js` — 結果発表シーケンス(scoreAnnounce.js・SC3・council/broadcast-scoring-SYNTHESIS.md §2.1)の
+- `src/lib/scoreAnnounceDiagKey.js` — 結果発表シーケンス(scoreAnnounce.js・SC3・council/broadcast-scoring-SYNTHESIS.md §2.1)の
 - `src/lib/statusExtrasBatch.js` — 状態速報「重さ根治 P2」: status-entry.js の extras ブロック(12秒間引き)が単一キー get だけの
 - `src/lib/statusFastDiagLite.js` — status.html 用「軽量 fastDiag ダイジェスト」。
 - `src/lib/statusRefreshBackoff.js` — v0.1.1010: 状態速報(status.html)の自動更新を「直近 refresh の所要に比例して間引く」純関数。
@@ -683,7 +685,7 @@
   - `src/lib/statusTrendKey.js`
   - `src/extension/status-entry.js`
   - `src/lib/statusActionAdvisor.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 125</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 126</summary>
 
 - `app/app.js` — スマホ閲覧用 status Web 版。
 - `app/live-view.js` — 純Web版 応援ライブビュー（拡張なし・PC/スマホ共通）。
@@ -780,6 +782,7 @@
 - `src/lib/refreshTaskGuard.js` — v0.1.437: popup の `refresh()` で chrome API が永久 pending になっても全カード「—」固定にしない
 - `src/lib/resolveKiramekiReturningAndFirstTimeUserKeys.js` — 「きらめきの賞」のかよい / はじまり判定用 userKey 分類（純関数）。
 - `src/lib/safeStorageLocal.js` — v0.1.1080: 拡張リロード後の古いタブ(stale content script / iframe)が
+- `src/lib/scoreAnnounce.js` — 配信採点「結果発表シーケンス」の純関数プランナー(council/broadcast-scoring-SYNTHESIS.md
 - `src/lib/scoreRadar.js` — 配信採点の「講評レーダー」5軸(council/broadcast-scoring-SYNTHESIS.md §2.3)を組む純関数群。
 - `src/lib/standalonePopupClose.js` — v0.1.433: 別ウィンドウ POP（standalone popup window）を「配信に飛ばしたら閉じる」判定（純ロジック）。
 - `src/lib/storageErrorState.js` — ストレージ書き込みエラーをポップアップ向けにシリアライズする純関数
@@ -815,7 +818,7 @@
 
 ## 🧬 修正系譜マップ(この系統のバグを過去にどう直したか)
 
-> changelog 全 434 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
+> changelog 全 435 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
 
 ### 💾 記録件数 (64版)
 - `v0.1.1084` 2026-07-06 — perf(status): マイ効果音計器のBlob全件走査を廃止
@@ -1800,7 +1803,8 @@
 - `v0.1.840` 2026-06-20 — 機能逆引き地図を全ファイル網羅に
 - `v0.1.835` 2026-06-20 — 自己検証ゲートを追加(版同期+診断文言)
 
-### その他 (23版)
+### その他 (24版)
+- `v0.1.1100` 2026-07-06 — feat(score): 結果発表シーケンス+採点音割当
 - `v0.1.1098` 2026-07-06 — feat(score): 配信採点モデルv2+フェーズ実績計器
 - `v0.1.1093` 2026-07-06 — fix(post): watchタブが開いていれば送信可能に
 - `v0.1.1082` 2026-07-06 — 拡張の版混在を検知してリロード案内

@@ -9351,6 +9351,64 @@
         color: var(--nl-muted);
       }
 
+      /* SC3(council/broadcast-scoring-SYNTHESIS.md §2.1): 結果発表シーケンス。
+         価値序列=発表は配信総括なので豪華でよい(Sランクは最豪華)。DOMは事前生成済みの
+         クラス切替のみ(churn禁止・new nodeを作らない)。 */
+      .nl-score-announce-btn {
+        display: block;
+        width: 100%;
+        margin: 4px 0 6px;
+        padding: 6px 10px;
+        font-weight: 700;
+        font-size: 12px;
+        border-radius: 8px;
+        border: 1px solid var(--nl-border);
+        background: linear-gradient(135deg, #ffd54a, #ff8a65);
+        color: #3a1f00;
+        cursor: pointer;
+      }
+
+      .nl-score-panel--announcing {
+        animation: nl-score-announce-shake 0.4s ease-in-out infinite;
+      }
+
+      @keyframes nl-score-announce-shake {
+        0%, 100% { transform: translateX(0); }
+        25% { transform: translateX(-1px); }
+        75% { transform: translateX(1px); }
+      }
+
+      .nl-score-panel--revealed .nl-score-total-row {
+        animation: nl-score-reveal-pop 0.35s ease-out;
+      }
+
+      @keyframes nl-score-reveal-pop {
+        0% { transform: scale(0.85); opacity: 0.4; }
+        100% { transform: scale(1); opacity: 1; }
+      }
+
+      .nl-score-radar-section--revealed .nl-score-radar-data {
+        animation: nl-score-radar-fade 1s ease-out;
+      }
+
+      @keyframes nl-score-radar-fade {
+        0% { opacity: 0; }
+        100% { opacity: 1; }
+      }
+
+      /* 通常表示(発表シーケンス外)ではハイライトは即表示。発表演出中(--announcing)だけ
+         スライドイン前提で隠す(通常時に見えなくなる回帰を防ぐ・スコープを絞る)。 */
+      .nl-score-panel--announcing .nl-score-highlight-item {
+        opacity: 0;
+        transform: translateX(-8px);
+      }
+
+      .nl-score-highlight-item--revealed {
+        opacity: 1;
+        transform: translateX(0);
+        transition: opacity 0.25s ease-out, transform 0.25s ease-out;
+      }
+
       .room-bar-row {
         margin-top: 3px;
         display: flex;
@@ -12492,6 +12550,11 @@
            付けない(embed_watchでも見たい=設計書§1.3の要件・HANDOFF確定要件1)。 -->
       <details id="broadcastScoreDetails" class="nl-score-panel-details">
         <summary>配信採点（カラオケ採点風）</summary>
+        <!-- SC3(council/broadcast-scoring-SYNTHESIS.md §2.1): 結果発表シーケンスの手動起動ボタン。
+             配信終了フラグによる自動起動と同じ二重起動ガードを通る(ボタン連打での多重実行を防ぐ)。 -->
+        <button type="button" id="broadcastScoreAnnounceBtn" class="nl-score-announce-btn">
+          ▶ 発表を再生
+        </button>
         <div id="broadcastScoreMount" class="nl-score-mount"></div>
       </details>
 

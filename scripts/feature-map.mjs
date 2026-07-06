@@ -150,7 +150,17 @@ const STORAGE_DISCONNECT_BASELINE = new Set([
   //   静的解析が producer を取りこぼす偽陽性。consumer は popup-entry.js の
   //   chrome.storage.local.get(KEY_OP_SOUND_ENABLED)(起動時キャッシュ)+ openBag 経由(refresh時)。
   //   経路は実在(storageKeys.test.js の isOpSoundEnabled テストで純関数側は確認済み)。
-  'KEY_OP_SOUND_ENABLED'
+  'KEY_OP_SOUND_ENABLED',
+  // 結果発表シーケンス計器(2026-07-06・SC3・council/broadcast-scoring-SYNTHESIS.md §2.1):
+  //   producer は popup-entry.js:publishScoreAnnounceDiag が safeStorageLocalSet({[KEY]:...})で
+  //   書く(検出対象・実際に見えている)。consumer は status-entry.js が直接 safeStorageLocalGet(KEY)
+  //   するのではなく、statusExtrasBatch.js の EXTRAS_BATCH_KEYS 配列変数経由で
+  //   safeStorageLocalGet(EXTRAS_BATCH_KEYS) を呼ぶ(KEY_HIGHLIGHT_LEDGER 等の既存20キーと同型の
+  //   間接化)ため、引数領域に KEY_SCORE_ANNOUNCE_DIAG の識別子が現れず静的解析が consumer を
+  //   取りこぼす偽陽性。経路は実在(statusExtrasBatch.test.js の pickExtrasBatchValues テストで
+  //   scoreAnnounceDiag の受け渡しを確認済み・buildScoreAnnounceDiagLines が status-entry.js の
+  //   概要行に描画する)。
+  'KEY_SCORE_ANNOUNCE_DIAG'
 ]);
 
 /**

@@ -311,6 +311,21 @@ import { KEY_REPORT_PREVIEW } from '../lib/reportPreviewKey.js';
 import { KEY_GIFT_EFFECT_DIAG } from '../lib/giftEffectDiagKey.js';
 import { KEY_VOICE_DIAG } from '../lib/voiceDiagKey.js';
 import { maybePlayEventRankChangeSound } from '../lib/officialEventRankSoundEffect.js';
+// SC3(council/broadcast-scoring-SYNTHESIS.md §2.1): 結果発表シーケンス(ドラムロール→カウントアップ→
+//   ジャーン→拍手/Sジングル→講評レーダー→ハイライト3選)。プランナー(純関数)はscoreAnnounce.js、
+//   実行器(累積setTimeout)はここに置く(venueBar.jsのplanJackpotChain実行と同型)。
+import {
+  planScoreAnnounce,
+  scoreAnnounceGate,
+  scoreAnnounceGateFinish,
+  makeInitialScoreAnnounceGateState
+} from '../lib/scoreAnnounce.js';
+import {
+  makeInitialScoreAnnounceDiag,
+  buildScoreAnnounceDiagSnapshot
+} from '../lib/scoreAnnounceDiag.js';
+import { KEY_SCORE_ANNOUNCE_DIAG } from '../lib/scoreAnnounceDiagKey.js';
+import { LIVE_ENDED_PREFIX, isLiveEndedFlag } from '../lib/liveEndedFlag.js';
 // Phase D1(2026-07-05): 操作音(council/operation-sound-SYNTHESIS.md)。コメント投稿=玉の打ち出し。
 //   検知点は拡張自身の投稿経路(押下=op_handle・成功=op_shot)。乱数ゼロ・全て決定論。
 import {
@@ -2052,6 +2067,12 @@ function maybePlayMilestoneEffectSound(spec) {
     _milestoneEffectDiagCounters.milestoneThrown += 1;
   }
   if (!_effectSoundEnabledCache) {
+    if (isCommentMilestone) publishMilestoneEffectDiag();
+    return;
+  }
+  // SC3(council/broadcast-scoring-SYNTHESIS.md §2.1優先度レーン整合): 発表シーケンス実行中は
+  //   popup側のP4通常SE(マイルストーン等)を破棄する(会場が開いていれば会場側で鳴るため欠落しない)。
+  if (isScoreAnnounceRunning()) {
     if (isCommentMilestone) publishMilestoneEffectDiag();
     return;
   }
@@ -4058,6 +4079,228 @@ async function renderBroadcastScorePanel(liveId) {
   } catch {
     mount.textContent = '読み込みに失敗しました。';
   }
+}
+
+/* ============================================================================
+ * SC3(council/broadcast-scoring-SYNTHESIS.md §2.1): 結果発表シーケンス。
+ * ========================================================================== */
+
+/** 二重起動ガードstate(1配信につきモジュールスコープで1インスタンス)。 */
+let _scoreAnnounceGateState = makeInitialScoreAnnounceGateState();
+/** 発表シーケンス実行中フラグ。true の間は popup の P4通常SE(ギフト/マイルストーン等)を破棄する
+ *   (§2.1優先度レーン整合。VOICEVOX読み上げは対象外=情報チャネル優先の既決)。 */
+let _scoreAnnounceRunning = false;
+/** SC3計器: 発表シーケンスの起動/完走/中断観測値(extras相乗り)。 */
+const _scoreAnnounceDiagCounters = makeInitialScoreAnnounceDiag();
+/** 実行中のsetTimeoutハンドル群(中断時に残りステップを止める)。 */
+let _scoreAnnounceTimers = [];
+
+/** SC3計器のpublish(他のextras相乗り計器と同じ3秒min-gap)。 */
+let _scoreAnnounceDiagLastWriteAt = 0;
+function publishScoreAnnounceDiag() {
+  const now = Date.now();
+  if (now - _scoreAnnounceDiagLastWriteAt < 3000) return;
+  _scoreAnnounceDiagLastWriteAt = now;
+  const snap = buildScoreAnnounceDiagSnapshot(_scoreAnnounceDiagCounters, now);
+  void safeStorageLocalSet({ [KEY_SCORE_ANNOUNCE_DIAG]: snap });
+}
+
+/**
+ * 発表シーケンス実行中かどうか(P4通常SEの呼び出し元がこれを見て破棄判定する)。
+ * @returns {boolean}
+ */
+function isScoreAnnounceRunning() {
+  return _scoreAnnounceRunning;
+}
+
+/**
+ * 発表シーケンスに必要な入力(score/radar/highlights)を、パネル描画と同じ経路
+ *   (buildBroadcastScorePanelViewModel)で組み立てる。パネルが閉じていても(開閉に関わらず)
+ *   発表は独立して動く必要があるため、renderBroadcastScorePanel の open ガードは通さない。
+ * @param {string} liveId
+ * @returns {Promise<import('../lib/broadcastScoreHtml.js').BroadcastScoreViewModel|null>}
+ */
+async function buildScoreAnnounceInputs(liveId) {
+  const lid = String(liveId || '').trim().toLowerCase();
+  if (!lid) return null;
+  const bag = await safeStorageLocalGet([KEY_REPORT_PREVIEW, KEY_GIFT_EFFECT_DIAG, KEY_VOICE_DIAG, KEY_HIGHLIGHT_LEDGER]);
+  const ledgerRaw = bag?.[KEY_HIGHLIGHT_LEDGER];
+  return buildBroadcastScorePanelViewModel({
+    liveId: lid,
+    nowMs: Date.now(),
+    previewRec: bag?.[KEY_REPORT_PREVIEW],
+    phaseStats: _bgmPhaseDiagCountersPopup,
+    giftDiag: bag?.[KEY_GIFT_EFFECT_DIAG],
+    voiceDiag: bag?.[KEY_VOICE_DIAG],
+    ledger: ledgerRaw && typeof ledgerRaw === 'object' ? ledgerRaw : null
+  });
+}
+
+/**
+ * ステップ実行本体(視覚+音)。純関数プランナー(planScoreAnnounce)が返した1ステップぶんの
+ *   副作用だけをここで行う(DOM描画/playEffectSound)。存在しないDOM/未割当音は静かに諦める
+ *   (演出は「完走できなくても壊れない」設計・§7)。
+ * @param {import('../lib/scoreAnnounce.js').ScoreAnnounceStep} step
+ * @param {import('../lib/broadcastScoreHtml.js').BroadcastScoreViewModel} vm
+ */
+function runScoreAnnounceStep(step, vm) {
+  const details = /** @type {HTMLDetailsElement|null} */ ($('broadcastScoreDetails'));
+  const panel = document.querySelector('.nl-score-panel');
+  switch (step.action) {
+    case 'drumroll_start':
+      if (details && !details.open) details.open = true; // 発表演出は必ず見える状態にする。
+      panel?.classList.add('nl-score-panel--announcing');
+      playEffectSound('score_drumroll', buildEffectSoundDeps('score_drumroll'));
+      break;
+    case 'count_up_start': {
+      const numEl = /** @type {HTMLElement|null} */ ($('broadcastScoreTotalNum'));
+      let lastTickAt = -Infinity;
+      if (numEl) {
+        startScoreCountUp(numEl, vm.score.total, {
+          durationMs: 1600,
+          onTick: (_v, elapsedMs) => {
+            if (elapsedMs - lastTickAt >= 90) {
+              lastTickAt = elapsedMs;
+              playEffectSound('score_tick', { ...buildEffectSoundDeps('score_tick'), guardMs: 0 });
+            }
+          }
+        });
+      }
+      break;
+    }
+    case 'result_reveal': {
+      playEffectSound('score_result', buildEffectSoundDeps('score_result'));
+      const rankEl = /** @type {HTMLElement|null} */ ($('broadcastScoreRank'));
+      if (rankEl) rankEl.hidden = false;
+      panel?.classList.add('nl-score-panel--revealed');
+      break;
+    }
+    case 'applause':
+      playEffectSound('score_applause', buildEffectSoundDeps('score_applause'));
+      break;
+    case 'jingle_s':
+      playEffectSound('score_jingle_s', buildEffectSoundDeps('score_jingle_s'));
+      break;
+    case 'radar_reveal':
+      document.getElementById('broadcastScoreRadarSection')?.classList.add('nl-score-radar-section--revealed');
+      break;
+    case 'highlight_1':
+    case 'highlight_2':
+    case 'highlight_3': {
+      const idx = Number(step.action.slice(-1)) - 1;
+      const items = document.querySelectorAll('#broadcastScoreHighlights .nl-score-highlight-item');
+      items[idx]?.classList.add('nl-score-highlight-item--revealed');
+      playEffectSound('score_swoosh', buildEffectSoundDeps('score_swoosh'));
+      break;
+    }
+    default:
+      break;
+  }
+}
+
+/**
+ * 結果発表シーケンスを起動する(§2.1)。配信終了フラグによる自動起動('auto')/「▶発表を再生」
+ *   ボタンによる手動起動('manual')の両方から呼ばれる。二重起動ガード(scoreAnnounceGate)を通り、
+ *   全ステップを累積setTimeoutで直列実行する(乱数なし・固定遅延)。
+ * @param {string} liveId
+ * @param {'auto'|'manual'} trigger
+ */
+async function runScoreAnnounceSequence(liveId, trigger) {
+  const lid = String(liveId || '').trim().toLowerCase();
+  const gate = scoreAnnounceGate(_scoreAnnounceGateState, lid, trigger);
+  _scoreAnnounceGateState = gate.nextState;
+  if (!gate.allowed) {
+    _scoreAnnounceDiagCounters.abortedCount += 1;
+    _scoreAnnounceDiagCounters.lastAbortReason = gate.reason;
+    _scoreAnnounceDiagCounters.lastEventAt = Date.now();
+    publishScoreAnnounceDiag();
+    return;
+  }
+  _scoreAnnounceDiagCounters.startedCount += 1;
+  if (trigger === 'auto') _scoreAnnounceDiagCounters.autoStartedCount += 1;
+  else _scoreAnnounceDiagCounters.manualStartedCount += 1;
+  _scoreAnnounceDiagCounters.lastLiveId = lid;
+  _scoreAnnounceDiagCounters.lastEventAt = Date.now();
+  publishScoreAnnounceDiag();
+
+  const finish = (completed) => {
+    _scoreAnnounceRunning = false;
+    for (const timer of _scoreAnnounceTimers) window.clearTimeout(timer);
+    _scoreAnnounceTimers = [];
+    _scoreAnnounceGateState = scoreAnnounceGateFinish(_scoreAnnounceGateState, lid, trigger);
+    if (completed) _scoreAnnounceDiagCounters.completedCount += 1;
+    _scoreAnnounceDiagCounters.lastEventAt = Date.now();
+    publishScoreAnnounceDiag();
+  };
+
+  try {
+    const vm = await buildScoreAnnounceInputs(lid);
+    if (!vm) {
+      _scoreAnnounceDiagCounters.abortedCount += 1;
+      _scoreAnnounceDiagCounters.lastAbortReason = 'no_score_data';
+      finish(false);
+      return;
+    }
+    _scoreAnnounceDiagCounters.lastRank = vm.score.rank;
+    // 描画を最終スコアで作り直す(発表は確定値を見せる。パネルが閉じていた場合も含めて再描画)。
+    const mount = $('broadcastScoreMount');
+    if (mount) mount.innerHTML = buildBroadcastScorePanelHtml({ ...vm, isFinal: trigger === 'auto' });
+    const numEl0 = /** @type {HTMLElement|null} */ ($('broadcastScoreTotalNum'));
+    if (numEl0) numEl0.textContent = '0';
+
+    const steps = planScoreAnnounce(vm.score, vm.radar, vm.highlights);
+    _scoreAnnounceRunning = true;
+    for (const step of steps) {
+      const timer = window.setTimeout(() => {
+        try {
+          runScoreAnnounceStep(step, vm);
+        } catch {
+          /* 個別ステップの失敗で発表全体を止めない(§7=壊れないUI)。 */
+        }
+      }, step.atMs);
+      _scoreAnnounceTimers.push(timer);
+    }
+    const totalMs = steps.length ? steps[steps.length - 1].atMs : 0;
+    const doneTimer = window.setTimeout(() => finish(true), totalMs + 50);
+    _scoreAnnounceTimers.push(doneTimer);
+  } catch {
+    _scoreAnnounceDiagCounters.abortedCount += 1;
+    _scoreAnnounceDiagCounters.lastAbortReason = 'error';
+    finish(false);
+  }
+}
+
+/** 配信終了フラグ(nls_live_ended_<lv>)を購読し、初回検知で発表シーケンスを1回だけ自動起動する。
+ *   §2.1「配信終了フラグ初回検知で1回だけ自動」。1配信1回きりの判定自体はscoreAnnounceGate側が持つ
+ *   (このリスナーは「検知したら呼ぶだけ」の薄いラッパー・bindXxxStorageListenerOnceパターン)。 */
+let _liveEndedScoreListenerBound = false;
+function bindLiveEndedScoreListenerOnce() {
+  if (_liveEndedScoreListenerBound) return;
+  if (typeof chrome === 'undefined' || !chrome.storage?.onChanged?.addListener) return;
+  _liveEndedScoreListenerBound = true;
+  chrome.storage.onChanged.addListener((changes, area) => {
+    if (area !== 'local') return;
+    for (const key of Object.keys(changes)) {
+      if (!key.startsWith(LIVE_ENDED_PREFIX)) continue;
+      const flag = changes[key].newValue;
+      if (!isLiveEndedFlag(flag)) continue;
+      const lid = String(flag.liveId || '').trim().toLowerCase();
+      if (!lid) continue;
+      // 確定値でカウントアップするため、発表前に1回だけreportPreviewをforce publishする
+      //   (§2.1「force 1回」・軽量制約は維持=通常間引きの経路をこの1回だけ迂回する)。
+      try {
+        publishReportPreviewThrottled(lid, {
+          resolveComments: resolveCommentsForHtmlExport,
+          getSnapshot: () => watchMetaCache.snapshot,
+          now: () => Date.now(),
+          force: true
+        });
+      } catch {
+        /* best-effort。force publishが失敗しても直近のreportPreviewで発表を続行する。 */
+      }
+      void runScoreAnnounceSequence(lid, 'auto');
+    }
+  });
 }
 
 /**
@@ -9773,6 +10016,7 @@ async function refreshBackfillRecordCardHint(liveId) {
   bindGiftHistoryStorageListenerOnce();
   bindGiftUsersLaneStorageListenerOnce();
   bindCommentsCelebrationStorageListenerOnce();
+  bindLiveEndedScoreListenerOnce();
   void refreshRecordingRecoveryHint(lid);
   // caught_up 確定済みの配信なら再表示しない（refresh のたびに「届いてるよ」が出るのを防ぐ）。
   if (_backfillCaughtUpForLiveId === lid) return;
@@ -18790,6 +19034,15 @@ async function initPopup() {
   $('broadcastScoreDetails')?.addEventListener('toggle', () => {
     const det = /** @type {HTMLDetailsElement|null} */ ($('broadcastScoreDetails'));
     if (det?.open) void renderBroadcastScorePanel(watchPopupLastPaintedLiveId);
+  });
+
+  // SC3(council/broadcast-scoring-SYNTHESIS.md §2.1): 「▶発表を再生」の手動起動。
+  //   二重起動ガード(scoreAnnounceGate)は runScoreAnnounceSequence 内で判定するため、
+  //   ここでは liveId が無ければ何もしない薄いラッパーにする。
+  $('broadcastScoreAnnounceBtn')?.addEventListener('click', () => {
+    const lv = String(watchPopupLastPaintedLiveId || '').trim().toLowerCase();
+    if (!lv) return;
+    void runScoreAnnounceSequence(lv, 'manual');
   });
 
   // v0.1.608 Phase 1-C: コメンターのフォロー情報を強制再取得(キャッシュ無視)
