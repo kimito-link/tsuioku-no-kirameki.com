@@ -29,7 +29,13 @@ import { detectVersionMismatch } from '../lib/versionMismatch.js';
 // v0.1.1080: BGM設定パネル(Phase C)が直接 chrome.storage.local を叩くと、status.html を
 //   タブに残したまま拡張をリロードした場合に同期 TypeError が uncaught で残る。
 //   唯一の安全な入口に集約する(popup-entry.js/venueBar.js と同じ helper を共有)。
-import { safeStorageLocalGet, safeStorageLocalSet, safeStorageLocalRef } from '../lib/safeStorageLocal.js';
+import {
+  safeStorageLocalGet,
+  safeStorageLocalSet,
+  safeStorageLocalRef,
+  getStorageWriteLedger
+} from '../lib/safeStorageLocal.js';
+import { buildStorageWriteLedgerLines } from '../lib/storageWriteLedger.js';
 // 2026-06-23: status.html 軽量化。2秒ループで巨大 fastDiag(~40KB)を read+parse+JSON.stringify していたのが
 //   重さの真因(council/status-heavy-open-SYNTHESIS.md)。status が使う4フィールドだけの軽量ダイジェスト
 //   (content が同時に書く)を read する=read 回数同じ・サイズ ~40分の1。読み取りパスは full と同形。
@@ -1374,6 +1380,15 @@ function renderAll({ lvList, summaries, fastDiag, popupDiag, backfillProgress, b
     const iLines = buildInstantPushDiagLines(instantPushDiag, Date.now());
     instantPushLine = iLines.length ? `\n${iLines.join('\n')}` : '';
   });
+  // robust-arch Phase 0(2026-07-07・計器のみ・挙動不変): このページ(status)から出た
+  //   chrome.storage.local への書込を「上位5キー bytes/分」で概要に併記する。真犯人と
+  //   目された巨大キー(KEY_LIVEVIEW_PUBLISH_PAYLOAD)の書込量を実配信で数値化し、MVP
+  //   (min-gap 3000→12000+prune)の効果を測る物差しにする。書込ゼロなら空=ノイズにしない。
+  let writeLedgerLine = '';
+  safeSection('書込台帳計器', () => {
+    const wLines = buildStorageWriteLedgerLines(getStorageWriteLedger(), Date.now(), 5);
+    writeLedgerLine = wLines.length ? `\n${wLines.join('\n')}` : '';
+  });
   // 2026-07-06: 配信切替(SPA遷移で iframe を作り直さない in-place 切替)の送信N/受信N/初描画msを
   //   概要に併記(切替が一度も無い配信なら空=ノイズにしない)。「切替が来ているのに送信ボタンが
   //   灰色のまま」等の切り分け用。
@@ -1400,7 +1415,7 @@ function renderAll({ lvList, summaries, fastDiag, popupDiag, backfillProgress, b
   if (overviewEl) {
     overviewEl.textContent =
       (overviewText || '視聴中の配信はありません。') +
-      backfillLine + laneLine + voiceLine + reportPreviewLine + giftEffectLine + milestoneEffectLine + customSoundLine + voiceEffectLine + bgmPhaseLine + opSoundEffectLine + commentPostLine + instantPushLine + channelSwitchLine + highlightLedgerLine + scoreAnnounceLine;
+      backfillLine + laneLine + voiceLine + reportPreviewLine + giftEffectLine + milestoneEffectLine + customSoundLine + voiceEffectLine + bgmPhaseLine + opSoundEffectLine + commentPostLine + instantPushLine + writeLedgerLine + channelSwitchLine + highlightLedgerLine + scoreAnnounceLine;
     overviewEl.classList.toggle('empty-note', !overviewText);
   }
 

@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 2 / 653 件
+## ⚠️ 役割コメントが無いソース 2 / 654 件
 - `src/lib/reportPreviewPublish.js`
 - `src/lib/venueLaneBuckets.js`
 
@@ -527,7 +527,7 @@
   - `gift-impact.mp3`
   - `gift-sparkle.mp3`
   - `gift-whoosh.mp3`
-- 📁 **src/** (1358)
+- 📁 **src/** (1360)
   - 📁 **data/** (6)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -792,7 +792,7 @@
         - `logo_funlink_white_RGB_maru_black.png`
       - `logo_guide_funlink_ol.pdf`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1143)
+  - 📁 **lib/** (1145)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -1713,6 +1713,8 @@
     - `storageKeys.test.js`
     - `storageOpTimeout.js` — v0.1.502: 単発の非同期処理（主に chrome.storage.local の get/set/remove）を
     - `storageOpTimeout.test.js`
+    - `storageWriteLedger.js` — 2026-07-07 (robust-arch Phase 0 / 計器のみ・挙動不変):
+    - `storageWriteLedger.test.js`
     - `storedCommentDedupeMerge.js` — popup normalizeStoredCommentEntries 用: 同一キー重複行のマージ（PII を増やさずフラグのみ統合）
     - `storyAvatarDiagLine.js` — 応援グリッド用・診断表示（PII なし・件数のみ）。
     - `storyAvatarDiagLine.test.js`

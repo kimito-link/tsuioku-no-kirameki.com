@@ -685,7 +685,7 @@
   - `src/lib/statusTrendKey.js`
   - `src/extension/status-entry.js`
   - `src/lib/statusActionAdvisor.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 126</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 127</summary>
 
 - `app/app.js` — スマホ閲覧用 status Web 版。
 - `app/live-view.js` — 純Web版 応援ライブビュー（拡張なし・PC/スマホ共通）。
@@ -786,6 +786,7 @@
 - `src/lib/scoreRadar.js` — 配信採点の「講評レーダー」5軸(council/broadcast-scoring-SYNTHESIS.md §2.3)を組む純関数群。
 - `src/lib/standalonePopupClose.js` — v0.1.433: 別ウィンドウ POP（standalone popup window）を「配信に飛ばしたら閉じる」判定（純ロジック）。
 - `src/lib/storageErrorState.js` — ストレージ書き込みエラーをポップアップ向けにシリアライズする純関数
+- `src/lib/storageWriteLedger.js` — 2026-07-07 (robust-arch Phase 0 / 計器のみ・挙動不変):
 - `src/lib/storedCommentDedupeMerge.js` — popup normalizeStoredCommentEntries 用: 同一キー重複行のマージ（PII を増やさずフラグのみ統合）
 - `src/lib/supportActivityTimeline.js` — 応援タイムライン: コメントとギフト着弾を時刻順に統合する純関数（v0.1.340）。
 - `src/lib/supportTimelineGuard.js` — 応援タイムラインの重い全件読み込みを実行してよいか判定する。
@@ -818,7 +819,7 @@
 
 ## 🧬 修正系譜マップ(この系統のバグを過去にどう直したか)
 
-> changelog 全 435 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
+> changelog 全 436 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
 
 ### 💾 記録件数 (64版)
 - `v0.1.1084` 2026-07-06 — perf(status): マイ効果音計器のBlob全件走査を廃止
@@ -1689,7 +1690,8 @@
 - `v0.1.806` 2026-06-17 — HTML保存の失敗を根治+完了音声を追加
 - `v0.1.785` 2026-06-16 — 状態ページのタイムアウト警告を拡張エラー欄に出さない
 
-### ⚡ 描画・性能 (107版)
+### ⚡ 描画・性能 (108版)
+- `v0.1.1101` 2026-07-07 — perf(diag): 書込台帳+配達/描画ギャップ計器
 - `v0.1.1096` 2026-07-06 — perf(diag): 即時プッシュ計器の書込を10秒集約
 - `v0.1.1092` 2026-07-06 — feat(lane): コメント即時プッシュで重負荷でも表示即時
 - `v0.1.1088` 2026-07-06 — feat(diag): 読み上げ/ギフトの体感遅延を実測計器化

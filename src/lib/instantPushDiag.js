@@ -15,10 +15,18 @@
  *   receivedRows: number,   // 受け取った行の累計件数
  *   rejectedCount: number,  // nonce 不一致 / 型不正で破棄した回数
  *   paintedRows: number,    // 実際にレーン表示バッファへ合流できた行の累計件数(重複除く)
- *   lastGapMs: number,      // 直近1回の「送信→表示合流」ms(-1=未計測)
- *   avgGapMs: number,       // gapMs の EMA 平均ms(-1=未計測)
+ *   lastGapMs: number,      // 直近1回の「送信→表示合流(描画完了)」ms(-1=未計測)
+ *   avgGapMs: number,       // gapMs(描画完了まで)の EMA 平均ms(-1=未計測)
+ *   lastDeliveryGapMs: number, // 直近1回の「送信→ハンドラ受信」ms=配達のみ(-1=未計測)
+ *   avgDeliveryGapMs: number,  // deliveryGapMs の EMA 平均ms(-1=未計測)
  *   lastEventAt: number     // 最後にイベントが起きた時刻(epoch ms・0=未観測)
  * }} InstantPushDiagState
+ *
+ * robust-arch Phase 0 (2026-07-07): lastGapMs/avgGapMs は「送信→**描画完了**」の全経路。
+ *   これを「配達(送信→ハンドラ受信)」と「描画(受信→描画完了)」に分けるため
+ *   lastDeliveryGapMs/avgDeliveryGapMs(配達のみ)を追加した。描画分 ≈ avgGapMs - avgDeliveryGapMs。
+ *   MVP(min-gap 3000→12000+prune)が外れた場合、この2値の大小で次の1手が数値で確定する
+ *   (配達支配→書込輻輳=設計通り / 描画支配→Phase3 を繰り上げ)。既存 avgGapMs の意味は不変。
  */
 
 /** 初期 即時プッシュ診断 state。 */
@@ -32,6 +40,8 @@ export function makeInitialInstantPushDiag() {
     paintedRows: 0,
     lastGapMs: -1,
     avgGapMs: -1,
+    lastDeliveryGapMs: -1,
+    avgDeliveryGapMs: -1,
     lastEventAt: 0
   };
 }
@@ -44,7 +54,8 @@ export function makeInitialInstantPushDiag() {
  *   lastEventAt は delta.lastEventAt があれば採用、無ければ既存値を保持。
  * @param {Partial<InstantPushDiagState>|null|undefined} prev
  * @param {{ sentCount?: number, sentRows?: number, receivedCount?: number, receivedRows?: number,
- *   rejectedCount?: number, paintedRows?: number, lastGapMs?: number, avgGapMs?: number, lastEventAt?: number }} delta
+ *   rejectedCount?: number, paintedRows?: number, lastGapMs?: number, avgGapMs?: number,
+ *   lastDeliveryGapMs?: number, avgDeliveryGapMs?: number, lastEventAt?: number }} delta
  * @returns {InstantPushDiagState}
  */
 export function applyInstantPushDiagDelta(prev, delta) {
@@ -52,6 +63,11 @@ export function applyInstantPushDiagDelta(prev, delta) {
   const d = delta && typeof delta === 'object' ? delta : {};
   /** @param {unknown} x @returns {number} */
   const addend = (x) => (Number.isFinite(Number(x)) ? Number(x) : 0);
+  /**
+   * delta にキーがあれば置換・無ければ既存維持(diagFlushThrottle の畳み込み契約)。
+   * @param {unknown} x @param {number} keep @returns {number}
+   */
+  const replaceOrKeep = (x, keep) => (x != null && Number.isFinite(Number(x)) ? Number(x) : keep);
   return {
     sentCount: base.sentCount + addend(d.sentCount),
     sentRows: base.sentRows + addend(d.sentRows),
@@ -59,9 +75,11 @@ export function applyInstantPushDiagDelta(prev, delta) {
     receivedRows: base.receivedRows + addend(d.receivedRows),
     rejectedCount: base.rejectedCount + addend(d.rejectedCount),
     paintedRows: base.paintedRows + addend(d.paintedRows),
-    lastGapMs: d.lastGapMs != null && Number.isFinite(Number(d.lastGapMs)) ? Number(d.lastGapMs) : base.lastGapMs,
-    avgGapMs: d.avgGapMs != null && Number.isFinite(Number(d.avgGapMs)) ? Number(d.avgGapMs) : base.avgGapMs,
-    lastEventAt: d.lastEventAt != null && Number.isFinite(Number(d.lastEventAt)) ? Number(d.lastEventAt) : base.lastEventAt
+    lastGapMs: replaceOrKeep(d.lastGapMs, base.lastGapMs),
+    avgGapMs: replaceOrKeep(d.avgGapMs, base.avgGapMs),
+    lastDeliveryGapMs: replaceOrKeep(d.lastDeliveryGapMs, base.lastDeliveryGapMs),
+    avgDeliveryGapMs: replaceOrKeep(d.avgDeliveryGapMs, base.avgDeliveryGapMs),
+    lastEventAt: replaceOrKeep(d.lastEventAt, base.lastEventAt)
   };
 }
 
@@ -83,6 +101,8 @@ function buildInstantPushDiagSnapshotInternal(diag) {
     paintedRows: num(d.paintedRows, base.paintedRows),
     lastGapMs: num(d.lastGapMs, base.lastGapMs),
     avgGapMs: num(d.avgGapMs, base.avgGapMs),
+    lastDeliveryGapMs: num(d.lastDeliveryGapMs, base.lastDeliveryGapMs),
+    avgDeliveryGapMs: num(d.avgDeliveryGapMs, base.avgDeliveryGapMs),
     lastEventAt: num(d.lastEventAt, base.lastEventAt)
   };
 }
@@ -117,6 +137,7 @@ export function buildInstantPushDiagLines(snap, nowMs) {
   const paintedRows = Number(snap.paintedRows) || 0;
   const lastGapMs = Number(snap.lastGapMs);
   const avgGapMs = Number(snap.avgGapMs);
+  const avgDeliveryGapMs = Number(snap.avgDeliveryGapMs);
   const now = Number.isFinite(Number(nowMs)) ? Number(nowMs) : 0;
   const lastAt = Number(snap.lastEventAt) || 0;
   const agoText = lastAt > 0 && now > 0 ? ` / 最終${Math.max(0, Math.round((now - lastAt) / 1000))}秒前` : '';
@@ -124,8 +145,18 @@ export function buildInstantPushDiagLines(snap, nowMs) {
     Number.isFinite(lastGapMs) && lastGapMs >= 0
       ? `表示遅延 直近${lastGapMs}ms${Number.isFinite(avgGapMs) && avgGapMs >= 0 ? `(平均${avgGapMs}ms)` : ''}`
       : '表示遅延 未計測';
-  return [
+  const lines = [
     `即時プッシュ: 送信${sentCount}件(行${sentRows}) / 受信${receivedCount}件(行${receivedRows}) / 破棄${rejectedCount} / 表示反映${paintedRows}行${agoText}`,
     `  → ${gapText}`
   ];
+  // robust-arch Phase 0: 配達(送信→受信) と 描画(受信→描画完了) の内訳を1行で見せる。
+  //   どちらが支配的かで MVP 後の次の一手が数値で決まる(嘘をつかないため未計測は出さない)。
+  if (Number.isFinite(avgDeliveryGapMs) && avgDeliveryGapMs >= 0) {
+    const paintPart =
+      Number.isFinite(avgGapMs) && avgGapMs >= 0
+        ? ` / 描画平均${Math.max(0, avgGapMs - avgDeliveryGapMs)}ms`
+        : '';
+    lines.push(`  → 内訳: 配達平均${avgDeliveryGapMs}ms${paintPart}`);
+  }
+  return lines;
 }
