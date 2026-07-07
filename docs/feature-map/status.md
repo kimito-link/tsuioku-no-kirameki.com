@@ -50,10 +50,10 @@ graph LR
   n_status --> n_src_lib_giftDisplayNickname_js["lib/giftDisplayNickname.js"]:::shared
   n_status --> n_src_lib_giftEffectDiag_js["lib/giftEffectDiag.js"]:::shared
   n_status --> n_src_lib_giftEffectDiagKey_js["lib/giftEffectDiagKey.js"]:::shared
+  n_status --> n_src_lib_giftHistoryMirrorKey_js["lib/giftHistoryMirrorKey.js"]:::shared
   n_status --> n_src_lib_googleSuggest_js["lib/googleSuggest.js"]
   n_status --> n_src_lib_healthCells_js["lib/healthCells.js"]
-  n_status --> n_src_lib_highlightLedger_js["lib/highlightLedger.js"]:::shared
   classDef shared fill:#eee,stroke:#999,color:#666;
 ```
 
-> ほか 75 ファイル省略（全件は storage-bus.md / metafile 参照）。
+> ほか 76 ファイル省略（全件は storage-bus.md / metafile 参照）。

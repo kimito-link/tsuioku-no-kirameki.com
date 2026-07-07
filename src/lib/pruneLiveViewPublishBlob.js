@@ -16,10 +16,12 @@
  *   - totalSeen 等の「本当は何件あったか」は据え置き=誠実に元件数を残す。
  *   - laneMirror.js:30 の cap 半減パターンが手本。ここは複数セクションを優先順で削る版。
  *
- * 削る順(価値の低い順・SYNTHESIS.md E):
+ * 削る順(価値の低い順・SYNTHESIS.md B2-6):
+ *   ⓪ giftHistoryMirror.ledgerRows を 20→8→0 に半減(投げ明細はランキングより価値低=最優先で削る)。
  *   ① commentTimelineMirror.rows を半減(最新側=末尾を残す)。複数回まで。
- *   ② topSupporters.rows を 10→5 に削る。
- *   ③ statusReport(fullText 文字列)を末尾切詰め+「※容量超過のため切詰め」注記。
+ *   ② giftHistoryMirror.rooms を 10→5 に削る。
+ *   ③ topSupporters.rows を 10→5 に削る。
+ *   ④ statusReport(fullText 文字列)を末尾切詰め+「※容量超過のため切詰め」注記。
  *
  * 純関数・chrome 非依存・副作用なし(入力 blob は破壊しない=浅い clone で作業する)。
  *
@@ -32,6 +34,10 @@ export const LIVEVIEW_PUBLISH_MAX_JSON_BYTES = 448 * 1024;
 const TOP_SUPPORTERS_FLOOR = 5;
 /** commentTimelineMirror.rows を半減し続けるときの下限件数。 */
 const COMMENT_ROWS_FLOOR = 8;
+/** giftHistoryMirror.ledgerRows を半減し続けるときの下限件数(20→8→...→0=投げ明細は最優先で削る)。 */
+const GIFT_LEDGER_ROWS_FLOOR = 8;
+/** giftHistoryMirror.rooms を削るときの下限件数(② 10→5)。 */
+const GIFT_ROOMS_FLOOR = 5;
 /** statusReport 切詰め時に末尾へ足す注記(この分の余白を残して切る)。 */
 const TRUNCATE_NOTE = '\n\n※容量超過のため切詰め（純Web公開ペイロードのサイズ上限による）';
 
@@ -67,6 +73,32 @@ export function pruneLiveViewPublishBlob(blob, opts = {}) {
   // 入力を破壊しないため浅い clone(削る対象のコンテナだけ差し替える)。
   const out = { ...src };
 
+  // ⓪ giftHistoryMirror.ledgerRows を 20→8→0 に半減(投げ明細=ランキングより価値低=最優先で削る)。
+  //    まず floor(8) まで半減。それでも上限超過なら 0 まで落とす(明細を完全に諦めても rooms は残す)。
+  {
+    const gh = out.giftHistoryMirror;
+    if (gh && typeof gh === 'object' && Array.isArray(gh.ledgerRows) && gh.ledgerRows.length > 0) {
+      let rows = gh.ledgerRows;
+      const before = rows.length;
+      // 半減ループ(floor まで)。
+      while (jsonBytes(out) > maxBytes && rows.length > GIFT_LEDGER_ROWS_FLOOR) {
+        const nextLen = Math.max(GIFT_LEDGER_ROWS_FLOOR, Math.floor(rows.length / 2));
+        if (nextLen >= rows.length) break;
+        rows = rows.slice(0, nextLen); // 新しい側(先頭)を残す(ledgerRows は新しい順)
+        // ledgerTotalCount は据え置き=「本当は何件あったか」を誠実に残す。
+        out.giftHistoryMirror = { ...gh, ledgerRows: rows };
+      }
+      // floor でもまだ超過なら 0 まで落とす(明細を完全に諦める)。
+      if (jsonBytes(out) > maxBytes && rows.length > 0) {
+        rows = [];
+        out.giftHistoryMirror = { ...gh, ledgerRows: rows };
+      }
+      if (rows.length < before) {
+        pruned.push({ section: 'giftHistoryMirror.ledgerRows', before, after: rows.length });
+      }
+    }
+  }
+
   // ① commentTimelineMirror.rows を半減(最新側=末尾を残す)。複数回まで。
   {
     const ctm = out.commentTimelineMirror;
@@ -86,7 +118,18 @@ export function pruneLiveViewPublishBlob(blob, opts = {}) {
     }
   }
 
-  // ② topSupporters.rows を 10→5 に削る。
+  // ② giftHistoryMirror.rooms を 10→5 に削る(貢献者ランキングの尾を切る)。
+  if (jsonBytes(out) > maxBytes) {
+    const gh = out.giftHistoryMirror;
+    if (gh && typeof gh === 'object' && Array.isArray(gh.rooms) && gh.rooms.length > GIFT_ROOMS_FLOOR) {
+      const before = gh.rooms.length;
+      const rooms = gh.rooms.slice(0, GIFT_ROOMS_FLOOR);
+      out.giftHistoryMirror = { ...gh, rooms };
+      pruned.push({ section: 'giftHistoryMirror.rooms', before, after: rooms.length });
+    }
+  }
+
+  // ③ topSupporters.rows を 10→5 に削る。
   if (jsonBytes(out) > maxBytes) {
     const sup = out.topSupporters;
     if (sup && typeof sup === 'object' && Array.isArray(sup.rows) && sup.rows.length > TOP_SUPPORTERS_FLOOR) {
@@ -97,7 +140,7 @@ export function pruneLiveViewPublishBlob(blob, opts = {}) {
     }
   }
 
-  // ③ statusReport(fullText 文字列)を末尾切詰め+注記。上限に収まる長さを二分探索せず線形で詰める。
+  // ④ statusReport(fullText 文字列)を末尾切詰め+注記。上限に収まる長さを二分探索せず線形で詰める。
   if (jsonBytes(out) > maxBytes && typeof out.statusReport === 'string' && out.statusReport.length > 0) {
     const before = out.statusReport.length;
     // 上限超過ぶんのバイト数(=文字数と1:1でない可能性はあるが JSON 長で測るので安全側)。

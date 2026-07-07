@@ -102,6 +102,9 @@ import {
 import { createPopupCelebrationGate } from '../lib/popupCelebrationGate.js';
 import { nicoadCommentCelebrationKey } from '../lib/nicoadCelebrationKey.js';
 import { buildGiftHistoryNorthStarViewModel } from '../lib/giftHistoryViewModel.js';
+// ③WEB投げ一覧丸写し(第2号・reference_full_mirror_SYNTHESIS.md B2-3): 北極星 giftHistory レーンを純Web③にも
+//   丸写しするための鏡スナップショット純関数。paint 済み ctx を渡すだけ=publish 経路に新規 storage read を足さない。
+import { buildGiftHistoryMirrorSnapshot } from '../lib/giftHistoryMirror.js';
 import {
   fetchKokenGiftHistoryAllViaExtension,
   fetchKokenGiftHistoryViaExtension
@@ -7251,6 +7254,28 @@ function publishTopSupportersMirror(liveId, rooms) {
   }
 }
 
+/**
+ * ③WEB投げ一覧丸写し(第2号・reference_full_mirror_SYNTHESIS.md B2-3): 北極星 giftHistory レーン
+ *   (貢献者 rooms + 個別投げ明細 ledgerRows)の鏡を status→純Web③用に publish する。
+ *   INLINE_PASSIVE は書かない(②の不可侵原則)。★paint に使った ctx の現物を渡すだけ=publish 経路に
+ *   新規 storage read を足さない(鉄則)。HTML(ctx.throwsTableHtml)は鏡に載せない(R-1)=ledgerRows を運ぶ。
+ * @param {string} liveId
+ * @param {object} ctx refreshNorthStarGiftHistoryLaneAsync が paint に使った VM(rooms/ledgerRows/pointsSum 系)
+ */
+function publishGiftHistoryMirror(liveId, ctx) {
+  if (INLINE_PASSIVE) return; // 受動ビュー: 鏡を上書きしない
+  try {
+    const now = Date.now();
+    const lid = String(liveId || '').trim().toLowerCase();
+    if (!/^lv\d{1,15}$/.test(lid)) return;
+    const snap = buildGiftHistoryMirrorSnapshot(ctx, { liveId: lid, nowMs: now });
+    if (!snap) return;
+    mergeAndScheduleFlush('giftHistory', snap, lid, now);
+  } catch {
+    /* no-op */
+  }
+}
+
 /** v0.1.1018: liveId検証・provisionalガード(暫定30件で全件鏡を潰さない)を判定する gate。
  *  ★v0.1.1036: min-gap はバンドル flush に一元化したので gate 側は無効化(minGapMs:0)=二重ゲートで
  *    gap 窓のコメントを捨てない(F-1 再来防止・commentMirrorPublishGate.js のコメント参照)。 */
@@ -11217,7 +11242,12 @@ async function computeGiftHistoryNorthStarRoomsContext(liveId, opts = {}) {
           pointsSumAll: vm.pointsSumAll,
           pointsSumDisplayed: vm.pointsSumDisplayed,
           throwCount: vm.throwCount,
-          throwsTableHtml: vm.throwsTableHtml
+          throwsTableHtml: vm.throwsTableHtml,
+          // ③WEB投げ一覧丸写し(第2号・B2-2): 個別投げ明細の【生データ行】を透過する(throwsTableHtml=HTML は
+          //   R-1 によりサーバー往復の鏡に載せられない)。①の描画は throwsTableHtml のまま=挙動不変。
+          ledgerRows: Array.isArray(vm.ledgerRows) ? vm.ledgerRows : [],
+          ledgerTotalCount: Number(vm.ledgerTotalCount) || 0,
+          payloadSource: String(vm.payloadSource || '')
         };
       }
     }
@@ -11364,6 +11394,10 @@ async function computeGiftHistoryNorthStarRoomsContext(liveId, opts = {}) {
         pointsSumAll: subAppCtx.pointsSumAll,
         pointsSumDisplayed: subAppCtx.pointsSumDisplayed,
         throwsTableHtml: subAppCtx.throwsTableHtml || '',
+        // ③WEB投げ一覧丸写し(第2号): ledger 生データを ctx に透過(鏡が buildGiftHistoryMirrorSnapshot で拾う)。
+        ledgerRows: subAppCtx.ledgerRows || [],
+        ledgerTotalCount: subAppCtx.ledgerTotalCount || 0,
+        payloadSource: subAppCtx.payloadSource || '',
         freshnessNote:
           subAppCtx.capturedAt > 0
             ? formatCardFreshnessNote(subAppCtx.capturedAt, { autoRefreshing: true })
@@ -11387,6 +11421,10 @@ async function computeGiftHistoryNorthStarRoomsContext(liveId, opts = {}) {
         pointsSumAll: livePtsSum,
         pointsSumDisplayed: livePtsDisplayed,
         throwsTableHtml: subAppCtx?.throwsTableHtml || '',
+        // ③WEB投げ一覧丸写し(第2号): ライブ採用時も投げ明細は subApp 由来を透過(throwsTableHtml と同流儀)。
+        ledgerRows: subAppCtx?.ledgerRows || [],
+        ledgerTotalCount: subAppCtx?.ledgerTotalCount || 0,
+        payloadSource: subAppCtx?.payloadSource || '',
         freshnessNote:
           liveCtx.latestAt > 0
             ? formatCardFreshnessNote(liveCtx.latestAt, { autoRefreshing: true })
@@ -12127,6 +12165,9 @@ async function refreshNorthStarGiftHistoryLaneAsync(liveId) {
       _giftHistoryThrowsPanelHtmlKey = '';
       clearNorthStarGiftThrowsPanel();
     }
+    // ③WEB投げ一覧丸写し(第2号・B2-3): paint 成功後、paint に使った ctx の現物を鏡へ publish する
+    //   (新規 storage read を足さない)。ledgerRows は ctxRaw から透過済み。INLINE_PASSIVE は関数内で早期 return。
+    publishGiftHistoryMirror(lid, ctx);
     return;
   }
   _giftHistoryNorthStarPaintKey = '';

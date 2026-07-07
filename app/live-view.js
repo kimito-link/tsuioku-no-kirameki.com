@@ -65,6 +65,11 @@ import { buildCommentTickerLatestHtml } from '../src/lib/commentTickerLatestHtml
 //   データは既存の commentTimelineMirror(jsonBlob 同梱済み)を再利用=新規送信ゼロ。
 import { buildSupportTimelineBodyHtml } from '../src/lib/supportTimelineHtml.js';
 import { summarizeTimelineGifts } from '../src/lib/supportActivityTimeline.js';
+// ③WEB投げ一覧丸写し(第2号・reference_full_mirror_SYNTHESIS.md B2-7)。①拡張の北極星 giftHistory レーンと
+//   同じ本物 lib(似せて自作しない)で、貢献者 strip(#northStarLaneBody-giftHistory)+投げ明細テーブル
+//   (#northStarLaneThrows-giftHistory)を描く。データは giftHistoryMirror(jsonBlob 同梱)を再利用。
+import { restoreGiftHistoryMirror } from '../src/lib/giftHistoryMirror.js';
+import { buildGiftThrowLedgerTableSectionHtml } from '../src/lib/giftThrowLedgerTableHtml.js';
 // 第1段(council/liveview-wholesale-root-SYNTHESIS.md): スナップショット丸ごと1枚の鮮度を【1回だけ】判定し、
 //   全レーンを一斉に出す/一斉に「古い」とする。per-section の個別鮮度ドロップ(=レーンがバラバラに消える)を廃止。
 import {
@@ -518,6 +523,51 @@ function paintSupportTimelineMirror(snap) {
   }
 }
 
+/** ③WEB投げ一覧丸写し(第2号・B2-7): 北極星 giftHistory レーンを純Web③にも描く。
+ *   ①拡張の refreshNorthStarGiftHistoryLaneAsync と同じ本物経路(似せて自作しない):
+ *     - 貢献者 rooms → renderTopSupportRankStripInto を #northStarLaneBody-giftHistory へ(strip 描画)。
+ *     - 投げ明細 ledgerRows → buildGiftThrowLedgerTableSectionHtml を #northStarLaneThrows-giftHistory へ(HTML は③内で組む=R-1 遵守)。
+ *   ★専用署名ガード(_lastGiftHistorySig)=既存 sig と共用しない(diff-skip 機構は新設・既存不変)。
+ *   ★rows/ledger 空なら該当 host を触らない(popup の空状態を上書きしない=死に画面回避)。 */
+let _lastGiftHistorySig = ' init';
+function paintGiftHistoryMirror(snap) {
+  const body = document.getElementById('northStarLaneBody-giftHistory');
+  if (!body) return;
+  const m = restoreGiftHistoryMirror(snap);
+  if (!m) return; // データ無し=popup の空状態のまま(死に画面にしない)
+  const sig = `${String(m.liveId || '')}|${Number(m.capturedAt) || 0}|${m.rooms.length}|${m.ledgerRows.length}`;
+  if (sig === _lastGiftHistorySig) return;
+  _lastGiftHistorySig = sig;
+  try {
+    // (a) 貢献者 rooms を strip 描画(①の paintTopSupportRankStyleIntoElement と同じ recipe)。
+    if (m.rooms.length) {
+      renderTopSupportRankStripInto(body, m.rooms, {
+        noteText: m.noteText,
+        unitSuffix: m.unitSuffix || 'pt',
+        ariaLabel: m.ariaLabel || 'ギフト投げ一覧の送り主別集計',
+        isNorthStarBody: true,
+        pointsSumAll: m.pointsSumAll,
+        pointsSumDisplayed: m.pointsSumDisplayed,
+        officialProgramGiftPts: m.officialProgramGiftPts || null,
+        ..._stripIo
+      });
+    }
+    // (b) 投げ明細テーブルを ③内で組む(サーバー往復はデータのみ=R-1)。空なら host を触らない。
+    if (m.ledgerRows.length) {
+      const throws = document.getElementById('northStarLaneThrows-giftHistory');
+      if (throws) {
+        throws.innerHTML = buildGiftThrowLedgerTableSectionHtml(m.ledgerRows, {
+          totalCount: m.ledgerTotalCount,
+          shownCount: m.ledgerRows.length,
+          payloadSource: m.payloadSource
+        });
+      }
+    }
+  } catch {
+    /* no-op: 投げ一覧は best-effort(壊れても他レーンを巻き込まない) */
+  }
+}
+
 /** snapshot の全鏡を本物 paint で popup DOM に塗る（signature ガード有効＝変化時のみ）。
  *   ★第1段(council/liveview-wholesale-root-SYNTHESIS.md): スナップショット丸ごとの鮮度を【1回だけ】判定し、
  *     新鮮なら全レーンを一斉に塗る・古ければ1枚バナーで知らせる(per-section でバラバラに消さない=全レーンが揃う)。 */
@@ -536,6 +586,8 @@ function paintAllMirrors(jsonBlob) {
   paintCommentTimelineMirror(jsonBlob.commentTimelineMirror || null);
   // ③WEB応援タイムライン丸写し(第1号): 同じ commentTimelineMirror を複数行リストにも描く(ティッカーと共存)。
   paintSupportTimelineMirror(jsonBlob.commentTimelineMirror || null);
+  // ③WEB投げ一覧丸写し(第2号): 北極星 giftHistory レーン(貢献者 strip + 投げ明細テーブル)を描く。
+  paintGiftHistoryMirror(jsonBlob.giftHistoryMirror || null);
   // 2026-06-29(HANDOFF-resume-0629 §3 (B)): ①POP と【全く同じフル状態速報】を③WEB でも出す。
   //   status が jsonBlob.statusReport に①の本文(buildAiShareFullText の結果)を同梱する=ここは貼るだけ。
   paintStatusReport(jsonBlob.statusReport || null);
@@ -592,6 +644,7 @@ function forcePaintAllMirrors() {
   _lastLaneSig = ' force';
   _lastTimelineSig = ' force';
   _lastSupportTimelineSig = ' force'; // ③応援タイムライン丸写し(第1号)も clobber から自己修復させる
+  _lastGiftHistorySig = ' force'; // ③投げ一覧丸写し(第2号)も clobber(passive の collapse)から自己修復させる
   const wasPainting = _painting;
   _painting = true; // 自分の paint 由来の mutation を observer に無視させる
   try {
@@ -689,7 +742,10 @@ function startSelfHealingRepaint() {
   //   ★supportTimelineBody(③応援タイムライン丸写し・第1号): ユーザーが <details> を開くと popup 本物の
   //     refreshSupportActivityTimeline がシム storage にコメントが無いため空文言で clobber する。
   //     observer 自己修復が唯一の防御(配線3点セットの3点目)。
-  const targets = ['sceneStoryUserLaneStack', 'liveStatCards', 'casterBanner', 'supportTimelineBody']
+  //   ★northStarLaneBody-giftHistory(③投げ一覧丸写し・第2号): passive popup は
+  //     collapseNorthStarGiftHistoryLaneForPassive がこのレーンを意図的に畳む=clobber が設計上確定。
+  //     observer 自己修復が唯一の防御(配線3点セットの3点目)。
+  const targets = ['sceneStoryUserLaneStack', 'liveStatCards', 'casterBanner', 'supportTimelineBody', 'northStarLaneBody-giftHistory']
     .map((id) => document.getElementById(id))
     .filter(Boolean);
   try {

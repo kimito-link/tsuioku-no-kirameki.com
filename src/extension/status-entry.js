@@ -577,6 +577,7 @@ async function refresh(opts = {}) {
         northStarMirror,
         publishOutcomeRec,
         commentTimelineMirror,
+        giftHistoryMirror,
         previewRenderAck,
         backfillLiveMetric,
         giftEffectDiag,
@@ -609,14 +610,14 @@ async function refresh(opts = {}) {
         () => _customSoundDiagGuard.run(customSoundDiagFallback),
         tmo
       ).catch(() => customSoundDiagFallback);
-      _extrasCache = { reportPreview, watchTabMap, trendFindings, laneDiag, laneMirror, statCardsMirror, northStarMirror, voiceDiag, venueSeatsDiag, publishOutcomeRec, commentTimelineMirror, previewRenderAck, backfillLiveMetric, giftEffectDiag, milestoneEffectDiag, customSoundDiag, voiceEffectDiag, bgmPhaseDiag, opSoundEffectDiag, commentPostDiag, instantPushDiag, channelSwitchDiag, highlightLedger, scoreAnnounceDiag };
+      _extrasCache = { reportPreview, watchTabMap, trendFindings, laneDiag, laneMirror, statCardsMirror, northStarMirror, voiceDiag, venueSeatsDiag, publishOutcomeRec, commentTimelineMirror, giftHistoryMirror, previewRenderAck, backfillLiveMetric, giftEffectDiag, milestoneEffectDiag, customSoundDiag, voiceEffectDiag, bgmPhaseDiag, opSoundEffectDiag, commentPostDiag, instantPushDiag, channelSwitchDiag, highlightLedger, scoreAnnounceDiag };
       _extrasCacheAt = Date.now();
       _mark('extras');
     }
-    const { reportPreview, watchTabMap, trendFindings, laneDiag, laneMirror, statCardsMirror, northStarMirror, voiceDiag, venueSeatsDiag, publishOutcomeRec, commentTimelineMirror, previewRenderAck, backfillLiveMetric, giftEffectDiag, milestoneEffectDiag, customSoundDiag, voiceEffectDiag, bgmPhaseDiag, opSoundEffectDiag, commentPostDiag, instantPushDiag, channelSwitchDiag, highlightLedger, scoreAnnounceDiag } = _extrasCache;
+    const { reportPreview, watchTabMap, trendFindings, laneDiag, laneMirror, statCardsMirror, northStarMirror, voiceDiag, venueSeatsDiag, publishOutcomeRec, commentTimelineMirror, giftHistoryMirror, previewRenderAck, backfillLiveMetric, giftEffectDiag, milestoneEffectDiag, customSoundDiag, voiceEffectDiag, bgmPhaseDiag, opSoundEffectDiag, commentPostDiag, instantPushDiag, channelSwitchDiag, highlightLedger, scoreAnnounceDiag } = _extrasCache;
     step = 'renderAll';
     // v0.1.1005: 前サイクルの所要計器をコピー本文へ渡す(画面ヘッダーだけでなく AI共有テキストにも出す)。
-    renderAll({ lvList, summaries, fastDiag, popupDiag, backfillProgress, backfillLiveMetric, voiceDiag, venueSeatsDiag, laneDiag, laneMirror, statCardsMirror, northStarMirror, reportPreview, trendFindings, watchTabMap, publishOutcomeRec, commentTimelineMirror, previewRenderAck, refreshPerf: _lastRefreshPerf, giftEffectDiag, milestoneEffectDiag, customSoundDiag, voiceEffectDiag, bgmPhaseDiag, opSoundEffectDiag, commentPostDiag, instantPushDiag, channelSwitchDiag, highlightLedger, scoreAnnounceDiag });
+    renderAll({ lvList, summaries, fastDiag, popupDiag, backfillProgress, backfillLiveMetric, voiceDiag, venueSeatsDiag, laneDiag, laneMirror, statCardsMirror, northStarMirror, reportPreview, trendFindings, watchTabMap, publishOutcomeRec, commentTimelineMirror, giftHistoryMirror, previewRenderAck, refreshPerf: _lastRefreshPerf, giftEffectDiag, milestoneEffectDiag, customSoundDiag, voiceEffectDiag, bgmPhaseDiag, opSoundEffectDiag, commentPostDiag, instantPushDiag, channelSwitchDiag, highlightLedger, scoreAnnounceDiag });
     _mark('render');
     const _totalMs = Math.round((typeof performance !== 'undefined' ? performance.now() : Date.now()) - _t0);
     updateLastUpdateMeta({ totalMs: _totalMs, stepMs: _stepMs });
@@ -1217,7 +1218,7 @@ async function loadBackfillLiveMetricSafe() {
 // v0.1.861: レポートプレビューの信頼度注釈の文脈は純関数 reportPreviewCtxFromFastDiag(src/lib)に抽出済み
 //   (NDGR 接続/userId 付き率/backfill 進行 → 注釈ctx・挙動同値・テストで固定)。import は冒頭。
 
-function renderAll({ lvList, summaries, fastDiag, popupDiag, backfillProgress, backfillLiveMetric, voiceDiag, venueSeatsDiag, laneDiag, laneMirror, statCardsMirror, northStarMirror, reportPreview, trendFindings, watchTabMap, publishOutcomeRec, commentTimelineMirror, previewRenderAck, refreshPerf, giftEffectDiag, milestoneEffectDiag, customSoundDiag, voiceEffectDiag, bgmPhaseDiag, opSoundEffectDiag, commentPostDiag, instantPushDiag, channelSwitchDiag, highlightLedger, scoreAnnounceDiag }) {
+function renderAll({ lvList, summaries, fastDiag, popupDiag, backfillProgress, backfillLiveMetric, voiceDiag, venueSeatsDiag, laneDiag, laneMirror, statCardsMirror, northStarMirror, reportPreview, trendFindings, watchTabMap, publishOutcomeRec, commentTimelineMirror, giftHistoryMirror, previewRenderAck, refreshPerf, giftEffectDiag, milestoneEffectDiag, customSoundDiag, voiceEffectDiag, bgmPhaseDiag, opSoundEffectDiag, commentPostDiag, instantPushDiag, channelSwitchDiag, highlightLedger, scoreAnnounceDiag }) {
   // v0.1.847: 各描画セクションを独立 try/catch で隔離するヘルパ。1つが throw しても他のセクションと
   //   最終更新メタを巻き込まない=「セルが全部消える/最終更新—のまま固まる」を根治。落ちた場所は
   //   console と AI 共有欄に出して真因を追えるようにする(star-romi 失敗体験の除去)。
@@ -1564,7 +1565,8 @@ function renderAll({ lvList, summaries, fastDiag, popupDiag, backfillProgress, b
     Number(laneMirror?.capturedAt) || 0,
     Number(statCardsMirror?.capturedAt) || 0,
     Number(northStarMirror?.capturedAt) || 0,
-    Number(commentTimelineMirror?.capturedAt) || 0
+    Number(commentTimelineMirror?.capturedAt) || 0,
+    Number(giftHistoryMirror?.capturedAt) || 0
   );
   const jsonBlob = {
     generatedAt: new Date().toISOString(),
@@ -1591,7 +1593,12 @@ function renderAll({ lvList, summaries, fastDiag, popupDiag, backfillProgress, b
       : null,
     // 第2段(council/liveview-wholesale-root-SYNTHESIS.md): コメントタイムライン鏡(最新N件)。純Webで
     //   「コメントが進む動き」を出す。popup が KEY_COMMENT_TIMELINE_MIRROR へ publish→ここで相乗り→純Webが貼る。
-    commentTimelineMirror: commentTimelineMirror || null
+    commentTimelineMirror: commentTimelineMirror || null,
+    // ③WEB投げ一覧丸写し(第2号・reference_full_mirror_SYNTHESIS.md B2-5): 北極星 giftHistory レーン
+    //   (貢献者 rooms + 個別投げ明細 ledgerRows)の鏡。popup が KEY_GIFT_HISTORY_MIRROR へ publish→
+    //   extras(12秒間引き)で読む→ここで相乗り→純Web③が本物 lib(strip + ledger table)で描く。
+    //   R-1: HTML は載せない=データ行を運ぶ(③で escapeHtml 済み lib が HTML 化)。
+    giftHistoryMirror: giftHistoryMirror || null
   };
   // 自己診断の「いま視聴中の lv」= 鏡(北極星/lane/数字)の liveId を優先採用(read を増やさない)。
   const currentLiveId = String(

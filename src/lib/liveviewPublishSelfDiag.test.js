@@ -32,7 +32,14 @@ function fullBlob() {
       liveId: 'lv1', capturedAt: NOW - 5000,
       lanes: { contributionRanking: [northRow('x', 10), northRow('y', 5)], adRanking: [] }
     },
-    topSupporters: { liveId: 'lv1', rows: [{}, {}, {}, {}, {}] }
+    topSupporters: { liveId: 'lv1', rows: [{}, {}, {}, {}, {}] },
+    // ③WEB投げ一覧丸写し(第2号): 貢献者 rooms 3 + 投げ明細 ledger 2(母数 7)。
+    giftHistoryMirror: {
+      liveId: 'lv1', capturedAt: NOW - 5000,
+      rooms: [{ userKey: 'u1', nickname: 'a', count: 3 }, { userKey: 'u2', nickname: 'b', count: 2 }, { userKey: 'u3', nickname: 'c', count: 1 }],
+      ledgerRows: [{ timeLabel: '1', itemName: 'x', points: 10 }, { timeLabel: '2', itemName: 'y', points: 5 }],
+      ledgerTotalCount: 7
+    }
   };
 }
 
@@ -54,6 +61,11 @@ describe('buildLiveviewPublishSelfDiag', () => {
     expect(d.mirrors.stat.concurrent).toBe(false); // placeholder
     expect(d.mirrors.stat.visitor).toBe(true);
     expect(d.mirrors.supporters.count).toBe(5);
+    // ③WEB投げ一覧丸写し(第2号): 貢献者 rooms 数・投げ明細 ledger 数・母数を出す。
+    expect(d.mirrors.giftHistory.present).toBe(true);
+    expect(d.mirrors.giftHistory.rooms).toBe(3);
+    expect(d.mirrors.giftHistory.ledger).toBe(2);
+    expect(d.mirrors.giftHistory.ledgerTotal).toBe(7);
   });
 
   it('空セル(displaySrcなし)は数えない', () => {
@@ -67,6 +79,7 @@ describe('buildLiveviewPublishSelfDiag', () => {
     const d = buildLiveviewPublishSelfDiag({ jsonBlob: {}, currentLiveId: 'lv1', publishKeys: {}, nowMs: NOW });
     expect(d.mirrors.lane.present).toBe(false);
     expect(d.mirrors.northStar.present).toBe(false);
+    expect(d.mirrors.giftHistory.present).toBe(false);
   });
 
   it('liveId 一致/不一致を判定', () => {
@@ -229,6 +242,30 @@ describe('formatLiveviewPublishSelfDiagLines', () => {
     expect(text).toContain('北極星: 貢献度2 / 広告0');
     expect(text).toContain('整合チェック');
     expect(text).toContain('元データ無し＝純Webに出なくて正常');
+  });
+
+  it('投げ一覧(giftHistory): 件数のみ(比較なし)を明示し嘘の✅/🔴を出さない', () => {
+    const d = buildLiveviewPublishSelfDiag({
+      jsonBlob: fullBlob(), currentLiveId: 'lv1',
+      publishKeys: { ingestKey: 'k', viewToken: 'v' }, nowMs: NOW
+    });
+    const line = formatLiveviewPublishSelfDiagLines(d).find((l) => l.startsWith('- 投げ一覧:'));
+    expect(line).toBeTruthy();
+    expect(line).toContain('貢献者3');
+    expect(line).toContain('投げ明細2/7件'); // 母数7>表示2=「2/7件」
+    expect(line).toContain('比較対象APIなし=件数のみ');
+    // consistency に giftHistory の突合行(嘘の🔴になりうる)は作らない
+    expect(d.consistency.some((c) => String(c.lane || '').includes('投げ'))).toBe(false);
+  });
+
+  it('投げ一覧が prune された場合、⚠️削減行に日本語ラベルで明記(嘘の欠落に見せない)', () => {
+    const blob = fullBlob();
+    blob.snapshotMeta = { capturedAt: NOW - 5000, pruned: [{ section: 'giftHistoryMirror.ledgerRows', before: 20, after: 8 }] };
+    const d = buildLiveviewPublishSelfDiag({ jsonBlob: blob, currentLiveId: 'lv1', publishKeys: {}, nowMs: NOW });
+    const line = formatLiveviewPublishSelfDiagLines(d).find((l) => l.startsWith('⚠️ 容量超過のため③WEB'));
+    expect(line).toBeTruthy();
+    expect(line).toContain('投げ一覧の明細rows 20→8'); // 生キーでなく日本語ラベル
+    expect(line).not.toContain('giftHistoryMirror.ledgerRows'); // 生キーが露出しない
   });
 
   it('未送信を明示', () => {

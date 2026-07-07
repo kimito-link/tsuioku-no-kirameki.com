@@ -1672,6 +1672,18 @@
       ]
     },
     {
+      "file": "src/lib/giftHistoryMirrorKey.js",
+      "featureCount": 2,
+      "features": [
+        "popup",
+        "status"
+      ],
+      "labels": [
+        "ポップアップ(応援レーン)",
+        "状態速報ページ"
+      ]
+    },
+    {
       "file": "src/lib/giftRankingLaneOptIn.js",
       "featureCount": 2,
       "features": [
@@ -4055,6 +4067,16 @@
     },
     {
       "file": "src/lib/giftBahamutCelebration.js",
+      "featureCount": 1,
+      "features": [
+        "popup"
+      ],
+      "labels": [
+        "ポップアップ(応援レーン)"
+      ]
+    },
+    {
+      "file": "src/lib/giftHistoryMirror.js",
       "featureCount": 1,
       "features": [
         "popup"

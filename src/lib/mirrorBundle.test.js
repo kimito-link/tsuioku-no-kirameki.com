@@ -22,9 +22,17 @@ const NORTH_STAR = {
   lanes: { contributionRanking: [{ name: '貢献A' }], adRanking: [] }
 };
 const TIMELINE = { liveId: 'lv1', capturedAt: 14, rows: [{ name: 'コメントA', text: '888' }], totalSeen: 1 };
+// ③WEB投げ一覧丸写し(第2号): giftHistory バンドル節。rooms(貢献者)+ledgerRows(投げ明細)。
+const GIFT_HISTORY = {
+  liveId: 'lv1',
+  capturedAt: 15,
+  rooms: [{ userKey: 'u1', nickname: '投げ主A', count: 500, avatarUrl: '' }],
+  ledgerRows: [{ timeLabel: '12:00', itemName: '花束', points: 300, userId: '1', senderLabel: '投げ主A', source: 'koken-api' }],
+  ledgerTotalCount: 1
+};
 
 describe('createEmptyMirrorBundle', () => {
-  it('5セクションが null の初期形を返す', () => {
+  it('6セクションが null の初期形を返す(giftHistory=③WEB投げ一覧丸写し・第2号を含む)', () => {
     expect(createEmptyMirrorBundle()).toEqual({
       liveId: '',
       gen: 0,
@@ -34,7 +42,8 @@ describe('createEmptyMirrorBundle', () => {
         statCards: null,
         topSupporters: null,
         northStar: null,
-        commentTimeline: null
+        commentTimeline: null,
+        giftHistory: null
       }
     });
   });
@@ -219,5 +228,23 @@ describe('mirrorBundle ネガティブコントロール', () => {
     expect(() => bumpMirrorBundleGeneration(undefined, undefined)).not.toThrow();
     expect(() => isMirrorBundleGenerationStale(undefined, undefined)).not.toThrow();
     expect(() => restoreMirrorBundleSection(undefined, undefined)).not.toThrow();
+  });
+});
+
+describe('giftHistory バンドル節(③WEB投げ一覧丸写し・第2号)', () => {
+  it("'giftHistory' は正規セクションキー=merge/restore できる(他5鏡と同一 tick に載る)", () => {
+    let buf = createEmptyMirrorBundle();
+    buf = mergeMirrorBundleSection(buf, 'commentTimeline', TIMELINE, { liveId: 'lv1', nowMs: 100 });
+    buf = mergeMirrorBundleSection(buf, 'giftHistory', GIFT_HISTORY, { liveId: 'lv1', nowMs: 101 });
+    // giftHistory を足しても既存の commentTimeline を消さない(後着が先着を消さない)。
+    expect(buf.sections.commentTimeline).toBe(TIMELINE);
+    expect(buf.sections.giftHistory).toBe(GIFT_HISTORY);
+    expect(restoreMirrorBundleSection(buf, 'giftHistory')).toBe(GIFT_HISTORY);
+  });
+
+  it('ネガコン: 未反映の giftHistory は初期形で null(既存を消さない)', () => {
+    const buf = mergeMirrorBundleSection(createEmptyMirrorBundle(), 'lane', LANE, { liveId: 'lv1', nowMs: 100 });
+    expect(buf.sections.giftHistory).toBeNull();
+    expect(restoreMirrorBundleSection(buf, 'giftHistory')).toBeNull();
   });
 });

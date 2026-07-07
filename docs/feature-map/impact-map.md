@@ -211,6 +211,7 @@
 | `src/lib/eventScoreRankingRelay.js` | 2 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) |
 | `src/lib/giftDeltaFallback.js` | 2 | 記録エンジン(watchページ常駐) / 会場モード(standalone) |
 | `src/lib/giftEventStore.js` | 2 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) |
+| `src/lib/giftHistoryMirrorKey.js` | 2 | ポップアップ(応援レーン) / 状態速報ページ |
 | `src/lib/giftRankingLaneOptIn.js` | 2 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) |
 | `src/lib/giftSubAppFrameSource.js` | 2 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) |
 | `src/lib/giftSubAppRelayDiag.js` | 2 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) |
@@ -435,6 +436,7 @@
 | `src/lib/forwardReactivation.js` | 1 | 記録エンジン(watchページ常駐) |
 | `src/lib/geminiNanoBridge.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/giftBahamutCelebration.js` | 1 | ポップアップ(応援レーン) |
+| `src/lib/giftHistoryMirror.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/giftHistoryNorthStarPaintKey.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/giftHistoryOfficialReconcile.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/giftHistorySourcePreference.js` | 1 | ポップアップ(応援レーン) |

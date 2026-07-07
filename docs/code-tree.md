@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 2 / 655 件
+## ⚠️ 役割コメントが無いソース 2 / 657 件
 - `src/lib/reportPreviewPublish.js`
 - `src/lib/venueLaneBuckets.js`
 
@@ -527,7 +527,7 @@
   - `gift-impact.mp3`
   - `gift-sparkle.mp3`
   - `gift-whoosh.mp3`
-- 📁 **src/** (1362)
+- 📁 **src/** (1365)
   - 📁 **data/** (6)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -792,7 +792,7 @@
         - `logo_funlink_white_RGB_maru_black.png`
       - `logo_guide_funlink_ol.pdf`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1147)
+  - 📁 **lib/** (1150)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -1182,6 +1182,9 @@
     - `giftEffectDiagKey.js` — ギフト/広告の「検知→演出(投擲)→効果音」が揃っているかの観測値を venueBar.js が書き、
     - `giftEventStore.js` — v0.1.206 Phase A: NDGR gift event の時系列ストア（純関数）。
     - `giftEventStore.test.js`
+    - `giftHistoryMirror.js` — 投げ一覧(giftHistory・koken API)の「鏡」スナップショット純関数
+    - `giftHistoryMirror.test.js`
+    - `giftHistoryMirrorKey.js` — 投げ一覧(giftHistory・koken API)鏡の storage キー正本
     - `giftHistoryNorthStarPaintKey.js` — 北極星ギフト履歴レーンの再描画スキップ用キー（v0.1.582）。
     - `giftHistoryNorthStarPaintKey.test.js`
     - `giftHistoryOfficialReconcile.js` — 北極星ギフト履歴: 公式番組累計 pt と履歴 API 合計の表示整合（v0.1.581）。

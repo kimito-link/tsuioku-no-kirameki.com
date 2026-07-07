@@ -276,7 +276,7 @@
   - `src/lib/giftThrowProjectile.js`
 - **吹き出し寿命管理** — 会場の吹き出しの表示上限・追い出し(eviction)ライフサイクル
   - `src/lib/venueBubbleLifecycle.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 180</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 182</summary>
 
 - `scripts/encode-marketing-html-avatars.mjs` — extension/images/marketing-html-avatars/*.png を data URI にし、
 - `scripts/split-avatar-parts.mjs` — 偽市松背景の除去 + パーツ切り出し(one-off アセットパイプライン)
@@ -329,6 +329,8 @@
 - `src/lib/giftDeltaFallback.js` — 「ギフト個別イベント欠落配信」のフォールバック検知(2026-07-06)。
 - `src/lib/giftDisplayNickname.js` — NDGR ギフト protobuf から拾いがちな「内部用ラベル」を表示名から除外する。
 - `src/lib/giftEventStore.js` — v0.1.206 Phase A: NDGR gift event の時系列ストア（純関数）。
+- `src/lib/giftHistoryMirror.js` — 投げ一覧(giftHistory・koken API)の「鏡」スナップショット純関数
+- `src/lib/giftHistoryMirrorKey.js` — 投げ一覧(giftHistory・koken API)鏡の storage キー正本
 - `src/lib/giftHistoryNorthStarPaintKey.js` — 北極星ギフト履歴レーンの再描画スキップ用キー（v0.1.582）。
 - `src/lib/giftHistoryOfficialReconcile.js` — 北極星ギフト履歴: 公式番組累計 pt と履歴 API 合計の表示整合（v0.1.581）。
 - `src/lib/giftHistorySourcePreference.js` — ギフト履歴レーンの「どのデータ源を表示するか」を決める純関数（v0.1.395）。
@@ -820,7 +822,7 @@
 
 ## 🧬 修正系譜マップ(この系統のバグを過去にどう直したか)
 
-> changelog 全 438 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
+> changelog 全 439 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
 
 ### 💾 記録件数 (65版)
 - `v0.1.1102` 2026-07-07 — perf(liveview): 公開書込12秒間隔+容量上限で削減
@@ -1250,7 +1252,8 @@
 - `v0.1.713` 2026-06-13 — 会場モードを明るくして発言を吹き出し表示
 - `v0.1.711` 2026-06-13 — 会場モードで発言を吹き出し表示
 
-### 🎁 ギフト (87版)
+### 🎁 ギフト (88版)
+- `v0.1.1104` 2026-07-07 — feat(web): ③応援ライブビューに投げ一覧丸写し
 - `v0.1.1103` 2026-07-07 — feat(web): ③応援ライブビューに応援タイムライン丸写し
 - `v0.1.1099` 2026-07-06 — feat(score): popupに採点パネル+ハイライト台帳
 - `v0.1.1097` 2026-07-06 — feat(venue): 来場が控えめな入賞演出になります
@@ -1694,7 +1697,8 @@
 - `v0.1.806` 2026-06-17 — HTML保存の失敗を根治+完了音声を追加
 - `v0.1.785` 2026-06-16 — 状態ページのタイムアウト警告を拡張エラー欄に出さない
 
-### ⚡ 描画・性能 (109版)
+### ⚡ 描画・性能 (110版)
+- `v0.1.1104` 2026-07-07 — feat(web): ③応援ライブビューに投げ一覧丸写し
 - `v0.1.1102` 2026-07-07 — perf(liveview): 公開書込12秒間隔+容量上限で削減
 - `v0.1.1101` 2026-07-07 — perf(diag): 書込台帳+配達/描画ギャップ計器
 - `v0.1.1096` 2026-07-06 — perf(diag): 即時プッシュ計器の書込を10秒集約

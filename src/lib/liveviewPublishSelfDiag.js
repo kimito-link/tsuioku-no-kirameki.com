@@ -189,6 +189,9 @@ export function buildLiveviewPublishSelfDiag(args) {
   // v0.1.1017: コメント鏡(①POP のティッカーと同じ displayEntries を最新N件に間引いたもの)。
   //   ①POP が描いた件数(totalSeen=鏡バッチの母数)と ③WEB へ載った件数(rows)を突合するのに使う。
   const comment = blob.commentTimelineMirror && typeof blob.commentTimelineMirror === 'object' ? blob.commentTimelineMirror : null;
+  // ③WEB投げ一覧丸写し(第2号・B2-8): giftHistory 鏡(貢献者 rooms + 投げ明細 ledgerRows)。
+  //   ①vs③の厳密突合は fastDiag 側に対応レーンが無いため、mirrors 一覧に present/rooms数/ledger数を出す。
+  const giftHistory = blob.giftHistoryMirror && typeof blob.giftHistoryMirror === 'object' ? blob.giftHistoryMirror : null;
 
   // 応援レーン（非null件数）
   const laneBuckets = ['link', 'gift', 'ad', 'konta', 'tanu'];
@@ -351,6 +354,18 @@ export function buildLiveviewPublishSelfDiag(args) {
         : { present: false },
       supporters: sup
         ? { present: true, liveId: lc(sup.liveId), lidMatch: lidMatch(sup), count: supCount }
+        : { present: false },
+      // ③WEB投げ一覧丸写し(第2号): 鏡の有無・貢献者 rooms 数・投げ明細 ledger 数(母数 ledgerTotalCount 込み)。
+      giftHistory: giftHistory
+        ? {
+          present: true,
+          liveId: lidOf(giftHistory),
+          lidMatch: lidMatch(giftHistory),
+          ageSec: freshOf(giftHistory),
+          rooms: Array.isArray(giftHistory.rooms) ? giftHistory.rooms.length : 0,
+          ledger: Array.isArray(giftHistory.ledgerRows) ? giftHistory.ledgerRows.length : 0,
+          ledgerTotal: Math.max(0, Math.floor(Number(giftHistory.ledgerTotalCount) || 0))
+        }
         : { present: false }
     },
     consistency,
@@ -444,6 +459,17 @@ export function formatLiveviewPublishSelfDiagLines(diag) {
   } else {
     lines.push('- 応援者ランキング: 🔴 鏡なし');
   }
+  // ③WEB投げ一覧丸写し(第2号・B2-8): 貢献者rooms数+投げ明細ledger数(母数込み)を出す。
+  //   ★giftHistory は koken 個別履歴で fastDiag に比較対象が無い=①vs③突合は原理的に不能。
+  //   よって consistency 突合行は作らず「件数のみ(比較なし)」を明示する(嘘の🔴も嘘の✅も出さない)。
+  //   prune で削られた場合は下の⚠️容量削減行に「投げ一覧の明細rows N→M」が併記される。
+  const gh = m.giftHistory || {};
+  if (gh.present) {
+    const ledgerLabel = gh.ledgerTotal > gh.ledger ? `${gh.ledger}/${gh.ledgerTotal}件` : `${gh.ledger}件`;
+    lines.push(`- 投げ一覧: 貢献者${gh.rooms || 0} / 投げ明細${ledgerLabel}${freshMark(gh.ageSec)}${lidMark(gh.lidMatch)} → ${(gh.rooms || gh.ledger) ? '純Webで描画' : '空'}（比較対象APIなし=件数のみ）`);
+  } else {
+    lines.push('- 投げ一覧: 鏡なし（投げが無い配信 or popup未起動）');
+  }
 
   // 整合チェック
   const cons = Array.isArray(d.consistency) ? d.consistency : [];
@@ -479,6 +505,9 @@ export function formatLiveviewPublishSelfDiagLines(diag) {
   const SECTION_LABEL = {
     'commentTimelineMirror.rows': 'コメント鏡rows',
     'topSupporters.rows': '応援者ランキングrows',
+    // ③WEB投げ一覧丸写し(第2号・B2-8): prune で投げ明細/貢献者が削られたら明記する(嘘の欠落に見せない)。
+    'giftHistoryMirror.ledgerRows': '投げ一覧の明細rows',
+    'giftHistoryMirror.rooms': '投げ一覧の貢献者rooms',
     statusReport: '状態速報本文'
   };
   const pr = Array.isArray(d.pruned) ? d.pruned : [];
