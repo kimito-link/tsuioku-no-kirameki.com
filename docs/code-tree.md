@@ -527,7 +527,7 @@
   - `gift-impact.mp3`
   - `gift-sparkle.mp3`
   - `gift-whoosh.mp3`
-- 📁 **src/** (1365)
+- 📁 **src/** (1366)
   - 📁 **data/** (6)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -792,7 +792,7 @@
         - `logo_funlink_white_RGB_maru_black.png`
       - `logo_guide_funlink_ol.pdf`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1150)
+  - 📁 **lib/** (1151)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -891,6 +891,7 @@
     - `broadcastScore.test.js`
     - `broadcastScoreHtml.js` — 配信スコアパネル(カラオケ採点風)の HTML を組む純関数。
     - `broadcastScoreHtml.test.js`
+    - `broadcastScoreMirrorWiring.test.js`
     - `broadcastScorePanelViewModel.js` — SC2(council/broadcast-scoring-SYNTHESIS.md §5)のpopupスコアパネル配線から、
     - `broadcastScorePanelViewModel.test.js`
     - `broadcastSessionSummaryDb.js` — 配信セッション単位の軽量サマリ（ポップアップの IndexedDB）

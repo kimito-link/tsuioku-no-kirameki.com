@@ -50,9 +50,9 @@ graph LR
   n_popup --> n_src_lib_broadcastDurationLabel_js["lib/broadcastDurationLabel.js"]
   n_popup --> n_src_lib_broadcastNarrativeBuilder_js["lib/broadcastNarrativeBuilder.js"]
   n_popup --> n_src_lib_broadcastReportSummary_js["lib/broadcastReportSummary.js"]
-  n_popup --> n_src_lib_broadcastScore_js["lib/broadcastScore.js"]
+  n_popup --> n_src_lib_broadcastScore_js["lib/broadcastScore.js"]:::shared
   n_popup --> n_src_lib_broadcastScoreHtml_js["lib/broadcastScoreHtml.js"]
-  n_popup --> n_src_lib_broadcastScorePanelViewModel_js["lib/broadcastScorePanelViewModel.js"]
+  n_popup --> n_src_lib_broadcastScorePanelViewModel_js["lib/broadcastScorePanelViewModel.js"]:::shared
   classDef shared fill:#eee,stroke:#999,color:#666;
 ```
 
