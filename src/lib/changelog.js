@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1106',
+    date: '2026-07-07',
+    summary: 'chore(web): 丸写しセクションレジストリでdrift検知',
+    items: Object.freeze([
+      'WEB版の丸写し（拡張の画面をWEBにも出す仕組み）を、パネルを1つ登録するだけで配線が揃ったか自動チェックする仕組みに整えました。今後パネルを足したときに「WEBに出す配線を忘れた」場合は、テスト（品質チェック）が赤くなって気づけます。表示は変わりません（内部の品質担保です）。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1105',
     date: '2026-07-07',
     summary: 'feat(web): ③応援ライブビューに配信採点丸写し',

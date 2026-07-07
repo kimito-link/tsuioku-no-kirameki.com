@@ -158,7 +158,7 @@
 
 - **応援レーン集約(誰が候補か)** — 保存コメント行を userId 単位に畳み込みレーン候補を作る唯一の集約正本(popup/venue 共通)
   - `src/lib/userLaneCandidatesFromStorage.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 93</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 94</summary>
 
 - `src/domain/lane/aggregate.js` — 応援ユーザーレーンの per-row → per-user 集約（純関数）。
 - `src/domain/observations/observationStore.js` — observationStore - StatObservation のメモリ常駐リングバッファ。
@@ -219,6 +219,7 @@
 - `src/lib/kokenContributionRankingApi.js` — koken 公式「ギフト貢献度ランキング」無認証 JSON API の URL 組立 & 正規化（純関数）。
 - `src/lib/liveChannelSwitch.js` — 「別の配信へ移動(SPA遷移)するとパネルが壊れる」問題の修正(2026-07-06)。
 - `src/lib/liveCommenterStats.js` — 記録済みコメントから「ユニーク投稿者（推定）」用の集計（純関数）
+- `src/lib/liveviewMirrorSections.js` — ③WEB丸写しの「セクション・レジストリ」= ①POP の各パネルが③に出るための配線を1箇所に集約した一覧表
 - `src/lib/loadLastBroadcastSummary.js` — 0.1.69 (AY): empty state（配信なし）popup で「前回の配信」cards を復元するために、
 - `src/lib/mangaBroadcastSummary.js` — 放送終了後の HTML レポート / マーケ分析の頭にくる「漫画読み体験」要約。
 - `src/lib/marketingAggregate.js` — userId: string,
@@ -822,7 +823,7 @@
 
 ## 🧬 修正系譜マップ(この系統のバグを過去にどう直したか)
 
-> changelog 全 440 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
+> changelog 全 441 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
 
 ### 💾 記録件数 (65版)
 - `v0.1.1102` 2026-07-07 — perf(liveview): 公開書込12秒間隔+容量上限で削減
@@ -1815,7 +1816,8 @@
 - `v0.1.840` 2026-06-20 — 機能逆引き地図を全ファイル網羅に
 - `v0.1.835` 2026-06-20 — 自己検証ゲートを追加(版同期+診断文言)
 
-### その他 (24版)
+### その他 (25版)
+- `v0.1.1106` 2026-07-07 — chore(web): 丸写しセクションレジストリでdrift検知
 - `v0.1.1100` 2026-07-06 — feat(score): 結果発表シーケンス+採点音割当
 - `v0.1.1098` 2026-07-06 — feat(score): 配信採点モデルv2+フェーズ実績計器
 - `v0.1.1093` 2026-07-06 — fix(post): watchタブが開いていれば送信可能に
