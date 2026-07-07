@@ -685,7 +685,7 @@
   - `src/lib/statusTrendKey.js`
   - `src/extension/status-entry.js`
   - `src/lib/statusActionAdvisor.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 127</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 128</summary>
 
 - `app/app.js` — スマホ閲覧用 status Web 版。
 - `app/live-view.js` — 純Web版 応援ライブビュー（拡張なし・PC/スマホ共通）。
@@ -778,6 +778,7 @@
 - `src/lib/prewarmCoordinator.js` — 複数 watch タブで popup.html の prewarm が同時に走るのを防ぐ
 - `src/lib/profileResolveState.js` — v0.1.720 PR-T2: プロフィール解決の状態管理（純関数）。
 - `src/lib/protobufVarint.js` — Protobuf の非負 varint を読み取る（length-delimited の長さ用）。
+- `src/lib/pruneLiveViewPublishBlob.js` — 純Web公開ペイロード(jsonBlob)の容量 prune はしご純関数
 - `src/lib/pruneStaleEventDomLvs.js` — v0.1.203 Patch 4: 古い event-dom snapshot 残骸を cleanup 対象として識別する純関数。
 - `src/lib/refreshTaskGuard.js` — v0.1.437: popup の `refresh()` で chrome API が永久 pending になっても全カード「—」固定にしない
 - `src/lib/resolveKiramekiReturningAndFirstTimeUserKeys.js` — 「きらめきの賞」のかよい / はじまり判定用 userKey 分類（純関数）。
@@ -819,9 +820,10 @@
 
 ## 🧬 修正系譜マップ(この系統のバグを過去にどう直したか)
 
-> changelog 全 436 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
+> changelog 全 437 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
 
-### 💾 記録件数 (64版)
+### 💾 記録件数 (65版)
+- `v0.1.1102` 2026-07-07 — perf(liveview): 公開書込12秒間隔+容量上限で削減
 - `v0.1.1084` 2026-07-06 — perf(status): マイ効果音計器のBlob全件走査を廃止
 - `v0.1.1077` 2026-07-05 — ボイス空振り消費とpayout張り付き修正
 - `v0.1.1072` 2026-07-05 — マイ効果音計器をextrasに追加
@@ -1507,7 +1509,8 @@
 - `v0.1.673` 2026-06-10 — コメビュの名前をパネルと同じ情報源で補完
 - `v0.1.670` 2026-06-10 — コメビュのアイコンを本家と同じサムネに
 
-### 🩺 診断・状態速報 (158版)
+### 🩺 診断・状態速報 (159版)
+- `v0.1.1102` 2026-07-07 — perf(liveview): 公開書込12秒間隔+容量上限で削減
 - `v0.1.1091` 2026-07-06 — ギフト音が静かに消える取りこぼしを根治
 - `v0.1.1089` 2026-07-06 — feat(diag): 自コメの実着までの感度を計測
 - `v0.1.1088` 2026-07-06 — feat(diag): 読み上げ/ギフトの体感遅延を実測計器化
@@ -1690,7 +1693,8 @@
 - `v0.1.806` 2026-06-17 — HTML保存の失敗を根治+完了音声を追加
 - `v0.1.785` 2026-06-16 — 状態ページのタイムアウト警告を拡張エラー欄に出さない
 
-### ⚡ 描画・性能 (108版)
+### ⚡ 描画・性能 (109版)
+- `v0.1.1102` 2026-07-07 — perf(liveview): 公開書込12秒間隔+容量上限で削減
 - `v0.1.1101` 2026-07-07 — perf(diag): 書込台帳+配達/描画ギャップ計器
 - `v0.1.1096` 2026-07-06 — perf(diag): 即時プッシュ計器の書込を10秒集約
 - `v0.1.1092` 2026-07-06 — feat(lane): コメント即時プッシュで重負荷でも表示即時
