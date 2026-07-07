@@ -5,7 +5,7 @@
 > **波及機能数(blast radius)が多いファイルほど、変更時の影響が大きい**(共有部品)。
 > 実装前にここで「触るファイルが何に波及するか」を確認すると誤前提を潰せる。
 
-## ⚠️ 影響大（3機能以上に波及・83 ファイル）
+## ⚠️ 影響大（3機能以上に波及・84 ファイル）
 
 ここを変えると複数の実行コンテキストに影響する。変更時は各 feature の動作確認を。
 
@@ -42,6 +42,7 @@
 - `src/lib/reportSilentError.js` → **4 機能**: 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 状態速報ページ / 会場モード(standalone)
 - `src/lib/safeStorageLocal.js` → **4 機能**: 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 状態速報ページ / 会場モード(standalone)
 - `src/lib/storageOpTimeout.js` → **4 機能**: コメビュ(別窓) / 記録エンジン(watchページ常駐) / 状態速報ページ / 会場モード(standalone)
+- `src/lib/storageWriteLedger.js` → **4 機能**: 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 状態速報ページ / 会場モード(standalone)
 - `src/lib/storyAvatarTvFallbackClass.js` → **4 機能**: 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 状態速報ページ / 会場モード(standalone)
 - `src/lib/storyTileTvStyle.js` → **4 機能**: 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 状態速報ページ / 会場モード(standalone)
 - `src/lib/storyUserLaneMeta.js` → **4 機能**: 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 状態速報ページ / 会場モード(standalone)
@@ -130,6 +131,7 @@
 | `src/lib/reportSilentError.js` | 4 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 状態速報ページ / 会場モード(standalone) |
 | `src/lib/safeStorageLocal.js` | 4 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 状態速報ページ / 会場モード(standalone) |
 | `src/lib/storageOpTimeout.js` | 4 | コメビュ(別窓) / 記録エンジン(watchページ常駐) / 状態速報ページ / 会場モード(standalone) |
+| `src/lib/storageWriteLedger.js` | 4 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 状態速報ページ / 会場モード(standalone) |
 | `src/lib/storyAvatarTvFallbackClass.js` | 4 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 状態速報ページ / 会場モード(standalone) |
 | `src/lib/storyTileTvStyle.js` | 4 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 状態速報ページ / 会場モード(standalone) |
 | `src/lib/storyUserLaneMeta.js` | 4 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 状態速報ページ / 会場モード(standalone) |

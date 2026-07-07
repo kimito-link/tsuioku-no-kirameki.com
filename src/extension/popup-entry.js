@@ -5956,6 +5956,14 @@ function noteInstantPushDiagReceived(delta) {
 let _instantPushAvgGapMsLocal = -1;
 
 /**
+ * robust-arch Phase 0 (2026-07-07・計器のみ・挙動不変): 「配達のみ」(送信→ハンドラ受信)の
+ * EMA 平均をメモリ上だけで追跡する。_instantPushAvgGapMsLocal(送信→描画完了=全経路)から
+ * これを引けば「描画分」が出る。どちらが支配的かで MVP 後の次の一手が数値で決まる。
+ * @type {number} -1=未計測
+ */
+let _instantPushAvgDeliveryGapMsLocal = -1;
+
+/**
  * v0.1.1092: 即時プッシュバッファの内容を STORY_SOURCE_STATE へ合流し、レーンだけを軽量に再描画する。
  *
  * 通常の refresh()(重い・tabs.query/storage 全件読み込み)を待たず、既に手元にある
@@ -6029,6 +6037,10 @@ function repaintStoryUserLaneWithInstantPushBuffer() {
  * 素の chrome.storage 呼び出しによる同期 throw は起きない。追加の自己解除は不要。
  */
 function handleInstantCommentPushMessage(event) {
+  // robust-arch Phase 0: ハンドラ突入時刻を最初に取る(配達 gap = handlerAt - sentAt)。
+  //   ここは「時刻を1つ取るだけ」で、即時プッシュ経路の本体(nonce検証・merge・描画)には
+  //   一切手を入れない(地雷: 即時プッシュ経路に触るな)。
+  const handlerAt = Date.now();
   if (!isInstantCommentPushValid(event, _instantPushExpectedNonce)) {
     // nonce 未設定(自 iframe に pn= が無い=古いビルドの content script 等)のときは
     // 「破棄」として計上しない(そもそも即時プッシュ機能が来ていないだけ=ノイズにしない)。
@@ -6054,10 +6066,25 @@ function handleInstantCommentPushMessage(event) {
     ? STORY_SOURCE_STATE.storageRowsForCurrentLive
     : [];
   _instantPushBuffer = mergeInstantPushBuffer(_instantPushBuffer, baseStorageRows, displayEntries);
+  // robust-arch Phase 0: 配達 gap は sentAt が実際に載っていたときだけ計測する
+  //   (fallback の Date.now() を使ったときは 0 になり無意味なので載せない=嘘をつかない)。
+  let deliveryGapDelta = {};
+  if (Number.isFinite(sentAt)) {
+    const deliveryGapMs = Math.max(0, handlerAt - sentAt);
+    _instantPushAvgDeliveryGapMsLocal = computeInstantPushGapAverage(
+      _instantPushAvgDeliveryGapMsLocal,
+      deliveryGapMs
+    );
+    deliveryGapDelta = {
+      lastDeliveryGapMs: deliveryGapMs,
+      avgDeliveryGapMs: _instantPushAvgDeliveryGapMsLocal
+    };
+  }
   noteInstantPushDiagReceived({
     receivedCount: 1,
     receivedRows: rows.length,
-    lastEventAt: Date.now()
+    lastEventAt: Date.now(),
+    ...deliveryGapDelta
   });
   repaintStoryUserLaneWithInstantPushBuffer();
 }

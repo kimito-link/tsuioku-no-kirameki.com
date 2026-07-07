@@ -25,6 +25,43 @@
  */
 
 import { isExtensionContextAlive } from './reportSilentError.js';
+import { makeStorageWriteLedger, recordWrite } from './storageWriteLedger.js';
+
+/**
+ * robust-arch Phase 0 (2026-07-07・計器のみ・挙動不変):
+ *   全 set の書込量を「キー名→{回数,概算bytes}」で積むプロセス内シングルトン台帳。
+ *   set の唯一の入口(safeStorageLocalSet)でここに積み、status:live 側が
+ *   getStorageWriteLedger() で読んで「書込上位5キー bytes/分」を1行表示する。
+ *
+ *   記録/演出/音・set の挙動には一切影響させない(recordWrite は set より前に、
+ *   独立した try/catch の中でのみ呼ぶ=集計が壊れても set は素通し)。
+ *   ウィンドウ起点は「このモジュールが最初に評価された時刻」(= ページ生存開始に相当)。
+ * @type {import('./storageWriteLedger.js').StorageWriteLedger}
+ */
+const _storageWriteLedger = makeStorageWriteLedger(
+  typeof Date !== 'undefined' ? Date.now() : 0
+);
+
+/**
+ * 書込台帳への積算(set の入口からのみ呼ぶ)。集計は診断専用=絶対に投げない。
+ * @param {Record<string, unknown>} items
+ */
+function noteStorageWrite(items) {
+  try {
+    recordWrite(_storageWriteLedger, items);
+  } catch {
+    // no-op: 診断専用。集計失敗が set を止めることは無い。
+  }
+}
+
+/**
+ * 書込台帳の現在値を返す(status:live 表示用の read アクセサ)。破壊的操作は提供しない
+ *   (表示側は topWriteKeysPerMinute 純関数に渡すだけ)。
+ * @returns {import('./storageWriteLedger.js').StorageWriteLedger}
+ */
+export function getStorageWriteLedger() {
+  return _storageWriteLedger;
+}
 
 /**
  * @param {{ runtime?: unknown, storage?: { local?: unknown, onChanged?: unknown } }} [chromeRef]
@@ -72,6 +109,8 @@ export async function safeStorageLocalGet(keys, opts = {}) {
 export async function safeStorageLocalSet(items, opts = {}) {
   const local = resolveStorageLocal(opts.chromeRef);
   if (!local) return;
+  // robust-arch Phase 0: 書込台帳へ積む(set の前・独立 try/catch。挙動不変)。
+  noteStorageWrite(items);
   try {
     await local.set(items);
   } catch {
