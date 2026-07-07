@@ -42,7 +42,7 @@ function toTimelineRow(item, resolveName, resolveAvatar) {
   const kind = s(it.kind) || (it.isGift ? 'gift' : 'comment');
   // 本文も名前も顔も無い行は鏡に載せても無意味=捨てる。
   if (!text && !name && !avatarUrl) return null;
-  return {
+  const row = {
     at: Number.isFinite(at) && at > 0 ? at : 0,
     name,
     text,
@@ -50,6 +50,15 @@ function toTimelineRow(item, resolveName, resolveAvatar) {
     userId,
     kind
   };
+  // ③応援タイムライン丸写し(第1号): ギフト行は itemName/point を保持=③でも「誰が何を(何pt)」を出す。
+  //   コメント行には付けない(容量ムダ)。値が無ければフィールドごと省く(鏡を膨らませない)。
+  if (kind === 'gift') {
+    const itemName = s(it.itemName ?? it.giftName ?? it.name).slice(0, TIMELINE_TEXT_MAX);
+    const point = Math.max(0, Math.floor(Number(it.point ?? it.contribution) || 0));
+    if (itemName) row.itemName = itemName;
+    if (point > 0) row.point = point;
+  }
+  return row;
 }
 
 /**
@@ -115,4 +124,59 @@ export function isTimelineMirrorRowRenderable(row) {
 export function restoreCommentTimelineRows(snap) {
   const rows = snap && Array.isArray(snap.rows) ? snap.rows : [];
   return rows.filter(isTimelineMirrorRowRenderable);
+}
+
+/**
+ * ③WEB応援タイムライン丸写し(第1号・reference_web_mirror_parity_SYNTHESIS.md A-4)。
+ *   鏡 row {at, name, text, avatarUrl, userId, kind} を、①拡張の応援タイムライン描画
+ *   (supportTimelineHtml.js の buildSupportTimelineBodyHtml)が食う TimelineItem 形へ変換する純関数。
+ *
+ * ★なぜアダプタが要るか: 鏡は最小フィールド(name)だが TimelineItem は nickname/commentNo/selfPosted/key を要求。
+ *   ①の buildSupportActivityTimeline は storage 生データ入力で③には無い。鏡は既に jsonBlob に載っている
+ *   ため、生データ全送(却下済みDOMシリアライズ)でなく「鏡→TimelineItem 変換」で丸写しを成立させる。
+ * ★並び: restore は古→新だが、①の refreshSupportActivityTimeline は order:'desc'(新しい順)。
+ *   丸写しの並びを揃えるため desc で返す。
+ * ★key: React風の一意キー。${kind}:${userId||'anon'}:${at}:${index} で全件一意を保証。
+ *
+ * @param {import('./commentTimelineMirror.js').CommentTimelineMirrorSnapshot|null|undefined} snap
+ * @returns {import('./supportActivityTimeline.js').TimelineItem[]} 新しい順(desc)
+ */
+export function restoreTimelineItemsForHtml(snap) {
+  const rows = restoreCommentTimelineRows(snap); // 描画可能(空行除去)・古→新
+  const items = rows.map((r, index) => {
+    const at = Number.isFinite(Number(r.at)) && Number(r.at) > 0 ? Number(r.at) : 0;
+    const userId = s(r.userId);
+    const nickname = s(r.name);
+    const avatarUrl = s(r.avatarUrl);
+    const text = s(r.text);
+    const key = `${s(r.kind) || 'comment'}:${userId || 'anon'}:${at}:${index}`;
+    if (s(r.kind) === 'gift') {
+      return {
+        kind: 'gift',
+        at,
+        key,
+        userId,
+        nickname,
+        // 鏡が itemName を持てば透過、無ければ本文(text)をギフト名にフォールバック。
+        itemName: s(r.itemName) || text,
+        point: Math.max(0, Math.floor(Number(r.point) || 0)),
+        message: '',
+        avatarUrl
+      };
+    }
+    return {
+      kind: 'comment',
+      at,
+      key,
+      userId,
+      nickname,
+      text,
+      commentNo: '', // 鏡は commentNo を持たない(丸写しで偽番号を作らない)
+      avatarUrl,
+      selfPosted: false // ③は視聴専用=自分の投稿という概念が無い
+    };
+  });
+  // 新しい順(desc)。at 同値は元の古→新順を保つ安定ソートの逆=index で決定的に。
+  items.reverse();
+  return /** @type {any} */ (items);
 }

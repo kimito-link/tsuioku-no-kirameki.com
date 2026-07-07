@@ -58,8 +58,13 @@ import { buildNorthStarAdRankingStatsHtml } from '../src/lib/buildNorthStarAdRan
 import { restoreNorthStarMirrorRows } from '../src/lib/northStarMirror.js';
 // 第2段(council/liveview-wholesale-root-SYNTHESIS.md): コメントタイムライン鏡(最新N件)を純Webで描いて
 //   「コメントが進む動き」を出す。popup と同じ本物 lib を再利用(似せて自作しない)。
-import { restoreCommentTimelineRows } from '../src/lib/commentTimelineMirror.js';
+import { restoreCommentTimelineRows, restoreTimelineItemsForHtml } from '../src/lib/commentTimelineMirror.js';
 import { buildCommentTickerLatestHtml } from '../src/lib/commentTickerLatestHtml.js';
+// ③WEB応援タイムライン丸写し(第1号・reference_web_mirror_parity_SYNTHESIS.md A-4)。
+//   ①拡張と同じ本物 lib(似せて自作しない)で #supportTimelineBody に複数行のタイムラインを描く。
+//   データは既存の commentTimelineMirror(jsonBlob 同梱済み)を再利用=新規送信ゼロ。
+import { buildSupportTimelineBodyHtml } from '../src/lib/supportTimelineHtml.js';
+import { summarizeTimelineGifts } from '../src/lib/supportActivityTimeline.js';
 // 第1段(council/liveview-wholesale-root-SYNTHESIS.md): スナップショット丸ごと1枚の鮮度を【1回だけ】判定し、
 //   全レーンを一斉に出す/一斉に「古い」とする。per-section の個別鮮度ドロップ(=レーンがバラバラに消える)を廃止。
 import {
@@ -478,6 +483,41 @@ function paintCommentTimelineMirror(snap) {
   }
 }
 
+/** ③WEB応援タイムライン丸写し(第1号): コメント鏡を「複数行の応援タイムライン」(#supportTimelineBody)に
+ *   本物 lib(buildSupportTimelineBodyHtml)で描く。①拡張の refreshSupportActivityTimeline と同じ見た目。
+ *   ★ティッカー(最新1件)とは別物=こちらは時系列リスト全体。データは同じ commentTimelineMirror を再利用。
+ *   ★署名ガードは専用(_lastSupportTimelineSig)=既存 _lastTimelineSig を共用しない(diff-skip 機構は新設・既存不変)。 */
+let _lastSupportTimelineSig = ' init';
+function paintSupportTimelineMirror(snap) {
+  const body = document.getElementById('supportTimelineBody');
+  if (!body) return;
+  const items = restoreTimelineItemsForHtml(snap); // 新しい順(desc)・空行除去済み
+  if (!items.length) return; // データ無し=popup の空文言 paint を上書きしない(死に画面回避・:465 と同流儀)
+  const sig = `${String(snap?.liveId || '')}|${Number(snap?.capturedAt) || 0}|${items.length}|${String(items[0]?.key || '')}`;
+  if (sig === _lastSupportTimelineSig) return;
+  _lastSupportTimelineSig = sig;
+  try {
+    const now = Date.now();
+    body.innerHTML = buildSupportTimelineBodyHtml(items, { defaultAvatar: _STRIP_DEFAULT_THUMB, now });
+    // ギフト集計メタ(件数/pt/贈り主数)を出す。ギフトが無ければ hidden のまま。
+    const meta = document.getElementById('supportTimelineGiftMeta');
+    if (meta) {
+      const g = summarizeTimelineGifts(items);
+      if (g.giftCount > 0) {
+        meta.textContent = `🎁 ${g.giftCount}件 / ${g.giftPoints.toLocaleString('ja-JP')}pt / ${g.giftSenders}人`;
+        meta.hidden = false;
+      } else {
+        meta.hidden = true;
+      }
+    }
+    // details を開ける状態にする(hidden 属性が付いていれば外す)。中身が出た=空の案内で誤解させない。
+    const details = document.getElementById('supportTimelineDetails');
+    if (details && details.hidden) details.hidden = false;
+  } catch {
+    /* no-op: タイムラインは best-effort(壊れても他レーンを巻き込まない) */
+  }
+}
+
 /** snapshot の全鏡を本物 paint で popup DOM に塗る（signature ガード有効＝変化時のみ）。
  *   ★第1段(council/liveview-wholesale-root-SYNTHESIS.md): スナップショット丸ごとの鮮度を【1回だけ】判定し、
  *     新鮮なら全レーンを一斉に塗る・古ければ1枚バナーで知らせる(per-section でバラバラに消さない=全レーンが揃う)。 */
@@ -494,6 +534,8 @@ function paintAllMirrors(jsonBlob) {
   paintNorthStarMirror(jsonBlob.northStarMirror || null);
   paintSupporterRanking(jsonBlob.topSupporters || null);
   paintCommentTimelineMirror(jsonBlob.commentTimelineMirror || null);
+  // ③WEB応援タイムライン丸写し(第1号): 同じ commentTimelineMirror を複数行リストにも描く(ティッカーと共存)。
+  paintSupportTimelineMirror(jsonBlob.commentTimelineMirror || null);
   // 2026-06-29(HANDOFF-resume-0629 §3 (B)): ①POP と【全く同じフル状態速報】を③WEB でも出す。
   //   status が jsonBlob.statusReport に①の本文(buildAiShareFullText の結果)を同梱する=ここは貼るだけ。
   paintStatusReport(jsonBlob.statusReport || null);
@@ -549,6 +591,7 @@ function forcePaintAllMirrors() {
   _lastStatCardsSig = ' force';
   _lastLaneSig = ' force';
   _lastTimelineSig = ' force';
+  _lastSupportTimelineSig = ' force'; // ③応援タイムライン丸写し(第1号)も clobber から自己修復させる
   const wasPainting = _painting;
   _painting = true; // 自分の paint 由来の mutation を observer に無視させる
   try {
@@ -643,7 +686,10 @@ function startSelfHealingRepaint() {
   };
 
   // 監視対象: 応援レーンのスタックと数字カード（popup が空に塗り直す要素）。
-  const targets = ['sceneStoryUserLaneStack', 'liveStatCards', 'casterBanner']
+  //   ★supportTimelineBody(③応援タイムライン丸写し・第1号): ユーザーが <details> を開くと popup 本物の
+  //     refreshSupportActivityTimeline がシム storage にコメントが無いため空文言で clobber する。
+  //     observer 自己修復が唯一の防御(配線3点セットの3点目)。
+  const targets = ['sceneStoryUserLaneStack', 'liveStatCards', 'casterBanner', 'supportTimelineBody']
     .map((id) => document.getElementById(id))
     .filter(Boolean);
   try {
