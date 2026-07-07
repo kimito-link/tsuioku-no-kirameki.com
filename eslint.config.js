@@ -217,8 +217,11 @@ export default [
     //   M3(室温)/M5(記録サマリ推移)で publishRoomHeatMirror/publishSessionSummaryMirror+import を追加
     //   (chrome.storage/DOM依存のグルー1行ずつ・純関数本体は roomHeatMirror.js/sessionSummaryMirror.js に隔離)。
     //   実測21842。ラチェットは実測+50の21892へ。
+    //   heavyRace再発の根治(v0.1.1109)で描画単調性ガード+canReuse fresh-read+readAtMs+計器のグルー
+    //   (判定純関数は shouldKeepStoryUserLaneTilesOnShrink/decideHeavyChunkReadReuse に隔離・chrome/DOM依存の
+    //   配線1行ずつのみ popup 側)。実測21902。ラチェットは実測+50の21952へ。
     files: ['src/extension/popup-entry.js'],
-    rules: { 'max-lines': ['error', { max: 21892, skipBlankLines: false, skipComments: false }] }
+    rules: { 'max-lines': ['error', { max: 21952, skipBlankLines: false, skipComments: false }] }
   },
   {
     files: ['src/extension/popup/**/*.js'],

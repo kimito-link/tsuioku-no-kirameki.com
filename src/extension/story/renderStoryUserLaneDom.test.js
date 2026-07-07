@@ -4,7 +4,9 @@ import {
   getStoryLaneRepaintCounts,
   paintStoryUserLaneDomFilled,
   resetStoryUserLaneDom,
-  shouldKeepStoryUserLaneTilesOnEmpty
+  shouldKeepStoryUserLaneTilesOnEmpty,
+  shouldKeepStoryUserLaneTilesOnShrink,
+  STORY_USER_LANE_SHRINK_KEEP_RATIO
 } from './renderStoryUserLaneDom.js';
 
 /**
@@ -188,5 +190,53 @@ describe('shouldKeepStoryUserLaneTilesOnEmpty', () => {
   });
   it('大文字小文字/前後空白を正規化して比較', () => {
     expect(shouldKeepStoryUserLaneTilesOnEmpty(elsWithTanu(1), ' LV1 ', 'lv1')).toBe(true);
+  });
+});
+
+/**
+ * ★heavyRace再発(大配信+backfill)の即効対策(HANDOFF-heavyrace-backfill-IMPL.md A)。
+ *   heavy未settleの暫定描画(短い候補)が、一度出た完全な描画(多タイル)を上書き退化させるのを防ぐ。
+ */
+describe('shouldKeepStoryUserLaneTilesOnShrink', () => {
+  /** 5段合計で prev タイルを持つ els(段は分散させる)。 */
+  function elsWithTiles(prev) {
+    const els = makeEls();
+    const lanes = [els.laneLink, els.laneGift, els.laneAd, els.laneKonta, els.laneTanu];
+    for (let i = 0; i < prev; i += 1) lanes[i % lanes.length].appendChild(document.createElement('div'));
+    return els;
+  }
+
+  it('同一lv+暫定+大幅減(200→74)は keep=true(前回の完全描画を守る)', () => {
+    expect(shouldKeepStoryUserLaneTilesOnShrink(elsWithTiles(200), 'lv1', 'lv1', 74, true)).toBe(true);
+  });
+
+  it('settled(provisional=false)なら同条件でも keep=false(正当な減少は描く)', () => {
+    expect(shouldKeepStoryUserLaneTilesOnShrink(elsWithTiles(200), 'lv1', 'lv1', 74, false)).toBe(false);
+  });
+
+  it('配信切替(lv不一致)なら keep=false(古い配信を残さない)', () => {
+    expect(shouldKeepStoryUserLaneTilesOnShrink(elsWithTiles(200), 'lv2', 'lv1', 74, true)).toBe(false);
+  });
+
+  it('前回タイル0(初回)なら keep=false(守るものが無い)', () => {
+    expect(shouldKeepStoryUserLaneTilesOnShrink(makeEls(), 'lv1', 'lv1', 0, true)).toBe(false);
+  });
+
+  it('微減(200→190=95%)は keep=false(60%以上は描く)', () => {
+    expect(shouldKeepStoryUserLaneTilesOnShrink(elsWithTiles(200), 'lv1', 'lv1', 190, true)).toBe(false);
+  });
+
+  it('増加(200→260)は keep=false(増える方向は当然描く)', () => {
+    expect(shouldKeepStoryUserLaneTilesOnShrink(elsWithTiles(200), 'lv1', 'lv1', 260, true)).toBe(false);
+  });
+
+  it('境界(prev=100・ratio0.6): next=59→keep true / next=60→false', () => {
+    expect(Math.floor(100 * STORY_USER_LANE_SHRINK_KEEP_RATIO)).toBe(60);
+    expect(shouldKeepStoryUserLaneTilesOnShrink(elsWithTiles(100), 'lv1', 'lv1', 59, true)).toBe(true);
+    expect(shouldKeepStoryUserLaneTilesOnShrink(elsWithTiles(100), 'lv1', 'lv1', 60, true)).toBe(false);
+  });
+
+  it('lv正規化(前後空白/大小)して比較', () => {
+    expect(shouldKeepStoryUserLaneTilesOnShrink(elsWithTiles(100), ' LV1 ', 'lv1', 10, true)).toBe(true);
   });
 });

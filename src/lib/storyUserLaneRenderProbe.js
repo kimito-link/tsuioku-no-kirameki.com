@@ -33,7 +33,10 @@ export const STORY_USER_LANE_STEPS = Object.freeze({
   ENTRIES_EMPTY_RETURN: 'entries-empty-return', // heavy 経路: STORY_SOURCE_STATE.entries が空で即 return
   MIRROR_EMPTY: 'mirror-empty', // mirror 経路: 鏡 totalCells===0
   PAINTED: 'painted', // paintStoryUserLaneDomFilled を呼んだ直後
-  DONE: 'done' // 正常完了
+  DONE: 'done', // 正常完了
+  // heavyRace再発の即効対策(HANDOFF-heavyrace-backfill-IMPL.md A): 暫定の縮小 supply が完全描画を
+  //   上書きしそうになったので paint を見送り前回描画を守った(=単調性ガードが実弾を止めた)。
+  SHRINK_KEPT: 'shrink-kept'
 });
 
 /**
@@ -54,6 +57,8 @@ export function createStoryUserLaneRenderProbe() {
     //   「たぬ姉レーンが暫定(直近N件)で固着」の真因(refreshGen レース)を状態速報から観測する。
     heavySettleState: '', // '' | 'settled' | 'race' | 'stale-snapshot' | 'null-resp' | 'empty-covered'
     heavyRaceReturns: 0, // 14532(refreshGen レース)で早期 return した累計回数(多い=レース支配的)
+    // heavyRace再発の即効対策(A): 暫定縮小の上書きを見送った累計回数(>0=ガードが完全描画を守った)。
+    shrinkKeepCount: 0,
     lastRunAtBase: 0 // 最終実行 epoch ms（lastRunAgoMs 算出用）
   };
 }
@@ -101,6 +106,8 @@ export function recordStoryUserLaneStep(probe, step, patch) {
     if (Number.isFinite(p.nowMs)) probe.lastRunAtBase = Number(p.nowMs);
   }
   if (step === STORY_USER_LANE_STEPS.DONE) probe.completed += 1;
+  // heavyRace再発の即効対策(A): 単調性ガードが暫定縮小の上書きを見送った回数(RACE カウントと同型)。
+  if (step === STORY_USER_LANE_STEPS.SHRINK_KEPT) probe.shrinkKeepCount = (Number(probe.shrinkKeepCount) || 0) + 1;
 }
 
 /**
@@ -123,6 +130,7 @@ export function snapshotStoryUserLaneRenderProbe(probe, nowMs) {
     entriesLen: Number.isFinite(probe.entriesLen) ? probe.entriesLen : -1,
     heavySettleState: probe.heavySettleState || '',
     heavyRaceReturns: Number(probe.heavyRaceReturns) || 0,
+    shrinkKeepCount: Number(probe.shrinkKeepCount) || 0,
     lastRunAgoMs: probe.lastRunAtBase > 0 && now > 0 ? Math.max(0, now - probe.lastRunAtBase) : null
   };
 }
@@ -203,6 +211,9 @@ export function buildStoryUserLaneRenderDiag(probeSnap, ctx) {
     expected,
     heavySettleState: String(s.heavySettleState || ''),
     heavyRaceReturns: Number(s.heavyRaceReturns) || 0,
+    shrinkKeepCount: Number(s.shrinkKeepCount) || 0,
+    // heavyRace根治(B)計器: fresh-read で heavy 全件再読みを省いた累計(popup-entry が snap に直接載せる)。
+    heavyFreshReadReuseCount: Number(s.heavyFreshReadReuseCount) || 0,
     lastRunAgoMs: s.lastRunAgoMs ?? null,
     // v0.1.1040 計器: 段ごとの実 replaceChildren 回数(churn 実測)をそのまま持ち越す。
     laneRepaintCounts: s.laneRepaintCounts && typeof s.laneRepaintCounts === 'object' ? s.laneRepaintCounts : null,
@@ -269,6 +280,14 @@ export function formatStoryUserLaneRenderDiagLines(diag, ctx) {
           ? `⚠ race(refreshに追い越され未settle・累計${d.heavyRaceReturns}回)=たぬ姉が暫定固着の疑い`
           : d.heavySettleState;
     lines.push(`  → heavy 完了: ${settleLabel}`);
+  }
+  // heavyRace再発の即効対策(A): 単調性ガードが暫定縮小の上書きを止めた回数(>0=前回の完全描画を守れている証拠)。
+  if (Number(d.shrinkKeepCount) > 0) {
+    lines.push(`  → ⚠ 暫定縮小の上書きを ${d.shrinkKeepCount} 回防御(前回の完全描画を保持=たぬ姉固着を回避)`);
+  }
+  // heavyRace根治(B): fresh-read で heavy 全件再読みを省いた回数(>0=backfill中の re-read ループが切れている証拠)。
+  if (Number(d.heavyFreshReadReuseCount) > 0) {
+    lines.push(`  → heavy 全件再読み省略(fresh-read再利用): ${d.heavyFreshReadReuseCount} 回(backfill中の re-read ループ抑止が効いている)`);
   }
   return lines;
 }

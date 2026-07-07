@@ -104,6 +104,50 @@ export function shouldKeepStoryUserLaneTilesOnEmpty(els, currentLiveId, lastTile
   return false; // 実タイルが1つも無い=畳んでよい(真の空)
 }
 
+/** 縮小上書きを見送る閾値。今回タイル数が前回 DOM 実タイル数のこの割合を下回ったら「暫定縮小」とみなす。 */
+export const STORY_USER_LANE_SHRINK_KEEP_RATIO = 0.6;
+
+/**
+ * 描画単調性ガード(HANDOFF-heavyrace-backfill-IMPL.md A・heavyRace再発の即効対策)。
+ *   大配信+backfill進行中は heavy read が race で未settleになり、応援レーンが「暫定(summary+tail 由来の
+ *   短い候補)」で描かれ続ける。その暫定 paint が「一度出た完全な描画(200+タイル)」を74件等に上書きして
+ *   退化する(=たぬ姉段固着に見える)。これを防ぐため:
+ *   「同一配信 かつ supply が暫定(heavy未settle) かつ 今回描く総タイル数が前回 DOM 実タイル数を
+ *    大幅に下回る」なら paint を見送り、前回の完全描画を守る。
+ *
+ * ★settled(provisional=false)な正当減少(配信中の contamination フィルタ等)は必ず描く=false を返す。
+ * ★配信切替(lid 不一致)は必ず描く=false(OnEmpty と同一の正規化)。
+ * ★前回タイル 0(初回)は守るものが無い=false。
+ *
+ * @param {StoryUserLaneDomElements} els
+ * @param {unknown} currentLiveId
+ * @param {unknown} lastTiledLid 最後に実タイルを描いた liveId
+ * @param {number} nextTileCount 今回描こうとしている総タイル数(picked + gift + ad の 5段合計相当)
+ * @param {boolean} entriesProvisional supply が暫定(heavy 未settle)か
+ * @returns {boolean} true=見送って前回描画を守る / false=描いてよい
+ */
+export function shouldKeepStoryUserLaneTilesOnShrink(
+  els,
+  currentLiveId,
+  lastTiledLid,
+  nextTileCount,
+  entriesProvisional
+) {
+  if (entriesProvisional !== true) return false; // settled な正当減少は必ず描く
+  const cur = String(currentLiveId || '').trim().toLowerCase();
+  const last = String(lastTiledLid || '').trim().toLowerCase();
+  if (!cur || cur !== last) return false; // 配信切替 or 未描画=描いてよい
+  const lanes = els ? [els.laneLink, els.laneGift, els.laneAd, els.laneKonta, els.laneTanu] : [];
+  let prev = 0;
+  for (const lane of lanes) {
+    if (lane && typeof lane.childElementCount === 'number') prev += lane.childElementCount;
+  }
+  if (prev <= 0) return false; // 前回タイル無し=守るものが無い
+  const next = Math.max(0, Math.floor(Number(nextTileCount) || 0));
+  // 今回が前回の 60% 未満=暫定縮小=見送る。60% 以上(微減/同数/増加)は描く。
+  return next < Math.floor(prev * STORY_USER_LANE_SHRINK_KEEP_RATIO);
+}
+
 /**
  * 段の items から「見た目が同じなら再描画不要」を判定する安定 key。
  *   ★時刻や guard 非同期差替後の src は入れない(v1022 型の毎回変化回避)= item 由来の確定フィールドのみ。

@@ -108,7 +108,7 @@
   - `src/lib/monotonicCommentCount.js`
 - **storage キー定義** — chrome.storage のキー名の正本(nls_comments_<lv> 等)
   - `src/lib/storageKeys.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 40</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 41</summary>
 
 - `src/lib/autoBackupState.js` — v0.1.808(星野ロミ式コンポーネント化・第1弾): content-entry.js の巨大化を抑えるため、
 - `src/lib/blobDownload.js` — Blob を指定ファイル名で保存する。
@@ -124,6 +124,7 @@
 - `src/lib/devMonitorTrendSession.js` — 開発監視トレンド: sessionStorage（セッション）+ chrome.storage.local（永続・最大7日）
 - `src/lib/displayRecordedCount.js` — 「画面に出す記録件数」の正本を1つに固定する純関数(v0.1.839・第1)。
 - `src/lib/giftRecord.js` — ギフト/広告ユーザーの永続化（純関数）
+- `src/lib/heavyChunkReadReuse.js` — heavy 全件コメント read の再利用判定純関数
 - `src/lib/inFlightGuard.js` — 状態速報「重さ根治 P3」: runStorageOpWithTimeout(storageOpTimeout.js)は Promise.race で
 - `src/lib/instantCommentPush.js` — 「コメント即時プッシュレーン(storage迂回)」の純関数部。
 - `src/lib/livePersistInterval.js` — v0.1.498〜501: ライブ記録の保存（コアレッサ）最小間隔を決める純粋関数。フリーズ対策 A。
@@ -827,7 +828,7 @@
 
 ## 🧬 修正系譜マップ(この系統のバグを過去にどう直したか)
 
-> changelog 全 443 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
+> changelog 全 444 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
 
 ### 💾 記録件数 (66版)
 - `v0.1.1107` 2026-07-07 — feat(web): ③応援ライブビューに室温丸写し
@@ -897,7 +898,8 @@
 - `v0.1.672` 2026-06-10 — コメビュの二重表示の残りを根治
 - `v0.1.665` 2026-06-10 — 長い配信が7割等で止まったままになるのを根治
 
-### 📥 コメント取得 (148版)
+### 📥 コメント取得 (149版)
+- `v0.1.1109` 2026-07-08 — fix(lane): 大配信backfillのアバター暫定固着を根治
 - `v0.1.1094` 2026-07-06 — fix(inline): 配信切替に即追従(再ロード・一括取得なし)
 - `v0.1.1091` 2026-07-06 — ギフト音が静かに消える取りこぼしを根治
 - `v0.1.1058` 2026-07-04 — ギフト取りこぼし修正+コメント数マイルストーン診断を新設
@@ -1406,7 +1408,8 @@
 - `v0.1.699` 2026-06-12 — 読み上げの名前ON/OFF切替を追加
 - `v0.1.698` 2026-06-12 — コメビュにユーザー別の声で読み上げ機能を追加
 
-### 🪟 応援レーン・タイル (113版)
+### 🪟 応援レーン・タイル (114版)
+- `v0.1.1109` 2026-07-08 — fix(lane): 大配信backfillのアバター暫定固着を根治
 - `v0.1.1099` 2026-07-06 — feat(score): popupに採点パネル+ハイライト台帳
 - `v0.1.1092` 2026-07-06 — feat(lane): コメント即時プッシュで重負荷でも表示即時
 - `v0.1.1083` 2026-07-06 — fix(post): 送信5秒締切+自コメ取り消しの厳格化

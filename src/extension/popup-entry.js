@@ -105,6 +105,9 @@ import { buildGiftHistoryNorthStarViewModel } from '../lib/giftHistoryViewModel.
 // ③WEB投げ一覧丸写し(第2号・reference_full_mirror_SYNTHESIS.md B2-3): 北極星 giftHistory レーンを純Web③にも
 //   丸写しするための鏡スナップショット純関数。paint 済み ctx を渡すだけ=publish 経路に新規 storage read を足さない。
 import { buildGiftHistoryMirrorSnapshot } from '../lib/giftHistoryMirror.js';
+// heavyRace再発の根治(HANDOFF-heavyrace-backfill-IMPL.md B): backfill中の全件re-readループを断つ
+//   canReuse fresh-read 判定(現total 80%coverage に加え「前回読了時完全 かつ 直近12秒以内」なら再利用)。
+import { decideHeavyChunkReadReuse, HEAVY_FULL_REREAD_MIN_GAP_MS } from '../lib/heavyChunkReadReuse.js';
 // ③WEB室温丸写し(第4号・reference_full_mirror_SYNTHESIS.md M3): 室温パネル(直近5分の応援増加=件数/人数/
 //   熱度%/文言)を純Web③にも丸写しするための鏡スナップショット純関数。renderRoomHeatSummary で計算済みの
 //   4値をそのまま渡すだけ=publish 経路に新規 storage read を足さない。数値4個+文言のみ(R-1・HTML 無し)。
@@ -607,7 +610,10 @@ import { userLaneHttpForTilePick } from '../lib/storyUserLaneDisplaySrc.js';
 import {
   paintStoryUserLaneDomEmptyGuides,
   paintStoryUserLaneDomFilled,
-  resetStoryUserLaneDom, getStoryLaneRepaintCounts, shouldKeepStoryUserLaneTilesOnEmpty
+  resetStoryUserLaneDom, getStoryLaneRepaintCounts, shouldKeepStoryUserLaneTilesOnEmpty,
+  // heavyRace再発の即効対策(HANDOFF-heavyrace-backfill-IMPL.md A): 暫定(heavy未settle)の短い候補で
+  //   一度出た完全描画を上書き退化させない単調性ガード。
+  shouldKeepStoryUserLaneTilesOnShrink
 } from './story/renderStoryUserLaneDom.js';
 // 応援レーン描画の自己診断(council/lane-render-self-diag-SYNTHESIS.md): 「鏡はあるのに画面に出ない/
 //   ローディングが終わらない」を状態速報で抜け漏れなく捕まえる。北極星の _northStarRenderProbe と同形。
@@ -3820,7 +3826,8 @@ const watchMetaCache = {
   //   塞ぐ。読めなかったときは同一 lv の前回値を保持して描画を継続する（stale-while-revalidate）。
   // v0.1.513: chunkTotal は「この arr が映しているチャンク index.total」。次回 refresh で total が
   //   不変なら全チャンク再読みを skip して再利用する版印（非チャンク経路では null）。
-  /** @type {{ lv: string, arr: unknown[], chunkTotal: number|null }|null} */
+  // readAtMs(heavyRace根治B): この arr を read で得た epoch ms。fresh-read 再利用判定に使う(旧形式は欠落=後方互換)。
+  /** @type {{ lv: string, arr: unknown[], chunkTotal: number|null, readAtMs?: number }|null} */
   lastCommentsArr: null
 };
 
@@ -5883,7 +5890,11 @@ const STORY_SOURCE_STATE = {
   /** ギフト投げ主専用列（りんく列とは別） */
   giftThrowerPicks: /** @type {readonly unknown[]} */ (Object.freeze([])),
   /** 広告投稿者専用列（公式ニコニ広告ランキング由来・ギフト列とは別段） */
-  adThrowerPicks: /** @type {readonly unknown[]} */ (Object.freeze([]))
+  adThrowerPicks: /** @type {readonly unknown[]} */ (Object.freeze([])),
+  /** heavyRace再発の即効対策(HANDOFF-heavyrace-backfill-IMPL.md A-2): supply が暫定(heavy未settle)か。
+   *   syncStorySourceEntries の opts.provisional で毎回上書き(sticky にしない・デフォルト false)。
+   *   renderStoryUserLane の単調性ガードが「暫定の縮小で完全描画を上書きしない」判定に使う。 */
+  entriesProvisional: false
 };
 
 /**
@@ -6714,6 +6725,30 @@ function renderStoryUserLane() {
     if (countStoryUserLaneDomTiles(els) > 0) { try { dismissInitialLoadShade(); } catch { /* no-op */ } }
     return;
   }
+  // ★描画単調性ガード(HANDOFF-heavyrace-backfill-IMPL.md A-3・heavyRace再発の即効対策):
+  //   heavy未settleの暫定 supply が、一度出た完全描画(多タイル)を短い候補で上書き退化させる
+  //   (=たぬ姉段固着に見える)のを防ぐ。同一配信+暫定+大幅縮小なら paint を見送り前回描画を守る。
+  //   ★sig を更新せずに return するのが肝: settle 後の本描画は sig 不一致で必ず通る(暫定が再来しても skip 継続)。
+  //   ★DONE を記録(domTilesPainted付き): しないと started>completed で「未完走」誤診(sig-skip と同型)。
+  const nextTileCount = picked.length + buckets.gift.length + buckets.ad.length;
+  if (
+    shouldKeepStoryUserLaneTilesOnShrink(
+      els,
+      STORY_SOURCE_STATE.liveId,
+      _storyUserLaneLastTiledLid,
+      nextTileCount,
+      STORY_SOURCE_STATE.entriesProvisional
+    )
+  ) {
+    recordStoryUserLaneStep(_storyUserLaneRenderProbe, STORY_USER_LANE_STEPS.SHRINK_KEPT, {
+      domTilesPainted: countStoryUserLaneDomTiles(els)
+    });
+    recordStoryUserLaneStep(_storyUserLaneRenderProbe, STORY_USER_LANE_STEPS.DONE, {
+      domTilesPainted: countStoryUserLaneDomTiles(els)
+    });
+    if (countStoryUserLaneDomTiles(els) > 0) { try { dismissInitialLoadShade(); } catch { /* no-op */ } }
+    return;
+  }
   storyUserLaneLastRenderSig = laneSig;
 
   if (!picked.length) {
@@ -7005,7 +7040,9 @@ async function renderStoryUserLaneFromLightCommentsForCurrentLive(lid) {
   const entries = buildDisplayCommentEntries(merged, live);
   if (!entries.length) return;
   // 既存の描画トリガに軽い entries を渡す=renderStoryUserLane が走り、末尾で現配信 lane mirror も publish。
-  syncStorySourceEntries(live, entries, entries);
+  //   ★provisional: true = summary+tail 由来の軽い候補=定義上暫定(HANDOFF-heavyrace A-2)。
+  //   heavy が settle するまでは、この短い候補で完全描画を上書きしない(単調性ガード)。
+  syncStorySourceEntries(live, entries, entries, { provisional: true });
 }
 
 /**
@@ -7665,10 +7702,14 @@ async function paintStoryUserLaneCoalesced(liveId, displayEntries, storageRows) 
  * @param {string} liveId
  * @param {PopupCommentEntry[]} displayList アイコン列・ストーリー UI 用（表示専用行を含む）
  * @param {PopupCommentEntry[]|null|undefined} [storageRowsForLane] nls_comments 相当・当放送のみ。省略時は応援レーン候補は空扱い。
+ * @param {{ provisional?: boolean }} [opts] provisional=true は supply が暫定(heavy未settle)。
+ *   単調性ガード(HANDOFF-heavyrace-backfill-IMPL.md A)が「暫定の縮小で完全描画を上書きしない」判定に使う。
+ *   毎呼び出しで上書き=sticky にしない。無指定は false=既存呼び出しは挙動不変。
  */
-function syncStorySourceEntries(liveId, displayList, storageRowsForLane) {
+function syncStorySourceEntries(liveId, displayList, storageRowsForLane, opts = {}) {
   const nextLiveId = String(liveId || '');
   const list = Array.isArray(displayList) ? displayList : [];
+  STORY_SOURCE_STATE.entriesProvisional = opts && opts.provisional === true;
 
   if (STORY_SOURCE_STATE.liveId !== nextLiveId) {
     resetCelebrationIncrementalScan();
@@ -10326,6 +10367,9 @@ let _giftHistoryThrowsPanelHtmlKey = '';
  *   (publish 経路に新規 storage read を足さない)。liveId 不一致なら使わない(別配信混入防止)。
  * @type {{ liveId: string, events: unknown[] }} */
 let _lastGiftEventsForMirror = { liveId: '', events: [] };
+/** heavyRace再発の根治(HANDOFF-heavyrace-backfill-IMPL.md B): fresh-read で heavy 全件再読みを省いた累計回数。
+ *   getHeavyFreshReadReuseCount で状態速報が読む(実配信で「fresh-read が効いているか/12秒ギャップが適正か」を判定)。 */
+let _heavyFreshReadReuseCount = 0;
 /** 鮮度注記用の最終データ反映時刻（epoch ms）。 */
 let _giftHistoryNorthStarCapturedAtMs = 0;
 /** @type {ReturnType<typeof setTimeout>|null} */
@@ -15631,17 +15675,23 @@ async function refresh() {
   //   の経路でスキップされると「5枠だけ表示」が永続化していた(実機 lv350676215・
   //   記録カードは 716 表示・応援帯は 5名固まり)。80% 以上カバーしていなければ
   //   cached を捨てて heavy 再読みする(冷スタート扱い)=確実に 716 件で塗り直す。
-  const cachedHeavyCoverageOk =
-    cachedHeavy &&
-    Array.isArray(cachedHeavy.arr) &&
-    cachedHeavy.arr.length > 0 &&
-    (currentChunkTotal == null ||
-      currentChunkTotal === 0 ||
-      cachedHeavy.arr.length >= Math.floor(currentChunkTotal * 0.8));
   // v0.1.1034(council/tanu-lane-heavy-stall・実機 heavySettleState:race 6回で確認): 旧 chunkTotal【完全一致】は
   //   総数が増え続ける重い配信で毎回不一致=heavy 全件再読み→完了(5秒)前に次 refresh に追い越され settled が永遠に
-  //   立たず、応援レーンが途中件数で固着(たぬ姉少ない/数字増えない/全員出ない)。→ 完全一致をやめ cachedHeavyCoverageOk
-  //   (現 total の80%以上をカバー)なら再利用=heavyDataPromise が即 resolve→レース窓が消え settled 継続(不足分は次 heavy+テール)。
+  //   立たず、応援レーンが途中件数で固着(たぬ姉少ない/数字増えない/全員出ない)。→ 完全一致をやめ「現 total の80%以上を
+  //   カバー」なら再利用(coverage)。
+  // ★heavyRace再発の根治(HANDOFF-heavyrace-backfill-IMPL.md B): 過去ログ遡り中(backfill)は total が秒単位で
+  //   増え続け coverage(80%) が永久に割れ→毎poll全件re-read→race固着。coverage に加え「前回読了時点では完全 かつ
+  //   読了が直近12秒以内」なら再利用する fresh-read 条件を decideHeavyChunkReadReuse で足す(全件re-readループを断つ)。
+  const heavyReuseDecision = decideHeavyChunkReadReuse({
+    lv,
+    cached: cachedHeavy
+      ? { lv: cachedHeavy.lv, arrLength: Array.isArray(cachedHeavy.arr) ? cachedHeavy.arr.length : 0, chunkTotal: cachedHeavy.chunkTotal, readAtMs: cachedHeavy.readAtMs }
+      : null,
+    currentChunkTotal,
+    nowMs: Date.now(),
+    minGapMs: HEAVY_FULL_REREAD_MIN_GAP_MS
+  });
+  if (heavyReuseDecision.reason === 'fresh-read') _heavyFreshReadReuseCount += 1; // 計器(実配信で fresh-read の効きを見る)
   const canReuseHeavyChunkRead =
     (idbMode || commentsChunked) &&
     currentChunkTotal != null &&
@@ -15649,7 +15699,7 @@ async function refresh() {
     cachedHeavy.lv === lv &&
     Array.isArray(cachedHeavy.arr) &&
     cachedHeavy.arr.length > 0 &&
-    cachedHeavyCoverageOk;
+    heavyReuseDecision.reuse;
   /** heavy 全件読み完了前はマイルストーン／ギフト Bahamut の誤爆を抑止 */
   let watchPopupHeavyCommentsSettled = canReuseHeavyChunkRead;
   // v0.1.509: 本体は追記専用チャンク（無ければ従来 main にフォールバック）から読む。
@@ -16115,7 +16165,12 @@ async function refresh() {
       commentSummary,
       cdbSummary
     });
-    syncStorySourceEntries(lv, displayEntries, laneFeedPick.entries);
+    // ★heavyRace再発の即効対策(HANDOFF-heavyrace A-2): heavy未settleなら supply は暫定。
+    //   laneFeedPick.provisional 単独では穴(provisionalLaneCommentRows.js: merged≦primary で heavy未settleでも false)
+    //   →!watchPopupHeavyCommentsSettled を OR で必ず併記。settled なら false=完全描画として単調性ガードを通す。
+    syncStorySourceEntries(lv, displayEntries, laneFeedPick.entries, {
+      provisional: laneFeedPick.provisional === true || !watchPopupHeavyCommentsSettled
+    });
     markWatchPopupLoadPhase(
       laneFeedPick.provisional ? 'ranking_paint' : 'ranking_full',
       {
@@ -16231,7 +16286,9 @@ async function refresh() {
       // v0.1.1035(レビュー指摘=初回レース残存): 追い越された古い callback でも snapshotKey は一致(上)=nextArr は現配信の
       //   有効な全件。stale 描画はせず、キャッシュだけ最新化→次 refresh が v0.1.1034 の80%再利用で settled で始まれる
       //   (初回が何度追い越されても「一度読めた全件」が次に活きる=自己修復の起点)。
-      if (nextArr.length > 0) watchMetaCache.lastCommentsArr = { lv, arr: nextArr, chunkTotal: idbMode || commentsChunked ? currentChunkTotal : null };
+      //   ★heavyRace根治(B): readAtMs を打つ=次 refresh(450ms後)が fresh-read で reuse=即 settled で始まれる。
+      //   これが「race で bail しても A+B だけで全件re-readループが切れる」自己修復の起点。
+      if (nextArr.length > 0) watchMetaCache.lastCommentsArr = { lv, arr: nextArr, chunkTotal: idbMode || commentsChunked ? currentChunkTotal : null, readAtMs: Date.now() };
       return bailHeavy(STORY_USER_LANE_HEAVY_SETTLE.RACE);
     }
     // v0.1.625: nextArr が空でも、現 arr が currentChunkTotal を満たしていない
@@ -16253,7 +16310,8 @@ async function refresh() {
     watchMetaCache.lastCommentsArr = {
       lv,
       arr,
-      chunkTotal: idbMode || commentsChunked ? currentChunkTotal : null
+      chunkTotal: idbMode || commentsChunked ? currentChunkTotal : null,
+      readAtMs: Date.now() // heavyRace根治(B): fresh-read 再利用の基準時刻(読了時点で完全だった証跡)
     };
     arr = await applyStoredCommentEntries(arr, true);
     // v0.1.505: heavy 再描画でもテール（未畳み込み新着）を表示用に concat（書き戻しはメインのみ）。
@@ -18547,6 +18605,8 @@ async function collectAiShareDevMonitorPayloadBundle(watchUrl) {
         try {
           const snap = snapshotStoryUserLaneRenderProbe(_storyUserLaneRenderProbe, Date.now());
           if (snap) snap.laneRepaintCounts = getStoryLaneRepaintCounts(); // v0.1.1040 計器: 段別 churn 実測
+          // heavyRace根治(B)計器: fresh-read で heavy 全件再読みを省いた累計(実配信で効きと12秒ギャップの適正を判定)。
+          if (snap) snap.heavyFreshReadReuseCount = _heavyFreshReadReuseCount;
           return snap;
         } catch { return null; }
       })()
