@@ -210,6 +210,10 @@ import { runStorageOpWithTimeout, STORAGE_OP_TIMED_OUT } from '../lib/storageOpT
 import { createInFlightGuard } from '../lib/inFlightGuard.js';
 // 重さ根治 P4(2026-07-06): publishLiveViewPublishPayload の dirty check(内容不変なら set 省略)用。
 import { buildLiveViewPublishSignature } from '../lib/liveViewPublishSignature.js';
+// Phase 1 MVP(2026-07-07): 純Web公開ペイロードを1枚あたり上限で段階的に削る純関数。
+//   min-gap 3000→12000 と対で「set 頻度」だけでなく「1枚のサイズ」も絞り、KEY_LIVEVIEW_PUBLISH_PAYLOAD
+//   の onChanged ファンアウト(browser process 輻輳の真犯人)を細くする。
+import { pruneLiveViewPublishBlob, LIVEVIEW_PUBLISH_MAX_JSON_BYTES } from '../lib/pruneLiveViewPublishBlob.js';
 import {
   NEXT_LIVE_REQUEST_TYPE,
   AUTOPATROL_ENABLED_KEY
@@ -1389,6 +1393,16 @@ function renderAll({ lvList, summaries, fastDiag, popupDiag, backfillProgress, b
     const wLines = buildStorageWriteLedgerLines(getStorageWriteLedger(), Date.now(), 5);
     writeLedgerLine = wLines.length ? `\n${wLines.join('\n')}` : '';
   });
+  // robust-arch Phase 1 MVP(2026-07-07): 公開ペイロード容量 prune(削り)の発動累計回数を概要に併記。
+  //   「消す側にも計器を置く」鉄則(story-userlane-churn-v1039)。0回なら空=ノイズにしない。
+  //   詳細な削り内訳(section/前後件数)は「純Web公開コピーの自己診断」の⚠️削減行に出る。
+  let prunePublishLine = '';
+  safeSection('公開ペイロードprune計器', () => {
+    const pc = getLiveViewPublishPruneCount();
+    prunePublishLine = pc > 0
+      ? `\n公開ペイロード容量削減(prune): 累計 ${pc} 回発動(1枚が上限448KB超のとき③WEB送信ぶんを段階的に削減。内訳は下の自己診断⚠️行)`
+      : '';
+  });
   // 2026-07-06: 配信切替(SPA遷移で iframe を作り直さない in-place 切替)の送信N/受信N/初描画msを
   //   概要に併記(切替が一度も無い配信なら空=ノイズにしない)。「切替が来ているのに送信ボタンが
   //   灰色のまま」等の切り分け用。
@@ -1415,7 +1429,7 @@ function renderAll({ lvList, summaries, fastDiag, popupDiag, backfillProgress, b
   if (overviewEl) {
     overviewEl.textContent =
       (overviewText || '視聴中の配信はありません。') +
-      backfillLine + laneLine + voiceLine + reportPreviewLine + giftEffectLine + milestoneEffectLine + customSoundLine + voiceEffectLine + bgmPhaseLine + opSoundEffectLine + commentPostLine + instantPushLine + writeLedgerLine + channelSwitchLine + highlightLedgerLine + scoreAnnounceLine;
+      backfillLine + laneLine + voiceLine + reportPreviewLine + giftEffectLine + milestoneEffectLine + customSoundLine + voiceEffectLine + bgmPhaseLine + opSoundEffectLine + commentPostLine + instantPushLine + writeLedgerLine + prunePublishLine + channelSwitchLine + highlightLedgerLine + scoreAnnounceLine;
     overviewEl.classList.toggle('empty-note', !overviewText);
   }
 
@@ -1652,11 +1666,18 @@ function maybeAutoPublishStatusSnapshot(livesData, publishOutcomeRec) {
 
 /** 公開ペイロード書き込みの min-gap 計時(描画のたびに書くが頻度を抑える)。 */
 let _liveViewPublishPayloadLastWriteAt = 0;
+// Phase 1 MVP(2026-07-07・robust-architecture): 公開ペイロードの set 最小間隔[ms]。
+//   3000→12000。KEY_LIVEVIEW_PUBLISH_PAYLOAD(0.5MB級)の onChanged ファンアウトが browser process の
+//   storage/IPC を輻輳させ、無関係な postMessage 配達(13秒滞留)や入力まで巻き添えにする真犯人。
+//   書込頻度を -75% に絞る(v0.1.1062 で read 頻度を下げただけで Chrome フリーズが緩和した実測前例と同型)。
+const LIVEVIEW_PUBLISH_MIN_GAP_MS = 12000;
 /** v0.1.1016: 自動 publish の多重送信防止フラグ(同時に2本 POST しない)。 */
 let _autoPublishInFlight = false;
 // 重さ根治 P4(2026-07-06): 直近 set 時のシグネチャ(buildLiveViewPublishSignature)。3秒 min-gap
 //   通過後、内容が前回 set と同じなら約131KB級の chrome.storage.local.set を省略する。
 let _liveViewPublishPayloadLastSig = '';
+/** Phase 1 MVP: prune(容量削り)発動の累計回数。消す側にも計器を置く鉄則(story-userlane-churn-v1039)。 */
+let _liveViewPublishPruneCount = 0;
 /**
  * 応援ライブビュー(拡張内)から WEB 公開できるよう、最新の jsonBlob + 共有キーを storage へ置く。
  *   best-effort(失敗しても status を止めない)・3秒 min-gap。キー未設定ビルドでは置かない。
@@ -1669,17 +1690,38 @@ function publishLiveViewPublishPayload(jsonBlob) {
     const { ingestKey, viewToken, appOrigin } = getUploadConfig();
     if (!ingestKey || !viewToken || !jsonBlob) return; // キー未設定=公開不可=置かない
     const now = Date.now();
-    if (now - _liveViewPublishPayloadLastWriteAt < 3000) return;
-    const sig = buildLiveViewPublishSignature(jsonBlob);
+    if (now - _liveViewPublishPayloadLastWriteAt < LIVEVIEW_PUBLISH_MIN_GAP_MS) return;
+    // Phase 1 MVP: min-gap 通過後・set 直前に容量 prune はしごを通す。上限超過ぶんだけ段階的に削り、
+    //   削った内訳を snapshotMeta.pruned に残す=①vs③件数突合が「削ったから減った=正常」と判定でき
+    //   嘘の🔴を出さない(地雷: lane-limit-200-mirror-cap-parity)。純関数=入力 jsonBlob は破壊しない。
+    const { blob: publishBlob, pruned } = pruneLiveViewPublishBlob(jsonBlob, {
+      maxBytes: LIVEVIEW_PUBLISH_MAX_JSON_BYTES
+    });
+    if (pruned.length) {
+      _liveViewPublishPruneCount += 1;
+      // 嘘をつかない: 削った事実を必ず載せる(自己診断が1行で見せる)。既存 snapshotMeta を壊さない。
+      const meta = publishBlob.snapshotMeta && typeof publishBlob.snapshotMeta === 'object'
+        ? { ...publishBlob.snapshotMeta }
+        : {};
+      meta.pruned = pruned;
+      publishBlob.snapshotMeta = meta;
+    }
+    // シグネチャは【実際に置く publishBlob】で取る=prune 結果が変わったら set し直す。
+    const sig = buildLiveViewPublishSignature(publishBlob);
     if (sig && sig === _liveViewPublishPayloadLastSig) return; // 変化なし=set 省略(min-gap 計時は更新しない)
     _liveViewPublishPayloadLastWriteAt = now;
     _liveViewPublishPayloadLastSig = sig;
     void safeStorageLocalSet({
-      [KEY_LIVEVIEW_PUBLISH_PAYLOAD]: { jsonBlob, ingestKey, viewToken, appOrigin, savedAt: now }
+      [KEY_LIVEVIEW_PUBLISH_PAYLOAD]: { jsonBlob: publishBlob, ingestKey, viewToken, appOrigin, savedAt: now }
     });
   } catch {
     /* no-op */
   }
+}
+
+/** Phase 1 MVP: prune 発動の累計回数を状態速報へ出すためのアクセサ(消す側の計器)。 */
+export function getLiveViewPublishPruneCount() {
+  return _liveViewPublishPruneCount;
 }
 
 /* ============================================================================

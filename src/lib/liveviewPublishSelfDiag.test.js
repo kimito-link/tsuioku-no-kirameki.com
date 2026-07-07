@@ -348,3 +348,59 @@ describe('judgeCommentMirrorConsistency — ①POP vs ③WEBのコメント突�
     expect(judgeCommentMirrorConsistency(0, 0, 60).verdict).toBe('match');
   });
 });
+
+describe('容量 prune の透明性(Phase 1 MVP・2026-07-07) — 嘘の🔴を出さない', () => {
+  /** コメント鏡付きの blob(母数40だが③には8件しか載っていない=本来なら mismatch)。 */
+  function blobWithThinComment(pruned) {
+    const rows = Array.from({ length: 8 }, (_, i) => ({ text: `c${i}`, name: `n${i}`, at: i + 1 }));
+    return {
+      snapshotMeta: pruned ? { capturedAt: NOW - 5000, pruned } : { capturedAt: NOW - 5000 },
+      laneMirror: { liveId: 'lv1', capturedAt: NOW - 5000, link: [cell('a')], gift: [], ad: [], konta: [], tanu: [] },
+      commentTimelineMirror: { liveId: 'lv1', capturedAt: NOW - 5000, rows, totalSeen: 40 }
+    };
+  }
+
+  it('prune 無し: 母数40 vs ③8件は mismatch(本物の欠落は🔴のまま)', () => {
+    const d = buildLiveviewPublishSelfDiag({ jsonBlob: blobWithThinComment(null), currentLiveId: 'lv1', publishKeys: {}, nowMs: NOW });
+    const c = d.consistency.find((x) => x.lane === 'コメント');
+    expect(c).toBeTruthy();
+    expect(c.match).toBe(false);
+  });
+
+  it('prune 有り: 同じ件数差でも「容量削減=正常」で🔴にしない(normal/skipped)', () => {
+    const pruned = [{ section: 'commentTimelineMirror.rows', before: 40, after: 8 }];
+    const d = buildLiveviewPublishSelfDiag({ jsonBlob: blobWithThinComment(pruned), currentLiveId: 'lv1', publishKeys: {}, nowMs: NOW });
+    const c = d.consistency.find((x) => x.lane === 'コメント');
+    expect(c).toBeTruthy();
+    expect(c.match).toBe(null);
+    expect(c.skipped).toBe(true);
+    expect(c.normal).toBe(true);
+    expect(c.reason).toContain('prune');
+  });
+
+  it('diag.pruned に削った内訳が入る', () => {
+    const pruned = [
+      { section: 'commentTimelineMirror.rows', before: 40, after: 8 },
+      { section: 'topSupporters.rows', before: 10, after: 5 }
+    ];
+    const d = buildLiveviewPublishSelfDiag({ jsonBlob: blobWithThinComment(pruned), currentLiveId: 'lv1', publishKeys: {}, nowMs: NOW });
+    expect(d.pruned).toHaveLength(2);
+    expect(d.pruned[0]).toMatchObject({ section: 'commentTimelineMirror.rows', before: 40, after: 8 });
+  });
+
+  it('format 行: prune したら⚠️行で削減を必ず明記する(嘘をつかない)', () => {
+    const pruned = [{ section: 'commentTimelineMirror.rows', before: 40, after: 8 }];
+    const d = buildLiveviewPublishSelfDiag({ jsonBlob: blobWithThinComment(pruned), currentLiveId: 'lv1', publishKeys: {}, nowMs: NOW });
+    const lines = formatLiveviewPublishSelfDiagLines(d);
+    const line = lines.find((l) => l.startsWith('⚠️ 容量超過のため③WEB'));
+    expect(line).toBeTruthy();
+    expect(line).toContain('コメント鏡rows 40→8');
+  });
+
+  it('prune していなければ⚠️削減行は出ない(挙動不変)', () => {
+    const d = buildLiveviewPublishSelfDiag({ jsonBlob: fullBlob(), currentLiveId: 'lv1', publishKeys: {}, nowMs: NOW });
+    expect(d.pruned).toEqual([]);
+    const lines = formatLiveviewPublishSelfDiagLines(d);
+    expect(lines.some((l) => l.startsWith('⚠️ 容量超過のため③WEB'))).toBe(false);
+  });
+});

@@ -240,6 +240,17 @@ export function buildLiveviewPublishSelfDiag(args) {
   try { sizeBytes = JSON.stringify(blob).length; } catch { sizeBytes = 0; }
   const sizeCap = 512 * 1024;
 
+  // Phase 1 MVP(2026-07-07): 公開ペイロード prune(容量削り)の内訳。status-entry の
+  //   pruneLiveViewPublishBlob が snapshotMeta.pruned に {section, before, after} を残す。
+  //   ★これを読むことで「削ったから件数が減った=正常」と判定でき、下の①vs③件数突合が
+  //   嘘の🔴を出さない(地雷: lane-limit-200-mirror-cap-parity)。
+  const meta = blob.snapshotMeta && typeof blob.snapshotMeta === 'object' ? blob.snapshotMeta : null;
+  const prunedList = meta && Array.isArray(meta.pruned) ? meta.pruned : [];
+  const prunedSections = new Set(prunedList.map((p) => String(p && p.section || '')));
+  // commentTimelineMirror.rows が prune された場合のみ下の①vs③件数突合を「正常(容量削減)」扱いにする。
+  //   topSupporters/statusReport は現状 consistency 突合の対象外なので、表示は d.pruned 一覧から直接出す。
+  const commentPruned = prunedSections.has('commentTimelineMirror.rows');
+
   // 整合チェック（拡張の生データ vs 鏡）。
   // ★誤検知の根治: 突合してよいのは「拡張側が確定状態(ok/no_ranking_data 等)」かつ「鏡が新鮮」のときだけ。
   //   拡張が not_yet(まだ取得中)だと apiRows=0 だが鏡には過去値が残り「拡張0 ≠ 鏡6」を誤って『コピー漏れ』
@@ -294,7 +305,11 @@ export function buildLiveviewPublishSelfDiag(args) {
   if (comment && commentLidMatch !== false && !commentStale) {
     const totalSeen = Math.max(0, Math.floor(Number(comment.totalSeen) || 0));
     const rowsRenderable = restoreCommentTimelineRows(comment).length;
-    if (totalSeen > 0) {
+    if (commentPruned) {
+      // Phase 1 MVP: 公開ペイロードが容量超過で rows を削られた=③WEB に載る件数が母数より少ないのは
+      //   「欠落」ではなく「意図的な容量 prune」=正常。嘘の🔴を出さない(地雷: lane-limit-200-mirror-cap-parity)。
+      consistency.push({ lane: 'コメント', extRows: totalSeen, mirrorRows: rowsRenderable, match: null, skipped: true, normal: true, reason: `容量超過のため③WEBは最新${rowsRenderable}件に削減(母数${totalSeen}件・prune=正常)`, srcLabel: '①POP', dstLabel: '③WEB鏡' });
+    } else if (totalSeen > 0) {
       const { verdict, reason } = judgeCommentMirrorConsistency(totalSeen, rowsRenderable);
       if (verdict === 'mismatch') {
         consistency.push({ lane: 'コメント', extRows: totalSeen, mirrorRows: rowsRenderable, match: false, reason, srcLabel: '①POP', dstLabel: '③WEB鏡' });
@@ -339,7 +354,13 @@ export function buildLiveviewPublishSelfDiag(args) {
         : { present: false }
     },
     consistency,
-    size: { bytes: sizeBytes, cap: sizeCap, percent: sizeCap > 0 ? Math.round((sizeBytes / sizeCap) * 100) : 0 }
+    size: { bytes: sizeBytes, cap: sizeCap, percent: sizeCap > 0 ? Math.round((sizeBytes / sizeCap) * 100) : 0 },
+    // Phase 1 MVP: 容量 prune の内訳(削った section とその前後件数)。消す側の計器(story-userlane-churn-v1039)。
+    pruned: prunedList.map((p) => ({
+      section: String(p && p.section || ''),
+      before: Math.max(0, Math.floor(Number(p && p.before) || 0)),
+      after: Math.max(0, Math.floor(Number(p && p.after) || 0))
+    }))
   };
 }
 
@@ -452,6 +473,18 @@ export function formatLiveviewPublishSelfDiagLines(diag) {
   const sz = d.size || {};
   if (sz.bytes) {
     lines.push(`jsonBlob サイズ: ${Math.round(sz.bytes / 1024)}KB / ${Math.round((sz.cap || 0) / 1024)}KB (${sz.percent || 0}%)`);
+  }
+
+  // Phase 1 MVP: 容量 prune の内訳(削ったら必ず出す=嘘をつかない)。削っていなければ何も出さない。
+  const SECTION_LABEL = {
+    'commentTimelineMirror.rows': 'コメント鏡rows',
+    'topSupporters.rows': '応援者ランキングrows',
+    statusReport: '状態速報本文'
+  };
+  const pr = Array.isArray(d.pruned) ? d.pruned : [];
+  if (pr.length) {
+    const parts = pr.map((p) => `${SECTION_LABEL[p.section] || p.section} ${p.before}→${p.after}`);
+    lines.push(`⚠️ 容量超過のため③WEB公開ペイロードを削減しました（純Webでは一部が省略されます・拡張内プレビューは全件のまま）: ${parts.join(' / ')}`);
   }
 
   return lines;
