@@ -1,6 +1,11 @@
-# nicolivelog
+# 君斗りんくの追憶のきらめき（Tsuioku no Kirameki）
 
-ニコニコ生放送（`https://live.nicovideo.jp/watch/lv...`）のコメントを、**オプトイン**で `chrome.storage.local` に蓄積する Chrome 拡張（MV3）のプロトタイプです。
+紹介サイト: https://tsuioku-no-kirameki.com/ ｜ [Chrome Web Store で公開中](https://chromewebstore.google.com/detail/cjbabignmmodaickpeckiojjabnlogdb)
+
+ニコニコ生放送（`https://live.nicovideo.jp/watch/lv...`）で流れる応援コメントを、**オプトイン**で利用者本人のローカル PC（`chrome.storage.local`）にのみ記録し、放送終了後に 3 つのレーン（りんく／こん太／たぬ姉）＋活発度の色分けで振り返れる Chrome 拡張（MV3）です。コメントデータは外部サーバーに送信されません。
+
+- 内部コードネームは `nicolivelog`（npm パッケージ名・ビルド識別子として残っています）
+- ライセンス: [MIT](LICENSE)
 
 ## 開発
 
