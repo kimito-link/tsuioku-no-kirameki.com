@@ -26,6 +26,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1107',
+    date: '2026-07-07',
+    summary: 'feat(web): ③応援ライブビューに室温丸写し',
+    items: Object.freeze([
+      'WEB版の応援ライブビューに「室温（直近5分の応援増加＝件数・人数・熱度バー・文言）」を表示するようにしました。拡張の画面とそっくり同じ見た目・同じ文言で丸写しします。',
+      '送るのは数値4個だけの最小データで、追加の読み取りもゼロです（軽量・安全）。拡張の画面をWEBにまるごと写す仕組みの第4弾です。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1106',
     date: '2026-07-07',
     summary: 'chore(web): 丸写しセクションレジストリでdrift検知',

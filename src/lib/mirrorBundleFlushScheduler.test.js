@@ -9,6 +9,7 @@ import { KEY_TOP_SUPPORTERS_MIRROR } from './storageKeys.js';
 import { KEY_NORTH_STAR_MIRROR } from './northStarMirrorKey.js';
 import { KEY_COMMENT_TIMELINE_MIRROR } from './commentTimelineMirrorKey.js';
 import { KEY_GIFT_HISTORY_MIRROR } from './giftHistoryMirrorKey.js';
+import { KEY_ROOM_HEAT_MIRROR } from './roomHeatMirrorKey.js';
 
 const LANE = { liveId: 'lv1', capturedAt: 10, link: [{ title: 'りんく' }] };
 // ③WEB投げ一覧丸写し(第2号): giftHistory 節。反映すれば legacy キー KEY_GIFT_HISTORY_MIRROR で同梱される。
@@ -19,6 +20,8 @@ const GIFT_HISTORY = {
   ledgerRows: [],
   ledgerTotalCount: 0
 };
+// ③WEB室温丸写し(第4号): roomHeat 節。反映すれば legacy キー KEY_ROOM_HEAT_MIRROR で同梱される。
+const ROOM_HEAT = { liveId: 'lv1', capturedAt: 16, total: 42, active: 7, heatPercent: 61.5, heatText: '増加が大きい' };
 const STAT = { liveId: 'lv1', capturedAt: 11, recordsText: '3件' };
 const NS = { liveId: 'lv1', capturedAt: 12, lanes: { contributionRanking: [{ name: '貢献A' }], adRanking: [] } };
 
@@ -40,6 +43,7 @@ describe('buildLegacyMirrorSetPayload', () => {
     expect(KEY_NORTH_STAR_MIRROR in payload).toBe(false);
     expect(KEY_COMMENT_TIMELINE_MIRROR in payload).toBe(false);
     expect(KEY_GIFT_HISTORY_MIRROR in payload).toBe(false);
+    expect(KEY_ROOM_HEAT_MIRROR in payload).toBe(false);
   });
 
   it('giftHistory 節を反映すると legacy キー KEY_GIFT_HISTORY_MIRROR で同梱される(第2号・③WEB投げ一覧)', () => {
@@ -47,6 +51,13 @@ describe('buildLegacyMirrorSetPayload', () => {
     sched.reflect('giftHistory', GIFT_HISTORY, { liveId: 'lv1', nowMs: 100 });
     const payload = buildLegacyMirrorSetPayload(sched.peekBundle());
     expect(payload[KEY_GIFT_HISTORY_MIRROR]).toMatchObject(GIFT_HISTORY);
+  });
+
+  it('roomHeat 節を反映すると legacy キー KEY_ROOM_HEAT_MIRROR で同梱される(第4号・③WEB室温)', () => {
+    const sched = createMirrorBundleFlushScheduler({ minGapMs: 0 });
+    sched.reflect('roomHeat', ROOM_HEAT, { liveId: 'lv1', nowMs: 100 });
+    const payload = buildLegacyMirrorSetPayload(sched.peekBundle());
+    expect(payload[KEY_ROOM_HEAT_MIRROR]).toMatchObject(ROOM_HEAT);
   });
 
   it('bundle が空/不正でも空ペイロード(投げない)', () => {
