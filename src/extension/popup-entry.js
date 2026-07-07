@@ -3061,6 +3061,9 @@ async function maybeCelebrateGiftEventsAfterRefresh(liveId) {
   } catch {
     return;
   }
+  // ③応援タイムライン丸写し(第1号・A1-4): この read の結果を popup 内変数にキャッシュし、コメント鏡 publish に
+  //   相乗りさせる(publish 経路には新規 storage read を足さない=status-extras-read-not-core-read の鉄則)。
+  _lastGiftEventsForMirror = { liveId: lid, events: Array.isArray(giftEvents) ? giftEvents : [] };
   const count = giftEvents.length;
   if (_giftEventCelebrationPrimedLiveId !== lid) {
     await primeGiftEventCelebrationsFromCount(lid, count);
@@ -7254,7 +7257,8 @@ function publishTopSupportersMirror(liveId, rooms) {
 const _commentMirrorGate = createCommentMirrorPublishGate({ minGapMs: 0 });
 /**
  * コメント鏡を status→純Web 用に publish。INLINE_PASSIVE は書かない。
- * @param {{ liveId: string, comments: any[], provisional?: boolean }} input
+ * @param {{ liveId: string, comments: any[], giftEvents?: any[], provisional?: boolean }} input
+ *   giftEvents は③応援タイムライン丸写し(第1号)用の相乗りギフト配列(任意・無ければコメントのみ)。
  */
 function publishCommentTimelineMirror(input) {
   if (INLINE_PASSIVE) return; // 受動: 本物 popup の鏡と競合させない
@@ -7263,10 +7267,13 @@ function publishCommentTimelineMirror(input) {
     const src = input && typeof input === 'object' ? input : {};
     const lid = String(src.liveId || '').trim().toLowerCase();
     const comments = Array.isArray(src.comments) ? src.comments : [];
+    // ③応援タイムライン丸写し(第1号・A1-4): ギフト配列(相乗り・任意)。無ければ従来通りコメントのみ。
+    const giftEvents = Array.isArray(src.giftEvents) ? src.giftEvents : [];
     if (!_commentMirrorGate.decide({ liveId: lid, hasComments: comments.length > 0, provisional: src.provisional === true, nowMs: now })) return;
     const snap = buildCommentTimelineMirrorSnapshot({
       liveId: lid,
       comments,
+      giftEvents,
       capturedAt: now,
       // 既に手元で解決済みの表示名/顔を使う(新規名寄せ・fetch しない=軽い・似せて自作しない)。
       resolveName: (c) => commentTickerDisplayLabel(c, lid, comments),
@@ -10232,6 +10239,11 @@ async function refreshRecordingRecoveryHint(currentLid) {
 let _giftHistoryNorthStarPaintKey = '';
 /** 個別投げ一覧パネルの直近 HTML キー。 */
 let _giftHistoryThrowsPanelHtmlKey = '';
+/** ③応援タイムライン丸写し(第1号・A1-4): 最後に read したギフトイベント配列のキャッシュ。
+ *   maybeCelebrateGiftEventsAfterRefresh の read を再利用し、コメント鏡 publish にギフト行を相乗りさせる
+ *   (publish 経路に新規 storage read を足さない)。liveId 不一致なら使わない(別配信混入防止)。
+ * @type {{ liveId: string, events: unknown[] }} */
+let _lastGiftEventsForMirror = { liveId: '', events: [] };
 /** 鮮度注記用の最終データ反映時刻（epoch ms）。 */
 let _giftHistoryNorthStarCapturedAtMs = 0;
 /** @type {ReturnType<typeof setTimeout>|null} */
@@ -15958,7 +15970,11 @@ async function refresh() {
     void updateIngestHeartbeatDisplay(lv);
     renderCommentTicker(/** @type {PopupCommentEntry[]} */ (displayEntries));
     // 純Webで「コメントが進む」ため鏡に publish。v0.1.1018: 多タブ飽和のサマリ30件は provisional で全件鏡を潰さない。
-    publishCommentTimelineMirror({ liveId: lv, comments: displayEntries, provisional: commentReadState === 'summary' });
+    //   ③応援タイムライン丸写し(第1号・A1-4): 直近 read 済みのギフト配列(liveId一致時のみ)を相乗り=③でもギフト行が出る。
+    const _giftsForMirror = _lastGiftEventsForMirror.liveId === String(lv || '').trim().toLowerCase()
+      ? _lastGiftEventsForMirror.events
+      : [];
+    publishCommentTimelineMirror({ liveId: lv, comments: displayEntries, giftEvents: _giftsForMirror, provisional: commentReadState === 'summary' });
     exportBtn.disabled = false;
     exportBtn.dataset.liveId = lv;
     exportBtn.dataset.storageKey = key;
