@@ -39,9 +39,24 @@ const ROOM_HEAT = {
   heatPercent: 61.5,
   heatText: '増加が大きい'
 };
+// ③WEB記録サマリ推移丸写し(第5号): sessionSummary バンドル節。rows(この放送・最大24行)。
+const SESSION_SUMMARY = {
+  liveId: 'lv1',
+  capturedAt: 17,
+  rows: [
+    {
+      capturedAt: 1000,
+      commentStorageCount: 120,
+      uniqueKnownCommenters: 30,
+      giftUserCount: 8,
+      peakConcurrentEstimate: 55,
+      officialCommentCount: 12
+    }
+  ]
+};
 
 describe('createEmptyMirrorBundle', () => {
-  it('7セクションが null の初期形を返す(giftHistory=第2号・roomHeat=第4号を含む)', () => {
+  it('8セクションが null の初期形を返す(giftHistory=第2号・roomHeat=第4号・sessionSummary=第5号を含む)', () => {
     expect(createEmptyMirrorBundle()).toEqual({
       liveId: '',
       gen: 0,
@@ -53,7 +68,8 @@ describe('createEmptyMirrorBundle', () => {
         northStar: null,
         commentTimeline: null,
         giftHistory: null,
-        roomHeat: null
+        roomHeat: null,
+        sessionSummary: null
       }
     });
   });
@@ -274,5 +290,23 @@ describe('roomHeat バンドル節(③WEB室温丸写し・第4号)', () => {
     const buf = mergeMirrorBundleSection(createEmptyMirrorBundle(), 'lane', LANE, { liveId: 'lv1', nowMs: 100 });
     expect(buf.sections.roomHeat).toBeNull();
     expect(restoreMirrorBundleSection(buf, 'roomHeat')).toBeNull();
+  });
+});
+
+describe('sessionSummary バンドル節(③WEB記録サマリ推移丸写し・第5号)', () => {
+  it("'sessionSummary' は正規セクションキー=merge/restore できる(他7鏡と同一 tick に載る)", () => {
+    let buf = createEmptyMirrorBundle();
+    buf = mergeMirrorBundleSection(buf, 'roomHeat', ROOM_HEAT, { liveId: 'lv1', nowMs: 100 });
+    buf = mergeMirrorBundleSection(buf, 'sessionSummary', SESSION_SUMMARY, { liveId: 'lv1', nowMs: 101 });
+    // sessionSummary を足しても既存の roomHeat を消さない(後着が先着を消さない)。
+    expect(buf.sections.roomHeat).toBe(ROOM_HEAT);
+    expect(buf.sections.sessionSummary).toBe(SESSION_SUMMARY);
+    expect(restoreMirrorBundleSection(buf, 'sessionSummary')).toBe(SESSION_SUMMARY);
+  });
+
+  it('ネガコン: 未反映の sessionSummary は初期形で null(既存を消さない)', () => {
+    const buf = mergeMirrorBundleSection(createEmptyMirrorBundle(), 'lane', LANE, { liveId: 'lv1', nowMs: 100 });
+    expect(buf.sections.sessionSummary).toBeNull();
+    expect(restoreMirrorBundleSection(buf, 'sessionSummary')).toBeNull();
   });
 });

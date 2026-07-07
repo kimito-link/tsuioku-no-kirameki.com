@@ -2212,6 +2212,18 @@
       ]
     },
     {
+      "file": "src/lib/sessionSummaryMirrorKey.js",
+      "featureCount": 2,
+      "features": [
+        "popup",
+        "status"
+      ],
+      "labels": [
+        "ポップアップ(応援レーン)",
+        "状態速報ページ"
+      ]
+    },
+    {
       "file": "src/lib/statCardsMirrorKey.js",
       "featureCount": 2,
       "features": [
@@ -5945,6 +5957,16 @@
     },
     {
       "file": "src/lib/sessionSummaryCompareTableHtml.js",
+      "featureCount": 1,
+      "features": [
+        "popup"
+      ],
+      "labels": [
+        "ポップアップ(応援レーン)"
+      ]
+    },
+    {
+      "file": "src/lib/sessionSummaryMirror.js",
       "featureCount": 1,
       "features": [
         "popup"

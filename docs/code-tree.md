@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 2 / 660 件
+## ⚠️ 役割コメントが無いソース 2 / 662 件
 - `src/lib/reportPreviewPublish.js`
 - `src/lib/venueLaneBuckets.js`
 
@@ -527,7 +527,7 @@
   - `gift-impact.mp3`
   - `gift-sparkle.mp3`
   - `gift-whoosh.mp3`
-- 📁 **src/** (1371)
+- 📁 **src/** (1374)
   - 📁 **data/** (6)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -792,7 +792,7 @@
         - `logo_funlink_white_RGB_maru_black.png`
       - `logo_guide_funlink_ol.pdf`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1156)
+  - 📁 **lib/** (1159)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -1686,6 +1686,9 @@
     - `sessionCommentCache.test.js`
     - `sessionSummaryCompareTableHtml.js` — セッションサマリ推移テーブル（renderSessionSummaryComparePanel の <table>）の HTML を組む純関数。
     - `sessionSummaryCompareTableHtml.test.js`
+    - `sessionSummaryMirror.js` — セッション比較(記録サマリの推移)の「鏡」スナップショット純関数
+    - `sessionSummaryMirror.test.js`
+    - `sessionSummaryMirrorKey.js` — セッション比較(記録サマリの推移)鏡の storage キー正本
     - `shouldRearmBackfillForOfficialGap.js` — 自動補充の核心: 「公式コメント件数と記録件数のギャップが大きいまま、NDGR バックフィルが
     - `shouldRearmBackfillForOfficialGap.test.js`
     - `shouldSkipDeepHarvest.js` — NDGR がリアルタイムでコメントを提供している間は deep harvest（仮想リスト走査）を

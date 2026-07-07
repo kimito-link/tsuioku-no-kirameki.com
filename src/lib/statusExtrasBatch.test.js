@@ -11,6 +11,7 @@ import { KEY_LIVEVIEW_PUBLISH_OUTCOME } from './liveviewPublishOutcomeKey.js';
 import { KEY_COMMENT_TIMELINE_MIRROR } from './commentTimelineMirrorKey.js';
 import { KEY_GIFT_HISTORY_MIRROR } from './giftHistoryMirrorKey.js';
 import { KEY_ROOM_HEAT_MIRROR } from './roomHeatMirrorKey.js';
+import { KEY_SESSION_SUMMARY_MIRROR } from './sessionSummaryMirrorKey.js';
 import { KEY_PREVIEW_RENDER_ACK } from './previewRenderAckKey.js';
 import { KEY_BACKFILL_LIVE_METRIC } from './storageKeys.js';
 import { KEY_GIFT_EFFECT_DIAG } from './giftEffectDiagKey.js';
@@ -27,9 +28,10 @@ import { KEY_SCORE_ANNOUNCE_DIAG } from './scoreAnnounceDiagKey.js';
 describe('EXTRAS_BATCH_KEYS', () => {
   // 会議設計時点の列挙(16キー)+ v0.1.1083 の commentPostDiag + v0.1.1092 の instantPushDiag +
   //   2026-07-06 の channelSwitchDiag + SC2 の highlightLedger + SC3 の scoreAnnounceDiag +
-  //   第2号(③WEB投げ一覧丸写し)の giftHistoryMirror + 第4号(③WEB室温丸写し)の roomHeatMirror で実際は23キー。
+  //   第2号(③WEB投げ一覧丸写し)の giftHistoryMirror + 第4号(③WEB室温丸写し)の roomHeatMirror +
+  //   第5号(③WEB記録サマリ推移丸写し)の sessionSummaryMirror で実際は24キー。
   //   「漏れなく統合したか」を人力の数え間違いに頼らず固定するため、実装済みの全キーを列挙して突合する。
-  it('23キーすべてを含む(commentPostDiag / instantPushDiag / channelSwitchDiag / highlightLedger / scoreAnnounceDiag / 第2号 giftHistoryMirror / 第4号 roomHeatMirror も含む)', () => {
+  it('24キーすべてを含む(commentPostDiag / instantPushDiag / channelSwitchDiag / highlightLedger / scoreAnnounceDiag / 第2号 giftHistoryMirror / 第4号 roomHeatMirror / 第5号 sessionSummaryMirror も含む)', () => {
     const expectedKeys = [
       KEY_VOICE_DIAG,
       KEY_VENUE_SEATS_DIAG,
@@ -42,6 +44,7 @@ describe('EXTRAS_BATCH_KEYS', () => {
       KEY_COMMENT_TIMELINE_MIRROR,
       KEY_GIFT_HISTORY_MIRROR,
       KEY_ROOM_HEAT_MIRROR,
+      KEY_SESSION_SUMMARY_MIRROR,
       KEY_PREVIEW_RENDER_ACK,
       KEY_BACKFILL_LIVE_METRIC,
       KEY_GIFT_EFFECT_DIAG,
@@ -55,8 +58,8 @@ describe('EXTRAS_BATCH_KEYS', () => {
       KEY_HIGHLIGHT_LEDGER,
       KEY_SCORE_ANNOUNCE_DIAG
     ];
-    expect(expectedKeys).toHaveLength(23);
-    expect(EXTRAS_BATCH_KEYS).toHaveLength(23);
+    expect(expectedKeys).toHaveLength(24);
+    expect(EXTRAS_BATCH_KEYS).toHaveLength(24);
     expect(EXTRAS_BATCH_KEYS).toEqual(expect.arrayContaining(expectedKeys));
   });
 
@@ -81,6 +84,7 @@ describe('pickExtrasBatchValues', () => {
       [KEY_COMMENT_TIMELINE_MIRROR]: { h: 9 },
       [KEY_GIFT_HISTORY_MIRROR]: { gh: 99 },
       [KEY_ROOM_HEAT_MIRROR]: { rh: 88 },
+      [KEY_SESSION_SUMMARY_MIRROR]: { ss: 77 },
       [KEY_PREVIEW_RENDER_ACK]: { i: 10 },
       [KEY_BACKFILL_LIVE_METRIC]: { j: 11 },
       [KEY_GIFT_EFFECT_DIAG]: { k: 12 },
@@ -106,6 +110,7 @@ describe('pickExtrasBatchValues', () => {
     expect(picked.commentTimelineMirror).toEqual({ h: 9 });
     expect(picked.giftHistoryMirror).toEqual({ gh: 99 });
     expect(picked.roomHeatMirror).toEqual({ rh: 88 });
+    expect(picked.sessionSummaryMirror).toEqual({ ss: 77 });
     expect(picked.previewRenderAck).toEqual({ i: 10 });
     expect(picked.backfillLiveMetric).toEqual({ j: 11 });
     expect(picked.giftEffectDiag).toEqual({ k: 12 });
@@ -133,6 +138,7 @@ describe('pickExtrasBatchValues', () => {
     expect(picked.commentTimelineMirror).toBeNull();
     expect(picked.giftHistoryMirror).toBeNull();
     expect(picked.roomHeatMirror).toBeNull();
+    expect(picked.sessionSummaryMirror).toBeNull();
     expect(picked.previewRenderAck).toBeNull();
     expect(picked.backfillLiveMetric).toBeNull();
     expect(picked.giftEffectDiag).toBeNull();

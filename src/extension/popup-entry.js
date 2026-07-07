@@ -109,6 +109,10 @@ import { buildGiftHistoryMirrorSnapshot } from '../lib/giftHistoryMirror.js';
 //   熱度%/文言)を純Web③にも丸写しするための鏡スナップショット純関数。renderRoomHeatSummary で計算済みの
 //   4値をそのまま渡すだけ=publish 経路に新規 storage read を足さない。数値4個+文言のみ(R-1・HTML 無し)。
 import { buildRoomHeatMirrorSnapshot } from '../lib/roomHeatMirror.js';
+// ③WEB記録サマリ推移丸写し(第5号・reference_full_mirror_SYNTHESIS.md M5): 記録サマリの推移(この放送・
+//   約1分ごとのサンプル最大24行)を純Web③にも丸写しするための鏡スナップショット純関数。renderSessionSummaryComparePanel
+//   が paint に使った rows(IDB read 済み)をそのまま渡すだけ=publish 経路に新規 storage read を足さない。
+import { buildSessionSummaryMirrorSnapshot } from '../lib/sessionSummaryMirror.js';
 import {
   fetchKokenGiftHistoryAllViaExtension,
   fetchKokenGiftHistoryViaExtension
@@ -3982,6 +3986,9 @@ async function renderSessionSummaryComparePanel(liveId) {
     // C-7 pure refactor: rows→テーブル HTML 組み立ては sessionSummaryCompareTableHtml.js に抽出
     //   （挙動不変・test 済）。IDB read・空状態文言・innerHTML 代入は popup に残す。
     mount.innerHTML = buildSessionSummaryCompareTableHtml(rows);
+    // ③WEB記録サマリ推移丸写し(第5号・M5): paint に使った rows(IDB read 済み)をそのまま鏡へ運ぶ
+    //   =新規 storage read 無し。空/失敗分岐(rows.length===0 や catch)では呼ばない(成功分岐のみ)。
+    publishSessionSummaryMirror(lid, rows);
   } catch {
     mount.innerHTML =
       '<p class="nl-sub">IndexedDB の読み込みに失敗しました。</p>';
@@ -7275,6 +7282,29 @@ function publishGiftHistoryMirror(liveId, ctx) {
     const snap = buildGiftHistoryMirrorSnapshot(ctx, { liveId: lid, nowMs: now });
     if (!snap) return;
     mergeAndScheduleFlush('giftHistory', snap, lid, now);
+  } catch {
+    /* no-op */
+  }
+}
+
+/**
+ * ③WEB記録サマリ推移丸写し(第5号・reference_full_mirror_SYNTHESIS.md M5): 記録サマリの推移(この放送・
+ *   約1分ごとのサンプル最大24行)の鏡を status→純Web③用に publish する。INLINE_PASSIVE は書かない
+ *   (②の不可侵原則)。★renderSessionSummaryComparePanel が paint に使った rows(IDB read 済み)を
+ *   そのまま渡すだけ=publish 経路に新規 storage read を足さない(鉄則)。HTML(テーブル)は鏡に載せない
+ *   (R-1)=数値行(rows)を運ぶ(③で buildSessionSummaryCompareTableHtml が HTML 化)。
+ * @param {string} liveId
+ * @param {unknown[]} rows renderSessionSummaryComparePanel が IDB から読んだサマリ推移行
+ */
+function publishSessionSummaryMirror(liveId, rows) {
+  if (INLINE_PASSIVE) return; // 受動ビュー: 鏡を上書きしない
+  try {
+    const now = Date.now();
+    const lid = String(liveId || '').trim().toLowerCase();
+    if (!/^lv\d{1,15}$/.test(lid)) return;
+    const snap = buildSessionSummaryMirrorSnapshot(rows, { liveId: lid, nowMs: now });
+    if (!snap) return;
+    mergeAndScheduleFlush('sessionSummary', snap, lid, now);
   } catch {
     /* no-op */
   }
