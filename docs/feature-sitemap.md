@@ -108,7 +108,7 @@
   - `src/lib/monotonicCommentCount.js`
 - **storage キー定義** — chrome.storage のキー名の正本(nls_comments_<lv> 等)
   - `src/lib/storageKeys.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 38</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 40</summary>
 
 - `src/lib/autoBackupState.js` — v0.1.808(星野ロミ式コンポーネント化・第1弾): content-entry.js の巨大化を抑えるため、
 - `src/lib/blobDownload.js` — Blob を指定ファイル名で保存する。
@@ -140,6 +140,8 @@
 - `src/lib/recordRate.js` — 取得スピード(records/sec)の算出と健康スコア化(純ロジック)。
 - `src/lib/roomHeatMirrorKey.js` — 室温(ルーム熱度・5分増減)鏡の storage キー正本
 - `src/lib/sessionSummaryCompareTableHtml.js` — セッションサマリ推移テーブル（renderSessionSummaryComparePanel の <table>）の HTML を組む純関数。
+- `src/lib/sessionSummaryMirror.js` — セッション比較(記録サマリの推移)の「鏡」スナップショット純関数
+- `src/lib/sessionSummaryMirrorKey.js` — セッション比較(記録サマリの推移)鏡の storage キー正本
 - `src/lib/statCardsMirror.js` — 数字カード鏡のスナップショット純関数。popup 上部の数字カード(記録N件・推定同時接続・来場者数)と
 - `src/lib/statCardsMirrorDom.js` — 数字カード鏡(記録/推定同時接続/来場者数+公式統計チップ)の【値セット部分】を、
 - `src/lib/statCardsMirrorKey.js` — popup 上部の数字カード群(記録N件・推定同時接続・来場者数・公式統計チップ)を status.html に
@@ -825,7 +827,7 @@
 
 ## 🧬 修正系譜マップ(この系統のバグを過去にどう直したか)
 
-> changelog 全 442 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
+> changelog 全 443 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
 
 ### 💾 記録件数 (66版)
 - `v0.1.1107` 2026-07-07 — feat(web): ③応援ライブビューに室温丸写し
@@ -1256,7 +1258,8 @@
 - `v0.1.713` 2026-06-13 — 会場モードを明るくして発言を吹き出し表示
 - `v0.1.711` 2026-06-13 — 会場モードで発言を吹き出し表示
 
-### 🎁 ギフト (89版)
+### 🎁 ギフト (90版)
+- `v0.1.1108` 2026-07-07 — feat(web): ③応援ライブビューに記録サマリ推移丸写し
 - `v0.1.1105` 2026-07-07 — feat(web): ③応援ライブビューに配信採点丸写し
 - `v0.1.1104` 2026-07-07 — feat(web): ③応援ライブビューに投げ一覧丸写し
 - `v0.1.1103` 2026-07-07 — feat(web): ③応援ライブビューに応援タイムライン丸写し

@@ -17,10 +17,12 @@
  *
  * @typedef {import('./roomHeatMirror.js').RoomHeatMirrorSnapshot} RoomHeatMirrorSnapshot
  *
+ * @typedef {import('./sessionSummaryMirror.js').SessionSummaryMirrorSnapshot} SessionSummaryMirrorSnapshot
+ *
  * @typedef {{ userKey: string, nickname: string, count: number, avatarUrl: string }} TopSupportersMirrorCell
  * @typedef {{ liveId: string, capturedAt: number, rooms: TopSupportersMirrorCell[] }} TopSupportersMirrorSnapshot
  *
- * @typedef {'lane'|'statCards'|'topSupporters'|'northStar'|'commentTimeline'|'giftHistory'|'roomHeat'} MirrorBundleSectionKey
+ * @typedef {'lane'|'statCards'|'topSupporters'|'northStar'|'commentTimeline'|'giftHistory'|'roomHeat'|'sessionSummary'} MirrorBundleSectionKey
  * @typedef {{
  *   lane: LaneMirrorSnapshot|null,
  *   statCards: StatCardsMirrorSnapshot|null,
@@ -28,7 +30,8 @@
  *   northStar: NorthStarMirrorSnapshot|null,
  *   commentTimeline: CommentTimelineMirrorSnapshot|null,
  *   giftHistory: GiftHistoryMirrorSnapshot|null,
- *   roomHeat: RoomHeatMirrorSnapshot|null
+ *   roomHeat: RoomHeatMirrorSnapshot|null,
+ *   sessionSummary: SessionSummaryMirrorSnapshot|null
  * }} MirrorBundleSections
  * @typedef {{
  *   liveId: string,
@@ -45,7 +48,8 @@ const SECTION_KEYS = /** @type {const} */ ([
   'northStar',
   'commentTimeline',
   'giftHistory',
-  'roomHeat'
+  'roomHeat',
+  'sessionSummary'
 ]);
 
 /** @returns {MirrorBundleSections} */
@@ -57,7 +61,8 @@ function createEmptySections() {
     northStar: null,
     commentTimeline: null,
     giftHistory: null,
-    roomHeat: null
+    roomHeat: null,
+    sessionSummary: null
   };
 }
 
@@ -100,7 +105,8 @@ function normalizeSections(sections) {
     northStar: s.northStar ?? null,
     commentTimeline: s.commentTimeline ?? null,
     giftHistory: s.giftHistory ?? null,
-    roomHeat: s.roomHeat ?? null
+    roomHeat: s.roomHeat ?? null,
+    sessionSummary: s.sessionSummary ?? null
   };
 }
 

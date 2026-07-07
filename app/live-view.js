@@ -77,6 +77,11 @@ import { buildBroadcastScorePanelHtml } from '../src/lib/broadcastScoreHtml.js';
 // ③WEB室温丸写し(第4号・reference_full_mirror_SYNTHESIS.md M3)。①拡張の renderRoomHeatSummary と全く同じ描画で
 //   #roomHeatSummary(直近5分の応援増加=件数/人数/熱度バー/文言)を純Web③にも描く。data は roomHeatMirror(jsonBlob 同梱)。
 import { restoreRoomHeatMirror } from '../src/lib/roomHeatMirror.js';
+// ③WEB記録サマリ推移丸写し(第5号・reference_full_mirror_SYNTHESIS.md M5)。①拡張の renderSessionSummaryComparePanel と
+//   同じ本物 lib(似せて自作しない)で #sessionSummaryCompareMount に記録サマリ推移テーブルを描く。
+//   データは sessionSummaryMirror(jsonBlob 同梱)を再利用=新規送信ゼロ。R-1: HTML は③内で lib が組む。
+import { restoreSessionSummaryMirror } from '../src/lib/sessionSummaryMirror.js';
+import { buildSessionSummaryCompareTableHtml } from '../src/lib/sessionSummaryCompareTableHtml.js';
 // 第1段(council/liveview-wholesale-root-SYNTHESIS.md): スナップショット丸ごと1枚の鮮度を【1回だけ】判定し、
 //   全レーンを一斉に出す/一斉に「古い」とする。per-section の個別鮮度ドロップ(=レーンがバラバラに消える)を廃止。
 import {
@@ -634,6 +639,27 @@ function paintRoomHeatMirror(snap) {
   }
 }
 
+/** ③WEB記録サマリ推移丸写し(第5号・M5): 記録サマリの推移テーブル(この放送・最大24行)を純Web③にも描く。
+ *   ①拡張の renderSessionSummaryComparePanel と同じ本物 lib(似せて自作しない):
+ *     rows → buildSessionSummaryCompareTableHtml で HTML 化し #sessionSummaryCompareMount へ innerHTML(R-1: HTML は③内で組む)。
+ *   ★m=null/rows 空なら host を触らない(popup passive の「まだサンプルがありません」空状態を上書きしない=死に画面回避)。
+ *   ★専用署名ガード(_lastSessionSummarySig)=既存 sig と共用しない(diff-skip 機構は新設・既存不変)。 */
+let _lastSessionSummarySig = ' init';
+function paintSessionSummaryMirror(snap) {
+  const m = restoreSessionSummaryMirror(snap);
+  if (!m || !m.rows.length) return; // データ無し=popup の空状態のまま(死に画面にしない)
+  const mount = document.getElementById('sessionSummaryCompareMount');
+  if (!mount) return;
+  const sig = `${String(m.liveId || '')}|${Number(m.capturedAt) || 0}|${m.rows.length}|${m.rows[0]?.capturedAt ?? ''}`;
+  if (sig === _lastSessionSummarySig) return;
+  _lastSessionSummarySig = sig;
+  try {
+    mount.innerHTML = buildSessionSummaryCompareTableHtml(m.rows);
+  } catch {
+    /* no-op: サマリ推移は best-effort(壊れても他レーンを巻き込まない) */
+  }
+}
+
 /** snapshot の全鏡を本物 paint で popup DOM に塗る（signature ガード有効＝変化時のみ）。
  *   ★第1段(council/liveview-wholesale-root-SYNTHESIS.md): スナップショット丸ごとの鮮度を【1回だけ】判定し、
  *     新鮮なら全レーンを一斉に塗る・古ければ1枚バナーで知らせる(per-section でバラバラに消さない=全レーンが揃う)。 */
@@ -658,6 +684,8 @@ function paintAllMirrors(jsonBlob) {
   paintBroadcastScorePanel(jsonBlob.broadcastScoreVm || null);
   // ③WEB室温丸写し(第4号・M3): 室温パネル(直近5分の応援増加=件数/人数/熱度バー/文言)を描く。
   paintRoomHeatMirror(jsonBlob.roomHeatMirror || null);
+  // ③WEB記録サマリ推移丸写し(第5号・M5): 記録サマリの推移テーブル(この放送・最大24行)を描く。
+  paintSessionSummaryMirror(jsonBlob.sessionSummaryMirror || null);
   // 2026-06-29(HANDOFF-resume-0629 §3 (B)): ①POP と【全く同じフル状態速報】を③WEB でも出す。
   //   status が jsonBlob.statusReport に①の本文(buildAiShareFullText の結果)を同梱する=ここは貼るだけ。
   paintStatusReport(jsonBlob.statusReport || null);
@@ -717,6 +745,7 @@ function forcePaintAllMirrors() {
   _lastGiftHistorySig = ' force'; // ③投げ一覧丸写し(第2号)も clobber(passive の collapse)から自己修復させる
   _lastBroadcastScoreSig = ' force'; // ③配信採点丸写し(第3号)も clobber(passive の空 VM 上書き)から自己修復させる
   _lastRoomHeatSig = ' force'; // ③室温丸写し(第4号)も clobber(passive の空描画上書き)から自己修復させる
+  _lastSessionSummarySig = ' force'; // ③記録サマリ推移丸写し(第5号)も clobber(passive の空状態上書き)から自己修復させる
   const wasPainting = _painting;
   _painting = true; // 自分の paint 由来の mutation を observer に無視させる
   try {
@@ -823,7 +852,10 @@ function startSelfHealingRepaint() {
   //   ★roomHeatSummary(③室温丸写し・第4号): passive popup の renderUserRooms→renderRoomHeatSummary が
   //     シム storage に生コメントが無いため「直近5分 +0件 / 0人」で summary を clobber する。
   //     observer 自己修復が唯一の防御(配線3点セットの3点目・安全側で必ず入れる)。
-  const targets = ['sceneStoryUserLaneStack', 'liveStatCards', 'casterBanner', 'supportTimelineBody', 'northStarLaneBody-giftHistory', 'broadcastScoreMount', 'roomHeatSummary']
+  //   ★sessionSummaryCompareMount(③記録サマリ推移丸写し・第5号): passive popup の
+  //     renderSessionSummaryComparePanel はシム環境で IDB が空のため「まだサンプルがありません」で mount を
+  //     clobber する。observer 自己修復が唯一の防御(配線3点セットの3点目)。
+  const targets = ['sceneStoryUserLaneStack', 'liveStatCards', 'casterBanner', 'supportTimelineBody', 'northStarLaneBody-giftHistory', 'broadcastScoreMount', 'roomHeatSummary', 'sessionSummaryCompareMount']
     .map((id) => document.getElementById(id))
     .filter(Boolean);
   try {

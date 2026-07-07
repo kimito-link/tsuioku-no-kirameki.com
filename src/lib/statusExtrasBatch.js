@@ -29,6 +29,7 @@ import { KEY_LIVEVIEW_PUBLISH_OUTCOME } from './liveviewPublishOutcomeKey.js';
 import { KEY_COMMENT_TIMELINE_MIRROR } from './commentTimelineMirrorKey.js';
 import { KEY_GIFT_HISTORY_MIRROR } from './giftHistoryMirrorKey.js';
 import { KEY_ROOM_HEAT_MIRROR } from './roomHeatMirrorKey.js';
+import { KEY_SESSION_SUMMARY_MIRROR } from './sessionSummaryMirrorKey.js';
 import { KEY_PREVIEW_RENDER_ACK } from './previewRenderAckKey.js';
 import { KEY_BACKFILL_LIVE_METRIC } from './storageKeys.js';
 import { KEY_GIFT_EFFECT_DIAG } from './giftEffectDiagKey.js';
@@ -65,6 +66,7 @@ export const EXTRAS_BATCH_KEYS = [
   KEY_COMMENT_TIMELINE_MIRROR,
   KEY_GIFT_HISTORY_MIRROR,
   KEY_ROOM_HEAT_MIRROR,
+  KEY_SESSION_SUMMARY_MIRROR,
   KEY_PREVIEW_RENDER_ACK,
   KEY_BACKFILL_LIVE_METRIC,
   KEY_GIFT_EFFECT_DIAG,
@@ -90,7 +92,7 @@ export const EXTRAS_BATCH_KEYS = [
  * @returns {{
  *   voiceDiag: any, venueSeatsDiag: any, reportPreview: any, laneDiag: any, laneMirror: any,
  *   statCardsMirror: any, northStarMirror: any, publishOutcomeRec: any, commentTimelineMirror: any,
- *   giftHistoryMirror: any, roomHeatMirror: any,
+ *   giftHistoryMirror: any, roomHeatMirror: any, sessionSummaryMirror: any,
  *   previewRenderAck: any, backfillLiveMetric: any, giftEffectDiag: any, milestoneEffectDiag: any,
  *   voiceEffectDiag: any, bgmPhaseDiag: any, opSoundEffectDiag: any, commentPostDiag: any,
  *   instantPushDiag: any, channelSwitchDiag: any, highlightLedger: any, scoreAnnounceDiag: any
@@ -111,6 +113,7 @@ export function pickExtrasBatchValues(bag, nowMs) {
     commentTimelineMirror: b[KEY_COMMENT_TIMELINE_MIRROR] || null,
     giftHistoryMirror: b[KEY_GIFT_HISTORY_MIRROR] || null,
     roomHeatMirror: b[KEY_ROOM_HEAT_MIRROR] || null,
+    sessionSummaryMirror: b[KEY_SESSION_SUMMARY_MIRROR] || null,
     previewRenderAck: b[KEY_PREVIEW_RENDER_ACK] || null,
     backfillLiveMetric: b[KEY_BACKFILL_LIVE_METRIC] || null,
     giftEffectDiag: b[KEY_GIFT_EFFECT_DIAG] || null,

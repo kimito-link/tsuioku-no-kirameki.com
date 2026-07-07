@@ -26,6 +26,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1108',
+    date: '2026-07-07',
+    summary: 'feat(web): ③応援ライブビューに記録サマリ推移丸写し',
+    items: Object.freeze([
+      'WEB版の応援ライブビューに「記録サマリの推移（この放送）」テーブル（約1分ごとのサンプル最大24行）を表示するようにしました。拡張の画面とそっくり同じ見た目で丸写しします。',
+      '拡張の画面をWEBにまるごと写す仕組みの第5弾です（応援タイムライン／投げ一覧／配信採点／室温に続く）。追加の読み取りゼロ・軽量です。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1107',
     date: '2026-07-07',
     summary: 'feat(web): ③応援ライブビューに室温丸写し',

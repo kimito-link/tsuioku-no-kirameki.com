@@ -100,6 +100,16 @@ export const LIVEVIEW_MIRROR_SECTIONS = /** @type {const} */ ([
     inBundle: true,
     driftGuardHost: false // room-heat host は①②③共通の既存構造(手動コピー節ではない)
   },
+  {
+    // ③WEB記録サマリ推移丸写し(第5号・reference_full_mirror_SYNTHESIS.md M5)。
+    key: 'sessionSummary',
+    blobField: 'sessionSummaryMirror',
+    paintFn: 'paintSessionSummaryMirror',
+    hostIds: ['sessionSummaryCompareMount'], // live-view.html に既存(手動コピー節ではない=drift対象外)
+    prunePolicy: 'never', // 24行≈5KB のコンパクト表=公開 prune 対象外
+    inBundle: true,
+    driftGuardHost: false
+  },
   // ── 統合バンドルに載らない「view キー」(同一鏡→複数paint) ──
   {
     key: 'supportTimeline',
