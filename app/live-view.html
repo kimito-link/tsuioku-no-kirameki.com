@@ -9859,6 +9859,176 @@
       html.nl-skin-panel-dark #storageErrorBanner {
         border-color: rgb(248 113 113 / 38%);
       }
+
+      /* ③WEB配信採点丸写し（第3号・reference_full_mirror_SYNTHESIS.md M2/C-2）: popup.html の
+         nl-score 系CSS（配信採点パネル）を live-view.html にも同期。①専用の発表シーケンス演出
+         （.nl-score-announce-btn / .nl-score-panel--announcing / @keyframes nl-score-announce-shake）は
+         ③では発表しないため除外。radar/rank/parts/highlights 等の表示CSSは必須。 */
+      .nl-score-mount {
+        margin-top: 4px;
+      }
+
+      .nl-score-panel {
+        font-size: 11px;
+      }
+
+      .nl-score-title {
+        margin: 0 0 4px;
+        font-weight: 600;
+      }
+
+      .nl-score-total-row {
+        display: flex;
+        align-items: baseline;
+        gap: 4px;
+      }
+
+      .nl-score-total-num {
+        font-size: 28px;
+        font-weight: 700;
+        line-height: 1;
+      }
+
+      .nl-score-total-unit {
+        font-size: 12px;
+        color: var(--nl-muted);
+      }
+
+      .nl-score-rank {
+        margin-left: 6px;
+        padding: 1px 8px;
+        border-radius: 999px;
+        font-weight: 700;
+        font-size: 13px;
+      }
+
+      .nl-score-rank--s {
+        background: #ffd54a;
+        color: #5b3d00;
+      }
+
+      .nl-score-rank--a {
+        background: #ffb3c7;
+        color: #5b0022;
+      }
+
+      .nl-score-rank--b {
+        background: #9fd8ff;
+        color: #003a5b;
+      }
+
+      .nl-score-rank--c {
+        background: #c9e8b0;
+        color: #234500;
+      }
+
+      .nl-score-rank--d {
+        background: var(--nl-bg-soft);
+        color: var(--nl-muted);
+      }
+
+      .nl-score-parts {
+        margin: 6px 0 0;
+        padding-left: 1.1em;
+        font-size: 10px;
+      }
+
+      .nl-score-bonus-row {
+        margin-top: 4px;
+        font-size: 10px;
+        color: var(--nl-muted);
+      }
+
+      .nl-score-bonus-val {
+        font-weight: 700;
+        color: inherit;
+        margin: 0 4px;
+      }
+
+      .nl-score-phase-chip {
+        margin: 4px 0 0;
+        font-size: 10px;
+        color: var(--nl-muted);
+      }
+
+      .nl-score-radar-section {
+        margin-top: 6px;
+        max-width: 200px;
+      }
+
+      .nl-score-radar-svg {
+        width: 100%;
+        height: auto;
+      }
+
+      .nl-score-radar-grid {
+        fill: none;
+        stroke: var(--nl-border);
+        stroke-width: 1;
+      }
+
+      .nl-score-radar-axis-line {
+        stroke: var(--nl-border);
+        stroke-width: 1;
+      }
+
+      .nl-score-radar-data {
+        fill: rgba(255, 138, 101, 0.35);
+        stroke: #ff8a65;
+        stroke-width: 1.5;
+      }
+
+      .nl-score-radar-label {
+        font-size: 7px;
+        fill: var(--nl-muted);
+      }
+
+      .nl-score-highlights-section {
+        margin-top: 6px;
+      }
+
+      .nl-score-highlights-title {
+        margin: 0 0 2px;
+        font-size: 10px;
+        font-weight: 600;
+      }
+
+      .nl-score-highlights-list {
+        margin: 0;
+        padding-left: 1.1em;
+        font-size: 10px;
+      }
+
+      .nl-score-stale {
+        margin-top: 4px;
+        font-size: 10px;
+        color: var(--nl-muted);
+      }
+
+      /* 発表シーケンスの reveal 演出（③では発表起動しないが、未使用CSSは無害・drift を最小化するため保持）。 */
+      .nl-score-panel--revealed .nl-score-total-row {
+        animation: nl-score-reveal-pop 0.35s ease-out;
+      }
+
+      @keyframes nl-score-reveal-pop {
+        0% { transform: scale(0.85); opacity: 0.4; }
+        100% { transform: scale(1); opacity: 1; }
+      }
+
+      .nl-score-radar-section--revealed .nl-score-radar-data {
+        animation: nl-score-radar-fade 1s ease-out;
+      }
+
+      @keyframes nl-score-radar-fade {
+        0% { opacity: 0; }
+        100% { opacity: 1; }
+      }
+
+      .nl-score-highlight-item--revealed {
+        opacity: 1;
+        transform: translateX(0);
+        transition: opacity 0.25s ease-out, transform 0.25s ease-out;
+      }
     </style>
   </head>
   <body>
@@ -11510,6 +11680,17 @@
                 aria-label="コメントとギフトの時系列"
                 aria-live="off"
               ></div>
+            </details>
+            <!--
+              ③WEB配信採点丸写し（第3号・reference_full_mirror_SYNTHESIS.md M2/C-2）:
+              ①popup.html の #broadcastScoreDetails を drift 解消のため live-view.html にも同期。
+              ★①専用UI（#broadcastScoreAnnounceBtn「▶発表を再生」）は③受動ビューには持ち込まない
+                （地雷 C2-b・③は発表しない）。summary と mount だけ残す。中身は status が組んだ
+                jsonBlob.broadcastScoreVm から paintBroadcastScorePanel が buildBroadcastScorePanelHtml で描く。
+            -->
+            <details id="broadcastScoreDetails" class="nl-score-panel-details">
+              <summary>配信採点（カラオケ採点風）</summary>
+              <div id="broadcastScoreMount" class="nl-score-mount"></div>
             </details>
           </div>
           <div id="roomHeatSummary" class="room-heat nl-heat-summary" role="status" aria-live="polite">

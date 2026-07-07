@@ -70,6 +70,10 @@ import { summarizeTimelineGifts } from '../src/lib/supportActivityTimeline.js';
 //   (#northStarLaneThrows-giftHistory)を描く。データは giftHistoryMirror(jsonBlob 同梱)を再利用。
 import { restoreGiftHistoryMirror } from '../src/lib/giftHistoryMirror.js';
 import { buildGiftThrowLedgerTableSectionHtml } from '../src/lib/giftThrowLedgerTableHtml.js';
+// ③WEB配信採点丸写し（第3号・reference_full_mirror_SYNTHESIS.md M2・路線2）。①拡張の renderBroadcastScorePanel と
+//   同じ本物 lib（似せて自作しない）で #broadcastScoreMount に採点パネルを描く。view-model は status が既読5値から
+//   ①と同じ buildBroadcastScorePanelViewModel で組んで jsonBlob.broadcastScoreVm に載せ済み（案A）＝③は HTML 化だけ。
+import { buildBroadcastScorePanelHtml } from '../src/lib/broadcastScoreHtml.js';
 // 第1段(council/liveview-wholesale-root-SYNTHESIS.md): スナップショット丸ごと1枚の鮮度を【1回だけ】判定し、
 //   全レーンを一斉に出す/一斉に「古い」とする。per-section の個別鮮度ドロップ(=レーンがバラバラに消える)を廃止。
 import {
@@ -568,6 +572,35 @@ function paintGiftHistoryMirror(snap) {
   }
 }
 
+/** ③WEB配信採点丸写し(第3号・M2): 配信採点パネルを純Web③に描く。
+ *   ①拡張の renderBroadcastScorePanel と同じ本物 lib(似せて自作しない):
+ *     status が既読5値から buildBroadcastScorePanelViewModel で組んだ view-model(jsonBlob.broadcastScoreVm)を
+ *     buildBroadcastScorePanelHtml で HTML 化し #broadcastScoreMount へ innerHTML(案A=③は HTML 化だけ)。
+ *   ★VM が null(未観測/liveId 未一致/鮮度落ち)なら host を触らない(popup passive の空状態を上書きしない=死に画面回避)。
+ *   ★①専用のカウントアップ演出(rAF)は③では省略=静的表示(設計 A-3)。
+ *   ★専用署名ガード(_lastBroadcastScoreSig)=既存 sig と共用しない(diff-skip 機構は新設・既存不変)。 */
+let _lastBroadcastScoreSig = ' init';
+function paintBroadcastScorePanel(vm) {
+  if (!vm || typeof vm !== 'object' || !vm.score) return; // データ無し=popup の空状態のまま(死に画面にしない)
+  const mount = document.getElementById('broadcastScoreMount');
+  if (!mount) return;
+  // VM に capturedAt は無いので採点の意味的な値(合計/ランク/鮮度/ハイライト数)で署名する
+  //   (broadcastScorePanelSig と同趣旨・同じ値の再描画は skip)。
+  const sig = `${Number(vm.score.total) || 0}|${String(vm.score.rank || '')}|${vm.isFresh ? '1' : '0'}|${Array.isArray(vm.highlights) ? vm.highlights.length : 0}`;
+  if (sig === _lastBroadcastScoreSig) return;
+  _lastBroadcastScoreSig = sig;
+  try {
+    const html = buildBroadcastScorePanelHtml(vm);
+    if (!html) return; // 念のため(空文字=器を作れない)。popup の空状態を上書きしない
+    mount.innerHTML = html;
+    // details を開ける状態にする(hidden 属性が付いていれば外す)。中身が出た=空の案内で誤解させない。
+    const details = document.getElementById('broadcastScoreDetails');
+    if (details && details.hidden) details.hidden = false;
+  } catch {
+    /* no-op: 採点パネルは best-effort(壊れても他レーンを巻き込まない) */
+  }
+}
+
 /** snapshot の全鏡を本物 paint で popup DOM に塗る（signature ガード有効＝変化時のみ）。
  *   ★第1段(council/liveview-wholesale-root-SYNTHESIS.md): スナップショット丸ごとの鮮度を【1回だけ】判定し、
  *     新鮮なら全レーンを一斉に塗る・古ければ1枚バナーで知らせる(per-section でバラバラに消さない=全レーンが揃う)。 */
@@ -588,6 +621,8 @@ function paintAllMirrors(jsonBlob) {
   paintSupportTimelineMirror(jsonBlob.commentTimelineMirror || null);
   // ③WEB投げ一覧丸写し(第2号): 北極星 giftHistory レーン(貢献者 strip + 投げ明細テーブル)を描く。
   paintGiftHistoryMirror(jsonBlob.giftHistoryMirror || null);
+  // ③WEB配信採点丸写し(第3号・M2): status が組んだ view-model(broadcastScoreVm)を採点パネルに描く。
+  paintBroadcastScorePanel(jsonBlob.broadcastScoreVm || null);
   // 2026-06-29(HANDOFF-resume-0629 §3 (B)): ①POP と【全く同じフル状態速報】を③WEB でも出す。
   //   status が jsonBlob.statusReport に①の本文(buildAiShareFullText の結果)を同梱する=ここは貼るだけ。
   paintStatusReport(jsonBlob.statusReport || null);
@@ -645,6 +680,7 @@ function forcePaintAllMirrors() {
   _lastTimelineSig = ' force';
   _lastSupportTimelineSig = ' force'; // ③応援タイムライン丸写し(第1号)も clobber から自己修復させる
   _lastGiftHistorySig = ' force'; // ③投げ一覧丸写し(第2号)も clobber(passive の collapse)から自己修復させる
+  _lastBroadcastScoreSig = ' force'; // ③配信採点丸写し(第3号)も clobber(passive の空 VM 上書き)から自己修復させる
   const wasPainting = _painting;
   _painting = true; // 自分の paint 由来の mutation を observer に無視させる
   try {
@@ -745,7 +781,10 @@ function startSelfHealingRepaint() {
   //   ★northStarLaneBody-giftHistory(③投げ一覧丸写し・第2号): passive popup は
   //     collapseNorthStarGiftHistoryLaneForPassive がこのレーンを意図的に畳む=clobber が設計上確定。
   //     observer 自己修復が唯一の防御(配線3点セットの3点目)。
-  const targets = ['sceneStoryUserLaneStack', 'liveStatCards', 'casterBanner', 'supportTimelineBody', 'northStarLaneBody-giftHistory']
+  //   ★broadcastScoreMount(③配信採点丸写し・第3号): passive popup の renderBroadcastScorePanel は
+  //     <details> を開くとシム storage に採点5値が無いため VM=null→「まだデータがありません」で mount を
+  //     clobber する。observer 自己修復が唯一の防御(配線3点セットの3点目・安全側で必ず入れる)。
+  const targets = ['sceneStoryUserLaneStack', 'liveStatCards', 'casterBanner', 'supportTimelineBody', 'northStarLaneBody-giftHistory', 'broadcastScoreMount']
     .map((id) => document.getElementById(id))
     .filter(Boolean);
   try {

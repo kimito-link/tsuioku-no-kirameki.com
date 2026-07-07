@@ -193,6 +193,8 @@
 | `src/lib/backfillTransientRetry.js` | 2 | バックフィル SW / 記録エンジン(watchページ常駐) |
 | `src/lib/broadcastContext.js` | 2 | 記録エンジン(watchページ常駐) / 会場モード(standalone) |
 | `src/lib/broadcasterProfileCard.js` | 2 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) |
+| `src/lib/broadcastScore.js` | 2 | ポップアップ(応援レーン) / 状態速報ページ |
+| `src/lib/broadcastScorePanelViewModel.js` | 2 | ポップアップ(応援レーン) / 状態速報ページ |
 | `src/lib/broadcastUrl.js` | 2 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) |
 | `src/lib/celebrationFlyText.js` | 2 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) |
 | `src/lib/celebrationPika.js` | 2 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) |
@@ -249,6 +251,7 @@
 | `src/lib/reportPreviewKey.js` | 2 | ポップアップ(応援レーン) / 状態速報ページ |
 | `src/lib/scoreAnnounceDiag.js` | 2 | ポップアップ(応援レーン) / 状態速報ページ |
 | `src/lib/scoreAnnounceDiagKey.js` | 2 | ポップアップ(応援レーン) / 状態速報ページ |
+| `src/lib/scoreRadar.js` | 2 | ポップアップ(応援レーン) / 状態速報ページ |
 | `src/lib/scrapeGiftHistoryList.js` | 2 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) |
 | `src/lib/selfActionCelebration.js` | 2 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) |
 | `src/lib/selfPostedMatcher.js` | 2 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) |
@@ -335,9 +338,7 @@
 | `src/lib/broadcasterUserId.js` | 1 | 記録エンジン(watchページ常駐) |
 | `src/lib/broadcastNarrativeBuilder.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/broadcastReportSummary.js` | 1 | ポップアップ(応援レーン) |
-| `src/lib/broadcastScore.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/broadcastScoreHtml.js` | 1 | ポップアップ(応援レーン) |
-| `src/lib/broadcastScorePanelViewModel.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/broadcastSessionSummaryDb.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/broadcastSessionSummaryFlush.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/broadcastWaveformFingerprint.js` | 1 | ポップアップ(応援レーン) |
@@ -614,7 +615,6 @@
 | `src/lib/sanitizeRoomAvatarsForBroadcaster.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/scoreAnnounce.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/scoreCountUp.js` | 1 | ポップアップ(応援レーン) |
-| `src/lib/scoreRadar.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/scrapeEventScoreRankingFromRichviewDom.js` | 1 | 記録エンジン(watchページ常駐) |
 | `src/lib/scrapeTotalGiftCountList.js` | 1 | 記録エンジン(watchページ常駐) |
 | `src/lib/scrollWhiteoutProbe.js` | 1 | 記録エンジン(watchページ常駐) |

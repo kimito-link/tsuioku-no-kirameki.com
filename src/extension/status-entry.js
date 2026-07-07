@@ -133,6 +133,11 @@ import { buildHighlightLedgerDiagLines } from '../lib/highlightLedger.js';
 //   起動/完走/中断観測値を extras(12秒間引き)で読む。popup が書く純観測値。キー定数自体は
 //   statusExtrasBatch.js が EXTRAS_BATCH_KEYS へ統合済み(直接importは不要)。
 import { buildScoreAnnounceDiagLines } from '../lib/scoreAnnounceDiag.js';
+// ③WEB配信採点丸写し(第3号・reference_full_mirror_SYNTHESIS.md M2/A-3・路線2): status が既に extras で
+//   読んでいる5値(reportPreview/bgmPhaseDiag/giftEffectDiag/voiceDiag/highlightLedger)から①と同じ純lib
+//   で view-model を組み、jsonBlob.broadcastScoreVm に載せる(新規 storage read ゼロ・publish ゼロ)。
+//   R-1: VM 戻りは score/radar/highlights 等の構造化データのみ=HTML文字列を含まない(③で buildBroadcastScorePanelHtml が HTML 化)。
+import { buildBroadcastScorePanelViewModel } from '../lib/broadcastScorePanelViewModel.js';
 // Phase D1(2026-07-05): 操作音(opSoundDirector.js)の「押下→成功→発音」観測値を extras(12秒間引き)で
 //   読む。popup が書く純観測値=「押下は鳴るのに成功が無い/成功しているのに未割当」を1枚で見分ける。
 import { buildOpSoundEffectDiagLines } from '../lib/opSoundEffectDiag.js';
@@ -1604,6 +1609,27 @@ function renderAll({ lvList, summaries, fastDiag, popupDiag, backfillProgress, b
   const currentLiveId = String(
     northStarMirror?.liveId || laneMirror?.liveId || statCardsMirror?.liveId || ''
   );
+
+  // ③WEB配信採点丸写し(第3号・reference_full_mirror_SYNTHESIS.md M2・路線2): status 既読の5値から①と同じ
+  //   純lib(buildBroadcastScorePanelViewModel)で view-model を組み、jsonBlob に載せる。③は
+  //   buildBroadcastScorePanelHtml を呼ぶだけ(VM ロジックは①と1回で共有)。
+  //   ★VM が liveId 未一致/鮮度落ち/未観測で null を返す設計(空パネルにしない)なので null なら載せない。
+  //   ★VM 戻りは構造化データのみ(score/radar/highlights)=innerHTML 行きの HTML 文字列は含まない(R-1 遵守)。
+  //   liveId は鏡優先→無ければ reportPreview.liveId にフォールバック(VM 側でも previewRec.liveId と突合される)。
+  const scoreLiveId = currentLiveId || String(reportPreview?.liveId || '');
+  const broadcastScoreVm = scoreLiveId
+    ? buildBroadcastScorePanelViewModel({
+        liveId: scoreLiveId,
+        nowMs: Date.now(),
+        previewRec: reportPreview,
+        phaseStats: bgmPhaseDiag,
+        giftDiag: giftEffectDiag,
+        voiceDiag,
+        ledger: highlightLedger && typeof highlightLedger === 'object' ? highlightLedger : null
+      })
+    : null;
+  if (broadcastScoreVm) jsonBlob.broadcastScoreVm = broadcastScoreVm;
+
   const publishKeys = getUploadConfig();
 
   // AI 共有用テキスト

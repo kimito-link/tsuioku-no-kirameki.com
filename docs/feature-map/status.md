@@ -25,6 +25,8 @@ graph LR
   n_status --> n_src_lib_backgroundWatchTab_js["lib/backgroundWatchTab.js"]
   n_status --> n_src_lib_bgmPhaseDiag_js["lib/bgmPhaseDiag.js"]:::shared
   n_status --> n_src_lib_bgmPhaseDiagKey_js["lib/bgmPhaseDiagKey.js"]:::shared
+  n_status --> n_src_lib_broadcastScore_js["lib/broadcastScore.js"]:::shared
+  n_status --> n_src_lib_broadcastScorePanelViewModel_js["lib/broadcastScorePanelViewModel.js"]:::shared
   n_status --> n_src_lib_broadcasterReputationKeywords_js["lib/broadcasterReputationKeywords.js"]
   n_status --> n_src_lib_broadcasterReputationView_js["lib/broadcasterReputationView.js"]
   n_status --> n_src_lib_channelSwitchDiag_js["lib/channelSwitchDiag.js"]:::shared
@@ -51,9 +53,7 @@ graph LR
   n_status --> n_src_lib_giftEffectDiag_js["lib/giftEffectDiag.js"]:::shared
   n_status --> n_src_lib_giftEffectDiagKey_js["lib/giftEffectDiagKey.js"]:::shared
   n_status --> n_src_lib_giftHistoryMirrorKey_js["lib/giftHistoryMirrorKey.js"]:::shared
-  n_status --> n_src_lib_googleSuggest_js["lib/googleSuggest.js"]
-  n_status --> n_src_lib_healthCells_js["lib/healthCells.js"]
   classDef shared fill:#eee,stroke:#999,color:#666;
 ```
 
-> ほか 76 ファイル省略（全件は storage-bus.md / metafile 参照）。
+> ほか 79 ファイル省略（全件は storage-bus.md / metafile 参照）。
