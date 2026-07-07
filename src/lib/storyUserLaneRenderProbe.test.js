@@ -140,6 +140,26 @@ describe('buildStoryUserLaneRenderDiag', () => {
     });
     expect(d.verdict).toBe('source_but_no_dom');
   });
+
+  it('heavyRace根治計器(A/B): shrinkKeepCount / heavyFreshReadReuseCount が >0 のとき診断行に出る', () => {
+    const d = buildStoryUserLaneRenderDiag({
+      activePath: 'heavy', started: 3, completed: 3, entriesLen: 300, domTilesPainted: 200, lastReachedStep: 'done',
+      shrinkKeepCount: 4, heavyFreshReadReuseCount: 7
+    });
+    const text = formatStoryUserLaneRenderDiagLines(d).join('\n');
+    expect(text).toContain('暫定縮小の上書きを 4 回防御'); // A計器
+    expect(text).toContain('fresh-read再利用): 7 回'); // B計器
+  });
+
+  it('計器が0なら診断行に出さない(ノイズにしない)', () => {
+    const d = buildStoryUserLaneRenderDiag({
+      activePath: 'heavy', started: 1, completed: 1, entriesLen: 5, domTilesPainted: 5, lastReachedStep: 'done',
+      shrinkKeepCount: 0, heavyFreshReadReuseCount: 0
+    });
+    const text = formatStoryUserLaneRenderDiagLines(d).join('\n');
+    expect(text).not.toContain('暫定縮小の上書き');
+    expect(text).not.toContain('fresh-read再利用');
+  });
 });
 
 describe('formatStoryUserLaneRenderDiagLines', () => {
