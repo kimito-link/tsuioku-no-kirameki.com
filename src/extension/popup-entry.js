@@ -105,6 +105,10 @@ import { buildGiftHistoryNorthStarViewModel } from '../lib/giftHistoryViewModel.
 // ③WEB投げ一覧丸写し(第2号・reference_full_mirror_SYNTHESIS.md B2-3): 北極星 giftHistory レーンを純Web③にも
 //   丸写しするための鏡スナップショット純関数。paint 済み ctx を渡すだけ=publish 経路に新規 storage read を足さない。
 import { buildGiftHistoryMirrorSnapshot } from '../lib/giftHistoryMirror.js';
+// ③WEB室温丸写し(第4号・reference_full_mirror_SYNTHESIS.md M3): 室温パネル(直近5分の応援増加=件数/人数/
+//   熱度%/文言)を純Web③にも丸写しするための鏡スナップショット純関数。renderRoomHeatSummary で計算済みの
+//   4値をそのまま渡すだけ=publish 経路に新規 storage read を足さない。数値4個+文言のみ(R-1・HTML 無し)。
+import { buildRoomHeatMirrorSnapshot } from '../lib/roomHeatMirror.js';
 import {
   fetchKokenGiftHistoryAllViaExtension,
   fetchKokenGiftHistoryViaExtension
@@ -7276,6 +7280,29 @@ function publishGiftHistoryMirror(liveId, ctx) {
   }
 }
 
+/**
+ * ③WEB室温丸写し(第4号・reference_full_mirror_SYNTHESIS.md M3): 室温パネル(直近5分の応援増加=件数/人数/
+ *   熱度%/文言)の鏡を status→純Web③用に publish する。INLINE_PASSIVE は書かない(②の不可侵原則)。
+ *   ★renderRoomHeatSummary が既に計算した4値をそのまま渡すだけ=publish 経路に新規 storage read を足さない
+ *     (鉄則)。HTML は載せない(R-1)=数値4個+文言1個のみ=最軽量(約100バイト)。
+ * @param {string} liveId
+ * @param {{ total: number, active: number, heatPercent: number, heatText: string }} vals
+ *   renderRoomHeatSummary に渡したのと同じ室温4値。
+ */
+function publishRoomHeatMirror(liveId, vals) {
+  if (INLINE_PASSIVE) return; // 受動ビュー: 鏡を上書きしない
+  try {
+    const now = Date.now();
+    const lid = String(liveId || '').trim().toLowerCase();
+    if (!/^lv\d{1,15}$/.test(lid)) return;
+    const snap = buildRoomHeatMirrorSnapshot(vals, { liveId: lid, nowMs: now });
+    if (!snap) return;
+    mergeAndScheduleFlush('roomHeat', snap, lid, now);
+  } catch {
+    /* no-op */
+  }
+}
+
 /** v0.1.1018: liveId検証・provisionalガード(暫定30件で全件鏡を潰さない)を判定する gate。
  *  ★v0.1.1036: min-gap はバンドル flush に一元化したので gate 側は無効化(minGapMs:0)=二重ゲートで
  *    gap 窓のコメントを捨てない(F-1 再来防止・commentMirrorPublishGate.js のコメント参照)。 */
@@ -12940,6 +12967,14 @@ function renderUserRooms(entries, liveId = '', renderOpts = {}) {
           ? '増加あり'
           : '増加は少なめ';
   renderRoomHeatSummary(heatDisp.total, heatDisp.active, heatPercent, heatText);
+  // ③WEB室温丸写し(第4号・reference_full_mirror_SYNTHESIS.md M3): ①が今描いた室温4値をそのまま鏡に publish。
+  //   新規 storage read 無し(この関数スコープで計算済みの4値を流用)・INLINE_PASSIVE ガードは publish 側。
+  publishRoomHeatMirror(lvPrimed, {
+    total: heatDisp.total,
+    active: heatDisp.active,
+    heatPercent,
+    heatText
+  });
 
   // 0.1.78: コメ記録に焼き込まれた汚染 avatar の表示時補正
   //   過去のバージョンで保存された nls_comments_<liveId> に broadcaster icon が

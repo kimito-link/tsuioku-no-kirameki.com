@@ -30,9 +30,18 @@ const GIFT_HISTORY = {
   ledgerRows: [{ timeLabel: '12:00', itemName: '花束', points: 300, userId: '1', senderLabel: '投げ主A', source: 'koken-api' }],
   ledgerTotalCount: 1
 };
+// ③WEB室温丸写し(第4号): roomHeat バンドル節。数値4個+文言(件数/人数/熱度%/文言)。
+const ROOM_HEAT = {
+  liveId: 'lv1',
+  capturedAt: 16,
+  total: 42,
+  active: 7,
+  heatPercent: 61.5,
+  heatText: '増加が大きい'
+};
 
 describe('createEmptyMirrorBundle', () => {
-  it('6セクションが null の初期形を返す(giftHistory=③WEB投げ一覧丸写し・第2号を含む)', () => {
+  it('7セクションが null の初期形を返す(giftHistory=第2号・roomHeat=第4号を含む)', () => {
     expect(createEmptyMirrorBundle()).toEqual({
       liveId: '',
       gen: 0,
@@ -43,7 +52,8 @@ describe('createEmptyMirrorBundle', () => {
         topSupporters: null,
         northStar: null,
         commentTimeline: null,
-        giftHistory: null
+        giftHistory: null,
+        roomHeat: null
       }
     });
   });
@@ -246,5 +256,23 @@ describe('giftHistory バンドル節(③WEB投げ一覧丸写し・第2号)', (
     const buf = mergeMirrorBundleSection(createEmptyMirrorBundle(), 'lane', LANE, { liveId: 'lv1', nowMs: 100 });
     expect(buf.sections.giftHistory).toBeNull();
     expect(restoreMirrorBundleSection(buf, 'giftHistory')).toBeNull();
+  });
+});
+
+describe('roomHeat バンドル節(③WEB室温丸写し・第4号)', () => {
+  it("'roomHeat' は正規セクションキー=merge/restore できる(他6鏡と同一 tick に載る)", () => {
+    let buf = createEmptyMirrorBundle();
+    buf = mergeMirrorBundleSection(buf, 'giftHistory', GIFT_HISTORY, { liveId: 'lv1', nowMs: 100 });
+    buf = mergeMirrorBundleSection(buf, 'roomHeat', ROOM_HEAT, { liveId: 'lv1', nowMs: 101 });
+    // roomHeat を足しても既存の giftHistory を消さない(後着が先着を消さない)。
+    expect(buf.sections.giftHistory).toBe(GIFT_HISTORY);
+    expect(buf.sections.roomHeat).toBe(ROOM_HEAT);
+    expect(restoreMirrorBundleSection(buf, 'roomHeat')).toBe(ROOM_HEAT);
+  });
+
+  it('ネガコン: 未反映の roomHeat は初期形で null(既存を消さない)', () => {
+    const buf = mergeMirrorBundleSection(createEmptyMirrorBundle(), 'lane', LANE, { liveId: 'lv1', nowMs: 100 });
+    expect(buf.sections.roomHeat).toBeNull();
+    expect(restoreMirrorBundleSection(buf, 'roomHeat')).toBeNull();
   });
 });

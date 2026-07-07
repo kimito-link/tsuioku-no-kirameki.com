@@ -91,6 +91,15 @@ export const LIVEVIEW_MIRROR_SECTIONS = /** @type {const} */ ([
     inBundle: true,
     driftGuardHost: true // ①popup.html の投げ一覧 host を live-view.html に同期した節
   },
+  {
+    key: 'roomHeat',
+    blobField: 'roomHeatMirror',
+    paintFn: 'paintRoomHeatMirror',
+    hostIds: ['roomHeatSummary'], // Meta/Fill/Note は Summary 配下=代表hostで存在担保
+    prunePolicy: 'never', // スカラー4個(≈100B)=公開 prune 対象外
+    inBundle: true,
+    driftGuardHost: false // room-heat host は①②③共通の既存構造(手動コピー節ではない)
+  },
   // ── 統合バンドルに載らない「view キー」(同一鏡→複数paint) ──
   {
     key: 'supportTimeline',

@@ -74,6 +74,9 @@ import { buildGiftThrowLedgerTableSectionHtml } from '../src/lib/giftThrowLedger
 //   同じ本物 lib（似せて自作しない）で #broadcastScoreMount に採点パネルを描く。view-model は status が既読5値から
 //   ①と同じ buildBroadcastScorePanelViewModel で組んで jsonBlob.broadcastScoreVm に載せ済み（案A）＝③は HTML 化だけ。
 import { buildBroadcastScorePanelHtml } from '../src/lib/broadcastScoreHtml.js';
+// ③WEB室温丸写し(第4号・reference_full_mirror_SYNTHESIS.md M3)。①拡張の renderRoomHeatSummary と全く同じ描画で
+//   #roomHeatSummary(直近5分の応援増加=件数/人数/熱度バー/文言)を純Web③にも描く。data は roomHeatMirror(jsonBlob 同梱)。
+import { restoreRoomHeatMirror } from '../src/lib/roomHeatMirror.js';
 // 第1段(council/liveview-wholesale-root-SYNTHESIS.md): スナップショット丸ごと1枚の鮮度を【1回だけ】判定し、
 //   全レーンを一斉に出す/一斉に「古い」とする。per-section の個別鮮度ドロップ(=レーンがバラバラに消える)を廃止。
 import {
@@ -601,6 +604,36 @@ function paintBroadcastScorePanel(vm) {
   }
 }
 
+/** ③WEB室温丸写し(第4号・M3): 室温パネル(直近5分の応援増加=件数/人数/熱度バー/文言)を純Web③にも描く。
+ *   ①拡張の renderRoomHeatSummary(popup-entry.js)と【全く同じ描画】(似せて自作しない=文言も width 書式も一致):
+ *     - #roomHeatSummary の hidden を外す(①と同じく summary.hidden=false)。
+ *     - #roomHeatMeta   textContent = `直近5分 +${total}件 / ${active}人`
+ *     - #roomHeatFill   style.width  = `${clamp(heatPercent).toFixed(2)}%`
+ *     - #roomHeatNote   textContent = `${heatText}（この5分で増えた件数）`
+ *   ★専用署名ガード(_lastRoomHeatSig)=既存 sig と共用しない(diff-skip 機構は新設・既存不変)。
+ *   ★m=null(データ無し)なら host を触らない(popup passive の空状態を上書きしない=死に画面回避)。 */
+let _lastRoomHeatSig = ' init';
+function paintRoomHeatMirror(snap) {
+  const m = restoreRoomHeatMirror(snap);
+  if (!m) return; // データ無し=popup の空状態のまま(死に画面にしない)
+  const summary = document.getElementById('roomHeatSummary');
+  const meta = document.getElementById('roomHeatMeta');
+  const fill = document.getElementById('roomHeatFill');
+  const note = document.getElementById('roomHeatNote');
+  if (!summary || !meta || !fill || !note) return;
+  const sig = `${String(m.liveId || '')}|${Number(m.capturedAt) || 0}|${m.total}|${m.active}|${m.heatPercent}`;
+  if (sig === _lastRoomHeatSig) return;
+  _lastRoomHeatSig = sig;
+  try {
+    summary.hidden = false;
+    meta.textContent = `直近5分 +${m.total}件 / ${m.active}人`;
+    fill.style.width = `${Math.max(0, Math.min(100, Number(m.heatPercent) || 0)).toFixed(2)}%`;
+    note.textContent = `${m.heatText}（この5分で増えた件数）`;
+  } catch {
+    /* no-op: 室温パネルは best-effort(壊れても他レーンを巻き込まない) */
+  }
+}
+
 /** snapshot の全鏡を本物 paint で popup DOM に塗る（signature ガード有効＝変化時のみ）。
  *   ★第1段(council/liveview-wholesale-root-SYNTHESIS.md): スナップショット丸ごとの鮮度を【1回だけ】判定し、
  *     新鮮なら全レーンを一斉に塗る・古ければ1枚バナーで知らせる(per-section でバラバラに消さない=全レーンが揃う)。 */
@@ -623,6 +656,8 @@ function paintAllMirrors(jsonBlob) {
   paintGiftHistoryMirror(jsonBlob.giftHistoryMirror || null);
   // ③WEB配信採点丸写し(第3号・M2): status が組んだ view-model(broadcastScoreVm)を採点パネルに描く。
   paintBroadcastScorePanel(jsonBlob.broadcastScoreVm || null);
+  // ③WEB室温丸写し(第4号・M3): 室温パネル(直近5分の応援増加=件数/人数/熱度バー/文言)を描く。
+  paintRoomHeatMirror(jsonBlob.roomHeatMirror || null);
   // 2026-06-29(HANDOFF-resume-0629 §3 (B)): ①POP と【全く同じフル状態速報】を③WEB でも出す。
   //   status が jsonBlob.statusReport に①の本文(buildAiShareFullText の結果)を同梱する=ここは貼るだけ。
   paintStatusReport(jsonBlob.statusReport || null);
@@ -681,6 +716,7 @@ function forcePaintAllMirrors() {
   _lastSupportTimelineSig = ' force'; // ③応援タイムライン丸写し(第1号)も clobber から自己修復させる
   _lastGiftHistorySig = ' force'; // ③投げ一覧丸写し(第2号)も clobber(passive の collapse)から自己修復させる
   _lastBroadcastScoreSig = ' force'; // ③配信採点丸写し(第3号)も clobber(passive の空 VM 上書き)から自己修復させる
+  _lastRoomHeatSig = ' force'; // ③室温丸写し(第4号)も clobber(passive の空描画上書き)から自己修復させる
   const wasPainting = _painting;
   _painting = true; // 自分の paint 由来の mutation を observer に無視させる
   try {
@@ -784,7 +820,10 @@ function startSelfHealingRepaint() {
   //   ★broadcastScoreMount(③配信採点丸写し・第3号): passive popup の renderBroadcastScorePanel は
   //     <details> を開くとシム storage に採点5値が無いため VM=null→「まだデータがありません」で mount を
   //     clobber する。observer 自己修復が唯一の防御(配線3点セットの3点目・安全側で必ず入れる)。
-  const targets = ['sceneStoryUserLaneStack', 'liveStatCards', 'casterBanner', 'supportTimelineBody', 'northStarLaneBody-giftHistory', 'broadcastScoreMount']
+  //   ★roomHeatSummary(③室温丸写し・第4号): passive popup の renderUserRooms→renderRoomHeatSummary が
+  //     シム storage に生コメントが無いため「直近5分 +0件 / 0人」で summary を clobber する。
+  //     observer 自己修復が唯一の防御(配線3点セットの3点目・安全側で必ず入れる)。
+  const targets = ['sceneStoryUserLaneStack', 'liveStatCards', 'casterBanner', 'supportTimelineBody', 'northStarLaneBody-giftHistory', 'broadcastScoreMount', 'roomHeatSummary']
     .map((id) => document.getElementById(id))
     .filter(Boolean);
   try {
