@@ -24,6 +24,7 @@ import { KEY_STAT_CARDS_MIRROR } from './statCardsMirrorKey.js';
 import { KEY_TOP_SUPPORTERS_MIRROR } from './storageKeys.js';
 import { KEY_NORTH_STAR_MIRROR } from './northStarMirrorKey.js';
 import { KEY_COMMENT_TIMELINE_MIRROR } from './commentTimelineMirrorKey.js';
+import { KEY_GIFT_HISTORY_MIRROR } from './giftHistoryMirrorKey.js';
 
 const DEFAULT_MIN_GAP_MS = 3000;
 
@@ -33,7 +34,8 @@ const SECTION_TO_LEGACY_KEY = /** @type {const} */ ({
   statCards: KEY_STAT_CARDS_MIRROR,
   topSupporters: KEY_TOP_SUPPORTERS_MIRROR,
   northStar: KEY_NORTH_STAR_MIRROR,
-  commentTimeline: KEY_COMMENT_TIMELINE_MIRROR
+  commentTimeline: KEY_COMMENT_TIMELINE_MIRROR,
+  giftHistory: KEY_GIFT_HISTORY_MIRROR
 });
 
 /**

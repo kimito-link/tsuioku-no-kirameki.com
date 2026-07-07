@@ -39,6 +39,13 @@ export function buildGiftHistoryNorthStarViewModel(payload, opts = {}) {
   return {
     ...agg,
     recentThrows,
+    // ③WEB丸写し(第2号・reference_full_mirror_SYNTHESIS.md B2-2): 個別投げ明細の【生データ行】を公開する。
+    //   throwsTableHtml(HTML文字列)は R-1 によりサーバー往復の鏡に載せられないため、鏡側はこの
+    //   ledgerRows(JSON-safe な giftThrowRow 配列)を運び、③が buildGiftThrowLedgerTableSectionHtml を
+    //   自分で呼ぶ。①の描画(recentThrows/throwsTableHtml)は一切変えない(挙動不変)。
+    ledgerRows,
+    ledgerTotalCount: history.length,
+    payloadSource,
     throwsTableHtml: buildGiftHistoryThrowsTableHtml(
       history,
       history.length,

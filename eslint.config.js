@@ -209,8 +209,13 @@ export default [
     //   chrome.storage.onChanged購読・setTimeout直列実行・DOM演出クラス切替のグルーでlib抽出不可。
     //   純関数プランナー本体は src/lib/scoreAnnounce.js・診断整形は src/lib/scoreAnnounceDiag.js に
     //   テスト付きで隔離済み)を追加=21440→21693。ラチェットは実測+50の21743へ。
+    //   第2号(2026-07-07・③WEB投げ一覧丸写し): publishGiftHistoryMirror(paint済みctxを鏡バンドルへ
+    //   反映するグルー=INLINE_PASSIVE/storageのグルーでlib抽出不可)+import+refreshNorthStarGiftHistoryLane
+    //   のpaint後publish 1行+subAppCtx への ledgerRows 透過=chrome.storage/DOM依存でlib抽出不可。
+    //   鏡スナップショット純関数本体は src/lib/giftHistoryMirror.js(テスト付き)に隔離済み
+    //   (reference_full_mirror_SYNTHESIS.md B2-3)。追加=21743→21777。ラチェットは実測+50の21827へ。
     files: ['src/extension/popup-entry.js'],
-    rules: { 'max-lines': ['error', { max: 21743, skipBlankLines: false, skipComments: false }] }
+    rules: { 'max-lines': ['error', { max: 21827, skipBlankLines: false, skipComments: false }] }
   },
   {
     files: ['src/extension/popup/**/*.js'],

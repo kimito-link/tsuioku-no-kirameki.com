@@ -102,4 +102,72 @@ describe('pruneLiveViewPublishBlob', () => {
     // 入力側は無傷
     expect(blob.commentTimelineMirror.rows.length).toBe(40);
   });
+
+  // ─── 第2号(③WEB投げ一覧丸写し)prune: B2-6 ───
+
+  it('⓪ giftHistoryMirror.ledgerRows を最優先で削り、ledgerTotalCount は据え置き(嘘をつかない)', () => {
+    const ledgerRows = Array.from({ length: 20 }, (_, i) => ({ itemName: bigText(600), points: 100 + i }));
+    const rooms = Array.from({ length: 10 }, (_, i) => ({ userKey: `u${i}`, nickname: `n${i}`, count: 1 }));
+    const blob = {
+      giftHistoryMirror: { liveId: 'lv1', capturedAt: 1, rooms, ledgerRows, ledgerTotalCount: 20 },
+      commentTimelineMirror: { rows: [{ text: bigText(400) }], totalSeen: 1 },
+      topSupporters: { liveId: 'lv1', rows: [] },
+      statusReport: 'short'
+    };
+    const { blob: out, pruned } = pruneLiveViewPublishBlob(blob, { maxBytes: 9 * 1024 });
+    // 投げ明細が最優先で削られている
+    expect(out.giftHistoryMirror.ledgerRows.length).toBeLessThan(20);
+    // ledgerTotalCount は元のまま=誠実に元件数を残す
+    expect(out.giftHistoryMirror.ledgerTotalCount).toBe(20);
+    // pruned に記録され、かつ先頭(=commentTimelineMirror.rows より前)に出る
+    const sections = pruned.map((p) => p.section);
+    expect(sections).toContain('giftHistoryMirror.ledgerRows');
+    const iLedger = sections.indexOf('giftHistoryMirror.ledgerRows');
+    const iComment = sections.indexOf('commentTimelineMirror.rows');
+    if (iComment >= 0) expect(iLedger).toBeLessThan(iComment);
+  });
+
+  it('⓪でも足りなければ ledgerRows を 0 まで落とす(明細を諦めても rooms は残す)', () => {
+    const ledgerRows = Array.from({ length: 20 }, () => ({ itemName: bigText(2000), points: 100 }));
+    const rooms = Array.from({ length: 10 }, (_, i) => ({ userKey: `u${i}`, nickname: `n${i}`, count: 1 }));
+    const blob = {
+      giftHistoryMirror: { liveId: 'lv1', rooms, ledgerRows, ledgerTotalCount: 20 },
+      commentTimelineMirror: { rows: [], totalSeen: 0 },
+      topSupporters: { liveId: 'lv1', rows: [] },
+      statusReport: 'short'
+    };
+    const { blob: out, pruned } = pruneLiveViewPublishBlob(blob, { maxBytes: 6 * 1024 });
+    expect(out.giftHistoryMirror.ledgerRows.length).toBe(0);
+    expect(pruned.some((p) => p.section === 'giftHistoryMirror.ledgerRows' && p.after === 0)).toBe(true);
+    // rooms は温存(明細を諦めても貢献者ランキングは残す)。
+    expect(out.giftHistoryMirror.rooms.length).toBeGreaterThan(0);
+  });
+
+  it('② ledgerRows を削っても足りなければ giftHistoryMirror.rooms を 10→5 に削る', () => {
+    // ledgerRows は無し(⓪スキップ)、rooms を大きくして②到達を狙う。
+    const rooms = Array.from({ length: 10 }, (_, i) => ({ userKey: `u${i}`, nickname: bigText(2000), count: i }));
+    const blob = {
+      giftHistoryMirror: { liveId: 'lv1', rooms, ledgerRows: [], ledgerTotalCount: 0 },
+      commentTimelineMirror: { rows: [], totalSeen: 0 },
+      topSupporters: { liveId: 'lv1', rows: [] },
+      statusReport: 'short'
+    };
+    const { blob: out, pruned } = pruneLiveViewPublishBlob(blob, { maxBytes: 12 * 1024 });
+    expect(out.giftHistoryMirror.rooms.length).toBeLessThanOrEqual(5);
+    expect(pruned.some((p) => p.section === 'giftHistoryMirror.rooms')).toBe(true);
+  });
+
+  it('第2号: 元の giftHistoryMirror を破壊しない(浅い clone)', () => {
+    const ledgerRows = Array.from({ length: 20 }, () => ({ itemName: bigText(600), points: 100 }));
+    const rooms = Array.from({ length: 10 }, (_, i) => ({ userKey: `u${i}`, nickname: `n${i}`, count: 1 }));
+    const blob = {
+      giftHistoryMirror: { liveId: 'lv1', rooms, ledgerRows, ledgerTotalCount: 20 },
+      commentTimelineMirror: { rows: [], totalSeen: 0 },
+      topSupporters: { liveId: 'lv1', rows: [] },
+      statusReport: 'short'
+    };
+    pruneLiveViewPublishBlob(blob, { maxBytes: 6 * 1024 });
+    expect(blob.giftHistoryMirror.ledgerRows.length).toBe(20);
+    expect(blob.giftHistoryMirror.rooms.length).toBe(10);
+  });
 });

@@ -8,8 +8,17 @@ import { KEY_STAT_CARDS_MIRROR } from './statCardsMirrorKey.js';
 import { KEY_TOP_SUPPORTERS_MIRROR } from './storageKeys.js';
 import { KEY_NORTH_STAR_MIRROR } from './northStarMirrorKey.js';
 import { KEY_COMMENT_TIMELINE_MIRROR } from './commentTimelineMirrorKey.js';
+import { KEY_GIFT_HISTORY_MIRROR } from './giftHistoryMirrorKey.js';
 
 const LANE = { liveId: 'lv1', capturedAt: 10, link: [{ title: 'りんく' }] };
+// ③WEB投げ一覧丸写し(第2号): giftHistory 節。反映すれば legacy キー KEY_GIFT_HISTORY_MIRROR で同梱される。
+const GIFT_HISTORY = {
+  liveId: 'lv1',
+  capturedAt: 15,
+  rooms: [{ userKey: 'u1', nickname: '投げ主A', count: 500, avatarUrl: '' }],
+  ledgerRows: [],
+  ledgerTotalCount: 0
+};
 const STAT = { liveId: 'lv1', capturedAt: 11, recordsText: '3件' };
 const NS = { liveId: 'lv1', capturedAt: 12, lanes: { contributionRanking: [{ name: '貢献A' }], adRanking: [] } };
 
@@ -30,6 +39,14 @@ describe('buildLegacyMirrorSetPayload', () => {
     expect(KEY_TOP_SUPPORTERS_MIRROR in payload).toBe(false);
     expect(KEY_NORTH_STAR_MIRROR in payload).toBe(false);
     expect(KEY_COMMENT_TIMELINE_MIRROR in payload).toBe(false);
+    expect(KEY_GIFT_HISTORY_MIRROR in payload).toBe(false);
+  });
+
+  it('giftHistory 節を反映すると legacy キー KEY_GIFT_HISTORY_MIRROR で同梱される(第2号・③WEB投げ一覧)', () => {
+    const sched = createMirrorBundleFlushScheduler({ minGapMs: 0 });
+    sched.reflect('giftHistory', GIFT_HISTORY, { liveId: 'lv1', nowMs: 100 });
+    const payload = buildLegacyMirrorSetPayload(sched.peekBundle());
+    expect(payload[KEY_GIFT_HISTORY_MIRROR]).toMatchObject(GIFT_HISTORY);
   });
 
   it('bundle が空/不正でも空ペイロード(投げない)', () => {
