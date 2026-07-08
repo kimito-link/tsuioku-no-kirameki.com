@@ -6,7 +6,7 @@
 ## storage の出入り
 
 - 書くキー: `KEY_BGM_PHASE_DIAG`, `KEY_GIFT_EFFECT_DIAG`, `KEY_HIGHLIGHT_LEDGER`, `KEY_VENUE_EFFECT_SOUND_PRESENCE`, `KEY_VENUE_SEATS_DIAG`, `KEY_VOICE_DIAG`, `KEY_VOICE_EFFECT_DIAG`
-- 読むキー: `KEY_BGM_ENABLED`, `KEY_BGM_VOLUME_FEVER`, `KEY_BGM_VOLUME_REACH`, `KEY_EFFECT_SOUND_ENABLED`, `KEY_HIGHLIGHT_LEDGER`, `KEY_LIVE_BROADCASTER_CTX`, `KEY_USER_COMMENT_PROFILE_CACHE`
+- 読むキー: `KEY_BGM_ENABLED`, `KEY_BGM_VOLUME_FEVER`, `KEY_BGM_VOLUME_REACH`, `KEY_EFFECT_SOUND_ENABLED`, `KEY_HIGHLIGHT_LEDGER`, `KEY_LANE_MIRROR`, `KEY_LIVE_BROADCASTER_CTX`, `KEY_USER_COMMENT_PROFILE_CACHE`
 
 ## 構成ファイル（import 到達・最大40件表示）
 
@@ -45,15 +45,15 @@ graph LR
   n_venue --> n_src_lib_highlightLedger_js["lib/highlightLedger.js"]:::shared
   n_venue --> n_src_lib_highlightLedgerKey_js["lib/highlightLedgerKey.js"]:::shared
   n_venue --> n_src_lib_htmlEscape_js["lib/htmlEscape.js"]:::shared
+  n_venue --> n_src_lib_laneMirror_js["lib/laneMirror.js"]:::shared
+  n_venue --> n_src_lib_laneMirrorKey_js["lib/laneMirrorKey.js"]:::shared
   n_venue --> n_src_lib_nicoAnonymousDisplay_js["lib/nicoAnonymousDisplay.js"]:::shared
   n_venue --> n_src_lib_nicoUserPage_js["lib/nicoUserPage.js"]:::shared
   n_venue --> n_src_lib_parseArrivalComment_js["lib/parseArrivalComment.js"]:::shared
   n_venue --> n_src_lib_parseGiftComment_js["lib/parseGiftComment.js"]:::shared
   n_venue --> n_src_lib_personTileDom_js["lib/personTileDom.js"]:::shared
   n_venue --> n_src_lib_phaseDirector_js["lib/phaseDirector.js"]:::shared
-  n_venue --> n_src_lib_popupAvatarResolver_js["lib/popupAvatarResolver.js"]:::shared
-  n_venue --> n_src_lib_reportSilentError_js["lib/reportSilentError.js"]:::shared
   classDef shared fill:#eee,stroke:#999,color:#666;
 ```
 
-> ほか 52 ファイル省略（全件は storage-bus.md / metafile 参照）。
+> ほか 56 ファイル省略（全件は storage-bus.md / metafile 参照）。

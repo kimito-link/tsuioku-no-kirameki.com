@@ -17,8 +17,11 @@
  *   perRow: number,              // 1段に収まる席数(seatsPerRow の実測)。0=未観測
  *   venueMaxRows: number,        // 積んだ段数(全席÷perRow を 500/perRow で cap)。0=未観測
  *   seatAreaWidth: number,       // 席エリアの実測幅px(clientWidth)。0=レイアウト未確定/事故の兆候
- *   visibleCapReason: 'participant'|'grid'|'hardCap'|''  // 可視席が何で頭打ちになったか(''=未観測)
+ *   visibleCapReason: 'participant'|'grid'|'hardCap'|'',  // 可視席が何で頭打ちになったか(''=未観測)
+ *   laneParity: { mode: string, verdict: string, line: string, unexplained: number, mirrorAgeSec: number }|null
  * }} VenueSeatsDiagState
+ *
+ * laneParity は v0.1.1111 の「会場=①レーンのメンバー一致トークン」(venueLaneParity.js)。null=未観測。
  */
 
 /** 初期 会場座席診断 state。 */
@@ -35,7 +38,8 @@ export function makeInitialVenueSeatsDiag() {
     perRow: 0,
     venueMaxRows: 0,
     seatAreaWidth: 0,
-    visibleCapReason: ''
+    visibleCapReason: '',
+    laneParity: /** @type {VenueSeatsDiagState['laneParity']} */ (null)
   };
 }
 
@@ -98,6 +102,18 @@ export function buildVenueSeatsDiagSnapshot(diag, nowMs) {
           venueMaxRows,
           hardCap: num(d.hardCap, 0)
         });
+  // v0.1.1111: 会場=①レーンのメンバー一致トークン(venueLaneParity.js の toVenueLaneParityDiag 出力)。
+  //   storage へは検証済みの軽量形だけ通す(未知の巨大オブジェクトを写さない)。
+  const lpIn = /** @type {any} */ (d.laneParity && typeof d.laneParity === 'object' ? d.laneParity : null);
+  const laneParity = lpIn
+    ? {
+        mode: String(lpIn.mode || ''),
+        verdict: String(lpIn.verdict || ''),
+        line: String(lpIn.line || ''),
+        unexplained: Math.max(0, Math.floor(num(lpIn.unexplained, 0))),
+        mirrorAgeSec: Math.floor(num(lpIn.mirrorAgeSec, 0))
+      }
+    : null;
   return {
     enabled: !!d.enabled,
     liveId: String(d.liveId || base.liveId),
@@ -111,6 +127,7 @@ export function buildVenueSeatsDiagSnapshot(diag, nowMs) {
     venueMaxRows,
     seatAreaWidth,
     visibleCapReason,
+    laneParity,
     capturedAt: now
   };
 }

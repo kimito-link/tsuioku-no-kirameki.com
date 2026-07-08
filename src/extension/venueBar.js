@@ -156,6 +156,22 @@ import {
   resolveBubbleFlowLifetimeMs
 } from '../lib/venueSpeechStreak.js';
 import { enrichVenueRowsWithProfileAvatars } from '../lib/venueAvatar.js';
+// v0.1.1111 会場=①レーン鏡映(メンバー完全一致): ①の実paint鏡(KEY_LANE_MIRROR)を会場の正本に昇格。
+//   設計正本=memory/reference_pop_venue_parity_SYNTHESIS.md(P層=鏡そのまま/T層=cap溢れの尾/X層=直近発言者)。
+import { KEY_LANE_MIRROR } from '../lib/laneMirrorKey.js';
+import { restoreLaneMirrorBuckets } from '../lib/laneMirror.js';
+import {
+  composeVenueLaneBuckets,
+  isLaneMirrorUsableForVenue,
+  venueRowsFromLaneMirror,
+  venueSeatIndexByUid
+} from '../lib/venueLaneMirrorSupply.js';
+import {
+  buildVenueLaneParity,
+  toVenueLaneParityDiag,
+  venueLaneParityKey,
+  VENUE_LANE_TRANSIENT_WINDOW_MS
+} from '../lib/venueLaneParity.js';
 import { nicoUserPageUrl, anonymousDisplayLabel } from '../lib/nicoUserPage.js';
 import { isNumericNicoUserId } from '../domain/user/identity.js';
 // person-tile-unify 第3コミット(2026-06-22): 会場の席タイルを popup の本物ビルダーで描く。
@@ -2185,6 +2201,18 @@ export function mountVenueBarButton(options = {}) {
   //   消費=commitDisplay が毎描画で enrich(冪等)。
   /** @type {Record<string, { avatarUrl?: unknown }>|null} */
   let profileAvatarMap = null;
+  // v0.1.1111 会場=①レーン鏡映: ①の実paint鏡(KEY_LANE_MIRROR)のキャッシュ。
+  //   laneMirrorSnap=最新(開時catch-up 1回+onChangedのnewValue直採用=追加readゼロ)。
+  //   laneMirrorPaintSnap=【この baseRows/paint に実際に使った鏡】(TOCTOU排除=一致判定はこれと突合)。
+  /** @type {Partial<import('../lib/laneMirror.js').LaneMirrorSnapshot>|null} */
+  let laneMirrorSnap = null;
+  /** @type {Partial<import('../lib/laneMirror.js').LaneMirrorSnapshot>|null} */
+  let laneMirrorPaintSnap = null;
+  /** X層: 鏡にまだ居ない直近発言者の初見時刻(壁時計)。60秒窓内は「暫定」=説明済み差分。 */
+  /** @type {Map<string, number>} */
+  const venueTransientFirstSeen = new Map();
+  /** 鏡更新の再供給を rAF に集約(コメント怒涛でも1フレーム1回)。 */
+  let laneMirrorRecommitRaf = 0;
   // 一度でも非空を描いたか(renderSeats の保険ガード用)。配信切替の意図的クリアと区別する。
   let hasRenderedNonEmpty = false;
   // 応援者トップNバーの状態(renderTopBar / clearDisplay が触る・宣言はここ=TDZ 回避)。
@@ -3944,7 +3972,47 @@ export function mountVenueBarButton(options = {}) {
       }
     }
 
-    const laneBuckets = bucketVenueLaneSeats(visibleSeats, { maxTotal: visibleSeats.length });
+    // v0.1.1111 会場=①レーン鏡映: 段割当の正本を選ぶ。鏡を使った供給(laneMirrorPaintSnap)なら
+    //   P層=鏡の5段そのまま(集合も順序も①と同一・広告/ギフト段も鏡から出る=未配線の欠落が直る)
+    //   +T/X層=鏡外メンバー(既存bucketの出力)を段末尾へ。鏡なしなら従来どおり(fallback)。
+    const fallbackLaneBuckets = bucketVenueLaneSeats(visibleSeats, { maxTotal: visibleSeats.length });
+    const lanePaintSnap = laneMirrorPaintSnap;
+    const laneWallNow = Date.now();
+    const laneTransientKeys = currentVenueTransientKeys(laneWallNow);
+    const laneBuckets = lanePaintSnap
+      ? composeVenueLaneBuckets({
+          mirrorBuckets: restoreLaneMirrorBuckets(lanePaintSnap),
+          fallbackBuckets: fallbackLaneBuckets,
+          seatIndexByUid: venueSeatIndexByUid(visibleSeats),
+          transientKeys: laneTransientKeys
+        })
+      : fallbackLaneBuckets;
+    // 一致計器: この paint に使う段割当列を、同じ snap と突合(TOCTOU排除)。失敗は会場を止めない。
+    /** @type {ReturnType<typeof toVenueLaneParityDiag>} */
+    let laneParityDiag = null;
+    try {
+      /** @type {Record<string, string[]>} */
+      const painted = {};
+      for (const tier of ['link', 'gift', 'ad', 'konta', 'tanu']) {
+        painted[tier] = (Array.isArray(/** @type {any} */ (laneBuckets)[tier]) ? /** @type {any} */ (laneBuckets)[tier] : [])
+          .map((/** @type {unknown} */ it) => venueLaneParityKey(/** @type {any} */ (it)))
+          .filter(Boolean);
+      }
+      laneParityDiag = toVenueLaneParityDiag(
+        buildVenueLaneParity({
+          snap: lanePaintSnap || laneMirrorSnap,
+          liveId: String(activeLiveId || liveIdFromPathname() || ''),
+          nowMs: laneWallNow,
+          mode: lanePaintSnap ? 'mirror' : 'fallback',
+          painted,
+          transientKeys: laneTransientKeys,
+          visibleShown: visibleSeats.length,
+          logicalTotal: seating.seats.length
+        })
+      );
+    } catch {
+      /* 計器失敗は描画を止めない */
+    }
     const visibleLaneItems = flattenVenueLaneBuckets(laneBuckets);
     emptyMessage.hidden = visibleLaneItems.length > 0;
     if (visibleLaneItems.length === 0) {
@@ -3961,8 +4029,11 @@ export function mountVenueBarButton(options = {}) {
           totalCandidates: seating.participantCount,
           wrapTileEl: (tileEl, item) => {
             const laneItem = /** @type {{ _venueSeatIndex?: unknown }} */ (item || {});
-            const seatIndex = Math.max(0, Math.floor(Number(laneItem._venueSeatIndex) || 0));
-            const node = seatNodes[seatIndex];
+            // v0.1.1111: 席を持たないアイテム(鏡由来の uid 無し広告主セル等)は _venueSeatIndex=-1
+            //   =素通しで lane に直接出す(誤って席0を乗っ取らない)。既存bucket出力は常に有効index。
+            const seatIndexRaw = Number(laneItem._venueSeatIndex);
+            if (!Number.isInteger(seatIndexRaw) || seatIndexRaw < 0) return tileEl;
+            const node = seatNodes[seatIndexRaw];
             if (!node) return tileEl;
             node.seat.replaceChildren(tileEl);
             node.tile = tileEl;
@@ -3973,7 +4044,10 @@ export function mountVenueBarButton(options = {}) {
     }
 
     for (const item of visibleLaneItems) {
-      const seatIndex = Math.max(0, Math.floor(Number(item?._venueSeatIndex) || 0));
+      // v0.1.1111: 席なしアイテム(-1)は席装飾の対象外(wrapTileEl と同じ規則で席0を誤装飾しない)。
+      const seatIndexRaw = Number(item?._venueSeatIndex);
+      if (!Number.isInteger(seatIndexRaw) || seatIndexRaw < 0) continue;
+      const seatIndex = seatIndexRaw;
       const node = seatNodes[seatIndex];
       const entry = entryBySeatIndex.get(seatIndex);
       if (!node || !entry) continue;
@@ -4056,7 +4130,9 @@ export function mountVenueBarButton(options = {}) {
       perRow,
       venueMaxRows,
       seatAreaWidth,
-      hardCap: VENUE_FULLSCREEN_MAX_SEATS
+      hardCap: VENUE_FULLSCREEN_MAX_SEATS,
+      // v0.1.1111: 会場=①レーンのメンバー一致トークン(P/T/X 3層)。状態速報が1行そのまま出す。
+      laneParity: laneParityDiag
     };
     publishVenueSeatsDiag(seatsDiagObs);
     // 2026-07-01 会議(venue-diag): 「🩺 会場の状態」パネル用に最新の観測値を保持。
@@ -4092,6 +4168,79 @@ export function mountVenueBarButton(options = {}) {
     }
   };
 
+  /**
+   * v0.1.1111 会場=①レーン鏡映: baseRows の供給合成。鏡が使える(同一配信・180s以内・非空)なら
+   *   P層=鏡の順序そのままの行 + T層=鏡に居ない集計候補(=①のcap外)を末尾へ。使えなければ
+   *   fallbackRows(従来経路)をそのまま返す=①未描画/開直後でも会場は空白にならない(L8)。
+   *   使った鏡は laneMirrorPaintSnap に固定(renderSeats の段割当・一致判定と同一snap=TOCTOU排除)。
+   * @param {ReadonlyArray<{userId?: unknown}>} candidates 集計候補(preCount join 用)
+   * @param {VenueRow[]} fallbackRows 従来経路の行(venueRowsFromUserLaneCandidates の出力)
+   * @returns {VenueRow[]}
+   */
+  const composeVenueBaseRows = (candidates, fallbackRows) => {
+    const liveId = String(activeLiveId || liveIdFromPathname() || '');
+    const usable = isLaneMirrorUsableForVenue(laneMirrorSnap, liveId, Date.now());
+    if (!usable.usable) {
+      laneMirrorPaintSnap = null;
+      return fallbackRows;
+    }
+    laneMirrorPaintSnap = laneMirrorSnap;
+    /** @type {Map<string, any>} */
+    const byUid = new Map();
+    for (const c of Array.isArray(candidates) ? candidates : []) {
+      const uid = String(/** @type {any} */ (c)?.userId || '').trim();
+      if (uid && !byUid.has(uid)) byUid.set(uid, c);
+    }
+    const mirrorRows = venueRowsFromLaneMirror(laneMirrorPaintSnap, byUid);
+    /** @type {Set<string>} */
+    const inMirror = new Set();
+    for (const r of mirrorRows) {
+      inMirror.add(r.userId);
+      // 鏡に現れた人は X層(暫定)を卒業=①と同化した。
+      venueTransientFirstSeen.delete(`u:${r.userId}`);
+    }
+    const tail = (Array.isArray(fallbackRows) ? fallbackRows : []).filter(
+      (r) => !inMirror.has(String(r?.userId || '').trim())
+    );
+    return /** @type {VenueRow[]} */ ([...mirrorRows, ...tail]);
+  };
+
+  /**
+   * X層の現在有効な暫定キー集合を返し、窓の2倍を過ぎた古い記録は掃除する(Map を有界に保つ)。
+   * @param {number} nowWallMs
+   * @returns {Set<string>}
+   */
+  const currentVenueTransientKeys = (nowWallMs) => {
+    /** @type {Set<string>} */
+    const out = new Set();
+    for (const [k, at] of venueTransientFirstSeen) {
+      if (nowWallMs - at > VENUE_LANE_TRANSIENT_WINDOW_MS * 2) {
+        venueTransientFirstSeen.delete(k);
+        continue;
+      }
+      if (nowWallMs - at <= VENUE_LANE_TRANSIENT_WINDOW_MS) out.add(k);
+    }
+    return out;
+  };
+
+  /**
+   * 鏡の新着(onChanged)を rAF に集約して再供給→再描画。コメント怒涛+3秒鏡でも1フレーム1回。
+   */
+  const scheduleLaneMirrorRecommit = () => {
+    if (laneMirrorRecommitRaf) return;
+    const run = () => {
+      laneMirrorRecommitRaf = 0;
+      if (!open) return;
+      baseRows = composeVenueBaseRows(
+        aggregatedCandidates,
+        venueRowsFromUserLaneCandidates(aggregatedCandidates)
+      );
+      commitDisplay(baseRows);
+    };
+    laneMirrorRecommitRaf =
+      typeof requestAnimationFrame === 'function' ? requestAnimationFrame(run) : (run(), 0);
+  };
+
   const aggregateParticipants = async () => {
     if (!open || aggregateInFlight) return;
     // v0.1.753: 拡張更新後の古いタブは chrome.* が全失敗する。storage を叩く前に先回りで検知し、
@@ -4109,6 +4258,9 @@ export function mountVenueBarButton(options = {}) {
         aggregatedChunkSeqs = []; // v0.1.754: 別配信の集約状態を持ち越さない
         aggregatedCandidates = [];
         liveRoster.clear(); // v0.1.754: 別配信の在席を持ち越さない
+        // v0.1.1111: 別配信の鏡/暫定(X層)を持ち越さない(鏡はliveId不一致でも弾かれるが明示クリア)。
+        laneMirrorPaintSnap = null;
+        venueTransientFirstSeen.clear();
         // 配信切替は意図的な空表示(前配信を持ち越さない)。clearDisplay で lastGood も破棄。
         clearDisplay();
       }
@@ -4188,7 +4340,11 @@ export function mountVenueBarButton(options = {}) {
           aggregatedCandidates = mergeUserLaneAggregates(aggregatedCandidates, newCandidates);
           aggregatedChunkSeqs = aggregatedChunkSeqs.concat(newSeqs);
         }
-        baseRows = venueRowsFromUserLaneCandidates(aggregatedCandidates);
+        // v0.1.1111: 鏡が使えれば「鏡そのまま+cap外の尾」、使えなければ従来行(fallback)。
+        baseRows = composeVenueBaseRows(
+          aggregatedCandidates,
+          venueRowsFromUserLaneCandidates(aggregatedCandidates)
+        );
       } else {
         // --- 未チャンク化(従来 main・小規模/移行前): 従来どおり全件読み(件数が小さいので安全) ---
         const result = await runStorageOpWithTimeout(
@@ -4200,7 +4356,10 @@ export function mountVenueBarButton(options = {}) {
         );
         if (!open || liveIdFromPathname() !== liveId) return;
         const candidates = userLaneCandidatesFromStorage(result.rows, liveId, LANE_OPTS);
-        baseRows = venueRowsFromUserLaneCandidates(candidates);
+        // v0.1.1111: 鏡更新時の再供給(scheduleLaneMirrorRecommit)が同じ候補で組み直せるよう保持
+        //   (frozen/readonly の候補をミュータブル配列へコピー=chunk移行後の merge とも整合)。
+        aggregatedCandidates = Array.from(candidates);
+        baseRows = composeVenueBaseRows(candidates, venueRowsFromUserLaneCandidates(candidates));
       }
       // パネルと同じ低頻度キャッシュで実サムネを補強し、会場だけ顔が欠ける差をなくす。
       const profileBag = await runStorageOpWithTimeout(
@@ -4255,6 +4414,24 @@ export function mountVenueBarButton(options = {}) {
 
   const startAggregation = () => {
     if (aggregateTimer || rosterPruneTimer) return;
+    // v0.1.1111 会場=①レーン鏡映: 開いた瞬間の catch-up を1回だけ(以降は onChanged の newValue 直採用)。
+    //   読めなくても会場は止めない(fallback=従来経路で描く)。鏡が取れたら rAF 再供給で即同化。
+    void (async () => {
+      try {
+        if (!hasVenueExtensionContext()) return;
+        const bag = await runStorageOpWithTimeout(
+          () => chrome.storage.local.get(KEY_LANE_MIRROR),
+          3000
+        );
+        const snap = bag?.[KEY_LANE_MIRROR];
+        if (open && snap && typeof snap === 'object') {
+          laneMirrorSnap = /** @type {Partial<import('../lib/laneMirror.js').LaneMirrorSnapshot>} */ (snap);
+          scheduleLaneMirrorRecommit();
+        }
+      } catch {
+        /* 鏡の catch-up 失敗は無視(fallback で描く・onChanged が来れば同化する) */
+      }
+    })();
     if (rosterDriven) {
       // v0.1.754 ストリーム駆動: storage は「開いた瞬間の catch-up を1回」だけ。aggregateParticipants
       //   が aggregatedCandidates(チャンク差分集計)を満たした後、それで在席を hydrate し、以降は
@@ -4346,6 +4523,18 @@ export function mountVenueBarButton(options = {}) {
         commitDisplay(baseRows); // 同期で renderSeats→seatByKey 更新(吹き出しが席を見つけられる)
       } else {
         // 非ストリーム(standalone/rollback)は従来どおり発言者マージで席を即更新。
+        // v0.1.1111(X層): 鏡使用中は「鏡にまだ居ない発言者」を暫定として初見時刻を記録。
+        //   60秒窓内は一致判定で「暫定」=説明済み(ライブ感の即着席と①一致を両立)。
+        //   鏡に現れたら composeVenueBaseRows が記録を消す(=①と同化した)。
+        if (laneMirrorPaintSnap) {
+          const wallNow = Date.now();
+          for (const speech of result.speeches) {
+            const uid = String(speech.userId || '').trim();
+            if (!uid) continue;
+            const k = `u:${uid}`;
+            if (!venueTransientFirstSeen.has(k)) venueTransientFirstSeen.set(k, wallNow);
+          }
+        }
         baseRows = mergeSpeakersIntoVenueRows(baseRows, result.speeches, nowMs);
         commitDisplay(baseRows);
       }
@@ -4519,6 +4708,15 @@ export function mountVenueBarButton(options = {}) {
     ) {
       profileAvatarMap = /** @type {Record<string, { avatarUrl?: unknown }>} */ (profChange.newValue);
       if (rosterDriven) scheduleRosterCommit();
+    }
+    // v0.1.1111 会場=①レーン鏡映: ①が publish した実paint鏡の新着を newValue 直採用(追加readゼロ)。
+    //   rAF集約で再供給→再描画(①のpaint後 数百msで会場が同じ5段に同化する)。
+    const mirrorChange = changes[KEY_LANE_MIRROR];
+    if (mirrorChange && mirrorChange.newValue && typeof mirrorChange.newValue === 'object') {
+      laneMirrorSnap = /** @type {Partial<import('../lib/laneMirror.js').LaneMirrorSnapshot>} */ (
+        mirrorChange.newValue
+      );
+      scheduleLaneMirrorRecommit();
     }
     // v0.1.741 安定化: 参加者データはコメントチャンク(nls_cchunk_<lv>_*)に入る。
     //   以前は summaryKey 変化時しか再集計せず、チャンクだけ更新された時に会場が古いまま/空に
