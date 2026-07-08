@@ -44,6 +44,25 @@ describe('enrichVenueRowsWithProfileAvatars', () => {
     expect(out[0].avatarObserved).toBe(true);
   });
 
+  it('preCount/preHasGift/preGiftCount 等の未知フィールドを保持する(VIP常連光らせの契約・v0.1.734の轍)', () => {
+    const rows = [
+      {
+        userId: '10340018',
+        name: '常連さん',
+        avatar: '',
+        capturedAt: 100,
+        preCount: 7,
+        preHasGift: true,
+        preGiftCount: 2
+      }
+    ];
+    const out = enrichVenueRowsWithProfileAvatars(rows, { 10340018: { avatarUrl: NICO_ICON } });
+    expect(out[0].avatar).toBe(NICO_ICON);
+    expect(out[0].preCount).toBe(7);
+    expect(out[0].preHasGift).toBe(true);
+    expect(out[0].preGiftCount).toBe(2);
+  });
+
   it('非配列・不正要素を安全に無視', () => {
     expect(enrichVenueRowsWithProfileAvatars(null, {})).toEqual([]);
     expect(enrichVenueRowsWithProfileAvatars([null, {}], null)).toEqual([
