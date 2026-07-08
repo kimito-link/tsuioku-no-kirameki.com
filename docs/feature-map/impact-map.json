@@ -522,6 +522,22 @@
       ]
     },
     {
+      "file": "src/lib/laneMirrorKey.js",
+      "featureCount": 4,
+      "features": [
+        "content",
+        "popup",
+        "status",
+        "venue"
+      ],
+      "labels": [
+        "記録エンジン(watchページ常駐)",
+        "ポップアップ(応援レーン)",
+        "状態速報ページ",
+        "会場モード(standalone)"
+      ]
+    },
+    {
       "file": "src/lib/personTileDom.js",
       "featureCount": 4,
       "features": [
@@ -985,6 +1001,20 @@
         "記録エンジン(watchページ常駐)",
         "ポップアップ(応援レーン)",
         "状態速報ページ"
+      ]
+    },
+    {
+      "file": "src/lib/laneMirror.js",
+      "featureCount": 3,
+      "features": [
+        "content",
+        "popup",
+        "venue"
+      ],
+      "labels": [
+        "記録エンジン(watchページ常駐)",
+        "ポップアップ(応援レーン)",
+        "会場モード(standalone)"
       ]
     },
     {
@@ -1840,18 +1870,6 @@
       ]
     },
     {
-      "file": "src/lib/laneMirrorKey.js",
-      "featureCount": 2,
-      "features": [
-        "popup",
-        "status"
-      ],
-      "labels": [
-        "ポップアップ(応援レーン)",
-        "状態速報ページ"
-      ]
-    },
-    {
       "file": "src/lib/liveAudienceDom.js",
       "featureCount": 2,
       "features": [
@@ -2477,6 +2495,30 @@
     },
     {
       "file": "src/lib/venueLaneBuckets.js",
+      "featureCount": 2,
+      "features": [
+        "content",
+        "venue"
+      ],
+      "labels": [
+        "記録エンジン(watchページ常駐)",
+        "会場モード(standalone)"
+      ]
+    },
+    {
+      "file": "src/lib/venueLaneMirrorSupply.js",
+      "featureCount": 2,
+      "features": [
+        "content",
+        "venue"
+      ],
+      "labels": [
+        "記録エンジン(watchページ常駐)",
+        "会場モード(standalone)"
+      ]
+    },
+    {
+      "file": "src/lib/venueLaneParity.js",
       "featureCount": 2,
       "features": [
         "content",
@@ -4627,16 +4669,6 @@
     },
     {
       "file": "src/lib/laneDiag.js",
-      "featureCount": 1,
-      "features": [
-        "popup"
-      ],
-      "labels": [
-        "ポップアップ(応援レーン)"
-      ]
-    },
-    {
-      "file": "src/lib/laneMirror.js",
       "featureCount": 1,
       "features": [
         "popup"
