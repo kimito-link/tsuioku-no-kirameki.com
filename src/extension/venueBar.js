@@ -2177,6 +2177,14 @@ export function mountVenueBarButton(options = {}) {
   //   storage 失敗で来ても会場を空で再描画しない(resolveDisplayRows・前状態保持)。配信切替で破棄。
   /** @type {VenueRow[]} */
   let lastGoodRows = [];
+  // v0.1.1110 会場サムネ白円根治: プロファイルキャッシュ(userId→{avatarUrl})の会場内キャッシュ。
+  //   チャンク本体(nls_cchunk)には avatarUrl が無いので、記名ユーザーの実サムネはこの補強が唯一の供給源。
+  //   v0.1.754 のストリーム駆動化で enrich(v0.1.712)が「開いた瞬間の aggregateParticipants 1回」に
+  //   退化し、以降の在席描画(rosterToVenueRows→commitDisplay)が補強を素通り→記名段が白円、の退行を塞ぐ。
+  //   更新元=aggregateParticipants(初回/standalone 30秒)+storage.onChanged(newValue直採用=追加readゼロ)。
+  //   消費=commitDisplay が毎描画で enrich(冪等)。
+  /** @type {Record<string, { avatarUrl?: unknown }>|null} */
+  let profileAvatarMap = null;
   // 一度でも非空を描いたか(renderSeats の保険ガード用)。配信切替の意図的クリアと区別する。
   let hasRenderedNonEmpty = false;
   // 応援者トップNバーの状態(renderTopBar / clearDisplay が触る・宣言はここ=TDZ 回避)。
@@ -3679,7 +3687,13 @@ export function mountVenueBarButton(options = {}) {
    * @param {VenueRow[]} incoming 今回の集計/マージ結果(空になりうる)
    */
   const commitDisplay = (incoming) => {
-    const resolved = resolveDisplayRows(incoming, lastGoodRows);
+    // v0.1.1110 白円根治: どの供給経路(storage集計/在席roster/発言マージ)でも描画直前に必ず
+    //   プロファイルキャッシュ補強を通す(補強済み行は素通り=冪等)。経路ごとの enrich 配線忘れを
+    //   関所1箇所で構造的に不可能にする(v0.1.754 で在席経路が補強を素通りした退行の再発防止)。
+    const resolved = resolveDisplayRows(
+      enrichVenueRowsWithProfileAvatars(incoming, profileAvatarMap),
+      lastGoodRows
+    );
     lastGoodRows = resolved.nextLastGood;
     renderSeats(resolved.rows);
   };
@@ -4198,7 +4212,9 @@ export function mountVenueBarButton(options = {}) {
         /** @type {Record<string, { avatarUrl?: unknown }>|null} */ (
           profileBag?.[KEY_USER_COMMENT_PROFILE_CACHE] || null
         );
-      baseRows = enrichVenueRowsWithProfileAvatars(baseRows, profileMap);
+      // v0.1.1110: 補強は commitDisplay(全描画の関所)が毎回行う。ここでは閉包キャッシュの
+      //   更新だけ(読めなかった時は前回のキャッシュを null で潰さない)。
+      if (profileMap) profileAvatarMap = profileMap;
       // commitDisplay 経由=空(0件)なら前回の非空表示を維持し、会場を空で再描画しない。
       commitDisplay(baseRows);
     } catch (err) {
@@ -4489,6 +4505,20 @@ export function mountVenueBarButton(options = {}) {
     const giftPointsAggregateKey = officialGiftPointsAggregateStorageKey(liveId);
     if (changes[giftPointsAggregateKey] && typeof changes[giftPointsAggregateKey].newValue === 'number') {
       handleGiftPointsAggregate(/** @type {number} */ (changes[giftPointsAggregateKey].newValue));
+    }
+    // v0.1.1110 白円根治(鮮度側): プロファイルキャッシュが後から充実したら在席サムネへ即反映。
+    //   onChanged の newValue を直接採用=追加 storage read ゼロ(大配信の輻輳を増やさない)。
+    //   rosterDriven は次フレームで再commit(rAF集約・O(席数))=白円→実サムネが数百msで埋まる。
+    //   standalone は次の30秒集計 or 次の描画で新キャッシュが効く(再描画トリガ不要)。
+    const profChange = changes[KEY_USER_COMMENT_PROFILE_CACHE];
+    if (
+      profChange &&
+      profChange.newValue &&
+      typeof profChange.newValue === 'object' &&
+      !Array.isArray(profChange.newValue)
+    ) {
+      profileAvatarMap = /** @type {Record<string, { avatarUrl?: unknown }>} */ (profChange.newValue);
+      if (rosterDriven) scheduleRosterCommit();
     }
     // v0.1.741 安定化: 参加者データはコメントチャンク(nls_cchunk_<lv>_*)に入る。
     //   以前は summaryKey 変化時しか再集計せず、チャンクだけ更新された時に会場が古いまま/空に

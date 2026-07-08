@@ -29,6 +29,10 @@ function isHttpUrl(u) {
  *
  * これでパネルと同じ「サムネ取れた人は実サムネ・無い人は空(=会場側でゆっくり顔生成)」になる。
  *
+ * v0.1.1110: 入力行の未知フィールドは保持する(スプレッド)。venueRowsFromUserLaneCandidates /
+ *   rosterToVenueRows が出す preCount/preHasGift/preGiftCount(VIP常連光らせの契約・
+ *   venueLiveRoster.js 冒頭の契約参照)を enrich が落とすと全員 count=1 扱いになる(v0.1.734 の轍)。
+ *
  * @param {ReadonlyArray<{userId?: string, name?: string, avatar?: string, text?: string, capturedAt?: number}>} rows
  * @param {Record<string, { avatarUrl?: unknown }>|null|undefined} profileMap
  *   KEY_USER_COMMENT_PROFILE_CACHE の値(userId→{nickname, avatarUrl})
@@ -59,6 +63,7 @@ export function enrichVenueRowsWithProfileAvatars(rows, profileMap) {
       }
     }
     out.push({
+      ...r,
       userId,
       name,
       avatar,
