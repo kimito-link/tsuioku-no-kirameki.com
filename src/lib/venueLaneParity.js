@@ -55,17 +55,25 @@ export function laneMirrorTierKeySequences(snap) {
 /**
  * 会場一致パリティを組み立てる。
  *
+ * v2(厳密完全一致・reference_pop_venue_exact_SYNTHESIS.md §C-2/§D):
+ *   - mirror モードでは段内の鏡外(尾/暫定を含む)は【全部 未説明=🔴】。説明済み余剰は段でなく
+ *     ロビー(lobby 入力)に居るのが正しい姿。✅条件に「全段 件数完全等値」「lobbyInMirror===0
+ *     (段とロビーの二重在籍なし)」を追加。
+ *   - fallback モードは v1 のまま(尾扱い・⚪)=後方互換。
+ *
  * @param {{
  *   snap: Partial<import('./laneMirror.js').LaneMirrorSnapshot>|null|undefined,
  *   liveId: string,
  *   nowMs: number,
  *   mode: 'mirror'|'fallback',
  *   painted: Partial<Record<typeof TIERS[number], string[]>>,
+ *   lobby?: string[],
  *   transientKeys?: ReadonlySet<string>|string[],
  *   visibleShown?: number,
  *   logicalTotal?: number
  * }} input
  *   - painted: 会場が実際に paint した段別キー列(venueLaneParityKey で作る)。
+ *   - lobby: ロビー(段外セクション)に描いたキー列。
  *   - transientKeys: X層(60秒窓内の直近発言者)のキー集合。
  * @returns {{
  *   mode: 'mirror'|'fallback',
@@ -74,6 +82,7 @@ export function laneMirrorTierKeySequences(snap) {
  *   mirrorAgeSec: number,
  *   mirrorPruned: boolean,
  *   perTier: Record<typeof TIERS[number], { pop: number, painted: number, prefixOk: boolean, tail: number, transient: number, missing: number }>,
+ *   lobby: { total: number, transient: number, inMirror: number },
  *   unexplained: { count: number, sampleKeys: string[] },
  *   visibleShown: number,
  *   logicalTotal: number,
@@ -86,6 +95,7 @@ export function buildVenueLaneParity(input) {
   const nowMs = Number.isFinite(Number(inp.nowMs)) ? Number(inp.nowMs) : 0;
   const snap = inp.snap && typeof inp.snap === 'object' ? inp.snap : null;
   const painted = inp.painted && typeof inp.painted === 'object' ? inp.painted : {};
+  const lobbyKeys = (Array.isArray(inp.lobby) ? inp.lobby : []).map(String).filter(Boolean);
   const transientKeys =
     inp.transientKeys instanceof Set
       ? inp.transientKeys
@@ -154,27 +164,21 @@ export function buildVenueLaneParity(input) {
       prefixOk = false;
     }
 
-    // T/X層: pop に居ない painted 分の分類。
+    // 段内の鏡外(pop に居ない painted)の分類。
+    // v2: mirror モードでは【段に鏡外が居ること自体が違反】(尾/暫定はロビーに居るのが正しい姿)。
+    //   説明済み扱い(v1 の capOverflow 分岐)は廃止し、全部 未説明=🔴 に計上する(嘘の緑防止)。
+    //   tail/transient フィールドは「段内に居た鏡外の内訳」の診断値として残す(期待値0)。
     let tail = 0;
     let transientCount = 0;
     for (const k of drawn) {
       if (popSet.has(k)) continue;
-      if (transientKeys.has(k)) {
-        transientCount += 1;
-      } else if (mode === 'mirror' && !mirrorIssue) {
-        // 鏡が「cap で切った」ことが数字で説明できる場合のみ尾=説明済み。
-        const totalCandidates = Math.max(0, Math.floor(Number(snap?.totalCandidates) || 0));
-        const capOverflowPossible = totalCandidates > pickedLength || mirrorPruned;
-        if (capOverflowPossible) {
-          tail += 1;
-        } else {
-          unexplainedCount += 1;
-          if (unexplainedSamples.length < 5) unexplainedSamples.push(`${tier}:余${k}`);
-        }
-      } else {
-        // fallback では「①に無い人」を主張できない=分類だけ(尾扱い・件数明記)。
-        tail += 1;
+      if (transientKeys.has(k)) transientCount += 1;
+      else tail += 1;
+      if (mode === 'mirror' && !mirrorIssue) {
+        unexplainedCount += 1;
+        if (unexplainedSamples.length < 5) unexplainedSamples.push(`${tier}:余${k}`);
       }
+      // fallback では「①に無い人」を主張できない=分類だけ(尾扱い・件数明記・⚪)。
     }
 
     perTier[tier] = {
@@ -186,6 +190,24 @@ export function buildVenueLaneParity(input) {
       missing
     };
   }
+
+  // --- ロビー突合(v2): 段とロビーの二重在籍(=余り)は未説明=🔴(嘘の緑防止)。 ---
+  /** @type {Set<string>} */
+  const allPopKeys = new Set();
+  for (const tier of TIERS) for (const k of popSeq[tier]) allPopKeys.add(k);
+  let lobbyInMirror = 0;
+  let lobbyTransient = 0;
+  for (const k of lobbyKeys) {
+    if (allPopKeys.has(k)) {
+      lobbyInMirror += 1;
+      if (mode === 'mirror' && !mirrorIssue) {
+        unexplainedCount += 1;
+        if (unexplainedSamples.length < 5) unexplainedSamples.push(`ロビー重複:${k}`);
+      }
+    }
+    if (transientKeys.has(k)) lobbyTransient += 1;
+  }
+  const lobby = { total: lobbyKeys.length, transient: lobbyTransient, inMirror: lobbyInMirror };
 
   // --- verdict(全条件AND=嘘の緑防止) ---
   /** @type {'✅'|'⚪'|'🔴'} */
@@ -206,16 +228,23 @@ export function buildVenueLaneParity(input) {
     reason = '';
   }
 
-  const totalTransient = TIERS.reduce((a, t) => a + perTier[t].transient, 0);
+  // line: mirror モードは「段=鏡と等値」が前提なので +尾n 表記を出さない(段内の鏡外は未説明側に出る)。
+  //   fallback は v1 表記のまま(尾扱い・⚪)。ロビーは mirror モードのみ意味を持つ(fallbackは段に全員)。
+  const isMirrorJudging = mode === 'mirror' && !mirrorIssue;
+  const totalTransientInLanes = TIERS.reduce((a, t) => a + perTier[t].transient, 0);
   const tierStr = TIERS.map((t) => {
     const p = perTier[t];
-    const tailStr = p.tail > 0 ? `+尾${p.tail}` : '';
+    const tailStr = !isMirrorJudging && p.tail > 0 ? `+尾${p.tail}` : '';
     return `${TIER_LABEL[t]}${p.pop}${tailStr}`;
   }).join(' ');
   const ageStr = mirrorAgeSec >= 0 && Number.isFinite(mirrorAgeMs) ? `鏡(${mirrorAgeSec}s前)` : '鏡なし';
+  const midStr = isMirrorJudging
+    ? ` / ロビー${lobby.total}(暫定${lobby.transient})`
+    : ` / 暫定${totalTransientInLanes}`;
   const line =
     `会場一致 ${verdict}${verdict === '⚪' ? reason : ageStr} ${tierStr}` +
-    ` / 暫定${totalTransient} / 未説明${unexplainedCount}` +
+    midStr +
+    ` / 未説明${unexplainedCount}` +
     (unexplainedSamples.length > 0 ? `(${unexplainedSamples.join(', ')})` : '') +
     (visibleShown < logicalTotal ? ` / 表示${visibleShown}/${logicalTotal}` : '');
 
@@ -226,6 +255,7 @@ export function buildVenueLaneParity(input) {
     mirrorAgeSec: Number.isFinite(mirrorAgeMs) ? mirrorAgeSec : -1,
     mirrorPruned,
     perTier: /** @type {any} */ (perTier),
+    lobby,
     unexplained: { count: unexplainedCount, sampleKeys: unexplainedSamples },
     visibleShown,
     logicalTotal,
@@ -236,7 +266,7 @@ export function buildVenueLaneParity(input) {
 /**
  * venueSeatsDiag(storage)へ同梱する軽量形。状態速報は line をそのまま1行出す。
  * @param {ReturnType<typeof buildVenueLaneParity>|null|undefined} parity
- * @returns {{ mode: string, verdict: string, line: string, unexplained: number, mirrorAgeSec: number }|null}
+ * @returns {{ mode: string, verdict: string, line: string, unexplained: number, mirrorAgeSec: number, lobby: number }|null}
  */
 export function toVenueLaneParityDiag(parity) {
   if (!parity || typeof parity !== 'object') return null;
@@ -245,6 +275,7 @@ export function toVenueLaneParityDiag(parity) {
     verdict: String(parity.verdict || ''),
     line: String(parity.line || ''),
     unexplained: Math.max(0, Math.floor(Number(parity.unexplained?.count) || 0)),
-    mirrorAgeSec: Math.floor(Number(parity.mirrorAgeSec) || 0)
+    mirrorAgeSec: Math.floor(Number(parity.mirrorAgeSec) || 0),
+    lobby: Math.max(0, Math.floor(Number(/** @type {any} */ (parity).lobby?.total) || 0))
   };
 }

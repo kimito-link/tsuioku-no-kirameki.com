@@ -76,7 +76,7 @@ describe('buildVenueLaneParity', () => {
     expect(p.line).toContain('ad2');
   });
 
-  it('T層(capあふれの尾)は説明済み=✅のまま件数明記(実機の43vs40の同型)', () => {
+  it('v2: 尾・暫定はロビーに居れば説明済み=✅のまま「ロビーN(暫定M)」を明記(実機の尾14+暫定1の同型)', () => {
     const snap = makeSnap({ totalCandidates: 20 }); // ①はcapで切っている
     const p = buildVenueLaneParity({
       snap,
@@ -84,46 +84,64 @@ describe('buildVenueLaneParity', () => {
       nowMs: NOW,
       mode: 'mirror',
       painted: {
-        // 鏡プレフィックス+尾3(13702502/33687377/96090801 相当)
-        link: keys(['1', '2', '3', '4', '13702502', '33687377', '96090801']),
+        // 段は鏡と厳密同一(尾は段に混ぜない)。
+        link: keys(['1', '2', '3', '4']),
         gift: [],
         ad: ['c:#1|珍味団', 'c:#2|ゲスト'],
         konta: [],
         tanu: keys(['a1', 'a2'])
-      }
-    });
-    expect(p.verdict).toBe('✅');
-    expect(p.perTier.link.tail).toBe(3);
-    expect(p.line).toContain('link4+尾3');
-  });
-
-  it('X層(60秒窓内の直近発言者)は暫定=説明済み', () => {
-    const snap = makeSnap(); // totalCandidates===pickedLength=capあふれ無し
-    const p = buildVenueLaneParity({
-      snap,
-      liveId: 'lv350912687',
-      nowMs: NOW,
-      mode: 'mirror',
-      painted: { link: keys(['1', '2', '3', '4']), gift: [], ad: ['c:#1|珍味団', 'c:#2|ゲスト'], konta: [], tanu: keys(['a1', 'a2', '999']) },
+      },
+      lobby: [...keys(['13702502', '33687377', '96090801']), 'u:999'],
       transientKeys: new Set(['u:999'])
     });
     expect(p.verdict).toBe('✅');
-    expect(p.perTier.tanu.transient).toBe(1);
-    expect(p.line).toContain('暫定1');
+    expect(p.lobby).toEqual({ total: 4, transient: 1, inMirror: 0 });
+    expect(p.line).toContain('ロビー4(暫定1)');
+    expect(p.line).not.toContain('+尾'); // mirrorモードの段に尾表記は出ない
   });
 
-  it('capあふれで説明できない余剰は 🔴 未説明(嘘の緑を出さない)', () => {
-    const snap = makeSnap(); // totalCandidates===pickedLength → 余剰は説明不能
+  it('v2: 段内の鏡外は capあふれでも暫定でも 🔴 未説明(尾を段に混ぜたら違反=実機の43vs40はこれで🔴に写る)', () => {
+    const snap = makeSnap({ totalCandidates: 20 }); // capあふれ有りでも段内の余剰は違反
     const p = buildVenueLaneParity({
       snap,
       liveId: 'lv350912687',
       nowMs: NOW,
       mode: 'mirror',
-      painted: { link: keys(['1', '2', '3', '4', '13702502']), gift: [], ad: ['c:#1|珍味団', 'c:#2|ゲスト'], konta: [], tanu: keys(['a1', 'a2']) }
+      painted: {
+        link: keys(['1', '2', '3', '4', '13702502']),
+        gift: [],
+        ad: ['c:#1|珍味団', 'c:#2|ゲスト'],
+        konta: [],
+        tanu: keys(['a1', 'a2', '999'])
+      },
+      transientKeys: new Set(['u:999'])
     });
     expect(p.verdict).toBe('🔴');
-    expect(p.unexplained.count).toBe(1);
-    expect(p.unexplained.sampleKeys[0]).toContain('13702502');
+    expect(p.unexplained.count).toBe(2); // 尾1+暫定1=段内の鏡外は全部未説明
+    expect(p.unexplained.sampleKeys.join(',')).toContain('13702502');
+    expect(p.perTier.link.tail).toBe(1); // 診断値としての内訳は残す(期待値0)
+    expect(p.perTier.tanu.transient).toBe(1);
+  });
+
+  it('v2: 段とロビーの二重在籍(lobbyInMirror)は 🔴(余り=嘘の緑を出さない)', () => {
+    const snap = makeSnap();
+    const p = buildVenueLaneParity({
+      snap,
+      liveId: 'lv350912687',
+      nowMs: NOW,
+      mode: 'mirror',
+      painted: {
+        link: keys(['1', '2', '3', '4']),
+        gift: [],
+        ad: ['c:#1|珍味団', 'c:#2|ゲスト'],
+        konta: [],
+        tanu: keys(['a1', 'a2'])
+      },
+      lobby: keys(['2']) // 鏡在籍者がロビーにも居る=二重
+    });
+    expect(p.verdict).toBe('🔴');
+    expect(p.lobby.inMirror).toBe(1);
+    expect(p.unexplained.sampleKeys.join(',')).toContain('ロビー重複');
   });
 
   it('鏡に居る人が描かれていない(欠落)は 🔴 未説明', () => {

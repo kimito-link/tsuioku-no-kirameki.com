@@ -91,8 +91,10 @@ export function venueRowsFromLaneMirror(snap, candidatesByUid) {
 }
 
 /**
- * 段割当の合成(P層=鏡の順序そのまま+T/X層=fallback buckets の鏡外メンバーを段末尾へ)。
- * 出力は paintStoryUserLaneDomFilled がそのまま食える buckets。
+ * 段割当の合成 v2(厳密完全一致・reference_pop_venue_exact_SYNTHESIS.md §C-1)。
+ *   P層=鏡の順序そのままの5段【のみ】を buckets に、T/X層(鏡外=①のcap外+直近発言者)は段に
+ *   混ぜず lobby として返す。これで「5つの段=鏡=①の実paint」が集合・順序・件数まで厳密同一になる。
+ *   lobby の順序は fallback の段順(link→gift→ad→konta→tanu)×既存comparator順=決定的。
  *
  * @param {{
  *   mirrorBuckets: { link: any[], gift: any[], ad: any[], konta: any[], tanu: any[] },
@@ -102,7 +104,7 @@ export function venueRowsFromLaneMirror(snap, candidatesByUid) {
  * }} input
  *   - mirrorBuckets: restoreLaneMirrorBuckets(snap) の出力({displaySrc,title,meta,entry})。
  *   - fallbackBuckets: 既存 bucketVenueLaneSeats(visibleSeats) の出力(席index等を保持)。
- * @returns {{ link: any[], gift: any[], ad: any[], konta: any[], tanu: any[] }}
+ * @returns {{ buckets: { link: any[], gift: any[], ad: any[], konta: any[], tanu: any[] }, lobby: any[] }}
  */
 export function composeVenueLaneBuckets(input) {
   const inp = /** @type {any} */ (input && typeof input === 'object' ? input : {});
@@ -123,6 +125,8 @@ export function composeVenueLaneBuckets(input) {
 
   /** @type {Record<string, any[]>} */
   const out = {};
+  /** @type {any[]} */
+  const lobby = [];
   for (const tier of TIERS) {
     const rows = [];
     const arr = Array.isArray(mirror[tier]) ? mirror[tier] : [];
@@ -147,12 +151,12 @@ export function composeVenueLaneBuckets(input) {
         _venueMirror: true
       });
     }
-    // T/X層: fallback の鏡外メンバーを段末尾へ(順序は fallback=既存comparatorのまま)。
+    // v2: T/X層(鏡外)は段に混ぜない=ロビーへ(段は鏡と厳密同一・L13=rows/席はそのまま)。
     const fb = Array.isArray(fallback[tier]) ? fallback[tier] : [];
     for (const item of fb) {
       const k = venueLaneParityKey(item);
       if (!k || mirrorKeySet.has(k)) continue;
-      rows.push({
+      lobby.push({
         ...item,
         _venueTail: true,
         _venueTransient: transientKeys.has(k)
@@ -160,7 +164,7 @@ export function composeVenueLaneBuckets(input) {
     }
     out[tier] = rows;
   }
-  return /** @type {any} */ (out);
+  return /** @type {any} */ ({ buckets: out, lobby });
 }
 
 /**

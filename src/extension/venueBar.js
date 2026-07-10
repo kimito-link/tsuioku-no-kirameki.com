@@ -1170,6 +1170,50 @@ const VENUE_CSS = `
     font-weight: 800;
   }
   /* LANE_CSS_SYNC_END */
+  /* v0.1.1112 厳密完全一致(ロビー隔離): ①のcap外+直近発言者の待機エリア。段(鏡=①と厳密同一)とは
+     点線と薄めのトーンで視覚的に区別しつつ、タイル部品は同じ=「同じ人が待っている」と読ませる。 */
+  .nlsb-lobby {
+    margin-top: 10px;
+    padding-top: 8px;
+    border-top: 2px dashed color-mix(in srgb, var(--nl-border) 80%, transparent);
+    background: color-mix(in srgb, var(--nl-surface) 94%, #000 6%);
+    border-radius: 10px;
+    padding: 8px 10px 10px;
+  }
+  .nlsb-lobby-banner {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    color: var(--nl-text-sub);
+    background: color-mix(in srgb, var(--nl-surface) 88%, var(--nl-border) 12%);
+    border: 1px solid color-mix(in srgb, var(--nl-border) 70%, transparent);
+    border-radius: 10px;
+    padding: 6px 10px;
+    margin-bottom: 6px;
+  }
+  .nlsb-lobby-face {
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    flex: 0 0 auto;
+  }
+  .nlsb-lobby-label {
+    font-size: 12px;
+    font-weight: 800;
+    color: var(--nl-text-sub);
+    margin: 2px 0 6px;
+  }
+  .nlsb-lobby-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    align-items: flex-start;
+  }
+  .nlsb-lobby-list .nl-story-userlane-cell,
+  .nlsb-lobby-list .nlsb-seat {
+    filter: saturate(0.85) opacity(0.92);
+  }
   .nlsb-seat {
     position: relative;
     display: inline-flex;
@@ -1947,6 +1991,34 @@ export function mountVenueBarButton(options = {}) {
     faceTanu: resolveVenueAssetUrl(STORY_GUIDE_FACE_TANU)
   };
   seatsHost.appendChild(venueLaneEls.stack);
+  // v0.1.1112 厳密完全一致(ロビー隔離・reference_pop_venue_exact_SYNTHESIS.md §B-3):
+  //   ①のcap外(尾)+直近発言者(暫定)は段でなくここに座る=5段は鏡=①と件数まで厳密同一。
+  //   「ほか N人は会場モードで全員見られます」(①フッター)の受け皿=約束は真のまま(L15)。
+  //   位置=たぬ姉段の真下(段からあふれた続き、と視線で読める)。fallback(鏡なし)時は非表示。
+  const lobbyHost = document.createElement('div');
+  lobbyHost.className = 'nlsb-lobby';
+  lobbyHost.hidden = true;
+  const lobbyBanner = document.createElement('div');
+  lobbyBanner.className = 'nlsb-lobby-banner';
+  const lobbyFace = document.createElement('img');
+  lobbyFace.className = 'nlsb-lobby-face';
+  lobbyFace.src = venueStoryFaces.faceTanu;
+  lobbyFace.alt = '';
+  lobbyFace.addEventListener('error', () => { lobbyFace.style.display = 'none'; });
+  const lobbyBannerText = document.createElement('span');
+  lobbyBannerText.textContent =
+    'たぬ姉: ここは ロビー だよ。①の画面に 入りきらなかった人と、たったいま しゃべった人が ここで待ってるよ。①の画面に のったら、上の段へ うつるからね。';
+  lobbyBanner.append(lobbyFace, lobbyBannerText);
+  const lobbyLabel = document.createElement('div');
+  lobbyLabel.className = 'nlsb-lobby-label';
+  const lobbyList = document.createElement('div');
+  lobbyList.className = 'nlsb-lobby-list';
+  lobbyHost.append(lobbyBanner, lobbyLabel, lobbyList);
+  seatsHost.appendChild(lobbyHost);
+  /** ロビーの diff-skip 署名(key@席index+暫定フラグ)。空文字=未描画。 */
+  let _lobbyPaintSig = '';
+  /** ロビーを畳んだ回数(「消す側」の計器=L18・story-userlane-churn の鉄則)。 */
+  let _venueLobbyResetCount = 0;
   /** @type {ReturnType<typeof createSeatNode>[]} */
   const seatNodes = [];
   for (let i = 0; i < VENUE_FULLSCREEN_MAX_SEATS; i += 1) {
@@ -3828,6 +3900,55 @@ export function mountVenueBarButton(options = {}) {
   /**
    * @param {VenueRow[]} rows
    */
+  /**
+   * v0.1.1112 ロビー(立ち見)の描画。①のcap外(尾)+直近発言者(暫定)=鏡外メンバーを段の外に描く。
+   *   タイルは段と同じ本物部品(buildPersonTileEl)+席ラップ(wrapTileEl と同じ node.seat 収容)
+   *   =吹き出し(seatByKey→席DOM位置)・座席座標系が無傷(L2/L13)。
+   *   diff-skip: sig=(key@席index+暫定フラグ)列。空→非空/非空→空の「消す側」も計器に記録(L18)。
+   * @param {ReadonlyArray<Record<string, any>>} lobbyItems
+   */
+  const paintVenueLobby = (lobbyItems) => {
+    const items = Array.isArray(lobbyItems) ? lobbyItems : [];
+    if (items.length === 0) {
+      if (!lobbyHost.hidden) {
+        _venueLobbyResetCount += 1; // 消す側の計器(fallback降格・全員が段へ卒業した時)
+        lobbyHost.hidden = true;
+        lobbyList.replaceChildren();
+        _lobbyPaintSig = '';
+      }
+      return;
+    }
+    lobbyLabel.textContent = `ロビー(立ち見) ${items.length}人`;
+    lobbyHost.hidden = false;
+    const sig = items
+      .map((it) => `${venueLaneParityKey(it)}@${Number(it?._venueSeatIndex)}${it?._venueTransient ? '*' : ''}`)
+      .join(',');
+    if (sig === _lobbyPaintSig) return; // 同一メンバー・同一席なら再描画しない(churn防止)
+    _lobbyPaintSig = sig;
+    const frag = document.createDocumentFragment();
+    for (const item of items) {
+      /** @type {HTMLElement} */
+      let tileEl;
+      try {
+        tileEl = buildPersonTileEl(/** @type {any} */ (item), venuePersonTileIo);
+      } catch {
+        continue; // 1件の失敗でロビー全体を止めない
+      }
+      const seatIndexRaw = Number(item?._venueSeatIndex);
+      const node =
+        Number.isInteger(seatIndexRaw) && seatIndexRaw >= 0 ? seatNodes[seatIndexRaw] : null;
+      if (node) {
+        node.seat.replaceChildren(tileEl);
+        node.tile = tileEl;
+        frag.appendChild(node.seat);
+      } else {
+        frag.appendChild(tileEl); // 席なし(素通し)=タイルを直接置く
+      }
+    }
+    lobbyList.replaceChildren(frag);
+  };
+
+  /** @param {VenueRow[]} rows */
   const renderSeats = (rows) => {
     // 保険ガード: 一度でも非空を描いた後に空入力が来たら無視する(空っぽ・消えるの二重防御)。
     //   意図的クリア(配信切替)は clearDisplay 経由で hasRenderedNonEmpty=false にしてから通す。
@@ -3979,14 +4100,18 @@ export function mountVenueBarButton(options = {}) {
     const lanePaintSnap = laneMirrorPaintSnap;
     const laneWallNow = Date.now();
     const laneTransientKeys = currentVenueTransientKeys(laneWallNow);
-    const laneBuckets = lanePaintSnap
+    // v0.1.1112 厳密完全一致: mirror モードでは段=鏡のみ(①と件数まで同一)・鏡外は lobby へ。
+    //   fallback(鏡なし)は従来どおり段に全員=ロビーは畳む。
+    const laneComposed = lanePaintSnap
       ? composeVenueLaneBuckets({
           mirrorBuckets: restoreLaneMirrorBuckets(lanePaintSnap),
           fallbackBuckets: fallbackLaneBuckets,
           seatIndexByUid: venueSeatIndexByUid(visibleSeats),
           transientKeys: laneTransientKeys
         })
-      : fallbackLaneBuckets;
+      : null;
+    const laneBuckets = laneComposed ? laneComposed.buckets : fallbackLaneBuckets;
+    const lobbyItems = laneComposed ? laneComposed.lobby : [];
     // 一致計器: この paint に使う段割当列を、同じ snap と突合(TOCTOU排除)。失敗は会場を止めない。
     /** @type {ReturnType<typeof toVenueLaneParityDiag>} */
     let laneParityDiag = null;
@@ -4005,6 +4130,7 @@ export function mountVenueBarButton(options = {}) {
           nowMs: laneWallNow,
           mode: lanePaintSnap ? 'mirror' : 'fallback',
           painted,
+          lobby: lobbyItems.map((it) => venueLaneParityKey(/** @type {any} */ (it))).filter(Boolean),
           transientKeys: laneTransientKeys,
           visibleShown: visibleSeats.length,
           logicalTotal: seating.seats.length
@@ -4014,7 +4140,8 @@ export function mountVenueBarButton(options = {}) {
       /* 計器失敗は描画を止めない */
     }
     const visibleLaneItems = flattenVenueLaneBuckets(laneBuckets);
-    emptyMessage.hidden = visibleLaneItems.length > 0;
+    // L19: 段0人でもロビーにN人居るなら「まだ参加者がいません」を出さない(合算判定)。
+    emptyMessage.hidden = visibleLaneItems.length + lobbyItems.length > 0;
     if (visibleLaneItems.length === 0) {
       resetStoryUserLaneDom(venueLaneEls);
     } else {
@@ -4043,7 +4170,12 @@ export function mountVenueBarButton(options = {}) {
       );
     }
 
-    for (const item of visibleLaneItems) {
+    // v0.1.1112: ロビーを段 paint の後に描く(席の取り合いは無い=段とロビーは互いに素な集合)。
+    paintVenueLobby(lobbyItems);
+
+    // L17: 席装飾(リンク化・VIP・順位バッジ・ストリーク)は段+ロビーの【合成列】に適用する。
+    //   ロビーを忘れると empty リセット(上)で外れた装飾が復活せず、ロビー席が素牌のままになる。
+    for (const item of [...visibleLaneItems, ...lobbyItems]) {
       // v0.1.1111: 席なしアイテム(-1)は席装飾の対象外(wrapTileEl と同じ規則で席0を誤装飾しない)。
       const seatIndexRaw = Number(item?._venueSeatIndex);
       if (!Number.isInteger(seatIndexRaw) || seatIndexRaw < 0) continue;
@@ -4132,7 +4264,9 @@ export function mountVenueBarButton(options = {}) {
       seatAreaWidth,
       hardCap: VENUE_FULLSCREEN_MAX_SEATS,
       // v0.1.1111: 会場=①レーンのメンバー一致トークン(P/T/X 3層)。状態速報が1行そのまま出す。
-      laneParity: laneParityDiag
+      laneParity: laneParityDiag,
+      // v0.1.1112: ロビーを畳んだ累計回数(「消す側」の計器=L18)。多発=モード明滅の兆候。
+      lobbyResetCount: _venueLobbyResetCount
     };
     publishVenueSeatsDiag(seatsDiagObs);
     // 2026-07-01 会議(venue-diag): 「🩺 会場の状態」パネル用に最新の観測値を保持。

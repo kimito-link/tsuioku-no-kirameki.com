@@ -93,17 +93,18 @@ describe('composeVenueLaneBuckets', () => {
 
   it('P層=鏡の順序そのまま・席indexを引き当て・uid無しセルは _venueSeatIndex=-1(素通し)', () => {
     const out = composeVenueLaneBuckets({ mirrorBuckets, fallbackBuckets: {}, seatIndexByUid });
-    expect(out.link.map((i) => i.entry.userId)).toEqual(['10', '20']);
-    expect(out.link[0]._venueSeatIndex).toBe(0);
-    expect(out.link[1]._venueSeatIndex).toBe(3);
-    expect(out.ad).toHaveLength(1);
-    expect(out.ad[0]._venueSeatIndex).toBe(-1);
-    expect(out.ad[0].title).toBe('珍味団');
+    expect(out.buckets.link.map((i) => i.entry.userId)).toEqual(['10', '20']);
+    expect(out.buckets.link[0]._venueSeatIndex).toBe(0);
+    expect(out.buckets.link[1]._venueSeatIndex).toBe(3);
+    expect(out.buckets.ad).toHaveLength(1);
+    expect(out.buckets.ad[0]._venueSeatIndex).toBe(-1);
+    expect(out.buckets.ad[0].title).toBe('珍味団');
+    expect(out.lobby).toEqual([]);
     // paintStoryUserLaneDomFilled が読む形(displaySrc/title/meta/entry)を保つ。
-    expect(out.link[0]).toMatchObject({ displaySrc: 'https://x/10.jpg', meta: { idLine: '10' } });
+    expect(out.buckets.link[0]).toMatchObject({ displaySrc: 'https://x/10.jpg', meta: { idLine: '10' } });
   });
 
-  it('T層=fallback の鏡外メンバーだけを段末尾へ(鏡在籍者は重複させない)', () => {
+  it('v2: 鏡外メンバーは段に混ぜず lobby へ(段=鏡と厳密同一・鏡在籍者は重複させない)', () => {
     const fallbackBuckets = {
       link: [
         { entry: { userId: '10' }, meta: { idLine: '10' }, title: 'てん', displaySrc: 'https://x/10.jpg', _venueSeatIndex: 0 },
@@ -115,12 +116,30 @@ describe('composeVenueLaneBuckets', () => {
       tanu: []
     };
     const out = composeVenueLaneBuckets({ mirrorBuckets, fallbackBuckets, seatIndexByUid });
-    expect(out.link.map((i) => i.entry.userId)).toEqual(['10', '20', '999']);
-    expect(out.link[2]._venueTail).toBe(true);
-    expect(out.link[2]._venueSeatIndex).toBe(7); // fallback item の席は保持
+    // 段は鏡のみ=①と件数まで同一(尾が段に混入しない)。
+    expect(out.buckets.link.map((i) => i.entry.userId)).toEqual(['10', '20']);
+    // 鏡外(999)はロビーへ。fallback item の席index等は保持。
+    expect(out.lobby.map((i) => i.entry.userId)).toEqual(['999']);
+    expect(out.lobby[0]._venueTail).toBe(true);
+    expect(out.lobby[0]._venueSeatIndex).toBe(7);
   });
 
-  it('X層= transientKeys に載っている尾は _venueTransient が付く', () => {
+  it('lobby の順序=段順(link→…→tanu)×fallback内の順序で決定的', () => {
+    const fallbackBuckets = {
+      link: [{ entry: { userId: '901' }, meta: { idLine: '901' }, title: 'a', displaySrc: '', _venueSeatIndex: 1 }],
+      gift: [],
+      ad: [],
+      konta: [],
+      tanu: [
+        { entry: { userId: '902' }, meta: { idLine: '902' }, title: 'b', displaySrc: '', _venueSeatIndex: 2 },
+        { entry: { userId: '903' }, meta: { idLine: '903' }, title: 'c', displaySrc: '', _venueSeatIndex: 4 }
+      ]
+    };
+    const out = composeVenueLaneBuckets({ mirrorBuckets, fallbackBuckets, seatIndexByUid });
+    expect(out.lobby.map((i) => i.entry.userId)).toEqual(['901', '902', '903']);
+  });
+
+  it('X層= transientKeys に載っているロビー行は _venueTransient が付く', () => {
     const fallbackBuckets = {
       link: [],
       gift: [],
@@ -134,8 +153,10 @@ describe('composeVenueLaneBuckets', () => {
       seatIndexByUid,
       transientKeys: new Set(['u:999'])
     });
-    const tailItem = out.tanu.find((i) => i.entry.userId === '999');
-    expect(tailItem._venueTransient).toBe(true);
+    const lobbyItem = out.lobby.find((i) => i.entry.userId === '999');
+    expect(lobbyItem._venueTransient).toBe(true);
+    // 段には居ない(厳密同一)。
+    expect(out.buckets.tanu.some((i) => i.entry.userId === '999')).toBe(false);
   });
 });
 
