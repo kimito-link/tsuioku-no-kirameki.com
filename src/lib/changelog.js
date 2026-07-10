@@ -26,6 +26,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1119',
+    date: '2026-07-10',
+    summary: 'feat(venue): 会場の段を①と同じ見た目に',
+    items: Object.freeze([
+      '会場モードの5つの段(りんく/ギフト/広告/こん太/たぬ姉)の見た目を応援レーン(①)と同じにしました。段の中のVIP金縁リングと連続発言の発光を外し、応援レーンと並べて区別がつかない見た目になります。上位3人の順位バッジ(🥇🥈🥉)と、発言した瞬間の小さな一拍はこれまでどおりです。',
+      '段とロビーの帯に応援レーンと同じカード背景を敷きました。背後のコメント欄などが段の中に透けなくなります。配信映像はこれまでどおりそのまま見えます(全面のスモークは今後も導入しません)。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1118',
     date: '2026-07-10',
     summary: 'feat(venue): ①が解決済みの顔を会場にも共有',
