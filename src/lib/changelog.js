@@ -26,6 +26,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1114',
+    date: '2026-07-10',
+    summary: 'feat(venue): 額縁フレーム(四辺のキャラ顔)を廃止',
+    items: Object.freeze([
+      '会場モードの四辺を囲んでいた3キャラの顔サムネ(額縁フレーム・v0.1.777)を非表示にしました。会場の顔は「参加者の席」だけになり、「実際より顔が多く見える」誤認の一因が消えます。',
+      '直前のバージョン(v0.1.1113)で入れた実DOM計器の「額縁N」がこのバージョンで0になることを、状態速報1枚でそのまま確認できます(計器→廃止の順)。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1113',
     date: '2026-07-10',
     summary: 'feat(diag): 会場一致を実DOMで判定(3点一致)',
