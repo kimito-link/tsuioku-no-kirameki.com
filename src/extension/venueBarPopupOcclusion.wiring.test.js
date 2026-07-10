@@ -40,3 +40,33 @@ describe('①POP遮蔽(v0.1.1115)の配線', () => {
     expect(venueBarSrc).toContain(`#${m[1]} {`);
   });
 });
+
+describe('見た目①化(v0.1.1119)のCSS', () => {
+  it('段配下のVIP金縁と連鎖発光が無効化されている(①のレーンと同じ見た目)', () => {
+    expect(venueBarSrc).toMatch(
+      /\.nlsb-venue-lane-stack \.nlsb-seat\.nlsb-seat-vip \.nl-story-userlane-avatar \{[^}]*box-shadow: none/
+    );
+    expect(venueBarSrc).toMatch(
+      /\.nlsb-venue-lane-stack \.nlsb-seat\[data-streak\] \.nl-story-userlane-avatar \{[^}]*animation: none/
+    );
+  });
+
+  it('順位バッジ(🥇🥈🥉)と発話の一拍(speaking)は残す(既存ユーザー指示)', () => {
+    expect(venueBarSrc).toContain("[data-venue-rank='1']::after { content: '🥇'; }");
+    expect(venueBarSrc).toMatch(/nlsb-seat-speaking \.nl-story-userlane-avatar \{\s*animation: nlsb-seat-speak/);
+  });
+
+  it('段とロビーに①と同じカードsurface(透け防止・全面スモークは導入しない)', () => {
+    expect(venueBarSrc).toMatch(
+      /\.nlsb-venue-lane-stack\.nl-story-userlane-stack \{\s*background: var\(--nl-surface\)/
+    );
+    expect(venueBarSrc).toMatch(/\.nlsb-lobby \{\s*background: var\(--nl-surface\)/);
+  });
+
+  it('★地雷: P5の上書きは LANE_CSS_SYNC マーカー区間の外(END より後)にある', () => {
+    const endAt = venueBarSrc.indexOf('LANE_CSS_SYNC_END');
+    const p5At = venueBarSrc.indexOf('.nlsb-venue-lane-stack .nlsb-seat.nlsb-seat-vip .nl-story-userlane-avatar');
+    expect(endAt).toBeGreaterThan(-1);
+    expect(p5At).toBeGreaterThan(endAt);
+  });
+});

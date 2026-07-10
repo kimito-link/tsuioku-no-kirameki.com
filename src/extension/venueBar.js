@@ -1655,6 +1655,37 @@ const VENUE_CSS = `
     visibility: hidden !important;
     pointer-events: none !important;
   }
+  /* v0.1.1119 見た目①化(P5・reference_venue_pop_copy_SYNTHESIS.md §C-3): 段(レーン帯)配下は
+     ①応援レーンと同じ見た目に=会場独自の席装飾(VIP金縁・連鎖発光)を段の中では無効化する。
+     順位バッジ(🥇🥈🥉)と発話の一拍(speaking)は残す(既存ユーザー指示=光る演出なし・バッジのみ)。
+     ロビー(立ち見)の装飾は会場資産として残置(段=①の鏡/ロビー=会場独自領域、の線引き)。
+     ★LANE_CSS_SYNC マーカー区間の外に書く(区間内直接編集は同期テスト赤/黙ったdriftの地雷)。
+     ★席ラップ(.nlsb-seat)の display/overflow は触らない(吹き出し/ギフト起点の座標系を変えない)。 */
+  .nlsb-venue-lane-stack .nlsb-seat.nlsb-seat-vip .nl-story-userlane-avatar {
+    filter: none;
+    border-color: color-mix(in srgb, var(--nl-border) 82%, #fff 18%);
+    box-shadow: none;
+    z-index: auto;
+  }
+  .nlsb-venue-lane-stack .nlsb-seat[data-streak] .nl-story-userlane-avatar {
+    box-shadow: none;
+    animation: none;
+    z-index: auto;
+  }
+  /* 段とロビーの帯に①と同じカードsurfaceを敷く=背後のwatch画面/コメント欄が段の中に透けない。
+     中央の映像は覆わない(帯は段の実高さぶんだけ・全面スモークは今後も導入しない)。 */
+  .nlsb-venue-lane-stack.nl-story-userlane-stack {
+    background: var(--nl-surface);
+    border: 1px solid var(--nl-border);
+    border-radius: 10px;
+    padding: 8px;
+  }
+  .nlsb-lobby {
+    background: var(--nl-surface);
+    border: 1px solid var(--nl-border);
+    border-radius: 10px;
+    padding: 8px;
+  }
 `;
 
 // colorFromKey(名前/IDから色生成)は person-tile-unify 第3コミットで不要になり削除。
