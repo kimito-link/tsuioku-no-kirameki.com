@@ -980,6 +980,10 @@ const VENUE_CSS = `
      */
     overflow-x: hidden;
     overflow-y: auto;
+    /* v0.1.1129: 会場のスクロールバー非表示(ユーザー要望「会場モードはスクロールバーが
+       でてるのなくせないですか?」)。スクロール機能(ホイール/パン/タッチ)はそのまま=
+       バーの見た目だけ消す。①POPは触らない(会場スコープのみ)。 */
+    scrollbar-width: none;
     /* 2026-06-14 会議(摩擦ゼロUI): 会場は左ドラッグでパンできる=grab カーソルで掴めると示す。
        席リンク(.nlsb-seat-link)上はリンクカーソルを優先(下のセレクタで上書き)。
        v0.1.738: パンできる(縦に溢れている)時だけ grab を出す=掴めるのに動かない誤解を防ぐ。
@@ -990,6 +994,11 @@ const VENUE_CSS = `
       radial-gradient(ellipse at 50% 100%, rgba(102, 144, 190, 0.16), transparent 62%);
     overscroll-behavior: contain;
     contain: layout paint;
+  }
+  /* v0.1.1129: Chrome系のスクロールバー非表示(scrollbar-width:none の webkit 版)。 */
+  .nlsb-seats::-webkit-scrollbar {
+    width: 0;
+    height: 0;
   }
   .nlsb-seats.nlsb-mode-empty {
     display: grid;
@@ -2154,7 +2163,11 @@ export function mountVenueBarButton(options = {}) {
   const lobbyLabel = document.createElement('div');
   lobbyLabel.className = 'nlsb-lobby-label';
   const lobbyList = document.createElement('div');
-  lobbyList.className = 'nlsb-lobby-list';
+  /* v0.1.1129 ロビータイル巨大化根治(実測: 段スタック内=38px強制/ロビー=寸法CSSゼロで
+     画像naturalサイズが素通し=素材が大きい匿名顔ほど巨大化)。タイル寸法CSS一式
+     (.nl-story-userlane-cell/avatar/meta 等)は .nlsb-venue-lane-stack 配下スコープなので、
+     ロビーにも同クラスを併記して段と同一の見た目に揃える(JSはこのクラスで query しない=実測済み)。 */
+  lobbyList.className = 'nlsb-lobby-list nlsb-venue-lane-stack';
   lobbyHost.append(lobbyBanner, lobbyLabel, lobbyList);
   seatsHost.appendChild(lobbyHost);
   /** ロビーの diff-skip 署名(key@席index+暫定フラグ)。空文字=未描画。 */
