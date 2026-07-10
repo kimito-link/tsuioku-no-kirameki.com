@@ -281,6 +281,24 @@ function buildVenueSeatsHealthCells(venueSeatsDiag, nowMs) {
     );
   }
 
+  // ④ v0.1.1113 会場一致(Tri-Parity): 鏡データ=段割当データ=段実DOM の3点一致で初めて✅。
+  //   これまで laneParity は状態速報のテキスト1行のみ=レジストリ未登録で、完全性スコアが100%でも
+  //   会場一致🔴がありうる盲点だった(reference_diag_truth_SYNTHESIS.md 穴f)。セル化+登録で閉じる。
+  //   ⚪(fallback/鏡なし/DOM未計測)は na=嘘の赤にしない。未観測(null)はセルを足さない。
+  const lp = /** @type {any} */ (snap).laneParity;
+  if (lp && typeof lp === 'object' && lp.verdict) {
+    const lpVerdict = String(lp.verdict);
+    const lpUnexplained = Math.max(0, Math.floor(num(lp.unexplained) || 0));
+    if (lpVerdict === '✅') {
+      const ghost = Math.max(0, Math.floor(num(lp.dom?.ghost) || 0));
+      out.push(stateCell('venue-parity', '会場一致', 'ok', `3点一致${ghost > 0 ? `(幽${ghost})` : ''}`));
+    } else if (lpVerdict === '🔴') {
+      out.push(stateCell('venue-parity', '会場一致', 'bad', String(lp.reason || `未説明${lpUnexplained}`)));
+    } else {
+      out.push(stateCell('venue-parity', '会場一致', 'na', String(lp.reason || '判定不能')));
+    }
+  }
+
   return out;
 }
 

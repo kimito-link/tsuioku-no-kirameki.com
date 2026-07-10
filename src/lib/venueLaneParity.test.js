@@ -15,6 +15,38 @@ const keys = (uids) => uids.map((u) => `u:${u}`);
 
 const NOW = 1_700_000_000_000;
 
+/**
+ * v3(Tri-Parity): painted と件数一致する実DOM census 要約を作る(3点一致の fixture)。
+ *   over で総計/重複/付帯を、over.perSection で段別可視数を上書きできる。
+ * @param {Record<string, string[]>} painted
+ * @param {number} [lobbyLen]
+ * @param {Record<string, any>} [over]
+ */
+function domMatching(painted, lobbyLen = 0, over = {}) {
+  /** @type {Record<string, any>} */
+  const perSection = {};
+  for (const t of ['link', 'gift', 'ad', 'konta', 'tanu']) {
+    perSection[t] = { visible: (painted[t] || []).length, ghost: 0, bare: 0, visibleEmpty: 0, unkeyed: 0 };
+  }
+  perSection.lobby = { visible: lobbyLen, ghost: 0, bare: 0, visibleEmpty: 0, unkeyed: 0 };
+  const base = {
+    measured: true,
+    perSection,
+    ghost: 0,
+    bare: 0,
+    visibleEmpty: 0,
+    unkeyed: 0,
+    dupIntra: 0,
+    dupCross: 0,
+    dupLaneLobby: 0,
+    strays: 0,
+    charFrame: 0,
+    crowdOn: false,
+    crowdCount: 0
+  };
+  return { ...base, ...over, perSection: { ...perSection, ...(over.perSection || {}) } };
+}
+
 /** 実機ケースの鏡: link40相当(縮めて4)・ad10相当(縮めて2)。 */
 function makeSnap(over = {}) {
   return {
@@ -54,45 +86,50 @@ describe('laneMirrorTierKeySequences', () => {
 });
 
 describe('buildVenueLaneParity', () => {
-  it('完全一致(P層のみ)なら ✅ で件数を明記する', () => {
+  it('完全一致(P層のみ)+DOM一致なら ✅ で件数を明記する(v3: dom必須)', () => {
     const snap = makeSnap();
+    const painted = {
+      link: keys(['1', '2', '3', '4']),
+      gift: [],
+      ad: ['c:#1|珍味団', 'c:#2|ゲスト'],
+      konta: [],
+      tanu: keys(['a1', 'a2'])
+    };
     const p = buildVenueLaneParity({
       snap,
       liveId: 'lv350912687',
       nowMs: NOW,
       mode: 'mirror',
-      painted: {
-        link: keys(['1', '2', '3', '4']),
-        gift: [],
-        ad: ['c:#1|珍味団', 'c:#2|ゲスト'],
-        konta: [],
-        tanu: keys(['a1', 'a2'])
-      }
+      painted,
+      dom: domMatching(painted)
     });
     expect(p.verdict).toBe('✅');
     expect(p.unexplained.count).toBe(0);
     expect(p.line).toContain('会場一致 ✅');
     expect(p.line).toContain('link4');
     expect(p.line).toContain('ad2');
+    expect(p.line).toContain('DOM=データ');
   });
 
   it('v2: 尾・暫定はロビーに居れば説明済み=✅のまま「ロビーN(暫定M)」を明記(実機の尾14+暫定1の同型)', () => {
     const snap = makeSnap({ totalCandidates: 20 }); // ①はcapで切っている
+    const painted = {
+      // 段は鏡と厳密同一(尾は段に混ぜない)。
+      link: keys(['1', '2', '3', '4']),
+      gift: [],
+      ad: ['c:#1|珍味団', 'c:#2|ゲスト'],
+      konta: [],
+      tanu: keys(['a1', 'a2'])
+    };
     const p = buildVenueLaneParity({
       snap,
       liveId: 'lv350912687',
       nowMs: NOW,
       mode: 'mirror',
-      painted: {
-        // 段は鏡と厳密同一(尾は段に混ぜない)。
-        link: keys(['1', '2', '3', '4']),
-        gift: [],
-        ad: ['c:#1|珍味団', 'c:#2|ゲスト'],
-        konta: [],
-        tanu: keys(['a1', 'a2'])
-      },
+      painted,
       lobby: [...keys(['13702502', '33687377', '96090801']), 'u:999'],
-      transientKeys: new Set(['u:999'])
+      transientKeys: new Set(['u:999']),
+      dom: domMatching(painted, 4)
     });
     expect(p.verdict).toBe('✅');
     expect(p.lobby).toEqual({ total: 4, transient: 1, inMirror: 0 });
@@ -210,18 +247,20 @@ describe('buildVenueLaneParity', () => {
 
   it('鏡縮退(Σセル<pickedLength)は ✅ を出さない(⚪鏡縮退)', () => {
     const snap = makeSnap({ pickedLength: 100 }); // セルは8つしか無い=縮退
+    const painted = {
+      link: keys(['1', '2', '3', '4']),
+      gift: [],
+      ad: ['c:#1|珍味団', 'c:#2|ゲスト'],
+      konta: [],
+      tanu: keys(['a1', 'a2'])
+    };
     const p = buildVenueLaneParity({
       snap,
       liveId: 'lv350912687',
       nowMs: NOW,
       mode: 'mirror',
-      painted: {
-        link: keys(['1', '2', '3', '4']),
-        gift: [],
-        ad: ['c:#1|珍味団', 'c:#2|ゲスト'],
-        konta: [],
-        tanu: keys(['a1', 'a2'])
-      }
+      painted,
+      dom: domMatching(painted)
     });
     expect(p.mirrorPruned).toBe(true);
     expect(p.verdict).toBe('⚪');
@@ -230,28 +269,156 @@ describe('buildVenueLaneParity', () => {
 
   it('表示間引き(L6)は不一致でなく 表示n/N の併記になる', () => {
     const snap = makeSnap();
+    const painted = {
+      link: keys(['1', '2', '3', '4']),
+      gift: [],
+      ad: ['c:#1|珍味団', 'c:#2|ゲスト'],
+      konta: [],
+      tanu: keys(['a1', 'a2'])
+    };
     const p = buildVenueLaneParity({
       snap,
       liveId: 'lv350912687',
       nowMs: NOW,
       mode: 'mirror',
-      painted: {
-        link: keys(['1', '2', '3', '4']),
-        gift: [],
-        ad: ['c:#1|珍味団', 'c:#2|ゲスト'],
-        konta: [],
-        tanu: keys(['a1', 'a2'])
-      },
+      painted,
       visibleShown: 6,
-      logicalTotal: 8
+      logicalTotal: 8,
+      dom: domMatching(painted)
     });
     expect(p.verdict).toBe('✅');
     expect(p.line).toContain('表示6/8');
   });
+
+  // --- v3(Tri-Parity=実DOM census)。実事例: データ一致✅なのに画面のたぬ姉が多い、を🔴に写す ---
+  describe('v3 実DOM census', () => {
+    /** 実事例に寄せた鏡: tanu 3人(縮小fixture)。 */
+    const painted = () => ({
+      link: keys(['1', '2', '3', '4']),
+      gift: [],
+      ad: ['c:#1|珍味団', 'c:#2|ゲスト'],
+      konta: [],
+      tanu: keys(['a1', 'a2'])
+    });
+    const base = () => ({
+      snap: makeSnap(),
+      liveId: 'lv350912687',
+      nowMs: NOW,
+      mode: /** @type {const} */ ('mirror'),
+      painted: painted()
+    });
+
+    it('データ一致でも DOM過剰(裸タイル残留)なら 🔴 で主犯を1行に名指し(実事例の再現)', () => {
+      const p = buildVenueLaneParity({
+        ...base(),
+        dom: domMatching(painted(), 0, {
+          perSection: { tanu: { visible: 52, ghost: 0, bare: 50, visibleEmpty: 0, unkeyed: 0 } },
+          bare: 50
+        })
+      });
+      expect(p.verdict).toBe('🔴');
+      expect(p.unexplained.count).toBe(50);
+      expect(p.unexplained.sampleKeys.join(',')).toContain('tanu:DOM余50');
+      expect(p.line).toContain('DOM≠ tanu:可視52(データ2 裸50)');
+      expect(p.line).toContain('重複0 迷子0');
+    });
+
+    it('DOM欠落(データより画面が少ない)も 🔴 DOM欠', () => {
+      const p = buildVenueLaneParity({
+        ...base(),
+        dom: domMatching(painted(), 0, {
+          perSection: { link: { visible: 2, ghost: 0, bare: 0, visibleEmpty: 0, unkeyed: 0 } }
+        })
+      });
+      expect(p.verdict).toBe('🔴');
+      expect(p.unexplained.sampleKeys.join(',')).toContain('link:DOM欠2');
+    });
+
+    it('3点一致(鏡=データ=実DOM)で初めて ✅・DOM=データ を明記', () => {
+      const p = buildVenueLaneParity({ ...base(), dom: domMatching(painted()) });
+      expect(p.verdict).toBe('✅');
+      expect(p.line).toContain('DOM=データ');
+      expect(p.dom).toMatchObject({ measured: true, ghost: 0 });
+    });
+
+    it('census欠落(dom なし)は ✅ を名乗れない=⚪ DOM未計測(fail-closed)', () => {
+      const p = buildVenueLaneParity(base());
+      expect(p.verdict).toBe('⚪');
+      expect(p.reason).toBe('DOM未計測');
+      expect(p.line).toContain('DOM未計測');
+      expect(p.dom).toBeNull();
+    });
+
+    it('幽霊のみ(不可視の消し残り)は verdict 不算入=✅+幽N 併記', () => {
+      const p = buildVenueLaneParity({
+        ...base(),
+        dom: domMatching(painted(), 0, {
+          perSection: { tanu: { visible: 2, ghost: 3, bare: 0, visibleEmpty: 0, unkeyed: 0 } },
+          ghost: 3
+        })
+      });
+      expect(p.verdict).toBe('✅');
+      expect(p.line).toContain('DOM=データ(幽3)');
+    });
+
+    it('重複/迷子/空可視/無鍵は件数一致でも 🔴 DOM異常(✅ブロッカー)', () => {
+      const p = buildVenueLaneParity({
+        ...base(),
+        dom: domMatching(painted(), 0, { dupLaneLobby: 1, strays: 2, visibleEmpty: 1, unkeyed: 2 })
+      });
+      expect(p.verdict).toBe('🔴');
+      expect(p.reason).toContain('DOM異常');
+      expect(p.reason).toContain('重複1');
+      expect(p.reason).toContain('迷子2');
+      expect(p.line).toContain('無鍵2');
+      expect(p.line).toContain('空可視1');
+    });
+
+    it('群衆Canvas/額縁は判定外の参考値として付帯する(容疑者③④が写る)', () => {
+      const p = buildVenueLaneParity({
+        ...base(),
+        dom: domMatching(painted(), 0, { crowdOn: true, crowdCount: 154, charFrame: 12 })
+      });
+      expect(p.verdict).toBe('✅'); // 参考値は✅を壊さない
+      expect(p.line).toContain('群衆on(154)');
+      expect(p.line).toContain('額縁12');
+    });
+
+    it('fallback でも census は参考で line に写る(白円/迷子はモード無関係)', () => {
+      const p = buildVenueLaneParity({
+        ...base(),
+        mode: 'fallback',
+        dom: domMatching(painted(), 0, {
+          perSection: { tanu: { visible: 5, ghost: 0, bare: 3, visibleEmpty: 0, unkeyed: 0 } }
+        })
+      });
+      expect(p.verdict).toBe('⚪'); // fallback は判定しない(従来どおり)
+      expect(p.unexplained.count).toBe(0); // 参考値は未説明に計上しない
+      expect(p.line).toContain('DOM≠ tanu:可視5(データ2 裸3)');
+    });
+  });
 });
 
 describe('toVenueLaneParityDiag', () => {
-  it('storage 同梱用の軽量形(line/verdict/unexplained)に畳む', () => {
+  it('storage 同梱用の軽量形(line/verdict/unexplained/dom要約)に畳む', () => {
+    const painted = { link: keys(['1', '2', '3', '4']), gift: [], ad: ['c:#1|珍味団', 'c:#2|ゲスト'], konta: [], tanu: keys(['a1', 'a2']) };
+    const p = buildVenueLaneParity({
+      snap: makeSnap(),
+      liveId: 'lv350912687',
+      nowMs: NOW,
+      mode: 'mirror',
+      painted,
+      dom: domMatching(painted, 0, { ghost: 3, charFrame: 12 })
+    });
+    const d = toVenueLaneParityDiag(p);
+    expect(d).toMatchObject({ mode: 'mirror', verdict: '✅', unexplained: 0 });
+    expect(d.line).toContain('会場一致');
+    expect(d.dom).toMatchObject({ measured: true, ghost: 3, charFrame: 12 });
+    expect(d.dom).not.toHaveProperty('perSection'); // 段別詳細は storage に常設しない
+    expect(toVenueLaneParityDiag(null)).toBeNull();
+  });
+
+  it('dom 未計測は dom:null のまま畳む(⚪ DOM未計測)', () => {
     const p = buildVenueLaneParity({
       snap: makeSnap(),
       liveId: 'lv350912687',
@@ -260,9 +427,9 @@ describe('toVenueLaneParityDiag', () => {
       painted: { link: keys(['1', '2', '3', '4']), gift: [], ad: ['c:#1|珍味団', 'c:#2|ゲスト'], konta: [], tanu: keys(['a1', 'a2']) }
     });
     const d = toVenueLaneParityDiag(p);
-    expect(d).toMatchObject({ mode: 'mirror', verdict: '✅', unexplained: 0 });
-    expect(d.line).toContain('会場一致');
-    expect(toVenueLaneParityDiag(null)).toBeNull();
+    expect(d.verdict).toBe('⚪');
+    expect(d.reason).toBe('DOM未計測');
+    expect(d.dom).toBeNull();
   });
 });
 

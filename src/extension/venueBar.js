@@ -172,6 +172,8 @@ import {
   venueLaneParityKey,
   VENUE_LANE_TRANSIENT_WINDOW_MS
 } from '../lib/venueLaneParity.js';
+// v0.1.1113 実DOM census(Tri-Parity): ✅の根拠をデータからDOMへ(reference_diag_truth_SYNTHESIS.md)。
+import { collectVenueLaneDomCensus, venueDomCensusToParityDom } from '../lib/venueDomCensus.js';
 import { nicoUserPageUrl, anonymousDisplayLabel } from '../lib/nicoUserPage.js';
 import { isNumericNicoUserId } from '../domain/user/identity.js';
 // person-tile-unify 第3コミット(2026-06-22): 会場の席タイルを popup の本物ビルダーで描く。
@@ -3931,6 +3933,8 @@ export function mountVenueBarButton(options = {}) {
       let tileEl;
       try {
         tileEl = buildPersonTileEl(/** @type {any} */ (item), venuePersonTileIo);
+        // v0.1.1113 実DOM census(Tri-Parity): ロビータイルにも段(fillLaneTier)と同じ照合キーを刻印。
+        tileEl.dataset.userKey = venueLaneParityKey(/** @type {any} */ (item));
       } catch {
         continue; // 1件の失敗でロビー全体を止めない
       }
@@ -4112,33 +4116,6 @@ export function mountVenueBarButton(options = {}) {
       : null;
     const laneBuckets = laneComposed ? laneComposed.buckets : fallbackLaneBuckets;
     const lobbyItems = laneComposed ? laneComposed.lobby : [];
-    // 一致計器: この paint に使う段割当列を、同じ snap と突合(TOCTOU排除)。失敗は会場を止めない。
-    /** @type {ReturnType<typeof toVenueLaneParityDiag>} */
-    let laneParityDiag = null;
-    try {
-      /** @type {Record<string, string[]>} */
-      const painted = {};
-      for (const tier of ['link', 'gift', 'ad', 'konta', 'tanu']) {
-        painted[tier] = (Array.isArray(/** @type {any} */ (laneBuckets)[tier]) ? /** @type {any} */ (laneBuckets)[tier] : [])
-          .map((/** @type {unknown} */ it) => venueLaneParityKey(/** @type {any} */ (it)))
-          .filter(Boolean);
-      }
-      laneParityDiag = toVenueLaneParityDiag(
-        buildVenueLaneParity({
-          snap: lanePaintSnap || laneMirrorSnap,
-          liveId: String(activeLiveId || liveIdFromPathname() || ''),
-          nowMs: laneWallNow,
-          mode: lanePaintSnap ? 'mirror' : 'fallback',
-          painted,
-          lobby: lobbyItems.map((it) => venueLaneParityKey(/** @type {any} */ (it))).filter(Boolean),
-          transientKeys: laneTransientKeys,
-          visibleShown: visibleSeats.length,
-          logicalTotal: seating.seats.length
-        })
-      );
-    } catch {
-      /* 計器失敗は描画を止めない */
-    }
     const visibleLaneItems = flattenVenueLaneBuckets(laneBuckets);
     // L19: 段0人でもロビーにN人居るなら「まだ参加者がいません」を出さない(合算判定)。
     emptyMessage.hidden = visibleLaneItems.length + lobbyItems.length > 0;
@@ -4214,6 +4191,67 @@ export function mountVenueBarButton(options = {}) {
         node.seat.dataset.streak = String(seatStreakStage);
       } else {
         delete node.seat.dataset.streak;
+      }
+    }
+
+    // v0.1.1113 一致計器 v3(Tri-Parity): 鏡データ=段割当データ=【段実DOM】の3点一致で初めて✅。
+    //   census は席装飾ループの【後】=この paint の最終DOM(装飾で is-empty が外れた後)を数える。
+    //   同一同期フレームで paint に使った laneBuckets/lobbyItems と突合=TOCTOU無し・新規readゼロ。
+    //   publish と同じ3秒期日(diagDue)のときだけ census+parity を組む(毎paint禁止=hot path 保護)。
+    //   期日外は前回値を保持(明滅させない)。計器失敗は描画を止めない。
+    const diagDue = nowMs() - _venueSeatsDiagLastWriteAt >= 3000;
+    /** @type {ReturnType<typeof toVenueLaneParityDiag>} */
+    let laneParityDiag = /** @type {any} */ (_lastVenueSeatsDiagObs ? (_lastVenueSeatsDiagObs.laneParity ?? null) : null);
+    if (diagDue) {
+      try {
+        /** @type {Record<string, string[]>} */
+        const painted = {};
+        for (const tier of ['link', 'gift', 'ad', 'konta', 'tanu']) {
+          painted[tier] = (Array.isArray(/** @type {any} */ (laneBuckets)[tier]) ? /** @type {any} */ (laneBuckets)[tier] : [])
+            .map((/** @type {unknown} */ it) => venueLaneParityKey(/** @type {any} */ (it)))
+            .filter(Boolean);
+        }
+        // 実DOM census(数えるだけ・1ノードも触らない)。失敗は dom:null=⚪「DOM未計測」(fail-closed)。
+        /** @type {ReturnType<typeof venueDomCensusToParityDom>} */
+        let domSummary = null;
+        try {
+          domSummary = venueDomCensusToParityDom(
+            collectVenueLaneDomCensus({
+              laneEls: {
+                link: venueLaneEls.laneLink,
+                gift: venueLaneEls.laneGift,
+                ad: venueLaneEls.laneAd,
+                konta: venueLaneEls.laneKonta,
+                tanu: venueLaneEls.laneTanu
+              },
+              lobbyList,
+              stackEl: venueLaneEls.stack,
+              extras: {
+                charFrameLayer,
+                crowdOn: totalAnonymous > 0,
+                crowdCount: totalAnonymous
+              }
+            })
+          );
+        } catch {
+          domSummary = null;
+        }
+        laneParityDiag = toVenueLaneParityDiag(
+          buildVenueLaneParity({
+            snap: lanePaintSnap || laneMirrorSnap,
+            liveId: String(activeLiveId || liveIdFromPathname() || ''),
+            nowMs: laneWallNow,
+            mode: lanePaintSnap ? 'mirror' : 'fallback',
+            painted,
+            lobby: lobbyItems.map((it) => venueLaneParityKey(/** @type {any} */ (it))).filter(Boolean),
+            transientKeys: laneTransientKeys,
+            visibleShown: visibleSeats.length,
+            logicalTotal: seating.seats.length,
+            dom: domSummary
+          })
+        );
+      } catch {
+        /* 計器失敗は描画を止めない(前回値を保持) */
       }
     }
     // 席が動いた(段の再描画/表示人数変化)後、表示中の吹き出しを席頭上へ追従させる。
