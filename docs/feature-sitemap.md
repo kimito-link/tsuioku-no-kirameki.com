@@ -281,7 +281,7 @@
   - `src/lib/giftThrowProjectile.js`
 - **吹き出し寿命管理** — 会場の吹き出しの表示上限・追い出し(eviction)ライフサイクル
   - `src/lib/venueBubbleLifecycle.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 187</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 188</summary>
 
 - `scripts/encode-marketing-html-avatars.mjs` — extension/images/marketing-html-avatars/*.png を data URI にし、
 - `scripts/split-avatar-parts.mjs` — 偽市松背景の除去 + パーツ切り出し(one-off アセットパイプライン)
@@ -356,6 +356,7 @@
 - `src/lib/inlineHostBesideSizing.js` — beside（横付き）モードの inline panel の幅・高さを最適計算する純粋関数。
 - `src/lib/inlineHostDockSizing.js` — dock_bottom モードの inline panel 高さを viewport と player rect から最適計算する純粋関数。
 - `src/lib/inlineHostLayoutReset.js` — インラインパネルの placement（below / beside / floating / dock_bottom）を切り替える際に、
+- `src/lib/inlineHostMoveProbe.js` — ①POPインラインパネルの host(#nls-inline-popup-host)DOM移設を観測する
 - `src/lib/inlineModeFlags.js` — popup.html の URL クエリから「どのモードで開かれた popup か」を判定する純関数。
 - `src/lib/inlinePanelFocusGate.js` — インラインパネル host element が toolbar 起点の「前面化」操作を受けられる
 - `src/lib/inlinePanelLayout.js` — 視聴ページに埋め込む nicolivelog パネルの幅・位置を、動画要素の表示矩形に合わせるための純関数。
@@ -833,7 +834,7 @@
 
 ## 🧬 修正系譜マップ(この系統のバグを過去にどう直したか)
 
-> changelog 全 458 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
+> changelog 全 459 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
 
 ### 💾 記録件数 (68版)
 - `v0.1.1116` 2026-07-10 — feat(diag): 会場の白円サムネを数える計器
@@ -1111,7 +1112,8 @@
 - `v0.1.668` 2026-06-10 — パネルに「💬コメビュ」ボタンを追加
 - `v0.1.667` 2026-06-10 — コメビュに匿名OKのニックネーム・ラベル・メモ
 
-### 🏟 会場・席 (145版)
+### 🏟 会場・席 (146版)
+- `v0.1.1124` 2026-07-10 — feat(diag): パネル引っ越し(=リロード)の実測計器
 - `v0.1.1122` 2026-07-10 — fix(venue): 匿名の大群がたぬ姉段の壁になるのを解消
 - `v0.1.1121` 2026-07-10 — fix(venue): 白い大パネルを解消=カード背景を行単位に
 - `v0.1.1120` 2026-07-10 — feat(venue): 会場から案内バナー等の文章を除去
@@ -1565,7 +1567,8 @@
 - `v0.1.673` 2026-06-10 — コメビュの名前をパネルと同じ情報源で補完
 - `v0.1.670` 2026-06-10 — コメビュのアイコンを本家と同じサムネに
 
-### 🩺 診断・状態速報 (167版)
+### 🩺 診断・状態速報 (168版)
+- `v0.1.1124` 2026-07-10 — feat(diag): パネル引っ越し(=リロード)の実測計器
 - `v0.1.1123` 2026-07-10 — feat(diag): ローディング/描画未起動の実測計器
 - `v0.1.1122` 2026-07-10 — fix(venue): 匿名の大群がたぬ姉段の壁になるのを解消
 - `v0.1.1117` 2026-07-10 — fix(venue): 会場の白円サムネを根治=①と同じ顔規則

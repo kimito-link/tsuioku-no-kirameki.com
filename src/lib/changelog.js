@@ -26,6 +26,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1124',
+    date: '2026-07-10',
+    summary: 'feat(diag): パネル引っ越し(=リロード)の実測計器',
+    items: Object.freeze([
+      'ローディングちかちかの真犯人候補「応援パネルがページ内で引っ越しされて中身ごと読み直される」を実測する計器を追加しました(動作は何も変えていません)。診断コピーの hostMoveDiag に、引っ越し回数・そのうち実害(リロード)になった回数・どの経路が・会場モード中だったかが数字で出ます。',
+      '前バージョン(v0.1.1123)の起動時刻計器とあわせて、ちかちか再現時の状態速報1枚で原因経路が確定します。数字が出たら、その経路だけを止める最小修正(会場中の引っ越し凍結など)に進みます。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1123',
     date: '2026-07-10',
     summary: 'feat(diag): ローディング/描画未起動の実測計器',
