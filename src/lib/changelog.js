@@ -26,6 +26,16 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1129',
+    date: '2026-07-11',
+    summary: 'fix(venue): スクロールバー非表示+ロビー巨大タイル根治',
+    items: Object.freeze([
+      '会場モードの右端に出ていたスクロールバーを非表示にしました。スクロール自体(マウスホイール・ドラッグでのパン・タッチ)はこれまでどおり使えます。',
+      'ロビー(立ち見)の顔が巨大に表示されてレイアウトが崩れる問題を根治しました。実測で「段のタイルは38pxに固定するCSSがあるのに、ロビーにはタイルの寸法CSSが1行も無く、画像が素のサイズのまま出ていた」ことが原因と確定。ロビーにも段とまったく同じタイルCSSを効かせます。',
+      '①POP(応援パネル)側には影響しません(会場だけの変更です)。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1128',
     date: '2026-07-11',
     summary: 'fix(venue): 会場中の点滅を根治(引っ越し凍結)',
