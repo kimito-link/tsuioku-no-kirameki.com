@@ -75,8 +75,17 @@ import { pickCommentsForExport } from '../lib/pickCommentsForExport.js';
 import { selectLaneFeedCommentRows } from '../lib/provisionalLaneCommentRows.js';
 import {
   markWatchPopupLoadPhase,
-  resetWatchPopupLoadDiagnostics
+  resetWatchPopupLoadDiagnostics,
+  snapshotWatchPopupLoadPhase
 } from '../lib/watchPopupLoadDiagnostics.js';
+// v0.1.1123 計器(D-0): 独立描画トリガ(tick)の結末を理由別に数える(started=0 の真因実測)。
+import {
+  createLaneTickProbe,
+  recordLaneTick,
+  snapshotLaneTickProbe,
+  LANE_TICK_REASONS,
+  LANE_TICK_LID_SOURCES
+} from '../lib/laneTickProbe.js';
 import { sanitizeRoomAvatarsForBroadcaster } from '../lib/sanitizeRoomAvatarsForBroadcaster.js';
 import { excludeBroadcasterFromRankedRooms } from '../lib/excludeBroadcasterFromRankedRooms.js';
 import { excludeBroadcasterFromCommentEntries } from '../lib/excludeBroadcasterFromCommentEntries.js';
@@ -12747,6 +12756,13 @@ const _northStarRenderProbe = {
 //   無く「鏡にはあるのに画面に出ない/ローディングが終わらない」を状態速報から知る術が無かった（盲点）。
 //   renderStoryUserLane（heavy経路）/applyLaneMirrorForPassive（mirror経路）の入口/分岐/出口を記録する。
 const _storyUserLaneRenderProbe = createStoryUserLaneRenderProbe();
+// v0.1.1123 計器(D-0): tick結末の理由別カウント。popup固有診断JSONの laneTickProbe に出る。
+const _laneTickProbe = createLaneTickProbe();
+/** popup(iframe)がこのコンテキストで起動した壁時計。状態速報を2回コピーしてこの値が変わっていれば
+ *  「iframeが再生成された」=ローディング幕の【再出現】が確定する(幕の永続は3重フェイルセーフで不可能)。 */
+const NL_POPUP_BOOT_AT_ISO = new Date().toISOString();
+/** dismissInitialLoadShade が呼ばれた累計(幕を畳む経路が生きているかの実測)。 */
+let _shadeDismissCalls = 0;
 
 /** 北極星 6 レーンを一括再描画（bundle / snapshot / storage の現在値を使用）。 */
 async function refreshAllNorthStarMirrorLanes(liveId) {
@@ -18310,6 +18326,7 @@ function ensureInitShadeFailsafeClassSync() {
 }
 
 function dismissInitialLoadShade() {
+  _shadeDismissCalls += 1; // v0.1.1123 計器(観測のみ)
   stopInitShadeCharCycle();
   const shade = document.getElementById('nlInitialLoadShade');
   if (!(shade instanceof HTMLElement)) return;
@@ -18608,6 +18625,27 @@ async function collectAiShareDevMonitorPayloadBundle(watchUrl) {
           // heavyRace根治(B)計器: fresh-read で heavy 全件再読みを省いた累計(実配信で効きと12秒ギャップの適正を判定)。
           if (snap) snap.heavyFreshReadReuseCount = _heavyFreshReadReuseCount;
           return snap;
+        } catch { return null; }
+      })(),
+      // v0.1.1123 計器(D-0): 「started=0(応援レーン描画が起動しない)」と「ローディングがつねに出る」
+      //   の真因実測。laneTickProbe=tick結末の理由別内訳(lidMiss支配=lid解決全滅が真因、等)。
+      //   loadShadeProbe.popupBootAtIso が前回コピーと違えば iframe再生成=幕の【再出現】が確定。
+      laneTickProbe: (() => {
+        try { return snapshotLaneTickProbe(_laneTickProbe, Date.now()); } catch { return null; }
+      })(),
+      loadShadeProbe: (() => {
+        try {
+          const shade = document.getElementById('nlInitialLoadShade');
+          const nowPerf =
+            typeof performance !== 'undefined' && performance.now ? performance.now() : Date.now();
+          return {
+            popupBootAtIso: NL_POPUP_BOOT_AT_ISO,
+            shadePresent: shade instanceof HTMLElement,
+            shadeDone: shade instanceof HTMLElement ? shade.classList.contains('nl-init-shade--done') : null,
+            shadeAgeMs: Math.max(0, Math.round(nowPerf - NL_INIT_SHADE_BORN_AT)),
+            dismissCalls: _shadeDismissCalls,
+            lastLoadPhase: snapshotWatchPopupLoadPhase(nowPerf)
+          };
         } catch { return null; }
       })()
     },
@@ -21700,14 +21738,25 @@ async function initPopup() {
    *   heavy 経路と二重に走っても同一なら no-op=競合しない。read path にキャッシュは足さない(§6 地雷回避)。
    */
   const tickIndependentNorthStar = () => {
-    if (!hasExtensionContext()) return;
-    if (typeof document !== 'undefined' && document.hidden) return;
+    // v0.1.1123 計器(観測のみ): tick の結末を理由別に数える=「started=0(描画が起動しない)」の
+    //   真因(lid解決全滅/タブ非表示/スクロールdefer)を状態速報の数字で特定する(D-0)。
+    if (!hasExtensionContext()) {
+      recordLaneTick(_laneTickProbe, LANE_TICK_REASONS.NO_CONTEXT);
+      return;
+    }
+    if (typeof document !== 'undefined' && document.hidden) {
+      recordLaneTick(_laneTickProbe, LANE_TICK_REASONS.DOC_HIDDEN);
+      return;
+    }
     // v0.1.981(回帰修正): スクロール中は重い再描画を見送る。独立 tick(v0.1.977/979)が
     //   shouldDeferHeavyPopupPaintNow を無視して北極星/応援レーンを 3〜6s ごとに作り直していたため、
     //   メインをスクロールすると描画が割り込んで白化し操作不能(コピーボタンも押せない)になっていた。
     //   既存の paint defer 原則(スクロール後 400ms は heavy paint しない)に揃える=スクロールが
     //   止まれば次の tick で出る(機能後退ゼロ)。
-    if (shouldDeferHeavyPopupPaintNow()) return;
+    if (shouldDeferHeavyPopupPaintNow()) {
+      recordLaneTick(_laneTickProbe, LANE_TICK_REASONS.DEFER_HEAVY);
+      return;
+    }
     // v0.1.988(複数配信タブの真因修正): lid の優先順位を見直す。
     //   embedded watch panel は【自タブの &lv=(INLINE_OWN_WATCH_URL)が確定的な真実】=最優先。
     //   v0.1.986 は watchPopupLastPaintedLiveId を最優先にしていたが、複数配信を同時視聴すると
@@ -21715,18 +21764,30 @@ async function initPopup() {
     //   (実機 v0.1.987・2配信視聴で再現: watchSnapshotMeta=しすたー なのに probe 全0)。
     //   解決順: ①自タブ &lv=(embedded) → ②自タブ snapshot.liveId → ③watchPopupLastPaintedLiveId(standalone popup)。
     let lid = '';
+    let lidSource = '';
     {
       const ownM = String(INLINE_OWN_WATCH_URL || '').match(/lv\d{1,15}/);
-      if (ownM) lid = ownM[0].toLowerCase();
+      if (ownM) {
+        lid = ownM[0].toLowerCase();
+        lidSource = LANE_TICK_LID_SOURCES.INLINE;
+      }
     }
     if (!/^lv\d{1,15}$/.test(lid)) {
       const snapLv = String(watchMetaCache?.snapshot?.liveId || '').trim().toLowerCase();
-      if (/^lv\d{1,15}$/.test(snapLv)) lid = snapLv;
+      if (/^lv\d{1,15}$/.test(snapLv)) {
+        lid = snapLv;
+        lidSource = LANE_TICK_LID_SOURCES.SNAPSHOT;
+      }
     }
     if (!/^lv\d{1,15}$/.test(lid)) {
       lid = String(watchPopupLastPaintedLiveId || '').trim().toLowerCase();
+      lidSource = LANE_TICK_LID_SOURCES.LAST_PAINTED;
     }
-    if (!/^lv\d{1,15}$/.test(lid)) return;
+    if (!/^lv\d{1,15}$/.test(lid)) {
+      recordLaneTick(_laneTickProbe, LANE_TICK_REASONS.LID_MISS);
+      return;
+    }
+    recordLaneTick(_laneTickProbe, LANE_TICK_REASONS.RUN, { lidSource, lid, nowMs: Date.now() });
     void refreshAllNorthStarMirrorLanes(lid);
     // v0.1.979: 応援レーンも heavy が詰まったときだけ鏡から描く(厳格ガード=空のときだけ/現配信のみ)。
     void applyLaneMirrorForMainPopupFallback(lid);

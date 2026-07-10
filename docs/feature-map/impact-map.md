@@ -510,6 +510,7 @@
 | `src/lib/kiramekiAwards.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/kiramekiAwardsSectionHtml.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/laneDiag.js` | 1 | ポップアップ(応援レーン) |
+| `src/lib/laneTickProbe.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/liveCommenterStats.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/liveHealthScore.js` | 1 | 状態速報ページ |
 | `src/lib/livePersistInterval.js` | 1 | 記録エンジン(watchページ常駐) |

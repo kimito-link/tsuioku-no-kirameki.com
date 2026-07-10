@@ -26,6 +26,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1123',
+    date: '2026-07-10',
+    summary: 'feat(diag): ローディング/描画未起動の実測計器',
+    items: Object.freeze([
+      '「ローディングが繰り返し出る」「応援レーンの描画が起動しない」の原因を実測するための計器を追加しました(動作は何も変えていません)。診断コピーに、描画トリガが何回・どの理由で見送られたか(laneTickProbe)と、ローディング幕の状態・パネルの起動時刻(loadShadeProbe)が数字で出ます。',
+      '状態速報を2回コピーして起動時刻(popupBootAtIso)が変わっていれば「パネルが作り直されてローディングが再出現している」ことが確定します。数字が出そろってから根治に進みます。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1122',
     date: '2026-07-10',
     summary: 'fix(venue): 匿名の大群がたぬ姉段の壁になるのを解消',

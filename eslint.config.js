@@ -220,8 +220,11 @@ export default [
     //   heavyRace再発の根治(v0.1.1109)で描画単調性ガード+canReuse fresh-read+readAtMs+計器のグルー
     //   (判定純関数は shouldKeepStoryUserLaneTilesOnShrink/decideHeavyChunkReadReuse に隔離・chrome/DOM依存の
     //   配線1行ずつのみ popup 側)。実測21902。ラチェットは実測+50の21952へ。
+    //   D-0計器(v0.1.1123)で tick結末probe+幕probe のグルー(計数純関数は laneTickProbe.js/
+    //   watchPopupLoadDiagnostics.js に隔離・popup側は record 1行ずつ+診断JSON露出)。実測21963。
+    //   ラチェットは実測+50の22013へ。
     files: ['src/extension/popup-entry.js'],
-    rules: { 'max-lines': ['error', { max: 21952, skipBlankLines: false, skipComments: false }] }
+    rules: { 'max-lines': ['error', { max: 22013, skipBlankLines: false, skipComments: false }] }
   },
   {
     files: ['src/extension/popup/**/*.js'],
