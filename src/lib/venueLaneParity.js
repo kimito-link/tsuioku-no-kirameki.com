@@ -302,7 +302,8 @@ export function buildVenueLaneParity(input) {
   const ageStr = mirrorAgeSec >= 0 && Number.isFinite(mirrorAgeMs) ? `鏡(${mirrorAgeSec}s前)` : '鏡なし';
   const midStr = isMirrorJudging
     ? ` / ロビー${lobby.total}(暫定${lobby.transient})`
-    : ` / 暫定${totalTransientInLanes}`;
+    : // v0.1.1122: fallback でも匿名系はロビーへ隔離されるため人数を明記(verdict は⚪のまま=情報のみ)。
+      ` / ロビー${lobby.total} 暫定${totalTransientInLanes}`;
   // v3 DOMセグメント: 一致なら「DOM=データ(幽N)」、不一致なら主犯内訳つき「DOM≠ …」、未計測は明示。
   //   fallback でも census があれば参考で写す(白円/迷子はモード無関係の会場単独異常)。
   /** @type {string} */

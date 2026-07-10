@@ -4005,8 +4005,9 @@ export function mountVenueBarButton(options = {}) {
    *   =吹き出し(seatByKey→席DOM位置)・座席座標系が無傷(L2/L13)。
    *   diff-skip: sig=(key@席index+暫定フラグ)列。空→非空/非空→空の「消す側」も計器に記録(L18)。
    * @param {ReadonlyArray<Record<string, any>>} lobbyItems
+   * @param {{ mirror?: boolean }} [lobbyOpts] mirror=false(v0.1.1122)=①同期待ちをラベルに明示
    */
-  const paintVenueLobby = (lobbyItems) => {
+  const paintVenueLobby = (lobbyItems, lobbyOpts) => {
     const items = Array.isArray(lobbyItems) ? lobbyItems : [];
     if (items.length === 0) {
       if (!lobbyHost.hidden) {
@@ -4017,7 +4018,10 @@ export function mountVenueBarButton(options = {}) {
       }
       return;
     }
-    lobbyLabel.textContent = `ロビー(立ち見) ${items.length}人`;
+    // v0.1.1122(B): fallback(鏡不可=タイムシフト/①同期待ち)時は「なぜ段が少ないか」を黙らない。
+    //   ラベル代入は下の sig スキップの前=タイル列不変でもモード表記は毎paint追従する。
+    const lobbyMirror = !(lobbyOpts && lobbyOpts.mirror === false);
+    lobbyLabel.textContent = `ロビー(立ち見) ${items.length}人${lobbyMirror ? '' : '・①と同期待ち'}`;
     lobbyHost.hidden = false;
     const sig = items
       .map((it) => `${venueLaneParityKey(it)}@${Number(it?._venueSeatIndex)}${it?._venueTransient ? '*' : ''}`)
@@ -4200,23 +4204,28 @@ export function mountVenueBarButton(options = {}) {
     const fallbackLaneBuckets = bucketVenueLaneSeats(visibleSeats, {
       maxTotal: visibleSeats.length,
       // v0.1.1117 白円根治(P3): ①と同じ資産で displaySrc を導出(委譲先は venueLaneBuckets)。
-      pickCtx: venueLanePickCtx
+      pickCtx: venueLanePickCtx,
+      // v0.1.1122(B): 匿名系はロビーへ分割=鏡不可(タイムシフト/①同期待ち)時の「匿名の壁」根治。
+      anonymousToLobby: true
     });
     const lanePaintSnap = laneMirrorPaintSnap;
     const laneWallNow = Date.now();
     const laneTransientKeys = currentVenueTransientKeys(laneWallNow);
     // v0.1.1112 厳密完全一致: mirror モードでは段=鏡のみ(①と件数まで同一)・鏡外は lobby へ。
-    //   fallback(鏡なし)は従来どおり段に全員=ロビーは畳む。
+    // v0.1.1122(B): fallback(鏡なし)も「段=記名(数値ID)のみ・匿名系はロビー」の mirror と同じ
+    //   構造に統一=タイムシフト/①同期待ちで匿名211人がたぬ姉段の壁になる実機事象の根治。
+    //   「会場では全員見られる」の約束はロビーで守る(間引かない)。
     const laneComposed = lanePaintSnap
       ? composeVenueLaneBuckets({
           mirrorBuckets: restoreLaneMirrorBuckets(lanePaintSnap),
           fallbackBuckets: fallbackLaneBuckets,
+          fallbackLobby: fallbackLaneBuckets.lobby,
           seatIndexByUid: venueSeatIndexByUid(visibleSeats),
           transientKeys: laneTransientKeys
         })
       : null;
     const laneBuckets = laneComposed ? laneComposed.buckets : fallbackLaneBuckets;
-    const lobbyItems = laneComposed ? laneComposed.lobby : [];
+    const lobbyItems = laneComposed ? laneComposed.lobby : (fallbackLaneBuckets.lobby || []);
     const visibleLaneItems = flattenVenueLaneBuckets(laneBuckets);
     // L19: 段0人でもロビーにN人居るなら「まだ参加者がいません」を出さない(合算判定)。
     emptyMessage.hidden = visibleLaneItems.length + lobbyItems.length > 0;
@@ -4253,7 +4262,7 @@ export function mountVenueBarButton(options = {}) {
     }
 
     // v0.1.1112: ロビーを段 paint の後に描く(席の取り合いは無い=段とロビーは互いに素な集合)。
-    paintVenueLobby(lobbyItems);
+    paintVenueLobby(lobbyItems, { mirror: Boolean(laneComposed) });
 
     // L17: 席装飾(リンク化・VIP・順位バッジ・ストリーク)は段+ロビーの【合成列】に適用する。
     //   ロビーを忘れると empty リセット(上)で外れた装飾が復活せず、ロビー席が素牌のままになる。

@@ -99,11 +99,15 @@ export function venueRowsFromLaneMirror(snap, candidatesByUid) {
  * @param {{
  *   mirrorBuckets: { link: any[], gift: any[], ad: any[], konta: any[], tanu: any[] },
  *   fallbackBuckets: { link: any[], gift: any[], ad: any[], konta: any[], tanu: any[] },
+ *   fallbackLobby?: any[],
  *   seatIndexByUid: ReadonlyMap<string, number>,
  *   transientKeys?: ReadonlySet<string>
  * }} input
  *   - mirrorBuckets: restoreLaneMirrorBuckets(snap) の出力({displaySrc,title,meta,entry})。
  *   - fallbackBuckets: 既存 bucketVenueLaneSeats(visibleSeats) の出力(席index等を保持)。
+ *   - fallbackLobby(v0.1.1122): bucketVenueLaneSeats の anonymousToLobby 分割で lobby へ落ちた
+ *     匿名系。mirror モードでも鏡在籍者を除いてロビーへ合流させる(従来は fallback.tanu 経由で
+ *     同じ dedupe を通っていた=集合は完全等値・順序のみ変化)。
  * @returns {{ buckets: { link: any[], gift: any[], ad: any[], konta: any[], tanu: any[] }, lobby: any[] }}
  */
 export function composeVenueLaneBuckets(input) {
@@ -163,6 +167,17 @@ export function composeVenueLaneBuckets(input) {
       });
     }
     out[tier] = rows;
+  }
+  // v0.1.1122: 匿名分割(fallbackLobby)もロビーへ合流。mirrorKeySet との dedupe 必須
+  //   (忘れると段とロビーの二重在籍=parity「ロビー重複」🔴・設計正本の地雷#4)。
+  for (const item of Array.isArray(inp.fallbackLobby) ? inp.fallbackLobby : []) {
+    const k = venueLaneParityKey(item);
+    if (!k || mirrorKeySet.has(k)) continue;
+    lobby.push({
+      ...item,
+      _venueTail: true,
+      _venueTransient: transientKeys.has(k)
+    });
   }
   return /** @type {any} */ ({ buckets: out, lobby });
 }
