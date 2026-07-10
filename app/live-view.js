@@ -33,8 +33,10 @@
 // PIIはスクラビング構造で保証(URLのquery/hash全落とし=viewTokenを送らない・コメント本文は不収集)。
 // DSN は公開値(secretではない)。空文字にすると全機能 no-op(=即時ロールバック)。
 import { installLiveviewErrorReporter } from '../src/lib/liveviewErrorReport.js';
-/** besttrust org / liveview プロジェクトの DSN(未設定=空文字なら送信しない)。 */
-const LIVEVIEW_SENTRY_DSN = '';
+/** besttrust org / javascript-react プロジェクトの DSN(公開値・空文字にすると送信停止=ロールバック)。
+ *  wire形式はローカル実弾で検証済み(2026-07-11 HTTP200・event受理・URLスクラブ確認)。 */
+const LIVEVIEW_SENTRY_DSN =
+  'https://5cc5bdbf4e19c6eaa68354a460d5be2e@o4510791371718656.ingest.us.sentry.io/4510791376699392';
 installLiveviewErrorReporter({
   dsn: LIVEVIEW_SENTRY_DSN,
   // esbuild define(scripts/build.mjs)が注入するビルドID=どの版の③で起きたかを識別する。

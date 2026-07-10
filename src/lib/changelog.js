@@ -26,6 +26,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1131',
+    date: '2026-07-11',
+    summary: 'feat(web): ③WEBのエラー報告を有効化(DSN設定)',
+    items: Object.freeze([
+      '前バージョン(v0.1.1130)で実装した③WEBのエラー自動報告に送信先(Sentry DSN)を設定し、有効化しました。送信形式は実弾テストで受理を確認済みです(閲覧トークンがURLから確実に落ちることも同時に確認)。',
+      'DSNを空文字に戻す1行で即時停止できます。拡張本体は引き続き無関係です。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1130',
     date: '2026-07-11',
     summary: 'feat(web): ③WEBにエラーレポータ(Sentry)',
