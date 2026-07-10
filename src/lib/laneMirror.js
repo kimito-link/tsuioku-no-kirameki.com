@@ -25,6 +25,12 @@
  *   picked.length ではない(取り違え注意)。totalCandidates=素性が取れた候補総数(cap 前)で「ほか M人」用。
  */
 
+// v0.1.1112(鏡スリム化 B-1・読み手先行): displaySrc が空で userId が有るセルは、読み手が
+//   anonymousIdenticonDataUrl(uid, 64)(純関数・①と同じ顔)を再生成して復元する。
+//   これは B-2(書き手が匿名 data URL を鏡から落とす)の前提となる後方互換フォールバック。
+//   旧鏡(data URL入り)では displaySrc 非空→再生成パス不発=byte同一出力(退行ゼロ)。
+import { anonymousIdenticonDataUrl } from './anonymousIdenticon.js';
+
 const LANE_MIRROR_TIERS = /** @type {const} */ (['link', 'gift', 'ad', 'konta', 'tanu']);
 /** 1スナップショットの上限(これを超えたら各段 cap を半減して作り直す)。 */
 const LANE_MIRROR_MAX_JSON_BYTES = 512 * 1024;
@@ -107,11 +113,15 @@ export function restoreLaneMirrorBuckets(snap) {
   const restore = (/** @type {unknown} */ arr) =>
     (Array.isArray(arr) ? arr : []).map((c) => {
       const cell = /** @type {LaneMirrorCell} */ (c && typeof c === 'object' ? c : {});
+      const userId = String(cell.userId || '').trim();
+      // v0.1.1112 B-1: displaySrc 空+uid有り=スリム化された匿名セル→①と同じ顔を再生成(冪等)。
+      const displaySrc =
+        String(cell.displaySrc || '') || (userId ? anonymousIdenticonDataUrl(userId, 64) : '');
       return {
-        displaySrc: String(cell.displaySrc || ''),
+        displaySrc,
         title: String(cell.title || ''),
         meta: { idLine: String(cell.idLine || ''), nameLine: String(cell.nameLine || '') },
-        entry: { userId: String(cell.userId || '') }
+        entry: { userId }
       };
     });
   return {

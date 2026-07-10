@@ -53,4 +53,23 @@ describe('会場=①レーン鏡映の配線(配線忘れ=CI赤)', () => {
     expect(venueBarSrc).toMatch(/baseRows = composeVenueBaseRows\(/);
     expect(venueBarSrc).toMatch(/commitDisplay\(baseRows\)/);
   });
+
+  // --- v0.1.1112 厳密完全一致(ロビー隔離)の配線 ---
+  it('venueBar がロビー(paintVenueLobby)を描き、lobby を parity へ渡している', () => {
+    expect(venueBarSrc).toMatch(/paintVenueLobby\(lobbyItems\)/);
+    expect(venueBarSrc).toMatch(/lobby: lobbyItems\.map\(/);
+  });
+
+  it('席装飾ループが段+ロビーの合成列を回す(L17=ロビー席の装飾取り残し防止)', () => {
+    expect(venueBarSrc).toMatch(/\[\.\.\.visibleLaneItems, \.\.\.lobbyItems\]/);
+  });
+
+  it('emptyMessage は段+ロビーの合算で判定(L19)', () => {
+    expect(venueBarSrc).toMatch(/visibleLaneItems\.length \+ lobbyItems\.length > 0/);
+  });
+
+  it('「消す側」の計器(lobbyResetCount)が diag に載る(L18)', () => {
+    expect(venueBarSrc).toMatch(/lobbyResetCount: _venueLobbyResetCount/);
+    expect(seatsDiagSrc).toMatch(/lobbyResetCount/);
+  });
 });

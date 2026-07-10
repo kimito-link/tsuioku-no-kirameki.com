@@ -18,10 +18,12 @@
  *   venueMaxRows: number,        // 積んだ段数(全席÷perRow を 500/perRow で cap)。0=未観測
  *   seatAreaWidth: number,       // 席エリアの実測幅px(clientWidth)。0=レイアウト未確定/事故の兆候
  *   visibleCapReason: 'participant'|'grid'|'hardCap'|'',  // 可視席が何で頭打ちになったか(''=未観測)
- *   laneParity: { mode: string, verdict: string, line: string, unexplained: number, mirrorAgeSec: number }|null
+ *   laneParity: { mode: string, verdict: string, line: string, unexplained: number, mirrorAgeSec: number, lobby?: number }|null,
+ *   lobbyResetCount: number
  * }} VenueSeatsDiagState
  *
  * laneParity は v0.1.1111 の「会場=①レーンのメンバー一致トークン」(venueLaneParity.js)。null=未観測。
+ * lobbyResetCount は v0.1.1112 のロビー(立ち見)を畳んだ累計回数(「消す側」の計器・多発=明滅の兆候)。
  */
 
 /** 初期 会場座席診断 state。 */
@@ -39,7 +41,8 @@ export function makeInitialVenueSeatsDiag() {
     venueMaxRows: 0,
     seatAreaWidth: 0,
     visibleCapReason: '',
-    laneParity: /** @type {VenueSeatsDiagState['laneParity']} */ (null)
+    laneParity: /** @type {VenueSeatsDiagState['laneParity']} */ (null),
+    lobbyResetCount: 0
   };
 }
 
@@ -111,7 +114,8 @@ export function buildVenueSeatsDiagSnapshot(diag, nowMs) {
         verdict: String(lpIn.verdict || ''),
         line: String(lpIn.line || ''),
         unexplained: Math.max(0, Math.floor(num(lpIn.unexplained, 0))),
-        mirrorAgeSec: Math.floor(num(lpIn.mirrorAgeSec, 0))
+        mirrorAgeSec: Math.floor(num(lpIn.mirrorAgeSec, 0)),
+        lobby: Math.max(0, Math.floor(num(lpIn.lobby, 0)))
       }
     : null;
   return {
@@ -128,6 +132,7 @@ export function buildVenueSeatsDiagSnapshot(diag, nowMs) {
     seatAreaWidth,
     visibleCapReason,
     laneParity,
+    lobbyResetCount: Math.max(0, Math.floor(num(d.lobbyResetCount, 0))),
     capturedAt: now
   };
 }
