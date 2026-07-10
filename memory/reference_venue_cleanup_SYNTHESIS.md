@@ -19,6 +19,10 @@
 
 ## 実装(v0.1.1120〜1122・各patch=1bump)
 
+> 実装時の意図的差異(reality-checker留保への回答・2026-07-10): guideLinesMidAd は hasAd=false のとき
+> 旧実装が「代入スキップ=前値保持」だったのを「''へ能動クリア」に変更した(不可視領域・画面差ゼロ)。
+> これは(A)の「非表示側は hidden+innerHTML='' を能動的に書く=残骸ゼロ」方針と整合する意図的挙動。
+
 ### v0.1.1120 (A) guides:false
 - renderStoryUserLaneDom.js paintStoryUserLaneDomFilled: `const showGuides = !(opts && opts.guides === false);`(省略時true=①③status完全不変)。抑止4点=空段ノート(syncStoryUserLaneTierEmptyNote第2引数に showGuides &&)・hintLink・ガイド帯5本(hidden=!showGuides+innerHTML='' を能動的に)・フッター。
 - venueBar.js paint opts に `guides: false` 1行。recordedCommentRowsTotal/totalCandidates は残置(inert・将来戻すとき用)。
