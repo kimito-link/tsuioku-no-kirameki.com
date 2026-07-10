@@ -26,6 +26,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1120',
+    date: '2026-07-10',
+    summary: 'feat(venue): 会場から案内バナー等の文章を除去',
+    items: Object.freeze([
+      '会場モードから、りんく/こん太/たぬ姉のキャラ案内バナー・空の段の説明文・「いま○件を表示中(ほか○人は会場モードで…)」のフッターをすべて取り除きました。会場は応援者の顔タイルだけが並ぶすっきりした場になります。',
+      'これらの文章は応援レーン(ポップアップ)側ではこれまでどおり表示されます(段の意味はそちらで確認できます)。会場の中で「会場モードで見られます」と自分を案内する無意味な文言も消えます。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1119',
     date: '2026-07-10',
     summary: 'feat(venue): 会場の段を①と同じ見た目に',
