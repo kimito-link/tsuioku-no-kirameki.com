@@ -13,7 +13,12 @@
 ```mermaid
 graph LR
   n_venue["会場モード(standalone)"]
+  n_venue --> n_src_domain_lane_columns_kontaPolicy_js["domain/lane/columns/kontaPolicy.js"]:::shared
+  n_venue --> n_src_domain_lane_columns_linkPolicy_js["domain/lane/columns/linkPolicy.js"]:::shared
+  n_venue --> n_src_domain_lane_columns_tanuPolicy_js["domain/lane/columns/tanuPolicy.js"]:::shared
+  n_venue --> n_src_domain_lane_tier_js["domain/lane/tier.js"]:::shared
   n_venue --> n_src_domain_user_identity_js["domain/user/identity.js"]:::shared
+  n_venue --> n_src_domain_user_nickname_js["domain/user/nickname.js"]:::shared
   n_venue --> n_src_extension_story_renderStoryUserLaneDom_js["extension/story/renderStoryUserLaneDom.js"]:::shared
   n_venue --> n_src_extension_venueBar_js["extension/venueBar.js"]:::shared
   n_venue --> n_src_lib_anonymousIdenticon_js["lib/anonymousIdenticon.js"]:::shared
@@ -48,12 +53,7 @@ graph LR
   n_venue --> n_src_lib_laneMirror_js["lib/laneMirror.js"]:::shared
   n_venue --> n_src_lib_laneMirrorKey_js["lib/laneMirrorKey.js"]:::shared
   n_venue --> n_src_lib_nicoAnonymousDisplay_js["lib/nicoAnonymousDisplay.js"]:::shared
-  n_venue --> n_src_lib_nicoUserPage_js["lib/nicoUserPage.js"]:::shared
-  n_venue --> n_src_lib_parseArrivalComment_js["lib/parseArrivalComment.js"]:::shared
-  n_venue --> n_src_lib_parseGiftComment_js["lib/parseGiftComment.js"]:::shared
-  n_venue --> n_src_lib_personTileDom_js["lib/personTileDom.js"]:::shared
-  n_venue --> n_src_lib_phaseDirector_js["lib/phaseDirector.js"]:::shared
   classDef shared fill:#eee,stroke:#999,color:#666;
 ```
 
-> ほか 57 ファイル省略（全件は storage-bus.md / metafile 参照）。
+> ほか 65 ファイル省略（全件は storage-bus.md / metafile 参照）。

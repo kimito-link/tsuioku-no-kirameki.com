@@ -4,8 +4,16 @@ import { storyUserLaneMetaLines } from './storyUserLaneMeta.js';
 import { bucketStoryUserLanePicks } from './storyUserLaneBuckets.js';
 import { compareStoryUserLaneCandidates } from './storyUserLaneSort.js';
 import { supportGridDisplayTier } from './supportGridDisplayTier.js';
-import { userLaneResolvedThumbScore } from './supportGrowthTileSrc.js';
+import {
+  isAnonymousStyleNicoUserId,
+  NICONICO_OFFICIAL_DEFAULT_USERICON_HTTPS,
+  userLaneResolvedThumbScore
+} from './supportGrowthTileSrc.js';
 import { deriveNicoUserIconUrl } from './venueSeats.js';
+// v0.1.1117 白円根治(P3・reference_venue_pop_copy_SYNTHESIS.md §C-2): displaySrc の導出を
+//   ①POP の正本チェーン(resolveStoryLaneAvatarSrc→buildStoryUserLaneCandidateRow)へ委譲する。
+import { buildStoryUserLaneCandidateRow } from './storyUserLaneRowModel.js';
+import { resolveStoryLaneAvatarSrc } from './storyLaneAvatarSrc.js';
 
 const TIER_PROFILE = { link: 3, konta: 2, tanu: 1 };
 
@@ -14,8 +22,18 @@ const TIER_PROFILE = { link: 3, konta: 2, tanu: 1 };
  * 配信者ID未確定時でもここでは数値ID候補を落とさない。席資格の正本は venueSeats.js であり、
  * 会場は「アクティブユーザーは全員着席」の哲学を保つ。
  *
+ * v0.1.1117 白円根治(P3): displaySrc は①正本(buildStoryUserLaneCandidateRow)へ委譲する。
+ *   旧実装は推測URL(deriveNicoUserIconUrl)を無フィルタで displaySrc に直入れし、①と違う
+ *   (短いIDでは必ず404の)URLやプローブ未成功の blank.jpg 白円を生んでいた(実配信スクショの真因)。
+ *   委譲後は①と同じ規則: 匿名(a:系)=identicon / 個人サムネ既知=実URL(取り違えガード込み) /
+ *   数値ID未解決=①と同一の合成URL(404時は①と同じ tv-fallback 様式=パリティ上「正」)。
+ *   ★_venueIsVip だけは旧式据え置き(このpatchで金縁の顔ぶれを変えない=1変更1patch)。
+ *
  * @param {{ seatIndex?: number, participant?: { key?: string, userId?: string, name?: string, avatar?: string, lastAt?: number }, venueRank?: number }} seatEntry
- * @param {{ fallbackLabel?: string }} [opts]
+ * @param {{ fallbackLabel?: string,
+ *           pickCtx?: { yukkuriSrc?: string, tvSrc?: string, anonymousIdenticonEnabled?: boolean } }} [opts]
+ *   - pickCtx: ①の lanePickCtx 相当(拡張アセットURL等)。lib既定は①既定と同値
+ *     (tvSrc=blank.jpg・identicon有効)=呼び出し側が渡し忘れても匿名の顔が崩れない(地雷#3の構造防止)。
  * @returns {null | {
  *   entryIndex: number,
  *   profileTier: number,
@@ -50,29 +68,59 @@ export function venueSeatEntryToLaneItem(seatEntry, opts = {}) {
   const displayName =
     rawName || (uid ? anonymousDisplayLabel(uid) : anonymousDisplayLabel(key || fallbackLabel));
   const avatarUrl = String(participant.avatar || '').trim();
-  const derivedAvatar = deriveNicoUserIconUrl(uid);
-  const httpAvatar = avatarUrl || derivedAvatar;
-  const displaySrc = httpAvatar || (uid ? anonymousIdenticonDataUrl(uid, 64) : anonymousIdenticonDataUrl(key || fallbackLabel, 64));
-  const tierName = supportGridDisplayTier({
+  const entryIndex = Number.isFinite(Number(participant.lastAt))
+    ? Math.max(0, Math.floor(Number(participant.lastAt)))
+    : seatIndex;
+
+  // --- ①正本への委譲(uid 持ちのみ。①も uid 無しはレーン候補にならない) ---
+  const pickCtxIn = opts.pickCtx && typeof opts.pickCtx === 'object' ? opts.pickCtx : {};
+  const entryModel = { userId: uid, nickname: rawName, avatarUrl };
+  /** @type {ReturnType<typeof buildStoryUserLaneCandidateRow>} */
+  let row = null;
+  if (uid) {
+    try {
+      row = buildStoryUserLaneCandidateRow(
+        entryModel,
+        entryIndex,
+        // ①の storyGrowthAvatarSrcCandidate 相当。会場は popup 固有 state(watchMeta/own判定/
+        //   remembered)を持たないため snapshot=null/own=false/remembered='' で渡す
+        //   =avatar 取り違えガードだけ①と同じ経路を通す(enrich 済み participant.avatar が入力)。
+        resolveStoryLaneAvatarSrc(entryModel, { snapshot: null, isOwnPosted: false, rememberedAvatar: '' }),
+        {
+          yukkuriSrc: String(pickCtxIn.yukkuriSrc || ''),
+          tvSrc: String(pickCtxIn.tvSrc || NICONICO_OFFICIAL_DEFAULT_USERICON_HTTPS),
+          anonymousIdenticonEnabled: pickCtxIn.anonymousIdenticonEnabled !== false,
+          // ①の getCachedAnonymousIdenticonDataUrl と同条件(匿名系IDのみ生成)。
+          anonymousIdenticonDataUrl: isAnonymousStyleNicoUserId(uid) ? anonymousIdenticonDataUrl(uid) : ''
+        }
+      );
+    } catch {
+      row = null; // 導出失敗でも席は落とさない(会場は「全員着席」哲学)
+    }
+  }
+  const httpForLane = row ? String(row.httpForLane || '') : '';
+  const displaySrc = row
+    ? row.displaySrc
+    : uid
+      ? anonymousIdenticonDataUrl(uid, 64)
+      : anonymousIdenticonDataUrl(key || fallbackLabel, 64);
+  // 旧式の推測URL(deriveNicoUserIconUrl)は displaySrc からは撤去。VIP判定(金縁の顔ぶれ)と
+  //   委譲失敗時の thumbScore だけ旧式のまま=このpatchの挙動変更を displaySrc に閉じる。
+  const legacyHttpAvatar = avatarUrl || deriveNicoUserIconUrl(uid);
+  const legacyTierName = supportGridDisplayTier({
     userId: uid,
     nickname: rawName,
-    httpAvatarCandidate: httpAvatar,
+    httpAvatarCandidate: legacyHttpAvatar,
     storedAvatarUrl: avatarUrl,
     avatarObserved: false
   });
-  const meta = storyUserLaneMetaLines(
-    { userId: uid, nickname: rawName },
-    httpAvatar,
-    key
-  );
+  const meta = storyUserLaneMetaLines({ userId: uid, nickname: rawName }, httpForLane, key);
   const speakerKey = uid ? `u:${uid}` : rawName ? `n:${rawName}` : '';
 
   return {
-    entryIndex: Number.isFinite(Number(participant.lastAt))
-      ? Math.max(0, Math.floor(Number(participant.lastAt)))
-      : seatIndex,
-    profileTier: TIER_PROFILE[tierName] || 1,
-    thumbScore: userLaneResolvedThumbScore(uid, httpAvatar),
+    entryIndex,
+    profileTier: row ? row.profileTier : TIER_PROFILE[legacyTierName] || 1,
+    thumbScore: row ? row.thumbScore : userLaneResolvedThumbScore(uid, legacyHttpAvatar),
     displaySrc,
     title: displayName,
     entry: { userId: uid },
@@ -80,7 +128,7 @@ export function venueSeatEntryToLaneItem(seatEntry, opts = {}) {
     _venueSeatIndex: seatIndex,
     _venueParticipantKey: key,
     _venueRank: Math.max(0, Math.floor(Number(seatEntry.venueRank) || 0)),
-    _venueIsVip: Boolean(httpAvatar),
+    _venueIsVip: Boolean(legacyHttpAvatar),
     _venueSpeakerKey: speakerKey,
     _venueAvatarUrl: avatarUrl,
     _venueRawName: rawName
@@ -89,7 +137,7 @@ export function venueSeatEntryToLaneItem(seatEntry, opts = {}) {
 
 /**
  * @param {Array<{ seatIndex?: number, participant?: object, venueRank?: number }>} seatEntries
- * @param {{ maxTotal?: number }} [opts]
+ * @param {{ maxTotal?: number, pickCtx?: { yukkuriSrc?: string, tvSrc?: string, anonymousIdenticonEnabled?: boolean } }} [opts]
  * @returns {{ link: any[], gift: any[], ad: any[], konta: any[], tanu: any[] }}
  */
 export function bucketVenueLaneSeats(seatEntries, opts = {}) {
@@ -98,7 +146,7 @@ export function bucketVenueLaneSeats(seatEntries, opts = {}) {
     ? Math.max(0, Math.floor(Number(opts.maxTotal)))
     : list.length;
   const candidates = list
-    .map((entry) => venueSeatEntryToLaneItem(entry))
+    .map((entry) => venueSeatEntryToLaneItem(entry, { pickCtx: opts.pickCtx }))
     .filter(Boolean)
     .sort(compareStoryUserLaneCandidates);
   const b = bucketStoryUserLanePicks(candidates, maxTotal);
