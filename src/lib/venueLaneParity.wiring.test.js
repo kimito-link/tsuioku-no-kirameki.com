@@ -111,4 +111,19 @@ describe('会場=①レーン鏡映の配線(配線忘れ=CI赤)', () => {
     expect(seatsDiagSrc).toMatch(/blankAnon/);
     expect(seatsDiagSrc).toMatch(/probeFail/);
   });
+
+  // --- v0.1.1117/1118 白円根治(導出委譲+鏡enrich)の配線 ---
+  it('会場の displaySrc 導出は①正本(buildStoryUserLaneCandidateRow)へ委譲されている(P3)', () => {
+    const bucketsSrc = read('src/lib/venueLaneBuckets.js');
+    expect(bucketsSrc).toMatch(/buildStoryUserLaneCandidateRow\(/);
+    expect(bucketsSrc).toMatch(/resolveStoryLaneAvatarSrc\(/);
+    // トップバーも第2導出でなく venueSeatEntryToLaneItem 一本(正本1つ)。
+    expect(venueBarSrc).toMatch(/venueSeatEntryToLaneItem\(\s*\{ seatIndex: 0, participant/);
+    expect(venueBarSrc).toMatch(/pickCtx: venueLanePickCtx/);
+  });
+
+  it('commitDisplay 関所が鏡enrich(P4)を profile 補強の後段に通している', () => {
+    expect(venueBarSrc).toMatch(/enrichVenueRowsWithMirrorAvatars\(\s*enrichVenueRowsWithProfileAvatars\(/);
+    expect(venueBarSrc).toMatch(/buildVenueMirrorAvatarMap\(/);
+  });
 });

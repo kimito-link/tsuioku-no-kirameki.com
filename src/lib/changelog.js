@@ -26,6 +26,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1118',
+    date: '2026-07-10',
+    summary: 'feat(venue): ①が解決済みの顔を会場にも共有',
+    items: Object.freeze([
+      '応援レーン(①)が既に解決した個人サムネのURLを、会場の座席・ロビー・応援者トップバーにもそのまま使うようにしました。①には顔が出ているのに会場では出ていない、という食い違いが減ります。',
+      '共有するのは「本人の個人サムネと確認できたURL」だけです。会場側で既により良い顔が出ている場合は上書きしません。追加のデータ読み込みはゼロ(①が画面共有用に出している鏡データを再利用)です。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1117',
     date: '2026-07-10',
     summary: 'fix(venue): 会場の白円サムネを根治=①と同じ顔規則',
