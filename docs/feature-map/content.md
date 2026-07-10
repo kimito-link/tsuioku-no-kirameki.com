@@ -13,7 +13,12 @@
 ```mermaid
 graph LR
   n_content["記録エンジン(watchページ常駐)"]
+  n_content --> n_src_domain_lane_columns_kontaPolicy_js["domain/lane/columns/kontaPolicy.js"]:::shared
+  n_content --> n_src_domain_lane_columns_linkPolicy_js["domain/lane/columns/linkPolicy.js"]:::shared
+  n_content --> n_src_domain_lane_columns_tanuPolicy_js["domain/lane/columns/tanuPolicy.js"]:::shared
+  n_content --> n_src_domain_lane_tier_js["domain/lane/tier.js"]:::shared
   n_content --> n_src_domain_user_identity_js["domain/user/identity.js"]:::shared
+  n_content --> n_src_domain_user_nickname_js["domain/user/nickname.js"]:::shared
   n_content --> n_src_extension_story_renderStoryUserLaneDom_js["extension/story/renderStoryUserLaneDom.js"]:::shared
   n_content --> n_src_extension_venueBar_js["extension/venueBar.js"]:::shared
   n_content --> n_src_lib_anonymousIdenticon_js["lib/anonymousIdenticon.js"]:::shared
@@ -48,12 +53,7 @@ graph LR
   n_content --> n_src_lib_channelBroadcasterMeta_js["lib/channelBroadcasterMeta.js"]
   n_content --> n_src_lib_channelSwitchDiag_js["lib/channelSwitchDiag.js"]:::shared
   n_content --> n_src_lib_channelSwitchDiagKey_js["lib/channelSwitchDiagKey.js"]:::shared
-  n_content --> n_src_lib_cleanNdgrChatRows_js["lib/cleanNdgrChatRows.js"]
-  n_content --> n_src_lib_comeviewRows_js["lib/comeviewRows.js"]:::shared
-  n_content --> n_src_lib_commentChunkStore_js["lib/commentChunkStore.js"]:::shared
-  n_content --> n_src_lib_commentHarvest_js["lib/commentHarvest.js"]
-  n_content --> n_src_lib_commentIngestLog_js["lib/commentIngestLog.js"]:::shared
   classDef shared fill:#eee,stroke:#999,color:#666;
 ```
 
-> ほか 238 ファイル省略（全件は storage-bus.md / metafile 参照）。
+> ほか 246 ファイル省略（全件は storage-bus.md / metafile 参照）。

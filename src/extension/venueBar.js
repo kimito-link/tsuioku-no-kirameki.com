@@ -140,7 +140,7 @@ import { KEY_BGM_PHASE_DIAG } from '../lib/bgmPhaseDiagKey.js';
 // SC2(council/broadcast-scoring-SYNTHESIS.md §2.2): ハイライト台帳(実際に発火した演出だけ記録)。
 import { appendHighlight, isHighlightWorthyKind } from '../lib/highlightLedger.js';
 import { KEY_HIGHLIGHT_LEDGER } from '../lib/highlightLedgerKey.js';
-import { anonymousIdenticonDataUrl } from '../lib/anonymousIdenticon.js';
+// anonymousIdenticonDataUrl は P3(v0.1.1117)で venueLaneBuckets(①正本委譲)側へ移動=venueBar 直参照なし。
 import { tailStorageKey } from '../lib/commentTailBuffer.js';
 import { pickNewVenueSpeech, mergeSpeakersIntoVenueRows, liveFeedSpeechRows } from '../lib/venueSpeech.js';
 import { isContextInvalidatedError } from '../lib/reportSilentError.js';
@@ -191,8 +191,8 @@ import {
   isHttpOrHttpsUrl,
   NICONICO_OFFICIAL_DEFAULT_USERICON_HTTPS
 } from '../lib/supportGrowthTileSrc.js';
-import { storyUserLaneMetaLines } from '../lib/storyUserLaneMeta.js';
-import { bucketVenueLaneSeats, flattenVenueLaneBuckets } from '../lib/venueLaneBuckets.js';
+// storyUserLaneMetaLines は P3(v0.1.1117)で venueSeatEntryToLaneItem(正本)経由に一本化=venueBar 直参照なし。
+import { bucketVenueLaneSeats, flattenVenueLaneBuckets, venueSeatEntryToLaneItem } from '../lib/venueLaneBuckets.js';
 import {
   paintStoryUserLaneDomFilled,
   resetStoryUserLaneDom
@@ -354,6 +354,18 @@ function resolveVenueAssetUrl(rel) {
 }
 
 /**
+ * v0.1.1117 白円根治(P3): ①の lanePickCtx(popup-entry.js:6524-6528)と同じ意味の資産を会場側で解決。
+ *   yukkuriSrc=①の STORY_GRID_DEFAULT_TILE_IMG と同一アセット / tvSrc=①の
+ *   STORY_REMOTE_FAILED_PLACEHOLDER_IMG(=blank.jpg)と同値。venueSeatEntryToLaneItem 経由で
+ *   ①正本の displaySrc 導出(buildStoryUserLaneCandidateRow)に渡る。
+ */
+const venueLanePickCtx = {
+  yukkuriSrc: resolveVenueAssetUrl(STORY_GUIDE_FACE_LINK),
+  tvSrc: NICONICO_OFFICIAL_DEFAULT_USERICON_HTTPS,
+  anonymousIdenticonEnabled: true
+};
+
+/**
  * 会場の participant から人物タイル要素(buildPersonTileEl)を作る共通ヘルパ。
  *
  * 席ループと「応援者トップNバー」で【同じ描画】を使うために切り出した(2026-07-01 会議
@@ -366,18 +378,26 @@ function resolveVenueAssetUrl(rel) {
  * @returns {HTMLElement}
  */
 function buildVenuePersonTile(participant, fallbackLabel = '会場') {
-  const p = participant && typeof participant === 'object' ? participant : {};
-  const uid = String(p.userId || '').trim();
-  const rawName = String(p.name || '').trim();
-  const displayName =
-    rawName || (uid ? anonymousDisplayLabel(uid) : anonymousDisplayLabel(String(p.key || fallbackLabel)));
-  const avatarUrl = String(p.avatar || '').trim();
-  const derivedAvatar = deriveNicoUserIconUrl(uid);
-  const yukkuriFace = uid ? anonymousIdenticonDataUrl(uid, 64) : '';
-  const avatarSrc = avatarUrl || derivedAvatar || yukkuriFace;
-  const meta = storyUserLaneMetaLines({ userId: uid, nickname: rawName }, avatarUrl, '');
+  // v0.1.1117 白円根治(P3): トップバー独自の第2導出(推測URL直入れ=白円の同型)を削除し、
+  //   席と同じ venueSeatEntryToLaneItem(=①正本 buildStoryUserLaneCandidateRow へ委譲)一本に統一。
+  const item = venueSeatEntryToLaneItem(
+    { seatIndex: 0, participant: /** @type {any} */ (participant) },
+    { fallbackLabel, pickCtx: venueLanePickCtx }
+  );
+  if (item) {
+    return buildPersonTileEl(
+      { displaySrc: item.displaySrc, title: item.title, meta: item.meta, entry: item.entry },
+      venuePersonTileIo
+    );
+  }
+  // participant 不正(uid も key も無い)時の最終フォールバック=旧実装と同じく描画は止めない。
   return buildPersonTileEl(
-    { displaySrc: avatarSrc, title: displayName, meta, entry: { userId: uid } },
+    {
+      displaySrc: '',
+      title: anonymousDisplayLabel(String(fallbackLabel)),
+      meta: { idLine: '', nameLine: '' },
+      entry: { userId: '' }
+    },
     venuePersonTileIo
   );
 }
@@ -4115,7 +4135,11 @@ export function mountVenueBarButton(options = {}) {
     // v0.1.1111 会場=①レーン鏡映: 段割当の正本を選ぶ。鏡を使った供給(laneMirrorPaintSnap)なら
     //   P層=鏡の5段そのまま(集合も順序も①と同一・広告/ギフト段も鏡から出る=未配線の欠落が直る)
     //   +T/X層=鏡外メンバー(既存bucketの出力)を段末尾へ。鏡なしなら従来どおり(fallback)。
-    const fallbackLaneBuckets = bucketVenueLaneSeats(visibleSeats, { maxTotal: visibleSeats.length });
+    const fallbackLaneBuckets = bucketVenueLaneSeats(visibleSeats, {
+      maxTotal: visibleSeats.length,
+      // v0.1.1117 白円根治(P3): ①と同じ資産で displaySrc を導出(委譲先は venueLaneBuckets)。
+      pickCtx: venueLanePickCtx
+    });
     const lanePaintSnap = laneMirrorPaintSnap;
     const laneWallNow = Date.now();
     const laneTransientKeys = currentVenueTransientKeys(laneWallNow);
