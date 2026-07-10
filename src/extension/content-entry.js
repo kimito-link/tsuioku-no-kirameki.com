@@ -319,6 +319,8 @@ import {
 import {
   recordInlineHostMove,
   recordInlineHostDuplicateSeen,
+  recordInlineHostMoveVenueSkip,
+  shouldSkipInlineHostMoveForVenue,
   summarizeInlineHostMoveDiag
 } from '../lib/inlineHostMoveProbe.js';
 import { probeWatchPageDomStructure } from '../lib/probeWatchPageDomStructure.js';
@@ -2760,6 +2762,27 @@ function noteInlineHostMove(reason, host) {
   }
 }
 
+/**
+ * v0.1.1128 根治(3-B): 会場open中の host DOM 移設を凍結するか(実測: 会場開=276リロードの点滅根治)。
+ * 3条件AND(venueOpen+接続済み+iframe持ち)の判定は純関数 shouldSkipInlineHostMoveForVenue に委譲。
+ * skip したら venueSkipCount 計器に記録(状態速報の hostMoveDiag に出る)。
+ * @param {HTMLElement|null} host
+ * @returns {boolean} true=移設しない
+ */
+function shouldSkipHostMoveForVenueNow(host) {
+  try {
+    const skip = shouldSkipInlineHostMoveForVenue({
+      venueOpen: document.documentElement.classList.contains('nlsb-venue-open'),
+      hostConnected: Boolean(host && host.isConnected),
+      hostHasIframe: Boolean(host && host.querySelector(`#${INLINE_POPUP_IFRAME_ID}`))
+    });
+    if (skip) recordInlineHostMoveVenueSkip(_inlineHostMoveState);
+    return skip;
+  } catch {
+    return false; // 判定に失敗したら従来どおり移設(fail-open=①の描画を止めない)
+  }
+}
+
 /** getElementById はツリー未接続ノードに効かないため、ホストは参照を保持する */
 /** @type {HTMLDivElement|null} */
 let nlsInlinePopupHostSingleton = null;
@@ -3972,7 +3995,7 @@ function renderInlinePanelFloatingHost() {
   const maxH = Math.min(Math.round(vh * 0.92), 900);
   const iframeH = Math.min(580, Math.round(vh * 0.78));
 
-  if (host.parentNode !== document.body) {
+  if (host.parentNode !== document.body && !shouldSkipHostMoveForVenueNow(host)) {
     noteInlineHostMove('floating_body', host);
     document.body.appendChild(host);
   }
@@ -4123,7 +4146,7 @@ function renderInlinePanelDockBottomHost() {
   const iframeInnerH = sizing.height;
   const hostMaxH = iframeInnerH + 16; // 上下の余白
 
-  if (host.parentNode !== document.body) {
+  if (host.parentNode !== document.body && !shouldSkipHostMoveForVenueNow(host)) {
     noteInlineHostMove('dock_body', host);
     document.body.appendChild(host);
   }
@@ -5270,13 +5293,14 @@ function renderInlineHostAnchoredToVideo(video) {
     viewport
   });
   if (hostAttachFallbackBody) {
-    if (host.parentNode !== hostParent) {
+    if (host.parentNode !== hostParent && !shouldSkipHostMoveForVenueNow(host)) {
       noteInlineHostMove('anchored_video_fallback_body', host);
       hostParent.appendChild(host);
     }
   } else {
     if (
-      !inlinePopupHostIsCorrectlyPlaced(host, hostParent, insertAfter)
+      !inlinePopupHostIsCorrectlyPlaced(host, hostParent, insertAfter) &&
+      !shouldSkipHostMoveForVenueNow(host)
     ) {
       noteInlineHostMove('anchored_video', host);
       insertAfter.insertAdjacentElement('afterend', host);
@@ -5450,13 +5474,14 @@ function renderInlinePopupHost(target) {
   });
 
   if (hostAttachFallbackBody) {
-    if (host.parentNode !== hostParent) {
+    if (host.parentNode !== hostParent && !shouldSkipHostMoveForVenueNow(host)) {
       noteInlineHostMove('nonvideo_fallback_body', host);
       hostParent.appendChild(host);
     }
   } else {
     if (
-      !inlinePopupHostIsCorrectlyPlaced(host, hostParent, insertAfter)
+      !inlinePopupHostIsCorrectlyPlaced(host, hostParent, insertAfter) &&
+      !shouldSkipHostMoveForVenueNow(host)
     ) {
       noteInlineHostMove('nonvideo_anchor', host);
       insertAfter.insertAdjacentElement('afterend', host);
@@ -7323,8 +7348,15 @@ function renderPageFrameOverlay() {
      * floating 表示契約（E2E inline-panel-align）を壊す。
      * 「意図した配置が floating or dock_bottom のとき」はフォールバックを skip する。
      */
+    /*
+     * v0.1.1128 根治(3-B): 会場open中は「見えない」が意図した状態(venueBarの遮蔽CSS=visibility:hidden)。
+     * ここで dock 退避すると次 tick の anchored 復帰と無限ピンポンになり、移設のたびに iframe が
+     * リロード=点滅(実測: 会場開1回で reloadCount=276/venueOpenMoves=275・v0.1.1125計器)。
+     * 会場open中はこのフォールバック自体を発火させない(閉じれば従来どおり)。
+     */
     if (
       !inlineHostLooksVisible() &&
+      !document.documentElement.classList.contains('nlsb-venue-open') &&
       effPlacement !== INLINE_PANEL_PLACEMENT_FLOATING &&
       effPlacement !== INLINE_PANEL_PLACEMENT_DOCK_BOTTOM
     ) {

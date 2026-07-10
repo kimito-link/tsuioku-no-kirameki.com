@@ -64,6 +64,21 @@ describe('inlineHostMoveProbe(v0.1.1124)の配線', () => {
     expect(src).toMatch(/recordInlineHostDuplicateSeen\(_inlineHostMoveState, hosts\.length\)/);
   });
 
+  it('★会場凍結(v0.1.1128 3-B): 移設6箇所すべてに shouldSkipHostMoveForVenueNow ガードがある', () => {
+    // 実測(2026-07-11): 会場open中に anchored_video⇄dock_body の往復移設で reloadCount=276=点滅。
+    //   6箇所のどれか1つでもガード無しだと、その経路がピンポンの再発点になる。
+    const guarded = (src.match(/!shouldSkipHostMoveForVenueNow\(host\)/g) || []).length;
+    expect(guarded).toBe(6); // floating_body/dock_body/anchored_video(+fallback)/nonvideo_anchor(+fallback)
+  });
+
+  it('★会場凍結: 不可視→dock退避フォールバックが会場open中は発火しない(ピンポンの発火点)', () => {
+    // renderPageFrameOverlay の「inlineHostLooksVisible()=false なら dock へ」は、会場遮蔽
+    //   (visibility:hidden)の意図した不可視を「異常」と誤認してピンポンを起動していた張本人。
+    expect(src).toMatch(
+      /!inlineHostLooksVisible\(\) &&\s*\n\s*!document\.documentElement\.classList\.contains\('nlsb-venue-open'\)/
+    );
+  });
+
   it('venueOpen 判定は venueBar.js と同一 literal(文字列契約=driftをCIで止める)', () => {
     const venueBarSrc = readFileSync(path.join(repoRoot, 'src/extension/venueBar.js'), 'utf8');
     expect(src).toContain("classList.contains('nlsb-venue-open')");
