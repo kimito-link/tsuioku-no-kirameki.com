@@ -173,3 +173,42 @@ describe('venueSeatIndexByUid', () => {
     expect(map.size).toBe(2);
   });
 });
+
+describe('composeVenueLaneBuckets の fallbackLobby 合流(v0.1.1122)', () => {
+  const mirrorBuckets = restoreLaneMirrorBuckets(makeSnap());
+  const seatIndexByUid = new Map([['10', 0], ['20', 3]]);
+  const anon = (uid, seatIndex) => ({
+    entry: { userId: uid }, meta: { idLine: uid }, title: '', displaySrc: 'data:image/svg+xml;x', _venueSeatIndex: seatIndex
+  });
+
+  it('fallbackLobby(匿名分割)は鏡在籍者を除いてロビーへ合流(dedupe=二重在籍🔴の予防)', () => {
+    const out = composeVenueLaneBuckets({
+      mirrorBuckets,
+      fallbackBuckets: { link: [], gift: [], ad: [], konta: [], tanu: [] },
+      fallbackLobby: [anon('a:new-1', 5), anon('10', 0)], // '10' は鏡在籍=落とす
+      seatIndexByUid,
+      transientKeys: new Set(['u:a:new-1'])
+    });
+    expect(out.lobby.map((i) => i.entry.userId)).toEqual(['a:new-1']);
+    expect(out.lobby[0]._venueTail).toBe(true);
+    expect(out.lobby[0]._venueTransient).toBe(true);
+    expect(out.lobby[0]._venueSeatIndex).toBe(5); // 席indexは保持(座標系無傷)
+  });
+
+  it('mirror時の lobby 集合は従来(fallback.tanu経由)と完全等値=分割は集合を変えない', () => {
+    const viaTanu = composeVenueLaneBuckets({
+      mirrorBuckets,
+      fallbackBuckets: { link: [], gift: [], ad: [], konta: [], tanu: [anon('a:z', 9)] },
+      seatIndexByUid
+    });
+    const viaLobby = composeVenueLaneBuckets({
+      mirrorBuckets,
+      fallbackBuckets: { link: [], gift: [], ad: [], konta: [], tanu: [] },
+      fallbackLobby: [anon('a:z', 9)],
+      seatIndexByUid
+    });
+    expect(new Set(viaLobby.lobby.map((i) => i.entry.userId))).toEqual(
+      new Set(viaTanu.lobby.map((i) => i.entry.userId))
+    );
+  });
+});

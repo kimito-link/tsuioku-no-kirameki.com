@@ -136,9 +136,14 @@ export function venueSeatEntryToLaneItem(seatEntry, opts = {}) {
 }
 
 /**
+ * v0.1.1122(B・reference_venue_cleanup_SYNTHESIS.md §C-2): anonymousToLobby=true で
+ *   匿名系ID(a:等)と uid 無しを段でなく lobby へ分割する(fallback=鏡不可時の「匿名の壁」根治)。
+ *   境界は【ID種別のみ】で機械判定(表示名は使わない=enrich後着で籍が揺れる churn 源を作らない)。
+ *   opt 無し(省略)は従来どおり全員が段=完全互換(lobby は常に [] で返る)。
+ *
  * @param {Array<{ seatIndex?: number, participant?: object, venueRank?: number }>} seatEntries
- * @param {{ maxTotal?: number, pickCtx?: { yukkuriSrc?: string, tvSrc?: string, anonymousIdenticonEnabled?: boolean } }} [opts]
- * @returns {{ link: any[], gift: any[], ad: any[], konta: any[], tanu: any[] }}
+ * @param {{ maxTotal?: number, anonymousToLobby?: boolean, pickCtx?: { yukkuriSrc?: string, tvSrc?: string, anonymousIdenticonEnabled?: boolean } }} [opts]
+ * @returns {{ link: any[], gift: any[], ad: any[], konta: any[], tanu: any[], lobby: any[] }}
  */
 export function bucketVenueLaneSeats(seatEntries, opts = {}) {
   const list = Array.isArray(seatEntries) ? seatEntries : [];
@@ -149,8 +154,17 @@ export function bucketVenueLaneSeats(seatEntries, opts = {}) {
     .map((entry) => venueSeatEntryToLaneItem(entry, { pickCtx: opts.pickCtx }))
     .filter(Boolean)
     .sort(compareStoryUserLaneCandidates);
-  const b = bucketStoryUserLanePicks(candidates, maxTotal);
-  return { link: b.link, gift: [], ad: [], konta: b.konta, tanu: b.tanu };
+  const splitAnon = opts.anonymousToLobby === true;
+  /** @param {any} it */
+  const isLobbyBound = (it) => {
+    const uid = String(it?.entry?.userId || '').trim();
+    return uid === '' || isAnonymousStyleNicoUserId(uid);
+  };
+  const laneCands = splitAnon ? candidates.filter((it) => !isLobbyBound(it)) : candidates;
+  const lobby = splitAnon ? candidates.filter(isLobbyBound) : [];
+  // maxTotal は段側のみに効く(ロビーは「全員見られる」の受け皿=切らない)。
+  const b = bucketStoryUserLanePicks(laneCands, maxTotal);
+  return { link: b.link, gift: [], ad: [], konta: b.konta, tanu: b.tanu, lobby };
 }
 
 /**

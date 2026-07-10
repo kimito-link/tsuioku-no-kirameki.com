@@ -56,8 +56,15 @@ describe('会場=①レーン鏡映の配線(配線忘れ=CI赤)', () => {
 
   // --- v0.1.1112 厳密完全一致(ロビー隔離)の配線 ---
   it('venueBar がロビー(paintVenueLobby)を描き、lobby を parity へ渡している', () => {
-    expect(venueBarSrc).toMatch(/paintVenueLobby\(lobbyItems\)/);
+    expect(venueBarSrc).toMatch(/paintVenueLobby\(lobbyItems, \{ mirror: Boolean\(laneComposed\) \}\)/);
     expect(venueBarSrc).toMatch(/lobby: lobbyItems\.map\(/);
+  });
+
+  // --- v0.1.1122 fallback 匿名ロビー隔離の配線 ---
+  it('fallback でも匿名系はロビーへ(anonymousToLobby)+compose へ fallbackLobby が渡る', () => {
+    expect(venueBarSrc).toMatch(/anonymousToLobby: true/);
+    expect(venueBarSrc).toMatch(/fallbackLobby: fallbackLaneBuckets\.lobby/);
+    expect(venueBarSrc).toMatch(/laneComposed\.lobby : \(fallbackLaneBuckets\.lobby \|\| \[\]\)/);
   });
 
   it('席装飾ループが段+ロビーの合成列を回す(L17=ロビー席の装飾取り残し防止)', () => {
