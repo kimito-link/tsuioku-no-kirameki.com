@@ -7484,6 +7484,11 @@ function renderStoryAvatarDiag() {
     }
   }
   storyAvatarDiagLastRenderSig = combinedSig;
+  const lid = String(STORY_SOURCE_STATE.liveId || '').trim().toLowerCase();
+  if (lid) {
+    const now = Date.now();
+    mergeAndScheduleFlush('storyDiag', { ...STORY_AVATAR_DIAG_STATE, liveId: lid, capturedAt: now }, lid, now);
+  }
 }
 
 function resetStoryAvatarDiagState() {

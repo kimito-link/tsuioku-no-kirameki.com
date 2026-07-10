@@ -21,6 +21,8 @@ function makeFullPayload() {
       // v0.1.1125: ちかちか調査の計器2つ(lite に通らないと状態速報のコピペで読めない)。
       hostMoveDiag: { moveCount: 5, reloadCount: 2, duplicateSeen: 1, byReason: { anchored_video: 3 } },
       scrollWhiteoutDiag: { whiteoutCount: 4, lastWhiteoutAgoMs: 1200, samples: [] },
+      // v0.1.1126: 会場の①診断鏡計器。lite に通らないと診断 JSON コピーから漏れる。
+      venueSeatsDiag: { storyDiagMirror: { present: true, ageSec: 4 }, noisy: new Array(20).fill('ignored') },
       ndgrUnknownSamples: { 'msg:2': new Array(3).fill({ hexPreview: 'deadbeef' }) },
       eventDomBundleSummary: { hasBundle: true, programStats: { commentCount: 17733 } },
       longTasks: { maxMs: 262, recent: new Array(8).fill({ durationMs: 100 }) }
@@ -65,10 +67,12 @@ describe('buildStatusFastDiagLite', () => {
       moveCount: 5, reloadCount: 2, duplicateSeen: 1, byReason: { anchored_video: 3 }
     });
     expect(lite.content.scrollWhiteoutDiag).toEqual({ whiteoutCount: 4, lastWhiteoutAgoMs: 1200, samples: [] });
+    expect(lite.content.venueSeatsDiag).toEqual({ storyDiagMirror: { present: true, ageSec: 4 } });
     // 無ければ null(死に表示にしない)
     const empty = buildStatusFastDiagLite({ content: {} });
     expect(empty.content.hostMoveDiag).toBeNull();
     expect(empty.content.scrollWhiteoutDiag).toBeNull();
+    expect(empty.content.venueSeatsDiag).toBeNull();
   });
 
   it('status が読まない巨大フィールドは含まない(肥大の元を落とす)', () => {

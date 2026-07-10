@@ -87,6 +87,21 @@ export function buildStatusFastDiagLite(payload) {
     content.scrollWhiteoutDiag && typeof content.scrollWhiteoutDiag === 'object'
       ? content.scrollWhiteoutDiag
       : null;
+  const venueSeatsDiag = content.venueSeatsDiag && typeof content.venueSeatsDiag === 'object'
+    ? content.venueSeatsDiag
+    : null;
+  const sdm = venueSeatsDiag && venueSeatsDiag.storyDiagMirror && typeof venueSeatsDiag.storyDiagMirror === 'object'
+    ? venueSeatsDiag.storyDiagMirror
+    : null;
+  const sdmAge = Number(sdm?.ageSec);
+  const venueSeatsDiagLite = sdm
+    ? {
+        storyDiagMirror: {
+          present: sdm.present === true,
+          ageSec: sdm.present === true && Number.isFinite(sdmAge) ? Math.max(0, Math.floor(sdmAge)) : null
+        }
+      }
+    : null;
 
   // ★読み取りパスを full と同形に保つ(status の consumer を書き換えないため):
   //   lite.content.giftDiagnostics['北極星レーン']
@@ -106,7 +121,8 @@ export function buildStatusFastDiagLite(payload) {
         ndgrConnectStatus: String(net.ndgrConnectStatus || '')
       },
       hostMoveDiag,
-      scrollWhiteoutDiag
+      scrollWhiteoutDiag,
+      venueSeatsDiag: venueSeatsDiagLite
     }
   };
 }
