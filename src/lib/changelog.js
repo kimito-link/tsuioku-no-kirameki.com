@@ -26,6 +26,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1127',
+    date: '2026-07-11',
+    summary: 'feat(venue): 会場ガイド帯を①一致で復活',
+    items: Object.freeze([
+      'v0.1.1120 で除去した会場のキャラ案内帯・フッターを①との完全一致のため意図的に復活(定数 VENUE_LANE_GUIDES_EXACT_COPY 1行で元に戻せます)・実機レビューで判断してください',
+      '会場が①の鏡を使っているときだけ、フッター件数も①が描いた pickedLength/totalCandidates をそのまま使います。①と同期できない fallback では従来どおり会場側の参加者数を使い、ガイド帯は出しません。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1126',
     date: '2026-07-10',
     summary: 'feat(venue): 会場に①の詳しい状況を転写',
