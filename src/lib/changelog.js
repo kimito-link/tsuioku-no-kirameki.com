@@ -26,6 +26,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1121',
+    date: '2026-07-10',
+    summary: 'fix(venue): 白い大パネルを解消=カード背景を行単位に',
+    items: Object.freeze([
+      '前バージョンで会場の段エリア全体に敷いていた白いカード背景をやめ、応援者のタイルが実際に並んでいる行だけに敷くようにしました。画面下半分が白い大パネルで占有される状態が解消し、配信画面がちゃんと見えます。',
+      'タイルの背後だけは不透明のままなので、顔の中に背景が透けて見づらくなることはありません。空の段は行ごと畳まれるため白い帯自体が出ません。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1120',
     date: '2026-07-10',
     summary: 'feat(venue): 会場から案内バナー等の文章を除去',

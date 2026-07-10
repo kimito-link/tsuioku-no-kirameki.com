@@ -1672,13 +1672,23 @@ const VENUE_CSS = `
     animation: none;
     z-index: auto;
   }
-  /* 段とロビーの帯に①と同じカードsurfaceを敷く=背後のwatch画面/コメント欄が段の中に透けない。
-     中央の映像は覆わない(帯は段の実高さぶんだけ・全面スモークは今後も導入しない)。 */
-  .nlsb-venue-lane-stack.nl-story-userlane-stack {
+  /* v0.1.1121 surface行単位化(C): v0.1.1119 の stack 全面surfaceは、ガイド/空文込みの下端55vh
+     バンド全体を白い大パネルにして画面下半分を占有した(実機で確認)。surfaceは【実在タイルの行
+     (.nl-story-userlane)だけ】に敷く=透け防止(タイル背後)と「画面を占有しない」を粒度で両立。
+     空の段は hidden(display:none)なので白帯自体が存在しない。①と同じ不透明(半透明は棄却=
+     透け防止の毀損+①との見た目差の再導入)。 */
+  .nlsb-venue-lane-stack .nl-story-userlane {
     background: var(--nl-surface);
     border: 1px solid var(--nl-border);
     border-radius: 10px;
-    padding: 8px;
+    padding: 6px;
+  }
+  /* gift/ad 段は wrap 自体が金色surface(--gift ルール)を既に持つ=行に重ねるとカードの入れ子に
+     なるため除外。 */
+  .nlsb-venue-lane-stack .nl-story-userlane-tier-wrap--gift .nl-story-userlane {
+    background: none;
+    border: none;
+    padding: 0;
   }
   .nlsb-lobby {
     background: var(--nl-surface);
