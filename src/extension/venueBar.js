@@ -161,6 +161,7 @@ import { buildVenueMirrorAvatarMap, enrichVenueRowsWithMirrorAvatars } from '../
 // v0.1.1111 会場=①レーン鏡映(メンバー完全一致): ①の実paint鏡(KEY_LANE_MIRROR)を会場の正本に昇格。
 //   設計正本=memory/reference_pop_venue_parity_SYNTHESIS.md(P層=鏡そのまま/T層=cap溢れの尾/X層=直近発言者)。
 import { KEY_LANE_MIRROR } from '../lib/laneMirrorKey.js';
+import { KEY_STORY_DIAG_MIRROR } from '../lib/storyDiagMirrorKey.js';
 import { restoreLaneMirrorBuckets } from '../lib/laneMirror.js';
 import {
   composeVenueLaneBuckets,
@@ -202,6 +203,7 @@ import {
 // v0.1.902: 会場座席の健全度を健全度パネルに載せる(配信者混入・固着を AI/人間が一目で発見)。
 import { KEY_VENUE_SEATS_DIAG } from '../lib/venueSeatsDiagKey.js';
 import { buildVenueSeatsDiagSnapshot } from '../lib/venueSeatsDiag.js';
+import { renderVenueStoryDiagMirrorPanel, storyDiagMirrorStatus } from '../lib/venueStoryDiagMirrorPanel.js';
 import {
   computeVenueParticipantAvatarCounts,
   venueDiagSig,
@@ -1194,6 +1196,64 @@ const VENUE_CSS = `
     font-weight: 800;
   }
   /* LANE_CSS_SYNC_END */
+  .nlsb-story-diag {
+    margin: 8px 0 10px;
+    padding: 8px 10px 10px;
+    border: 1px solid color-mix(in srgb, var(--nl-border) 74%, transparent);
+    border-radius: 10px;
+    background: color-mix(in srgb, var(--nl-surface) 94%, #f4fbff 6%);
+    color: var(--nl-text-sub);
+    font-size: 11px;
+    line-height: 1.45;
+  }
+  .nlsb-story-diag__head {
+    margin: 0 0 6px;
+    color: var(--nl-text);
+    font-size: 11px;
+    font-weight: 800;
+  }
+  .nlsb-story-diag .nl-story-diag__lead {
+    margin: 0 0 6px;
+  }
+  .nlsb-story-diag .nl-story-diag__lead strong {
+    color: var(--nl-text);
+    font-weight: 800;
+  }
+  .nlsb-story-diag .nl-story-diag__more {
+    margin: 0;
+    padding: 4px 8px 6px;
+    border: 1px solid color-mix(in srgb, var(--nl-border) 80%, transparent);
+    border-radius: 8px;
+    background: color-mix(in srgb, var(--nl-surface) 92%, transparent);
+  }
+  .nlsb-story-diag .nl-story-diag__summary {
+    cursor: pointer;
+    color: var(--nl-muted);
+    font-size: 10px;
+    font-weight: 700;
+    list-style-position: outside;
+  }
+  .nlsb-story-diag .nl-story-diag__body {
+    margin-top: 6px;
+    padding-top: 6px;
+    border-top: 1px solid color-mix(in srgb, var(--nl-border) 65%, transparent);
+    color: var(--nl-muted);
+    font-size: 10px;
+    line-height: 1.4;
+  }
+  .nlsb-story-diag .nl-story-diag__list {
+    margin: 0 0 6px;
+    padding-left: 1.1em;
+  }
+  .nlsb-story-diag .nl-story-diag__list li {
+    margin-bottom: 4px;
+  }
+  .nlsb-story-diag .nl-story-diag__technical {
+    margin: 0;
+    color: var(--nl-text-sub);
+    font-size: 10px;
+    overflow-wrap: anywhere;
+  }
   /* v0.1.1112 厳密完全一致(ロビー隔離): ①のcap外+直近発言者の待機エリア。段(鏡=①と厳密同一)とは
      点線と薄めのトーンで視覚的に区別しつつ、タイル部品は同じ=「同じ人が待っている」と読ませる。 */
   .nlsb-lobby {
@@ -2066,6 +2126,10 @@ export function mountVenueBarButton(options = {}) {
     faceTanu: resolveVenueAssetUrl(STORY_GUIDE_FACE_TANU)
   };
   seatsHost.appendChild(venueLaneEls.stack);
+  const storyDiagHost = document.createElement('div');
+  storyDiagHost.className = 'nlsb-story-diag';
+  storyDiagHost.hidden = true;
+  seatsHost.appendChild(storyDiagHost);
   // v0.1.1112 厳密完全一致(ロビー隔離・reference_pop_venue_exact_SYNTHESIS.md §B-3):
   //   ①のcap外(尾)+直近発言者(暫定)は段でなくここに座る=5段は鏡=①と件数まで厳密同一。
   //   「ほか N人は会場モードで全員見られます」(①フッター)の受け皿=約束は真のまま(L15)。
@@ -2355,6 +2419,9 @@ export function mountVenueBarButton(options = {}) {
   let laneMirrorSnap = null;
   /** @type {Partial<import('../lib/laneMirror.js').LaneMirrorSnapshot>|null} */
   let laneMirrorPaintSnap = null;
+  /** @type {Record<string, unknown>|null} */
+  let storyDiagMirrorSnap = null;
+  let storyDiagMirrorRenderSig = '';
   /** X層: 鏡にまだ居ない直近発言者の初見時刻(壁時計)。60秒窓内は「暫定」=説明済み差分。 */
   /** @type {Map<string, number>} */
   const venueTransientFirstSeen = new Map();
@@ -3870,6 +3937,15 @@ export function mountVenueBarButton(options = {}) {
     return _mirrorAvatarMapCache;
   };
 
+  const renderStoryDiagMirrorPanel = () => {
+    const result = renderVenueStoryDiagMirrorPanel(storyDiagHost, storyDiagMirrorSnap, {
+      liveId: String(activeLiveId || liveIdFromPathname() || ''),
+      nowMs: Date.now(),
+      lastSig: storyDiagMirrorRenderSig
+    });
+    storyDiagMirrorRenderSig = result.sig;
+  };
+
   /**
    * 表示行を「新鮮優先・空なら前回保持」で確定してから席を描く(空っぽ・消える根治の入口)。
    * 集計/poll はここを通すことで、一瞬0件や storage 失敗でも会場が空で再描画されない。
@@ -4421,7 +4497,8 @@ export function mountVenueBarButton(options = {}) {
       // v0.1.1111: 会場=①レーンのメンバー一致トークン(P/T/X 3層)。状態速報が1行そのまま出す。
       laneParity: laneParityDiag,
       // v0.1.1112: ロビーを畳んだ累計回数(「消す側」の計器=L18)。多発=モード明滅の兆候。
-      lobbyResetCount: _venueLobbyResetCount
+      lobbyResetCount: _venueLobbyResetCount,
+      storyDiagMirror: storyDiagMirrorStatus(storyDiagMirrorSnap, String(activeLiveId || liveIdFromPathname() || ''), Date.now())
     };
     publishVenueSeatsDiag(seatsDiagObs);
     // 2026-07-01 会議(venue-diag): 「🩺 会場の状態」パネル用に最新の観測値を保持。
@@ -4709,13 +4786,18 @@ export function mountVenueBarButton(options = {}) {
       try {
         if (!hasVenueExtensionContext()) return;
         const bag = await runStorageOpWithTimeout(
-          () => chrome.storage.local.get(KEY_LANE_MIRROR),
+          () => chrome.storage.local.get([KEY_LANE_MIRROR, KEY_STORY_DIAG_MIRROR]),
           3000
         );
         const snap = bag?.[KEY_LANE_MIRROR];
         if (open && snap && typeof snap === 'object') {
           laneMirrorSnap = /** @type {Partial<import('../lib/laneMirror.js').LaneMirrorSnapshot>} */ (snap);
           scheduleLaneMirrorRecommit();
+        }
+        const storySnap = bag?.[KEY_STORY_DIAG_MIRROR];
+        if (open && storySnap && typeof storySnap === 'object') {
+          storyDiagMirrorSnap = /** @type {Record<string, unknown>} */ (storySnap);
+          renderStoryDiagMirrorPanel();
         }
       } catch {
         /* 鏡の catch-up 失敗は無視(fallback で描く・onChanged が来れば同化する) */
@@ -5006,6 +5088,11 @@ export function mountVenueBarButton(options = {}) {
         mirrorChange.newValue
       );
       scheduleLaneMirrorRecommit();
+    }
+    const storyDiagChange = changes[KEY_STORY_DIAG_MIRROR];
+    if (storyDiagChange && storyDiagChange.newValue && typeof storyDiagChange.newValue === 'object') {
+      storyDiagMirrorSnap = /** @type {Record<string, unknown>} */ (storyDiagChange.newValue);
+      renderStoryDiagMirrorPanel();
     }
     // v0.1.741 安定化: 参加者データはコメントチャンク(nls_cchunk_<lv>_*)に入る。
     //   以前は summaryKey 変化時しか再集計せず、チャンクだけ更新された時に会場が古いまま/空に

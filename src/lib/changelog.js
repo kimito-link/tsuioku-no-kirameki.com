@@ -26,6 +26,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1126',
+    date: '2026-07-10',
+    summary: 'feat(venue): 会場に①の詳しい状況を転写',
+    items: Object.freeze([
+      '会場モードに、応援レーン(①)の「詳しい状況」診断がそのまま出るようになりました。',
+      '表示されるのは「N秒前の①の数字」の転写です。会場側では人数や状態を新しく計算せず、①が見ている診断と同じ内容だけを映します。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1125',
     date: '2026-07-10',
     summary: 'feat(diag): ちかちか計器を状態速報で読める化+盲点2経路',

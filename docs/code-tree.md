@@ -27,9 +27,10 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 2 / 669 件
+## ⚠️ 役割コメントが無いソース 3 / 671 件
 - `src/lib/reportPreviewPublish.js`
 - `src/lib/venueLaneBuckets.js`
+- `src/lib/venueStoryDiagMirrorPanel.js`
 
 ## 全ファイルツリー
 
@@ -527,7 +528,7 @@
   - `gift-impact.mp3`
   - `gift-sparkle.mp3`
   - `gift-whoosh.mp3`
-- 📁 **src/** (1392)
+- 📁 **src/** (1395)
   - 📁 **data/** (6)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -794,7 +795,7 @@
         - `logo_funlink_white_RGB_maru_black.png`
       - `logo_guide_funlink_ol.pdf`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1175)
+  - 📁 **lib/** (1178)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -1743,6 +1744,7 @@
     - `storyAvatarTvFallbackClass.js` — 人物タイル/アイコンの「リモートサムネ取得失敗→ゆっくりTVスタイルへ落とす」class 付け外しの正本。
     - `storyDetailRelatedEntries.js` — ストーリー詳細／プレビュー脇の「同一ユーザーの直近」リスト用。
     - `storyDetailRelatedEntries.test.js`
+    - `storyDiagMirrorKey.js` — ①「詳しい状況」診断を会場へ鏡映する legacy storage key。
     - `storyGrowthLimits.js` — りんく成長グリッド（story growth）の描画上限。
     - `storyLaneAvatarSrc.js` — 応援レーン(アイコン列)のタイル画像 URL 解決（state 注入型の純関数）。
     - `storyLaneAvatarSrc.test.js`
@@ -1903,6 +1905,8 @@
     - `venueSpeech.test.js`
     - `venueSpeechStreak.js` — 「会話の連鎖」(2026-06-15 会議の最大多数決の本命・弱点A/C):
     - `venueSpeechStreak.test.js`
+    - `venueStoryDiagMirrorPanel.js` — ⚠️ 役割コメント無し
+    - `venueStoryDiagMirrorPanel.test.js`
     - `venueViewport.js` — v0.1.715: 会場モードの「映像セーフエリア」と「同時表示人数」を決める純関数。
     - `venueViewport.test.js`
     - `versionMismatch.js` — 「本体とページで版がズレている」を検知する純関数(2026-07-06)。

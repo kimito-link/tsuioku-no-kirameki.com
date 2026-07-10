@@ -22,7 +22,8 @@
  *                 dom?: null | { measured: boolean, ghost: number, bare: number, visibleEmpty: number, unkeyed: number,
  *                               dupIntra: number, dupCross: number, dupLaneLobby: number, strays: number,
  *                               charFrame: number, crowdOn: boolean, crowdCount: number } }|null,
- *   lobbyResetCount: number
+ *   lobbyResetCount: number,
+ *   storyDiagMirror: { present: boolean, ageSec: number|null }
  * }} VenueSeatsDiagState
  *
  * laneParity は v0.1.1111 の「会場=①レーンのメンバー一致トークン」(venueLaneParity.js)。null=未観測。
@@ -46,7 +47,8 @@ export function makeInitialVenueSeatsDiag() {
     seatAreaWidth: 0,
     visibleCapReason: '',
     laneParity: /** @type {VenueSeatsDiagState['laneParity']} */ (null),
-    lobbyResetCount: 0
+    lobbyResetCount: 0,
+    storyDiagMirror: { present: false, ageSec: /** @type {number|null} */ (null) }
   };
 }
 
@@ -147,6 +149,12 @@ export function buildVenueSeatsDiagSnapshot(diag, nowMs) {
         dom: lpDom
       }
     : null;
+  const sdmIn = /** @type {any} */ (d.storyDiagMirror && typeof d.storyDiagMirror === 'object' ? d.storyDiagMirror : null);
+  const sdmAge = Number(sdmIn?.ageSec);
+  const storyDiagMirror = {
+    present: sdmIn?.present === true,
+    ageSec: sdmIn?.present === true && Number.isFinite(sdmAge) ? Math.max(0, Math.floor(sdmAge)) : null
+  };
   return {
     enabled: !!d.enabled,
     liveId: String(d.liveId || base.liveId),
@@ -162,6 +170,7 @@ export function buildVenueSeatsDiagSnapshot(diag, nowMs) {
     visibleCapReason,
     laneParity,
     lobbyResetCount: Math.max(0, Math.floor(num(d.lobbyResetCount, 0))),
+    storyDiagMirror,
     capturedAt: now
   };
 }

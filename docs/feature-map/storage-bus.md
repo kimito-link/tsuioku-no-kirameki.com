@@ -57,6 +57,7 @@
 - 🔵 **KEY_PROFILE_RESOLVE_STATE** — 読む人だけ（書く経路が無い疑い）: src/extension/content-entry.js
 - 🔵 **KEY_RECORDING** — 読む人だけ（書く経路が無い疑い）: src/extension/content-entry.js, src/extension/popup-entry.js
 - 🔵 **KEY_STAT_CARDS_MIRROR** — 読む人だけ（書く経路が無い疑い）: src/extension/popup-entry.js, src/extension/status-entry.js
+- 🔵 **KEY_STORY_DIAG_MIRROR** — 読む人だけ（書く経路が無い疑い）: src/extension/venueBar.js
 - 🔵 **KEY_STORY_GROWTH_COLLAPSED** — 読む人だけ（書く経路が無い疑い）: src/extension/popup-entry.js
 - 🔵 **KEY_SUPPORT_CELEBRATION_STATE** — 読む人だけ（書く経路が無い疑い）: src/extension/popup-entry.js
 - 🔵 **KEY_THUMB_AUTO** — 読む人だけ（書く経路が無い疑い）: src/extension/content-entry.js, src/extension/popup-entry.js
@@ -144,6 +145,7 @@
 | `KEY_STATUS_TREND` | extension/status-entry.js | extension/status-entry.js |
 | `KEY_STAT_CARDS_MIRROR` | — | extension/popup-entry.js<br>extension/status-entry.js |
 | `KEY_STORAGE_WRITE_ERROR` | extension/content-entry.js<br>extension/popup-entry.js | extension/popup-entry.js |
+| `KEY_STORY_DIAG_MIRROR` | — | extension/venueBar.js |
 | `KEY_STORY_GROWTH_COLLAPSED` | — | extension/popup-entry.js |
 | `KEY_SUPPORT_CELEBRATION_STATE` | — | extension/popup-entry.js |
 | `KEY_SW_PROGRESS` | extension/backfill-sw-entry.js | — |

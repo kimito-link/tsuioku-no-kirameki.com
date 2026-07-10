@@ -18,6 +18,7 @@ const read = (rel) => readFileSync(path.join(repoRoot, rel), 'utf8');
 const venueBarSrc = read('src/extension/venueBar.js');
 const aiShareSrc = read('src/lib/aiShareFullText.js');
 const seatsDiagSrc = read('src/lib/venueSeatsDiag.js');
+const statusFastDiagLiteSrc = read('src/lib/statusFastDiagLite.js');
 
 describe('会場=①レーン鏡映の配線(配線忘れ=CI赤)', () => {
   it('venueBar が鏡キー(KEY_LANE_MIRROR)を購読している(onChanged 直採用+catch-up)', () => {
@@ -137,5 +138,37 @@ describe('会場=①レーン鏡映の配線(配線忘れ=CI赤)', () => {
   // --- v0.1.1120 会場のガイド帯除去 ---
   it('会場の paint は guides:false(キャラ帯/空段ノート/フッターを描画パスから除外)', () => {
     expect(venueBarSrc).toMatch(/guides: false/);
+  });
+
+  // --- v0.1.1126 ①「詳しい状況」診断の会場コピー ---
+  it('venueBar が storyDiag 鏡キーを catch-up と onChanged の両方で読む', () => {
+    expect(venueBarSrc).toMatch(/KEY_STORY_DIAG_MIRROR/);
+    expect(venueBarSrc).toMatch(/chrome\.storage\.local\.get\(\[KEY_LANE_MIRROR, KEY_STORY_DIAG_MIRROR\]\)/);
+    expect(venueBarSrc).toMatch(/changes\[KEY_STORY_DIAG_MIRROR\]/);
+  });
+
+  it('venueBar が nlsb-story-diag パネルを段stackの下・ロビーの上へ配置して描画している', () => {
+    expect(venueBarSrc).toMatch(/nlsb-story-diag/);
+    expect(venueBarSrc).toMatch(/seatsHost\.appendChild\(storyDiagHost\)/);
+    expect(venueBarSrc).toMatch(/seatsHost\.appendChild\(lobbyHost\)/);
+    expect(venueBarSrc.indexOf('seatsHost.appendChild(storyDiagHost)')).toBeLessThan(
+      venueBarSrc.indexOf('seatsHost.appendChild(lobbyHost)')
+    );
+    expect(venueBarSrc).toMatch(/renderVenueStoryDiagMirrorPanel\(/);
+  });
+
+  it('venueSeatsDiag と statusFastDiagLite が storyDiagMirror を通す(状態速報コピペ落ち防止)', () => {
+    expect(venueBarSrc).toMatch(/storyDiagMirror:/);
+    expect(seatsDiagSrc).toMatch(/storyDiagMirror/);
+    expect(statusFastDiagLiteSrc).toMatch(/storyDiagMirror/);
+  });
+
+  it('venueBar に loading/spinner/skeleton の新規出現を増やさない(Patch A ローディング禁止)', () => {
+    const counts = {
+      loading: (venueBarSrc.match(/loading/g) || []).length,
+      spinner: (venueBarSrc.match(/spinner/g) || []).length,
+      skeleton: (venueBarSrc.match(/skeleton/g) || []).length
+    };
+    expect(counts).toEqual({ loading: 9, spinner: 0, skeleton: 0 });
   });
 });
