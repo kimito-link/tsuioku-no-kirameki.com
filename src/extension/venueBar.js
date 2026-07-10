@@ -4244,7 +4244,10 @@ export function mountVenueBarButton(options = {}) {
               extras: {
                 charFrameLayer,
                 crowdOn: totalAnonymous > 0,
-                crowdCount: totalAnonymous
+                crowdCount: totalAnonymous,
+                // v0.1.1116 白円計器: 会場の顔プローブ実績(成功/404)を census 経由で状態速報へ。
+                //   getDiagnostics は Set サイズ集計のみ=3秒期日内の1回呼びで hot path 無汚染。
+                avatarProbe: venueAvatarLoadGuard.getDiagnostics()
               }
             })
           );

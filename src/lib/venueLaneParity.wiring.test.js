@@ -101,4 +101,14 @@ describe('会場=①レーン鏡映の配線(配線忘れ=CI赤)', () => {
     expect(healthSrc).toMatch(/stateCell\('venue-parity'/);
     expect(registrySrc).toMatch(/reg\('venue-parity'/);
   });
+
+  // --- v0.1.1116 白円計器の配線 ---
+  it('venueBar が顔プローブ実績(getDiagnostics)を census extras へ渡している', () => {
+    expect(venueBarSrc).toMatch(/avatarProbe: venueAvatarLoadGuard\.getDiagnostics\(\)/);
+  });
+
+  it('venueSeatsDiag スナップショットが blank/blankAnon/probeFail を通す(whitelist落ち防止)', () => {
+    expect(seatsDiagSrc).toMatch(/blankAnon/);
+    expect(seatsDiagSrc).toMatch(/probeFail/);
+  });
 });
