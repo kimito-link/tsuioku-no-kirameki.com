@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 3 / 671 件
+## ⚠️ 役割コメントが無いソース 3 / 672 件
 - `src/lib/reportPreviewPublish.js`
 - `src/lib/venueLaneBuckets.js`
 - `src/lib/venueStoryDiagMirrorPanel.js`
@@ -147,7 +147,7 @@
   - `app.js` — スマホ閲覧用 status Web 版。
   - `index.html`
   - `live-view.html`
-  - `live-view.js` — 純Web版 応援ライブビュー（拡張なし・PC/スマホ共通）。
+  - `live-view.js` — global NL_BUILD_ID
 - 📁 **docs/** (158)
   - 📁 **article-assets/** (87)
     - 📁 **venue-frames/** (12)
@@ -528,7 +528,7 @@
   - `gift-impact.mp3`
   - `gift-sparkle.mp3`
   - `gift-whoosh.mp3`
-- 📁 **src/** (1395)
+- 📁 **src/** (1397)
   - 📁 **data/** (6)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -795,7 +795,7 @@
         - `logo_funlink_white_RGB_maru_black.png`
       - `logo_guide_funlink_ol.pdf`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1178)
+  - 📁 **lib/** (1180)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -1347,6 +1347,8 @@
     - `liveStatValuePlaceholder.test.js`
     - `liveViewPublishSignature.js` — 状態速報「重さ根治 P4」: publishLiveViewPublishPayload(status-entry.js)は 3秒 min-gap を
     - `liveViewPublishSignature.test.js`
+    - `liveviewErrorReport.js` — 純Web③(app.tsuioku-no-kirameki.com)専用の最小エラーレポータ(v0.1.1130)。
+    - `liveviewErrorReport.test.js`
     - `liveviewMirrorSections.js` — ③WEB丸写しの「セクション・レジストリ」= ①POP の各パネルが③に出るための配線を1箇所に集約した一覧表
     - `liveviewMirrorSections.wiring.test.js`
     - `liveviewPublishOutcome.js` — 純Web公開（応援ライブビューの /api/status への POST）の直近結果を記録・要約する。

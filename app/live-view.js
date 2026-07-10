@@ -1,4 +1,5 @@
 // @ts-nocheck
+/* global NL_BUILD_ID */
 /**
  * 純Web版 応援ライブビュー（拡張なし・PC/スマホ共通）。
  *
@@ -26,6 +27,19 @@
  *
  * @module live-view-web
  */
+
+// ── Sentryエラーレポータ(③専用・v0.1.1130) ──────────────────────────────
+// ③は「他人のスマホ」で動く=状態速報のコピペを頼めない唯一の場所。未捕捉例外だけを Sentry へ送る。
+// PIIはスクラビング構造で保証(URLのquery/hash全落とし=viewTokenを送らない・コメント本文は不収集)。
+// DSN は公開値(secretではない)。空文字にすると全機能 no-op(=即時ロールバック)。
+import { installLiveviewErrorReporter } from '../src/lib/liveviewErrorReport.js';
+/** besttrust org / liveview プロジェクトの DSN(未設定=空文字なら送信しない)。 */
+const LIVEVIEW_SENTRY_DSN = '';
+installLiveviewErrorReporter({
+  dsn: LIVEVIEW_SENTRY_DSN,
+  // esbuild define(scripts/build.mjs)が注入するビルドID=どの版の③で起きたかを識別する。
+  release: typeof NL_BUILD_ID === 'string' ? NL_BUILD_ID : 'unknown'
+});
 
 // ── 本物の描画関数（chrome 非依存・全て再利用＝似せて自作しない）─────────────
 import { KEY_LANE_MIRROR } from '../src/lib/laneMirrorKey.js';

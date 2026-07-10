@@ -506,7 +506,7 @@
 
 - **HTMLレポート生成** — マーケ/イベント順位/タイムライン等を1枚の HTML レポートに組み立てる(popup-entry 内)
   - `src/extension/popup-entry.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 36</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 37</summary>
 
 - `scripts/build-sound-preview.mjs` — 開発用: extension/sound/ 配下の全効果音を1枚のHTMLで試聴できるページを生成する。
 - `scripts/inspect-nicolive-watch-stats.mjs` — ニコ生 watch ページの HTML から、来場・同接まわりの数値がどう埋め込まれているかを CLI で確認する。
@@ -522,6 +522,7 @@
 - `src/lib/exportWaitNarration.js` — HTML / マーケ DL 待ち中の りんく・こん太・たぬ姉 セリフ（popup 吹き出し用）。
 - `src/lib/htmlReportCommenterFollowSection.js` — HTML レポート向けコメンターフォロー分析ブロック。
 - `src/lib/htmlReportConceptGuide.js` — HTML レポート用キャラガイド（この拡張の説明／保存ページの使い方）
+- `src/lib/liveviewErrorReport.js` — 純Web③(app.tsuioku-no-kirameki.com)専用の最小エラーレポータ(v0.1.1130)。
 - `src/lib/marketingChartsHtml.js` — マーケ集計(MarketingReport)から HTMLレポート用のグラフ/チャート HTML を組み立てる。
 - `src/lib/marketingDynamicAdvice.js` — 0.1.33 (AH): マーケ分析の各セクションに「内容に応じて変わる」キャラ解説を出す
 - `src/lib/marketingReportEmbed.js` — マーケ分析 HTML に埋め込む JSON（表計算・ツール連携用）。
@@ -702,7 +703,7 @@
 <details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 129</summary>
 
 - `app/app.js` — スマホ閲覧用 status Web 版。
-- `app/live-view.js` — 純Web版 応援ライブビュー（拡張なし・PC/スマホ共通）。
+- `app/live-view.js` — global NL_BUILD_ID
 - `extension/background.js` — MV3 Service Worker
 - `scripts/build-sounds.mjs` — sound-src/(CC0原素材)から extension/sound/ の効果音mp3を組み立てる。
 - `scripts/build-watch.mjs` — watch では起動時刻を埋める（rebuild 毎に再 import される訳ではないので、
@@ -835,7 +836,7 @@
 
 ## 🧬 修正系譜マップ(この系統のバグを過去にどう直したか)
 
-> changelog 全 464 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
+> changelog 全 465 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
 
 ### 💾 記録件数 (69版)
 - `v0.1.1127` 2026-07-11 — feat(venue): 会場ガイド帯を①一致で復活
@@ -1894,7 +1895,8 @@
 - `v0.1.840` 2026-06-20 — 機能逆引き地図を全ファイル網羅に
 - `v0.1.835` 2026-06-20 — 自己検証ゲートを追加(版同期+診断文言)
 
-### その他 (25版)
+### その他 (26版)
+- `v0.1.1130` 2026-07-11 — feat(web): ③WEBにエラーレポータ(Sentry)
 - `v0.1.1106` 2026-07-07 — chore(web): 丸写しセクションレジストリでdrift検知
 - `v0.1.1100` 2026-07-06 — feat(score): 結果発表シーケンス+採点音割当
 - `v0.1.1098` 2026-07-06 — feat(score): 配信採点モデルv2+フェーズ実績計器

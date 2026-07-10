@@ -26,6 +26,16 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1130',
+    date: '2026-07-11',
+    summary: 'feat(web): ③WEBにエラーレポータ(Sentry)',
+    items: Object.freeze([
+      '純Web版の応援ライブビュー(③・スマホ閲覧)にだけ、エラー自動報告(Sentry)を追加しました。③は他人のスマホで動くため、これまで画面が壊れても気づく手段がありませんでした。今後は未捕捉エラーが開発者に自動で届きます。',
+      'プライバシーは構造で守ります: 送るのはエラー内容と発生ページ(URLのクエリ=閲覧トークンは全部落とす)だけ。コメント本文や視聴者の情報は一切収集しません。拡張本体(このChrome拡張)には何も追加していません。',
+      '送信は1ページ滞在で最大8件・同じエラーは1回だけ。DSN(送信先)未設定のうちは何も送りません。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1129',
     date: '2026-07-11',
     summary: 'fix(venue): スクロールバー非表示+ロビー巨大タイル根治',
