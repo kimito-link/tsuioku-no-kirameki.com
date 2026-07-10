@@ -72,4 +72,33 @@ describe('会場=①レーン鏡映の配線(配線忘れ=CI赤)', () => {
     expect(venueBarSrc).toMatch(/lobbyResetCount: _venueLobbyResetCount/);
     expect(seatsDiagSrc).toMatch(/lobbyResetCount/);
   });
+
+  // --- v0.1.1113 実DOM census(Tri-Parity)の配線 ---
+  it('venueBar が実DOM census を収集し dom として parity へ渡している', () => {
+    expect(venueBarSrc).toMatch(/collectVenueLaneDomCensus\(/);
+    expect(venueBarSrc).toMatch(/venueDomCensusToParityDom\(/);
+    expect(venueBarSrc).toMatch(/dom: domSummary/);
+  });
+
+  it('census は publish と同じ3秒期日ゲートの中でだけ走る(毎paint禁止)', () => {
+    expect(venueBarSrc).toMatch(/_venueSeatsDiagLastWriteAt >= 3000/);
+    expect(venueBarSrc).toMatch(/if \(diagDue\)/);
+  });
+
+  it('タイルへ照合キーが刻印されている(fillLaneTier とロビーの両方)', () => {
+    const laneDomSrc = read('src/extension/story/renderStoryUserLaneDom.js');
+    expect(laneDomSrc).toMatch(/dataset\.userKey = venueLaneParityKey\(/);
+    expect(venueBarSrc).toMatch(/dataset\.userKey = venueLaneParityKey\(/);
+  });
+
+  it('venueSeatsDiag スナップショットが laneParity.dom を通す(whitelist 落ち防止)', () => {
+    expect(seatsDiagSrc).toMatch(/dom: lpDom/);
+  });
+
+  it('venue-parity が healthCells セル+診断レジストリに登録されている(穴f=盲点の閉鎖)', () => {
+    const healthSrc = read('src/lib/healthCells.js');
+    const registrySrc = read('src/lib/diagnosisRegistry.js');
+    expect(healthSrc).toMatch(/stateCell\('venue-parity'/);
+    expect(registrySrc).toMatch(/reg\('venue-parity'/);
+  });
 });

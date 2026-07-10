@@ -80,7 +80,11 @@ export const DIAGNOSIS_REGISTRY = Object.freeze([
   reg('voice-coverage', '読み上げ漏れ', 'venue', 1, false),
   reg('venue-broadcaster', '配信者混入', 'venue', 1, false),
   reg('venue-seats', '会場座席', 'venue', 1, false),
-  reg('venue-seats-visible', '会場席の網羅', 'venue', 1, false)
+  reg('venue-seats-visible', '会場席の網羅', 'venue', 1, false),
+  // v0.1.1113: 会場一致(Tri-Parity=鏡データ=段割当データ=段実DOM)。従来はテキスト1行のみで
+  //   レジストリ未登録=完全性スコア100%でも会場一致🔴がありうる盲点(穴f)だった。healthCells の
+  //   venue-parity セルと同時に登録する(v0.1.1054 のレジストリ・ドリフトを繰り返さない)。
+  reg('venue-parity', '会場一致', 'venue', 2, false)
 ]);
 
 /** id → 観点 の索引(集計で O(1) 参照)。 */

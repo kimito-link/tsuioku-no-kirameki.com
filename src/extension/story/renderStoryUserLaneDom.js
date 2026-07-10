@@ -17,6 +17,8 @@ import {
 } from '../../lib/storyUserLaneGuideHtml.js';
 import { buildStoryUserLaneStackAriaLabel } from '../../lib/supportVisualStoryCopy.js';
 import { buildPersonTileEl } from '../../lib/personTileDom.js';
+// v0.1.1113 実DOM census(Tri-Parity): タイルへ照合キーを恒久刻印するための純関数(葉lib同士=循環なし)。
+import { venueLaneParityKey } from '../../lib/venueLaneParity.js';
 
 /**
  * @typedef {{
@@ -285,6 +287,10 @@ function fillLaneTier(el, items, io, wrapTileEl) {
     //   personTileDom.js(タイル正本・凍結)は不触=ここ(呼び出し側)で属性を付ける。
     try {
       tileEl.dataset.thumb = io.isHttpOrHttpsUrl(String(p && p.displaySrc || '')) ? '1' : '0';
+      // v0.1.1113 実DOM census(Tri-Parity): 実DOMをキー単位で突合するための恒久刻印。
+      //   タイル正本(personTileDom)は凍結のため呼び出し側で付ける。''=無鍵(census が unkeyed に数える)。
+      //   ★storyLaneTierBodyKey には入れない(diff-skip の key 揺れを作らない)。
+      tileEl.dataset.userKey = venueLaneParityKey(p);
     } catch { /* io 未注入等でも描画は止めない */ }
     frag.appendChild(typeof wrapTileEl === 'function' ? wrapTileEl(tileEl, p, i) : tileEl);
   }
