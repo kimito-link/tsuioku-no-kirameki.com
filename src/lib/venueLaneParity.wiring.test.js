@@ -135,9 +135,43 @@ describe('会場=①レーン鏡映の配線(配線忘れ=CI赤)', () => {
     expect(venueBarSrc).toMatch(/buildVenueMirrorAvatarMap\(/);
   });
 
-  // --- v0.1.1120 会場のガイド帯除去 ---
-  it('会場の paint は guides:false(キャラ帯/空段ノート/フッターを描画パスから除外)', () => {
-    expect(venueBarSrc).toMatch(/guides: false/);
+  // --- v0.1.1127 会場のガイド/フッターを mirror mode だけ①と完全一致へ戻す ---
+  it('mirror mode の paint は①鏡の pickedLength/totalCandidates とガイド復活定数を渡す', () => {
+    expect(venueBarSrc).toMatch(/const VENUE_LANE_GUIDES_EXACT_COPY = true;/);
+    expect(venueBarSrc).toMatch(/const isLaneMirrorPaintMode = Boolean\(lanePaintSnap\);/);
+    expect(venueBarSrc).toMatch(
+      /recordedCommentRowsTotal: isLaneMirrorPaintMode\s*\?\s*lanePaintSnap\.pickedLength\s*:\s*seating\.participantCount/
+    );
+    expect(venueBarSrc).toMatch(
+      /totalCandidates: isLaneMirrorPaintMode\s*\?\s*lanePaintSnap\.totalCandidates\s*:\s*seating\.participantCount/
+    );
+    expect(venueBarSrc).toMatch(
+      /guides: isLaneMirrorPaintMode\s*\?\s*VENUE_LANE_GUIDES_EXACT_COPY\s*:\s*false/
+    );
+  });
+
+  it('fallback mode の paint は従来どおり seating.participantCount と guides:false を保つ', () => {
+    expect(venueBarSrc).toMatch(
+      /recordedCommentRowsTotal: isLaneMirrorPaintMode\s*\?\s*lanePaintSnap\.pickedLength\s*:\s*seating\.participantCount/
+    );
+    expect(venueBarSrc).toMatch(
+      /totalCandidates: isLaneMirrorPaintMode\s*\?\s*lanePaintSnap\.totalCandidates\s*:\s*seating\.participantCount/
+    );
+    expect(venueBarSrc).toMatch(/:\s*false,\s*wrapTileEl:/);
+  });
+
+  it('guide 要素の CSS は LANE_CSS_SYNC 区間内に置かれている', () => {
+    const begin = venueBarSrc.indexOf('/* LANE_CSS_SYNC_BEGIN');
+    const end = venueBarSrc.indexOf('/* LANE_CSS_SYNC_END */');
+    expect(begin).toBeGreaterThanOrEqual(0);
+    expect(end).toBeGreaterThan(begin);
+    const laneCssSync = venueBarSrc.slice(begin, end);
+    expect(laneCssSync).toContain('.nlsb-venue-lane-stack .nl-story-userlane-guide {');
+    expect(laneCssSync).toContain('.nlsb-venue-lane-stack .nl-story-userlane-guide__lines {');
+    expect(laneCssSync).toContain('.nlsb-venue-lane-stack .nl-story-userlane-guide__line {');
+    expect(laneCssSync).toContain('.nlsb-venue-lane-stack .nl-story-userlane-guide__face {');
+    expect(laneCssSync).toContain('.nlsb-venue-lane-stack .nl-story-userlane-guide__foot {');
+    expect(laneCssSync).toContain('.nlsb-venue-lane-stack .nl-story-userlane-guide__count {');
   });
 
   // --- v0.1.1126 ①「詳しい状況」診断の会場コピー ---

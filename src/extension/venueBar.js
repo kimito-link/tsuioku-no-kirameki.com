@@ -311,6 +311,9 @@ const VENUE_LAYOUT_CLASSES = [
   'nlsb-mode-normal',
   'nlsb-mode-packed'
 ];
+// v0.1.1127 Patch B: mirror mode の会場は①POP完全一致のため、v0.1.1120で外した
+// キャラ案内帯/空段ノート/フッターを意図的に戻す。不要ならこの1行を false に戻す。
+const VENUE_LANE_GUIDES_EXACT_COPY = true;
 
 /**
  * 会場の席タイル(buildPersonTileEl)に渡す avatar load guard と I/O。
@@ -4303,6 +4306,7 @@ export function mountVenueBarButton(options = {}) {
     const laneBuckets = laneComposed ? laneComposed.buckets : fallbackLaneBuckets;
     const lobbyItems = laneComposed ? laneComposed.lobby : (fallbackLaneBuckets.lobby || []);
     const visibleLaneItems = flattenVenueLaneBuckets(laneBuckets);
+    const isLaneMirrorPaintMode = Boolean(lanePaintSnap);
     // L19: 段0人でもロビーにN人居るなら「まだ参加者がいません」を出さない(合算判定)。
     emptyMessage.hidden = visibleLaneItems.length + lobbyItems.length > 0;
     if (visibleLaneItems.length === 0) {
@@ -4315,12 +4319,15 @@ export function mountVenueBarButton(options = {}) {
         visibleLaneItems.length,
         venuePersonTileIo,
         {
-          recordedCommentRowsTotal: seating.participantCount,
-          totalCandidates: seating.participantCount,
-          // v0.1.1120: 会場ではキャラ案内帯/空段説明/フッター(「ほかN人は会場モードで…」=自己言及)を
-          //   描画パスから除外。recordedCommentRowsTotal/totalCandidates は inert だが残置
-          //   (将来ガイドを戻すとき正値が要る・設計正本の地雷#9)。
-          guides: false,
+          recordedCommentRowsTotal: isLaneMirrorPaintMode
+            ? lanePaintSnap.pickedLength
+            : seating.participantCount,
+          totalCandidates: isLaneMirrorPaintMode
+            ? lanePaintSnap.totalCandidates
+            : seating.participantCount,
+          // v0.1.1127 Patch B: mirror mode だけ①POPのフッター/ガイドも完全一致に戻す。
+          // fallback は①の鏡件数を名乗らないため、v0.1.1120 の guides:false を維持する。
+          guides: isLaneMirrorPaintMode ? VENUE_LANE_GUIDES_EXACT_COPY : false,
           wrapTileEl: (tileEl, item) => {
             const laneItem = /** @type {{ _venueSeatIndex?: unknown }} */ (item || {});
             // v0.1.1111: 席を持たないアイテム(鏡由来の uid 無し広告主セル等)は _venueSeatIndex=-1
