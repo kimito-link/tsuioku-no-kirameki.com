@@ -3846,8 +3846,13 @@ export function mountVenueBarButton(options = {}) {
   };
 
   // v0.1.777 額縁フレーム: 3キャラ全表情サムネを四辺に並べ会場を囲む(1回だけ描画・軽量 thumb128)。
+  // v0.1.1114 廃止(フラグOFF): 四辺のキャラ顔散らばりが「会場に顔が多く見える」誤認の一因
+  //   (実DOM census の容疑者④)としてユーザー要望で非表示化。計器(額縁N)→廃止の順=v0.1.1113 の
+  //   census トークンで廃止効果(額縁12→0)を同じ物差しで検証できる。復活はこのフラグ1つ。
+  const VENUE_CHAR_FRAME_ENABLED = false;
   let charFrameRendered = false;
   const renderCharFrame = () => {
+    if (!VENUE_CHAR_FRAME_ENABLED) return; // 廃止中: charFrameLayer は空のまま=census の額縁0
     if (charFrameRendered) return;
     const resolveUrl =
       typeof chrome !== 'undefined' && chrome.runtime && typeof chrome.runtime.getURL === 'function'
