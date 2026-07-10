@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   recordInlineHostMove,
+  recordInlineHostDuplicateSeen,
   summarizeInlineHostMoveDiag,
   INLINE_HOST_MOVE_SAMPLE_CAP
 } from './inlineHostMoveProbe.js';
@@ -39,6 +40,16 @@ describe('inlineHostMoveProbe(v0.1.1124 D-1計器)', () => {
   it('未観測/不正入力で throw しない', () => {
     expect(() => recordInlineHostMove(null, { reason: 'x' })).not.toThrow();
     const d = summarizeInlineHostMoveDiag(null, 100);
-    expect(d).toMatchObject({ moveCount: 0, reloadCount: 0, lastMoveAgoMs: null });
+    expect(d).toMatchObject({ moveCount: 0, reloadCount: 0, duplicateSeen: 0, lastMoveAgoMs: null });
+  });
+
+  it('duplicateSeen は host 2以上のときだけ増える(v0.1.1125 盲点計器)', () => {
+    const s = {};
+    recordInlineHostDuplicateSeen(s, 2);
+    recordInlineHostDuplicateSeen(s, 3);
+    recordInlineHostDuplicateSeen(s, 1); // 単独=正常は数えない
+    recordInlineHostDuplicateSeen(s, 0);
+    expect(summarizeInlineHostMoveDiag(s, 100).duplicateSeen).toBe(2);
+    expect(() => recordInlineHostDuplicateSeen(null, 2)).not.toThrow();
   });
 });

@@ -77,10 +77,22 @@ export function buildStatusFastDiagLite(payload) {
       }))
     : [];
 
+  // v0.1.1125: ちかちか調査の計器2つを lite に通す(印字の穴ふさぎ)。状態速報の
+  //   「診断 JSON (fastDiag)」と対処候補(scrollWhiteoutToActionCards)はこの lite を読むため、
+  //   ここに無い計器はユーザーのコピペに永久に出ない(v0.1.1124 hostMoveDiag が実機で読めなかった真因)。
+  //   どちらも samples がリング cap 済み(hostMove=8件/whiteout同型)で小さい=lite の軽さは保つ。
+  const hostMoveDiag =
+    content.hostMoveDiag && typeof content.hostMoveDiag === 'object' ? content.hostMoveDiag : null;
+  const scrollWhiteoutDiag =
+    content.scrollWhiteoutDiag && typeof content.scrollWhiteoutDiag === 'object'
+      ? content.scrollWhiteoutDiag
+      : null;
+
   // ★読み取りパスを full と同形に保つ(status の consumer を書き換えないため):
   //   lite.content.giftDiagnostics['北極星レーン']
   //   lite.content.giftDiagnostics.commentObservability.savedCommentsUidStats.withUidPercent
   //   lite.content.networkErrorProbe.ndgrConnectStatus
+  //   lite.content.hostMoveDiag / lite.content.scrollWhiteoutDiag
   return {
     lives,
     content: {
@@ -92,7 +104,9 @@ export function buildStatusFastDiagLite(payload) {
       },
       networkErrorProbe: {
         ndgrConnectStatus: String(net.ndgrConnectStatus || '')
-      }
+      },
+      hostMoveDiag,
+      scrollWhiteoutDiag
     }
   };
 }

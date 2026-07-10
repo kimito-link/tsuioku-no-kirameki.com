@@ -54,10 +54,25 @@ export function recordInlineHostMove(state, move) {
 }
 
 /**
- * fastDiag(content.inlinePanel.hostMoveDiag)へ出す形に要約する純関数。
- * @param {{ count:number, reloadCount:number, venueOpenMoves:number, byReason:Record<string,number>, samples:Array<object>, lastAtMs:number }|null} state
+ * v0.1.1125 盲点計器: 同一 document に `#nls-inline-popup-host` が2つ以上見えた瞬間を数える
+ * (破壊的更新)。dedupe(pickPrimaryInlinePopupHostFromDom)は非primaryを即 remove するため、
+ * 「2つできてる」現象は count でしか残らない(実測: 削除まで約74ms=状態速報のスクショには写らない)。
+ * @param {{ duplicateSeen?:number }} state recordInlineHostMove と同じ state を共有する
+ * @param {number} hostCount その瞬間の host 総数(2以上のときだけ呼ぶ想定だが、ガードもする)
+ * @returns {object} 更新後の同じ state
+ */
+export function recordInlineHostDuplicateSeen(state, hostCount) {
+  if (!state || typeof state !== 'object') return state;
+  if ((Number(hostCount) || 0) < 2) return state;
+  state.duplicateSeen = (Number(state.duplicateSeen) || 0) + 1;
+  return state;
+}
+
+/**
+ * fastDiag(content.hostMoveDiag)へ出す形に要約する純関数。
+ * @param {{ count:number, reloadCount:number, venueOpenMoves:number, duplicateSeen?:number, byReason:Record<string,number>, samples:Array<object>, lastAtMs:number }|null} state
  * @param {number} nowMs
- * @returns {{ moveCount:number, reloadCount:number, venueOpenMoves:number, lastMoveAgoMs:(number|null), byReason:Record<string,number>, samples:Array<object> }}
+ * @returns {{ moveCount:number, reloadCount:number, venueOpenMoves:number, duplicateSeen:number, lastMoveAgoMs:(number|null), byReason:Record<string,number>, samples:Array<object> }}
  */
 export function summarizeInlineHostMoveDiag(state, nowMs) {
   const lastAtMs = Number(state?.lastAtMs) || 0;
@@ -65,6 +80,7 @@ export function summarizeInlineHostMoveDiag(state, nowMs) {
     moveCount: Number(state?.count) || 0,
     reloadCount: Number(state?.reloadCount) || 0,
     venueOpenMoves: Number(state?.venueOpenMoves) || 0,
+    duplicateSeen: Number(state?.duplicateSeen) || 0,
     lastMoveAgoMs: lastAtMs > 0 ? Math.max(0, Number(nowMs) - lastAtMs) : null,
     byReason: state?.byReason && typeof state.byReason === 'object' ? { ...state.byReason } : {},
     samples: Array.isArray(state?.samples) ? state.samples.slice(-INLINE_HOST_MOVE_SAMPLE_CAP) : []

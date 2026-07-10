@@ -318,6 +318,7 @@ import {
 // v0.1.1124 D-1計器: host移設(=iframeリロード実害)の観測(robust-pondering-fountain 計画 Patch1)。
 import {
   recordInlineHostMove,
+  recordInlineHostDuplicateSeen,
   summarizeInlineHostMoveDiag
 } from '../lib/inlineHostMoveProbe.js';
 import { probeWatchPageDomStructure } from '../lib/probeWatchPageDomStructure.js';
@@ -3255,6 +3256,15 @@ function pickPrimaryInlinePopupHostFromDom() {
     }
     return null;
   }
+  // v0.1.1125 盲点計器: 「2つできてる」(ユーザー証言)の実在を数字で残す。dedupe は非primaryを
+  //   即 remove するため(実測: 注入→削除まで約74ms)、瞬間の重複はこのカウンタでしか観測できない。
+  if (hosts.length > 1) {
+    try {
+      recordInlineHostDuplicateSeen(_inlineHostMoveState, hosts.length);
+    } catch {
+      // 計器失敗は dedupe を止めない
+    }
+  }
   const connected = hosts.filter((h) => h.isConnected);
   /** @type {HTMLDivElement} */
   let primary;
@@ -3269,6 +3279,9 @@ function pickPrimaryInlinePopupHostFromDom() {
   }
   for (const h of hosts) {
     if (h === primary) continue;
+    // v0.1.1125 盲点計器: 削除される h が iframe 持ちなら reloadCount に入る(=dedupe が
+    //   iframe を殺した=ちかちか実害)。v0.1.1124 の移設7経路計器はここを見ていなかった。
+    noteInlineHostMove('duplicate_host_removed', h);
     try {
       h.remove();
     } catch {
@@ -3749,6 +3762,9 @@ function ensureInlinePopupHost() {
   host.style.pointerEvents = 'auto';
   host.style.width = '100%';
 
+  // v0.1.1125 盲点計器: host の新規生成を記録(prevConnected=false・iframe無し=reloadCountには
+  //   入らずbyReasonにだけ出る)。「作り直しループ」なら host_created が移設回数と並走して伸びる。
+  noteInlineHostMove('host_created', host);
   ensureInlinePopupIframe(host);
   nlsInlinePopupHostSingleton = host;
   return host;
