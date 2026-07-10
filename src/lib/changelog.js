@@ -26,6 +26,16 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1125',
+    date: '2026-07-10',
+    summary: 'feat(diag): ちかちか計器を状態速報で読める化+盲点2経路',
+    items: Object.freeze([
+      '前バージョン(v0.1.1124)で追加したパネル引っ越し計器(hostMoveDiag)が、状態速報のコピペに実際には出ていなかった穴を塞ぎました。状態速報の「診断 JSON (fastDiag)」に hostMoveDiag と scrollWhiteoutDiag(スクロール白化計器)が出るようになります(動作は何も変えていません)。',
+      '計器の盲点だった2経路も観測に追加しました: (1)パネルの入れ物が2つできたとき片方を掃除する処理(duplicate_host_removed・消される側が中身持ちなら実害としてreloadCountに入る)、(2)入れ物の新規作り直し(host_created)。「パネルが2つできてるような」現象の実在が duplicateSeen の数字で確定できます。',
+      'ちかちか再現時に状態速報を1枚コピーするだけで、原因経路(引っ越し/掃除/作り直し・会場モード中か)が数字で読めます。数字が出たら該当経路だけを止める最小修正に進みます。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1124',
     date: '2026-07-10',
     summary: 'feat(diag): パネル引っ越し(=リロード)の実測計器',
