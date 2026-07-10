@@ -1623,6 +1623,16 @@ const VENUE_CSS = `
       animation: none;
     }
   }
+  /* v0.1.1115 ①POP遮蔽(reference_venue_pop_copy_SYNTHESIS.md §C-1): 会場open中は①POP(インライン
+     埋め込みホスト)を畳む。会場=①の鏡なので同じ情報の二重表示であり、①のキャラ案内バナーが
+     会場の背景に透けて邪魔になるのを消す。配信映像と本家watch UIは今後も素通し(スモーク禁止
+     方針は不変・隠すのは拡張自身の冗長UIのみ)。
+     ★display:none は禁止: iframe のレイアウト消滅で①の paint/鏡publish が痩せ、会場は鏡で
+     生きているため自殺になる。visibility:hidden はレイアウト保持=鏡は生き続ける。 */
+  html.nlsb-venue-open #nls-inline-popup-host {
+    visibility: hidden !important;
+    pointer-events: none !important;
+  }
 `;
 
 // colorFromKey(名前/IDから色生成)は person-tile-unify 第3コミットで不要になり削除。
@@ -5014,6 +5024,12 @@ export function mountVenueBarButton(options = {}) {
   const setOpen = (nextOpen, persist) => {
     open = nextOpen === true;
     root.classList.toggle('nlsb-is-open', open);
+    // v0.1.1115 ①POP遮蔽: 会場open中だけ document ルートに印を付け、CSS(VENUE_CSS末尾)が
+    //   ①POPホスト(#nls-inline-popup-host)を visibility:hidden にする。open→close 往復で
+    //   toggle が印を外す=style残骸ゼロ。ホストが無いページ(standalone会場タブ)は自然に no-op。
+    try {
+      document.documentElement.classList.toggle('nlsb-venue-open', open);
+    } catch { /* documentElement 不在環境でも会場は止めない */ }
     toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
     stage.setAttribute('aria-hidden', open ? 'false' : 'true');
     if (open) {
