@@ -26,6 +26,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1116',
+    date: '2026-07-10',
+    summary: 'feat(diag): 会場の白円サムネを数える計器',
+    items: Object.freeze([
+      '状態速報の「会場一致」行に、会場の白い円(サムネが空白のタイル)の実数が「白円N(匿名M)」として出るようになりました。匿名Mは「本来は模様つきの代替顔になるべき人が白円になっている」件数で、次の修正の効果測定に使います。',
+      'アイコン画像の読み込み失敗(CDNの404)件数も「顔404=N」として同じ行に併記します。数値IDの人の白円はニコニコ側にアイコンが無い場合で応援レーンと同じ表示=正常です。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1115',
     date: '2026-07-10',
     summary: 'feat(venue): 会場を開くと①パネルを自動で畳む',

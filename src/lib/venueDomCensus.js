@@ -18,8 +18,13 @@
  *   - 空可視(visibleEmpty): 席は可視なのにタイルが無い(白円空白の再演検出=venue-thumb 同型)
  *   - 無鍵(unkeyed): dataset.userKey が無い/空の可視タイル(重複判定の対象外・期待値0)
  *   - keys: 可視タイルの userKey 列(重複/迷子判定の材料。storage へは出さない=PII/容量)
+ *   - 白円(blank): 可視タイルの avatar img が blank.jpg(usericon/defaults)を表示中(v0.1.1116)。
+ *     blankAnon = そのうち数値ID(u:数字)でない鍵のタイル=匿名/合成鍵は identicon になるべき
+ *     なのに白円=導出バグの証拠(数値IDの白円は①も同じ404 tv-fallback=パリティ上「正」)。
  *   - 迷子(strays): stack 配下だが5段のどれにも属さないタイル
  *   - 額縁(charFrameTiles)・群衆Canvas(crowdOn/crowdCount): 「顔が多く見える」容疑者の参考値
+ *   - avatarProbe: 会場の顔プローブ実績(supportGrowthAvatarLoad.getDiagnostics)を extras で受けて
+ *     写すだけ(usericonSucceeded/usericonFailed)。census は計測しない=露出のみ
  * 【測らないもの】(スコープ固定テストで担保)
  *   - topBar(応援者トップ)・roster・吹き出し・常駐3キャラ(residents)=段/ロビーの外
  *   - 透明オーバーレイ越しに透ける背景ページ(拡張のDOM外)・Canvas のピクセル内容
@@ -34,10 +39,15 @@ const TILE_SELECTOR = '.nl-story-userlane-cell';
 const SEAT_SELECTOR = '.nlsb-seat';
 const SEAT_EMPTY_CLASS = 'nlsb-is-empty';
 const LANE_SELECTOR = '.nl-story-userlane';
+const AVATAR_IMG_SELECTOR = 'img.nl-story-userlane-avatar';
+/** 白円=ニコニコ公式の空アイコン(blank.jpg)。supportGrowthTileSrc.js:19 の defaults パスが正本。 */
+const BLANK_AVATAR_RE = /\/usericon\/defaults\//i;
+/** 数値ID鍵(u:数字)。これ以外の鍵で白円=identicon になるべき人が白い=導出バグ(blankAnon)。 */
+const NUMERIC_UID_KEY_RE = /^u:\d+$/;
 
 /** 空のセクション計数。 */
 function emptySectionCount() {
-  return { visible: 0, ghost: 0, bare: 0, visibleEmpty: 0, unkeyed: 0, keys: [] };
+  return { visible: 0, ghost: 0, bare: 0, visibleEmpty: 0, unkeyed: 0, blank: 0, blankAnon: 0, keys: [] };
 }
 
 /**
@@ -58,6 +68,12 @@ function countSection(rootEl) {
     const key = String((tile.dataset && tile.dataset.userKey) || '').trim();
     if (key) out.keys.push(key);
     else out.unkeyed += 1;
+    // 白円(v0.1.1116): avatar img が blank.jpg を表示中。src を読むだけ(getComputedStyle不使用)。
+    const img = typeof tile.querySelector === 'function' ? tile.querySelector(AVATAR_IMG_SELECTOR) : null;
+    if (img && BLANK_AVATAR_RE.test(String(img.src || img.getAttribute?.('src') || ''))) {
+      out.blank += 1;
+      if (!NUMERIC_UID_KEY_RE.test(key)) out.blankAnon += 1;
+    }
   }
   // 席単位の異常: 幽霊(不可視なのに中身あり)・空可視(可視なのにタイル無し)。
   for (const seat of rootEl.querySelectorAll(SEAT_SELECTOR)) {
@@ -76,14 +92,16 @@ function countSection(rootEl) {
  *   laneEls?: Partial<Record<'link'|'gift'|'ad'|'konta'|'tanu', Element|null>>,
  *   lobbyList?: Element|null,
  *   stackEl?: Element|null,
- *   extras?: { charFrameLayer?: Element|null, crowdOn?: boolean, crowdCount?: number }
+ *   extras?: { charFrameLayer?: Element|null, crowdOn?: boolean, crowdCount?: number,
+ *              avatarProbe?: { usericonSucceeded?: number, usericonFailed?: number }|null }
  * }} input
  * @returns {{
- *   perSection: Record<'link'|'gift'|'ad'|'konta'|'tanu'|'lobby', { visible:number, ghost:number, bare:number, visibleEmpty:number, unkeyed:number, keys:string[] }>,
+ *   perSection: Record<'link'|'gift'|'ad'|'konta'|'tanu'|'lobby', { visible:number, ghost:number, bare:number, visibleEmpty:number, unkeyed:number, blank:number, blankAnon:number, keys:string[] }>,
  *   strays: number,
  *   charFrameTiles: number,
  *   crowdOn: boolean,
- *   crowdCount: number
+ *   crowdCount: number,
+ *   avatarProbe: { usericonSucceeded: number, usericonFailed: number }|null
  * }}
  */
 export function collectVenueLaneDomCensus(input) {
@@ -108,12 +126,19 @@ export function collectVenueLaneDomCensus(input) {
     charFrameLayer && Number.isFinite(Number(charFrameLayer.childElementCount))
       ? Math.max(0, Number(charFrameLayer.childElementCount))
       : 0;
+  const probeIn = extras.avatarProbe && typeof extras.avatarProbe === 'object' ? extras.avatarProbe : null;
   return {
     perSection: /** @type {any} */ (perSection),
     strays,
     charFrameTiles,
     crowdOn: extras.crowdOn === true,
-    crowdCount: Math.max(0, Math.floor(Number(extras.crowdCount) || 0))
+    crowdCount: Math.max(0, Math.floor(Number(extras.crowdCount) || 0)),
+    avatarProbe: probeIn
+      ? {
+          usericonSucceeded: Math.max(0, Math.floor(Number(probeIn.usericonSucceeded) || 0)),
+          usericonFailed: Math.max(0, Math.floor(Number(probeIn.usericonFailed) || 0))
+        }
+      : null
   };
 }
 
@@ -158,10 +183,12 @@ export function countVenueKeyDuplicates(perSection) {
  * @param {ReturnType<typeof collectVenueLaneDomCensus>|null|undefined} census
  * @returns {null | {
  *   measured: true,
- *   perSection: Record<string, { visible:number, ghost:number, bare:number, visibleEmpty:number, unkeyed:number }>,
+ *   perSection: Record<string, { visible:number, ghost:number, bare:number, visibleEmpty:number, unkeyed:number, blank:number, blankAnon:number }>,
  *   ghost:number, bare:number, visibleEmpty:number, unkeyed:number,
+ *   blank:number, blankAnon:number,
  *   dupIntra:number, dupCross:number, dupLaneLobby:number,
- *   strays:number, charFrame:number, crowdOn:boolean, crowdCount:number
+ *   strays:number, charFrame:number, crowdOn:boolean, crowdCount:number,
+ *   probeOk:number, probeFail:number
  * }}
  */
 export function venueDomCensusToParityDom(census) {
@@ -173,6 +200,8 @@ export function venueDomCensusToParityDom(census) {
   let bare = 0;
   let visibleEmpty = 0;
   let unkeyed = 0;
+  let blank = 0;
+  let blankAnon = 0;
   for (const sec of VENUE_CENSUS_SECTIONS) {
     const c = census.perSection[sec] || emptySectionCount();
     perSection[sec] = {
@@ -180,12 +209,16 @@ export function venueDomCensusToParityDom(census) {
       ghost: Math.max(0, Math.floor(Number(c.ghost) || 0)),
       bare: Math.max(0, Math.floor(Number(c.bare) || 0)),
       visibleEmpty: Math.max(0, Math.floor(Number(c.visibleEmpty) || 0)),
-      unkeyed: Math.max(0, Math.floor(Number(c.unkeyed) || 0))
+      unkeyed: Math.max(0, Math.floor(Number(c.unkeyed) || 0)),
+      blank: Math.max(0, Math.floor(Number(c.blank) || 0)),
+      blankAnon: Math.max(0, Math.floor(Number(c.blankAnon) || 0))
     };
     ghost += perSection[sec].ghost;
     bare += perSection[sec].bare;
     visibleEmpty += perSection[sec].visibleEmpty;
     unkeyed += perSection[sec].unkeyed;
+    blank += perSection[sec].blank;
+    blankAnon += perSection[sec].blankAnon;
   }
   return {
     measured: true,
@@ -194,12 +227,16 @@ export function venueDomCensusToParityDom(census) {
     bare,
     visibleEmpty,
     unkeyed,
+    blank,
+    blankAnon,
     dupIntra: dup.dupIntra,
     dupCross: dup.dupCross,
     dupLaneLobby: dup.dupLaneLobby,
     strays: Math.max(0, Math.floor(Number(census.strays) || 0)),
     charFrame: Math.max(0, Math.floor(Number(census.charFrameTiles) || 0)),
     crowdOn: census.crowdOn === true,
-    crowdCount: Math.max(0, Math.floor(Number(census.crowdCount) || 0))
+    crowdCount: Math.max(0, Math.floor(Number(census.crowdCount) || 0)),
+    probeOk: Math.max(0, Math.floor(Number(census.avatarProbe?.usericonSucceeded) || 0)),
+    probeFail: Math.max(0, Math.floor(Number(census.avatarProbe?.usericonFailed) || 0))
   };
 }

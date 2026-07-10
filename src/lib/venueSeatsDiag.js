@@ -122,13 +122,17 @@ export function buildVenueSeatsDiagSnapshot(diag, nowMs) {
           bare: Math.max(0, Math.floor(num(lpDomIn.bare, 0))),
           visibleEmpty: Math.max(0, Math.floor(num(lpDomIn.visibleEmpty, 0))),
           unkeyed: Math.max(0, Math.floor(num(lpDomIn.unkeyed, 0))),
+          // v0.1.1116: 白円計器(blank=avatarがblank.jpg・blankAnon=数値ID鍵でないのに白円=導出バグ)。
+          blank: Math.max(0, Math.floor(num(lpDomIn.blank, 0))),
+          blankAnon: Math.max(0, Math.floor(num(lpDomIn.blankAnon, 0))),
           dupIntra: Math.max(0, Math.floor(num(lpDomIn.dupIntra, 0))),
           dupCross: Math.max(0, Math.floor(num(lpDomIn.dupCross, 0))),
           dupLaneLobby: Math.max(0, Math.floor(num(lpDomIn.dupLaneLobby, 0))),
           strays: Math.max(0, Math.floor(num(lpDomIn.strays, 0))),
           charFrame: Math.max(0, Math.floor(num(lpDomIn.charFrame, 0))),
           crowdOn: lpDomIn.crowdOn === true,
-          crowdCount: Math.max(0, Math.floor(num(lpDomIn.crowdCount, 0)))
+          crowdCount: Math.max(0, Math.floor(num(lpDomIn.crowdCount, 0))),
+          probeFail: Math.max(0, Math.floor(num(lpDomIn.probeFail, 0)))
         }
       : null;
   const laneParity = lpIn

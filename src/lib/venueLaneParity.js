@@ -97,8 +97,9 @@ export function laneMirrorTierKeySequences(snap) {
  *   visibleShown: number,
  *   logicalTotal: number,
  *   dom: null | { measured: boolean, ghost: number, bare: number, visibleEmpty: number, unkeyed: number,
+ *                 blank: number, blankAnon: number,
  *                 dupIntra: number, dupCross: number, dupLaneLobby: number, strays: number,
- *                 charFrame: number, crowdOn: boolean, crowdCount: number },
+ *                 charFrame: number, crowdOn: boolean, crowdCount: number, probeFail: number },
  *   line: string
  * }}
  */
@@ -316,11 +317,18 @@ export function buildVenueLaneParity(input) {
       (domDupTotal > 0 || domStrays > 0 ? ` / 重複${domDupTotal} 迷子${domStrays}` : '');
   }
   // 付帯(>0のときだけ末尾): 「顔が多く見える」容疑者(群衆Canvas/額縁)と✅ブロッカー(無鍵/空可視)の実数。
+  //   v0.1.1116: 白円(blank=avatar が blank.jpg)と顔プローブ404も参考併記。blankAnon(数値IDでない鍵の
+  //   白円=identiconになるべき人が白い)は導出バグの証拠で、修正後の期待値0(数値IDの白円は①も同じ=正)。
+  const domBlank = domMeasured ? Math.max(0, Math.floor(Number(domIn.blank) || 0)) : 0;
+  const domBlankAnon = domMeasured ? Math.max(0, Math.floor(Number(domIn.blankAnon) || 0)) : 0;
+  const domProbeFail = domMeasured ? Math.max(0, Math.floor(Number(domIn.probeFail) || 0)) : 0;
   const extraStr = domMeasured
     ? (domIn.crowdOn === true ? ` / 群衆on(${Math.max(0, Math.floor(Number(domIn.crowdCount) || 0))})` : '') +
       (Number(domIn.charFrame) > 0 ? ` / 額縁${Math.floor(Number(domIn.charFrame))}` : '') +
       (domUnkeyed > 0 ? ` / 無鍵${domUnkeyed}` : '') +
-      (domVisibleEmpty > 0 ? ` / 空可視${domVisibleEmpty}` : '')
+      (domVisibleEmpty > 0 ? ` / 空可視${domVisibleEmpty}` : '') +
+      (domBlank > 0 ? ` / 白円${domBlank}(匿名${domBlankAnon})` : '') +
+      (domProbeFail > 0 ? ` / 顔404=${domProbeFail}` : '')
     : '';
   const line =
     `会場一致 ${verdict}${verdict === '⚪' ? reason : ageStr} ${tierStr}` +
@@ -350,13 +358,16 @@ export function buildVenueLaneParity(input) {
           bare: Math.max(0, Math.floor(Number(domIn.bare) || 0)),
           visibleEmpty: domVisibleEmpty,
           unkeyed: domUnkeyed,
+          blank: domBlank,
+          blankAnon: domBlankAnon,
           dupIntra: Math.max(0, Math.floor(Number(domIn.dupIntra) || 0)),
           dupCross: Math.max(0, Math.floor(Number(domIn.dupCross) || 0)),
           dupLaneLobby: Math.max(0, Math.floor(Number(domIn.dupLaneLobby) || 0)),
           strays: domStrays,
           charFrame: Math.max(0, Math.floor(Number(domIn.charFrame) || 0)),
           crowdOn: domIn.crowdOn === true,
-          crowdCount: Math.max(0, Math.floor(Number(domIn.crowdCount) || 0))
+          crowdCount: Math.max(0, Math.floor(Number(domIn.crowdCount) || 0)),
+          probeFail: domProbeFail
         }
       : null,
     line
@@ -369,8 +380,9 @@ export function buildVenueLaneParity(input) {
  * @param {ReturnType<typeof buildVenueLaneParity>|null|undefined} parity
  * @returns {{ mode: string, verdict: string, reason: string, line: string, unexplained: number, mirrorAgeSec: number, lobby: number,
  *             dom: null | { measured: boolean, ghost: number, bare: number, visibleEmpty: number, unkeyed: number,
+ *                           blank: number, blankAnon: number,
  *                           dupIntra: number, dupCross: number, dupLaneLobby: number, strays: number,
- *                           charFrame: number, crowdOn: boolean, crowdCount: number } }|null}
+ *                           charFrame: number, crowdOn: boolean, crowdCount: number, probeFail: number } }|null}
  */
 export function toVenueLaneParityDiag(parity) {
   if (!parity || typeof parity !== 'object') return null;
@@ -391,13 +403,16 @@ export function toVenueLaneParityDiag(parity) {
             bare: Math.max(0, Math.floor(Number(dom.bare) || 0)),
             visibleEmpty: Math.max(0, Math.floor(Number(dom.visibleEmpty) || 0)),
             unkeyed: Math.max(0, Math.floor(Number(dom.unkeyed) || 0)),
+            blank: Math.max(0, Math.floor(Number(/** @type {any} */ (dom).blank) || 0)),
+            blankAnon: Math.max(0, Math.floor(Number(/** @type {any} */ (dom).blankAnon) || 0)),
             dupIntra: Math.max(0, Math.floor(Number(dom.dupIntra) || 0)),
             dupCross: Math.max(0, Math.floor(Number(dom.dupCross) || 0)),
             dupLaneLobby: Math.max(0, Math.floor(Number(dom.dupLaneLobby) || 0)),
             strays: Math.max(0, Math.floor(Number(dom.strays) || 0)),
             charFrame: Math.max(0, Math.floor(Number(dom.charFrame) || 0)),
             crowdOn: dom.crowdOn === true,
-            crowdCount: Math.max(0, Math.floor(Number(dom.crowdCount) || 0))
+            crowdCount: Math.max(0, Math.floor(Number(dom.crowdCount) || 0)),
+            probeFail: Math.max(0, Math.floor(Number(/** @type {any} */ (dom).probeFail) || 0))
           }
         : null
   };

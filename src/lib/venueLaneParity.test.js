@@ -384,6 +384,18 @@ describe('buildVenueLaneParity', () => {
       expect(p.line).toContain('額縁12');
     });
 
+    it('v0.1.1116: 白円/顔404 は判定外の参考値として付帯し、diag の dom にも載る', () => {
+      const p = buildVenueLaneParity({
+        ...base(),
+        dom: domMatching(painted(), 0, { blank: 9, blankAnon: 3, probeFail: 7 })
+      });
+      expect(p.verdict).toBe('✅'); // 白円は①も同じ404がありうる=参考値(P3後は blankAnon=0 が期待値)
+      expect(p.line).toContain('白円9(匿名3)');
+      expect(p.line).toContain('顔404=7');
+      const d = toVenueLaneParityDiag(p);
+      expect(d.dom).toMatchObject({ blank: 9, blankAnon: 3, probeFail: 7 });
+    });
+
     it('fallback でも census は参考で line に写る(白円/迷子はモード無関係)', () => {
       const p = buildVenueLaneParity({
         ...base(),

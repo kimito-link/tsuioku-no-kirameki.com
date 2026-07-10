@@ -7,13 +7,21 @@ import {
   VENUE_CENSUS_SECTIONS
 } from './venueDomCensus.js';
 
-/** @param {string} [key] userKey('' や省略=無鍵) */
-function makeTile(key) {
+/** @param {string} [key] userKey('' や省略=無鍵) @param {string} [imgSrc] avatar img の src(省略=img無し) */
+function makeTile(key, imgSrc) {
   const tile = document.createElement('div');
   tile.className = 'nl-story-userlane-cell';
   if (key) tile.dataset.userKey = key;
+  if (imgSrc) {
+    const img = document.createElement('img');
+    img.className = 'nl-story-userlane-avatar';
+    img.src = imgSrc;
+    tile.appendChild(img);
+  }
   return tile;
 }
+
+const BLANK_URL = 'https://secure-dcdn.cdn.nimg.jp/nicoaccount/usericon/defaults/blank.jpg';
 
 /** @param {{ empty?: boolean, tile?: HTMLElement|null }} [opts] */
 function makeSeat(opts = {}) {
@@ -139,6 +147,33 @@ describe('collectVenueLaneDomCensus', () => {
     for (const sec of VENUE_CENSUS_SECTIONS) expect(c.perSection[sec].visible).toBe(0);
     expect(c.strays).toBe(0);
     expect(c.charFrameTiles).toBe(0);
+    expect(c.avatarProbe).toBeNull();
+  });
+
+  // --- v0.1.1116 白円計器 ---
+  it('白円(blank.jpg表示中)を数え、数値ID鍵でない白円は blankAnon(導出バグの証拠)', () => {
+    const { stack, laneEls, lobbyList } = makeVenueDom();
+    laneEls.link.appendChild(makeSeat({ tile: makeTile('u:123456', BLANK_URL) })); // 数値ID白円=①も同じ404(正)
+    laneEls.tanu.appendChild(makeSeat({ tile: makeTile('u:aXyzToken', BLANK_URL) })); // 匿名鍵の白円=導出バグ
+    laneEls.tanu.appendChild(makeSeat({ tile: makeTile('c:#1|広告主', BLANK_URL) })); // 合成鍵の白円=導出バグ
+    laneEls.tanu.appendChild(makeSeat({ tile: makeTile('u:789', 'https://x/real.jpg') })); // 実サムネ=白円でない
+    laneEls.tanu.appendChild(makeSeat({ tile: makeTile('u:790') })); // img無し=白円に数えない
+    const c = collectVenueLaneDomCensus({ laneEls, lobbyList, stackEl: stack });
+    expect(c.perSection.link.blank).toBe(1);
+    expect(c.perSection.link.blankAnon).toBe(0);
+    expect(c.perSection.tanu.blank).toBe(2);
+    expect(c.perSection.tanu.blankAnon).toBe(2);
+  });
+
+  it('avatarProbe(顔プローブ実績)は extras から検証つきで写す(露出のみ・計測しない)', () => {
+    const { stack, laneEls, lobbyList } = makeVenueDom();
+    const c = collectVenueLaneDomCensus({
+      laneEls,
+      lobbyList,
+      stackEl: stack,
+      extras: { avatarProbe: { usericonSucceeded: 44, usericonFailed: 7 } }
+    });
+    expect(c.avatarProbe).toEqual({ usericonSucceeded: 44, usericonFailed: 7 });
   });
 });
 
@@ -182,6 +217,24 @@ describe('venueDomCensusToParityDom', () => {
     expect(dom.bare).toBe(1);
     expect(dom.dupIntra).toBe(1);
     expect(dom.dupLaneLobby).toBe(1);
+  });
+
+  it('v0.1.1116: blank/blankAnon 総計と probeOk/probeFail を要約に畳む', () => {
+    const { stack, laneEls, lobbyList } = makeVenueDom();
+    laneEls.tanu.appendChild(makeSeat({ tile: makeTile('u:aTok', BLANK_URL) }));
+    lobbyList.appendChild(makeSeat({ tile: makeTile('u:42424242', BLANK_URL) }));
+    const dom = venueDomCensusToParityDom(
+      collectVenueLaneDomCensus({
+        laneEls,
+        lobbyList,
+        stackEl: stack,
+        extras: { avatarProbe: { usericonSucceeded: 44, usericonFailed: 7 } }
+      })
+    );
+    expect(dom.blank).toBe(2);
+    expect(dom.blankAnon).toBe(1);
+    expect(dom.probeOk).toBe(44);
+    expect(dom.probeFail).toBe(7);
   });
 
   it('census が無ければ null(fail-closed: 判定側は DOM未計測=⚪)', () => {
