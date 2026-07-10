@@ -156,6 +156,8 @@ import {
   resolveBubbleFlowLifetimeMs
 } from '../lib/venueSpeechStreak.js';
 import { enrichVenueRowsWithProfileAvatars } from '../lib/venueAvatar.js';
+// v0.1.1118 鏡enrich(P4): ①が解決済みの顔URL(鏡displaySrc)を追加のenrich源にする(新規readゼロ)。
+import { buildVenueMirrorAvatarMap, enrichVenueRowsWithMirrorAvatars } from '../lib/venueMirrorAvatarEnrich.js';
 // v0.1.1111 会場=①レーン鏡映(メンバー完全一致): ①の実paint鏡(KEY_LANE_MIRROR)を会場の正本に昇格。
 //   設計正本=memory/reference_pop_venue_parity_SYNTHESIS.md(P層=鏡そのまま/T層=cap溢れの尾/X層=直近発言者)。
 import { KEY_LANE_MIRROR } from '../lib/laneMirrorKey.js';
@@ -3813,6 +3815,20 @@ export function mountVenueBarButton(options = {}) {
     crowdRaf = 0;
   };
 
+  /** v0.1.1118 鏡enrichマップのキャッシュ(鏡 capturedAt が変わったときだけ作り直す=毎commitのO(鏡)回避)。 */
+  let _mirrorAvatarMapCacheAt = -1;
+  /** @type {Map<string, string>} */
+  let _mirrorAvatarMapCache = new Map();
+  const currentMirrorAvatarMap = () => {
+    const snap = laneMirrorPaintSnap || laneMirrorSnap;
+    const cap = Math.max(0, Number(/** @type {any} */ (snap)?.capturedAt) || 0);
+    if (cap !== _mirrorAvatarMapCacheAt) {
+      _mirrorAvatarMapCacheAt = cap;
+      _mirrorAvatarMapCache = buildVenueMirrorAvatarMap(/** @type {any} */ (snap));
+    }
+    return _mirrorAvatarMapCache;
+  };
+
   /**
    * 表示行を「新鮮優先・空なら前回保持」で確定してから席を描く(空っぽ・消える根治の入口)。
    * 集計/poll はここを通すことで、一瞬0件や storage 失敗でも会場が空で再描画されない。
@@ -3822,8 +3838,13 @@ export function mountVenueBarButton(options = {}) {
     // v0.1.1110 白円根治: どの供給経路(storage集計/在席roster/発言マージ)でも描画直前に必ず
     //   プロファイルキャッシュ補強を通す(補強済み行は素通り=冪等)。経路ごとの enrich 配線忘れを
     //   関所1箇所で構造的に不可能にする(v0.1.754 で在席経路が補強を素通りした退行の再発防止)。
+    // v0.1.1118 鏡enrich(P4): その後段で「①が解決済みの顔URL(鏡displaySrc・score2のみ)」を注入。
+    //   ロビー/トップバー/fallback でも①とバイト一致の顔になる(score比較で強い方のみ=冪等)。
     const resolved = resolveDisplayRows(
-      enrichVenueRowsWithProfileAvatars(incoming, profileAvatarMap),
+      enrichVenueRowsWithMirrorAvatars(
+        enrichVenueRowsWithProfileAvatars(incoming, profileAvatarMap),
+        currentMirrorAvatarMap()
+      ),
       lastGoodRows
     );
     lastGoodRows = resolved.nextLastGood;
