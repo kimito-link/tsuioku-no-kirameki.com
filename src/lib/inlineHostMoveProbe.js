@@ -69,10 +69,44 @@ export function recordInlineHostDuplicateSeen(state, hostCount) {
 }
 
 /**
+ * v0.1.1128 根治(3-B): 会場open中は host の DOM 移設を凍結するか?の純判定。
+ *
+ * 実測(v0.1.1125計器・2026-07-11): 会場を開くと ①host が anchored_video⇄dock_body を
+ * 360ms tick ごとに往復移設され reloadCount=276/venueOpenMoves=275(=毎回 iframe リロード=点滅)。
+ * 機序: 会場遮蔽(visibility:hidden)で inlineHostLooksVisible()=false → 「見えないからドックへ退避」
+ * フォールバックが発火 → 次 tick で anchored へ戻る → 無限ピンポン。
+ *
+ * 凍結条件は3条件AND(計画 robust-pondering-fountain §3-B・承認済み):
+ *   - venueOpen: 会場open中(意図した不可視=退避理由にならない)
+ *   - hostConnected: host が DOM に居る(切断時は必ず再attach=鏡publishを死守するため凍結しない)
+ *   - hostHasIframe: iframe を抱えている(=移設がリロード実害になる状態)
+ * @param {{ venueOpen?: boolean, hostConnected?: boolean, hostHasIframe?: boolean }} input
+ * @returns {boolean} true=移設をskipする
+ */
+export function shouldSkipInlineHostMoveForVenue(input) {
+  return (
+    input?.venueOpen === true &&
+    input?.hostConnected === true &&
+    input?.hostHasIframe === true
+  );
+}
+
+/**
+ * 会場凍結で移設をskipした回数を数える(破壊的更新・観測用)。
+ * @param {{ venueSkipCount?: number }} state recordInlineHostMove と同じ state を共有
+ * @returns {object} 更新後の同じ state
+ */
+export function recordInlineHostMoveVenueSkip(state) {
+  if (!state || typeof state !== 'object') return state;
+  state.venueSkipCount = (Number(state.venueSkipCount) || 0) + 1;
+  return state;
+}
+
+/**
  * fastDiag(content.hostMoveDiag)へ出す形に要約する純関数。
- * @param {{ count:number, reloadCount:number, venueOpenMoves:number, duplicateSeen?:number, byReason:Record<string,number>, samples:Array<object>, lastAtMs:number }|null} state
+ * @param {{ count:number, reloadCount:number, venueOpenMoves:number, duplicateSeen?:number, venueSkipCount?:number, byReason:Record<string,number>, samples:Array<object>, lastAtMs:number }|null} state
  * @param {number} nowMs
- * @returns {{ moveCount:number, reloadCount:number, venueOpenMoves:number, duplicateSeen:number, lastMoveAgoMs:(number|null), byReason:Record<string,number>, samples:Array<object> }}
+ * @returns {{ moveCount:number, reloadCount:number, venueOpenMoves:number, duplicateSeen:number, venueSkipCount:number, lastMoveAgoMs:(number|null), byReason:Record<string,number>, samples:Array<object> }}
  */
 export function summarizeInlineHostMoveDiag(state, nowMs) {
   const lastAtMs = Number(state?.lastAtMs) || 0;
@@ -81,6 +115,7 @@ export function summarizeInlineHostMoveDiag(state, nowMs) {
     reloadCount: Number(state?.reloadCount) || 0,
     venueOpenMoves: Number(state?.venueOpenMoves) || 0,
     duplicateSeen: Number(state?.duplicateSeen) || 0,
+    venueSkipCount: Number(state?.venueSkipCount) || 0,
     lastMoveAgoMs: lastAtMs > 0 ? Math.max(0, Number(nowMs) - lastAtMs) : null,
     byReason: state?.byReason && typeof state.byReason === 'object' ? { ...state.byReason } : {},
     samples: Array.isArray(state?.samples) ? state.samples.slice(-INLINE_HOST_MOVE_SAMPLE_CAP) : []

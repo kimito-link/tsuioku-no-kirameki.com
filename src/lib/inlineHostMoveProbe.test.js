@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import {
   recordInlineHostMove,
   recordInlineHostDuplicateSeen,
+  recordInlineHostMoveVenueSkip,
+  shouldSkipInlineHostMoveForVenue,
   summarizeInlineHostMoveDiag,
   INLINE_HOST_MOVE_SAMPLE_CAP
 } from './inlineHostMoveProbe.js';
@@ -51,5 +53,37 @@ describe('inlineHostMoveProbe(v0.1.1124 D-1計器)', () => {
     recordInlineHostDuplicateSeen(s, 0);
     expect(summarizeInlineHostMoveDiag(s, 100).duplicateSeen).toBe(2);
     expect(() => recordInlineHostDuplicateSeen(null, 2)).not.toThrow();
+  });
+
+  describe('shouldSkipInlineHostMoveForVenue(v0.1.1128 会場凍結・3-B)', () => {
+    it('3条件AND(会場open+接続済み+iframe持ち)のときだけ true', () => {
+      expect(shouldSkipInlineHostMoveForVenue({ venueOpen: true, hostConnected: true, hostHasIframe: true })).toBe(true);
+    });
+
+    it('会場が閉じていれば凍結しない(従来どおり移設)', () => {
+      expect(shouldSkipInlineHostMoveForVenue({ venueOpen: false, hostConnected: true, hostHasIframe: true })).toBe(false);
+    });
+
+    it('host切断時は凍結しない(再attach=鏡publishを死守)', () => {
+      expect(shouldSkipInlineHostMoveForVenue({ venueOpen: true, hostConnected: false, hostHasIframe: true })).toBe(false);
+    });
+
+    it('iframe未生成なら凍結しない(移設してもリロード実害なし)', () => {
+      expect(shouldSkipInlineHostMoveForVenue({ venueOpen: true, hostConnected: true, hostHasIframe: false })).toBe(false);
+    });
+
+    it('不正入力で throw しない(false=fail-open)', () => {
+      expect(shouldSkipInlineHostMoveForVenue(null)).toBe(false);
+      expect(shouldSkipInlineHostMoveForVenue({})).toBe(false);
+    });
+  });
+
+  it('venueSkipCount はskipのたびに増え summarize に出る(v0.1.1128)', () => {
+    const s = {};
+    recordInlineHostMoveVenueSkip(s);
+    recordInlineHostMoveVenueSkip(s);
+    expect(summarizeInlineHostMoveDiag(s, 100).venueSkipCount).toBe(2);
+    expect(summarizeInlineHostMoveDiag(null, 100).venueSkipCount).toBe(0);
+    expect(() => recordInlineHostMoveVenueSkip(null)).not.toThrow();
   });
 });
