@@ -126,4 +126,9 @@ describe('会場=①レーン鏡映の配線(配線忘れ=CI赤)', () => {
     expect(venueBarSrc).toMatch(/enrichVenueRowsWithMirrorAvatars\(\s*enrichVenueRowsWithProfileAvatars\(/);
     expect(venueBarSrc).toMatch(/buildVenueMirrorAvatarMap\(/);
   });
+
+  // --- v0.1.1120 会場のガイド帯除去 ---
+  it('会場の paint は guides:false(キャラ帯/空段ノート/フッターを描画パスから除外)', () => {
+    expect(venueBarSrc).toMatch(/guides: false/);
+  });
 });

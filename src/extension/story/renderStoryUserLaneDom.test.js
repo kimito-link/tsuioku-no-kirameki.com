@@ -240,3 +240,48 @@ describe('shouldKeepStoryUserLaneTilesOnShrink', () => {
     expect(shouldKeepStoryUserLaneTilesOnShrink(elsWithTiles(100), ' LV1 ', 'lv1', 10, true)).toBe(true);
   });
 });
+
+describe('guides:false(v0.1.1120 会場用) — 案内帯/空段ノート/hint/フッターの描画パス除外', () => {
+  const BUCKETS = { link: [], gift: [], ad: [], konta: [], tanu: TANU };
+
+  it('guides:false で ガイド帯5種+フッターが hidden かつ innerHTML 空', () => {
+    const els = makeEls();
+    paintStoryUserLaneDomFilled(els, FACES, BUCKETS, 2, IO, { guides: false });
+    for (const g of [els.guideTop, els.guideMidGift, els.guideMidKonta, els.guideMidTanu, els.guideBottom]) {
+      expect(g.hidden).toBe(true);
+    }
+    for (const l of [els.guideLinesTop, els.guideLinesMidGift, els.guideLinesMidKonta, els.guideLinesMidTanu, els.guideLinesBottom]) {
+      expect(l.innerHTML).toBe('');
+    }
+  });
+
+  it('guides:false で 空段説明ノートと りんくヒントも出ない(タイルは従来どおり描く)', () => {
+    const els = makeEls();
+    document.body.append(els.laneLink, els.laneGift, els.laneKonta, els.laneTanu);
+    paintStoryUserLaneDomFilled(els, FACES, BUCKETS, 2, IO, { guides: false });
+    expect(document.querySelectorAll('.nl-story-userlane__empty-note').length).toBe(0);
+    expect(els.hintLink.hidden).toBe(true);
+    expect(els.laneTanu.children.length).toBe(2); // タイル本体は不変
+  });
+
+  it('モード遷移: guides:true で描いた帯/ノートが guides:false の再paintで能動的に消える(残骸ゼロ)', () => {
+    const els = makeEls();
+    document.body.append(els.laneLink, els.laneGift, els.laneKonta, els.laneTanu);
+    paintStoryUserLaneDomFilled(els, FACES, BUCKETS, 2, IO, {});
+    expect(els.guideTop.hidden).toBe(false);
+    expect(document.querySelectorAll('.nl-story-userlane__empty-note').length).toBeGreaterThan(0);
+    paintStoryUserLaneDomFilled(els, FACES, BUCKETS, 2, IO, { guides: false });
+    expect(els.guideTop.hidden).toBe(true);
+    expect(els.guideLinesTop.innerHTML).toBe('');
+    expect(document.querySelectorAll('.nl-story-userlane__empty-note').length).toBe(0);
+  });
+
+  it('opts 省略(①③status)は従来どおり全ガイドが出る=既存挙動不変', () => {
+    const els = makeEls();
+    paintStoryUserLaneDomFilled(els, FACES, BUCKETS, 2, IO, {});
+    expect(els.guideTop.hidden).toBe(false);
+    expect(els.guideLinesTop.innerHTML).not.toBe('');
+    expect(els.guideBottom.hidden).toBe(false);
+    expect(els.guideLinesBottom.innerHTML).not.toBe('');
+  });
+});

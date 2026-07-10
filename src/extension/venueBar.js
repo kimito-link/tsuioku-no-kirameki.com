@@ -4222,6 +4222,10 @@ export function mountVenueBarButton(options = {}) {
         {
           recordedCommentRowsTotal: seating.participantCount,
           totalCandidates: seating.participantCount,
+          // v0.1.1120: 会場ではキャラ案内帯/空段説明/フッター(「ほかN人は会場モードで…」=自己言及)を
+          //   描画パスから除外。recordedCommentRowsTotal/totalCandidates は inert だが残置
+          //   (将来ガイドを戻すとき正値が要る・設計正本の地雷#9)。
+          guides: false,
           wrapTileEl: (tileEl, item) => {
             const laneItem = /** @type {{ _venueSeatIndex?: unknown }} */ (item || {});
             // v0.1.1111: 席を持たないアイテム(鏡由来の uid 無し広告主セル等)は _venueSeatIndex=-1
