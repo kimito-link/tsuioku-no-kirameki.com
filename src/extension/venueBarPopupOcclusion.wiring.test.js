@@ -56,9 +56,17 @@ describe('見た目①化(v0.1.1119)のCSS', () => {
     expect(venueBarSrc).toMatch(/nlsb-seat-speaking \.nl-story-userlane-avatar \{\s*animation: nlsb-seat-speak/);
   });
 
-  it('段とロビーに①と同じカードsurface(透け防止・全面スモークは導入しない)', () => {
+  it('surfaceは段行単位のみ(v0.1.1121: stack全面surface=白い大パネルの再発防止)', () => {
+    // stack 全面に background を敷くルールが復活したらCI赤(下端55vhバンド白面化の再発)。
+    expect(venueBarSrc).not.toMatch(
+      /\.nlsb-venue-lane-stack\.nl-story-userlane-stack \{[^}]*background/
+    );
     expect(venueBarSrc).toMatch(
-      /\.nlsb-venue-lane-stack\.nl-story-userlane-stack \{\s*background: var\(--nl-surface\)/
+      /\.nlsb-venue-lane-stack \.nl-story-userlane \{\s*background: var\(--nl-surface\)/
+    );
+    // gift/ad wrap(金色surface持ち)配下は入れ子カード防止で除外。
+    expect(venueBarSrc).toMatch(
+      /\.nlsb-venue-lane-stack \.nl-story-userlane-tier-wrap--gift \.nl-story-userlane \{\s*background: none/
     );
     expect(venueBarSrc).toMatch(/\.nlsb-lobby \{\s*background: var\(--nl-surface\)/);
   });
