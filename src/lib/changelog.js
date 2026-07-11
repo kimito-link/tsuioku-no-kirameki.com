@@ -26,6 +26,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1132',
+    date: '2026-07-11',
+    summary: 'fix(gift): 公式ギフト履歴の鮮度優先を修正',
+    items: Object.freeze([
+      'koken sub-app履歴が取得できない配信で、公式サイドバー(iframe)由来の新しいギフト履歴があっても常にライブ受信側が優先されてしまうバグを修正しました。',
+      '公式値が新しいうちはそれを優先し、明らかに古くなったときだけライブへ切替える本来の挙動(v0.1.395)に戻ります。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1131',
     date: '2026-07-11',
     summary: 'feat(web): ③WEBのエラー報告を有効化(DSN設定)',

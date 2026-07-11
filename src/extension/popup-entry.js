@@ -11482,7 +11482,10 @@ async function computeGiftHistoryNorthStarRoomsContext(liveId, opts = {}) {
   }
 
   // --- 源0 vs 源3（v0.1.578）: koken API の histories が極端に少ないとき NDGR ライブを優先。
-  if (subAppCtx || liveCtx) {
+  //   subAppCtx が無いときは比較対象が無い（iframe vs live は下の v0.1.395 分岐の役目）ので
+  //   この分岐には入らない（不具合修正 v0.1.1132: subAppCtx==null でも liveCtx があるだけで
+  //   ここに入り、v0.1.395 の iframe 鮮度優先ロジックが常に握りつぶされていた）。
+  if (subAppCtx) {
     const livePtsSum = liveCtx
       ? Number(liveCtx.pointsSumAll) ||
         liveCtx.rooms.reduce((s, r) => s + (Number(r.count) || 0), 0)
