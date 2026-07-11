@@ -1,4 +1,7 @@
 import { describe, it, expect } from 'vitest';
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import {
   VENUE_FRAME_CHARACTER_THUMBS,
   VENUE_FRAME_EDGES,
@@ -6,6 +9,17 @@ import {
   distributeFrameSlots,
   buildVenueCharacterFrame
 } from './venueCharacterFrame.js';
+
+describe('v0.1.1114 額縁フレームの廃止(フラグOFF)', () => {
+  it('venueBar の renderCharFrame はフラグOFFで no-op(キャラ顔の散らばりを描かない)', () => {
+    // ユーザー要望(2026-07-10): 四辺のキャラ顔散らばりは「会場に顔が多く見える」誤認の一因=非表示化。
+    //   計器→廃止の順(v0.1.1113 census の額縁Nで廃止効果を検証)。復活はフラグ1つ=このテストも直す。
+    const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
+    const src = readFileSync(path.join(repoRoot, 'src/extension/venueBar.js'), 'utf8');
+    expect(src).toMatch(/const VENUE_CHAR_FRAME_ENABLED = false;/);
+    expect(src).toMatch(/if \(!VENUE_CHAR_FRAME_ENABLED\) return;/);
+  });
+});
 
 describe('VENUE_FRAME_CHARACTER_THUMBS', () => {
   it('3キャラとも .thumb128 の表情バリアントだけ(非表情は含まない)', () => {

@@ -5,7 +5,7 @@
 > 下にマインドマップ（GitHub で図として表示）→ ディレクトリ一覧 → 機能逆引き索引 の順。
 > **全部の地図への入口: [MAP.md](MAP.md)** ／ 視覚ビュー: [repo-tree-map.html](repo-tree-map.html) ／ 機能依存図: [feature-map/index.md](feature-map/index.md) ／ 配置ルール正本: [AGENTS.md](../AGENTS.md) §4。
 
-ルート直下の設定ファイル: 17 件（package.json / *.config.js / AGENTS.md 等）
+ルート直下の設定ファイル: 18 件（package.json / *.config.js / AGENTS.md 等）
 
 ## マインドマップ（自動生成・GitHub で図として表示）
 
@@ -211,7 +211,7 @@ graph LR
 - `sound/`（33 件） — 読み上げ・完了音などの音声素材  〔音声〕
 
 ## `memory/` — セッション横断の知見・引き継ぎ(AI のメモリ)。コミット対象外も混在  〔メモリ / 知見〕
-<sub>ファイル 78 件</sub>
+<sub>ファイル 79 件</sub>
 
 - `archive/`（12 件） — 過去セッションの引き継ぎ(HANDOFF)アーカイブ  〔メモリ / 履歴〕
 - `avatar-parts/`（26 件） — アバター素材(顔シート等)の参考画像  〔アバター / 画像〕
@@ -227,14 +227,14 @@ graph LR
 - `tiers/`（23 件） — ⚠️ 未記入（ROLES に追記）
 
 ## `src/` — LP 側 + 純粋関数ライブラリの源  〔ソース〕
-<sub>ファイル 1376 件</sub>
+<sub>ファイル 1397 件</sub>
 
 - `data/`（6 件） — 保存コメントからレーン候補を読む acquirer / source 層  〔コメント / 取得〕
 - `domain/`（18 件） — ドメイン正本(応援レーンの集約・列ポリシー等。識別子判定など)  〔応援 / 集約 / 識別子〕
-- `extension/`（16 件） — バンドル entry(content/popup/venue/status/offscreen/backfill-sw 等=機能境界)  〔entry / 記録 / 会場 / 応援〕
+- `extension/`（18 件） — バンドル entry(content/popup/venue/status/offscreen/backfill-sw 等=機能境界)  〔entry / 記録 / 会場 / 応援〕
 - `fixtures/`（1 件） — テスト用フィクスチャ  〔テスト〕
 - `images/`（165 件） — LP / CWS 提出物のマスター画像  〔画像〕
-- `lib/`（1161 件） — 純粋関数ライブラリ(unit test 対象)。色・速度・コメント・レポート等の計算ロジックの大半  〔色 / 速度 / コメント / レポート / 純粋関数〕
+- `lib/`（1180 件） — 純粋関数ライブラリ(unit test 対象)。色・速度・コメント・レポート等の計算ロジックの大半  〔色 / 速度 / コメント / レポート / 純粋関数〕
 - `shared/`（7 件） — 複数機能で共有する小部品(アバター URL ガード等)  〔共有 / アバター〕
 - `sound/`（1 件） — 音声素材(src 側)  〔音声〕
 

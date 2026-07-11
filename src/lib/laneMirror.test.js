@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { buildLaneMirrorSnapshot, restoreLaneMirrorBuckets } from './laneMirror.js';
+import { anonymousIdenticonDataUrl } from './anonymousIdenticon.js';
 
 /**
  * 鏡スナップショット: buckets を最小5フィールドに間引いて保存し、status が paint に渡せる buckets 形に
@@ -99,5 +100,54 @@ describe('restoreLaneMirrorBuckets(round-trip)', () => {
     const r = restoreLaneMirrorBuckets(null);
     expect(r.link).toEqual([]);
     expect(r.tanu).toEqual([]);
+  });
+});
+
+describe('鏡スリム化 B-1(読み手フォールバック・v0.1.1112)', () => {
+  it('旧鏡(data URL入り)は再生成パス不発=byte同一出力(退行ゼロ)', () => {
+    const dataUrl = anonymousIdenticonDataUrl('a:abc', 64);
+    const snap = {
+      liveId: 'lv1',
+      capturedAt: 1,
+      link: [],
+      gift: [],
+      ad: [],
+      konta: [],
+      tanu: [{ displaySrc: dataUrl, title: '匿名', idLine: 'a:abc', nameLine: '匿名', userId: 'a:abc' }],
+      pickedLength: 1,
+      totalCandidates: 1
+    };
+    const restored = restoreLaneMirrorBuckets(snap);
+    expect(restored.tanu[0].displaySrc).toBe(dataUrl);
+  });
+
+  it('スリム化セル(displaySrc空+uid有り)は ①と同じ顔(anonymousIdenticonDataUrl(uid,64))を再生成', () => {
+    const snap = {
+      liveId: 'lv1',
+      capturedAt: 1,
+      link: [],
+      gift: [],
+      ad: [],
+      konta: [],
+      tanu: [{ displaySrc: '', title: '匿名', idLine: 'a:xyz', nameLine: '匿名', userId: 'a:xyz' }],
+      pickedLength: 1,
+      totalCandidates: 1
+    };
+    const restored = restoreLaneMirrorBuckets(snap);
+    expect(restored.tanu[0].displaySrc).toBe(anonymousIdenticonDataUrl('a:xyz', 64));
+    expect(restored.tanu[0].displaySrc.startsWith('data:')).toBe(true);
+  });
+
+  it('displaySrc空+uid無し(壊れセル)は空のまま(勝手に顔を作らない)', () => {
+    const snap = {
+      liveId: 'lv1', capturedAt: 1, link: [], gift: [], ad: [], konta: [],
+      tanu: [{ displaySrc: '', title: 'x', idLine: '', nameLine: '', userId: '' }],
+      pickedLength: 1, totalCandidates: 1
+    };
+    expect(restoreLaneMirrorBuckets(snap).tanu[0].displaySrc).toBe('');
+  });
+
+  it('B-2の前提: ①の既定生成(引数なし)は size=64 とbyte一致(strip比較の成立条件)', () => {
+    expect(anonymousIdenticonDataUrl('a:same')).toBe(anonymousIdenticonDataUrl('a:same', 64));
   });
 });

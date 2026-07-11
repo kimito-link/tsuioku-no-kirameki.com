@@ -54,9 +54,18 @@ const SESSION_SUMMARY = {
     }
   ]
 };
+// 会場=①POP完全一致 Patch A: ①「詳しい状況」診断の軽量鏡。
+const STORY_DIAG = {
+  liveId: 'lv1',
+  capturedAt: 18,
+  total: 12,
+  withUid: 10,
+  resolvedAvatar: 9,
+  interceptExportCode: 'ok'
+};
 
 describe('createEmptyMirrorBundle', () => {
-  it('8セクションが null の初期形を返す(giftHistory=第2号・roomHeat=第4号・sessionSummary=第5号を含む)', () => {
+  it('9セクションが null の初期形を返す(giftHistory=第2号・roomHeat=第4号・sessionSummary=第5号・storyDiag=①診断を含む)', () => {
     expect(createEmptyMirrorBundle()).toEqual({
       liveId: '',
       gen: 0,
@@ -69,7 +78,8 @@ describe('createEmptyMirrorBundle', () => {
         commentTimeline: null,
         giftHistory: null,
         roomHeat: null,
-        sessionSummary: null
+        sessionSummary: null,
+        storyDiag: null
       }
     });
   });
@@ -308,5 +318,23 @@ describe('sessionSummary バンドル節(③WEB記録サマリ推移丸写し・
     const buf = mergeMirrorBundleSection(createEmptyMirrorBundle(), 'lane', LANE, { liveId: 'lv1', nowMs: 100 });
     expect(buf.sections.sessionSummary).toBeNull();
     expect(restoreMirrorBundleSection(buf, 'sessionSummary')).toBeNull();
+  });
+});
+
+describe('storyDiag バンドル節(会場=① 詳しい状況診断 Patch A)', () => {
+  it("'storyDiag' は正規セクションキー=merge/restore できる(他8鏡と同一 tick に載る)", () => {
+    let buf = createEmptyMirrorBundle();
+    buf = mergeMirrorBundleSection(buf, 'lane', LANE, { liveId: 'lv1', nowMs: 100 });
+    buf = mergeMirrorBundleSection(buf, 'storyDiag', STORY_DIAG, { liveId: 'lv1', nowMs: 101 });
+    // storyDiag を足しても既存の lane を消さない(後着が先着を消さない)。
+    expect(buf.sections.lane).toBe(LANE);
+    expect(buf.sections.storyDiag).toBe(STORY_DIAG);
+    expect(restoreMirrorBundleSection(buf, 'storyDiag')).toBe(STORY_DIAG);
+  });
+
+  it('ネガコン: 未反映の storyDiag は初期形で null(既存を消さない)', () => {
+    const buf = mergeMirrorBundleSection(createEmptyMirrorBundle(), 'lane', LANE, { liveId: 'lv1', nowMs: 100 });
+    expect(buf.sections.storyDiag).toBeNull();
+    expect(restoreMirrorBundleSection(buf, 'storyDiag')).toBeNull();
   });
 });

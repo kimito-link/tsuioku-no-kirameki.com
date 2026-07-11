@@ -17,6 +17,8 @@ import {
 } from '../../lib/storyUserLaneGuideHtml.js';
 import { buildStoryUserLaneStackAriaLabel } from '../../lib/supportVisualStoryCopy.js';
 import { buildPersonTileEl } from '../../lib/personTileDom.js';
+// v0.1.1113 実DOM census(Tri-Parity): タイルへ照合キーを恒久刻印するための純関数(葉lib同士=循環なし)。
+import { venueLaneParityKey } from '../../lib/venueLaneParity.js';
 
 /**
  * @typedef {{
@@ -285,6 +287,10 @@ function fillLaneTier(el, items, io, wrapTileEl) {
     //   personTileDom.js(タイル正本・凍結)は不触=ここ(呼び出し側)で属性を付ける。
     try {
       tileEl.dataset.thumb = io.isHttpOrHttpsUrl(String(p && p.displaySrc || '')) ? '1' : '0';
+      // v0.1.1113 実DOM census(Tri-Parity): 実DOMをキー単位で突合するための恒久刻印。
+      //   タイル正本(personTileDom)は凍結のため呼び出し側で付ける。''=無鍵(census が unkeyed に数える)。
+      //   ★storyLaneTierBodyKey には入れない(diff-skip の key 揺れを作らない)。
+      tileEl.dataset.userKey = venueLaneParityKey(p);
     } catch { /* io 未注入等でも描画は止めない */ }
     frag.appendChild(typeof wrapTileEl === 'function' ? wrapTileEl(tileEl, p, i) : tileEl);
   }
@@ -302,8 +308,10 @@ function fillLaneTier(el, items, io, wrapTileEl) {
  * @param {{ link: unknown[], gift: unknown[], konta: unknown[], tanu: unknown[] }} buckets
  * @param {number} pickedLength
  * @param {StoryUserLaneDomIo} io
- * @param {{ recordedCommentRowsTotal?: number, totalCandidates?: number, wrapTileEl?: (tileEl: HTMLElement, item: unknown, index: number) => HTMLElement }} [opts] 診断の total と同じ記録件数
+ * @param {{ recordedCommentRowsTotal?: number, totalCandidates?: number, guides?: boolean, wrapTileEl?: (tileEl: HTMLElement, item: unknown, index: number) => HTMLElement }} [opts] 診断の total と同じ記録件数
  *   （省略時はレーン直下の第2文なし）。totalCandidates=素性が取れた候補総数（cap 前）で「ほか M人」併記用。
+ *   guides=false(v0.1.1120 会場用): キャラ案内帯・空段説明ノート・りんくヒント・フッター
+ *   (「ほかN人は会場モードで…」=会場内では自己言及)を描画パスから除外する。省略時 true=①③status 完全不変。
  */
 export function paintStoryUserLaneDomFilled(
   els,
@@ -339,35 +347,41 @@ export function paintStoryUserLaneDomFilled(
   } = els;
 
   const wrapTileEl = opts && typeof opts.wrapTileEl === 'function' ? opts.wrapTileEl : undefined;
+  // v0.1.1120: guides=false は案内帯/空段ノート/hint/フッターを【描画パスから除外】する(CSS隠しでない
+  //   =構造依存driftなし)。省略時 true=①③status のDOMはバイト一致で不変(reference_venue_cleanup §C-1)。
+  const showGuides = !(opts && opts.guides === false);
   fillLaneTier(laneLink, buckets.link, io, wrapTileEl);
   fillLaneTier(laneGift, buckets.gift, io, wrapTileEl);
   if (laneAd) fillLaneTier(laneAd, buckets.ad || [], io, wrapTileEl);
   fillLaneTier(laneKonta, buckets.konta, io, wrapTileEl);
   fillLaneTier(laneTanu, buckets.tanu, io, wrapTileEl);
 
+  // 空段ノートは lane el 直付け(:188-198)のため、非表示は必ずこの関数の show=false 経由で
+  //   【能動的に除去】する(guide 要素の null 化では消えない=設計正本の地雷#5)。
   syncStoryUserLaneTierEmptyNote(
     laneLink,
-    buckets.link.length === 0,
+    showGuides && buckets.link.length === 0,
     buildStoryUserLaneEmptyNoteLinkHtml()
   );
   syncStoryUserLaneTierEmptyNote(
     laneGift,
-    buckets.gift.length === 0,
+    showGuides && buckets.gift.length === 0,
     buildStoryUserLaneEmptyNoteGiftHtml()
   );
   syncStoryUserLaneTierEmptyNote(
     laneKonta,
-    buckets.konta.length === 0,
+    showGuides && buckets.konta.length === 0,
     buildStoryUserLaneEmptyNoteKontaHtml()
   );
   syncStoryUserLaneTierEmptyNote(
     laneTanu,
-    buckets.tanu.length === 0,
+    showGuides && buckets.tanu.length === 0,
     buildStoryUserLaneEmptyNoteTanuHtml()
   );
 
   if (hintLink) {
     const showLinkHint =
+      showGuides &&
       buckets.link.length === 0 &&
       (buckets.konta.length > 0 || buckets.tanu.length > 0);
     hintLink.hidden = !showLinkHint;
@@ -390,47 +404,52 @@ export function paintStoryUserLaneDomFilled(
     const hasAd = (buckets.ad || []).length > 0;
     if (hasAd) laneAd.hidden = false;
     adWrap.hidden = !hasAd;
-    if (guideMidAd) guideMidAd.hidden = !hasAd;
-    if (hasAd && guideLinesMidAd) {
-      guideLinesMidAd.innerHTML = buildStoryUserLaneGuideAdHtml(faces.faceAd);
+    if (guideMidAd) guideMidAd.hidden = !(showGuides && hasAd);
+    if (guideLinesMidAd) {
+      guideLinesMidAd.innerHTML =
+        showGuides && hasAd ? buildStoryUserLaneGuideAdHtml(faces.faceAd) : '';
     }
   }
 
   stack.setAttribute('aria-label', buildStoryUserLaneStackAriaLabel(pickedLength));
   stack.hidden = false;
 
+  // ガイド帯: 非表示側も hidden=true + innerHTML='' を【能動的に】書く(モード遷移で残骸ゼロ)。
+  //   showGuides=true 側は従来と同文=①③の diff ゼロ。
   if (guideLinesTop) {
-    guideLinesTop.innerHTML = buildStoryUserLaneGuideTopHtml(faces.faceLink);
+    guideLinesTop.innerHTML = showGuides ? buildStoryUserLaneGuideTopHtml(faces.faceLink) : '';
   }
-  if (guideTop) guideTop.hidden = false;
+  if (guideTop) guideTop.hidden = !showGuides;
   if (guideLinesMidGift) {
-    guideLinesMidGift.innerHTML = buildStoryUserLaneGuideGiftHtml(faces.faceGift);
+    guideLinesMidGift.innerHTML = showGuides ? buildStoryUserLaneGuideGiftHtml(faces.faceGift) : '';
   }
-  if (guideMidGift) guideMidGift.hidden = false;
+  if (guideMidGift) guideMidGift.hidden = !showGuides;
   if (guideLinesMidKonta) {
-    guideLinesMidKonta.innerHTML = buildStoryUserLaneGuideKontaHtml(
-      faces.faceKonta
-    );
+    guideLinesMidKonta.innerHTML = showGuides
+      ? buildStoryUserLaneGuideKontaHtml(faces.faceKonta)
+      : '';
   }
-  if (guideMidKonta) guideMidKonta.hidden = false;
+  if (guideMidKonta) guideMidKonta.hidden = !showGuides;
   if (guideLinesMidTanu) {
-    guideLinesMidTanu.innerHTML = buildStoryUserLaneGuideTanuHtml(
-      faces.faceTanu
-    );
+    guideLinesMidTanu.innerHTML = showGuides
+      ? buildStoryUserLaneGuideTanuHtml(faces.faceTanu)
+      : '';
   }
-  if (guideMidTanu) guideMidTanu.hidden = false;
+  if (guideMidTanu) guideMidTanu.hidden = !showGuides;
   if (guideLinesBottom) {
-    guideLinesBottom.innerHTML = buildStoryUserLaneGuideFootAndRecordedHtml(
-      pickedLength,
-      opts && typeof opts.recordedCommentRowsTotal === 'number'
-        ? opts.recordedCommentRowsTotal
-        : undefined,
-      opts && typeof opts.totalCandidates === 'number'
-        ? opts.totalCandidates
-        : undefined
-    );
+    guideLinesBottom.innerHTML = showGuides
+      ? buildStoryUserLaneGuideFootAndRecordedHtml(
+          pickedLength,
+          opts && typeof opts.recordedCommentRowsTotal === 'number'
+            ? opts.recordedCommentRowsTotal
+            : undefined,
+          opts && typeof opts.totalCandidates === 'number'
+            ? opts.totalCandidates
+            : undefined
+        )
+      : '';
   }
-  if (guideBottom) guideBottom.hidden = false;
+  if (guideBottom) guideBottom.hidden = !showGuides;
 }
 
 /**

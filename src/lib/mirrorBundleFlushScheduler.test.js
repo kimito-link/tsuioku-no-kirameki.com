@@ -11,6 +11,7 @@ import { KEY_COMMENT_TIMELINE_MIRROR } from './commentTimelineMirrorKey.js';
 import { KEY_GIFT_HISTORY_MIRROR } from './giftHistoryMirrorKey.js';
 import { KEY_ROOM_HEAT_MIRROR } from './roomHeatMirrorKey.js';
 import { KEY_SESSION_SUMMARY_MIRROR } from './sessionSummaryMirrorKey.js';
+import { KEY_STORY_DIAG_MIRROR } from './storyDiagMirrorKey.js';
 
 const LANE = { liveId: 'lv1', capturedAt: 10, link: [{ title: 'りんく' }] };
 // ③WEB投げ一覧丸写し(第2号): giftHistory 節。反映すれば legacy キー KEY_GIFT_HISTORY_MIRROR で同梱される。
@@ -29,6 +30,7 @@ const SESSION_SUMMARY = {
   capturedAt: 17,
   rows: [{ capturedAt: 1000, commentStorageCount: 120, uniqueKnownCommenters: 30, giftUserCount: 8, peakConcurrentEstimate: 55, officialCommentCount: 12 }]
 };
+const STORY_DIAG = { liveId: 'lv1', capturedAt: 18, total: 12, withUid: 10, resolvedAvatar: 9 };
 const STAT = { liveId: 'lv1', capturedAt: 11, recordsText: '3件' };
 const NS = { liveId: 'lv1', capturedAt: 12, lanes: { contributionRanking: [{ name: '貢献A' }], adRanking: [] } };
 
@@ -52,6 +54,7 @@ describe('buildLegacyMirrorSetPayload', () => {
     expect(KEY_GIFT_HISTORY_MIRROR in payload).toBe(false);
     expect(KEY_ROOM_HEAT_MIRROR in payload).toBe(false);
     expect(KEY_SESSION_SUMMARY_MIRROR in payload).toBe(false);
+    expect(KEY_STORY_DIAG_MIRROR in payload).toBe(false);
   });
 
   it('giftHistory 節を反映すると legacy キー KEY_GIFT_HISTORY_MIRROR で同梱される(第2号・③WEB投げ一覧)', () => {
@@ -73,6 +76,13 @@ describe('buildLegacyMirrorSetPayload', () => {
     sched.reflect('sessionSummary', SESSION_SUMMARY, { liveId: 'lv1', nowMs: 100 });
     const payload = buildLegacyMirrorSetPayload(sched.peekBundle());
     expect(payload[KEY_SESSION_SUMMARY_MIRROR]).toMatchObject(SESSION_SUMMARY);
+  });
+
+  it('storyDiag 節を反映すると legacy キー KEY_STORY_DIAG_MIRROR で同梱される(会場=① 詳しい状況診断)', () => {
+    const sched = createMirrorBundleFlushScheduler({ minGapMs: 0 });
+    sched.reflect('storyDiag', STORY_DIAG, { liveId: 'lv1', nowMs: 100 });
+    const payload = buildLegacyMirrorSetPayload(sched.peekBundle());
+    expect(payload[KEY_STORY_DIAG_MIRROR]).toMatchObject(STORY_DIAG);
   });
 
   it('bundle が空/不正でも空ペイロード(投げない)', () => {

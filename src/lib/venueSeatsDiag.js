@@ -17,8 +17,18 @@
  *   perRow: number,              // 1段に収まる席数(seatsPerRow の実測)。0=未観測
  *   venueMaxRows: number,        // 積んだ段数(全席÷perRow を 500/perRow で cap)。0=未観測
  *   seatAreaWidth: number,       // 席エリアの実測幅px(clientWidth)。0=レイアウト未確定/事故の兆候
- *   visibleCapReason: 'participant'|'grid'|'hardCap'|''  // 可視席が何で頭打ちになったか(''=未観測)
+ *   visibleCapReason: 'participant'|'grid'|'hardCap'|'',  // 可視席が何で頭打ちになったか(''=未観測)
+ *   laneParity: { mode: string, verdict: string, reason?: string, line: string, unexplained: number, mirrorAgeSec: number, lobby?: number,
+ *                 dom?: null | { measured: boolean, ghost: number, bare: number, visibleEmpty: number, unkeyed: number,
+ *                               dupIntra: number, dupCross: number, dupLaneLobby: number, strays: number,
+ *                               charFrame: number, crowdOn: boolean, crowdCount: number } }|null,
+ *   lobbyResetCount: number,
+ *   storyDiagMirror: { present: boolean, ageSec: number|null }
  * }} VenueSeatsDiagState
+ *
+ * laneParity は v0.1.1111 の「会場=①レーンのメンバー一致トークン」(venueLaneParity.js)。null=未観測。
+ *   v0.1.1113(Tri-Parity): dom=実DOM census 要約(venueDomCensus.js)。measured=false 相当は null。
+ * lobbyResetCount は v0.1.1112 のロビー(立ち見)を畳んだ累計回数(「消す側」の計器・多発=明滅の兆候)。
  */
 
 /** 初期 会場座席診断 state。 */
@@ -35,7 +45,10 @@ export function makeInitialVenueSeatsDiag() {
     perRow: 0,
     venueMaxRows: 0,
     seatAreaWidth: 0,
-    visibleCapReason: ''
+    visibleCapReason: '',
+    laneParity: /** @type {VenueSeatsDiagState['laneParity']} */ (null),
+    lobbyResetCount: 0,
+    storyDiagMirror: { present: false, ageSec: /** @type {number|null} */ (null) }
   };
 }
 
@@ -98,6 +111,50 @@ export function buildVenueSeatsDiagSnapshot(diag, nowMs) {
           venueMaxRows,
           hardCap: num(d.hardCap, 0)
         });
+  // v0.1.1111: 会場=①レーンのメンバー一致トークン(venueLaneParity.js の toVenueLaneParityDiag 出力)。
+  //   storage へは検証済みの軽量形だけ通す(未知の巨大オブジェクトを写さない)。
+  const lpIn = /** @type {any} */ (d.laneParity && typeof d.laneParity === 'object' ? d.laneParity : null);
+  // v0.1.1113(Tri-Parity): dom 要約(実DOM census)。検証済みの数値だけ通す(keys/段別詳細は通さない)。
+  const lpDomIn = /** @type {any} */ (lpIn && lpIn.dom && typeof lpIn.dom === 'object' ? lpIn.dom : null);
+  const lpDom =
+    lpDomIn && lpDomIn.measured === true
+      ? {
+          measured: true,
+          ghost: Math.max(0, Math.floor(num(lpDomIn.ghost, 0))),
+          bare: Math.max(0, Math.floor(num(lpDomIn.bare, 0))),
+          visibleEmpty: Math.max(0, Math.floor(num(lpDomIn.visibleEmpty, 0))),
+          unkeyed: Math.max(0, Math.floor(num(lpDomIn.unkeyed, 0))),
+          // v0.1.1116: 白円計器(blank=avatarがblank.jpg・blankAnon=数値ID鍵でないのに白円=導出バグ)。
+          blank: Math.max(0, Math.floor(num(lpDomIn.blank, 0))),
+          blankAnon: Math.max(0, Math.floor(num(lpDomIn.blankAnon, 0))),
+          dupIntra: Math.max(0, Math.floor(num(lpDomIn.dupIntra, 0))),
+          dupCross: Math.max(0, Math.floor(num(lpDomIn.dupCross, 0))),
+          dupLaneLobby: Math.max(0, Math.floor(num(lpDomIn.dupLaneLobby, 0))),
+          strays: Math.max(0, Math.floor(num(lpDomIn.strays, 0))),
+          charFrame: Math.max(0, Math.floor(num(lpDomIn.charFrame, 0))),
+          crowdOn: lpDomIn.crowdOn === true,
+          crowdCount: Math.max(0, Math.floor(num(lpDomIn.crowdCount, 0))),
+          probeFail: Math.max(0, Math.floor(num(lpDomIn.probeFail, 0)))
+        }
+      : null;
+  const laneParity = lpIn
+    ? {
+        mode: String(lpIn.mode || ''),
+        verdict: String(lpIn.verdict || ''),
+        reason: String(lpIn.reason || ''),
+        line: String(lpIn.line || ''),
+        unexplained: Math.max(0, Math.floor(num(lpIn.unexplained, 0))),
+        mirrorAgeSec: Math.floor(num(lpIn.mirrorAgeSec, 0)),
+        lobby: Math.max(0, Math.floor(num(lpIn.lobby, 0))),
+        dom: lpDom
+      }
+    : null;
+  const sdmIn = /** @type {any} */ (d.storyDiagMirror && typeof d.storyDiagMirror === 'object' ? d.storyDiagMirror : null);
+  const sdmAge = Number(sdmIn?.ageSec);
+  const storyDiagMirror = {
+    present: sdmIn?.present === true,
+    ageSec: sdmIn?.present === true && Number.isFinite(sdmAge) ? Math.max(0, Math.floor(sdmAge)) : null
+  };
   return {
     enabled: !!d.enabled,
     liveId: String(d.liveId || base.liveId),
@@ -111,6 +168,9 @@ export function buildVenueSeatsDiagSnapshot(diag, nowMs) {
     venueMaxRows,
     seatAreaWidth,
     visibleCapReason,
+    laneParity,
+    lobbyResetCount: Math.max(0, Math.floor(num(d.lobbyResetCount, 0))),
+    storyDiagMirror,
     capturedAt: now
   };
 }

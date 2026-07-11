@@ -107,4 +107,18 @@ describe('buildVenueSeatsDiagSnapshot 新フィールド', () => {
     expect(snap.seatAreaWidth).toBe(base.seatAreaWidth);
     expect(snap.visibleCapReason).toBe('');
   });
+
+  it('storyDiagMirror は present/ageSec の2フィールドだけを通す(状態速報への計器)', () => {
+    const snap = buildVenueSeatsDiagSnapshot(
+      {
+        enabled: true,
+        storyDiagMirror: { present: true, ageSec: 7, extra: 'ignored' }
+      },
+      1000
+    );
+    expect(snap.storyDiagMirror).toEqual({ present: true, ageSec: 7 });
+
+    const empty = buildVenueSeatsDiagSnapshot({ enabled: true }, 1000);
+    expect(empty.storyDiagMirror).toEqual({ present: false, ageSec: null });
+  });
 });

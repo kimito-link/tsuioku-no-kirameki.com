@@ -27,9 +27,10 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 2 / 663 件
+## ⚠️ 役割コメントが無いソース 3 / 672 件
 - `src/lib/reportPreviewPublish.js`
 - `src/lib/venueLaneBuckets.js`
+- `src/lib/venueStoryDiagMirrorPanel.js`
 
 ## 全ファイルツリー
 
@@ -146,7 +147,7 @@
   - `app.js` — スマホ閲覧用 status Web 版。
   - `index.html`
   - `live-view.html`
-  - `live-view.js` — 純Web版 応援ライブビュー（拡張なし・PC/スマホ共通）。
+  - `live-view.js` — global NL_BUILD_ID
 - 📁 **docs/** (158)
   - 📁 **article-assets/** (87)
     - 📁 **venue-frames/** (12)
@@ -527,7 +528,7 @@
   - `gift-impact.mp3`
   - `gift-sparkle.mp3`
   - `gift-whoosh.mp3`
-- 📁 **src/** (1376)
+- 📁 **src/** (1397)
   - 📁 **data/** (6)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -561,7 +562,7 @@
       - `avatarResolver.test.js`
       - `identity.js` — ニコ生ユーザー ID の「匿名性」判定と関連アイデンティティ・ユーティリティ。
       - `nickname.js` — 表示名（ニックネーム）の「強弱」判定。
-  - 📁 **extension/** (16)
+  - 📁 **extension/** (18)
     - 📁 **popup/** (2)
       - 📁 **report/** (2)
         - `htmlReportDocument.js` — HTMLレポート(振り返り用の保存HTML)組み立てクラスタ。
@@ -572,6 +573,7 @@
     - `backfill-sw-entry.js` — Service Worker 側の過去ログ取得(バックフィル)エンジン。NDGR を遡って取り込む。
     - `comeview-entry.js` — v0.1.652: 独自コメビュ「KIRAMEKI Comment View」(comeview.html)。
     - `content-entry.js` — watch ページ常駐の記録エンジン本体。コメント取得(NDGR+DOM)・記録・バックフィル・パネル描画の中枢。
+    - `inlineHostMoveProbe.wiring.test.js`
     - `live-view-entry.js` — 応援ライブビュー(live-view.html)のエントリ。
     - `offscreen-entry.js` — feat/multitab-scale-globalcap（2026-05-31）: コメント IDB の「常駐・単一書き手」を担う
     - `page-intercept-entry.js` — MAIN world エントリ（esbuild で単一 IIFE にバンドルされる）
@@ -581,6 +583,7 @@
     - `venue-entry.js` — 会場モード(standalone)のエントリ。venueBar をページに mount するだけの薄い起動点。
     - `venueBar.js` — 会場モード UI 本体。観客の席割り・群衆・吹き出し・ギフト演出・読み上げ連動を描く。
     - `venueBarGiftDeltaSoundWiring.test.js`
+    - `venueBarPopupOcclusion.wiring.test.js`
   - 📁 **fixtures/** (1)
     - `nicolive-comment-list.html`
   - 📁 **images/** (165)
@@ -792,7 +795,7 @@
         - `logo_funlink_white_RGB_maru_black.png`
       - `logo_guide_funlink_ol.pdf`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1161)
+  - 📁 **lib/** (1180)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -1269,6 +1272,8 @@
     - `inlineHostDockSizing.test.js`
     - `inlineHostLayoutReset.js` — インラインパネルの placement（below / beside / floating / dock_bottom）を切り替える際に、
     - `inlineHostLayoutReset.test.js`
+    - `inlineHostMoveProbe.js` — ①POPインラインパネルの host(#nls-inline-popup-host)DOM移設を観測する
+    - `inlineHostMoveProbe.test.js`
     - `inlineModeFlags.js` — popup.html の URL クエリから「どのモードで開かれた popup か」を判定する純関数。
     - `inlineModeFlags.test.js`
     - `inlinePanelFocusGate.js` — インラインパネル host element が toolbar 起点の「前面化」操作を受けられる
@@ -1322,6 +1327,8 @@
     - `laneMirror.js` — 応援レーンの「鏡」スナップショット純関数。popup がレーンを描いた buckets を、status が本物の
     - `laneMirror.test.js`
     - `laneMirrorKey.js` — popup の応援レーン(りんく/こん太/広告/たぬ姉の段組み)を「顔=avatar 含めてそっくり」status へ
+    - `laneTickProbe.js` — ①popup の独立描画トリガ(tickIndependentNorthStar)の自己診断(v0.1.1123)。
+    - `laneTickProbe.test.js`
     - `lengthDelimitedStream.js` — length-delimited（varint 長 + ペイロード）の連続を分割する。
     - `lengthDelimitedStream.test.js`
     - `liveAudienceDom.js` — watch ページ DOM から「同時接続（ページ表示）」に近い視聴者数を読む（純関数・ベストエフォート）
@@ -1340,6 +1347,8 @@
     - `liveStatValuePlaceholder.test.js`
     - `liveViewPublishSignature.js` — 状態速報「重さ根治 P4」: publishLiveViewPublishPayload(status-entry.js)は 3秒 min-gap を
     - `liveViewPublishSignature.test.js`
+    - `liveviewErrorReport.js` — 純Web③(app.tsuioku-no-kirameki.com)専用の最小エラーレポータ(v0.1.1130)。
+    - `liveviewErrorReport.test.js`
     - `liveviewMirrorSections.js` — ③WEB丸写しの「セクション・レジストリ」= ①POP の各パネルが③に出るための配線を1箇所に集約した一覧表
     - `liveviewMirrorSections.wiring.test.js`
     - `liveviewPublishOutcome.js` — 純Web公開（応援ライブビューの /api/status への POST）の直近結果を記録・要約する。
@@ -1737,6 +1746,7 @@
     - `storyAvatarTvFallbackClass.js` — 人物タイル/アイコンの「リモートサムネ取得失敗→ゆっくりTVスタイルへ落とす」class 付け外しの正本。
     - `storyDetailRelatedEntries.js` — ストーリー詳細／プレビュー脇の「同一ユーザーの直近」リスト用。
     - `storyDetailRelatedEntries.test.js`
+    - `storyDiagMirrorKey.js` — ①「詳しい状況」診断を会場へ鏡映する legacy storage key。
     - `storyGrowthLimits.js` — りんく成長グリッド（story growth）の描画上限。
     - `storyLaneAvatarSrc.js` — 応援レーン(アイコン列)のタイル画像 URL 解決（state 注入型の純関数）。
     - `storyLaneAvatarSrc.test.js`
@@ -1865,6 +1875,8 @@
     - `venueCrowdMotion.test.js`
     - `venueDisplayRows.js` — 会場モードの「空っぽ・途中で消える・ちらつき」根治の正本(2026-06-15・会議+根本原因調査)。
     - `venueDisplayRows.test.js`
+    - `venueDomCensus.js` — 会場5段+ロビーの【実DOM国勢調査(census)】。
+    - `venueDomCensus.test.js`
     - `venueDragScroll.js` — 2026-06-14 会議(星野ロミ・摩擦ゼロUI): 会場を左ドラッグでパン(縦スクロール)する純ロジック。
     - `venueDragScroll.test.js`
     - `venueHeat.js` — v0.1.732: 会場モードの「熱量の色温度」純関数。
@@ -1873,8 +1885,15 @@
     - `venueIncrementalAggregate.test.js`
     - `venueLaneBuckets.js` — ⚠️ 役割コメント無し
     - `venueLaneBuckets.test.js`
+    - `venueLaneMirrorSupply.js` — 会場の「鏡優先+同型フォールバック」供給(純関数)。①POP が実 paint した5段 buckets の鏡
+    - `venueLaneMirrorSupply.test.js`
+    - `venueLaneParity.js` — 会場レーンのパリティ計器(純関数)。会場が実際に paint した段割当列を、①POP の実描画鏡
+    - `venueLaneParity.test.js`
+    - `venueLaneParity.wiring.test.js`
     - `venueLiveRoster.js` — v0.1.754 会場の3時間安定化(星野ロミ・メソッド会議の本質解・6体ほぼ全会一致):
     - `venueLiveRoster.test.js`
+    - `venueMirrorAvatarEnrich.js` — 会場行の avatar を「①の実描画鏡(laneMirror)が解決済みの顔URL」で
+    - `venueMirrorAvatarEnrich.test.js`
     - `venueResidents.js` — 会場モードの常駐3キャラ(りんく・こん太・たぬ姉)の描画モデル(純関数)。
     - `venueResidents.test.js`
     - `venueRoster.js` — 2026-06-14 ユーザー要望「今会場にいるメンバーを視覚的に確認できるボタン・AIも人間も検証
@@ -1888,6 +1907,8 @@
     - `venueSpeech.test.js`
     - `venueSpeechStreak.js` — 「会話の連鎖」(2026-06-15 会議の最大多数決の本命・弱点A/C):
     - `venueSpeechStreak.test.js`
+    - `venueStoryDiagMirrorPanel.js` — ⚠️ 役割コメント無し
+    - `venueStoryDiagMirrorPanel.test.js`
     - `venueViewport.js` — v0.1.715: 会場モードの「映像セーフエリア」と「同時表示人数」を決める純関数。
     - `venueViewport.test.js`
     - `versionMismatch.js` — 「本体とページで版がズレている」を検知する純関数(2026-07-06)。
@@ -1942,6 +1963,7 @@
     - `watchPopupCelebrationGuard.js` — popup 再描画時の応援演出ガード（純関数）。
     - `watchPopupCelebrationGuard.test.js`
     - `watchPopupLoadDiagnostics.js` — watch インラインパネルの読み込みフェーズ計測（DevTools / 実機メモ用）。
+    - `watchPopupLoadDiagnostics.test.js`
     - `watchProgramEndState.js` — 視聴ページ文言から「番組終了状態」を推定する。
     - `watchProgramEndState.test.js`
     - `watchSnapshotAlignment.js` — content からの応答(intercept/AI診断 等)が現在解決済の watch と同じ配信由来か判定し別 live の混入を防ぐ。

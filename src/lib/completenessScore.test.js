@@ -37,7 +37,9 @@ describe('diagnosisRegistry の網羅性(これが「抜けを構造的に無く
         perRow: 4,
         venueMaxRows: 2,
         seatAreaWidth: 800,
-        hardCap: 500
+        hardCap: 500,
+        // v0.1.1113: laneParity を渡して venue-parity も発生させる(同上・登録漏れ再発防止)。
+        laneParity: { mode: 'mirror', verdict: '✅', reason: '', line: '会場一致 ✅', unexplained: 0, mirrorAgeSec: 1, lobby: 0, dom: { measured: true, ghost: 0 } }
       },
       // v0.1.1054: paintMs を渡して lane-paint も発生させる(同上・登録漏れ再発防止)。
       laneDiag: { liveId: 'lv1', identified: 3, laneShown: 3, paintMs: 10 },
