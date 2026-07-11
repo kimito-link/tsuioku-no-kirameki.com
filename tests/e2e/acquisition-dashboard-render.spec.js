@@ -47,6 +47,12 @@ test('取得率ダッシュボードのレーダーと円グラフが描画さ�
   const host = popup.locator('#devMonitorAcquisition');
   await expect(host).toBeAttached();
 
+  // v0.1.637: devMonitor は details が開いているときだけ O(N) 集計を実行する
+  // （閉じたまま放置してもスクロールが重くならないための perf gate）。
+  await popup.locator('#devMonitorDetails').evaluate((el) => {
+    el.open = true;
+  });
+
   // liveId があるのでチャート（section.nl-acquisition）が描画される
   await expect
     .poll(async () => (await host.innerHTML().catch(() => '')).includes('nl-acquisition__radar'), {

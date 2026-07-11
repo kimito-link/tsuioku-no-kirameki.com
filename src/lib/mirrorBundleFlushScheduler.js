@@ -27,6 +27,7 @@ import { KEY_COMMENT_TIMELINE_MIRROR } from './commentTimelineMirrorKey.js';
 import { KEY_GIFT_HISTORY_MIRROR } from './giftHistoryMirrorKey.js';
 import { KEY_ROOM_HEAT_MIRROR } from './roomHeatMirrorKey.js';
 import { KEY_SESSION_SUMMARY_MIRROR } from './sessionSummaryMirrorKey.js';
+import { KEY_STORY_DIAG_MIRROR } from './storyDiagMirrorKey.js';
 
 const DEFAULT_MIN_GAP_MS = 3000;
 
@@ -39,7 +40,8 @@ const SECTION_TO_LEGACY_KEY = /** @type {const} */ ({
   commentTimeline: KEY_COMMENT_TIMELINE_MIRROR,
   giftHistory: KEY_GIFT_HISTORY_MIRROR,
   roomHeat: KEY_ROOM_HEAT_MIRROR,
-  sessionSummary: KEY_SESSION_SUMMARY_MIRROR
+  sessionSummary: KEY_SESSION_SUMMARY_MIRROR,
+  storyDiag: KEY_STORY_DIAG_MIRROR
 });
 
 /**

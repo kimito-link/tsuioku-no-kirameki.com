@@ -315,6 +315,14 @@ import {
   recordWhiteoutSample,
   summarizeWhiteoutDiag
 } from '../lib/scrollWhiteoutProbe.js';
+// v0.1.1124 D-1計器: host移設(=iframeリロード実害)の観測(robust-pondering-fountain 計画 Patch1)。
+import {
+  recordInlineHostMove,
+  recordInlineHostDuplicateSeen,
+  recordInlineHostMoveVenueSkip,
+  shouldSkipInlineHostMoveForVenue,
+  summarizeInlineHostMoveDiag
+} from '../lib/inlineHostMoveProbe.js';
 import { probeWatchPageDomStructure } from '../lib/probeWatchPageDomStructure.js';
 import { summarizeGiftSubAppHistoryDiag } from '../lib/summarizeGiftSubAppHistoryDiag.js';
 import { createConsoleErrorBuffer } from '../lib/consoleErrorBuffer.js';
@@ -2726,6 +2734,55 @@ const INLINE_POPUP_HOST_ID = 'nls-inline-popup-host';
 const INLINE_POPUP_IFRAME_ID = 'nls-inline-popup-iframe';
 const KEY_AI_SHARE_FAST_DIAG = 'nls_ai_share_fast_diag_v1';
 
+/**
+ * v0.1.1124 D-1計器: host(#nls-inline-popup-host)のDOM移設観測。iframe を外して付け直すと中身が
+ * リロードされる(ブラウザ仕様)=D-0実測(popupBootAtIso 33ms前・ticks=1)の「ローディングちかちか」の
+ * 真犯人候補。どの経路が・何回・会場open中に動かしているかを実測してから直す(推測patch禁止)。
+ * @type {{ count:number, reloadCount:number, venueOpenMoves:number, byReason:Record<string,number>, samples:Array<object>, lastAtMs:number }}
+ */
+const _inlineHostMoveState = { count: 0, reloadCount: 0, venueOpenMoves: 0, byReason: {}, samples: [], lastAtMs: 0 };
+
+/**
+ * host 移設の【直前】に呼ぶ(観測のみ・DOMは触らない)。isConnected/iframe有無/会場open を採取。
+ * @param {string} reason 移設経路名(anchored_video / floating_body 等)
+ * @param {HTMLElement|null} host
+ */
+function noteInlineHostMove(reason, host) {
+  try {
+    recordInlineHostMove(_inlineHostMoveState, {
+      reason,
+      atMs: Date.now(),
+      prevConnected: Boolean(host && host.isConnected),
+      hadIframe: Boolean(host && host.querySelector(`#${INLINE_POPUP_IFRAME_ID}`)),
+      // venueBar.js(別バンドル)が open 中に立てる documentElement クラス(文字列契約・wiringテストで固定)。
+      venueOpen: document.documentElement.classList.contains('nlsb-venue-open')
+    });
+  } catch {
+    /* 計器失敗は描画を止めない */
+  }
+}
+
+/**
+ * v0.1.1128 根治(3-B): 会場open中の host DOM 移設を凍結するか(実測: 会場開=276リロードの点滅根治)。
+ * 3条件AND(venueOpen+接続済み+iframe持ち)の判定は純関数 shouldSkipInlineHostMoveForVenue に委譲。
+ * skip したら venueSkipCount 計器に記録(状態速報の hostMoveDiag に出る)。
+ * @param {HTMLElement|null} host
+ * @returns {boolean} true=移設しない
+ */
+function shouldSkipHostMoveForVenueNow(host) {
+  try {
+    const skip = shouldSkipInlineHostMoveForVenue({
+      venueOpen: document.documentElement.classList.contains('nlsb-venue-open'),
+      hostConnected: Boolean(host && host.isConnected),
+      hostHasIframe: Boolean(host && host.querySelector(`#${INLINE_POPUP_IFRAME_ID}`))
+    });
+    if (skip) recordInlineHostMoveVenueSkip(_inlineHostMoveState);
+    return skip;
+  } catch {
+    return false; // 判定に失敗したら従来どおり移設(fail-open=①の描画を止めない)
+  }
+}
+
 /** getElementById はツリー未接続ノードに効かないため、ホストは参照を保持する */
 /** @type {HTMLDivElement|null} */
 let nlsInlinePopupHostSingleton = null;
@@ -3222,6 +3279,15 @@ function pickPrimaryInlinePopupHostFromDom() {
     }
     return null;
   }
+  // v0.1.1125 盲点計器: 「2つできてる」(ユーザー証言)の実在を数字で残す。dedupe は非primaryを
+  //   即 remove するため(実測: 注入→削除まで約74ms)、瞬間の重複はこのカウンタでしか観測できない。
+  if (hosts.length > 1) {
+    try {
+      recordInlineHostDuplicateSeen(_inlineHostMoveState, hosts.length);
+    } catch {
+      // 計器失敗は dedupe を止めない
+    }
+  }
   const connected = hosts.filter((h) => h.isConnected);
   /** @type {HTMLDivElement} */
   let primary;
@@ -3236,6 +3302,9 @@ function pickPrimaryInlinePopupHostFromDom() {
   }
   for (const h of hosts) {
     if (h === primary) continue;
+    // v0.1.1125 盲点計器: 削除される h が iframe 持ちなら reloadCount に入る(=dedupe が
+    //   iframe を殺した=ちかちか実害)。v0.1.1124 の移設7経路計器はここを見ていなかった。
+    noteInlineHostMove('duplicate_host_removed', h);
     try {
       h.remove();
     } catch {
@@ -3716,6 +3785,9 @@ function ensureInlinePopupHost() {
   host.style.pointerEvents = 'auto';
   host.style.width = '100%';
 
+  // v0.1.1125 盲点計器: host の新規生成を記録(prevConnected=false・iframe無し=reloadCountには
+  //   入らずbyReasonにだけ出る)。「作り直しループ」なら host_created が移設回数と並走して伸びる。
+  noteInlineHostMove('host_created', host);
   ensureInlinePopupIframe(host);
   nlsInlinePopupHostSingleton = host;
   return host;
@@ -3923,7 +3995,8 @@ function renderInlinePanelFloatingHost() {
   const maxH = Math.min(Math.round(vh * 0.92), 900);
   const iframeH = Math.min(580, Math.round(vh * 0.78));
 
-  if (host.parentNode !== document.body) {
+  if (host.parentNode !== document.body && !shouldSkipHostMoveForVenueNow(host)) {
+    noteInlineHostMove('floating_body', host);
     document.body.appendChild(host);
   }
   host.classList.add('nls-inline-host--floating');
@@ -4073,7 +4146,8 @@ function renderInlinePanelDockBottomHost() {
   const iframeInnerH = sizing.height;
   const hostMaxH = iframeInnerH + 16; // 上下の余白
 
-  if (host.parentNode !== document.body) {
+  if (host.parentNode !== document.body && !shouldSkipHostMoveForVenueNow(host)) {
+    noteInlineHostMove('dock_body', host);
     document.body.appendChild(host);
   }
   host.style.position = 'fixed';
@@ -5219,11 +5293,16 @@ function renderInlineHostAnchoredToVideo(video) {
     viewport
   });
   if (hostAttachFallbackBody) {
-    if (host.parentNode !== hostParent) hostParent.appendChild(host);
+    if (host.parentNode !== hostParent && !shouldSkipHostMoveForVenueNow(host)) {
+      noteInlineHostMove('anchored_video_fallback_body', host);
+      hostParent.appendChild(host);
+    }
   } else {
     if (
-      !inlinePopupHostIsCorrectlyPlaced(host, hostParent, insertAfter)
+      !inlinePopupHostIsCorrectlyPlaced(host, hostParent, insertAfter) &&
+      !shouldSkipHostMoveForVenueNow(host)
     ) {
+      noteInlineHostMove('anchored_video', host);
       insertAfter.insertAdjacentElement('afterend', host);
     }
   }
@@ -5395,11 +5474,16 @@ function renderInlinePopupHost(target) {
   });
 
   if (hostAttachFallbackBody) {
-    if (host.parentNode !== hostParent) hostParent.appendChild(host);
+    if (host.parentNode !== hostParent && !shouldSkipHostMoveForVenueNow(host)) {
+      noteInlineHostMove('nonvideo_fallback_body', host);
+      hostParent.appendChild(host);
+    }
   } else {
     if (
-      !inlinePopupHostIsCorrectlyPlaced(host, hostParent, insertAfter)
+      !inlinePopupHostIsCorrectlyPlaced(host, hostParent, insertAfter) &&
+      !shouldSkipHostMoveForVenueNow(host)
     ) {
+      noteInlineHostMove('nonvideo_anchor', host);
       insertAfter.insertAdjacentElement('afterend', host);
     }
   }
@@ -6649,6 +6733,9 @@ function buildAiShareFastDiagnosticsPayload() {
     //   直近の失敗理由）。globalThis 集計を読むだけ＝storage read を増やさない。送信が
     //   一度も無ければ null（出さない）。失敗が続く・成功率が落ちる等を status で可視化する。
     commentSubmitDiag: summarizeCommentSubmitDiag(),
+    // v0.1.1124 D-1計器: host移設の実測(reloadCount=iframeリロード実害あり移設・byReason=犯人経路・
+    //   venueOpenMoves=会場open中の移設)。ローディングちかちかの真犯人を状態速報の数字で確定する。
+    hostMoveDiag: summarizeInlineHostMoveDiag(_inlineHostMoveState, Date.now()),
     inlinePanel: {
       placementMode: inlinePanelPlacementMode,
       placementEffective: placementEffectiveFast,
@@ -7261,8 +7348,15 @@ function renderPageFrameOverlay() {
      * floating 表示契約（E2E inline-panel-align）を壊す。
      * 「意図した配置が floating or dock_bottom のとき」はフォールバックを skip する。
      */
+    /*
+     * v0.1.1128 根治(3-B): 会場open中は「見えない」が意図した状態(venueBarの遮蔽CSS=visibility:hidden)。
+     * ここで dock 退避すると次 tick の anchored 復帰と無限ピンポンになり、移設のたびに iframe が
+     * リロード=点滅(実測: 会場開1回で reloadCount=276/venueOpenMoves=275・v0.1.1125計器)。
+     * 会場open中はこのフォールバック自体を発火させない(閉じれば従来どおり)。
+     */
     if (
       !inlineHostLooksVisible() &&
+      !document.documentElement.classList.contains('nlsb-venue-open') &&
       effPlacement !== INLINE_PANEL_PLACEMENT_FLOATING &&
       effPlacement !== INLINE_PANEL_PLACEMENT_DOCK_BOTTOM
     ) {
@@ -7754,6 +7848,7 @@ function prewarmInlinePopupIframe() {
         host.style.width = '420px';
         host.style.height = '600px';
         host.style.pointerEvents = 'none';
+        noteInlineHostMove('prewarm_offscreen', host);
         document.body.appendChild(host);
       }
       prewarmInlinePopupDone = true;
@@ -9273,6 +9368,9 @@ function buildAiSharePageDiagnostics() {
     // v0.1.925: コメント送信の感度（試行数/成功数/失敗数/成功率/所要 ms の平均・最大/
     //   直近の失敗理由）。globalThis 集計を読むだけ＝storage read を増やさない。
     commentSubmitDiag: summarizeCommentSubmitDiag(),
+    // v0.1.1124 D-1計器: host移設の実測(reloadCount=iframeリロード実害あり移設・byReason=犯人経路・
+    //   venueOpenMoves=会場open中の移設)。ローディングちかちかの真犯人を状態速報の数字で確定する。
+    hostMoveDiag: summarizeInlineHostMoveDiag(_inlineHostMoveState, Date.now()),
     inlinePanel: {
       placementMode: inlinePanelPlacementMode,
       placementEffective,

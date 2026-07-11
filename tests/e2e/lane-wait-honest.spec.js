@@ -7,17 +7,19 @@ import {
 import { E2E_MOCK_WATCH_URL as MOCK_WATCH } from './constants.js';
 
 /*
- * v0.1.332: 待機UIの正直化を実ブラウザ（実拡張）で実証する。
+ * v0.1.332: 待機UIの正直化を実ブラウザ（実拡張）で実証する（rescue-link 配信＝
+ * koken/DOM/iframe 3経路とも永久に空、への対処として新設）。
  *
- * rescue-link 配信（koken/DOM/iframe 3経路とも永久に空）で iframe_unrendered の
- * 待機UIが永久に出続け「固まった」印象を与える真因3への対処。
+ * ★v0.1.653 で仕様が上書きされた: ユーザー実機要望「ローディング表示を全廃・
+ * 無いものは静かに隠せ」により、contributionRanking は
+ * NORTH_STAR_API_DIRECT_HIDE_WHEN_EMPTY_LANES に入り、待機UI（「問い合わせ中」案内）
+ * を一切出さず静かに畳む(body.innerHTML='')仕様になった。本テストはその新仕様
+ * （待機UIを出さず隠れる）を検証する。
  *
  * 検証分担:
  *  - 確定文言への遷移ロジック（閾値・後方互換・field6 silence）= lib unit test
- *    (northStarLaneWaitingUi.test.js 16件) で担保。
- *  - 本 e2e = 「貢献度が取れない配信で待機UIが実拡張に実際に表示される」統合確認
- *    （待機UIが出るからこそ、閾値超で確定文言へ遷移する経路が意味を持つ）。
- *    50s 経過の実時間待ちは非現実的なので、待機UIの存在と data-lane-state を観測する。
+ *    (northStarLaneWaitingUi.test.js) で担保。
+ *  - 本 e2e = 「貢献度が取れない配信で待機UIを出さず静かに畳まれる」統合確認。
  */
 
 const KEY_LAST_WATCH_URL = 'nls_last_watch_url';
@@ -30,7 +32,7 @@ async function swOf(context) {
   return sw;
 }
 
-test('待機UI正直化: 貢献度が取れない配信で待機UIが実拡張に表示される', async ({ context }) => {
+test('待機UI正直化: 貢献度が取れない配信で待機UIを出さず静かに畳まれる（v0.1.653）', async ({ context }) => {
   const sw = await swOf(context);
   const extensionId = new URL(sw.url()).hostname;
 
@@ -66,26 +68,27 @@ test('待機UI正直化: 貢献度が取れない配信で待機UIが実拡張�
   const body = popup.locator('#northStarLaneBody-contributionRanking');
   await expect(body).toBeAttached();
 
-  // 待機UI（取得待ち）が実際に表示される＝確定文言遷移の前提が実拡張で成立している。
+  // v0.1.653: contributionRanking は待機UIを出さず、data-lane-state を保持したまま
+  // 静かに畳まれる（body 空・待機UIの「問い合わせ中」案内は出ない）。
   await expect
     .poll(
       async () => {
         const state = await body.getAttribute('data-lane-state').catch(() => null);
         const html = await body.innerHTML().catch(() => '');
-        return { state, hasWaitUi: html.includes('nl-north-star-lane-wait') };
+        return {
+          state,
+          hasWaitUi: html.includes('nl-north-star-lane-wait'),
+          isEmpty: html.trim().length === 0
+        };
       },
       { timeout: 10_000 }
     )
-    .toMatchObject({ hasWaitUi: true });
+    .toMatchObject({ hasWaitUi: false, isEmpty: true });
 
-  const text = await body.innerText();
-  console.log('contribution lane (no data) text:', JSON.stringify(text));
-
-  // 待機メッセージが出ている（取得待ちのキャラ台詞）。閾値前なので確定文言ではない。
-  expect(text.length).toBeGreaterThan(0);
-  // 内部キーや数値の誤露出が無いこと（field6 silence・待機段階で順位を出さない）。
-  expect(text).not.toContain('__');
-  expect(text).not.toContain('undefined');
+  const state = await body.getAttribute('data-lane-state');
+  console.log('contribution lane (no data) state:', JSON.stringify(state));
+  // 待機状態であることは data-lane-state に残る（診断用）。
+  expect(state).toBeTruthy();
 
   await popup.screenshot({ path: 'test-results/lane-wait-honest.png', fullPage: false });
 });

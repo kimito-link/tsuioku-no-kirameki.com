@@ -5,7 +5,7 @@
 > **波及機能数(blast radius)が多いファイルほど、変更時の影響が大きい**(共有部品)。
 > 実装前にここで「触るファイルが何に波及するか」を確認すると誤前提を潰せる。
 
-## ⚠️ 影響大（3機能以上に波及・84 ファイル）
+## ⚠️ 影響大（3機能以上に波及・97 ファイル）
 
 ここを変えると複数の実行コンテキストに影響する。変更時は各 feature の動作確認を。
 
@@ -38,6 +38,7 @@
 - `src/lib/highlightLedger.js` → **4 機能**: 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 状態速報ページ / 会場モード(standalone)
 - `src/lib/highlightLedgerKey.js` → **4 機能**: 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 状態速報ページ / 会場モード(standalone)
 - `src/lib/htmlEscape.js` → **4 機能**: 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 状態速報ページ / 会場モード(standalone)
+- `src/lib/laneMirrorKey.js` → **4 機能**: 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 状態速報ページ / 会場モード(standalone)
 - `src/lib/personTileDom.js` → **4 機能**: 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 状態速報ページ / 会場モード(standalone)
 - `src/lib/reportSilentError.js` → **4 機能**: 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 状態速報ページ / 会場モード(standalone)
 - `src/lib/safeStorageLocal.js` → **4 機能**: 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 状態速報ページ / 会場モード(standalone)
@@ -54,6 +55,11 @@
 - `src/lib/voiceEffectDiagKey.js` → **4 機能**: 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 状態速報ページ / 会場モード(standalone)
 - `src/shared/avatar/avatarUrlGuard.js` → **4 機能**: コメビュ(別窓) / 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 会場モード(standalone)
 - `src/shared/html/escape.js` → **4 機能**: 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 状態速報ページ / 会場モード(standalone)
+- `src/domain/lane/columns/kontaPolicy.js` → **3 機能**: 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 会場モード(standalone)
+- `src/domain/lane/columns/linkPolicy.js` → **3 機能**: 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 会場モード(standalone)
+- `src/domain/lane/columns/tanuPolicy.js` → **3 機能**: 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 会場モード(standalone)
+- `src/domain/lane/tier.js` → **3 機能**: 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 会場モード(standalone)
+- `src/domain/user/nickname.js` → **3 機能**: 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 会場モード(standalone)
 - `src/extension/story/renderStoryUserLaneDom.js` → **3 機能**: 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 会場モード(standalone)
 - `src/lib/avatarUrlCompare.js` → **3 機能**: 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 会場モード(standalone)
 - `src/lib/backfillRinkuNarration.js` → **3 機能**: ポップアップ(応援レーン) / 状態速報ページ / Web版 状態(スマホ)
@@ -69,6 +75,7 @@
 - `src/lib/giftEffectDiag.js` → **3 機能**: 記録エンジン(watchページ常駐) / 状態速報ページ / 会場モード(standalone)
 - `src/lib/instantPushDiag.js` → **3 機能**: 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 状態速報ページ
 - `src/lib/instantPushDiagKey.js` → **3 機能**: 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 状態速報ページ
+- `src/lib/laneMirror.js` → **3 機能**: 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 会場モード(standalone)
 - `src/lib/lengthDelimitedStream.js` → **3 機能**: バックフィル SW / 記録エンジン(watchページ常駐) / ページ傍受
 - `src/lib/liveEndedFlag.js` → **3 機能**: 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 状態速報ページ
 - `src/lib/ndgrChatRows.js` → **3 機能**: バックフィル SW / 記録エンジン(watchページ常駐) / ページ傍受
@@ -79,12 +86,18 @@
 - `src/lib/phaseDirector.js` → **3 機能**: 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 会場モード(standalone)
 - `src/lib/popupAvatarResolver.js` → **3 機能**: 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 会場モード(standalone)
 - `src/lib/protobufVarint.js` → **3 機能**: バックフィル SW / 記録エンジン(watchページ常駐) / ページ傍受
+- `src/lib/storyAvatarDiagLine.js` → **3 機能**: 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 会場モード(standalone)
+- `src/lib/storyDiagMirrorKey.js` → **3 機能**: 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 会場モード(standalone)
+- `src/lib/storyLaneAvatarSrc.js` → **3 機能**: 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 会場モード(standalone)
 - `src/lib/storyUserLaneBuckets.js` → **3 機能**: 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 会場モード(standalone)
+- `src/lib/storyUserLaneDisplaySrc.js` → **3 機能**: 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 会場モード(standalone)
 - `src/lib/storyUserLaneGuideHtml.js` → **3 機能**: 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 会場モード(standalone)
+- `src/lib/storyUserLaneRowModel.js` → **3 機能**: 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 会場モード(standalone)
 - `src/lib/storyUserLaneSort.js` → **3 機能**: 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 会場モード(standalone)
 - `src/lib/supportVisualStoryCopy.js` → **3 機能**: 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 会場モード(standalone)
 - `src/lib/userCommentProfileCache.js` → **3 機能**: コメビュ(別窓) / 記録エンジン(watchページ常駐) / ポップアップ(応援レーン)
 - `src/lib/userLaneCandidatesFromStorage.js` → **3 機能**: 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 会場モード(standalone)
+- `src/lib/venueLaneParity.js` → **3 機能**: 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 会場モード(standalone)
 - `src/lib/venueSeatsDiagKey.js` → **3 機能**: 記録エンジン(watchページ常駐) / 状態速報ページ / 会場モード(standalone)
 - `src/lib/voiceAgeGate.js` → **3 機能**: コメビュ(別窓) / 記録エンジン(watchページ常駐) / 会場モード(standalone)
 - `src/lib/voiceAssignment.js` → **3 機能**: コメビュ(別窓) / 記録エンジン(watchページ常駐) / 会場モード(standalone)
@@ -127,6 +140,7 @@
 | `src/lib/highlightLedger.js` | 4 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 状態速報ページ / 会場モード(standalone) |
 | `src/lib/highlightLedgerKey.js` | 4 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 状態速報ページ / 会場モード(standalone) |
 | `src/lib/htmlEscape.js` | 4 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 状態速報ページ / 会場モード(standalone) |
+| `src/lib/laneMirrorKey.js` | 4 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 状態速報ページ / 会場モード(standalone) |
 | `src/lib/personTileDom.js` | 4 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 状態速報ページ / 会場モード(standalone) |
 | `src/lib/reportSilentError.js` | 4 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 状態速報ページ / 会場モード(standalone) |
 | `src/lib/safeStorageLocal.js` | 4 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 状態速報ページ / 会場モード(standalone) |
@@ -143,6 +157,11 @@
 | `src/lib/voiceEffectDiagKey.js` | 4 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 状態速報ページ / 会場モード(standalone) |
 | `src/shared/avatar/avatarUrlGuard.js` | 4 | コメビュ(別窓) / 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 会場モード(standalone) |
 | `src/shared/html/escape.js` | 4 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 状態速報ページ / 会場モード(standalone) |
+| `src/domain/lane/columns/kontaPolicy.js` | 3 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 会場モード(standalone) |
+| `src/domain/lane/columns/linkPolicy.js` | 3 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 会場モード(standalone) |
+| `src/domain/lane/columns/tanuPolicy.js` | 3 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 会場モード(standalone) |
+| `src/domain/lane/tier.js` | 3 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 会場モード(standalone) |
+| `src/domain/user/nickname.js` | 3 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 会場モード(standalone) |
 | `src/extension/story/renderStoryUserLaneDom.js` | 3 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 会場モード(standalone) |
 | `src/lib/avatarUrlCompare.js` | 3 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 会場モード(standalone) |
 | `src/lib/backfillRinkuNarration.js` | 3 | ポップアップ(応援レーン) / 状態速報ページ / Web版 状態(スマホ) |
@@ -158,6 +177,7 @@
 | `src/lib/giftEffectDiag.js` | 3 | 記録エンジン(watchページ常駐) / 状態速報ページ / 会場モード(standalone) |
 | `src/lib/instantPushDiag.js` | 3 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 状態速報ページ |
 | `src/lib/instantPushDiagKey.js` | 3 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 状態速報ページ |
+| `src/lib/laneMirror.js` | 3 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 会場モード(standalone) |
 | `src/lib/lengthDelimitedStream.js` | 3 | バックフィル SW / 記録エンジン(watchページ常駐) / ページ傍受 |
 | `src/lib/liveEndedFlag.js` | 3 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 状態速報ページ |
 | `src/lib/ndgrChatRows.js` | 3 | バックフィル SW / 記録エンジン(watchページ常駐) / ページ傍受 |
@@ -168,12 +188,18 @@
 | `src/lib/phaseDirector.js` | 3 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 会場モード(standalone) |
 | `src/lib/popupAvatarResolver.js` | 3 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 会場モード(standalone) |
 | `src/lib/protobufVarint.js` | 3 | バックフィル SW / 記録エンジン(watchページ常駐) / ページ傍受 |
+| `src/lib/storyAvatarDiagLine.js` | 3 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 会場モード(standalone) |
+| `src/lib/storyDiagMirrorKey.js` | 3 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 会場モード(standalone) |
+| `src/lib/storyLaneAvatarSrc.js` | 3 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 会場モード(standalone) |
 | `src/lib/storyUserLaneBuckets.js` | 3 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 会場モード(standalone) |
+| `src/lib/storyUserLaneDisplaySrc.js` | 3 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 会場モード(standalone) |
 | `src/lib/storyUserLaneGuideHtml.js` | 3 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 会場モード(standalone) |
+| `src/lib/storyUserLaneRowModel.js` | 3 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 会場モード(standalone) |
 | `src/lib/storyUserLaneSort.js` | 3 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 会場モード(standalone) |
 | `src/lib/supportVisualStoryCopy.js` | 3 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 会場モード(standalone) |
 | `src/lib/userCommentProfileCache.js` | 3 | コメビュ(別窓) / 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) |
 | `src/lib/userLaneCandidatesFromStorage.js` | 3 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 会場モード(standalone) |
+| `src/lib/venueLaneParity.js` | 3 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 会場モード(standalone) |
 | `src/lib/venueSeatsDiagKey.js` | 3 | 記録エンジン(watchページ常駐) / 状態速報ページ / 会場モード(standalone) |
 | `src/lib/voiceAgeGate.js` | 3 | コメビュ(別窓) / 記録エンジン(watchページ常駐) / 会場モード(standalone) |
 | `src/lib/voiceAssignment.js` | 3 | コメビュ(別窓) / 記録エンジン(watchページ常駐) / 会場モード(standalone) |
@@ -225,7 +251,6 @@
 | `src/lib/kokenGiftHistoryApi.js` | 2 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) |
 | `src/lib/kokenGiftHistoryFetchClient.js` | 2 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) |
 | `src/lib/laneDiagKey.js` | 2 | ポップアップ(応援レーン) / 状態速報ページ |
-| `src/lib/laneMirrorKey.js` | 2 | ポップアップ(応援レーン) / 状態速報ページ |
 | `src/lib/liveAudienceDom.js` | 2 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) |
 | `src/lib/liveChannelSwitch.js` | 2 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) |
 | `src/lib/metricConfidence.js` | 2 | ポップアップ(応援レーン) / 状態速報ページ |
@@ -275,17 +300,21 @@
 | `src/lib/venueCharacterFrame.js` | 2 | 記録エンジン(watchページ常駐) / 会場モード(standalone) |
 | `src/lib/venueCrowdMotion.js` | 2 | 記録エンジン(watchページ常駐) / 会場モード(standalone) |
 | `src/lib/venueDisplayRows.js` | 2 | 記録エンジン(watchページ常駐) / 会場モード(standalone) |
+| `src/lib/venueDomCensus.js` | 2 | 記録エンジン(watchページ常駐) / 会場モード(standalone) |
 | `src/lib/venueDragScroll.js` | 2 | 記録エンジン(watchページ常駐) / 会場モード(standalone) |
 | `src/lib/venueHeat.js` | 2 | 記録エンジン(watchページ常駐) / 会場モード(standalone) |
 | `src/lib/venueIncrementalAggregate.js` | 2 | 記録エンジン(watchページ常駐) / 会場モード(standalone) |
 | `src/lib/venueLaneBuckets.js` | 2 | 記録エンジン(watchページ常駐) / 会場モード(standalone) |
+| `src/lib/venueLaneMirrorSupply.js` | 2 | 記録エンジン(watchページ常駐) / 会場モード(standalone) |
 | `src/lib/venueLiveRoster.js` | 2 | 記録エンジン(watchページ常駐) / 会場モード(standalone) |
+| `src/lib/venueMirrorAvatarEnrich.js` | 2 | 記録エンジン(watchページ常駐) / 会場モード(standalone) |
 | `src/lib/venueResidents.js` | 2 | 記録エンジン(watchページ常駐) / 会場モード(standalone) |
 | `src/lib/venueRoster.js` | 2 | 記録エンジン(watchページ常駐) / 会場モード(standalone) |
 | `src/lib/venueSeats.js` | 2 | 記録エンジン(watchページ常駐) / 会場モード(standalone) |
 | `src/lib/venueSeatsDiag.js` | 2 | 記録エンジン(watchページ常駐) / 会場モード(standalone) |
 | `src/lib/venueSpeech.js` | 2 | 記録エンジン(watchページ常駐) / 会場モード(standalone) |
 | `src/lib/venueSpeechStreak.js` | 2 | 記録エンジン(watchページ常駐) / 会場モード(standalone) |
+| `src/lib/venueStoryDiagMirrorPanel.js` | 2 | 記録エンジン(watchページ常駐) / 会場モード(standalone) |
 | `src/lib/venueViewport.js` | 2 | 記録エンジン(watchページ常駐) / 会場モード(standalone) |
 | `src/lib/versionMismatch.js` | 2 | ポップアップ(応援レーン) / 状態速報ページ |
 | `src/lib/videoCapture.js` | 2 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) |
@@ -298,12 +327,7 @@
 | `src/data/sources/laneFromStoredComments.js` | 1 | ポップアップ(応援レーン) |
 | `src/data/store/laneStore.js` | 1 | ポップアップ(応援レーン) |
 | `src/domain/lane/aggregate.js` | 1 | ポップアップ(応援レーン) |
-| `src/domain/lane/columns/kontaPolicy.js` | 1 | ポップアップ(応援レーン) |
-| `src/domain/lane/columns/linkPolicy.js` | 1 | ポップアップ(応援レーン) |
-| `src/domain/lane/columns/tanuPolicy.js` | 1 | ポップアップ(応援レーン) |
-| `src/domain/lane/tier.js` | 1 | ポップアップ(応援レーン) |
 | `src/domain/user/avatar.js` | 1 | ポップアップ(応援レーン) |
-| `src/domain/user/nickname.js` | 1 | ポップアップ(応援レーン) |
 | `src/extension/backfill-sw-entry.js` | 1 | バックフィル SW |
 | `src/extension/comeview-entry.js` | 1 | コメビュ(別窓) |
 | `src/extension/content-entry.js` | 1 | 記録エンジン(watchページ常駐) |
@@ -473,6 +497,7 @@
 | `src/lib/inlineHostBesideSizing.js` | 1 | 記録エンジン(watchページ常駐) |
 | `src/lib/inlineHostDockSizing.js` | 1 | 記録エンジン(watchページ常駐) |
 | `src/lib/inlineHostLayoutReset.js` | 1 | 記録エンジン(watchページ常駐) |
+| `src/lib/inlineHostMoveProbe.js` | 1 | 記録エンジン(watchページ常駐) |
 | `src/lib/inlineModeFlags.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/inlinePanelFocusGate.js` | 1 | 記録エンジン(watchページ常駐) |
 | `src/lib/inlinePanelPlacementResolver.js` | 1 | 記録エンジン(watchページ常駐) |
@@ -491,7 +516,7 @@
 | `src/lib/kiramekiAwards.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/kiramekiAwardsSectionHtml.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/laneDiag.js` | 1 | ポップアップ(応援レーン) |
-| `src/lib/laneMirror.js` | 1 | ポップアップ(応援レーン) |
+| `src/lib/laneTickProbe.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/liveCommenterStats.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/liveHealthScore.js` | 1 | 状態速報ページ |
 | `src/lib/livePersistInterval.js` | 1 | 記録エンジン(watchページ常駐) |
@@ -640,14 +665,10 @@
 | `src/lib/statusTrend.js` | 1 | 状態速報ページ |
 | `src/lib/statusTrendKey.js` | 1 | 状態速報ページ |
 | `src/lib/storedCommentDedupeMerge.js` | 1 | ポップアップ(応援レーン) |
-| `src/lib/storyAvatarDiagLine.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/storyDetailRelatedEntries.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/storyGrowthLimits.js` | 1 | ポップアップ(応援レーン) |
-| `src/lib/storyLaneAvatarSrc.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/storyUserLaneContaminationGuard.js` | 1 | ポップアップ(応援レーン) |
-| `src/lib/storyUserLaneDisplaySrc.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/storyUserLaneRenderSignature.js` | 1 | ポップアップ(応援レーン) |
-| `src/lib/storyUserLaneRowModel.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/suggestInitialInlinePanelPlacement.js` | 1 | 記録エンジン(watchページ常駐) |
 | `src/lib/summarizeDevMonitorGiftRanking.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/summarizeGiftSubAppHistoryDiag.js` | 1 | 記録エンジン(watchページ常駐) |

@@ -12,7 +12,11 @@ async function waitForPopupWired(popup) {
 }
 
 test.describe('compose quick toolbar (UD + compact)', () => {
-  test('書き出し・再読み込みボタンはプライマリコメント枠内にあり、操作しやすいサイズと名前がある', async ({
+  // v0.1.896: 操作ボタン群(.nl-compose-quick-toolbar)はユーザー要望+会議で
+  // .nl-comment-compose--primary の中から .nl-main 上部(配信者バナー/統計カードの直前)へ
+  // hoistQuickToolbarToTop() が昇格させる。よって「プライマリコメント枠内にある」の
+  // 前提はこの版で意図的に覆っている(本テストは旧版時代の想定)。
+  test('書き出し・再読み込みボタンはパネル上部へ昇格しており、操作しやすいサイズと名前がある', async ({
     context
   }) => {
     let sw = context.serviceWorkers()[0];
@@ -59,12 +63,20 @@ test.describe('compose quick toolbar (UD + compact)', () => {
     const compose = popup.locator('.nl-comment-compose--primary');
     await expect(compose).toBeVisible();
 
+    const toolbar = popup.locator('.nl-compose-quick-toolbar');
+    await expect(toolbar).toBeVisible();
+    // v0.1.896: 昇格済みの印(dataset.nlHoisted='top')が付き、.nl-main 直下にある。
+    await expect(toolbar).toHaveAttribute('data-nl-hoisted', 'top');
+    await expect(
+      toolbar.locator('xpath=ancestor::*[contains(@class,"nl-main")]')
+    ).toHaveCount(1);
+
     for (const id of ['exportJson', 'captureScreenshot', 'reloadWatchTabBtn']) {
       const btn = popup.locator(`#${id}`);
       await expect(btn).toBeVisible();
       await expect(
         btn.locator(
-          'xpath=ancestor::section[contains(@class,"nl-comment-compose--primary")]'
+          'xpath=ancestor::*[contains(@class,"nl-compose-quick-toolbar")]'
         )
       ).toHaveCount(1);
     }
