@@ -37,6 +37,12 @@ describe('会場=①レーン鏡映の配線(配線忘れ=CI赤)', () => {
     expect(venueBarSrc).toMatch(/composeVenueBaseRows\(/);
   });
 
+  // --- v0.1.1136 C2(scroll-whiteout-freeze-DESIGN.mdとは別件・venue-pop-parity-loop-root-cause C2) ---
+  it('composeVenueBaseRows は reason=stale のときは fallback へ降格せず鏡を使い続ける', () => {
+    expect(venueBarSrc).toMatch(/staleButUsable\s*=\s*!usable\.usable\s*&&\s*usable\.reason\s*===\s*'stale'/);
+    expect(venueBarSrc).toMatch(/if\s*\(!usable\.usable\s*&&\s*!staleButUsable\)\s*\{/);
+  });
+
   it('venueBar が段割当の合成(composeVenueLaneBuckets)を呼んでいる', () => {
     expect(venueBarSrc).toMatch(/composeVenueLaneBuckets\(/);
   });

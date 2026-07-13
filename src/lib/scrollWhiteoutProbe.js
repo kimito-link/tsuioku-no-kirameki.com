@@ -18,6 +18,9 @@ export const WHITEOUT_PREV_VISIBLE_MIN_H = 50;
 export const WHITEOUT_NOW_GONE_MAX_H = 10;
 /** 記録する最新サンプルの最大数(リングバッファ)。 */
 export const WHITEOUT_SAMPLE_CAP = 5;
+/** 白化検知時、この ms 以内に host 移設があれば「移設が犯人」と分類する閾値。
+ *  根拠: whiteout throttle 250ms + reflow debounce 150ms + interval tick 360ms + マージン。 */
+export const WHITEOUT_CULPRIT_MOVE_WINDOW_MS = 1200;
 
 /**
  * 1 要素の「直前→今回」の遷移が白化(可視→消失)に当たるかを判定する純関数。
@@ -35,25 +38,56 @@ export function judgeWhiteoutTransition(t) {
 }
 
 /**
+ * 白化1件の真犯人分類(v0.1.1135・W-1計器・scroll-whiteout-freeze設計)。
+ *   move: 直近 WHITEOUT_CULPRIT_MOVE_WINDOW_MS 以内に host 移設が記録されている(=移設が犯人の疑い)
+ *   repaint: 移設記録が無い、または閾値より前(=再描画側の何かが犯人の疑い)
+ * @param {{ lastMoveAgoMs: (number|null|undefined) }} t
+ * @returns {'move'|'repaint'}
+ */
+export function classifyWhiteoutCulprit(t) {
+  const agoMs = t?.lastMoveAgoMs;
+  if (typeof agoMs === 'number' && agoMs >= 0 && agoMs <= WHITEOUT_CULPRIT_MOVE_WINDOW_MS) {
+    return 'move';
+  }
+  return 'repaint';
+}
+
+/**
  * 観測状態に1サンプルを取り込み、白化が起きていれば count/最新サンプルを更新する純関数。
  * 状態オブジェクトは呼び出し側が保持(content-entry.js のモジュール変数)。
- * @param {{ count:number, samples:Array<object>, lastAtMs:number }} state
- * @param {{ kind:string, prevH:number, nowH:number, visibleNow:boolean, atMs:number }} sample
+ * @param {{ count:number, samples:Array<object>, lastAtMs:number, culpritMove?:number, culpritRepaint?:number }} state
+ * @param {{ kind:string, prevH:number, nowH:number, visibleNow:boolean, atMs:number, lastMoveReason?:string, lastMoveAgoMs?:number|null, hostDisplay?:string, hostVisibility?:string }} sample
+ *   lastMoveReason/lastMoveAgoMs: 呼び出し側が _inlineHostMoveState から読んで渡す(W-1相関計器)。
+ *   hostDisplay/hostVisibility: 呼び出し側が getComputedStyle(host) から読んで渡す(host種別のときのみ意味を持つ)。
  * @returns {{ count:number, samples:Array<object>, lastAtMs:number }} 更新後の同じ state(破壊的更新)
  */
 export function recordWhiteoutSample(state, sample) {
   if (!state || typeof state !== 'object') return state;
   if (!Array.isArray(state.samples)) state.samples = [];
   if (typeof state.count !== 'number') state.count = 0;
+  if (typeof state.culpritMove !== 'number') state.culpritMove = 0;
+  if (typeof state.culpritRepaint !== 'number') state.culpritRepaint = 0;
   if (!judgeWhiteoutTransition(sample)) return state;
   state.count += 1;
   state.lastAtMs = Number(sample?.atMs) || 0;
+  const lastMoveAgoMs =
+    typeof sample?.lastMoveAgoMs === 'number' && sample.lastMoveAgoMs >= 0
+      ? Math.round(sample.lastMoveAgoMs)
+      : null;
+  const culprit = classifyWhiteoutCulprit({ lastMoveAgoMs });
+  if (culprit === 'move') state.culpritMove += 1;
+  else state.culpritRepaint += 1;
   state.samples.push({
     kind: String(sample?.kind || '').slice(0, 32),
     prevH: Math.round(Number(sample?.prevH) || 0),
     nowH: Math.round(Number(sample?.nowH) || 0),
     visibleNow: sample?.visibleNow !== false,
-    atMs: state.lastAtMs
+    atMs: state.lastAtMs,
+    lastMoveReason: String(sample?.lastMoveReason || '').slice(0, 40),
+    lastMoveAgoMs,
+    hostDisplay: String(sample?.hostDisplay || '').slice(0, 24),
+    hostVisibility: String(sample?.hostVisibility || '').slice(0, 24),
+    culprit
   });
   if (state.samples.length > WHITEOUT_SAMPLE_CAP) {
     state.samples = state.samples.slice(-WHITEOUT_SAMPLE_CAP);
@@ -63,9 +97,9 @@ export function recordWhiteoutSample(state, sample) {
 
 /**
  * fastDiag に出す形に要約する純関数。nowMs から「最後の白化が何 ms 前か」を出す。
- * @param {{ count:number, samples:Array<object>, lastAtMs:number }|null} state
+ * @param {{ count:number, samples:Array<object>, lastAtMs:number, culpritMove?:number, culpritRepaint?:number }|null} state
  * @param {number} nowMs
- * @returns {{ whiteoutCount:number, lastWhiteoutAgoMs:(number|null), samples:Array<object> }}
+ * @returns {{ whiteoutCount:number, lastWhiteoutAgoMs:(number|null), culpritMove:number, culpritRepaint:number, samples:Array<object> }}
  */
 export function summarizeWhiteoutDiag(state, nowMs) {
   const count = Number(state?.count) || 0;
@@ -74,6 +108,8 @@ export function summarizeWhiteoutDiag(state, nowMs) {
   return {
     whiteoutCount: count,
     lastWhiteoutAgoMs: lastAtMs > 0 ? Math.max(0, Number(nowMs) - lastAtMs) : null,
+    culpritMove: Number(state?.culpritMove) || 0,
+    culpritRepaint: Number(state?.culpritRepaint) || 0,
     samples
   };
 }
