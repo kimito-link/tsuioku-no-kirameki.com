@@ -18,6 +18,21 @@
 export const VENUE_LANE_MIRROR_SOFT_WINDOW_MS = 180_000;
 /** X層(鏡にまだ居ない直近発言者)の猶予窓(ms)。①のpoll+paint+publishの通常10秒に十分な余裕。 */
 export const VENUE_LANE_TRANSIENT_WINDOW_MS = 60_000;
+/** ①POPと会場のタイル寸法に許容する相対差。超えたら見た目不一致。 */
+export const VENUE_TILE_GEOMETRY_TOLERANCE = 0.1;
+
+/** @param {unknown} value */
+function positiveMetric(value) {
+  const n = Number(value);
+  return Number.isFinite(n) && n > 0 ? n : 0;
+}
+
+/** DPR込みの物理寸法で相対差を判定する。 @param {number} a @param {number} b */
+function geometryDiffers(a, b) {
+  if (!(a > 0) || !(b > 0)) return false;
+  return Math.abs(a - b) / Math.max(a, b) > VENUE_TILE_GEOMETRY_TOLERANCE;
+}
+
 
 const TIERS = /** @type {const} */ (['link', 'gift', 'ad', 'konta', 'tanu']);
 const TIER_LABEL = { link: 'link', gift: 'gift', ad: 'ad', konta: 'konta', tanu: 'tanu' };
@@ -227,6 +242,38 @@ export function buildVenueLaneParity(input) {
   const isMirrorJudgingEarly = mode === 'mirror' && !mirrorIssue;
   const domIn = /** @type {any} */ (inp.dom && typeof inp.dom === 'object' ? inp.dom : null);
   const domMeasured = !!(domIn && domIn.measured === true && domIn.perSection && typeof domIn.perSection === 'object');
+  const popDomIn =
+    snap?.domSelf && typeof snap.domSelf === 'object' ? /** @type {any} */ (snap.domSelf) : null;
+  const popDomMeasured = !!(
+    popDomIn &&
+    popDomIn.measured === true &&
+    popDomIn.perTier &&
+    typeof popDomIn.perTier === 'object'
+  );
+  /** @type {string[]} */
+  const popDomMismatchParts = [];
+  /** @type {string[]} */
+  const geometryMismatchParts = [];
+  /** @type {string[]} */
+  const geometryMissingParts = [];
+  const popupDpr = popDomMeasured ? positiveMetric(popDomIn.dpr) || 1 : 1;
+  const venueDpr = domMeasured ? positiveMetric(domIn.dpr) || 1 : 1;
+
+  if (popDomMeasured) {
+    for (const tier of TIERS) {
+      const visible = Math.max(0, Math.floor(Number(popDomIn.perTier[tier]?.visible) || 0));
+      const expected = perTier[tier].pop;
+      const diff = visible - expected;
+      if (diff === 0) continue;
+      popDomMismatchParts.push(`${tier}:可視${visible}(鏡${expected})`);
+      if (isMirrorJudgingEarly) {
+        unexplainedCount += Math.abs(diff);
+        if (unexplainedSamples.length < 5) {
+          unexplainedSamples.push(diff > 0 ? `${tier}:①DOM余${diff}` : `${tier}:①DOM欠${-diff}`);
+        }
+      }
+    }
+  }
   /** @type {string[]} DOM≠データ の段別内訳(`tanu:可視204(データ154 裸50)` 形式) */
   const domMismatchParts = [];
   if (domMeasured) {
@@ -251,6 +298,57 @@ export function buildVenueLaneParity(input) {
     };
     for (const tier of TIERS) checkSection(tier, perTier[tier].painted);
     checkSection('lobby', lobbyKeys.length);
+    if (popDomMeasured) {
+      /** @type {{ visible:number, tileW:number, tileH:number, physicalW:number, physicalH:number }|null} */
+      let lobbyReference = null;
+      /** @param {any} source @param {number} dpr */
+      const readGeometry = (source, dpr) => ({
+        visible: Math.max(0, Math.floor(Number(source?.visible) || 0)),
+        tileW: positiveMetric(source?.tileW),
+        tileH: positiveMetric(source?.tileH),
+        physicalW: positiveMetric(source?.tileW) * dpr,
+        physicalH: positiveMetric(source?.tileH) * dpr
+      });
+      /** @param {string} label @param {ReturnType<typeof readGeometry>} popupGeometry
+       * @param {ReturnType<typeof readGeometry>} venueGeometry */
+      const compareGeometry = (label, popupGeometry, venueGeometry) => {
+        if (!(popupGeometry.tileW > 0 && popupGeometry.tileH > 0 && venueGeometry.tileW > 0 && venueGeometry.tileH > 0)) {
+          geometryMissingParts.push(label);
+          return;
+        }
+        if (
+          !geometryDiffers(popupGeometry.physicalW, venueGeometry.physicalW) &&
+          !geometryDiffers(popupGeometry.physicalH, venueGeometry.physicalH)
+        ) return;
+        geometryMismatchParts.push(
+          `${label}:${venueGeometry.tileW}×${venueGeometry.tileH}px(①${popupGeometry.tileW}×${popupGeometry.tileH}px)`
+        );
+        if (isMirrorJudgingEarly) {
+          unexplainedCount += 1;
+          if (unexplainedSamples.length < 5) unexplainedSamples.push(`${label}:幾何差`);
+        }
+      };
+
+      for (const tier of TIERS) {
+        const popupGeometry = readGeometry(popDomIn.perTier[tier], popupDpr);
+        const venueGeometry = readGeometry(domIn.perSection[tier], venueDpr);
+        if (
+          popupGeometry.visible > 0 &&
+          popupGeometry.tileW > 0 &&
+          popupGeometry.tileH > 0 &&
+          !lobbyReference
+        ) lobbyReference = popupGeometry;
+        if (popupGeometry.visible > 0 && venueGeometry.visible > 0) {
+          compareGeometry(tier, popupGeometry, venueGeometry);
+        }
+      }
+
+      const venueLobbyGeometry = readGeometry(domIn.perSection.lobby, venueDpr);
+      if (venueLobbyGeometry.visible > 0) {
+        if (lobbyReference) compareGeometry('ロビー', lobbyReference, venueLobbyGeometry);
+        else geometryMissingParts.push('ロビー(①基準なし)');
+      }
+    }
   }
   const domGhost = domMeasured ? Math.max(0, Math.floor(Number(domIn.ghost) || 0)) : 0;
   const domDupTotal = domMeasured
@@ -282,6 +380,12 @@ export function buildVenueLaneParity(input) {
     // fail-closed: DOMを測れなかったとき✅を名乗れない(データ一致だけでは画面の真実を保証しない)。
     verdict = '⚪';
     reason = 'DOM未計測';
+  } else if (!popDomMeasured) {
+    verdict = '⚪';
+    reason = '①DOM未計測';
+  } else if (geometryMissingParts.length > 0) {
+    verdict = '⚪';
+    reason = `寸法未計測(${geometryMissingParts.join(',')})`;
   } else if (mirrorPruned) {
     verdict = '⚪';
     reason = '鏡縮退(判定は鏡範囲のみ)';
@@ -317,6 +421,21 @@ export function buildVenueLaneParity(input) {
       ` / DOM=データ${domGhost > 0 ? `(幽${domGhost})` : ''}` +
       (domDupTotal > 0 || domStrays > 0 ? ` / 重複${domDupTotal} 迷子${domStrays}` : '');
   }
+  const popDomStr = !popDomMeasured
+    ? ' / ①DOM未計測'
+    : popDomMismatchParts.length > 0
+      ? ` / ①DOM≠鏡 ${popDomMismatchParts.join(' ')}`
+      : ' / ①DOM=鏡';
+  let geometryStr = '';
+  if (popDomMeasured && domMeasured) {
+    if (geometryMismatchParts.length > 0) {
+      geometryStr = ` / 幾何≠ ${geometryMismatchParts.join(' ')}`;
+    } else if (geometryMissingParts.length > 0) {
+      geometryStr = ` / 幾何未計測(${geometryMissingParts.join(',')})`;
+    } else {
+      geometryStr = ' / 幾何=一致';
+    }
+  }
   // 付帯(>0のときだけ末尾): 「顔が多く見える」容疑者(群衆Canvas/額縁)と✅ブロッカー(無鍵/空可視)の実数。
   //   v0.1.1116: 白円(blank=avatar が blank.jpg)と顔プローブ404も参考併記。blankAnon(数値IDでない鍵の
   //   白円=identiconになるべき人が白い)は導出バグの証拠で、修正後の期待値0(数値IDの白円は①も同じ=正)。
@@ -335,6 +454,8 @@ export function buildVenueLaneParity(input) {
     `会場一致 ${verdict}${verdict === '⚪' ? reason : ageStr} ${tierStr}` +
     midStr +
     domStr +
+    popDomStr +
+    geometryStr +
     ` / 未説明${unexplainedCount}` +
     (unexplainedSamples.length > 0 ? `(${unexplainedSamples.join(', ')})` : '') +
     (visibleShown < logicalTotal ? ` / 表示${visibleShown}/${logicalTotal}` : '') +

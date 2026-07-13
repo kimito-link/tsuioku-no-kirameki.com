@@ -26,11 +26,29 @@ function domMatching(painted, lobbyLen = 0, over = {}) {
   /** @type {Record<string, any>} */
   const perSection = {};
   for (const t of ['link', 'gift', 'ad', 'konta', 'tanu']) {
-    perSection[t] = { visible: (painted[t] || []).length, ghost: 0, bare: 0, visibleEmpty: 0, unkeyed: 0 };
+    const visible = (painted[t] || []).length;
+    perSection[t] = {
+      visible,
+      tileW: visible > 0 ? 64 : 0,
+      tileH: visible > 0 ? 84 : 0,
+      ghost: 0,
+      bare: 0,
+      visibleEmpty: 0,
+      unkeyed: 0
+    };
   }
-  perSection.lobby = { visible: lobbyLen, ghost: 0, bare: 0, visibleEmpty: 0, unkeyed: 0 };
+  perSection.lobby = {
+    visible: lobbyLen,
+    tileW: lobbyLen > 0 ? 64 : 0,
+    tileH: lobbyLen > 0 ? 84 : 0,
+    ghost: 0,
+    bare: 0,
+    visibleEmpty: 0,
+    unkeyed: 0
+  };
   const base = {
     measured: true,
+    dpr: 1,
     perSection,
     ghost: 0,
     bare: 0,
@@ -44,7 +62,11 @@ function domMatching(painted, lobbyLen = 0, over = {}) {
     crowdOn: false,
     crowdCount: 0
   };
-  return { ...base, ...over, perSection: { ...perSection, ...(over.perSection || {}) } };
+  const mergedPerSection = { ...perSection };
+  for (const [section, value] of Object.entries(over.perSection || {})) {
+    mergedPerSection[section] = { ...(perSection[section] || {}), ...value };
+  }
+  return { ...base, ...over, perSection: mergedPerSection };
 }
 
 /** 実機ケースの鏡: link40相当(縮めて4)・ad10相当(縮めて2)。 */
@@ -61,6 +83,17 @@ function makeSnap(over = {}) {
     konta: [],
     tanu: cells(['a1', 'a2']),
     pickedLength: 8,
+    domSelf: {
+      measured: true,
+      dpr: 1,
+      perTier: {
+        link: { visible: 4, tileW: 64, tileH: 84 },
+        gift: { visible: 0, tileW: 0, tileH: 0 },
+        ad: { visible: 2, tileW: 64, tileH: 84 },
+        konta: { visible: 0, tileW: 0, tileH: 0 },
+        tanu: { visible: 2, tileW: 64, tileH: 84 }
+      }
+    },
     totalCandidates: 8,
     ...over
   };
@@ -338,7 +371,55 @@ describe('buildVenueLaneParity', () => {
       const p = buildVenueLaneParity({ ...base(), dom: domMatching(painted()) });
       expect(p.verdict).toBe('✅');
       expect(p.line).toContain('DOM=データ');
+      expect(p.line).toContain('①DOM=鏡');
+      expect(p.line).toContain('幾何=一致');
       expect(p.dom).toMatchObject({ measured: true, ghost: 0 });
+    });
+
+    it('旧鏡(domSelfなし)は一致を断言せず ⚪ ①DOM未計測', () => {
+      const snap = makeSnap();
+      delete snap.domSelf;
+      const p = buildVenueLaneParity({ ...base(), snap, dom: domMatching(painted()) });
+      expect(p.verdict).toBe('⚪');
+      expect(p.reason).toBe('①DOM未計測');
+      expect(p.line).toContain('①DOM未計測');
+    });
+
+    it('①の実DOM表示数が鏡セル数と違えば 🔴(paint完了報告の嘘を検出)', () => {
+      const snap = makeSnap();
+      snap.domSelf.perTier.tanu.visible = 3;
+      const p = buildVenueLaneParity({ ...base(), snap, dom: domMatching(painted()) });
+      expect(p.verdict).toBe('🔴');
+      expect(p.unexplained.count).toBe(1);
+      expect(p.line).toContain('①DOM≠鏡 tanu:可視3(鏡2)');
+    });
+
+    it('段のタイル寸法が10%を超えて違えば 🔴 幾何差', () => {
+      const p = buildVenueLaneParity({
+        ...base(),
+        dom: domMatching(painted(), 0, { perSection: { tanu: { tileW: 96, tileH: 84 } } })
+      });
+      expect(p.verdict).toBe('🔴');
+      expect(p.unexplained.count).toBe(1);
+      expect(p.line).toContain('幾何≠ tanu:96×84px(①64×84px)');
+    });
+
+    it('ロビー巨大タイルも①の最初の有効タイル寸法と比較して 🔴', () => {
+      const p = buildVenueLaneParity({
+        ...base(),
+        lobby: ['u:tail'],
+        dom: domMatching(painted(), 1, { perSection: { lobby: { tileW: 96, tileH: 120 } } })
+      });
+      expect(p.verdict).toBe('🔴');
+      expect(p.line).toContain('幾何≠ ロビー:96×120px(①64×84px)');
+    });
+
+    it('表示中タイルの寸法が取れなければ ✅ にせず ⚪ 寸法未計測', () => {
+      const snap = makeSnap();
+      snap.domSelf.perTier.tanu.tileW = 0;
+      const p = buildVenueLaneParity({ ...base(), snap, dom: domMatching(painted()) });
+      expect(p.verdict).toBe('⚪');
+      expect(p.reason).toContain('寸法未計測');
     });
 
     it('census欠落(dom なし)は ✅ を名乗れない=⚪ DOM未計測(fail-closed)', () => {

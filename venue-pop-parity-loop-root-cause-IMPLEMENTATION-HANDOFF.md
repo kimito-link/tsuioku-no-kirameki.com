@@ -2,6 +2,14 @@
 
 このファイル1枚で着手できる。設計の背景・根本原因・却下案の理由は [venue-pop-parity-loop-root-cause-DESIGN.md](venue-pop-parity-loop-root-cause-DESIGN.md) 参照(設計=Fable/裏取り=司令塔、2026-07-13)。
 
+## 実装状況（2026-07-14）
+
+- ✅ C1のソース実装・単体/配線テスト完了（対象5ファイル93件）・`npm run typecheck`通過。
+- ✅ version bump **v0.1.1134**（manifest / package / changelog 同期）。
+- ✅ `verify:cc`・build・copy:ext・commit（本ハンドオフ更新時点で実施）。
+- ⏳実機待ち: 拡張リロード＋watch F5後、状態速報の「会場一致」lineで`①DOM=鏡`/`幾何=一致`または具体的な🔴差分を確認する。
+- フェーズ図: [docs/venue-pop-parity-loop-flow.html](docs/venue-pop-parity-loop-flow.html)
+
 ## 今回のスコープ(MVPのみ = C1)
 
 設計書のB節にはC1〜C4の4コンポーネントがあるが、**今回実装するのはC1(両端実DOM指紋)のみ**。理由はE節参照(過去4回の偽陽性のうち最多型=見た目ズレの素通りを、最小変更で機械検知に変えられるため)。C2(供給一元化)・C3(見た目完了ゲート)・C4(退行リング)は後続タスクとして別途着手する。

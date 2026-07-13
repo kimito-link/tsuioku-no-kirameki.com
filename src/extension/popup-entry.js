@@ -694,6 +694,7 @@ import { buildLaneDiagSnapshot } from '../lib/laneDiag.js';
 import { KEY_LANE_MIRROR } from '../lib/laneMirrorKey.js';
 import { KEY_PREVIEW_RENDER_ACK, buildPreviewRenderAck } from '../lib/previewRenderAckKey.js';
 import { buildLaneMirrorSnapshot, restoreLaneMirrorBuckets } from '../lib/laneMirror.js';
+import { measureLaneDomSelf } from '../lib/laneDomSelfMeasure.js';
 import { createMirrorBundleFlushScheduler } from '../lib/mirrorBundleFlushScheduler.js';
 import { KEY_STAT_CARDS_MIRROR } from '../lib/statCardsMirrorKey.js';
 import { buildStatCardsMirrorSnapshot } from '../lib/statCardsMirror.js';
@@ -6778,6 +6779,8 @@ function renderStoryUserLane() {
   paintStoryUserLaneDomFilled(els, faces, buckets, laneDisplayedTotal, laneDomIo, {
     totalCandidates: candidates.length
   });
+  // C1: paint と同じ同期フレームで①実DOMを測り、後段の鏡publishへ渡す(TOCTOU防止)。
+  const laneDomSelf = measureLaneDomSelf(els);
   if (countStoryUserLaneDomTiles(els) > 0) _storyUserLaneLastTiledLid = String(liveId || '').trim().toLowerCase(); // v1041: 実タイルを描いた lid を記録
   // 自己診断: paint 直後に DOM 顔タイル総数を記録（観測のみ・描画は変えない）→ 完了。
   recordStoryUserLaneStep(_storyUserLaneRenderProbe, STORY_USER_LANE_STEPS.PAINTED, {
@@ -6813,6 +6816,7 @@ function renderStoryUserLane() {
   publishLaneMirror({
     liveId,
     buckets,
+    domSelf: laneDomSelf,
     pickedLength: laneDisplayedTotal,
     totalCandidates: candidates.length
   });
@@ -7258,7 +7262,8 @@ function mergeAndScheduleFlush(sectionKey, snapshot, liveId, nowMs) {
   } catch { /* no-op */ }
 }
 
-/** @param {{ liveId: string, buckets: Record<string, unknown[]>, pickedLength: number, totalCandidates: number }} input */
+/** @param {{ liveId: string, buckets: Record<string, unknown[]>, domSelf: unknown,
+ *   pickedLength: number, totalCandidates: number }} input */
 function publishLaneMirror(input) {
   if (INLINE_PASSIVE) return; // 受動ビュー: 鏡を上書きしない
   try {
@@ -10165,6 +10170,16 @@ let _backfillHintLiveId = '';
 /** @type {{ lid: string, running: boolean, started: boolean, stopReason: string }|null} */
 let _backfillStateForOfficial = null;
 
+function repaintOfficialComparisonFromCurrentCount() {
+  const liveStatEl = /** @type {HTMLElement|null} */ ($('liveStatComments'));
+  if (!liveStatEl) return;
+  const normalized = String(liveStatEl.textContent || '').replace(/[,，]/g, '').trim();
+  if (!/^\d+$/.test(normalized)) return;
+  const recorded = Number(normalized);
+  if (!Number.isFinite(recorded)) return;
+  setCountDisplay(recorded, watchMetaCache.snapshot);
+}
+
 /** v0.1.463: caught_up(記録>=公式95%)到達後の再リトライ/再描画ちらちら抑止。配信切替でリセット。 */
 let _backfillCaughtUpForLiveId = '';
 
@@ -10199,6 +10214,16 @@ async function refreshBackfillRecordCardHint(liveId) {
     const recent =
       prog && typeof prog.ts === 'number' && Date.now() - prog.ts < 180_000;
     if (prog && String(prog.lid || '').toLowerCase() === lid && recent) {
+      // Restore the official-comparison state used by the live onChanged path.
+      // Otherwise reopening the popup loses reached_start and shows loading again.
+      _backfillStateForOfficial = {
+        lid,
+        running: !(prog.done === 1 || prog.done === true),
+        started: true,
+        stopReason: String(prog.stopReason || '')
+      };
+      repaintOfficialComparisonFromCurrentCount();
+
       // v0.1.464/v0.1.465: popup が開いた時点で既に done=1 になっていると onChanged が来ない。
       //   storage.get 経由では caught_up フラグ設定のみ行い、triggerBackfillRetry は呼ばない。
       //   （popup 開き直しで自動フラグが立ち e2e 「ボタン前は null」テストが壊れるため。
@@ -10293,6 +10318,7 @@ function bindBackfillProgressListenerOnce() {
     if (String(prog.lid || '').toLowerCase() !== _backfillHintLiveId) return;
     // v0.1.763: 公式比較行を正直な状態にするため直近 backfill 状態を保持(setCountDisplay が読む)。
     _backfillStateForOfficial = { lid: _backfillHintLiveId, running: !(prog.done === 1 || prog.done === true), started: true, stopReason: String(prog.stopReason || '') };
+    repaintOfficialComparisonFromCurrentCount();
     // v0.1.463: 既に caught_up 確定済みの配信なら progress 更新を無視してちらちらを防ぐ。
     if (_backfillCaughtUpForLiveId === _backfillHintLiveId) return;
     // v0.1.415: stopReason も渡す（done=1 でも reached_start か途中かで文言を分ける）。

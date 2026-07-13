@@ -1049,6 +1049,14 @@ const VENUE_CSS = `
     overflow-x: auto;
     overflow-y: visible;
     -webkit-overflow-scrolling: touch;
+    /* v0.1.1133: v0.1.1129 は外枠 .nlsb-seats のスクロールバーだけ消しており、①からの
+       転写元 CSS(LANE_CSS_SYNC_BEGIN)にある段自体(たぬ姉等)の overflow-x:auto には
+       効いていなかった(段だけ独自スクロールバーが出る不具合)。ここにも同様に適用する。 */
+    scrollbar-width: none;
+  }
+  .nlsb-venue-lane-stack .nl-story-userlane::-webkit-scrollbar {
+    width: 0;
+    height: 0;
   }
   .nlsb-venue-lane-stack .nl-story-userlane-cell {
     display: inline-flex;
@@ -4338,9 +4346,9 @@ export function mountVenueBarButton(options = {}) {
           totalCandidates: isLaneMirrorPaintMode
             ? lanePaintSnap.totalCandidates
             : seating.participantCount,
-          // v0.1.1127 Patch B: mirror mode だけ①POPのフッター/ガイドも完全一致に戻す。
-          // fallback は①の鏡件数を名乗らないため、v0.1.1120 の guides:false を維持する。
-          guides: isLaneMirrorPaintMode ? VENUE_LANE_GUIDES_EXACT_COPY : false,
+          // v0.1.1133: fallback でも同じ共有rendererの案内文言を出す。fallback は件数だけ
+          //   seating.participantCount に差し替え、a:匿名ルール等の説明文は①POPと同じ正本に揃える。
+          guides: VENUE_LANE_GUIDES_EXACT_COPY,
           wrapTileEl: (tileEl, item) => {
             const laneItem = /** @type {{ _venueSeatIndex?: unknown }} */ (item || {});
             // v0.1.1111: 席を持たないアイテム(鏡由来の uid 無し広告主セル等)は _venueSeatIndex=-1

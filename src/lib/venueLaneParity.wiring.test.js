@@ -19,6 +19,11 @@ const venueBarSrc = read('src/extension/venueBar.js');
 const aiShareSrc = read('src/lib/aiShareFullText.js');
 const seatsDiagSrc = read('src/lib/venueSeatsDiag.js');
 const statusFastDiagLiteSrc = read('src/lib/statusFastDiagLite.js');
+const popupSrc = read('src/extension/popup-entry.js');
+const laneMirrorSrc = read('src/lib/laneMirror.js');
+const laneDomSelfMeasureSrc = read('src/lib/laneDomSelfMeasure.js');
+const venueDomCensusSrc = read('src/lib/venueDomCensus.js');
+const venueLaneParitySrc = read('src/lib/venueLaneParity.js');
 
 describe('会場=①レーン鏡映の配線(配線忘れ=CI赤)', () => {
   it('venueBar が鏡キー(KEY_LANE_MIRROR)を購読している(onChanged 直採用+catch-up)', () => {
@@ -135,8 +140,8 @@ describe('会場=①レーン鏡映の配線(配線忘れ=CI赤)', () => {
     expect(venueBarSrc).toMatch(/buildVenueMirrorAvatarMap\(/);
   });
 
-  // --- v0.1.1127 会場のガイド/フッターを mirror mode だけ①と完全一致へ戻す ---
-  it('mirror mode の paint は①鏡の pickedLength/totalCandidates とガイド復活定数を渡す', () => {
+  // --- v0.1.1133 会場のガイド/フッターは fallback でも①の共有文言を出す ---
+  it('paint は mirror 時だけ①鏡の pickedLength/totalCandidates を渡し、ガイド文言は常に①正本を使う', () => {
     expect(venueBarSrc).toMatch(/const VENUE_LANE_GUIDES_EXACT_COPY = true;/);
     expect(venueBarSrc).toMatch(/const isLaneMirrorPaintMode = Boolean\(lanePaintSnap\);/);
     expect(venueBarSrc).toMatch(
@@ -145,19 +150,17 @@ describe('会場=①レーン鏡映の配線(配線忘れ=CI赤)', () => {
     expect(venueBarSrc).toMatch(
       /totalCandidates: isLaneMirrorPaintMode\s*\?\s*lanePaintSnap\.totalCandidates\s*:\s*seating\.participantCount/
     );
-    expect(venueBarSrc).toMatch(
-      /guides: isLaneMirrorPaintMode\s*\?\s*VENUE_LANE_GUIDES_EXACT_COPY\s*:\s*false/
-    );
+    expect(venueBarSrc).toMatch(/guides:\s*VENUE_LANE_GUIDES_EXACT_COPY/);
   });
 
-  it('fallback mode の paint は従来どおり seating.participantCount と guides:false を保つ', () => {
+  it('fallback mode の paint は件数だけ seating.participantCount にし、guides:false には戻さない', () => {
     expect(venueBarSrc).toMatch(
       /recordedCommentRowsTotal: isLaneMirrorPaintMode\s*\?\s*lanePaintSnap\.pickedLength\s*:\s*seating\.participantCount/
     );
     expect(venueBarSrc).toMatch(
       /totalCandidates: isLaneMirrorPaintMode\s*\?\s*lanePaintSnap\.totalCandidates\s*:\s*seating\.participantCount/
     );
-    expect(venueBarSrc).toMatch(/:\s*false,\s*wrapTileEl:/);
+    expect(venueBarSrc).not.toMatch(/guides:\s*isLaneMirrorPaintMode\s*\?\s*VENUE_LANE_GUIDES_EXACT_COPY\s*:\s*false/);
   });
 
   it('guide 要素の CSS は LANE_CSS_SYNC 区間内に置かれている', () => {
@@ -204,5 +207,34 @@ describe('会場=①レーン鏡映の配線(配線忘れ=CI赤)', () => {
       skeleton: (venueBarSrc.match(/skeleton/g) || []).length
     };
     expect(counts).toEqual({ loading: 9, spinner: 0, skeleton: 0 });
+  });
+
+  // --- C1: 両端実DOM指紋(件数+寸法) ---
+  it('①POP は paint 直後に実DOMを測り、その同じ指紋を鏡へ渡す', () => {
+    expect(popupSrc).toMatch(/measureLaneDomSelf/);
+    const paintAt = popupSrc.indexOf('paintStoryUserLaneDomFilled(');
+    const measureAt = popupSrc.indexOf('const laneDomSelf = measureLaneDomSelf(els)', paintAt);
+    const publishAt = popupSrc.indexOf('publishLaneMirror({', measureAt);
+    expect(paintAt).toBeGreaterThanOrEqual(0);
+    expect(measureAt).toBeGreaterThan(paintAt);
+    expect(publishAt).toBeGreaterThan(measureAt);
+    expect(popupSrc.slice(publishAt, publishAt + 500)).toMatch(/domSelf:\s*laneDomSelf/);
+  });
+
+  it('鏡は domSelf を容量計算に含め、計測器は5段の表示数と寸法を返す', () => {
+    expect(laneMirrorSrc).toMatch(/const domSelf = normalizeDomSelf\(input\?\.domSelf\)/);
+    expect(laneMirrorSrc).toMatch(/domSelf,/);
+    expect(laneDomSelfMeasureSrc).toMatch(/visible:\s*tiles\.length/);
+    expect(laneDomSelfMeasureSrc).toMatch(/tileW/);
+    expect(laneDomSelfMeasureSrc).toMatch(/tileH/);
+  });
+
+  it('会場 census と parity が寸法・①DOM未計測・10%幾何差を判定する', () => {
+    expect(venueDomCensusSrc).toMatch(/tileW/);
+    expect(venueDomCensusSrc).toMatch(/tileH/);
+    expect(venueLaneParitySrc).toMatch(/snap\?\.domSelf/);
+    expect(venueLaneParitySrc).toMatch(/VENUE_TILE_GEOMETRY_TOLERANCE = 0\.1/);
+    expect(venueLaneParitySrc).toMatch(/①DOM未計測/);
+    expect(venueLaneParitySrc).toMatch(/幾何≠/);
   });
 });

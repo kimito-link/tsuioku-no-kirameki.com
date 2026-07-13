@@ -26,6 +26,24 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1134',
+    date: '2026-07-14',
+    summary: '会場一致判定に①実DOMの寸法指紋を追加',
+    items: Object.freeze([
+      '①ポップアップが描いたレーンの表示数・タイル寸法を鏡へ同梱し、会場の実DOMと突合するようにしました。',
+      '旧鏡は「①DOM未計測」、件数やタイル寸法のずれは赤判定、完全一致のときだけ緑になります（ロビーの巨大タイルも検知）。'
+    ])
+  }),
+  Object.freeze({
+    version: '0.1.1133',
+    date: '2026-07-13',
+    summary: 'fix(venue): 会場の案内文言・診断パネルを①と完全一致に',
+    items: Object.freeze([
+      '会場モードの応援レーン上部にある案内文言(数値ユーザーID・匿名(a:)の扱い等の説明)が、鏡データが使えないとき①ポップアップと違う内容(非表示)になっていた問題を修正しました。',
+      '件数表示だけは会場側の実データを使いつつ、説明文言そのものは①ポップアップと同じ内容で常に表示されるようになります。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1132',
     date: '2026-07-11',
     summary: 'fix(gift): 公式ギフト履歴の鮮度優先を修正',

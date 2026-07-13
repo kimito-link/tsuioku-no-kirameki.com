@@ -650,6 +650,18 @@ describe('resolveOfficialComparisonDisplay（v0.1.763: 中途半端な％をや�
     expect(r.text).toContain('取り込み済み');
   });
 
+  it('explicit reached_start stays complete below the 95 percent ratio', () => {
+    const r = resolveOfficialComparisonDisplay({
+      officialCount: 5200,
+      recordedCount: 4100,
+      backfillRunning: false,
+      backfillStarted: true,
+      backfillStopReason: 'reached_start',
+      recordingActive: true
+    });
+    expect(r.mode).toBe('complete');
+  });
+
   it('まだ走行中=「取り込み中」状態名(％で不安にさせない)', () => {
     const r = resolveOfficialComparisonDisplay({
       officialCount: 1000,

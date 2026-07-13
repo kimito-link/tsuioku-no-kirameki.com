@@ -40,6 +40,34 @@ describe('buildLaneMirrorSnapshot', () => {
     expect(snap.konta[0].userId).toBe('a:X');
   });
 
+  it('①実DOM指紋を固定5段の数値だけに正規化して同梱する', () => {
+    const snap = buildLaneMirrorSnapshot({
+      liveId: 'lv1',
+      buckets: { link: [], gift: [], ad: [], konta: [], tanu: [] },
+      domSelf: {
+        measured: true,
+        perTier: {
+          link: { visible: 2.9, tileW: 64.125, tileH: 84.5, ignored: 'drop' },
+          tanu: { visible: -1, tileW: '72', tileH: null }
+        },
+        dpr: 1.25,
+        ignored: { large: true }
+      }
+    }, { nowMs: 1 });
+    expect(snap.domSelf).toEqual({
+      measured: true,
+      perTier: {
+        link: { visible: 2, tileW: 64.13, tileH: 84.5 },
+        gift: { visible: 0, tileW: 0, tileH: 0 },
+        ad: { visible: 0, tileW: 0, tileH: 0 },
+        konta: { visible: 0, tileW: 0, tileH: 0 },
+        tanu: { visible: 0, tileW: 72, tileH: 0 }
+      },
+      dpr: 1.25
+    });
+    expect(snap.domSelf).not.toHaveProperty('ignored');
+  });
+
   it('displaySrc 空の要素は落とす(鏡に出せない)', () => {
     const snap = buildLaneMirrorSnapshot({
       liveId: 'lv1',
