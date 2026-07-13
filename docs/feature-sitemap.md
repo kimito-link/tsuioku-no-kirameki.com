@@ -281,7 +281,7 @@
   - `src/lib/giftThrowProjectile.js`
 - **吹き出し寿命管理** — 会場の吹き出しの表示上限・追い出し(eviction)ライフサイクル
   - `src/lib/venueBubbleLifecycle.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 188</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 189</summary>
 
 - `scripts/encode-marketing-html-avatars.mjs` — extension/images/marketing-html-avatars/*.png を data URI にし、
 - `scripts/split-avatar-parts.mjs` — 偽市松背景の除去 + パーツ切り出し(one-off アセットパイプライン)
@@ -373,6 +373,7 @@
 - `src/lib/laneDiagKey.js` — 応援アイコン列(popup レーン)の「人数整合」観測値を popup が書き、status が読む storage キー。
 - `src/lib/laneMirror.js` — 応援レーンの「鏡」スナップショット純関数。popup がレーンを描いた buckets を、status が本物の
 - `src/lib/laneMirrorKey.js` — popup の応援レーン(りんく/こん太/広告/たぬ姉の段組み)を「顔=avatar 含めてそっくり」status へ
+- `src/lib/laneSceneEnvelope.js` — LaneScene一致証明の封筒(純関数)。lanescene-structural-review-DESIGN.md のMVP実装。
 - `src/lib/laneTickProbe.js` — ①popup の独立描画トリガ(tickIndependentNorthStar)の自己診断(v0.1.1123)。
 - `src/lib/liveAudienceDom.js` — watch ページ DOM から「同時接続（ページ表示）」に近い視聴者数を読む（純関数・ベストエフォート）
 - `src/lib/liveStatValuePlaceholder.js` — `.nl-live-stat-value` 向け: 数字表示かプレースホルダー文言かを判定（0.1.68 の極太フォント切替と共通）。
@@ -836,7 +837,7 @@
 
 ## 🧬 修正系譜マップ(この系統のバグを過去にどう直したか)
 
-> changelog 全 471 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
+> changelog 全 472 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
 
 ### 💾 記録件数 (71版)
 - `v0.1.1134` 2026-07-14 — 会場一致判定に①実DOMの寸法指紋を追加
@@ -1119,7 +1120,8 @@
 - `v0.1.668` 2026-06-10 — パネルに「💬コメビュ」ボタンを追加
 - `v0.1.667` 2026-06-10 — コメビュに匿名OKのニックネーム・ラベル・メモ
 
-### 🏟 会場・席 (154版)
+### 🏟 会場・席 (155版)
+- `v0.1.1137` 2026-07-14 — 会場一致判定に鏡世代の突合を追加(診断強化のみ)
 - `v0.1.1136` 2026-07-14 — 会場のりんく段が数分おきに出たり消えたりする不具合を修正
 - `v0.1.1134` 2026-07-14 — 会場一致判定に①実DOMの寸法指紋を追加
 - `v0.1.1133` 2026-07-13 — fix(venue): 会場の案内文言・診断パネルを①と完全一致に
@@ -1588,7 +1590,8 @@
 - `v0.1.673` 2026-06-10 — コメビュの名前をパネルと同じ情報源で補完
 - `v0.1.670` 2026-06-10 — コメビュのアイコンを本家と同じサムネに
 
-### 🩺 診断・状態速報 (173版)
+### 🩺 診断・状態速報 (174版)
+- `v0.1.1137` 2026-07-14 — 会場一致判定に鏡世代の突合を追加(診断強化のみ)
 - `v0.1.1135` 2026-07-14 — スクロール白化の真犯人を特定する診断を追加
 - `v0.1.1133` 2026-07-13 — fix(venue): 会場の案内文言・診断パネルを①と完全一致に
 - `v0.1.1128` 2026-07-11 — fix(venue): 会場中の点滅を根治(引っ越し凍結)

@@ -233,6 +233,14 @@ export function buildAiShareFullText({ overviewText, livesData, fastDiag, popupD
     } catch {
       /* no-op */
     }
+    // v0.1.1137(lanescene-structural-review MVP): ①=会場の鏡世代突合(laneParityとは独立の軽量な
+    //   代理指標・revision/contentHashのみ見る)。両者は別の判定なので別行で出す。
+    try {
+      const srLine = String(/** @type {any} */ (venueSeatsDiag)?.sceneReceipt?.line || '');
+      if (srLine) lines.push(srLine);
+    } catch {
+      /* no-op */
+    }
     // v0.1.1054: ギフト/広告の「検知→演出→効果音」整合診断(使用時のみ)。「ちゃんと飛ぶか・音が出るか」を共有に載せる。
     try {
       const gLines = buildGiftEffectDiagLines(giftEffectDiag, Date.now());

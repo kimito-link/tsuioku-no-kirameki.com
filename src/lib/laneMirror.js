@@ -22,7 +22,8 @@
  *   tanu: LaneMirrorCell[],
  *   domSelf: LaneMirrorDomSelf,
  *   pickedLength: number,
- *   totalCandidates: number
+ *   totalCandidates: number,
+ *   contentHash: string
  * }} LaneMirrorSnapshot
  *
  * ★pickedLength = popup が paint に渡す laneDisplayedTotal(全5段=りんく+ギフト+広告+こん太+たぬ姉の
@@ -35,6 +36,9 @@
 //   これは B-2(書き手が匿名 data URL を鏡から落とす)の前提となる後方互換フォールバック。
 //   旧鏡(data URL入り)では displaySrc 非空→再生成パス不発=byte同一出力(退行ゼロ)。
 import { anonymousIdenticonDataUrl } from './anonymousIdenticon.js';
+// v0.1.1137(lanescene-structural-review MVP): 一致証明の contentHash は capturedAt 確定前の
+//   確定フィールド(userId/displaySrc/title)のみで計算する(揺れるフィールドを混ぜない=既知地雷)。
+import { laneSceneContentHash } from './laneSceneEnvelope.js';
 
 const LANE_MIRROR_TIERS = /** @type {const} */ (['link', 'gift', 'ad', 'konta', 'tanu']);
 /** 1スナップショットの上限(これを超えたら各段 cap を半減して作り直す)。 */
@@ -121,14 +125,21 @@ export function buildLaneMirrorSnapshot(input, opts = {}) {
   let cap = Math.max(1, Math.floor(Number(opts?.cap) || 48));
 
   /** @param {number} c */
-  const make = (c) => ({
-    liveId,
-    capturedAt: nowMs,
-    ...buildTiers(/** @type {any} */ (buckets), c),
-    domSelf,
-    pickedLength,
-    totalCandidates
-  });
+  const make = (c) => {
+    const tiers = buildTiers(/** @type {any} */ (buckets), c);
+    return {
+      liveId,
+      capturedAt: nowMs,
+      ...tiers,
+      domSelf,
+      pickedLength,
+      totalCandidates,
+      // v0.1.1137(lanescene-structural-review MVP): revisionはcapturedAt(壁時計)をそのまま使う
+      //   (新規カウンタを作らない)。contentHashはcap後の実際のセル列から計算=会場が受け取る
+      //   restoreLaneMirrorBuckets後の中身と同じ範囲で突合できる。
+      contentHash: laneSceneContentHash(/** @type {any} */ (tiers))
+    };
+  };
 
   let snap = make(cap);
   // 容量上限を超えたら cap を半減して作り直す(最大2回まで=最小16件)。

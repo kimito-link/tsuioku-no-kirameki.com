@@ -56,4 +56,4 @@ graph LR
   classDef shared fill:#eee,stroke:#999,color:#666;
 ```
 
-> ほか 342 ファイル省略（全件は storage-bus.md / metafile 参照）。
+> ほか 343 ファイル省略（全件は storage-bus.md / metafile 参照）。

@@ -175,6 +175,9 @@ import {
   venueLaneParityKey,
   VENUE_LANE_TRANSIENT_WINDOW_MS
 } from '../lib/venueLaneParity.js';
+// v0.1.1137(lanescene-structural-review MVP): venueLaneParityの厳密突合(P/T/X層・DOM census)とは
+//   独立に、①と会場が同じ鏡世代(revision)を見ているかを1行で確認する軽量な代理指標。
+import { buildSceneEnvelope, buildRenderReceipt, compareRenderReceipts } from '../lib/laneSceneEnvelope.js';
 // v0.1.1113 実DOM census(Tri-Parity): ✅の根拠をデータからDOMへ(reference_diag_truth_SYNTHESIS.md)。
 import { collectVenueLaneDomCensus, venueDomCensusToParityDom } from '../lib/venueDomCensus.js';
 import { nicoUserPageUrl, anonymousDisplayLabel } from '../lib/nicoUserPage.js';
@@ -4420,6 +4423,9 @@ export function mountVenueBarButton(options = {}) {
     const diagDue = nowMs() - _venueSeatsDiagLastWriteAt >= 3000;
     /** @type {ReturnType<typeof toVenueLaneParityDiag>} */
     let laneParityDiag = /** @type {any} */ (_lastVenueSeatsDiagObs ? (_lastVenueSeatsDiagObs.laneParity ?? null) : null);
+    // v0.1.1137(lanescene-structural-review MVP): ①=会場の鏡世代突合(軽量な代理指標)。
+    /** @type {ReturnType<typeof compareRenderReceipts>|null} */
+    let sceneReceiptDiag = /** @type {any} */ (_lastVenueSeatsDiagObs ? (_lastVenueSeatsDiagObs.sceneReceipt ?? null) : null);
     if (diagDue) {
       try {
         /** @type {Record<string, string[]>} */
@@ -4471,6 +4477,26 @@ export function mountVenueBarButton(options = {}) {
             dom: domSummary
           })
         );
+        // v0.1.1137(lanescene-structural-review MVP): mirror mode のときだけ、①が発行した鏡世代
+        //   (revision/contentHash)と会場が実際にpaintした段(laneBuckets)を突合する。venueLaneParity
+        //   の厳密突合(上)とは独立した軽量な代理指標なので、判定に失敗しても laneParityDiag には影響しない。
+        if (lanePaintSnap) {
+          const popEnvelope = buildSceneEnvelope(lanePaintSnap);
+          const popReceipt = buildRenderReceipt({
+            surface: 'pop',
+            revision: popEnvelope.revision,
+            contentHash: popEnvelope.contentHash
+          });
+          const venueEnvelope = buildSceneEnvelope(/** @type {any} */ (laneBuckets));
+          const venueReceipt = buildRenderReceipt({
+            surface: 'venue',
+            revision: popEnvelope.revision,
+            contentHash: venueEnvelope.contentHash
+          });
+          sceneReceiptDiag = compareRenderReceipts(popReceipt, venueReceipt);
+        } else {
+          sceneReceiptDiag = null;
+        }
       } catch {
         /* 計器失敗は描画を止めない(前回値を保持) */
       }
@@ -4524,6 +4550,8 @@ export function mountVenueBarButton(options = {}) {
       hardCap: VENUE_FULLSCREEN_MAX_SEATS,
       // v0.1.1111: 会場=①レーンのメンバー一致トークン(P/T/X 3層)。状態速報が1行そのまま出す。
       laneParity: laneParityDiag,
+      // v0.1.1137(lanescene-structural-review MVP): ①=会場の鏡世代突合(軽量な代理指標・独立判定)。
+      sceneReceipt: sceneReceiptDiag,
       // v0.1.1112: ロビーを畳んだ累計回数(「消す側」の計器=L18)。多発=モード明滅の兆候。
       lobbyResetCount: _venueLobbyResetCount,
       storyDiagMirror: storyDiagMirrorStatus(storyDiagMirrorSnap, String(activeLiveId || liveIdFromPathname() || ''), Date.now())
