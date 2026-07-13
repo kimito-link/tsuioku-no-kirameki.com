@@ -6,7 +6,7 @@
 
 - ✅ C1のソース実装・単体/配線テスト完了（対象5ファイル93件）・`npm run typecheck`通過。
 - ✅ version bump **v0.1.1134**（manifest / package / changelog 同期）。
-- ✅ `verify:cc`・build・copy:ext・commit（本ハンドオフ更新時点で実施）。
+- ✅ `verify:cc`・build・copy:ext・commit・push 完了（`d25fe994` → origin/master）。
 - ⏳実機待ち: 拡張リロード＋watch F5後、状態速報の「会場一致」lineで`①DOM=鏡`/`幾何=一致`または具体的な🔴差分を確認する。
 - フェーズ図: [docs/venue-pop-parity-loop-flow.html](docs/venue-pop-parity-loop-flow.html)
 
