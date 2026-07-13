@@ -1,4 +1,12 @@
 #!/usr/bin/env sh
+# agent-git-lock: 外部AI/検証エージェント作業中の司令塔commitをブロック(detached HEAD事故 2026-07-07)
+# 解除: サブエージェント完了を待つ。クラッシュ残骸なら rm .artifacts/agent-git.lock
+if [ -f .artifacts/agent-git.lock ] && [ -z "$AGENT_GIT_LOCK" ]; then
+  echo "BLOCKED: agent git lock exists (.artifacts/agent-git.lock). An impl/verify agent is running."
+  echo "If it crashed, remove the lock file manually and retry."
+  exit 1
+fi
+
 # 影響範囲ゲート(星野ロミ式・規律を自動ゲートに)。
 # コミット直前に、ステージした変更のうち「影響大(複数機能に波及)」の共有ファイルを検出し、
 # 波及先の機能を警告表示する。【ブロックしない】(摩擦ゼロ)=警告だけ出して必ずコミットは通す。

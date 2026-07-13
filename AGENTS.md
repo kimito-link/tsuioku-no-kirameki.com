@@ -401,3 +401,19 @@ per-live 単調化済み)の1本だけ**。取り出しは `src/lib/displayRecor
 `commentIngestBySource`(取込源別の累積・重複込み)・`displayEntriesBase.length`(UI生成数・0潰しの一因)。
 診断カウンタは AI 診断 JSON 用であって表示用ではない(役割を混同しない)。第2以降で countToShow の max・
 配信者除外の引き算・各ゲートを段階的に剥がす(一斉撤去はしない・回帰テストで「増えて減る/0潰れ」を固定してから)。
+
+### 12.9 委譲・検証サブエージェントの運用ルール(2026-07-13)
+
+> 背景: Codex等への実装委譲で「指示を無視される/無関係な箇所を直される」「version bump・生成物driftを
+> 素通しされ司令塔が事後に手直しする」手戻りが繰り返した。設計=`bug-investigation-handoff-DESIGN.md`
+> (会議→Fable・2026-07-13)。委譲テンプレは `council/_TEMPLATE-impl-prompt.md`。
+
+- **codex-impl / cursor-impl / reality-checker は同期実行のみ・バックグラウンド禁止**
+  (`run_in_background: false`)。時間的重なりの根絶が第一防衛線、`.husky/pre-commit` の
+  `agent-git.lock` チェックが第二防衛線(detached HEAD 不完全コミット事故対策・2026-07-07実事故)。
+- **実機待ちの運用**: 拡張の実機確認(ユーザーの pull→リロード→F5)は自動化不可。待機せず、
+  HANDOFF に「⏳実機待ち: <確認項目>」を1行記録して司令塔は別領域の次の調査・設計・プロンプト
+  起草に着手してよい。禁止は2つだけ: (1) 同一ファイル群を触る次の実装委譲(版混在防止・§12.5)
+  (2) 配信視聴中の `copy:ext`(既存ルール・§12.5)。実機NG報告が来たら進行中の作業より優先で割り込む。
+- **委譲は必ず `council/codex-prompt-*.md` ファイル経由**(`council/_TEMPLATE-impl-prompt.md` 参照)。
+  口頭要約だけでの委譲は禁止(ファイルパス・行番号・既存フラグ名を名指しした方が忠実に実行される)。
