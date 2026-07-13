@@ -24,6 +24,7 @@ const laneMirrorSrc = read('src/lib/laneMirror.js');
 const laneDomSelfMeasureSrc = read('src/lib/laneDomSelfMeasure.js');
 const venueDomCensusSrc = read('src/lib/venueDomCensus.js');
 const venueLaneParitySrc = read('src/lib/venueLaneParity.js');
+const laneSceneEnvelopeSrc = read('src/lib/laneSceneEnvelope.js');
 
 describe('会場=①レーン鏡映の配線(配線忘れ=CI赤)', () => {
   it('venueBar が鏡キー(KEY_LANE_MIRROR)を購読している(onChanged 直採用+catch-up)', () => {
@@ -242,5 +243,37 @@ describe('会場=①レーン鏡映の配線(配線忘れ=CI赤)', () => {
     expect(venueLaneParitySrc).toMatch(/VENUE_TILE_GEOMETRY_TOLERANCE = 0\.1/);
     expect(venueLaneParitySrc).toMatch(/①DOM未計測/);
     expect(venueLaneParitySrc).toMatch(/幾何≠/);
+  });
+
+  // --- v0.1.1137 lanescene-structural-review MVP: SceneEnvelope/RenderReceipt の配線忘れ防止 ---
+  it('鏡は contentHash を持ち、laneSceneContentHash を使って計算している', () => {
+    expect(laneMirrorSrc).toMatch(/import\s*\{\s*laneSceneContentHash\s*\}\s*from\s*'\.\/laneSceneEnvelope\.js'/);
+    expect(laneMirrorSrc).toMatch(/contentHash:\s*laneSceneContentHash\(/);
+  });
+
+  it('venueBar が鏡世代(SceneEnvelope)と会場paint結果を突合し、sceneReceipt として渡している', () => {
+    expect(venueBarSrc).toMatch(
+      /import\s*\{\s*buildSceneEnvelope,\s*buildRenderReceipt,\s*compareRenderReceipts\s*\}\s*from\s*'\.\.\/lib\/laneSceneEnvelope\.js'/
+    );
+    expect(venueBarSrc).toMatch(/buildSceneEnvelope\(lanePaintSnap\)/);
+    expect(venueBarSrc).toMatch(/buildSceneEnvelope\(\/\*\* @type \{any\} \*\/ \(laneBuckets\)\)/);
+    expect(venueBarSrc).toMatch(/sceneReceiptDiag = compareRenderReceipts\(/);
+    expect(venueBarSrc).toMatch(/sceneReceipt:\s*sceneReceiptDiag/);
+  });
+
+  it('venueSeatsDiag が sceneReceipt を検証済みの軽量形(match/line)だけ通す', () => {
+    expect(seatsDiagSrc).toMatch(/sceneReceipt:\s*\/\*\* @type \{VenueSeatsDiagState\['sceneReceipt'\]\} \*\//);
+    expect(seatsDiagSrc).toMatch(/const sceneReceipt = srIn \?/);
+  });
+
+  it('aiShareFullText が sceneReceipt.line を状態速報に出している', () => {
+    expect(aiShareSrc).toMatch(/venueSeatsDiag\)\?\.sceneReceipt\?\.line/);
+  });
+
+  it('laneSceneEnvelope.js に4つの純関数が実在する', () => {
+    expect(laneSceneEnvelopeSrc).toMatch(/export function laneSceneContentHash\(/);
+    expect(laneSceneEnvelopeSrc).toMatch(/export function buildSceneEnvelope\(/);
+    expect(laneSceneEnvelopeSrc).toMatch(/export function buildRenderReceipt\(/);
+    expect(laneSceneEnvelopeSrc).toMatch(/export function compareRenderReceipts\(/);
   });
 });

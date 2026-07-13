@@ -52,8 +52,8 @@ graph LR
   n_venue --> n_src_lib_htmlEscape_js["lib/htmlEscape.js"]:::shared
   n_venue --> n_src_lib_laneMirror_js["lib/laneMirror.js"]:::shared
   n_venue --> n_src_lib_laneMirrorKey_js["lib/laneMirrorKey.js"]:::shared
-  n_venue --> n_src_lib_nicoAnonymousDisplay_js["lib/nicoAnonymousDisplay.js"]:::shared
+  n_venue --> n_src_lib_laneSceneEnvelope_js["lib/laneSceneEnvelope.js"]:::shared
   classDef shared fill:#eee,stroke:#999,color:#666;
 ```
 
-> ほか 69 ファイル省略（全件は storage-bus.md / metafile 参照）。
+> ほか 70 ファイル省略（全件は storage-bus.md / metafile 参照）。

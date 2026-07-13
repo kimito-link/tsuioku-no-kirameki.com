@@ -23,7 +23,8 @@
  *                               dupIntra: number, dupCross: number, dupLaneLobby: number, strays: number,
  *                               charFrame: number, crowdOn: boolean, crowdCount: number } }|null,
  *   lobbyResetCount: number,
- *   storyDiagMirror: { present: boolean, ageSec: number|null }
+ *   storyDiagMirror: { present: boolean, ageSec: number|null },
+ *   sceneReceipt: { match: boolean, line: string }|null
  * }} VenueSeatsDiagState
  *
  * laneParity は v0.1.1111 の「会場=①レーンのメンバー一致トークン」(venueLaneParity.js)。null=未観測。
@@ -47,6 +48,7 @@ export function makeInitialVenueSeatsDiag() {
     seatAreaWidth: 0,
     visibleCapReason: '',
     laneParity: /** @type {VenueSeatsDiagState['laneParity']} */ (null),
+    sceneReceipt: /** @type {VenueSeatsDiagState['sceneReceipt']} */ (null),
     lobbyResetCount: 0,
     storyDiagMirror: { present: false, ageSec: /** @type {number|null} */ (null) }
   };
@@ -155,6 +157,10 @@ export function buildVenueSeatsDiagSnapshot(diag, nowMs) {
     present: sdmIn?.present === true,
     ageSec: sdmIn?.present === true && Number.isFinite(sdmAge) ? Math.max(0, Math.floor(sdmAge)) : null
   };
+  // v0.1.1137(lanescene-structural-review MVP): ①=会場の鏡世代突合(軽量な代理指標)。
+  //   検証済みの match/line だけ通す(未知の巨大オブジェクトを写さない)。
+  const srIn = /** @type {any} */ (d.sceneReceipt && typeof d.sceneReceipt === 'object' ? d.sceneReceipt : null);
+  const sceneReceipt = srIn ? { match: srIn.match === true, line: String(srIn.line || '') } : null;
   return {
     enabled: !!d.enabled,
     liveId: String(d.liveId || base.liveId),
@@ -169,6 +175,7 @@ export function buildVenueSeatsDiagSnapshot(diag, nowMs) {
     seatAreaWidth,
     visibleCapReason,
     laneParity,
+    sceneReceipt,
     lobbyResetCount: Math.max(0, Math.floor(num(d.lobbyResetCount, 0))),
     storyDiagMirror,
     capturedAt: now

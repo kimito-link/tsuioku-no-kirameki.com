@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1137',
+    date: '2026-07-14',
+    summary: '会場一致判定に鏡世代の突合を追加(診断強化のみ)',
+    items: Object.freeze([
+      '会場一致の診断に、①ポップアップと会場が同じ鏡データの世代を見ているかを1行で確認できる項目を追加しました。既存の詳しい一致判定とは別の、軽い確認用の項目です。表示自体への影響はありません。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1136',
     date: '2026-07-14',
     summary: '会場のりんく段が数分おきに出たり消えたりする不具合を修正',
