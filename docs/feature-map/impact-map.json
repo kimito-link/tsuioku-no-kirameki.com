@@ -4816,6 +4816,16 @@
       ]
     },
     {
+      "file": "src/lib/laneDomSelfMeasure.js",
+      "featureCount": 1,
+      "features": [
+        "popup"
+      ],
+      "labels": [
+        "ポップアップ(応援レーン)"
+      ]
+    },
+    {
       "file": "src/lib/laneTickProbe.js",
       "featureCount": 1,
       "features": [

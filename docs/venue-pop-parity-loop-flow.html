@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>会場=①POP 一致ループ根治フロー — 君斗りんくの追憶のきらめき</title>
+<style>
+  :root {
+    --bg:#0f1115; --panel:#161922; --ink:#e6e8ec; --sub:#aab0bb; --muted:#7b8390; --line:#2a2f3a;
+    --ok-bg:#14361f; --ok-bd:#2f7d4a; --ok-ink:#b8f0cf;
+    --block-bg:#3a1620; --block-bd:#b5485f; --block-ink:#f6c7d2;
+    --freeze-bg:#14283a; --freeze-bd:#3f7fb5; --freeze-ink:#c7e1f6;
+    --opp-bg:#3a3216; --opp-bd:#b59a3f; --opp-ink:#f0e3b8;
+    --human-bg:#2b1a3a; --human-bd:#8a5fb5; --human-ink:#e3d2f6;
+  }
+  body { margin:0; padding:28px 20px; background:var(--bg); color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Hiragino Sans","Yu Gothic UI",sans-serif; }
+  .wrap { max-width:1040px; margin:0 auto; }
+  h1 { font-size:21px; margin:0 0 4px; }
+  .meta { color:var(--muted); font-size:12px; margin:0 0 24px; line-height:1.7; }
+  .meta a { color:#7fa8e0; }
+  .phase-label { color:var(--sub); font-size:13px; font-weight:600; margin:18px 0 8px; }
+  .row { display:flex; gap:16px; flex-wrap:wrap; }
+  .card { flex:1 1 280px; min-width:240px; border-radius:12px; padding:14px 18px;
+    border:1.5px solid var(--line); background:var(--panel); }
+  .card .t { font-size:15px; font-weight:700; margin:0 0 6px; }
+  .card .d { font-size:12.5px; line-height:1.7; color:var(--sub); margin:0; }
+  .card code { background:rgba(255,255,255,.08); padding:1px 5px; border-radius:4px; font-size:11.5px; }
+  .ok { background:var(--ok-bg); border-color:var(--ok-bd); } .ok .t { color:var(--ok-ink); }
+  .block { background:var(--block-bg); border-color:var(--block-bd); } .block .t { color:var(--block-ink); }
+  .freeze { background:var(--freeze-bg); border-color:var(--freeze-bd); } .freeze .t { color:var(--freeze-ink); }
+  .opp { background:var(--opp-bg); border-color:var(--opp-bd); } .opp .t { color:var(--opp-ink); }
+  .human { background:var(--human-bg); border-color:var(--human-bd); } .human .t { color:var(--human-ink); }
+  .gate { text-align:center; margin:5px 0; color:var(--muted); font-size:18px; }
+  .gate small { color:#c9909d; font-size:12px; margin-left:8px; }
+  .legend { margin-top:26px; font-size:12.5px; line-height:1.9; color:var(--sub);
+    background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:14px 18px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>会場モードと①POP — 一致ループ根治フロー</h1>
+  <p class="meta">
+    設計正本:
+    <a href="../venue-pop-parity-loop-root-cause-DESIGN.md">root-cause-DESIGN.md</a> ／
+    実装手順:
+    <a href="../venue-pop-parity-loop-root-cause-IMPLEMENTATION-HANDOFF.md">IMPLEMENTATION-HANDOFF.md</a><br>
+    状態色は AGENTS.md §12.6 に準拠。最終更新 2026-07-14・実装バンプ <strong>v0.1.1134</strong>。
+    フェーズ2まで実装済み。フェーズ3（実機）のみユーザー反映待ち。
+  </p>
+
+  <div class="phase-label">フェーズ0：症状と真因</div>
+  <div class="row">
+    <div class="card block">
+      <p class="t">🟥 同じ描画関数でも入力が別合成</p>
+      <p class="d">①POPと会場は人物・段・件数を別々に組み立てる。「デフォルト=発散、同期=人力」なので、片側に1項目増えるたび不一致が再発した。</p>
+    </div>
+    <div class="card block">
+      <p class="t">🟥 従来の✅は見た目を測っていない</p>
+      <p class="d">配列・件数の存在確認だけで、①自身の実描画数やタイル寸法は未計測。ロビー巨大タイルでも✅を出せた。</p>
+    </div>
+  </div>
+
+  <div class="gate">↓ <small>真因を実DOMで観測できなければ、次の「修正済み」も証明できない</small></div>
+
+  <div class="phase-label">フェーズ1：C1 両端実DOM指紋</div>
+  <div class="row">
+    <div class="card ok">
+      <p class="t">✅ ①POPのpaint直後を計測</p>
+      <p class="d"><code>measureLaneDomSelf</code>が5段の表示数・先頭タイル幅/高さ・DPRを読み取り、同じフレームの鏡<code>domSelf</code>へ同梱する。</p>
+    </div>
+    <div class="card ok">
+      <p class="t">✅ 会場・ロビーの実寸を計測</p>
+      <p class="d"><code>venueDomCensus</code>が既存の表示数・重複・迷子に加え、各段とロビーのタイル寸法を採取する。DOM変更はしない。</p>
+    </div>
+  </div>
+
+  <div class="gate">↓ <small>両端の実測が揃って初めて一致判定へ進む</small></div>
+
+  <div class="phase-label">フェーズ2：fail-closed判定と自動検証</div>
+  <div class="row">
+    <div class="card ok">
+      <p class="t">✅ 実画面まで一致した時だけ緑</p>
+      <p class="d">旧鏡・未計測は⚪、①DOM件数差または寸法差10%超は🔴。5段とロビーの件数・幾何が一致した時だけ✅。対象93テストと型チェック通過。</p>
+    </div>
+  </div>
+
+  <div class="gate">↓ <small>自動判定を実機へ反映して状態速報の1行で答え合わせ</small></div>
+
+  <div class="phase-label">フェーズ3：実機確認</div>
+  <div class="row">
+    <div class="card human">
+      <p class="t">🙋 拡張反映後の会場で確認待ち</p>
+      <p class="d">状態速報「会場一致」lineに<code>①DOM=鏡</code>と<code>幾何=一致</code>、または具体的な🔴差分が出ることを確認する。配信視聴中のcopy:extは禁止。</p>
+    </div>
+  </div>
+
+  <div class="phase-label">後続フェーズ（今回の対象外）</div>
+  <div class="row">
+    <div class="card freeze">
+      <p class="t">❄️ C2 供給一元化</p>
+      <p class="d">C1の実機結果で入力発散が再現・特定された時に再開。会場fallback経路を縮小する。</p>
+    </div>
+    <div class="card freeze">
+      <p class="t">❄️ C3/C4 完了ゲート・退行リング</p>
+      <p class="d">C1の状態lineが安定してから別タスクで導入。今回のMVPへ混ぜない。</p>
+    </div>
+  </div>
+
+  <div class="legend">
+    <b>読み方:</b> ✅緑=完了・自動検証済み ／ 🟥赤=再発の根本原因 ／ ❄️青=凍結・再開条件あり ／ 🙋紫=人間の実機操作待ち。<br>
+    <b>依存ゲート:</b> 「コードの入力が同じらしい」では通さず、両端実DOMの表示数と寸法が揃った証拠でのみ✅を許す。
+  </div>
+</div>
+</body>
+</html>

@@ -318,9 +318,16 @@ export function resolveOfficialComparisonDisplay(args) {
   const recorded = Number(args && args.recordedCount);
   const rec = Number.isFinite(recorded) && recorded >= 0 ? recorded : 0;
 
+  // reached_start is explicit proof that the crawler reached the stream start.
+  // An imperfect recorded/official ratio must not turn completion back into loading.
+  const explicitComplete =
+    !(args && args.backfillRunning) &&
+    !!(args && args.backfillStarted) &&
+    String((args && args.backfillStopReason) || '') === 'reached_start';
+
   // 実質達成(記録が公式の 95% 以上 or 記録が公式以上)=％でなく静かな肯定。公式は配信中増え続け
   //   gift/system 差で数件ズレるので「約100%」と数字で煽らず「最新まで取り込み済み」と状態名で。
-  if (rec >= official * BACKFILL_RECORD_HINT_NEAR_COMPLETE_RATIO) {
+  if (explicitComplete || rec >= official * BACKFILL_RECORD_HINT_NEAR_COMPLETE_RATIO) {
     return { mode: 'complete', text: '最新まで取り込み済み ✨' };
   }
 

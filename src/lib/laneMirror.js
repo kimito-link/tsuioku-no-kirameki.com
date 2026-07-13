@@ -8,6 +8,10 @@
  * ★各段 cap で件数を抑え、全体が容量上限(JSON 512KB)を超えるなら cap を半減する二段ガード=status を重くしない。
  *
  * @typedef {{ displaySrc: string, title: string, idLine: string, nameLine: string, userId: string }} LaneMirrorCell
+ * @typedef {{ visible: number, tileW: number, tileH: number }} LaneMirrorDomTier
+ * @typedef {{ measured: boolean,
+ *   perTier: { link: LaneMirrorDomTier, gift: LaneMirrorDomTier, ad: LaneMirrorDomTier, konta: LaneMirrorDomTier, tanu: LaneMirrorDomTier },
+ *   dpr: number }} LaneMirrorDomSelf
  * @typedef {{
  *   liveId: string,
  *   capturedAt: number,
@@ -16,6 +20,7 @@
  *   ad: LaneMirrorCell[],
  *   konta: LaneMirrorCell[],
  *   tanu: LaneMirrorCell[],
+ *   domSelf: LaneMirrorDomSelf,
  *   pickedLength: number,
  *   totalCandidates: number
  * }} LaneMirrorSnapshot
@@ -34,6 +39,35 @@ import { anonymousIdenticonDataUrl } from './anonymousIdenticon.js';
 const LANE_MIRROR_TIERS = /** @type {const} */ (['link', 'gift', 'ad', 'konta', 'tanu']);
 /** 1スナップショットの上限(これを超えたら各段 cap を半減して作り直す)。 */
 const LANE_MIRROR_MAX_JSON_BYTES = 512 * 1024;
+
+/** @param {unknown} value @param {boolean} [integer] */
+function nonNegativeMetric(value, integer = false) {
+  const n = Number(value);
+  if (!Number.isFinite(n) || n <= 0) return 0;
+  return integer ? Math.floor(n) : Math.round(n * 100) / 100;
+}
+
+/** @param {unknown} input @returns {LaneMirrorDomSelf} */
+function normalizeDomSelf(input) {
+  const source = /** @type {any} */ (input && typeof input === 'object' ? input : {});
+  const sourceTiers = source.perTier && typeof source.perTier === 'object' ? source.perTier : {};
+  /** @type {Record<string, LaneMirrorDomTier>} */
+  const perTier = {};
+  for (const tier of LANE_MIRROR_TIERS) {
+    const raw = sourceTiers[tier] && typeof sourceTiers[tier] === 'object' ? sourceTiers[tier] : {};
+    perTier[tier] = {
+      visible: nonNegativeMetric(raw.visible, true),
+      tileW: nonNegativeMetric(raw.tileW),
+      tileH: nonNegativeMetric(raw.tileH)
+    };
+  }
+  const rawDpr = Number(source.dpr);
+  return {
+    measured: source.measured === true,
+    perTier: /** @type {LaneMirrorDomSelf['perTier']} */ (perTier),
+    dpr: Number.isFinite(rawDpr) && rawDpr > 0 ? Math.round(rawDpr * 1000) / 1000 : 1
+  };
+}
 
 /**
  * buckets の1要素を鏡セルに間引く。
@@ -72,7 +106,8 @@ function buildTiers(buckets, cap) {
 
 /**
  * storage 書き込み用の鏡スナップショット。容量超過時は cap を半減して作り直す(status を重くしない)。
- * @param {{ liveId?: unknown, buckets?: Record<string, unknown[]>, pickedLength?: unknown, totalCandidates?: unknown }} input
+ * @param {{ liveId?: unknown, buckets?: Record<string, unknown[]>, pickedLength?: unknown,
+ *   totalCandidates?: unknown, domSelf?: unknown }} input
  * @param {{ cap?: number, nowMs?: number }} [opts]
  * @returns {LaneMirrorSnapshot}
  */
@@ -81,6 +116,7 @@ export function buildLaneMirrorSnapshot(input, opts = {}) {
   const buckets = input?.buckets && typeof input.buckets === 'object' ? input.buckets : {};
   const pickedLength = Math.max(0, Math.floor(Number(input?.pickedLength) || 0));
   const totalCandidates = Math.max(0, Math.floor(Number(input?.totalCandidates) || 0));
+  const domSelf = normalizeDomSelf(input?.domSelf);
   const nowMs = Number.isFinite(Number(opts?.nowMs)) ? Number(opts.nowMs) : 0;
   let cap = Math.max(1, Math.floor(Number(opts?.cap) || 48));
 
@@ -89,6 +125,7 @@ export function buildLaneMirrorSnapshot(input, opts = {}) {
     liveId,
     capturedAt: nowMs,
     ...buildTiers(/** @type {any} */ (buckets), c),
+    domSelf,
     pickedLength,
     totalCandidates
   });

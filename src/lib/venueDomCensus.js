@@ -45,15 +45,32 @@ const BLANK_AVATAR_RE = /\/usericon\/defaults\//i;
 /** 数値ID鍵(u:数字)。これ以外の鍵で白円=identicon になるべき人が白い=導出バグ(blankAnon)。 */
 const NUMERIC_UID_KEY_RE = /^u:\d+$/;
 
+/** @param {unknown} value */
+function nonNegativeDimension(value) {
+  const n = Number(value);
+  return Number.isFinite(n) && n > 0 ? n : 0;
+}
+
 /** 空のセクション計数。 */
 function emptySectionCount() {
-  return { visible: 0, ghost: 0, bare: 0, visibleEmpty: 0, unkeyed: 0, blank: 0, blankAnon: 0, keys: [] };
+  return {
+    visible: 0,
+    tileW: 0,
+    tileH: 0,
+    ghost: 0,
+    bare: 0,
+    visibleEmpty: 0,
+    unkeyed: 0,
+    blank: 0,
+    blankAnon: 0,
+    keys: []
+  };
 }
 
 /**
  * 1セクション(段el または lobbyList)の実DOMを数える(触らない)。
  * @param {Element|null|undefined} rootEl
- * @returns {{ visible:number, ghost:number, bare:number, visibleEmpty:number, unkeyed:number, keys:string[] }}
+ * @returns {{ visible:number, tileW:number, tileH:number, ghost:number, bare:number, visibleEmpty:number, unkeyed:number, keys:string[] }}
  */
 function countSection(rootEl) {
   const out = emptySectionCount();
@@ -64,6 +81,10 @@ function countSection(rootEl) {
     const inSeat = !!(seat && rootEl.contains(seat));
     if (inSeat && seat.classList.contains(SEAT_EMPTY_CLASS)) continue; // 幽霊の中身(下で席単位に数える)
     if (!inSeat) out.bare += 1; // .nlsb-seat 管理外の素通し=リセットループが消せない
+    if (out.visible === 0) {
+      out.tileW = nonNegativeDimension(tile.offsetWidth);
+      out.tileH = nonNegativeDimension(tile.offsetHeight);
+    }
     out.visible += 1;
     const key = String((tile.dataset && tile.dataset.userKey) || '').trim();
     if (key) out.keys.push(key);
@@ -96,7 +117,8 @@ function countSection(rootEl) {
  *              avatarProbe?: { usericonSucceeded?: number, usericonFailed?: number }|null }
  * }} input
  * @returns {{
- *   perSection: Record<'link'|'gift'|'ad'|'konta'|'tanu'|'lobby', { visible:number, ghost:number, bare:number, visibleEmpty:number, unkeyed:number, blank:number, blankAnon:number, keys:string[] }>,
+ *   perSection: Record<'link'|'gift'|'ad'|'konta'|'tanu'|'lobby', { visible:number, tileW:number, tileH:number, ghost:number, bare:number, visibleEmpty:number, unkeyed:number, blank:number, blankAnon:number, keys:string[] }>,
+ *   dpr: number,
  *   strays: number,
  *   charFrameTiles: number,
  *   crowdOn: boolean,
@@ -127,8 +149,10 @@ export function collectVenueLaneDomCensus(input) {
       ? Math.max(0, Number(charFrameLayer.childElementCount))
       : 0;
   const probeIn = extras.avatarProbe && typeof extras.avatarProbe === 'object' ? extras.avatarProbe : null;
+  const rawDpr = typeof window !== 'undefined' ? Number(window.devicePixelRatio) : 1;
   return {
     perSection: /** @type {any} */ (perSection),
+    dpr: Number.isFinite(rawDpr) && rawDpr > 0 ? rawDpr : 1,
     strays,
     charFrameTiles,
     crowdOn: extras.crowdOn === true,
@@ -183,7 +207,8 @@ export function countVenueKeyDuplicates(perSection) {
  * @param {ReturnType<typeof collectVenueLaneDomCensus>|null|undefined} census
  * @returns {null | {
  *   measured: true,
- *   perSection: Record<string, { visible:number, ghost:number, bare:number, visibleEmpty:number, unkeyed:number, blank:number, blankAnon:number }>,
+ *   perSection: Record<string, { visible:number, tileW:number, tileH:number, ghost:number, bare:number, visibleEmpty:number, unkeyed:number, blank:number, blankAnon:number }>,
+ *   dpr:number,
  *   ghost:number, bare:number, visibleEmpty:number, unkeyed:number,
  *   blank:number, blankAnon:number,
  *   dupIntra:number, dupCross:number, dupLaneLobby:number,
@@ -206,6 +231,8 @@ export function venueDomCensusToParityDom(census) {
     const c = census.perSection[sec] || emptySectionCount();
     perSection[sec] = {
       visible: Math.max(0, Math.floor(Number(c.visible) || 0)),
+      tileW: nonNegativeDimension(c.tileW),
+      tileH: nonNegativeDimension(c.tileH),
       ghost: Math.max(0, Math.floor(Number(c.ghost) || 0)),
       bare: Math.max(0, Math.floor(Number(c.bare) || 0)),
       visibleEmpty: Math.max(0, Math.floor(Number(c.visibleEmpty) || 0)),
@@ -223,6 +250,7 @@ export function venueDomCensusToParityDom(census) {
   return {
     measured: true,
     perSection,
+    dpr: Number.isFinite(Number(census.dpr)) && Number(census.dpr) > 0 ? Number(census.dpr) : 1,
     ghost,
     bare,
     visibleEmpty,

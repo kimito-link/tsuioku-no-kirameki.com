@@ -78,3 +78,11 @@ describe('見た目①化(v0.1.1119)のCSS', () => {
     expect(p5At).toBeGreaterThan(endAt);
   });
 });
+
+describe('会場レーン案内文言の①正本コピー', () => {
+  it('fallback 時も guides:false に戻さず、①POPと同じ案内文言セットを共有rendererから出す', () => {
+    expect(venueBarSrc).toContain('const VENUE_LANE_GUIDES_EXACT_COPY = true;');
+    expect(venueBarSrc).toMatch(/guides:\s*VENUE_LANE_GUIDES_EXACT_COPY/);
+    expect(venueBarSrc).not.toMatch(/guides:\s*isLaneMirrorPaintMode\s*\?\s*VENUE_LANE_GUIDES_EXACT_COPY\s*:\s*false/);
+  });
+});

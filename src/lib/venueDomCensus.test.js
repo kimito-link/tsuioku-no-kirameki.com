@@ -7,10 +7,18 @@ import {
   VENUE_CENSUS_SECTIONS
 } from './venueDomCensus.js';
 
-/** @param {string} [key] userKey('' や省略=無鍵) @param {string} [imgSrc] avatar img の src(省略=img無し) */
-function makeTile(key, imgSrc) {
+/**
+ * @param {string} [key] userKey('' や省略=無鍵)
+ * @param {string} [imgSrc] avatar img の src(省略=img無し)
+ * @param {{ width?:number, height?:number }} [size] 実DOM寸法
+ */
+function makeTile(key, imgSrc, size) {
   const tile = document.createElement('div');
   tile.className = 'nl-story-userlane-cell';
+  if (size) {
+    Object.defineProperty(tile, 'offsetWidth', { configurable: true, value: Number(size.width) || 0 });
+    Object.defineProperty(tile, 'offsetHeight', { configurable: true, value: Number(size.height) || 0 });
+  }
   if (key) tile.dataset.userKey = key;
   if (imgSrc) {
     const img = document.createElement('img');
@@ -63,6 +71,24 @@ describe('collectVenueLaneDomCensus', () => {
     expect(c.perSection.tanu.bare).toBe(1);
     expect(c.perSection.tanu.keys).toEqual(['u:1', 'u:2', 'c:#1|広告']);
     expect(c.perSection.link.visible).toBe(0);
+  });
+
+  it('各セクションの最初の可視タイル寸法と DPR を実DOM指紋として返す', () => {
+    const { stack, laneEls, lobbyList } = makeVenueDom();
+    laneEls.tanu.appendChild(makeSeat({ tile: makeTile('u:1', undefined, { width: 64, height: 84 }) }));
+    laneEls.tanu.appendChild(makeSeat({ tile: makeTile('u:2', undefined, { width: 96, height: 120 }) }));
+    lobbyList.appendChild(makeSeat({ tile: makeTile('u:3', undefined, { width: 72, height: 90 }) }));
+    const previousDpr = window.devicePixelRatio;
+    Object.defineProperty(window, 'devicePixelRatio', { configurable: true, value: 1.75 });
+    try {
+      const c = collectVenueLaneDomCensus({ laneEls, lobbyList, stackEl: stack });
+      expect(c.perSection.tanu).toMatchObject({ visible: 2, tileW: 64, tileH: 84 });
+      expect(c.perSection.lobby).toMatchObject({ visible: 1, tileW: 72, tileH: 90 });
+      expect(c.perSection.link).toMatchObject({ visible: 0, tileW: 0, tileH: 0 });
+      expect(c.dpr).toBe(1.75);
+    } finally {
+      Object.defineProperty(window, 'devicePixelRatio', { configurable: true, value: previousDpr });
+    }
   });
 
   it('幽霊(is-empty なのに中身あり)は可視に入れず ghost に数える(消し残り予備軍)', () => {
@@ -203,7 +229,7 @@ describe('countVenueKeyDuplicates', () => {
 describe('venueDomCensusToParityDom', () => {
   it('keys を落とし(PII/容量)、重複を集計し、measured:true を明示する', () => {
     const { stack, laneEls, lobbyList } = makeVenueDom();
-    laneEls.tanu.appendChild(makeSeat({ tile: makeTile('u:1') }));
+    laneEls.tanu.appendChild(makeSeat({ tile: makeTile('u:1', undefined, { width: 64, height: 84 }) }));
     laneEls.tanu.appendChild(makeTile('u:1')); // 裸+同段重複
     laneEls.tanu.appendChild(makeSeat({ empty: true, tile: makeTile('u:g') })); // 幽霊
     lobbyList.appendChild(makeSeat({ tile: makeTile('u:1') })); // 段×ロビー二重
@@ -213,7 +239,9 @@ describe('venueDomCensusToParityDom', () => {
     expect(dom.measured).toBe(true);
     expect(dom.perSection.tanu.visible).toBe(2);
     expect(dom.perSection.tanu).not.toHaveProperty('keys');
+    expect(dom.dpr).toBeGreaterThan(0);
     expect(dom.ghost).toBe(1);
+    expect(dom.perSection.tanu).toMatchObject({ tileW: 64, tileH: 84 });
     expect(dom.bare).toBe(1);
     expect(dom.dupIntra).toBe(1);
     expect(dom.dupLaneLobby).toBe(1);
