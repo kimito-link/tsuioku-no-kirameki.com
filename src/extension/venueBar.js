@@ -4567,6 +4567,13 @@ export function mountVenueBarButton(options = {}) {
    *   P層=鏡の順序そのままの行 + T層=鏡に居ない集計候補(=①のcap外)を末尾へ。使えなければ
    *   fallbackRows(従来経路)をそのまま返す=①未描画/開直後でも会場は空白にならない(L8)。
    *   使った鏡は laneMirrorPaintSnap に固定(renderSeats の段割当・一致判定と同一snap=TOCTOU排除)。
+   *
+   * v0.1.1136 C2(scroll-whiteout-freeze設計とは別件・venue-pop-parity-loop-root-cause設計C2):
+   *   reason='stale'(同一配信・鏡はあるが180s窓超え)のときは fallback へ切替えず、直近の鏡
+   *   (laneMirrorSnap自体・古いだけで実在する)を使い続ける。これにより配信のコメント速度が
+   *   遅い時間帯で「鏡モード⇔fallbackモード」を数分おきに往復してりんく段が総入替=出たり
+   *   消えたりする(diff-skipキーがモードごとに変わるため)実害を止める。fallback降格は
+   *   liveIdMismatch/absent/empty のときだけ(=鏡が本当に使えない・別配信・鏡が届く前)。
    * @param {ReadonlyArray<{userId?: unknown}>} candidates 集計候補(preCount join 用)
    * @param {VenueRow[]} fallbackRows 従来経路の行(venueRowsFromUserLaneCandidates の出力)
    * @returns {VenueRow[]}
@@ -4574,7 +4581,8 @@ export function mountVenueBarButton(options = {}) {
   const composeVenueBaseRows = (candidates, fallbackRows) => {
     const liveId = String(activeLiveId || liveIdFromPathname() || '');
     const usable = isLaneMirrorUsableForVenue(laneMirrorSnap, liveId, Date.now());
-    if (!usable.usable) {
+    const staleButUsable = !usable.usable && usable.reason === 'stale';
+    if (!usable.usable && !staleButUsable) {
       laneMirrorPaintSnap = null;
       return fallbackRows;
     }

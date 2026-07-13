@@ -4284,12 +4284,19 @@ function ensureScrollWhiteoutSampler() {
         const r = host.getBoundingClientRect();
         const cs = window.getComputedStyle(host);
         const visibleNow = cs.display !== 'none' && cs.visibility !== 'hidden';
+        // W-1相関計器(scroll-whiteout-freeze設計・v0.1.1135): 白化検知の瞬間に host 移設 state を
+        //   同じ同期呼び出しで読んで焼き込む(2つの計器を後から時刻でjoinしない=取りこぼしゼロ)。
+        const lastMoveAtMs = Number(_inlineHostMoveState.lastAtMs) || 0;
         recordWhiteoutSample(_scrollWhiteoutState, {
           kind: 'host',
           prevH: _scrollWhiteoutPrevH.host,
           nowH: r.height,
           visibleNow,
-          atMs: now
+          atMs: now,
+          lastMoveReason: _inlineHostMoveState.samples.at(-1)?.reason || '',
+          lastMoveAgoMs: lastMoveAtMs > 0 ? now - lastMoveAtMs : null,
+          hostDisplay: cs.display,
+          hostVisibility: cs.visibility
         });
         _scrollWhiteoutPrevH.host = visibleNow ? r.height : 0;
       }
