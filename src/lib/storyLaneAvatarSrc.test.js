@@ -89,4 +89,42 @@ describe('resolveStoryLaneAvatarSrc', () => {
     });
     expect(typeof out).toBe('string');
   });
+
+  // --- 2026-07-14(gift-lane-thumb-own-posted-mismatch根治): INV-1(viewerUserId等値→own) ---
+  it('視聴者本人(uid一致)は isOwnPosted=false でも own 扱いされ mistakenBroadcaster が発動しない(バグの最小再現)', () => {
+    const out = resolveStoryLaneAvatarSrc(
+      { userId: '123456', avatarUrl: '' },
+      {
+        snapshot: { viewerUserId: '123456', broadcasterUserId: '123456', broadcasterIconUrl: HTTP_AV },
+        isOwnPosted: false,
+        rememberedAvatar: HTTP_AV
+      }
+    );
+    // own=true(uid一致)になるため mistakenBroadcaster は発動せず、remembered avatar が使われる。
+    expect(out).toBe(HTTP_AV);
+  });
+
+  it('視聴者本人(uid一致)は isOwnPosted=false でも own 扱いされ viewer-avatar 除外が発動しない', () => {
+    const out = resolveStoryLaneAvatarSrc(
+      { userId: '123456', avatarUrl: HTTP_AV },
+      {
+        snapshot: { viewerUserId: '123456', viewerAvatarUrl: HTTP_AV },
+        isOwnPosted: false,
+        rememberedAvatar: ''
+      }
+    );
+    expect(out).toBe(HTTP_AV);
+  });
+
+  it('他人(uid不一致)は viewerUserId があっても own 扱いされず誤帰属防止ガードは不変(回帰断言)', () => {
+    const out = resolveStoryLaneAvatarSrc(
+      { userId: '999999', avatarUrl: HTTP_AV },
+      {
+        snapshot: { viewerUserId: '123456', viewerAvatarUrl: HTTP_AV },
+        isOwnPosted: false,
+        rememberedAvatar: ''
+      }
+    );
+    expect(out).not.toBe(HTTP_AV);
+  });
 });
