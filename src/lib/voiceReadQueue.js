@@ -122,6 +122,25 @@ export function computeVoiceE2eAverage(prevAvgMs, sampleMs, alpha = 0.3) {
   return Math.round(prev + alpha * (sample - prev));
 }
 
+const VOICE_PLAYBACK_RATE_MAX = 1.35;
+
+/**
+ * voice-tempo-realtime-SYNTHESIS §3 Phase 2: 先読み合成した WAV は「合成した瞬間の混雑度」の
+ *   速度(speedBoost)で焼き固まる。その後キューが膨らんでも遅い声のまま再生される構造穴を、
+ *   再生直前の playbackRate(preservesPitch=true・Chrome標準)でゼロコスト補正する。
+ *   決定論(入力2点のみ・乱数なし)・上げるだけ(下げない=間延び退行を防ぐ)・上限1.35でclamp。
+ * @param {unknown} boostAtSynth 合成起動時点のspeedBoost(0〜0.8)
+ * @param {unknown} boostNow 再生直前(今)のspeedBoost(0〜0.8)
+ * @returns {number} audio.playbackRate に設定する倍率(1.0〜1.35)。不正値は1.0にフォールバック。
+ */
+export function computeVoicePlaybackRate(boostAtSynth, boostNow) {
+  const at = Number(boostAtSynth);
+  const now = Number(boostNow);
+  if (!Number.isFinite(at) || !Number.isFinite(now)) return 1.0;
+  const rate = (1 + now) / (1 + at);
+  return Math.min(VOICE_PLAYBACK_RATE_MAX, Math.max(1.0, rate));
+}
+
 /**
  * 合成パイプラインの「先読み深さ」(再生中に何件先まで先行合成するか)を返す純関数。
  *
