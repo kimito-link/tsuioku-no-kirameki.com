@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1151',
+    date: '2026-07-15',
+    summary: '広告・順位変動の効果音をより自然な音に更新',
+    items: Object.freeze([
+      'ニコニ広告投稿時・イベント順位変動時の効果音を、アプリの雰囲気に合わせて更新しました。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1150',
     date: '2026-07-15',
     summary: '大規模配信で状態速報ページが固まりやすい不具合を軽減',

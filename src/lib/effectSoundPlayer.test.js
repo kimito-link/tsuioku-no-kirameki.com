@@ -45,7 +45,37 @@ describe('shouldSkipEffectSoundForVenuePresence', () => {
 describe('resolveEffectSoundPath', () => {
   it('バリエーションが無い種類は EFFECT_SOUND_PATHS の単一パスを返す(後方互換)', () => {
     expect(resolveEffectSoundPath(EFFECT_SOUND_KINDS.GIFT)).toBe(EFFECT_SOUND_PATHS[EFFECT_SOUND_KINDS.GIFT]);
-    expect(resolveEffectSoundPath(EFFECT_SOUND_KINDS.AD)).toBe(EFFECT_SOUND_PATHS[EFFECT_SOUND_KINDS.AD]);
+  });
+
+  // 2026-07-15(効果音最適化): ad/rank_up/rank_downはOtoLogic(CC BY 4.0)単一ファイルのまま
+  //   取り残されていた。既存CC0素材(gift-medium/milestone-soft/gift-small)を音色転用した
+  //   variantを追加(新規DL不要・追跡性は既存sound-src/SOURCES.mdの出典行に委ねる)。
+  it('adはgift_medium系のCC0チャイムをバリエーションとして返す', () => {
+    const variants = EFFECT_SOUND_VARIANT_PATHS[EFFECT_SOUND_KINDS.AD];
+    expect(resolveEffectSoundPath(EFFECT_SOUND_KINDS.AD, { rng: () => 0 })).toBe(variants[0]);
+    expect(resolveEffectSoundPath(EFFECT_SOUND_KINDS.AD, { rng: () => 0.999 })).toBe(variants[2]);
+  });
+
+  it('rank_upはmilestone_soft系のCC0通知音をバリエーションとして返す', () => {
+    const variants = EFFECT_SOUND_VARIANT_PATHS[EFFECT_SOUND_KINDS.RANK_UP];
+    expect(resolveEffectSoundPath(EFFECT_SOUND_KINDS.RANK_UP, { rng: () => 0 })).toBe(variants[0]);
+    expect(resolveEffectSoundPath(EFFECT_SOUND_KINDS.RANK_UP, { rng: () => 0.999 })).toBe(variants[2]);
+  });
+
+  it('rank_downはgift_small系のCC0ポップ音をバリエーションとして返す', () => {
+    const variants = EFFECT_SOUND_VARIANT_PATHS[EFFECT_SOUND_KINDS.RANK_DOWN];
+    expect(resolveEffectSoundPath(EFFECT_SOUND_KINDS.RANK_DOWN, { rng: () => 0 })).toBe(variants[0]);
+    expect(resolveEffectSoundPath(EFFECT_SOUND_KINDS.RANK_DOWN, { rng: () => 0.999 })).toBe(variants[2]);
+  });
+
+  it('ad/rank_up/rank_downのバリエーションは3件ずつでEFFECT_SOUND_PATHSの旧OtoLogicパスと異なる', () => {
+    for (const kind of [EFFECT_SOUND_KINDS.AD, EFFECT_SOUND_KINDS.RANK_UP, EFFECT_SOUND_KINDS.RANK_DOWN]) {
+      const variants = EFFECT_SOUND_VARIANT_PATHS[kind];
+      expect(variants).toHaveLength(3);
+      for (const v of variants) {
+        expect(v).not.toBe(EFFECT_SOUND_PATHS[kind]);
+      }
+    }
   });
 
   it('バリエーションがある種類は候補一覧の中からrngで選ぶ', () => {
