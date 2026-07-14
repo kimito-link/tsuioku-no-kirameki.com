@@ -328,6 +328,18 @@ if (CF && CF_ACC) push('cloudflare/kimi-k2.7-code', 'cloud', (p, s) => openaiCha
 // 実IDは /ai/models/search で実機確認済み(@cf/zai-org/glm-4.7-flash)。単発疎通は200 OK確認済み。
 if (CF && CF_ACC) push('cloudflare/glm-4.7-flash', 'cloud', (p, s) => openaiChat(CF_URL, CF, '@cf/zai-org/glm-4.7-flash', p, s, {}, 60000));
 if (N) push('nvidia/qwen3.5-122b', 'cloud', (p, s) => openaiChat(NV, N, 'qwen/qwen3.5-122b-a10b', p, s, { chat_template_kwargs: { thinking: false } }));
+// 2026-07-14 追加: NIM無料枠の全121モデルを実機一覧取得→大型候補抽出→2並列200 OK裏取り
+// →会議諮問(慎重派/発散派の対立)→Fable設計で採用。詳細はmemory/council-llm-lineup-upgrade
+// 系ファイル参照。labelの"mistral-large"/"nemotron-3-ultra"/"deepseek-v4"の綴りが
+// roleOf/weightOfの判定に直結するので変更しないこと。
+//  - mistral-large-3-675b: 675B。会議のlead(統括)枠が従来local/gemma4(8B)頼みで
+//    全役割中最弱だった穴を埋める本命。roleOfでlead・weightOfは既存nvidiaルールでweight2。
+//  - nemotron-3-ultra-550b: 550BのNVIDIA自社大型。leadの2番手予備(weight3)。
+//  - deepseek-v4-pro: 実測5〜15秒とやや遅いが並列会議では律速にならない。criticの予備(weight3)。
+//    ※ nvidia/llama-3.1-nemotron-ultra-253b-v1 は404で現在アクセス不可・採用禁止。
+if (N) push('nvidia/mistral-large-3-675b', 'cloud', (p, s) => openaiChat(NV, N, 'mistralai/mistral-large-3-675b-instruct-2512', p, s, {}, 90000));
+if (N) push('nvidia/nemotron-3-ultra-550b', 'cloud', (p, s) => openaiChat(NV, N, 'nvidia/nemotron-3-ultra-550b-a55b', p, s, {}, 90000));
+if (N) push('nvidia/deepseek-v4-pro', 'cloud', (p, s) => openaiChat(NV, N, 'deepseek-ai/deepseek-v4-pro', p, s, {}, 120000));
 if (E) push('gemini-2.5-flash', 'cloud', (p, s) => geminiChat('gemini-2.5-flash', p, s), 'gemini-2.5-flash', 'gemini');
 // 2026-07-04 追加: 2026-06-25には429/503で常用不可だったが、今回の再検証で単発・4並列とも
 // 全て200 OKを確認。Google側の無料枠割当が時期変動していると解釈し、weightOfで予備(weight3)に
@@ -706,6 +718,9 @@ async function council(members, label, key) {
   if (SYNTH) {
     let synth = null;
     if (SYNTH_STRONG) {
+      // 2026-07-14: nvidia/mistral-large-3-675bは統合失敗時にリトライが無い一発工程のため
+      // 即座にpriority先頭へは入れない。QUALITY会議2回連続でFAILEDゼロなら先頭に昇格させる
+      // （cloudflare/glm-4.7-flashのトライアル方式と同じ流儀）。
       const priority = ['groq/gpt-oss-120b', 'cloudflare/nemotron-120b', 'groq/llama-3.3-70b', 'gemini-2.5-flash', 'cloudflare/glm-5.2'];
       synth = priority.map(l => allMembers.find(m => m.label === l && !exhaustedLabels.has(l))).find(Boolean)
         || allMembers.find(m => m.kind === 'cloud' && !exhaustedLabels.has(m.label));
