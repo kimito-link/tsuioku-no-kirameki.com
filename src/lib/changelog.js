@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1150',
+    date: '2026-07-15',
+    summary: '大規模配信で状態速報ページが固まりやすい不具合を軽減',
+    items: Object.freeze([
+      'コメント数が非常に多い配信で、状態速報ページを開いたときに固まりやすくなることがある不具合を軽減しました。混雑時は古い値を正直に表示して自動で回復します。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1144',
     date: '2026-07-14',
     summary: 'コメントが多いときの読み上げのテンポを改善',

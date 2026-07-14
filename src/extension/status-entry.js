@@ -295,6 +295,19 @@ const _backfillGuard = createStaleGuardedRead(() => loadBackfillProgressSafe(), 
   emptyValue: null,
   reissueCeilingMs: CORE_READ_REISSUE_CEILING_MS
 });
+// 2026-07-15: extras(12秒間引き)の幽霊read対策。コア5readと同じ理由(runStorageOpWithTimeout直呼びは
+//   timeoutしてもopFn自体を止められず、次のextras間引きtickが同じキーへ再発行して幽霊readと多重競合する)。
+//   実測(23,944件規模の大規模配信)でstatus.htmlのフリーズが608秒修正後も残っていたため対象を広げる。
+//   queryWatchTabMap/recordAndAnalyzeTrendSafeはコアread化と別理由(chrome.tabs.query・read+set混在)で
+//   別ガードに分ける(統合するとwriteの副作用タイミングが変わる)。
+const _extrasBatchGuard = createStaleGuardedRead(() => safeStorageLocalGet(EXTRAS_BATCH_KEYS), {
+  emptyValue: {},
+  reissueCeilingMs: CORE_READ_REISSUE_CEILING_MS
+});
+const _watchTabMapGuard = createStaleGuardedRead(() => queryWatchTabMap(), {
+  emptyValue: new Map(),
+  reissueCeilingMs: CORE_READ_REISSUE_CEILING_MS
+});
 /** v0.1.1005: 直近 refresh の所要計器(totalMs と重いステップ)。コピー本文(AI共有)にも出すため保持。
  *   renderAll は当該 refresh の render 計測【前】に走るので、前サイクルの値を本文に載せる(代表値として十分)。 */
 let _lastRefreshPerf = /** @type {{ totalMs: number|null, stepMs: Array<[string, number]> }} */ ({ totalMs: null, stepMs: [] });
@@ -603,11 +616,12 @@ async function refresh(opts = {}) {
       //   ★統合しないもの(意味が変わる/別APIのため個別 await のまま):
       //     queryWatchTabMap(chrome.tabs.query)・recordAndAnalyzeTrendSafe(read+set混在)・
       //     loadCustomSoundDiagSafe(IndexedDB open+count。P1(v0.1.1084)で別途 count() 化済み)。
+      // 2026-07-15: コア5readと同じstale-while-revalidateガード経由に変更(旧runStorageOpWithTimeout
+      //   直呼びは幽霊readの多重競合を止められなかった)。
       step = 'loadExtrasBatch';
-      const extrasBag = await runStorageOpWithTimeout(
-        () => safeStorageLocalGet(EXTRAS_BATCH_KEYS),
-        tmo
-      ).catch(() => ({}));
+      const extrasRes = await _extrasBatchGuard.read({ timeoutMs: tmo });
+      const extrasBag = extrasRes.value;
+      _mark(extrasRes.stale ? 'extrasBatch(stale)' : 'extrasBatch');
       const {
         voiceDiag,
         venueSeatsDiag,
@@ -635,7 +649,9 @@ async function refresh(opts = {}) {
         scoreAnnounceDiag
       } = pickExtrasBatchValues(extrasBag, Date.now());
       step = 'queryWatchTabMap';
-      const watchTabMap = await runStorageOpWithTimeout(() => queryWatchTabMap(), tmo).catch(() => new Map());
+      const wtRes = await _watchTabMapGuard.read({ timeoutMs: tmo });
+      const watchTabMap = wtRes.value;
+      _mark(wtRes.stale ? 'watchTabMap(stale)' : 'watchTabMap');
       step = 'recordAndAnalyzeTrend';
       const trendFindings = await runStorageOpWithTimeout(
         () => recordAndAnalyzeTrendSafe(lvList, summaries),
