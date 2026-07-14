@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1141',
+    date: '2026-07-14',
+    summary: '会場のギフト・広告レーンの表示欠けを修正',
+    items: Object.freeze([
+      '会場モードで、ギフト・広告レーンの応援が本来より少なく表示されることがある不具合を修正しました。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1140',
     date: '2026-07-14',
     summary: '状態速報の自己診断を強化(内部計器)',

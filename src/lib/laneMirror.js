@@ -83,14 +83,18 @@ function toMirrorCell(item) {
     item && typeof item === 'object' ? item : {}
   );
   const displaySrc = String(it.displaySrc || '').trim();
-  if (!displaySrc) return null;
-  return {
-    displaySrc,
-    title: String(it.title || '').trim(),
-    idLine: String(it.meta?.idLine || ''),
-    nameLine: String(it.meta?.nameLine || ''),
-    userId: String(it.entry?.userId || '').trim()
-  };
+  const title = String(it.title || '').trim();
+  const idLine = String(it.meta?.idLine || '');
+  const nameLine = String(it.meta?.nameLine || '');
+  const userId = String(it.entry?.userId || '').trim();
+  // 会場一致gift/ad根治(2026-07-14): 鏡の会員資格=「照合キーを持つ」であり、displaySrcの
+  //   有無ではない。displaySrc空+userId有りは restoreLaneMirrorBuckets(B-1・v0.1.1112)が
+  //   anonymousIdenticonDataUrlで復元する正常なスリムセル。ここでuserIdを見ずに落とすと
+  //   B-1の復元ロジックに永遠に到達できない(旧バグ=会場のgift/ad段DOM欠落の真因)。
+  //   顔も素性(uid/idLine/title)も無いセルだけ従来どおり落とす(鏡に出せない)。
+  const hasIdentity = userId !== '' || `${idLine.trim()}|${title}` !== '|';
+  if (!displaySrc && !hasIdentity) return null;
+  return { displaySrc, title, idLine, nameLine, userId };
 }
 
 /**
@@ -135,9 +139,14 @@ export function buildLaneMirrorSnapshot(input, opts = {}) {
       pickedLength,
       totalCandidates,
       // v0.1.1137(lanescene-structural-review MVP): revisionはcapturedAt(壁時計)をそのまま使う
-      //   (新規カウンタを作らない)。contentHashはcap後の実際のセル列から計算=会場が受け取る
-      //   restoreLaneMirrorBuckets後の中身と同じ範囲で突合できる。
-      contentHash: laneSceneContentHash(/** @type {any} */ (tiers))
+      //   (新規カウンタを作らない)。
+      // 会場一致gift/ad根治(2026-07-14 Patch 2b): contentHashは復元正準形(読み手B-1適用後)で
+      //   署名する=会場が実際に受け取り描く中身とバイト同一の範囲。displaySrc空+uid有りのスリム
+      //   セルはB-1でidenticonに復元されるため、復元前(tiers生値)で署名すると会場が正しく
+      //   描いても①=会場のhashが恒常的に不一致になる(scene行の偽🔴を防ぐための必須対応)。
+      contentHash: laneSceneContentHash(
+        /** @type {any} */ (restoreLaneMirrorBuckets(/** @type {any} */ (tiers)))
+      )
     };
   };
 
