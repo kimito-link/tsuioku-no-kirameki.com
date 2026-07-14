@@ -54,6 +54,9 @@ import { buildStatusActions } from './statusActionAdvisor.js';
 // v0.1.1026: アイコン画像(usericon)のロード失敗を状態速報で名指し(画像が壊れて見える理由=CDN側404を説明)。
 import { avatarLoadDiagToActionCards } from './avatarLoadReport.js';
 import { buildLaneStatusLine, buildLiveBlockText } from './statusFormat.js';
+// 2026-07-14 診断カウンタchurn根治(diagnostic-architecture-strengthen-DESIGN.md C-3): 内訳・用語の
+//   「表示ゆらぎ補正」回数を状態速報にも出す(popup 側の折りたたみでしか見えない値を1行貼るだけ)。
+import { formatStoryAvatarDiagLine } from './storyAvatarDiagLine.js';
 
 /**
  * v0.1.1005: 状態速報の更新所要(計器)を1行に整形する純関数。
@@ -230,7 +233,7 @@ export function buildAiShareFullText({ overviewText, livesData, fastDiag, popupD
     // v0.1.846: 総合判定を概要に1行併記。満点=「異常ゼロ」(進行中/対象外は正常扱い)。
     //   ユーザー要望「全部100%になるまで=修復いらないぐらい完全に」への回答=異常が無ければ満点。
     try {
-      const verdict = summarizeHealthVerdict(buildHealthCells({ livesData, fastDiag, voiceDiag, venueSeatsDiag, laneDiag, giftEffectDiag, milestoneEffectDiag, previewRenderAck, laneMirror }));
+      const verdict = summarizeHealthVerdict(buildHealthCells({ livesData, fastDiag, popupDiag, voiceDiag, venueSeatsDiag, laneDiag, giftEffectDiag, milestoneEffectDiag, previewRenderAck, laneMirror }));
       const vmark = verdict.level === 'ok' ? '🟢' : verdict.level === 'warn' ? '🟡' : '🔴';
       lines.push(`総合判定: ${vmark} ${verdict.text}`);
     } catch {
@@ -239,6 +242,14 @@ export function buildAiShareFullText({ overviewText, livesData, fastDiag, popupD
     // v0.1.766: 概要に公式値レーン(北極星レーン)の状況も併記(視聴中の配信のみ)。
     const laneStr = buildLaneStatusLine(fastDiag?.content?.giftDiagnostics?.['北極星レーン']);
     if (laneStr) lines.push(laneStr);
+    // 2026-07-14: 内訳・用語(popup折りたたみ)の技術行をそのまま状態速報にも貼る(表示ゆらぎ補正回数を含む)。
+    try {
+      const storyDiagSnap = (popupDiag?.popup ?? popupDiag)?.storyDiag || null;
+      const storyDiagStr = storyDiagSnap ? formatStoryAvatarDiagLine(storyDiagSnap) : null;
+      if (storyDiagStr) lines.push(storyDiagStr);
+    } catch {
+      /* no-op */
+    }
     // v0.1.852: 会場モードの読み上げ診断(使用時のみ)。「たまに遅れる」の切り分け材料を AI 共有に載せる。
     try {
       const vStr = buildVoiceDiagLine(voiceDiag, Date.now());

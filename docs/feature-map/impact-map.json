@@ -618,6 +618,22 @@
       ]
     },
     {
+      "file": "src/lib/storyAvatarDiagLine.js",
+      "featureCount": 4,
+      "features": [
+        "content",
+        "popup",
+        "status",
+        "venue"
+      ],
+      "labels": [
+        "記録エンジン(watchページ常駐)",
+        "ポップアップ(応援レーン)",
+        "状態速報ページ",
+        "会場モード(standalone)"
+      ]
+    },
+    {
       "file": "src/lib/storyAvatarTvFallbackClass.js",
       "featureCount": 4,
       "features": [
@@ -667,6 +683,22 @@
     },
     {
       "file": "src/lib/supportGrowthAvatarLoad.js",
+      "featureCount": 4,
+      "features": [
+        "content",
+        "popup",
+        "status",
+        "venue"
+      ],
+      "labels": [
+        "記録エンジン(watchページ常駐)",
+        "ポップアップ(応援レーン)",
+        "状態速報ページ",
+        "会場モード(standalone)"
+      ]
+    },
+    {
+      "file": "src/lib/supportVisualStoryCopy.js",
       "featureCount": 4,
       "features": [
         "content",
@@ -1242,20 +1274,6 @@
       ]
     },
     {
-      "file": "src/lib/storyAvatarDiagLine.js",
-      "featureCount": 3,
-      "features": [
-        "content",
-        "popup",
-        "venue"
-      ],
-      "labels": [
-        "記録エンジン(watchページ常駐)",
-        "ポップアップ(応援レーン)",
-        "会場モード(standalone)"
-      ]
-    },
-    {
       "file": "src/lib/storyDiagMirrorKey.js",
       "featureCount": 3,
       "features": [
@@ -1341,20 +1359,6 @@
     },
     {
       "file": "src/lib/storyUserLaneSort.js",
-      "featureCount": 3,
-      "features": [
-        "content",
-        "popup",
-        "venue"
-      ],
-      "labels": [
-        "記録エンジン(watchページ常駐)",
-        "ポップアップ(応援レーン)",
-        "会場モード(standalone)"
-      ]
-    },
-    {
-      "file": "src/lib/supportVisualStoryCopy.js",
       "featureCount": 3,
       "features": [
         "content",
@@ -6331,6 +6335,16 @@
     },
     {
       "file": "src/lib/storyDetailRelatedEntries.js",
+      "featureCount": 1,
+      "features": [
+        "popup"
+      ],
+      "labels": [
+        "ポップアップ(応援レーン)"
+      ]
+    },
+    {
+      "file": "src/lib/storyDiagMonotonic.js",
       "featureCount": 1,
       "features": [
         "popup"

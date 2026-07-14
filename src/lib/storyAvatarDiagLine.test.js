@@ -84,6 +84,16 @@ describe('formatStoryAvatarDiagLine', () => {
     });
     expect(line).toContain('レーン候補8（り1/こ2/た5・強名3/個サ4）');
   });
+
+  it('diagRegressions=0(既定)では表示ゆらぎ補正サフィックスを出さない', () => {
+    const line = formatStoryAvatarDiagLine(base);
+    expect(line).not.toContain('表示ゆらぎ補正');
+  });
+
+  it('diagRegressions>0なら表示ゆらぎ補正N回を出す(2026-07-14 churn根治C-3)', () => {
+    const line = formatStoryAvatarDiagLine({ ...base, diagRegressions: 3 });
+    expect(line).toContain('表示ゆらぎ補正3回');
+  });
 });
 
 describe('buildStoryAvatarDiagHtml', () => {

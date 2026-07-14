@@ -108,7 +108,7 @@
   - `src/lib/monotonicCommentCount.js`
 - **storage キー定義** — chrome.storage のキー名の正本(nls_comments_<lv> 等)
   - `src/lib/storageKeys.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 41</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 42</summary>
 
 - `src/lib/autoBackupState.js` — v0.1.808(星野ロミ式コンポーネント化・第1弾): content-entry.js の巨大化を抑えるため、
 - `src/lib/blobDownload.js` — Blob を指定ファイル名で保存する。
@@ -148,6 +148,7 @@
 - `src/lib/statCardsMirrorKey.js` — popup 上部の数字カード群(記録N件・推定同時接続・来場者数・公式統計チップ)を status.html に
 - `src/lib/storageOpTimeout.js` — v0.1.502: 単発の非同期処理（主に chrome.storage.local の get/set/remove）を
 - `src/lib/storyDetailRelatedEntries.js` — ストーリー詳細／プレビュー脇の「同一ユーザーの直近」リスト用。
+- `src/lib/storyDiagMonotonic.js` — 診断カウンタchurn(内訳・用語の顔一覧が増減して見える)の根治。
 - `src/lib/supportVisualExpanded.js` — 応援ビジュアル（アイコン列・グリッド・診断）の開閉を storage に保存するときの正規化。
 - `src/lib/userProfileLinkHtml.js` — 応援コメントの各種 HTML 出力（マーケティング HTML・HTML 保存レポート等）で、
 - `src/lib/userRooms.js` — 保存済みコメントを「ユーザー＝ルーム」に集計（純関数）
@@ -837,9 +838,10 @@
 
 ## 🧬 修正系譜マップ(この系統のバグを過去にどう直したか)
 
-> changelog 全 479 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
+> changelog 全 480 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
 
-### 💾 記録件数 (72版)
+### 💾 記録件数 (73版)
+- `v0.1.1147` 2026-07-14 — 応援コメントの内訳表示が増減して見える不具合を修正
 - `v0.1.1139` 2026-07-14 — 応援レーンの表示上限を差し戻し、二重スクロールを解消
 - `v0.1.1134` 2026-07-14 — 会場一致判定に①実DOMの寸法指紋を追加
 - `v0.1.1133` 2026-07-13 — fix(venue): 会場の案内文言・診断パネルを①と完全一致に
