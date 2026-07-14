@@ -26,6 +26,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1145',
+    date: '2026-07-14',
+    summary: 'コメント収集の誤混入対策と診断強化',
+    items: Object.freeze([
+      '同時視聴中に出る「おすすめユーザー」欄の人物が、コメント投稿者として誤って記録に混入することがある不具合を修正しました。',
+      '状態速報に、この除外処理が正しく働いているかを確認する診断項目を追加しました。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1144',
     date: '2026-07-14',
     summary: 'コメントが多いときの読み上げのテンポを改善',

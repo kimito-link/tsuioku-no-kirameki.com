@@ -477,6 +477,28 @@ export function buildHealthCells(data) {
     cells.push(stateCell('scroll-whiteout', 'スクロール白化', 'na', '—'));
   }
 
+  // 8c. おすすめユーザー欄からの誤混入(診断強化Patch4)。content-entry の gift 行スキャンが
+  //   isInsideRecommendedUserSection で除外した実績+除外機構自体の生存canary(class検出とhref検出の
+  //   二重検出)。excludedByHref>0 かつ excludedByClass===0 が続く場合、ニコニコ側の CSS Modules
+  //   ハッシュ変更で class 検出だけが死んでいる確定的な証拠(href の ref= マーカはハッシュ非依存で生存)。
+  //   件数の多寡自体は正常動作(除外できている)なので bad にはしない=warn止まり。
+  const scanProbe = gift?.giftCommentDiag?.scanProbe;
+  if (scanProbe && typeof scanProbe === 'object') {
+    const byClass = num(scanProbe.excludedByClass) || 0;
+    const byHref = num(scanProbe.excludedByHref) || 0;
+    const selectorDrift = byHref > 0 && byClass === 0;
+    cells.push(
+      stateCell(
+        'harvest-exclusion',
+        'おすすめ除外の生存',
+        selectorDrift ? 'warn' : 'ok',
+        selectorDrift ? `除外セレクタ劣化の疑い(class0/href${byHref})` : `class${byClass}/href${byHref}`
+      )
+    );
+  } else {
+    cells.push(stateCell('harvest-exclusion', 'おすすめ除外の生存', 'na', '—'));
+  }
+
   // 9-14. 北極星6レーン。
   //   v0.1.889: 「貢献度ランキング」→「ギフト貢献度」にラベル変更(正体は koken の /gift/ ランキング=
   //   広告貢献度とは別系統)。laneKind を渡して no_ranking_data の文言を「まだギフト無し/まだ広告無し」と
