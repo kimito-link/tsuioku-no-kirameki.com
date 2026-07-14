@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1140',
+    date: '2026-07-14',
+    summary: '状態速報の自己診断を強化(内部計器)',
+    items: Object.freeze([
+      '状態速報ページの「更新が重い」原因を突き止めやすくする内部計器を追加しました(画面の見た目は変わりません)。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1139',
     date: '2026-07-14',
     summary: '応援レーンの表示上限を差し戻し、二重スクロールを解消',

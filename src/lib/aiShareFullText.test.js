@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { formatRefreshPerfLine } from './aiShareFullText.js';
+import { formatRefreshPerfLine, formatRenderSectionMsLine } from './aiShareFullText.js';
 
 describe('formatRefreshPerfLine（v0.1.1005: 更新所要の計器を本文に出す）', () => {
   it('totalMs と重いステップ top3 を降順で出す', () => {
@@ -35,5 +35,36 @@ describe('formatRefreshPerfLine（v0.1.1005: 更新所要の計器を本文に�
     const line = formatRefreshPerfLine({ totalMs: 0, stepMs: [['lives', 0]] });
     expect(line).toContain('更新所要(計器): 0ms');
     expect(line).not.toContain('重い順');
+  });
+});
+
+describe('formatRenderSectionMsLine（2026-07-14: renderAll内訳の計器を本文に出す・診断ページ軽量化の実測材料）', () => {
+  it('上位5件を降順で1行に出す', () => {
+    const line = formatRenderSectionMsLine([
+      ['マインドマップ', 40],
+      ['配信カード', 10],
+      ['AI共有テキスト', 25],
+      ['健全度パネル', 5],
+      ['対処候補', 3],
+      ['popup埋め込み', 1]
+    ]);
+    expect(line).toBe(
+      'renderAll内訳(重い順・上位5): マインドマップ 40ms / AI共有テキスト 25ms / 配信カード 10ms / 健全度パネル 5ms / 対処候補 3ms'
+    );
+  });
+
+  it('0ms のセクションは除外する', () => {
+    const line = formatRenderSectionMsLine([
+      ['マインドマップ', 12],
+      ['概要併記', 0]
+    ]);
+    expect(line).toBe('renderAll内訳(重い順・上位5): マインドマップ 12ms');
+  });
+
+  it('材料が無ければ空文字', () => {
+    expect(formatRenderSectionMsLine(null)).toBe('');
+    expect(formatRenderSectionMsLine(undefined)).toBe('');
+    expect(formatRenderSectionMsLine([])).toBe('');
+    expect(formatRenderSectionMsLine([['a', 0]])).toBe('');
   });
 });
