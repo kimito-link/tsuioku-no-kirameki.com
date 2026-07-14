@@ -101,7 +101,6 @@ const ROLES_ON = process.env.COUNCIL_ROLES !== '0';
 const FULL = process.env.COUNCIL_FULL === '1';
 const AB = process.env.COUNCIL_AB === '1';
 const FAST = process.env.COUNCIL_FAST === '1'; // 批判役もクラウドに回して最速化（深さより速度）
-const MAX_MEMBERS = Number(process.env.COUNCIL_MAX_MEMBERS) || 4;
 
 // ── 質向上スイッチ（2026-06-22 追加・既定は従来動作のまま＝全OFF相当）──────────
 // いずれもエンジン（モデルの地頭）は変えず「議論の回し方」を改善する。副作用は時間増と
@@ -111,13 +110,20 @@ const MAX_MEMBERS = Number(process.env.COUNCIL_MAX_MEMBERS) || 4;
 //   COUNCIL_CRITICS=N   … ③批判役を最大N体召集（既定1）。多視点で穴を拾う
 //   COUNCIL_REVISE=1    … ①批判を受けて、指摘された側が2巡目で答えを修正する
 //   COUNCIL_SYNTH=1     … ②統括(lead)役が全回答を読んで最後に1案へ統合する
+// 2026-07-04 会議品質向上設計: SAMPLES は「回数で稼ぐ」施策で費用対効果が低いと判定し、
+// QUALITY時の既定を2→1に変更（諮問結果: 冗長サンプリングより1発で深い出力を狙う方が
+// TPD/レート制限下で効率的）。明示指定 COUNCIL_SAMPLES=N は退避弁として存続。
 const QUALITY = process.env.COUNCIL_QUALITY === '1';
-const SAMPLES = Math.max(1, Number(process.env.COUNCIL_SAMPLES) || (QUALITY ? 2 : 1));
+const SAMPLES = Math.max(1, Number(process.env.COUNCIL_SAMPLES) || 1);
 const CRITICS = Math.max(1, Number(process.env.COUNCIL_CRITICS) || (QUALITY ? 2 : 1));
 const REVISE = process.env.COUNCIL_REVISE === '1' || QUALITY;
 const SYNTH = process.env.COUNCIL_SYNTH === '1' || QUALITY;
+// 統合役を「最強クラウド」に固定するか（2026-07-04設計・既定ON）。0で従来のlead選出に戻す。
+const SYNTH_STRONG = process.env.COUNCIL_SYNTH_STRONG !== '0';
 // ②統合の出力指定（council-roles の DEFAULT_FORMAT と同じ4ブロックを短文で示す）。
 const DEFAULT_FORMAT_HINT = '「結論／根拠／反論・リスク／具体案」';
+// 2026-07-03 設計: QUALITY時はCRITICS=2が2席使うため want 側が痩せないよう既定+1(5)。
+const MAX_MEMBERS = Number(process.env.COUNCIL_MAX_MEMBERS) || (QUALITY ? 5 : 4);
 
 const G = process.env.GROQ_API_KEY, N = process.env.NVIDIA_API_KEY, O = process.env.OPENROUTER_API_KEY, E = process.env.GEMINI_API_KEY;
 // Cloudflare Workers AI（OpenAI互換）。トークン1つ＋アカウントID(公開情報)で叩ける無料枠。
@@ -146,6 +152,18 @@ function stripThinking(text) {
   return t.trim() || text.trim(); // 全部 think だった異常時は元を返す（空回答にしない）
 }
 
+// ── TPD(1日トークン上限)枯渇のセッション内検知（2026-07-04 追加）──────────────
+// 背景: 実機で groq/llama-3.3-70b-versatile が「Limit 100000, Used 99486... tokens per day (TPD)」
+//   で429 FAILEDする事例を確認。同日中は何度リトライしても回復しないため、検知したら「本セッション」
+//   の以降のラウンド・敗者復活の対象から外す。翌日はプロセス再起動で自然にリセットされるため
+//   フラグは永続化しない（永続化すると枯渇解消後も除外され続ける事故になる）。
+// 注意: TPM(1分あたり上限)は数十秒〜1分で回復するため、TPDと区別してセッション除外の
+//   対象にしない（実機確認: "tokens per minute (TPM)" は誤検知しやすく、TPD専用の文言で絞る）。
+const exhaustedLabels = new Set();
+function isTpdExhaustedError(message) {
+  return /tokens per day|\bTPD\b/i.test(String(message || ''));
+}
+
 /** OpenAI互換チャットを叩く。system 任意。 */
 async function openaiChat(url, key, model, prompt, system = '', extra = {}, timeoutMs = 150000) {
   const ctrl = new AbortController();
@@ -159,9 +177,17 @@ async function openaiChat(url, key, model, prompt, system = '', extra = {}, time
       body: JSON.stringify({ model, messages, max_tokens: 1600, temperature: 0.6, ...extra })
     });
     const j = await r.json();
-    if (!r.ok || j.error) throw new Error('HTTP ' + r.status + ' ' + (j.error?.message || JSON.stringify(j).slice(0, 120)));
+    if (!r.ok || j.error) {
+      const msg = 'HTTP ' + r.status + ' ' + (j.error?.message || JSON.stringify(j).slice(0, 120));
+      if (r.status === 429 && isTpdExhaustedError(msg)) {
+        throw Object.assign(new Error(msg), { tpdExhausted: true });
+      }
+      throw new Error(msg);
+    }
     const msg = j?.choices?.[0]?.message;
-    const content = msg?.content || '';
+    // reasoning系モデル(glm-4.7-flash等)は content が null で reasoning フィールドに
+    // 中身を返すことがある(2026-07-04 実機確認)。content優先だが、無ければreasoningで救う。
+    const content = msg?.content || msg?.reasoning_content || msg?.reasoning || '';
     if (!content) throw new Error('empty content (reasoning_len=' + String(msg?.reasoning_content || msg?.reasoning || '').length + ')');
     return stripThinking(content);
   } finally { clearTimeout(timer); }
@@ -242,9 +268,24 @@ const OR = 'https://openrouter.ai/api/v1/chat/completions';
 // Cloudflare Workers AI の OpenAI 互換エンドポイント（アカウントIDをパスに含む）。
 const CF_URL = CF_ACC ? `https://api.cloudflare.com/client/v4/accounts/${CF_ACC}/ai/v1/chat/completions` : '';
 // rawId = プロバイダ側の実モデルID（起動時ライブ実在チェックで /models と突き合わせる用。任意）。
-// provider = 実在チェックのグループ（'groq'|'gemini' のみ検証対象。他は listing が無い/不安定なので素通し）。
-const push = (label, kind, run, rawId = '', provider = '') =>
-  allMembers.push({ label, role: roleOf(label), kind, run, rawId, provider });
+// provider = 実在チェックのグループ（'groq'|'gemini'|'ollama' のみ検証対象。他は listing が無い/不安定なので素通し）。
+// run はTPD枯渇検知でラップする: HTTP 429のtpdExhaustedエラーを検知したら exhaustedLabels に
+// 記録して1行報告し、そのまま投げ直す（本セッションの以降のラウンド/敗者復活選定は
+// exhaustedLabels を見て除外する側の責務。ここでは記録だけ行う・永続化はしない）。
+const push = (label, kind, run, rawId = '', provider = '') => {
+  const wrapped = async (p, s) => {
+    try {
+      return await run(p, s);
+    } catch (e) {
+      if (e?.tpdExhausted && !exhaustedLabels.has(label)) {
+        exhaustedLabels.add(label);
+        console.error(`[TPD枯渇] ${label} を本セッション除外（${String(e.message).slice(0, 100)}）`);
+      }
+      throw e;
+    }
+  };
+  allMembers.push({ label, role: roleOf(label), kind, run: wrapped, rawId, provider });
+};
 
 if (G) push('groq/gpt-oss-120b', 'cloud', (p, s) => openaiChat(GROQ, G, 'openai/gpt-oss-120b', p, s, { reasoning_effort: 'low' }), 'openai/gpt-oss-120b', 'groq');
 if (G) push('groq/llama-3.3-70b', 'cloud', (p, s) => openaiChat(GROQ, G, 'llama-3.3-70b-versatile', p, s), 'llama-3.3-70b-versatile', 'groq');
@@ -267,17 +308,33 @@ if (G) push('groq/compound-mini', 'cloud', (p, s) => openaiChat(GROQ, G, 'groq/c
 //  ※ 会議は「llama-3.3-70b-instant」を批判/速い視点に推したが【実在しない幻覚】。70Bは -versatile のみ。
 //    8B級の -instant は llama-3.1-8b-instant だけ（実機で確認）。幻覚IDは採用しない。
 if (G) push('groq/qwen3.6-27b', 'cloud', (p, s) => openaiChat(GROQ, G, 'qwen/qwen3.6-27b', p, s), 'qwen/qwen3.6-27b', 'groq');
+// 2026-07-04 追加（実機 /models 取得で新顔確認・weightOf で予備(weight3)に格下げ）:
+//  - gpt-oss-20b: gpt-oss-120b の軽量版。Ollama停止時に diverge-alt(ローカルgpt-oss:20b専任)が
+//    消滅する穴を、クラウド版で塞ぐための予備。正規のgpt-oss-120b(weight1)は絶対に食わない。
+if (G) push('groq/gpt-oss-20b', 'cloud', (p, s) => openaiChat(GROQ, G, 'openai/gpt-oss-20b', p, s, { reasoning_effort: 'low' }), 'openai/gpt-oss-20b', 'groq');
 // Cloudflare Workers AI（2026-06-27 実機で 200＋本文を裏取りして採用。X 一覧は鵜呑みにせず叩いて確認）。
 //  - 採用基準: 会議に「無い能力」を足すものだけ。gpt-oss-120b / llama-3.3-70b は Groq 等で既出なので CF では足さない。
 //  - nemotron-3-120b: どこにも無い大型の別頭脳 → 汎用(generalist)。/ai/models/search で実在確認済み。
 //  - glm-5.2:        reasoning_content を別フィールドで返す強い推論 → 批判(critic)。content は既にクリーンなので stripThinking で十分。
 //  - kimi-k2.7-code: コード特化 → 実装(implement)。
 //  ※ いずれも openaiChat 流用可（OpenAI互換）。役割は council-roles の roleOf が label から自動付与（glm/kimi+code 用に1行追記済）。
-if (CF && CF_ACC) push('cloudflare/nemotron-120b', 'cloud', (p, s) => openaiChat(CF_URL, CF, '@cf/nvidia/nemotron-3-120b-a12b', p, s));
-if (CF && CF_ACC) push('cloudflare/glm-5.2', 'cloud', (p, s) => openaiChat(CF_URL, CF, '@cf/zai-org/glm-5.2', p, s));
-if (CF && CF_ACC) push('cloudflare/kimi-k2.7-code', 'cloud', (p, s) => openaiChat(CF_URL, CF, '@cf/moonshotai/kimi-k2.7-code', p, s));
+//  2026-06-27実機確認: 会議の並列実負荷でFAILEDしやすい→ weightOf で reserve層(weight4)に格下げ済み。
+//  timeout はここで明示（nemotronは61秒成功実績があるため45秒では誤殺するので90秒、glm/kimiは60秒）。
+if (CF && CF_ACC) push('cloudflare/nemotron-120b', 'cloud', (p, s) => openaiChat(CF_URL, CF, '@cf/nvidia/nemotron-3-120b-a12b', p, s, {}, 90000));
+if (CF && CF_ACC) push('cloudflare/glm-5.2', 'cloud', (p, s) => openaiChat(CF_URL, CF, '@cf/zai-org/glm-5.2', p, s, {}, 60000));
+if (CF && CF_ACC) push('cloudflare/kimi-k2.7-code', 'cloud', (p, s) => openaiChat(CF_URL, CF, '@cf/moonshotai/kimi-k2.7-code', p, s, {}, 60000));
+// 2026-07-04 追加: glm-5.2(不安定)の軽量flash版。並列実負荷での安定性トライアル中。
+// トライアル判定: QUALITY会議2回でFAILEDゼロ→glm-5.2を撤去して一本化。1回でもFAILEDなら本モデルを撤去。
+// 実IDは /ai/models/search で実機確認済み(@cf/zai-org/glm-4.7-flash)。単発疎通は200 OK確認済み。
+if (CF && CF_ACC) push('cloudflare/glm-4.7-flash', 'cloud', (p, s) => openaiChat(CF_URL, CF, '@cf/zai-org/glm-4.7-flash', p, s, {}, 60000));
 if (N) push('nvidia/qwen3.5-122b', 'cloud', (p, s) => openaiChat(NV, N, 'qwen/qwen3.5-122b-a10b', p, s, { chat_template_kwargs: { thinking: false } }));
 if (E) push('gemini-2.5-flash', 'cloud', (p, s) => geminiChat('gemini-2.5-flash', p, s), 'gemini-2.5-flash', 'gemini');
+// 2026-07-04 追加: 2026-06-25には429/503で常用不可だったが、今回の再検証で単発・4並列とも
+// 全て200 OKを確認。Google側の無料枠割当が時期変動していると解釈し、weightOfで予備(weight3)に
+// 留める。昇格基準: 7日以上空けた実会議2回でFAILEDゼロなら正規化。降格基準: 1回でも429/503が
+// 出たら即撤去。3-pro/3-flash-previewは今回も429継続 or 完全重複のため不採用（詳細は
+// memory/council-llm-lineup-upgrade-2026-07-03.md 参照）。
+if (E) push('gemini-3.5-flash', 'cloud', (p, s) => geminiChat('gemini-3.5-flash', p, s), 'gemini-3.5-flash', 'gemini');
 // OpenRouter は無料枠で 429 が出やすい=予備の1票(reference-free-cloud-llm-apis.md)。
 if (O) push('openrouter/gpt-oss-120b', 'cloud', (p, s) => openaiChat(OR, O, 'openai/gpt-oss-120b:free', p, s, { reasoning_effort: 'low' }));
 // 司令塔 Claude(Opus 4.8) を会議の最強メンバー(統括/批判)として自動参加させる。
@@ -295,12 +352,15 @@ const LOCAL_DEFAULT = [
   // ※ glm-5.2:cloud は Ollama サブスク必須(無料は subscription エラー)のため不採用。
   // 2026-06-24 棚卸し: gemma4:31b(19GB/最重量・統括は latest+Opus で代替) と
   //   qwen2.5:14b(発散は qwen3/qwen3.5 の新版で代替・2ヶ月未使用) を削除し計28GB回収。
-  'gemma4:latest', 'qwen2.5-coder:14b', 'hermes3:8b',
+  // 2026-07-03 棚卸し: hermes3:8b(役割未定のまま無価値・fastはクラウドで充足) を削除。
+  'gemma4:latest', 'qwen2.5-coder:14b',
 ];
 const localModels = (process.env.MEETING_LOCAL_MODELS || LOCAL_DEFAULT.join(','))
   .split(',').map((s) => s.trim()).filter(Boolean);
 for (const m of localModels) {
-  push(`local/${m}`, 'local', (p, s) => ollamaChat(m, p, s));
+  // provider='ollama' で起動時ライブ実在チェックに参加させる（下記 fetchLiveModelIds 参照）。
+  // rawId=モデル名そのもの（Ollamaは1台構成でIDのゆらぎが無いためlabelと同じでよい）。
+  push(`local/${m}`, 'local', (p, s) => ollamaChat(m, p, s), m, 'ollama');
 }
 
 // ── 起動時ライブ実在チェック（2026-07-01 追加）────────────────────────────────
@@ -333,13 +393,37 @@ async function fetchLiveModelIds(provider) {
   } catch { return null; }
   return null;
 }
+// 2026-07-03 設計: Ollama の生死判定は groq/gemini の実在チェックとは意味論が逆になる。
+//   groq/gemini: null(検証不能)=素通し・除外しない / Set(検証可能)=一覧に無ければ除外。
+//   ollama:      到達不能=Ollamaが起動していない=ローカル全メンバーを丸ごと除外すべき状況。
+// そのため fetchLiveModelIds の null 分岐を流用せず、ollama 専用の生死フラグを別に持つ。
+/** Ollama の /api/tags に2秒timeoutで疎通確認する。生きていれば true。 */
+async function isOllamaAlive() {
+  try {
+    const r = await fetch(`${OLLAMA}/api/tags`, { signal: AbortSignal.timeout(2000) });
+    return r.ok;
+  } catch { return false; }
+}
 /** allMembers から、live 一覧に無い(=幻覚/廃止)クラウドメンバーを警告除去する。 */
 async function verifyLiveModels() {
   if (!VERIFY_MODELS) return;
-  const providers = [...new Set(allMembers.map(m => m.provider).filter(Boolean))];
+  const providers = [...new Set(allMembers.map(m => m.provider).filter(Boolean).filter(p => p !== 'ollama'))];
   const live = new Map();
-  await Promise.all(providers.map(async p => { live.set(p, await fetchLiveModelIds(p)); }));
+  const hasOllamaMembers = allMembers.some(m => m.provider === 'ollama');
+  const [, ollamaAlive] = await Promise.all([
+    Promise.all(providers.map(async p => { live.set(p, await fetchLiveModelIds(p)); })),
+    hasOllamaMembers ? isOllamaAlive() : Promise.resolve(true),
+  ]);
   let removed = 0;
+  if (hasOllamaMembers && !ollamaAlive) {
+    const before = allMembers.length;
+    for (let i = allMembers.length - 1; i >= 0; i--) {
+      if (allMembers[i].provider === 'ollama') allMembers.splice(i, 1);
+    }
+    const droppedCount = before - allMembers.length;
+    removed += droppedCount;
+    console.error(`[Ollama生死] http://127.0.0.1:11434 に到達不能 → local ${droppedCount}体を除外（クラウドのみで縮退運用）`);
+  }
   for (let i = allMembers.length - 1; i >= 0; i--) {
     const m = allMembers[i];
     const set = m.provider && live.get(m.provider);
@@ -399,10 +483,17 @@ async function runRound(members, taskText, extraContextFor = null) {
     : { label: members[i].label, role: members[i].role, ms: 0, answer: '', error: String(r.reason?.message || r.reason).slice(0, 200) });
 }
 
+// 2026-07-03 設計: 分類器専任のllama-3.1-8b-instant。1語JSONを返すだけの仕事にfast主力の
+// TPD(1日トークン上限)を使うのは浪費（2026-07-04実測でllama-3.3-70bがTPD枯渇した一因）。
+// 正規メンバー(allMembers)には入れない＝動的ルーティングの穴埋め候補にはならない。
+const classifierOnly = G
+  ? { label: 'groq/llama-3.1-8b-instant', run: (p, s) => openaiChat(GROQ, G, 'llama-3.1-8b-instant', p, s) }
+  : null;
+
 /** 分類器: 最速の利用可能メンバー1体にカテゴリを聞く。失敗時は general。 */
 async function classify(taskText) {
   const order = ['groq/llama-3.3-70b', 'gemini-2.5-flash', 'groq/gpt-oss-120b', 'local/qwen3.5:9b'];
-  const classifier = order.map(l => allMembers.find(m => m.label === l)).find(Boolean) || allMembers[0];
+  const classifier = classifierOnly || order.map(l => allMembers.find(m => m.label === l)).find(Boolean) || allMembers[0];
   if (!classifier) return { category: 'general', by: '(none)', raw: '' };
   try {
     const raw = await classifier.run(classifyPrompt(taskText), '');
@@ -514,10 +605,36 @@ function dedupResults(results, label) {
   return results.filter(r => !dropped.has(r));
 }
 
+/**
+ * 1件の回答テキストを、統合(SYNTH)・批判往復への同梱用に圧縮する。
+ * 2026-07-04設計: 旧実装は先頭からcap文字での機械的な頭切りで、4ブロック型の回答は
+ * 常に「具体案」ブロックが切り捨てられていた（結論・根拠が長いと具体案まで届かない）。
+ * 見出しがある回答は「結論(全量)＋反論・リスク(先頭400字)＋具体案(先頭400字)」を優先的に
+ * 抽出する（根拠ブロックは統合に最も不要なので落とす）。見出しが無い回答（critic の
+ * (0)〜(3)構造や、フォーマットを外したモデル）は従来通り先頭capで丸めるが、
+ * 【最重要】を含む行だけは必ず残す（capの外に落ちても末尾に追記）。
+ */
+function compressAnswer(answer, cap) {
+  const text = String(answer || '');
+  const m = text.match(/##\s*結論([\s\S]*?)(?:##\s*根拠|$)/);
+  if (m) {
+    const conclusion = text.match(/##\s*結論[\s\S]*?(?=##\s*根拠|$)/)?.[0] || '';
+    const risk = text.match(/##\s*反論・リスク[\s\S]*?(?=##\s*具体案|$)/)?.[0]?.slice(0, 400) || '';
+    const plan = text.match(/##\s*具体案[\s\S]*/)?.[0]?.slice(0, 400) || '';
+    return [conclusion.trim(), risk.trim(), plan.trim()].filter(Boolean).join('\n');
+  }
+  const head = text.slice(0, cap);
+  const criticalLine = text.split('\n').find(l => l.includes('【最重要】'));
+  if (criticalLine && !head.includes(criticalLine)) {
+    return head + '\n(【最重要】行): ' + criticalLine.trim();
+  }
+  return head;
+}
+
 /** 結果配列を「■ ラベル（役割）の結論: …」のダイジェストに畳む（プロンプト同梱用）。 */
 function digestOf(results, cap = 700) {
   return results.filter(r => !r.error && (r.answer || '').trim())
-    .map(r => `■ ${r.label}（${ROLE_LABEL[r.role] || r.role}）:\n${(r.answer || '').slice(0, cap)}`)
+    .map(r => `■ ${r.label}（${ROLE_LABEL[r.role] || r.role}）:\n${compressAnswer(r.answer, cap)}`)
     .join('\n\n');
 }
 
@@ -540,6 +657,7 @@ async function council(members, label, key) {
     }
 
     // ① 反論を受けて2巡目: 批判された側（critic以外）が、批判を読んで自案を修正する。
+    // 2026-07-04設計: 「採用/反論」の明示を義務化。旧版は批判を黙殺しても検出できなかった。
     if (REVISE && others.length) {
       const critDigest = first.filter(r => r.role === 'critic' && !r.error && (r.answer || '').trim())
         .map(r => `■ 批判（${r.label}）:\n${(r.answer || '').slice(0, 1000)}`).join('\n\n');
@@ -549,8 +667,8 @@ async function council(members, label, key) {
         console.error(`[${label}] ①2巡目: ${revisers.length}体が批判を受けて修正`);
         const revised = await runRound(revisers, question, () =>
           `【あなたの先の回答への批判】\n${critDigest}\n\n` +
-          `この批判を踏まえ、当たっている指摘は取り込んで自分の案を改訂してください。` +
-          `的外れな批判には簡潔に反論してよい。最終形だけを出すこと。`);
+          `冒頭で、批判の各指摘に対し「採用/反論」を1行ずつ明示すること。【最重要】印の指摘を最初に扱う。` +
+          `反論は1文で簡潔に。そのうえで最終形の案だけを、元と同じ4ブロックの見出しで出し直すこと。`);
         for (const rv of revised) {
           const idx = first.findIndex(r => r.label === rv.label);
           if (idx >= 0 && !rv.error) first[idx] = { ...rv, ms: first[idx].ms + rv.ms, rebutted: first[idx].rebutted, revised: true };
@@ -560,19 +678,52 @@ async function council(members, label, key) {
   }
 
   // 回答dedup: 統合・表示の前に「ほぼ同一の素回答」を畳む（費用ゼロの質向上・黙って消さずログ）。
-  const shown = dedupResults(first, label);
+  let shown = dedupResults(first, label);
 
-  // ② 統括(lead)が全回答を読んで1案へ統合する。lead不在なら最速の生存メンバーに代行させる。
+  // 敗者復活（rescue 1回制・2026-07-04 追加）: 有効回答が3体未満なら、まだ召集していない
+  // 安定クラウド(weight<=2)1体に同じ問いを1回だけ追加で投げる。CF予備勢のFAILED連発や
+  // TPD枯渇での歩留まり低下を、追加コスト最小(1体・1回のみ)で救う。再帰はしない。
+  const okCount = shown.filter(r => !r.error).length;
+  if (okCount < 3) {
+    const usedLabels = new Set(members.map(m => m.label));
+    const rescueCand = allMembers
+      .filter(m => !usedLabels.has(m.label) && !exhaustedLabels.has(m.label) && weightOf(m.label) <= 2)
+      .sort((a, b) => weightOf(a.label) - weightOf(b.label))[0];
+    if (rescueCand) {
+      console.error(`[${label}] 敗者復活: 有効回答${okCount}体のため ${rescueCand.label} に1回だけ追加依頼`);
+      const rescued = await runRound([rescueCand], question);
+      if (rescued[0] && !rescued[0].error) {
+        shown = [...shown, rescued[0]];
+      }
+    }
+  }
+
+  // ② 統括(lead)が全回答を読んで1案へ統合する。
+  // 2026-07-04設計: 統合役を「最強クラウド」に固定する（L1レバー）。従来は
+  // routedMembers 内の lead(=local/gemma4 8B) が統合を担っており、会議で最も地頭が
+  // 要る工程を最弱メンバーがやっているのが Fable との差の最大要因だった。
+  // routedMembers に参加していないモデルが統合するのは問題ない（digest を読むだけの独立工程）。
   if (SYNTH) {
-    let synth = members.find(m => m.role === 'lead' && shown.some(r => r.label === m.label && !r.error));
+    let synth = null;
+    if (SYNTH_STRONG) {
+      const priority = ['groq/gpt-oss-120b', 'cloudflare/nemotron-120b', 'groq/llama-3.3-70b', 'gemini-2.5-flash', 'cloudflare/glm-5.2'];
+      synth = priority.map(l => allMembers.find(m => m.label === l && !exhaustedLabels.has(l))).find(Boolean)
+        || allMembers.find(m => m.kind === 'cloud' && !exhaustedLabels.has(m.label));
+      if (synth) console.error(`[${label}] ②統合役(能力優先): ${synth.label}`);
+    }
+    if (!synth) synth = members.find(m => m.role === 'lead' && shown.some(r => r.label === m.label && !r.error));
     if (!synth) synth = members.find(m => shown.some(r => r.label === m.label && !r.error));
     if (synth) {
       console.error(`[${label}] ②統合: ${synth.label} が1案に束ねる`);
       const all = digestOf(shown, 900); // 重複を畳んだ後の回答で統合（ノイズ・重複を統括に見せない）
       const sres = await runRound([{ ...synth, role: 'lead' }], question, () =>
         `【会議メンバー全員の回答（批判・修正済み）】\n${all}\n\n` +
-        `あなたは統括役。上の議論を統合し、対立点はどちらを採るか理由付きで決め、` +
-        `優先順位を付けた「最終1案」を ${DEFAULT_FORMAT_HINT} の形で示すこと。あれもこれもにしない。`);
+        `あなたは統括役。次の手順で統合すること:\n` +
+        `(1)対立点の列挙: メンバー間で結論が食い違う点を箇条書きで挙げる。批判役同士の指摘が食い違う場合も対立点として挙げ、どちらが正しいか判定する。無ければ「対立なし」と書く。\n` +
+        `(2)判定: 各対立点についてどちらを採るか理由付きで決める。単なる折衷は禁止。両者の前提を組み替えて両立させる第三案が実在する場合のみ、それを採ってよい。\n` +
+        `(3)少数意見の検分: 多数派の前提そのものを否定する意見があれば、無視せず「採用/却下＋理由」を明示する。【最重要】印の付いた批判が最終案で解決されているかを必ず確認する。\n` +
+        `(4)自己検証: 自分の統合ロジックを2文で要約し、(2)の判定と矛盾していないことを確かめてから最終案を書く。\n` +
+        `最終案は ${DEFAULT_FORMAT_HINT} の4見出しで。優先順位を付け、何を捨てるかまで決める。あれもこれもにしない。`);
       if (sres[0] && !sres[0].error) {
         shown.push({ ...sres[0], label: synth.label + ' [統合]', role: 'lead', ms: sres[0].ms, synthesis: true });
       }
@@ -595,8 +746,12 @@ function swapToCloud(member, routedMembers, allMembers, reason) {
   if (idx < 0) return;
   const usedLabels = new Set(routedMembers.map((m) => m.label));
   // 同役割で使える空きクラウドを優先、無ければ任意の空きクラウド（役割を引き継がせる）。
-  const spare = allMembers.find((m) => m.kind === 'cloud' && m.role === member.role && !usedLabels.has(m.label))
-             || allMembers.find((m) => m.kind === 'cloud' && !usedLabels.has(m.label));
+  // 2026-07-04 設計: 同点候補が複数ある場合はweight昇順(安定勢優先)で選ぶ。
+  // CF予備(weight4)への振替は「他に安定勢が無い」時だけの最後の手段にする。
+  const byWeight = (a, b) => weightOf(a.label) - weightOf(b.label);
+  const sameRole = allMembers.filter((m) => m.kind === 'cloud' && m.role === member.role && !usedLabels.has(m.label)).sort(byWeight);
+  const anyCloud = allMembers.filter((m) => m.kind === 'cloud' && !usedLabels.has(m.label)).sort(byWeight);
+  const spare = sameRole[0] || anyCloud[0];
   if (!spare) { console.error(`[振替] ${member.label} の代替クラウドが無く、そのまま残す（${reason}）`); return; }
   routedMembers.splice(idx, 1, { ...spare, role: member.role });
   console.error(`[振替] ${member.label} → ${spare.label}（${ROLE_LABEL[member.role]}・理由:${reason}）`);
@@ -613,7 +768,8 @@ if (FULL && !AB) {
   console.error(`\n分類: category=${category}  by=${by}  (${CATEGORIES[category]?.hint || ''})`);
   if (raw) console.error(`  分類器の生出力: ${raw}`);
 
-  const availableLabels = allMembers.map(m => m.label);
+  // TPD枯渇済み(本セッション中に429で確認済み)のメンバーは選抜候補から外す。
+  const availableLabels = allMembers.map(m => m.label).filter(l => !exhaustedLabels.has(l));
   const chosen = selectMembers(category, availableLabels, MAX_MEMBERS);
   const routedMembers = chosen.map(l => allMembers.find(m => m.label === l)).filter(Boolean);
 
