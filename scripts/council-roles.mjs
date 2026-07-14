@@ -22,6 +22,9 @@ export function roleOf(name) {
   // Claude/Opus は司令塔級の地頭 → 統括(lead)。会議の最終的な舵取りに最も効く。
   if (n.includes("claude") || n.includes("opus") || n.includes("sonnet")) return "lead";
   if (n.includes("deepseek-r1")) return "critic";
+  // 2026-07-14 追加: NVIDIA NIM無料枠の超大型3体。実機2並列200 OK裏取り済み(会議諮問→Fable設計)。
+  //  - deepseek-v4-pro: DeepSeek系。criticは既に層が厚いため予備(weight3)として批判枠の保険に。
+  if (n.includes("deepseek-v4")) return "critic";
   // qwen3-32b は thinking 付き推論モデル → 批判(critic)。汎用 qwen3(発散)より先に判定する。
   if (n.includes("qwen3-32b") || n.includes("qwq")) return "critic";
   // GLM(5.2 等)は reasoning_content を別フィールドで返す強い推論モデル → 批判(critic)。
@@ -42,6 +45,12 @@ export function roleOf(name) {
   if (n.includes("gpt-oss")) return "diverge-alt";
   if (n.includes("qwen3") || n.includes("qwen3.5")) return "diverge";
   if (n.includes("gemma4")) return "lead";
+  // 2026-07-14 追加: 675B・550Bの超大型はどちらも統括(lead)。会議のlead枠は従来local/gemma4(8B)
+  // 頼みで全役割中最弱だった＝Fableとの能力ギャップが最大の箇所。ここに刺すのが本改修の本体。
+  // mistral-large が正規(weight2)・nemotron-3-ultra が予備(weight3)。
+  // 注意: 素の"nemotron"では書かない（cloudflare/nemotron-120bは意図的にgeneralist=フォールスルー）。
+  if (n.includes("mistral-large")) return "lead";
+  if (n.includes("nemotron-3-ultra")) return "lead";
   // llama-4(scout/maverick) は軽快な新顔 → 速い視点。汎用 llama-3.3 と同枠。
   if (n.includes("llama-4") || n.includes("scout") || n.includes("maverick")) return "fast";
   if (n.includes("groq") || n.includes("llama-3.3")) return "fast";
@@ -198,8 +207,15 @@ export const ROLE_FALLBACK = {
 export function weightOf(label) {
   const n = String(label).toLowerCase();
   if (!n.startsWith("local/")) {
+    // 2026-07-14 追加: NIM超大型の予備層。CF勢(weight4・並列FAILED実績あり)より上、
+    // 本線(weight1)とnvidia既存枠(weight2)より下。deepseekは実測5〜15秒と遅いが
+    // 並列会議では律速にならないため遅さでの格下げはしない。
+    if (n.includes("nemotron-3-ultra") || n.includes("deepseek-v4")) return 3;
     // 実測で詰まりやすい不安定クラウドは後回し（同役割なら安定クラウドを先に選ぶ）。
     // nvidia/qwen3.5-122b は150秒タイムアウトが頻発(2026-06-17実測) → 重み2。
+    // mistral-large-3-675bも意図的にこの2を踏襲(2026-07-14): NIM全体の「やや不安定枠」
+    // という2026-06-17実測の教訓を捨てないため、個別に軽い重みを与えない。leadにはcloud
+    // weight1が存在しないため、weight2でも事実上のlead主力になる。
     if (n.includes("nvidia") || n.includes("qwen3.5-122b")) return 2;
     // 2026-07-03/07-04 設計: 予備クラウド専用の reserve 層。同役割に安定勢(weight1)が
     // いる限り絶対に選ばれない（weight昇順ソートのため）。安定勢が不在/全滅した時だけ浮上する。
