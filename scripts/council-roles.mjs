@@ -33,12 +33,18 @@ export function roleOf(name) {
   // fact カテゴリの「会議内で最新情報を取りに行く」担当。2026-07-01 ライブAPIで実在確認・2リポ同期。
   // gpt-oss 判定より先に置く（"compound" は "gpt-oss" に非一致だが、意図を明示するため上に）。
   if (n.includes("compound")) return "generalist";
+  // gpt-oss-120b は批判主力级の最大クラウド → 批判(critic)。"gpt-oss" 判定より必ず前に置くこと
+  // （if の先勝ちなので、順序を間違えると 120b も 20b と同じ diverge-alt に落ちてしまう）。
+  // 2026-07-03 会議ハーネス設計で発覚: 従来はこの分岐が無く、gpt-oss-120b が diverge-alt 誤判定
+  // されていたため、CATEGORIES のどの want にも登場せず実質不召集だった（設計バグ）。
+  if (n.includes("gpt-oss-120b")) return "critic";
+  // gpt-oss(20b・safeguard-20b 等) はローカル/クラウドの軽量別系統発散 → diverge-alt。
   if (n.includes("gpt-oss")) return "diverge-alt";
   if (n.includes("qwen3") || n.includes("qwen3.5")) return "diverge";
   if (n.includes("gemma4")) return "lead";
   // llama-4(scout/maverick) は軽快な新顔 → 速い視点。汎用 llama-3.3 と同枠。
   if (n.includes("llama-4") || n.includes("scout") || n.includes("maverick")) return "fast";
-  if (n.includes("groq") || n.includes("llama-3.3") || n.includes("hermes")) return "fast";
+  if (n.includes("groq") || n.includes("llama-3.3")) return "fast";
   if (n.includes("gemini")) return "generalist";
   return "generalist";
 }
@@ -54,12 +60,24 @@ export const ROLE_LABEL = {
   generalist: "汎用",
 };
 
-/** 役割キー → その役割にだけ刺さる system 追記文。 */
+/**
+ * 役割キー → その役割にだけ刺さる system 追記文。
+ * critic のみ 2026-07-04 会議品質向上設計で全面差し替え。旧版「穴を最低1つ」は
+ * 浅い指摘1個で義務が満たされてしまう欠陥があった。新版は1回の生成の中で
+ * 「擁護→初期評価→反証→修正指示」の4段を必須の出力順序として強制する。
+ * 追加APIコールを伴わずに批判の深さを引き上げる（会議ハーネス自身への諮問で
+ * 「モデルを増やす以外で質を上げる」打ち手として設計・採用）。
+ * critic には DEFAULT_FORMAT を足さない（buildSystem 側で分岐。二重フォーマット指定は
+ * 指示過多そのものであり、むしろ質を下げるという諮問結果を採用）。
+ */
 const ROLE_DIRECTIVE = {
   critic:
-    "あなたの担当は『批判・詰め』です。賛成意見は不要。" +
-    "提案の穴・破綻・見落とし・リスクを最低1つ、必ず具体的に指摘してください。" +
-    "指摘できない場合は『なぜ穴が無いと言えるか』を根拠付きで述べること。",
+    "あなたの担当は『批判・詰め』です。賛成意見は不要。次の順で必ず書くこと:\n" +
+    "(0)擁護: 対象の提案が最も正しく見える解釈を1文だけ書く（強い形を叩くため）。\n" +
+    "(1)初期評価: それでも残る明白な弱点を具体的に指摘する。\n" +
+    "(2)反証: 提案が暗黙に依拠している前提を1つ特定し、その前提が崩れる現実的な条件を示す。\n" +
+    "(3)修正指示: (1)(2)を踏まえ、提案者が結論をどう変えるべきかを1〜2文で断定する。\n" +
+    "最後に、指摘のうち最も重大な1つの行頭に【最重要】と印を付けること。印は必ず1つだけ。",
   diverge:
     "あなたの担当は『発散』です。無難案ではなく、他の人が思いつかない角度の案を出してください。" +
     "1つに絞らず、毛色の違う案を2つ以上出してかまいません。",
@@ -76,13 +94,21 @@ const ROLE_DIRECTIVE = {
   generalist: "幅広い観点から、実際に使える具体案を出してください。抽象論は避けること。",
 };
 
-/** 問いが独自フォーマットを指定していないときに使う既定の出力型。 */
+/**
+ * 問いが独自フォーマットを指定していないときに使う既定の出力型。
+ * 2026-07-04 会議品質向上設計で「反論・リスク」「具体案」ブロックを強化。
+ * 旧版は「別の正解の可能性を最低1つ」という緩い要求で検証可能性が無かった。
+ * 新版は「自分が依拠する前提と、それが崩れる条件」を明示させ、具体案でその
+ * 失敗シナリオへの対処を必ず含めさせる＝1回の生成の中で批判→修正が閉じる。
+ * 見出しは4つのまま増やさない（digestOf・dedup・司令塔の読み取りが見出し依存のため）。
+ */
 export const DEFAULT_FORMAT =
   "回答は次の4ブロックの見出しを付けて、この順で書いてください:\n" +
   "## 結論（この問いへの答えを1〜2文で）\n" +
   "## 根拠（なぜそう言えるか）\n" +
-  "## 反論・リスク（自分の案の弱点や、別の正解の可能性を最低1つ）\n" +
-  "## 具体案（実際に動く/作れる形で具体的に）";
+  "## 反論・リスク（自分の案が失敗する最も現実的なシナリオを1つ。自分が依拠している前提と、それが崩れる条件を明示する）\n" +
+  "## 具体案（実際に動く/作れる形で。上の失敗シナリオへの対処を必ず1つ含める）\n" +
+  "見出しは4つのまま。増やさないこと。";
 
 /**
  * 問い本文が既に出力フォーマットを指定しているかを雑に判定する。
@@ -106,7 +132,9 @@ export function taskSpecifiesFormat(taskText) {
 export function buildSystem({ baseSystem = "", modelName, taskText = "", addFormat = true }) {
   const key = roleOf(modelName);
   const directive = ROLE_DIRECTIVE[key];
-  const wantFormat = addFormat && !taskSpecifiesFormat(taskText);
+  // critic は自前の(0)〜(3)構造が出力フォーマットそのもの。DEFAULT_FORMATの4ブロックを
+  // 追加で強制すると二重フォーマット指定になり指示過多で質が下がる（2026-07-04設計の結論）。
+  const wantFormat = addFormat && key !== "critic" && !taskSpecifiesFormat(taskText);
   const parts = [baseSystem, `【あなたの役割】${directive}`];
   if (wantFormat) parts.push(`【出力の型】\n${DEFAULT_FORMAT}`);
   return {
@@ -137,11 +165,28 @@ export const CATEGORIES = {
   design:  { want: ["lead", "diverge", "fast"],        hint: "設計判断・アーキテクチャ・技術選定・トレードオフ" },
   fact:    { want: ["generalist", "fast", "lead"],     hint: "事実調査・比較・最新情報・用語の意味" },
   writing: { want: ["lead", "diverge", "generalist"],  hint: "文章・コピー・要約・説明・命名" },
-  general: { want: ["lead", "diverge", "fast"],        hint: "上のどれにも当てはまらない一般的な相談" },
+  // 2026-07-03 設計: diverge-alt を3番手に追加。従来は CATEGORIES のどの want にも
+  // diverge-alt が登場せず、ローカル唯一の別系統発散(gpt-oss:20b)が死に役割だった。
+  general: { want: ["lead", "diverge", "diverge-alt"],  hint: "上のどれにも当てはまらない一般的な相談" },
 };
 
 /** critic（批判役）は全カテゴリで必ず1体召集する。 */
 export const ALWAYS_ROLES = ["critic"];
+
+/**
+ * 縮退運用の代替役割マップ（2026-07-03 追加）。
+ * Ollama 停止時など、本来の役割プールが空のときにどの役割で代打を立てるかを定義する。
+ * 順番に試し、最初にプールが見つかった役割で埋める。
+ * @type {Record<string,string[]>}
+ */
+export const ROLE_FALLBACK = {
+  implement: ["fast", "generalist"],
+  lead: ["generalist", "fast"],
+  diverge: ["diverge-alt", "generalist"],
+  // 2026-07-04 追加: fast主力(llama-3.3-70b/llama-4-scout)が両方 TPD 枯渇/障害で
+  // 全滅した最悪日でも、別プロバイダの generalist(gemini-2.5-flash) が代行する。
+  fast: ["generalist"],
+};
 
 /**
  * メンバーの「重さ」を推定する。値が小さいほど速い＝優先。
@@ -156,7 +201,20 @@ export function weightOf(label) {
     // 実測で詰まりやすい不安定クラウドは後回し（同役割なら安定クラウドを先に選ぶ）。
     // nvidia/qwen3.5-122b は150秒タイムアウトが頻発(2026-06-17実測) → 重み2。
     if (n.includes("nvidia") || n.includes("qwen3.5-122b")) return 2;
-    return 1; // 安定クラウド（groq/gemini/openrouter）は速い
+    // 2026-07-03/07-04 設計: 予備クラウド専用の reserve 層。同役割に安定勢(weight1)が
+    // いる限り絶対に選ばれない（weight昇順ソートのため）。安定勢が不在/全滅した時だけ浮上する。
+    //  - gpt-oss-20b: gpt-oss-120b(正規)の軽量予備。diverge-alt の穴埋め専任(下記参照)。
+    //  - gemini-3系(3.5-flash等): 過去に429/503実績あり(2026-06-25)。2026-07-04再検証で
+    //    安定を確認したが、preview/新顔ゆえ即正規化はせず予備に留める（昇格・降格基準は
+    //    memory/council-llm-lineup-upgrade-2026-07-03.md 参照）。"gemini-3" は "gemini-2.5" に
+    //    非一致（先頭一致ではなく部分一致だが "gemini-2.5-flash" に "gemini-3" は含まれない）。
+    if (n.includes("gpt-oss-20b") || n.includes("gemini-3")) return 3;
+    // openrouter は無料枠で429が出やすい実績→予備(weight3)。
+    if (n.includes("openrouter")) return 3;
+    // cloudflare 勢は会議の並列実負荷で FAILED しやすい実績(2026-06-27)→ reserve層(weight4)。
+    // 同役割に安定勢(weight1〜3)がいる限り選ばれず、いなければ最後の砦として浮上する。
+    if (n.includes("cloudflare")) return 4;
+    return 1; // 安定クラウド（groq/gemini 本線）は速い
   }
   // ローカルは概ねサイズで遅さが決まる。実測で詰まりやすい順に重み付け。
   if (n.includes("deepseek-r1") || n.includes(":31b") || n.includes("gemma4:31b")) return 9; // 最重量(推論/大型)
@@ -216,26 +274,38 @@ export function selectMembers(category, availableLabels, maxMembers = 4) {
   let heavyCount = 0;
   const isHeavy = (l) => weightOf(l) >= 9;
   // role から1体取る。重いローカルが上限超過なら、その役割内の軽い代替を探す。
+  // 戻り値: 実際に1体確保できたら true（ROLE_FALLBACK の呼び出し元で成否判定に使う）。
   const takeRole = (role) => {
     const pool = byRole.get(role);
-    if (!pool || !pool.length) return;
+    if (!pool || !pool.length) return false;
     let idx = 0;
     if (heavyCount >= MAX_HEAVY_LOCAL) {
       const light = pool.findIndex((l) => !isHeavy(l));
       idx = light >= 0 ? light : -1; // 軽い代替が無ければこの役割はスキップ
     }
-    if (idx < 0) return;
+    if (idx < 0) return false;
     const l = pool.splice(idx, 1)[0];
     if (l && !picked.includes(l)) {
       picked.push(l);
       if (isHeavy(l)) heavyCount++;
+      return true;
     }
+    return false;
+  };
+  // role から1体取る。プールが空/枯渇なら ROLE_FALLBACK の代替役割を順に試す（2026-07-03 追加）。
+  // 主に Ollama 停止時など、本来の役割が丸ごと不在になる縮退運用のための救済。
+  const takeRoleWithFallback = (role) => {
+    if (takeRole(role)) return true;
+    for (const alt of ROLE_FALLBACK[role] || []) {
+      if (takeRole(alt)) return true;
+    }
+    return false;
   };
   // critic は必ず先に確保（重い deepseek しか居なければ1体だけ許容）
   for (const role of ALWAYS_ROLES) takeRole(role);
   for (const role of cat.want) {
     if (picked.length >= maxMembers) break;
-    takeRole(role);
+    takeRoleWithFallback(role);
   }
   // 穴埋め: まだ枠があれば、軽い順・重いローカル上限を尊重して足す
   if (picked.length < Math.min(2, availableLabels.length)) {
