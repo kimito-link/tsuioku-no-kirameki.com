@@ -23,9 +23,15 @@ import { resolveSupportGrowthTileSrc } from './supportGrowthTileSrc.js';
  * @typedef {{
  *   broadcasterUserId?: string,
  *   broadcasterIconUrl?: string,
- *   viewerAvatarUrl?: string
+ *   viewerAvatarUrl?: string,
+ *   viewerUserId?: string
  * }} StoryLaneAvatarSnapshot
  */
+// v0.1.1142(gift-lane-thumb-own-posted-mismatch根治): INV-1のみ意図的に加法拡張。
+//   entry.userId が snapshot.viewerUserId と等値なら own=true(呼び出し側の isOwnPosted が
+//   false でも)。呼び出し側の own-posted 集合(コメント照合)が不完全(ギフトのみ投げてコメント
+//   未投稿等)でも、本人の正当なサムネ解決を誤帰属防止ガードが握り潰さないための最後の砦。
+//   false→true 方向にしか動かない(加法のみ)ので、viewerUserId 未注入の既存呼び出しは挙動不変。
 
 /**
  * @param {{ userId?: unknown, avatarUrl?: unknown }|null|undefined} entry
@@ -41,11 +47,13 @@ import { resolveSupportGrowthTileSrc } from './supportGrowthTileSrc.js';
  */
 export function resolveStoryLaneAvatarSrc(entry, ctx) {
   const snap = ctx?.snapshot;
-  const own = ctx?.isOwnPosted === true;
-  const guardedRememberedSource = String(ctx?.rememberedAvatar ?? '').trim();
   const bc = String(snap?.broadcasterUserId || '').trim();
   const broadcasterIconUrl = String(snap?.broadcasterIconUrl || '').trim();
   const entUid = String(entry?.userId || '').trim();
+  const viewerUid = String(snap?.viewerUserId || '').trim();
+  const own =
+    ctx?.isOwnPosted === true || Boolean(viewerUid && entUid && entUid === viewerUid);
+  const guardedRememberedSource = String(ctx?.rememberedAvatar ?? '').trim();
   const avatarUrl = String(entry?.avatarUrl || '').trim();
   const viewerAvatarUrl = String(snap?.viewerAvatarUrl || '').trim();
   const mistakenBroadcaster =
