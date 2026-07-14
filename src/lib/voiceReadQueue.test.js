@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   computeVoiceCongestion,
   computeVoiceE2eAverage,
+  computeVoicePlaybackRate,
   computeVoiceQueueSpeedBoost,
   isVoicePrefetchUsable,
   mergeRepeatedVoiceItem,
@@ -330,5 +331,35 @@ describe('computeVoiceQueueSpeedBoost', () => {
     expect(computeVoiceQueueSpeedBoost(-10)).toBe(0);
     expect(computeVoiceQueueSpeedBoost('invalid')).toBe(0);
     expect(computeVoiceQueueSpeedBoost(Infinity)).toBe(0);
+  });
+});
+
+describe('computeVoicePlaybackRate（voice-tempo-realtime-SYNTHESIS §3 Phase 2: 再生時レート補正）', () => {
+  it('合成時と同じ混雑度なら等速(1.0)', () => {
+    expect(computeVoicePlaybackRate(0.3, 0.3)).toBe(1.0);
+    expect(computeVoicePlaybackRate(0, 0)).toBe(1.0);
+  });
+
+  it('合成時より今の方が混雑していれば加速する((1+boostNow)/(1+boostAtSynth))', () => {
+    // 合成時0(平時)→再生時0.8(8件以上)なら 1.8/1.0 = 1.8 だが上限1.35でclampされる
+    expect(computeVoicePlaybackRate(0, 0.8)).toBe(1.35);
+    // 合成時0.15→再生時0.5: 1.5/1.15 ≈ 1.3043...
+    expect(computeVoicePlaybackRate(0.15, 0.5)).toBeCloseTo(1.3043, 4);
+  });
+
+  it('合成時より今の方が空いていても減速しない(下限1.0でclamp・間延び退行を防ぐ)', () => {
+    // 合成時0.8(詰まっていた)→再生時0(今は空いた): 1.0/1.8 ≈ 0.556 だが下限1.0でclamp
+    expect(computeVoicePlaybackRate(0.8, 0)).toBe(1.0);
+  });
+
+  it('上限は1.35を超えない(聴感限界のclamp)', () => {
+    expect(computeVoicePlaybackRate(0, 0.8)).toBeLessThanOrEqual(1.35);
+    expect(computeVoicePlaybackRate(-1, 5)).toBeLessThanOrEqual(1.35);
+  });
+
+  it('不正値は等速(1.0)にフォールバックする(壊れず沈黙にしない)', () => {
+    expect(computeVoicePlaybackRate(NaN, 0.5)).toBe(1.0);
+    expect(computeVoicePlaybackRate(0.5, NaN)).toBe(1.0);
+    expect(computeVoicePlaybackRate(undefined, undefined)).toBe(1.0);
   });
 });

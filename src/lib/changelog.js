@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1144',
+    date: '2026-07-14',
+    summary: 'コメントが多いときの読み上げのテンポを改善',
+    items: Object.freeze([
+      '会場の読み上げで、コメントが混雑してきた瞬間に声だけゆっくりのまま残ってしまい、テンポが遅れて感じる不具合を改善しました。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1143',
     date: '2026-07-14',
     summary: '状態速報が大規模配信時に固まる不具合を修正',
