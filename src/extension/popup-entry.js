@@ -929,6 +929,9 @@ const TOOLBAR_POPUP = _inlineFlags.toolbar;
 const INLINE_EMBED_WATCH = _inlineFlags.embedWatch;
 const INLINE_SIDE_PANEL = _inlineFlags.sidePanel;
 const INLINE_PASSIVE = _inlineFlags.passive;
+// 2026-07-14(会場モード改修 Patch 2): INLINE応援レーンの表示上限(v0.1.1051以前の48へ差し戻し)。
+//   publishLaneMirror()の鏡capも必ず同じ値に追随させること(limitと鏡capの分離はv0.1.1052の実績地雷)。
+const STORY_USER_LANE_INLINE_LIMIT = 48;
 // 2026-06-23: 応援ライブビュー専用タブに popup を全面 iframe 埋め込みするモード(dock=liveview)。
 //   挙動は INLINE_PASSIVE(受動ビュー)に集約済み=ここでは将来の全画面 CSS フック用のクラス付けにだけ使う。
 const INLINE_EMBED_LIVEVIEW = _inlineFlags.embedLiveView;
@@ -6570,10 +6573,11 @@ function renderStoryUserLane() {
     return;
   }
 
-  // v0.1.1051 Step C(全員表示 Phase1): 48→200へ引き上げ(HANDOFF-show-all-participants.md)。
-  //   候補組み立ては limit と無関係に既に全件走査(このファイル内 bucketStoryUserLanePicks 手前まで)、
-  //   diff-skip も件数と無関係に効くため、200 化で churn/重さは増えない設計(Fable裏取り済み)。
-  const limit = INLINE_MODE ? 200 : 24;
+  // 2026-07-14(会場モード改修 Patch 2): 200→48へ差し戻し(v0.1.1051以前の値)。
+  //   Patch 1で「会場=①の完成済み5段のみ描く(独自の受け皿は持たない)」に確定したため、上限自体を48へ戻す。
+  //   STORY_USER_LANE_INLINE_LIMIT と publishLaneMirror() の鏡 cap は必ずセットで変更すること
+  //   (v0.1.1052で limit と鏡 cap の分離が①211≠③99の不一致を起こした実績地雷)。
+  const limit = INLINE_MODE ? STORY_USER_LANE_INLINE_LIMIT : 24;
   const seen = new Set();
   const liveId = String(STORY_SOURCE_STATE.liveId || '');
   const laneScheme = getStoryColorScheme();
@@ -6773,9 +6777,9 @@ function renderStoryUserLane() {
   }
 
   const laneDisplayedTotal = picked.length + buckets.gift.length + buckets.ad.length;
-  // 2026-06-22(council/lane-show-all-active) → v0.1.1051 Step Cで limit 48→200 に更新。
-  //   素性が取れた候補総数(cap 前)を渡し、limit 200 で切られたぶんを「ほか M人は会場モードで
-  //   全員見られます」と誠実に併記する(黙って切らない)。
+  // 2026-07-14(会場モード改修 Patch 2): limit を48へ差し戻し。
+  //   素性が取れた候補総数(cap 前)を渡し、limit で切られたぶんは「いま N件を表示中(ほか M人・
+  //   直近アクティブ順)」と誠実に併記する(Patch 1でフッター文言を全員表示前提から差し替え済み・黙って切らない)。
   paintStoryUserLaneDomFilled(els, faces, buckets, laneDisplayedTotal, laneDomIo, {
     totalCandidates: candidates.length
   });
@@ -7268,10 +7272,10 @@ function publishLaneMirror(input) {
   if (INLINE_PASSIVE) return; // 受動ビュー: 鏡を上書きしない
   try {
     const now = Date.now();
-    // v0.1.1052 Step C追補: popup表示limitを48→200に上げたのに鏡capが48のままだと
-    //   ①POP≠③WEB鏡のパリティ不一致になる(実機で担張211≠鏡99を確認)。鏡capもlimitに合わせる。
+    // 2026-07-14(会場モード改修 Patch 2): 鏡capもSTORY_USER_LANE_INLINE_LIMITへ追随(48)。
+    //   limitと鏡capを分離すると①POP≠③WEB鏡のパリティ不一致になる(v0.1.1052で実際に211≠99を確認)。
     //   容量超過時はlaneMirror.js側の自衛(512KB超でcap半減・最大2回)が引き続き効く。
-    const snap = buildLaneMirrorSnapshot(input, { cap: 200, nowMs: now });
+    const snap = buildLaneMirrorSnapshot(input, { cap: STORY_USER_LANE_INLINE_LIMIT, nowMs: now });
     mergeAndScheduleFlush('lane', snap, snap && snap.liveId, now);
   } catch {
     /* no-op */
