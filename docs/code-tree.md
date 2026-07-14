@@ -530,7 +530,7 @@
   - `gift-impact.mp3`
   - `gift-sparkle.mp3`
   - `gift-whoosh.mp3`
-- 📁 **src/** (1401)
+- 📁 **src/** (1402)
   - 📁 **data/** (6)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -797,7 +797,7 @@
         - `logo_funlink_white_RGB_maru_black.png`
       - `logo_guide_funlink_ol.pdf`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1184)
+  - 📁 **lib/** (1185)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -1465,6 +1465,7 @@
     - `nlMainScrollReveal.test.js`
     - `nlsInterceptAuth.js` — v0.1.234: page-intercept (MAIN world) → content-entry (ISOLATED world) 経路の
     - `nlsInterceptAuth.test.js`
+    - `noLobbyString.test.js`
     - `northStarAcquisitionGauge.js` — 北極星レーン左ガジェット「取得率」メーター用の純関数。
     - `northStarAcquisitionGauge.test.js`
     - `northStarCharaTrioConfig.js` — 北極星 3 キャラ trio（りんく / こん太 / たぬ姉）の slot 構成と tier 連動 src 解決。

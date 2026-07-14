@@ -346,11 +346,18 @@
         overflow-x: hidden;
         overflow-y: auto;
         -webkit-overflow-scrolling: touch;
-        /* グリッド列幅の振れ抑制はメイン列側の gutter に寄せる */
+        /* グリッド列幅の振れ抑制はメイン列側の gutter に寄せる(スクロールバー非表示化後も維持) */
         scrollbar-gutter: stable;
         border: none;
         outline: none;
         box-shadow: none;
+        /* 2026-07-14(venue-lobby-removal Patch 3): レーン内スクロール撤去に伴い、
+         * 縦スクロールは .nl-main 一本化。バーは非表示にしつつ操作自体は維持する。 */
+        scrollbar-width: none;
+      }
+
+      html.nl-inline body .nl-main::-webkit-scrollbar {
+        display: none;
       }
 
       /* フォーカスが内側にあっても「大きな枠」だけ消す（各コントロールの :focus-visible は維持） */
@@ -923,15 +930,6 @@
       .nl-story-userlane-stack .nl-story-userlane-tier-wrap .nl-story-userlane {
         max-height: none;
         overflow-y: visible;
-      }
-
-      /* v0.1.1051 Step C(全員表示 Phase1): limit 48→200 で段が長くなるため、embed_watch(INLINE)は
-       * 会場 seatsHost と同型の縦スクロール枠にする(器の高さだけ違える・描画データ/ロジックは3面同一)。
-       * HANDOFF-show-all-participants.md Phase1。 */
-      html.nl-inline body .nl-story-userlane-stack .nl-story-userlane {
-        max-height: 40vh;
-        overflow-y: auto;
-        -webkit-overflow-scrolling: touch;
       }
 
       /* 識別色はラッパー背景・外枠のみ（既定のリンクゆっくり画像の見え方は変えない） */

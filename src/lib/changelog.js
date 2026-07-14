@@ -26,6 +26,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1139',
+    date: '2026-07-14',
+    summary: '応援レーンの表示上限を差し戻し、二重スクロールを解消',
+    items: Object.freeze([
+      '応援レーンの表示件数の上限を元(48件)に戻しました。',
+      '応援レーン内の縦スクロールを解消し、ポップアップ全体のスクロールに一本化しました。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1138',
     date: '2026-07-14',
     summary: 'ロビーを廃止し会場を①と同じ顔ぶれだけに',
