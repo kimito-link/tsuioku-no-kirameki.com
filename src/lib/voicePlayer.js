@@ -5,6 +5,7 @@ import { isVoiceItemStale } from './voiceAgeGate.js';
 import {
   computeVoiceCongestion,
   computeVoiceE2eAverage,
+  computeVoicePlaybackRate,
   mergeRepeatedVoiceItem,
   pushVoiceQueue,
   resolveVoiceSynthDepth
@@ -219,7 +220,10 @@ export class VoicePlayer {
         speedOffset: assigned.speedOffset + congestion.speedBoost
       }
     ).catch(() => null);
-    this.prefetches.set(item, { generation, promise });
+    // v0.1.1089(voice-tempo-realtime-SYNTHESIS §3 Phase 2): 合成起動時点のspeedBoostを保存する。
+    //   このWAVは既にこの速度で焼き固まっているため、再生直前に「今」の混雑度と比較して
+    //   playbackRateで追いつかせる(合成のやり直しなし=ゼロコスト)。
+    this.prefetches.set(item, { generation, promise, boostAtSynth: congestion.speedBoost });
     return promise;
   }
 
@@ -312,6 +316,9 @@ export class VoicePlayer {
         // 先頭は _startPrefetch で必ず先読み起動済み(深さ>=1)。その in-flight を再利用する。
         const pf = this.prefetches.get(item);
         this.prefetches.delete(item);
+        // v0.1.1089(Phase 2): 先読み済みWAVは pf.boostAtSynth の速度で焼き固まっている。
+        //   先読み無し(その場で合成)なら今の congestion.speedBoost がそのまま合成速度=補正不要(等速)。
+        const boostAtSynth = pf ? pf.boostAtSynth : congestion.speedBoost;
         const _synthStart = Date.now(); // v0.1.1065計器: 合成待ち(先読み済ならほぼ0)。
         const wav = pf
           ? await pf.promise
@@ -340,7 +347,16 @@ export class VoicePlayer {
           objectUrl = this.createObjectURL(blob);
           const AudioCtor = this.audioConstructor;
           const audio = new AudioCtor(objectUrl);
-          
+          // v0.1.1089(voice-tempo-realtime-SYNTHESIS §3 Phase 2): 再生直前の「今」の混雑度と
+          //   合成時点の混雑度を比べ、今の方が詰まっていれば playbackRate で追いつかせる
+          //   (合成やり直しなし=ゼロコスト・上げるだけ=間延び退行なし)。
+          const boostNow = computeVoiceCongestion(this.queue.length).speedBoost;
+          const playbackRate = computeVoicePlaybackRate(boostAtSynth, boostNow);
+          if (playbackRate !== 1.0) {
+            audio.preservesPitch = true;
+            audio.playbackRate = playbackRate;
+          }
+
           await new Promise((resolve) => {
             let settled = false;
             // v0.1.1065: 再生watchdog(comeview v0.1.883の移植)。'ended'/'error'が一度も来ない
