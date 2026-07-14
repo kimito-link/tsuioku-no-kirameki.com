@@ -90,6 +90,18 @@ export function buildStatusFastDiagLite(payload) {
   const venueSeatsDiag = content.venueSeatsDiag && typeof content.venueSeatsDiag === 'object'
     ? content.venueSeatsDiag
     : null;
+  // 2026-07-14(診断強化Patch4): 「おすすめユーザー」除外の実績+除外機構の生存canary。
+  //   状態速報の harvest-exclusion セルがこれを読む=liteに無いと印字の穴になる([[fastdiag-lite-is-the-printer-subset]])。
+  const giftCommentScanProbe = gift.giftCommentDiag?.scanProbe && typeof gift.giftCommentDiag.scanProbe === 'object'
+    ? gift.giftCommentDiag.scanProbe
+    : null;
+  const harvestExclusionLite = giftCommentScanProbe
+    ? {
+        excludedUserRec: Number(giftCommentScanProbe.excludedUserRec) || 0,
+        excludedByClass: Number(giftCommentScanProbe.excludedByClass) || 0,
+        excludedByHref: Number(giftCommentScanProbe.excludedByHref) || 0
+      }
+    : null;
   const sdm = venueSeatsDiag && venueSeatsDiag.storyDiagMirror && typeof venueSeatsDiag.storyDiagMirror === 'object'
     ? venueSeatsDiag.storyDiagMirror
     : null;
@@ -106,6 +118,7 @@ export function buildStatusFastDiagLite(payload) {
   // ★読み取りパスを full と同形に保つ(status の consumer を書き換えないため):
   //   lite.content.giftDiagnostics['北極星レーン']
   //   lite.content.giftDiagnostics.commentObservability.savedCommentsUidStats.withUidPercent
+  //   lite.content.giftDiagnostics.giftCommentDiag.scanProbe(2026-07-14: harvest-exclusion canary)
   //   lite.content.networkErrorProbe.ndgrConnectStatus
   //   lite.content.hostMoveDiag / lite.content.scrollWhiteoutDiag
   return {
@@ -115,7 +128,8 @@ export function buildStatusFastDiagLite(payload) {
         '北極星レーン': gift['北極星レーン'] ?? null,
         commentObservability: {
           savedCommentsUidStats: { withUidPercent, commentNoLess, commentNoLessPercent, totalSaved }
-        }
+        },
+        giftCommentDiag: harvestExclusionLite ? { scanProbe: harvestExclusionLite } : null
       },
       networkErrorProbe: {
         ndgrConnectStatus: String(net.ndgrConnectStatus || '')

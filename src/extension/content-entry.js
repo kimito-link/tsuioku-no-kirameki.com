@@ -501,6 +501,7 @@ import { migrateSuggestInitialInlinePanelPlacementOnce } from '../lib/migrateSug
 import { createPersistCoalescer } from '../lib/persistThrottle.js';
 import { computeLivePersistIntervalMs } from '../lib/livePersistInterval.js';
 import { isInsideRecommendedLiveSection } from '../lib/isInsideRecommendedLiveSection.js';
+import { recommendedUserSectionHitKind } from '../lib/isInsideRecommendedUserSection.js';
 import { resolveUserEntryAvatarSignals } from '../lib/userEntryAvatarResolve.js';
 import { recordDiagnosticException } from '../lib/diagnosticRingStore.js';
 import { isPersistableHarvestedCommentRow } from '../lib/persistableCommentRow.js';
@@ -1407,7 +1408,10 @@ function harvestGiftCommentsFromCommentTableDom() {
    *   iframeCount: number,
    *   sampleClasses: string[],
    *   commentTypeValues: string[],
-   *   giftRowSamples: string[]
+   *   giftRowSamples: string[],
+   *   excludedUserRec: number,
+   *   excludedByClass: number,
+   *   excludedByHref: number
    * }} */
   const probe = {
     tableRowCount: 0,
@@ -1417,7 +1421,13 @@ function harvestGiftCommentsFromCommentTableDom() {
     iframeCount: 0,
     sampleClasses: [],
     commentTypeValues: [],
-    giftRowSamples: []
+    giftRowSamples: [],
+    // 2026-07-14(診断強化Patch4): 「おすすめユーザー」除外の実績+除外機構自体の生存canary。
+    //   excludedByHref>0 かつ excludedByClass===0 が続く場合、ニコニコ側のCSS Modulesハッシュ
+    //   変更でclass検出だけが死んでいる確定的な証拠(hrefのref=マーカはハッシュ非依存で生存)。
+    excludedUserRec: 0,
+    excludedByClass: 0,
+    excludedByHref: 0
   };
 
   try {
@@ -1454,6 +1464,16 @@ function harvestGiftCommentsFromCommentTableDom() {
     for (const row of giftRows) {
       if (!(row instanceof HTMLElement)) continue;
       if (isInsideRecommendedLiveSection(row)) continue;
+      // 2026-07-14(診断強化Patch4): このgiftスキャンだけ isInsideRecommendedUserSection の
+      //   呼び出しが漏れていた(主要harvestパスのnicoliveDom.jsは両方通していた)。
+      //   「おすすめユーザー」欄の人物がコメント投稿ユーザーとして誤混入するのを防ぐ。
+      const hitKind = recommendedUserSectionHitKind(row);
+      if (hitKind) {
+        probe.excludedUserRec += 1;
+        if (hitKind === 'class') probe.excludedByClass += 1;
+        else if (hitKind === 'href') probe.excludedByHref += 1;
+        continue;
+      }
       const textEl = row.querySelector('.comment-text');
       const trimmed = (textEl?.textContent || '').trim();
       if (sampled < 3 && trimmed) {
@@ -6429,7 +6449,11 @@ function buildGiftDiagnosticsBundle() {
           parsedCount: snap.parsedCount,
           sampleClasses: snap.sampleClasses,
           commentTypeValues: snap.commentTypeValues,
-          giftRowSamples: snap.giftRowSamples
+          giftRowSamples: snap.giftRowSamples,
+          // 2026-07-14(診断強化Patch4): 「おすすめユーザー」除外の実績+除外機構の生存canary。
+          excludedUserRec: snap.excludedUserRec,
+          excludedByClass: snap.excludedByClass,
+          excludedByHref: snap.excludedByHref
         };
       })();
       return {

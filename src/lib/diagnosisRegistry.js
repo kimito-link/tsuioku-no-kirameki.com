@@ -52,6 +52,7 @@ export const DIAGNOSIS_REGISTRY = Object.freeze([
   reg('stale', '多タブ名残', 'render', 1, false),
   reg('console', 'エラー', 'render', 1, false),
   reg('scroll-whiteout', 'スクロール白化', 'render', 1, false),
+  reg('harvest-exclusion', 'おすすめ除外の生存', 'render', 1, false),
   // ④ 外部値レーン(北極星6レーン + アバター + 応援レーン人数)。
   reg('ns-contrib', 'ギフト貢献度', 'northstar', 1, false),
   reg('ns-ad', '広告ランキング', 'northstar', 1, false),

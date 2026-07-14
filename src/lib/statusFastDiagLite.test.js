@@ -15,7 +15,17 @@ function makeFullPayload() {
           ndgrMessageIdDedupe: { accepted: 398, droppedDuplicate: 54 }
         },
         // status が読まない巨大フィールド群(lite からは消えるべき)。
-        giftSubAppRelayDiag: { heartbeatsByFrameUrl: { a: { lastDomShape: { txtLen: 41242 } } } }
+        giftSubAppRelayDiag: { heartbeatsByFrameUrl: { a: { lastDomShape: { txtLen: 41242 } } } },
+        // 2026-07-14(診断強化Patch4): harvest-exclusion canary(class/href二重検出)。
+        giftCommentDiag: {
+          scanProbe: {
+            excludedUserRec: 3,
+            excludedByClass: 3,
+            excludedByHref: 0,
+            giftRowCount: 12,
+            giftRowSamples: ['x']
+          }
+        }
       },
       networkErrorProbe: { ndgrConnectStatus: 'connected', ndgrReconnectCount: 0 },
       // v0.1.1125: ちかちか調査の計器2つ(lite に通らないと状態速報のコピペで読めない)。
@@ -84,6 +94,22 @@ describe('buildStatusFastDiagLite', () => {
     expect(lite.content.ndgrUnknownSamples).toBeUndefined();
     expect(lite.content.eventDomBundleSummary).toBeUndefined();
     expect(lite.content.longTasks).toBeUndefined();
+  });
+
+  it('2026-07-14: giftCommentDiag.scanProbe の除外canary(excludedUserRec/ByClass/ByHref)を同形パスで通す', () => {
+    const lite = buildStatusFastDiagLite(makeFullPayload());
+    expect(lite.content.giftDiagnostics.giftCommentDiag.scanProbe).toEqual({
+      excludedUserRec: 3,
+      excludedByClass: 3,
+      excludedByHref: 0
+    });
+    // giftRowCount/giftRowSamples等の巨大フィールドはliteに含めない(肥大防止)。
+    expect(lite.content.giftDiagnostics.giftCommentDiag.scanProbe.giftRowSamples).toBeUndefined();
+  });
+
+  it('scanProbeが無ければgiftCommentDiagはnull(死に表示にしない)', () => {
+    const lite = buildStatusFastDiagLite({ content: { giftDiagnostics: {} } });
+    expect(lite.content.giftDiagnostics.giftCommentDiag).toBeNull();
   });
 
   it('lite は full より大幅に小さい(JSON サイズで確認)', () => {
