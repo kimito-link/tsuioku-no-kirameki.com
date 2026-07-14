@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1143',
+    date: '2026-07-14',
+    summary: '状態速報が大規模配信時に固まる不具合を修正',
+    items: Object.freeze([
+      '多数の配信を同時記録している場合に、状態速報ページが長時間固まって開けなくなることがある不具合を修正しました。混雑時は古い値を正直に表示して自動で回復します。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1142',
     date: '2026-07-14',
     summary: 'ギフト列で自分のサムネが表示されない不具合を修正',
