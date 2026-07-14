@@ -4333,7 +4333,15 @@ export function mountVenueBarButton(options = {}) {
         //   (revision/contentHash)と会場が実際にpaintした段(laneBuckets)を突合する。venueLaneParity
         //   の厳密突合(上)とは独立した軽量な代理指標なので、判定に失敗しても laneParityDiag には影響しない。
         if (lanePaintSnap) {
-          const popEnvelope = buildSceneEnvelope(lanePaintSnap);
+          // 会場一致gift/ad根治(2026-07-14 Patch 2a): ①Receiptのhashは「会場が実際に受け取り
+          //   描く中身=復元正準形」で取る。displaySrc空+uid有りのスリムセル(laneMirror.js
+          //   toMirrorCellのPatch1でcapされなくなった)はrestoreLaneMirrorBuckets(B-1)で
+          //   identiconに復元されるため、snapshot生値のまま署名すると会場が正しく描いても
+          //   ①=会場のhashが恒常的に不一致(偽🔴)になる。
+          const popEnvelope = buildSceneEnvelope({
+            capturedAt: lanePaintSnap.capturedAt,
+            ...restoreLaneMirrorBuckets(lanePaintSnap)
+          });
           const popReceipt = buildRenderReceipt({
             surface: 'pop',
             revision: popEnvelope.revision,

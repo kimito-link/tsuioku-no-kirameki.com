@@ -240,7 +240,10 @@ describe('会場=①レーン鏡映の配線(配線忘れ=CI赤)', () => {
     expect(venueBarSrc).toMatch(
       /import\s*\{\s*buildSceneEnvelope,\s*buildRenderReceipt,\s*compareRenderReceipts\s*\}\s*from\s*'\.\.\/lib\/laneSceneEnvelope\.js'/
     );
-    expect(venueBarSrc).toMatch(/buildSceneEnvelope\(lanePaintSnap\)/);
+    // 会場一致gift/ad根治(2026-07-14 Patch 2a): ①Receiptのhashは復元正準形(restoreLaneMirrorBuckets
+    //   適用後)で取る。snapshot生値のまま署名するとスリムセル(displaySrc空+uid有り)が鏡に載る
+    //   ようになった(laneMirror.js toMirrorCell Patch1)ことで①=会場のhashが恒常的に不一致になるため。
+    expect(venueBarSrc).toMatch(/buildSceneEnvelope\(\{\s*capturedAt:\s*lanePaintSnap\.capturedAt,\s*\.\.\.restoreLaneMirrorBuckets\(lanePaintSnap\)\s*\}\)/);
     expect(venueBarSrc).toMatch(/buildSceneEnvelope\(\/\*\* @type \{any\} \*\/ \(laneBuckets\)\)/);
     expect(venueBarSrc).toMatch(/sceneReceiptDiag = compareRenderReceipts\(/);
     expect(venueBarSrc).toMatch(/sceneReceipt:\s*sceneReceiptDiag/);
