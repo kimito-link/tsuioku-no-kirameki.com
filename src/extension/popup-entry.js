@@ -7584,8 +7584,14 @@ function buildStoryGiftThrowerLanePicks(giftUsers, liveId, storageCtx, limit) {
     const g = laneEntries[i];
     const uidRaw = String(g.userId || '').trim();
     if (!uidRaw) continue;
-    if (!broadcasterUid && /^\d{5,14}$/.test(uidRaw)) continue;
-    const ownPostedForUid = giftOwnPostedUidSet.has(uidRaw);
+    // 2026-07-14(gift-lane-thumb-own-posted-mismatch根治): 視聴者本人はUID直接比較でown確定。
+    //   giftOwnPostedUidSetは通常コメント(nls_comments)由来なので「ギフトだけ投げてコメント
+    //   未投稿」の本人が落ち、後段の誤帰属防止ガード(resolveStoryLaneAvatarSrc)が本人の正当な
+    //   サムネ解決まで潰していた。UID等値は集合の完全性に依存しないground truth(①のlink段
+    //   6633行と同じ本人免除の思想)。
+    const ownPostedForUid =
+      giftOwnPostedUidSet.has(uidRaw) || (Boolean(viewerUid) && uidRaw === viewerUid);
+    if (!broadcasterUid && !ownPostedForUid && /^\d{5,14}$/.test(uidRaw)) continue;
     if (
       shouldSkipStoryUserLaneCandidateByContamination({
         candidateUserId: uidRaw,

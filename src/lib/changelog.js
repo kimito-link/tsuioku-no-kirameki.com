@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1142',
+    date: '2026-07-14',
+    summary: 'ギフト列で自分のサムネが表示されない不具合を修正',
+    items: Object.freeze([
+      '応援レーンの「ギフト列」で、コメントを投稿していない状態でギフトだけ投げた場合に自分自身のサムネイルが表示されない不具合を修正しました。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1141',
     date: '2026-07-14',
     summary: '会場のギフト・広告レーンの表示欠けを修正',
