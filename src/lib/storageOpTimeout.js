@@ -47,3 +47,31 @@ export async function runStorageOpWithTimeout(
     if (timer != null) clearTimeout(timer);
   }
 }
+
+/**
+ * 2026-07-14 診断ページ608秒固まり根治: runStorageOpWithTimeout は timeout しても opFn 自体を
+ *   止められず(chrome.storage に abort API が無い)、しかも負けた側の promise を呼び出し側が
+ *   観測できない=幽霊 read の settle を誰も収穫できなかった。本関数は race(有界化された結果)と
+ *   op(生の opFn promise)を両方返し、「timeout で見切る」と「遅延 settle を後から収穫する」を両立する。
+ * @template T
+ * @param {() => Promise<T>} opFn
+ * @param {number} timeoutMs 0以下/非有限なら無制限(race===op)
+ * @param {symbol} [sentinel]
+ * @returns {{ race: Promise<T>, op: Promise<T> }}
+ */
+export function startStorageOpWithTimeout(opFn, timeoutMs, sentinel = STORAGE_OP_TIMED_OUT) {
+  const op = Promise.resolve().then(() => opFn());
+  const ms = Number(timeoutMs);
+  if (!Number.isFinite(ms) || ms <= 0) return { race: op, op };
+  /** @type {ReturnType<typeof setTimeout>|null} */
+  let timer = null;
+  const race = Promise.race([
+    op,
+    new Promise((_resolve, reject) => {
+      timer = setTimeout(() => reject(sentinel), ms);
+    })
+  ]).finally(() => {
+    if (timer != null) clearTimeout(timer);
+  });
+  return { race, op };
+}
