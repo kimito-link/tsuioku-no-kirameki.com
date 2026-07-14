@@ -77,11 +77,29 @@ export function formatRefreshPerfLine(refreshPerf) {
 }
 
 /**
+ * 2026-07-14: renderAll 内のセクション別所要(計器)を1行に整形する純関数。
+ *   診断ページ軽量化(lazy details 化)の対象を推測でなく実測で決めるための材料。材料が無ければ ''。
+ * @param {Array<[string, number]>|null|undefined} renderSectionMs
+ * @returns {string}
+ */
+export function formatRenderSectionMsLine(renderSectionMs) {
+  const sections = Array.isArray(renderSectionMs) ? renderSectionMs.slice() : [];
+  sections.sort((a, b) => (Number(b?.[1]) || 0) - (Number(a?.[1]) || 0));
+  const top = sections
+    .filter((s) => (Number(s?.[1]) || 0) > 0)
+    .slice(0, 5)
+    .map((s) => `${s[0]} ${s[1]}ms`)
+    .join(' / ');
+  if (!top) return '';
+  return `renderAll内訳(重い順・上位5): ${top}`;
+}
+
+/**
  * 状態速報(AI共有)の本文を組み立てる。status-entry.js から挙動同値で切り出し。
  * @param {any} args
  * @returns {string}
  */
-export function buildAiShareFullText({ overviewText, livesData, fastDiag, popupDiag, voiceDiag, venueSeatsDiag, laneDiag, laneMirror, reportPreview, trendFindings, jsonBlob, currentLiveId, publishKeys, publishOutcomeRec, previewRenderAck, refreshPerf, giftEffectDiag, milestoneEffectDiag, customSoundDiag, voiceEffectDiag, bgmPhaseDiag, opSoundEffectDiag, commentPostDiag, instantPushDiag, channelSwitchDiag, highlightLedger }) {
+export function buildAiShareFullText({ overviewText, livesData, fastDiag, popupDiag, voiceDiag, venueSeatsDiag, laneDiag, laneMirror, reportPreview, trendFindings, jsonBlob, currentLiveId, publishKeys, publishOutcomeRec, previewRenderAck, refreshPerf, renderSectionMs, giftEffectDiag, milestoneEffectDiag, customSoundDiag, voiceEffectDiag, bgmPhaseDiag, opSoundEffectDiag, commentPostDiag, instantPushDiag, channelSwitchDiag, highlightLedger }) {
   const lines = [];
   lines.push('## 君斗りんくの追憶のきらめき 状態速報');
   lines.push(`生成: ${new Date().toISOString()}`);
@@ -90,6 +108,9 @@ export function buildAiShareFullText({ overviewText, livesData, fastDiag, popupD
   //   体感の重さは初期ロード/スクロール側、という切り分けが状態速報1枚で分かる。
   const perfLine = formatRefreshPerfLine(refreshPerf);
   if (perfLine) lines.push(perfLine);
+  // 2026-07-14: 「更新所要(計器)」のrenderステップだけをさらに分解した内訳(診断ページ軽量化の実測材料)。
+  const sectionMsLine = formatRenderSectionMsLine(renderSectionMs);
+  if (sectionMsLine) lines.push(sectionMsLine);
   // v0.1.1020: 更新所要が重い×②応援プレビューが開いている(ack 新鮮)を突合し「②が重さの原因」を名指しする。
   //   ユーザー実機「応援プレビュー出すとめちゃ重い」への対応=体感でなく状態速報1枚で原因が分かる。
   try {
