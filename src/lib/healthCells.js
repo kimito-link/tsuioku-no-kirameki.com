@@ -299,6 +299,21 @@ function buildVenueSeatsHealthCells(venueSeatsDiag, nowMs) {
     }
   }
 
+  // ⑤ 2026-07-15 診断先行(venue-yukkuri-named-diagnose): 「名前ありゆっくり顔」実害計器。
+  //   真因(桁レンジ境界)は意図的仕様のため修正しない。実害の有無だけを可視化する(赤にしない=warn止め)。
+  const yn = /** @type {any} */ (snap).yukkuriNamedCensus;
+  if (yn && typeof yn === 'object' && num(yn.checked) > 0) {
+    const yukkuriNamed = Math.max(0, Math.floor(num(yn.yukkuriNamed) || 0));
+    out.push(
+      stateCell(
+        'venue-yukkuri-face',
+        '名前ありゆっくり顔',
+        yukkuriNamed > 0 ? 'warn' : 'ok',
+        yukkuriNamed > 0 ? `${yukkuriNamed}件` : 'なし'
+      )
+    );
+  }
+
   return out;
 }
 

@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1148',
+    date: '2026-07-15',
+    summary: '会場の「名前ありゆっくり顔」の原因を見つけやすくする診断を追加',
+    items: Object.freeze([
+      '会場モードで、名前が表示されているのにアバターがゆっくり顔になることがある不具合の原因を切り分けるための診断項目を追加しました（表示・動作の変更はありません）。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1144',
     date: '2026-07-14',
     summary: 'コメントが多いときの読み上げのテンポを改善',

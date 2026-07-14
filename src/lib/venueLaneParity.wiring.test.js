@@ -264,4 +264,21 @@ describe('会場=①レーン鏡映の配線(配線忘れ=CI赤)', () => {
     expect(laneSceneEnvelopeSrc).toMatch(/export function buildRenderReceipt\(/);
     expect(laneSceneEnvelopeSrc).toMatch(/export function compareRenderReceipts\(/);
   });
+
+  // --- 2026-07-15 診断先行(venue-yukkuri-named-diagnose): 「名前ありゆっくり顔」計器の配線 ---
+  it('venueBar が名前ありゆっくり顔計器(observeVenueYukkuriNamedTile)を毎席観測している', () => {
+    expect(venueBarSrc).toMatch(
+      /import\s*\{\s*createVenueYukkuriNamedCensusState,\s*observeVenueYukkuriNamedTile,\s*toVenueYukkuriNamedCensusDiag\s*\}\s*from\s*'\.\.\/lib\/venueYukkuriNamedCensus\.js'/
+    );
+    expect(venueBarSrc).toMatch(/observeVenueYukkuriNamedTile\(_yukkuriNamedCensus,/);
+    expect(venueBarSrc).toMatch(/yukkuriNamedCensus:\s*toVenueYukkuriNamedCensusDiag\(_yukkuriNamedCensus\)/);
+  });
+
+  it('venueSeatsDiag が yukkuriNamedCensus を通す(whitelist落ち防止)', () => {
+    expect(seatsDiagSrc).toMatch(/yukkuriNamedCensus/);
+  });
+
+  it('aiShareFullText が yukkuriNamedCensus.line を状態速報に出している', () => {
+    expect(aiShareSrc).toMatch(/venueSeatsDiag\)\?\.yukkuriNamedCensus\?\.line/);
+  });
 });
