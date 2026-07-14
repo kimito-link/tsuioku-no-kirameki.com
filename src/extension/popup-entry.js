@@ -752,6 +752,13 @@ import {
   createMonotonicCommentCountState,
   resolveMonotonicCommentCount
 } from '../lib/monotonicCommentCount.js';
+// 2026-07-14 診断カウンタchurn根治(diagnostic-architecture-strengthen-DESIGN.md C-3): arr の非同期
+//   再構築途中を paint が観測するとtotal/withUid/selfSavedが一時的に減って見える。単調化して防ぐ。
+import {
+  createStoryDiagMonotonicState,
+  applyStoryDiagMonotonic,
+  forgetStoryDiagMonotonicForLive
+} from '../lib/storyDiagMonotonic.js';
 import { buildOwnPostedUserIdSet } from '../lib/ownPostedUserIdSet.js';
 import { appendViewerSelfLaneAggregate } from '../lib/viewerSelfLaneAggregate.js';
 import {
@@ -1126,6 +1133,9 @@ let _prevSupportCount = /** @type {number|null} */ (null);
 //   4 経路(panel即時 / panel軽量 / 公式統計 / メイン全件)が別タイミングの生値で
 //   setCountDisplay を呼び合うため数値がズレ・前後していた。最大値=正本で収束させる。
 const _monotonicCommentCountState = createMonotonicCommentCountState();
+
+// 2026-07-14: STORY_AVATAR_DIAG_STATE の total/withUid/selfSaved を同一 lv 内で単調化するゲート。
+const _storyDiagMonotonicState = createStoryDiagMonotonicState();
 
 /** @type {number|null} */
 let _prevMilestoneCommentHighWater = null;
@@ -1938,6 +1948,8 @@ const _nicknameResolveMap = new Map();
 function resetPerBroadcastPopupCachesIfLiveIdChanged(nextLiveId) {
   const norm = String(nextLiveId || '').trim().toLowerCase();
   if (norm === watchPopupLastPaintedLiveId) return;
+  // 2026-07-14: 本当の配信切替でだけ診断カウンタの単調ゲートを破棄(recording OFF/ONでは保持)。
+  forgetStoryDiagMonotonicForLive(_storyDiagMonotonicState, watchPopupLastPaintedLiveId);
   watchPopupLastPaintedLiveId = norm;
   _panelMetricsAppliedForLv = '';
   _giftHistoryNorthStarPaintKey = '';
@@ -6252,7 +6264,9 @@ const STORY_AVATAR_DIAG_STATE = {
   userLaneTier2: 0,
   userLaneTier1: 0,
   userLaneStrongNick: 0,
-  userLanePersonalThumb: 0
+  userLanePersonalThumb: 0,
+  /** 2026-07-14: total/withUid/selfSavedの単調ゲートが実際に後退をクランプした累積回数(嘘をつかない・C-3) */
+  diagRegressions: 0
 };
 
 /** renderStoryUserLane の見た目が同じなら DOM を付け直さない（高流量時のちらつき抑制） */
@@ -16010,6 +16024,9 @@ async function refresh() {
   }
   STORY_AVATAR_DIAG_STATE.selfShown = countOwnPostedEntries(arr, lv);
   STORY_AVATAR_DIAG_STATE.selfSaved = countSavedOwnPostedEntries(arr);
+  // 2026-07-14: total/withUid/selfSaved を同一lv内で単調化(churn根治・C-3)。
+  Object.assign(STORY_AVATAR_DIAG_STATE, applyStoryDiagMonotonic(_storyDiagMonotonicState, lv, STORY_AVATAR_DIAG_STATE));
+  STORY_AVATAR_DIAG_STATE.diagRegressions = _storyDiagMonotonicState.diagRegressions;
   STORY_AVATAR_DIAG_STATE.selfPending = countPendingSelfPostedRecentsForLive(lv);
   STORY_AVATAR_DIAG_STATE.selfPendingMatched = getOwnPostedMatchedIdSet(arr, lv).size;
   STORY_AVATAR_DIAG_STATE.interceptItems = 0;
@@ -16058,7 +16075,10 @@ async function refresh() {
     syncInterceptMapDiagFromSnapshot(watchSnapshot);
     // total(=arr.length・O(1))は常時表示「記録している応援コメント N 件です」
     //   (storyAvatarDiag の compactLead)が依存するので**必ず更新**=スクロール中も止めない。
-    STORY_AVATAR_DIAG_STATE.total = arr.length;
+    // 2026-07-14: arr非同期再構築途中の一時的な減少を単調化(churn根治・C-3)。withUid/selfSavedは
+    //   下の diagPaintDeferActive ブロックで個別にゲートする。
+    STORY_AVATAR_DIAG_STATE.total = applyStoryDiagMonotonic(_storyDiagMonotonicState, lv, { total: arr.length }).total;
+    STORY_AVATAR_DIAG_STATE.diagRegressions = _storyDiagMonotonicState.diagRegressions;
     // v0.1.639 スクロール根治 PR4: withUid/withAvatar/uniqueAvatar/resolvedAvatar の
     //   全件 O(N) 集計群は、storyAvatarDiag の折りたたみ「内訳・用語(詳しく見る)」内の技術行
     //   (formatStoryAvatarDiagLine)と dev monitor(PR1 でゲート済)でしか読まれない。どちらも
@@ -16090,6 +16110,13 @@ async function refresh() {
       // v0.1.638 PR2 の dead store 削除はそのまま(selfShown は displayEntries 版で上書き)。
       STORY_AVATAR_DIAG_STATE.selfSaved = countSavedOwnPostedEntries(arr);
       STORY_AVATAR_DIAG_STATE.selfPendingMatched = getOwnPostedMatchedIdSet(arr, lv).size;
+      // 2026-07-14: withUid/selfSaved も同じ理由(arr非同期再構築の途中観測)で単調化(churn根治・C-3)。
+      const gatedWS = applyStoryDiagMonotonic(_storyDiagMonotonicState, lv, {
+        withUid: STORY_AVATAR_DIAG_STATE.withUid,
+        selfSaved: STORY_AVATAR_DIAG_STATE.selfSaved
+      });
+      Object.assign(STORY_AVATAR_DIAG_STATE, gatedWS);
+      STORY_AVATAR_DIAG_STATE.diagRegressions = _storyDiagMonotonicState.diagRegressions;
     }
     STORY_AVATAR_DIAG_STATE.selfPending = countPendingSelfPostedRecentsForLive(lv);
     // 0.1.100: 配信者本人の自コメは応援コメでないので display 経路から除外(grid/件数/lane/ticker)。

@@ -33,7 +33,8 @@ import { SUPPORT_VISUAL_DEV_MONITOR_SUMMARY_LABEL } from './supportVisualStoryCo
  *   userLaneTier2?: number,
  *   userLaneTier1?: number,
  *   userLaneStrongNick?: number,
- *   userLanePersonalThumb?: number
+ *   userLanePersonalThumb?: number,
+ *   diagRegressions?: number
  * }} StoryAvatarDiagSnapshot
  */
 
@@ -109,6 +110,13 @@ export function formatStoryAvatarDiagLine(s) {
     const sn = Math.max(0, Math.floor(Number(s.userLaneStrongNick) || 0));
     const th = Math.max(0, Math.floor(Number(s.userLanePersonalThumb) || 0));
     line += ` / レーン候補${ulDed}（り${t3}/こ${t2}/た${t1}・強名${sn}/個サ${th}）`;
+  }
+
+  // 2026-07-14(診断カウンタchurn根治・C-3): 単調ゲートが後退をクランプした累積回数。
+  //   0=このliveでは一度も観測されていない(正常)。1以上=実際にchurnが起きていた証拠。
+  const regressions = Math.max(0, Math.floor(Number(s.diagRegressions) || 0));
+  if (regressions > 0) {
+    line += ` / 表示ゆらぎ補正${regressions}回`;
   }
 
   return line;

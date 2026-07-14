@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1147',
+    date: '2026-07-14',
+    summary: '応援コメントの内訳表示が増減して見える不具合を修正',
+    items: Object.freeze([
+      'ポップアップの「内訳・用語」に表示する件数が、記録中に一時的に減って見えることがある不具合を修正しました（実際の記録は減っていません）。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1144',
     date: '2026-07-14',
     summary: 'コメントが多いときの読み上げのテンポを改善',
