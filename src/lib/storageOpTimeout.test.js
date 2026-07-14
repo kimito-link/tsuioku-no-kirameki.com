@@ -1,7 +1,8 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
   STORAGE_OP_TIMED_OUT,
-  runStorageOpWithTimeout
+  runStorageOpWithTimeout,
+  startStorageOpWithTimeout
 } from './storageOpTimeout.js';
 
 beforeEach(() => {
@@ -62,5 +63,48 @@ describe('runStorageOpWithTimeout', () => {
     );
     await vi.runAllTimersAsync();
     await expect(settled).resolves.toBe(boom);
+  });
+});
+
+describe('startStorageOpWithTimeout（2026-07-14 診断ページ608秒固まり根治: race有界化+op生observable両立）', () => {
+  it('race が sentinel で reject しても op は opFn の解決値へ後から到達できる（幽霊readの観測）', async () => {
+    let resolveOp;
+    const op = vi.fn(() => new Promise((resolve) => { resolveOp = resolve; }));
+    const { race, op: opPromise } = startStorageOpWithTimeout(op, 4000);
+    const raceSettled = race.then(
+      () => 'resolved',
+      (err) => err
+    );
+    await vi.advanceTimersByTimeAsync(4000);
+    await expect(raceSettled).resolves.toBe(STORAGE_OP_TIMED_OUT);
+    // race が timeout した後、opFn が実際に解決すれば op 側はそれを観測できる。
+    resolveOp('late-value');
+    await expect(opPromise).resolves.toBe('late-value');
+  });
+
+  it('timeoutMs<=0 なら race===op（無制限・従来どおり）', async () => {
+    const op = vi.fn().mockResolvedValue('passthrough');
+    const { race, op: opPromise } = startStorageOpWithTimeout(op, 0);
+    expect(race).toBe(opPromise);
+    await expect(race).resolves.toBe('passthrough');
+  });
+
+  it('timeout 前に解決すれば race は解決値を返す（タイマーは finally で破棄）', async () => {
+    const op = vi.fn(
+      () => new Promise((resolve) => { setTimeout(() => resolve('done'), 1000); })
+    );
+    const { race } = startStorageOpWithTimeout(op, 4000);
+    await vi.advanceTimersByTimeAsync(1000);
+    await expect(race).resolves.toBe('done');
+  });
+
+  it('opFn が同期的に throw しても reject に正規化される（race・op 双方）', async () => {
+    const op = vi.fn(() => { throw new Error('sync boom'); });
+    const { race, op: opPromise } = startStorageOpWithTimeout(op, 4000);
+    const raceSettled = race.then(() => 'resolved', (err) => err.message);
+    const opSettled = opPromise.then(() => 'resolved', (err) => err.message);
+    await vi.runAllTimersAsync();
+    await expect(raceSettled).resolves.toBe('sync boom');
+    await expect(opSettled).resolves.toBe('sync boom');
   });
 });

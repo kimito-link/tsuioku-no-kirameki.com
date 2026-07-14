@@ -212,7 +212,7 @@ import { runStorageOpWithTimeout, STORAGE_OP_TIMED_OUT } from '../lib/storageOpT
 //   (Promise.race の性質)。次 tick が同じ opFn を再発行すると幽霊 read と多重競合するため、
 //   loadCustomSoundDiagSafe(IndexedDB open+count+fetch を伴う唯一の重い extras 処理)に
 //   in-flight ガードを掛けて新規発行を抑止する。popup-entry.js の heavyReadActive と同型。
-import { createInFlightGuard } from '../lib/inFlightGuard.js';
+import { createInFlightGuard, createStaleGuardedRead } from '../lib/inFlightGuard.js';
 // 重さ根治 P4(2026-07-06): publishLiveViewPublishPayload の dirty check(内容不変なら set 省略)用。
 import { buildLiveViewPublishSignature } from '../lib/liveViewPublishSignature.js';
 // Phase 1 MVP(2026-07-07): 純Web公開ペイロードを1枚あたり上限で段階的に削る純関数。
@@ -270,6 +270,31 @@ let _extrasCacheAt = 0;
 // 重さ根治 P3(2026-07-06): loadCustomSoundDiagSafe(IndexedDB open+count+fetch)の幽霊 read 対策。
 //   前回発行分が未解決の間は新規発行せず、直近スナップショット(fallback)を呼び出し側で渡す。
 const _customSoundDiagGuard = createInFlightGuard(() => loadCustomSoundDiagSafe(), { ceilingMs: 15000 });
+// 2026-07-14 診断ページ608秒固まり根治: コア5readにも幽霊read抑止+last-good stale供給を適用。
+//   実測 summaries×1 229960ms=単発get(24キー)が229秒settleしなかった間、旧実装は
+//   (a)timeout→refresh全体がcatch転落=真っ白、(b)次tickが同キーへ新規get発行=幽霊と多重競合、
+//   の両方を起こしていた。ガードは「読まない・落とさない・古い値を正直に出す」に変える。
+const CORE_READ_REISSUE_CEILING_MS = 60_000; // 229秒級stallでも並走幽霊は最大4本(現状は数十本)
+const _livesGuard = createStaleGuardedRead(() => enumerateActiveLives(), {
+  emptyValue: [],
+  reissueCeilingMs: CORE_READ_REISSUE_CEILING_MS
+});
+const _summariesGuard = createStaleGuardedRead((lvList) => loadAllSummaries(lvList), {
+  emptyValue: {},
+  reissueCeilingMs: CORE_READ_REISSUE_CEILING_MS
+});
+const _fastDiagGuard = createStaleGuardedRead(() => loadStatusFastDiagLiteSafe(), {
+  emptyValue: null,
+  reissueCeilingMs: CORE_READ_REISSUE_CEILING_MS
+});
+const _popupDiagGuard = createStaleGuardedRead(() => loadPopupDiagSafe(), {
+  emptyValue: null,
+  reissueCeilingMs: CORE_READ_REISSUE_CEILING_MS
+});
+const _backfillGuard = createStaleGuardedRead(() => loadBackfillProgressSafe(), {
+  emptyValue: null,
+  reissueCeilingMs: CORE_READ_REISSUE_CEILING_MS
+});
 /** v0.1.1005: 直近 refresh の所要計器(totalMs と重いステップ)。コピー本文(AI共有)にも出すため保持。
  *   renderAll は当該 refresh の render 計測【前】に走るので、前サイクルの値を本文に載せる(代表値として十分)。 */
 let _lastRefreshPerf = /** @type {{ totalMs: number|null, stepMs: Array<[string, number]> }} */ ({ totalMs: null, stepMs: [] });
@@ -536,23 +561,31 @@ async function refresh(opts = {}) {
     //   fastDiag={}・記録0 と空表示になる退行を出した(ユーザー実機で確認)。並行化を撤回し【直列】に戻す。
     //   「重い/開かない」の本来の対策は別=コア(配信一覧+summaries+fastDiag)を先に描き、重い追加データ
     //   (reportPreview/トレンド/watchTabMap)は失敗しても握って空で描く(画面を白くしない)。
+    // 2026-07-14 診断ページ608秒固まり根治: コア5readはガード経由(timeoutでもthrowしない)。
+    //   幽霊readが多重に競合していた旧実装(runStorageOpWithTimeout直呼び)から置換。
     step = 'enumerateActiveLives';
-    const lvList = await runStorageOpWithTimeout(() => enumerateActiveLives(), tmo);
-    _mark('lives');
+    const lvRes = await _livesGuard.read({ timeoutMs: tmo });
+    const lvList = lvRes.value;
+    _mark(lvRes.stale ? 'lives(stale)' : 'lives');
     step = `loadAllSummaries(${lvList.length}件)`;
-    const summaries = await runStorageOpWithTimeout(() => loadAllSummaries(lvList), tmo);
-    _mark(`summaries×${lvList.length}`);
+    const sumRes = await _summariesGuard.read({ timeoutMs: tmo, arg: lvList });
+    const summaries = sumRes.value;
+    _mark(sumRes.stale ? `summaries×${lvList.length}(stale)` : `summaries×${lvList.length}`);
     // 2026-06-23: 2秒ループは full(~40KB)でなく軽量ダイジェスト(~1KB)を read=重さの真因を断つ。
     //   読み取りパスは full と同形なので renderAll 以下の consumer は無変更(council/status-heavy-open-SYNTHESIS.md)。
     step = 'loadStatusFastDiagLiteSafe';
-    const fastDiag = await runStorageOpWithTimeout(() => loadStatusFastDiagLiteSafe(), tmo);
-    _mark('fastDiagLite');
+    const fdRes = await _fastDiagGuard.read({ timeoutMs: tmo });
+    const fastDiag = fdRes.value;
+    _mark(fdRes.stale ? 'fastDiagLite(stale)' : 'fastDiagLite');
     step = 'loadPopupDiagSafe';
-    const popupDiag = await runStorageOpWithTimeout(() => loadPopupDiagSafe(), tmo);
-    _mark('popupDiag');
+    const pdRes = await _popupDiagGuard.read({ timeoutMs: tmo });
+    const popupDiag = pdRes.value;
+    _mark(pdRes.stale ? 'popupDiag(stale)' : 'popupDiag');
     step = 'loadBackfillProgress';
-    const backfillProgress = await runStorageOpWithTimeout(() => loadBackfillProgressSafe(), tmo);
-    _mark('backfill');
+    const bfRes = await _backfillGuard.read({ timeoutMs: tmo });
+    const backfillProgress = bfRes.value;
+    _mark(bfRes.stale ? 'backfill(stale)' : 'backfill');
+    const coreReads = [lvRes, sumRes, fdRes, pdRes, bfRes];
     // 以下は「追加データ」=失敗しても他の表示と記録を妨げない(空で描く)。12 秒間引きでキャッシュ
     //   再利用=2 秒ごとの storage read を減らして「スムーズじゃない」を改善(コア表示は毎回更新のまま)。
     //   ★laneDiag(応援レーン人数整合セル)もここに含める=v0.1.909 で毎回の直列 read に足したら
@@ -625,16 +658,34 @@ async function refresh(opts = {}) {
       _mark('extras');
     }
     const { reportPreview, watchTabMap, trendFindings, laneDiag, laneMirror, statCardsMirror, northStarMirror, voiceDiag, venueSeatsDiag, publishOutcomeRec, commentTimelineMirror, giftHistoryMirror, roomHeatMirror, sessionSummaryMirror, previewRenderAck, backfillLiveMetric, giftEffectDiag, milestoneEffectDiag, customSoundDiag, voiceEffectDiag, bgmPhaseDiag, opSoundEffectDiag, commentPostDiag, instantPushDiag, channelSwitchDiag, highlightLedger, scoreAnnounceDiag } = _extrasCache;
+    // 2026-07-14 診断ページ608秒固まり根治: コアreadがstale供給(timeoutでも直近成功値)された場合、
+    //   嘘の新鮮さを装わずヘッダーに鮮度を明記する(parity診断群と同じ「嘘をつかない」原則)。
+    const staleCores = coreReads.filter((r) => r.stale);
+    const neverHadData = staleCores.some((r) => !r.hadData);
+    let staleNote = '';
+    if (staleCores.length > 0 && !neverHadData) {
+      const worstSec = Math.round(Math.max(...staleCores.map((r) => r.ageMs)) / 1000);
+      staleNote = worstSec >= 600
+        ? ` ⚠${worstSec}秒前の値(混雑が長引いています・記録は継続中)`
+        : ` ⏳${worstSec}秒前の値(混雑中・裏で読み直し中)`;
+    }
+    if (neverHadData) {
+      // 初回から混雑=一度も成功値が無い。旧catchの⏳文言と同趣旨をここで出す(画面は空degradeのまま)。
+      _statusLastErrorText =
+        `⏳ ストレージが混雑していて状態の読み込みに少し時間がかかっています。\n` +
+        `  記録自体は各 watch タブ側で続いています(止まっていません)。\n` +
+        `  数秒ごとに自動で再読み込みします。このまま少しお待ちください。`;
+    }
     step = 'renderAll';
     // v0.1.1005: 前サイクルの所要計器をコピー本文へ渡す(画面ヘッダーだけでなく AI共有テキストにも出す)。
     // 2026-07-14: renderAll 内のセクション別内訳(前サイクル計測)も同様に渡す(診断ページ軽量化の実測材料)。
     renderAll({ lvList, summaries, fastDiag, popupDiag, backfillProgress, backfillLiveMetric, voiceDiag, venueSeatsDiag, laneDiag, laneMirror, statCardsMirror, northStarMirror, reportPreview, trendFindings, watchTabMap, publishOutcomeRec, commentTimelineMirror, giftHistoryMirror, roomHeatMirror, sessionSummaryMirror, previewRenderAck, refreshPerf: _lastRefreshPerf, renderSectionMs: _lastRenderSectionMs, giftEffectDiag, milestoneEffectDiag, customSoundDiag, voiceEffectDiag, bgmPhaseDiag, opSoundEffectDiag, commentPostDiag, instantPushDiag, channelSwitchDiag, highlightLedger, scoreAnnounceDiag });
     _mark('render');
     const _totalMs = Math.round((typeof performance !== 'undefined' ? performance.now() : Date.now()) - _t0);
-    updateLastUpdateMeta({ totalMs: _totalMs, stepMs: _stepMs });
+    updateLastUpdateMeta({ totalMs: _totalMs, stepMs: _stepMs, staleNote });
     // 次サイクルのコピー本文に出すため、この refresh の計器を保持(render 込みの最新 totalMs/stepMs)。
     _lastRefreshPerf = { totalMs: _totalMs, stepMs: _stepMs.slice() };
-    _statusLastErrorText = '';
+    if (staleCores.length === 0) _statusLastErrorText = '';
   } catch (err) {
     // v0.1.797: timeout は「ストレージ混雑(記録は別途継続)」の想定内 degrade=不安にさせない文言に。
     //   それ以外の実エラーだけ「つまずいた処理」を出す(自己診断)。どちらも 2秒ごとの通常更新が後で埋める。
@@ -694,9 +745,10 @@ async function refresh(opts = {}) {
 }
 
 /**
- * @param {{ totalMs?: number, stepMs?: Array<[string, number]> }} [perf]
+ * @param {{ totalMs?: number, stepMs?: Array<[string, number]>, staleNote?: string }} [perf]
  *   v0.1.890: refresh 所要時間の計器。totalMs と「重かったステップ top2」を最終更新の隣に出す=
  *   「状態速報が重い」の真因を、推測せず実データで見えるようにする(self-verifying)。
+ *   staleNote: 2026-07-14 診断ページ608秒固まり根治。コアreadがstale供給された場合の鮮度明記。
  */
 function updateLastUpdateMeta(perf) {
   const el = document.getElementById('metaLastUpdate');
@@ -718,7 +770,7 @@ function updateLastUpdateMeta(perf) {
       .join(' / ');
     perfText = ` ・ 更新 ${total}ms${topText ? `(${topText})` : ''}`;
   }
-  el.textContent = `最終更新 ${hh}:${mm}:${ss}${perfText}`;
+  el.textContent = `最終更新 ${hh}:${mm}:${ss}${perfText}${perf?.staleNote || ''}`;
 }
 
 /* ============================================================================

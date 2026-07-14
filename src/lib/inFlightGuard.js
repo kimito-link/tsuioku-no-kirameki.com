@@ -58,3 +58,105 @@ export function createInFlightGuard(opFn, options = {}) {
 
   return { run, isInFlight };
 }
+
+// v0.1.1142(診断ページ608秒固まり根治): 上の createInFlightGuard は「in-flight中はfallbackを
+//   1回返す」だけで、timeout有界化・last-good(直近成功値)の保持・幽霊readの遅延resolve収穫を
+//   持たない。status-entry.js のコアread(lives/summaries/fastDiagLite/popupDiag/backfillProgress)
+//   はtimeoutでrejectするとrefresh()全体がcatchへ落ちて真っ白になり(制御フローの問題)、次tickが
+//   同じopFnを再発行して幽霊readと多重競合する(輻輳の増幅)。createStaleGuardedRead はこの2つを
+//   同時に断つ: timeoutしてもthrowせず直近成功値をstaleで返し、in-flight中は新規発行せず、
+//   幽霊のresolveを自動収穫(harvest)してlast-goodを更新する。
+
+import { startStorageOpWithTimeout, STORAGE_OP_TIMED_OUT } from './storageOpTimeout.js';
+
+/**
+ * 2026-07-14: コアread用「stale-while-revalidate」ガード。in-flight判定はDate.now壁時計に
+ *   依存する(setTimeoutの発火に頼らない=裏タブ化によるタイマースロットリングでも壊れない)。
+ * @template T
+ * @param {(arg?: any) => Promise<T>} opFn
+ * @param {{ emptyValue?: T, reissueCeilingMs?: number, now?: () => number }} [options]
+ * @returns {{
+ *   read: (opts?: { timeoutMs?: number, arg?: any }) => Promise<{
+ *     value: T, stale: boolean, hadData: boolean, ageMs: number, reason: string
+ *   }>,
+ *   getStats: () => { freshCount: number, staleServeCount: number, timeoutCount: number,
+ *     lateHarvestCount: number, reissueCount: number, inFlight: boolean, pendingMs: number,
+ *     lastGoodAgeMs: number }
+ * }}
+ */
+export function createStaleGuardedRead(opFn, options = {}) {
+  const reissueCeilingMs = Number.isFinite(options.reissueCeilingMs)
+    ? Number(options.reissueCeilingMs)
+    : 60_000;
+  const emptyValue = 'emptyValue' in options ? options.emptyValue : null;
+  const now = typeof options.now === 'function' ? options.now : Date.now;
+
+  /** @type {{ op: Promise<any>, startedAt: number, seq: number }|null} */
+  let pending = null;
+  let seqCounter = 0;
+  let lastGood = { value: emptyValue, at: 0, seq: 0 };
+  const stats = {
+    freshCount: 0,
+    staleServeCount: 0,
+    timeoutCount: 0,
+    lateHarvestCount: 0,
+    reissueCount: 0
+  };
+
+  /** @param {string} reason */
+  const staleResult = (reason) => ({
+    value: lastGood.value,
+    stale: true,
+    hadData: lastGood.at > 0,
+    ageMs: lastGood.at > 0 ? now() - lastGood.at : -1,
+    reason
+  });
+
+  /** @param {{ timeoutMs?: number, arg?: any }} [readOpts] */
+  const read = async (readOpts = {}) => {
+    const { timeoutMs, arg } = readOpts;
+    if (pending) {
+      if (now() - pending.startedAt < reissueCeilingMs) {
+        stats.staleServeCount += 1;
+        return staleResult('in-flight'); // 幽霊が生きている間は新規readを一切発行しない
+      }
+      stats.reissueCount += 1; // 固着とみなし再発行(旧幽霊のharvestは残る=遅延resolveも無駄にしない)
+    }
+    const seq = ++seqCounter;
+    const { race, op } = startStorageOpWithTimeout(() => opFn(arg), timeoutMs);
+    const mine = { op, startedAt: now(), seq };
+    pending = mine;
+    let servedStale = false;
+    op.then((v) => {
+      if (seq > lastGood.seq) {
+        // 古い幽霊が新しい成功値を上書きしない(逆転防止)。
+        lastGood = { value: v, at: now(), seq };
+        if (servedStale) stats.lateHarvestCount += 1;
+      }
+    })
+      .catch(() => {
+        /* 幽霊のrejectは握る(unhandled rejection防止) */
+      })
+      .finally(() => {
+        if (pending === mine) pending = null;
+      });
+    try {
+      const value = await race;
+      stats.freshCount += 1;
+      return { value, stale: false, hadData: true, ageMs: 0, reason: 'fresh' };
+    } catch (err) {
+      servedStale = true;
+      if (err === STORAGE_OP_TIMED_OUT) stats.timeoutCount += 1;
+      return staleResult(err === STORAGE_OP_TIMED_OUT ? 'timeout' : 'error');
+    }
+  };
+
+  const getStats = () => ({
+    ...stats,
+    inFlight: pending != null,
+    pendingMs: pending ? now() - pending.startedAt : 0,
+    lastGoodAgeMs: lastGood.at > 0 ? now() - lastGood.at : -1
+  });
+
+  return { read, getStats };
+}
