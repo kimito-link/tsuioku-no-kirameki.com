@@ -308,7 +308,7 @@ function buildSynthPachinkoSuite(tmpDir) {
     );
   }
 
-  console.log('[build-sounds] パチンコ文法準拠の合成音22ファイル(gift12/milestone9/reach2)を生成しました。');
+  console.log('[build-sounds] パチンコ文法準拠の合成音23ファイル(gift12/milestone9/reach2)を生成しました。');
 }
 
 function main() {

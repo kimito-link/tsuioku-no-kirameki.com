@@ -36,8 +36,9 @@ export const EFFECT_SOUND_PATHS = Object.freeze({
  * v0.1.1059(パチンコ台的バリエーション): 種類ごとに複数バリエーションを持つ場合の候補一覧。
  *   ユーザー要望「1つだけじゃなくパチンコみたいにたくさん欲しい」への対応。同じイベントでも
  *   毎回違う音が鳴るよう、ここに列挙したファイルからランダムに1本を選んで再生する。
- *   ここに載っていない種類(gift/ad/rank_up/rank_down)は従来どおり EFFECT_SOUND_PATHS の
- *   単一ファイルにフォールバックする(後方互換・破壊的変更なし)。
+ *   ここに載っていない種類(gift)は従来どおり EFFECT_SOUND_PATHS の単一ファイルに
+ *   フォールバックする(後方互換・破壊的変更なし)。ad/rank_up/rank_downは2026-07-15に
+ *   ここへ追加済み(sound-optimization-DESIGN.md)。
  * @type {Readonly<Record<string, ReadonlyArray<string>>>}
  */
 export const EFFECT_SOUND_VARIANT_PATHS = Object.freeze({
@@ -63,7 +64,14 @@ export const EFFECT_SOUND_VARIANT_PATHS = Object.freeze({
   gift_medium: Object.freeze(['sound/tiers/gift-medium-1.mp3', 'sound/tiers/gift-medium-2.mp3', 'sound/tiers/gift-medium-3.mp3']),
   gift_large: Object.freeze(['sound/tiers/gift-large-1.mp3', 'sound/tiers/gift-large-2.mp3', 'sound/tiers/gift-large-3.mp3']),
   gift_mega: Object.freeze(['sound/tiers/gift-mega-1.mp3', 'sound/tiers/gift-mega-2.mp3', 'sound/tiers/gift-mega-3.mp3']),
-  reach: Object.freeze(['sound/tiers/reach-1.mp3', 'sound/tiers/reach-2.mp3'])
+  reach: Object.freeze(['sound/tiers/reach-1.mp3', 'sound/tiers/reach-2.mp3']),
+  // 2026-07-15(効果音最適化・sound-optimization-DESIGN.md): ad/rank_up/rank_downは
+  //   v0.1.1059のパチンコ的バリエーション化から取り残され、OtoLogic(CC BY 4.0)単一ファイルの
+  //   ままだった。新規CC0を選定・DLせず、既存の同色CC0素材(gift-medium/milestone-soft/
+  //   gift-small)を音色転用する。ギフト未満の「控えめな通知」という価値序列上の位置づけを守る。
+  [EFFECT_SOUND_KINDS.AD]: Object.freeze(['sound/tiers/gift-medium-1.mp3', 'sound/tiers/gift-medium-2.mp3', 'sound/tiers/gift-medium-3.mp3']),
+  [EFFECT_SOUND_KINDS.RANK_UP]: Object.freeze(['sound/tiers/milestone-soft-1.mp3', 'sound/tiers/milestone-soft-2.mp3', 'sound/tiers/milestone-soft-3.mp3']),
+  [EFFECT_SOUND_KINDS.RANK_DOWN]: Object.freeze(['sound/tiers/gift-small-1.mp3', 'sound/tiers/gift-small-2.mp3', 'sound/tiers/gift-small-3.mp3'])
 });
 
 /**

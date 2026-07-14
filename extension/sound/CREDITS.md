@@ -2,18 +2,18 @@
 
 このディレクトリの mp3 は以下の出典です。差し替える場合もこのファイルを更新してください。
 
-## v0.1.1053 で追加(ギフト/広告/イベント順位変動の効果音)
+## v0.1.1053 で追加(ギフト/広告/イベント順位変動の効果音) — 2026-07-15 ad/rank-up/rank-down は差し替え済み
 
 出典: [OtoLogic](https://otologic.jp/)（フリー効果音素材・[CC BY 4.0](https://creativecommons.org/licenses/by/4.0/deed.ja)）
 
 | ファイル | 元素材名 | 用途 |
 |---|---|---|
-| `effect-gift.mp3` | Cash_Register-Beep01-1 | ギフトが投げられたとき |
-| `effect-ad.mp3` | Short_Accent01-1(Dry) | ニコニ広告が投稿されたとき |
-| `effect-rank-up.mp3` | Inspiration02-1(High) | 参加中イベントの順位が上がったとき |
-| `effect-rank-down.mp3` | Onoma-Negative01-1(Dry) | 参加中イベントの順位が下がったとき |
+| `effect-gift.mp3` | Cash_Register-Beep01-1 | ギフトが投げられたとき(v0.1.1059でCC0へ差し替え済み・下記参照) |
+| ~~`effect-ad.mp3`~~ | ~~Short_Accent01-1(Dry)~~ | 2026-07-15差し替え(下記参照) |
+| ~~`effect-rank-up.mp3`~~ | ~~Inspiration02-1(High)~~ | 2026-07-15差し替え(下記参照) |
+| ~~`effect-rank-down.mp3`~~ | ~~Onoma-Negative01-1(Dry)~~ | 2026-07-15差し替え(下記参照) |
 
-CC BY 4.0 につきクレジット表記が必須。ユーザー向け表示は `popup.html` フッター(OtoLogic へのリンク)で満たす。
+上記のうち有効なOtoLogic依存は無し(全て差し替え済み)。この節は履歴として残す。
 
 ## v0.1.1054 で追加(コメント数マイルストーン=パチンコ演出の効果音)
 
@@ -35,10 +35,34 @@ CC BY 4.0 につきクレジット表記が必須。ユーザー向け表示は 
 
 あわせて「1つだけでなくパチンコみたいにたくさん欲しい」というユーザー要望に対応し、
 `sound/tiers/` 配下にギフト金額帯(small/medium/large/mega)・マイルストーン段階
-(soft/hard/jackpot)・リーチ演出、それぞれ2〜3種類のバリエーションを追加(全23ファイル、
-Freesound CC0)。出典一覧は `sound-src/SOURCES.md` を参照。`effectSoundPlayer.js` の
-`resolveEffectSoundPath()` がカテゴリ内からランダムに1本選んで再生する。
+(soft/hard/jackpot)・リーチ演出、それぞれ2〜3種類のバリエーションを追加(全23ファイル)。
+**注: v0.1.1069(`scripts/build-sounds.mjs`の`buildSynthPachinkoSuite`)で、gift-*/milestone-*/
+reach-*の全23ファイルはFreesound CC0素材から「ffmpeg aevalsrcによる完全自作合成音(決定論・
+サードパーティ音源不使用)」へ上書きされている。`sound-src/SOURCES.md`のFreesound出典表は
+現在使われていない過去の記録(履歴として残置)。実際に鳴っているのは自作合成音のためライセンス
+上さらにクリア(帰属表記の必要すら無い)。**`effectSoundPlayer.js`の`resolveEffectSoundPath()`が
+カテゴリ内からランダムに1本選んで再生する。
+
+## v0.1.1150(効果音最適化)で追加(ad/rank-up/rank-downをCC0化)
+
+`effect-ad.mp3`・`effect-rank-up.mp3`・`effect-rank-down.mp3`(旧OtoLogic CC BY 4.0)は
+`EFFECT_SOUND_VARIANT_PATHS`にエントリが無くv0.1.1059のバリエーション化から取り残されていた。
+既存の自作合成音(上記参照)を音色転用してバリエーション化:
+
+| kind | 転用元 | 選定理由 |
+|---|---|---|
+| `ad` | `tiers/gift-medium-1/2/3.mp3` | チャイム系・ギフト未満の控えめな通知 |
+| `rank_up` | `tiers/milestone-soft-1/2/3.mp3` | 短い上昇モチーフ・通知音 |
+| `rank_down` | `tiers/gift-small-1/2/3.mp3` | 短いポップ音・最も控えめな通知 |
+
+フォールバック単一ファイル(`effect-ad.mp3`等)も各カテゴリの1番目のコピーに差し替え済み。
+新規ファイル追加は無し(`web_accessible_resources`の`sound/tiers/*.mp3`ワイルドカードで既にカバー
+済み)。これによりOtoLogic依存はゼロになった(popup.htmlフッターのOtoLogicクレジット表記は撤去可能)。
 
 ## 既存(v0.1.806〜)
 
-`voice-complete.mp3` / `voice-watch.mp3` — 出典未記録(過去実装分、要調査)。
+`voice-complete.mp3` / `voice-watch.mp3` — 出典未記録(過去実装分)。2026-07-15調査:
+別プロジェクト(dns-osint-pro)のコミットログに「kimitoさん提供の音声ファイル(D:/download/)を
+rubberbandで変換」と記録されているが、その元音声(「完成しました.mp3」「ゆっくりみていってね.mp3」)
+自体が何らかの無料AI音声合成サービスで生成されたものらしいとの記憶があるのみで、サービス名・
+利用規約は特定できなかった。**出典不明確なまま同梱を継続中(次回差し替え予定)**。
