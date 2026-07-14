@@ -1,6 +1,6 @@
 // @ts-nocheck — DOM 要素を引数で受けて数えるだけの計器(chrome 非依存・happy-dom でテスト可能)
 /**
- * venueDomCensus.js — 会場5段+ロビーの【実DOM国勢調査(census)】。
+ * venueDomCensus.js — 会場5段の【実DOM国勢調査(census)】。
  *
  * 背景(memory/reference_diag_truth_SYNTHESIS.md・2026-07-10): 「会場一致✅なのに実画面のたぬ姉が
  *   明らかに多い」実事例の確定原因=従来計器はデータ同士の突合で実DOMを一度も数えていなかった。
@@ -12,7 +12,7 @@
  *   getComputedStyle は1回も呼ばない(500席×3秒でも hot path を汚さない)。
  *
  * 【測るもの】
- *   - 5段(link/gift/ad/konta/tanu)+ロビーの実タイル(.nl-story-userlane-cell)数(セクション別)
+ *   - 5段(link/gift/ad/konta/tanu)の実タイル(.nl-story-userlane-cell)数(セクション別)
  *   - 幽霊(ghost): .nlsb-seat.nlsb-is-empty なのに中身がある席(display:none の消し残り予備軍)
  *   - 裸(bare): .nlsb-seat 管理外でセクション直下に居るタイル(リセットループの対象外=消し残り容疑)
  *   - 空可視(visibleEmpty): 席は可視なのにタイルが無い(白円空白の再演検出=venue-thumb 同型)
@@ -26,14 +26,14 @@
  *   - avatarProbe: 会場の顔プローブ実績(supportGrowthAvatarLoad.getDiagnostics)を extras で受けて
  *     写すだけ(usericonSucceeded/usericonFailed)。census は計測しない=露出のみ
  * 【測らないもの】(スコープ固定テストで担保)
- *   - topBar(応援者トップ)・roster・吹き出し・常駐3キャラ(residents)=段/ロビーの外
+ *   - topBar(応援者トップ)・roster・吹き出し・常駐3キャラ(residents)=段の外
  *   - 透明オーバーレイ越しに透ける背景ページ(拡張のDOM外)・Canvas のピクセル内容
  *
  * @module venueDomCensus
  */
 
-/** census が数えるセクション(5段+ロビー)。 */
-export const VENUE_CENSUS_SECTIONS = Object.freeze(['link', 'gift', 'ad', 'konta', 'tanu', 'lobby']);
+/** census が数えるセクション(5段)。 */
+export const VENUE_CENSUS_SECTIONS = Object.freeze(['link', 'gift', 'ad', 'konta', 'tanu']);
 
 const TILE_SELECTOR = '.nl-story-userlane-cell';
 const SEAT_SELECTOR = '.nlsb-seat';
@@ -68,7 +68,7 @@ function emptySectionCount() {
 }
 
 /**
- * 1セクション(段el または lobbyList)の実DOMを数える(触らない)。
+ * 1セクション(段el)の実DOMを数える(触らない)。
  * @param {Element|null|undefined} rootEl
  * @returns {{ visible:number, tileW:number, tileH:number, ghost:number, bare:number, visibleEmpty:number, unkeyed:number, keys:string[] }}
  */
@@ -108,16 +108,15 @@ function countSection(rootEl) {
 }
 
 /**
- * 会場5段+ロビーの実DOM census を収集する(数えるだけ・1ノードも触らない)。
+ * 会場5段の実DOM census を収集する(数えるだけ・1ノードも触らない)。
  * @param {{
  *   laneEls?: Partial<Record<'link'|'gift'|'ad'|'konta'|'tanu', Element|null>>,
- *   lobbyList?: Element|null,
  *   stackEl?: Element|null,
  *   extras?: { charFrameLayer?: Element|null, crowdOn?: boolean, crowdCount?: number,
  *              avatarProbe?: { usericonSucceeded?: number, usericonFailed?: number }|null }
  * }} input
  * @returns {{
- *   perSection: Record<'link'|'gift'|'ad'|'konta'|'tanu'|'lobby', { visible:number, tileW:number, tileH:number, ghost:number, bare:number, visibleEmpty:number, unkeyed:number, blank:number, blankAnon:number, keys:string[] }>,
+ *   perSection: Record<'link'|'gift'|'ad'|'konta'|'tanu', { visible:number, tileW:number, tileH:number, ghost:number, bare:number, visibleEmpty:number, unkeyed:number, blank:number, blankAnon:number, keys:string[] }>,
  *   dpr: number,
  *   strays: number,
  *   charFrameTiles: number,
@@ -132,7 +131,7 @@ export function collectVenueLaneDomCensus(input) {
   /** @type {Record<string, ReturnType<typeof emptySectionCount>>} */
   const perSection = {};
   for (const sec of VENUE_CENSUS_SECTIONS) {
-    perSection[sec] = countSection(sec === 'lobby' ? inp.lobbyList : laneEls[sec]);
+    perSection[sec] = countSection(laneEls[sec]);
   }
   // 迷子: stack 配下だが5段(.nl-story-userlane)のどれにも属さないタイル(居場所の無い消し残り)。
   let strays = 0;
@@ -170,9 +169,8 @@ export function collectVenueLaneDomCensus(input) {
  * census の keys 列からキー重複を集計する(純関数)。
  *   - dupIntra: 同一セクション内で同じ key が2回以上(席index churn の二重占有)。超過数の総和。
  *   - dupCross: 段×段の横断重複(同じ人が2段に居る)。余分な段在籍数の総和。
- *   - dupLaneLobby: 段×ロビーの二重在籍(実DOM版。v2 の lobbyInMirror はデータ版=両方残す)。
  * @param {Record<string, { keys?: string[] }>} perSection collectVenueLaneDomCensus().perSection
- * @returns {{ dupIntra:number, dupCross:number, dupLaneLobby:number }}
+ * @returns {{ dupIntra:number, dupCross:number }}
  */
 export function countVenueKeyDuplicates(perSection) {
   const ps = perSection && typeof perSection === 'object' ? perSection : {};
@@ -191,13 +189,11 @@ export function countVenueKeyDuplicates(perSection) {
     }
   }
   let dupCross = 0;
-  let dupLaneLobby = 0;
   for (const secs of sectionsByKey.values()) {
-    const laneCount = [...secs].filter((s) => s !== 'lobby').length;
+    const laneCount = secs.size;
     if (laneCount > 1) dupCross += laneCount - 1;
-    if (laneCount > 0 && secs.has('lobby')) dupLaneLobby += 1;
   }
-  return { dupIntra, dupCross, dupLaneLobby };
+  return { dupIntra, dupCross };
 }
 
 /**
@@ -211,7 +207,7 @@ export function countVenueKeyDuplicates(perSection) {
  *   dpr:number,
  *   ghost:number, bare:number, visibleEmpty:number, unkeyed:number,
  *   blank:number, blankAnon:number,
- *   dupIntra:number, dupCross:number, dupLaneLobby:number,
+ *   dupIntra:number, dupCross:number,
  *   strays:number, charFrame:number, crowdOn:boolean, crowdCount:number,
  *   probeOk:number, probeFail:number
  * }}
@@ -259,7 +255,6 @@ export function venueDomCensusToParityDom(census) {
     blankAnon,
     dupIntra: dup.dupIntra,
     dupCross: dup.dupCross,
-    dupLaneLobby: dup.dupLaneLobby,
     strays: Math.max(0, Math.floor(Number(census.strays) || 0)),
     charFrame: Math.max(0, Math.floor(Number(census.charFrameTiles) || 0)),
     crowdOn: census.crowdOn === true,

@@ -68,7 +68,6 @@ describe('見た目①化(v0.1.1119)のCSS', () => {
     expect(venueBarSrc).toMatch(
       /\.nlsb-venue-lane-stack \.nl-story-userlane-tier-wrap--gift \.nl-story-userlane \{\s*background: none/
     );
-    expect(venueBarSrc).toMatch(/\.nlsb-lobby \{\s*background: var\(--nl-surface\)/);
   });
 
   it('★地雷: P5の上書きは LANE_CSS_SYNC マーカー区間の外(END より後)にある', () => {

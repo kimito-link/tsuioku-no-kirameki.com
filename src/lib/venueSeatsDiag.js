@@ -18,18 +18,19 @@
  *   venueMaxRows: number,        // 積んだ段数(全席÷perRow を 500/perRow で cap)。0=未観測
  *   seatAreaWidth: number,       // 席エリアの実測幅px(clientWidth)。0=レイアウト未確定/事故の兆候
  *   visibleCapReason: 'participant'|'grid'|'hardCap'|'',  // 可視席が何で頭打ちになったか(''=未観測)
- *   laneParity: { mode: string, verdict: string, reason?: string, line: string, unexplained: number, mirrorAgeSec: number, lobby?: number,
+ *   laneParity: { mode: string, verdict: string, reason?: string, line: string, unexplained: number, mirrorAgeSec: number,
  *                 dom?: null | { measured: boolean, ghost: number, bare: number, visibleEmpty: number, unkeyed: number,
- *                               dupIntra: number, dupCross: number, dupLaneLobby: number, strays: number,
+ *                               dupIntra: number, dupCross: number, strays: number,
  *                               charFrame: number, crowdOn: boolean, crowdCount: number } }|null,
- *   lobbyResetCount: number,
+ *   anonExcluded: number,
  *   storyDiagMirror: { present: boolean, ageSec: number|null },
  *   sceneReceipt: { match: boolean, line: string }|null
  * }} VenueSeatsDiagState
  *
  * laneParity は v0.1.1111 の「会場=①レーンのメンバー一致トークン」(venueLaneParity.js)。null=未観測。
  *   v0.1.1113(Tri-Parity): dom=実DOM census 要約(venueDomCensus.js)。measured=false 相当は null。
- * lobbyResetCount は v0.1.1112 のロビー(立ち見)を畳んだ累計回数(「消す側」の計器・多発=明滅の兆候)。
+ * anonExcluded(2026-07-14 会場独自受け皿の撤去): fallback時に会場独自の受け皿を持たなくなったため、
+ *   「なぜ段が少ないか」を黙らないための計器(「消す側」に計器を、の鉄則)。匿名として除外した人数。
  */
 
 /** 初期 会場座席診断 state。 */
@@ -49,7 +50,7 @@ export function makeInitialVenueSeatsDiag() {
     visibleCapReason: '',
     laneParity: /** @type {VenueSeatsDiagState['laneParity']} */ (null),
     sceneReceipt: /** @type {VenueSeatsDiagState['sceneReceipt']} */ (null),
-    lobbyResetCount: 0,
+    anonExcluded: 0,
     storyDiagMirror: { present: false, ageSec: /** @type {number|null} */ (null) }
   };
 }
@@ -131,7 +132,6 @@ export function buildVenueSeatsDiagSnapshot(diag, nowMs) {
           blankAnon: Math.max(0, Math.floor(num(lpDomIn.blankAnon, 0))),
           dupIntra: Math.max(0, Math.floor(num(lpDomIn.dupIntra, 0))),
           dupCross: Math.max(0, Math.floor(num(lpDomIn.dupCross, 0))),
-          dupLaneLobby: Math.max(0, Math.floor(num(lpDomIn.dupLaneLobby, 0))),
           strays: Math.max(0, Math.floor(num(lpDomIn.strays, 0))),
           charFrame: Math.max(0, Math.floor(num(lpDomIn.charFrame, 0))),
           crowdOn: lpDomIn.crowdOn === true,
@@ -147,7 +147,6 @@ export function buildVenueSeatsDiagSnapshot(diag, nowMs) {
         line: String(lpIn.line || ''),
         unexplained: Math.max(0, Math.floor(num(lpIn.unexplained, 0))),
         mirrorAgeSec: Math.floor(num(lpIn.mirrorAgeSec, 0)),
-        lobby: Math.max(0, Math.floor(num(lpIn.lobby, 0))),
         dom: lpDom
       }
     : null;
@@ -176,7 +175,7 @@ export function buildVenueSeatsDiagSnapshot(diag, nowMs) {
     visibleCapReason,
     laneParity,
     sceneReceipt,
-    lobbyResetCount: Math.max(0, Math.floor(num(d.lobbyResetCount, 0))),
+    anonExcluded: Math.max(0, Math.floor(num(d.anonExcluded, 0))),
     storyDiagMirror,
     capturedAt: now
   };

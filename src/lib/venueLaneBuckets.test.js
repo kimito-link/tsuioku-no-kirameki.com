@@ -88,7 +88,7 @@ describe('venueSeatEntryToLaneItem', () => {
 });
 
 describe('bucketVenueLaneSeats', () => {
-  it('popup と同じ比較器順で link/konta/tanu に分ける', () => {
+  it('popup と同じ比較器順で link/konta に分ける(2026-07-14: 匿名は常に除外)', () => {
     const buckets = bucketVenueLaneSeats([
       seat(0, 'a:1', '', ''),
       seat(1, '22222', '', ''),
@@ -97,7 +97,7 @@ describe('bucketVenueLaneSeats', () => {
 
     expect(buckets.link.map((x) => x.entry.userId)).toEqual(['11111']);
     expect(buckets.konta.map((x) => x.entry.userId)).toEqual(['22222']);
-    expect(buckets.tanu.map((x) => x.entry.userId)).toEqual(['a:1']);
+    expect(buckets.tanu.map((x) => x.entry.userId)).toEqual([]);
   });
 
   it('maxTotal は5段合計の上限として効く', () => {
@@ -114,22 +114,18 @@ describe('bucketVenueLaneSeats', () => {
     expect(flattenVenueLaneBuckets(buckets).map((x) => x.entry.userId)).toEqual(['11111', '22222']);
   });
 
-  // --- v0.1.1122(B): fallback 匿名ロビー分割 ---
-  it('anonymousToLobby: 匿名系(a:)と無uidはロビーへ・数値IDは段へ(ID種別のみで判定)', () => {
-    const b = bucketVenueLaneSeats(
-      [
-        seat(0, '11111', '太郎', 'https://cdn.example/11111.jpg'),
-        seat(1, 'a:anon-1', '匿名でも名前あり', ''), // 表示名があってもID種別でロビー(churn防止)
-        seat(2, 'a:anon-2', '', ''),
-        seat(3, '22222', '', '')
-      ],
-      { anonymousToLobby: true }
-    );
+  // --- 2026-07-14(会場独自受け皿の撤去): 匿名・無uidは会場のどこにも表示しない ---
+  it('匿名系(a:)と無uidは会場のどこにも表示されない(段にもそれ以外にも出ない)', () => {
+    const b = bucketVenueLaneSeats([
+      seat(0, '11111', '太郎', 'https://cdn.example/11111.jpg'),
+      seat(1, 'a:anon-1', '匿名でも名前あり', ''), // 表示名があってもID種別で除外(churn防止)
+      seat(2, 'a:anon-2', '', ''),
+      seat(3, '22222', '', '')
+    ]);
     expect(flattenVenueLaneBuckets(b).map((x) => x.entry.userId)).toEqual(['11111', '22222']);
-    expect(b.lobby.map((x) => x.entry.userId)).toEqual(['a:anon-1', 'a:anon-2']);
   });
 
-  it('anonymousToLobby: maxTotal は段側のみに効く(ロビー=全員見られる受け皿は切らない)', () => {
+  it('maxTotal は段側のみに効く(匿名は元々段に出ないので影響しない)', () => {
     const b = bucketVenueLaneSeats(
       [
         seat(0, '11111', 'A', 'https://cdn.example/1.jpg'),
@@ -138,16 +134,9 @@ describe('bucketVenueLaneSeats', () => {
         seat(3, 'a:2', '', ''),
         seat(4, 'a:3', '', '')
       ],
-      { maxTotal: 1, anonymousToLobby: true }
+      { maxTotal: 1 }
     );
     expect(flattenVenueLaneBuckets(b).length).toBe(1);
-    expect(b.lobby.length).toBe(3);
-  });
-
-  it('opt 無しは従来どおり全員が段=完全互換(lobby は常に空)', () => {
-    const b = bucketVenueLaneSeats([seat(0, 'a:1', '', ''), seat(1, '22222', '', '')]);
-    expect(flattenVenueLaneBuckets(b).map((x) => x.entry.userId)).toEqual(['22222', 'a:1']);
-    expect(b.lobby).toEqual([]);
   });
 
   it('flatten は画面表示順を返す', () => {

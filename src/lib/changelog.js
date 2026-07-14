@@ -26,6 +26,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1138',
+    date: '2026-07-14',
+    summary: 'ロビーを廃止し会場を①と同じ顔ぶれだけに',
+    items: Object.freeze([
+      '会場モードの「ロビー(立ち見)」を廃止しました。会場は①ポップアップと完全に同じ応援レーンの顔ぶれだけを表示します。',
+      '匿名の応援や①の表示枠から溢れた応援は、会場のどこにも表示されなくなります(①に表示された時点で会場にも反映されます)。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1137',
     date: '2026-07-14',
     summary: '会場一致判定に鏡世代の突合を追加(診断強化のみ)',
