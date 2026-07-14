@@ -24,13 +24,17 @@
  *                               charFrame: number, crowdOn: boolean, crowdCount: number } }|null,
  *   anonExcluded: number,
  *   storyDiagMirror: { present: boolean, ageSec: number|null },
- *   sceneReceipt: { match: boolean, line: string }|null
+ *   sceneReceipt: { match: boolean, line: string }|null,
+ *   yukkuriNamedCensus: { line: string, checked: number, yukkuriNamed: number, outOfRangeDigits: number,
+ *     lastSample: null | { uid: string, name: string, digits: number } }|null
  * }} VenueSeatsDiagState
  *
  * laneParity は v0.1.1111 の「会場=①レーンのメンバー一致トークン」(venueLaneParity.js)。null=未観測。
  *   v0.1.1113(Tri-Parity): dom=実DOM census 要約(venueDomCensus.js)。measured=false 相当は null。
  * anonExcluded(2026-07-14 会場独自受け皿の撤去): fallback時に会場独自の受け皿を持たなくなったため、
  *   「なぜ段が少ないか」を黙らないための計器(「消す側」に計器を、の鉄則)。匿名として除外した人数。
+ * yukkuriNamedCensus(2026-07-15 診断先行・venue-yukkuri-named-diagnose): 「名前ありゆっくり顔」の
+ *   実害を数えるだけの計器(修正はしない)。null=未観測。
  */
 
 /** 初期 会場座席診断 state。 */
@@ -51,7 +55,8 @@ export function makeInitialVenueSeatsDiag() {
     laneParity: /** @type {VenueSeatsDiagState['laneParity']} */ (null),
     sceneReceipt: /** @type {VenueSeatsDiagState['sceneReceipt']} */ (null),
     anonExcluded: 0,
-    storyDiagMirror: { present: false, ageSec: /** @type {number|null} */ (null) }
+    storyDiagMirror: { present: false, ageSec: /** @type {number|null} */ (null) },
+    yukkuriNamedCensus: /** @type {VenueSeatsDiagState['yukkuriNamedCensus']} */ (null)
   };
 }
 
@@ -160,6 +165,24 @@ export function buildVenueSeatsDiagSnapshot(diag, nowMs) {
   //   検証済みの match/line だけ通す(未知の巨大オブジェクトを写さない)。
   const srIn = /** @type {any} */ (d.sceneReceipt && typeof d.sceneReceipt === 'object' ? d.sceneReceipt : null);
   const sceneReceipt = srIn ? { match: srIn.match === true, line: String(srIn.line || '') } : null;
+  // 2026-07-15 診断先行(venue-yukkuri-named-diagnose): 検証済みのフィールドだけ通す。
+  const ynIn = /** @type {any} */ (d.yukkuriNamedCensus && typeof d.yukkuriNamedCensus === 'object' ? d.yukkuriNamedCensus : null);
+  const ynSampleIn = /** @type {any} */ (ynIn?.lastSample && typeof ynIn.lastSample === 'object' ? ynIn.lastSample : null);
+  const yukkuriNamedCensus = ynIn
+    ? {
+        line: String(ynIn.line || ''),
+        checked: Math.max(0, Math.floor(num(ynIn.checked, 0))),
+        yukkuriNamed: Math.max(0, Math.floor(num(ynIn.yukkuriNamed, 0))),
+        outOfRangeDigits: Math.max(0, Math.floor(num(ynIn.outOfRangeDigits, 0))),
+        lastSample: ynSampleIn
+          ? {
+              uid: String(ynSampleIn.uid || ''),
+              name: String(ynSampleIn.name || ''),
+              digits: Math.max(0, Math.floor(num(ynSampleIn.digits, 0)))
+            }
+          : null
+      }
+    : null;
   return {
     enabled: !!d.enabled,
     liveId: String(d.liveId || base.liveId),
@@ -177,6 +200,7 @@ export function buildVenueSeatsDiagSnapshot(diag, nowMs) {
     sceneReceipt,
     anonExcluded: Math.max(0, Math.floor(num(d.anonExcluded, 0))),
     storyDiagMirror,
+    yukkuriNamedCensus,
     capturedAt: now
   };
 }
