@@ -50,11 +50,13 @@ describe('storyUserLaneGuideHtml', () => {
   });
 
   // 2026-06-22(council/lane-show-all-active): 48 で黙って切らず「ほか M人」を誠実に併記。
-  it('候補総数が表示数より多いとき「ほか M人は会場モードで」を併記する', () => {
+  // 2026-07-14(会場独自受け皿の撤去): 会場は①と同じ顔ぶれだけを表示するため
+  //   「会場モードで全員見られます」の約束は撤回し、直近アクティブ順の案内に変更。
+  it('候補総数が表示数より多いとき「ほか M人」を併記する', () => {
     const foot = buildStoryUserLaneGuideFootHtml(48, 522);
     expect(foot).toContain('いま 48 件を表示中');
     expect(foot).toContain('ほか 474人');
-    expect(foot).toContain('会場モード');
+    expect(foot).not.toContain('会場モード');
   });
 
   it('候補総数が表示数以下なら「ほか M人」は出さない(全員出ている)', () => {

@@ -70,7 +70,8 @@ export function buildStoryUserLaneGuideTanuHtml(faceTanu) {
  * @param {number} [totalCandidates] 素性が取れた候補の総数。displayCount より多ければ「ほか M人」を併記。
  *   2026-06-22(council/lane-show-all-active): popup レーンは limit 48 で打ち切るため、48 を超える配信で
  *   「素性が取れた人が他にもいるのに黙って切る」不誠実が起きていた(実機522人中48人しか出ず)。
- *   何人いるかを正直に出し、全員は会場モードで見られると案内する。
+ *   2026-07-14(会場独自受け皿の撤去): 会場は①と完全に同じ顔ぶれだけを表示するため
+ *   「会場モードで全員見られます」の約束は撤回。何人いるかを正直に出すだけにする。
  */
 export function buildStoryUserLaneGuideFootHtml(displayCount, totalCandidates) {
   const n = Math.max(0, Math.floor(Number(displayCount) || 0));
@@ -78,7 +79,7 @@ export function buildStoryUserLaneGuideFootHtml(displayCount, totalCandidates) {
   const others = total > n ? total - n : 0;
   const text =
     others > 0
-      ? `いま ${n} 件を表示中（ほか ${others}人は会場モードで全員見られます）`
+      ? `いま ${n} 件を表示中（ほか ${others}人・直近アクティブ順）`
       : `いま ${n} 件を表示中`;
   return `<p class="nl-story-userlane-guide__foot" aria-live="polite">${escapeHtml(text)}</p>`;
 }

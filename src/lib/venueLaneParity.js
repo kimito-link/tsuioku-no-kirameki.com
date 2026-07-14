@@ -70,19 +70,16 @@ export function laneMirrorTierKeySequences(snap) {
 /**
  * 会場一致パリティを組み立てる。
  *
- * v2(厳密完全一致・reference_pop_venue_exact_SYNTHESIS.md §C-2/§D):
- *   - mirror モードでは段内の鏡外(尾/暫定を含む)は【全部 未説明=🔴】。説明済み余剰は段でなく
- *     ロビー(lobby 入力)に居るのが正しい姿。✅条件に「全段 件数完全等値」「lobbyInMirror===0
- *     (段とロビーの二重在籍なし)」を追加。
- *   - fallback モードは v1 のまま(尾扱い・⚪)=後方互換。
+ * v4(2026-07-14 会場独自受け皿の撤去): 段に鏡外メンバーが混ざること自体は
+ *   v2から変わらず「全部 未説明=🔴」だが、鏡外メンバーの行き先(独自受け皿)が消えたため、
+ *   その突合・DOM・幾何比較を全て削除。✅条件=「全段 件数完全等値 ∧ dom.measured ∧
+ *   全段 dom.visible===painted.length ∧ 重複0 ∧ 迷子0 ∧ 空可視0 ∧ 無鍵0」。
  *
  * v3(Tri-Parity=実DOM census・reference_diag_truth_SYNTHESIS.md §C-3):
- *   - 入力に dom(venueDomCensusToParityDom の要約)を追加。✅=v2全条件 ∧ dom.measured ∧
- *     全段 dom.visible===painted.length ∧ ロビーDOM一致 ∧ 重複0 ∧ 迷子0 ∧ 空可視0 ∧ 無鍵0。
+ *   - 入力に dom(venueDomCensusToParityDom の要約)を追加。
  *   - DOM過剰/欠落は unexplained に計上(`${tier}:DOM余n`/`DOM欠n`)=真犯人を1行で名指し。
  *   - 幽霊(ghost)は不可視なので verdict 不算入・`幽N` 併記のみ(消し残り予備軍の観測)。
  *   - dom が無い/measured でないとき mirror モードは ⚪「DOM未計測」=✅を名乗れない(fail-closed)。
- *   - fallback では dom は参考値(白円/迷子はモード無関係に line へ写す)。
  *
  * @param {{
  *   snap: Partial<import('./laneMirror.js').LaneMirrorSnapshot>|null|undefined,
@@ -90,14 +87,12 @@ export function laneMirrorTierKeySequences(snap) {
  *   nowMs: number,
  *   mode: 'mirror'|'fallback',
  *   painted: Partial<Record<typeof TIERS[number], string[]>>,
- *   lobby?: string[],
  *   transientKeys?: ReadonlySet<string>|string[],
  *   visibleShown?: number,
  *   logicalTotal?: number,
  *   dom?: ReturnType<typeof import('./venueDomCensus.js').venueDomCensusToParityDom>|null
  * }} input
  *   - painted: 会場が実際に paint した段別キー列(venueLaneParityKey で作る)。
- *   - lobby: ロビー(段外セクション)に描いたキー列。
  *   - transientKeys: X層(60秒窓内の直近発言者)のキー集合。
  *   - dom: 実DOM census 要約(venueDomCensus.js)。null=未計測(mirror では ⚪)。
  * @returns {{
@@ -107,13 +102,12 @@ export function laneMirrorTierKeySequences(snap) {
  *   mirrorAgeSec: number,
  *   mirrorPruned: boolean,
  *   perTier: Record<typeof TIERS[number], { pop: number, painted: number, prefixOk: boolean, tail: number, transient: number, missing: number }>,
- *   lobby: { total: number, transient: number, inMirror: number },
  *   unexplained: { count: number, sampleKeys: string[] },
  *   visibleShown: number,
  *   logicalTotal: number,
  *   dom: null | { measured: boolean, ghost: number, bare: number, visibleEmpty: number, unkeyed: number,
  *                 blank: number, blankAnon: number,
- *                 dupIntra: number, dupCross: number, dupLaneLobby: number, strays: number,
+ *                 dupIntra: number, dupCross: number, strays: number,
  *                 charFrame: number, crowdOn: boolean, crowdCount: number, probeFail: number },
  *   line: string
  * }}
@@ -124,7 +118,6 @@ export function buildVenueLaneParity(input) {
   const nowMs = Number.isFinite(Number(inp.nowMs)) ? Number(inp.nowMs) : 0;
   const snap = inp.snap && typeof inp.snap === 'object' ? inp.snap : null;
   const painted = inp.painted && typeof inp.painted === 'object' ? inp.painted : {};
-  const lobbyKeys = (Array.isArray(inp.lobby) ? inp.lobby : []).map(String).filter(Boolean);
   const transientKeys =
     inp.transientKeys instanceof Set
       ? inp.transientKeys
@@ -194,7 +187,7 @@ export function buildVenueLaneParity(input) {
     }
 
     // 段内の鏡外(pop に居ない painted)の分類。
-    // v2: mirror モードでは【段に鏡外が居ること自体が違反】(尾/暫定はロビーに居るのが正しい姿)。
+    // v2/v4: mirror モードでは【段に鏡外が居ること自体が違反】(鏡外メンバーは会場に表示しないのが正しい姿)。
     //   説明済み扱い(v1 の capOverflow 分岐)は廃止し、全部 未説明=🔴 に計上する(嘘の緑防止)。
     //   tail/transient フィールドは「段内に居た鏡外の内訳」の診断値として残す(期待値0)。
     let tail = 0;
@@ -219,24 +212,6 @@ export function buildVenueLaneParity(input) {
       missing
     };
   }
-
-  // --- ロビー突合(v2): 段とロビーの二重在籍(=余り)は未説明=🔴(嘘の緑防止)。 ---
-  /** @type {Set<string>} */
-  const allPopKeys = new Set();
-  for (const tier of TIERS) for (const k of popSeq[tier]) allPopKeys.add(k);
-  let lobbyInMirror = 0;
-  let lobbyTransient = 0;
-  for (const k of lobbyKeys) {
-    if (allPopKeys.has(k)) {
-      lobbyInMirror += 1;
-      if (mode === 'mirror' && !mirrorIssue) {
-        unexplainedCount += 1;
-        if (unexplainedSamples.length < 5) unexplainedSamples.push(`ロビー重複:${k}`);
-      }
-    }
-    if (transientKeys.has(k)) lobbyTransient += 1;
-  }
-  const lobby = { total: lobbyKeys.length, transient: lobbyTransient, inMirror: lobbyInMirror };
 
   // --- v3: 実DOM census 突合(Tri-Parity の第3面=段割当データ⇄段実DOM) ---
   const isMirrorJudgingEarly = mode === 'mirror' && !mirrorIssue;
@@ -285,22 +260,18 @@ export function buildVenueLaneParity(input) {
       const diff = visible - expected;
       if (diff === 0) return;
       domMismatchParts.push(
-        `${sec === 'lobby' ? 'ロビー' : /** @type {any} */ (TIER_LABEL)[sec]}:可視${visible}(データ${expected}${bare > 0 ? ` 裸${bare}` : ''})`
+        `${/** @type {any} */ (TIER_LABEL)[sec]}:可視${visible}(データ${expected}${bare > 0 ? ` 裸${bare}` : ''})`
       );
       // DOM過剰/欠落は「説明できない画面上の差」=未説明へ計上(mirror 判定時のみ verdict に影響)。
       if (isMirrorJudgingEarly) {
         unexplainedCount += Math.abs(diff);
         if (unexplainedSamples.length < 5) {
-          const label = sec === 'lobby' ? 'ロビー' : sec;
-          unexplainedSamples.push(diff > 0 ? `${label}:DOM余${diff}` : `${label}:DOM欠${-diff}`);
+          unexplainedSamples.push(diff > 0 ? `${sec}:DOM余${diff}` : `${sec}:DOM欠${-diff}`);
         }
       }
     };
     for (const tier of TIERS) checkSection(tier, perTier[tier].painted);
-    checkSection('lobby', lobbyKeys.length);
     if (popDomMeasured) {
-      /** @type {{ visible:number, tileW:number, tileH:number, physicalW:number, physicalH:number }|null} */
-      let lobbyReference = null;
       /** @param {any} source @param {number} dpr */
       const readGeometry = (source, dpr) => ({
         visible: Math.max(0, Math.floor(Number(source?.visible) || 0)),
@@ -332,29 +303,16 @@ export function buildVenueLaneParity(input) {
       for (const tier of TIERS) {
         const popupGeometry = readGeometry(popDomIn.perTier[tier], popupDpr);
         const venueGeometry = readGeometry(domIn.perSection[tier], venueDpr);
-        if (
-          popupGeometry.visible > 0 &&
-          popupGeometry.tileW > 0 &&
-          popupGeometry.tileH > 0 &&
-          !lobbyReference
-        ) lobbyReference = popupGeometry;
         if (popupGeometry.visible > 0 && venueGeometry.visible > 0) {
           compareGeometry(tier, popupGeometry, venueGeometry);
         }
-      }
-
-      const venueLobbyGeometry = readGeometry(domIn.perSection.lobby, venueDpr);
-      if (venueLobbyGeometry.visible > 0) {
-        if (lobbyReference) compareGeometry('ロビー', lobbyReference, venueLobbyGeometry);
-        else geometryMissingParts.push('ロビー(①基準なし)');
       }
     }
   }
   const domGhost = domMeasured ? Math.max(0, Math.floor(Number(domIn.ghost) || 0)) : 0;
   const domDupTotal = domMeasured
     ? Math.max(0, Math.floor(Number(domIn.dupIntra) || 0)) +
-      Math.max(0, Math.floor(Number(domIn.dupCross) || 0)) +
-      Math.max(0, Math.floor(Number(domIn.dupLaneLobby) || 0))
+      Math.max(0, Math.floor(Number(domIn.dupCross) || 0))
     : 0;
   const domStrays = domMeasured ? Math.max(0, Math.floor(Number(domIn.strays) || 0)) : 0;
   const domVisibleEmpty = domMeasured ? Math.max(0, Math.floor(Number(domIn.visibleEmpty) || 0)) : 0;
@@ -395,7 +353,7 @@ export function buildVenueLaneParity(input) {
   }
 
   // line: mirror モードは「段=鏡と等値」が前提なので +尾n 表記を出さない(段内の鏡外は未説明側に出る)。
-  //   fallback は v1 表記のまま(尾扱い・⚪)。ロビーは mirror モードのみ意味を持つ(fallbackは段に全員)。
+  //   fallback は v1 表記のまま(尾扱い・⚪)。v4: 独自受け皿の人数表記は撤去。
   const isMirrorJudging = mode === 'mirror' && !mirrorIssue;
   const totalTransientInLanes = TIERS.reduce((a, t) => a + perTier[t].transient, 0);
   const tierStr = TIERS.map((t) => {
@@ -404,10 +362,7 @@ export function buildVenueLaneParity(input) {
     return `${TIER_LABEL[t]}${p.pop}${tailStr}`;
   }).join(' ');
   const ageStr = mirrorAgeSec >= 0 && Number.isFinite(mirrorAgeMs) ? `鏡(${mirrorAgeSec}s前)` : '鏡なし';
-  const midStr = isMirrorJudging
-    ? ` / ロビー${lobby.total}(暫定${lobby.transient})`
-    : // v0.1.1122: fallback でも匿名系はロビーへ隔離されるため人数を明記(verdict は⚪のまま=情報のみ)。
-      ` / ロビー${lobby.total} 暫定${totalTransientInLanes}`;
+  const midStr = isMirrorJudging ? '' : ` / 暫定${totalTransientInLanes}`;
   // v3 DOMセグメント: 一致なら「DOM=データ(幽N)」、不一致なら主犯内訳つき「DOM≠ …」、未計測は明示。
   //   fallback でも census があれば参考で写す(白円/迷子はモード無関係の会場単独異常)。
   /** @type {string} */
@@ -468,7 +423,6 @@ export function buildVenueLaneParity(input) {
     mirrorAgeSec: Number.isFinite(mirrorAgeMs) ? mirrorAgeSec : -1,
     mirrorPruned,
     perTier: /** @type {any} */ (perTier),
-    lobby,
     unexplained: { count: unexplainedCount, sampleKeys: unexplainedSamples },
     visibleShown,
     logicalTotal,
@@ -484,7 +438,6 @@ export function buildVenueLaneParity(input) {
           blankAnon: domBlankAnon,
           dupIntra: Math.max(0, Math.floor(Number(domIn.dupIntra) || 0)),
           dupCross: Math.max(0, Math.floor(Number(domIn.dupCross) || 0)),
-          dupLaneLobby: Math.max(0, Math.floor(Number(domIn.dupLaneLobby) || 0)),
           strays: domStrays,
           charFrame: Math.max(0, Math.floor(Number(domIn.charFrame) || 0)),
           crowdOn: domIn.crowdOn === true,
@@ -500,10 +453,10 @@ export function buildVenueLaneParity(input) {
  * venueSeatsDiag(storage)へ同梱する軽量形。状態速報は line をそのまま1行出す。
  *   v3: reason(⚪の理由=DOM未計測/fallback等)と dom 要約(数値のみ・keys/段別詳細なし)を追加。
  * @param {ReturnType<typeof buildVenueLaneParity>|null|undefined} parity
- * @returns {{ mode: string, verdict: string, reason: string, line: string, unexplained: number, mirrorAgeSec: number, lobby: number,
+ * @returns {{ mode: string, verdict: string, reason: string, line: string, unexplained: number, mirrorAgeSec: number,
  *             dom: null | { measured: boolean, ghost: number, bare: number, visibleEmpty: number, unkeyed: number,
  *                           blank: number, blankAnon: number,
- *                           dupIntra: number, dupCross: number, dupLaneLobby: number, strays: number,
+ *                           dupIntra: number, dupCross: number, strays: number,
  *                           charFrame: number, crowdOn: boolean, crowdCount: number, probeFail: number } }|null}
  */
 export function toVenueLaneParityDiag(parity) {
@@ -516,7 +469,6 @@ export function toVenueLaneParityDiag(parity) {
     line: String(parity.line || ''),
     unexplained: Math.max(0, Math.floor(Number(parity.unexplained?.count) || 0)),
     mirrorAgeSec: Math.floor(Number(parity.mirrorAgeSec) || 0),
-    lobby: Math.max(0, Math.floor(Number(/** @type {any} */ (parity).lobby?.total) || 0)),
     dom:
       dom && typeof dom === 'object' && dom.measured === true
         ? {
@@ -529,7 +481,6 @@ export function toVenueLaneParityDiag(parity) {
             blankAnon: Math.max(0, Math.floor(Number(/** @type {any} */ (dom).blankAnon) || 0)),
             dupIntra: Math.max(0, Math.floor(Number(dom.dupIntra) || 0)),
             dupCross: Math.max(0, Math.floor(Number(dom.dupCross) || 0)),
-            dupLaneLobby: Math.max(0, Math.floor(Number(dom.dupLaneLobby) || 0)),
             strays: Math.max(0, Math.floor(Number(dom.strays) || 0)),
             charFrame: Math.max(0, Math.floor(Number(dom.charFrame) || 0)),
             crowdOn: dom.crowdOn === true,

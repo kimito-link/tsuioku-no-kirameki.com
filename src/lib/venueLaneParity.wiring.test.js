@@ -67,30 +67,20 @@ describe('会場=①レーン鏡映の配線(配線忘れ=CI赤)', () => {
     expect(venueBarSrc).toMatch(/commitDisplay\(baseRows\)/);
   });
 
-  // --- v0.1.1112 厳密完全一致(ロビー隔離)の配線 ---
-  it('venueBar がロビー(paintVenueLobby)を描き、lobby を parity へ渡している', () => {
-    expect(venueBarSrc).toMatch(/paintVenueLobby\(lobbyItems, \{ mirror: Boolean\(laneComposed\) \}\)/);
-    expect(venueBarSrc).toMatch(/lobby: lobbyItems\.map\(/);
+  // --- 2026-07-14(会場独自受け皿の撤去)の配線 ---
+  it('venueBar はロビー(paintVenueLobby等)を描かない=会場は①と同じ5段のみ', () => {
+    expect(venueBarSrc).not.toMatch(/paintVenueLobby/);
+    expect(venueBarSrc).not.toMatch(/anonymousToLobby/);
+    expect(venueBarSrc).not.toMatch(/fallbackLobby/);
   });
 
-  // --- v0.1.1122 fallback 匿名ロビー隔離の配線 ---
-  it('fallback でも匿名系はロビーへ(anonymousToLobby)+compose へ fallbackLobby が渡る', () => {
-    expect(venueBarSrc).toMatch(/anonymousToLobby: true/);
-    expect(venueBarSrc).toMatch(/fallbackLobby: fallbackLaneBuckets\.lobby/);
-    expect(venueBarSrc).toMatch(/laneComposed\.lobby : \(fallbackLaneBuckets\.lobby \|\| \[\]\)/);
+  it('emptyMessage は段の可視件数のみで判定する', () => {
+    expect(venueBarSrc).toMatch(/emptyMessage\.hidden = visibleLaneItems\.length > 0/);
   });
 
-  it('席装飾ループが段+ロビーの合成列を回す(L17=ロビー席の装飾取り残し防止)', () => {
-    expect(venueBarSrc).toMatch(/\[\.\.\.visibleLaneItems, \.\.\.lobbyItems\]/);
-  });
-
-  it('emptyMessage は段+ロビーの合算で判定(L19)', () => {
-    expect(venueBarSrc).toMatch(/visibleLaneItems\.length \+ lobbyItems\.length > 0/);
-  });
-
-  it('「消す側」の計器(lobbyResetCount)が diag に載る(L18)', () => {
-    expect(venueBarSrc).toMatch(/lobbyResetCount: _venueLobbyResetCount/);
-    expect(seatsDiagSrc).toMatch(/lobbyResetCount/);
+  it('「消す側」の計器(anonExcluded)が diag に載る(旧lobbyResetCountの後継)', () => {
+    expect(venueBarSrc).toMatch(/anonExcluded: _anonExcludedCount/);
+    expect(seatsDiagSrc).toMatch(/anonExcluded/);
   });
 
   // --- v0.1.1113 実DOM census(Tri-Parity)の配線 ---
@@ -105,10 +95,9 @@ describe('会場=①レーン鏡映の配線(配線忘れ=CI赤)', () => {
     expect(venueBarSrc).toMatch(/if \(diagDue\)/);
   });
 
-  it('タイルへ照合キーが刻印されている(fillLaneTier とロビーの両方)', () => {
+  it('タイルへ照合キーが刻印されている(fillLaneTier)', () => {
     const laneDomSrc = read('src/extension/story/renderStoryUserLaneDom.js');
     expect(laneDomSrc).toMatch(/dataset\.userKey = venueLaneParityKey\(/);
-    expect(venueBarSrc).toMatch(/dataset\.userKey = venueLaneParityKey\(/);
   });
 
   it('venueSeatsDiag スナップショットが laneParity.dom を通す(whitelist 落ち防止)', () => {
@@ -191,13 +180,9 @@ describe('会場=①レーン鏡映の配線(配線忘れ=CI赤)', () => {
     expect(venueBarSrc).toMatch(/changes\[KEY_STORY_DIAG_MIRROR\]/);
   });
 
-  it('venueBar が nlsb-story-diag パネルを段stackの下・ロビーの上へ配置して描画している', () => {
+  it('venueBar が nlsb-story-diag パネルを段stackの下へ配置して描画している', () => {
     expect(venueBarSrc).toMatch(/nlsb-story-diag/);
     expect(venueBarSrc).toMatch(/seatsHost\.appendChild\(storyDiagHost\)/);
-    expect(venueBarSrc).toMatch(/seatsHost\.appendChild\(lobbyHost\)/);
-    expect(venueBarSrc.indexOf('seatsHost.appendChild(storyDiagHost)')).toBeLessThan(
-      venueBarSrc.indexOf('seatsHost.appendChild(lobbyHost)')
-    );
     expect(venueBarSrc).toMatch(/renderVenueStoryDiagMirrorPanel\(/);
   });
 

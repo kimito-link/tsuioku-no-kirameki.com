@@ -5,7 +5,7 @@
  * 背景: ①のレーンセルはコメントenrich由来の個人サムネURL(score2)を displaySrc に持つが、
  *   会場の participant.avatar は空のことが多く、profileAvatarMap 補強(v0.1.1110)もキャッシュミスの
  *   uid は救えない。鏡には①が解決済みの URL が既に載っている(=新規 storage read ゼロの enrich 源)。
- *   これを注入すると、ロビー/トップバー/fallback でも①と【バイト一致】の顔URLになる=丸写しの字義どおり。
+ *   これを注入すると、トップバー/fallback でも①と【バイト一致】の顔URLになる=丸写しの字義どおり。
  *
  * 規則(嘘の上書きをしない):
  *   - 鏡から採るのは http(s) かつ 個人サムネ相当(commentEnrichmentAvatarScore===2)のみ。

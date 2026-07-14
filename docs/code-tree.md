@@ -1881,7 +1881,7 @@
     - `venueCrowdMotion.test.js`
     - `venueDisplayRows.js` — 会場モードの「空っぽ・途中で消える・ちらつき」根治の正本(2026-06-15・会議+根本原因調査)。
     - `venueDisplayRows.test.js`
-    - `venueDomCensus.js` — 会場5段+ロビーの【実DOM国勢調査(census)】。
+    - `venueDomCensus.js` — 会場5段の【実DOM国勢調査(census)】。
     - `venueDomCensus.test.js`
     - `venueDragScroll.js` — 2026-06-14 会議(星野ロミ・摩擦ゼロUI): 会場を左ドラッグでパン(縦スクロール)する純ロジック。
     - `venueDragScroll.test.js`

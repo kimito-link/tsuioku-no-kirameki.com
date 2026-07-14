@@ -11,7 +11,7 @@
  * DOM/chrome 非依存=単体テスト可能。venueBar.js が snap/candidates/seats を渡す。
  */
 
-import { venueLaneParityKey, VENUE_LANE_MIRROR_SOFT_WINDOW_MS } from './venueLaneParity.js';
+import { VENUE_LANE_MIRROR_SOFT_WINDOW_MS } from './venueLaneParity.js';
 
 /** @typedef {import('./laneMirror.js').LaneMirrorSnapshot} LaneMirrorSnapshot */
 
@@ -91,46 +91,25 @@ export function venueRowsFromLaneMirror(snap, candidatesByUid) {
 }
 
 /**
- * 段割当の合成 v2(厳密完全一致・reference_pop_venue_exact_SYNTHESIS.md §C-1)。
- *   P層=鏡の順序そのままの5段【のみ】を buckets に、T/X層(鏡外=①のcap外+直近発言者)は段に
- *   混ぜず lobby として返す。これで「5つの段=鏡=①の実paint」が集合・順序・件数まで厳密同一になる。
- *   lobby の順序は fallback の段順(link→gift→ad→konta→tanu)×既存comparator順=決定的。
+ * 段割当の合成 v3(2026-07-14 会場独自受け皿の撤去): P層=鏡の順序そのままの5段【のみ】を buckets に返す。
+ *   T/X層(鏡外=①のcap外+直近発言者)は会場独自の受け皿を持たず、単に描かない
+ *   (①に載った瞬間、次の鏡publishで会場にも現れる)。これで「5つの段=鏡=①の実paint」が
+ *   集合・順序・件数まで厳密同一になる。
  *
  * @param {{
  *   mirrorBuckets: { link: any[], gift: any[], ad: any[], konta: any[], tanu: any[] },
- *   fallbackBuckets: { link: any[], gift: any[], ad: any[], konta: any[], tanu: any[] },
- *   fallbackLobby?: any[],
- *   seatIndexByUid: ReadonlyMap<string, number>,
- *   transientKeys?: ReadonlySet<string>
+ *   seatIndexByUid: ReadonlyMap<string, number>
  * }} input
  *   - mirrorBuckets: restoreLaneMirrorBuckets(snap) の出力({displaySrc,title,meta,entry})。
- *   - fallbackBuckets: 既存 bucketVenueLaneSeats(visibleSeats) の出力(席index等を保持)。
- *   - fallbackLobby(v0.1.1122): bucketVenueLaneSeats の anonymousToLobby 分割で lobby へ落ちた
- *     匿名系。mirror モードでも鏡在籍者を除いてロビーへ合流させる(従来は fallback.tanu 経由で
- *     同じ dedupe を通っていた=集合は完全等値・順序のみ変化)。
- * @returns {{ buckets: { link: any[], gift: any[], ad: any[], konta: any[], tanu: any[] }, lobby: any[] }}
+ * @returns {{ buckets: { link: any[], gift: any[], ad: any[], konta: any[], tanu: any[] } }}
  */
 export function composeVenueLaneBuckets(input) {
   const inp = /** @type {any} */ (input && typeof input === 'object' ? input : {});
   const mirror = inp.mirrorBuckets && typeof inp.mirrorBuckets === 'object' ? inp.mirrorBuckets : {};
-  const fallback = inp.fallbackBuckets && typeof inp.fallbackBuckets === 'object' ? inp.fallbackBuckets : {};
   const seatIndexByUid = inp.seatIndexByUid instanceof Map ? inp.seatIndexByUid : new Map();
-  const transientKeys = inp.transientKeys instanceof Set ? inp.transientKeys : new Set();
-
-  /** @type {Set<string>} */
-  const mirrorKeySet = new Set();
-  for (const tier of TIERS) {
-    const arr = Array.isArray(mirror[tier]) ? mirror[tier] : [];
-    for (const item of arr) {
-      const k = venueLaneParityKey(item);
-      if (k) mirrorKeySet.add(k);
-    }
-  }
 
   /** @type {Record<string, any[]>} */
   const out = {};
-  /** @type {any[]} */
-  const lobby = [];
   for (const tier of TIERS) {
     const rows = [];
     const arr = Array.isArray(mirror[tier]) ? mirror[tier] : [];
@@ -155,31 +134,9 @@ export function composeVenueLaneBuckets(input) {
         _venueMirror: true
       });
     }
-    // v2: T/X層(鏡外)は段に混ぜない=ロビーへ(段は鏡と厳密同一・L13=rows/席はそのまま)。
-    const fb = Array.isArray(fallback[tier]) ? fallback[tier] : [];
-    for (const item of fb) {
-      const k = venueLaneParityKey(item);
-      if (!k || mirrorKeySet.has(k)) continue;
-      lobby.push({
-        ...item,
-        _venueTail: true,
-        _venueTransient: transientKeys.has(k)
-      });
-    }
     out[tier] = rows;
   }
-  // v0.1.1122: 匿名分割(fallbackLobby)もロビーへ合流。mirrorKeySet との dedupe 必須
-  //   (忘れると段とロビーの二重在籍=parity「ロビー重複」🔴・設計正本の地雷#4)。
-  for (const item of Array.isArray(inp.fallbackLobby) ? inp.fallbackLobby : []) {
-    const k = venueLaneParityKey(item);
-    if (!k || mirrorKeySet.has(k)) continue;
-    lobby.push({
-      ...item,
-      _venueTail: true,
-      _venueTransient: transientKeys.has(k)
-    });
-  }
-  return /** @type {any} */ ({ buckets: out, lobby });
+  return /** @type {any} */ ({ buckets: out });
 }
 
 /**
