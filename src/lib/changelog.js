@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1146',
+    date: '2026-07-14',
+    summary: '会場のリンク不具合を見つけやすくする診断を追加',
+    items: Object.freeze([
+      '会場モードでユーザー名がリンクにならないことがある不具合の原因を切り分けるための診断項目を追加しました（表示・動作の変更はありません）。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1144',
     date: '2026-07-14',
     summary: 'コメントが多いときの読み上げのテンポを改善',

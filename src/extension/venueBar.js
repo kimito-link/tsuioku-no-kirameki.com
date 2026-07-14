@@ -199,6 +199,14 @@ import {
 } from '../lib/supportGrowthTileSrc.js';
 // storyUserLaneMetaLines は P3(v0.1.1117)で venueSeatEntryToLaneItem(正本)経由に一本化=venueBar 直参照なし。
 import { bucketVenueLaneSeats, flattenVenueLaneBuckets, venueSeatEntryToLaneItem } from '../lib/venueLaneBuckets.js';
+// 2026-07-14 診断先行(venue-tile-link-parity-diagnose-DESIGN.md): タイル実体(鏡uid)⇄席クラス
+//   (roster uid)の二重ソース不一致が実害を出しているかを累積で数える計器(観測のみ・修正はしない)。
+import {
+  beginVenueSeatLinkPaint,
+  createVenueSeatLinkParityState,
+  observeVenueSeatLink,
+  toVenueSeatLinkParityDiag
+} from '../lib/venueSeatLinkParity.js';
 import {
   paintStoryUserLaneDomFilled,
   resetStoryUserLaneDom
@@ -2376,6 +2384,9 @@ export function mountVenueBarButton(options = {}) {
   // v0.1.1138(2026-07-14 会場独自受け皿の撤去・「消す側」の計器): fallback時に段から除外された
   //   匿名の人数。会場独自の受け皿を持たなくなったため、これが唯一の可視化手段。
   let _anonExcludedCount = 0;
+  // 2026-07-14 席リンク一致計器(診断先行アプローチ): タイル実体(鏡uid)と席クラス(roster uid)の
+  //   二重ソース不一致が実害を出しているかを累積で数える(観測のみ・修正はしない)。
+  const _seatLinkParity = createVenueSeatLinkParityState();
   // 応援者トップNバーの状態(renderTopBar / clearDisplay が触る・宣言はここ=TDZ 回避)。
   let _lastTopBarSig = '';
   let _topBarShownOnce = false;
@@ -4225,6 +4236,10 @@ export function mountVenueBarButton(options = {}) {
     }
 
     // L17: 席装飾(リンク化・VIP・順位バッジ・ストリーク)は段の描画列に適用する。
+    // 席リンク一致計器: 毎paint観測(diagDueの3秒期日に入れない=過渡的不一致も累積に残す)。
+    //   publishは既存publishVenueSeatsDiagの3秒min-gapサイクルに相乗り(新規タイマー/read/writeなし)。
+    beginVenueSeatLinkPaint(_seatLinkParity);
+    const seatLinkWallNow = Date.now();
     for (const item of visibleLaneItems) {
       // v0.1.1111: 席なしアイテム(-1)は席装飾の対象外(wrapTileEl と同じ規則で席0を誤装飾しない)。
       const seatIndexRaw = Number(item?._venueSeatIndex);
@@ -4242,10 +4257,23 @@ export function mountVenueBarButton(options = {}) {
         (uid ? anonymousDisplayLabel(uid) : anonymousDisplayLabel(participant.key || `会場${seatIndex + 1}`));
       const tile = node.seat.querySelector('.nl-story-userlane-cell');
       if (tile instanceof HTMLElement) node.tile = tile;
-      node.seat.classList.toggle(
-        'nlsb-seat-link',
-        isNumericNicoUserId(uid) && nicoUserPageUrl(uid) !== ''
-      );
+      const seatLinkOn = isNumericNicoUserId(uid) && nicoUserPageUrl(uid) !== '';
+      node.seat.classList.toggle('nlsb-seat-link', seatLinkOn);
+      // 観測のみ(DOM/データ不変・失敗は握る=描画を止めない)。tileは直前で取得済み=新規クエリ0。
+      try {
+        observeVenueSeatLink(_seatLinkParity, {
+          seatIndex,
+          mirrorUid: String(item?.entry?.userId || '').trim(),
+          rosterUid: uid,
+          seatLinkOn,
+          tileTag: tile instanceof HTMLElement ? tile.tagName : '',
+          tileHref: tile instanceof HTMLAnchorElement ? tile.getAttribute('href') || '' : '',
+          mode: isLaneMirrorPaintMode ? 'mirror' : 'fallback',
+          wallNow: seatLinkWallNow
+        });
+      } catch {
+        /* 計器失敗は描画を止めない */
+      }
       node.seat.title = displayName;
       node.seat.classList.remove('nlsb-is-empty');
       node.seat.setAttribute('aria-hidden', 'false');
@@ -4414,6 +4442,8 @@ export function mountVenueBarButton(options = {}) {
       sceneReceipt: sceneReceiptDiag,
       // v0.1.1138(「消す側」の計器): fallback時に段から除外された匿名の人数。
       anonExcluded: _anonExcludedCount,
+      // 2026-07-14 席リンク一致計器: タイル実体(鏡uid)⇄席クラス(roster uid)の二重ソース突合(累積)。
+      seatLinkParity: toVenueSeatLinkParityDiag(_seatLinkParity, Date.now()),
       storyDiagMirror: storyDiagMirrorStatus(storyDiagMirrorSnap, String(activeLiveId || liveIdFromPathname() || ''), Date.now())
     };
     publishVenueSeatsDiag(seatsDiagObs);
