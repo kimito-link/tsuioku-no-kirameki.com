@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { buildLaneMirrorSnapshot, restoreLaneMirrorBuckets } from './laneMirror.js';
 import { anonymousIdenticonDataUrl } from './anonymousIdenticon.js';
+import { laneSceneContentHash } from './laneSceneEnvelope.js';
 
 /**
  * 鏡スナップショット: buckets を最小5フィールドに間引いて保存し、status が paint に渡せる buckets 形に
@@ -68,10 +69,40 @@ describe('buildLaneMirrorSnapshot', () => {
     expect(snap.domSelf).not.toHaveProperty('ignored');
   });
 
-  it('displaySrc 空の要素は落とす(鏡に出せない)', () => {
+  it('displaySrc 空+uid 有りは落とさない(スリムセル=読み手B-1識のidentity復元の入口)', () => {
+    // 会場一致gift/ad根治(2026-07-14): toMirrorCell がuserIdを見ずにdisplaySrc空だけで
+    //   即捨てていたバグの回帰防止。displaySrc空+uid有りは restoreLaneMirrorBuckets(B-1)が
+    //   identiconで復元する正常なケースなので、鏡の時点で落としてはいけない。
     const snap = buildLaneMirrorSnapshot({
       liveId: 'lv1',
       buckets: { link: [cell('1', ''), cell('2', 'https://cdn/2.jpg')], konta: [], tanu: [], gift: [], ad: [] }
+    }, { nowMs: 1 });
+    expect(snap.link).toHaveLength(2);
+    expect(snap.link.map((c) => c.userId)).toEqual(['1', '2']);
+    expect(snap.link[0].displaySrc).toBe('');
+  });
+
+  it('displaySrc 空+uid 無しでも idLine|title の複合キーがあれば落とさない(広告主セル等)', () => {
+    const adCell = {
+      displaySrc: '',
+      title: '広告主X',
+      meta: { idLine: 'AD-1', nameLine: '広告主X' },
+      entry: { userId: '' }
+    };
+    const snap = buildLaneMirrorSnapshot({
+      liveId: 'lv1',
+      buckets: { link: [], konta: [], tanu: [], gift: [], ad: [adCell] }
+    }, { nowMs: 1 });
+    expect(snap.ad).toHaveLength(1);
+    expect(snap.ad[0].idLine).toBe('AD-1');
+    expect(snap.ad[0].displaySrc).toBe('');
+  });
+
+  it('displaySrc も素性(uid/idLine/title)も無いセルだけ落とす(鏡に出せない)', () => {
+    const emptyCell = { displaySrc: '', title: '', meta: { idLine: '', nameLine: '' }, entry: { userId: '' } };
+    const snap = buildLaneMirrorSnapshot({
+      liveId: 'lv1',
+      buckets: { link: [emptyCell, cell('2', 'https://cdn/2.jpg')], konta: [], tanu: [], gift: [], ad: [] }
     }, { nowMs: 1 });
     expect(snap.link).toHaveLength(1);
     expect(snap.link[0].userId).toBe('2');
@@ -177,5 +208,18 @@ describe('鏡スリム化 B-1(読み手フォールバック・v0.1.1112)', () =
 
   it('B-2の前提: ①の既定生成(引数なし)は size=64 とbyte一致(strip比較の成立条件)', () => {
     expect(anonymousIdenticonDataUrl('a:same')).toBe(anonymousIdenticonDataUrl('a:same', 64));
+  });
+
+  it('会場一致gift/ad根治: giftのスリムセルを含むsnapのcontentHashは復元後の正準形と一致する(Patch 2b契約)', () => {
+    const snap = buildLaneMirrorSnapshot({
+      liveId: 'lv1',
+      buckets: {
+        link: [], konta: [], tanu: [],
+        gift: [cell('g1', ''), cell('g2', 'https://cdn/g2.jpg')],
+        ad: []
+      }
+    }, { nowMs: 1 });
+    const restored = restoreLaneMirrorBuckets(snap);
+    expect(snap.contentHash).toBe(laneSceneContentHash(restored));
   });
 });
