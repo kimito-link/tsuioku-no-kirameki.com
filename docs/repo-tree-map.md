@@ -39,7 +39,6 @@ graph LR
   ROOT --> d6["scripts/ 〔ビルド/自動生成〕"]
   d6 --> d6_0["xserver/ 〔デプロイ/webhook〕"]
   ROOT --> d7["sound-src/"]
-  d7 --> d7_0["tiers/"]
   ROOT --> d8["src/ 〔ソース〕"]
   d8 --> d8_0["data/ 〔コメント/取得〕"]
   d8 --> d8_1["domain/ 〔応援/集約/識別子〕"]
@@ -222,9 +221,7 @@ graph LR
 - `xserver/`（2 件） — Xserver 向け webhook(git pull デプロイ)スクリプト  〔デプロイ / webhook〕
 
 ## `sound-src/` — ⚠️ 未記入（ROLES に追記）
-<sub>ファイル 27 件</sub>
-
-- `tiers/`（23 件） — ⚠️ 未記入（ROLES に追記）
+<sub>ファイル 1 件</sub>
 
 ## `src/` — LP 側 + 純粋関数ライブラリの源  〔ソース〕
 <sub>ファイル 1408 件</sub>
@@ -487,10 +484,9 @@ esbuild の import 到達グラフを逆引きし「このファイルを変え�
 
 ---
 
-## ⚠️ 役割が未記入のディレクトリ（3）
+## ⚠️ 役割が未記入のディレクトリ（2）
 
 以下は `ROLES` 辞書に説明が無い。`scripts/repo-tree-map.mjs` の `ROLES` に1行足してから再生成すること。
 
 - `docs/article-drafts/`
 - `sound-src/`
-- `sound-src/tiers/`

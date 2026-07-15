@@ -709,7 +709,7 @@
 - `app/app.js` — スマホ閲覧用 status Web 版。
 - `app/live-view.js` — global NL_BUILD_ID
 - `extension/background.js` — MV3 Service Worker
-- `scripts/build-sounds.mjs` — sound-src/(CC0原素材)から extension/sound/ の効果音mp3を組み立てる。
+- `scripts/build-sounds.mjs` — extension/sound/ の効果音mp3を組み立てる。
 - `scripts/build-watch.mjs` — watch では起動時刻を埋める（rebuild 毎に再 import される訳ではないので、
 - `scripts/build.mjs` — .env を読み込む(status の共有キー NL_STATUS_INGEST_KEY / NL_STATUS_VIEW_TOKEN は .env から注入)。
 - `scripts/capture-store-screenshots.mjs` — Chrome ウェブストア用スクショ自動撮影
@@ -840,7 +840,7 @@
 
 ## 🧬 修正系譜マップ(この系統のバグを過去にどう直したか)
 
-> changelog 全 487 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
+> changelog 全 488 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
 
 ### 💾 記録件数 (73版)
 - `v0.1.1153` 2026-07-15 — 応援コメントの内訳表示が増減して見える不具合を修正
@@ -1316,7 +1316,8 @@
 - `v0.1.713` 2026-06-13 — 会場モードを明るくして発言を吹き出し表示
 - `v0.1.711` 2026-06-13 — 会場モードで発言を吹き出し表示
 
-### 🎁 ギフト (98版)
+### 🎁 ギフト (99版)
+- `v0.1.1158` 2026-07-16 — ギフト音の原素材の出典記録を撤回し全て自作音源へ統一
 - `v0.1.1157` 2026-07-16 — ギフト効果音の状態表示が古いまま固まることがある不具合を修正
 - `v0.1.1156` 2026-07-15 — ギフト演出は出るのに効果音が鳴らないことがある不具合を修正
 - `v0.1.1142` 2026-07-14 — ギフト列で自分のサムネが表示されない不具合を修正

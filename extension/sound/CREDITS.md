@@ -27,22 +27,25 @@
 
 上記のうち有効なOtoLogic依存は無し(全て差し替え済み)。この節は履歴として残す。
 
-## v0.1.1059 で更新(ギフト音を差し替え+パチンコ台的バリエーションを新設)
+## v0.1.1059 で更新(ギフト音を差し替え+パチンコ台的バリエーションを新設) — 2026-07-16 出典記録を撤回・全面差し替え
 
-`effect-gift.mp3`(旧: OtoLogic Cash_Register-Beep01-1)が「ギフトらしくない・迫力がない」と
-不評だったため、Freesound(CC0)素材3層(投擲のフッ→着弾のドン→きらめきの余韻)の自作ミックスに
-差し替え。CC0のためクレジット表記は法的に不要だが、選定ミス時の追跡性のため
-`sound-src/SOURCES.md` に出典を記録している(素材原本は `sound-src/`、ビルド成果物は
-`scripts/build-sounds.mjs` が `extension/sound/` へ出力する)。
+当初は「Freesound(CC0)素材3層(投擲のフッ→着弾のドン→きらめきの余韻)の自作ミックス」
+「`sound-src/tiers/`配下26ファイルもFreesound CC0」と記録していたが、本人(kimito)から
+「Audiostockを定額契約してダウンロードした素材の記憶が強い」との指摘があり、この
+Freesound出典記録自体が信頼できない(AIが記載した内容で裏取りができない)と判明した。
+該当する原素材ファイル(`gift-whoosh.mp3`/`gift-impact.mp3`/`gift-sparkle.mp3`、
+`sound-src/tiers/`配下26ファイル)と、それらを読み込むビルドコード
+(`buildGiftSound`・`buildTierVariations`)は2026-07-16に全てリポジトリから削除した。
+詳細は`sound-src/SOURCES.md`参照。
 
-あわせて「1つだけでなくパチンコみたいにたくさん欲しい」というユーザー要望に対応し、
-`sound/tiers/` 配下にギフト金額帯(small/medium/large/mega)・マイルストーン段階
-(soft/hard/jackpot)・リーチ演出、それぞれ2〜3種類のバリエーションを追加(全23ファイル)。
-**注: v0.1.1069(`scripts/build-sounds.mjs`の`buildSynthPachinkoSuite`)で、gift-*/milestone-*/
-reach-*の全23ファイルはFreesound CC0素材から「ffmpeg aevalsrcによる完全自作合成音(決定論・
-サードパーティ音源不使用)」へ上書きされている。`sound-src/SOURCES.md`のFreesound出典表は
-現在使われていない過去の記録(履歴として残置)。実際に鳴っているのは自作合成音のためライセンス
-上さらにクリア(帰属表記の必要すら無い)。**`effectSoundPlayer.js`の`resolveEffectSoundPath()`が
+「1つだけでなくパチンコみたいにたくさん欲しい」というユーザー要望に対応した
+`sound/tiers/` 配下(ギフト金額帯small/medium/large/mega・マイルストーン段階
+soft/hard/jackpot・リーチ演出、全23ファイル)は、v0.1.1069時点で既に
+`scripts/build-sounds.mjs`の`buildSynthPachinkoSuite`(ffmpeg `aevalsrc`による完全な
+数式合成・サードパーティ音源不使用)へ上書きされていたため、**上記の出典撤回による
+実配布物への影響は無い**(実際に鳴っているのは元から自作合成音)。`effect-gift.mp3`
+(GIFT種別のフォールバック単一ファイル)も`tiers/gift-medium-1.mp3`の複製に差し替え、
+自作合成音へ完全統一した。`effectSoundPlayer.js`の`resolveEffectSoundPath()`が
 カテゴリ内からランダムに1本選んで再生する。
 
 ## v0.1.1150(効果音最適化)で追加(ad/rank-up/rank-downをCC0化)
