@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1155',
+    date: '2026-07-15',
+    summary: 'コメント数マイルストーン効果音の第三者ライセンス依存を解消',
+    items: Object.freeze([
+      'コメント数の節目(100/200/500/1000件)で鳴る効果音のフォールバック用ファイルを、既存の自作音源へ差し替えました。これにより効果音の第三者ライセンス依存はなくなりました。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1154',
     date: '2026-07-15',
     summary: '会場の「名前ありゆっくり顔」の原因を見つけやすくする診断を追加',
