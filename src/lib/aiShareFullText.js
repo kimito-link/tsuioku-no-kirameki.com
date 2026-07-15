@@ -262,6 +262,14 @@ export function buildAiShareFullText({ overviewText, livesData, fastDiag, popupD
     } catch {
       /* no-op */
     }
+    // 2026-07-14 診断先行(venue-tile-link-parity-diagnose-DESIGN.md): タイル実体(鏡uid)⇄席クラス
+    //   (roster uid)の二重ソース不一致が実害を出しているかを数えるだけの1行(修正はしない・観測のみ)。
+    try {
+      const slpLine = String(/** @type {any} */ (venueSeatsDiag)?.seatLinkParity?.line || '');
+      if (slpLine) lines.push(slpLine);
+    } catch {
+      /* no-op */
+    }
     // v0.1.1054: ギフト/広告の「検知→演出→効果音」整合診断(使用時のみ)。「ちゃんと飛ぶか・音が出るか」を共有に載せる。
     try {
       const gLines = buildGiftEffectDiagLines(giftEffectDiag, Date.now());

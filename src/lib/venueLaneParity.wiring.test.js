@@ -264,4 +264,22 @@ describe('会場=①レーン鏡映の配線(配線忘れ=CI赤)', () => {
     expect(laneSceneEnvelopeSrc).toMatch(/export function buildRenderReceipt\(/);
     expect(laneSceneEnvelopeSrc).toMatch(/export function compareRenderReceipts\(/);
   });
+
+  // --- 2026-07-14 診断先行(venue-tile-link-parity-diagnose-DESIGN.md): 席リンク一致計器の配線 ---
+  it('venueBar が席リンク一致計器(observeVenueSeatLink)を毎paint観測している', () => {
+    expect(venueBarSrc).toMatch(
+      /import\s*\{\s*beginVenueSeatLinkPaint,\s*createVenueSeatLinkParityState,\s*observeVenueSeatLink,\s*toVenueSeatLinkParityDiag\s*\}\s*from\s*'\.\.\/lib\/venueSeatLinkParity\.js'/
+    );
+    expect(venueBarSrc).toMatch(/beginVenueSeatLinkPaint\(_seatLinkParity\)/);
+    expect(venueBarSrc).toMatch(/observeVenueSeatLink\(_seatLinkParity,/);
+    expect(venueBarSrc).toMatch(/seatLinkParity:\s*toVenueSeatLinkParityDiag\(_seatLinkParity,\s*Date\.now\(\)\)/);
+  });
+
+  it('venueSeatsDiag が seatLinkParity を通す(whitelist落ち防止)', () => {
+    expect(seatsDiagSrc).toMatch(/seatLinkParity/);
+  });
+
+  it('aiShareFullText が seatLinkParity.line を状態速報に出している', () => {
+    expect(aiShareSrc).toMatch(/venueSeatsDiag\)\?\.seatLinkParity\?\.line/);
+  });
 });
