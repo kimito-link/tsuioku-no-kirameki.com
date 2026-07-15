@@ -36,8 +36,8 @@ describe('v0.1.1095: デルタ補完ギフトの scheduleGiftSound 配線(handle
   const deltaFn = extractFunctionBody(src, 'const handleGiftPointsAggregate = (aggregatePoints)');
   // maybeThrowGiftFromSpeech(コメント本文パース経路)が「launchGiftThrow の戻り値(実際に
   //   投げたか)を見てからカウントする」模範実装(v0.1.1057)。handleNewGiftEvents(NDGR構造化
-  //   event経路)はこのゲートを欠いたまま残っている既知の非対称(本タスクのスコープ外・
-  //   デルタ経路の音が鳴らない症状には無関係なので触らない)。デルタ経路は模範側に揃える。
+  //   event経路)はv0.1.1095時点ではこのゲートを欠いたまま残っていたが、v0.1.1156で
+  //   実際に「検知1→演出1✅→音0」の実害が確認され模範側へ揃えた(下のdescribeブロック参照)。
   const referenceFn = extractFunctionBody(src, 'const maybeThrowGiftFromSpeech = (speech)');
 
   it('handleGiftPointsAggregate は launchGiftThrow を呼ぶ', () => {
@@ -68,5 +68,33 @@ describe('v0.1.1095: デルタ補完ギフトの scheduleGiftSound 配線(handle
     expect(scheduleFn).toContain("_giftEffectDiagCounters[field] += 1"); // guarded/no-path/error
     expect(scheduleFn).toContain('giftSoundError += 1');
     expect(scheduleFn).toContain("return 'coalesced'");
+  });
+});
+
+describe('v0.1.1156: NDGR構造化event経路(handleNewGiftEvents)の非対称是正+pagehideタイマー回収', () => {
+  // 実配信2回で「検知1→演出1✅→音0(内訳全部ゼロ)」が観測された。真因は2つ:
+  //   (1) handleNewGiftEvents が launchGiftThrow の戻り値を見ずに giftThrown を無条件加算していた
+  //       (maybeThrowGiftFromSpeech/handleGiftPointsAggregateは既にゲート済みだった非対称)。
+  //   (2) scheduleGiftSound が予約する setTimeout(0) は、コールバック発火前にタブ/ウィンドウが
+  //       閉じられるとタイマーごと消え、giftSoundPlayed/Coalesced/Guarded/NoPath/Error/Off の
+  //       どれにも計上されないまま音だけ失われる(pagehideで保留タイマーを回収する経路が無かった)。
+  const eventsFn = extractFunctionBody(src, 'const handleNewGiftEvents = (events)');
+  const referenceFn = extractFunctionBody(src, 'const maybeThrowGiftFromSpeech = (speech)');
+
+  it('handleNewGiftEvents は launchGiftThrow の戻り値をゲートにしてから giftThrown を加算し scheduleGiftSound を呼ぶ(模範実装と同型)', () => {
+    expect(referenceFn).toMatch(/if \(launchGiftThrow\([^)]*\)\) \{[\s\S]*?giftThrown \+= 1;[\s\S]*?scheduleGiftSound\(/);
+    expect(eventsFn).toMatch(/if \(launchGiftThrow\([^)]*\)\) \{[\s\S]*?giftThrown \+= 1;[\s\S]*?scheduleGiftSound\(/);
+  });
+
+  it('scheduleGiftSound は保留中の1本を再実行できる関数(run)を _pendingGiftSound に保持する', () => {
+    const scheduleFn = extractFunctionBody(src, 'const scheduleGiftSound = (tier, _flightMs, detectAt)');
+    expect(scheduleFn).toMatch(/const runPendingGiftSound = \(\) => \{/);
+    expect(scheduleFn).toContain('pending.run = runPendingGiftSound');
+  });
+
+  it('mountVenueBarButton は pagehide 時に保留中のギフト音を強制フラッシュし、内訳ゼロで音が消えることを防ぐ', () => {
+    expect(src).toMatch(
+      /window\.addEventListener\(\s*'pagehide',\s*\(\) => \{\s*if \(_pendingGiftSound && _pendingGiftSound\.run\) \{\s*window\.clearTimeout\(_pendingGiftSound\.timer\);\s*_pendingGiftSound\.run\(\);\s*\}\s*\},\s*\{ once: true \}\s*\);/
+    );
   });
 });

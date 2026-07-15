@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1156',
+    date: '2026-07-15',
+    summary: 'ギフト演出は出るのに効果音が鳴らないことがある不具合を修正',
+    items: Object.freeze([
+      '一部のギフトで、投擲の演出は表示されるのに効果音だけ鳴らないことがある不具合を修正しました。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1155',
     date: '2026-07-15',
     summary: 'コメント数マイルストーン効果音の第三者ライセンス依存を解消',
