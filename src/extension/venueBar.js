@@ -207,6 +207,13 @@ import {
   observeVenueSeatLink,
   toVenueSeatLinkParityDiag
 } from '../lib/venueSeatLinkParity.js';
+// 2026-07-15 診断先行(venue-yukkuri-named-diagnose): 「名前ありゆっくり顔」の実害を数えるだけの計器
+//   (修正はしない・観測のみ)。真因は桁レンジ境界(isAnonymousStyleNicoUserId)で、意図的仕様のため触らない。
+import {
+  createVenueYukkuriNamedCensusState,
+  observeVenueYukkuriNamedTile,
+  toVenueYukkuriNamedCensusDiag
+} from '../lib/venueYukkuriNamedCensus.js';
 import {
   paintStoryUserLaneDomFilled,
   resetStoryUserLaneDom
@@ -2387,6 +2394,9 @@ export function mountVenueBarButton(options = {}) {
   // 2026-07-14 席リンク一致計器(診断先行アプローチ): タイル実体(鏡uid)と席クラス(roster uid)の
   //   二重ソース不一致が実害を出しているかを累積で数える(観測のみ・修正はしない)。
   const _seatLinkParity = createVenueSeatLinkParityState();
+  // 2026-07-15 名前ありゆっくり顔 計器(診断先行アプローチ): 実害の有無・頻度を累積で数える
+  //   (観測のみ・修正はしない)。
+  const _yukkuriNamedCensus = createVenueYukkuriNamedCensusState();
   // 応援者トップNバーの状態(renderTopBar / clearDisplay が触る・宣言はここ=TDZ 回避)。
   let _lastTopBarSig = '';
   let _topBarShownOnce = false;
@@ -4251,6 +4261,12 @@ export function mountVenueBarButton(options = {}) {
       const participant = entry.participant || {};
       const uid = String(participant.userId || '').trim();
       const rawName = String(participant.name || '').trim();
+      // 観測のみ(データ不変・失敗は握る=描画を止めない)。item は既に構築済み=新規計算ゼロ。
+      try {
+        observeVenueYukkuriNamedTile(_yukkuriNamedCensus, { uid, rawName, displaySrc: item?.displaySrc });
+      } catch {
+        /* 計器失敗は描画を止めない */
+      }
       const displayName =
         String(item?.title || '').trim() ||
         rawName ||
@@ -4444,6 +4460,8 @@ export function mountVenueBarButton(options = {}) {
       anonExcluded: _anonExcludedCount,
       // 2026-07-14 席リンク一致計器: タイル実体(鏡uid)⇄席クラス(roster uid)の二重ソース突合(累積)。
       seatLinkParity: toVenueSeatLinkParityDiag(_seatLinkParity, Date.now()),
+      // 2026-07-15 診断先行(venue-yukkuri-named-diagnose): 「名前ありゆっくり顔」の実害を数えるだけの1行。
+      yukkuriNamedCensus: toVenueYukkuriNamedCensusDiag(_yukkuriNamedCensus),
       storyDiagMirror: storyDiagMirrorStatus(storyDiagMirrorSnap, String(activeLiveId || liveIdFromPathname() || ''), Date.now())
     };
     publishVenueSeatsDiag(seatsDiagObs);

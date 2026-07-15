@@ -85,7 +85,9 @@ export const DIAGNOSIS_REGISTRY = Object.freeze([
   // v0.1.1113: 会場一致(Tri-Parity=鏡データ=段割当データ=段実DOM)。従来はテキスト1行のみで
   //   レジストリ未登録=完全性スコア100%でも会場一致🔴がありうる盲点(穴f)だった。healthCells の
   //   venue-parity セルと同時に登録する(v0.1.1054 のレジストリ・ドリフトを繰り返さない)。
-  reg('venue-parity', '会場一致', 'venue', 2, false)
+  reg('venue-parity', '会場一致', 'venue', 2, false),
+  // 2026-07-15 診断先行(venue-yukkuri-named-diagnose): 「名前ありゆっくり顔」実害計器。
+  reg('venue-yukkuri-face', '名前ありゆっくり顔', 'venue', 1, false)
 ]);
 
 /** id → 観点 の索引(集計で O(1) 参照)。 */
