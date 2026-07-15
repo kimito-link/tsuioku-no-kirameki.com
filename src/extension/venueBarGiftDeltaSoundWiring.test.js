@@ -98,3 +98,34 @@ describe('v0.1.1156: NDGR構造化event経路(handleNewGiftEvents)の非対称�
     );
   });
 });
+
+describe('v0.1.1156追補: publishGiftEffectDiagの3秒min-gapが音カウンタ反映を握りつぶす競合の是正', () => {
+  // v0.1.1156の2点(上のdescribe参照)を適用したのに実配信で「検知1→演出1✅→音0(内訳全ゼロ)」が
+  //   624秒経っても解消せず再発した。真因は別にあった: 1件のギフト処理でpublishGiftEffectDiagは
+  //   最低2回呼ばれる(演出直後=giftThrown加算済み・音カウンタはまだ0/setTimeoutコールバック内=
+  //   音カウンタ加算後)。この2回は数msしか離れておらず、2回目は必ず3秒min-gapに弾かれてstorageへ
+  //   届かない。その後は同じ配信で他のギフト系イベントが来るまでpublishの機会が無く、「演出✅・
+  //   音0」の中間状態が半永久的に残る=音は実際には鳴っているのに診断表示だけが嘘をつき続ける。
+  const publishFn = extractFunctionBody(src, 'const publishGiftEffectDiag = ()');
+
+  it('publishGiftEffectDiag はmin-gapで弾いた書き込みを "dirty" として記録する(取りこぼしを覚えておく)', () => {
+    expect(publishFn).toMatch(/_giftEffectDiagDirty = true/);
+  });
+
+  it('publishGiftEffectDiag はmin-gap明け直後に1回だけ追いpublishするタイマーを予約する(多重予約しない)', () => {
+    expect(publishFn).toMatch(/if \(!_giftEffectDiagFlushTimer\) \{/);
+    expect(publishFn).toContain('_giftEffectDiagFlushTimer = window.setTimeout(');
+    expect(publishFn).toMatch(/3000 - elapsed/);
+  });
+
+  it('追いpublishタイマーは dirty がまだ立っている場合だけ実際に書き込む(不要な二重書き込みを避ける)', () => {
+    expect(publishFn).toMatch(/if \(_giftEffectDiagDirty\) writeGiftEffectDiagSnapshot\(Date\.now\(\)\);/);
+  });
+
+  it('実際のstorage書き込みはwriteGiftEffectDiagSnapshotの1箇所に集約されている(min-gap通過時・追いpublish時とも同じ経路)', () => {
+    const writeFn = extractFunctionBody(src, 'const writeGiftEffectDiagSnapshot = (now)');
+    expect(writeFn).toContain('_giftEffectDiagDirty = false');
+    expect(writeFn).toContain('chrome.storage.local.set({ [KEY_GIFT_EFFECT_DIAG]: snap })');
+    expect(publishFn).toContain('writeGiftEffectDiagSnapshot(now);');
+  });
+});
