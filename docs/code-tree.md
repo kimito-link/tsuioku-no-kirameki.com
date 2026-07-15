@@ -1922,6 +1922,8 @@
     - `venueStoryDiagMirrorPanel.test.js`
     - `venueViewport.js` — v0.1.715: 会場モードの「映像セーフエリア」と「同時表示人数」を決める純関数。
     - `venueViewport.test.js`
+    - `venueYukkuriNamedCensus.js` — 「名前ありゆっくり顔」実害確定計器(診断先行アプローチ)。
+    - `venueYukkuriNamedCensus.test.js`
     - `versionMismatch.js` — 「本体とページで版がズレている」を検知する純関数(2026-07-06)。
     - `versionMismatch.test.js`
     - `videoCapture.js` — watch ページの video から PNG を取るためのユーティリティ。
