@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1158',
+    date: '2026-07-16',
+    summary: 'ギフト音の原素材の出典記録を撤回し全て自作音源へ統一',
+    items: Object.freeze([
+      '一部の効果音の元になっていた素材ファイルの出典記録に誤りの疑いが見つかったため、該当ファイルをリポジトリから削除し、既に配布・使用中の自作合成音へ完全に統一しました。実際に鳴る音の切り替わりはありません。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1157',
     date: '2026-07-16',
     summary: 'ギフト効果音の状態表示が古いまま固まることがある不具合を修正',
