@@ -24,13 +24,19 @@
  *                               charFrame: number, crowdOn: boolean, crowdCount: number } }|null,
  *   anonExcluded: number,
  *   storyDiagMirror: { present: boolean, ageSec: number|null },
- *   sceneReceipt: { match: boolean, line: string }|null
+ *   sceneReceipt: { match: boolean, line: string }|null,
+ *   seatLinkParity: { line: string, checked: number, paints: number, badPaints: number,
+ *     uidMismatch: number, affordanceMismatch: number, hrefStale: number,
+ *     lastSample: null | { kind: string, seatIndex: number, mirrorUid: string, rosterUid: string,
+ *       tileTag: string, seatLinkOn: boolean, mode: string, atWall: number } }|null
  * }} VenueSeatsDiagState
  *
  * laneParity は v0.1.1111 の「会場=①レーンのメンバー一致トークン」(venueLaneParity.js)。null=未観測。
  *   v0.1.1113(Tri-Parity): dom=実DOM census 要約(venueDomCensus.js)。measured=false 相当は null。
  * anonExcluded(2026-07-14 会場独自受け皿の撤去): fallback時に会場独自の受け皿を持たなくなったため、
  *   「なぜ段が少ないか」を黙らないための計器(「消す側」に計器を、の鉄則)。匿名として除外した人数。
+ * seatLinkParity(2026-07-14 診断先行・venue-tile-link-parity-diagnose-DESIGN.md): タイル実体(鏡uid)⇄
+ *   席クラス(roster uid)の二重ソース不一致が実害を出しているかを数えるだけの計器(修正はしない)。null=未観測。
  */
 
 /** 初期 会場座席診断 state。 */
@@ -51,7 +57,8 @@ export function makeInitialVenueSeatsDiag() {
     laneParity: /** @type {VenueSeatsDiagState['laneParity']} */ (null),
     sceneReceipt: /** @type {VenueSeatsDiagState['sceneReceipt']} */ (null),
     anonExcluded: 0,
-    storyDiagMirror: { present: false, ageSec: /** @type {number|null} */ (null) }
+    storyDiagMirror: { present: false, ageSec: /** @type {number|null} */ (null) },
+    seatLinkParity: /** @type {VenueSeatsDiagState['seatLinkParity']} */ (null)
   };
 }
 
@@ -160,6 +167,32 @@ export function buildVenueSeatsDiagSnapshot(diag, nowMs) {
   //   検証済みの match/line だけ通す(未知の巨大オブジェクトを写さない)。
   const srIn = /** @type {any} */ (d.sceneReceipt && typeof d.sceneReceipt === 'object' ? d.sceneReceipt : null);
   const sceneReceipt = srIn ? { match: srIn.match === true, line: String(srIn.line || '') } : null;
+  // 2026-07-14 席リンク一致計器: 検証済みのフィールドだけ通す(未知の巨大オブジェクトを写さない)。
+  const slpIn = /** @type {any} */ (d.seatLinkParity && typeof d.seatLinkParity === 'object' ? d.seatLinkParity : null);
+  const slpSampleIn = /** @type {any} */ (slpIn?.lastSample && typeof slpIn.lastSample === 'object' ? slpIn.lastSample : null);
+  const seatLinkParity = slpIn
+    ? {
+        line: String(slpIn.line || ''),
+        checked: Math.max(0, Math.floor(num(slpIn.checked, 0))),
+        paints: Math.max(0, Math.floor(num(slpIn.paints, 0))),
+        badPaints: Math.max(0, Math.floor(num(slpIn.badPaints, 0))),
+        uidMismatch: Math.max(0, Math.floor(num(slpIn.uidMismatch, 0))),
+        affordanceMismatch: Math.max(0, Math.floor(num(slpIn.affordanceMismatch, 0))),
+        hrefStale: Math.max(0, Math.floor(num(slpIn.hrefStale, 0))),
+        lastSample: slpSampleIn
+          ? {
+              kind: String(slpSampleIn.kind || ''),
+              seatIndex: Math.max(0, Math.floor(num(slpSampleIn.seatIndex, 0))),
+              mirrorUid: String(slpSampleIn.mirrorUid || ''),
+              rosterUid: String(slpSampleIn.rosterUid || ''),
+              tileTag: String(slpSampleIn.tileTag || ''),
+              seatLinkOn: slpSampleIn.seatLinkOn === true,
+              mode: String(slpSampleIn.mode || ''),
+              atWall: Math.max(0, Math.floor(num(slpSampleIn.atWall, 0)))
+            }
+          : null
+      }
+    : null;
   return {
     enabled: !!d.enabled,
     liveId: String(d.liveId || base.liveId),
@@ -177,6 +210,7 @@ export function buildVenueSeatsDiagSnapshot(diag, nowMs) {
     sceneReceipt,
     anonExcluded: Math.max(0, Math.floor(num(d.anonExcluded, 0))),
     storyDiagMirror,
+    seatLinkParity,
     capturedAt: now
   };
 }
