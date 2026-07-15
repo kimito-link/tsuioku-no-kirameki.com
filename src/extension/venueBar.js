@@ -2469,19 +2469,45 @@ export function mountVenueBarButton(options = {}) {
   //   ようにする計器(検知→演出→音の3段階カウンタ・観測のみ・描画/演出は変えない)。
   const _giftEffectDiagCounters = makeInitialGiftEffectDiag();
   let _giftEffectDiagLastWriteAt = 0;
+  // v0.1.1156: 1件のギフト処理内で publishGiftEffectDiag は最低2回呼ばれる
+  //   (演出直後=giftThrown加算済み・音カウンタはまだ0/setTimeoutコールバック内=音カウンタ加算後)。
+  //   この2回は数msしか離れておらず、2回目は必ず3秒min-gapに弾かれてstorageへ届かない。
+  //   結果「演出✅・音0」の中間状態が次のギフト系イベントが来るまで(配信終了まで)嘘のまま
+  //   残り続ける実測バグを踏んだ(検知1→演出1✅→音0が624秒経っても解消しなかった)。
+  //   弾かれた書き込みは「まだ反映していない差分がある」フラグを立て、min-gap明け直後に
+  //   1回だけ追いpublishするタイマーで拾う(他の診断のmin-gap設計自体は変えない)。
+  let _giftEffectDiagDirty = false;
+  let _giftEffectDiagFlushTimer = 0;
   // v0.1.1090: 個別ギフトイベント欠落配信のデルタ補完検知(帳簿state・配信=liveId単位で
   //   computeGiftDelta が内部でリセットする。ここでは1個の可変stateを持ち回すだけ)。
   let _giftDeltaState = makeInitialGiftDeltaState('');
   // 2026-07-06: 来場入賞演出専用の20秒CD(積み増し禁止=CD中に来場が来ても待たせず単にスキップし
   //   カウンタだけ計上する)。0=未発火(shouldFireArrivalEffectはlastAt=0/十分先のnowMsで発火可)。
   let _lastArrivalEffectAtMs = 0;
-  const publishGiftEffectDiag = () => {
-    const now = Date.now();
-    if (now - _giftEffectDiagLastWriteAt < 3000) return; // 3秒 min-gap(他の診断と同型)。
+  /** @param {number} now */
+  const writeGiftEffectDiagSnapshot = (now) => {
     _giftEffectDiagLastWriteAt = now;
+    _giftEffectDiagDirty = false;
     _giftEffectDiagCounters.soundEnabled = _effectSoundEnabledCache;
     const snap = buildGiftEffectDiagSnapshot(_giftEffectDiagCounters, now);
     void chrome.storage.local.set({ [KEY_GIFT_EFFECT_DIAG]: snap }).catch(() => {});
+  };
+  const publishGiftEffectDiag = () => {
+    const now = Date.now();
+    const elapsed = now - _giftEffectDiagLastWriteAt;
+    if (elapsed < 3000) {
+      // 弾かれた=直近の書き込み以降にカウンタが変化した可能性がある。取りこぼさないよう、
+      //   min-gap明け直後に1回だけ追いpublishする(タイマーは1本だけ・多重予約しない)。
+      _giftEffectDiagDirty = true;
+      if (!_giftEffectDiagFlushTimer) {
+        _giftEffectDiagFlushTimer = window.setTimeout(() => {
+          _giftEffectDiagFlushTimer = 0;
+          if (_giftEffectDiagDirty) writeGiftEffectDiagSnapshot(Date.now());
+        }, 3000 - elapsed + 50);
+      }
+      return;
+    }
+    writeGiftEffectDiagSnapshot(now);
   };
 
   // Phase B(2026-07-05): パチンコボイス演出+歯止め(council/pachinko-ultimate-SYNTHESIS.md §4/§6)。

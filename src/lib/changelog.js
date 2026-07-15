@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1157',
+    date: '2026-07-16',
+    summary: 'ギフト効果音の状態表示が古いまま固まることがある不具合を修正',
+    items: Object.freeze([
+      '「ギフトの効果音が鳴っていない」ように見える状態表示が、実際には音が鳴った後もしばらく更新されず古いまま残ることがある不具合を修正しました(効果音そのものの再生には影響ありません)。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1156',
     date: '2026-07-15',
     summary: 'ギフト演出は出るのに効果音が鳴らないことがある不具合を修正',
