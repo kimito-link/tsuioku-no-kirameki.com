@@ -2604,7 +2604,7 @@ export function mountVenueBarButton(options = {}) {
   //   ギフトのコンボ窓は10秒(30秒だと安定した連続ギフトが常時megaに張り付くため・決定論)。
   const GIFT_COMBO_WINDOW_MS = 10_000;
   let _giftComboState = makeInitialComboState();
-  let _pendingGiftSound = /** @type {{ kind: string, timer: number }|null} */ (null);
+  let _pendingGiftSound = /** @type {{ kind: string, timer: number, run: () => void }|null} */ (null);
   /**
    * ギフト1件ぶんの音をディレクター経由で予約する。
    * @param {string|undefined} tier 'small'|'medium'|'large'|'mega'
@@ -2645,8 +2645,8 @@ export function mountVenueBarButton(options = {}) {
     }
     // v0.1.1066: 実試聴「タイミングが遅れてる」→飛翔時間まるごと待つのをやめ、最大200msに短縮。
     //   (投げた瞬間に音が出始める方が体感が良い。200msはバースト統合の窓として最低限残す)
-    const pending = { kind, timer: 0 };
-    pending.timer = window.setTimeout(() => {
+    const pending = { kind, timer: 0, run: /** @type {() => void} */ (() => {}) };
+    const runPendingGiftSound = () => {
       _pendingGiftSound = null;
       try {
         // 「鳴らした」時だけ数える(戻り値を見ずに数えると診断が嘘をつく・v0.1.1057と同じ教訓)。
@@ -2678,7 +2678,9 @@ export function mountVenueBarButton(options = {}) {
         _giftEffectDiagCounters.giftSoundError += 1;
       }
       publishGiftEffectDiag();
-    }, 0); // v0.1.1068: 即発音(同一バーストの統合はsetTimeout(0)がループ後に走ることで維持)
+    };
+    pending.timer = window.setTimeout(runPendingGiftSound, 0); // v0.1.1068: 即発音(同一バーストの統合はsetTimeout(0)がループ後に走ることで維持)
+    pending.run = runPendingGiftSound;
     _pendingGiftSound = pending;
     // Phase C(2026-07-05): 盛り上がりメーター(M)にギフト重みを加算(§3.2: small/medium/large/mega=4/8/16/32)。
     //   comboStreakはギフトの連続コンボ数(effectDirector.directHit)=§3.3「コンボ2連中/3連目」条件。
@@ -2690,6 +2692,22 @@ export function mountVenueBarButton(options = {}) {
     });
     return 'scheduled';
   };
+
+  // v0.1.1156: 「検知→演出✅→音の内訳が全部ゼロ」実機バグの根治。scheduleGiftSoundが予約する
+  //   setTimeout(0)はページ/タブが閉じられる瞬間に発火せず消えることがあり、_pendingGiftSoundが
+  //   giftSoundPlayed/Coalesced/Guarded/NoPath/Error/Offのどれにも計上されないまま失われていた
+  //   (診断が「⚠N件鳴っていない」と嘘をつかない設計のはずが、ここだけ抜け穴だった)。
+  //   pagehide時に保留中の1本があれば強制的に走らせて必ずどれかのカウンタへ計上する。
+  window.addEventListener(
+    'pagehide',
+    () => {
+      if (_pendingGiftSound && _pendingGiftSound.run) {
+        window.clearTimeout(_pendingGiftSound.timer);
+        _pendingGiftSound.run();
+      }
+    },
+    { once: true }
+  );
 
   /* ==========================================================================
    * Phase C(2026-07-05): 物語弧の完成(council/pachinko-ultimate-SYNTHESIS.md §3/§5/§6)。
@@ -3676,11 +3694,16 @@ export function mountVenueBarButton(options = {}) {
       // 起点: 席キーは venueSpeakerKey/venueParticipantKey と同じ `u:${uid}` 形にする
       //   (raw uid だと seatByKey に当たらず常に crowdBubbleAnchor へ落ちる)。
       if (proj) {
-        launchGiftThrow(uid ? `u:${uid}` : '', proj, _detectAt);
-        _giftEffectDiagCounters.giftThrown += 1;
-        // v0.1.1061: 即時再生をやめ、着弾タイミングに1本だけ予約(バーストは置換昇格)。
-        if (scheduleGiftSound(proj.tier, proj.durationMs, _detectAt) === 'coalesced') {
-          _giftEffectDiagCounters.giftSoundCoalesced += 1;
+        // v0.1.1156: 他2経路(maybeThrowGiftFromSpeech/handleGiftPointsAggregate)と同じく
+        //   launchGiftThrow の戻り値(実際に投げたか)を見てからカウントする。従来は無条件加算で、
+        //   同時投擲上限超過等の早期returnも「投げた」扱いになり giftThrown が実態より過大
+        //   (=音の取りこぼしを過小報告)していた。
+        if (launchGiftThrow(uid ? `u:${uid}` : '', proj, _detectAt)) {
+          _giftEffectDiagCounters.giftThrown += 1;
+          // v0.1.1061: 即時再生をやめ、着弾タイミングに1本だけ予約(バーストは置換昇格)。
+          if (scheduleGiftSound(proj.tier, proj.durationMs, _detectAt) === 'coalesced') {
+            _giftEffectDiagCounters.giftSoundCoalesced += 1;
+          }
         }
       }
       publishGiftEffectDiag();
