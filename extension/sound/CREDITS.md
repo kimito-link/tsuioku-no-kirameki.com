@@ -15,15 +15,17 @@
 
 上記のうち有効なOtoLogic依存は無し(全て差し替え済み)。この節は履歴として残す。
 
-## v0.1.1054 で追加(コメント数マイルストーン=パチンコ演出の効果音)
+## v0.1.1054 で追加(コメント数マイルストーン=パチンコ演出の効果音) — 2026-07-15 差し替え済み
 
 出典: [OtoLogic](https://otologic.jp/)（フリー効果音素材・[CC BY 4.0](https://creativecommons.org/licenses/by/4.0/deed.ja)）
 
 | ファイル | 元素材名 | 用途 |
 |---|---|---|
-| `effect-milestone-soft.mp3` | Phrase01-1 | コメント数が100/200件に到達したとき |
-| `effect-milestone-hard.mp3` | Winning_Bell01-05(Gentle) | コメント数が500件に到達したとき |
-| `effect-milestone-jackpot.mp3` | Winning_Bell01-01(Strong) | コメント数が1000件以上に到達したとき(大当たり) |
+| ~~`effect-milestone-soft.mp3`~~ | ~~Phrase01-1~~ | 2026-07-15差し替え(下記参照) |
+| ~~`effect-milestone-hard.mp3`~~ | ~~Winning_Bell01-05(Gentle)~~ | 2026-07-15差し替え(下記参照) |
+| ~~`effect-milestone-jackpot.mp3`~~ | ~~Winning_Bell01-01(Strong)~~ | 2026-07-15差し替え(下記参照) |
+
+上記のうち有効なOtoLogic依存は無し(全て差し替え済み)。この節は履歴として残す。
 
 ## v0.1.1059 で更新(ギフト音を差し替え+パチンコ台的バリエーションを新設)
 
@@ -57,7 +59,24 @@ reach-*の全23ファイルはFreesound CC0素材から「ffmpeg aevalsrcによ�
 
 フォールバック単一ファイル(`effect-ad.mp3`等)も各カテゴリの1番目のコピーに差し替え済み。
 新規ファイル追加は無し(`web_accessible_resources`の`sound/tiers/*.mp3`ワイルドカードで既にカバー
-済み)。これによりOtoLogic依存はゼロになった(popup.htmlフッターのOtoLogicクレジット表記は撤去可能)。
+済み)。
+
+## 2026-07-15 マイルストーン(soft/hard/jackpot)のフォールバック単一ファイルもCC0化
+
+`effect-milestone-soft.mp3`・`effect-milestone-hard.mp3`・`effect-milestone-jackpot.mp3`は
+v0.1.1059時点で`EFFECT_SOUND_VARIANT_PATHS`のバリエーション化対象になっており通常時は
+`tiers/milestone-*.mp3`(自作合成音)が優先再生されるため実害は薄かったが、フォールバック経路
+(バリエーション解決に失敗した場合)に落ちると旧OtoLogic音源が鳴る余地が残っていた。ad/rank系
+(v0.1.1150)と同じパターンで、各カテゴリの1番目のコピーに差し替え:
+
+| ファイル | 差し替え元 |
+|---|---|
+| `effect-milestone-soft.mp3` | `tiers/milestone-soft-1.mp3` |
+| `effect-milestone-hard.mp3` | `tiers/milestone-hard-1.mp3` |
+| `effect-milestone-jackpot.mp3` | `tiers/milestone-jackpot-1.mp3` |
+
+これにより`extension/sound/`配下のOtoLogic(CC BY 4.0)依存は完全にゼロになった
+(popup.htmlフッターのOtoLogicクレジット表記は撤去可能)。
 
 ## 既存(v0.1.806〜) — 2026-07-15 出典確認完了
 
