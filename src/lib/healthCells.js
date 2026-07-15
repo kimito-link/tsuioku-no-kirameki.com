@@ -350,7 +350,7 @@ function buildLaneHealthCells(laneDiag) {
 
 /**
  * 健全度セル配列を作る。
- * @param {{ livesData?: any[], fastDiag?: any, voiceDiag?: any, venueSeatsDiag?: any, laneDiag?: any, giftEffectDiag?: any, milestoneEffectDiag?: any, previewRenderAck?: any, laneMirror?: any, nowMs?: number }} data
+ * @param {{ livesData?: any[], fastDiag?: any, popupDiag?: any, voiceDiag?: any, venueSeatsDiag?: any, laneDiag?: any, giftEffectDiag?: any, milestoneEffectDiag?: any, previewRenderAck?: any, laneMirror?: any, nowMs?: number }} data
  * @returns {HealthCell[]}
  */
 export function buildHealthCells(data) {
@@ -475,6 +475,19 @@ export function buildHealthCells(data) {
     cells.push(stateCell('scroll-whiteout', 'スクロール白化', woCount > 0 ? 'warn' : 'ok', woCount > 0 ? `${woCount}回` : 'なし'));
   } else {
     cells.push(stateCell('scroll-whiteout', 'スクロール白化', 'na', '—'));
+  }
+
+  // 8c. 診断カウンタchurn(2026-07-14 diagnostic-architecture-strengthen-DESIGN.md C-3): 内訳・用語の
+  //   total/withUid/selfSaved は arr の非同期再構築(reset→fill)途中を paint が観測すると一時的に
+  //   減って見える。単調ゲート(storyDiagMonotonic.js)が実際にクランプした累積回数=diagRegressions。
+  //   0=このセッションでは一度もchurnを観測していない(正常)。実害はUI表示のみ(記録は減らない)なので
+  //   warnまで(赤にしない)。
+  const storyDiagSnap = (data?.popupDiag?.popup ?? data?.popupDiag)?.storyDiag;
+  if (storyDiagSnap && typeof storyDiagSnap === 'object' && num(storyDiagSnap.total) > 0) {
+    const regressions = num(storyDiagSnap.diagRegressions) || 0;
+    cells.push(stateCell('diag-stability', '診断カウンタの安定性', regressions > 0 ? 'warn' : 'ok', regressions > 0 ? `補正${regressions}回` : '安定'));
+  } else {
+    cells.push(stateCell('diag-stability', '診断カウンタの安定性', 'na', '—'));
   }
 
   // 9-14. 北極星6レーン。

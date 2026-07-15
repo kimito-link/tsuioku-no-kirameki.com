@@ -613,6 +613,43 @@ describe('summarizeHealthVerdict v0.1.846 満点=「異常ゼロ」(進行中/�
     });
   });
 
+  // 2026-07-14 診断カウンタchurn根治(diagnostic-architecture-strengthen-DESIGN.md C-3)。
+  describe('診断カウンタの安定性セル(diag-stability)', () => {
+    it('popupDiag未指定/storyDiag無し/total<=0は na', () => {
+      expect(cellById(buildHealthCells({ livesData: [] }), 'diag-stability').level).toBe('na');
+      expect(
+        cellById(
+          buildHealthCells({ livesData: [], popupDiag: { popup: { storyDiag: { total: 0, diagRegressions: 3 } } } }),
+          'diag-stability'
+        ).level
+      ).toBe('na');
+    });
+
+    it('diagRegressions=0は ok・安定', () => {
+      const c = cellById(
+        buildHealthCells({
+          livesData: [],
+          popupDiag: { popup: { storyDiag: { total: 10, diagRegressions: 0 } } }
+        }),
+        'diag-stability'
+      );
+      expect(c.level).toBe('ok');
+      expect(c.text).toBe('安定');
+    });
+
+    it('diagRegressions>0は warn・補正回数を出す(赤にしない)', () => {
+      const c = cellById(
+        buildHealthCells({
+          livesData: [],
+          popupDiag: { popup: { storyDiag: { total: 10, diagRegressions: 2 } } }
+        }),
+        'diag-stability'
+      );
+      expect(c.level).toBe('warn');
+      expect(c.text).toBe('補正2回');
+    });
+  });
+
   // v0.1.1054: ギフト/広告の「検知→演出→効果音」整合セル。
   describe('ギフト演出/効果音整合セル(giftEffectDiag)', () => {
     it('giftEffectDiag 未指定/未観測(検知0件)=セルを足さない(死にセルにしない)', () => {

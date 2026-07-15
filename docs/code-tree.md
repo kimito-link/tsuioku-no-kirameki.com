@@ -1754,6 +1754,8 @@
     - `storyDetailRelatedEntries.js` — ストーリー詳細／プレビュー脇の「同一ユーザーの直近」リスト用。
     - `storyDetailRelatedEntries.test.js`
     - `storyDiagMirrorKey.js` — ①「詳しい状況」診断を会場へ鏡映する legacy storage key。
+    - `storyDiagMonotonic.js` — 診断カウンタchurn(内訳・用語の顔一覧が増減して見える)の根治。
+    - `storyDiagMonotonic.test.js`
     - `storyGrowthLimits.js` — りんく成長グリッド（story growth）の描画上限。
     - `storyLaneAvatarSrc.js` — 応援レーン(アイコン列)のタイル画像 URL 解決（state 注入型の純関数）。
     - `storyLaneAvatarSrc.test.js`

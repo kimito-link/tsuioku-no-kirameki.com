@@ -223,8 +223,11 @@ export default [
     //   D-0計器(v0.1.1123)で tick結末probe+幕probe のグルー(計数純関数は laneTickProbe.js/
     //   watchPopupLoadDiagnostics.js に隔離・popup側は record 1行ずつ+診断JSON露出)。実測21963。
     //   ラチェットは実測+50の22013へ。
+    //   診断カウンタchurn根治(2026-07-14 diagnostic-architecture-strengthen-DESIGN.md C-3)で単調ゲート
+    //   のグルー(判定純関数は storyDiagMonotonic.js に隔離・popup側は3関所への適用+forget呼び出しのみ)。
+    //   実測22034。ラチェットは実測+50の22084へ。
     files: ['src/extension/popup-entry.js'],
-    rules: { 'max-lines': ['error', { max: 22013, skipBlankLines: false, skipComments: false }] }
+    rules: { 'max-lines': ['error', { max: 22084, skipBlankLines: false, skipComments: false }] }
   },
   {
     files: ['src/extension/popup/**/*.js'],
