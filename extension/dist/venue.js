@@ -663,8 +663,10 @@
     justify-content: center;
     gap: 1px;
     min-width: 0;
-    max-width: min(118px, 30vw);
-    font-size: 10px;
+    /* \u2460popup.html \u306E html.nl-inline(\u52D5\u753B\u57CB\u3081\u8FBC\u307F\u8868\u793A)\u9650\u5B9A\u62E1\u5927\u30EB\u30FC\u30EB\u3068\u540C\u5024\u3002
+       \u4F1A\u5834\u306F\u5E38\u306B\u305D\u306E\u8868\u793A\u306B\u76F8\u5F53\u3059\u308B\u305F\u3081\u7121\u6761\u4EF6\u9069\u7528(avatar 38px \u62E1\u5927\u3068\u540C\u3058\u6271\u3044)\u3002 */
+    max-width: min(142px, 34vw);
+    font-size: 11px;
     line-height: 1.22;
     text-align: left;
   }

@@ -529,7 +529,7 @@
     - `trumpet1.mp3`
     - `wallet1.mp3`
   - `SOURCES.md`
-- 📁 **src/** (1409)
+- 📁 **src/** (1410)
   - 📁 **data/** (6)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -563,7 +563,7 @@
       - `avatarResolver.test.js`
       - `identity.js` — ニコ生ユーザー ID の「匿名性」判定と関連アイデンティティ・ユーティリティ。
       - `nickname.js` — 表示名（ニックネーム）の「強弱」判定。
-  - 📁 **extension/** (19)
+  - 📁 **extension/** (20)
     - 📁 **popup/** (2)
       - 📁 **report/** (2)
         - `htmlReportDocument.js` — HTMLレポート(振り返り用の保存HTML)組み立てクラスタ。
@@ -576,6 +576,7 @@
     - `content-entry.js` — watch ページ常駐の記録エンジン本体。コメント取得(NDGR+DOM)・記録・バックフィル・パネル描画の中枢。
     - `inlineHostMoveProbe.wiring.test.js`
     - `live-view-entry.js` — 応援ライブビュー(live-view.html)のエントリ。
+    - `ndgrStatisticsPointsSanityGuard.wiring.test.js`
     - `offscreen-entry.js` — feat/multitab-scale-globalcap（2026-05-31）: コメント IDB の「常駐・単一書き手」を担う
     - `page-intercept-entry.js` — MAIN world エントリ（esbuild で単一 IIFE にバンドルされる）
     - `pageInterceptFetchHookCatch.wiring.test.js`
