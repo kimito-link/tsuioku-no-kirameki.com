@@ -118,6 +118,31 @@ describe('decodeStatistics', () => {
     expect(stats.eventTitle).toBe('春のギフト');
   });
 
+  // 2026-07-16: パース位置ずれでゴミバイト列をvarint解釈すると巨大な値になりうる
+  //   (実機でgiftPoints=21,775,806,936,812,300が観測された)。ニコニコ生放送の実際の
+  //   制度上ありえない桁(10億pt超)はnullへクランプし、下流の帳簿計算を巨大値で
+  //   汚染しないことを固定する。
+  it('giftPoints/adPointsが10億ptを超える異常値ならnullにクランプする', () => {
+    const HUGE = 21_775_806_936_812_300;
+    const buf = new Uint8Array([
+      ...varintField(3, HUGE),
+      ...varintField(4, HUGE)
+    ]);
+    const stats = decodeStatistics(buf, 0, buf.length);
+    expect(stats.adPoints).toBeNull();
+    expect(stats.giftPoints).toBeNull();
+  });
+
+  it('giftPoints/adPointsが10億pt以下の現実的な値ならそのまま通す', () => {
+    const buf = new Uint8Array([
+      ...varintField(3, 999_999_999),
+      ...varintField(4, 500_000_000)
+    ]);
+    const stats = decodeStatistics(buf, 0, buf.length);
+    expect(stats.adPoints).toBe(999_999_999);
+    expect(stats.giftPoints).toBe(500_000_000);
+  });
+
   it('ndgrStatisticsHasWireSignal: giftPoints のみでも true', () => {
     expect(
       ndgrStatisticsHasWireSignal({

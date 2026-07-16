@@ -222,9 +222,9 @@ graph LR
 - `xserver/`（2 件） — Xserver 向け webhook(git pull デプロイ)スクリプト  〔デプロイ / webhook〕
 
 ## `sound-src/` — ⚠️ 未記入（ROLES に追記）
-<sub>ファイル 11 件</sub>
+<sub>ファイル 20 件</sub>
 
-- `soundeffect-lab/`（10 件） — ⚠️ 未記入（ROLES に追記）
+- `soundeffect-lab/`（19 件） — ⚠️ 未記入（ROLES に追記）
 
 ## `src/` — LP 側 + 純粋関数ライブラリの源  〔ソース〕
 <sub>ファイル 1409 件</sub>

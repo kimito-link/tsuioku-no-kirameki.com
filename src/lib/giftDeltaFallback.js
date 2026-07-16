@@ -137,7 +137,13 @@ export function computeGiftDelta(state, aggregatePoints, nowMs, opts = {}) {
     s = { ...s, liveId };
   }
 
-  const aggregate = Math.max(0, Math.floor(Number(aggregatePoints) || 0));
+  // 2026-07-16: 上流(NDGR protobufデコード)のパース位置ずれで巨大なゴミ値が届く経路が
+  //   あった(実機でaggregatePoints=21,775,806,936,812,300が観測)。この純関数自体は
+  //   決定論の帳簿ロジックとして正しく動くため上限を知らないが、呼び出し元を問わず
+  //   異常値の全額がそのまま「デルタ補完イベント」として合成されるのを防ぐ最終防衛線として、
+  //   ここでも上限(ndgrDecode.js/content-entry.jsと同じ10億pt)でクランプする。
+  const GIFT_DELTA_AGGREGATE_SANITY_MAX = 1_000_000_000;
+  const aggregate = Math.min(GIFT_DELTA_AGGREGATE_SANITY_MAX, Math.max(0, Math.floor(Number(aggregatePoints) || 0)));
 
   // 集計が取れていない(0や不正値)場合は何もしない(state のaggregateだけ据え置き)。
   if (!(aggregate > 0) && s.lastAggregate === 0) {

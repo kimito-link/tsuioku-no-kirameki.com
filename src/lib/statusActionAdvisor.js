@@ -168,16 +168,22 @@ export function buildStatusActions(data) {
     }
   }
 
-  // --- 北極星レーン描画が途中で詰まる(popup診断) ---
+  // --- 北極星レーン(貢献度/広告ランキング)描画が途中で詰まる(popup診断) ---
+  //   refreshAllNorthStarMirrorLanes は3秒間隔(embed_watch)で無ガード呼び出しされるため、
+  //   started>completedは「複数tickが平行実行中でまだ最新が完走していない」健全な過渡状態でも
+  //   恒常的に起こりうる(2026-07-16調査で判明)。lastRunAgoMsが直近(15秒未満)なら
+  //   「実行中の可能性が高い」として様子見にし、それより古ければ本当に詰まっていると判定する。
   const ns = popup?.northStarRenderProbe;
   if (ns && typeof ns === 'object') {
     const started = num(ns.refreshAllStarted) || 0;
     const completed = num(ns.refreshAllCompleted) || 0;
-    if (started > 0 && completed === 0) {
+    const lastRunAgoMs = num(ns.lastRunAgoMs);
+    const likelyStillRunning = lastRunAgoMs != null && lastRunAgoMs < 15_000;
+    if (started > 0 && completed === 0 && !likelyStillRunning) {
       add({
         id: 'northstar-stuck',
         severity: 'bad',
-        symptom: '応援レーンの描画が途中で止まっている',
+        symptom: '公式値ランキング(貢献度/広告)レーンの描画が途中で止まっている',
         cause: `描画ループが開始(${started})したのに完了(0)していない${ns.lastError ? ` / エラー: ${String(ns.lastError).slice(0, 60)}` : ''}`,
         action: '拡張を再読み込み(chrome://extensions でリロード) → watch タブを F5',
         fixableHere: 'partly'

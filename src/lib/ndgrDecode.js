@@ -144,6 +144,17 @@ export function mergeNdgrStatistics(a, b) {
   };
 }
 
+// 2026-07-16: pbVarint は最大56ビット(≈7.2×10^16)まで蓄積を許すため、パース位置が
+//   ずれて本来のフィールドでないゴミバイト列を varint 解釈すると巨大な値になりうる
+//   (実機で giftPoints=21,775,806,936,812,300 のような値が観測された)。ニコニコ生放送の
+//   実際の制度上ありえない桁を弾く上限(10億pt・実際の最高額イベントの想定を大きく上回る余裕値)。
+const STATISTICS_POINTS_SANITY_MAX = 1_000_000_000;
+
+/** @param {number|null} v @returns {number|null} */
+function clampStatisticsPoints(v) {
+  return typeof v === 'number' && v > STATISTICS_POINTS_SANITY_MAX ? null : v;
+}
+
 /**
  * @param {Uint8Array} buf
  * @param {number} start
@@ -181,8 +192,8 @@ export function decodeStatistics(buf, start, end) {
   return {
     viewers,
     comments,
-    adPoints,
-    giftPoints,
+    adPoints: clampStatisticsPoints(adPoints),
+    giftPoints: clampStatisticsPoints(giftPoints),
     eventGiftScore,
     eventRank,
     eventTitle

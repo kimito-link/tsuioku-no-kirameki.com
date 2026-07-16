@@ -507,18 +507,27 @@
   - `vendor-visual-explainer.mjs` — Vendors nicobailon/visual-explainer (MIT) into .cursor/skills/visual-explainer/
   - `verify-bump.mjs` — extension bump 後の整合性チェッカー
   - `write-extension-placeholder-icons.mjs` — リポジトリに 256px アイコンしか無い環境向け: manifest 用の小さめ PNG を生成する。
-- 📁 **sound-src/** (11)
-  - 📁 **soundeffect-lab/** (10)
+- 📁 **sound-src/** (20)
+  - 📁 **soundeffect-lab/** (19)
+    - `clearing1.mp3`
     - `cute-pose1.mp3`
     - `cute-pose2.mp3`
+    - `decision22.mp3`
+    - `decision26.mp3`
+    - `decision34.mp3`
+    - `decision37.mp3`
     - `item-get1.mp3`
     - `item-get2.mp3`
     - `jajean1.mp3`
     - `levelup1.mp3`
+    - `money-drop1.mp3`
+    - `money-drop2.mp3`
+    - `money1.mp3`
     - `shakin1.mp3`
     - `shakin2.mp3`
     - `shakin3.mp3`
     - `trumpet1.mp3`
+    - `wallet1.mp3`
   - `SOURCES.md`
 - 📁 **src/** (1409)
   - 📁 **data/** (6)
