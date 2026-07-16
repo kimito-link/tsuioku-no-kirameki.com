@@ -520,7 +520,7 @@
     - `shakin3.mp3`
     - `trumpet1.mp3`
   - `SOURCES.md`
-- 📁 **src/** (1408)
+- 📁 **src/** (1409)
   - 📁 **data/** (6)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -554,7 +554,7 @@
       - `avatarResolver.test.js`
       - `identity.js` — ニコ生ユーザー ID の「匿名性」判定と関連アイデンティティ・ユーティリティ。
       - `nickname.js` — 表示名（ニックネーム）の「強弱」判定。
-  - 📁 **extension/** (18)
+  - 📁 **extension/** (19)
     - 📁 **popup/** (2)
       - 📁 **report/** (2)
         - `htmlReportDocument.js` — HTMLレポート(振り返り用の保存HTML)組み立てクラスタ。
@@ -569,6 +569,7 @@
     - `live-view-entry.js` — 応援ライブビュー(live-view.html)のエントリ。
     - `offscreen-entry.js` — feat/multitab-scale-globalcap（2026-05-31）: コメント IDB の「常駐・単一書き手」を担う
     - `page-intercept-entry.js` — MAIN world エントリ（esbuild で単一 IIFE にバンドルされる）
+    - `pageInterceptFetchHookCatch.wiring.test.js`
     - `popup-entry.js` — ポップアップ UI 本体。応援レーン描画・HTMLレポート生成・各種診断/共有のまとめ役。
     - `popupUserLaneAvatarObservedFlow.test.js`
     - `status-entry.js` — v0.1.629: 固定 URL 状態表示ページ。

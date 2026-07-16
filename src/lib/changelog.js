@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1161',
+    date: '2026-07-16',
+    summary: 'ギフトの効果音をより自然な音に更新',
+    items: Object.freeze([
+      'ギフトが投げられたときに鳴る効果音(金額帯ごとの全パターン)を、ライセンス上利用が明確に許可されている素材へ更新しました。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1160',
     date: '2026-07-16',
     summary: 'ニコニコ動画ページで拡張のエラー表示が出ることがある不具合を修正',
