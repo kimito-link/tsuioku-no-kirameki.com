@@ -78,10 +78,31 @@ describe('buildStatusActions', () => {
     expect(ids(cards)).not.toContain('lane-empty');
   });
 
-  it('北極星描画が詰まる(started>0,completed=0) → northstar-stuck(severity bad)', () => {
+  it('北極星描画が詰まる(started>0,completed=0,lastRunAgoMs無し=旧popup) → northstar-stuck(severity bad)', () => {
     const cards = buildStatusActions({
       livesData: [{ liveId: 'lv1', officialRatePct: 90 }],
       popupDiag: { popup: { northStarRenderProbe: { refreshAllStarted: 2, refreshAllCompleted: 0, lastError: 'boom' } } }
+    });
+    const c = cards.find((x) => x.id === 'northstar-stuck');
+    expect(c).toBeTruthy();
+    expect(c.severity).toBe('bad');
+  });
+
+  // 2026-07-16: refreshAllNorthStarMirrorLanesは3秒間隔(embed_watch)で無ガード呼び出しされ、
+  //   started>completedは「複数tickが平行実行中でまだ最新が完走していない」健全な過渡状態でも
+  //   恒常的に起こりうると判明。lastRunAgoMsが直近(15秒未満)なら誤検知として抑止する。
+  it('北極星描画のstarted>completedでも、直近(15秒未満)に実行していれば northstar-stuck を出さない(誤検知抑止)', () => {
+    const cards = buildStatusActions({
+      livesData: [{ liveId: 'lv1', officialRatePct: 90 }],
+      popupDiag: { popup: { northStarRenderProbe: { refreshAllStarted: 3, refreshAllCompleted: 0, lastRunAgoMs: 26 } } }
+    });
+    expect(ids(cards)).not.toContain('northstar-stuck');
+  });
+
+  it('北極星描画のstarted>completedで、最後の実行から15秒以上経っていれば northstar-stuck を出す(本当に詰まっている)', () => {
+    const cards = buildStatusActions({
+      livesData: [{ liveId: 'lv1', officialRatePct: 90 }],
+      popupDiag: { popup: { northStarRenderProbe: { refreshAllStarted: 3, refreshAllCompleted: 0, lastRunAgoMs: 20_000 } } }
     });
     const c = cards.find((x) => x.id === 'northstar-stuck');
     expect(c).toBeTruthy();

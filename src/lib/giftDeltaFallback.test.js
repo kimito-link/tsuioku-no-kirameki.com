@@ -130,6 +130,17 @@ describe('computeGiftDelta(帳簿の収支)', () => {
     const r2 = computeGiftDelta(s0, 40, T, { liveId: 'lv1', minPoints: 30 });
     expect(r2.events).toEqual([{ points: 40, tier: 'small' }]);
   });
+
+  // 2026-07-16: 上流(NDGR protobufデコード)のパース位置ずれで巨大なゴミ値(実機で
+  //   aggregatePoints=21,775,806,936,812,300が観測)が届いても、この純関数が全額を
+  //   1件のデルタ補完イベントとして合成してしまわないよう、最終防衛線として上限で
+  //   クランプすることを固定する。
+  it('aggregatePointsが10億ptを超える異常値でも、合成されるデルタは上限(10億pt)を超えない', () => {
+    const s0 = makeInitialGiftDeltaState('lv1');
+    const r = computeGiftDelta(s0, 21_775_806_936_812_300, T, { liveId: 'lv1' });
+    expect(r.events).toEqual([{ points: 1_000_000_000, tier: 'mega' }]);
+    expect(r.nextState.lastAggregate).toBe(1_000_000_000);
+  });
 });
 
 describe('accountRealGiftEvent(本物の説明済み計上)', () => {

@@ -26,6 +26,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1162',
+    date: '2026-07-16',
+    summary: '状態速報の異常な数値表示・誤った警告表示を修正',
+    items: Object.freeze([
+      '一部の配信で、ギフト集計の異常な巨大数値が状態速報に表示されることがある不具合を修正しました。',
+      '「応援レーンの描画が止まっている」という警告が、実際には正常に動作中でも誤って表示されることがある不具合を修正しました。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1161',
     date: '2026-07-16',
     summary: 'ギフトの効果音をより自然な音に更新',

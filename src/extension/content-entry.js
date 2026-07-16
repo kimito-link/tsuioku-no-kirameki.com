@@ -2171,13 +2171,18 @@ function applyInterceptNdgrStatisticsFields(payload) {
       ? payload.observedAt
       : Date.now();
   let touched = false;
+  // 2026-07-16: ndgrDecode.js の pbVarint は最大56ビットの蓄積を許すため、パース位置が
+  //   ずれると本来のフィールドでないゴミバイト列を巨大な数値として返しうる(実機で
+  //   giftPoints=21,775,806,936,812,300のような値が観測された)。ndgrDecode.js側でも
+  //   クランプ済みだが、postMessage経由でこの関数へ届く値を独立に再検証する(二重防御)。
+  const STATISTICS_POINTS_SANITY_MAX = 1_000_000_000;
   const ap = payload?.adPoints;
-  if (typeof ap === 'number' && Number.isFinite(ap) && ap >= 0) {
+  if (typeof ap === 'number' && Number.isFinite(ap) && ap >= 0 && ap <= STATISTICS_POINTS_SANITY_MAX) {
     officialAdPointsNdgr = Math.floor(ap);
     touched = true;
   }
   const gp = payload?.giftPoints;
-  if (typeof gp === 'number' && Number.isFinite(gp) && gp >= 0) {
+  if (typeof gp === 'number' && Number.isFinite(gp) && gp >= 0 && gp <= STATISTICS_POINTS_SANITY_MAX) {
     officialGiftPointsNdgr = Math.floor(gp);
     touched = true;
     // v0.1.1090: 個別ギフトイベント欠落配信のデルタ補完検知(giftDeltaFallback.js)向けに、
