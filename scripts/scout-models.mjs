@@ -310,7 +310,7 @@ async function main() {
   const adoptedRawIds = new Set(
     LINEUP.filter((e) => e.rawId).map((e) => e.rawId),
   );
-  let freshCandidates = [];
+  const freshCandidates = [];
   const referenceCounts = {};
   if (!isFirstRun) {
     for (const [provider, diff] of Object.entries(diffs)) {
