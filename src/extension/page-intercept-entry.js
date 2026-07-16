@@ -1471,7 +1471,20 @@ import {
         const root = document.documentElement;
         if (root) root.setAttribute('data-nls-fetch-other', _allFetchLog.join(' | '));
       }
-      return prevFetch.apply(this, args);
+      let p2;
+      try {
+        p2 = prevFetch.apply(this, args);
+      } catch (e) {
+        return Promise.reject(e);
+      }
+      // 上のfetchフック(874行目)と同じ理由: このPromiseをページ側がcatchしない失敗で
+      // 「Uncaught (in promise) TypeError: Failed to fetch」が拡張エラーに出るのを防ぐ。
+      if (p2 != null && typeof p2.then === 'function') {
+        p2.catch(() => {
+          /* ネットワーク失敗・CORS等はページ本来の挙動。ロギング目的のフックでは無視 */
+        });
+      }
+      return p2;
     };
   } catch { /* no-op */ }
 

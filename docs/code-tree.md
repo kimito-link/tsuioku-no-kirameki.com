@@ -320,7 +320,7 @@
   - `ux-tdd-hypothesis-matrix.md`
   - `venue-pop-parity-loop-flow.html`
   - `visual-explainer.md`
-- 📁 **extension/** (130)
+- 📁 **extension/** (136)
   - 📁 **images/** (87)
     - 📁 **avatar-parts/** (22)
       - `cheek-0.png`
@@ -418,8 +418,11 @@
         - `tanuki-yukkuri-smile-mouth-open.thumb128.png`
     - `nico-retro-tv-placeholder.svg`
     - `toumeilink.png`
-  - 📁 **sound/** (33)
-    - 📁 **tiers/** (23)
+  - 📁 **sound/** (39)
+    - 📁 **tiers/** (29)
+      - `ad-1.mp3`
+      - `ad-2.mp3`
+      - `ad-3.mp3`
       - `gift-large-1.mp3`
       - `gift-large-2.mp3`
       - `gift-large-3.mp3`
@@ -441,6 +444,9 @@
       - `milestone-soft-1.mp3`
       - `milestone-soft-2.mp3`
       - `milestone-soft-3.mp3`
+      - `rank-up-1.mp3`
+      - `rank-up-2.mp3`
+      - `rank-up-3.mp3`
       - `reach-1.mp3`
       - `reach-2.mp3`
     - `CREDITS.md`
@@ -501,7 +507,18 @@
   - `vendor-visual-explainer.mjs` — Vendors nicobailon/visual-explainer (MIT) into .cursor/skills/visual-explainer/
   - `verify-bump.mjs` — extension bump 後の整合性チェッカー
   - `write-extension-placeholder-icons.mjs` — リポジトリに 256px アイコンしか無い環境向け: manifest 用の小さめ PNG を生成する。
-- 📁 **sound-src/** (1)
+- 📁 **sound-src/** (11)
+  - 📁 **soundeffect-lab/** (10)
+    - `cute-pose1.mp3`
+    - `cute-pose2.mp3`
+    - `item-get1.mp3`
+    - `item-get2.mp3`
+    - `jajean1.mp3`
+    - `levelup1.mp3`
+    - `shakin1.mp3`
+    - `shakin2.mp3`
+    - `shakin3.mp3`
+    - `trumpet1.mp3`
   - `SOURCES.md`
 - 📁 **src/** (1408)
   - 📁 **data/** (6)

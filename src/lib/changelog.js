@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1160',
+    date: '2026-07-16',
+    summary: 'ニコニコ動画ページで拡張のエラー表示が出ることがある不具合を修正',
+    items: Object.freeze([
+      'ニコニコ動画の視聴ページで、通信エラー発生時に拡張機能側のエラーとして表示されてしまうことがある不具合を修正しました。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1159',
     date: '2026-07-16',
     summary: '広告・順位変動・コメント数節目の効果音をより自然な音に更新',
