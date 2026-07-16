@@ -39,6 +39,7 @@ graph LR
   ROOT --> d6["scripts/ 〔ビルド/自動生成〕"]
   d6 --> d6_0["xserver/ 〔デプロイ/webhook〕"]
   ROOT --> d7["sound-src/"]
+  d7 --> d7_0["soundeffect-lab/"]
   ROOT --> d8["src/ 〔ソース〕"]
   d8 --> d8_0["data/ 〔コメント/取得〕"]
   d8 --> d8_1["domain/ 〔応援/集約/識別子〕"]
@@ -203,11 +204,11 @@ graph LR
 - `workflows/`（1 件） — 開発ワークフロー設計(TDD/UI-UX ロードマップ等)  〔ワークフロー〕
 
 ## `extension/` — 拡張本体の配布版ソース(ここを編集)。manifest/background/各 html  〔配布 / manifest〕
-<sub>ファイル 140 件</sub>
+<sub>ファイル 146 件</sub>
 
 - `dist/`（10 件） — ビルド成果物(content/popup/status 等の bundle)。build が生成  〔ビルド成果物〕
 - `images/`（87 件） — アイコン・ロゴのマスター画像  〔画像〕
-- `sound/`（33 件） — 読み上げ・完了音などの音声素材  〔音声〕
+- `sound/`（39 件） — 読み上げ・完了音などの音声素材  〔音声〕
 
 ## `memory/` — セッション横断の知見・引き継ぎ(AI のメモリ)。コミット対象外も混在  〔メモリ / 知見〕
 <sub>ファイル 79 件</sub>
@@ -221,7 +222,9 @@ graph LR
 - `xserver/`（2 件） — Xserver 向け webhook(git pull デプロイ)スクリプト  〔デプロイ / webhook〕
 
 ## `sound-src/` — ⚠️ 未記入（ROLES に追記）
-<sub>ファイル 1 件</sub>
+<sub>ファイル 11 件</sub>
+
+- `soundeffect-lab/`（10 件） — ⚠️ 未記入（ROLES に追記）
 
 ## `src/` — LP 側 + 純粋関数ライブラリの源  〔ソース〕
 <sub>ファイル 1408 件</sub>
@@ -484,9 +487,10 @@ esbuild の import 到達グラフを逆引きし「このファイルを変え�
 
 ---
 
-## ⚠️ 役割が未記入のディレクトリ（2）
+## ⚠️ 役割が未記入のディレクトリ（3）
 
 以下は `ROLES` 辞書に説明が無い。`scripts/repo-tree-map.mjs` の `ROLES` に1行足してから再生成すること。
 
 - `docs/article-drafts/`
 - `sound-src/`
+- `sound-src/soundeffect-lab/`
