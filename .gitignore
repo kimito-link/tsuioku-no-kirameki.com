@@ -50,3 +50,7 @@ playwright-report/
 
 .vercel
 .env*.local
+
+# Council Scout の状態ファイル（日々変わるスナップショット。日報 briefs/ はコミット対象）
+council-scout/state.json
+council-scout/LATEST.md
