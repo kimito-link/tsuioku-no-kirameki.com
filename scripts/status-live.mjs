@@ -108,7 +108,6 @@ async function main() {
   }
   console.log(`👀 ${watchSec}秒間隔で監視します(Ctrl+Cで終了)。差分行のみ表示します。\n`);
   let prevReport = '';
-  // eslint-disable-next-line no-constant-condition
   while (true) {
     const result = await fetchLatest();
     if (!result.ok) {
