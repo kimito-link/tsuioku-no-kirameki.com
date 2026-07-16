@@ -393,62 +393,26 @@ describe('buildLocalVariantPaths(プリセット×manifest→sound/custom/相対
   });
 });
 
-describe('loadCustomSoundRuntimeState 優先度マージ(IDB割当 > ローカル同梱 > フォールバック)', () => {
-  it('ローカル同梱のみ(manifestあり・IDB割当なし)→ローカル同梱パスが使われ、gainは既定値', async () => {
+describe('loadCustomSoundRuntimeState はローカル同梱を読まない(2026-07-16無効化・IDB手動取込のみ有効)', () => {
+  it('manifestがあってもfetchせず無視する(ユーザーの操作なしに音源が有効化されない)', async () => {
     const fetchImpl = vi.fn(async () => ({
       ok: true,
       json: async () => ({ files: { as_812926: 'audiostock_812926.mp3', as_1587171: 'audiostock_1587171.wav' } })
     }));
     const state = await loadCustomSoundRuntimeState({ getUrl: (p) => p, fetchImpl });
-    expect(state.customVariantPaths.gift_medium).toEqual([
-      'sound/custom/audiostock_812926.mp3',
-      'sound/custom/audiostock_1587171.wav'
-    ]);
-    expect(state.gainFor('gift_medium')).toBe(CUSTOM_SOUND_DEFAULT_GAIN);
-    expect(state.localBundledCount).toBe(2);
+    expect(fetchImpl).not.toHaveBeenCalled();
+    expect(state.customVariantPaths.gift_medium).toBeUndefined();
+    expect(state.localBundledCount).toBe(0);
   });
 
-  it('IDB割当がある場合はローカル同梱より優先される(同じキー)', async () => {
+  it('IDB割当は従来どおり機能する(ローカル同梱無効化の影響を受けない)', async () => {
     const db = await openCustomSoundDb();
     await putSoundBlob(db, { id: 'as_204361', blob: new Blob(['a'], { type: 'audio/mpeg' }), name: 'audiostock_204361.mp3' });
     await setAssignment(db, 'gift_medium', ['as_204361'], 0.5);
 
-    const fetchImpl = vi.fn(async () => ({
-      ok: true,
-      json: async () => ({ files: { as_812926: 'audiostock_812926.mp3', as_1587171: 'audiostock_1587171.wav' } })
-    }));
-    const state = await loadCustomSoundRuntimeState({ getUrl: (p) => p, fetchImpl });
-    // gift_medium は IDB割当(blob:...)が勝つ。ローカル同梱の sound/custom/... ではない。
+    const state = await loadCustomSoundRuntimeState();
     expect(state.customVariantPaths.gift_medium).toHaveLength(1);
     expect(state.customVariantPaths.gift_medium[0]).toMatch(/^blob:/);
     expect(state.gainFor('gift_medium')).toBe(0.5);
-  });
-
-  it('IDB未割当キーはローカル同梱にフォールバックし、gainは既定値のまま', async () => {
-    const db = await openCustomSoundDb();
-    // 別キー(ad)だけIDB割当。gift_mediumはIDB未割当。
-    await putSoundBlob(db, { id: 'as_104491', blob: new Blob(['a']), name: 'a.mp3' });
-    await setAssignment(db, 'ad', ['as_104491'], 0.2);
-
-    const fetchImpl = vi.fn(async () => ({
-      ok: true,
-      json: async () => ({ files: { as_812926: 'audiostock_812926.mp3' } })
-    }));
-    const state = await loadCustomSoundRuntimeState({ getUrl: (p) => p, fetchImpl });
-    expect(state.customVariantPaths.gift_medium).toEqual(['sound/custom/audiostock_812926.mp3']);
-    expect(state.gainFor('gift_medium')).toBe(CUSTOM_SOUND_DEFAULT_GAIN);
-    expect(state.gainFor('ad')).toBe(0.2);
-  });
-
-  it('manifest取得失敗(fetch例外)でもIDB割当は従来どおり機能する', async () => {
-    const db = await openCustomSoundDb();
-    await putSoundBlob(db, { id: 'as_1', blob: new Blob(['a']), name: 'a.mp3' });
-    await setAssignment(db, 'ad', ['as_1'], 0.9);
-    const fetchImpl = vi.fn(async () => { throw new Error('boom'); });
-
-    const state = await loadCustomSoundRuntimeState({ getUrl: (p) => p, fetchImpl });
-    expect(state.localBundledCount).toBe(0);
-    expect(state.customVariantPaths.ad).toHaveLength(1);
-    expect(state.gainFor('ad')).toBe(0.9);
   });
 });
