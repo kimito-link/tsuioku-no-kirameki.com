@@ -1108,8 +1108,10 @@ const VENUE_CSS = `
     justify-content: center;
     gap: 1px;
     min-width: 0;
-    max-width: min(118px, 30vw);
-    font-size: 10px;
+    /* ①popup.html の html.nl-inline(動画埋め込み表示)限定拡大ルールと同値。
+       会場は常にその表示に相当するため無条件適用(avatar 38px 拡大と同じ扱い)。 */
+    max-width: min(142px, 34vw);
+    font-size: 11px;
     line-height: 1.22;
     text-align: left;
   }

@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1163',
+    date: '2026-07-16',
+    summary: '会場の応援アイコン列を①ポップアップと同じ大きさに統一',
+    items: Object.freeze([
+      '会場モードの応援アイコン列(りんく/こん太/広告/たぬ姉)のタイル横幅が、①ポップアップの表示より一回り小さくなっていた見た目のズレを修正しました。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1162',
     date: '2026-07-16',
     summary: '状態速報の異常な数値表示・誤った警告表示を修正',
