@@ -101,8 +101,23 @@ v0.1.1059時点で`EFFECT_SOUND_VARIANT_PATHS`のバリエーション化対象�
 `buildSoundEffectLabVariations`がラウドネス正規化して`extension/sound/tiers/`へ出力する。
 milestone-*は従来の自作合成音(ffmpeg aevalsrc)を完全に置き換えた(ユーザー承認済み)。
 フォールバック単一ファイル(`effect-ad.mp3`等)も`syncFallbackFilesToTierOne`で各カテゴリの
-1番目のコピーに同期している。rank_downは価値序列上いちばん控えめであるべきため、
-引き続き自作合成音(gift-small系)のまま。詳細は`sound-src/SOURCES.md`参照。
+1番目のコピーに同期している。詳細は`sound-src/SOURCES.md`参照。
+
+## 2026-07-16追補 gift_small/medium/large/megaも効果音ラボ素材へ差し替え
+
+出典: [効果音ラボ](https://soundeffect-lab.info/)（上記と同一の利用規約）。
+
+| ファイル | 元タイトル | 用途 |
+|---|---|---|
+| `tiers/gift-small-1/2/3.mp3` | 決定ボタンを押す(ピコッ/ポップ/ポン) | ギフト少額 |
+| `tiers/gift-medium-1/2/3.mp3` | お金を落とす(硬貨)×2 / 決定(キラリーン) | ギフト中額 |
+| `tiers/gift-large-1/2/3.mp3` | 財布をジャラッ / お金がジャラジャラ(+複製1) | ギフト高額 |
+| `tiers/gift-mega-1/2/3.mp3` | レジスターで精算 / ジャジャーン / ラッパのファンファーレ | ギフト最高額 |
+
+v0.1.1069(`buildSynthPachinkoSuite`)以来の自作合成音を完全に置き換えた(ユーザー承認済み)。
+`effect-gift.mp3`(GIFT種別フォールバック)も新しい`tiers/gift-medium-1.mp3`の複製に追随する。
+これによりrank_downのフォールバック先(gift-small系)も間接的に効果音ラボ音色になっているが、
+gift_small自体が「控えめな決定音」のため価値序列は維持されている。
 
 ## 既存(v0.1.806〜) — 2026-07-15 出典確認完了
 

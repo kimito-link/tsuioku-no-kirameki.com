@@ -49,4 +49,27 @@
 | `soundeffect-lab/levelup1.mp3` | レベルアップテッテレー(1種・複製で3本埋める) | milestone_hard(500件到達) |
 | `soundeffect-lab/jajean1.mp3` / `trumpet1.mp3` | ジャジャーン / ラッパのファンファーレ(1本は複製で3本目を埋める) | milestone_jackpot(1000件以上・大当たり) |
 
-rank_downは価値序列上いちばん控えめであるべきため、引き続き自作合成音(gift-small系)を使う。
+rank_downのみ、価値序列上いちばん控えめであるべきため引き続き自作合成音(gift-small系)を
+使う想定だったが、下記(2026-07-16追補)でgift_smallも効果音ラボ素材へ差し替えたため、
+rank_downも間接的に効果音ラボ音色になっている(gift_small自体が既に「控えめな決定音」の
+ため価値序列は維持されている)。
+
+## 2026-07-16追補: gift_small/medium/large/mega(ギフト金額帯)にも効果音ラボ素材を追加
+
+`sound-src/soundeffect-lab/`配下に9ファイルを追加し、`extension/sound/tiers/`の
+`gift-small-*`/`gift-medium-*`/`gift-large-*`/`gift-mega-*`(合計12ファイル)を効果音ラボ素材へ
+差し替えた。これによりv0.1.1069(`buildSynthPachinkoSuite`)以来の自作合成音は完全に
+置き換わった(ユーザー承認済み)。`effect-gift.mp3`(GIFT種別フォールバック)も新しい
+`tiers/gift-medium-1.mp3`の複製に追随する。
+
+| ファイル | 元タイトル(効果音ラボ) | 用途 |
+|---|---|---|
+| `soundeffect-lab/decision22.mp3`〜`decision34.mp3` | 決定ボタンを押す(ピコッ/ポップ/ポン) | gift_small(少額・軽快な決定音) |
+| `soundeffect-lab/money-drop1.mp3`〜`money-drop2.mp3` / `decision37.mp3` | お金を落とす(硬貨)×2 / 決定(キラリーン) | gift_medium |
+| `soundeffect-lab/wallet1.mp3` / `money1.mp3` | 財布をジャラッ / お金がジャラジャラ | gift_large(1本は複製で3本目を埋める) |
+| `soundeffect-lab/clearing1.mp3` / `jajean1.mp3` / `trumpet1.mp3` | レジスターで精算 / ジャジャーン / ラッパのファンファーレ | gift_mega(最高額・最も派手) |
+
+build-sounds.mjsの実行順序は「buildSynthPachinkoSuite(自作合成音の生成)→
+buildSoundEffectLabVariations(効果音ラボ素材で上書き)→buildGiftSoundFromSynthTier
+(最終的なgift-medium-1を複製)」でなければならない(順序を誤るとeffect-gift.mp3が
+古い自作合成音のまま複製される事故が過去に一度発生し即座に修正した)。

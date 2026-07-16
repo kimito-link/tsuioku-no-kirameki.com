@@ -26,8 +26,9 @@ const DEFAULT_LOUDNORM = 'loudnorm=I=-14:TP=-1.0:LRA=11';
  * 2026-07-16: 旧buildGiftSound(sound-src/gift-whoosh.mp3+gift-impact.mp3+gift-sparkle.mp3を
  *   ミックスする経路)は出典が信頼できないと判明し削除した(3ファイルとも削除済み)。
  *   GIFT種別(effectSoundKindForGiftTierの未対応tierフォールバック)は、実際に配布・使用中の
- *   gift_mediumバリエーション(buildSynthPachinkoSuiteが生成する完全自作合成音)の1本目を
- *   そのまま流用する(ad/rank_up/rank_down/milestone_*と同じ「既存自作音を転用」パターン)。
+ *   gift_mediumバリエーションの1本目をそのまま流用する(ad/rank_up/rank_down/milestone_*と
+ *   同じ「既存自作音を転用」パターン)。gift_medium-1自体はbuildSoundEffectLabVariationsが
+ *   効果音ラボ素材で上書きするため、必ずそちらの後に呼ぶこと。
  * @returns {boolean} コピーできたか
  */
 function buildGiftSoundFromSynthTier() {
@@ -38,7 +39,7 @@ function buildGiftSoundFromSynthTier() {
     return false;
   }
   copyFileSync(src, dest);
-  console.log(`[build-sounds] ${dest} を再生成しました(tiers/gift-medium-1.mp3 の複製・自作合成音)。`);
+  console.log(`[build-sounds] ${dest} を再生成しました(tiers/gift-medium-1.mp3 の複製)。`);
   return true;
 }
 
@@ -231,12 +232,15 @@ function buildSynthPachinkoSuite(tmpDir) {
 
 /**
  * 2026-07-16: 効果音ラボ(soundeffect-lab.info)の原素材から ad/rank_up/milestone_soft/
- *   milestone_hard/milestone_jackpot のバリエーションを組み立てる。効果音ラボは商用利用無料・
- *   クレジット表記不要・「アプリの操作音として組み込む」用途を明示的に許可している
- *   (禁止されるのは「効果音を自由に鳴らせるアプリの作成」= 本プロジェクトの未公開の
- *   「マイ効果音」機能はこの禁止に抵触しうるため対象外・別途要検討)。
+ *   milestone_hard/milestone_jackpot/gift_small/gift_medium/gift_large/gift_mega の
+ *   バリエーションを組み立てる。効果音ラボは商用利用無料・クレジット表記不要・
+ *   「アプリの操作音として組み込む」用途を明示的に許可している(禁止されるのは
+ *   「効果音を自由に鳴らせるアプリの作成」= 本プロジェクトの未公開の「マイ効果音」機能は
+ *   この禁止に抵触しうるため対象外・別途要検討)。
  *   各カテゴリはラウドネス正規化(DEFAULT_LOUDNORM)のみ行い、tiers/<category>-<n>.mp3 へ
  *   出力する(バリエーション不足のカテゴリは同一ファイルの複製で埋める・乱数不使用)。
+ *   gift_*は既存のbuildSynthPachinkoSuite(自作合成音)を完全に上書きするため、
+ *   main()内で必ずbuildSynthPachinkoSuiteの後に呼ぶこと。
  * @param {string} tmpDir
  * @returns {boolean} 1件でも生成できたか
  */
@@ -247,7 +251,12 @@ function buildSoundEffectLabVariations(tmpDir) {
     ad: ['cute-pose1.mp3', 'cute-pose2.mp3'],
     milestone_soft: ['item-get1.mp3', 'item-get2.mp3'],
     milestone_hard: ['levelup1.mp3'],
-    milestone_jackpot: ['jajean1.mp3', 'trumpet1.mp3']
+    milestone_jackpot: ['jajean1.mp3', 'trumpet1.mp3'],
+    // 2026-07-16追加: ギフト金額帯(small→mega)。価値序列に沿って音の規模を段階的に大きくする。
+    gift_small: ['decision22.mp3', 'decision26.mp3', 'decision34.mp3'],
+    gift_medium: ['money-drop1.mp3', 'money-drop2.mp3', 'decision37.mp3'],
+    gift_large: ['wallet1.mp3', 'money1.mp3'],
+    gift_mega: ['clearing1.mp3', 'jajean1.mp3', 'trumpet1.mp3']
   };
   mkdirSync(TIERS_OUT_DIR, { recursive: true });
   let builtAny = false;
@@ -269,7 +278,7 @@ function buildSoundEffectLabVariations(tmpDir) {
     });
   }
   if (builtAny) {
-    console.log('[build-sounds] 効果音ラボ素材から ad/rank_up/milestone_soft/hard/jackpot のバリエーションを生成しました。');
+    console.log('[build-sounds] 効果音ラボ素材から ad/rank_up/milestone_soft/hard/jackpot/gift_small/medium/large/mega のバリエーションを生成しました。');
   }
   return builtAny;
 }
@@ -281,11 +290,13 @@ function main() {
     //   出典が信頼できないと判明し削除した(sound-src/tiers/ 自体も削除済み)。gift/milestone/reach
     //   のtierは常にこの直後のbuildSynthPachinkoSuiteが上書きしていたため、実配布物への影響はない。
     buildSynthPachinkoSuite(tmpDir);
-    // buildGiftSoundFromSynthTier は tiers/gift-medium-1.mp3(上のbuildSynthPachinkoSuiteが
-    //   生成)を複製するため、必ずこの後に呼ぶ。
-    const built = buildGiftSoundFromSynthTier();
-    // 効果音ラボ素材(ad/rank_up/milestone_*専用ファイル)。無くても他の生成物には影響しない。
+    // 効果音ラボ素材(ad/rank_up/milestone_*/gift_*専用ファイル)。gift_small/medium/large/megaは
+    //   上のbuildSynthPachinkoSuiteが生成した自作合成音を完全に上書きする(ユーザー承認済み)。
+    //   無くても他の生成物には影響しない。
     buildSoundEffectLabVariations(tmpDir);
+    // buildGiftSoundFromSynthTier は tiers/gift-medium-1.mp3(最終的な内容=効果音ラボ版)を
+    //   複製するため、必ずbuildSoundEffectLabVariationsの後に呼ぶ。
+    const built = buildGiftSoundFromSynthTier();
     // フォールバック単一ファイルをtiersの1番目へ同期(必ずbuildSoundEffectLabVariationsの後)。
     syncFallbackFilesToTierOne();
     if (process.argv.includes('--normalize-all')) {
