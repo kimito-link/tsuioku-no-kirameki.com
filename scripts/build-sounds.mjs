@@ -12,6 +12,7 @@ import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
+const SRC_DIR = join(ROOT, 'sound-src', 'soundeffect-lab');
 const OUT_DIR = join(ROOT, 'extension', 'sound');
 const TIERS_OUT_DIR = join(OUT_DIR, 'tiers');
 
@@ -39,6 +40,27 @@ function buildGiftSoundFromSynthTier() {
   copyFileSync(src, dest);
   console.log(`[build-sounds] ${dest} を再生成しました(tiers/gift-medium-1.mp3 の複製・自作合成音)。`);
   return true;
+}
+
+/**
+ * 2026-07-16: フォールバック単一ファイル(EFFECT_SOUND_PATHSが指すeffect-<kind>.mp3)を、
+ *   対応するtiersバリエーションの1番目のコピーへ揃える(ad/rank_up/milestone_*と同じパターン・
+ *   バリエーション解決に失敗した異常系でも出典不明の音が鳴らないようにする)。
+ */
+function syncFallbackFilesToTierOne() {
+  const mapping = {
+    'effect-ad.mp3': 'ad-1.mp3',
+    'effect-rank-up.mp3': 'rank-up-1.mp3',
+    'effect-milestone-soft.mp3': 'milestone-soft-1.mp3',
+    'effect-milestone-hard.mp3': 'milestone-hard-1.mp3',
+    'effect-milestone-jackpot.mp3': 'milestone-jackpot-1.mp3'
+  };
+  for (const [destName, srcName] of Object.entries(mapping)) {
+    const src = join(TIERS_OUT_DIR, srcName);
+    if (!existsSync(src)) continue;
+    copyFileSync(src, join(OUT_DIR, destName));
+  }
+  console.log('[build-sounds] フォールバック単一ファイル(effect-ad/rank-up/milestone-*.mp3)をtiersの1番目へ同期しました。');
 }
 
 /** 既存の effect-*.mp3 全てをラウドネス正規化する(音圧のばらつきを均す・恒久対応)。 */
@@ -207,6 +229,51 @@ function buildSynthPachinkoSuite(tmpDir) {
   console.log('[build-sounds] パチンコ文法準拠の合成音23ファイル(gift12/milestone9/reach2)を生成しました。');
 }
 
+/**
+ * 2026-07-16: 効果音ラボ(soundeffect-lab.info)の原素材から ad/rank_up/milestone_soft/
+ *   milestone_hard/milestone_jackpot のバリエーションを組み立てる。効果音ラボは商用利用無料・
+ *   クレジット表記不要・「アプリの操作音として組み込む」用途を明示的に許可している
+ *   (禁止されるのは「効果音を自由に鳴らせるアプリの作成」= 本プロジェクトの未公開の
+ *   「マイ効果音」機能はこの禁止に抵触しうるため対象外・別途要検討)。
+ *   各カテゴリはラウドネス正規化(DEFAULT_LOUDNORM)のみ行い、tiers/<category>-<n>.mp3 へ
+ *   出力する(バリエーション不足のカテゴリは同一ファイルの複製で埋める・乱数不使用)。
+ * @param {string} tmpDir
+ * @returns {boolean} 1件でも生成できたか
+ */
+function buildSoundEffectLabVariations(tmpDir) {
+  /** @type {Record<string, string[]>} カテゴリ→原素材ファイル名(音量が大きい順に並べる必要はない)。 */
+  const CATEGORY_SOURCES = {
+    rank_up: ['shakin1.mp3', 'shakin2.mp3', 'shakin3.mp3'],
+    ad: ['cute-pose1.mp3', 'cute-pose2.mp3'],
+    milestone_soft: ['item-get1.mp3', 'item-get2.mp3'],
+    milestone_hard: ['levelup1.mp3'],
+    milestone_jackpot: ['jajean1.mp3', 'trumpet1.mp3']
+  };
+  mkdirSync(TIERS_OUT_DIR, { recursive: true });
+  let builtAny = false;
+  for (const [category, sources] of Object.entries(CATEGORY_SOURCES)) {
+    const missing = sources.filter((name) => !existsSync(join(SRC_DIR, name)));
+    if (missing.length > 0) {
+      console.log(`[build-sounds] sound-src/soundeffect-lab/ に ${missing.join(', ')} が無いため ${category} をスキップします。`);
+      continue;
+    }
+    // カテゴリ内バリエーション数を他カテゴリと揃えるため、原素材が2本未満なら先頭を複製で埋める。
+    const filled = [sources[0], sources[1] || sources[0], sources[2] || sources[1] || sources[0]];
+    filled.forEach((name, i) => {
+      const src = join(SRC_DIR, name);
+      const dest = join(TIERS_OUT_DIR, `${category.replace(/_/g, '-')}-${i + 1}.mp3`);
+      const tmp = join(tmpDir, `lab-${category}-${i + 1}.mp3`);
+      ffmpeg(['-i', src, '-af', DEFAULT_LOUDNORM, '-ar', '44100', '-q:a', '2', tmp]);
+      copyFileSync(tmp, dest);
+      builtAny = true;
+    });
+  }
+  if (builtAny) {
+    console.log('[build-sounds] 効果音ラボ素材から ad/rank_up/milestone_soft/hard/jackpot のバリエーションを生成しました。');
+  }
+  return builtAny;
+}
+
 function main() {
   const tmpDir = mkdtempSync(join(tmpdir(), 'nls-sound-build-'));
   try {
@@ -217,6 +284,10 @@ function main() {
     // buildGiftSoundFromSynthTier は tiers/gift-medium-1.mp3(上のbuildSynthPachinkoSuiteが
     //   生成)を複製するため、必ずこの後に呼ぶ。
     const built = buildGiftSoundFromSynthTier();
+    // 効果音ラボ素材(ad/rank_up/milestone_*専用ファイル)。無くても他の生成物には影響しない。
+    buildSoundEffectLabVariations(tmpDir);
+    // フォールバック単一ファイルをtiersの1番目へ同期(必ずbuildSoundEffectLabVariationsの後)。
+    syncFallbackFilesToTierOne();
     if (process.argv.includes('--normalize-all')) {
       normalizeExistingEffects(tmpDir);
     }

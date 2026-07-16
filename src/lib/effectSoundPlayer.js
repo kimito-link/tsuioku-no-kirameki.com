@@ -65,12 +65,12 @@ export const EFFECT_SOUND_VARIANT_PATHS = Object.freeze({
   gift_large: Object.freeze(['sound/tiers/gift-large-1.mp3', 'sound/tiers/gift-large-2.mp3', 'sound/tiers/gift-large-3.mp3']),
   gift_mega: Object.freeze(['sound/tiers/gift-mega-1.mp3', 'sound/tiers/gift-mega-2.mp3', 'sound/tiers/gift-mega-3.mp3']),
   reach: Object.freeze(['sound/tiers/reach-1.mp3', 'sound/tiers/reach-2.mp3']),
-  // 2026-07-15(効果音最適化・sound-optimization-DESIGN.md): ad/rank_up/rank_downは
-  //   v0.1.1059のパチンコ的バリエーション化から取り残され、OtoLogic(CC BY 4.0)単一ファイルの
-  //   ままだった。新規CC0を選定・DLせず、既存の同色CC0素材(gift-medium/milestone-soft/
-  //   gift-small)を音色転用する。ギフト未満の「控えめな通知」という価値序列上の位置づけを守る。
-  [EFFECT_SOUND_KINDS.AD]: Object.freeze(['sound/tiers/gift-medium-1.mp3', 'sound/tiers/gift-medium-2.mp3', 'sound/tiers/gift-medium-3.mp3']),
-  [EFFECT_SOUND_KINDS.RANK_UP]: Object.freeze(['sound/tiers/milestone-soft-1.mp3', 'sound/tiers/milestone-soft-2.mp3', 'sound/tiers/milestone-soft-3.mp3']),
+  // 2026-07-16: ad/rank_upは効果音ラボ(soundeffect-lab.info・商用利用無料/クレジット表記不要/
+  //   「アプリの操作音として組み込む」用途を明示許可)の専用素材へ差し替え(sound-src/SOURCES.md
+  //   参照)。ad=可愛く輝く(控えめな通知)・rank_up=シャキーン(短い上昇感)。
+  [EFFECT_SOUND_KINDS.AD]: Object.freeze(['sound/tiers/ad-1.mp3', 'sound/tiers/ad-2.mp3', 'sound/tiers/ad-3.mp3']),
+  [EFFECT_SOUND_KINDS.RANK_UP]: Object.freeze(['sound/tiers/rank-up-1.mp3', 'sound/tiers/rank-up-2.mp3', 'sound/tiers/rank-up-3.mp3']),
+  // rank_downは価値序列上ad/rank_upより控えめであるべきため、引き続きgift-small(自作合成音)を使う。
   [EFFECT_SOUND_KINDS.RANK_DOWN]: Object.freeze(['sound/tiers/gift-small-1.mp3', 'sound/tiers/gift-small-2.mp3', 'sound/tiers/gift-small-3.mp3'])
 });
 
