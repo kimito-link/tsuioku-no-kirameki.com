@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1159',
+    date: '2026-07-16',
+    summary: '広告・順位変動・コメント数節目の効果音をより自然な音に更新',
+    items: Object.freeze([
+      '広告投稿・応援ランキング順位上昇・コメント数の節目(100/200/500/1000件)で鳴る効果音を、ライセンス上利用が明確に許可されている素材へ更新しました。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1158',
     date: '2026-07-16',
     summary: 'ギフト音の原素材の出典記録を撤回し全て自作音源へ統一',

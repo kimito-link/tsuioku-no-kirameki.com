@@ -81,6 +81,29 @@ v0.1.1059時点で`EFFECT_SOUND_VARIANT_PATHS`のバリエーション化対象�
 これにより`extension/sound/`配下のOtoLogic(CC BY 4.0)依存は完全にゼロになった
 (popup.htmlフッターのOtoLogicクレジット表記は撤去可能)。
 
+## 2026-07-16 ad/rank_up/milestone_soft/hard/jackpotを効果音ラボ素材へ差し替え
+
+出典: [効果音ラボ](https://soundeffect-lab.info/)（フリー効果音素材・商用利用無料・
+クレジット表記不要・[利用規約](https://soundeffect-lab.info/agreement/)で
+「アプリの操作音として組み込む」用途を明示的に許可。禁止は「効果音を自由に鳴らせる
+アプリの作成」で、本プロジェクトの未公開「マイ効果音」機能はこの禁止に抵触しうるため
+その用途では使用しないこと。）
+
+| ファイル | 元タイトル | 用途 |
+|---|---|---|
+| `tiers/rank-up-1/2/3.mp3` | シャキーン(全3種) | 順位上昇の短い上昇感 |
+| `tiers/ad-1/2/3.mp3` | 可愛く輝く(全2種+複製1) | 広告・控えめな通知 |
+| `tiers/milestone-soft-1/2/3.mp3` | アイテムを入手(全2種+複製1) | コメント数100/200件到達 |
+| `tiers/milestone-hard-1/2/3.mp3` | レベルアップテッテレー(1種+複製2) | コメント数500件到達 |
+| `tiers/milestone-jackpot-1/2/3.mp3` | ジャジャーン・ラッパのファンファーレ(2種+複製1) | コメント数1000件以上(大当たり) |
+
+原素材は`sound-src/soundeffect-lab/`に配置し、`scripts/build-sounds.mjs`の
+`buildSoundEffectLabVariations`がラウドネス正規化して`extension/sound/tiers/`へ出力する。
+milestone-*は従来の自作合成音(ffmpeg aevalsrc)を完全に置き換えた(ユーザー承認済み)。
+フォールバック単一ファイル(`effect-ad.mp3`等)も`syncFallbackFilesToTierOne`で各カテゴリの
+1番目のコピーに同期している。rank_downは価値序列上いちばん控えめであるべきため、
+引き続き自作合成音(gift-small系)のまま。詳細は`sound-src/SOURCES.md`参照。
+
 ## 既存(v0.1.806〜) — 2026-07-15 出典確認完了
 
 `voice-complete.mp3` / `voice-watch.mp3` — kimito(本プロジェクト開発者)本人が作成した音声。

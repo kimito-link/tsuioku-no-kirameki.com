@@ -47,28 +47,27 @@ describe('resolveEffectSoundPath', () => {
     expect(resolveEffectSoundPath(EFFECT_SOUND_KINDS.GIFT)).toBe(EFFECT_SOUND_PATHS[EFFECT_SOUND_KINDS.GIFT]);
   });
 
-  // 2026-07-15(効果音最適化): ad/rank_up/rank_downはOtoLogic(CC BY 4.0)単一ファイルのまま
-  //   取り残されていた。既存CC0素材(gift-medium/milestone-soft/gift-small)を音色転用した
-  //   variantを追加(新規DL不要・追跡性は既存sound-src/SOURCES.mdの出典行に委ねる)。
-  it('adはgift_medium系のCC0チャイムをバリエーションとして返す', () => {
+  // 2026-07-16: ad/rank_upは効果音ラボ(soundeffect-lab.info)の専用素材(sound/tiers/ad-*.mp3・
+  //   rank-up-*.mp3)へ、rank_downは引き続き自作合成音(gift-small・価値序列上いちばん控えめ)へ。
+  it('adは効果音ラボ由来の専用バリエーション(sound/tiers/ad-*.mp3)を返す', () => {
     const variants = EFFECT_SOUND_VARIANT_PATHS[EFFECT_SOUND_KINDS.AD];
     expect(resolveEffectSoundPath(EFFECT_SOUND_KINDS.AD, { rng: () => 0 })).toBe(variants[0]);
     expect(resolveEffectSoundPath(EFFECT_SOUND_KINDS.AD, { rng: () => 0.999 })).toBe(variants[2]);
   });
 
-  it('rank_upはmilestone_soft系のCC0通知音をバリエーションとして返す', () => {
+  it('rank_upは効果音ラボ由来の専用バリエーション(sound/tiers/rank-up-*.mp3)を返す', () => {
     const variants = EFFECT_SOUND_VARIANT_PATHS[EFFECT_SOUND_KINDS.RANK_UP];
     expect(resolveEffectSoundPath(EFFECT_SOUND_KINDS.RANK_UP, { rng: () => 0 })).toBe(variants[0]);
     expect(resolveEffectSoundPath(EFFECT_SOUND_KINDS.RANK_UP, { rng: () => 0.999 })).toBe(variants[2]);
   });
 
-  it('rank_downはgift_small系のCC0ポップ音をバリエーションとして返す', () => {
+  it('rank_downは自作合成音(gift-small系)をバリエーションとして返す', () => {
     const variants = EFFECT_SOUND_VARIANT_PATHS[EFFECT_SOUND_KINDS.RANK_DOWN];
     expect(resolveEffectSoundPath(EFFECT_SOUND_KINDS.RANK_DOWN, { rng: () => 0 })).toBe(variants[0]);
     expect(resolveEffectSoundPath(EFFECT_SOUND_KINDS.RANK_DOWN, { rng: () => 0.999 })).toBe(variants[2]);
   });
 
-  it('ad/rank_up/rank_downのバリエーションは3件ずつでEFFECT_SOUND_PATHSの旧OtoLogicパスと異なる', () => {
+  it('ad/rank_up/rank_downのバリエーションは3件ずつでEFFECT_SOUND_PATHSの旧パスと異なる', () => {
     for (const kind of [EFFECT_SOUND_KINDS.AD, EFFECT_SOUND_KINDS.RANK_UP, EFFECT_SOUND_KINDS.RANK_DOWN]) {
       const variants = EFFECT_SOUND_VARIANT_PATHS[kind];
       expect(variants).toHaveLength(3);
