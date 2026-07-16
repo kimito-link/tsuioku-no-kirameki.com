@@ -30,7 +30,6 @@
  */
 
 import { KEY_CUSTOM_SOUND_REV } from './storageKeys.js';
-import { CUSTOM_SOUND_PRESET } from './customSoundPreset.js';
 
 /** IndexedDB データベース名。 */
 export const CUSTOM_SOUND_DB_NAME = 'tk-custom-sounds';
@@ -523,20 +522,14 @@ export async function loadCustomSoundRuntimeState(opts = {}) {
   /** @type {{ customVariantPaths: Record<string, ReadonlyArray<string>>, gainFor: () => number, urlsById: Map<string, string>, localBundledCount: number }} */
   const empty = { customVariantPaths: {}, gainFor: () => CUSTOM_SOUND_DEFAULT_GAIN, urlsById: new Map(), localBundledCount: 0 };
 
-  // ローカル同梱は IndexedDB の有無に関係なく試す(manifest.jsonが無ければ静かに空)。
+  // 2026-07-16: ローカル同梱(install-local-sounds.mjsが展開するsound/custom/manifest.json経由の
+  //   自動読込)を無効化。プリセット(customSoundPreset.js)のNo.はAudiostock音源番号であり、
+  //   ユーザーが一切操作していなくても常時この音源が再生されてしまっていた(ライセンス上の
+  //   ユーザー選択型アプリへの組み込み禁止に抵触しうる・ユーザー実機報告で発覚)。
+  //   IDB手動取込(ユーザーが明示的に自分の音源を割り当てる経路)のみ有効のまま残す。
   /** @type {Record<string, ReadonlyArray<string>>} */
-  let localVariantPaths = {};
-  let localBundledCount = 0;
-  try {
-    const manifestFiles = await loadLocalBundledSoundManifest({ getUrl: opts.getUrl, fetchImpl: opts.fetchImpl });
-    if (manifestFiles) {
-      localBundledCount = Object.keys(manifestFiles).length;
-      localVariantPaths = buildLocalVariantPaths(CUSTOM_SOUND_PRESET, manifestFiles);
-    }
-  } catch {
-    localVariantPaths = {};
-    localBundledCount = 0;
-  }
+  const localVariantPaths = {};
+  const localBundledCount = 0;
 
   if (!isCustomSoundDbAvailable()) {
     return { ...empty, customVariantPaths: localVariantPaths, localBundledCount };

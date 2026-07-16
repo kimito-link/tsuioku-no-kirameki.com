@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1164',
+    date: '2026-07-16',
+    summary: '会場を開いた瞬間の意図しない効果音を停止',
+    items: Object.freeze([
+      '会場モードを開いた瞬間に、意図せず効果音が鳴ってしまうことがある不具合を修正しました。この音は開発時のローカル環境でのみ有効だったはずの音源が誤って有効化されていたもので、ユーザーの方が「マイ効果音」機能で明示的に音源を選択・取り込んでいない限り、今後は鳴らなくなります。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1163',
     date: '2026-07-16',
     summary: '会場の応援アイコン列を①ポップアップと同じ大きさに統一',
