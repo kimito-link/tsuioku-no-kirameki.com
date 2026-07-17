@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1169',
+    date: '2026-07-17',
+    summary: 'マーケ分析の目次リンクで空白に見える不具合を修正',
+    items: Object.freeze([
+      'マーケ分析レポートの目次リンクから、まだ発表演出が到達していないセクションへジャンプすると、一時的に空白に見えることがある不具合を修正しました。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1168',
     date: '2026-07-17',
     summary: 'マーケ分析に音付き発表演出を追加',
