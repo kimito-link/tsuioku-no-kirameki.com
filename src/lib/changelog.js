@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1170',
+    date: '2026-07-17',
+    summary: '応援レーンの応援者が出没する不具合を修正',
+    items: Object.freeze([
+      '配信によっては、応援レーン(りんく列)の記名ユーザーが一時的に消えたり戻ったりすることがある不具合を修正しました。配信者の判定が揺れても、一度表示した応援者を安定して表示し続けるようにしました。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1169',
     date: '2026-07-17',
     summary: 'マーケ分析の目次リンクで空白に見える不具合を修正',

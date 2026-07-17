@@ -363,6 +363,7 @@
 | `src/lib/broadcasterFollowTarget.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/broadcasterReputationKeywords.js` | 1 | 状態速報ページ |
 | `src/lib/broadcasterReputationView.js` | 1 | 状態速報ページ |
+| `src/lib/broadcasterUidTracker.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/broadcasterUserId.js` | 1 | 記録エンジン(watchページ常駐) |
 | `src/lib/broadcastNarrativeBuilder.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/broadcastReportSummary.js` | 1 | ポップアップ(応援レーン) |
