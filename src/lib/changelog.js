@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1166',
+    date: '2026-07-17',
+    summary: 'マーケ分析を別タブでダウンロードするように変更',
+    items: Object.freeze([
+      'マーケ分析のダウンロードが、ポップアップを固まらせずに別タブで進むようになりました。りんく・こん太・たぬ姉が交代で応援している間に分析が進み、終わったら自動でダウンロードされます。ポップアップは開いてすぐに閉じても大丈夫です。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1165',
     date: '2026-07-17',
     summary: 'タイムシフト視聴時の重さ・画面の白化を修正',

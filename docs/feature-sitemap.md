@@ -510,10 +510,12 @@
 
 - **HTMLレポート生成** — マーケ/イベント順位/タイムライン等を1枚の HTML レポートに組み立てる(popup-entry 内)
   - `src/extension/popup-entry.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 37</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 39</summary>
 
+- `extension/marketing-export-guard.js` — マーケ分析タブ(marketing-export.html)の「何があっても開く」保険。
 - `scripts/build-sound-preview.mjs` — 開発用: extension/sound/ 配下の全効果音を1枚のHTMLで試聴できるページを生成する。
 - `scripts/inspect-nicolive-watch-stats.mjs` — ニコ生 watch ページの HTML から、来場・同接まわりの数値がどう埋め込まれているかを CLI で確認する。
+- `src/extension/marketing-export-entry.js` — マーケ分析レポートの別タブ化(marketing-export.html)のエントリ。
 - `src/extension/popup/report/htmlReportDocument.js` — HTMLレポート(振り返り用の保存HTML)組み立てクラスタ。
 - `src/lib/audienceEngagementGap.js` — 来場者数は多いがコメントが少ない状態を検出するローカル分析コア。
 - `src/lib/broadcastNarrativeBuilder.js` — コメント本文だけから「配信内容の流れ」を再構成する純粋関数。
@@ -842,7 +844,7 @@
 
 ## 🧬 修正系譜マップ(この系統のバグを過去にどう直したか)
 
-> changelog 全 495 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
+> changelog 全 496 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
 
 ### 💾 記録件数 (73版)
 - `v0.1.1153` 2026-07-15 — 応援コメントの内訳表示が増減して見える不具合を修正
@@ -1952,7 +1954,8 @@
 - `v0.1.840` 2026-06-20 — 機能逆引き地図を全ファイル網羅に
 - `v0.1.835` 2026-06-20 — 自己検証ゲートを追加(版同期+診断文言)
 
-### その他 (31版)
+### その他 (32版)
+- `v0.1.1166` 2026-07-17 — マーケ分析を別タブでダウンロードするように変更
 - `v0.1.1160` 2026-07-16 — ニコニコ動画ページで拡張のエラー表示が出ることがある不具合を修正
 - `v0.1.1159` 2026-07-16 — 広告・順位変動・コメント数節目の効果音をより自然な音に更新
 - `v0.1.1155` 2026-07-15 — コメント数マイルストーン効果音の第三者ライセンス依存を解消

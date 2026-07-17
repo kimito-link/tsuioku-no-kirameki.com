@@ -4,7 +4,6 @@ import { extractLiveIdFromUrl, isNicoLiveWatchUrl, watchPageUrlsMatchForSnapshot
 // v0.1.1057: HTMLレポート組み立てクラスタを popup/report/ へ切り出し(max-linesラチェット対応・挙動不変)。
 import {
   buildYukkuriImageDataUrlMap,
-  attachCommenterFollowToReport,
   buildHtmlReportDocument
 } from './popup/report/htmlReportDocument.js';
 import { makeInitialMilestoneEffectDiag, buildMilestoneEffectDiagSnapshot } from '../lib/milestoneEffectDiag.js';
@@ -99,10 +98,7 @@ import { aggregateGiftSenderTotals } from '../lib/giftEventStore.js';
 import { kokenContribStorageKey } from '../lib/kokenContributionRankingApi.js';
 import {
   giftHistoryThrowsStorageKey,
-  buildGiftSubAppPayloadFromKokenJson,
-  buildKokenGiftPersistPayload,
-  mergeGiftSubAppHistoryPayload,
-  normalizeKokenGiftHistoryResponse
+  buildKokenGiftPersistPayload
 } from '../lib/kokenGiftHistoryApi.js';
 import {
   shouldDeferCelebrationsUntilHeavySettled,
@@ -125,10 +121,7 @@ import { buildRoomHeatMirrorSnapshot } from '../lib/roomHeatMirror.js';
 //   約1分ごとのサンプル最大24行)を純Web③にも丸写しするための鏡スナップショット純関数。renderSessionSummaryComparePanel
 //   が paint に使った rows(IDB read 済み)をそのまま渡すだけ=publish 経路に新規 storage read を足さない。
 import { buildSessionSummaryMirrorSnapshot } from '../lib/sessionSummaryMirror.js';
-import {
-  fetchKokenGiftHistoryAllViaExtension,
-  fetchKokenGiftHistoryViaExtension
-} from '../lib/kokenGiftHistoryFetchClient.js';
+import { fetchKokenGiftHistoryAllViaExtension } from '../lib/kokenGiftHistoryFetchClient.js';
 import { eventScoreRankingStorageKey } from '../lib/eventScoreRankingRelay.js';
 import { eventVotingRankingStorageKey } from '../lib/auditionEventRankingApi.js';
 import { buildEventRankingReportModel } from '../lib/eventRankingReportModel.js';
@@ -638,11 +631,7 @@ import {
 import { storyUserLaneMetaLines } from '../lib/storyUserLaneMeta.js';
 import { anonymousIdenticonDataUrl } from '../lib/anonymousIdenticon.js';
 import { upgradeAnonymousAvatarImage, upgradeAnonymousAvatarImageFromFallback, upgradeAnonymousAvatarImages } from '../lib/avatarPartsComposer.js';
-import { HTML_REPORT_HEAVY_COMMENT_THRESHOLD } from '../lib/reportCommentsTableSection.js';
-import {
-  buildHtmlReportDownloadFilename,
-  buildMarketingReportDownloadFilename
-} from '../lib/exportDownloadFilename.js';
+import { buildHtmlReportDownloadFilename } from '../lib/exportDownloadFilename.js';
 import {
   createExportStageProfiler,
   logExportStageProfileIfEnabled
@@ -741,9 +730,7 @@ import {
   readMergedTrendSeries,
   readTrendSeries
 } from '../lib/devMonitorTrendSession.js';
-import { aggregateMarketingReport } from '../lib/marketingAggregate.js';
 import { publishReportPreviewThrottled } from '../lib/reportPreviewPublish.js';
-import { buildMarketingDashboardHtml } from '../lib/marketingChartsHtml.js';
 import {
   summarizeCommentRecordBreakdown,
   formatCommentRecordBreakdownLine
@@ -17744,6 +17731,37 @@ async function resolveSnapshotForHtmlExport(watchUrl) {
 }
 
 /**
+ * 2026-07-17(marketing-export-tab-DESIGN.md・PR2): マーケ分析タブ(marketing-export.html?lv=<lid>)を
+ *   開くか、既に同じ liveId で開いている処理中タブがあればそれをフォーカスする。
+ *   live-view.html の chrome.tabs.create 前例(popup-entry.js内で完結・background.js非経由)に倣う。
+ *   同一liveIdへの多重タブオープンを防ぐ単一インスタンス制御。
+ * @param {string} lv
+ */
+async function openOrFocusMarketingExportTab(lv) {
+  try {
+    const url = chrome.runtime.getURL(`marketing-export.html?lv=${encodeURIComponent(lv)}`);
+    const existing = await chrome.tabs.query({
+      url: chrome.runtime.getURL('marketing-export.html*')
+    });
+    const match = (existing || []).find((t) => {
+      try {
+        return new URL(t.url || '').searchParams.get('lv') === lv;
+      } catch {
+        return false;
+      }
+    });
+    if (match && match.id != null) {
+      await chrome.tabs.update(match.id, { active: true });
+      if (match.windowId != null) await chrome.windows.update(match.windowId, { focused: true });
+      return;
+    }
+    await chrome.tabs.create({ url });
+  } catch {
+    /* context切れ等は無視(致命ではない) */
+  }
+}
+
+/**
  * htmlReportDocument.js(切り出し済みHTMLレポート組み立てクラスタ)へ渡す共有依存の束。
  * closure依存(watchMetaCache.snapshot / INLINE_PASSIVE / 共有ヘルパ)を1箇所で注入する。
  */
@@ -19688,337 +19706,19 @@ async function initPopup() {
   $('devMonitorExportMarketingBtn')?.addEventListener('click', async () => {
     const prm = lastDevMonitorPanelParams;
     const stEl = /** @type {HTMLElement|null} */ ($('devMonitorExportTrendStatus'));
-    const btn = /** @type {HTMLButtonElement|null} */ ($('devMonitorExportMarketingBtn'));
     // v0.1.527: ボタンを lv 判明時点で早期有効化したため、devMonitor パネルの params が
     //   まだ未確定（lastDevMonitorPanelParams=null）でクリックされ得る。その場合は保存ボタンが
     //   持つ liveId を使う（マーケ集計は liveId から storage を読み直すため prm は liveId だけ必要）。
     const lid = String(
       /** @type {any} */ (prm)?.liveId || $('exportJson')?.dataset.liveId || ''
-    ).trim();
+    ).trim().toLowerCase();
     if (!lid) {
       if (stEl) stEl.textContent = 'liveId なし';
       return;
     }
-    if (btn) btn.disabled = true;
-    const mktProf = createExportStageProfiler();
-    showExportWaitPanel('marketing');
-    setExportWaitTechStatus('分析中… (1/3) データ取得');
-    if (stEl) stEl.textContent = '分析中… (1/3) データ取得';
-    try {
-      await yieldToBrowserPaint();
-      const gKey = giftUsersStorageKey(lid);
-      const giftEventsKey = `nls_gift_events_${lid}`;
-      const giftThrowsKey = giftHistoryThrowsStorageKey(lid);
-      const giftSubKey = giftSubAppHistoryStorageKey(lid);
-      // v0.1.509: 本体は全チャンク＋未畳み込みテールを連結（チャンク移行後対応・テール取りこぼし修正）。
-      const [commentsRaw, data] = await withTimeout(
-        Promise.all([
-          resolveCommentsForHtmlExport(lid),
-          chrome.storage.local.get([gKey, giftEventsKey, giftThrowsKey, giftSubKey])
-        ]),
-        30_000,
-        'marketing_storage_timeout'
-      );
-      const comments = /** @type {import('../lib/commentRecord.js').StoredComment[]} */ (
-        Array.isArray(commentsRaw) ? commentsRaw : []
-      );
-      const giftUsersForMarketing = Array.isArray(data[gKey]) ? data[gKey] : [];
-      const giftEventsForMarketing = Array.isArray(data[giftEventsKey]) ? data[giftEventsKey] : [];
-      const giftHistoryThrowsForMarketing = Array.isArray(data[giftThrowsKey])
-        ? data[giftThrowsKey]
-        : [];
-      const giftSubAppHistoryRaw =
-        data[giftSubKey] && typeof data[giftSubKey] === 'object' ? data[giftSubKey] : null;
-      if (comments.length === 0) {
-        if (stEl) stEl.textContent = 'コメントが0件です';
-        setExportWaitTechStatus('コメントが0件です');
-        if (btn) btn.disabled = false;
-        hideExportWaitPanel();
-        return;
-      }
-      mktProf.mark('read');
-      const heavyMkt = comments.length > HTML_REPORT_HEAVY_COMMENT_THRESHOLD;
-      // 0.1.46 (AB): 配信者本人のコメ（合いの手等）を KPI 集計から除外
-      const reportBroadcasterUid = String(
-        watchMetaCache.snapshot?.broadcasterUserId || ''
-      ).trim();
-      if (stEl) stEl.textContent = '分析中… (2/3) 集計・画像準備';
-      setExportWaitTechStatus('分析中… (2/3) 集計・画像準備');
-      // 集計は件数が多いと数百ms 同期で詰まり、上の status すら描画されず「固まった」
-      //   ように見える。重い同期処理の前に 1 フレーム譲ってステータスを確実に出す。
-      await yieldToBrowserPaint();
-      const report = aggregateMarketingReport(comments, lid, {
-        broadcasterUserId: reportBroadcasterUid
-      });
-      mktProf.mark('aggregate');
-      const maskEl = /** @type {HTMLInputElement|null} */ ($('devMonitorExportMarketingMaskLabels'));
-      const maskShare = Boolean(maskEl?.checked);
-      // 0.1.588: フォロー nvapi 補完は DL 前に待たない（キャッシュのみ・数秒短縮）。
-      // 同接 / 過去配信 / bundle / ゆっくり / koken / 配信者プロフィールも並列。
-      const [
-        ,
-        sessionSummaryRows,
-        pastBroadcasts,
-        bundleForMkt,
-        yukkuriImageMapForMkt,
-        eventRankingForMkt,
-        kokenGiftResp,
-        broadcasterProfileForMkt
-      ] = await Promise.all([
-          attachCommenterFollowToReport(report, lid, { cacheOnly: true }, buildHtmlReportDeps()),
-          (async () => {
-            try {
-              const db = await openBroadcastSessionSummaryDb();
-              return await listBroadcastSessionSummaryForLive(db, lid, 200);
-            } catch {
-              return [];
-            }
-          })(),
-          (async () => {
-            if (heavyMkt) return [];
-            try {
-              const sumDb = await openBroadcastSessionSummaryDb();
-              const pastLimit = comments.length > 8000 ? 4 : 8;
-              const recentLiveIds = await listRecentUniqueBroadcastLiveIds(sumDb, {
-                limit: pastLimit,
-                excludeLiveId: lid
-              });
-              if (!recentLiveIds.length) return [];
-              // v0.1.509: 過去配信もチャンク移行後対応＋テール込みで読む。
-              const pastArrays = await Promise.all(
-                recentLiveIds.map((id) => readAllCommentsForLive(id))
-              );
-              /** @type {{ liveId: string, comments: import('../lib/commentRecord.js').StoredComment[] }[]} */
-              const out = [];
-              for (let i = 0; i < recentLiveIds.length; i += 1) {
-                const cs = /** @type {import('../lib/commentRecord.js').StoredComment[]} */ (
-                  Array.isArray(pastArrays[i]) ? pastArrays[i] : []
-                );
-                if (cs.length) out.push({ liveId: recentLiveIds[i], comments: cs });
-              }
-              return out;
-            } catch {
-              return [];
-            }
-          })(),
-          readOfficialEventDomBundleFromStorage(lid),
-          buildYukkuriImageDataUrlMap(),
-          // イベント💎順位（あれば）。HTMLレポートと同じ正本 model を渡す（marketing は
-          // opts.eventRanking で受ける）。取れない/イベント不参加は null＝セクション省略。
-          (async () => {
-            try {
-              const lidLc = String(lid || '').trim().toLowerCase();
-              if (!/^lv\d{1,15}$/.test(lidLc)) return null;
-              const ek = eventScoreRankingStorageKey(lidLc);
-              const bag = await chrome.storage.local.get(ek).catch(() => ({}));
-              return bag && bag[ek]
-                ? buildEventRankingReportModel(bag[ek], { nowMs: Date.now() })
-                : null;
-            } catch {
-              return null;
-            }
-          })(),
-          (async () => {
-            try {
-              return await Promise.race([
-                fetchKokenGiftHistoryViaExtension(lid),
-                new Promise((_, reject) => {
-                  setTimeout(() => reject(new Error('koken_fetch_timeout')), 5000);
-                })
-              ]);
-            } catch {
-              return null;
-            }
-          })(),
-          resolveBroadcasterProfileModel(watchMetaCache.snapshot, lid)
-        ]);
-      mktProf.mark('parallel_io');
-      const kokenPayload =
-        kokenGiftResp?.ok && kokenGiftResp.json != null
-          ? buildGiftSubAppPayloadFromKokenJson(kokenGiftResp.json, {
-              now: Date.now(),
-              liveId: lid
-            })
-          : null;
-      const giftSubAppHistoryForMarketing = mergeGiftSubAppHistoryPayload(
-        giftSubAppHistoryRaw,
-        kokenPayload
-      );
-      if (stEl) stEl.textContent = '分析中… (3/3) HTML生成';
-      setExportWaitTechStatus('分析中… (3/3) HTML生成');
-      // HTML 文字列生成（数万コメ・画像 data URL 込み）は最重量の同期処理。直前に
-      //   1 フレーム譲り、「(3/3) HTML生成」を描画してから走らせる（体感の固まり解消）。
-      await yieldToBrowserPaint();
-      // 0.1.12 (F1/F3): 匿名 a:... ユーザーへの identicon SVG data URL は popup
-      // 側のキャッシュ helper で解決（identicon 無効化設定時は空文字を返すので
-      // ユーザーの opt-out が尊重される）。
-      // 0.1.17 (R): 配信者本人を topUsers / サムネ付き一覧から除外するため
-      // snapshot.broadcasterUserId を thread。空文字なら影響なし（互換）。
-      // niconico DOM から掬った正本値（番組統計5値・参加イベント・貢献度ランキング）も
-      // ゆっくり解説の素材として渡す。無ければマーケ分析側で最小構成にフォールバック。
-      const html = buildMarketingDashboardHtml(report, {
-        maskShareLabels: maskShare,
-        anonymousIdenticonResolver: getCachedAnonymousIdenticonDataUrl,
-        broadcasterUserId: String(
-          watchMetaCache.snapshot?.broadcasterUserId || ''
-        ).trim(),
-        sessionSummaryRows,
-        commentsForAnalytics: heavyMkt ? capCommentsForAnalytics(comments) : comments,
-        pastBroadcasts,
-        giftUsers: giftUsersForMarketing,
-        giftEvents: giftEventsForMarketing,
-        giftHistoryThrows: giftHistoryThrowsForMarketing,
-        giftSubAppHistory: giftSubAppHistoryForMarketing,
-        officialEventDomBundle: bundleForMkt,
-        broadcastTitle: String(
-          watchMetaCache.snapshot?.broadcastTitle || watchMetaCache.snapshot?.title || ''
-        ),
-        broadcasterName: String(watchMetaCache.snapshot?.broadcasterName || ''),
-        broadcasterProfile: broadcasterProfileForMkt,
-        noopenerLinks: Array.isArray(watchMetaCache.snapshot?.noopenerLinks)
-          ? watchMetaCache.snapshot.noopenerLinks
-          : [],
-        recordedCommentCount: Array.isArray(comments) ? comments.length : 0,
-        streamAgeMin:
-          typeof watchMetaCache.snapshot?.streamAgeMin === 'number'
-            ? watchMetaCache.snapshot.streamAgeMin
-            : undefined,
-        yukkuriImageDataUrlMap: yukkuriImageMapForMkt,
-        eventRanking: eventRankingForMkt,
-        slimForHeavyExport: heavyMkt
-      });
-      mktProf.mark('build_html');
-      const mktFilename = buildMarketingReportDownloadFilename(lid, {
-        comments,
-        snapshot: watchMetaCache.snapshot
-      });
-      if (stEl) stEl.textContent = `DL開始: ${mktFilename}`;
-      await downloadBlobViaChromeDownloads(
-        new Blob([html], { type: 'text/html;charset=utf-8' }),
-        mktFilename
-      );
-      mktProf.mark('download');
-      const mktDone = mktProf.finish('マーケ');
-      logExportStageProfileIfEnabled('マーケ', mktDone.rows);
-      // 0.1.588: storage 書き戻しは DL 開始後に best-effort（DL 待ちを増やさない）。
-      void (async () => {
-        try {
-          /** @type {Record<string, unknown>} */
-          const giftPersist = {};
-          if (giftSubAppHistoryForMarketing) {
-            giftPersist[giftSubKey] = giftSubAppHistoryForMarketing;
-          }
-          if (kokenGiftResp?.ok && kokenGiftResp.json != null) {
-            const throwsRows = normalizeKokenGiftHistoryResponse(kokenGiftResp.json, {
-              now: Date.now()
-            });
-            if (Array.isArray(throwsRows) && throwsRows.length > 0) {
-              giftPersist[giftThrowsKey] = throwsRows;
-            }
-          }
-          if (Object.keys(giftPersist).length > 0) {
-            await chrome.storage.local.set(giftPersist);
-          }
-        } catch {
-          /* best-effort */
-        }
-      })();
-      if (stEl) {
-        stEl.textContent = `${mktDone.summary} · ${report.totalComments}件 / ${report.uniqueUsers}人`;
-      }
-      playReportCompleteVoiceSequence(); // v0.1.806: マーケ保存成功直後に完了音声
-    } catch (e) {
-      const msg = String(
-        e && typeof e === 'object' && 'message' in e
-          ? /** @type {{ message?: unknown }} */ (e).message
-          : e || 'marketing_dl_error'
-      );
-      if (isExtensionContextInvalidatedError(msg)) {
-        const fallbackComments = Array.isArray(STORY_SOURCE_STATE.entries)
-          ? STORY_SOURCE_STATE.entries
-          : [];
-        if (fallbackComments.length > 0) {
-          try {
-            // 0.1.46 (AB): fallback 経路でも配信者本人を集計除外する
-            const fallbackBroadcasterUid = String(
-              watchMetaCache.snapshot?.broadcasterUserId || ''
-            ).trim();
-            const report = aggregateMarketingReport(
-              /** @type {import('../lib/commentRecord.js').StoredComment[]} */ (
-                fallbackComments
-              ),
-              lid || String(STORY_SOURCE_STATE.liveId || '').trim(),
-              { broadcasterUserId: fallbackBroadcasterUid }
-            );
-            const maskEl = /** @type {HTMLInputElement|null} */ (
-              $('devMonitorExportMarketingMaskLabels')
-            );
-            const maskShare = Boolean(maskEl?.checked);
-            const yukkuriImageMapFb = await buildYukkuriImageDataUrlMap();
-            const fbHeavy =
-              fallbackComments.length > HTML_REPORT_HEAVY_COMMENT_THRESHOLD;
-            const html = buildMarketingDashboardHtml(report, {
-              maskShareLabels: maskShare,
-              anonymousIdenticonResolver: getCachedAnonymousIdenticonDataUrl,
-              broadcasterUserId: String(
-                watchMetaCache.snapshot?.broadcasterUserId || ''
-              ).trim(),
-              // fallback 経路では IDB アクセスは諦める（拡張再読み込み中でも分析だけは出す）
-              sessionSummaryRows: [],
-              commentsForAnalytics: fallbackComments,
-              slimForHeavyExport: fbHeavy,
-              giftUsers: [],
-              // ゆっくり解説向けに、メモリ上の watchSnapshot からヒントを引く
-              broadcastTitle: String(
-                watchMetaCache.snapshot?.broadcastTitle || watchMetaCache.snapshot?.title || ''
-              ),
-              broadcasterName: String(watchMetaCache.snapshot?.broadcasterName || ''),
-              broadcasterProfile: normalizeBroadcasterProfileModel(
-                mergeBroadcasterProfileRaw(watchMetaCache.snapshot, null)
-              ),
-              recordedCommentCount: Array.isArray(fallbackComments) ? fallbackComments.length : 0,
-              streamAgeMin:
-                typeof watchMetaCache.snapshot?.streamAgeMin === 'number'
-                  ? watchMetaCache.snapshot.streamAgeMin
-                  : undefined,
-              yukkuriImageDataUrlMap: yukkuriImageMapFb
-            });
-            const fbFilename = buildMarketingReportDownloadFilename(
-              lid || String(STORY_SOURCE_STATE.liveId || '').trim(),
-              { comments: fallbackComments, snapshot: watchMetaCache.snapshot }
-            );
-            await downloadBlobViaChromeDownloads(
-              new Blob([html], { type: 'text/html;charset=utf-8' }),
-              fbFilename
-            );
-            if (stEl) {
-              stEl.textContent =
-                '拡張再読み込み中のためメモリデータでDLしました（開き直して再実行推奨）';
-            }
-            return;
-          } catch {
-            // 通常エラー表示にフォールスルー
-          }
-        }
-      }
-      // v0.1.396: context-invalidated（フォールバックも出せなかった）ときは、
-      //   即・ワンクリック復帰できるよう再読み込みバナーを出して案内を残す。
-      if (isExtensionContextInvalidatedError(msg)) {
-        renderExtensionContextBanner(true);
-        if (stEl) {
-          stEl.textContent =
-            '拡張が更新され接続が切れています。上の「このパネルを再読み込み」で直ります';
-        }
-      } else if (stEl) {
-        stEl.textContent =
-          msg === 'marketing_storage_timeout'
-            ? '分析がタイムアウトしました（再試行してください）'
-            : `エラー: ${msg}`;
-      }
-    } finally {
-      hideExportWaitPanel();
-      if (btn) btn.disabled = false;
-    }
+    if (stEl) stEl.textContent = '別タブでマーケ分析を開いています…';
+    await openOrFocusMarketingExportTab(lid);
+    if (stEl) stEl.textContent = '別タブで分析中…（このポップアップは閉じても大丈夫です）';
   });
 
   const readCustomFrameInputs = () =>
