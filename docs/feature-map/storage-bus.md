@@ -25,7 +25,7 @@
 - 🟠 **fn:officialGiftPointsAggregateStorageKey** — 書く人だけ（読む経路が無い疑い）: src/extension/content-entry.js
 - 🟠 **fn:perfDiagStorageKey** — 書く人だけ（読む経路が無い疑い）: src/extension/popup-entry.js
 - 🔵 **KEY_AI_SHARE_POPUP_DIAG** — 読む人だけ（書く経路が無い疑い）: src/extension/status-entry.js
-- 🔵 **KEY_ANONYMOUS_IDENTICON_ENABLED** — 読む人だけ（書く経路が無い疑い）: src/extension/popup-entry.js
+- 🔵 **KEY_ANONYMOUS_IDENTICON_ENABLED** — 読む人だけ（書く経路が無い疑い）: src/extension/marketing-export-entry.js, src/extension/popup-entry.js
 - 🔵 **KEY_AUTOPATROL_ENABLED** — 読む人だけ（書く経路が無い疑い）: src/extension/popup-entry.js
 - 🔵 **KEY_AUTOPATROL_STATE** — 読む人だけ（書く経路が無い疑い）: src/extension/popup-entry.js
 - 🔵 **KEY_BACKFILL_AUTO_DISABLED** — 読む人だけ（書く経路が無い疑い）: src/extension/content-entry.js, src/extension/popup-entry.js
@@ -75,7 +75,7 @@
 |---|---|---|
 | `KEY_AI_SHARE_FAST_DIAG` | extension/content-entry.js | extension/popup-entry.js |
 | `KEY_AI_SHARE_POPUP_DIAG` | — | extension/status-entry.js |
-| `KEY_ANONYMOUS_IDENTICON_ENABLED` | — | extension/popup-entry.js |
+| `KEY_ANONYMOUS_IDENTICON_ENABLED` | — | extension/marketing-export-entry.js<br>extension/popup-entry.js |
 | `KEY_AUTOPATROL_ENABLED` | — | extension/popup-entry.js |
 | `KEY_AUTOPATROL_STATE` | — | extension/popup-entry.js |
 | `KEY_AUTO_BACKUP_STATE` | extension/content-entry.js | extension/content-entry.js |

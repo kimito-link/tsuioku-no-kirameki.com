@@ -704,7 +704,7 @@
   - `src/lib/statusTrendKey.js`
   - `src/extension/status-entry.js`
   - `src/lib/statusActionAdvisor.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 129</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 131</summary>
 
 - `app/app.js` — スマホ閲覧用 status Web 版。
 - `app/live-view.js` — global NL_BUILD_ID
@@ -715,6 +715,7 @@
 - `scripts/capture-store-screenshots.mjs` — Chrome ウェブストア用スクショ自動撮影
 - `scripts/check-tracked-imports.mjs` — 「コミットし忘れた新規ファイルを import している」ことを機械的に検出するリリース工程ガード(2026-07-06)。
 - `scripts/copy-ext.mjs` — 拡張を「同期対象外フォルダ」へコピーする(Chrome の再読み込み固着の根治)。
+- `scripts/council-lineup.mjs` — 会議メンバー名簿（クラウドのみ。ローカルOllamaは従来通り meeting.mjs 側の
 - `scripts/council-roles.mjs` — 会議ハーネス共通の「役割・出力フォーマット・批判強制」定義。
 - `scripts/cws-publish.mjs` — Chrome Web Store Publish API で ZIP をアップロード(+任意で公開申請)する。
 - `scripts/delete-dead-lib.mjs` — scripts/delete-dead-lib.mjs — 死蔵lib実装ファイルとそのテストを削除
@@ -724,6 +725,7 @@
 - `scripts/repo-tree-map.mjs` — リポジトリのディレクトリツリー＋各ディレクトリの「役割」を自動生成する(2026-06-18 ユーザー提案)。
 - `scripts/run-e2e.mjs` — SKIP_E2E=1 のときは成功終了（CI などディスプレイなし環境用）。
 - `scripts/scan-dead-lib.mjs` — scripts/scan-dead-lib.mjs — lib/ の死蔵ファイルを entry から到達性スキャンして報告
+- `scripts/scout-models.mjs` — Council Scout — 会議メンバー名簿（council-lineup.mjs）の「AI社員の日課」化。
 - `scripts/setup-claude-code.mjs` — プロジェクト用 Claude Code 設定を .claude/settings.json に展開する。
 - `scripts/sync-lp-twitter-icon.mjs` — LP 右端コラボ用: src/images/icon/twitter-icon.png → extension/images/lp/twitter-icon.png
 - `scripts/vendor-visual-explainer.mjs` — Vendors nicobailon/visual-explainer (MIT) into .cursor/skills/visual-explainer/
@@ -840,7 +842,7 @@
 
 ## 🧬 修正系譜マップ(この系統のバグを過去にどう直したか)
 
-> changelog 全 492 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
+> changelog 全 495 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
 
 ### 💾 記録件数 (73版)
 - `v0.1.1153` 2026-07-15 — 応援コメントの内訳表示が増減して見える不具合を修正
@@ -1126,7 +1128,9 @@
 - `v0.1.668` 2026-06-10 — パネルに「💬コメビュ」ボタンを追加
 - `v0.1.667` 2026-06-10 — コメビュに匿名OKのニックネーム・ラベル・メモ
 
-### 🏟 会場・席 (160版)
+### 🏟 会場・席 (162版)
+- `v0.1.1164` 2026-07-16 — 会場を開いた瞬間の意図しない効果音を停止
+- `v0.1.1163` 2026-07-16 — 会場の応援アイコン列を①ポップアップと同じ大きさに統一
 - `v0.1.1154` 2026-07-15 — 会場の「名前ありゆっくり顔」の原因を見つけやすくする診断を追加
 - `v0.1.1152` 2026-07-15 — 会場のリンク不具合を見つけやすくする診断を追加
 - `v0.1.1144` 2026-07-14 — コメントが多いときの読み上げのテンポを改善
@@ -1476,7 +1480,8 @@
 - `v0.1.699` 2026-06-12 — 読み上げの名前ON/OFF切替を追加
 - `v0.1.698` 2026-06-12 — コメビュにユーザー別の声で読み上げ機能を追加
 
-### 🪟 応援レーン・タイル (137版)
+### 🪟 応援レーン・タイル (138版)
+- `v0.1.1163` 2026-07-16 — 会場の応援アイコン列を①ポップアップと同じ大きさに統一
 - `v0.1.1162` 2026-07-16 — 状態速報の異常な数値表示・誤った警告表示を修正
 - `v0.1.1154` 2026-07-15 — 会場の「名前ありゆっくり顔」の原因を見つけやすくする診断を追加
 - `v0.1.1142` 2026-07-14 — ギフト列で自分のサムネが表示されない不具合を修正
@@ -1820,7 +1825,8 @@
 - `v0.1.806` 2026-06-17 — HTML保存の失敗を根治+完了音声を追加
 - `v0.1.785` 2026-06-16 — 状態ページのタイムアウト警告を拡張エラー欄に出さない
 
-### ⚡ 描画・性能 (119版)
+### ⚡ 描画・性能 (120版)
+- `v0.1.1165` 2026-07-17 — タイムシフト視聴時の重さ・画面の白化を修正
 - `v0.1.1162` 2026-07-16 — 状態速報の異常な数値表示・誤った警告表示を修正
 - `v0.1.1140` 2026-07-14 — 状態速報の自己診断を強化(内部計器)
 - `v0.1.1139` 2026-07-14 — 応援レーンの表示上限を差し戻し、二重スクロールを解消

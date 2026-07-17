@@ -137,6 +137,14 @@ const targets = [
     target: 'chrome100'
   },
   {
+    // 2026-07-17: マーケ分析レポートの別タブ化(marketing-export.html・PR1)。popup内で数分固まって
+    //   見えた重い集計・HTML組み立てを別タブへ完全に追い出す。live-view.html と同じくpopup非依存・
+    //   background SWを起こさない骨格(chrome.tabs.createで開くだけ)。
+    entryPoints: ['src/extension/marketing-export-entry.js'],
+    outfile: 'extension/dist/marketing-export.js',
+    target: 'chrome100'
+  },
+  {
     // v0.1.652: 独自コメビュ「KIRAMEKI Comment View」(comeview.html)。読みやすい普段使いの
     //   独立コメビュ。status と同じく chrome.storage.local の軽量キー(cdb_summary.recent / tail)を
     //   リードオンリーで読み新着だけ append。popup と独立・SW を起こさない。?obs=1 で透過。
