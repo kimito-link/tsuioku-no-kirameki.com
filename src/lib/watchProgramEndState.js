@@ -6,7 +6,10 @@
 export function isWatchProgramEndedText(text) {
   const s = String(text || '').trim();
   if (!s) return false;
-  return /(公開終了|放送は終了|番組は終了|次回の放送をお楽しみ|タイムシフト)/.test(s);
+  // 「タイムシフト」単語だけだと、タイムシフト視聴ページ自体のUI文言(プレイヤー機能名等)に
+  //   常時マッチしてしまい「配信終了」を誤検知し続ける(視聴中ずっとendedDetected=trueになる)。
+  //   配信終了→タイムシフト案内への切り替わりを示す文言に絞る。
+  return /(公開終了|放送は終了|番組は終了|次回の放送をお楽しみ|タイムシフトで(ご覧|見))/.test(s);
 }
 
 /**

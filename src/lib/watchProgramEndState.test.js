@@ -16,6 +16,16 @@ describe('isWatchProgramEndedText', () => {
   it('通常の視聴中文言だけなら false', () => {
     expect(isWatchProgramEndedText('コメント 1234件 視聴中')).toBe(false);
   });
+
+  it('タイムシフト再生ページ自体のUI文言(単語のみ)なら false(2026-07-17: 単語だけでの誤検知を修正)', () => {
+    expect(isWatchProgramEndedText('タイムシフト再生中はコメントできません')).toBe(false);
+    expect(isWatchProgramEndedText('タイムシフト機能')).toBe(false);
+  });
+
+  it('配信終了→タイムシフト案内の切り替わり文言なら true', () => {
+    expect(isWatchProgramEndedText('放送は終了しました。タイムシフトでご覧いただけます')).toBe(true);
+    expect(isWatchProgramEndedText('この番組はタイムシフトで見ることができます')).toBe(true);
+  });
 });
 
 describe('shouldRunEndedBulkHarvest', () => {
