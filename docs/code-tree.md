@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 4 / 677 件
+## ⚠️ 役割コメントが無いソース 4 / 679 件
 - `src/lib/laneDomSelfMeasure.js`
 - `src/lib/reportPreviewPublish.js`
 - `src/lib/venueLaneBuckets.js`
@@ -149,6 +149,9 @@
   - `index.html`
   - `live-view.html`
   - `live-view.js` — global NL_BUILD_ID
+- 📁 **council-scout/** (1)
+  - 📁 **briefs/** (1)
+    - `2026-07-16.md`
 - 📁 **docs/** (159)
   - 📁 **article-assets/** (87)
     - 📁 **venue-frames/** (12)
@@ -469,7 +472,7 @@
   - `status-guard.js` — 状態速報ページ(status.html)の「何があっても開く」保険。
   - `status.html`
   - `venue.html`
-- 📁 **scripts/** (36)
+- 📁 **scripts/** (38)
   - 📁 **xserver/** (2)
     - `github-webhook-pull.php.example`
     - `webhook-git-pull-for-upload.php`
@@ -480,6 +483,7 @@
   - `capture-store-screenshots.mjs` — Chrome ウェブストア用スクショ自動撮影
   - `check-tracked-imports.mjs` — 「コミットし忘れた新規ファイルを import している」ことを機械的に検出するリリース工程ガード(2026-07-06)。
   - `copy-ext.mjs` — 拡張を「同期対象外フォルダ」へコピーする(Chrome の再読み込み固着の根治)。
+  - `council-lineup.mjs` — 会議メンバー名簿（クラウドのみ。ローカルOllamaは従来通り meeting.mjs 側の
   - `council-roles.mjs` — 会議ハーネス共通の「役割・出力フォーマット・批判強制」定義。
   - `cws-publish.mjs` — Chrome Web Store Publish API で ZIP をアップロード(+任意で公開申請)する。
   - `delete-dead-lib.mjs` — scripts/delete-dead-lib.mjs — 死蔵lib実装ファイルとそのテストを削除
@@ -497,6 +501,7 @@
   - `run-e2e.mjs` — SKIP_E2E=1 のときは成功終了（CI などディスプレイなし環境用）。
   - `run-verify-cc.mjs` — Claude Code 向け verify ランナー。
   - `scan-dead-lib.mjs` — scripts/scan-dead-lib.mjs — lib/ の死蔵ファイルを entry から到達性スキャンして報告
+  - `scout-models.mjs` — Council Scout — 会議メンバー名簿（council-lineup.mjs）の「AI社員の日課」化。
   - `setup-claude-code.mjs` — プロジェクト用 Claude Code 設定を .claude/settings.json に展開する。
   - `site-health.mjs` — 公開ページ(LP/記事/docs)の「内部リンク健全性」を検証する(2026-06-18・COUNCIL bug-proof-map)。
   - `split-avatar-parts.mjs` — 偽市松背景の除去 + パーツ切り出し(one-off アセットパイプライン)

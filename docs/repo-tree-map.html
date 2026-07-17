@@ -69,7 +69,7 @@
     どのディレクトリが何の担当か（色・速度・コメント・レポート…）を一目で。<code>scripts/repo-tree-map.mjs</code> が git 追跡ファイルから自動生成（手編集しない）。<br>
     テキスト正本: <a href="repo-tree-map.md">repo-tree-map.md</a> ／ 機能依存図: <a href="feature-map/index.md">feature-map/index.md</a> ／ 配置ルール: <a href="../AGENTS.md">AGENTS.md</a> §4。
   </p>
-  <div class="banner warn">⚠️ 役割が未記入のディレクトリ 3 件: <code>docs/article-drafts</code> <code>sound-src</code> <code>sound-src/soundeffect-lab</code> — <code>scripts/repo-tree-map.mjs</code> の <code>ROLES</code> に追記</div>
+  <div class="banner warn">⚠️ 役割が未記入のディレクトリ 5 件: <code>council-scout</code> <code>council-scout/briefs</code> <code>docs/article-drafts</code> <code>sound-src</code> <code>sound-src/soundeffect-lab</code> — <code>scripts/repo-tree-map.mjs</code> の <code>ROLES</code> に追記</div>
   <section class="dir">
       <div class="dhead"><span class="dname">api/</span><span class="cnt">1 件</span></div>
       <div class="drole">サーバレス API(status エンドポイント) <span class="tag">API</span></div>
@@ -84,6 +84,11 @@
       <div class="dhead"><span class="dname">council/</span><span class="cnt">119 件</span></div>
       <div class="drole">会議(COUNCIL)の問い・回答・統合(SYNTHESIS)。設計判断の根拠 <span class="tag">会議</span><span class="tag">設計</span></div>
       
+    </section>
+<section class="dir miss">
+      <div class="dhead"><span class="dname">council-scout/</span><span class="cnt">1 件</span></div>
+      <div class="drole">⚠️ 未記入（ROLES 辞書に追記） </div>
+      <div class="kids"><div class="kid miss"><div class="kname">briefs/ <span class="cnt">1</span></div><div class="krole">⚠️ 未記入 </div></div></div>
     </section>
 <section class="dir">
       <div class="dhead"><span class="dname">docs/</span><span class="cnt">159 件</span></div>
@@ -101,7 +106,7 @@
       <div class="kids"><div class="kid"><div class="kname">archive/ <span class="cnt">12</span></div><div class="krole">過去セッションの引き継ぎ(HANDOFF)アーカイブ <span class="tag">メモリ</span><span class="tag">履歴</span></div></div><div class="kid"><div class="kname">avatar-parts/ <span class="cnt">26</span></div><div class="krole">アバター素材(顔シート等)の参考画像 <span class="tag">アバター</span><span class="tag">画像</span></div></div></div>
     </section>
 <section class="dir">
-      <div class="dhead"><span class="dname">scripts/</span><span class="cnt">36 件</span></div>
+      <div class="dhead"><span class="dname">scripts/</span><span class="cnt">38 件</span></div>
       <div class="drole">ビルド・検証・自動生成スクリプト(build/feature-map/repo-tree-map 等) <span class="tag">ビルド</span><span class="tag">自動生成</span></div>
       <div class="kids"><div class="kid"><div class="kname">xserver/ <span class="cnt">2</span></div><div class="krole">Xserver 向け webhook(git pull デプロイ)スクリプト <span class="tag">デプロイ</span><span class="tag">webhook</span></div></div></div>
     </section>

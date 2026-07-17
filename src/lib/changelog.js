@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1165',
+    date: '2026-07-17',
+    summary: 'タイムシフト視聴時の重さ・画面の白化を修正',
+    items: Object.freeze([
+      'ニコニコ生放送のタイムシフト（見逃し視聴）をご覧のとき、拡張がページを「配信終了直後」だと誤って判断し続け、それが原因で画面が重くなったり、スクロール時に一瞬白くなったりすることがある不具合を修正しました。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1164',
     date: '2026-07-16',
     summary: '会場を開いた瞬間の意図しない効果音を停止',
