@@ -3926,6 +3926,234 @@ function sectionSupporterChikuranBeta(analysis, maskShare, identiconResolver) {
 }
 
 /**
+ * セクション順次発表の CSS を初回描画前から効かせるための早期フラグ。
+ * 本体 script が動かない環境では class が付かないため、レポートは通常表示のまま残る。
+ * @returns {string}
+ */
+function buildSectionRevealBootScriptHtml() {
+  return `<script>
+(function(){
+  try{document.documentElement.classList.add('mkt-section-reveal-enabled');}catch(e){}
+})();
+</script>`;
+}
+
+/**
+ * ダウンロード済みの単独 HTML 内で動く、拡張 API 非依存の発表演出。
+ * Web Audio は自動再生制限を受けるため、音ONボタンまたはページ操作後に鳴らす。
+ * @returns {string}
+ */
+function buildSectionRevealScriptHtml() {
+  return `<div id="mktRevealControl" class="mkt-reveal-control" role="group" aria-label="セクション発表">
+<span id="mktRevealStatus" class="mkt-reveal-control__status">発表準備中…</span>
+<button id="mktRevealSoundBtn" class="mkt-reveal-btn mkt-reveal-btn--sound" type="button">音ON</button>
+<button id="mktRevealSkipBtn" class="mkt-reveal-btn mkt-reveal-btn--skip" type="button">スキップ</button>
+</div>
+<script>
+(function(){
+  var root=document.documentElement;
+  var REVEAL_DELAY_MS=520;
+  var REVEAL_HIGHLIGHT_MS=620;
+  var audioCtx=null;
+  var audioReady=false;
+  var autoScroll=true;
+  var timer=0;
+  var index=0;
+  var stopped=false;
+
+  function allSections(){
+    return Array.prototype.slice.call(document.querySelectorAll('.mkt-section'));
+  }
+
+  function reducedMotion(){
+    try{return !!(window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches);}
+    catch(e){return false;}
+  }
+
+  function failOpen(){
+    try{root.classList.remove('mkt-section-reveal-enabled');}catch(e){}
+    var control=document.getElementById('mktRevealControl');
+    if(control&&control.parentNode)control.parentNode.removeChild(control);
+  }
+
+  function enableAll(sections){
+    sections.forEach(function(section){
+      section.classList.add('mkt-section--reveal');
+      section.classList.remove('mkt-section--revealing');
+    });
+    root.classList.add('mkt-section-reveal-done');
+  }
+
+  function ensureAudioContext(){
+    var Ctor=window.AudioContext||window.webkitAudioContext;
+    if(!Ctor)return null;
+    if(!audioCtx)audioCtx=new Ctor();
+    return audioCtx;
+  }
+
+  function updateSoundButton(btn){
+    if(!btn)return;
+    if(audioReady){
+      btn.textContent='音ON';
+      btn.classList.add('is-ready');
+      btn.disabled=true;
+      btn.title='発表音は有効です';
+      return;
+    }
+    btn.textContent='音ON';
+    btn.classList.remove('is-ready');
+    btn.disabled=false;
+    btn.title='ブラウザの自動再生制限で音が出ないときに押してください';
+  }
+
+  function tryEnableAudio(btn){
+    var ctx=ensureAudioContext();
+    if(!ctx){
+      if(btn){
+        btn.textContent='音なし';
+        btn.disabled=true;
+      }
+      return Promise.resolve(false);
+    }
+    var resume=ctx.state==='suspended'&&typeof ctx.resume==='function'?ctx.resume():Promise.resolve();
+    return Promise.resolve(resume).then(function(){
+      audioReady=ctx.state==='running';
+      updateSoundButton(btn);
+      if(audioReady)playTone({start:660,end:920,duration:0.11,type:'sine',gain:0.055,delay:0});
+      return audioReady;
+    }).catch(function(){
+      audioReady=false;
+      updateSoundButton(btn);
+      return false;
+    });
+  }
+
+  function playTone(opts){
+    var ctx=ensureAudioContext();
+    if(!ctx||ctx.state!=='running')return;
+    var now=ctx.currentTime+(opts.delay||0);
+    var osc=ctx.createOscillator();
+    var gain=ctx.createGain();
+    osc.type=opts.type||'sine';
+    osc.frequency.setValueAtTime(opts.start,now);
+    osc.frequency.exponentialRampToValueAtTime(opts.end,now+opts.duration);
+    gain.gain.setValueAtTime(0.0001,now);
+    gain.gain.exponentialRampToValueAtTime(opts.gain,now+0.012);
+    gain.gain.exponentialRampToValueAtTime(0.0001,now+opts.duration);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start(now);
+    osc.stop(now+opts.duration+0.025);
+  }
+
+  function playSectionCue(step,total){
+    var ctx=ensureAudioContext();
+    if(!ctx){
+      updateSoundButton(document.getElementById('mktRevealSoundBtn'));
+      return;
+    }
+    if(ctx.state!=='running'){
+      audioReady=false;
+      updateSoundButton(document.getElementById('mktRevealSoundBtn'));
+      return;
+    }
+    audioReady=true;
+    updateSoundButton(document.getElementById('mktRevealSoundBtn'));
+    var phase=step%6;
+    if(phase===0){
+      playTone({start:138,end:82,duration:0.12,type:'triangle',gain:0.09,delay:0});
+      playTone({start:510,end:690,duration:0.09,type:'sine',gain:0.035,delay:0.035});
+    }else{
+      var base=520+phase*48;
+      playTone({start:base,end:base*1.42,duration:0.105,type:'sine',gain:0.052,delay:0});
+    }
+    if(step===total-1){
+      playTone({start:740,end:980,duration:0.11,type:'sine',gain:0.048,delay:0.13});
+      playTone({start:980,end:1320,duration:0.13,type:'triangle',gain:0.045,delay:0.24});
+    }
+  }
+
+  function setStatus(status,count,total){
+    if(!status)return;
+    status.textContent='発表中 '+count+'/'+total;
+  }
+
+  function revealOne(section,step,total){
+    section.classList.add('mkt-section--reveal','mkt-section--revealing');
+    window.setTimeout(function(){
+      section.classList.remove('mkt-section--revealing');
+    },REVEAL_HIGHLIGHT_MS);
+    playSectionCue(step,total);
+    if(autoScroll&&typeof section.scrollIntoView==='function'){
+      try{section.scrollIntoView({behavior:'smooth',block:'center'});}catch(e){}
+    }
+  }
+
+  function init(){
+    var sections=allSections();
+    var control=document.getElementById('mktRevealControl');
+    var status=document.getElementById('mktRevealStatus');
+    var soundBtn=document.getElementById('mktRevealSoundBtn');
+    var skipBtn=document.getElementById('mktRevealSkipBtn');
+    if(!sections.length){failOpen();return;}
+    if(reducedMotion()){
+      enableAll(sections);
+      if(control&&control.parentNode)control.parentNode.removeChild(control);
+      return;
+    }
+    setStatus(status,0,sections.length);
+    updateSoundButton(soundBtn);
+    ['wheel','touchstart','keydown'].forEach(function(type){
+      window.addEventListener(type,function(){autoScroll=false;},{passive:true});
+    });
+    if(soundBtn){
+      soundBtn.addEventListener('click',function(){tryEnableAudio(soundBtn);});
+    }
+    window.addEventListener('pointerdown',function(){
+      if(audioCtx&&audioCtx.state==='suspended')tryEnableAudio(soundBtn);
+    },{passive:true});
+    if(skipBtn){
+      skipBtn.addEventListener('click',function(){
+        stopped=true;
+        if(timer)window.clearTimeout(timer);
+        enableAll(sections);
+        setStatus(status,sections.length,sections.length);
+        skipBtn.textContent='表示済み';
+        skipBtn.disabled=true;
+        if(control)control.classList.add('is-done');
+      });
+    }
+    function tick(){
+      if(stopped)return;
+      if(index>=sections.length){
+        root.classList.add('mkt-section-reveal-done');
+        if(skipBtn){
+          skipBtn.textContent='表示済み';
+          skipBtn.disabled=true;
+        }
+        if(control)control.classList.add('is-done');
+        setStatus(status,sections.length,sections.length);
+        return;
+      }
+      revealOne(sections[index],index,sections.length);
+      index+=1;
+      setStatus(status,index,sections.length);
+      timer=window.setTimeout(tick,REVEAL_DELAY_MS);
+    }
+    timer=window.setTimeout(tick,180);
+  }
+
+  try{
+    if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init,{once:true});
+    else init();
+  }catch(e){
+    failOpen();
+  }
+})();
+</script>`;
+}
+
+/**
  * @param {MarketingReport} r
  * @param {{
  *   maskShareLabels?: boolean,
@@ -4531,6 +4759,7 @@ ${idWrap('mkt-hour', sectionHourHeatmap(r))}`;
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>配信マーケ分析 — ${escapeHtml(r.liveId)}</title>
+${buildSectionRevealBootScriptHtml()}
 <style>${CSS_BODY}${BROADCASTER_PROFILE_MARKETING_CSS}${yukkuriBroadcastSummaryEmbeddedCss()}${mangaBroadcastSummaryEmbeddedCss()}</style>
 </head>
 <body>
@@ -4545,6 +4774,7 @@ ${finalBody}
 </main>
 <footer class="mkt-footer">追憶のきらめき · マーケ分析（手元用） — ${escapeHtml(exportedAtIso)}</footer>
 ${idWrap('mkt-json', sectionMachineReadableJson(embedJson, maskShare))}
+${buildSectionRevealScriptHtml()}
 </body></html>`;
 }
 
@@ -5925,6 +6155,30 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
 .mkt-section{content-visibility:auto;contain-intrinsic-size:auto 360px;contain:layout style paint;background:#1e293b;border-radius:12px;padding:1.2rem 1.4rem;margin-bottom:1.2rem;border:1px solid #334155;scroll-margin-top:1rem}
 .mkt-section h2{margin:0 0 .8rem;font-size:1.1rem;line-height:1.35;color:#f8fafc;border-left:4px solid #3b82f6;padding-left:.6rem}
 .mkt-section p,.mkt-section li{overflow-wrap:anywhere}
+html.mkt-section-reveal-enabled .mkt-section{opacity:0;transform:translateY(18px) scale(.985);filter:saturate(.72);transition:opacity .34s ease,transform .38s cubic-bezier(.2,.8,.2,1),filter .34s ease,border-color .34s ease,box-shadow .34s ease;will-change:opacity,transform,filter}
+html.mkt-section-reveal-enabled .mkt-section.mkt-section--reveal{opacity:1;transform:none;filter:none}
+html.mkt-section-reveal-enabled .mkt-section.mkt-section--revealing{border-color:rgba(250,204,21,.78);box-shadow:0 0 0 1px rgba(250,204,21,.2),0 14px 34px rgba(14,165,233,.18)}
+html.mkt-section-reveal-done .mkt-section{will-change:auto}
+.mkt-reveal-control{position:fixed;right:16px;bottom:16px;z-index:60;display:flex;align-items:center;gap:.45rem;max-width:min(calc(100% - 24px),440px);padding:.45rem .55rem;border:1px solid rgba(148,163,184,.35);border-radius:12px;background:rgba(15,23,42,.94);box-shadow:0 14px 34px rgba(0,0,0,.32);backdrop-filter:blur(10px)}
+.mkt-reveal-control__status{font-size:.75rem;line-height:1.3;color:#cbd5e1;white-space:nowrap}
+.mkt-reveal-btn{cursor:pointer;border:1px solid #475569;background:#111827;color:#e2e8f0;border-radius:999px;padding:.42rem .75rem;font-size:.75rem;font-weight:700;line-height:1.2;white-space:nowrap}
+.mkt-reveal-btn:hover{border-color:#93c5fd;color:#f8fafc;background:#17233a}
+.mkt-reveal-btn:disabled{cursor:default;opacity:.62}
+.mkt-reveal-btn--sound.is-ready{border-color:#22c55e;color:#bbf7d0;background:#052e16}
+.mkt-reveal-btn--skip{border-color:#f59e0b;color:#fde68a}
+.mkt-reveal-control.is-done .mkt-reveal-btn--skip{border-color:#475569;color:#cbd5e1;background:#0f172a}
+@media(max-width:640px){
+  .mkt-reveal-control{left:.65rem;right:.65rem;bottom:.65rem;max-width:none;justify-content:space-between;flex-wrap:wrap}
+  .mkt-reveal-control__status{flex:1 1 100%}
+}
+@media(prefers-reduced-motion:reduce){
+  html.mkt-section-reveal-enabled .mkt-section{opacity:1;transform:none;filter:none;transition:none;will-change:auto}
+  .mkt-reveal-control{display:none}
+}
+@media print{
+  html.mkt-section-reveal-enabled .mkt-section{opacity:1;transform:none;filter:none;transition:none;will-change:auto}
+  .mkt-reveal-control{display:none!important}
+}
 .mkt-subhead{margin:1rem 0 .55rem;font-size:.95rem;line-height:1.4;color:#f8fafc}
 .mkt-section--toc{background:#0f172a}
 .mkt-toc{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:.45rem}

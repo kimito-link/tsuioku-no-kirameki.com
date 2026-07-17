@@ -735,7 +735,217 @@ ${escapeHtml(row.ok?"OK":"\u672A\u53D6\u5F97")} ${escapeHtml(row.label)}<small>$
 <thead><tr><th>#</th><th>\u5FDC\u63F4\u8005</th><th>\u30ED\u30FC\u30AB\u30EB\u52E2\u3044</th><th>\u30B3\u30E1</th><th>\u76F4\u8FD115\u5206</th><th>\u30AE\u30D5\u30C8</th><th>\u5E83\u544Apt</th><th>\u6839\u62E0</th></tr></thead>
 <tbody>${rowHtml}</tbody>
 </table></div>
-</section>`}function buildMarketingDashboardHtml(r,opts={}){let maskShare=opts.maskShareLabels===!0,identiconResolver=typeof opts.anonymousIdenticonResolver=="function"?opts.anonymousIdenticonResolver:void 0,broadcasterUserId=typeof opts.broadcasterUserId=="string"?opts.broadcasterUserId:"",sessionSummaryRows=Array.isArray(opts.sessionSummaryRows)?opts.sessionSummaryRows:[],exportedAtIso=new Date().toISOString(),embedJson=buildMarketingEmbedScriptInnerText(r,{maskShareLabels:maskShare,exportedAt:exportedAtIso,slimForHeavyExport:opts.slimForHeavyExport===!0}),subSuffix=maskShare?" \xB7 \u5171\u6709\u5411\u3051\u306B\u8868\u793A\u540D\u3092\u4F0F\u305B\u305F\u51FA\u529B":"",concurrentSeries=buildConcurrentTimelineSeries(sessionSummaryRows),concurrentPeak=analyzeConcurrentPeak(concurrentSeries),commentsForAnalytics=Array.isArray(opts.commentsForAnalytics)?opts.commentsForAnalytics:[],velocityTimeline=buildCommentVelocityTimeline(commentsForAnalytics,{bucketMs:6e4,rollingWindowMin:5}),silenceZones=detectCommentSilenceZones(commentsForAnalytics,{thresholdMs:6e4,quality:{windowMs:3e4}}),laughterDensity=buildLaughterDensityTimeline(commentsForAnalytics,{bucketMs:3e4}),commentFatigue=computeCommentFatigue(commentsForAnalytics,{broadcasterUserId,maxTenureMin:30}),pastBroadcasts=Array.isArray(opts.pastBroadcasts)?opts.pastBroadcasts:[],filterBroadcaster2=broadcasterUserId?cs=>Array.isArray(cs)?cs.filter(c=>String(c?.userId||"").trim()!==broadcasterUserId):[]:cs=>Array.isArray(cs)?cs:[],currentCommentsForLayer=filterBroadcaster2(commentsForAnalytics),broadcastNarrative=buildBroadcastNarrative({report:r,comments:currentCommentsForLayer,broadcasterUserId,includeSamples:!maskShare}),pastBroadcastsForLayer=pastBroadcasts.map(b=>({liveId:String(b?.liveId||""),comments:filterBroadcaster2(b?.comments)})),newVsRepeat=classifyCommentersAgainstHistory({currentLiveId:r.liveId,currentComments:currentCommentsForLayer,pastBroadcasts:pastBroadcastsForLayer,heavyThreshold:5}),survivalCurve=buildCommenterSurvivalCurve(currentCommentsForLayer,{segmentCount:5}),departedHeavy=findDepartedHeavyCommenters({currentComments:currentCommentsForLayer,pastBroadcasts:pastBroadcastsForLayer.filter(b=>String(b.liveId).toLowerCase()!==String(r.liveId).toLowerCase()),heavyThreshold:5,topN:15}),attendanceMatrix=buildCommenterAttendanceMatrix({broadcasts:[...pastBroadcastsForLayer.filter(b=>String(b.liveId).toLowerCase()!==String(r.liveId).toLowerCase()),{liveId:r.liveId,comments:currentCommentsForLayer}],topN:20}),keyboardTypes=diagnoseKeyboardTypes(commentsForAnalytics,{broadcasterUserId}),allBroadcastsForCompare=[...pastBroadcastsForLayer.filter(b=>String(b.liveId).toLowerCase()!==String(r.liveId).toLowerCase()),{liveId:String(r.liveId||""),comments:currentCommentsForLayer}],recentComparison=buildRecentBroadcastComparison({broadcasts:allBroadcastsForCompare,limit:5}),weekdayHourHeat=buildWeekdayHourHeatmap({broadcasts:allBroadcastsForCompare}),pastTotalsForGrowth=pastBroadcastsForLayer.filter(b=>String(b.liveId).toLowerCase()!==String(r.liveId).toLowerCase()).map(b=>Array.isArray(b.comments)?b.comments.length:0).filter(n=>n>0),growth=computeBroadcastGrowthScore({currentValue:r.totalComments||currentCommentsForLayer.length,pastValues:pastTotalsForGrowth}),openingFivePts=buildOpeningFiveMinutePoints(allBroadcastsForCompare),currentFingerprint=buildBroadcastWaveformFingerprint(currentCommentsForLayer),pastFingerprints=pastBroadcastsForLayer.filter(b=>String(b.liveId).toLowerCase()!==String(r.liveId).toLowerCase()).map(b=>{let fp=buildBroadcastWaveformFingerprint(b.comments);return fp?{liveId:b.liveId,vector:fp.vector,totalCount:fp.totalCount}:null}).filter(x=>x!=null),similarBroadcasts=currentFingerprint?findSimilarBroadcasts({liveId:String(r.liveId||""),vector:currentFingerprint.vector,totalCount:currentFingerprint.totalCount},pastFingerprints,{topN:5}):[],echoPropagation=detectCommentPropagation(currentCommentsForLayer,{windowMs:3e4,minDistinctUsers:3}),echoSync=detectCommentSyncBursts(currentCommentsForLayer,{windowMs:5e3,minDistinctUsers:3}),firstSecondLatency=buildCommenterFirstSecondLatency(currentCommentsForLayer),talentPeaks=detectTalentPeakMoments(currentCommentsForLayer),sentimentCurve=scoreSentimentTimeline(currentCommentsForLayer,{bucketMs:6e4}),selfComments=Array.isArray(opts.commentsForAnalytics)?opts.commentsForAnalytics.filter(c=>!!c?.selfPosted):[],uniqueWords=suggestUniqueWords({allComments:currentCommentsForLayer,selfComments,topN:15,minOccurrence:3}),lastPoint=concurrentSeries.points[concurrentSeries.points.length-1],recentActiveCommenters=(()=>{if(!currentCommentsForLayer.length)return 0;let last=currentCommentsForLayer.reduce((mx,c)=>typeof c?.capturedAt=="number"&&c.capturedAt>mx?c.capturedAt:mx,0);if(!last)return 0;let since=last-5*6e4,recent=new Set;for(let c of currentCommentsForLayer){if(typeof c?.capturedAt!="number"||c.capturedAt<since)continue;let uid=c.userId==null?"":String(c.userId).trim();uid&&recent.add(uid)}return recent.size})(),reach=computeReachCoefficient({currentConcurrent:lastPoint?lastPoint.value:NaN,uniqueCommentersInWindow:recentActiveCommenters}),dynMetrics=buildDynamicAdviceMetrics({r,concurrentPeak,laughterDensity,silenceZones,newVsRepeat,sentimentCurve,reach,growth,firstSecondLatency,survivalCurve,talentPeaks,echoPropagation,echoSync,recentComparison,uniqueWords,similarBroadcasts,keyboardTypes}),giftUsersForSg=Array.isArray(opts.giftUsers)?opts.giftUsers:[],giftEventsForAnalytics=Array.isArray(opts.giftEvents)?opts.giftEvents:[],giftHistoryThrowsForAnalytics=Array.isArray(opts.giftHistoryThrows)?opts.giftHistoryThrows:[],officialGiftHistoryForAnalytics=Array.isArray(opts.officialEventDomBundle?.giftHistory)?opts.officialEventDomBundle.giftHistory:[],giftContributionRankingForAnalytics=Array.isArray(opts.officialEventDomBundle?.contributionRanking)?opts.officialEventDomBundle.contributionRanking:[],adContributionRankingForAnalytics=Array.isArray(opts.officialEventDomBundle?.adContributionRanking)?opts.officialEventDomBundle.adContributionRanking:[],sgInsights=buildSupportGrowthInsights({report:r,comments:currentCommentsForLayer,giftUsers:giftUsersForSg,sessionSummaryRows,pastBroadcasts:pastBroadcastsForLayer,broadcasterUserId,maskShareLabels:maskShare}),giftMomentum=analyzeGiftMomentum({comments:currentCommentsForLayer,giftUsers:giftUsersForSg,giftEvents:giftEventsForAnalytics,giftHistoryThrows:giftHistoryThrowsForAnalytics,officialGiftHistory:officialGiftHistoryForAnalytics,giftContributionRanking:giftContributionRankingForAnalytics,adContributionRanking:adContributionRankingForAnalytics,programStats:opts.officialEventDomBundle?.programStats||null},{broadcasterUserId}),giftThrowLedger=buildMarketingGiftThrowLedger({giftSubAppHistory:opts.giftSubAppHistory||null,officialGiftHistory:officialGiftHistoryForAnalytics,giftEvents:giftEventsForAnalytics}),supporterChikuran=buildSupporterChikuranRows({liveId:r.liveId,comments:currentCommentsForLayer,giftUsers:giftUsersForSg,giftEvents:giftEventsForAnalytics,giftContributionRanking:[...giftContributionRankingForAnalytics,...giftHistoryThrowsForAnalytics],adContributionRanking:adContributionRankingForAnalytics},{liveId:r.liveId,excludeUserIds:broadcasterUserId?[broadcasterUserId]:[],maxRows:15}),audienceGap=analyzeAudienceEngagementGap({liveId:r.liveId,comments:currentCommentsForLayer,samples:sessionSummaryRows,visitorCount:opts.officialEventDomBundle?.programStats?.watchCount??null,officialCommentCount:opts.officialEventDomBundle?.programStats?.commentCount??null},{broadcasterUserId}),supportParticipationBase=resolveMarketingSupportParticipationCounts({giftUsers:giftUsersForSg,giftEvents:giftEventsForAnalytics,giftHistoryThrows:giftHistoryThrowsForAnalytics,adContributionRanking:adContributionRankingForAnalytics,comments:currentCommentsForLayer}),supportParticipation={...supportParticipationBase,...supportParticipationPctAgainstVisitors(audienceGap,supportParticipationBase)},marketingDataSummary=buildMarketingDataSummary({report:r,audienceGap,giftMomentum,supporterChikuran,sessionSummaryRows,pastBroadcasts:pastBroadcastsForLayer,giftUsers:giftUsersForSg,giftEvents:giftEventsForAnalytics,giftHistoryThrows:giftHistoryThrowsForAnalytics,officialGiftHistory:officialGiftHistoryForAnalytics,giftContributionRanking:giftContributionRankingForAnalytics,adContributionRanking:adContributionRankingForAnalytics,programStats:opts.officialEventDomBundle?.programStats||null,eventRanking:opts.eventRanking||null}),marketingFunnelBoard=buildMarketingFunnelBoard({report:r,audienceGap,giftMomentum,supporterChikuran,sessionSummaryRows,pastBroadcasts:pastBroadcastsForLayer,giftUsers:giftUsersForSg,giftEvents:giftEventsForAnalytics,giftHistoryThrows:giftHistoryThrowsForAnalytics,officialGiftHistory:officialGiftHistoryForAnalytics,giftContributionRanking:giftContributionRankingForAnalytics,adContributionRanking:adContributionRankingForAnalytics,programStats:opts.officialEventDomBundle?.programStats||null,eventRanking:opts.eventRanking||null}),marketingSegmentActionBoard=buildMarketingSegmentActionBoard({report:r,giftMomentum,supporterChikuran}),analysisSkillBoard=buildAnalysisSkillBoard({report:r,audienceGap,giftMomentum,supporterChikuran,sessionSummaryRows,pastBroadcasts:pastBroadcastsForLayer,adContributionRanking:adContributionRankingForAnalytics,eventRanking:opts.eventRanking||null,uniqueWords,talentPeaks,silenceZones,recentComparison,maskShareLabels:maskShare}),harnessScalingBoard=buildHarnessScalingBoard({report:r,audienceGap,giftMomentum,supporterChikuran,analysisSkillBoard,sessionSummaryRows,pastBroadcasts:pastBroadcastsForLayer,adContributionRanking:adContributionRankingForAnalytics,eventRanking:opts.eventRanking||null,programStats:opts.officialEventDomBundle?.programStats||null,maskShareLabels:maskShare}),metricsForAdvice={...dynMetrics,...supportGrowthMetricsForAdvice(sgInsights.adviceSlice)},allTocItems=[{id:"mkt-participation-lead",label:"\u6765\u5834\u3068\u30B3\u30E1\u30F3\u30C8\u53C2\u52A0"},{id:"mkt-analysis-skills",label:"\u5206\u6790\u30B9\u30AD\u30EB\u30DC\u30FC\u30C9"},{id:"mkt-harness-scaling",label:"\u5206\u6790\u30CF\u30FC\u30CD\u30B9\u8A2D\u8A08"},{id:"mkt-next-actions",label:"\u308A\u3093\u304F\u9054\u306E\u4F5C\u6226\u4F1A\u8B70"},{id:"mkt-data-summary",label:"\u30DE\u30FC\u30B1\u7DCF\u5408\u30B5\u30DE\u30EA"},{id:"mkt-marketing-funnel",label:"\u30DE\u30FC\u30B1\u30D5\u30A1\u30CD\u30EB"},{id:"mkt-segment-action",label:"\u5C64\u5225\u30DE\u30FC\u30B1\u8A3A\u65AD"},{id:"mkt-audience-gap",label:"\u6765\u5834\u2192\u30B3\u30E1\u30F3\u30C8\u5909\u63DB\u7387"},{id:"mkt-supporter-chikuran",label:"\u5FDC\u63F4\u8005\u3061\u304F\u3089\u3093\u03B2"},{id:"mkt-support-chance",label:"\u5FDC\u63F4\u304C\u5897\u3048\u305D\u3046\u306A\u6642\u9593"},{id:"mkt-gift-flow",label:"\u30AE\u30D5\u30C8\u306E\u6D41\u308C"},{id:"mkt-gift-deep",label:"\u30AE\u30D5\u30C8\u6DF1\u6398\u308A"},{id:"mkt-gift-ledger",label:"\u30AE\u30D5\u30C8\u6295\u3052\u5C65\u6B74"},{id:"mkt-onboarding",label:"\u521D\u898B\u3055\u3093\u306E\u624B\u304C\u304B\u308A"},{id:"mkt-clip-promo",label:"\u5207\u308A\u629C\u304D\u30FB\u544A\u77E5\u5019\u88DC"},{id:"mkt-listener-care",label:"\u30EA\u30B9\u30CA\u30FC\u304A\u8FD4\u3057"},{id:"mkt-ask-timing",label:"\u304A\u9858\u3044\u306E\u51FA\u3057\u3069\u3053\u308D"},{id:"mkt-sg-caution",label:"\u8AAD\u307F\u53D6\u308A\u306E\u6CE8\u610F"},{id:"mkt-event-ranking",label:"\u30A4\u30D9\u30F3\u30C8\u9806\u4F4D"},{id:"mkt-ext-links",label:"\u652F\u63F4\u7269\u8CC7\u30FB\u5916\u90E8\u30EA\u30F3\u30AF"},{id:"mkt-kpi",label:"KPI \u30B5\u30DE\u30EA"},{id:"mkt-content",label:"\u30B3\u30E1\u30F3\u30C8\u672C\u6587\u30FB\u5C5E\u6027\u306E\u50BE\u5411"},{id:"mkt-narrative",label:"\u914D\u4FE1\u5185\u5BB9\u306E\u6D41\u308C"},{id:"mkt-quarter",label:"\u5192\u982D\u30FB\u7D42\u76E4\uFF08\u56DB\u5206\u4F4D\uFF09"},{id:"mkt-timeline",label:"\u30B3\u30E1\u30F3\u30C8\u30BF\u30A4\u30E0\u30E9\u30A4\u30F3"},{id:"mkt-velocity",label:"\u30B3\u30E1\u901F\u5EA6\u30AB\u30FC\u30D6\uFF08PRO\uFF09"},{id:"mkt-fatigue",label:"\u30B3\u30E1\u30F3\u30C8\u75B2\u52B4\u30AB\u30FC\u30D6\uFF08PRO\uFF09"},{id:"mkt-concurrent",label:"\u540C\u63A5\u63A8\u79FB\u30AB\u30FC\u30D6\uFF08PRO\uFF09"},{id:"mkt-silence",label:"\u6C88\u9ED9\u30BE\u30FC\u30F3 \xD7 \u6C88\u9ED9\u306E\u8CEA\uFF08PRO\uFF09"},{id:"mkt-laughter",label:"\u7B11\u3044\u5BC6\u5EA6\uFF08PRO\uFF09"},{id:"mkt-new-vs-repeat",label:"\u65B0\u898F vs \u5E38\u9023\uFF08PRO\uFF09"},{id:"mkt-survival",label:"\u30B3\u30E1\u30F3\u30BF\u30FC\u751F\u5B58\u66F2\u7DDA\uFF08PRO\uFF09"},{id:"mkt-departed",label:"\u96E2\u53CD\u30B3\u30E1\u30F3\u30BF\u30FC TOP\uFF08PRO\uFF09"},{id:"mkt-attendance",label:"\u5E38\u9023\u51FA\u5E2D\u30AB\u30EC\u30F3\u30C0\u30FC\uFF08PRO\uFF09"},{id:"mkt-keyboard",label:"\u30AD\u30FC\u30DC\u30FC\u30C9\u578B\u8A3A\u65AD\uFF08PRO\uFF09"},{id:"mkt-recent-cmp",label:"\u76F4\u8FD1 5 \u914D\u4FE1\u306E\u6BD4\u8F03\uFF08PRO\uFF09"},{id:"mkt-weekday-heat",label:"\u66DC\u65E5\xD7\u6642\u9593\u5E2F\u30D2\u30FC\u30C8\u30DE\u30C3\u30D7\uFF08PRO\uFF09"},{id:"mkt-growth-meter",label:"\u6210\u9577\u30E1\u30FC\u30BF\u30FC\uFF08PRO\uFF09"},{id:"mkt-opening-five",label:"\u5192\u982D 5 \u5206\u306E\u4E88\u5146\uFF08PRO\uFF09"},{id:"mkt-waveform",label:"\u4F3C\u3066\u308B\u914D\u4FE1\uFF08\u6CE2\u5F62\u6307\u7D0B\uFF09\uFF08PRO\uFF09"},{id:"mkt-echo",label:"\u30B3\u30E1\u4F1D\u67D3 \xD7 \u88AB\u308A\uFF08PRO\uFF09"},{id:"mkt-first-second",label:"\u521D\u30B3\u30E1\u21922\u30B3\u30E1\u76EE latency\uFF08PRO\uFF09"},{id:"mkt-talent-peak",label:"\u914D\u4FE1\u8005\u306E\u8A71\u82B8\u30D4\u30FC\u30AF\uFF08PRO\uFF09"},{id:"mkt-sentiment",label:"\u611F\u60C5\u66F2\u7DDA\uFF08PRO\uFF09"},{id:"mkt-unique-words",label:"\u8996\u8074\u8005\u767A\u306E\u4EBA\u6C17\u8A9E TOP\uFF08PRO\uFF09"},{id:"mkt-reach",label:"\u30EA\u30FC\u30C1\u4FC2\u6570\uFF08PRO\uFF09"},{id:"mkt-derived",label:"\u7D2F\u7A4D\u30B3\u30E1\u30F3\u30C8\u6570\u30685\u5206\u7A93"},{id:"mkt-segment",label:"\u30E6\u30FC\u30B6\u30FC\u30BB\u30B0\u30E1\u30F3\u30C8"},{id:"mkt-top-users",label:"\u30C8\u30C3\u30D7\u30B3\u30E1\u30F3\u30BF\u30FC TOP 20"},{id:"mkt-commenter-follow",label:"\u6570\u5024ID\u30B3\u30E1\u30F3\u30BF\u30FC\uFF08\u30D5\u30A9\u30ED\u30FC\u60C5\u5831\uFF09"},{id:"mkt-commenter-follow-analytics",label:"\u30D5\u30A9\u30ED\u30FC\xD7\u30B3\u30E1\u30F3\u30C8\u5206\u6790"},{id:"mkt-supporter-power",label:"\u5FDC\u63F4\u8005\u30D1\u30EF\u30FC\u8A3A\u65AD\uFF08S/A/B/C/D/E\uFF09"},{id:"mkt-interest-arrival",label:"\u8208\u5473\u30BF\u30B0\u5225\u6765\u5834"},{id:"mkt-thumb-grid",label:"\u30B5\u30E0\u30CD\u4ED8\u304D\u30E6\u30FC\u30B6\u30FC\u4E00\u89A7"},{id:"mkt-vpos",label:"vpos \u4E09\u5206\u5272\uFF08\u518D\u751F\u4F4D\u7F6E\uFF09"},{id:"mkt-hour",label:"\u6642\u9593\u5E2F\u30D2\u30FC\u30C8\u30DE\u30C3\u30D7"},{id:"mkt-json",label:"\u8868\u8A08\u7B97\u30FB\u30C4\u30FC\u30EB\u5411\u3051 JSON"}],cfaAnalyticsShared=(()=>{let ac=Array.isArray(r.allNumericCommenters)?r.allNumericCommenters:[];return ac.length?buildCommenterFollowAnalytics(ac,{commenterFollowDataset:r.commenterFollowDataset,excludeUserId:broadcasterUserId,priorFollowEntries:r.commenterFollowPriorEntries,followingListMap:r.commenterFollowingListCache,followingListCoverage:r.followingListCoverage,durationMs:Math.max(0,Number(r.durationMinutes)||0)*6e4,includeSupporterPower:!0,supporterPowerTopN:10}):null})(),bodyHtml=`${sectionFeaturesOverview()}
+</section>`}function buildSectionRevealBootScriptHtml(){return`<script>
+(function(){
+  try{document.documentElement.classList.add('mkt-section-reveal-enabled');}catch(e){}
+})();
+<\/script>`}function buildSectionRevealScriptHtml(){return`<div id="mktRevealControl" class="mkt-reveal-control" role="group" aria-label="\u30BB\u30AF\u30B7\u30E7\u30F3\u767A\u8868">
+<span id="mktRevealStatus" class="mkt-reveal-control__status">\u767A\u8868\u6E96\u5099\u4E2D\u2026</span>
+<button id="mktRevealSoundBtn" class="mkt-reveal-btn mkt-reveal-btn--sound" type="button">\u97F3ON</button>
+<button id="mktRevealSkipBtn" class="mkt-reveal-btn mkt-reveal-btn--skip" type="button">\u30B9\u30AD\u30C3\u30D7</button>
+</div>
+<script>
+(function(){
+  var root=document.documentElement;
+  var REVEAL_DELAY_MS=520;
+  var REVEAL_HIGHLIGHT_MS=620;
+  var audioCtx=null;
+  var audioReady=false;
+  var autoScroll=true;
+  var timer=0;
+  var index=0;
+  var stopped=false;
+
+  function allSections(){
+    return Array.prototype.slice.call(document.querySelectorAll('.mkt-section'));
+  }
+
+  function reducedMotion(){
+    try{return !!(window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches);}
+    catch(e){return false;}
+  }
+
+  function failOpen(){
+    try{root.classList.remove('mkt-section-reveal-enabled');}catch(e){}
+    var control=document.getElementById('mktRevealControl');
+    if(control&&control.parentNode)control.parentNode.removeChild(control);
+  }
+
+  function enableAll(sections){
+    sections.forEach(function(section){
+      section.classList.add('mkt-section--reveal');
+      section.classList.remove('mkt-section--revealing');
+    });
+    root.classList.add('mkt-section-reveal-done');
+  }
+
+  function ensureAudioContext(){
+    var Ctor=window.AudioContext||window.webkitAudioContext;
+    if(!Ctor)return null;
+    if(!audioCtx)audioCtx=new Ctor();
+    return audioCtx;
+  }
+
+  function updateSoundButton(btn){
+    if(!btn)return;
+    if(audioReady){
+      btn.textContent='\u97F3ON';
+      btn.classList.add('is-ready');
+      btn.disabled=true;
+      btn.title='\u767A\u8868\u97F3\u306F\u6709\u52B9\u3067\u3059';
+      return;
+    }
+    btn.textContent='\u97F3ON';
+    btn.classList.remove('is-ready');
+    btn.disabled=false;
+    btn.title='\u30D6\u30E9\u30A6\u30B6\u306E\u81EA\u52D5\u518D\u751F\u5236\u9650\u3067\u97F3\u304C\u51FA\u306A\u3044\u3068\u304D\u306B\u62BC\u3057\u3066\u304F\u3060\u3055\u3044';
+  }
+
+  function tryEnableAudio(btn){
+    var ctx=ensureAudioContext();
+    if(!ctx){
+      if(btn){
+        btn.textContent='\u97F3\u306A\u3057';
+        btn.disabled=true;
+      }
+      return Promise.resolve(false);
+    }
+    var resume=ctx.state==='suspended'&&typeof ctx.resume==='function'?ctx.resume():Promise.resolve();
+    return Promise.resolve(resume).then(function(){
+      audioReady=ctx.state==='running';
+      updateSoundButton(btn);
+      if(audioReady)playTone({start:660,end:920,duration:0.11,type:'sine',gain:0.055,delay:0});
+      return audioReady;
+    }).catch(function(){
+      audioReady=false;
+      updateSoundButton(btn);
+      return false;
+    });
+  }
+
+  function playTone(opts){
+    var ctx=ensureAudioContext();
+    if(!ctx||ctx.state!=='running')return;
+    var now=ctx.currentTime+(opts.delay||0);
+    var osc=ctx.createOscillator();
+    var gain=ctx.createGain();
+    osc.type=opts.type||'sine';
+    osc.frequency.setValueAtTime(opts.start,now);
+    osc.frequency.exponentialRampToValueAtTime(opts.end,now+opts.duration);
+    gain.gain.setValueAtTime(0.0001,now);
+    gain.gain.exponentialRampToValueAtTime(opts.gain,now+0.012);
+    gain.gain.exponentialRampToValueAtTime(0.0001,now+opts.duration);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start(now);
+    osc.stop(now+opts.duration+0.025);
+  }
+
+  function playSectionCue(step,total){
+    var ctx=ensureAudioContext();
+    if(!ctx){
+      updateSoundButton(document.getElementById('mktRevealSoundBtn'));
+      return;
+    }
+    if(ctx.state!=='running'){
+      audioReady=false;
+      updateSoundButton(document.getElementById('mktRevealSoundBtn'));
+      return;
+    }
+    audioReady=true;
+    updateSoundButton(document.getElementById('mktRevealSoundBtn'));
+    var phase=step%6;
+    if(phase===0){
+      playTone({start:138,end:82,duration:0.12,type:'triangle',gain:0.09,delay:0});
+      playTone({start:510,end:690,duration:0.09,type:'sine',gain:0.035,delay:0.035});
+    }else{
+      var base=520+phase*48;
+      playTone({start:base,end:base*1.42,duration:0.105,type:'sine',gain:0.052,delay:0});
+    }
+    if(step===total-1){
+      playTone({start:740,end:980,duration:0.11,type:'sine',gain:0.048,delay:0.13});
+      playTone({start:980,end:1320,duration:0.13,type:'triangle',gain:0.045,delay:0.24});
+    }
+  }
+
+  function setStatus(status,count,total){
+    if(!status)return;
+    status.textContent='\u767A\u8868\u4E2D '+count+'/'+total;
+  }
+
+  function revealOne(section,step,total){
+    section.classList.add('mkt-section--reveal','mkt-section--revealing');
+    window.setTimeout(function(){
+      section.classList.remove('mkt-section--revealing');
+    },REVEAL_HIGHLIGHT_MS);
+    playSectionCue(step,total);
+    if(autoScroll&&typeof section.scrollIntoView==='function'){
+      try{section.scrollIntoView({behavior:'smooth',block:'center'});}catch(e){}
+    }
+  }
+
+  function init(){
+    var sections=allSections();
+    var control=document.getElementById('mktRevealControl');
+    var status=document.getElementById('mktRevealStatus');
+    var soundBtn=document.getElementById('mktRevealSoundBtn');
+    var skipBtn=document.getElementById('mktRevealSkipBtn');
+    if(!sections.length){failOpen();return;}
+    if(reducedMotion()){
+      enableAll(sections);
+      if(control&&control.parentNode)control.parentNode.removeChild(control);
+      return;
+    }
+    setStatus(status,0,sections.length);
+    updateSoundButton(soundBtn);
+    ['wheel','touchstart','keydown'].forEach(function(type){
+      window.addEventListener(type,function(){autoScroll=false;},{passive:true});
+    });
+    if(soundBtn){
+      soundBtn.addEventListener('click',function(){tryEnableAudio(soundBtn);});
+    }
+    window.addEventListener('pointerdown',function(){
+      if(audioCtx&&audioCtx.state==='suspended')tryEnableAudio(soundBtn);
+    },{passive:true});
+    if(skipBtn){
+      skipBtn.addEventListener('click',function(){
+        stopped=true;
+        if(timer)window.clearTimeout(timer);
+        enableAll(sections);
+        setStatus(status,sections.length,sections.length);
+        skipBtn.textContent='\u8868\u793A\u6E08\u307F';
+        skipBtn.disabled=true;
+        if(control)control.classList.add('is-done');
+      });
+    }
+    function tick(){
+      if(stopped)return;
+      if(index>=sections.length){
+        root.classList.add('mkt-section-reveal-done');
+        if(skipBtn){
+          skipBtn.textContent='\u8868\u793A\u6E08\u307F';
+          skipBtn.disabled=true;
+        }
+        if(control)control.classList.add('is-done');
+        setStatus(status,sections.length,sections.length);
+        return;
+      }
+      revealOne(sections[index],index,sections.length);
+      index+=1;
+      setStatus(status,index,sections.length);
+      timer=window.setTimeout(tick,REVEAL_DELAY_MS);
+    }
+    timer=window.setTimeout(tick,180);
+  }
+
+  try{
+    if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init,{once:true});
+    else init();
+  }catch(e){
+    failOpen();
+  }
+})();
+<\/script>`}function buildMarketingDashboardHtml(r,opts={}){let maskShare=opts.maskShareLabels===!0,identiconResolver=typeof opts.anonymousIdenticonResolver=="function"?opts.anonymousIdenticonResolver:void 0,broadcasterUserId=typeof opts.broadcasterUserId=="string"?opts.broadcasterUserId:"",sessionSummaryRows=Array.isArray(opts.sessionSummaryRows)?opts.sessionSummaryRows:[],exportedAtIso=new Date().toISOString(),embedJson=buildMarketingEmbedScriptInnerText(r,{maskShareLabels:maskShare,exportedAt:exportedAtIso,slimForHeavyExport:opts.slimForHeavyExport===!0}),subSuffix=maskShare?" \xB7 \u5171\u6709\u5411\u3051\u306B\u8868\u793A\u540D\u3092\u4F0F\u305B\u305F\u51FA\u529B":"",concurrentSeries=buildConcurrentTimelineSeries(sessionSummaryRows),concurrentPeak=analyzeConcurrentPeak(concurrentSeries),commentsForAnalytics=Array.isArray(opts.commentsForAnalytics)?opts.commentsForAnalytics:[],velocityTimeline=buildCommentVelocityTimeline(commentsForAnalytics,{bucketMs:6e4,rollingWindowMin:5}),silenceZones=detectCommentSilenceZones(commentsForAnalytics,{thresholdMs:6e4,quality:{windowMs:3e4}}),laughterDensity=buildLaughterDensityTimeline(commentsForAnalytics,{bucketMs:3e4}),commentFatigue=computeCommentFatigue(commentsForAnalytics,{broadcasterUserId,maxTenureMin:30}),pastBroadcasts=Array.isArray(opts.pastBroadcasts)?opts.pastBroadcasts:[],filterBroadcaster2=broadcasterUserId?cs=>Array.isArray(cs)?cs.filter(c=>String(c?.userId||"").trim()!==broadcasterUserId):[]:cs=>Array.isArray(cs)?cs:[],currentCommentsForLayer=filterBroadcaster2(commentsForAnalytics),broadcastNarrative=buildBroadcastNarrative({report:r,comments:currentCommentsForLayer,broadcasterUserId,includeSamples:!maskShare}),pastBroadcastsForLayer=pastBroadcasts.map(b=>({liveId:String(b?.liveId||""),comments:filterBroadcaster2(b?.comments)})),newVsRepeat=classifyCommentersAgainstHistory({currentLiveId:r.liveId,currentComments:currentCommentsForLayer,pastBroadcasts:pastBroadcastsForLayer,heavyThreshold:5}),survivalCurve=buildCommenterSurvivalCurve(currentCommentsForLayer,{segmentCount:5}),departedHeavy=findDepartedHeavyCommenters({currentComments:currentCommentsForLayer,pastBroadcasts:pastBroadcastsForLayer.filter(b=>String(b.liveId).toLowerCase()!==String(r.liveId).toLowerCase()),heavyThreshold:5,topN:15}),attendanceMatrix=buildCommenterAttendanceMatrix({broadcasts:[...pastBroadcastsForLayer.filter(b=>String(b.liveId).toLowerCase()!==String(r.liveId).toLowerCase()),{liveId:r.liveId,comments:currentCommentsForLayer}],topN:20}),keyboardTypes=diagnoseKeyboardTypes(commentsForAnalytics,{broadcasterUserId}),allBroadcastsForCompare=[...pastBroadcastsForLayer.filter(b=>String(b.liveId).toLowerCase()!==String(r.liveId).toLowerCase()),{liveId:String(r.liveId||""),comments:currentCommentsForLayer}],recentComparison=buildRecentBroadcastComparison({broadcasts:allBroadcastsForCompare,limit:5}),weekdayHourHeat=buildWeekdayHourHeatmap({broadcasts:allBroadcastsForCompare}),pastTotalsForGrowth=pastBroadcastsForLayer.filter(b=>String(b.liveId).toLowerCase()!==String(r.liveId).toLowerCase()).map(b=>Array.isArray(b.comments)?b.comments.length:0).filter(n=>n>0),growth=computeBroadcastGrowthScore({currentValue:r.totalComments||currentCommentsForLayer.length,pastValues:pastTotalsForGrowth}),openingFivePts=buildOpeningFiveMinutePoints(allBroadcastsForCompare),currentFingerprint=buildBroadcastWaveformFingerprint(currentCommentsForLayer),pastFingerprints=pastBroadcastsForLayer.filter(b=>String(b.liveId).toLowerCase()!==String(r.liveId).toLowerCase()).map(b=>{let fp=buildBroadcastWaveformFingerprint(b.comments);return fp?{liveId:b.liveId,vector:fp.vector,totalCount:fp.totalCount}:null}).filter(x=>x!=null),similarBroadcasts=currentFingerprint?findSimilarBroadcasts({liveId:String(r.liveId||""),vector:currentFingerprint.vector,totalCount:currentFingerprint.totalCount},pastFingerprints,{topN:5}):[],echoPropagation=detectCommentPropagation(currentCommentsForLayer,{windowMs:3e4,minDistinctUsers:3}),echoSync=detectCommentSyncBursts(currentCommentsForLayer,{windowMs:5e3,minDistinctUsers:3}),firstSecondLatency=buildCommenterFirstSecondLatency(currentCommentsForLayer),talentPeaks=detectTalentPeakMoments(currentCommentsForLayer),sentimentCurve=scoreSentimentTimeline(currentCommentsForLayer,{bucketMs:6e4}),selfComments=Array.isArray(opts.commentsForAnalytics)?opts.commentsForAnalytics.filter(c=>!!c?.selfPosted):[],uniqueWords=suggestUniqueWords({allComments:currentCommentsForLayer,selfComments,topN:15,minOccurrence:3}),lastPoint=concurrentSeries.points[concurrentSeries.points.length-1],recentActiveCommenters=(()=>{if(!currentCommentsForLayer.length)return 0;let last=currentCommentsForLayer.reduce((mx,c)=>typeof c?.capturedAt=="number"&&c.capturedAt>mx?c.capturedAt:mx,0);if(!last)return 0;let since=last-5*6e4,recent=new Set;for(let c of currentCommentsForLayer){if(typeof c?.capturedAt!="number"||c.capturedAt<since)continue;let uid=c.userId==null?"":String(c.userId).trim();uid&&recent.add(uid)}return recent.size})(),reach=computeReachCoefficient({currentConcurrent:lastPoint?lastPoint.value:NaN,uniqueCommentersInWindow:recentActiveCommenters}),dynMetrics=buildDynamicAdviceMetrics({r,concurrentPeak,laughterDensity,silenceZones,newVsRepeat,sentimentCurve,reach,growth,firstSecondLatency,survivalCurve,talentPeaks,echoPropagation,echoSync,recentComparison,uniqueWords,similarBroadcasts,keyboardTypes}),giftUsersForSg=Array.isArray(opts.giftUsers)?opts.giftUsers:[],giftEventsForAnalytics=Array.isArray(opts.giftEvents)?opts.giftEvents:[],giftHistoryThrowsForAnalytics=Array.isArray(opts.giftHistoryThrows)?opts.giftHistoryThrows:[],officialGiftHistoryForAnalytics=Array.isArray(opts.officialEventDomBundle?.giftHistory)?opts.officialEventDomBundle.giftHistory:[],giftContributionRankingForAnalytics=Array.isArray(opts.officialEventDomBundle?.contributionRanking)?opts.officialEventDomBundle.contributionRanking:[],adContributionRankingForAnalytics=Array.isArray(opts.officialEventDomBundle?.adContributionRanking)?opts.officialEventDomBundle.adContributionRanking:[],sgInsights=buildSupportGrowthInsights({report:r,comments:currentCommentsForLayer,giftUsers:giftUsersForSg,sessionSummaryRows,pastBroadcasts:pastBroadcastsForLayer,broadcasterUserId,maskShareLabels:maskShare}),giftMomentum=analyzeGiftMomentum({comments:currentCommentsForLayer,giftUsers:giftUsersForSg,giftEvents:giftEventsForAnalytics,giftHistoryThrows:giftHistoryThrowsForAnalytics,officialGiftHistory:officialGiftHistoryForAnalytics,giftContributionRanking:giftContributionRankingForAnalytics,adContributionRanking:adContributionRankingForAnalytics,programStats:opts.officialEventDomBundle?.programStats||null},{broadcasterUserId}),giftThrowLedger=buildMarketingGiftThrowLedger({giftSubAppHistory:opts.giftSubAppHistory||null,officialGiftHistory:officialGiftHistoryForAnalytics,giftEvents:giftEventsForAnalytics}),supporterChikuran=buildSupporterChikuranRows({liveId:r.liveId,comments:currentCommentsForLayer,giftUsers:giftUsersForSg,giftEvents:giftEventsForAnalytics,giftContributionRanking:[...giftContributionRankingForAnalytics,...giftHistoryThrowsForAnalytics],adContributionRanking:adContributionRankingForAnalytics},{liveId:r.liveId,excludeUserIds:broadcasterUserId?[broadcasterUserId]:[],maxRows:15}),audienceGap=analyzeAudienceEngagementGap({liveId:r.liveId,comments:currentCommentsForLayer,samples:sessionSummaryRows,visitorCount:opts.officialEventDomBundle?.programStats?.watchCount??null,officialCommentCount:opts.officialEventDomBundle?.programStats?.commentCount??null},{broadcasterUserId}),supportParticipationBase=resolveMarketingSupportParticipationCounts({giftUsers:giftUsersForSg,giftEvents:giftEventsForAnalytics,giftHistoryThrows:giftHistoryThrowsForAnalytics,adContributionRanking:adContributionRankingForAnalytics,comments:currentCommentsForLayer}),supportParticipation={...supportParticipationBase,...supportParticipationPctAgainstVisitors(audienceGap,supportParticipationBase)},marketingDataSummary=buildMarketingDataSummary({report:r,audienceGap,giftMomentum,supporterChikuran,sessionSummaryRows,pastBroadcasts:pastBroadcastsForLayer,giftUsers:giftUsersForSg,giftEvents:giftEventsForAnalytics,giftHistoryThrows:giftHistoryThrowsForAnalytics,officialGiftHistory:officialGiftHistoryForAnalytics,giftContributionRanking:giftContributionRankingForAnalytics,adContributionRanking:adContributionRankingForAnalytics,programStats:opts.officialEventDomBundle?.programStats||null,eventRanking:opts.eventRanking||null}),marketingFunnelBoard=buildMarketingFunnelBoard({report:r,audienceGap,giftMomentum,supporterChikuran,sessionSummaryRows,pastBroadcasts:pastBroadcastsForLayer,giftUsers:giftUsersForSg,giftEvents:giftEventsForAnalytics,giftHistoryThrows:giftHistoryThrowsForAnalytics,officialGiftHistory:officialGiftHistoryForAnalytics,giftContributionRanking:giftContributionRankingForAnalytics,adContributionRanking:adContributionRankingForAnalytics,programStats:opts.officialEventDomBundle?.programStats||null,eventRanking:opts.eventRanking||null}),marketingSegmentActionBoard=buildMarketingSegmentActionBoard({report:r,giftMomentum,supporterChikuran}),analysisSkillBoard=buildAnalysisSkillBoard({report:r,audienceGap,giftMomentum,supporterChikuran,sessionSummaryRows,pastBroadcasts:pastBroadcastsForLayer,adContributionRanking:adContributionRankingForAnalytics,eventRanking:opts.eventRanking||null,uniqueWords,talentPeaks,silenceZones,recentComparison,maskShareLabels:maskShare}),harnessScalingBoard=buildHarnessScalingBoard({report:r,audienceGap,giftMomentum,supporterChikuran,analysisSkillBoard,sessionSummaryRows,pastBroadcasts:pastBroadcastsForLayer,adContributionRanking:adContributionRankingForAnalytics,eventRanking:opts.eventRanking||null,programStats:opts.officialEventDomBundle?.programStats||null,maskShareLabels:maskShare}),metricsForAdvice={...dynMetrics,...supportGrowthMetricsForAdvice(sgInsights.adviceSlice)},allTocItems=[{id:"mkt-participation-lead",label:"\u6765\u5834\u3068\u30B3\u30E1\u30F3\u30C8\u53C2\u52A0"},{id:"mkt-analysis-skills",label:"\u5206\u6790\u30B9\u30AD\u30EB\u30DC\u30FC\u30C9"},{id:"mkt-harness-scaling",label:"\u5206\u6790\u30CF\u30FC\u30CD\u30B9\u8A2D\u8A08"},{id:"mkt-next-actions",label:"\u308A\u3093\u304F\u9054\u306E\u4F5C\u6226\u4F1A\u8B70"},{id:"mkt-data-summary",label:"\u30DE\u30FC\u30B1\u7DCF\u5408\u30B5\u30DE\u30EA"},{id:"mkt-marketing-funnel",label:"\u30DE\u30FC\u30B1\u30D5\u30A1\u30CD\u30EB"},{id:"mkt-segment-action",label:"\u5C64\u5225\u30DE\u30FC\u30B1\u8A3A\u65AD"},{id:"mkt-audience-gap",label:"\u6765\u5834\u2192\u30B3\u30E1\u30F3\u30C8\u5909\u63DB\u7387"},{id:"mkt-supporter-chikuran",label:"\u5FDC\u63F4\u8005\u3061\u304F\u3089\u3093\u03B2"},{id:"mkt-support-chance",label:"\u5FDC\u63F4\u304C\u5897\u3048\u305D\u3046\u306A\u6642\u9593"},{id:"mkt-gift-flow",label:"\u30AE\u30D5\u30C8\u306E\u6D41\u308C"},{id:"mkt-gift-deep",label:"\u30AE\u30D5\u30C8\u6DF1\u6398\u308A"},{id:"mkt-gift-ledger",label:"\u30AE\u30D5\u30C8\u6295\u3052\u5C65\u6B74"},{id:"mkt-onboarding",label:"\u521D\u898B\u3055\u3093\u306E\u624B\u304C\u304B\u308A"},{id:"mkt-clip-promo",label:"\u5207\u308A\u629C\u304D\u30FB\u544A\u77E5\u5019\u88DC"},{id:"mkt-listener-care",label:"\u30EA\u30B9\u30CA\u30FC\u304A\u8FD4\u3057"},{id:"mkt-ask-timing",label:"\u304A\u9858\u3044\u306E\u51FA\u3057\u3069\u3053\u308D"},{id:"mkt-sg-caution",label:"\u8AAD\u307F\u53D6\u308A\u306E\u6CE8\u610F"},{id:"mkt-event-ranking",label:"\u30A4\u30D9\u30F3\u30C8\u9806\u4F4D"},{id:"mkt-ext-links",label:"\u652F\u63F4\u7269\u8CC7\u30FB\u5916\u90E8\u30EA\u30F3\u30AF"},{id:"mkt-kpi",label:"KPI \u30B5\u30DE\u30EA"},{id:"mkt-content",label:"\u30B3\u30E1\u30F3\u30C8\u672C\u6587\u30FB\u5C5E\u6027\u306E\u50BE\u5411"},{id:"mkt-narrative",label:"\u914D\u4FE1\u5185\u5BB9\u306E\u6D41\u308C"},{id:"mkt-quarter",label:"\u5192\u982D\u30FB\u7D42\u76E4\uFF08\u56DB\u5206\u4F4D\uFF09"},{id:"mkt-timeline",label:"\u30B3\u30E1\u30F3\u30C8\u30BF\u30A4\u30E0\u30E9\u30A4\u30F3"},{id:"mkt-velocity",label:"\u30B3\u30E1\u901F\u5EA6\u30AB\u30FC\u30D6\uFF08PRO\uFF09"},{id:"mkt-fatigue",label:"\u30B3\u30E1\u30F3\u30C8\u75B2\u52B4\u30AB\u30FC\u30D6\uFF08PRO\uFF09"},{id:"mkt-concurrent",label:"\u540C\u63A5\u63A8\u79FB\u30AB\u30FC\u30D6\uFF08PRO\uFF09"},{id:"mkt-silence",label:"\u6C88\u9ED9\u30BE\u30FC\u30F3 \xD7 \u6C88\u9ED9\u306E\u8CEA\uFF08PRO\uFF09"},{id:"mkt-laughter",label:"\u7B11\u3044\u5BC6\u5EA6\uFF08PRO\uFF09"},{id:"mkt-new-vs-repeat",label:"\u65B0\u898F vs \u5E38\u9023\uFF08PRO\uFF09"},{id:"mkt-survival",label:"\u30B3\u30E1\u30F3\u30BF\u30FC\u751F\u5B58\u66F2\u7DDA\uFF08PRO\uFF09"},{id:"mkt-departed",label:"\u96E2\u53CD\u30B3\u30E1\u30F3\u30BF\u30FC TOP\uFF08PRO\uFF09"},{id:"mkt-attendance",label:"\u5E38\u9023\u51FA\u5E2D\u30AB\u30EC\u30F3\u30C0\u30FC\uFF08PRO\uFF09"},{id:"mkt-keyboard",label:"\u30AD\u30FC\u30DC\u30FC\u30C9\u578B\u8A3A\u65AD\uFF08PRO\uFF09"},{id:"mkt-recent-cmp",label:"\u76F4\u8FD1 5 \u914D\u4FE1\u306E\u6BD4\u8F03\uFF08PRO\uFF09"},{id:"mkt-weekday-heat",label:"\u66DC\u65E5\xD7\u6642\u9593\u5E2F\u30D2\u30FC\u30C8\u30DE\u30C3\u30D7\uFF08PRO\uFF09"},{id:"mkt-growth-meter",label:"\u6210\u9577\u30E1\u30FC\u30BF\u30FC\uFF08PRO\uFF09"},{id:"mkt-opening-five",label:"\u5192\u982D 5 \u5206\u306E\u4E88\u5146\uFF08PRO\uFF09"},{id:"mkt-waveform",label:"\u4F3C\u3066\u308B\u914D\u4FE1\uFF08\u6CE2\u5F62\u6307\u7D0B\uFF09\uFF08PRO\uFF09"},{id:"mkt-echo",label:"\u30B3\u30E1\u4F1D\u67D3 \xD7 \u88AB\u308A\uFF08PRO\uFF09"},{id:"mkt-first-second",label:"\u521D\u30B3\u30E1\u21922\u30B3\u30E1\u76EE latency\uFF08PRO\uFF09"},{id:"mkt-talent-peak",label:"\u914D\u4FE1\u8005\u306E\u8A71\u82B8\u30D4\u30FC\u30AF\uFF08PRO\uFF09"},{id:"mkt-sentiment",label:"\u611F\u60C5\u66F2\u7DDA\uFF08PRO\uFF09"},{id:"mkt-unique-words",label:"\u8996\u8074\u8005\u767A\u306E\u4EBA\u6C17\u8A9E TOP\uFF08PRO\uFF09"},{id:"mkt-reach",label:"\u30EA\u30FC\u30C1\u4FC2\u6570\uFF08PRO\uFF09"},{id:"mkt-derived",label:"\u7D2F\u7A4D\u30B3\u30E1\u30F3\u30C8\u6570\u30685\u5206\u7A93"},{id:"mkt-segment",label:"\u30E6\u30FC\u30B6\u30FC\u30BB\u30B0\u30E1\u30F3\u30C8"},{id:"mkt-top-users",label:"\u30C8\u30C3\u30D7\u30B3\u30E1\u30F3\u30BF\u30FC TOP 20"},{id:"mkt-commenter-follow",label:"\u6570\u5024ID\u30B3\u30E1\u30F3\u30BF\u30FC\uFF08\u30D5\u30A9\u30ED\u30FC\u60C5\u5831\uFF09"},{id:"mkt-commenter-follow-analytics",label:"\u30D5\u30A9\u30ED\u30FC\xD7\u30B3\u30E1\u30F3\u30C8\u5206\u6790"},{id:"mkt-supporter-power",label:"\u5FDC\u63F4\u8005\u30D1\u30EF\u30FC\u8A3A\u65AD\uFF08S/A/B/C/D/E\uFF09"},{id:"mkt-interest-arrival",label:"\u8208\u5473\u30BF\u30B0\u5225\u6765\u5834"},{id:"mkt-thumb-grid",label:"\u30B5\u30E0\u30CD\u4ED8\u304D\u30E6\u30FC\u30B6\u30FC\u4E00\u89A7"},{id:"mkt-vpos",label:"vpos \u4E09\u5206\u5272\uFF08\u518D\u751F\u4F4D\u7F6E\uFF09"},{id:"mkt-hour",label:"\u6642\u9593\u5E2F\u30D2\u30FC\u30C8\u30DE\u30C3\u30D7"},{id:"mkt-json",label:"\u8868\u8A08\u7B97\u30FB\u30C4\u30FC\u30EB\u5411\u3051 JSON"}],cfaAnalyticsShared=(()=>{let ac=Array.isArray(r.allNumericCommenters)?r.allNumericCommenters:[];return ac.length?buildCommenterFollowAnalytics(ac,{commenterFollowDataset:r.commenterFollowDataset,excludeUserId:broadcasterUserId,priorFollowEntries:r.commenterFollowPriorEntries,followingListMap:r.commenterFollowingListCache,followingListCoverage:r.followingListCoverage,durationMs:Math.max(0,Number(r.durationMinutes)||0)*6e4,includeSupporterPower:!0,supporterPowerTopN:10}):null})(),bodyHtml=`${sectionFeaturesOverview()}
 __NL_TOC_PLACEHOLDER__
 ${sectionAudienceParticipationLead(audienceGap,r,supportParticipation)}
 ${sectionAdviceIntro()}
@@ -836,6 +1046,7 @@ ${idWrap("mkt-hour",sectionHourHeatmap(r))}`,tocItems=allTocItems.filter(t=>body
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>\u914D\u4FE1\u30DE\u30FC\u30B1\u5206\u6790 \u2014 ${escapeHtml(r.liveId)}</title>
+${buildSectionRevealBootScriptHtml()}
 <style>${CSS_BODY}${BROADCASTER_PROFILE_MARKETING_CSS}${yukkuriBroadcastSummaryEmbeddedCss()}${mangaBroadcastSummaryEmbeddedCss()}</style>
 </head>
 <body>
@@ -850,6 +1061,7 @@ ${finalBody}
 </main>
 <footer class="mkt-footer">\u8FFD\u61B6\u306E\u304D\u3089\u3081\u304D \xB7 \u30DE\u30FC\u30B1\u5206\u6790\uFF08\u624B\u5143\u7528\uFF09 \u2014 ${escapeHtml(exportedAtIso)}</footer>
 ${idWrap("mkt-json",sectionMachineReadableJson(embedJson,maskShare))}
+${buildSectionRevealScriptHtml()}
 </body></html>`}function sectionBroadcasterExternalLinks(links){if(!Array.isArray(links)||links.length===0)return"";let seen=new Set,chips=[];for(let l of links){let href=String(l?.href||"").trim();if(!/^https?:\/\//i.test(href)||seen.has(href))continue;seen.add(href);let label=String(l?.text||"").replace(/\s+/g," ").trim();if(!label)try{label=new URL(href).hostname.replace(/^www\./,"")}catch{label=href}if(label.length>60&&(label=`${label.slice(0,57)}\u2026`),chips.push(`<a class="mkt-ext-link-chip" href="${escapeAttr(href)}" target="_blank" rel="noopener noreferrer">${escapeHtml(label)}</a>`),chips.length>=20)break}return chips.length===0?"":`<section class="mkt-section mkt-section--ext-links" aria-label="\u652F\u63F4\u7269\u8CC7\u30FB\u5916\u90E8\u30EA\u30F3\u30AF">
 <h2>\u{1F517} \u652F\u63F4\u7269\u8CC7\u30FB\u5916\u90E8\u30EA\u30F3\u30AF</h2>
 <p class="mkt-note">\u914D\u4FE1\u30DA\u30FC\u30B8\u306B\u8A18\u8F09\u3055\u308C\u305F\u5916\u90E8\u30EA\u30F3\u30AF\uFF08\u6B32\u3057\u3044\u3082\u306E\u30EA\u30B9\u30C8\u30FB\u652F\u63F4\u7269\u8CC7\u30FBSNS \u7B49\uFF09\u3067\u3059\u3002\u30EA\u30F3\u30AF\u5148\u306F\u914D\u4FE1\u8005\u306E\u7BA1\u7406\u4E0B\u306B\u3042\u308A\u307E\u3059\u3002</p>
@@ -1192,6 +1404,30 @@ body{margin:0;font-family:'Segoe UI','Hiragino Sans',sans-serif;background:#0f17
 .mkt-section{content-visibility:auto;contain-intrinsic-size:auto 360px;contain:layout style paint;background:#1e293b;border-radius:12px;padding:1.2rem 1.4rem;margin-bottom:1.2rem;border:1px solid #334155;scroll-margin-top:1rem}
 .mkt-section h2{margin:0 0 .8rem;font-size:1.1rem;line-height:1.35;color:#f8fafc;border-left:4px solid #3b82f6;padding-left:.6rem}
 .mkt-section p,.mkt-section li{overflow-wrap:anywhere}
+html.mkt-section-reveal-enabled .mkt-section{opacity:0;transform:translateY(18px) scale(.985);filter:saturate(.72);transition:opacity .34s ease,transform .38s cubic-bezier(.2,.8,.2,1),filter .34s ease,border-color .34s ease,box-shadow .34s ease;will-change:opacity,transform,filter}
+html.mkt-section-reveal-enabled .mkt-section.mkt-section--reveal{opacity:1;transform:none;filter:none}
+html.mkt-section-reveal-enabled .mkt-section.mkt-section--revealing{border-color:rgba(250,204,21,.78);box-shadow:0 0 0 1px rgba(250,204,21,.2),0 14px 34px rgba(14,165,233,.18)}
+html.mkt-section-reveal-done .mkt-section{will-change:auto}
+.mkt-reveal-control{position:fixed;right:16px;bottom:16px;z-index:60;display:flex;align-items:center;gap:.45rem;max-width:min(calc(100% - 24px),440px);padding:.45rem .55rem;border:1px solid rgba(148,163,184,.35);border-radius:12px;background:rgba(15,23,42,.94);box-shadow:0 14px 34px rgba(0,0,0,.32);backdrop-filter:blur(10px)}
+.mkt-reveal-control__status{font-size:.75rem;line-height:1.3;color:#cbd5e1;white-space:nowrap}
+.mkt-reveal-btn{cursor:pointer;border:1px solid #475569;background:#111827;color:#e2e8f0;border-radius:999px;padding:.42rem .75rem;font-size:.75rem;font-weight:700;line-height:1.2;white-space:nowrap}
+.mkt-reveal-btn:hover{border-color:#93c5fd;color:#f8fafc;background:#17233a}
+.mkt-reveal-btn:disabled{cursor:default;opacity:.62}
+.mkt-reveal-btn--sound.is-ready{border-color:#22c55e;color:#bbf7d0;background:#052e16}
+.mkt-reveal-btn--skip{border-color:#f59e0b;color:#fde68a}
+.mkt-reveal-control.is-done .mkt-reveal-btn--skip{border-color:#475569;color:#cbd5e1;background:#0f172a}
+@media(max-width:640px){
+  .mkt-reveal-control{left:.65rem;right:.65rem;bottom:.65rem;max-width:none;justify-content:space-between;flex-wrap:wrap}
+  .mkt-reveal-control__status{flex:1 1 100%}
+}
+@media(prefers-reduced-motion:reduce){
+  html.mkt-section-reveal-enabled .mkt-section{opacity:1;transform:none;filter:none;transition:none;will-change:auto}
+  .mkt-reveal-control{display:none}
+}
+@media print{
+  html.mkt-section-reveal-enabled .mkt-section{opacity:1;transform:none;filter:none;transition:none;will-change:auto}
+  .mkt-reveal-control{display:none!important}
+}
 .mkt-subhead{margin:1rem 0 .55rem;font-size:.95rem;line-height:1.4;color:#f8fafc}
 .mkt-section--toc{background:#0f172a}
 .mkt-toc{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:.45rem}

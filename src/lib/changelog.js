@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1168',
+    date: '2026-07-17',
+    summary: 'マーケ分析に音付き発表演出を追加',
+    items: Object.freeze([
+      'マーケ分析レポートを開いたとき、各セクションが音付きで順番に表示されるようになりました。ブラウザの自動再生制限で音が出ないときは、レポート右下の「音ON」から有効化できます。長く感じるときは「スキップ」で全セクションをすぐ表示できます。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1167',
     date: '2026-07-17',
     summary: '会場モードのサムネが白丸になる不具合を修正',
