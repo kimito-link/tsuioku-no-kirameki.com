@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 4 / 681 件
+## ⚠️ 役割コメントが無いソース 4 / 682 件
 - `src/lib/laneDomSelfMeasure.js`
 - `src/lib/reportPreviewPublish.js`
 - `src/lib/venueLaneBuckets.js`
@@ -536,7 +536,7 @@
     - `trumpet1.mp3`
     - `wallet1.mp3`
   - `SOURCES.md`
-- 📁 **src/** (1411)
+- 📁 **src/** (1413)
   - 📁 **data/** (6)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -806,7 +806,7 @@
         - `logo_funlink_white_RGB_maru_black.png`
       - `logo_guide_funlink_ol.pdf`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1191)
+  - 📁 **lib/** (1193)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -928,6 +928,8 @@
     - `broadcasterReputationKeywords.test.js`
     - `broadcasterReputationView.js` — 配信者の評判チェック - 表示ビューモデル + アラート HTML (純関数)
     - `broadcasterReputationView.test.js`
+    - `broadcasterUidTracker.js` — broadcasterUidTracker — 配信者UIDの sticky 解決(この機能群で唯一の stateful 部品)。
+    - `broadcasterUidTracker.test.js`
     - `broadcasterUserId.js` — 配信者 userId を embedded-data / DOM から純粋関数で抽出する。
     - `broadcasterUserId.test.js`
     - `buildNorthStarAdRankingStatsHtml.js` — 北極星「広告ランキング」レーン用: watch の番組統計と一覧の「貢」の内訳を短い HTML にする。

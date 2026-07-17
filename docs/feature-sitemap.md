@@ -163,7 +163,7 @@
 
 - **応援レーン集約(誰が候補か)** — 保存コメント行を userId 単位に畳み込みレーン候補を作る唯一の集約正本(popup/venue 共通)
   - `src/lib/userLaneCandidatesFromStorage.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 94</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 95</summary>
 
 - `src/domain/lane/aggregate.js` — 応援ユーザーレーンの per-row → per-user 集約（純関数）。
 - `src/domain/observations/observationStore.js` — observationStore - StatObservation のメモリ常駐リングバッファ。
@@ -178,6 +178,7 @@
 - `src/lib/broadcasterProfileCard.js` — 配信者プロフィールの「レポート用 正規化モデル」と HTML 断片ビルダー（純関数）。
 - `src/lib/broadcasterReputationKeywords.js` — 配信者の評判チェック - ネガティブキーワード判定エンジン
 - `src/lib/broadcasterReputationView.js` — 配信者の評判チェック - 表示ビューモデル + アラート HTML (純関数)
+- `src/lib/broadcasterUidTracker.js` — broadcasterUidTracker — 配信者UIDの sticky 解決(この機能群で唯一の stateful 部品)。
 - `src/lib/broadcasterUserId.js` — 配信者 userId を embedded-data / DOM から純粋関数で抽出する。
 - `src/lib/broadcastScore.js` — 配信スコアパネル(カラオケ採点/太鼓の達人風)の純粋なスコア化ロジック。
 - `src/lib/broadcastScoreHtml.js` — 配信スコアパネル(カラオケ採点風)の HTML を組む純関数。
@@ -844,7 +845,7 @@
 
 ## 🧬 修正系譜マップ(この系統のバグを過去にどう直したか)
 
-> changelog 全 499 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
+> changelog 全 500 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
 
 ### 💾 記録件数 (73版)
 - `v0.1.1153` 2026-07-15 — 応援コメントの内訳表示が増減して見える不具合を修正
@@ -1483,7 +1484,8 @@
 - `v0.1.699` 2026-06-12 — 読み上げの名前ON/OFF切替を追加
 - `v0.1.698` 2026-06-12 — コメビュにユーザー別の声で読み上げ機能を追加
 
-### 🪟 応援レーン・タイル (138版)
+### 🪟 応援レーン・タイル (139版)
+- `v0.1.1170` 2026-07-17 — 応援レーンの応援者が出没する不具合を修正
 - `v0.1.1163` 2026-07-16 — 会場の応援アイコン列を①ポップアップと同じ大きさに統一
 - `v0.1.1162` 2026-07-16 — 状態速報の異常な数値表示・誤った警告表示を修正
 - `v0.1.1154` 2026-07-15 — 会場の「名前ありゆっくり顔」の原因を見つけやすくする診断を追加

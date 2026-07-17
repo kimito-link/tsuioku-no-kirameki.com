@@ -831,7 +831,7 @@ import {
   responseAlignedWithWatchUrl
 } from '../lib/watchSnapshotAlignment.js';
 import { extractNicoUserIdFromProfileUrl } from '../lib/nicoUserProfilePage.js';
-import { inferBroadcasterUserIdFromComments } from '../lib/inferBroadcasterUserIdFromComments.js';
+import { createBroadcasterUidTracker } from '../lib/broadcasterUidTracker.js';
 
 /**
  * @typedef {{
@@ -5910,6 +5910,33 @@ const STORY_SOURCE_STATE = {
 };
 
 /**
+ * 配信者UIDの sticky 解決(user-identity-unification-DESIGN.md・2026-07-17)。
+ * チャンネル放送では snapshot.broadcasterUserId が構造的に取れず、コメントの
+ * ニックネーム一致推定(inferBroadcasterUserIdFromComments)に頼らざるを得ない。
+ * この推定は候補数が0/複数になると空文字に転ぶため、素で毎paint呼ぶと
+ * りんく列の記名ユーザーが一時的に全員除外→復活を繰り返す(出没ちらつき)。
+ * popup 内で唯一の tracker インスタンス(popup を閉じたらリセット=前配信の
+ * uid を持ち越さない・fail-closed)。
+ * 【関所】このファイルから inferBroadcasterUserIdFromComments を直接呼ばず、
+ *   必ず resolveBroadcasterUidSticky 経由にすること(6箇所を同時に置換済み)。
+ */
+const _broadcasterUidTracker = createBroadcasterUidTracker();
+
+/**
+ * @param {string} liveId
+ * @param {readonly unknown[]|null|undefined} entries
+ * @param {object} snapshot
+ * @returns {string}
+ */
+function resolveBroadcasterUidSticky(liveId, entries, snapshot) {
+  return _broadcasterUidTracker.update({
+    liveId: String(liveId || ''),
+    entries: Array.isArray(entries) ? entries : [],
+    snapshot: snapshot || {}
+  }).uid;
+}
+
+/**
  * v0.1.1092: コメント即時プッシュレーン(storage迂回)の「先出し」バッファ。content-entry.js から
  * postMessage で届いた新着行(nonce 照合済み)を、storage 由来の正規行(STORY_SOURCE_STATE.entries)が
  * 追いつくまで一時的に保持する。記録・鏡・集計・演出/音のトリガには使わない=表示専用(instantCommentPush.js
@@ -6031,7 +6058,8 @@ function repaintStoryUserLaneWithInstantPushBuffer() {
     STORY_SOURCE_STATE.storageRowsForCurrentLive,
     liveId,
     {
-      broadcasterUid: inferBroadcasterUserIdFromComments(
+      broadcasterUid: resolveBroadcasterUidSticky(
+        liveId,
         STORY_SOURCE_STATE.storageRowsForCurrentLive,
         watchMetaCache.snapshot || {}
       ),
@@ -6583,7 +6611,8 @@ function renderStoryUserLane() {
   const liveId = String(STORY_SOURCE_STATE.liveId || '');
   const laneScheme = getStoryColorScheme();
   const viewerUid = String(watchMetaCache.snapshot?.viewerUserId || '').trim();
-  const broadcasterUid = inferBroadcasterUserIdFromComments(
+  const broadcasterUid = resolveBroadcasterUidSticky(
+    liveId,
     storageCtx,
     watchMetaCache.snapshot || {}
   );
@@ -7559,7 +7588,8 @@ function buildStoryGiftThrowerLanePicks(giftUsers, liveId, storageCtx, limit) {
   const cap = Math.max(0, Math.floor(Number(limit) || 0));
   if (!lid || !cap) return Object.freeze([]);
 
-  const broadcasterUid = inferBroadcasterUserIdFromComments(
+  const broadcasterUid = resolveBroadcasterUidSticky(
+    lid,
     storageCtx,
     watchMetaCache.snapshot || {}
   );
@@ -7774,7 +7804,8 @@ function syncStorySourceEntries(liveId, displayList, storageRowsForLane, opts = 
         STORY_SOURCE_STATE.storageRowsForCurrentLive,
         nextLiveId,
         {
-          broadcasterUid: inferBroadcasterUserIdFromComments(
+          broadcasterUid: resolveBroadcasterUidSticky(
+            nextLiveId,
             STORY_SOURCE_STATE.storageRowsForCurrentLive,
             watchMetaCache.snapshot || {}
           ),
@@ -13120,7 +13151,7 @@ function renderUserRooms(entries, liveId = '', renderOpts = {}) {
   const broadcasterUid = String(watchMetaCache.snapshot?.broadcasterUserId || '').trim();
   const inferredBroadcasterUid =
     broadcasterUid ||
-    inferBroadcasterUserIdFromComments(list, watchMetaCache.snapshot || {});
+    resolveBroadcasterUidSticky(lvPrimed, list, watchMetaCache.snapshot || {});
   const broadcasterIconUrl = String(watchMetaCache.snapshot?.broadcasterIconUrl || '').trim();
   // 0.1.172: text が空の entry（ギフト送信のみ・システムイベント等）は
   //   「ユーザー別の応援件数」セクションの趣旨と合わないため、`requireText: true`
@@ -16120,7 +16151,7 @@ async function refresh() {
       const memoPre = Number(_displayEntriesMemo.preExcludeLen);
       _preExcludeLen = Number.isFinite(memoPre) ? memoPre : displayEntriesBase.length;
     } else {
-      const bcUid = inferBroadcasterUserIdFromComments(arr, watchMetaCache.snapshot || {});
+      const bcUid = resolveBroadcasterUidSticky(lv, arr, watchMetaCache.snapshot || {});
       const _preExcludeEntries = buildDisplayCommentEntries(arr, lv); // v0.1.838: 除外前の件数
       _preExcludeLen = _preExcludeEntries.length;
       displayEntriesBase = excludeBroadcasterFromCommentEntries(_preExcludeEntries, bcUid);
