@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>マーケ分析を準備中… — 君斗りんくの追憶のきらめき</title>
+    <!--
+      2026-07-17 マーケ分析レポートの別タブ化(PR1・marketing-export-tab-DESIGN.md):
+        popup内で数分固まって見えた重い集計・HTML組み立てを、この新規タブへ完全に追い出す。
+        popupは chrome.tabs.create でこのタブを開いたら即座に解放される(要望の核心)。
+        待機演出は りんく/こん太/たぬ姉 が交代でセリフを言う全画面レイアウト
+        (popup.html の .nl-export-wait__* のビジュアル言語を全画面向けにスケールアップ)。
+        配色は status.html の Tsuioku Warm Pastel(DESIGN.md 正本)を踏襲。
+    -->
+    <style>
+      :root {
+        color-scheme: light;
+        --nl-bg: #fff7ec;
+        --nl-text: #4a3b34;
+        --nl-text-soft: #8a7568;
+        --nl-border: #e3c9b5;
+        --nl-card-bg: #fffdf9;
+        --nl-accent: #f06aa0;
+        --nl-surface: #fffdf9;
+        --nl-text-sub: #7a6458;
+        --nl-muted: #9c8678;
+        --nl-bg-soft: #fff1f4;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --nl-bg: #fff7ec;
+          --nl-text: #4a3b34;
+          --nl-text-soft: #8a7568;
+          --nl-border: #e3c9b5;
+          --nl-card-bg: #fffdf9;
+          --nl-surface: #fffdf9;
+          --nl-text-sub: #7a6458;
+          --nl-muted: #9c8678;
+          --nl-bg-soft: #fff1f4;
+        }
+      }
+      * {
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        min-height: 100%;
+        background: var(--nl-bg);
+        color: var(--nl-text);
+        font-family:
+          system-ui,
+          -apple-system,
+          'Segoe UI',
+          'Hiragino Sans',
+          sans-serif;
+      }
+      body {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        min-height: 100vh;
+        padding: 24px 16px;
+      }
+
+      /* ── 待機画面 ─────────────────────────────────────── */
+      #mktWaitStage {
+        width: 100%;
+        max-width: 560px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 18px;
+      }
+      #mktWaitTitle {
+        margin: 0;
+        font-size: clamp(16px, 4vw, 20px);
+        font-weight: 800;
+        color: var(--nl-accent);
+        text-align: center;
+        letter-spacing: 0.02em;
+      }
+      #mktWaitGrid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: clamp(10px, 3vw, 18px);
+        width: 100%;
+      }
+      .mkt-wait-row {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 8px;
+        min-width: 0;
+        opacity: 0.68;
+        transform: scale(0.96);
+        transition:
+          opacity 0.25s ease-out,
+          transform 0.25s ease-out;
+      }
+      .mkt-wait-row.is-speaking {
+        opacity: 1;
+        transform: scale(1) translateY(-4px);
+      }
+      .mkt-wait-char {
+        width: clamp(64px, 16vw, 84px);
+        height: clamp(64px, 16vw, 84px);
+        border-radius: 50%;
+        object-fit: cover;
+        border: 3px solid color-mix(in srgb, var(--nl-text) 30%, transparent);
+        box-shadow: 3px 3px 0 color-mix(in srgb, var(--nl-text) 18%, transparent);
+        background: var(--nl-surface);
+      }
+      .mkt-wait-row.is-speaking .mkt-wait-char {
+        border-color: var(--nl-accent);
+        box-shadow:
+          0 0 0 3px color-mix(in srgb, var(--nl-accent) 35%, transparent),
+          3px 4px 0 color-mix(in srgb, var(--nl-accent) 28%, transparent);
+        animation: mktCharBob 0.6s ease-in-out infinite alternate;
+      }
+      @keyframes mktCharBob {
+        from {
+          transform: translateY(0);
+        }
+        to {
+          transform: translateY(-5px);
+        }
+      }
+      .mkt-wait-bubble {
+        position: relative;
+        width: 100%;
+        min-height: 54px;
+        padding: 8px 10px;
+        border-radius: 12px;
+        border: 1px solid var(--nl-border);
+        background: var(--nl-card-bg);
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.07);
+      }
+      .mkt-wait-bubble::before {
+        content: '';
+        position: absolute;
+        top: -6px;
+        left: 50%;
+        width: 10px;
+        height: 10px;
+        margin-left: -5px;
+        background: var(--nl-card-bg);
+        border-top: 1px solid var(--nl-border);
+        border-left: 1px solid var(--nl-border);
+        transform: rotate(45deg);
+      }
+      .mkt-wait-row--link .mkt-wait-bubble {
+        border-left: 3px solid #38bdf8;
+      }
+      .mkt-wait-row--konta .mkt-wait-bubble {
+        border-left: 3px solid #fb923c;
+      }
+      .mkt-wait-row--tanunee .mkt-wait-bubble {
+        border-left: 3px solid #c4b5fd;
+      }
+      .mkt-wait-name {
+        display: block;
+        font-size: 11px;
+        font-weight: 800;
+        margin: 0 0 3px;
+        letter-spacing: 0.02em;
+      }
+      .mkt-wait-row--link .mkt-wait-name {
+        color: #0284c7;
+      }
+      .mkt-wait-row--konta .mkt-wait-name {
+        color: #c2410c;
+      }
+      .mkt-wait-row--tanunee .mkt-wait-name {
+        color: #7c3aed;
+      }
+      .mkt-wait-text {
+        margin: 0;
+        font-size: clamp(11px, 2.6vw, 13px);
+        line-height: 1.45;
+        font-weight: 600;
+        color: var(--nl-text);
+        overflow-wrap: anywhere;
+      }
+      #mktWaitStageText {
+        margin: 4px 0 0;
+        font-size: 13px;
+        line-height: 1.5;
+        color: var(--nl-muted);
+        text-align: center;
+      }
+      #mktWaitProgressTrack {
+        width: 100%;
+        max-width: 360px;
+        height: 6px;
+        border-radius: 999px;
+        background: var(--nl-border);
+        overflow: hidden;
+      }
+      #mktWaitProgressFill {
+        height: 100%;
+        width: 8%;
+        border-radius: 999px;
+        background: linear-gradient(90deg, var(--nl-accent), #ff9d5c);
+        transition: width 0.5s ease-out;
+      }
+
+      /* ── 完了/エラー画面 ───────────────────────────────── */
+      #mktDoneStage,
+      #mktErrorStage {
+        display: none;
+        width: 100%;
+        max-width: 480px;
+        text-align: center;
+        flex-direction: column;
+        align-items: center;
+        gap: 14px;
+      }
+      #mktDoneStage.is-visible,
+      #mktErrorStage.is-visible {
+        display: flex;
+      }
+      .mkt-done-icon {
+        font-size: 44px;
+        line-height: 1;
+      }
+      #mktDoneTitle,
+      #mktErrorTitle {
+        margin: 0;
+        font-size: 18px;
+        font-weight: 800;
+        color: var(--nl-accent);
+      }
+      #mktErrorTitle {
+        color: #d4495f;
+      }
+      #mktDoneText,
+      #mktErrorText {
+        margin: 0;
+        font-size: 13px;
+        line-height: 1.6;
+        color: var(--nl-text-sub);
+        white-space: pre-wrap;
+      }
+      .mkt-retry-btn {
+        margin-top: 6px;
+        padding: 10px 20px;
+        border-radius: 10px;
+        border: 1px solid var(--nl-accent);
+        background: var(--nl-accent);
+        color: #fff;
+        font-size: 13px;
+        font-weight: 700;
+        cursor: pointer;
+      }
+      .mkt-retry-btn:hover {
+        opacity: 0.92;
+      }
+
+      /* ── スキップボタン(演出を長く感じるときの安全弁) ─── */
+      #mktSkipBtn {
+        margin-top: 4px;
+        padding: 6px 14px;
+        border-radius: 999px;
+        border: 1px solid var(--nl-border);
+        background: var(--nl-card-bg);
+        color: var(--nl-text-soft);
+        font-size: 11px;
+        cursor: pointer;
+      }
+      #mktSkipBtn:hover {
+        border-color: var(--nl-accent);
+        color: var(--nl-accent);
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        .mkt-wait-row,
+        .mkt-wait-row.is-speaking .mkt-wait-char {
+          transition: none;
+          animation: none;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <!-- 待機画面: キャラクター3人が交代でセリフを言う。 -->
+    <section id="mktWaitStage">
+      <p id="mktWaitTitle">マーケ分析を組み立て中…</p>
+      <div id="mktWaitGrid">
+        <div class="mkt-wait-row mkt-wait-row--link" data-who="link">
+          <img
+            class="mkt-wait-char"
+            src="images/yukkuri-charactore-english/link/link-yukkuri-smile-mouth-open.png"
+            alt="りんく"
+            decoding="async"
+          />
+          <div class="mkt-wait-bubble">
+            <span class="mkt-wait-name">りんく</span>
+            <p class="mkt-wait-text" data-wait-text="link">準備中…</p>
+          </div>
+        </div>
+        <div class="mkt-wait-row mkt-wait-row--konta" data-who="konta">
+          <img
+            class="mkt-wait-char"
+            src="images/yukkuri-charactore-english/konta/kitsune-yukkuri-smile-mouth-open.png"
+            alt="こん太"
+            decoding="async"
+          />
+          <div class="mkt-wait-bubble">
+            <span class="mkt-wait-name">こん太</span>
+            <p class="mkt-wait-text" data-wait-text="konta">準備中…</p>
+          </div>
+        </div>
+        <div class="mkt-wait-row mkt-wait-row--tanunee" data-who="tanunee">
+          <img
+            class="mkt-wait-char"
+            src="images/yukkuri-charactore-english/tanunee/tanuki-yukkuri-smile-mouth-open.png"
+            alt="たぬ姉"
+            decoding="async"
+          />
+          <div class="mkt-wait-bubble">
+            <span class="mkt-wait-name">たぬ姉</span>
+            <p class="mkt-wait-text" data-wait-text="tanunee">準備中…</p>
+          </div>
+        </div>
+      </div>
+      <div id="mktWaitProgressTrack"><div id="mktWaitProgressFill"></div></div>
+      <p id="mktWaitStageText">分析を開始しています…</p>
+      <button id="mktSkipBtn" type="button" hidden>演出をスキップ</button>
+    </section>
+
+    <!-- 完了画面。 -->
+    <section id="mktDoneStage">
+      <div class="mkt-done-icon">✅</div>
+      <p id="mktDoneTitle">ダウンロードを開始しました</p>
+      <p id="mktDoneText"></p>
+    </section>
+
+    <!-- エラー画面。 -->
+    <section id="mktErrorStage">
+      <div class="mkt-done-icon">⚠️</div>
+      <p id="mktErrorTitle">分析でエラーが発生しました</p>
+      <p id="mktErrorText"></p>
+      <button id="mktRetryBtn" class="mkt-retry-btn" type="button" hidden>もう一度実行</button>
+    </section>
+
+    <!-- 何があっても先に動く軽量guard(status-guard.jsと同型)。素のファイル・esbuild非経由。 -->
+    <script src="marketing-export-guard.js"></script>
+    <script src="dist/marketing-export.js"></script>
+  </body>
+</html>
