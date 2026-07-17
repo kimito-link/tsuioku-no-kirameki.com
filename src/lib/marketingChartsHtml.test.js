@@ -78,6 +78,22 @@ describe('buildMarketingDashboardHtml', () => {
     expect(html).toContain('lv123');
   });
 
+  it('単独HTML内にセクション順次発表・音・スキップの演出を埋め込む', () => {
+    const html = buildMarketingDashboardHtml(minimal());
+    expect(html).toContain('mkt-section-reveal-enabled');
+    expect(html).toContain('id="mktRevealControl"');
+    expect(html).toContain('id="mktRevealSoundBtn"');
+    expect(html).toContain('id="mktRevealSkipBtn"');
+    expect(html).toContain("document.querySelectorAll('.mkt-section')");
+    expect(html).toContain('window.AudioContext');
+    expect(html).toContain('createOscillator');
+    expect(html).toContain('prefers-reduced-motion:reduce');
+    expect(html).toContain('mkt-section--reveal');
+
+    const revealBlock = html.slice(html.indexOf('id="mktRevealControl"'));
+    expect(revealBlock).not.toContain('chrome.');
+  });
+
   it('eventRanking opt が無いときはイベント順位セクションを出さない', () => {
     const html = buildMarketingDashboardHtml(minimal());
     expect(html).not.toContain('id="mkt-event-ranking"');
