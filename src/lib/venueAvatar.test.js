@@ -19,21 +19,31 @@ describe('enrichVenueRowsWithProfileAvatars', () => {
     expect(out[0].avatarObserved).toBe(true);
   });
 
-  it('URL埋め込みuidとエントリuidが食い違う取り違えは弾く(配信者アイコン混入防止)', () => {
+  it('URL埋め込みuidとエントリuidが食い違う取り違えは弾く(配信者アイコン混入防止・UID生成URLへfallback)', () => {
     // profileMap の avatarUrl が uid=10340018 のものなのに、エントリは別人(999)
     const rows = [{ userId: '999', name: 'べつじん', avatar: '', capturedAt: 1 }];
     const profileMap = { 999: { avatarUrl: NICO_ICON } };
     const out = enrichVenueRowsWithProfileAvatars(rows, profileMap);
-    expect(out[0].avatar).toBe(''); // 取り違えなので採用しない
-    expect(out[0].avatarObserved).toBe(false);
+    // 取り違えの NICO_ICON(10340018 のもの)は採用しないが、999 自身の確定パターン URL は生成される。
+    expect(out[0].avatar).toBe('https://secure-dcdn.cdn.nimg.jp/nicoaccount/usericon/s/0/999.jpg');
+    expect(out[0].avatarObserved).toBe(true);
   });
 
-  it('プロファイルにサムネが無い人は avatar 空のまま(=会場側でゆっくり顔生成)', () => {
+  it('匿名(数値以外)uid はプロファイルにサムネが無ければ avatar 空のまま(=会場側でゆっくり顔生成)', () => {
     const rows = [{ userId: 'a:abc', name: '', avatar: '', capturedAt: 1 }];
     const out = enrichVenueRowsWithProfileAvatars(rows, {});
     expect(out[0].avatar).toBe('');
     expect(out[0].avatarObserved).toBe(false);
     expect(out[0].userId).toBe('a:abc'); // 匿名も行は保持(観客席で顔つきにする)
+  });
+
+  it('数値uidはプロファイルにサムネが無くても UID から確定パターンで生成する(popup と同じ動作)', () => {
+    const rows = [{ userId: '10340018', name: '隣の家のねこ', avatar: '', capturedAt: 1 }];
+    const out = enrichVenueRowsWithProfileAvatars(rows, {});
+    expect(out[0].avatar).toBe(
+      'https://secure-dcdn.cdn.nimg.jp/nicoaccount/usericon/s/1034/10340018.jpg'
+    );
+    expect(out[0].avatarObserved).toBe(true);
   });
 
   it('data URL は http でないので observed 扱いしない(プロファイル補強の対象)', () => {

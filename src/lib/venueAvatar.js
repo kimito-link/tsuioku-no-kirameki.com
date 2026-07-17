@@ -12,6 +12,7 @@
 //   取り違えガード(URL 埋め込み uid とエントリ uid の不一致を弾く)は avatarBroadcasterGuard を再利用。
 
 import { isAvatarUrlForUserId } from './avatarBroadcasterGuard.js';
+import { deriveAvatarUrlFromUid } from './deriveAvatarUrlFromUid.js';
 
 /**
  * http(s) URL か。data URL や空は false。
@@ -59,6 +60,18 @@ export function enrichVenueRowsWithProfileAvatars(rows, profileMap) {
       // 取り違えガード: URL 埋め込み uid とエントリ uid が一致するときだけ採用。
       if (isHttpUrl(profileAvatar) && isAvatarUrlForUserId(profileAvatar, userId)) {
         avatar = profileAvatar;
+        observed = true;
+      }
+    }
+    // プロファイルキャッシュにも無ければ、popup と同じ確定パターンで UID から生成する
+    // (popup 側は storyGrowthAvatarSrcCandidate→rememberedAvatarUrlForUserId が
+    //   deriveAvatarUrlFromUid でこのフォールバックを持つが、会場側だけ欠けていたため
+    //   記名ユーザーでもキャッシュ未充填だと白円のままになっていた)。数値 uid のみ対象
+    //   (匿名 uid 'a:xxx' 等は deriveAvatarUrlFromUid が '' を返すので無害)。
+    if (!observed && userId) {
+      const derived = deriveAvatarUrlFromUid(userId);
+      if (derived) {
+        avatar = derived;
         observed = true;
       }
     }

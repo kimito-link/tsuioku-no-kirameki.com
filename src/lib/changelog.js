@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1167',
+    date: '2026-07-17',
+    summary: '会場モードのサムネが白丸になる不具合を修正',
+    items: Object.freeze([
+      '会場モード(全画面表示)で、記名ユーザーのサムネイルが白丸のままになることがある不具合を修正しました。①ポップアップ側では出ていたサムネが会場側だけ出ないケースがありましたが、同じ仕組みで補完するようにしました。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1166',
     date: '2026-07-17',
     summary: 'マーケ分析を別タブでダウンロードするように変更',
