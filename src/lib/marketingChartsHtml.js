@@ -4123,6 +4123,24 @@ function buildSectionRevealScriptHtml() {
         if(control)control.classList.add('is-done');
       });
     }
+    function revealThrough(target){
+      if(!target||stopped)return;
+      var i=sections.indexOf(target);
+      if(i<0||i<index)return;
+      for(var j=index;j<=i;j+=1){
+        sections[j].classList.add('mkt-section--reveal');
+      }
+      index=i+1;
+      setStatus(status,index,sections.length);
+    }
+    function revealTargetFromHash(){
+      var id=(location.hash||'').replace(/^#/,'');
+      if(!id)return;
+      var el=document.getElementById(id);
+      if(el)revealThrough(el);
+    }
+    window.addEventListener('hashchange',revealTargetFromHash);
+    revealTargetFromHash();
     function tick(){
       if(stopped)return;
       if(index>=sections.length){

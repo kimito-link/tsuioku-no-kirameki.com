@@ -94,6 +94,13 @@ describe('buildMarketingDashboardHtml', () => {
     expect(revealBlock).not.toContain('chrome.');
   });
 
+  it('目次リンクのジャンプ先が演出未到達でも空白に見えないよう hashchange で先行 reveal する', () => {
+    const html = buildMarketingDashboardHtml(minimal());
+    expect(html).toContain("addEventListener('hashchange'");
+    expect(html).toContain('revealTargetFromHash');
+    expect(html).toContain('location.hash');
+  });
+
   it('eventRanking opt が無いときはイベント順位セクションを出さない', () => {
     const html = buildMarketingDashboardHtml(minimal());
     expect(html).not.toContain('id="mkt-event-ranking"');
