@@ -5373,6 +5373,12 @@ function scheduleDeferredUserCommentProfileHydrate(ctx) {
   }
 }
 
+// avatar-stability-DESIGN.md §E-1: rememberedAvatarUrlForUserId の2分岐(profileCache/
+//   entries逆順走査)のどちらが解決の決め手になったかを実測するカウンタ。会場には
+//   entries逆順走査(第2分岐)相当が無い(§A裁定=意図的に埋めない)。hitEntriesScan が
+//   実配信で無視できない比率なら、この裁定を再検討する(状態速報 avatarRememberedDiag で確認)。
+const _avatarRememberedDiag = { hitProfileCache: 0, hitEntriesScan: 0, hitSynth: 0 };
+
 /**
  * 同一 userId で過去に取れた avatarUrl を再利用する（仮想スクロールの欠落補完）
  * @param {unknown} userId
@@ -5388,12 +5394,14 @@ function rememberedAvatarUrlForUserId(userId) {
     isHttpOrHttpsUrl(fromCache) &&
     !isWeakNiconicoUserIconHttpUrl(fromCache)
   ) {
+    _avatarRememberedDiag.hitProfileCache += 1;
     return fromCache;
   }
   const list = STORY_SOURCE_STATE?.entries;
   // v0.1.208 Phase B: STORY_SOURCE が空でも、uid から生成 URL を返して
   // avatar 取得率を上げる（v0.1.203 Patch 1 で確立した deriveAvatarUrlFromUid 経由）。
   if (!Array.isArray(list) || list.length === 0) {
+    _avatarRememberedDiag.hitSynth += 1;
     return pickAvatarUrlForUid(uid, null);
   }
   for (let i = list.length - 1; i >= 0; i -= 1) {
@@ -5405,11 +5413,18 @@ function rememberedAvatarUrlForUserId(userId) {
       isHttpOrHttpsUrl(av) &&
       !isWeakNiconicoUserIconHttpUrl(av)
     ) {
+      _avatarRememberedDiag.hitEntriesScan += 1;
       return av;
     }
   }
   // v0.1.208 Phase B: STORY_SOURCE 走査でも見つからなければ uid から生成。
+  _avatarRememberedDiag.hitSynth += 1;
   return pickAvatarUrlForUid(uid, null);
+}
+
+/** avatar-stability-DESIGN.md §E-1 計器のスナップショットを返す(状態速報配線用・副作用なし)。 */
+function getAvatarRememberedDiagSnapshot() {
+  return { ..._avatarRememberedDiag };
 }
 
 /** @param {PopupCommentEntry[]} entries */
@@ -18711,6 +18726,11 @@ async function collectAiShareDevMonitorPayloadBundle(watchUrl) {
       //   形に偏るなら 404/CORS が真因＝nvapi 経由等の対処へ進む判断材料にする。
       avatarLoadDiag: (() => {
         try { return storyAvatarLoadGuard.getDiagnostics(); } catch { return null; }
+      })(),
+      // avatar-stability-DESIGN.md §E-1/§A: rememberedAvatarUrlForUserId の分岐別ヒット数。
+      //   hitEntriesScan(会場に無い第2分岐)の比率が §A の「埋めない」裁定の再検討条件。
+      avatarRememberedDiag: (() => {
+        try { return getAvatarRememberedDiagSnapshot(); } catch { return null; }
       })(),
       // v0.1.616: 北極星描画経路の観測。content は取得完璧(koken 69件)なのに popup の
       //   レーンが空の真因を一点に絞る。
