@@ -162,6 +162,9 @@ import { buildVenueMirrorAvatarMap, enrichVenueRowsWithMirrorAvatars } from '../
 //   設計正本=memory/reference_pop_venue_parity_SYNTHESIS.md(P層=鏡そのまま/T層=cap溢れの尾/X層=直近発言者)。
 import { KEY_LANE_MIRROR } from '../lib/laneMirrorKey.js';
 import { KEY_STORY_DIAG_MIRROR } from '../lib/storyDiagMirrorKey.js';
+// 記録件数の正本購読(story-diag-realtime-sync-DESIGN.md): ①popup非依存で content-entry.js が
+//   書く nls_panel_summary_<lv> を購読し、①が閉じていても件数だけはリアルタイムで動かす。
+import { panelSummaryStorageKey } from '../lib/panelLiveSummary.js';
 import { restoreLaneMirrorBuckets } from '../lib/laneMirror.js';
 import {
   composeVenueLaneBuckets,
@@ -2383,6 +2386,13 @@ export function mountVenueBarButton(options = {}) {
   /** @type {Record<string, unknown>|null} */
   let storyDiagMirrorSnap = null;
   let storyDiagMirrorRenderSig = '';
+  // 記録件数の正本購読(story-diag-realtime-sync-DESIGN.md §C-2)。
+  //   入力の出どころ: nls_panel_summary_<lv>。content-entry.js が取込イベント+min-gap 2秒で
+  //   popup非依存に書く recordedCount(AGENTS.md §12.8 の表示正本)。①popupが閉じていても
+  //   この経路だけで件数は動き続ける(本設計の根治点)。
+  /** @type {Record<string, unknown>|null} */
+  let panelSummarySnap = null;
+  let _panelSummaryLastSeenAt = 0;
   /** X層: 鏡にまだ居ない直近発言者の初見時刻(壁時計)。60秒窓内は「暫定」=説明済み差分。 */
   /** @type {Map<string, number>} */
   const venueTransientFirstSeen = new Map();
@@ -3960,7 +3970,8 @@ export function mountVenueBarButton(options = {}) {
     const result = renderVenueStoryDiagMirrorPanel(storyDiagHost, storyDiagMirrorSnap, {
       liveId: String(activeLiveId || liveIdFromPathname() || ''),
       nowMs: Date.now(),
-      lastSig: storyDiagMirrorRenderSig
+      lastSig: storyDiagMirrorRenderSig,
+      panelSummary: panelSummarySnap
     });
     storyDiagMirrorRenderSig = result.sig;
   };
@@ -4808,8 +4819,15 @@ export function mountVenueBarButton(options = {}) {
     void (async () => {
       try {
         if (!hasVenueExtensionContext()) return;
+        const _catchUpLiveId = String(activeLiveId || liveIdFromPathname() || '').trim().toLowerCase();
+        const _panelKey = _catchUpLiveId ? panelSummaryStorageKey(_catchUpLiveId) : '';
         const bag = await runStorageOpWithTimeout(
-          () => chrome.storage.local.get([KEY_LANE_MIRROR, KEY_STORY_DIAG_MIRROR]),
+          () =>
+            chrome.storage.local.get(
+              _panelKey
+                ? [KEY_LANE_MIRROR, KEY_STORY_DIAG_MIRROR, _panelKey]
+                : [KEY_LANE_MIRROR, KEY_STORY_DIAG_MIRROR]
+            ),
           3000
         );
         const snap = bag?.[KEY_LANE_MIRROR];
@@ -4820,6 +4838,13 @@ export function mountVenueBarButton(options = {}) {
         const storySnap = bag?.[KEY_STORY_DIAG_MIRROR];
         if (open && storySnap && typeof storySnap === 'object') {
           storyDiagMirrorSnap = /** @type {Record<string, unknown>} */ (storySnap);
+        }
+        const panelSnap = _panelKey ? bag?.[_panelKey] : null;
+        if (open && panelSnap && typeof panelSnap === 'object') {
+          panelSummarySnap = /** @type {Record<string, unknown>} */ (panelSnap);
+          _panelSummaryLastSeenAt = Date.now();
+        }
+        if (open && ((storySnap && typeof storySnap === 'object') || (panelSnap && typeof panelSnap === 'object'))) {
           renderStoryDiagMirrorPanel();
         }
       } catch {
@@ -5029,9 +5054,19 @@ export function mountVenueBarButton(options = {}) {
     // v0.1.1090: onChanged だけに頼らず、既存の定期ポーリングに相乗りして「会場を開いた時点で
     //   既に貯まっている集計ギフトpt」も拾う(保険・tail/summaryと同じ方針)。
     const giftPointsAggregateKey = officialGiftPointsAggregateStorageKey(liveId);
+    // story-diag-realtime-sync §D-2(b): onChanged 欠落時の自己修復(15秒以上更新が無いときだけ
+    //   1 key read)。担わない責務: 通常時の更新(それは onChanged が担う=毎tick read を増やさない)。
+    const STORY_DIAG_PANEL_STALE_MS = 15_000;
+    const needsPanelSummaryRefresh =
+      Date.now() - _panelSummaryLastSeenAt > STORY_DIAG_PANEL_STALE_MS;
+    const panelKey = needsPanelSummaryRefresh ? panelSummaryStorageKey(liveId) : '';
     speechInFlight = true;
     try {
-      const bag = await chrome.storage.local.get([tailKey, summaryKey, giftPointsAggregateKey]);
+      const bag = await chrome.storage.local.get(
+        panelKey
+          ? [tailKey, summaryKey, giftPointsAggregateKey, panelKey]
+          : [tailKey, summaryKey, giftPointsAggregateKey]
+      );
       if (
         !open ||
         generation !== speechGeneration ||
@@ -5047,6 +5082,14 @@ export function mountVenueBarButton(options = {}) {
       processSpeechRows(rows);
       const aggregatePoints = bag?.[giftPointsAggregateKey];
       if (typeof aggregatePoints === 'number') handleGiftPointsAggregate(aggregatePoints);
+      if (panelKey) {
+        const panelSnap = bag?.[panelKey];
+        if (panelSnap && typeof panelSnap === 'object') {
+          panelSummarySnap = /** @type {Record<string, unknown>} */ (panelSnap);
+          _panelSummaryLastSeenAt = Date.now();
+          renderStoryDiagMirrorPanel();
+        }
+      }
     } catch (err) {
       // v0.1.753: context invalidated(拡張更新後の古いタブ)は恒久失敗→停止+案内。
       if (isContextInvalidatedError(err) || !hasVenueExtensionContext()) {
@@ -5115,6 +5158,22 @@ export function mountVenueBarButton(options = {}) {
     const storyDiagChange = changes[KEY_STORY_DIAG_MIRROR];
     if (storyDiagChange && storyDiagChange.newValue && typeof storyDiagChange.newValue === 'object') {
       storyDiagMirrorSnap = /** @type {Record<string, unknown>} */ (storyDiagChange.newValue);
+      renderStoryDiagMirrorPanel();
+    }
+    // ── 記録件数の正本購読(v0.1.117x・story-diag-realtime-sync設計 §C-2) ──────────────
+    // 入力の出どころ: nls_panel_summary_<lv>。content-entry.js が取込イベント+min-gap 2秒で
+    //   popup非依存に書く recordedCount(= recordedCountForDisplay(lid)・per-live単調化済み・
+    //   AGENTS.md §12.8 の表示正本)。
+    // 出力の使われ方: renderStoryDiagMirrorPanel → resolveStoryDiagTotal が KEY_STORY_DIAG_MIRROR
+    //   由来の total(①popupのarr.length系)より優先して「記録している応援コメント N 件です」の N になる。
+    // 担う責務: newValue 直採用(追加readゼロ)でのキャッシュ更新と再描画キック。
+    // 担わない責務: 集計(contentが正本)・内訳(withUid等は鏡=①popupが唯一の計算者)・
+    //   単調化(storyDiagMonotonic が担う)・保険read(既存ポーリング相乗り側が担う)。
+    // ①popupが閉じていてもこの経路だけで件数は動き続ける=本設計の根治点。
+    const panelChange = changes[panelSummaryStorageKey(liveId)];
+    if (panelChange && panelChange.newValue && typeof panelChange.newValue === 'object') {
+      panelSummarySnap = /** @type {Record<string, unknown>} */ (panelChange.newValue);
+      _panelSummaryLastSeenAt = Date.now();
       renderStoryDiagMirrorPanel();
     }
     // v0.1.741 安定化: 参加者データはコメントチャンク(nls_cchunk_<lv>_*)に入る。

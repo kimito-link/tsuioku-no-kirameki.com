@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1171',
+    date: '2026-07-18',
+    summary: '会場モードの記録件数がリアルタイムで動くように',
+    items: Object.freeze([
+      '会場モード(全画面表示)の「記録している応援コメント」の件数が、①ポップアップを開いていなくてもリアルタイムで更新されるようになりました。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1170',
     date: '2026-07-17',
     summary: '応援レーンの応援者が出没する不具合を修正',

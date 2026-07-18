@@ -35,10 +35,12 @@ graph LR
   n_venue --> n_src_lib_comeviewRows_js["lib/comeviewRows.js"]:::shared
   n_venue --> n_src_lib_commentChunkStore_js["lib/commentChunkStore.js"]:::shared
   n_venue --> n_src_lib_commentRecord_js["lib/commentRecord.js"]:::shared
+  n_venue --> n_src_lib_commentSummary_js["lib/commentSummary.js"]:::shared
   n_venue --> n_src_lib_commentTailBuffer_js["lib/commentTailBuffer.js"]:::shared
   n_venue --> n_src_lib_crowdRasterizer_js["lib/crowdRasterizer.js"]:::shared
   n_venue --> n_src_lib_customSoundStore_js["lib/customSoundStore.js"]:::shared
   n_venue --> n_src_lib_deriveAvatarUrlFromUid_js["lib/deriveAvatarUrlFromUid.js"]:::shared
+  n_venue --> n_src_lib_displayRecordedCount_js["lib/displayRecordedCount.js"]:::shared
   n_venue --> n_src_lib_effectDirector_js["lib/effectDirector.js"]:::shared
   n_venue --> n_src_lib_effectSoundPlayer_js["lib/effectSoundPlayer.js"]:::shared
   n_venue --> n_src_lib_giftDeltaFallback_js["lib/giftDeltaFallback.js"]:::shared
@@ -51,9 +53,7 @@ graph LR
   n_venue --> n_src_lib_htmlEscape_js["lib/htmlEscape.js"]:::shared
   n_venue --> n_src_lib_laneMirror_js["lib/laneMirror.js"]:::shared
   n_venue --> n_src_lib_laneMirrorKey_js["lib/laneMirrorKey.js"]:::shared
-  n_venue --> n_src_lib_laneSceneEnvelope_js["lib/laneSceneEnvelope.js"]:::shared
-  n_venue --> n_src_lib_nicoAnonymousDisplay_js["lib/nicoAnonymousDisplay.js"]:::shared
   classDef shared fill:#eee,stroke:#999,color:#666;
 ```
 
-> ほか 71 ファイル省略（全件は storage-bus.md / metafile 参照）。
+> ほか 75 ファイル省略（全件は storage-bus.md / metafile 参照）。

@@ -2,6 +2,7 @@ import {
   buildStoryAvatarDiagHtml,
   buildStoryAvatarDiagVerboseHtml
 } from './storyAvatarDiagLine.js';
+import { resolveStoryDiagTotal } from './storyDiagTotalSource.js';
 
 /** @param {unknown} value @returns {string} */
 function normalizeLiveId(value) {
@@ -58,16 +59,60 @@ function buildVenueStoryDiagMirrorHtml(snap, nowMs) {
   return {
     sig,
     html:
-      `<div class="nlsb-story-diag__head">①の診断(${ageLabel})</div>` +
+      `<div class="nlsb-story-diag__head">①の診断(内訳 ${ageLabel})</div>` +
       compactHtml +
       (verboseHtml || '')
   };
 }
 
 /**
+ * 鏡(KEY_STORY_DIAG_MIRROR)が無い/別配信でも、panel summary(件数の正本ストリーム)だけで
+ * 件数行のみを描く簡易HTML(story-diag-realtime-sync-DESIGN.md §C-3)。
+ * 入力の出どころ: panelSummary(nls_panel_summary_<lv>由来、①popup非依存でcontentが書く)。
+ * 出力の使われ方: 鏡不在時のフォールバック描画(renderVenueStoryDiagMirrorPanel から)。
+ * 担う責務: 件数行のみの表示。内訳(withUid等)は①でしか計算されないため、代わりに
+ *   「内訳は①ポップアップを開くと表示されます」の案内文を出す(0埋めで誤読させない)。
+ * 担わない責務: 内訳の算出・単調化(呼び出し側が resolveStoryDiagTotal 経由で解決済みの
+ *   total を渡す前提)。
+ * @param {{ total: number, panelAgeSec: number|null }} resolved
+ * @returns {{ html: string, sig: string }}
+ */
+function buildVenueStoryDiagPanelOnlyHtml(resolved) {
+  const totalNum = Math.max(0, Math.floor(Number(resolved.total) || 0));
+  const ageLabel =
+    resolved.panelAgeSec == null ? '' : `(件数 ${formatAgeLabel(resolved.panelAgeSec)})`;
+  const compactHtml =
+    '<div class="nl-story-diag nl-story-diag--compact">' +
+    `<p class="nl-story-diag__lead">記録している応援コメント <strong>${totalNum}</strong> 件です。` +
+    '内訳は①ポップアップを開くと表示されます。</p></div>';
+  const sig = `panelOnly|${totalNum}`;
+  return {
+    sig,
+    html: `<div class="nlsb-story-diag__head">①の診断${ageLabel}</div>` + compactHtml
+  };
+}
+
+/**
+ * 鏡が使えないときの panel summary フォールバックを試みる。使えなければ null。
+ * @param {{ liveId?: unknown, nowMs?: unknown, panelSummary?: unknown }} opts
+ * @returns {{ html: string, sig: string }|null}
+ */
+function tryBuildPanelOnlyFallback(opts) {
+  if (opts.panelSummary === undefined) return null; // panelSummary 未対応の呼び出し元は挙動不変
+  const resolved = resolveStoryDiagTotal({
+    panelSummary: opts.panelSummary,
+    liveId: String(opts.liveId || ''),
+    fallbackTotal: 0,
+    nowMs: finiteNumberOrZero(opts.nowMs)
+  });
+  if (resolved.source !== 'panel') return null;
+  return buildVenueStoryDiagPanelOnlyHtml(resolved);
+}
+
+/**
  * @param {HTMLElement|null|undefined} host
  * @param {unknown} snap
- * @param {{ liveId?: unknown, nowMs?: unknown, lastSig?: string }} opts
+ * @param {{ liveId?: unknown, nowMs?: unknown, lastSig?: string, panelSummary?: unknown }} opts
  * @returns {{ sig: string, changed: boolean }}
  */
 export function renderVenueStoryDiagMirrorPanel(host, snap, opts = {}) {
@@ -75,6 +120,13 @@ export function renderVenueStoryDiagMirrorPanel(host, snap, opts = {}) {
   const s = snap && typeof snap === 'object' ? /** @type {Record<string, unknown>} */ (snap) : null;
   const sameLive = Boolean(s && normalizeLiveId(s.liveId) && normalizeLiveId(s.liveId) === normalizeLiveId(opts.liveId));
   if (!sameLive) {
+    const fallback = tryBuildPanelOnlyFallback(opts);
+    if (fallback) {
+      if (fallback.sig === opts.lastSig && !host.hidden) return { sig: fallback.sig, changed: false };
+      host.innerHTML = fallback.html;
+      host.hidden = false;
+      return { sig: fallback.sig, changed: true };
+    }
     const changed = !host.hidden || host.innerHTML !== '' || opts.lastSig !== '__hidden__';
     if (changed) {
       host.hidden = true;
@@ -85,6 +137,13 @@ export function renderVenueStoryDiagMirrorPanel(host, snap, opts = {}) {
 
   const built = buildVenueStoryDiagMirrorHtml(s, opts.nowMs);
   if (built.html == null) {
+    const fallback = tryBuildPanelOnlyFallback(opts);
+    if (fallback) {
+      if (fallback.sig === opts.lastSig && !host.hidden) return { sig: fallback.sig, changed: false };
+      host.innerHTML = fallback.html;
+      host.hidden = false;
+      return { sig: fallback.sig, changed: true };
+    }
     const changed = !host.hidden || host.innerHTML !== '' || opts.lastSig !== '__hidden__';
     if (changed) {
       host.hidden = true;
