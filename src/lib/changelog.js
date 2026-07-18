@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1173',
+    date: '2026-07-18',
+    summary: 'アイコン表示の内部処理を整理',
+    items: Object.freeze([
+      'ユーザーアイコンURLの生成処理を整理し、画面ごとの表示のずれが起きにくくなるよう改善しました。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1172',
     date: '2026-07-18',
     summary: 'サムネ表示の安定化に向けた計器を追加',

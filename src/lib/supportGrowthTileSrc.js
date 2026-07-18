@@ -2,6 +2,8 @@
  * 応援グリッド用タイル画像 URL の優先解決（純関数）
  */
 
+import { deriveAvatarUrlFromUid } from './deriveAvatarUrlFromUid.js';
+
 /**
  * @param {unknown} url
  * @returns {boolean}
@@ -23,6 +25,11 @@ export const NICONICO_OFFICIAL_DEFAULT_USERICON_HTTPS =
  * DOM に img が無い行でも ID だけ取れていればタイルに他者アイコンを出せる。
  * 未設定アカウント等では 404 になり得る（ブラウザは既定の壊れ画像表示）。
  *
+ * v0.1.1173(avatar-stability-DESIGN.md §B手順3): 式の内蔵をやめ deriveAvatarUrlFromUid
+ *   (src/lib/deriveAvatarUrlFromUid.js)へ委譲。precondition(^\d{5,14}$・n<1除外)は
+ *   ここに残す(挙動不変)。旧バケット計算式(max(1, uid の万の位))は precondition の
+ *   下では正本の計算式と数学的に等価(deriveAvatarUrlFromUid.equivalence.test.js で固定済み)。
+ *
  * @param {unknown} userId
  * @returns {string} 組み立て不可時は空
  */
@@ -31,8 +38,7 @@ export function niconicoDefaultUserIconUrl(userId) {
   if (!/^\d{5,14}$/.test(s)) return '';
   const n = Number(s);
   if (!Number.isFinite(n) || n < 1) return '';
-  const bucket = Math.max(1, Math.floor(n / 10000));
-  return `https://secure-dcdn.cdn.nimg.jp/nicoaccount/usericon/s/${bucket}/${s}.jpg`;
+  return deriveAvatarUrlFromUid(s);
 }
 
 /**

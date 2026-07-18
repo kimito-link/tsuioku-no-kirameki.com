@@ -536,7 +536,7 @@
     - `trumpet1.mp3`
     - `wallet1.mp3`
   - `SOURCES.md`
-- 📁 **src/** (1415)
+- 📁 **src/** (1417)
   - 📁 **data/** (6)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -806,7 +806,7 @@
         - `logo_funlink_white_RGB_maru_black.png`
       - `logo_guide_funlink_ol.pdf`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1195)
+  - 📁 **lib/** (1197)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -1105,6 +1105,7 @@
     - `deepExportPolicy.test.js`
     - `deepHarvestReason.js` — 深掘り収穫(deep harvest)の発動理由(起動/記録ON/配信切替/タブ可視)の定義と判定。
     - `deepHarvestReason.test.js`
+    - `deriveAvatarUrlFromUid.equivalence.test.js`
     - `deriveAvatarUrlFromUid.js` — v0.1.203 Patch 1: niconico ユーザー UID から avatar URL を確定パターンで生成する純関数。
     - `deriveAvatarUrlFromUid.test.js`
     - `devMonitorAvatarStats.js` — 開発者向け監視: storage コメント配列からアバター／userId の集計（PII なし・件数のみ）
@@ -1883,6 +1884,7 @@
     - `userSupportGridAccent.test.js`
     - `userThumbGrid.js` — 「サムネ付きユーザー一覧」のカテゴリ分け純粋関数。
     - `userThumbGrid.test.js`
+    - `usericonUrlGuard.test.js`
     - `venueAvatar.js` — v0.1.712: 会場モードのアバター解決(サムネ補強)純関数。
     - `venueAvatar.test.js`
     - `venueAvatarDiagLine.js` — 会場モード(venueBar.js)の「🩺 会場の状態」診断ブロックを組み立てる純関数群。

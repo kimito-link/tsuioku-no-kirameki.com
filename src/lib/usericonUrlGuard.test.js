@@ -39,8 +39,11 @@ function listJsFilesRecursive(dir) {
 const ALLOWLIST_BUILD = [
   'lib/deriveAvatarUrlFromUid.js', // 正本(恒久)
   // v0.1.1172: venueSeats.js は正本委譲済み(avatar-stability-DESIGN.md §B手順2)につき許可リストから除外
-  'lib/adLanePicksFromRooms.js',
-  'lib/supportGrowthTileSrc.js',
+  // v0.1.1173: adLanePicksFromRooms.js は正本委譲済み(avatar-stability-DESIGN.md §B手順1)につき許可リストから除外
+  // v0.1.1173: supportGrowthTileSrc.js は正本委譲済み(avatar-stability-DESIGN.md §B手順3)につき許可リストから除外
+  // domain/user/avatar.js: 委譲を試みたが tests/contract/layer-dependency.test.js の
+  // 依存方向契約(domain は lib に依存禁止)によりNG。正本を shared/ へ移す対応はMVPスコープ外
+  // のため見送り式のまま残置(avatar-stability-DESIGN.md §B手順4)。
   'domain/user/avatar.js',
   // avatarResolver.js: 未配線だが「設計の正本として意図的に残置」と明記されたファイル
   // (docs/plan-avatar-resolver-refactor.md の再配線計画あり)。削除しない(2026-07-18 ユーザー判断)。
@@ -93,7 +96,6 @@ describe('usericon URL 組み立ての増殖ガード', () => {
     // 許可リストからの削除漏れを知らせる(fail にはしない・情報提供のみ)。
     const stale = ALLOWLIST_BUILD.filter((f) => !hits.includes(f));
     if (stale.length) {
-      // eslint-disable-next-line no-console
       console.warn(
         `[usericonUrlGuard] 委譲済みで許可リストから削除できるファイル: ${stale.join(', ')}`
       );
