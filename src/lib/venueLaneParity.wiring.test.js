@@ -176,8 +176,14 @@ describe('会場=①レーン鏡映の配線(配線忘れ=CI赤)', () => {
   // --- v0.1.1126 ①「詳しい状況」診断の会場コピー ---
   it('venueBar が storyDiag 鏡キーを catch-up と onChanged の両方で読む', () => {
     expect(venueBarSrc).toMatch(/KEY_STORY_DIAG_MIRROR/);
-    expect(venueBarSrc).toMatch(/chrome\.storage\.local\.get\(\[KEY_LANE_MIRROR, KEY_STORY_DIAG_MIRROR\]\)/);
+    expect(venueBarSrc).toMatch(/\[KEY_LANE_MIRROR, KEY_STORY_DIAG_MIRROR, _panelKey\]/);
     expect(venueBarSrc).toMatch(/changes\[KEY_STORY_DIAG_MIRROR\]/);
+  });
+
+  it('venueBar が記録件数の正本(panel summary)を catch-up・onChanged・保険read の3経路で読む(story-diag-realtime-sync §C-2/D-2)', () => {
+    expect(venueBarSrc).toMatch(/panelSummaryStorageKey/);
+    expect(venueBarSrc).toMatch(/changes\[panelSummaryStorageKey\(liveId\)\]/);
+    expect(venueBarSrc).toMatch(/STORY_DIAG_PANEL_STALE_MS/);
   });
 
   it('venueBar が nlsb-story-diag パネルを段stackの下へ配置して描画している', () => {

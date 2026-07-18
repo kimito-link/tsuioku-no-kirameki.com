@@ -583,7 +583,7 @@
 - **影響範囲ゲート(規律を自動化)** — 星野ロミ式「規律を自動ゲートに」。diff から影響大(複数機能波及)の変更ファイルを検出し波及先機能を列挙。警告のみ(摩擦ゼロ)・--strict で exit1。AGENTS.md §10 のルールを diff 発火に
   - `scripts/impact-check.mjs`
   - `docs/feature-map/impact-map.json`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 60</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 61</summary>
 
 - `api/status.js` — status 受け口 Vercel Serverless Function。
 - `extension/status-guard.js` — 状態速報ページ(status.html)の「何があっても開く」保険。
@@ -641,6 +641,7 @@
 - `src/lib/statusRefreshBackoff.js` — v0.1.1010: 状態速報(status.html)の自動更新を「直近 refresh の所要に比例して間引く」純関数。
 - `src/lib/statusShareUrls.js` — 状態速報の共有 URL を組み立てる純関数。
 - `src/lib/storyDiagMirrorKey.js` — ①「詳しい状況」診断を会場へ鏡映する legacy storage key。
+- `src/lib/storyDiagTotalSource.js` — 「記録している応援コメント N 件」の N を1箇所で決める純関数。
 - `src/lib/summarizeGiftSubAppHistoryDiag.js` — v0.1.201: gift sub-app DOM の payload を診断 JSON 用 summary に変換する純関数。
 - `src/lib/supportVisualStoryCopy.js` — アイコン列・診断ブロックで共有する文言（二重定義防止）。
 - `src/lib/watchPopupLoadDiagnostics.js` — watch インラインパネルの読み込みフェーズ計測（DevTools / 実機メモ用）。
@@ -845,9 +846,10 @@
 
 ## 🧬 修正系譜マップ(この系統のバグを過去にどう直したか)
 
-> changelog 全 500 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
+> changelog 全 501 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
 
-### 💾 記録件数 (73版)
+### 💾 記録件数 (74版)
+- `v0.1.1171` 2026-07-18 — 会場モードの記録件数がリアルタイムで動くように
 - `v0.1.1153` 2026-07-15 — 応援コメントの内訳表示が増減して見える不具合を修正
 - `v0.1.1139` 2026-07-14 — 応援レーンの表示上限を差し戻し、二重スクロールを解消
 - `v0.1.1134` 2026-07-14 — 会場一致判定に①実DOMの寸法指紋を追加
@@ -1131,7 +1133,8 @@
 - `v0.1.668` 2026-06-10 — パネルに「💬コメビュ」ボタンを追加
 - `v0.1.667` 2026-06-10 — コメビュに匿名OKのニックネーム・ラベル・メモ
 
-### 🏟 会場・席 (163版)
+### 🏟 会場・席 (164版)
+- `v0.1.1171` 2026-07-18 — 会場モードの記録件数がリアルタイムで動くように
 - `v0.1.1167` 2026-07-17 — 会場モードのサムネが白丸になる不具合を修正
 - `v0.1.1164` 2026-07-16 — 会場を開いた瞬間の意図しない効果音を停止
 - `v0.1.1163` 2026-07-16 — 会場の応援アイコン列を①ポップアップと同じ大きさに統一

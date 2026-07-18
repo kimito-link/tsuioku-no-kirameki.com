@@ -52,12 +52,12 @@ describe('renderVenueStoryDiagMirrorPanel', () => {
     expect(second.changed).toBe(false);
     expect(host.hidden).toBe(false);
     expect(host.innerHTML).toBe(html);
-    expect(host.textContent).toContain('①の診断(4秒前)');
+    expect(host.textContent).toContain('①の診断(内訳 4秒前)');
     expect(host.innerHTML).toContain('nl-story-diag--compact');
     expect(host.innerHTML).toContain('nl-story-diag--verbose');
   });
 
-  it('liveId が会場対象配信と不一致なら非表示', () => {
+  it('liveId が会場対象配信と不一致なら非表示(panelSummary 未指定=挙動不変)', () => {
     const host = document.createElement('div');
     host.innerHTML = '<p>old</p>';
     host.hidden = false;
@@ -69,6 +69,52 @@ describe('renderVenueStoryDiagMirrorPanel', () => {
 
     expect(result.sig).toBe('__hidden__');
     expect(result.changed).toBe(true);
+    expect(host.hidden).toBe(true);
+    expect(host.innerHTML).toBe('');
+  });
+
+  it('鏡が無くても panelSummary(件数の正本)があれば件数行だけ描画する(story-diag-realtime-sync §C-3)', () => {
+    const host = document.createElement('div');
+    const result = renderVenueStoryDiagMirrorPanel(host, null, {
+      liveId: 'lv123',
+      nowMs: 14_000,
+      lastSig: '',
+      panelSummary: { liveId: 'lv123', recordedCount: 400, updatedAt: 12_000 }
+    });
+
+    expect(result.changed).toBe(true);
+    expect(host.hidden).toBe(false);
+    expect(host.innerHTML).toContain('記録している応援コメント <strong>400</strong> 件です');
+    expect(host.innerHTML).toContain('内訳は①ポップアップを開くと表示されます');
+    expect(host.innerHTML).not.toContain('nl-story-diag--verbose');
+  });
+
+  it('鏡が別配信でも panelSummary が現配信一致なら件数行だけ描画する', () => {
+    const host = document.createElement('div');
+    const result = renderVenueStoryDiagMirrorPanel(host, SNAP, {
+      liveId: 'lv999',
+      nowMs: 14_000,
+      lastSig: '',
+      panelSummary: { liveId: 'lv999', recordedCount: 55, updatedAt: 13_000 }
+    });
+
+    expect(result.changed).toBe(true);
+    expect(host.hidden).toBe(false);
+    expect(host.innerHTML).toContain('記録している応援コメント <strong>55</strong> 件です');
+  });
+
+  it('panelSummary も鏡も無ければ従来通り非表示', () => {
+    const host = document.createElement('div');
+    host.innerHTML = '<p>old</p>';
+    host.hidden = false;
+    const result = renderVenueStoryDiagMirrorPanel(host, null, {
+      liveId: 'lv123',
+      nowMs: 14_000,
+      lastSig: 'old',
+      panelSummary: null
+    });
+
+    expect(result.sig).toBe('__hidden__');
     expect(host.hidden).toBe(true);
     expect(host.innerHTML).toBe('');
   });
