@@ -18,10 +18,9 @@ import { deriveNicoUserIconUrl } from './venueSeats.js';
 import { niconicoDefaultUserIconUrl } from './supportGrowthTileSrc.js';
 import { resolveAvatarObservation } from '../domain/user/avatar.js';
 
-// adLanePicksFromRooms.js の nicoIconUrlForUid は module-private なので直接 import できない。
-// 同ファイル内で正本と同一の式(`s/${floor(uid/10000)}/${uid}.jpg`, precondition `^\d{2,15}$`)を
-// venueSeats.deriveNicoUserIconUrl と共有していることをコード実読で確認済み(設計書 事実1)。
-// 委譲後(§B手順1)は import 可能になるので、その時点でこのテストに合流させる。
+// adLanePicksFromRooms.js の nicoIconUrlForUid は v0.1.1173(§B手順1)で正本へ委譲済み。
+// ただし module-private のままのため直接 import できない(委譲そのもの=deriveAvatarUrlFromUid
+// を1行呼ぶだけの形なので、正本の等価性テストが間接的にこのファイルもカバーする)。
 
 const BOUNDARY_UIDS = [
   '99', // 1桁バケット境界
