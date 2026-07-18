@@ -14,6 +14,7 @@
 graph LR
   n_page_intercept["ページ傍受"]
   n_page_intercept --> n_src_lib_commentRecord_js["lib/commentRecord.js"]:::shared
+  n_page_intercept --> n_src_lib_deriveAvatarUrlFromUid_js["lib/deriveAvatarUrlFromUid.js"]:::shared
   n_page_intercept --> n_src_lib_interceptBinaryTextExtract_js["lib/interceptBinaryTextExtract.js"]
   n_page_intercept --> n_src_lib_interceptViewerJoinSignals_js["lib/interceptViewerJoinSignals.js"]
   n_page_intercept --> n_src_lib_interceptVisitorProbeDebug_js["lib/interceptVisitorProbeDebug.js"]

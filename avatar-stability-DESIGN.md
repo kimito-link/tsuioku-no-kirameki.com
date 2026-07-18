@@ -174,6 +174,15 @@ export function niconicoDefaultUserIconUrl(userId) {
 同型。ただしこちらは`CANONICAL_USERICON_HTTPS_PREFIX`定数を使っているので、委譲後に
 プレフィックス比較系関数(`isCanonicalUsericonUrl`)が壊れないことをテストで確認。
 
+**手順1・3完了、手順4は見送り(v0.1.1173)**: `adLanePicksFromRooms.js`(手順1)・
+`supportGrowthTileSrc.js`(手順3)を正本へ委譲済み。**`domain/user/avatar.js`(手順4)は
+委譲を試みたが`tests/contract/layer-dependency.test.js`の依存方向契約
+(`shared ← domain ← data ← ui ← extension`)により`domain/`から`lib/`への import が
+禁止されておりNG判明**。正本`deriveAvatarUrlFromUid.js`を`shared/`層へ移動する対応は
+13ファイルに影響する規模でMVPスコープ外のため、このファイルは見送り式のまま維持
+(CI構造ガードの許可リストに残置)。[C1]は残り`domain/user/avatar.js`(レイヤー制約待ち)・
+`reportUserThumb.js`(手順6・出力URLが異なるため実機裁定待ち)の2件。
+
 **手順5(訂正・2026-07-18実装時): 削除しない**。当初「未配線dead codeなので削除」としていたが、
 実装時にファイル冒頭のコメントで「設計の正本として意図的に残置。再配線時は
 `docs/plan-avatar-resolver-refactor.md`の5phaseに沿う」という明示的な保持方針が確認された

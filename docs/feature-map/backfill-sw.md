@@ -18,6 +18,7 @@ graph LR
   n_backfill_sw --> n_src_lib_backfillSlotPool_js["lib/backfillSlotPool.js"]:::shared
   n_backfill_sw --> n_src_lib_backfillTransientRetry_js["lib/backfillTransientRetry.js"]:::shared
   n_backfill_sw --> n_src_lib_commentRecord_js["lib/commentRecord.js"]:::shared
+  n_backfill_sw --> n_src_lib_deriveAvatarUrlFromUid_js["lib/deriveAvatarUrlFromUid.js"]:::shared
   n_backfill_sw --> n_src_lib_lengthDelimitedStream_js["lib/lengthDelimitedStream.js"]:::shared
   n_backfill_sw --> n_src_lib_ndgrBackfillCrawl_js["lib/ndgrBackfillCrawl.js"]:::shared
   n_backfill_sw --> n_src_lib_ndgrChatRows_js["lib/ndgrChatRows.js"]:::shared

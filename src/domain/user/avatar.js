@@ -70,6 +70,13 @@ function isHttpUrl(url) {
  * 数値 userId から公式 usericon CDN の合成 URL を組み立てる。
  * 合成 URL との一致比較にも使う。
  *
+ * v0.1.1173(avatar-stability-DESIGN.md §B手順4・見送り): 正本 deriveAvatarUrlFromUid.js
+ *   への委譲を試みたが、tests/contract/layer-dependency.test.js の依存方向契約
+ *   (shared ← domain ← data ← ui ← extension)により domain/ から lib/ への import は
+ *   禁止されておりNG。正本を shared/ 層へ移動する対応は7ファイル+テスト影響の大きい
+ *   変更でありMVPスコープ外のため、このファイルの委譲は見送り式のまま維持する
+ *   (CI構造ガード usericonUrlGuard.test.js の許可リストにも残置)。
+ *
  * @param {string} userId
  * @returns {string}
  */

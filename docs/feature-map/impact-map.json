@@ -2,6 +2,30 @@
   "generatedBy": "scripts/feature-map.mjs",
   "files": [
     {
+      "file": "src/lib/deriveAvatarUrlFromUid.js",
+      "featureCount": 8,
+      "features": [
+        "backfill-sw",
+        "comeview",
+        "content",
+        "offscreen",
+        "page-intercept",
+        "popup",
+        "status",
+        "venue"
+      ],
+      "labels": [
+        "バックフィル SW",
+        "コメビュ(別窓)",
+        "記録エンジン(watchページ常駐)",
+        "コメント IDB 書き手",
+        "ページ傍受",
+        "ポップアップ(応援レーン)",
+        "状態速報ページ",
+        "会場モード(standalone)"
+      ]
+    },
+    {
       "file": "src/lib/nicoAnonymousDisplay.js",
       "featureCount": 8,
       "features": [
@@ -157,24 +181,6 @@
     },
     {
       "file": "src/lib/avatarPartsComposer.js",
-      "featureCount": 5,
-      "features": [
-        "comeview",
-        "content",
-        "popup",
-        "status",
-        "venue"
-      ],
-      "labels": [
-        "コメビュ(別窓)",
-        "記録エンジン(watchページ常駐)",
-        "ポップアップ(応援レーン)",
-        "状態速報ページ",
-        "会場モード(standalone)"
-      ]
-    },
-    {
-      "file": "src/lib/deriveAvatarUrlFromUid.js",
       "featureCount": 5,
       "features": [
         "comeview",

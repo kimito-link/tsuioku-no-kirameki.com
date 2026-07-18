@@ -15,6 +15,7 @@ graph LR
   n_offscreen["コメント IDB 書き手"]
   n_offscreen --> n_src_lib_commentDb_js["lib/commentDb.js"]:::shared
   n_offscreen --> n_src_lib_commentRecord_js["lib/commentRecord.js"]:::shared
+  n_offscreen --> n_src_lib_deriveAvatarUrlFromUid_js["lib/deriveAvatarUrlFromUid.js"]:::shared
   n_offscreen --> n_src_lib_nicoAnonymousDisplay_js["lib/nicoAnonymousDisplay.js"]:::shared
   n_offscreen --> n_src_lib_storageKeys_js["lib/storageKeys.js"]:::shared
   n_offscreen --> n_src_lib_supportGrowthTileSrc_js["lib/supportGrowthTileSrc.js"]:::shared

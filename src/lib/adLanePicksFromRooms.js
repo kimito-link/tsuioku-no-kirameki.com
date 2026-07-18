@@ -11,6 +11,7 @@
 // ギフト列の「記録できた順(時系列)」とは別原理なので、段を分けることで衝突を避ける(会議確定)。
 
 import { isNumericNicoUserId } from '../domain/user/identity.js';
+import { deriveAvatarUrlFromUid } from './deriveAvatarUrlFromUid.js';
 
 /**
  * room.userKey が公式由来の数値 uid(officialDomRankingRowsToStripRooms が記名行に採用)か判定する。
@@ -25,15 +26,18 @@ function numericUidFromRoomKey(userKey) {
 }
 
 /**
- * 数値 userId から niconico アカウントアイコンの URL を導出する(venueSeats の deriveNicoUserIconUrl と
- *   同式・依存を増やさないため広告列の純関数内に内蔵)。匿名/非数値は ''。
+ * 数値 userId から niconico アカウントアイコンの URL を導出する。
+ *
+ * v0.1.1173(avatar-stability-DESIGN.md §B手順1): 式の内蔵をやめ deriveAvatarUrlFromUid
+ *   (src/lib/deriveAvatarUrlFromUid.js)へ委譲。precondition(^\d{2,15}$)はここに残す
+ *   (正本は緩い ^[0-9]+$ なので、ここを外すと挙動が変わる=equivalence.test で固定済み)。
  * @param {string} uid
  * @returns {string}
  */
 function nicoIconUrlForUid(uid) {
   const s = String(uid || '').trim();
   if (!/^\d{2,15}$/.test(s)) return '';
-  return `https://secure-dcdn.cdn.nimg.jp/nicoaccount/usericon/s/${Math.floor(Number(s) / 10000)}/${s}.jpg`;
+  return deriveAvatarUrlFromUid(s);
 }
 
 /**
