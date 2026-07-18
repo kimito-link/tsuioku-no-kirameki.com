@@ -85,6 +85,16 @@ export function venueSeatEntryToLaneItem(seatEntry, opts = {}) {
         // ①の storyGrowthAvatarSrcCandidate 相当。会場は popup 固有 state(watchMeta/own判定/
         //   remembered)を持たないため snapshot=null/own=false/remembered='' で渡す
         //   =avatar 取り違えガードだけ①と同じ経路を通す(enrich 済み participant.avatar が入力)。
+        //
+        //   ★avatar-stability-DESIGN.md §A 裁定(2026-07-18・意図的・未実装の穴ではない):
+        //   rememberedAvatar='' は popup の rememberedAvatarUrlForUserId の【第2分岐】
+        //   (STORY_SOURCE_STATE.entries 逆順走査=popup 専用のメモリ上生コメント配列)相当を
+        //   「埋めない」という確定裁定。第1分岐(profileCache)相当は entryModel.avatarUrl 経由で
+        //   既に enrichVenueRowsWithProfileAvatars(venueAvatar.js)がカバー済みなので、
+        //   ここで欠けているのは第2分岐の狭い残余窓だけ(白丸ではなく UID 合成 URL に落ちる)。
+        //   会場に生 entries 配列相当の新 state を持たせるコストに見合わないため埋めない。
+        //   再裁定条件: popup 側 avatarRememberedDiag.hitEntriesScan の実配信比率が無視できない
+        //   (目安1%超)なら再検討(avatar-stability-DESIGN.md §A/§E 参照)。
         resolveStoryLaneAvatarSrc(entryModel, { snapshot: null, isOwnPosted: false, rememberedAvatar: '' }),
         {
           yukkuriSrc: String(pickCtxIn.yukkuriSrc || ''),

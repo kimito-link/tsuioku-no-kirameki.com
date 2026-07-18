@@ -17,6 +17,8 @@
 //   + docs/person-tile-architecture.md(人物タイル経路の正本マインドマップ・用語/データフロー/方針変遷)。
 //   SHOWROOM 風の会場感を、ごちゃごちゃさせず整理して出す。
 //
+import { deriveAvatarUrlFromUid } from './deriveAvatarUrlFromUid.js';
+
 // このファイルは席割りの核ロジックだけ(DOM/storage/chrome.* 非依存・テスト可能・Web/OBS版で共用):
 //   - 参加者(アクション行)を一意キー(venueParticipantKey)でまとめ、最終発言時刻・発言数・ギフト数を集計
 //   - 最大 N 席に cap。超過時はスクロールでなく「入れ替え制」(最も古い参加者を降ろす)
@@ -192,13 +194,17 @@ export function hasRealThumbnail(avatar) {
  * 匿名(数値でない/空)は '' を返す。venueBar の描画と診断(roster)で同じ式を使い、
  * 「席ではサムネが出てるのに診断ではサムネ持ち0」という不整合を防ぐ正本。
  *
+ * v0.1.1172(avatar-stability-DESIGN.md §B手順2): 式の内蔵をやめ deriveAvatarUrlFromUid
+ *   (src/lib/deriveAvatarUrlFromUid.js)へ委譲。precondition(^\d{2,15}$)はここに残す
+ *   (正本は緩い ^[0-9]+$ なので、ここを外すと挙動が変わる=equivalence.test で固定済み)。
+ *
  * @param {unknown} userId
  * @returns {string} アイコン URL、または匿名で ''
  */
 export function deriveNicoUserIconUrl(userId) {
   const uid = String(userId || '').trim();
   if (!/^\d{2,15}$/.test(uid)) return '';
-  return `https://secure-dcdn.cdn.nimg.jp/nicoaccount/usericon/s/${Math.floor(Number(uid) / 10000)}/${uid}.jpg`;
+  return deriveAvatarUrlFromUid(uid);
 }
 
 /**

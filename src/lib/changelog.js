@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1172',
+    date: '2026-07-18',
+    summary: 'サムネ表示の安定化に向けた計器を追加',
+    items: Object.freeze([
+      'ユーザーアイコンの取得経路を整理し、表示が不安定になる原因を追跡できる診断計器を追加しました。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1171',
     date: '2026-07-18',
     summary: '会場モードの記録件数がリアルタイムで動くように',
