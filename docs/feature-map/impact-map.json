@@ -6278,6 +6278,16 @@
       ]
     },
     {
+      "file": "src/lib/singleFlightByKey.js",
+      "featureCount": 1,
+      "features": [
+        "popup"
+      ],
+      "labels": [
+        "ポップアップ(応援レーン)"
+      ]
+    },
+    {
       "file": "src/lib/standalonePopupClose.js",
       "featureCount": 1,
       "features": [
