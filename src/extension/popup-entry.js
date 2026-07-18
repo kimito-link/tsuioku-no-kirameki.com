@@ -3811,7 +3811,8 @@ function renderExtensionContextBanner(visible) {
  *   fetchInflight: boolean,
  *   fetchError: string,
  *   snapshotFetchActive: boolean,
- *   heavyReadActive: boolean
+ *   heavyReadActive: boolean,
+ *   heavyReadInflight: { lv: string, promise: Promise<unknown[]|null> } | null
  * }}
  */
 // 0.1.31 (AF): blob URL の revoke を queue 管理。15 秒で revoke / 同時 3 個まで。
@@ -3832,6 +3833,12 @@ const watchMetaCache = {
   // v0.1.1037: heavy 全件読み(readHeavyFromStore)進行中 true。embed_watch の3秒 polling が重い配信で heavy read を
   //   追い越す refreshGen レース(応援レーンちかちか)を防ぐ in-flight ガード(snapshotFetchActive 同型・read を減らす方向)。
   heavyReadActive: false,
+  // heavyRace根治C-1(HANDOFF-heavyrace-backfill-IMPL.md §C-1): 進行中の heavy 全件 read の
+  //   promise を保持し、同一 lv の read が refresh のたびに多重発生するのを防ぐ(single-flight)。
+  //   onChanged coalesced 経由の refresh には in-flight チェックが無く、read 中に次の refresh が
+  //   来ると新しい全件 read を張ってしまっていた(大配信+backfill 中の heavyRaceReturns 増加の主因)。
+  //   read 完了時に finally でクリアするので、永久固着はしない(withTimeout 15s が上位で保証)。
+  heavyReadInflight: null,
   // v0.1.481: 読み取り成功時の最新コメント配列を { lv, arr } で退避する。多タブで
   //   chrome.storage.local.get がタイムアウトして {} が返ったとき、空配列で描画して全カードを
   //   「—」固定にしてしまう穴（v0.1.336/437 のガードは「固まり防止」止まりで空塗りつぶしは残存）を
@@ -10467,6 +10474,9 @@ let _lastGiftEventsForMirror = { liveId: '', events: [] };
 /** heavyRace再発の根治(HANDOFF-heavyrace-backfill-IMPL.md B): fresh-read で heavy 全件再読みを省いた累計回数。
  *   getHeavyFreshReadReuseCount で状態速報が読む(実配信で「fresh-read が効いているか/12秒ギャップが適正か」を判定)。 */
 let _heavyFreshReadReuseCount = 0;
+/** heavyRace再発の根治(HANDOFF-heavyrace-backfill-IMPL.md C-1): 進行中の heavy 全件 read に
+ *   合流し、新規 read を張らずに済んだ累計回数。実配信で single-flight の効きを見る計器。 */
+let _heavyReadInflightJoinCount = 0;
 /** 鮮度注記用の最終データ反映時刻（epoch ms）。 */
 let _giftHistoryNorthStarCapturedAtMs = 0;
 /** @type {ReturnType<typeof setTimeout>|null} */
@@ -15856,10 +15866,26 @@ async function refresh() {
   //   ★watch タブの本物 popup は不変(heavy read はそちらが担う=記録・描画に影響なし)。
   // v0.1.1037: heavy read を実呼びする時だけ in-flight フラグを立て(canReuse/session hit は read しないので立てない)、
   //   withTimeout(15s)で必ず settle=永久 true 固着(heavy read 全停止でレーン固着)を防ぐ。次 poll の追い越しレース(ちかちか)を断つ。
+  // heavyRace根治C-1: 同一 lv の read が進行中なら新規 read を張らず、その promise に合流する
+  //   (single-flight)。onChanged coalesced 経由の refresh はこれまで in-flight チェックが無く、
+  //   read 中に次の refresh が来ると全件 read が多重に走っていた(大配信+backfill 中の主因)。
   const readHeavyFromStoreGuarded = () => {
+    const inflight = watchMetaCache.heavyReadInflight;
+    if (inflight && inflight.lv === lv) {
+      _heavyReadInflightJoinCount += 1;
+      return inflight.promise;
+    }
     watchMetaCache.heavyReadActive = true;
-    return withTimeout(Promise.resolve(readHeavyFromStore()), 15_000, 'heavy_read_timeout')
-      .catch(() => /** @type {unknown[]|null} */ (null)).finally(() => { watchMetaCache.heavyReadActive = false; });
+    const p = withTimeout(Promise.resolve(readHeavyFromStore()), 15_000, 'heavy_read_timeout')
+      .catch(() => /** @type {unknown[]|null} */ (null))
+      .finally(() => {
+        watchMetaCache.heavyReadActive = false;
+        if (watchMetaCache.heavyReadInflight && watchMetaCache.heavyReadInflight.promise === p) {
+          watchMetaCache.heavyReadInflight = null;
+        }
+      });
+    watchMetaCache.heavyReadInflight = { lv, promise: p };
+    return p;
   };
   const heavyDataPromise = INLINE_PASSIVE
     ? Promise.resolve(/** @type {unknown[]|null} */ (null))
@@ -18764,6 +18790,8 @@ async function collectAiShareDevMonitorPayloadBundle(watchUrl) {
           if (snap) snap.laneRepaintCounts = getStoryLaneRepaintCounts(); // v0.1.1040 計器: 段別 churn 実測
           // heavyRace根治(B)計器: fresh-read で heavy 全件再読みを省いた累計(実配信で効きと12秒ギャップの適正を判定)。
           if (snap) snap.heavyFreshReadReuseCount = _heavyFreshReadReuseCount;
+          // heavyRace根治(C-1)計器: 進行中read への合流で新規readを張らずに済んだ累計(single-flightの効き)。
+          if (snap) snap.heavyReadInflightJoinCount = _heavyReadInflightJoinCount;
           return snap;
         } catch { return null; }
       })(),

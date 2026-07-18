@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1174',
+    date: '2026-07-18',
+    summary: '大配信でのサムネ取りこぼしを軽減',
+    items: Object.freeze([
+      '大人数の配信で、コメント全件の読み込みが重複して発生し応援レーンのサムネが一時的に取得できなくなる不具合を軽減しました。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1173',
     date: '2026-07-18',
     summary: 'アイコン表示の内部処理を整理',
