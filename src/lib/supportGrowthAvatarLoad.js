@@ -47,8 +47,13 @@ export function createSupportAvatarLoadGuard(options) {
   const timeoutRaw = Number(options?.timeoutMs);
   const timeoutMs = Number.isFinite(timeoutRaw) && timeoutRaw > 0 ? timeoutRaw : 3000;
 
-  /** @type {Set<string>} */
-  const failedKeys = new Set();
+  // venue-avatar-stale-mirror-DESIGN.md §C-1a: failedKeys は Set→Map化し、失敗種別
+  //   (timeout/error)・失敗回数・最終失敗時刻をメタデータとして持つ。has() 判定の意味は
+  //   不変(段階0はここまで=挙動不変)。retryPolicy(段階1で追加予定)が無い間は今までどおり
+  //   一度失敗したら永久に fallback のまま(TTL/リトライは無い)。
+  /** @typedef {{ kind: 'timeout'|'error', failCount: number, lastFailAt: number }} FailedProbeRecord */
+  /** @type {Map<string, FailedProbeRecord>} */
+  const failedKeys = new Map();
   /** @type {Set<string>} */
   const succeededKeys = new Set();
   /** @type {WeakMap<HTMLImageElement, () => void>} */
@@ -112,10 +117,16 @@ export function createSupportAvatarLoadGuard(options) {
       activeProbes.delete(img);
     };
 
-    const applyFailed = () => {
+    /** @param {'timeout'|'error'} kind */
+    const applyFailed = (kind) => {
       if (settled) return;
       settled = true;
-      failedKeys.add(key);
+      const prev = failedKeys.get(key);
+      failedKeys.set(key, {
+        kind,
+        failCount: (prev?.failCount || 0) + 1,
+        lastFailAt: Date.now()
+      });
       onFallbackApplied?.(img);
       cleanup();
     };
@@ -130,8 +141,8 @@ export function createSupportAvatarLoadGuard(options) {
     };
 
     probe.addEventListener('load', applySuccess, { once: true });
-    probe.addEventListener('error', applyFailed, { once: true });
-    timer = setTimeout(applyFailed, timeoutMs);
+    probe.addEventListener('error', () => applyFailed('error'), { once: true });
+    timer = setTimeout(() => applyFailed('timeout'), timeoutMs);
 
     activeProbes.set(img, () => {
       if (!settled) {
@@ -149,10 +160,13 @@ export function createSupportAvatarLoadGuard(options) {
     succeededKeys.clear();
   }
 
-  /** @param {string} url Vitest 用（失敗セットへの直接投入） */
-  function markFailedForTests(url) {
+  /**
+   * @param {string} url Vitest 用（失敗セットへの直接投入）
+   * @param {'timeout'|'error'} [kind] 既定 'error'
+   */
+  function markFailedForTests(url, kind = 'error') {
     const k = urlKeyFn(String(url || ''));
-    if (k) failedKeys.add(k);
+    if (k) failedKeys.set(k, { kind, failCount: 1, lastFailAt: Date.now() });
   }
 
   /** @param {string} url Vitest 用（成功セットへの直接投入） */
@@ -166,10 +180,15 @@ export function createSupportAvatarLoadGuard(options) {
    *   合成 usericon URL（/nicoaccount/usericon/...）の load 成否を集計して、
    *   どれだけが 404/timeout で fallback に落ちているかを実機ログで可視化する。
    *   key は `origin+pathname` 小文字（probe 結果ベース）なので副作用なしの読み取りのみ。
+   * venue-avatar-stale-mirror-DESIGN.md §C-1a/§D: failedTimeout/failedError/retriedTotal/
+   *   lastFailAgoMs を追加(会場の白丸が「一度の一時失敗が永久固着している」現象を実機で
+   *   切り分けるための計器)。retriedTotal は段階1(再プローブ)未実装のため常に0(将来拡張用)。
    * @returns {{
    *   succeededTotal: number, failedTotal: number,
    *   usericonSucceeded: number, usericonFailed: number,
-   *   failedUsericonSamples: string[]
+   *   failedUsericonSamples: string[],
+   *   failedTimeout: number, failedError: number, retriedTotal: number,
+   *   lastFailAgoMs: number|null
    * }}
    */
   function getDiagnostics() {
@@ -178,9 +197,15 @@ export function createSupportAvatarLoadGuard(options) {
     let usericonSucceeded = 0;
     for (const k of succeededKeys) if (isUsericon(k)) usericonSucceeded += 1;
     let usericonFailed = 0;
+    let failedTimeout = 0;
+    let failedError = 0;
+    let lastFailAt = 0;
     /** @type {string[]} */
     const failedUsericonSamples = [];
-    for (const k of failedKeys) {
+    for (const [k, rec] of failedKeys) {
+      if (rec.kind === 'timeout') failedTimeout += 1;
+      else failedError += 1;
+      if (rec.lastFailAt > lastFailAt) lastFailAt = rec.lastFailAt;
       if (!isUsericon(k)) continue;
       usericonFailed += 1;
       if (failedUsericonSamples.length < 5) failedUsericonSamples.push(k);
@@ -190,7 +215,11 @@ export function createSupportAvatarLoadGuard(options) {
       failedTotal: failedKeys.size,
       usericonSucceeded,
       usericonFailed,
-      failedUsericonSamples
+      failedUsericonSamples,
+      failedTimeout,
+      failedError,
+      retriedTotal: 0,
+      lastFailAgoMs: lastFailAt > 0 ? Math.max(0, Date.now() - lastFailAt) : null
     };
   }
 

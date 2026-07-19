@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1175',
+    date: '2026-07-20',
+    summary: '会場の顔アイコン診断を強化',
+    items: Object.freeze([
+      '会場モードで顔アイコンが表示されない不具合を追跡するための診断情報を強化しました。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1174',
     date: '2026-07-18',
     summary: '大配信でのサムネ取りこぼしを軽減',

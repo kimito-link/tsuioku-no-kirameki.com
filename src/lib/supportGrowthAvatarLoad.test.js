@@ -192,8 +192,53 @@ describe('createSupportAvatarLoadGuard', () => {
         failedTotal: 0,
         usericonSucceeded: 0,
         usericonFailed: 0,
-        failedUsericonSamples: []
+        failedUsericonSamples: [],
+        failedTimeout: 0,
+        failedError: 0,
+        retriedTotal: 0,
+        lastFailAgoMs: null
       });
+    });
+
+    it('venue-avatar-stale-mirror-DESIGN.md §D: 失敗種別(timeout/error)を分けて集計する', () => {
+      const g = createSupportAvatarLoadGuard({ fallbackSrc: FALLBACK });
+      g.markFailedForTests(
+        'https://secure-dcdn.cdn.nimg.jp/nicoaccount/usericon/s/1/111111.jpg',
+        'timeout'
+      );
+      g.markFailedForTests(
+        'https://secure-dcdn.cdn.nimg.jp/nicoaccount/usericon/s/2/222222.jpg',
+        'error'
+      );
+      g.markFailedForTests(
+        'https://secure-dcdn.cdn.nimg.jp/nicoaccount/usericon/s/3/333333.jpg',
+        'timeout'
+      );
+      const d = g.getDiagnostics();
+      expect(d.failedTimeout).toBe(2);
+      expect(d.failedError).toBe(1);
+      expect(d.retriedTotal).toBe(0);
+      expect(d.lastFailAgoMs).not.toBeNull();
+      expect(d.lastFailAgoMs).toBeGreaterThanOrEqual(0);
+    });
+
+    it('noteRemoteAttempt の timeout 失敗は getDiagnostics().failedTimeout に、error 失敗は failedError に計上される', () => {
+      vi.useFakeTimers();
+      const g = createSupportAvatarLoadGuard({ fallbackSrc: FALLBACK, timeoutMs: 3000 });
+      const imgTimeout = document.createElement('img');
+      imgTimeout.src = FALLBACK;
+      g.noteRemoteAttempt(imgTimeout, REMOTE);
+      vi.advanceTimersByTime(3001);
+
+      const REMOTE2 = 'https://secure-dcdn.cdn.nimg.jp/nicoaccount/usericon/s/9/999999999.jpg';
+      const imgError = document.createElement('img');
+      imgError.src = FALLBACK;
+      const probe = g.noteRemoteAttempt(imgError, REMOTE2);
+      probe.dispatchEvent(new Event('error'));
+
+      const d = g.getDiagnostics();
+      expect(d.failedTimeout).toBe(1);
+      expect(d.failedError).toBe(1);
     });
   });
 });

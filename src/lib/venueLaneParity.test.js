@@ -431,6 +431,22 @@ describe('buildVenueLaneParity', () => {
       expect(d.dom).toMatchObject({ blank: 9, blankAnon: 3, probeFail: 7 });
     });
 
+    it('venue-avatar-stale-mirror-DESIGN.md §D: 顔404の種別(timeout/error)を line と diag.dom に分けて出す', () => {
+      const p = buildVenueLaneParity({
+        ...base(),
+        dom: domMatching(painted(), {
+          blank: 9,
+          blankAnon: 3,
+          probeFail: 7,
+          probeFailTimeout: 5,
+          probeFailError: 2
+        })
+      });
+      expect(p.line).toContain('顔404=7(t:5,e:2)');
+      const d = toVenueLaneParityDiag(p);
+      expect(d.dom).toMatchObject({ probeFail: 7, probeFailTimeout: 5, probeFailError: 2 });
+    });
+
     it('fallback でも census は参考で line に写る(白円/迷子はモード無関係)', () => {
       const p = buildVenueLaneParity({
         ...base(),
