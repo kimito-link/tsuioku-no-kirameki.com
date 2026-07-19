@@ -108,7 +108,8 @@ export function laneMirrorTierKeySequences(snap) {
  *   dom: null | { measured: boolean, ghost: number, bare: number, visibleEmpty: number, unkeyed: number,
  *                 blank: number, blankAnon: number,
  *                 dupIntra: number, dupCross: number, strays: number,
- *                 charFrame: number, crowdOn: boolean, crowdCount: number, probeFail: number },
+ *                 charFrame: number, crowdOn: boolean, crowdCount: number, probeFail: number,
+ *                 probeFailTimeout: number, probeFailError: number },
  *   line: string
  * }}
  */
@@ -397,13 +398,18 @@ export function buildVenueLaneParity(input) {
   const domBlank = domMeasured ? Math.max(0, Math.floor(Number(domIn.blank) || 0)) : 0;
   const domBlankAnon = domMeasured ? Math.max(0, Math.floor(Number(domIn.blankAnon) || 0)) : 0;
   const domProbeFail = domMeasured ? Math.max(0, Math.floor(Number(domIn.probeFail) || 0)) : 0;
+  // venue-avatar-stale-mirror-DESIGN.md §D: 顔プローブ失敗の種別(timeout/error)を分けて
+  //   表示する。白丸(blank)が「一度の一時失敗が永久固着している」現象かどうかの切り分け用
+  //   (timeout優勢+鏡age大なら本設計の想定どおり)。
+  const domProbeFailTimeout = domMeasured ? Math.max(0, Math.floor(Number(domIn.probeFailTimeout) || 0)) : 0;
+  const domProbeFailError = domMeasured ? Math.max(0, Math.floor(Number(domIn.probeFailError) || 0)) : 0;
   const extraStr = domMeasured
     ? (domIn.crowdOn === true ? ` / 群衆on(${Math.max(0, Math.floor(Number(domIn.crowdCount) || 0))})` : '') +
       (Number(domIn.charFrame) > 0 ? ` / 額縁${Math.floor(Number(domIn.charFrame))}` : '') +
       (domUnkeyed > 0 ? ` / 無鍵${domUnkeyed}` : '') +
       (domVisibleEmpty > 0 ? ` / 空可視${domVisibleEmpty}` : '') +
       (domBlank > 0 ? ` / 白円${domBlank}(匿名${domBlankAnon})` : '') +
-      (domProbeFail > 0 ? ` / 顔404=${domProbeFail}` : '')
+      (domProbeFail > 0 ? ` / 顔404=${domProbeFail}(t:${domProbeFailTimeout},e:${domProbeFailError})` : '')
     : '';
   const line =
     `会場一致 ${verdict}${verdict === '⚪' ? reason : ageStr} ${tierStr}` +
@@ -442,7 +448,9 @@ export function buildVenueLaneParity(input) {
           charFrame: Math.max(0, Math.floor(Number(domIn.charFrame) || 0)),
           crowdOn: domIn.crowdOn === true,
           crowdCount: Math.max(0, Math.floor(Number(domIn.crowdCount) || 0)),
-          probeFail: domProbeFail
+          probeFail: domProbeFail,
+          probeFailTimeout: domProbeFailTimeout,
+          probeFailError: domProbeFailError
         }
       : null,
     line
@@ -457,7 +465,8 @@ export function buildVenueLaneParity(input) {
  *             dom: null | { measured: boolean, ghost: number, bare: number, visibleEmpty: number, unkeyed: number,
  *                           blank: number, blankAnon: number,
  *                           dupIntra: number, dupCross: number, strays: number,
- *                           charFrame: number, crowdOn: boolean, crowdCount: number, probeFail: number } }|null}
+ *                           charFrame: number, crowdOn: boolean, crowdCount: number, probeFail: number,
+ *                           probeFailTimeout: number, probeFailError: number } }|null}
  */
 export function toVenueLaneParityDiag(parity) {
   if (!parity || typeof parity !== 'object') return null;
@@ -485,7 +494,9 @@ export function toVenueLaneParityDiag(parity) {
             charFrame: Math.max(0, Math.floor(Number(dom.charFrame) || 0)),
             crowdOn: dom.crowdOn === true,
             crowdCount: Math.max(0, Math.floor(Number(dom.crowdCount) || 0)),
-            probeFail: Math.max(0, Math.floor(Number(/** @type {any} */ (dom).probeFail) || 0))
+            probeFail: Math.max(0, Math.floor(Number(/** @type {any} */ (dom).probeFail) || 0)),
+            probeFailTimeout: Math.max(0, Math.floor(Number(/** @type {any} */ (dom).probeFailTimeout) || 0)),
+            probeFailError: Math.max(0, Math.floor(Number(/** @type {any} */ (dom).probeFailError) || 0))
           }
         : null
   };

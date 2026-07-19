@@ -24,7 +24,10 @@
  *   - 迷子(strays): stack 配下だが5段のどれにも属さないタイル
  *   - 額縁(charFrameTiles)・群衆Canvas(crowdOn/crowdCount): 「顔が多く見える」容疑者の参考値
  *   - avatarProbe: 会場の顔プローブ実績(supportGrowthAvatarLoad.getDiagnostics)を extras で受けて
- *     写すだけ(usericonSucceeded/usericonFailed)。census は計測しない=露出のみ
+ *     写すだけ(usericonSucceeded/usericonFailed/failedTimeout/failedError/retriedTotal/
+ *     lastFailAgoMs)。census は計測しない=露出のみ。venue-avatar-stale-mirror-DESIGN.md §D:
+ *     白丸(blank)が「一度の一時失敗が永久固着している」現象かどうかを、種別(timeout/error)と
+ *     最終失敗からの経過時間で切り分けるための追加フィールド。
  * 【測らないもの】(スコープ固定テストで担保)
  *   - topBar(応援者トップ)・roster・吹き出し・常駐3キャラ(residents)=段の外
  *   - 透明オーバーレイ越しに透ける背景ページ(拡張のDOM外)・Canvas のピクセル内容
@@ -122,7 +125,7 @@ function countSection(rootEl) {
  *   charFrameTiles: number,
  *   crowdOn: boolean,
  *   crowdCount: number,
- *   avatarProbe: { usericonSucceeded: number, usericonFailed: number }|null
+ *   avatarProbe: { usericonSucceeded: number, usericonFailed: number, failedTimeout: number, failedError: number, retriedTotal: number, lastFailAgoMs: number|null }|null
  * }}
  */
 export function collectVenueLaneDomCensus(input) {
@@ -159,7 +162,14 @@ export function collectVenueLaneDomCensus(input) {
     avatarProbe: probeIn
       ? {
           usericonSucceeded: Math.max(0, Math.floor(Number(probeIn.usericonSucceeded) || 0)),
-          usericonFailed: Math.max(0, Math.floor(Number(probeIn.usericonFailed) || 0))
+          usericonFailed: Math.max(0, Math.floor(Number(probeIn.usericonFailed) || 0)),
+          failedTimeout: Math.max(0, Math.floor(Number(probeIn.failedTimeout) || 0)),
+          failedError: Math.max(0, Math.floor(Number(probeIn.failedError) || 0)),
+          retriedTotal: Math.max(0, Math.floor(Number(probeIn.retriedTotal) || 0)),
+          lastFailAgoMs:
+            Number.isFinite(Number(probeIn.lastFailAgoMs)) && Number(probeIn.lastFailAgoMs) >= 0
+              ? Math.floor(Number(probeIn.lastFailAgoMs))
+              : null
         }
       : null
   };
@@ -209,7 +219,8 @@ export function countVenueKeyDuplicates(perSection) {
  *   blank:number, blankAnon:number,
  *   dupIntra:number, dupCross:number,
  *   strays:number, charFrame:number, crowdOn:boolean, crowdCount:number,
- *   probeOk:number, probeFail:number
+ *   probeOk:number, probeFail:number,
+ *   probeFailTimeout:number, probeFailError:number, probeRetried:number, probeLastFailAgoSec:number|null
  * }}
  */
 export function venueDomCensusToParityDom(census) {
@@ -260,6 +271,14 @@ export function venueDomCensusToParityDom(census) {
     crowdOn: census.crowdOn === true,
     crowdCount: Math.max(0, Math.floor(Number(census.crowdCount) || 0)),
     probeOk: Math.max(0, Math.floor(Number(census.avatarProbe?.usericonSucceeded) || 0)),
-    probeFail: Math.max(0, Math.floor(Number(census.avatarProbe?.usericonFailed) || 0))
+    probeFail: Math.max(0, Math.floor(Number(census.avatarProbe?.usericonFailed) || 0)),
+    probeFailTimeout: Math.max(0, Math.floor(Number(census.avatarProbe?.failedTimeout) || 0)),
+    probeFailError: Math.max(0, Math.floor(Number(census.avatarProbe?.failedError) || 0)),
+    probeRetried: Math.max(0, Math.floor(Number(census.avatarProbe?.retriedTotal) || 0)),
+    probeLastFailAgoSec:
+      Number.isFinite(Number(census.avatarProbe?.lastFailAgoMs)) &&
+      Number(census.avatarProbe?.lastFailAgoMs) >= 0
+        ? Math.floor(Number(census.avatarProbe.lastFailAgoMs) / 1000)
+        : null
   };
 }

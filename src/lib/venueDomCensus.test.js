@@ -183,7 +183,40 @@ describe('collectVenueLaneDomCensus', () => {
       stackEl: stack,
       extras: { avatarProbe: { usericonSucceeded: 44, usericonFailed: 7 } }
     });
-    expect(c.avatarProbe).toEqual({ usericonSucceeded: 44, usericonFailed: 7 });
+    expect(c.avatarProbe).toEqual({
+      usericonSucceeded: 44,
+      usericonFailed: 7,
+      failedTimeout: 0,
+      failedError: 0,
+      retriedTotal: 0,
+      lastFailAgoMs: null
+    });
+  });
+
+  it('venue-avatar-stale-mirror-DESIGN.md §D: avatarProbe の失敗種別/再試行/最終失敗経過も extras から写す', () => {
+    const { stack, laneEls } = makeVenueDom();
+    const c = collectVenueLaneDomCensus({
+      laneEls,
+      stackEl: stack,
+      extras: {
+        avatarProbe: {
+          usericonSucceeded: 44,
+          usericonFailed: 7,
+          failedTimeout: 5,
+          failedError: 2,
+          retriedTotal: 1,
+          lastFailAgoMs: 21437000
+        }
+      }
+    });
+    expect(c.avatarProbe).toEqual({
+      usericonSucceeded: 44,
+      usericonFailed: 7,
+      failedTimeout: 5,
+      failedError: 2,
+      retriedTotal: 1,
+      lastFailAgoMs: 21437000
+    });
   });
 });
 
@@ -241,6 +274,41 @@ describe('venueDomCensusToParityDom', () => {
     expect(dom.blankAnon).toBe(1);
     expect(dom.probeOk).toBe(44);
     expect(dom.probeFail).toBe(7);
+  });
+
+  it('venue-avatar-stale-mirror-DESIGN.md §D: probeFailTimeout/probeFailError/probeRetried/probeLastFailAgoSec を要約に畳む', () => {
+    const { stack, laneEls } = makeVenueDom();
+    const dom = venueDomCensusToParityDom(
+      collectVenueLaneDomCensus({
+        laneEls,
+        stackEl: stack,
+        extras: {
+          avatarProbe: {
+            usericonSucceeded: 44,
+            usericonFailed: 7,
+            failedTimeout: 5,
+            failedError: 2,
+            retriedTotal: 1,
+            lastFailAgoMs: 21437000
+          }
+        }
+      })
+    );
+    expect(dom.probeFailTimeout).toBe(5);
+    expect(dom.probeFailError).toBe(2);
+    expect(dom.probeRetried).toBe(1);
+    expect(dom.probeLastFailAgoSec).toBe(21437);
+  });
+
+  it('avatarProbe が無ければ probeFailTimeout 等は 0 / probeLastFailAgoSec は null', () => {
+    const { stack, laneEls } = makeVenueDom();
+    const dom = venueDomCensusToParityDom(
+      collectVenueLaneDomCensus({ laneEls, stackEl: stack })
+    );
+    expect(dom.probeFailTimeout).toBe(0);
+    expect(dom.probeFailError).toBe(0);
+    expect(dom.probeRetried).toBe(0);
+    expect(dom.probeLastFailAgoSec).toBeNull();
   });
 
   it('census が無ければ null(fail-closed: 判定側は DOM未計測=⚪)', () => {
