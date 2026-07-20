@@ -19470,7 +19470,8 @@ async function initPopup() {
   //   だった。データは手元にあるのに配達を待っていた、が体感遅延の正体(§A裁定)。
   //   描画は既存 safeRefresh() をそのまま使う(新描画パスは作らない・v0.1.421/422の教訓)。
   const requestSelfCommentInstantPaint = () => {
-    coalescedRefreshScheduler.scheduleImmediate(() => { void safeRefresh(); });
+    const ran = coalescedRefreshScheduler.scheduleImmediate(() => { void safeRefresh(); });
+    if (ran) _commentPostDiagCounters.instantPaintRuns += 1;
   };
 
   $('devMonitorRefresh')?.addEventListener('click', () => {
