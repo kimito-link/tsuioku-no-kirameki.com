@@ -811,7 +811,8 @@ import {
   makeInitialCommentPostDiag,
   commentPostOutcomeKindForResult,
   buildCommentPostDiagSnapshot,
-  computeCommentEchoAverage
+  computeCommentEchoAverage,
+  takeOptimisticPaintSamples
 } from '../lib/commentPostDiag.js';
 import { KEY_COMMENT_POST_DIAG } from '../lib/commentPostDiagKey.js';
 import { avatarCompareKey, isSameAvatarUrl } from '../lib/avatarUrlCompare.js';
@@ -1186,6 +1187,47 @@ function publishOpSoundEffectDiag() {
 //   目的: 「送信中…」張り付き・自コメ「一瞬載って消える」を状態速報1枚で切り分ける。
 const _commentPostDiagCounters = makeInitialCommentPostDiag();
 let _commentPostDiagLastWriteAt = 0;
+// comment-post-speed-DESIGN.md §F(Phase 0計器・§B-2/D Phase 1で消費): submitComment の楽観追記
+//   時に押下時刻を積む。renderStoryUserLane の paint 直後に pending-self エントリの capturedAt と
+//   突合し、成立分だけ「押下→楽観表示がレーンに描画完了」のサンプルにする(嘘をつかない=
+//   revert/TTL失効で表示されなかった mark は消費しない)。上限8件・TTL30秒でメモリ有界。
+const COMMENT_POST_OPTIMISTIC_MARK_MAX = 8;
+const COMMENT_POST_OPTIMISTIC_MARK_TTL_MS = 30_000;
+/** @type {Array<{ at: number }>} */
+let _commentPostOptimisticMarks = [];
+/** @param {number} at */
+function markCommentPostOptimisticPaint(at) {
+  const nowMs = Date.now();
+  const kept = _commentPostOptimisticMarks.filter((m) => nowMs - m.at < COMMENT_POST_OPTIMISTIC_MARK_TTL_MS);
+  kept.push({ at });
+  while (kept.length > COMMENT_POST_OPTIMISTIC_MARK_MAX) kept.shift();
+  _commentPostOptimisticMarks = kept;
+}
+/** renderStoryUserLane の paint 直後に呼ぶ。今回表示された pending-self の capturedAt 集合と mark を突合する。 */
+function consumeCommentPostOptimisticPaintSamples() {
+  if (!_commentPostOptimisticMarks.length) return;
+  const entries = Array.isArray(STORY_SOURCE_STATE.entries) ? STORY_SOURCE_STATE.entries : [];
+  /** @type {Set<number>} */
+  const displayedAts = new Set();
+  for (const e of entries) {
+    if (e?.selfPosted !== true) continue;
+    const at = Number(e?.capturedAt);
+    if (Number.isFinite(at)) displayedAts.add(at);
+  }
+  if (!displayedAts.size) return;
+  const nowMs = Date.now();
+  const { samples, remaining } = takeOptimisticPaintSamples(_commentPostOptimisticMarks, displayedAts, nowMs);
+  _commentPostOptimisticMarks = remaining;
+  if (!samples.length) return;
+  for (const s of samples) {
+    _commentPostDiagCounters.lastOptimisticPaintMs = s;
+    _commentPostDiagCounters.avgOptimisticPaintMs = computeCommentEchoAverage(
+      _commentPostDiagCounters.avgOptimisticPaintMs,
+      s
+    );
+  }
+  publishCommentPostDiag();
+}
 function publishCommentPostDiag() {
   const now = Date.now();
   if (now - _commentPostDiagLastWriteAt < 3000) return; // 3秒 min-gap(他の診断と同型)。
@@ -5190,11 +5232,13 @@ function applySelfPostedRecentsFromBag(bag) {
 /**
  * @param {string} liveId
  * @param {string} rawText
+ * @returns {Promise<number|null>} 楽観追記した押下時刻(at)。重複/無効入力で追記しなければ null
+ *   (comment-post-speed-DESIGN.md §F: 即時paintの照合キーとして呼び出し側が使う)。
  */
 async function appendSelfPostedComment(liveId, rawText) {
   const lid = String(liveId || '').trim().toLowerCase();
   const textNorm = normalizeCommentText(rawText);
-  if (!lid || !textNorm) return;
+  if (!lid || !textNorm) return null;
   const at = Date.now();
   const next = selfPostedRecentsCache.filter((it) => at - it.at < SELF_POST_RECENT_TTL_MS);
   const duplicated = next.some(
@@ -5203,7 +5247,7 @@ async function appendSelfPostedComment(liveId, rawText) {
       String(it.textNorm || '') === textNorm &&
       Math.abs(at - (Number(it.at) || 0)) < SELF_POST_DUPLICATE_WINDOW_MS
   );
-  if (duplicated) return;
+  if (duplicated) return null;
   /** @type {{liveId: string, at: number, textNorm: string, textRaw?: string}} */
   const item = { liveId: lid, at, textNorm };
   // pending 表示で改行・前後空白などを保持するため、生本文も optional で持つ。
@@ -5216,6 +5260,7 @@ async function appendSelfPostedComment(liveId, rawText) {
   void storageSetSafe({
     [KEY_SELF_POSTED_RECENTS]: { items: next }
   }).catch(() => {});
+  return at;
 }
 
 /**
@@ -6837,6 +6882,9 @@ function renderStoryUserLane() {
     domTilesPainted: countStoryUserLaneDomTiles(els)
   });
   recordStoryUserLaneStep(_storyUserLaneRenderProbe, STORY_USER_LANE_STEPS.DONE);
+  // comment-post-speed-DESIGN.md §F(Phase 0計器): この paint で pending-self が実際に
+  //   表示されたか mark と突合する(観測のみ・描画は変えない)。
+  try { consumeCommentPostOptimisticPaintSamples(); } catch { /* no-op: 計器の失敗で描画を止めない */ }
   // v0.1.987(状態速報「描画済みなのにローディング継続」の根治): レーンが実際にタイルを描けた瞬間=
   //   「中身が画面に出た」確定シグナル。従来の幕撤去は inlineWatchPanelHasRealDataForShade/失敗時タイマー
   //   依存で、heavy 経路が詰まり気味だと幕が残ることがあった(実機 perfDiag.shadeActive=true・painted)。
@@ -19415,6 +19463,16 @@ async function initPopup() {
       });
   };
 
+  // comment-post-speed-DESIGN.md §B-2: 自コメ送信/revert の押下直後だけ、通常の450ms
+  //   スロットルを無視して即時 safeRefresh() を呼ぶ(scheduleImmediate・floorMs既定150ms)。
+  //   楽観表示(pending-self)は appendSelfPostedComment で押下と同時にメモリへ入るのに、
+  //   画面に出るのは storage.set 往復→自分の onChanged→450msスロットル→refresh 完了後
+  //   だった。データは手元にあるのに配達を待っていた、が体感遅延の正体(§A裁定)。
+  //   描画は既存 safeRefresh() をそのまま使う(新描画パスは作らない・v0.1.421/422の教訓)。
+  const requestSelfCommentInstantPaint = () => {
+    coalescedRefreshScheduler.scheduleImmediate(() => { void safeRefresh(); });
+  };
+
   $('devMonitorRefresh')?.addEventListener('click', () => {
     watchMetaCache.key = '';
     watchMetaCache.snapshot = null;
@@ -20595,7 +20653,10 @@ async function initPopup() {
     triggerOpSoundHandlePress();
     try {
       if (lvPost && toggle.checked) {
-        void appendSelfPostedComment(lvPost, text);
+        void appendSelfPostedComment(lvPost, text).then((at) => {
+          if (typeof at === 'number') markCommentPostOptimisticPaint(at);
+          requestSelfCommentInstantPaint();
+        });
         optimisticLogged = true;
       }
       // v0.1.396: context が切れていたら、送信中…固定を解きつつ復帰バナーを出す。
@@ -20655,6 +20716,9 @@ async function initPopup() {
         _commentPostDiagCounters.revertCount += 1;
         publishCommentPostDiag();
         optimisticLogged = false;
+        // comment-post-speed-DESIGN.md §D: 「消す側」も表示側と同じ即時化で対にする
+        // (表示だけ速くなり失敗コメの残留が相対的に悪化するのを防ぐ)。
+        requestSelfCommentInstantPaint();
       }
       if (result.timedOut) {
         // 「不明」を失敗と断定しない文言(既に withCommentPostDeadline が組み立て済み)。
@@ -20683,6 +20747,8 @@ async function initPopup() {
         await revertLastSelfPostedComment(lvPost, text).catch(() => {});
         _commentPostDiagCounters.revertCount += 1;
         publishCommentPostDiag();
+        // comment-post-speed-DESIGN.md §D: 例外経路でも「消す側」を即時化で対にする。
+        requestSelfCommentInstantPaint();
       }
       // v0.1.396: 拡張の接続が切れた（Extension context invalidated）ときは、
       //   「送信中…」のまま固まって見える（context 喪失で repaint も走らない）。

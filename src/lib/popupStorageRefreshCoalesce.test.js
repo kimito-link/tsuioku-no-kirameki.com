@@ -144,4 +144,62 @@ describe('createCoalescedRefreshScheduler', () => {
     clock.advance(5_000);
     expect(calls).toBe(1); // trailing は取り消された
   });
+
+  describe('scheduleImmediate(comment-post-speed-DESIGN.md §B-1: 自コメ送信の即時再描画バイパス)', () => {
+    it('floorMs 経過していれば即時実行し true を返す', () => {
+      const clock = createClock();
+      const sched = createCoalescedRefreshScheduler({ throttleMs: 450, deps: clock });
+      let calls = 0;
+      const ran = sched.scheduleImmediate(() => calls++, { floorMs: 150 });
+      expect(ran).toBe(true);
+      expect(calls).toBe(1);
+    });
+
+    it('floorMs 内の連続呼び出しはスキップし false を返す(新規 fn を呼ばない)', () => {
+      const clock = createClock();
+      const sched = createCoalescedRefreshScheduler({ throttleMs: 450, deps: clock });
+      let calls = 0;
+      sched.scheduleImmediate(() => calls++, { floorMs: 150 });
+      clock.advance(100);
+      const ran = sched.scheduleImmediate(() => calls++, { floorMs: 150 });
+      expect(ran).toBe(false);
+      expect(calls).toBe(1);
+    });
+
+    it('floorMs を超えれば再び即時実行される', () => {
+      const clock = createClock();
+      const sched = createCoalescedRefreshScheduler({ throttleMs: 450, deps: clock });
+      let calls = 0;
+      sched.scheduleImmediate(() => calls++, { floorMs: 150 });
+      clock.advance(151);
+      const ran = sched.scheduleImmediate(() => calls++, { floorMs: 150 });
+      expect(ran).toBe(true);
+      expect(calls).toBe(2);
+    });
+
+    it('即時実行は lastPaintAt を更新し、直後の通常 schedule(高頻度キー)は leading せず trailing に畳まれる', () => {
+      const clock = createClock();
+      const sched = createCoalescedRefreshScheduler({ throttleMs: 450, deps: clock });
+      let calls = 0;
+      const run = () => calls++;
+      sched.scheduleImmediate(run, { floorMs: 150 });
+      expect(calls).toBe(1);
+      // 即時実行の直後(throttleMs=450 内)に来た高頻度 schedule は leading せず trailing 予約のみ。
+      sched.schedule({ allHighFreq: true, initialDone: true }, run);
+      expect(calls).toBe(1); // 2連発しない
+      clock.advance(450);
+      expect(calls).toBe(2); // trailing で1回だけ追いつく
+    });
+
+    it('floorMs 未指定時は既定150msとして扱う', () => {
+      const clock = createClock();
+      const sched = createCoalescedRefreshScheduler({ throttleMs: 450, deps: clock });
+      let calls = 0;
+      sched.scheduleImmediate(() => calls++);
+      clock.advance(149);
+      const ran = sched.scheduleImmediate(() => calls++);
+      expect(ran).toBe(false);
+      expect(calls).toBe(1);
+    });
+  });
 });

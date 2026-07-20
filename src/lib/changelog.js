@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1176',
+    date: '2026-07-20',
+    summary: '自分のコメントが速く画面に反映されるように',
+    items: Object.freeze([
+      '自分でコメントを投稿したとき、応援レーンに表示されるまでの待ち時間を短縮しました。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1175',
     date: '2026-07-20',
     summary: '会場の顔アイコン診断を強化',

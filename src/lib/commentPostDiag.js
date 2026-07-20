@@ -27,7 +27,10 @@
  *   lastOutcome: string,   // 直近1回の結果種別('ok'|'fail'|'timeout'|'')
  *   lastEventAt: number,   // 最後にイベントが起きた時刻(epoch ms・0=未観測)
  *   lastEchoMs: number,    // 直近1回の「押下→実フィード到着確定(echo)」ms(-1=未計測)
- *   avgEchoMs: number      // echo の EMA 平均ms(-1=未計測)
+ *   avgEchoMs: number,     // echo の EMA 平均ms(-1=未計測)
+ *   lastOptimisticPaintMs: number, // 直近1回の「押下→楽観表示(pending-self)がレーンに描画完了」ms(-1=未計測。echoとは別物=体感速度の直接指標)
+ *   avgOptimisticPaintMs: number,  // 楽観表示描画の EMA 平均ms(-1=未計測)
+ *   instantPaintRuns: number       // scheduleImmediate(即時paint)が実行された累計回数(Phase 1導入前は常に0)
  * }} CommentPostDiagState
  */
 
@@ -44,7 +47,10 @@ export function makeInitialCommentPostDiag() {
     lastOutcome: '',
     lastEventAt: 0,
     lastEchoMs: -1,
-    avgEchoMs: -1
+    avgEchoMs: -1,
+    lastOptimisticPaintMs: -1,
+    avgOptimisticPaintMs: -1,
+    instantPaintRuns: 0
   };
 }
 
@@ -66,6 +72,44 @@ export function computeCommentEchoAverage(prevAvgMs, sampleMs, alpha = 0.3) {
   const prev = Number(prevAvgMs);
   if (!Number.isFinite(prev) || prev < 0) return Math.round(sample);
   return Math.round(prev + alpha * (sample - prev));
+}
+
+/**
+ * comment-post-speed-DESIGN.md §F: 「押下→楽観表示(pending-self)がレーンに描画完了」の
+ *   サンプルを、押下時刻の記録(marks)と今回の paint で実際に表示された pending-self の
+ *   at 集合(displayedPendingAts)を突合して取り出す純関数。
+ *
+ * 嘘をつかない: 照合が成立した mark だけを sample 化する。revert・TTL失効で表示されなかった
+ *   mark はここでは捨てる(remaining に残らない=次回以降も対象外)。「表示されなかったのに
+ *   楽観表示が速かった」と偽らない。
+ *
+ * @param {ReadonlyArray<{ at: number }>} marks 押下時刻の記録(呼び出し側が submitComment 時に積む)
+ * @param {ReadonlySet<number>|ReadonlyArray<number>} displayedPendingAts 今回の paint で実際に
+ *   画面に表示された pending-self エントリの at 値集合
+ * @param {number} nowMs 現在時刻(サンプル値=nowMs - mark.at)
+ * @returns {{ samples: number[], remaining: Array<{ at: number }> }}
+ */
+export function takeOptimisticPaintSamples(marks, displayedPendingAts, nowMs) {
+  const list = Array.isArray(marks) ? marks : [];
+  const displayed =
+    displayedPendingAts instanceof Set
+      ? displayedPendingAts
+      : new Set(Array.isArray(displayedPendingAts) ? displayedPendingAts : []);
+  const now = Number.isFinite(Number(nowMs)) ? Number(nowMs) : 0;
+  /** @type {number[]} */
+  const samples = [];
+  /** @type {Array<{ at: number }>} */
+  const remaining = [];
+  for (const m of list) {
+    const at = Number(m?.at);
+    if (!Number.isFinite(at)) continue;
+    if (displayed.has(at)) {
+      samples.push(Math.max(0, now - at));
+    } else {
+      remaining.push({ at });
+    }
+  }
+  return { samples, remaining };
 }
 
 /**
@@ -106,6 +150,9 @@ export function buildCommentPostDiagSnapshot(diag, nowMs) {
     lastEventAt: num(d.lastEventAt, base.lastEventAt),
     lastEchoMs: num(d.lastEchoMs, base.lastEchoMs),
     avgEchoMs: num(d.avgEchoMs, base.avgEchoMs),
+    lastOptimisticPaintMs: num(d.lastOptimisticPaintMs, base.lastOptimisticPaintMs),
+    avgOptimisticPaintMs: num(d.avgOptimisticPaintMs, base.avgOptimisticPaintMs),
+    instantPaintRuns: num(d.instantPaintRuns, base.instantPaintRuns),
     capturedAt: now
   };
 }
@@ -151,5 +198,20 @@ export function buildCommentPostDiagLines(snap, nowMs) {
   lines.push(
     `  → 送信応答 直近${(lastTotalMs / 1000).toFixed(1)}秒${echoText} / フレーム試行累計${totalRetryAttempts} / 取消${revertCount}`
   );
+  // comment-post-speed-DESIGN.md §F/§G(Phase 0): 「押下→楽観表示がレーンに描画完了」の実測。
+  //   echo(本物到着)と違い、これがユーザー体感の「反応速度」の直接指標。Phase 1(即時paint)
+  //   導入前後の効果をこの値のbefore/afterで実証する。未計測(-1)ならノイズにしない=行を出さない。
+  const lastOptimisticPaintMs = Number(snap.lastOptimisticPaintMs);
+  const avgOptimisticPaintMs = Number(snap.avgOptimisticPaintMs);
+  const instantPaintRuns = Number(snap.instantPaintRuns) || 0;
+  if (Number.isFinite(lastOptimisticPaintMs) && lastOptimisticPaintMs >= 0) {
+    const avgText =
+      Number.isFinite(avgOptimisticPaintMs) && avgOptimisticPaintMs >= 0
+        ? `(平均${(avgOptimisticPaintMs / 1000).toFixed(1)}秒)`
+        : '';
+    lines.push(
+      `  → 楽観表示 直近${(lastOptimisticPaintMs / 1000).toFixed(1)}秒${avgText} / 即時paint${instantPaintRuns}回`
+    );
+  }
   return lines;
 }

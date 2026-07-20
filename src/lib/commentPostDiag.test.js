@@ -4,7 +4,8 @@ import {
   commentPostOutcomeKindForResult,
   buildCommentPostDiagSnapshot,
   buildCommentPostDiagLines,
-  computeCommentEchoAverage
+  computeCommentEchoAverage,
+  takeOptimisticPaintSamples
 } from './commentPostDiag.js';
 
 describe('makeInitialCommentPostDiag', () => {
@@ -21,6 +22,9 @@ describe('makeInitialCommentPostDiag', () => {
     expect(s.lastEventAt).toBe(0);
     expect(s.lastEchoMs).toBe(-1);
     expect(s.avgEchoMs).toBe(-1);
+    expect(s.lastOptimisticPaintMs).toBe(-1);
+    expect(s.avgOptimisticPaintMs).toBe(-1);
+    expect(s.instantPaintRuns).toBe(0);
   });
 });
 
@@ -44,6 +48,48 @@ describe('computeCommentEchoAverage(EMA・giftEffectDiag/voiceReadQueueと同方
   it('alpha を指定できる', () => {
     const avg = computeCommentEchoAverage(1000, 2000, 0.5);
     expect(avg).toBe(1500);
+  });
+});
+
+describe('takeOptimisticPaintSamples(comment-post-speed-DESIGN.md §F)', () => {
+  it('displayedPendingAts に含まれる mark だけ sample 化し、含まれない mark は remaining に残す', () => {
+    const marks = [{ at: 1000 }, { at: 2000 }, { at: 3000 }];
+    const { samples, remaining } = takeOptimisticPaintSamples(marks, new Set([1000, 3000]), 4000);
+    expect(samples).toEqual([3000, 1000]); // 4000-1000, 4000-3000
+    expect(remaining).toEqual([{ at: 2000 }]);
+  });
+
+  it('配列で渡された displayedPendingAts も Set と同様に扱う', () => {
+    const marks = [{ at: 1000 }];
+    const { samples, remaining } = takeOptimisticPaintSamples(marks, [1000], 1500);
+    expect(samples).toEqual([500]);
+    expect(remaining).toEqual([]);
+  });
+
+  it('一致が無ければ全 mark が remaining に残り samples は空', () => {
+    const marks = [{ at: 1000 }, { at: 2000 }];
+    const { samples, remaining } = takeOptimisticPaintSamples(marks, new Set(), 3000);
+    expect(samples).toEqual([]);
+    expect(remaining).toEqual(marks);
+  });
+
+  it('marks が空/非配列でも落ちない', () => {
+    expect(takeOptimisticPaintSamples([], new Set([1]), 100)).toEqual({ samples: [], remaining: [] });
+    expect(takeOptimisticPaintSamples(null, new Set([1]), 100)).toEqual({ samples: [], remaining: [] });
+    expect(takeOptimisticPaintSamples(undefined, new Set([1]), 100)).toEqual({ samples: [], remaining: [] });
+  });
+
+  it('at が非数値の mark は無視する(remaining にも samples にも入れない)', () => {
+    const marks = [{ at: 'x' }, { at: 1000 }];
+    const { samples, remaining } = takeOptimisticPaintSamples(marks, new Set([1000]), 1200);
+    expect(samples).toEqual([200]);
+    expect(remaining).toEqual([]);
+  });
+
+  it('nowMs より前の at でも負値にならない(Math.max(0, ...))', () => {
+    const marks = [{ at: 5000 }];
+    const { samples } = takeOptimisticPaintSamples(marks, new Set([5000]), 100);
+    expect(samples).toEqual([0]);
   });
 });
 
@@ -160,5 +206,28 @@ describe('buildCommentPostDiagLines', () => {
     const snap = buildCommentPostDiagSnapshot({ attempts: 1, okCount: 1, lastTotalMs: 500 }, 1000);
     const lines = buildCommentPostDiagLines(snap, 1000);
     expect(lines[1]).not.toContain('画面実着');
+  });
+
+  it('comment-post-speed-DESIGN.md §F: 楽観表示が計測済みなら3行目に直近/平均/即時paint回数を出す', () => {
+    const snap = buildCommentPostDiagSnapshot(
+      {
+        attempts: 1,
+        okCount: 1,
+        lastTotalMs: 500,
+        lastOptimisticPaintMs: 400,
+        avgOptimisticPaintMs: 550,
+        instantPaintRuns: 3
+      },
+      1000
+    );
+    const lines = buildCommentPostDiagLines(snap, 1000);
+    expect(lines).toHaveLength(3);
+    expect(lines[2]).toBe('  → 楽観表示 直近0.4秒(平均0.6秒) / 即時paint3回');
+  });
+
+  it('楽観表示未計測(-1)なら3行目を出さない(ノイズにしない・既存2行のまま)', () => {
+    const snap = buildCommentPostDiagSnapshot({ attempts: 1, okCount: 1, lastTotalMs: 500 }, 1000);
+    const lines = buildCommentPostDiagLines(snap, 1000);
+    expect(lines).toHaveLength(2);
   });
 });

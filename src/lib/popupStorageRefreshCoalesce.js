@@ -96,8 +96,39 @@ export function createCoalescedRefreshScheduler(opts = {}) {
     clearTrailing();
   }
 
+  /**
+   * comment-post-speed-DESIGN.md §B-1: 自コメ送信/revert 直後の「押下直後の即時再描画」専用
+   * バイパス。通常の throttleMs(450ms 既定)を無視して即時 runRefresh() を実行する。
+   *
+   * 【担う責務】
+   *   - ユーザー自身の送信/revert 操作を起点とする refresh の前倒し実行(スロットル無視)。
+   *   - floorMs(既定150ms)による即時パス同士の最小間隔保証(連打・音声自動送信の暴発防止)。
+   *   - 実行時の lastPaintAt 更新(直後に来る通常 schedule の leading 判定を trailing に畳み、
+   *     1送信で refresh 2連発になるのを防ぐ)。
+   *
+   * 【担わない責務】
+   *   - schedule() の既定挙動(throttleMs・trailing)には一切影響しない(既存テスト無変更)。
+   *
+   * ★注意: 高頻度キー(NDGR由来)のバイパスにこの関数を流用してはならない。発火源は
+   *   人間の送信操作のみを想定(呼び出し頻度がイベント流量に比例しない前提)。
+   *
+   * @param {() => void} runRefresh
+   * @param {{ floorMs?: number }} [opts] floorMs 既定150ms
+   * @returns {boolean} 実行したら true。floor 内でスキップしたら false(既存の trailing 予約に委ねる)。
+   */
+  function scheduleImmediate(runRefresh, opts = {}) {
+    const floorMs = Number.isFinite(opts.floorMs) ? Math.max(0, /** @type {number} */ (opts.floorMs)) : 150;
+    const now = nowFn();
+    if (now - lastPaintAt < floorMs) return false;
+    clearTrailing();
+    runRefresh();
+    lastPaintAt = nowFn();
+    return true;
+  }
+
   return {
     schedule,
+    scheduleImmediate,
     cancel,
     /** 読み取り専用: 最後に runRefresh が呼ばれた時刻（テスト用） */
     lastPaintAtForTest: () => lastPaintAt
