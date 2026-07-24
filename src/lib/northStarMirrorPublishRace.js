@@ -85,11 +85,14 @@ export function observeNorthStarFlushOutcome(state, succeeded) {
 /**
  * 状態速報1行を作る。publishCalls=0(未観測)は⚪(誤報しない)。
  * @param {ReturnType<typeof createNorthStarMirrorPublishRaceState>|null|undefined} state
+ * @param {number} [singleFlightJoinCount] - v0.1.1184: single-flight化で合流し
+ *   _refreshAllNorthStarMirrorLanesImpl自体の実行を省けた累計(joinが効いているかの直接証拠)。
  * @returns {{ line: string, inflightMax: number, publishCalls: number, liveIdReset: number,
- *   flushSuccess: number, flushSkipped: number } | null}
+ *   flushSuccess: number, flushSkipped: number, singleFlightJoinCount: number } | null}
  */
-export function toNorthStarMirrorPublishRaceDiag(state) {
+export function toNorthStarMirrorPublishRaceDiag(state, singleFlightJoinCount) {
   if (!state || typeof state !== 'object') return null;
+  const joinCount = Number.isFinite(singleFlightJoinCount) ? singleFlightJoinCount : 0;
   let line;
   if (state.publishCalls <= 0) {
     line = '北極星鏡publish ⚪ 未観測';
@@ -97,9 +100,11 @@ export function toNorthStarMirrorPublishRaceDiag(state) {
     const raceMark = state.inflightMax >= 2 ? '🔴' : '✅';
     // ★同時実行最大/publish累計/liveIdリセットは北極星専有カウンタ。flush成功/スキップは
     //   全9鏡共通のflushスケジューラの値(北極星専用ではない)なので「全鏡」と明記して誤読を防ぐ。
+    //   ★v0.1.1184: single-flight合流累計を併記(joinが起きた回数=多重並行実行を防げた回数の直接証拠)。
     line =
       `北極星鏡publish ${raceMark} 同時実行最大${state.inflightMax} / publish累計${state.publishCalls}` +
-      ` / liveIdリセット${state.liveIdReset} / 全鏡flush成功${state.flushSuccess}・スキップ${state.flushSkipped}`;
+      ` / liveIdリセット${state.liveIdReset} / 全鏡flush成功${state.flushSuccess}・スキップ${state.flushSkipped}` +
+      ` / single-flight合流${joinCount}`;
   }
   return {
     line,
@@ -107,6 +112,7 @@ export function toNorthStarMirrorPublishRaceDiag(state) {
     publishCalls: state.publishCalls,
     liveIdReset: state.liveIdReset,
     flushSuccess: state.flushSuccess,
-    flushSkipped: state.flushSkipped
+    flushSkipped: state.flushSkipped,
+    singleFlightJoinCount: joinCount
   };
 }

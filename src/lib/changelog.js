@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1185',
+    date: '2026-07-24',
+    summary: '状態速報の診断計器を強化(表示のみ)',
+    items: Object.freeze([
+      '北極星鏡publishの多重並行実行対策(v0.1.1184)が実際に効いているかを状態速報から直接確認できるよう、診断表示に「合流回数」を追加しました(動作は変わりません)。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1184',
     date: '2026-07-24',
     summary: '純Web公開データの同期を安定化',

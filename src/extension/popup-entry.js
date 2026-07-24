@@ -18908,9 +18908,11 @@ async function collectAiShareDevMonitorPayloadBundle(watchUrl) {
         }
       })(),
       // 2026-07-21 診断先行(北極星鏡publish取りこぼし実害確定計器)。数えるだけ・観測のみ。
+      // ★v0.1.1184: single-flight合流累計(_northStarRefreshSingleFlight.joinCount())を併記し、
+      //   同時実行対策の効きを直接検証できるようにする(heavyReadInflightJoinCountと同じ配線対称性)。
       northStarMirrorPublishRace: (() => {
         try {
-          return toNorthStarMirrorPublishRaceDiag(_northStarMirrorPublishRace);
+          return toNorthStarMirrorPublishRaceDiag(_northStarMirrorPublishRace, _northStarRefreshSingleFlight.joinCount());
         } catch {
           return null;
         }
