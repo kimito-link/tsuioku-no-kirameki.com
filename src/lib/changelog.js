@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1183',
+    date: '2026-07-24',
+    summary: '状態速報の表示文言を修正',
+    items: Object.freeze([
+      '会場読み上げの診断表示で、実際には反映されている設定が「未適用」と誤って表示される問題を修正しました(動作は変わりません)。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1182',
     date: '2026-07-24',
     summary: '会場の順位バッジのちらつきを修正',

@@ -150,7 +150,10 @@ export function buildVoiceDiagLine(snap, nowMs) {
   const effectiveMax = Number(snap.effectiveQueueMax);
   if (Number.isFinite(serviceTimeEma) && serviceTimeEma >= 0) {
     parts.push(`処理時間${Math.round(serviceTimeEma)}ms/件`);
-    if (Number.isFinite(effectiveMax)) parts.push(`実効上限${effectiveMax}(未適用)`);
+    // v0.1.1181(段階1=apply)で実際にpushVoiceQueueのmaxへ適用済み。「(未適用)」表記は
+    //   v0.1.1180(段階0=shadow)当時の名残で、実適用後もこの文言が残っていたのは表示上の
+    //   不整合(実害は無いが誤解を招く)。
+    if (Number.isFinite(effectiveMax)) parts.push(`実効上限${effectiveMax}`);
   }
   const rateClamp = Number(snap.rateClampTotal) || 0;
   if (rateClamp > 0) parts.push(`速度飽和${rateClamp}件`); // playbackRateが上限で追いつけていない兆候。
