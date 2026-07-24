@@ -13,6 +13,13 @@
  *   本モジュールは「直す」のではなく「実害の有無・頻度を数える」ことだけが目的(観測のみ)。
  *   掟(venueDomCensus.js と同じ): 数えるだけ・DOM/データを一切触らない。
  *
+ * 2026-07-20 拡張(a:系カウンタ + ①POPへの適用): 数値ID桁境界とは別に、ユーザー実機報告
+ *   「ハンドルネーム(カスタム表示名)があるのにゆっくり顔」の再調査で、a:形式(ニコ運営の匿名割当)の
+ *   カスタム表示名ユーザーは従来 NUMERIC_UID_RE 判定で対象外(=未観測)だったと判明。桁境界(数値ID)の
+ *   「意図的に触らない」方針は変えず、a:系/ハッシュ系の実害だけを別カウンタ(yukkuriNamedAnonymousStyle)
+ *   で新たに可視化する。あわせて、従来は会場(venueBar.js)専用配線だった本計器を①POP応援レーン
+ *   (renderStoryUserLaneDom.js の fillLaneTier)にも配線する(観測対象を PersonTileItem に一般化)。
+ *
  * @module venueYukkuriNamedCensus
  */
 
@@ -23,15 +30,27 @@ const NUMERIC_UID_RE = /^\d+$/;
 const IN_RANGE_NUMERIC_UID_RE = /^\d{5,14}$/;
 
 /**
- * @returns {{ checked: number, yukkuriNamed: number, outOfRangeDigits: number, lastSample: null | { uid: string, name: string, digits: number } }}
+ * @returns {{ checked: number, yukkuriNamed: number, outOfRangeDigits: number,
+ *   checkedAnonymousStyle: number, yukkuriNamedAnonymousStyle: number,
+ *   lastSample: null | { uid: string, name: string, digits: number },
+ *   lastSampleAnonymousStyle: null | { uid: string, name: string } }}
  */
 export function createVenueYukkuriNamedCensusState() {
-  return { checked: 0, yukkuriNamed: 0, outOfRangeDigits: 0, lastSample: null };
+  return {
+    checked: 0,
+    yukkuriNamed: 0,
+    outOfRangeDigits: 0,
+    checkedAnonymousStyle: 0,
+    yukkuriNamedAnonymousStyle: 0,
+    lastSample: null,
+    lastSampleAnonymousStyle: null
+  };
 }
 
 /**
- * 会場の1タイル(venueSeatEntryToLaneItem の結果)を観測する。呼び出し側は席ループ内で
- * 生成した item をそのまま渡す(新規計算なし)。
+ * 会場の1タイル(venueSeatEntryToLaneItem の結果)、または①POP応援レーンの1タイル
+ * (PersonTileItem: uid=entry.userId, rawName=title, displaySrc=displaySrc)を観測する。
+ * 呼び出し側はループ内で生成済みの item をそのまま渡す(新規計算なし)。
  * @param {ReturnType<typeof createVenueYukkuriNamedCensusState>|null|undefined} state
  * @param {{ uid?: unknown, rawName?: unknown, displaySrc?: unknown }} obs
  */
@@ -43,8 +62,21 @@ export function observeVenueYukkuriNamedTile(state, obs) {
   // 名前(参加者本人が投稿した表示名)が無いタイルは対象外(匿名表示名"匿名NNN"がゆっくり顔なのは
   //   仕様どおりで実害ではない=venueSeatEntryToLaneItem の rawName は participant.name そのもの)。
   if (!rawName) return;
-  // 数値IDでなければ(a:系・ハッシュ系)本来から匿名系=ゆっくり顔で正常。対象外。
-  if (!NUMERIC_UID_RE.test(uid)) return;
+  // 2026-07-20実測(実配信で10件検知→誤検知と判明): rawName が「匿名」で始まる場合、本人の投稿名
+  //   ではなく displayUserLabel/anonymousDisplayLabel が合成したフォールバックラベル
+  //   (「匿名123」「匿名（a:xxx）」)。これは↑と同じ「仕様どおりで実害ではない」ケースの亜種なので対象外。
+  if (rawName.startsWith('匿名')) return;
+
+  if (!NUMERIC_UID_RE.test(uid)) {
+    // a:系・ハッシュ系(カスタム表示名を持つ匿名スタイルユーザー)。従来は完全対象外だったが、
+    //   「名前はあるのにゆっくり顔」は数値ID系と同じ症状なので別カウンタで観測する(桁境界とは別集計)。
+    if (!uid) return; // uid空(素性不明)は対象外(観測しても原因特定に繋がらない)
+    state.checkedAnonymousStyle += 1;
+    if (!displaySrc.startsWith(IDENTICON_SRC_PREFIX)) return; // 実写/CDN URL=正常
+    state.yukkuriNamedAnonymousStyle += 1;
+    state.lastSampleAnonymousStyle = { uid, name: rawName };
+    return;
+  }
 
   state.checked += 1;
   if (!displaySrc.startsWith(IDENTICON_SRC_PREFIX)) return; // 実写/CDN URL=正常
@@ -55,29 +87,38 @@ export function observeVenueYukkuriNamedTile(state, obs) {
 }
 
 /**
- * 状態速報1行を作る。checked=0(未観測)は⚪(誤報しない)。
+ * 状態速報1行を作る。checked=0かつcheckedAnonymousStyle=0(未観測)は⚪(誤報しない)。
  * @param {ReturnType<typeof createVenueYukkuriNamedCensusState>|null|undefined} state
  * @returns {{ line: string, checked: number, yukkuriNamed: number, outOfRangeDigits: number,
- *   lastSample: null | { uid: string, name: string, digits: number } } | null}
+ *   checkedAnonymousStyle: number, yukkuriNamedAnonymousStyle: number,
+ *   lastSample: null | { uid: string, name: string, digits: number },
+ *   lastSampleAnonymousStyle: null | { uid: string, name: string } } | null}
  */
 export function toVenueYukkuriNamedCensusDiag(state) {
   if (!state || typeof state !== 'object') return null;
+  const checkedAny = state.checked > 0 || state.checkedAnonymousStyle > 0;
   let line;
-  if (state.checked <= 0) {
+  if (!checkedAny) {
     line = '名前ありゆっくり顔 ⚪ 未観測';
-  } else if (state.yukkuriNamed === 0) {
-    line = `名前ありゆっくり顔 ✅ 検${state.checked}`;
+  } else if (state.yukkuriNamed === 0 && state.yukkuriNamedAnonymousStyle === 0) {
+    line = `名前ありゆっくり顔 ✅ 検${state.checked}(匿名系検${state.checkedAnonymousStyle})`;
   } else {
     const s = state.lastSample;
+    const sa = state.lastSampleAnonymousStyle;
     line =
-      `名前ありゆっくり顔 🔴 ${state.yukkuriNamed}件(桁境界${state.outOfRangeDigits}) / 検${state.checked}` +
-      (s ? ` / 直近{${s.name} uid${s.digits}桁}` : '');
+      `名前ありゆっくり顔 🔴 ${state.yukkuriNamed}件(桁境界${state.outOfRangeDigits})` +
+      ` 匿名系${state.yukkuriNamedAnonymousStyle}件 / 検${state.checked}(匿名系検${state.checkedAnonymousStyle})` +
+      (s ? ` / 直近{${s.name} uid${s.digits}桁}` : '') +
+      (sa ? ` / 直近匿名系{${sa.name} uid=${sa.uid}}` : '');
   }
   return {
     line,
     checked: state.checked,
     yukkuriNamed: state.yukkuriNamed,
     outOfRangeDigits: state.outOfRangeDigits,
-    lastSample: state.lastSample ? { ...state.lastSample } : null
+    checkedAnonymousStyle: state.checkedAnonymousStyle,
+    yukkuriNamedAnonymousStyle: state.yukkuriNamedAnonymousStyle,
+    lastSample: state.lastSample ? { ...state.lastSample } : null,
+    lastSampleAnonymousStyle: state.lastSampleAnonymousStyle ? { ...state.lastSampleAnonymousStyle } : null
   };
 }

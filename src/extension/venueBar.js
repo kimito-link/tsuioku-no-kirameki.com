@@ -155,6 +155,14 @@ import {
   streakBubbleLifetimeMs,
   resolveBubbleFlowLifetimeMs
 } from '../lib/venueSpeechStreak.js';
+// 2026-07-21 診断先行(応援TOP吹き出しchurn実測計器): 生成頻度・寿命分布・強制退去を数えるだけ
+//   (観測のみ・修正はしない・新規DOM走査やタイマーは追加しない)。
+import {
+  createVenueBubbleChurnState,
+  observeVenueBubbleSpawn,
+  observeVenueBubbleEviction,
+  toVenueBubbleChurnDiag
+} from '../lib/venueBubbleChurn.js';
 import { enrichVenueRowsWithProfileAvatars } from '../lib/venueAvatar.js';
 // v0.1.1118 鏡enrich(P4): ①が解決済みの顔URL(鏡displaySrc)を追加のenrich源にする(新規readゼロ)。
 import { buildVenueMirrorAvatarMap, enrichVenueRowsWithMirrorAvatars } from '../lib/venueMirrorAvatarEnrich.js';
@@ -2409,6 +2417,9 @@ export function mountVenueBarButton(options = {}) {
   // 2026-07-15 名前ありゆっくり顔 計器(診断先行アプローチ): 実害の有無・頻度を累積で数える
   //   (観測のみ・修正はしない)。
   const _yukkuriNamedCensus = createVenueYukkuriNamedCensusState();
+  // 2026-07-21 応援TOP吹き出しchurn計器(診断先行アプローチ): 生成頻度・寿命分布・強制退去を
+  //   累積で数える(観測のみ・修正はしない)。
+  const _bubbleChurn = createVenueBubbleChurnState();
   // 応援者トップNバーの状態(renderTopBar / clearDisplay が触る・宣言はここ=TDZ 回避)。
   let _lastTopBarSig = '';
   let _topBarShownOnce = false;
@@ -3311,6 +3322,8 @@ export function mountVenueBarButton(options = {}) {
     if (activeBubbles.length >= BUBBLE_MAX) {
       const toEvict = selectBubblesToEvict(activeBubbles, BUBBLE_MAX - 1, Date.now());
       for (const victim of toEvict) removeBubble(victim);
+      // 2026-07-21 計器(観測のみ): 上限超過による強制退去回数を数える。失敗は握る(描画を止めない)。
+      try { observeVenueBubbleEviction(_bubbleChurn, toEvict.length); } catch { /* 計器失敗は描画を止めない */ }
     }
 
     const element = document.createElement('div');
@@ -3329,8 +3342,11 @@ export function mountVenueBarButton(options = {}) {
     //   その上で連続発言の人は少し長く残す(会話の連鎖)。max で「連続発言は流速可変より短くしない」。
     const now = Date.now();
     recordBubbleFlow(now);
-    const flowBase = resolveBubbleFlowLifetimeMs(currentBubbleFlowPerSec(now), BUBBLE_LIFETIME_MS);
+    const ratePerSec = currentBubbleFlowPerSec(now);
+    const flowBase = resolveBubbleFlowLifetimeMs(ratePerSec, BUBBLE_LIFETIME_MS);
     const lifetimeMs = Math.max(flowBase, streakBubbleLifetimeMs(streak.count, flowBase));
+    // 2026-07-21 計器(観測のみ): 吹き出し1個の生成・寿命バケット・流速を数える。失敗は握る(描画を止めない)。
+    try { observeVenueBubbleSpawn(_bubbleChurn, { flowLifetimeMs: flowBase, ratePerSec }); } catch { /* 計器失敗は描画を止めない */ }
     const reducedMotion =
       typeof window.matchMedia === 'function' &&
       window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -4524,6 +4540,8 @@ export function mountVenueBarButton(options = {}) {
       seatLinkParity: toVenueSeatLinkParityDiag(_seatLinkParity, Date.now()),
       // 2026-07-15 診断先行(venue-yukkuri-named-diagnose): 「名前ありゆっくり顔」の実害を数えるだけの1行。
       yukkuriNamedCensus: toVenueYukkuriNamedCensusDiag(_yukkuriNamedCensus),
+      // 2026-07-21 診断先行: 応援TOP吹き出しchurnの実害を数えるだけの1行。
+      bubbleChurn: toVenueBubbleChurnDiag(_bubbleChurn),
       storyDiagMirror: storyDiagMirrorStatus(storyDiagMirrorSnap, String(activeLiveId || liveIdFromPathname() || ''), Date.now())
     };
     publishVenueSeatsDiag(seatsDiagObs);

@@ -26,6 +26,30 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1179',
+    date: '2026-07-21',
+    summary: '公開データ同期と会場表示の診断を強化',
+    items: Object.freeze([
+      '純Web公開へのデータ反映状況と、会場モードの発言表示の切り替わり具合を診断できるようにしました。'
+    ])
+  }),
+  Object.freeze({
+    version: '0.1.1178',
+    date: '2026-07-20',
+    summary: '診断の誤検知を修正',
+    items: Object.freeze([
+      '匿名の方の表示に対して、診断が誤って「表示に問題あり」と報告してしまう不具合を修正しました。'
+    ])
+  }),
+  Object.freeze({
+    version: '0.1.1177',
+    date: '2026-07-20',
+    summary: '応援アイコンの表示診断を強化',
+    items: Object.freeze([
+      'クリックできないアイコンや、名前があるのにゆっくり顔になる状態を検出できるようにしました。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1176',
     date: '2026-07-20',
     summary: '自分のコメントが速く画面に反映されるように',

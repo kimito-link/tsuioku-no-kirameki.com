@@ -19,6 +19,18 @@ import { buildStoryUserLaneStackAriaLabel } from '../../lib/supportVisualStoryCo
 import { buildPersonTileEl } from '../../lib/personTileDom.js';
 // v0.1.1113 実DOM census(Tri-Parity): タイルへ照合キーを恒久刻印するための純関数(葉lib同士=循環なし)。
 import { venueLaneParityKey } from '../../lib/venueLaneParity.js';
+// 2026-07-20 診断先行(①POP「クリック不能な手カーソル」実害確定): タイル実体(span)なのに
+//   computed cursor が pointer になっている個体を数えるだけの計器(観測のみ・修正はしない)。
+import {
+  createStoryUserLaneClickAffordanceParityState,
+  observeStoryUserLaneClickAffordance
+} from '../../lib/storyUserLaneClickAffordanceParity.js';
+// 2026-07-20 診断先行(①POP「名前ありゆっくり顔」実害確定): 会場専用だった計器を①POPにも適用
+//   (観測のみ・修正はしない)。
+import {
+  createVenueYukkuriNamedCensusState,
+  observeVenueYukkuriNamedTile
+} from '../../lib/venueYukkuriNamedCensus.js';
 
 /**
  * @typedef {{
@@ -83,6 +95,30 @@ function laneNameOfEl(el) {
 /** 計器の現在値(状態速報が読む・スナップショット)。 */
 export function getStoryLaneRepaintCounts() {
   return { ...(_laneTierRepaintCount) };
+}
+
+/**
+ * ★2026-07-20(計器・観測のみ): ①POP応援レーンのタイル実体(span)なのにcomputed cursorがpointerに
+ *   なっている個体を数える。venueYukkuriNamedCensus.js と同じ掟(数えるだけ・DOM/データ不変)。
+ * @type {ReturnType<typeof createStoryUserLaneClickAffordanceParityState>}
+ */
+const _clickAffordanceParity = createStoryUserLaneClickAffordanceParityState();
+
+/** 計器の現在値(状態速報が読む・スナップショット)。 */
+export function getStoryUserLaneClickAffordanceParityState() {
+  return _clickAffordanceParity;
+}
+
+/**
+ * ★2026-07-20(計器・観測のみ): ①POP応援レーンの「名前ありゆっくり顔」実害を数える
+ *   (venueYukkuriNamedCensus.js を会場専用から①POPにも拡張)。
+ * @type {ReturnType<typeof createVenueYukkuriNamedCensusState>}
+ */
+const _yukkuriNamedCensus = createVenueYukkuriNamedCensusState();
+
+/** 計器の現在値(状態速報が読む・スナップショット)。 */
+export function getStoryUserLaneYukkuriNamedCensusState() {
+  return _yukkuriNamedCensus;
 }
 
 /**
@@ -280,6 +316,24 @@ function fillLaneTier(el, items, io, wrapTileEl) {
     // タイル本体の生成は人物タイル正本(buildPersonTileEl)に集約。
     // ループ・hidden 制御(=レイアウト)はここに残す。全消しでなく変化時だけ replaceChildren で一括差替。
     const tileEl = buildPersonTileEl(p, io);
+    // 2026-07-20 計器(観測のみ・新規生成タイルのみ対象=diff-skip温存分は対象外): span実体なのに
+    //   computed cursor が pointer になっている個体を数える。失敗は握る(描画を止めない)。
+    try {
+      observeStoryUserLaneClickAffordance(_clickAffordanceParity, { tileEl, title: p && p.title });
+    } catch {
+      /* 計器失敗は描画を止めない */
+    }
+    // 2026-07-20 計器(観測のみ・新規生成タイルのみ対象=diff-skip温存分は対象外): 「名前ありゆっくり顔」
+    //   実害を数える(会場専用だった計器を①POPにも適用)。失敗は握る(描画を止めない)。
+    try {
+      observeVenueYukkuriNamedTile(_yukkuriNamedCensus, {
+        uid: p && p.entry && p.entry.userId,
+        rawName: p && p.title,
+        displaySrc: p && p.displaySrc
+      });
+    } catch {
+      /* 計器失敗は描画を止めない */
+    }
     // ★v0.1.1049: サムネ持ち=大 / 匿名=小(ぎゅうぎゅう詰め)の CSS 出し分け用フラグ。
     //   判定は displaySrc が http(s) か【のみ】(=実サムネ)。thumbScore は匿名でも 2 になり得る
     //   (identicon 顔なのに大タイル)ため使わない。displaySrc は storyLaneTierBodyKey に含まれるので、
