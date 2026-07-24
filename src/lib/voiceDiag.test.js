@@ -186,13 +186,14 @@ describe('2026-07-24計器(段階0=shadow・council-fable設計venue-bubble-voic
     expect(line).not.toContain('voiced率');
   });
 
-  it('serviceTimeEmaMs計測済みなら処理時間と実効上限(未適用)を表示する', () => {
+  it('serviceTimeEmaMs計測済みなら処理時間と実効上限を表示する(v0.1.1181段階1=apply、未適用表記は出さない)', () => {
     const line = buildVoiceDiagLine({
       enabled: true, queueNow: 0, queueMax: 2, spokenTotal: 5,
       serviceTimeEmaMs: 1500, effectiveQueueMax: 4
     }, 1000);
     expect(line).toContain('処理時間1500ms/件');
-    expect(line).toContain('実効上限4(未適用)');
+    expect(line).toContain('実効上限4');
+    expect(line).not.toContain('未適用');
   });
 
   it('serviceTimeEmaMs未計測(-1)なら処理時間/実効上限は出さない', () => {
