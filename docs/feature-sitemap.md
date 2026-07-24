@@ -283,7 +283,7 @@
   - `src/lib/giftThrowProjectile.js`
 - **吹き出し寿命管理** — 会場の吹き出しの表示上限・追い出し(eviction)ライフサイクル
   - `src/lib/venueBubbleLifecycle.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 191</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 193</summary>
 
 - `scripts/encode-marketing-html-avatars.mjs` — extension/images/marketing-html-avatars/*.png を data URI にし、
 - `scripts/split-avatar-parts.mjs` — 偽市松背景の除去 + パーツ切り出し(one-off アセットパイプライン)
@@ -425,6 +425,7 @@
 - `src/lib/storyLaneAvatarSrc.js` — 応援レーン(アイコン列)のタイル画像 URL 解決（state 注入型の純関数）。
 - `src/lib/storyTileTvStyle.js` — ストーリータイル / レーンアバターで「ゆっくり風キャラ画像かどうか」を判定する純関数。
 - `src/lib/storyUserLaneBuckets.js` — 応援ユーザーレーン: ソート済み候補を tier（profileTier）別に上限付きで分割する。
+- `src/lib/storyUserLaneClickAffordanceParity.js` — ①POP応援レーンの「クリック不能な手カーソル」実害確定計器
 - `src/lib/storyUserLaneContaminationGuard.js` — 応援ユーザーレーン候補から、視聴者/配信者 UID の混入を除外する判定。
 - `src/lib/storyUserLaneDisplaySrc.js` — 応援ユーザーレーン（りんく・こん太・たぬ姉）のセル画像 URL。
 - `src/lib/storyUserLaneGuideHtml.js` — 応援ユーザーレーンの案内 HTML（ポップアップ・E2E と共有）
@@ -449,6 +450,7 @@
 - `src/lib/userSupportGridAccent.js` — Paul Tol Bright に近い 8 色を OKLCH で表現（カテゴリ識別用）。
 - `src/lib/venueAvatar.js` — v0.1.712: 会場モードのアバター解決(サムネ補強)純関数。
 - `src/lib/venueAvatarDiagLine.js` — 会場モード(venueBar.js)の「🩺 会場の状態」診断ブロックを組み立てる純関数群。
+- `src/lib/venueBubbleChurn.js` — 会場「応援TOP」吹き出しchurnの実測計器(診断先行アプローチ)。
 - `src/lib/venueBubbleLayout.js` — v0.1.717: 会場モードの吹き出し(セリフ)を「席の外の最上位レイヤー」に置くための配置純関数。
 - `src/lib/venueCharacterFrame.js` — 会場モードの「額縁(フレーム)」: ゆっくり3キャラ(りんく/こん太/たぬ姉)の全表情サムネを、
 - `src/lib/venueCrowdMotion.js` — 会場の観客シルエット群を「生きている会場」にするための動きパラメータ(純関数)。
@@ -583,7 +585,7 @@
 - **影響範囲ゲート(規律を自動化)** — 星野ロミ式「規律を自動ゲートに」。diff から影響大(複数機能波及)の変更ファイルを検出し波及先機能を列挙。警告のみ(摩擦ゼロ)・--strict で exit1。AGENTS.md §10 のルールを diff 発火に
   - `scripts/impact-check.mjs`
   - `docs/feature-map/impact-map.json`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 61</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 62</summary>
 
 - `api/status.js` — status 受け口 Vercel Serverless Function。
 - `extension/status-guard.js` — 状態速報ページ(status.html)の「何があっても開く」保険。
@@ -629,6 +631,7 @@
 - `src/lib/liveViewPublishSignature.js` — 状態速報「重さ根治 P4」: publishLiveViewPublishPayload(status-entry.js)は 3秒 min-gap を
 - `src/lib/milestoneEffectDiag.js` — コメント数マイルストーン(100/200/500/1000/2000/3000/5000/10000件)の
 - `src/lib/milestoneEffectDiagKey.js` — コメント数マイルストーンの「検知→演出→効果音」が揃っているかの観測値を popup-entry.js が
+- `src/lib/northStarMirrorPublishRace.js` — 北極星鏡publish取りこぼしの実害確定計器(診断先行アプローチ)。
 - `src/lib/opSoundEffectDiag.js` — 操作音(opSoundDirector.js・Phase D1)の「押下→成功→発音」観測値を組み立てる純関数群。
 - `src/lib/opSoundEffectDiagKey.js` — 操作音(opSoundDirector.js・Phase D1)の「押下/成功/発音」観測値を
 - `src/lib/popupAiDiagOrchestrator.js` — v0.1.211: popup「AI 診断」ボタンのオーケストレータ純関数。
@@ -847,7 +850,7 @@
 
 ## 🧬 修正系譜マップ(この系統のバグを過去にどう直したか)
 
-> changelog 全 506 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
+> changelog 全 509 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
 
 ### 💾 記録件数 (74版)
 - `v0.1.1171` 2026-07-18 — 会場モードの記録件数がリアルタイムで動くように
@@ -1081,7 +1084,8 @@
 - `v0.1.664` 2026-06-10 — 複数タブ並列取得を安全に(重い時は自動で絞る)
 - `v0.1.663` 2026-06-06 — 複数タブでも過去ログを並行して一気に取れるように(2配信まで)
 
-### 🙂 匿名(184) (53版)
+### 🙂 匿名(184) (54版)
+- `v0.1.1178` 2026-07-20 — 診断の誤検知を修正
 - `v0.1.1138` 2026-07-14 — ロビーを廃止し会場を①と同じ顔ぶれだけに
 - `v0.1.1133` 2026-07-13 — fix(venue): 会場の案内文言・診断パネルを①と完全一致に
 - `v0.1.1122` 2026-07-10 — fix(venue): 匿名の大群がたぬ姉段の壁になるのを解消
@@ -1136,7 +1140,8 @@
 - `v0.1.668` 2026-06-10 — パネルに「💬コメビュ」ボタンを追加
 - `v0.1.667` 2026-06-10 — コメビュに匿名OKのニックネーム・ラベル・メモ
 
-### 🏟 会場・席 (165版)
+### 🏟 会場・席 (166版)
+- `v0.1.1179` 2026-07-21 — 公開データ同期と会場表示の診断を強化
 - `v0.1.1175` 2026-07-20 — 会場の顔アイコン診断を強化
 - `v0.1.1171` 2026-07-18 — 会場モードの記録件数がリアルタイムで動くように
 - `v0.1.1167` 2026-07-17 — 会場モードのサムネが白丸になる不具合を修正
@@ -1491,7 +1496,8 @@
 - `v0.1.699` 2026-06-12 — 読み上げの名前ON/OFF切替を追加
 - `v0.1.698` 2026-06-12 — コメビュにユーザー別の声で読み上げ機能を追加
 
-### 🪟 応援レーン・タイル (141版)
+### 🪟 応援レーン・タイル (142版)
+- `v0.1.1177` 2026-07-20 — 応援アイコンの表示診断を強化
 - `v0.1.1176` 2026-07-20 — 自分のコメントが速く画面に反映されるように
 - `v0.1.1174` 2026-07-18 — 大配信でのサムネ取りこぼしを軽減
 - `v0.1.1170` 2026-07-17 — 応援レーンの応援者が出没する不具合を修正
@@ -1634,7 +1640,10 @@
 - `v0.1.673` 2026-06-10 — コメビュの名前をパネルと同じ情報源で補完
 - `v0.1.670` 2026-06-10 — コメビュのアイコンを本家と同じサムネに
 
-### 🩺 診断・状態速報 (182版)
+### 🩺 診断・状態速報 (185版)
+- `v0.1.1179` 2026-07-21 — 公開データ同期と会場表示の診断を強化
+- `v0.1.1178` 2026-07-20 — 診断の誤検知を修正
+- `v0.1.1177` 2026-07-20 — 応援アイコンの表示診断を強化
 - `v0.1.1175` 2026-07-20 — 会場の顔アイコン診断を強化
 - `v0.1.1172` 2026-07-18 — サムネ表示の安定化に向けた計器を追加
 - `v0.1.1162` 2026-07-16 — 状態速報の異常な数値表示・誤った警告表示を修正

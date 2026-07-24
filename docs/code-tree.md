@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 4 / 684 件
+## ⚠️ 役割コメントが無いソース 4 / 687 件
 - `src/lib/laneDomSelfMeasure.js`
 - `src/lib/reportPreviewPublish.js`
 - `src/lib/venueLaneBuckets.js`
@@ -536,7 +536,7 @@
     - `trumpet1.mp3`
     - `wallet1.mp3`
   - `SOURCES.md`
-- 📁 **src/** (1419)
+- 📁 **src/** (1425)
   - 📁 **data/** (6)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -806,7 +806,7 @@
         - `logo_funlink_white_RGB_maru_black.png`
       - `logo_guide_funlink_ol.pdf`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1199)
+  - 📁 **lib/** (1205)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -1499,6 +1499,8 @@
     - `northStarMirror.js` — 北極星レーン鏡(公式値レーン)のスナップショット純関数。
     - `northStarMirror.test.js`
     - `northStarMirrorKey.js` — 北極星レーン鏡(公式値レーン)の storage キー。
+    - `northStarMirrorPublishRace.js` — 北極星鏡publish取りこぼしの実害確定計器(診断先行アプローチ)。
+    - `northStarMirrorPublishRace.test.js`
     - `numberConsistency.js` — 状態速報の「数字の自己矛盾」を自動検知する純関数(v0.1.859)。
     - `numberConsistency.test.js`
     - `objectUrlRevokeQueue.js` — `URL.createObjectURL` で作った blob URL を、メモリ滞留を抑えながら revoke する
@@ -1779,6 +1781,8 @@
     - `storyTileTvStyle.test.js`
     - `storyUserLaneBuckets.js` — 応援ユーザーレーン: ソート済み候補を tier（profileTier）別に上限付きで分割する。
     - `storyUserLaneBuckets.test.js`
+    - `storyUserLaneClickAffordanceParity.js` — ①POP応援レーンの「クリック不能な手カーソル」実害確定計器
+    - `storyUserLaneClickAffordanceParity.test.js`
     - `storyUserLaneContaminationGuard.js` — 応援ユーザーレーン候補から、視聴者/配信者 UID の混入を除外する判定。
     - `storyUserLaneContaminationGuard.test.js`
     - `storyUserLaneDisplaySrc.js` — 応援ユーザーレーン（りんく・こん太・たぬ姉）のセル画像 URL。
@@ -1891,6 +1895,8 @@
     - `venueAvatar.test.js`
     - `venueAvatarDiagLine.js` — 会場モード(venueBar.js)の「🩺 会場の状態」診断ブロックを組み立てる純関数群。
     - `venueAvatarDiagLine.test.js`
+    - `venueBubbleChurn.js` — 会場「応援TOP」吹き出しchurnの実測計器(診断先行アプローチ)。
+    - `venueBubbleChurn.test.js`
     - `venueBubbleLayout.js` — v0.1.717: 会場モードの吹き出し(セリフ)を「席の外の最上位レイヤー」に置くための配置純関数。
     - `venueBubbleLayout.test.js`
     - `venueBubbleLifecycle.js` — 吹き出しの寿命を「読み上げ(TTS)」に連動させる純関数群。

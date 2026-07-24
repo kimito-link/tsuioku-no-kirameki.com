@@ -616,8 +616,28 @@ import {
   resetStoryUserLaneDom, getStoryLaneRepaintCounts, shouldKeepStoryUserLaneTilesOnEmpty,
   // heavyRace再発の即効対策(HANDOFF-heavyrace-backfill-IMPL.md A): 暫定(heavy未settle)の短い候補で
   //   一度出た完全描画を上書き退化させない単調性ガード。
-  shouldKeepStoryUserLaneTilesOnShrink
+  shouldKeepStoryUserLaneTilesOnShrink,
+  // 2026-07-20 診断先行(①POP「クリック不能な手カーソル」実害確定計器のstate)。
+  getStoryUserLaneClickAffordanceParityState,
+  // 2026-07-20 診断先行(①POP「名前ありゆっくり顔」実害確定計器のstate)。
+  getStoryUserLaneYukkuriNamedCensusState
 } from './story/renderStoryUserLaneDom.js';
+import {
+  observeStoryUserLaneClickAffordance,
+  toStoryUserLaneClickAffordanceParityDiag
+} from '../lib/storyUserLaneClickAffordanceParity.js';
+import { toVenueYukkuriNamedCensusDiag } from '../lib/venueYukkuriNamedCensus.js';
+// 2026-07-21 診断先行(北極星鏡publish取りこぼし実害確定計器): refreshAllNorthStarMirrorLanesの
+//   多重並行実行によるバッファ競合仮説を実測する(観測のみ・修正はしない)。
+import {
+  createNorthStarMirrorPublishRaceState,
+  beginNorthStarRefreshAll,
+  endNorthStarRefreshAll,
+  observeNorthStarPublishCall,
+  observeNorthStarLiveIdReset,
+  observeNorthStarFlushOutcome,
+  toNorthStarMirrorPublishRaceDiag
+} from '../lib/northStarMirrorPublishRace.js';
 // 応援レーン描画の自己診断(council/lane-render-self-diag-SYNTHESIS.md): 「鏡はあるのに画面に出ない/
 //   ローディングが終わらない」を状態速報で抜け漏れなく捕まえる。北極星の _northStarRenderProbe と同形。
 import {
@@ -7343,6 +7363,9 @@ function publishLaneDiag(obs) {
 //   相互一貫=「①150 vs ②129」根治)。min-gap は scheduler 一元(gap 中の更新も次 flush で載る=F-1 根治)。KEY_MIRROR_BUNDLE は後続。
 const _mirrorFlushScheduler = createMirrorBundleFlushScheduler();
 let _mirrorFlushTimer = null;
+// 2026-07-21 診断先行(北極星鏡publish取りこぼし実害確定計器): 全9鏡共通のflushスケジューラが
+//   実際にstorageへ書けているかを観測する(観測のみ・修正はしない)。
+const _northStarMirrorPublishRace = createNorthStarMirrorPublishRaceState();
 /** 合流バッファに 1 鏡を反映し、trailing-edge(~400ms)で旧5キーを 1 回の set に統合して書く。描画は触らない。 */
 function mergeAndScheduleFlush(sectionKey, snapshot, liveId, nowMs) {
   if (INLINE_PASSIVE) return; // 受動ビュー: 鏡を書かない(②の不可侵原則)
@@ -7353,6 +7376,7 @@ function mergeAndScheduleFlush(sectionKey, snapshot, liveId, nowMs) {
       _mirrorFlushTimer = null;
       try {
         const out = _mirrorFlushScheduler.takeFlushPayload(Date.now());
+        try { observeNorthStarFlushOutcome(_northStarMirrorPublishRace, Boolean(out)); } catch { /* 計器失敗はflushを止めない */ }
         if (!out) { if (_mirrorFlushScheduler.isDirty()) mergeAndScheduleFlush(sectionKey, null, liveId, Date.now()); return; }
         void chrome.storage.local.set(out.legacyPayload).catch(() => { /* best-effort */ });
       } catch { /* no-op */ }
@@ -7537,6 +7561,13 @@ function publishNorthStarMirror(input) {
   if (INLINE_PASSIVE) return; // 受動ビュー: 北極星レーン鏡を上書きしない
   try {
     const src = input && typeof input === 'object' ? input : {};
+    // 2026-07-21 計器(観測のみ): liveId変化による合流バッファリセットを検知(取りこぼし仮説の裏取り)。
+    try {
+      observeNorthStarLiveIdReset(_northStarMirrorPublishRace, {
+        prevLiveId: _northStarMirrorLanes.liveId,
+        nextLiveId: src.liveId
+      });
+    } catch { /* 計器失敗はpublishを止めない */ }
     // 北極星セクション内の合流は純関数 mergeNorthStarMirrorLanes に集約(貢献度/広告のコピー漏れ再発防止)。
     _northStarMirrorLanes = mergeNorthStarMirrorLanes(_northStarMirrorLanes, src);
     if (src.deferWrite) return; // バースト中は合流だけ(write は allSettled 後の 1 回が担う)。
@@ -7550,6 +7581,7 @@ function publishNorthStarMirror(input) {
       },
       now
     );
+    try { observeNorthStarPublishCall(_northStarMirrorPublishRace); } catch { /* 計器失敗はpublishを止めない */ }
     mergeAndScheduleFlush('northStar', snap, _northStarMirrorLanes.liveId, now);
   } catch {
     /* no-op */
@@ -12328,6 +12360,20 @@ function paintNorthStarGiftThrowsPanel(html) {
   panel.hidden = false;
   panel.removeAttribute('aria-hidden');
   bindOnErrorHandlersWithin(panel);
+  // 2026-07-20 計器(観測のみ・新規貼り替え時のみ対象): 投げ一覧テーブルのtd(リンクでもボタンでもない
+  //   ただの表示セル)がcomputed cursor:pointerになっていないかを数える。失敗は握る(描画を止めない)。
+  try {
+    const state = getStoryUserLaneClickAffordanceParityState();
+    const cells = panel.querySelectorAll('td');
+    for (let i = 0; i < cells.length; i += 1) {
+      const cell = cells[i];
+      // <a>や<button>を内包するセルは対象外(内部要素のcursorが親に波及するのは正常)。
+      if (cell.querySelector('a,button')) continue;
+      observeStoryUserLaneClickAffordance(state, { tileEl: cell, title: cell.textContent });
+    }
+  } catch {
+    /* 計器失敗は描画を止めない */
+  }
 }
 
 /**
@@ -12917,6 +12963,8 @@ async function refreshAllNorthStarMirrorLanes(liveId) {
   _northStarRenderProbe.lastRunAtBase = Date.now();
   _northStarRenderProbe.lastReachedLane = 'start';
   _northStarRenderProbe.lastError = '';
+  // 2026-07-21 計器(観測のみ): 本関数の多重並行実行を検知する(北極星鏡取りこぼし仮説の裏取り)。
+  try { beginNorthStarRefreshAll(_northStarMirrorPublishRace); } catch { /* 計器失敗は本処理を止めない */ }
   try {
     // v0.1.617: イベント系2レーンの「非参加なら即・確実に畳む」。
     // ★v0.1.990(真因修正): これを await すると、内部の chrome.storage.local.get が重い配信(大量
@@ -12994,6 +13042,9 @@ async function refreshAllNorthStarMirrorLanes(liveId) {
       (e && /** @type {any} */ (e).message) || e || 'unknown'
     ).slice(0, 200);
     throw e;
+  } finally {
+    // 2026-07-21 計器(観測のみ): 開始時+1した同時実行数を必ず-1する(例外時も含む)。
+    try { endNorthStarRefreshAll(_northStarMirrorPublishRace); } catch { /* 計器失敗は本処理を止めない */ }
   }
 }
 
@@ -18828,6 +18879,30 @@ async function collectAiShareDevMonitorPayloadBundle(watchUrl) {
           if (snap) snap.heavyReadInflightJoinCount = _heavyReadSingleFlight.joinCount();
           return snap;
         } catch { return null; }
+      })(),
+      // 2026-07-20 診断先行(①POP「クリック不能な手カーソル」実害確定計器)。数えるだけ・観測のみ。
+      storyUserLaneClickAffordanceParity: (() => {
+        try {
+          return toStoryUserLaneClickAffordanceParityDiag(getStoryUserLaneClickAffordanceParityState());
+        } catch {
+          return null;
+        }
+      })(),
+      // 2026-07-20 診断先行(①POP「名前ありゆっくり顔」実害確定計器・会場専用だった計器を①POPに拡張)。
+      storyUserLaneYukkuriNamedCensus: (() => {
+        try {
+          return toVenueYukkuriNamedCensusDiag(getStoryUserLaneYukkuriNamedCensusState());
+        } catch {
+          return null;
+        }
+      })(),
+      // 2026-07-21 診断先行(北極星鏡publish取りこぼし実害確定計器)。数えるだけ・観測のみ。
+      northStarMirrorPublishRace: (() => {
+        try {
+          return toNorthStarMirrorPublishRaceDiag(_northStarMirrorPublishRace);
+        } catch {
+          return null;
+        }
       })(),
       // v0.1.1123 計器(D-0): 「started=0(応援レーン描画が起動しない)」と「ローディングがつねに出る」
       //   の真因実測。laneTickProbe=tick結末の理由別内訳(lidMiss支配=lid解決全滅が真因、等)。

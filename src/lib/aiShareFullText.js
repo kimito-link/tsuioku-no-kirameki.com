@@ -288,6 +288,13 @@ export function buildAiShareFullText({ overviewText, livesData, fastDiag, popupD
     } catch {
       /* no-op */
     }
+    // 2026-07-21 診断先行: 応援TOP吹き出しchurnの実害を数えるだけの1行。
+    try {
+      const bcLine = String(/** @type {any} */ (venueSeatsDiag)?.bubbleChurn?.line || '');
+      if (bcLine) lines.push(bcLine);
+    } catch {
+      /* no-op */
+    }
     // v0.1.1054: ギフト/広告の「検知→演出→効果音」整合診断(使用時のみ)。「ちゃんと飛ぶか・音が出るか」を共有に載せる。
     try {
       const gLines = buildGiftEffectDiagLines(giftEffectDiag, Date.now());
@@ -458,6 +465,29 @@ export function buildAiShareFullText({ overviewText, livesData, fastDiag, popupD
     } catch {
       /* no-op: 自己診断の失敗は状態速報を壊さない */
     }
+  }
+  // 2026-07-20 診断先行: ①POP応援レーン/投げ一覧の「クリック不能な手カーソル」実害を数えるだけの1行。
+  try {
+    const capLine = String((popupDiag?.popup ?? popupDiag)?.storyUserLaneClickAffordanceParity?.line || '');
+    if (capLine) lines.push(capLine);
+  } catch {
+    /* no-op: 自己診断の失敗は状態速報を壊さない */
+  }
+  // 2026-07-20 診断先行: ①POP応援レーンの「名前ありゆっくり顔」実害を数えるだけの1行(会場専用だった
+  //   計器を①POPにも拡張)。
+  try {
+    const ynPopupLine = String((popupDiag?.popup ?? popupDiag)?.storyUserLaneYukkuriNamedCensus?.line || '');
+    if (ynPopupLine) lines.push(ynPopupLine);
+  } catch {
+    /* no-op: 自己診断の失敗は状態速報を壊さない */
+  }
+  // 2026-07-21 診断先行: 北極星鏡publish取りこぼしの実害を数えるだけの1行(多重並行実行によるバッファ
+  //   競合仮説の裏取り)。
+  try {
+    const nsRaceLine = String((popupDiag?.popup ?? popupDiag)?.northStarMirrorPublishRace?.line || '');
+    if (nsRaceLine) lines.push(nsRaceLine);
+  } catch {
+    /* no-op: 自己診断の失敗は状態速報を壊さない */
   }
   lines.push('### 診断 JSON (fastDiag)');
   lines.push('```json');

@@ -39,10 +39,63 @@ describe('observeVenueYukkuriNamedTile（正常系）', () => {
     expect(state.yukkuriNamed).toBe(0);
   });
 
-  it('数値IDでない(a:系)は対象外(仕様通りのidenticon)', () => {
+  it('数値IDでない(a:系)は数値ID系カウンタ(checked)は対象外(桁境界とは別集計)', () => {
     const state = createVenueYukkuriNamedCensusState();
     observeVenueYukkuriNamedTile(state, { uid: 'a:anon-1', rawName: '名前あり', displaySrc: IDENTICON });
     expect(state.checked).toBe(0);
+  });
+
+  it('uid空(素性不明)は匿名系カウンタも対象外', () => {
+    const state = createVenueYukkuriNamedCensusState();
+    observeVenueYukkuriNamedTile(state, { uid: '', rawName: '名前あり', displaySrc: IDENTICON });
+    expect(state.checkedAnonymousStyle).toBe(0);
+  });
+
+  it('2026-07-20実測(実配信で誤検知10件→判明): rawNameが「匿名（uid）」合成ラベル(displayUserLabelの' +
+    'フォールバック)なら数値ID系・匿名系どちらも対象外(本人の投稿名ではない)', () => {
+    const state = createVenueYukkuriNamedCensusState();
+    observeVenueYukkuriNamedTile(state, {
+      uid: 'a:t_boQTpES7t72s20',
+      rawName: '匿名（a:t_boQTpES7t72s20）',
+      displaySrc: IDENTICON
+    });
+    expect(state.checkedAnonymousStyle).toBe(0);
+    expect(state.yukkuriNamedAnonymousStyle).toBe(0);
+  });
+
+  it('rawNameが「匿名NNN」(anonymousDisplayLabel由来)も数値ID系で対象外', () => {
+    const state = createVenueYukkuriNamedCensusState();
+    observeVenueYukkuriNamedTile(state, { uid: '12345678', rawName: '匿名123', displaySrc: IDENTICON });
+    expect(state.checked).toBe(0);
+    expect(state.yukkuriNamed).toBe(0);
+  });
+});
+
+describe('observeVenueYukkuriNamedTile（2026-07-20拡張: a:系/ハッシュ系の匿名スタイルカウンタ）', () => {
+  it('a:系で実写/CDN URLなら不一致カウントは増えない(検査対象にはなる)', () => {
+    const state = createVenueYukkuriNamedCensusState();
+    observeVenueYukkuriNamedTile(state, { uid: 'a:anon-1', rawName: 'メデタセット', displaySrc: REAL_URL });
+    expect(state.checkedAnonymousStyle).toBe(1);
+    expect(state.yukkuriNamedAnonymousStyle).toBe(0);
+  });
+
+  it('a:系で名前ありがidenticonなら yukkuriNamedAnonymousStyle が増える(数値ID系のyukkuriNamedとは別集計)', () => {
+    const state = createVenueYukkuriNamedCensusState();
+    observeVenueYukkuriNamedTile(state, { uid: 'a:anon-1', rawName: 'メデタセット', displaySrc: IDENTICON });
+    expect(state.checkedAnonymousStyle).toBe(1);
+    expect(state.yukkuriNamedAnonymousStyle).toBe(1);
+    expect(state.yukkuriNamed).toBe(0);
+    expect(state.lastSampleAnonymousStyle).toEqual({ uid: 'a:anon-1', name: 'メデタセット' });
+  });
+
+  it('ハッシュ系(10〜26文字英数字)も匿名スタイルカウンタで観測される', () => {
+    const state = createVenueYukkuriNamedCensusState();
+    observeVenueYukkuriNamedTile(state, {
+      uid: 'abcdef1234567890',
+      rawName: '花子',
+      displaySrc: IDENTICON
+    });
+    expect(state.yukkuriNamedAnonymousStyle).toBe(1);
   });
 });
 
@@ -106,6 +159,26 @@ describe('toVenueYukkuriNamedCensusDiag', () => {
     expect(diag.line).toContain('桁境界1');
     expect(diag.line).toContain('花子');
     expect(diag.yukkuriNamed).toBe(1);
+  });
+
+  it('数値ID系は未観測(checked=0)でも匿名系が観測済みなら⚪にならない', () => {
+    const state = createVenueYukkuriNamedCensusState();
+    observeVenueYukkuriNamedTile(state, { uid: 'a:anon-1', rawName: 'メデタセット', displaySrc: REAL_URL });
+    const diag = toVenueYukkuriNamedCensusDiag(state);
+    expect(diag.line).not.toContain('⚪');
+    expect(diag.line).toContain('✅');
+    expect(diag.line).toContain('匿名系検1');
+  });
+
+  it('匿名系のみ実害ありは🔴+匿名系件数+直近匿名系サンプルを1行に含む', () => {
+    const state = createVenueYukkuriNamedCensusState();
+    observeVenueYukkuriNamedTile(state, { uid: 'a:anon-1', rawName: 'メデタセット', displaySrc: IDENTICON });
+    const diag = toVenueYukkuriNamedCensusDiag(state);
+    expect(diag.line).toContain('🔴');
+    expect(diag.line).toContain('匿名系1件');
+    expect(diag.line).toContain('メデタセット');
+    expect(diag.line).toContain('uid=a:anon-1');
+    expect(diag.yukkuriNamedAnonymousStyle).toBe(1);
   });
 
   it('壊れたstateでも例外を投げずnullを返す', () => {
