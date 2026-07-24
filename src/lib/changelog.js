@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1181',
+    date: '2026-07-24',
+    summary: '会場読み上げが混雑時に詰まりにくく',
+    items: Object.freeze([
+      'コメントが多い配信で読み上げの合成が遅くなったとき、待機件数を自動で減らしてラグを抑えるようにしました。読み上げは間引かれますが、いつも「今」に近いコメントが読まれるようになります。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1180',
     date: '2026-07-24',
     summary: '会場読み上げの診断を強化',

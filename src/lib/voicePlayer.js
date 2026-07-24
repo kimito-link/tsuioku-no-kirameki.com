@@ -11,8 +11,9 @@ import {
   resolveVoiceSynthDepth,
   VOICE_PLAYBACK_RATE_MAX
 } from './voiceReadQueue.js';
-// 2026-07-24 診断先行(段階0=shadow計測のみ・council-fable設計): 件数ゲート実効上限を
-//   処理時間EMAから算出するだけで、実際のpushVoiceQueueのmaxはまだ変えない(観測のみ)。
+// 2026-07-24(段階1=apply・council-fable設計venue-bubble-voice-realtime-max-DESIGN.md): 件数
+//   ゲート実効上限を処理時間EMAから算出し、pushVoiceQueueのmaxへ実適用する(shadow実測で
+//   effectiveQueueMax<8が実配信で起きることを確認済み)。
 import { updateVoiceServiceTimeEma, resolveVoiceQueueMax, stepVoiceQueueMax } from './voiceLagBudget.js';
 
 export class VoicePlayer {
@@ -52,9 +53,9 @@ export class VoicePlayer {
     //   onDiag(注入)経由で呼び出し元がstorageへ書く。従来この経路は完全に無計器で、
     //   状態速報の「会場読み上げ」行が別経路(comeview)の化石を表示し続けていた。
     this.onDiag = deps.onDiag || (() => {});
-    // 2026-07-24 計器の内部state(段階0=shadow・観測のみ・実際のキュー動作は変えない)。
+    // 2026-07-24 会場読み上げの件数ゲート実効上限state(council-fable設計・段階1=apply)。
     //   serviceTimeEma=1件あたり処理時間のEMA、effectiveQueueMax=そこから計算した実効上限
-    //   (診断表示のみ・pushVoiceQueueには未適用)、growStreak=復帰ヒステリシスの連続カウンタ。
+    //   (pushVoiceQueueのmaxに実適用・床2〜天井8)、growStreak=復帰ヒステリシスの連続カウンタ。
     this._serviceTimeEmaMs = -1;
     this._effectiveQueueMax = 8;
     this._growStreak = 0;
@@ -66,10 +67,10 @@ export class VoicePlayer {
       //   lastE2eMs=直近1件・e2eAvgMs=EMA(係数0.3・窓バッファ無し=メモリ有界)。
       //   mergeTotal=mergeRepeatedVoiceItem で吸収した累計(統合が効いているかの計器)。
       lastE2eMs: -1, e2eAvgMs: -1, mergeTotal: 0,
-      // 2026-07-24 計器(段階0=shadow・council-fable設計venue-bubble-voice-realtime-max-DESIGN.md):
+      // 2026-07-24 計器(段階1=apply・council-fable設計venue-bubble-voice-realtime-max-DESIGN.md):
       //   serviceTimeEmaMs=1件あたり処理時間の実測EMA、effectiveQueueMax=そこから算出した
-      //   実効上限(表示のみ・未適用)、rateClampTotal=playbackRateが上限1.35で飽和した回数、
-      //   voicedRatio=spokenTotal/(spokenTotal+staleDropTotal)(生存者バイアスの緑を潰す指標)。
+      //   実効上限(pushVoiceQueueのmaxに実適用)、rateClampTotal=playbackRateが上限1.35で
+      //   飽和した回数、voicedRatio=spokenTotal/(spokenTotal+staleDropTotal)(生存者バイアスの緑を潰す指標)。
       serviceTimeEmaMs: -1, effectiveQueueMax: 8, rateClampTotal: 0, voicedRatio: -1
     };
   }
@@ -444,9 +445,9 @@ export class VoicePlayer {
         // v0.1.1065計器: 1件完了(comeviewと同じくcatch経路も含む)。
         this.diag.spokenTotal += 1;
         this.diag.lastSpokenBase = Date.now();
-        // 2026-07-24計器(段階0=shadow・council-fable設計venue-bubble-voice-realtime-max-DESIGN.md):
-        //   1件あたり処理時間(shift〜再生完了)をEMA化し、そこから実効上限を計算するだけ
-        //   (pushVoiceQueueのmaxはまだ8固定のまま変えない=観測のみ)。
+        // 2026-07-24(段階1=apply・council-fable設計venue-bubble-voice-realtime-max-DESIGN.md):
+        //   1件あたり処理時間(shift〜再生完了)をEMA化し、そこから実効上限を計算する。
+        //   ここで更新したthis._effectiveQueueMaxは次のenqueue時にpushVoiceQueueへ実適用される。
         this._serviceTimeEmaMs = updateVoiceServiceTimeEma(this._serviceTimeEmaMs, Date.now() - _serviceStart);
         const _computedMax = resolveVoiceQueueMax(this._serviceTimeEmaMs);
         const _step = stepVoiceQueueMax(this._effectiveQueueMax, _computedMax, this._growStreak);
@@ -514,7 +515,11 @@ export class VoicePlayer {
       //   【件数ゲート(最古drop)】に置く。上限を 12→8 に下げ、ラグを「8件 × 再生1本」に有界化。
       //   溢れたら最古から捨てる=常に直近コメントが読まれ、絶対にゼロ音声にならない。時間ゲート
       //   (voiceAgeGate)は安全網(8秒・タブ凍結放置だけ落とす)に格下げ済み。
-      const pushed = pushVoiceQueue(this.queue, candidate, { max: 8 });
+      // 2026-07-24(段階1=apply・council-fable設計venue-bubble-voice-realtime-max-DESIGN.md): 8固定は
+      //   天井のみ(voiceLagBudget.VOICE_QUEUE_MAX_CEIL)。実際のmaxは処理時間EMAから動的算出した
+      //   this._effectiveQueueMax(床2〜天井8)。実配信で処理時間が伸びた(1703ms/件)ときに8件固定だと
+      //   ラグ上界が安全網(8000ms)を超えるのを、実効上限の動的縮小で構造的に防ぐ。
+      const pushed = pushVoiceQueue(this.queue, candidate, { max: this._effectiveQueueMax });
       this.queue = pushed.queue;
       
       if (pushed.dropped && pushed.dropped.length > 0) {
