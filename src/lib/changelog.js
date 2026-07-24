@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1184',
+    date: '2026-07-24',
+    summary: '純Web公開データの同期を安定化',
+    items: Object.freeze([
+      '北極星レーン(貢献度・広告ランキング)のデータが純Web公開に反映されない不具合の原因(処理の多重実行)を解消しました。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1183',
     date: '2026-07-24',
     summary: '状態速報の表示文言を修正',
