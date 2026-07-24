@@ -12955,9 +12955,20 @@ const NL_POPUP_BOOT_AT_ISO = new Date().toISOString();
 /** dismissInitialLoadShade が呼ばれた累計(幕を畳む経路が生きているかの実測)。 */
 let _shadeDismissCalls = 0;
 
+// 2026-07-24(北極星鏡publish競合の根治): tickIndependentNorthStarが400ms/1500ms/4000ms後の
+//   setTimeout+6000ms間隔のsetInterval+storage.onChangedのたびに void で多重発火する設計
+//   (v0.1.989「タイマー任せにせず複数回試行してstarvationに対処する」の意図的設計)により、
+//   実配信でrefreshAllNorthStarMirrorLanesの同時実行最大7が実測された。呼び出し自体は
+//   減らさず(v0.1.989の意図を保つ)、同一liveIdの多重並行実行だけをjoinさせる。
+const _northStarRefreshSingleFlight = createSingleFlightByKey();
+
 /** 北極星 6 レーンを一括再描画（bundle / snapshot / storage の現在値を使用）。 */
 async function refreshAllNorthStarMirrorLanes(liveId) {
   const lid = String(liveId || '').trim().toLowerCase();
+  return _northStarRefreshSingleFlight.run(lid, () => _refreshAllNorthStarMirrorLanesImpl(lid));
+}
+
+async function _refreshAllNorthStarMirrorLanesImpl(lid) {
   // v0.1.616: 観測。どこまで到達したか（先頭の重いギフト同期で詰まる仮説の検証）。
   _northStarRenderProbe.refreshAllStarted += 1;
   _northStarRenderProbe.lastRunAtBase = Date.now();
