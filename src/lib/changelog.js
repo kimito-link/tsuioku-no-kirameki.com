@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1182',
+    date: '2026-07-24',
+    summary: '会場の順位バッジのちらつきを修正',
+    items: Object.freeze([
+      '会場参加者パネルで、上位3名に付く順位バッジ(🥇🥈🥉)が細かく明滅することがある不具合を修正しました。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1181',
     date: '2026-07-24',
     summary: '会場読み上げが混雑時に詰まりにくく',

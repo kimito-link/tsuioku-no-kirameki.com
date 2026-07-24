@@ -2424,6 +2424,11 @@ export function mountVenueBarButton(options = {}) {
   // 応援者トップNバーの状態(renderTopBar / clearDisplay が触る・宣言はここ=TDZ 回避)。
   let _lastTopBarSig = '';
   let _topBarShownOnce = false;
+  // 2026-07-24: RANKバッジ(dataset.venueRank)の局所diff-skip用。renderSeats全体のsig-skipは
+  //   v0.1.1032で実機ちらつき回帰を招き撤回済みの地雷なので導入しない。DOM要素(node.seat)単位で
+  //   「最後に書き込んだvenueRank」だけを覚え、同じ値ならdataset書き込みそのものをスキップする。
+  /** @type {WeakMap<HTMLElement, number>} */
+  const _lastVenueRankByNode = new WeakMap();
   // 診断シート(メンバー一覧ボタン)用: renderSeats が最新の席割りをここに保存する。
   /** @type {{ allSeats: any[], visibleSeats: any[], audienceCount: number }} */
   let lastRosterInput = { allSeats: [], visibleSeats: [], audienceCount: 0 };
@@ -4257,7 +4262,11 @@ export function mountVenueBarButton(options = {}) {
       node.seat.setAttribute('aria-hidden', 'true');
       node.seat.removeAttribute('title');
       delete node.seat.dataset.tierIndex;
-      delete node.seat.dataset.venueRank;
+      // 2026-07-24: venueRankはここでdeleteしない(装飾ループのWeakMap diff-skipに一本化)。
+      //   1コメントごとに全参加者のスコアが僅かに動き上位3位が頻繁に入れ替わる構造(venueSeats.js
+      //   resolveVenueRegularScore)に対し、順位不変でも毎paintでdelete→再代入していたのがバッジの
+      //   明滅(ちらつき)の真因。renderSeats全体のsig-skipはv0.1.1032で撤回済みの地雷なので、
+      //   ここではRANKバッジのdataset属性1つだけを対象にした局所diff-skipで対処する。
       delete node.seat.dataset.streak;
       if (!visibleSeatIndexSet.has(i)) {
         if (node.seat.parentElement) node.seat.parentElement.removeChild(node.seat);
@@ -4377,10 +4386,15 @@ export function mountVenueBarButton(options = {}) {
       node.seat.classList.toggle('nlsb-seat-vip', item?._venueIsVip === true);
       node.seat.classList.remove('nlsb-seat-regular');
       const venueRank = Math.max(0, Math.floor(Number(entry.venueRank || item?._venueRank) || 0));
-      if (venueRank >= 1 && venueRank <= 3) {
-        node.seat.dataset.venueRank = String(venueRank);
-      } else {
-        delete node.seat.dataset.venueRank;
+      // 2026-07-24(局所diff-skip): この席(node.seat)へ最後に書き込んだ順位と同じなら何もしない。
+      //   順位が実際に変わったときだけdataset書き込み(delete/再代入)を行い、無変化でのバッジ明滅を防ぐ。
+      if (_lastVenueRankByNode.get(node.seat) !== venueRank) {
+        if (venueRank >= 1 && venueRank <= 3) {
+          node.seat.dataset.venueRank = String(venueRank);
+        } else {
+          delete node.seat.dataset.venueRank;
+        }
+        _lastVenueRankByNode.set(node.seat, venueRank);
       }
       const speakerKey = uid ? `u:${uid}` : rawName ? `n:${rawName}` : '';
       const streakEntry = speakerKey ? speechStreaks.get(speakerKey) : null;
