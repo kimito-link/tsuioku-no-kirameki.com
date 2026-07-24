@@ -143,3 +143,77 @@ describe('makeInitialVoiceDiag / buildVoiceDiagSnapshot: v0.1.1088計器の初�
     expect(snap.mergeTotal).toBe(3);
   });
 });
+
+describe('2026-07-24計器(段階0=shadow・council-fable設計venue-bubble-voice-realtime-max-DESIGN.md)', () => {
+  it('初期stateはserviceTimeEmaMs=-1・effectiveQueueMax=8・rateClampTotal=0・voicedRatio=-1', () => {
+    const d = makeInitialVoiceDiag();
+    expect(d.serviceTimeEmaMs).toBe(-1);
+    expect(d.effectiveQueueMax).toBe(8);
+    expect(d.rateClampTotal).toBe(0);
+    expect(d.voicedRatio).toBe(-1);
+  });
+
+  it('スナップショットが欠損フィールドを初期値で埋める', () => {
+    const snap = buildVoiceDiagSnapshot({}, 0);
+    expect(snap.serviceTimeEmaMs).toBe(-1);
+    expect(snap.effectiveQueueMax).toBe(8);
+    expect(snap.rateClampTotal).toBe(0);
+    expect(snap.voicedRatio).toBe(-1);
+  });
+
+  it('実測値を保持する', () => {
+    const snap = buildVoiceDiagSnapshot(
+      { serviceTimeEmaMs: 1500, effectiveQueueMax: 4, rateClampTotal: 2, voicedRatio: 0.75 },
+      0
+    );
+    expect(snap.serviceTimeEmaMs).toBe(1500);
+    expect(snap.effectiveQueueMax).toBe(4);
+    expect(snap.rateClampTotal).toBe(2);
+    expect(snap.voicedRatio).toBe(0.75);
+  });
+
+  it('voicedRatio計測済みなら%表示する(生存者バイアス潰し・D章)', () => {
+    const line = buildVoiceDiagLine({
+      enabled: true, queueNow: 0, queueMax: 2, spokenTotal: 5, voicedRatio: 0.8
+    }, 1000);
+    expect(line).toContain('voiced率80%');
+  });
+
+  it('voicedRatio未計測(-1)なら出さない(ノイズにしない)', () => {
+    const line = buildVoiceDiagLine({
+      enabled: true, queueNow: 0, queueMax: 2, spokenTotal: 5, voicedRatio: -1
+    }, 1000);
+    expect(line).not.toContain('voiced率');
+  });
+
+  it('serviceTimeEmaMs計測済みなら処理時間と実効上限(未適用)を表示する', () => {
+    const line = buildVoiceDiagLine({
+      enabled: true, queueNow: 0, queueMax: 2, spokenTotal: 5,
+      serviceTimeEmaMs: 1500, effectiveQueueMax: 4
+    }, 1000);
+    expect(line).toContain('処理時間1500ms/件');
+    expect(line).toContain('実効上限4(未適用)');
+  });
+
+  it('serviceTimeEmaMs未計測(-1)なら処理時間/実効上限は出さない', () => {
+    const line = buildVoiceDiagLine({
+      enabled: true, queueNow: 0, queueMax: 2, spokenTotal: 5, serviceTimeEmaMs: -1
+    }, 1000);
+    expect(line).not.toContain('処理時間');
+    expect(line).not.toContain('実効上限');
+  });
+
+  it('rateClampTotal>0なら速度飽和件数を表示する', () => {
+    const line = buildVoiceDiagLine({
+      enabled: true, queueNow: 0, queueMax: 2, spokenTotal: 5, rateClampTotal: 3
+    }, 1000);
+    expect(line).toContain('速度飽和3件');
+  });
+
+  it('rateClampTotal=0なら速度飽和項目は出さない', () => {
+    const line = buildVoiceDiagLine({
+      enabled: true, queueNow: 0, queueMax: 2, spokenTotal: 5, rateClampTotal: 0
+    }, 1000);
+    expect(line).not.toContain('速度飽和');
+  });
+});

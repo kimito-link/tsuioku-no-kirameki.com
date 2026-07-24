@@ -122,7 +122,9 @@ export function computeVoiceE2eAverage(prevAvgMs, sampleMs, alpha = 0.3) {
   return Math.round(prev + alpha * (sample - prev));
 }
 
-const VOICE_PLAYBACK_RATE_MAX = 1.35;
+// 2026-07-24: 呼び出し側(voicePlayer.js)がplaybackRate飽和(clamp張り付き)を計器で
+//   観測できるよう、既存の内部定数をexportに変更(値自体は不変・挙動を変えない)。
+export const VOICE_PLAYBACK_RATE_MAX = 1.35;
 
 /**
  * voice-tempo-realtime-SYNTHESIS §3 Phase 2: 先読み合成した WAV は「合成した瞬間の混雑度」の

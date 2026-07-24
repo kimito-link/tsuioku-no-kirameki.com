@@ -3,6 +3,7 @@ import {
   createVenueBubbleChurnState,
   observeVenueBubbleSpawn,
   observeVenueBubbleEviction,
+  observeVenueBubbleRemoval,
   toVenueBubbleChurnDiag
 } from './venueBubbleChurn.js';
 
@@ -20,6 +21,8 @@ describe('createVenueBubbleChurnState', () => {
     expect(state.longCount).toBe(0);
     expect(state.evicted).toBe(0);
     expect(state.lastRatePerSec).toBe(0);
+    expect(state.removedVoiced).toBe(0);
+    expect(state.removedUnvoiced).toBe(0);
   });
 });
 
@@ -79,6 +82,41 @@ describe('observeVenueBubbleEviction', () => {
   });
 });
 
+describe('observeVenueBubbleRemoval', () => {
+  it('speakingで消滅した吹き出しはremovedVoicedに分類', () => {
+    const state = createVenueBubbleChurnState();
+    observeVenueBubbleRemoval(state, 'speaking');
+    expect(state.removedVoiced).toBe(1);
+    expect(state.removedUnvoiced).toBe(0);
+  });
+
+  it('doneで消滅した吹き出しもremovedVoicedに分類', () => {
+    const state = createVenueBubbleChurnState();
+    observeVenueBubbleRemoval(state, 'done');
+    expect(state.removedVoiced).toBe(1);
+  });
+
+  it('pendingで消滅した吹き出しはremovedUnvoicedに分類', () => {
+    const state = createVenueBubbleChurnState();
+    observeVenueBubbleRemoval(state, 'pending');
+    expect(state.removedUnvoiced).toBe(1);
+    expect(state.removedVoiced).toBe(0);
+  });
+
+  it('unvoicedで消滅した吹き出しもremovedUnvoicedに分類', () => {
+    const state = createVenueBubbleChurnState();
+    observeVenueBubbleRemoval(state, 'unvoiced');
+    expect(state.removedUnvoiced).toBe(1);
+  });
+
+  it('未知の値/undefinedは安全側(unvoiced)に倒す', () => {
+    const state = createVenueBubbleChurnState();
+    observeVenueBubbleRemoval(state, undefined);
+    observeVenueBubbleRemoval(state, 'unknown-state');
+    expect(state.removedUnvoiced).toBe(2);
+  });
+});
+
 describe('toVenueBubbleChurnDiag', () => {
   it('spawned=0は⚪未観測', () => {
     const diag = toVenueBubbleChurnDiag(createVenueBubbleChurnState());
@@ -98,6 +136,27 @@ describe('toVenueBubbleChurnDiag', () => {
     expect(diag.line).toContain('長>3s:1');
     expect(diag.line).toContain('強制退去2');
     expect(diag.line).toContain('直近流速4件/秒');
+  });
+
+  it('消滅時voiced/unvoiced分布とunvoiced率を1行に含む(偽陽性潰し用指標)', () => {
+    const state = createVenueBubbleChurnState();
+    observeVenueBubbleSpawn(state, { flowLifetimeMs: 1200, ratePerSec: 5 });
+    observeVenueBubbleRemoval(state, 'speaking');
+    observeVenueBubbleRemoval(state, 'pending');
+    observeVenueBubbleRemoval(state, 'pending');
+    observeVenueBubbleRemoval(state, 'pending');
+    const diag = toVenueBubbleChurnDiag(state);
+    expect(diag.line).toContain('消滅時voiced1・unvoiced3');
+    expect(diag.line).toContain('unvoiced率75%');
+    expect(diag.removedVoiced).toBe(1);
+    expect(diag.removedUnvoiced).toBe(3);
+  });
+
+  it('removedVoiced/removedUnvoiceceが両方0ならunvoiced率は-表記', () => {
+    const state = createVenueBubbleChurnState();
+    observeVenueBubbleSpawn(state, { flowLifetimeMs: 1200, ratePerSec: 5 });
+    const diag = toVenueBubbleChurnDiag(state);
+    expect(diag.line).toContain('unvoiced率-');
   });
 
   it('壊れたstateでも例外を投げずnullを返す', () => {
