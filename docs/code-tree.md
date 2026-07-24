@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 4 / 687 件
+## ⚠️ 役割コメントが無いソース 4 / 688 件
 - `src/lib/laneDomSelfMeasure.js`
 - `src/lib/reportPreviewPublish.js`
 - `src/lib/venueLaneBuckets.js`
@@ -536,7 +536,7 @@
     - `trumpet1.mp3`
     - `wallet1.mp3`
   - `SOURCES.md`
-- 📁 **src/** (1425)
+- 📁 **src/** (1427)
   - 📁 **data/** (6)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -806,7 +806,7 @@
         - `logo_funlink_white_RGB_maru_black.png`
       - `logo_guide_funlink_ol.pdf`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1205)
+  - 📁 **lib/** (1207)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -1971,6 +1971,8 @@
     - `voiceEffectDiagKey.js` — パチンコボイス演出(voiceDirector.js・Phase B)の「発火/スキップ内訳」観測値を
     - `voiceInputDevices.js` — マイク確認でサンプルする時間（ms）
     - `voiceInputDevices.test.js`
+    - `voiceLagBudget.js` — 会場読み上げの件数ゲート実効上限を、処理時間EMA(実測)から動的に
+    - `voiceLagBudget.test.js`
     - `voiceLoadingState.js` — VOICEVOX 起動待ちのローディング表示を決める純関数群。
     - `voiceLoadingState.test.js`
     - `voicePlayer.js` — comeview-entry.js と同じ方針(@ts-nocheck)。ロジックは変更しない。

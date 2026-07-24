@@ -8,8 +8,12 @@ import {
   computeVoicePlaybackRate,
   mergeRepeatedVoiceItem,
   pushVoiceQueue,
-  resolveVoiceSynthDepth
+  resolveVoiceSynthDepth,
+  VOICE_PLAYBACK_RATE_MAX
 } from './voiceReadQueue.js';
+// 2026-07-24 診断先行(段階0=shadow計測のみ・council-fable設計): 件数ゲート実効上限を
+//   処理時間EMAから算出するだけで、実際のpushVoiceQueueのmaxはまだ変えない(観測のみ)。
+import { updateVoiceServiceTimeEma, resolveVoiceQueueMax, stepVoiceQueueMax } from './voiceLagBudget.js';
 
 export class VoicePlayer {
   constructor(deps = {}) {
@@ -48,6 +52,12 @@ export class VoicePlayer {
     //   onDiag(注入)経由で呼び出し元がstorageへ書く。従来この経路は完全に無計器で、
     //   状態速報の「会場読み上げ」行が別経路(comeview)の化石を表示し続けていた。
     this.onDiag = deps.onDiag || (() => {});
+    // 2026-07-24 計器の内部state(段階0=shadow・観測のみ・実際のキュー動作は変えない)。
+    //   serviceTimeEma=1件あたり処理時間のEMA、effectiveQueueMax=そこから計算した実効上限
+    //   (診断表示のみ・pushVoiceQueueには未適用)、growStreak=復帰ヒステリシスの連続カウンタ。
+    this._serviceTimeEmaMs = -1;
+    this._effectiveQueueMax = 8;
+    this._growStreak = 0;
     this.diag = {
       enabled: false, queueNow: 0, queueMax: 0, spokenTotal: 0, staleDropTotal: 0,
       playbackTimeoutTotal: 0, lastSpokenBase: 0, lastSynthMs: -1, lastDepth: 0,
@@ -55,7 +65,12 @@ export class VoicePlayer {
       // v0.1.1088計器(voice-tempo-realtime-SYNTHESIS §3 Phase 1): 「到着→発声」の体感遅延。
       //   lastE2eMs=直近1件・e2eAvgMs=EMA(係数0.3・窓バッファ無し=メモリ有界)。
       //   mergeTotal=mergeRepeatedVoiceItem で吸収した累計(統合が効いているかの計器)。
-      lastE2eMs: -1, e2eAvgMs: -1, mergeTotal: 0
+      lastE2eMs: -1, e2eAvgMs: -1, mergeTotal: 0,
+      // 2026-07-24 計器(段階0=shadow・council-fable設計venue-bubble-voice-realtime-max-DESIGN.md):
+      //   serviceTimeEmaMs=1件あたり処理時間の実測EMA、effectiveQueueMax=そこから算出した
+      //   実効上限(表示のみ・未適用)、rateClampTotal=playbackRateが上限1.35で飽和した回数、
+      //   voicedRatio=spokenTotal/(spokenTotal+staleDropTotal)(生存者バイアスの緑を潰す指標)。
+      serviceTimeEmaMs: -1, effectiveQueueMax: 8, rateClampTotal: 0, voicedRatio: -1
     };
   }
 
@@ -298,6 +313,9 @@ export class VoicePlayer {
 
         const item = this.queue.shift();
         if (!item) continue;
+        // 2026-07-24計器(段階0=shadow): 1件あたり処理時間(shift〜再生完了)の起点。
+        //   staleで即時破棄されたitemは合成/再生を伴わないため計測対象外(下のstale分岐でreturn)。
+        const _serviceStart = Date.now();
 
         const ageCheck = isVoiceItemStale(item.enqueuedAt, Date.now(), queueLength, item.priority === 'high');
         if (ageCheck.stale) {
@@ -356,6 +374,8 @@ export class VoicePlayer {
             audio.preservesPitch = true;
             audio.playbackRate = playbackRate;
           }
+          // 2026-07-24計器(段階0=shadow): playbackRateが上限で飽和=補正が追いつけていない兆候。
+          if (playbackRate >= VOICE_PLAYBACK_RATE_MAX) this.diag.rateClampTotal += 1;
 
           await new Promise((resolve) => {
             let settled = false;
@@ -424,6 +444,18 @@ export class VoicePlayer {
         // v0.1.1065計器: 1件完了(comeviewと同じくcatch経路も含む)。
         this.diag.spokenTotal += 1;
         this.diag.lastSpokenBase = Date.now();
+        // 2026-07-24計器(段階0=shadow・council-fable設計venue-bubble-voice-realtime-max-DESIGN.md):
+        //   1件あたり処理時間(shift〜再生完了)をEMA化し、そこから実効上限を計算するだけ
+        //   (pushVoiceQueueのmaxはまだ8固定のまま変えない=観測のみ)。
+        this._serviceTimeEmaMs = updateVoiceServiceTimeEma(this._serviceTimeEmaMs, Date.now() - _serviceStart);
+        const _computedMax = resolveVoiceQueueMax(this._serviceTimeEmaMs);
+        const _step = stepVoiceQueueMax(this._effectiveQueueMax, _computedMax, this._growStreak);
+        this._effectiveQueueMax = _step.nextMax;
+        this._growStreak = _step.nextGrowStreak;
+        this.diag.serviceTimeEmaMs = this._serviceTimeEmaMs;
+        this.diag.effectiveQueueMax = this._effectiveQueueMax;
+        const _voicedDenom = this.diag.spokenTotal + this.diag.staleDropTotal;
+        this.diag.voicedRatio = _voicedDenom > 0 ? this.diag.spokenTotal / _voicedDenom : -1;
         this._emitDiag();
       }
     } finally {

@@ -161,6 +161,7 @@ import {
   createVenueBubbleChurnState,
   observeVenueBubbleSpawn,
   observeVenueBubbleEviction,
+  observeVenueBubbleRemoval,
   toVenueBubbleChurnDiag
 } from '../lib/venueBubbleChurn.js';
 import { enrichVenueRowsWithProfileAvatars } from '../lib/venueAvatar.js';
@@ -3233,6 +3234,8 @@ export function mountVenueBarButton(options = {}) {
   const removeBubble = (bubble) => {
     if (!bubble || bubble.removed) return;
     bubble.removed = true;
+    // 2026-07-24 計器(観測のみ): 消滅時点のvoiceStateを数える(voiced/unvoiced分布・偽陽性潰し用)。
+    try { observeVenueBubbleRemoval(_bubbleChurn, bubble.voiceState); } catch { /* 計器失敗は描画を止めない */ }
     if (bubble.fadeTimer) clearTimeout(bubble.fadeTimer);
     if (bubble.removeTimer) clearTimeout(bubble.removeTimer);
     if (bubble.speakingCapTimer) clearTimeout(bubble.speakingCapTimer);

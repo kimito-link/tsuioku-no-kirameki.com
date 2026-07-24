@@ -22,7 +22,11 @@
  *   lastPhaseAt: number,         // v0.1.895: lastPhase に到達した時刻(epoch ms・0=未到達)
  *   lastE2eMs: number,           // v0.1.1088: 直近1件の「到着→発声」体感遅延ms(-1=未計測)
  *   e2eAvgMs: number,            // v0.1.1088: 体感遅延のEMA平均ms(-1=未計測)
- *   mergeTotal: number           // v0.1.1088: mergeRepeatedVoiceItem で吸収した累計(同文統合の実効計器)
+ *   mergeTotal: number,          // v0.1.1088: mergeRepeatedVoiceItem で吸収した累計(同文統合の実効計器)
+ *   serviceTimeEmaMs: number,    // 2026-07-24計器(段階0=shadow): 1件あたり処理時間の実測EMA(-1=未計測)
+ *   effectiveQueueMax: number,   // 2026-07-24計器: そこから算出した実効上限(表示のみ・未適用)
+ *   rateClampTotal: number,      // 2026-07-24計器: playbackRateが上限1.35で飽和した累計回数
+ *   voicedRatio: number          // 2026-07-24計器: spokenTotal/(spokenTotal+staleDropTotal)(-1=未計測)
  * }} VoiceDiagState
  */
 
@@ -43,7 +47,11 @@ export function makeInitialVoiceDiag() {
     lastPhaseAt: 0,
     lastE2eMs: -1,
     e2eAvgMs: -1,
-    mergeTotal: 0
+    mergeTotal: 0,
+    serviceTimeEmaMs: -1,
+    effectiveQueueMax: 8,
+    rateClampTotal: 0,
+    voicedRatio: -1
   };
 }
 
@@ -78,6 +86,10 @@ export function buildVoiceDiagSnapshot(diag, nowMs) {
     lastE2eMs: num(d.lastE2eMs, base.lastE2eMs),
     e2eAvgMs: num(d.e2eAvgMs, base.e2eAvgMs),
     mergeTotal: num(d.mergeTotal, base.mergeTotal),
+    serviceTimeEmaMs: num(d.serviceTimeEmaMs, base.serviceTimeEmaMs),
+    effectiveQueueMax: num(d.effectiveQueueMax, base.effectiveQueueMax),
+    rateClampTotal: num(d.rateClampTotal, base.rateClampTotal),
+    voicedRatio: num(d.voicedRatio, base.voicedRatio),
     capturedAt: now
   };
 }
@@ -127,6 +139,21 @@ export function buildVoiceDiagLine(snap, nowMs) {
   if (mergeTotal > 0) parts.push(`統合${mergeTotal}件`); // 同文まとめ(「ほか○件」)が効いている実測。
   const synth = Number(snap.lastSynthMs);
   if (Number.isFinite(synth) && synth >= 0) parts.push(`合成${synth}ms`);
+  // 2026-07-24計器(段階0=shadow・council-fable設計venue-bubble-voice-realtime-max-DESIGN.md D章):
+  //   生存者バイアスの緑防止=voicedRatioは必ず間引き件数(drop)と同一行に併記する。
+  //   voicedRatio低いのにe2e緑=「間引きで買った緑」と分かるようにする。
+  const voicedRatio = Number(snap.voicedRatio);
+  if (Number.isFinite(voicedRatio) && voicedRatio >= 0) {
+    parts.push(`voiced率${Math.round(voicedRatio * 1000) / 10}%`);
+  }
+  const serviceTimeEma = Number(snap.serviceTimeEmaMs);
+  const effectiveMax = Number(snap.effectiveQueueMax);
+  if (Number.isFinite(serviceTimeEma) && serviceTimeEma >= 0) {
+    parts.push(`処理時間${Math.round(serviceTimeEma)}ms/件`);
+    if (Number.isFinite(effectiveMax)) parts.push(`実効上限${effectiveMax}(未適用)`);
+  }
+  const rateClamp = Number(snap.rateClampTotal) || 0;
+  if (rateClamp > 0) parts.push(`速度飽和${rateClamp}件`); // playbackRateが上限で追いつけていない兆候。
   // v0.1.895: 固着の切り分け。最終発話が古い(沈黙)のに待機があるとき、drainVoiceQueue が
   //   最後にどのフェーズまで進んだか(lastPhase)を出す=どこで止まったかを実データで確定する計器。
   const lastPhase = String(snap.lastPhase || '');

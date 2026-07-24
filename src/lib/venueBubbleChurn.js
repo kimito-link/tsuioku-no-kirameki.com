@@ -10,6 +10,10 @@
  *   掟(venueSeatLinkParity.js等と同じ): 数えるだけ・DOM/データを一切触らない・新規のDOM走査や
  *   setInterval等の継続コストを持ち込まない(実際に発生したイベントが起きたその場で+1するだけ)。
  *
+ * 2026-07-24拡張(council-fable設計venue-bubble-voice-realtime-max-DESIGN.md D-3): 消滅時の
+ *   voiceState分布(voiced/unvoiced)を追加。「鳴っている声の吹き出しが残るため同期している
+ *   ように見えるが、その間に新着がunvoicedで流れ切っている」という偽陽性(D章)を検出する。
+ *
  * @module venueBubbleChurn
  */
 
@@ -19,10 +23,19 @@ const MID_LIFETIME_MS = 3000;
 
 /**
  * @returns {{ spawned: number, shortCount: number, midCount: number, longCount: number,
- *   evicted: number, lastRatePerSec: number }}
+ *   evicted: number, lastRatePerSec: number, removedVoiced: number, removedUnvoiced: number }}
  */
 export function createVenueBubbleChurnState() {
-  return { spawned: 0, shortCount: 0, midCount: 0, longCount: 0, evicted: 0, lastRatePerSec: 0 };
+  return {
+    spawned: 0,
+    shortCount: 0,
+    midCount: 0,
+    longCount: 0,
+    evicted: 0,
+    lastRatePerSec: 0,
+    removedVoiced: 0,
+    removedUnvoiced: 0
+  };
 }
 
 /**
@@ -54,11 +67,26 @@ export function observeVenueBubbleEviction(state, count) {
   state.evicted += n;
 }
 
+/** voiced判定の対象(声が実際に鳴った状態に到達した)voiceState値。 */
+const VOICED_STATES = new Set(['speaking', 'done']);
+
+/**
+ * 吹き出しが消滅する(removeBubble)たびに呼び、その時点のvoiceStateがvoiced(speaking/done=
+ * 声が実際に鳴った/鳴っている)かunvoiced(pending/unvoiced=鳴らずに消えた)かを数える。
+ * @param {ReturnType<typeof createVenueBubbleChurnState>|null|undefined} state
+ * @param {unknown} voiceState 消滅時点のbubble.voiceState
+ */
+export function observeVenueBubbleRemoval(state, voiceState) {
+  if (!state || typeof state !== 'object') return;
+  if (VOICED_STATES.has(String(voiceState))) state.removedVoiced += 1;
+  else state.removedUnvoiced += 1;
+}
+
 /**
  * 状態速報1行を作る。spawned=0(未観測)は⚪(誤報しない)。
  * @param {ReturnType<typeof createVenueBubbleChurnState>|null|undefined} state
  * @returns {{ line: string, spawned: number, shortCount: number, midCount: number, longCount: number,
- *   evicted: number, lastRatePerSec: number } | null}
+ *   evicted: number, lastRatePerSec: number, removedVoiced: number, removedUnvoiced: number } | null}
  */
 export function toVenueBubbleChurnDiag(state) {
   if (!state || typeof state !== 'object') return null;
@@ -66,10 +94,14 @@ export function toVenueBubbleChurnDiag(state) {
   if (state.spawned <= 0) {
     line = '応援TOP吹き出し ⚪ 未観測';
   } else {
+    const removedTotal = state.removedVoiced + state.removedUnvoiced;
+    const unvoicedRatioStr =
+      removedTotal > 0 ? `${Math.round((state.removedUnvoiced / removedTotal) * 1000) / 10}%` : '-';
     line =
       `応援TOP吹き出し 生成累計${state.spawned}` +
       `(短命<1.5s:${state.shortCount} 中1.5-3s:${state.midCount} 長>3s:${state.longCount})` +
-      ` / 強制退去${state.evicted} / 直近流速${Math.round(state.lastRatePerSec * 10) / 10}件/秒`;
+      ` / 強制退去${state.evicted} / 直近流速${Math.round(state.lastRatePerSec * 10) / 10}件/秒` +
+      ` / 消滅時voiced${state.removedVoiced}・unvoiced${state.removedUnvoiced}(unvoiced率${unvoicedRatioStr})`;
   }
   return {
     line,
@@ -78,6 +110,8 @@ export function toVenueBubbleChurnDiag(state) {
     midCount: state.midCount,
     longCount: state.longCount,
     evicted: state.evicted,
-    lastRatePerSec: state.lastRatePerSec
+    lastRatePerSec: state.lastRatePerSec,
+    removedVoiced: state.removedVoiced,
+    removedUnvoiced: state.removedUnvoiced
   };
 }

@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1180',
+    date: '2026-07-24',
+    summary: '会場読み上げの診断を強化',
+    items: Object.freeze([
+      '会場モードの読み上げが混雑したときの処理状況を診断できるようにしました(動作は変わりません)。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1179',
     date: '2026-07-21',
     summary: '公開データ同期と会場表示の診断を強化',
