@@ -1,6 +1,6 @@
 /**
  * voiceLagBudget.js — 会場読み上げの件数ゲート実効上限を、処理時間EMA(実測)から動的に
- * 算出する純関数群(診断先行アプローチ・段階0=shadow計測のみ)。
+ * 算出する純関数群(診断先行アプローチ)。
  *
  * 背景(council-fable 3段構え・venue-bubble-voice-realtime-max-DESIGN.md C-1章):
  *   会議の批判(gpt-oss-120b)が「VOICEVOXの合成レートは負荷変動で崩れる」と指摘。正確には
@@ -11,8 +11,9 @@
  *   対策は時間ゲートを触ることではなく(不可侵の鉄則3)、件数ゲート自身を実測処理時間で
  *   縮めること。決定論・FIFO・最古dropの原則(不可侵の鉄則4)を1つも壊さない。
  *
- *   本モジュールは「直す」のではなく実効上限を計算するだけ(段階0=shadow)。voicePlayer.js
- *   側では計算結果をdiagに出すのみで、実際のpushVoiceQueueのmaxは8固定のまま変えない。
+ *   経緯: v0.1.1180で段階0(shadow計測のみ・診断表示のみ)として導入。実配信で
+ *   effectiveQueueMax<8(処理時間1703ms/件→実効上限3)が実際に観測されたため、
+ *   v0.1.1181で段階1(apply)へ移行し、voicePlayer.jsのpushVoiceQueue呼び出しに実適用した。
  *
  * @module voiceLagBudget
  */

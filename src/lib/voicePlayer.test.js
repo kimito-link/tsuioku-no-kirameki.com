@@ -203,6 +203,42 @@ describe('VoicePlayer', () => {
     expect(synthCalls.some((t) => t.includes('newest'))).toBe(true);
   });
 
+  describe('2026-07-24(段階1=apply・council-fable設計venue-bubble-voice-realtime-max-DESIGN.md): 実効上限の実適用', () => {
+    it('初期状態(_effectiveQueueMax=8)はデフォルト挙動(件数ゲート8件)のまま', async () => {
+      let resolveSynth;
+      player.fetchSynthesizeVoice = vi.fn(() => new Promise((r) => { resolveSynth = r; }));
+      await player.enable({ persist: false });
+      expect(player._effectiveQueueMax).toBe(8);
+      const items = Array.from({ length: 10 }, (_, i) => ({
+        kind: 'comment', userId: `u${i}`, nickname: `N${i}`, text: `msg${i}`
+      }));
+      player.enqueue(items);
+      await new Promise((r) => setTimeout(r, 10));
+      // 先頭1件はdrainでshift済み・残りqueueは実効上限(8)でクランプされる。
+      expect(player.queue.length).toBeLessThanOrEqual(8);
+      if (resolveSynth) resolveSynth(null);
+    });
+
+    it('_effectiveQueueMaxを縮めた状態でenqueueすると、実際にその件数で溢れがdropされる', async () => {
+      let resolveSynth;
+      player.fetchSynthesizeVoice = vi.fn(() => new Promise((r) => { resolveSynth = r; }));
+      await player.enable({ persist: false });
+      // 処理時間が伸びた状況を模して実効上限を3に縮める(voiceLagBudgetの計算結果を想定)。
+      player._effectiveQueueMax = 3;
+      const onDropped = vi.fn();
+      const items = Array.from({ length: 6 }, (_, i) => ({
+        kind: 'comment', userId: `u${i}`, nickname: `N${i}`, text: `msg${i}`, onDropped
+      }));
+      player.enqueue(items);
+      await new Promise((r) => setTimeout(r, 10));
+      // 先頭1件はdrainでshift済み・残りqueueは実効上限(3)でクランプされる(8固定なら5件残るはず)。
+      expect(player.queue.length).toBeLessThanOrEqual(3);
+      // 縮小で溢れた分は既存のdroppedループを通り、onDroppedが呼ばれている(地雷G-3: 通知漏れ防止)。
+      expect(onDropped).toHaveBeenCalled();
+      if (resolveSynth) resolveSynth(null);
+    });
+  });
+
   describe('v0.1.1088計器(voice-tempo-realtime-SYNTHESIS §3 Phase 1): E2E/統合', () => {
     it('実再生時にlastE2eMs/e2eAvgMsを計測する(到着→発声)', async () => {
       await player.enable({ persist: false });
