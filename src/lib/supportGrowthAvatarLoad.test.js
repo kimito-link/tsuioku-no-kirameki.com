@@ -1,6 +1,6 @@
 /** @vitest-environment happy-dom */
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { createSupportAvatarLoadGuard } from './supportGrowthAvatarLoad.js';
+import { createSupportAvatarLoadGuard, isProbeRetryEligible } from './supportGrowthAvatarLoad.js';
 import { NICONICO_OFFICIAL_DEFAULT_USERICON_HTTPS } from './supportGrowthTileSrc.js';
 
 const FALLBACK = NICONICO_OFFICIAL_DEFAULT_USERICON_HTTPS;
@@ -239,6 +239,257 @@ describe('createSupportAvatarLoadGuard', () => {
       const d = g.getDiagnostics();
       expect(d.failedTimeout).toBe(1);
       expect(d.failedError).toBe(1);
+    });
+  });
+
+  describe('isProbeRetryEligible(venue-avatar-stale-mirror-DESIGN.md §C-1b・純関数)', () => {
+    const policy = { baseMs: 30_000, maxMs: 600_000, maxAttempts: 5 };
+
+    it('policyがnull/undefinedなら常にfalse(従来の恒久負キャッシュ=後方互換)', () => {
+      const rec = { failCount: 1, lastFailAt: 0 };
+      expect(isProbeRetryEligible(rec, 1_000_000, null)).toBe(false);
+      expect(isProbeRetryEligible(rec, 1_000_000, undefined)).toBe(false);
+    });
+
+    it('recがnull/undefinedならfalse', () => {
+      expect(isProbeRetryEligible(null, 1_000_000, policy)).toBe(false);
+      expect(isProbeRetryEligible(undefined, 1_000_000, policy)).toBe(false);
+    });
+
+    it('baseMs未経過ならfalse', () => {
+      const rec = { failCount: 1, lastFailAt: 1000 };
+      expect(isProbeRetryEligible(rec, 1000 + 29_000, policy)).toBe(false);
+    });
+
+    it('baseMs経過後はtrue(failCount=1の初回バックオフ)', () => {
+      const rec = { failCount: 1, lastFailAt: 1000 };
+      expect(isProbeRetryEligible(rec, 1000 + 30_001, policy)).toBe(true);
+    });
+
+    it('failCountが増えるほど指数バックオフで長く待つ', () => {
+      // failCount=3 → backoff = 30_000 * 2^2 = 120_000
+      const rec = { failCount: 3, lastFailAt: 1000 };
+      expect(isProbeRetryEligible(rec, 1000 + 119_000, policy)).toBe(false);
+      expect(isProbeRetryEligible(rec, 1000 + 120_001, policy)).toBe(true);
+    });
+
+    it('maxMsで頭打ちになる', () => {
+      // failCount=10なら 30_000*2^9 は maxMs(600_000)を大幅に超えるが、頭打ちされる
+      const rec = { failCount: 10, lastFailAt: 1000 };
+      // maxAttempts=5なのでこのfailCountは既にeligible対象外(下のテストで別途検証)。
+      // ここではmaxAttemptsを緩めたpolicyでbackoff頭打ちだけを検証する。
+      const loosePolicy = { baseMs: 30_000, maxMs: 600_000, maxAttempts: 100 };
+      expect(isProbeRetryEligible(rec, 1000 + 599_000, loosePolicy)).toBe(false);
+      expect(isProbeRetryEligible(rec, 1000 + 600_001, loosePolicy)).toBe(true);
+    });
+
+    it('failCountがmaxAttempts以上ならfalse(404恒久URLへの無限リトライを止める)', () => {
+      const rec = { failCount: 5, lastFailAt: 1000 };
+      expect(isProbeRetryEligible(rec, 1000 + 10_000_000, policy)).toBe(false);
+    });
+
+    it('lastFailAtが無い(0)ならfalse', () => {
+      const rec = { failCount: 1, lastFailAt: 0 };
+      expect(isProbeRetryEligible(rec, 1_000_000, policy)).toBe(false);
+    });
+  });
+
+  describe('retryPolicy opt-in(venue-avatar-stale-mirror-DESIGN.md §C-1b/1c・段階1)', () => {
+    it('retryPolicy未指定(既定null)なら、timeout失敗後もbackoff経過で再プローブされない(popup互換)', () => {
+      vi.useFakeTimers();
+      const g = createSupportAvatarLoadGuard({ fallbackSrc: FALLBACK, timeoutMs: 3000 });
+      const img = document.createElement('img');
+      img.src = FALLBACK;
+      g.noteRemoteAttempt(img, REMOTE);
+      vi.advanceTimersByTime(3001);
+      expect(g.pickDisplaySrc(REMOTE)).toBe(FALLBACK);
+      // 30秒以上経過してもretryPolicy無しなら拒否されたまま。
+      vi.advanceTimersByTime(60_000);
+      const probe2 = g.noteRemoteAttempt(img, REMOTE);
+      expect(probe2).toBeNull();
+    });
+
+    it('retryPolicy指定時、backoff経過後の再noteRemoteAttemptはeligibleならプローブを再発行する', () => {
+      vi.useFakeTimers();
+      const g = createSupportAvatarLoadGuard({
+        fallbackSrc: FALLBACK,
+        timeoutMs: 3000,
+        retryPolicy: { baseMs: 30_000, maxMs: 600_000, maxAttempts: 5 }
+      });
+      const img = document.createElement('img');
+      img.src = FALLBACK;
+      g.noteRemoteAttempt(img, REMOTE);
+      vi.advanceTimersByTime(3001); // timeout失敗登録
+      expect(g.pickDisplaySrc(REMOTE)).toBe(FALLBACK);
+      vi.advanceTimersByTime(30_001); // backoff経過
+      const probe2 = g.noteRemoteAttempt(img, REMOTE);
+      expect(probe2).toBeInstanceOf(HTMLImageElement);
+      expect(g.getDiagnostics().retriedTotal).toBe(1);
+      // 再プローブが成功すればgetDiagnostics().retriedTotalは1のまま(成功はretriedとは別集計)、
+      // かつpickDisplaySrcが正URLへ復帰する。
+      probe2.dispatchEvent(new Event('load'));
+      expect(g.pickDisplaySrc(REMOTE)).toBe(REMOTE);
+    });
+
+    it('noteRemoteAttemptは失敗キーへの再試行時、img.dataset.nlsbAvatarRetrySrcを刻む', () => {
+      vi.useFakeTimers();
+      const g = createSupportAvatarLoadGuard({
+        fallbackSrc: FALLBACK,
+        timeoutMs: 3000,
+        retryPolicy: { baseMs: 30_000, maxMs: 600_000, maxAttempts: 5 }
+      });
+      const img = document.createElement('img');
+      img.src = FALLBACK;
+      g.noteRemoteAttempt(img, REMOTE);
+      vi.advanceTimersByTime(3001);
+      expect(img.dataset.nlsbAvatarRetrySrc).toBe(REMOTE);
+    });
+
+    it('プローブ成功時、img.dataset.nlsbAvatarRetrySrcが削除される', () => {
+      vi.useFakeTimers();
+      const g = createSupportAvatarLoadGuard({
+        fallbackSrc: FALLBACK,
+        timeoutMs: 3000,
+        retryPolicy: { baseMs: 30_000, maxMs: 600_000, maxAttempts: 5 }
+      });
+      const img = document.createElement('img');
+      img.src = FALLBACK;
+      g.noteRemoteAttempt(img, REMOTE);
+      vi.advanceTimersByTime(3001);
+      vi.advanceTimersByTime(30_001);
+      const probe2 = g.noteRemoteAttempt(img, REMOTE);
+      probe2.dispatchEvent(new Event('load'));
+      expect(img.dataset.nlsbAvatarRetrySrc).toBeUndefined();
+    });
+
+    it('maxAttempts到達後はretryPolicy指定でも再プローブされない(404恒久URLの無限リトライ防止)', () => {
+      vi.useFakeTimers();
+      const g = createSupportAvatarLoadGuard({
+        fallbackSrc: FALLBACK,
+        timeoutMs: 3000,
+        retryPolicy: { baseMs: 1000, maxMs: 5000, maxAttempts: 2 }
+      });
+      const img = document.createElement('img');
+      img.src = FALLBACK;
+      // 1回目失敗
+      g.noteRemoteAttempt(img, REMOTE);
+      vi.advanceTimersByTime(3001);
+      // backoff経過→2回目のnoteRemoteAttemptでeligible(failCount=1<maxAttempts=2)、再度失敗させる
+      vi.advanceTimersByTime(1001);
+      const probe2 = g.noteRemoteAttempt(img, REMOTE);
+      expect(probe2).toBeInstanceOf(HTMLImageElement);
+      probe2.dispatchEvent(new Event('error'));
+      // 3回目: failCount=2>=maxAttempts=2 なのでeligible=false
+      vi.advanceTimersByTime(10_000);
+      const probe3 = g.noteRemoteAttempt(img, REMOTE);
+      expect(probe3).toBeNull();
+    });
+  });
+
+  describe('clearTimedOutFailures(venue-avatar-stale-mirror-DESIGN.md §C-1d)', () => {
+    it('timeout種別のみ削除し、error種別とsucceededKeysは維持する', () => {
+      vi.useFakeTimers();
+      const g = createSupportAvatarLoadGuard({
+        fallbackSrc: FALLBACK,
+        timeoutMs: 3000,
+        retryPolicy: { baseMs: 30_000, maxMs: 600_000, maxAttempts: 5 }
+      });
+      const REMOTE_ERROR = 'https://secure-dcdn.cdn.nimg.jp/nicoaccount/usericon/s/9/errorurl.jpg';
+      const REMOTE_SUCCESS = 'https://secure-dcdn.cdn.nimg.jp/nicoaccount/usericon/s/8/okurl.jpg';
+      g.markFailedForTests(REMOTE, 'timeout');
+      g.markFailedForTests(REMOTE_ERROR, 'error');
+      g.markSucceededForTests(REMOTE_SUCCESS);
+
+      g.clearTimedOutFailures();
+
+      // timeout種別は消えて再プローブ対象(fallback判定を抜ける=noteRemoteAttemptがプローブを作る)
+      const imgTimeout = document.createElement('img');
+      imgTimeout.src = FALLBACK;
+      expect(g.noteRemoteAttempt(imgTimeout, REMOTE)).toBeInstanceOf(HTMLImageElement);
+      // error種別は維持(依然fallback)
+      expect(g.pickDisplaySrc(REMOTE_ERROR)).toBe(FALLBACK);
+      // succeededKeysは無傷(全消しちらつき防止)
+      expect(g.pickDisplaySrc(REMOTE_SUCCESS)).toBe(REMOTE_SUCCESS);
+    });
+  });
+
+  describe('retrySweep(venue-avatar-stale-mirror-DESIGN.md §C-1c)', () => {
+    it('retryPolicy未指定なら常にno-op(scanned:0, retried:0)', () => {
+      const g = createSupportAvatarLoadGuard({ fallbackSrc: FALLBACK });
+      const root = document.createElement('div');
+      const result = g.retrySweep(root, Date.now());
+      expect(result).toEqual({ scanned: 0, retried: 0 });
+    });
+
+    it('rootEl配下のretry刻印付きimgをeligibleなら再プローブする', () => {
+      vi.useFakeTimers();
+      const g = createSupportAvatarLoadGuard({
+        fallbackSrc: FALLBACK,
+        timeoutMs: 3000,
+        retryPolicy: { baseMs: 30_000, maxMs: 600_000, maxAttempts: 5 }
+      });
+      const root = document.createElement('div');
+      const img = document.createElement('img');
+      img.src = FALLBACK;
+      root.appendChild(img);
+      g.noteRemoteAttempt(img, REMOTE);
+      vi.advanceTimersByTime(3001); // timeout失敗→刻印される
+      expect(img.dataset.nlsbAvatarRetrySrc).toBe(REMOTE);
+
+      vi.advanceTimersByTime(30_001); // backoff経過
+      const result = g.retrySweep(root, Date.now());
+      expect(result.scanned).toBe(1);
+      expect(result.retried).toBe(1);
+      expect(g.getDiagnostics().retriedTotal).toBe(1);
+    });
+
+    it('backoff未経過のimgはscannedされるがretriedされない', () => {
+      vi.useFakeTimers();
+      const g = createSupportAvatarLoadGuard({
+        fallbackSrc: FALLBACK,
+        timeoutMs: 3000,
+        retryPolicy: { baseMs: 30_000, maxMs: 600_000, maxAttempts: 5 }
+      });
+      const root = document.createElement('div');
+      const img = document.createElement('img');
+      img.src = FALLBACK;
+      root.appendChild(img);
+      g.noteRemoteAttempt(img, REMOTE);
+      vi.advanceTimersByTime(3001);
+      const result = g.retrySweep(root, Date.now()); // backoff(30s)未経過
+      expect(result.scanned).toBe(1);
+      expect(result.retried).toBe(0);
+    });
+
+    it('rootEl/nullが渡されても例外にならない', () => {
+      const g = createSupportAvatarLoadGuard({
+        fallbackSrc: FALLBACK,
+        retryPolicy: {}
+      });
+      expect(() => g.retrySweep(null, Date.now())).not.toThrow();
+      expect(g.retrySweep(null, Date.now())).toEqual({ scanned: 0, retried: 0 });
+    });
+
+    it('進行中プローブがあるimgは二重発行しない', () => {
+      vi.useFakeTimers();
+      const g = createSupportAvatarLoadGuard({
+        fallbackSrc: FALLBACK,
+        timeoutMs: 3000,
+        retryPolicy: { baseMs: 30_000, maxMs: 600_000, maxAttempts: 5 }
+      });
+      const root = document.createElement('div');
+      const img = document.createElement('img');
+      img.src = FALLBACK;
+      root.appendChild(img);
+      g.noteRemoteAttempt(img, REMOTE);
+      vi.advanceTimersByTime(3001);
+      vi.advanceTimersByTime(30_001);
+      // 1回目のsweepでプローブ発行(activeProbesに登録される)
+      const r1 = g.retrySweep(root, Date.now());
+      expect(r1.retried).toBe(1);
+      // 直後の2回目sweep(まだプローブ未解決)は二重発行しない
+      const r2 = g.retrySweep(root, Date.now());
+      expect(r2.retried).toBe(0);
     });
   });
 });

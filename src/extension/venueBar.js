@@ -352,10 +352,15 @@ const VENUE_LANE_GUIDES_EXACT_COPY = true;
  *   会場は content script の別レイヤー/別バンドルなので、popup のインスタンスは届かない=
  *   同じ lib の本物から会場が同設定で生成する(live-view が io を自前で組むのと同型)。
  */
+// venue-avatar-stale-mirror-DESIGN.md §C-1b(段階1): 会場は数時間規模でpopupが開かれない
+//   ことがあり、一度の一時的プローブ失敗(timeout/error)が永久固着して白丸のまま=真因確定済み。
+//   retryPolicy を opt-in(会場のみ・既定値のまま)で有効化し、TTL+指数バックオフで再プローブ
+//   の機会を与える。popup側は§Eの段階3判断まで既定null(従来の恒久負キャッシュ)のまま。
 const venueAvatarLoadGuard = createSupportAvatarLoadGuard({
   fallbackSrc: NICONICO_OFFICIAL_DEFAULT_USERICON_HTTPS,
   onFallbackApplied: applyStoryAvatarTvFallbackClass,
-  onRemoteSuccess: removeStoryAvatarTvFallbackClass
+  onRemoteSuccess: removeStoryAvatarTvFallbackClass,
+  retryPolicy: {}
 });
 
 /** buildPersonTileEl(p, io) の io 引数。popup の laneDomIo(popup-entry.js:5232)と同形。 */
@@ -2392,6 +2397,9 @@ export function mountVenueBarButton(options = {}) {
   let laneMirrorSnap = null;
   /** @type {Partial<import('../lib/laneMirror.js').LaneMirrorSnapshot>|null} */
   let laneMirrorPaintSnap = null;
+  // venue-avatar-stale-mirror-DESIGN.md §C-1d: 鏡capturedAtの前進(popup復帰等)を検知する
+  //   ための直前値。composeVenueBaseRowsが新しい鏡をpaintに採用するたびに更新する。
+  let _lastPaintedMirrorCapturedAt = 0;
   /** @type {Record<string, unknown>|null} */
   let storyDiagMirrorSnap = null;
   let storyDiagMirrorRenderSig = '';
@@ -4420,6 +4428,12 @@ export function mountVenueBarButton(options = {}) {
     /** @type {ReturnType<typeof compareRenderReceipts>|null} */
     let sceneReceiptDiag = /** @type {any} */ (_lastVenueSeatsDiagObs ? (_lastVenueSeatsDiagObs.sceneReceipt ?? null) : null);
     if (diagDue) {
+      // venue-avatar-stale-mirror-DESIGN.md §C-1c: 再プローブスイープを既存diagDue(3秒
+      //   min-gap)に相乗り(新規タイマーを作らない=hot path保護)。TTL+バックオフを経過した
+      //   失敗記録だけを再プローブする(観測のみのcensusと違い実際にimg.srcを叩き得る副作用)。
+      try {
+        venueAvatarLoadGuard.retrySweep(venueLaneEls.stack, laneWallNow);
+      } catch { /* 計器/再試行の失敗は描画を止めない */ }
       try {
         /** @type {Record<string, string[]>} */
         const painted = {};
@@ -4620,6 +4634,17 @@ export function mountVenueBarButton(options = {}) {
       return fallbackRows;
     }
     laneMirrorPaintSnap = laneMirrorSnap;
+    // venue-avatar-stale-mirror-DESIGN.md §C-1d: 鏡capturedAtが前進した(popup復帰等でstorageが
+    //   新鮮化した)節目で、timeout種別の失敗記録だけ消して即座の再機会を与える(errorは維持=
+    //   404の再打撃を避ける)。clearFailedUrls(全消し)は使わない(§G-1: succeededKeysも消えて
+    //   全タイルが一瞬白丸に戻るちらつきを防ぐため)。
+    try {
+      const cap = Math.max(0, Number(laneMirrorSnap?.capturedAt) || 0);
+      if (cap > 0 && cap > _lastPaintedMirrorCapturedAt) {
+        _lastPaintedMirrorCapturedAt = cap;
+        venueAvatarLoadGuard.clearTimedOutFailures();
+      }
+    } catch { /* no-op: 計器/再試行の失敗は描画を止めない */ }
     /** @type {Map<string, any>} */
     const byUid = new Map();
     for (const c of Array.isArray(candidates) ? candidates : []) {

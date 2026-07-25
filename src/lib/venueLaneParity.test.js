@@ -447,6 +447,31 @@ describe('buildVenueLaneParity', () => {
       expect(d.dom).toMatchObject({ probeFail: 7, probeFailTimeout: 5, probeFailError: 2 });
     });
 
+    it('venue-avatar-stale-mirror-DESIGN.md §C-1(段階1): 顔再試行回数(probeRetried)をlineとdiag.domに出す', () => {
+      const p = buildVenueLaneParity({
+        ...base(),
+        dom: domMatching(painted(), {
+          blank: 9,
+          blankAnon: 3,
+          probeFail: 7,
+          probeFailTimeout: 5,
+          probeFailError: 2,
+          probeRetried: 4
+        })
+      });
+      expect(p.line).toContain('顔再試行4');
+      const d = toVenueLaneParityDiag(p);
+      expect(d.dom).toMatchObject({ probeRetried: 4 });
+    });
+
+    it('probeRetried=0のときはline に「顔再試行」を出さない(誤報しない)', () => {
+      const p = buildVenueLaneParity({
+        ...base(),
+        dom: domMatching(painted(), { blank: 9, blankAnon: 3, probeFail: 7 })
+      });
+      expect(p.line).not.toContain('顔再試行');
+    });
+
     it('fallback でも census は参考で line に写る(白円/迷子はモード無関係)', () => {
       const p = buildVenueLaneParity({
         ...base(),

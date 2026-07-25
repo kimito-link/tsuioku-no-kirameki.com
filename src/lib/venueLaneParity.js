@@ -109,7 +109,7 @@ export function laneMirrorTierKeySequences(snap) {
  *                 blank: number, blankAnon: number,
  *                 dupIntra: number, dupCross: number, strays: number,
  *                 charFrame: number, crowdOn: boolean, crowdCount: number, probeFail: number,
- *                 probeFailTimeout: number, probeFailError: number },
+ *                 probeFailTimeout: number, probeFailError: number, probeRetried: number },
  *   line: string
  * }}
  */
@@ -403,13 +403,17 @@ export function buildVenueLaneParity(input) {
   //   (timeout優勢+鏡age大なら本設計の想定どおり)。
   const domProbeFailTimeout = domMeasured ? Math.max(0, Math.floor(Number(domIn.probeFailTimeout) || 0)) : 0;
   const domProbeFailError = domMeasured ? Math.max(0, Math.floor(Number(domIn.probeFailError) || 0)) : 0;
+  // venue-avatar-stale-mirror-DESIGN.md §C-1(段階1): 負キャッシュTTL+バックオフ再プローブが
+  //   実際に発行された累計。段階1の効果(白丸がretryで回復しているか)を実配信で直接確認する計器。
+  const domProbeRetried = domMeasured ? Math.max(0, Math.floor(Number(domIn.probeRetried) || 0)) : 0;
   const extraStr = domMeasured
     ? (domIn.crowdOn === true ? ` / 群衆on(${Math.max(0, Math.floor(Number(domIn.crowdCount) || 0))})` : '') +
       (Number(domIn.charFrame) > 0 ? ` / 額縁${Math.floor(Number(domIn.charFrame))}` : '') +
       (domUnkeyed > 0 ? ` / 無鍵${domUnkeyed}` : '') +
       (domVisibleEmpty > 0 ? ` / 空可視${domVisibleEmpty}` : '') +
       (domBlank > 0 ? ` / 白円${domBlank}(匿名${domBlankAnon})` : '') +
-      (domProbeFail > 0 ? ` / 顔404=${domProbeFail}(t:${domProbeFailTimeout},e:${domProbeFailError})` : '')
+      (domProbeFail > 0 ? ` / 顔404=${domProbeFail}(t:${domProbeFailTimeout},e:${domProbeFailError})` : '') +
+      (domProbeRetried > 0 ? ` / 顔再試行${domProbeRetried}` : '')
     : '';
   const line =
     `会場一致 ${verdict}${verdict === '⚪' ? reason : ageStr} ${tierStr}` +
@@ -450,7 +454,8 @@ export function buildVenueLaneParity(input) {
           crowdCount: Math.max(0, Math.floor(Number(domIn.crowdCount) || 0)),
           probeFail: domProbeFail,
           probeFailTimeout: domProbeFailTimeout,
-          probeFailError: domProbeFailError
+          probeFailError: domProbeFailError,
+          probeRetried: domProbeRetried
         }
       : null,
     line
@@ -466,7 +471,7 @@ export function buildVenueLaneParity(input) {
  *                           blank: number, blankAnon: number,
  *                           dupIntra: number, dupCross: number, strays: number,
  *                           charFrame: number, crowdOn: boolean, crowdCount: number, probeFail: number,
- *                           probeFailTimeout: number, probeFailError: number } }|null}
+ *                           probeFailTimeout: number, probeFailError: number, probeRetried: number } }|null}
  */
 export function toVenueLaneParityDiag(parity) {
   if (!parity || typeof parity !== 'object') return null;
@@ -496,7 +501,9 @@ export function toVenueLaneParityDiag(parity) {
             crowdCount: Math.max(0, Math.floor(Number(dom.crowdCount) || 0)),
             probeFail: Math.max(0, Math.floor(Number(/** @type {any} */ (dom).probeFail) || 0)),
             probeFailTimeout: Math.max(0, Math.floor(Number(/** @type {any} */ (dom).probeFailTimeout) || 0)),
-            probeFailError: Math.max(0, Math.floor(Number(/** @type {any} */ (dom).probeFailError) || 0))
+            probeFailError: Math.max(0, Math.floor(Number(/** @type {any} */ (dom).probeFailError) || 0)),
+            // venue-avatar-stale-mirror-DESIGN.md §C-1(段階1): 顔再試行回数(実測)。
+            probeRetried: Math.max(0, Math.floor(Number(/** @type {any} */ (dom).probeRetried) || 0))
           }
         : null
   };
