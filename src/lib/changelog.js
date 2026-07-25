@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1187',
+    date: '2026-07-25',
+    summary: 'ポップアップの記録件数表示を安定化',
+    items: Object.freeze([
+      'ポップアップの応援コメント件数表示が、内部の一時的な集計値ではなく安定した記録値を優先して使うようにしました。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1186',
     date: '2026-07-25',
     summary: '状態速報の診断計器を強化(表示のみ)',

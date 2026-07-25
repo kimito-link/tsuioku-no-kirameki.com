@@ -536,7 +536,7 @@
     - `trumpet1.mp3`
     - `wallet1.mp3`
   - `SOURCES.md`
-- 📁 **src/** (1427)
+- 📁 **src/** (1428)
   - 📁 **data/** (6)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -570,7 +570,7 @@
       - `avatarResolver.test.js`
       - `identity.js` — ニコ生ユーザー ID の「匿名性」判定と関連アイデンティティ・ユーティリティ。
       - `nickname.js` — 表示名（ニックネーム）の「強弱」判定。
-  - 📁 **extension/** (21)
+  - 📁 **extension/** (22)
     - 📁 **popup/** (2)
       - 📁 **report/** (2)
         - `htmlReportDocument.js` — HTMLレポート(振り返り用の保存HTML)組み立てクラスタ。
@@ -581,6 +581,7 @@
     - `backfill-sw-entry.js` — Service Worker 側の過去ログ取得(バックフィル)エンジン。NDGR を遡って取り込む。
     - `comeview-entry.js` — v0.1.652: 独自コメビュ「KIRAMEKI Comment View」(comeview.html)。
     - `content-entry.js` — watch ページ常駐の記録エンジン本体。コメント取得(NDGR+DOM)・記録・バックフィル・パネル描画の中枢。
+    - `dedupeSeedDiag.wiring.test.js`
     - `inlineHostMoveProbe.wiring.test.js`
     - `live-view-entry.js` — 応援ライブビュー(live-view.html)のエントリ。
     - `marketing-export-entry.js` — マーケ分析レポートの別タブ化(marketing-export.html)のエントリ。

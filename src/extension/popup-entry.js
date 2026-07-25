@@ -516,6 +516,7 @@ import {
   isPanelLiveSummary,
   watchSnapshotFromPanelSummary
 } from '../lib/panelLiveSummary.js';
+import { resolveStoryDiagTotal } from '../lib/storyDiagTotalSource.js';
 import { perfDiagStorageKey, buildPerfDiag } from '../lib/perfDiag.js';
 import { computeRecordRate } from '../lib/recordRate.js';
 import { listBackfillWaitingLiveIds } from '../lib/globalBackfillQueue.js';
@@ -6331,6 +6332,11 @@ let lastDevMonitorPanelParams = /** @type {null|object} */ (null);
 
 const STORY_AVATAR_DIAG_STATE = {
   total: 0,
+  // v0.1.117x(story-diag-realtime-sync設計 §E): totalの出所計器。'panel'=nls_panel_summary_<lv>
+  //   (content-entry.jsのpopup非依存正本)由来、'fallback'=手元配列長(arr.length)由来。
+  //   panelAgeSecはpanel由来のときだけ「その値が何秒前のものか」。鏡に載る→②/状態速報で読める。
+  totalSource: 'fallback',
+  panelAgeSec: /** @type {number|null} */ (null),
   withUid: 0,
   withAvatar: 0,
   uniqueAvatar: 0,
@@ -7628,6 +7634,8 @@ function renderStoryAvatarDiag() {
 
 function resetStoryAvatarDiagState() {
   STORY_AVATAR_DIAG_STATE.total = 0;
+  STORY_AVATAR_DIAG_STATE.totalSource = 'fallback';
+  STORY_AVATAR_DIAG_STATE.panelAgeSec = null;
   STORY_AVATAR_DIAG_STATE.withUid = 0;
   STORY_AVATAR_DIAG_STATE.withAvatar = 0;
   STORY_AVATAR_DIAG_STATE.uniqueAvatar = 0;
@@ -16168,7 +16176,18 @@ async function refresh() {
   if (tailDisplayRows.length) {
     arr = /** @type {unknown[]} */ (arr).concat(tailDisplayRows);
   }
-  STORY_AVATAR_DIAG_STATE.total = arr.length;
+  // v0.1.117x(story-diag-realtime-sync設計 §E-箇所2): 件数の正本はnls_panel_summary_<lv>
+  //   (content-entry.jsのpopup非依存publish)。不在時のみarr.lengthへfallback(§12.8: maxで
+  //   混ぜない)。panelLiveSummaryは16048行目でrefresh内に既に読み込み・検証済み。
+  const _totalResolved = resolveStoryDiagTotal({
+    panelSummary: panelLiveSummary,
+    liveId: lv,
+    fallbackTotal: arr.length,
+    nowMs: Date.now()
+  });
+  STORY_AVATAR_DIAG_STATE.total = _totalResolved.total;
+  STORY_AVATAR_DIAG_STATE.totalSource = _totalResolved.source;
+  STORY_AVATAR_DIAG_STATE.panelAgeSec = _totalResolved.panelAgeSec;
   STORY_AVATAR_DIAG_STATE.withUid = countEntriesWithUserId(arr);
   STORY_AVATAR_DIAG_STATE.withAvatar = countEntriesWithAvatar(arr);
   STORY_AVATAR_DIAG_STATE.uniqueAvatar = countUniqueAvatarEntries(arr);
@@ -16232,7 +16251,17 @@ async function refresh() {
     //   (storyAvatarDiag の compactLead)が依存するので**必ず更新**=スクロール中も止めない。
     // 2026-07-14: arr非同期再構築途中の一時的な減少を単調化(churn根治・C-3)。withUid/selfSavedは
     //   下の diagPaintDeferActive ブロックで個別にゲートする。
-    STORY_AVATAR_DIAG_STATE.total = applyStoryDiagMonotonic(_storyDiagMonotonicState, lv, { total: arr.length }).total;
+    // v0.1.117x(story-diag-realtime-sync設計 §E-箇所3): 正本優先で解決してから従来の単調化
+    //   ゲートへ通す(ゲートの位置・回数は不変)。panelLiveSummaryは16048行目のクロージャ変数。
+    const _paintTotal = resolveStoryDiagTotal({
+      panelSummary: panelLiveSummary,
+      liveId: lv,
+      fallbackTotal: arr.length,
+      nowMs: Date.now()
+    });
+    STORY_AVATAR_DIAG_STATE.total = applyStoryDiagMonotonic(_storyDiagMonotonicState, lv, { total: _paintTotal.total }).total;
+    STORY_AVATAR_DIAG_STATE.totalSource = _paintTotal.source;
+    STORY_AVATAR_DIAG_STATE.panelAgeSec = _paintTotal.panelAgeSec;
     STORY_AVATAR_DIAG_STATE.diagRegressions = _storyDiagMonotonicState.diagRegressions;
     // v0.1.639 スクロール根治 PR4: withUid/withAvatar/uniqueAvatar/resolvedAvatar の
     //   全件 O(N) 集計群は、storyAvatarDiag の折りたたみ「内訳・用語(詳しく見る)」内の技術行
@@ -18848,6 +18877,17 @@ async function collectAiShareDevMonitorPayloadBundle(watchUrl) {
       //   形に偏るなら 404/CORS が真因＝nvapi 経由等の対処へ進む判断材料にする。
       avatarLoadDiag: (() => {
         try { return storyAvatarLoadGuard.getDiagnostics(); } catch { return null; }
+      })(),
+      // v0.1.117x(story-diag-realtime-sync設計 §E-計器): STORY_AVATAR_DIAG_STATE.total の
+      //   出所(正本nls_panel_summary_<lv> or fallback arr.length)。②venueは既にpanel summaryを
+      //   直接購読(MVP完了済み)だが、①popup側の解決結果もここで状態速報から確認できるようにする。
+      storyDiagTotalSource: (() => {
+        try {
+          return {
+            totalSource: STORY_AVATAR_DIAG_STATE.totalSource,
+            panelAgeSec: STORY_AVATAR_DIAG_STATE.panelAgeSec
+          };
+        } catch { return null; }
       })(),
       // avatar-stability-DESIGN.md §E-1/§A: rememberedAvatarUrlForUserId の分岐別ヒット数。
       //   hitEntriesScan(会場に無い第2分岐)の比率が §A の「埋めない」裁定の再検討条件。
