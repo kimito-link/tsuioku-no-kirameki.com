@@ -69,6 +69,18 @@ export function buildStatusFastDiagLite(payload) {
     typeof uidStats.commentNoLessPercent === 'number' ? uidStats.commentNoLessPercent : null;
   const totalSaved =
     typeof uidStats.totalSaved === 'number' ? uidStats.totalSaved : null;
+  // v0.1.1186: dedup シード計器(記録が本家を上回る異常の切り分け)も lite に通す。
+  //   ★ここに足さないと status の provenance「dedupシード(計器)」行が出ない([[fastdiag-lite-is-the-printer-subset]]と同型)。
+  const dsd = obs.dedupeSeedDiag && typeof obs.dedupeSeedDiag === 'object' ? obs.dedupeSeedDiag : {};
+  const dedupeSeedDiag = {
+    seedSkipCount: typeof dsd.seedSkipCount === 'number' ? dsd.seedSkipCount : 0,
+    seedRebuildCount: typeof dsd.seedRebuildCount === 'number' ? dsd.seedRebuildCount : 0,
+    seedRequeueCount: typeof dsd.seedRequeueCount === 'number' ? dsd.seedRequeueCount : 0,
+    maxIncrementalAddedCount:
+      typeof dsd.maxIncrementalAddedCount === 'number' ? dsd.maxIncrementalAddedCount : 0,
+    suspiciousAddedCount:
+      typeof dsd.suspiciousAddedCount === 'number' ? dsd.suspiciousAddedCount : 0
+  };
 
   // lives は enumerateActiveLives 経路2でしか使わず、各要素は liveId/lv だけ見る=最小化して持つ。
   const lives = Array.isArray(p.lives)
@@ -106,6 +118,7 @@ export function buildStatusFastDiagLite(payload) {
   // ★読み取りパスを full と同形に保つ(status の consumer を書き換えないため):
   //   lite.content.giftDiagnostics['北極星レーン']
   //   lite.content.giftDiagnostics.commentObservability.savedCommentsUidStats.withUidPercent
+  //   lite.content.giftDiagnostics.commentObservability.dedupeSeedDiag(v0.1.1186)
   //   lite.content.networkErrorProbe.ndgrConnectStatus
   //   lite.content.hostMoveDiag / lite.content.scrollWhiteoutDiag
   return {
@@ -114,7 +127,8 @@ export function buildStatusFastDiagLite(payload) {
       giftDiagnostics: {
         '北極星レーン': gift['北極星レーン'] ?? null,
         commentObservability: {
-          savedCommentsUidStats: { withUidPercent, commentNoLess, commentNoLessPercent, totalSaved }
+          savedCommentsUidStats: { withUidPercent, commentNoLess, commentNoLessPercent, totalSaved },
+          dedupeSeedDiag
         }
       },
       networkErrorProbe: {

@@ -264,7 +264,11 @@ import {
   aggregateSavedCommentsUidStats,
   accumulateSavedCommentsUidStats,
   parseInterceptFetchLog,
-  snapshotCommentIngestCounters
+  snapshotCommentIngestCounters,
+  createDedupeSeedDiagState,
+  noteDedupeSeedOutcome,
+  noteIncrementalAddedCount,
+  snapshotDedupeSeedDiag
 } from '../lib/commentObservabilityDiag.js';
 import { snapshotIframeRelayDiag } from '../lib/giftSubAppRelayDiag.js';
 import {
@@ -758,6 +762,10 @@ const officialViewerIntervals = [];
 const officialCommentHistory = [];
 /** @type {number} */
 let observedRecordedCommentCount = 0;
+// v0.1.1186 計器(記録が本家を上回る異常の切り分け): commentCountProvenance.js の「記録Δが
+//   本家Δを上回る」誤検知/実害切り分け用。ensureLiveDedupeStateSeeded の skip/rebuild/requeue
+//   分岐と、incrementalMode の1回のマージで確定した added 件数を数えるだけ(観測のみ)。
+const _dedupeSeedDiag = createDedupeSeedDiagState();
 // v0.1.792「記録が増えて減る」根治: observedRecordedCommentCount は内部ロジック(バックフィルの
 //   gap 計算・ストール判定・テール compaction)が【生の実件数】を必要とするため単調化できない
 //   (過去最大に固定すると gap/stall が壊れる)。そこで正本変数は生のままにし、【表示用サマリに
@@ -6610,6 +6618,9 @@ function buildGiftDiagnosticsBundle() {
         ),
         commentIngestBySource: snapshotCommentIngestCounters(_commentIngestSourceCounters),
         savedCommentsUidStats: { ..._lastSavedCommentsUidStats },
+        // v0.1.1186 計器: 記録が本家を上回る異常の切り分け(ensureLiveDedupeStateSeededの
+        //   skip/rebuild/requeue分岐と、1回のマージのadded件数)。
+        dedupeSeedDiag: snapshotDedupeSeedDiag(_dedupeSeedDiag),
         ndgrChatToPersistRatio: {
           decodedChats,
           ndgrPersistedRows: persistedNdgr,
@@ -10518,6 +10529,8 @@ async function ensureLiveDedupeStateSeeded(lid, mainKey) {
     if (isChunkIndex(storedIndex, lid)) {
       liveChunkIndex = /** @type {any} */ (storedIndex);
     }
+    // v0.1.1186 計器: この skip 経路が実際どれだけ通っているか観測(観測のみ・挙動変更ゼロ)。
+    try { noteDedupeSeedOutcome(_dedupeSeedDiag, 'skip'); } catch { /* 計器失敗は本処理を止めない */ }
     return { ok: true };
   }
   // 初回 or クロスタブで total がずれた → 全チャンクを 1 回読んで state を作り直す（O(N) 一回）。
@@ -10536,6 +10549,7 @@ async function ensureLiveDedupeStateSeeded(lid, mainKey) {
     console.debug(formatPipelinePhase('dedupe_seed_partial_requeue', {
       readRows: Array.isArray(chunkRead.rows) ? chunkRead.rows.length : 0
     }));
+    try { noteDedupeSeedOutcome(_dedupeSeedDiag, 'requeue'); } catch { /* 計器失敗は本処理を止めない */ }
     return { ok: false };
   }
   const existingRows = Array.isArray(chunkRead.rows) ? chunkRead.rows : [];
@@ -10544,6 +10558,7 @@ async function ensureLiveDedupeStateSeeded(lid, mainKey) {
   }
   liveDedupeState = buildCommentDedupeState(lid, existingRows);
   liveDedupeStateLiveId = lid;
+  try { noteDedupeSeedOutcome(_dedupeSeedDiag, 'rebuild'); } catch { /* 計器失敗は本処理を止めない */ }
   return { ok: true };
 }
 
@@ -11813,6 +11828,12 @@ async function persistCommentRowsImpl(rows, opts = {}) {
       );
       incrementalAdded = incMerged.added;
       incrementalUndo = incMerged.undo;
+      // v0.1.1186 計器: 1回のマージで確定した added 件数を観測(観測のみ・挙動変更ゼロ)。
+      //   記録が本家を上回る異常の切り分け用(仮説: skip 経路の不完全 state が原因なら、
+      //   この値が通常の新着ペースを超えて桁違いに膨らむはず)。
+      try {
+        noteIncrementalAddedCount(_dedupeSeedDiag, incrementalAdded ? incrementalAdded.length : 0);
+      } catch { /* 計器失敗は本処理を止めない */ }
       existing = []; // 下流の next 依存は incrementalMode 用に分岐済み（全件配列は作らない）。
     } else if (chunkMode) {
       // チャンク read 失敗時は「重複/欠落」を避けるため絶対に書き込まず requeue する。

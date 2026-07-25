@@ -11,6 +11,15 @@ function makeFullPayload() {
         '北極星レーン': { '4_番組累計ポイント': { value: 21370, state: 'ok' } },
         commentObservability: {
           savedCommentsUidStats: { totalSaved: 3370, withUid: 3370, withUidPercent: 100, withoutUid: 0, commentNoLess: 1200, commentNoLessPercent: 35.6 },
+          // v0.1.1186: dedup シード計器(記録が本家を上回る異常の切り分け)。
+          dedupeSeedDiag: {
+            seedSkipCount: 12,
+            seedRebuildCount: 2,
+            seedRequeueCount: 0,
+            lastIncrementalAddedCount: 3,
+            maxIncrementalAddedCount: 8290,
+            suspiciousAddedCount: 1
+          },
           interceptFetchLog: new Array(20).fill('/some/long/url [application/json]'),
           ndgrMessageIdDedupe: { accepted: 398, droppedDuplicate: 54 }
         },
@@ -59,6 +68,30 @@ describe('buildStatusFastDiagLite', () => {
     expect(us.totalSaved).toBe(3370);
     // 4) ndgrConnectStatus(同形パス)
     expect(lite.content.networkErrorProbe.ndgrConnectStatus).toBe('connected');
+  });
+
+  it('v0.1.1186: dedupeSeedDiag を同形パスで通す(記録>本家異常の切り分け計器の印字の穴ふさぎ)', () => {
+    const lite = buildStatusFastDiagLite(makeFullPayload());
+    expect(lite.content.giftDiagnostics.commentObservability.dedupeSeedDiag).toEqual({
+      seedSkipCount: 12,
+      seedRebuildCount: 2,
+      seedRequeueCount: 0,
+      maxIncrementalAddedCount: 8290,
+      suspiciousAddedCount: 1
+    });
+  });
+
+  it('dedupeSeedDiagが無ければ既定値(全ゼロ)で埋める(死に表示にしない)', () => {
+    const lite = buildStatusFastDiagLite({
+      content: { giftDiagnostics: { commentObservability: {} } }
+    });
+    expect(lite.content.giftDiagnostics.commentObservability.dedupeSeedDiag).toEqual({
+      seedSkipCount: 0,
+      seedRebuildCount: 0,
+      seedRequeueCount: 0,
+      maxIncrementalAddedCount: 0,
+      suspiciousAddedCount: 0
+    });
   });
 
   it('v0.1.1125: hostMoveDiag / scrollWhiteoutDiag を同形パスで通す(ちかちか計器の印字の穴ふさぎ)', () => {

@@ -241,6 +241,86 @@ export function parseInterceptFetchLog(attrValue) {
 }
 
 /**
+ * @typedef {{
+ *   seedSkipCount: number,
+ *   seedRebuildCount: number,
+ *   seedRequeueCount: number,
+ *   lastIncrementalAddedCount: number,
+ *   maxIncrementalAddedCount: number,
+ *   suspiciousAddedCount: number
+ * }} DedupeSeedDiag
+ */
+
+/**
+ * v0.1.1186 計器(記録が本家を上回る異常の切り分け): ensureLiveDedupeStateSeeded が
+ *   「storedTotal===myTotal 一致→既存 state 再利用(skip)」と「不一致→全チャンク read
+ *   で作り直し(rebuild)」のどちらの経路を通ったか、そして incrementalMode の1回のマージで
+ *   何件 added になったかを数えるだけの計器(観測のみ・挙動変更ゼロ)。
+ *
+ * 仮説: skip 経路で再利用した liveDedupeState が実は不完全(古いタブ切替・seed 時点の
+ *   部分読み等)だと、後続の mergeNewCommentsIncremental が既存コメントを新規誤判定し、
+ *   1回の incrementalAdded が桁違いに膨らむ(=記録の瞬間的な過剰増)。
+ *   suspiciousAddedCount は「1回のマージで100件を超える added」が出た回数(通常の新着
+ *   コメントペースでは起こり得ない規模を機械的にフラグする閾値)。
+ *
+ * @returns {DedupeSeedDiag}
+ */
+export function createDedupeSeedDiagState() {
+  return {
+    seedSkipCount: 0,
+    seedRebuildCount: 0,
+    seedRequeueCount: 0,
+    lastIncrementalAddedCount: 0,
+    maxIncrementalAddedCount: 0,
+    suspiciousAddedCount: 0
+  };
+}
+
+/**
+ * ensureLiveDedupeStateSeeded の分岐結果を観測する。
+ * @param {DedupeSeedDiag|null|undefined} state
+ * @param {'skip'|'rebuild'|'requeue'} outcome
+ */
+export function noteDedupeSeedOutcome(state, outcome) {
+  if (!state || typeof state !== 'object') return;
+  if (outcome === 'skip') state.seedSkipCount += 1;
+  else if (outcome === 'rebuild') state.seedRebuildCount += 1;
+  else if (outcome === 'requeue') state.seedRequeueCount += 1;
+}
+
+/**
+ * incrementalMode の1回のマージで確定した added 件数を観測する。
+ * @param {DedupeSeedDiag|null|undefined} state
+ * @param {number} addedCount
+ * @param {{ suspiciousThreshold?: number }} [opts]
+ */
+export function noteIncrementalAddedCount(state, addedCount, opts) {
+  if (!state || typeof state !== 'object') return;
+  const n = Number(addedCount) || 0;
+  const threshold = Math.max(1, Number(opts?.suspiciousThreshold) || 100);
+  state.lastIncrementalAddedCount = n;
+  if (n > state.maxIncrementalAddedCount) state.maxIncrementalAddedCount = n;
+  if (n > threshold) state.suspiciousAddedCount += 1;
+}
+
+/**
+ * 状態速報向けの snapshot(コピー・副作用なし)。
+ * @param {DedupeSeedDiag|null|undefined} state
+ * @returns {DedupeSeedDiag}
+ */
+export function snapshotDedupeSeedDiag(state) {
+  if (!state || typeof state !== 'object') return createDedupeSeedDiagState();
+  return {
+    seedSkipCount: Number(state.seedSkipCount) || 0,
+    seedRebuildCount: Number(state.seedRebuildCount) || 0,
+    seedRequeueCount: Number(state.seedRequeueCount) || 0,
+    lastIncrementalAddedCount: Number(state.lastIncrementalAddedCount) || 0,
+    maxIncrementalAddedCount: Number(state.maxIncrementalAddedCount) || 0,
+    suspiciousAddedCount: Number(state.suspiciousAddedCount) || 0
+  };
+}
+
+/**
  * 累積カウンタ（commentIngestBySource 等）を snapshot として安全にコピーする。
  * @param {Record<string, number>|null|undefined} counters
  * @returns {Record<string, number>}

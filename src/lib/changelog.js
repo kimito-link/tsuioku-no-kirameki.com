@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1186',
+    date: '2026-07-25',
+    summary: '状態速報の診断計器を強化(表示のみ)',
+    items: Object.freeze([
+      '記録件数が本家コメント数を大きく上回る現象の原因を切り分けるための診断表示を追加しました(動作は変わりません)。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1185',
     date: '2026-07-24',
     summary: '状態速報の診断計器を強化(表示のみ)',
