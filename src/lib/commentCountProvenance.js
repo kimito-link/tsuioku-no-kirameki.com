@@ -188,6 +188,30 @@ function commentNoLessStatsFromFastDiag(fastDiag) {
 }
 
 /**
+ * v0.1.1186 計器: fastDiag から dedup シード計器(skip/rebuild/requeue回数・1回のマージの
+ *   added件数)を取り出す。記録>本家(check)の異常が「storedTotal一致で state 再利用した
+ *   skip 経路の不完全 state が原因」かを切り分けるため。取れなければ null。
+ * @param {object|null|undefined} fastDiag
+ * @returns {{ seedSkipCount: number, seedRebuildCount: number, seedRequeueCount: number,
+ *   maxIncrementalAddedCount: number, suspiciousAddedCount: number }|null}
+ */
+function dedupeSeedDiagFromFastDiag(fastDiag) {
+  try {
+    const s = fastDiag?.content?.giftDiagnostics?.commentObservability?.dedupeSeedDiag;
+    if (!s || typeof s !== 'object') return null;
+    return {
+      seedSkipCount: Number(s.seedSkipCount) || 0,
+      seedRebuildCount: Number(s.seedRebuildCount) || 0,
+      seedRequeueCount: Number(s.seedRequeueCount) || 0,
+      maxIncrementalAddedCount: Number(s.maxIncrementalAddedCount) || 0,
+      suspiciousAddedCount: Number(s.suspiciousAddedCount) || 0
+    };
+  } catch {
+    return null;
+  }
+}
+
+/**
  * 状態速報に載せるテキスト行配列。判定はせず「何を数えているか」を並べる。
  * @param {object[]} livesData summarizeOneLive の配列
  * @param {object|null} [fastDiag] commentNo 欠落割合の計器(記録>本家の内訳切り分け用・省略可)
@@ -243,6 +267,22 @@ export function formatCommentCountProvenanceLines(livesData, fastDiag = null) {
               : ' — 本家Δ≈記録Δ＝母数差/本家の遅延寄り(記録が正しく先行)'
             : '';
         lines.push(`- 時系列(計器): ${winLabel}${od} / ${rd}${hint}`);
+      }
+      // v0.1.1186 計器: 記録Δが本家Δを上回るケースで、dedup シードの skip/rebuild 回数と
+      //   1回のマージで確定した added の最大件数を出す。maxIncrementalAddedCount が本家Δと
+      //   比べて桁違いに大きい(suspiciousAddedCount>0)なら、skip 経路で再利用した state が
+      //   不完全だった疑い(仮説の直接裏取り)。
+      const dsd = dedupeSeedDiagFromFastDiag(fastDiag);
+      if (dsd && (dsd.seedSkipCount > 0 || dsd.seedRebuildCount > 0)) {
+        const suspiciousHint =
+          dsd.suspiciousAddedCount > 0
+            ? ' — 1回のマージで大量addedを検知(dedup再利用stateが不完全だった疑い)'
+            : '';
+        lines.push(
+          `- dedupシード(計器): skip${ja(dsd.seedSkipCount)}回 / rebuild${ja(dsd.seedRebuildCount)}回` +
+            ` / requeue${ja(dsd.seedRequeueCount)}回 / 1回の最大added${ja(dsd.maxIncrementalAddedCount)}件` +
+            `${suspiciousHint}`
+        );
       }
     }
   }

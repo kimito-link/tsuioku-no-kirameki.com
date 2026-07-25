@@ -6,7 +6,11 @@ import {
   aggregateSavedCommentsUidStats,
   accumulateSavedCommentsUidStats,
   parseInterceptFetchLog,
-  snapshotCommentIngestCounters
+  snapshotCommentIngestCounters,
+  createDedupeSeedDiagState,
+  noteDedupeSeedOutcome,
+  noteIncrementalAddedCount,
+  snapshotDedupeSeedDiag
 } from './commentObservabilityDiag.js';
 
 function makeRow(window, attrs) {
@@ -303,5 +307,73 @@ describe('snapshotCommentIngestCounters', () => {
   it('null / 不正入力は空オブジェクト', () => {
     expect(snapshotCommentIngestCounters(null)).toEqual({});
     expect(snapshotCommentIngestCounters(undefined)).toEqual({});
+  });
+});
+
+describe('createDedupeSeedDiagState / noteDedupeSeedOutcome / noteIncrementalAddedCount / snapshotDedupeSeedDiag', () => {
+  it('初期値は全部ゼロ', () => {
+    const s = createDedupeSeedDiagState();
+    expect(s.seedSkipCount).toBe(0);
+    expect(s.seedRebuildCount).toBe(0);
+    expect(s.seedRequeueCount).toBe(0);
+    expect(s.lastIncrementalAddedCount).toBe(0);
+    expect(s.maxIncrementalAddedCount).toBe(0);
+    expect(s.suspiciousAddedCount).toBe(0);
+  });
+
+  it('skip/rebuild/requeue それぞれ独立してカウントされる', () => {
+    const s = createDedupeSeedDiagState();
+    noteDedupeSeedOutcome(s, 'skip');
+    noteDedupeSeedOutcome(s, 'skip');
+    noteDedupeSeedOutcome(s, 'rebuild');
+    noteDedupeSeedOutcome(s, 'requeue');
+    expect(s.seedSkipCount).toBe(2);
+    expect(s.seedRebuildCount).toBe(1);
+    expect(s.seedRequeueCount).toBe(1);
+  });
+
+  it('壊れたstateでも例外を投げない', () => {
+    expect(() => noteDedupeSeedOutcome(null, 'skip')).not.toThrow();
+    expect(() => noteDedupeSeedOutcome(undefined, 'rebuild')).not.toThrow();
+  });
+
+  it('noteIncrementalAddedCountは最大値を保持し、閾値超で疑わしいカウントが増える', () => {
+    const s = createDedupeSeedDiagState();
+    noteIncrementalAddedCount(s, 3);
+    noteIncrementalAddedCount(s, 150, { suspiciousThreshold: 100 });
+    noteIncrementalAddedCount(s, 5);
+    expect(s.lastIncrementalAddedCount).toBe(5); // 最後の呼び出し値
+    expect(s.maxIncrementalAddedCount).toBe(150); // 最大値は下がらない
+    expect(s.suspiciousAddedCount).toBe(1); // 閾値(100)超は1回だけ
+  });
+
+  it('閾値未指定時は既定100で判定される', () => {
+    const s = createDedupeSeedDiagState();
+    noteIncrementalAddedCount(s, 50);
+    noteIncrementalAddedCount(s, 101);
+    expect(s.suspiciousAddedCount).toBe(1);
+  });
+
+  it('snapshotDedupeSeedDiagは元stateのコピーを返す(副作用なし)', () => {
+    const s = createDedupeSeedDiagState();
+    noteDedupeSeedOutcome(s, 'skip');
+    noteIncrementalAddedCount(s, 200, { suspiciousThreshold: 100 });
+    const snap = snapshotDedupeSeedDiag(s);
+    expect(snap).toEqual({
+      seedSkipCount: 1,
+      seedRebuildCount: 0,
+      seedRequeueCount: 0,
+      lastIncrementalAddedCount: 200,
+      maxIncrementalAddedCount: 200,
+      suspiciousAddedCount: 1
+    });
+    // コピーであり同一参照ではない
+    snap.seedSkipCount = 999;
+    expect(s.seedSkipCount).toBe(1);
+  });
+
+  it('壊れたstate/nullはsnapshotで初期値相当を返す', () => {
+    expect(snapshotDedupeSeedDiag(null)).toEqual(createDedupeSeedDiagState());
+    expect(snapshotDedupeSeedDiag(undefined)).toEqual(createDedupeSeedDiagState());
   });
 });

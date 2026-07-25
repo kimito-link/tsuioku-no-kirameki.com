@@ -266,6 +266,66 @@ describe('formatCommentCountProvenanceLines', () => {
     expect(text).toContain('判定: 🟡 要確認');
     expect(text).not.toContain('内訳(計器)');
   });
+
+  // v0.1.1186: 要確認(check)のとき fastDiag から dedup シード計器(skip/rebuild回数・大量added)を出す。
+  it('要確認のとき dedupeSeedDiag があれば skip/rebuild回数と最大added件数を併記する', () => {
+    const fastDiag = {
+      content: { giftDiagnostics: { commentObservability: { dedupeSeedDiag: {
+        seedSkipCount: 12, seedRebuildCount: 1, seedRequeueCount: 0,
+        maxIncrementalAddedCount: 8290, suspiciousAddedCount: 1
+      } } } }
+    };
+    const text = formatCommentCountProvenanceLines([
+      { lv: 'lv1', recordedCount: 8294, officialCommentCount: 8281, lastIngestAgoMs: 2000 }
+    ], fastDiag).join('\n');
+    expect(text).toContain('判定: 🟡 要確認');
+    expect(text).toContain('dedupシード(計器)');
+    expect(text).toContain('skip12回');
+    expect(text).toContain('rebuild1回');
+    expect(text).toContain('1回の最大added8,290件');
+    expect(text).toContain('dedup再利用stateが不完全だった疑い');
+  });
+
+  it('suspiciousAddedCount=0のときは疑いヒントを出さない', () => {
+    const fastDiag = {
+      content: { giftDiagnostics: { commentObservability: { dedupeSeedDiag: {
+        seedSkipCount: 5, seedRebuildCount: 1, seedRequeueCount: 0,
+        maxIncrementalAddedCount: 3, suspiciousAddedCount: 0
+      } } } }
+    };
+    const text = formatCommentCountProvenanceLines([
+      { lv: 'lv1', recordedCount: 1400, officialCommentCount: 926, lastIngestAgoMs: 5 * 60 * 1000 }
+    ], fastDiag).join('\n');
+    expect(text).toContain('dedupシード(計器)');
+    expect(text).not.toContain('不完全だった疑い');
+  });
+
+  it('skip/rebuildが両方0ならdedupシード行は出さない', () => {
+    const fastDiag = {
+      content: { giftDiagnostics: { commentObservability: { dedupeSeedDiag: {
+        seedSkipCount: 0, seedRebuildCount: 0, seedRequeueCount: 0,
+        maxIncrementalAddedCount: 0, suspiciousAddedCount: 0
+      } } } }
+    };
+    const text = formatCommentCountProvenanceLines([
+      { lv: 'lv1', recordedCount: 1400, officialCommentCount: 926, lastIngestAgoMs: 5 * 60 * 1000 }
+    ], fastDiag).join('\n');
+    expect(text).not.toContain('dedupシード(計器)');
+  });
+
+  it('正常(🟢)のときはdedupシード行を出さない', () => {
+    const fastDiag = {
+      content: { giftDiagnostics: { commentObservability: { dedupeSeedDiag: {
+        seedSkipCount: 12, seedRebuildCount: 1, seedRequeueCount: 0,
+        maxIncrementalAddedCount: 8290, suspiciousAddedCount: 1
+      } } } }
+    };
+    const text = formatCommentCountProvenanceLines([
+      { lv: 'lv1', recordedCount: 800, officialCommentCount: 926, lastIngestAgoMs: 5000 }
+    ], fastDiag).join('\n');
+    expect(text).toContain('判定: 🟢 正常');
+    expect(text).not.toContain('dedupシード(計器)');
+  });
 });
 
 describe('commentCountProvenanceToActionCards', () => {
