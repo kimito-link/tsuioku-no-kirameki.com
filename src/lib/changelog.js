@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1188',
+    date: '2026-07-25',
+    summary: '会場のサムネ白丸を根治',
+    items: Object.freeze([
+      '会場モードで一度サムネの取得に失敗すると白丸のまま固着していた不具合を修正しました。時間を置いて自動的に再取得を試みるようになります。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1187',
     date: '2026-07-25',
     summary: 'ポップアップの記録件数表示を安定化',
