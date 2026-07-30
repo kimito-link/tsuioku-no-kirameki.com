@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1192',
+    date: '2026-07-30',
+    summary: '会場ホバープレビューの表示内容を調整',
+    items: Object.freeze([
+      'サムネイルの取得状況の表示は「🩺状態」パネルを開いているときだけに絞りました。最後にコメントした時刻(相対表示)を発言数の横に追加しました。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1191',
     date: '2026-07-30',
     summary: '会場アイコンにホバープレビューを追加',

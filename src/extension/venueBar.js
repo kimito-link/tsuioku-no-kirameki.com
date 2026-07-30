@@ -1629,6 +1629,9 @@ const VENUE_CSS = `
     white-space: nowrap;
   }
   .nlsb-hover-card__id {
+    /* 2026-07-30(council-fable設計・venue-hover-card-content-DESIGN.md 必答1): 文言は
+       そのまま(匿名の同一人物照合に必須)・体裁だけ格下げ(名前/活動より控えめな見た目)。 */
+    font-size: 11px;
     opacity: 0.7;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -2376,7 +2379,10 @@ export function mountVenueBarButton(options = {}) {
     if (imgEl instanceof HTMLElement) imgEl.title = '';
 
     const thumb = readVenueTileThumbState(/** @type {HTMLElement|null} */ (cellEl));
-    const model = buildVenueHoverCardModel({ ...data, thumb });
+    // 2026-07-30(council-fable設計・venue-hover-card-content-DESIGN.md 必答2/必答4):
+    //   diagModeは既存の🩺状態パネルの開閉状態に連動(新規UI・新規storageを追加しない)。
+    //   開いた瞬間の状態を都度読む(固定しない・地雷3)。nowMsは純関数を汚さないための注入。
+    const model = buildVenueHoverCardModel({ ...data, thumb, nowMs: Date.now(), diagMode: !diagPanel.hidden });
     renderVenueHoverCard(hoverCardEl, model);
     hoverCardEl.classList.add('nlsb-hover-card--open');
 
@@ -2632,7 +2638,7 @@ export function mountVenueBarButton(options = {}) {
   // 2026-07-30(wayfinder→to-spec方式・venue-avatar-hover-preview-SPEC.md §4.3): ホバープレビュー
   //   カード用のデータ。paint時(席装飾ループ/renderTopBar)にWeakMapへ相乗り登録するだけで、
   //   DOM書き込み・新規タイマー・新規計算は無い(RANKバッジちらつき教訓=diff-skip不要な設計)。
-  /** @type {WeakMap<HTMLElement, { uid: string, displayName: string, count: number, hasGift: boolean, giftCount: number, venueRank: number }>} */
+  /** @type {WeakMap<HTMLElement, { uid: string, displayName: string, count: number, hasGift: boolean, giftCount: number, venueRank: number, lastAt: number }>} */
   const _hoverCardDataByEl = new WeakMap();
   /** @type {WeakMap<HTMLElement, { seatTitle: string, cellTitle: string, imgTitle: string, cellEl: HTMLElement|null }>} */
   const _hoverCardTitleBackupByEl = new WeakMap();
@@ -4318,7 +4324,7 @@ export function mountVenueBarButton(options = {}) {
   //   sig(上位の userId+順位)が無変化なら DOM を触らない=毎フレーム作り直さない(hot path 保護)。
   //   一度でも非空を描いたら、一瞬の空(データ遅延)では畳まない=高さ振動を作らない(v0.1.1026)。
   //   状態フラグは clearDisplay(先に定義)からも触るため、宣言は関数より前(下の hasRenderedNonEmpty 付近)。
-  /** @param {Array<{ rank:number, participant:{ key?:string, userId?:string, name?:string, count?:number, hasGift?:boolean, giftCount?:number } }>} topSupporters */
+  /** @param {Array<{ rank:number, participant:{ key?:string, userId?:string, name?:string, count?:number, hasGift?:boolean, giftCount?:number, lastAt?:number } }>} topSupporters */
   const renderTopBar = (topSupporters) => {
     const list = Array.isArray(topSupporters) ? topSupporters : [];
     // 空入力でも、一度出したバーは畳まない(前回の顔を残す=明滅/高さ振動を防ぐ)。
@@ -4346,7 +4352,10 @@ export function mountVenueBarButton(options = {}) {
         count: Number(p.count) || 0,
         hasGift: p.hasGift === true,
         giftCount: Number(p.giftCount) || 0,
-        venueRank: Math.max(0, Math.floor(Number(item.rank) || 0))
+        venueRank: Math.max(0, Math.floor(Number(item.rank) || 0)),
+        // 2026-07-30(MVP-2・venue-hover-card-content-DESIGN.md): 最終発言時刻(既存データ・
+        //   新規取得ゼロ)。ホバーカードで相対時刻(「3分前」等)に変換して表示する。
+        lastAt: Number(p.lastAt) || 0
       });
       frag.appendChild(cell);
     }
@@ -4645,7 +4654,10 @@ export function mountVenueBarButton(options = {}) {
         count: Number(participant.count) || 0,
         hasGift: participant.hasGift === true,
         giftCount: Number(participant.giftCount) || 0,
-        venueRank
+        venueRank,
+        // 2026-07-30(MVP-2・venue-hover-card-content-DESIGN.md): 最終発言時刻(既存データ・
+        //   新規取得ゼロ)。ホバーカードで相対時刻(「3分前」等)に変換して表示する。
+        lastAt: Number(participant.lastAt) || 0
       });
       const speakerKey = uid ? `u:${uid}` : rawName ? `n:${rawName}` : '';
       const streakEntry = speakerKey ? speechStreaks.get(speakerKey) : null;

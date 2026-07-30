@@ -83,4 +83,31 @@ describe('会場ホバープレビューカードの配線(配線忘れ=CI赤)',
     const block = venueBarSrc.slice(begin, end);
     expect(block).toMatch(/pointer-events:\s*none/);
   });
+
+  // --- 2026-07-30(council-fable設計・venue-hover-card-content-DESIGN.md MVP-1/MVP-2) ---
+  it('openHoverCardFor が diagMode を🩺状態パネルの開閉状態から都度読んでいる(固定していない)', () => {
+    expect(venueBarSrc).toMatch(/diagMode:\s*!diagPanel\.hidden/);
+  });
+
+  it('openHoverCardFor が nowMs を Date.now() から注入している(純関数側にDate.now()を持ち込まない)', () => {
+    expect(venueBarSrc).toMatch(/nowMs:\s*Date\.now\(\)/);
+  });
+
+  it('席装飾ループ・renderTopBarの両方の_hoverCardDataByEl.setにlastAtが乗っている(配線忘れ=CI赤)', () => {
+    const seatSetAt = venueBarSrc.indexOf('_hoverCardDataByEl.set(node.seat,');
+    const topbarSetAt = venueBarSrc.indexOf('_hoverCardDataByEl.set(cell,');
+    expect(seatSetAt).toBeGreaterThanOrEqual(0);
+    expect(topbarSetAt).toBeGreaterThanOrEqual(0);
+    const seatBlock = venueBarSrc.slice(seatSetAt, venueBarSrc.indexOf('});', seatSetAt));
+    const topbarBlock = venueBarSrc.slice(topbarSetAt, venueBarSrc.indexOf('});', topbarSetAt));
+    expect(seatBlock).toMatch(/lastAt:/);
+    expect(topbarBlock).toMatch(/lastAt:/);
+  });
+
+  it('.nlsb-hover-card__id に格下げのfont-sizeが設定されている', () => {
+    const begin = venueBarSrc.indexOf('.nlsb-hover-card__id {');
+    const end = venueBarSrc.indexOf('}', begin);
+    const block = venueBarSrc.slice(begin, end);
+    expect(block).toMatch(/font-size:\s*11px/);
+  });
 });
