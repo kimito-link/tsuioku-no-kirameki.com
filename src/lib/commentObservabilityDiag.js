@@ -247,7 +247,9 @@ export function parseInterceptFetchLog(attrValue) {
  *   seedRequeueCount: number,
  *   lastIncrementalAddedCount: number,
  *   maxIncrementalAddedCount: number,
- *   suspiciousAddedCount: number
+ *   suspiciousAddedCount: number,
+ *   addedNoLessCount: number,
+ *   addedTotalCount: number
  * }} DedupeSeedDiag
  */
 
@@ -272,7 +274,9 @@ export function createDedupeSeedDiagState() {
     seedRequeueCount: 0,
     lastIncrementalAddedCount: 0,
     maxIncrementalAddedCount: 0,
-    suspiciousAddedCount: 0
+    suspiciousAddedCount: 0,
+    addedNoLessCount: 0,
+    addedTotalCount: 0
   };
 }
 
@@ -304,6 +308,51 @@ export function noteIncrementalAddedCount(state, addedCount, opts) {
 }
 
 /**
+ * added 行のうち「コメント番号を持たない行」の件数を積む(v0.1.1196 計器・観測のみ)。
+ *
+ * ★これが二重計上の候補を切り分ける決定打になる。
+ *
+ * dedup キー(commentRecord.js:75-84 buildDedupeKey)は commentNo の有無で構造が変わる:
+ *   - commentNo あり: `${liveId}|${no}|${text}`            ← capturedAt に依存しない
+ *   - commentNo 無し: `${liveId}||${text}|${sec}|${uid}`   ← capturedAt の「秒」が混ざる
+ *
+ * そして capturedAt はコメントの取得経路によって導出が異なる:
+ *   - ライブNDGR / DOM harvest / intercept_post : capturedAt 無し → createCommentEntry が Date.now() を押す
+ *   - backfill / NDGR_FORWARD                   : 配信開始+vpos で算出した値を持つ
+ *
+ * よって同じ匿名コメントがライブ経路と backfill 経路の両方から入ると、`sec` 成分が
+ * 数十分〜数時間ずれてキーが一致せず、dedup をすり抜けて二重計上される——という仮説が立つ。
+ * この機序は commentNo 欠落行でしか成立しない(番号があればキーは capturedAt 非依存)。
+ *
+ * したがって:
+ *   - addedNoLessCount がほぼ 0 → 上記仮説は棄却でき、seed skip 経路(別候補)に絞れる
+ *   - addedNoLessCount が大きい → 仮説が有力。capturedAt 正規化の設計に進む
+ *
+ * ⚠️ 修正ではなく観測に留めている理由: dedup キーの意味論を変えると既存の全保存データの
+ *    キーと非互換になり、誤ると逆に大量の二重計上を招く。実測で候補を絞ってから設計する。
+ *
+ * @param {DedupeSeedDiag|null|undefined} state
+ * @param {ReadonlyArray<{ commentNo?: unknown }>|null|undefined} addedRows
+ *   mergeNewCommentsIncremental が返した added 行。
+ */
+export function noteAddedCommentNoLess(state, addedRows) {
+  if (!state || typeof state !== 'object') return;
+  const rows = Array.isArray(addedRows) ? addedRows : [];
+  if (!rows.length) return;
+  let noLess = 0;
+  for (const row of rows) {
+    // ⚠️ 判定は buildDedupeKey(commentRecord.js:76-79)と1バイト単位でそろえること。
+    //    あちらは `String(rec.commentNo ?? '').trim()` が非空かどうかだけを見る
+    //    (`no` フィールドは見ない・数値化もしない)。ここがズレると「キーがどちらの
+    //    構造で作られたか」を取り違え、計器が嘘をつく。
+    const no = String(row?.commentNo ?? '').trim();
+    if (!no) noLess += 1;
+  }
+  state.addedTotalCount += rows.length;
+  state.addedNoLessCount += noLess;
+}
+
+/**
  * 状態速報向けの snapshot(コピー・副作用なし)。
  * @param {DedupeSeedDiag|null|undefined} state
  * @returns {DedupeSeedDiag}
@@ -316,7 +365,9 @@ export function snapshotDedupeSeedDiag(state) {
     seedRequeueCount: Number(state.seedRequeueCount) || 0,
     lastIncrementalAddedCount: Number(state.lastIncrementalAddedCount) || 0,
     maxIncrementalAddedCount: Number(state.maxIncrementalAddedCount) || 0,
-    suspiciousAddedCount: Number(state.suspiciousAddedCount) || 0
+    suspiciousAddedCount: Number(state.suspiciousAddedCount) || 0,
+    addedNoLessCount: Number(state.addedNoLessCount) || 0,
+    addedTotalCount: Number(state.addedTotalCount) || 0
   };
 }
 

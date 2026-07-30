@@ -267,6 +267,7 @@ import {
   snapshotCommentIngestCounters,
   createDedupeSeedDiagState,
   noteDedupeSeedOutcome,
+  noteAddedCommentNoLess,
   noteIncrementalAddedCount,
   snapshotDedupeSeedDiag
 } from '../lib/commentObservabilityDiag.js';
@@ -11835,6 +11836,11 @@ async function persistCommentRowsImpl(rows, opts = {}) {
       //   この値が通常の新着ペースを超えて桁違いに膨らむはず)。
       try {
         noteIncrementalAddedCount(_dedupeSeedDiag, incrementalAdded ? incrementalAdded.length : 0);
+        // v0.1.1196 計器: added のうち commentNo 欠落行を数える。dedup キーは commentNo の
+        //   有無で構造が変わり(欠落時だけ capturedAt の秒が混ざる)、二重計上の有力仮説
+        //   「ライブ経路と backfill 経路で capturedAt の導出が違うためキーが一致しない」は
+        //   欠落行でしか成立しない。0 に近ければその仮説を棄却できる(切り分けの決定打)。
+        noteAddedCommentNoLess(_dedupeSeedDiag, incrementalAdded);
       } catch { /* 計器失敗は本処理を止めない */ }
       existing = []; // 下流の next 依存は incrementalMode 用に分岐済み（全件配列は作らない）。
     } else if (chunkMode) {

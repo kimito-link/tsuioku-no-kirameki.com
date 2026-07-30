@@ -18,7 +18,10 @@ function makeFullPayload() {
             seedRequeueCount: 0,
             lastIncrementalAddedCount: 3,
             maxIncrementalAddedCount: 8290,
-            suspiciousAddedCount: 1
+            suspiciousAddedCount: 1,
+            // 実配信 lv351067643 で観測された maxIncrementalAddedCount=613 を模した値。
+            addedNoLessCount: 613,
+            addedTotalCount: 900
           },
           interceptFetchLog: new Array(20).fill('/some/long/url [application/json]'),
           ndgrMessageIdDedupe: { accepted: 398, droppedDuplicate: 54 }
@@ -77,7 +80,10 @@ describe('buildStatusFastDiagLite', () => {
       seedRebuildCount: 2,
       seedRequeueCount: 0,
       maxIncrementalAddedCount: 8290,
-      suspiciousAddedCount: 1
+      suspiciousAddedCount: 1,
+      // v0.1.1196: added の番号欠落内訳(二重計上の切り分け)も lite に通っていること。
+      addedNoLessCount: 613,
+      addedTotalCount: 900
     });
   });
 
@@ -90,7 +96,9 @@ describe('buildStatusFastDiagLite', () => {
       seedRebuildCount: 0,
       seedRequeueCount: 0,
       maxIncrementalAddedCount: 0,
-      suspiciousAddedCount: 0
+      suspiciousAddedCount: 0,
+      addedNoLessCount: 0,
+      addedTotalCount: 0
     });
   });
 

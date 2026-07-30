@@ -300,6 +300,61 @@ describe('formatCommentCountProvenanceLines', () => {
     expect(text).not.toContain('不完全だった疑い');
   });
 
+  // v0.1.1196: added の番号欠落内訳。dedup キーは commentNo 欠落時だけ capturedAt の秒が
+  //   混ざるため、「ライブ経路と backfill 経路で capturedAt の導出が違うので二重計上する」
+  //   仮説はこの行でしか成立しない。読める本文に出て初めて切り分けに使える(printerまで固定)。
+  describe('added内訳(計器)の印字', () => {
+    /** @param {object} dsd */
+    const render = (dsd) =>
+      formatCommentCountProvenanceLines(
+        [{ lv: 'lv1', recordedCount: 1400, officialCommentCount: 926, lastIngestAgoMs: 5 * 60 * 1000 }],
+        { content: { giftDiagnostics: { commentObservability: { dedupeSeedDiag: dsd } } } }
+      ).join('\n');
+
+    it('番号欠落が多いときは capturedAt 起因が有力だと言う', () => {
+      const text = render({
+        seedSkipCount: 5, seedRebuildCount: 1, seedRequeueCount: 0,
+        maxIncrementalAddedCount: 613, suspiciousAddedCount: 1,
+        addedNoLessCount: 613, addedTotalCount: 900
+      });
+      expect(text).toContain('added内訳(計器)');
+      expect(text).toContain('番号欠落613件');
+      expect(text).toContain('全900件(68%)');
+      expect(text).toContain('capturedAt導出の経路差による二重計上が有力');
+    });
+
+    it('番号欠落0件なら仮説を否定して seed skip 側へ誘導する', () => {
+      const text = render({
+        seedSkipCount: 5, seedRebuildCount: 1, seedRequeueCount: 0,
+        maxIncrementalAddedCount: 613, suspiciousAddedCount: 1,
+        addedNoLessCount: 0, addedTotalCount: 900
+      });
+      expect(text).toContain('番号欠落0件');
+      expect(text).toContain('capturedAt起因の二重計上は否定的');
+      expect(text).toContain('seed skip側を疑う');
+    });
+
+    it('割合が小さいときは断定しない(誤誘導しない)', () => {
+      const text = render({
+        seedSkipCount: 5, seedRebuildCount: 1, seedRequeueCount: 0,
+        maxIncrementalAddedCount: 10, suspiciousAddedCount: 0,
+        addedNoLessCount: 9, addedTotalCount: 900
+      });
+      expect(text).toContain('added内訳(計器)');
+      expect(text).not.toContain('有力');
+      expect(text).not.toContain('否定的');
+    });
+
+    it('addedTotalCount=0(v0.1.1196以前の古いdiag)なら内訳行を出さない', () => {
+      const text = render({
+        seedSkipCount: 5, seedRebuildCount: 1, seedRequeueCount: 0,
+        maxIncrementalAddedCount: 3, suspiciousAddedCount: 0
+      });
+      expect(text).toContain('dedupシード(計器)');
+      expect(text).not.toContain('added内訳(計器)');
+    });
+  });
+
   it('skip/rebuildが両方0ならdedupシード行は出さない', () => {
     const fastDiag = {
       content: { giftDiagnostics: { commentObservability: { dedupeSeedDiag: {
