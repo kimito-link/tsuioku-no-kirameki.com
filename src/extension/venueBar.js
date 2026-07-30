@@ -3540,7 +3540,19 @@ export function mountVenueBarButton(options = {}) {
    */
   const launchGiftThrow = (speakerKey, proj, detectAt) => {
     if (!proj || !open) return false;
-    if (!canLaunchGiftThrow(giftProjActive)) return false; // 上限超過は捨てる(性能最優先)
+    if (!canLaunchGiftThrow(giftProjActive)) {
+      // 2026-07-30(診断先行アプローチ): 同時投擲上限(GIFT_THROW_MAX_CONCURRENT)超過は
+      //   性能ガードによる正常動作だが、従来この件数を計上する内訳が無く「検知N→演出N-k」の
+      //   差分が常に⚠(取りこぼし)扱いになっていた(実配信で検知24→演出21の3件差を誤診断)。
+      //   proj.kindで種別を判定し、音側(giftSoundGuarded等)と同じ思想で内訳計上する。
+      if (proj.kind === 'ad') {
+        _giftEffectDiagCounters.adThrowCapGuarded += 1;
+      } else {
+        _giftEffectDiagCounters.giftThrowCapGuarded += 1;
+      }
+      publishGiftEffectDiag();
+      return false; // 上限超過は捨てる(性能最優先)
+    }
     const el = giftProjPool.pop() || (() => {
       const d = document.createElement('div');
       d.className = 'nlsb-gift-proj';
