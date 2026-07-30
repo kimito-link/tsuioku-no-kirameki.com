@@ -87,3 +87,140 @@ export function stepVoiceQueueMax(currentMax, computedMax, growStreak) {
   }
   return { nextMax: current, nextGrowStreak: nextStreak };
 }
+
+// ---------------------------------------------------------------------------
+// 2026-07-28(段階0=shadow・council-fable設計voice-lag-decomposition-DESIGN.md):
+//   「読み上げが遅い」体感の真因診断。会議は「コメント流量に処理時間が構造的に追いつけない
+//   (仮説A=再生時間支配)」と結論したが、Fableが実コード(_drainQueueは直列await1本サーバ)を
+//   読み「実効上限はスループットに寄与しない」と検算を訂正した上で、混雑ヒューリスティクス
+//   (computeVoiceCongestion/resolveVoiceSynthDepth)が絶対キュー長依存のため実効上限が
+//   絞られたレジームで「先読み深さ1→合成が再生と重ならず毎件コールドスタート→処理時間が
+//   伸びる→実効上限がさらに絞られる」という自己強化ループ(仮説B)を起こしている疑いを発見。
+//   この節はその真因(A/B/C)を実測から判別する純関数群。段階0=印字のみ・挙動には一切介入しない。
+// ---------------------------------------------------------------------------
+
+/** 需要/供給比(pressure=λ×S/60000)がこれ以下なら「過負荷ではない」とみなす閾値。EMA振れの誤差帯。 */
+export const VOICE_PRESSURE_OK_MAX = 1.2;
+
+/** 合成待ち(synthWaitEmaMs)がserviceTimeEmaMsに占める比率がこれ以上なら「合成の重なりが
+ *  失われている」とみなす閾値(仮説B=coldsynthの検出条件の一部)。 */
+export const VOICE_SYNTH_WAIT_DOMINANT_RATIO = 0.35;
+
+/** 期待再生時間(expectedPlayEmaMs)がserviceTimeEmaMsに占める比率がこれ以上なら「再生時間が
+ *  処理時間の大部分を占める」とみなす閾値(仮説A=playbackの検出条件)。 */
+export const VOICE_PLAYBACK_DOMINANT_RATIO = 0.6;
+
+/** 実再生時間(playbackEmaMs)が期待再生時間(expectedPlayEmaMs)よりserviceTimeEmaMs比でこれ以上
+ *  超過していれば「再生ストール」とみなす閾値(バッファ待ち・デバイス起因の疑い)。 */
+export const VOICE_STALL_EXCESS_RATIO = 0.2;
+
+/**
+ * 発話成功/dropのイベント列を二項EMAで均し、「直近voiced率」を得る純関数。
+ * 累計voicedRatio(spokenTotal/(spokenTotal+staleDropTotal))は配信開始からの累計で、
+ * リロード跨ぎや序盤の少数サンプルにバイアスされやすい(実測で62.1%→3.8%の急落を観測)。
+ * alpha=0.05は「直近30件程度で均す」狙いの小さめの値(体感遅延のe2eAvgMsのalpha=0.3より慎重)。
+ * @param {unknown} prevRatio 直前のEMA値(-1=未計測)
+ * @param {unknown} hit 発話成功なら1、dropなら0
+ * @param {number} [alpha]
+ * @returns {number} 更新後のEMA値(0〜1)。不正なhitは直前値をそのまま返す(壊れない)。
+ */
+export function updateVoiceEventRatioEma(prevRatio, hit, alpha = 0.05) {
+  const h = Number(hit);
+  if (h !== 0 && h !== 1) {
+    const prev = Number(prevRatio);
+    return Number.isFinite(prev) ? prev : -1;
+  }
+  const prev = Number(prevRatio);
+  if (!Number.isFinite(prev) || prev < 0) return h;
+  return prev + alpha * (h - prev);
+}
+
+/**
+ * 到着件数を固定windowMs(既定10秒)で畳み、「件/分」のEMAへ変換する純関数。
+ * enqueueはバッチで来るため同一Date.now()が並ぶことがあり、到着"間隔"のEMA(gap-EMA)は
+ * gap=0連発で崩壊する。窓を閉じたタイミングでその窓の件数を「件/分」換算してEMA化する。
+ * @param {{ windowStartMs?: number, windowCount?: number, arrivalPerMin?: number }|null|undefined} state
+ * @param {number} nowMs
+ * @param {number} [count] 今回追加する到着件数(既定1)
+ * @param {number} [windowMs] 窓の長さ(既定10000ms)
+ * @param {number} [alpha] EMA係数(既定0.3)
+ * @returns {{ windowStartMs: number, windowCount: number, arrivalPerMin: number }}
+ */
+export function foldVoiceArrivalWindow(state, nowMs, count = 1, windowMs = 10000, alpha = 0.3) {
+  const now = Number(nowMs);
+  const safeNow = Number.isFinite(now) ? now : 0;
+  const addCount = Math.max(0, Math.floor(Number(count) || 0));
+  const s = state && typeof state === 'object' ? state : {};
+  const prevStart = Number(s.windowStartMs);
+  const prevCount = Math.max(0, Math.floor(Number(s.windowCount) || 0));
+  const prevRate = Number(s.arrivalPerMin);
+
+  if (!Number.isFinite(prevStart)) {
+    // 初回: 窓を開始するだけ(まだレートは確定させない)。
+    return { windowStartMs: safeNow, windowCount: addCount, arrivalPerMin: Number.isFinite(prevRate) && prevRate >= 0 ? prevRate : -1 };
+  }
+
+  const elapsed = safeNow - prevStart;
+  if (elapsed < windowMs) {
+    // 窓の途中: 件数だけ積む。
+    return { windowStartMs: prevStart, windowCount: prevCount + addCount, arrivalPerMin: Number.isFinite(prevRate) && prevRate >= 0 ? prevRate : -1 };
+  }
+
+  // 窓を閉じる: 今回分も含めたこの窓の件数を「件/分」に換算してEMA化し、新しい窓を開始する。
+  const closedCount = prevCount + addCount;
+  const safeElapsed = Math.max(1, elapsed); // 0除算防止(理論上elapsed>=windowMs>0なので到達しないがfail-safe)。
+  const sampleRate = (closedCount * 60000) / safeElapsed;
+  const nextRate = !Number.isFinite(prevRate) || prevRate < 0 ? sampleRate : prevRate + alpha * (sampleRate - prevRate);
+  return { windowStartMs: safeNow, windowCount: 0, arrivalPerMin: nextRate };
+}
+
+/**
+ * serviceTimeの内訳(合成待ち/期待再生時間/実再生時間)と需要/供給から、体感遅延の真因トークンを
+ * 判定する純関数。段階0=shadow専用。この関数の戻り値で挙動(キュー制御・混雑ヒューリスティクス)を
+ * 変えてはならない(印字のみ)。真理値表はvoiceLagBudget.test.jsで全トークンを固定する。
+ *
+ * @param {{
+ *   serviceTimeEmaMs?: unknown, synthWaitEmaMs?: unknown, expectedPlayEmaMs?: unknown,
+ *   playbackEmaMs?: unknown, arrivalPerMin?: unknown, effectiveQueueMax?: unknown,
+ *   computedMax?: unknown, capLagTicks?: unknown, sampleCount?: unknown
+ * }} inputs
+ * @returns {'insufficient'|'ok'|'hysteresis'|'coldsynth'|'synthslow'|'stall'|'playback'|'mixed'}
+ */
+export function computeVoiceLagVerdict(inputs) {
+  const i = inputs && typeof inputs === 'object' ? inputs : {};
+  const S = Number(i.serviceTimeEmaMs);
+  const W = Number(i.synthWaitEmaMs);
+  const E = Number(i.expectedPlayEmaMs);
+  const P = Number(i.playbackEmaMs);
+  const L = Number(i.arrivalPerMin);
+  const cap = Number(i.effectiveQueueMax);
+  // computedMax自体はこの判定式では使わない(capLagTicksの算出は呼び出し側の責務。
+  // D章の判定式が参照するのはcapLagTicksの値のみ)。inputsの受け口としてキーは許容する。
+  const capLagTicks = Math.max(0, Math.floor(Number(i.capLagTicks) || 0));
+  const sampleCount = Math.max(0, Math.floor(Number(i.sampleCount) || 0));
+
+  if (!Number.isFinite(S) || S <= 0 || !Number.isFinite(L) || L <= 0 || sampleCount < 5) {
+    return 'insufficient'; // データ不足で断定しない(fail-closed)。
+  }
+
+  const pressure = (L * S) / 60000;
+
+  if (pressure <= VOICE_PRESSURE_OK_MAX) {
+    if (capLagTicks >= 10) return 'hysteresis'; // 仮説C: 負荷が引いたのに上限が戻らない。
+    return 'ok'; // 間引きは偶発。騒がない。
+  }
+
+  // 過負荷確定(pressure > OK_MAX)。
+  const synthDominant = Number.isFinite(W) && W >= 0 && W / S >= VOICE_SYNTH_WAIT_DOMINANT_RATIO;
+  if (synthDominant) {
+    const capIsSmall = Number.isFinite(cap) && cap <= 3;
+    return capIsSmall ? 'coldsynth' : 'synthslow';
+  }
+  if (Number.isFinite(P) && Number.isFinite(E) && (P - E) / S >= VOICE_STALL_EXCESS_RATIO) {
+    return 'stall'; // バッファ/再生ストール。
+  }
+  if (Number.isFinite(E) && E >= 0 && E / S >= VOICE_PLAYBACK_DOMINANT_RATIO) {
+    return 'playback'; // 仮説A確定: 再生時間支配=構造的供給不足。
+  }
+  return 'mixed';
+}

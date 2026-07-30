@@ -14,7 +14,12 @@ import {
 // 2026-07-24(段階1=apply・council-fable設計venue-bubble-voice-realtime-max-DESIGN.md): 件数
 //   ゲート実効上限を処理時間EMAから算出し、pushVoiceQueueのmaxへ実適用する(shadow実測で
 //   effectiveQueueMax<8が実配信で起きることを確認済み)。
-import { updateVoiceServiceTimeEma, resolveVoiceQueueMax, stepVoiceQueueMax } from './voiceLagBudget.js';
+// 2026-07-28(段階0=shadow・council-fable設計voice-lag-decomposition-DESIGN.md): 体感遅延の
+//   真因診断(合成待ち/準備待ち/実再生の3分解+需要/供給+判定)。挙動には一切介入しない印字のみ。
+import {
+  updateVoiceServiceTimeEma, resolveVoiceQueueMax, stepVoiceQueueMax,
+  updateVoiceEventRatioEma, foldVoiceArrivalWindow, computeVoiceLagVerdict
+} from './voiceLagBudget.js';
 
 export class VoicePlayer {
   constructor(deps = {}) {
@@ -59,6 +64,20 @@ export class VoicePlayer {
     this._serviceTimeEmaMs = -1;
     this._effectiveQueueMax = 8;
     this._growStreak = 0;
+    // 2026-07-28(段階0=shadow・council-fable設計voice-lag-decomposition-DESIGN.md): 体感遅延
+    //   真因診断の内部state。印字のみ・挙動には一切使わない(DESIGN.md鉄則: 判定で挙動を変えない)。
+    this._synthWaitEmaMs = -1;
+    this._playPrepEmaMs = -1;
+    this._playbackEmaMs = -1;
+    this._expectedPlayEmaMs = -1;
+    this._arrivalWindowState = null;
+    this._dropCountGateTotal = 0;
+    this._dropHeadStaleTotal = 0;
+    this._dropSweepStaleTotal = 0;
+    this._voicedRecentRatioEma = -1;
+    this._capLagTicks = 0;
+    this._diagBornAt = Date.now();
+    this._spokenSampleCount = 0;
     this.diag = {
       enabled: false, queueNow: 0, queueMax: 0, spokenTotal: 0, staleDropTotal: 0,
       playbackTimeoutTotal: 0, lastSpokenBase: 0, lastSynthMs: -1, lastDepth: 0,
@@ -71,7 +90,13 @@ export class VoicePlayer {
       //   serviceTimeEmaMs=1件あたり処理時間の実測EMA、effectiveQueueMax=そこから算出した
       //   実効上限(pushVoiceQueueのmaxに実適用)、rateClampTotal=playbackRateが上限1.35で
       //   飽和した回数、voicedRatio=spokenTotal/(spokenTotal+staleDropTotal)(生存者バイアスの緑を潰す指標)。
-      serviceTimeEmaMs: -1, effectiveQueueMax: 8, rateClampTotal: 0, voicedRatio: -1
+      serviceTimeEmaMs: -1, effectiveQueueMax: 8, rateClampTotal: 0, voicedRatio: -1,
+      // 2026-07-28計器(段階0=shadow・council-fable設計voice-lag-decomposition-DESIGN.md):
+      //   serviceTimeの3分解(合成待ち/準備待ち/実再生/期待再生時間)+drop原因の分別+需要/供給+判定。
+      synthWaitEmaMs: -1, playPrepEmaMs: -1, playbackEmaMs: -1, expectedPlayEmaMs: -1,
+      arrivalPerMin: -1, voicedRecentRatio: -1,
+      dropCountGateTotal: 0, dropHeadStaleTotal: 0, dropSweepStaleTotal: 0,
+      lagVerdict: '', diagBornAt: this._diagBornAt
     };
   }
 
@@ -300,6 +325,13 @@ export class VoicePlayer {
           if (dropped.length > 0) {
             this._showSkipped(dropped.length);
             this.diag.staleDropTotal += dropped.length;
+            // 2026-07-28計器(段階0=shadow): 全stale時の先頭群破棄(3地点のうちの1つ)。
+            this._dropSweepStaleTotal += dropped.length;
+            this.diag.dropSweepStaleTotal = this._dropSweepStaleTotal;
+            for (let _i = 0; _i < dropped.length; _i += 1) {
+              this._voicedRecentRatioEma = updateVoiceEventRatioEma(this._voicedRecentRatioEma, 0);
+            }
+            this.diag.voicedRecentRatio = this._voicedRecentRatioEma;
             this._emitDiag();
           }
           // newest はこの後の通常フロー(下の shift→合成→再生)で必ず再生される。
@@ -324,6 +356,11 @@ export class VoicePlayer {
           this._notifyDropped(item); // v0.1.799: stale で鳴らず破棄→吹き出しを unvoiced へ
           this._showSkipped(1);
           this.diag.staleDropTotal += 1;
+          // 2026-07-28計器(段階0=shadow): 先頭itemの単体stale破棄(3地点のうちの1つ)。
+          this._dropHeadStaleTotal += 1;
+          this.diag.dropHeadStaleTotal = this._dropHeadStaleTotal;
+          this._voicedRecentRatioEma = updateVoiceEventRatioEma(this._voicedRecentRatioEma, 0);
+          this.diag.voicedRecentRatio = this._voicedRecentRatioEma;
           this._emitDiag();
           this.prefetches.delete(item);
           continue;
@@ -350,6 +387,10 @@ export class VoicePlayer {
             );
         this.diag.lastSynthMs = Math.max(0, Date.now() - _synthStart);
         this.diag.lastSpeedBoost = congestion.speedBoost;
+        // 2026-07-28計器(段階0=shadow・voice-lag-decomposition-DESIGN.md C-1): 合成待ち時間の
+        //   EMA化。先読みが効いていればほぼ0のはず(coldsynth判定の核心=W/S比)。
+        this._synthWaitEmaMs = updateVoiceServiceTimeEma(this._synthWaitEmaMs, this.diag.lastSynthMs);
+        this.diag.synthWaitEmaMs = this._synthWaitEmaMs;
 
         if (!wav || !this.enabled || generation !== this.generation || this.isObsMode()) {
           if (typeof item.onPlayStart === 'function') item.onPlayStart();
@@ -378,6 +419,28 @@ export class VoicePlayer {
           // 2026-07-24計器(段階0=shadow): playbackRateが上限で飽和=補正が追いつけていない兆候。
           if (playbackRate >= VOICE_PLAYBACK_RATE_MAX) this.diag.rateClampTotal += 1;
 
+          // 2026-07-28計器(段階0=shadow・voice-lag-decomposition-DESIGN.md C-1): 準備待ち/実再生/
+          //   期待再生時間の計測。'playing'は観測専用({once:true}・try/catch)、finish()の
+          //   ライフサイクル(resolve/再生制御)には一切介入しない(地雷G-2)。
+          const _prepStart = Date.now();
+          let _playbackStartAt = -1;
+          try {
+            audio.addEventListener('playing', () => {
+              try {
+                const prepMs = Math.max(0, Date.now() - _prepStart);
+                this._playPrepEmaMs = updateVoiceServiceTimeEma(this._playPrepEmaMs, prepMs);
+                this.diag.playPrepEmaMs = this._playPrepEmaMs;
+                _playbackStartAt = Date.now();
+                const durationSec = Number(audio.duration);
+                if (Number.isFinite(durationSec) && durationSec > 0) {
+                  const expectedMs = (durationSec * 1000) / (Number.isFinite(playbackRate) && playbackRate > 0 ? playbackRate : 1);
+                  this._expectedPlayEmaMs = updateVoiceServiceTimeEma(this._expectedPlayEmaMs, expectedMs);
+                  this.diag.expectedPlayEmaMs = this._expectedPlayEmaMs;
+                }
+              } catch { /* 計測失敗は本体の再生に影響させない */ }
+            }, { once: true });
+          } catch { /* addEventListener自体が無いFakeAudio等でも壊れない */ }
+
           await new Promise((resolve) => {
             let settled = false;
             // v0.1.1065: 再生watchdog(comeview v0.1.883の移植)。'ended'/'error'が一度も来ない
@@ -396,6 +459,14 @@ export class VoicePlayer {
               if (objectUrl) this.revokeObjectURL(objectUrl);
               objectUrl = '';
               this.stopCurrent = null;
+              // 2026-07-28計器(段階0=shadow): 'playing'が発火していれば実再生時間を計測。
+              if (_playbackStartAt > 0) {
+                try {
+                  const playbackMs = Math.max(0, Date.now() - _playbackStartAt);
+                  this._playbackEmaMs = updateVoiceServiceTimeEma(this._playbackEmaMs, playbackMs);
+                  this.diag.playbackEmaMs = this._playbackEmaMs;
+                } catch { /* 計測失敗は無視 */ }
+              }
               // v0.1.771: 再生が終わった(ended/error/stop)→ 吹き出しに「読み上げ終了」を通知。
               //   これで「声がまだ喋っているのに吹き出しが先に消える」をゼロにできる。
               if (typeof item.onAudioEnd === 'function') item.onAudioEnd();
@@ -445,6 +516,7 @@ export class VoicePlayer {
         // v0.1.1065計器: 1件完了(comeviewと同じくcatch経路も含む)。
         this.diag.spokenTotal += 1;
         this.diag.lastSpokenBase = Date.now();
+        this._spokenSampleCount += 1;
         // 2026-07-24(段階1=apply・council-fable設計venue-bubble-voice-realtime-max-DESIGN.md):
         //   1件あたり処理時間(shift〜再生完了)をEMA化し、そこから実効上限を計算する。
         //   ここで更新したthis._effectiveQueueMaxは次のenqueue時にpushVoiceQueueへ実適用される。
@@ -457,6 +529,30 @@ export class VoicePlayer {
         this.diag.effectiveQueueMax = this._effectiveQueueMax;
         const _voicedDenom = this.diag.spokenTotal + this.diag.staleDropTotal;
         this.diag.voicedRatio = _voicedDenom > 0 ? this.diag.spokenTotal / _voicedDenom : -1;
+        // 2026-07-28計器(段階0=shadow・voice-lag-decomposition-DESIGN.md C-3/C-4): 発話成功(hit=1)を
+        //   直近voiced率へ・仮説C(hysteresis)検出用capLagTicksを更新し・判定を計算する。
+        //   判定(lagVerdict)は印字専用で、この値でキュー制御や混雑ヒューリスティクスは一切変えない。
+        this._voicedRecentRatioEma = updateVoiceEventRatioEma(this._voicedRecentRatioEma, 1);
+        this.diag.voicedRecentRatio = this._voicedRecentRatioEma;
+        {
+          const _pressure = (this.diag.arrivalPerMin > 0 && this._serviceTimeEmaMs > 0)
+            ? (this.diag.arrivalPerMin * this._serviceTimeEmaMs) / 60000
+            : -1;
+          this._capLagTicks = (_pressure >= 0 && _pressure <= 1.2 && _computedMax - this._effectiveQueueMax >= 2)
+            ? this._capLagTicks + 1
+            : 0;
+          this.diag.lagVerdict = computeVoiceLagVerdict({
+            serviceTimeEmaMs: this._serviceTimeEmaMs,
+            synthWaitEmaMs: this._synthWaitEmaMs,
+            expectedPlayEmaMs: this._expectedPlayEmaMs,
+            playbackEmaMs: this._playbackEmaMs,
+            arrivalPerMin: this.diag.arrivalPerMin,
+            effectiveQueueMax: this._effectiveQueueMax,
+            computedMax: _computedMax,
+            capLagTicks: this._capLagTicks,
+            sampleCount: this._spokenSampleCount
+          });
+        }
         this._emitDiag();
       }
     } finally {
@@ -484,7 +580,13 @@ export class VoicePlayer {
       }
 
       if (!buildVoiceReadingText({ name, text: body })) continue;
-      
+
+      // 2026-07-28計器(段階0=shadow・voice-lag-decomposition-DESIGN.md C-3): 有効候補
+      //   (テキスト構築に成功した=読み上げ対象になりうる)ごとに到着窓を畳む(件/分)。
+      //   merge吸収分もここで数える(別コメントとして到着している需要のため)。
+      this._arrivalWindowState = foldVoiceArrivalWindow(this._arrivalWindowState, Date.now(), 1);
+      this.diag.arrivalPerMin = this._arrivalWindowState.arrivalPerMin;
+
       const candidate = {
         userKey: this._voiceUserKeyForItem(item),
         name,
@@ -530,10 +632,17 @@ export class VoicePlayer {
         droppedCount += pushed.dropped.length;
       }
     }
-    
+
     if (droppedCount > 0) {
       this._showSkipped(droppedCount);
       this.diag.staleDropTotal += droppedCount; // 件数ゲート(最古drop)も間引きとして計上。
+      // 2026-07-28計器(段階0=shadow): 件数ゲート最古drop(3地点のうちの1つ)。
+      this._dropCountGateTotal += droppedCount;
+      this.diag.dropCountGateTotal = this._dropCountGateTotal;
+      for (let _i = 0; _i < droppedCount; _i += 1) {
+        this._voicedRecentRatioEma = updateVoiceEventRatioEma(this._voicedRecentRatioEma, 0);
+      }
+      this.diag.voicedRecentRatio = this._voicedRecentRatioEma;
     }
     this._emitDiag();
     // v0.1.800「吹き出しと読み上げを同時に」(会議 案B): enqueue した瞬間にキュー先頭の合成を

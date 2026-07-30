@@ -218,3 +218,153 @@ describe('2026-07-24計器(段階0=shadow・council-fable設計venue-bubble-voic
     expect(line).not.toContain('速度飽和');
   });
 });
+
+describe('2026-07-28計器(段階0=shadow・council-fable設計voice-lag-decomposition-DESIGN.md)', () => {
+  it('初期stateの全新フィールドが安全な初期値', () => {
+    const d = makeInitialVoiceDiag();
+    expect(d.synthWaitEmaMs).toBe(-1);
+    expect(d.playPrepEmaMs).toBe(-1);
+    expect(d.playbackEmaMs).toBe(-1);
+    expect(d.expectedPlayEmaMs).toBe(-1);
+    expect(d.arrivalPerMin).toBe(-1);
+    expect(d.voicedRecentRatio).toBe(-1);
+    expect(d.dropCountGateTotal).toBe(0);
+    expect(d.dropHeadStaleTotal).toBe(0);
+    expect(d.dropSweepStaleTotal).toBe(0);
+    expect(d.lagVerdict).toBe('');
+    expect(d.diagBornAt).toBe(0);
+  });
+
+  it('スナップショットが欠損フィールドを初期値で埋める(allowlist漏れ防止・地雷G-1)', () => {
+    const snap = buildVoiceDiagSnapshot({}, 0);
+    expect(snap.synthWaitEmaMs).toBe(-1);
+    expect(snap.playPrepEmaMs).toBe(-1);
+    expect(snap.playbackEmaMs).toBe(-1);
+    expect(snap.expectedPlayEmaMs).toBe(-1);
+    expect(snap.arrivalPerMin).toBe(-1);
+    expect(snap.voicedRecentRatio).toBe(-1);
+    expect(snap.dropCountGateTotal).toBe(0);
+    expect(snap.dropHeadStaleTotal).toBe(0);
+    expect(snap.dropSweepStaleTotal).toBe(0);
+    expect(snap.lagVerdict).toBe('');
+    expect(snap.diagBornAt).toBe(0);
+  });
+
+  it('スナップショットが全新フィールドの実測値を保持する', () => {
+    const snap = buildVoiceDiagSnapshot({
+      synthWaitEmaMs: 3000, playPrepEmaMs: 120, playbackEmaMs: 1800, expectedPlayEmaMs: 1700,
+      arrivalPerMin: 233.7, voicedRecentRatio: 0.62, dropCountGateTotal: 5, dropHeadStaleTotal: 2,
+      dropSweepStaleTotal: 8, lagVerdict: 'coldsynth', diagBornAt: 12345
+    }, 0);
+    expect(snap.synthWaitEmaMs).toBe(3000);
+    expect(snap.playPrepEmaMs).toBe(120);
+    expect(snap.playbackEmaMs).toBe(1800);
+    expect(snap.expectedPlayEmaMs).toBe(1700);
+    expect(snap.arrivalPerMin).toBeCloseTo(233.7, 5);
+    expect(snap.voicedRecentRatio).toBeCloseTo(0.62, 5);
+    expect(snap.dropCountGateTotal).toBe(5);
+    expect(snap.dropHeadStaleTotal).toBe(2);
+    expect(snap.dropSweepStaleTotal).toBe(8);
+    expect(snap.lagVerdict).toBe('coldsynth');
+    expect(snap.diagBornAt).toBe(12345);
+  });
+
+  it('内訳(合成待/準備/実再生)が1つでも計測済みならまとめて表示する', () => {
+    const line = buildVoiceDiagLine({
+      enabled: true, queueNow: 0, queueMax: 2, spokenTotal: 5,
+      synthWaitEmaMs: 3000, playPrepEmaMs: 120, playbackEmaMs: 1800
+    }, 1000);
+    expect(line).toContain('内訳(合成待3000/準備120/実再生1800ms)');
+  });
+
+  it('内訳が全て未計測(-1)なら内訳項目自体を出さない', () => {
+    const line = buildVoiceDiagLine({
+      enabled: true, queueNow: 0, queueMax: 2, spokenTotal: 5,
+      synthWaitEmaMs: -1, playPrepEmaMs: -1, playbackEmaMs: -1
+    }, 1000);
+    expect(line).not.toContain('内訳');
+  });
+
+  it('需要/供給は両方(arrivalPerMinとserviceTimeEmaMs)が計測済みのときだけ表示する', () => {
+    const line = buildVoiceDiagLine({
+      enabled: true, queueNow: 0, queueMax: 2, spokenTotal: 5,
+      arrivalPerMin: 233.7, serviceTimeEmaMs: 5769
+    }, 1000);
+    // 供給 = 60000/5769 ≈ 10.4/分
+    expect(line).toContain('需要233.7/分vs供給10.4/分');
+  });
+
+  it('arrivalPerMinが未計測(-1)なら需要/供給行は出さない', () => {
+    const line = buildVoiceDiagLine({
+      enabled: true, queueNow: 0, queueMax: 2, spokenTotal: 5,
+      arrivalPerMin: -1, serviceTimeEmaMs: 5769
+    }, 1000);
+    expect(line).not.toContain('需要');
+  });
+
+  it('直近voiced率(voicedRecentRatio)が計測済みなら%表示する', () => {
+    const line = buildVoiceDiagLine({
+      enabled: true, queueNow: 0, queueMax: 2, spokenTotal: 5, voicedRecentRatio: 0.038
+    }, 1000);
+    expect(line).toContain('直近voiced率3.8%');
+  });
+
+  it('直近voiced率が未計測(-1)なら出さない', () => {
+    const line = buildVoiceDiagLine({
+      enabled: true, queueNow: 0, queueMax: 2, spokenTotal: 5, voicedRecentRatio: -1
+    }, 1000);
+    expect(line).not.toContain('直近voiced率');
+  });
+
+  it('drop内訳は1件でも計上があれば3種まとめて出す', () => {
+    const line = buildVoiceDiagLine({
+      enabled: true, queueNow: 0, queueMax: 2, spokenTotal: 5,
+      dropCountGateTotal: 5, dropHeadStaleTotal: 0, dropSweepStaleTotal: 2
+    }, 1000);
+    expect(line).toContain('drop内訳(件数5/鮮度0/全stale2)');
+  });
+
+  it('drop内訳が全て0なら出さない', () => {
+    const line = buildVoiceDiagLine({
+      enabled: true, queueNow: 0, queueMax: 2, spokenTotal: 5,
+      dropCountGateTotal: 0, dropHeadStaleTotal: 0, dropSweepStaleTotal: 0
+    }, 1000);
+    expect(line).not.toContain('drop内訳');
+  });
+
+  it('判定(lagVerdict)がcoldsynth等なら表示する', () => {
+    const line = buildVoiceDiagLine({
+      enabled: true, queueNow: 0, queueMax: 2, spokenTotal: 5, lagVerdict: 'coldsynth'
+    }, 1000);
+    expect(line).toContain('判定=coldsynth');
+  });
+
+  it('判定がokなら表示しない(間引きは偶発でノイズにしない)', () => {
+    const line = buildVoiceDiagLine({
+      enabled: true, queueNow: 0, queueMax: 2, spokenTotal: 5, lagVerdict: 'ok'
+    }, 1000);
+    expect(line).not.toContain('判定=');
+  });
+
+  it('判定がinsufficientなら表示しない(データ不足でノイズにしない)', () => {
+    const line = buildVoiceDiagLine({
+      enabled: true, queueNow: 0, queueMax: 2, spokenTotal: 5, lagVerdict: 'insufficient'
+    }, 1000);
+    expect(line).not.toContain('判定=');
+  });
+
+  it('計測経過分(diagBornAt)が設定されていれば表示する', () => {
+    const now = 1000 * 60 * 5; // 5分後
+    const line = buildVoiceDiagLine({
+      enabled: true, queueNow: 0, queueMax: 2, spokenTotal: 5, diagBornAt: 1
+    }, now);
+    expect(line).toContain('計測5分');
+  });
+
+  it('diagBornAtが未設定(0)なら計測経過分を出さない', () => {
+    const line = buildVoiceDiagLine({
+      enabled: true, queueNow: 0, queueMax: 2, spokenTotal: 5, diagBornAt: 0
+    }, 0);
+    expect(line).not.toContain('計測');
+  });
+});

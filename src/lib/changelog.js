@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1189',
+    date: '2026-07-28',
+    summary: '会場読み上げの遅延の内訳を診断できるように',
+    items: Object.freeze([
+      '会場読み上げが遅れる体感の原因を切り分けるための診断計器を追加しました(表示のみ・読み上げの動作は変わりません)。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1188',
     date: '2026-07-25',
     summary: '会場のサムネ白丸を根治',

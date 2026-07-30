@@ -5,9 +5,16 @@ import {
   VOICE_QUEUE_MAX_CEIL,
   VOICE_QUEUE_MAX_FLOOR,
   VOICE_GROW_STREAK_N,
+  VOICE_PRESSURE_OK_MAX,
+  VOICE_SYNTH_WAIT_DOMINANT_RATIO,
+  VOICE_PLAYBACK_DOMINANT_RATIO,
+  VOICE_STALL_EXCESS_RATIO,
   updateVoiceServiceTimeEma,
   resolveVoiceQueueMax,
-  stepVoiceQueueMax
+  stepVoiceQueueMax,
+  updateVoiceEventRatioEma,
+  foldVoiceArrivalWindow,
+  computeVoiceLagVerdict
 } from './voiceLagBudget.js';
 
 /**
@@ -146,5 +153,167 @@ describe('stepVoiceQueueMax(ヒステリシス: 縮小即時・復帰N件連続)
   it('現行値がFLOORを下回らないようclampされる', () => {
     const result = stepVoiceQueueMax(2, 1, 0);
     expect(result.nextMax).toBeGreaterThanOrEqual(VOICE_QUEUE_MAX_FLOOR);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 2026-07-28(段階0=shadow・council-fable設計voice-lag-decomposition-DESIGN.md):
+//   体感遅延の真因診断(合成待ち/準備待ち/実再生の3分解+判定式)。
+// ---------------------------------------------------------------------------
+
+describe('updateVoiceEventRatioEma', () => {
+  it('初回(prev=-1)はhitをそのまま採用', () => {
+    expect(updateVoiceEventRatioEma(-1, 1)).toBe(1);
+    expect(updateVoiceEventRatioEma(-1, 0)).toBe(0);
+  });
+
+  it('2回目以降はEMA(alpha=0.05既定)で平滑化される', () => {
+    const next = updateVoiceEventRatioEma(0.8, 0, 0.5);
+    // 0.8 + 0.5*(0-0.8) = 0.4
+    expect(next).toBeCloseTo(0.4, 5);
+  });
+
+  it('hitが0/1以外なら直前値をそのまま返す(壊れない)', () => {
+    expect(updateVoiceEventRatioEma(0.6, 'x')).toBe(0.6);
+    expect(updateVoiceEventRatioEma(0.6, NaN)).toBe(0.6);
+  });
+
+  it('直前値が未計測(NaN)でhitも不正なら-1を返す', () => {
+    expect(updateVoiceEventRatioEma(undefined, 'x')).toBe(-1);
+  });
+});
+
+describe('foldVoiceArrivalWindow', () => {
+  it('初回は窓を開始するだけでarrivalPerMinは未確定(-1)', () => {
+    const state = foldVoiceArrivalWindow(null, 1000, 3);
+    expect(state.windowStartMs).toBe(1000);
+    expect(state.windowCount).toBe(3);
+    expect(state.arrivalPerMin).toBe(-1);
+  });
+
+  it('窓の途中(elapsed<windowMs)は件数を積むだけでレートは変わらない', () => {
+    const s1 = foldVoiceArrivalWindow(null, 0, 2);
+    const s2 = foldVoiceArrivalWindow(s1, 3000, 4, 10000);
+    expect(s2.windowStartMs).toBe(0);
+    expect(s2.windowCount).toBe(6);
+    expect(s2.arrivalPerMin).toBe(-1);
+  });
+
+  it('窓を閉じると件数を件/分に換算する(10秒で30件→180件/分)', () => {
+    const s1 = foldVoiceArrivalWindow(null, 0, 29); // 窓の間に29件積む
+    const s2 = foldVoiceArrivalWindow(s1, 10000, 1, 10000); // 10秒経過時にラスト1件→窓を閉じる(計30件)
+    // 初回換算なのでEMAでなくsampleRateがそのまま採用される。
+    expect(s2.arrivalPerMin).toBeCloseTo(180, 5);
+    expect(s2.windowStartMs).toBe(10000);
+    expect(s2.windowCount).toBe(0); // 窓を閉じた直後は新しい窓がcount=0から始まる。
+  });
+
+  it('2回目以降の窓閉じはEMA(alpha既定0.3)で平滑化される', () => {
+    const s1 = foldVoiceArrivalWindow(null, 0, 29);
+    const s2 = foldVoiceArrivalWindow(s1, 10000, 1, 10000); // 180件/分
+    const s3 = foldVoiceArrivalWindow(s2, 20000, 10, 10000); // sample=60件/分
+    // 180 + 0.3*(60-180) = 144
+    expect(s3.arrivalPerMin).toBeCloseTo(144, 5);
+  });
+
+  it('バッチ到着(同一Date.now()連発)でも壊れない(gap-EMAでなく窓畳みのため)', () => {
+    let state = null;
+    const now = 5000;
+    for (let i = 0; i < 5; i += 1) {
+      state = foldVoiceArrivalWindow(state, now, 1, 10000);
+    }
+    expect(state.windowCount).toBe(5);
+    expect(state.arrivalPerMin).toBe(-1); // まだ窓が閉じていないので未確定のまま(壊れない)。
+  });
+
+  it('countが不正でも0扱いで壊れない', () => {
+    const state = foldVoiceArrivalWindow(null, 0, 'x');
+    expect(state.windowCount).toBe(0);
+  });
+});
+
+describe('computeVoiceLagVerdict(真理値表)', () => {
+  const base = {
+    serviceTimeEmaMs: 5769,
+    synthWaitEmaMs: 0,
+    expectedPlayEmaMs: 0,
+    playbackEmaMs: 0,
+    arrivalPerMin: 233.7,
+    effectiveQueueMax: 2,
+    computedMax: 2,
+    capLagTicks: 0,
+    sampleCount: 20
+  };
+
+  it('serviceTimeEmaMs<=0はinsufficient', () => {
+    expect(computeVoiceLagVerdict({ ...base, serviceTimeEmaMs: -1 })).toBe('insufficient');
+    expect(computeVoiceLagVerdict({ ...base, serviceTimeEmaMs: 0 })).toBe('insufficient');
+  });
+
+  it('arrivalPerMin<=0はinsufficient', () => {
+    expect(computeVoiceLagVerdict({ ...base, arrivalPerMin: -1 })).toBe('insufficient');
+    expect(computeVoiceLagVerdict({ ...base, arrivalPerMin: 0 })).toBe('insufficient');
+  });
+
+  it('sampleCount<5はinsufficient(データ不足で断定しない=fail-closed)', () => {
+    expect(computeVoiceLagVerdict({ ...base, sampleCount: 4 })).toBe('insufficient');
+    expect(computeVoiceLagVerdict({ ...base, sampleCount: 0 })).toBe('insufficient');
+  });
+
+  it('pressure<=1.2かつcapLagTicks<10ならok(間引きは偶発)', () => {
+    // pressure = 10件/分 * 1000ms / 60000 = 0.167 <= 1.2
+    const verdict = computeVoiceLagVerdict({ ...base, arrivalPerMin: 10, serviceTimeEmaMs: 1000, capLagTicks: 0 });
+    expect(verdict).toBe('ok');
+  });
+
+  it('pressure<=1.2かつcapLagTicks>=10ならhysteresis(仮説C: 上限が戻らない)', () => {
+    const verdict = computeVoiceLagVerdict({ ...base, arrivalPerMin: 10, serviceTimeEmaMs: 1000, capLagTicks: 10 });
+    expect(verdict).toBe('hysteresis');
+  });
+
+  it('過負荷+W/S>=0.35+cap<=3はcoldsynth(仮説B実体: 上限縮小の自己強化ループ)', () => {
+    // pressure = 233.7*5769/60000 ≈ 22.5 > 1.2
+    const verdict = computeVoiceLagVerdict({ ...base, synthWaitEmaMs: 3000, effectiveQueueMax: 2 });
+    expect(verdict).toBe('coldsynth');
+  });
+
+  it('過負荷+W/S>=0.35+cap>3はsynthslow(VOICEVOX自体が遅い。Bではない)', () => {
+    const verdict = computeVoiceLagVerdict({ ...base, synthWaitEmaMs: 3000, effectiveQueueMax: 6 });
+    expect(verdict).toBe('synthslow');
+  });
+
+  it('過負荷+(P-E)/S>=0.2はstall(バッファ/再生ストール)', () => {
+    const verdict = computeVoiceLagVerdict({
+      ...base, synthWaitEmaMs: 0, expectedPlayEmaMs: 1000, playbackEmaMs: 1000 + 5769 * 0.2 + 100
+    });
+    expect(verdict).toBe('stall');
+  });
+
+  it('過負荷+E/S>=0.6はplayback(仮説A確定: 再生時間支配=構造的供給不足)', () => {
+    const verdict = computeVoiceLagVerdict({
+      ...base, synthWaitEmaMs: 0, expectedPlayEmaMs: 5769 * 0.7, playbackEmaMs: 5769 * 0.7
+    });
+    expect(verdict).toBe('playback');
+  });
+
+  it('過負荷だがどの条件にも当てはまらなければmixed', () => {
+    const verdict = computeVoiceLagVerdict({
+      ...base, synthWaitEmaMs: 0, expectedPlayEmaMs: 0, playbackEmaMs: 0
+    });
+    expect(verdict).toBe('mixed');
+  });
+
+  it('W/S判定はsynthWaitEmaMs未計測(NaN)ならsynthDominant扱いにしない', () => {
+    const verdict = computeVoiceLagVerdict({
+      ...base, synthWaitEmaMs: NaN, expectedPlayEmaMs: 5769 * 0.7, playbackEmaMs: 5769 * 0.7
+    });
+    expect(verdict).toBe('playback'); // coldsynth/synthslowに落ちずplaybackへ抜ける。
+  });
+
+  it('しきい値定数がDESIGN.mdどおりの値', () => {
+    expect(VOICE_PRESSURE_OK_MAX).toBe(1.2);
+    expect(VOICE_SYNTH_WAIT_DOMINANT_RATIO).toBe(0.35);
+    expect(VOICE_PLAYBACK_DOMINANT_RATIO).toBe(0.6);
+    expect(VOICE_STALL_EXCESS_RATIO).toBe(0.2);
   });
 });
