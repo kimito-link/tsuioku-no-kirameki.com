@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 4 / 688 件
+## ⚠️ 役割コメントが無いソース 4 / 689 件
 - `src/lib/laneDomSelfMeasure.js`
 - `src/lib/reportPreviewPublish.js`
 - `src/lib/venueLaneBuckets.js`
@@ -536,7 +536,7 @@
     - `trumpet1.mp3`
     - `wallet1.mp3`
   - `SOURCES.md`
-- 📁 **src/** (1431)
+- 📁 **src/** (1434)
   - 📁 **data/** (6)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -809,7 +809,7 @@
         - `logo_funlink_white_RGB_maru_black.png`
       - `logo_guide_funlink_ol.pdf`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1208)
+  - 📁 **lib/** (1211)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -1916,6 +1916,9 @@
     - `venueDragScroll.test.js`
     - `venueHeat.js` — v0.1.732: 会場モードの「熱量の色温度」純関数。
     - `venueHeat.test.js`
+    - `venueHoverCard.js` — 会場アイコンのホバープレビューカード(純ロジック+DOMビルダー)。
+    - `venueHoverCard.test.js`
+    - `venueHoverCard.wiring.test.js`
     - `venueIncrementalAggregate.js` — v0.1.754 会場の3時間安定化(会議6体ほぼ全会一致の最大ボトルネック根治): 参加者集計を
     - `venueIncrementalAggregate.test.js`
     - `venueLaneBuckets.js` — ⚠️ 役割コメント無し
