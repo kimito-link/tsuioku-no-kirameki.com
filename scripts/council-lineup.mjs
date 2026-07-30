@@ -28,8 +28,15 @@ export const LINEUP = [
   //  - qwen3-32b: thinking付き推論モデル → 批判(critic)。ローカル deepseek の重さ無しで鋭い批判が出せる。
   //  - llama-4-scout: 軽快な新顔 → 速い視点(fast)。
   // ※ groq/kimi-k2 は同日プローブで access 無し（未開放/要申請）→ 不採用。
-  { label: 'groq/qwen3-32b', provider: 'groq', rawId: 'qwen/qwen3-32b', apiModel: 'qwen/qwen3-32b', opts: {}, requires: ['G'] },
-  { label: 'groq/llama-4-scout', provider: 'groq', rawId: 'meta-llama/llama-4-scout-17b-16e-instruct', apiModel: 'meta-llama/llama-4-scout-17b-16e-instruct', opts: {}, requires: ['G'] },
+  //
+  // 2026-07-23 撤去（上の2体・qwen3-32b / llama-4-scout）:
+  //   council-scout が 07-20 に Groq カタログから消滅を検知し、07-22・07-23 と3日連続で
+  //   不在＋プローブ 404。groq の /models 件数も 17→15 と、ちょうどこの2体分だけ減っている。
+  //   一時障害ではなく Groq 側の提供終了と判断し、会議を回さず手動で撤去した。
+  //   役割の穴: critic 6→5（層が厚く問題なし）／ fast 2→1（groq/llama-3.3-70b のみ）。
+  //   fast が単一プロバイダ依存になるが、council-roles の ROLE_FALLBACK fast:["generalist"]
+  //   （2026-07-04 追加）が別プロバイダで代行するため会議は成立する。
+  //   復活したら council-scout が「新着候補」として拾うので、その時に再採用を検討する。
 
   // 2026-07-01 追加（司令塔Claudeがライブ /models で実在裏取り）:
   //  - groq/compound: Web検索を内蔵したエージェント型（Groq無料枠）。fact裏取りの「会議内で最新を取りに行く」担当。
