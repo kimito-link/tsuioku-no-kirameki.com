@@ -26,7 +26,18 @@
  *   serviceTimeEmaMs: number,    // 2026-07-24計器(段階0=shadow): 1件あたり処理時間の実測EMA(-1=未計測)
  *   effectiveQueueMax: number,   // 2026-07-24計器: そこから算出した実効上限(表示のみ・未適用)
  *   rateClampTotal: number,      // 2026-07-24計器: playbackRateが上限1.35で飽和した累計回数
- *   voicedRatio: number          // 2026-07-24計器: spokenTotal/(spokenTotal+staleDropTotal)(-1=未計測)
+ *   voicedRatio: number,         // 2026-07-24計器: spokenTotal/(spokenTotal+staleDropTotal)(-1=未計測)
+ *   synthWaitEmaMs: number,      // 2026-07-28計器: 合成待ち時間のEMA(-1=未計測。coldsynth判定の核心)
+ *   playPrepEmaMs: number,       // 2026-07-28計器: 再生準備待ち(blob化〜'playing')のEMA(-1=未計測)
+ *   playbackEmaMs: number,       // 2026-07-28計器: 実再生時間のEMA(-1=未計測)
+ *   expectedPlayEmaMs: number,   // 2026-07-28計器: WAV申告再生時間のEMA(-1=未計測。仮説Aの物差し)
+ *   arrivalPerMin: number,       // 2026-07-28計器: 需要(コメント到着レート・件/分・-1=未計測)
+ *   voicedRecentRatio: number,   // 2026-07-28計器: 直近voiced率EMA(累計voicedRatioの世代錯誤を補う)
+ *   dropCountGateTotal: number,  // 2026-07-28計器: 件数ゲート最古dropの累計(3分別のうちの1つ)
+ *   dropHeadStaleTotal: number,  // 2026-07-28計器: 先頭itemの単体stale破棄の累計
+ *   dropSweepStaleTotal: number, // 2026-07-28計器: 全stale時の先頭群破棄の累計
+ *   lagVerdict: string,          // 2026-07-28計器: 体感遅延の真因判定トークン(印字専用・挙動に不使用)
+ *   diagBornAt: number           // 2026-07-28計器: この診断stateが生まれた時刻(epoch ms・世代識別用)
  * }} VoiceDiagState
  */
 
@@ -51,7 +62,18 @@ export function makeInitialVoiceDiag() {
     serviceTimeEmaMs: -1,
     effectiveQueueMax: 8,
     rateClampTotal: 0,
-    voicedRatio: -1
+    voicedRatio: -1,
+    synthWaitEmaMs: -1,
+    playPrepEmaMs: -1,
+    playbackEmaMs: -1,
+    expectedPlayEmaMs: -1,
+    arrivalPerMin: -1,
+    voicedRecentRatio: -1,
+    dropCountGateTotal: 0,
+    dropHeadStaleTotal: 0,
+    dropSweepStaleTotal: 0,
+    lagVerdict: '',
+    diagBornAt: 0
   };
 }
 
@@ -90,6 +112,17 @@ export function buildVoiceDiagSnapshot(diag, nowMs) {
     effectiveQueueMax: num(d.effectiveQueueMax, base.effectiveQueueMax),
     rateClampTotal: num(d.rateClampTotal, base.rateClampTotal),
     voicedRatio: num(d.voicedRatio, base.voicedRatio),
+    synthWaitEmaMs: num(d.synthWaitEmaMs, base.synthWaitEmaMs),
+    playPrepEmaMs: num(d.playPrepEmaMs, base.playPrepEmaMs),
+    playbackEmaMs: num(d.playbackEmaMs, base.playbackEmaMs),
+    expectedPlayEmaMs: num(d.expectedPlayEmaMs, base.expectedPlayEmaMs),
+    arrivalPerMin: num(d.arrivalPerMin, base.arrivalPerMin),
+    voicedRecentRatio: num(d.voicedRecentRatio, base.voicedRecentRatio),
+    dropCountGateTotal: num(d.dropCountGateTotal, base.dropCountGateTotal),
+    dropHeadStaleTotal: num(d.dropHeadStaleTotal, base.dropHeadStaleTotal),
+    dropSweepStaleTotal: num(d.dropSweepStaleTotal, base.dropSweepStaleTotal),
+    lagVerdict: String(d.lagVerdict || base.lagVerdict),
+    diagBornAt: num(d.diagBornAt, base.diagBornAt),
     capturedAt: now
   };
 }
@@ -164,6 +197,44 @@ export function buildVoiceDiagLine(snap, nowMs) {
   if (lastPhase && queueNow > 0 && base > 0 && now > 0 && now - base >= 8000) {
     const phaseAgo = phaseAt > 0 ? Math.max(0, Math.round((now - phaseAt) / 1000)) : null;
     parts.push(phaseAgo != null ? `停止位置=${lastPhase}(${phaseAgo}秒前)` : `停止位置=${lastPhase}`);
+  }
+  // 2026-07-28計器(段階0=shadow・council-fable設計voice-lag-decomposition-DESIGN.md):
+  //   serviceTimeの内訳(合成待/準備/実再生)。1つでも計測済みならまとめて出す(未計測項目は省略)。
+  const synthWait = Number(snap.synthWaitEmaMs);
+  const playPrep = Number(snap.playPrepEmaMs);
+  const playback = Number(snap.playbackEmaMs);
+  const breakdownParts = [];
+  if (Number.isFinite(synthWait) && synthWait >= 0) breakdownParts.push(`合成待${Math.round(synthWait)}`);
+  if (Number.isFinite(playPrep) && playPrep >= 0) breakdownParts.push(`準備${Math.round(playPrep)}`);
+  if (Number.isFinite(playback) && playback >= 0) breakdownParts.push(`実再生${Math.round(playback)}`);
+  if (breakdownParts.length > 0) parts.push(`内訳(${breakdownParts.join('/')}ms)`);
+  // 需要(到着レート)vs供給(1/serviceTime)。どちらも計測済みのときだけ出す。
+  const arrivalPerMin = Number(snap.arrivalPerMin);
+  if (Number.isFinite(arrivalPerMin) && arrivalPerMin >= 0 && Number.isFinite(serviceTimeEma) && serviceTimeEma > 0) {
+    const supplyPerMin = 60000 / serviceTimeEma;
+    parts.push(`需要${Math.round(arrivalPerMin * 10) / 10}/分vs供給${Math.round(supplyPerMin * 10) / 10}/分`);
+  }
+  // 直近voiced率(累計voicedRatioの世代錯誤=リロード跨ぎの累計バイアスを補う)。
+  const voicedRecentRatio = Number(snap.voicedRecentRatio);
+  if (Number.isFinite(voicedRecentRatio) && voicedRecentRatio >= 0) {
+    parts.push(`直近voiced率${Math.round(voicedRecentRatio * 1000) / 10}%`);
+  }
+  // drop原因の分別(件数ゲート/先頭stale/全staleスイープ)。1件でも計上があれば出す。
+  const dropCountGate = Number(snap.dropCountGateTotal) || 0;
+  const dropHeadStale = Number(snap.dropHeadStaleTotal) || 0;
+  const dropSweepStale = Number(snap.dropSweepStaleTotal) || 0;
+  if (dropCountGate > 0 || dropHeadStale > 0 || dropSweepStale > 0) {
+    parts.push(`drop内訳(件数${dropCountGate}/鮮度${dropHeadStale}/全stale${dropSweepStale})`);
+  }
+  // 真因判定。ok/insufficientは「間引きは偶発」「データ不足」でノイズになるため出さない。
+  const lagVerdict = String(snap.lagVerdict || '');
+  if (lagVerdict && lagVerdict !== 'ok' && lagVerdict !== 'insufficient') {
+    parts.push(`判定=${lagVerdict}`);
+  }
+  // 計測開始からの経過分。snapshot間の比較でリロード跨ぎ(計器リセット)を誤診しないための世代識別。
+  const diagBornAt = Number(snap.diagBornAt) || 0;
+  if (diagBornAt > 0 && now > 0) {
+    parts.push(`計測${Math.max(0, Math.round((now - diagBornAt) / 60000))}分`);
   }
   return `会場読み上げ: ${parts.join(' / ')}`;
 }
