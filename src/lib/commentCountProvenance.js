@@ -193,7 +193,8 @@ function commentNoLessStatsFromFastDiag(fastDiag) {
  *   skip 経路の不完全 state が原因」かを切り分けるため。取れなければ null。
  * @param {object|null|undefined} fastDiag
  * @returns {{ seedSkipCount: number, seedRebuildCount: number, seedRequeueCount: number,
- *   maxIncrementalAddedCount: number, suspiciousAddedCount: number }|null}
+ *   maxIncrementalAddedCount: number, suspiciousAddedCount: number,
+ *   addedNoLessCount: number, addedTotalCount: number }|null}
  */
 function dedupeSeedDiagFromFastDiag(fastDiag) {
   try {
@@ -204,7 +205,9 @@ function dedupeSeedDiagFromFastDiag(fastDiag) {
       seedRebuildCount: Number(s.seedRebuildCount) || 0,
       seedRequeueCount: Number(s.seedRequeueCount) || 0,
       maxIncrementalAddedCount: Number(s.maxIncrementalAddedCount) || 0,
-      suspiciousAddedCount: Number(s.suspiciousAddedCount) || 0
+      suspiciousAddedCount: Number(s.suspiciousAddedCount) || 0,
+      addedNoLessCount: Number(s.addedNoLessCount) || 0,
+      addedTotalCount: Number(s.addedTotalCount) || 0
     };
   } catch {
     return null;
@@ -283,6 +286,22 @@ export function formatCommentCountProvenanceLines(livesData, fastDiag = null) {
             ` / requeue${ja(dsd.seedRequeueCount)}回 / 1回の最大added${ja(dsd.maxIncrementalAddedCount)}件` +
             `${suspiciousHint}`
         );
+        // v0.1.1196 計器: added のうち commentNo 欠落行の割合。dedup キーは欠落時だけ
+        //   capturedAt の秒が混ざるので、「ライブ経路と backfill 経路で capturedAt の導出が
+        //   違うためキーが一致せず二重計上する」仮説はこの行でしか成立しない。
+        //   ここが 0 に近ければ仮説を棄却でき、seed skip 経路(別候補)に絞れる。
+        if (dsd.addedTotalCount > 0) {
+          const pct = Math.round((dsd.addedNoLessCount / dsd.addedTotalCount) * 100);
+          const verdict =
+            dsd.addedNoLessCount === 0
+              ? ' — 番号欠落0件=capturedAt起因の二重計上は否定的(seed skip側を疑う)'
+              : pct >= 20
+                ? ' — 番号欠落が多い=capturedAt導出の経路差による二重計上が有力'
+                : '';
+          lines.push(
+            `- added内訳(計器): 番号欠落${ja(dsd.addedNoLessCount)}件 / 全${ja(dsd.addedTotalCount)}件(${pct}%)${verdict}`
+          );
+        }
       }
     }
   }

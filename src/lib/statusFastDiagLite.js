@@ -79,7 +79,12 @@ export function buildStatusFastDiagLite(payload) {
     maxIncrementalAddedCount:
       typeof dsd.maxIncrementalAddedCount === 'number' ? dsd.maxIncrementalAddedCount : 0,
     suspiciousAddedCount:
-      typeof dsd.suspiciousAddedCount === 'number' ? dsd.suspiciousAddedCount : 0
+      typeof dsd.suspiciousAddedCount === 'number' ? dsd.suspiciousAddedCount : 0,
+    // v0.1.1196: added のうち commentNo 欠落行の件数(二重計上の候補を切り分ける決定打)。
+    //   dedup キーは commentNo 欠落時だけ capturedAt の秒が混ざるため、「ライブ経路と
+    //   backfill 経路で capturedAt の導出が違う」仮説はこの行でしか成立しない。
+    addedNoLessCount: typeof dsd.addedNoLessCount === 'number' ? dsd.addedNoLessCount : 0,
+    addedTotalCount: typeof dsd.addedTotalCount === 'number' ? dsd.addedTotalCount : 0
   };
 
   // lives は enumerateActiveLives 経路2でしか使わず、各要素は liveId/lv だけ見る=最小化して持つ。

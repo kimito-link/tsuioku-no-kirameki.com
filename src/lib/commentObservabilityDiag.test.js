@@ -9,9 +9,12 @@ import {
   snapshotCommentIngestCounters,
   createDedupeSeedDiagState,
   noteDedupeSeedOutcome,
+  noteAddedCommentNoLess,
   noteIncrementalAddedCount,
   snapshotDedupeSeedDiag
 } from './commentObservabilityDiag.js';
+// 計器の判定が本番の dedup キー生成とズレていないことを突き合わせるため実 import する。
+import { buildDedupeKey } from './commentRecord.js';
 
 function makeRow(window, attrs) {
   const el = window.document.createElement('div');
@@ -354,6 +357,83 @@ describe('createDedupeSeedDiagState / noteDedupeSeedOutcome / noteIncrementalAdd
     expect(s.suspiciousAddedCount).toBe(1);
   });
 
+  // v0.1.1196: added のうち commentNo 欠落行を数える計器。dedup キー(buildDedupeKey)は
+  //   commentNo の有無で構造が変わり、欠落時だけ capturedAt の秒が混ざる。二重計上の有力仮説
+  //   「ライブ経路と backfill 経路で capturedAt の導出が違うためキーが一致しない」は欠落行で
+  //   しか成立しないため、この値が切り分けの決定打になる。
+  describe('noteAddedCommentNoLess(番号欠落行の計数)', () => {
+    it('commentNo の有無で分類し、累積する', () => {
+      const s = createDedupeSeedDiagState();
+      noteAddedCommentNoLess(s, [
+        { commentNo: 101 },
+        { commentNo: null },
+        {},
+        { commentNo: 102 }
+      ]);
+      expect(s.addedTotalCount).toBe(4);
+      expect(s.addedNoLessCount).toBe(2);
+      // 2回目の呼び出しでも積み上がる(放送を通した累積)
+      noteAddedCommentNoLess(s, [{ commentNo: undefined }]);
+      expect(s.addedTotalCount).toBe(5);
+      expect(s.addedNoLessCount).toBe(3);
+    });
+
+    it('判定は buildDedupeKey と一致する(空文字/空白のみは「番号なし」側)', () => {
+      const s = createDedupeSeedDiagState();
+      // buildDedupeKey は String(rec.commentNo ?? '').trim() が非空かだけを見る。
+      //   よって '0' や 0 は「番号あり」側(数値化して 0 を falsy 扱いしてはいけない)。
+      noteAddedCommentNoLess(s, [
+        { commentNo: '' }, // なし
+        { commentNo: '   ' }, // なし(空白のみ)
+        { commentNo: '0' }, // あり(文字列として非空)
+        { commentNo: 0 } // あり(String(0)='0' で非空)
+      ]);
+      expect(s.addedTotalCount).toBe(4);
+      expect(s.addedNoLessCount).toBe(2);
+    });
+
+    it('空配列/null は何も積まない(呼び出し側でガードしない前提)', () => {
+      const s = createDedupeSeedDiagState();
+      noteAddedCommentNoLess(s, []);
+      noteAddedCommentNoLess(s, null);
+      noteAddedCommentNoLess(s, undefined);
+      expect(s.addedTotalCount).toBe(0);
+      expect(s.addedNoLessCount).toBe(0);
+      expect(() => noteAddedCommentNoLess(null, [{ commentNo: 1 }])).not.toThrow();
+    });
+
+    it('snapshot に新フィールドが載る(印字経路の入口)', () => {
+      const s = createDedupeSeedDiagState();
+      noteAddedCommentNoLess(s, [{ commentNo: 1 }, {}]);
+      const snap = snapshotDedupeSeedDiag(s);
+      expect(snap.addedTotalCount).toBe(2);
+      expect(snap.addedNoLessCount).toBe(1);
+    });
+
+    // ★この計器の値は「dedup キーがどちらの構造で作られたか」を意味する。判定が本番の
+    //   buildDedupeKey とズレた瞬間、計器は嘘をつき、切り分けを誤らせる。だから手書きの
+    //   期待値ではなく、本番モジュールを実 import して「キーの実物」と突き合わせる
+    //   ([[integration-test-must-import-real-code]])。
+    it('本番の buildDedupeKey が capturedAt を混ぜる行と、この計器が数える行が一致する', () => {
+      const cases = [
+        { commentNo: 101, text: 'a', capturedAt: 1_700_000_000_000, userId: 'u1' },
+        { commentNo: '', text: 'b', capturedAt: 1_700_000_000_000, userId: 'u2' },
+        { commentNo: '   ', text: 'c', capturedAt: 1_700_000_000_000, userId: 'u3' },
+        { commentNo: '0', text: 'd', capturedAt: 1_700_000_000_000, userId: 'u4' },
+        { text: 'e', capturedAt: 1_700_000_000_000, userId: 'u5' }
+      ];
+      // 「capturedAt の秒がキーに混ざる」= 二重計上の仮説が成立しうる行を、実キーから判定する。
+      const secToken = String(Math.floor(1_700_000_000_000 / 1000));
+      const keyDependsOnCapturedAt = cases.map((rec) =>
+        buildDedupeKey('lv1', /** @type {any} */ (rec)).includes(`|${secToken}|`)
+      );
+      const s = createDedupeSeedDiagState();
+      noteAddedCommentNoLess(s, /** @type {any} */ (cases));
+      expect(s.addedNoLessCount).toBe(keyDependsOnCapturedAt.filter(Boolean).length);
+      expect(s.addedTotalCount).toBe(cases.length);
+    });
+  });
+
   it('snapshotDedupeSeedDiagは元stateのコピーを返す(副作用なし)', () => {
     const s = createDedupeSeedDiagState();
     noteDedupeSeedOutcome(s, 'skip');
@@ -365,7 +445,9 @@ describe('createDedupeSeedDiagState / noteDedupeSeedOutcome / noteIncrementalAdd
       seedRequeueCount: 0,
       lastIncrementalAddedCount: 200,
       maxIncrementalAddedCount: 200,
-      suspiciousAddedCount: 1
+      suspiciousAddedCount: 1,
+      addedNoLessCount: 0,
+      addedTotalCount: 0
     });
     // コピーであり同一参照ではない
     snap.seedSkipCount = 999;

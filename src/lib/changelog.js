@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1197',
+    date: '2026-07-31',
+    summary: '記録件数が多すぎる原因の切り分け計器を追加',
+    items: Object.freeze([
+      '記録した応援コメントの件数が実際より多くなることがある問題について、原因を切り分けるための情報を状態速報に追加しました(表示のみ・動作は変わりません)。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1196',
     date: '2026-07-31',
     summary: 'スクロール白化の原因が状態速報から読めるように',
