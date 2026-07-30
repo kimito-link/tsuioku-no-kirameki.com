@@ -34,6 +34,49 @@ function agoText(lastWhiteoutAgoMs) {
 }
 
 /**
+ * 真犯人の内訳を1行にする(v0.1.1196)。
+ *
+ * W-1(v0.1.1135)が `culpritMove`/`culpritRepaint` を数え、lite まで通していたのに、
+ * 【読める本文】には1つも出ていなかった=生の fastDiag JSON を目視しないと真犯人が読めない
+ * 状態だった([[fastdiag-lite-is-the-printer-subset]]の変種: liteは通っているが本文への昇格漏れ)。
+ * この内訳こそ scroll-whiteout-freeze 設計が「次にW-2とW-3のどちらを実装するか」を決めるための
+ * 判定材料なので、ここで昇格させる。
+ *
+ * @param {object} diag summarizeWhiteoutDiag の出力
+ * @returns {string} 例 '移設起因 3 / 再描画起因 1'。両方0なら ''(内訳不明として出さない)
+ */
+function culpritText(diag) {
+  const move = Number(diag?.culpritMove) || 0;
+  const repaint = Number(diag?.culpritRepaint) || 0;
+  if (move <= 0 && repaint <= 0) return '';
+  return `移設起因 ${move} / 再描画起因 ${repaint}`;
+}
+
+/**
+ * 直近サンプルから、真犯人の裏付けになる手がかりを拾う(v0.1.1196)。
+ * hostDisplay:'none' なら W-3(render の style 書き順)、hostVisibility:'hidden' なら会場遮蔽の
+ * 巻き添え、lastMoveReason があれば W-2(移設凍結)の裏付けになる。
+ * @param {object} diag
+ * @returns {string} 手がかりが無ければ ''
+ */
+function culpritHintText(diag) {
+  const samples = Array.isArray(diag?.samples) ? diag.samples : [];
+  for (let i = samples.length - 1; i >= 0; i -= 1) {
+    const s = samples[i];
+    if (!s || typeof s !== 'object') continue;
+    const bits = [];
+    const reason = String(s.lastMoveReason || '').slice(0, 32);
+    if (reason) bits.push(`直近移設=${reason}`);
+    const display = String(s.hostDisplay || '').slice(0, 16);
+    if (display && display !== 'block') bits.push(`display:${display}`);
+    const visibility = String(s.hostVisibility || '').slice(0, 16);
+    if (visibility && visibility !== 'visible') bits.push(`visibility:${visibility}`);
+    if (bits.length) return bits.join(' ');
+  }
+  return '';
+}
+
+/**
  * 状態速報用の白化診断行を組み立てる。
  *   - diag 無し → 空配列(出さない=このセクション自体を作らない)。
  *   - count===0 → 「観測されていません」を出す(=スクロール白化は今のところ起きていない の事実)。
@@ -64,6 +107,13 @@ export function formatScrollWhiteoutReportLines(fastDiag) {
     : '(要素不明)';
   lines.push(`  🟡 スクロール白化を ${count} 回観測${ago ? ` (${ago})` : ''}。直近サンプル: ${kindStr}`);
   lines.push('     ＝下にスクロールすると応援パネルやプレイヤーが一瞬消え(白くなり)、遅れて再描画されています。');
+  // v0.1.1196: 真犯人の内訳(W-1計器)。どちらが優勢かで次の対策(W-2=移設凍結 / W-3=style書き順)が決まる。
+  const culprit = culpritText(diag);
+  if (culprit) {
+    lines.push(`     真犯人の内訳: ${culprit}`);
+    const hint = culpritHintText(diag);
+    if (hint) lines.push(`     手がかり: ${hint}`);
+  }
   return lines;
 }
 
