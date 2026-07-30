@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1190',
+    date: '2026-07-30',
+    summary: '会場の応援者ランキングのチラつきを軽減',
+    items: Object.freeze([
+      '会場モードで応援者ランキング(1〜3位)が序盤の少ないコメントの時間帯に頻繁に入れ替わっていた挙動を緩和しました。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1189',
     date: '2026-07-28',
     summary: '会場読み上げの遅延の内訳を診断できるように',

@@ -21,6 +21,9 @@ import {
   selectVenueVipRegularKeys,
   rankVenueContributors,
   selectVenueTopRankKeys,
+  stabilizeVenueSupporterOrder,
+  VENUE_SUPPORTER_RANK_BAND,
+  VENUE_SUPPORTER_ORDER_KEEP,
   VENUE_TOP_RANK_MAX,
   VENUE_VIP_REGULAR_SCORE_THRESHOLD,
   VENUE_VIP_REGULAR_MAX,
@@ -381,6 +384,190 @@ describe('rankVenueContributors / selectVenueTopRankKeys(応援者ランキン�
     expect(rankVenueContributors([])).toEqual([]);
     expect(selectVenueTopRankKeys([]).size).toBe(0);
     expect(selectVenueTopRankKeys(null).size).toBe(0);
+  });
+});
+
+describe('stabilizeVenueSupporterOrder(応援者ランキングのヒステリシス・2026-07-30 venue-ranking-churn-SPEC.md)', () => {
+  const ranked = (arr) => arr.map(([key, score, count]) => ({ key, score, count }));
+
+  it('prevOrderKeysが空なら素のscore降順と完全一致(初回・後方互換)', () => {
+    const input = ranked([['A', 26.5, 5], ['B', 20.5, 3], ['C', 10.3, 1]]);
+    const result = stabilizeVenueSupporterOrder(input, []);
+    expect(result.order.map((r) => r.key)).toEqual(['A', 'B', 'C']);
+    expect(result.orderKeys).toEqual(['A', 'B', 'C']);
+    expect(result.droppedKeys).toEqual([]);
+    expect(result.overtakeCount).toBe(0);
+  });
+
+  it('prevOrderKeys未指定(undefined)でも素のscore降順と一致する', () => {
+    const input = ranked([['A', 26.5, 5], ['B', 20.5, 3]]);
+    const result = stabilizeVenueSupporterOrder(input, undefined);
+    expect(result.order.map((r) => r.key)).toEqual(['A', 'B']);
+  });
+
+  it('同一バンド内では前回の並びを維持する(1コメント差では入れ替わらない)', () => {
+    // A(2コメ・score16.271)が前回1位、B(1コメ・score10.266)が2位。同じband(=1)なので
+    // Bが少しスコアを上げても(3コメ・20.532、まだband=2でAと同じband)prevIndexで維持される。
+    // A: band=Math.floor(16.271/8)=2, B(3コメ想定20.532): band=Math.floor(20.532/8)=2 → 同band。
+    const prev = ['A', 'B'];
+    const input = ranked([['B', 20.532, 3], ['A', 16.271, 2]]); // 素のscore順ではBが上
+    const result = stabilizeVenueSupporterOrder(input, prev);
+    // 同バンドなのでprevIndex(A=0,B=1)が優先され、Aが1位のまま。
+    expect(result.order.map((r) => r.key)).toEqual(['A', 'B']);
+  });
+
+  it('バンドを跨いだ挑戦者だけが追い越す(2コメ現職 vs 5コメ挑戦者)', () => {
+    // A(2コメ・score16.271・band=2)が現職。B(5コメ・score26.537・band=3)が挑戦しband跨ぎで追い越す。
+    const prev = ['A', 'B'];
+    const input = ranked([['B', 26.537, 5], ['A', 16.271, 2]]);
+    const result = stabilizeVenueSupporterOrder(input, prev);
+    expect(result.order.map((r) => r.key)).toEqual(['B', 'A']);
+    expect(result.overtakeCount).toBe(1);
+  });
+
+  it('ギフト送信者(+30点相当)は同一commitで即座に上位へ', () => {
+    // A(1コメ・score10.266・band=1)が現職。B(1コメ+ギフト・score約40・band=5)が挑戦。
+    const prev = ['A', 'B'];
+    const input = ranked([['B', 40, 1], ['A', 10.266, 1]]);
+    const result = stabilizeVenueSupporterOrder(input, prev);
+    expect(result.order.map((r) => r.key)).toEqual(['B', 'A']);
+  });
+
+  it('新規参加者は同一バンドでは現職の下に入る(prevIndex優先)', () => {
+    // Aが現職(prevにあり)。Cは新規(prevに無し=prevIndex Infinity)。同バンドならAが上。
+    const prev = ['A'];
+    const input = ranked([['C', 16.0, 2], ['A', 16.271, 2]]); // 同band(=2)
+    const result = stabilizeVenueSupporterOrder(input, prev);
+    expect(result.order.map((r) => r.key)).toEqual(['A', 'C']);
+  });
+
+  it('現職がrankedから消えたらdroppedKeysに載る(消す側の計器)', () => {
+    const prev = ['A', 'B', 'C'];
+    const input = ranked([['A', 20, 3], ['B', 15, 2]]); // Cが消えた
+    const result = stabilizeVenueSupporterOrder(input, prev);
+    expect(result.droppedKeys).toEqual(['C']);
+  });
+
+  it('overtakeCountがバンド跨ぎ逆転の組数を数える', () => {
+    // prev順: A,B,C。新順で C が A,B の両方を追い越す→転倒2組。
+    const prev = ['A', 'B', 'C'];
+    const input = ranked([['C', 40, 8], ['A', 10, 1], ['B', 10, 1]]);
+    const result = stabilizeVenueSupporterOrder(input, prev);
+    expect(result.order.map((r) => r.key)).toEqual(['C', 'A', 'B']);
+    expect(result.overtakeCount).toBe(2);
+  });
+
+  it('orderKeysはkeep件(既定24)に切り詰められる', () => {
+    const input = ranked(Array.from({ length: 30 }, (_, i) => [`u${i}`, 100 - i, 10]));
+    const result = stabilizeVenueSupporterOrder(input, []);
+    expect(result.orderKeys.length).toBe(VENUE_SUPPORTER_ORDER_KEEP);
+    expect(result.order.length).toBe(30); // orderは全件、orderKeysだけ切り詰め
+  });
+
+  it('決定論: 同一入力で2回呼んでも同一出力', () => {
+    const input = ranked([['A', 20, 3], ['B', 15, 2], ['C', 10, 1]]);
+    const prev = ['B', 'A', 'C'];
+    const r1 = stabilizeVenueSupporterOrder(input, prev);
+    const r2 = stabilizeVenueSupporterOrder(input, prev);
+    expect(r1.order.map((r) => r.key)).toEqual(r2.order.map((r) => r.key));
+    expect(r1.overtakeCount).toBe(r2.overtakeCount);
+  });
+
+  it('不正入力(非配列prev/重複key/key欠落要素)で落ちない', () => {
+    expect(() => stabilizeVenueSupporterOrder([], 'not-an-array')).not.toThrow();
+    expect(() => stabilizeVenueSupporterOrder(null, null)).not.toThrow();
+    expect(stabilizeVenueSupporterOrder(null, null).order).toEqual([]);
+    const input = [{ key: 'A', score: 10, count: 1 }, { score: 5, count: 1 }, null, { key: '', score: 1, count: 1 }];
+    const result = stabilizeVenueSupporterOrder(input, ['A', 'A', 'B']); // 重複key
+    expect(result.order.map((r) => r.key)).toEqual(['A']); // key無し/空key要素は除外
+  });
+
+  it('band幅(opts.band)を変えると量子化が変わる', () => {
+    const prev = ['A', 'B'];
+    const input = ranked([['B', 20.532, 3], ['A', 16.271, 2]]);
+    // band=100と広くすると全部band=0に潰れ、prevIndexだけで並ぶ(Aのまま)。
+    const wide = stabilizeVenueSupporterOrder(input, prev, { band: 100 });
+    expect(wide.order.map((r) => r.key)).toEqual(['A', 'B']);
+    // band=1と狭くすると素のscore順に近づく(Bが上)。
+    const narrow = stabilizeVenueSupporterOrder(input, prev, { band: 1 });
+    expect(narrow.order.map((r) => r.key)).toEqual(['B', 'A']);
+  });
+
+  it('VENUE_SUPPORTER_RANK_BANDの既定値は8', () => {
+    expect(VENUE_SUPPORTER_RANK_BAND).toBe(8);
+  });
+
+  it('VENUE_SUPPORTER_ORDER_KEEPの既定値は24', () => {
+    expect(VENUE_SUPPORTER_ORDER_KEEP).toBe(24);
+  });
+});
+
+describe('buildVenueSeating × supporterRank(安定化の一気通貫・2026-07-30)', () => {
+  it('prevSupporterOrderKeysを渡すとtopSupportersと席のvenueRankが同じ安定順を共有する(driftしない)', () => {
+    // A=2コメ(score16.271・band2)、B=3コメ(score20.532・band2)。同バンドなのでprevIndexが効く。
+    const rows = [];
+    for (let i = 0; i < 2; i += 1) rows.push({ userId: 'A', name: 'A', text: `a${i}`, capturedAt: i });
+    for (let i = 0; i < 3; i += 1) rows.push({ userId: 'B', name: 'B', text: `b${i}`, capturedAt: 100 + i });
+    const r = buildVenueSeating(rows, { isGenericName: isGeneric, prevSupporterOrderKeys: ['u:A', 'u:B'] });
+    // 同バンドならprevIndexが優先されAが1位のまま維持される(素のscore順ならBが上のはず)。
+    expect(r.topSupporters[0].participant.key).toBe('u:A');
+    const rankOfA = r.seats.find((s) => s.participant.key === 'u:A')?.venueRank;
+    expect(rankOfA).toBe(1); // トップバーと席バッジが同じ順序を共有(driftしない)。
+    expect(r.supporterRank.orderKeys[0]).toBe('u:A');
+  });
+
+  it('supporterOrderKeysを次回prevに渡す2tickシミュレーションで僅差入れ替えが起きない', () => {
+    // tick1: Aが2コメ(score16.271・band2) → Aが1位(単独)。
+    const rowsTick1 = [
+      { userId: 'A', name: 'A', text: 'a0', capturedAt: 0 },
+      { userId: 'A', name: 'A', text: 'a1', capturedAt: 1 }
+    ];
+    const tick1 = buildVenueSeating(rowsTick1, { isGenericName: isGeneric });
+    expect(tick1.topSupporters[0].participant.key).toBe('u:A');
+
+    // tick2: Bが3コメ(score20.532・band2=Aと同バンド)で追いつく。素のscore順ならBが上に
+    // 来るはずだが、prevOrderKeysを渡せばAが1位のまま維持される(僅差入れ替え防止)。
+    const rowsTick2 = [
+      ...rowsTick1,
+      { userId: 'B', name: 'B', text: 'b0', capturedAt: 2 },
+      { userId: 'B', name: 'B', text: 'b1', capturedAt: 3 },
+      { userId: 'B', name: 'B', text: 'b2', capturedAt: 4 }
+    ];
+    const tick2 = buildVenueSeating(rowsTick2, {
+      isGenericName: isGeneric,
+      prevSupporterOrderKeys: tick1.supporterRank.orderKeys
+    });
+    expect(tick2.topSupporters[0].participant.key).toBe('u:A'); // 入れ替わらない
+  });
+
+  it('序盤シナリオ回帰: 1〜2コメ帯で交互にコメントが来ても1位が毎commitで交代しない', () => {
+    let prevOrderKeys = [];
+    let flips = 0;
+    let lastTop = null;
+    const rows = [];
+    // A,B,Cに交互に1コメントずつ計6コメント追加していく(全員最終的に2コメ)。
+    const speakers = ['A', 'B', 'C', 'A', 'B', 'C'];
+    for (let i = 0; i < speakers.length; i += 1) {
+      rows.push({ userId: speakers[i], name: speakers[i], text: `t${i}`, capturedAt: i });
+      const r = buildVenueSeating(rows, { isGenericName: isGeneric, prevSupporterOrderKeys: prevOrderKeys });
+      const top = r.topSupporters[0]?.participant.key;
+      if (lastTop !== null && top !== lastTop) flips += 1;
+      lastTop = top;
+      prevOrderKeys = r.supporterRank.orderKeys;
+    }
+    // 素のscore順(ヒステリシス無し)なら発言のたびに1位が代わりうるが、安定化により
+    // 最初に1位を取った人(A)がバンド跨ぎするまで居座り続けるはず(頻繁な交代が起きない)。
+    expect(flips).toBeLessThanOrEqual(1);
+  });
+
+  it('prevSupporterOrderKeys未指定なら従来挙動(既存topSupporters/venueRankテストが緑のまま)', () => {
+    const rows = [];
+    for (let i = 0; i < 20; i += 1) rows.push({ userId: 'A', name: 'A', text: `a${i}`, capturedAt: i });
+    for (let i = 0; i < 15; i += 1) rows.push({ userId: 'B', name: 'B', text: `b${i}`, capturedAt: 100 + i });
+    const r = buildVenueSeating(rows, { isGenericName: isGeneric });
+    expect(r.topSupporters[0].participant.key).toBe('u:A');
+    expect(r.seats.find((s) => s.participant.key === 'u:A')?.venueRank).toBe(1);
+    expect(r.supporterRank.orderKeys[0]).toBe('u:A');
   });
 });
 

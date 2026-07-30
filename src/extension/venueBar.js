@@ -3211,6 +3211,13 @@ export function mountVenueBarButton(options = {}) {
   const spokenUserIds = new Set();
   /** @type {Map<string, number>} */
   let seatByKey = new Map();
+  // 2026-07-30(wayfinder→to-spec方式・venue-ranking-churn-SPEC.md §4.3): 応援者ランキングの
+  //   ヒステリシス安定化状態。seatByKeyと同じライフサイクル(初期化・配信切替リセット)で
+  //   持ち回す(=リセット漏れによる前配信の現職持ち越し事故を構造的に防ぐ)。
+  /** @type {string[]} */
+  let supporterOrderKeys = [];
+  let _supporterRankDrops = 0;
+  let _supporterRankOvertakes = 0;
   /**
    * @typedef {{ bubbleKey?: number|string, seatIndex: number, fallbackAnchor?: {x:number,y:number}|null,
    *   element: HTMLDivElement, fadeTimer: number, removeTimer: number, removed: boolean,
@@ -4148,10 +4155,22 @@ export function mountVenueBarButton(options = {}) {
       isGenericName: isGenericComeviewName,
       promoteUserIds: spokenUserIds,
       // 光らせ演出(金色オーラ)はユーザー要望で無効。上位貢献者は順位バッジ(venueRank)で示す。
-      vipRegular: false
+      vipRegular: false,
+      // 2026-07-30(venue-ranking-churn-SPEC.md §4.3): 応援者ランキングのヒステリシス安定化。
+      prevSupporterOrderKeys: supporterOrderKeys
     });
     if (seating.participantCount > 0) hasRenderedNonEmpty = true;
     seatByKey = seating.seatByKey;
+    // 2026-07-30: 次回commitへ安定化済み順序を持ち回す(消す側の計器も同時に更新)。
+    supporterOrderKeys = seating.supporterRank.orderKeys;
+    _supporterRankDrops += seating.supporterRank.droppedKeys.length;
+    _supporterRankOvertakes += seating.supporterRank.overtakeCount;
+    if (topBar.dataset.rankDrops !== String(_supporterRankDrops)) {
+      topBar.dataset.rankDrops = String(_supporterRankDrops);
+    }
+    if (topBar.dataset.rankOvertakes !== String(_supporterRankOvertakes)) {
+      topBar.dataset.rankOvertakes = String(_supporterRankOvertakes);
+    }
     // 応援者トップNバー(ひな壇上部)。席と同じ seating 結果から描く=二重集計しない(drift なし)。
     renderTopBar(seating.topSupporters);
     seatsHost.classList.remove(...VENUE_LAYOUT_CLASSES);
@@ -4714,6 +4733,11 @@ export function mountVenueBarButton(options = {}) {
         activeLiveId = liveId;
         baseRows = [];
         seatByKey = new Map();
+        // 2026-07-30(venue-ranking-churn-SPEC.md §4.3): 応援者ランキング安定化状態も
+        //   seatByKeyと同じ場所でリセット(前配信の現職を持ち越さない)。
+        supporterOrderKeys = [];
+        _supporterRankDrops = 0;
+        _supporterRankOvertakes = 0;
         spokenUserIds.clear(); // 別配信の昇格匿名を持ち越さない
         aggregatedChunkSeqs = []; // v0.1.754: 別配信の集約状態を持ち越さない
         aggregatedCandidates = [];
