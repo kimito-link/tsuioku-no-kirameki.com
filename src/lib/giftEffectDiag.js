@@ -31,7 +31,9 @@
  *   arrivalThrown: number,     // 来場の入賞演出(launchGiftThrow)が実際に走った回数
  *   arrivalSoundPlayed: number, // 来場効果音を実際に鳴らした回数(戻り値'played'のみ)
  *   arrivalSkippedCd: number,  // 来場演出専用20秒CD中でスキップした回数(積み増し禁止=正常動作)
- *   throwPointFallbackUsed: number // 2026-07-06: 投擲の起点/着弾座標が(0,0)/領域外/NaN等でresolveVisibleThrowPointの既定位置へ差し替わった回数(=「音は鳴るが飛翔が見えない」の元凶を可視の既定へ救済した回数)
+ *   throwPointFallbackUsed: number, // 2026-07-06: 投擲の起点/着弾座標が(0,0)/領域外/NaN等でresolveVisibleThrowPointの既定位置へ差し替わった回数(=「音は鳴るが飛翔が見えない」の元凶を可視の既定へ救済した回数)
+ *   giftThrowCapGuarded: number, // 2026-07-30: ギフトがcanLaunchGiftThrow(同時投擲上限GIFT_THROW_MAX_CONCURRENT)超過でlaunchGiftThrowがfalseを返し、演出を意図的に捨てた回数(性能ガード=正常動作)
+ *   adThrowCapGuarded: number   // 2026-07-30: 広告版のgiftThrowCapGuarded(投擲上限は種別を問わず共有=giftProjActiveが同一カウンタのため)
  * }} GiftEffectDiagState
  */
 
@@ -61,7 +63,9 @@ export function makeInitialGiftEffectDiag() {
     arrivalThrown: 0,
     arrivalSoundPlayed: 0,
     arrivalSkippedCd: 0,
-    throwPointFallbackUsed: 0
+    throwPointFallbackUsed: 0,
+    giftThrowCapGuarded: 0,
+    adThrowCapGuarded: 0
   };
 }
 
@@ -140,6 +144,8 @@ export function buildGiftEffectDiagSnapshot(diag, nowMs) {
     arrivalSoundPlayed: num(d.arrivalSoundPlayed, base.arrivalSoundPlayed),
     arrivalSkippedCd: num(d.arrivalSkippedCd, base.arrivalSkippedCd),
     throwPointFallbackUsed: num(d.throwPointFallbackUsed, base.throwPointFallbackUsed),
+    giftThrowCapGuarded: num(d.giftThrowCapGuarded, base.giftThrowCapGuarded),
+    adThrowCapGuarded: num(d.adThrowCapGuarded, base.adThrowCapGuarded),
     capturedAt: now
   };
 }
@@ -148,16 +154,20 @@ export function buildGiftEffectDiagSnapshot(diag, nowMs) {
  * 1系統(ギフト or 広告)の取りこぼし判定(修正3: guarded/noPath/errorの内訳で説明できる分を
  *   除外してから残りを計算する。「⚠N件鳴っていない」は内訳で説明できない分だけに絞る=
  *   意図した動き(600msガード等)を取りこぼしとして騙って警告しない)。
+ * 2026-07-30: throwMissing側にも同じ思想を適用する。canLaunchGiftThrow(同時投擲上限)
+ *   超過でlaunchGiftThrowがfalseを返した件数(throwExplained)は性能ガードによる正常動作
+ *   なので、内訳で説明できる分だけ取りこぼしから除外する。
  * @param {number} detected
  * @param {number} thrown
  * @param {number} soundPlayed
  * @param {number} [soundCoalesced] バースト置換で統合された件数(意図的=取りこぼしに数えない)
  * @param {number} [soundExplained] guarded+noPath+errorの合計(内訳が判明している分=取りこぼしに数えない)
+ * @param {number} [throwExplained] 同時投擲上限超過等、演出を意図的に捨てた件数(内訳が判明している分=取りこぼしに数えない)
  * @returns {{ throwMissing: number, soundMissing: number }}
  */
-function diffCounts(detected, thrown, soundPlayed, soundCoalesced = 0, soundExplained = 0) {
+function diffCounts(detected, thrown, soundPlayed, soundCoalesced = 0, soundExplained = 0, throwExplained = 0) {
   return {
-    throwMissing: Math.max(0, detected - thrown),
+    throwMissing: Math.max(0, detected - thrown - Math.max(0, throwExplained)),
     soundMissing: Math.max(0, thrown - soundPlayed - Math.max(0, soundCoalesced) - Math.max(0, soundExplained))
   };
 }
@@ -197,14 +207,18 @@ export function buildGiftEffectDiagLines(snap, nowMs) {
     const giftSoundNoPath = Number(snap.giftSoundNoPath) || 0;
     const giftSoundError = Number(snap.giftSoundError) || 0;
     const giftSoundOff = Number(snap.giftSoundOff) || 0;
+    const giftThrowCapGuarded = Number(snap.giftThrowCapGuarded) || 0;
     const soundExplained = giftSoundGuarded + giftSoundNoPath + giftSoundError + giftSoundOff;
-    const { throwMissing, soundMissing } = diffCounts(giftDetected, giftThrown, giftSoundPlayed, giftSoundCoalesced, soundExplained);
+    const { throwMissing, soundMissing } = diffCounts(giftDetected, giftThrown, giftSoundPlayed, giftSoundCoalesced, soundExplained, giftThrowCapGuarded);
     const throwMark = throwMissing > 0 ? `⚠${throwMissing}件飛んでいない` : '✅';
     // 修正3: 内訳(guarded/noPath/error/off)で説明できる時は⚠にしない(意図した動き=嘘をつかない)。
     //   説明できない残りがある時だけ⚠にする(件数が本当に合わない時)。
     const soundMark = !soundEnabled ? '(OFF)' : soundMissing > 0 ? `⚠${soundMissing}件鳴っていない` : '✅';
     // v0.1.1061: 置換(バースト統合)は意図した動きなので件数を明記しつつ⚠にしない=嘘をつかない。
     const coalescedText = giftSoundCoalesced > 0 ? `(+置換${giftSoundCoalesced})` : '';
+    // 2026-07-30: 同時投擲上限(GIFT_THROW_MAX_CONCURRENT)超過で捨てた件数=性能ガードによる
+    //   正常動作。内訳として明記し、throwMissingの誤診断(⚠扱い)を防ぐ(音側と同じ思想)。
+    const throwCapText = giftThrowCapGuarded > 0 ? ` / 上限超過${giftThrowCapGuarded}` : '';
     // 修正3: ガード(600ms同種ガード)は正常動作なので内訳を明記する。未割当/エラーも同様に内訳表示。
     // v0.1.1091: off(効果音設定OFFの瞬間に鳴らそうとした)も同じ思想で内訳に明記する
     //   (soundEnabled=ONの時にoff>0が出ることがある=設定が短時間OFF→ONだった痕跡)。
@@ -218,7 +232,7 @@ export function buildGiftEffectDiagLines(snap, nowMs) {
     //   区別して表示する(嘘をつかない=合成であることを隠さない)。
     const deltaPoints = Number(snap.deltaPoints) || 0;
     const deltaText = deltaSynthesized > 0 ? `(うちデルタ補完${deltaSynthesized}件・${deltaPoints.toLocaleString('ja-JP')}pt)` : '';
-    lines.push(`  → ギフト: 検知${giftDetected} → 演出${giftThrown} ${throwMark} → 音${giftSoundPlayed}${coalescedText} ${soundMark}${explainedText}${deltaText}`);
+    lines.push(`  → ギフト: 検知${giftDetected} → 演出${giftThrown} ${throwMark}${throwCapText} → 音${giftSoundPlayed}${coalescedText} ${soundMark}${explainedText}${deltaText}`);
     // v0.1.1088計器: 「検知→音/着弾」の体感ギャップ(実測)。未計測(-1)なら出さない(ノイズにしない)。
     const lastSoundGap = Number(snap.lastSoundGapMs);
     const lastBurstGap = Number(snap.lastBurstGapMs);
@@ -238,10 +252,13 @@ export function buildGiftEffectDiagLines(snap, nowMs) {
   if (adDetected > 0) {
     const adThrown = Number(snap.adThrown) || 0;
     const adSoundPlayed = Number(snap.adSoundPlayed) || 0;
-    const { throwMissing, soundMissing } = diffCounts(adDetected, adThrown, adSoundPlayed);
+    const adThrowCapGuarded = Number(snap.adThrowCapGuarded) || 0;
+    const { throwMissing, soundMissing } = diffCounts(adDetected, adThrown, adSoundPlayed, 0, 0, adThrowCapGuarded);
     const throwMark = throwMissing > 0 ? `⚠${throwMissing}件飛んでいない` : '✅';
     const soundMark = !soundEnabled ? '(OFF)' : soundMissing > 0 ? `⚠${soundMissing}件鳴っていない` : '✅';
-    lines.push(`  → 広告: 検知${adDetected} → 演出${adThrown} ${throwMark} → 音${adSoundPlayed} ${soundMark}`);
+    // 2026-07-30: ギフトと同じ思想(同時投擲上限超過は性能ガード=正常動作の内訳表示)。
+    const throwCapText = adThrowCapGuarded > 0 ? ` / 上限超過${adThrowCapGuarded}` : '';
+    lines.push(`  → 広告: 検知${adDetected} → 演出${adThrown} ${throwMark}${throwCapText} → 音${adSoundPlayed} ${soundMark}`);
   }
   if (arrivalDetected > 0) {
     // 2026-07-06: 来場入賞演出の内訳。CDスキップは意図した動き(積み増し禁止)なので取りこぼしに
@@ -270,9 +287,11 @@ export function giftEffectDiagToActionCards(snap) {
   const soundEnabled = snap.soundEnabled !== false;
   /** @type {Array<{id:string,severity:string,symptom:string,cause:string,action:string,fixableHere:string}>} */
   const cards = [];
-  /** @param {'gift'|'ad'} kind @param {number} detected @param {number} thrown @param {number} soundPlayed @param {number} [soundCoalesced] @param {number} [soundExplained] */
-  const check = (kind, detected, thrown, soundPlayed, soundCoalesced = 0, soundExplained = 0) => {
-    const { throwMissing, soundMissing } = diffCounts(detected, thrown, soundPlayed, soundCoalesced, soundExplained);
+  /** @param {'gift'|'ad'} kind @param {number} detected @param {number} thrown @param {number} soundPlayed @param {number} [soundCoalesced] @param {number} [soundExplained] @param {number} [throwExplained] */
+  const check = (kind, detected, thrown, soundPlayed, soundCoalesced = 0, soundExplained = 0, throwExplained = 0) => {
+    const { throwMissing, soundMissing } = diffCounts(detected, thrown, soundPlayed, soundCoalesced, soundExplained, throwExplained);
+    // 修正3と同じ思想(2026-07-30): 同時投擲上限超過(throwExplained)で説明できる分は
+    //   diffCountsが既に取りこぼしから除外している。それでも残りがある時だけカードを出す。
     if (throwMissing > 0) {
       cards.push({
         id: `gift-effect-throw-missing-${kind}`,
@@ -302,8 +321,17 @@ export function giftEffectDiagToActionCards(snap) {
     Number(snap.giftThrown) || 0,
     Number(snap.giftSoundPlayed) || 0,
     Number(snap.giftSoundCoalesced) || 0,
-    (Number(snap.giftSoundGuarded) || 0) + (Number(snap.giftSoundNoPath) || 0) + (Number(snap.giftSoundError) || 0) + (Number(snap.giftSoundOff) || 0)
+    (Number(snap.giftSoundGuarded) || 0) + (Number(snap.giftSoundNoPath) || 0) + (Number(snap.giftSoundError) || 0) + (Number(snap.giftSoundOff) || 0),
+    Number(snap.giftThrowCapGuarded) || 0
   );
-  check('ad', Number(snap.adDetected) || 0, Number(snap.adThrown) || 0, Number(snap.adSoundPlayed) || 0);
+  check(
+    'ad',
+    Number(snap.adDetected) || 0,
+    Number(snap.adThrown) || 0,
+    Number(snap.adSoundPlayed) || 0,
+    0,
+    0,
+    Number(snap.adThrowCapGuarded) || 0
+  );
   return cards;
 }

@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1194',
+    date: '2026-07-31',
+    summary: 'ギフト演出の診断精度を改善',
+    items: Object.freeze([
+      '状態速報の「ギフト演出が出ていない」警告が、実際には性能保護(同時演出の上限)で正しく間引かれた場合にも出てしまう問題を解消しました。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1193',
     date: '2026-07-31',
     summary: '紹介サイトの掲載内容を最新版に更新',
