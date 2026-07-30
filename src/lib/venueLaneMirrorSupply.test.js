@@ -42,6 +42,45 @@ describe('isLaneMirrorUsableForVenue', () => {
   it('liveId は大文字小文字を吸収する', () => {
     expect(isLaneMirrorUsableForVenue(makeSnap({ liveId: 'LV350912687' }), 'lv350912687', NOW).usable).toBe(true);
   });
+
+  // venue-avatar-stale-mirror-DESIGN.md 根治2(二段窓)。SOFT帯は v0.1.1136 C2 のちらつき防止の
+  // ために鏡を使い続け、HARD超だけ fallback へ降格させる。SOFT帯の挙動が変わっていないことを
+  // 同時に固定する(C2の退化ガード)。
+  describe('stale 二段窓(SOFT=3分 / HARD=15分)', () => {
+    it('SOFT超〜HARD以内は stale のまま(C2: 鏡を使い続けてちらつきを防ぐ)', () => {
+      for (const ageMs of [181_000, 300_000, 600_000, 899_000]) {
+        expect(isLaneMirrorUsableForVenue(makeSnap({ capturedAt: NOW - ageMs }), 'lv350912687', NOW).reason).toBe(
+          'stale'
+        );
+      }
+    });
+
+    it('HARD超は staleHard(popup実質不在=fallbackへ降格させる)', () => {
+      for (const ageMs of [901_000, 3_600_000, 21_437_000]) {
+        expect(isLaneMirrorUsableForVenue(makeSnap({ capturedAt: NOW - ageMs }), 'lv350912687', NOW).reason).toBe(
+          'staleHard'
+        );
+      }
+    });
+
+    it('境界: HARD ちょうどは stale 側(降格は「超えたら」)', () => {
+      expect(isLaneMirrorUsableForVenue(makeSnap({ capturedAt: NOW - 900_000 }), 'lv350912687', NOW).reason).toBe(
+        'stale'
+      );
+    });
+
+    it('capturedAt 刻印なしは staleHard(いつの鏡か不明=popup不在と同義)', () => {
+      expect(isLaneMirrorUsableForVenue(makeSnap({ capturedAt: 0 }), 'lv350912687', NOW).reason).toBe('staleHard');
+    });
+
+    it('年齢は単調増加なので境界の往復は起きない(ヒステリシス不要の根拠)', () => {
+      const capturedAt = NOW - 899_000;
+      expect(isLaneMirrorUsableForVenue(makeSnap({ capturedAt }), 'lv350912687', NOW).reason).toBe('stale');
+      // 同じ鏡のまま時間だけ進めると stale→staleHard の一方向にしか遷移しない
+      expect(isLaneMirrorUsableForVenue(makeSnap({ capturedAt }), 'lv350912687', NOW + 2_000).reason).toBe('staleHard');
+      expect(isLaneMirrorUsableForVenue(makeSnap({ capturedAt }), 'lv350912687', NOW + 60_000).reason).toBe('staleHard');
+    });
+  });
 });
 
 describe('venueRowsFromLaneMirror', () => {

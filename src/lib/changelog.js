@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1195',
+    date: '2026-07-31',
+    summary: '長時間ポップアップを開いていないときも会場に新しい人が出るように',
+    items: Object.freeze([
+      '会場モードで、ポップアップを15分以上開いていないと、その間に来た方が参加者の段に現れないことがある不具合を修正しました。しばらく開いていないときは会場側だけで参加者を組み直すようになります(数分程度の遅れでは今までどおりの表示を保つので、ちらつきは増えません)。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1194',
     date: '2026-07-31',
     summary: 'ギフト演出の診断精度を改善',

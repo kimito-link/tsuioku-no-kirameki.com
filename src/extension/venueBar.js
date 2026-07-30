@@ -4888,6 +4888,13 @@ export function mountVenueBarButton(options = {}) {
    *   遅い時間帯で「鏡モード⇔fallbackモード」を数分おきに往復してりんく段が総入替=出たり
    *   消えたりする(diff-skipキーがモードごとに変わるため)実害を止める。fallback降格は
    *   liveIdMismatch/absent/empty のときだけ(=鏡が本当に使えない・別配信・鏡が届く前)。
+   *
+   * v0.1.1195(venue-avatar-stale-mirror-DESIGN.md 根治2・二段窓): 上記C2は「数分規模の一時的な
+   *   遅れ」を想定した判断であり、popupが数時間開かれないケースは想定の外だった(実測: 鏡stale
+   *   21437s=約6時間の間、その間に来た新規参加者が段に一切現れない)。そこでHARD窓(15分)を
+   *   足し、超えた鏡は reason='staleHard' として fallback へ降格させる。staleButUsable は
+   *   reason==='stale' の厳密一致なので、この行を変えずに 'staleHard' が自動的に降格する。
+   *   SOFT(3分)帯の挙動は1バイトも変わらない=C2のちらつき防止はそのまま維持される。
    * @param {ReadonlyArray<{userId?: unknown}>} candidates 集計候補(preCount join 用)
    * @param {VenueRow[]} fallbackRows 従来経路の行(venueRowsFromUserLaneCandidates の出力)
    * @returns {VenueRow[]}

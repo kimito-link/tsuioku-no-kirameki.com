@@ -152,7 +152,7 @@
 - 📁 **council-scout/** (1)
   - 📁 **briefs/** (1)
     - `2026-07-16.md`
-- 📁 **docs/** (159)
+- 📁 **docs/** (221)
   - 📁 **article-assets/** (87)
     - 📁 **venue-frames/** (12)
       - `f01.png`
@@ -262,6 +262,68 @@
     - `storage-bus.md`
     - `venue.md`
     - `web-status.md`
+  - 📁 **handoff/** (59)
+    - `HANDOFF-backfill-instant-restore.md`
+    - `HANDOFF-broadcast-score-panel.md`
+    - `HANDOFF-diag-truth-IMPL.md`
+    - `HANDOFF-heavyrace-backfill-IMPL.md`
+    - `HANDOFF-liveview-copy.md`
+    - `HANDOFF-perfect-parity-diag.md`
+    - `HANDOFF-pop-venue-exact-IMPL.md`
+    - `HANDOFF-pop-venue-parity-IMPL.md`
+    - `HANDOFF-resume-0627.md`
+    - `HANDOFF-resume-0628.md`
+    - `HANDOFF-resume-0629.md`
+    - `HANDOFF-resume-0630.md`
+    - `HANDOFF-resume-0702-venue.md`
+    - `HANDOFF-resume-0703.md`
+    - `HANDOFF-resume-0704-sound.md`
+    - `HANDOFF-resume-0707-cc0-sound-swap.md`
+    - `HANDOFF-resume-0711.md`
+    - `HANDOFF-resume-0714-venue.md`
+    - `HANDOFF-resume-0715.md`
+    - `HANDOFF-resume-0716.md`
+    - `HANDOFF-resume-0718-avatar-stability.md`
+    - `HANDOFF-resume-0720.md`
+    - `HANDOFF-resume-0724-voice-lag-budget.md`
+    - `HANDOFF-resume-0730.md`
+    - `HANDOFF-robust-architecture-IMPL.md`
+    - `HANDOFF-show-all-participants.md`
+    - `HANDOFF-sound-optimization.md`
+    - `HANDOFF-venue-equals-lane.md`
+    - `HANDOFF-venue-exact-copy-IMPL.md`
+    - `HANDOFF-venue-pop-copy-IMPL.md`
+    - `HANDOFF-web-same-as-ext.md`
+    - `clip-history-persistence-synthesis.md`
+    - `diagnostic-architecture-strengthen-DESIGN.md`
+    - `diagnostic-architecture-strengthen-IMPLEMENTATION-HANDOFF.md`
+    - `diagnostic-instrument-strengthen-2-DESIGN.md`
+    - `diagnostic-instrument-strengthen-2-IMPLEMENTATION-HANDOFF.md`
+    - `gift-lane-thumb-own-posted-mismatch-DESIGN.md`
+    - `gift-lane-thumb-own-posted-mismatch-IMPLEMENTATION-HANDOFF.md`
+    - `lanescene-structural-review-DESIGN.md`
+    - `lanescene-structural-review-IMPLEMENTATION-HANDOFF.md`
+    - `marketing-export-tab-IMPLEMENTATION-HANDOFF.md`
+    - `scroll-whiteout-freeze-DESIGN.md`
+    - `snippet-manager-clibor-parity-synthesis.md`
+    - `sound-optimization-DESIGN.md`
+    - `status-diag-608s-freeze-DESIGN.md`
+    - `status-diag-608s-freeze-IMPLEMENTATION-HANDOFF.md`
+    - `story-diag-realtime-sync-DESIGN.md`
+    - `story-diag-realtime-sync-IMPLEMENTATION-HANDOFF.md`
+    - `user-identity-unification-DESIGN.md`
+    - `user-identity-unification-IMPLEMENTATION-HANDOFF.md`
+    - `venue-bubble-voice-realtime-max-DESIGN.md`
+    - `venue-bubble-voice-realtime-max-IMPLEMENTATION-HANDOFF.md`
+    - `venue-gift-ad-mirror-mismatch-DESIGN.md`
+    - `venue-gift-ad-mirror-mismatch-IMPLEMENTATION-HANDOFF.md`
+    - `venue-lobby-removal-DESIGN.md`
+    - `venue-lobby-removal-IMPLEMENTATION-HANDOFF.md`
+    - `venue-tile-link-parity-diagnose-DESIGN.md`
+    - `venue-tile-link-parity-diagnose-IMPLEMENTATION-HANDOFF.md`
+    - `winv-clipboard-freeze-synthesis.md`
+  - 📁 **patent-unique-voice-reading-filing-final/** (1)
+    - `MOVED.md`
   - 📁 **policies/** (1)
     - `STATS_FAILURE_MODES.md`
   - 📁 **releases/** (4)
@@ -276,6 +338,8 @@
     - `tdd-ui-ux-roadmap.md`
   - `MAP.md`
   - `agents-session-history-archive.md`
+  - `backfill-complete-loading-flow.html`
+  - `bug-investigation-loading-scroll-2026-07-10.html`
   - `code-tree.html`
   - `code-tree.md`
   - `codex-commenter-follow-analytics-v0535.md`

@@ -27,10 +27,12 @@ graph LR
   d4 --> d4_0["article-assets/ 〔記事/画像〕"]
   d4 --> d4_1["article-drafts/"]
   d4 --> d4_2["feature-map/ 〔依存図/自動生成〕"]
-  d4 --> d4_3["policies/ 〔方針〕"]
-  d4 --> d4_4["releases/ 〔リリース〕"]
-  d4 --> d4_5["research/ 〔調査/レポート〕"]
-  d4 --> d4_6["workflows/ 〔ワークフロー〕"]
+  d4 --> d4_3["handoff/ 〔引継ぎ/設計〕"]
+  d4 --> d4_4["patent-unique-voice-reading-filing-final/"]
+  d4 --> d4_5["policies/ 〔方針〕"]
+  d4 --> d4_6["releases/ 〔リリース〕"]
+  d4 --> d4_7["research/ 〔調査/レポート〕"]
+  d4 --> d4_8["workflows/ 〔ワークフロー〕"]
   ROOT --> d5["extension/ 〔配布/manifest〕"]
   d5 --> d5_0["dist/ 〔ビルド成果物〕"]
   d5 --> d5_1["images/ 〔画像〕"]
@@ -200,11 +202,13 @@ graph LR
 - `briefs/`（1 件） — ⚠️ 未記入（ROLES に追記）
 
 ## `docs/` — 設計正本・マインドマップ・フロー図・feature-map(AI/人間向け)  〔設計 / レポート〕
-<sub>ファイル 159 件</sub>
+<sub>ファイル 221 件</sub>
 
 - `article-assets/`（87 件） — 記事用の画像・動画・音声アセット  〔記事 / 画像〕
 - `article-drafts/`（2 件） — ⚠️ 未記入（ROLES に追記）
 - `feature-map/`（13 件） — 機能ごと依存図(自動生成)。誰が storage を書き/読むか  〔依存図 / 自動生成〕
+- `handoff/`（59 件） — セッション引継ぎ・調査設計の記録(HANDOFF-*/MAP/SPEC/DESIGN)。ルート直下に散らかっていたものを 2026-07-31 に集約  〔引継ぎ / 設計〕
+- `patent-unique-voice-reading-filing-final/`（1 件） — ⚠️ 未記入（ROLES に追記）
 - `policies/`（1 件） — 運用方針メモ(統計の失敗モード等)  〔方針〕
 - `releases/`（4 件） — リリース関連メモ(CWS 公開 API 設定・版ごとの記事下書き)  〔リリース〕
 - `research/`（2 件） — ディープリサーチ成果(ギフトランキング等の調査)  〔調査 / レポート〕
@@ -494,12 +498,13 @@ esbuild の import 到達グラフを逆引きし「このファイルを変え�
 
 ---
 
-## ⚠️ 役割が未記入のディレクトリ（5）
+## ⚠️ 役割が未記入のディレクトリ（6）
 
 以下は `ROLES` 辞書に説明が無い。`scripts/repo-tree-map.mjs` の `ROLES` に1行足してから再生成すること。
 
 - `council-scout/`
 - `council-scout/briefs/`
 - `docs/article-drafts/`
+- `docs/patent-unique-voice-reading-filing-final/`
 - `sound-src/`
 - `sound-src/soundeffect-lab/`

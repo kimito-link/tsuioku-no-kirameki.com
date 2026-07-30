@@ -1,7 +1,9 @@
 # 実装ハンドオフ: マーケ分析レポートの別タブ化
 
-> 正本設計: [`marketing-export-tab-DESIGN.md`](marketing-export-tab-DESIGN.md)(未作成・このファイルが暫定の代わり。
-> 元プランは `C:\Users\info\.claude\plans\giggly-brewing-sutherland.md` に保存済み)
+> 正本設計: `marketing-export-tab-DESIGN.md` は**未作成**(このファイルが暫定の正本を兼ねる)。
+> 元プランは `C:\Users\info\.claude\plans\giggly-brewing-sutherland.md` に保存済み。
+> ※ 実体の無いファイルへのリンク記法は site-health のリンク切れ検査に当たるため外してある
+>   (2026-07-31: ルート直下からこのディレクトリへ移動して git 管理下に入ったことで検出された)。
 > 日付: 2026-07-17
 
 ## 背景

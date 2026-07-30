@@ -11,7 +11,10 @@
  * DOM/chrome 非依存=単体テスト可能。venueBar.js が snap/candidates/seats を渡す。
  */
 
-import { VENUE_LANE_MIRROR_SOFT_WINDOW_MS } from './venueLaneParity.js';
+import {
+  VENUE_LANE_MIRROR_SOFT_WINDOW_MS,
+  VENUE_LANE_MIRROR_HARD_WINDOW_MS
+} from './venueLaneParity.js';
 
 /** @typedef {import('./laneMirror.js').LaneMirrorSnapshot} LaneMirrorSnapshot */
 
@@ -28,7 +31,15 @@ function isHttpUrl(u) {
  * @param {Partial<LaneMirrorSnapshot>|null|undefined} snap
  * @param {string} liveId 現配信
  * @param {number} nowMs 壁時計(Date.now)。snap.capturedAt も壁時計(publishLaneMirror が Date.now で刻印)。
- * @returns {{ usable: boolean, reason: ''|'absent'|'liveIdMismatch'|'stale'|'empty' }}
+ * 年齢は二段窓で見る(venue-avatar-stale-mirror-DESIGN.md §C-根治2):
+ *   - SOFT(180s)以内       : usable=true。
+ *   - SOFT超〜HARD(15分)以内: reason='stale'。呼び出し側(venueBar.js の staleButUsable)が
+ *                             鏡を使い続ける=C2のちらつき防止(v0.1.1136)を維持する。
+ *   - HARD超               : reason='staleHard'。popup実質不在とみなし fallback へ降格させ、
+ *                             その間に来た新規参加者を段に出す。
+ * ヒステリシスは不要(鏡が更新されない限り年齢は単調増加なので境界の往復が構造的に起きない)。
+ *
+ * @returns {{ usable: boolean, reason: ''|'absent'|'liveIdMismatch'|'stale'|'staleHard'|'empty' }}
  */
 export function isLaneMirrorUsableForVenue(snap, liveId, nowMs) {
   if (!snap || typeof snap !== 'object') return { usable: false, reason: 'absent' };
@@ -37,7 +48,12 @@ export function isLaneMirrorUsableForVenue(snap, liveId, nowMs) {
   if (!snapLive || !cur || snapLive !== cur) return { usable: false, reason: 'liveIdMismatch' };
   const capturedAt = Number(snap.capturedAt) || 0;
   const now = Number(nowMs) || 0;
-  if (capturedAt <= 0 || now - capturedAt > VENUE_LANE_MIRROR_SOFT_WINDOW_MS) {
+  if (capturedAt <= 0) return { usable: false, reason: 'staleHard' };
+  const ageMs = now - capturedAt;
+  if (ageMs > VENUE_LANE_MIRROR_HARD_WINDOW_MS) {
+    return { usable: false, reason: 'staleHard' };
+  }
+  if (ageMs > VENUE_LANE_MIRROR_SOFT_WINDOW_MS) {
     return { usable: false, reason: 'stale' };
   }
   const total = TIERS.reduce(
