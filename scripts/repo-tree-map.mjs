@@ -64,6 +64,7 @@ const ROLES = {
   'docs': { role: '設計正本・マインドマップ・フロー図・feature-map(AI/人間向け)', tags: ['設計', 'レポート'] },
   'docs/feature-map': { role: '機能ごと依存図(自動生成)。誰が storage を書き/読むか', tags: ['依存図', '自動生成'] },
   'docs/article-assets': { role: '記事用の画像・動画・音声アセット', tags: ['記事', '画像'] },
+  'docs/handoff': { role: 'セッション引継ぎ・調査設計の記録(HANDOFF-*/MAP/SPEC/DESIGN)。ルート直下に散らかっていたものを 2026-07-31 に集約', tags: ['引継ぎ', '設計'] },
   'docs/policies': { role: '運用方針メモ(統計の失敗モード等)', tags: ['方針'] },
   'docs/releases': { role: 'リリース関連メモ(CWS 公開 API 設定・版ごとの記事下書き)', tags: ['リリース'] },
   'docs/research': { role: 'ディープリサーチ成果(ギフトランキング等の調査)', tags: ['調査', 'レポート'] },
