@@ -1,0 +1,538 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>不具合調査レポート — 読み込み遅延 / スクロール非表示 / Claude停止</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --font-body: 'IBM Plex Sans', system-ui, sans-serif;
+    --font-mono: 'IBM Plex Mono', 'SF Mono', Consolas, monospace;
+    --bg: #f4f7fb;
+    --surface: #ffffff;
+    --surface2: #e8eef6;
+    --surface-elevated: #f8fafc;
+    --border: rgba(15, 40, 80, 0.08);
+    --border-bright: rgba(15, 40, 80, 0.16);
+    --text: #0f1c2e;
+    --text-dim: #5a6b82;
+    --accent: #1d4ed8;
+    --accent-dim: rgba(29, 78, 216, 0.08);
+    --green: #15803d;
+    --green-dim: rgba(21, 128, 61, 0.1);
+    --orange: #c2410c;
+    --orange-dim: rgba(194, 65, 12, 0.1);
+    --amber: #a16207;
+    --amber-dim: rgba(161, 98, 7, 0.1);
+    --red: #b91c1c;
+    --red-dim: rgba(185, 28, 28, 0.1);
+    --teal: #0f766e;
+    --teal-dim: rgba(15, 118, 110, 0.1);
+    --grid: rgba(29, 78, 216, 0.04);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0b1220;
+      --surface: #121a2b;
+      --surface2: #1a2438;
+      --surface-elevated: #1e2a40;
+      --border: rgba(148, 180, 255, 0.08);
+      --border-bright: rgba(148, 180, 255, 0.18);
+      --text: #e8eef8;
+      --text-dim: #93a4bf;
+      --accent: #60a5fa;
+      --accent-dim: rgba(96, 165, 250, 0.12);
+      --green: #4ade80;
+      --green-dim: rgba(74, 222, 128, 0.12);
+      --orange: #fb923c;
+      --orange-dim: rgba(251, 146, 60, 0.12);
+      --amber: #fbbf24;
+      --amber-dim: rgba(251, 191, 36, 0.12);
+      --red: #f87171;
+      --red-dim: rgba(248, 113, 113, 0.12);
+      --teal: #2dd4bf;
+      --teal-dim: rgba(45, 212, 191, 0.12);
+      --grid: rgba(96, 165, 250, 0.05);
+    }
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background-color: var(--bg);
+    background-image:
+      linear-gradient(var(--grid) 1px, transparent 1px),
+      linear-gradient(90deg, var(--grid) 1px, transparent 1px),
+      radial-gradient(ellipse at 12% 0%, var(--accent-dim) 0%, transparent 45%);
+    background-size: 24px 24px, 24px 24px, auto;
+    color: var(--text);
+    font-family: var(--font-body);
+    line-height: 1.55;
+    min-height: 100vh;
+  }
+  .wrap {
+    max-width: 1280px;
+    margin: 0 auto;
+    padding: 28px 20px 64px;
+    display: grid;
+    grid-template-columns: 180px 1fr;
+    gap: 0 36px;
+  }
+  .main { min-width: 0; }
+  .toc {
+    position: sticky;
+    top: 20px;
+    align-self: start;
+    padding: 12px 0;
+    grid-row: 1 / -1;
+    max-height: calc(100dvh - 40px);
+    overflow-y: auto;
+  }
+  .toc-title {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 1.6px;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    margin-bottom: 10px;
+  }
+  .toc a {
+    display: block;
+    font-size: 12.5px;
+    color: var(--text-dim);
+    text-decoration: none;
+    padding: 5px 8px;
+    border-left: 2px solid transparent;
+    border-radius: 0 6px 6px 0;
+  }
+  .toc a:hover { color: var(--accent); background: var(--accent-dim); border-left-color: var(--accent); }
+  h1 {
+    font-size: clamp(26px, 4vw, 36px);
+    letter-spacing: -0.03em;
+    line-height: 1.15;
+    margin-bottom: 8px;
+  }
+  .subtitle { color: var(--text-dim); font-size: 14.5px; margin-bottom: 22px; }
+  .meta {
+    display: flex; flex-wrap: wrap; gap: 8px;
+    margin-bottom: 28px;
+  }
+  .chip {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    padding: 4px 10px;
+    border-radius: 999px;
+    border: 1px solid var(--border-bright);
+    background: var(--surface);
+  }
+  .chip.ok { color: var(--green); background: var(--green-dim); border-color: transparent; }
+  .chip.warn { color: var(--amber); background: var(--amber-dim); border-color: transparent; }
+  .chip.bad { color: var(--red); background: var(--red-dim); border-color: transparent; }
+  .chip.info { color: var(--accent); background: var(--accent-dim); border-color: transparent; }
+  .sec {
+    margin: 36px 0 12px;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--accent);
+    scroll-margin-top: 24px;
+  }
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 18px 18px 16px;
+    margin-bottom: 14px;
+    box-shadow: 0 1px 0 rgba(15,40,80,0.03);
+    animation: fadeUp 0.45s ease both;
+    animation-delay: calc(var(--i, 0) * 40ms);
+  }
+  .card.recessed { background: var(--surface2); }
+  .card h2 { font-size: 17px; margin-bottom: 8px; }
+  .card h3 { font-size: 14.5px; margin: 14px 0 6px; }
+  .card p, .card li { font-size: 14px; color: var(--text); }
+  .card p + p { margin-top: 8px; }
+  .muted { color: var(--text-dim); }
+  .grid2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+  }
+  .grid3 {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+  }
+  th, td {
+    text-align: left;
+    padding: 9px 10px;
+    border-bottom: 1px solid var(--border);
+    vertical-align: top;
+  }
+  th {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-dim);
+    background: var(--surface2);
+  }
+  code, .mono {
+    font-family: var(--font-mono);
+    font-size: 12px;
+  }
+  code {
+    background: var(--surface2);
+    padding: 1px 5px;
+    border-radius: 4px;
+  }
+  .path {
+    font-family: var(--font-mono);
+    font-size: 11.5px;
+    color: var(--teal);
+    word-break: break-all;
+  }
+  .verdict {
+    border-left: 4px solid var(--accent);
+    background: var(--accent-dim);
+  }
+  .sev-p0 { border-left: 4px solid var(--red); }
+  .sev-p1 { border-left: 4px solid var(--orange); }
+  .sev-p2 { border-left: 4px solid var(--amber); }
+  .sev-ok { border-left: 4px solid var(--green); }
+  .flow {
+    display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
+    margin: 10px 0;
+  }
+  .flow .box {
+    background: var(--surface2);
+    border: 1px solid var(--border-bright);
+    border-radius: 8px;
+    padding: 8px 10px;
+    font-size: 12.5px;
+    min-width: 110px;
+  }
+  .flow .box.fast { border-color: var(--green); background: var(--green-dim); }
+  .flow .box.slow { border-color: var(--orange); background: var(--orange-dim); }
+  .flow .arr { color: var(--text-dim); font-family: var(--font-mono); }
+  ul.clean { padding-left: 1.15em; }
+  ul.clean li { margin: 4px 0; }
+  .callout {
+    margin-top: 10px;
+    padding: 10px 12px;
+    border-radius: 8px;
+    background: var(--amber-dim);
+    color: var(--text);
+    font-size: 13.5px;
+  }
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .card { animation: none; }
+  }
+  @media (max-width: 900px) {
+    .wrap { grid-template-columns: 1fr; padding: 16px 14px 48px; }
+    .toc {
+      position: sticky; top: 0; z-index: 5;
+      display: flex; gap: 4px; overflow-x: auto;
+      background: color-mix(in srgb, var(--bg) 92%, transparent);
+      backdrop-filter: blur(8px);
+      max-height: none; padding: 8px 0 10px; margin-bottom: 8px;
+      grid-row: auto;
+    }
+    .toc-title { display: none; }
+    .toc a {
+      white-space: nowrap; border-left: none;
+      border-bottom: 2px solid transparent; border-radius: 6px;
+      padding: 6px 10px;
+    }
+    .toc a:hover { border-left: none; border-bottom-color: var(--accent); }
+    .grid2, .grid3 { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <nav class="toc" id="toc" aria-label="目次">
+    <div class="toc-title">Contents</div>
+    <a href="#s1">1. 結論</a>
+    <a href="#s2">2. 症状分解</a>
+    <a href="#s3">3. 現状コード</a>
+    <a href="#s4">4. 残存リスク</a>
+    <a href="#s5">5. Claude停止</a>
+    <a href="#s6">6. 検証手順</a>
+    <a href="#s7">7. 次アクション</a>
+  </nav>
+
+  <div class="main">
+    <h1>不具合調査レポート</h1>
+    <p class="subtitle">読み込み遅延・スクロール非表示・Claude Code 停止 — ソース変更なしの静的調査（v0.1.1123）</p>
+    <div class="meta">
+      <span class="chip info">調査日 2026-07-10</span>
+      <span class="chip">拡張 v0.1.1123</span>
+      <span class="chip ok">製品コード未変更</span>
+      <span class="chip warn">実機未再録（コード裏取り）</span>
+    </div>
+
+    <div class="sec" id="s1">1 — 結論（Verdict）</div>
+    <div class="card verdict" style="--i:0">
+      <h2>数値カードは速報経路で改善済み。体感「読み込みが長い／スクロールしても中身が出ない」は別レイヤーが残っている</h2>
+      <p>計画どおり <strong>A（幕）/ B（ランキング・レーン）/ C（スクロール取り込み）</strong> に分解すると、現行コードでは P0〜P2 の多くが既に入っている。一方で「記録 1万件級なのにリストが薄い」「スクロール中はランキングが更新されない」は、<strong>設計上の上限と見送り窓</strong>として残っており、バグというよりトレードオフの見え方問題になりやすい。</p>
+      <div class="grid3" style="margin-top:14px">
+        <div class="card recessed" style="margin:0">
+          <h3 class="muted">速報（A寄り）</h3>
+          <p><span class="chip ok">良好</span></p>
+          <p class="muted" style="margin-top:6px;font-size:13px">幕は記録数値で解除。トリオカードは panel metrics / summary 経路。</p>
+        </div>
+        <div class="card recessed" style="margin:0">
+          <h3 class="muted">中身（B）</h3>
+          <p><span class="chip warn">部分残存</span></p>
+          <p class="muted" style="margin-top:6px;font-size:13px">暫定ランキングは直近30件上限。heavy 完了前は件数とリストが一致しない。</p>
+        </div>
+        <div class="card recessed" style="margin:0">
+          <h3 class="muted">スクロール（C）</h3>
+          <p><span class="chip warn">意図的遅延</span></p>
+          <p class="muted" style="margin-top:6px;font-size:13px">visible 400ms / deep 1500ms。静止後再試行あり。フリーズ回避とのトレードオフ。</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="sec" id="s2">2 — 症状の分解</div>
+    <div class="card" style="--i:1">
+      <h2>3つの「読み込み」は別経路</h2>
+      <div class="flow">
+        <div class="box fast">速報<br><span class="mono">panel metrics / summary</span></div>
+        <span class="arr">→</span>
+        <div class="box fast">トリオ数値・幕解除</div>
+        <span class="arr">∥</span>
+        <div class="box slow">heavy read<br><span class="mono">IDB / chunk</span></div>
+        <span class="arr">→</span>
+        <div class="box slow">ランキング / レーン</div>
+      </div>
+      <table>
+        <thead>
+          <tr><th>層</th><th>ユーザー体感</th><th>主経路</th><th>現状判定</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>A</strong> 幕</td>
+            <td>数値は出ているのにローディングが残る</td>
+            <td><code>inlineWatchPanelHasRealDataForShade</code></td>
+            <td><span class="chip ok">数値で幕解除</span> 北極星完了は待たない</td>
+          </tr>
+          <tr>
+            <td><strong>B</strong> 中身</td>
+            <td>記録はあるのにランキング／レーンが空 or 薄い</td>
+            <td><code>selectLaneFeedCommentRows</code> → <code>renderUserRooms</code> / north star</td>
+            <td><span class="chip warn">暫定30件＋heavy後差し替え</span></td>
+          </tr>
+          <tr>
+            <td><strong>C</strong> スクロール</td>
+            <td>コメント欄を動かしても増えない</td>
+            <td><code>scanVisibleCommentsNow</code> / deep harvest defer</td>
+            <td><span class="chip warn">静止後400ms/1500msで再開</span></td>
+          </tr>
+        </tbody>
+      </table>
+      <div class="callout">
+        ユーザー提供の Bandicam（2026-06-03）は <strong>watch/パネルではなく Codex のレート制限画面</strong>だったため、拡張症状の実機証拠には使えない。本レポートは現行ソースの静的裏取りが主。
+      </div>
+    </div>
+
+    <div class="sec" id="s3">3 — 現状コードで入っている対策</div>
+    <div class="card sev-ok" style="--i:2">
+      <h2>実装済み（v0.1.599〜1123 で積み上げ）</h2>
+      <table>
+        <thead><tr><th>対策</th><th>根拠ファイル</th><th>効果</th></tr></thead>
+        <tbody>
+          <tr>
+            <td>暫定ランキング（summary recent マージ）</td>
+            <td class="path">src/lib/provisionalLaneCommentRows.js<br>popup-entry.js ~16176</td>
+            <td>heavy 前でも直近コメントから部屋リストを出す。<code>panelSummary.recent</code> 対応済み（旧 <code>recentRows</code> だけ読む退行は修正済）</td>
+          </tr>
+          <tr>
+            <td>北極星の非ブロッキング化</td>
+            <td class="path">popup-entry.js renderUserRooms / refreshAllNorthStarMirrorLanes</td>
+            <td>ギフト同期・イベント hide を fire-and-forget。レーンは並列 allSettled 系。bundle 前に即描画（v0.1.882+）</td>
+          </tr>
+          <tr>
+            <td>ランキング入力 cap</td>
+            <td class="path">capCommentsForAnalytics.js（2500）</td>
+            <td>1万件全走査のメインスレッド占有を抑制</td>
+          </tr>
+          <tr>
+            <td>scroll-end visible / deep 再試行</td>
+            <td class="path">content-entry.js scheduleVisibleScanAfterScrollQuiet</td>
+            <td>見送り中にタイマーが死なないよう debounce 再スケジュール</td>
+          </tr>
+          <tr>
+            <td>スクロール中の重い popup paint 見送り</td>
+            <td class="path">popupMainScrollDefer.js / shouldDeferHeavyPopupPaintNow（400ms）</td>
+            <td>白フラッシュ防止。描画済みなら <code>renderUserRooms</code> をスキップ</td>
+          </tr>
+          <tr>
+            <td>load フェーズ計測</td>
+            <td class="path">watchPopupLoadDiagnostics.js</td>
+            <td><code>localStorage nls_debug_watch_popup_load=1</code> で shade/count/ranking/north_star の ms 差を出せる</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="sec" id="s4">4 — 残存リスク（コードで裏取り済み）</div>
+    <div class="card sev-p0" style="--i:3">
+      <h2>P0 体感 — 「件数 11,092 なのにランキングがスカスカ」</h2>
+      <p><strong>因果:</strong> 暫定フィードの材料は <code>SUMMARY_RECENT_ROWS_MAX = 30</code>。heavy 未完了時は最大でも直近30コメント分のユーザーしか集計できない。記録カードの正本は summary total（万件）なので、<strong>数字とリストのギャップは構造的</strong>。</p>
+      <p class="path">src/lib/commentSummary.js:26 / provisionalLaneCommentRows.js</p>
+      <p style="margin-top:8px"><strong>さらに:</strong> <code>merged.length &lt;= primary.length</code> のとき <code>provisional:false</code> になる穴があり、popup 側は <code>!watchPopupHeavyCommentsSettled</code> を OR して story 側を守っている（コメント 16184–16188）。UI 注記「暫定ランキングです」は <code>laneFeedPick.provisional</code> だけを見るため、<strong>heavy 未完了でも注記が出ない</strong>ケースがあり得る。</p>
+    </div>
+    <div class="card sev-p1" style="--i:4">
+      <h2>P1 — スクロール中に「中身が増えない／ランキングが動かない」</h2>
+      <div class="grid2">
+        <div>
+          <h3>content（取り込み）</h3>
+          <ul class="clean">
+            <li>visible scan 見送り窓 <code>400ms</code></li>
+            <li>deep harvest 見送り <code>1500ms</code></li>
+            <li>静止後に再試行（再スケジュールあり）</li>
+            <li>一次取得は NDGR。手動スクロール過去読みは DOM 経路依存</li>
+          </ul>
+        </div>
+        <div>
+          <h3>popup（表示）</h3>
+          <ul class="clean">
+            <li>パネル内スクロール 400ms は <code>renderUserRooms</code> 自体を見送り</li>
+            <li>既に描画済みなら次 refresh（最大数秒）までリスト更新なし</li>
+            <li>「スクロールしても出ない」＝取り込み遅延＋描画見送りの二重</li>
+          </ul>
+        </div>
+      </div>
+      <p class="muted" style="margin-top:10px">フリーズ（応答しません）回避のための意図的設計。退行させずに体感だけ改善するなら「見送り中 UI 明示」が安全。</p>
+    </div>
+    <div class="card sev-p1" style="--i:5">
+      <h2>P1 — heavy race（重い配信でレーンが途中件数のまま）</h2>
+      <p>changelog（0.1.1033 前後）で実機確認済みの系統: 全件 read が終わる前に次 refresh が追い越し、<code>heavySettled</code> が立たずレーンが暫定のまま固まる。現行は「直前全件が総数の8割以上なら再利用」等で緩和済みだが、<strong>多タブ＋万件＋backfill 同時</strong>では再発余地あり。</p>
+      <p class="path">popup-entry.js heavyDataPromise / watchPopupHeavyCommentsSettled / story provisional OR</p>
+    </div>
+    <div class="card sev-p2" style="--i:6">
+      <h2>P2 — ランキング集計の cap（2500）</h2>
+      <p><code>renderUserRooms</code> は <code>capCommentsForAnalytics</code> で均等サンプル 2500 件に落とす。1万件級では<strong>完全なユーザー別件数ランキングではない</strong>（負荷対策）。件数カードの正本とは別物。</p>
+    </div>
+    <div class="card sev-p2" style="--i:7">
+      <h2>スコープ外（計画どおり触らない）</h2>
+      <ul class="clean">
+        <li><code>eventDom</code> 汚染 / <code>staleDomBundleSuspected</code></li>
+        <li>北極星 koken iframe マウント不全 Epic</li>
+        <li>Git / PR 整理</li>
+      </ul>
+    </div>
+
+    <div class="sec" id="s5">5 — Claude Code が頻繁に止まる件</div>
+    <div class="card" style="--i:8">
+      <h2>製品バグではなく、エージェント実行環境の既知ハング</h2>
+      <table>
+        <thead><tr><th>原因</th><th>症状</th><th>対策（導入済）</th></tr></thead>
+        <tbody>
+          <tr>
+            <td>権限待ち</td>
+            <td>Bash が黙って進まない</td>
+            <td><code>npm run setup:claude</code> → <code>defaultMode: bypassPermissions</code></td>
+          </tr>
+          <tr>
+            <td>ターミナル統合ハング</td>
+            <td><code>npm run verify</code> / vitest が返らない</td>
+            <td><code>npm run verify:cc</code> / <code>test:cc</code> + <code>.artifacts/verify-cc.log</code></td>
+          </tr>
+          <tr>
+            <td>XML 風 tool 誤出力</td>
+            <td>UI がスピンしたまま</td>
+            <td>CLAUDE.md / ~/.claude/CLAUDE.md で禁止明記</td>
+          </tr>
+          <tr>
+            <td>Computer Use sandbox</td>
+            <td><code>windows sandbox failed: spawn setup refresh</code></td>
+            <td>再試行ループ禁止。Claude-in-Chrome か手動</td>
+          </tr>
+          <tr>
+            <td>レート制限</td>
+            <td>Codex「メッセージ上限」</td>
+            <td>別ツールへ切替 / リセット待ち（録画で確認済）</td>
+          </tr>
+        </tbody>
+      </table>
+      <p style="margin-top:10px" class="muted">vitest は <code>pool: 'forks'</code> に変更済み（Windows ハング緩和）。</p>
+    </div>
+
+    <div class="sec" id="s6">6 — 実機で切り分ける手順（変更なし）</div>
+    <div class="card" style="--i:9">
+      <h2>5分マトリクス</h2>
+      <table>
+        <thead><tr><th>観測</th><th>見るもの</th><th>判定</th></tr></thead>
+        <tbody>
+          <tr>
+            <td>記録カード vs <code>#userRoomList</code></td>
+            <td>件数と行数</td>
+            <td>heavy 前は行数が少なくて正常。注記の有無も確認</td>
+          </tr>
+          <tr>
+            <td>DevTools タイムライン</td>
+            <td><code>nls_debug_watch_popup_load=1</code></td>
+            <td><code>count_card</code>→<code>ranking_*</code>→<code>north_star_done</code> の差が 10s超なら B</td>
+          </tr>
+          <tr>
+            <td>スクロール A/B</td>
+            <td>30秒連続 → 3秒静止</td>
+            <td>静止後だけ増える → C（見送り窓）。静止後も増えない → heavy/多タブ</td>
+          </tr>
+          <tr>
+            <td>30秒連続スクロール</td>
+            <td>「応答しません」</td>
+            <td>出たら deep/visible 緩和の退行。出なければ P1 成功基準クリア</td>
+          </tr>
+        </tbody>
+      </table>
+      <p style="margin-top:10px">詳細チェックリスト: <span class="path">docs/loading-scroll-research-checklist.md</span></p>
+    </div>
+
+    <div class="sec" id="s7">7 — 推奨次アクション（実装は別承認）</div>
+    <div class="card" style="--i:10">
+      <h2>コードを触るならこの順（今回は未実施）</h2>
+      <ol class="clean" style="padding-left:1.2em">
+        <li><strong>UX明示:</strong> heavy 未 settle なら暫定注記を必ず出す（<code>provisional || !heavySettled</code>）。件数とリストのギャップを「壊れてない」と伝える。</li>
+        <li><strong>見送り中コピー:</strong> deep/visible defer 中は「一時停止中」表示。loading ぐるぐるは出さない（既に一部実装）。</li>
+        <li><strong>暫定材料の拡充:</strong> recent 30 だけではランキングが弱い。チャンク index / 事前集計サマリ（HANDOFF 4-A）へ。</li>
+        <li><strong>実機1本:</strong> 前面1タブ・1万件級で Step1–4 を録画（watch＋パネルが写るもの）。</li>
+      </ol>
+      <div class="callout">
+        本レポートはソース変更なし。製品コードへのパッチはユーザー承認後に別作業とする。
+      </div>
+    </div>
+
+    <div class="card recessed" style="--i:11;margin-top:20px">
+      <h2>参照パス早見</h2>
+      <ul class="clean">
+        <li class="path">src/extension/popup-entry.js — paint / renderUserRooms / shade / heavy</li>
+        <li class="path">src/extension/content-entry.js — visible/deep scroll defer</li>
+        <li class="path">src/lib/provisionalLaneCommentRows.js</li>
+        <li class="path">src/lib/commentSummary.js — SUMMARY_RECENT_ROWS_MAX=30</li>
+        <li class="path">src/lib/capCommentsForAnalytics.js — CAP=2500</li>
+        <li class="path">src/lib/popupMainScrollDefer.js</li>
+        <li class="path">docs/loading-scroll-research-checklist.md</li>
+        <li class="path">CLAUDE.md / AGENTS.md §9 — Claude 停止対策</li>
+      </ul>
+    </div>
+  </div>
+</div>
+</body>
+</html>

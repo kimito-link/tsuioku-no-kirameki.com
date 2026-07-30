@@ -536,7 +536,7 @@
     - `trumpet1.mp3`
     - `wallet1.mp3`
   - `SOURCES.md`
-- 📁 **src/** (1434)
+- 📁 **src/** (1435)
   - 📁 **data/** (6)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -809,7 +809,7 @@
         - `logo_funlink_white_RGB_maru_black.png`
       - `logo_guide_funlink_ol.pdf`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1211)
+  - 📁 **lib/** (1212)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -1240,6 +1240,7 @@
     - `giftSubAppRelayDiag.test.js`
     - `giftSubAppRelayTrust.js` — Cross-frame gift relay messages are accepted only from NicoNico/local-dev
     - `giftSubAppRelayTrust.test.js`
+    - `giftThrowCapGuard.wiring.test.js`
     - `giftThrowLedgerTableHtml.js` — ギフト投げ一覧テーブル HTML（マーケ #mkt-gift-ledger と同型・popup 用 nl- クラス）。
     - `giftThrowLedgerTableHtml.test.js`
     - `giftThrowProjectile.js` — 会場モードの「ギフト/広告を投げ主のサムネから中央映像へ投げる」演出の純関数群。

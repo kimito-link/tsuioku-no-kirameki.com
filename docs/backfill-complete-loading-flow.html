@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>過去ログ完了後ローディング再発防止フロー</title>
+  <style>
+    :root { color-scheme: dark; font-family: system-ui, sans-serif; background: #0b1020; color: #eef2ff; }
+    body { max-width: 1040px; margin: 0 auto; padding: 32px 20px 56px; }
+    a { color: #93c5fd; }
+    h1 { margin-bottom: 8px; }
+    .meta { color: #a5b4fc; margin-bottom: 28px; }
+    .flow { display: grid; gap: 14px; }
+    .phase { border: 1px solid #334155; border-left-width: 8px; border-radius: 14px; padding: 18px 20px; background: #111827; }
+    .phase h2 { margin: 0 0 8px; font-size: 1.1rem; }
+    .phase p { margin: 5px 0; line-height: 1.65; }
+    .done { border-left-color: #22c55e; }
+    .blocker { border-left-color: #ef4444; }
+    .human { border-left-color: #a855f7; }
+    .arrow { text-align: center; color: #fbbf24; font-weight: 700; }
+    code { background: #1e293b; border-radius: 5px; padding: 2px 6px; }
+    .gate { color: #fde68a; }
+  </style>
+</head>
+<body>
+  <h1>過去ログ完了後ローディング再発防止フロー</h1>
+  <p class="meta">最終更新 2026-07-14 ／ テキスト正本: <a href="../council/backfill-complete-loading-regression-SYNTHESIS.md">SYNTHESIS</a></p>
+
+  <main class="flow">
+    <section class="phase done">
+      <h2>✅ フェーズ0 — 実データの完了条件を確定</h2>
+      <p>一括取得エンジンは配信開始まで遡ると <code>done=1</code>、<code>stopReason=reached_start</code> を保存する。</p>
+      <p>OneDrive同期は常時停止中のため、ファイル同期起因の仮説は除外。</p>
+    </section>
+
+    <div class="arrow">↓ 完了通知がUIでどう消えるかを追跡</div>
+
+    <section class="phase blocker">
+      <h2>🟥 フェーズ1 — 3つの断線を確認</h2>
+      <p>① popup再起動時に保存済みprogressを公式比較状態へ復元していない。</p>
+      <p>② 状態更新後に公式比較行を即時再描画していない。</p>
+      <p>③ 95%未満の <code>reached_start</code> が「取り込み中」へ落ちる。</p>
+      <p class="gate">この3点を同時に塞がない限り、別の経路から同じ表示が再発する。</p>
+    </section>
+
+    <div class="arrow">↓ 3断線を外科的に修正</div>
+
+    <section class="phase done">
+      <h2>✅ フェーズ2 — 状態復元・完了優先・即時再描画</h2>
+      <p><code>reached_start</code> を件数比率より強い明示完了として扱う。</p>
+      <p>保存済みprogressとlive通知の両方で状態を同期し、その直後に現在の記録件数で比較行を再描画する。</p>
+      <p>storage形式・保存件数・一括取得エンジンは変更しない。</p>
+    </section>
+
+    <div class="arrow">↓ 回帰テストを突破して初めて安全</div>
+
+    <section class="phase done">
+      <h2>✅ フェーズ3 — 自動検証</h2>
+      <p>公式5,200件・記録4,100件でも <code>reached_start</code> は完了になることを固定。</p>
+      <p>popup再起動経路とlive通知経路が、状態同期→即時再描画の順になることを固定。</p>
+      <p>対象Vitest 93件に加え、全単体テスト602ファイル・7,836件、ESLint、構文検査、typecheck、diff検査が通過。</p>
+    </section>
+
+    <div class="arrow">↓ 明示依頼があれば配布工程へ</div>
+
+    <section class="phase human">
+      <h2>🙋 フェーズ4 — version bump・build・反映</h2>
+      <p>既存の v0.1.1133 作業と混ぜないため未実行。version bump、dist生成、commit、push、拡張リロードは別途明示後に行う。</p>
+    </section>
+  </main>
+</body>
+</html>

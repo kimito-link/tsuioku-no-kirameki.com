@@ -54,3 +54,23 @@ playwright-report/
 # Council Scout の状態ファイル（日々変わるスナップショット。日報 briefs/ はコミット対象）
 council-scout/state.json
 council-scout/LATEST.md
+
+# 会議ハーネス(council-fable)の作業ログ。設問・各モデルの回答・実行ログの一時ファイルで、
+# 結論は設計文書(docs/handoff/*-DESIGN.md)に転記済み。ルート直下に溜まり続けると
+# tree-map:check が「ルート直下の設定ファイル」件数の drift で常時赤になる(2026-07-31)。
+/council-*.json
+/council-*.txt
+/council-*.log
+/_council-*.json
+/clip-history-persistence-*.json
+/clip-history-persistence-*.txt
+/winv-clipboard-freeze-*.json
+/winv-clipboard-freeze-*.txt
+/*-answers.json
+/*-council.json
+/*-council[0-9].json
+/*-council-result.json
+/login-speed-*.txt
+/maximize-*.txt
+/snippet-manager-*.txt
+/venue_log.txt
