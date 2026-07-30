@@ -472,6 +472,63 @@ describe('2026-07-06: 来場入賞演出の計器(arrivalDetected/arrivalThrown/
   });
 });
 
+// 2026-07-30: 「ギフト検知N→演出N-k」の差分が、実は同時投擲上限(GIFT_THROW_MAX_CONCURRENT=8)
+//   超過で正しく捨てられた分(性能ガード=正常動作)であることが多いのに、throwMissingの計算に
+//   説明可能な内訳が無く常に⚠扱いになっていた「診断の盲点」を解消する。
+//   音側(giftSoundGuarded等)と同じ設計思想: 内訳で説明できる分は取りこぼしから除外する。
+describe('2026-07-30: giftThrowCapGuarded(同時投擲上限超過でcanLaunchGiftThrowがfalseを返した件数)', () => {
+  it('初期stateはgiftThrowCapGuarded=0', () => {
+    expect(makeInitialGiftEffectDiag().giftThrowCapGuarded).toBe(0);
+  });
+
+  it('旧スナップショット(フィールド無し)は0扱い=従来と同じ判定', () => {
+    const snap = buildGiftEffectDiagSnapshot({ giftDetected: 3, giftThrown: 3, giftSoundPlayed: 3 }, 1000);
+    expect(snap.giftThrowCapGuarded).toBe(0);
+  });
+
+  it('上限超過4件で説明できれば⚠にせず内訳「上限超過4」を表示する(検知24→演出21が正常動作と分かるケース)', () => {
+    // ユーザー実配信の症状: 検知24→演出21、内訳が無く⚠3件飛んでいない、と誤診断されていた。
+    const snap = buildGiftEffectDiagSnapshot(
+      { giftDetected: 24, giftThrown: 21, giftSoundPlayed: 21, giftThrowCapGuarded: 3 },
+      1000
+    );
+    const lines = buildGiftEffectDiagLines(snap, 1000);
+    const giftLine = lines.find((l) => l.includes('ギフト:'));
+    expect(giftLine).toContain('検知24 → 演出21');
+    expect(giftLine).toContain('上限超過3');
+    expect(giftLine).not.toContain('⚠');
+    expect(giftEffectDiagToActionCards(snap).some((c) => c.id === 'gift-effect-throw-missing-gift')).toBe(false);
+  });
+
+  it('上限超過の内訳で説明できない残りがあれば⚠は消えない(件数が本当に合わない時だけ警告)', () => {
+    // 検知10・演出7・上限超過1 → 説明できるのは1件、残り2件は不明=⚠のまま。
+    const snap = buildGiftEffectDiagSnapshot(
+      { giftDetected: 10, giftThrown: 7, giftSoundPlayed: 7, giftThrowCapGuarded: 1 },
+      1000
+    );
+    const lines = buildGiftEffectDiagLines(snap, 1000);
+    expect(lines.some((l) => l.includes('⚠2件飛んでいない'))).toBe(true);
+  });
+
+  it('上限超過0件なら内訳テキストを出さない(ノイズにしない)', () => {
+    const snap = buildGiftEffectDiagSnapshot({ giftDetected: 3, giftThrown: 3, giftSoundPlayed: 3 }, 1000);
+    const lines = buildGiftEffectDiagLines(snap, 1000);
+    const giftLine = lines.find((l) => l.includes('ギフト:'));
+    expect(giftLine).not.toContain('上限超過');
+  });
+
+  it('広告(ad)側も同じ上限を共有するため同様に内訳表示する', () => {
+    const snap = buildGiftEffectDiagSnapshot(
+      { adDetected: 10, adThrown: 8, adSoundPlayed: 8, adThrowCapGuarded: 2 },
+      1000
+    );
+    const lines = buildGiftEffectDiagLines(snap, 1000);
+    const adLine = lines.find((l) => l.includes('広告:'));
+    expect(adLine).toContain('上限超過2');
+    expect(adLine).not.toContain('⚠');
+  });
+});
+
 describe('2026-07-06: 投擲座標フォールバック計器(throwPointFallbackUsed)', () => {
   it('0件なら行を出さない(ノイズにしない)', () => {
     const snap = buildGiftEffectDiagSnapshot({ giftDetected: 1, giftThrown: 1, giftSoundPlayed: 1 }, 1000);
