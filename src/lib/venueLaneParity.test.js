@@ -4,6 +4,7 @@ import {
   laneMirrorTierKeySequences,
   toVenueLaneParityDiag,
   venueLaneParityKey,
+  VENUE_LANE_MIRROR_HARD_WINDOW_MS,
   VENUE_LANE_MIRROR_SOFT_WINDOW_MS,
   VENUE_LANE_TRANSIENT_WINDOW_MS
 } from './venueLaneParity.js';
@@ -241,6 +242,48 @@ describe('buildVenueLaneParity', () => {
     });
     expect(stale.verdict).toBe('⚪');
     expect(stale.reason).toContain('stale');
+    // SOFT帯は `鏡stale(...)` であって staleHard ではない(toContain('stale')だけだと
+    //   staleHard にもマッチして両者を区別できないため、ここで明示的に否定しておく)。
+    expect(stale.reason).not.toContain('staleHard');
+  });
+
+  // v0.1.1195(根治2・二段窓)の印字経路の退化ガード。
+  // reality-checker の指摘(2026-07-31): 実装は動くが venueLaneParity.test.js に staleHard の
+  //   断言が1件も無く、HARD分岐を削除する変異を入れても73件全て緑のままだった=「今は動くが
+  //   次のコミットで壊れても誰も気づかない」状態。[[fastdiag-lite-is-the-printer-subset]]と
+  //   同型の地雷(計器を足してもテストで固定しなければ「配線済み」と言い切れない)。
+  describe('鏡の二段窓が状態速報の文言に出る(印字経路の退化ガード)', () => {
+    const base = { liveId: 'lv350912687', nowMs: NOW, mode: /** @type {const} */ ('mirror'), painted: {} };
+
+    it('HARD超は `鏡staleHard(...→fallback降格)` と名乗る(SOFT帯と読み分けられる)', () => {
+      const hard = buildVenueLaneParity({
+        ...base,
+        snap: makeSnap({ capturedAt: NOW - VENUE_LANE_MIRROR_HARD_WINDOW_MS - 1000 })
+      });
+      expect(hard.verdict).toBe('⚪');
+      expect(hard.reason).toContain('staleHard');
+      // 「なぜ会場の見た目が変わったのか」を読み手が理解できる語を含むこと。
+      expect(hard.reason).toContain('fallback降格');
+      // 経過秒も出る(実機で21437s級の値を読んで切り分けるため)。
+      expect(hard.reason).toMatch(/\d+s/);
+      // line(状態速報に貼られる1行)にも昇格していること=printerまで通っている。
+      expect(hard.line).toContain('staleHard');
+    });
+
+    it('HARD ちょうどは SOFT 帯側の文言(境界は「超えたら」降格)', () => {
+      const boundary = buildVenueLaneParity({
+        ...base,
+        snap: makeSnap({ capturedAt: NOW - VENUE_LANE_MIRROR_HARD_WINDOW_MS })
+      });
+      expect(boundary.reason).toContain('stale');
+      expect(boundary.reason).not.toContain('staleHard');
+    });
+
+    it('実機で観測された約6時間(21437s)は staleHard 側に落ちる', () => {
+      const real = buildVenueLaneParity({ ...base, snap: makeSnap({ capturedAt: NOW - 21_437_000 }) });
+      expect(real.reason).toContain('staleHard');
+      expect(real.reason).toContain('21437s');
+    });
   });
 
   it('鏡縮退(Σセル<pickedLength)は ✅ を出さない(⚪鏡縮退)', () => {
