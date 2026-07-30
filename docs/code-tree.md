@@ -536,7 +536,7 @@
     - `trumpet1.mp3`
     - `wallet1.mp3`
   - `SOURCES.md`
-- 📁 **src/** (1430)
+- 📁 **src/** (1431)
   - 📁 **data/** (6)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -809,7 +809,7 @@
         - `logo_funlink_white_RGB_maru_black.png`
       - `logo_guide_funlink_ol.pdf`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1207)
+  - 📁 **lib/** (1208)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -1979,6 +1979,7 @@
     - `voiceLoadingState.js` — VOICEVOX 起動待ちのローディング表示を決める純関数群。
     - `voiceLoadingState.test.js`
     - `voicePlayer.js` — comeview-entry.js と同じ方針(@ts-nocheck)。ロジックは変更しない。
+    - `voicePlayer.lagDecomposition.test.js`
     - `voicePlayer.test.js`
     - `voiceReadQueue.js` — 読み上げキュー末尾へ追加し、上限超過分を古い順に返す。
     - `voiceReadQueue.test.js`

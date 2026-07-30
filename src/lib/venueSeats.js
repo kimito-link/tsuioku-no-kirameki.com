@@ -344,6 +344,102 @@ export function rankVenueContributors(participants, opts = {}) {
   return scored;
 }
 
+// ---------------------------------------------------------------------------
+// 2026-07-30(wayfinder→to-spec方式・venue-ranking-churn-SPEC.md §2/§4.1):
+//   応援者ランキング(topSupporters・順位バッジ)が序盤の少コメント帯でコメント1件ごとに
+//   別人へ入れ替わる問題への対策。rankVenueContributors は前回の順位を一切参照しない
+//   無状態の毎回再計算のため、僅差の参加者間で発言1件ごとに順位が逆転していた。
+//
+//   採用したのは「バンド量子化ヒステリシス」。スコアを幅BAND点のバンドに量子化し、
+//   「挑戦者は現職より上のバンドに到達して初めて追い越せる」というルールにする。
+//   「差がM点開いたら逆転」という単純なペアワイズ比較(マージン比較器)は不採用: これは
+//   非推移になりうる(例: M=6, A=10/B=15/C=19, 前回順A>B>C → A>B, B>C, C>A の循環)。
+//   非推移comparatorをArray.sortに渡すと結果がエンジン実装依存になり決定論が壊れる。
+//   バンド量子化+5段辞書式ソートキーはstrict weak ordering(推移的)なので安全。
+// ---------------------------------------------------------------------------
+
+/** 応援者ランキングのヒステリシス・バンド幅(点)。count1→2の跳ね(+6.0点)が同一バンドに
+ *  畳まれやすく、ギフト(+30点)は3〜4バンド跳ねて即逆転する幅(実測値からの設計判断・
+ *  実配信最適値ではない。呼び出し側のoptsで調整可能)。 */
+export const VENUE_SUPPORTER_RANK_BAND = 8;
+
+/** 前回順として持ち回す key 数の上限(バー8人×3の余裕。これ以下は非表示ゾーン=視覚churnなし)。 */
+export const VENUE_SUPPORTER_ORDER_KEEP = 24;
+
+/**
+ * rankVenueContributors の出力を、前回の安定化済み順序(prevOrderKeys)を踏まえて
+ * ヒステリシス付きで再整列する純関数。再スコアリングはしない(スコア源は不変更=drift防止)。
+ *
+ * ソートキー(辞書式・上から優先): band降順 → prevIndex昇順(前回リスト内の位置。
+ * 不在は+Infinity) → score降順 → count降順 → key昇順。
+ * 重要な性質: prevOrderKeysが空のとき、この順序は素のrankVenueContributors順
+ * (score降順→count降順→key昇順)と完全一致する(bandはscoreの単調関数なので
+ * 「band降順→score降順」は「score降順」と同値)。つまり初回・配信切替直後は挙動不変。
+ *
+ * @param {Array<{ key: string, score: number, count: number }>} ranked rankVenueContributorsの出力
+ * @param {ReadonlyArray<string>} [prevOrderKeys] 前回の安定化済みkey列(先頭=1位)
+ * @param {{ band?: number, keep?: number }} [opts]
+ * @returns {{
+ *   order: Array<{ key: string, score: number, count: number }>,
+ *   orderKeys: string[],
+ *   droppedKeys: string[],
+ *   overtakeCount: number
+ * }}
+ */
+export function stabilizeVenueSupporterOrder(ranked, prevOrderKeys, opts = {}) {
+  const list = Array.isArray(ranked) ? ranked.filter((r) => r && typeof r.key === 'string' && r.key) : [];
+  const band =
+    Number.isFinite(opts.band) && opts.band > 0 ? opts.band : VENUE_SUPPORTER_RANK_BAND;
+  const keep =
+    Number.isFinite(opts.keep) && opts.keep >= 0 ? Math.floor(opts.keep) : VENUE_SUPPORTER_ORDER_KEEP;
+  const prevKeys = Array.isArray(prevOrderKeys)
+    ? prevOrderKeys.filter((k) => typeof k === 'string' && k)
+    : [];
+  /** @type {Map<string, number>} */
+  const prevIndexByKey = new Map();
+  prevKeys.forEach((k, i) => {
+    if (!prevIndexByKey.has(k)) prevIndexByKey.set(k, i); // 重複keyは最初の出現位置を採用。
+  });
+
+  const decorated = list.map((r) => ({
+    r,
+    band: Math.floor((Number(r.score) || 0) / band),
+    prevIndex: prevIndexByKey.has(r.key) ? prevIndexByKey.get(r.key) : Number.POSITIVE_INFINITY
+  }));
+
+  decorated.sort((a, b) => {
+    if (b.band !== a.band) return b.band - a.band;
+    if (a.prevIndex !== b.prevIndex) return a.prevIndex - b.prevIndex;
+    if (b.r.score !== a.r.score) return b.r.score - a.r.score;
+    if (b.r.count !== a.r.count) return b.r.count - a.r.count;
+    return a.r.key < b.r.key ? -1 : a.r.key > b.r.key ? 1 : 0;
+  });
+
+  const order = decorated.map((d) => d.r);
+  const orderKeys = order.map((r) => r.key).slice(0, keep);
+
+  // 消す側の計器(v0.1.1037-1042の教訓: 「消す/空にする側」に計器が無かったことが真犯人)。
+  //   prevに居たが今回rankedに居ないkeyを記録する(rankedから外れた=score<minScore or 参加者消失)。
+  const currentKeys = new Set(order.map((r) => r.key));
+  const droppedKeys = prevKeys.filter((k) => !currentKeys.has(k));
+
+  // overtakeCount: prevに両方居る要素ペアのうち、最終順序がprevと逆になった組数(転倒数)。
+  //   prev側はkeep<=24件程度なのでO(k^2)で十分軽い。
+  const prevPresent = prevKeys.filter((k) => currentKeys.has(k));
+  const finalIndexByKey = new Map(order.map((r, i) => [r.key, i]));
+  let overtakeCount = 0;
+  for (let i = 0; i < prevPresent.length; i += 1) {
+    for (let j = i + 1; j < prevPresent.length; j += 1) {
+      const ki = prevPresent[i];
+      const kj = prevPresent[j];
+      // prevではi<j(iが上位)。finalでjがiより上位(小さいindex)なら転倒。
+      if (finalIndexByKey.get(kj) < finalIndexByKey.get(ki)) overtakeCount += 1;
+    }
+  }
+
+  return { order, orderKeys, droppedKeys, overtakeCount };
+}
+
 /** 席に付ける「応援者ランキング」順位バッジの既定上限(上位 topN 位まで=🥇🥈🥉)。 */
 export const VENUE_TOP_RANK_MAX = 3;
 
@@ -659,7 +755,9 @@ export function collectAudienceFaceUserIds(rows, opts = {}) {
  *   vipRegularCommentCap?: number,
  *   vipRegularGiftPointsCap?: number,
  *   topRank?: number,
- *   topSupporters?: number
+ *   topSupporters?: number,
+ *   prevSupporterOrderKeys?: ReadonlyArray<string>,
+ *   supporterRankBand?: number
  * }} [opts]
  * @returns {{
  *   seats: Array<{ seatIndex: number, isFrontRow: boolean, isVipRegular: boolean, venueRank: number, participant: ReturnType<typeof collectVenueParticipants>[number] }>,
@@ -667,7 +765,8 @@ export function collectAudienceFaceUserIds(rows, opts = {}) {
  *   seatByKey: Map<string, number>,
  *   participantCount: number,
  *   anonymousCount: number,
- *   layoutMode: 'empty'|'vip'|'normal'|'packed'
+ *   layoutMode: 'empty'|'vip'|'normal'|'packed',
+ *   supporterRank: { orderKeys: string[], droppedKeys: string[], overtakeCount: number }
  * }}
  */
 export function buildVenueSeating(rows, opts = {}) {
@@ -694,20 +793,28 @@ export function buildVenueSeating(rows, opts = {}) {
           commentCap: opts.vipRegularCommentCap,
           giftPointsCap: opts.vipRegularGiftPointsCap
         });
+  // 2026-07-30(wayfinder→to-spec方式・venue-ranking-churn-SPEC.md §4.2): 応援者ランキングの
+  //   スコア源(rankVenueContributors)は席バッジ(venueRank)とトップバー(topSupporters)から
+  //   従来2回呼ばれていたが、ここで1回に統合してstabilizeVenueSupporterOrder(ヒステリシス)
+  //   を通し、両者が【同一の安定化済み順序】を共有するようにする(drift防止・地図5章の懸念対応)。
+  const contributorOpts = {
+    commentCap: opts.vipRegularCommentCap,
+    giftPointsCap: opts.vipRegularGiftPointsCap
+  };
+  const stabilized = stabilizeVenueSupporterOrder(
+    rankVenueContributors(participants, contributorOpts),
+    opts.prevSupporterOrderKeys,
+    { band: opts.supporterRankBand }
+  );
   // 応援者ランキング上位 topRank 位に順位(1始まり)を付ける(席タイルの順位バッジ用)。
   //   topRank<=0 で無効化(後方互換=既定は付ける)。スコア源は光らせ判定と共有(drift 回避)。
   const topRankN =
     Number.isFinite(opts.topRank) ? Math.floor(opts.topRank) : VENUE_TOP_RANK_MAX;
   const rankByKey =
     topRankN > 0
-      ? selectVenueTopRankKeys(participants, {
-          topN: topRankN,
-          commentCap: opts.vipRegularCommentCap,
-          giftPointsCap: opts.vipRegularGiftPointsCap
-        })
+      ? new Map(stabilized.order.slice(0, topRankN).map((r, i) => [r.key, i + 1]))
       : new Map();
-  // 「応援者トップNバー」用に、貢献度スコア降順の participant を topSupporters 件だけ返す。
-  //   スコア源は席の順位バッジ(rankByKey)と共有(rankVenueContributors)=drift しない。
+  // 「応援者トップNバー」用に、安定化済み順序から topSupporters 件だけ返す。
   //   topSupporters<=0 で無効(既定は出す)。匿名も含む(会場の「全員主役」を壊さない)。
   const topSupportersN =
     Number.isFinite(opts.topSupporters) ? Math.floor(opts.topSupporters) : VENUE_TOP_SUPPORTERS_BAR;
@@ -715,10 +822,7 @@ export function buildVenueSeating(rows, opts = {}) {
   let topSupporters = [];
   if (topSupportersN > 0) {
     const byKey = new Map(participants.map((p) => [p.key, p]));
-    topSupporters = rankVenueContributors(participants, {
-      commentCap: opts.vipRegularCommentCap,
-      giftPointsCap: opts.vipRegularGiftPointsCap
-    })
+    topSupporters = stabilized.order
       .slice(0, topSupportersN)
       .map((r, idx) => ({ rank: idx + 1, participant: byKey.get(r.key), score: r.score }))
       .filter((x) => x.participant);
@@ -734,7 +838,12 @@ export function buildVenueSeating(rows, opts = {}) {
     seatByKey,
     participantCount: participants.length,
     anonymousCount: countAnonymousParticipants(rows, opts.isGenericName, promoteUserIds),
-    layoutMode: resolveVenueLayoutMode(participants.length)
+    layoutMode: resolveVenueLayoutMode(participants.length),
+    supporterRank: {
+      orderKeys: stabilized.orderKeys,
+      droppedKeys: stabilized.droppedKeys,
+      overtakeCount: stabilized.overtakeCount
+    }
   };
 }
 
