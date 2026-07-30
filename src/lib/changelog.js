@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1193',
+    date: '2026-07-31',
+    summary: '紹介サイトの掲載内容を最新版に更新',
+    items: Object.freeze([
+      '紹介サイト(tsuioku-no-kirameki.com)の掲載バージョンを最新に更新し、会場モードのホバープレビュー・混雑時の読み上げ・サムネの白丸根治など、v0.1.1165以降の改善を掲載しました(拡張の動作は変わりません)。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1192',
     date: '2026-07-30',
     summary: '会場ホバープレビューの表示内容を調整',
