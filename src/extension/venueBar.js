@@ -25,6 +25,16 @@ import {
   VENUE_ROSTER_VIP_WINDOW_MS,
   VENUE_ROSTER_MAX_SEATS
 } from '../lib/venueLiveRoster.js';
+// 2026-07-30(wayfinder→to-spec方式・venue-avatar-hover-preview-SPEC.md §4.1): 会場アイコンの
+//   ホバープレビューカード。純ロジック+DOMビルダーはここに切り出し済み(buildPersonTileEl等の
+//   タイル正本は一切変更しない)。
+import {
+  readVenueTileThumbState,
+  buildVenueHoverCardModel,
+  createVenueHoverCardEl,
+  renderVenueHoverCard,
+  resolveVenueHoverCardPlacement
+} from '../lib/venueHoverCard.js';
 
 /**
  * 会場の参加者ソース切替。
@@ -1558,6 +1568,79 @@ const VENUE_CSS = `
    * translate(-50%, -100%) で「指定点が吹き出しの下辺中央」になる。
    * 会議確定B: font 18px(12px から大幅拡大)・最大2行・読みやすさ最優先(星野ロミ流)。
    */
+  /*
+   * 2026-07-30(wayfinder→to-spec方式・venue-avatar-hover-preview): 会場アイコンのホバー
+   * プレビューカード。吹き出し(z:5)より前・投げ物演出(z:7)より背面になるよう z:6 とし、
+   * stage 直下の最後に append することで常駐レイヤー(同z:6)より DOM 順で手前にする。
+   * pointer-events:none=マウスを一切奪わない(カード越しのクリック・ドラッグ・下のタイルへの
+   * ホバーは素通し)。表示/非表示はクラス nlsb-hover-card--open のトグルのみ(最小構成)。
+   */
+  .nlsb-hover-card {
+    position: absolute;
+    left: 0;
+    top: 0;
+    z-index: 6;
+    display: none;
+    box-sizing: border-box;
+    width: max-content;
+    max-width: min(26ch, 70vw);
+    padding: 10px 12px;
+    gap: 10px;
+    border: 1px solid rgba(20, 29, 42, 0.16);
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.97);
+    color: #141d28;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.34);
+    pointer-events: none;
+  }
+  .nlsb-hover-card.nlsb-hover-card--open {
+    display: flex;
+  }
+  .nlsb-hover-card__avatar-box {
+    flex: 0 0 auto;
+    width: 72px;
+    height: 72px;
+    border-radius: 50%;
+    background: rgba(20, 29, 42, 0.12);
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .nlsb-hover-card__avatar {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+  .nlsb-hover-card__body {
+    flex: 1 1 auto;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    font-size: 13px;
+    line-height: 1.4;
+  }
+  .nlsb-hover-card__name {
+    font-size: 15px;
+    font-weight: 700;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .nlsb-hover-card__id {
+    opacity: 0.7;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .nlsb-hover-card__stats {
+    font-weight: 600;
+  }
+  .nlsb-hover-card__thumb-status {
+    opacity: 0.65;
+    font-size: 12px;
+  }
   .nlsb-bubble {
     position: absolute;
     left: 0;
@@ -2235,7 +2318,116 @@ export function mountVenueBarButton(options = {}) {
   const diagPanel = document.createElement('div');
   diagPanel.className = 'nlsb-roster-panel nlsb-venue-diag-panel';
   diagPanel.hidden = true;
-  stage.append(stageLayout, bubbleLayer, rosterPanel, diagPanel);
+  // 2026-07-30(wayfinder→to-spec方式・venue-avatar-hover-preview-SPEC.md §4.3): ホバープレビュー
+  //   カードはシングルトン1個をstage直下に常設(表示/非表示と中身差し替えのみ・500人規模でも
+  //   DOM数は人数非依存)。stage.appendの最後に置くことで、同z-index(6)の常駐レイヤーより
+  //   DOM順で手前に来る。
+  const hoverCardEl = createVenueHoverCardEl(document);
+  stage.append(stageLayout, bubbleLayer, rosterPanel, diagPanel, hoverCardEl);
+
+  // 2026-07-30(wayfinder→to-spec方式・venue-avatar-hover-preview-SPEC.md §4.3/§7):
+  //   委譲リスナー2個(seatsHost/topBarList)+シングルトンカードのみ。タイル個別リスナー・
+  //   新規タイマー・新規計算(APIコール等)は一切無い(500人規模でも人数非依存)。
+  const VENUE_HOVER_CARD_OPEN_DELAY_MS = 120;
+
+  /** 開いているカードを閉じ、退避したtitleを復元する。全経路(pointerout/pointerdown/scroll)は
+   *  必ずこの単一関数を通る(「消す側」の経路漏れを作らない・[[story-userlane-churn-filllanetier-v1039]]の鉄則)。 */
+  const closeHoverCard = () => {
+    if (_hoverCardTimer) {
+      clearTimeout(_hoverCardTimer);
+      _hoverCardTimer = 0;
+    }
+    const anchorEl = _hoverCardOpenFor;
+    _hoverCardOpenFor = null;
+    hoverCardEl.classList.remove('nlsb-hover-card--open');
+    if (!(anchorEl instanceof HTMLElement)) return;
+    const backup = _hoverCardTitleBackupByEl.get(anchorEl);
+    if (!backup) return;
+    _hoverCardTitleBackupByEl.delete(anchorEl);
+    // paint(renderSeats)がホバー中にtitleを再セットしている可能性があるため、現在値が
+    // 空のときだけ復元する(上書きされていたらそちらが最新の正しい値・SPEC.md §7-2の地雷対策)。
+    if (!anchorEl.title) anchorEl.title = backup.seatTitle;
+    if (backup.cellEl instanceof HTMLElement) {
+      if (!backup.cellEl.title) backup.cellEl.title = backup.cellTitle;
+      const img = backup.cellEl.querySelector('img');
+      if (img instanceof HTMLElement && !img.title) img.title = backup.imgTitle;
+    }
+  };
+
+  /** アンカー要素にホバー中のカードを実際に開く。 @param {HTMLElement} anchorEl */
+  const openHoverCardFor = (anchorEl) => {
+    const data = _hoverCardDataByEl.get(anchorEl);
+    if (!data) return; // データ無し=fail-closed(ネイティブtitleがそのまま生きる)。
+    _hoverCardOpenFor = anchorEl;
+
+    // title退避(seat/cell/imgの3点)。カード表示中は二重ツールチップを避ける。
+    const cellEl = anchorEl.querySelector instanceof Function
+      ? anchorEl.querySelector('.nl-story-userlane-cell') || (anchorEl.classList?.contains('nl-story-userlane-cell') ? anchorEl : null)
+      : null;
+    const imgEl = cellEl instanceof HTMLElement ? cellEl.querySelector('img') : null;
+    _hoverCardTitleBackupByEl.set(anchorEl, {
+      seatTitle: anchorEl.title || '',
+      cellTitle: cellEl instanceof HTMLElement ? cellEl.title || '' : '',
+      imgTitle: imgEl instanceof HTMLElement ? imgEl.title || '' : '',
+      cellEl: cellEl instanceof HTMLElement ? cellEl : null
+    });
+    anchorEl.title = '';
+    if (cellEl instanceof HTMLElement) cellEl.title = '';
+    if (imgEl instanceof HTMLElement) imgEl.title = '';
+
+    const thumb = readVenueTileThumbState(/** @type {HTMLElement|null} */ (cellEl));
+    const model = buildVenueHoverCardModel({ ...data, thumb });
+    renderVenueHoverCard(hoverCardEl, model);
+    hoverCardEl.classList.add('nlsb-hover-card--open');
+
+    const anchorRect = anchorEl.getBoundingClientRect();
+    const stageRect = stage.getBoundingClientRect();
+    const cardRect = hoverCardEl.getBoundingClientRect();
+    const placement = resolveVenueHoverCardPlacement({
+      anchor: {
+        left: anchorRect.left - stageRect.left,
+        top: anchorRect.top - stageRect.top,
+        width: anchorRect.width,
+        height: anchorRect.height
+      },
+      card: { width: cardRect.width, height: cardRect.height },
+      viewport: { width: stageRect.width, height: stageRect.height }
+    });
+    hoverCardEl.style.left = `${placement.left}px`;
+    hoverCardEl.style.top = `${placement.top}px`;
+  };
+
+  /** @param {HTMLElement} host */
+  const wireHoverCardDelegation = (host) => {
+    host.addEventListener('pointerover', (e) => {
+      if (e.pointerType === 'touch') return; // MVPはタッチ非対応(既存タップ挙動を邪魔しない)。
+      const anchorEl = e.target instanceof HTMLElement
+        ? e.target.closest('.nlsb-seat, .nlsb-topbar-cell')
+        : null;
+      if (!(anchorEl instanceof HTMLElement)) return;
+      if (anchorEl === _hoverCardOpenFor) return; // 同じ席内での移動は無視。
+      if (_hoverCardTimer) clearTimeout(_hoverCardTimer);
+      _hoverCardTimer = window.setTimeout(() => {
+        _hoverCardTimer = 0;
+        openHoverCardFor(anchorEl);
+      }, VENUE_HOVER_CARD_OPEN_DELAY_MS);
+    });
+    host.addEventListener('pointerout', (e) => {
+      const anchorEl = e.target instanceof HTMLElement
+        ? e.target.closest('.nlsb-seat, .nlsb-topbar-cell')
+        : null;
+      if (!(anchorEl instanceof HTMLElement)) return;
+      const related = e.relatedTarget instanceof HTMLElement ? e.relatedTarget.closest('.nlsb-seat, .nlsb-topbar-cell') : null;
+      if (related === anchorEl) return; // 同じ席内の子要素間移動は無視。
+      closeHoverCard();
+    });
+  };
+  wireHoverCardDelegation(seatsHost);
+  wireHoverCardDelegation(topBarList);
+  // ドラッグスクロール中・スクロール中はカードを浮遊させたまま残さない(即閉じ)。
+  seatsHost.addEventListener('pointerdown', closeHoverCard);
+  seatsHost.addEventListener('scroll', closeHoverCard);
+
   root.append(toggle, stage);
   parent.appendChild(root);
 
@@ -2437,6 +2629,16 @@ export function mountVenueBarButton(options = {}) {
   //   「最後に書き込んだvenueRank」だけを覚え、同じ値ならdataset書き込みそのものをスキップする。
   /** @type {WeakMap<HTMLElement, number>} */
   const _lastVenueRankByNode = new WeakMap();
+  // 2026-07-30(wayfinder→to-spec方式・venue-avatar-hover-preview-SPEC.md §4.3): ホバープレビュー
+  //   カード用のデータ。paint時(席装飾ループ/renderTopBar)にWeakMapへ相乗り登録するだけで、
+  //   DOM書き込み・新規タイマー・新規計算は無い(RANKバッジちらつき教訓=diff-skip不要な設計)。
+  /** @type {WeakMap<HTMLElement, { uid: string, displayName: string, count: number, hasGift: boolean, giftCount: number, venueRank: number }>} */
+  const _hoverCardDataByEl = new WeakMap();
+  /** @type {WeakMap<HTMLElement, { seatTitle: string, cellTitle: string, imgTitle: string, cellEl: HTMLElement|null }>} */
+  const _hoverCardTitleBackupByEl = new WeakMap();
+  let _hoverCardTimer = 0;
+  /** @type {HTMLElement|null} 現在カードを開いている(または開こうとしている)アンカー要素。 */
+  let _hoverCardOpenFor = null;
   // 診断シート(メンバー一覧ボタン)用: renderSeats が最新の席割りをここに保存する。
   /** @type {{ allSeats: any[], visibleSeats: any[], audienceCount: number }} */
   let lastRosterInput = { allSeats: [], visibleSeats: [], audienceCount: 0 };
@@ -4116,7 +4318,7 @@ export function mountVenueBarButton(options = {}) {
   //   sig(上位の userId+順位)が無変化なら DOM を触らない=毎フレーム作り直さない(hot path 保護)。
   //   一度でも非空を描いたら、一瞬の空(データ遅延)では畳まない=高さ振動を作らない(v0.1.1026)。
   //   状態フラグは clearDisplay(先に定義)からも触るため、宣言は関数より前(下の hasRenderedNonEmpty 付近)。
-  /** @param {Array<{ rank:number, participant:{ key?:string, userId?:string } }>} topSupporters */
+  /** @param {Array<{ rank:number, participant:{ key?:string, userId?:string, name?:string, count?:number, hasGift?:boolean, giftCount?:number } }>} topSupporters */
   const renderTopBar = (topSupporters) => {
     const list = Array.isArray(topSupporters) ? topSupporters : [];
     // 空入力でも、一度出したバーは畳まない(前回の顔を残す=明滅/高さ振動を防ぐ)。
@@ -4134,6 +4336,18 @@ export function mountVenueBarButton(options = {}) {
       cell.className = 'nlsb-topbar-cell';
       if (item.rank >= 1 && item.rank <= 3) cell.dataset.venueRank = String(item.rank);
       cell.appendChild(buildVenuePersonTile(item.participant, '応援者'));
+      // 2026-07-30(wayfinder→to-spec方式・venue-avatar-hover-preview-SPEC.md §4.3): ホバー
+      //   プレビューカード用データをWeakMapへ相乗り登録。sig-skipで一度も再構築されない間は
+      //   この登録も走らない(既存cellは残るためカードのデータも古いまま=許容。SPEC.md §7末尾)。
+      const p = item.participant || {};
+      _hoverCardDataByEl.set(cell, {
+        uid: String(p.userId || '').trim(),
+        displayName: String(p.name || '').trim() || String(item?.participant?.key || ''),
+        count: Number(p.count) || 0,
+        hasGift: p.hasGift === true,
+        giftCount: Number(p.giftCount) || 0,
+        venueRank: Math.max(0, Math.floor(Number(item.rank) || 0))
+      });
       frag.appendChild(cell);
     }
     topBarList.replaceChildren(frag);
@@ -4423,6 +4637,16 @@ export function mountVenueBarButton(options = {}) {
         }
         _lastVenueRankByNode.set(node.seat, venueRank);
       }
+      // 2026-07-30(wayfinder→to-spec方式・venue-avatar-hover-preview-SPEC.md §4.3): ホバー
+      //   プレビューカード用データをWeakMapへ相乗り登録(DOM書き込みなし・diff-skip不要)。
+      _hoverCardDataByEl.set(node.seat, {
+        uid,
+        displayName,
+        count: Number(participant.count) || 0,
+        hasGift: participant.hasGift === true,
+        giftCount: Number(participant.giftCount) || 0,
+        venueRank
+      });
       const speakerKey = uid ? `u:${uid}` : rawName ? `n:${rawName}` : '';
       const streakEntry = speakerKey ? speechStreaks.get(speakerKey) : null;
       const seatStreakStage = streakEntry ? streakGlowStage(streakEntry.count) : 0;

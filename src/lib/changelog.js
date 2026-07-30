@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1191',
+    date: '2026-07-30',
+    summary: '会場アイコンにホバープレビューを追加',
+    items: Object.freeze([
+      '会場モードの参加者アイコンにマウスを乗せると、表示名・ID種別・発言数・応援者ランキング順位・サムネイルの取得状況をカードで確認できるようになりました。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1190',
     date: '2026-07-30',
     summary: '会場の応援者ランキングのチラつきを軽減',
