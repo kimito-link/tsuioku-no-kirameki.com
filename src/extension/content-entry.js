@@ -2736,9 +2736,11 @@ const PAGE_FRAME_OVERLAY_ID = 'nls-watch-prikura-frame';
  * judge/record/summarize は純関数(scrollWhiteoutProbe.js・test 済)。ここでは scroll に
  * throttle で乗って video / inline panel host の高さを測り、「直前は可視→今回は消失」を白化候補として
  * 数える。確証でなく観測が目的=status の fastDiag に whiteoutCount/最新サンプルを出して切り分ける。
- * @type {{ count:number, samples:Array<object>, lastAtMs:number }}
+ * @type {{ count:number, samples:Array<object>, lastAtMs:number, culpritMove:number, culpritRepaint:number }}
  */
-const _scrollWhiteoutState = { count: 0, samples: [], lastAtMs: 0 };
+// v0.1.1196: culpritMove/culpritRepaint(W-1の真犯人分類カウンタ)を初期化に明示する。
+//   recordWhiteoutSample が遅延初期化するため実害は無かったが、型注釈と実体がズレていた。
+const _scrollWhiteoutState = { count: 0, samples: [], lastAtMs: 0, culpritMove: 0, culpritRepaint: 0 };
 /** 直前サンプルの高さ(要素種別ごと)。白化遷移(可視→消失)の判定に使う。 */
 const _scrollWhiteoutPrevH = { video: 0, host: 0 };
 let _scrollWhiteoutListenerRegistered = false;

@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1196',
+    date: '2026-07-31',
+    summary: 'スクロール白化の原因が状態速報から読めるように',
+    items: Object.freeze([
+      'スクロールすると画面が一瞬白くなる現象について、原因の内訳(パネルの置き直しが原因か、描き直しが原因か)を状態速報に表示するようにしました(表示のみ・動作は変わりません)。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1195',
     date: '2026-07-31',
     summary: '長時間ポップアップを開いていないときも会場に新しい人が出るように',
