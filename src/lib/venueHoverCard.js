@@ -73,6 +73,29 @@ export function readVenueTileThumbState(cellEl) {
  * }} VenueHoverCardModel
  */
 
+/**
+ * 2026-07-30(council-fable設計・venue-hover-card-content-DESIGN.md MVP-2): 「最後に
+ * コメントした時刻」を相対時刻の粗い粒度で返す純関数。参加者データに既在のlastAt(epoch ms)
+ * から算出し、新規API取得は行わない。nowMsは呼び出し側(openHoverCardFor)が注入する
+ * (純関数内でDate.now()を呼ばない・地雷G-1)。
+ *
+ * @param {unknown} lastAt 最終発言時刻(epoch ms)
+ * @param {unknown} nowMs カードを開いた瞬間のDate.now()
+ * @returns {string} 空文字=出さない(データ不足・クロック異常時のfail-closed)
+ */
+export function formatVenueHoverRelativeTime(lastAt, nowMs) {
+  const a = Number(lastAt);
+  const n = Number(nowMs);
+  if (!Number.isFinite(a) || a <= 0 || !Number.isFinite(n) || n <= 0) return '';
+  const d = n - a;
+  if (d < 60_000) return 'たった今'; // 負値(時計ズレ)もここに丸める。
+  if (d < 3_600_000) return `${Math.floor(d / 60_000)}分前`;
+  if (d < 86_400_000) return `${Math.floor(d / 3_600_000)}時間前`;
+  if (d < 30 * 86_400_000) return `${Math.floor(d / 86_400_000)}日前`;
+  // 30日超は単位/クロック異常とみなし出さない(v1044「56年前」事故の再発防止・fail-closed)。
+  return '';
+}
+
 /** @param {VenueTileThumbState['kind']} kind @param {VenueTileThumbState['load']} load @returns {string} */
 function resolveThumbStatusLabel(kind, load) {
   if (load === 'loading') return '読み込み中';
@@ -87,7 +110,8 @@ function resolveThumbStatusLabel(kind, load) {
  * カード表示モデルを組み立てる純関数。ホバー時点で手元にあるデータのみ(新規取得ゼロ)。
  * @param {{
  *   uid?: unknown, displayName?: unknown, count?: unknown, hasGift?: unknown,
- *   giftCount?: unknown, venueRank?: unknown, thumb?: Partial<VenueTileThumbState>
+ *   giftCount?: unknown, venueRank?: unknown, thumb?: Partial<VenueTileThumbState>,
+ *   lastAt?: unknown, nowMs?: unknown, diagMode?: unknown
  * }} input
  * @returns {VenueHoverCardModel}
  */
@@ -103,6 +127,10 @@ export function buildVenueHoverCardModel(input) {
   const thumbSrc = String(thumb.src || '');
   const thumbKind = /** @type {VenueTileThumbState['kind']} */ (thumb.kind || 'none');
   const thumbLoad = /** @type {VenueTileThumbState['load']} */ (thumb.load || 'loading');
+  // 2026-07-30(council-fable設計・venue-hover-card-content-DESIGN.md MVP-1): 診断情報
+  // (サムネ状態ラベル)は🩺状態パネル開時のみ表示する(diagMode===trueのときだけ)。
+  // thumbKind/thumbLoadはdiagModeに関わらず常に返す(dataset刻印=機械層はモード非依存)。
+  const diagMode = i.diagMode === true;
 
   // ID種別判定はisNumericNicoUserId一択(唯一の判定基準・新しい判定ロジックを作らない)。
   let idKind = /** @type {VenueHoverCardModel['idKind']} */ ('none');
@@ -123,8 +151,11 @@ export function buildVenueHoverCardModel(input) {
   const avatarSrc =
     thumbKind === 'real-http' && thumbLoad !== 'ok' ? '' : thumbSrc;
 
+  // 2026-07-30(MVP-2): lastAt/nowMsが両方有効なら「発言N(3分前)」のように括弧で埋め込む。
+  // 専用行・専用DOM・タイマー更新は追加しない(カード寿命は数秒なのでtick更新は不要)。
+  const relTime = formatVenueHoverRelativeTime(i.lastAt, i.nowMs);
   const statParts = [];
-  statParts.push(`発言 ${count}`);
+  statParts.push(relTime ? `発言 ${count}(${relTime})` : `発言 ${count}`);
   if (hasGift) statParts.push(`🎁${giftCount}`);
   if (venueRank === 1) statParts.push('🥇1位');
   else if (venueRank === 2) statParts.push('🥈2位');
@@ -136,7 +167,7 @@ export function buildVenueHoverCardModel(input) {
     idKind,
     avatarSrc,
     statLine: statParts.join(' ・ '),
-    thumbStatusLabel: resolveThumbStatusLabel(thumbKind, thumbLoad),
+    thumbStatusLabel: diagMode ? resolveThumbStatusLabel(thumbKind, thumbLoad) : '',
     thumbKind,
     thumbLoad
   };
@@ -173,7 +204,10 @@ export function createVenueHoverCardEl(doc) {
   statsEl.className = 'nlsb-hover-card__stats';
   const thumbStatusEl = doc.createElement('div');
   thumbStatusEl.className = 'nlsb-hover-card__thumb-status';
-  body.append(nameEl, idEl, statsEl, thumbStatusEl);
+  // 2026-07-30(council-fable設計・venue-hover-card-content-DESIGN.md 必答1): 「名前→活動→
+  // (補足として)ID」の情報序列を構造でも表現する。IDは文言そのまま・体裁だけ格下げ(CSS側で
+  // font-size縮小)。ロジック変更ゼロ・isNumericNicoUserId判定基準は不変。
+  body.append(nameEl, statsEl, idEl, thumbStatusEl);
 
   card.append(avatarBox, body);
   return card;
@@ -205,7 +239,12 @@ export function renderVenueHoverCard(cardEl, model) {
   if (statsEl) statsEl.textContent = String(m.statLine || '');
 
   const thumbStatusEl = cardEl.querySelector('.nlsb-hover-card__thumb-status');
-  if (thumbStatusEl) thumbStatusEl.textContent = String(m.thumbStatusLabel || '');
+  if (thumbStatusEl) {
+    const label = String(m.thumbStatusLabel || '');
+    thumbStatusEl.textContent = label;
+    // 2026-07-30(MVP-1): 診断行は空(diagMode:false)のとき隙間を残さずhiddenにする。
+    thumbStatusEl.hidden = !label;
+  }
 
   // 将来の census/実機確認用フック(data属性)。挙動には使わない(印字専用)。
   cardEl.dataset.thumbKind = String(m.thumbKind || '');

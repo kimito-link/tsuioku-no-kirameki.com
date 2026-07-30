@@ -5,7 +5,8 @@ import {
   buildVenueHoverCardModel,
   createVenueHoverCardEl,
   renderVenueHoverCard,
-  resolveVenueHoverCardPlacement
+  resolveVenueHoverCardPlacement,
+  formatVenueHoverRelativeTime
 } from './venueHoverCard.js';
 
 /**
@@ -172,26 +173,27 @@ describe('buildVenueHoverCardModel', () => {
     expect(model.statLine).not.toContain('🎁');
   });
 
-  it('thumbStatusLabelがkind/loadの組み合わせごとに人間可読な文言を返す', () => {
+  it('thumbStatusLabelがkind/loadの組み合わせごとに人間可読な文言を返す(diagMode:trueのとき)', () => {
+    // 2026-07-30(MVP-1): thumbStatusLabelはdiagMode:trueのときだけ非空になる仕様に変更。
     expect(buildVenueHoverCardModel({
       uid: '1', displayName: 'x', count: 0, hasGift: false, giftCount: 0, venueRank: 0,
-      thumb: { src: 'https://x', kind: 'real-http', load: 'ok' }
+      thumb: { src: 'https://x', kind: 'real-http', load: 'ok' }, diagMode: true
     }).thumbStatusLabel).toContain('実サムネ');
     expect(buildVenueHoverCardModel({
       uid: '1', displayName: 'x', count: 0, hasGift: false, giftCount: 0, venueRank: 0,
-      thumb: { src: 'https://x', kind: 'real-http', load: 'failed' }
+      thumb: { src: 'https://x', kind: 'real-http', load: 'failed' }, diagMode: true
     }).thumbStatusLabel).toContain('失敗');
     expect(buildVenueHoverCardModel({
       uid: '1', displayName: 'x', count: 0, hasGift: false, giftCount: 0, venueRank: 0,
-      thumb: { src: '', kind: 'none', load: 'loading' }
+      thumb: { src: '', kind: 'none', load: 'loading' }, diagMode: true
     }).thumbStatusLabel).toContain('読み込み中');
     expect(buildVenueHoverCardModel({
       uid: '1', displayName: 'x', count: 0, hasGift: false, giftCount: 0, venueRank: 0,
-      thumb: { src: 'data:image/svg+xml;x', kind: 'identicon', load: 'ok' }
+      thumb: { src: 'data:image/svg+xml;x', kind: 'identicon', load: 'ok' }, diagMode: true
     }).thumbStatusLabel).toContain('代替顔');
     expect(buildVenueHoverCardModel({
       uid: '1', displayName: 'x', count: 0, hasGift: false, giftCount: 0, venueRank: 0,
-      thumb: { src: 'https://x', kind: 'tv-fallback', load: 'ok' }
+      thumb: { src: 'https://x', kind: 'tv-fallback', load: 'ok' }, diagMode: true
     }).thumbStatusLabel).toContain('公式デフォルト');
   });
 
@@ -199,6 +201,58 @@ describe('buildVenueHoverCardModel', () => {
     expect(() => buildVenueHoverCardModel({})).not.toThrow();
     const model = buildVenueHoverCardModel({});
     expect(model.idKind).toBe('none');
+  });
+
+  // 2026-07-30(council-fable設計・venue-hover-card-content-DESIGN.md MVP-1): 診断情報
+  // (サムネ状態ラベル)は🩺状態パネル開時のみ表示する。thumbKind/thumbLoadはdiagModeに
+  // 関わらず常に返す(dataset刻印=機械層はモード非依存・地雷G-4)。
+  describe('diagMode(サムネ診断ラベルの表示ゲート)', () => {
+    const baseThumb = { src: 'https://example.test/a.png', kind: 'real-http', load: 'ok' };
+
+    it('diagMode未指定ならthumbStatusLabelは空文字', () => {
+      const model = buildVenueHoverCardModel({
+        uid: '12345678', displayName: 'x', count: 0, hasGift: false, giftCount: 0, venueRank: 0, thumb: baseThumb
+      });
+      expect(model.thumbStatusLabel).toBe('');
+    });
+
+    it('diagMode:falseならthumbStatusLabelは空文字', () => {
+      const model = buildVenueHoverCardModel({
+        uid: '12345678', displayName: 'x', count: 0, hasGift: false, giftCount: 0, venueRank: 0, thumb: baseThumb,
+        diagMode: false
+      });
+      expect(model.thumbStatusLabel).toBe('');
+    });
+
+    it('diagMode:trueなら現行どおりのラベルが返る', () => {
+      const model = buildVenueHoverCardModel({
+        uid: '12345678', displayName: 'x', count: 0, hasGift: false, giftCount: 0, venueRank: 0, thumb: baseThumb,
+        diagMode: true
+      });
+      expect(model.thumbStatusLabel).toBe('実サムネ');
+    });
+
+    it('diagMode:trueで読み込み失敗(白丸)ならその旨のラベルが返る', () => {
+      const model = buildVenueHoverCardModel({
+        uid: '12345678', displayName: 'x', count: 0, hasGift: false, giftCount: 0, venueRank: 0,
+        thumb: { src: 'https://example.test/broken.png', kind: 'real-http', load: 'failed' },
+        diagMode: true
+      });
+      expect(model.thumbStatusLabel).toContain('失敗');
+    });
+
+    it('thumbKind/thumbLoadはdiagModeに関わらず常に値を持つ(機械層はモード非依存)', () => {
+      const withDiag = buildVenueHoverCardModel({
+        uid: '1', displayName: 'x', count: 0, hasGift: false, giftCount: 0, venueRank: 0, thumb: baseThumb, diagMode: true
+      });
+      const withoutDiag = buildVenueHoverCardModel({
+        uid: '1', displayName: 'x', count: 0, hasGift: false, giftCount: 0, venueRank: 0, thumb: baseThumb, diagMode: false
+      });
+      expect(withDiag.thumbKind).toBe('real-http');
+      expect(withDiag.thumbLoad).toBe('ok');
+      expect(withoutDiag.thumbKind).toBe('real-http');
+      expect(withoutDiag.thumbLoad).toBe('ok');
+    });
   });
 });
 
@@ -303,5 +357,88 @@ describe('createVenueHoverCardEl / renderVenueHoverCard', () => {
     const nameEl2 = cardEl.querySelector('.nlsb-hover-card__name');
     expect(nameEl1).toBe(nameEl2);
     expect(nameEl2.textContent).toBe('B');
+  });
+});
+
+// 2026-07-30(council-fable設計・venue-hover-card-content-DESIGN.md MVP-2): 「最後に
+// コメントした時刻」を相対時刻でstatLineに追加する。参加者データに既に存在するlastAt
+// (新規API取得なし)から算出する純関数。
+describe('formatVenueHoverRelativeTime', () => {
+  it('59秒未満は「たった今」', () => {
+    expect(formatVenueHoverRelativeTime(1000, 1000 + 59_000)).toBe('たった今');
+  });
+
+  it('60秒ちょうどは「1分前」(境界)', () => {
+    expect(formatVenueHoverRelativeTime(1, 60_001)).toBe('1分前');
+  });
+
+  it('59分は「59分前」、60分(1時間)は「1時間前」', () => {
+    expect(formatVenueHoverRelativeTime(1, 1 + 59 * 60_000)).toBe('59分前');
+    expect(formatVenueHoverRelativeTime(1, 1 + 60 * 60_000)).toBe('1時間前');
+  });
+
+  it('23時間は「23時間前」、24時間(1日)は「1日前」', () => {
+    expect(formatVenueHoverRelativeTime(1, 1 + 23 * 3_600_000)).toBe('23時間前');
+    expect(formatVenueHoverRelativeTime(1, 1 + 24 * 3_600_000)).toBe('1日前');
+  });
+
+  it('29日は「29日前」、30日超は空文字(クロック異常とみなしfail-closed)', () => {
+    expect(formatVenueHoverRelativeTime(1, 1 + 29 * 86_400_000)).toBe('29日前');
+    expect(formatVenueHoverRelativeTime(1, 1 + 30 * 86_400_000 + 1)).toBe('');
+  });
+
+  it('負値(時計ズレ)は「たった今」に丸める', () => {
+    expect(formatVenueHoverRelativeTime(1000, 500)).toBe('たった今');
+  });
+
+  it('lastAt/nowMsが0・負・NaN・非数値なら空文字(壊れない)', () => {
+    expect(formatVenueHoverRelativeTime(0, 1000)).toBe('');
+    expect(formatVenueHoverRelativeTime(-1, 1000)).toBe('');
+    expect(formatVenueHoverRelativeTime(NaN, 1000)).toBe('');
+    expect(formatVenueHoverRelativeTime(1000, 0)).toBe('');
+    expect(formatVenueHoverRelativeTime('x', 1000)).toBe('');
+  });
+});
+
+describe('buildVenueHoverCardModel: lastAt相対時刻のstatLine反映(MVP-2)', () => {
+  const baseThumb = { src: '', kind: 'none', load: 'loading' };
+
+  it('lastAt/nowMsが両方有効なら発言数の後ろに相対時刻が括弧で付く', () => {
+    const model = buildVenueHoverCardModel({
+      uid: '1', displayName: 'x', count: 12, hasGift: false, giftCount: 0, venueRank: 0,
+      thumb: baseThumb, lastAt: 1000, nowMs: 1000 + 3 * 60_000
+    });
+    expect(model.statLine).toContain('発言 12(3分前)');
+  });
+
+  it('lastAt/nowMsのどちらかが欠損なら現行どおり(後方互換恒等)', () => {
+    const noTime = buildVenueHoverCardModel({
+      uid: '1', displayName: 'x', count: 12, hasGift: false, giftCount: 0, venueRank: 0, thumb: baseThumb
+    });
+    expect(noTime.statLine).toBe('発言 12');
+    const onlyLastAt = buildVenueHoverCardModel({
+      uid: '1', displayName: 'x', count: 12, hasGift: false, giftCount: 0, venueRank: 0, thumb: baseThumb, lastAt: 1000
+    });
+    expect(onlyLastAt.statLine).toBe('発言 12');
+    const onlyNowMs = buildVenueHoverCardModel({
+      uid: '1', displayName: 'x', count: 12, hasGift: false, giftCount: 0, venueRank: 0, thumb: baseThumb, nowMs: 1000
+    });
+    expect(onlyNowMs.statLine).toBe('発言 12');
+  });
+
+  it('相対時刻が空文字を返すケース(30日超)は括弧ごと省略される', () => {
+    const model = buildVenueHoverCardModel({
+      uid: '1', displayName: 'x', count: 5, hasGift: false, giftCount: 0, venueRank: 0,
+      thumb: baseThumb, lastAt: 1000, nowMs: 1000 + 31 * 86_400_000
+    });
+    expect(model.statLine).toBe('発言 5');
+  });
+
+  it('ギフト・ランキングと併記しても順序と区切りが崩れない', () => {
+    const model = buildVenueHoverCardModel({
+      uid: '1', displayName: 'x', count: 12, hasGift: true, giftCount: 2, venueRank: 1,
+      thumb: baseThumb, lastAt: 1000, nowMs: 1000 + 3 * 60_000
+    });
+    expect(model.statLine).toBe('発言 12(3分前) ・ 🎁2 ・ 🥇1位');
   });
 });
