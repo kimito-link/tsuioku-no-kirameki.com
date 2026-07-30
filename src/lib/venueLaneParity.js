@@ -16,6 +16,17 @@
 
 /** 鏡が「新鮮」とみなせる年齢(ms)。完璧な診断シート設計の W_soft=180s と同じ。 */
 export const VENUE_LANE_MIRROR_SOFT_WINDOW_MS = 180_000;
+/**
+ * 鏡を「popup実質不在」とみなす年齢(ms)。SOFT を超えた鏡は v0.1.1136(C2)の判断で
+ * fallback へ降格せずそのまま使い続ける(モード往復による段総入替ちらつきの防止)が、
+ * その判断は「数分規模の一時的な遅れ」を想定したもの。popup が数時間開かれない実機ケース
+ * (実測: 鏡stale 21437s=約6時間)では、その間に来た新規参加者が段に一切現れない実害が出る。
+ * HARD を超えたら fallback(全参加者を候補から組む)へ降格させ、新規参加者を可視化する。
+ *
+ * ⚠️ SOFT(180s)とは別定数のまま維持すること。1つにまとめると C2 のちらつき防止が壊れる
+ *    (venue-avatar-stale-mirror-DESIGN.md §G-8)。
+ */
+export const VENUE_LANE_MIRROR_HARD_WINDOW_MS = 900_000;
 /** X層(鏡にまだ居ない直近発言者)の猶予窓(ms)。①のpoll+paint+publishの通常10秒に十分な余裕。 */
 export const VENUE_LANE_TRANSIENT_WINDOW_MS = 60_000;
 /** ①POPと会場のタイル寸法に許容する相対差。超えたら見た目不一致。 */
@@ -136,6 +147,9 @@ export function buildVenueLaneParity(input) {
   let mirrorIssue = '';
   if (!snap) mirrorIssue = '鏡なし';
   else if (!snapLiveId || (liveId && snapLiveId !== liveId)) mirrorIssue = '鏡は別配信';
+  // v0.1.1195(根治2・二段窓): HARD超は「popup実質不在→fallbackへ降格した」ことが状態速報から
+  //   一目で分かるよう別表記にする(SOFT帯の`鏡stale`は鏡を使い続けている状態=意味が違う)。
+  else if (mirrorAgeMs > VENUE_LANE_MIRROR_HARD_WINDOW_MS) mirrorIssue = `鏡staleHard(${mirrorAgeSec}s→fallback降格)`;
   else if (mirrorAgeMs > VENUE_LANE_MIRROR_SOFT_WINDOW_MS) mirrorIssue = `鏡stale(${mirrorAgeSec}s)`;
 
   const popSeq = laneMirrorTierKeySequences(snap);
