@@ -911,6 +911,60 @@ describe('buildMarketingDashboardHtml', () => {
     expect(html).not.toContain('data:image/svg+xml,<svg/>');
   });
 
+  // 2026-07-31(ユーザー要望): マーケ分析HTMLには検索が1つも無く(input要素0個)、アイコンが
+  //   並ぶだけで「あの人」を探せなかった。HTMLレポート側(htmlReportDocument.js:1610)と同じ
+  //   data-search 方式の絞り込みを、サムネ付きユーザー一覧に付ける。
+  describe('サムネ付きユーザー一覧の検索', () => {
+    /** @returns {string} */
+    const buildWithUsers = () => {
+      /** @type {import('./commentRecord.js').StoredComment[]} */
+      const comments = [
+        {
+          id: 'a1', liveId: 'lv1', commentNo: '1', text: 'やっほー', userId: '78759947',
+          nickname: '多忙なあやりん', avatarUrl: 'https://example.test/a.jpg',
+          capturedAt: Date.now(), vpos: 0, is184: false, selfPosted: false
+        },
+        {
+          id: 'b1', liveId: 'lv1', commentNo: '2', text: 'こん', userId: '45574905',
+          nickname: 'たっつん', avatarUrl: 'https://example.test/b.jpg',
+          capturedAt: Date.now(), vpos: 0, is184: false, selfPosted: false
+        }
+      ];
+      return buildMarketingDashboardHtml(aggregateMarketingReport(comments, 'lv1'), {
+        anonymousIdenticonResolver: () => 'data:image/svg+xml,<svg/>'
+      });
+    };
+
+    it('検索窓(input)が出力される', () => {
+      const html = buildWithUsers();
+      expect(html).toContain('id="mktThumbGridSearch"');
+      expect(html).toContain('type="search"');
+      expect(html).toContain('id="mktThumbGridSearchResult"');
+    });
+
+    it('各セルに data-search(名前+ID・小文字化)が乗る', () => {
+      const html = buildWithUsers();
+      // 名前でもIDでも引けること。実際の絞り込みはこの属性の部分一致で行う。
+      expect(html).toMatch(/data-search="[^"]*多忙なあやりん[^"]*"/);
+      expect(html).toMatch(/data-search="[^"]*78759947[^"]*"/);
+      expect(html).toMatch(/data-search="[^"]*たっつん[^"]*"/);
+    });
+
+    it('絞り込みスクリプトが data-search を読んで表示を切り替える', () => {
+      const html = buildWithUsers();
+      expect(html).toContain("getElementById('mktThumbGridSearch')");
+      expect(html).toContain("getAttribute('data-search')");
+      expect(html).toContain("addEventListener('input'");
+    });
+
+    it('0件のとき「60名上限」を明記する(居ないと誤解させない)', () => {
+      const html = buildWithUsers();
+      // この一覧はコメ件数上位60名までなので、該当なし=不在とは限らない。
+      expect(html).toContain('該当なし');
+      expect(html).toContain('最大 60 名');
+    });
+  });
+
   it('maskShareLabels=true のときは「サムネ付きユーザー一覧」セクションを出さない', () => {
     /** @type {import('./commentRecord.js').StoredComment[]} */
     const comments = [

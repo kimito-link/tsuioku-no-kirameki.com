@@ -3,6 +3,7 @@ import { describe, it, expect } from 'vitest';
 import {
   readVenueTileThumbState,
   buildVenueHoverCardModel,
+  HOVER_LAST_TEXT_MAX,
   createVenueHoverCardEl,
   renderVenueHoverCard,
   resolveVenueHoverCardPlacement,
@@ -451,7 +452,55 @@ describe('buildVenueHoverCardModel: lastAt相対時刻のstatLine反映(MVP-2)',
       expect(model.statLine).toContain('🎁3');
     });
 
-    // 2026-07-31(ユーザー指摘): 広告段の #1/#5 等は uid を持たず席が割り当たらないため、
+    // 2026-07-31(ユーザー要望): 「多忙なあやりん」が何を言ったか分からない=名前と件数だけでは
+  //   誰なのか思い出せない、という指摘。直前の発言内容をカードに出す。
+  describe('直前の発言内容(lastText)', () => {
+    it('発言段では直前の発言をそのまま返す', () => {
+      const model = buildVenueHoverCardModel({
+        uid: '78759947', displayName: '多忙なあやりん', count: 1, hasGift: false, giftCount: 0,
+        venueRank: 0, thumb: baseThumb, tier: 'link', lastText: 'こんばんはー'
+      });
+      expect(model.lastText).toBe('こんばんはー');
+    });
+
+    it('長文は上限で畳んで省略記号を付ける(カードが席を覆わないように)', () => {
+      const long = 'あ'.repeat(HOVER_LAST_TEXT_MAX + 20);
+      const model = buildVenueHoverCardModel({
+        uid: '1', displayName: 'x', count: 3, hasGift: false, giftCount: 0, venueRank: 0,
+        thumb: baseThumb, tier: 'link', lastText: long
+      });
+      expect(model.lastText).toBe(`${'あ'.repeat(HOVER_LAST_TEXT_MAX)}…`);
+      expect(model.lastText.length).toBe(HOVER_LAST_TEXT_MAX + 1);
+    });
+
+    it('改行・連続空白は1つに畳む(カードの行数が暴れない)', () => {
+      const model = buildVenueHoverCardModel({
+        uid: '1', displayName: 'x', count: 1, hasGift: false, giftCount: 0, venueRank: 0,
+        thumb: baseThumb, tier: 'link', lastText: ' あ\n\nい   う  '
+      });
+      expect(model.lastText).toBe('あ い う');
+    });
+
+    it('投擲段(広告/ギフト)では出さない(発言していないのに本文が出る嘘を作らない)', () => {
+      for (const tier of ['ad', 'gift']) {
+        const model = buildVenueHoverCardModel({
+          uid: '1', displayName: 'x', count: 1, hasGift: false, giftCount: 0, venueRank: 0,
+          thumb: baseThumb, tier, lastText: '本文があっても出さない'
+        });
+        expect(model.lastText).toBe('');
+      }
+    });
+
+    it('lastText が無ければ空文字(行ごと消える・後方互換)', () => {
+      const model = buildVenueHoverCardModel({
+        uid: '1', displayName: 'x', count: 1, hasGift: false, giftCount: 0, venueRank: 0,
+        thumb: baseThumb, tier: 'link'
+      });
+      expect(model.lastText).toBe('');
+    });
+  });
+
+  // 2026-07-31(ユーザー指摘): 広告段の #1/#5 等は uid を持たず席が割り当たらないため、
     //   ホバーカードのデータが一度も登録されず「ホバーしても無反応」だった。席なしでも
     //   カードを出せるよう、uid・lastAt が無くても表示名とラベルだけで成立することを固定する。
     it('席なし広告主(uid無し・lastAt無し)でも表示名とラベルが出る', () => {

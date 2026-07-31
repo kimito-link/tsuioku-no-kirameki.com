@@ -779,7 +779,7 @@ import { KEY_AI_SHARE_FAST_DIAG } from '../lib/aiShareFastDiagKey.js';
 import { KEY_AI_SHARE_POPUP_DIAG, buildAiSharePopupDiagRecord } from '../lib/aiSharePopupDiagKey.js';
 import { createPopupDiagAutoPublisher, resolvePopupWatchUrl } from '../lib/popupDiagAutoPublish.js';
 import { shouldDeferHeavyPopupPaintDuringScroll } from '../lib/popupMainScrollDefer.js';
-import { STORY_GROWTH_MAX_CELLS } from '../lib/storyGrowthLimits.js';
+import { STORY_GROWTH_MAX_CELLS, buildStoryGrowthGaugeLabel } from '../lib/storyGrowthLimits.js';
 import { buildDevMonitorDlChartsHtml } from '../lib/devMonitorViz.js';
 import {
   buildStoryAvatarDiagHtml,
@@ -5842,10 +5842,11 @@ function setSceneStory(lead, sub, opts = {}) {
     );
   }
   if (gaugeLabel) {
-    gaugeLabel.textContent =
-      count <= 0
-        ? '応援 0 コメント'
-        : `応援 ${count.toLocaleString('ja-JP')} コメント / ホバーでプレビュー・クリックで詳細固定（Esc・外側クリックで閉じる）`;
+    // v0.1.1202: グリッドは直近360件だけを描くウィンドウ表示。全件数だけを出すと
+    //   「2,716人ぶん並んでいる=探している人も居るはず」と誤読され、実際には窓の外に
+    //   落ちていた人を「居ない」と誤解させる(2026-07-31 ユーザー報告の真因)。
+    //   応援レーンと同じく「黙って切らない」で、表示中の件数と枠外の件数を併記する。
+    gaugeLabel.textContent = buildStoryGrowthGaugeLabel(count, STORY_GROWTH_MAX_CELLS);
   }
   if (!story) return;
   const reaction = String(opts.reaction || 'idle');
