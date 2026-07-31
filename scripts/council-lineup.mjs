@@ -9,7 +9,7 @@
  *
  * スキーマ:
  *   label:     会議での表示名（例: 'groq/gpt-oss-120b'）
- *   provider:  'groq' | 'gemini' | 'nvidia' | 'cloudflare' | 'openrouter' | 'anthropic'
+ *   provider:  'groq' | 'gemini' | 'nvidia' | 'cloudflare' | 'openrouter' | 'sambanova' | 'anthropic'
  *              実在チェック(verifyLiveModels)の対象グループは 'groq'|'gemini' のみ。
  *   rawId:     プロバイダ側の実モデルID（起動時ライブ実在チェックで /models と突合する用。
  *              空文字なら実在チェック対象外＝素通し）。
@@ -17,7 +17,7 @@
  *              例: groq/compound は rawId も apiModel も 'groq/compound' で同一）。
  *   opts:      openaiChat/geminiChat への追加パラメータ（reasoning_effort 等）。
  *   timeoutMs: 個別タイムアウト（省略時は各 xxxChat の既定値）。
- *   requires:  このエントリを有効化するのに必要な env キー名の配列（'G'|'N'|'O'|'E'|'CF'|'CF_ACC'）。
+ *   requires:  このエントリを有効化するのに必要な env キー名の配列（'G'|'N'|'O'|'E'|'CF'|'CF_ACC'|'SN'）。
  *              meeting.mjs 側で解決済みの真偽フラグと突き合わせて if 判定する。
  *   liveProbe: true なら council-scout が毎日実疎通(chat/completions 1発)を確認する
  *              （2026-07-31追加）。カタログ照合(rawId)では「一覧に存在するが実際は呼べない」
@@ -29,6 +29,18 @@
  * 17体中9体(53%)がrawId空になっており、その間にnvidia/mistral-large-3-675bのEOL消滅を
  * 8日間検知できなかった実害が出た。今後rawIdを空にする場合は、(a)エントリコメントに
  * 理由を書く、(b)liveProbe:trueで代替監視を付ける、のどちらかを必須とする。
+ *
+ * 【新規プロバイダ追加時の基本姿勢】(2026-07-31追記・SambaNova採用を機に制定):
+ * 1. カード登録不要の無料枠であることを公式ドキュメントで確認してから触る。
+ * 2. 実機で2並列以上の200 OKを裏取りしてから採用会議へ（カタログ実在≠呼べる、はglm-5.2で実証済み）。
+ * 3. 新規プロバイダのモデルは必ず予備(weight3以上)から入れる。主力(weight1〜2)には最低でも
+ *    「7日以上空けた実会議2回でFAILEDゼロ」（gemini-3.5-flash昇格基準の流用）を経ずに置かない。
+ * 4. rawId必須（既存ルール）。加えて「カタログに残ったまま課金要求で死ぬ」型があり得る
+ *    プロバイダ（プラン自動適用型＝SambaNova・Cloudflare）はliveProbe:true必須。
+ *    カタログから消える型（Groq・OpenRouter・NIM）はカタログ照合のみでよい。
+ * 5. 同役割の予備に同一プロバイダを重ね積みしない（そのプロバイダが死んだ日に予備が
+ *    まとめて消え、冗長化の意味が1体分しかなくなるため）。異なる役割への同一プロバイダ
+ *    配置は、両方が予備である限り許容する。
  */
 export const LINEUP = [
   { label: 'groq/gpt-oss-120b', provider: 'groq', rawId: 'openai/gpt-oss-120b', apiModel: 'openai/gpt-oss-120b', opts: { reasoning_effort: 'low' }, requires: ['G'] },
@@ -131,6 +143,39 @@ export const LINEUP = [
   //   安定成功しているため、rawId空にしていたことに合理的理由が無かった）。
   { label: 'nvidia/nemotron-3-ultra-550b', provider: 'nvidia', rawId: 'nvidia/nemotron-3-ultra-550b-a55b', apiModel: 'nvidia/nemotron-3-ultra-550b-a55b', opts: {}, timeoutMs: 90000, requires: ['N'] },
   { label: 'nvidia/deepseek-v4-pro', provider: 'nvidia', rawId: 'deepseek-ai/deepseek-v4-pro', apiModel: 'deepseek-ai/deepseek-v4-pro', opts: {}, timeoutMs: 120000, requires: ['N'] },
+
+  // 2026-07-31 追加: NVIDIA lead正規(nemotron-3-ultra-550b)の別経路予備。OpenRouterの無料
+  // モデル一覧(:freeサフィックス)に同一モデルが存在することを発見し、3並列200 OK(360/402/2140ms)
+  // で裏取り済み。roleOfはlabelに"nemotron-3-ultra"を含むため自動でlead判定される。
+  // 注意: labelに"nvidia"の文字列を含めないこと——weightOfの`n.includes("nvidia")`判定(weight2)
+  // に誤爆し、NVIDIA本線と同格になってタイブレークがLINEUP順依存になってしまう。
+  // weightOfは変更不要（既存のopenrouter判定でweight3が自動適用される。OpenRouterは429が
+  // 出やすい実績があるため個別に軽い重みは与えない）。liveProbeは不要（OpenRouterの無料枠
+  // 終了は「カタログから:freeスラッグが消える」形で現れることが本改修のopenrouter/gpt-oss-120b
+  // 撤去で実証済みのため、カタログ照合で十分）。
+  { label: 'openrouter/nemotron-3-ultra-550b', provider: 'openrouter', rawId: 'nvidia/nemotron-3-ultra-550b-a55b:free', apiModel: 'nvidia/nemotron-3-ultra-550b-a55b:free', opts: {}, timeoutMs: 90000, requires: ['O'] },
+
+  // 2026-07-31 追加: SambaNova Cloud（新規プロバイダ）。Free Tierは支払い方法未登録時に
+  // 自動適用されカード登録不要（docs.sambanova.ai/docs/en/models/rate-limitsで確認済み）。
+  // 会議ハーネス自身への諮問で「同一無料プロバイダへの二重依存」を懸念されたが、両エントリ
+  // とも予備(weight3)のみで採用し、主力は一切置き換えない。SambaNovaが死んだ日に失うのは
+  // 予備2枠だけで、会議は今日(2026-07-31)と同じ構成で成立する。
+  //  - deepseek-v3.1: criticの予備。nvidia/deepseek-v4-proより後ろに置くこと必須
+  //    （weight3同士のタイブレークはJSの安定ソート＝配列順で決まる。v4-proは稼働実績が
+  //    あるため先、V3.1は実績ゼロのため後、という優先順位をこの並び順で表現している。
+  //    並べ替え禁止）。実機2並列200 OK・600-900ms(2026-07-31)。
+  //  - llama-3.3-70b: fastの予備。groq/llama-3.3-70bと完全同一モデルの別経路。
+  //    2026-07-23にqwen3-32b/llama-4-scoutが撤去されて以来fastはgroq単騎（このファイル
+  //    上部のコメント参照）で単一プロバイダ依存が明記されていた穴を塞ぐのが本採用の主目的。
+  //    実機2並列200 OK・600ms(2026-07-31)。
+  //  - gpt-oss-120b(SambaNova版)は見送り: 応答7〜14秒でgroq版に速度で明確に劣後し、
+  //    criticの冗長化はdeepseek-v3.1で確保済みのため採用価値が薄い。
+  //  - MiniMax-M2.7は無料枠対象外（402 "A payment method is required"）のため採用不可。
+  //  両エントリとも liveProbe:true 必須: SambaNovaの規約は「カタログに残ったまま402で
+  //  無料枠対象外になる」型（MiniMax-M2.7で実証済み）であり、これはcloudflare/glm-5.2の
+  //  有料化と同一の、カタログ照合では原理的に検知不可能なパターンのため。
+  { label: 'sambanova/deepseek-v3.1', provider: 'sambanova', rawId: 'DeepSeek-V3.1', apiModel: 'DeepSeek-V3.1', opts: {}, requires: ['SN'], liveProbe: true },
+  { label: 'sambanova/llama-3.3-70b', provider: 'sambanova', rawId: 'Meta-Llama-3.3-70B-Instruct', apiModel: 'Meta-Llama-3.3-70B-Instruct', opts: {}, requires: ['SN'], liveProbe: true },
 
   { label: 'gemini-2.5-flash', provider: 'gemini', rawId: 'gemini-2.5-flash', apiModel: 'gemini-2.5-flash', opts: {}, requires: ['E'] },
 

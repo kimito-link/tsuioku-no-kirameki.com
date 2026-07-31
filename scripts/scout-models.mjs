@@ -44,6 +44,7 @@ const N = process.env.NVIDIA_API_KEY;
 const O = process.env.OPENROUTER_API_KEY;
 const CF = process.env.CLOUDFLARE_API_TOKEN;
 const CF_ACC = process.env.CLOUDFLARE_ACCOUNT_ID;
+const SN = process.env.SAMBANOVA_API_KEY;
 
 function todayJst() {
   const parts = new Intl.DateTimeFormat('en-CA', {
@@ -161,6 +162,18 @@ async function listCloudflare() {
     return { ok: true, models };
   } catch (e) { return { ok: models.length > 0, models, error: String(e.message || e) }; }
 }
+// 2026-07-31 追加: SambaNova Cloud。/v1/models はOpenAI互換形式で返る。
+async function listSambanova() {
+  if (!SN) return { ok: false, models: [], error: '未設定' };
+  try {
+    const r = await fetch('https://api.sambanova.ai/v1/models', {
+      headers: { Authorization: 'Bearer ' + SN }, signal: AbortSignal.timeout(15000),
+    });
+    if (!r.ok) return { ok: false, models: [], error: `HTTP ${r.status}` };
+    const j = await r.json();
+    return { ok: true, models: (j.data || []).map((m) => m.id) };
+  } catch (e) { return { ok: false, models: [], error: String(e.message || e) }; }
+}
 
 const PROVIDERS = {
   groq: listGroq,
@@ -168,6 +181,7 @@ const PROVIDERS = {
   nvidia: listNvidia,
   openrouter: listOpenRouter,
   cloudflare: listCloudflare,
+  sambanova: listSambanova,
 };
 
 // ── 軽量プローブ（§2-2・実際に呼べるかの検証）────────────────────────────────
@@ -176,8 +190,9 @@ const PROBE_URL = {
   nvidia: 'https://integrate.api.nvidia.com/v1/chat/completions',
   openrouter: 'https://openrouter.ai/api/v1/chat/completions',
   cloudflare: CF_ACC ? `https://api.cloudflare.com/client/v4/accounts/${CF_ACC}/ai/v1/chat/completions` : '',
+  sambanova: 'https://api.sambanova.ai/v1/chat/completions',
 };
-const PROBE_KEY = { groq: G, nvidia: N, openrouter: O, cloudflare: CF };
+const PROBE_KEY = { groq: G, nvidia: N, openrouter: O, cloudflare: CF, sambanova: SN };
 
 /** 1モデルに軽量プロンプトを1発投げ、呼べるかだけ検証する。@returns {{status:number|string, ms:number, snippet:string}} */
 async function probeModel(provider, modelId) {
