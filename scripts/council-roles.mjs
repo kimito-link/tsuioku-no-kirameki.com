@@ -25,6 +25,10 @@ export function roleOf(name) {
   // 2026-07-14 追加: NVIDIA NIM無料枠の超大型3体。実機2並列200 OK裏取り済み(会議諮問→Fable設計)。
   //  - deepseek-v4-pro: DeepSeek系。criticは既に層が厚いため予備(weight3)として批判枠の保険に。
   if (n.includes("deepseek-v4")) return "critic";
+  // 2026-07-31 追加: SambaNova Cloud経由のDeepSeek系。deepseek-v4より前に判定しないと
+  // "deepseek-v4"に一致しないため独立の分岐が必要（v3とv4は文字列として非一致）。
+  // criticの予備(weight3・council-lineup.mjsでnvidia/deepseek-v4-proより後ろに配置)。
+  if (n.includes("deepseek-v3")) return "critic";
   // qwen3-32b は thinking 付き推論モデル → 批判(critic)。汎用 qwen3(発散)より先に判定する。
   if (n.includes("qwen3-32b") || n.includes("qwq")) return "critic";
   // GLM(5.2 等)は reasoning_content を別フィールドで返す強い推論モデル → 批判(critic)。
@@ -234,6 +238,11 @@ export function weightOf(label) {
     if (n.includes("gpt-oss-20b") || n.includes("gemini-3")) return 3;
     // openrouter は無料枠で429が出やすい実績→予備(weight3)。
     if (n.includes("openrouter")) return 3;
+    // 2026-07-31 追加: SambaNova(新規プロバイダ)は並列実負荷実績が無く、無料枠が規約上
+    // 「カタログに残ったまま402で対象外になる」型で死に得るため予備(weight3)から入れる。
+    // 昇格・降格基準はgemini-3系と同一（7日以上空けた実会議2回でFAILEDゼロなら正規化・
+    // liveProbeで1回でも失敗確認なら即撤去）。
+    if (n.includes("sambanova")) return 3;
     // cloudflare 勢は会議の並列実負荷で FAILED しやすい実績(2026-06-27)→ reserve層(weight4)。
     // 同役割に安定勢(weight1〜3)がいる限り選ばれず、いなければ最後の砦として浮上する。
     if (n.includes("cloudflare")) return 4;
