@@ -2639,7 +2639,7 @@ export function mountVenueBarButton(options = {}) {
   // 2026-07-30(wayfinder→to-spec方式・venue-avatar-hover-preview-SPEC.md §4.3): ホバープレビュー
   //   カード用のデータ。paint時(席装飾ループ/renderTopBar)にWeakMapへ相乗り登録するだけで、
   //   DOM書き込み・新規タイマー・新規計算は無い(RANKバッジちらつき教訓=diff-skip不要な設計)。
-  /** @type {WeakMap<HTMLElement, { uid: string, displayName: string, count: number, hasGift: boolean, giftCount: number, venueRank: number, lastAt: number }>} */
+  /** @type {WeakMap<HTMLElement, { uid: string, displayName: string, count: number, hasGift: boolean, giftCount: number, venueRank: number, lastAt: number, tier?: string }>} */
   const _hoverCardDataByEl = new WeakMap();
   /** @type {WeakMap<HTMLElement, { seatTitle: string, cellTitle: string, imgTitle: string, cellEl: HTMLElement|null }>} */
   const _hoverCardTitleBackupByEl = new WeakMap();
@@ -4561,6 +4561,22 @@ export function mountVenueBarButton(options = {}) {
       : null;
     const laneBuckets = laneComposed ? laneComposed.buckets : fallbackLaneBuckets;
     const visibleLaneItems = flattenVenueLaneBuckets(laneBuckets);
+    // 2026-07-31(ユーザー指摘): ホバーカードのラベルを段に合わせて出し分けるための uid→段 索引。
+    //   広告段/ギフト段に載る条件は「投げたこと」であって発言ではないため、「発言N」は嘘になる。
+    //   flattenVenueLaneBuckets は段を捨てて平坦化するので、平坦化する前のここで拾っておく。
+    //   ★描画ループ(visibleLaneItems)には一切触らない=既存の diff-skip/churn 対策に無干渉。
+    /** @type {Map<string, string>} */
+    const laneTierByUid = new Map();
+    for (const tierName of ['link', 'gift', 'ad', 'konta', 'tanu']) {
+      const arr = Array.isArray(/** @type {any} */ (laneBuckets)?.[tierName])
+        ? /** @type {any} */ (laneBuckets)[tierName]
+        : [];
+      for (const it of arr) {
+        const u = String(it?.entry?.userId || '').trim();
+        // 同一 uid が複数段に居る場合は先勝ち(link→gift→ad の順=発言段を優先)。
+        if (u && !laneTierByUid.has(u)) laneTierByUid.set(u, tierName);
+      }
+    }
     const isLaneMirrorPaintMode = Boolean(lanePaintSnap);
     emptyMessage.hidden = visibleLaneItems.length > 0;
     if (visibleLaneItems.length === 0) {
@@ -4670,7 +4686,9 @@ export function mountVenueBarButton(options = {}) {
         venueRank,
         // 2026-07-30(MVP-2・venue-hover-card-content-DESIGN.md): 最終発言時刻(既存データ・
         //   新規取得ゼロ)。ホバーカードで相対時刻(「3分前」等)に変換して表示する。
-        lastAt: Number(participant.lastAt) || 0
+        lastAt: Number(participant.lastAt) || 0,
+        // 2026-07-31: 段。広告/ギフト段では「発言N」でなく「広告(◯分前)」等に出し分ける。
+        tier: uid ? laneTierByUid.get(uid) || '' : ''
       });
       const speakerKey = uid ? `u:${uid}` : rawName ? `n:${rawName}` : '';
       const streakEntry = speakerKey ? speechStreaks.get(speakerKey) : null;

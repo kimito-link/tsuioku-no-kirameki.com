@@ -111,7 +111,7 @@ function resolveThumbStatusLabel(kind, load) {
  * @param {{
  *   uid?: unknown, displayName?: unknown, count?: unknown, hasGift?: unknown,
  *   giftCount?: unknown, venueRank?: unknown, thumb?: Partial<VenueTileThumbState>,
- *   lastAt?: unknown, nowMs?: unknown, diagMode?: unknown
+ *   lastAt?: unknown, nowMs?: unknown, diagMode?: unknown, tier?: unknown
  * }} input
  * @returns {VenueHoverCardModel}
  */
@@ -155,7 +155,21 @@ export function buildVenueHoverCardModel(input) {
   // 専用行・専用DOM・タイマー更新は追加しない(カード寿命は数秒なのでtick更新は不要)。
   const relTime = formatVenueHoverRelativeTime(i.lastAt, i.nowMs);
   const statParts = [];
-  statParts.push(relTime ? `発言 ${count}(${relTime})` : `発言 ${count}`);
+  // 2026-07-31(ユーザー指摘): 広告段・ギフト段の人は「発言」していない。その段に載る条件は
+  //   投擲(広告/ギフト)であって発言ではないため、「発言N」と出すのは意味が合わない。
+  //   lastAt の実体は capturedAt(その行を記録した時刻・venueSeats.js:138)なので、
+  //   投擲で載った人にとっては実質「最後に投げたタイミング」を指す。ラベルだけを段に
+  //   合わせて出し分ける(データも集計も変えない)。
+  //   ★count は preCount の最低1仕様(venueLaneMirrorSupply.js:100)で、発言0でも1になる。
+  //     投擲段では件数を出すとその1が「発言1」の嘘になるので、件数ごと出さず時刻だけ出す。
+  const tier = String(i.tier || '').trim();
+  if (tier === 'ad') {
+    statParts.push(relTime ? `広告(${relTime})` : '広告');
+  } else if (tier === 'gift') {
+    statParts.push(relTime ? `ギフト(${relTime})` : 'ギフト');
+  } else {
+    statParts.push(relTime ? `発言 ${count}(${relTime})` : `発言 ${count}`);
+  }
   if (hasGift) statParts.push(`🎁${giftCount}`);
   if (venueRank === 1) statParts.push('🥇1位');
   else if (venueRank === 2) statParts.push('🥈2位');

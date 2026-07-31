@@ -108,9 +108,10 @@
   - `src/lib/monotonicCommentCount.js`
 - **storage キー定義** — chrome.storage のキー名の正本(nls_comments_<lv> 等)
   - `src/lib/storageKeys.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 42</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 43</summary>
 
 - `src/lib/autoBackupState.js` — v0.1.808(星野ロミ式コンポーネント化・第1弾): content-entry.js の巨大化を抑えるため、
+- `src/lib/avCue.js` — 「AVCue = 音の再生結果を真実とする単一発火点」の純関数群(V1・DOM/storage/音に触れない)。
 - `src/lib/blobDownload.js` — Blob を指定ファイル名で保存する。
 - `src/lib/broadcastSessionSummaryDb.js` — 配信セッション単位の軽量サマリ（ポップアップの IndexedDB）
 - `src/lib/broadcastSessionSummaryFlush.js` — サマリ IndexedDB への間欠フラッシュ（ポップアップから呼ぶ）
@@ -587,7 +588,7 @@
 - **影響範囲ゲート(規律を自動化)** — 星野ロミ式「規律を自動ゲートに」。diff から影響大(複数機能波及)の変更ファイルを検出し波及先機能を列挙。警告のみ(摩擦ゼロ)・--strict で exit1。AGENTS.md §10 のルールを diff 発火に
   - `scripts/impact-check.mjs`
   - `docs/feature-map/impact-map.json`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 62</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 63</summary>
 
 - `api/status.js` — status 受け口 Vercel Serverless Function。
 - `extension/status-guard.js` — 状態速報ページ(status.html)の「何があっても開く」保険。
@@ -598,6 +599,7 @@
 - `src/lib/aiShareDiagSchema.js` — AI 共有診断バンドル（popup が組み立てる JSON / storage の nls_ai_share_fast_diag_v1）の
 - `src/lib/aiShareFastDiagKey.js` — v0.1.629: AI 共有 fastDiag キャッシュの storage key を popup と status ページで共有。
 - `src/lib/aiShareFullText.js` — 状態速報(AI共有)本文ビルダー。②応援ライブビュー/③WEB が同一の status-report builder を
+- `src/lib/avCueDiagKey.js` — AVCue(音+視覚の単一発火点・council/pachinko-av-max-SYNTHESIS.md V1)の観測値を
 - `src/lib/bgmPhaseDiag.js` — BGMディレクター(bgmDirector.js)+フェーズディレクター(phaseDirector.js)の観測値を組み立てる
 - `src/lib/bgmPhaseDiagKey.js` — BGMディレクター(bgmDirector.js)+フェーズディレクター(phaseDirector.js・Phase C)の
 - `src/lib/captureAuditionRichviewEventScoreDiagProbe.js` — audition.nicovideo.jp `/embedded/richview/live` 向けの診断ペイロード（PR1）。
@@ -852,7 +854,7 @@
 
 ## 🧬 修正系譜マップ(この系統のバグを過去にどう直したか)
 
-> changelog 全 529 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
+> changelog 全 530 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
 
 ### 💾 記録件数 (79版)
 - `v0.1.1199` 2026-07-31 — 記録件数が実際より多くなる不具合を修正/会場の説明文をすっきり
@@ -1151,7 +1153,8 @@
 - `v0.1.668` 2026-06-10 — パネルに「💬コメビュ」ボタンを追加
 - `v0.1.667` 2026-06-10 — コメビュに匿名OKのニックネーム・ラベル・メモ
 
-### 🏟 会場・席 (179版)
+### 🏟 会場・席 (180版)
+- `v0.1.1200` 2026-07-31 — 広告・ギフトの方のホバー表示を「投げたタイミング」に
 - `v0.1.1199` 2026-07-31 — 記録件数が実際より多くなる不具合を修正/会場の説明文をすっきり
 - `v0.1.1198` 2026-07-31 — 会場を開いたときの誤った「白化」警告を解消
 - `v0.1.1195` 2026-07-31 — 長時間ポップアップを開いていないときも会場に新しい人が出るように
@@ -1360,7 +1363,8 @@
 - `v0.1.713` 2026-06-13 — 会場モードを明るくして発言を吹き出し表示
 - `v0.1.711` 2026-06-13 — 会場モードで発言を吹き出し表示
 
-### 🎁 ギフト (102版)
+### 🎁 ギフト (103版)
+- `v0.1.1200` 2026-07-31 — 広告・ギフトの方のホバー表示を「投げたタイミング」に
 - `v0.1.1194` 2026-07-31 — ギフト演出の診断精度を改善
 - `v0.1.1162` 2026-07-16 — 状態速報の異常な数値表示・誤った警告表示を修正
 - `v0.1.1161` 2026-07-16 — ギフトの効果音をより自然な音に更新

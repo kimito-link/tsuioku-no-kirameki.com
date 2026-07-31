@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1200',
+    date: '2026-07-31',
+    summary: '広告・ギフトの方のホバー表示を「投げたタイミング」に',
+    items: Object.freeze([
+      '会場モードで広告主・ギフトを贈った方のアイコンにマウスを乗せたとき、コメントしていなくても「発言 1(たった今)」と表示されていた問題を修正しました。広告の段なら「広告(◯分前)」、ギフトの段なら「ギフト(◯分前)」と、投げたタイミングを表示します。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1199',
     date: '2026-07-31',
     summary: '記録件数が実際より多くなる不具合を修正/会場の説明文をすっきり',
