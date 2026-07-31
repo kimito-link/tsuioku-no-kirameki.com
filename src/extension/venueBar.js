@@ -4614,6 +4614,57 @@ export function mountVenueBarButton(options = {}) {
       );
     }
 
+    // 2026-07-31(ユーザー指摘): 広告段の #1/#5 等にホバーしても何も出ない件の解消。
+    //   ホバーカードのデータ登録は「席装飾ループ」(下)に相乗りしていたが、そのループは
+    //   v0.1.1111 の契約で席なしアイテム(_venueSeatIndex:-1)を continue で飛ばす。
+    //   広告ランキング由来のセルは uid を持たない=席が割り当たらないため、カードのデータが
+    //   一度も登録されず「ホバーしても無反応」になっていた(リンクが無いのも同じ理由)。
+    //   → 席装飾ループには手を入れず(v0.1.1111の契約を壊さない)、paint 済みの段DOMを
+    //     段ごとに走査して席なしぶんだけ登録する。タイルは描画順に並ぶので item と索引で対応する。
+    //   ★DOM書き込みゼロ・新規read/タイマーゼロ(WeakMapへ入れるだけ)=hot path 非汚染。
+    try {
+      /** @type {Array<[string, HTMLElement|null|undefined]>} */
+      const laneDomPairs = [
+        ['link', venueLaneEls.laneLink],
+        ['gift', venueLaneEls.laneGift],
+        ['ad', venueLaneEls.laneAd],
+        ['konta', venueLaneEls.laneKonta],
+        ['tanu', venueLaneEls.laneTanu]
+      ];
+      for (const [tierName, laneEl] of laneDomPairs) {
+        if (!(laneEl instanceof HTMLElement)) continue;
+        const items = Array.isArray(/** @type {any} */ (laneBuckets)?.[tierName])
+          ? /** @type {any} */ (laneBuckets)[tierName]
+          : [];
+        if (!items.length) continue;
+        const tiles = laneEl.querySelectorAll('.nl-story-userlane-cell');
+        for (let i = 0; i < tiles.length && i < items.length; i += 1) {
+          const tileEl = tiles[i];
+          if (!(tileEl instanceof HTMLElement)) continue;
+          // 席ありは席装飾ループが seat 要素に登録済み(そちらが participant 由来の実数を持つ)。
+          //   ここでは席なしぶんだけを補う=二重登録も上書きもしない。
+          const it = items[i];
+          const seatIdx = Number(it?._venueSeatIndex);
+          if (Number.isInteger(seatIdx) && seatIdx >= 0) continue;
+          if (_hoverCardDataByEl.has(tileEl)) continue;
+          const u = String(it?.entry?.userId || '').trim();
+          _hoverCardDataByEl.set(tileEl, {
+            uid: u,
+            displayName: String(it?.title || '').trim(),
+            // 席が無い=participant(コメント集計)に紐づかない。発言数は持たないので0。
+            //   投擲段では statLine が件数を出さない設計なので、0が表に出ることはない。
+            count: 0,
+            hasGift: tierName === 'gift',
+            giftCount: 0,
+            venueRank: 0,
+            // 席なしは lastAt を持たない。相対時刻は出さず、ラベルだけになる。
+            lastAt: 0,
+            tier: tierName
+          });
+        }
+      }
+    } catch { /* ホバー登録の失敗は描画を止めない */ }
+
     // L17: 席装飾(リンク化・VIP・順位バッジ・ストリーク)は段の描画列に適用する。
     // 席リンク一致計器: 毎paint観測(diagDueの3秒期日に入れない=過渡的不一致も累積に残す)。
     //   publishは既存publishVenueSeatsDiagの3秒min-gapサイクルに相乗り(新規タイマー/read/writeなし)。

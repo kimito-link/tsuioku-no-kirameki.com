@@ -104,6 +104,42 @@ describe('会場ホバープレビューカードの配線(配線忘れ=CI赤)',
     expect(topbarBlock).toMatch(/lastAt:/);
   });
 
+  // 2026-07-31(ユーザー指摘): 広告段の #1/#5 等にホバーしても無反応だった件の退化ガード。
+  //   原因はホバー登録が席装飾ループに相乗りしており、そのループが v0.1.1111 の契約で
+  //   席なしアイテム(_venueSeatIndex:-1)を continue で飛ばすこと。席なし補完を別途持たないと
+  //   「uid を持たない広告主は永久にカードが出ない」に戻る。
+  it('席なしアイテム(広告主等)にもホバーデータを登録している(席装飾ループの外)', () => {
+    // 段DOMを走査して席なしぶんを補う処理が存在すること。
+    expect(venueBarSrc).toMatch(/_hoverCardDataByEl\.set\(tileEl,/);
+    const setAt = venueBarSrc.indexOf('_hoverCardDataByEl.set(tileEl,');
+    const block = venueBarSrc.slice(setAt, venueBarSrc.indexOf('});', setAt));
+    // 段が乗っていること(広告/ギフト段のラベル出し分けに必要)。
+    expect(block).toMatch(/tier:/);
+    // ★文字列の存在だけを見ると `if (false)` を前置する無効化を検知できない(文字列スキャン方式の
+    //   構造的な穴・2026-07-31 に自分で踏んだ)。呼び出しが「無条件に実行される文」であることまで
+    //   断言する: 直前の行が制御構文で潰されていないこと。
+    const lineStart = venueBarSrc.lastIndexOf('\n', setAt) + 1;
+    const callLine = venueBarSrc.slice(lineStart, setAt);
+    expect(callLine.trim()).toBe('');
+  });
+
+  it('席なし補完は席あり(seat側)を上書きしない(二重登録の防止)', () => {
+    const setAt = venueBarSrc.indexOf('_hoverCardDataByEl.set(tileEl,');
+    expect(setAt).toBeGreaterThanOrEqual(0);
+    const before = venueBarSrc.slice(Math.max(0, setAt - 900), setAt);
+    // 席あり(seatIdx>=0)は skip し、既に登録済みの要素も skip していること。
+    expect(before).toMatch(/_venueSeatIndex/);
+    expect(before).toMatch(/_hoverCardDataByEl\.has\(tileEl\)/);
+  });
+
+  it('席装飾ループの v0.1.1111 契約(席なしを飛ばす)は維持されている', () => {
+    // 席なし補完を足したからといって、席装飾側で席なしを装飾してはいけない。
+    const loopAt = venueBarSrc.indexOf('for (const item of visibleLaneItems)');
+    expect(loopAt).toBeGreaterThanOrEqual(0);
+    const loopHead = venueBarSrc.slice(loopAt, loopAt + 400);
+    expect(loopHead).toMatch(/seatIndexRaw\s*<\s*0\)\s*continue/);
+  });
+
   it('.nlsb-hover-card__id に格下げのfont-sizeが設定されている', () => {
     const begin = venueBarSrc.indexOf('.nlsb-hover-card__id {');
     const end = venueBarSrc.indexOf('}', begin);
