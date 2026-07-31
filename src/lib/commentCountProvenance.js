@@ -207,7 +207,8 @@ function dedupeSeedDiagFromFastDiag(fastDiag) {
       maxIncrementalAddedCount: Number(s.maxIncrementalAddedCount) || 0,
       suspiciousAddedCount: Number(s.suspiciousAddedCount) || 0,
       addedNoLessCount: Number(s.addedNoLessCount) || 0,
-      addedTotalCount: Number(s.addedTotalCount) || 0
+      addedTotalCount: Number(s.addedTotalCount) || 0,
+      seedUnseededRejectCount: Number(s.seedUnseededRejectCount) || 0
     };
   } catch {
     return null;
@@ -300,6 +301,13 @@ export function formatCommentCountProvenanceLines(livesData, fastDiag = null) {
                 : '';
           lines.push(
             `- added内訳(計器): 番号欠落${ja(dsd.addedNoLessCount)}件 / 全${ja(dsd.addedTotalCount)}件(${pct}%)${verdict}`
+          );
+        }
+        // v0.1.1199: 空keySetのstate再利用を弾いた回数。>0 なら「本来二重計上していた場面を
+        //   防いだ」証拠(根治が効いている)。0のまま推移し逆転も起きないなら再発なし。
+        if (dsd.seedUnseededRejectCount > 0) {
+          lines.push(
+            `- dedup再seed(計器): 空keySetの再利用を${ja(dsd.seedUnseededRejectCount)}回ブロック — 二重計上を未然に防ぎました(v0.1.1199の根治が作動)`
           );
         }
       }

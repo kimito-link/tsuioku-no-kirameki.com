@@ -267,6 +267,7 @@ import {
   snapshotCommentIngestCounters,
   createDedupeSeedDiagState,
   noteDedupeSeedOutcome,
+  noteDedupeSeedUnseededReject,
   noteAddedCommentNoLess,
   noteIncrementalAddedCount,
   snapshotDedupeSeedDiag
@@ -10539,8 +10540,27 @@ async function ensureLiveDedupeStateSeeded(lid, mainKey) {
   const storedTotal = isChunkIndex(storedIndex, lid)
     ? Math.max(0, Number(/** @type {any} */ (storedIndex).total) || 0)
     : null;
-  const haveState = liveDedupeState && liveDedupeStateLiveId === lid;
   const myTotal = liveChunkIndex ? Math.max(0, Number(liveChunkIndex.total) || 0) : null;
+  // ★v0.1.1199 二重計上の根治(実測 2026-07-31 lv351071157 で確定):
+  //   従来の haveState は「state が在る ∧ 配信IDが一致」しか見ておらず、その state が
+  //   【中身を持っているか】を検査していなかった。keySet が空/不足のまま skip されると、
+  //   照合相手が無いので既存コメントが丸ごと「新規」と誤判定され再挿入される。
+  //   実測: 直近31秒で 本家+0 / 記録+1,069、1回のマージで added 1,063件、
+  //         skip3回、番号欠落0件(=キー構造は健全)、withUid 99% → 記録1,190/公式1,062=112%。
+  //   キーの構造ではなく「キー集合そのものが空だった」ことを示す署名。
+  //   よって skip の条件に「keySet が保存済み件数に見合う」を足す。見合わなければ
+  //   rebuild へ落とす(O(N) 一回のコストより二重計上のほうが遥かに高くつく)。
+  const keySetSize =
+    liveDedupeState && liveDedupeState.keySet instanceof Set ? liveDedupeState.keySet.size : 0;
+  // 完全一致は要求しない(同一テキスト同秒の畳み込みで keySet は total より小さくなり得る)。
+  // 「明らかに足りない」ときだけ弾く=定常状態の skip は従来どおり効かせる。
+  const keySetLooksSeeded = myTotal == null || myTotal === 0 || keySetSize >= Math.floor(myTotal / 2);
+  const stateMatchesLive = !!liveDedupeState && liveDedupeStateLiveId === lid;
+  if (stateMatchesLive && !keySetLooksSeeded) {
+    // 本来なら skip して二重計上していた場面。rebuild へ落としたことを計器に残す。
+    try { noteDedupeSeedUnseededReject(_dedupeSeedDiag); } catch { /* 計器失敗は本処理を止めない */ }
+  }
+  const haveState = stateMatchesLive && keySetLooksSeeded;
   // 自タブの保持インデックスと storage の total が一致＝外部追記なし。state を再利用。
   if (haveState && storedTotal != null && myTotal != null && storedTotal === myTotal) {
     if (isChunkIndex(storedIndex, lid)) {

@@ -249,7 +249,8 @@ export function parseInterceptFetchLog(attrValue) {
  *   maxIncrementalAddedCount: number,
  *   suspiciousAddedCount: number,
  *   addedNoLessCount: number,
- *   addedTotalCount: number
+ *   addedTotalCount: number,
+ *   seedUnseededRejectCount: number
  * }} DedupeSeedDiag
  */
 
@@ -276,7 +277,8 @@ export function createDedupeSeedDiagState() {
     maxIncrementalAddedCount: 0,
     suspiciousAddedCount: 0,
     addedNoLessCount: 0,
-    addedTotalCount: 0
+    addedTotalCount: 0,
+    seedUnseededRejectCount: 0
   };
 }
 
@@ -353,6 +355,24 @@ export function noteAddedCommentNoLess(state, addedRows) {
 }
 
 /**
+ * 「keySet が中身を持たない state の再利用」を弾いた回数を積む(v0.1.1199)。
+ *
+ * 二重計上の真因は、ensureLiveDedupeStateSeeded の skip 判定が
+ * 「state が在る ∧ 配信IDが一致」しか見ておらず、その state が実際に seed 済みか
+ * (keySet が保存済み件数に見合うか)を検査していなかったこと。空の keySet で dedup すると
+ * 照合相手が無いので既存コメントが丸ごと新規と誤判定され再挿入される。
+ *
+ * この値が increment されていれば「本来なら二重計上していた場面を1回防いだ」ことを意味する。
+ * 実配信で 0 のまま推移し、かつ記録↔公式の逆転も起きないなら根治が効いている証拠になる。
+ *
+ * @param {DedupeSeedDiag|null|undefined} state
+ */
+export function noteDedupeSeedUnseededReject(state) {
+  if (!state || typeof state !== 'object') return;
+  state.seedUnseededRejectCount = (Number(state.seedUnseededRejectCount) || 0) + 1;
+}
+
+/**
  * 状態速報向けの snapshot(コピー・副作用なし)。
  * @param {DedupeSeedDiag|null|undefined} state
  * @returns {DedupeSeedDiag}
@@ -367,7 +387,8 @@ export function snapshotDedupeSeedDiag(state) {
     maxIncrementalAddedCount: Number(state.maxIncrementalAddedCount) || 0,
     suspiciousAddedCount: Number(state.suspiciousAddedCount) || 0,
     addedNoLessCount: Number(state.addedNoLessCount) || 0,
-    addedTotalCount: Number(state.addedTotalCount) || 0
+    addedTotalCount: Number(state.addedTotalCount) || 0,
+    seedUnseededRejectCount: Number(state.seedUnseededRejectCount) || 0
   };
 }
 

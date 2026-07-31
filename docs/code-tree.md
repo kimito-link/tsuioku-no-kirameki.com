@@ -600,7 +600,7 @@
     - `trumpet1.mp3`
     - `wallet1.mp3`
   - `SOURCES.md`
-- 📁 **src/** (1435)
+- 📁 **src/** (1436)
   - 📁 **data/** (6)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -873,7 +873,7 @@
         - `logo_funlink_white_RGB_maru_black.png`
       - `logo_guide_funlink_ol.pdf`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1212)
+  - 📁 **lib/** (1213)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -1778,6 +1778,7 @@
     - `scrollWhiteoutProbe.test.js`
     - `scrollWhiteoutReport.js` — スクロール白化(下にスクロールすると重く・一瞬白くなって・遅れて描画される)を状態速報の
     - `scrollWhiteoutReport.test.js`
+    - `scrollWhiteoutVenueGuard.wiring.test.js`
     - `selfActionCelebration.js` — アプリから自分が操作した直後に返す軽量演出の spec。
     - `selfActionCelebration.test.js`
     - `selfPostedMatcher.js` — 自己投稿コメント（self-posted recents）と、保存済みコメント一覧の

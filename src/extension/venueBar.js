@@ -1207,7 +1207,8 @@ const VENUE_CSS = `
   .nlsb-venue-lane-stack .nl-story-userlane-guide__line {
     display: flex;
     align-items: flex-start;
-    gap: 7px;
+    /* 顔アイコンを display:none にしたぶん、左の余白は不要(v0.1.1199)。 */
+    gap: 0;
     padding: 5px 8px;
     border-radius: 10px;
     background: linear-gradient(180deg, #fffaf0, #fff4db);
@@ -1219,15 +1220,15 @@ const VENUE_CSS = `
     box-shadow: 0 1px 5px rgb(148 101 14 / 9%);
     min-width: 0;
   }
+  /*
+   * v0.1.1199(ユーザー要望 2026-07-31): 会場では段の説明文からキャラ顔アイコンを外す。
+   *   説明文は5段ぶん繰り返されるため、24pxの丸顔+枠が5回並んで場所を取り、
+   *   会場が賑わっている(191人)ときほど参加者の邪魔になっていた。文言自体は
+   *   「どの段か」を伝える役目があるので残し、装飾だけ落とす。
+   *   ①POP側は storyUserLaneGuideHtml.js が正本で従来どおり顔つき(このCSSは会場限定)。
+   */
   .nlsb-venue-lane-stack .nl-story-userlane-guide__face {
-    width: 24px;
-    height: 24px;
-    border-radius: 999px;
-    object-fit: cover;
-    object-position: center;
-    border: 1px solid color-mix(in srgb, var(--nl-border) 82%, #fff 18%);
-    background: var(--nl-surface);
-    flex: 0 0 auto;
+    display: none;
   }
   .nlsb-venue-lane-stack .nl-story-userlane-guide__text {
     flex: 1 1 auto;
