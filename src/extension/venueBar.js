@@ -2374,9 +2374,60 @@ export function mountVenueBarButton(options = {}) {
     }
   };
 
+  /**
+   * 席なしタイル(広告主等)のホバーデータを、その瞬間だけ解決する(v0.1.1204)。
+   * 席あり(seat)は paint 時に登録済みなので、ここへは来ない。
+   * ★paint 時に全タイルを走査する実装は hot path 汚染で実機が重くなったため、
+   *   「ホバーされた1枚だけ・その場で」に変更した。走査対象は同じ段の中だけ。
+   * @param {HTMLElement} el
+   * @returns {{ uid: string, displayName: string, count: number, hasGift: boolean, giftCount: number, venueRank: number, lastAt: number, tier?: string, lastText?: string }|null}
+   */
+  const resolveSeatlessHoverData = (el) => {
+    try {
+      const laneEl = el.closest?.('.nl-story-userlane');
+      if (!(laneEl instanceof HTMLElement)) return null;
+      // 段の識別子は makeLane が刻む dataset.laneName(venueBar.js:1936)。
+      const tier = String(laneEl.dataset?.laneName || '').trim();
+      const items = /** @type {any} */ (_laneItemsByTier)[tier];
+      if (!Array.isArray(items) || !items.length) return null;
+      // この1枚が段の何番目かを、同じ段の兄弟から求める(段内だけの走査)。
+      const siblings = laneEl.querySelectorAll('.nl-story-userlane-cell');
+      let idx = -1;
+      for (let i = 0; i < siblings.length; i += 1) {
+        if (siblings[i] === el) { idx = i; break; }
+      }
+      if (idx < 0 || idx >= items.length) return null;
+      const it = items[idx];
+      const seatIdx = Number(it?._venueSeatIndex);
+      if (Number.isInteger(seatIdx) && seatIdx >= 0) return null; // 席ありは対象外
+      const u = String(it?.entry?.userId || '').trim();
+      return {
+        uid: u,
+        displayName: String(it?.title || '').trim(),
+        count: 0,
+        hasGift: tier === 'gift',
+        giftCount: 0,
+        venueRank: 0,
+        lastAt: 0,
+        tier,
+        lastText: ''
+      };
+    } catch {
+      return null;
+    }
+  };
+
   /** アンカー要素にホバー中のカードを実際に開く。 @param {HTMLElement} anchorEl */
   const openHoverCardFor = (anchorEl) => {
-    const data = _hoverCardDataByEl.get(anchorEl);
+    let data = _hoverCardDataByEl.get(anchorEl);
+    if (!data) {
+      // 席なしタイル(広告主等)はここで初めて解決する(paint 時には触らない)。
+      const seatless = resolveSeatlessHoverData(anchorEl);
+      if (seatless) {
+        data = seatless;
+        _hoverCardDataByEl.set(anchorEl, seatless); // 同じ要素の2回目以降は走査しない
+      }
+    }
     if (!data) return; // データ無し=fail-closed(ネイティブtitleがそのまま生きる)。
     _hoverCardOpenFor = anchorEl;
 
@@ -2657,6 +2708,11 @@ export function mountVenueBarButton(options = {}) {
   //   DOM書き込み・新規タイマー・新規計算は無い(RANKバッジちらつき教訓=diff-skip不要な設計)。
   /** @type {WeakMap<HTMLElement, { uid: string, displayName: string, count: number, hasGift: boolean, giftCount: number, venueRank: number, lastAt: number, tier?: string, lastText?: string }>} */
   const _hoverCardDataByEl = new WeakMap();
+  // v0.1.1204: 段ごとの item 列(paint 時に参照を控えるだけ・DOM走査なし)。席なしタイル
+  //   (広告主等)にホバーされた瞬間だけ、この列から索引でデータを引いてカードを出す。
+  //   ★paint のたびに querySelectorAll する実装は hot path 汚染で実機が重くなったため撤去した。
+  /** @type {{ link: any[], gift: any[], ad: any[], konta: any[], tanu: any[] }} */
+  let _laneItemsByTier = { link: [], gift: [], ad: [], konta: [], tanu: [] };
   /** @type {WeakMap<HTMLElement, { seatTitle: string, cellTitle: string, imgTitle: string, cellEl: HTMLElement|null }>} */
   const _hoverCardTitleBackupByEl = new WeakMap();
   let _hoverCardTimer = 0;
@@ -4637,51 +4693,18 @@ export function mountVenueBarButton(options = {}) {
     //   v0.1.1111 の契約で席なしアイテム(_venueSeatIndex:-1)を continue で飛ばす。
     //   広告ランキング由来のセルは uid を持たない=席が割り当たらないため、カードのデータが
     //   一度も登録されず「ホバーしても無反応」になっていた(リンクが無いのも同じ理由)。
-    //   → 席装飾ループには手を入れず(v0.1.1111の契約を壊さない)、paint 済みの段DOMを
-    //     段ごとに走査して席なしぶんだけ登録する。タイルは描画順に並ぶので item と索引で対応する。
-    //   ★DOM書き込みゼロ・新規read/タイマーゼロ(WeakMapへ入れるだけ)=hot path 非汚染。
-    try {
-      /** @type {Array<[string, HTMLElement|null|undefined]>} */
-      const laneDomPairs = [
-        ['link', venueLaneEls.laneLink],
-        ['gift', venueLaneEls.laneGift],
-        ['ad', venueLaneEls.laneAd],
-        ['konta', venueLaneEls.laneKonta],
-        ['tanu', venueLaneEls.laneTanu]
-      ];
-      for (const [tierName, laneEl] of laneDomPairs) {
-        if (!(laneEl instanceof HTMLElement)) continue;
-        const items = Array.isArray(/** @type {any} */ (laneBuckets)?.[tierName])
-          ? /** @type {any} */ (laneBuckets)[tierName]
-          : [];
-        if (!items.length) continue;
-        const tiles = laneEl.querySelectorAll('.nl-story-userlane-cell');
-        for (let i = 0; i < tiles.length && i < items.length; i += 1) {
-          const tileEl = tiles[i];
-          if (!(tileEl instanceof HTMLElement)) continue;
-          // 席ありは席装飾ループが seat 要素に登録済み(そちらが participant 由来の実数を持つ)。
-          //   ここでは席なしぶんだけを補う=二重登録も上書きもしない。
-          const it = items[i];
-          const seatIdx = Number(it?._venueSeatIndex);
-          if (Number.isInteger(seatIdx) && seatIdx >= 0) continue;
-          if (_hoverCardDataByEl.has(tileEl)) continue;
-          const u = String(it?.entry?.userId || '').trim();
-          _hoverCardDataByEl.set(tileEl, {
-            uid: u,
-            displayName: String(it?.title || '').trim(),
-            // 席が無い=participant(コメント集計)に紐づかない。発言数は持たないので0。
-            //   投擲段では statLine が件数を出さない設計なので、0が表に出ることはない。
-            count: 0,
-            hasGift: tierName === 'gift',
-            giftCount: 0,
-            venueRank: 0,
-            // 席なしは lastAt を持たない。相対時刻は出さず、ラベルだけになる。
-            lastAt: 0,
-            tier: tierName
-          });
-        }
-      }
-    } catch { /* ホバー登録の失敗は描画を止めない */ }
+    //
+    // ★v0.1.1204 訂正: 当初は paint ごとに5段の全タイルを querySelectorAll で走査していたが、
+    //   これは「paint のたびの DOM 走査は hot path 汚染」という既存規律の違反で、実機で
+    //   拡張全体が重くなった(2026-07-31 ユーザー報告)。段の item 列だけを控えておき、
+    //   実際にホバーされた瞬間に索引で引く方式へ変更する=paint 時のDOM走査ゼロ。
+    _laneItemsByTier = {
+      link: Array.isArray(/** @type {any} */ (laneBuckets)?.link) ? /** @type {any} */ (laneBuckets).link : [],
+      gift: Array.isArray(/** @type {any} */ (laneBuckets)?.gift) ? /** @type {any} */ (laneBuckets).gift : [],
+      ad: Array.isArray(/** @type {any} */ (laneBuckets)?.ad) ? /** @type {any} */ (laneBuckets).ad : [],
+      konta: Array.isArray(/** @type {any} */ (laneBuckets)?.konta) ? /** @type {any} */ (laneBuckets).konta : [],
+      tanu: Array.isArray(/** @type {any} */ (laneBuckets)?.tanu) ? /** @type {any} */ (laneBuckets).tanu : []
+    };
 
     // L17: 席装飾(リンク化・VIP・順位バッジ・ストリーク)は段の描画列に適用する。
     // 席リンク一致計器: 毎paint観測(diagDueの3秒期日に入れない=過渡的不一致も累積に残す)。

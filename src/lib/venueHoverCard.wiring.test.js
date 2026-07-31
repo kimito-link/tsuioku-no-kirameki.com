@@ -108,28 +108,34 @@ describe('会場ホバープレビューカードの配線(配線忘れ=CI赤)',
   //   原因はホバー登録が席装飾ループに相乗りしており、そのループが v0.1.1111 の契約で
   //   席なしアイテム(_venueSeatIndex:-1)を continue で飛ばすこと。席なし補完を別途持たないと
   //   「uid を持たない広告主は永久にカードが出ない」に戻る。
-  it('席なしアイテム(広告主等)にもホバーデータを登録している(席装飾ループの外)', () => {
-    // 段DOMを走査して席なしぶんを補う処理が存在すること。
-    expect(venueBarSrc).toMatch(/_hoverCardDataByEl\.set\(tileEl,/);
-    const setAt = venueBarSrc.indexOf('_hoverCardDataByEl.set(tileEl,');
-    const block = venueBarSrc.slice(setAt, venueBarSrc.indexOf('});', setAt));
-    // 段が乗っていること(広告/ギフト段のラベル出し分けに必要)。
-    expect(block).toMatch(/tier:/);
-    // ★文字列の存在だけを見ると `if (false)` を前置する無効化を検知できない(文字列スキャン方式の
-    //   構造的な穴・2026-07-31 に自分で踏んだ)。呼び出しが「無条件に実行される文」であることまで
-    //   断言する: 直前の行が制御構文で潰されていないこと。
-    const lineStart = venueBarSrc.lastIndexOf('\n', setAt) + 1;
-    const callLine = venueBarSrc.slice(lineStart, setAt);
-    expect(callLine.trim()).toBe('');
+  it('席なしアイテム(広告主等)にもホバーデータを解決する経路がある', () => {
+    // v0.1.1204: paint 時の全タイル走査(hot path 汚染で実機が重くなった)を撤去し、
+    //   ホバーされた瞬間に段の item 列から索引で引く方式に変更した。
+    expect(venueBarSrc).toMatch(/const resolveSeatlessHoverData\s*=/);
+    expect(venueBarSrc).toMatch(/_laneItemsByTier/);
+    const fnAt = venueBarSrc.indexOf('const resolveSeatlessHoverData');
+    const fnBlock = venueBarSrc.slice(fnAt, fnAt + 1600);
+    // 段が乗ること(広告/ギフト段のラベル出し分けに必要)。
+    expect(fnBlock).toMatch(/tier,?\s*$|tier[,:]/m);
+    // 席あり(seatIdx>=0)は対象外にして seat 側の実数を上書きしないこと。
+    expect(fnBlock).toMatch(/_venueSeatIndex/);
   });
 
-  it('席なし補完は席あり(seat側)を上書きしない(二重登録の防止)', () => {
-    const setAt = venueBarSrc.indexOf('_hoverCardDataByEl.set(tileEl,');
-    expect(setAt).toBeGreaterThanOrEqual(0);
-    const before = venueBarSrc.slice(Math.max(0, setAt - 900), setAt);
-    // 席あり(seatIdx>=0)は skip し、既に登録済みの要素も skip していること。
-    expect(before).toMatch(/_venueSeatIndex/);
-    expect(before).toMatch(/_hoverCardDataByEl\.has\(tileEl\)/);
+  it('ホバー解決は paint 時ではなくホバー時に呼ばれる(hot path を汚さない)', () => {
+    // ★paint 経路(renderSeats)の中で全タイルを querySelectorAll してはいけない。
+    //   2026-07-31 にこれをやって拡張全体が重くなった(実機報告)ので退化ガードにする。
+    // renderSeats(paint本体)の中に全タイル走査が無いこと。
+    const renderAt = venueBarSrc.indexOf('const renderSeats = (rows) =>');
+    expect(renderAt).toBeGreaterThan(0);
+    const openAtForBound = venueBarSrc.indexOf('const openHoverCardFor');
+    const paintBlock = venueBarSrc.slice(renderAt, renderAt + 40000);
+    expect(paintBlock).not.toContain("querySelectorAll('.nl-story-userlane-cell')");
+    expect(openAtForBound).toBeGreaterThan(0);
+    // 解決関数は openHoverCardFor から呼ばれること(=ホバー時のみ)。
+    const openAt = venueBarSrc.indexOf('const openHoverCardFor');
+    expect(openAt).toBeGreaterThan(0);
+    const openBlock = venueBarSrc.slice(openAt, openAt + 900);
+    expect(openBlock).toMatch(/resolveSeatlessHoverData\(anchorEl\)/);
   });
 
   it('席装飾ループの v0.1.1111 契約(席なしを飛ばす)は維持されている', () => {

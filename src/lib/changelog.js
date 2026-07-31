@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1204',
+    date: '2026-07-31',
+    summary: '拡張が重くなる原因を解消(v0.1.1201の不具合)',
+    items: Object.freeze([
+      'v0.1.1201 以降、会場モードの描画のたびに画面全体を数え直す処理が入ってしまい、拡張全体(マーケ分析・診断など)が重くなっていた問題を修正しました。広告主のホバーカードは、マウスを乗せた瞬間だけ調べる方式に変えています。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1203',
     date: '2026-07-31',
     summary: 'ポップアップの段説明からもキャラアイコンと枠を削除',

@@ -4944,24 +4944,41 @@ ${anonymousBlock}
   var section = input.closest('.mkt-section--thumb-grid');
   if (!section) return;
   var cells = Array.prototype.slice.call(section.querySelectorAll('.mkt-thumb-grid__cell'));
-  var headings = Array.prototype.slice.call(section.querySelectorAll('.mkt-thumb-grid__heading'));
   var total = cells.length;
+  // ★hay は初回に1度だけ読んで配列に持つ(入力のたびに getAttribute しない)。
+  //   セルごとの所属リストも先に控えておき、見出しの表示判定を O(リスト数) で終える。
+  var hays = [];
+  var lists = [];
+  var cellList = [];
+  for (var p = 0; p < cells.length; p++) {
+    hays.push(String(cells[p].getAttribute('data-search') || ''));
+    var parent = cells[p].parentElement;
+    var li = lists.indexOf(parent);
+    if (li === -1) { li = lists.length; lists.push(parent); }
+    cellList.push(li);
+  }
   var update = function () {
     var kw = String(input.value || '').toLowerCase().trim();
     var visible = 0;
+    var liveByList = [];
+    for (var z = 0; z < lists.length; z++) liveByList.push(0);
     for (var i = 0; i < cells.length; i++) {
-      var hay = String(cells[i].getAttribute('data-search') || '');
-      var hit = !kw || hay.indexOf(kw) !== -1;
+      var hit = !kw || hays[i].indexOf(kw) !== -1;
       cells[i].style.display = hit ? '' : 'none';
-      if (hit) visible++;
+      if (hit) { visible++; liveByList[cellList[i]]++; }
     }
     // 見出し(数値ID/匿名)は、その直後のリストが全滅したら一緒に隠す。
-    for (var h = 0; h < headings.length; h++) {
-      var list = headings[h].nextElementSibling;
+    //   ここで querySelector を使うと入力のたびに全走査になり重い(2026-07-31 の実測で
+    //   マーケ分析が開かなくなった)。上で数えた件数だけで判定する。
+    for (var h = 0; h < lists.length; h++) {
+      var list = lists[h];
       if (!list) continue;
-      var any = list.querySelector('.mkt-thumb-grid__cell:not([style*="display: none"])');
-      headings[h].style.display = any ? '' : 'none';
+      var any = liveByList[h] > 0;
       list.style.display = any ? '' : 'none';
+      var heading = list.previousElementSibling;
+      if (heading && heading.classList && heading.classList.contains('mkt-thumb-grid__heading')) {
+        heading.style.display = any ? '' : 'none';
+      }
     }
     if (!kw) {
       result.textContent = '検索対象: ' + total + ' 名';
