@@ -4303,17 +4303,31 @@ function ensureScrollWhiteoutSampler() {
         // W-1相関計器(scroll-whiteout-freeze設計・v0.1.1135): 白化検知の瞬間に host 移設 state を
         //   同じ同期呼び出しで読んで焼き込む(2つの計器を後から時刻でjoinしない=取りこぼしゼロ)。
         const lastMoveAtMs = Number(_inlineHostMoveState.lastAtMs) || 0;
-        recordWhiteoutSample(_scrollWhiteoutState, {
-          kind: 'host',
-          prevH: _scrollWhiteoutPrevH.host,
-          nowH: r.height,
-          visibleNow,
-          atMs: now,
-          lastMoveReason: _inlineHostMoveState.samples.at(-1)?.reason || '',
-          lastMoveAgoMs: lastMoveAtMs > 0 ? now - lastMoveAtMs : null,
-          hostDisplay: cs.display,
-          hostVisibility: cs.visibility
-        });
+        // v0.1.1198(偽陽性の除去・実測 2026-07-31 で確定): 会場open中の host 不可視は
+        //   「白化」ではなく venueBar の意図した遮蔽(venueBar.js:1813
+        //   `html.nlsb-venue-open #nls-inline-popup-host { visibility: hidden !important }`)。
+        //   実配信の白化サンプルが hostVisibility:'hidden' / hostDisplay:'block' / 高さ600のまま
+        //   =遮蔽の署名そのものだった。ここを数えると「会場を開くたびに白化1回」が積まれ、
+        //   本物の白化(再描画で一瞬消える)が埋もれる。設計書 scroll-whiteout-freeze の
+        //   「hostVisibility:'hidden' → 会場遮蔽の巻き添え=判定除外を検討」に対する回答。
+        const venueOpen =
+          typeof document !== 'undefined' &&
+          !!document.documentElement?.classList?.contains('nlsb-venue-open');
+        if (!venueOpen) {
+          recordWhiteoutSample(_scrollWhiteoutState, {
+            kind: 'host',
+            prevH: _scrollWhiteoutPrevH.host,
+            nowH: r.height,
+            visibleNow,
+            atMs: now,
+            lastMoveReason: _inlineHostMoveState.samples.at(-1)?.reason || '',
+            lastMoveAgoMs: lastMoveAtMs > 0 ? now - lastMoveAtMs : null,
+            hostDisplay: cs.display,
+            hostVisibility: cs.visibility
+          });
+        }
+        // 会場open中も prevH は更新する(遮蔽中の高さを 0 として持ち越すと、閉じた直後の
+        //   最初のサンプルが「0→600」になり本物の白化判定が狂うため)。
         _scrollWhiteoutPrevH.host = visibleNow ? r.height : 0;
       }
     } catch {

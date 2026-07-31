@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1198',
+    date: '2026-07-31',
+    summary: '会場を開いたときの誤った「白化」警告を解消',
+    items: Object.freeze([
+      '会場モードを開くと画面下の応援パネルが隠れますが、これは意図した動作です。この正常な動作を診断が「スクロール白化」として数えてしまい、警告が出ていた問題を解消しました。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1197',
     date: '2026-07-31',
     summary: '記録件数が多すぎる原因の切り分け計器を追加',
