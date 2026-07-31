@@ -600,7 +600,7 @@
     - `trumpet1.mp3`
     - `wallet1.mp3`
   - `SOURCES.md`
-- 📁 **src/** (1440)
+- 📁 **src/** (1441)
   - 📁 **data/** (6)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -874,7 +874,7 @@
         - `logo_funlink_white_RGB_maru_black.png`
       - `logo_guide_funlink_ol.pdf`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1216)
+  - 📁 **lib/** (1217)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -1848,6 +1848,7 @@
     - `storyDiagTotalSource.js` — 「記録している応援コメント N 件」の N を1箇所で決める純関数。
     - `storyDiagTotalSource.test.js`
     - `storyGrowthLimits.js` — りんく成長グリッド（story growth）の描画上限。
+    - `storyGrowthLimits.test.js`
     - `storyLaneAvatarSrc.js` — 応援レーン(アイコン列)のタイル画像 URL 解決（state 注入型の純関数）。
     - `storyLaneAvatarSrc.test.js`
     - `storyTileTvStyle.js` — ストーリータイル / レーンアバターで「ゆっくり風キャラ画像かどうか」を判定する純関数。
