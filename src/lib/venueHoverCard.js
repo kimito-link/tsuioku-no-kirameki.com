@@ -67,6 +67,7 @@ export function readVenueTileThumbState(cellEl) {
  *   idKind: 'registered'|'anonymous'|'none',
  *   avatarSrc: string,
  *   statLine: string,
+ *   lastText: string,
  *   thumbStatusLabel: string,
  *   thumbKind: VenueTileThumbState['kind'],
  *   thumbLoad: VenueTileThumbState['load']
@@ -107,11 +108,18 @@ function resolveThumbStatusLabel(kind, load) {
 }
 
 /**
+ * ホバーカードに出す直前発言の最大文字数。これを超えたら末尾を「…」で畳む。
+ * カードは会場の上に重なるので、長文コメントで縦に伸びると席を覆ってしまう。
+ */
+export const HOVER_LAST_TEXT_MAX = 60;
+
+/**
  * カード表示モデルを組み立てる純関数。ホバー時点で手元にあるデータのみ(新規取得ゼロ)。
  * @param {{
  *   uid?: unknown, displayName?: unknown, count?: unknown, hasGift?: unknown,
  *   giftCount?: unknown, venueRank?: unknown, thumb?: Partial<VenueTileThumbState>,
- *   lastAt?: unknown, nowMs?: unknown, diagMode?: unknown, tier?: unknown
+ *   lastAt?: unknown, nowMs?: unknown, diagMode?: unknown, tier?: unknown,
+ *   lastText?: unknown
  * }} input
  * @returns {VenueHoverCardModel}
  */
@@ -175,12 +183,26 @@ export function buildVenueHoverCardModel(input) {
   else if (venueRank === 2) statParts.push('🥈2位');
   else if (venueRank === 3) statParts.push('🥉3位');
 
+  // 2026-07-31(ユーザー要望): 「この人が直前に何を言ったか」をカードで読めるようにする。
+  //   participant.lastText(既存データ・新規取得ゼロ)をそのまま出す。長文はカードが伸びて
+  //   会場を覆うので上限で切る(切ったことが分かるよう省略記号を付ける)。
+  //   投擲段(広告/ギフト)は発言由来ではないので出さない=「発言していないのに本文が出る」嘘を作らない。
+  const isThrowTier = tier === 'ad' || tier === 'gift';
+  const rawLastText = String(i.lastText || '').replace(/\s+/g, ' ').trim();
+  const lastText =
+    isThrowTier || !rawLastText
+      ? ''
+      : rawLastText.length > HOVER_LAST_TEXT_MAX
+        ? `${rawLastText.slice(0, HOVER_LAST_TEXT_MAX)}…`
+        : rawLastText;
+
   return {
     displayName,
     idLine,
     idKind,
     avatarSrc,
     statLine: statParts.join(' ・ '),
+    lastText,
     thumbStatusLabel: diagMode ? resolveThumbStatusLabel(thumbKind, thumbLoad) : '',
     thumbKind,
     thumbLoad
@@ -218,10 +240,15 @@ export function createVenueHoverCardEl(doc) {
   statsEl.className = 'nlsb-hover-card__stats';
   const thumbStatusEl = doc.createElement('div');
   thumbStatusEl.className = 'nlsb-hover-card__thumb-status';
+  // 2026-07-31(ユーザー要望): 直前の発言内容。「この人が何を言ったか」が分からないと
+  //   名前と件数だけでは誰なのか思い出せない、という指摘への回答。
+  const lastTextEl = doc.createElement('div');
+  lastTextEl.className = 'nlsb-hover-card__last-text';
   // 2026-07-30(council-fable設計・venue-hover-card-content-DESIGN.md 必答1): 「名前→活動→
   // (補足として)ID」の情報序列を構造でも表現する。IDは文言そのまま・体裁だけ格下げ(CSS側で
   // font-size縮小)。ロジック変更ゼロ・isNumericNicoUserId判定基準は不変。
-  body.append(nameEl, statsEl, idEl, thumbStatusEl);
+  //   発言本文は「活動」の直後=名前の次に読みたい情報なので stats の後ろに置く。
+  body.append(nameEl, statsEl, lastTextEl, idEl, thumbStatusEl);
 
   card.append(avatarBox, body);
   return card;
@@ -251,6 +278,14 @@ export function renderVenueHoverCard(cardEl, model) {
 
   const statsEl = cardEl.querySelector('.nlsb-hover-card__stats');
   if (statsEl) statsEl.textContent = String(m.statLine || '');
+
+  // 2026-07-31: 直前の発言内容。無い(未発言/投擲段/データ未到達)ときは行ごと消して隙間を作らない。
+  const lastTextEl = cardEl.querySelector('.nlsb-hover-card__last-text');
+  if (lastTextEl) {
+    const text = String(m.lastText || '');
+    lastTextEl.textContent = text ? `「${text}」` : '';
+    lastTextEl.hidden = !text;
+  }
 
   const thumbStatusEl = cardEl.querySelector('.nlsb-hover-card__thumb-status');
   if (thumbStatusEl) {

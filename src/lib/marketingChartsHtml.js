@@ -4894,7 +4894,11 @@ function sectionUsersWithThumbnails(r, maskShare, identiconResolver, broadcaster
     const countText = `${u.count}件`;
     const followHtml = followerInlineHtml(followByUid.get(String(u.userId || '')) || null, maskShare);
     const avatarInner = `<span class="mkt-thumb-grid__avatar-wrap"><img class="mkt-thumb-grid__avatar" src="${escapeHtml(u.thumbSrc)}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer" ${DEFAULT_USERICON_ONERROR_ATTR}></span>`;
-    return `<li class="mkt-thumb-grid__cell">
+    // 2026-07-31(ユーザー要望): 名前とIDで絞り込めるようにする。「あの人を探したいのに
+    //   アイコンが並んでいるだけで見つけられない」という指摘への回答。
+    //   HTMLレポート側の検索(htmlReportDocument.js:1610)と同じ data-search 方式に揃える。
+    const searchHay = `${rawLabel} ${uidForLabel}`.toLowerCase();
+    return `<li class="mkt-thumb-grid__cell" data-search="${escapeAttr(searchHay)}">
 ${wrapThumbWithProfileLink(u.userId, avatarInner)}
 <span class="mkt-thumb-grid__label">${labelHtml}</span>
 ${followHtml}
@@ -4914,12 +4918,64 @@ ${followHtml}
 <ol class="mkt-thumb-grid">${anonymousUsers.map(cellHtml).join('')}</ol>`
       : '';
 
+  // 2026-07-31(ユーザー要望): 名前・IDで絞り込む検索窓。マーケ分析HTMLには検索が1つも無く
+  //   (input要素0個)、アイコンが並ぶだけで「あの人」を探せなかった。HTMLレポート側には
+  //   同型の検索があるので、そちらと揃えた data-search 方式にする(新しい仕組みを作らない)。
+  //   ★このセクションは各カテゴリ最大60名の上限がある。検索して0件のとき、それが「居ない」
+  //     のか「上限で切られた」のか区別できないと誤解を生むので、その旨を結果欄に明記する。
+  const searchBoxHtml = `<div class="mkt-thumb-grid__search">
+<label class="mkt-thumb-grid__search-label" for="mktThumbGridSearch">名前・ID で絞り込む</label>
+<input id="mktThumbGridSearch" class="mkt-thumb-grid__search-input" type="search" placeholder="例: あやりん / 78759947" autocomplete="off">
+<div id="mktThumbGridSearchResult" class="mkt-note mkt-thumb-grid__search-result" role="status" aria-live="polite"></div>
+</div>`;
+
   return `<section class="mkt-section mkt-section--thumb-grid" aria-label="サムネ付きユーザー一覧">
 <h2>サムネ付きユーザー一覧</h2>
 <p class="mkt-note">アイコンが解決できた応援ユーザーをコメ件数の多い順、種別ごとに並べました（各カテゴリ最大 60 名）。アイコンは ① 個人サムネ ② ニコ既定アイコン ③ 識別子から生成した identicon の優先順で選びます。</p>
+${searchBoxHtml}
 <p class="mkt-spec-note">※ 表示名はコメ記録時点のもの（仕様）。配信者がニコニコでハンドル名を変更した場合、ここの表示と niconico の最新表示が異なることがあります。リアルタイム取得は行っていないため（API 連発によるレート制限を避けるため）、最新名は ID クリック先のユーザーページで確認できます。</p>
 ${numericBlock}
 ${anonymousBlock}
+<script>
+(function () {
+  var input = document.getElementById('mktThumbGridSearch');
+  var result = document.getElementById('mktThumbGridSearchResult');
+  if (!input || !result) return;
+  var section = input.closest('.mkt-section--thumb-grid');
+  if (!section) return;
+  var cells = Array.prototype.slice.call(section.querySelectorAll('.mkt-thumb-grid__cell'));
+  var headings = Array.prototype.slice.call(section.querySelectorAll('.mkt-thumb-grid__heading'));
+  var total = cells.length;
+  var update = function () {
+    var kw = String(input.value || '').toLowerCase().trim();
+    var visible = 0;
+    for (var i = 0; i < cells.length; i++) {
+      var hay = String(cells[i].getAttribute('data-search') || '');
+      var hit = !kw || hay.indexOf(kw) !== -1;
+      cells[i].style.display = hit ? '' : 'none';
+      if (hit) visible++;
+    }
+    // 見出し(数値ID/匿名)は、その直後のリストが全滅したら一緒に隠す。
+    for (var h = 0; h < headings.length; h++) {
+      var list = headings[h].nextElementSibling;
+      if (!list) continue;
+      var any = list.querySelector('.mkt-thumb-grid__cell:not([style*="display: none"])');
+      headings[h].style.display = any ? '' : 'none';
+      list.style.display = any ? '' : 'none';
+    }
+    if (!kw) {
+      result.textContent = '検索対象: ' + total + ' 名';
+      return;
+    }
+    // ★0件のとき「居ない」と誤解させない。この一覧は各カテゴリ最大60名の上限がある。
+    result.textContent = visible > 0
+      ? '検索結果: ' + visible + ' / ' + total + ' 名'
+      : '該当なし（0 / ' + total + ' 名）― この一覧はコメ件数の多い順に各カテゴリ最大 60 名までです。発言が少ない方はここに載らないことがあります。';
+  };
+  input.addEventListener('input', update);
+  update();
+})();
+</script>
 </section>`;
 }
 
@@ -6392,6 +6448,12 @@ html.mkt-section-reveal-done .mkt-section{will-change:auto}
 .mkt-thumb-grid__label{font-size:.74rem;line-height:1.25;color:#e2e8f0;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;width:100%}
 .mkt-thumb-grid__label .nl-user-profile-link{color:#93c5fd}
 .mkt-thumb-grid__count{font-size:.7rem;color:#94a3b8}
+/* 2026-07-31: 名前・IDで絞り込む検索窓(マーケ分析HTMLに検索が1つも無かったため追加)。 */
+.mkt-thumb-grid__search{margin:.75rem 0 1rem;display:flex;flex-direction:column;gap:.35rem}
+.mkt-thumb-grid__search-label{font-size:.75rem;color:#64748b;font-weight:700}
+.mkt-thumb-grid__search-input{width:100%;max-width:28rem;padding:.5rem .7rem;font-size:.9rem;border:1px solid #cbd5e1;border-radius:.5rem;background:#fff;color:#0f172a}
+.mkt-thumb-grid__search-input:focus{outline:2px solid #2563eb;outline-offset:1px;border-color:#2563eb}
+.mkt-thumb-grid__search-result{font-size:.75rem;color:#64748b;margin:0}
 .mkt-hour-grid{display:grid;grid-template-columns:repeat(12,1fr);gap:4px}
 .mkt-hour{border-radius:6px;text-align:center;padding:.5rem .2rem;min-height:52px;display:flex;flex-direction:column;justify-content:center;border:1px solid #334155}
 .mkt-hour__label{font-size:.7rem;color:#94a3b8}

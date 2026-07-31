@@ -1084,7 +1084,7 @@ ${buildSectionRevealScriptHtml()}
 <h2>\u{1F517} \u652F\u63F4\u7269\u8CC7\u30FB\u5916\u90E8\u30EA\u30F3\u30AF</h2>
 <p class="mkt-note">\u914D\u4FE1\u30DA\u30FC\u30B8\u306B\u8A18\u8F09\u3055\u308C\u305F\u5916\u90E8\u30EA\u30F3\u30AF\uFF08\u6B32\u3057\u3044\u3082\u306E\u30EA\u30B9\u30C8\u30FB\u652F\u63F4\u7269\u8CC7\u30FBSNS \u7B49\uFF09\u3067\u3059\u3002\u30EA\u30F3\u30AF\u5148\u306F\u914D\u4FE1\u8005\u306E\u7BA1\u7406\u4E0B\u306B\u3042\u308A\u307E\u3059\u3002</p>
 <div class="mkt-ext-link-chips">${chips.join("")}</div>
-</section>`}function idWrap(id,html){return html?html.replace(/<section\b/,`<section id="${id}"`):""}function sectionUsersWithThumbnails(r,maskShare,identiconResolver,broadcasterUserId){if(maskShare||!Array.isArray(r.topUsers)||r.topUsers.length===0)return"";let{numericIdUsers,anonymousUsers}=categorizeUsersForThumbGrid(r.topUsers,{identiconResolver,maxNumeric:60,maxAnonymous:60,broadcasterUserId});if(numericIdUsers.length===0&&anonymousUsers.length===0)return"";let followByUid=new Map;for(let u of r.allNumericCommenters||[]){let uid=String(u.userId||"").trim();uid&&followByUid.set(uid,u)}let cellHtml=u=>{let uidForLabel=u.userId||UNKNOWN_USER_KEY,rawLabel=displayUserLabel(u.userId,u.nickname||""),labelHtml=buildUserProfileLinkedLabelHtml(uidForLabel,rawLabel),countText=`${u.count}\u4EF6`,followHtml=followerInlineHtml(followByUid.get(String(u.userId||""))||null,maskShare),avatarInner=`<span class="mkt-thumb-grid__avatar-wrap"><img class="mkt-thumb-grid__avatar" src="${escapeHtml(u.thumbSrc)}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer" ${DEFAULT_USERICON_ONERROR_ATTR}></span>`;return`<li class="mkt-thumb-grid__cell">
+</section>`}function idWrap(id,html){return html?html.replace(/<section\b/,`<section id="${id}"`):""}function sectionUsersWithThumbnails(r,maskShare,identiconResolver,broadcasterUserId){if(maskShare||!Array.isArray(r.topUsers)||r.topUsers.length===0)return"";let{numericIdUsers,anonymousUsers}=categorizeUsersForThumbGrid(r.topUsers,{identiconResolver,maxNumeric:60,maxAnonymous:60,broadcasterUserId});if(numericIdUsers.length===0&&anonymousUsers.length===0)return"";let followByUid=new Map;for(let u of r.allNumericCommenters||[]){let uid=String(u.userId||"").trim();uid&&followByUid.set(uid,u)}let cellHtml=u=>{let uidForLabel=u.userId||UNKNOWN_USER_KEY,rawLabel=displayUserLabel(u.userId,u.nickname||""),labelHtml=buildUserProfileLinkedLabelHtml(uidForLabel,rawLabel),countText=`${u.count}\u4EF6`,followHtml=followerInlineHtml(followByUid.get(String(u.userId||""))||null,maskShare),avatarInner=`<span class="mkt-thumb-grid__avatar-wrap"><img class="mkt-thumb-grid__avatar" src="${escapeHtml(u.thumbSrc)}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer" ${DEFAULT_USERICON_ONERROR_ATTR}></span>`,searchHay=`${rawLabel} ${uidForLabel}`.toLowerCase();return`<li class="mkt-thumb-grid__cell" data-search="${escapeAttr(searchHay)}">
 ${wrapThumbWithProfileLink(u.userId,avatarInner)}
 <span class="mkt-thumb-grid__label">${labelHtml}</span>
 ${followHtml}
@@ -1094,9 +1094,54 @@ ${followHtml}
 <ol class="mkt-thumb-grid">${anonymousUsers.map(cellHtml).join("")}</ol>`:"";return`<section class="mkt-section mkt-section--thumb-grid" aria-label="\u30B5\u30E0\u30CD\u4ED8\u304D\u30E6\u30FC\u30B6\u30FC\u4E00\u89A7">
 <h2>\u30B5\u30E0\u30CD\u4ED8\u304D\u30E6\u30FC\u30B6\u30FC\u4E00\u89A7</h2>
 <p class="mkt-note">\u30A2\u30A4\u30B3\u30F3\u304C\u89E3\u6C7A\u3067\u304D\u305F\u5FDC\u63F4\u30E6\u30FC\u30B6\u30FC\u3092\u30B3\u30E1\u4EF6\u6570\u306E\u591A\u3044\u9806\u3001\u7A2E\u5225\u3054\u3068\u306B\u4E26\u3079\u307E\u3057\u305F\uFF08\u5404\u30AB\u30C6\u30B4\u30EA\u6700\u5927 60 \u540D\uFF09\u3002\u30A2\u30A4\u30B3\u30F3\u306F \u2460 \u500B\u4EBA\u30B5\u30E0\u30CD \u2461 \u30CB\u30B3\u65E2\u5B9A\u30A2\u30A4\u30B3\u30F3 \u2462 \u8B58\u5225\u5B50\u304B\u3089\u751F\u6210\u3057\u305F identicon \u306E\u512A\u5148\u9806\u3067\u9078\u3073\u307E\u3059\u3002</p>
+<div class="mkt-thumb-grid__search">
+<label class="mkt-thumb-grid__search-label" for="mktThumbGridSearch">\u540D\u524D\u30FBID \u3067\u7D5E\u308A\u8FBC\u3080</label>
+<input id="mktThumbGridSearch" class="mkt-thumb-grid__search-input" type="search" placeholder="\u4F8B: \u3042\u3084\u308A\u3093 / 78759947" autocomplete="off">
+<div id="mktThumbGridSearchResult" class="mkt-note mkt-thumb-grid__search-result" role="status" aria-live="polite"></div>
+</div>
 <p class="mkt-spec-note">\u203B \u8868\u793A\u540D\u306F\u30B3\u30E1\u8A18\u9332\u6642\u70B9\u306E\u3082\u306E\uFF08\u4ED5\u69D8\uFF09\u3002\u914D\u4FE1\u8005\u304C\u30CB\u30B3\u30CB\u30B3\u3067\u30CF\u30F3\u30C9\u30EB\u540D\u3092\u5909\u66F4\u3057\u305F\u5834\u5408\u3001\u3053\u3053\u306E\u8868\u793A\u3068 niconico \u306E\u6700\u65B0\u8868\u793A\u304C\u7570\u306A\u308B\u3053\u3068\u304C\u3042\u308A\u307E\u3059\u3002\u30EA\u30A2\u30EB\u30BF\u30A4\u30E0\u53D6\u5F97\u306F\u884C\u3063\u3066\u3044\u306A\u3044\u305F\u3081\uFF08API \u9023\u767A\u306B\u3088\u308B\u30EC\u30FC\u30C8\u5236\u9650\u3092\u907F\u3051\u308B\u305F\u3081\uFF09\u3001\u6700\u65B0\u540D\u306F ID \u30AF\u30EA\u30C3\u30AF\u5148\u306E\u30E6\u30FC\u30B6\u30FC\u30DA\u30FC\u30B8\u3067\u78BA\u8A8D\u3067\u304D\u307E\u3059\u3002</p>
 ${numericBlock}
 ${anonymousBlock}
+<script>
+(function () {
+  var input = document.getElementById('mktThumbGridSearch');
+  var result = document.getElementById('mktThumbGridSearchResult');
+  if (!input || !result) return;
+  var section = input.closest('.mkt-section--thumb-grid');
+  if (!section) return;
+  var cells = Array.prototype.slice.call(section.querySelectorAll('.mkt-thumb-grid__cell'));
+  var headings = Array.prototype.slice.call(section.querySelectorAll('.mkt-thumb-grid__heading'));
+  var total = cells.length;
+  var update = function () {
+    var kw = String(input.value || '').toLowerCase().trim();
+    var visible = 0;
+    for (var i = 0; i < cells.length; i++) {
+      var hay = String(cells[i].getAttribute('data-search') || '');
+      var hit = !kw || hay.indexOf(kw) !== -1;
+      cells[i].style.display = hit ? '' : 'none';
+      if (hit) visible++;
+    }
+    // \u898B\u51FA\u3057(\u6570\u5024ID/\u533F\u540D)\u306F\u3001\u305D\u306E\u76F4\u5F8C\u306E\u30EA\u30B9\u30C8\u304C\u5168\u6EC5\u3057\u305F\u3089\u4E00\u7DD2\u306B\u96A0\u3059\u3002
+    for (var h = 0; h < headings.length; h++) {
+      var list = headings[h].nextElementSibling;
+      if (!list) continue;
+      var any = list.querySelector('.mkt-thumb-grid__cell:not([style*="display: none"])');
+      headings[h].style.display = any ? '' : 'none';
+      list.style.display = any ? '' : 'none';
+    }
+    if (!kw) {
+      result.textContent = '\u691C\u7D22\u5BFE\u8C61: ' + total + ' \u540D';
+      return;
+    }
+    // \u26050\u4EF6\u306E\u3068\u304D\u300C\u5C45\u306A\u3044\u300D\u3068\u8AA4\u89E3\u3055\u305B\u306A\u3044\u3002\u3053\u306E\u4E00\u89A7\u306F\u5404\u30AB\u30C6\u30B4\u30EA\u6700\u592760\u540D\u306E\u4E0A\u9650\u304C\u3042\u308B\u3002
+    result.textContent = visible > 0
+      ? '\u691C\u7D22\u7D50\u679C: ' + visible + ' / ' + total + ' \u540D'
+      : '\u8A72\u5F53\u306A\u3057\uFF080 / ' + total + ' \u540D\uFF09\u2015 \u3053\u306E\u4E00\u89A7\u306F\u30B3\u30E1\u4EF6\u6570\u306E\u591A\u3044\u9806\u306B\u5404\u30AB\u30C6\u30B4\u30EA\u6700\u5927 60 \u540D\u307E\u3067\u3067\u3059\u3002\u767A\u8A00\u304C\u5C11\u306A\u3044\u65B9\u306F\u3053\u3053\u306B\u8F09\u3089\u306A\u3044\u3053\u3068\u304C\u3042\u308A\u307E\u3059\u3002';
+  };
+  input.addEventListener('input', update);
+  update();
+})();
+<\/script>
 </section>`}function sectionMachineReadableJson(embedJson,maskShare){return`<section class="mkt-section mkt-section--embed" aria-label="JSON \u30C7\u30FC\u30BF">
 <h2>\u8868\u8A08\u7B97\u30FB\u30C4\u30FC\u30EB\u5411\u3051 JSON</h2>
 <p class="mkt-note">${maskShare?"\u3053\u306E\u51FA\u529B\u3067\u306F\u5171\u6709\u5411\u3051\u306B<strong>\u4F0F\u305B\u5B57</strong>\u3092\u4ED8\u3051\u3066\u304A\u308A\u3001JSON \u5185\u306E\u30C8\u30C3\u30D7\u30B3\u30E1\u30F3\u30BF\u30FC\u306E\u8868\u793A\u540D\u30FBID \u3082\u4F0F\u305B\u3001\u30A2\u30A4\u30B3\u30F3 URL \u306F\u7A7A\u3067\u3059\u3002":"\u624B\u5143\u7528\u306E\u305F\u3081 ID \u304C\u305D\u306E\u307E\u307E\u5165\u308A\u307E\u3059\u3002\u7B2C\u4E09\u8005\u306B\u6E21\u3059\u3068\u304D\u306F\u62E1\u5F35\u306E\u300C\u4F0F\u305B\u5B57\u300D\u30C1\u30A7\u30C3\u30AF\u4ED8\u304D\u3067\u66F8\u304D\u51FA\u3057\u3066\u304F\u3060\u3055\u3044\u3002"} \u4E2D\u8EAB\u306F <code>id="nl-marketing-export-v1"</code> \u306E <code>script</code> \u8981\u7D20\u306B\u3042\u308A\u307E\u3059\uFF08<code>schemaVersion</code>\u30FB<code>report</code> \u5F62\u5F0F\uFF09\u3002</p>
@@ -1641,6 +1686,12 @@ html.mkt-section-reveal-done .mkt-section{will-change:auto}
 .mkt-thumb-grid__label{font-size:.74rem;line-height:1.25;color:#e2e8f0;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;width:100%}
 .mkt-thumb-grid__label .nl-user-profile-link{color:#93c5fd}
 .mkt-thumb-grid__count{font-size:.7rem;color:#94a3b8}
+/* 2026-07-31: \u540D\u524D\u30FBID\u3067\u7D5E\u308A\u8FBC\u3080\u691C\u7D22\u7A93(\u30DE\u30FC\u30B1\u5206\u6790HTML\u306B\u691C\u7D22\u304C1\u3064\u3082\u7121\u304B\u3063\u305F\u305F\u3081\u8FFD\u52A0)\u3002 */
+.mkt-thumb-grid__search{margin:.75rem 0 1rem;display:flex;flex-direction:column;gap:.35rem}
+.mkt-thumb-grid__search-label{font-size:.75rem;color:#64748b;font-weight:700}
+.mkt-thumb-grid__search-input{width:100%;max-width:28rem;padding:.5rem .7rem;font-size:.9rem;border:1px solid #cbd5e1;border-radius:.5rem;background:#fff;color:#0f172a}
+.mkt-thumb-grid__search-input:focus{outline:2px solid #2563eb;outline-offset:1px;border-color:#2563eb}
+.mkt-thumb-grid__search-result{font-size:.75rem;color:#64748b;margin:0}
 .mkt-hour-grid{display:grid;grid-template-columns:repeat(12,1fr);gap:4px}
 .mkt-hour{border-radius:6px;text-align:center;padding:.5rem .2rem;min-height:52px;display:flex;flex-direction:column;justify-content:center;border:1px solid #334155}
 .mkt-hour__label{font-size:.7rem;color:#94a3b8}

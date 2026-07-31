@@ -1641,6 +1641,22 @@ const VENUE_CSS = `
   .nlsb-hover-card__stats {
     font-weight: 600;
   }
+  /*
+   * 2026-07-31(ユーザー要望): 直前の発言内容。「多忙なあやりん」が何を言ったか分からない、
+   *   という指摘への回答。本文はモデル側で60字に畳んであるが、それでも席を覆わないよう
+   *   2行までで省略する(カードは会場の上に重なるため縦に伸ばさない)。
+   */
+  .nlsb-hover-card__last-text {
+    margin-top: 2px;
+    font-size: 12px;
+    line-height: 1.4;
+    opacity: 0.9;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    word-break: break-word;
+  }
   .nlsb-hover-card__thumb-status {
     opacity: 0.65;
     font-size: 12px;
@@ -2639,7 +2655,7 @@ export function mountVenueBarButton(options = {}) {
   // 2026-07-30(wayfinder→to-spec方式・venue-avatar-hover-preview-SPEC.md §4.3): ホバープレビュー
   //   カード用のデータ。paint時(席装飾ループ/renderTopBar)にWeakMapへ相乗り登録するだけで、
   //   DOM書き込み・新規タイマー・新規計算は無い(RANKバッジちらつき教訓=diff-skip不要な設計)。
-  /** @type {WeakMap<HTMLElement, { uid: string, displayName: string, count: number, hasGift: boolean, giftCount: number, venueRank: number, lastAt: number, tier?: string }>} */
+  /** @type {WeakMap<HTMLElement, { uid: string, displayName: string, count: number, hasGift: boolean, giftCount: number, venueRank: number, lastAt: number, tier?: string, lastText?: string }>} */
   const _hoverCardDataByEl = new WeakMap();
   /** @type {WeakMap<HTMLElement, { seatTitle: string, cellTitle: string, imgTitle: string, cellEl: HTMLElement|null }>} */
   const _hoverCardTitleBackupByEl = new WeakMap();
@@ -4337,7 +4353,7 @@ export function mountVenueBarButton(options = {}) {
   //   sig(上位の userId+順位)が無変化なら DOM を触らない=毎フレーム作り直さない(hot path 保護)。
   //   一度でも非空を描いたら、一瞬の空(データ遅延)では畳まない=高さ振動を作らない(v0.1.1026)。
   //   状態フラグは clearDisplay(先に定義)からも触るため、宣言は関数より前(下の hasRenderedNonEmpty 付近)。
-  /** @param {Array<{ rank:number, participant:{ key?:string, userId?:string, name?:string, count?:number, hasGift?:boolean, giftCount?:number, lastAt?:number } }>} topSupporters */
+  /** @param {Array<{ rank:number, participant:{ key?:string, userId?:string, name?:string, count?:number, hasGift?:boolean, giftCount?:number, lastAt?:number, lastText?:string } }>} topSupporters */
   const renderTopBar = (topSupporters) => {
     const list = Array.isArray(topSupporters) ? topSupporters : [];
     // 空入力でも、一度出したバーは畳まない(前回の顔を残す=明滅/高さ振動を防ぐ)。
@@ -4368,7 +4384,9 @@ export function mountVenueBarButton(options = {}) {
         venueRank: Math.max(0, Math.floor(Number(item.rank) || 0)),
         // 2026-07-30(MVP-2・venue-hover-card-content-DESIGN.md): 最終発言時刻(既存データ・
         //   新規取得ゼロ)。ホバーカードで相対時刻(「3分前」等)に変換して表示する。
-        lastAt: Number(p.lastAt) || 0
+        lastAt: Number(p.lastAt) || 0,
+        // 2026-07-31(ユーザー要望): 直前の発言内容(既存データ・新規取得ゼロ)。
+        lastText: String(p.lastText || '')
       });
       frag.appendChild(cell);
     }
@@ -4739,7 +4757,9 @@ export function mountVenueBarButton(options = {}) {
         //   新規取得ゼロ)。ホバーカードで相対時刻(「3分前」等)に変換して表示する。
         lastAt: Number(participant.lastAt) || 0,
         // 2026-07-31: 段。広告/ギフト段では「発言N」でなく「広告(◯分前)」等に出し分ける。
-        tier: uid ? laneTierByUid.get(uid) || '' : ''
+        tier: uid ? laneTierByUid.get(uid) || '' : '',
+        // 2026-07-31(ユーザー要望): 直前の発言内容(既存データ・新規取得ゼロ)。
+        lastText: String(participant.lastText || '')
       });
       const speakerKey = uid ? `u:${uid}` : rawName ? `n:${rawName}` : '';
       const streakEntry = speakerKey ? speechStreaks.get(speakerKey) : null;
