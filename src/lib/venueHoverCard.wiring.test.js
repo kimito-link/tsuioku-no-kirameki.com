@@ -194,6 +194,34 @@ describe('会場ホバープレビューカードの配線(配線忘れ=CI赤)',
     });
   });
 
+  // 2026-07-31: 広告段のタイルにホバーしても無反応だった件の真因は「ホバー検知の対象に
+  //   入っていなかった」こと。席なしタイルは .nlsb-seat にならず .nl-story-userlane-cell なので、
+  //   委譲セレクタが席とトップバーだけだと永久に拾えない(v0.1.1201の実装が一度も動かなかった)。
+  describe('ホバー対象の解決(席なしタイルも拾う)', () => {
+    it('アンカー解決は席なしタイル(.nl-story-userlane-cell)も対象にしている', () => {
+      expect(venueBarSrc).toMatch(/const resolveHoverAnchor\s*=/);
+      const at = venueBarSrc.indexOf('const resolveHoverAnchor');
+      const block = venueBarSrc.slice(at, at + 700);
+      expect(block).toContain('.nl-story-userlane-cell');
+    });
+
+    it('席(.nlsb-seat)を先に見る(内側タイルに先に当たると席の実数が使われない)', () => {
+      const at = venueBarSrc.indexOf('const resolveHoverAnchor');
+      const block = venueBarSrc.slice(at, at + 700);
+      const seatAt = block.indexOf(".closest('.nlsb-seat, .nlsb-topbar-cell')");
+      const cellAt = block.indexOf(".closest('.nl-story-userlane-cell')");
+      expect(seatAt).toBeGreaterThan(0);
+      expect(cellAt).toBeGreaterThan(0);
+      expect(seatAt).toBeLessThan(cellAt); // 席が先
+    });
+
+    it('委譲リスナーは生セレクタでなく解決関数を通す(3箇所で食い違わせない)', () => {
+      // pointerover / pointerout / click の全経路が同じ解決を使うこと。
+      const uses = venueBarSrc.match(/resolveHoverAnchor\(/g) || [];
+      expect(uses.length).toBeGreaterThanOrEqual(4); // 定義1 + 呼び出し3以上
+    });
+  });
+
   it('.nlsb-hover-card__id に格下げのfont-sizeが設定されている', () => {
     const begin = venueBarSrc.indexOf('.nlsb-hover-card__id {');
     const end = venueBarSrc.indexOf('}', begin);

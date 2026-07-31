@@ -2508,13 +2508,34 @@ export function mountVenueBarButton(options = {}) {
     hoverCardEl.style.top = `${placement.top}px`;
   };
 
+  /**
+   * ホバー/クリックのアンカー要素を求める。
+   *
+   * ★v0.1.1206 修正: 従来は席(.nlsb-seat)とトップバー(.nlsb-topbar-cell)だけを見ていたため、
+   *   席を持たないタイル(広告ランキング由来の広告主など)は【ホバー検知の対象ですらなかった】。
+   *   v0.1.1201 で「席なしにもカードを出す」実装を入れたのに一度も動かなかったのはこれが原因。
+   *   .nl-story-userlane-cell(段のタイル本体)も対象に加える。
+   *
+   * ★席あり(.nlsb-seat)はタイルを内側に包む(wrapTileEl: seat.replaceChildren(tileEl))ため、
+   *   closest を素直に使うと内側のタイルが先に当たり、席側の正しいデータ(発言数・順位・
+   *   最終発言時刻)ではなく席なし用の簡易データが使われてしまう。だから席を優先する。
+   *
+   * @param {EventTarget|null} target
+   * @returns {HTMLElement|null}
+   */
+  const resolveHoverAnchor = (target) => {
+    if (!(target instanceof HTMLElement)) return null;
+    const seat = target.closest('.nlsb-seat, .nlsb-topbar-cell');
+    if (seat instanceof HTMLElement) return seat;
+    const cell = target.closest('.nl-story-userlane-cell');
+    return cell instanceof HTMLElement ? cell : null;
+  };
+
   /** @param {HTMLElement} host */
   const wireHoverCardDelegation = (host) => {
     host.addEventListener('pointerover', (e) => {
       if (e.pointerType === 'touch') return; // MVPはタッチ非対応(既存タップ挙動を邪魔しない)。
-      const anchorEl = e.target instanceof HTMLElement
-        ? e.target.closest('.nlsb-seat, .nlsb-topbar-cell')
-        : null;
+      const anchorEl = resolveHoverAnchor(e.target);
       if (!(anchorEl instanceof HTMLElement)) return;
       if (anchorEl === _hoverCardOpenFor) return; // 同じ席内での移動は無視。
       if (_hoverCardTimer) clearTimeout(_hoverCardTimer);
@@ -2524,11 +2545,9 @@ export function mountVenueBarButton(options = {}) {
       }, VENUE_HOVER_CARD_OPEN_DELAY_MS);
     });
     host.addEventListener('pointerout', (e) => {
-      const anchorEl = e.target instanceof HTMLElement
-        ? e.target.closest('.nlsb-seat, .nlsb-topbar-cell')
-        : null;
+      const anchorEl = resolveHoverAnchor(e.target);
       if (!(anchorEl instanceof HTMLElement)) return;
-      const related = e.relatedTarget instanceof HTMLElement ? e.relatedTarget.closest('.nlsb-seat, .nlsb-topbar-cell') : null;
+      const related = resolveHoverAnchor(e.relatedTarget);
       if (related === anchorEl) return; // 同じ席内の子要素間移動は無視。
       closeHoverCard();
     });
@@ -2545,9 +2564,7 @@ export function mountVenueBarButton(options = {}) {
    */
   const wireSpeechPanelDelegation = (host) => {
     host.addEventListener('click', (e) => {
-      const anchorEl = e.target instanceof HTMLElement
-        ? e.target.closest('.nlsb-seat, .nlsb-topbar-cell')
-        : null;
+      const anchorEl = resolveHoverAnchor(e.target);
       if (!(anchorEl instanceof HTMLElement)) return;
       const data = _hoverCardDataByEl.get(anchorEl) || resolveSeatlessHoverData(anchorEl);
       const uid = String(data?.uid || '').trim();

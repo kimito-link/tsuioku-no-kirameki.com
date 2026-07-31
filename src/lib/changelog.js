@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1206',
+    date: '2026-07-31',
+    summary: '広告主のアイコンにホバー・クリックが効かなかった問題を修正',
+    items: Object.freeze([
+      '会場モードで広告ランキング由来の広告主(#1・#5 などの番号が付く方)のアイコンに、マウスを乗せてもクリックしても何も起きなかった問題を修正しました。v0.1.1201 で対応したつもりでしたが、そもそも反応する対象に入っていませんでした。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1205',
     date: '2026-07-31',
     summary: '会場のアイコンをクリックすると、その方の発言を全部読めるように',
