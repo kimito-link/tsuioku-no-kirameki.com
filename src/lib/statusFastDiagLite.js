@@ -84,7 +84,10 @@ export function buildStatusFastDiagLite(payload) {
     //   dedup キーは commentNo 欠落時だけ capturedAt の秒が混ざるため、「ライブ経路と
     //   backfill 経路で capturedAt の導出が違う」仮説はこの行でしか成立しない。
     addedNoLessCount: typeof dsd.addedNoLessCount === 'number' ? dsd.addedNoLessCount : 0,
-    addedTotalCount: typeof dsd.addedTotalCount === 'number' ? dsd.addedTotalCount : 0
+    addedTotalCount: typeof dsd.addedTotalCount === 'number' ? dsd.addedTotalCount : 0,
+    // v0.1.1199: 空keySetのstate再利用を弾いた回数(=二重計上を未然に防いだ回数)。
+    seedUnseededRejectCount:
+      typeof dsd.seedUnseededRejectCount === 'number' ? dsd.seedUnseededRejectCount : 0
   };
 
   // lives は enumerateActiveLives 経路2でしか使わず、各要素は liveId/lv だけ見る=最小化して持つ。

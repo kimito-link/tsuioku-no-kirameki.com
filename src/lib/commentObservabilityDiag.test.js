@@ -447,7 +447,8 @@ describe('createDedupeSeedDiagState / noteDedupeSeedOutcome / noteIncrementalAdd
       maxIncrementalAddedCount: 200,
       suspiciousAddedCount: 1,
       addedNoLessCount: 0,
-      addedTotalCount: 0
+      addedTotalCount: 0,
+      seedUnseededRejectCount: 0
     });
     // コピーであり同一参照ではない
     snap.seedSkipCount = 999;

@@ -26,6 +26,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1199',
+    date: '2026-07-31',
+    summary: '記録件数が実際より多くなる不具合を修正/会場の説明文をすっきり',
+    items: Object.freeze([
+      '記録した応援コメントの件数が実際より多くなることがある不具合を修正しました。同じコメントを二重に数えてしまう経路(重複チェック用の情報が空のまま使い回される場合)を塞いでいます。',
+      '会場モードの各段の説明文から、小さなキャラアイコンと枠を外して見やすくしました。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1198',
     date: '2026-07-31',
     summary: '会場を開いたときの誤った「白化」警告を解消',

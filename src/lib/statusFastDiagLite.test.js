@@ -83,7 +83,8 @@ describe('buildStatusFastDiagLite', () => {
       suspiciousAddedCount: 1,
       // v0.1.1196: added の番号欠落内訳(二重計上の切り分け)も lite に通っていること。
       addedNoLessCount: 613,
-      addedTotalCount: 900
+      addedTotalCount: 900,
+      seedUnseededRejectCount: 0
     });
   });
 
@@ -98,7 +99,8 @@ describe('buildStatusFastDiagLite', () => {
       maxIncrementalAddedCount: 0,
       suspiciousAddedCount: 0,
       addedNoLessCount: 0,
-      addedTotalCount: 0
+      addedTotalCount: 0,
+      seedUnseededRejectCount: 0
     });
   });
 
