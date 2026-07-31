@@ -16,7 +16,7 @@ graph LR
   n_comeview --> n_src_lib_anonymousIdenticon_js["lib/anonymousIdenticon.js"]:::shared
   n_comeview --> n_src_lib_avatarBroadcasterGuard_js["lib/avatarBroadcasterGuard.js"]:::shared
   n_comeview --> n_src_lib_avatarPartsComposer_js["lib/avatarPartsComposer.js"]:::shared
-  n_comeview --> n_src_lib_comeviewActions_js["lib/comeviewActions.js"]
+  n_comeview --> n_src_lib_comeviewActions_js["lib/comeviewActions.js"]:::shared
   n_comeview --> n_src_lib_comeviewInstantRender_js["lib/comeviewInstantRender.js"]
   n_comeview --> n_src_lib_comeviewRows_js["lib/comeviewRows.js"]:::shared
   n_comeview --> n_src_lib_comeviewUserNotes_js["lib/comeviewUserNotes.js"]:::shared

@@ -15,6 +15,7 @@ import {
   isBroadcasterCtxUsableForGuard
 } from '../lib/broadcastContext.js';
 import { readChunkedComments, chunkIndexKey, chunkStorageKey, isChunkIndex } from '../lib/commentChunkStore.js';
+import { extractUserCommentRows } from '../lib/comeviewActions.js';
 import { selectNewChunkSeqs, mergeUserLaneAggregates } from '../lib/venueIncrementalAggregate.js';
 import {
   touchRoster,
@@ -33,7 +34,8 @@ import {
   buildVenueHoverCardModel,
   createVenueHoverCardEl,
   renderVenueHoverCard,
-  resolveVenueHoverCardPlacement
+  resolveVenueHoverCardPlacement,
+  formatVenueHoverRelativeTime
 } from '../lib/venueHoverCard.js';
 
 /**
@@ -61,6 +63,12 @@ import {
  *   popup と会場で「誰を出すか」がズレたら、それは描画/表示間引き(visibleSeats)層のバグ=ここではない。
  */
 const VENUE_ROSTER_ENABLED = false;
+/**
+ * 発言パネル(アイコンクリックで開く)に出す最大件数。新しい方から採る。
+ * 上限を設けるのは、1配信で数百件しゃべる人がいてもパネルが実用的な長さに収まるようにするため。
+ * 全件数は見出しに併記するので「切られた」ことは読み手に伝わる(黙って切らない)。
+ */
+const VENUE_SPEECH_PANEL_MAX = 200;
 import { resolveDisplayRows } from '../lib/venueDisplayRows.js';
 import { runStorageOpWithTimeout, STORAGE_OP_TIMED_OUT } from '../lib/storageOpTimeout.js';
 import { buildVenueResidents } from '../lib/venueResidents.js';
@@ -1416,6 +1424,27 @@ const VENUE_CSS = `
     text-overflow: ellipsis;
     white-space: nowrap;
   }
+  /*
+   * 2026-07-31: 発言パネル(クリックで開く)は本文を読ませるのが目的なので、
+   *   名簿の1行省略(nowrap+ellipsis)を打ち消して折り返す。名簿側の見た目は変えない。
+   */
+  .nlsb-speech-panel .nlsb-roster-who {
+    white-space: normal;
+    overflow: visible;
+    text-overflow: clip;
+    word-break: break-word;
+    line-height: 1.45;
+  }
+  .nlsb-speech-panel .nlsb-roster-badges {
+    flex: 0 0 auto;
+    opacity: 0.7;
+    font-size: 11px;
+    white-space: nowrap;
+  }
+  .nlsb-speech-panel .nlsb-roster-row {
+    align-items: flex-start;
+    gap: 8px;
+  }
   .nlsb-roster-badge {
     display: inline-block;
     margin-left: 4px;
@@ -2331,6 +2360,14 @@ export function mountVenueBarButton(options = {}) {
   bubbleLayer.className = 'nlsb-bubble-layer';
   bubbleLayer.setAttribute('aria-live', 'polite');
   // 診断: メンバー一覧パネル(モーダル風)。DOM はここで作り、描画関数は下(lastRosterInput 宣言後)で定義。
+  // 2026-07-31(ユーザー要望): アイコンをクリックすると、その人の発言を全部読めるパネル。
+  //   ホバーカードは直前の1件しか出せない(マウスを外すと消える小さな吹き出し)ため、
+  //   「この人が何を言ってきたか」を追うにはクリックで開く一覧が要る。
+  //   ★読み込みはクリックした瞬間だけ(comeview の同型実装と同じ方針)=常時のstorage readは増やさない。
+  const speechPanel = document.createElement('div');
+  speechPanel.className = 'nlsb-roster-panel nlsb-speech-panel';
+  speechPanel.hidden = true;
+
   const rosterPanel = document.createElement('div');
   rosterPanel.className = 'nlsb-roster-panel';
   rosterPanel.hidden = true;
@@ -2343,7 +2380,7 @@ export function mountVenueBarButton(options = {}) {
   //   DOM数は人数非依存)。stage.appendの最後に置くことで、同z-index(6)の常駐レイヤーより
   //   DOM順で手前に来る。
   const hoverCardEl = createVenueHoverCardEl(document);
-  stage.append(stageLayout, bubbleLayer, rosterPanel, diagPanel, hoverCardEl);
+  stage.append(stageLayout, bubbleLayer, rosterPanel, speechPanel, diagPanel, hoverCardEl);
 
   // 2026-07-30(wayfinder→to-spec方式・venue-avatar-hover-preview-SPEC.md §4.3/§7):
   //   委譲リスナー2個(seatsHost/topBarList)+シングルトンカードのみ。タイル個別リスナー・
@@ -2498,6 +2535,29 @@ export function mountVenueBarButton(options = {}) {
   };
   wireHoverCardDelegation(seatsHost);
   wireHoverCardDelegation(topBarList);
+
+  /**
+   * v0.1.1205: アイコンをクリックしたら、その人の発言を全部出すパネルを開く。
+   *   ホバーカードは直前1件しか出せないので、「何を言ってきたか」を追う導線をここで足す。
+   *   ★席・トップバーのどちらでも動くよう、ホバーと同じ委譲方式にする。
+   *   ★storage read はクリックの瞬間だけ(openSpeechPanelFor の中)=常時readは増えない。
+   * @param {HTMLElement} host
+   */
+  const wireSpeechPanelDelegation = (host) => {
+    host.addEventListener('click', (e) => {
+      const anchorEl = e.target instanceof HTMLElement
+        ? e.target.closest('.nlsb-seat, .nlsb-topbar-cell')
+        : null;
+      if (!(anchorEl instanceof HTMLElement)) return;
+      const data = _hoverCardDataByEl.get(anchorEl) || resolveSeatlessHoverData(anchorEl);
+      const uid = String(data?.uid || '').trim();
+      if (!uid) return; // uid が無い(広告主等)は発言記録に紐づかない=何も開かない
+      closeHoverCard();
+      void openSpeechPanelFor({ uid, displayName: String(data?.displayName || '') });
+    });
+  };
+  wireSpeechPanelDelegation(seatsHost);
+  wireSpeechPanelDelegation(topBarList);
   // ドラッグスクロール中・スクロール中はカードを浮遊させたまま残さない(即閉じ)。
   seatsHost.addEventListener('pointerdown', closeHoverCard);
   seatsHost.addEventListener('scroll', closeHoverCard);
@@ -3419,6 +3479,106 @@ export function mountVenueBarButton(options = {}) {
     if (target && rosterPanel.contains(target)) return; // パネル内は維持
     toggleRosterPanel(false);
   };
+  // ───────── 発言パネル(アイコンクリックで開く・v0.1.1205) ─────────
+  /**
+   * 発言パネル用にこの配信の記録を読む。
+   * ★呼ばれるのはクリックの瞬間だけ(常時のstorage readは1件も増やさない)。
+   *   大配信では read が browser process を詰まらせる既知の地雷があるため、
+   *   タイムアウト付きで走らせ、失敗しても会場の描画は止めない。
+   * @param {string} liveId
+   * @returns {Promise<any[]>}
+   */
+  const readVenueCommentRowsForSpeech = async (liveId) => {
+    const lid = String(liveId || '').trim();
+    if (!lid) return [];
+    try {
+      const result = await runStorageOpWithTimeout(
+        () => readChunkedComments(lid, commentsStorageKey(lid), (keys) => chrome.storage.local.get(keys)),
+        8000
+      );
+      return Array.isArray(result?.rows) ? result.rows : [];
+    } catch {
+      return [];
+    }
+  };
+
+  /** @param {MouseEvent} event */
+  const onSpeechOutsideClick = (event) => {
+    if (speechPanel.hidden) return;
+    const target = /** @type {Node|null} */ (event.target);
+    if (target && speechPanel.contains(target)) return;
+    closeSpeechPanel();
+  };
+  const closeSpeechPanel = () => {
+    speechPanel.hidden = true;
+    stage.removeEventListener('click', onSpeechOutsideClick);
+  };
+  /**
+   * その人の全発言を読み込んでパネルに出す。
+   * ★storage read はこの関数の中だけ=クリックした瞬間だけ(常時readを増やさない)。
+   * @param {{ uid: string, displayName: string }} who
+   */
+  const openSpeechPanelFor = async (who) => {
+    const uid = String(who?.uid || '').trim();
+    const name = String(who?.displayName || '').trim() || uid || '(名前なし)';
+    if (!uid) return; // uid が無い人(広告主等)は発言記録に紐づかない
+    const head =
+      `<div class="nlsb-roster-head">` +
+      `<span class="nlsb-roster-title">${escapeHtml(name)} の発言</span>` +
+      `<button type="button" class="nlsb-roster-close" aria-label="閉じる">✕</button>` +
+      `</div>`;
+    speechPanel.innerHTML = `${head}<div class="nlsb-roster-list"><div class="nlsb-roster-empty">読み込み中…</div></div>`;
+    speechPanel.hidden = false;
+    const closeBtnEl = speechPanel.querySelector('.nlsb-roster-close');
+    if (closeBtnEl) closeBtnEl.addEventListener('click', () => closeSpeechPanel());
+    setTimeout(() => {
+      if (!speechPanel.hidden) stage.addEventListener('click', onSpeechOutsideClick);
+    }, 0);
+
+    /** @type {Array<{ text?: unknown, capturedAt?: unknown }>} */
+    let rows = [];
+    let total = 0;
+    try {
+      const lid = String(activeLiveId || liveIdFromPathname() || '');
+      const raw = await readVenueCommentRowsForSpeech(lid);
+      const picked = extractUserCommentRows(raw, uid, VENUE_SPEECH_PANEL_MAX);
+      rows = picked.rows;
+      total = picked.total;
+    } catch {
+      rows = [];
+      total = 0;
+    }
+    if (speechPanel.hidden) return; // 読み込み中に閉じられた
+
+    const listHtml = rows.length
+      ? rows
+          .slice()
+          .reverse() // 新しい順に読めるほうが「直前に何を言ったか」を追いやすい
+          .map((r) => {
+            const t = String(r?.text || '').trim();
+            if (!t) return '';
+            const at = Number(r?.capturedAt) || 0;
+            const rel = at > 0 ? formatVenueHoverRelativeTime(at, Date.now()) : '';
+            return (
+              `<div class="nlsb-roster-row">` +
+              `<span class="nlsb-roster-who">${escapeHtml(t)}</span>` +
+              `<span class="nlsb-roster-badges">${escapeHtml(rel)}</span>` +
+              `</div>`
+            );
+          })
+          .join('')
+      : '';
+    const note = total > rows.length ? `（新しい ${rows.length} 件を表示 / 全 ${total} 件）` : `（全 ${total} 件）`;
+    speechPanel.innerHTML =
+      `<div class="nlsb-roster-head">` +
+      `<span class="nlsb-roster-title">${escapeHtml(name)} の発言${escapeHtml(total ? note : '')}</span>` +
+      `<button type="button" class="nlsb-roster-close" aria-label="閉じる">✕</button>` +
+      `</div>` +
+      `<div class="nlsb-roster-list">${listHtml || '<div class="nlsb-roster-empty">この配信の記録にはまだ発言がありません</div>'}</div>`;
+    const closeBtn2 = speechPanel.querySelector('.nlsb-roster-close');
+    if (closeBtn2) closeBtn2.addEventListener('click', () => closeSpeechPanel());
+  };
+
   /** @param {boolean} [force] */
   const toggleRosterPanel = (force) => {
     const next = typeof force === 'boolean' ? force : rosterPanel.hidden;

@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1205',
+    date: '2026-07-31',
+    summary: '会場のアイコンをクリックすると、その方の発言を全部読めるように',
+    items: Object.freeze([
+      '会場モードで参加者のアイコンをクリックすると、その方がこの配信でした発言の一覧が開くようになりました(新しい順・最大200件・全件数も表示)。マウスを乗せたときのカードは直前の1件しか出せないため、まとめて読みたいときはクリックしてください。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1204',
     date: '2026-07-31',
     summary: '拡張が重くなる原因を解消(v0.1.1201の不具合)',

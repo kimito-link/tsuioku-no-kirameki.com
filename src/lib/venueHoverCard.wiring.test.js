@@ -21,9 +21,20 @@ const laneMirrorSrc = read('src/lib/laneMirror.js');
 
 describe('会場ホバープレビューカードの配線(配線忘れ=CI赤)', () => {
   it('venueBar が venueHoverCard の全関数を import している', () => {
-    expect(venueBarSrc).toMatch(
-      /import\s*\{\s*readVenueTileThumbState,\s*buildVenueHoverCardModel,\s*createVenueHoverCardEl,\s*renderVenueHoverCard,\s*resolveVenueHoverCardPlacement\s*\}\s*from\s*'\.\.\/lib\/venueHoverCard\.js'/
-    );
+    // import ブロックを切り出して、必要な関数が全て入っていることを個別に断言する。
+    //   (1本の正規表現で並び順まで固定すると、関数を1つ足すたびに壊れて本質を見失う)
+    const m = venueBarSrc.match(/import\s*\{([\s\S]*?)\}\s*from\s*'\.\.\/lib\/venueHoverCard\.js'/);
+    expect(m).toBeTruthy();
+    const names = String(m?.[1] || '');
+    for (const fn of [
+      'readVenueTileThumbState',
+      'buildVenueHoverCardModel',
+      'createVenueHoverCardEl',
+      'renderVenueHoverCard',
+      'resolveVenueHoverCardPlacement'
+    ]) {
+      expect(names).toContain(fn);
+    }
   });
 
   it('venueBar が stage にカードを append している', () => {
@@ -144,6 +155,43 @@ describe('会場ホバープレビューカードの配線(配線忘れ=CI赤)',
     expect(loopAt).toBeGreaterThanOrEqual(0);
     const loopHead = venueBarSrc.slice(loopAt, loopAt + 400);
     expect(loopHead).toMatch(/seatIndexRaw\s*<\s*0\)\s*continue/);
+  });
+
+  // 2026-07-31(ユーザー要望): アイコンをクリックすると全発言を読めるパネル。
+  //   ホバーカードは直前1件しか出せないため、「何を言ってきたか」を追う導線が別途要る。
+  describe('発言パネル(クリックで開く)の配線', () => {
+    it('クリック委譲が席・トップバーの両方に張られている', () => {
+      expect(venueBarSrc).toMatch(/wireSpeechPanelDelegation\(seatsHost\)/);
+      expect(venueBarSrc).toMatch(/wireSpeechPanelDelegation\(topBarList\)/);
+    });
+
+    it('storage read はクリック時だけ(paint経路に持ち込まない)', () => {
+      // ★常時 read を増やすと大配信で browser process が詰まる(既知の地雷)。
+      //   読み込み関数は発言パネルを開く関数の中からのみ呼ばれること。
+      expect(venueBarSrc).toMatch(/const readVenueCommentRowsForSpeech\s*=/);
+      const callAt = venueBarSrc.indexOf('await readVenueCommentRowsForSpeech(');
+      expect(callAt).toBeGreaterThan(0);
+      const openAt = venueBarSrc.indexOf('const openSpeechPanelFor');
+      expect(openAt).toBeGreaterThan(0);
+      expect(callAt).toBeGreaterThan(openAt); // 呼び出しは openSpeechPanelFor の内側
+      // renderSeats(paint本体)からは呼ばれないこと。
+      const renderAt = venueBarSrc.indexOf('const renderSeats = (rows) =>');
+      const paintBlock = venueBarSrc.slice(renderAt, renderAt + 40000);
+      expect(paintBlock).not.toContain('readVenueCommentRowsForSpeech(');
+    });
+
+    it('uid が無い人(広告主等)ではパネルを開かない(発言記録に紐づかない)', () => {
+      const wireAt = venueBarSrc.indexOf('const wireSpeechPanelDelegation');
+      const block = venueBarSrc.slice(wireAt, wireAt + 900);
+      expect(block).toMatch(/if \(!uid\) return/);
+    });
+
+    it('表示上限があり、全件数を併記する(黙って切らない)', () => {
+      expect(venueBarSrc).toMatch(/VENUE_SPEECH_PANEL_MAX\s*=\s*\d+/);
+      const openAt = venueBarSrc.indexOf('const openSpeechPanelFor');
+      const block = venueBarSrc.slice(openAt, openAt + 3000);
+      expect(block).toMatch(/全 \$\{total\} 件/);
+    });
   });
 
   it('.nlsb-hover-card__id に格下げのfont-sizeが設定されている', () => {

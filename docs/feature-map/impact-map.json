@@ -1016,6 +1016,20 @@
       ]
     },
     {
+      "file": "src/lib/comeviewActions.js",
+      "featureCount": 3,
+      "features": [
+        "comeview",
+        "content",
+        "venue"
+      ],
+      "labels": [
+        "コメビュ(別窓)",
+        "記録エンジン(watchページ常駐)",
+        "会場モード(standalone)"
+      ]
+    },
+    {
       "file": "src/lib/commentDb.js",
       "featureCount": 3,
       "features": [
@@ -3589,16 +3603,6 @@
       ],
       "labels": [
         "記録エンジン(watchページ常駐)"
-      ]
-    },
-    {
-      "file": "src/lib/comeviewActions.js",
-      "featureCount": 1,
-      "features": [
-        "comeview"
-      ],
-      "labels": [
-        "コメビュ(別窓)"
       ]
     },
     {
