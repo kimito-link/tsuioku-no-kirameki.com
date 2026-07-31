@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1201',
+    date: '2026-07-31',
+    summary: '広告主のアイコンにもホバーカードが出るように',
+    items: Object.freeze([
+      '会場モードで、広告ランキング由来の広告主(#1・#5 などの番号が付く方)のアイコンにマウスを乗せても何も表示されなかった問題を修正しました。表示名と「広告」のカードが出るようになります。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1200',
     date: '2026-07-31',
     summary: '広告・ギフトの方のホバー表示を「投げたタイミング」に',

@@ -451,6 +451,24 @@ describe('buildVenueHoverCardModel: lastAt相対時刻のstatLine反映(MVP-2)',
       expect(model.statLine).toContain('🎁3');
     });
 
+    // 2026-07-31(ユーザー指摘): 広告段の #1/#5 等は uid を持たず席が割り当たらないため、
+    //   ホバーカードのデータが一度も登録されず「ホバーしても無反応」だった。席なしでも
+    //   カードを出せるよう、uid・lastAt が無くても表示名とラベルだけで成立することを固定する。
+    it('席なし広告主(uid無し・lastAt無し)でも表示名とラベルが出る', () => {
+      const model = buildVenueHoverCardModel({
+        uid: '', displayName: 'ヨミヒトシラズ', count: 0, hasGift: false, giftCount: 0,
+        venueRank: 0, thumb: baseThumb, tier: 'ad'
+      });
+      expect(model.displayName).toBe('ヨミヒトシラズ');
+      expect(model.statLine).toBe('広告');
+      // uid が無いので ID 行は出さない(空欄や「ID:」だけの行を作らない)。
+      expect(model.idLine).toBe('');
+      expect(model.idKind).toBe('none');
+      // count:0 が「発言 0」として漏れ出さないこと(投擲段は件数を出さない設計)。
+      expect(model.statLine).not.toContain('発言');
+      expect(model.statLine).not.toContain('0');
+    });
+
     it('時刻が取れない投擲段は件数を出さずラベルだけにする(嘘を作らない)', () => {
       const ad = buildVenueHoverCardModel({
         uid: '1', displayName: 'x', count: 1, hasGift: false, giftCount: 0, venueRank: 0,
