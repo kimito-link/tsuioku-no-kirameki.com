@@ -1110,24 +1110,41 @@ ${anonymousBlock}
   var section = input.closest('.mkt-section--thumb-grid');
   if (!section) return;
   var cells = Array.prototype.slice.call(section.querySelectorAll('.mkt-thumb-grid__cell'));
-  var headings = Array.prototype.slice.call(section.querySelectorAll('.mkt-thumb-grid__heading'));
   var total = cells.length;
+  // \u2605hay \u306F\u521D\u56DE\u306B1\u5EA6\u3060\u3051\u8AAD\u3093\u3067\u914D\u5217\u306B\u6301\u3064(\u5165\u529B\u306E\u305F\u3073\u306B getAttribute \u3057\u306A\u3044)\u3002
+  //   \u30BB\u30EB\u3054\u3068\u306E\u6240\u5C5E\u30EA\u30B9\u30C8\u3082\u5148\u306B\u63A7\u3048\u3066\u304A\u304D\u3001\u898B\u51FA\u3057\u306E\u8868\u793A\u5224\u5B9A\u3092 O(\u30EA\u30B9\u30C8\u6570) \u3067\u7D42\u3048\u308B\u3002
+  var hays = [];
+  var lists = [];
+  var cellList = [];
+  for (var p = 0; p < cells.length; p++) {
+    hays.push(String(cells[p].getAttribute('data-search') || ''));
+    var parent = cells[p].parentElement;
+    var li = lists.indexOf(parent);
+    if (li === -1) { li = lists.length; lists.push(parent); }
+    cellList.push(li);
+  }
   var update = function () {
     var kw = String(input.value || '').toLowerCase().trim();
     var visible = 0;
+    var liveByList = [];
+    for (var z = 0; z < lists.length; z++) liveByList.push(0);
     for (var i = 0; i < cells.length; i++) {
-      var hay = String(cells[i].getAttribute('data-search') || '');
-      var hit = !kw || hay.indexOf(kw) !== -1;
+      var hit = !kw || hays[i].indexOf(kw) !== -1;
       cells[i].style.display = hit ? '' : 'none';
-      if (hit) visible++;
+      if (hit) { visible++; liveByList[cellList[i]]++; }
     }
     // \u898B\u51FA\u3057(\u6570\u5024ID/\u533F\u540D)\u306F\u3001\u305D\u306E\u76F4\u5F8C\u306E\u30EA\u30B9\u30C8\u304C\u5168\u6EC5\u3057\u305F\u3089\u4E00\u7DD2\u306B\u96A0\u3059\u3002
-    for (var h = 0; h < headings.length; h++) {
-      var list = headings[h].nextElementSibling;
+    //   \u3053\u3053\u3067 querySelector \u3092\u4F7F\u3046\u3068\u5165\u529B\u306E\u305F\u3073\u306B\u5168\u8D70\u67FB\u306B\u306A\u308A\u91CD\u3044(2026-07-31 \u306E\u5B9F\u6E2C\u3067
+    //   \u30DE\u30FC\u30B1\u5206\u6790\u304C\u958B\u304B\u306A\u304F\u306A\u3063\u305F)\u3002\u4E0A\u3067\u6570\u3048\u305F\u4EF6\u6570\u3060\u3051\u3067\u5224\u5B9A\u3059\u308B\u3002
+    for (var h = 0; h < lists.length; h++) {
+      var list = lists[h];
       if (!list) continue;
-      var any = list.querySelector('.mkt-thumb-grid__cell:not([style*="display: none"])');
-      headings[h].style.display = any ? '' : 'none';
+      var any = liveByList[h] > 0;
       list.style.display = any ? '' : 'none';
+      var heading = list.previousElementSibling;
+      if (heading && heading.classList && heading.classList.contains('mkt-thumb-grid__heading')) {
+        heading.style.display = any ? '' : 'none';
+      }
     }
     if (!kw) {
       result.textContent = '\u691C\u7D22\u5BFE\u8C61: ' + total + ' \u540D';
