@@ -426,6 +426,50 @@ describe('buildVenueHoverCardModel: lastAt相対時刻のstatLine反映(MVP-2)',
     expect(onlyNowMs.statLine).toBe('発言 12');
   });
 
+  // 2026-07-31(ユーザー指摘): 広告段/ギフト段に載る条件は「投げたこと」で発言ではない。
+  //   しかも count は preCount の最低1仕様(venueLaneMirrorSupply.js:100)で発言0でも1になるため、
+  //   「発言 1(たった今)」という二重の嘘が出ていた。投擲段では件数を出さず時刻だけを出す。
+  describe('段による出し分け(投擲段は「発言」と言わない)', () => {
+    it('広告段は「広告(◯分前)」で、発言件数を出さない', () => {
+      const model = buildVenueHoverCardModel({
+        uid: '58269373', displayName: 'たつ', count: 1, hasGift: false, giftCount: 0, venueRank: 0,
+        thumb: baseThumb, lastAt: 1000, nowMs: 1000 + 3 * 60_000, tier: 'ad'
+      });
+      expect(model.statLine).toContain('広告(3分前)');
+      expect(model.statLine).not.toContain('発言');
+      expect(model.statLine).not.toContain('1');
+    });
+
+    it('ギフト段は「ギフト(◯分前)」になる', () => {
+      const model = buildVenueHoverCardModel({
+        uid: '1', displayName: 'x', count: 1, hasGift: true, giftCount: 3, venueRank: 0,
+        thumb: baseThumb, lastAt: 1000, nowMs: 1000 + 30_000, tier: 'gift'
+      });
+      expect(model.statLine).toContain('ギフト(');
+      expect(model.statLine).not.toContain('発言');
+      // 🎁件数は投擲段でも意味があるので従来どおり併記される。
+      expect(model.statLine).toContain('🎁3');
+    });
+
+    it('時刻が取れない投擲段は件数を出さずラベルだけにする(嘘を作らない)', () => {
+      const ad = buildVenueHoverCardModel({
+        uid: '1', displayName: 'x', count: 1, hasGift: false, giftCount: 0, venueRank: 0,
+        thumb: baseThumb, tier: 'ad'
+      });
+      expect(ad.statLine).toBe('広告');
+    });
+
+    it('発言段(link/konta/tanu)と段未指定は従来どおり「発言N」(後方互換恒等)', () => {
+      for (const tier of ['link', 'konta', 'tanu', '', undefined]) {
+        const model = buildVenueHoverCardModel({
+          uid: '1', displayName: 'x', count: 12, hasGift: false, giftCount: 0, venueRank: 0,
+          thumb: baseThumb, lastAt: 1000, nowMs: 1000 + 3 * 60_000, tier
+        });
+        expect(model.statLine).toContain('発言 12(3分前)');
+      }
+    });
+  });
+
   it('相対時刻が空文字を返すケース(30日超)は括弧ごと省略される', () => {
     const model = buildVenueHoverCardModel({
       uid: '1', displayName: 'x', count: 5, hasGift: false, giftCount: 0, venueRank: 0,
