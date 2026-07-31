@@ -19,6 +19,16 @@
  *   timeoutMs: 個別タイムアウト（省略時は各 xxxChat の既定値）。
  *   requires:  このエントリを有効化するのに必要な env キー名の配列（'G'|'N'|'O'|'E'|'CF'|'CF_ACC'）。
  *              meeting.mjs 側で解決済みの真偽フラグと突き合わせて if 判定する。
+ *   liveProbe: true なら council-scout が毎日実疎通(chat/completions 1発)を確認する
+ *              （2026-07-31追加）。カタログ照合(rawId)では「一覧に存在するが実際は呼べない」
+ *              劣化（例: 有料プラン専用化）を検知できないため、その種の事象が実証された
+ *              プロバイダにだけ付ける。省略時はfalse相当（カタログ照合のみ）。
+ *
+ * 【rawIdを空にする場合の必須ルール】(2026-07-31追記):
+ * rawId空＝council-scoutのカタログ照合(健康診断)から丸ごと除外される。2026-07-31時点で
+ * 17体中9体(53%)がrawId空になっており、その間にnvidia/mistral-large-3-675bのEOL消滅を
+ * 8日間検知できなかった実害が出た。今後rawIdを空にする場合は、(a)エントリコメントに
+ * 理由を書く、(b)liveProbe:trueで代替監視を付ける、のどちらかを必須とする。
  */
 export const LINEUP = [
   { label: 'groq/gpt-oss-120b', provider: 'groq', rawId: 'openai/gpt-oss-120b', apiModel: 'openai/gpt-oss-120b', opts: { reasoning_effort: 'low' }, requires: ['G'] },
@@ -61,34 +71,66 @@ export const LINEUP = [
   // Cloudflare Workers AI（2026-06-27 実機で 200＋本文を裏取りして採用。X 一覧は鵜呑みにせず叩いて確認）。
   //  - 採用基準: 会議に「無い能力」を足すものだけ。gpt-oss-120b / llama-3.3-70b は Groq 等で既出なので CF では足さない。
   //  - nemotron-3-120b: どこにも無い大型の別頭脳 → 汎用(generalist)。/ai/models/search で実在確認済み。
-  //  - glm-5.2:        reasoning_content を別フィールドで返す強い推論 → 批判(critic)。content は既にクリーンなので stripThinking で十分。
-  //  - kimi-k2.7-code: コード特化 → 実装(implement)。
-  //  ※ いずれも openaiChat 流用可（OpenAI互換）。役割は council-roles の roleOf が label から自動付与（glm/kimi+code 用に1行追記済）。
+  //  ※ いずれも openaiChat 流用可（OpenAI互換）。役割は council-roles の roleOf が label から自動付与。
   //  2026-06-27実機確認: 会議の並列実負荷でFAILEDしやすい→ weightOf で reserve層(weight4)に格下げ済み。
-  //  timeout はここで明示（nemotronは61秒成功実績があるため45秒では誤殺するので90秒、glm/kimiは60秒）。
-  { label: 'cloudflare/nemotron-120b', provider: 'cloudflare', rawId: '', apiModel: '@cf/nvidia/nemotron-3-120b-a12b', opts: {}, timeoutMs: 90000, requires: ['CF', 'CF_ACC'] },
-  { label: 'cloudflare/glm-5.2', provider: 'cloudflare', rawId: '', apiModel: '@cf/zai-org/glm-5.2', opts: {}, timeoutMs: 60000, requires: ['CF', 'CF_ACC'] },
-  { label: 'cloudflare/kimi-k2.7-code', provider: 'cloudflare', rawId: '', apiModel: '@cf/moonshotai/kimi-k2.7-code', opts: {}, timeoutMs: 60000, requires: ['CF', 'CF_ACC'] },
+  //  timeout はここで明示（nemotronは61秒成功実績があるため45秒では誤殺するので90秒）。
+  //  2026-07-31: rawIdをapiModelと同値で埋めた（従来空だったため健康診断の対象外になっていた）。
+  //  CFの/ai/models/searchは実測で毎日安定取得できており、素通しにする理由が既に消えている。
+  //  liveProbe:true も付与（下記glm-5.2/kimi-k2.7-codeの有料化発覚を受け、カタログ照合だけでは
+  //  検知できない「一覧に存在するが無料枠では呼べない」劣化を実疎通で毎日確認する）。
+  { label: 'cloudflare/nemotron-120b', provider: 'cloudflare', rawId: '@cf/nvidia/nemotron-3-120b-a12b', apiModel: '@cf/nvidia/nemotron-3-120b-a12b', opts: {}, timeoutMs: 90000, requires: ['CF', 'CF_ACC'], liveProbe: true },
+
+  // 2026-06-27 追加 → 2026-07-31 撤去（cloudflare/glm-5.2, cloudflare/kimi-k2.7-code）:
+  //   実機でCloudflare Workers AI /ai/v1/chat/completions を叩いたところ両モデルとも
+  //   "AiError: Model is not available on the Workers Free plan: This model requires a
+  //   Workers Paid plan." で401/403。モデルカタログ(/ai/models/search)には今も両方
+  //   載っており、rawId空(=健康診断対象外)だったためcouncil-scoutは「消滅疑いなし」と
+  //   誤診断し続けていた。カタログ照合では原理的に検知不可能な劣化パターン（有料プラン
+  //   専用化）であり、これがliveProbe機構(上記)を新設した直接の動機。
+  //   役割の穴: glm-5.2(critic)は同役割・同プロバイダの glm-4.7-flash が無料枠で稼働中
+  //   →実質的な後退なし。kimi-k2.7-code(implement)はローカルqwen2.5-coder:14bのみが残るが、
+  //   weightOfでCF勢(weight4)がローカル(weight5)より軽く扱われていたため、撤去前は
+  //   codeカテゴリのimplement枠を死んだkimiが毎回先取りしFAILEDさせていた（現在進行形の実害）。
+  //   Ollama停止時はROLE_FALLBACK(implement→fast→generalist)が代打するため会議は成立する。
+  //   復活検知は不可: 撤去後もCFカタログに残り続けるため、差分ベースのscoutは二度と
+  //   「新着候補」として拾わない。無料化に気づいたら `node scripts/scout-models.mjs
+  //   --probe-only @cf/zai-org/glm-5.2 --provider cloudflare` 等で手動裏取りしてから再採用会議へ。
 
   // 2026-07-04 追加: glm-5.2(不安定)の軽量flash版。並列実負荷での安定性トライアル中。
   // トライアル判定: QUALITY会議2回でFAILEDゼロ→glm-5.2を撤去して一本化。1回でもFAILEDなら本モデルを撤去。
   // 実IDは /ai/models/search で実機確認済み(@cf/zai-org/glm-4.7-flash)。単発疎通は200 OK確認済み。
-  { label: 'cloudflare/glm-4.7-flash', provider: 'cloudflare', rawId: '', apiModel: '@cf/zai-org/glm-4.7-flash', opts: {}, timeoutMs: 60000, requires: ['CF', 'CF_ACC'] },
+  // 2026-07-31: glm-5.2が有料化により強制撤去されたため、このモデルがcritic役の一本に
+  // 確定した（トライアル判定は事実上「合格」で終了）。rawId埋め＋liveProbe追加は上記と同じ理由。
+  { label: 'cloudflare/glm-4.7-flash', provider: 'cloudflare', rawId: '@cf/zai-org/glm-4.7-flash', apiModel: '@cf/zai-org/glm-4.7-flash', opts: {}, timeoutMs: 60000, requires: ['CF', 'CF_ACC'], liveProbe: true },
 
-  { label: 'nvidia/qwen3.5-122b', provider: 'nvidia', rawId: '', apiModel: 'qwen/qwen3.5-122b-a10b', opts: { chat_template_kwargs: { thinking: false } }, requires: ['N'] },
+  // 2026-06-?? 追加 → 2026-07-31 撤去（nvidia/qwen3.5-122b）:
+  //   本改修でrawIdを空('')からapiModelと同値('qwen/qwen3.5-122b-a10b')に埋め、
+  //   council-scoutの健康診断が初めて機能した結果、実行直後にカタログ不在を検知
+  //   （adoptedHealthに`nvidia:qwen/qwen3.5-122b-a10b`のmissingStreak=1が記録された）。
+  //   念のため実機で直接叩いて確認したところ HTTP 410 Gone（mistral-large-3-675bと
+  //   同一のEOLパターン）。NIM現行モデル一覧(102件)にも不在。復活の見込みなし。
+  //   役割の穴: diverge役はgroq/qwen3.6-27b・ローカルqwen3.5:9b/qwen3:14bが健在で
+  //   問題なし。もともとweight2(NIM不安定枠)の予備的な位置づけだったため実害は小さい。
+  //   rawId空のまま8日以上放置されていれば同じくmistral-large型の長期未検知になっていた
+  //   （rawId全数埋めの効果を初回実行で即座に実証した事例として記録）。
 
-  // 2026-07-14 追加: NIM無料枠の全121モデルを実機一覧取得→大型候補抽出→2並列200 OK裏取り
-  // →会議諮問(慎重派/発散派の対立)→Fable設計で採用。詳細はmemory/council-llm-lineup-upgrade
-  // 系ファイル参照。labelの"mistral-large"/"nemotron-3-ultra"/"deepseek-v4"の綴りが
-  // roleOf/weightOfの判定に直結するので変更しないこと。
-  //  - mistral-large-3-675b: 675B。会議のlead(統括)枠が従来local/gemma4(8B)頼みで
-  //    全役割中最弱だった穴を埋める本命。roleOfでlead・weightOfは既存nvidiaルールでweight2。
-  //  - nemotron-3-ultra-550b: 550BのNVIDIA自社大型。leadの2番手予備(weight3)。
+  // 2026-07-14 追加 → 2026-07-23 EOL（nvidia/mistral-large-3-675b）:
+  //   会議のlead(統括)枠が従来local/gemma4(8B)頼みで全役割中最弱だった穴を埋める本命として
+  //   採用したが、NVIDIA側が2026-07-23T09:00:00Zに正式にEOL(提供終了)。実機で叩くと
+  //   HTTP 410 "has reached its end of life ... and is no longer available"。NIMの現行
+  //   モデル一覧からも完全に消滅済み(復活の見込みなし＝メンテ落ちでなく提供終了宣言のため)。
+  //   rawIdが空だったため council-scout のカタログ照合が効かず、発覚が2026-07-31まで
+  //   8日遅れた。これがrawId全数埋めルール(このファイル冒頭)を新設した最大の動機。
+  //   lead役の後継: 同時に予備採用していた nemotron-3-ultra-550b を正規(weight2)に格上げ
+  //   （council-roles.mjs weightOf 参照）。roleOfの"mistral-large"判定行は削除しない
+  //   （mistral-large-2系など将来の同名系統モデル採用時にそのまま効く無害な行のため）。
+  //  - nemotron-3-ultra-550b: 550BのNVIDIA自社大型。lead正規(weight2、2026-07-31格上げ)。
   //  - deepseek-v4-pro: 実測5〜15秒とやや遅いが並列会議では律速にならない。criticの予備(weight3)。
   //    ※ nvidia/llama-3.1-nemotron-ultra-253b-v1 は404で現在アクセス不可・採用禁止。
-  { label: 'nvidia/mistral-large-3-675b', provider: 'nvidia', rawId: '', apiModel: 'mistralai/mistral-large-3-675b-instruct-2512', opts: {}, timeoutMs: 90000, requires: ['N'] },
-  { label: 'nvidia/nemotron-3-ultra-550b', provider: 'nvidia', rawId: '', apiModel: 'nvidia/nemotron-3-ultra-550b-a55b', opts: {}, timeoutMs: 90000, requires: ['N'] },
-  { label: 'nvidia/deepseek-v4-pro', provider: 'nvidia', rawId: '', apiModel: 'deepseek-ai/deepseek-v4-pro', opts: {}, timeoutMs: 120000, requires: ['N'] },
+  //   2026-07-31: rawIdをapiModelと同値で埋めた（NVIDIA NIMのカタログ取得自体は毎日
+  //   安定成功しているため、rawId空にしていたことに合理的理由が無かった）。
+  { label: 'nvidia/nemotron-3-ultra-550b', provider: 'nvidia', rawId: 'nvidia/nemotron-3-ultra-550b-a55b', apiModel: 'nvidia/nemotron-3-ultra-550b-a55b', opts: {}, timeoutMs: 90000, requires: ['N'] },
+  { label: 'nvidia/deepseek-v4-pro', provider: 'nvidia', rawId: 'deepseek-ai/deepseek-v4-pro', apiModel: 'deepseek-ai/deepseek-v4-pro', opts: {}, timeoutMs: 120000, requires: ['N'] },
 
   { label: 'gemini-2.5-flash', provider: 'gemini', rawId: 'gemini-2.5-flash', apiModel: 'gemini-2.5-flash', opts: {}, requires: ['E'] },
 
@@ -99,6 +141,14 @@ export const LINEUP = [
   // memory/council-llm-lineup-upgrade-2026-07-03.md 参照）。
   { label: 'gemini-3.5-flash', provider: 'gemini', rawId: 'gemini-3.5-flash', apiModel: 'gemini-3.5-flash', opts: {}, requires: ['E'] },
 
-  // OpenRouter は無料枠で 429 が出やすい=予備の1票(reference-free-cloud-llm-apis.md)。
-  { label: 'openrouter/gpt-oss-120b', provider: 'openrouter', rawId: '', apiModel: 'openai/gpt-oss-120b:free', opts: { reasoning_effort: 'low' }, requires: ['O'] },
+  // 2026-06-?? 追加 → 2026-07-31 撤去（openrouter/gpt-oss-120b）:
+  //   本改修でrawIdを空('')から'openai/gpt-oss-120b:free'に埋めた直後の初回実行で
+  //   カタログ不在を検知（adoptedHealthにmissingStreak=1として記録）。実機で直接叩いて
+  //   確認したところ HTTP 404、エラー本文:「This model is unavailable for free. The
+  //   paid version is available now - use this slug instead: openai/gpt-oss-120b」。
+  //   OpenRouterが120bの無料枠提供を終了し、20b版のみ無料枠に残す方針に変更した模様
+  //   （実際 /models 一覧には 'openai/gpt-oss-20b:free' は存在する）。
+  //   役割の穴: このエントリは元々「予備の1票」（コメント参照）。critic役はgroq勢+
+  //   nvidia/deepseek-v4-proが健在で実害なし。gpt-oss-20b:freeへの乗り換えは今回は
+  //   見送り（groq/gpt-oss-20bと役割・系統が重複するため採用価値が薄い。未検証）。
 ];

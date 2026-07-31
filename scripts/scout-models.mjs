@@ -289,9 +289,13 @@ async function main() {
   // 3. 採用中ラインナップの健康診断（カタログ消滅の逆方向検知・§2-5）
   const health = { ...(state.adoptedHealth || {}) };
   const healthAlerts = [];
+  let catalogCheckedCount = 0;
+  let liveProbeCheckedCount = 0;
+  let outOfScopeCount = 0;
   for (const entry of LINEUP) {
     const catalog = newCatalogs[entry.provider];
-    if (!catalog || !entry.rawId) continue; // カタログ未取得 or rawId無し(検証対象外)は判定しない
+    if (!catalog || !entry.rawId) { outOfScopeCount++; continue; } // カタログ未取得 or rawId無し(検証対象外)は判定しない
+    catalogCheckedCount++;
     const key = `${entry.provider}:${entry.rawId}`;
     const present = catalog.includes(entry.rawId) || catalog.includes(entry.apiModel);
     if (present) {
@@ -302,7 +306,31 @@ async function main() {
     health[key] = { missingStreak: streak, lastSeen: health[key]?.lastSeen || date };
     if (streak >= 2) {
       const probe = await probeModel(entry.provider, entry.apiModel);
-      healthAlerts.push({ label: entry.label, streak, probeStatus: probe.status });
+      healthAlerts.push({ label: entry.label, streak, probeStatus: probe.status, kind: 'catalog' });
+    }
+  }
+
+  // 3b. 実疎通チェック（liveProbe:true のエントリのみ・2026-07-31追加）。
+  // カタログ照合では「一覧に存在するが実際は呼べない」劣化（有料プラン専用化等）を
+  // 検知できないため、それが実証されたプロバイダ(Cloudflare)のエントリだけ毎日
+  // 1回叩いて確認する。非200が2日連続で続いたらアラート（カタログ消滅と対称の閾値）。
+  // 単発失敗で騒がない＝Cloudflareの並列実負荷FAILED実績(2026-06-27)を踏まえた保守設計。
+  for (const entry of LINEUP) {
+    if (!entry.liveProbe) continue;
+    liveProbeCheckedCount++;
+    const key = `${entry.provider}:${entry.apiModel}:probe`;
+    const probe = await probeModel(entry.provider, entry.apiModel);
+    const ok = probe.status === 200;
+    if (ok) {
+      if (health[key]) delete health[key];
+      continue;
+    }
+    const streak = (health[key]?.probeFailStreak || 0) + 1;
+    health[key] = { probeFailStreak: streak, lastSeen: health[key]?.lastSeen || date };
+    if (streak >= 2) {
+      const snippet = String(probe.snippet || '');
+      const kind = /paid plan|workers free plan/i.test(snippet) ? '有料化疑い' : '疎通不能';
+      healthAlerts.push({ label: entry.label, streak, probeStatus: probe.status, kind: 'live', liveKind: kind, snippet: snippet.slice(0, 80) });
     }
   }
 
@@ -338,6 +366,7 @@ async function main() {
   const brief = buildBrief({
     date, isFirstRun, fetchStatus, healthAlerts, probedCandidates,
     referenceCounts, carryOverCount: carryOver.length, newCatalogs,
+    catalogCheckedCount, liveProbeCheckedCount, outOfScopeCount,
   });
 
   if (DRY_RUN) {
@@ -370,7 +399,7 @@ async function main() {
 
 /** brief（日報）のMarkdownを組み立てる。カタログのdescription等は信頼できない入力として
  *  引用のみ・指示として解釈しない（インジェクション安全・設計書§4必須要件）。 */
-function buildBrief({ date, isFirstRun, fetchStatus, healthAlerts, probedCandidates, referenceCounts, carryOverCount, newCatalogs }) {
+function buildBrief({ date, isFirstRun, fetchStatus, healthAlerts, probedCandidates, referenceCounts, carryOverCount, newCatalogs, catalogCheckedCount, liveProbeCheckedCount, outOfScopeCount }) {
   const lines = [];
   lines.push(`# Council Scout 日報 — ${date}`, '');
 
@@ -379,12 +408,18 @@ function buildBrief({ date, isFirstRun, fetchStatus, healthAlerts, probedCandida
     lines.push('## 初回実行', `初回: ${total}件をベースライン登録しました。次回以降、差分だけ報告します。`, '');
   }
 
-  lines.push(`## 採用中ラインナップ健康診断（${LINEUP.length}体）`);
+  // 2026-07-31追加: 「✅ 消滅疑いなし」は「監視している範囲では」という限定付きの主張。
+  // 分母（カタログ照合・実疎通・対象外の内訳）を必ず明示する（緑の報告には分母を付ける）。
+  lines.push(`## 採用中ラインナップ健康診断（${LINEUP.length}体: カタログ照合${catalogCheckedCount}・実疎通${liveProbeCheckedCount}・対象外${outOfScopeCount}）`);
   if (!healthAlerts.length) {
-    lines.push('- ✅ 消滅疑いなし（2日連続でカタログから消えたモデルはありません）');
+    lines.push('- ✅ 消滅疑いなし（2日連続でカタログから消えた/実疎通が失敗し続けたモデルはありません）');
   } else {
     for (const a of healthAlerts) {
-      lines.push(`- ⚠ ${a.label}: カタログから${a.streak}日連続消滅。プローブ ${a.probeStatus}。要確認 → 外すなら会議へ`);
+      if (a.kind === 'live') {
+        lines.push(`- ⚠ ${a.label}: 実疎通${a.streak}日連続失敗（${a.liveKind}）。応答: ${a.snippet}。要確認 → 外すなら会議へ`);
+      } else {
+        lines.push(`- ⚠ ${a.label}: カタログから${a.streak}日連続消滅。プローブ ${a.probeStatus}。要確認 → 外すなら会議へ`);
+      }
     }
   }
   lines.push('');
