@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1203',
+    date: '2026-07-31',
+    summary: 'ポップアップの段説明からもキャラアイコンと枠を削除',
+    items: Object.freeze([
+      'ポップアップの各段の説明文に残っていた小さなキャラアイコンと丸枠を外しました(会場モードは v0.1.1199 で対応済み・こちらは取りこぼしでした)。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1202',
     date: '2026-07-31',
     summary: '「あの人が何を言ったか・どこに居るか」を追えるように3点改善',

@@ -1073,7 +1073,8 @@
       .nl-story-userlane-guide__line {
         display: flex;
         align-items: flex-start;
-        gap: 7px;
+        /* 顔アイコンを display:none にしたぶん、左の余白は不要(2026-07-31)。 */
+        gap: 0;
         padding: 5px 8px;
         border-radius: 10px;
         background: linear-gradient(180deg, #fffaf0, #fff4db);
@@ -1086,15 +1087,14 @@
         min-width: 0;
       }
 
+      /*
+       * 2026-07-31(ユーザー要望): 段の説明文からキャラ顔アイコンと丸枠を外す。
+       *   説明文は5段ぶん繰り返されるため、24pxの丸顔+枠が5回並んで場所を取っていた。
+       *   文言は「どの段か」を伝える役目があるので残し、装飾だけ落とす。
+       *   会場側(venueBar.js)は v0.1.1199 で同じ対応済み。こちらは popup 側の取りこぼし。
+       */
       .nl-story-userlane-guide__face {
-        width: 24px;
-        height: 24px;
-        border-radius: 999px;
-        object-fit: cover;
-        object-position: center;
-        border: 1px solid color-mix(in srgb, var(--nl-border) 82%, #fff 18%);
-        background: var(--nl-surface);
-        flex: 0 0 auto;
+        display: none;
       }
 
       .nl-story-userlane-guide__text {
