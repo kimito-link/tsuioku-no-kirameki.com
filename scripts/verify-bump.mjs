@@ -185,9 +185,48 @@ if (!flamboyantPath || !fs.existsSync(flamboyantPath)) {
   }
 }
 
+// 6. 紹介LP(tsuioku-no-kirameki/index.html) の掲載版数が package と一致 (v0.1.1210)
+//    2026-08-01: LP が v0.1.1193 のまま 15 版ぶん取り残されていたのを発見。
+//    「LPを最新化した」と報告した直後からまた乖離しており、手作業では再発すると判明したため
+//    機械照合に載せる。
+//    ★方針の分離: 「版数表記は常に追従・掲載内容は選別」。
+//      診断計器のみの版を LP の機能紹介に載せない従来方針とは衝突しない(版数だけ追う)。
+console.log(`\n[6] 紹介LP の掲載版数が package と一致`);
+{
+  const lpPath = path.join(ROOT, 'tsuioku-no-kirameki/index.html');
+  if (!fs.existsSync(lpPath)) {
+    log.warn('紹介LP が見つからない（tsuioku-no-kirameki/index.html）');
+  } else {
+    const lp = fs.readFileSync(lpPath, 'utf8');
+    const want = pkg.version;
+    // 「現在版」を示す 4 箇所だけを狙う。本文中の機能説明にも（v0.1.240）のような
+    // 過去版の表記が多数あるため、単純な全文スキャンでは誤検知する。
+    /** @type {ReadonlyArray<{ name: string, re: RegExp }>} */
+    const spots = [
+      { name: 'meta description', re: /<meta\s+name="description"[^>]*?（v(\d+\.\d+\.\d+)）[^>]*>/ },
+      { name: 'JSON-LD softwareVersion', re: /"softwareVersion":"(\d+\.\d+\.\d+)"/ },
+      {
+        name: 'twitter:description',
+        re: /<meta\s+name="twitter:description"[^>]*?（v(\d+\.\d+\.\d+)）[^>]*>/
+      },
+      { name: 'フッター', re: /追憶のきらめき v(\d+\.\d+\.\d+)/ }
+    ];
+    for (const spot of spots) {
+      const m = lp.match(spot.re);
+      if (!m) {
+        fail(`LP の版数表記が見つからない: ${spot.name}（表記の形が変わった可能性）`);
+      } else if (m[1] !== want) {
+        fail(`LP の ${spot.name} が v${m[1]} → package の v${want} に合わせてください`);
+      } else {
+        log.ok(`${spot.name} v${m[1]}`);
+      }
+    }
+  }
+}
+
 console.log();
 if (failed > 0) {
   console.log(`\x1b[31m✗ ${failed} 件失敗。ship 前に解消してください。\x1b[0m`);
   process.exit(1);
 }
-console.log('\x1b[32m✓ 全 5 ステップ OK。Chrome をリロードすれば反映されるはず。\x1b[0m');
+console.log('\x1b[32m✓ 全 6 ステップ OK。Chrome をリロードすれば反映されるはず。\x1b[0m');

@@ -26,6 +26,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1210',
+    date: '2026-08-01',
+    summary: '紹介サイトが古いファイル名を見せていた問題を修正',
+    items: Object.freeze([
+      '紹介サイトの「HTML保存」の見本が、昔のファイル名(nicolivelog-report-...)のままでした。実際の保存名は「2026-06-02_lv123456789.html」のように配信日から始まる形に変わっています。この古い見本が「HTMLダウンロードが無くなった」という誤解のもとになっていました(機能は今も使えます)。',
+      '紹介サイトの掲載版数が15版ぶん取り残されていたのを最新にし、以後ずれたら出荷前チェックで止まるようにしました(拡張の動作には影響しません)。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1209',
     date: '2026-08-01',
     summary: 'グリッドの「同ユーザー計N件」が実際より少なく見えていた表記を修正',
