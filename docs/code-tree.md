@@ -157,7 +157,7 @@
     - `2026-07-22.md`
     - `2026-07-23.md`
     - `2026-07-31.md`
-- 📁 **docs/** (226)
+- 📁 **docs/** (227)
   - 📁 **article-assets/** (87)
     - 📁 **venue-frames/** (12)
       - `f01.png`
@@ -267,9 +267,10 @@
     - `storage-bus.md`
     - `venue.md`
     - `web-status.md`
-  - 📁 **handoff/** (63)
+  - 📁 **handoff/** (64)
     - `HANDOFF-backfill-instant-restore.md`
     - `HANDOFF-broadcast-score-panel.md`
+    - `HANDOFF-comment-pickup-bsp.md`
     - `HANDOFF-diag-truth-IMPL.md`
     - `HANDOFF-heavyrace-backfill-IMPL.md`
     - `HANDOFF-liveview-copy.md`
