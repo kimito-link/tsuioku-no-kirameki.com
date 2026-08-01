@@ -131,13 +131,19 @@ export function pickTickerHighlightEntry(list, nowMs, opts = {}) {
   };
   if (!rows.length || bucketAt <= 0) return fallback();
 
-  // 窓: (bucketAt - LOOKBACK, bucketAt]。bucketAt より後の到着は次のバケットの担当。
+  // 窓: (bucketAt - LOOKBACK, bucketAt + BUCKET]。
+  //   ★v0.1.1228: 上端を bucketAt(=バケットの【開始】時刻)で切っていたため、
+  //     「このバケットの最中に届いたコメント」が丸ごと窓の外になり、実配信で
+  //     常に候補0=fallback だった(実測: fallback 5 / scored 0 / filtered全0=
+  //     フィルタで弾かれたのではなく最初から窓に入っていない形)。
+  //     バケット末尾までを窓に含める。決定性は bucketAt 基準のままなので崩れない。
   const windowFrom = bucketAt - TICKER_LOOKBACK_MS;
+  const windowTo = bucketAt + TICKER_BUCKET_MS;
   /** @type {TickerCandidate[]} */
   const inWindow = [];
   for (const row of rows) {
     const c = toCandidate(row);
-    if (!c || c.ts <= windowFrom || c.ts > bucketAt) continue;
+    if (!c || c.ts <= windowFrom || c.ts > windowTo) continue;
     inWindow.push(c);
   }
   if (!inWindow.length) return fallback();

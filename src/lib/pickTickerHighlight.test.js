@@ -59,6 +59,40 @@ describe('pickTickerHighlightEntry — 決定性(3画面パリティの根拠)',
   });
 });
 
+describe('pickTickerHighlightEntry — 窓の上端(v0.1.1228 回帰)', () => {
+  /**
+   * ★実配信(lv351085223)で fallback 5 / scored 0 / filtered全0 が観測された。
+   *   フィルタで弾かれたのではなく【最初から窓に入っていない】形。真因は窓の上端を
+   *   bucketAt(=バケットの開始時刻)で切っていたこと=「このバケットの最中に届いた
+   *   コメント」が全部窓の外になっていた。
+   */
+  it('★バケット開始より後に届いたコメントも候補になる(実配信の真因)', () => {
+    const list = [
+      entry(BASE + 1000, 'ばけつのあとにとどいたコメント', { userId: 'a' }),
+      entry(BASE + 2000, 'これもあとにとどいた', { userId: 'b' })
+    ];
+    const r = pickTickerHighlightEntry(list, BASE + 3000);
+    expect(r.why).toBe('scored');
+    expect(r.stats.candidates).toBe(2);
+  });
+
+  it('バケット末尾を超えた未来のコメントは入れない(窓は有界)', () => {
+    const list = [entry(BASE + TICKER_BUCKET_MS + 5000, 'ずっと先の時刻', { userId: 'a' })];
+    const r = pickTickerHighlightEntry(list, BASE + 100);
+    expect(r.why).toBe('fallback');
+  });
+
+  it('★窓を広げても決定性は保たれる(3画面パリティの根拠を壊さない)', () => {
+    const list = [
+      entry(BASE + 1000, 'ばけつのなかのはつげん', { userId: 'a' }),
+      entry(BASE + 2000, 'もうひとつのはつげん', { userId: 'b' })
+    ];
+    const a = pickTickerHighlightEntry(list, BASE + 100);
+    const b = pickTickerHighlightEntry(list, BASE + 6900);
+    expect(a.entry).toBe(b.entry);
+  });
+});
+
 describe('pickTickerHighlightEntry — フォールバック(最悪ケースが現状維持)', () => {
   it('候補が窓に無ければ最新1件へフォールバック(枠は空にならない)', () => {
     // 窓(直近8秒)から大きく外れた古い行だけ
