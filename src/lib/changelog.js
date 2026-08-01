@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1212',
+    date: '2026-08-01',
+    summary: '会場と①の「幾何差」が本物か測り方の問題かを見分ける計器を追加',
+    items: Object.freeze([
+      '会場と①でタイルの大きさが違うと出ていた診断について、その原因が「見た目の不一致」なのか「①と会場で別の人のタイルを測っていただけ」なのかを見分けて表示するようにしました(表示のみ・動作は変わりません)。名前の長さでタイル幅は変わるため、別人を測ると一致していても差が出ます。直す必要のない箇所を触って壊さないための計器です。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1211',
     date: '2026-08-01',
     summary: '状態速報に「popup起動から何秒後の値か」を明記',

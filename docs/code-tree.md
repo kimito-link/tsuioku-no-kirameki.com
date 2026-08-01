@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 4 / 694 件
+## ⚠️ 役割コメントが無いソース 4 / 695 件
 - `src/lib/laneDomSelfMeasure.js`
 - `src/lib/reportPreviewPublish.js`
 - `src/lib/venueLaneBuckets.js`
@@ -606,7 +606,7 @@
     - `trumpet1.mp3`
     - `wallet1.mp3`
   - `SOURCES.md`
-- 📁 **src/** (1449)
+- 📁 **src/** (1451)
   - 📁 **data/** (6)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -881,7 +881,7 @@
         - `logo_funlink_white_RGB_maru_black.png`
       - `logo_guide_funlink_ol.pdf`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1224)
+  - 📁 **lib/** (1226)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -1997,6 +1997,8 @@
     - `venueDomCensus.test.js`
     - `venueDragScroll.js` — 2026-06-14 会議(星野ロミ・摩擦ゼロUI): 会場を左ドラッグでパン(縦スクロール)する純ロジック。
     - `venueDragScroll.test.js`
+    - `venueGeometryVerdict.js` — 会場と①POPのタイル寸法差が「CSS不整合」か「測定対象ズレ」かを見分ける純関数(v0.1.1212)。
+    - `venueGeometryVerdict.test.js`
     - `venueHeat.js` — v0.1.732: 会場モードの「熱量の色温度」純関数。
     - `venueHeat.test.js`
     - `venueHoverCard.js` — 会場アイコンのホバープレビューカード(純ロジック+DOMビルダー)。

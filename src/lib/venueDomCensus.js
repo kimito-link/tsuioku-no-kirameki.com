@@ -60,6 +60,9 @@ function emptySectionCount() {
     visible: 0,
     tileW: 0,
     tileH: 0,
+    // v0.1.1212: tileW/tileH を測った当のタイルの userKey。①側(laneDomSelfMeasure)と
+    //   突き合わせ、別人を測っていたなら「幾何差」ではなく「測定対象ズレ」と判定するため。
+    tileKey: '',
     ghost: 0,
     bare: 0,
     visibleEmpty: 0,
@@ -87,6 +90,8 @@ function countSection(rootEl) {
     if (out.visible === 0) {
       out.tileW = nonNegativeDimension(tile.offsetWidth);
       out.tileH = nonNegativeDimension(tile.offsetHeight);
+      // 寸法を測った当のタイルが誰かを控える(①側と突き合わせて測定対象ズレを検出する)。
+      out.tileKey = String((tile.dataset && tile.dataset.userKey) || '').trim();
     }
     out.visible += 1;
     const key = String((tile.dataset && tile.dataset.userKey) || '').trim();
