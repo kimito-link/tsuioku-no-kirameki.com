@@ -5,6 +5,46 @@
 export const STORY_GROWTH_MAX_CELLS = 360;
 
 /**
+ * グリッドの表示窓の先頭位置を決める純関数(v0.1.1217)。
+ *
+ * ユーザー報告(2026-08-01)「積み上げ式にならず、もともと記録されたアイコンがちらちら変わる。
+ * この人はどんな発言をしたのかが追いづらい」の根治。
+ *
+ * 【旧】offset = 全件数 - 上限
+ *   → 上限を超えると**コメント1件ごとに offset が1進み、全マスの中身がずれる**。
+ *     i番目のマスに毎回別人が入るので、狙った人を掴む前に位置が変わっていた。
+ *     v0.1.1208 の churn 計器が「積み上がりのみ」と報告したのは計器の盲点で、
+ *     DOM枚数を変えず中身だけ書き換える経路(patchStoryGrowthIconsFromSource)を
+ *     数えていなかったため(v0.1.1215 で計測可能にした)。
+ *
+ * 【新】offset = 0 で固定
+ *   → 最初の360件を「名簿」として凍結する。一度並んだ人は二度と動かない。
+ *     上限到達後の新規コメントはグリッドに出さず、件数ラベルで「ほかN件」と伝える。
+ *
+ * ★会議(2026-08-01・4体)の結論。3体が本案を支持:
+ *   - グリッドの役割は「固定された名簿からの逆引き」。「今来た人に気づく」のは
+ *     応援レーン(直近アクティブ順・storyUserLaneGuideHtml.js:82)とランキングが担う
+ *   - 上限前後で体験が地続きになる(0〜359=積み上がる / 360で名簿完成 / 以降はラベルが伸びる)
+ *   - DOM が360で完全に頭打ちになり、1万件・4時間超でも一定
+ *   - diff-skip 機構(ちらつき対策で7版かけた資産)を壊さない
+ *   反対意見(新規が見えなくなる)は事実誤認だった。応援レーンに新規は出る。
+ *
+ * @param {number} sourceLength 全コメント件数
+ * @param {number} [maxCells] 描画上限(既定=STORY_GROWTH_MAX_CELLS)
+ * @returns {number} 表示窓の先頭位置(常に0=先頭固定)
+ */
+export function resolveStoryGrowthWindowOffset(sourceLength, maxCells) {
+  const len = Math.max(0, Math.floor(Number(sourceLength) || 0));
+  const cap = Math.max(1, Math.floor(Number(maxCells) || STORY_GROWTH_MAX_CELLS));
+  // 先頭固定。上限未満でも超過でも 0(=最初の1件目から並べる)。
+  //   ★この関数が常に0を返すことが「ちらつかない」の担保。将来ここを
+  //     len - cap のような式に戻すと、上限超過で全マスがずれる問題が再発する。
+  void len;
+  void cap;
+  return 0;
+}
+
+/**
  * アイコングリッドのラベル文言を作る純関数(v0.1.1202)。
  *
  * 2026-07-31 ユーザー報告「レーンには居るのにグリッドに居ない人がいる」の根治。
@@ -30,10 +70,14 @@ export function buildStoryGrowthGaugeLabel(total, maxCells) {
     return `応援 ${all.toLocaleString('ja-JP')} コメント / ${hint}`;
   }
   // 切り捨てが起きているときだけ、何件を描いていて何件が窓の外かを明記する。
+  // v0.1.1217: 窓を先頭固定にしたので「直近N件」ではなく「はじめのN件」が実態。
+  //   ここを「直近」のままにすると、実際には出ていない最新のコメントが
+  //   グリッドにあるかのような嘘になる(「黙って切らない」方針に反する)。
   const hidden = all - cap;
   return (
     `応援 ${all.toLocaleString('ja-JP')} コメント` +
-    `（いま直近 ${cap.toLocaleString('ja-JP')} 件を表示中・ほか ${hidden.toLocaleString('ja-JP')} 件は表示枠の外）` +
+    `（グリッドははじめの ${cap.toLocaleString('ja-JP')} 件で固定・` +
+    `そのあとの ${hidden.toLocaleString('ja-JP')} 件は下の応援レーンに出ます）` +
     ` / ${hint}`
   );
 }
