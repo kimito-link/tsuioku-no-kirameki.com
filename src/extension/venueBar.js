@@ -4538,7 +4538,16 @@ export function mountVenueBarButton(options = {}) {
    * 3キャラ常駐(りんく・こん太・たぬ姉)を最前列中央に描く。会場を開いた瞬間に集計を待たず
    * 1回呼ぶ=開いた直後から必ず誰かが居る。画像は拡張URLに解決。読み込み失敗は名札のみへ。
    */
+  /*
+   * 3キャラ常駐(りんく・こん太・たぬ姉)を配信画面の左右の縁に出す演出。
+   * v0.1.1214 廃止(フラグOFF・ユーザー要望 2026-08-01): 映像に重なって
+   *   「見づらくなる」ため。左上りんく・左下たぬ姉・右こん太の3体と、
+   *   名前ラベル・金色のグロー枠がまとめて出なくなる。
+   *   額縁フレーム(VENUE_CHAR_FRAME_ENABLED・v0.1.1114廃止)と同じ流儀=復活はこのフラグ1つ。
+   */
+  const VENUE_RESIDENTS_ENABLED = false;
   const renderResidents = () => {
+    if (!VENUE_RESIDENTS_ENABLED) return; // 廃止中: residentsLayer は空のまま
     if (residentsRendered) return;
     const resolveUrl =
       typeof chrome !== 'undefined' && chrome.runtime && typeof chrome.runtime.getURL === 'function'
