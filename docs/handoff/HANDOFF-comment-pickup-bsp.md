@@ -1,6 +1,14 @@
-# 埋もれるコメントを拾う「BSP風ピックアップ枠」設計メモ
+# 埋もれるコメントを拾う「BSP風ピックアップ枠」設計メモ（初期メモ・後継あり）
 
-> 2026-08-02 未明、ユーザー発案。**実装未着手**。次のセッションはここから。
+> ⚠️ **この文書は初期の走り書き。正式な設計は会議＋Fableを経て
+> [comment-pickup-ticker-DESIGN.md](comment-pickup-ticker-DESIGN.md) に置き換わった。**
+> 着手は [comment-pickup-ticker-IMPLEMENTATION-HANDOFF.md](comment-pickup-ticker-IMPLEMENTATION-HANDOFF.md) から。
+>
+> ★このメモの推し案「読み上げから漏れたコメントを拾う」は**撤回された**。
+>   理由(1) dropは合成速度の都合で内容の重要性と無関係（スパムも等しく落ちる）
+>   理由(2) `voicePlayer._notifyDropped` は引数なしで、**捨てた本文を保持していない**（実コードで確認）
+>
+> 2026-08-02 未明、ユーザー発案。**実装未着手**。
 > 前段の経緯: `HANDOFF-resume-0801-hover.md`（v0.1.1216→1225）
 
 ## 何をしたいか（ユーザーの言葉）
