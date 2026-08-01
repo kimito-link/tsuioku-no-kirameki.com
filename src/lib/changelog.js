@@ -26,6 +26,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1218',
+    date: '2026-08-01',
+    summary: '会場でアイコンにマウスを乗せると、その人の発言が数件読めるように',
+    items: Object.freeze([
+      '会場モードでアイコンにマウスを乗せたとき、直前の1件だけでなく直近5件までの発言が読めるようにしました。クリックしなくても「この人が何を言っていたか」を追えます。',
+      'ギフトや広告だけの人には発言を出しません(発言していないため)。長い発言はカードが会場を覆わないよう短く切ります。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1217',
     date: '2026-08-01',
     summary: 'アイコングリッドがちらちら変わる問題を根治',

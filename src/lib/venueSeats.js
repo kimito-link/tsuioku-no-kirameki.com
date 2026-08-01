@@ -120,16 +120,16 @@ export function venueParticipantKey(row, isGenericName, _promoteUserIds) {
  * 正規化済み発言行の配列(昇順=古い→新しい)から、会場参加者を集計する純関数。
  * 同一参加者はまとめ、最終発言・最新本文・発言数・ギフト有無を持つ。
  *
- * @param {Array<{ userId?: string, name?: string, text?: string, avatar?: string, capturedAt?: number|null, isGift?: boolean, preCount?: number, preHasGift?: boolean, preGiftCount?: number }>} rows
+ * @param {Array<{ userId?: string, name?: string, text?: string, avatar?: string, capturedAt?: number|null, isGift?: boolean, preCount?: number, preHasGift?: boolean, preGiftCount?: number, recentTexts?: string[] }>} rows
  * @param {{ isGenericName?: (name: string) => boolean, promoteUserIds?: Set<string>|null }} [opts]
- * @returns {Array<{ key: string, name: string, userId: string, avatar: string, lastText: string, lastAt: number, count: number, hasGift: boolean, giftCount: number, firstAt: number }>}
+ * @returns {Array<{ key: string, name: string, userId: string, avatar: string, lastText: string, lastAt: number, count: number, hasGift: boolean, giftCount: number, firstAt: number, recentTexts: string[] }>}
  *   参加者配列(初出順=安定。席割りはこの順を尊重しつつ優先度で並べ替える)
  */
 export function collectVenueParticipants(rows, opts = {}) {
   const list = Array.isArray(rows) ? rows : [];
   const isGenericName = opts.isGenericName;
   const promoteUserIds = opts.promoteUserIds instanceof Set ? opts.promoteUserIds : null;
-  /** @type {Map<string, { key: string, name: string, userId: string, avatar: string, lastText: string, lastAt: number, count: number, hasGift: boolean, giftCount: number, firstAt: number, order: number }>} */
+  /** @type {Map<string, { key: string, name: string, userId: string, avatar: string, lastText: string, lastAt: number, count: number, hasGift: boolean, giftCount: number, firstAt: number, order: number, recentTexts: string[] }>} */
   const byKey = new Map();
   let order = 0;
   for (const r of list) {
@@ -149,6 +149,10 @@ export function collectVenueParticipants(rows, opts = {}) {
       if (at >= existing.lastAt) {
         existing.lastAt = at;
         if (text) existing.lastText = text;
+        // v0.1.1218: ホバーカードの直近数件。より新しい行の内容を採る。
+        if (Array.isArray(r?.recentTexts) && r.recentTexts.length) {
+          existing.recentTexts = r.recentTexts.slice();
+        }
       }
       if (preHasGift) existing.hasGift = true;
       const uid = String(r?.userId || '').trim();
@@ -164,6 +168,7 @@ export function collectVenueParticipants(rows, opts = {}) {
         userId: String(r?.userId || '').trim(),
         avatar: String(r?.avatar || '').trim(),
         lastText: text,
+        recentTexts: Array.isArray(r?.recentTexts) ? r.recentTexts.slice() : [],
         lastAt: at,
         firstAt: at,
         count: preCount,

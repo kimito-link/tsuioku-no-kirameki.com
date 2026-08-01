@@ -1683,16 +1683,26 @@ const VENUE_CSS = `
    *   という指摘への回答。本文はモデル側で60字に畳んであるが、それでも席を覆わないよう
    *   2行までで省略する(カードは会場の上に重なるため縦に伸ばさない)。
    */
+  /* v0.1.1218: 直近数件を縦に並べる。以前は1件前提で -webkit-line-clamp:2 だったため、
+     複数件にすると3行目以降が隠れて「出しているのに見えない」状態になっていた。 */
   .nlsb-hover-card__last-text {
     margin-top: 2px;
     font-size: 12px;
     line-height: 1.4;
     opacity: 0.9;
+    word-break: break-word;
+  }
+  /* 1件ぶん。長文は buildVenueHoverCardModel 側で既に切ってあるので、ここでは
+     2行までに抑えて「1件が縦に伸びてカードが会場を覆う」のを防ぐ。 */
+  .nlsb-hover-card__speech {
     display: -webkit-box;
     -webkit-line-clamp: 2;
     -webkit-box-orient: vertical;
     overflow: hidden;
-    word-break: break-word;
+  }
+  .nlsb-hover-card__speech + .nlsb-hover-card__speech {
+    margin-top: 2px;
+    opacity: 0.72; /* 古い発言ほど控えめ=最新がどれか一目で分かる */
   }
   .nlsb-hover-card__thumb-status {
     opacity: 0.65;
@@ -2425,7 +2435,7 @@ export function mountVenueBarButton(options = {}) {
    * ★paint 時に全タイルを走査する実装は hot path 汚染で実機が重くなったため、
    *   「ホバーされた1枚だけ・その場で」に変更した。走査対象は同じ段の中だけ。
    * @param {HTMLElement} el
-   * @returns {{ uid: string, displayName: string, count: number, hasGift: boolean, giftCount: number, venueRank: number, lastAt: number, tier?: string, lastText?: string }|null}
+   * @returns {{ uid: string, displayName: string, count: number, hasGift: boolean, giftCount: number, venueRank: number, lastAt: number, tier?: string, lastText?: string, recentTexts?: string[] }|null}
    */
   const resolveSeatlessHoverData = (el) => {
     try {
@@ -2455,7 +2465,9 @@ export function mountVenueBarButton(options = {}) {
         venueRank: 0,
         lastAt: 0,
         tier,
-        lastText: ''
+        lastText: '',
+        // 席なしタイル(広告主等)は発言記録に紐づかないので空。
+        recentTexts: []
       };
     } catch {
       return null;
@@ -2791,7 +2803,7 @@ export function mountVenueBarButton(options = {}) {
   // 2026-07-30(wayfinder→to-spec方式・venue-avatar-hover-preview-SPEC.md §4.3): ホバープレビュー
   //   カード用のデータ。paint時(席装飾ループ/renderTopBar)にWeakMapへ相乗り登録するだけで、
   //   DOM書き込み・新規タイマー・新規計算は無い(RANKバッジちらつき教訓=diff-skip不要な設計)。
-  /** @type {WeakMap<HTMLElement, { uid: string, displayName: string, count: number, hasGift: boolean, giftCount: number, venueRank: number, lastAt: number, tier?: string, lastText?: string }>} */
+  /** @type {WeakMap<HTMLElement, { uid: string, displayName: string, count: number, hasGift: boolean, giftCount: number, venueRank: number, lastAt: number, tier?: string, lastText?: string, recentTexts?: string[] }>} */
   const _hoverCardDataByEl = new WeakMap();
   // v0.1.1207: 会場の「開いてから見えるまで」を分解して観測する(ユーザー報告
   //   「立ち上がりが遅い/出ないときがある」を体感でなく数字で切り分けるため)。
@@ -4606,7 +4618,7 @@ export function mountVenueBarButton(options = {}) {
   //   sig(上位の userId+順位)が無変化なら DOM を触らない=毎フレーム作り直さない(hot path 保護)。
   //   一度でも非空を描いたら、一瞬の空(データ遅延)では畳まない=高さ振動を作らない(v0.1.1026)。
   //   状態フラグは clearDisplay(先に定義)からも触るため、宣言は関数より前(下の hasRenderedNonEmpty 付近)。
-  /** @param {Array<{ rank:number, participant:{ key?:string, userId?:string, name?:string, count?:number, hasGift?:boolean, giftCount?:number, lastAt?:number, lastText?:string } }>} topSupporters */
+  /** @param {Array<{ rank:number, participant:{ key?:string, userId?:string, name?:string, count?:number, hasGift?:boolean, giftCount?:number, lastAt?:number, lastText?:string, recentTexts?:string[] } }>} topSupporters */
   const renderTopBar = (topSupporters) => {
     const list = Array.isArray(topSupporters) ? topSupporters : [];
     // 空入力でも、一度出したバーは畳まない(前回の顔を残す=明滅/高さ振動を防ぐ)。
@@ -4639,7 +4651,8 @@ export function mountVenueBarButton(options = {}) {
         //   新規取得ゼロ)。ホバーカードで相対時刻(「3分前」等)に変換して表示する。
         lastAt: Number(p.lastAt) || 0,
         // 2026-07-31(ユーザー要望): 直前の発言内容(既存データ・新規取得ゼロ)。
-        lastText: String(p.lastText || '')
+        lastText: String(p.lastText || ''),
+        recentTexts: Array.isArray(p.recentTexts) ? p.recentTexts : []
       });
       frag.appendChild(cell);
     }
@@ -4982,7 +4995,9 @@ export function mountVenueBarButton(options = {}) {
         // 2026-07-31: 段。広告/ギフト段では「発言N」でなく「広告(◯分前)」等に出し分ける。
         tier: uid ? laneTierByUid.get(uid) || '' : '',
         // 2026-07-31(ユーザー要望): 直前の発言内容(既存データ・新規取得ゼロ)。
-        lastText: String(participant.lastText || '')
+        lastText: String(participant.lastText || ''),
+        // v0.1.1218: ホバーで直近数件を読めるようにする(既存データ・新規取得ゼロ)。
+        recentTexts: Array.isArray(participant.recentTexts) ? participant.recentTexts : []
       });
       const speakerKey = uid ? `u:${uid}` : rawName ? `n:${rawName}` : '';
       const streakEntry = speakerKey ? speechStreaks.get(speakerKey) : null;
