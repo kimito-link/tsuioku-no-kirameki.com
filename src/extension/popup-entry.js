@@ -587,9 +587,7 @@ import {
 } from '../lib/userRooms.js';
 import {
   buildSupportAccentIndex,
-  supportOrdinalForIndex,
-  supportSameUserTotalInEntries,
-  supportUserKeyFromEntry
+  supportOrdinalForIndex
 } from '../lib/userSupportGridAccent.js';
 import {
   applyUserCommentProfileMapToEntries,
@@ -779,7 +777,11 @@ import { KEY_AI_SHARE_FAST_DIAG } from '../lib/aiShareFastDiagKey.js';
 import { KEY_AI_SHARE_POPUP_DIAG, buildAiSharePopupDiagRecord } from '../lib/aiSharePopupDiagKey.js';
 import { createPopupDiagAutoPublisher, resolvePopupWatchUrl } from '../lib/popupDiagAutoPublish.js';
 import { shouldDeferHeavyPopupPaintDuringScroll } from '../lib/popupMainScrollDefer.js';
-import { STORY_GROWTH_MAX_CELLS, buildStoryGrowthGaugeLabel } from '../lib/storyGrowthLimits.js';
+import {
+  STORY_GROWTH_MAX_CELLS,
+  buildStoryGrowthGaugeLabel,
+  buildSupportSameUserBlurb
+} from '../lib/storyGrowthLimits.js';
 import {
   createStoryGrowthChurnState,
   noteStoryGrowthRebuild,
@@ -8639,7 +8641,6 @@ function applyStoryGrowthIconAttributes(img, index, isNew, accent) {
   }
 
   const entries = STORY_SOURCE_STATE.entries;
-  const storyKey = entry ? supportUserKeyFromEntry(entry) : UNKNOWN_USER_KEY;
   const absIndex = (STORY_GROWTH_STATE.sourceOffset || 0) + index;
   const ordinal = accent
     ? accent.ordinal
@@ -8671,13 +8672,18 @@ function applyStoryGrowthIconAttributes(img, index, isNew, accent) {
   const hoverHint = storyHoverPreviewEnabled()
     ? 'マウスを乗せるとプレビュー、'
     : '';
-  const totalSame = accent
-    ? accent.total
-    : supportSameUserTotalInEntries(entries, storyKey);
-  const sameUserBlurb =
-    entry && totalSame > 1
-      ? `同一ユーザー${ordinal}件目、一覧に同ユーザー計${totalSame}件。`
-      : '';
+  // ordinal / total は buildSupportAccentIndex が「表示ウィンドウ内だけ」を数えた値。
+  // 窓が効いている(sourceOffset>0)ときに「一覧に計N件」と書くと窓外の発言を無かったことに
+  // するので、文言側で数えた範囲を明示する(v0.1.1209)。sourceOffset は上の absIndex 計算で
+  // 既読なので追加の走査はゼロ。★ここはセル描画ごとに走るホットパス。走査を持ち込まないこと。
+  const totalSame = accent ? accent.total : 0;
+  const sameUserBlurb = entry
+    ? buildSupportSameUserBlurb({
+        ordinal,
+        total: totalSame,
+        windowed: (STORY_GROWTH_STATE.sourceOffset || 0) > 0
+      })
+    : '';
   img.setAttribute(
     'aria-label',
     entry
