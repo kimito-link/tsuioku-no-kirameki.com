@@ -245,8 +245,18 @@ export function computeVoiceLagVerdict(inputs) {
 //   - 上げるだけ(既存の congestion 由来ブーストを下回らせない)=間延び退行を作らない
 // ---------------------------------------------------------------------------
 
-/** 持続過負荷とみなす pressure の下限(誤差帯 VOICE_PRESSURE_OK_MAX を上回る領域)。 */
-export const VOICE_SUSTAINED_PRESSURE_MIN = 1.5;
+/**
+ * 持続過負荷とみなす pressure の下限。
+ *
+ * v0.1.1225: 1.5 → VOICE_PRESSURE_OK_MAX(1.2) へ。実配信2点の実測で、1.5 は
+ *   「じわっと足りない」領域を丸ごと取り逃がしていた:
+ *     需要23.8/分・処理2874ms → pressure 1.30 → 底上げ 0.00(発火せず)
+ *     需要31.8/分・処理2840ms → pressure 1.51 → 底上げ 0.07(かすっただけ)
+ *   どちらも voiced率 67〜75%=**3〜4件に1件は読めていない**のに、速度は据え置きだった。
+ *   1.2 は既存の「過負荷ではない」判定境界そのもの(computeVoiceLagVerdict が使う値)。
+ *   新しい概念を増やさず、「過負荷と判定する領域では速度も上げる」と定義を揃える。
+ */
+export const VOICE_SUSTAINED_PRESSURE_MIN = VOICE_PRESSURE_OK_MAX;
 
 /** pressure 由来ブーストの上限。既存 computeVoiceCongestion の最大値と揃える(声質を守る)。 */
 export const VOICE_SUSTAINED_BOOST_MAX = 0.8;
