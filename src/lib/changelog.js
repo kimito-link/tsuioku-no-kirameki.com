@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1208',
+    date: '2026-08-01',
+    summary: 'アイコングリッドの動きを実測する計器を追加',
+    items: Object.freeze([
+      'アイコンが並ぶグリッドについて、作り直しの回数と内訳(積み上がりか、表示枠がずれた総入れ替えか)を状態速報に表示するようにしました(表示のみ・動作は変わりません)。「増えていく動きになっていない」という状態の原因を確かめるための計器です。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1207',
     date: '2026-08-01',
     summary: '会場モードの立ち上がりの遅さを切り分ける計器を追加',

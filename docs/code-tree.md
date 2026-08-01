@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 4 / 692 件
+## ⚠️ 役割コメントが無いソース 4 / 693 件
 - `src/lib/laneDomSelfMeasure.js`
 - `src/lib/reportPreviewPublish.js`
 - `src/lib/venueLaneBuckets.js`
@@ -605,7 +605,7 @@
     - `trumpet1.mp3`
     - `wallet1.mp3`
   - `SOURCES.md`
-- 📁 **src/** (1443)
+- 📁 **src/** (1445)
   - 📁 **data/** (6)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -879,7 +879,7 @@
         - `logo_funlink_white_RGB_maru_black.png`
       - `logo_guide_funlink_ol.pdf`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1219)
+  - 📁 **lib/** (1221)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -1852,6 +1852,8 @@
     - `storyDiagMonotonic.test.js`
     - `storyDiagTotalSource.js` — 「記録している応援コメント N 件」の N を1箇所で決める純関数。
     - `storyDiagTotalSource.test.js`
+    - `storyGrowthChurn.js` — アイコングリッド(story growth)の「作り直し」を観測する純関数(v0.1.1208)。
+    - `storyGrowthChurn.test.js`
     - `storyGrowthLimits.js` — りんく成長グリッド（story growth）の描画上限。
     - `storyGrowthLimits.test.js`
     - `storyLaneAvatarSrc.js` — 応援レーン(アイコン列)のタイル画像 URL 解決（state 注入型の純関数）。
