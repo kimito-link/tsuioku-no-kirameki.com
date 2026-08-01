@@ -780,6 +780,11 @@ import { KEY_AI_SHARE_POPUP_DIAG, buildAiSharePopupDiagRecord } from '../lib/aiS
 import { createPopupDiagAutoPublisher, resolvePopupWatchUrl } from '../lib/popupDiagAutoPublish.js';
 import { shouldDeferHeavyPopupPaintDuringScroll } from '../lib/popupMainScrollDefer.js';
 import { STORY_GROWTH_MAX_CELLS, buildStoryGrowthGaugeLabel } from '../lib/storyGrowthLimits.js';
+import {
+  createStoryGrowthChurnState,
+  noteStoryGrowthRebuild,
+  summarizeStoryGrowthChurn
+} from '../lib/storyGrowthChurn.js';
 import { buildDevMonitorDlChartsHtml } from '../lib/devMonitorViz.js';
 import {
   buildStoryAvatarDiagHtml,
@@ -8750,7 +8755,12 @@ function patchStoryGrowthIconsFromSource(root, opts = {}) {
  * @param {HTMLElement} root
  * @param {number} total
  */
+// v0.1.1208: アイコングリッドの作り直しを観測する(ユーザー報告「増えていく動きじゃない」)。
+//   上限超えで窓がスライドすると毎回360枚が総入替になる、という推論を実機で確かめるため。
+const STORY_GROWTH_CHURN = createStoryGrowthChurnState();
+
 function rebuildStoryGrowth(root, total) {
+  const _churnT0 = typeof performance !== 'undefined' ? performance.now() : 0;
   root.innerHTML = '';
   if (total <= 0) return;
   const accent = buildStoryAccentForWindow(total);
@@ -8764,6 +8774,17 @@ function rebuildStoryGrowth(root, total) {
     );
   }
   root.appendChild(frag);
+  // 観測のみ(失敗は握る=描画を止めない)。offset は「窓の先頭位置」で、これが進んだ回が
+  //   スライド=既存の枚を捨てて描き直した回。
+  try {
+    const _churnMs = typeof performance !== 'undefined' ? performance.now() - _churnT0 : -1;
+    noteStoryGrowthRebuild(STORY_GROWTH_CHURN, {
+      cells: total,
+      offset: Number(STORY_GROWTH_STATE.sourceOffset) || 0,
+      atMs: Date.now(),
+      elapsedMs: _churnMs >= 0 ? Math.round(_churnMs * 10) / 10 : undefined
+    });
+  } catch { /* 計器失敗は描画を止めない */ }
 }
 
 /**
@@ -18915,6 +18936,16 @@ async function collectAiShareDevMonitorPayloadBundle(watchUrl) {
                 ? Math.max(0, Date.now() - _northStarRenderProbe.lastRunAtBase)
                 : null
           };
+        } catch {
+          return null;
+        }
+      })(),
+      // v0.1.1208: アイコングリッドの作り直し実測(ユーザー報告「増えていく動きじゃない」)。
+      //   上限(360)超えで窓がスライドすると毎回総入替になる、という推論を実機で確かめる。
+      //   ★ここに載せないと状態速報に出ない([[fastdiag-lite-is-the-printer-subset]]の同型)。
+      storyGrowthChurn: (() => {
+        try {
+          return summarizeStoryGrowthChurn(STORY_GROWTH_CHURN, Date.now());
         } catch {
           return null;
         }

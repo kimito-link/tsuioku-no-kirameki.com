@@ -685,6 +685,7 @@
 | `src/lib/storedCommentDedupeMerge.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/storyDetailRelatedEntries.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/storyDiagMonotonic.js` | 1 | ポップアップ(応援レーン) |
+| `src/lib/storyGrowthChurn.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/storyGrowthLimits.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/storyUserLaneContaminationGuard.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/storyUserLaneRenderSignature.js` | 1 | ポップアップ(応援レーン) |
