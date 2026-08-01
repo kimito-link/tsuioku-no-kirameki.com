@@ -614,6 +614,7 @@
 | `src/lib/pickBroadcasterNameForReputation.js` | 1 | 状態速報ページ |
 | `src/lib/pickCommentsForExport.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/pickLatestComment.js` | 1 | ポップアップ(応援レーン) |
+| `src/lib/pickTickerHighlight.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/pollUntil.js` | 1 | 記録エンジン(watchページ常駐) |
 | `src/lib/popupAiDiagOrchestrator.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/popupBooleanSettingController.js` | 1 | ポップアップ(応援レーン) |
