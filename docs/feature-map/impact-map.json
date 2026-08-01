@@ -832,6 +832,22 @@
       ]
     },
     {
+      "file": "src/lib/voiceSynthFailureReason.js",
+      "featureCount": 4,
+      "features": [
+        "comeview",
+        "content",
+        "status",
+        "venue"
+      ],
+      "labels": [
+        "コメビュ(別窓)",
+        "記録エンジン(watchページ常駐)",
+        "状態速報ページ",
+        "会場モード(standalone)"
+      ]
+    },
+    {
       "file": "src/shared/avatar/avatarUrlGuard.js",
       "featureCount": 4,
       "features": [
