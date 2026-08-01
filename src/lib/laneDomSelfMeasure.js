@@ -18,7 +18,7 @@ function nonNegativeNumber(value) {
 
 /** @param {Element|null|undefined} lane */
 function measureLane(lane) {
-  if (!lane || lane.hidden === true) return { visible: 0, tileW: 0, tileH: 0 };
+  if (!lane || lane.hidden === true) return { visible: 0, tileW: 0, tileH: 0, tileKey: '' };
   const children = Array.from(lane.children || []);
   const tiles = children.filter(
     (child) => child?.classList?.contains(TILE_CLASS) && child.hidden !== true
@@ -29,7 +29,11 @@ function measureLane(lane) {
   return {
     visible: tiles.length,
     tileW: firstTile ? nonNegativeNumber(firstTile.offsetWidth) : 0,
-    tileH: firstTile ? nonNegativeNumber(firstTile.offsetHeight) : 0
+    tileH: firstTile ? nonNegativeNumber(firstTile.offsetHeight) : 0,
+    // v0.1.1212: 「誰を測ったか」。①と会場で先頭タイルの人が違えば、CSSが完全一致でも
+    //   名前の長さが違うぶんタイル幅が変わる(metaはmax-width上限までの収縮ボックス)。
+    //   これが無いと「幾何≠」がCSS不整合なのか測定対象ズレなのか永久に区別できない。
+    tileKey: firstTile ? String(firstTile.dataset?.userKey || '').trim() : ''
   };
 }
 
@@ -37,11 +41,13 @@ function measureLane(lane) {
  * ①POP が paint した5段の実DOM指紋を同期採取する。DOMは一切変更しない。
  * @param {{ laneLink?: Element|null, laneGift?: Element|null, laneAd?: Element|null,
  *   laneKonta?: Element|null, laneTanu?: Element|null }|null|undefined} els
- * @returns {{ measured: boolean, perTier: Record<string,{visible:number,tileW:number,tileH:number}>, dpr: number }}
+ * @returns {{ measured: boolean,
+ *   perTier: Record<string,{visible:number,tileW:number,tileH:number,tileKey:string}>,
+ *   dpr: number }}
  */
 export function measureLaneDomSelf(els) {
   const source = els && typeof els === 'object' ? els : {};
-  /** @type {Record<string, {visible:number,tileW:number,tileH:number}>} */
+  /** @type {Record<string, {visible:number,tileW:number,tileH:number,tileKey:string}>} */
   const perTier = {};
   let measured = false;
   for (const tier of TIERS) {

@@ -26,6 +26,11 @@ export const VENUE_LANE_MIRROR_SOFT_WINDOW_MS = 180_000;
  * ⚠️ SOFT(180s)とは別定数のまま維持すること。1つにまとめると C2 のちらつき防止が壊れる
  *    (venue-avatar-stale-mirror-DESIGN.md §G-8)。
  */
+import {
+  classifyVenueGeometryDiff,
+  formatVenueGeometryCause
+} from './venueGeometryVerdict.js';
+
 export const VENUE_LANE_MIRROR_HARD_WINDOW_MS = 900_000;
 /** X層(鏡にまだ居ない直近発言者)の猶予窓(ms)。①のpoll+paint+publishの通常10秒に十分な余裕。 */
 export const VENUE_LANE_TRANSIENT_WINDOW_MS = 60_000;
@@ -293,7 +298,10 @@ export function buildVenueLaneParity(input) {
         tileW: positiveMetric(source?.tileW),
         tileH: positiveMetric(source?.tileH),
         physicalW: positiveMetric(source?.tileW) * dpr,
-        physicalH: positiveMetric(source?.tileH) * dpr
+        physicalH: positiveMetric(source?.tileH) * dpr,
+        // v0.1.1212: 寸法を測った当のタイルが誰か。①と会場で別人を測っていれば
+        //   名前長の差でタイル幅が変わるだけで、CSS不一致ではない。
+        tileKey: String(source?.tileKey || '').trim()
       });
       /** @param {string} label @param {ReturnType<typeof readGeometry>} popupGeometry
        * @param {ReturnType<typeof readGeometry>} venueGeometry */
@@ -306,12 +314,19 @@ export function buildVenueLaneParity(input) {
           !geometryDiffers(popupGeometry.physicalW, venueGeometry.physicalW) &&
           !geometryDiffers(popupGeometry.physicalH, venueGeometry.physicalH)
         ) return;
+        // v0.1.1212: 同じ寸法差でも原因が2つある(同一人物=CSS不一致 / 別人=名前長の差)。
+        //   区別せずに報告すると、直す必要のないCSSを触って壊す。
+        const cause = classifyVenueGeometryDiff(popupGeometry, venueGeometry);
         geometryMismatchParts.push(
-          `${label}:${venueGeometry.tileW}×${venueGeometry.tileH}px(①${popupGeometry.tileW}×${popupGeometry.tileH}px)`
+          `${label}:${venueGeometry.tileW}×${venueGeometry.tileH}px(①${popupGeometry.tileW}×${popupGeometry.tileH}px${
+            cause.sameTarget ? '・同一人物' : cause.cause === 'measured_different_people' ? '・別人を測定' : ''
+          })`
         );
         if (isMirrorJudgingEarly) {
           unexplainedCount += 1;
-          if (unexplainedSamples.length < 5) unexplainedSamples.push(`${label}:幾何差`);
+          if (unexplainedSamples.length < 5) {
+            unexplainedSamples.push(formatVenueGeometryCause(label, cause));
+          }
         }
       };
 
