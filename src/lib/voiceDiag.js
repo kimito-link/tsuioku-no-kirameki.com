@@ -36,10 +36,14 @@
  *   dropCountGateTotal: number,  // 2026-07-28計器: 件数ゲート最古dropの累計(3分別のうちの1つ)
  *   dropHeadStaleTotal: number,  // 2026-07-28計器: 先頭itemの単体stale破棄の累計
  *   dropSweepStaleTotal: number, // 2026-07-28計器: 全stale時の先頭群破棄の累計
+ *   synthNullTotal: number,      // 2026-08-01計器: 合成がnullで返り読まれずに消えた累計
+ *   synthNullNearTimeout: number,// 同上のうち時間切れ(8000ms上限付近)由来の件数
  *   lagVerdict: string,          // 2026-07-28計器: 体感遅延の真因判定トークン(印字専用・挙動に不使用)
  *   diagBornAt: number           // 2026-07-28計器: この診断stateが生まれた時刻(epoch ms・世代識別用)
  * }} VoiceDiagState
  */
+
+import { formatVoiceSynthFailureLine } from './voiceSynthFailure.js';
 
 /** 初期 voice 診断 state。 */
 export function makeInitialVoiceDiag() {
@@ -72,6 +76,9 @@ export function makeInitialVoiceDiag() {
     dropCountGateTotal: 0,
     dropHeadStaleTotal: 0,
     dropSweepStaleTotal: 0,
+    // v0.1.1213: 合成が null で返って消えた件(時間切れ内訳つき)。
+    synthNullTotal: 0,
+    synthNullNearTimeout: 0,
     lagVerdict: '',
     diagBornAt: 0
   };
@@ -118,6 +125,8 @@ export function buildVoiceDiagSnapshot(diag, nowMs) {
     expectedPlayEmaMs: num(d.expectedPlayEmaMs, base.expectedPlayEmaMs),
     arrivalPerMin: num(d.arrivalPerMin, base.arrivalPerMin),
     voicedRecentRatio: num(d.voicedRecentRatio, base.voicedRecentRatio),
+    synthNullTotal: num(d.synthNullTotal, base.synthNullTotal),
+    synthNullNearTimeout: num(d.synthNullNearTimeout, base.synthNullNearTimeout),
     dropCountGateTotal: num(d.dropCountGateTotal, base.dropCountGateTotal),
     dropHeadStaleTotal: num(d.dropHeadStaleTotal, base.dropHeadStaleTotal),
     dropSweepStaleTotal: num(d.dropSweepStaleTotal, base.dropSweepStaleTotal),
@@ -143,7 +152,11 @@ export function buildVoiceDiagLine(snap, nowMs) {
   const queueMax = Number(snap.queueMax) || 0;
   const drop = Number(snap.staleDropTotal) || 0;
   // 一度も ON にも発話にもなっていない=会場モード未使用=ノイズにしない。
-  if (!enabled && spoken === 0 && queueMax === 0) return '';
+  // ★v0.1.1213: ただし合成失敗が出ているなら黙ってはいけない。合成が全滅すると
+  //   spokenTotal が 0 のままなので、この早期returnは「読み上げが最も壊れているときほど
+  //   診断行が丸ごと消える」向きに効いてしまう(実配信で約34件が行方不明だった件と同根)。
+  const synthNull = Number(snap.synthNullTotal) || 0;
+  if (!enabled && spoken === 0 && queueMax === 0 && synthNull === 0) return '';
   const parts = [];
   parts.push(enabled ? '読み上げ:ON' : '読み上げ:OFF');
   parts.push(`待機${queueNow}(最大${queueMax})`);
@@ -226,6 +239,10 @@ export function buildVoiceDiagLine(snap, nowMs) {
   if (dropCountGate > 0 || dropHeadStale > 0 || dropSweepStale > 0) {
     parts.push(`drop内訳(件数${dropCountGate}/鮮度${dropHeadStale}/全stale${dropSweepStale})`);
   }
+  // v0.1.1213: 合成が null で返って消えた件。drop内訳の隣に置く(どちらも「読まれなかった理由」)。
+  //   実配信で「需要52.2/分・読めた6件・間引き12件」=約34件がどの計器にも乗らない穴があった。
+  const synthFailureLine = formatVoiceSynthFailureLine(snap);
+  if (synthFailureLine) parts.push(synthFailureLine);
   // 真因判定。ok/insufficientは「間引きは偶発」「データ不足」でノイズになるため出さない。
   const lagVerdict = String(snap.lagVerdict || '');
   if (lagVerdict && lagVerdict !== 'ok' && lagVerdict !== 'insufficient') {

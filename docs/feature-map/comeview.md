@@ -42,6 +42,7 @@ graph LR
   n_comeview --> n_src_lib_voiceDiagKey_js["lib/voiceDiagKey.js"]:::shared
   n_comeview --> n_src_lib_voiceLoadingState_js["lib/voiceLoadingState.js"]:::shared
   n_comeview --> n_src_lib_voiceReadQueue_js["lib/voiceReadQueue.js"]:::shared
+  n_comeview --> n_src_lib_voiceSynthFailure_js["lib/voiceSynthFailure.js"]:::shared
   n_comeview --> n_src_lib_voicevoxClient_js["lib/voicevoxClient.js"]:::shared
   n_comeview --> n_src_shared_avatar_avatarUrlGuard_js["shared/avatar/avatarUrlGuard.js"]:::shared
   n_comeview --> n_src_shared_avatar_clampAvatarUrl_js["shared/avatar/clampAvatarUrl.js"]:::shared
