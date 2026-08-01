@@ -75,6 +75,7 @@ import { restoreNorthStarMirrorRows } from '../src/lib/northStarMirror.js';
 // 第2段(council/liveview-wholesale-root-SYNTHESIS.md): コメントタイムライン鏡(最新N件)を純Webで描いて
 //   「コメントが進む動き」を出す。popup と同じ本物 lib を再利用(似せて自作しない)。
 import { restoreCommentTimelineRows, restoreTimelineItemsForHtml } from '../src/lib/commentTimelineMirror.js';
+import { pickTickerHighlightEntry, tickerArgsFromMirrorRow, tickerHighlightKey } from '../src/lib/pickTickerHighlight.js';
 import { buildCommentTickerLatestHtml } from '../src/lib/commentTickerLatestHtml.js';
 // ③WEB応援タイムライン丸写し(第1号・reference_web_mirror_parity_SYNTHESIS.md A-4)。
 //   ①拡張と同じ本物 lib(似せて自作しない)で #supportTimelineBody に複数行のタイムラインを描く。
@@ -496,8 +497,11 @@ function paintCommentTimelineMirror(snap) {
   if (!segA) return;
   const rows = restoreCommentTimelineRows(snap);
   if (!rows.length) return; // データ無し=popup の空状態(placeholder)のまま(死に画面にしない)
-  const latest = rows[rows.length - 1]; // restore は古→新=末尾が最新
-  const sig = `${String(snap?.liveId || '')}|${Number(snap?.capturedAt) || 0}|${rows.length}|${String(latest.text || '')}`;
+  // v0.1.1226: ①②と【同一の純関数】で選ぶ。バケット丸めが決定的なので、
+  //   3画面が別タイミングで呼んでも同じ7秒窓なら同じ1件になる(鏡への新フィールド追加ゼロ)。
+  const picked = pickTickerHighlightEntry(rows, Date.now());
+  const latest = picked.entry || rows[rows.length - 1];
+  const sig = `${String(snap?.liveId || '')}|${Number(snap?.capturedAt) || 0}|${rows.length}|${tickerHighlightKey(picked)}`;
   if (sig === _lastTimelineSig) return;
   _lastTimelineSig = sig;
   try {
@@ -505,12 +509,7 @@ function paintCommentTimelineMirror(snap) {
     if (segB) segB.innerHTML = '';
     if (viewport) viewport.classList.remove('is-empty');
     // 匿名(a:)や数値IDのリンクは純Webでは付けない(referrer 露出を避ける)=span のまま。
-    segA.innerHTML = buildCommentTickerLatestHtml({
-      label: String(latest.name || ''),
-      avatarSrc: String(latest.avatarUrl || ''),
-      textShown: String(latest.text || '').slice(0, 72),
-      userPageHref: ''
-    });
+    segA.innerHTML = buildCommentTickerLatestHtml(tickerArgsFromMirrorRow(latest, ''));
   } catch {
     /* no-op: ティッカーは best-effort(壊れても他レーンを巻き込まない) */
   }
