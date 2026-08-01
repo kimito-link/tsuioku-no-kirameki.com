@@ -2,6 +2,7 @@
 //   comeview-entry.js と同じ方針(@ts-nocheck)。ロジックは変更しない。
 import { buildVoiceReadingText, buildMergedVoiceText } from './voicevoxClient.js';
 import { isVoiceItemStale } from './voiceAgeGate.js';
+import { classifyVoiceSynthNull } from './voiceSynthFailure.js';
 import {
   computeVoiceCongestion,
   computeVoiceE2eAverage,
@@ -96,6 +97,12 @@ export class VoicePlayer {
       synthWaitEmaMs: -1, playPrepEmaMs: -1, playbackEmaMs: -1, expectedPlayEmaMs: -1,
       arrivalPerMin: -1, voicedRecentRatio: -1,
       dropCountGateTotal: 0, dropHeadStaleTotal: 0, dropSweepStaleTotal: 0,
+      // 2026-08-01計器(v0.1.1213): 合成が null で返った件を数える。
+      //   実配信(lv351072048)で「需要52.2/分・読めた約6件・間引き12件」=**約34件がどの計器にも
+      //   乗っていない**帳尻の穴が見つかった。真犯人は下の !wav 分岐が spokenTotal も drop も
+      //   増やさずに continue していたこと(voicevoxClient は 8000ms タイムアウトで null を返す)。
+      //   これが無いと「なぜ読まれないか」が原理的に分からない。
+      synthNullTotal: 0, synthNullNearTimeout: 0,
       lagVerdict: '', diagBornAt: this._diagBornAt
     };
   }
@@ -393,6 +400,15 @@ export class VoicePlayer {
         this.diag.synthWaitEmaMs = this._synthWaitEmaMs;
 
         if (!wav || !this.enabled || generation !== this.generation || this.isObsMode()) {
+          // v0.1.1213: 合成が null で返った件を数える。ここは以前どのカウンタも増やさずに
+          //   捨てており、実配信で「需要52.2/分・読めた6件・間引き12件」=約34件が
+          //   どの計器にも乗らない穴になっていた(=なぜ読まれないか答えられない)。
+          //   無効化/世代替わり/OBSは別事由なので、合成失敗(!wav)のときだけ数える。
+          if (!wav) {
+            this.diag.synthNullTotal += 1;
+            const failure = classifyVoiceSynthNull({ synthMs: this.diag.lastSynthMs });
+            if (failure.nearTimeout) this.diag.synthNullNearTimeout += 1;
+          }
           if (typeof item.onPlayStart === 'function') item.onPlayStart();
           this._notifyDropped(item); // v0.1.799: 合成失敗/無効化で鳴らず→吹き出しを unvoiced へ
           continue;
