@@ -34,9 +34,14 @@ describe('buildLaneMirrorSnapshot', () => {
     expect(snap.pickedLength).toBe(2);
     expect(snap.totalCandidates).toBe(5);
     expect(snap.link).toHaveLength(1);
+    // v0.1.1220: recentTexts(会場ホバーカードの直近発言)を追加。
+    //   会場は鏡が使えるとき鏡を優先するので、ここに載せないとカードへ届かない。
+    //   ★「最小フィールド」の契約は維持する意図: 上限3件・空なら空配列で、
+    //     1人あたり数十バイトに収まる範囲に留める(純Web公開のサイズを守る)。
     expect(snap.link[0]).toEqual({
       displaySrc: 'https://cdn/123.jpg', title: 'ユーザー',
-      idLine: 'ID 123', nameLine: '名前 123', userId: '123'
+      idLine: 'ID 123', nameLine: '名前 123', userId: '123',
+      recentTexts: []
     });
     expect(snap.konta[0].userId).toBe('a:X');
   });
