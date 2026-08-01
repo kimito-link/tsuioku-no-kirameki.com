@@ -54,4 +54,20 @@ describe('lpIndexFeatures', () => {
     expect(html).toMatch(/SHA-256|SHA256/);
     expect(html).toMatch(/ポップアップに目立つスイッチは置かない|萎縮/);
   });
+
+  /**
+   * 2026-08-01: LP が HTML 保存のファイル名を旧名(nicolivelog-report-lv...)のまま見せており、
+   * それが「HTML ダウンロード機能が無くなった」というユーザーの認識の原因になっていた。
+   * 実際の命名は v0.1.590/591 で `YYYY-MM-DD_lvID.html` に変わっており、機能自体は生きている。
+   *
+   * 生成側は exportDownloadFilename.test.js が既に `not.toContain('nicolivelog')` で
+   * 旧名の復活を禁じている。同じ語を LP 側にも張って、対で守る。
+   */
+  it('HTML 保存の見本ファイル名が現行の命名規則(YYYY-MM-DD_lvID.html)である', () => {
+    expect(html).toMatch(/\d{4}-\d{2}-\d{2}_lv\d+\.html/);
+  });
+
+  it('旧ファイル名(nicolivelog-)が LP に残っていない', () => {
+    expect(html).not.toContain('nicolivelog');
+  });
 });
