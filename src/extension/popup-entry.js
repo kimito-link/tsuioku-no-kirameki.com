@@ -7832,6 +7832,11 @@ async function paintStoryUserLaneCoalesced(liveId, displayEntries, storageRows) 
   //   2回目の描画で載る(後段で埋まる=進行的)。read path にキャッシュは足さない(§6 地雷回避)。
   if (lid && String(STORY_SOURCE_STATE.liveId || '').trim().toLowerCase() === lid) {
     renderStoryUserLane();
+    // v0.1.1227: ティッカーも「見せる人」側に含める。v0.1.1226 は renderCommentTicker を
+    //   重い refresh() の中だけから呼んでいたため、レーンがこの独立経路(v0.1.976)で描かれる
+    //   実配信では**一度も呼ばれなかった**(実測: laneTickProbe.runs=9 なのに tickerPick 全0)。
+    //   餓死しない経路に相乗りさせる=レーンが描けるときは必ずティッカーも更新される。
+    try { renderCommentTicker(/** @type {any} */ (displayEntries)); } catch { /* 描画は best-effort */ }
   }
 
   let giftUsers = [];
