@@ -723,4 +723,47 @@ maybeEnrich('enrichUserLaneAggregatesWithProfileAndDisplay', () => {
     );
     expect(out[0].avatarObserved).toBe(true);
   });
+
+  /**
+   * v0.1.1221 回帰: enrich が「変更した人」のフィールドを取りこぼさないこと。
+   *
+   * ★このテストは【本番の producer が作った集約】をそのまま enrich へ渡す。
+   *   手書きの集約(このファイルの他テスト)は元から余分なキーを持たないので、
+   *   5キーだけ書き写す実装でも緑になってしまい、実機でだけ壊れていた。
+   *   producer と enrich の結合をここで断言する。
+   */
+  it('★v0.1.1221: nickname を変えた人でも producer 由来の全フィールドが残る', () => {
+    const rows = [
+      { userId: '55141222', nickname: '匿名', text: 'こんばんは', capturedAt: 1000, liveId: 'lv1' },
+      { userId: '55141222', nickname: '匿名', text: 'たのしい', capturedAt: 3000, liveId: 'lv1' }
+    ];
+    const agg = userLaneCandidatesFromStorage(rows, 'lv1', {});
+    // 前提: producer はこれらを出している(出していなければテストの前提が崩れている)
+    expect(agg[0].recentTexts?.length).toBeGreaterThan(0);
+    expect(agg[0].commentCount).toBe(2);
+
+    // nickname が変わる=enrich が新しいオブジェクトを作る経路に入る
+    const out = enrichUserLaneAggregatesWithProfileAndDisplay(agg, rows, {
+      '55141222': { nickname: 'だるま' }
+    });
+    expect(out[0].nickname).toBe('だるま');
+
+    // ここが本体: 変更していないフィールドが消えていないこと
+    expect(out[0].recentTexts).toEqual(agg[0].recentTexts);
+    expect(out[0].commentCount).toBe(2);
+    expect(out[0].giftCount).toBe(0);
+    expect(out[0]._laneSortAt).toBe(3000);
+  });
+
+  it('★v0.1.1221: producer が持つキー集合が enrich 後も欠けない', () => {
+    const rows = [
+      { userId: '55141222', nickname: '匿名', text: 'a', capturedAt: 1000, liveId: 'lv1' }
+    ];
+    const agg = userLaneCandidatesFromStorage(rows, 'lv1', {});
+    const out = enrichUserLaneAggregatesWithProfileAndDisplay(agg, rows, {
+      '55141222': { nickname: 'だるま' }
+    });
+    const lost = Object.keys(agg[0]).filter((k) => !(k in out[0]));
+    expect(lost).toEqual([]);
+  });
 });

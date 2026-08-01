@@ -324,12 +324,22 @@ export function enrichUserLaneAggregatesWithProfileAndDisplay(
     const observedChanged = observedNext !== Boolean(agg.avatarObserved);
     if (!nickChanged && !observedChanged) return agg;
     anyChange = true;
+    // v0.1.1221: ★ここはフィールドを個別に列挙してはいけない。
+    //   旧実装は5キーだけ書き写しており、nickname か avatarObserved が変わった人だけ
+    //   commentCount / giftCount / recentTexts / _laneSortAt が【黙って消えて】いた。
+    //   この関数の戻り値は STORY_SOURCE_STATE.laneAggregates(表示の正本)を上書きするので、
+    //   欠けたまま会場・レーンの全下流へ流れる:
+    //     recentTexts  → ホバーカードの直近発言が空(v0.1.1216〜1220で4回直したのに実機で出なかった真因)
+    //     commentCount → venueSeats.js の preCount が 1 に落ち VIP が誰も光らない(v0.1.734 の退行)
+    //     _laneSortAt  → 会場の席順・レーンの並び順の根拠が 0 になる
+    //   実機でだけ壊れたのは、この関数が「名前が変わった人」にしか適用されないから
+    //   (手書き集約の単体テストは元から余分なキーを持たず、差に気づけなかった)。
+    //   ★このため spread で全フィールドを保持し、変更するキーだけ上書きする。
+    //   新しいフィールドが producer に増えても、ここは何もしなくて済む形にしてある。
     return Object.freeze({
-      userId: agg.userId,
+      ...agg,
       nickname: nickChanged ? merged : agg.nickname,
-      avatarUrl: agg.avatarUrl,
-      avatarObserved: observedNext,
-      liveId: agg.liveId
+      avatarObserved: observedNext
     });
   });
 
