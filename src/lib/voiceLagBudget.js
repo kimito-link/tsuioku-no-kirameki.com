@@ -224,3 +224,70 @@ export function computeVoiceLagVerdict(inputs) {
   }
   return 'mixed';
 }
+
+// ---------------------------------------------------------------------------
+// v0.1.1222: 持続的な過負荷での速度底上げ(仮説A=playback への対処・段階1=apply)
+//
+// 【真因】混雑ヒューリスティクス computeVoiceCongestion は【絶対キュー長】で速度を決めるが
+//   (5件で0.5・8件で0.8)、実効上限(resolveVoiceQueueMax)が処理時間EMAから 3 まで絞られると
+//   **キューは構造的に5件へ到達できない**。つまり上位2段の速度が永久に発火しない。
+//   結果、系は「速く読んで消化する」のではなく「入口で捨てる」方に倒れる。
+//   2026-08-01 実測: 需要102.3/分 vs 供給39.6/分・間引き88件・判定=playback・実効上限3。
+//
+// 【対処】速度の判断材料をキュー長でなく **pressure(需要/供給比)** にする。pressure は
+//   λ×S/60000 で、キュー長が上限に張り付いていても過負荷を正しく検出できる
+//   (computeVoiceLagVerdict が既に使っている指標=新しい概念を持ち込まない)。
+//
+// 【不可侵の鉄則との整合】
+//   - 時間ゲート(VOICE_STALE_MS_NORMAL)には触れない(鉄則3)
+//   - 決定論・FIFO・最古drop を一切変えない(鉄則4)。変えるのは speedScale だけ
+//   - 「今+次」の床(VOICE_QUEUE_MAX_FLOOR=2)にも触れない
+//   - 上げるだけ(既存の congestion 由来ブーストを下回らせない)=間延び退行を作らない
+// ---------------------------------------------------------------------------
+
+/** 持続過負荷とみなす pressure の下限(誤差帯 VOICE_PRESSURE_OK_MAX を上回る領域)。 */
+export const VOICE_SUSTAINED_PRESSURE_MIN = 1.5;
+
+/** pressure 由来ブーストの上限。既存 computeVoiceCongestion の最大値と揃える(声質を守る)。 */
+export const VOICE_SUSTAINED_BOOST_MAX = 0.8;
+
+/**
+ * 持続的な過負荷のときに上乗せする speedBoost を返す純関数。
+ *
+ * キュー長が実効上限に張り付いて混雑を検出できないレジームを救うのが目的。
+ * 落ち着いていれば 0 を返す(通常時の声の速さは1バイトも変えない)。
+ *
+ * @param {{ arrivalPerMin?: unknown, serviceTimeEmaMs?: unknown, sampleCount?: unknown }} inputs
+ * @returns {number} 0〜VOICE_SUSTAINED_BOOST_MAX の上乗せ値
+ */
+export function computeSustainedPressureBoost(inputs) {
+  const i = inputs && typeof inputs === 'object' ? inputs : {};
+  const L = Number(i.arrivalPerMin);
+  const S = Number(i.serviceTimeEmaMs);
+  const sampleCount = Math.max(0, Math.floor(Number(i.sampleCount) || 0));
+  // データ不足で断定しない(fail-closed=静かなときに勝手に速くしない)。
+  if (!Number.isFinite(L) || L <= 0 || !Number.isFinite(S) || S <= 0 || sampleCount < 5) {
+    return 0;
+  }
+  const pressure = (L * S) / 60000;
+  if (pressure <= VOICE_SUSTAINED_PRESSURE_MIN) return 0;
+  // pressure 1.5→0 / 2.5→0.4 / 3.5→0.8(以降は上限で頭打ち)。線形・決定論。
+  const raw = (pressure - VOICE_SUSTAINED_PRESSURE_MIN) * 0.4;
+  return Math.min(VOICE_SUSTAINED_BOOST_MAX, Math.max(0, raw));
+}
+
+/**
+ * 既存の混雑ブーストと持続過負荷ブーストを合成する(上げるだけ・上限で clamp)。
+ *
+ * @param {unknown} congestionBoost computeVoiceCongestion 由来の既存値
+ * @param {unknown} sustainedBoost computeSustainedPressureBoost 由来の値
+ * @returns {number}
+ */
+export function mergeVoiceSpeedBoost(congestionBoost, sustainedBoost) {
+  const a = Number(congestionBoost);
+  const b = Number(sustainedBoost);
+  const base = Number.isFinite(a) && a > 0 ? a : 0;
+  const extra = Number.isFinite(b) && b > 0 ? b : 0;
+  // 下げない(max)。既存の挙動を悪化させないことを型で保証する。
+  return Math.min(VOICE_SUSTAINED_BOOST_MAX, Math.max(base, extra));
+}

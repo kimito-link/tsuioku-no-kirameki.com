@@ -14,7 +14,9 @@ import {
   stepVoiceQueueMax,
   updateVoiceEventRatioEma,
   foldVoiceArrivalWindow,
-  computeVoiceLagVerdict
+  computeVoiceLagVerdict,
+  computeSustainedPressureBoost,
+  mergeVoiceSpeedBoost
 } from './voiceLagBudget.js';
 
 /**
@@ -315,5 +317,68 @@ describe('computeVoiceLagVerdict(真理値表)', () => {
     expect(VOICE_SYNTH_WAIT_DOMINANT_RATIO).toBe(0.35);
     expect(VOICE_PLAYBACK_DOMINANT_RATIO).toBe(0.6);
     expect(VOICE_STALL_EXCESS_RATIO).toBe(0.2);
+  });
+});
+
+/**
+ * v0.1.1222: 持続過負荷での速度底上げ。
+ *
+ * ★実測(2026-08-01 lv351083087)で踏んだ構造穴の回帰:
+ *   実効上限が3に絞られるとキューは5件に届かず、computeVoiceCongestion の
+ *   0.5/0.8段が【永久に発火しない】。速度で消化せず入口で捨てる方に倒れていた。
+ */
+describe('computeSustainedPressureBoost (v0.1.1222)', () => {
+  it('データ不足なら0(静かなときに勝手に速くしない・fail-closed)', () => {
+    expect(computeSustainedPressureBoost({ arrivalPerMin: 100, serviceTimeEmaMs: 1500, sampleCount: 4 })).toBe(0);
+    expect(computeSustainedPressureBoost({})).toBe(0);
+    expect(computeSustainedPressureBoost({ arrivalPerMin: 0, serviceTimeEmaMs: 1500, sampleCount: 50 })).toBe(0);
+  });
+
+  it('落ち着いていれば0(通常時の声の速さを変えない)', () => {
+    // pressure = 20*1500/60000 = 0.5
+    expect(computeSustainedPressureBoost({ arrivalPerMin: 20, serviceTimeEmaMs: 1500, sampleCount: 50 })).toBe(0);
+  });
+
+  it('★実測レジーム(需要102/分・1517ms/件)でブーストが立つ', () => {
+    // pressure = 102.3*1517/60000 ≒ 2.59 → (2.59-1.5)*0.4 ≒ 0.43
+    const b = computeSustainedPressureBoost({
+      arrivalPerMin: 102.3,
+      serviceTimeEmaMs: 1517,
+      sampleCount: 50
+    });
+    expect(b).toBeGreaterThan(0.3);
+    expect(b).toBeLessThanOrEqual(0.8);
+  });
+
+  it('極端な過負荷でも上限0.8を超えない(声質を守る)', () => {
+    expect(
+      computeSustainedPressureBoost({ arrivalPerMin: 1000, serviceTimeEmaMs: 3000, sampleCount: 99 })
+    ).toBe(0.8);
+  });
+
+  it('決定論: 同じ入力は同じ値', () => {
+    const args = { arrivalPerMin: 102.3, serviceTimeEmaMs: 1517, sampleCount: 50 };
+    expect(computeSustainedPressureBoost(args)).toBe(computeSustainedPressureBoost(args));
+  });
+});
+
+describe('mergeVoiceSpeedBoost (v0.1.1222)', () => {
+  it('★下げない(既存の混雑ブーストを弱めない=間延び退行を作らない)', () => {
+    expect(mergeVoiceSpeedBoost(0.8, 0)).toBe(0.8);
+    expect(mergeVoiceSpeedBoost(0.5, 0.1)).toBe(0.5);
+  });
+
+  it('キュー長では出せない領域を持続ブーストが埋める', () => {
+    // 実効上限3でキューが3件=congestion は 0.3 止まり。pressure 由来で 0.43 まで上げる。
+    expect(mergeVoiceSpeedBoost(0.3, 0.43)).toBeCloseTo(0.43, 5);
+  });
+
+  it('上限で clamp する', () => {
+    expect(mergeVoiceSpeedBoost(0.8, 0.8)).toBe(0.8);
+  });
+
+  it('不正値は0扱いで壊れない', () => {
+    expect(mergeVoiceSpeedBoost(NaN, NaN)).toBe(0);
+    expect(mergeVoiceSpeedBoost(undefined, 0.4)).toBeCloseTo(0.4, 5);
   });
 });

@@ -33,6 +33,8 @@
  *   expectedPlayEmaMs: number,   // 2026-07-28計器: WAV申告再生時間のEMA(-1=未計測。仮説Aの物差し)
  *   arrivalPerMin: number,       // 2026-07-28計器: 需要(コメント到着レート・件/分・-1=未計測)
  *   voicedRecentRatio: number,   // 2026-07-28計器: 直近voiced率EMA(累計voicedRatioの世代錯誤を補う)
+ *   lastSustainedBoost: number,  // v0.1.1222計器: 持続過負荷(pressure由来)で上乗せした速度(0=未適用)
+ *   sustainedBoostTotal: number, // v0.1.1222計器: キュー長では出せない速度を実際に足した累計件数
  *   dropCountGateTotal: number,  // 2026-07-28計器: 件数ゲート最古dropの累計(3分別のうちの1つ)
  *   dropHeadStaleTotal: number,  // 2026-07-28計器: 先頭itemの単体stale破棄の累計
  *   dropSweepStaleTotal: number, // 2026-07-28計器: 全stale時の先頭群破棄の累計
@@ -73,6 +75,8 @@ export function makeInitialVoiceDiag() {
     expectedPlayEmaMs: -1,
     arrivalPerMin: -1,
     voicedRecentRatio: -1,
+    lastSustainedBoost: 0,
+    sustainedBoostTotal: 0,
     dropCountGateTotal: 0,
     dropHeadStaleTotal: 0,
     dropSweepStaleTotal: 0,
@@ -123,6 +127,8 @@ export function buildVoiceDiagSnapshot(diag, nowMs) {
     playPrepEmaMs: num(d.playPrepEmaMs, base.playPrepEmaMs),
     playbackEmaMs: num(d.playbackEmaMs, base.playbackEmaMs),
     expectedPlayEmaMs: num(d.expectedPlayEmaMs, base.expectedPlayEmaMs),
+    lastSustainedBoost: num(d.lastSustainedBoost, base.lastSustainedBoost),
+    sustainedBoostTotal: num(d.sustainedBoostTotal, base.sustainedBoostTotal),
     arrivalPerMin: num(d.arrivalPerMin, base.arrivalPerMin),
     voicedRecentRatio: num(d.voicedRecentRatio, base.voicedRecentRatio),
     synthNullTotal: num(d.synthNullTotal, base.synthNullTotal),
@@ -203,6 +209,14 @@ export function buildVoiceDiagLine(snap, nowMs) {
   }
   const rateClamp = Number(snap.rateClampTotal) || 0;
   if (rateClamp > 0) parts.push(`速度飽和${rateClamp}件`); // playbackRateが上限で追いつけていない兆候。
+  // v0.1.1222: 持続過負荷ブースト。実効上限が絞られてキュー長では出せない速度を、
+  //   pressure(需要/供給比)から足したぶん。0なら出さない(落ち着いている時は何も言わない)。
+  //   ★「速くした結果どうなったか」を voiced率/間引き件数と並べて検算できるようにする。
+  const sustainedNow = Number(snap.lastSustainedBoost) || 0;
+  const sustainedTotal = Number(snap.sustainedBoostTotal) || 0;
+  if (sustainedNow > 0 || sustainedTotal > 0) {
+    parts.push(`速度底上げ+${sustainedNow.toFixed(2)}(適用${sustainedTotal}件)`);
+  }
   // v0.1.895: 固着の切り分け。最終発話が古い(沈黙)のに待機があるとき、drainVoiceQueue が
   //   最後にどのフェーズまで進んだか(lastPhase)を出す=どこで止まったかを実データで確定する計器。
   const lastPhase = String(snap.lastPhase || '');
