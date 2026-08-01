@@ -47,15 +47,16 @@ export async function copyTextWithFallback(text, io = {}) {
     }
   }
 
-  // 2) execCommand('copy')。select 対象があればそれを、無ければ一時 textarea を使う。
+  // 2) execCommand('copy')。
+  //    ★v0.1.1223: 以前は selectEl があるとそれを select して execCommand していたが、
+  //      これは【selectEl の中身】をコピーする=引数 text と食い違う。v0.1.1222 で
+  //      「本文の先頭に鮮度バナーを足す」ようにした結果、バナー無しの古い中身が
+  //      コピーされる(textarea が空なら何もコピーされない)不具合になった。
+  //      渡された body を確実にコピーするため、常に一時 textarea を使う。
+  //      selectEl は「自動コピーが全部ダメだったとき」の Ctrl+C 逃がし先としてのみ使う(下の3)。
   if (doc && typeof doc.execCommand === 'function') {
-    const el = io.selectEl || null;
     try {
-      if (el && typeof el.select === 'function') {
-        el.focus();
-        el.select();
-        if (doc.execCommand('copy')) return 'execCommand';
-      } else if (doc.body && typeof doc.createElement === 'function') {
+      if (doc.body && typeof doc.createElement === 'function') {
         const ta = doc.createElement('textarea');
         ta.value = body;
         ta.style.position = 'fixed';
