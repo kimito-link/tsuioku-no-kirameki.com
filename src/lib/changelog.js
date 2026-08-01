@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1216',
+    date: '2026-08-01',
+    summary: '会場でアイコンにマウスを乗せたとき、直前の発言が出るように',
+    items: Object.freeze([
+      '会場モードでアイコンにマウスを乗せたとき、その人が直前に何を言ったかが出るようにしました。表示する仕組みは以前からありましたが、本文が渡っていなかったため常に空欄になっていました。ギフトだけ投げた人には本文を出しません(発言していないため)。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1215',
     date: '2026-08-01',
     summary: 'アイコンが「ちらちら変わる」現象を実測する計器を追加',

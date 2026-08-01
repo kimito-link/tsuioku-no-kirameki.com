@@ -37,6 +37,7 @@ export const VENUE_ROSTER_MAX_SEATS = VENUE_FULLSCREEN_MAX_SEATS;
  *   userId: string,
  *   name: string,
  *   avatar: string,
+ *   lastText: string,
  *   firstSeen: number,
  *   lastSeen: number,
  *   commentCount: number,
@@ -82,6 +83,11 @@ export function touchRoster(roster, row, nowMs, opts = {}) {
       userId,
       name: incomingName,
       avatar: incomingAvatar,
+      // 2026-08-01(v0.1.1216): 直前の発言本文を保持する。以前はここで text の有無だけを見て
+      //   捨てていたため、rosterToVenueRows が text:'' しか出せず、ホバーカードの
+      //   本文表示(v0.1.1192実装済み)が**席のある人でも常に空**になっていた。
+      //   ★ギフトだけの行(isGift)は発言ではないので本文を持たせない。
+      lastText: isGift ? '' : text,
       firstSeen: now,
       lastSeen: now,
       commentCount: 1,
@@ -96,6 +102,9 @@ export function touchRoster(roster, row, nowMs, opts = {}) {
   e.lastSeen = Math.max(e.lastSeen || 0, now);
   e.commentCount = (e.commentCount || 0) + 1;
   if (isGift) e.giftCount = (e.giftCount || 0) + 1;
+  // 発言があれば最新の本文で上書き(ホバーカードは「直前の発言」を出す仕様)。
+  //   ギフトだけの行では上書きしない=直前の発言を投擲で消さない。
+  if (!isGift && text) e.lastText = text;
   if (!e.name && incomingName) e.name = incomingName; // 非空を採用・下げない
   // avatar: 実サムネ(http)を優先。実を非実(空/data:)で上書きしない。
   if (incomingAvatar && hasRealThumbnail(incomingAvatar) && !hasRealThumbnail(e.avatar)) {
@@ -170,7 +179,10 @@ export function rosterToVenueRows(roster) {
       userId: e.userId,
       name: String(e.name || ''),
       avatar: String(e.avatar || ''),
-      text: '',
+      // 2026-08-01(v0.1.1216): 直前の発言本文。collectVenueParticipants がこの text を
+      //   lastText に載せ(venueSeats.js:166)、ホバーカードが表示する(v0.1.1192実装済み)。
+      //   以前は '' 固定だったため、席のある人でもカードに本文が出ていなかった。
+      text: String(e.lastText || ''),
       capturedAt: Math.max(0, Number(e.lastSeen) || 0),
       preCount: Math.max(1, Math.floor(Number(e.commentCount) || 0) || 1),
       preHasGift: giftCount > 0,
@@ -202,6 +214,9 @@ export function hydrateRosterFromCandidates(roster, candidates, opts = {}) {
       userId,
       name: String(c.nickname ?? '').trim(),
       avatar: String(c.avatarUrl ?? '').trim(),
+      // 候補(storage シード)は本文を持たないので空。以後ライブで発言が届いたときに
+      //   touchRoster が埋める=「開いた直後は空欄・喋ったら出る」という自然な挙動になる。
+      lastText: '',
       firstSeen: lastSeen,
       lastSeen,
       commentCount: Math.max(1, Math.floor(Number(c.commentCount) || 0) || 1),
