@@ -2,8 +2,52 @@ import { describe, expect, it } from 'vitest';
 import {
   STORY_GROWTH_MAX_CELLS,
   buildStoryGrowthGaugeLabel,
-  buildSupportSameUserBlurb
+  buildSupportSameUserBlurb,
+  resolveStoryGrowthWindowOffset
 } from './storyGrowthLimits.js';
+
+/**
+ * v0.1.1217: ユーザー報告「積み上げ式にならず、もともと記録されたアイコンが
+ * ちらちら変わる。この人がどんな発言をしたのか追いづらい」の根治。
+ *
+ * 旧実装は offset = 全件数 - 上限 で、上限超過後は**コメント1件ごとに全マスがずれた**。
+ * 先頭固定(常に0)にすることで、一度並んだアイコンは二度と動かない。
+ *
+ * ★このテストが緑である限りちらつきは起きない。ここを len - cap のような式に
+ *   戻す変更が入ったら必ず赤になる=退化ガード。
+ */
+describe('resolveStoryGrowthWindowOffset (窓は先頭固定=ちらつかない担保)', () => {
+  it('上限未満なら0(従来どおり全件を先頭から)', () => {
+    expect(resolveStoryGrowthWindowOffset(0)).toBe(0);
+    expect(resolveStoryGrowthWindowOffset(100)).toBe(0);
+    expect(resolveStoryGrowthWindowOffset(STORY_GROWTH_MAX_CELLS)).toBe(0);
+  });
+
+  it('上限を超えても0のまま(=既存アイコンがずれない)', () => {
+    expect(resolveStoryGrowthWindowOffset(STORY_GROWTH_MAX_CELLS + 1)).toBe(0);
+    expect(resolveStoryGrowthWindowOffset(2716)).toBe(0);
+    expect(resolveStoryGrowthWindowOffset(10219)).toBe(0);
+  });
+
+  it('件数が1件ずつ増えても offset が動かない(ちらつきの直接の反証)', () => {
+    // 旧実装ではこの連続で offset が 1,2,3... と進み、全マスがずれていた。
+    const offsets = [361, 362, 363, 364, 365].map((n) =>
+      resolveStoryGrowthWindowOffset(n)
+    );
+    expect(new Set(offsets).size).toBe(1);
+    expect(offsets[0]).toBe(0);
+  });
+
+  it('上限を明示しても先頭固定(既定に依存しない)', () => {
+    expect(resolveStoryGrowthWindowOffset(5000, 100)).toBe(0);
+  });
+
+  it('壊れた入力でも0を返す(負のoffsetを作らない)', () => {
+    expect(resolveStoryGrowthWindowOffset(NaN)).toBe(0);
+    expect(resolveStoryGrowthWindowOffset(-5)).toBe(0);
+    expect(resolveStoryGrowthWindowOffset(undefined)).toBe(0);
+  });
+});
 
 /**
  * 2026-07-31 ユーザー報告「応援レーンには居るのにアイコングリッドに居ない人がいる」の根治。
@@ -36,31 +80,38 @@ describe('buildStoryGrowthGaugeLabel', () => {
     expect(label).not.toContain('表示枠の外');
   });
 
-  it('上限超過なら「表示中の件数」と「枠外の件数」を明記する', () => {
+  /**
+   * v0.1.1217: 窓を先頭固定にしたので「直近N件」ではなく「はじめのN件」が実態。
+   * 「直近」のままだと、実際には出ていない最新コメントがグリッドにあるかのような
+   * 嘘になる(「黙って切らない」方針に反する)。
+   */
+  it('上限超過なら「はじめのN件で固定」と「残りの行き先」を明記する', () => {
     const label = buildStoryGrowthGaugeLabel(STORY_GROWTH_MAX_CELLS + 1);
-    expect(label).toContain(`いま直近 ${STORY_GROWTH_MAX_CELLS.toLocaleString('ja-JP')} 件を表示中`);
-    expect(label).toContain('ほか 1 件は表示枠の外');
+    expect(label).toContain(`グリッドははじめの ${STORY_GROWTH_MAX_CELLS.toLocaleString('ja-JP')} 件で固定`);
+    expect(label).toContain('そのあとの 1 件は下の応援レーンに出ます');
+    // 実態と違う「直近」表現が復活していないこと
+    expect(label).not.toContain('いま直近');
   });
 
-  it('実例(2,716件)で「360件表示中・2,356件が枠外」と出る', () => {
+  it('実例(2,716件)で「はじめの360件で固定・2,356件は応援レーンへ」と出る', () => {
     const label = buildStoryGrowthGaugeLabel(2716);
     expect(label).toContain('応援 2,716 コメント');
-    expect(label).toContain('いま直近 360 件を表示中');
-    expect(label).toContain('ほか 2,356 件は表示枠の外');
+    expect(label).toContain('グリッドははじめの 360 件で固定');
+    expect(label).toContain('そのあとの 2,356 件は下の応援レーンに出ます');
   });
 
   it('桁区切りは日本語ロケール(全件・枠外の両方)', () => {
     const label = buildStoryGrowthGaugeLabel(12345, 1000);
     expect(label).toContain('応援 12,345 コメント');
-    expect(label).toContain('いま直近 1,000 件を表示中');
-    expect(label).toContain('ほか 11,345 件は表示枠の外');
+    expect(label).toContain('グリッドははじめの 1,000 件で固定');
+    expect(label).toContain('そのあとの 11,345 件は下の応援レーンに出ます');
   });
 
   it('maxCells を明示できる(既定は STORY_GROWTH_MAX_CELLS)', () => {
-    expect(buildStoryGrowthGaugeLabel(500, 100)).toContain('いま直近 100 件を表示中');
+    expect(buildStoryGrowthGaugeLabel(500, 100)).toContain('グリッドははじめの 100 件で固定');
     // 未指定時は既定値で判定される
     expect(buildStoryGrowthGaugeLabel(500)).toContain(
-      `いま直近 ${STORY_GROWTH_MAX_CELLS.toLocaleString('ja-JP')} 件を表示中`
+      `グリッドははじめの ${STORY_GROWTH_MAX_CELLS.toLocaleString('ja-JP')} 件で固定`
     );
   });
 });

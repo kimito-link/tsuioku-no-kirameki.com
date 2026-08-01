@@ -780,7 +780,8 @@ import { shouldDeferHeavyPopupPaintDuringScroll } from '../lib/popupMainScrollDe
 import {
   STORY_GROWTH_MAX_CELLS,
   buildStoryGrowthGaugeLabel,
-  buildSupportSameUserBlurb
+  buildSupportSameUserBlurb,
+  resolveStoryGrowthWindowOffset
 } from '../lib/storyGrowthLimits.js';
 import {
   createStoryGrowthChurnState,
@@ -8841,11 +8842,14 @@ function syncStoryGrowth(liveId, count, root) {
 
   STORY_GROWTH_STATE.root = root;
   STORY_GROWTH_STATE.targetCount = target;
-  // 描画ウィンドウの先頭オフセット。entries 全体（lane/集計用）は不変で、グリッドだけ
-  // 直近 target 件を表示する。上限未満では srcLen<=target ＝ offset 0（全件）。
+  // 描画ウィンドウの先頭オフセット。entries 全体（lane/集計用）は不変。
+  // v0.1.1217: 先頭固定にした(常に0)。以前は srcLen - target で、上限を超えると
+  //   コメント1件ごとに窓がずれ、既に並んだアイコンが別人に入れ替わっていた
+  //   (ユーザー報告「ちらちら変わって人を追えない」の真因)。
+  //   上限後の新規はグリッドに出さず、件数ラベルと応援レーンで伝える(会議で決定)。
   {
     const srcLen = STORY_SOURCE_STATE.entries.length;
-    STORY_GROWTH_STATE.sourceOffset = Math.max(0, srcLen - target);
+    STORY_GROWTH_STATE.sourceOffset = resolveStoryGrowthWindowOffset(srcLen, target);
   }
 
   if (!root) return;
