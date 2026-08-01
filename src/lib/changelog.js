@@ -26,6 +26,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1227',
+    date: '2026-08-02',
+    summary: 'コメントのピックアップが動いていなかったのを修正',
+    items: Object.freeze([
+      '前の版で入れた「7秒ごとに1件を選んで留める」機能が、実際の配信では一度も動いていませんでした。応援レーンは重い処理を待たずに描く専用の経路を持っているのですが、ピックアップの方は重い処理の中からしか呼んでいなかったためです。',
+      '同じ経路から呼ぶようにしたので、レーンが描けるときは必ずピックアップも更新されます。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1226',
     date: '2026-08-02',
     summary: '流れて埋もれるコメントを1件ずつ留めて見せる',
