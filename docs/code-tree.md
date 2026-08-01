@@ -157,7 +157,7 @@
     - `2026-07-22.md`
     - `2026-07-23.md`
     - `2026-07-31.md`
-- 📁 **docs/** (223)
+- 📁 **docs/** (225)
   - 📁 **article-assets/** (87)
     - 📁 **venue-frames/** (12)
       - `f01.png`
@@ -267,7 +267,7 @@
     - `storage-bus.md`
     - `venue.md`
     - `web-status.md`
-  - 📁 **handoff/** (61)
+  - 📁 **handoff/** (62)
     - `HANDOFF-backfill-instant-restore.md`
     - `HANDOFF-broadcast-score-panel.md`
     - `HANDOFF-diag-truth-IMPL.md`
@@ -302,6 +302,7 @@
     - `HANDOFF-venue-pop-copy-IMPL.md`
     - `HANDOFF-web-same-as-ext.md`
     - `clip-history-persistence-synthesis.md`
+    - `component-factoring-zero-error-IMPLEMENTATION-HANDOFF.md`
     - `diagnostic-architecture-strengthen-DESIGN.md`
     - `diagnostic-architecture-strengthen-IMPLEMENTATION-HANDOFF.md`
     - `diagnostic-instrument-strengthen-2-DESIGN.md`
@@ -362,6 +363,7 @@
   - `comment-ingest-log-debug.md`
   - `comment-metadata-pipeline-notes.md`
   - `comment-number-rescue-flow.html`
+  - `component-factoring-zero-error-flow.html`
   - `cursor-handoff-direct-concurrent-viewers.md`
   - `dev-sound-preview.html`
   - `diagnostics-strengthening-log.md`

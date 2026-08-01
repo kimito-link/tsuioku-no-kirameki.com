@@ -1,0 +1,199 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>コンポーネント化・ファクタリング ゼロエラーフロー</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #08111f;
+      --panel: #111d31;
+      --line: #32445f;
+      --text: #edf4ff;
+      --muted: #a7b6cc;
+      --green: #38d996;
+      --red: #ff657a;
+      --blue: #69a8ff;
+      --yellow: #f7c95c;
+      --purple: #c992ff;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: radial-gradient(circle at top, #132641 0, var(--bg) 42%);
+      color: var(--text);
+      font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+      line-height: 1.55;
+    }
+    main { width: min(1180px, calc(100% - 32px)); margin: 0 auto; padding: 34px 0 60px; }
+    h1 { margin: 0 0 8px; font-size: clamp(1.7rem, 4vw, 2.7rem); }
+    h2 { margin: 34px 0 14px; }
+    p { color: var(--muted); }
+    a { color: #9fc6ff; }
+    .hero, .card, .gate, .phase {
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      background: rgba(17, 29, 49, .94);
+      box-shadow: 0 12px 30px rgba(0, 0, 0, .22);
+    }
+    .hero { padding: 24px; }
+    .hero strong { color: var(--yellow); }
+    .legend { display: flex; flex-wrap: wrap; gap: 9px; margin-top: 16px; }
+    .chip { padding: 5px 10px; border-radius: 999px; font-weight: 700; font-size: .86rem; }
+    .done { color: var(--green); background: color-mix(in srgb, var(--green) 14%, transparent); }
+    .block { color: var(--red); background: color-mix(in srgb, var(--red) 14%, transparent); }
+    .frozen { color: var(--blue); background: color-mix(in srgb, var(--blue) 14%, transparent); }
+    .hyp { color: var(--yellow); background: color-mix(in srgb, var(--yellow) 14%, transparent); }
+    .human { color: var(--purple); background: color-mix(in srgb, var(--purple) 14%, transparent); }
+    .flow { display: grid; gap: 12px; margin-top: 18px; }
+    .phase { padding: 18px 20px; position: relative; }
+    .phase:not(:last-child)::after {
+      content: "↓  ゲート通過時だけ次へ";
+      display: block;
+      color: var(--muted);
+      padding-top: 20px;
+      text-align: center;
+      font-weight: 700;
+    }
+    .phase h3 { margin: 0 0 8px; font-size: 1.08rem; }
+    .phase p { margin: 5px 0; }
+    .phase .state { float: right; }
+    .gate { padding: 14px 16px; border-left: 5px solid var(--yellow); margin-top: 12px; }
+    .gate strong { color: var(--yellow); }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(245px, 1fr)); gap: 14px; }
+    .card { padding: 18px; }
+    .card h3 { margin: 0 0 8px; }
+    .card p, .card ul { margin: 6px 0 0; }
+    ul { padding-left: 20px; color: var(--muted); }
+    code { color: #c8ddff; }
+    .split { border-color: var(--red); }
+    .target { border-color: var(--green); }
+    .decision {
+      display: grid;
+      grid-template-columns: 1fr auto 1fr;
+      gap: 12px;
+      align-items: center;
+      margin-top: 14px;
+    }
+    .arrow { color: var(--yellow); font-size: 1.8rem; font-weight: 900; }
+    .footer { margin-top: 30px; font-size: .9rem; }
+    @media (max-width: 720px) {
+      .decision { grid-template-columns: 1fr; }
+      .arrow { transform: rotate(90deg); text-align: center; }
+      .phase .state { float: none; display: inline-block; margin-bottom: 8px; }
+    }
+  </style>
+</head>
+<body>
+<main>
+  <section class="hero">
+    <h1>コンポーネント化・ファクタリング</h1>
+    <p><strong>分割より先に正本を1本にする。</strong> 旧系を表示のauthorityに保ったまま新系を比較し、差分0を証明してから切り替える。</p>
+    <p>正本: <a href="handoff/component-factoring-zero-error-IMPLEMENTATION-HANDOFF.md">設計・実装ハンドオフ</a> ／ 最終更新 2026-08-01</p>
+    <div class="legend">
+      <span class="chip done">✅ 完了・安全</span>
+      <span class="chip block">🟥 ブロッカー</span>
+      <span class="chip frozen">❄️ 凍結</span>
+      <span class="chip hyp">⚙️ 実装候補</span>
+      <span class="chip human">🙋 人間承認</span>
+    </div>
+  </section>
+
+  <h2>現在の構造的ブロッカー</h2>
+  <div class="grid">
+    <article class="card split">
+      <h3>🟥 レーンの二重正本</h3>
+      <p><code>laneStoreInstance.setCandidates()</code> は呼ばれるが、production subscriberがない。実画面は旧 <code>STORY_SOURCE_STATE</code> が支配。</p>
+    </article>
+    <article class="card split">
+      <h3>🟥 アバターのdead正本</h3>
+      <p><code>avatarResolver</code> は22テスト付きでも未配線。緑のテストと本番表示が別経路。</p>
+    </article>
+    <article class="card split">
+      <h3>🟥 隠れライフサイクル</h3>
+      <p>巨大entry/closureがstate、listener、timer、DOM root、storage順序を暗黙所有。関数移動だけで破綻する。</p>
+    </article>
+  </div>
+
+  <h2>authority移行の唯一の順序</h2>
+  <div class="decision">
+    <article class="card split">
+      <h3>現在</h3>
+      <p>旧: live authority<br>新: shadow / dead</p>
+    </article>
+    <div class="arrow">→</div>
+    <article class="card target">
+      <h3>到達点</h3>
+      <p>1概念1正本<br>旧経路・shadow・dead codeなし</p>
+    </article>
+  </div>
+  <div class="gate">
+    <strong>依存ゲート:</strong> 旧新の userKey / tier / order / avatar / nickname / count に1件でも差があればauthority switch禁止。
+  </div>
+
+  <h2>フェーズフロー</h2>
+  <section class="flow">
+    <article class="phase">
+      <span class="chip human state">🙋 承認待ち</span>
+      <h3>Phase 0 — baseline凍結</h3>
+      <p>5 surface、DOM、storage、message、runtime error、performanceをcharacterization testで固定。</p>
+      <div class="gate"><strong>ゲート:</strong> verify:cc全緑 + テストを壊した変異が赤。ここが無いと以降の「緑」は信用しない。</div>
+    </article>
+    <article class="phase">
+      <span class="chip hyp state">⚙️ 最優先</span>
+      <h3>Phase 1 — DUAL_RUN</h3>
+      <p>旧だけを表示。laneStore / avatarResolverは同じ入力で比較だけ行う。</p>
+      <div class="gate"><strong>ゲート:</strong> fixture + 反例 + 実配信で差分0。差分ありは🟥、旧authorityのまま停止。</div>
+    </article>
+    <article class="phase">
+      <span class="chip hyp state">⚙️ 安全</span>
+      <h3>Phase 2 — pure builder抽出</h3>
+      <p>診断bundle、snapshot、AI共有、NorthStar deriveを1関数1patchで抽出。出力バイト一致。</p>
+      <div class="gate"><strong>ゲート:</strong> entry→lib一方向、storage write増加0、max-linesラチェット下降。</div>
+    </article>
+    <article class="phase">
+      <span class="chip hyp state">⚙️ 中リスク</span>
+      <h3>Phase 3 — popup controller</h3>
+      <p><code>initPopup</code>をcomposition rootにし、frame/export/compose/effects/refresh所有権を分離。</p>
+      <div class="gate"><strong>ゲート:</strong> 3画面でlistener/timer/read/write列が一致。passiveのwrite/fetchは0。</div>
+    </article>
+    <article class="phase">
+      <span class="chip hyp state">⚙️ 中リスク</span>
+      <h3>Phase 4 — StoryLane component</h3>
+      <p>LaneSupply → ViewModel → 共通Surface → RenderReceiptの一本線へ。人物タイルと5段DOMは既存正本を再利用。</p>
+      <div class="gate"><strong>ゲート:</strong> 同一ViewModelのDOM貼替0、時刻入りsignature 0、全段hot-path走査0。</div>
+    </article>
+    <article class="phase">
+      <span class="chip hyp state">⚙️ 高リスク</span>
+      <h3>Phase 5 — venue controller</h3>
+      <p>voice/effects/speech/scene/aggregation/lifecycleを所有権ごとに1つずつ抽出。</p>
+      <div class="gate"><strong>ゲート:</strong> open/close 10回でlistener/timer増加0。first-seat退行0。host/iframe/CSS不変。</div>
+    </article>
+    <article class="phase">
+      <span class="chip frozen state">❄️ 後段</span>
+      <h3>Phase 6 — content controller</h3>
+      <p>snapshot → external mirrors → inline host → backfill → recordingの順。記録系は最後。</p>
+      <div class="gate"><strong>ゲート:</strong> IDB/chunk/tailの件数・payload・fallback順が一致。二重保存/欠落0。</div>
+    </article>
+    <article class="phase">
+      <span class="chip block state">🟥 差分0まで禁止</span>
+      <h3>Phase 7 — authority switch</h3>
+      <p>Patch Aで新をauthority、旧をfallback。実機緑の次patchでのみlegacy削除。</p>
+      <div class="gate"><strong>最終ゲート:</strong> shadow store 0、dead resolver 0、旧import 0、cycle 0、5層のエラー0。</div>
+    </article>
+  </section>
+
+  <h2>エラー0の5層</h2>
+  <div class="grid">
+    <article class="card"><h3>Static</h3><p>verify:cc 9 STEP全緑</p></article>
+    <article class="card"><h3>Test</h3><p>unit / contract / characterization / E2E 失敗0</p></article>
+    <article class="card"><h3>Runtime</h3><p>current buildのuncaught / unhandled / extension error 0</p></article>
+    <article class="card"><h3>Data</h3><p>DOM / storage / message / count の意図しない差分0</p></article>
+    <article class="card"><h3>Performance</h3><p>write / churn / long task / startup の退行0</p></article>
+  </div>
+
+  <p class="footer">この図は実装そのものではない。各PhaseのPlan承認前はRead/Grep/git diffのみ。コード、build、version、distの変更は別依頼で行う。</p>
+</main>
+</body>
+</html>
