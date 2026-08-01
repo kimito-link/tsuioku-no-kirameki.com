@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1207',
+    date: '2026-08-01',
+    summary: '会場モードの立ち上がりの遅さを切り分ける計器を追加',
+    items: Object.freeze([
+      '会場モードを開いてから参加者が見えるまでの内訳(データの読み込み・集計・描画)を状態速報に表示するようにしました(表示のみ・動作は変わりません)。「立ち上がりが遅い」「出ないときがある」の原因を切り分けるための計器です。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1206',
     date: '2026-07-31',
     summary: '広告主のアイコンにホバー・クリックが効かなかった問題を修正',

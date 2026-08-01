@@ -16,6 +16,14 @@ import {
 } from '../lib/broadcastContext.js';
 import { readChunkedComments, chunkIndexKey, chunkStorageKey, isChunkIndex } from '../lib/commentChunkStore.js';
 import { extractUserCommentRows } from '../lib/comeviewActions.js';
+import {
+  createVenueOpenLatencyState,
+  noteVenueOpened,
+  noteVenueMirrorSettled,
+  noteVenueAggregateSettled,
+  noteVenueFirstPaint,
+  summarizeVenueOpenLatency
+} from '../lib/venueOpenLatency.js';
 import { selectNewChunkSeqs, mergeUserLaneAggregates } from '../lib/venueIncrementalAggregate.js';
 import {
   touchRoster,
@@ -2785,6 +2793,9 @@ export function mountVenueBarButton(options = {}) {
   //   DOM書き込み・新規タイマー・新規計算は無い(RANKバッジちらつき教訓=diff-skip不要な設計)。
   /** @type {WeakMap<HTMLElement, { uid: string, displayName: string, count: number, hasGift: boolean, giftCount: number, venueRank: number, lastAt: number, tier?: string, lastText?: string }>} */
   const _hoverCardDataByEl = new WeakMap();
+  // v0.1.1207: 会場の「開いてから見えるまで」を分解して観測する(ユーザー報告
+  //   「立ち上がりが遅い/出ないときがある」を体感でなく数字で切り分けるため)。
+  const _openLatency = createVenueOpenLatencyState();
   // v0.1.1204: 段ごとの item 列(paint 時に参照を控えるだけ・DOM走査なし)。席なしタイル
   //   (広告主等)にホバーされた瞬間だけ、この列から索引でデータを引いてカードを出す。
   //   ★paint のたびに querySelectorAll する実装は hot path 汚染で実機が重くなったため撤去した。
@@ -4812,6 +4823,9 @@ export function mountVenueBarButton(options = {}) {
       : null;
     const laneBuckets = laneComposed ? laneComposed.buckets : fallbackLaneBuckets;
     const visibleLaneItems = flattenVenueLaneBuckets(laneBuckets);
+    // v0.1.1207: 会場が実際に描いた瞬間と、そのとき人が居たかを刻む。
+    //   「出ない」報告が仕様(匿名主体で0人)か不具合かを、体感でなく数字で分けるため。
+    try { noteVenueFirstPaint(_openLatency, Date.now(), visibleLaneItems.length); } catch { /* no-op */ }
     // 2026-07-31(ユーザー指摘): ホバーカードのラベルを段に合わせて出し分けるための uid→段 索引。
     //   広告段/ギフト段に載る条件は「投げたこと」であって発言ではないため、「発言N」は嘘になる。
     //   flattenVenueLaneBuckets は段を捨てて平坦化するので、平坦化する前のここで拾っておく。
@@ -5130,7 +5144,11 @@ export function mountVenueBarButton(options = {}) {
       yukkuriNamedCensus: toVenueYukkuriNamedCensusDiag(_yukkuriNamedCensus),
       // 2026-07-21 診断先行: 応援TOP吹き出しchurnの実害を数えるだけの1行。
       bubbleChurn: toVenueBubbleChurnDiag(_bubbleChurn),
-      storyDiagMirror: storyDiagMirrorStatus(storyDiagMirrorSnap, String(activeLiveId || liveIdFromPathname() || ''), Date.now())
+      storyDiagMirror: storyDiagMirrorStatus(storyDiagMirrorSnap, String(activeLiveId || liveIdFromPathname() || ''), Date.now()),
+      // v0.1.1207: 会場の立ち上がり分解(開く→鏡→集計→初描画→初席)。ユーザー報告
+      //   「立ち上がりが遅い/出ないときがある」を体感でなく数字で切り分けるため。
+      //   ★ここに載せないと状態速報に出ない([[fastdiag-lite-is-the-printer-subset]]の同型)。
+      openLatency: summarizeVenueOpenLatency(_openLatency)
     };
     publishVenueSeatsDiag(seatsDiagObs);
     // 2026-07-01 会議(venue-diag): 「🩺 会場の状態」パネル用に最新の観測値を保持。
@@ -5476,8 +5494,16 @@ export function mountVenueBarButton(options = {}) {
         if (open && ((storySnap && typeof storySnap === 'object') || (panelSnap && typeof panelSnap === 'object'))) {
           renderStoryDiagMirrorPanel();
         }
+        // v0.1.1207: 鏡の catch-up が決着した瞬間(取れた/空だった のどちらも決着)。
+        try {
+          noteVenueMirrorSettled(_openLatency, Date.now(), {
+            absent: !(snap && typeof snap === 'object')
+          });
+        } catch { /* 計器失敗は会場を止めない */ }
       } catch {
         /* 鏡の catch-up 失敗は無視(fallback で描く・onChanged が来れば同化する) */
+        // v0.1.1207: 失敗(タイムアウト含む)も「決着」として刻む=遅さの理由が読める。
+        try { noteVenueMirrorSettled(_openLatency, Date.now(), { timedOut: true }); } catch { /* no-op */ }
       }
     })();
     if (rosterDriven) {
@@ -5486,6 +5512,7 @@ export function mountVenueBarButton(options = {}) {
       //   onLiveComments のストリームに任せる(30秒の全集計ループは回さない=3時間でも軽い)。
       void (async () => {
         await aggregateParticipants(); // 1回だけ(チャンク差分読み)
+        try { noteVenueAggregateSettled(_openLatency, Date.now()); } catch { /* no-op */ }
         if (!open || !rosterDriven) return;
         hydrateRosterFromCandidates(liveRoster, aggregatedCandidates, {
           maxSeats: VENUE_ROSTER_MAX_SEATS
@@ -5933,6 +5960,7 @@ export function mountVenueBarButton(options = {}) {
     toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
     stage.setAttribute('aria-hidden', open ? 'false' : 'true');
     if (open) {
+      try { noteVenueOpened(_openLatency, Date.now()); } catch { /* 計器失敗は会場を止めない */ }
       addEscapeListener();
       addBubbleReflowListener();
       // 3キャラ常駐: 集計を待たず先に描く=開いた瞬間から必ず誰かが居る(無人に見せない)。

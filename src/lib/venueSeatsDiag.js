@@ -24,6 +24,8 @@
  *                               charFrame: number, crowdOn: boolean, crowdCount: number } }|null,
  *   anonExcluded: number,
  *   storyDiagMirror: { present: boolean, ageSec: number|null },
+ *   openLatency: { opens: number, mirrorMs: number, aggregateMs: number, firstPaintMs: number,
+ *                  firstSeatMs: number, mirrorTimedOut: boolean, mirrorAbsent: boolean, line: string },
  *   sceneReceipt: { match: boolean, line: string }|null,
  *   seatLinkParity: { line: string, checked: number, paints: number, badPaints: number,
  *     uidMismatch: number, affordanceMismatch: number, hrefStale: number,
@@ -62,6 +64,11 @@ export function makeInitialVenueSeatsDiag() {
     sceneReceipt: /** @type {VenueSeatsDiagState['sceneReceipt']} */ (null),
     anonExcluded: 0,
     storyDiagMirror: { present: false, ageSec: /** @type {number|null} */ (null) },
+    // v0.1.1207: 会場の立ち上がり分解(開く→鏡→集計→初描画→初席)。未観測は -1。
+    openLatency: {
+      opens: 0, mirrorMs: -1, aggregateMs: -1, firstPaintMs: -1, firstSeatMs: -1,
+      mirrorTimedOut: false, mirrorAbsent: false, line: '会場立ち上がり ⚪ 未観測'
+    },
     seatLinkParity: /** @type {VenueSeatsDiagState['seatLinkParity']} */ (null),
     yukkuriNamedCensus: /** @type {VenueSeatsDiagState['yukkuriNamedCensus']} */ (null)
   };
@@ -164,6 +171,20 @@ export function buildVenueSeatsDiagSnapshot(diag, nowMs) {
     : null;
   const sdmIn = /** @type {any} */ (d.storyDiagMirror && typeof d.storyDiagMirror === 'object' ? d.storyDiagMirror : null);
   const sdmAge = Number(sdmIn?.ageSec);
+  // v0.1.1207: 立ち上がり分解はそのまま通す(純関数側で整形済み・ここでは型だけ守る)。
+  const olIn = /** @type {any} */ (d.openLatency && typeof d.openLatency === 'object' ? d.openLatency : null);
+  const openLatency = olIn
+    ? {
+        opens: num(olIn.opens, 0),
+        mirrorMs: num(olIn.mirrorMs, -1),
+        aggregateMs: num(olIn.aggregateMs, -1),
+        firstPaintMs: num(olIn.firstPaintMs, -1),
+        firstSeatMs: num(olIn.firstSeatMs, -1),
+        mirrorTimedOut: olIn.mirrorTimedOut === true,
+        mirrorAbsent: olIn.mirrorAbsent === true,
+        line: String(olIn.line || '')
+      }
+    : base.openLatency;
   const storyDiagMirror = {
     present: sdmIn?.present === true,
     ageSec: sdmIn?.present === true && Number.isFinite(sdmAge) ? Math.max(0, Math.floor(sdmAge)) : null
@@ -233,6 +254,7 @@ export function buildVenueSeatsDiagSnapshot(diag, nowMs) {
     sceneReceipt,
     anonExcluded: Math.max(0, Math.floor(num(d.anonExcluded, 0))),
     storyDiagMirror,
+    openLatency,
     seatLinkParity,
     yukkuriNamedCensus,
     capturedAt: now
