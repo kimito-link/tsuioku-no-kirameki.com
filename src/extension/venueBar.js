@@ -1243,8 +1243,22 @@ const VENUE_CSS = `
    *   「どの段か」を伝える役目があるので残し、装飾だけ落とす。
    *   ①POP側は storyUserLaneGuideHtml.js が正本で従来どおり顔つき(このCSSは会場限定)。
    */
+  /*
+   * 2026-08-01(v0.1.1220): v0.1.1199 の display:none を撤回して復活。
+   *   消してほしかったのは「映像に重なる」3キャラ常駐(v0.1.1214で対応済み)の方で、
+   *   段の説明文の顔アイコンは映像に重ならないので残す=ユーザー確定
+   *   「重ならない部分は残してほしい」。
+   *   ★「会場=①と見た目もそっくり同じ」方針に従い①側と同じ寸法。
+   */
   .nlsb-venue-lane-stack .nl-story-userlane-guide__face {
-    display: none;
+    width: 24px;
+    height: 24px;
+    border-radius: 999px;
+    object-fit: cover;
+    object-position: center;
+    border: 1px solid color-mix(in srgb, var(--nl-border) 82%, #fff 18%);
+    background: var(--nl-surface);
+    flex: 0 0 auto;
   }
   .nlsb-venue-lane-stack .nl-story-userlane-guide__text {
     flex: 1 1 auto;

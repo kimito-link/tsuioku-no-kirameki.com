@@ -4,6 +4,8 @@ import { collectVenueParticipants, venueRowsFromUserLaneCandidates } from './ven
 import { buildVenueHoverCardModel } from './venueHoverCard.js';
 import { RECENT_TEXT_KEEP } from './recentTextRing.js';
 import { userLaneCandidatesFromStorage } from './userLaneCandidatesFromStorage.js';
+import { buildLaneMirrorSnapshot } from './laneMirror.js';
+import { venueRowsFromLaneMirror } from './venueLaneMirrorSupply.js';
 
 /**
  * v0.1.1218: 会場のホバーカードで「その人の直近数件の発言」を読めるようにした配線を、
@@ -157,5 +159,74 @@ describe('会場ホバーカードの直近発言(実機で使われる主経路
     const candidates = userLaneCandidatesFromStorage(storedComments(3), 'lv1', {});
     expect(Array.isArray(candidates[0].recentTexts)).toBe(true);
     expect(candidates[0].recentTexts).toHaveLength(3);
+  });
+});
+
+/**
+ * ★★実機で最も使われる経路(v0.1.1220)。
+ *
+ * 会場は鏡(laneMirror)が使えるとき**鏡を優先**する(venueBar.js composeVenueBaseRows)。
+ * v0.1.1218 は roster を、v0.1.1219 は候補集計を直したが、どちらも鏡に負けていたため
+ * 実機では空のままだった=同じ機能で2回続けて外した。
+ *
+ * 経路: ①POPのbuckets → buildLaneMirrorSnapshot → venueRowsFromLaneMirror
+ *       → collectVenueParticipants → buildVenueHoverCardModel
+ */
+describe('会場ホバーカードの直近発言(鏡経路=実機の本命)', () => {
+  const bucketsWith = (/** @type {string[]} */ recentTexts) => ({
+    link: [
+      {
+        displaySrc: 'https://example.invalid/a.jpg',
+        title: 'こんこんかん',
+        meta: { idLine: 'ID:80330078', nameLine: 'こんこんかん' },
+        entry: { userId: '80330078' },
+        recentTexts
+      }
+    ],
+    gift: [],
+    ad: [],
+    konta: [],
+    tanu: []
+  });
+
+  it('①POPのbuckets → 鏡 → 会場行 → 参加者 → カードまで届く', () => {
+    const snap = buildLaneMirrorSnapshot({
+      liveId: 'lv1',
+      buckets: bucketsWith(['最新の発言', 'その前の発言']),
+      capturedAt: NOW
+    });
+    // ★鏡セルに載っていること(ここが落ちると会場では永久に空)
+    expect(snap.link[0].recentTexts).toEqual(['最新の発言', 'その前の発言']);
+
+    const rows = venueRowsFromLaneMirror(snap, new Map());
+    const participants = collectVenueParticipants(rows, {});
+    const model = buildVenueHoverCardModel({
+      uid: '80330078',
+      displayName: 'こんこんかん',
+      lastAt: NOW,
+      nowMs: NOW,
+      tier: 'link',
+      recentTexts: participants[0].recentTexts
+    });
+    expect(model.recentTexts).toEqual(['最新の発言', 'その前の発言']);
+  });
+
+  it('鏡は容量を優先して3件までに絞る(純Web公開のサイズを膨らませない)', () => {
+    const many = ['1', '2', '3', '4', '5'];
+    const snap = buildLaneMirrorSnapshot({
+      liveId: 'lv1',
+      buckets: bucketsWith(many),
+      capturedAt: NOW
+    });
+    expect(snap.link[0].recentTexts).toEqual(['1', '2', '3']);
+  });
+
+  it('recentTexts が無い旧い鏡でも落ちない(後方互換)', () => {
+    const b = bucketsWith([]);
+    delete b.link[0].recentTexts;
+    const snap = buildLaneMirrorSnapshot({ liveId: 'lv1', buckets: b, capturedAt: NOW });
+    expect(snap.link[0].recentTexts).toEqual([]);
+    const rows = venueRowsFromLaneMirror(snap, new Map());
+    expect(rows[0].recentTexts).toEqual([]);
   });
 });

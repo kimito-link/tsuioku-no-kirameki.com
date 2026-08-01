@@ -96,6 +96,9 @@ export function venueRowsFromLaneMirror(snap, candidatesByUid) {
         //   会場側の生成に任せる=enrich 関所とも整合)。
         avatar: isHttpUrl(cell?.displaySrc) ? String(cell.displaySrc).trim() : '',
         text: '',
+        // v0.1.1220: ホバーカードの直近発言。会場は鏡が使えるとき鏡を優先するので、
+        //   ここを通さないと候補側に足しても届かない(v0.1.1218/1219 で2回踏んだ)。
+        recentTexts: Array.isArray(cell?.recentTexts) ? cell.recentTexts.slice() : [],
         capturedAt: Math.max(0, Number(cand?._laneSortAt) || 0) || fallbackAt,
         preCount: Math.max(1, Math.floor(Number(cand?.commentCount) || 0) || 1),
         preHasGift: giftCount > 0,

@@ -7,7 +7,7 @@
  *   5フィールドだけ(personTileDom.js)。鏡もこの5つだけ保存=最小化。
  * ★各段 cap で件数を抑え、全体が容量上限(JSON 512KB)を超えるなら cap を半減する二段ガード=status を重くしない。
  *
- * @typedef {{ displaySrc: string, title: string, idLine: string, nameLine: string, userId: string }} LaneMirrorCell
+ * @typedef {{ displaySrc: string, title: string, idLine: string, nameLine: string, userId: string, recentTexts: string[] }} LaneMirrorCell
  * @typedef {{ visible: number, tileW: number, tileH: number }} LaneMirrorDomTier
  * @typedef {{ measured: boolean,
  *   perTier: { link: LaneMirrorDomTier, gift: LaneMirrorDomTier, ad: LaneMirrorDomTier, konta: LaneMirrorDomTier, tanu: LaneMirrorDomTier },
@@ -74,12 +74,18 @@ function normalizeDomSelf(input) {
 }
 
 /**
+ * 鏡セルに載せる直近発言の上限。純Web公開のサイズを膨らませないため小さく固定する
+ * (会場ホバーカードは5件表示だが、鏡は容量を優先して3件に絞る)。
+ */
+const LANE_MIRROR_RECENT_TEXTS = 3;
+
+/**
  * buckets の1要素を鏡セルに間引く。
  * @param {unknown} item
  * @returns {LaneMirrorCell|null}
  */
 function toMirrorCell(item) {
-  const it = /** @type {{ displaySrc?: unknown, title?: unknown, meta?: { idLine?: unknown, nameLine?: unknown }, entry?: { userId?: unknown } }} */ (
+  const it = /** @type {{ displaySrc?: unknown, title?: unknown, meta?: { idLine?: unknown, nameLine?: unknown }, entry?: { userId?: unknown }, recentTexts?: unknown }} */ (
     item && typeof item === 'object' ? item : {}
   );
   const displaySrc = String(it.displaySrc || '').trim();
@@ -94,7 +100,13 @@ function toMirrorCell(item) {
   //   顔も素性(uid/idLine/title)も無いセルだけ従来どおり落とす(鏡に出せない)。
   const hasIdentity = userId !== '' || `${idLine.trim()}|${title}` !== '|';
   if (!displaySrc && !hasIdentity) return null;
-  return { displaySrc, title, idLine, nameLine, userId };
+  // v0.1.1220: 会場ホバーカードの直近発言。会場は鏡が使えるとき鏡を優先する
+  //   (venueBar.js composeVenueBaseRows)ため、ここに載せないと候補側に足しても届かない
+  //   =実際に v0.1.1218/1219 で2回踏んだ。純Web公開のサイズは1人あたり数十バイト。
+  const recentTexts = Array.isArray(it.recentTexts)
+    ? it.recentTexts.filter((t) => typeof t === 'string' && t).slice(0, LANE_MIRROR_RECENT_TEXTS)
+    : [];
+  return { displaySrc, title, idLine, nameLine, userId, recentTexts };
 }
 
 /**

@@ -1073,8 +1073,7 @@
       .nl-story-userlane-guide__line {
         display: flex;
         align-items: flex-start;
-        /* 顔アイコンを display:none にしたぶん、左の余白は不要(2026-07-31)。 */
-        gap: 0;
+        gap: 7px;
         padding: 5px 8px;
         border-radius: 10px;
         background: linear-gradient(180deg, #fffaf0, #fff4db);
@@ -1093,8 +1092,23 @@
        *   文言は「どの段か」を伝える役目があるので残し、装飾だけ落とす。
        *   会場側(venueBar.js)は v0.1.1199 で同じ対応済み。こちらは popup 側の取りこぼし。
        */
+      /*
+       * 2026-08-01(v0.1.1220): v0.1.1203 の display:none を撤回して復活。
+       *   「キャラと枠を消して」という要望を、段の説明文の顔アイコンまで含むと
+       *   解釈したのが誤りだった。実際に消してほしかったのは会場で映像に重なる
+       *   3キャラ常駐(v0.1.1214 で対応済み)の方。
+       *   ここの顔は「どの段が誰の段か(りんく/こん太/たぬ姉)」を一目で示す役割を持つ。
+       *   ★画面の指定は推測で対象を広げない。今日この取り違えを3回繰り返した。
+       */
       .nl-story-userlane-guide__face {
-        display: none;
+        width: 24px;
+        height: 24px;
+        border-radius: 999px;
+        object-fit: cover;
+        object-position: center;
+        border: 1px solid color-mix(in srgb, var(--nl-border) 82%, #fff 18%);
+        background: var(--nl-surface);
+        flex: 0 0 auto;
       }
 
       .nl-story-userlane-guide__text {

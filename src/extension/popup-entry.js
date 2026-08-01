@@ -6821,6 +6821,12 @@ function renderStoryUserLane() {
     else laneDiagT1 += 1;
     const label = storyGrowthDisplayLabel(e, liveId) || 'ユーザー';
     const meta = storyUserLaneMetaLines(e, row.httpForLane, dedupeKey);
+    // v0.1.1220: 会場ホバーカードの直近発言。このループは集計(aggList)そのものを
+    //   回っているので agg から直接取れる=検索も追加走査も storage 読みも不要。
+    //   ★会場は鏡が使えるとき鏡を優先するため、ここから鏡(laneMirror)まで運ばないと
+    //     カードに届かない(v0.1.1218/1219 で2回踏んだ)。
+    const _recentTexts = Array.isArray(agg?.recentTexts) ? agg.recentTexts.slice() : [];
+
     candidates.push({
       entryIndex: row.entryIndex,
       profileTier: row.profileTier,
@@ -6828,6 +6834,7 @@ function renderStoryUserLane() {
       displaySrc: row.displaySrc,
       title: label,
       entry: row.entry,
+      recentTexts: _recentTexts,
       meta
     });
   }
