@@ -9,6 +9,7 @@ import { normalizeLv as normalizeLvCanonical } from '../shared/niconico/liveId.j
 import { pickStrongestAvatarUrlForUser } from './supportGrowthTileSrc.js';
 import { isSameAvatarUrl } from './avatarUrlCompare.js';
 import { isAvatarUrlForUserId } from './avatarBroadcasterGuard.js';
+import { RECENT_TEXT_KEEP } from './recentTextRing.js';
 import {
   pickBetterInterceptNickname,
   pickGiftRankDisplayNicknameWithUidFallback
@@ -24,6 +25,7 @@ import { isAvatarObservedInCommentProfileMap } from './popupAvatarResolver.js';
  *   liveId: string,
  *   commentCount?: number,
  *   giftCount?: number,
+ *   recentTexts?: readonly string[],
  *   _laneSortAt?: number
  * }} UserLaneCandidateFromStorage
  */
@@ -187,6 +189,22 @@ export function userLaneCandidatesFromStorage(storedComments, liveId, opts) {
       ? lidNorm
       : rowLiveId(newestFirst[0] || chronological[chronological.length - 1] || {});
 
+    // v0.1.1219: 会場ホバーカードで「この人が何を言っていたか」を数件読めるようにする。
+    //   newestFirst は上で作った既存配列なので追加の走査はほぼゼロ(先頭N件だけ見る)。
+    //   ★storage の追加読みもゼロ。ホバーのたびに読むと会場が重くなる(クリックパネルが
+    //     「常時readを増やさない」と明記している方針と揃える)。
+    /** @type {string[]} */
+    const recentTexts = [];
+    for (const g of newestFirst) {
+      if (recentTexts.length >= RECENT_TEXT_KEEP) break;
+      const t = String(/** @type {{ text?: unknown }} */ (g).text ?? '')
+        .replace(/\s+/g, ' ')
+        .trim();
+      if (!t) continue;
+      if (recentTexts[recentTexts.length - 1] === t) continue; // 直前と同一の連投は畳む
+      recentTexts.push(t);
+    }
+
     built.push({
       userId,
       nickname,
@@ -195,6 +213,7 @@ export function userLaneCandidatesFromStorage(storedComments, liveId, opts) {
       liveId: outLiveId,
       commentCount,
       giftCount,
+      recentTexts,
       _laneSortAt: lastCapturedAt
     });
   }
@@ -211,6 +230,9 @@ export function userLaneCandidatesFromStorage(storedComments, liveId, opts) {
         liveId: row.liveId,
         commentCount: row.commentCount,
         giftCount: row.giftCount,
+        // v0.1.1219: ここはフィールドを個別に列挙する造りなので、足し忘れると
+        //   上で作った値が黙って消える(実際に踏んだ)。新フィールドは必ずここにも足す。
+        recentTexts: Object.freeze(row.recentTexts || []),
         _laneSortAt: row._laneSortAt
       })
     )

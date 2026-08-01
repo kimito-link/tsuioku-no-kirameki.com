@@ -59,8 +59,10 @@ describe('Phase0: レーン候補の二重正本 characterization', () => {
    */
   it('【差分】新経路に無いキーを固定する(切替をブロックしている当の差分)', () => {
     const missing = Object.keys(oldOut[0]).filter((k) => !(k in newOut[0]));
+    // v0.1.1219 で recentTexts(会場ホバーカードの直近発言)が旧経路に増えた。
+    //   新経路へ切り替えるならこれも出せるようにする必要がある=差分として固定しておく。
     expect(missing.sort()).toEqual(
-      ['_laneSortAt', 'avatarObserved', 'commentCount', 'giftCount'].sort()
+      ['_laneSortAt', 'avatarObserved', 'commentCount', 'giftCount', 'recentTexts'].sort()
     );
   });
 

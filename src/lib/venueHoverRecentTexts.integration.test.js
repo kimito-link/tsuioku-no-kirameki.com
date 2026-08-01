@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { rosterToVenueRows, touchRoster } from './venueLiveRoster.js';
-import { collectVenueParticipants } from './venueSeats.js';
+import { collectVenueParticipants, venueRowsFromUserLaneCandidates } from './venueSeats.js';
 import { buildVenueHoverCardModel } from './venueHoverCard.js';
 import { RECENT_TEXT_KEEP } from './recentTextRing.js';
+import { userLaneCandidatesFromStorage } from './userLaneCandidatesFromStorage.js';
 
 /**
  * v0.1.1218: 会場のホバーカードで「その人の直近数件の発言」を読めるようにした配線を、
@@ -104,5 +105,57 @@ describe('会場ホバーカードの直近発言(端から端)', () => {
     });
     expect(model.lastText).toBe('旧データの1件');
     expect(model.recentTexts).toEqual([]);
+  });
+});
+
+/**
+ * ★実機で本文が出なかった真因(v0.1.1218 → 1219)。
+ *
+ * 会場が実際に使うのは roster 経路ではなく
+ *   userLaneCandidatesFromStorage → venueRowsFromUserLaneCandidates → collectVenueParticipants
+ * だった。v0.1.1218 は roster 側だけ直していたため、実機では常に空のままだった。
+ *
+ * さらに userLaneCandidatesFromStorage は返す直前に Object.freeze で
+ * **フィールドを個別に列挙し直す**造りで、そこに足し忘れると値が黙って消える。
+ * これも実際に踏んだ。両方をこのテストで縛る。
+ */
+describe('会場ホバーカードの直近発言(実機で使われる主経路)', () => {
+  /** @param {number} n */
+  const storedComments = (n) =>
+    Array.from({ length: n }, (_, i) => ({
+      userId: '138339168',
+      nickname: 'ヘンリー塚原',
+      text: `発言${i + 1}`,
+      capturedAt: NOW + i * 1000,
+      commentNo: i + 1,
+      liveId: 'lv1'
+    }));
+
+  it('storage集計 → 会場行 → 参加者 → カードまで届く', () => {
+    const candidates = userLaneCandidatesFromStorage(storedComments(17), 'lv1', {});
+    // ★ここが落ちると以降が全部空になる(freeze の列挙漏れ)
+    expect(candidates[0].recentTexts).toBeDefined();
+
+    const participants = collectVenueParticipants(
+      venueRowsFromUserLaneCandidates(candidates),
+      {}
+    );
+    const model = buildVenueHoverCardModel({
+      uid: '138339168',
+      displayName: 'ヘンリー塚原',
+      count: 17,
+      lastAt: NOW,
+      nowMs: NOW,
+      tier: 'link',
+      recentTexts: participants[0].recentTexts
+    });
+    // 新しい順に上限件数ぶん
+    expect(model.recentTexts).toEqual(['発言17', '発言16', '発言15', '発言14', '発言13']);
+  });
+
+  it('freeze後も配列が保たれる(列挙漏れの退化ガード)', () => {
+    const candidates = userLaneCandidatesFromStorage(storedComments(3), 'lv1', {});
+    expect(Array.isArray(candidates[0].recentTexts)).toBe(true);
+    expect(candidates[0].recentTexts).toHaveLength(3);
   });
 });
