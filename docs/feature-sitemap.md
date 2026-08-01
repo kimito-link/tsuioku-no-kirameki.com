@@ -590,7 +590,7 @@
 - **影響範囲ゲート(規律を自動化)** — 星野ロミ式「規律を自動ゲートに」。diff から影響大(複数機能波及)の変更ファイルを検出し波及先機能を列挙。警告のみ(摩擦ゼロ)・--strict で exit1。AGENTS.md §10 のルールを diff 発火に
   - `scripts/impact-check.mjs`
   - `docs/feature-map/impact-map.json`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 63</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 64</summary>
 
 - `api/status.js` — status 受け口 Vercel Serverless Function。
 - `extension/status-guard.js` — 状態速報ページ(status.html)の「何があっても開く」保険。
@@ -642,6 +642,7 @@
 - `src/lib/opSoundEffectDiagKey.js` — 操作音(opSoundDirector.js・Phase D1)の「押下/成功/発音」観測値を
 - `src/lib/popupAiDiagOrchestrator.js` — v0.1.211: popup「AI 診断」ボタンのオーケストレータ純関数。
 - `src/lib/popupDiagAutoPublish.js` — popup を開いたとき popup 固有診断を status へ自動集約するスケジューラ(純ロジック)。
+- `src/lib/popupDiagUptimeNote.js` — popup 固有診断が「popup 起動から何秒後の値か」を明示する注記を作る純関数(v0.1.1211)。
 - `src/lib/previewHeavyHint.js` — 「応援プレビュー(②)を開いている間は診断更新が重い」を状態速報で名指しする純関数(v0.1.1020)。
 - `src/lib/scoreAnnounceDiag.js` — 結果発表シーケンス(scoreAnnounce.js・SC3・council/broadcast-scoring-SYNTHESIS.md §2.1)の
 - `src/lib/scoreAnnounceDiagKey.js` — 結果発表シーケンス(scoreAnnounce.js・SC3・council/broadcast-scoring-SYNTHESIS.md §2.1)の
@@ -856,7 +857,7 @@
 
 ## 🧬 修正系譜マップ(この系統のバグを過去にどう直したか)
 
-> changelog 全 540 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
+> changelog 全 541 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
 
 ### 💾 記録件数 (82版)
 - `v0.1.1209` 2026-08-01 — グリッドの「同ユーザー計N件」が実際より少なく見えていた表記を修正
@@ -1689,7 +1690,8 @@
 - `v0.1.673` 2026-06-10 — コメビュの名前をパネルと同じ情報源で補完
 - `v0.1.670` 2026-06-10 — コメビュのアイコンを本家と同じサムネに
 
-### 🩺 診断・状態速報 (197版)
+### 🩺 診断・状態速報 (198版)
+- `v0.1.1211` 2026-08-01 — 状態速報に「popup起動から何秒後の値か」を明記
 - `v0.1.1208` 2026-08-01 — アイコングリッドの動きを実測する計器を追加
 - `v0.1.1207` 2026-08-01 — 会場モードの立ち上がりの遅さを切り分ける計器を追加
 - `v0.1.1204` 2026-07-31 — 拡張が重くなる原因を解消(v0.1.1201の不具合)

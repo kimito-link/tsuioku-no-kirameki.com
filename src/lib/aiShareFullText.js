@@ -12,6 +12,7 @@ import { buildDiagnosticsTrust, formatDiagnosticsTrustLines } from './diagnostic
 import { buildParityVerdict, formatParityVerdictLine } from './parityVerdict.js';
 // v0.1.1020: 「応援プレビューを開いている間は診断更新が重い」を名指しする純関数(refreshPerf×previewAck 突合)。
 import { buildPreviewHeavyHint } from './previewHeavyHint.js';
+import { buildPopupDiagUptimeNote } from './popupDiagUptimeNote.js';
 import {
   buildStoryUserLaneRenderDiag,
   formatStoryUserLaneRenderDiagLines,
@@ -509,6 +510,12 @@ export function buildAiShareFullText({ overviewText, livesData, fastDiag, popupD
       const ageSec = Number.isFinite(ageMs) ? Math.max(0, Math.round(ageMs / 1000)) : null;
       const ageStr = ageSec != null ? `(約${ageSec}秒前にpopupで取得)` : '';
       lines.push(`取得時刻: ${persistedAt} ${ageStr}`);
+      // 2026-08-01(v0.1.1211): 上の「約N秒前」は【速報生成時刻から見た経過】であって
+      //   【popup 起動からの経過】ではない。この2つを取り違えると、起動直後で構造的にゼロな
+      //   計器(鏡・グリッド)を「不具合」と誤読する。実際に開発者が 362ms のスナップショットを
+      //   「22秒経っても鏡が空」と読み違えた。値の"齢"を必ず併記する。
+      const uptimeNote = buildPopupDiagUptimeNote(popupDiag?.popup?.loadShadeProbe?.shadeAgeMs);
+      if (uptimeNote) lines.push(`↑ ${uptimeNote}`);
       // 第2段(鮮度の正直化): 3分超なら「古い」を明示(根1=1回だけ集約で固着するため)。
       if (Number.isFinite(ageMs) && ageMs > 3 * 60 * 1000) {
         lines.push('⚠ この popup 診断は古いです(3分超)。下の応援レーン描画/北極星 probe は現状と違う可能性があります。watch タブで popup を開き直すと新鮮化します。');
