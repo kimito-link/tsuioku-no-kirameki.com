@@ -1,5 +1,20 @@
 import { describe, test, expect } from 'vitest';
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { buildVenueResidents, VENUE_RESIDENT_IDS } from './venueResidents.js';
+
+describe('v0.1.1214 3キャラ常駐の廃止(フラグOFF)', () => {
+  test('venueBar の renderResidents はフラグOFFで no-op(映像に重ねない)', () => {
+    // ユーザー要望(2026-08-01): 左上りんく・左下たぬ姉・右こん太が映像に重なり
+    //   「見づらくなる」ため非表示化。額縁フレーム(v0.1.1114)と同じ流儀=復活はフラグ1つ。
+    //   ★このモデル自体(buildVenueResidents)は残す=復活時にそのまま使えるようにする。
+    const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
+    const src = readFileSync(path.join(repoRoot, 'src/extension/venueBar.js'), 'utf8');
+    expect(src).toMatch(/const VENUE_RESIDENTS_ENABLED = false;/);
+    expect(src).toMatch(/if \(!VENUE_RESIDENTS_ENABLED\) return;/);
+  });
+});
 
 /**
  * 会場常駐3キャラ(りんく・こん太・たぬ姉)の描画モデル。

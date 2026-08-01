@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1214',
+    date: '2026-08-01',
+    summary: '会場モードで映像に重なっていた3キャラを非表示に',
+    items: Object.freeze([
+      '会場モードで配信画面の左右の縁に出ていた3キャラ(りんく・こん太・たぬ姉)と、その名前・光る枠を表示しないようにしました。映像に重なって見づらいというご指摘への対応です。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1213',
     date: '2026-08-01',
     summary: '読み上げが「読まれずに消えた件数」を数えるようにしました',
