@@ -6538,6 +6538,16 @@
       ]
     },
     {
+      "file": "src/lib/storyGrowthCellSwap.js",
+      "featureCount": 1,
+      "features": [
+        "popup"
+      ],
+      "labels": [
+        "ポップアップ(応援レーン)"
+      ]
+    },
+    {
       "file": "src/lib/storyGrowthChurn.js",
       "featureCount": 1,
       "features": [

@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 4 / 696 件
+## ⚠️ 役割コメントが無いソース 4 / 697 件
 - `src/lib/laneDomSelfMeasure.js`
 - `src/lib/reportPreviewPublish.js`
 - `src/lib/venueLaneBuckets.js`
@@ -606,7 +606,7 @@
     - `trumpet1.mp3`
     - `wallet1.mp3`
   - `SOURCES.md`
-- 📁 **src/** (1454)
+- 📁 **src/** (1456)
   - 📁 **data/** (6)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -881,7 +881,7 @@
         - `logo_funlink_white_RGB_maru_black.png`
       - `logo_guide_funlink_ol.pdf`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1229)
+  - 📁 **lib/** (1231)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -1857,6 +1857,8 @@
     - `storyDiagMonotonic.test.js`
     - `storyDiagTotalSource.js` — 「記録している応援コメント N 件」の N を1箇所で決める純関数。
     - `storyDiagTotalSource.test.js`
+    - `storyGrowthCellSwap.js` — アイコングリッドの「既存マスの中身がすり替わった回数」を観測する純関数(v0.1.1215)。
+    - `storyGrowthCellSwap.test.js`
     - `storyGrowthChurn.js` — アイコングリッド(story growth)の「作り直し」を観測する純関数(v0.1.1208)。
     - `storyGrowthChurn.test.js`
     - `storyGrowthLimits.js` — りんく成長グリッド（story growth）の描画上限。
