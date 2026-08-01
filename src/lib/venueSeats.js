@@ -882,8 +882,12 @@ export function venueRowsFromUserLaneCandidates(candidates) {
       userId,
       name: String(c.nickname || '').trim(),
       avatar: String(c.avatarUrl || '').trim(),
-      // userLane 集計は本文を保持しないので空。会場席は名前/サムネで成立する(吹き出しは別経路)。
+      // 席の表示自体は名前/サムネで成立する(吹き出しは別経路)ので text は空のまま。
       text: '',
+      // v0.1.1219: ホバーカード用の直近発言。userLaneCandidatesFromStorage が
+      //   集計時に既存配列の先頭N件から作っている(storage の追加読みゼロ)。
+      //   ★ここを落とすと、値は貯まるのにカードが空になる(v0.1.1218 で実際に踏んだ)。
+      recentTexts: Array.isArray(c.recentTexts) ? c.recentTexts.slice() : [],
       capturedAt: Number.isFinite(Number(c._laneSortAt)) ? Number(c._laneSortAt) : 0,
       // 集約済みの実数(VIP常連光らせのスコア用)。collectVenueParticipants が拾う。
       preCount,

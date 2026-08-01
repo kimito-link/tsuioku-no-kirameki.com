@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1219',
+    date: '2026-08-01',
+    summary: 'ホバーの発言が実際には出ていなかったのを修正',
+    items: Object.freeze([
+      '前の版でホバーカードに発言を出すようにしましたが、実際の画面では空欄のままでした。会場が使っているデータの流れが別のところにあり、そちらに発言が渡っていなかったためです。17件発言している人でもカードが空だった状態を直しました。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1218',
     date: '2026-08-01',
     summary: '会場でアイコンにマウスを乗せると、その人の発言が数件読めるように',
