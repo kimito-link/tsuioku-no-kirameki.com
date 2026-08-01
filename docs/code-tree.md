@@ -609,8 +609,8 @@
     - `trumpet1.mp3`
     - `wallet1.mp3`
   - `SOURCES.md`
-- 📁 **src/** (1456)
-  - 📁 **data/** (6)
+- 📁 **src/** (1457)
+  - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
       - `laneFromStorage.test.js`
@@ -620,6 +620,7 @@
     - 📁 **store/** (2)
       - `laneStore.js` — 応援ユーザーレーンの単一 store。
       - `laneStore.test.js`
+    - `laneDualPathParity.characterization.test.js`
   - 📁 **domain/** (18)
     - 📁 **lane/** (7)
       - 📁 **columns/** (3)
