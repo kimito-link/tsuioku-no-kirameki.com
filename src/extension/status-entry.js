@@ -42,6 +42,10 @@ import { buildStorageWriteLedgerLines } from '../lib/storageWriteLedger.js';
 import { KEY_STATUS_FAST_DIAG_LITE } from '../lib/statusFastDiagLite.js';
 import { buildStatusMindmapModel } from '../lib/statusMindmapModel.js';
 import { copyTextWithFallback } from '../lib/copyTextWithFallback.js';
+import {
+  buildStatusCopyButtonLabel,
+  buildStatusCopyStaleBanner
+} from '../lib/statusCopyFreshness.js';
 import { buildStatusActions } from '../lib/statusActionAdvisor.js';
 // 純Web公開コピーの自己診断(council/status-self-diagnoses-SYNTHESIS.md): 状態速報1枚で「純Webに何が
 //   送られ・何件で・古くないか・拡張と一致するか」が分かるようにする。jsonBlob と引数だけから組む純関数
@@ -396,6 +400,16 @@ let _lastRenderedBundle = /** @type {{ overview: string, lives: object[], textBl
   null
 );
 /**
+ * v0.1.1222: 直近 render の本文が「いつ組まれたか」と「その時点で元データが何秒古かったか」。
+ *   共有ボタンは _lastRenderedBundle.textBlob(=最後に描けた本文)を渡すため、混雑時
+ *   (実測: 更新に103秒)は数十秒前の凍った値がコピーされる。画面ヘッダーには鮮度が
+ *   出ていたが【コピー本文には入っていなかった】ので、受け取り側は古いと分からない。
+ *   2026-08-01 に実際これで読み上げの状態を誤読しかけた(会場休止中/累計値)。
+ */
+let _lastRenderedAtMs = 0;
+/** 本文を組んだ時点で元データが何秒古かったか(コアread の stale 供給ぶん)。 */
+let _lastRenderedSourceStaleSec = 0;
+/**
  * v0.1.804: 概要「累計 記録」を後退させない床。enumerate の一瞬の揺れ(タブ query タイミング・
  *   storage クランプで panel summary が一時欠ける)で合算対象から live が落ちて累計だけが減るのを
  *   表示層で吸収する。床はこのページが開いている間だけ(リロードで素直に再計算)。storage には書かない。
@@ -679,8 +693,12 @@ async function refresh(opts = {}) {
     const staleCores = coreReads.filter((r) => r.stale);
     const neverHadData = staleCores.some((r) => !r.hadData);
     let staleNote = '';
+    // v0.1.1222: コピー本文にも同じ鮮度を載せるため、この時点の古さを保持しておく
+    //   (画面ヘッダーだけに出していたのが、古い本文を共有してしまう穴の原因だった)。
+    _lastRenderedSourceStaleSec = 0;
     if (staleCores.length > 0 && !neverHadData) {
       const worstSec = Math.round(Math.max(...staleCores.map((r) => r.ageMs)) / 1000);
+      _lastRenderedSourceStaleSec = worstSec;
       staleNote = worstSec >= 600
         ? ` ⚠${worstSec}秒前の値(混雑が長引いています・記録は継続中)`
         : ` ⏳${worstSec}秒前の値(混雑中・裏で読み直し中)`;
@@ -1744,6 +1762,8 @@ function renderAll({ lvList, summaries, fastDiag, popupDiag, backfillProgress, b
     textBlob: fullText,
     jsonBlob
   };
+  // v0.1.1222: 共有ボタンが「この本文はいつのものか」を言えるようにする(黙って古い値を渡さない)。
+  _lastRenderedAtMs = Date.now();
   // 応援ライブビュー(拡張内 live-view.html)の「このURLをWEBでも公開する」用に、いま組み立てた
   //   公開ペイロード(jsonBlob)+共有キーを storage へ置く。live-view ページは別ページで jsonBlob を
   //   持たないため、再構築せず【これを読んで POST するだけ】=status が送るものと byte 一致(drift ゼロ)。
@@ -2965,16 +2985,19 @@ function setupButtons() {
           heroFlash('まだ読み込み中…もう一度押してください', 2500);
           return;
         }
+        // v0.1.1222: この本文がどれくらい古いかを、コピーする側にも受け取る側にも伝える。
+        //   混雑時(実測: 更新に103秒)は数十秒前の凍った値が渡るのに「コピーしました ✓」としか
+        //   出ておらず、古いと分からないまま判断に使われていた(2026-08-01 に実際に踏んだ)。
+        //   古さ = 本文を組んでからの経過 + 組んだ時点で元データが古かったぶん。
+        const ageSec =
+          Math.max(0, Math.round((Date.now() - (_lastRenderedAtMs || Date.now())) / 1000)) +
+          Math.max(0, Math.floor(_lastRenderedSourceStaleSec || 0));
+        const banner = buildStatusCopyStaleBanner(ageSec);
         // v0.1.975: navigator.clipboard 失敗時も execCommand('copy') で実際にコピーする。
         const ta = /** @type {HTMLTextAreaElement|null} */ (document.getElementById('aiShareText'));
-        const outcome = await copyTextWithFallback(text, { selectEl: ta });
-        if (outcome === 'clipboard' || outcome === 'execCommand') {
-          heroFlash('コピーしました ✓ そのまま貼ってください', 2500);
-        } else if (outcome === 'selected') {
-          heroFlash('選択しました→Ctrl+C', 2500);
-        } else {
-          heroFlash('コピーできませんでした', 2500);
-        }
+        const outcome = await copyTextWithFallback(banner + text, { selectEl: ta });
+        const { label } = buildStatusCopyButtonLabel(outcome, ageSec);
+        heroFlash(label, 3500);
       });
     }
   }

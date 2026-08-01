@@ -19,7 +19,8 @@ import {
 //   真因診断(合成待ち/準備待ち/実再生の3分解+需要/供給+判定)。挙動には一切介入しない印字のみ。
 import {
   updateVoiceServiceTimeEma, resolveVoiceQueueMax, stepVoiceQueueMax,
-  updateVoiceEventRatioEma, foldVoiceArrivalWindow, computeVoiceLagVerdict
+  updateVoiceEventRatioEma, foldVoiceArrivalWindow, computeVoiceLagVerdict,
+  computeSustainedPressureBoost, mergeVoiceSpeedBoost
 } from './voiceLagBudget.js';
 
 export class VoicePlayer {
@@ -96,6 +97,10 @@ export class VoicePlayer {
       //   serviceTimeの3分解(合成待ち/準備待ち/実再生/期待再生時間)+drop原因の分別+需要/供給+判定。
       synthWaitEmaMs: -1, playPrepEmaMs: -1, playbackEmaMs: -1, expectedPlayEmaMs: -1,
       arrivalPerMin: -1, voicedRecentRatio: -1,
+      // v0.1.1222計器: 持続過負荷ブースト(pressure由来)。lastSustainedBoost=直近の上乗せ値、
+      //   sustainedBoostTotal=キュー長では出せない速度を実際に足した累計。
+      //   ★「速くしたのに読める数が増えたか」を後から検算するための計器(効果の裏取り用)。
+      lastSustainedBoost: 0, sustainedBoostTotal: 0,
       dropCountGateTotal: 0, dropHeadStaleTotal: 0, dropSweepStaleTotal: 0,
       // 2026-08-01計器(v0.1.1213): 合成が null で返った件を数える。
       //   実配信(lv351072048)で「需要52.2/分・読めた約6件・間引き12件」=**約34件がどの計器にも
@@ -260,19 +265,50 @@ export class VoicePlayer {
     const existing = this.prefetches.get(item);
     if (existing && existing.generation === generation) return existing.promise;
     const congestion = computeVoiceCongestion(this.queue.length);
+    // v0.1.1222: 実効上限が絞られるとキューが5件に届かず congestion の上位段が発火しない構造穴を
+    //   pressure(需要/供給比)由来のブーストで埋める。上げるだけ・落ち着いていれば0。
+    const effBoost = this._resolveEffectiveSpeedBoost(congestion.speedBoost);
     const assigned = this.resolveVoice(item.userKey, this.assignments, this.styleIds);
     const promise = this.fetchSynthesizeVoice(
       buildMergedVoiceText(item, { maxChars: congestion.maxChars }),
       {
         ...assigned,
-        speedOffset: assigned.speedOffset + congestion.speedBoost
+        speedOffset: assigned.speedOffset + effBoost
       }
     ).catch(() => null);
     // v0.1.1089(voice-tempo-realtime-SYNTHESIS §3 Phase 2): 合成起動時点のspeedBoostを保存する。
     //   このWAVは既にこの速度で焼き固まっているため、再生直前に「今」の混雑度と比較して
     //   playbackRateで追いつかせる(合成のやり直しなし=ゼロコスト)。
-    this.prefetches.set(item, { generation, promise, boostAtSynth: congestion.speedBoost });
+    this.prefetches.set(item, { generation, promise, boostAtSynth: effBoost });
     return promise;
+  }
+
+  /**
+   * v0.1.1222: 実際に適用する speedBoost を決める(既存の混雑ブースト ∪ 持続過負荷ブースト)。
+   *
+   * 【なぜ要るか】混雑ブーストは【絶対キュー長】依存(5件で0.5・8件で0.8)だが、実効上限が
+   *   処理時間EMAから3まで絞られると**キューは構造的に5件へ到達できない**=上位2段が
+   *   永久に発火しない。結果「速く読んで消化する」より「入口で捨てる」に倒れていた
+   *   (2026-08-01 実測: 需要102.3/分 vs 供給39.6/分・間引き88件・判定=playback・実効上限3)。
+   *   pressure はキュー長に依らず過負荷を検出できるので、この穴だけを埋める。
+   *
+   * ★上げるだけ(mergeVoiceSpeedBoost が max を取る)なので、既存の速さを下回らせない。
+   * @param {number} congestionBoost 既存の混雑由来ブースト
+   * @returns {number}
+   */
+  _resolveEffectiveSpeedBoost(congestionBoost) {
+    const sustained = computeSustainedPressureBoost({
+      arrivalPerMin: this.diag?.arrivalPerMin,
+      serviceTimeEmaMs: this._serviceTimeEmaMs,
+      sampleCount: this._spokenSampleCount
+    });
+    const merged = mergeVoiceSpeedBoost(congestionBoost, sustained);
+    // 計器: 持続ブーストが実際に効いた累計(効果を後から検算できるようにする)。
+    if (sustained > 0 && merged > congestionBoost) {
+      this.diag.sustainedBoostTotal = (Number(this.diag.sustainedBoostTotal) || 0) + 1;
+    }
+    this.diag.lastSustainedBoost = sustained;
+    return merged;
   }
 
   /**
@@ -374,14 +410,16 @@ export class VoicePlayer {
         }
 
         const congestion = computeVoiceCongestion(queueLength);
+        // v0.1.1222: 先読み側と同じ実効ブーストを使う(2経路で速度が食い違わないようにする)。
+        const effBoostNow = this._resolveEffectiveSpeedBoost(congestion.speedBoost);
         const assigned = this.resolveVoice(item.userKey, this.assignments, this.styleIds);
 
         // 先頭は _startPrefetch で必ず先読み起動済み(深さ>=1)。その in-flight を再利用する。
         const pf = this.prefetches.get(item);
         this.prefetches.delete(item);
         // v0.1.1089(Phase 2): 先読み済みWAVは pf.boostAtSynth の速度で焼き固まっている。
-        //   先読み無し(その場で合成)なら今の congestion.speedBoost がそのまま合成速度=補正不要(等速)。
-        const boostAtSynth = pf ? pf.boostAtSynth : congestion.speedBoost;
+        //   先読み無し(その場で合成)なら今の実効ブーストがそのまま合成速度=補正不要(等速)。
+        const boostAtSynth = pf ? pf.boostAtSynth : effBoostNow;
         const _synthStart = Date.now(); // v0.1.1065計器: 合成待ち(先読み済ならほぼ0)。
         const wav = pf
           ? await pf.promise
@@ -389,11 +427,11 @@ export class VoicePlayer {
               buildMergedVoiceText(item, { maxChars: congestion.maxChars }),
               {
                 ...assigned,
-                speedOffset: assigned.speedOffset + congestion.speedBoost
+                speedOffset: assigned.speedOffset + effBoostNow
               }
             );
         this.diag.lastSynthMs = Math.max(0, Date.now() - _synthStart);
-        this.diag.lastSpeedBoost = congestion.speedBoost;
+        this.diag.lastSpeedBoost = effBoostNow;
         // 2026-07-28計器(段階0=shadow・voice-lag-decomposition-DESIGN.md C-1): 合成待ち時間の
         //   EMA化。先読みが効いていればほぼ0のはず(coldsynth判定の核心=W/S比)。
         this._synthWaitEmaMs = updateVoiceServiceTimeEma(this._synthWaitEmaMs, this.diag.lastSynthMs);
@@ -426,7 +464,11 @@ export class VoicePlayer {
           // v0.1.1089(voice-tempo-realtime-SYNTHESIS §3 Phase 2): 再生直前の「今」の混雑度と
           //   合成時点の混雑度を比べ、今の方が詰まっていれば playbackRate で追いつかせる
           //   (合成やり直しなし=ゼロコスト・上げるだけ=間延び退行なし)。
-          const boostNow = computeVoiceCongestion(this.queue.length).speedBoost;
+          // v0.1.1222: 「今」の混雑も実効ブースト(pressure込み)で見る。焼き固まった速度との
+          //   比較なので、両辺を同じ物差しにしないと playbackRate 補正が過小になる。
+          const boostNow = this._resolveEffectiveSpeedBoost(
+            computeVoiceCongestion(this.queue.length).speedBoost
+          );
           const playbackRate = computeVoicePlaybackRate(boostAtSynth, boostNow);
           if (playbackRate !== 1.0) {
             audio.preservesPitch = true;
