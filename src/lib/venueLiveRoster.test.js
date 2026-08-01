@@ -149,9 +149,36 @@ describe('rosterToVenueRows (buildVenueSeating の入力形に変換=契約厳�
     const rows = rosterToVenueRows(roster);
     expect(rows).toHaveLength(1);
     expect(rows[0]).toMatchObject({
-      userId: 'a', name: 'A', avatar: 'https://x/y.jpg', text: '',
+      // v0.1.1216: text は '' 固定をやめ「直前の発言本文」を載せる(最新の 'y')。
+      //   以前は '' だったため、ホバーカードの本文表示(v0.1.1192実装済み)が
+      //   席のある人でも常に空になっていた。
+      userId: 'a', name: 'A', avatar: 'https://x/y.jpg', text: 'y',
       capturedAt: 2000, preCount: 2, preHasGift: false, preGiftCount: 0
     });
+  });
+
+  /**
+   * v0.1.1216: ホバーカードに「この人が直前に何を言ったか」を出すための供給。
+   * 真因は touchRoster が text の有無だけ見て保存していなかったこと。
+   */
+  it('最新の発言で本文が上書きされる(直前の発言を出す仕様)', () => {
+    const roster = new Map();
+    touchRoster(roster, { userId: 'a', text: '古い' }, 1000);
+    touchRoster(roster, { userId: 'a', text: '新しい' }, 2000);
+    expect(rosterToVenueRows(roster)[0].text).toBe('新しい');
+  });
+
+  it('ギフトだけの行では本文を上書きしない(直前の発言を投擲で消さない)', () => {
+    const roster = new Map();
+    touchRoster(roster, { userId: 'a', text: '発言' }, 1000);
+    touchRoster(roster, { userId: 'a', text: '' }, 2000, { requireText: false, isGift: true });
+    expect(rosterToVenueRows(roster)[0].text).toBe('発言');
+  });
+
+  it('ギフトだけで登場した人は本文を持たない(発言していないのに本文が出る嘘を作らない)', () => {
+    const roster = new Map();
+    touchRoster(roster, { userId: 'g', text: '' }, 1000, { requireText: false, isGift: true });
+    expect(rosterToVenueRows(roster)[0].text).toBe('');
   });
 
   it('capturedAt(=lastSeen)降順にソート', () => {
