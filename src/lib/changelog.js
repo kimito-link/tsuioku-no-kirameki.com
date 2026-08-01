@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1215',
+    date: '2026-08-01',
+    summary: 'アイコンが「ちらちら変わる」現象を実測する計器を追加',
+    items: Object.freeze([
+      'アイコングリッドが積み上がらず、すでに並んでいたアイコンが別の人に変わってしまう現象を実測する計器を追加しました(表示のみ・動作は変わりません)。前回の計器は「グリッドを丸ごと作り直した回数」しか数えておらず、枚数を変えずに中身だけ書き換わる今回の現象を見逃していました。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1214',
     date: '2026-08-01',
     summary: '会場モードで映像に重なっていた3キャラを非表示に',

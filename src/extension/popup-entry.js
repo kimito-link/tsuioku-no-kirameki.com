@@ -787,6 +787,11 @@ import {
   noteStoryGrowthRebuild,
   summarizeStoryGrowthChurn
 } from '../lib/storyGrowthChurn.js';
+import {
+  createStoryGrowthCellSwapState,
+  noteStoryGrowthPatch,
+  formatStoryGrowthCellSwapLine
+} from '../lib/storyGrowthCellSwap.js';
 import { buildDevMonitorDlChartsHtml } from '../lib/devMonitorViz.js';
 import {
   buildStoryAvatarDiagHtml,
@@ -8742,6 +8747,18 @@ function patchStoryGrowthIconsFromSource(root, opts = {}) {
     return;
   }
   const accent = buildStoryAccentForWindow(n);
+  // v0.1.1215計器: ユーザー報告「積み上げ式にならず、もともと記録されたアイコンが
+  //   ちらちら変わる」の正体はこの経路。DOM枚数は変えず中身だけ上書きするため
+  //   v0.1.1208 の churn 計器(全消し再構築だけを数える)には映らなかった。
+  //   窓(sourceOffset)がずれると i 番目のマスに別人が入る=既存アイコンのすり替え。
+  //   ★受け取るのは既にある値だけ(配列を舐めない)=ホットパスを汚さない。
+  try {
+    noteStoryGrowthPatch(STORY_GROWTH_CELL_SWAP, {
+      cells: n,
+      offset: Number(STORY_GROWTH_STATE.sourceOffset) || 0,
+      atMs: Date.now()
+    });
+  } catch { /* 計器の失敗は描画を止めない */ }
   for (let i = 0; i < n; i += 1) {
     applyStoryGrowthIconAttributes(/** @type {HTMLImageElement} */ (imgs[i]), i, false, {
       ordinal: accent.ordinals[i] || 0,
@@ -8764,6 +8781,8 @@ function patchStoryGrowthIconsFromSource(root, opts = {}) {
 // v0.1.1208: アイコングリッドの作り直しを観測する(ユーザー報告「増えていく動きじゃない」)。
 //   上限超えで窓がスライドすると毎回360枚が総入替になる、という推論を実機で確かめるため。
 const STORY_GROWTH_CHURN = createStoryGrowthChurnState();
+// v0.1.1215: 全消し再構築ではなく「既存マスの中身のすり替え」を観測する(churn の盲点)。
+const STORY_GROWTH_CELL_SWAP = createStoryGrowthCellSwapState();
 
 function rebuildStoryGrowth(root, total) {
   const _churnT0 = typeof performance !== 'undefined' ? performance.now() : 0;
@@ -18952,6 +18971,21 @@ async function collectAiShareDevMonitorPayloadBundle(watchUrl) {
       storyGrowthChurn: (() => {
         try {
           return summarizeStoryGrowthChurn(STORY_GROWTH_CHURN, Date.now());
+        } catch {
+          return null;
+        }
+      })(),
+      // v0.1.1215: 「積み上げ式にならずアイコンがちらちら変わる」の観測。上の churn は
+      //   全消し再構築だけを数えるため、DOM枚数を変えない「中身のすり替え」を取りこぼす。
+      storyGrowthCellSwap: (() => {
+        try {
+          return {
+            patches: STORY_GROWTH_CELL_SWAP.patches,
+            cellsPatched: STORY_GROWTH_CELL_SWAP.cellsPatched,
+            swaps: STORY_GROWTH_CELL_SWAP.swaps,
+            maxSwapsInOnePatch: STORY_GROWTH_CELL_SWAP.maxSwapsInOnePatch,
+            line: formatStoryGrowthCellSwapLine(STORY_GROWTH_CELL_SWAP)
+          };
         } catch {
           return null;
         }
