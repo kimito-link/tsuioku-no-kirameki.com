@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1211',
+    date: '2026-08-01',
+    summary: '状態速報に「popup起動から何秒後の値か」を明記',
+    items: Object.freeze([
+      '状態速報の popup 固有診断に、その値が「popup を開いてから何秒後のものか」を出すようにしました。起動直後は鏡やアイコングリッドがゼロ・未観測なのが正常なので、その場合はその旨も併記します(表示のみ・動作は変わりません)。開発者が起動0.4秒の値を「22秒経っても直っていない」と読み違えたのを防ぐためのものです。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1210',
     date: '2026-08-01',
     summary: '紹介サイトが古いファイル名を見せていた問題を修正',
