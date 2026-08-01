@@ -16,7 +16,8 @@ import {
   foldVoiceArrivalWindow,
   computeVoiceLagVerdict,
   computeSustainedPressureBoost,
-  mergeVoiceSpeedBoost
+  mergeVoiceSpeedBoost,
+  VOICE_SUSTAINED_PRESSURE_MIN
 } from './voiceLagBudget.js';
 
 /**
@@ -337,6 +338,39 @@ describe('computeSustainedPressureBoost (v0.1.1222)', () => {
   it('落ち着いていれば0(通常時の声の速さを変えない)', () => {
     // pressure = 20*1500/60000 = 0.5
     expect(computeSustainedPressureBoost({ arrivalPerMin: 20, serviceTimeEmaMs: 1500, sampleCount: 50 })).toBe(0);
+  });
+
+  /**
+   * ★v0.1.1225 回帰: 実配信で「じわっと足りない」領域を取り逃がしていた2点を固定する。
+   *   閾値1.5では下の2点とも 0.00/0.07 しか出ず、voiced率は67〜75%(3〜4件に1件読めない)。
+   *   閾値を既存の判定境界(1.2)へ揃えたので、どちらでも実際に上乗せが立つ。
+   */
+  it('★実測: 需要23.8/分・処理3274ms(pressure≒1.30)で底上げが立つ', () => {
+    const b = computeSustainedPressureBoost({
+      arrivalPerMin: 23.8,
+      serviceTimeEmaMs: 3274,
+      sampleCount: 50
+    });
+    expect(b).toBeGreaterThan(0);
+  });
+
+  it('★実測: 需要31.8/分・処理2840ms(pressure≒1.51)では更に強く効く', () => {
+    const weak = computeSustainedPressureBoost({
+      arrivalPerMin: 23.8, serviceTimeEmaMs: 3274, sampleCount: 50
+    });
+    const strong = computeSustainedPressureBoost({
+      arrivalPerMin: 31.8, serviceTimeEmaMs: 2840, sampleCount: 50
+    });
+    // 混むほど強くなる(単調)。旧閾値では 0.00 → 0.07 と、ほぼ差が付かなかった。
+    expect(strong).toBeGreaterThan(weak);
+  });
+
+  it('閾値は「過負荷ではない」判定境界と同じ値(定義を揃える)', () => {
+    expect(VOICE_SUSTAINED_PRESSURE_MIN).toBe(VOICE_PRESSURE_OK_MAX);
+    // 境界ちょうどでは発火しない(誤差帯を過負荷と呼ばない)。
+    expect(
+      computeSustainedPressureBoost({ arrivalPerMin: 24, serviceTimeEmaMs: 3000, sampleCount: 50 })
+    ).toBe(0);
   });
 
   it('★実測レジーム(需要102/分・1517ms/件)でブーストが立つ', () => {
