@@ -8,7 +8,10 @@ import {
   snapshotStoryUserLaneRenderProbe,
   buildStoryUserLaneRenderDiag,
   formatStoryUserLaneRenderDiagLines,
-  storyUserLaneRenderDiagToActionCards
+  storyUserLaneRenderDiagToActionCards,
+  detectStoryUserLaneShrink,
+  notePaintDecision,
+  STORY_USER_LANE_SKIP_REASON
 } from './storyUserLaneRenderProbe.js';
 
 const NOW = 1_000_000_000_000;
@@ -283,5 +286,98 @@ describe('recordStoryUserLaneHeavySettle(refreshGen レース観測・v0.1.1033)
     const d = buildStoryUserLaneRenderDiag(snap, {});
     const text = formatStoryUserLaneRenderDiagLines(d, {}).join('\n');
     expect(text).toContain('heavy 完了: ⚠ race');
+  });
+});
+
+
+/**
+ * v0.1.1229(会議2026-08-02): 「レーンが出たり消えたり」の真因が
+ *   (a)レース頻発 か (b)provisional 未設定でガード素通り かを機械的に切り分ける計器。
+ *
+ * ★実測 shrinkKeepCount:0 だけでは「縮小していない」と「縮小したがガードが素通りした」を
+ *   区別できなかった。そこを分けるのがこの計器の存在意義。
+ */
+function fakeEls(tileCount) {
+  const lane = { childElementCount: tileCount };
+  return { laneLink: lane, laneGift: null, laneAd: null, laneKonta: null, laneTanu: null };
+}
+
+describe('detectStoryUserLaneShrink — ガードと独立に縮小を測る', () => {
+  it('前回より6割未満に減れば縮小と判定', () => {
+    expect(detectStoryUserLaneShrink(fakeEls(100), 50)).toBe(true);
+  });
+
+  it('微減・同数・増加は縮小ではない', () => {
+    expect(detectStoryUserLaneShrink(fakeEls(100), 70)).toBe(false);
+    expect(detectStoryUserLaneShrink(fakeEls(100), 100)).toBe(false);
+    expect(detectStoryUserLaneShrink(fakeEls(100), 200)).toBe(false);
+  });
+
+  it('前回タイル0(初回)は縮小ではない', () => {
+    expect(detectStoryUserLaneShrink(fakeEls(0), 0)).toBe(false);
+  });
+
+  it('★provisional に依存しない(ガードの発動条件と切り離されている)', () => {
+    // detect は els と件数だけを見る=フラグの状態に関係なく縮小を検出できる
+    expect(detectStoryUserLaneShrink(fakeEls(100), 10)).toBe(true);
+  });
+
+  it('壊れた入力でも例外を投げない', () => {
+    expect(detectStoryUserLaneShrink(null, 10)).toBe(false);
+    expect(detectStoryUserLaneShrink(undefined, NaN)).toBe(false);
+  });
+});
+
+describe('notePaintDecision — (a)/(b) の切り分け', () => {
+  it('★(b)の形: 縮小しているのに provisional=false → provisional-false として記録', () => {
+    const probe = createStoryUserLaneRenderProbe();
+    notePaintDecision(probe, {
+      els: fakeEls(100), nextTileCount: 10, provisional: false, guardHit: false
+    });
+    expect(probe.lastPaintSkipReason).toBe(STORY_USER_LANE_SKIP_REASON.PROVISIONAL_FALSE);
+    expect(probe.shrinkDetectedCount).toBe(1);
+    expect(probe.provisionalFalseCount).toBe(1);
+    expect(probe.shrinkKeepCount).toBe(0); // ガードは発動していない
+  });
+
+  it('ガードが正しく効いた形: provisional=true で見送り → shrink として記録', () => {
+    const probe = createStoryUserLaneRenderProbe();
+    notePaintDecision(probe, {
+      els: fakeEls(100), nextTileCount: 10, provisional: true, guardHit: true
+    });
+    expect(probe.lastPaintSkipReason).toBe(STORY_USER_LANE_SKIP_REASON.SHRINK);
+    expect(probe.provisionalTrueCount).toBe(1);
+  });
+
+  it('★(a)の形: 縮小していないのに描画が少ない → none(=供給側を疑う)', () => {
+    const probe = createStoryUserLaneRenderProbe();
+    notePaintDecision(probe, {
+      els: fakeEls(1), nextTileCount: 1, provisional: false, guardHit: false
+    });
+    expect(probe.lastPaintSkipReason).toBe(STORY_USER_LANE_SKIP_REASON.NONE);
+    expect(probe.shrinkDetectedCount).toBe(0);
+  });
+
+  it('理由別に累計される(29回走って1件の内訳が説明できる)', () => {
+    const probe = createStoryUserLaneRenderProbe();
+    for (let i = 0; i < 3; i += 1) {
+      notePaintDecision(probe, { els: fakeEls(100), nextTileCount: 10, provisional: false, guardHit: false });
+    }
+    expect(probe.paintSkipReasons[STORY_USER_LANE_SKIP_REASON.PROVISIONAL_FALSE]).toBe(3);
+  });
+
+  it('★状態速報の行に真因の名指しが出る', () => {
+    const probe = createStoryUserLaneRenderProbe();
+    notePaintDecision(probe, { els: fakeEls(100), nextTileCount: 10, provisional: false, guardHit: false });
+    recordStoryUserLaneStep(probe, STORY_USER_LANE_STEPS.DONE, { domTilesPainted: 10 });
+    const snap = snapshotStoryUserLaneRenderProbe(probe, Date.now());
+    const diag = buildStoryUserLaneRenderDiag(snap);
+    const lines = formatStoryUserLaneRenderDiagLines(diag).join(' | ');
+    expect(lines).toContain('描画判断');
+    expect(lines).toContain('ガードが素通り');
+  });
+
+  it('計器の失敗は描画を止めない(壊れた probe でも例外なし)', () => {
+    expect(() => notePaintDecision(null, { els: fakeEls(10), nextTileCount: 1 })).not.toThrow();
   });
 });

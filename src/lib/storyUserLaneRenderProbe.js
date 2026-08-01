@@ -59,6 +59,25 @@ export function createStoryUserLaneRenderProbe() {
     heavyRaceReturns: 0, // 14532(refreshGen レース)で早期 return した累計回数(多い=レース支配的)
     // heavyRace再発の即効対策(A): 暫定縮小の上書きを見送った累計回数(>0=ガードが完全描画を守った)。
     shrinkKeepCount: 0,
+    // ───────────────────────────────────────────────────────────────────
+    // v0.1.1229 計器(会議2026-08-02): 「レーンが出たり消えたり」の真因が
+    //   (a)レースの頻発 なのか (b)entriesProvisional が立たずガードが素通り なのかを
+    //   機械的に切り分ける。実測で shrinkKeepCount:0(ガードが一度も発動しない)ことは
+    //   分かったが、「呼ばれて条件を満たさなかった」のか「そもそも縮小していない」のかが
+    //   区別できなかった。★症状でなく原因を出すための計器。
+    // ───────────────────────────────────────────────────────────────────
+    /** 直近 paint 時点の entriesProvisional 実値(-1=未計測 / 0=false / 1=true)。 */
+    lastProvisional: -1,
+    /** paint 時点で provisional=true だった累計(=ガードが働きうる状態だった回数)。 */
+    provisionalTrueCount: 0,
+    /** paint 時点で provisional=false だった累計。これが支配的なら (b) が濃厚。 */
+    provisionalFalseCount: 0,
+    /** 直近の「描かなかった理由」。none=実際に描いた。 */
+    lastPaintSkipReason: '',
+    /** 理由別の累計。29回走って1件しか描けない内訳をここで説明する。 */
+    paintSkipReasons: {},
+    /** 縮小を検知した累計(next < prev*0.6)。ガード未発動でもここは増える=切り分けの要。 */
+    shrinkDetectedCount: 0,
     lastRunAtBase: 0 // 最終実行 epoch ms（lastRunAgoMs 算出用）
   };
 }
@@ -83,6 +102,45 @@ export function recordStoryUserLaneHeavySettle(probe, state) {
   if (state === STORY_USER_LANE_HEAVY_SETTLE.RACE) {
     probe.heavyRaceReturns = (Number(probe.heavyRaceReturns) || 0) + 1;
   }
+}
+
+/** paint を見送った理由の正本(状態速報の内訳ラベルにそのまま使う)。 */
+export const STORY_USER_LANE_SKIP_REASON = Object.freeze({
+  NONE: 'none', // 実際に描いた
+  SHRINK: 'shrink', // 単調性ガードが縮小上書きを見送った
+  EMPTY: 'empty', // 空ガードが既存タイルを守った
+  DIFF_SKIP: 'diffskip', // 同一 signature で再描画不要
+  PROVISIONAL_FALSE: 'provisional-false' // ★縮小しているのに provisional=false でガードが素通り
+});
+
+/**
+ * v0.1.1229: paint の判断結果を1件記録する(計器の失敗は描画を止めない)。
+ *
+ * ★これが (a)/(b) の切り分けの核心:
+ *   - provisional-false が支配的        → (b) フラグ側が原因
+ *   - provisionalTrue なのに shrinkKeep が増えない → ガードの条件式が原因
+ *   - none が多い(skipせず描いて1件)     → (a) 供給側が原因
+ *
+ * @param {object} probe
+ * @param {{ provisional?: unknown, reason?: string, shrinkDetected?: boolean }} info
+ */
+export function recordStoryUserLanePaintDecision(probe, info) {
+  if (!probe || typeof probe !== 'object') return;
+  try {
+    const prov = info?.provisional === true;
+    probe.lastProvisional = prov ? 1 : 0;
+    if (prov) probe.provisionalTrueCount = (Number(probe.provisionalTrueCount) || 0) + 1;
+    else probe.provisionalFalseCount = (Number(probe.provisionalFalseCount) || 0) + 1;
+    if (info?.shrinkDetected === true) {
+      probe.shrinkDetectedCount = (Number(probe.shrinkDetectedCount) || 0) + 1;
+    }
+    const reason = String(info?.reason || '');
+    if (reason) {
+      probe.lastPaintSkipReason = reason;
+      const bag = probe.paintSkipReasons || (probe.paintSkipReasons = {});
+      bag[reason] = (Number(bag[reason]) || 0) + 1;
+    }
+  } catch { /* 計器の失敗は描画を止めない */ }
 }
 
 /**
@@ -131,6 +189,16 @@ export function snapshotStoryUserLaneRenderProbe(probe, nowMs) {
     heavySettleState: probe.heavySettleState || '',
     heavyRaceReturns: Number(probe.heavyRaceReturns) || 0,
     shrinkKeepCount: Number(probe.shrinkKeepCount) || 0,
+    // v0.1.1229: (a)/(b) 切り分け用。
+    lastProvisional: Number.isFinite(probe.lastProvisional) ? probe.lastProvisional : -1,
+    provisionalTrueCount: Number(probe.provisionalTrueCount) || 0,
+    provisionalFalseCount: Number(probe.provisionalFalseCount) || 0,
+    shrinkDetectedCount: Number(probe.shrinkDetectedCount) || 0,
+    lastPaintSkipReason: String(probe.lastPaintSkipReason || ''),
+    paintSkipReasons:
+      probe.paintSkipReasons && typeof probe.paintSkipReasons === 'object'
+        ? { ...probe.paintSkipReasons }
+        : {},
     lastRunAgoMs: probe.lastRunAtBase > 0 && now > 0 ? Math.max(0, now - probe.lastRunAtBase) : null
   };
 }
@@ -212,6 +280,13 @@ export function buildStoryUserLaneRenderDiag(probeSnap, ctx) {
     heavySettleState: String(s.heavySettleState || ''),
     heavyRaceReturns: Number(s.heavyRaceReturns) || 0,
     shrinkKeepCount: Number(s.shrinkKeepCount) || 0,
+    // v0.1.1229: (a)/(b) 切り分け用(そのまま持ち越す)。
+    lastProvisional: Number.isFinite(s.lastProvisional) ? s.lastProvisional : -1,
+    provisionalTrueCount: Number(s.provisionalTrueCount) || 0,
+    provisionalFalseCount: Number(s.provisionalFalseCount) || 0,
+    shrinkDetectedCount: Number(s.shrinkDetectedCount) || 0,
+    lastPaintSkipReason: String(s.lastPaintSkipReason || ''),
+    paintSkipReasons: s.paintSkipReasons && typeof s.paintSkipReasons === 'object' ? s.paintSkipReasons : {},
     // heavyRace根治(B)計器: fresh-read で heavy 全件再読みを省いた累計(popup-entry が snap に直接載せる)。
     heavyFreshReadReuseCount: Number(s.heavyFreshReadReuseCount) || 0,
     lastRunAgoMs: s.lastRunAgoMs ?? null,
@@ -285,6 +360,28 @@ export function formatStoryUserLaneRenderDiagLines(diag, ctx) {
   if (Number(d.shrinkKeepCount) > 0) {
     lines.push(`  → ⚠ 暫定縮小の上書きを ${d.shrinkKeepCount} 回防御(前回の完全描画を保持=たぬ姉固着を回避)`);
   }
+  // ★v0.1.1229(会議2026-08-02): 「出たり消えたり」の (a)レース頻発 / (b)フラグ未設定 を切り分ける。
+  //   ここが出れば、次に直すべき場所が推測でなく数字で決まる。
+  const provT = Number(d.provisionalTrueCount) || 0;
+  const provF = Number(d.provisionalFalseCount) || 0;
+  const shrinkDet = Number(d.shrinkDetectedCount) || 0;
+  if (provT + provF > 0) {
+    const reasons = d.paintSkipReasons && typeof d.paintSkipReasons === 'object' ? d.paintSkipReasons : {};
+    const parts = [];
+    for (const k of Object.keys(reasons)) {
+      const n = Number(reasons[k]) || 0;
+      if (n > 0) parts.push(`${k}${n}`);
+    }
+    lines.push(
+      `  → 描画判断: 暫定${provT}/確定${provF} / 縮小検知${shrinkDet}回 / 見送り内訳(${parts.join(' ') || 'なし'})`
+    );
+    // ★真因の名指し。縮小しているのに provisional=false ならガードは構造上素通りする。
+    if (shrinkDet > 0 && Number(d.shrinkKeepCount) === 0 && provF > 0) {
+      lines.push(
+        '  → ⚠ 縮小しているのにガードが素通り(provisional=false)=タイルが消える直接原因。フラグ設定側を疑う'
+      );
+    }
+  }
   // heavyRace根治(B): fresh-read で heavy 全件再読みを省いた回数(>0=backfill中の re-read ループが切れている証拠)。
   if (Number(d.heavyFreshReadReuseCount) > 0) {
     lines.push(`  → heavy 全件再読み省略(fresh-read再利用): ${d.heavyFreshReadReuseCount} 回(backfill中の re-read ループ抑止が効いている)`);
@@ -354,4 +451,56 @@ export function storyUserLaneRenderDiagToActionCards(diag, ctx) {
   }
 
   return cards;
+}
+
+/**
+ * v0.1.1229: 「今回の描画がタイルを大幅に減らすか」をガードとは独立に判定する。
+ *
+ * ★ガードの発動条件(provisional 必須)と切り離して測るのが要点。
+ *   でないと「縮小していない」と「縮小したがガードが素通りした」が同じ値になり、
+ *   実測 shrinkKeepCount:0 の意味が読めない(今回の切り分けが詰まった直接の理由)。
+ *
+ * @param {{ laneLink?: any, laneGift?: any, laneAd?: any, laneKonta?: any, laneTanu?: any }|null|undefined} els
+ * @param {number} nextTileCount
+ * @param {number} [ratio] 既定 0.6(ガードと同じ閾値)
+ * @returns {boolean}
+ */
+export function detectStoryUserLaneShrink(els, nextTileCount, ratio = 0.6) {
+  try {
+    const lanes = els ? [els.laneLink, els.laneGift, els.laneAd, els.laneKonta, els.laneTanu] : [];
+    let prev = 0;
+    for (const lane of lanes) {
+      if (lane && typeof lane.childElementCount === 'number') prev += lane.childElementCount;
+    }
+    if (prev <= 0) return false;
+    const next = Math.max(0, Math.floor(Number(nextTileCount) || 0));
+    return next < Math.floor(prev * ratio);
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * v0.1.1229: 縮小判定→計器記録までを1関数に閉じる(popup-entry の肥大を避ける)。
+ *
+ * @param {object} probe
+ * @param {object} args
+ * @param {any} args.els レーン要素群
+ * @param {number} args.nextTileCount 今回描こうとしている総タイル数
+ * @param {unknown} args.provisional STORY_SOURCE_STATE.entriesProvisional
+ * @param {boolean} args.guardHit shouldKeepStoryUserLaneTilesOnShrink の戻り
+ * @returns {{ shrinkDetected: boolean }}
+ */
+export function notePaintDecision(probe, args) {
+  const shrinkDetected = detectStoryUserLaneShrink(args?.els, Number(args?.nextTileCount) || 0);
+  recordStoryUserLanePaintDecision(probe, {
+    provisional: args?.provisional,
+    shrinkDetected,
+    reason: args?.guardHit === true
+      ? STORY_USER_LANE_SKIP_REASON.SHRINK
+      : (shrinkDetected
+          ? STORY_USER_LANE_SKIP_REASON.PROVISIONAL_FALSE
+          : STORY_USER_LANE_SKIP_REASON.NONE)
+  });
+  return { shrinkDetected };
 }
