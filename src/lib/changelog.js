@@ -26,6 +26,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1228',
+    date: '2026-08-02',
+    summary: 'ピックアップが常に最新1件に戻っていたのを修正',
+    items: Object.freeze([
+      'コメントのピックアップが、実際の配信では常に「最新の1件」に戻ってしまっていました。選ぶ対象を集める時間の範囲を1つ手前で区切っていたため、今まさに届いているコメントが対象から外れていたのが原因です。',
+      '今の時間帯に届いたコメントも対象に含めるようにしました。どの画面でも同じコメントが出る仕組みはそのままです。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1227',
     date: '2026-08-02',
     summary: 'コメントのピックアップが動いていなかったのを修正',
