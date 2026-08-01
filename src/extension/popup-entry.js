@@ -579,7 +579,15 @@ import {
   prepareSelfPostedMatchRecents
 } from '../lib/selfPostedMatcher.js';
 import { parseViewerCountFromLooseText } from '../lib/liveAudienceDom.js';
-import { pickLatestCommentEntry } from '../lib/pickLatestComment.js';
+import {
+  buildTickerTextAndTip,
+  decorateTickerLine,
+  makeTickerPickDiag,
+  pickTickerHighlightEntry,
+  recordTickerPick,
+  tickerArgsFromMirrorRow,
+  tickerHighlightKey
+} from '../lib/pickTickerHighlight.js';
 import {
   aggregateCommentsByUser,
   displayUserLabel,
@@ -3462,6 +3470,10 @@ function commentTickerDisplayLabel(entry, liveId, entries) {
   return '';
 }
 
+/** v0.1.1226: ティッカー選定の計器と、直前に選ばれた userId(1人占拠の防止・匿名には効かせない)。 */
+const _tickerPickDiag = makeTickerPickDiag();
+let _tickerLastUserId = '';
+
 /** @param {PopupCommentEntry[]} comments */
 function renderCommentTicker(comments) {
   const segA = $('commentTickerSegA');
@@ -3471,7 +3483,10 @@ function renderCommentTicker(comments) {
   if (!segA || !segB || !scroll) return;
 
   const list = Array.isArray(comments) ? comments : [];
-  const latest = /** @type {PopupCommentEntry|null} */ (pickLatestCommentEntry(list));
+  // v0.1.1226: 「最新1件を流す」→「7秒バケットで選んだ1件を留める」(埋もれ対策・候補ゼロなら現状維持)。
+  const _picked = pickTickerHighlightEntry(list, Date.now(), { lastUserId: _tickerLastUserId });
+  recordTickerPick(_tickerPickDiag, _picked);
+  const latest = /** @type {PopupCommentEntry|null} */ (_picked.entry);
   const placeholder =
     '<span class="nl-ticker-item nl-ticker-latest">まだ応援コメントがないのだ… 記録ONでたまるよ</span>';
 
@@ -3488,34 +3503,22 @@ function renderCommentTicker(comments) {
   const liveId = String(latest.liveId || STORY_SOURCE_STATE.liveId || '');
   const label = commentTickerDisplayLabel(latest, liveId, list);
   const avatarSrc = storyGrowthTileSrcForEntry(latest, liveId, list);
-  const rawText = String(latest.text || '').trim();
-  const noStr = String(latest.commentNo || '').trim();
-  const noPrefix = /^\d+$/.test(noStr) ? `No.${noStr} ` : '';
-  const textFallback =
-    rawText ||
-    (noStr ? `（本文なし・${noPrefix.trim()}）` : '（本文なし）');
-  const textShown = truncateText(rawText || textFallback, 72);
-  const tip = label
-    ? `${noPrefix}${label}：${rawText || '（コメント本文なし）'}`
-    : `${noPrefix}${rawText || '（コメント本文なし）'}`;
-  // 数値 ID を持つユーザーの場合、行全体（アバター＋名前＋本文）を niconico ユーザーページへのリンクにする。
-  // 匿名（a:xxx）やハッシュ風 ID は buildCommentTickerNameHref が '' を返すので、リンクにはならない span のまま。
-  // HTML 文字列の組み立ては純関数 buildCommentTickerLatestHtml に外出し（pure refactor）。
+  // 整形は純関数へ外出し(v0.1.1226)。数値IDのみリンク化=匿名は span のまま。
+  const { textShown, tip } = buildTickerTextAndTip(latest, label, truncateText, 72);
   const userPageHref = buildCommentTickerNameHref(latest.userId);
+  // v0.1.1226 diff-skip: 同じ選定結果ならDOMを書き換えない(「消す側」も同じ機構を通す)。
+  const _tickerKey = tickerHighlightKey(_picked);
+  if (segA.dataset.nlTickerKey === _tickerKey) return;
+  segA.dataset.nlTickerKey = _tickerKey;
+  _tickerLastUserId = String(latest.userId || '');
+  _tickerPickDiag.domWriteTotal += 1;
   segA.innerHTML = buildCommentTickerLatestHtml({
     label,
     avatarSrc,
     textShown,
     userPageHref
   });
-  const line = /** @type {HTMLElement|null} */ (segA.querySelector('.nl-ticker-latest'));
-  if (line) line.title = tip;
-  const avatar = /** @type {HTMLImageElement|null} */ (
-    segA.querySelector('.nl-ticker-latest__avatar')
-  );
-  if (avatar && isHttpOrHttpsUrl(avatarSrc)) {
-    avatar.referrerPolicy = 'no-referrer';
-  }
+  decorateTickerLine(segA, { tip, avatarSrc, isHttpUrl: isHttpOrHttpsUrl });
 }
 
 /**
@@ -7224,9 +7227,12 @@ async function applyCommentTimelineMirrorForPassive() {
   }
   const rows = restoreCommentTimelineRows(snap);
   if (!rows.length) return; // データ無し=popup の空状態(placeholder)のまま(死に画面にしない)
-  const latest = rows[rows.length - 1]; // restore は古→新=末尾が最新。
-  // v0.1.1022(明滅根治): sig から capturedAt を外す(件数+最新本文で中身変化は検知・新着で変わる)。
-  const sig = `${String(snap && snap.liveId ? snap.liveId : '')}|${rows.length}|${String(latest.text || '')}`;
+  // v0.1.1226: ①と同一の純関数で選ぶ。バケット丸めが決定的=同じ7秒窓なら①と同じ1件になる。
+  const _picked = pickTickerHighlightEntry(rows, Date.now());
+  recordTickerPick(_tickerPickDiag, _picked);
+  const latest = _picked.entry || rows[rows.length - 1];
+  // v0.1.1022(明滅根治): sig から capturedAt を外す。v0.1.1226: 選定キーを混ぜる。
+  const sig = `${String(snap && snap.liveId ? snap.liveId : '')}|${rows.length}|${tickerHighlightKey(_picked)}`;
   if (sig === _commentTimelineMirrorPassiveSig) return;
   _commentTimelineMirrorPassiveSig = sig;
   const segB = $('commentTickerSegB');
@@ -7237,19 +7243,13 @@ async function applyCommentTimelineMirrorForPassive() {
     if (segB) segB.innerHTML = '';
     if (viewport) viewport.classList.remove('is-empty');
     // 数値 ID のユーザーは niconico ユーザーページへリンク(匿名/ハッシュ風は '' で span のまま)。
-    const userPageHref = buildCommentTickerNameHref(latest.userId);
-    segA.innerHTML = buildCommentTickerLatestHtml({
-      label: String(latest.name || ''),
-      avatarSrc: String(latest.avatarUrl || ''),
-      textShown: String(latest.text || '').slice(0, 72),
-      userPageHref
-    });
-    const avatar = /** @type {HTMLImageElement|null} */ (
-      segA.querySelector('.nl-ticker-latest__avatar')
+    segA.innerHTML = buildCommentTickerLatestHtml(
+      tickerArgsFromMirrorRow(latest, buildCommentTickerNameHref(latest.userId))
     );
-    if (avatar && isHttpOrHttpsUrl(String(latest.avatarUrl || ''))) {
-      avatar.referrerPolicy = 'no-referrer';
-    }
+    decorateTickerLine(segA, {
+      avatarSrc: String(latest.avatarUrl || ''),
+      isHttpUrl: isHttpOrHttpsUrl
+    });
   } catch {
     /* no-op: ティッカーは best-effort(壊れても他レーンを巻き込まない) */
   }
@@ -18986,6 +18986,8 @@ async function collectAiShareDevMonitorPayloadBundle(watchUrl) {
           return null;
         }
       })(),
+      // v0.1.1226: ティッカーのピックアップ計器(gift+scored=0 なら未発火と断言できる)。
+      tickerPick: { ..._tickerPickDiag },
       // v0.1.1215: 「積み上げ式にならずアイコンがちらちら変わる」の観測。上の churn は
       //   全消し再構築だけを数えるため、DOM枚数を変えない「中身のすり替え」を取りこぼす。
       storyGrowthCellSwap: (() => {
