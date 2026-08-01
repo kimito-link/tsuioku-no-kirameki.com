@@ -22,6 +22,7 @@
  */
 
 import { isNumericNicoUserId } from '../domain/user/identity.js';
+import { RECENT_TEXT_KEEP, formatRecentTexts } from './recentTextRing.js';
 
 /**
  * @typedef {{ src: string, kind: 'real-http'|'identicon'|'tv-fallback'|'none',
@@ -68,6 +69,7 @@ export function readVenueTileThumbState(cellEl) {
  *   avatarSrc: string,
  *   statLine: string,
  *   lastText: string,
+ *   recentTexts: string[],
  *   thumbStatusLabel: string,
  *   thumbKind: VenueTileThumbState['kind'],
  *   thumbLoad: VenueTileThumbState['load']
@@ -119,7 +121,7 @@ export const HOVER_LAST_TEXT_MAX = 60;
  *   uid?: unknown, displayName?: unknown, count?: unknown, hasGift?: unknown,
  *   giftCount?: unknown, venueRank?: unknown, thumb?: Partial<VenueTileThumbState>,
  *   lastAt?: unknown, nowMs?: unknown, diagMode?: unknown, tier?: unknown,
- *   lastText?: unknown
+ *   lastText?: unknown, recentTexts?: unknown
  * }} input
  * @returns {VenueHoverCardModel}
  */
@@ -203,6 +205,10 @@ export function buildVenueHoverCardModel(input) {
     avatarSrc,
     statLine: statParts.join(' ・ '),
     lastText,
+    // v0.1.1218(ユーザー要望): ホバーだけでその人の発言を数件読めるようにする。
+    //   既存データ(在席の記録)から来るので storage の追加読みはゼロ。
+    //   投擲段(広告/ギフト)は発言由来ではないので出さない=lastText と同じ扱い。
+    recentTexts: isThrowTier ? [] : formatRecentTexts(i.recentTexts, { max: RECENT_TEXT_KEEP, maxChars: HOVER_LAST_TEXT_MAX }),
     thumbStatusLabel: diagMode ? resolveThumbStatusLabel(thumbKind, thumbLoad) : '',
     thumbKind,
     thumbLoad
@@ -279,12 +285,22 @@ export function renderVenueHoverCard(cardEl, model) {
   const statsEl = cardEl.querySelector('.nlsb-hover-card__stats');
   if (statsEl) statsEl.textContent = String(m.statLine || '');
 
-  // 2026-07-31: 直前の発言内容。無い(未発言/投擲段/データ未到達)ときは行ごと消して隙間を作らない。
+  // 2026-07-31: 発言内容。無い(未発言/投擲段/データ未到達)ときは行ごと消して隙間を作らない。
+  // v0.1.1218(ユーザー要望): 直近1件だけでなく数件を出す。クリックしなくても
+  //   「この人が何を言っていたか」を追える。件数は会場の席を覆わない範囲に絞る。
   const lastTextEl = cardEl.querySelector('.nlsb-hover-card__last-text');
   if (lastTextEl) {
-    const text = String(m.lastText || '');
-    lastTextEl.textContent = text ? `「${text}」` : '';
-    lastTextEl.hidden = !text;
+    const list = Array.isArray(m.recentTexts) ? m.recentTexts.filter(Boolean) : [];
+    // 後方互換: recentTexts が空でも lastText があればそれ1件を出す。
+    const rows = list.length ? list : [String(m.lastText || '')].filter(Boolean);
+    lastTextEl.textContent = '';
+    for (const t of rows) {
+      const line = cardEl.ownerDocument.createElement('div');
+      line.className = 'nlsb-hover-card__speech';
+      line.textContent = `「${t}」`;
+      lastTextEl.appendChild(line);
+    }
+    lastTextEl.hidden = rows.length === 0;
   }
 
   const thumbStatusEl = cardEl.querySelector('.nlsb-hover-card__thumb-status');

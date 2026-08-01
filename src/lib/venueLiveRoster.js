@@ -22,6 +22,7 @@
  */
 
 import { hasRealThumbnail, VENUE_FULLSCREEN_MAX_SEATS } from './venueSeats.js';
+import { pushRecentText } from './recentTextRing.js';
 
 /** 常連/支援者(=保持窓を延長する軸)の発言数しきい値。これ以上 or ギフト有りで vip。 */
 export const VENUE_ROSTER_VIP_COMMENT_THRESHOLD = 5;
@@ -38,6 +39,7 @@ export const VENUE_ROSTER_MAX_SEATS = VENUE_FULLSCREEN_MAX_SEATS;
  *   name: string,
  *   avatar: string,
  *   lastText: string,
+ *   recentTexts: string[],
  *   firstSeen: number,
  *   lastSeen: number,
  *   commentCount: number,
@@ -88,6 +90,9 @@ export function touchRoster(roster, row, nowMs, opts = {}) {
       //   本文表示(v0.1.1192実装済み)が**席のある人でも常に空**になっていた。
       //   ★ギフトだけの行(isGift)は発言ではないので本文を持たせない。
       lastText: isGift ? '' : text,
+      // v0.1.1218: ホバーカードで直近数件を読めるようにする。storage を読まずに
+      //   在席の記録へ持たせる(ホバーのたびに read すると会場が重くなる)。
+      recentTexts: isGift ? [] : pushRecentText([], text),
       firstSeen: now,
       lastSeen: now,
       commentCount: 1,
@@ -104,7 +109,10 @@ export function touchRoster(roster, row, nowMs, opts = {}) {
   if (isGift) e.giftCount = (e.giftCount || 0) + 1;
   // 発言があれば最新の本文で上書き(ホバーカードは「直前の発言」を出す仕様)。
   //   ギフトだけの行では上書きしない=直前の発言を投擲で消さない。
-  if (!isGift && text) e.lastText = text;
+  if (!isGift && text) {
+    e.lastText = text;
+    e.recentTexts = pushRecentText(e.recentTexts, text);
+  }
   if (!e.name && incomingName) e.name = incomingName; // 非空を採用・下げない
   // avatar: 実サムネ(http)を優先。実を非実(空/data:)で上書きしない。
   if (incomingAvatar && hasRealThumbnail(incomingAvatar) && !hasRealThumbnail(e.avatar)) {
@@ -183,6 +191,8 @@ export function rosterToVenueRows(roster) {
       //   lastText に載せ(venueSeats.js:166)、ホバーカードが表示する(v0.1.1192実装済み)。
       //   以前は '' 固定だったため、席のある人でもカードに本文が出ていなかった。
       text: String(e.lastText || ''),
+      // v0.1.1218: 直近数件。collectVenueParticipants → ホバーカードへ運ぶ。
+      recentTexts: Array.isArray(e.recentTexts) ? e.recentTexts.slice() : [],
       capturedAt: Math.max(0, Number(e.lastSeen) || 0),
       preCount: Math.max(1, Math.floor(Number(e.commentCount) || 0) || 1),
       preHasGift: giftCount > 0,
@@ -217,6 +227,7 @@ export function hydrateRosterFromCandidates(roster, candidates, opts = {}) {
       // 候補(storage シード)は本文を持たないので空。以後ライブで発言が届いたときに
       //   touchRoster が埋める=「開いた直後は空欄・喋ったら出る」という自然な挙動になる。
       lastText: '',
+      recentTexts: /** @type {string[]} */ ([]),
       firstSeen: lastSeen,
       lastSeen,
       commentCount: Math.max(1, Math.floor(Number(c.commentCount) || 0) || 1),
