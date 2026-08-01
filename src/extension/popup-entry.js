@@ -651,6 +651,7 @@ import {
   STORY_USER_LANE_STEPS,
   STORY_USER_LANE_HEAVY_SETTLE,
   createStoryUserLaneRenderProbe,
+  notePaintDecision,
   recordStoryUserLaneStep,
   recordStoryUserLaneHeavySettle,
   snapshotStoryUserLaneRenderProbe
@@ -6886,15 +6887,13 @@ function renderStoryUserLane() {
   //   ★sig を更新せずに return するのが肝: settle 後の本描画は sig 不一致で必ず通る(暫定が再来しても skip 継続)。
   //   ★DONE を記録(domTilesPainted付き): しないと started>completed で「未完走」誤診(sig-skip と同型)。
   const nextTileCount = picked.length + buckets.gift.length + buckets.ad.length;
-  if (
-    shouldKeepStoryUserLaneTilesOnShrink(
-      els,
-      STORY_SOURCE_STATE.liveId,
-      _storyUserLaneLastTiledLid,
-      nextTileCount,
-      STORY_SOURCE_STATE.entriesProvisional
-    )
-  ) {
+  // v0.1.1229 計器: (a)レース頻発 か (b)provisional 未設定でガード素通り かを切り分ける。
+  const _prov = STORY_SOURCE_STATE.entriesProvisional;
+  const _shrinkGuardHit = shouldKeepStoryUserLaneTilesOnShrink(
+    els, STORY_SOURCE_STATE.liveId, _storyUserLaneLastTiledLid, nextTileCount, _prov);
+  notePaintDecision(_storyUserLaneRenderProbe,
+    { els, nextTileCount, provisional: _prov, guardHit: _shrinkGuardHit });
+  if (_shrinkGuardHit) {
     recordStoryUserLaneStep(_storyUserLaneRenderProbe, STORY_USER_LANE_STEPS.SHRINK_KEPT, {
       domTilesPainted: countStoryUserLaneDomTiles(els)
     });

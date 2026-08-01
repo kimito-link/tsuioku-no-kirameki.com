@@ -26,6 +26,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1229',
+    date: '2026-08-02',
+    summary: 'レーンが出たり消えたりする原因を特定する計器',
+    items: Object.freeze([
+      '応援レーンの人が出たり消えたりする件について、原因を特定するための計測を追加しました。表示を守る仕組みは入っているのに働いていないことが分かっており、その理由が「守る条件が整っていない」のか「そもそも別の原因」なのかを数字で見分けます。',
+      '状態速報に「描画判断」の行が出るようになります。表示の動きは変えていません(計測だけの追加です)。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1228',
     date: '2026-08-02',
     summary: 'ピックアップが常に最新1件に戻っていたのを修正',
