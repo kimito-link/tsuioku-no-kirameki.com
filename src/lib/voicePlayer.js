@@ -3,6 +3,7 @@
 import { buildVoiceReadingText, buildMergedVoiceText } from './voicevoxClient.js';
 import { isVoiceItemStale } from './voiceAgeGate.js';
 import { classifyVoiceSynthNull } from './voiceSynthFailure.js';
+import { classifyVoiceSynthFailureReason } from './voiceSynthFailureReason.js';
 import {
   computeVoiceCongestion,
   computeVoiceE2eAverage,
@@ -108,6 +109,10 @@ export class VoicePlayer {
       //   増やさずに continue していたこと(voicevoxClient は 8000ms タイムアウトで null を返す)。
       //   これが無いと「なぜ読まれないか」が原理的に分からない。
       synthNullTotal: 0, synthNullNearTimeout: 0,
+      // v0.1.1224計器: 合成失敗の【理由別】内訳。従来は6通りの失敗が全部 null に畳まれ、
+      //   実配信の「合成失敗17件(その他16)」の正体を誰も答えられなかった。
+      //   原因ごとに打つ手が正反対(接続不能=拡張では直せない / HTTP拒否=絞れば直る)。
+      synthFailReasons: {},
       lagVerdict: '', diagBornAt: this._diagBornAt
     };
   }
@@ -274,13 +279,27 @@ export class VoicePlayer {
       {
         ...assigned,
         speedOffset: assigned.speedOffset + effBoost
-      }
+      },
+      // v0.1.1224: 失敗理由を計器へ。第3引数(opts)は既存呼び出しに無くても壊れない。
+      { onFailure: (info) => this._recordSynthFailureReason(info) }
     ).catch(() => null);
     // v0.1.1089(voice-tempo-realtime-SYNTHESIS §3 Phase 2): 合成起動時点のspeedBoostを保存する。
     //   このWAVは既にこの速度で焼き固まっているため、再生直前に「今」の混雑度と比較して
     //   playbackRateで追いつかせる(合成のやり直しなし=ゼロコスト)。
     this.prefetches.set(item, { generation, promise, boostAtSynth: effBoost });
     return promise;
+  }
+
+  /**
+   * v0.1.1224: 合成失敗の理由を1件記録する。voicevoxClient の onFailure から呼ばれる。
+   * @param {{ stage?: string, error?: unknown, httpStatus?: number, bodyInvalid?: boolean }} info
+   */
+  _recordSynthFailureReason(info) {
+    try {
+      const reason = classifyVoiceSynthFailureReason(info);
+      const bag = this.diag.synthFailReasons || (this.diag.synthFailReasons = {});
+      bag[reason] = (Number(bag[reason]) || 0) + 1;
+    } catch { /* 計器の失敗は読み上げを止めない */ }
   }
 
   /**
@@ -428,7 +447,8 @@ export class VoicePlayer {
               {
                 ...assigned,
                 speedOffset: assigned.speedOffset + effBoostNow
-              }
+              },
+              { onFailure: (info) => this._recordSynthFailureReason(info) }
             );
         this.diag.lastSynthMs = Math.max(0, Date.now() - _synthStart);
         this.diag.lastSpeedBoost = effBoostNow;

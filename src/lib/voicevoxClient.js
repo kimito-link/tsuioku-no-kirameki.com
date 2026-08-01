@@ -256,14 +256,26 @@ export async function listVoicevoxStyleIds(opts = {}) {
  *   fetchFn?: FetchFn,
  *   audioQueryTimeoutMs?: number,
  *   synthesisTimeoutMs?: number,
- *   baseUrl?: string
+ *   baseUrl?: string,
+ *   onFailure?: (info: { stage?: string, error?: unknown, httpStatus?: number, bodyInvalid?: boolean }) => void
  * }} [opts]
+ *   v0.1.1224: onFailure は「null を返す理由」を呼び出し側へ伝える任意コールバック。
+ *   戻り値の型(ArrayBuffer|null)は変えないので既存の呼び出しは無改修で動く。
+ *   ★従来は6通りの失敗が全部 null に畳まれ、実配信の「合成失敗17件(その他16)」の
+ *     正体を誰も答えられなかった([[instrument-must-name-the-cause-2026-08-01]])。
  * @returns {Promise<ArrayBuffer|null>}
  */
 export async function synthesizeVoice(text, voice, opts = {}) {
   const readingText = String(text || '').trim();
   const fetchFn = opts.fetchFn || proxyFetchFn;
   const fetchBufferFn = opts.fetchFn ? opts.fetchFn : proxyFetchBufferFn;
+  /** 失敗理由の通知(計器が壊れても本処理は止めない)。 */
+  /** @param {{ stage?: string, error?: unknown, httpStatus?: number, bodyInvalid?: boolean }} info */
+  const notifyFailure = (info) => {
+    try {
+      if (typeof opts.onFailure === 'function') opts.onFailure(info);
+    } catch { /* 計器の失敗は読み上げを止めない */ }
+  };
   if (!readingText || typeof fetchFn !== 'function') return null;
 
   const baseUrl = String(opts.baseUrl || VOICEVOX_BASE_URL).replace(/\/+$/, '');
@@ -288,9 +300,15 @@ export async function synthesizeVoice(text, voice, opts = {}) {
       { method: 'POST' },
       positiveTimeout(opts.audioQueryTimeoutMs, 3000)
     );
-    if (!queryResponse || queryResponse.ok === false) return null;
+    if (!queryResponse || queryResponse.ok === false) {
+      notifyFailure({ stage: 'query', httpStatus: Number(queryResponse?.status) || 0 });
+      return null;
+    }
     const audioQuery = await queryResponse.json();
-    if (!audioQuery || typeof audioQuery !== 'object') return null;
+    if (!audioQuery || typeof audioQuery !== 'object') {
+      notifyFailure({ stage: 'query', bodyInvalid: true });
+      return null;
+    }
 
     const pitchScale = Number(audioQuery.pitchScale);
     const speedScale = Number(audioQuery.speedScale);
@@ -315,14 +333,20 @@ export async function synthesizeVoice(text, voice, opts = {}) {
       },
       positiveTimeout(opts.synthesisTimeoutMs, 8000)
     );
-    if (!synthesisRes || synthesisRes.ok === false) return null;
+    if (!synthesisRes || synthesisRes.ok === false) {
+      notifyFailure({ stage: 'synth', httpStatus: Number(synthesisRes?.status) || 0 });
+      return null;
+    }
     // v0.1.1004: body 読み取りもタイムアウト保護(リクエストのみの保護では本体配信途中停止で
     //   永遠 pending → 読み上げが await_prefetch 固着する)。超過/失敗時は catch で null=この1件を捨てる。
     return await arrayBufferWithTimeout(
       synthesisRes,
       positiveTimeout(opts.synthesisTimeoutMs, 8000)
     );
-  } catch {
+  } catch (err) {
+    // v0.1.1224: ここは「接続不能(VOICEVOX未起動)」と「時間切れ」と「本文読み取り失敗」が
+    //   全部落ちてくる。error をそのまま渡し、分類は純関数(voiceSynthFailureReason)に任せる。
+    notifyFailure({ stage: 'synth', error: err });
     return null;
   }
 }

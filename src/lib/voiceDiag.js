@@ -35,6 +35,7 @@
  *   voicedRecentRatio: number,   // 2026-07-28計器: 直近voiced率EMA(累計voicedRatioの世代錯誤を補う)
  *   lastSustainedBoost: number,  // v0.1.1222計器: 持続過負荷(pressure由来)で上乗せした速度(0=未適用)
  *   sustainedBoostTotal: number, // v0.1.1222計器: キュー長では出せない速度を実際に足した累計件数
+ *   synthFailReasons: Record<string, number>, // v0.1.1224計器: 合成失敗の理由別内訳(原因を名指しする)
  *   dropCountGateTotal: number,  // 2026-07-28計器: 件数ゲート最古dropの累計(3分別のうちの1つ)
  *   dropHeadStaleTotal: number,  // 2026-07-28計器: 先頭itemの単体stale破棄の累計
  *   dropSweepStaleTotal: number, // 2026-07-28計器: 全stale時の先頭群破棄の累計
@@ -46,6 +47,10 @@
  */
 
 import { formatVoiceSynthFailureLine } from './voiceSynthFailure.js';
+import {
+  adviseVoiceSynthFailure,
+  formatVoiceSynthFailureReasonLine
+} from './voiceSynthFailureReason.js';
 
 /** 初期 voice 診断 state。 */
 export function makeInitialVoiceDiag() {
@@ -77,6 +82,7 @@ export function makeInitialVoiceDiag() {
     voicedRecentRatio: -1,
     lastSustainedBoost: 0,
     sustainedBoostTotal: 0,
+    synthFailReasons: {},
     dropCountGateTotal: 0,
     dropHeadStaleTotal: 0,
     dropSweepStaleTotal: 0,
@@ -127,6 +133,10 @@ export function buildVoiceDiagSnapshot(diag, nowMs) {
     playPrepEmaMs: num(d.playPrepEmaMs, base.playPrepEmaMs),
     playbackEmaMs: num(d.playbackEmaMs, base.playbackEmaMs),
     expectedPlayEmaMs: num(d.expectedPlayEmaMs, base.expectedPlayEmaMs),
+    synthFailReasons:
+      d.synthFailReasons && typeof d.synthFailReasons === 'object' && !Array.isArray(d.synthFailReasons)
+        ? { ...d.synthFailReasons }
+        : base.synthFailReasons,
     lastSustainedBoost: num(d.lastSustainedBoost, base.lastSustainedBoost),
     sustainedBoostTotal: num(d.sustainedBoostTotal, base.sustainedBoostTotal),
     arrivalPerMin: num(d.arrivalPerMin, base.arrivalPerMin),
@@ -257,6 +267,14 @@ export function buildVoiceDiagLine(snap, nowMs) {
   //   実配信で「需要52.2/分・読めた6件・間引き12件」=約34件がどの計器にも乗らない穴があった。
   const synthFailureLine = formatVoiceSynthFailureLine(snap);
   if (synthFailureLine) parts.push(synthFailureLine);
+  // v0.1.1224: 「その他N件」の正体を名前で割る。原因ごとに打つ手が正反対なので対処文も出す
+  //   (接続不能=拡張では直せない / HTTP拒否=過負荷で絞れば直る / 時間切れ=処理が重い)。
+  const reasonLine = formatVoiceSynthFailureReasonLine(snap.synthFailReasons);
+  if (reasonLine) {
+    parts.push(reasonLine);
+    const advice = adviseVoiceSynthFailure(snap.synthFailReasons);
+    if (advice) parts.push(`→ ${advice}`);
+  }
   // 真因判定。ok/insufficientは「間引きは偶発」「データ不足」でノイズになるため出さない。
   const lagVerdict = String(snap.lagVerdict || '');
   if (lagVerdict && lagVerdict !== 'ok' && lagVerdict !== 'insufficient') {

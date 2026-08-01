@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 4 / 699 件
+## ⚠️ 役割コメントが無いソース 4 / 700 件
 - `src/lib/laneDomSelfMeasure.js`
 - `src/lib/reportPreviewPublish.js`
 - `src/lib/venueLaneBuckets.js`
@@ -610,7 +610,7 @@
     - `trumpet1.mp3`
     - `wallet1.mp3`
   - `SOURCES.md`
-- 📁 **src/** (1464)
+- 📁 **src/** (1467)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -887,7 +887,7 @@
         - `logo_funlink_white_RGB_maru_black.png`
       - `logo_guide_funlink_ol.pdf`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1237)
+  - 📁 **lib/** (1240)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -2090,6 +2090,9 @@
     - `voiceSynthFailure.js` — 読み上げの合成失敗を分類する純関数(v0.1.1213)。
     - `voiceSynthFailure.test.js`
     - `voiceSynthFailure.wiring.test.js`
+    - `voiceSynthFailureReason.integration.test.js`
+    - `voiceSynthFailureReason.js` — 読み上げ合成が失敗した「どこで・なぜ」を名前で返す純関数(v0.1.1224)。
+    - `voiceSynthFailureReason.test.js`
     - `voicevoxClient.js` — ローカル VOICEVOX エンジン(127.0.0.1:50021)へ音声合成をリクエストするクライアント。
     - `voicevoxClient.test.js`
     - `watchAudienceCopy.js` — watch パネル「観客メモ」用の短文・ツールチップ文言（DOM 非依存）。
