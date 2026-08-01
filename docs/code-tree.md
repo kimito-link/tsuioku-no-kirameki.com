@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 4 / 700 件
+## ⚠️ 役割コメントが無いソース 4 / 701 件
 - `src/lib/laneDomSelfMeasure.js`
 - `src/lib/reportPreviewPublish.js`
 - `src/lib/venueLaneBuckets.js`
@@ -157,7 +157,7 @@
     - `2026-07-22.md`
     - `2026-07-23.md`
     - `2026-07-31.md`
-- 📁 **docs/** (227)
+- 📁 **docs/** (229)
   - 📁 **article-assets/** (87)
     - 📁 **venue-frames/** (12)
       - `f01.png`
@@ -267,7 +267,7 @@
     - `storage-bus.md`
     - `venue.md`
     - `web-status.md`
-  - 📁 **handoff/** (64)
+  - 📁 **handoff/** (66)
     - `HANDOFF-backfill-instant-restore.md`
     - `HANDOFF-broadcast-score-panel.md`
     - `HANDOFF-comment-pickup-bsp.md`
@@ -304,6 +304,8 @@
     - `HANDOFF-venue-pop-copy-IMPL.md`
     - `HANDOFF-web-same-as-ext.md`
     - `clip-history-persistence-synthesis.md`
+    - `comment-pickup-ticker-DESIGN.md`
+    - `comment-pickup-ticker-IMPLEMENTATION-HANDOFF.md`
     - `component-factoring-zero-error-IMPLEMENTATION-HANDOFF.md`
     - `diagnostic-architecture-strengthen-DESIGN.md`
     - `diagnostic-architecture-strengthen-IMPLEMENTATION-HANDOFF.md`
@@ -611,7 +613,7 @@
     - `trumpet1.mp3`
     - `wallet1.mp3`
   - `SOURCES.md`
-- 📁 **src/** (1467)
+- 📁 **src/** (1469)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -888,7 +890,7 @@
         - `logo_funlink_white_RGB_maru_black.png`
       - `logo_guide_funlink_ol.pdf`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1240)
+  - 📁 **lib/** (1242)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -1654,6 +1656,8 @@
     - `pickCommentsForExport.test.js`
     - `pickLatestComment.js` — ストレージ上のコメント配列の並びは一定でないため、
     - `pickLatestComment.test.js`
+    - `pickTickerHighlight.js` — コメントティッカーに「留める1件」を選ぶ純関数(v0.1.1226)。
+    - `pickTickerHighlight.test.js`
     - `pollUntil.js` — 再読み込み直後など DOM が遅れて現れるまで待つ（純粋な間隔ポーリング）
     - `pollUntil.test.js`
     - `popupAiDiagOrchestrator.js` — v0.1.211: popup「AI 診断」ボタンのオーケストレータ純関数。
