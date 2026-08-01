@@ -2814,6 +2814,18 @@
       ]
     },
     {
+      "file": "src/lib/venueOpenLatency.js",
+      "featureCount": 2,
+      "features": [
+        "content",
+        "venue"
+      ],
+      "labels": [
+        "記録エンジン(watchページ常駐)",
+        "会場モード(standalone)"
+      ]
+    },
+    {
       "file": "src/lib/venueResidents.js",
       "featureCount": 2,
       "features": [
