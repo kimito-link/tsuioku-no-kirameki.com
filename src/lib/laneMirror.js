@@ -99,14 +99,24 @@ function toMirrorCell(item) {
   //   B-1の復元ロジックに永遠に到達できない(旧バグ=会場のgift/ad段DOM欠落の真因)。
   //   顔も素性(uid/idLine/title)も無いセルだけ従来どおり落とす(鏡に出せない)。
   const hasIdentity = userId !== '' || `${idLine.trim()}|${title}` !== '|';
-  if (!displaySrc && !hasIdentity) return null;
+  // v0.1.1235(鏡スリム化 B-2・書き手): ①が生成した匿名 identicon の data URL は uid から
+  //   純関数で再生成できる(B-1・読み手側は :207-209 に実装済み)。1件約2.5KBを鏡から落とすと
+  //   匿名258人で 622KB→33KB になり、512KB フェイルセーフの cap 半減が発動しない。
+  //   ★実配信 lv351092763 で「①POP 266 / ③WEB鏡 137(たぬ姉が129へ半減)」を観測した根治。
+  // ★バイト完全一致のときだけ落とす(可逆)。部分一致・data: 接頭辞判定は禁止=実サムネの
+  //   data URL まで消して別人化する。広告段 yukkuriFaceFor(seed=roomKey≠uid)は不一致で残る。
+  // ★hasIdentity は strip 前の値で判定済み(上行)。slim 後の空を見ると、落としたセルが
+  //   丸ごと捨てられる(旧バグ=会場のgift/ad段DOM欠落と同じ穴)。
+  const slimSrc =
+    userId && displaySrc === anonymousIdenticonDataUrl(userId, 64) ? '' : displaySrc;
+  if (!slimSrc && !hasIdentity) return null;
   // v0.1.1220: 会場ホバーカードの直近発言。会場は鏡が使えるとき鏡を優先する
   //   (venueBar.js composeVenueBaseRows)ため、ここに載せないと候補側に足しても届かない
   //   =実際に v0.1.1218/1219 で2回踏んだ。純Web公開のサイズは1人あたり数十バイト。
   const recentTexts = Array.isArray(it.recentTexts)
     ? it.recentTexts.filter((t) => typeof t === 'string' && t).slice(0, LANE_MIRROR_RECENT_TEXTS)
     : [];
-  return { displaySrc, title, idLine, nameLine, userId, recentTexts };
+  return { displaySrc: slimSrc, title, idLine, nameLine, userId, recentTexts };
 }
 
 /**
