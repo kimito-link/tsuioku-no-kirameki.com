@@ -624,6 +624,8 @@ import {
   // heavyRace再発の即効対策(HANDOFF-heavyrace-backfill-IMPL.md A): 暫定(heavy未settle)の短い候補で
   //   一度出た完全描画を上書き退化させない単調性ガード。
   shouldKeepStoryUserLaneTilesOnShrink,
+  makeLaneShrinkKeepClock,
+  laneShrinkKeepExpired,
   // 2026-07-20 診断先行(①POP「クリック不能な手カーソル」実害確定計器のstate)。
   getStoryUserLaneClickAffordanceParityState,
   // 2026-07-20 診断先行(①POP「名前ありゆっくり顔」実害確定計器のstate)。
@@ -6406,6 +6408,8 @@ let _storyUserLaneLastTiledLid = '';
 const _laneRosterDeltaState = makeLaneRosterDeltaState();
 /** v0.1.1232 Phase2: 「一度出た人」を覚える名簿(描画に使う・計器とは別物)。 */
 const _laneRosterKeeperState = makeLaneRosterKeeperState();
+/** v0.1.1233 出口4: 縮小keepが続きすぎたら非常口を開くための時計(永久stale防止)。 */
+const _laneShrinkKeepClock = makeLaneShrinkKeepClock();
 /** renderStoryAvatarDiag の同内容再描画を抑止（診断パネルのチカつき抑制） */
 let storyAvatarDiagLastRenderSig = '';
 
@@ -6908,8 +6912,13 @@ function renderStoryUserLane() {
   const nextTileCount = picked.length + buckets.gift.length + buckets.ad.length;
   // v0.1.1229 計器: (a)レース頻発 か (b)provisional 未設定でガード素通り かを切り分ける。
   const _prov = STORY_SOURCE_STATE.entriesProvisional;
-  const _shrinkGuardHit = shouldKeepStoryUserLaneTilesOnShrink(
+  const _rawKeep = shouldKeepStoryUserLaneTilesOnShrink(
     els, STORY_SOURCE_STATE.liveId, _storyUserLaneLastTiledLid, nextTileCount, _prov);
+  // ★v0.1.1233 出口4: keep が同一配信で10分続いたら縮小でも描く(永久staleを防ぐ非常口)。
+  //   settle しない経路が万一あっても、古い表示が残り続けることはない。
+  const _keepExpired = laneShrinkKeepExpired(_laneShrinkKeepClock,
+    { liveId: STORY_SOURCE_STATE.liveId, wouldKeep: _rawKeep, nowMs: Date.now() });
+  const _shrinkGuardHit = _rawKeep && !_keepExpired;
   notePaintDecision(_storyUserLaneRenderProbe,
     { els, nextTileCount, provisional: _prov, guardHit: _shrinkGuardHit });
   if (_shrinkGuardHit) {
@@ -14933,7 +14942,11 @@ async function populateStorySourceEntriesFromStorageFallback(opts = {}) {
     );
     const displayEntriesBase = buildDisplayCommentEntries(storageRowsForLane, latestLv);
     const displayEntries = displayEntriesBase;
-    syncStorySourceEntries(latestLv, displayEntries, storageRowsForLane);
+    // ★v0.1.1233: この経路は nls_comments を読み直す fallback で、取り込み途中(実測20%)でも走る
+    //   =本質的に暫定。opts 無指定は provisional=false(確定)になり、縮小ガード
+    //   (shouldKeepStoryUserLaneTilesOnShrink)が1行目で素通りして**タイルが消える**。
+    //   実配信 lv351091198 で「サムネが減る」として観測(速報: shrinkDetected=1/provisionalFalse=1)。
+    syncStorySourceEntries(latestLv, displayEntries, storageRowsForLane, { provisional: true });
     try {
       laneStoreInstance.setCandidates(
         latestLv,

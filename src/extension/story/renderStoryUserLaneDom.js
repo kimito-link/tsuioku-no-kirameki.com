@@ -134,7 +134,11 @@ export function getStoryUserLaneYukkuriNamedCensusState() {
 export function shouldKeepStoryUserLaneTilesOnEmpty(els, currentLiveId, lastTiledLid) {
   const cur = String(currentLiveId || '').trim().toLowerCase();
   const last = String(lastTiledLid || '').trim().toLowerCase();
-  if (!cur || cur !== last) return false; // 配信切替 or 未描画=畳んでよい
+  // ★v0.1.1233(穴3): cur が空('')は「配信切替」ではなく「URL不明」。
+  //   popup-entry.js の `if (!hasWatch) syncStorySourceEntries('', [])` で空になる窓が実在し、
+  //   ここで畳むと同一配信なのにタイルが消える(lane-tiles-vanish-MAP.md §1.4)。
+  if (!last) return false; // 一度も描いていない=守るものが無い
+  if (cur && cur !== last) return false; // 本物の配信切替=畳んでよい
   const lanes = els ? [els.laneLink, els.laneGift, els.laneAd, els.laneKonta, els.laneTanu] : [];
   for (const lane of lanes) {
     if (lane && typeof lane.childElementCount === 'number' && lane.childElementCount > 0) return true;
@@ -142,8 +146,52 @@ export function shouldKeepStoryUserLaneTilesOnEmpty(els, currentLiveId, lastTile
   return false; // 実タイルが1つも無い=畳んでよい(真の空)
 }
 
-/** 縮小上書きを見送る閾値。今回タイル数が前回 DOM 実タイル数のこの割合を下回ったら「暫定縮小」とみなす。 */
-export const STORY_USER_LANE_SHRINK_KEEP_RATIO = 0.6;
+/**
+ * keep が続きすぎたときの非常口(出口4)。同一配信で keep がこの時間だけ連続したら、
+ * 縮小でも描く(永久 stale を防ぐ)。
+ * ★10分の根拠: 大配信の backfill は分単位で続く(実測: 取り込み20%・残640件)ため短すぎると
+ *   症状が再発する。不変条件は「stale > 縮小」を選好するので長めに倒す。
+ */
+export const STORY_USER_LANE_SHRINK_KEEP_MAX_MS = 10 * 60 * 1000;
+
+/**
+ * keep 連続時間を測る時計の初期状態。
+ * @returns {{ lid: string, firstKeptAtMs: number }}
+ */
+export function makeLaneShrinkKeepClock() {
+  // keeping=false のとき firstKeptAtMs は無意味。0 を「未計測」の番兵にすると
+  // nowMs=0 で時計が始まらないため、明示フラグで持つ(番兵値を使わない)。
+  return { lid: '', firstKeptAtMs: 0, keeping: false };
+}
+
+/**
+ * keep 判定のたびに呼ぶ。同一配信で keep が MAX_MS を超えて連続したら true(=非常口を開く)。
+ *   - wouldKeep=false(描けた) → 時計リセット。
+ *   - lid が変わった → 仕切り直し(前配信の経過を持ち込まない)。
+ * @param {{ lid: string, firstKeptAtMs: number }} clock
+ * @param {{ liveId?: unknown, wouldKeep: boolean, nowMs: number }} args
+ * @returns {boolean} true=期限切れ(keep を解除して描く)
+ */
+export function laneShrinkKeepExpired(clock, args) {
+  if (!clock || typeof clock !== 'object') return false;
+  const lid = String(args?.liveId ?? '').trim().toLowerCase();
+  const now = Number(args?.nowMs) || 0;
+  if (args?.wouldKeep !== true) {
+    // 描けた=守る必要が無くなった。次の keep から測り直す。
+    clock.lid = lid;
+    clock.firstKeptAtMs = 0;
+    clock.keeping = false;
+    return false;
+  }
+  if (lid !== clock.lid || clock.keeping !== true) {
+    // keep の始まり(または配信切替で仕切り直し)。
+    clock.lid = lid;
+    clock.firstKeptAtMs = now;
+    clock.keeping = true;
+    return false;
+  }
+  return now - clock.firstKeptAtMs > STORY_USER_LANE_SHRINK_KEEP_MAX_MS;
+}
 
 /**
  * 描画単調性ガード(HANDOFF-heavyrace-backfill-IMPL.md A・heavyRace再発の即効対策)。
@@ -174,7 +222,9 @@ export function shouldKeepStoryUserLaneTilesOnShrink(
   if (entriesProvisional !== true) return false; // settled な正当減少は必ず描く
   const cur = String(currentLiveId || '').trim().toLowerCase();
   const last = String(lastTiledLid || '').trim().toLowerCase();
-  if (!cur || cur !== last) return false; // 配信切替 or 未描画=描いてよい
+  // ★v0.1.1233(穴3): cur が空('')は「配信切替」ではなく「URL不明」(OnEmpty と同じ理由)。
+  if (!last) return false; // 一度も描いていない=守るものが無い
+  if (cur && cur !== last) return false; // 本物の配信切替=描いてよい
   const lanes = els ? [els.laneLink, els.laneGift, els.laneAd, els.laneKonta, els.laneTanu] : [];
   let prev = 0;
   for (const lane of lanes) {
@@ -182,8 +232,11 @@ export function shouldKeepStoryUserLaneTilesOnShrink(
   }
   if (prev <= 0) return false; // 前回タイル無し=守るものが無い
   const next = Math.max(0, Math.floor(Number(nextTileCount) || 0));
-  // 今回が前回の 60% 未満=暫定縮小=見送る。60% 以上(微減/同数/増加)は描く。
-  return next < Math.floor(prev * STORY_USER_LANE_SHRINK_KEEP_RATIO);
+  // ★v0.1.1233 契約変更: 旧「前回の60%未満なら見送る」→「1枚でも減ったら見送る」。
+  //   根拠: 名簿キーパー(v0.1.1232)でユーザー段 picked は同一配信内で単調増加になったため、
+  //   暫定供給の縮小は「正当な減少」ではなく常に「供給が不完全」を意味する。
+  //   同数・増加は描く(内容更新を止めない)。永久 stale は laneShrinkKeepExpired が防ぐ。
+  return next < prev;
 }
 
 /**

@@ -109,6 +109,44 @@ describe('applyLaneRosterKeeper', () => {
     expect(st.rows.size).toBe(1);
   });
 
+  // ★v0.1.1233(穴3): lid='' は「配信が変わった」ではなく「URL不明」。
+  //   popup-entry.js:8989 の `if (!hasWatch) syncStorySourceEntries('', [])` で
+  //   liveId が空になる窓が実在し、そこで名簿を全消去すると
+  //   「同一配信なのにサムネが減る」が起きる(lane-tiles-vanish-MAP.md §1.4 穴3)。
+  it("lid空('')では名簿をリセットしない(不明は切替ではない)", () => {
+    const st = makeLaneRosterKeeperState();
+    applyLaneRosterKeeper(st, { liveId: 'lv1', candidates: [row('a'), row('b'), row('c')] });
+    applyLaneRosterKeeper(st, { liveId: '', candidates: [] });
+    // 名簿が生き残っていること(ここが消えると次のpaintで人が消える)。
+    expect(st.rows.size).toBe(3);
+    expect(st.lid).toBe('lv1');
+  });
+
+  it("lid空('')+空candidatesでも名簿全員がmergedに載る(pickedが保たれる)", () => {
+    const st = makeLaneRosterKeeperState();
+    applyLaneRosterKeeper(st, { liveId: 'lv1', candidates: [row('a'), row('b'), row('c')] });
+    const r = applyLaneRosterKeeper(st, { liveId: '', candidates: [] });
+    expect(uids(r.merged).sort()).toEqual(['a', 'b', 'c']);
+    expect(r.revivedCount).toBe(3);
+  });
+
+  it("lid空('')を挟んでも、その後の同一配信で名簿が継続する", () => {
+    const st = makeLaneRosterKeeperState();
+    applyLaneRosterKeeper(st, { liveId: 'lv1', candidates: [row('a'), row('b')] });
+    applyLaneRosterKeeper(st, { liveId: '', candidates: [] }); // 谷間(watch取得失敗)
+    const r = applyLaneRosterKeeper(st, { liveId: 'lv1', candidates: [row('c')] });
+    // 谷間の前後で人が消えない。
+    expect(uids(r.merged).sort()).toEqual(['a', 'b', 'c']);
+  });
+
+  it('本物のlid切替では従来どおり名簿を作り直す(空以外は切替)', () => {
+    const st = makeLaneRosterKeeperState();
+    applyLaneRosterKeeper(st, { liveId: 'lv1', candidates: [row('a'), row('b')] });
+    const r = applyLaneRosterKeeper(st, { liveId: 'lv2', candidates: [row('z')] });
+    expect(uids(r.merged)).toEqual(['z']);
+    expect(st.rows.size).toBe(1);
+  });
+
   it('壊れた入力でも落ちない(candidates非配列・null要素)', () => {
     const st = makeLaneRosterKeeperState();
     const r = applyLaneRosterKeeper(st, { liveId: 'lv1', candidates: /** @type {any} */ (null) });

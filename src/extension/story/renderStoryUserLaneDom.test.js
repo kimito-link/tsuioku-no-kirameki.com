@@ -6,7 +6,9 @@ import {
   resetStoryUserLaneDom,
   shouldKeepStoryUserLaneTilesOnEmpty,
   shouldKeepStoryUserLaneTilesOnShrink,
-  STORY_USER_LANE_SHRINK_KEEP_RATIO
+  makeLaneShrinkKeepClock,
+  laneShrinkKeepExpired,
+  STORY_USER_LANE_SHRINK_KEEP_MAX_MS
 } from './renderStoryUserLaneDom.js';
 
 /**
@@ -182,6 +184,18 @@ describe('shouldKeepStoryUserLaneTilesOnEmpty', () => {
   it('配信切替(liveId 不一致)なら keep=false(畳む=古い配信を残さない)', () => {
     expect(shouldKeepStoryUserLaneTilesOnEmpty(elsWithTanu(2), 'lv2', 'lv1')).toBe(false);
   });
+  // ★v0.1.1233(穴3): lid='' は「切替」ではなく「URL不明」。
+  //   popup-entry.js の `if (!hasWatch) syncStorySourceEntries('', [])` で空になる窓が実在し、
+  //   ここで畳むと「同一配信なのにサムネが減る」(lane-tiles-vanish-MAP.md §1.4 穴3)。
+  it("lid空('')は切替扱いしない: タイルがあれば keep=true(no-url谷間で畳まない)", () => {
+    expect(shouldKeepStoryUserLaneTilesOnEmpty(elsWithTanu(2), '', 'lv1')).toBe(true);
+  });
+  it("lid空('')でも実タイルが無ければ keep=false(真の空は畳む)", () => {
+    expect(shouldKeepStoryUserLaneTilesOnEmpty(makeEls(), '', 'lv1')).toBe(false);
+  });
+  it("一度も描いていない(last空)なら keep=false(守るものが無い)", () => {
+    expect(shouldKeepStoryUserLaneTilesOnEmpty(elsWithTanu(2), 'lv1', '')).toBe(false);
+  });
   it('タイルが1つも無ければ keep=false(真の空は畳む)', () => {
     expect(shouldKeepStoryUserLaneTilesOnEmpty(makeEls(), 'lv1', 'lv1')).toBe(false);
   });
@@ -222,22 +236,95 @@ describe('shouldKeepStoryUserLaneTilesOnShrink', () => {
     expect(shouldKeepStoryUserLaneTilesOnShrink(makeEls(), 'lv1', 'lv1', 0, true)).toBe(false);
   });
 
-  it('微減(200→190=95%)は keep=false(60%以上は描く)', () => {
-    expect(shouldKeepStoryUserLaneTilesOnShrink(elsWithTiles(200), 'lv1', 'lv1', 190, true)).toBe(false);
+  // ★v0.1.1233 契約変更(lane-tiles-vanish-SPEC.md §2-B):
+  //   旧「微減(200→190=95%)は keep=false(60%以上は描く)」を反転する。
+  //   根拠: 名簿キーパー(v0.1.1232)でユーザー段 picked は同一配信内で単調増加になった。
+  //   暫定供給の縮小は「正当な減少」ではなく常に「供給が不完全」を意味する。
+  //   ユーザー確定の不変条件では 95% は「微減だから許す」ではなく「5%の人が消えた」。
+  it('微減(200→199)でも暫定中は keep=true(名簿導入後は1枚の減も供給不完全のしるし)', () => {
+    expect(shouldKeepStoryUserLaneTilesOnShrink(elsWithTiles(200), 'lv1', 'lv1', 199, true)).toBe(true);
+  });
+
+  it('同数(200→200)は keep=false(減っていないので描く=内容更新を止めない)', () => {
+    expect(shouldKeepStoryUserLaneTilesOnShrink(elsWithTiles(200), 'lv1', 'lv1', 200, true)).toBe(false);
   });
 
   it('増加(200→260)は keep=false(増える方向は当然描く)', () => {
     expect(shouldKeepStoryUserLaneTilesOnShrink(elsWithTiles(200), 'lv1', 'lv1', 260, true)).toBe(false);
   });
 
-  it('境界(prev=100・ratio0.6): next=59→keep true / next=60→false', () => {
-    expect(Math.floor(100 * STORY_USER_LANE_SHRINK_KEEP_RATIO)).toBe(60);
-    expect(shouldKeepStoryUserLaneTilesOnShrink(elsWithTiles(100), 'lv1', 'lv1', 59, true)).toBe(true);
-    expect(shouldKeepStoryUserLaneTilesOnShrink(elsWithTiles(100), 'lv1', 'lv1', 60, true)).toBe(false);
+  it("lid空('')は切替扱いしない: 暫定+縮小なら keep=true(リセット窓でタイルを守る)", () => {
+    expect(shouldKeepStoryUserLaneTilesOnShrink(elsWithTiles(200), '', 'lv1', 10, true)).toBe(true);
+  });
+
+  // ★v0.1.1233: 旧「境界(prev=100・ratio0.6): next=59→keep true / next=60→false」は削除した。
+  //   STORY_USER_LANE_SHRINK_KEEP_RATIO 定数そのものを廃止したため、そのテストは
+  //   存在しない定数を検証する形になり維持できない(削除理由の記録)。
+  //   新しい境界(1枚差)は直上の「微減(200→199)」「同数(200→200)」が担保する。
+  it('境界(1枚差): next=prev-1→keep true / next=prev→false', () => {
+    expect(shouldKeepStoryUserLaneTilesOnShrink(elsWithTiles(100), 'lv1', 'lv1', 99, true)).toBe(true);
+    expect(shouldKeepStoryUserLaneTilesOnShrink(elsWithTiles(100), 'lv1', 'lv1', 100, true)).toBe(false);
   });
 
   it('lv正規化(前後空白/大小)して比較', () => {
     expect(shouldKeepStoryUserLaneTilesOnShrink(elsWithTiles(100), ' LV1 ', 'lv1', 10, true)).toBe(true);
+  });
+});
+
+describe('laneShrinkKeepExpired(keep の時間上限=出口4・永久staleを防ぐ非常口)', () => {
+  it('初回 keep で時計が始まり、MAX_MS 以内は false(まだ守る)', () => {
+    const clock = makeLaneShrinkKeepClock();
+    expect(laneShrinkKeepExpired(clock, { liveId: 'lv1', wouldKeep: true, nowMs: 1000 })).toBe(false);
+    expect(
+      laneShrinkKeepExpired(clock, {
+        liveId: 'lv1',
+        wouldKeep: true,
+        nowMs: 1000 + STORY_USER_LANE_SHRINK_KEEP_MAX_MS - 1
+      })
+    ).toBe(false);
+  });
+
+  it('同一lvで keep が MAX_MS 超で連続したら true(縮小でも描く非常口)', () => {
+    const clock = makeLaneShrinkKeepClock();
+    laneShrinkKeepExpired(clock, { liveId: 'lv1', wouldKeep: true, nowMs: 1000 });
+    expect(
+      laneShrinkKeepExpired(clock, {
+        liveId: 'lv1',
+        wouldKeep: true,
+        nowMs: 1000 + STORY_USER_LANE_SHRINK_KEEP_MAX_MS + 1
+      })
+    ).toBe(true);
+  });
+
+  it('途中で wouldKeep=false(描けた)なら時計はリセットされる', () => {
+    const clock = makeLaneShrinkKeepClock();
+    laneShrinkKeepExpired(clock, { liveId: 'lv1', wouldKeep: true, nowMs: 1000 });
+    laneShrinkKeepExpired(clock, { liveId: 'lv1', wouldKeep: false, nowMs: 2000 });
+    // 描けた時点で仕切り直し=ここから MAX_MS 計り直し。
+    expect(
+      laneShrinkKeepExpired(clock, {
+        liveId: 'lv1',
+        wouldKeep: true,
+        nowMs: 2000 + STORY_USER_LANE_SHRINK_KEEP_MAX_MS - 1
+      })
+    ).toBe(false);
+  });
+
+  it('lv が変わったら時計は仕切り直し(前配信の経過を持ち込まない)', () => {
+    const clock = makeLaneShrinkKeepClock();
+    laneShrinkKeepExpired(clock, { liveId: 'lv1', wouldKeep: true, nowMs: 1000 });
+    expect(
+      laneShrinkKeepExpired(clock, {
+        liveId: 'lv2',
+        wouldKeep: true,
+        nowMs: 1000 + STORY_USER_LANE_SHRINK_KEEP_MAX_MS + 1
+      })
+    ).toBe(false);
+  });
+
+  it('wouldKeep=false のときは常に false(描くべき場面で非常口は関係ない)', () => {
+    const clock = makeLaneShrinkKeepClock();
+    expect(laneShrinkKeepExpired(clock, { liveId: 'lv1', wouldKeep: false, nowMs: 9_999_999 })).toBe(false);
   });
 });
 
