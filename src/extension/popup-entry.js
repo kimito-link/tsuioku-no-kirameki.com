@@ -658,6 +658,8 @@ import {
 } from '../lib/storyUserLaneRenderProbe.js';
 // v0.1.1231 Phase1: レーンの人物集合の増減(誰が消えたか)を測る計器。観測のみ。
 import { makeLaneRosterDeltaState, noteLaneRoster, snapshotLaneRosterDelta } from '../lib/laneRosterDelta.js';
+// v0.1.1232 lane-never-drop: 「一度出た人」を覚える名簿(Phase2 蓄積器)。計器とは別モジュール。
+import { applyLaneRosterKeeper, makeLaneRosterKeeperState } from '../lib/laneRosterKeeper.js';
 // 人物タイルの ID 行・名前行の正本(person-tile-unify 第3コミット)。popup と会場で共有。
 import { storyUserLaneMetaLines } from '../lib/storyUserLaneMeta.js';
 import { anonymousIdenticonDataUrl } from '../lib/anonymousIdenticon.js';
@@ -970,9 +972,14 @@ const TOOLBAR_POPUP = _inlineFlags.toolbar;
 const INLINE_EMBED_WATCH = _inlineFlags.embedWatch;
 const INLINE_SIDE_PANEL = _inlineFlags.sidePanel;
 const INLINE_PASSIVE = _inlineFlags.passive;
-// 2026-07-14(会場モード改修 Patch 2): INLINE応援レーンの表示上限(v0.1.1051以前の48へ差し戻し)。
-//   publishLaneMirror()の鏡capも必ず同じ値に追随させること(limitと鏡capの分離はv0.1.1052の実績地雷)。
+// v0.1.1232(lane-never-drop): ①レーンの上限撤廃に伴い、この定数は③鏡(publishLaneMirror)の cap 専用。
+//   ①③は非対称だが v0.1.1052 型の「黙った不一致」にはならない(差分はフッターが「ほか M人」と宣言)。
+//   ★鏡は 512KB 超で cap 半減が発動し「かえって人が減る」ため安易に上げない(実測 1人=実名235B/匿名158B)。
 const STORY_USER_LANE_INLINE_LIMIT = 48;
+// v0.1.1232 lane-never-drop: ①の表示上限は撤廃(ユーザー確定「1度出た人はずっと出る」)。
+//   Infinity は slice(0, Infinity) で全件通過=契約(storyUserLaneBuckets.test.js で固定)。
+//   ★48へ戻すと laneNeverDrop.integration.test.js の自己証明ケースが赤くなる。
+const STORY_USER_LANE_LIMIT_UNLIMITED = Number.POSITIVE_INFINITY;
 // 2026-06-23: 応援ライブビュー専用タブに popup を全面 iframe 埋め込みするモード(dock=liveview)。
 //   挙動は INLINE_PASSIVE(受動ビュー)に集約済み=ここでは将来の全画面 CSS フック用のクラス付けにだけ使う。
 const INLINE_EMBED_LIVEVIEW = _inlineFlags.embedLiveView;
@@ -6397,6 +6404,8 @@ let storyUserLaneLastRenderSig = '';
 let _storyUserLaneLastTiledLid = '';
 /** v0.1.1231 Phase1: 人物集合の増減を測る計器の状態(観測のみ)。 */
 const _laneRosterDeltaState = makeLaneRosterDeltaState();
+/** v0.1.1232 Phase2: 「一度出た人」を覚える名簿(描画に使う・計器とは別物)。 */
+const _laneRosterKeeperState = makeLaneRosterKeeperState();
 /** renderStoryAvatarDiag の同内容再描画を抑止（診断パネルのチカつき抑制） */
 let storyAvatarDiagLastRenderSig = '';
 
@@ -6711,9 +6720,10 @@ function renderStoryUserLane() {
     return;
   }
 
-  // 2026-07-14(会場改修 Patch2): 200→48へ差し戻し。★STORY_USER_LANE_INLINE_LIMIT と
-  //   publishLaneMirror() の鏡 cap は必ずセットで変更(v0.1.1052で①211≠③99を起こした地雷)。
-  const limit = INLINE_MODE ? STORY_USER_LANE_INLINE_LIMIT : 24;
+  // v0.1.1232 lane-never-drop: 表示上限を撤廃(旧 INLINE_MODE?48:24)。上限こそが「消失の実行者」で、
+  //   新規上位者が入るたび下位の既存者が押し出されていた(522人中48人=474人が黙って隠れた・MAP §4.2)。
+  //   狭い popup も同じ不変条件の対象=溢れは .nl-main のスクロールが受ける。
+  const limit = STORY_USER_LANE_LIMIT_UNLIMITED;
   const seen = new Set();
   const liveId = String(STORY_SOURCE_STATE.liveId || '');
   const laneScheme = getStoryColorScheme();
@@ -6852,12 +6862,20 @@ function renderStoryUserLane() {
   STORY_AVATAR_DIAG_STATE.userLaneStrongNick = laneDiagStrongNick;
   STORY_AVATAR_DIAG_STATE.userLanePersonalThumb = laneDiagPersonalThumb;
 
-  candidates.sort(compareStoryUserLaneCandidates);
+  // v0.1.1232 lane-never-drop Phase2: 「一度出た人」を名簿から復活合流させる。上限撤廃だけでは
+  //   「候補集合そのものから人が落ちた」場合に消える(候補は毎paint再構築=名簿が唯一の記憶・MAP §4.1)。
+  //   ★必ず sort の前。後に足すと復活行が段末尾に固まり表示順契約(popup=venue)を壊す(SPEC §7-1)。
+  const { merged: rosteredCandidates } = applyLaneRosterKeeper(_laneRosterKeeperState, {
+    liveId: STORY_SOURCE_STATE.liveId,
+    candidates
+  });
 
-  const buckets = bucketStoryUserLanePicks(candidates, limit);
+  rosteredCandidates.sort(compareStoryUserLaneCandidates);
+
+  const buckets = bucketStoryUserLanePicks(rosteredCandidates, limit);
   const picked = flattenStoryUserLaneBuckets(buckets);
   // v0.1.1231 Phase1 計器: 誰が消えたかを測る(挙動不変・個数だけでは入れ替わりが見えないため)。
-  noteLaneRoster(_laneRosterDeltaState, { liveId: STORY_SOURCE_STATE.liveId, picks: picked, candidateTotal: candidates.length });
+  noteLaneRoster(_laneRosterDeltaState, { liveId: STORY_SOURCE_STATE.liveId, picks: picked, candidateTotal: rosteredCandidates.length });
   const giftPicks = Array.isArray(STORY_SOURCE_STATE.giftThrowerPicks)
     ? STORY_SOURCE_STATE.giftThrowerPicks
     : [];
@@ -6918,11 +6936,10 @@ function renderStoryUserLane() {
   }
 
   const laneDisplayedTotal = picked.length + buckets.gift.length + buckets.ad.length;
-  // 2026-07-14(会場モード改修 Patch 2): limit を48へ差し戻し。
-  //   素性が取れた候補総数(cap 前)を渡し、limit で切られたぶんは「いま N件を表示中(ほか M人・
-  //   直近アクティブ順)」と誠実に併記する(Patch 1でフッター文言を全員表示前提から差し替え済み・黙って切らない)。
+  // 2026-07-14(Patch 2): 候補総数を渡し、切られたぶんは「ほか M人」と誠実に併記する(黙って切らない)。
+  //   ★v0.1.1232: ①は上限撤廃で通常「ほか M人」は出ない(全員表示)が、器は③鏡(cap 48)の宣言に必要。
   paintStoryUserLaneDomFilled(els, faces, buckets, laneDisplayedTotal, laneDomIo, {
-    totalCandidates: candidates.length
+    totalCandidates: rosteredCandidates.length
   });
   // C1: paint と同じ同期フレームで①実DOMを測り、後段の鏡publishへ渡す(TOCTOU防止)。
   const laneDomSelf = measureLaneDomSelf(els);
@@ -6943,13 +6960,15 @@ function renderStoryUserLane() {
     try { dismissInitialLoadShade(); } catch { /* no-op */ }
   }
   // 2026-06-22(council/lane-show-all-active): 健全度パネル「応援レーン」セル用に、人数整合の純観測値を
-  //   storage へ(素性が取れた人 candidates.length / レーンに出した人 picked.length / 上限 limit)。
+  //   storage へ(素性が取れた人 rosteredCandidates.length / レーンに出した人 picked.length / 上限 limit)。
   //   venueSeatsDiag と同型(min-gap・best-effort・記録/描画は触らない)。
+  //   ★v0.1.1232: identified は名簿復活者を含む(帳簿を1本に保つ)。limit は Infinity を JSON 化すると
+  //     null になるため 0(=無制限)で報告する(laneDiag.js の typedef 参照)。
   publishLaneDiag({
     liveId,
-    identified: candidates.length,
+    identified: rosteredCandidates.length,
     laneShown: picked.length,
-    limit,
+    limit: Number.isFinite(limit) ? limit : 0,
     // ★v0.1.1048 Phase0: この描画1回の所要ms(全員表示の重さ判定用・観測のみ)。
     paintMs: Math.round(
       ((typeof performance !== 'undefined' ? performance.now() : Date.now()) - _laneRenderT0) * 10
@@ -6966,7 +6985,8 @@ function renderStoryUserLane() {
     buckets,
     domSelf: laneDomSelf,
     pickedLength: laneDisplayedTotal,
-    totalCandidates: candidates.length
+    // ★v0.1.1232: 名簿復活者を含む総数。③は cap 48 で切るため差分は鏡フッターが宣言する。
+    totalCandidates: rosteredCandidates.length
   });
   setTimeout(() => {
     if (typeof window !== 'undefined' && window.__NLS_LANE_DIAG__) {

@@ -12,7 +12,7 @@
  *   liveId: string,           // 観測した配信(空=未観測)
  *   identified: number,       // 素性(userId)が取れた候補の総数(cap 前)= bucketStoryUserLanePicks 入力数
  *   laneShown: number,        // popup レーンに実際に並べた数(cap 後・gift/ad 除く)
- *   limit: number,            // その時点の表示上限(INLINE_MODE?48:24)
+ *   limit: number,            // 表示上限。★v0.1.1232(lane-never-drop)以降は 0=無制限(旧 INLINE_MODE?48:24)
  *   paintMs: number,          // ★v0.1.1048 Phase0: renderStoryUserLane 1回の所要ms(全員表示の重さ判定用・0=未計測)
  *   lastUpdateAt: number      // 最後にレーンを描いた時刻(epoch ms・0=未更新)
  * }} LaneDiagState

@@ -226,8 +226,14 @@ export default [
     //   診断カウンタchurn根治(2026-07-14 diagnostic-architecture-strengthen-DESIGN.md C-3)で単調ゲート
     //   のグルー(判定純関数は storyDiagMonotonic.js に隔離・popup側は3関所への適用+forget呼び出しのみ)。
     //   実測22034。ラチェットは実測+50の22084へ。
+    //   lane-never-drop(2026-08-02・v0.1.1232): 応援レーンの表示上限48を撤廃し、「一度出た人」を
+    //   名簿から復活合流させる配線を追加(ユーザー確定の不変条件「1度出た人はずっと出る」)。
+    //   純関数の名簿ロジックは src/lib/laneRosterKeeper.js にテスト付きで隔離済み=popup 側は
+    //   import/state/呼び出しの最小フック6行のみ。残りは既存コメントの契約更新
+    //   (limit と鏡cap の関係が①③非対称に変わったため、旧「必ずセットで変更」注記を書き換え)。
+    //   実測22104。ラチェットは実測+50の22154へ。
     files: ['src/extension/popup-entry.js'],
-    rules: { 'max-lines': ['error', { max: 22084, skipBlankLines: false, skipComments: false }] }
+    rules: { 'max-lines': ['error', { max: 22154, skipBlankLines: false, skipComments: false }] }
   },
   {
     files: ['src/extension/popup/**/*.js'],
