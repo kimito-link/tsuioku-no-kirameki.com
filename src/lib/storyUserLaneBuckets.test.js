@@ -62,4 +62,31 @@ describe('bucketStoryUserLanePicks', () => {
     const b = bucketStoryUserLanePicks(sorted, 2);
     expect(b.link.map((x) => x.id)).toEqual(['first', 'second']);
   });
+
+  // v0.1.1232 lane-never-drop: 表示上限の撤廃は maxTotal=Infinity で表現する。
+  //   Math.max(0, Math.floor(Number(Infinity)||0)) === Infinity / slice(0, Infinity) は全件。
+  //   ★これは実装の偶然ではなく「契約」なので、ここで固定する(退行検知)。
+  it('maxTotal=Infinity で全候補を返す(切り捨てゼロ・段の順序は不変)', () => {
+    const sorted = [
+      ...Array.from({ length: 300 }, (_, i) => t(3, `link${i}`)),
+      ...Array.from({ length: 200 }, (_, i) => t(2, `konta${i}`)),
+      ...Array.from({ length: 100 }, (_, i) => t(1, `tanu${i}`))
+    ];
+    const b = bucketStoryUserLanePicks(sorted, Number.POSITIVE_INFINITY);
+    expect(b.link).toHaveLength(300);
+    expect(b.konta).toHaveLength(200);
+    expect(b.tanu).toHaveLength(100);
+    expect(flattenStoryUserLaneBuckets(b)).toHaveLength(600);
+    // 段の順序(link→konta→tanu)と段内順序は不変。
+    expect(b.link[0].id).toBe('link0');
+    expect(b.tanu[99].id).toBe('tanu99');
+  });
+
+  it('有限maxTotalの既存挙動は不変(回帰)', () => {
+    const sorted = [t(3, 'a'), t(3, 'b'), t(2, 'c'), t(1, 'd')];
+    const b = bucketStoryUserLanePicks(sorted, 3);
+    expect(b.link.map((x) => x.id)).toEqual(['a', 'b']);
+    expect(b.konta.map((x) => x.id)).toEqual(['c']);
+    expect(b.tanu).toEqual([]);
+  });
 });
