@@ -93,7 +93,11 @@ export function applyLaneRosterKeeper(state, args) {
     const lid = String(args?.liveId ?? '').trim().toLowerCase();
 
     // 配信が変わったら名簿をリセット(ユーザーが別番組へ移った=正当な切替)。
-    if (lid !== state.lid) {
+    // ★v0.1.1233(穴3): lid が空('')は「切替」ではなく「URL不明」。
+    //   popup-entry.js の `if (!hasWatch) syncStorySourceEntries('', [])` で liveId が空になる
+    //   窓が実在し、ここでリセットすると名簿が全消去→直後に取り込み途中の少ない供給で
+    //   作り直され「同一配信なのにサムネが減る」。空は state.lid を保持して復活合流へ落とす。
+    if (lid && lid !== state.lid) {
       state.lid = lid;
       state.rows = new Map();
       for (const row of candidates) {
