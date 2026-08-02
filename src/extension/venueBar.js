@@ -1,6 +1,12 @@
 // venueBar.js — 会場モード UI 本体。観客の席割り・群衆・吹き出し・ギフト演出・読み上げ連動を描く。
 import { isGenericComeviewName } from '../lib/comeviewRows.js';
 import {
+  applyVenuePickupView,
+  buildVenuePickupView,
+  createVenuePickupBanner
+} from '../lib/venuePickupBanner.js';
+import { pickTickerHighlightEntry } from '../lib/pickTickerHighlight.js';
+import {
   buildVenueSeating,
   collectAudienceFaceUserIds,
   hasRealThumbnail,
@@ -523,6 +529,46 @@ const VENUE_CSS = `
   .nlsb-toggle:focus-visible {
     outline: 2px solid #8dc8ff;
     outline-offset: 2px;
+  }
+  /* v0.1.1230 ピックアップ枠(BSP風): 会場ヘッダー直下に常設。高さを先に確保して
+     出たり消えたりで下の段が動かないようにする(ユーザー報告「上下に動く」の対策と同趣旨)。 */
+  .nlsb-pickup {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 34px;
+    margin: 4px 0 6px;
+    padding: 6px 10px;
+    border-radius: 8px;
+    border: 1px solid rgba(255, 190, 90, 0.55);
+    background: linear-gradient(90deg, rgba(255, 176, 62, 0.22), rgba(255, 176, 62, 0.06));
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.18);
+    font-size: 13px;
+    line-height: 1.35;
+  }
+  .nlsb-pickup[data-empty='1'] { opacity: 0.55; }
+  .nlsb-pickup__badge {
+    flex: 0 0 auto;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    padding: 2px 6px;
+    border-radius: 999px;
+    background: rgba(255, 152, 0, 0.9);
+    color: #fff;
+  }
+  .nlsb-pickup__body {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-weight: 600;
+  }
+  .nlsb-pickup__meta {
+    flex: 0 0 auto;
+    font-size: 11px;
+    opacity: 0.75;
   }
   .nlsb-stage {
     position: fixed;
@@ -2380,8 +2426,13 @@ export function mountVenueBarButton(options = {}) {
   charFrameLayer.className = 'nlsb-charframe';
   charFrameLayer.setAttribute('aria-hidden', 'true');
 
-  // seating は下端のひな壇だけ(header + seats)。
-  seating.append(header, topBar, seatsHost);
+  // v0.1.1230: ピックアップ枠(BSP風)。会場ヘッダーの直下=いま見ている場所に常設で置く。
+  //   ★①POPのticker(「応援 N コメント」の右)だとスクロール外で目に入らず、
+  //     「埋もれるコメントを拾う」のに拾った先がまた埋もれていた(ユーザー報告)。
+  //   DOM は一度作ったら remove しない(churn地雷対策)。中身の差し替えだけで進行する。
+  const pickupEls = createVenuePickupBanner(document);
+  // seating は下端のひな壇だけ(header + pickup + seats)。
+  seating.append(header, pickupEls.root, topBar, seatsHost);
   // center は CSS で display:none(撤去)だが、互換のため DOM には残す。
   // 3キャラ常駐は配信画面の「まわり(左右の縁)」に出す(会場の席とは重ねない=邪魔にしない)。
   //   stageLayout 基準=映像セーフエリアの高さに合わせて左右に配置できる。
@@ -4542,6 +4593,13 @@ export function mountVenueBarButton(options = {}) {
     );
     lastGoodRows = resolved.nextLastGood;
     renderSeats(resolved.rows);
+    // v0.1.1230: ピックアップ枠を更新。①POPと【同一の純関数】で選ぶので、
+    //   7秒バケットが同じなら同じ1件になる(画面ごとに違うものが出ない)。
+    //   diff-skip 済み=同じ内容なら DOM を書き換えない。
+    try {
+      const picked = pickTickerHighlightEntry(resolved.rows, Date.now());
+      applyVenuePickupView(pickupEls, buildVenuePickupView(picked));
+    } catch { /* 枠の更新失敗は席の描画を止めない */ }
   };
 
   /**

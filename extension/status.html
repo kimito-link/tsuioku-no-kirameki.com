@@ -73,6 +73,13 @@
         border-bottom: 1px solid var(--nl-border);
         padding-bottom: 10px;
         margin-bottom: 14px;
+        /* ★v0.1.1230(ユーザー報告「共有ボタンが上下に動く」): ヘッダーは
+           「最終更新 …(更新Nms / 内訳…)⏳N秒前の値(混雑中…)」が更新のたびに伸縮し、
+           flex-wrap で2行↔3行に折り返す=下の共有ボタンが押し上げ/押し下げされていた。
+           あらかじめ2行ぶんの高さを確保して、文言が伸びてもレイアウトを動かさない。
+           (min-height なので、それ以上に長い場合は従来どおり伸びる=情報は隠さない) */
+        min-height: 3.4em;
+        align-content: flex-start;
       }
       header.status-header h1 {
         margin: 0;
@@ -447,6 +454,9 @@
       }
       /* 健全度パネル: 正常は淡い緑、異常(黄/赤)だけ目を引く。対象外は灰の「—」。 */
       section.health-panel { margin: 0 0 14px; }
+      /* ★v0.1.1230: 健全度カードは件数が更新のたびに変わり、グリッドの行数が増減して
+         下の内容が上下する。1行ぶんの高さを先に確保して土台を安定させる。 */
+      .health-cells { min-height: 4.5em; }
       .health-cells {
         display: grid;
         grid-template-columns: repeat(auto-fill, minmax(108px, 1fr));

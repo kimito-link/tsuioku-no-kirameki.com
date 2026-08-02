@@ -1300,6 +1300,34 @@
       ]
     },
     {
+      "file": "src/lib/pickLatestComment.js",
+      "featureCount": 3,
+      "features": [
+        "content",
+        "popup",
+        "venue"
+      ],
+      "labels": [
+        "記録エンジン(watchページ常駐)",
+        "ポップアップ(応援レーン)",
+        "会場モード(standalone)"
+      ]
+    },
+    {
+      "file": "src/lib/pickTickerHighlight.js",
+      "featureCount": 3,
+      "features": [
+        "content",
+        "popup",
+        "venue"
+      ],
+      "labels": [
+        "記録エンジン(watchページ常駐)",
+        "ポップアップ(応援レーン)",
+        "会場モード(standalone)"
+      ]
+    },
+    {
       "file": "src/lib/popupAvatarResolver.js",
       "featureCount": 3,
       "features": [
@@ -2875,6 +2903,18 @@
     },
     {
       "file": "src/lib/venueOpenLatency.js",
+      "featureCount": 2,
+      "features": [
+        "content",
+        "venue"
+      ],
+      "labels": [
+        "記録エンジン(watchページ常駐)",
+        "会場モード(standalone)"
+      ]
+    },
+    {
+      "file": "src/lib/venuePickupBanner.js",
       "featureCount": 2,
       "features": [
         "content",
@@ -5749,26 +5789,6 @@
     },
     {
       "file": "src/lib/pickCommentsForExport.js",
-      "featureCount": 1,
-      "features": [
-        "popup"
-      ],
-      "labels": [
-        "ポップアップ(応援レーン)"
-      ]
-    },
-    {
-      "file": "src/lib/pickLatestComment.js",
-      "featureCount": 1,
-      "features": [
-        "popup"
-      ],
-      "labels": [
-        "ポップアップ(応援レーン)"
-      ]
-    },
-    {
-      "file": "src/lib/pickTickerHighlight.js",
       "featureCount": 1,
       "features": [
         "popup"
