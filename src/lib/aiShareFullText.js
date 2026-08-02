@@ -6,6 +6,7 @@ import {
   formatLiveviewPublishSelfDiagLines,
   liveviewPublishSelfDiagToActionCards
 } from './liveviewPublishSelfDiag.js';
+import { formatLaneRosterDeltaLine } from './laneRosterDelta.js';
 import { summarizeLiveviewPublishOutcome } from './liveviewPublishOutcome.js';
 import { summarizeLiveviewPublishOutcomeRecord } from './liveviewPublishOutcomeKey.js';
 import { buildDiagnosticsTrust, formatDiagnosticsTrustLines } from './diagnosticsTrust.js';
@@ -467,6 +468,13 @@ export function buildAiShareFullText({ overviewText, livesData, fastDiag, popupD
       /* no-op: 自己診断の失敗は状態速報を壊さない */
     }
   }
+  // v0.1.1231 Phase1: レーンの人物集合の増減。★「消えた人数」が本丸(不変条件=減ってはいけない)。
+  //   来た人の累計は「上限48を撤廃したら何人になるか」の実測=上限を決める材料。
+  try {
+    const rosterSnap = (popupDiag?.popup ?? popupDiag)?.laneRosterDelta;
+    const rosterLine = formatLaneRosterDeltaLine(rosterSnap);
+    if (rosterLine) { lines.push(rosterLine); lines.push(''); }
+  } catch { /* no-op: 計器の失敗は状態速報を壊さない */ }
   // 2026-07-20 診断先行: ①POP応援レーン/投げ一覧の「クリック不能な手カーソル」実害を数えるだけの1行。
   try {
     const capLine = String((popupDiag?.popup ?? popupDiag)?.storyUserLaneClickAffordanceParity?.line || '');

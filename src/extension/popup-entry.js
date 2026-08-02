@@ -656,6 +656,8 @@ import {
   recordStoryUserLaneHeavySettle,
   snapshotStoryUserLaneRenderProbe
 } from '../lib/storyUserLaneRenderProbe.js';
+// v0.1.1231 Phase1: レーンの人物集合の増減(誰が消えたか)を測る計器。観測のみ。
+import { makeLaneRosterDeltaState, noteLaneRoster, snapshotLaneRosterDelta } from '../lib/laneRosterDelta.js';
 // 人物タイルの ID 行・名前行の正本(person-tile-unify 第3コミット)。popup と会場で共有。
 import { storyUserLaneMetaLines } from '../lib/storyUserLaneMeta.js';
 import { anonymousIdenticonDataUrl } from '../lib/anonymousIdenticon.js';
@@ -6393,6 +6395,8 @@ const STORY_AVATAR_DIAG_STATE = {
 let storyUserLaneLastRenderSig = '';
 /** v0.1.1041: 最後に実タイルを描いた liveId。同一配信 backfill 谷間の一瞬空でタイルを畳まない判定の基準(shouldKeepStoryUserLaneTilesOnEmpty)。 */
 let _storyUserLaneLastTiledLid = '';
+/** v0.1.1231 Phase1: 人物集合の増減を測る計器の状態(観測のみ)。 */
+const _laneRosterDeltaState = makeLaneRosterDeltaState();
 /** renderStoryAvatarDiag の同内容再描画を抑止（診断パネルのチカつき抑制） */
 let storyAvatarDiagLastRenderSig = '';
 
@@ -6707,10 +6711,8 @@ function renderStoryUserLane() {
     return;
   }
 
-  // 2026-07-14(会場モード改修 Patch 2): 200→48へ差し戻し(v0.1.1051以前の値)。
-  //   Patch 1で「会場=①の完成済み5段のみ描く(独自の受け皿は持たない)」に確定したため、上限自体を48へ戻す。
-  //   STORY_USER_LANE_INLINE_LIMIT と publishLaneMirror() の鏡 cap は必ずセットで変更すること
-  //   (v0.1.1052で limit と鏡 cap の分離が①211≠③99の不一致を起こした実績地雷)。
+  // 2026-07-14(会場改修 Patch2): 200→48へ差し戻し。★STORY_USER_LANE_INLINE_LIMIT と
+  //   publishLaneMirror() の鏡 cap は必ずセットで変更(v0.1.1052で①211≠③99を起こした地雷)。
   const limit = INLINE_MODE ? STORY_USER_LANE_INLINE_LIMIT : 24;
   const seen = new Set();
   const liveId = String(STORY_SOURCE_STATE.liveId || '');
@@ -6854,6 +6856,8 @@ function renderStoryUserLane() {
 
   const buckets = bucketStoryUserLanePicks(candidates, limit);
   const picked = flattenStoryUserLaneBuckets(buckets);
+  // v0.1.1231 Phase1 計器: 誰が消えたかを測る(挙動不変・個数だけでは入れ替わりが見えないため)。
+  noteLaneRoster(_laneRosterDeltaState, { liveId: STORY_SOURCE_STATE.liveId, picks: picked, candidateTotal: candidates.length });
   const giftPicks = Array.isArray(STORY_SOURCE_STATE.giftThrowerPicks)
     ? STORY_SOURCE_STATE.giftThrowerPicks
     : [];
@@ -6881,11 +6885,8 @@ function renderStoryUserLane() {
     if (countStoryUserLaneDomTiles(els) > 0) { try { dismissInitialLoadShade(); } catch { /* no-op */ } }
     return;
   }
-  // ★描画単調性ガード(HANDOFF-heavyrace-backfill-IMPL.md A-3・heavyRace再発の即効対策):
-  //   heavy未settleの暫定 supply が、一度出た完全描画(多タイル)を短い候補で上書き退化させる
-  //   (=たぬ姉段固着に見える)のを防ぐ。同一配信+暫定+大幅縮小なら paint を見送り前回描画を守る。
-  //   ★sig を更新せずに return するのが肝: settle 後の本描画は sig 不一致で必ず通る(暫定が再来しても skip 継続)。
-  //   ★DONE を記録(domTilesPainted付き): しないと started>completed で「未完走」誤診(sig-skip と同型)。
+  // ★描画単調性ガード(HANDOFF-heavyrace A-3): 暫定 supply が完全描画を短い候補で上書きするのを防ぐ。
+  //   sig を更新せず return するのが肝(settle 後は sig 不一致で必ず通る)。DONE も記録する。
   const nextTileCount = picked.length + buckets.gift.length + buckets.ad.length;
   // v0.1.1229 計器: (a)レース頻発 か (b)provisional 未設定でガード素通り かを切り分ける。
   const _prov = STORY_SOURCE_STATE.entriesProvisional;
@@ -7824,11 +7825,9 @@ async function paintStoryUserLaneCoalesced(liveId, displayEntries, storageRows) 
     );
   }
 
-  // v0.1.976(council/render-not-firing-SYNTHESIS.md・記事 role-separation-design §5): 「見せる人」を
-  //   重い storage read の後ろで餓死させない。コメント由来レーン(りんく/こん太/たぬ姉)は entries+
-  //   laneAggregates(既に手元にある)だけで描けるので、ギフト/広告列の await の【前】に1回描く。
-  //   これで render probe started>0・開いた瞬間に最初の1枚が出る。ギフト/広告列は await 解決後の
-  //   2回目の描画で載る(後段で埋まる=進行的)。read path にキャッシュは足さない(§6 地雷回避)。
+  // v0.1.976: 「見せる人」を重い storage read の後ろで餓死させない。コメント由来レーンは
+  //   手元の entries+laneAggregates だけで描けるので、ギフト/広告の await の【前】に1回描く。
+  //   ギフト/広告列は await 解決後の2回目で載る。read path にキャッシュは足さない(§6)。
   if (lid && String(STORY_SOURCE_STATE.liveId || '').trim().toLowerCase() === lid) {
     renderStoryUserLane();
     // v0.1.1227: ティッカーも「見せる人」側に含める。v0.1.1226 は renderCommentTicker を
@@ -18992,6 +18991,8 @@ async function collectAiShareDevMonitorPayloadBundle(watchUrl) {
       })(),
       // v0.1.1226: ティッカーのピックアップ計器(gift+scored=0 なら未発火と断言できる)。
       tickerPick: { ..._tickerPickDiag },
+      // v0.1.1231 Phase1: 人物集合の増減。「消えた人数」が本丸/everSeenMax は上限判断の実測。
+      laneRosterDelta: snapshotLaneRosterDelta(_laneRosterDeltaState),
       // v0.1.1215: 「積み上げ式にならずアイコンがちらちら変わる」の観測。上の churn は
       //   全消し再構築だけを数えるため、DOM枚数を変えない「中身のすり替え」を取りこぼす。
       storyGrowthCellSwap: (() => {
