@@ -62,9 +62,19 @@ describe('lane-never-drop の配線(配線忘れ=CI赤)', () => {
     expect(popupSrc).toMatch(/totalCandidates:\s*rosteredCandidates\.length/);
   });
 
-  it('鏡(会場)には有限 cap を渡している(Infinityは512KBフェイルセーフを無力化する既知地雷)', () => {
-    expect(popupSrc).toMatch(/cap:\s*STORY_USER_LANE_INLINE_LIMIT/);
+  // ★v0.1.1234: 鏡(会場)の cap も撤廃。ただし Infinity は渡さない。
+  //   laneMirror.js の 512KB フェイルセーフ(cap半減)は有限値でしか働かず、
+  //   Infinity だと Math.floor(Infinity/2)=Infinity で無力化する(既知地雷)。
+  //   実際の段の最大長(有限)を渡すことで「全員載せる」と「容量の最終防衛」を両立する。
+  it('★鏡(会場)の cap も撤廃されている(①だけ無制限で③が48だと会場が①DOM≠鏡になる)', () => {
+    // 実配信 lv351091938 で「会場のたぬ姉段 可視286 / 鏡48」を観測した退行を封じる。
+    expect(popupSrc).not.toMatch(/cap:\s*STORY_USER_LANE_INLINE_LIMIT/);
+    expect(popupSrc).toMatch(/cap:\s*laneMirrorCapFromBuckets\(/);
+  });
+
+  it('鏡の cap に Infinity を渡していない(512KBフェイルセーフを殺さない)', () => {
     expect(popupSrc).not.toMatch(/cap:\s*STORY_USER_LANE_LIMIT_UNLIMITED/);
+    expect(popupSrc).not.toMatch(/cap:\s*(Number\.POSITIVE_)?Infinity/);
   });
 
   it('laneDiag の limit は Infinity を素通しせず 0(無制限)へ落としている', () => {

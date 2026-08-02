@@ -125,6 +125,27 @@ function buildTiers(buckets, cap) {
 }
 
 /**
+ * buckets から「全段を切り捨てなく載せられる有限の cap」を求める(v0.1.1234)。
+ *
+ * ★なぜ Infinity を使わないか: buildLaneMirrorSnapshot の 512KB フェイルセーフ
+ *   (cap を半減して作り直す)は**有限値でしか働かない**。Infinity を渡すと
+ *   Math.floor(Infinity / 2) === Infinity となり半減が無力化し、超過スナップショットが
+ *   そのまま書かれる。実際の最大段長(有限)を渡せば slice は無発動のまま
+ *   「全員載せる」と「容量の最終防衛」を両立できる。
+ *
+ * @param {Record<string, unknown[]>|null|undefined} buckets
+ * @returns {number} 1以上の有限値
+ */
+export function laneMirrorCapFromBuckets(buckets) {
+  let max = 0;
+  for (const tier of LANE_MIRROR_TIERS) {
+    const arr = Array.isArray(buckets?.[tier]) ? buckets[tier] : [];
+    if (arr.length > max) max = arr.length;
+  }
+  return Math.max(1, max);
+}
+
+/**
  * storage 書き込み用の鏡スナップショット。容量超過時は cap を半減して作り直す(status を重くしない)。
  * @param {{ liveId?: unknown, buckets?: Record<string, unknown[]>, pickedLength?: unknown,
  *   totalCandidates?: unknown, domSelf?: unknown }} input
