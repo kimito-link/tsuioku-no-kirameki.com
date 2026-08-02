@@ -306,3 +306,142 @@ describe('laneMirrorCapFromBuckets — 鏡 cap の撤廃(全段を切り捨て�
     expect(snap.link.length).toBeLessThan(400);
   });
 });
+
+/**
+ * 鏡スリム化 B-2(書き手・v0.1.1235)。
+ *
+ * 【なぜ必要か】
+ * ①が生成する匿名 identicon の data URL は 1件あたり約2.5KB。これを鏡へ丸ごと
+ * 載せていたため、匿名258人で622KBとなり 512KB フェイルセーフ(cap半減)が発動し、
+ * **鏡が129人に切られていた**(実配信 lv351092763: ①POP 266 / ③WEB鏡 137)。
+ *
+ * 読み手側の復元(B-1・v0.1.1112)は既に実装済みで、displaySrc 空 + uid 有りなら
+ * anonymousIdenticonDataUrl(uid, 64) で同じ顔を再生成する。よって**書き手で落とすだけ**でよい。
+ * 構想は laneMirror.js:34-37 に「B-2」として記録されていたが未実装のまま残っていた。
+ *
+ * ★バイト完全一致のときだけ落とす(可逆)。部分一致・data:接頭辞判定は禁止=実サムネの
+ *   data URL まで消して別人化するため。
+ */
+describe('鏡スリム化 B-2(書き手が匿名 data URL を落とす・v0.1.1235)', () => {
+  /** 匿名セル(①が identicon を注入した状態)。 */
+  const anonCell = (uid) => ({
+    displaySrc: anonymousIdenticonDataUrl(uid, 64),
+    title: '',
+    meta: { idLine: '', nameLine: '' },
+    entry: { userId: uid }
+  });
+
+  it('①が生成した identicon(uid,64)とバイト一致する displaySrc だけ空に落とす', () => {
+    const snap = buildLaneMirrorSnapshot({
+      liveId: 'lv1',
+      buckets: { link: [], konta: [], tanu: [anonCell('a:abc')], gift: [], ad: [] }
+    }, { nowMs: 1 });
+    expect(snap.tanu[0].displaySrc).toBe('');
+    expect(snap.tanu[0].userId).toBe('a:abc');
+  });
+
+  it('落としたセルは鏡から消えない(uid が素性なので hasIdentity が真)', () => {
+    // ★地雷: hasIdentity を slim 後の値で判定すると、落としたセルが丸ごと捨てられる
+    //   (旧バグ=会場のgift/ad段DOM欠落の真因と同じ穴)。
+    const snap = buildLaneMirrorSnapshot({
+      liveId: 'lv1',
+      buckets: { link: [], konta: [], tanu: [anonCell('a:x'), anonCell('a:y')], gift: [], ad: [] }
+    }, { nowMs: 1 });
+    expect(snap.tanu).toHaveLength(2);
+  });
+
+  it('★往復がバイト同一: strip → 復元で①と同じ顔に戻る(可逆)', () => {
+    const uid = 'a:roundtrip';
+    const original = anonymousIdenticonDataUrl(uid, 64);
+    const snap = buildLaneMirrorSnapshot({
+      liveId: 'lv1',
+      buckets: { link: [], konta: [], tanu: [anonCell(uid)], gift: [], ad: [] }
+    }, { nowMs: 1 });
+    expect(snap.tanu[0].displaySrc).toBe(''); // 鏡には載っていない
+    expect(restoreLaneMirrorBuckets(snap).tanu[0].displaySrc).toBe(original); // 復元でバイト同一
+  });
+
+  it('★contentHash は strip の有無で変わらない(会場の scene ①=会場 ✅ を守る)', () => {
+    // hash は restoreLaneMirrorBuckets 適用後の復元正準形で署名しているため、
+    // strip は hash に影響しない。ここが崩れると会場が恒常的に偽🔴になる。
+    const uid = 'a:hash';
+    const slim = buildLaneMirrorSnapshot({
+      liveId: 'lv1', buckets: { link: [], konta: [], tanu: [anonCell(uid)], gift: [], ad: [] }
+    }, { nowMs: 1 });
+    // strip されない形(実サムネ)と比較するのではなく、復元正準形が一致することを見る。
+    expect(slim.contentHash).toBe(laneSceneContentHash(restoreLaneMirrorBuckets(slim)));
+  });
+
+  it('実サムネ(https)は落とさない', () => {
+    const snap = buildLaneMirrorSnapshot({
+      liveId: 'lv1',
+      buckets: { link: [cell('123', 'https://cdn/123.jpg')], konta: [], tanu: [], gift: [], ad: [] }
+    }, { nowMs: 1 });
+    expect(snap.link[0].displaySrc).toBe('https://cdn/123.jpg');
+  });
+
+  it('偽物の data URL(identicon と1バイトでも違う)は落とさない=別人化させない', () => {
+    const fake = `${anonymousIdenticonDataUrl('a:fake', 64)}X`; // 末尾1バイト違い
+    const snap = buildLaneMirrorSnapshot({
+      liveId: 'lv1',
+      buckets: {
+        link: [], konta: [],
+        tanu: [{ displaySrc: fake, title: '', meta: { idLine: '', nameLine: '' }, entry: { userId: 'a:fake' } }],
+        gift: [], ad: []
+      }
+    }, { nowMs: 1 });
+    expect(snap.tanu[0].displaySrc).toBe(fake);
+  });
+
+  it('別 uid の identicon は落とさない(uid が一致するものだけ再生成できる)', () => {
+    const other = anonymousIdenticonDataUrl('a:other', 64);
+    const snap = buildLaneMirrorSnapshot({
+      liveId: 'lv1',
+      buckets: {
+        link: [], konta: [],
+        tanu: [{ displaySrc: other, title: '', meta: { idLine: '', nameLine: '' }, entry: { userId: 'a:me' } }],
+        gift: [], ad: []
+      }
+    }, { nowMs: 1 });
+    expect(snap.tanu[0].displaySrc).toBe(other);
+  });
+
+  it('size≠64 の identicon は落とさない(既定値以外は復元できない)', () => {
+    const big = anonymousIdenticonDataUrl('a:big', 128);
+    const snap = buildLaneMirrorSnapshot({
+      liveId: 'lv1',
+      buckets: {
+        link: [], konta: [],
+        tanu: [{ displaySrc: big, title: '', meta: { idLine: '', nameLine: '' }, entry: { userId: 'a:big' } }],
+        gift: [], ad: []
+      }
+    }, { nowMs: 1 });
+    expect(snap.tanu[0].displaySrc).toBe(big);
+  });
+
+  it('uid が空のセル(広告主 yukkuriFaceFor 等)は data URL を保持する', () => {
+    // 広告段は seed が roomKey(≠uid)なのでバイト不一致 + uid 空の二重で保護される。
+    const adSrc = anonymousIdenticonDataUrl('room:ad-1', 64);
+    const snap = buildLaneMirrorSnapshot({
+      liveId: 'lv1',
+      buckets: {
+        link: [], konta: [], tanu: [], gift: [],
+        ad: [{ displaySrc: adSrc, title: '広告主X', meta: { idLine: 'AD-1', nameLine: '広告主X' }, entry: { userId: '' } }]
+      }
+    }, { nowMs: 1 });
+    expect(snap.ad).toHaveLength(1);
+    expect(snap.ad[0].displaySrc).toBe(adSrc);
+  });
+
+  it('★実配信の再現(匿名258人): 半減が発動せず全員が鏡に載る', () => {
+    // 旧: 622KB → 512KB超で cap 半減 → 129人(実配信で観測)。
+    const tanu = Array.from({ length: 258 }, (_, i) => anonCell(`a:${'x'.repeat(20)}${i}`));
+    const snap = buildLaneMirrorSnapshot({
+      liveId: 'lv1', buckets: { link: [], konta: [], tanu, gift: [], ad: [] },
+      pickedLength: 258, totalCandidates: 258
+    }, { cap: 258, nowMs: 1 });
+    expect(snap.tanu).toHaveLength(258);
+    // 1/10 以下に縮む(identicon のバイト数は uid 依存で揺れるため範囲で見る)。
+    expect(JSON.stringify(snap).length).toBeLessThan(64 * 1024);
+  });
+});
