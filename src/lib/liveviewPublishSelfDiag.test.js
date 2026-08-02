@@ -72,7 +72,51 @@ describe('buildLiveviewPublishSelfDiag', () => {
     const blob = fullBlob();
     blob.laneMirror.link.push({ displaySrc: '' }, { title: 'no-src' });
     const d = buildLiveviewPublishSelfDiag({ jsonBlob: blob, currentLiveId: 'lv1', publishKeys: {}, nowMs: NOW });
-    expect(d.mirrors.lane.counts.link).toBe(3); // 空2件は無視
+    expect(d.mirrors.lane.counts.link).toBe(3); // 空2件は無視(userId も無いので復元できない)
+  });
+
+  /**
+   * v0.1.1236: 鏡スリム化 B-2(v0.1.1235)の副作用で、③WEB鏡の件数が 0 に見える偽🔴が出ていた。
+   *
+   * B-2 は匿名セルの displaySrc(identicon の data URL・約2.5KB)を鏡から落とす。
+   * 読み手(B-1・laneMirror.js:207-209)が userId から同じ顔を再生成するので**表示は正常**だが、
+   * laneCellFilled が displaySrc しか見ていなかったため「中身なし」と数え、
+   * 匿名258人の配信で「①POP 258 / ③WEB鏡 0 🔴」という嘘の不一致を出していた(実測で再現)。
+   *
+   * ★「中身あり」の定義を B-1 と揃える: displaySrc 空でも userId があれば復元できる=中身あり。
+   */
+  describe('B-2(鏡スリム化)でstripされたセルの数え方', () => {
+    it('★displaySrc空+userId有り は「中身あり」と数える(復元できるため・偽🔴を出さない)', () => {
+      const blob = fullBlob();
+      blob.laneMirror.tanu = [
+        { displaySrc: '', userId: 'a:anon1' },
+        { displaySrc: '', userId: 'a:anon2' }
+      ];
+      const d = buildLiveviewPublishSelfDiag({ jsonBlob: blob, currentLiveId: 'lv1', publishKeys: {}, nowMs: NOW });
+      expect(d.mirrors.lane.counts.tanu).toBe(2);
+    });
+
+    it('displaySrc も userId も空のセルは従来どおり数えない(復元できない)', () => {
+      const blob = fullBlob();
+      blob.laneMirror.tanu = [{ displaySrc: '', userId: '' }, { title: 'no-src' }];
+      const d = buildLiveviewPublishSelfDiag({ jsonBlob: blob, currentLiveId: 'lv1', publishKeys: {}, nowMs: NOW });
+      expect(d.mirrors.lane.counts.tanu).toBe(0);
+    });
+
+    it('★実配信の再現(匿名258人が全員strip): ①POP と ③WEB鏡 が一致して✅になる', () => {
+      const blob = fullBlob();
+      blob.laneMirror.link = [];
+      blob.laneMirror.gift = [];
+      blob.laneMirror.ad = [];
+      blob.laneMirror.konta = [];
+      blob.laneMirror.tanu = Array.from({ length: 258 }, (_, i) => ({ displaySrc: '', userId: `a:u${i}` }));
+      blob.laneMirror.pickedLength = 258;
+      blob.laneMirror.totalCandidates = 258;
+      const d = buildLiveviewPublishSelfDiag({ jsonBlob: blob, currentLiveId: 'lv1', publishKeys: {}, nowMs: NOW });
+      expect(d.mirrors.lane.total).toBe(258);
+      const laneRow = d.consistency.find((c) => c.lane === '応援レーン(全段)');
+      expect(laneRow?.match).toBe(true); // 🔴を出さない
+    });
   });
 
   it('鏡が無いと present:false', () => {

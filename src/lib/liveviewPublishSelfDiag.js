@@ -28,9 +28,20 @@ function lc(v) {
   return String(v == null ? '' : v).trim().toLowerCase();
 }
 
-/** 鏡 row/cell が「中身あり（空埋めでない）」か。 */
+/**
+ * 鏡 row/cell が「中身あり（空埋めでない）」か。
+ *
+ * ★v0.1.1236: 判定基準を読み手(B-1)と揃える。B-2(鏡スリム化・v0.1.1235)は匿名セルの
+ *   displaySrc(identicon の data URL)を鏡から落とすが、読み手は userId から同じ顔を
+ *   再生成する(laneMirror.js の restoreLaneMirrorBuckets)。つまり **displaySrc が空でも
+ *   userId があれば③WEBは正しく描ける=中身あり**。
+ *   displaySrc だけで数えると匿名主体の配信で③WEB鏡が0件に見え、
+ *   「①POP 258 / ③WEB鏡 0 🔴」という嘘の不一致を出す(実測で再現済み)。
+ */
 function laneCellFilled(c) {
-  return Boolean(c && typeof c === 'object' && String(c.displaySrc || '').trim());
+  if (!c || typeof c !== 'object') return false;
+  if (String(c.displaySrc || '').trim()) return true;
+  return Boolean(String(c.userId || '').trim()); // B-1 が identicon を再生成できる
 }
 function northRowFilled(r) {
   if (!r || typeof r !== 'object') return false;
