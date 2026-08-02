@@ -5,7 +5,7 @@
 > **波及機能数(blast radius)が多いファイルほど、変更時の影響が大きい**(共有部品)。
 > 実装前にここで「触るファイルが何に波及するか」を確認すると誤前提を潰せる。
 
-## ⚠️ 影響大（3機能以上に波及・106 ファイル）
+## ⚠️ 影響大（3機能以上に波及・108 ファイル）
 
 ここを変えると複数の実行コンテキストに影響する。変更時は各 feature の動作確認を。
 
@@ -90,6 +90,8 @@
 - `src/lib/nlsInterceptAuth.js` → **3 機能**: 記録エンジン(watchページ常駐) / ページ傍受 / ポップアップ(応援レーン)
 - `src/lib/perfDiag.js` → **3 機能**: ポップアップ(応援レーン) / 状態速報ページ / Web版 状態(スマホ)
 - `src/lib/phaseDirector.js` → **3 機能**: 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 会場モード(standalone)
+- `src/lib/pickLatestComment.js` → **3 機能**: 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 会場モード(standalone)
+- `src/lib/pickTickerHighlight.js` → **3 機能**: 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 会場モード(standalone)
 - `src/lib/popupAvatarResolver.js` → **3 機能**: 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 会場モード(standalone)
 - `src/lib/protobufVarint.js` → **3 機能**: バックフィル SW / 記録エンジン(watchページ常駐) / ページ傍受
 - `src/lib/recentTextRing.js` → **3 機能**: 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 会場モード(standalone)
@@ -201,6 +203,8 @@
 | `src/lib/nlsInterceptAuth.js` | 3 | 記録エンジン(watchページ常駐) / ページ傍受 / ポップアップ(応援レーン) |
 | `src/lib/perfDiag.js` | 3 | ポップアップ(応援レーン) / 状態速報ページ / Web版 状態(スマホ) |
 | `src/lib/phaseDirector.js` | 3 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 会場モード(standalone) |
+| `src/lib/pickLatestComment.js` | 3 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 会場モード(standalone) |
+| `src/lib/pickTickerHighlight.js` | 3 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 会場モード(standalone) |
 | `src/lib/popupAvatarResolver.js` | 3 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 会場モード(standalone) |
 | `src/lib/protobufVarint.js` | 3 | バックフィル SW / 記録エンジン(watchページ常駐) / ページ傍受 |
 | `src/lib/recentTextRing.js` | 3 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 会場モード(standalone) |
@@ -329,6 +333,7 @@
 | `src/lib/venueLiveRoster.js` | 2 | 記録エンジン(watchページ常駐) / 会場モード(standalone) |
 | `src/lib/venueMirrorAvatarEnrich.js` | 2 | 記録エンジン(watchページ常駐) / 会場モード(standalone) |
 | `src/lib/venueOpenLatency.js` | 2 | 記録エンジン(watchページ常駐) / 会場モード(standalone) |
+| `src/lib/venuePickupBanner.js` | 2 | 記録エンジン(watchページ常駐) / 会場モード(standalone) |
 | `src/lib/venueResidents.js` | 2 | 記録エンジン(watchページ常駐) / 会場モード(standalone) |
 | `src/lib/venueRoster.js` | 2 | 記録エンジン(watchページ常駐) / 会場モード(standalone) |
 | `src/lib/venueSeatLinkParity.js` | 2 | 記録エンジン(watchページ常駐) / 会場モード(standalone) |
@@ -613,8 +618,6 @@
 | `src/lib/persistThrottle.js` | 1 | 記録エンジン(watchページ常駐) |
 | `src/lib/pickBroadcasterNameForReputation.js` | 1 | 状態速報ページ |
 | `src/lib/pickCommentsForExport.js` | 1 | ポップアップ(応援レーン) |
-| `src/lib/pickLatestComment.js` | 1 | ポップアップ(応援レーン) |
-| `src/lib/pickTickerHighlight.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/pollUntil.js` | 1 | 記録エンジン(watchページ常駐) |
 | `src/lib/popupAiDiagOrchestrator.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/popupBooleanSettingController.js` | 1 | ポップアップ(応援レーン) |
