@@ -717,7 +717,7 @@ import { KEY_LANE_DIAG } from '../lib/laneDiagKey.js';
 import { buildLaneDiagSnapshot } from '../lib/laneDiag.js';
 import { KEY_LANE_MIRROR } from '../lib/laneMirrorKey.js';
 import { KEY_PREVIEW_RENDER_ACK, buildPreviewRenderAck } from '../lib/previewRenderAckKey.js';
-import { buildLaneMirrorSnapshot, restoreLaneMirrorBuckets } from '../lib/laneMirror.js';
+import { buildLaneMirrorSnapshot, laneMirrorCapFromBuckets, restoreLaneMirrorBuckets } from '../lib/laneMirror.js';
 import { measureLaneDomSelf } from '../lib/laneDomSelfMeasure.js';
 import { createMirrorBundleFlushScheduler } from '../lib/mirrorBundleFlushScheduler.js';
 import { KEY_STAT_CARDS_MIRROR } from '../lib/statCardsMirrorKey.js';
@@ -974,10 +974,10 @@ const TOOLBAR_POPUP = _inlineFlags.toolbar;
 const INLINE_EMBED_WATCH = _inlineFlags.embedWatch;
 const INLINE_SIDE_PANEL = _inlineFlags.sidePanel;
 const INLINE_PASSIVE = _inlineFlags.passive;
-// v0.1.1232(lane-never-drop): ①レーンの上限撤廃に伴い、この定数は③鏡(publishLaneMirror)の cap 専用。
-//   ①③は非対称だが v0.1.1052 型の「黙った不一致」にはならない(差分はフッターが「ほか M人」と宣言)。
-//   ★鏡は 512KB 超で cap 半減が発動し「かえって人が減る」ため安易に上げない(実測 1人=実名235B/匿名158B)。
-const STORY_USER_LANE_INLINE_LIMIT = 48;
+// ★v0.1.1234: STORY_USER_LANE_INLINE_LIMIT(=48) は削除した。
+//   v0.1.1232 で①だけ撤廃し鏡は48に据え置いたが、実配信 lv351091938 で
+//   「会場のたぬ姉段 可視286 ≠ 鏡48」となり238人が③に載らなかった。
+//   鏡の cap は laneMirrorCapFromBuckets(実際の最大段長)で決める(publishLaneMirror 参照)。
 // v0.1.1232 lane-never-drop: ①の表示上限は撤廃(ユーザー確定「1度出た人はずっと出る」)。
 //   Infinity は slice(0, Infinity) で全件通過=契約(storyUserLaneBuckets.test.js で固定)。
 //   ★48へ戻すと laneNeverDrop.integration.test.js の自己証明ケースが赤くなる。
@@ -7446,10 +7446,17 @@ function publishLaneMirror(input) {
   if (INLINE_PASSIVE) return; // 受動ビュー: 鏡を上書きしない
   try {
     const now = Date.now();
-    // 2026-07-14(会場モード改修 Patch 2): 鏡capもSTORY_USER_LANE_INLINE_LIMITへ追随(48)。
-    //   limitと鏡capを分離すると①POP≠③WEB鏡のパリティ不一致になる(v0.1.1052で実際に211≠99を確認)。
-    //   容量超過時はlaneMirror.js側の自衛(512KB超でcap半減・最大2回)が引き続き効く。
-    const snap = buildLaneMirrorSnapshot(input, { cap: STORY_USER_LANE_INLINE_LIMIT, nowMs: now });
+    // ★v0.1.1234: 鏡capも撤廃(①レーンと揃える)。
+    //   旧: cap=48 固定。①だけ上限撤廃したため、会場で「①DOM 可視286 ≠ 鏡48」となり
+    //   238人が③に載らなかった(実配信 lv351091938 で観測)。limitと鏡capの分離は
+    //   v0.1.1052 の①211≠③99 と同じ地雷で、今回は自分で踏み直した形。
+    //   ★Infinity は渡さない: laneMirror.js の 512KB フェイルセーフ(cap半減)は有限値で
+    //   しか働かず、Infinity だと無力化する。実際の最大段長を渡せば slice は無発動のまま
+    //   「全員載せる」と「容量の最終防衛」を両立できる。
+    const snap = buildLaneMirrorSnapshot(input, {
+      cap: laneMirrorCapFromBuckets(input?.buckets),
+      nowMs: now
+    });
     mergeAndScheduleFlush('lane', snap, snap && snap.liveId, now);
   } catch {
     /* no-op */

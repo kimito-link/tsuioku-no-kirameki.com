@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildLaneMirrorSnapshot, restoreLaneMirrorBuckets } from './laneMirror.js';
+import { buildLaneMirrorSnapshot, laneMirrorCapFromBuckets, restoreLaneMirrorBuckets } from './laneMirror.js';
 import { anonymousIdenticonDataUrl } from './anonymousIdenticon.js';
 import { laneSceneContentHash } from './laneSceneEnvelope.js';
 
@@ -226,5 +226,83 @@ describe('鏡スリム化 B-1(読み手フォールバック・v0.1.1112)', () =
     }, { nowMs: 1 });
     const restored = restoreLaneMirrorBuckets(snap);
     expect(snap.contentHash).toBe(laneSceneContentHash(restored));
+  });
+});
+
+/**
+ * v0.1.1234: 鏡 cap の撤廃。
+ *
+ * 【なぜ必要だったか】
+ * v0.1.1232 で①レーンの上限だけ撤廃し、鏡は cap 48 に据え置いた。その結果
+ * 実配信 lv351091938 で「会場のたぬ姉段 可視286 / 鏡48」となり、238人が③に載らなかった
+ * (状態速報: 会場一致 🔴 ①DOM≠鏡 / 未説明240)。
+ * limit と鏡 cap の分離は v0.1.1052 の①211≠③99 と同じ地雷。
+ *
+ * ★Infinity を使わない理由: 512KB フェイルセーフ(cap半減)は有限値でしか働かない。
+ */
+describe('laneMirrorCapFromBuckets — 鏡 cap の撤廃(全段を切り捨てなく載せる有限値)', () => {
+  it('最大段長を返す(その値なら slice が全段で無発動)', () => {
+    const buckets = {
+      link: new Array(31).fill(cell('u', '')),
+      konta: [],
+      tanu: new Array(286).fill(cell('u', '')),
+      gift: [],
+      ad: new Array(10).fill(cell('u', ''))
+    };
+    expect(laneMirrorCapFromBuckets(buckets)).toBe(286);
+  });
+
+  it('空/壊れた入力でも1以上の有限値を返す(0を返すと全件消える)', () => {
+    expect(laneMirrorCapFromBuckets(null)).toBe(1);
+    expect(laneMirrorCapFromBuckets({})).toBe(1);
+    expect(laneMirrorCapFromBuckets({ link: [], konta: [], tanu: [], gift: [], ad: [] })).toBe(1);
+  });
+
+  it('必ず有限を返す(Infinityは512KBフェイルセーフを無力化する)', () => {
+    const buckets = { link: new Array(5000).fill(cell('u', '')), konta: [], tanu: [], gift: [], ad: [] };
+    const cap = laneMirrorCapFromBuckets(buckets);
+    expect(Number.isFinite(cap)).toBe(true);
+    expect(cap).toBe(5000);
+  });
+
+  it('★実配信の再現(たぬ姉286人): この cap なら鏡に全員載る=①DOM≠鏡が解消する', () => {
+    const buckets = {
+      link: Array.from({ length: 31 }, (_, i) => cell(`l${i}`, `https://cdn/l${i}.jpg`)),
+      konta: [],
+      tanu: Array.from({ length: 286 }, (_, i) => cell(`t${i}`, '')),
+      gift: [],
+      ad: Array.from({ length: 10 }, (_, i) => cell(`a${i}`, `https://cdn/a${i}.jpg`))
+    };
+    const snap = buildLaneMirrorSnapshot(
+      { liveId: 'lv1', buckets, pickedLength: 327, totalCandidates: 327 },
+      { cap: laneMirrorCapFromBuckets(buckets), nowMs: 1 }
+    );
+    // 旧(cap48)では tanu が48件に切られていた。
+    expect(snap.tanu).toHaveLength(286);
+    expect(snap.link).toHaveLength(31);
+    expect(snap.ad).toHaveLength(10);
+    // 512KB のフェイルセーフは発動していない(=切り捨てゼロ)。
+    expect(JSON.stringify(snap).length).toBeLessThan(512 * 1024);
+  });
+
+  it('容量を本当に超えたら既存のフェイルセーフ(cap半減)が働く=最終防衛は生きている', () => {
+    // 1セルを大きくして 512KB を超えさせる。
+    const fat = (uid) => ({
+      displaySrc: `https://cdn/${uid}/${'x'.repeat(2000)}.jpg`,
+      title: 'y'.repeat(500),
+      entry: { userId: uid },
+      meta: { idLine: uid, nameLine: 'z'.repeat(500) },
+      recentTexts: []
+    });
+    const buckets = {
+      link: Array.from({ length: 400 }, (_, i) => fat(`u${i}`)),
+      konta: [], tanu: [], gift: [], ad: []
+    };
+    const snap = buildLaneMirrorSnapshot(
+      { liveId: 'lv1', buckets, pickedLength: 400, totalCandidates: 400 },
+      { cap: laneMirrorCapFromBuckets(buckets), nowMs: 1 }
+    );
+    // 半減が働いて件数が減っている(=無制限に書き込まない)。
+    expect(snap.link.length).toBeLessThan(400);
   });
 });
