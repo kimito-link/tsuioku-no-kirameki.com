@@ -6,11 +6,11 @@ Chrome Web Store の「ストアの掲載情報 → 詳細な説明」に貼り�
 - **対象拡張**: 君斗りんくの追憶のきらめき（ID: `cjbabignmmodaickpeckiojjabnlogdb`）
 - **連動更新**: `extension/manifest.json` の version、`src/lib/changelog.js` の先頭エントリ
 - **最後の提出版**: 0.1.727
-- **次回提出予定**: 0.1.1164（2026-07-16 ZIP: build/tsuioku-no-kirameki-0.1.1164.zip）
+- **次回提出予定**: 0.1.1243（2026-08-03 ZIP: build/tsuioku-no-kirameki-0.1.1243.zip）
 
 ---
 
-## 0.1.1164 提出時に貼る本文（最近のアップデート節を更新済み）
+## 0.1.1243 提出時に貼る本文（最近のアップデート節を更新済み）
 
 ```
 ■ ニコ生の「届いていたかな」を、そっとキミのものに
@@ -24,7 +24,7 @@ Chrome Web Store の「ストアの掲載情報 → 詳細な説明」に貼り�
 "このPCの中だけに" 静かに記録して、あとから眺められるように整理してくれる
 Chrome 拡張機能です。
 
-外部サーバーには何ひとつ送りません。
+記録はこのPCの中だけ。「WEBで共有」を自分で使ったときだけ送信します（初期状態はOFF）。
 広告も、トラッキング計測も、クラッシュレポートも、いっさい組み込んでいません。
 ただ、キミのPCの中に「きらめきの欠片」を積み重ねて、
 放送が終わったあとでも、大切な応援を眺め直せるようにするだけ。
@@ -122,7 +122,7 @@ S/A/B/C/D/E の階級で見える化（HTML レポートに表示・集計はロ
 
 ▼ 記録は、すべてこの PC のローカル保存のみ
 chrome.storage.local にだけ保存されます。
-このPC以外のどこにも自動的には送信されません。
+このPC以外へ出るのは、「WEBで共有」を自分で使ったときだけです（初期状態はOFF）。
 
 ▼ 広告・行動トラッキング計測は一切ありません
 Google Analytics、Mixpanel、Sentry、広告 SDK ── 計測ライブラリは
@@ -135,13 +135,18 @@ Google Analytics、Mixpanel、Sentry、広告 SDK ── 計測ライブラリ�
 の3つすべてを手動でONにしたときだけ動作する設計にする予定です。
 既定（インストール直後）はすべてOFFのまま提供します。
 
-▼ 拡張が通信する先は、ニコニコ生放送と「お使いのPC内の VOICEVOX」だけ
+▼ 拡張が通信する先は、この4つだけ
 ・ニコニコ生放送（*.nicovideo.jp） … 公式サイトでの動作に必要
 ・VOICEVOX（http://127.0.0.1:50021・このPC内のローカル音声合成）
 　… 読み上げ機能を ON にしたときだけ、このPCの中の VOICEVOX に音声合成を
 　　依頼します。インターネット上のサーバーではなく「お使いのPC自身」への通信
 　　なので、コメント本文が外部に送られることはありません。
-外部のインターネットサーバーへは、いかなる経路でもアクセスしません。
+・共有サーバー（app.tsuioku-no-kirameki.com）
+　… 「WEBで共有」を自分で使ったときだけ。初期状態はOFFです。
+・検索補助（suggestqueries.google.com）
+　… 配信者名などを入力したときの候補取得（入力語句のみ送信）。
+
+この4つ以外のサーバーへ、記録したデータを送ることはありません。
 
 ▼ 権限が必要な理由（まとめ）
 ・storage / unlimitedStorage … 放送ごとのコメント記録をローカル保存
@@ -151,7 +156,10 @@ Google Analytics、Mixpanel、Sentry、広告 SDK ── 計測ライブラリ�
 ・webNavigation … 配信ページのフレーム構成を把握しコメントを取りこぼさず記録
 ・sidePanel … サイドパネルUI表示
 ・offscreen … 大量コメントを安定して保存（ローカル保存の集約）
-・host_permissions（*.nicovideo.jp） … 対象をニコ生ドメインに限定
+・host_permissions（*.nicovideo.jp） … コメント取得の対象をニコ生ドメインに限定
+・host_permissions（app.tsuioku-no-kirameki.com） … 「WEBで共有」を使ったときの
+　送信先（初期状態はOFF）
+・host_permissions（suggestqueries.google.com） … 入力補助の候補取得
 ・host_permissions（127.0.0.1:50021） … 読み上げ ON 時のみ、このPC内の
 　VOICEVOX に音声合成を依頼（外部ネットワークへは出ません）
 

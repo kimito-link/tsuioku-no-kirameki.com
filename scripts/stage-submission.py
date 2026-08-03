@@ -107,7 +107,13 @@ def copy_declared_resources(manifest: dict, dest: Path) -> None:
 #     (`marketing-export.html?lv=${lv}`)や getURL("marketing-export.html*") を取りこぼすと、
 #     そのページが丸ごと欠落したまま通過する(v0.1.1243 で実際に踏んだ)。
 RUNTIME_PAGE_RE = re.compile(r'getURL\(\s*[\'"`]([A-Za-z0-9_\-./]+\.html)(?:[?*#][^\'"`]*)?[\'"`]')
-HTML_SCRIPT_SRC_RE = re.compile(r'<script[^>]*\ssrc=["\']([^"\']+)["\']')
+# ★v0.1.1244: <script src> だけを見ていたため、<img src> の画像3件
+#   (images/marketing-html-avatars/*.png = popup を開いた瞬間に描画される北極星パネルの
+#   キャラアイコン)が欠落したまま通過した。タグ種別を限定せず src/href の全属性を拾う。
+#   属性が複数行に折られている実例があるので、タグ単位ではなく全文から抜くこと。
+HTML_ASSET_REF_RE = re.compile(r'(?:src|href)\s*=\s*["\']([^"\']+)["\']', re.S)
+#   外部/擬似URLは同梱対象外。
+EXTERNAL_REF_PREFIXES = ('http://', 'https://', '//', 'data:', 'mailto:', '#', 'javascript:', 'blob:')
 
 
 def collect_runtime_referenced_pages(search_dirs: list[Path]) -> set[str]:
@@ -132,22 +138,38 @@ def collect_runtime_referenced_pages(search_dirs: list[Path]) -> set[str]:
     return found
 
 
+def local_asset_refs(text: str) -> set[str]:
+    """HTML 本文から、同梱すべきローカル参照(src/href)を抜く。
+
+    ★v0.1.1244: <script src> 限定だと <img src> の画像が漏れる(実例=
+      images/marketing-html-avatars/*.png・popup を開いた瞬間に描画される
+      北極星パネルのキャラアイコン3点が欠落したまま通過した)。
+      クエリ/フラグメントは実ファイル名に含まれないので落とす。
+    """
+    found: set[str] = set()
+    for raw in HTML_ASSET_REF_RE.findall(text):
+        ref = raw.strip()
+        if not ref or ref.startswith(EXTERNAL_REF_PREFIXES):
+            continue
+        ref = ref.split('?', 1)[0].split('#', 1)[0].lstrip('./')
+        if ref:
+            found.add(ref)
+    return found
+
+
 def collect_html_script_srcs(html_files: list[Path]) -> set[str]:
-    """HTML が <script src> で読む同梱スクリプトを列挙する(extension/ 相対パス)。
+    """HTML が読む同梱アセット(スクリプト・画像等)を列挙する(extension/ 相対パス)。
 
     ★v0.1.1243: status.html は status-guard.js(「何があっても開く」保険)を読むが、
       これも manifest に宣言が無い。欠落すると **ページを開いた瞬間に 404** になる
       (クリック不要=審査員が最初に踏む)。http(s) の外部URLは対象外。
+    ★v0.1.1244: <script src> だけでなく src/href の全属性を対象にした(上記参照)。
     """
     found: set[str] = set()
     for path in html_files:
         if not path.exists():
             continue
-        text = path.read_text(encoding='utf-8', errors='ignore')
-        for src in HTML_SCRIPT_SRC_RE.findall(text):
-            if src.startswith(('http://', 'https://', '//', 'data:')):
-                continue
-            found.add(src.lstrip('./'))
+        found |= local_asset_refs(path.read_text(encoding='utf-8', errors='ignore'))
     return found
 
 
@@ -370,13 +392,11 @@ def verify_runtime_references(zf: zipfile.ZipFile, names: set) -> None:
             target = rel.lstrip('./')
             if target not in names:
                 missing.append(f'{name} が開く {target}')
-    # (b) HTML の <script src>(外部URLは対象外)
+    # (b) HTML のローカル参照(src/href の全属性・外部URLは対象外)。
+    #     ★v0.1.1244: <script src> 限定だと <img src> の画像欠落を素通りさせる。
     for name in sorted(n for n in names if n.endswith('.html')):
         text = zf.read(name).decode('utf-8', 'ignore')
-        for src in set(HTML_SCRIPT_SRC_RE.findall(text)):
-            if src.startswith(('http://', 'https://', '//', 'data:')):
-                continue
-            target = src.lstrip('./')
+        for target in local_asset_refs(text):
             if target not in names:
                 missing.append(f'{name} が読む {target}')
     if missing:
