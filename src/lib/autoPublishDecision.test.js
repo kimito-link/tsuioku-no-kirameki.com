@@ -2,6 +2,9 @@ import { describe, it, expect } from 'vitest';
 import { shouldAutoPublish, DEFAULT_AUTO_PUBLISH_INTERVAL_MS } from './autoPublishDecision.js';
 
 const base = {
+  // ★v0.1.1242: optedIn を明示しないと publish されない(既定OFF)。既存ケースは
+  //   「同意済みの利用者」を前提にした判定を見ているので true を置く。
+  optedIn: true,
   hasKeys: true,
   hasPayload: true,
   hasWatchTab: true,
@@ -11,6 +14,45 @@ const base = {
   nowMs: 1_000_000 + DEFAULT_AUTO_PUBLISH_INTERVAL_MS,
   intervalMs: DEFAULT_AUTO_PUBLISH_INTERVAL_MS
 };
+
+/**
+ * ★v0.1.1242(CWS提出ブロッカー BLOCKING-1)の回帰テスト。
+ *
+ * 旧実装のゲートは hasKeys/hasPayload/hasWatchTab/inFlight の4つだけで、
+ * **同意の条件が一つも無かった**。その結果 status ページを開いて視聴しているだけで
+ * 120秒ごとに視聴者のユーザーID・名前・コメント本文が外部サーバーへ自動送信されていた。
+ * privacy.html / 提出テキスト / 説明文の4文書はいずれも「自動送信しない」と明記しており、
+ * 実挙動と開示が真逆だった(CWS User Data Policy 違反=アイテム停止級)。
+ * AGENTS.md §53「データ送信は利用者の明確な同意(オプトイン)に基づく」にも違反していた。
+ *
+ * 不変条件: **同意していない限り、他のどの条件が揃っても publish は false**。
+ */
+describe('shouldAutoPublish — 同意(オプトイン)が最優先ゲート', () => {
+  it('optedIn 未指定なら、他が全部揃っていても送らない(既定OFF)', () => {
+    const noConsent = { ...base };
+    delete noConsent.optedIn;
+    expect(shouldAutoPublish(noConsent)).toEqual({ publish: false, reason: 'no_consent' });
+  });
+
+  it('optedIn:false なら送らない', () => {
+    expect(shouldAutoPublish({ ...base, optedIn: false }).reason).toBe('no_consent');
+  });
+
+  it('同意は初回送信(first_publish)より優先される=未同意なら初回すら送らない', () => {
+    const r = shouldAutoPublish({ ...base, optedIn: false, everSent: false, lastSentAtMs: 0 });
+    expect(r.publish).toBe(false);
+    expect(r.reason).toBe('no_consent');
+  });
+
+  it('optedIn:true かつ他条件が揃えば従来どおり送る', () => {
+    expect(shouldAutoPublish(base).publish).toBe(true);
+  });
+
+  it('optedIn は真偽値のみ受け付ける("true"等の紛れで同意扱いにしない)', () => {
+    expect(shouldAutoPublish({ ...base, optedIn: 'true' }).reason).toBe('no_consent');
+    expect(shouldAutoPublish({ ...base, optedIn: 1 }).reason).toBe('no_consent');
+  });
+});
 
 describe('shouldAutoPublish — 誤発射しない前提条件', () => {
   it('キー未設定なら false', () => {

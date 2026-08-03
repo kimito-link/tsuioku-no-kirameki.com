@@ -78,14 +78,26 @@ const popupDefine = {
 //   - NL_STATUS_VIEW_TOKEN: 閲覧 URL の ?v= トークン(推測困難な長い文字列)
 //   - NL_STATUS_APP_ORIGIN: 送信先オリジン(既定 https://app.tsuioku-no-kirameki.com)
 // 未設定時は空文字 → 拡張は「未設定」を検知してアップロードボタンを無効表示にする。
+//
+// ★v0.1.1242(CWS提出ブロッカー BLOCKING-2): NL_STORE_BUILD=1 のときは【必ず空文字】にする。
+//   ingestKey は /api/status の【書き込み】認証で、CRX は誰でも展開できるため、
+//   同梱したまま公開すると全世界に書き込み鍵を配ることになる(第三者が任意データを
+//   POST 可能)。viewToken も「推測困難な長い文字列」であることが唯一の閲覧防御なので、
+//   同梱すると全ユーザー共通・公知になり、全利用者のスナップショットが誰でも閲覧可能になる。
+//   拡張側は既に「キー未設定=公開機能を出さない」を正しく実装している(status-entry.js:2584)
+//   ので、空にするだけで公開機能ごと安全に無効化される。
+const IS_STORE_BUILD = process.env.NL_STORE_BUILD === '1';
 const statusDefine = {
   ...popupDefine,
-  NL_STATUS_INGEST_KEY: JSON.stringify(process.env.NL_STATUS_INGEST_KEY || ''),
-  NL_STATUS_VIEW_TOKEN: JSON.stringify(process.env.NL_STATUS_VIEW_TOKEN || ''),
+  NL_STATUS_INGEST_KEY: JSON.stringify(IS_STORE_BUILD ? '' : process.env.NL_STATUS_INGEST_KEY || ''),
+  NL_STATUS_VIEW_TOKEN: JSON.stringify(IS_STORE_BUILD ? '' : process.env.NL_STATUS_VIEW_TOKEN || ''),
   NL_STATUS_APP_ORIGIN: JSON.stringify(
     process.env.NL_STATUS_APP_ORIGIN || 'https://app.tsuioku-no-kirameki.com'
   )
 };
+if (IS_STORE_BUILD) {
+  console.log('nicolivelog: STORE BUILD = 公開キーを空にしました(鍵をZIPに同梱しない)');
+}
 
 const targets = [
   {

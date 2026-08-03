@@ -59,6 +59,42 @@ def build_submission_manifest(dev_manifest: dict, version: str) -> dict:
     return m
 
 
+def declared_resource_patterns(manifest: dict) -> list[str]:
+    """manifest の web_accessible_resources が宣言する resources パターンを平坦化して返す。"""
+    out: list[str] = []
+    for block in manifest.get('web_accessible_resources') or []:
+        for rel in block.get('resources') or []:
+            out.append(str(rel))
+    return out
+
+
+def resolve_declared_files(pattern: str) -> list[Path]:
+    """宣言パターン(glob 可)を extension/ 配下の実ファイルへ解決する。
+
+    存在しないパターンはここでは落とさない(空リストを返す)。存在すべきかどうかの
+    判定は verify_zip の突合に任せる=「宣言があるのに実体が無い」を見逃さないため。
+    """
+    if '*' in pattern:
+        return [p for p in sorted(EXT_DIR.glob(pattern)) if p.is_file()]
+    candidate = EXT_DIR / pattern
+    return [candidate] if candidate.is_file() else []
+
+
+def copy_declared_resources(manifest: dict, dest: Path) -> None:
+    """manifest が宣言する web_accessible_resources の実体をステージングへコピーする。
+
+    ★v0.1.1242: これが無いと「manifest だけ更新され staging スクリプトが追随しない」
+      drift が起き、宣言済みリソースがZIPから丸ごと欠ける(実例=sound/・avatar-parts/)。
+      dist/ と HTML は上流で copy_tree/copy_file 済みなのでスキップする。
+    """
+    for pattern in declared_resource_patterns(manifest):
+        if pattern.startswith('dist/') or pattern.endswith('.html'):
+            continue  # 既にコピー済み(重複コピーを避ける)
+        for src in resolve_declared_files(pattern):
+            rel = src.relative_to(EXT_DIR).as_posix()
+            copy_file(src, dest / rel)
+
+
 def stage(version: str) -> Path:
     dest = BUILD_DIR / f'submission-{version}'
     if dest.exists():
@@ -145,8 +181,20 @@ def stage(version: str) -> Path:
                 dest / 'images' / 'yukkuri-charactore-english' / chara / fname,
             )
 
+    # 2-b) ★v0.1.1242: manifest が web_accessible_resources で宣言したリソースを
+    #      【manifest から導出して】コピーする。
+    #
+    #      上のホワイトリストは手書き列挙なので、manifest に新しいリソースを足しても
+    #      追随せず、宣言だけがあって実体がZIPに入らない drift が起きる。実際 v0.1.1241 の
+    #      提出ZIPでは sound/(9ファイル) と images/avatar-parts/(22ファイル) が
+    #      manifest 宣言済みなのに 0 件で、効果音とアバター合成が審査員の実機で壊れる
+    #      状態だった(同型事故は status.html で一度起きている=上の 75-77 行のコメント)。
+    #      手書きに足すのではなく manifest を正本にすることで、以後の追加に自動で追随する。
+    dev_manifest_for_assets = json.loads((EXT_DIR / 'manifest.json').read_text(encoding='utf-8'))
+    copy_declared_resources(dev_manifest_for_assets, dest)
+
     # 3) 提出用 manifest
-    dev_manifest = json.loads((EXT_DIR / 'manifest.json').read_text(encoding='utf-8'))
+    dev_manifest = dev_manifest_for_assets
     out_manifest = build_submission_manifest(dev_manifest, version)
     (dest / 'manifest.json').write_text(
         json.dumps(out_manifest, ensure_ascii=False, indent=2) + '\n',
@@ -170,7 +218,15 @@ def make_zip(version: str, stage_dir: Path) -> Path:
 
 
 def verify_zip(zip_path: Path) -> None:
-    """ZIP 内のパス全てがフォワードスラッシュで、期待 top-level エントリがあることを確認。"""
+    """ZIP の健全性を検査する。フォワードスラッシュ・必須エントリ・宣言/実体の突合。
+
+    ★v0.1.1242: 従来の required は手書き9件の固定リストで、manifest が何を宣言しているかを
+      見ていなかった。そのため「manifest は宣言しているのにZIPに実体が無い」を素通りさせ、
+      v0.1.1241 の提出ZIPで sound/(9) と images/avatar-parts/(22) が丸ごと欠けていた
+      (審査員の実機で効果音が鳴らずアバター合成が壊れる=Broken Functionality の指摘対象)。
+      **ZIP内 manifest の宣言を正本に突合する**ことで、手書きリストの更新忘れでは
+      すり抜けられないようにする(fail-closed)。
+    """
     required = {
         'manifest.json',
         'background.js',
@@ -190,6 +246,57 @@ def verify_zip(zip_path: Path) -> None:
         missing = required - names
         if missing:
             raise RuntimeError(f'missing from zip: {sorted(missing)}')
+
+        # 宣言/実体の突合: manifest が web_accessible_resources で宣言した各パターンに
+        #   対して、ZIP 内に少なくとも1件の実体があること。glob は前方一致で照合する。
+        #   (sound/custom/* のようにユーザー生成物のみを指す宣言は実体0でも正常なので除外。)
+        manifest = json.loads(zf.read('manifest.json').decode('utf-8'))
+        undeclared_ok = {'sound/custom/*'}  # 取込後に生成される=同梱しないのが正しい
+        unmet: list[str] = []
+        for pattern in declared_resource_patterns(manifest):
+            if pattern in undeclared_ok:
+                continue
+            if '*' in pattern:
+                prefix = pattern.split('*', 1)[0]
+                suffix = pattern.rsplit('*', 1)[1]
+                if not any(n.startswith(prefix) and n.endswith(suffix) for n in names):
+                    unmet.append(pattern)
+            elif pattern not in names:
+                unmet.append(pattern)
+        if unmet:
+            raise RuntimeError(
+                'manifest が宣言しているのに ZIP に実体が無いリソース: '
+                f'{sorted(unmet)}'
+            )
+
+        verify_no_secrets(zf, names)
+
+
+def verify_no_secrets(zf: zipfile.ZipFile, names: set) -> None:
+    """公開キーがバンドルに焼き込まれていないことを確認する(fail-closed)。
+
+    ★v0.1.1242(CWS提出ブロッカー BLOCKING-2): ingestKey は /api/status の【書き込み】
+      認証。CRX は誰でも展開できるので、同梱したまま公開すると第三者が任意データを
+      POST できるようになる。viewToken も同梱すると全ユーザー共通・公知となり、
+      全利用者のスナップショットが誰でも閲覧可能になる。
+      NL_STORE_BUILD=1 でビルドすれば空文字が焼かれる(scripts/build.mjs)。
+      ここでは【実際に空であること】をZIPから読み直して確認する=ビルド手順の
+      間違いを提出前に必ず止める。
+    """
+    import re
+    leaked: list[str] = []
+    for name in sorted(n for n in names if n.endswith('.js')):
+        text = zf.read(name).decode('utf-8', 'ignore')
+        for key_name in ('ingestKey', 'viewToken'):
+            # getUploadConfig() が返すリテラルが空文字以外なら焼き込まれている。
+            for m in re.finditer(rf'{key_name}\s*:\s*"([^"]*)"', text):
+                if m.group(1):
+                    leaked.append(f'{name}: {key_name} が空でない({len(m.group(1))}文字)')
+    if leaked:
+        raise RuntimeError(
+            '公開キーが提出物に焼き込まれています。NL_STORE_BUILD=1 でビルドし直してください: '
+            + '; '.join(leaked)
+        )
 
 
 def main() -> None:
