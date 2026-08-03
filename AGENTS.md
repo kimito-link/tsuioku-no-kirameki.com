@@ -28,11 +28,41 @@ Cursor / Claude Code / その他エージェントが共通で参照する前提
 - **CWS Developer Dashboard 入力の正本**: [docs/releases/cws-submission-texts.md](docs/releases/cws-submission-texts.md)
   - 提出時に毎回そこから貼り直す運用（再構築コスト削減）
 - **ホスト権限**: `https://*.nicovideo.jp/*` のみ（`localhost`/`127.0.0.1` は提出版から除外）
+### ★提出は「全自動」（AI も人間もここを最初に読むこと）
+
+**Chrome Web Store への提出は、審査送信までコマンド1本で完了する。**
+ダッシュボードを人間が開く必要は無い。「提出は代行できない」は**誤り**。
+
+```bash
+node scripts/cws-publish.mjs build/tsuioku-no-kirameki-<version>.zip --publish
+```
+
+- `--publish` **なし** = 下書きアップロードのみ／**あり** = 審査へ提出まで実行
+- 成功の判定は `status:["OK"]`。認証は `.cws-credentials.json`（gitignore 済み・設定済み）
+- セットアップ正本: [docs/releases/cws-publish-api-setup.md](docs/releases/cws-publish-api-setup.md)
+
+> **なぜ誤解が起きるか**（2026-08-03 に Claude が3回繰り返して user を困らせた）
+> CWS の管理画面は Chrome のポリシーで拡張からの自動操作が全面ブロックされている
+> （"The extensions gallery cannot be scripted"）。これは事実だが、**公式の Publish API**
+> があるので API 経由なら全自動でできる。**「ブラウザ操作が不可」と「提出が不可」は別問題**。
+> memory の [[claude-cannot-drive-own-extension-pages]] はブラウザ操作の話であって、
+> 提出できない話ではない。混同しないこと。
+>
+> **Google Play は境界が違う**：AAB ビルド〜アップロード〜掲載情報入力までは自動だが、
+> **最後の「審査に送信」だけは UI 必須**（API の限界として実体験で確定済み・
+> `web-ios-android/_docs/google-play-submission-playbook.md` §42-51）。CWS と混同しない。
+
 - **次回提出時のチェック**:
-  1. ZIP 生成: `python scripts/stage-submission.py <version>`
+  1. ZIP 生成: `NL_STORE_BUILD=1 npm run build && python scripts/stage-submission.py <version>`
+     - ★`NL_STORE_BUILD=1` 必須。付け忘れると公開キー（`ingestKey`=書き込み認証）が
+       ZIP に平文で焼き込まれる。`stage-submission.py` の `verify_no_secrets` が止める
   2. `npm run verify:bump` で manifest / package / changelog 整合確認
-  3. ダッシュボード本文を `docs/releases/cws-submission-texts.md` から貼り直し
-  4. privacy.html とダッシュボード入力の文言整合（特に「AI 連携」「個人特定情報」）
+  3. LP のライブ版が最新か確認（Vercel が push で自動反映するので、push 済みなら通常 OK）
+     `curl -s https://tsuioku-no-kirameki.com/privacy.html | grep 最終更新`
+     - ★審査員が見るのは**ライブ URL**。リポを直しただけでは審査員に旧文が見える
+  4. `node scripts/cws-publish.mjs build/<zip> --publish` で提出（上記）
+  5. ダッシュボードの本文欄を変えたいときだけ、`docs/releases/cws-submission-texts.md`
+     から貼り直す（本文が前回と同じなら不要）
 
 ---
 
