@@ -9,6 +9,19 @@
 - Linux Foundation Agentic AI Foundation の **AGENTS.md は20+ツール対応の業界標準**(2025-12 発足・Codex/Cursor/Aider/Windsurf/Warp 等で公式採用)
 - Claude Code は AGENTS.md を直接読まない([Issue #6235](https://github.com/anthropics/claude-code/issues/6235) で 3000+ upvote だが未対応)ため、このファイルがブリッジ役
 
+## ★ストア提出は「全自動」（ここで間違えた実績あり）
+
+**Chrome Web Store への提出は、審査送信までコマンド1本で完了する。**
+
+```bash
+node scripts/cws-publish.mjs build/tsuioku-no-kirameki-<version>.zip --publish
+```
+
+「ダッシュボードでのログインと提出ボタンは代行できない」は**誤り**。CWS の管理画面が
+ブラウザ自動操作できないのは事実だが、**公式 Publish API があるので API 経由なら全自動**。
+2026-08-03 に Claude がこれを見落として3回「できません」と繰り返した。
+詳細と Google Play との境界の違いは **[AGENTS.md §2](AGENTS.md)** を読むこと。
+
 ## Claude Code を含む全ツール共通の最重要ルール
 
 1. **必ず AGENTS.md を読んでから作業を始める**
