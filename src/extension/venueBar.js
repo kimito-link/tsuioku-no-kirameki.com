@@ -2214,11 +2214,16 @@ export function mountVenueBarButton(options = {}) {
     root.style.background = '#0a0b0c';
   }
 
+  /** 群衆canvasの解像度(CSSで画面幅に引き伸ばす)。閉じるとき0に落として復元するため定数化。 */
+  const CROWD_CANVAS_W = 1200;
+  const CROWD_CANVAS_H = 350;
   const crowdCanvas = document.createElement('canvas');
   crowdCanvas.className = 'nlsb-crowd-canvas';
   // 高画質すぎると重いので適度な解像度に固定（CSSで画面幅に引き伸ばす）
-  crowdCanvas.width = 1200;
-  crowdCanvas.height = 350;
+  // ★v0.1.1239: 寸法は定数化。会場を閉じたとき stopCrowdMotion が 0 に落として
+  //   バックストア(1200x350x4B = 1.68MB)を解放し、開くとき ensureCrowdCanvasSize が戻す。
+  crowdCanvas.width = CROWD_CANVAS_W;
+  crowdCanvas.height = CROWD_CANVAS_H;
 
   const stageLayout = document.createElement('div');
   stageLayout.className = 'nlsb-stage-layout';
@@ -4551,9 +4556,24 @@ export function mountVenueBarButton(options = {}) {
     }
   };
 
+  /**
+   * 群衆canvasの寸法を戻す(v0.1.1239)。stopCrowdMotion が 0 に落としてバックストアを
+   * 解放するため、描き始める前に必ず復元する。既に正しい寸法なら何もしない
+   * (寸法代入は canvas をクリアする副作用があるため、無条件代入は避ける)。
+   */
+  const ensureCrowdCanvasSize = () => {
+    try {
+      if (crowdCanvas && crowdCanvas.width !== CROWD_CANVAS_W) {
+        crowdCanvas.width = CROWD_CANVAS_W;
+        crowdCanvas.height = CROWD_CANVAS_H;
+      }
+    } catch { /* canvas 不在環境でも会場は止めない */ }
+  };
+
   const startCrowdMotion = () => {
     if (crowdReducedMotion || crowdRaf || !open || crowdAnimCount <= 0) return;
     if (typeof requestAnimationFrame !== 'function') return;
+    ensureCrowdCanvasSize();
     crowdLastDrawMs = 0;
     crowdRaf = requestAnimationFrame(crowdMotionTick);
   };
@@ -4561,6 +4581,19 @@ export function mountVenueBarButton(options = {}) {
   const stopCrowdMotion = () => {
     if (crowdRaf && typeof cancelAnimationFrame === 'function') cancelAnimationFrame(crowdRaf);
     crowdRaf = 0;
+    // ★v0.1.1239: 群衆canvasのバックストア(1200x350x4B = 1.68MB)を解放する。
+    //   従来は rAF を止めるだけでピクセルバッファが残り続けていた。
+    //   width=0 でバックストアが破棄される(次に描くとき setupCrowd 側が寸法を戻す)。
+    try {
+      if (crowdCanvas && crowdCanvas.width > 0) {
+        crowdCanvas.width = 0;
+        crowdCanvas.height = 0;
+        // ★寸法を戻すと canvas はクリアされる。再描画スキップのキャッシュを無効化しないと
+        //   「同じ人数だから描かない」判定に当たって群衆が空のままになる(必須)。
+        lastCrowdCount = -1;
+        lastCrowdSeed = Number.NaN;
+      }
+    } catch { /* canvas 不在環境でも会場は止めない */ }
   };
 
   /** v0.1.1118 鏡enrichマップのキャッシュ(鏡 capturedAt が変わったときだけ作り直す=毎commitのO(鏡)回避)。 */
@@ -4870,6 +4903,9 @@ export function mountVenueBarButton(options = {}) {
       // 退避強化: 同じ人数+同じ seed なら静止描画は同一(純粋)→再描画を省く。ただし動きを付ける
       //   場合はアニメループ側が毎フレーム描くので、ここでは「初回/人数変化時の即時1枚」を担う。
       if (totalAnonymous !== lastCrowdCount || seed !== lastCrowdSeed) {
+        // ★v0.1.1239: この経路は startCrowdMotion を通らずに直接描くため、
+        //   閉じたとき 0 に落とした寸法をここでも戻す(復元漏れ=群衆が出ない)。
+        ensureCrowdCanvasSize();
         drawCrowdOnCanvas(crowdCanvas, totalAnonymous, seed, crowdReducedMotion ? null : { timeMs: nowMs(), heatLevel: crowdHeatLevel });
         lastCrowdCount = totalAnonymous;
         lastCrowdSeed = seed;
