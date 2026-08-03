@@ -60,3 +60,35 @@ describe('会場を閉じたら解放する配線(メモリリーク防止=CI赤
     expect(body).toMatch(/renderSeats\(\[\]\)/);
   });
 });
+
+/**
+ * 群衆canvasのバックストア解放(v0.1.1239)。
+ *
+ * `crowdCanvas` は 1200x350 = **1.68MB** のピクセルバッファを会場マウント時に確保する
+ * (venueBar.js)。従来 `stopCrowdMotion` は rAF を止めるだけで、閉じても解放されなかった。
+ *
+ * ★width=0 で解放するが、**開き直したとき寸法を戻さないと群衆が描かれなくなる**ため、
+ *   `startCrowdMotion` の先頭で `ensureCrowdCanvasSize()` を呼ぶ必要がある。
+ *   この対称性が崩れると「閉じて開いたら群衆が消える」不具合になる。
+ */
+describe('群衆canvasのバックストア解放(1.68MB)', () => {
+  it('★閉じるとき(stopCrowdMotion)にバックストアを解放する', () => {
+    const at = venueSrc.indexOf('const stopCrowdMotion = () => {');
+    expect(at).toBeGreaterThan(-1);
+    const body = venueSrc.slice(at, at + 600);
+    expect(body).toMatch(/crowdCanvas\.width = 0/);
+  });
+
+  it('★開くとき(startCrowdMotion)に寸法を復元する(復元漏れ=群衆が消える)', () => {
+    const at = venueSrc.indexOf('const startCrowdMotion = () => {');
+    expect(at).toBeGreaterThan(-1);
+    const body = venueSrc.slice(at, at + 400);
+    expect(body).toMatch(/ensureCrowdCanvasSize\(\)/);
+  });
+
+  it('寸法は定数で一元管理されている(作成時と復元時のズレを防ぐ)', () => {
+    expect(venueSrc).toMatch(/const CROWD_CANVAS_W = 1200/);
+    expect(venueSrc).toMatch(/crowdCanvas\.width = CROWD_CANVAS_W/);
+    expect(venueSrc).toMatch(/crowdCanvas\.width !== CROWD_CANVAS_W/);
+  });
+});

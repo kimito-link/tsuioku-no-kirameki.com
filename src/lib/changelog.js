@@ -26,6 +26,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1239',
+    date: '2026-08-03',
+    summary: '会場の背景描画のメモリも閉じたときに解放するようにしました',
+    items: Object.freeze([
+      '会場モードの背景(匿名の方を表す群衆の絵)が使う約1.7MBのメモリを、会場を閉じたときに解放するようにしました。これまでは描画を止めるだけで、メモリは確保したままでした。',
+      '会場を開き直したときは自動で描き直されます(表示の変化はありません)。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1238',
     date: '2026-08-03',
     summary: '会場を大幅に軽くしました(匿名の方の顔の作り方を変更)',
