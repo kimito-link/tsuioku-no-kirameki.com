@@ -1091,12 +1091,28 @@ async function loadCommentPostDiagSafe() {
 //   IDBObjectStore.count()ベースのcountSoundBlobs/countAssignmentsへ差し替え(重さ根治P1)。
 //   件数比例で重くなっていた大配信時のextras遅延を解消する(取込UI側のrenderList/renderStatsは
 //   一覧表示そのものが必要なためlistSoundBlobs/listAssignmentsのまま=無改修)。
+/**
+ * sound/custom/manifest.json は**拡張同梱の静的ファイル**で実行中に変わらない。
+ * ★v0.1.1237: 従来は loadCustomSoundDiagSafe(:1099)と setupMyCustomSoundPanel(:3143)が
+ *   同じURLを独立に fetch していた(二重取得)。1本の Promise を共有して初回だけ取りに行く。
+ * @type {Promise<Record<string,string>|null>|null}
+ */
+let _localSoundManifestPromise = null;
+function loadLocalSoundManifestShared() {
+  if (!_localSoundManifestPromise) {
+    _localSoundManifestPromise = loadLocalBundledSoundManifest({
+      getUrl: (p) => chrome.runtime.getURL(p)
+    }).catch(() => null);
+  }
+  return _localSoundManifestPromise;
+}
+
 async function loadCustomSoundDiagSafe() {
   // ローカル同梱本数(sound/custom/manifest.json)は IndexedDB の有無に関係なく計測する
   //   (install-local-sounds.mjs による自動同梱の実態を必ず出す・静かに0埋め)。
   let localBundledCount = 0;
   try {
-    const manifestFiles = await loadLocalBundledSoundManifest({ getUrl: (p) => chrome.runtime.getURL(p) });
+    const manifestFiles = await loadLocalSoundManifestShared();
     localBundledCount = manifestFiles ? Object.keys(manifestFiles).length : 0;
   } catch {
     localBundledCount = 0;
@@ -3140,7 +3156,8 @@ function setupMyCustomSoundPanel() {
   // 2026-07-05: ローカル自動同梱(scripts/install-local-sounds.mjs)の検出本数を注記する。
   //   取込UIは「上書き用」であることを明示し、手動取込が必須ではないことを伝える。
   if (localNoteEl) {
-    void loadLocalBundledSoundManifest({ getUrl: (p) => chrome.runtime.getURL(p) }).then((manifestFiles) => {
+    // ★v0.1.1237: 共有 Promise 経由(loadCustomSoundDiagSafe と同じ1本を使う=二重fetch解消)。
+    void loadLocalSoundManifestShared().then((manifestFiles) => {
       const n = manifestFiles ? Object.keys(manifestFiles).length : 0;
       localNoteEl.textContent = n > 0
         ? `ローカル同梱を検出(${n}本)。下の取込UIは上書き用です(未操作でも自動で鳴ります)。`
@@ -3333,8 +3350,23 @@ function setupMyCustomSoundPanel() {
     })();
   });
 
-  void renderList();
-  void renderStats();
+  // ★v0.1.1237(診断ページ初回12.6秒の根治): 従来はここで無条件に renderList/renderStats を
+  //   発火していた。両者は IndexedDB を **全件走査**(listSoundBlobs=Blob本体込み・
+  //   getAssignment の直列ループ)するため、同じ DB を軽量 count で読む extras
+  //   (loadCustomSoundDiag)がその後ろで順番待ちし、初回 refresh が 12,607ms になっていた。
+  //   実測: 1回目 12,610ms(extras 12,607 / render 3) → 2回目 5ms。
+  //   ★このパネルは開発用(release非表示)なので、開いたときだけ読めば十分。
+  const panelEl = document.getElementById('myCustomSoundPanel');
+  const renderPanelOnce = () => {
+    void renderList();
+    void renderStats();
+  };
+  if (panelEl instanceof HTMLDetailsElement) {
+    if (panelEl.open) renderPanelOnce(); // 既に開いている(前回状態の復元等)なら即描く
+    else panelEl.addEventListener('toggle', () => { if (panelEl.open) renderPanelOnce(); });
+  } else {
+    renderPanelOnce(); // 入れ物が見つからない環境では従来どおり(挙動不変のfail-soft)
+  }
 }
 
 function hideDevDiagnosticsIfRelease() {

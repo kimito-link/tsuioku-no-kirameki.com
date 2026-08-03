@@ -6071,6 +6071,17 @@ export function mountVenueBarButton(options = {}) {
       stopSpeechPolling();
       stopCrowdMotion();
       resetSpeechTracking();
+      // ★v0.1.1237: 閉じたら DOM と集計データを解放する(メモリリーク根治)。
+      //   実測(ブラウザ): 会場を開くとヒープ +14.9MB(48.2→63.1MB)。従来はタイマーを
+      //   止めるだけで clearDisplay を呼ばず、228枚のタイル・画像・集計が残り続けていた。
+      //   clearDisplay は hasRenderedNonEmpty=false にするので、次に開けば再描画される
+      //   (配信切替時 :5408 と同じ経路)。
+      clearDisplay();
+      aggregatedChunkSeqs = [];
+      aggregatedCandidates = [];
+      spokenUserIds.clear();
+      laneMirrorPaintSnap = null;
+      venueTransientFirstSeen.clear();
     }
     if (persist) {
       // ユーザー要望により状態を復元しなくなったため、保存も無効化する
