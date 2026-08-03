@@ -16,6 +16,7 @@ CWS 提出用 ZIP を作るためのステージングスクリプト。
 from __future__ import annotations
 
 import json
+import re
 import shutil
 import sys
 import zipfile
@@ -85,13 +86,85 @@ def copy_declared_resources(manifest: dict, dest: Path) -> None:
 
     ★v0.1.1242: これが無いと「manifest だけ更新され staging スクリプトが追随しない」
       drift が起き、宣言済みリソースがZIPから丸ごと欠ける(実例=sound/・avatar-parts/)。
-      dist/ と HTML は上流で copy_tree/copy_file 済みなのでスキップする。
+      dist/ は copy_tree 済みなのでスキップする。
+      ★v0.1.1243: HTML はスキップしない。以前 `.html` を一括除外していたため
+      venue.html / live-view.html / marketing-export.html が欠落した(下記 collect_* 参照)。
     """
     for pattern in declared_resource_patterns(manifest):
-        if pattern.startswith('dist/') or pattern.endswith('.html'):
-            continue  # 既にコピー済み(重複コピーを避ける)
+        if pattern.startswith('dist/'):
+            continue  # copy_tree 済み(重複コピーを避ける)
         for src in resolve_declared_files(pattern):
             rel = src.relative_to(EXT_DIR).as_posix()
+            copy_file(src, dest / rel)
+
+
+# 実行時に参照されるページ/スクリプトを見つけるためのパターン。
+#   manifest の web_accessible_resources に【宣言されない】経路がある:
+#     - chrome.runtime.getURL('venue.html') のように拡張自身が開くページ
+#     - HTML 内の <script src="status-guard.js"> のような同梱スクリプト
+#   これらは宣言が無いので「宣言/実体の突合」では原理的に検出できない。
+#   ★引用符3種(' " `)とクエリ/ワイルドカード付きに対応すること。テンプレートリテラル
+#     (`marketing-export.html?lv=${lv}`)や getURL("marketing-export.html*") を取りこぼすと、
+#     そのページが丸ごと欠落したまま通過する(v0.1.1243 で実際に踏んだ)。
+RUNTIME_PAGE_RE = re.compile(r'getURL\(\s*[\'"`]([A-Za-z0-9_\-./]+\.html)(?:[?*#][^\'"`]*)?[\'"`]')
+HTML_SCRIPT_SRC_RE = re.compile(r'<script[^>]*\ssrc=["\']([^"\']+)["\']')
+
+
+def collect_runtime_referenced_pages(search_dirs: list[Path]) -> set[str]:
+    """コードが getURL(...) で開く .html を列挙する(extension/ 相対パス)。
+
+    ★v0.1.1243: venue.html / live-view.html / marketing-export.html は
+      web_accessible_resources に無い(拡張自身が開くだけなので宣言不要)ため、
+      manifest 起点の導出では拾えなかった。実際にZIPから丸ごと欠落し、
+      会場モード・応援ライブビュー・マーケ分析のボタンが空白タブになる状態だった。
+    """
+    found: set[str] = set()
+    for base in search_dirs:
+        if not base.exists():
+            continue
+        for path in base.rglob('*.js'):
+            try:
+                text = path.read_text(encoding='utf-8', errors='ignore')
+            except OSError:
+                continue
+            for rel in RUNTIME_PAGE_RE.findall(text):
+                found.add(rel.lstrip('./'))
+    return found
+
+
+def collect_html_script_srcs(html_files: list[Path]) -> set[str]:
+    """HTML が <script src> で読む同梱スクリプトを列挙する(extension/ 相対パス)。
+
+    ★v0.1.1243: status.html は status-guard.js(「何があっても開く」保険)を読むが、
+      これも manifest に宣言が無い。欠落すると **ページを開いた瞬間に 404** になる
+      (クリック不要=審査員が最初に踏む)。http(s) の外部URLは対象外。
+    """
+    found: set[str] = set()
+    for path in html_files:
+        if not path.exists():
+            continue
+        text = path.read_text(encoding='utf-8', errors='ignore')
+        for src in HTML_SCRIPT_SRC_RE.findall(text):
+            if src.startswith(('http://', 'https://', '//', 'data:')):
+                continue
+            found.add(src.lstrip('./'))
+    return found
+
+
+def copy_runtime_referenced_files(dest: Path) -> None:
+    """getURL 参照ページと、その HTML が読むスクリプトをコピーする(再帰1段)。"""
+    pages = collect_runtime_referenced_pages([EXT_DIR / 'dist', EXT_DIR])
+    for rel in sorted(pages):
+        src = EXT_DIR / rel
+        if src.is_file():
+            copy_file(src, dest / rel)
+    # ステージ済み HTML すべて(既存コピー分 + いま足したページ)の <script src> を回収する。
+    html_files = sorted(dest.rglob('*.html'))
+    for rel in sorted(collect_html_script_srcs(html_files)):
+        if rel.startswith('dist/'):
+            continue  # copy_tree 済み
+        src = EXT_DIR / rel
+        if src.is_file():
             copy_file(src, dest / rel)
 
 
@@ -192,6 +265,9 @@ def stage(version: str) -> Path:
     #      手書きに足すのではなく manifest を正本にすることで、以後の追加に自動で追随する。
     dev_manifest_for_assets = json.loads((EXT_DIR / 'manifest.json').read_text(encoding='utf-8'))
     copy_declared_resources(dev_manifest_for_assets, dest)
+    # ★v0.1.1243: manifest に宣言が無い実行時参照(getURL のページ・HTMLのscript src)も回収する。
+    #   宣言が無いので verify_zip の「宣言/実体の突合」では原理的に拾えない経路。
+    copy_runtime_referenced_files(dest)
 
     # 3) 提出用 manifest
     dev_manifest = dev_manifest_for_assets
@@ -269,7 +345,45 @@ def verify_zip(zip_path: Path) -> None:
                 f'{sorted(unmet)}'
             )
 
+        verify_runtime_references(zf, names)
         verify_no_secrets(zf, names)
+
+
+def verify_runtime_references(zf: zipfile.ZipFile, names: set) -> None:
+    """ZIP 内のコードが参照するページ/スクリプトが、同じ ZIP に実在することを確認する。
+
+    ★v0.1.1243: manifest の web_accessible_resources に【宣言されない】参照経路がある。
+      - chrome.runtime.getURL('venue.html') 等、拡張自身が開くページ(宣言不要)
+      - HTML の <script src="status-guard.js">(宣言不要)
+      v0.1.1242 の「宣言/実体の突合」はこれらを原理的に検出できず、実際に
+      venue.html / live-view.html / marketing-export.html / status-guard.js /
+      marketing-export-guard.js の5件が欠落したまま通過していた。
+      とくに status.html→status-guard.js は **ページを開いた瞬間に 404**
+      (クリック不要=審査員が最初に踏む経路)で Broken Functionality に直結する。
+      よって【ZIPの中身だけを見て】参照先の実在を突合する(fail-closed)。
+    """
+    missing: list[str] = []
+    # (a) getURL('*.html') の参照先
+    for name in sorted(n for n in names if n.endswith('.js')):
+        text = zf.read(name).decode('utf-8', 'ignore')
+        for rel in set(RUNTIME_PAGE_RE.findall(text)):
+            target = rel.lstrip('./')
+            if target not in names:
+                missing.append(f'{name} が開く {target}')
+    # (b) HTML の <script src>(外部URLは対象外)
+    for name in sorted(n for n in names if n.endswith('.html')):
+        text = zf.read(name).decode('utf-8', 'ignore')
+        for src in set(HTML_SCRIPT_SRC_RE.findall(text)):
+            if src.startswith(('http://', 'https://', '//', 'data:')):
+                continue
+            target = src.lstrip('./')
+            if target not in names:
+                missing.append(f'{name} が読む {target}')
+    if missing:
+        raise RuntimeError(
+            'ZIP 内のコードが参照しているのに ZIP に実体が無いファイル: '
+            + '; '.join(sorted(set(missing)))
+        )
 
 
 def verify_no_secrets(zf: zipfile.ZipFile, names: set) -> None:
@@ -283,7 +397,6 @@ def verify_no_secrets(zf: zipfile.ZipFile, names: set) -> None:
       ここでは【実際に空であること】をZIPから読み直して確認する=ビルド手順の
       間違いを提出前に必ず止める。
     """
-    import re
     leaked: list[str] = []
     for name in sorted(n for n in names if n.endswith('.js')):
         text = zf.read(name).decode('utf-8', 'ignore')
