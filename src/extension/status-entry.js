@@ -517,6 +517,9 @@ async function bootstrap() {
   //   これより前に自動送信が走ることはない(maybeAutoPublishStatusSnapshot は
   //   描画のたびに呼ばれるが、キャッシュ初期値 false=送らない側に倒れている)。
   await refreshWebPublishOptInCache();
+  // ★v0.1.1245: 共有キーを storage から読む(ビルドに焼き込まない)。
+  //   キャッシュ初期値は未設定なので、これより前に送信やURL提示が走ることはない。
+  await refreshUploadConfigCache();
 
   try {
     checkVersionMismatchBanner();
@@ -1617,6 +1620,8 @@ function renderAll({ lvList, summaries, fastDiag, popupDiag, backfillProgress, b
       // v0.1.1242: 自動公開の明示同意(既定OFF)。ボタンの直下に置く。
       const consentEl = buildAutoPublishConsentToggle();
       if (consentEl) livesEl.appendChild(consentEl);
+      // v0.1.1245: 共有キーの設定欄(ビルドに焼き込まないための入口)。未設定なら開いて出る。
+      livesEl.appendChild(buildUploadConfigEditor());
     } else {
       // v0.1.868: 「スムーズじゃない」対策。配信カードは 2 秒ごとに innerHTML 全再構築+<img>再生成で
       //   サムネが毎回チラつき重い。表示に効く値だけの軽い signature を作り、変化が無ければ再構築を
@@ -1680,6 +1685,8 @@ function renderAll({ lvList, summaries, fastDiag, popupDiag, backfillProgress, b
         // v0.1.1242: 自動公開の明示同意(既定OFF)。何が送られるかを明記して選ばせる。
         const consentEl = buildAutoPublishConsentToggle();
         if (consentEl) card.appendChild(consentEl);
+        // v0.1.1245: 共有キーの設定欄(ビルドに焼き込まないための入口)。未設定なら開いて出る。
+        card.appendChild(buildUploadConfigEditor());
 
         // 2026-06-23: この配信が「Alt+Tab に出ない裏タブ(active:false)」のときだけ、警告 + 手動クローズ
         //   ボタンを出す(過去 autopatrol/古い重複拡張の遺物対策・自動では閉じない=誤爆ゼロ)。
@@ -2275,9 +2282,97 @@ function buildLiveViewButton(live) {
  *
  * @returns {HTMLElement|null}
  */
+/**
+ * ★v0.1.1245: 共有キーの設定欄（折りたたみ）。**ビルドに焼き込まないための入口**。
+ *
+ * 旧実装はビルド時に `.env` の値を dist へ焼いていたが、`extension/dist/status.js` は
+ * git 追跡下で公開リポジトリに push されており、書き込み認証キーが誰でも読めていた。
+ * 鍵をローテーションしても次の push でまた漏れる構造だったので、
+ * **利用者が自分の端末に入力して保存する**方式へ変えた（chrome.storage.local）。
+ *
+ * 未設定でも拡張の記録・表示は完全に動く（共有機能だけが出ない）。
+ *
+ * @returns {HTMLElement}
+ */
+function buildUploadConfigEditor() {
+  const cfg = getUploadConfig();
+  const details = document.createElement('details');
+  details.style.cssText =
+    'margin-top:8px;padding:6px 8px;border-radius:6px;font-size:11px;line-height:1.5;' +
+    'border:1px solid var(--nl-border);background:var(--nl-card-bg);';
+  // 未設定なら開いた状態で出す（何をすればいいか一目で分かる）
+  details.open = !(cfg.ingestKey && cfg.viewToken);
+
+  const summary = document.createElement('summary');
+  summary.style.cssText = 'cursor:pointer;font-weight:600;';
+  summary.textContent = cfg.ingestKey && cfg.viewToken
+    ? '🔑 WEB共有の設定（設定済み）'
+    : '🔑 WEB共有の設定（未設定＝共有機能は使えません）';
+  details.appendChild(summary);
+
+  const note = document.createElement('p');
+  note.style.cssText = 'margin:6px 0;color:var(--nl-muted);';
+  note.textContent =
+    '記録をスマホや他の人に見せる「WEB共有」を使うときだけ必要です。空のままでも記録・表示は問題なく動きます。' +
+    'この値はこのPCの中だけに保存され、外部には送られません。';
+  details.appendChild(note);
+
+  /** @param {string} label @param {string} value @param {string} hint */
+  const field = (label, value, hint) => {
+    const wrap = document.createElement('label');
+    wrap.style.cssText = 'display:block;margin:6px 0;';
+    const cap = document.createElement('span');
+    cap.style.cssText = 'display:block;margin-bottom:2px;';
+    cap.textContent = label;
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.value = value;
+    input.placeholder = hint;
+    input.spellcheck = false;
+    input.autocomplete = 'off';
+    input.style.cssText =
+      'width:100%;padding:4px 6px;border-radius:4px;font-size:11px;font-family:monospace;' +
+      'border:1px solid var(--nl-border);background:var(--nl-bg);color:var(--nl-fg);';
+    wrap.appendChild(cap);
+    wrap.appendChild(input);
+    details.appendChild(wrap);
+    return input;
+  };
+
+  const ingestInput = field('書き込みキー（x-share-key）', cfg.ingestKey, '未設定');
+  const tokenInput = field('閲覧トークン（URLの ?v=）', cfg.viewToken, '未設定');
+  const originInput = field('送信先（通常は変更不要）', cfg.appOrigin, DEFAULT_APP_ORIGIN);
+
+  const row = document.createElement('div');
+  row.style.cssText = 'display:flex;gap:6px;align-items:center;margin-top:6px;';
+  const saveBtn = document.createElement('button');
+  saveBtn.type = 'button';
+  saveBtn.textContent = '保存';
+  saveBtn.style.cssText =
+    'padding:4px 12px;border-radius:6px;cursor:pointer;font-size:11px;font-weight:600;' +
+    'border:1px solid var(--nl-accent);background:var(--nl-card-bg);color:var(--nl-accent);';
+  const result = document.createElement('span');
+  result.style.cssText = 'color:var(--nl-muted);';
+  saveBtn.addEventListener('click', async () => {
+    await setUploadConfig({
+      ingestKey: ingestInput.value,
+      viewToken: tokenInput.value,
+      appOrigin: originInput.value
+    });
+    const now = getUploadConfig();
+    result.textContent = now.ingestKey && now.viewToken
+      ? '✅ 保存しました（画面を更新すると共有ボタンが出ます）'
+      : '保存しました（未設定＝共有機能は出ません）';
+  });
+  row.appendChild(saveBtn);
+  row.appendChild(result);
+  details.appendChild(row);
+  return details;
+}
+
 function buildAutoPublishConsentToggle() {
   const { ingestKey, viewToken } = getUploadConfig();
-  if (!ingestKey || !viewToken) return null; // キー未設定ビルド=公開機能なし=出さない
+  if (!ingestKey || !viewToken) return null; // キー未設定=公開機能なし=出さない
   const wrap = document.createElement('label');
   wrap.style.cssText =
     'display:flex;align-items:flex-start;gap:6px;margin-top:8px;padding:6px 8px;border-radius:6px;' +
@@ -2627,17 +2722,65 @@ function numOrNull(v) {
  * ========================================================================== */
 
 /**
- * ビルド時 define で注入されるアップロード設定(scripts/build.mjs の statusDefine)。
- *   未注入のローカル/テスト環境でも壊れないよう typeof ガードする。
+ * 共有キーのアップロード設定。**ビルドには一切焼き込まない**(v0.1.1245)。
+ *
+ * ★2026-08-03 の事故: 旧実装はビルド時 define(scripts/build.mjs の statusDefine)で
+ *   `.env` の値を dist に焼き込んでいた。`extension/dist/status.js` は git 追跡下で
+ *   **公開リポジトリに push されていた**ため、`ingestKey`(=/api/status の【書き込み】認証)が
+ *   誰でも読める状態だった。CRX を展開されるまでもなく GitHub で読めた。
+ *   鍵をローテーションしても、次のビルド+push で新しい鍵がまた公開される構造だったため、
+ *   **鍵をバンドルに載せない**方式へ変更した。
+ *
+ *   保存先は chrome.storage.local(拡張専用領域・他サイトや他拡張から読めない)。
+ *   利用者が設定欄に一度入力すれば以後保持される。未設定なら公開機能は出ない
+ *   (従来の「キー未設定ビルド」と同じ挙動なので、呼び出し側は不変)。
+ *
+ *   ★同期で読めるようメモリにキャッシュする(呼び出しが6箇所あり、描画経路から
+ *   同期的に呼ばれるため)。storage 読みは bootstrap で1回だけ(コアread を増やさない)。
  */
+const KEY_STATUS_UPLOAD_CONFIG = 'nls_status_upload_config_v1';
+const DEFAULT_APP_ORIGIN = 'https://app.tsuioku-no-kirameki.com';
+
+/** @type {{ ingestKey: string, viewToken: string, appOrigin: string }} */
+let _uploadConfigCache = { ingestKey: '', viewToken: '', appOrigin: DEFAULT_APP_ORIGIN };
+
 function getUploadConfig() {
-  const ingestKey = typeof NL_STATUS_INGEST_KEY !== 'undefined' ? NL_STATUS_INGEST_KEY : '';
-  const viewToken = typeof NL_STATUS_VIEW_TOKEN !== 'undefined' ? NL_STATUS_VIEW_TOKEN : '';
-  const appOrigin =
-    typeof NL_STATUS_APP_ORIGIN !== 'undefined' && NL_STATUS_APP_ORIGIN
-      ? NL_STATUS_APP_ORIGIN
-      : 'https://app.tsuioku-no-kirameki.com';
-  return { ingestKey, viewToken, appOrigin };
+  return _uploadConfigCache;
+}
+
+/** storage から共有キーを読み直してキャッシュする(失敗時は未設定=公開機能を出さない側に倒す)。 */
+async function refreshUploadConfigCache() {
+  try {
+    const bag = await chrome.storage.local.get(KEY_STATUS_UPLOAD_CONFIG);
+    const raw = bag?.[KEY_STATUS_UPLOAD_CONFIG];
+    const src = raw && typeof raw === 'object' ? raw : {};
+    _uploadConfigCache = {
+      ingestKey: String(src.ingestKey || '').trim(),
+      viewToken: String(src.viewToken || '').trim(),
+      appOrigin: String(src.appOrigin || '').trim() || DEFAULT_APP_ORIGIN
+    };
+  } catch {
+    // fail-closed: 読めないなら未設定扱い(送信もURL提示もしない)
+    _uploadConfigCache = { ingestKey: '', viewToken: '', appOrigin: DEFAULT_APP_ORIGIN };
+  }
+  return _uploadConfigCache;
+}
+
+/** 共有キーを保存してキャッシュも更新する。空文字で保存すれば公開機能を無効化できる。 */
+async function setUploadConfig(next) {
+  const src = next && typeof next === 'object' ? next : {};
+  const value = {
+    ingestKey: String(src.ingestKey || '').trim(),
+    viewToken: String(src.viewToken || '').trim(),
+    appOrigin: String(src.appOrigin || '').trim() || DEFAULT_APP_ORIGIN
+  };
+  _uploadConfigCache = value;
+  try {
+    await chrome.storage.local.set({ [KEY_STATUS_UPLOAD_CONFIG]: value });
+  } catch {
+    /* best-effort: 保存に失敗してもキャッシュは反映済み(次回起動で未設定に戻る=安全側) */
+  }
+  return value;
 }
 
 /**
@@ -2665,7 +2808,7 @@ function persistLiveviewPublishOutcome(outcome) {
 async function uploadStatusSnapshot() {
   const { ingestKey, viewToken, appOrigin } = getUploadConfig();
   if (!ingestKey || !viewToken) {
-    return { ok: false, error: 'キー未設定(ビルド時に NL_STATUS_INGEST_KEY / NL_STATUS_VIEW_TOKEN を注入してください)' };
+    return { ok: false, error: 'キー未設定(この画面の「🔑 WEB共有の設定」で書き込みキーと閲覧トークンを入力してください)' };
   }
   const jsonBlob = _lastRenderedBundle?.jsonBlob;
   if (!jsonBlob) {

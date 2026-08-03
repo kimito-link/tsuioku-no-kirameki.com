@@ -419,7 +419,7 @@ export function formatLiveviewPublishSelfDiagLines(diag) {
   const p = d.publish || {};
   lines.push(`公開設定: ingestKey ${p.hasIngestKey ? '✅' : '🔴未設定'} / viewToken ${p.hasViewToken ? '✅' : '🔴未設定'}`);
   if (!p.ready) {
-    lines.push('  → キー未設定＝純Webに何も届きません（ビルド時の NL_STATUS_INGEST_KEY / NL_STATUS_VIEW_TOKEN 要設定）');
+    lines.push('  → キー未設定＝純Webに何も届きません（状態速報の「🔑 WEB共有の設定」で入力してください）');
   }
 
   // 直近の公開送信

@@ -73,31 +73,23 @@ const popupDefine = {
   NL_BUNDLE_VERSION: JSON.stringify(PKG_VERSION)
 };
 
-// status ページのアップロード機能に渡すキー。ソース直書きを避け、環境変数(.env)から注入。
-//   - NL_STATUS_INGEST_KEY: api/status の書き込み認証(x-share-key)
-//   - NL_STATUS_VIEW_TOKEN: 閲覧 URL の ?v= トークン(推測困難な長い文字列)
-//   - NL_STATUS_APP_ORIGIN: 送信先オリジン(既定 https://app.tsuioku-no-kirameki.com)
-// 未設定時は空文字 → 拡張は「未設定」を検知してアップロードボタンを無効表示にする。
+// ★v0.1.1245: status の共有キーは【ビルドに一切焼き込まない】。
 //
-// ★v0.1.1242(CWS提出ブロッカー BLOCKING-2): NL_STORE_BUILD=1 のときは【必ず空文字】にする。
-//   ingestKey は /api/status の【書き込み】認証で、CRX は誰でも展開できるため、
-//   同梱したまま公開すると全世界に書き込み鍵を配ることになる(第三者が任意データを
-//   POST 可能)。viewToken も「推測困難な長い文字列」であることが唯一の閲覧防御なので、
-//   同梱すると全ユーザー共通・公知になり、全利用者のスナップショットが誰でも閲覧可能になる。
-//   拡張側は既に「キー未設定=公開機能を出さない」を正しく実装している(status-entry.js:2584)
-//   ので、空にするだけで公開機能ごと安全に無効化される。
-const IS_STORE_BUILD = process.env.NL_STORE_BUILD === '1';
-const statusDefine = {
-  ...popupDefine,
-  NL_STATUS_INGEST_KEY: JSON.stringify(IS_STORE_BUILD ? '' : process.env.NL_STATUS_INGEST_KEY || ''),
-  NL_STATUS_VIEW_TOKEN: JSON.stringify(IS_STORE_BUILD ? '' : process.env.NL_STATUS_VIEW_TOKEN || ''),
-  NL_STATUS_APP_ORIGIN: JSON.stringify(
-    process.env.NL_STATUS_APP_ORIGIN || 'https://app.tsuioku-no-kirameki.com'
-  )
-};
-if (IS_STORE_BUILD) {
-  console.log('nicolivelog: STORE BUILD = 公開キーを空にしました(鍵をZIPに同梱しない)');
-}
+//   旧実装は .env の NL_STATUS_INGEST_KEY / NL_STATUS_VIEW_TOKEN を esbuild の define で
+//   dist へ埋め込んでいた。しかし `extension/dist/status.js` は git 追跡下にあり、
+//   **公開リポジトリに push されていた**ため、/api/status の【書き込み】認証キーが
+//   GitHub 上で誰でも読める状態だった(CRX を展開するまでもない)。
+//   v0.1.1242 で NL_STORE_BUILD=1 のとき空にする対処を入れたが、それは提出ZIPを守るだけで、
+//   **通常ビルドの成果物を push すれば新しい鍵がまた公開される**構造は残っていた。
+//   鍵のローテーションでは根治しないため、**バンドルに載せない**方式へ変更した。
+//
+//   現在の保存先は chrome.storage.local(status 画面の「🔑 WEB共有の設定」で利用者が入力)。
+//   拡張は未設定なら共有機能を出さない(従来の「キー未設定ビルド」と同じ挙動)。
+//   → dist に鍵が入らないので、push しても、ZIP を配っても漏れない。
+//
+//   NL_STATUS_APP_ORIGIN(送信先オリジン)は秘密ではないが、同じく storage 側に持たせて
+//   define を全廃した(define が1つでも残ると「ここに足せばいい」と再発しやすいため)。
+const statusDefine = { ...popupDefine };
 
 const targets = [
   {
