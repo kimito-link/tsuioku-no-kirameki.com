@@ -236,7 +236,8 @@ import {
   removeStoryAvatarTvFallbackClass
 } from '../lib/storyAvatarTvFallbackClass.js';
 import { storyTileUsesYukkuriTvStyle } from '../lib/storyTileTvStyle.js';
-import { upgradeAnonymousAvatarImage } from '../lib/avatarPartsComposer.js';
+// ★v0.1.1238: 会場は匿名の顔をSVGのまま使うため upgradeAnonymousAvatarImage を import しない
+//   (venuePersonTileIo のコメント参照)。popup/comeview/status は従来どおり合成PNGを使う。
 import {
   isHttpOrHttpsUrl,
   NICONICO_OFFICIAL_DEFAULT_USERICON_HTTPS
@@ -395,12 +396,25 @@ const venueAvatarLoadGuard = createSupportAvatarLoadGuard({
   retryPolicy: {}
 });
 
-/** buildPersonTileEl(p, io) の io 引数。popup の laneDomIo(popup-entry.js:5232)と同形。 */
+/**
+ * buildPersonTileEl(p, io) の io 引数。popup の laneDomIo(popup-entry.js:5232)と同形。
+ *
+ * ★v0.1.1238: 会場では `upgradeAnonymousAvatarImage` を**注入しない**(匿名の顔はSVGのまま)。
+ *   実測(ブラウザ): 会場内img 228枚・ユニーク177種で、匿名の顔は1件 29,262バイトの
+ *   PNG(128x128)だった。文字列だけで 5.05MB・デコード後ビットマップ推定 11MB。
+ *   一方、席の実表示は 22px(下の [data-thumb="0"] のCSS)= 5.8倍の過剰。
+ *   SVG(anonymousIdenticonDataUrl・約2.5KB)なら約1/12で済む。
+ *   ★ホバーカード(72px)も席の img.src を流用するが、readVenueTileThumbState
+ *     (venueHoverCard.js:48)が data:image/svg+xml を identicon として扱う分岐を持つ。
+ *     SVGはベクタなので拡大しても劣化しない=従来のPNG(128px)より鮮明になる。
+ *   ★popup/comeview/status の注入は変更していない(会場だけの最適化)。
+ *   personTileDom.js は凍結ファイルなので触らず、io の有無で制御する
+ *   (:95 の `typeof io.upgradeAnonymousAvatarImage === 'function'` が分岐点)。
+ */
 const venuePersonTileIo = {
   storyAvatarLoadGuard: venueAvatarLoadGuard,
   isHttpOrHttpsUrl,
-  storyTileUsesYukkuriTvStyle,
-  upgradeAnonymousAvatarImage
+  storyTileUsesYukkuriTvStyle
 };
 
 const STORY_GUIDE_FACE_LINK =
