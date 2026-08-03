@@ -261,6 +261,43 @@ const WATCH_SNAPSHOT_PREFIX = 'nls_watch_snapshot_';
 /** 最後に視聴した URL の storage key。 */
 const KEY_LAST_WATCH_URL = 'nls_last_watch_url';
 
+/**
+ * ★v0.1.1242(CWS提出ブロッカー BLOCKING-1): WEB公開の明示同意フラグ(既定OFF)。
+ *
+ * 旧実装は同意ゲートが無く、status ページを開いて視聴しているだけで 120秒ごとに
+ * 視聴者のユーザーID・名前・コメント本文を外部サーバーへ自動送信していた
+ * (privacy.html 等4文書の「自動送信しない」と真逆=CWS User Data Policy 違反)。
+ * true を明示的に保存するまで自動送信しない。手動の共有ボタンは従来どおり
+ * 「押した=その回の同意」として扱うので、このフラグの対象は【自動送信のみ】。
+ */
+const KEY_WEB_PUBLISH_OPT_IN = 'nls_web_publish_opt_in';
+
+/** 同意フラグのメモリキャッシュ。判定は同期で行うため(コアreadを増やさない)。 */
+let _webPublishOptIn = false;
+
+/** 同意フラグを storage から読み直してキャッシュする(失敗時は false=送らない側に倒す)。 */
+async function refreshWebPublishOptInCache() {
+  try {
+    const bag = await chrome.storage.local.get(KEY_WEB_PUBLISH_OPT_IN);
+    _webPublishOptIn = bag?.[KEY_WEB_PUBLISH_OPT_IN] === true;
+  } catch {
+    _webPublishOptIn = false; // fail-closed: 読めないなら送らない
+  }
+  return _webPublishOptIn;
+}
+
+/** 同意フラグを保存してキャッシュも更新する。 */
+async function setWebPublishOptIn(next) {
+  const value = next === true;
+  _webPublishOptIn = value;
+  try {
+    await chrome.storage.local.set({ [KEY_WEB_PUBLISH_OPT_IN]: value });
+  } catch {
+    /* best-effort: 保存に失敗してもキャッシュは反映済み(次回起動で既定OFFに戻る=安全側) */
+  }
+  return value;
+}
+
 /** 自動更新の一時停止フラグ。 */
 let _refreshPausedByUser = false;
 /** v0.1.644: 直近の status refresh エラー(画面の自己診断表示用)。 */
@@ -475,6 +512,11 @@ async function bootstrap() {
   // 自分の URL を footer に
   const urlEl = document.getElementById('statusPageUrl');
   if (urlEl) urlEl.textContent = location.href;
+
+  // ★v0.1.1242(BLOCKING-1): WEB公開の同意フラグを最初に読む(既定OFF)。
+  //   これより前に自動送信が走ることはない(maybeAutoPublishStatusSnapshot は
+  //   描画のたびに呼ばれるが、キャッシュ初期値 false=送らない側に倒れている)。
+  await refreshWebPublishOptInCache();
 
   try {
     checkVersionMismatchBanner();
@@ -1572,6 +1614,9 @@ function renderAll({ lvList, summaries, fastDiag, popupDiag, backfillProgress, b
         webUrlBtn.style.marginRight = '0';
         livesEl.appendChild(webUrlBtn);
       }
+      // v0.1.1242: 自動公開の明示同意(既定OFF)。ボタンの直下に置く。
+      const consentEl = buildAutoPublishConsentToggle();
+      if (consentEl) livesEl.appendChild(consentEl);
     } else {
       // v0.1.868: 「スムーズじゃない」対策。配信カードは 2 秒ごとに innerHTML 全再構築+<img>再生成で
       //   サムネが毎回チラつき重い。表示に効く値だけの軽い signature を作り、変化が無ければ再構築を
@@ -1632,6 +1677,9 @@ function renderAll({ lvList, summaries, fastDiag, popupDiag, backfillProgress, b
         //   送信→WEB状態速報URLを新規タブで開く。キー未設定ビルドでは null=出さない。
         const webUrlBtn = buildWebUrlButton();
         if (webUrlBtn) card.appendChild(webUrlBtn);
+        // v0.1.1242: 自動公開の明示同意(既定OFF)。何が送られるかを明記して選ばせる。
+        const consentEl = buildAutoPublishConsentToggle();
+        if (consentEl) card.appendChild(consentEl);
 
         // 2026-06-23: この配信が「Alt+Tab に出ない裏タブ(active:false)」のときだけ、警告 + 手動クローズ
         //   ボタンを出す(過去 autopatrol/古い重複拡張の遺物対策・自動では閉じない=誤爆ゼロ)。
@@ -1810,6 +1858,8 @@ function maybeAutoPublishStatusSnapshot(livesData, publishOutcomeRec) {
     const hasWatchTab = Array.isArray(livesData) && livesData.some((l) => l && l.recording);
     const outcome = summarizeLiveviewPublishOutcomeRecord(publishOutcomeRec || null, Date.now());
     const decision = shouldAutoPublish({
+      // ★v0.1.1242: 明示同意(既定OFF)が最優先ゲート。未同意なら他が揃っていても送らない。
+      optedIn: _webPublishOptIn === true,
       hasKeys: Boolean(ingestKey && viewToken),
       hasPayload: Boolean(_lastRenderedBundle?.jsonBlob),
       hasWatchTab,
@@ -2215,6 +2265,39 @@ function buildLiveViewButton(live) {
 //     popup そっくり)とは役割が別。文言を「共有」と明記してユーザーの取り違えを無くす(誠実な設計)。
 //   結果(成功/失敗・両URL)は従来どおり上部 #uploadResult にも出す。
 //   キー未注入ビルドでは出さない(死にボタン回避)。多重送信防止に送信中はボタンを無効化。
+/**
+ * ★v0.1.1242(CWS提出ブロッカー BLOCKING-1): 自動でWEB公開し続けることへの明示同意トグル。
+ *
+ * 既定OFF。ONにするまで自動送信は一切行わない(手動の共有ボタンは押した時点が同意なので別扱い)。
+ * 送信内容には視聴者のユーザーID・表示名・コメント本文が含まれるため、何が送られるかを
+ * ラベルに明記して選ばせる(privacy.html §4 と同じ内容を1行で示す)。
+ * キー未設定ビルド(=ストア提出版)では公開機能そのものが無いので出さない。
+ *
+ * @returns {HTMLElement|null}
+ */
+function buildAutoPublishConsentToggle() {
+  const { ingestKey, viewToken } = getUploadConfig();
+  if (!ingestKey || !viewToken) return null; // キー未設定ビルド=公開機能なし=出さない
+  const wrap = document.createElement('label');
+  wrap.style.cssText =
+    'display:flex;align-items:flex-start;gap:6px;margin-top:8px;padding:6px 8px;border-radius:6px;' +
+    'font-size:11px;line-height:1.5;cursor:pointer;border:1px solid var(--nl-border);background:var(--nl-card-bg);';
+  const cb = document.createElement('input');
+  cb.type = 'checkbox';
+  cb.checked = _webPublishOptIn === true;
+  cb.style.cssText = 'margin-top:2px;flex:0 0 auto;cursor:pointer;';
+  const text = document.createElement('span');
+  text.textContent =
+    '配信中、この画面の内容(視聴者のID・表示名・コメント本文を含みます)を2分ごとに自動でWEBへ公開する。' +
+    'OFFのあいだは自動送信しません(「🔗 WEBサイトURLで共有」を押したときだけ送信します)。';
+  cb.addEventListener('change', () => {
+    void setWebPublishOptIn(cb.checked === true);
+  });
+  wrap.appendChild(cb);
+  wrap.appendChild(text);
+  return wrap;
+}
+
 function buildWebUrlButton() {
   const { ingestKey, viewToken } = getUploadConfig();
   if (!ingestKey || !viewToken) return null; // キー未設定ビルド=出さない。

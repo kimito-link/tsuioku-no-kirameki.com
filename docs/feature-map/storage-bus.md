@@ -158,6 +158,7 @@
 | `KEY_VOICE_DIAG` | extension/comeview-entry.js<br>extension/venueBar.js | extension/popup-entry.js<br>extension/status-entry.js |
 | `KEY_VOICE_EFFECT_DIAG` | extension/popup-entry.js<br>extension/venueBar.js | extension/status-entry.js |
 | `KEY_VOICE_INPUT_DEVICE` | extension/popup-entry.js | extension/popup-entry.js |
+| `KEY_WEB_PUBLISH_OPT_IN` | extension/status-entry.js | extension/status-entry.js |
 | `fn:backfillHeartbeatKey` | extension/content-entry.js | — |
 | `fn:chunkIndexKey` | extension/content-entry.js | extension/popup-entry.js |
 | `fn:chunkMigratedKey` | extension/content-entry.js | — |
