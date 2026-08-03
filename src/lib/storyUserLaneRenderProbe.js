@@ -57,6 +57,7 @@ export function createStoryUserLaneRenderProbe() {
     //   「たぬ姉レーンが暫定(直近N件)で固着」の真因(refreshGen レース)を状態速報から観測する。
     heavySettleState: '', // '' | 'settled' | 'race' | 'stale-snapshot' | 'null-resp' | 'empty-covered'
     heavyRaceReturns: 0, // 14532(refreshGen レース)で早期 return した累計回数(多い=レース支配的)
+    heavyEverSettled: false, // v0.1.1241: 一度でも settled に到達したか(最後が race でも消えない)
     // heavyRace再発の即効対策(A): 暫定縮小の上書きを見送った累計回数(>0=ガードが完全描画を守った)。
     shrinkKeepCount: 0,
     // ───────────────────────────────────────────────────────────────────
@@ -101,6 +102,14 @@ export function recordStoryUserLaneHeavySettle(probe, state) {
   probe.heavySettleState = String(state || '');
   if (state === STORY_USER_LANE_HEAVY_SETTLE.RACE) {
     probe.heavyRaceReturns = (Number(probe.heavyRaceReturns) || 0) + 1;
+  }
+  // ★v0.1.1241: heavySettleState は【最後の1回】しか持たない。5回中4回 race でも
+  //   「一度は全件が乗った」事実が消え、実配信 lv351085849 で droppedTotal=0(誰も消えていない)
+  //   なのに「たぬ姉が暫定固着の疑い」と誤警告した。race は自己修復の途中経過でもあるので
+  //   (v0.1.1035: race で bail しても readAtMs を打って次 refresh が settled で始まれる)、
+  //   settled 到達の有無を別に持ち、症状から原因を飛躍して名指ししない。
+  if (state === STORY_USER_LANE_HEAVY_SETTLE.SETTLED) {
+    probe.heavyEverSettled = true;
   }
 }
 
@@ -188,6 +197,7 @@ export function snapshotStoryUserLaneRenderProbe(probe, nowMs) {
     entriesLen: Number.isFinite(probe.entriesLen) ? probe.entriesLen : -1,
     heavySettleState: probe.heavySettleState || '',
     heavyRaceReturns: Number(probe.heavyRaceReturns) || 0,
+    heavyEverSettled: probe.heavyEverSettled === true, // v0.1.1241: 誤警告防止(最後が race でも消えない)
     shrinkKeepCount: Number(probe.shrinkKeepCount) || 0,
     // v0.1.1229: (a)/(b) 切り分け用。
     lastProvisional: Number.isFinite(probe.lastProvisional) ? probe.lastProvisional : -1,
@@ -279,6 +289,7 @@ export function buildStoryUserLaneRenderDiag(probeSnap, ctx) {
     expected,
     heavySettleState: String(s.heavySettleState || ''),
     heavyRaceReturns: Number(s.heavyRaceReturns) || 0,
+    heavyEverSettled: s.heavyEverSettled === true, // v0.1.1241
     shrinkKeepCount: Number(s.shrinkKeepCount) || 0,
     // v0.1.1229: (a)/(b) 切り分け用(そのまま持ち越す)。
     lastProvisional: Number.isFinite(s.lastProvisional) ? s.lastProvisional : -1,
@@ -347,12 +358,17 @@ export function formatStoryUserLaneRenderDiagLines(diag, ctx) {
     );
   }
   // v0.1.1033: heavy 完了が settled に到達したか。race 多発=たぬ姉レーンが暫定(直近N件)で固着の真因。
+  // ★v0.1.1241: 「一度でも settled したか」で言い分けを変える。race は自己修復の途中経過でもあり
+  //   (v0.1.1035: race で bail しても次 refresh が settled で始まれる)、最後の1回が race というだけで
+  //   固着を名指しすると、実配信 lv351085849 のように droppedTotal=0(誰も消えていない)でも誤警告になる。
   if (d.heavySettleState) {
     const settleLabel =
       d.heavySettleState === 'settled'
         ? '✅ settled(全件がレーンに乗る正常)'
         : d.heavySettleState === 'race'
-          ? `⚠ race(refreshに追い越され未settle・累計${d.heavyRaceReturns}回)=たぬ姉が暫定固着の疑い`
+          ? d.heavyEverSettled
+            ? `⚪ race(累計${d.heavyRaceReturns}回)だが一度は全件到達済み=自己修復中(固着ではない)`
+            : `⚠ race(refreshに追い越され未settle・累計${d.heavyRaceReturns}回)=一度も全件到達なし=たぬ姉が暫定固着の疑い`
           : d.heavySettleState;
     lines.push(`  → heavy 完了: ${settleLabel}`);
   }
