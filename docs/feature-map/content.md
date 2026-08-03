@@ -26,7 +26,6 @@ graph LR
   n_content --> n_src_lib_auditionEventRankingApi_js["lib/auditionEventRankingApi.js"]:::shared
   n_content --> n_src_lib_autoBackupState_js["lib/autoBackupState.js"]
   n_content --> n_src_lib_avatarBroadcasterGuard_js["lib/avatarBroadcasterGuard.js"]:::shared
-  n_content --> n_src_lib_avatarPartsComposer_js["lib/avatarPartsComposer.js"]:::shared
   n_content --> n_src_lib_avatarUrlCompare_js["lib/avatarUrlCompare.js"]:::shared
   n_content --> n_src_lib_backfillCapturedAt_js["lib/backfillCapturedAt.js"]:::shared
   n_content --> n_src_lib_backfillFlushThreshold_js["lib/backfillFlushThreshold.js"]
@@ -53,7 +52,8 @@ graph LR
   n_content --> n_src_lib_channelBroadcasterMeta_js["lib/channelBroadcasterMeta.js"]
   n_content --> n_src_lib_channelSwitchDiag_js["lib/channelSwitchDiag.js"]:::shared
   n_content --> n_src_lib_channelSwitchDiagKey_js["lib/channelSwitchDiagKey.js"]:::shared
+  n_content --> n_src_lib_cleanNdgrChatRows_js["lib/cleanNdgrChatRows.js"]
   classDef shared fill:#eee,stroke:#999,color:#666;
 ```
 
-> ほか 268 ファイル省略（全件は storage-bus.md / metafile 参照）。
+> ほか 267 ファイル省略（全件は storage-bus.md / metafile 参照）。
