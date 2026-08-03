@@ -462,10 +462,15 @@ export function storyUserLaneRenderDiagToActionCards(diag, ctx) {
  *
  * @param {{ laneLink?: any, laneGift?: any, laneAd?: any, laneKonta?: any, laneTanu?: any }|null|undefined} els
  * @param {number} nextTileCount
- * @param {number} [ratio] 既定 0.6(ガードと同じ閾値)
+ * @param {number} [ratio] 既定 1(ガードと同じ定義=1枚でも減ったら縮小)
+ *   ★v0.1.1240: 既定を 0.6 → 1 に変更。ガードは v0.1.1233 で `next < prev` になったのに
+ *     計器だけ 0.6 のままで、定義がズレていた。その結果、実配信 v0.1.1239 で
+ *     **誰も消えていない**(消えた人0人/来た人423人/DOM433件)のに
+ *     「⚠ 縮小しているのにガードが素通り」という誤警告が出た。
+ *     計器とガードで「縮小」の意味が違うと、切り分けが永久に詰まる。
  * @returns {boolean}
  */
-export function detectStoryUserLaneShrink(els, nextTileCount, ratio = 0.6) {
+export function detectStoryUserLaneShrink(els, nextTileCount, ratio = 1) {
   try {
     const lanes = els ? [els.laneLink, els.laneGift, els.laneAd, els.laneKonta, els.laneTanu] : [];
     let prev = 0;
