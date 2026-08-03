@@ -287,6 +287,56 @@ describe('recordStoryUserLaneHeavySettle(refreshGen レース観測・v0.1.1033)
     const text = formatStoryUserLaneRenderDiagLines(d, {}).join('\n');
     expect(text).toContain('heavy 完了: ⚠ race');
   });
+
+  /**
+   * ★v0.1.1241 実配信 lv351085849 で踏んだ誤警告。
+   *
+   * heavySettleState は【最後の1回】しか持たないため、5回中4回が race でも
+   * 「一度は全件が乗った(settled)」事実が消える。実測では droppedTotal=0 で
+   * 誰も消えていないのに「たぬ姉が暫定固着の疑い」と断定していた。
+   * 症状(race)から原因(固着)を飛躍して名指しするのは
+   * [[instrument-must-name-the-cause-2026-08-01]] 違反。
+   * 一度でも settled に到達したかを別に持ち、固着と言い切らない。
+   */
+  it('一度でも settled に到達したら heavyEverSettled が立つ(最後が race でも消えない)', () => {
+    const p = createStoryUserLaneRenderProbe();
+    recordStoryUserLaneHeavySettle(p, STORY_USER_LANE_HEAVY_SETTLE.SETTLED);
+    recordStoryUserLaneHeavySettle(p, STORY_USER_LANE_HEAVY_SETTLE.RACE);
+    expect(p.heavySettleState).toBe('race');
+    expect(p.heavyEverSettled).toBe(true);
+  });
+
+  it('一度も settled していなければ heavyEverSettled は false のまま', () => {
+    const p = createStoryUserLaneRenderProbe();
+    recordStoryUserLaneHeavySettle(p, STORY_USER_LANE_HEAVY_SETTLE.RACE);
+    recordStoryUserLaneHeavySettle(p, STORY_USER_LANE_HEAVY_SETTLE.RACE);
+    expect(p.heavyEverSettled).toBe(false);
+  });
+
+  it('settled 済みで最後が race なら「固着の疑い」と断定せず自己修復中と出す', () => {
+    const p = createStoryUserLaneRenderProbe();
+    recordStoryUserLaneStep(p, STORY_USER_LANE_STEPS.START, { activePath: 'heavy', entriesLen: 10, nowMs: NOW });
+    recordStoryUserLaneStep(p, STORY_USER_LANE_STEPS.DONE);
+    recordStoryUserLaneHeavySettle(p, STORY_USER_LANE_HEAVY_SETTLE.SETTLED);
+    recordStoryUserLaneHeavySettle(p, STORY_USER_LANE_HEAVY_SETTLE.RACE);
+    const snap = snapshotStoryUserLaneRenderProbe(p, NOW);
+    const d = buildStoryUserLaneRenderDiag(snap, {});
+    expect(d.heavyEverSettled).toBe(true);
+    const text = formatStoryUserLaneRenderDiagLines(d, {}).join('\n');
+    expect(text).not.toContain('固着の疑い');
+    expect(text).toContain('一度は全件到達');
+  });
+
+  it('一度も settled していない race だけが「固着の疑い」を名乗れる', () => {
+    const p = createStoryUserLaneRenderProbe();
+    recordStoryUserLaneStep(p, STORY_USER_LANE_STEPS.START, { activePath: 'heavy', entriesLen: 10, nowMs: NOW });
+    recordStoryUserLaneStep(p, STORY_USER_LANE_STEPS.DONE);
+    recordStoryUserLaneHeavySettle(p, STORY_USER_LANE_HEAVY_SETTLE.RACE);
+    const snap = snapshotStoryUserLaneRenderProbe(p, NOW);
+    const d = buildStoryUserLaneRenderDiag(snap, {});
+    const text = formatStoryUserLaneRenderDiagLines(d, {}).join('\n');
+    expect(text).toContain('固着の疑い');
+  });
 });
 
 
