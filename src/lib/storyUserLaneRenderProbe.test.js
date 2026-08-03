@@ -303,14 +303,25 @@ function fakeEls(tileCount) {
 }
 
 describe('detectStoryUserLaneShrink — ガードと独立に縮小を測る', () => {
-  it('前回より6割未満に減れば縮小と判定', () => {
+  // ★v0.1.1240 契約変更: 既定 ratio を 0.6 → 1 にしてガードと定義を揃える。
+  //   ガードは v0.1.1233 で `next < prev`(1枚でも減ったら守る)になったのに、
+  //   計器だけ 0.6 のままだった(仕様に書いたのに実装漏れ)。
+  //   その結果、実配信 v0.1.1239 で **誰も消えていない**(消えた人0人/来た人423人/DOM433件)のに
+  //   「⚠ 縮小しているのにガードが素通り」という**誤警告**が出た。
+  //   計器とガードの「縮小」の定義が違うと、切り分けが永久に詰まる。
+  it('1枚でも減れば縮小と判定(ガードと同じ定義)', () => {
+    expect(detectStoryUserLaneShrink(fakeEls(100), 99)).toBe(true);
     expect(detectStoryUserLaneShrink(fakeEls(100), 50)).toBe(true);
   });
 
-  it('微減・同数・増加は縮小ではない', () => {
-    expect(detectStoryUserLaneShrink(fakeEls(100), 70)).toBe(false);
+  it('同数・増加は縮小ではない', () => {
     expect(detectStoryUserLaneShrink(fakeEls(100), 100)).toBe(false);
     expect(detectStoryUserLaneShrink(fakeEls(100), 200)).toBe(false);
+  });
+
+  it('ratio を明示すれば従来どおり割合でも測れる(後方互換)', () => {
+    expect(detectStoryUserLaneShrink(fakeEls(100), 70, 0.6)).toBe(false);
+    expect(detectStoryUserLaneShrink(fakeEls(100), 50, 0.6)).toBe(true);
   });
 
   it('前回タイル0(初回)は縮小ではない', () => {
