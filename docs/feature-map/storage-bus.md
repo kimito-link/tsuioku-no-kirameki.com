@@ -143,6 +143,7 @@
 | `KEY_SELF_POSTED_RECENTS` | extension/content-entry.js | extension/content-entry.js<br>extension/popup-entry.js |
 | `KEY_STATUS_FAST_DIAG_LITE` | extension/content-entry.js | extension/status-entry.js |
 | `KEY_STATUS_TREND` | extension/status-entry.js | extension/status-entry.js |
+| `KEY_STATUS_UPLOAD_CONFIG` | extension/status-entry.js | extension/status-entry.js |
 | `KEY_STAT_CARDS_MIRROR` | — | extension/popup-entry.js<br>extension/status-entry.js |
 | `KEY_STORAGE_WRITE_ERROR` | extension/content-entry.js<br>extension/popup-entry.js | extension/popup-entry.js |
 | `KEY_STORY_DIAG_MIRROR` | — | extension/venueBar.js |

@@ -63,6 +63,10 @@ const steps = [
   ['lint', 'lint'],
   ['typecheck', 'typecheck'],
   ['build', 'build'],
+  // ★v0.1.1245: ビルド直後に「秘密が焼き込まれていないか」を検査する。
+  //   dist は git 追跡下=push すると公開リポジトリで誰でも読める。実際に
+  //   /api/status の書き込み認証キーが GitHub 上に出ていた事故があった。
+  ['no-secrets', 'check:no-secrets'],
   ['tracked-imports', 'check:tracked-imports'],
   ['tree-map', 'tree-map:check'],
   ['site-health', 'site-health:check'],
