@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { VOICE_STALE_MS_NORMAL } from './voiceAgeGate.js';
+import { resolveVoiceSynthDepth } from './voiceReadQueue.js';
 import {
   VOICE_LAG_BUDGET_MS,
   VOICE_QUEUE_MAX_CEIL,
@@ -39,8 +40,18 @@ describe('定数の不変条件(地雷G-1: 鮮度しきい値との食い違い�
     expect(VOICE_QUEUE_MAX_CEIL).toBe(8);
   });
 
-  it('VOICE_QUEUE_MAX_FLOORは4(v0.1.1246: 実測5847ms/件で床2に張り付き39%取りこぼし→わんコメ式に寄せて引き上げ)', () => {
-    expect(VOICE_QUEUE_MAX_FLOOR).toBe(4);
+  it('VOICE_QUEUE_MAX_FLOORは5(v0.1.1247: 床4では先読み深さ2止まり→自己強化ループが切れないため5へ)', () => {
+    expect(VOICE_QUEUE_MAX_FLOOR).toBe(5);
+  });
+
+  // v0.1.1247: 【今回の真因】を構造として固定する回帰テスト。
+  //   実効上限が絞られると キュー長も絞られ → resolveVoiceSynthDepth が浅くなり →
+  //   先読みが効かず毎件コールドスタート → 合成待ちが伸び → 上限がさらに絞られる、
+  //   という自己強化ループが起きる(実測: 合成待ち1310→3343ms・合成失敗52件が全部時間切れ)。
+  //   床が「先読み最大深さ(3)に到達できるキュー長」を必ず満たすことを断言し、
+  //   将来どちらかの定数だけを動かしてループが再発することを防ぐ。
+  it('床のキュー長だけで先読み深さが最大(3)に届く=自己強化ループが構造的に起きない', () => {
+    expect(resolveVoiceSynthDepth(VOICE_QUEUE_MAX_FLOOR)).toBe(3);
   });
 });
 
@@ -74,22 +85,22 @@ describe('resolveVoiceQueueMax', () => {
     expect(resolveVoiceQueueMax(750)).toBe(8);
   });
 
-  it('やや詰まる(1500ms/件)と4まで縮む(6000/1500=4)', () => {
-    expect(resolveVoiceQueueMax(1500)).toBe(4);
+  it('やや詰まる(1500ms/件)は計算上4だが床5で頭打ち(v0.1.1247)', () => {
+    expect(resolveVoiceQueueMax(1500)).toBe(VOICE_QUEUE_MAX_FLOOR);
   });
 
-  it('大きく詰まる(3000ms/件)でも床4で頭打ち(6000/3000=2 → 床4に切り上げ)', () => {
-    expect(resolveVoiceQueueMax(3000)).toBe(4);
+  it('大きく詰まる(3000ms/件)でも床5で頭打ち(6000/3000=2 → 床5に切り上げ)', () => {
+    expect(resolveVoiceQueueMax(3000)).toBe(5);
   });
 
-  it('極端に詰まっても床(4)を下回らない', () => {
+  it('極端に詰まっても床(5)を下回らない', () => {
     expect(resolveVoiceQueueMax(60000)).toBe(VOICE_QUEUE_MAX_FLOOR);
   });
 
   // v0.1.1246: 実機実測値(ノートPC・2026-08-04)での回帰。旧床2ならここが2に落ち、
   //   677件中266件(39%)が捨てられていた。床4を下回らないことを実測値で固定する。
-  it('実測5847ms/件(ノートPC実機)でも床4を保つ', () => {
-    expect(resolveVoiceQueueMax(5847)).toBe(4);
+  it('実測5847ms/件(ノートPC実機)でも床5を保つ', () => {
+    expect(resolveVoiceQueueMax(5847)).toBe(5);
   });
 
   it('0や負数は未計測相当としてCEILを返す(壊れない)', () => {
@@ -101,7 +112,7 @@ describe('resolveVoiceQueueMax', () => {
 describe('stepVoiceQueueMax(ヒステリシス: 縮小即時・復帰N件連続)', () => {
   it('計算値が現行より小さいときは即座に縮小しgrowStreakは0に戻る', () => {
     const result = stepVoiceQueueMax(8, 4, 3);
-    expect(result.nextMax).toBe(4);
+    expect(result.nextMax).toBe(VOICE_QUEUE_MAX_FLOOR); // computed=4は床未満→clamp
     expect(result.nextGrowStreak).toBe(0);
   });
 
@@ -113,7 +124,7 @@ describe('stepVoiceQueueMax(ヒステリシス: 縮小即時・復帰N件連続)
 
   it('計算値が現行より大きいがstreak不足なら復帰しない(縮小状態を維持)', () => {
     const result = stepVoiceQueueMax(4, 8, 1);
-    expect(result.nextMax).toBe(4);
+    expect(result.nextMax).toBe(VOICE_QUEUE_MAX_FLOOR); // 現行4も床未満→clamp
     expect(result.nextGrowStreak).toBe(2);
   });
 
@@ -125,9 +136,9 @@ describe('stepVoiceQueueMax(ヒステリシス: 縮小即時・復帰N件連続)
       max = r.nextMax;
       streak = r.nextGrowStreak;
     }
-    expect(max).toBe(4); // まだ復帰しない
+    expect(max).toBe(VOICE_QUEUE_MAX_FLOOR); // まだ復帰しない(床に張り付いたまま)
     const finalStep = stepVoiceQueueMax(max, 8, streak);
-    expect(finalStep.nextMax).toBe(5); // ここでようやく+1段
+    expect(finalStep.nextMax).toBe(VOICE_QUEUE_MAX_FLOOR + 1); // ここでようやく+1段
     expect(finalStep.nextGrowStreak).toBe(0);
   });
 
@@ -152,7 +163,7 @@ describe('stepVoiceQueueMax(ヒステリシス: 縮小即時・復帰N件連続)
     }
     // 縮小は毎回即座に反映されるが、8への復帰はstreak不足のため一度も起きない
     expect(history.every((m) => m <= 8 && m >= VOICE_QUEUE_MAX_FLOOR)).toBe(true);
-    expect(max).toBe(4); // 最後は計算値4で縮小のまま(往復せず安定)
+    expect(max).toBe(VOICE_QUEUE_MAX_FLOOR); // 最後は計算値4→床にclampされたまま(往復せず安定)
   });
 
   it('現行値がCEILを超えないようclampされる', () => {

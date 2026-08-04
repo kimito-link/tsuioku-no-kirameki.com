@@ -157,7 +157,7 @@
     - `2026-07-22.md`
     - `2026-07-23.md`
     - `2026-07-31.md`
-- 📁 **docs/** (232)
+- 📁 **docs/** (234)
   - 📁 **article-assets/** (87)
     - 📁 **venue-frames/** (12)
       - `f01.png`
@@ -267,7 +267,7 @@
     - `storage-bus.md`
     - `venue.md`
     - `web-status.md`
-  - 📁 **handoff/** (69)
+  - 📁 **handoff/** (71)
     - `HANDOFF-backfill-instant-restore.md`
     - `HANDOFF-broadcast-score-panel.md`
     - `HANDOFF-comment-pickup-bsp.md`
@@ -306,6 +306,7 @@
     - `HANDOFF-venue-exact-copy-IMPL.md`
     - `HANDOFF-venue-pop-copy-IMPL.md`
     - `HANDOFF-web-same-as-ext.md`
+    - `NOTEPC-CHECK-PROMPT.md`
     - `clip-history-persistence-synthesis.md`
     - `comment-pickup-ticker-DESIGN.md`
     - `comment-pickup-ticker-IMPLEMENTATION-HANDOFF.md`
@@ -336,6 +337,7 @@
     - `venue-lobby-removal-IMPLEMENTATION-HANDOFF.md`
     - `venue-tile-link-parity-diagnose-DESIGN.md`
     - `venue-tile-link-parity-diagnose-IMPLEMENTATION-HANDOFF.md`
+    - `voicevox-any-pc-DESIGN.md`
     - `winv-clipboard-freeze-synthesis.md`
   - 📁 **patent-unique-voice-reading-filing-final/** (1)
     - `MOVED.md`
