@@ -1,0 +1,38 @@
+お題: Chrome拡張(MV3)の「診断ページ status.html」を開くのが【めちゃくちゃ重い】。原因を切り分け、最小ブラスト半径で軽くする方式を決める。status は「軽さ最優先」が絶対ルール(過去に何度も重さと戦い、毎回の storage read を増やすたびに重くなった履歴がある)。
+
+★前提(実コードで確認済み・推測でなく現物):
+- status-entry.js は setInterval 2秒ループ(REFRESH_INTERVAL_MS=2000)で毎回、以下を【直列】に chrome.storage.local.get する(並行化は過去に試して LevelDB 競合で timeout 多発→撤回済=直列が正):
+  1. enumerateActiveLives(内部でさらに複数 read: last_watch_url + panel_summary 走査)
+  2. loadAllSummaries(lvList)= 視聴中 live ごとに read
+  3. loadFastDiagSafe(KEY_AI_SHARE_FAST_DIAG を read)
+  4. loadPopupDiagSafe
+  5. loadBackfillProgressSafe
+- 追加データ(reportPreview / watchTabMap / trend / laneDiag / laneMirror / statCardsMirror / voiceDiag / venueSeatsDiag)は EXTRAS_REFETCH_MS=12秒の間引きキャッシュ(=毎回は読まない・過去の重さ対策の結果)。
+- chrome.storage.local は単一 LevelDB。並行 read で stall する特性(コード内コメントに明記)。
+
+★実機の事実(診断 JSON fastDiag より):
+- fastDiag(=毎回 read+parse する KEY_AI_SHARE_FAST_DIAG)は【非常に大きい】(実測で約40KB の JSON。giftSubAppRelayDiag / ndgrUnknownSamples / interceptFetchLog / commentObservability 等が入れ子で巨大)。これを 2秒ごとに read→JSON.parse→render している。
+- content(watch タブ)側は別途かなり忙しい: longTasks 最大262ms、広告 iframe 3枚が ~330ms ごとに heartbeat、backfill 実行中(17,224行)、deep harvest、NDGR 受信。ただしこれは watch タブの負荷であって status.html 自体ではない。
+- 記録規模: 記録 17,828 件 / コメントした人 1,045人 / interceptMapSize 398。
+
+★切り分けの注意:
+- ユーザーの訴えは「status.html を開くのが重い」。watch タブが重いのとは別問題の可能性。だが status は fastDiag(content が書く巨大 JSON)を読むので、content の重さが fastDiag 肥大経由で status に波及している可能性もある。
+- status には既に _stepMs 計器(どのステップが重いか)が「最終更新」の隣に出る=どの read が律速かは実測で取れる。
+
+問い: status.html を開くのが重い原因として最も確度が高いのはどれか。そして「軽さ最優先・最小ブラスト半径(既存の表示や記録を壊さない)」でどう直すか。候補:
+
+  案1(fastDiag を status 用に軽量化): content が status 向けに「巨大な生 fastDiag」とは別に、status が必要とする最小フィールドだけの軽量ダイジェスト(別 storage キー)を書く。status はそれを 2秒ごとに read(巨大 JSON の read+parse を毎回しない)。フル fastDiag は「AI共有ボタンを押した時だけ」読む。
+
+  案2(2秒ループの read をさらに減らす/間引く): 毎回の直列 read(fastDiag/popupDiag/backfill)も EXTRAS と同じく間引き(例: コア=lives+summaries だけ毎回、fastDiag は 4〜6秒間引き)。描画は stale-while-revalidate。
+
+  案3(初回ロードを速くする): 開いた瞬間に重いのが問題なら、初回は最小(lives+summaries)だけ描いて即表示し、fastDiag/diag 系は遅延ロード(requestIdleCallback / 初回 paint 後)。
+
+  案4(その他): 例=fastDiag の肥大そのものを content 側で抑える(giftSubAppRelayDiag 等の verbose を fastDiag から外す)/ JSON.parse をワーカー化 / storage read 回数の根本削減。
+
+評価軸(優先順):
+  ① 「開くのが重い」を最も確実に消せるか(初回ロード+2秒ループの両方)。
+  ② 最小ブラスト半径=既存の status 表示・健全度パネル・記録・他ページ(popup/会場)を壊さないか。過去に「並行化したら timeout 退行」「diag を毎回 read に足したら重くなった」という地雷がある。
+  ③ 実装コストと、再発防止(今後 diag を足すたび重くなるのを構造的に防げるか)。
+  ④ 計測ファースト: 直す前に _stepMs でどの read が律速か実測すべきか、それとも構造的に明らかか。
+
+各メンバーは『結論(案番号) → 根拠 → 反論・リスク → 具体案(どのファイルをどう触るか・段取り)』の4ブロックで簡潔に。批判役は「計測せずに直すと外す」リスクと、採用案の最大の穴を必ず指摘せよ。

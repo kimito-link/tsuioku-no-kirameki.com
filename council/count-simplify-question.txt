@@ -1,0 +1,33 @@
+お題: ニコ生コメント記録Chrome拡張で「記録件数の数字がソース/画面ごとにバラバラで正確さが崩れている」をユーザー根底批判として受け、表示数値ロジックを根治(簡素化+正本一本化)する設計を1案にまとめる。対症の積み増し(複数ゲート)で複雑化したのを解く。
+
+# 実コードで棚卸しした現状(これが前提・覆さない)
+「コメント記録の件数」という単一概念が実装で【6つの数字】に分裂している:
+1. observedRecordedCommentCount(content-entry.js:717) = 内部生値。tailMainCount+tailRowsBuffer.length / chunk index.total / backfill response から更新(11箇所)。テール畳み込み・gap計算・stall判定が必要とする。
+2. recordedCountForDisplay(lid)(content-entry.js:736) = ①を per-live 単調化Map(resolveMonotonicCommentCountForLive)に通した表示用値。
+3. savedCommentsUidStats.totalSaved(content-entry.js:11333) = 最後のflush batchの next 配列長だけ(全保存でない・v0.1.420で条件付き更新に=多くのflushで更新されず古い値を握る)。診断用。
+4. commentIngestBySource(visible/deep/mutation/ndgr/backfill)(content-entry.js:10952) = 各取込源の persistCommentRows 累積行数。重複・未保存・dedupで消えた行も含む生カウント。診断用。
+5. panel_summary.recordedCount = ②をcontentからpopup/statusへ渡す共通ソース。
+6. displayEntriesBase.length(popup) = UI生成済みエントリ数(未生成・配信者除外で減る)。
+
+# 食い違いの実例(lv350790559)
+observedRecordedCommentCount=118 / savedCommentsUidStats.totalSaved=1 / commentIngestBySource.visible=974 / 公式117。同じ「記録」に 118・1・974 が同時存在。
+
+# 表示までのゲート段数(最大6段=複雑さの根源)
+observed生値 → per-live単調化(v0.1.792) → countToShow=max(summary, displayEntries) → 配信者除外(v0.1.774/838) → popup per-state単調化(v0.1.645) → status床recordedSumFloor(v0.1.804)。
+対症の経緯: v0.1.645(4経路上書き合戦を単調化で吸収)→v0.1.792(増えて減る対症)→v0.1.804(累計後退対症)→v0.1.838(配信者除外の引き算誤り修正)。
+
+# 正本(source of truth)の現状
+- 真の記録数=IDB実レコード数だが、全件読込が重い・chunk modeで全件読めない=直接数える正本関数は無い。
+- 実質 observedRecordedCommentCount(観測ベース推定)を正本扱い。chunk index.total が chunk mode の確定値。
+
+# 問い(これに答えて)
+1. 根治の射程: (A)正本を1つに定め全画面がそれを見る(単調化/床/配信者除外のゲートを撤去 or 最小化) (B)現状のゲート群を整理統合するが正本一本化まではしない (C)診断用(savedCommentsUidStats/commentIngestBySource)と表示用(recordedCountForDisplay)を明確に分離し『表示は1本・診断は別』と役割を固定。星野ロミ式(落とさない・既存活かす・過剰実装回避)でどこまでやるか。
+2. 表示の正本候補: (i)observedRecordedCommentCount(軽い・リアルタイム・だがロジック副作用で揺れる) (ii)chunk index.total + tail(chunk modeの確定値・main配列modeでnull) (iii)IDB実数を間引き集計(正確だが重い)。どれを表示の正本にすべきか。chunk/main 両mode共存の複雑さをどう畳むか。
+3. ゲートの要否を1つずつ判定: 単調化(v0.1.645/792)は「増えて減る」を防ぐが正本が安定なら不要では? 配信者除外(v0.1.774)は「公式と基準を揃える」が引き算でなく『記録N(うち配信者M)』と並記する方が正確では? 床(v0.1.804)は enumerate揺れ対症だが正本が安定なら不要では? 各ゲートを「正本を安定させれば消せるか/残すべきか」で仕分け。
+4. 「増えて減る」「0に潰れる」の再発をゲート撤去で招かないか(批判役は必ず穴を指摘)。ゲートは対症だが、撤去すると元の病(4経路の上書き合戦・enumerate揺れ・OFF/ON max飛び)が再発する。正本一本化で本当に病が消えるか、それともゲートは安全網として残すべきか。撤去の前提条件は?
+5. やってはいけない過剰実装を1つ以上: 例=IDB全件を毎フラッシュ数えてhot path重く/正本を新storageキーに書いて整合の別問題を生む/全ゲート一斉撤去で退行多発/chunk/main両対応の巨大分岐を新設。
+
+# 制約(星野ロミ式)
+記録本体(IDB/chunk/tail)不可侵・新storage書込み増やさない・hot path(persist/描画)重くしない・落とさない・既存データ活かす・過剰実装回避・段階導入(一気に全ゲート撤去しない)・characterization test 先行で「増えて減る/0潰れ」回帰を固定。
+
+出力は『結論 → 根拠 → 反論・リスク → 具体案』の4ブロックで。具体案は段階導入の順序(第1で何を・どのゲートから整理するか)と、表示正本の選択・各ゲートの存廃判定まで。

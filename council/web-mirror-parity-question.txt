@@ -1,0 +1,38 @@
+【お題】Chrome拡張の「①POP画面」を、純Web版「③WEB(app/live-view)」で完全に丸写し(視覚・並び・レイアウトまでそっくり)にするための、最高のアーキテクチャを設計せよ。ゴールは「①=③のバイト級パリティ」を達成し、その先にあるスマホアプリ化(WebをそのままCapacitor/TWAで包む)への道を開くこと。
+
+## プロダクト背景
+- ニコニコ生放送の応援コメントを記録・可視化するChrome拡張(君斗りんくの追憶のきらめき)。配信者/視聴者が「応援の盛り上がり」を見る。
+- ①POP = 拡張のpopup/status画面(本体・全機能)。②応援プレビュー = 拡張内の別窓プレビュー。③WEB = app.tsuioku-no-kirameki.com/live-view (拡張なしでURLで見れる純Web版・スマホ視野)。
+- 設計思想「①=②=③は見た目もそっくり同じであるべき(並び・レイアウトまで)」はユーザー確定済み。
+- ③WEBが完全な丸写しになれば、それをCapacitor/TWAで包んでiOS/Android提出できる=スマホアプリ化の最短路になる、というのがユーザーの狙い。
+
+## 今日、実コードで裏取りした「③に出ていないもの」と構造的原因(推測でなく確認済み)
+1. **応援タイムライン(コメント＋ギフトの時系列リスト)が③に出ない**。
+   - データは③に届いている: ①は jsonBlob に commentTimelineMirror(最新60件)を同梱してpublish、③のstatus:live自己診断で「鏡60件・①POP1123/③WEB鏡60 🟢正常」を確認済み。
+   - だが③の app/live-view.js の paintCommentTimelineMirror() は、鏡の「最新1件」だけを取り出して #commentTickerSegA(1行ティッカー)に流すだけ。複数行リストDOM(#supportTimelineBody)には何も描いていない。
+   - ①拡張には src/lib/supportActivityTimeline.js(データ組立) + src/lib/supportTimelineHtml.js(HTML化)があるが、③の app/live-view.js はこれらを import すらしていない。
+   - ③の live-view.html には #supportTimelineDetails / #supportTimelineBody というDOM土台とCSS(v0.1.340「応援タイムライン」)が既に存在する=箱はあるのに中身を描く配線が無い。
+2. **配信採点パネル(カラオケ採点風)の中身も③に出ていない疑い**(同型: ①に描画関数、③に配線無し)。
+
+## 丸写しの「既にある部分」と「抜けている部分」の構造
+- ③の描画は paintAllMirrors(jsonBlob) が per-mirror で個別に塗る方式:
+  paintBroadcasterCard / paintStatCardsMirror / paintLaneMirror / paintNorthStarMirror / paintSupporterRanking / paintCommentTimelineMirror / paintStatusReport。
+- 各鏡は「①が最小フィールドに間引いた鏡データ」を「③が本物のpaint関数で再描画」する方式(似せ自作でなく本物lib再利用が原則)。
+- statusReport(①のAI共有本文)はバイト一致で丸ごと同梱→③は貼るだけ(paintStatusReport)=テキストは完全パリティ達成済み。
+- だが**視覚的DOM(タイムライン/採点パネル/その他リスト系)は per-mirror方式で、リスト系の鏡化・③配線が「1つずつ手作業」で抜けが出る**。応援タイムラインはその抜けの1例。
+
+## 設計で答えてほしい核心問い
+Q1. 「①の全画面を③で丸写し」を、いまの per-mirror(鏡ごとに①で間引き→③で本物paint)方式で1つずつ埋めていくべきか、それとも別のアーキ(例: ①がDOMを丸ごとシリアライズして③が復元、iframe埋め込み、サーバーサイドレンダリング、①のレンダリング関数を③と共有する単一コンポーネント層)に作り替えるべきか。**丸写しの抜けが構造的に起きない**のはどれか。
+Q2. スマホアプリ化(Capacitor/TWAで③WebをそのままラップしてiOS/Android提出)を見据えたとき、③の描画アーキはどうあるべきか。拡張専用APIに依存しない・オフライン/低速回線に強い・審査(WebViewラップ)で落ちない条件は何か。
+Q3. publish経路の堅牢性: いま①→クラウド(api/status)へのpublishが実配信で23時間停止していた(③が古いスナップショットで固まる)。丸写しの前提として、この配送が止まらない設計(stateless再送・SW-alarm等)をどう組み込むか。
+Q4. 「嘘をつかない」制約: ③が①と違う瞬間(古い/一部欠落)を、誠実に1行で示す(既にsnapshotMeta.capturedAt/pruned/staleバナーの仕組みあり)。丸写し度を自動検証(①の各セクション値と③の描画値を突合し、不一致を必ず表示)する仕組みはどう設計すべきか。
+
+## 制約・地雷(壊すな)
+- ③はreferrer露出を避ける(匿名ユーザーのリンクを純Webで付けない=既存挙動)。
+- 各鏡は容量上限あり(pruneはしご・448KB)。丸写しでDOM全体を送ると肥大する懸念=容量とパリティのトレードオフ。
+- 拡張の反映は copy:ext(C:\nicolive-ext)経由・配信中は版混在注意。③(Web)はVercelデプロイ。
+- ①のちらつき対策(diff-skip機構)は触らない。
+- voiceには触らない。
+
+## 出力形式
+結論 → 根拠 → 反論・リスク → 具体案(実装ステップ) の4ブロックで。特にQ1(アーキ選択)は明確に1案を推し、なぜ他案を捨てるかを述べること。

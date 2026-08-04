@@ -1,0 +1,308 @@
+会議メンバー 12体に並列で問い合わせ中...
+
+
+========================================================================
+### groq/gpt-oss-120b  (3868ms)
+========================================================================
+**1. 結論**  
+人物タイル（丸いサムネイル）を「**UserTile**」という正本コンポーネントにし、`UserTile` が **userId** をキーに `UserLaneCandidateFromStorage` にコメント・ギフト・広告情報を **オンデマンドでマージ** した `UserProfile` オブジェクトを受け取る形に統一する。  
+`popup` と `venue` は `UserTile` をそのまま再利用し、venue‑only の **吹き出し・読み上げ・ギフト投擲** は `UserTile` の子コンポーネントとして差し込むだけにする。
+
+---
+
+**2. 根拠（星野ロミ思想）**  
+
+| 原則 | 具体的適用例 |
+|------|--------------|
+| **摩擦除去** | `UserTile` が 1 つだけあれば、popup と venue の両方で同一 API (`<UserTile userId={…} />`) を呼び出すだけで済む。データ取得から描画までのステップが 1 回に削減され、ユーザーが「誰かを見る」までの距離が最小化。 |
+| **元からあるデータを最大限活かす** | 既に `UserLaneCandidateFromStorage` に `userId` が揃っているので、追加のストレージ書き込みは行わず、`comments[]/gifts[]/ads[]` を **読み取り専用で** そのままマージ。 |
+| **同じものを 2 回作らない** | `UserTile` が正本コンポーネント。popup 用の `StoryUserTile`、venue 用の `SeatUserTile` は薄いラッパーで `UserTile` を包むだけ。ロジックやスタイルの重複は排除され、ドリフトは構造的に防止できる。 |
+| **軽く・有界に・絶対に落とさない** | `UserTile` は **純粋関数コンポーネント** とし、内部で `useMemo` / `useCallback` により **最大 150 件** のアクティブユーザーだけをキャッシュ。超過分は “待機リスト” に保持し、描画は行わないのでフレーム毎の計算量は O(150) に抑えられる。エラーは `ErrorBoundary` で捕捉し、タイルはフェイルオープンでプレースホルダーを表示。 |
+
+---
+
+**3. データモデル**  
+
+```ts
+// 既存
+type UserLaneCandidateFromStorage = {
+  userId: string;
+  nickname: string;
+  avatarUrl: string;
+  avatarObserved: boolean;
+  liveId: string;
+  commentCount?: number;
+  giftCount?: number;
+  _laneSortAt?: number;
+};
+
+// 拡張（読み取り専用）
+type UserProfile = UserLaneCandidateFromStorage & {
+  /** コメント本文の最新 5 件（取得は read‑only） */
+  recentComments: CommentRow[];
+  /** 受け取ったギフトの最新 3 件 */
+  recentGifts: GiftRow[];
+  /** 広告／貢献度情報（スコア） */
+  contributionScore?: number;
+};
+```
+
+* **取得方法**  
+  1. `userLaneCandidatesFromStorage` で `UserLaneCandidateFromStorage[]` を取得（既存ロジック）。  
+  2. `aggregateUserProfile(userId)` を純粋関数で実装し、`indexedDB` から **コメント・ギフト・広告** を `userId` でフィルタして `UserProfile` にマージ。  
+  3. `aggregateUserProfile` は **キャッシュ** (`Map<string, UserProfile>`) を保持し、同一 `userId` が再度要求されたときは再計算せずに返す。  
+
+* **書き込みゼロの保証**  
+  - すべての集約は `indexedDB.getAll` 系の **読み取り API** のみ。  
+  - `UserProfile` は **一時オブジェクト** で、メモリ上に保持するだけ。永続化は行わない。
+
+---
+
+**4. コンポーネント分割**  
+
+```
++-------------------+          +-------------------+
+|   <UserTile/>     |←正本     |   <UserTile/>     |
+|  (avatar, name)  |          |  (avatar, name)  |
++--------+----------+          +--------+----------+
+         |                               |
+   +-----+-----+                 +-------+-------+
+   | PopupWrap |                 | VenueWrap     |
+   | (thin)    |                 | (adds seat‑   |
+   |           |                 |  specific UI) |
+   +-----+-----+                 +-------+-------+
+         |                               |
+   (popup)列表示                (seat) +---+---+---+
+                               |   |Bubble|Voice|Gift|
+                               |   +------+-----+----+
+                               |   (venue‑only)   |
+                               +-----------------+
+```
+
+* **`UserTile`**  
+  - Props: `userId: string; profile?: UserProfile; size?: "sm"|"md"|"lg"`  
+  - 内部で `useUserProfile(userId)` フックが `UserProfile` を取得（キャッシュ付き）。  
+  - 基本描画は **丸い avatar + ニックネーム**。  
+
+* **`PopupWrap`**（既存 `renderStoryUserLane` の薄いラッパー）  
+  - ただ `UserTile` を横並びに配置し、匿名ユーザーは `isAnonymous` フラグで別段にスタイルを変えるだけ。  
+  - 追加ロジックは **なし**（摩擦除去）。  
+
+* **`VenueWrap`**（既存 `buildVenueSeating` の一部）  
+  - `UserTile` を座席位置に配置し、`<Bubble/>`, `<VoicePlayer/>`, `<GiftProjectile/>` を **子コンポーネント** として条件付きでマウント。  
+  - `maxSeats = 150` を超える場合は `seatQueue` に残し、`replaceSeat(oldUserId, newUserId)` で入れ替えロジックを走らせる（O(1) の Map 操作）。  
+
+* **背景群衆**  
+  - `CrowdCanvas` は従来通り `viewerCount`（PV）だけで描画。  
+  - 「ほか観客 N 人」テキストは **「座席に収まりきれなかったアクティブユーザー数」** に置き換えるか、完全に削除し、代わりに `viewerCount` ラベルを表示。
+
+---
+
+**5. 反論・リスク・段階導入**  
+
+| リスク | 内容 | 緩和策 |
+
+
+========================================================================
+### groq/llama-3.3-70b  (2167ms)
+========================================================================
+## 結論
+人物タイルを正本化し、コメント本文・ギフト・広告（貢献度）を userId で関連づけて、文脈に応じたアクション（吹き出し・読み上げ・ギフト投擲演出）を載せ、popup と会場モードで共通化する。
+
+## 根拠
+星野ロミ思想の「同じものを2回作らない（1つの正本）」と「元からあるデータを最大限活かす（捨てない）」に当たる。1つの正本コンポーネントを作り、既存のデータを最大限活かすことで、ドリフトが消え、重複実装を排し、1コンポーネント/1純関数に集約できる。
+
+## データモデル
+既存の `UserLaneCandidateFromStorage` を拡張し、コメント本文・ギフト・広告（貢献度）を userId 単位で畳み込む。新規 storage 書き込みゼロを守るため、読むだけで畳み込み、既存の IndexedDB のコメント記録・チャンク・テールバッファには書き込みを行わない。
+
+## コンポーネント分割
+丸サムネタイルを1部品に切り出し、popup と venue で共通化する。席・吹き出し・読み上げ・ギフト演出は venue 専用のまま被せる。コンポーネントの境界は、人物タイルとその関連データ（コメント本文・ギフト・広告）を含む。
+
+## 反論・リスク・段階導入
+自分の案の穴として、hot path で重くならないかが懸念される。1つの正本コンポーネントを作り、既存のデータを最大限活かすことで、重い全件再計算・無界蓄積を避けられるが、初期のコミットでは、たとえば、コメント本文とギフトの関連付けのみを実装し、広告（貢献度）の関連付けは後回しにすることで、安全に刻む順序をとることができる。
+
+========================================================================
+### nvidia/qwen3.5-122b  (0ms)  [FAILED: HTTP 500 invalid type: unit variant, expected newtype variant at line 1 column 40]
+========================================================================
+(no answer)
+
+========================================================================
+### gemini-2.5-flash  (12202ms)
+========================================================================
+1.  **結論**
+    人物タイルを `UserTile` コンポーネントとして正本化し、`UserLaneCandidateFromStorage` を拡張した `ExtendedUserLaneCandidate` データモデルを共通の入力とすることで、popup と venue の人物表示を完全に一致させ、文脈に応じたアクション（吹き出し・読み上げ・ギフト演出）を `UserTile`
+
+========================================================================
+### openrouter/gpt-oss-120b  (92952ms)
+========================================================================
+**1. 結論**  
+人物タイル（丸いサムネイル）を「UserTile」正本コンポーネントとして実装し、`popup` のアイコン列と `venue` の座席両方で同一インスタンスを使用する。タイル内部で `userId` をキーにした `UserProfile`（コメント・ギフト・広告情報）をオンデマンドで **読み取り専用** に結合し、文脈（popup vs venue）に応じた UI（数値ID・ニックネーム・吹き出し・読み上げ・ギフト演出）だけを差し替える。
+
+---
+
+**2. 根拠（星野ロミ4本柱）**  
+
+| 原則 | 具体的適用例 |
+|------|--------------|
+| **摩擦除去** | タイル 1 個で UI・データ取得・アクション全てを完結させ、`popup` と `venue` が同じ API/コンポーネントを呼び出すだけに。ユーザーがタイルをクリックした瞬間にコメント吹き出し・読み上げが走り、余計なデータフェッチが無い。 |
+| **元からあるデータを最大限活かす** | `userLaneCandidatesFromStorage` の戻り値に **`comments[]`・`gifts[]`・`ads[]`** を **lazy‑merge** で付与。既存の IndexedDB からは読み取り専用で取得し、書き込みは一切行わない。 |
+| **同じものを2回作らない（正本化）** | `UserTile` を唯一の正本コンポーネントにし、`PopupUserLane` と `VenueSeat` は「装飾」だけを差し替えるラッパー。タイル内部ロジックは 1 つでドリフトが発生しない。 |
+| **軽く・有界に・絶対に落とさない** | - タイルは **`useMemo` + `useCallback`** で `userId` が変わらない限り再計算しない。<br>- 座席は最大 150 席（`VENUE_FULLSCREEN_MAX_SEATS`）に上限を設け、超過分は **FIFO** で入れ替え。<br>- 失敗時はタイルをプレースホルダー（デフォルトアバター＋ID）で表示し、全体描画は継続（fail‑open）。 |
+
+---
+
+**3. データモデル**  
+
+```ts
+// 既存
+type UserLaneCandidateFromStorage = {
+  userId: string;
+  nickname: string;
+  avatarUrl: string;
+  avatarObserved: boolean;
+  liveId: string;
+  commentCount?: number;
+  giftCount?: number;
+  _laneSortAt?: number;
+};
+
+// 正本化＋読み取り専用拡張
+type UserProfile = UserLaneCandidateFromStorage & {
+  /** コメント行（userId が付与されたもの）を全件取得しただけの参照 */
+  comments: ReadonlyArray<CommentRow>;
+  /** ギフト行 */
+  gifts: ReadonlyArray<GiftRow>;
+  /** 広告/貢献度行 */
+  ads: ReadonlyArray<AdRow>;
+};
+
+/**
+ * pure function – storage から取得した rows, liveId を渡すだけで
+ * userId がキーの Map<UserProfile> を生成。書き込みは行わない。
+ */
+function buildUserProfiles(
+  rows: CommentRow[],               // IndexedDB から取得した全コメント行
+  liveId: string
+): Map<string, UserProfile> {
+  const map = new Map<string, UserProfile>();
+  rows.forEach(row => {
+    const uid = row.userId;
+    if (!uid) return;               // userId が無い行は除外（NDGR では取得不可）
+    let profile = map.get(uid);
+    if (!profile) {
+      profile = {
+        userId: uid,
+        nickname: row.nickname ?? `a:${row.anonymousId ?? '???'}`,
+        avatarUrl: row.avatarUrl ?? '',
+        avatarObserved: !!row.avatarObserved,
+        liveId,
+        commentCount: 0,
+        giftCount: 0,
+        _laneSortAt: row.timestamp,
+        comments: [],
+        gifts: [],
+        ads: []
+      };
+      map.set(uid, profile);
+    }
+    // 集約は読み取り専用なので直接 push せず新配列を作らない
+    if (row.type === 'comment') profile.comments = [...profile.comments, row];
+    if (row.type === 'gift')    profile.gifts    = [...profile.gifts, row];
+    if (row.type === 'ad')      profile.ads      = [...profile.ads, row];
+    // カウントは即時インクリメントだけ
+    if (row.type === 'comment') profile.commentCount = (profile.commentCount ?? 0) + 1;
+    if (row.type === 'gift')    profile.giftCount    = (profile.giftCount ?? 0) + 1;
+  });
+  return map;
+}
+```
+
+- **書き込みゼロ**：`buildUserProfiles` は **pure function** で、引数の `rows` は既に IndexedDB から読み取ったキャッシュ。内部で新しい配列を生成しても外部ストレージに書き込まない。
+- **オンデマンド**：`UserTile` が必要になるたびに `profile.comments.slice(-1)[0]` などで最新コメントだけを取得すれば、全体再走査を防げる。
+
+---
+
+**4. コンポーネント分割**  
+
+```
++-------------------+          +-------------------+
+|   UserTile (正本) |<-------->|   TileContext     |
+|  - avatar         |  props   |  (popup|venue)    |
+|  - nickname/id    |----------|  - mode           |
+|  - badge (count)  |          |  - actionsHook    |
++-------------------+          +-------------------+
+        ^   ^                         ^   ^
+        |   |                         |   |
+        |   +--- PopupUserLane --------+   |
+        |                                 |
+        +--- VenueSeat -------------------+
+            (adds: SpeechBubble, Voice, GiftAnim)
+```
+
+- **`UserTile`**：丸サムネイル・アバター・ニックネーム・ID・カウント表示だけを描画。`props: { profile: UserProfile; mode: 'popup' | 'venue' }`。`mode` に応じて CSS（横並び vs 座席位置）を切り替えるだけでロジックは共有。
+- **`PopupUserLane`**：`UserTile` を横並びに配置し、匿名段落用の追加ラッパー（`<section class="anonymous">`）を保持。`mode='popup'` で `UserTile` に渡す。
+- **`VenueSeat`**：`UserTile` に `mode='venue'` を渡し、**座席レイアウト**（`transform: translate3d(x,y,0)`）を付与。さらに以下を **副作用フック** で付加  
+  - `useSpeechBubble(profile)` → コメントがあれば吹き出しを生成。  
+  - `useVoicePlayer(profile)` → 読み上げキューに enqueue。  
+  - `useGiftThrow(profile)` → ギフトが来たら `giftThrowProjectile` を発火。  
+  これらは **venue‑only** の副作用で、`UserTile` 本体は一切触らない。
+
+- **共通 CSS**：`.user-tile { width: 48px; height: 48px; border-radius: 50%; }`。`popup` 用は `flex`、`venue` 用は `position:absolute` で座標計算だけ別。
+
+---
+
+**5. 反論・リスク・段階導入**  
+
+| リスク | 内容 | 対策・段階 |
+|-------|------|------------|
+| **hot‑path での全コメント集約が重い** | `buildUserProfiles` が全コメント行を走査すると数千件になる可能性。 | ① 初回ロード時に **一度だけ** 実行し、結果を `useRef` に保持。② 以降は **増分更新**（`onNewRow`）だけを差分マージし、全走査を回避。 |
+| **座席入れ替えロジックが複雑化** | 匿名ユーザーが大量に同時にアクティブになると、FIFO 入れ替えが頻発し UI がちらつく。 | `VenueSeatManager` に **優先度スコア**（`_laneSortAt` + `commentCount`）を付与し、上位 150 をソート済みリストで保持。入れ替えは **スロットリング（30 fps）** で実行し、1 フレームでの DOM 変更数を上限 20 に抑える。 |
+| **タイル正本化で既存バグが再現** | 既存の「匿名は別段落」ロジックが `UserTile` に混在すると、popup が崩れる可能性。 | `PopupUserLane` だけが **匿名判定**（`profile.nickname.startsWith('a:')`）を行い、`UserTile` には「表示だけ」委譲。既存 CSS をそのまま流用し、見た目のドリフトは防げる。 |
+| **読み上げ・ギフト演出が失敗したときのフォールト** | 音声合成エラーや projectile 描画失敗で画面が止まるリスク。 | 各副作用フックは **try/catch** で失敗を捕捉し、`console.warn` 後は **no‑op** にフェイルオープン。UI の描画は絶対に止めない。 |
+
+### 段階的導入プラン  
+
+1. **第1スプリント** – `UserTile` 正本コンポーネント実装、`PopupUserLane` からの置換。データモデルは `UserLaneCandidateFromStorage` → `UserProfile`（コメント・ギフトは空配列）に拡張し、書き込みは行わないことだけ検証。  
+2. **第2スプリント** – `VenueSeat` に `UserTile` を組み込み、座席上限ロジック（150 席 FIFO）を実装。既存 `collectVenueParticipants` の匿名除外分岐を削除し、テストで匿名も座席に入ることを確認。  
+3. **第3スプリント** – 吹き出し・読み上げ・ギフト演出フックを追加。`useSpeechBubble` などは **lazy** にインポートし、実際に該当ユーザーがアクションしたときだけロード。  
+4. **第4スプリント** – 背景群衆 Canvas の密度表現を `activeSeatOverflow`（表示しきれないアクティブ人数）と `totalPV`（来場者数）に分離し、テキスト表示を「超過アクティブ N 人」へリネーム。  
+
+この手順で **既存 UI の壊れリスクを最小化** しつつ、**正本コンポーネント化とデータ再利用** を段階的に導入できます。  
+
+========================================================================
+### local/gpt-oss:20b  (0ms)  [FAILED: This operation was aborted]
+========================================================================
+(no answer)
+
+========================================================================
+### local/qwen3.5:9b  (0ms)  [FAILED: This operation was aborted]
+========================================================================
+(no answer)
+
+========================================================================
+### local/qwen3:14b  (0ms)  [FAILED: This operation was aborted]
+========================================================================
+(no answer)
+
+========================================================================
+### local/deepseek-r1:14b  (0ms)  [FAILED: This operation was aborted]
+========================================================================
+(no answer)
+
+========================================================================
+### local/gemma4:31b  (0ms)  [FAILED: This operation was aborted]
+========================================================================
+(no answer)
+
+========================================================================
+### local/qwen2.5:14b  (0ms)  [FAILED: This operation was aborted]
+========================================================================
+(no answer)
+
+========================================================================
+### local/hermes3:8b  (0ms)  [FAILED: This operation was aborted]
+========================================================================
+(no answer)
+
+--- 完了 180080ms ・ 成功 4/12 ---
+保存: council/person-tile-unify-answers.json

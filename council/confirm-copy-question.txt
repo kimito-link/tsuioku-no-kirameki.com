@@ -1,0 +1,24 @@
+お題: ニコ生コメント記録 Chrome 拡張「君斗りんくの追憶のきらめき」で、拡張内の応援ライブビュー(popup.html を iframe で丸ごと表示=完璧)と「まったく同じ画面」を、拡張なしの純Web公開ページ(app.tsuioku-no-kirameki.com/live-view?v=token)に【確実にコピー】する最善の方法を決めたい。
+
+背景・制約(実コードと実機で確定済みの事実):
+- 純Web版は popup.html を DOM+CSS 丸ごとコピーした app/live-view.html を持つ(CSS class は全部揃っている)。
+- popup の本体 popup.js は chrome.* に約190箇所依存。純Web では chrome シムで一部だけ動かせるが、描画は chrome.storage の生データから再計算する設計。
+- データは PC 拡張が「公開」ボタンを押した時点のスナップショットを Vercel(api/status)+Upstash に保存し、純Web が GET して描く。リアルタイムではなくスナップショット。
+- これまでの実装(失敗中): popup の各セクション(数字カード/応援レーン/北極星=ギフト貢献度/応援者ランキング)を【別々の鏡データ】として publish し、純Web 側で本物 paint 関数を1個ずつ呼んで描いていた。
+- 実データで判明した致命的問題: 各鏡が【別々のタイミング・別々の鮮度】で送られるため、純Web では「数字カードは17分前で鮮度切れ・応援者ランキングはそもそも送られていない・りんく段が空」のように【永久に揃わない】。1個ずつ paint を足すほど穴が増える。ユーザーは一貫して「コピーしろ・同じものにしろ・1個ずつ足すな」と言っている。
+- 既存資産: 北極星レーンだけは既に「niconico の DOM の outerHTML を sanitizeMirrorHtml で許可タグ/属性だけ通して popup に貼る」HTML 鏡方式が動いている(実証済み)。sanitizeMirrorHtml は小フラグメント用で style/href/非whitelistタグ/[hidden] を削る。
+- サーバ(api/status.js)は payload を丸ごと保存=無変更。現状の per-section スナップショットは約45KB。Upstash の値は MB 級まで可。Vercel body 上限は約4.5MB。
+- 拡張側で popup の描画済み .nl-main(メインコンテナ) の outerHTML はその場で取得できる(画面に出ているので)。
+
+検討してほしい本命方針(ユーザー確定):「popup が今表示している .nl-main の outerHTML を【1かたまり】で publish し、純Web はそれを #nl-main に貼るだけ」。全セクションが同時・同一・鮮度1つ=文字通り同じDOM。純Web は popup.html 丸ごとコピーなので CSS class が揃っており、class 付き HTML を貼れば CSS で同一に描ける(style 属性は不要)。
+
+この本命方針を【確実に】成功させるための設計を、次の観点で詰めてほしい:
+1. 結論: 丸ごと HTML 鏡方式で進めるべきか。Yes なら最小で確実な実装の骨子。No なら代替。
+2. sanitize: 全 popup を通すには現 sanitizeMirrorHtml をどう拡張/分離すべきか(許可すべきタグ/属性=a/href のユーザーページリンク, img の loading/decoding/referrerpolicy, data-*, [hidden] の扱い)。XSS(script/on*/style/危険protocol)は必ず削る。丸ごと用の別 sanitizer を作るか既存を緩めるか。
+3. 画像: popup は images/... 相対パス。純Web で /app/images/... に解決する確実な方法(<base href="/app/"> は既に注入済み・注入HTML内の相対 src がそれで解決されるか/data:svg や cross-origin の secure-dcdn 顔画像はそのまま出るか)。
+4. サイズ: .nl-main 全体(70人規模のタイル+SVG)が Upstash/Vercel 上限に収まるか。超える時の確実な縮小策(段ごと cap/不要 SVG 除去/gzip)。
+5. 鮮度と取りこぼし: capturedAt 1つで「終わった配信の残骸」を隠す。スナップショット方式なので「公開を押した瞬間」が古いと薄い→公開時に最新描画を1回強制してから取得する等の確実化。
+6. 失敗モードと再発防止: per-section 方式で起きた「揃わない」を二度と起こさない構造的保証(単一スナップショット・単一鮮度)。純Web 側の per-section paint を全廃して「貼るだけ」にする移行手順。
+7. popup.js を純Web で動かす必要が無くなるか(HTMLを貼るだけなら不要では)。ローディング幕/利用規約ゲートの扱い。
+
+出力は各自『結論 → 根拠 → 反論・リスク → 具体案』の型で。最後は司令塔(Claude)が統合・裏取りして1案にまとめる。

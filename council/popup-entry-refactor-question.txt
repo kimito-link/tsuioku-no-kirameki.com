@@ -1,0 +1,38 @@
+【お題】Chrome拡張「君斗りんくの追憶のきらめき」の巨大ファイル popup-entry.js（21642行・max-lines 上限ちょうどで新規1行も入らない）を、安全にコンポーネント分割＋リファクタリングしたい。方針（案・リスク・具体案）を発散・批判・裏取りしてほしい。
+
+【現状の構造（実コードで確定）】
+- popup-entry.js（21642行）が【3つの画面すべて】を描画する単一巨大 entry:
+  ①本物POP=extension/popup.html（鏡を書く源泉）
+  ②応援プレビュー=extension/live-view.html の INLINE_PASSIVE（鏡を読むだけの受動ビュー）
+  ③WEB=app/live-view.html（popup-entry を chrome シムで動かす純Web）
+  さらに INLINE_MODE(embed_watch=watch埋め込み) / TOOLBAR_POPUP / INLINE_SIDE_PANEL の分岐も同ファイル。
+- モード分岐フラグ: INLINE_PASSIVE / INLINE_MODE / INLINE_EMBED_WATCH / INLINE_SIDE_PANEL / TOOLBAR_POPUP。
+- 巨大関数: refresh()（watch popup の重い本体・全件コメント処理/tabs.query/paintWatchPopupUi）、
+  paintWatchPopupUi、renderStoryUserLane（応援レーン=アイコン列 heavy 経路）、renderUserRooms（グリッド）、
+  refreshAllNorthStarMirrorLanes（貢献度/広告/イベントレーン）、多数の publishXxx/applyXxxForPassive。
+- 既に src/lib へ純関数を切り出す規律はある（laneMirror.js / mirrorBundle.js 等・chrome非依存でテスト可能）。
+  だが DOM 描画・chrome.storage・タイマー・onChanged 配線は popup-entry.js に密結合したまま。
+- 品質ゲート: eslint max-lines ラチェット（現在値+εで固定・増やすの禁止・抽出で下げる方針）。
+  verify:cc（test:cc/lint/typecheck/build/tree-map/feature-map/site-health/verify:bump）。
+
+【なぜ今やるか（動機）】
+- 21642行ちょうど＝新規コードを入れるたびコメントを削って捻出する限界状態。
+- 同じ巨大ファイルに絡む不具合が繰り返し出る（鏡が別tickで数字ズレ・広告列の明滅・heavyRace のちかちか）。
+  真因特定も修正も高コスト（毎回どの経路か 21642行を追う）。
+- 「規律を自動ゲートに」（星野ロミ式）の思想で、構造を分割して各部を独立にテスト・保守可能にしたい。
+
+【過去に踏んだ地雷（捨てた案・繰り返し禁止）】
+- refresh()/paint の read path を触ると実機退化（v0.1.948 で read cache/丸ごとHTML鏡を2回却下）。
+- 描画に「入力sig同一なら丸ごと早期return」を盲目的に足すと別surfaceのアイコン列がちらつく（v1032 撤回・機序未特定）。
+- sig に capturedAt（時刻）を入れると明滅（v1022）。
+- ②INLINE_PASSIVE に storage 書込やキャッシュを足すと真っ白（v1023・②は"読むだけ"死守）。
+- 3画面が同一 popup-entry を共有する構造ゆえ、片方向けの変更が他画面に波及しやすい（embed_watch と popup lane が同じ content バンドル/同フレームに同居して干渉した実例 v1032）。
+
+【問い（案・リスク・具体案を出してほしい）】
+Q1. 21642行 entry を安全に分割する【単位】は何が最適か。(a)モード別（passive/heavy/web を別 entry に）(b)機能別（応援レーン/北極星/数字カード/コメントティッカー/ギフト を module に）(c)層別（描画層/storage IO層/配線層 を分ける）。3画面共有を壊さずに済むのはどれか。組み合わせるならどう。
+Q2. 「一気に大分割」は全損リスクが高い。段階導入（strangler fig 的に1関数ずつ純関数化→module 化）の具体的な順序。最初に切り出すべき最も安全な単位は。各段の「これが壊れたら気づける」検証ゲートは。
+Q3. 3画面（①②③）が同一 entry を共有する構造そのものを見直すべきか（別 entry に分けて共有 module を import）、それとも共有 entry を保ったまま内部を module 化すべきか。過去地雷（他画面への波及）を踏まえた判断。
+Q4. DOM描画・chrome.storage・タイマー・onChanged 配線の密結合をどう解くか。純関数（src/lib・テスト可能）と副作用（chrome/DOM）の境界をどこに引くか。max-lines ラチェットを下げながら進める具体策。
+Q5. リファクタ中に既存の挙動（記録・3画面同一・応援レーン描画）が壊れていないことを保証する方法。characterization test（現挙動を固定するテスト）を先に敷くべきか。実機検証（状態速報のコピペ）との併用は。
+
+各案について「案・リスク・具体的な次の一手」を出し、批判役は他案の穴（特に過去地雷=3画面波及・refresh/paint 不触・②受動の不可侵・明滅の再来）を突いてほしい。過剰設計（全面書き直し・フレームワーク導入・CRDT等）は避ける前提。星野ロミ式（摩擦ゼロ・段階導入・規律を自動ゲートに）で。

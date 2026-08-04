@@ -1,0 +1,40 @@
+【会議の問い】3画面パリティ未達の真因＝popup の応援レーン/北極星の「描画関数が一度も起動しない」を、設計記事 role-separation-design に厳密に従って直す最小の配置変更は何か。
+
+## 設計の正本（必ずこの思想に従う）
+記事: https://tsuioku-no-kirameki.com/articles/role-separation-design/ （リポ内 tsuioku-no-kirameki/articles/role-separation-design/index.html）
+4つの役割: ①集める(常駐=content・記録の心臓部) ②集計する(前段で1回・画面不在でも進む) ③置く(storage=正本の鏡) ④見せる(画面は鏡を貼るだけ・重い読み込み/計算を持たない)。
+要求: ①メインPOP(watch本体のpopup) = ②応援プレビュー(INLINE_PASSIVE) = ③WEB化(純Web) を「全部おなじ鏡を読むだけ」に揃える。
+
+## §6 やってはいけない直し方（踏むと却下・実機で却下済み）
+- 画面の描画パス(refresh/paint の read path)にキャッシュを足す/包む → 全カードちらつきで却下。
+- 画面まるごとを毎回コピー → 数千件で重く却下。
+- 「作る人(記録の心臓部=content)」に集計ロジックを足す → 記録の信頼性が落ちる。
+
+## 実機の事実（状態速報2枚・質問不要なほど確定）
+- データは「ある」: 拡張側 fastDiag で 北極星 貢献度 apiRows=22(or 6) / 広告 apiRows=10(or 4)・state="ok"。記録 12,723件(別配信は98件・取り込み中1%)。
+- なのに popup 固有診断の render probe が全部ゼロ:
+  storyUserLaneRenderProbe = { started:0, activePath:"", entriesLen:-1, domTilesPainted:-1, completed:0, lastReachedStep:"" }
+  northStarRenderProbe = { refreshAllStarted:0, refreshAllCompleted:0, contribResolveCalls:0 }
+- 状態速報本文: 「応援レーン描画: 経路=不明 / 供給?件 → 画面描画件数不明 🔴 → 描画関数が一度も呼ばれていません」
+  「⚙ paint 8ms / 描画1回 / コメント 2 / ⚠ローディング継続」。
+- 北極星鏡=69秒前で新鮮なのに「貢献度0/広告0=空」、応援レーン鏡は別配信の古い6件。整合チェック「拡張22 ≠ 鏡0」。
+- popup 固有診断は「✅現配信・66秒前」と新鮮(watchSnapshotMeta も現 lv で埋まっている)＝popup は現配信を正しく認識している。
+
+## 実コードで確認済みのトリガ連鎖（popup-entry.js）
+- renderStoryUserLane()(5034): entries 空なら STORY_USER_LANE_STEPS.ENTRIES_EMPTY_RETURN で即 return。但し probe は started=0 すら立っていない＝そもそも renderStoryUserLane に到達していない疑い。
+- 応援レーンの起動は syncStorySourceEntries(lv, displayEntries, laneFeedPick.entries)(14185) → paintStoryUserLaneCoalesced → renderStoryUserLane。
+- displayEntries は arr(=storage の保存コメント data[key]・13868)由来。arr が空でなくても、14185 に到達する前に refresh が早期 return している可能性。
+- 北極星は refreshAllNorthStarMirrorLanes(10859) が起点だが refreshAllStarted=0＝一度も呼ばれていない。
+- スクロール中は shouldDeferHeavyPopupPaintNow()/diagPaintDeferActive で heavy paint を defer する分岐がある(14033 付近)。
+
+## 真因仮説（会議で検証してほしい）
+「見せる人(popup の応援レーン/北極星描画)」が、「集める/集計の完了(コメント全件 heavy read / refresh の重い前段)」に依存して起動している。だから heavy が終わるか、ある条件を満たすまで描画トリガ(syncStorySourceEntries / refreshAllNorthStarMirrorLanes)に到達せず、render probe が0のまま=「重い・開かないと出ない・ローディングが続く」。記事§1の症状そのもの。
+
+## 会議で出してほしいもの（優先順）
+1. render probe が0になる「到達していない」真因の最有力候補を、上記トリガ連鎖のどの早期return/ガードか spec-level で特定（複数候補なら確度順）。
+2. 記事§2/§5 に従い「描画を集計済みの鏡から貼るだけにし、heavy/refresh の前段完了を待たずに起動する」最小の配置変更。①②③が同じ鏡を読む形に揃えること。
+3. §6 の地雷(描画パスを包む/丸ごとコピー/記録側に集計追加)を踏まない根拠。
+4. 北極星 refreshAllNorthStarMirrorLanes が呼ばれない件と、応援レーン描画が呼ばれない件が「同じ1つの根」か「別々」かの判定。
+5. 第1段の最小修正(1 PR・pure/低リスク)と、その単体テスト方針・実機での到達条件(render probe が0でなくなる・鏡が現配信で埋まる)。
+
+注意: 推測でなく、popup-entry.js の実コードのトリガ連鎖に即して答えること。「ドキュメントの実装済みを鵜呑みにせず実コードで前提を立てる」(記事§7)。

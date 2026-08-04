@@ -1,0 +1,66 @@
+# 会議: WEB URL(純Web公開)を拡張内プレビューと「同じ画面」にする設計
+
+## ユーザーの正本(星野ロミ理論)
+「通常の応援ライブビューはいい感じなので、そのまま WEBサイトURLも同じものを出したい」
+「現状のWEBを近づけるという発想がダメ。今あるものを使う。それが星野ロミ理論」
+「おそらくローカルで動いているプログラムを世界中で調査すればある。ローカルPCのサーバーをWEBに出すような発想かも」
+= 純Web版を「1個ずつレーンを足して近づける」のは禁止。今あるもの(拡張が既にローカルで描いている全レーン)を
+  そのまま WEB に出す。世界の確立手法に乗る。
+
+## 世界調査の結論(URLで裏取り済み・前提)
+配信補助ツール StreamElements が「ローカルで集計→クラウド→視聴者表示」を実際にやっており、その方式は
+`onWidgetLoad` で【全状態を1つの JSON で丸ごと配る】(以後は差分)。これは redux-persist の state hydration、
+local-first の snapshot materialization と同じ確立パターン。
+- ★「丸ごと送る対象は DOM ではなく state(全レーンを1JSON)」。DOM丸ごと方式は重さで却下済(このプロジェクトの
+  v0.1.948 revert と一致)・配信業界も誰もやっていない。
+- ★tunnel(ngrok/cloudflared)は PC生存依存でスマホ視聴に不向き=不採用。
+- ★読み取り専用視聴なので CRDT(Yjs/Automerge)/RxDB replication は過剰(RxDB公式が「協調編集無いなら入れるな」)。
+- ★Vercel serverless + Upstash REST のスタックでは SSE/WebSocket 常時接続は不利(Vercel が10秒で切る)。
+  「ローカルが N秒ごとに最新スナップショットを PUT、純Webが GET ポーリング」(現状方式)がこのスタックの定石。
+
+## 実コードで確定した事実(会議の前提・推測でない)
+1. ★純Web版(app/live-view.js)は既に本物 popup-entry を chrome シムで動かしている=描画コードは純Webにもある。
+   = 「今あるものを使う」が技術的に成立済み。足りないのは【データ(鏡)】だけ。
+2. 純Webが今出せている(jsonBlob に乗っている): 配信者カード・上段3カード(statCardsMirror)・応援レーン(laneMirror)・
+   応援者ランキング(topSupporters)・ギフト貢献度(northStarMirror.contributionRanking)。実機スクショで確認済。
+3. ★純Webが空欄(jsonBlob に乗っていない): 広告ランキング・イベント現在順位・イベント累計スコア。
+   真因(実コード)= publishNorthStarMirror(popup-entry.js:5473)→buildNorthStarMirrorSnapshot は
+   `{ liveId, contributionRanking }` だけを鏡(KEY_NORTH_STAR_MIRROR)に publish。adRanking(広告)・イベント系を
+   含めていない(northStarMirror.js の NorthStarMirrorSnapshot は lanes.contributionRanking のみ)。
+4. 拡張内プレビュー(popup iframe)はこれら全レーンを storage/IDB 直読み+API直叩きで描ける(passive でも v0.1.951 で
+   貢献度/広告/イベントが出た)。純Webは chrome 無し=storage 直読み不可=鏡(サーバ送信)だけが頼り。
+5. サーバ(api/status.js)は payload を丸ごと Upstash に保存(TTL 7日)・明示サイズ上限なし。現状 jsonBlob 実測~131KB。
+   laneMirror は 512KB 二段 cap ガードあり。
+6. ★別問題(既知): 純Web は PC が定期再送信しない=「🌐このURLをWEBでも公開する」を押した瞬間の1枚で止まる
+   (以前ユーザー「出た瞬間止まる・動かない」)。StreamElements 型は「N秒ごとに最新を PUT」が前提。
+
+## 論点(会議で裁定してほしい)
+A. ★最重要: 拡張内で出ている全レーン(広告ランキング/イベント現在順位/イベント累計スコア)を、純Webでも出すために、
+   それぞれの鏡データを「今ある鏡の仕組み」にどう相乗りさせるか。具体的に:
+   - 広告ランキング: popup が描く adRanking の rows は storage キー nls_nicoad_api_ranking_<lid> 由来。
+     これを northStarMirror に adRanking レーンとして足す(buildNorthStarMirrorSnapshot を拡張)のが筋か。
+   - イベント現在順位/累計スコア: これらは ndgrValue や iframe 由来(診断で iframe_unrendered/no_event)。
+     純Webで出せる形(rows or 値)を鏡に持てるか。出せないなら純Webでは畳む(拡張内 passive と同じ扱い)か。
+B. StreamElements onWidgetLoad 型に倣い、バラバラの鏡(laneMirror/statCardsMirror/northStarMirror/topSupporters)を
+   【1つの集約スナップショット・1つの capturedAt】にまとめるべきか。今は別キー・別鮮度で「永久に揃わない」リスク。
+   ただし現状でも jsonBlob に全部入れて1回で送っている(status-entry.js:1001)ので、実質1スナップショット。
+   鮮度を1つに統一する追加価値はあるか、それとも現状の jsonBlob 同梱で足りるか。
+C. PC 定期再送信(StreamElements の「N秒ごとに PUT」)。status ページが開いている間、_lastRenderedBundle.jsonBlob を
+   間引いて(15-30秒)再 POST する設計。これは別途ユーザーが「PCが定期再送信する仕組みを作る」を選択済み。
+   今回の「同じ画面」と一緒にやるか、レーン相乗りを先にやるか。
+D. サイズ: 全レーンの鏡を足すと jsonBlob が太る(現状131KB)。広告/イベントは cap 10件程度。Upstash 上限・
+   ポーリング GET のコスト。512KB 以内に収まるか。
+
+## 制約(触らない)
+- 拡張内プレビュー(いい感じに動いている)の描画は壊さない。
+- popup の refresh()/paint の read path は触らない(v0.1.948 で2回却下された地雷)。
+- content-entry.js(記録の心臓部)は触らない。
+- ★「現状のWEBを近づける(1個ずつ自作で足す)」のは禁止。今ある本物 lib・本物鏡の仕組みを使う(似せて自作しない)。
+- DOM丸ごと方式は禁止(重さ却下済)。state(JSON)を送る。
+
+## 出してほしいアウトプット
+- A の裁定: 広告ランキング/イベント系の鏡を、既存の鏡の仕組み(northStarMirror 拡張 or 新キー)にどう足すか。
+  popup が既に持っている rows(再計算しない)をどこで拾って鏡に積むか。具体的な関数・storage キー。
+- B/C/D の裁定: 集約スナップショット化の要否、PC定期再送信を同時にやるか、サイズの見通し。
+- PR 分割と実装接点。
+- 実機検証手順(純Webで拡張内と同じ全レーンが出る・古いまま止まらない)。

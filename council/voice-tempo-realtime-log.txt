@@ -1,0 +1,155 @@
+[Ollama生死] http://127.0.0.1:11434 に到達不能 → local 6体を除外（クラウドのみで縮退運用）
+[実在チェック] groq/gemini を照合。6体を除外
+
+分類: category=design  by=groq/llama-3.1-8b-instant  (設計判断・アーキテクチャ・技術選定・トレードオフ)
+  分類器の生出力: {"category":"design"}
+召集 4体（最大4）: groq/gpt-oss-120b[批判・詰め（推論特化）], groq/compound[汎用], groq/qwen3.6-27b[発散アイデア（推論強）], groq/llama-3.3-70b[爆速の視点]
+
+[ルーティング選抜・design] 4体に問い合わせ中: groq/gpt-oss-120b, groq/compound, groq/qwen3.6-27b, groq/llama-3.3-70b
+
+########################################################################
+# ルーティング選抜・design
+########################################################################
+
+========================================================================
+### groq/gpt-oss-120b  [批判・詰め（推論特化）]  (4020ms)
+========================================================================
+**結論**  
+現在の「キュー長主導」設計は、コメントが滝のように流れる極端な負荷下では **「遅延蓄積」** と **「音声ロスの不可視化**」 という二つの致命的な穴を抱えている。  
+提案された改善案は、いずれも **「遅延がさらに増大」** もしくは **「誤統合で意味が失われる」** リスクを伴うため、実装コストに見合う効果が得られない可能性が高い。  
+
+---
+
+## 1. 追加改善案（3 件）とそのリスク  
+
+| 改善案 | 実装コスト | 退行リスク / 主な欠点 |
+|--------|------------|----------------------|
+| **A. 動的キュー上限の自動伸縮** – キュー長上限を「8件」から「8 ~ 12件」へ、CPU使用率と合成レイテンシをリアルタイムで監視し、上限を自動的に緩める。 | 中 (監視ロジック＋設定 UI) | *遅延蓄積*: キューが伸びるほど「実際のコメント到着」→「音声再生」までの時間が長くなる。結果、視聴者は「コメントが読まれるまで数秒」待たされる感覚が増大し、リアルタイム感が失われる。 |
+| **B. 先読み深さの上限を固定（常に3）にし、合成タスクを常時3件パイプライン化** – キュー長に関わらず、常に3件の合成を前もって走らせる。 | 低‑中 (パイプライン制御の追加) | *CPUスパイク*: コメントが突発的に増えると、3件分の合成が常にフル稼働し、VOICEVOX サーバが過負荷になる。タイムアウトが頻発し、watchdog が強制的に次へ送るケースが増えて「音声欠落」につながる。 |
+| **C. 「遅延警告」UI の導入** – キュー長が 6 件以上になると、画面左上に「⚠️ 読み上げ遅延が増大中」アイコンを表示し、配信者が手動で「読み上げ速度ブースト」ボタンを押せる。 | 低 (UI だけ) | *ヒューマンエラー*: 配信者がボタンを押すタイミングが遅れれば効果がない。逆に頻繁に押しすぎると音声が速すぎて聞き取りにくくなる（速度ブースト上限 0.8 が超過すると文字切れが起きる）。 |
+
+**根拠**  
+- キュー上限が伸びると、**「キュー長 × 平均合成時間」** が遅延の上限になる。現在 1.5 s/件 × 8 件 = 12 s の遅延が許容範囲とされているが、12 件に増やすだけで 18 s に跳ね上がり、リアルタイム感が実質的に失われる。  
+- 先読み深さを固定すると、**CPU 使用率** がコメントレートに比例しなくなる。負荷が急増した際にサーバがキューを捨てる（タイムアウト）頻度が上がり、watchdog が頻発 → **音声欠落** が増える。  
+- UI 警告は **人間の介入** に依存するため、システム的な根本解決にならない。実際の配信では配信者はコメント読み上げに集中できず、警告は無視されやすい。
+
+---
+
+## 2. 「ほぼ同文コメント」統合の安全な実装  
+
+**結論**  
+「ほぼ同文」統合は **文字列類似度閾値だけで自動マージ** すると、**意味が異なるコメント（例: 「草」 と 「草むしり」）を誤統合** するリスクが高く、視聴者の期待を裏切る。  
+
+**根拠**  
+- 日本語は助詞や絵文字の有無で意味が変わるケースが多い。単純な Levenshtein 距離や Jaccard 類似度だけでは「草」「草ｗｗｗ」「草草草」などは同一と判定しやすいが、**「草むしり」** も同様に高類似度になる。  
+- 誤統合が起きると、**「草」 が 1 回だけ読まれる** という体感が生まれ、コメント投稿者の存在感が失われる。  
+
+**反論・リスク**  
+- 類似度閾値を 0.9 以上に上げても「草ｗｗｗ」→「草」 は除外できない。逆に閾値を低くしすぎると **統合効果がほぼ無意味** になる。  
+- ユーザー側で「統合許可」設定をオンにしない限り、誤統合は許容できない。  
+
+**具体案**  
+1. **トークンベースの正規化**  
+   - コメントを「絵文字・記号・数字・英字」だけ除去し、残りを形態素解析で単語単位に分割。  
+   - 同一トークン列（順序は保持）かつ **長さ差が 2 文字以内** のものだけを統合対象にする。  
+2. **頻度ベースのヒューリスティック**  
+   - 1 秒以内に同一トークン列が **3 回以上** 出現した場合にのみ「まとめて」読み上げる（例: 「草」×5 → 「草が 5 回」）。  
+3. **ユーザー設定フラグ**  
+   - 配信者が「類似コメント統合」オプションを有効にした時だけ上記ロジックを走らせ、無効時は完全一致のみ。  
+
+---
+
+## 3. 合成の真の並列化は「price」に見合うか  
+
+**結論**  
+VOICEVOX の **1 リクエストあたり 1.0‑1.5 s** の合成時間と **CPU 2‑4%** の負荷を考えると、**最大 3 並列** であればサーバは余裕があるが、**4 以上** になると **リクエストキューの
+
+========================================================================
+### groq/compound  [汎用]  (0ms)  [FAILED: HTTP 413 Request Entity Too Large]
+========================================================================
+(no answer)
+
+========================================================================
+### groq/qwen3.6-27b  [発散アイデア（推論強）]  (3314ms)
+========================================================================
+<think>
+Here's a thinking process:
+
+1.  **Analyze User Input:**
+    *   **Role:** Divergent thinker. Must provide unconventional, non-obvious ideas. Can provide 2+ distinct approaches.
+    *   **Topic:** How to design a TTS (Text-to-Speech) system for live streaming so that reading comments keeps up with real-time comment flow, even during "comment waterfalls" (high volume).
+    *   **Current Implementation (Respect as baseline):**
+        1. Comment → Queue (max 8, drop oldest)
+        2. Congestion control based on queue length: +0.15 speed/char at 2 waiting, +0.8 at 8+ waiting. Max speed 60, min char limit 30.
+        3. Pre-synthesis depth varies by queue length: 1 (≤2), 2 (3-4), 3 (5+). CPU bounded.
+        4. VOICEVOX synthesis: audio_query (3s) + synthesis (8s) timeout. Actual ~1.0-1.5s/item (16kHz mono).
+        5. Playback: Sequential, no overlap. Watchdog 20s forces next.
+        6. Time gate (`voiceAgeGate.js`): Fallback only. Normal 8s, priority 10s. Drops if exceeded. *Main lever is queue length, not time.*
+        7. Priority: `high` (gifts, etc.) jumps ahead in FIFO.
+    *   **Past Failures (Do NOT repeat):**
+        - v0.1.773: Time gate as main lever → silence regression → reverted.
+        - OneComme binary: Queue-length only, no time gate.
+        - Pre-synthesis only increases "depth", not true parallelism (up to 3 tested but not fully implemented).
+        - Probabilistic/gambling-based filtering rejected due to policy.
+    *   **Unresolved Issues (Divergence points):**
+        - Fuzzy duplicate merging (currently only exact match). "草", "ｗｗｗ" flood.
+        - No notification when comments are dropped (silent loss).
+        - True parallel synthesis design (safe concurrent requests → ordered playback).
+        - Synthesis caching (no cache currently).
+        - No empirical metric for "good tempo". Current values (+0.8, 30 char limit) unverified.
+    *   **Questions to Answer:**
+        1. 3+ improvement ideas maintaining current baseline, with cost & regression risk.
+        2. Safe implementation of "fuzzy duplicate merging".
+        3. Is true parallel synthesis worth it? CPU/VOICEVOX load risks.
+        4. UX of notifying dropped comments (e.g., "+N omitted"). Effective? Damages UX?
+        5. Caching effectiveness & safe scoping.
+    *   **Output Format:** Conclusion → Rationale → Counterarguments/Risks → Concrete Proposal (for each point/idea).
+
+2.  **Deconstruct & Brainstorm (Divergent Thinking Mode):**
+    *   *Constraint Check:* Must keep queue-length as main lever, time gate as fallback, sequential playback, no probabilistic filtering. Must address the 5 questions. Must be unconventional.
+    *   *Question 1: 3+ Improvement Ideas (Cost/Risk)*
+        *   Idea A: **Dynamic Chunking & Overlap Fading (Non-destructive)** - Instead of dropping entire comments, split long comments into chunks. If queue is full, drop the *tail chunk* but play the head chunk, or crossfade. Wait, constraint says sequential playback, no overlap. But maybe "streaming chunk playback" where synthesis outputs are played as they finish, not waiting for full sentence? That changes playback model. Let's stick closer to constraints but twist it: **Adaptive Semantic Compression** - Instead of dropping, truncate long comments to core keywords/nouns, or apply rule-based shortening on the fly. Cost: Medium. Risk: Alters original comment.
+        *   Idea B: **Queue Pressure Mapping to Audio Pitch/Speed Curve** - Instead of linear speed boost, map queue length to a non-linear tempo curve that mimics human "rushing" speech, combined with dynamic pause compression. Cost: Low. Risk: Might sound unnatural if not tuned.
+        *   Idea C: **Predictive Pre-fetch with Comment Velocity Tracking** - Track comment arrival rate (comments/sec). If rate > threshold, proactively synthesize *anticipated* common phrases or use a lightweight LLM/regex to predict next comment type and pre-synthesize. Too complex? Let's refine: **Velocity-Driven Queue Admission** - Instead of hard drop at 8, use a "soft drop" where low-engagement comments (no likes, short, generic) are deprioritized, while high-velocity unique comments get a "fast lane" within the queue. But constraint says no probabilistic/gambling. Let's stick to deterministic: **Comment Density Hashing** - Group comments by semantic similarity in real-time, play one representative, but tag the rest as "merged". This overlaps with Q2.
+        *   Let's pivot to truly divergent but safe ideas that fit the constraints:
+            1. **Sliding Window Tempo Adjustment (SRTA)**: Instead of fixed speed steps, calculate a continuous tempo multiplier based on the *derivative* of queue length change over 3 seconds. Smooths out the "jerky" speed jumps. Cost: Low. Risk: Over-complication of math, but safe.
+            2. **Asymmetric Queue Dropping (Head vs Tail)**: Currently drops oldest. What if we drop the *least time-critical*? e.g., drop comments that are >5s old but not high priority, or drop comments with low "information density" (e.g., single kana vs full sentence). Cost: Medium. Risk: Might drop important comments.
+            3. **Synthesis Pipeline Decoupling with Priority Inheritance**: Separate the "synthesis queue" from the "playback queue". Allow synthesis to run ahead aggressively, but playback only pulls when ready. If synthesis finishes early, it waits. If playback lags, synthesis queue prunes based on age. This is essentially what pre-synthesis does, but let's frame it as **Dual-Queue Pressure Valve**.
+        *   Let's align with the prompt's request for 3 ideas with cost/risk, maintaining baseline. I'll structure them clearly.
+    *   *Question 2: Fuzzy Duplicate Merging*
+        *   Need safe, deterministic, low-cost method. Levenshtein distance is too heavy. Use **Normalized Token Hashing**: Strip punctuation, convert to lowercase/hiragana, remove common filler words (草, わ, 笑), hash the result. If hash matches within a 2-second window, merge. Risk: False positives on short phrases. Mitigation: Minimum length threshold (e.g., >=3 chars after normalization), or require exact match on first/last character. Alternative: **N-gram Overlap Threshold** - If 70% of characters match within a sliding window, merge. But deterministic rule-based is safer: **Regex-based Pattern Grouping** + **Time-Window Deduplication**. I'll propose a "Semantic Normalization + Time-Bounded Exact Match" approach.
+    *   *Question 3: True Parallel Synthesis*
+        *   Is it worth it
+
+========================================================================
+### groq/llama-3.3-70b  [爆速の視点]  (2245ms)
+========================================================================
+### 結論
+読み上げがテンポよくリアルタイムでコメントと同時になるようにするためには、複数の改善案を実施する必要がある。
+
+### 根拠
+現在の実装では、キュー長が主なレバーとなっており、時間ゲートは保険として機能している。ただし、コメントの滝のような状況では、読み上げがテンポを崩さないようにするために、追加の改善が必要である。
+
+### 反論・リスク
+過去の失敗例では、時間ゲートを主レバーにして早期に間引く設計が撤回された。また、確率的な「アツい」演出はギャンブル前提に抵触するため、却下されている。
+
+### 具体案
+1. **「ほぼ同文」コメントの統合**: 完全一致以外の類似コメントの統合を実装する。例えば、編集距離を使用して類似度を計算し、一定の閾値以下のコメントを統合する。
+   - 実装コスト: 中
+   - 退行リスク: 低
+2. **合成のキャッシュ**: 同一文字列の再合成を避けるために、キャッシュを実装する。例えば、挨拶や定型的な相槌など、繰り返し出現しやすい短文をキャッシュする。
+   - 実装コスト: 低
+   - 退行リスク: 低
+3. **合成の並列化**: 複数のVOICEVOXリクエストを同時発火し、その結果を順番通りに再生キューへ差し込む。ただし、CPUやVOICEVOXサーバ負荷の観点でのリスクも考慮する必要がある。
+   - 実装コスト: 高
+   - 退行リスク: 中
+4. **「間引かれた」ことを配信者/視聴者に通知**: UIに「+N件省略」等を表示して、間引かれたことを配信者/視聴者に通知する。
+   - 実装コスト: 低
+   - 退行リスク: 低
+5. **テンポの体感評価基準**: 速度ブースト+0.8・文字上限30文字という現在の値が、実際の滝配信で自然に感じられるかの検証手段を整備する。
+   - 実装コスト: 中
+   - 退行リスク: 低
+--- [ルーティング選抜・design] 成功 3/4 ---
+
+=== 完了 5755ms ===
+保存: council/voice-tempo-realtime-answers.json

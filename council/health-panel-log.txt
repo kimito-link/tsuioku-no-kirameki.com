@@ -1,0 +1,116 @@
+
+分類: category=design  by=groq/llama-3.3-70b  (設計判断・アーキテクチャ・技術選定・トレードオフ)
+  分類器の生出力: {"category":"design"}
+[FAST] 批判役を local/deepseek-r1:14b → groq/gpt-oss-120b に差し替え（速度優先）
+召集 3体（最大4）: nvidia/qwen3.5-122b[発散アイデア（推論強）], groq/llama-3.3-70b[爆速の視点], groq/gpt-oss-120b[批判・詰め（推論特化）]
+
+[ルーティング選抜・design] 3体に問い合わせ中: nvidia/qwen3.5-122b, groq/llama-3.3-70b, groq/gpt-oss-120b
+
+########################################################################
+# ルーティング選抜・design
+########################################################################
+
+========================================================================
+### nvidia/qwen3.5-122b  [発散アイデア（推論強）]  (0ms)  [FAILED: HTTP 500 invalid type: unit variant, expected newtype variant at line 1 column 40]
+========================================================================
+(no answer)
+
+========================================================================
+### groq/llama-3.3-70b  [爆速の視点]  (2514ms)
+========================================================================
+## 結論
+健全度セル約20個のダッシュボードを作成し、正常なら100%、おかしい所だけ90、88などと数値で出して、パッと異常が分かるようにする。
+
+## 根拠
+既存のデータを活かすことで、新規の重い集計やストレージの必要性を減らし、hot pathを重くしないことが可能である。さらに、失敗体験の除去を考慮して、「該当データ無し」を赤にしないようにする必要がある。
+
+## 反論・リスク
+過剰実装を避ける必要があり、新規の集計やストレージの追加は避けるべきである。また、恣意的な重み付けで意味のない%を作ることを避け、純ロジック+test先行で各セルの%算出を純関数化する必要がある。
+
+## 具体案
+### 20項目の一覧
+1. 取得率(記録) - 計算元: statusMindmapModel.js - 100%基準: 100% - 対象外: —
+2. 取得率(公式) - 計算元: statusMindmapModel.js - 100%基準: 100% - 対象外: —
+3. withUidPercent - 計算元: statusMindmapModel.js - 100%基準: 100% - 対象外: —
+4. NDGR接続 - 計算元: statusMindmapModel.js - 100%基準: connected=100%, unknown/disconnected=0 - 対象外: —
+5. backfill完了度 - 計算元: statusMindmapModel.js - 100%基準: 100% - 対象外: —
+6. 北極星6レーン(ok) - 計算元: statusMindmapModel.js - 100%基準: ok=100%, それ以外=段階% - 対象外: —
+7. アバター解決率 - 計算元: statusMindmapModel.js - 100%基準: 100% - 対象外: —
+8. 描画(paint ms) - 計算元: statusMindmapModel.js - 100%基準: 100-劣化 - 対象外: —
+9. stale警告 - 計算元: statusMindmapModel.js - 100%基準: 無=100%, 有=低 - 対象外: —
+10. 記録↔公式一致度 - 計算元: statusMindmapModel.js - 100%基準: 100% - 対象外: —
+11. コメント取得速度 - 計算元: statusMindmapModel.js - 100%基準: 100% - 対象外: —
+12. external fetch - 計算元: statusMindmapModel.js - 100%基準: 100% - 対象外: —
+13. longTasks - 計算元: statusMindmapModel.js - 100%基準: 100% - 対象外: —
+14. 北極星レーン state - 計算元: statusMindmapModel.js - 100%基準: ok=100%, それ以外=段階% - 対象外: —
+15. staleDomBundleSuspected - 計算元: statusMindmapModel.js - 100%基準: 無=100%, 有=低 - 対象外: —
+16. ndgr-disconnected - 計算元: statusActionAdvisor.js - 100%基準: connected=100%, unknown/disconnected=0 - 対象外: —
+17. capture-low - 計算元: statusActionAdvisor.js - 100%基準: 100% - 対象外: —
+18. uid-low - 計算元: statusActionAdvisor.js - 100%基準: 100% - 対象外: —
+19. lane-empty - 計算元: statusActionAdvisor.js - 100%基準: 100% - 対象外: —
+20. northstar-stuck - 計算元: statusActionAdvisor.js - 100%基準: 100% - 対象外: —
+
+### 純関数の置き場所
+src/lib/healthCheck.js
+
+### statusのどこに描くか
+statusのファーストビューに20セルのグリッドを描く。色(緑/黄/赤)+%数値を表示し、100%は目立たせないようにし、低いものだけ赤/黄で目を引くようにする。クリックで詳細(対処カード or マインドマップの該当ノード)へ遷移する。
+
+========================================================================
+### groq/gpt-oss-120b  [批判・詰め（推論特化）]  (7385ms)
+========================================================================
+**結論**  
+20 個の「健全度セル」は、既存 `statusMindmapModel.js` と `statusActionAdvisor.js` が出す **badge** と **数値指標** をそのまま **%化** したものに限定し、**新規集計は一切行わない**。  
+* 正常＝100 % とし、異常は 0 %‑90 % のスコアで表す。  
+* データが取得できない（対象外）場合は **「—」** と表示し、スコアは付けない。  
+* すべての計算は **純関数** として `src/lib/healthScore.ts` に実装し、テストでカバーする。  
+* UI は 4 行 × 5 列のグリッドで、**緑＝100 %（目立たせない）・黄＝70‑99 %・赤＝0‑69 %** のカラーリングと数値を併記し、クリックで該当の対処カード／マインドマップノードへ遷移させる。
+
+---
+
+### 根拠  
+
+| 項目 | 既存データの有無 | 100 % 基準 | %化の根拠 | 対象外扱い |
+|------|----------------|-----------|-----------|------------|
+| 取得率（記録） | あり (`recordedRate`) | 100 % = 1.0 | そのまま `rate * 100` | データ欠損時は「—」 |
+| 取得率（公式） | あり (`officialRate`) | 100 % = 1.0 | 同上 | — |
+| withUidPercent | あり | 100 % = 1.0 | `withUidPercent * 100` | — |
+| NDGR 接続 | あり (`ndgrConnectStatus`) | `connected` = 100 % / `unknown` = 50 % / `disconnected` = 0 % | 3 段階化 | — |
+| backfill 完了度 | あり (`backfill.progress`) | 100 % = 完了 | `progress * 100` | `running` 中は 0 %（ただし実行中は「—」に切り替える） |
+| 北極星レーン ①‑⑥ | あり (`northstar.lanes[i].state`) | `ok` = 100 % / `iframe_unrendered` = 70 % / `event_present_unscrapable` = 50 % / `no_event` = 0 % | 状態ごとに段階化 | `state === null` → 「—」 |
+| avatar 解決率 | あり (`avatarMapSize / interceptMapSize`) | 100 % = `avatarMapSize === interceptMapSize` | `Math.min(1, avatarMapSize / interceptMapSize) * 100` | `interceptMapSize === 0` → 「—」 |
+| paint ms | あり (`paintMs`) | 100 % = 0 ms（理想） | `Math.max(0, 100 - paintMs / 10)`（例: 200 ms → 80 %） | `paintMs === null` → 「—」 |
+| staleDomBundleSuspected | あり (`staleDomBundleSuspected`) | `false` = 100 % / `true` = 0 % | 二値化 | — |
+| capture‑low | あり (`captureLowRate`) | 100 % = 0 % low | `Math.max(0, 100 - captureLowRate * 100)` | — |
+| uid‑low | あり (`uidLowRate`) | 同上 | 同上 | — |
+| lane‑empty | あり (`laneEmptyRate`) | 100 % = 0 % empty | 同上 | — |
+| northstar‑stuck | あり (`northstarStuck`) | `false` = 100 % / `true` = 0 % | 二値化 | — |
+| avatar‑lagging | あり (`avatarLaggingRate`) | 100 % = 0 % lag | 同上 | — |
+| external‑fetch‑error | あり (`externalFetchErrorRate`) | 100 % = 0 % error | 同上 | — |
+| long‑tasks‑ratio | あり (`longTaskRatio`) | 100 % = 0 % long tasks | `Math.max(0, 100 - longTaskRatio * 100)` | — |
+| NDGR‑queue‑depth | あり (`ndgrQueueDepth`) | 100 % = 0 depth | `Math.max(0, 100 - ndgrQueueDepth)`（上限 100） | — |
+| event‑present‑unscrapable | あり (`eventUnscrapableRate`) | 100 % = 0 % | 同上 | — |
+| iframe‑unrendered | あり (`iframeUnrenderedRate`) | 100 % = 0 % | 同上 | — |
+| backfill‑stopReason | あり (`backfill.stopReason`) | `null` = 100 % / 有り = 0 % | 二値化 | — |
+| record‑vs‑official 差分 | あり (`recordOfficialDiff`) | 0 % 差分 = 100 % | `Math.max(0, 100 - Math.abs(diff) * 10)`（差が 5% で 50 %） | — |
+
+* **100 % の基準は「理想的・完全に成功した」状態**。  
+* **段階化は業務上許容できる劣化レベル**（例: `iframe_unrendered` はまだ画面が見えるが一部機能欠損、といったニュアンス）。  
+* **対象外は「—」** にして、スコアが 0 % になるリスクを排除する。
+
+---
+
+### 反論・リスク（他メンバー回答への批判）
+
+1. **過剰な項目列挙**  
+   - Llama の回答は「取得率(記録)」「取得率(公式)」を別々に出すなど、**実質的に同一指標の二重計上**で UI が散漫になる。取得率は **「記録 / 公式」** の比率で 1 つにまとめるべき。
+
+2. **スコア算出ロジックが曖昧**  
+   - 「NDGR 接続＝connected=100 / unknown/disconnected=0」だけでなく、**unknown** は「情報不足」なので **「—」** とすべき。0 % で赤くすると、実際は不明なのに障害と誤認させるリスクがある。
+
+3. **対象外の扱いが不統一**  
+   - 提示された一覧では「対象外: —」と
+--- [ルーティング選抜・design] 成功 2/3 ---
+
+=== 完了 28337ms ===
+保存: council/health-panel-answers.json

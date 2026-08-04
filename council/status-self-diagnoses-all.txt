@@ -1,0 +1,64 @@
+【お題】状態速報（AI共有テキスト）を1回コピーして渡すだけで、「純Web応援ライブビュー（app/live-view, 拡張なしで見るURL ?v=token）が、拡張内プレビュー（popup を iframe で丸ごと出す本物）と完全一致しているか／一致していないならどこで・なぜ落ちているか」が抜け漏れなく全部分かるようにしたい。
+
+【背景・確定している事実（実コードで裏取り済み）】
+- 純Webに送られる全データ = status-entry.js の `_lastRenderedBundle.jsonBlob`。中身は:
+  - generatedAt, overview, lives, fastDiag
+  - laneMirror（応援レーン鏡: りんく/こん太/たぬ姉/ギフト/広告のバケツ。各 cap48・顔/名前込み）
+  - statCardsMirror（数字カード鏡: 記録/同接/来場）
+  - northStarMirror（北極星レーン鏡。今は lanes.contributionRanking と lanes.adRanking の2レーン）
+  - topSupporters（応援者ランキング上位10件）
+- このjsonBlobが /api/status へ POST → Upstash 保存 → 純Webが GET → 本物 paint 関数で描く。
+- 純Web(app/live-view.js)の paintAllMirrors が statCards/lane/northStar/supporter を1個ずつ塗る。
+- 状態速報テキスト(buildAiShareFullText)は fastDiag と popupDiag は JSON で全部出すが、
+  **jsonBlob の鏡（純Webに送る当のデータ）の中身を一切要約・出力しない**。これが盲点。
+  そもそも buildAiShareFullText は laneMirror/statCardsMirror/northStarMirror/topSupporters を
+  引数として受け取っていない（自己診断のしようがない）。
+- 実例: ある配信で「純Webに広告ランキングが出ない」→ 状態速報を見ても、
+  「広告データが元々無い(no_ranking_data)」のか「鏡に積み忘れた」のか「純Webの描画が落ちた」のか
+  状態速報だけでは切り分け不能。結局ユーザーにスクショを往復で求めることになった = 状態速報の欠陥。
+
+【ユーザーの要求（原文ニュアンス）】
+「これを共有すれば原因がすべて分かる、を抜け漏れなく載せろ」
+= 状態速報1枚で、純Web側の真実（何が送られ・何件で・拡張側の生データと一致するか・古くないか）が
+  全部読み取れること。スクショ往復ゼロにする。
+
+【制約・地雷（MEMORY 由来・絶対厳守）】
+1. status は2秒ループで再描画される激重ページ。**毎回 read を増やすな**（鏡は既に extras=12秒間引きで読んでいる。
+   新たな storage read を足してはいけない。既に手元にある jsonBlob/鏡オブジェクトから組むだけにする）。
+2. popup refresh()/paint の hot read path には触れない（過去に触って実機で却下・revert を繰り返した）。
+3. status の心臓部(content記録/会場読み上げ)に触れない。
+4. 純関数は src/lib に切り出してテスト必須（status-entry.js を太らせない。max-lines ラチェット）。
+5. リリースビルド(NL_RELEASE)では生診断JSONを隠す既存挙動を壊さない。
+6. 「1個ずつ足す」発想は禁止されている。今回は“診断の自己照合”なので機能追加ではなく観測だが、
+   それでも網羅性（抜け漏れゼロ）が肝。場当たりに1項目ずつ足すと、また漏れる。
+
+【会議で決めてほしいこと】
+A. 状態速報に載せるべき「純Web鏡の自己診断」項目を、抜け漏れなく列挙せよ。
+   最低限の候補（これで足りるか・他に要るかを批判的に詰めてほしい）:
+   - jsonBlob 全体のサイズ（512KB cap に対して何%か。肥大で送信落ちしていないか）
+   - 各鏡の有無と liveId（laneMirror/statCardsMirror/northStarMirror/topSupporters それぞれ）
+   - 各鏡の鮮度（capturedAt/savedAt から経過秒。3分超なら「古い＝popup未起動疑い」）
+   - laneMirror: バケツ別件数（りんく/こん太/たぬ姉/ギフト/広告）と合計
+   - northStarMirror: contributionRanking 件数 / adRanking 件数
+   - statCardsMirror: 記録/同接/来場の値が入っているか（null/—でないか）
+   - topSupporters: 件数・liveId
+   - 全鏡の liveId が「いま視聴中の lv」と一致しているか（別配信の古い鏡が混ざっていないか）
+   - **整合チェック（最重要）**: 拡張側の生データ（fastDiag の北極星レーン apiRows 等）と
+     鏡の件数が一致するか。不一致なら「コピー漏れ／積み忘れ」を症状として明示。
+   - 公開キー（ingestKey/viewToken）が設定されているか（未設定なら純Webに何も届かない＝送信無効）。
+   - 直近の POST が成功したか／いつか（送ってすらいない＝古い snapshot を純Webが見続ける問題の検知）。
+B. これらを「拡張側にしか無い情報の羅列」ではなく、**ユーザー/AIが一目で“どこで落ちたか”を掴める構造**で
+   どう出すか（症状→原因→次の一手 の既存フォーマットに乗せるか、専用セクションか）。
+C. 純関数の責務分割（lib に何を切り出すか）。status-entry.js への配線は最小フックに留める設計。
+D. 既存の「検知された対処候補(症状→原因→次の一手)」に統合すべき項目（例: 鏡が空/古い/件数不一致は
+   そのまま対処カードになる）と、純粋な事実列挙に留める項目の切り分け。
+E. これは「丸ごとコピーになっていない」根本問題とは別レイヤー（自己診断の整備）。
+   だがこの自己診断が入れば、根本問題も事実ベースで議論できるようになる。順序として自己診断が先で正しいか、
+   それとも根本（丸ごと一致）を先にやるべきか、批判的に意見せよ。
+
+【出力してほしい形式】
+- 載せる項目の最終リスト（抜け漏れチェック済み・優先度つき）
+- セクション構造の提案（状態速報のどこに、どんな見出しで）
+- lib 分割の提案
+- 実装の最小ブラスト半径（どのファイルの何行を触るか）
+- リスクと、それぞれの潰し方

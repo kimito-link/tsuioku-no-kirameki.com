@@ -1,0 +1,32 @@
+お題: Chrome拡張(MV3)で集めたニコ生応援データを、サーバーに上げて【拡張なしの純Web(PC/スマホ共通・レスポンシブ)】で「応援ライブビュー(popup そっくり)」として見せたい。最善の実装方式を決める。
+
+★ユーザーの確定事項(尊重する・蒸し返さない):
+- 個人情報の懸念はクリア = ニコ生のコメント/ユーザーは公開情報、コメントビューワー文化が既にある、OSINT の範囲なので外部公開して問題ない、とユーザーが判断済み。
+- レスポンシブ1枚で PC/スマホ共通にする。
+- 「そっくり(popup の見た目)」を純Webでも維持したい(過去に何度も『そっくりでない』と却下された経緯あり=見た目の妥協は不可)。
+
+★既にある土台(実コードで確認済み):
+- 拡張→サーバー送信: status.html の「📱スマホへ送信」ボタン → POST https://app.tsuioku-no-kirameki.com/api/status(x-share-key 認証・viewToken)。送っているのは {generatedAt, overview, lives[]} = 概要+配信一覧だけ(応援レーンの顔/名前は送っていない)。
+- サーバー: api/status.js(Vercel Serverless + Upstash Redis)。キー status:latest:<token>・TTL 7日・GET /api/status?v=<token> で返す。
+- 純Web版: app/index.html + app/app.js(chrome 依存ゼロ)。?v=token → fetch /api/status → src/lib/statusFormat.js の純関数 buildOverviewText/buildLiveBlockText で描画。60秒ポーリング。ビルドは scripts/build.mjs に app ターゲットあり(app/dist/app.js)。
+- ★応援レーンの「鏡」スナップショット: src/lib/laneMirror.js#buildLaneMirrorSnapshot(KEY_LANE_MIRROR='nls_lane_mirror_v1')が、popup の応援レーン(りんく/こん太/広告/たぬ姉)を顔(avatar)/名前込みで間引いた純データを既に作っている(status/live-view が鏡として使用)。
+- ★本物の描画関数 src/extension/story/renderStoryUserLaneDom.js#paintStoryUserLaneDomFilled + src/lib/personTileDom.js#buildPersonTileEl は chrome 非依存=純Webでも import して同じ見た目で描ける。数字カード鏡(KEY_STAT_CARDS_MIRROR)も同様。
+
+★現状の拡張内 live-view(参考): 本物 popup.html を iframe で全面埋め込み(chrome-extension://.../popup.html?inline=1&dock=liveview)。これは chrome.runtime.getURL + popup の chrome.storage 依存(181箇所)があるので、そのままサーバーには上げられない。
+
+問い: 「応援ライブビュー(popup そっくり)を純Web(レスポンシブ)でサーバー公開する」最善・最確実な方式はどれか。
+
+  案1(鏡スナップショット送信 + 純Web再描画): 拡張が lane mirror / stat cards mirror スナップショット(顔/名前込み・既存の純データ)をサーバーに送る(status 送信に相乗り or 別エンドポイント)。純Web(app/live-view.js 新規・app.js が手本)が ?v=token で fetch し、本物の paintStoryUserLaneDomFilled + buildPersonTileEl で描く。CSS は popup の応援レーン CSS を移植(status/live-view と同じ)。= status Web 版と同じ綺麗なパターン。
+
+  案2(popup が描いた HTML 文字列を送る): 拡張側で応援レーンを描画した結果の outerHTML を丸ごとサーバーに送り、純Web は受け取った HTML を innerHTML で貼るだけ。描画ロジックをサーバーに持たない。
+
+  案3(その他): 例=拡張内 live-view の iframe を活かしたまま「サーバー版 popup(chrome.* を fetch に置換した派生ビルド)」を作る/ SSR / 別案。
+
+評価軸(優先順):
+  ① 「そっくり(popup と見た目一致)」を純Webで確実に出せるか。本物の描画関数/CSS を再利用して drift しないか。
+  ② レスポンシブで PC/スマホ共通にできるか(popup は元々狭い幅前提=スマホは合うが PC 全画面で間延びしないか)。
+  ③ 既存土台(api/status.js・app/app.js・lane mirror)をどれだけ再利用できるか=実装/保守コスト最小か。
+  ④ データ量・更新頻度(顔画像 URL を含むスナップショットのサイズ・60秒ポーリングで足りるか)。アバター画像は CDN(secure-dcdn.cdn.nimg.jp)直リンクで純Webからも出るか。
+  ⑤ セキュリティ(viewToken が URL 露出・公開GETの是非)。
+
+各メンバーは『結論(案番号) → 根拠 → 反論・リスク → 具体案(どのファイルをどう触るか・段取り)』の4ブロックで簡潔に。批判役は採用案の最大の穴を必ず1つ指摘し、特に「アバター画像が純Webで出るか(referrerPolicy/CORS)」「popup の幅前提がレスポンシブで崩れないか」を吟味せよ。

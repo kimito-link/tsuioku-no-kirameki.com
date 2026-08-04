@@ -1,0 +1,18 @@
+お題: Chrome拡張(MV3)で、ポップアップ(popup-entry.js)にある「応援帯/公式値レーンのランキング描画関数 paintTopSupportRankStyleIntoElement」を、別ページ(live-view-entry.js / live-view.html)でも【完全コピー(verbatim・見た目が1px も違わない)】で出したい。
+
+背景:
+- 私(実装者)は live-view で popup の関数を自作で「再現」した(paintNorthStarStripInto)。だが実機で「完全コピーじゃない」と却下された=自作の再現はアレンジになる。
+- 正しいゴール=popup の本物の描画関数 paintTopSupportRankStyleIntoElement をそのまま使うこと。
+- paintTopSupportRankStyleIntoElement は popup-entry.js 内のローカル関数で、以下に依存している:
+  (A) 純粋関数/lib import: topSupportRankLineModels, escapeHtml/escapeAttr, isHttpOrHttpsUrl, isAnonymousStyleNicoUserId(全部 src/lib にある=live-view でも import 可)
+  (B) popup の module-level state や runtime ヘルパ: getStoryColorScheme(配色scheme), storyAvatarLoadGuard(.pickDisplaySrc/.noteRemoteAttempt=画像ロードguard), anonymousIdenticonRuntimeEnabled(フラグ)+getCachedAnonymousIdenticonDataUrl(キャッシュ付き identicon), bindOnErrorHandlersWithin, upgradeAnonymousAvatarImageFromFallback, teardownNorthStarLaneWaitingUi/setNorthStarLaneHidden/syncNorthStarLaneGadgetFromBodyState/clearNorthStarVerticalRailForBody(北極星レーン専用の状態同期), paintNorthStarGiftHistorySummaryGadget(ギフト履歴サマリー), _topSupportRankLastHtmlByEl(差分キャッシュWeakMap)
+- live-view は別ページで chrome.storage しか持たない(popup の in-memory state は無い)。データ自体は storage から取れている(貢献度/広告ランキング/ギフト履歴の rows は live-view 側で既に取得済み)。
+
+問い: 「自作の再現を一切作らず、popup の本物の描画(HTML/CSS/クラス)が live-view でも 1px 違わず出る」ための最小・最確実な設計はどれか。候補:
+  案1: paintTopSupportRankStyleIntoElement を src/lib の共有モジュールに【そのまま抽出】し、依存(B)を引数(opts)で注入できる形にして、popup と live-view の両方から import する。popup 側は今の挙動を1mmも変えない(opts 既定値で従来動作)。
+  案2: live-view 側で paintTopSupportRankStyleIntoElement の本体を【丸ごとコピペ】し、依存(B)は live-view 用の最小スタブ(scheme='light'固定・guard はno-op・identicon は anonymousIdenticonDataUrl)に差し替える。
+  案3: その他(例: popup を iframe で live-view に埋める/ popup の描画結果HTMLを storage 経由で live-view に渡す 等)。
+
+評価軸: ①「完全コピー(見た目1px違わず)」をどれだけ確実に保証できるか ②popup 側に回帰(挙動変化)を起こさないか ③将来サーバー公開版(拡張API無し)への移植性 ④実装/保守コスト。
+
+各メンバーは『結論 → 根拠 → 反論・リスク → 具体案(どのファイルをどう触るか・関数シグネチャ)』の4ブロックで。批判役は必ず穴を1つ指摘。

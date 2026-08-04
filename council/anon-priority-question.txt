@@ -1,0 +1,30 @@
+お題: 「匿名(184)コメント主を会場・応援レーンに人として出す」の残り作業について、(1)文字化け修正・(2)第3-b(DOM観測匿名に識別子)・(2と密結合の第2(DOM番号フィルタ凍結解除))・検証優先 のどれを・どの順で・どこまでやるか、優先度と射程を1案に決めたい。難所なので過去の凍結(v0.1.820)を繰り返さない判断が要る。
+
+# 実コードで裏取りした確定事実(これが前提・覆さない)
+匿名の安定識別子=hashedUserId(例 a:mKKbwxnYZB_nVS3O)。実機 NDGR 生データに本文+hashedUserId が確かに写っている。
+
+【経路A=NDGR(protobuf直読み)】
+- 匿名 chat は hashedUserId を持つ。ndgrDecode.js:255-287 shouldAcceptNdgrChatAsComment が ^[a-zA-Z0-9_:-]{8,}$ で採用。
+- 第1(v0.1.836)で記録に hashedUserId が userId として載るようになった。下流(userLaneCandidatesFromStorage:117/venueSeats venueParticipantKey/anonymousIdenticon/anonymousNicknameFallback)は hashedUserId を人として扱える(v0.1.775〜803)。
+- ∴ **NDGR 由来の匿名は会場/レーンに人として出せる**(第3-a 検証済)。
+
+【経路B=DOM観測(visible)】← ここが本体課題
+- 実機 commentIngestBySource: visible:451 vs ndgr:82=DOM観測が多数。
+- DOM行の userId は resolveUserIdForNicoLiveCommentRow(nicoliveDom.js:461)が data-user-id/リンク/アイコンsrc/React fiber 56連鎖/outerHTML の6経路で探す。
+- **だが匿名 DOM 行はこの6経路すべてで null**(memory: v0.1.820 実機確証=React fiber 70連鎖でも匿名行に userId/hashedUserId/anonymity 一切無し。匿名 userId は DOM に存在せず NDGR にしか無い)。
+- ∴ 第2(番号緩和 requireNumber:false)で DOM 匿名行を採用しても userId は null のまま=レーンに出ない。第3-b で「DOM 匿名行に識別子を載せる」唯一の道は【NDGR の同一 chat(hashedUserId 持ち)と text+時刻 で join する】=hot path での近接マッチング=精度を誤ると別人の userId を載せる重大事故。
+
+【別系統バグ=文字化け __anon_】
+- giftSenderDiag.topSenders に "__anon_<生protobufバイト>"(文字化け)。発生源=giftSenderObservation.js:20 `__anon_${nickname}`(nickname が生バイトのまま)・giftRecord.js:144 も同型。これは「ギフト送信者観測数」という診断表示で会場/レーンの席とは別系統。小さく確実に直せる(制御文字/非ID nickname を弾く or 「匿名」正規化)。
+
+# 問い(これに答えて)
+1. 残り作業の優先順位と射程を決めよ。候補: (1)文字化け __anon_ 修正(小・確実・別系統) (2)第3-b=DOM観測匿名にNDGR join で識別子(本丸・難所・事故リスク) (3)第2=DOM番号緩和(単独では利得ゼロ=userId が DOM に無いので) (4)検証優先で一旦止める。星野ロミ式(落とさない/既存活かす/過剰実装回避/失敗体験除去)で。
+2. 第3-b(DOM匿名にNDGR join)は「やる価値があるか」。実は NDGR 経由で既に hashedUserId 付きの同じ匿名コメントが記録されている可能性が高い=DOM観測の匿名は「同じコメントの重複観測」かもしれない。だとすると DOM 匿名に識別子を載せるより「NDGR 経由で十分カバーできているか」を先に測るべきでは? DOM でしか観測されず NDGR に来ない匿名コメントが実在するのか(取りこぼし率)を測る観測項目は?
+3. 第2(番号緩和)は第3-b と切り離して単独で意味があるか。userId が DOM に無いなら、番号緩和は「本文だけ記録が増える(userId 無し行)」になる=記録件数は増えるが人としては出ない。これは「落とさない(本文を記録する)」価値があるか、それとも userId 無し行を増やすだけで会場/レーンには無益か。v0.1.820 で凍結した理由(保たれた行に userId 無し=利得ゼロ)と今回で何が変わったか。
+4. 文字化け __anon_ 修正の最小形。giftSenderObservation.js:20 / giftRecord.js:144 で nickname が「制御文字を含む/ID形式でない生バイト」なら __anon_ 化せず弾くか「匿名」に正規化。既存の anonymousNicknameFallback / nicoAnonymousDisplay.js を流用できるか。診断カウンタなので記録本体は無関係=安全に直せるか。
+5. やってはいけない過剰実装を1つ以上(批判役は必ず穴を指摘): 例=DOM↔NDGR join を精度検証なしに入れて別人を会場に出す/番号緩和で userId 無し行を量産しレーンを汚す/診断バグ修正を会場の席ロジックに波及させる。
+
+# 制約(星野ロミ式)
+記録本体不可侵・新storage書込み増やさない・hot path(描画/席割り/persist)重くしない・落とさない・既存データ活かす(hashedUserId/identicon/anonymousNicknameFallback は既存)・過剰実装回避・検証ファースト(取りこぼし率を測ってから本丸に入る)。過去の凍結(v0.1.820=実機で前提が覆り盲目実装を回避した)を繰り返さない。
+
+出力は『結論 → 根拠 → 反論・リスク → 具体案』の4ブロックで。具体案は「次の1コミットで何を/どの順で」と観測項目・最小修正のファイル:関数まで。

@@ -1,0 +1,37 @@
+【お題】大配信＋過去ログ遡り中(backfill進行中)で、応援レーンのアバターが「サムネ無し(たぬ姉段・ゆっくり顔)で固着」する heavyRace 再発を根治せよ。v0.1.1037 で一度 in-flight ガードで直したはずが、この条件で再発している。
+
+## 症状(実配信の状態速報で確定・推測でない)
+- 大配信7,900人・過去ログ遡り中(backfill進行中)。viewKind=embed_watch。
+- 診断: heavyRaceReturns:11 / heavySettleState:"race" / activePath:"heavy" / entriesLen:307 / domTilesPainted:74。
+- **アバター画像自体は31/32成功(失敗率3%)=画像取得は正常**。問題は「heavyがraceで未settleのまま、アバターURL解決前の暫定描画(サムネ無し→たぬ姉段)で固着」。
+- withUid 99.9%(記名ユーザーほぼ全員)なのに、鏡の たぬ姉70件/りんく2件=記名なのにサムネ無し扱いで たぬ姉段に大量。
+
+## 真因(司令塔が実コードで裏取り確定)
+1. **canReuseHeavyChunkRead の80%再利用が backfill 中は構造的に永久不成立**。
+   - coverage判定(popup-entry.js:15634-15640): `cachedHeavy.arr.length >= Math.floor(currentChunkTotal * 0.8)`。
+   - backfill進行中は currentChunkTotal が秒単位で増え続ける(過去ログ追記)。
+   - race時(popup-entry.js:16232)に「nextArr(例307件)+その瞬間のchunkTotal」でキャッシュ更新するが、次pollでは total がさらに増えて(例450)、307 >= 450×0.8(360) が false → **また canReuse不成立**。
+   - v1035の自己修復(「一度読めた全件を次に活かす」)は【total固定】前提で、backfillの動的total増加では永久に80%を割り続けて機能しない。
+2. 結果: 毎poll(3秒)で readHeavyFromStoreGuarded() 全件read → heavyReadActive=true → poll見送り(popup-entry.js:21611)は効くが、heavy readが3秒で終わらず次refreshが新refreshGen → race(popup-entry.js:16230) → paintWatchPopupUi 呼ばれず前回の暫定描画が残存。
+3. サムネ無し固着の機序: race未settleで「短い候補配列/未解決アバターURL」で tier計算 → displaySrc が tier<3 で HTTP削除(storyUserLaneDisplaySrc.js:49) → Identicon/TV(たぬ姉段)に落ちる。
+
+## v1037ガードの現状(実在・でも漏れる)
+- heavyReadActive フラグ(popup-entry.js:3816)・readHeavyFromStoreGuarded(withTimeout 15s・:15702)・poll見送り(:21611 `if(heavyReadActive){applyLightweightPanelSummaryCards();return;}`)は【存在する】。
+- でも「canReuseが不成立で毎poll全件read」が続く限り、readが3秒polに追い越されるレースは止まらない。ガードは「readが走っている間の追加refreshを見送る」だけで、「readが遅くて次pollに間に合わない」根本を解けていない。
+
+## 制約・地雷(壊すな)
+- 記録(content-entry)は触らない。heavy readは描画専用。②INLINE_PASSIVEはheavy readを通らない(無影響)。
+- readを減らす方向のみ(v948でread cache追加を2回却下した逆)。refresh冒頭に早期return足さない(v1032ちらつき退行)。
+- diff-skip機構(段別 storyLaneTierBodyKey)は触らない。
+- popup-entry.jsはmax-lines上限ちょうど付近(コメント圧縮で相殺 or lib抽出)。
+- backfill自体は止めない(過去ログ取得は機能)。
+- 初回paint/revealは同期本体でheavyをinline awaitしない三重安全網あり(触らない)。
+
+## 核心の問い
+Q1. backfill進行中(total動的増加)で canReuseHeavyChunkRead を成立させる正しい条件は何か。80%固定閾値の代わりに: (a)「絶対件数の増分が小さければ再利用」 (b)「backfill中はcoverage判定を total でなく『前回読んだ時点のtotal』基準にする」 (c)「backfill state を検知して閾値を動的に緩める」 (d)「増分ぶんだけ差分read(全件再readしない)」。最も安全で効くのはどれか。
+Q2. race を根本から減らすには「readを速くする」か「readが終わるまでpollを本当に止める」か。poll見送り(:21611)が効いていない/漏れている経路はどこか。safeRefresh冒頭にガードを上流化すべきか(v1032退行リスクとの兼ね合い)。
+Q3. たとえheavyがraceでも「前回の完全な描画」を保持し「暫定の短い候補で上書きしない」ようにできるか(描画の単調性=件数が減る方向の再描画を拒否)。これは根治でなく緩和だが即効性がある。
+Q4. これらは丸写し(③WEB)と無関係=①拡張の描画層の問題。③には影響しないことを確認しつつ、①の応援レーン描画だけを直す最小変更は何か。
+
+## 出力
+結論→根拠→反論リスク→具体案(実装ステップ・触るファイル:行)。Q1は1案を明確に推せ。実装は次段。

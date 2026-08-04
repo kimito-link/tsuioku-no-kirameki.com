@@ -1,0 +1,34 @@
+お題: Chrome拡張(MV3・ニコ生コメント記録 nicolivelog)で、過去に「ローディングなしで過去ログを一気に全件取得」できていた体験が退行した。これを取り戻しつつ、固着(ハング)を再発させない「最高の過去ログ一括取得」を設計せよ。
+
+## 確定した事実(実コード+git履歴で裏取り済み)
+
+### 昔できていた「一気取得」の正体
+- v0.1.657: 「ローディングなしで一気に取る」。単一タブなら数秒で reached_start まで一気に掘り切る(実測 2695件を約2.5秒)。取得は速く、途中経過(実況)を popup に見せていたのが逆にうるさいとされ、進捗の橋渡しを【完走(done=1)時だけ】に絞った(content-entry.js:15691 `if (_backfillProgress.done !== 1) return;`)。
+- v0.1.759(c6fdb57e): 1区画先読みパイプライン化。次区画の fetch を await せず先行起動し、consumer の persist(50-100ms)と重ねて直列待機を隠す(ndgrBackfillCrawl.js:950-975 付近)。
+- v0.1.761(2b6b1ca9): 前面タブ低遅延設定。BACKFILL_FOREGROUND_FETCH_GAP_MS=6(従来15)、EMPTY_RESEED_PAUSE_MS=24(従来150)。理論 12-15区画/秒。
+
+### 退行させた疑いの変更(コード構造からの推定・実機未裏取り)
+- v0.1.946(09efc70b, 2026-06-26): 「yield bridging」。入口探索(seed/seek)中に seekingEvent() を yield(?at=now 前に1回+seed候補ごと最大16回)。目的は「入口探索中に generator が yield せず consumer の genSteps=0 のままローディング表示されない→stall watchdog が誤発火して abort/リトライ」を防ぐこと。
+- 副作用(推定): content-entry.js:16180 付近で毎 gen.next() ごとに segmentsSinceYield += 1。>=6 で scheduler.yield() 待機。bridging イベントも gen.next() を1回消費するため、同じ実データ量でも gen.next() が約2倍→scheduler.yield() が約2倍頻繁(3区画ごと相当)→マクロタスク遷移の待機が蓄積→実測 0.5件/秒(理論値の約1/4)。
+
+### 計器の穴(実機裏取りを阻む)
+- スループット計器 backfillThroughputLine(「⏱ 取得速度: 経過Xs・区画Y・再シードZ回 → 約1区画Wms」)は statusFormat.js:182 で呼ぶが、材料 bp(backfillProgress)は content が【完走時だけ】storage に書く(上記 v0.1.657 の名残)。→ 途中参加の走行中は bp=null=計器が出ず、yield bridging が本当に律速か実機で確定できない。
+- ユーザー方針: まず「走行中も seg/elapsedMs/reseeds を書き出す小さな計器改修」を入れて実機数値で律速を裏取りしてから本修正する(推測で犯人を叩かない)。観測のみ・取り込み内容/順序/件数には触れない。
+
+## 地雷マップ(踏むな)
+- v0.1.946 の yield bridging は「ローディング固着の誤検知修正」のために入れた。単純 revert すると固着(genSteps=0でstall watchdog誤発火→abort無限リトライ)が再発する恐れ。yield は残しつつ速度を殺さない形にする。
+- backfill は過去に固着で何度も苦しんだ神経質な領域: v0.1.458(per-request timeout欠落でハング), v0.1.750(入口0行固着無限ループ), v0.1.758(視聴中タブ2%固着回帰), v0.1.760(23%固着), v0.1.814(疎区間stalled誤殺), v0.1.946(誤検知修正)。
+- MV3 Service Worker 制約: keepalive~20秒・メモリ・並列数・ニコ生サーバ負荷/BANリスク。並列フェッチやレート緩和はBANリスクと表裏。
+- 「嘘で緑にしない」self-verifying 原則。取れてないものを取れてると言わない。
+- 完全性スコアの%(達成率)は council/completeness-diagnosis-SYNTHESIS.md で「隠蔽を防ぐため正直に%で出す」と決定済み=別物。触るな。混同するな。
+- 表示の%(記録/公式の取得率 39% 等)は statusFormat.js の buildOverviewText/buildCaptureRateLine に集中。ユーザーは「途中参加で全件を分母にする%はおかしい・件数+進捗にしたい」意向。ただし本件(エンジン退行)とは別レーンの課題。
+
+## 問い(会議で発散・批判・裏取りしてほしい)
+案A(計器先行): まず走行中スループット計器を出す最小改修だけ入れ、実機で「約1区画Wms」と reseeds を測り、yield bridging が律速か確定してから本修正の設計を決める。→ この計器改修を、v0.1.657「完成だけドンと出す」体験(popup実況は完走時だけ)を壊さずにどう実装するか。同じ KEY_BACKFILL_PROGRESS に書くと popup が実況を再開してしまう懸念への対処は。
+案B(yield最適化): yield bridging は残すが、segmentsSinceYield を bridging(空chats)では増やさない/実データ区画だけで数える等、速度を殺さない形に直す。具体的にどのカウンタ・どの条件か。回帰(固着)を防ぐガードは。
+案C(設計刷新): 入口探索の stall 検出を「gen.next()が回っているか」でなく別の生存信号(fetch実行中フラグ・時間ベースのハートビート)にして、そもそも bridging を不要にする。MV3制約下での現実性は。
+案D(表示体験): エンジンを速くしても途中参加では一瞬%が出る。「一気に取れた」と感じさせる表示(%をやめ件数+進捗、あるいは短時間は黙って完成だけ出す v0.1.657 思想の徹底)をどう設計するか。
+
+評価軸: ①ユーザーの「一気に取れる」体感への効き ②MV3 SW・ニコ生負荷・BANの安全性 ③固着(過去の地雷)を再発させない回帰安全性 ④実装/保守コスト ⑤self-verifying 原則との整合。
+
+各メンバーは『結論 → 根拠 → 反論・リスク → 具体案(どのファイル/定数/カウンタをどう触るか・段階)』の4ブロックで。批判役は必ず穴を1つ指摘。司令塔(Claude)が最後に統合・裏取りして1案に収束させる。

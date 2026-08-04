@@ -1,0 +1,7 @@
+
+分類: category=general  by=groq/llama-3.3-70b [FAILED]  (上のどれにも当てはまらない一般的な相談)
+  分類器の生出力: HTTP 429 Rate limit reached for model `llama-3.3-70b-versatile` in organization `org_01krppypmaebbbzwk32xg6evsa` service
+[③多視点] 2体目の批判役として groq/gpt-oss-120b を追加
+召集 4体（最大4）: local/deepseek-r1:14b[批判・詰め（推論特化）], local/gemma4:latest[総合・統括（最大モデル）], groq/llama-3.3-70b[爆速の視点], groq/gpt-oss-120b[批判・詰め（推論特化）]
+
+[ルーティング選抜・general] 4体に問い合わせ中: local/deepseek-r1:14b, local/gemma4:latest, groq/llama-3.3-70b, groq/gpt-oss-120b（各2回サンプリング）

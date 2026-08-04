@@ -1,0 +1,32 @@
+お題: Chrome拡張(MV3)の「応援ライブビュー」ページ(live-view.html / live-view-entry.js)を、拡張ポップアップ(popup.html / popup-entry.js)と【完全コピー(verbatim・見た目が1px も違わない)】にしたい。どちらの実装方式で進めるべきか。
+
+ユーザーの絶対要件(過去に複数回叱られて確定した制約):
+- 「完全コピー」= 実装者の美的判断・アレンジを一切入れない。popup の本物の描画関数・CSSクラス・純関数をそのまま使う。自作の「再現」は却下される(過去に paintNorthStarStripInto を自作して却下された)。
+- popup にあるパネルを省く・popup に無いパネルを足す、はどちらも違反。
+- 盛り上がりメーター🔥だけは live-view に残してOKと明言済み。
+
+現状(実コードで確認済み):
+- master の live-view は popup の【本物の純関数を import】して段階的に再現済み: 統計カード/応援者ランキング(renderTopSupportRankStripInto)/りんく列/ギフト列/公式値レーン(北極星=貢献度・広告ランキング・ギフト履歴)/応援レーン鏡・数字カード鏡(paintStoryUserLaneDomFilled・buildPersonTileEl)/盛り上がりメーター。
+- ただし live-view 固有の自作描画が一部残る(例: buildLaneTile が本物アイコン解決を使わず "👤" 代用にフォールバックする=過去に却下されたアレンジ型)。
+- 別ブランチ live-view-full-clone は「popup.html を丸ごと複製」した土台(WIP 1コミット)だが master から55コミット遅れ・描画配線未完で放置状態。
+
+技術的事実(重要):
+- popup-entry.js は chrome.tabs / chrome.scripting / chrome.windows に強く依存し、watch タブが前面にいる前提で動く(DOMContentLoaded→initPopup が自動実行)。live-view は別タブ単独で chrome.storage しか持たない=popup-entry.js をそのまま動かすと落ちる箇所がある。
+- popup の各レーン描画は「本物の純関数(src/lib)」+「popup の module-level state/runtimeヘルパ(配色scheme・avatar load guard・identicon キャッシュ等)」に依存。純関数は live-view でも import 可。state/ヘルパは live-view 用に注入かスタブが要る。
+- 将来サーバー公開版(拡張API無し・chrome.* が一切使えない)へ live-view を移植する構想がある。
+
+問い: 「自作の再現を一切作らず、popup の見た目を1px違わず live-view で出す」ための最善の実装方式はどれか。
+
+  案A(共有lib移植・漸進): popup の描画関数を1枚ずつ src/lib の共有モジュールへ抽出し(依存する state/ヘルパは opts 引数で注入・popup 側は既定値で挙動1mm不変)、live-view から import して同じ入力で呼ぶ。popup にあって live-view にまだ無い/自作で残っているパネルを、本物の関数で順に置換していく。master 継続。
+
+  案B(丸ごとクローン): popup.html を丸ごと複製した live-view.html を土台にし、popup-entry.js の描画を live-view 単独で動かす(chrome.tabs/scripting 依存箇所をガード/スタブ化・DOMContentLoaded 自動実行を抑止して描画エントリだけ export)。配信者操作系は CSS で非表示。live-view-full-clone ブランチを master に追従させて再開。
+
+  案C: その他(例: popup を iframe で live-view に丸ごと埋め込む / popup の描画結果HTMLを storage 経由で渡す 等)。iframe 埋込は MV3 同一拡張ページ間で可否・操作の透過・サーバー版移植性を必ず論じること。
+
+評価軸(優先順):
+  ① 「完全コピー(1px違わず)」をどれだけ確実に保証できるか。自作アレンジが混入する余地が小さいのはどれか。
+  ② popup 側に回帰(挙動変化)を起こさないか。
+  ③ 将来サーバー公開版(chrome.* 無し)への移植性。
+  ④ 実装/保守コスト。差分追従コスト(popup を直すたび live-view も追従する手間)。
+
+各メンバーは『結論(A/B/C のどれか) → 根拠 → 反論・リスク → 具体案(どのファイルをどう触るか・関数シグネチャや段取り)』の4ブロックで簡潔に。批判役は採用案の穴を必ず1つ指摘すること。
