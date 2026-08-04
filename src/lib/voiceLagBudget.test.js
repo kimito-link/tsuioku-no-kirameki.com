@@ -39,8 +39,8 @@ describe('定数の不変条件(地雷G-1: 鮮度しきい値との食い違い�
     expect(VOICE_QUEUE_MAX_CEIL).toBe(8);
   });
 
-  it('VOICE_QUEUE_MAX_FLOORは2(ゼロ音声防止の床)', () => {
-    expect(VOICE_QUEUE_MAX_FLOOR).toBe(2);
+  it('VOICE_QUEUE_MAX_FLOORは4(v0.1.1246: 実測5847ms/件で床2に張り付き39%取りこぼし→わんコメ式に寄せて引き上げ)', () => {
+    expect(VOICE_QUEUE_MAX_FLOOR).toBe(4);
   });
 });
 
@@ -78,12 +78,18 @@ describe('resolveVoiceQueueMax', () => {
     expect(resolveVoiceQueueMax(1500)).toBe(4);
   });
 
-  it('大きく詰まる(3000ms/件)と2まで縮む(6000/3000=2)', () => {
-    expect(resolveVoiceQueueMax(3000)).toBe(2);
+  it('大きく詰まる(3000ms/件)でも床4で頭打ち(6000/3000=2 → 床4に切り上げ)', () => {
+    expect(resolveVoiceQueueMax(3000)).toBe(4);
   });
 
-  it('極端に詰まっても床(2)を下回らない', () => {
+  it('極端に詰まっても床(4)を下回らない', () => {
     expect(resolveVoiceQueueMax(60000)).toBe(VOICE_QUEUE_MAX_FLOOR);
+  });
+
+  // v0.1.1246: 実機実測値(ノートPC・2026-08-04)での回帰。旧床2ならここが2に落ち、
+  //   677件中266件(39%)が捨てられていた。床4を下回らないことを実測値で固定する。
+  it('実測5847ms/件(ノートPC実機)でも床4を保つ', () => {
+    expect(resolveVoiceQueueMax(5847)).toBe(4);
   });
 
   it('0や負数は未計測相当としてCEILを返す(壊れない)', () => {
@@ -126,10 +132,11 @@ describe('stepVoiceQueueMax(ヒステリシス: 縮小即時・復帰N件連続)
   });
 
   it('復帰は+1段ずつ(計算値がCEILでも一気に飛ばない)', () => {
-    const max = 2;
+    // v0.1.1246: 床が2→4になったので、床に張り付いた状態=4から始める(性質は不変=+1段ずつ)。
+    const max = VOICE_QUEUE_MAX_FLOOR;
     const streak = VOICE_GROW_STREAK_N - 1;
     const result = stepVoiceQueueMax(max, 8, streak);
-    expect(result.nextMax).toBe(3);
+    expect(result.nextMax).toBe(VOICE_QUEUE_MAX_FLOOR + 1);
   });
 
   it('急激な負荷変動でも往復(ピンポン)しない(地雷G-2): 縮小→復帰境界を連続して跨いでも発振しない', () => {
