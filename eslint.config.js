@@ -232,8 +232,13 @@ export default [
     //   import/state/呼び出しの最小フック6行のみ。残りは既存コメントの契約更新
     //   (limit と鏡cap の関係が①③非対称に変わったため、旧「必ずセットで変更」注記を書き換え)。
     //   実測22104。ラチェットは実測+50の22154へ。
+    //   lane-supply-fail-closed(2026-08-04・v0.1.1249): provisional 既定値を fail-closed へ反転し
+    //   (申告漏れが「タイル消失」でなく「最長10分stale」に倒れる)、供給元を名指しする計器を追加。
+    //   計器の状態・判定・整形は src/lib/laneSupplyOriginDiag.js にテスト付きで隔離=popup 側は
+    //   import/state/呼び出し3箇所+origin タグ6箇所の最小フックのみ(縮小判定も lib へ寄せた)。
+    //   実測22174。ラチェットは実測+50の22224へ。
     files: ['src/extension/popup-entry.js'],
-    rules: { 'max-lines': ['error', { max: 22154, skipBlankLines: false, skipComments: false }] }
+    rules: { 'max-lines': ['error', { max: 22224, skipBlankLines: false, skipComments: false }] }
   },
   {
     files: ['src/extension/popup/**/*.js'],

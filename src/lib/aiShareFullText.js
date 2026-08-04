@@ -475,6 +475,12 @@ export function buildAiShareFullText({ overviewText, livesData, fastDiag, popupD
     const rosterLine = formatLaneRosterDeltaLine(rosterSnap);
     if (rosterLine) { lines.push(rosterLine); lines.push(''); }
   } catch { /* no-op: 計器の失敗は状態速報を壊さない */ }
+  // ★v0.1.1249: タイルが減った「直前に供給を書いた者」を名指しする。
+  //   roster は gift/ad 段を数えないため「消えた人0」でもタイルは減りうる=この行で補う。
+  try {
+    const supplyLine = String((popupDiag?.popup ?? popupDiag)?.laneSupplyOrigin?.line || '');
+    if (supplyLine) { lines.push(supplyLine); lines.push(''); }
+  } catch { /* no-op: 計器の失敗は状態速報を壊さない */ }
   // 2026-07-20 診断先行: ①POP応援レーン/投げ一覧の「クリック不能な手カーソル」実害を数えるだけの1行。
   try {
     const capLine = String((popupDiag?.popup ?? popupDiag)?.storyUserLaneClickAffordanceParity?.line || '');
