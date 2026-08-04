@@ -329,6 +329,13 @@ import {
   shouldSkipInlineHostMoveForVenue,
   summarizeInlineHostMoveDiag
 } from '../lib/inlineHostMoveProbe.js';
+// v0.1.1250: パネルが「消えた⇄戻った」を数える計器(移設でもscrollでもない消失を捕まえる)。
+import {
+  createHostVisibilityFlipCensus,
+  noteHostHidden,
+  noteHostShown,
+  snapshotHostVisibilityFlipCensus
+} from '../lib/hostVisibilityFlipCensus.js';
 import { probeWatchPageDomStructure } from '../lib/probeWatchPageDomStructure.js';
 import { summarizeGiftSubAppHistoryDiag } from '../lib/summarizeGiftSubAppHistoryDiag.js';
 import { createConsoleErrorBuffer } from '../lib/consoleErrorBuffer.js';
@@ -2760,6 +2767,35 @@ const KEY_AI_SHARE_FAST_DIAG = 'nls_ai_share_fast_diag_v1';
 const _inlineHostMoveState = { count: 0, reloadCount: 0, venueOpenMoves: 0, byReason: {}, samples: [], lastAtMs: 0 };
 
 /**
+ * v0.1.1250 計器: host が「消えた⇄戻った」を数える(移設ではなく display の変化)。
+ *
+ * ★hostMoveDiag は【親を変える移設】しか数えず、scrollWhiteoutDiag は【scroll時にしか】
+ *   サンプルしない。2026-08-04 の実測(録画)で確定した「4秒ごとに1フレームだけ消える」は
+ *   どちらの計器にも1件も乗らなかった(moveCount:1 / whiteoutCount:0 のまま)。その穴を埋める。
+ * @type {import('../lib/hostVisibilityFlipCensus.js').HostVisibilityFlipCensus}
+ */
+const _hostFlipCensus = createHostVisibilityFlipCensus();
+
+/**
+ * ★host の display を書き換える唯一の入口(9箇所に散っていた直接代入をここへ集約)。
+ *   個別に計器を足すと必ず配線漏れが出るため、書き換え自体を1関数に閉じる。
+ * @param {HTMLElement|null} host
+ * @param {'none'|'block'} display
+ * @param {string} cause 消した/戻した経路のタグ(状態速報にそのまま出す)
+ */
+function setInlineHostDisplay(host, display, cause) {
+  if (!host || !host.style) return;
+  const prev = host.style.display;
+  host.style.display = display;
+  if (prev === display) return; // 状態変化なし=計上しない
+  try {
+    const now = Date.now();
+    if (display === 'none') noteHostHidden(_hostFlipCensus, { cause, nowMs: now });
+    else noteHostShown(_hostFlipCensus, { nowMs: now });
+  } catch { /* 計器失敗は描画を止めない */ }
+}
+
+/**
  * host 移設の【直前】に呼ぶ(観測のみ・DOMは触らない)。isConnected/iframe有無/会場open を採取。
  * @param {string} reason 移設経路名(anchored_video / floating_body 等)
  * @param {HTMLElement|null} host
@@ -3798,7 +3834,7 @@ function ensureInlinePopupHost() {
   host = document.createElement('div');
   host.id = INLINE_POPUP_HOST_ID;
   host.setAttribute('aria-hidden', 'true');
-  host.style.display = 'none';
+  setInlineHostDisplay(host, 'none', 'host_created');
   host.style.pointerEvents = 'auto';
   host.style.width = '100%';
 
@@ -4053,7 +4089,7 @@ function renderInlinePanelFloatingHost() {
   }
   host.style.pointerEvents = 'auto';
   host.setAttribute('aria-hidden', 'false');
-  host.style.display = 'block';
+  setInlineHostDisplay(host, 'block', 'floating_show');
   host.style.opacity = '1';
   // 閉じるボタン（A30）。元は floating 専用だったが、0.1.11 (B2) で dock_bottom
   // にも追加（dock_bottom も同様に panel を非表示にする手段が無く、設定画面で
@@ -4199,7 +4235,7 @@ function renderInlinePanelDockBottomHost() {
   ensureInlineHostReflowListener();
   host.style.pointerEvents = 'auto';
   host.setAttribute('aria-hidden', 'false');
-  host.style.display = 'block';
+  setInlineHostDisplay(host, 'block', 'dock_show');
   host.style.opacity = '1';
   // 0.1.11 (B2): dock_bottom でも閉じるボタンを設置（floating と共通）。
   // 元は floating だけで「× 閉じる」を出していたが、dock_bottom も同じ理由で
@@ -5095,7 +5131,7 @@ function maybePassFirstPaintGateForBeside(video) {
   // まだ待つ: host を隠し（崩れた初回を見せない）、次フレームで再評価を予約。
   try {
     const host = ensureInlinePopupHost();
-    host.style.display = 'none';
+    setInlineHostDisplay(host, 'none', 'first_paint_gate');
     host.setAttribute('aria-hidden', 'true');
   } catch {
     // no-op
@@ -5294,7 +5330,7 @@ function renderInlineHostAnchoredToVideo(video) {
       belowWideRowChosen,
       null
     );
-    host.style.display = 'none';
+    setInlineHostDisplay(host, 'none', 'video_rect_too_small');
     host.setAttribute('aria-hidden', 'true');
     maybeReconnectCommentMutationObserverAfterInlineLayout();
     return;
@@ -5411,7 +5447,7 @@ function renderInlineHostAnchoredToVideo(video) {
   }
   host.style.pointerEvents = 'auto';
   host.setAttribute('aria-hidden', 'false');
-  host.style.display = 'block';
+  setInlineHostDisplay(host, 'block', 'anchored_show');
   host.style.opacity = '1';
   publishInlinePanelLayoutRenderSnapshot(
     besideFlexRowColumn,
@@ -5537,7 +5573,7 @@ function renderInlinePopupHost(target) {
   });
   host.style.pointerEvents = 'auto';
   host.setAttribute('aria-hidden', 'false');
-  host.style.display = 'block';
+  setInlineHostDisplay(host, 'block', 'nonvideo_show');
   host.style.opacity = '1';
   maybeReconnectCommentMutationObserverAfterInlineLayout();
 }
@@ -5558,7 +5594,7 @@ function hidePageFrameOverlay() {
     nlsInlinePopupHostSingleton ||
     document.getElementById(INLINE_POPUP_HOST_ID);
   if (host) {
-    host.style.display = 'none';
+    setInlineHostDisplay(host, 'none', 'overlay_hidden');
     host.setAttribute('aria-hidden', 'true');
     // × 閉じる等で display:none のみ残すと pointerEvents/opacity が中途半端に残り、
     // 次回ツールバー直後の前面化判定やヒット領域が不安定になることがある。
@@ -6777,6 +6813,8 @@ function buildAiShareFastDiagnosticsPayload() {
     // v0.1.1124 D-1計器: host移設の実測(reloadCount=iframeリロード実害あり移設・byReason=犯人経路・
     //   venueOpenMoves=会場open中の移設)。ローディングちかちかの真犯人を状態速報の数字で確定する。
     hostMoveDiag: summarizeInlineHostMoveDiag(_inlineHostMoveState, Date.now()),
+      // v0.1.1250: 移設でもscrollでもない「パネルが一瞬消える」を名指しする計器。
+      hostFlipCensus: snapshotHostVisibilityFlipCensus(_hostFlipCensus),
     inlinePanel: {
       placementMode: inlinePanelPlacementMode,
       placementEffective: placementEffectiveFast,
@@ -7880,7 +7918,7 @@ function prewarmInlinePopupIframe() {
       }
       if (host.parentNode !== document.body) {
         // 画面に出さないままで body に挿入。iframe は display:none でも load する。
-        host.style.display = 'none';
+        setInlineHostDisplay(host, 'none', 'prewarm_offscreen');
         host.setAttribute('aria-hidden', 'true');
         // レイアウトに影響しないよう offscreen に固定。
         host.style.position = 'fixed';
@@ -9412,6 +9450,8 @@ function buildAiSharePageDiagnostics() {
     // v0.1.1124 D-1計器: host移設の実測(reloadCount=iframeリロード実害あり移設・byReason=犯人経路・
     //   venueOpenMoves=会場open中の移設)。ローディングちかちかの真犯人を状態速報の数字で確定する。
     hostMoveDiag: summarizeInlineHostMoveDiag(_inlineHostMoveState, Date.now()),
+      // v0.1.1250: 移設でもscrollでもない「パネルが一瞬消える」を名指しする計器。
+      hostFlipCensus: snapshotHostVisibilityFlipCensus(_hostFlipCensus),
     inlinePanel: {
       placementMode: inlinePanelPlacementMode,
       placementEffective,
@@ -12336,7 +12376,23 @@ function syncLiveIdFromLocation() {
     }
     // watch ページを確認＝非 watch デバウンスを解除。
     _nonWatchTickCount = 0;
-    renderPageFrameOverlay();
+    /*
+     * ★v0.1.1250: ここは 4秒(LIVE_POLL_MS)ごとに呼ばれる。旧実装は【無条件】に
+     *   renderPageFrameOverlay() を呼んでいたため、画面が完全に静止していても
+     *   4秒ごとにパネルの再配置が走り、その途中経過(host が display:none / 幅が潰れた状態)が
+     *   1フレームだけ合成されて「4秒周期のちかちか」になっていた。
+     *   2026-08-04 の画面録画で実測: 30fps で 120フレームちょうど間隔・33msだけ消失・
+     *   幅 920px→11px に潰れて即復帰・前後フレームは変化 0.0%(完全静止)。
+     *
+     *   360ms ループ(tickPageFrameLayoutFromInterval)は同じ描画を inlineLayoutDirty で
+     *   ゲートしており静止時は呼ばない。この 4秒経路だけがゲートを持たない非対称だった。
+     *   → 配信切替(=レイアウトを組み直す必要がある)と、geometry が実際に変わったときだけ描く。
+     *   ★どちらでもないときは何もしない=静止画面で再配置を起こさない。
+     */
+    if (ctx.liveIdSwitched || inlineLayoutDirty) {
+      inlineLayoutDirty = false;
+      renderPageFrameOverlay();
+    }
     return;
   }
 
@@ -12396,7 +12452,12 @@ function syncLiveIdFromLocation() {
     }
     // 有効なコメントパネルを確認＝非 watch デバウンスを解除。
     _nonWatchTickCount = 0;
-    renderPageFrameOverlay();
+    // ★v0.1.1250: watch 側と同じく無条件描画をやめる(4秒周期のパネル消失の第2経路)。
+    //   こちらは liveId 切替の文脈が無いので geometry 変化のときだけ描く。
+    if (inlineLayoutDirty) {
+      inlineLayoutDirty = false;
+      renderPageFrameOverlay();
+    }
     return;
   }
 

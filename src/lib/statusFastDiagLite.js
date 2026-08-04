@@ -107,6 +107,9 @@ export function buildStatusFastDiagLite(payload) {
     content.scrollWhiteoutDiag && typeof content.scrollWhiteoutDiag === 'object'
       ? content.scrollWhiteoutDiag
       : null;
+  // v0.1.1250: パネルが一瞬消える計器も lite へ(通さないとコピペに永久に出ない=上のコメントの再演)。
+  const hostFlipCensus =
+    content.hostFlipCensus && typeof content.hostFlipCensus === 'object' ? content.hostFlipCensus : null;
   const venueSeatsDiag = content.venueSeatsDiag && typeof content.venueSeatsDiag === 'object'
     ? content.venueSeatsDiag
     : null;
@@ -144,6 +147,7 @@ export function buildStatusFastDiagLite(payload) {
       },
       hostMoveDiag,
       scrollWhiteoutDiag,
+      hostFlipCensus,
       venueSeatsDiag: venueSeatsDiagLite
     }
   };
