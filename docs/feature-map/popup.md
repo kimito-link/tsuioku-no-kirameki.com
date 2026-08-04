@@ -31,6 +31,7 @@ graph LR
   n_popup --> n_src_lib_aiShareDiagSchema_js["lib/aiShareDiagSchema.js"]
   n_popup --> n_src_lib_aiShareFastDiagKey_js["lib/aiShareFastDiagKey.js"]
   n_popup --> n_src_lib_aiSharePopupDiagKey_js["lib/aiSharePopupDiagKey.js"]:::shared
+  n_popup --> n_src_lib_anomalyVerdict_js["lib/anomalyVerdict.js"]:::shared
   n_popup --> n_src_lib_anonymousIdenticon_js["lib/anonymousIdenticon.js"]:::shared
   n_popup --> n_src_lib_audienceEngagementGap_js["lib/audienceEngagementGap.js"]
   n_popup --> n_src_lib_auditionEventRankingApi_js["lib/auditionEventRankingApi.js"]:::shared
@@ -52,8 +53,7 @@ graph LR
   n_popup --> n_src_lib_broadcastReportSummary_js["lib/broadcastReportSummary.js"]
   n_popup --> n_src_lib_broadcastScore_js["lib/broadcastScore.js"]:::shared
   n_popup --> n_src_lib_broadcastScoreHtml_js["lib/broadcastScoreHtml.js"]
-  n_popup --> n_src_lib_broadcastScorePanelViewModel_js["lib/broadcastScorePanelViewModel.js"]:::shared
   classDef shared fill:#eee,stroke:#999,color:#666;
 ```
 
-> ほか 356 ファイル省略（全件は storage-bus.md / metafile 参照）。
+> ほか 359 ファイル省略（全件は storage-bus.md / metafile 参照）。

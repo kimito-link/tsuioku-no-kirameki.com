@@ -9,6 +9,10 @@
  *
  * @module perfDiag
  */
+// v0.1.1248: 描画回数に【正常域の判定】を付ける。数字だけ印字しても人もAIも読み飛ばす
+//   (2026-08-04 に描画2517回が印字されていたのに誰も気づかなかった)。
+import { judgePaintPerComment } from './anomalyVerdict.js';
+import { formatRepaintReasonLine } from './repaintReasonCensus.js';
 
 /** perfDiag の storage キー接頭辞。 */
 export const PERF_DIAG_PREFIX = 'nls_perf_diag_';
@@ -43,7 +47,8 @@ function numOrNull(v) {
  *   tabVisible?: boolean|null,
  *   recordRate?: number|null,
  *   panelPainted?: boolean|null,
- *   shadeActive?: boolean|null
+ *   shadeActive?: boolean|null,
+ *   repaintReasons?: Record<string, number>|null
  * }} [opts]
  * @returns {{
  *   liveId: string,
@@ -56,7 +61,8 @@ function numOrNull(v) {
  *   tabVisible: boolean|null,
  *   recordRate: number|null,
  *   panelPainted: boolean|null,
- *   shadeActive: boolean|null
+ *   shadeActive: boolean|null,
+ *   repaintReasons: Record<string, number>|null
  * }}
  */
 export function buildPerfDiag(opts = {}) {
@@ -77,7 +83,13 @@ export function buildPerfDiag(opts = {}) {
     //   「スクロールで白・放置で固着」を DOM/F12 を見ずに status だけで切り分ける(null=不明)。
     panelPainted: opts.panelPainted == null ? null : opts.panelPainted === true,
     // v0.1.854: ローディング幕が今も出ているか。データが来た後も true=ローディング固着(null=不明)。
-    shadeActive: opts.shadeActive == null ? null : opts.shadeActive === true
+    shadeActive: opts.shadeActive == null ? null : opts.shadeActive === true,
+    // v0.1.1248: 描き直しの【理由別内訳】。総数(paintCount)だけでは36ある引き金の
+    //   どれが暴走しているか分からず、2026-08-04 に原因特定へ時間を要した。
+    repaintReasons:
+      opts.repaintReasons && typeof opts.repaintReasons === 'object'
+        ? opts.repaintReasons
+        : null
   };
 }
 
@@ -105,7 +117,18 @@ export function buildPerfDiagLine(diag, nowMs = Date.now()) {
   if (diag.recordRate != null) {
     parts.push(`取得 ${diag.recordRate >= 10 ? Math.round(diag.recordRate) : diag.recordRate.toFixed(1)}件/秒`);
   }
-  if (diag.paintCount != null) parts.push(`描画${diag.paintCount}回`);
+  if (diag.paintCount != null) {
+    parts.push(`描画${diag.paintCount}回`);
+    // v0.1.1248: 「多いか少ないか」を必ず添える。判定が無いと読み飛ばされる。
+    const verdict = judgePaintPerComment(diag.paintCount, diag.commentCount);
+    if (verdict.level === 'bad' || verdict.level === 'warn') {
+      parts.push(`⚠${verdict.label}(${verdict.detail})`);
+    }
+  }
+  // v0.1.1248: 描き直しの【理由別内訳】。犯人が過半を占めていれば名指しする。
+  //   拮抗しているときは名指ししない(=特定の1箇所を直しても効かないと分かる)。
+  const reasonLine = formatRepaintReasonLine(diag.repaintReasons, diag.commentCount);
+  if (reasonLine) parts.push(reasonLine);
   if (diag.tabVisible === false) parts.push('裏タブ');
   if (diag.tabCount != null) parts.push(`タブ ${diag.tabCount}`);
   if (diag.commentCount != null) {

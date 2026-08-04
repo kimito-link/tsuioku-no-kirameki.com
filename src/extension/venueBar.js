@@ -21,7 +21,7 @@ import {
   isBroadcasterCtxUsableForGuard
 } from '../lib/broadcastContext.js';
 import { readChunkedComments, chunkIndexKey, chunkStorageKey, isChunkIndex } from '../lib/commentChunkStore.js';
-import { extractUserCommentRows } from '../lib/comeviewActions.js';
+import { extractUserCommentRows, comeviewUserKeyForRow } from '../lib/comeviewActions.js';
 import {
   createVenueOpenLatencyState,
   noteVenueOpened,
@@ -3665,7 +3665,16 @@ export function mountVenueBarButton(options = {}) {
     try {
       const lid = String(activeLiveId || liveIdFromPathname() || '');
       const raw = await readVenueCommentRowsForSpeech(lid);
-      const picked = extractUserCommentRows(raw, uid, VENUE_SPEECH_PANEL_MAX);
+      // v0.1.1248(2026-08-04 真因確定): extractUserCommentRows が期待するのは
+      //   comeviewUserKeyForRow が返す【接頭辞つきキー】('u:<userId>' / 'n:<name>')であり、
+      //   生の uid ではない(comeviewActions.js:226 は完全一致で照合する)。
+      //   ここは生の uid("140475218")を渡していたため "140475218" !== "u:140475218" で
+      //   全行が外れ、total が常に0=「この配信の記録にはまだ発言がありません」と
+      //   出続けていた(実測: 速報では同一人物が6〜12件発言・応援者ランキング1位)。
+      //   データも liveId も正しく、キーの書式だけが違う。正しい呼び出し側は
+      //   comeview-entry.js:1052(comeviewUserKeyForRow を経由してから渡す)。
+      const userKey = comeviewUserKeyForRow({ userId: uid });
+      const picked = extractUserCommentRows(raw, userKey, VENUE_SPEECH_PANEL_MAX);
       rows = picked.rows;
       total = picked.total;
     } catch {

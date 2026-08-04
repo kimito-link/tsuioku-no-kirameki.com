@@ -59,6 +59,9 @@ import { summarizeDevMonitorGiftRanking } from '../lib/summarizeDevMonitorGiftRa
 import { AI_SHARE_DIAG_SCHEMA_VERSION } from '../lib/aiShareDiagSchema.js';
 import { buildStorageWriteErrorPayload } from '../lib/storageErrorState.js';
 import { createCoalescedRefreshScheduler } from '../lib/popupStorageRefreshCoalesce.js';
+// v0.1.1248: refresh() の自己フィードバックループ(ちらつきの真因)を断つ判定と理由別内訳。
+import { isAllSelfWrittenRenderArtifacts, stripSelfWrittenRenderArtifacts } from '../lib/selfWrittenStorageKeys.js';
+import { addRepaintReason } from '../lib/repaintReasonCensus.js';
 import { deriveCommentPostUiState } from '../lib/commentPostUi.js';
 import {
   resolveCommentPostStatus,
@@ -1914,6 +1917,20 @@ let _recordRateLastLiveId = '';
 /** このタブで paintWatchPopupUi の重い paint 区間を実行した累計回数。 */
 let _perfPaintCount = 0;
 
+/** v0.1.1248: 描き直しの理由別内訳(総数だけでは36ある引き金を特定できない)。 @type {Record<string, number>} */
+let _repaintReasonCounts = {};
+
+/** v0.1.1248: 次の refresh() の引き金タグ(呼び出し元が safeRefresh 直前に置く)。 */
+let _refreshReasonTag = 'unknown';
+/** @param {string} reason 描き直し(または見送り)の理由を1件積む。 */
+function noteRepaintReason(reason) {
+  _repaintReasonCounts = addRepaintReason(_repaintReasonCounts, reason);
+}
+/** @param {string} tag 次の paint をこのタグで計上する。 */
+function tagRefreshReason(tag) {
+  _refreshReasonTag = String(tag || 'unknown');
+}
+
 /**
  * paint 所要 ms 等を nls_perf_diag_<lv> に間引いて書く(白フラッシュ原因の見える化)。
  * 複数タブの storage 競合を増やさないよう、同 liveId への書き込みは 2 秒に 1 回まで。
@@ -1984,6 +2001,7 @@ function recordPerfDiagThrottled(liveId, paintMs, commentCount, deferActive) {
     commentCount,
     deferActive,
     paintCount: _perfPaintCount,
+    repaintReasons: _repaintReasonCounts, // v0.1.1248: 渡さないと速報に永久に出ない
     tabVisible: typeof document !== 'undefined' ? !document.hidden : null,
     recordRate, panelPainted, shadeActive
   });
@@ -16559,6 +16577,7 @@ async function refresh() {
     //   初回/配信切替/未描画(空)のときは見送らず必ず描画する。
     // 白フラッシュ見える化: ここから renderWatchMetaCard までの重い paint 区間を計測する。
     _perfPaintCount += 1;
+    noteRepaintReason(_refreshReasonTag || 'unknown'); // v0.1.1248: 引き金別に積む
     const _perfPaintT0 = typeof performance !== 'undefined' ? performance.now() : Date.now();
     const userRoomsUl = /** @type {HTMLElement|null} */ ($('userRoomList'));
     const userRoomsAlreadyPainted =
@@ -18848,6 +18867,12 @@ function isHighFrequencyCommentRelatedStorageKey(key) {
 function scheduleCoalescedStorageRefresh(changes, runRefresh) {
   const keys = Object.keys(changes || {});
   if (!keys.length) return;
+  // v0.1.1248: refresh の自己フィードバックループ(ちらつきの真因)を断つ。自己書き込み
+  //   キー"だけ"なら止める。外部由来が1つでも混ざれば従来どおり(正本=selfWrittenStorageKeys.js)。
+  if (isAllSelfWrittenRenderArtifacts(keys)) {
+    noteRepaintReason('self_write_skipped');
+    return;
+  }
   // v0.1.440: 隠れタブ(他タブが前面)では re-render を skip して多タブ reflow N→1 を達成。
   //   可視復帰時の catch-up は既存 visibilitychange listener が担うので追加処理は不要。
   //   描画パスには触らない＝v0.1.421/422 パネル消失リグレッションを構造的に再発させない。
@@ -18857,9 +18882,10 @@ function scheduleCoalescedStorageRefresh(changes, runRefresh) {
     initialDone: initialRefreshDone
   });
   if (action === 'skip') return;
-  const allHighFreq = keys.every((k) =>
-    isHighFrequencyCommentRelatedStorageKey(k)
-  );
+  const keysForFreq = stripSelfWrittenRenderArtifacts(keys); // v0.1.1248: 混在でthrottleを失う穴を塞ぐ
+  const allHighFreq =
+    keysForFreq.length > 0 &&
+    keysForFreq.every((k) => isHighFrequencyCommentRelatedStorageKey(k));
   coalescedRefreshScheduler.schedule(
     { allHighFreq, initialDone: initialRefreshDone },
     runRefresh
@@ -21765,7 +21791,9 @@ async function initPopup() {
         const onlyVisualExpanded =
           changedKeys.length === 1 && changedKeys[0] === KEY_SUPPORT_VISUAL_EXPANDED;
         if (!skipVisualExternalSync || !onlyVisualExpanded) {
-          scheduleCoalescedStorageRefresh(changes, () => safeRefresh());
+          scheduleCoalescedStorageRefresh(changes, () => {
+            tagRefreshReason('storage_changed'); safeRefresh();
+          });
         }
       };
       stCh.addListener(onStorageChanged);
@@ -21801,7 +21829,7 @@ async function initPopup() {
         //   合流 / high-freq 判定をそのまま再利用＝表示中の配信だけ refresh のロジックも共通）。
         scheduleCoalescedStorageRefresh(
           { [commentDbSummaryKey(lv)]: { newValue: { total: Number(data.total) || 0 } } },
-          () => safeRefresh()
+          () => { tagRefreshReason('cdb_summary_push'); safeRefresh(); }
         );
       };
       cdbBc.addEventListener('message', onCdbBroadcast);
@@ -21874,6 +21902,7 @@ async function initPopup() {
         //   fetch 中も古い数値を表示し続ける（loading 状態の点滅を防ぐ）。
         watchMetaCache.key = '';
         // watchMetaCache.snapshot = null; ← 0.1.92: 削除（古い snapshot を表示維持）
+        tagRefreshReason('interval_poll');
         safeRefresh();
       }, POLL_INTERVAL_MS)
     )
@@ -22016,6 +22045,7 @@ async function initPopup() {
       //   visibilitychange でも snapshot を残す（stale-while-revalidate）。
       //   タブ切替で戻った瞬間に「接続中…」が再点灯する症状を防ぐ。
       watchMetaCache.key = '';
+      tagRefreshReason('visibility_resume');
       safeRefresh();
     });
   }

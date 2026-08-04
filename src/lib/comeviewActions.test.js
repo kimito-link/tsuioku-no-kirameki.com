@@ -134,6 +134,33 @@ describe('extractUserCommentRows(追憶独自: この人の発言だけ)', () =>
     expect(extractUserCommentRows(null, 'u:1')).toEqual({ rows: [], total: 0 });
     expect(extractUserCommentRows(archive, '')).toEqual({ rows: [], total: 0 });
   });
+
+  // ───────────────────────────────────────────────────────────────────
+  // v0.1.1248(2026-08-04): 実機で踏んだバグの回帰テスト。
+  //   venueBar.js:3668 が【生の uid】("140475218")を渡していたため、
+  //   "140475218" !== "u:140475218" で全行が外れ、パネルが常に
+  //   「この配信の記録にはまだ発言がありません」を出していた
+  //   (速報では同一人物が6〜12件発言・応援者ランキング1位)。
+  //
+  //   ★このバグを既存テストが見逃した理由: 上のテストは全部 'u:1' 形式
+  //     (=正しい形)でしか呼んでおらず、【呼び出し側が間違った形を渡す】
+  //     ケースを一度も試していなかった。関数は正しく動いていた。
+  //     よってここでは「間違った形を渡すと0件になる」ことを明示的に固定し、
+  //     この関数が接頭辞つきキーを要求する契約であることを断言する。
+  // ───────────────────────────────────────────────────────────────────
+  it('【実機バグの回帰】生の userId を渡すと0件になる(接頭辞つきキーが必須)', () => {
+    // 実機で渡していた値と同じ形。u: が無いので必ず外れる。
+    expect(extractUserCommentRows(archive, '1')).toEqual({ rows: [], total: 0 });
+    // 正しい形なら取れる=データではなくキーの書式だけの問題だったことの対比。
+    expect(extractUserCommentRows(archive, 'u:1').total).toBe(2);
+  });
+
+  it('【契約】comeviewUserKeyForRow の戻り値をそのまま渡せば一致する', () => {
+    // 呼び出し側は必ずこの関数を経由すること(comeview-entry.js:1052 が正しい例)。
+    const key = comeviewUserKeyForRow({ userId: '1' });
+    expect(key).toBe('u:1');
+    expect(extractUserCommentRows(archive, key).total).toBe(2);
+  });
 });
 
 describe('resolveComeviewAvatarUrl(本家と同じサムネ解決)', () => {
