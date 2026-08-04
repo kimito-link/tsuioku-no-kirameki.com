@@ -481,6 +481,11 @@ export function buildAiShareFullText({ overviewText, livesData, fastDiag, popupD
     const supplyLine = String((popupDiag?.popup ?? popupDiag)?.laneSupplyOrigin?.line || '');
     if (supplyLine) { lines.push(supplyLine); lines.push(''); }
   } catch { /* no-op: 計器の失敗は状態速報を壊さない */ }
+  // ★v0.1.1250: パネルが一瞬消える(移設でもscrollでもない)を名指しする1行。
+  try {
+    const flipLine = String(fastDiag?.content?.hostFlipCensus?.line || '');
+    if (flipLine) { lines.push(flipLine); lines.push(''); }
+  } catch { /* no-op: 計器の失敗は状態速報を壊さない */ }
   // 2026-07-20 診断先行: ①POP応援レーン/投げ一覧の「クリック不能な手カーソル」実害を数えるだけの1行。
   try {
     const capLine = String((popupDiag?.popup ?? popupDiag)?.storyUserLaneClickAffordanceParity?.line || '');

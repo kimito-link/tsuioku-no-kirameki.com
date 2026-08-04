@@ -4784,6 +4784,16 @@
       ]
     },
     {
+      "file": "src/lib/hostVisibilityFlipCensus.js",
+      "featureCount": 1,
+      "features": [
+        "content"
+      ],
+      "labels": [
+        "記録エンジン(watchページ常駐)"
+      ]
+    },
+    {
       "file": "src/lib/htmlReportCommenterFollowSection.js",
       "featureCount": 1,
       "features": [
