@@ -1,7 +1,7 @@
 # 会場モード=popup パネルのコピペ 設計会議 — 司令塔の収束 (2026-06-22)
 
 質問: `council/venue-is-popup-clone-question.txt` / 生回答: `council/venue-is-popup-clone-answers.json`
-正本: [reference_venue_is_popup_panel_clone.md](../memory/reference_venue_is_popup_panel_clone.md)
+正本: `reference_venue_is_popup_panel_clone.md`(未作成・2026-08-04時点で存在しない)
 
 ## 会議の結果(routed・3体回答)
 - groq/qwen3-32b(批判)・local/gemma4(統括)・nvidia/qwen3.5(発散) が回答。groq/llama-3.3-70b は HTTP 429。
