@@ -5500,7 +5500,11 @@ function renderInlinePopupHost(target) {
   const currentRect = target.getBoundingClientRect();
   const hostEarly = ensureInlinePopupHost();
   if (currentRect.width < 260 || currentRect.height < 140) {
-    hostEarly.style.display = 'none';
+    // ★v0.1.1252: ここは v0.1.1250 の集約から漏れていた(変数名が host でなく hostEarly のため
+    //   grep/置換をすり抜けた)。実配信 2026-08-04 で scrollWhiteoutDiag が
+    //   hostDisplay:"none" / prevH:600→nowH:0 を捕らえたのに hostFlipCensus が 0回 と
+    //   出ていた真因がこれ。名前が違うだけで計器の穴になる=集約は「代入の形」で洗うこと。
+    setInlineHostDisplay(hostEarly, 'none', 'nonvideo_rect_too_small');
     hostEarly.setAttribute('aria-hidden', 'true');
     maybeReconnectCommentMutationObserverAfterInlineLayout();
     return;
