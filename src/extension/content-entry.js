@@ -336,6 +336,13 @@ import {
   noteHostShown,
   snapshotHostVisibilityFlipCensus
 } from '../lib/hostVisibilityFlipCensus.js';
+// ★v0.1.1253: 原因を問わず【実際に見えているか】を毎フレーム測る見張り。
+//   display だけを見る上の計器では、幅が潰れる消え方(録画の実測=920→11)を数えられなかった。
+import {
+  createHostVisibilityWatch,
+  noteHostFrame,
+  snapshotHostVisibilityWatch
+} from '../lib/hostVisibilityWatch.js';
 import { probeWatchPageDomStructure } from '../lib/probeWatchPageDomStructure.js';
 import { summarizeGiftSubAppHistoryDiag } from '../lib/summarizeGiftSubAppHistoryDiag.js';
 import { createConsoleErrorBuffer } from '../lib/consoleErrorBuffer.js';
@@ -2775,6 +2782,41 @@ const _inlineHostMoveState = { count: 0, reloadCount: 0, venueOpenMoves: 0, byRe
  * @type {import('../lib/hostVisibilityFlipCensus.js').HostVisibilityFlipCensus}
  */
 const _hostFlipCensus = createHostVisibilityFlipCensus();
+// ★v0.1.1253: 原因を先に決めず【実際に見えているか】だけを毎フレーム測る見張り。
+//   display/幅潰れ/親外れ のどれでも同じように捕らえる(録画の実測=幅920→11 は display ではなかった)。
+const _hostVisWatch = createHostVisibilityWatch();
+let _hostVisWatchRaf = null;
+/**
+ * パネルの可視性を毎フレーム見張る。走査はせず host 参照1つの矩形だけ読む=O(1)
+ * (paint 毎の DOM 走査は禁止・v0.1.1201 で自分が拡張全体を重くした反省)。
+ */
+function startHostVisibilityWatch() {
+  if (_hostVisWatchRaf != null) return; // 二重起動しない
+  if (typeof requestAnimationFrame !== 'function') return;
+  const tick = () => {
+    try {
+      const host = nlsInlinePopupHostSingleton;
+      if (host && host.getBoundingClientRect) {
+        const r = host.getBoundingClientRect();
+        let cs = null;
+        // computed は「消えた瞬間だけ」読みたいが、前フレームとの比較が要るので
+        // 毎フレーム読む。単一要素の getComputedStyle は O(1) で走査ではない。
+        try { cs = window.getComputedStyle(host); } catch { cs = null; }
+        noteHostFrame(_hostVisWatch, {
+          nowMs: Date.now(),
+          rect: { w: r.width, h: r.height },
+          display: cs ? cs.display : '',
+          visibility: cs ? cs.visibility : '',
+          opacity: cs ? cs.opacity : '',
+          connected: host.isConnected !== false,
+          parentTag: host.parentElement ? host.parentElement.tagName : ''
+        });
+      }
+    } catch { /* 計器失敗は描画を止めない */ }
+    _hostVisWatchRaf = requestAnimationFrame(tick);
+  };
+  _hostVisWatchRaf = requestAnimationFrame(tick);
+}
 
 /**
  * ★host の display を書き換える唯一の入口(9箇所に散っていた直接代入をここへ集約)。
@@ -6819,6 +6861,7 @@ function buildAiShareFastDiagnosticsPayload() {
     hostMoveDiag: summarizeInlineHostMoveDiag(_inlineHostMoveState, Date.now()),
       // v0.1.1250: 移設でもscrollでもない「パネルが一瞬消える」を名指しする計器。
       hostFlipCensus: snapshotHostVisibilityFlipCensus(_hostFlipCensus),
+      hostVisWatch: snapshotHostVisibilityWatch(_hostVisWatch),
     inlinePanel: {
       placementMode: inlinePanelPlacementMode,
       placementEffective: placementEffectiveFast,
@@ -9456,6 +9499,7 @@ function buildAiSharePageDiagnostics() {
     hostMoveDiag: summarizeInlineHostMoveDiag(_inlineHostMoveState, Date.now()),
       // v0.1.1250: 移設でもscrollでもない「パネルが一瞬消える」を名指しする計器。
       hostFlipCensus: snapshotHostVisibilityFlipCensus(_hostFlipCensus),
+      hostVisWatch: snapshotHostVisibilityWatch(_hostVisWatch),
     inlinePanel: {
       placementMode: inlinePanelPlacementMode,
       placementEffective,
@@ -14255,6 +14299,10 @@ async function start() {
       }, LIVE_POLL_MS)
     )
   );
+
+  // ★v0.1.1253: パネル可視の見張りを開始する(idempotent=二重起動しない)。
+  //   ここで始めるのは、この時点で inline panel の土台が作られる経路に必ず乗るため。
+  startHostVisibilityWatch();
 
   livePanelScanIntervalId = /** @type {number} */ (
     /** @type {unknown} */ (

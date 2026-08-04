@@ -731,7 +731,7 @@
   - `src/lib/statusTrendKey.js`
   - `src/extension/status-entry.js`
   - `src/lib/statusActionAdvisor.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 137</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 138</summary>
 
 - `app/app.js` — スマホ閲覧用 status Web 版。
 - `app/live-view.js` — global NL_BUILD_ID
@@ -788,6 +788,7 @@
 - `src/lib/geminiNanoBridge.js` — v0.1.205 Phase C: Built-in AI (Gemini Nano, Chrome 138+) の薄いラッパー。
 - `src/lib/globalFetchRateLimiter.js` — v0.1.664 PR4: tokenBucket.js を用いた全タブ横断の fetch レートリミッター(土台)。
 - `src/lib/hostVisibilityFlipCensus.js` — インラインパネル(host)の「消えた⇄戻った」を数える計器。
+- `src/lib/hostVisibilityWatch.js` — パネルが「実際に見えなくなった瞬間」を、原因の種類を問わず捕らえる見張り(純関数群)。
 - `src/lib/htmlEscape.js` — 旧パス：`src/lib/htmlEscape.js`
 - `src/lib/initShadeFailsafe.js` — 初回ロード幕(.nl-init-shade)の CSS フェイルセーフとクラスの乖離を断つ純関数。
 - `src/lib/isInsideRecommendedLiveSection.js` — v0.1.200: ニコ生 watch ページの「おすすめ生放送」セクション内 DOM を識別する純関数。
@@ -875,7 +876,7 @@
 
 ## 🧬 修正系譜マップ(この系統のバグを過去にどう直したか)
 
-> changelog 全 582 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
+> changelog 全 583 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
 
 ### 💾 記録件数 (89版)
 - `v0.1.1247` 2026-08-04 — 読み上げが遅くなる悪循環を断ち切りました
@@ -2143,7 +2144,8 @@
 - `v0.1.840` 2026-06-20 — 機能逆引き地図を全ファイル網羅に
 - `v0.1.835` 2026-06-20 — 自己検証ゲートを追加(版同期+診断文言)
 
-### その他 (40版)
+### その他 (41版)
+- `v0.1.1253` 2026-08-04 — パネルが消える瞬間を確実に捕まえる見張りを入れました
 - `v0.1.1252` 2026-08-04 — パネルが消えても記録されない穴を塞ぎました
 - `v0.1.1228` 2026-08-02 — ピックアップが常に最新1件に戻っていたのを修正
 - `v0.1.1223` 2026-08-01 — コピーが効かない/中身が古いのを修正

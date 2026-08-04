@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 4 / 712 件
+## ⚠️ 役割コメントが無いソース 4 / 713 件
 - `src/lib/laneDomSelfMeasure.js`
 - `src/lib/reportPreviewPublish.js`
 - `src/lib/venueLaneBuckets.js`
@@ -621,7 +621,7 @@
     - `trumpet1.mp3`
     - `wallet1.mp3`
   - `SOURCES.md`
-- 📁 **src/** (1501)
+- 📁 **src/** (1504)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -902,7 +902,7 @@
         - `logo_funlink_white_RGB_maru_black.png`
       - `logo_guide_funlink_ol.pdf`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1270)
+  - 📁 **lib/** (1273)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -1364,8 +1364,11 @@
     - `highlightLedger.test.js`
     - `highlightLedgerKey.js` — 配信採点「発表演出」用のハイライト台帳(実際に画面に出た演出だけを記録する最小台帳)の
     - `hostFlipCensus.wiring.test.js`
+    - `hostVisWatch.wiring.test.js`
     - `hostVisibilityFlipCensus.js` — インラインパネル(host)の「消えた⇄戻った」を数える計器。
     - `hostVisibilityFlipCensus.test.js`
+    - `hostVisibilityWatch.js` — パネルが「実際に見えなくなった瞬間」を、原因の種類を問わず捕らえる見張り(純関数群)。
+    - `hostVisibilityWatch.test.js`
     - `htmlEscape.js` — 旧パス：`src/lib/htmlEscape.js`
     - `htmlEscape.test.js`
     - `htmlReportCommenterFollowSection.js` — HTML レポート向けコメンターフォロー分析ブロック。

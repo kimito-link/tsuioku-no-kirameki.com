@@ -7,6 +7,8 @@ import {
   liveviewPublishSelfDiagToActionCards
 } from './liveviewPublishSelfDiag.js';
 import { formatLaneRosterDeltaLine } from './laneRosterDelta.js';
+// v0.1.1253: パネルが実際に見えなくなった瞬間を名指しする計器の整形。
+import { formatHostVisibilityWatchLine } from './hostVisibilityWatch.js';
 import { summarizeLiveviewPublishOutcome } from './liveviewPublishOutcome.js';
 import { summarizeLiveviewPublishOutcomeRecord } from './liveviewPublishOutcomeKey.js';
 import { buildDiagnosticsTrust, formatDiagnosticsTrustLines } from './diagnosticsTrust.js';
@@ -485,6 +487,11 @@ export function buildAiShareFullText({ overviewText, livesData, fastDiag, popupD
   try {
     const lightLine = String((popupDiag?.popup ?? popupDiag)?.lightSupplyGuard?.line || '');
     if (lightLine) { lines.push(lightLine); lines.push(''); }
+  } catch { /* no-op: 計器の失敗は状態速報を壊さない */ }
+  // ★v0.1.1253: 原因を問わず「実際に見えなくなった」瞬間を名指しする(幅潰れ/親外れも捕らえる)。
+  try {
+    const visLine = formatHostVisibilityWatchLine(fastDiag?.content?.hostVisWatch);
+    if (visLine) { lines.push(visLine); lines.push(''); }
   } catch { /* no-op: 計器の失敗は状態速報を壊さない */ }
   // ★v0.1.1250: パネルが一瞬消える(移設でもscrollでもない)を名指しする1行。
   try {
