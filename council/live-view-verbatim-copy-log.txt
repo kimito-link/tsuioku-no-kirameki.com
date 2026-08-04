@@ -1,0 +1,260 @@
+
+分類: category=code  by=groq/llama-3.3-70b  (コード生成・実装・デバッグ・リファクタ)
+  分類器の生出力: {"category":"code"}
+召集 4体（最大4）: local/deepseek-r1:14b[批判・詰め（推論特化）], local/qwen2.5-coder:14b[実装・実現性レビュー], nvidia/qwen3.5-122b[発散アイデア（推論強）], groq/llama-3.3-70b[爆速の視点]
+
+[ルーティング選抜・code] 4体に問い合わせ中: local/deepseek-r1:14b, local/qwen2.5-coder:14b, nvidia/qwen3.5-122b, groq/llama-3.3-70b
+
+########################################################################
+# ルーティング選抜・code
+########################################################################
+
+========================================================================
+### local/deepseek-r1:14b  [批判・詰め（推論特化）]  (166433ms)
+========================================================================
+## 結論
+案2が最も危険で、穴が多い設計です。
+
+## 根拠
+- **完全コピーの破绽**: paintTopSupportRankStyleIntoElement を丸ごとコピペしても、依存(B)の状態やヘルパー関数がライブビュー側とポップアップ側で同一ではないため、見た目が変わってしまう。
+- **保守コストの高さ**: 依存(B)をライブビュー側でスタブ化する必要があり、メンテナンス時に抜け漏れが発生しやすい。
+- **移植性の欠如**: サーバー公開版への移植は容易ではなく、修正コストが嵩む。
+
+## 反論・リスク
+- **保守コストの高さ**: 依存(B)をライブビュー側でスタブ化する必要があり、メンテナンス時に抜け漏れが発生しやすい。
+- **破绽の可能性**: 依存(B)の状態やヘルパー関数がライブビュー側とポップアップ側で完全に同期していない場合、見た目が変わってしまう。
+
+## 具体案
+### どのファイルをどう触るか
+- `live-view-entry.js`: paintTopSupportRankStyleIntoElement を import し、依存(B)をスタブ化する関数を定義。
+- `live-view.html`: 必要な CSS クラスと HTML 要素を追加。
+
+### 関数シグネチャ
+```javascript
+function paintTopSupportRankStyleIntoElement(opts) {
+  // 依存(B)を opts で受け取り、描画を行う。
+}
+```
+
+### 詳細
+- **スタブ化の危険**: 依存(B)のうち、`getStoryColorScheme`, `storyAvatarLoadGuard`, 等はライブビュー側とポップアップ側で挙動が異なる可能性があるため、完全コピーを保証できない。
+- **保守コスト**: 依存(B)が増えれば増えるほど、ライブビュー側でのスタブ化が難しくなる。
+
+========================================================================
+### local/qwen2.5-coder:14b  [実装・実現性レビュー]  (78165ms)
+========================================================================
+## 結論
+案2が最も確実で効率的な解法です。
+
+## 根拠
+- **完全コピーの確実性**: paintTopSupportRankStyleIntoElement の本体を丸ごとコピペすることで、見た目が1pxも変わらないことが保証できます。
+- **popup 側への影響**: popup 側に変更を加えることなく、動作を維持できます。
+- **移植性**: 今後サーバー公開版への移植性は考慮されず、必要に応じて再調整が必要です。
+- **実装/保守コスト**: live-view 側の依存部分を最小限のスタブに差し替えることで、保守コストが削減できます。
+
+## 反論・リスク
+- **複雑性増加**: paintTopSupportRankStyleIntoElement に依存する複数の関数や状態を live-view 側で再現することが難しくなる可能性があります。
+- **メンテナンス負担**: 後で popup 側と live-view 側のコードが不一致になった場合、修正が必要になります。
+
+## 具体案
+### どのファイルをどう触るか
+- `src/lib/topSupportRankLineModels.js`: import する。
+- `src/lib/escapeHtml.js`: import する。
+- `src/lib/escapeAttr.js`: import する。
+- `src/lib/isHttpOrHttpsUrl.js`: import する。
+- `src/lib/isAnonymousStyleNicoUserId.js`: import する。
+- `live-view-entry.js`:
+  - paintTopSupportRankStyleIntoElement を丸ごとコピペする。
+  - 依存部分を live-view 用の最小スタブに差し替える。
+
+### 関数シグネチャ
+```javascript
+// live-view-entry.js 内に追加
+function paintTopSupportRankStyleIntoElement(element, rows) {
+  // コピペした本体
+}
+
+// 依存部分を live-view 用の最小スタブに差し替える
+const getStoryColorScheme = () => 'light';
+const storyAvatarLoadGuard = (url) => url;
+const anonymousIdenticonRuntimeEnabled = false;
+const getCachedAnonymousIdenticonDataUrl = () => '';
+const bindOnErrorHandlersWithin = (el, handler) => {};
+const upgradeAnonymousAvatarImageFromFallback = (imgEl) => {};
+const teardownNorthStarLaneWaitingUi = () => {};
+const setNorthStarLaneHidden = (hidden) => {};
+const syncNorthStarLaneGadgetFromBodyState = () => {};
+const clearNorthStarVerticalRailForBody = () => {};
+const paintNorthStarGiftHistorySummaryGadget = () => {};
+```
+
+### 批判役の穴指摘
+- **依存関数の実装**: live-view 側で実装する最小スタブが十分に機能するか、動作確認が必要です。
+
+========================================================================
+### nvidia/qwen3.5-122b  [発散アイデア（推論強）]  (21617ms)
+========================================================================
+## 結論
+「依存関係の注入（案1）」や「コピペ（案2）」ではなく、**「Popup の描画関数を『Web Worker』として別スレッドで動作させ、その生成した HTML 文字列を `postMessage` で Live-View へ転送し、`innerHTML` として貼り付ける」**という、**「描画ロジックと DOM 環境の完全分離」**による解決を提案します。
+
+## 根拠
+1.  **1px の狂いを物理的にゼロにする**: 描画関数が依存する「Popup 固有の DOM 状態（`storyAvatarLoadGuard` の内部キャッシュや `bindOnErrorHandlersWithin` が束縛したイベントリスナー、`_topSupportRankLastHtmlByEl` の WeakMap 参照）」は、Live-View の DOM 環境とは完全に異なるため、Live-View 内で直接実行すると「環境依存のバグ」が必ず発生します。Web Worker 内で実行すれば、Worker 内部で Popup と同一の DOM 環境（あるいはそのモック）をシミュレートできるため、出力される HTML 文字列（DOM 構造・クラス名・インラインスタイル）が 100% 同一になります。
+2.  **依存関係の「汚染」を回避**: 案1のように依存物を引数で渡すと、`live-view` 側で `getStoryColorScheme` などを実装する際、Popup の「隠れた挙動（Side Effect）」を再現しきれず、微妙な挙動の違い（例：画像ロード失敗時のフォールバックタイミング）が生まれます。Worker 内であれば、Popup のコードをそのまま `eval` またはモジュールとして読み込み、Popup が想定する「仮想 DOM 環境」を構築するだけで済みます。
+3.  **MV3 のセキュリティ制約の逆利用**: MV3 では `eval` が制限されていますが、Worker 内でスクリプトを動的にロードすることは可能です。これにより、Popup の「ローカル関数」を、Live-View からは見えない「ブラックボックス」として安全に呼び出せます。
+
+## 反論・リスク
+*   **非同期レイテンシと白飛び**: `postMessage` を使うため、描画完了までに数ミリ秒〜数十ミリ秒の遅延が発生します。Live-View の読み込み直後に「白っぽい枠」や「空のコンテナ」が一瞬表示される可能性があります（案1や案2なら同期的に描画可能）。
+    *   *対策*: Live-View 側で、Worker からのメッセージ到着前に「Skeleton 表示」や「Popup と全く同じ CSS の空のプレースホルダー」を表示し、メッセージ到達後に `innerHTML` 置換する UX 設計を必須とします。
+*   **DOM 操作の制限**: Worker 内では `document` が存在しないため、`document.createElement` などの API が使えません。
+    *   *対策*: Worker 内では、ブラウザ標準の `DOMParser` や、`jsdom` などの軽量ライブラリ（MV3 制限内であれば）をライブラリとして読み込み、Popup 関数が `document` を叩く代わりに、Worker 内で構築した「仮想 document」を差し替える（あるいは、Popup 側を `document` 操作から `string` 生成ロジックへリファクタする最小変更を加える）必要があります。
+
+## 具体案
+以下の 3 ステップで実装します。
+
+### ステップ 1: Worker 用アダプタースクリプト作成 (`src/lib/support-rank-renderer.worker.js`)
+Popup の描画関数を Worker 内で実行するための「仮想 DOM 環境」を構築します。
+
+```javascript
+// src/lib/support-rank-renderer.worker.js
+importScripts('lib/topSupportRankLineModels.js', 'lib/escapeHtml.js', 'lib/isHttpOrHttpsUrl.js');
+// 依存するすべてのライブラリをここで importScripts する
+// 重要：popup-entry.js 自体を importScripts するのではなく、
+// 描画関数 paintTopSupportRankStyleIntoElement を export したモジュールを import する必要がある。
+// もし popup-entry.js がローカル関数しか持たない場合、ここを「描画ロジックの抽出先」として作成する。
+
+// 1. 仮想 DOM 環境の構築 (Worker 内では document がないため、jsdom などを使うか、
+//    あるいは「HTML 文字列を直接生成する」ように paintTopSupportRankStyleIntoElement を引数で受け取る形に微修正する)
+// 本提案の核心：「関数の引数として document を受け取る」形に、popup-entry.js を 1 行だけ修正する。
+// 修正前：function paintTopSupportRankStyleIntoElement(el, data)
+// 修正後：function paintTopSupportRankStyleIntoElement(el, data, documentRef)
+
+// 2. メッセージ受信
+self.onmessage = async (e) => {
+  const { targetId, data, schemeData, identiconCache } = e.data;
+  
+  // 仮想 DOM 生成 (例: DOMParser を使って HTML 文字列を DOM 木に変換し、Worker 内で操作)
+  const parser = new DOMParser();
+  const doc = parser.parseFromString('<div id="rank-container"></div>', 'text/html');
+  const targetEl = doc.getElementById('rank-container');
+
+  // 依存 B (state) を Worker 内でモックまたは渡す
+  const mockStoryColorScheme = () => schemeData;
+  const mockIdenticon = (id) => identiconCache[id];
+  
+  // 本物の関数を実行 (ここが「完全コピー」の肝)
+  // 注意：paintTopSupportRankStyleIntoElement 内部で documentRef を使うように修正済みと仮定
+  // 修正が難しければ、この Worker 内で document を polyfill する
+  paintTopSupportRankStyleIntoElement(targetEl, data, doc, mockStoryColorScheme, mockIdenticon);
+
+  // 結果を HTML 文字列として返す
+  self.postMessage({ html: targetEl.innerHTML });
+};
+```
+
+### ステップ 2: Popup 側の微修正 (`src/popup-entry.js`)
+関数のシグネチャを「環境依存」から「環境非依存」へ変更します。
+
+```javascript
+// src/popup-entry.js
+// 変更点：document を引数に追加。既定値で window.document を取ることで後方互換を維持
+export function paintTopSupportRankStyleIntoElement(el, data, documentRef = window.document, colorSchemeFn, identiconFn) {
+  // 既存のロジックを documentRef を使うように書き換える
+  // 例：document.createElement('div') -> documentRef.createElement('div')
+  // 既存のローカル変数へのアクセスも documentRef を通じて行う
+  // ... (中略) ...
+}
+```
+
+### ステップ 3: Live-View 側の統合 (`src/live-view-entry.js`)
+Worker を起動し、HTML 文字列を取得して DOM に流し込みます。
+
+```javascript
+// src/live-view-entry.js
+const worker = new Worker('src/lib/support-rank-renderer.worker.js');
+
+//
+
+========================================================================
+### groq/llama-3.3-70b  [爆速の視点]  (2457ms)
+========================================================================
+## 結論
+最小・最確実な設計は案1: paintTopSupportRankStyleIntoElement を src/lib の共有モジュールに【そのまま抽出】し、依存(B)を引数(opts)で注入できる形にして、popup と live-view の両方から import する。
+
+## 根拠
+案1は、paintTopSupportRankStyleIntoElement の本体を共有モジュール化することで、完全コピーを保証し、popup の挙動を変更せずに live-view で同じ描画結果を得ることができる。また、依存(B)を引数で注入できる形にすることで、live-view の実装を最小限に抑え、将来のサーバー公開版への移植性も確保できる。
+
+## 反論・リスク
+しかし、案1では、paintTopSupportRankStyleIntoElement の依存(B)をすべて引数で注入できる必要があり、実装コストが増加する可能性がある。また、依存(B)の中には、popup の module-level state などの複雑な依存関係があるため、完全に引数で注入できるわけではない可能性もある。
+
+## 具体案
+具体的な実装案としては、次のようになる。
+```javascript
+// src/lib/paintTopSupportRankStyleIntoElement.js
+export function paintTopSupportRankStyleIntoElement(opts) {
+  // 依存(B)を引数で注入
+  const {
+    getStoryColorScheme,
+    storyAvatarLoadGuard,
+    anonymousIdenticonRuntimeEnabled,
+    getCachedAnonymousIdenticonDataUrl,
+    bindOnErrorHandlersWithin,
+    upgradeAnonymousAvatarImageFromFallback,
+    teardownNorthStarLaneWaitingUi,
+    setNorthStarLaneHidden,
+    syncNorthStarLaneGadgetFromBodyState,
+    clearNorthStarVerticalRailForBody,
+    paintNorthStarGiftHistorySummaryGadget,
+    _topSupportRankLastHtmlByEl,
+  } = opts;
+
+  // paintTopSupportRankStyleIntoElement の本体
+  // ...
+}
+
+// popup-entry.js
+import { paintTopSupportRankStyleIntoElement } from '../lib/paintTopSupportRankStyleIntoElement';
+
+// 依存(B)を注入
+const opts = {
+  getStoryColorScheme,
+  storyAvatarLoadGuard,
+  anonymousIdenticonRuntimeEnabled,
+  getCachedAnonymousIdenticonDataUrl,
+  bindOnErrorHandlersWithin,
+  upgradeAnonymousAvatarImageFromFallback,
+  teardownNorthStarLaneWaitingUi,
+  setNorthStarLaneHidden,
+  syncNorthStarLaneGadgetFromBodyState,
+  clearNorthStarVerticalRailForBody,
+  paintNorthStarGiftHistorySummaryGadget,
+  _topSupportRankLastHtmlByEl,
+};
+
+paintTopSupportRankStyleIntoElement(opts);
+
+// live-view-entry.js
+import { paintTopSupportRankStyleIntoElement } from '../lib/paintTopSupportRankStyleIntoElement';
+
+// 依存(B)を最小スタブで注入
+const opts = {
+  getStoryColorScheme: () => 'light',
+  storyAvatarLoadGuard: () => {},
+  anonymousIdenticonRuntimeEnabled: false,
+  getCachedAnonymousIdenticonDataUrl: () => '',
+  bindOnErrorHandlersWithin: () => {},
+  upgradeAnonymousAvatarImageFromFallback: () => {},
+  teardownNorthStarLaneWaitingUi: () => {},
+  setNorthStarLaneHidden: () => {},
+  syncNorthStarLaneGadgetFromBodyState: () => {},
+  clearNorthStarVerticalRailForBody: () => {},
+  paintNorthStarGiftHistorySummaryGadget: () => {},
+  _topSupportRankLastHtmlByEl: () => {},
+};
+
+paintTopSupportRankStyleIntoElement(opts);
+```
+この実装では、paintTopSupportRankStyleIntoElement を共有モジュール化し、依存(B)を引数で注入できる形にしています。popup と live-view の両方で同じ描画結果を得ることができ、将来のサーバー公開版への移植性も確保されています。
+--- [ルーティング選抜・code] 成功 4/4 ---
+
+=== 完了 166855ms ===
+保存: council/live-view-verbatim-copy-answers.json

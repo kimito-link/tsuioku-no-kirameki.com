@@ -1,0 +1,37 @@
+お題: Chrome拡張「君斗りんくの追憶のきらめき」(ニコ生コメント記録・応援可視化)の【会場モード】を、ユーザーが100回以上伝えている本来の姿に作り替える設計を会議してほしい。星野ロミ(リスクを取って大胆・摩擦ゼロ・失敗体験の除去・既存資産を最大活用・見やすさ最優先)ならどう実装するか。
+
+== ユーザーが確定した「会場モードの正体」(これが絶対の正本) ==
+会場モードとは、独自の凝った別画面ではない。次の4点だけ:
+1. 【popup の画面そのまま】popup の「アイコン列・グリッド・診断を表示」(りんく段・こん太段・広告段・たぬ姉段・全コメント者グリッド)が、そっくりそのまま会場に出る=本物の描画を再利用(コピペ)。似せて自作・独自の席は違反。
+2. 【3キャラ登場演出】会場を開くと「会場モードになるよー」と りんく・こん太・たぬ姉 が出てくる演出をする。
+3. 【その演出の間に VOICEVOX を準備】キャラ演出で時間を稼いでいる間に、裏で VOICEVOX(読み上げ)の呼び出し/ウォームアップを済ませる(起動待ちの間を演出で隠す)。
+4. 【そのまま吹き出し読み上げ】演出後、popup のアイコン(席)の上に吹き出しを付けて、コメントを VOICEVOX で読み上げる。
+
+== 現状(実コードで裏取り済み・ユーザーの正本とズレている) ==
+- venueBar.js:1「会場モード UI 本体。観客の【席割り】・群衆・吹き出し・ギフト演出・読み上げ連動を描く」。
+- mountVenueBarButton が watch ページに【独立 fixed レイヤーの全画面ダイアログ(role=dialog)】を追加。これが【独自の席(ひな壇・3D tier・buildVenueTiers・ensureTierNodes・createSeatNode)】を組んでいる=popup の段組みになっていない=【コピペ違反】。
+- データ源は popup と同じ userLaneCandidatesFromStorage だが、popup の段振り分け(bucketStoryUserLanePicks=りんく/こん太/たぬ姉)も広告列(adThrowerPicks)も会場は通さず、生候補を独自席に並べているだけ=popup で直したこと(レーン件数の誠実表示・広告サムネ導出・全員表示)が会場に反映されない。
+- ★既に存在する部品(再利用できる): 3キャラ常駐レイヤー(.nlsb-residents=りんく/こん太/たぬ姉)・VOICEVOX 起動待ちの「楽しいローディング」演出(v0.1.770)・VOICEVOX クライアント(voicevoxClient.js synthesizeVoice)・読み上げキュー(drainVoiceQueue・状態速報に『読み上げ:ON』)・吹き出し(bubbleLayer・seatAnchorEl で席ノード基準に座標)。
+- ★描画ロジックは既に共有 lib に分離済み(朗報): paintStoryUserLaneDomFilled(renderStoryUserLaneDom.js)が段組みを描く。popup の renderStoryUserLane(popup-entry.js:5114)は popup.html 固有 DOM($('sceneStoryUserLane...'))を集めて els とし、データ(buckets)と一緒に paint 関数へ渡すだけ。bucketStoryUserLanePicks も buildPersonTileEl も共有 lib。
+- ⚠popup-entry.js の関数まるごとは chrome.tabs/scripting・popup 固有 state 依存で会場(別 content script)から呼べない。共有すべきは描画 lib であって popup-entry の関数ではない(過去 live-view 丸ごとクローンで同じ壁)。
+- ⚠本物タイル/段組みの CSS は popup.html にしか無い=会場(content script の VENUE_CSS)には来ない=会場に同等 CSS を持たせる必要(v0.1.900 の教訓)。
+- ⚠吹き出しは seatAnchorEl(席ノード)基準=独自席に強く結合。popup 段組みに作り替えるなら吹き出し起点を popup のアイコン要素に向け直す必要。
+- ⚠会場CSS/描画は content.js と venue.js の二重バンドル。
+
+== 重要な過去の失敗(前提として必ず踏まえる) ==
+- 司令塔は 2026-06-22 に会場の正体を【何度も取り違えた】=「会場に全員500人並べる」「数が合わない」と独自席を前提に遠回りした。ユーザーの正本は最初から「popup のコピペ+キャラ演出+VOICEVOX+吹き出し」だった。会議も前提が誤ると全員同じ方向に間違える=各メンバーは上の正本(4点)を疑わず、ただし実装手段は実機検証前提で。
+- loading="lazy" を会場の3D変形に入れたら可視判定が壊れサムネが出ない実機症状=安易な手段は裏目。
+
+== 問い ==
+1. 「会場 = popup パネルのコピペ」を、本物の描画を再利用して実現する最良の実装は何か。候補(これに限らない):
+   (a) 会場ダイアログ内に popup と同じ段組み DOM 構造(sceneStoryUserLane... 相当)を生成し、同じ paintStoryUserLaneDomFilled・bucketStoryUserLanePicks・buildPersonTileEl・グリッド(renderUserRooms 相当)を会場が呼ぶ。独自席(buildVenueTiers/createSeatNode)は捨てる。
+   (b) popup の「アイコン列・グリッド・診断」パネルの DOM を会場ダイアログに移設/複製する(同一ノードを動かす vs 複製)。
+   (c) その他(既存の共有 lib を最大活用しつつ会場固有の演出=キャラ登場/VOICEVOX/吹き出しを乗せる)。
+2. キャラ登場演出と VOICEVOX 準備のタイミング設計。「会場モードになるよー」の演出時間中に VOICEVOX のウォームアップ(初回合成は時間がかかる)を走らせ、演出が終わる頃に読み上げ可能にする同期をどう作るか。VOICEVOX 起動が演出より遅い/速い場合の扱い。
+3. 吹き出しの起点を、独自席(seatAnchorEl)から popup の段組みアイコン要素へどう向け直すか。コメントが来た人のアイコンの上に吹き出しを出す座標計算。段組みが縦に長い/スクロールする時の追従。
+4. popup 段組みの CSS が popup.html 限定の問題を会場でどう解決するか(会場に同等 CSS を持たせる/共有 CSS lib 化)。
+5. 最小ブラスト半径で段階リリースするなら、どの順でPRを切るか。各段で実機確認。例: PR1=会場ダイアログに popup 段組み(paint 関数再利用)を出す→PR2=キャラ演出中 VOICEVOX 準備→PR3=吹き出しを段組みアイコンに向け直す→PR4=独自席の撤去。
+
+評価軸: ①popup の中身がそっくり会場に出るか(コピペ=本物再利用・似せて自作でない) ②キャラ演出中に VOICEVOX が準備でき待ち時間が隠れるか ③吹き出し読み上げが popup アイコン上で正しく出るか ④既存の共有 lib(paint/bucket/buildPersonTileEl/voicevoxClient/吹き出し)を最大活用 ⑤実装/保守コストと回帰リスク(最小ブラスト半径・独自席の撤去は段階的に) ⑥CSS の所在問題(popup.html 限定)の解決 ⑦星野ロミらしさ(摩擦ゼロ・失敗体験除去) ⑧content.js/venue.js 二重バンドルの整合。
+
+各メンバーは『結論 → 根拠 → 反論・リスク → 具体案(どの関数/DOM/CSS をどう変えるか・PR段階)』の4ブロックで。批判役は必ず穴を1つ指摘(特に『同一 DOM を移すか複製か』『独自席を一気に捨てる vs 段階』『VOICEVOX ウォームアップが演出時間内に終わらないリスク』)。司令塔(Claude)が最後に統合・裏取りして1案に収束させる。最優先は「popup の中身をそっくり会場に出し(本物再利用)、キャラ演出中に VOICEVOX を準備し、アイコンに吹き出しを付けて読み上げる」設計。

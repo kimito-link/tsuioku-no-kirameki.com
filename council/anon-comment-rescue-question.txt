@@ -1,0 +1,39 @@
+お題: ニコ生コメント記録Chrome拡張で、匿名(184)コメントの【本文】が番号(commentNo)必須フィルタで捨てられている本物のバグを根治する。ニコ生は匿名主体=これが取れないのは存在意義に関わる。
+
+# 実機で確定した証拠(これが前提・覆さない)
+配信 lv350789879(ブラジル戦・大規模)で:
+- commentIngestBySource.visible: 10364(DOM観測で1万件見ている)・ndgr: 275(NDGR chat 受信)
+- ndgrTagHistogram.msg["1"]: 979(chatタグが979件来ている=chatは確実に来ている)
+- ndgrWireCounters: chats:275 / decoded:4317 / stats:430
+- **savedCommentsUidStats.totalSaved: わずか 7 / withUidPercent:100%(userId付き7件しか保存していない)**
+→ 1万件超を観測し chat も来ているのに、保存は userId付き7件だけ。匿名本文は全部捨てられている。
+別の匿名主体配信 lv350790052 では totalSaved:0(全滅)。
+
+# 実コードで裏取りした真因(これも前提)
+匿名コメント本文が commentNo 必須の2ゲートで落ちる:
+1. src/lib/cleanNdgrChatRows.js:17 `if (!commentNo) continue;` ← 番号無しを除外。だが行オブジェクトは既に
+   { commentNo, text, userId, nickname?, vpos?, accountStatus?, is184? } を持つ=番号以外のデータは揃っている。
+2. src/extension/content-entry.js:1794 `if (!no || !text) continue;` ← flushNdgrChatRowsBatch。
+   **dedup キーが `${no}\t${text}`(commentNo 依存)** ← ここが厄介。番号を緩めても、このキーだと別々の匿名
+   コメントが衝突して1件に潰れる/番号無しは全部同じキー側に寄る恐れ。
+
+# 既に揃っているデータ(救済の材料・実コード確認済み)
+- src/lib/ndgrDecode.js:252 が chat ごとに { no, rawUserId, hashedUserId, name, content, vpos, accountStatus, is184 } を抽出済み。
+- src/lib/ndgrChatRows.js:16-20 が userId = rawUserId || hashedUserId を解決(匿名は hashedUserId が乗る・^[a-zA-Z0-9_:-]{8,}$ 形式)。
+- つまり匿名chatも【本文 content・安定ID hashedUserId・vpos・is184】を持っている。番号が無いだけ。
+- 参考(OneComme 答え合わせ・memory): 受理原則=身元(hashedUserId/rawUserId)+本文で受理・no は持ち回るが必須にしない・どちらも無ければ捨てる。data-comment-type は構造ラベル。
+- 過去の凍結(v0.1.820・memory): 「番号必須緩和」は一度凍結したが、それは『実機で番号セルが消えていない+保たれた行にuserIdが無い』配信での話。今回は別=chat来てる(msg[1]:979)のに保存7=緩和の利得が実在。
+
+# 問い(これに答えて)
+1. **cleanNdgrChatRows.js:17 の `if (!commentNo) continue;` をどう緩めるか**。OneComme式「番号 OR (本文+識別子)」で受理。具体的な受理条件式(commentNo があれば従来通り・無ければ text非空 かつ (userId/hashedUserId 有り) なら通す・両方無しは捨てる)。gift システムメッセージ排除(parseGiftCommentText)は維持。
+2. **flushNdgrChatRowsBatch の dedup キー `${no}\t${text}` の作り直し**(content-entry.js:1789-1816)。番号無し匿名行を正しく重複排除しつつ別コメントを潰さないキーは何か。候補: no があれば `no\ttext`、無ければ `hashedUserId\ttext\tvpos`(同一人物の同一本文同一位置=真の重複)or `userId\ttext\tvpos`。vpos が null のときの扱い。番号有り行と番号無し行が同一コメントを二重持ちする恐れ(NDGR と DOM 両方で来る)への対処。
+3. **記録の単調化・件数表示への影響**(memory: per-live monotonic ゲート v0.1.804)。匿名本文が大量に増えると observedRecordedCommentCount が跳ねる=正常な増加であって退化ではない、で良いか。会場/応援レーン(userLaneCandidatesFromStorage は userId 必須)に匿名(hashedUserId)を出すかは別フェーズか、同時か。
+4. **誤検知ガード(最重要・批判役は必ず穴を指摘)**: 番号必須を外すと何が誤って混入するか。gift以外のシステムメッセージ(運営アナウンス・generalSystemMessage)、空本文、重複、他配信の残骸。data-comment-type / accountStatus / is184 を構造ガードに使えるか。記録本体を汚さない最小の防御。
+5. **段階導入の切り方**: 第1=本文記録の救済(挙動が変わる=慎重)、第2=匿名を会場/レーンに出す。第1だけでも「匿名コメントが記録される」価値が出るか。フェーズ・フロー図(docs/*-flow.html)を作るべき substantial タスクか。
+
+# 制約(星野ロミ式)
+- 記録本体(IndexedDB/chunk/テール)不可侵・新規storage書込みを既存以上に増やさない・hot path(persist/描画)を重くしない。
+- 落とさない(匿名も拾う)・既存データ活かす(hashedUserId は既に decode 済)・過剰実装回避・失敗体験の除去(匿名が取れない=存在意義の失敗)。
+- characterization test 先行(既存の cleanNdgrChatRows / flushNdgrChatRowsBatch テストを壊さず、番号無し匿名が通る新ケースを追加)。
+
+出力は『結論 → 根拠 → 反論・リスク → 具体案』の4ブロックで。具体案は受理条件式と dedup キーをコードで・置き場所(ファイル:行)まで。

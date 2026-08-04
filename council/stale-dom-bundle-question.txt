@@ -1,0 +1,25 @@
+お題: ニコ生コメント記録Chrome拡張で「過去に開いた他配信タブの名残DOMバンドルが混乱を起こす」というユーザー体験を、プログラム改善で根治する。
+
+# 実コードで裏取りした真因(これが前提・覆さない)
+- 症状: 実機診断で multiTabDiag.staleDomBundleSuspected:true / eventDomLvCount:31 / eventDomLvs に現在見ていない配信lvが多数。ユーザーは「公式値レーン(貢献度/ギフト/Eスコア/E順位/広告ランキング)の表示が混乱する」と感じている。
+- **重要な事実**: 名残DOMが実際に表示を混乱させる経路は【存在しない】。各watchタブは自分のliveIdのbundleだけ使う(content-entry.js:1997 で lv切替時 lastOfficialEventDomBundle=null 強制初期化・northStarLaneReason.js は単数bundleのみ受け取る・複数lv誤選択コードは無い)。記録(IndexedDB)も健全(withUidPercent:100)。
+- staleDomBundleSuspected:true の正体 = 診断の【過剰警告】。判定は diagWarnings.js:deriveStaleDomBundleSuspected で eventDomLvCount>30(実機31が引っかかる) または currentLiveIdInEventDom===false。
+- 既に prune はある: pruneStaleEventDomLvs.js(TTL 6h・LRU上限30件・現在lvは無条件保護)。trigger は persistOfficialEventDomBundleNow から 8秒 coalesce。短時間に大量タブ(autopatrol背景巡回など)が nls_event_dom_<lv> を書くと、次のpruneまで一時的に30超になり警告が立つ。
+- storage は単一LevelDBを全watch/popup/status/会場で共有。eventDomLvs/nicoadLvs は storage キー全スキャンで集計、snapshot=globalThis.__nls_multitab_snapshot__。
+
+# 問い(これに答えて)
+1. ユーザーの不満の【本体】は何か: (A)実害がある表示混乱 (B)診断に出る不穏な警告テキストそのもの (C)storageに古いキーが溜まること。実コード上「表示混乱の経路が無い」なら、根治とは何を直すことか。星野ロミ式(落とさない・既存データ活かす・過剰実装回避・失敗体験=不穏な表示の除去)で定義せよ。
+2. 取りうる手の比較と推奨:
+   - 案P: prune を高頻度化(storage.onChanged で nls_event_dom_* 書込検知→即prune)。古いキーを溜めない根治。リスク=onChanged が高頻度発火で重くならないか・共有storage stallを誘発しないか。
+   - 案T: 閾値/判定の現実化(>30 を緩める or 「現在lvが無い時だけ警告」に限定)。最小だが本質を隠すだけでは?
+   - 案M: 診断メッセージの差別化(「snapshotは31件だが表示に使うbundleは現在lvのみ=実害なし」と明示)。誤解の除去。
+   - これらは排他か、組み合わせか。星野ロミ式でどれを正本にし何を捨てるか。
+3. autopatrol背景巡回が大量タブを開く設計なら、そもそも eventDom を書かないタブ(背景巡回・非watch)を増やさない方が筋では? 書込み元を絞る案はあるか(実コード前提: 背景巡回タブも content が走り persist する可能性)。
+4. やってはいけない過剰実装を1つ以上(批判役は必ず穴を指摘): 例=表示に害が無いのに大掛かりな多タブ協調(リーダー選出でeventDom集約等)を作る、storage書込みを増やす、prune を同期化してhot pathを重くする。
+
+# 制約
+- 記録本体(IndexedDB/chunk/テール)不可侵・新規storage書込みを増やさない・hot path(描画/persist)を重くしない。
+- 共有storage stall を誘発しない(STORAGE_OP_TIMED_OUT は静かに諦めスロット解放する既存方針を壊さない)。
+- version bump 1変更=patch1つ・verify:cc で腐り検知。
+
+出力は『結論 → 根拠 → 反論・リスク → 具体案』の4ブロックで。具体案は実装の置き場所(ファイルのどの関数)まで踏み込め。

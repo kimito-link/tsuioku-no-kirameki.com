@@ -1,0 +1,52 @@
+【議題】popup の「ギフト列」に広告投稿者を正しく統合する設計(会場より先に popup を完全にする)
+
+# 背景・ユーザーの指摘
+ユーザー「広告投げたユーザーが元々のPOP(popup)に出てない問題。ギフト列の説明文には
+『この放送でギフトや広告を投げた人を、数値ユーザーIDで記録できた順に並べる』とあるのに、
+広告を投げた人が並んでいない。ここは広告も並べるべきなのに乗っていない。
+先に POP を完全にしてから会場をつくるべき。」
+
+# コード精査で判明した事実(裏取り済み)
+- ギフト列の描画候補は buildStoryGiftThrowerLanePicks(popup-entry.js:5460)が giftUsers から作る。
+- giftUsers の源は nls_gift_users_<liveId>(giftUsersStorageKey)。書くのは content-entry.js:2291 の
+  NLS_INTERCEPT_GIFT_USERS ハンドラ=【NDGR ギフトイベントのみ】。広告(nicoad)は一切入っていない。
+- giftUser のフィールドは {userId, nickname, capturedAt} のみ。ギフト/広告の区別印は無い。
+- 説明文「ギフトや広告を投げた人」は storyUserLaneGuideHtml.js:33 由来。実装(ギフトのみ)と乖離=仕様欠落。
+- 広告ランキングの源は別キー nls_nicoad_api_ranking_<liveId>。公式 nicoad API
+  (api.nicoad.nicovideo.jp/v1/contents/live/<lv>/ranking/contribution)を Service Worker が直叩き。
+- 「この放送でこの人がいつ何pt広告を投げたか」という、ギフト列と同じ時系列イベント粒度の広告データは
+  【拡張のどこにも存在しない】。あるのは公式ランキング(貢献pt順・rank)だけ。
+
+# 実機 API で裏取りした広告ランキングの実レスポンス(lv350805294・status200)
+data = { contentId:"lv350805294", contentType, contentTotalContribution:259933, count, ranking:[...] }
+ranking[i] = { userId(数値・無い行もある), advertiserName, totalContribution(貢pt), rank, userPageUrl(記名行のみ) }
+- ★contentId がこの放送=「この放送の広告貢献ランキング」であり別配信混在ではない(放送スコープはギフト列と同じ)。
+- ★userId を持つ行と持たない行が混在(rank2「伊藤福島」は userId 無し=記名なし広告)。
+- ★期間専用フィールドは無い。contentTotalContribution がこの放送の累計。
+- ★並びは rank=貢献pt降順(ギフト列の『記録できた順=時系列』とは並び原理が違う)。
+
+# 確定している論点(ユーザーの懸念に回答済み)
+ユーザー懸念「現在の広告ランキングか/今まで投げた広告のランキングか精査が要る」
+→ 実機 API で確定=「この放送(contentId)で投げられた広告の貢献ランキング(pt順)」。別配信混在ではない。
+  ゆえに『ギフトや広告を投げた人』にこの放送の広告投稿者を並べるのは設計意図どおりで妥当。
+
+# 会議で決めてほしい設計判断
+Q1. 広告投稿者をギフト列にどう統合するか。候補:
+  (案A) popup の paint 時に nls_nicoad_api_ranking_ を併読し、ギフト投稿者リストに広告投稿者を merge して
+        buildStoryGiftThrowerLanePicks に渡す(最小結合点・popup-entry.js:5570-5590)。
+  (案B) ギフト列とは別に「広告列」を新設する(段を分ける)。
+  (案C) ギフト列の中で「ギフト/広告」をアイコンや小バッジで区別しつつ1列に混ぜる。
+Q2. 並び順の原理の衝突をどう解くか。ギフト列=「記録できた順(時系列)」、広告=「貢献pt順」。
+    混ぜるなら統一順序は何にすべきか(説明文『記録できた順』を活かすか、pt順に寄せるか、ギフト→広告の順で連結か)。
+Q3. userId 無しの広告行(記名なし広告・例「伊藤福島」)をどう扱うか。説明文は『数値ユーザーIDで記録できた順』。
+    数値ID無しの広告は載せない(=ID取れた人だけ)のか、匿名扱いで載せる(たぬ姉段相当)のか。
+Q4. 説明文(storyUserLaneGuideHtml.js)と実装の乖離は、実装を説明文に合わせる(広告も載せる)で正しいか。
+    それとも説明文を実態に合わせて直す(将来 broadcaster や粒度の都合があるか)。
+Q5. 既存の鏡映設計(popup列と会場席は同じ集約 userLaneCandidatesFromStorage を共有=顔ぶれ一致が正)を壊さずに
+    広告統合する方法。広告は userLaneCandidatesFromStorage を通らない別経路なので、会場とどう顔ぶれを一致させるか。
+
+# 制約(厳守)
+- BAN リスク回避(throttle 緩和・並列増強はしない)。広告 API は既存の最小 gap 設計を変えない。
+- popup の既存挙動(りんく/こん太/たぬ姉段・ギフト列の現状の人)を壊さない=追加(広告)だけ。
+- 会場は popup の本物を再利用する方針(v0.1.900 で席タイルは本物化済)=popup を正本に直せば会場へ波及。
+- 推測で実装しない。最小ブラスト半径。

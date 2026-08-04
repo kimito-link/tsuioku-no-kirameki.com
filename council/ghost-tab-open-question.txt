@@ -1,0 +1,26 @@
+【お題】Chrome拡張(Manifest V3)で「拡張をリロード/ブラウザ再起動するたびに、知らないニコ生配信のタブが勝手に開き、手で閉じても復活する」症状の真因を特定したい。司令塔(Claude Code)が単独で5回修正を試みて全て外しているので、別角度の仮説と「次に取るべき1手(実機で何を観測すれば犯人が一意に決まるか)」を出してほしい。
+
+【確定している事実(実機の診断JSONとコード網羅探索で裏取り済み)】
+1. 開くタブのURLは素の `https://live.nicovideo.jp/watch/lvXXXXXXXXX`(例 lv350761740)。末尾に `#nls_autopatrol=1` のような独自マーカーは付いていない。
+2. 拡張には「自動巡回(autopatrol)」機能があり、過去はランキングから拾った配信を `chrome.tabs.create({active:false, url: watch+'#nls_autopatrol=1'})` で裏タブに開いていた。これは現在 KILL_SWITCH 定数で完全停止済み(getAutopatrolEnabled が常に false を返す)。診断JSONでも autoOpen.attemptCount=0。
+3. ギフトサイドバー自動オープン(合成クリックでサイドバーを開く機構)も停止済み。診断で attemptCount=0。
+4. サブエージェント2体でコードベース全体(background.js / content script / popup / status / comeview / lib)を網羅探索した結果、「マーカー無しの素の watch URL を“自動で”(タイマー/alarm/onInstalled/onStartup/observer等で)開く経路」は見つからなかった。chrome.tabs.create で watch URL を開くのは (a)autopatrol=停止中 (b)手動ボタン(NEXT_LIVE_REQUEST=ユーザークリックのみ) だけ。
+5. content script は chrome.tabs.create を持たない(権限なし)。content script 内に window.open も location.href 書き換えも anchor の合成クリックも無い。
+6. Chrome の起動設定 chrome://settings/onStartup は「新しいタブページを開く」になっている(「前回開いていたページを開く」ではない)。つまり Chrome 標準のセッション復元ではない。
+7. それでも、手でタブを閉じて Chrome を完全終了→再起動すると、また同じ/別の watch タブが開く(=復活する)。
+8. 診断JSONの multiTabDiag.eventDomLvs に過去の lv が30件並ぶが、これは storage キー `nls_event_dom_<lv>` の残骸(24時間TTL)であり「今開いているタブ」ではなく「過去に開かれた結果の痕跡」。タブを開く原因ではない。
+
+【まだ確認できていないこと(未確定)】
+- 開くタブが active(前面) か background(裏) か。
+- 復活するのが毎回「同じ lv」か「毎回違う lv」か。
+- 拡張をリロードした瞬間に開くのか、何もしなくても時間が経つと開くのか、ブラウザ再起動時か。
+- autopatrol が過去に作った chrome.alarms(`nls_autopatrol_tick` 0.5分周期)が KILL_SWITCH 適用後も Chrome 内部に残って発火し続けていないか(alarm は拡張更新をまたいで永続する)。
+- 別の Chrome 拡張やニコ生公式のページ機能が開いている可能性。
+- Chrome のタブのピン留め/タブグループ/「最近閉じたタブ」自動復元など、onStartup 設定以外のタブ復元経路。
+
+【問い】
+A. 上記の確定事実(特に「コードに自動オープン経路が無い」「onStartup は新しいタブページ」)を前提に、なぜ素の watch URL が再起動のたびに復活しうるか、考えられる仮説を可能性の高い順に挙げてほしい。Chrome 内部の挙動(alarm 永続/Service Worker の再生成/tab discard からの復活/別経路のセッション復元/プロファイル同期/別拡張)も含めて。
+B. 各仮説について、「実機で何を1回観測すれば、その仮説が真か偽か一意に切り分けられるか」を具体的に(どのURL/どの設定画面/どのDevTools/どの診断値を見るか)書いてほしい。司令塔は実機を勝手に触れないので、ユーザーに頼む観測手順は最小手数で。
+C. もし拡張側で安全に止められる対処があるなら、「ユーザーが手で見ている配信タブを絶対に誤爆しない」制約のもとで何ができるか。誤爆リスクが高い案(全 watch タブを閉じる等)は明示的に却下理由も添えて。
+
+技術前提: Chrome Manifest V3 / Service Worker 型 background / chrome.alarms / chrome.tabs / chrome.storage.local。日本語で、推測と確証を分けて答えてほしい。

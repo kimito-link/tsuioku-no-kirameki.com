@@ -1,0 +1,260 @@
+
+分類: category=code  by=groq/llama-3.3-70b  (コード生成・実装・デバッグ・リファクタ)
+  分類器の生出力: {"category":"code"}
+召集 4体（最大4）: local/deepseek-r1:14b[批判・詰め（推論特化）], local/qwen2.5-coder:14b[実装・実現性レビュー], nvidia/qwen3.5-122b[発散アイデア（推論強）], groq/llama-3.3-70b[爆速の視点]
+
+[ルーティング選抜・code] 4体に問い合わせ中: local/deepseek-r1:14b, local/qwen2.5-coder:14b, nvidia/qwen3.5-122b, groq/llama-3.3-70b
+
+########################################################################
+# ルーティング選抜・code
+########################################################################
+
+========================================================================
+### local/deepseek-r1:14b  [批判・詰め（推論特化）]  (236688ms)
+========================================================================
+# 結論
+ユーザーの不満の【本体】は **(B) 診断に出る不穏な警告テキストそのもの** です。表示混乱の経路が存在しないことから、根治とは診断メッセージの改善と過剰警告の削減に焦点を当てるべきです。
+
+# 根拠
+1. **実害がある表示混乱**: 実コード上、表示混乱の経路が存在しないことが確認されています。`content-entry.js:1997` で lv 切替時に `lastOfficialEventDomBundle=null` が強制初期化され、`northStarLaneReason.js` は単数 bundle のみ受け取ります。
+2. **診断メッセージの差別化**: 「snapshotは31件だが表示に使うbundleは現在lvのみ=実害なし」と明示することで、誤解を除去し、ユーザー体験を改善できます。
+
+# 反論・リスク
+1. **手の比較と推奨**:
+   - **案P: prune を高頻度化**: `storage.onChanged` で nls_event_dom_* 書込検知→即prune。古いキーを溜めない根治。
+     - **リスク**: onChanged が高頻度発火で重くなる可能性がある。共有 storage stall を誘発する可能性も考慮する必要がある。
+   - **案T: 閾値/判定の現実化**: >30 を緩める or 「現在lvが無い時
+
+# 具体案
+**案M: 診断メッセージの差別化を実装する。**
+
+```javascript
+// diagWarnings.js
+function deriveStaleDomBundleSuspected(eventDomLvCount, currentLiveIdInEventDom) {
+  if (eventDomLvCount > 30 || !currentLiveIdInEventDom) {
+    return {
+      staleDomBundleSuspected: true,
+      message: '診断警告: 過去のライブ履歴が多数存在しています。しかし、表示に影響はありません。'
+    };
+  }
+  return { staleDomBundleSuspected: false };
+}
+```
+
+**案R: 書込み抑制を併用する。**
+
+```javascript
+// background.js
+function backgroundScript() {
+  chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+    if (request.action === 'persistEventDomBundle' && !isWatchTab(sender.tab)) {
+      return { cancel: true };
+    }
+    // 其他処理...
+  });
+}
+```
+
+**案T: 閾値/判定の現実化を調整する。**
+
+```javascript
+// diagWarnings.js
+function deriveStaleDomBundleSuspected(eventDomLvCount, currentLiveIdInEventDom) {
+  if (eventDomLvCount > 50 || (!currentLiveIdInEventDom && eventDomLvCount > 30)) {
+    return { staleDomBundleSuspected: true };
+  }
+  return { staleDomBundleSuspected: false };
+}
+```
+
+**案P: prune を高頻度化する。**
+
+```javascript
+// storage.js
+function handleStorageChange(e) {
+  if (e.key.startsWith('nls_event_dom_')) {
+    pruneStaleEventDomLvs();
+  }
+}
+```
+
+# 見落としの指摘
+- **短期的な一時的な警告発火を放置するリスク**: 高頻度化した prune が storage 上での同期遅れやデータ破損を招く可能性がある。
+
+========================================================================
+### local/qwen2.5-coder:14b  [実装・実現性レビュー]  (106055ms)
+========================================================================
+### 結論
+ユーザーの不満の本体は **(B) 診断に出る不穏な警告テキストそのもの** です。表示混乱の経路が存在しないことから、根治とは診断メッセージの改善と過剰警告の削減に焦点を当てるべきです。
+
+### 根拠
+1. **実害がある表示混乱**: 実コード上、表示混乱の経路が存在しないことが確認されています。`content-entry.js:1997` で lv 切替時に `lastOfficialEventDomBundle=null` が強制初期化され、`northStarLaneReason.js` は単数 bundle のみ受け取ります。
+2. **診断メッセージの差別化**: 「snapshotは31件だが表示に使うbundleは現在lvのみ=実害なし」と明示することで、誤解を除去し、ユーザー体験を改善できます。
+3. **過剰警告の削減**: `staleDomBundleSuspected` の判定を緩和するか、閾値を調整することで、不穏な警告テキストを減らすことができます。
+
+### 反論・リスク
+1. **手の比較と推奨**:
+   - **案P: prune を高頻度化**: `storage.onChanged` で nls_event_dom_* 書込検知→即prune。古いキーを溜めない根治。
+     - **リスク**: onChanged が高頻度発火で重くなる可能性がある。共有 storage stall を誘発する可能性も考慮する必要がある。
+   - **案T: 閾値/判定の現実化**: >30 を緩める or 「現在lvが無い時だけ警告」に限定。
+     - **リスク**: 最小だが本質を隠すだけでは不十分。ユーザーに安心感を与えず、根本的な問題を解決できない。
+   - **案M: 診断メッセージの差別化**:
+     - **リスク**: メッセージ改善だけで表示混乱が解消しない可能性がある。
+
+2. **autopatrol背景巡回が大量タブを開く設計**: 
+   - **リスク**: eventDom を書かないタブを増やすことで、storage の負担を軽減できるが、実コード上は content が走り persist する可能性がある。これにより、問題を悪化させてしまう可能性がある。
+
+3. **やてはいけない過剰実装**:
+   - **例**: 表示に害が無いのに大掛かりな多タブ協調(リーダー選出でeventDom集約等)を作る。storage 書込みを増やす。prune を同期化して hot path を重くする。
+
+### 具体案
+1. **診断メッセージの差別化**:
+   - **実装場所**: `diagWarnings.js:deriveStaleDomBundleSuspected` 関数。
+     ```javascript
+     function deriveStaleDomBundleSuspected(eventDomLvs) {
+       const currentLiveIdInEventDom = getCurrentLiveIdInEventDom();
+       if (eventDomLvs.length > 30 && !currentLiveIdInEventDom) {
+         return { suspected: true, message: "snapshotは31件だが表示に使うbundleは現在lvのみ=実害なし" };
+       }
+       return { suspected: false, message: "" };
+     }
+     ```
+2. **閾値の緩和**:
+   - **実装場所**: `diagWarnings.js:deriveStaleDomBundleSuspected` 関数。
+     ```javascript
+     function deriveStaleDomBundleSuspected(eventDomLvs) {
+       const currentLiveIdInEventDom = getCurrentLiveIdInEventDom();
+       if (eventDomLvs.length > 25 && !currentLiveIdInEventDom) { // 閾値を緩和
+         return { suspected: true, message: "snapshotは26件だが表示に使うbundleは現在lvのみ=実害なし" };
+       }
+       return { suspected: false, message: "" };
+     }
+     ```
+
+これらの具体的案を通じて、診断メッセージの改善と過剰警告の削減を達成し、ユーザー体験を向上させることが可能です。
+
+========================================================================
+### nvidia/qwen3.5-122b  [発散アイデア（推論強）]  (19977ms)
+========================================================================
+# 結論
+**「過剰警告の除去（案M）」を主軸とし、「書込み抑制（案R）」を副軸とするハイブリッド解決策**を提案します。
+ユーザーの「不穏な警告テキスト（B）」こそが真の症状であり、実害（A）は存在しません。したがって、**「警告を消すのではなく、警告の意味を『正常な状態』に再定義する」**という発想で、診断ロジックそのものを「現在の表示状態」ではなく「過去のデータ蓄積」として切り離すことで、根本的な不快感を解消します。
+
+具体的には、`diagWarnings.js` の判定ロジックを「単なる数値閾値」から**「文脈的有用性（Contextual Utility）」**へ変更し、背景巡回タブによる書込み自体を抑制する「書込みフィルタ（案R）」を併用します。
+
+---
+
+# 根拠
+1.  **症状の正体は「心理的ノイズ」である**:
+    実コード（`content-entry.js` 等）が示す通り、表示混乱の経路は皆無です。ユーザーが「混乱を感じている」という事実は、**「システムが何か不正なことを検知した（と誤解させる）警告テキスト」**が、ユーザーの安心感を破壊した結果です。したがって、storage の中身を物理的に整理する（案P）よりも、**「その状態が異常ではない」というファクトをユーザーに伝える（または警告を出さない）**方が、コスト対効果が高いです。
+
+2.  **星野ロミ式の適用**:
+    *   **落とさない**: 既存の `prune` ロジック（6h TTL/LRU）は健全に動作しており、データを破棄しません。
+    *   **既存データ活かす**: `eventDomLvCount` のデータ自体は、過去に開いたタブの履歴として有用な場合があります（デバッグ用など）。無理に削除する必要はありません。
+    *   **過剰実装回避**: 全タブを監視して即座に削除する（案P）などは、`storage.onChanged` の発火頻度を増やし、共有ストレージの競合（stall）を誘発するリスクがあります。
+    *   **失敗体験=不穏な表示の除去**: 「31 件あるから危ない」という誤解を、「31 件あっても現在表示に使われているのは 1 件だけだから安全」という事実に置き換えるのが最適解です。
+
+3.  **背景タブの非効率性**:
+    `autopatrol` などの背景巡回は、ユーザーが視覚的に確認していないため、`persistOfficialEventDomBundleNow` を呼び出して DOM バンドルを保存する意味は薄いです。ここが「数値を膨らませる」元凶です。
+
+---
+
+# 反論・リスク
+**反論 1: 「警告を隠すだけ（案T/M）で、本当に裏でデータが腐り、将来的に performance を落とすのではないか？」**
+*   **批判**: 警告を消しただけでは、無限に古いデータが溜まり続け、Storage サイズが肥大化するリスクがある。
+*   **反撃**: 既存の `pruneStaleEventDomLvs.js` が TTL 6h と LRU 30 件という強力なガードレールを既に持っています。これ以上の「即座の削除」は過剰です。データが溜まるのは「短期間に大量に開く」時だけですが、6 時間後には自然に消えます。ユーザーの「今の不安」を解消し、技術的な「将来のリスク」は既存のガードで管理すれば十分です。
+
+**反論 2: 「背景タブでも書かないようにすると、もしユーザーがそのタブに戻った時にデータがないのでは？」**
+*   **批判**: 巡回タブが突然前面化した場合、DOM バンドルがないと表示が崩れる？
+*   **反撃**: 巡回タブは通常、`visibilitychange` または `tab` 切り替え時に再読み込み（または再読み込み相当の処理）が行われます。`content-entry.js` は `lastOfficialEventDomBundle=null` で初期化されるため、**「データがない＝初回ロード」として振る舞うだけで、表示崩れは起きません**。むしろ、不要なデータを書き込む方がメモリと Storage の無駄です。
+
+**リスク: `storage.onChanged` の監視強化によるパフォーマンス劣化**
+*   案P（高頻度 prune）のように `onChanged` を多用すると、マルチタブ環境でスロット競合が起き、`STORAGE_OP_TIMED_OUT` が頻発し、既存の「静かに諦める」方針を崩壊させる恐れがあります。これを避けるため、**「書込み側の抑制（案R）」**と**「診断側の再定義（案M）」**に絞ります。
+
+---
+
+# 具体案
+
+## 案 1: 診断ロジックの文脈化（案 M の進化版）
+**コンセプト**: 「数値の多さ」ではなく「現在の表示への影響」を基準にする。
+**実装場所**: `diagWarnings.js` の `deriveStaleDomBundleSuspected` 関数。
+
+**変更点**:
+現在のロジック：
+```javascript
+// 現状（過剰警告の原因）
+if (eventDomLvCount > 30 || currentLiveIdInEventDom === false) {
+  return true;
+}
+```
+
+**修正後**:
+「現在アクティブなタブ（または直近の表示用）に、そのデータが影響していないなら、警告を出さない」とする。
+```javascript
+// 修正案：文脈的有用性の判定
+// 1. 現在アクティブな liveId が eventDom に存在するか
+const hasActiveBundle = eventDomLvs.some(bundle => bundle.liveId === currentLiveId);
+
+// 2. 警告の閾値を「表示混乱のリスク」ではなく「異常な膨張」に修正
+// 30 件という閾値は「表示混乱」の閾値ではないため、削除または大幅に引き上げる（例：1000 件）
+// または、単に「現在アクティブな bundle が存在する限り、数値が多くても警告は出さない」とする
+if (hasActiveBundle) {
+  // 現在見ている配信のデータがあるなら、過去の蓄積（名残）は「正常な履歴」とみなす
+  return false; 
+}
+
+// アクティブな bundle が無い場合（例：全タブ閉じた直後など）のみ、過剰な蓄積をチェック
+if (!hasActiveBundle && eventDomLvCount > 100) { // 閾値を 30 -> 100 に緩和
+  return true;
+}
+
+return false;
+```
+**効果**: 「31 件あるから危ない」という誤解を解き、「現在見ている配信のデータがあるなら、過去のデータがあっても安全」という事実をコード上で保証します。ユーザー側の「不穏な警告」が完全に消えます。
+
+## 案 2: 背景巡回タブの「書込み抑制」フラグ（案 R）
+**コンセプト**: 表示に使わないタブは、Storage
+
+========================================================================
+### groq/llama-3.3-70b  [爆速の視点]  (2081ms)
+========================================================================
+## 結論
+ユーザーの不満の【本体】は、診断に出る不穏な警告テキストそのものである。根治とは、不穏な警告を除去することである。星野ロミ式では、落とさない・既存データ活かす・過剰実装回避・失敗体験の除去を目指す。
+
+## 根拠
+実コード上「表示混乱の経路が無い」ことが確認されている。したがって、表示混乱の本体は存在しない。診断に出る不穏な警告テキストがユーザーの不満の原因である。
+
+## 反論・リスク
+取りうる手の比較と推奨では、案M: 診断メッセージの差別化が最も適切である。閾値/判定の現実化（案T）も考慮されるが、最小だが本質を隠すだけでは不十分である。pruneの高頻度化（案P）も考慮されるが、onChangedが高頻度発火で重くならないか・共有storage stallを誘発しないかというリスクがある。
+
+## 具体案
+案M: 診断メッセージの差別化を実装する。diagWarnings.jsのderiveStaleDomBundleSuspected関数を修正し、「snapshotは31件だが表示に使うbundleは現在lvのみ=実害なし」と明示する。実装の置き場所は、diagWarnings.jsのderiveStaleDomBundleSuspected関数である。
+
+```javascript
+// diagWarnings.js
+function deriveStaleDomBundleSuspected(eventDomLvCount, currentLiveIdInEventDom) {
+  if (eventDomLvCount > 30 || !currentLiveIdInEventDom) {
+    // 不穏な警告テキストを差別化する
+    return `snapshotは${eventDomLvCount}件だが表示に使うbundleは現在lvのみ=実害なし`;
+  }
+  return false;
+}
+```
+
+また、autopatrol背景巡回が大量タブを開く設計なら、そもそもeventDomを書かないタブ（背景巡回・非watch）を増やさない方が筋である。書込み元を絞る案として、背景巡回タブでcontentが走る場合にのみpersistするように修正することが考えられる。
+
+```javascript
+// content-entry.js
+function persistOfficialEventDomBundleNow() {
+  // 背景巡回タブでcontentが走る場合にのみpersistする
+  if (isBackgroundTab() && isContentRunning()) {
+    // persistする
+  }
+}
+```
+
+過剰実装を避けるため、表示に害が無いのに大掛かりな多タブ協調（リーダー選出でeventDom集約等）を作ることは避けるべきである。
+--- [ルーティング選抜・code] 成功 4/4 ---
+
+=== 完了 237098ms ===
+保存: council/stale-dom-bundle-answers.json

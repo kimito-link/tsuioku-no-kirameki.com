@@ -15,6 +15,7 @@
     "verify:bump": "node scripts/verify-bump.mjs",
     "setup:claude": "node scripts/setup-claude-code.mjs",
     "build": "node scripts/build.mjs",
+    "check:root-cause-claim": "node scripts/check-root-cause-claim.mjs --last",
     "check:no-secrets": "node scripts/check-no-secrets-in-dist.mjs",
     "check:tracked-imports": "node scripts/check-tracked-imports.mjs",
     "build:watch": "node scripts/build-watch.mjs",
