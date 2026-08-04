@@ -663,6 +663,7 @@ import {
 } from '../lib/storyUserLaneRenderProbe.js';
 // v0.1.1231 Phase1: レーンの人物集合の増減(誰が消えたか)を測る計器。観測のみ。
 import { makeLaneRosterDeltaState, noteLaneRoster, snapshotLaneRosterDelta } from '../lib/laneRosterDelta.js';
+import { shouldSkipLightSupplyOverwrite, formatLightSupplyGuardLine } from '../lib/lightSupplyOverwriteGuard.js';
 // v0.1.1249: 「誰が供給を書いたか」を名指しする計器(provisional 申告漏れの検出込み)。
 import { LANE_SUPPLY_ORIGIN, createLaneSupplyOriginDiag, noteLaneSupplyShrink, noteLaneSupplyWrite, snapshotLaneSupplyOriginDiag } from '../lib/laneSupplyOriginDiag.js';
 // v0.1.1232 lane-never-drop: 「一度出た人」を覚える名簿(Phase2 蓄積器)。計器とは別モジュール。
@@ -6426,6 +6427,10 @@ let storyUserLaneLastRenderSig = '';
 let _storyUserLaneLastTiledLid = '';
 /** v0.1.1231 Phase1: 人物集合の増減を測る計器の状態(観測のみ)。 */
 const _laneRosterDeltaState = makeLaneRosterDeltaState();
+// v0.1.1251: 軽い供給(summary+tail)の上書きを見送った回数を数える計器。
+//   ★件数0の意味を区別するため observedCount(暫定供給を何回判定したか)も持つ
+//   ([[zero-count-may-mean-unmeasured-2026-08-04]])。
+const _lightSupplyGuardDiag = { skipCount: 0, observedCount: 0, worst: null };
 const _laneSupplyOriginDiag = createLaneSupplyOriginDiag();
 /** v0.1.1232 Phase2: 「一度出た人」を覚える名簿(描画に使う・計器とは別物)。 */
 const _laneRosterKeeperState = makeLaneRosterKeeperState();
@@ -7253,6 +7258,30 @@ async function renderStoryUserLaneFromLightCommentsForCurrentLive(lid) {
   if (!merged.length) return; // 現配信の軽い源がまだ無い=出すものが無い(heavy/onChanged の次回に委ねる)
   const entries = buildDisplayCommentEntries(merged, live);
   if (!entries.length) return;
+  // ★v0.1.1251 真因対処(2026-08-04 実配信で「light_summary(暫定) 72枚→3枚」を実測):
+  //   上の冪等ガード(DOM>0)は【DOM が 0枚の瞬間】だけ素通りする。そして縮小ガード側も
+  //   prev<=0 で「守るものが無い」と判断するため、同じ 0枚が防御を2つとも無力化していた。
+  //   DOM が 0枚になる窓は実在する(renderStoryUserLaneDom のガイド状態が 5段を innerHTML='' する)。
+  //   → 守りの基準を DOM でなく【名簿(この配信で一度でも見た人数・単調増加)】に移す。
+  {
+    const _roster = snapshotLaneRosterDelta(_laneRosterDeltaState);
+    const _verdict = shouldSkipLightSupplyOverwrite({
+      provisional: true, // この経路の供給は定義上つねに暫定
+      nextSupplyCount: entries.length,
+      rosterEverSeen: Number(_roster?.everSeenMax) || 0,
+      currentLiveId: live,
+      rosterLiveId: String(_roster?.lastLid || '')
+    });
+    _lightSupplyGuardDiag.observedCount += 1;
+    if (_verdict.skip) {
+      _lightSupplyGuardDiag.skipCount += 1;
+      const _r = Number(_roster?.everSeenMax) || 0;
+      if (!_lightSupplyGuardDiag.worst || _r - entries.length > _lightSupplyGuardDiag.worst.roster - _lightSupplyGuardDiag.worst.next) {
+        _lightSupplyGuardDiag.worst = { next: entries.length, roster: _r };
+      }
+      return; // 不完全な軽い供給で完全描画を潰さない(heavy/onChanged の次回に委ねる)
+    }
+  }
   // 既存の描画トリガに軽い entries を渡す=renderStoryUserLane が走り、末尾で現配信 lane mirror も publish。
   //   ★provisional: true = summary+tail 由来の軽い候補=定義上暫定(HANDOFF-heavyrace A-2)。
   //   heavy が settle するまでは、この短い候補で完全描画を上書きしない(単調性ガード)。
@@ -19078,6 +19107,12 @@ async function collectAiShareDevMonitorPayloadBundle(watchUrl) {
       tickerPick: { ..._tickerPickDiag },
       // v0.1.1231 Phase1: 人物集合の増減。「消えた人数」が本丸/everSeenMax は上限判断の実測。
       laneRosterDelta: snapshotLaneRosterDelta(_laneRosterDeltaState),
+      lightSupplyGuard: {
+        skipCount: _lightSupplyGuardDiag.skipCount,
+        observedCount: _lightSupplyGuardDiag.observedCount,
+        worst: _lightSupplyGuardDiag.worst,
+        line: formatLightSupplyGuardLine(_lightSupplyGuardDiag)
+      },
       laneSupplyOrigin: snapshotLaneSupplyOriginDiag(_laneSupplyOriginDiag),
       // v0.1.1215: 「積み上げ式にならずアイコンがちらちら変わる」の観測。上の churn は
       //   全消し再構築だけを数えるため、DOM枚数を変えない「中身のすり替え」を取りこぼす。

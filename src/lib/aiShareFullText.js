@@ -481,6 +481,11 @@ export function buildAiShareFullText({ overviewText, livesData, fastDiag, popupD
     const supplyLine = String((popupDiag?.popup ?? popupDiag)?.laneSupplyOrigin?.line || '');
     if (supplyLine) { lines.push(supplyLine); lines.push(''); }
   } catch { /* no-op: 計器の失敗は状態速報を壊さない */ }
+  // ★v0.1.1251: 不完全な軽い供給が完全描画を潰すのを止めた回数(72枚→3枚 の実測に対する防御)。
+  try {
+    const lightLine = String((popupDiag?.popup ?? popupDiag)?.lightSupplyGuard?.line || '');
+    if (lightLine) { lines.push(lightLine); lines.push(''); }
+  } catch { /* no-op: 計器の失敗は状態速報を壊さない */ }
   // ★v0.1.1250: パネルが一瞬消える(移設でもscrollでもない)を名指しする1行。
   try {
     const flipLine = String(fastDiag?.content?.hostFlipCensus?.line || '');
