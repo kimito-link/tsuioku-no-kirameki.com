@@ -185,6 +185,9 @@ export function snapshotLaneRosterDelta(state) {
     maxDroppedAtOnce: Number(s.maxDroppedAtOnce) || 0,
     droppedSamples: Array.isArray(s.droppedSamples) ? s.droppedSamples.slice(0, LANE_DROPPED_SAMPLE_MAX) : [],
     addedTotal: Number(s.addedTotal) || 0,
+    // v0.1.1251: 軽い供給の上書き判定(lightSupplyOverwriteGuard)が「どの配信の名簿か」を
+    //   確かめられるよう配信IDも出す。別配信の名簿で縛らないための照合用。
+    lastLid: String(s.lastLid || ''),
     everSeenNow: s.everSeen instanceof Set ? s.everSeen.size : 0,
     everSeenMax: Number(s.everSeenMax) || 0,
     cappedOutTotal: Number(s.cappedOutTotal) || 0
