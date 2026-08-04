@@ -663,6 +663,8 @@ import {
 } from '../lib/storyUserLaneRenderProbe.js';
 // v0.1.1231 Phase1: レーンの人物集合の増減(誰が消えたか)を測る計器。観測のみ。
 import { makeLaneRosterDeltaState, noteLaneRoster, snapshotLaneRosterDelta } from '../lib/laneRosterDelta.js';
+// v0.1.1249: 「誰が供給を書いたか」を名指しする計器(provisional 申告漏れの検出込み)。
+import { LANE_SUPPLY_ORIGIN, createLaneSupplyOriginDiag, noteLaneSupplyShrink, noteLaneSupplyWrite, snapshotLaneSupplyOriginDiag } from '../lib/laneSupplyOriginDiag.js';
 // v0.1.1232 lane-never-drop: 「一度出た人」を覚える名簿(Phase2 蓄積器)。計器とは別モジュール。
 import { applyLaneRosterKeeper, makeLaneRosterKeeperState } from '../lib/laneRosterKeeper.js';
 // 人物タイルの ID 行・名前行の正本(person-tile-unify 第3コミット)。popup と会場で共有。
@@ -6424,6 +6426,7 @@ let storyUserLaneLastRenderSig = '';
 let _storyUserLaneLastTiledLid = '';
 /** v0.1.1231 Phase1: 人物集合の増減を測る計器の状態(観測のみ)。 */
 const _laneRosterDeltaState = makeLaneRosterDeltaState();
+const _laneSupplyOriginDiag = createLaneSupplyOriginDiag();
 /** v0.1.1232 Phase2: 「一度出た人」を覚える名簿(描画に使う・計器とは別物)。 */
 const _laneRosterKeeperState = makeLaneRosterKeeperState();
 /** v0.1.1233 出口4: 縮小keepが続きすぎたら非常口を開くための時計(永久stale防止)。 */
@@ -6939,6 +6942,9 @@ function renderStoryUserLane() {
   const _shrinkGuardHit = _rawKeep && !_keepExpired;
   notePaintDecision(_storyUserLaneRenderProbe,
     { els, nextTileCount, provisional: _prov, guardHit: _shrinkGuardHit });
+  // ★v0.1.1249 現行犯記録: 実際に減る瞬間、直前に供給を書いた者を名指しで残す(判定は計器側)。
+  noteLaneSupplyShrink(_laneSupplyOriginDiag,
+    { prevTiles: countStoryUserLaneDomTiles(els), nextTiles: nextTileCount, guardHit: _shrinkGuardHit });
   if (_shrinkGuardHit) {
     recordStoryUserLaneStep(_storyUserLaneRenderProbe, STORY_USER_LANE_STEPS.SHRINK_KEPT, {
       domTilesPainted: countStoryUserLaneDomTiles(els)
@@ -7250,7 +7256,7 @@ async function renderStoryUserLaneFromLightCommentsForCurrentLive(lid) {
   // 既存の描画トリガに軽い entries を渡す=renderStoryUserLane が走り、末尾で現配信 lane mirror も publish。
   //   ★provisional: true = summary+tail 由来の軽い候補=定義上暫定(HANDOFF-heavyrace A-2)。
   //   heavy が settle するまでは、この短い候補で完全描画を上書きしない(単調性ガード)。
-  syncStorySourceEntries(live, entries, entries, { provisional: true });
+  syncStorySourceEntries(live, entries, entries, { provisional: true, origin: LANE_SUPPLY_ORIGIN.LIGHT });
 }
 
 /**
@@ -7944,14 +7950,26 @@ async function paintStoryUserLaneCoalesced(liveId, displayEntries, storageRows) 
  * @param {string} liveId
  * @param {PopupCommentEntry[]} displayList アイコン列・ストーリー UI 用（表示専用行を含む）
  * @param {PopupCommentEntry[]|null|undefined} [storageRowsForLane] nls_comments 相当・当放送のみ。省略時は応援レーン候補は空扱い。
- * @param {{ provisional?: boolean }} [opts] provisional=true は supply が暫定(heavy未settle)。
+ * @param {{ provisional?: boolean, origin?: string }} [opts] provisional=true は supply が暫定(heavy未settle)。
  *   単調性ガード(HANDOFF-heavyrace-backfill-IMPL.md A)が「暫定の縮小で完全描画を上書きしない」判定に使う。
- *   毎呼び出しで上書き=sticky にしない。無指定は false=既存呼び出しは挙動不変。
+ *   毎呼び出しで上書き=sticky にしない。
+ *
+ * ★v0.1.1249 fail-closed 化(正本=lane-tiles-vanish-SPEC.md Patch 4・2026-08-02設計/未出荷だった対策):
+ *   旧「無指定=false(確定)」は申告漏れがそのまま静かなタイル消失になった(v1233穴1・08-04実配信で再観測)。
+ *   無指定=暫定へ反転し、最悪ケースを「消える」→「最長10分stale(非常口で回復)」に格下げする。
  */
 function syncStorySourceEntries(liveId, displayList, storageRowsForLane, opts = {}) {
   const nextLiveId = String(liveId || '');
   const list = Array.isArray(displayList) ? displayList : [];
-  STORY_SOURCE_STATE.entriesProvisional = opts && opts.provisional === true;
+  // ★申告漏れの検出: provisional を明示しなかった呼び出しを計器で名指しする。
+  const _provDeclared = opts != null && typeof opts === 'object'
+    && Object.prototype.hasOwnProperty.call(opts, 'provisional');
+  STORY_SOURCE_STATE.entriesProvisional = !(opts && opts.provisional === false);
+  noteLaneSupplyWrite(_laneSupplyOriginDiag, {
+    origin: (opts && opts.origin) || LANE_SUPPLY_ORIGIN.UNKNOWN,
+    provisional: STORY_SOURCE_STATE.entriesProvisional,
+    defaulted: !_provDeclared
+  });
 
   if (STORY_SOURCE_STATE.liveId !== nextLiveId) {
     resetCelebrationIncrementalScan();
@@ -9020,7 +9038,7 @@ function renderCharacterScene(state) {
   if (!hasWatch) {
     STORY_REACTION_STATE.liveId = '';
     STORY_REACTION_STATE.lastCount = 0;
-    syncStorySourceEntries('', []);
+    syncStorySourceEntries('', [], null, { provisional: false, origin: LANE_SUPPLY_ORIGIN.RESET_NO_WATCH });
     setSceneStory(
       'りんくがみんなの応援コメントを集める準備中だよ。',
       recording
@@ -14971,7 +14989,7 @@ async function populateStorySourceEntriesFromStorageFallback(opts = {}) {
     //   =本質的に暫定。opts 無指定は provisional=false(確定)になり、縮小ガード
     //   (shouldKeepStoryUserLaneTilesOnShrink)が1行目で素通りして**タイルが消える**。
     //   実配信 lv351091198 で「サムネが減る」として観測(速報: shrinkDetected=1/provisionalFalse=1)。
-    syncStorySourceEntries(latestLv, displayEntries, storageRowsForLane, { provisional: true });
+    syncStorySourceEntries(latestLv, displayEntries, storageRowsForLane, { provisional: true, origin: LANE_SUPPLY_ORIGIN.FALLBACK });
     try {
       laneStoreInstance.setCandidates(
         latestLv,
@@ -15726,7 +15744,7 @@ async function refresh() {
     watchMetaCache.fetchError = '';
     clearWatchMetaCard();
     popupUserCommentProfileMap = null;
-    syncStorySourceEntries('', []);
+    syncStorySourceEntries('', [], null, { provisional: false, origin: LANE_SUPPLY_ORIGIN.RESET_NO_WATCH });
     resetStoryAvatarDiagState();
     renderCharacterScene({
       hasWatch: false,
@@ -15838,7 +15856,7 @@ async function refresh() {
     watchMetaCache.fetchError = '';
     clearWatchMetaCard();
     popupUserCommentProfileMap = null;
-    syncStorySourceEntries('', []);
+    syncStorySourceEntries('', [], null, { provisional: false, origin: LANE_SUPPLY_ORIGIN.RESET_NO_WATCH });
     resetStoryAvatarDiagState();
     renderCharacterScene({
       hasWatch: true,
@@ -16559,7 +16577,8 @@ async function refresh() {
     //   laneFeedPick.provisional 単独では穴(provisionalLaneCommentRows.js: merged≦primary で heavy未settleでも false)
     //   →!watchPopupHeavyCommentsSettled を OR で必ず併記。settled なら false=完全描画として単調性ガードを通す。
     syncStorySourceEntries(lv, displayEntries, laneFeedPick.entries, {
-      provisional: laneFeedPick.provisional === true || !watchPopupHeavyCommentsSettled
+      provisional: laneFeedPick.provisional === true || !watchPopupHeavyCommentsSettled,
+      origin: LANE_SUPPLY_ORIGIN.HEAVY
     });
     markWatchPopupLoadPhase(
       laneFeedPick.provisional ? 'ranking_paint' : 'ranking_full',
@@ -19059,6 +19078,7 @@ async function collectAiShareDevMonitorPayloadBundle(watchUrl) {
       tickerPick: { ..._tickerPickDiag },
       // v0.1.1231 Phase1: 人物集合の増減。「消えた人数」が本丸/everSeenMax は上限判断の実測。
       laneRosterDelta: snapshotLaneRosterDelta(_laneRosterDeltaState),
+      laneSupplyOrigin: snapshotLaneSupplyOriginDiag(_laneSupplyOriginDiag),
       // v0.1.1215: 「積み上げ式にならずアイコンがちらちら変わる」の観測。上の churn は
       //   全消し再構築だけを数えるため、DOM枚数を変えない「中身のすり替え」を取りこぼす。
       storyGrowthCellSwap: (() => {
