@@ -1,7 +1,7 @@
 # 会場モード=てこの原理(inline iframe を全画面化するだけ) 設計会議 — 司令塔の収束 (2026-06-22)
 
 質問: `council/venue-lever-iframe-question.txt` / 生回答: `council/venue-lever-iframe-answers.json`
-正本: [reference_venue_is_popup_panel_clone.md](../memory/reference_venue_is_popup_panel_clone.md)
+正本: `reference_venue_is_popup_panel_clone.md`(未作成・2026-08-04時点で存在しない)
 
 ## ★前回会議(venue-is-popup-clone)を覆す
 前回は「会場ダイアログに popup 段組みを paint 関数で再構築=独自席撤去」=【中〜大工事】と結論。だがユーザー「星野ロミなら大工事でなく、てこの原理で最小実装」。実コードで【watch ページに既に inline パネル iframe(=popup.html 本物)が動いている】を発見=作り直す必要なし。前回案は破棄。
