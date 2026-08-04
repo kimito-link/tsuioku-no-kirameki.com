@@ -33,8 +33,22 @@ describe('host flip census + 4s repaint gate wiring', () => {
 
   it('★display の書き換えが1関数に集約され、直接代入が残っていない', () => {
     // 直接代入が1つでも残っていると、その経路の消失は永久に計上されない。
-    expect(contentSrc).not.toMatch(/host\.style\.display\s*=\s*'(none|block)'/);
     expect(contentSrc).toMatch(/function setInlineHostDisplay\(host, display, cause\) \{/);
+
+    // ★v0.1.1252: 旧テストは /host\.style\.display/ と【変数名】で探しており、
+    //   `hostEarly.style.display = 'none'`(5503行)を見逃していた。実配信で
+    //   scrollWhiteoutDiag が hostDisplay:"none" を捕らえたのに hostFlipCensus が
+    //   0回だった真因がこれ。→ 変数名に依存せず「host で始まる識別子」を全部見る。
+    const lines = contentSrc.split(String.fromCharCode(10));
+    const offenders = [];
+    lines.forEach((ln, i) => {
+      const m = /\b(host[A-Za-z0-9_]*)\.style\.display\s*=/.exec(ln);
+      if (!m) return;
+      // 集約関数の内部(host.style.display = display)だけが唯一の正当な代入。
+      if (/\.style\.display\s*=\s*display;/.test(ln)) return;
+      offenders.push(`${i + 1}: ${ln.trim()}`);
+    });
+    expect(offenders).toEqual([]);
   });
 
   it('★集約関数が「状態が変わったときだけ」計上する(水増ししない)', () => {
