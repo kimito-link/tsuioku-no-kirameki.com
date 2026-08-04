@@ -343,6 +343,13 @@ import {
   noteHostFrame,
   snapshotHostVisibilityWatch
 } from '../lib/hostVisibilityWatch.js';
+// ★v0.1.1254: パネルが「消えたまま戻らない」を防ぐ復帰ゲート(真因=v0.1.1250 で私が
+//   4秒経路にゲートを入れたとき、それが唯一の復帰経路だったことに気づかなかった)。
+import {
+  shouldRenderInlineHostOnPoll,
+  shouldHideInlineHostOnMissingPanel,
+  formatInlineHostRecoveryLine
+} from '../lib/inlineHostRecoveryGate.js';
 import { probeWatchPageDomStructure } from '../lib/probeWatchPageDomStructure.js';
 import { summarizeGiftSubAppHistoryDiag } from '../lib/summarizeGiftSubAppHistoryDiag.js';
 import { createConsoleErrorBuffer } from '../lib/consoleErrorBuffer.js';
@@ -5671,6 +5678,42 @@ function inlineHostLooksVisible() {
   return r.width >= 120 && r.height >= 120;
 }
 
+/**
+ * ★v0.1.1254: 復帰ゲート用の可視判定(4秒に1回だけ呼ぶ・360msループには足さない)。
+ *   v0.1.1201 で paint 毎の DOM 走査を入れて拡張全体を重くした反省から、
+ *   ここでは host 参照1つの computed/rect だけを読む=O(1)。走査はしない。
+ *
+ * @returns {{ visible: boolean, known: boolean }}
+ *   known=false は「判定できなかった」(host 未作成など)。描画の根拠にしない。
+ */
+function probeInlineHostVisibilityForRecovery() {
+  try {
+    const host =
+      nlsInlinePopupHostSingleton || document.getElementById(INLINE_POPUP_HOST_ID);
+    if (!(host instanceof HTMLElement) || !host.isConnected) {
+      return { visible: false, known: false }; // host がまだ無い=初期描画は dirty 初期値 true が担う
+    }
+    const cs = window.getComputedStyle(host);
+    // ★hidePageFrameOverlay が作る状態(display:none + opacity:0)をここで捕らえる。
+    if (cs.display === 'none' || cs.visibility === 'hidden') return { visible: false, known: true };
+    if (Number(cs.opacity) === 0) return { visible: false, known: true };
+    const r = host.getBoundingClientRect();
+    // 実測の消失は 0x0。閾値は hostVisibilityWatch と揃える(40x24)。
+    return { visible: r.width >= 40 && r.height >= 24, known: true };
+  } catch {
+    return { visible: false, known: false }; // 判定不能=描かない(安全側)
+  }
+}
+
+/** ★v0.1.1254: 復帰ゲートの計器。0 の意味を区別するため点検回数も数える。 */
+const _inlineHostRecoveryDiag = { checkCount: 0, recoverCount: 0, keptOnWatchCount: 0 };
+
+/** @param {string} reason shouldRenderInlineHostOnPoll の判定理由 */
+function noteInlineHostRecoveryCheck(reason) {
+  _inlineHostRecoveryDiag.checkCount += 1;
+  if (reason === 'host-hidden') _inlineHostRecoveryDiag.recoverCount += 1;
+}
+
 const NLS_TOOLBAR_OPEN_TOAST_ID = 'nls-toolbar-open-toast';
 
 /** ツールバー（こん太）押下の瞬間にだけ出す軽量トースト。複数 watch タブでも「押せた」体感を補強。 */
@@ -6862,6 +6905,12 @@ function buildAiShareFastDiagnosticsPayload() {
       // v0.1.1250: 移設でもscrollでもない「パネルが一瞬消える」を名指しする計器。
       hostFlipCensus: snapshotHostVisibilityFlipCensus(_hostFlipCensus),
       hostVisWatch: snapshotHostVisibilityWatch(_hostVisWatch),
+      hostRecoveryDiag: {
+        checkCount: _inlineHostRecoveryDiag.checkCount,
+        recoverCount: _inlineHostRecoveryDiag.recoverCount,
+        keptOnWatchCount: _inlineHostRecoveryDiag.keptOnWatchCount,
+        line: formatInlineHostRecoveryLine(_inlineHostRecoveryDiag)
+      },
     inlinePanel: {
       placementMode: inlinePanelPlacementMode,
       placementEffective: placementEffectiveFast,
@@ -9500,6 +9549,12 @@ function buildAiSharePageDiagnostics() {
       // v0.1.1250: 移設でもscrollでもない「パネルが一瞬消える」を名指しする計器。
       hostFlipCensus: snapshotHostVisibilityFlipCensus(_hostFlipCensus),
       hostVisWatch: snapshotHostVisibilityWatch(_hostVisWatch),
+      hostRecoveryDiag: {
+        checkCount: _inlineHostRecoveryDiag.checkCount,
+        recoverCount: _inlineHostRecoveryDiag.recoverCount,
+        keptOnWatchCount: _inlineHostRecoveryDiag.keptOnWatchCount,
+        line: formatInlineHostRecoveryLine(_inlineHostRecoveryDiag)
+      },
     inlinePanel: {
       placementMode: inlinePanelPlacementMode,
       placementEffective,
@@ -12437,9 +12492,28 @@ function syncLiveIdFromLocation() {
      *   → 配信切替(=レイアウトを組み直す必要がある)と、geometry が実際に変わったときだけ描く。
      *   ★どちらでもないときは何もしない=静止画面で再配置を起こさない。
      */
-    if (ctx.liveIdSwitched || inlineLayoutDirty) {
-      inlineLayoutDirty = false;
-      renderPageFrameOverlay();
+    /*
+     * ★v0.1.1254(真因対処): 上のゲートだけだと【消えたまま戻らない】。
+     *   実測(hostVisWatch): maxHiddenFrames:426(約7秒) / currentlyHidden:true /
+     *   display:none opacity:0 = hidePageFrameOverlay が消したまま誰も戻していない。
+     *   戻す処理は renderPageFrameOverlay の中にしか無く、その呼び出し口 3本が
+     *   全部 inlineLayoutDirty 待ちだった。しかも同フラグを立てる ResizeObserver は
+     *   【プレイヤー】を見ており、動画は無変化なのでフラグが永久に立たない=閉じた罠。
+     *   → 第3の通過条件「実際に消えているなら描く」を足す(ゲート自体は残す)。
+     */
+    {
+      const vis = probeInlineHostVisibilityForRecovery();
+      const verdict = shouldRenderInlineHostOnPoll({
+        liveIdSwitched: ctx.liveIdSwitched === true,
+        layoutDirty: inlineLayoutDirty === true,
+        hostVisible: vis.visible,
+        hostKnown: vis.known
+      });
+      noteInlineHostRecoveryCheck(verdict.reason);
+      if (verdict.render) {
+        inlineLayoutDirty = false;
+        renderPageFrameOverlay();
+      }
     }
     return;
   }
@@ -12502,9 +12576,20 @@ function syncLiveIdFromLocation() {
     _nonWatchTickCount = 0;
     // ★v0.1.1250: watch 側と同じく無条件描画をやめる(4秒周期のパネル消失の第2経路)。
     //   こちらは liveId 切替の文脈が無いので geometry 変化のときだけ描く。
-    if (inlineLayoutDirty) {
-      inlineLayoutDirty = false;
-      renderPageFrameOverlay();
+    {
+      // ★v0.1.1254: watch 分岐と同じ復帰の非常口(消えているなら描く)。
+      const vis = probeInlineHostVisibilityForRecovery();
+      const verdict = shouldRenderInlineHostOnPoll({
+        liveIdSwitched: false,
+        layoutDirty: inlineLayoutDirty === true,
+        hostVisible: vis.visible,
+        hostKnown: vis.known
+      });
+      noteInlineHostRecoveryCheck(verdict.reason);
+      if (verdict.render) {
+        inlineLayoutDirty = false;
+        renderPageFrameOverlay();
+      }
     }
     return;
   }
@@ -12514,8 +12599,25 @@ function syncLiveIdFromLocation() {
   //   連続 NON_WATCH_HIDE_TICK_THRESHOLD 回観測してから初めて hide / 破壊的 cleanup する。
   //   閾値未満の間は何もせず return（liveId 等の状態を温存）＝await I/O なし・追加のみ。
   _nonWatchTickCount += 1;
-  if (_nonWatchTickCount < NON_WATCH_HIDE_TICK_THRESHOLD) {
-    return;
+  /*
+   * ★v0.1.1254(消しすぎの是正): 旧実装は「コメントパネルが見つからない」が
+   *   NON_WATCH_HIDE_TICK_THRESHOLD 回続いたら無条件に hidePageFrameOverlay() まで走った。
+   *   だが hasWatchCommentPanel() は .ga-ns-comment-panel / .comment-panel を
+   *   querySelector するだけで、ニコ生側の SPA 再描画で一時的に false になりうる。
+   *   = 視聴を続けているのにパネルが消える(2026-08-04 実機の引き金)。
+   *   「コメント欄が見つからない」と「視聴ページを離れた」は別の事象なので分ける。
+   *   ★閾値を上げる対処にはしない(遅れて消えるだけで本質が変わらないため)。
+   */
+  {
+    const verdict = shouldHideInlineHostOnMissingPanel({
+      stillOnWatchUrl: isNicoLiveWatchUrl(href),
+      missTicks: _nonWatchTickCount,
+      threshold: NON_WATCH_HIDE_TICK_THRESHOLD
+    });
+    if (!verdict.hide) {
+      if (verdict.reason === 'keep-on-watch') _inlineHostRecoveryDiag.keptOnWatchCount += 1;
+      return;
+    }
   }
 
   liveId = null;

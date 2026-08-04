@@ -488,6 +488,11 @@ export function buildAiShareFullText({ overviewText, livesData, fastDiag, popupD
     const lightLine = String((popupDiag?.popup ?? popupDiag)?.lightSupplyGuard?.line || '');
     if (lightLine) { lines.push(lightLine); lines.push(''); }
   } catch { /* no-op: 計器の失敗は状態速報を壊さない */ }
+  // ★v0.1.1254: 消えたパネルを復帰させた回数(v0.1.1250 で塞いだ非常口を戻した防御)。
+  try {
+    const recLine = String(fastDiag?.content?.hostRecoveryDiag?.line || '');
+    if (recLine) { lines.push(recLine); lines.push(''); }
+  } catch { /* no-op: 計器の失敗は状態速報を壊さない */ }
   // ★v0.1.1253: 原因を問わず「実際に見えなくなった」瞬間を名指しする(幅潰れ/親外れも捕らえる)。
   try {
     const visLine = formatHostVisibilityWatchLine(fastDiag?.content?.hostVisWatch);

@@ -16,10 +16,21 @@ const contentSrc = fs.readFileSync(path.join(root, 'extension/content-entry.js')
  */
 describe('host flip census + 4s repaint gate wiring', () => {
   it('★中核: 4秒経路(syncLiveIdFromLocation)が無条件描画をやめている', () => {
-    // 配信切替 or geometry変化のときだけ描く。無条件 renderPageFrameOverlay は復活させない。
-    expect(contentSrc).toMatch(
-      /\n\s*if \(ctx\.liveIdSwitched \|\| inlineLayoutDirty\) \{\n\s*inlineLayoutDirty = false;\n\s*renderPageFrameOverlay\(\);\n\s*\}/
-    );
+    // ★v0.1.1254 で判定は shouldRenderInlineHostOnPoll(純関数)へ移した。
+    //   条件式の【書き方】ではなく「判定を経てからでないと描かない」ことを断言する
+    //   (書き方を固定すると、正しいリファクタで赤になり実装側を歪めてしまう)。
+    //   復帰の非常口(消えていたら描く)は inlineHostRecovery.wiring.test.js が担当。
+    //   ★2箇所ある(watch / 非watch)。片方だけ無条件に戻す変異を通さないよう
+    //     「ゲート付き呼び出しが2つ」と「裸の呼び出しが0」の両方を数で断言する。
+    const gated = contentSrc.match(
+      /if \(verdict\.render\) \{\n\s*inlineLayoutDirty = false;\n\s*renderPageFrameOverlay\(\);\n\s*\}/g
+    ) || [];
+    expect(gated.length).toBe(2);
+    const ungated = contentSrc.match(
+      /\n\s*(?:if \(true\) \{\s*\n\s*)?inlineLayoutDirty = false;\n\s*renderPageFrameOverlay\(\);/g
+    ) || [];
+    // 上の gated 2件 + 360msループ(独自ゲート)1件 = 3件を超えたら無条件呼び出しが増えている。
+    expect(ungated.length).toBeLessThanOrEqual(3);
     // 旧実装(_nonWatchTickCount リセット直後の無条件呼び出し)が戻っていないこと。
     expect(contentSrc).not.toMatch(
       /_nonWatchTickCount = 0;\n\s*renderPageFrameOverlay\(\);/
