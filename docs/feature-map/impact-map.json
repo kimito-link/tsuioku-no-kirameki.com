@@ -2146,6 +2146,18 @@
       ]
     },
     {
+      "file": "src/lib/hostVisibilityWatch.js",
+      "featureCount": 2,
+      "features": [
+        "content",
+        "status"
+      ],
+      "labels": [
+        "記録エンジン(watchページ常駐)",
+        "状態速報ページ"
+      ]
+    },
+    {
       "file": "src/lib/inlinePanelLayout.js",
       "featureCount": 2,
       "features": [
