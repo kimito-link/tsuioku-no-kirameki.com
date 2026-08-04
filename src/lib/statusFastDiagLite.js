@@ -113,6 +113,11 @@ export function buildStatusFastDiagLite(payload) {
   // v0.1.1253: 可視性の見張り(原因を問わない消失検知)も lite へ。
   const hostVisWatch =
     content.hostVisWatch && typeof content.hostVisWatch === 'object' ? content.hostVisWatch : null;
+  // v0.1.1254: 復帰ゲートの計器も lite へ(通さないとコピペに永久に出ない)。
+  const hostRecoveryDiag =
+    content.hostRecoveryDiag && typeof content.hostRecoveryDiag === 'object'
+      ? content.hostRecoveryDiag
+      : null;
   const venueSeatsDiag = content.venueSeatsDiag && typeof content.venueSeatsDiag === 'object'
     ? content.venueSeatsDiag
     : null;
@@ -152,6 +157,7 @@ export function buildStatusFastDiagLite(payload) {
       scrollWhiteoutDiag,
       hostFlipCensus,
       hostVisWatch,
+      hostRecoveryDiag,
       venueSeatsDiag: venueSeatsDiagLite
     }
   };
