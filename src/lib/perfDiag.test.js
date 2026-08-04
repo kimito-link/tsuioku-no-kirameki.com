@@ -36,8 +36,19 @@ describe('buildPerfDiag', () => {
       tabVisible: false,
       recordRate: 8.5,
       panelPainted: null, // 未指定=不明(null)。
-      shadeActive: null
+      shadeActive: null,
+      repaintReasons: null // v0.1.1248: 未指定=内訳なし(null)。
     });
+  });
+
+  // v0.1.1248: 描き直しの理由別内訳。総数だけでは36ある引き金のどれが暴走しているか
+  //   分からなかった(2026-08-04 の実測でそのために原因特定に時間を要した)。
+  it('repaintReasons はオブジェクトならそのまま載る/不正なら null', () => {
+    expect(buildPerfDiag({ repaintReasons: { storage_changed: 2000 } }).repaintReasons).toEqual({
+      storage_changed: 2000
+    });
+    expect(buildPerfDiag({ repaintReasons: 'x' }).repaintReasons).toBeNull();
+    expect(buildPerfDiag({}).repaintReasons).toBeNull();
   });
   it('不正な数値は null・deferActive 既定 false', () => {
     const d = buildPerfDiag({ liveId: 'lv1', tabCount: NaN, lastPaintMs: undefined });
@@ -77,6 +88,43 @@ describe('buildPerfDiagLine', () => {
   it('perfDiag が無ければ空文字', () => {
     expect(buildPerfDiagLine(null)).toBe('');
     expect(buildPerfDiagLine(undefined)).toBe('');
+  });
+
+  // ───────────────────────────────────────────────────────────────────
+  // v0.1.1248: 【実際に見落とした値】をそのまま焼く。
+  //   2026-08-04 の実配信で描画2517回・コメント133件が印字されていたが、
+  //   多寡の判定が無かったため人もAIも読み飛ばし、ユーザーが「ちかちかする」と
+  //   言うまで気づけなかった。以後この値なら必ず⚠が出ることを固定する。
+  // ───────────────────────────────────────────────────────────────────
+  it('【実測・見落とした値】描画2517回/コメント133件なら⚠で名指しする', () => {
+    const diag = buildPerfDiag({
+      liveId: 'lv351100897',
+      lastPaintMs: 9,
+      commentCount: 133,
+      paintCount: 2517
+    });
+    const line = buildPerfDiagLine(diag, 0);
+    expect(line).toContain('描画2517回');
+    expect(line).toContain('⚠描き直しすぎ');
+    expect(line).toContain('ちらつき');
+  });
+
+  it('正常域(コメント12254件で描画42回)では⚠を出さない(誤報にしない)', () => {
+    const diag = buildPerfDiag({ liveId: 'lv1', lastPaintMs: 5, commentCount: 12254, paintCount: 42 });
+    expect(buildPerfDiagLine(diag, 0)).not.toContain('⚠描き直し');
+  });
+
+  it('理由別内訳があれば犯人を名指しして印字する', () => {
+    const diag = buildPerfDiag({
+      liveId: 'lv1',
+      lastPaintMs: 5,
+      commentCount: 133,
+      paintCount: 2517,
+      repaintReasons: { storage_changed: 2400, interval_poll: 117 }
+    });
+    const line = buildPerfDiagLine(diag, 0);
+    expect(line).toContain('storage_changed');
+    expect(line).toContain('ここが原因');
   });
 
   it('v0.1.854 パネル未描画(白)= コメントがあるのに panelPainted:false で ⚠ を出す', () => {

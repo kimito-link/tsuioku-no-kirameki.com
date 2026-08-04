@@ -110,7 +110,7 @@
   - `src/lib/monotonicCommentCount.js`
 - **storage キー定義** — chrome.storage のキー名の正本(nls_comments_<lv> 等)
   - `src/lib/storageKeys.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 43</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 44</summary>
 
 - `src/lib/autoBackupState.js` — v0.1.808(星野ロミ式コンポーネント化・第1弾): content-entry.js の巨大化を抑えるため、
 - `src/lib/avCue.js` — 「AVCue = 音の再生結果を真実とする単一発火点」の純関数群(V1・DOM/storage/音に触れない)。
@@ -143,6 +143,7 @@
 - `src/lib/recordingStallWatchdog.js` — 記録停止ウォッチドッグの純粋判定ロジック。
 - `src/lib/recordRate.js` — 取得スピード(records/sec)の算出と健康スコア化(純ロジック)。
 - `src/lib/roomHeatMirrorKey.js` — 室温(ルーム熱度・5分増減)鏡の storage キー正本
+- `src/lib/selfWrittenStorageKeys.js` — refresh() 自身が書くキー(=再描画を誘発してはいけないキー)の判定。
 - `src/lib/sessionSummaryCompareTableHtml.js` — セッションサマリ推移テーブル（renderSessionSummaryComparePanel の <table>）の HTML を組む純関数。
 - `src/lib/sessionSummaryMirror.js` — セッション比較(記録サマリの推移)の「鏡」スナップショット純関数
 - `src/lib/sessionSummaryMirrorKey.js` — セッション比較(記録サマリの推移)鏡の storage キー正本
@@ -286,7 +287,7 @@
   - `src/lib/giftThrowProjectile.js`
 - **吹き出し寿命管理** — 会場の吹き出しの表示上限・追い出し(eviction)ライフサイクル
   - `src/lib/venueBubbleLifecycle.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 200</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 201</summary>
 
 - `scripts/encode-marketing-html-avatars.mjs` — extension/images/marketing-html-avatars/*.png を data URI にし、
 - `scripts/split-avatar-parts.mjs` — 偽市松背景の除去 + パーツ切り出し(one-off アセットパイプライン)
@@ -415,6 +416,7 @@
 - `src/lib/previewRenderAckKey.js` — ②応援プレビュー(INLINE_PASSIVE)が「自分が描画できた」を status へ伝えるための専用 ack キー。
 - `src/lib/privacyDisplay.js` — 共有・掲載向けに表示ラベルを短く伏せる（完全一致検索を難しくする程度。暗号化や匿名化ではない）。
 - `src/lib/provisionalLaneCommentRows.js` — heavy read 完了前に応援ランキングへ載せる暫定コメント行の合成（0 秒表示用）。
+- `src/lib/repaintReasonCensus.js` — 「描き直しが何回・どの理由で起きたか」を数える純関数群。
 - `src/lib/reportUserThumb.js` — HTML レポート / マーケ分析の各ユーザー行に「最低サムネ」を必ず出すための
 - `src/lib/resolveVisitorCount.js` — v0.1.646: 「来場(累計来場者数)」の単一定義。表示場所(popup / status / レポート)で
 - `src/lib/sanitizeRoomAvatarsForBroadcaster.js` — 集計済み user room の avatarUrl から「broadcaster icon の取り違え」を除去する純粋関数。
@@ -870,7 +872,7 @@
 
 ## 🧬 修正系譜マップ(この系統のバグを過去にどう直したか)
 
-> changelog 全 577 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
+> changelog 全 578 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
 
 ### 💾 記録件数 (89版)
 - `v0.1.1247` 2026-08-04 — 読み上げが遅くなる悪循環を断ち切りました
@@ -1760,7 +1762,8 @@
 - `v0.1.673` 2026-06-10 — コメビュの名前をパネルと同じ情報源で補完
 - `v0.1.670` 2026-06-10 — コメビュのアイコンを本家と同じサムネに
 
-### 🩺 診断・状態速報 (212版)
+### 🩺 診断・状態速報 (213版)
+- `v0.1.1248` 2026-08-04 — 画面のちらつきと「発言がありません」を直しました
 - `v0.1.1245` 2026-08-03 — WEB共有のキーを、拡張の中に埋め込まない方式に変えました（重要）
 - `v0.1.1243` 2026-08-03 — ストア提出物に会場モード等のページが入っていなかったのを修正
 - `v0.1.1242` 2026-08-03 — WEB公開を「自分でONにしたときだけ」に変更しました(重要)

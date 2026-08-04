@@ -16,6 +16,7 @@ graph LR
   n_status --> n_src_domain_user_identity_js["domain/user/identity.js"]:::shared
   n_status --> n_src_lib_aiShareFullText_js["lib/aiShareFullText.js"]
   n_status --> n_src_lib_aiSharePopupDiagKey_js["lib/aiSharePopupDiagKey.js"]:::shared
+  n_status --> n_src_lib_anomalyVerdict_js["lib/anomalyVerdict.js"]:::shared
   n_status --> n_src_lib_anonymousIdenticon_js["lib/anonymousIdenticon.js"]:::shared
   n_status --> n_src_lib_autoPublishDecision_js["lib/autoPublishDecision.js"]
   n_status --> n_src_lib_avatarLoadReport_js["lib/avatarLoadReport.js"]
@@ -52,8 +53,7 @@ graph LR
   n_status --> n_src_lib_giftDisplayNickname_js["lib/giftDisplayNickname.js"]:::shared
   n_status --> n_src_lib_giftEffectDiag_js["lib/giftEffectDiag.js"]:::shared
   n_status --> n_src_lib_giftEffectDiagKey_js["lib/giftEffectDiagKey.js"]:::shared
-  n_status --> n_src_lib_giftHistoryMirrorKey_js["lib/giftHistoryMirrorKey.js"]:::shared
   classDef shared fill:#eee,stroke:#999,color:#666;
 ```
 
-> ほか 88 ファイル省略（全件は storage-bus.md / metafile 参照）。
+> ほか 90 ファイル省略（全件は storage-bus.md / metafile 参照）。
