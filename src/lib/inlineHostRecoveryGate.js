@@ -38,14 +38,33 @@
  * @param {boolean} [args.layoutDirty] geometry が変わった(Observer が立てたフラグ)。
  * @param {boolean} [args.hostVisible] パネルがいま実際に見えているか。
  * @param {boolean} [args.hostKnown] 可視判定が取れたか。false=判定不能(host 未作成など)。
- * @returns {{ render: boolean, reason: 'live-switch'|'layout-dirty'|'host-hidden'|'skip' }}
+ * @param {boolean} [args.intentionallyHidden] 意図的に消してある状態か。
+ *   autoshow OFF かつツールバー未押下=「こん太を押すまで出さない」が既定動作。
+ *   true なら「消えている」は異常ではないので復帰させない。
+ * @returns {{ render: boolean, reason: 'live-switch'|'layout-dirty'|'host-hidden'|'intended-hidden'|'skip' }}
  */
 export function shouldRenderInlineHostOnPoll(args) {
   // 配信切替は従来どおり最優先で描く(中身が別配信になるため)。
   if (args?.liveIdSwitched === true) return { render: true, reason: 'live-switch' };
   // geometry 変化も従来どおり(v0.1.1250 のゲートはここまでが正しかった)。
   if (args?.layoutDirty === true) return { render: true, reason: 'layout-dirty' };
-  // ★追加した第3の条件: 実際に消えているなら描く(=復帰の非常口)。
+  /*
+   * ★v0.1.1258(真因対処・2026-08-05 実測):
+   *   「パネルを消した理由 ⚠ 17回 — autoshow_off 100%」「復帰29回/点検364回」
+   *   = 消すのと戻すのが競り合っていた。これが点滅の正体。
+   *
+   *   autoshow OFF かつツールバー未押下は【仕様どおりの非表示】であって異常ではない。
+   *   それを v0.1.1254 の復帰ゲートが「消えている＝異常」と誤認し、4秒ごとに
+   *   renderPageFrameOverlay を呼び、その中の autoshow 判定でまた消される、を繰り返していた。
+   *
+   *   ★教訓: 「壊れているなら直す」ゲートには【何が正常な状態か】を必ず教える。
+   *     さもないと、正常な状態を異常と誤認して直し続ける無限ループになる
+   *     ([[gate-may-be-the-only-recovery-path-2026-08-04]] の裏返し)。
+   */
+  if (args?.intentionallyHidden === true) {
+    return { render: false, reason: 'intended-hidden' };
+  }
+  // ★第3の条件: 実際に消えているなら描く(=復帰の非常口)。
   //   判定不能(hostKnown=false)のときは描かない。host がまだ無い段階で毎4秒
   //   重い再描画を走らせると、起動直後に無駄な負荷がかかるため。
   //   ※host が無い状態からの初期描画は inlineLayoutDirty の初期値 true が担う。

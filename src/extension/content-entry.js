@@ -5748,6 +5748,22 @@ function inlineHostLooksVisible() {
  * @returns {{ visible: boolean, known: boolean }}
  *   known=false は「判定できなかった」(host 未作成など)。描画の根拠にしない。
  */
+/**
+ * ★v0.1.1258: 「いま消えているのは仕様どおりか」を判定する。
+ *   autoshow OFF かつツールバー未押下 = 「こん太を押すまでパネルを出さない」既定動作。
+ *   この状態の非表示は【正常】であり、復帰ゲートが直しに行ってはいけない。
+ *   renderPageFrameOverlay:7527 の autoshow_off ゲートと同一条件にすること
+ *   (食い違うと、片方が消して片方が戻す競り合いに戻る)。
+ * @returns {boolean}
+ */
+function isInlineHostIntentionallyHidden() {
+  return (
+    !inlinePanelAutoshowEnabled &&
+    !toolbarInitiatedShowThisSession &&
+    !inlinePanelAutoshowActivatedThisSession
+  );
+}
+
 function probeInlineHostVisibilityForRecovery() {
   try {
     const host =
@@ -12577,7 +12593,8 @@ function syncLiveIdFromLocation() {
         liveIdSwitched: ctx.liveIdSwitched === true,
         layoutDirty: inlineLayoutDirty === true,
         hostVisible: vis.visible,
-        hostKnown: vis.known
+        hostKnown: vis.known,
+        intentionallyHidden: isInlineHostIntentionallyHidden()
       });
       noteInlineHostRecoveryCheck(verdict.reason);
       if (verdict.render) {
@@ -12653,7 +12670,8 @@ function syncLiveIdFromLocation() {
         liveIdSwitched: false,
         layoutDirty: inlineLayoutDirty === true,
         hostVisible: vis.visible,
-        hostKnown: vis.known
+        hostKnown: vis.known,
+        intentionallyHidden: isInlineHostIntentionallyHidden()
       });
       noteInlineHostRecoveryCheck(verdict.reason);
       if (verdict.render) {
