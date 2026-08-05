@@ -1654,13 +1654,79 @@ import {
       postNlsIntercept({ type: HWT_MSG, armed: ok, armReason: reason });
     };
 
-    // content-entry(isolated)が host を作った/差し替えたら教えてくれる。
-    //   ★CustomEvent は world を跨いで届く(detail 未使用なので clone 問題なし)。
-    window.addEventListener(HWT_ARM_EVENT, () => {
+    /*
+     * ★v0.1.1269: 装着の合図を【3系統】にした。1系統だけだと取りこぼす。
+     *
+     *   v0.1.1268 は CustomEvent の1回きりの合図だけに頼っていた。実測は armed:null
+     *   (=1度も装着結果を報告していない)。合図が1回きりだと、
+     *     ・host がまだ DOM に入っていない
+     *     ・isolated 側の dispatch が MAIN 側のリスナー登録より前
+     *     ・そもそも host が新規生成されず条件が成立しない(実測: host_created=0回)
+     *   のどれかで【永久に届かない】。★一度きりの合図は取りこぼす、が今回の教訓。
+     *
+     *   (1) CustomEvent: isolated からの明示的な合図(届けば最速)
+     *   (2) MutationObserver: host が DOM に現れた/差し替わった瞬間を自力で捕らえる
+     *   (3) 低頻度ポーリング: 上2つが両方すり抜けても必ず追いつく最後の砦
+     *   ★どれか1つでも通れば装着される。WeakSet で idempotent なので二重装着は無い。
+     */
+    /*
+     * ★装着を試みた回数と「host が見つからなかった」回数を数える。
+     *   v0.1.1268 の armed:null は「トラップが動いていない」としか分からず、
+     *   ①合図が来ていないのか ②host が見つからないのか ③装着に失敗したのか
+     *   を区別できなかった。数を報告して二度と曖昧にしない
+     *   ([[zero-count-may-mean-unmeasured-2026-08-04]])。
+     */
+    let hwtArmAttempts = 0;
+    let hwtHostMissing = 0;
+
+    const tryArmNow = () => {
       try {
+        hwtArmAttempts += 1;
         const el = document.getElementById(HWT_HOST_ID);
-        if (el) installHostDisplayWriteTrap(el);
+        if (!el) {
+          hwtHostMissing += 1;
+          // 何度探しても居ないことを、たまに報告する(黙って諦めない)。
+          if (hwtArmAttempts === 5 || hwtArmAttempts === 30) {
+            postNlsIntercept({
+              type: HWT_MSG, armed: false,
+              armReason: `host-not-found(探索${hwtArmAttempts}回・不在${hwtHostMissing}回)`
+            });
+          }
+          return;
+        }
+        installHostDisplayWriteTrap(el);
       } catch { /* no-op */ }
-    });
+    };
+
+    // (1) isolated からの明示的な合図。
+    window.addEventListener(HWT_ARM_EVENT, tryArmNow);
+
+    /*
+     * (2) host の出現を自力で監視する(isolated の合図に依存しない)。
+     * ★ニコ生はコメントが滝のように流れるページなので、subtree 全体を監視すると
+     *   コールバックが毎秒何百回も走る(v0.1.1201 で「paint毎のDOM走査」を入れて
+     *   拡張全体を重くした前科と同じ轍)。
+     *   → 装着に成功したら【即 disconnect】し、常駐させない。
+     *     取りこぼしても (3) のポーリングが必ず拾うので、ここは best-effort でよい。
+     */
+    let hwtRootObserver = null;
+    const stopRootObserver = () => {
+      try { if (hwtRootObserver) { hwtRootObserver.disconnect(); hwtRootObserver = null; } }
+      catch { /* no-op */ }
+    };
+    try {
+      hwtRootObserver = new MutationObserver(() => {
+        const el = document.getElementById(HWT_HOST_ID);
+        if (!el) return;          // まだ居ない=何もしない(最も多い経路を最速で抜ける)
+        installHostDisplayWriteTrap(el);
+        stopRootObserver();        // ★役目を終えたら常駐させない
+      });
+      hwtRootObserver.observe(document.documentElement, { childList: true, subtree: true });
+    } catch { /* observer 不可なら (3) が拾う */ }
+
+    // (3) 最後の砦。2秒ごとに存在確認するだけ(O(1)・getElementById のみ)。
+    //     ★装着済みなら WeakSet で即 return するので、実質コストはゼロ。
+    try { setInterval(tryArmNow, 2000); } catch { /* no-op */ }
+    tryArmNow(); // 既に host が居るなら即装着(リロード後の再注入など)
   } catch { /* トラップの失敗で本体を止めない */ }
 })();
