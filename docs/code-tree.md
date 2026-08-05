@@ -621,7 +621,7 @@
     - `trumpet1.mp3`
     - `wallet1.mp3`
   - `SOURCES.md`
-- 📁 **src/** (1523)
+- 📁 **src/** (1524)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -902,7 +902,7 @@
         - `logo_funlink_white_RGB_maru_black.png`
       - `logo_guide_funlink_ol.pdf`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1292)
+  - 📁 **lib/** (1293)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -1364,6 +1364,7 @@
     - `highlightLedger.js` — 配信採点「発表演出」用のハイライト台帳(council/broadcast-scoring-SYNTHESIS.md §2.2・SC2)。
     - `highlightLedger.test.js`
     - `highlightLedgerKey.js` — 配信採点「発表演出」用のハイライト台帳(実際に画面に出た演出だけを記録する最小台帳)の
+    - `hostCreateOnce.wiring.test.js`
     - `hostFlipCensus.wiring.test.js`
     - `hostStyleMutationTrace.js` — パネルの style 書き換えを「経路を問わず」捕らえ、呼び出し元を名指しする計器(純関数)。
     - `hostStyleMutationTrace.test.js`

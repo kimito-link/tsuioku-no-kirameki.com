@@ -2975,7 +2975,10 @@ function noteInlineHostHideReason(reason) {
  *   ちらつきが止まるか否かで、このゲートが犯人かを1回で判定するための実験。
  *   ★判定できたら必ず false に戻し、正しい条件を実装すること(Phase 3)。
  */
-const INLINE_AUTOSHOW_HIDE_EXPERIMENT = true;
+// ★実験は終了(2026-08-05)。実測で【無罪】と確定したため false に戻す:
+//   実験中(消さないようにした)にも消失6回。犯人は autoshow_off ではなかった。
+//   真犯人は host_created(パネルが同じ1ミリ秒に3個作られていた)。
+const INLINE_AUTOSHOW_HIDE_EXPERIMENT = false;
 
 let _inlineHostEverShown = false;
 
@@ -4028,8 +4031,26 @@ function ensureInlinePopupHost() {
     ensureInlinePopupIframe(nlsInlinePopupHostSingleton);
     return nlsInlinePopupHostSingleton;
   }
+  /*
+   * ★v0.1.1264 真因(2026-08-05 実測で確定):
+   *   hostMoveDiag: host_created が【同じ1ミリ秒に3回】(1785910801850/851/851)。
+   *   hostHideReason: display:host_created が 75% を占める。
+   *   = パネルが3個作られ、そのたびに display:none から始まるのでちらつく。
+   *
+   *   なぜ3個できるか:
+   *     createElement した host は【まだ DOM に入っていない】(appendChild は呼び出し元の仕事)。
+   *     → 次に ensureInlinePopupHost が呼ばれても pickPrimaryInlinePopupHostFromDom で
+   *       見つからず、また新規作成する。
+   *     → singleton による2つ目の早期returnは効かない。singleton を代入するのは
+   *       この関数の【最後】で、作っている途中の再入には間に合わないため。
+   *
+   *   対処: 作った直後に singleton へ入れる(=次の呼び出しは2つ目のreturnで止まる)。
+   *   ★これで「同じ瞬間に3個作る」が構造的に起こらなくなる。
+   */
   host = document.createElement('div');
   host.id = INLINE_POPUP_HOST_ID;
+  // ★作った直後に登録する。関数末尾まで待たない(待つと再入で作り直される)。
+  nlsInlinePopupHostSingleton = host;
   host.setAttribute('aria-hidden', 'true');
   setInlineHostDisplay(host, 'none', 'host_created');
   // ★v0.1.1261: この host の style 書き換えを経路を問わず見張る(idempotent)。
