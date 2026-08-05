@@ -27,10 +27,13 @@ describe('hidePageFrameOverlay の理由タグ配線', () => {
   });
 
   it('★消す関数の入口で無条件に記録している(if で囲われていない)', () => {
-    const i = contentSrc.indexOf('function hidePageFrameOverlay(');
-    expect(i).toBeGreaterThan(-1);
-    const body = contentSrc.slice(i, i + 260);
-    expect(body).toMatch(/function hidePageFrameOverlay\(reason = 'unknown'\) \{\n\s*noteInlineHostHideReason\(reason\);/);
+    // ★v0.1.1265: 足跡計器の1行が入った。断言すべきは「入口で無条件に記録する」で
+    //   あって、直後の行であることではない(隣接や文字数を固定すると正当な追加で赤になる)。
+    const body = fnBody(contentSrc, 'function hidePageFrameOverlay(');
+    expect(body).toMatch(/function hidePageFrameOverlay\(reason = 'unknown'\) \{/);
+    expect(body).toMatch(/\n\s*noteInlineHostHideReason\(reason\);/);
+    // if 等で条件付きにされていないこと。
+    expect(body).not.toMatch(/if \([^)]*\)\s*noteInlineHostHideReason\(reason\)/);
   });
 
   it('★全ての呼び出しにタグが付いている(タグ無しが1つでもあると犯人が unknown に埋もれる)', () => {

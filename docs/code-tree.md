@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 4 / 719 件
+## ⚠️ 役割コメントが無いソース 4 / 720 件
 - `src/lib/laneDomSelfMeasure.js`
 - `src/lib/reportPreviewPublish.js`
 - `src/lib/venueLaneBuckets.js`
@@ -621,7 +621,7 @@
     - `trumpet1.mp3`
     - `wallet1.mp3`
   - `SOURCES.md`
-- 📁 **src/** (1524)
+- 📁 **src/** (1526)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -902,7 +902,7 @@
         - `logo_funlink_white_RGB_maru_black.png`
       - `logo_guide_funlink_ol.pdf`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1293)
+  - 📁 **lib/** (1295)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -1369,6 +1369,8 @@
     - `hostStyleMutationTrace.js` — パネルの style 書き換えを「経路を問わず」捕らえ、呼び出し元を名指しする計器(純関数)。
     - `hostStyleMutationTrace.test.js`
     - `hostStyleTrace.wiring.test.js`
+    - `hostVanishForensics.js` — 消えた瞬間の「直前に何が起きたか」を記録する計器(純関数)。
+    - `hostVanishForensics.test.js`
     - `hostVisWatch.wiring.test.js`
     - `hostVisibilityFlipCensus.js` — インラインパネル(host)の「消えた⇄戻った」を数える計器。
     - `hostVisibilityFlipCensus.test.js`

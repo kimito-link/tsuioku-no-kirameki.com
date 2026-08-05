@@ -110,7 +110,7 @@
   - `src/lib/monotonicCommentCount.js`
 - **storage キー定義** — chrome.storage のキー名の正本(nls_comments_<lv> 等)
   - `src/lib/storageKeys.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 44</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 45</summary>
 
 - `src/lib/autoBackupState.js` — v0.1.808(星野ロミ式コンポーネント化・第1弾): content-entry.js の巨大化を抑えるため、
 - `src/lib/avCue.js` — 「AVCue = 音の再生結果を真実とする単一発火点」の純関数群(V1・DOM/storage/音に触れない)。
@@ -128,6 +128,7 @@
 - `src/lib/displayRecordedCount.js` — 「画面に出す記録件数」の正本を1つに固定する純関数(v0.1.839・第1)。
 - `src/lib/giftRecord.js` — ギフト/広告ユーザーの永続化（純関数）
 - `src/lib/heavyChunkReadReuse.js` — heavy 全件コメント read の再利用判定純関数
+- `src/lib/hostVanishForensics.js` — 消えた瞬間の「直前に何が起きたか」を記録する計器(純関数)。
 - `src/lib/inFlightGuard.js` — 状態速報「重さ根治 P3」: runStorageOpWithTimeout(storageOpTimeout.js)は Promise.race で
 - `src/lib/instantCommentPush.js` — 「コメント即時プッシュレーン(storage迂回)」の純関数部。
 - `src/lib/livePersistInterval.js` — v0.1.498〜501: ライブ記録の保存（コアレッサ）最小間隔を決める純粋関数。フリーズ対策 A。
@@ -882,7 +883,7 @@
 
 ## 🧬 修正系譜マップ(この系統のバグを過去にどう直したか)
 
-> changelog 全 594 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
+> changelog 全 595 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
 
 ### 💾 記録件数 (89版)
 - `v0.1.1247` 2026-08-04 — 読み上げが遅くなる悪循環を断ち切りました
@@ -2152,7 +2153,8 @@
 - `v0.1.840` 2026-06-20 — 機能逆引き地図を全ファイル網羅に
 - `v0.1.835` 2026-06-20 — 自己検証ゲートを追加(版同期+診断文言)
 
-### その他 (50版)
+### その他 (51版)
+- `v0.1.1265` 2026-08-05 — 消える直前に何が起きたかを記録します
 - `v0.1.1264` 2026-08-05 — パネルが3個作られていたのを直しました
 - `v0.1.1263` 2026-08-05 — 【実験】ちらつきの原因を1回で判定します
 - `v0.1.1262` 2026-08-05 — 一度出したパネルを消さないようにしました

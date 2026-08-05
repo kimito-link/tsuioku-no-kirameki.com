@@ -371,6 +371,11 @@ import {
   snapshotHostStyleMutationTrace,
   formatHostStyleMutationLine
 } from '../lib/hostStyleMutationTrace.js';
+// ★v0.1.1265: 消えた瞬間の【直前に何が走ったか】を記録する(足跡)。
+import {
+  createVanishForensics, markTrail, noteVanishWithTrail,
+  snapshotVanishForensics, formatVanishForensicsLine
+} from '../lib/hostVanishForensics.js';
 import { probeWatchPageDomStructure } from '../lib/probeWatchPageDomStructure.js';
 import { summarizeGiftSubAppHistoryDiag } from '../lib/summarizeGiftSubAppHistoryDiag.js';
 import { createConsoleErrorBuffer } from '../lib/consoleErrorBuffer.js';
@@ -2819,6 +2824,11 @@ let _hostVisWatchRaf = null;
  * (paint 毎の DOM 走査は禁止・v0.1.1201 で自分が拡張全体を重くした反省)。
  */
 const _hostStyleTrace = createHostStyleMutationTrace();
+const _vanishForensics = createVanishForensics();
+/** @param {string} tag 走った処理名(軽さ最優先: 文字列と時刻だけ) */
+function trail(tag) {
+  try { markTrail(_vanishForensics, tag, Date.now()); } catch { /* no-op */ }
+}
 let _hostStyleObserver = null;
 let _hostStylePrevVisible = null;
 
@@ -2873,6 +2883,16 @@ function startHostVisibilityWatch() {
         // computed は「消えた瞬間だけ」読みたいが、前フレームとの比較が要るので
         // 毎フレーム読む。単一要素の getComputedStyle は O(1) で走査ではない。
         try { cs = window.getComputedStyle(host); } catch { cs = null; }
+        // ★v0.1.1265: 消えた瞬間に直前の足跡を切り出す(見えていた→見えない の遷移時のみ)。
+        try {
+          const visNow = r.width >= 40 && r.height >= 24;
+          if (_hostStylePrevVisible === true && !visNow) {
+            noteVanishWithTrail(_vanishForensics, {
+              nowMs: Date.now(), w: r.width, h: r.height, display: cs ? cs.display : ''
+            });
+          }
+          _hostStylePrevVisible = visNow;
+        } catch { /* 計器失敗は描画を止めない */ }
         noteHostFrame(_hostVisWatch, {
           nowMs: Date.now(),
           rect: { w: r.width, h: r.height },
@@ -2897,6 +2917,7 @@ function startHostVisibilityWatch() {
  * @param {string} cause 消した/戻した経路のタグ(状態速報にそのまま出す)
  */
 function setInlineHostDisplay(host, display, cause) {
+  trail('disp:' + display + ':' + cause);
   if (!host || !host.style) return;
   const prev = host.style.display;
   /*
@@ -2983,6 +3004,7 @@ const INLINE_AUTOSHOW_HIDE_EXPERIMENT = false;
 let _inlineHostEverShown = false;
 
 function setInlineHostVisible(host, visible, cause) {
+  trail((visible ? 'show:' : 'hide:') + cause);
   if (!host || !host.style) return;
   // 見せる経路は4つ(floating/dock/anchored/nonvideo)あるが、全部この入口を通る。
   //   ここで1回立てれば取りこぼさない(v0.1.1255 で集約済みなのを利用)。
@@ -5803,6 +5825,7 @@ function renderInlinePopupHost(target) {
  * @param {string} [reason] 消した経路のタグ(状態速報にそのまま出る)
  */
 function hidePageFrameOverlay(reason = 'unknown') {
+  trail('hide:' + reason);
   noteInlineHostHideReason(reason);
   try {
     dismissToolbarOpenInstantFeedback();
@@ -7095,6 +7118,10 @@ function buildAiShareFastDiagnosticsPayload() {
       // v0.1.1250: 移設でもscrollでもない「パネルが一瞬消える」を名指しする計器。
       hostFlipCensus: snapshotHostVisibilityFlipCensus(_hostFlipCensus),
       hostVisWatch: snapshotHostVisibilityWatch(_hostVisWatch),
+      vanishForensics: (() => {
+        const snap = snapshotVanishForensics(_vanishForensics);
+        return snap ? { ...snap, line: formatVanishForensicsLine(snap) } : null;
+      })(),
       hostStyleTrace: (() => {
         const snap = snapshotHostStyleMutationTrace(_hostStyleTrace);
         return snap ? { ...snap, line: formatHostStyleMutationLine(snap) } : null;
@@ -7638,6 +7665,7 @@ function isWatchInlinePanelTopFrame() {
 
 /** 視聴ページの動画周り装飾枠（#nls-watch-prikura-frame）は表示しない。インライン用ホストの配置のみ行う。 */
 function renderPageFrameOverlay() {
+  trail('render');
   if (renderingPageFrame) {
     pageFrameOverlayRenderDeferred = true;
     return;
@@ -9783,6 +9811,10 @@ function buildAiSharePageDiagnostics() {
       // v0.1.1250: 移設でもscrollでもない「パネルが一瞬消える」を名指しする計器。
       hostFlipCensus: snapshotHostVisibilityFlipCensus(_hostFlipCensus),
       hostVisWatch: snapshotHostVisibilityWatch(_hostVisWatch),
+      vanishForensics: (() => {
+        const snap = snapshotVanishForensics(_vanishForensics);
+        return snap ? { ...snap, line: formatVanishForensicsLine(snap) } : null;
+      })(),
       hostStyleTrace: (() => {
         const snap = snapshotHostStyleMutationTrace(_hostStyleTrace);
         return snap ? { ...snap, line: formatHostStyleMutationLine(snap) } : null;
