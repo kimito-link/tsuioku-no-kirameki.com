@@ -9,7 +9,7 @@
  *
  * スキーマ:
  *   label:     会議での表示名（例: 'groq/gpt-oss-120b'）
- *   provider:  'groq' | 'gemini' | 'nvidia' | 'cloudflare' | 'openrouter' | 'sambanova' | 'anthropic'
+ *   provider:  'groq' | 'gemini' | 'nvidia' | 'cloudflare' | 'openrouter' | 'sambanova' | 'mistral' | 'anthropic'
  *              実在チェック(verifyLiveModels)の対象グループは 'groq'|'gemini' のみ。
  *   rawId:     プロバイダ側の実モデルID（起動時ライブ実在チェックで /models と突合する用。
  *              空文字なら実在チェック対象外＝素通し）。
@@ -17,7 +17,7 @@
  *              例: groq/compound は rawId も apiModel も 'groq/compound' で同一）。
  *   opts:      openaiChat/geminiChat への追加パラメータ（reasoning_effort 等）。
  *   timeoutMs: 個別タイムアウト（省略時は各 xxxChat の既定値）。
- *   requires:  このエントリを有効化するのに必要な env キー名の配列（'G'|'N'|'O'|'E'|'CF'|'CF_ACC'|'SN'）。
+ *   requires:  このエントリを有効化するのに必要な env キー名の配列（'G'|'N'|'O'|'E'|'CF'|'CF_ACC'|'SN'|'MI'）。
  *              meeting.mjs 側で解決済みの真偽フラグと突き合わせて if 判定する。
  *   liveProbe: true なら council-scout が毎日実疎通(chat/completions 1発)を確認する
  *              （2026-07-31追加）。カタログ照合(rawId)では「一覧に存在するが実際は呼べない」
@@ -176,6 +176,42 @@ export const LINEUP = [
   //  有料化と同一の、カタログ照合では原理的に検知不可能なパターンのため。
   { label: 'sambanova/deepseek-v3.1', provider: 'sambanova', rawId: 'DeepSeek-V3.1', apiModel: 'DeepSeek-V3.1', opts: {}, requires: ['SN'], liveProbe: true },
   { label: 'sambanova/llama-3.3-70b', provider: 'sambanova', rawId: 'Meta-Llama-3.3-70B-Instruct', apiModel: 'Meta-Llama-3.3-70B-Instruct', opts: {}, requires: ['SN'], liveProbe: true },
+
+  // 2026-08-05 追加: Mistral AI（新規プロバイダ・フランス独立系）。La Plateformeの無料枠は
+  // カード登録不要で、実機で /v1/models 200(chat系39体)＋chat/completions 6モデル全て200を
+  // 裏取り済み（mistral-large/medium/magistral-small/small/devstral-medium/ministral-8b・
+  // 応答500〜790ms）。2並列も200 OKで429なし。同日に調査したCerebrasが全モデル402
+  // "payment required" で全滅したのとは対照的に、本当にカード無しで呼べることを確認した。
+  //  採用の主目的は「学習系譜の多様化」。既存クラウド勢はGroq/SambaNova/OpenRouter/CFいずれも
+  //  他社製モデル(llama/deepseek/nemotron/glm)を走らせるインフラ業者であり、経路を増やしても
+  //  中身の頭脳が被る（openrouter/nemotron-3-ultraはnvidia本線と同一モデルの別経路）。Mistralは
+  //  自社開発モデルを自社で提供する唯一のメンバーで、欧州の独立した学習系譜という点で会議に
+  //  「無い頭」を足せる（このファイルのCF採用基準「会議に無い能力を足すものだけ」と同じ理屈）。
+  //  - mistral-large-latest: leadの予備。roleOfの"mistral-large"判定行(council-roles.mjs)に
+  //    そのまま乗る——同行は2026-07-23にnvidia/mistral-large-3-675bがEOLした際「将来
+  //    mistral-large-2系等を採用する際にそのまま効く無害な行」として意図的に温存されたもので、
+  //    今回その想定通りに再利用される（roleOfへの追加行は不要）。
+  //    lead予備は既にopenrouter/nemotron-3-ultra-550bがあるが別プロバイダのため恒久ルール5
+  //    （同役割の予備に同一プロバイダを重ね積みしない）に抵触しない。加えてopenrouter版は
+  //    nvidia本線と中身が同一モデルであり、真に独立した頭脳のlead予備はこれが初。
+  //  - magistral-small-latest: criticの予備。Mistral自社の推論特化モデル。実機で日本語の
+  //    批判役プロンプト(system付き)に的確な指摘を返すことを確認済み。<think>タグも
+  //    reasoning_contentも使わず通常のcontentで返すため、meeting.mjsのstripThinking/
+  //    reasoning救済のどちらも不要（glm-4.7-flash型の特殊対応がいらない）。
+  //    critic予備はnvidia/deepseek-v4-pro・sambanova/deepseek-v3.1と合わせて3体になるが、
+  //    3体とも別プロバイダ（ルール5適合）。かつ前2体はどちらもDeepSeek系＝同一系譜であり、
+  //    ここに非DeepSeek系の批判役が入ることで批判の視点自体が分散する。
+  //  両エントリとも weightOf の n.includes("mistral") で予備(weight3)が自動適用される
+  //  （council-roles.mjs・恒久ルール3「新規プロバイダは必ず予備から」）。昇格基準は
+  //  gemini-3系/SambaNovaと同一（7日以上空けた実会議2回でFAILEDゼロ）。
+  //  liveProbe:true 必須と判断: Mistralのダッシュボードは「0% used, Resets in 27 days」という
+  //  月次クォータ表示を持つが、枯渇時に429で止まるのか課金に移るのかがAPI側から判別できない
+  //  （Pay-As-You-Goは任意オプトインだが、無料枠内でのカタログ表示は変わらない見込み）。
+  //  「カタログに残ったまま呼べなくなる」型に該当し得るため、SambaNova・CFと同じ扱いにする。
+  //  labelに"large"を含むが weightOf に "large" 判定は無いため誤爆しない（"nvidia"を含めない
+  //  のはopenrouter/nemotron採用時と同じ注意点。ここでは"mistral/"プレフィクスなので問題なし）。
+  { label: 'mistral/mistral-large', provider: 'mistral', rawId: 'mistral-large-latest', apiModel: 'mistral-large-latest', opts: {}, requires: ['MI'], liveProbe: true },
+  { label: 'mistral/magistral-small', provider: 'mistral', rawId: 'magistral-small-latest', apiModel: 'magistral-small-latest', opts: {}, requires: ['MI'], liveProbe: true },
 
   { label: 'gemini-2.5-flash', provider: 'gemini', rawId: 'gemini-2.5-flash', apiModel: 'gemini-2.5-flash', opts: {}, requires: ['E'] },
 

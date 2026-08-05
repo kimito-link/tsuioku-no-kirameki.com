@@ -29,6 +29,13 @@ export function roleOf(name) {
   // "deepseek-v4"に一致しないため独立の分岐が必要（v3とv4は文字列として非一致）。
   // criticの予備(weight3・council-lineup.mjsでnvidia/deepseek-v4-proより後ろに配置)。
   if (n.includes("deepseek-v3")) return "critic";
+  // 2026-08-05 追加: Mistral自社の推論特化モデル magistral → 批判(critic)。
+  // 必ず下の "mistral-large"→lead 判定より前に置くこと（if は先勝ち。"magistral" は
+  // "mistral-large" に非一致なので実害は無いが、同じMistral系の役割分岐が離れた2箇所に
+  // 散らないよう、critic群のここにまとめる意図）。critic予備はnvidia/deepseek-v4-pro・
+  // sambanova/deepseek-v3.1と合わせて3体になるが全て別プロバイダ（恒久ルール5適合）で、
+  // かつ前2体がDeepSeek系＝同一系譜のため、非DeepSeek系が入ることで批判の視点が分散する。
+  if (n.includes("magistral")) return "critic";
   // qwen3-32b は thinking 付き推論モデル → 批判(critic)。汎用 qwen3(発散)より先に判定する。
   if (n.includes("qwen3-32b") || n.includes("qwq")) return "critic";
   // GLM(5.2 等)は reasoning_content を別フィールドで返す強い推論モデル → 批判(critic)。
@@ -243,6 +250,12 @@ export function weightOf(label) {
     // 昇格・降格基準はgemini-3系と同一（7日以上空けた実会議2回でFAILEDゼロなら正規化・
     // liveProbeで1回でも失敗確認なら即撤去）。
     if (n.includes("sambanova")) return 3;
+    // 2026-08-05 追加: Mistral AI(新規プロバイダ)も同じ理由で予備(weight3)から入れる。
+    // 判定は "mistral/" ではなく "mistral" の部分一致にする——将来 nvidia/mistral-large 系や
+    // openrouter経由のMistral系を採用した場合も、素性が同じである以上まとめて予備扱いに
+    // したいため（同時に、2026-07-23にEOLしたnvidia/mistral-large-3-675bのようなエントリが
+    // 復活してもweight2のnvidia判定が先に効くので、この行が既存の重みを奪うことはない）。
+    if (n.includes("mistral") || n.includes("magistral")) return 3;
     // cloudflare 勢は会議の並列実負荷で FAILED しやすい実績(2026-06-27)→ reserve層(weight4)。
     // 同役割に安定勢(weight1〜3)がいる限り選ばれず、いなければ最後の砦として浮上する。
     if (n.includes("cloudflare")) return 4;

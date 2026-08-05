@@ -45,6 +45,7 @@ const O = process.env.OPENROUTER_API_KEY;
 const CF = process.env.CLOUDFLARE_API_TOKEN;
 const CF_ACC = process.env.CLOUDFLARE_ACCOUNT_ID;
 const SN = process.env.SAMBANOVA_API_KEY;
+const MI = process.env.MISTRAL_API_KEY;
 
 function todayJst() {
   const parts = new Intl.DateTimeFormat('en-CA', {
@@ -175,6 +176,22 @@ async function listSambanova() {
   } catch (e) { return { ok: false, models: [], error: String(e.message || e) }; }
 }
 
+// 2026-08-05 追加: Mistral AI La Plateforme。/v1/models はOpenAI互換形式で返る（実機で
+// 53体・うちchat系39体を確認）。埋め込み/OCR/音声(voxtral)等の非チャットモデルも同じ
+// 一覧に混ざるが、健康診断はLINEUPのrawIdとの突合なのでフィルタは不要（新着候補の
+// 提示時に人間が読んで判断する。同じ事情のcloudflare/nvidiaもフィルタしていない）。
+async function listMistral() {
+  if (!MI) return { ok: false, models: [], error: '未設定' };
+  try {
+    const r = await fetch('https://api.mistral.ai/v1/models', {
+      headers: { Authorization: 'Bearer ' + MI }, signal: AbortSignal.timeout(15000),
+    });
+    if (!r.ok) return { ok: false, models: [], error: `HTTP ${r.status}` };
+    const j = await r.json();
+    return { ok: true, models: (j.data || []).map((m) => m.id) };
+  } catch (e) { return { ok: false, models: [], error: String(e.message || e) }; }
+}
+
 const PROVIDERS = {
   groq: listGroq,
   gemini: listGemini,
@@ -182,6 +199,7 @@ const PROVIDERS = {
   openrouter: listOpenRouter,
   cloudflare: listCloudflare,
   sambanova: listSambanova,
+  mistral: listMistral,
 };
 
 // ── 軽量プローブ（§2-2・実際に呼べるかの検証）────────────────────────────────
@@ -191,8 +209,9 @@ const PROBE_URL = {
   openrouter: 'https://openrouter.ai/api/v1/chat/completions',
   cloudflare: CF_ACC ? `https://api.cloudflare.com/client/v4/accounts/${CF_ACC}/ai/v1/chat/completions` : '',
   sambanova: 'https://api.sambanova.ai/v1/chat/completions',
+  mistral: 'https://api.mistral.ai/v1/chat/completions',
 };
-const PROBE_KEY = { groq: G, nvidia: N, openrouter: O, cloudflare: CF, sambanova: SN };
+const PROBE_KEY = { groq: G, nvidia: N, openrouter: O, cloudflare: CF, sambanova: SN, mistral: MI };
 
 /** 1モデルに軽量プロンプトを1発投げ、呼べるかだけ検証する。@returns {{status:number|string, ms:number, snippet:string}} */
 async function probeModel(provider, modelId) {
