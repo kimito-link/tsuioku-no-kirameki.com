@@ -48,10 +48,38 @@ describe('v0.1.1268 — ★world 境界(ここを外すと永遠に0)', () => {
   it('★arm リスナーが無条件に登録される文である(if(false)前置を殺す)', () => {
     const body = codeOnly(pageSrc);
     // 直前のアンカーまで固定する([[mutation-test-needs-anchored-regex-2026-08-05]])。
-    expect(body).toMatch(
-      /window\.addEventListener\(HWT_ARM_EVENT, \(\) => \{/
-    );
+    expect(body).toMatch(/window\.addEventListener\(HWT_ARM_EVENT, tryArmNow\);/);
     expect(body).not.toMatch(/if \(false\)[\s\S]{0,80}HWT_ARM_EVENT/);
+  });
+
+  it('★装着の合図は3系統ある(1系統だけだと取りこぼす=v0.1.1268の失敗)', () => {
+    /*
+     * v0.1.1268 は CustomEvent の1回きりの合図だけに頼り、実測 armed:null(未装着)だった。
+     * 「一度きりの合図は取りこぼす」。3系統のうち1つでも通れば装着される形を固定する。
+     */
+    const body = codeOnly(pageSrc);
+    // (1) isolated からの明示的な合図
+    expect(body).toMatch(/window\.addEventListener\(HWT_ARM_EVENT, tryArmNow\);/);
+    // (2) host の出現を自力で監視
+    expect(body).toMatch(/hwtRootObserver = new MutationObserver\(/);
+    expect(body).toMatch(/hwtRootObserver\.observe\(document\.documentElement/);
+    // (3) 最後の砦のポーリング
+    expect(body).toMatch(/setInterval\(tryArmNow, 2000\)/);
+    // 起動時の即時試行(既に host が居る場合)
+    expect(body).toMatch(/\n\s*tryArmNow\(\);/);
+  });
+
+  it('★(2)の常駐監視は装着できたら止める(滝コメントで重くしない)', () => {
+    // subtree:true の監視を常駐させると毎秒何百回も走る(v0.1.1201 の前科)。
+    const body = codeOnly(pageSrc);
+    expect(body).toMatch(/installHostDisplayWriteTrap\(el\);\n\s*stopRootObserver\(\);/);
+    expect(body).toMatch(/hwtRootObserver\.disconnect\(\)/);
+  });
+
+  it('★host が見つからないことを報告する(armed:null を二度と曖昧にしない)', () => {
+    const body = codeOnly(pageSrc);
+    expect(body).toMatch(/hwtHostMissing \+= 1;/);
+    expect(body).toMatch(/armReason: `host-not-found\(探索\$\{hwtArmAttempts\}回・不在\$\{hwtHostMissing\}回\)`/);
   });
 });
 
