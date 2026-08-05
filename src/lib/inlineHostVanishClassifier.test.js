@@ -218,10 +218,14 @@ describe('formatVanishPhaseLine — 意味を言い切る', () => {
     expect(line).toContain('内部が上流');
   });
 
-  it('walking は「外部要因」と書く', () => {
+  it('★walking は「区別不能」と書く(外部要因と断定しない)', () => {
+    // ★v0.1.1268 訂正: 旧実装は walking を「別の時計=外部要因」と断定していたが誤り。
+    //   内部の4秒tickの非同期後段(microtask/rAF/observer)でも Δ はばらつく。
+    //   断定に戻す変異はここで赤になる。
     const line = formatVanishPhaseLine(assessVanishPhase([0, 1200, 2600]), [0, 1200, 2600]);
     expect(line).toContain('walking');
-    expect(line).toContain('外部要因');
+    expect(line).toContain('区別不能');
+    expect(line).not.toMatch(/=外部要因\)/);
   });
 
   it('★insufficient は「何件で判定できるか」を出す(0の意味を区別)', () => {

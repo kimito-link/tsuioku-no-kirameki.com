@@ -168,7 +168,7 @@
 
 - **応援レーン集約(誰が候補か)** — 保存コメント行を userId 単位に畳み込みレーン候補を作る唯一の集約正本(popup/venue 共通)
   - `src/lib/userLaneCandidatesFromStorage.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 95</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 96</summary>
 
 - `src/domain/lane/aggregate.js` — 応援ユーザーレーンの per-row → per-user 集約（純関数）。
 - `src/domain/observations/observationStore.js` — observationStore - StatObservation のメモリ常駐リングバッファ。
@@ -223,6 +223,7 @@
 - `src/lib/giftMomentumAnalytics.js` — HTML マーケ分析向けのギフト深掘り集計。
 - `src/lib/giftRankingLaneOptIn.js` — v0.1.228: ギフトランキングレーンの opt-in 判定 純関数群。
 - `src/lib/hiddenTabExternalFetchGate.js` — v0.1.616: 非可視タブでも外部 API fetch（koken 貢献度 / nicoad 広告 / ギフト履歴 /
+- `src/lib/hostWriteTrap.js` — 「誰が host に display:none を書いたか」を同期で捕らえた結果を集計する純関数群。
 - `src/lib/inferBroadcasterUserIdFromComments.js` — snapshot の broadcasterUserId が空のとき、保存済みコメント内の表示名から
 - `src/lib/isInsideRecommendedUserSection.js` — ニコニコ視聴ページ周辺に出る「おすすめユーザー／フォロー候補」系 UI の子孫かを粗く判定する。
 - `src/lib/kiramekiAwards.js` — 「きらめきの賞」判定ロジック（純関数）。
@@ -884,7 +885,7 @@
 
 ## 🧬 修正系譜マップ(この系統のバグを過去にどう直したか)
 
-> changelog 全 597 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
+> changelog 全 598 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
 
 ### 💾 記録件数 (89版)
 - `v0.1.1247` 2026-08-04 — 読み上げが遅くなる悪循環を断ち切りました
@@ -2154,7 +2155,8 @@
 - `v0.1.840` 2026-06-20 — 機能逆引き地図を全ファイル網羅に
 - `v0.1.835` 2026-06-20 — 自己検証ゲートを追加(版同期+診断文言)
 
-### その他 (53版)
+### その他 (54版)
+- `v0.1.1268` 2026-08-05 — パネルを消している相手を名指しします
 - `v0.1.1267` 2026-08-05 — 消えた原因を1回で見分けられるようにしました
 - `v0.1.1266` 2026-08-05 — パネルが「消えない構造」になりました
 - `v0.1.1265` 2026-08-05 — 消える直前に何が起きたかを記録します

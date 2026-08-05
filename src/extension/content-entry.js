@@ -383,6 +383,11 @@ import {
 import {
   classifyVanishSnapshot, assessVanishPhase, formatVanishPhaseLine
 } from '../lib/inlineHostVanishClassifier.js';
+// ★v0.1.1268: MAIN world の同期トラップが捕らえた「display:none を書いた犯人」を集計する。
+import {
+  createHostWriteTrapState, noteHostWriteTrapArmed, noteHostWriteTrapReport,
+  snapshotHostWriteTrap, formatHostWriteTrapLine
+} from '../lib/hostWriteTrap.js';
 import { probeWatchPageDomStructure } from '../lib/probeWatchPageDomStructure.js';
 import { summarizeGiftSubAppHistoryDiag } from '../lib/summarizeGiftSubAppHistoryDiag.js';
 import { createConsoleErrorBuffer } from '../lib/consoleErrorBuffer.js';
@@ -2330,6 +2335,20 @@ window.addEventListener('message', (e) => {
   const expectedToken = readNlsPageToken();
   if (!isNlsInterceptTokenValid(e, expectedToken)) return;
 
+  /*
+   * ★v0.1.1268: MAIN world の同期トラップからの報告。
+   *   armed(装着結果)と捕獲レポートの2種類が同じ type で来る。
+   *   ★armed は「0回」と「未計測」を区別するために必須(0の意味を三分岐にする)。
+   */
+  if (e.data.type === 'NLS_HOST_WRITE_TRAP') {
+    if (typeof e.data.armed === 'boolean') {
+      noteHostWriteTrapArmed(_hostWriteTrap, e.data.armed, e.data.armReason);
+    } else {
+      noteHostWriteTrapReport(_hostWriteTrap, e.data);
+    }
+    return;
+  }
+
   if (e.data.type === 'NLS_INTERCEPT_SCHEDULE') {
     const b = e.data.begin;
     if (typeof b === 'string' && b.length >= 10) {
@@ -2856,6 +2875,21 @@ const _hostAncestryTrace = { entries: [], total: 0, reattachCount: 0 };
 let _pageFrameStyleReattachCount = 0;
 /** 直近の 4秒 poll tick 時刻。消失との位相差 Δ を出すために使う。 */
 let _lastLivePollTickAt = 0;
+/** ★v0.1.1268: MAIN world の同期トラップの集計。犯人を名指しするための計器。 */
+const _hostWriteTrap = createHostWriteTrapState();
+/** トラップを arm 済みの host。差し替わったら1回だけ再 arm する(ポインタ比較のみ)。 */
+let _hwtArmedHost = null;
+
+/**
+ * MAIN world のトラップに「この host を見張れ」と伝える。
+ * ★content script(isolated world)からは style の書き込みを捕まえられないため、
+ *   トラップ本体は page-intercept-entry.js(world:MAIN)に居る。
+ *   CustomEvent は world を跨いで届くので、これが唯一の伝達手段。
+ */
+function armHostWriteTrap() {
+  try { window.dispatchEvent(new CustomEvent('nls:hwt-arm')); }
+  catch { /* 計器の失敗で描画を止めない */ }
+}
 
 /**
  * ★v0.1.1261: host の style/class 変化を MutationObserver で見張る。
@@ -3011,6 +3045,12 @@ function startHostVisibilityWatch() {
          */
         if (host !== _hostTraceHost || host.parentElement !== _hostTraceParent) {
           ensureHostAncestryMutationTrace(host);
+        }
+        // ★v0.1.1268: host が差し替わったら MAIN world のトラップも張り直させる。
+        //   追加コストはポインタ比較1個(v0.1.1201 の「paint毎のDOM走査」を繰り返さない)。
+        if (host !== _hwtArmedHost) {
+          _hwtArmedHost = host;
+          armHostWriteTrap();
         }
         const r = host.getBoundingClientRect();
         let cs = null;
@@ -4266,6 +4306,8 @@ function ensureInlinePopupHost() {
   setInlineHostDisplay(host, 'none', 'host_created');
   // ★v0.1.1261: この host の style 書き換えを経路を問わず見張る(idempotent)。
   ensureHostAncestryMutationTrace(host);
+  // ★v0.1.1268: 生成直後に MAIN world のトラップも張らせる(rAF の追従を待たない)。
+  armHostWriteTrap();
   host.style.pointerEvents = 'auto';
   host.style.width = '100%';
 
@@ -7331,6 +7373,13 @@ function buildAiShareFastDiagnosticsPayload() {
         count: _pageFrameStyleReattachCount,
         line: `styleReattach: ${_pageFrameStyleReattachCount}回(拡張の<style>を貼り直した回数)`
       },
+      hostWriteTrap: (() => {
+        // ★v0.1.1268: 犯人の名指し。自拡張 origin を渡して「自分/外部」を分類させる。
+        let own = '';
+        try { own = chrome.runtime.getURL(''); } catch { own = ''; }
+        const snap = snapshotHostWriteTrap(_hostWriteTrap, own);
+        return snap ? { ...snap, line: formatHostWriteTrapLine(snap) } : null;
+      })(),
       hostStyleTrace: (() => {
         const snap = snapshotHostStyleMutationTrace(_hostStyleTrace);
         return snap ? { ...snap, line: formatHostStyleMutationLine(snap) } : null;
@@ -10044,6 +10093,13 @@ function buildAiSharePageDiagnostics() {
         count: _pageFrameStyleReattachCount,
         line: `styleReattach: ${_pageFrameStyleReattachCount}回(拡張の<style>を貼り直した回数)`
       },
+      hostWriteTrap: (() => {
+        // ★v0.1.1268: 犯人の名指し。自拡張 origin を渡して「自分/外部」を分類させる。
+        let own = '';
+        try { own = chrome.runtime.getURL(''); } catch { own = ''; }
+        const snap = snapshotHostWriteTrap(_hostWriteTrap, own);
+        return snap ? { ...snap, line: formatHostWriteTrapLine(snap) } : null;
+      })(),
       hostStyleTrace: (() => {
         const snap = snapshotHostStyleMutationTrace(_hostStyleTrace);
         return snap ? { ...snap, line: formatHostStyleMutationLine(snap) } : null;

@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 4 / 721 件
+## ⚠️ 役割コメントが無いソース 4 / 722 件
 - `src/lib/laneDomSelfMeasure.js`
 - `src/lib/reportPreviewPublish.js`
 - `src/lib/venueLaneBuckets.js`
@@ -157,7 +157,7 @@
     - `2026-07-22.md`
     - `2026-07-23.md`
     - `2026-07-31.md`
-- 📁 **docs/** (239)
+- 📁 **docs/** (241)
   - 📁 **article-assets/** (87)
     - 📁 **venue-frames/** (12)
       - `f01.png`
@@ -267,7 +267,7 @@
     - `storage-bus.md`
     - `venue.md`
     - `web-status.md`
-  - 📁 **handoff/** (76)
+  - 📁 **handoff/** (78)
     - `HANDOFF-backfill-instant-restore.md`
     - `HANDOFF-broadcast-score-panel.md`
     - `HANDOFF-comment-pickup-bsp.md`
@@ -322,9 +322,11 @@
     - `lanescene-structural-review-IMPLEMENTATION-HANDOFF.md`
     - `marketing-export-tab-IMPLEMENTATION-HANDOFF.md`
     - `panel-flicker-council-brief-2026-08-05.md`
+    - `panel-flicker-culprit-trap-DESIGN.md`
     - `panel-flicker-fable-brief-2026-08-05.md`
     - `panel-flicker-resolution-DESIGN.md`
     - `panel-flicker-resolution-IMPLEMENTATION-HANDOFF.md`
+    - `panel-flicker-round2-brief-2026-08-05.md`
     - `scroll-whiteout-freeze-DESIGN.md`
     - `snippet-manager-clibor-parity-synthesis.md`
     - `sound-optimization-DESIGN.md`
@@ -625,7 +627,7 @@
     - `trumpet1.mp3`
     - `wallet1.mp3`
   - `SOURCES.md`
-- 📁 **src/** (1530)
+- 📁 **src/** (1533)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -906,7 +908,7 @@
         - `logo_funlink_white_RGB_maru_black.png`
       - `logo_guide_funlink_ol.pdf`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1299)
+  - 📁 **lib/** (1302)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -1380,6 +1382,9 @@
     - `hostVisibilityFlipCensus.test.js`
     - `hostVisibilityWatch.js` — パネルが「実際に見えなくなった瞬間」を、原因の種類を問わず捕らえる見張り(純関数群)。
     - `hostVisibilityWatch.test.js`
+    - `hostWriteTrap.js` — 「誰が host に display:none を書いたか」を同期で捕らえた結果を集計する純関数群。
+    - `hostWriteTrap.test.js`
+    - `hostWriteTrap.wiring.test.js`
     - `htmlEscape.js` — 旧パス：`src/lib/htmlEscape.js`
     - `htmlEscape.test.js`
     - `htmlReportCommenterFollowSection.js` — HTML レポート向けコメンターフォロー分析ブロック。

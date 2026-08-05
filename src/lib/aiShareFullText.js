@@ -493,6 +493,11 @@ export function buildAiShareFullText({ overviewText, livesData, fastDiag, popupD
     const vfLine = String(fastDiag?.content?.vanishForensics?.line || '');
     if (vfLine) { lines.push(vfLine); lines.push(''); }
   } catch { /* no-op: 計器の失敗は状態速報を壊さない */ }
+  // ★v0.1.1268: 犯人の名指し。この1行がこの版の答えなので足跡の直後に置く。
+  try {
+    const trapLine = String(fastDiag?.content?.hostWriteTrap?.line || '');
+    if (trapLine) { lines.push(trapLine); lines.push(''); }
+  } catch { /* no-op: 計器の失敗は状態速報を壊さない */ }
   // ★v0.1.1267: 祖先まで含めた属性変化の追跡(観測対象が現物かの自己申告つき)。
   try {
     const ancLine = String(fastDiag?.content?.hostAncestryTrace?.line || '');
