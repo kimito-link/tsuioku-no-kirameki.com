@@ -46,11 +46,12 @@ describe('autoshow_off 二分実験の配線', () => {
     expect(note).toBeLessThan(hide);
   });
 
-  it('★これは一時的な実験である旨がコードに明記されている(畳み忘れ防止)', () => {
+  it('★実験は畳まれている(実測で autoshow_off は無罪と確定した)', () => {
+    // 実験中(消さないようにした状態)でも消失6回 = このゲートは犯人ではない。
+    expect(contentSrc).toContain('const INLINE_AUTOSHOW_HIDE_EXPERIMENT = false;');
     const i = contentSrc.indexOf('const INLINE_AUTOSHOW_HIDE_EXPERIMENT');
-    const around = contentSrc.slice(Math.max(0, i - 500), i + 200);
-    expect(around).toContain('一時的');
-    expect(around).toMatch(/必ず false に戻し|Phase 3/);
+    const around = contentSrc.slice(Math.max(0, i - 400), i + 100);
+    expect(around).toMatch(/無罪|実験は終了/);
   });
 
   it('他の消す経路には手を入れていない(実験の範囲を広げない)', () => {
