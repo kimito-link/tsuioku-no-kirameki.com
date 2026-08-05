@@ -257,6 +257,8 @@ import {
   KEY_TOP_SUPPORTERS_MIRROR,
   broadcasterProfileStorageKey,
   KEY_EFFECT_SOUND_ENABLED,
+  KEY_VENUE_BUTTON_VISIBLE,
+  isVenueButtonVisible,
   KEY_CUSTOM_SOUND_REV,
   KEY_VENUE_EFFECT_SOUND_PRESENCE,
   isEffectSoundEnabled,
@@ -15439,6 +15441,8 @@ async function refresh() {
         KEY_SELF_POSTED_RECENTS,
         KEY_LAST_WATCH_URL,
         KEY_RECORDING,
+        // ★v0.1.1271: ここに足さないと、popup を開くたびに既定(ON)へ戻って見える。
+        KEY_VENUE_BUTTON_VISIBLE,
         KEY_DEEP_HARVEST_QUIET_UI,
         KEY_BACKFILL_AUTO_DISABLED,
         KEY_INLINE_PANEL_AUTOSHOW_ENABLED,
@@ -15596,6 +15600,10 @@ async function refresh() {
     effectSoundEl.checked = _effectSoundEnabledCache;
     effectSoundEl.disabled = false;
   }
+
+  // v0.1.1271: 視聴ページの「🏟 会場モード」ボタンを出すか(既定 ON=出す)。
+  const venueBtnEl = /** @type {HTMLInputElement|null} */ ($('venueButtonVisibleToggle'));
+  if (venueBtnEl) venueBtnEl.checked = isVenueButtonVisible(openBag[KEY_VENUE_BUTTON_VISIBLE]);
 
   // Phase D1(2026-07-05): 操作音(コメント送信の打ち出し音等) ON/OFF(既定ON)。
   _opSoundEnabledCache = isOpSoundEnabled(openBag[KEY_OP_SOUND_ENABLED]);
@@ -20298,6 +20306,13 @@ async function initPopup() {
     } catch {
       //
     }
+  });
+
+  // v0.1.1271: 会場モードのボタンを出すか(反映には watch タブの再読み込みが要る)。
+  const venueBtnToggle = /** @type {HTMLInputElement|null} */ ($('venueButtonVisibleToggle'));
+  venueBtnToggle?.addEventListener('change', async () => {
+    try { await storageSetSafe({ [KEY_VENUE_BUTTON_VISIBLE]: venueBtnToggle.checked }); }
+    catch { /* 保存失敗は次回の変更で再試行される */ }
   });
 
   // Phase D1(2026-07-05・council/operation-sound-SYNTHESIS.md §4.2): 操作音マスタートグル(既定ON)。

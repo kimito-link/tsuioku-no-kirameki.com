@@ -11253,6 +11253,24 @@
               </span>
             </label>
           </div>
+          <!-- v0.1.1271(ユーザー要望): 視聴ページに「🏟 会場モード」ボタンを出すか（既定 ON＝出す）。
+               「開いた瞬間つねに会場モードが有効になっている」という指摘の実体は、会場の画面ではなく
+               ボタンが常時表示されていることだった。会場を使わない人は隠せるようにする。 -->
+          <div class="nl-record-sub">
+            <label for="venueButtonVisibleToggle" class="nl-record-sub__label">
+              <input
+                type="checkbox"
+                id="venueButtonVisibleToggle"
+                checked
+                aria-label="視聴ページに会場モードのボタンを表示する"
+              />
+              <span>
+                視聴ページに「会場モード」ボタンを出す
+                <span class="nl-record-sub__hint"
+                  >ニコ生の視聴ページの右下に出る「🏟 会場モード」ボタンです。会場モードを使わない場合はオフにすると表示されなくなります（反映には視聴ページの再読み込みが必要です）。</span>
+              </span>
+            </label>
+          </div>
           <!-- Phase C(2026-07-05・council/pachinko-ultimate-SYNTHESIS.md §5.1): パチンコBGM（既定OFF＝
                オプトイン）。マイ効果音でbgm_reach_loop/bgm_fever_loop等を割り当てていない場合は無音。 -->
           <div class="nl-record-sub">

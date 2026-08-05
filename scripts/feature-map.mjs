@@ -89,6 +89,11 @@ const STORAGE_DISCONNECT_BASELINE = new Set([
   'KEY_INLINE_PANEL_VIEWPORT_WIDE_POLICY', 'KEY_INLINE_PANEL_WIDTH_MODE', 'KEY_LAST_WATCH_URL',
   'KEY_MARKETING_EXPORT_MASK_LABELS', 'KEY_NDGR_DETERMINISTIC_BACKFILL', 'KEY_NDGR_FORWARD_ENABLED',
   'KEY_PAINT_PERF_RING_V1', 'KEY_PROFILE_RESOLVE_STATE', 'KEY_RECORDING', 'KEY_STORY_GROWTH_COLLAPSED',
+  // v0.1.1271: 会場モードのボタンを出すか。producer=popup-entry.js(トグル保存)/
+  //   consumer=content-entry.js(readVenueButtonVisible が chrome.storage.local.get で読む)。
+  //   両方あるが、consumer 側が helper 関数の中で読むため静的解析が取りこぼす偽陽性。
+  //   KEY_RECORDING(同じく readRecordingFlag 経由)と全く同型。
+  'KEY_VENUE_BUTTON_VISIBLE',
   'KEY_SUPPORT_CELEBRATION_STATE', 'KEY_SW_PROGRESS', 'KEY_THUMB_AUTO', 'KEY_THUMB_INTERVAL_MS',
   'fn:backfillHeartbeatKey', 'fn:chunkMigratedKey', 'fn:comeviewPinStorageKey', 'fn:commentDbSummaryKey',
   'fn:eventDomStorageKey', 'fn:giftSubAppHistoryStorageKey', 'fn:perfDiagStorageKey', 'fn:tailStorageKey',

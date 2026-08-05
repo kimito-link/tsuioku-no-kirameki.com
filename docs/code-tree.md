@@ -627,7 +627,7 @@
     - `trumpet1.mp3`
     - `wallet1.mp3`
   - `SOURCES.md`
-- 📁 **src/** (1533)
+- 📁 **src/** (1534)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -908,7 +908,7 @@
         - `logo_funlink_white_RGB_maru_black.png`
       - `logo_guide_funlink_ol.pdf`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1302)
+  - 📁 **lib/** (1303)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -2079,6 +2079,7 @@
     - `venueBubbleLayout.test.js`
     - `venueBubbleLifecycle.js` — 吹き出しの寿命を「読み上げ(TTS)」に連動させる純関数群。
     - `venueBubbleLifecycle.test.js`
+    - `venueButtonVisible.wiring.test.js`
     - `venueCharacterFrame.js` — 会場モードの「額縁(フレーム)」: ゆっくり3キャラ(りんく/こん太/たぬ姉)の全表情サムネを、
     - `venueCharacterFrame.test.js`
     - `venueCloseRelease.wiring.test.js`
