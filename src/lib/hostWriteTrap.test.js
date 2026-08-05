@@ -116,6 +116,31 @@ describe('formatHostWriteTrapLine — ★0の意味を三分岐で言い切る',
     expect(line).not.toContain('0回');
   });
 
+  it('★到達報告は装着報告に上書きされない(切り分けの土台を消さない)', () => {
+    const s = createHostWriteTrapState();
+    noteHostWriteTrapArmed(s, false, 'reached(top=true, path=/watch/lv123)');
+    expect(s.reached).toBe(true);
+    // ★到達報告で armed を確定させない(装着の成否はこの後の報告で決まる)。
+    expect(s.armed).toBe(null);
+    // あとから装着失敗が来ても到達の事実は残る。
+    noteHostWriteTrapArmed(s, false, 'host-not-found(探索5回・不在5回)');
+    expect(s.reached).toBe(true);
+    expect(s.armReason).toContain('host-not-found');
+  });
+
+  it('★未装着の行に「到達したか」を必ず併記する(次の一手が変わるので)', () => {
+    const notReached = formatHostWriteTrapLine(
+      snapshotHostWriteTrap(createHostWriteTrapState(), OWN)
+    );
+    expect(notReached).toContain('到達なし');
+
+    const s = createHostWriteTrapState();
+    noteHostWriteTrapArmed(s, false, 'reached(top=true, path=/watch/lv123)');
+    const reached = formatHostWriteTrapLine(snapshotHostWriteTrap(s, OWN));
+    expect(reached).toContain('到達✅');
+    expect(reached).toContain('/watch/lv123');
+  });
+
   it('(1b) 装着失敗は理由を出す', () => {
     const s = createHostWriteTrapState();
     noteHostWriteTrapArmed(s, false, 'defineProperty-threw');
