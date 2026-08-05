@@ -166,5 +166,12 @@ export function formatVanishPhaseLine(a, deltas) {
   if (a.phase === 'locked') {
     return `${head} → locked(ばらつき${a.spreadMs}ms=拡張の4秒時計と同位相=内部が上流)`;
   }
-  return `${head} → walking(ばらつき${a.spreadMs}ms=別の時計=外部要因)`;
+  /*
+   * ★v0.1.1268 訂正: 旧文言は walking を「別の時計=外部要因」と断定していたが【誤り】。
+   *   書き手が拡張内部の4秒tickの非同期後段(microtask/rAF/observerコールバック)でも
+   *   Δ は数十〜数百ms ばらつく。この計器は非対称にしか読めない:
+   *   locked だけが「内部が上流」を示し、walking は何も証明しない。
+   *   (犯人の同期特定は hostWriteTrap が担当する)
+   */
+  return `${head} → walking(ばらつき${a.spreadMs}ms=別の時計 または 同一時計の非同期後段。この計器では区別不能)`;
 }

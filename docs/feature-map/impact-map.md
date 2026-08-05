@@ -522,6 +522,7 @@
 | `src/lib/hostStyleMutationTrace.js` | 1 | 記録エンジン(watchページ常駐) |
 | `src/lib/hostVanishForensics.js` | 1 | 記録エンジン(watchページ常駐) |
 | `src/lib/hostVisibilityFlipCensus.js` | 1 | 記録エンジン(watchページ常駐) |
+| `src/lib/hostWriteTrap.js` | 1 | 記録エンジン(watchページ常駐) |
 | `src/lib/htmlReportCommenterFollowSection.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/htmlReportConceptGuide.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/iframeOfficialDomFromRelay.js` | 1 | 記録エンジン(watchページ常駐) |

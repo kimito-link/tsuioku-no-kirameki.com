@@ -1511,4 +1511,156 @@ import {
     };
     window.addEventListener('popstate', notifySpaNavigation);
   } catch { /* no-op */ }
+
+  /*
+   * ★v0.1.1268: 「誰が host に display:none を書いたか」を【同期で】捕らえるトラップ。
+   *
+   * ■ なぜ MAIN world(このファイル)に置くか — 最重要
+   *   content script は isolated world で動き、DOM は共有でも【JSラッパーは world ごとに別】。
+   *   content-entry 側で defineProperty しても、ページの書き込みは別ラッパーを通るため
+   *   【絶対に発火しない】。実証(DevToolsコンソール)が main world だったため、
+   *   実装先を間違えると「実証済みなのに0が出る」最悪の空振りになる。
+   *
+   * ■ なぜ MutationObserver ではダメか
+   *   コールバックは非同期(マイクロタスク)で配信され、書き手は既にスタックから消えている(MDN)。
+   *   v0.1.1267 の速報に出た「書き換えた場所: at MutationObserver...」は計器自身の座標だった。
+   *
+   * ■ 副産物: 自分を犯人と誤報する経路が原理的に無い
+   *   拡張(isolated)の書き込みはこのトラップを物理的に通らない。reentrancy フラグ不要。
+   *
+   * ■ ★prototype は触らない
+   *   setProperty / setAttribute は【インスタンスに own property を定義すれば prototype を
+   *   shadow できる】。よってページ全体・他拡張への副作用はゼロ。
+   *
+   * ■ ★この版は観測に徹する(値の拒否・復元はしない)
+   *   犯人特定前の対処は v0.1.1250(唯一の復帰経路を塞いでパネルが戻らなくなった)の再演リスク。
+   */
+  try {
+    const HWT_MSG = 'NLS_HOST_WRITE_TRAP';
+    const HWT_HOST_ID = 'nls-inline-popup-host';
+    const HWT_ARM_EVENT = 'nls:hwt-arm';
+    const HWT_STACK_SAMPLE_MAX = 4;
+    const HWT_FLUSH_MS = 1000;
+
+    const hwtArmed = new WeakSet();
+    let hwtCounts = { prop: 0, setProperty: 0, cssText: 0, setAttribute: 0 };
+    let hwtNoneWrites = 0;
+    let hwtStacksTaken = 0;
+    let hwtPending = [];
+    let hwtFlushTimer = null;
+
+    const hwtHasNone = (v) => /display\s*:\s*none/i.test(String(v || ''));
+
+    const hwtFlush = () => {
+      hwtFlushTimer = null;
+      if (!hwtNoneWrites && !hwtPending.length) return;
+      const newSamples = hwtPending;
+      hwtPending = [];
+      postNlsIntercept({
+        type: HWT_MSG,
+        counts: { ...hwtCounts },
+        noneWrites: hwtNoneWrites,
+        newSamples
+      });
+      hwtCounts = { prop: 0, setProperty: 0, cssText: 0, setAttribute: 0 };
+      hwtNoneWrites = 0;
+    };
+
+    /** 捕獲を記録する。★記録の失敗が書き込み自体を壊してはいけない。 */
+    const hwtNote = (route, value) => {
+      try {
+        hwtCounts[route] = (hwtCounts[route] || 0) + 1;
+        hwtNoneWrites += 1;
+        if (hwtStacksTaken < HWT_STACK_SAMPLE_MAX) {
+          hwtStacksTaken += 1;
+          const stack = String(new Error('nls-who-set-display-none').stack || '');
+          hwtPending.push({
+            route,
+            valueHead: String(value || '').slice(0, 80),
+            // 先頭行は "Error: ..." なので落とし、呼び出し元の行だけを渡す。
+            frames: stack.split('\n').slice(1, 6).map((s) => s.trim()).filter(Boolean).slice(0, 3),
+            t: Date.now()
+          });
+        }
+        if (hwtFlushTimer == null) hwtFlushTimer = setTimeout(hwtFlush, HWT_FLUSH_MS);
+      } catch { /* 計器の失敗で描画を止めない */ }
+    };
+
+    /**
+     * host 1つにトラップを装着する(idempotent)。
+     * @param {HTMLElement} el
+     */
+    const installHostDisplayWriteTrap = (el) => {
+      if (!el || hwtArmed.has(el)) return;
+      hwtArmed.add(el);
+      let ok = false;
+      let reason = '';
+      try {
+        const style = el.style;
+        const proto = Object.getPrototypeOf(style);
+        // ★original は装着前に保存する(自分の shadow を再帰的に呼ばないため)。
+        const origSetProperty = proto.setProperty;
+        const origSetAttribute = el.setAttribute;
+        const cssTextDesc = Object.getOwnPropertyDescriptor(proto, 'cssText');
+
+        // (1) el.style.display = 'none'
+        Object.defineProperty(style, 'display', {
+          configurable: true,
+          enumerable: true,
+          get() { return origSetProperty ? style.getPropertyValue('display') : ''; },
+          set(v) {
+            if (String(v) === 'none') hwtNote('prop', v);
+            origSetProperty.call(style, 'display', String(v));
+          }
+        });
+
+        // (2) el.style.setProperty('display','none') — own property が prototype を shadow する
+        Object.defineProperty(style, 'setProperty', {
+          configurable: true,
+          writable: true,
+          value: function (name, value, priority) {
+            if (String(name) === 'display' && String(value) === 'none') hwtNote('setProperty', value);
+            return origSetProperty.call(this, name, value, priority);
+          }
+        });
+
+        // (3) el.style.cssText = '...display:none...'
+        if (cssTextDesc && cssTextDesc.set) {
+          Object.defineProperty(style, 'cssText', {
+            configurable: true,
+            enumerable: true,
+            get() { return cssTextDesc.get ? cssTextDesc.get.call(style) : ''; },
+            set(v) {
+              if (hwtHasNone(v)) hwtNote('cssText', v);
+              cssTextDesc.set.call(style, v);
+            }
+          });
+        }
+
+        // (4) el.setAttribute('style','...display:none...')
+        Object.defineProperty(el, 'setAttribute', {
+          configurable: true,
+          writable: true,
+          value: function (name, value) {
+            if (String(name) === 'style' && hwtHasNone(value)) hwtNote('setAttribute', value);
+            return origSetAttribute.call(this, name, value);
+          }
+        });
+
+        ok = true;
+      } catch (e) {
+        reason = String((e && e.message) || e || 'unknown').slice(0, 80);
+      }
+      postNlsIntercept({ type: HWT_MSG, armed: ok, armReason: reason });
+    };
+
+    // content-entry(isolated)が host を作った/差し替えたら教えてくれる。
+    //   ★CustomEvent は world を跨いで届く(detail 未使用なので clone 問題なし)。
+    window.addEventListener(HWT_ARM_EVENT, () => {
+      try {
+        const el = document.getElementById(HWT_HOST_ID);
+        if (el) installHostDisplayWriteTrap(el);
+      } catch { /* no-op */ }
+    });
+  } catch { /* トラップの失敗で本体を止めない */ }
 })();
