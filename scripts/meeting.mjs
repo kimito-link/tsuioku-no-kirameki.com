@@ -131,6 +131,11 @@ const G = process.env.GROQ_API_KEY, N = process.env.NVIDIA_API_KEY, O = process.
 // カード登録不要。ただしMiniMax-M2.7のように「カタログには残るが402で無料枠対象外」という
 // glm-5.2型の劣化パターンがあり得るため、採用エントリにはliveProbe必須（council-lineup.mjs参照）。
 const SN = process.env.SAMBANOVA_API_KEY;
+// Mistral AI La Plateforme（OpenAI互換）。2026-08-05追加: 無料枠はカード登録不要で、
+// 実機で6モデル200・2並列200を裏取り済み（council-lineup.mjs のエントリコメント参照）。
+// 月次クォータ枯渇時の挙動（429で止まるか課金に移るか）がAPI側から判別できないため、
+// 採用エントリには liveProbe 必須。
+const MI = process.env.MISTRAL_API_KEY;
 // Cloudflare Workers AI（OpenAI互換）。トークン1つ＋アカウントID(公開情報)で叩ける無料枠。
 // 2026-06-27 実機確認: glm-5.2 / nemotron-3-120b / kimi-k2.7-code が 200＋本文で返ることを裏取り済み。
 const CF = process.env.CLOUDFLARE_API_TOKEN, CF_ACC = process.env.CLOUDFLARE_ACCOUNT_ID;
@@ -271,6 +276,7 @@ const GROQ = 'https://api.groq.com/openai/v1/chat/completions';
 const NV = 'https://integrate.api.nvidia.com/v1/chat/completions';
 const OR = 'https://openrouter.ai/api/v1/chat/completions';
 const SNV = 'https://api.sambanova.ai/v1/chat/completions';
+const MIS = 'https://api.mistral.ai/v1/chat/completions';
 // Cloudflare Workers AI の OpenAI 互換エンドポイント（アカウントIDをパスに含む）。
 const CF_URL = CF_ACC ? `https://api.cloudflare.com/client/v4/accounts/${CF_ACC}/ai/v1/chat/completions` : '';
 // rawId = プロバイダ側の実モデルID（起動時ライブ実在チェックで /models と突き合わせる用。任意）。
@@ -297,7 +303,7 @@ const push = (label, kind, run, rawId = '', provider = '') => {
 // 2026-07-16 リファクタ（HANDOFF-council-scout-design.md Phase 0）: 個別の
 // push(...) 呼び出し列を LINEUP データ + このループに置き換えた。挙動は不変
 // （requires/provider/rawId/apiModel/opts/timeoutMs は元のpush引数と1:1対応）。
-const ENV_FLAGS = { G, N, O, E, CF, CF_ACC, SN };
+const ENV_FLAGS = { G, N, O, E, CF, CF_ACC, SN, MI };
 const PROVIDER_RUN = {
   groq: (entry) => (p, s) => openaiChat(GROQ, G, entry.apiModel, p, s, entry.opts, entry.timeoutMs || undefined),
   gemini: (entry) => (p, s) => geminiChat(entry.apiModel, p, s, entry.timeoutMs || undefined),
@@ -305,6 +311,7 @@ const PROVIDER_RUN = {
   cloudflare: (entry) => (p, s) => openaiChat(CF_URL, CF, entry.apiModel, p, s, entry.opts, entry.timeoutMs || undefined),
   openrouter: (entry) => (p, s) => openaiChat(OR, O, entry.apiModel, p, s, entry.opts, entry.timeoutMs || undefined),
   sambanova: (entry) => (p, s) => openaiChat(SNV, SN, entry.apiModel, p, s, entry.opts, entry.timeoutMs || undefined),
+  mistral: (entry) => (p, s) => openaiChat(MIS, MI, entry.apiModel, p, s, entry.opts, entry.timeoutMs || undefined),
 };
 // openaiChat/geminiChat の timeoutMs 既定引数を上書きしないよう、未指定時は
 // 呼び出し側の既定値に委ねる（下の runFor が entry.timeoutMs 未設定なら省略する）。
@@ -313,9 +320,9 @@ function runFor(entry) {
   if (!build) throw new Error(`unknown provider in council-lineup: ${entry.provider}`);
   if (!entry.timeoutMs) {
     // xxxChat の既定タイムアウトを使わせるため、明示引数を渡さない薄いラッパーにする。
-    if (entry.provider === 'groq' || entry.provider === 'nvidia' || entry.provider === 'cloudflare' || entry.provider === 'openrouter' || entry.provider === 'sambanova') {
-      const url = { groq: GROQ, nvidia: NV, cloudflare: CF_URL, openrouter: OR, sambanova: SNV }[entry.provider];
-      const key = { groq: G, nvidia: N, cloudflare: CF, openrouter: O, sambanova: SN }[entry.provider];
+    if (entry.provider === 'groq' || entry.provider === 'nvidia' || entry.provider === 'cloudflare' || entry.provider === 'openrouter' || entry.provider === 'sambanova' || entry.provider === 'mistral') {
+      const url = { groq: GROQ, nvidia: NV, cloudflare: CF_URL, openrouter: OR, sambanova: SNV, mistral: MIS }[entry.provider];
+      const key = { groq: G, nvidia: N, cloudflare: CF, openrouter: O, sambanova: SN, mistral: MI }[entry.provider];
       return (p, s) => openaiChat(url, key, entry.apiModel, p, s, entry.opts);
     }
     if (entry.provider === 'gemini') return (p, s) => geminiChat(entry.apiModel, p, s);
