@@ -734,7 +734,7 @@
   - `src/lib/statusTrendKey.js`
   - `src/extension/status-entry.js`
   - `src/lib/statusActionAdvisor.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 138</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 139</summary>
 
 - `app/app.js` — スマホ閲覧用 status Web 版。
 - `app/live-view.js` — global NL_BUILD_ID
@@ -843,6 +843,7 @@
 - `src/lib/safeStorageLocal.js` — v0.1.1080: 拡張リロード後の古いタブ(stale content script / iframe)が
 - `src/lib/scoreAnnounce.js` — 配信採点「結果発表シーケンス」の純関数プランナー(council/broadcast-scoring-SYNTHESIS.md
 - `src/lib/scoreRadar.js` — 配信採点の「講評レーダー」5軸(council/broadcast-scoring-SYNTHESIS.md §2.3)を組む純関数群。
+- `src/lib/sidePanelWatchTarget.js` — サイドパネルを「どの配信に紐づけるか」を決める純関数。
 - `src/lib/singleFlightByKey.js` — key 単位の single-flight 実行器(純関数コア)。
 - `src/lib/standalonePopupClose.js` — v0.1.433: 別ウィンドウ POP（standalone popup window）を「配信に飛ばしたら閉じる」判定（純ロジック）。
 - `src/lib/storageErrorState.js` — ストレージ書き込みエラーをポップアップ向けにシリアライズする純関数
@@ -879,7 +880,7 @@
 
 ## 🧬 修正系譜マップ(この系統のバグを過去にどう直したか)
 
-> changelog 全 588 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
+> changelog 全 589 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
 
 ### 💾 記録件数 (89版)
 - `v0.1.1247` 2026-08-04 — 読み上げが遅くなる悪循環を断ち切りました
@@ -2149,7 +2150,8 @@
 - `v0.1.840` 2026-06-20 — 機能逆引き地図を全ファイル網羅に
 - `v0.1.835` 2026-06-20 — 自己検証ゲートを追加(版同期+診断文言)
 
-### その他 (44版)
+### その他 (45版)
+- `v0.1.1259` 2026-08-05 — サイドパネルで開けるようにする準備をしました(内部)
 - `v0.1.1258` 2026-08-05 — 点滅を止めました(消す側と戻す側が競り合っていました)
 - `v0.1.1257` 2026-08-05 — 消えた回数の数え漏れを塞ぎました
 - `v0.1.1255` 2026-08-04 — パネルの表示切替を1つの操作にまとめました(内部整理)

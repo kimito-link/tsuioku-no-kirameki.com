@@ -1981,6 +1981,66 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   return true; // 非同期 sendResponse
 });
 
+/* ------------------------------------------------------------------ */
+/* v0.1.1259: サイドパネルを開く。NLS_OPEN_COMEVIEW と同型(既存の作法に揃える)。 */
+/*                                                                      */
+/* ★過去の撤退記録(本ファイル 3200 行付近)を繰り返さないための設計:      */
+/*   「0.1.67 では sidePanel.open を試したが、環境・タブ種別で空／未表示に */
+/*     見え『いつもの POP が出ない』報告があり popup 窓へ戻した」          */
+/*   真因は sidepanel.html が静的HTMLで ?lv= を持てず、かつ公式仕様で      */
+/*   サイドパネルが【既定で全タブ共有】のため前面タブの配信を掴むこと。    */
+/*                                                                      */
+/*   → 対処は3点:                                                       */
+/*     1. setOptions({ tabId, path }) で【タブ固有】にし ?lv= を焼く      */
+/*     2. watch タブでないなら開かない(空のパネルを出さない)             */
+/*     3. ★setPanelBehavior({openPanelOnActionClick:false}) は維持する   */
+/*        =ツールバー押下は従来どおり POP。奪わない(事故の直接原因)       */
+/* ------------------------------------------------------------------ */
+const OPEN_SIDE_PANEL_MESSAGE_TYPE = 'NLS_OPEN_SIDE_PANEL';
+const SIDE_PANEL_LV_RE = /^lv\d{1,15}$/;
+
+chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+  if (!msg || msg.type !== OPEN_SIDE_PANEL_MESSAGE_TYPE) return undefined;
+  if (!sender || sender.id !== chrome.runtime.id) {
+    try { sendResponse({ ok: false }); } catch { /* no-op */ }
+    return false;
+  }
+  const reply = (v) => {
+    try { sendResponse(v); } catch { /* port closed */ }
+  };
+  (async () => {
+    try {
+      if (!chrome.sidePanel || typeof chrome.sidePanel.open !== 'function') {
+        reply({ ok: false, error: 'sidePanel-unavailable' });
+        return;
+      }
+      const tabId = sender.tab && Number.isFinite(sender.tab.id) ? sender.tab.id : null;
+      if (tabId == null) {
+        reply({ ok: false, error: 'no-tab' });
+        return;
+      }
+      // lv は呼び出し元から渡る生値。固定リテラル path に正規化済み lv だけ載せる。
+      const lv = SIDE_PANEL_LV_RE.test(String(msg.liveId || '')) ? String(msg.liveId) : '';
+      // ★タブ固有にする。これをしないと全タブ共有のまま=別配信を掴む(過去の事故)。
+      if (typeof chrome.sidePanel.setOptions === 'function') {
+        await chrome.sidePanel.setOptions({
+          tabId,
+          path: lv ? `sidepanel.html?lv=${lv}` : 'sidepanel.html',
+          enabled: true
+        });
+      }
+      // open() はユーザー操作への応答でのみ許される(公式仕様)。
+      // 呼び出し元はパネル内のボタン=ユーザー操作なので満たす。
+      await chrome.sidePanel.open({ tabId });
+      reply({ ok: true, liveId: lv });
+    } catch (err) {
+      // ★失敗しても popup 窓へ落とさない。従来動作を一切変えないため。
+      reply({ ok: false, error: String(err && err.message) });
+    }
+  })();
+  return true; // 非同期 sendResponse
+});
+
 const OPEN_VENUE_MESSAGE_TYPE = 'NLS_OPEN_VENUE';
 
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {

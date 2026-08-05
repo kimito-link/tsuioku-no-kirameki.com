@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 4 / 716 件
+## ⚠️ 役割コメントが無いソース 4 / 717 件
 - `src/lib/laneDomSelfMeasure.js`
 - `src/lib/reportPreviewPublish.js`
 - `src/lib/venueLaneBuckets.js`
@@ -621,7 +621,7 @@
     - `trumpet1.mp3`
     - `wallet1.mp3`
   - `SOURCES.md`
-- 📁 **src/** (1513)
+- 📁 **src/** (1516)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -902,7 +902,7 @@
         - `logo_funlink_white_RGB_maru_black.png`
       - `logo_guide_funlink_ol.pdf`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1282)
+  - 📁 **lib/** (1285)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -1870,6 +1870,9 @@
     - `shouldSkipDeepHarvest.test.js`
     - `shouldTriggerOfficialGapDeepHarvest.js` — ライブ中に「公式 statistics コメント数」と「記録件数」の差が大きいとき、
     - `shouldTriggerOfficialGapDeepHarvest.test.js`
+    - `sidePanel.wiring.test.js`
+    - `sidePanelWatchTarget.js` — サイドパネルを「どの配信に紐づけるか」を決める純関数。
+    - `sidePanelWatchTarget.test.js`
     - `singleFlightByKey.js` — key 単位の single-flight 実行器(純関数コア)。
     - `singleFlightByKey.test.js`
     - `siteLinkHealth.js` — 公開ページ(LP/記事/docs)の「内部リンク健全性」を検証する純ロジック(2026-06-18)。
