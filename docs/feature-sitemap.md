@@ -287,7 +287,7 @@
   - `src/lib/giftThrowProjectile.js`
 - **吹き出し寿命管理** — 会場の吹き出しの表示上限・追い出し(eviction)ライフサイクル
   - `src/lib/venueBubbleLifecycle.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 205</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 206</summary>
 
 - `scripts/encode-marketing-html-avatars.mjs` — extension/images/marketing-html-avatars/*.png を data URI にし、
 - `scripts/split-avatar-parts.mjs` — 偽市松背景の除去 + パーツ切り出し(one-off アセットパイプライン)
@@ -361,6 +361,7 @@
 - `src/lib/inlineHostAnchorScoring.js` — 埋め込みパネル（inline host）の挿入アンカー候補をスコアリングする純粋関数。
 - `src/lib/inlineHostBesideSizing.js` — beside（横付き）モードの inline panel の幅・高さを最適計算する純粋関数。
 - `src/lib/inlineHostDockSizing.js` — dock_bottom モードの inline panel 高さを viewport と player rect から最適計算する純粋関数。
+- `src/lib/inlineHostHideReasonCensus.js` — パネルを消した「理由」を経路ごとに数える計器(純関数)。
 - `src/lib/inlineHostLayoutReset.js` — インラインパネルの placement（below / beside / floating / dock_bottom）を切り替える際に、
 - `src/lib/inlineHostMoveProbe.js` — ①POPインラインパネルの host(#nls-inline-popup-host)DOM移設を観測する
 - `src/lib/inlineHostRecoveryGate.js` — パネルが「消えたまま戻らない」を防ぐ復帰ゲート(純関数)。
@@ -878,7 +879,7 @@
 
 ## 🧬 修正系譜マップ(この系統のバグを過去にどう直したか)
 
-> changelog 全 585 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
+> changelog 全 586 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
 
 ### 💾 記録件数 (89版)
 - `v0.1.1247` 2026-08-04 — 読み上げが遅くなる悪循環を断ち切りました
@@ -1769,7 +1770,8 @@
 - `v0.1.673` 2026-06-10 — コメビュの名前をパネルと同じ情報源で補完
 - `v0.1.670` 2026-06-10 — コメビュのアイコンを本家と同じサムネに
 
-### 🩺 診断・状態速報 (217版)
+### 🩺 診断・状態速報 (218版)
+- `v0.1.1256` 2026-08-05 — パネルを消している犯人を名指しする計器を入れました
 - `v0.1.1254` 2026-08-04 — パネルが消えたまま戻らなくなる不具合を直しました
 - `v0.1.1251` 2026-08-04 — 応援タイルが一瞬で3枚まで減る症状を止めました
 - `v0.1.1250` 2026-08-04 — パネルが4秒ごとに一瞬消えるちらつきを止めました
