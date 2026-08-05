@@ -36,6 +36,21 @@ describe('hidePageFrameOverlay の理由タグ配線', () => {
     expect(new Set(tags).size).toBe(tags.length);
   });
 
+  it('★実際に見えていたか(computed)基準でも消失を記録する — インライン基準の取りこぼしを塞ぐ', () => {
+    // hostFlipCensus が2日間 0 を出し続けた真因: CSS 既定が display:none のため
+    // インラインの prev===display で素通りしていた。computed 基準なら取りこぼさない。
+    const i = contentSrc.indexOf('function setInlineHostDisplay(');
+    const body = contentSrc.slice(i, i + 1200);
+    expect(body).toContain('window.getComputedStyle(host)');
+    expect(body).toMatch(/noteInlineHostHideReason\(`display:\$\{cause\}`\)/);
+    // ★prev の値に依存しない位置(早期returnより前)で記録していること。
+    const recIdx = body.indexOf('noteInlineHostHideReason');
+    const retIdx = body.indexOf('if (prev === display) return;');
+    expect(recIdx).toBeGreaterThan(-1);
+    expect(retIdx).toBeGreaterThan(-1);
+    expect(recIdx).toBeLessThan(retIdx);
+  });
+
   it('診断に載せている(2箇所とも)', () => {
     const hits = contentSrc.match(/hostHideReason: \(\(\) => \{/g) || [];
     expect(hits.length).toBe(2);

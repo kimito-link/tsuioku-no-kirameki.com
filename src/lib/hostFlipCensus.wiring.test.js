@@ -14,6 +14,21 @@ const contentSrc = fs.readFileSync(path.join(root, 'extension/content-entry.js')
  *   33msだけ消えて即復帰。幅 920px→11px に潰れる。前後フレームは変化0.0%(完全静止)。
  * ★既存2計器はこれを取りこぼしていた(hostMoveDiag=移設のみ / scrollWhiteout=scroll時のみ)。
  */
+
+/**
+ * 関数本体を「次の行頭 `}`」まで切り出す。
+ * ★固定文字数(slice(i, i+N))で切ると、関数に行を足しただけで断言が範囲外に落ちて
+ *   偽の赤になる(2026-08-05 に実際に発生)。断言すべきは【契約の有無】であって
+ *   コードの長さではないので、終端まで見る。
+ * @param {string} src @param {string} decl
+ */
+function fnBody(src, decl) {
+  const i = src.indexOf(decl);
+  if (i < 0) return '';
+  const end = src.indexOf(String.fromCharCode(10) + '}' + String.fromCharCode(10), i);
+  return end < 0 ? src.slice(i) : src.slice(i, end + 2);
+}
+
 describe('host flip census + 4s repaint gate wiring', () => {
   it('★中核: 4秒経路(syncLiveIdFromLocation)が無条件描画をやめている', () => {
     // ★v0.1.1254 で判定は shouldRenderInlineHostOnPoll(純関数)へ移した。
@@ -63,8 +78,7 @@ describe('host flip census + 4s repaint gate wiring', () => {
   });
 
   it('★集約関数が「状態が変わったときだけ」計上する(水増ししない)', () => {
-    const idx = contentSrc.indexOf('function setInlineHostDisplay(');
-    const body = contentSrc.slice(idx, idx + 700);
+    const body = fnBody(contentSrc, 'function setInlineHostDisplay(');
     expect(body).toMatch(/const prev = host\.style\.display;/);
     expect(body).toMatch(/if \(prev === display\) return;/);
     expect(body).toMatch(/if \(display === 'none'\) noteHostHidden\(/);
