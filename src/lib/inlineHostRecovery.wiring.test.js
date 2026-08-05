@@ -35,6 +35,24 @@ describe('inlineHostRecoveryGate の配線', () => {
     expect(contentSrc).toMatch(/if \(verdict\.render\) \{\s*\n\s*inlineLayoutDirty = false;\s*\n\s*renderPageFrameOverlay\(\);/);
   });
 
+  it('★仕様どおりの非表示を判定に渡している(渡さないと消す/戻すの競り合いが再発)', () => {
+    const calls = contentSrc.match(/intentionallyHidden: isInlineHostIntentionallyHidden\(\)/g) || [];
+    expect(calls.length).toBe(2); // watch / 非watch の両方
+    expect(contentSrc).toMatch(/function isInlineHostIntentionallyHidden\(\) \{/);
+  });
+
+  it('★判定条件が autoshow_off ゲートと同一(食い違うと競り合いに戻る)', () => {
+    const i = contentSrc.indexOf('function isInlineHostIntentionallyHidden(');
+    const body = contentSrc.slice(i, contentSrc.indexOf(String.fromCharCode(10) + '}', i));
+    for (const flag of [
+      '!inlinePanelAutoshowEnabled',
+      '!toolbarInitiatedShowThisSession',
+      '!inlinePanelAutoshowActivatedThisSession'
+    ]) {
+      expect(body).toContain(flag);
+    }
+  });
+
   it('可視判定が DOM 走査をしていない(4秒に1回でも走査は入れない)', () => {
     const idx = contentSrc.indexOf('function probeInlineHostVisibilityForRecovery(');
     expect(idx).toBeGreaterThan(-1);
