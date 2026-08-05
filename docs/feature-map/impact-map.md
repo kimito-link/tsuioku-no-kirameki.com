@@ -541,6 +541,7 @@
 | `src/lib/inlinePanelFocusGate.js` | 1 | 記録エンジン(watchページ常駐) |
 | `src/lib/inlinePanelPlacementResolver.js` | 1 | 記録エンジン(watchページ常駐) |
 | `src/lib/inlinePanelPlacementStorage.js` | 1 | ポップアップ(応援レーン) |
+| `src/lib/inlinePanelShowGate.js` | 1 | 記録エンジン(watchページ常駐) |
 | `src/lib/inlinePanelViewportWide.js` | 1 | 記録エンジン(watchページ常駐) |
 | `src/lib/inlinePlacementQuickbar.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/inlinePopupHostPrimaryPick.js` | 1 | 記録エンジン(watchページ常駐) |
