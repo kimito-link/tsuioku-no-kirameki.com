@@ -353,6 +353,13 @@ import {
 // ★v0.1.1255(Phase A): 「見せる/消す」1回分の値の組を決める純関数。
 //   会議の結論=ディレクトリ移動より先に副作用を正本化する、の最初の対象。
 import { buildInlineHostVisibilityIntent } from '../lib/inlineHostVisibilityIntent.js';
+// ★v0.1.1256: パネルを消した【理由】を経路ごとに数える(症状でなく原因を名指しする)。
+import {
+  createInlineHostHideReasonCensus,
+  noteInlineHostHide,
+  snapshotInlineHostHideReasonCensus,
+  formatInlineHostHideReasonLine
+} from '../lib/inlineHostHideReasonCensus.js';
 import { probeWatchPageDomStructure } from '../lib/probeWatchPageDomStructure.js';
 import { summarizeGiftSubAppHistoryDiag } from '../lib/summarizeGiftSubAppHistoryDiag.js';
 import { createConsoleErrorBuffer } from '../lib/consoleErrorBuffer.js';
@@ -2867,6 +2874,14 @@ function setInlineHostDisplay(host, display, cause) {
  * @param {boolean} visible true=見せる / false=消す
  * @param {string} cause 経路タグ(状態速報にそのまま出る)
  */
+const _hostHideReasonCensus = createInlineHostHideReasonCensus();
+
+/** @param {string} reason hidePageFrameOverlay の呼び出し元タグ */
+function noteInlineHostHideReason(reason) {
+  try { noteInlineHostHide(_hostHideReasonCensus, reason, Date.now()); }
+  catch { /* 計器失敗は描画を止めない */ }
+}
+
 function setInlineHostVisible(host, visible, cause) {
   if (!host || !host.style) return;
   const intent = buildInlineHostVisibilityIntent({ visible, cause });
@@ -4218,7 +4233,7 @@ function ensureInlinePanelCloseButton(host) {
         toolbarInitiatedShowThisSession = false;
         // 手動 close は hidePageFrameOverlay に寄せ、stableFrameTarget 掃除と
         // iframe visibility タイマ解除を常に揃える（閉じた直後の再オープン安定化）。
-        hidePageFrameOverlay();
+        hidePageFrameOverlay('toolbar_close');
       } catch {
         // no-op
       }
@@ -5656,7 +5671,16 @@ function renderInlinePopupHost(target) {
   maybeReconnectCommentMutationObserverAfterInlineLayout();
 }
 
-function hidePageFrameOverlay() {
+/**
+ * ★v0.1.1256: reason を必須化(既定 'unknown')。
+ *   実測(v0.1.1255)で「4.0秒ちょうどの周期・誤差0.001」でパネルが消えることが確定したが、
+ *   renderPageFrameOverlay 内に hide 経路が3つあり【どれが消しているか】が分からなかった。
+ *   症状でなく原因を名指しするため、消した理由を経路ごとに数える
+ *   ([[instrument-must-name-the-cause-2026-08-01]])。
+ * @param {string} [reason] 消した経路のタグ(状態速報にそのまま出る)
+ */
+function hidePageFrameOverlay(reason = 'unknown') {
+  noteInlineHostHideReason(reason);
   try {
     dismissToolbarOpenInstantFeedback();
   } catch {
@@ -6928,6 +6952,10 @@ function buildAiShareFastDiagnosticsPayload() {
       // v0.1.1250: 移設でもscrollでもない「パネルが一瞬消える」を名指しする計器。
       hostFlipCensus: snapshotHostVisibilityFlipCensus(_hostFlipCensus),
       hostVisWatch: snapshotHostVisibilityWatch(_hostVisWatch),
+      hostHideReason: (() => {
+        const snap = snapshotInlineHostHideReasonCensus(_hostHideReasonCensus);
+        return snap ? { ...snap, line: formatInlineHostHideReasonLine(snap) } : null;
+      })(),
       hostRecoveryDiag: {
         checkCount: _inlineHostRecoveryDiag.checkCount,
         recoverCount: _inlineHostRecoveryDiag.recoverCount,
@@ -7468,12 +7496,12 @@ function renderPageFrameOverlay() {
     return;
   }
   if (!isWatchInlinePanelTopFrame()) {
-    hidePageFrameOverlay();
+    hidePageFrameOverlay('not_top_frame');
     maybeReconnectCommentMutationObserverAfterInlineLayout();
     return;
   }
   if (!isNicoLiveWatchUrl(window.location.href)) {
-    hidePageFrameOverlay();
+    hidePageFrameOverlay('not_watch_url');
     maybeReconnectCommentMutationObserverAfterInlineLayout();
     return;
   }
@@ -7487,7 +7515,7 @@ function renderPageFrameOverlay() {
     !toolbarInitiatedShowThisSession &&
     !inlinePanelAutoshowActivatedThisSession
   ) {
-    hidePageFrameOverlay();
+    hidePageFrameOverlay('autoshow_off');
     /*
      * try/finally に入らないため、ここでも監視ルートを取り直す。
      * パネル非表示中も公式コメ欄 DOM は差し替わり得る（tick 経路での取りこぼし防止）。
@@ -9572,6 +9600,10 @@ function buildAiSharePageDiagnostics() {
       // v0.1.1250: 移設でもscrollでもない「パネルが一瞬消える」を名指しする計器。
       hostFlipCensus: snapshotHostVisibilityFlipCensus(_hostFlipCensus),
       hostVisWatch: snapshotHostVisibilityWatch(_hostVisWatch),
+      hostHideReason: (() => {
+        const snap = snapshotInlineHostHideReasonCensus(_hostHideReasonCensus);
+        return snap ? { ...snap, line: formatInlineHostHideReasonLine(snap) } : null;
+      })(),
       hostRecoveryDiag: {
         checkCount: _inlineHostRecoveryDiag.checkCount,
         recoverCount: _inlineHostRecoveryDiag.recoverCount,
@@ -12654,7 +12686,7 @@ function syncLiveIdFromLocation() {
   lastOfficialGapDeepHarvestAt = 0;
   clearThumbTimer();
   reconnectMutationObserver();
-  hidePageFrameOverlay();
+  hidePageFrameOverlay('left_watch_page');
 }
 
 /** @param {Node|null|undefined} node */

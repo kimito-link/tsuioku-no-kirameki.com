@@ -4916,6 +4916,16 @@
       ]
     },
     {
+      "file": "src/lib/inlineHostHideReasonCensus.js",
+      "featureCount": 1,
+      "features": [
+        "content"
+      ],
+      "labels": [
+        "記録エンジン(watchページ常駐)"
+      ]
+    },
+    {
       "file": "src/lib/inlineHostLayoutReset.js",
       "featureCount": 1,
       "features": [
