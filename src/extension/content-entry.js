@@ -2856,8 +2856,19 @@ function setInlineHostDisplay(host, display, cause) {
   if (display === 'none') {
     try {
       const cs = window.getComputedStyle(host);
-      const wasVisible = cs.display !== 'none' && cs.visibility !== 'hidden' && Number(cs.opacity) !== 0;
-      if (wasVisible) noteInlineHostHideReason(`display:${cause}`);
+      /*
+       * ★v0.1.1260: 判定から opacity を外した。
+       *   旧実装は「display!=='none' かつ visibility!=='hidden' かつ opacity!==0」を
+       *   "見えていた" の条件にしていたが、この関数は【display だけ】を書き換える経路
+       *   (first_paint_gate / video_rect_too_small / prewarm_offscreen / host_created)
+       *   からも呼ばれる。それらは opacity を触らないため、CSS 既定の opacity:0 が
+       *   残っていると wasVisible=false となり【消したのに記録されない】。
+       *   実測(2026-08-05): 消失8回に対し記録4回=ちょうど半分が取りこぼされていた。
+       *   → この関数の責務は display なので、display と visibility だけで判定する。
+       *     opacity 込みの「実際に見えたか」は hostVisWatch(rAF実測)が別途担当する。
+       */
+      const wasDisplayed = cs.display !== 'none' && cs.visibility !== 'hidden';
+      if (wasDisplayed) noteInlineHostHideReason(`display:${cause}`);
     } catch { /* 計器失敗は描画を止めない */ }
   }
   host.style.display = display;
