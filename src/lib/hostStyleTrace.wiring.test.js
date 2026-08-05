@@ -20,26 +20,36 @@ describe('hostStyleMutationTrace の配線', () => {
     expect(contentSrc).toMatch(/const _hostStyleTrace = createHostStyleMutationTrace\(\);/);
   });
 
+  /*
+   * ★v0.1.1267: startHostStyleMutationTrace → ensureHostAncestryMutationTrace に改名。
+   *   同時に観測範囲を「host だけ」から「host+祖先2階層」へ広げ、
+   *   初代固着(host 再生成後に死んだノードを見張る)を根治した。
+   *   祖先観測・張り直しの断言は vanishForensics1267.wiring.test.js が担当する。
+   */
   it('★MutationObserver で見張っている(関数を通らない書き換えも捕らえる)', () => {
-    const body = fnBody(contentSrc, 'function startHostStyleMutationTrace(');
+    const body = fnBody(contentSrc, 'function ensureHostAncestryMutationTrace(');
     expect(body).toContain('new MutationObserver(');
-    expect(body).toMatch(/attributeFilter:\s*\['style', 'class', 'hidden', 'aria-hidden'\]/);
+    expect(body).toMatch(
+      /attrFilter = \['style', 'class', 'hidden', 'aria-hidden', 'data-nls-hidden'\]/
+    );
   });
 
   it('★消えた瞬間だけ stack を採る(毎回だと重い)', () => {
-    const body = fnBody(contentSrc, 'function startHostStyleMutationTrace(');
+    const body = fnBody(contentSrc, 'function ensureHostAncestryMutationTrace(');
     expect(body).toMatch(/stack: becameHidden \? new Error\('host-hidden'\)\.stack : ''/);
   });
 
   it('★host 作成時に無条件で観測を開始する', () => {
-    expect(contentSrc).toMatch(/\n\s*startHostStyleMutationTrace\(host\);/);
+    expect(contentSrc).toMatch(/\n\s*ensureHostAncestryMutationTrace\(host\);/);
     // if で無効化されていないこと。
-    expect(contentSrc).not.toMatch(/if\s*\([^)]*\)\s*startHostStyleMutationTrace\(/);
+    expect(contentSrc).not.toMatch(/if\s*\([^)]*\)\s*ensureHostAncestryMutationTrace\(host\);/);
   });
 
-  it('二重起動を防いでいる', () => {
-    const body = fnBody(contentSrc, 'function startHostStyleMutationTrace(');
-    expect(body).toMatch(/if \(_hostStyleObserver \|\| !host/);
+  it('★現物を見ているときだけ早期returnする(旧実装は初代に固着していた)', () => {
+    const body = fnBody(contentSrc, 'function ensureHostAncestryMutationTrace(');
+    expect(body).toMatch(
+      /if \(_hostStyleObserver && _hostTraceHost === host && _hostTraceParent === parent\) return;/
+    );
   });
 
   it('診断に載せている(2箇所とも)', () => {

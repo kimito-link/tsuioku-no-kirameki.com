@@ -379,6 +379,10 @@ import {
   createVanishForensics, markTrail, noteVanishWithTrail,
   snapshotVanishForensics, formatVanishForensicsLine
 } from '../lib/hostVanishForensics.js';
+// ★v0.1.1267: 消えた瞬間の事実から【原因】を分類する / 位相で時計の持ち主を二分する。
+import {
+  classifyVanishSnapshot, assessVanishPhase, formatVanishPhaseLine
+} from '../lib/inlineHostVanishClassifier.js';
 import { probeWatchPageDomStructure } from '../lib/probeWatchPageDomStructure.js';
 import { summarizeGiftSubAppHistoryDiag } from '../lib/summarizeGiftSubAppHistoryDiag.js';
 import { createConsoleErrorBuffer } from '../lib/consoleErrorBuffer.js';
@@ -2833,7 +2837,25 @@ function trail(tag) {
   try { markTrail(_vanishForensics, tag, Date.now()); } catch { /* no-op */ }
 }
 let _hostStyleObserver = null;
-let _hostStylePrevVisible = null;
+/*
+ * ★v0.1.1267: 旧 `_hostStylePrevVisible` を【2つに分離】した。
+ *   旧実装は MutationObserver と rAF ループが同じ1変数を共有しており、
+ *   rAF が毎フレーム(60回/秒)上書きするため observer 側の becameHidden 判定が
+ *   ほぼ成立しなかった。これが hostStyleTrace=0 の原因の1つ
+ *   (=「異常なし」ではなく【壊れていて測れていなかった】)。
+ *   ★2つの計器が状態を共有してはいけない。旧名は復活させないこと(wiringテストで固定)。
+ */
+let _hostMutPrevVisible = null;
+let _hostRafPrevVisible = null;
+/** observer が「いま見ている」host と親。変わったら張り直す(初代固着の根治)。 */
+let _hostTraceHost = null;
+let _hostTraceParent = null;
+/** 祖先まで含めた属性変化のリング(12件)。★書き手の指紋(old→new)を残す。 */
+const _hostAncestryTrace = { entries: [], total: 0, reattachCount: 0 };
+/** 拡張の <style> を貼り直した回数(0 は「消されていない」の証拠になる)。 */
+let _pageFrameStyleReattachCount = 0;
+/** 直近の 4秒 poll tick 時刻。消失との位相差 Δ を出すために使う。 */
+let _lastLivePollTickAt = 0;
 
 /**
  * ★v0.1.1261: host の style/class 変化を MutationObserver で見張る。
@@ -2842,17 +2864,44 @@ let _hostStylePrevVisible = null;
  *   stack 取得は「見えている→消えた」の遷移時だけ(毎回だと重い)。
  * @param {HTMLElement|null} host
  */
-function startHostStyleMutationTrace(host) {
-  if (_hostStyleObserver || !host || typeof MutationObserver !== 'function') return;
+function ensureHostAncestryMutationTrace(host) {
+  if (!host || typeof MutationObserver !== 'function') return;
+  const parent = host.parentElement || null;
+  // 既に「現物」を見ているなら何もしない(idempotent・rAF から毎フレーム呼ばれる)。
+  if (_hostStyleObserver && _hostTraceHost === host && _hostTraceParent === parent) return;
   try {
-    _hostStyleObserver = new MutationObserver(() => {
+    if (_hostStyleObserver) {
+      // ★張り直し。旧実装は `if (_hostStyleObserver) return` で初代に固着し、
+      //   host が作り直されると【死んだノードを永久に見張って】いた。
+      _hostStyleObserver.disconnect();
+      _hostAncestryTrace.reattachCount += 1;
+    }
+    _hostStyleObserver = new MutationObserver((records) => {
       try {
+        // 属性の old→new を残す=「誰が何をどう書き換えたか」の指紋。
+        for (const rec of records) {
+          if (!rec || rec.type !== 'attributes') continue;
+          const t = rec.target;
+          const level = t === host ? 'host' : t === parent ? 'parent' : 'ancestor';
+          let nowValue = '';
+          try { nowValue = String(t.getAttribute(rec.attributeName) ?? ''); } catch { nowValue = ''; }
+          _hostAncestryTrace.total += 1;
+          _hostAncestryTrace.entries.push({
+            nowMs: Date.now(),
+            level,
+            attr: String(rec.attributeName || ''),
+            oldValue: String(rec.oldValue ?? '').slice(0, 120),
+            newValue: nowValue.slice(0, 120)
+          });
+          if (_hostAncestryTrace.entries.length > 12) _hostAncestryTrace.entries.shift();
+        }
         const cs = window.getComputedStyle(host);
         const r = host.getBoundingClientRect();
         const visible =
           cs.display !== 'none' && cs.visibility !== 'hidden' &&
           Number(cs.opacity) !== 0 && r.width >= 40 && r.height >= 24;
-        const becameHidden = _hostStylePrevVisible === true && !visible;
+        // ★rAF と共有しない専用変数(v0.1.1267)。共有していたのが旧実装の欠陥。
+        const becameHidden = _hostMutPrevVisible === true && !visible;
         noteHostStyleMutation(_hostStyleTrace, {
           nowMs: Date.now(),
           becameHidden,
@@ -2864,14 +2913,87 @@ function startHostStyleMutationTrace(host) {
           // 消えた瞬間だけ stack を採る(毎回は重い)。
           stack: becameHidden ? new Error('host-hidden').stack : ''
         });
-        _hostStylePrevVisible = visible;
+        _hostMutPrevVisible = visible;
       } catch { /* 計器失敗は描画を止めない */ }
     });
+    const attrFilter = ['style', 'class', 'hidden', 'aria-hidden', 'data-nls-hidden'];
+    // ★host 自身【と祖先2階層】を見る。旧実装は host しか見ておらず、
+    //   「親が潰されていない」証拠には全くならなかった(今回の症状は幅も高さも同時に0)。
     _hostStyleObserver.observe(host, {
-      attributes: true,
-      attributeFilter: ['style', 'class', 'hidden', 'aria-hidden']
+      attributes: true, attributeOldValue: true, attributeFilter: attrFilter
     });
+    if (parent) {
+      _hostStyleObserver.observe(parent, {
+        attributes: true, attributeOldValue: true, attributeFilter: attrFilter,
+        childList: true // host が親から外される瞬間も捕らえる
+      });
+      const grand = parent.parentElement;
+      if (grand) {
+        _hostStyleObserver.observe(grand, {
+          attributes: true, attributeOldValue: true, attributeFilter: attrFilter
+        });
+      }
+    }
+    _hostTraceHost = host;
+    _hostTraceParent = parent;
   } catch { /* observer 生成失敗は無視 */ }
+}
+
+/**
+ * 消えた瞬間の事実を採取する(★遷移時のみ呼ぶ。毎フレームは重い)。
+ * @param {HTMLElement} host
+ * @param {CSSStyleDeclaration|null} cs
+ * @returns {{hiddenAttr:string|null, styleAttr:string|null, hostDisplay:string, ancestors:Array<object>, cssAlive:boolean}}
+ */
+function captureVanishSnapshot(host, cs) {
+  let styleAttr = null;
+  try { styleAttr = host.getAttribute('style'); } catch { styleAttr = null; }
+  let hiddenAttr = null;
+  try { hiddenAttr = host.getAttribute(INLINE_HOST_HIDDEN_ATTR); } catch { hiddenAttr = null; }
+  const ancestors = [];
+  try {
+    let el = host.parentElement;
+    for (let i = 0; i < 3 && el; i += 1) {
+      const acs = window.getComputedStyle(el);
+      const ar = el.getBoundingClientRect();
+      ancestors.push({
+        tag: el.tagName,
+        cls: String(el.className || '').slice(0, 40),
+        display: acs.display,
+        w: Math.round(ar.width),
+        h: Math.round(ar.height)
+      });
+      el = el.parentElement;
+    }
+  } catch { /* 採取失敗は分類側が unknown として扱う */ }
+  let cssAlive = true;
+  try {
+    cssAlive = !!document.getElementById(PAGE_FRAME_STYLE_ID)?.isConnected;
+  } catch { cssAlive = true; }
+  return {
+    hiddenAttr,
+    styleAttr: typeof styleAttr === 'string' ? styleAttr.slice(0, 160) : styleAttr,
+    hostDisplay: cs ? cs.display : '',
+    ancestors,
+    cssAlive
+  };
+}
+
+/**
+ * 拡張の <style> が生きていることを保証する(★v0.1.1267)。
+ *
+ * ★なぜ要るか: v0.1.1266 で「消えている」の正本を `[data-nls-hidden]` の CSS ルールに移した。
+ *   その <style> が外部に消されるとルールごと死に、**属性が付いていても消えなくなる**
+ *   =「こん太を押す前にパネルが出る」という逆向きの事故になる。
+ * ★正常系(style要素が在る)では完全に no-op。「何が正常か」を getElementById の有無という
+ *   一義的な条件で教えてある([[repair-gate-needs-to-know-normal-2026-08-05]])。
+ */
+function ensurePageFrameStyleAlive() {
+  try {
+    if (document.getElementById(PAGE_FRAME_STYLE_ID)) return; // 正常=何もしない
+    _pageFrameStyleReattachCount += 1;
+    ensurePageFrameStyle();
+  } catch { /* 復旧失敗は描画を止めない */ }
 }
 
 function startHostVisibilityWatch() {
@@ -2881,6 +3003,15 @@ function startHostVisibilityWatch() {
     try {
       const host = nlsInlinePopupHostSingleton;
       if (host && host.getBoundingClientRect) {
+        /*
+         * ★v0.1.1267: observer が「現物」を見ているか毎フレーム確かめる。
+         *   host は生成/移設で差し替わるので、ここで追従させないと初代に固着する。
+         *   ★hot path なので【ポインタ比較2つだけ】。DOM 走査は絶対に足さない
+         *   (v0.1.1201 で paint 毎の querySelectorAll を入れて拡張全体を重くした前科)。
+         */
+        if (host !== _hostTraceHost || host.parentElement !== _hostTraceParent) {
+          ensureHostAncestryMutationTrace(host);
+        }
         const r = host.getBoundingClientRect();
         let cs = null;
         // computed は「消えた瞬間だけ」読みたいが、前フレームとの比較が要るので
@@ -2889,12 +3020,18 @@ function startHostVisibilityWatch() {
         // ★v0.1.1265: 消えた瞬間に直前の足跡を切り出す(見えていた→見えない の遷移時のみ)。
         try {
           const visNow = r.width >= 40 && r.height >= 24;
-          if (_hostStylePrevVisible === true && !visNow) {
+          if (_hostRafPrevVisible === true && !visNow) {
+            // ★遷移の瞬間だけ採取する(祖先3つの getComputedStyle は毎フレームだと重い)。
+            const snapshot = captureVanishSnapshot(host, cs);
+            const { hint, detail } = classifyVanishSnapshot(snapshot);
             noteVanishWithTrail(_vanishForensics, {
-              nowMs: Date.now(), w: r.width, h: r.height, display: cs ? cs.display : ''
+              nowMs: Date.now(), w: r.width, h: r.height, display: cs ? cs.display : '',
+              hint, detail, snapshot,
+              // Δ = 消失時刻 − 直近の拡張4秒tick。位相で「どちらの時計か」を二分する。
+              pollDeltaMs: _lastLivePollTickAt > 0 ? Date.now() - _lastLivePollTickAt : null
             });
           }
-          _hostStylePrevVisible = visNow;
+          _hostRafPrevVisible = visNow;
         } catch { /* 計器失敗は描画を止めない */ }
         noteHostFrame(_hostVisWatch, {
           nowMs: Date.now(),
@@ -3392,6 +3529,16 @@ function ensurePageFrameStyle() {
     #${INLINE_POPUP_HOST_ID} {
       display: block;
       width: 100%;
+      /*
+       * ★v0.1.1267: 幾何の自衛。実測の消失は「幅も高さも同時に0」(axis:both)で、
+       *   親のレイアウトに潰される形と整合する。ここで下限を敷いて潰れを防ぐ。
+       *   ★[data-nls-hidden="1"] 時は display:none !important が勝つので
+       *     「こん太を押すまで出さない」既定動作には影響しない(テストで固定)。
+       *   ★親が display:none なら min-* は無効。その場合は計器が
+       *     hint:ancestor-collapsed で親を名指しするので、この版は無駄にならない。
+       */
+      min-width: 280px;
+      min-height: 120px;
       margin: 2px 0 2px;
       opacity: 1;
       transition: opacity 0.14s ease-out;
@@ -4118,7 +4265,7 @@ function ensureInlinePopupHost() {
   host.setAttribute('aria-hidden', 'true');
   setInlineHostDisplay(host, 'none', 'host_created');
   // ★v0.1.1261: この host の style 書き換えを経路を問わず見張る(idempotent)。
-  startHostStyleMutationTrace(host);
+  ensureHostAncestryMutationTrace(host);
   host.style.pointerEvents = 'auto';
   host.style.width = '100%';
 
@@ -7162,8 +7309,28 @@ function buildAiShareFastDiagnosticsPayload() {
       hostVisWatch: snapshotHostVisibilityWatch(_hostVisWatch),
       vanishForensics: (() => {
         const snap = snapshotVanishForensics(_vanishForensics);
-        return snap ? { ...snap, line: formatVanishForensicsLine(snap) } : null;
+        if (!snap) return null;
+        // ★v0.1.1267: 位相(どちらの時計か)と、観測対象が現物かの自己申告を併記する。
+        const phase = assessVanishPhase(snap.pollDeltas);
+        return {
+          ...snap,
+          phase,
+          phaseLine: formatVanishPhaseLine(phase, snap.pollDeltas),
+          line: formatVanishForensicsLine(snap) + '\n' + formatVanishPhaseLine(phase, snap.pollDeltas)
+        };
       })(),
+      hostAncestryTrace: {
+        total: _hostAncestryTrace.total,
+        reattachCount: _hostAncestryTrace.reattachCount,
+        entries: _hostAncestryTrace.entries.slice(-6),
+        // ★「いま現物を見ているか」を毎回自己申告させる(初代固着の再発検知)。
+        watchingCurrentHost: _hostTraceHost === nlsInlinePopupHostSingleton,
+        line: `hostAncestryTrace: 属性変化${_hostAncestryTrace.total}件 / 再attach${_hostAncestryTrace.reattachCount}回 / 観測対象=${_hostTraceHost === nlsInlinePopupHostSingleton ? '現host ✅' : '★別ノード(固着)'}`
+      },
+      styleReattach: {
+        count: _pageFrameStyleReattachCount,
+        line: `styleReattach: ${_pageFrameStyleReattachCount}回(拡張の<style>を貼り直した回数)`
+      },
       hostStyleTrace: (() => {
         const snap = snapshotHostStyleMutationTrace(_hostStyleTrace);
         return snap ? { ...snap, line: formatHostStyleMutationLine(snap) } : null;
@@ -9855,8 +10022,28 @@ function buildAiSharePageDiagnostics() {
       hostVisWatch: snapshotHostVisibilityWatch(_hostVisWatch),
       vanishForensics: (() => {
         const snap = snapshotVanishForensics(_vanishForensics);
-        return snap ? { ...snap, line: formatVanishForensicsLine(snap) } : null;
+        if (!snap) return null;
+        // ★v0.1.1267: 位相(どちらの時計か)と、観測対象が現物かの自己申告を併記する。
+        const phase = assessVanishPhase(snap.pollDeltas);
+        return {
+          ...snap,
+          phase,
+          phaseLine: formatVanishPhaseLine(phase, snap.pollDeltas),
+          line: formatVanishForensicsLine(snap) + '\n' + formatVanishPhaseLine(phase, snap.pollDeltas)
+        };
       })(),
+      hostAncestryTrace: {
+        total: _hostAncestryTrace.total,
+        reattachCount: _hostAncestryTrace.reattachCount,
+        entries: _hostAncestryTrace.entries.slice(-6),
+        // ★「いま現物を見ているか」を毎回自己申告させる(初代固着の再発検知)。
+        watchingCurrentHost: _hostTraceHost === nlsInlinePopupHostSingleton,
+        line: `hostAncestryTrace: 属性変化${_hostAncestryTrace.total}件 / 再attach${_hostAncestryTrace.reattachCount}回 / 観測対象=${_hostTraceHost === nlsInlinePopupHostSingleton ? '現host ✅' : '★別ノード(固着)'}`
+      },
+      styleReattach: {
+        count: _pageFrameStyleReattachCount,
+        line: `styleReattach: ${_pageFrameStyleReattachCount}回(拡張の<style>を貼り直した回数)`
+      },
       hostStyleTrace: (() => {
         const snap = snapshotHostStyleMutationTrace(_hostStyleTrace);
         return snap ? { ...snap, line: formatHostStyleMutationLine(snap) } : null;
@@ -12722,6 +12909,13 @@ async function runThumbCaptureTick() {
 }
 
 function syncLiveIdFromLocation() {
+  /*
+   * ★v0.1.1267 位相計器: ここは LIVE_POLL_MS(4秒)ごとに呼ばれる唯一の入口。
+   *   消失時刻との差 Δ を採ることで「消失を駆動しているのが拡張の時計か外部か」を
+   *   【復帰ゲートを止めずに】二分する(止める案は v0.1.1250 の地雷=唯一の復帰経路)。
+   *   Δがほぼ一定=locked(内部が上流) / Δが歩く=walking(別の時計=外部)。
+   */
+  _lastLivePollTickAt = Date.now();
   const href = window.location.href;
   if (isNicoLiveWatchUrl(href)) {
     rememberWatchPageUrl();
@@ -12818,6 +13012,9 @@ function syncLiveIdFromLocation() {
      *   → 第3の通過条件「実際に消えているなら描く」を足す(ゲート自体は残す)。
      */
     {
+      // ★v0.1.1267: 「消えている」の正本である <style> 自体が生きているか先に確かめる。
+      //   ルールが死ぬと属性が付いていても消えない=既定動作(こん太まで出さない)が壊れる。
+      ensurePageFrameStyleAlive();
       const vis = probeInlineHostVisibilityForRecovery();
       const verdict = shouldRenderInlineHostOnPoll({
         liveIdSwitched: ctx.liveIdSwitched === true,
@@ -12895,6 +13092,9 @@ function syncLiveIdFromLocation() {
     //   こちらは liveId 切替の文脈が無いので geometry 変化のときだけ描く。
     {
       // ★v0.1.1254: watch 分岐と同じ復帰の非常口(消えているなら描く)。
+      // ★v0.1.1267: 「消えている」の正本である <style> 自体が生きているか先に確かめる。
+      //   ルールが死ぬと属性が付いていても消えない=既定動作(こん太まで出さない)が壊れる。
+      ensurePageFrameStyleAlive();
       const vis = probeInlineHostVisibilityForRecovery();
       const verdict = shouldRenderInlineHostOnPoll({
         liveIdSwitched: false,

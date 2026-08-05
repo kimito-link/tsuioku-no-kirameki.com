@@ -1,8 +1,94 @@
 import { describe, it, expect } from 'vitest';
 import {
   createVanishForensics, markTrail, recentTrail, noteVanishWithTrail,
-  snapshotVanishForensics, formatVanishForensicsLine, TRAIL_MAX
+  snapshotVanishForensics, formatVanishForensicsLine, TRAIL_MAX, POLL_DELTA_MAX
 } from './hostVanishForensics.js';
+
+/**
+ * v0.1.1267 追加分: hint / snapshot / pollDelta。
+ * ★位相判定に要る Δ は samples 上限(4件)と別勘定であることを固定する。
+ *   ここが同勘定だと、5回目以降の消失で Δ が貯まらず永久に insufficient になる。
+ */
+describe('v0.1.1267 — hint / snapshot / pollDelta', () => {
+  it('★Δは samples 上限(4件)を超えても貯まり続ける(位相判定を殺さない)', () => {
+    const f = createVanishForensics();
+    for (let i = 0; i < 6; i += 1) {
+      noteVanishWithTrail(f, { nowMs: 1000 + i, pollDeltaMs: 100 + i });
+    }
+    expect(f.samples.length).toBe(4);        // サンプルは打ち切る
+    expect(f.pollDeltas.length).toBe(6);     // Δは貯まる
+    expect(f.vanishCount).toBe(6);
+  });
+
+  it(`Δの保持上限は ${POLL_DELTA_MAX} 件(古い方から捨てる)`, () => {
+    const f = createVanishForensics();
+    for (let i = 0; i < POLL_DELTA_MAX + 3; i += 1) {
+      noteVanishWithTrail(f, { nowMs: i, pollDeltaMs: i });
+    }
+    expect(f.pollDeltas.length).toBe(POLL_DELTA_MAX);
+    expect(f.pollDeltas[POLL_DELTA_MAX - 1]).toBe(POLL_DELTA_MAX + 2);
+  });
+
+  it('★数値でない Δ は積まない(欠損が0msとして位相に混ざらない)', () => {
+    const f = createVanishForensics();
+    noteVanishWithTrail(f, { nowMs: 1, pollDeltaMs: null });
+    noteVanishWithTrail(f, { nowMs: 2 });
+    noteVanishWithTrail(f, { nowMs: 3, pollDeltaMs: 42 });
+    expect(f.pollDeltas).toEqual([42]);
+    expect(f.samples[0].pollDeltaMs).toBe(null);
+  });
+
+  it('hint / detail / snapshot が sample に残る', () => {
+    const f = createVanishForensics();
+    noteVanishWithTrail(f, {
+      nowMs: 10, w: 0, h: 0, display: 'none',
+      hint: 'style-wiped', detail: 'inline display lost',
+      snapshot: { styleAttr: 'width:100%', ancestors: [{ tag: 'DIV', display: 'block', w: 933, h: 600 }] },
+      pollDeltaMs: 1832
+    });
+    const s = f.samples[0];
+    expect(s.hint).toBe('style-wiped');
+    expect(s.detail).toBe('inline display lost');
+    expect(s.snapshot.styleAttr).toBe('width:100%');
+    expect(s.pollDeltaMs).toBe(1832);
+  });
+
+  it('★速報の行に hint と Δ と祖先が出る(ユーザーが読む行)', () => {
+    const f = createVanishForensics();
+    markTrail(f, 'render', 9);
+    noteVanishWithTrail(f, {
+      nowMs: 10, w: 0, h: 0, display: 'none',
+      hint: 'ancestor-collapsed', detail: 'ancestor[1] SECTION display:none',
+      snapshot: {
+        styleAttr: 'display:block',
+        ancestors: [
+          { tag: 'DIV', display: 'block', w: 933, h: 600 },
+          { tag: 'SECTION', display: 'none', w: 0, h: 0 }
+        ]
+      },
+      pollDeltaMs: 1832
+    });
+    const line = formatVanishForensicsLine(snapshotVanishForensics(f));
+    expect(line).toContain('hint:ancestor-collapsed');
+    expect(line).toContain('Δpoll:+1832ms');
+    expect(line).toContain('SECTION');
+    expect(line).toContain('理由: ancestor[1] SECTION display:none');
+  });
+
+  it('hint が無いときは「未分類」と明記する(空欄で誤読させない)', () => {
+    const f = createVanishForensics();
+    markTrail(f, 'render', 9);
+    noteVanishWithTrail(f, { nowMs: 10, w: 0, h: 0, display: 'none' });
+    expect(formatVanishForensicsLine(snapshotVanishForensics(f))).toContain('hint:(未分類)');
+  });
+
+  it('snapshot に pollDeltas が載る(位相判定の入力)', () => {
+    const f = createVanishForensics();
+    noteVanishWithTrail(f, { nowMs: 1, pollDeltaMs: 100 });
+    noteVanishWithTrail(f, { nowMs: 2, pollDeltaMs: 110 });
+    expect(snapshotVanishForensics(f).pollDeltas).toEqual([100, 110]);
+  });
+});
 
 describe('markTrail / recentTrail', () => {
   it('★直前1.2秒以内の足跡だけを古い順に返す', () => {

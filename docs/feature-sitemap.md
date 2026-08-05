@@ -288,7 +288,7 @@
   - `src/lib/giftThrowProjectile.js`
 - **吹き出し寿命管理** — 会場の吹き出しの表示上限・追い出し(eviction)ライフサイクル
   - `src/lib/venueBubbleLifecycle.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 207</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 208</summary>
 
 - `scripts/encode-marketing-html-avatars.mjs` — extension/images/marketing-html-avatars/*.png を data URI にし、
 - `scripts/split-avatar-parts.mjs` — 偽市松背景の除去 + パーツ切り出し(one-off アセットパイプライン)
@@ -366,6 +366,7 @@
 - `src/lib/inlineHostLayoutReset.js` — インラインパネルの placement（below / beside / floating / dock_bottom）を切り替える際に、
 - `src/lib/inlineHostMoveProbe.js` — ①POPインラインパネルの host(#nls-inline-popup-host)DOM移設を観測する
 - `src/lib/inlineHostRecoveryGate.js` — パネルが「消えたまま戻らない」を防ぐ復帰ゲート(純関数)。
+- `src/lib/inlineHostVanishClassifier.js` — 「なぜ消えたか」を消失時のスナップショットから分類する純関数。DOM は触らない。
 - `src/lib/inlineHostVisibilityIntent.js` — 応援パネル(inline host)を「見せる/消す」1回分の指示を組み立てる純関数。
 - `src/lib/inlineModeFlags.js` — popup.html の URL クエリから「どのモードで開かれた popup か」を判定する純関数。
 - `src/lib/inlinePanelFocusGate.js` — インラインパネル host element が toolbar 起点の「前面化」操作を受けられる
@@ -883,7 +884,7 @@
 
 ## 🧬 修正系譜マップ(この系統のバグを過去にどう直したか)
 
-> changelog 全 596 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
+> changelog 全 597 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
 
 ### 💾 記録件数 (89版)
 - `v0.1.1247` 2026-08-04 — 読み上げが遅くなる悪循環を断ち切りました
@@ -2153,7 +2154,8 @@
 - `v0.1.840` 2026-06-20 — 機能逆引き地図を全ファイル網羅に
 - `v0.1.835` 2026-06-20 — 自己検証ゲートを追加(版同期+診断文言)
 
-### その他 (52版)
+### その他 (53版)
+- `v0.1.1267` 2026-08-05 — 消えた原因を1回で見分けられるようにしました
 - `v0.1.1266` 2026-08-05 — パネルが「消えない構造」になりました
 - `v0.1.1265` 2026-08-05 — 消える直前に何が起きたかを記録します
 - `v0.1.1264` 2026-08-05 — パネルが3個作られていたのを直しました

@@ -493,6 +493,16 @@ export function buildAiShareFullText({ overviewText, livesData, fastDiag, popupD
     const vfLine = String(fastDiag?.content?.vanishForensics?.line || '');
     if (vfLine) { lines.push(vfLine); lines.push(''); }
   } catch { /* no-op: 計器の失敗は状態速報を壊さない */ }
+  // ★v0.1.1267: 祖先まで含めた属性変化の追跡(観測対象が現物かの自己申告つき)。
+  try {
+    const ancLine = String(fastDiag?.content?.hostAncestryTrace?.line || '');
+    if (ancLine) { lines.push(ancLine); lines.push(''); }
+  } catch { /* no-op: 計器の失敗は状態速報を壊さない */ }
+  // ★v0.1.1267: <style> を貼り直した回数(0 なら消されていない証拠)。
+  try {
+    const srLine = String(fastDiag?.content?.styleReattach?.line || '');
+    if (srLine) { lines.push(srLine); lines.push(''); }
+  } catch { /* no-op: 計器の失敗は状態速報を壊さない */ }
   // ★v0.1.1261: style 書き換えの呼び出し元を名指しする(経路を問わず捕らえる)。
   try {
     const traceLine = String(fastDiag?.content?.hostStyleTrace?.line || '');

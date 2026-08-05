@@ -121,6 +121,14 @@ export function buildStatusFastDiagLite(payload) {
     content.vanishForensics && typeof content.vanishForensics === 'object' ? content.vanishForensics : null;
   const hostStyleTrace =
     content.hostStyleTrace && typeof content.hostStyleTrace === 'object' ? content.hostStyleTrace : null;
+  // v0.1.1267: 祖先まで含めた属性変化の追跡と <style> 貼り直し回数も lite へ
+  //   (通さないとコピペに永久に出ない = [[fastdiag-lite-is-the-printer-subset]])。
+  const hostAncestryTrace =
+    content.hostAncestryTrace && typeof content.hostAncestryTrace === 'object'
+      ? content.hostAncestryTrace
+      : null;
+  const styleReattach =
+    content.styleReattach && typeof content.styleReattach === 'object' ? content.styleReattach : null;
   const hostHideReason =
     content.hostHideReason && typeof content.hostHideReason === 'object' ? content.hostHideReason : null;
   const hostRecoveryDiag =
@@ -170,6 +178,8 @@ export function buildStatusFastDiagLite(payload) {
       hostHideReason,
       hostStyleTrace,
       vanishForensics,
+      hostAncestryTrace,
+      styleReattach,
       venueSeatsDiag: venueSeatsDiagLite
     }
   };
