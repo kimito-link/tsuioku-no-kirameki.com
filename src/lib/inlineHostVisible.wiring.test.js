@@ -14,6 +14,21 @@ const contentSrc = fs
  *   [[wiring-test-must-assert-counts-2026-08-04]]: 同じ配線が複数箇所に要るときは
  *   「存在する」でなく「N箇所ある」と数で断言する。存在の断言は片方だけ壊す変異を通す。
  */
+
+/**
+ * 関数本体を「次の行頭 `}`」まで切り出す。
+ * ★固定文字数(slice(i, i+N))で切ると、関数に行を足しただけで断言が範囲外に落ちて
+ *   偽の赤になる(2026-08-05 に実際に発生)。断言すべきは【契約の有無】であって
+ *   コードの長さではないので、終端まで見る。
+ * @param {string} src @param {string} decl
+ */
+function fnBody(src, decl) {
+  const i = src.indexOf(decl);
+  if (i < 0) return '';
+  const end = src.indexOf(String.fromCharCode(10) + '}' + String.fromCharCode(10), i);
+  return end < 0 ? src.slice(i) : src.slice(i, end + 2);
+}
+
 describe('setInlineHostVisible の配線', () => {
   it('純関数を import して唯一の入口を定義している', () => {
     expect(contentSrc).toContain("from '../lib/inlineHostVisibilityIntent.js'");
@@ -21,8 +36,7 @@ describe('setInlineHostVisible の配線', () => {
   });
 
   it('★入口は4つの値を全部書く(1つでも欠けると中途半端＝事故1の再現)', () => {
-    const i = contentSrc.indexOf('function setInlineHostVisible(');
-    const body = contentSrc.slice(i, i + 900);
+    const body = fnBody(contentSrc, 'function setInlineHostVisible(');
     expect(body).toContain('setInlineHostDisplay(host, intent.display, intent.cause)');
     expect(body).toMatch(/host\.style\.opacity = intent\.opacity;/);
     expect(body).toMatch(/host\.style\.pointerEvents = intent\.pointerEvents;/);
@@ -33,8 +47,7 @@ describe('setInlineHostVisible の配線', () => {
     // setInlineHostDisplay 自体が消えていないこと。
     expect(contentSrc).toMatch(/function setInlineHostDisplay\(host, display, cause\) \{/);
     // 「状態が変わったときだけ計上」の契約が残っていること(計器の水増し防止)。
-    const i = contentSrc.indexOf('function setInlineHostDisplay(');
-    expect(contentSrc.slice(i, i + 500)).toMatch(/if \(prev === display\) return;/);
+    expect(fnBody(contentSrc, 'function setInlineHostDisplay(')).toMatch(/if \(prev === display\) return;/);
   });
 
   it('★見せる経路4つが全部この入口を通っている(数で断言)', () => {

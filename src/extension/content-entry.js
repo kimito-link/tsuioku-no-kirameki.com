@@ -2845,6 +2845,21 @@ function startHostVisibilityWatch() {
 function setInlineHostDisplay(host, display, cause) {
   if (!host || !host.style) return;
   const prev = host.style.display;
+  /*
+   * ★v0.1.1257: ここは【インラインスタイル】の前後しか見ていない。
+   *   本拡張は CSS 側で #nls-inline-popup-host { display:none } を既定にしており、
+   *   インラインが '' のままでも実際は消えている。よって prev===display による
+   *   早期return は「実際に消したのに 0回」を生む(hostFlipCensus が2日間 0 を出し続けた真因)。
+   *   → 実際に見えていたか(getComputedStyle)を基準に、消した経路を別計器へ記録する。
+   *     こちらは prev の値に依存しないので取りこぼさない。
+   */
+  if (display === 'none') {
+    try {
+      const cs = window.getComputedStyle(host);
+      const wasVisible = cs.display !== 'none' && cs.visibility !== 'hidden' && Number(cs.opacity) !== 0;
+      if (wasVisible) noteInlineHostHideReason(`display:${cause}`);
+    } catch { /* 計器失敗は描画を止めない */ }
+  }
   host.style.display = display;
   if (prev === display) return; // 状態変化なし=計上しない
   try {
