@@ -115,6 +115,9 @@ export function buildStatusFastDiagLite(payload) {
     content.hostVisWatch && typeof content.hostVisWatch === 'object' ? content.hostVisWatch : null;
   // v0.1.1254: 復帰ゲートの計器も lite へ(通さないとコピペに永久に出ない)。
   // v0.1.1256: 消した理由の計器も lite へ(通さないとコピペに永久に出ない)。
+  // v0.1.1261: style 書き換えの追跡も lite へ。
+  const hostStyleTrace =
+    content.hostStyleTrace && typeof content.hostStyleTrace === 'object' ? content.hostStyleTrace : null;
   const hostHideReason =
     content.hostHideReason && typeof content.hostHideReason === 'object' ? content.hostHideReason : null;
   const hostRecoveryDiag =
@@ -162,6 +165,7 @@ export function buildStatusFastDiagLite(payload) {
       hostVisWatch,
       hostRecoveryDiag,
       hostHideReason,
+      hostStyleTrace,
       venueSeatsDiag: venueSeatsDiagLite
     }
   };
