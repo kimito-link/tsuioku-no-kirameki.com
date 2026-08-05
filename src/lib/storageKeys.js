@@ -576,6 +576,22 @@ export function isEffectSoundEnabled(raw) {
 }
 
 /**
+ * 視聴ページに「🏟 会場モード」ボタンを出すか(既定 true=出す)。
+ *
+ * ★v0.1.1271(ユーザー要望・2026-08-06):
+ *   「開いた瞬間つねに会場モードが有効になっているのが気になる」という指摘の実体は
+ *   【ボタンが常時表示されていること】だった(会場の画面自体は閉じて始まっている)。
+ *   会場を使わない人には常時見えている必要が無いので、隠せるようにする。
+ *   ★既定は true(従来どおり出す)。黙って消すと「機能が無くなった」と誤解されるため。
+ */
+export const KEY_VENUE_BUTTON_VISIBLE = 'nls_venue_button_visible_v1';
+
+/** @param {unknown} raw */
+export function isVenueButtonVisible(raw) {
+  return raw !== false;
+}
+
+/**
  * 会場window(venueBar.js)が生存している間、3秒間隔以内で更新し続けるプレゼンスキー。
  *   popup側(popup-entry.js)はこれの新鮮さ(既定8秒以内)を見て、会場が開いていれば効果音を鳴らさない
  *   (会場が優先=同じギフト/広告に対して2画面で二重に鳴るのを避ける)。値は epoch ms の数値のみ(PII無し)。

@@ -29,6 +29,8 @@ import {
   KEY_POPUP_FRAME,
   KEY_POPUP_FRAME_CUSTOM,
   KEY_RECORDING,
+  KEY_VENUE_BUTTON_VISIBLE,
+  isVenueButtonVisible,
   KEY_DEEP_HARVEST_QUIET_UI,
   KEY_SELF_POSTED_RECENTS,
   KEY_USER_COMMENT_PROFILE_CACHE,
@@ -10767,6 +10769,21 @@ async function readRecordingFlag() {
   return isRecordingEnabled(r[KEY_RECORDING]);
 }
 
+/**
+ * 会場モードのボタンを出してよいか(既定 true=出す)。
+ * ★読めなかったときは【出す】側に倒す。設定の読み取り失敗で機能が黙って消えると
+ *   「壊れた」と誤解されるため(既定を安全側=従来どおりに保つ)。
+ */
+async function readVenueButtonVisible() {
+  if (!hasExtensionContext()) return true;
+  try {
+    const r = await chrome.storage.local.get(KEY_VENUE_BUTTON_VISIBLE);
+    return isVenueButtonVisible(r[KEY_VENUE_BUTTON_VISIBLE]);
+  } catch {
+    return true;
+  }
+}
+
 async function readDeepHarvestQuietUiFromStorage() {
   if (!hasExtensionContext()) {
     deepHarvestQuietUi = true;
@@ -14373,7 +14390,16 @@ function createDevMonitorOverlay() {
 async function start() {
   if (!hasExtensionContext()) return;
   if (!shouldRunWatchContentInThisFrame()) return;
-  if (isWatchInlinePanelTopFrame()) _venueApi = mountVenueBarButton();
+  /*
+   * ★v0.1.1271(ユーザー要望): 会場モードのボタンを出すかを設定で選べるようにした。
+   *   「開いた瞬間つねに会場モードが有効になっている」という指摘の実体は、
+   *   会場の画面ではなく【ボタンが常に画面に出ていること】だった。
+   *   ★既定は表示(従来どおり)。OFF にした人だけ出さない。
+   *   ★設定の読み取りに失敗したら【出す】側に倒す(機能が黙って消えるのを避ける)。
+   */
+  if (isWatchInlinePanelTopFrame() && (await readVenueButtonVisible())) {
+    _venueApi = mountVenueBarButton();
+  }
   recording = await readRecordingFlag();
   await readDeepHarvestQuietUiFromStorage();
   await readCommentPanelAutoRestoreFromStorage();
