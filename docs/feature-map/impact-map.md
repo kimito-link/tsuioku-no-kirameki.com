@@ -534,6 +534,7 @@
 | `src/lib/inlineHostLayoutReset.js` | 1 | 記録エンジン(watchページ常駐) |
 | `src/lib/inlineHostMoveProbe.js` | 1 | 記録エンジン(watchページ常駐) |
 | `src/lib/inlineHostRecoveryGate.js` | 1 | 記録エンジン(watchページ常駐) |
+| `src/lib/inlineHostVisibilityIntent.js` | 1 | 記録エンジン(watchページ常駐) |
 | `src/lib/inlineModeFlags.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/inlinePanelFocusGate.js` | 1 | 記録エンジン(watchページ常駐) |
 | `src/lib/inlinePanelPlacementResolver.js` | 1 | 記録エンジン(watchページ常駐) |
