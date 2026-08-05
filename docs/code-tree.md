@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 4 / 720 件
+## ⚠️ 役割コメントが無いソース 4 / 721 件
 - `src/lib/laneDomSelfMeasure.js`
 - `src/lib/reportPreviewPublish.js`
 - `src/lib/venueLaneBuckets.js`
@@ -157,7 +157,7 @@
     - `2026-07-22.md`
     - `2026-07-23.md`
     - `2026-07-31.md`
-- 📁 **docs/** (235)
+- 📁 **docs/** (239)
   - 📁 **article-assets/** (87)
     - 📁 **venue-frames/** (12)
       - `f01.png`
@@ -267,7 +267,7 @@
     - `storage-bus.md`
     - `venue.md`
     - `web-status.md`
-  - 📁 **handoff/** (72)
+  - 📁 **handoff/** (76)
     - `HANDOFF-backfill-instant-restore.md`
     - `HANDOFF-broadcast-score-panel.md`
     - `HANDOFF-comment-pickup-bsp.md`
@@ -321,6 +321,10 @@
     - `lanescene-structural-review-DESIGN.md`
     - `lanescene-structural-review-IMPLEMENTATION-HANDOFF.md`
     - `marketing-export-tab-IMPLEMENTATION-HANDOFF.md`
+    - `panel-flicker-council-brief-2026-08-05.md`
+    - `panel-flicker-fable-brief-2026-08-05.md`
+    - `panel-flicker-resolution-DESIGN.md`
+    - `panel-flicker-resolution-IMPLEMENTATION-HANDOFF.md`
     - `scroll-whiteout-freeze-DESIGN.md`
     - `snippet-manager-clibor-parity-synthesis.md`
     - `sound-optimization-DESIGN.md`
@@ -621,7 +625,7 @@
     - `trumpet1.mp3`
     - `wallet1.mp3`
   - `SOURCES.md`
-- 📁 **src/** (1526)
+- 📁 **src/** (1530)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -902,7 +906,7 @@
         - `logo_funlink_white_RGB_maru_black.png`
       - `logo_guide_funlink_ol.pdf`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1295)
+  - 📁 **lib/** (1299)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -1400,6 +1404,7 @@
     - `inlineHostBesideSizing.test.js`
     - `inlineHostDockSizing.js` — dock_bottom モードの inline panel 高さを viewport と player rect から最適計算する純粋関数。
     - `inlineHostDockSizing.test.js`
+    - `inlineHostHiddenAttr.wiring.test.js`
     - `inlineHostHideReason.wiring.test.js`
     - `inlineHostHideReasonCensus.js` — パネルを消した「理由」を経路ごとに数える計器(純関数)。
     - `inlineHostHideReasonCensus.test.js`
@@ -1410,6 +1415,8 @@
     - `inlineHostRecovery.wiring.test.js`
     - `inlineHostRecoveryGate.js` — パネルが「消えたまま戻らない」を防ぐ復帰ゲート(純関数)。
     - `inlineHostRecoveryGate.test.js`
+    - `inlineHostVanishClassifier.js` — 「なぜ消えたか」を消失時のスナップショットから分類する純関数。DOM は触らない。
+    - `inlineHostVanishClassifier.test.js`
     - `inlineHostVisibilityIntent.js` — 応援パネル(inline host)を「見せる/消す」1回分の指示を組み立てる純関数。
     - `inlineHostVisibilityIntent.test.js`
     - `inlineHostVisible.wiring.test.js`
@@ -2055,6 +2062,7 @@
     - `userThumbGrid.js` — 「サムネ付きユーザー一覧」のカテゴリ分け純粋関数。
     - `userThumbGrid.test.js`
     - `usericonUrlGuard.test.js`
+    - `vanishForensics1267.wiring.test.js`
     - `venueAvatar.js` — v0.1.712: 会場モードのアバター解決(サムネ補強)純関数。
     - `venueAvatar.test.js`
     - `venueAvatarDiagLine.js` — 会場モード(venueBar.js)の「🩺 会場の状態」診断ブロックを組み立てる純関数群。
