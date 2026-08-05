@@ -1538,6 +1538,20 @@ import {
   try {
     const HWT_MSG = 'NLS_HOST_WRITE_TRAP';
     const HWT_HOST_ID = 'nls-inline-popup-host';
+    /*
+     * ★v0.1.1270: 「トラップのコードにそもそも到達したか」を最初に1回報告する。
+     *
+     *   v0.1.1268/1269 は2版続けて armed:null(=1度も報告が届かない)だった。
+     *   合図を3系統に増やしても変わらなかったので、疑うべきは合図ではなく
+     *   【この MAIN world スクリプト自体が視聴ページで走っているか】。
+     *   ここより上には早期 return が2つある(既に注入済み / 視聴ページ以外)。
+     *   到達の可否を先に切り分けないと、これ以上どこを直しても当たらない。
+     *   ★この1行が届けば「到達している=合図側の問題」、届かなければ「到達していない」。
+     */
+    postNlsIntercept({
+      type: HWT_MSG, armed: false,
+      armReason: `reached(top=${window.top === window.self}, path=${String(window.location?.pathname || '').slice(0, 40)})`
+    });
     const HWT_ARM_EVENT = 'nls:hwt-arm';
     const HWT_STACK_SAMPLE_MAX = 4;
     const HWT_FLUSH_MS = 1000;

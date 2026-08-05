@@ -30,6 +30,8 @@ export const TRAP_SAMPLE_MAX = 4;
  * @typedef {{
  *   armed: boolean|null,
  *   armReason: string,
+ *   reached: boolean,
+ *   reachedInfo: string,
  *   counts: { prop: number, setProperty: number, cssText: number, setAttribute: number },
  *   noneWrites: number,
  *   samples: Array<{ route: string, valueHead: string, frames: string[], t: number }>
@@ -42,6 +44,9 @@ export function createHostWriteTrapState() {
     // ★null = まだ装着結果の報告を受け取っていない(=未計測)。false とは意味が違う。
     armed: null,
     armReason: '',
+    // ★v0.1.1270: MAIN world のトラップコードに到達したか(合図とは独立の土台)。
+    reached: false,
+    reachedInfo: '',
     counts: { prop: 0, setProperty: 0, cssText: 0, setAttribute: 0 },
     noneWrites: 0,
     samples: []
@@ -56,8 +61,20 @@ export function createHostWriteTrapState() {
  */
 export function noteHostWriteTrapArmed(state, ok, reason) {
   if (!state || typeof state !== 'object') return;
+  const r = String(reason || '');
+  /*
+   * ★v0.1.1270: 「トラップのコードに到達した」報告は、あとから来る装着報告に
+   *   上書きさせない。到達したか否かは切り分けの土台なので、消えると
+   *   「合図が悪いのか、そもそも走っていないのか」がまた分からなくなる。
+   */
+  if (r.startsWith('reached(')) {
+    state.reached = true;
+    state.reachedInfo = r;
+    // armed 自体はまだ確定していない(装着の成否はこの後の報告で決まる)。
+    return;
+  }
   state.armed = ok === true;
-  state.armReason = String(reason || '');
+  state.armReason = r;
 }
 
 /**
@@ -145,6 +162,8 @@ export function snapshotHostWriteTrap(state, ownOrigin) {
   return {
     armed: s.armed,
     armReason: String(s.armReason || ''),
+    reached: s.reached === true,
+    reachedInfo: String(s.reachedInfo || ''),
     counts: { ...s.counts },
     noneWrites: Number(s.noneWrites) || 0,
     samples,
@@ -176,7 +195,16 @@ export function formatHostWriteTrapLine(snap) {
   if (s.armed !== true) {
     const why = s.armReason ? `:${s.armReason}` : '';
     const head = s.armed === null ? 'arm未受信' : `装着失敗${why}`;
-    return `犯人トラップ ⚪ 未装着(${head})=まだ測れていません`;
+    /*
+     * ★v0.1.1270: 「到達したか」を必ず併記する。ここが切り分けの分岐点:
+     *   到達✅ + 未装着 → 合図/host探索の問題(拡張内で直せる)
+     *   到達なし        → MAIN world のコードが視聴ページで走っていない(仕込む場所が違う)
+     * 2版続けて armed:null のまま原因が絞れなかったのは、この区別が無かったため。
+     */
+    const reach = s.reached
+      ? `到達✅ ${s.reachedInfo}`
+      : '★到達なし(MAIN worldのコードが動いていません)';
+    return `犯人トラップ ⚪ 未装着(${head})\n  ${reach}`;
   }
   // (2) 装着済みで0回 = 「ページではない」という積極的な情報。
   if (s.noneWrites <= 0) {
