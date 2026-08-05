@@ -36,7 +36,17 @@ describe('inlinePanelShowGate の配線', () => {
   });
 
   it('★判定が hide のときだけ消す(無条件に戻していない)', () => {
-    expect(contentSrc).toMatch(/\}\)\.hide\n\s*\) \{\n\s*hidePageFrameOverlay\('autoshow_off'\);/);
+    // ★v0.1.1263: 二分実験で判定と実行の間に行が入った。
+    //   断言すべきは「判定 .hide を経てからでないと消さない」であって、
+    //   間に何行あるかではない(行数を固定すると正当な変更で赤になる)。
+    const gate = contentSrc.indexOf('}).hide');
+    const hide = contentSrc.indexOf("hidePageFrameOverlay('autoshow_off')");
+    expect(gate).toBeGreaterThan(-1);
+    expect(hide).toBeGreaterThan(-1);
+    expect(gate).toBeLessThan(hide); // 判定が先
+    // 判定を経ない裸の呼び出しが無いこと(出所は1箇所のまま)。
+    const calls = contentSrc.match(/hidePageFrameOverlay\('autoshow_off'\)/g) || [];
+    expect(calls.length).toBe(1);
   });
 
   it('★everShown を「見せる入口」で無条件に立てている(呼ばれるかを断言)', () => {

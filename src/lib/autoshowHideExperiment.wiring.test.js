@@ -1,0 +1,61 @@
+import { describe, expect, it } from 'vitest';
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const contentSrc = fs
+  .readFileSync(path.join(root, 'extension/content-entry.js'), 'utf8')
+  .replace(/\r\n/g, '\n');
+
+/**
+ * ★v0.1.1263 二分実験の配線断言。
+ *   会議(4体・全員一致)「特定より先に止まるか否かを確かめよ」に基づく一時的な実験。
+ *   ここで断言するのは「実験が実際に効いていること」と「畳み忘れを検出できること」。
+ */
+describe('autoshow_off 二分実験の配線', () => {
+  it('実験フラグが定義されている', () => {
+    expect(contentSrc).toMatch(/const INLINE_AUTOSHOW_HIDE_EXPERIMENT = (true|false);/);
+  });
+
+  it('★実験中は消す処理を実行しない(フラグで囲われている)', () => {
+    // 存在の断言だけだと「囲っていない」変異を通す。囲いの形まで見る。
+    expect(contentSrc).toMatch(
+      /if \(!INLINE_AUTOSHOW_HIDE_EXPERIMENT\) \{\n\s*hidePageFrameOverlay\('autoshow_off'\);/
+    );
+  });
+
+  it('★消す処理が囲いの外に残っていない(素通りで消えたら実験にならない)', () => {
+    const calls = contentSrc.match(/hidePageFrameOverlay\('autoshow_off'\)/g) || [];
+    expect(calls.length).toBe(1);
+  });
+
+  it('★判定は記録する(消さなくても計器は動く=何回通ったか分かる)', () => {
+    expect(contentSrc).toMatch(
+      /\n\s*noteInlineHostHideReason\('autoshow_off_experiment_skipped'\);/
+    );
+    // 記録が条件で無効化されていないこと。
+    expect(contentSrc).not.toMatch(/if \([^)]*\) noteInlineHostHideReason\('autoshow_off_experiment/);
+  });
+
+  it('★記録は消す判定より前にある(消す前に必ず数える)', () => {
+    const note = contentSrc.indexOf("noteInlineHostHideReason('autoshow_off_experiment_skipped')");
+    const hide = contentSrc.indexOf("hidePageFrameOverlay('autoshow_off')");
+    expect(note).toBeGreaterThan(-1);
+    expect(hide).toBeGreaterThan(-1);
+    expect(note).toBeLessThan(hide);
+  });
+
+  it('★これは一時的な実験である旨がコードに明記されている(畳み忘れ防止)', () => {
+    const i = contentSrc.indexOf('const INLINE_AUTOSHOW_HIDE_EXPERIMENT');
+    const around = contentSrc.slice(Math.max(0, i - 500), i + 200);
+    expect(around).toContain('一時的');
+    expect(around).toMatch(/必ず false に戻し|Phase 3/);
+  });
+
+  it('他の消す経路には手を入れていない(実験の範囲を広げない)', () => {
+    for (const tag of ['not_top_frame', 'not_watch_url', 'toolbar_close', 'left_watch_page']) {
+      expect(contentSrc).toContain(`hidePageFrameOverlay('${tag}')`);
+    }
+  });
+});

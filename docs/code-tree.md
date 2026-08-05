@@ -621,7 +621,7 @@
     - `trumpet1.mp3`
     - `wallet1.mp3`
   - `SOURCES.md`
-- 📁 **src/** (1522)
+- 📁 **src/** (1523)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -902,7 +902,7 @@
         - `logo_funlink_white_RGB_maru_black.png`
       - `logo_guide_funlink_ol.pdf`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1291)
+  - 📁 **lib/** (1292)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -944,6 +944,7 @@
     - `autoPublishConsentWiring.test.js`
     - `autoPublishDecision.js` — ③WEB(純Web公開コピー)が古くなる前に自動で再 publish すべきかを判定する純関数(v0.1.1016)。
     - `autoPublishDecision.test.js`
+    - `autoshowHideExperiment.wiring.test.js`
     - `avCue.js` — 「AVCue = 音の再生結果を真実とする単一発火点」の純関数群(V1・DOM/storage/音に触れない)。
     - `avCue.test.js`
     - `avCueDiagKey.js` — AVCue(音+視覚の単一発火点・council/pachinko-av-max-SYNTHESIS.md V1)の観測値を

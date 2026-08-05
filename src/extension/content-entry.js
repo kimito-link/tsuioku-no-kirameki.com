@@ -2969,6 +2969,14 @@ function noteInlineHostHideReason(reason) {
  *   実測で「表示中なのに autoshow_off で消される」が 0.4秒周期で起きていたため、
  *   これを最後の砦として使う。★一度 true になったら false に戻さない。
  */
+/**
+ * ★v0.1.1263: 二分実験フラグ(一時的)。
+ *   true = autoshow_off で【消さない】(判定の記録だけ残す)。
+ *   ちらつきが止まるか否かで、このゲートが犯人かを1回で判定するための実験。
+ *   ★判定できたら必ず false に戻し、正しい条件を実装すること(Phase 3)。
+ */
+const INLINE_AUTOSHOW_HIDE_EXPERIMENT = true;
+
 let _inlineHostEverShown = false;
 
 function setInlineHostVisible(host, visible, cause) {
@@ -7644,13 +7652,38 @@ function renderPageFrameOverlay() {
       everShown: _inlineHostEverShown
     }).hide
   ) {
-    hidePageFrameOverlay('autoshow_off');
     /*
-     * try/finally に入らないため、ここでも監視ルートを取り直す。
-     * パネル非表示中も公式コメ欄 DOM は差し替わり得る（tick 経路での取りこぼし防止）。
+     * ★★★ v0.1.1263 二分実験(一時的・必ず畳む) ★★★
+     *
+     * 会議(4体・全員一致)の裁定:
+     *   「犯人の場所は既に確定している(autoshow_off の出所は本行の1箇所のみ)。
+     *     これ以上の特定作業は不要。特定より先に【止まるか否か】を確かめよ」
+     *
+     * 実測で犯人はこのゲートに絞れている:
+     *   消失4回 と「消した」記録4回が【完全に1対1】
+     *   4.0秒ちょうどの周期・変動係数 0.002
+     *
+     * ★MutationObserver で犯人を特定する案(v0.1.1261)は【原理的に不可能】と確定した。
+     *   コールバックはマイクロタスクで非同期配信され、書き換え元は既にスタックから
+     *   消えている(MDN)。Error().stack を採っても Observer の内部フレームしか出ない。
+     *
+     * → よってここでは【消す実行だけを止め、判定は記録する】。
+     *   止まれば犯人確定。止まらなければこのゲートは無罪でこの線を捨てる。
+     *
+     * ⚠副作用: 「こん太を押す前でもパネルが出る」可能性がある。
+     *   判定できたら Phase 3 で必ず正しい形へ戻すこと。
      */
-    maybeReconnectCommentMutationObserverAfterInlineLayout();
-    return;
+    noteInlineHostHideReason('autoshow_off_experiment_skipped');
+    if (!INLINE_AUTOSHOW_HIDE_EXPERIMENT) {
+      hidePageFrameOverlay('autoshow_off');
+      /*
+       * try/finally に入らないため、ここでも監視ルートを取り直す。
+       * パネル非表示中も公式コメ欄 DOM は差し替わり得る（tick 経路での取りこぼし防止）。
+       */
+      maybeReconnectCommentMutationObserverAfterInlineLayout();
+      return;
+    }
+    // 実験中はここを素通りし、通常の描画へ進む(=消さない)。
   }
 
   // autoshow ON のときは「次回だけ表示」にし、1 回表示したら OFF に戻す。
