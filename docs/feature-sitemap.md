@@ -287,7 +287,7 @@
   - `src/lib/giftThrowProjectile.js`
 - **吹き出し寿命管理** — 会場の吹き出しの表示上限・追い出し(eviction)ライフサイクル
   - `src/lib/venueBubbleLifecycle.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 206</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 207</summary>
 
 - `scripts/encode-marketing-html-avatars.mjs` — extension/images/marketing-html-avatars/*.png を data URI にし、
 - `scripts/split-avatar-parts.mjs` — 偽市松背景の除去 + パーツ切り出し(one-off アセットパイプライン)
@@ -371,6 +371,7 @@
 - `src/lib/inlinePanelLayout.js` — 視聴ページに埋め込む nicolivelog パネルの幅・位置を、動画要素の表示矩形に合わせるための純関数。
 - `src/lib/inlinePanelPlacementResolver.js` — インラインパネル配置の「単一の真実」コンポーネント。
 - `src/lib/inlinePanelPlacementStorage.js` — インライン配置・幅・ビューポート幅・浮遊アンカーの chrome.storage.local 正本まわり。
+- `src/lib/inlinePanelShowGate.js` — 「パネルを出してよいか / 消してよいか」を決める純関数。
 - `src/lib/inlinePanelViewportWide.js` — インラインパネルを「タブ幅に近い」まで広げる幅の純粋計算（content-entry から利用）。
 - `src/lib/inlinePlacementQuickbar.js` — ヘッダーの「パネル位置」クイックバー用 純関数（v0.1.334）。
 - `src/lib/inlinePopupHostPrimaryPick.js` — 複数 `#nls-inline-popup-host` が `isConnected` なとき、どれを primary として残すか。
@@ -881,7 +882,7 @@
 
 ## 🧬 修正系譜マップ(この系統のバグを過去にどう直したか)
 
-> changelog 全 591 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
+> changelog 全 592 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
 
 ### 💾 記録件数 (89版)
 - `v0.1.1247` 2026-08-04 — 読み上げが遅くなる悪循環を断ち切りました
@@ -2151,7 +2152,8 @@
 - `v0.1.840` 2026-06-20 — 機能逆引き地図を全ファイル網羅に
 - `v0.1.835` 2026-06-20 — 自己検証ゲートを追加(版同期+診断文言)
 
-### その他 (47版)
+### その他 (48版)
+- `v0.1.1262` 2026-08-05 — 一度出したパネルを消さないようにしました
 - `v0.1.1261` 2026-08-05 — パネルを消している場所を直接つきとめる計器を入れました
 - `v0.1.1260` 2026-08-05 — 消えた回数の数え漏れを直しました(半分しか数えていませんでした)
 - `v0.1.1259` 2026-08-05 — サイドパネルで開けるようにする準備をしました(内部)

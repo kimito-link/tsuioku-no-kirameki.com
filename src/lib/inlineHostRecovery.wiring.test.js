@@ -42,15 +42,16 @@ describe('inlineHostRecoveryGate の配線', () => {
   });
 
   it('★判定条件が autoshow_off ゲートと同一(食い違うと競り合いに戻る)', () => {
+    // ★v0.1.1262: 条件の【直書き】をやめ、消す側と同じ純関数
+    //   shouldHideInlinePanelByAutoshow に一本化した。
+    //   断言すべきは「同じ判定を使っていること」であって、フラグの書き方ではない
+    //   (書き方を固定すると、正しい一本化で赤になり実装を歪める)。
     const i = contentSrc.indexOf('function isInlineHostIntentionallyHidden(');
     const body = contentSrc.slice(i, contentSrc.indexOf(String.fromCharCode(10) + '}', i));
-    for (const flag of [
-      '!inlinePanelAutoshowEnabled',
-      '!toolbarInitiatedShowThisSession',
-      '!inlinePanelAutoshowActivatedThisSession'
-    ]) {
-      expect(body).toContain(flag);
-    }
+    expect(body).toContain('shouldHideInlinePanelByAutoshow({');
+    // 消す側と復帰側の2箇所とも同じ関数を通っていること(数で断言)。
+    const uses = contentSrc.match(/shouldHideInlinePanelByAutoshow\(\{/g) || [];
+    expect(uses.length).toBe(2);
   });
 
   it('可視判定が DOM 走査をしていない(4秒に1回でも走査は入れない)', () => {

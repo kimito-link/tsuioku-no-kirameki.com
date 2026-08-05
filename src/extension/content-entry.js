@@ -353,6 +353,9 @@ import {
 // ★v0.1.1255(Phase A): 「見せる/消す」1回分の値の組を決める純関数。
 //   会議の結論=ディレクトリ移動より先に副作用を正本化する、の最初の対象。
 import { buildInlineHostVisibilityIntent } from '../lib/inlineHostVisibilityIntent.js';
+// ★v0.1.1262: 「出してよいか」の判定を純関数へ。実測の矛盾(表示中なのに autoshow_off で
+//   消される)を潰すため「一度でも出したなら消さない」を足す。
+import { shouldHideInlinePanelByAutoshow } from '../lib/inlinePanelShowGate.js';
 // ★v0.1.1256: パネルを消した【理由】を経路ごとに数える(症状でなく原因を名指しする)。
 import {
   createInlineHostHideReasonCensus,
@@ -2959,8 +2962,20 @@ function noteInlineHostHideReason(reason) {
   catch { /* 計器失敗は描画を止めない */ }
 }
 
+/**
+ * ★v0.1.1262: このセッションで一度でもパネルを【実際に表示した】か。
+ *   フラグ(toolbarInitiatedShowThisSession / inlinePanelAutoshowActivatedThisSession)は
+ *   立つ前の窓があったり巻き戻る経路があったりするが、実際に出した事実は覆らない。
+ *   実測で「表示中なのに autoshow_off で消される」が 0.4秒周期で起きていたため、
+ *   これを最後の砦として使う。★一度 true になったら false に戻さない。
+ */
+let _inlineHostEverShown = false;
+
 function setInlineHostVisible(host, visible, cause) {
   if (!host || !host.style) return;
+  // 見せる経路は4つ(floating/dock/anchored/nonvideo)あるが、全部この入口を通る。
+  //   ここで1回立てれば取りこぼさない(v0.1.1255 で集約済みなのを利用)。
+  if (visible === true) _inlineHostEverShown = true;
   const intent = buildInlineHostVisibilityIntent({ visible, cause });
   // display は既存の集約入口に通す(計器・変化検出の契約を維持)。
   setInlineHostDisplay(host, intent.display, intent.cause);
@@ -5821,11 +5836,15 @@ function inlineHostLooksVisible() {
  * @returns {boolean}
  */
 function isInlineHostIntentionallyHidden() {
-  return (
-    !inlinePanelAutoshowEnabled &&
-    !toolbarInitiatedShowThisSession &&
-    !inlinePanelAutoshowActivatedThisSession
-  );
+  // ★v0.1.1262: 消す側と同じ純関数を使う。既存コメントが「同一条件にすること
+  //   (食い違うと片方が消して片方が戻す競り合いに戻る)」と警告していたとおり、
+  //   条件を2箇所に直書きすると必ずズレる。判定を1本に寄せる。
+  return shouldHideInlinePanelByAutoshow({
+    autoshowEnabled: inlinePanelAutoshowEnabled,
+    toolbarPressed: toolbarInitiatedShowThisSession,
+    activatedThisSession: inlinePanelAutoshowActivatedThisSession,
+    everShown: _inlineHostEverShown
+  }).hide;
 }
 
 function probeInlineHostVisibilityForRecovery() {
@@ -7609,10 +7628,21 @@ function renderPageFrameOverlay() {
    * インラインパネルを一切表示しない（「こん太を押す前は extension を出さない」が既定動作）。
    * ツールバークリックで toolbarInitiatedShowThisSession が立つと以降は通常どおり表示する。
    */
+  /*
+   * ★v0.1.1262: 判定を純関数へ移し「一度でも出したなら消さない」を足した。
+   *   実測(2026-08-05): パネルが表示されているのに
+   *   「消した理由: autoshow_off 4回(100%)・0.4秒ちょうどの周期」。
+   *   3フラグ全部 false でないと入れない分岐に、表示中なのに入っていた
+   *   = フラグが立つ前の窓、または巻き戻る経路がある。
+   *   ★初回(まだ一度も出していない)は従来どおり消す=既定動作は不変。
+   */
   if (
-    !inlinePanelAutoshowEnabled &&
-    !toolbarInitiatedShowThisSession &&
-    !inlinePanelAutoshowActivatedThisSession
+    shouldHideInlinePanelByAutoshow({
+      autoshowEnabled: inlinePanelAutoshowEnabled,
+      toolbarPressed: toolbarInitiatedShowThisSession,
+      activatedThisSession: inlinePanelAutoshowActivatedThisSession,
+      everShown: _inlineHostEverShown
+    }).hide
   ) {
     hidePageFrameOverlay('autoshow_off');
     /*
