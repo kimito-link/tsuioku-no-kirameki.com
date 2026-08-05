@@ -13,6 +13,7 @@ describe('buildInlineHostVisibilityIntent — 値は必ずセット', () => {
       opacity: '1',
       pointerEvents: 'auto',
       ariaHidden: 'false',
+      hiddenAttr: null,
       cause: 'anchored_show'
     });
   });
@@ -23,6 +24,7 @@ describe('buildInlineHostVisibilityIntent — 値は必ずセット', () => {
       opacity: '0',
       pointerEvents: 'none',
       ariaHidden: 'true',
+      hiddenAttr: '1',
       cause: 'overlay_hidden'
     });
   });

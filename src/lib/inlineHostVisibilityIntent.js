@@ -41,6 +41,7 @@
  *   opacity: '1'|'0',
  *   pointerEvents: 'auto'|'none',
  *   ariaHidden: 'false'|'true',
+ *   hiddenAttr: '1'|null,
  *   cause: string
  * }} InlineHostVisibilityIntent
  */
@@ -63,9 +64,43 @@ export function buildInlineHostVisibilityIntent(args) {
     opacity: visible ? '1' : '0',
     pointerEvents: visible ? 'auto' : 'none',
     ariaHidden: visible ? 'false' : 'true',
+    // ★v0.1.1266: 「消えている」の正本は【属性】(data-nls-hidden)であって
+    //   インラインスタイルではない。理由は buildInlineHostHiddenAttrIntent を参照。
+    hiddenAttr: visible ? null : '1',
     cause: String(args?.cause || '')
   };
 }
+
+/**
+ * host が「今おおやけに消えているか」を属性の有無だけで判定する。
+ *
+ * ★v0.1.1266 の動機(2026-08-05・実測で確定):
+ *   消えた瞬間の実測値が【CSS 既定値と完全に一致】した:
+ *     実測  : display:none / opacity:0 / visibility:visible / connected:true
+ *     CSS既定: #nls-inline-popup-host { display:none; opacity:0 }
+ *   同時に計器は全部 0 だった(hostFlipCensus=0 / hostStyleTrace=0 / connected=true)。
+ *   = 誰も「消して」いない。インラインの上書きが失われて CSS 既定に戻っているだけ。
+ *
+ * ■ だから犯人探しをやめて「消えない構造」にする
+ *   インラインスタイルは失われうる(誰が落としているか特定できなかった)。
+ *   ならばインラインに依存するのをやめる:
+ *     CSS 既定を display:block にし、消したいときだけ属性を付ける。
+ *   こうすると【インラインが失われても既定は "見えている"】ので、
+ *   上書きの消失は「勝手に消える」ではなく無害な no-op になる。
+ *
+ * @param {HTMLElement|null|undefined} host
+ * @returns {boolean} true=属性により消されている
+ */
+export function isInlineHostHiddenByAttr(host) {
+  try {
+    return host?.getAttribute?.(INLINE_HOST_HIDDEN_ATTR) === '1';
+  } catch {
+    return false;
+  }
+}
+
+/** 消えている状態を表す属性名(CSS 側のセレクタと必ず一致させること)。 */
+export const INLINE_HOST_HIDDEN_ATTR = 'data-nls-hidden';
 
 /**
  * 指示どおりの状態に既になっているか(＝書く必要が無いか)を判定する。

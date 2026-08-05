@@ -352,7 +352,10 @@ import {
 } from '../lib/inlineHostRecoveryGate.js';
 // ★v0.1.1255(Phase A): 「見せる/消す」1回分の値の組を決める純関数。
 //   会議の結論=ディレクトリ移動より先に副作用を正本化する、の最初の対象。
-import { buildInlineHostVisibilityIntent } from '../lib/inlineHostVisibilityIntent.js';
+import {
+  buildInlineHostVisibilityIntent,
+  INLINE_HOST_HIDDEN_ATTR
+} from '../lib/inlineHostVisibilityIntent.js';
 // ★v0.1.1262: 「出してよいか」の判定を純関数へ。実測の矛盾(表示中なのに autoshow_off で
 //   消される)を潰すため「一度でも出したなら消さない」を足す。
 import { shouldHideInlinePanelByAutoshow } from '../lib/inlinePanelShowGate.js';
@@ -2946,6 +2949,17 @@ function setInlineHostDisplay(host, display, cause) {
       if (wasDisplayed) noteInlineHostHideReason(`display:${cause}`);
     } catch { /* 計器失敗は描画を止めない */ }
   }
+  /*
+   * ★v0.1.1266: 属性が「消えている」の正本。インラインも従来どおり書くが、
+   *   インラインは失われうる(実測で確定)ので、属性の付け外しを必ずセットで行う。
+   *   ここに置く理由: display を書く経路は6箇所(host_created / first_paint_gate /
+   *   video_rect_too_small / nonvideo_rect_too_small / prewarm_offscreen /
+   *   setInlineHostVisible 経由)あり、全部この関数を通る。呼び出し側に配るとまた漏れる。
+   */
+  try {
+    if (display === 'none') host.setAttribute(INLINE_HOST_HIDDEN_ATTR, '1');
+    else host.removeAttribute(INLINE_HOST_HIDDEN_ATTR);
+  } catch { /* 属性失敗は描画を止めない */ }
   host.style.display = display;
   if (prev === display) return; // 状態変化なし=計上しない
   try {
@@ -3367,11 +3381,19 @@ function ensurePageFrameStyle() {
         linear-gradient(138deg, rgb(255 255 255 / 10%), transparent 34%) border-box,
         linear-gradient(145deg, rgb(15 23 42 / 4%), transparent 70%) border-box;
     }
+    /*
+     * ★v0.1.1266: 既定を【見えている】に反転した(旧: display:none; opacity:0)。
+     *   実測(2026-08-05)で、消えた瞬間の値が旧 CSS 既定と完全一致し、かつ
+     *   計器が全部0(誰もインラインを書き換えていない)だった。
+     *   = インラインの上書きが失われて既定へ落ちているだけ、と確定。
+     *   → 既定が "見えている" なら、上書きが失われても消えない(無害な no-op になる)。
+     *   消すときは下の [data-nls-hidden="1"] を付ける。★正本は属性であってインラインではない。
+     */
     #${INLINE_POPUP_HOST_ID} {
-      display: none;
+      display: block;
       width: 100%;
       margin: 2px 0 2px;
-      opacity: 0;
+      opacity: 1;
       transition: opacity 0.14s ease-out;
       pointer-events: auto;
       position: relative;
@@ -3389,6 +3411,17 @@ function ensurePageFrameStyle() {
          popup の不透明な背景が前面に来るので、この下地は隠れる（継ぎ目なし）。 */
       background: linear-gradient(180deg, #fffaf2, #eef9f3);
       border-radius: 12px;
+    }
+    /*
+     * ★v0.1.1266: 「消えている」の唯一の正本。インラインの display:none も併記して書くが、
+     *   そちらは失われうるのでこの属性ルールが最後の砦になる。
+     *   !important はインライン由来の display:block(reveal 経路の書き戻し等)にも勝つため。
+     *   ⚠このセレクタ名は inlineHostVisibilityIntent.js の INLINE_HOST_HIDDEN_ATTR と対。
+     */
+    #${INLINE_POPUP_HOST_ID}[data-nls-hidden="1"] {
+      display: none !important;
+      opacity: 0 !important;
+      pointer-events: none !important;
     }
     #${INLINE_POPUP_HOST_ID}:focus,
     #${INLINE_POPUP_HOST_ID}:focus-within {
@@ -4071,6 +4104,15 @@ function ensureInlinePopupHost() {
    */
   host = document.createElement('div');
   host.id = INLINE_POPUP_HOST_ID;
+  /*
+   * ★v0.1.1266: id を付けた【直後・DOM に入る前】に隠し属性を付ける。
+   *   v0.1.1266 で CSS 既定を display:block に反転したため、属性が無い host は
+   *   「見えている」になる。appendChild までに属性が付いていないと
+   *   「こん太を押すまで出さない」が壊れ、新規生成のたびに一瞬出てしまう。
+   *   下の setInlineHostDisplay(host,'none',...) でも同じ属性が付くが、
+   *   そちらに依存せずここでも付ける(生成〜集約入口の間に窓を作らない)。
+   */
+  host.setAttribute(INLINE_HOST_HIDDEN_ATTR, '1');
   // ★作った直後に登録する。関数末尾まで待たない(待つと再入で作り直される)。
   nlsInlinePopupHostSingleton = host;
   host.setAttribute('aria-hidden', 'true');
