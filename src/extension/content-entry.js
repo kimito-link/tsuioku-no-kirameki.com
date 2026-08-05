@@ -360,6 +360,14 @@ import {
   snapshotInlineHostHideReasonCensus,
   formatInlineHostHideReasonLine
 } from '../lib/inlineHostHideReasonCensus.js';
+// ★v0.1.1261: style の書き換えを【経路を問わず】捕らえ、呼び出し元を名指しする。
+//   既存計器は「特定の関数を通った場合だけ」数えるため、関数を通らない書き換えが見えない。
+import {
+  createHostStyleMutationTrace,
+  noteHostStyleMutation,
+  snapshotHostStyleMutationTrace,
+  formatHostStyleMutationLine
+} from '../lib/hostStyleMutationTrace.js';
 import { probeWatchPageDomStructure } from '../lib/probeWatchPageDomStructure.js';
 import { summarizeGiftSubAppHistoryDiag } from '../lib/summarizeGiftSubAppHistoryDiag.js';
 import { createConsoleErrorBuffer } from '../lib/consoleErrorBuffer.js';
@@ -2807,6 +2815,49 @@ let _hostVisWatchRaf = null;
  * パネルの可視性を毎フレーム見張る。走査はせず host 参照1つの矩形だけ読む=O(1)
  * (paint 毎の DOM 走査は禁止・v0.1.1201 で自分が拡張全体を重くした反省)。
  */
+const _hostStyleTrace = createHostStyleMutationTrace();
+let _hostStyleObserver = null;
+let _hostStylePrevVisible = null;
+
+/**
+ * ★v0.1.1261: host の style/class 変化を MutationObserver で見張る。
+ *   「誰が呼んだか」を関数の内側で数えるのをやめ、【DOM が変わった事実】を捕らえる。
+ *   変化時に Error().stack を採ると、経路を問わず書き換え元が分かる。
+ *   stack 取得は「見えている→消えた」の遷移時だけ(毎回だと重い)。
+ * @param {HTMLElement|null} host
+ */
+function startHostStyleMutationTrace(host) {
+  if (_hostStyleObserver || !host || typeof MutationObserver !== 'function') return;
+  try {
+    _hostStyleObserver = new MutationObserver(() => {
+      try {
+        const cs = window.getComputedStyle(host);
+        const r = host.getBoundingClientRect();
+        const visible =
+          cs.display !== 'none' && cs.visibility !== 'hidden' &&
+          Number(cs.opacity) !== 0 && r.width >= 40 && r.height >= 24;
+        const becameHidden = _hostStylePrevVisible === true && !visible;
+        noteHostStyleMutation(_hostStyleTrace, {
+          nowMs: Date.now(),
+          becameHidden,
+          display: cs.display,
+          opacity: cs.opacity,
+          visibility: cs.visibility,
+          width: r.width,
+          height: r.height,
+          // 消えた瞬間だけ stack を採る(毎回は重い)。
+          stack: becameHidden ? new Error('host-hidden').stack : ''
+        });
+        _hostStylePrevVisible = visible;
+      } catch { /* 計器失敗は描画を止めない */ }
+    });
+    _hostStyleObserver.observe(host, {
+      attributes: true,
+      attributeFilter: ['style', 'class', 'hidden', 'aria-hidden']
+    });
+  } catch { /* observer 生成失敗は無視 */ }
+}
+
 function startHostVisibilityWatch() {
   if (_hostVisWatchRaf != null) return; // 二重起動しない
   if (typeof requestAnimationFrame !== 'function') return;
@@ -3958,6 +4009,8 @@ function ensureInlinePopupHost() {
   host.id = INLINE_POPUP_HOST_ID;
   host.setAttribute('aria-hidden', 'true');
   setInlineHostDisplay(host, 'none', 'host_created');
+  // ★v0.1.1261: この host の style 書き換えを経路を問わず見張る(idempotent)。
+  startHostStyleMutationTrace(host);
   host.style.pointerEvents = 'auto';
   host.style.width = '100%';
 
@@ -6994,6 +7047,10 @@ function buildAiShareFastDiagnosticsPayload() {
       // v0.1.1250: 移設でもscrollでもない「パネルが一瞬消える」を名指しする計器。
       hostFlipCensus: snapshotHostVisibilityFlipCensus(_hostFlipCensus),
       hostVisWatch: snapshotHostVisibilityWatch(_hostVisWatch),
+      hostStyleTrace: (() => {
+        const snap = snapshotHostStyleMutationTrace(_hostStyleTrace);
+        return snap ? { ...snap, line: formatHostStyleMutationLine(snap) } : null;
+      })(),
       hostHideReason: (() => {
         const snap = snapshotInlineHostHideReasonCensus(_hostHideReasonCensus);
         return snap ? { ...snap, line: formatInlineHostHideReasonLine(snap) } : null;
@@ -9642,6 +9699,10 @@ function buildAiSharePageDiagnostics() {
       // v0.1.1250: 移設でもscrollでもない「パネルが一瞬消える」を名指しする計器。
       hostFlipCensus: snapshotHostVisibilityFlipCensus(_hostFlipCensus),
       hostVisWatch: snapshotHostVisibilityWatch(_hostVisWatch),
+      hostStyleTrace: (() => {
+        const snap = snapshotHostStyleMutationTrace(_hostStyleTrace);
+        return snap ? { ...snap, line: formatHostStyleMutationLine(snap) } : null;
+      })(),
       hostHideReason: (() => {
         const snap = snapshotInlineHostHideReasonCensus(_hostHideReasonCensus);
         return snap ? { ...snap, line: formatInlineHostHideReasonLine(snap) } : null;

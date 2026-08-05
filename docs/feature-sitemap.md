@@ -734,7 +734,7 @@
   - `src/lib/statusTrendKey.js`
   - `src/extension/status-entry.js`
   - `src/lib/statusActionAdvisor.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 139</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 140</summary>
 
 - `app/app.js` — スマホ閲覧用 status Web 版。
 - `app/live-view.js` — global NL_BUILD_ID
@@ -790,6 +790,7 @@
 - `src/lib/forwardReactivation.js` — v0.1.765「最終系(a): 入口が死んだ時だけ forward crawl を起動して再接続」の判定(純ロジック)。
 - `src/lib/geminiNanoBridge.js` — v0.1.205 Phase C: Built-in AI (Gemini Nano, Chrome 138+) の薄いラッパー。
 - `src/lib/globalFetchRateLimiter.js` — v0.1.664 PR4: tokenBucket.js を用いた全タブ横断の fetch レートリミッター(土台)。
+- `src/lib/hostStyleMutationTrace.js` — パネルの style 書き換えを「経路を問わず」捕らえ、呼び出し元を名指しする計器(純関数)。
 - `src/lib/hostVisibilityFlipCensus.js` — インラインパネル(host)の「消えた⇄戻った」を数える計器。
 - `src/lib/hostVisibilityWatch.js` — パネルが「実際に見えなくなった瞬間」を、原因の種類を問わず捕らえる見張り(純関数群)。
 - `src/lib/htmlEscape.js` — 旧パス：`src/lib/htmlEscape.js`
@@ -880,7 +881,7 @@
 
 ## 🧬 修正系譜マップ(この系統のバグを過去にどう直したか)
 
-> changelog 全 590 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
+> changelog 全 591 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
 
 ### 💾 記録件数 (89版)
 - `v0.1.1247` 2026-08-04 — 読み上げが遅くなる悪循環を断ち切りました
@@ -2150,7 +2151,8 @@
 - `v0.1.840` 2026-06-20 — 機能逆引き地図を全ファイル網羅に
 - `v0.1.835` 2026-06-20 — 自己検証ゲートを追加(版同期+診断文言)
 
-### その他 (46版)
+### その他 (47版)
+- `v0.1.1261` 2026-08-05 — パネルを消している場所を直接つきとめる計器を入れました
 - `v0.1.1260` 2026-08-05 — 消えた回数の数え漏れを直しました(半分しか数えていませんでした)
 - `v0.1.1259` 2026-08-05 — サイドパネルで開けるようにする準備をしました(内部)
 - `v0.1.1258` 2026-08-05 — 点滅を止めました(消す側と戻す側が競り合っていました)
