@@ -1548,10 +1548,48 @@ import {
      *   到達の可否を先に切り分けないと、これ以上どこを直しても当たらない。
      *   ★この1行が届けば「到達している=合図側の問題」、届かなければ「到達していない」。
      */
-    postNlsIntercept({
+    /*
+     * ★v0.1.1272 真因(chrome-devtools MCP で実測して確定・2026-08-06):
+     *
+     *   実測結果:
+     *     __NLS_PAGE_INTERCEPT__ = true      (MAIN world は走っている)
+     *     host.style.display = accessor      (トラップは【正しく装着されている】)
+     *     なのに診断は armed:null            (報告だけが1つも届いていない)
+     *
+     *   真因は【タイミング】。manifest は
+     *     MAIN(page-intercept)  = document_start
+     *     ISOLATED(content.js)  = document_idle
+     *   なので、報告を送る側が【聞く側より先に】走っている。
+     *   postMessage は投げっぱなしなので、リスナー登録前の1回は【永久に失われる】。
+     *   ★「1回だけ送る」設計そのものが誤りだった(v0.1.1268/1269/1270 の3版とも同じ穴)。
+     *
+     *   対処: 状態を保持し、聞かれるまで送り続ける。
+     *     ・最新の報告内容を hwtLastReport に必ず保存する
+     *     ・content 側が起動したら再送させる(下の nls:hwt-hello を受けて再送)
+     *     ・保険として最初の10秒だけ1秒ごとに再送する(hello を取りこぼしても届く)
+     */
+    let hwtLastReport = {
       type: HWT_MSG, armed: false,
       armReason: `reached(top=${window.top === window.self}, path=${String(window.location?.pathname || '').slice(0, 40)})`
+    };
+    /** 最新の状態を保存してから送る(送信失敗・未着でも状態は残す)。 */
+    const hwtPost = (payload) => {
+      // armed 系の報告だけを「最新状態」として保持する(捕獲レポートは別扱い)。
+      if (typeof payload?.armed === 'boolean') hwtLastReport = payload;
+      postNlsIntercept(payload);
+    };
+    hwtPost(hwtLastReport);
+    // content(isolated)が起きたら「今の状態」を送り直す。
+    window.addEventListener('nls:hwt-hello', () => {
+      try { postNlsIntercept(hwtLastReport); } catch { /* no-op */ }
     });
+    // ★hello を取りこぼしても届くよう、最初の10秒だけ1秒ごとに再送する。
+    let hwtResend = 0;
+    const hwtResendTimer = setInterval(() => {
+      hwtResend += 1;
+      try { postNlsIntercept(hwtLastReport); } catch { /* no-op */ }
+      if (hwtResend >= 10) clearInterval(hwtResendTimer);
+    }, 1000);
     const HWT_ARM_EVENT = 'nls:hwt-arm';
     const HWT_STACK_SAMPLE_MAX = 4;
     const HWT_FLUSH_MS = 1000;
@@ -1665,7 +1703,8 @@ import {
       } catch (e) {
         reason = String((e && e.message) || e || 'unknown').slice(0, 80);
       }
-      postNlsIntercept({ type: HWT_MSG, armed: ok, armReason: reason });
+      // ★hwtPost で送る=最新状態を保持し、content 側が後から起きても再送で届く。
+      hwtPost({ type: HWT_MSG, armed: ok, armReason: reason });
     };
 
     /*
@@ -1701,7 +1740,7 @@ import {
           hwtHostMissing += 1;
           // 何度探しても居ないことを、たまに報告する(黙って諦めない)。
           if (hwtArmAttempts === 5 || hwtArmAttempts === 30) {
-            postNlsIntercept({
+            hwtPost({
               type: HWT_MSG, armed: false,
               armReason: `host-not-found(探索${hwtArmAttempts}回・不在${hwtHostMissing}回)`
             });

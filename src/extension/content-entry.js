@@ -2893,6 +2893,21 @@ function armHostWriteTrap() {
   catch { /* 計器の失敗で描画を止めない */ }
 }
 
+/*
+ * ★v0.1.1272: 「こちらは聞ける状態になった」と MAIN world に伝える。
+ *
+ *   真因(chrome-devtools MCP で実測して確定): manifest の run_at が
+ *     MAIN(page-intercept) = document_start / ISOLATED(content) = document_idle
+ *   なので、報告を送る側が【聞く側より先に】走る。postMessage は投げっぱなしなので
+ *   リスナー登録前の報告は永久に失われる。実測では
+ *   「トラップは装着済み(accessor)なのに armed:null」という形で現れていた。
+ *   → 起動を知らせて、保持してある最新の状態を送り直してもらう。
+ */
+function helloHostWriteTrap() {
+  try { window.dispatchEvent(new CustomEvent('nls:hwt-hello')); }
+  catch { /* 計器の失敗で描画を止めない */ }
+}
+
 /**
  * ★v0.1.1261: host の style/class 変化を MutationObserver で見張る。
  *   「誰が呼んだか」を関数の内側で数えるのをやめ、【DOM が変わった事実】を捕らえる。
@@ -14397,6 +14412,9 @@ async function start() {
    *   ★既定は表示(従来どおり)。OFF にした人だけ出さない。
    *   ★設定の読み取りに失敗したら【出す】側に倒す(機能が黙って消えるのを避ける)。
    */
+  // ★v0.1.1272: message リスナーは登録済みなので、MAIN world に「聞ける」と伝える。
+  //   これが無いと document_start 側が送った報告を永久に取りこぼす(実測で確定した真因)。
+  helloHostWriteTrap();
   if (isWatchInlinePanelTopFrame() && (await readVenueButtonVisible())) {
     _venueApi = mountVenueBarButton();
   }

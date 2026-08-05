@@ -83,6 +83,53 @@ describe('v0.1.1268 — ★world 境界(ここを外すと永遠に0)', () => {
   });
 });
 
+describe('v0.1.1272 — ★報告のタイミング(真因)', () => {
+  /*
+   * chrome-devtools MCP で実測して確定した真因:
+   *   MAIN(page-intercept)=document_start / ISOLATED(content)=document_idle
+   *   → 報告を送る側が聞く側より先に走る。postMessage は投げっぱなしなので
+   *     リスナー登録前の報告は永久に失われる。
+   *   実測は「トラップは装着済み(accessor)なのに armed:null」という形だった。
+   *   ★「1回だけ送る」設計そのものが誤り。3版(1268/1269/1270)とも同じ穴だった。
+   */
+  it('★最新の報告を保持している(投げっぱなしにしない)', () => {
+    const body = codeOnly(pageSrc);
+    expect(body).toMatch(/let hwtLastReport = \{/);
+    // armed 系は必ず保持してから送る。
+    expect(body).toMatch(/if \(typeof payload\?\.armed === 'boolean'\) hwtLastReport = payload;/);
+  });
+
+  it('★content 側の hello を受けたら再送する', () => {
+    const body = codeOnly(pageSrc);
+    expect(body).toMatch(
+      /window\.addEventListener\('nls:hwt-hello', \(\) => \{[\s\S]{0,120}postNlsIntercept\(hwtLastReport\)/
+    );
+  });
+
+  it('★hello を取りこぼしても届くよう再送する(保険)', () => {
+    const body = codeOnly(pageSrc);
+    expect(body).toMatch(/setInterval\(\(\) => \{[\s\S]{0,200}postNlsIntercept\(hwtLastReport\)/);
+    // 無限に送り続けない(10回で止める)。
+    expect(body).toMatch(/if \(hwtResend >= 10\) clearInterval\(hwtResendTimer\);/);
+  });
+
+  it('★armed 報告はすべて hwtPost 経由(保持されない経路を残さない)', () => {
+    const body = codeOnly(pageSrc);
+    // 生の postNlsIntercept で armed を送っている箇所が無いこと。
+    expect(body).not.toMatch(/postNlsIntercept\(\{\s*type: HWT_MSG, armed:/);
+    expect(body).not.toMatch(/postNlsIntercept\(\{\n\s*type: HWT_MSG, armed:/);
+    // hwtPost 経由が2箇所(装着結果 / host-not-found)+初回1回。
+    expect((body.match(/hwtPost\(/g) || []).length).toBeGreaterThanOrEqual(3);
+  });
+
+  it('★content 側が「聞ける」と伝える(無条件に実行される文)', () => {
+    const body = codeOnly(contentSrc);
+    // 定義内の dispatch と、start() からの呼び出しの2箇所。
+    expect(body).toMatch(/\n\s*helloHostWriteTrap\(\);/);
+    expect((body.match(/helloHostWriteTrap/g) || []).length).toBe(2);
+  });
+});
+
 describe('v0.1.1268 — 装着と捕獲', () => {
   it('★4経路すべてを【無条件に】包んでいる(if(false)前置で1経路だけ殺す変異を捕らえる)', () => {
     const body = codeOnly(pageSrc);
@@ -128,7 +175,8 @@ describe('v0.1.1268 — 装着と捕獲', () => {
 
   it('★装着結果(armed)を必ず報告する(0回と未計測を区別するため)', () => {
     const body = codeOnly(pageSrc);
-    expect(body).toMatch(/postNlsIntercept\(\{ type: HWT_MSG, armed: ok, armReason: reason \}\)/);
+    // ★v0.1.1272: hwtPost 経由に変更(最新状態を保持して再送できるようにするため)。
+    expect(body).toMatch(/hwtPost\(\{ type: HWT_MSG, armed: ok, armReason: reason \}\)/);
   });
 
   it('stack 採取は上限つき(4秒周期で無限に伸びない)', () => {
