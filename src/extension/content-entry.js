@@ -350,6 +350,9 @@ import {
   shouldHideInlineHostOnMissingPanel,
   formatInlineHostRecoveryLine
 } from '../lib/inlineHostRecoveryGate.js';
+// ★v0.1.1255(Phase A): 「見せる/消す」1回分の値の組を決める純関数。
+//   会議の結論=ディレクトリ移動より先に副作用を正本化する、の最初の対象。
+import { buildInlineHostVisibilityIntent } from '../lib/inlineHostVisibilityIntent.js';
 import { probeWatchPageDomStructure } from '../lib/probeWatchPageDomStructure.js';
 import { summarizeGiftSubAppHistoryDiag } from '../lib/summarizeGiftSubAppHistoryDiag.js';
 import { createConsoleErrorBuffer } from '../lib/consoleErrorBuffer.js';
@@ -2845,6 +2848,36 @@ function setInlineHostDisplay(host, display, cause) {
 }
 
 /**
+ * ★v0.1.1255: パネルを「見せる/消す」唯一の入口。display/opacity/pointerEvents/aria-hidden を
+ *   【必ずセットで】書く。1つの操作が複数行に分かれていたのが事故の温床だった。
+ *
+ *   既存コメント(旧 hidePageFrameOverlay 内)が既にこう証言していた:
+ *     「display:none のみ残すと pointerEvents/opacity が中途半端に残り、
+ *       次回ツールバー直後の前面化判定やヒット領域が不安定になることがある」
+ *   → 書く場所が分かれている限り防げないので、書き方ごと1関数に閉じる。
+ *
+ *   ★setInlineHostDisplay を置き換えず【内側で呼ぶ】。計器(hostFlipCensus)の
+ *     配線と「状態が変わったときだけ計上する」契約をそのまま生かすため。
+ *
+ *   ⚠この関数を使ってはいけない場所: display を触らない reveal 経路
+ *     (attachInlineIframeRevealFallback / same-src 再入)。
+ *     あちらで display:'block' を書くと、意図的に消された状態を復活させてしまう。
+ *
+ * @param {HTMLElement|null} host
+ * @param {boolean} visible true=見せる / false=消す
+ * @param {string} cause 経路タグ(状態速報にそのまま出る)
+ */
+function setInlineHostVisible(host, visible, cause) {
+  if (!host || !host.style) return;
+  const intent = buildInlineHostVisibilityIntent({ visible, cause });
+  // display は既存の集約入口に通す(計器・変化検出の契約を維持)。
+  setInlineHostDisplay(host, intent.display, intent.cause);
+  host.style.opacity = intent.opacity;
+  host.style.pointerEvents = intent.pointerEvents;
+  try { host.setAttribute('aria-hidden', intent.ariaHidden); } catch { /* 属性失敗は描画を止めない */ }
+}
+
+/**
  * host 移設の【直前】に呼ぶ(観測のみ・DOMは触らない)。isConnected/iframe有無/会場open を採取。
  * @param {string} reason 移設経路名(anchored_video / floating_body 等)
  * @param {HTMLElement|null} host
@@ -4136,10 +4169,8 @@ function renderInlinePanelFloatingHost() {
     iframe.style.height = `${Math.min(iframeH, maxH - 12)}px`;
     iframe.style.maxHeight = `${Math.min(iframeH, maxH - 12)}px`;
   }
-  host.style.pointerEvents = 'auto';
-  host.setAttribute('aria-hidden', 'false');
-  setInlineHostDisplay(host, 'block', 'floating_show');
-  host.style.opacity = '1';
+  // ★v0.1.1255: 4行に分かれていた「見せる」を1操作に(片方だけ書く事故を構造的に断つ)。
+  setInlineHostVisible(host, true, 'floating_show');
   // 閉じるボタン（A30）。元は floating 専用だったが、0.1.11 (B2) で dock_bottom
   // にも追加（dock_bottom も同様に panel を非表示にする手段が無く、設定画面で
   // placement を変えないと消せなかった）。一度だけ生成して再利用する。
@@ -4282,10 +4313,8 @@ function renderInlinePanelDockBottomHost() {
     iframe.style.maxHeight = `${iframeInnerH}px`;
   }
   ensureInlineHostReflowListener();
-  host.style.pointerEvents = 'auto';
-  host.setAttribute('aria-hidden', 'false');
-  setInlineHostDisplay(host, 'block', 'dock_show');
-  host.style.opacity = '1';
+  // ★v0.1.1255: 4行に分かれていた「見せる」を1操作に(片方だけ書く事故を構造的に断つ)。
+  setInlineHostVisible(host, true, 'dock_show');
   // 0.1.11 (B2): dock_bottom でも閉じるボタンを設置（floating と共通）。
   // 元は floating だけで「× 閉じる」を出していたが、dock_bottom も同じ理由で
   // ユーザーが明示的に閉じる手段が必要だった（設定画面に行かないと消せない）。
@@ -5494,10 +5523,8 @@ function renderInlineHostAnchoredToVideo(video) {
       iframe.style.removeProperty('max-height');
     }
   }
-  host.style.pointerEvents = 'auto';
-  host.setAttribute('aria-hidden', 'false');
-  setInlineHostDisplay(host, 'block', 'anchored_show');
-  host.style.opacity = '1';
+  // ★v0.1.1255: 4行に分かれていた「見せる」を1操作に(片方だけ書く事故を構造的に断つ)。
+  setInlineHostVisible(host, true, 'anchored_show');
   publishInlinePanelLayoutRenderSnapshot(
     besideFlexRowColumn,
     belowWideRowChosen,
@@ -5624,10 +5651,8 @@ function renderInlinePopupHost(target) {
     baselineWidthPx: panelWidthPx,
     hostAttachFallbackBody
   });
-  host.style.pointerEvents = 'auto';
-  host.setAttribute('aria-hidden', 'false');
-  setInlineHostDisplay(host, 'block', 'nonvideo_show');
-  host.style.opacity = '1';
+  // ★v0.1.1255: 4行に分かれていた「見せる」を1操作に(片方だけ書く事故を構造的に断つ)。
+  setInlineHostVisible(host, true, 'nonvideo_show');
   maybeReconnectCommentMutationObserverAfterInlineLayout();
 }
 
@@ -5647,12 +5672,10 @@ function hidePageFrameOverlay() {
     nlsInlinePopupHostSingleton ||
     document.getElementById(INLINE_POPUP_HOST_ID);
   if (host) {
-    setInlineHostDisplay(host, 'none', 'overlay_hidden');
-    host.setAttribute('aria-hidden', 'true');
     // × 閉じる等で display:none のみ残すと pointerEvents/opacity が中途半端に残り、
     // 次回ツールバー直後の前面化判定やヒット領域が不安定になることがある。
-    host.style.pointerEvents = 'none';
-    host.style.opacity = '0';
+    // ★v0.1.1255: その「中途半端」を構造的に不可能にするため1操作へ束ねた。
+    setInlineHostVisible(host, false, 'overlay_hidden');
   }
   stableFrameTarget = null;
   syncWatchPageDockBodyReserve();

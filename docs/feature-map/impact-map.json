@@ -4946,6 +4946,16 @@
       ]
     },
     {
+      "file": "src/lib/inlineHostVisibilityIntent.js",
+      "featureCount": 1,
+      "features": [
+        "content"
+      ],
+      "labels": [
+        "記録エンジン(watchページ常駐)"
+      ]
+    },
+    {
       "file": "src/lib/inlineModeFlags.js",
       "featureCount": 1,
       "features": [
