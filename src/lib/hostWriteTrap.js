@@ -83,7 +83,7 @@ export function noteHostWriteTrapReport(state, detail) {
       valueHead: String(s.valueHead || '').slice(0, 80),
       frames: (Array.isArray(s.frames) ? s.frames : [])
         .slice(0, 3)
-        .map((f) => String(f).slice(0, 160)),
+        .map(/** @param {unknown} f */ (f) => String(f).slice(0, 160)),
       t: Number(s.t) || 0
     });
   }
@@ -153,7 +153,10 @@ export function snapshotHostWriteTrap(state, ownOrigin) {
   };
 }
 
-/** 分類タグを日本語に。 */
+/**
+ * 分類タグを日本語に。
+ * @param {string} kind
+ */
 function kindLabel(kind) {
   if (kind === 'page') return 'ページ';
   if (kind === 'other-extension') return '別の拡張';
