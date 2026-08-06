@@ -277,6 +277,7 @@
 | `src/lib/kokenGiftHistoryApi.js` | 2 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) |
 | `src/lib/kokenGiftHistoryFetchClient.js` | 2 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) |
 | `src/lib/laneDiagKey.js` | 2 | ポップアップ(応援レーン) / 状態速報ページ |
+| `src/lib/laneMirrorContract.js` | 2 | 記録エンジン(watchページ常駐) / 会場モード(standalone) |
 | `src/lib/laneRosterDelta.js` | 2 | ポップアップ(応援レーン) / 状態速報ページ |
 | `src/lib/liveAudienceDom.js` | 2 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) |
 | `src/lib/liveChannelSwitch.js` | 2 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) |

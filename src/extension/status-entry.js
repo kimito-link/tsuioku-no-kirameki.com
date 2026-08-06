@@ -162,7 +162,10 @@ import { buildCustomSoundDiagSnapshot, buildCustomSoundDiagLine } from '../lib/c
 // 2026-06-22(council/lane-show-all-active): 応援レーンの人数整合(素性 N/表示 M)を健全度パネルに載せる。
 import { KEY_LANE_DIAG } from '../lib/laneDiagKey.js';
 // 応援レーン鏡: popup の応援レーン(りんく/こん太/広告/たぬ姉の段組み)を顔まで含めてそっくり映す。
-//   データは popup→storage(KEY_LANE_MIRROR)、status が読んで本物の描画関数で描く(会場とは無関係)。
+//   データは popup→storage(KEY_LANE_MIRROR)、status が読んで本物の描画関数で描く。
+//   ★このキーの読者一覧は src/lib/laneMirrorContract.js の LANE_MIRROR_CONSUMERS が正本。
+//     status だけでなく【会場モード(venueBar.js)も読む】(v0.1.1111 で会場の正本に昇格)。
+//     旧コメントは会場を読者から除外していたが誤り(2026-08-06 に訂正)。
 import { KEY_LANE_MIRROR } from '../lib/laneMirrorKey.js';
 // 2026-06-26: restoreLaneMirrorBuckets / paintStoryUserLaneDom* の import は応援レーン鏡撤去で不要になり削除。
 // 数字カード鏡: v0.1.948 で status への描画は撤去。KEY_STAT_CARDS_MIRROR は
