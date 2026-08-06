@@ -175,3 +175,33 @@ export function venueSeatIndexByUid(visibleSeats) {
   }
   return map;
 }
+
+/**
+ * ★v0.1.1280: 会場に「①の鏡がどれくらい古いか」を出すための文言(純関数)。
+ *
+ * ■ なぜ要るか(2026-08-06 の実測)
+ *   会場と①の中身がずれる最大の原因は【鏡の陳腐化】だった。鏡は①が描画したときにしか
+ *   更新されない(publishLaneMirror の呼び出しは renderStoryUserLane 内の1箇所のみ)。
+ *   Side Panel 移行(v0.1.1275)で「①を閉じたまま会場を見る」が普通になり、実測で 656秒
+ *   古い鏡をそのまま描いていた。SOFT(180s)〜HARD(900s)は「ちらつき防止のため意図的に
+ *   古い鏡を使い続ける」帯域なので、**降格させずに事実だけ伝える**のが正しい扱い。
+ *
+ * ■ 何を返すか(表示しないときは空文字)
+ *   fresh    : ''                      … 何も出さない(通常)
+ *   stale    : '①の鏡 N分前（…）'       … 使い続けているが古い
+ *   fallback : '①パネル未接続'          … 鏡を使っていない(席から組んでいる)
+ *
+ * @param {'mirror'|'fallback'|string} mode 会場が実際に使った供給経路
+ * @param {number} mirrorAgeSec 鏡の年齢(秒)。負値/非有限は不明扱い
+ * @param {number} [softWindowSec=180] SOFT 窓(秒)。既定は VENUE_LANE_MIRROR_SOFT_WINDOW_MS と同値
+ * @returns {string}
+ */
+export function venueMirrorAgeNotice(mode, mirrorAgeSec, softWindowSec = 180) {
+  if (String(mode) === 'fallback') return '①パネル未接続';
+  const sec = Number(mirrorAgeSec);
+  if (!Number.isFinite(sec) || sec < 0) return '';
+  const soft = Number.isFinite(Number(softWindowSec)) ? Number(softWindowSec) : 180;
+  if (sec <= soft) return '';
+  const min = Math.max(1, Math.round(sec / 60));
+  return `①の鏡 ${min}分前（①パネルを開くと更新）`;
+}
