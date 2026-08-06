@@ -27,8 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 5 / 722 件
-- `src/lib/hostWriteTrap.js`
+## ⚠️ 役割コメントが無いソース 4 / 721 件
 - `src/lib/laneDomSelfMeasure.js`
 - `src/lib/reportPreviewPublish.js`
 - `src/lib/venueLaneBuckets.js`
@@ -629,7 +628,7 @@
     - `trumpet1.mp3`
     - `wallet1.mp3`
   - `SOURCES.md`
-- 📁 **src/** (1534)
+- 📁 **src/** (1531)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -910,7 +909,7 @@
         - `logo_funlink_white_RGB_maru_black.png`
       - `logo_guide_funlink_ol.pdf`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1303)
+  - 📁 **lib/** (1300)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -1384,9 +1383,6 @@
     - `hostVisibilityFlipCensus.test.js`
     - `hostVisibilityWatch.js` — パネルが「実際に見えなくなった瞬間」を、原因の種類を問わず捕らえる見張り(純関数群)。
     - `hostVisibilityWatch.test.js`
-    - `hostWriteTrap.js` — ⚠️ 役割コメント無し
-    - `hostWriteTrap.test.js`
-    - `hostWriteTrap.wiring.test.js`
     - `htmlEscape.js` — 旧パス：`src/lib/htmlEscape.js`
     - `htmlEscape.test.js`
     - `htmlReportCommenterFollowSection.js` — HTML レポート向けコメンターフォロー分析ブロック。
