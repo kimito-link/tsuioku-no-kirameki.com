@@ -271,7 +271,6 @@
 | `src/lib/giftSubAppRelayDiag.js` | 2 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) |
 | `src/lib/giftThrowProjectile.js` | 2 | 記録エンジン(watchページ常駐) / 会場モード(standalone) |
 | `src/lib/globalBackfillQueue.js` | 2 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) |
-| `src/lib/hostVisibilityWatch.js` | 2 | 記録エンジン(watchページ常駐) / 状態速報ページ |
 | `src/lib/inlinePanelLayout.js` | 2 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) |
 | `src/lib/instantCommentPush.js` | 2 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) |
 | `src/lib/kokenContributionRankingApi.js` | 2 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) |
@@ -519,9 +518,6 @@
 | `src/lib/heavyChunkReadReuse.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/hiddenOfficialIframeReinjectGate.js` | 1 | 記録エンジン(watchページ常駐) |
 | `src/lib/hiddenTabExternalFetchGate.js` | 1 | 記録エンジン(watchページ常駐) |
-| `src/lib/hostStyleMutationTrace.js` | 1 | 記録エンジン(watchページ常駐) |
-| `src/lib/hostVanishForensics.js` | 1 | 記録エンジン(watchページ常駐) |
-| `src/lib/hostVisibilityFlipCensus.js` | 1 | 記録エンジン(watchページ常駐) |
 | `src/lib/htmlReportCommenterFollowSection.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/htmlReportConceptGuide.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/iframeOfficialDomFromRelay.js` | 1 | 記録エンジン(watchページ常駐) |
@@ -533,11 +529,9 @@
 | `src/lib/inlineHostAnchorScoring.js` | 1 | 記録エンジン(watchページ常駐) |
 | `src/lib/inlineHostBesideSizing.js` | 1 | 記録エンジン(watchページ常駐) |
 | `src/lib/inlineHostDockSizing.js` | 1 | 記録エンジン(watchページ常駐) |
-| `src/lib/inlineHostHideReasonCensus.js` | 1 | 記録エンジン(watchページ常駐) |
 | `src/lib/inlineHostLayoutReset.js` | 1 | 記録エンジン(watchページ常駐) |
 | `src/lib/inlineHostMoveProbe.js` | 1 | 記録エンジン(watchページ常駐) |
 | `src/lib/inlineHostRecoveryGate.js` | 1 | 記録エンジン(watchページ常駐) |
-| `src/lib/inlineHostVanishClassifier.js` | 1 | 記録エンジン(watchページ常駐) |
 | `src/lib/inlineHostVisibilityIntent.js` | 1 | 記録エンジン(watchページ常駐) |
 | `src/lib/inlineModeFlags.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/inlinePanelFocusGate.js` | 1 | 記録エンジン(watchページ常駐) |

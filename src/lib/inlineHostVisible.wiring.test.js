@@ -43,11 +43,20 @@ describe('setInlineHostVisible の配線', () => {
     expect(body).toMatch(/setAttribute\('aria-hidden', intent\.ariaHidden\)/);
   });
 
-  it('★既存の集約入口を置き換えず内側で呼ぶ(計器 hostFlipCensus の契約を壊さない)', () => {
-    // setInlineHostDisplay 自体が消えていないこと。
-    expect(contentSrc).toMatch(/function setInlineHostDisplay\(host, display, cause\) \{/);
-    // 「状態が変わったときだけ計上」の契約が残っていること(計器の水増し防止)。
-    expect(fnBody(contentSrc, 'function setInlineHostDisplay(')).toMatch(/if \(prev === display\) return;/);
+  it('★既存の集約入口を置き換えず内側で呼ぶ(display を書く唯一の場所を保つ)', () => {
+    /*
+     * ★v0.1.1278: 旧版はここで計器 hostFlipCensus の契約
+     *   (`if (prev === display) return;` による水増し防止)も固定していたが、
+     *   計器を撤去したのでその断言は落とした。
+     *   ★残すのは実挙動=「display を書く唯一の入口が存在し、内側で呼ばれること」。
+     *     第3引数は経路タグ(計器撤去で現在は未使用のため _cause)。
+     */
+    expect(contentSrc).toMatch(/function setInlineHostDisplay\(host, display, _cause\) \{/);
+    // 属性(消えているの正本)と display をセットで書く契約は実挙動なので固定する。
+    const body = fnBody(contentSrc, 'function setInlineHostDisplay(');
+    expect(body).toMatch(/setAttribute\(INLINE_HOST_HIDDEN_ATTR, '1'\)/);
+    expect(body).toMatch(/removeAttribute\(INLINE_HOST_HIDDEN_ATTR\)/);
+    expect(body).toMatch(/host\.style\.display = display;/);
   });
 
   it('★見せる経路4つが全部この入口を通っている(数で断言)', () => {

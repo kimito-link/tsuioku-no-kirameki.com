@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 4 / 721 件
+## ⚠️ 役割コメントが無いソース 4 / 715 件
 - `src/lib/laneDomSelfMeasure.js`
 - `src/lib/reportPreviewPublish.js`
 - `src/lib/venueLaneBuckets.js`
@@ -157,7 +157,7 @@
     - `2026-07-22.md`
     - `2026-07-23.md`
     - `2026-07-31.md`
-- 📁 **docs/** (242)
+- 📁 **docs/** (244)
   - 📁 **article-assets/** (87)
     - 📁 **venue-frames/** (12)
       - `f01.png`
@@ -267,7 +267,7 @@
     - `storage-bus.md`
     - `venue.md`
     - `web-status.md`
-  - 📁 **handoff/** (79)
+  - 📁 **handoff/** (80)
     - `HANDOFF-backfill-instant-restore.md`
     - `HANDOFF-broadcast-score-panel.md`
     - `HANDOFF-comment-pickup-bsp.md`
@@ -299,6 +299,7 @@
     - `HANDOFF-resume-0801.md`
     - `HANDOFF-resume-0802.md`
     - `HANDOFF-resume-0803.md`
+    - `HANDOFF-resume-0806-sidepanel.md`
     - `HANDOFF-robust-architecture-IMPL.md`
     - `HANDOFF-show-all-participants.md`
     - `HANDOFF-sound-optimization.md`
@@ -402,6 +403,7 @@
   - `plan-avatar-resolver-refactor.md`
   - `plan-empty-state-no-broadcast.md`
   - `plan-story-user-lane-tiers.md`
+  - `refactor-instructions.md`
   - `reference_deterministic_backfill.md`
   - `reliability-backlog-phase-b.md`
   - `repo-tree-map.html`
@@ -628,7 +630,7 @@
     - `trumpet1.mp3`
     - `wallet1.mp3`
   - `SOURCES.md`
-- 📁 **src/** (1531)
+- 📁 **src/** (1514)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -909,7 +911,7 @@
         - `logo_funlink_white_RGB_maru_black.png`
       - `logo_guide_funlink_ol.pdf`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1300)
+  - 📁 **lib/** (1283)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -1372,17 +1374,6 @@
     - `highlightLedger.test.js`
     - `highlightLedgerKey.js` — 配信採点「発表演出」用のハイライト台帳(実際に画面に出た演出だけを記録する最小台帳)の
     - `hostCreateOnce.wiring.test.js`
-    - `hostFlipCensus.wiring.test.js`
-    - `hostStyleMutationTrace.js` — パネルの style 書き換えを「経路を問わず」捕らえ、呼び出し元を名指しする計器(純関数)。
-    - `hostStyleMutationTrace.test.js`
-    - `hostStyleTrace.wiring.test.js`
-    - `hostVanishForensics.js` — 消えた瞬間の「直前に何が起きたか」を記録する計器(純関数)。
-    - `hostVanishForensics.test.js`
-    - `hostVisWatch.wiring.test.js`
-    - `hostVisibilityFlipCensus.js` — インラインパネル(host)の「消えた⇄戻った」を数える計器。
-    - `hostVisibilityFlipCensus.test.js`
-    - `hostVisibilityWatch.js` — パネルが「実際に見えなくなった瞬間」を、原因の種類を問わず捕らえる見張り(純関数群)。
-    - `hostVisibilityWatch.test.js`
     - `htmlEscape.js` — 旧パス：`src/lib/htmlEscape.js`
     - `htmlEscape.test.js`
     - `htmlReportCommenterFollowSection.js` — HTML レポート向けコメンターフォロー分析ブロック。
@@ -1408,9 +1399,6 @@
     - `inlineHostDockSizing.js` — dock_bottom モードの inline panel 高さを viewport と player rect から最適計算する純粋関数。
     - `inlineHostDockSizing.test.js`
     - `inlineHostHiddenAttr.wiring.test.js`
-    - `inlineHostHideReason.wiring.test.js`
-    - `inlineHostHideReasonCensus.js` — パネルを消した「理由」を経路ごとに数える計器(純関数)。
-    - `inlineHostHideReasonCensus.test.js`
     - `inlineHostLayoutReset.js` — インラインパネルの placement（below / beside / floating / dock_bottom）を切り替える際に、
     - `inlineHostLayoutReset.test.js`
     - `inlineHostMoveProbe.js` — ①POPインラインパネルの host(#nls-inline-popup-host)DOM移設を観測する
@@ -1418,8 +1406,6 @@
     - `inlineHostRecovery.wiring.test.js`
     - `inlineHostRecoveryGate.js` — パネルが「消えたまま戻らない」を防ぐ復帰ゲート(純関数)。
     - `inlineHostRecoveryGate.test.js`
-    - `inlineHostVanishClassifier.js` — 「なぜ消えたか」を消失時のスナップショットから分類する純関数。DOM は触らない。
-    - `inlineHostVanishClassifier.test.js`
     - `inlineHostVisibilityIntent.js` — 応援パネル(inline host)を「見せる/消す」1回分の指示を組み立てる純関数。
     - `inlineHostVisibilityIntent.test.js`
     - `inlineHostVisible.wiring.test.js`
@@ -2065,7 +2051,6 @@
     - `userThumbGrid.js` — 「サムネ付きユーザー一覧」のカテゴリ分け純粋関数。
     - `userThumbGrid.test.js`
     - `usericonUrlGuard.test.js`
-    - `vanishForensics1267.wiring.test.js`
     - `venueAvatar.js` — v0.1.712: 会場モードのアバター解決(サムネ補強)純関数。
     - `venueAvatar.test.js`
     - `venueAvatarDiagLine.js` — 会場モード(venueBar.js)の「🩺 会場の状態」診断ブロックを組み立てる純関数群。
