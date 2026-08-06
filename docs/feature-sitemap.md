@@ -110,7 +110,7 @@
   - `src/lib/monotonicCommentCount.js`
 - **storage キー定義** — chrome.storage のキー名の正本(nls_comments_<lv> 等)
   - `src/lib/storageKeys.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 45</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 44</summary>
 
 - `src/lib/autoBackupState.js` — v0.1.808(星野ロミ式コンポーネント化・第1弾): content-entry.js の巨大化を抑えるため、
 - `src/lib/avCue.js` — 「AVCue = 音の再生結果を真実とする単一発火点」の純関数群(V1・DOM/storage/音に触れない)。
@@ -128,7 +128,6 @@
 - `src/lib/displayRecordedCount.js` — 「画面に出す記録件数」の正本を1つに固定する純関数(v0.1.839・第1)。
 - `src/lib/giftRecord.js` — ギフト/広告ユーザーの永続化（純関数）
 - `src/lib/heavyChunkReadReuse.js` — heavy 全件コメント read の再利用判定純関数
-- `src/lib/hostVanishForensics.js` — 消えた瞬間の「直前に何が起きたか」を記録する計器(純関数)。
 - `src/lib/inFlightGuard.js` — 状態速報「重さ根治 P3」: runStorageOpWithTimeout(storageOpTimeout.js)は Promise.race で
 - `src/lib/instantCommentPush.js` — 「コメント即時プッシュレーン(storage迂回)」の純関数部。
 - `src/lib/livePersistInterval.js` — v0.1.498〜501: ライブ記録の保存（コアレッサ）最小間隔を決める純粋関数。フリーズ対策 A。
@@ -288,7 +287,7 @@
   - `src/lib/giftThrowProjectile.js`
 - **吹き出し寿命管理** — 会場の吹き出しの表示上限・追い出し(eviction)ライフサイクル
   - `src/lib/venueBubbleLifecycle.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 208</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 206</summary>
 
 - `scripts/encode-marketing-html-avatars.mjs` — extension/images/marketing-html-avatars/*.png を data URI にし、
 - `scripts/split-avatar-parts.mjs` — 偽市松背景の除去 + パーツ切り出し(one-off アセットパイプライン)
@@ -362,11 +361,9 @@
 - `src/lib/inlineHostAnchorScoring.js` — 埋め込みパネル（inline host）の挿入アンカー候補をスコアリングする純粋関数。
 - `src/lib/inlineHostBesideSizing.js` — beside（横付き）モードの inline panel の幅・高さを最適計算する純粋関数。
 - `src/lib/inlineHostDockSizing.js` — dock_bottom モードの inline panel 高さを viewport と player rect から最適計算する純粋関数。
-- `src/lib/inlineHostHideReasonCensus.js` — パネルを消した「理由」を経路ごとに数える計器(純関数)。
 - `src/lib/inlineHostLayoutReset.js` — インラインパネルの placement（below / beside / floating / dock_bottom）を切り替える際に、
 - `src/lib/inlineHostMoveProbe.js` — ①POPインラインパネルの host(#nls-inline-popup-host)DOM移設を観測する
 - `src/lib/inlineHostRecoveryGate.js` — パネルが「消えたまま戻らない」を防ぐ復帰ゲート(純関数)。
-- `src/lib/inlineHostVanishClassifier.js` — 「なぜ消えたか」を消失時のスナップショットから分類する純関数。DOM は触らない。
 - `src/lib/inlineHostVisibilityIntent.js` — 応援パネル(inline host)を「見せる/消す」1回分の指示を組み立てる純関数。
 - `src/lib/inlineModeFlags.js` — popup.html の URL クエリから「どのモードで開かれた popup か」を判定する純関数。
 - `src/lib/inlinePanelFocusGate.js` — インラインパネル host element が toolbar 起点の「前面化」操作を受けられる
@@ -737,7 +734,7 @@
   - `src/lib/statusTrendKey.js`
   - `src/extension/status-entry.js`
   - `src/lib/statusActionAdvisor.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 140</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 137</summary>
 
 - `app/app.js` — スマホ閲覧用 status Web 版。
 - `app/live-view.js` — global NL_BUILD_ID
@@ -793,9 +790,6 @@
 - `src/lib/forwardReactivation.js` — v0.1.765「最終系(a): 入口が死んだ時だけ forward crawl を起動して再接続」の判定(純ロジック)。
 - `src/lib/geminiNanoBridge.js` — v0.1.205 Phase C: Built-in AI (Gemini Nano, Chrome 138+) の薄いラッパー。
 - `src/lib/globalFetchRateLimiter.js` — v0.1.664 PR4: tokenBucket.js を用いた全タブ横断の fetch レートリミッター(土台)。
-- `src/lib/hostStyleMutationTrace.js` — パネルの style 書き換えを「経路を問わず」捕らえ、呼び出し元を名指しする計器(純関数)。
-- `src/lib/hostVisibilityFlipCensus.js` — インラインパネル(host)の「消えた⇄戻った」を数える計器。
-- `src/lib/hostVisibilityWatch.js` — パネルが「実際に見えなくなった瞬間」を、原因の種類を問わず捕らえる見張り(純関数群)。
 - `src/lib/htmlEscape.js` — 旧パス：`src/lib/htmlEscape.js`
 - `src/lib/initShadeFailsafe.js` — 初回ロード幕(.nl-init-shade)の CSS フェイルセーフとクラスの乖離を断つ純関数。
 - `src/lib/isInsideRecommendedLiveSection.js` — v0.1.200: ニコ生 watch ページの「おすすめ生放送」セクション内 DOM を識別する純関数。

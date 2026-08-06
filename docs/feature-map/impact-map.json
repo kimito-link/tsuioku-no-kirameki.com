@@ -2146,18 +2146,6 @@
       ]
     },
     {
-      "file": "src/lib/hostVisibilityWatch.js",
-      "featureCount": 2,
-      "features": [
-        "content",
-        "status"
-      ],
-      "labels": [
-        "記録エンジン(watchページ常駐)",
-        "状態速報ページ"
-      ]
-    },
-    {
       "file": "src/lib/inlinePanelLayout.js",
       "featureCount": 2,
       "features": [
@@ -4796,36 +4784,6 @@
       ]
     },
     {
-      "file": "src/lib/hostStyleMutationTrace.js",
-      "featureCount": 1,
-      "features": [
-        "content"
-      ],
-      "labels": [
-        "記録エンジン(watchページ常駐)"
-      ]
-    },
-    {
-      "file": "src/lib/hostVanishForensics.js",
-      "featureCount": 1,
-      "features": [
-        "content"
-      ],
-      "labels": [
-        "記録エンジン(watchページ常駐)"
-      ]
-    },
-    {
-      "file": "src/lib/hostVisibilityFlipCensus.js",
-      "featureCount": 1,
-      "features": [
-        "content"
-      ],
-      "labels": [
-        "記録エンジン(watchページ常駐)"
-      ]
-    },
-    {
       "file": "src/lib/htmlReportCommenterFollowSection.js",
       "featureCount": 1,
       "features": [
@@ -4936,16 +4894,6 @@
       ]
     },
     {
-      "file": "src/lib/inlineHostHideReasonCensus.js",
-      "featureCount": 1,
-      "features": [
-        "content"
-      ],
-      "labels": [
-        "記録エンジン(watchページ常駐)"
-      ]
-    },
-    {
       "file": "src/lib/inlineHostLayoutReset.js",
       "featureCount": 1,
       "features": [
@@ -4967,16 +4915,6 @@
     },
     {
       "file": "src/lib/inlineHostRecoveryGate.js",
-      "featureCount": 1,
-      "features": [
-        "content"
-      ],
-      "labels": [
-        "記録エンジン(watchページ常駐)"
-      ]
-    },
-    {
-      "file": "src/lib/inlineHostVanishClassifier.js",
       "featureCount": 1,
       "features": [
         "content"
