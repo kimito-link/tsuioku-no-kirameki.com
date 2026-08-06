@@ -26,6 +26,17 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1279',
+    date: '2026-08-06',
+    summary: 'サイドパネルを開いたとき真っ黒になるのを直しました',
+    items: Object.freeze([
+      'サイドパネルを開いた瞬間、中身が出るまで画面が真っ黒になっていたのを直しました。',
+      'パネルの入れ物に背景色を指定していなかったのが原因です。',
+      'パソコンの設定が「ダークモード」のときは落ち着いた濃紺、通常のときはクリーム色になります。',
+      '中身の見た目は今までと同じです。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1278',
     date: '2026-08-06',
     summary: '点滅調査で使った仕掛けのうち、役目を終えたものを片付けました',
