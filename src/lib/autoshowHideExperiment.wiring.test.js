@@ -18,10 +18,18 @@ describe('autoshow_off 二分実験の配線', () => {
     expect(contentSrc).toMatch(/const INLINE_AUTOSHOW_HIDE_EXPERIMENT = (true|false);/);
   });
 
-  it('★実験中は消す処理を実行しない(フラグで囲われている)', () => {
-    // 存在の断言だけだと「囲っていない」変異を通す。囲いの形まで見る。
+  it('★一度でも表示したら autoshow_off では消さない(点滅の直接原因を断つ)', () => {
+    /*
+     * ★v0.1.1274 で条件を強化した。
+     *   実測(2026-08-06)で、消える直前の足跡が
+     *     show:anchored_show → hide:autoshow_off → hide:overlay_hidden → disp:none
+     *   となっており【出した直後に自分で消していた】(autoshow_off が28回)。
+     *   純関数側の everShown 判定に依存せず、ここでも直接ガードする。
+     *   ★初回(everShown=false)は従来どおり消えるので
+     *     「こん太を押すまで出さない」は壊れない。
+     */
     expect(contentSrc).toMatch(
-      /if \(!INLINE_AUTOSHOW_HIDE_EXPERIMENT\) \{\n\s*hidePageFrameOverlay\('autoshow_off'\);/
+      /if \(!INLINE_AUTOSHOW_HIDE_EXPERIMENT && !_inlineHostEverShown\) \{\n\s*hidePageFrameOverlay\('autoshow_off'\);/
     );
   });
 
