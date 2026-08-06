@@ -107,34 +107,15 @@ export function buildStatusFastDiagLite(payload) {
     content.scrollWhiteoutDiag && typeof content.scrollWhiteoutDiag === 'object'
       ? content.scrollWhiteoutDiag
       : null;
-  // v0.1.1250: パネルが一瞬消える計器も lite へ(通さないとコピペに永久に出ない=上のコメントの再演)。
-  const hostFlipCensus =
-    content.hostFlipCensus && typeof content.hostFlipCensus === 'object' ? content.hostFlipCensus : null;
-  // v0.1.1253: 可視性の見張り(原因を問わない消失検知)も lite へ。
-  const hostVisWatch =
-    content.hostVisWatch && typeof content.hostVisWatch === 'object' ? content.hostVisWatch : null;
-  // v0.1.1254: 復帰ゲートの計器も lite へ(通さないとコピペに永久に出ない)。
-  // v0.1.1256: 消した理由の計器も lite へ(通さないとコピペに永久に出ない)。
-  // v0.1.1261: style 書き換えの追跡も lite へ。
-  // v0.1.1265: 消える直前の足跡も lite へ。
-  const vanishForensics =
-    content.vanishForensics && typeof content.vanishForensics === 'object' ? content.vanishForensics : null;
-  const hostStyleTrace =
-    content.hostStyleTrace && typeof content.hostStyleTrace === 'object' ? content.hostStyleTrace : null;
-  // v0.1.1267: 祖先まで含めた属性変化の追跡と <style> 貼り直し回数も lite へ
-  //   (通さないとコピペに永久に出ない = [[fastdiag-lite-is-the-printer-subset]])。
-  const hostAncestryTrace =
-    content.hostAncestryTrace && typeof content.hostAncestryTrace === 'object'
-      ? content.hostAncestryTrace
-      : null;
+  /*
+   * ★v0.1.1278: 点滅追跡の計器(hostFlipCensus / hostVisWatch / vanishForensics /
+   *   hostStyleTrace / hostAncestryTrace / hostHideReason / hostRecoveryDiag)を
+   *   lite から外した。点滅は Side Panel 移行(v0.1.1275)で解決済み。
+   * ★styleReattach は残す=計器ではなく【自己修復が働いた回数】(実挙動)。
+   *   通さないとコピペに永久に出ない = [[fastdiag-lite-is-the-printer-subset]]。
+   */
   const styleReattach =
     content.styleReattach && typeof content.styleReattach === 'object' ? content.styleReattach : null;
-  const hostHideReason =
-    content.hostHideReason && typeof content.hostHideReason === 'object' ? content.hostHideReason : null;
-  const hostRecoveryDiag =
-    content.hostRecoveryDiag && typeof content.hostRecoveryDiag === 'object'
-      ? content.hostRecoveryDiag
-      : null;
   const venueSeatsDiag = content.venueSeatsDiag && typeof content.venueSeatsDiag === 'object'
     ? content.venueSeatsDiag
     : null;
@@ -172,13 +153,6 @@ export function buildStatusFastDiagLite(payload) {
       },
       hostMoveDiag,
       scrollWhiteoutDiag,
-      hostFlipCensus,
-      hostVisWatch,
-      hostRecoveryDiag,
-      hostHideReason,
-      hostStyleTrace,
-      vanishForensics,
-      hostAncestryTrace,
       styleReattach,
       venueSeatsDiag: venueSeatsDiagLite
     }

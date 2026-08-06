@@ -7,8 +7,6 @@ import {
   liveviewPublishSelfDiagToActionCards
 } from './liveviewPublishSelfDiag.js';
 import { formatLaneRosterDeltaLine } from './laneRosterDelta.js';
-// v0.1.1253: パネルが実際に見えなくなった瞬間を名指しする計器の整形。
-import { formatHostVisibilityWatchLine } from './hostVisibilityWatch.js';
 import { summarizeLiveviewPublishOutcome } from './liveviewPublishOutcome.js';
 import { summarizeLiveviewPublishOutcomeRecord } from './liveviewPublishOutcomeKey.js';
 import { buildDiagnosticsTrust, formatDiagnosticsTrustLines } from './diagnosticsTrust.js';
@@ -488,45 +486,16 @@ export function buildAiShareFullText({ overviewText, livesData, fastDiag, popupD
     const lightLine = String((popupDiag?.popup ?? popupDiag)?.lightSupplyGuard?.line || '');
     if (lightLine) { lines.push(lightLine); lines.push(''); }
   } catch { /* no-op: 計器の失敗は状態速報を壊さない */ }
-  // ★v0.1.1265: 消えた瞬間の直前に何が走ったかを出す(リアルタイム実測)。
-  try {
-    const vfLine = String(fastDiag?.content?.vanishForensics?.line || '');
-    if (vfLine) { lines.push(vfLine); lines.push(''); }
-  } catch { /* no-op: 計器の失敗は状態速報を壊さない */ }
-  // ★v0.1.1267: 祖先まで含めた属性変化の追跡(観測対象が現物かの自己申告つき)。
-  try {
-    const ancLine = String(fastDiag?.content?.hostAncestryTrace?.line || '');
-    if (ancLine) { lines.push(ancLine); lines.push(''); }
-  } catch { /* no-op: 計器の失敗は状態速報を壊さない */ }
-  // ★v0.1.1267: <style> を貼り直した回数(0 なら消されていない証拠)。
+  /*
+   * ★v0.1.1278: 点滅追跡の計器7行(vanishForensics / hostAncestryTrace /
+   *   hostStyleTrace / hostHideReason / hostRecoveryDiag / hostVisWatch /
+   *   hostFlipCensus)を速報から外した。点滅は Side Panel 移行(v0.1.1275)で
+   *   解決済みで、用の済んだ計器が速報を長くしていた。
+   * ★styleReattach は残す=計器ではなく【自己修復が働いた回数】(実挙動)。
+   */
   try {
     const srLine = String(fastDiag?.content?.styleReattach?.line || '');
     if (srLine) { lines.push(srLine); lines.push(''); }
-  } catch { /* no-op: 計器の失敗は状態速報を壊さない */ }
-  // ★v0.1.1261: style 書き換えの呼び出し元を名指しする(経路を問わず捕らえる)。
-  try {
-    const traceLine = String(fastDiag?.content?.hostStyleTrace?.line || '');
-    if (traceLine) { lines.push(traceLine); lines.push(''); }
-  } catch { /* no-op: 計器の失敗は状態速報を壊さない */ }
-  // ★v0.1.1256: パネルを消した【理由】を名指しする(4秒周期の犯人特定用)。
-  try {
-    const hideLine = String(fastDiag?.content?.hostHideReason?.line || '');
-    if (hideLine) { lines.push(hideLine); lines.push(''); }
-  } catch { /* no-op: 計器の失敗は状態速報を壊さない */ }
-  // ★v0.1.1254: 消えたパネルを復帰させた回数(v0.1.1250 で塞いだ非常口を戻した防御)。
-  try {
-    const recLine = String(fastDiag?.content?.hostRecoveryDiag?.line || '');
-    if (recLine) { lines.push(recLine); lines.push(''); }
-  } catch { /* no-op: 計器の失敗は状態速報を壊さない */ }
-  // ★v0.1.1253: 原因を問わず「実際に見えなくなった」瞬間を名指しする(幅潰れ/親外れも捕らえる)。
-  try {
-    const visLine = formatHostVisibilityWatchLine(fastDiag?.content?.hostVisWatch);
-    if (visLine) { lines.push(visLine); lines.push(''); }
-  } catch { /* no-op: 計器の失敗は状態速報を壊さない */ }
-  // ★v0.1.1250: パネルが一瞬消える(移設でもscrollでもない)を名指しする1行。
-  try {
-    const flipLine = String(fastDiag?.content?.hostFlipCensus?.line || '');
-    if (flipLine) { lines.push(flipLine); lines.push(''); }
   } catch { /* no-op: 計器の失敗は状態速報を壊さない */ }
   // 2026-07-20 診断先行: ①POP応援レーン/投げ一覧の「クリック不能な手カーソル」実害を数えるだけの1行。
   try {
