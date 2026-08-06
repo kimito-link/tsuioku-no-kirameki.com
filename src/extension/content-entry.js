@@ -348,7 +348,8 @@ import {
 // ★v0.1.1254: パネルが「消えたまま戻らない」を防ぐ復帰ゲート(真因=v0.1.1250 で私が
 //   4秒経路にゲートを入れたとき、それが唯一の復帰経路だったことに気づかなかった)。
 import {
-  shouldRenderInlineHostOnPoll,
+  // ★v0.1.1273: shouldRenderInlineHostOnPoll は撤去(4秒経路のゲートごと廃止)。
+  //   詳細は inlineHostRecovery.wiring.test.js の冒頭コメント。
   shouldHideInlineHostOnMissingPanel,
   formatInlineHostRecoveryLine
 } from '../lib/inlineHostRecoveryGate.js';
@@ -6135,45 +6136,11 @@ function inlineHostLooksVisible() {
  *   (食い違うと、片方が消して片方が戻す競り合いに戻る)。
  * @returns {boolean}
  */
-function isInlineHostIntentionallyHidden() {
-  // ★v0.1.1262: 消す側と同じ純関数を使う。既存コメントが「同一条件にすること
-  //   (食い違うと片方が消して片方が戻す競り合いに戻る)」と警告していたとおり、
-  //   条件を2箇所に直書きすると必ずズレる。判定を1本に寄せる。
-  return shouldHideInlinePanelByAutoshow({
-    autoshowEnabled: inlinePanelAutoshowEnabled,
-    toolbarPressed: toolbarInitiatedShowThisSession,
-    activatedThisSession: inlinePanelAutoshowActivatedThisSession,
-    everShown: _inlineHostEverShown
-  }).hide;
-}
 
-function probeInlineHostVisibilityForRecovery() {
-  try {
-    const host =
-      nlsInlinePopupHostSingleton || document.getElementById(INLINE_POPUP_HOST_ID);
-    if (!(host instanceof HTMLElement) || !host.isConnected) {
-      return { visible: false, known: false }; // host がまだ無い=初期描画は dirty 初期値 true が担う
-    }
-    const cs = window.getComputedStyle(host);
-    // ★hidePageFrameOverlay が作る状態(display:none + opacity:0)をここで捕らえる。
-    if (cs.display === 'none' || cs.visibility === 'hidden') return { visible: false, known: true };
-    if (Number(cs.opacity) === 0) return { visible: false, known: true };
-    const r = host.getBoundingClientRect();
-    // 実測の消失は 0x0。閾値は hostVisibilityWatch と揃える(40x24)。
-    return { visible: r.width >= 40 && r.height >= 24, known: true };
-  } catch {
-    return { visible: false, known: false }; // 判定不能=描かない(安全側)
-  }
-}
 
 /** ★v0.1.1254: 復帰ゲートの計器。0 の意味を区別するため点検回数も数える。 */
 const _inlineHostRecoveryDiag = { checkCount: 0, recoverCount: 0, keptOnWatchCount: 0 };
 
-/** @param {string} reason shouldRenderInlineHostOnPoll の判定理由 */
-function noteInlineHostRecoveryCheck(reason) {
-  _inlineHostRecoveryDiag.checkCount += 1;
-  if (reason === 'host-hidden') _inlineHostRecoveryDiag.recoverCount += 1;
-}
 
 const NLS_TOOLBAR_OPEN_TOAST_ID = 'nls-toolbar-open-toast';
 
@@ -13100,22 +13067,29 @@ function syncLiveIdFromLocation() {
      *   → 第3の通過条件「実際に消えているなら描く」を足す(ゲート自体は残す)。
      */
     {
-      // ★v0.1.1267: 「消えている」の正本である <style> 自体が生きているか先に確かめる。
-      //   ルールが死ぬと属性が付いていても消えない=既定動作(こん太まで出さない)が壊れる。
+      /*
+       * ★v0.1.1273: v0.1.1250 で足したゲートを撤去し、v0.1.1248(=リリース直後で
+       *   安定していた版)と同じ【無条件の再描画】に戻す。
+       *
+       *   経緯(2026-08-06にユーザーと突き合わせて判明):
+       *     ・発端はリリース(v0.1.1244)後の「ノートPCで重いかも」という指摘
+       *     ・v0.1.1248 で毎秒11回の描き直しを止めた=これは正しい対処だった
+       *     ・v0.1.1250 で【ここに再描画ゲートを足した】のが事故の始まり。
+       *       直後の v0.1.1254 のタイトルが「自分が塞いだ非常口を戻す」で、
+       *       私自身がゲートで復帰経路を塞いだと書いている。
+       *     ・以降28版、そのゲートが生む症状を別の原因と誤認して追い続けた
+       *
+       *   ★教訓([[gate-may-be-the-only-recovery-path-2026-08-04]])を自分で破っていた:
+       *     「無条件で走っている処理にゲートを足す前に、それが唯一の復帰経路でないか
+       *       確かめる」。ここは唯一の復帰経路だった。
+       *
+       *   ★重さ対策は v0.1.1248(refresh の自己ループ遮断)が担っており、
+       *     このゲートは重さ対策としては不要。撤去しても「重い」は再発しない見込み。
+       *     再発したら、今度は【描画の中身】を軽くする方向で正しくやり直す。
+       */
       ensurePageFrameStyleAlive();
-      const vis = probeInlineHostVisibilityForRecovery();
-      const verdict = shouldRenderInlineHostOnPoll({
-        liveIdSwitched: ctx.liveIdSwitched === true,
-        layoutDirty: inlineLayoutDirty === true,
-        hostVisible: vis.visible,
-        hostKnown: vis.known,
-        intentionallyHidden: isInlineHostIntentionallyHidden()
-      });
-      noteInlineHostRecoveryCheck(verdict.reason);
-      if (verdict.render) {
-        inlineLayoutDirty = false;
-        renderPageFrameOverlay();
-      }
+      inlineLayoutDirty = false;
+      renderPageFrameOverlay();
     }
     return;
   }
@@ -13176,26 +13150,16 @@ function syncLiveIdFromLocation() {
     }
     // 有効なコメントパネルを確認＝非 watch デバウンスを解除。
     _nonWatchTickCount = 0;
-    // ★v0.1.1250: watch 側と同じく無条件描画をやめる(4秒周期のパネル消失の第2経路)。
-    //   こちらは liveId 切替の文脈が無いので geometry 変化のときだけ描く。
     {
-      // ★v0.1.1254: watch 分岐と同じ復帰の非常口(消えているなら描く)。
-      // ★v0.1.1267: 「消えている」の正本である <style> 自体が生きているか先に確かめる。
-      //   ルールが死ぬと属性が付いていても消えない=既定動作(こん太まで出さない)が壊れる。
+      /*
+       * ★v0.1.1273: ここも v0.1.1250 のゲートを撤去し、v0.1.1248 と同じ
+       *   【無条件の再描画】へ戻す。理由は watch 分岐と同じ(上のコメント参照)。
+       *   ゲートを2箇所に足したので、戻すのも2箇所そろえる
+       *   (片方だけ戻すと非対称になり、また別の症状を生む)。
+       */
       ensurePageFrameStyleAlive();
-      const vis = probeInlineHostVisibilityForRecovery();
-      const verdict = shouldRenderInlineHostOnPoll({
-        liveIdSwitched: false,
-        layoutDirty: inlineLayoutDirty === true,
-        hostVisible: vis.visible,
-        hostKnown: vis.known,
-        intentionallyHidden: isInlineHostIntentionallyHidden()
-      });
-      noteInlineHostRecoveryCheck(verdict.reason);
-      if (verdict.render) {
-        inlineLayoutDirty = false;
-        renderPageFrameOverlay();
-      }
+      inlineLayoutDirty = false;
+      renderPageFrameOverlay();
     }
     return;
   }

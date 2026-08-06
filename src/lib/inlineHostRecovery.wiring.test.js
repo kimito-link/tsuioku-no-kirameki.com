@@ -9,88 +9,53 @@ const read = (p) => fs.readFileSync(path.join(root, p), 'utf8').replace(/\r\n/g,
 const contentSrc = read('extension/content-entry.js');
 
 /**
- * ★v0.1.1254 の配線断言。純関数が正しくても呼ばれていなければ実配信では直らない。
- *   [[wiring-test-mutation-check-2026-08-01]]: 変異で赤を確認済み。
+ * ★v0.1.1273: このファイルが固定していた「4秒経路の再描画ゲート」は撤去された。
+ *
+ * ■ 経緯(2026-08-06にユーザーと突き合わせて判明)
+ *   発端はリリース(v0.1.1244)後の「ノートPCで重いかも」という指摘だった。
+ *   v0.1.1248 で毎秒11回の描き直しを止めたのは正しい対処。
+ *   ところが v0.1.1250 で【4秒経路に再描画ゲートを足した】のが事故の始まりで、
+ *   直後の v0.1.1254 のタイトルが「自分が塞いだ非常口を戻す」だった
+ *   =自分でゲートを足し、自分で復帰経路を塞いだと書いている。
+ *   以降28版、そのゲートが生む症状を別の原因と誤認して追い続けた。
+ *
+ * ■ なぜテストごと消すのか(コメントアウトで残さない)
+ *   これらの断言は「ゲートが在ること」を固定する内容で、ゲート撤去と両立しない。
+ *   赤いまま残すと出荷ゲートが永久に通らず、skip で残すと「なぜ skip か」が
+ *   いずれ失われる。★消した事実と理由をこのファイルに残すのが最も誤解が少ない。
+ *
+ * ■ 代わりに何を守るか
+ *   「4秒経路が無条件で描き直す」ことを下で断言する。
+ *   これは v0.1.1248(リリース直後で安定していた版)と同じ挙動であり、
+ *   将来また誰かがゲートを足そうとしたらここが赤くなる。
+ *   ([[gate-may-be-the-only-recovery-path-2026-08-04]] を機械で守る)
  */
-describe('inlineHostRecoveryGate の配線', () => {
-  it('content-entry が復帰ゲートを import している', () => {
-    expect(contentSrc).toContain("from '../lib/inlineHostRecoveryGate.js'");
+describe('4秒経路は無条件で描き直す(ゲートを足さない)', () => {
+  it('★復帰ゲートの判定関数を呼んでいない(v0.1.1250のゲートが復活したら赤)', () => {
+    // shouldRenderInlineHostOnPoll による分岐は撤去済み。
+    // ここが再び現れたら「唯一の復帰経路にゲートを足す」事故の再演。
+    const calls = contentSrc.match(/shouldRenderInlineHostOnPoll\(\{/g) || [];
+    expect(calls).toHaveLength(0);
   });
 
-  it('★4秒経路の【両方】で復帰ゲートを呼んでいる(片方だけだと症状が半分残る)', () => {
-    // v0.1.1250 で私はゲートを2箇所に入れた。復帰の非常口も同じ2箇所に要る。
-    const calls = contentSrc.match(/shouldRenderInlineHostOnPoll\(/g) || [];
-    expect(calls.length).toBe(2);
+  it('★4秒経路の2箇所とも renderPageFrameOverlay を無条件で呼ぶ', () => {
+    /*
+     * 期待する形(watch / 非watch の2箇所):
+     *   ensurePageFrameStyleAlive();
+     *   inlineLayoutDirty = false;
+     *   renderPageFrameOverlay();
+     * ★if で包まれていないこと(=条件付きに戻していないこと)を形で固定する。
+     */
+    const unconditional = contentSrc.match(
+      /ensurePageFrameStyleAlive\(\);\n\s*inlineLayoutDirty = false;\n\s*renderPageFrameOverlay\(\);/g
+    ) || [];
+    expect(unconditional).toHaveLength(2);
   });
 
-  it('★可視状態を判定に渡している(これが無いと消えたまま戻らない)', () => {
-    const idx = contentSrc.indexOf('shouldRenderInlineHostOnPoll({');
-    const block = contentSrc.slice(idx, contentSrc.indexOf('});', idx));
-    expect(block).toContain('hostVisible:');
-    expect(block).toContain('hostKnown:');
-    expect(block).toMatch(/hostVisible:\s*vis\.visible/);
-  });
-
-  it('★判定が render のときだけ描く(無条件描画に戻していない=4秒ちらつきを再発させない)', () => {
-    expect(contentSrc).toMatch(/if \(verdict\.render\) \{\s*\n\s*inlineLayoutDirty = false;\s*\n\s*renderPageFrameOverlay\(\);/);
-  });
-
-  it('★仕様どおりの非表示を判定に渡している(渡さないと消す/戻すの競り合いが再発)', () => {
-    const calls = contentSrc.match(/intentionallyHidden: isInlineHostIntentionallyHidden\(\)/g) || [];
-    expect(calls.length).toBe(2); // watch / 非watch の両方
-    expect(contentSrc).toMatch(/function isInlineHostIntentionallyHidden\(\) \{/);
-  });
-
-  it('★判定条件が autoshow_off ゲートと同一(食い違うと競り合いに戻る)', () => {
-    // ★v0.1.1262: 条件の【直書き】をやめ、消す側と同じ純関数
-    //   shouldHideInlinePanelByAutoshow に一本化した。
-    //   断言すべきは「同じ判定を使っていること」であって、フラグの書き方ではない
-    //   (書き方を固定すると、正しい一本化で赤になり実装を歪める)。
-    const i = contentSrc.indexOf('function isInlineHostIntentionallyHidden(');
-    const body = contentSrc.slice(i, contentSrc.indexOf(String.fromCharCode(10) + '}', i));
-    expect(body).toContain('shouldHideInlinePanelByAutoshow({');
-    // 消す側と復帰側の2箇所とも同じ関数を通っていること(数で断言)。
-    const uses = contentSrc.match(/shouldHideInlinePanelByAutoshow\(\{/g) || [];
-    expect(uses.length).toBe(2);
-  });
-
-  it('可視判定が DOM 走査をしていない(4秒に1回でも走査は入れない)', () => {
-    const idx = contentSrc.indexOf('function probeInlineHostVisibilityForRecovery(');
-    expect(idx).toBeGreaterThan(-1);
-    const body = contentSrc.slice(idx, idx + 1400);
-    expect(body).not.toContain('querySelectorAll');
-    // ★hidePageFrameOverlay が作る状態(display:none / opacity:0)を見ていること。
-    expect(body).toContain("cs.display === 'none'");
-    expect(body).toMatch(/Number\(cs\.opacity\) === 0/);
-  });
-
-  it('★消しすぎ防止が配線され、視聴ページなら消さない', () => {
-    expect(contentSrc).toContain('shouldHideInlineHostOnMissingPanel({');
-    const idx = contentSrc.indexOf('shouldHideInlineHostOnMissingPanel({');
-    const block = contentSrc.slice(idx, contentSrc.indexOf('});', idx));
-    expect(block).toMatch(/stillOnWatchUrl:\s*isNicoLiveWatchUrl\(href\)/);
-    // 判定が hide のときだけ先へ進む(無条件に消す旧実装へ戻していない)。
-    expect(contentSrc).toMatch(/if \(!verdict\.hide\) \{/);
-  });
-
-  it('点検回数を必ず数えている(0の意味を区別するため)', () => {
-    expect(contentSrc).toContain('_inlineHostRecoveryDiag.checkCount += 1;');
-    expect(contentSrc).toMatch(/noteInlineHostRecoveryCheck\(verdict\.reason\)/);
-  });
-
-  it('診断オブジェクトに hostRecoveryDiag を載せている', () => {
-    expect(contentSrc).toContain('formatInlineHostRecoveryLine(_inlineHostRecoveryDiag)');
-  });
-
-  it('★lite に通している(通さないとコピペに永久に出ない)', () => {
-    const lite = read('lib/statusFastDiagLite.js');
-    expect(lite).toContain('content.hostRecoveryDiag');
-    expect(lite).toMatch(/\n\s+hostRecoveryDiag,/);
-  });
-
-  it('★状態速報の本文に1行出している', () => {
-    const report = read('lib/aiShareFullText.js');
-    expect(report).toContain('hostRecoveryDiag?.line');
-    expect(report).toMatch(/if \(recLine\) \{ lines\.push\(recLine\)/);
+  it('★片方だけ戻す/片方だけゲートを足す非対称を防ぐ', () => {
+    // 2箇所は必ず同じ形。非対称にすると「症状が半分だけ残る」形になり、
+    // 原因の切り分けが極端に難しくなる(実際にそれで28版を費やした)。
+    const verdictBranch = contentSrc.match(/if \(verdict\.render\) \{/g) || [];
+    expect(verdictBranch).toHaveLength(0);
   });
 });
