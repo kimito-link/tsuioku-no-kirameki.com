@@ -2952,29 +2952,57 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 const KEY_TOOLBAR_ACTION_POLICY = 'nls_toolbar_action_policy';
 
 /** メモリキャッシュ（ツールバー連打時の storage 往復を削る）。storage 変更で無効化。 */
-let __toolbarActionPolicyMem = /** @type {'prefer_focus_inline' | 'always_open_popup' | null} */ (
+let __toolbarActionPolicyMem = /** @type {'prefer_focus_inline' | 'always_open_popup' | 'side_panel' | null} */ (
   null
 );
 
 chrome.storage.onChanged.addListener((changes, areaName) => {
   if (areaName !== 'local' || !changes[KEY_TOOLBAR_ACTION_POLICY]) return;
   __toolbarActionPolicyMem = null;
+  // ★spike: 変更直後にキャッシュを温め直す。クリック時は同期でしか読めないため
+  //   (open() が user gesture を要求する = await を挟めない)。
+  void getToolbarActionPolicy();
 });
 
+/*
+ * ★spike(2026-08-06): SW 起動直後にキャッシュを温める。
+ *   これが無いと SW 再起動後の【最初の1クリック】だけ設定を読めず、
+ *   side_panel を選んでいても従来動作に落ちる(ユーザーには「たまに効かない」に見える)。
+ */
+void getToolbarActionPolicy();
+
 /**
- * @returns {'prefer_focus_inline' | 'always_open_popup'}
+ * @returns {'prefer_focus_inline' | 'always_open_popup' | 'side_panel'}
  */
 async function getToolbarActionPolicy() {
   if (__toolbarActionPolicyMem != null) return __toolbarActionPolicyMem;
   try {
     const bag = await chrome.storage.local.get(KEY_TOOLBAR_ACTION_POLICY);
     const v = String(bag[KEY_TOOLBAR_ACTION_POLICY] || '').trim();
-    const out = v === 'always_open_popup' ? 'always_open_popup' : 'prefer_focus_inline';
+    /*
+     * ★v0.1.1275: 既定を side_panel にした。
+     *
+     *   理由: ニコ生のページに埋め込む方式は、5日28版かけても点滅が止まらなかった。
+     *   ページの中に居る限り、ページ側の再レンダーで消される/潰される。
+     *   サイドパネルは【ブラウザのUI領域=ページの外】なので、
+     *   ニコ生のDOMではない=原理的に消しようがない。
+     *
+     *   ★原因の追及は打ち切る。「消されない場所へ移す」ことで症状を止める。
+     *   ★埋め込みに戻したい人は storage に 'prefer_focus_inline' を入れれば戻る
+     *     (コードは残してある)。
+     */
+    const out =
+      v === 'always_open_popup' ? 'always_open_popup'
+        : v === 'prefer_focus_inline' ? 'prefer_focus_inline'
+          : 'side_panel';
     __toolbarActionPolicyMem = out;
     return out;
   } catch {
-    __toolbarActionPolicyMem = 'prefer_focus_inline';
-    return 'prefer_focus_inline';
+    // ★v0.1.1275: 読めなかったときも side_panel(既定と同じ)へ倒す。
+    //   ここを 'prefer_focus_inline' のままにすると、storage 読み取り失敗時だけ
+    //   点滅する埋め込み方式に戻ってしまう(「たまに点滅する」が最も厄介)。
+    __toolbarActionPolicyMem = 'side_panel';
+    return 'side_panel';
   }
 }
 
@@ -3410,6 +3438,50 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 });
 
 chrome.action.onClicked.addListener((tab) => {
+  /*
+   * ★spike(2026-08-06): Side Panel を「見てから判断する」ための最小プレビュー。
+   *
+   *   点滅の根治候補として Side Panel(Chrome公式のUI領域)がある。
+   *   ニコ生のDOMの【外】なのでページから触れず、原理的に消されない。
+   *   土台(sidePanel権限・side_panel宣言・sidepanel.html)は既に入っており、
+   *   残っていたのは「開く処理」だけだった。
+   *
+   *   ★実測で判明(2026-08-06・chrome-devtools MCP):
+   *     open() は【ユーザー操作の文脈でのみ】許される。
+   *     `may only be called in response to a user gesture` を実際に踏んだ。
+   *     await を1つでも挟むと文脈が切れるため、【リスナーの先頭・await より前】で
+   *     同期的に呼ぶ必要がある。設定の読み出し(await)を待ってからでは遅い。
+   *   → 設定はメモリキャッシュ(__toolbarActionPolicyMem)を同期で見る。
+   *     まだ読めていない初回は従来動作にフォールバックする(安全側)。
+   *
+   *   ★既存動作は一切変えない。設定を 'side_panel' にした人だけこの経路に入る。
+   *   ★タブ固有にする(setOptions の tabId)。過去に「全タブ共有で別配信を掴む」
+   *     問題で撤退した記録があるため、その回避を最初から入れておく。
+   */
+  const tid = tab && tab.id != null ? tab.id : chrome.tabs.TAB_ID_NONE;
+  /*
+   * ★v0.1.1275: 判定を【反転】した。
+   *   旧: キャッシュが 'side_panel' のときだけ開く
+   *       → SW再起動直後(null)や古い値が残っているときに開かず、
+   *         点滅する埋め込みへ落ちる(実際に踏んだ)
+   *   新: 【明示的に埋め込みを選んでいない限り】サイドパネルを開く
+   *       → 未設定・キャッシュ未読込・読み取り失敗、すべてサイドパネル側に倒れる
+   */
+  const wantsInline =
+    __toolbarActionPolicyMem === 'prefer_focus_inline' ||
+    __toolbarActionPolicyMem === 'always_open_popup';
+  if (!wantsInline && tid !== chrome.tabs.TAB_ID_NONE) {
+    try {
+      // ★同期的に開く(await を挟まない)。設定は open の後で整える。
+      chrome.sidePanel.open({ tabId: tid });
+      void chrome.sidePanel
+        .setOptions({ tabId: tid, path: 'sidepanel.html', enabled: true })
+        .catch(() => {});
+      return;
+    } catch {
+      // 開けなければ従来動作へ落ちる(消えたまま何も出ない、を避ける)
+    }
+  }
   void handleBrowserActionClick(tab).catch(() => {
     void openOrFocusPopupWindow(tab?.windowId);
   });
