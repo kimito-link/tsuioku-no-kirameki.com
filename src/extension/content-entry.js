@@ -7965,7 +7965,27 @@ function renderPageFrameOverlay() {
      *   判定できたら Phase 3 で必ず正しい形へ戻すこと。
      */
     noteInlineHostHideReason('autoshow_off_experiment_skipped');
-    if (!INLINE_AUTOSHOW_HIDE_EXPERIMENT) {
+    /*
+     * ★v0.1.1274: 一度でも表示したら、この経路では【二度と消さない】。
+     *
+     *   実測(2026-08-06・ユーザー速報):
+     *     消える直前の足跡が
+     *       show:anchored_show → hide:autoshow_off → hide:overlay_hidden → disp:none
+     *     となっており、【出した直後に自分で消している】。
+     *     hostHideReason は autoshow_off が28回。外部犯ではなく拡張自身だった。
+     *     (私は以前これを「無罪」と判定したが、その判定が誤りだった)
+     *
+     *   純関数 shouldHideInlinePanelByAutoshow は everShown を見て hide:false を
+     *   返すはずだが、実際には消えている。フラグが巻き戻るか、判定前に別の状態に
+     *   なっている経路が残っている。
+     *
+     *   ★もう原因の特定はしない。ユーザーは5日間ちらつきに苦しんでいる。
+     *     「一度出したパネルを、この自動判定で消すことは金輪際しない」を
+     *     ここで直接、二重に保証する。純関数の判定に依存しない。
+     *   ★「こん太を押すまで出さない」は初回(まだ一度も出していない)だけの話なので、
+     *     everShown が false の間は従来どおり消える=既定動作は壊れない。
+     */
+    if (!INLINE_AUTOSHOW_HIDE_EXPERIMENT && !_inlineHostEverShown) {
       hidePageFrameOverlay('autoshow_off');
       /*
        * try/finally に入らないため、ここでも監視ルートを取り直す。
