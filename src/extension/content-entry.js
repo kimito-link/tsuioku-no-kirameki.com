@@ -331,27 +331,18 @@ import {
   shouldSkipInlineHostMoveForVenue,
   summarizeInlineHostMoveDiag
 } from '../lib/inlineHostMoveProbe.js';
-// v0.1.1250: パネルが「消えた⇄戻った」を数える計器(移設でもscrollでもない消失を捕まえる)。
-import {
-  createHostVisibilityFlipCensus,
-  noteHostHidden,
-  noteHostShown,
-  snapshotHostVisibilityFlipCensus
-} from '../lib/hostVisibilityFlipCensus.js';
-// ★v0.1.1253: 原因を問わず【実際に見えているか】を毎フレーム測る見張り。
-//   display だけを見る上の計器では、幅が潰れる消え方(録画の実測=920→11)を数えられなかった。
-import {
-  createHostVisibilityWatch,
-  noteHostFrame,
-  snapshotHostVisibilityWatch
-} from '../lib/hostVisibilityWatch.js';
-// ★v0.1.1254: パネルが「消えたまま戻らない」を防ぐ復帰ゲート(真因=v0.1.1250 で私が
-//   4秒経路にゲートを入れたとき、それが唯一の復帰経路だったことに気づかなかった)。
+/*
+ * ★v0.1.1278: 点滅追跡の計器 import を撤去した(hostVisibilityFlipCensus /
+ *   hostVisibilityWatch / hostStyleMutationTrace / hostVanishForensics /
+ *   inlineHostVanishClassifier / inlineHostHideReasonCensus)。
+ *   点滅は Side Panel 移行(v0.1.1275)で解決済み。
+ */
+// ★v0.1.1254: パネルを「消しすぎない」ためのガード(コメント欄の一時消失に巻き込まれない)。
+//   ★これは計器ではなく実挙動。SPA 再描画で DOM が差し替わってもパネルを消さない。
 import {
   // ★v0.1.1273: shouldRenderInlineHostOnPoll は撤去(4秒経路のゲートごと廃止)。
   //   詳細は inlineHostRecovery.wiring.test.js の冒頭コメント。
-  shouldHideInlineHostOnMissingPanel,
-  formatInlineHostRecoveryLine
+  shouldHideInlineHostOnMissingPanel
 } from '../lib/inlineHostRecoveryGate.js';
 // ★v0.1.1255(Phase A): 「見せる/消す」1回分の値の組を決める純関数。
 //   会議の結論=ディレクトリ移動より先に副作用を正本化する、の最初の対象。
@@ -362,30 +353,6 @@ import {
 // ★v0.1.1262: 「出してよいか」の判定を純関数へ。実測の矛盾(表示中なのに autoshow_off で
 //   消される)を潰すため「一度でも出したなら消さない」を足す。
 import { shouldHideInlinePanelByAutoshow } from '../lib/inlinePanelShowGate.js';
-// ★v0.1.1256: パネルを消した【理由】を経路ごとに数える(症状でなく原因を名指しする)。
-import {
-  createInlineHostHideReasonCensus,
-  noteInlineHostHide,
-  snapshotInlineHostHideReasonCensus,
-  formatInlineHostHideReasonLine
-} from '../lib/inlineHostHideReasonCensus.js';
-// ★v0.1.1261: style の書き換えを【経路を問わず】捕らえ、呼び出し元を名指しする。
-//   既存計器は「特定の関数を通った場合だけ」数えるため、関数を通らない書き換えが見えない。
-import {
-  createHostStyleMutationTrace,
-  noteHostStyleMutation,
-  snapshotHostStyleMutationTrace,
-  formatHostStyleMutationLine
-} from '../lib/hostStyleMutationTrace.js';
-// ★v0.1.1265: 消えた瞬間の【直前に何が走ったか】を記録する(足跡)。
-import {
-  createVanishForensics, markTrail, noteVanishWithTrail,
-  snapshotVanishForensics, formatVanishForensicsLine
-} from '../lib/hostVanishForensics.js';
-// ★v0.1.1267: 消えた瞬間の事実から【原因】を分類する / 位相で時計の持ち主を二分する。
-import {
-  classifyVanishSnapshot, assessVanishPhase, formatVanishPhaseLine
-} from '../lib/inlineHostVanishClassifier.js';
 import { probeWatchPageDomStructure } from '../lib/probeWatchPageDomStructure.js';
 import { summarizeGiftSubAppHistoryDiag } from '../lib/summarizeGiftSubAppHistoryDiag.js';
 import { createConsoleErrorBuffer } from '../lib/consoleErrorBuffer.js';
@@ -2816,199 +2783,23 @@ const KEY_AI_SHARE_FAST_DIAG = 'nls_ai_share_fast_diag_v1';
  */
 const _inlineHostMoveState = { count: 0, reloadCount: 0, venueOpenMoves: 0, byReason: {}, samples: [], lastAtMs: 0 };
 
-/**
- * v0.1.1250 計器: host が「消えた⇄戻った」を数える(移設ではなく display の変化)。
- *
- * ★hostMoveDiag は【親を変える移設】しか数えず、scrollWhiteoutDiag は【scroll時にしか】
- *   サンプルしない。2026-08-04 の実測(録画)で確定した「4秒ごとに1フレームだけ消える」は
- *   どちらの計器にも1件も乗らなかった(moveCount:1 / whiteoutCount:0 のまま)。その穴を埋める。
- * @type {import('../lib/hostVisibilityFlipCensus.js').HostVisibilityFlipCensus}
- */
-const _hostFlipCensus = createHostVisibilityFlipCensus();
-// ★v0.1.1253: 原因を先に決めず【実際に見えているか】だけを毎フレーム測る見張り。
-//   display/幅潰れ/親外れ のどれでも同じように捕らえる(録画の実測=幅920→11 は display ではなかった)。
-const _hostVisWatch = createHostVisibilityWatch();
-let _hostVisWatchRaf = null;
-/**
- * パネルの可視性を毎フレーム見張る。走査はせず host 参照1つの矩形だけ読む=O(1)
- * (paint 毎の DOM 走査は禁止・v0.1.1201 で自分が拡張全体を重くした反省)。
- */
-const _hostStyleTrace = createHostStyleMutationTrace();
-const _vanishForensics = createVanishForensics();
-/** @param {string} tag 走った処理名(軽さ最優先: 文字列と時刻だけ) */
-function trail(tag) {
-  try { markTrail(_vanishForensics, tag, Date.now()); } catch { /* no-op */ }
-}
-let _hostStyleObserver = null;
-/*
- * ★v0.1.1267: 旧 `_hostStylePrevVisible` を【2つに分離】した。
- *   旧実装は MutationObserver と rAF ループが同じ1変数を共有しており、
- *   rAF が毎フレーム(60回/秒)上書きするため observer 側の becameHidden 判定が
- *   ほぼ成立しなかった。これが hostStyleTrace=0 の原因の1つ
- *   (=「異常なし」ではなく【壊れていて測れていなかった】)。
- *   ★2つの計器が状態を共有してはいけない。旧名は復活させないこと(wiringテストで固定)。
- */
-let _hostMutPrevVisible = null;
-let _hostRafPrevVisible = null;
-/** observer が「いま見ている」host と親。変わったら張り直す(初代固着の根治)。 */
-let _hostTraceHost = null;
-let _hostTraceParent = null;
-/** 祖先まで含めた属性変化のリング(12件)。★書き手の指紋(old→new)を残す。 */
-const _hostAncestryTrace = { entries: [], total: 0, reattachCount: 0 };
 /** 拡張の <style> を貼り直した回数(0 は「消されていない」の証拠になる)。 */
 let _pageFrameStyleReattachCount = 0;
-/** 直近の 4秒 poll tick 時刻。消失との位相差 Δ を出すために使う。 */
-let _lastLivePollTickAt = 0;
-/** トラップを arm 済みの host。差し替わったら1回だけ再 arm する(ポインタ比較のみ)。 */
-let _hwtArmedHost = null;
-
-/**
- * MAIN world のトラップに「この host を見張れ」と伝える。
- * ★content script(isolated world)からは style の書き込みを捕まえられないため、
- *   トラップ本体は page-intercept-entry.js(world:MAIN)に居る。
- *   CustomEvent は world を跨いで届くので、これが唯一の伝達手段。
+/*
+ * ★v0.1.1278: MAIN world 書き込みトラップ(hwt)の送信口を撤去した。
+ *   受信側(page-intercept 側の 'nls:hwt-arm' / 'nls:hwt-hello' リスナー)は
+ *   v0.1.1276 で既に撤去済みで、送信だけが残っていた=誰も聴かない CustomEvent を
+ *   host 差し替えのたびに dispatch し続ける死コードだった。
+ *   点滅は Side Panel 移行(v0.1.1275)で解決済みのため、トラップ自体が不要。
  */
-function armHostWriteTrap() {
-  try { window.dispatchEvent(new CustomEvent('nls:hwt-arm')); }
-  catch { /* 計器の失敗で描画を止めない */ }
-}
 
 /*
- * ★v0.1.1272: 「こちらは聞ける状態になった」と MAIN world に伝える。
- *
- *   真因(chrome-devtools MCP で実測して確定): manifest の run_at が
- *     MAIN(page-intercept) = document_start / ISOLATED(content) = document_idle
- *   なので、報告を送る側が【聞く側より先に】走る。postMessage は投げっぱなしなので
- *   リスナー登録前の報告は永久に失われる。実測では
- *   「トラップは装着済み(accessor)なのに armed:null」という形で現れていた。
- *   → 起動を知らせて、保持してある最新の状態を送り直してもらう。
+ * ★v0.1.1278: host 祖先の MutationObserver 計器(ensureHostAncestryMutationTrace)と
+ *   消失スナップショット採取(captureVanishSnapshot)を撤去した。
+ *   host + 親 + 祖父の3階層に attributeOldValue 付き observer を張り、
+ *   変化のたびに getComputedStyle + getBoundingClientRect を読む重い計器だった。
+ *   点滅は Side Panel 移行(v0.1.1275)で解決済み=役目を終えた。
  */
-function helloHostWriteTrap() {
-  try { window.dispatchEvent(new CustomEvent('nls:hwt-hello')); }
-  catch { /* 計器の失敗で描画を止めない */ }
-}
-
-/**
- * ★v0.1.1261: host の style/class 変化を MutationObserver で見張る。
- *   「誰が呼んだか」を関数の内側で数えるのをやめ、【DOM が変わった事実】を捕らえる。
- *   変化時に Error().stack を採ると、経路を問わず書き換え元が分かる。
- *   stack 取得は「見えている→消えた」の遷移時だけ(毎回だと重い)。
- * @param {HTMLElement|null} host
- */
-function ensureHostAncestryMutationTrace(host) {
-  if (!host || typeof MutationObserver !== 'function') return;
-  const parent = host.parentElement || null;
-  // 既に「現物」を見ているなら何もしない(idempotent・rAF から毎フレーム呼ばれる)。
-  if (_hostStyleObserver && _hostTraceHost === host && _hostTraceParent === parent) return;
-  try {
-    if (_hostStyleObserver) {
-      // ★張り直し。旧実装は `if (_hostStyleObserver) return` で初代に固着し、
-      //   host が作り直されると【死んだノードを永久に見張って】いた。
-      _hostStyleObserver.disconnect();
-      _hostAncestryTrace.reattachCount += 1;
-    }
-    _hostStyleObserver = new MutationObserver((records) => {
-      try {
-        // 属性の old→new を残す=「誰が何をどう書き換えたか」の指紋。
-        for (const rec of records) {
-          if (!rec || rec.type !== 'attributes') continue;
-          const t = rec.target;
-          const level = t === host ? 'host' : t === parent ? 'parent' : 'ancestor';
-          let nowValue = '';
-          try { nowValue = String(t.getAttribute(rec.attributeName) ?? ''); } catch { nowValue = ''; }
-          _hostAncestryTrace.total += 1;
-          _hostAncestryTrace.entries.push({
-            nowMs: Date.now(),
-            level,
-            attr: String(rec.attributeName || ''),
-            oldValue: String(rec.oldValue ?? '').slice(0, 120),
-            newValue: nowValue.slice(0, 120)
-          });
-          if (_hostAncestryTrace.entries.length > 12) _hostAncestryTrace.entries.shift();
-        }
-        const cs = window.getComputedStyle(host);
-        const r = host.getBoundingClientRect();
-        const visible =
-          cs.display !== 'none' && cs.visibility !== 'hidden' &&
-          Number(cs.opacity) !== 0 && r.width >= 40 && r.height >= 24;
-        // ★rAF と共有しない専用変数(v0.1.1267)。共有していたのが旧実装の欠陥。
-        const becameHidden = _hostMutPrevVisible === true && !visible;
-        noteHostStyleMutation(_hostStyleTrace, {
-          nowMs: Date.now(),
-          becameHidden,
-          display: cs.display,
-          opacity: cs.opacity,
-          visibility: cs.visibility,
-          width: r.width,
-          height: r.height,
-          // 消えた瞬間だけ stack を採る(毎回は重い)。
-          stack: becameHidden ? new Error('host-hidden').stack : ''
-        });
-        _hostMutPrevVisible = visible;
-      } catch { /* 計器失敗は描画を止めない */ }
-    });
-    const attrFilter = ['style', 'class', 'hidden', 'aria-hidden', 'data-nls-hidden'];
-    // ★host 自身【と祖先2階層】を見る。旧実装は host しか見ておらず、
-    //   「親が潰されていない」証拠には全くならなかった(今回の症状は幅も高さも同時に0)。
-    _hostStyleObserver.observe(host, {
-      attributes: true, attributeOldValue: true, attributeFilter: attrFilter
-    });
-    if (parent) {
-      _hostStyleObserver.observe(parent, {
-        attributes: true, attributeOldValue: true, attributeFilter: attrFilter,
-        childList: true // host が親から外される瞬間も捕らえる
-      });
-      const grand = parent.parentElement;
-      if (grand) {
-        _hostStyleObserver.observe(grand, {
-          attributes: true, attributeOldValue: true, attributeFilter: attrFilter
-        });
-      }
-    }
-    _hostTraceHost = host;
-    _hostTraceParent = parent;
-  } catch { /* observer 生成失敗は無視 */ }
-}
-
-/**
- * 消えた瞬間の事実を採取する(★遷移時のみ呼ぶ。毎フレームは重い)。
- * @param {HTMLElement} host
- * @param {CSSStyleDeclaration|null} cs
- * @returns {{hiddenAttr:string|null, styleAttr:string|null, hostDisplay:string, ancestors:Array<object>, cssAlive:boolean}}
- */
-function captureVanishSnapshot(host, cs) {
-  let styleAttr = null;
-  try { styleAttr = host.getAttribute('style'); } catch { styleAttr = null; }
-  let hiddenAttr = null;
-  try { hiddenAttr = host.getAttribute(INLINE_HOST_HIDDEN_ATTR); } catch { hiddenAttr = null; }
-  const ancestors = [];
-  try {
-    let el = host.parentElement;
-    for (let i = 0; i < 3 && el; i += 1) {
-      const acs = window.getComputedStyle(el);
-      const ar = el.getBoundingClientRect();
-      ancestors.push({
-        tag: el.tagName,
-        cls: String(el.className || '').slice(0, 40),
-        display: acs.display,
-        w: Math.round(ar.width),
-        h: Math.round(ar.height)
-      });
-      el = el.parentElement;
-    }
-  } catch { /* 採取失敗は分類側が unknown として扱う */ }
-  let cssAlive = true;
-  try {
-    cssAlive = !!document.getElementById(PAGE_FRAME_STYLE_ID)?.isConnected;
-  } catch { cssAlive = true; }
-  return {
-    hiddenAttr,
-    styleAttr: typeof styleAttr === 'string' ? styleAttr.slice(0, 160) : styleAttr,
-    hostDisplay: cs ? cs.display : '',
-    ancestors,
-    cssAlive
-  };
-}
 
 /**
  * 拡張の <style> が生きていることを保証する(★v0.1.1267)。
@@ -3027,102 +2818,32 @@ function ensurePageFrameStyleAlive() {
   } catch { /* 復旧失敗は描画を止めない */ }
 }
 
-function startHostVisibilityWatch() {
-  if (_hostVisWatchRaf != null) return; // 二重起動しない
-  if (typeof requestAnimationFrame !== 'function') return;
-  const tick = () => {
-    try {
-      const host = nlsInlinePopupHostSingleton;
-      if (host && host.getBoundingClientRect) {
-        /*
-         * ★v0.1.1267: observer が「現物」を見ているか毎フレーム確かめる。
-         *   host は生成/移設で差し替わるので、ここで追従させないと初代に固着する。
-         *   ★hot path なので【ポインタ比較2つだけ】。DOM 走査は絶対に足さない
-         *   (v0.1.1201 で paint 毎の querySelectorAll を入れて拡張全体を重くした前科)。
-         */
-        if (host !== _hostTraceHost || host.parentElement !== _hostTraceParent) {
-          ensureHostAncestryMutationTrace(host);
-        }
-        // ★v0.1.1268: host が差し替わったら MAIN world のトラップも張り直させる。
-        //   追加コストはポインタ比較1個(v0.1.1201 の「paint毎のDOM走査」を繰り返さない)。
-        if (host !== _hwtArmedHost) {
-          _hwtArmedHost = host;
-          armHostWriteTrap();
-        }
-        const r = host.getBoundingClientRect();
-        let cs = null;
-        // computed は「消えた瞬間だけ」読みたいが、前フレームとの比較が要るので
-        // 毎フレーム読む。単一要素の getComputedStyle は O(1) で走査ではない。
-        try { cs = window.getComputedStyle(host); } catch { cs = null; }
-        // ★v0.1.1265: 消えた瞬間に直前の足跡を切り出す(見えていた→見えない の遷移時のみ)。
-        try {
-          const visNow = r.width >= 40 && r.height >= 24;
-          if (_hostRafPrevVisible === true && !visNow) {
-            // ★遷移の瞬間だけ採取する(祖先3つの getComputedStyle は毎フレームだと重い)。
-            const snapshot = captureVanishSnapshot(host, cs);
-            const { hint, detail } = classifyVanishSnapshot(snapshot);
-            noteVanishWithTrail(_vanishForensics, {
-              nowMs: Date.now(), w: r.width, h: r.height, display: cs ? cs.display : '',
-              hint, detail, snapshot,
-              // Δ = 消失時刻 − 直近の拡張4秒tick。位相で「どちらの時計か」を二分する。
-              pollDeltaMs: _lastLivePollTickAt > 0 ? Date.now() - _lastLivePollTickAt : null
-            });
-          }
-          _hostRafPrevVisible = visNow;
-        } catch { /* 計器失敗は描画を止めない */ }
-        noteHostFrame(_hostVisWatch, {
-          nowMs: Date.now(),
-          rect: { w: r.width, h: r.height },
-          display: cs ? cs.display : '',
-          visibility: cs ? cs.visibility : '',
-          opacity: cs ? cs.opacity : '',
-          connected: host.isConnected !== false,
-          parentTag: host.parentElement ? host.parentElement.tagName : ''
-        });
-      }
-    } catch { /* 計器失敗は描画を止めない */ }
-    _hostVisWatchRaf = requestAnimationFrame(tick);
-  };
-  _hostVisWatchRaf = requestAnimationFrame(tick);
-}
+/*
+ * ★v0.1.1278: startHostVisibilityWatch(毎フレームの rAF ループ)を撤去した。
+ *
+ *   v0.1.1253 で「パネルが実際に見えているか」を毎フレーム測るために入れた計器。
+ *   点滅は Side Panel 移行(v0.1.1275)で解決したため役目を終えた。
+ *
+ *   ★撤去の根拠(実測・2026-08-06 のユーザー速報):
+ *     Side Panel へ移行した後も hostVisWatch は frames 12,660 を数え続けており、
+ *     tick の中身は ancestryTrace 追従 / vanishForensics / hostVisWatch の
+ *     【3つとも計器】で実挙動はゼロだった。
+ *     つまり watch ページ全体で、誰も読まない値のために毎フレーム
+ *     getComputedStyle + getBoundingClientRect を回していた。
+ *     (v0.1.1276 でコメント送信を遅くしていた常駐監視を撤去したのと同じ形)
+ */
 
 /**
  * ★host の display を書き換える唯一の入口(9箇所に散っていた直接代入をここへ集約)。
  *   個別に計器を足すと必ず配線漏れが出るため、書き換え自体を1関数に閉じる。
  * @param {HTMLElement|null} host
  * @param {'none'|'block'} display
- * @param {string} cause 消した/戻した経路のタグ(状態速報にそのまま出す)
+ * @param {string} _cause 消した/戻した経路のタグ。
+ *   ★v0.1.1278 で計器を撤去したため現在は未使用だが、呼び出し側8箇所が経路名を
+ *     渡しており、将来診断を戻すときの手がかりになるので引数は残す。
  */
-function setInlineHostDisplay(host, display, cause) {
-  trail('disp:' + display + ':' + cause);
+function setInlineHostDisplay(host, display, _cause) {
   if (!host || !host.style) return;
-  const prev = host.style.display;
-  /*
-   * ★v0.1.1257: ここは【インラインスタイル】の前後しか見ていない。
-   *   本拡張は CSS 側で #nls-inline-popup-host { display:none } を既定にしており、
-   *   インラインが '' のままでも実際は消えている。よって prev===display による
-   *   早期return は「実際に消したのに 0回」を生む(hostFlipCensus が2日間 0 を出し続けた真因)。
-   *   → 実際に見えていたか(getComputedStyle)を基準に、消した経路を別計器へ記録する。
-   *     こちらは prev の値に依存しないので取りこぼさない。
-   */
-  if (display === 'none') {
-    try {
-      const cs = window.getComputedStyle(host);
-      /*
-       * ★v0.1.1260: 判定から opacity を外した。
-       *   旧実装は「display!=='none' かつ visibility!=='hidden' かつ opacity!==0」を
-       *   "見えていた" の条件にしていたが、この関数は【display だけ】を書き換える経路
-       *   (first_paint_gate / video_rect_too_small / prewarm_offscreen / host_created)
-       *   からも呼ばれる。それらは opacity を触らないため、CSS 既定の opacity:0 が
-       *   残っていると wasVisible=false となり【消したのに記録されない】。
-       *   実測(2026-08-05): 消失8回に対し記録4回=ちょうど半分が取りこぼされていた。
-       *   → この関数の責務は display なので、display と visibility だけで判定する。
-       *     opacity 込みの「実際に見えたか」は hostVisWatch(rAF実測)が別途担当する。
-       */
-      const wasDisplayed = cs.display !== 'none' && cs.visibility !== 'hidden';
-      if (wasDisplayed) noteInlineHostHideReason(`display:${cause}`);
-    } catch { /* 計器失敗は描画を止めない */ }
-  }
   /*
    * ★v0.1.1266: 属性が「消えている」の正本。インラインも従来どおり書くが、
    *   インラインは失われうる(実測で確定)ので、属性の付け外しを必ずセットで行う。
@@ -3135,12 +2856,6 @@ function setInlineHostDisplay(host, display, cause) {
     else host.removeAttribute(INLINE_HOST_HIDDEN_ATTR);
   } catch { /* 属性失敗は描画を止めない */ }
   host.style.display = display;
-  if (prev === display) return; // 状態変化なし=計上しない
-  try {
-    const now = Date.now();
-    if (display === 'none') noteHostHidden(_hostFlipCensus, { cause, nowMs: now });
-    else noteHostShown(_hostFlipCensus, { nowMs: now });
-  } catch { /* 計器失敗は描画を止めない */ }
 }
 
 /**
@@ -3163,14 +2878,6 @@ function setInlineHostDisplay(host, display, cause) {
  * @param {boolean} visible true=見せる / false=消す
  * @param {string} cause 経路タグ(状態速報にそのまま出る)
  */
-const _hostHideReasonCensus = createInlineHostHideReasonCensus();
-
-/** @param {string} reason hidePageFrameOverlay の呼び出し元タグ */
-function noteInlineHostHideReason(reason) {
-  try { noteInlineHostHide(_hostHideReasonCensus, reason, Date.now()); }
-  catch { /* 計器失敗は描画を止めない */ }
-}
-
 /**
  * ★v0.1.1262: このセッションで一度でもパネルを【実際に表示した】か。
  *   フラグ(toolbarInitiatedShowThisSession / inlinePanelAutoshowActivatedThisSession)は
@@ -3178,21 +2885,17 @@ function noteInlineHostHideReason(reason) {
  *   実測で「表示中なのに autoshow_off で消される」が 0.4秒周期で起きていたため、
  *   これを最後の砦として使う。★一度 true になったら false に戻さない。
  */
-/**
- * ★v0.1.1263: 二分実験フラグ(一時的)。
- *   true = autoshow_off で【消さない】(判定の記録だけ残す)。
- *   ちらつきが止まるか否かで、このゲートが犯人かを1回で判定するための実験。
- *   ★判定できたら必ず false に戻し、正しい条件を実装すること(Phase 3)。
+/*
+ * ★v0.1.1278: v0.1.1263 の二分実験フラグを撤去した。
+ *   実験は 2026-08-05 に終了し、実測で autoshow_off は【無罪】と確定して恒久 false。
+ *   以降の実効条件は !_inlineHostEverShown だけ = フラグは死んだ分岐だった。
+ *   点滅自体は Side Panel 移行(v0.1.1275)で解決済み。
+ *   ★残す挙動は v0.1.1274 の everShown ガード(下の分岐)。実験ではなく実挙動。
  */
-// ★実験は終了(2026-08-05)。実測で【無罪】と確定したため false に戻す:
-//   実験中(消さないようにした)にも消失6回。犯人は autoshow_off ではなかった。
-//   真犯人は host_created(パネルが同じ1ミリ秒に3個作られていた)。
-const INLINE_AUTOSHOW_HIDE_EXPERIMENT = false;
 
 let _inlineHostEverShown = false;
 
 function setInlineHostVisible(host, visible, cause) {
-  trail((visible ? 'show:' : 'hide:') + cause);
   if (!host || !host.style) return;
   // 見せる経路は4つ(floating/dock/anchored/nonvideo)あるが、全部この入口を通る。
   //   ここで1回立てれば取りこぼさない(v0.1.1255 で集約済みなのを利用)。
@@ -4301,10 +4004,6 @@ function ensureInlinePopupHost() {
   nlsInlinePopupHostSingleton = host;
   host.setAttribute('aria-hidden', 'true');
   setInlineHostDisplay(host, 'none', 'host_created');
-  // ★v0.1.1261: この host の style 書き換えを経路を問わず見張る(idempotent)。
-  ensureHostAncestryMutationTrace(host);
-  // ★v0.1.1268: 生成直後に MAIN world のトラップも張らせる(rAF の追従を待たない)。
-  armHostWriteTrap();
   host.style.pointerEvents = 'auto';
   host.style.width = '100%';
 
@@ -6050,11 +5749,11 @@ function renderInlinePopupHost(target) {
  *   renderPageFrameOverlay 内に hide 経路が3つあり【どれが消しているか】が分からなかった。
  *   症状でなく原因を名指しするため、消した理由を経路ごとに数える
  *   ([[instrument-must-name-the-cause-2026-08-01]])。
- * @param {string} [reason] 消した経路のタグ(状態速報にそのまま出る)
+ * @param {string} [_reason] 消した経路のタグ。
+ *   ★v0.1.1278 で計器を撤去したため現在は未使用だが、呼び出し側8箇所が経路名を
+ *     渡しており、将来診断を戻すときの手がかりになるので引数は残す。
  */
-function hidePageFrameOverlay(reason = 'unknown') {
-  trail('hide:' + reason);
-  noteInlineHostHideReason(reason);
+function hidePageFrameOverlay(_reason = 'unknown') {
   try {
     dismissToolbarOpenInstantFeedback();
   } catch {
@@ -7309,46 +7008,16 @@ function buildAiShareFastDiagnosticsPayload() {
     // v0.1.1124 D-1計器: host移設の実測(reloadCount=iframeリロード実害あり移設・byReason=犯人経路・
     //   venueOpenMoves=会場open中の移設)。ローディングちかちかの真犯人を状態速報の数字で確定する。
     hostMoveDiag: summarizeInlineHostMoveDiag(_inlineHostMoveState, Date.now()),
-      // v0.1.1250: 移設でもscrollでもない「パネルが一瞬消える」を名指しする計器。
-      hostFlipCensus: snapshotHostVisibilityFlipCensus(_hostFlipCensus),
-      hostVisWatch: snapshotHostVisibilityWatch(_hostVisWatch),
-      vanishForensics: (() => {
-        const snap = snapshotVanishForensics(_vanishForensics);
-        if (!snap) return null;
-        // ★v0.1.1267: 位相(どちらの時計か)と、観測対象が現物かの自己申告を併記する。
-        const phase = assessVanishPhase(snap.pollDeltas);
-        return {
-          ...snap,
-          phase,
-          phaseLine: formatVanishPhaseLine(phase, snap.pollDeltas),
-          line: formatVanishForensicsLine(snap) + '\n' + formatVanishPhaseLine(phase, snap.pollDeltas)
-        };
-      })(),
-      hostAncestryTrace: {
-        total: _hostAncestryTrace.total,
-        reattachCount: _hostAncestryTrace.reattachCount,
-        entries: _hostAncestryTrace.entries.slice(-6),
-        // ★「いま現物を見ているか」を毎回自己申告させる(初代固着の再発検知)。
-        watchingCurrentHost: _hostTraceHost === nlsInlinePopupHostSingleton,
-        line: `hostAncestryTrace: 属性変化${_hostAncestryTrace.total}件 / 再attach${_hostAncestryTrace.reattachCount}回 / 観測対象=${_hostTraceHost === nlsInlinePopupHostSingleton ? '現host ✅' : '★別ノード(固着)'}`
-      },
+      /*
+       * ★v0.1.1278: 点滅追跡の計器(hostFlipCensus / hostVisWatch / vanishForensics /
+       *   hostAncestryTrace / hostStyleTrace / hostHideReason / hostRecoveryDiag)を
+       *   速報から外した。点滅は Side Panel 移行(v0.1.1275)で解決済みで、
+       *   用の済んだ計器が速報を長くしていた。
+       * ★styleReattach は残す=計器ではなく【自己修復が働いた回数】(実挙動)。
+       */
       styleReattach: {
         count: _pageFrameStyleReattachCount,
         line: `styleReattach: ${_pageFrameStyleReattachCount}回(拡張の<style>を貼り直した回数)`
-      },
-      hostStyleTrace: (() => {
-        const snap = snapshotHostStyleMutationTrace(_hostStyleTrace);
-        return snap ? { ...snap, line: formatHostStyleMutationLine(snap) } : null;
-      })(),
-      hostHideReason: (() => {
-        const snap = snapshotInlineHostHideReasonCensus(_hostHideReasonCensus);
-        return snap ? { ...snap, line: formatInlineHostHideReasonLine(snap) } : null;
-      })(),
-      hostRecoveryDiag: {
-        checkCount: _inlineHostRecoveryDiag.checkCount,
-        recoverCount: _inlineHostRecoveryDiag.recoverCount,
-        keptOnWatchCount: _inlineHostRecoveryDiag.keptOnWatchCount,
-        line: formatInlineHostRecoveryLine(_inlineHostRecoveryDiag)
       },
     inlinePanel: {
       placementMode: inlinePanelPlacementMode,
@@ -7879,7 +7548,6 @@ function isWatchInlinePanelTopFrame() {
 
 /** 視聴ページの動画周り装飾枠（#nls-watch-prikura-frame）は表示しない。インライン用ホストの配置のみ行う。 */
 function renderPageFrameOverlay() {
-  trail('render');
   if (renderingPageFrame) {
     pageFrameOverlayRenderDeferred = true;
     return;
@@ -7916,28 +7584,6 @@ function renderPageFrameOverlay() {
     }).hide
   ) {
     /*
-     * ★★★ v0.1.1263 二分実験(一時的・必ず畳む) ★★★
-     *
-     * 会議(4体・全員一致)の裁定:
-     *   「犯人の場所は既に確定している(autoshow_off の出所は本行の1箇所のみ)。
-     *     これ以上の特定作業は不要。特定より先に【止まるか否か】を確かめよ」
-     *
-     * 実測で犯人はこのゲートに絞れている:
-     *   消失4回 と「消した」記録4回が【完全に1対1】
-     *   4.0秒ちょうどの周期・変動係数 0.002
-     *
-     * ★MutationObserver で犯人を特定する案(v0.1.1261)は【原理的に不可能】と確定した。
-     *   コールバックはマイクロタスクで非同期配信され、書き換え元は既にスタックから
-     *   消えている(MDN)。Error().stack を採っても Observer の内部フレームしか出ない。
-     *
-     * → よってここでは【消す実行だけを止め、判定は記録する】。
-     *   止まれば犯人確定。止まらなければこのゲートは無罪でこの線を捨てる。
-     *
-     * ⚠副作用: 「こん太を押す前でもパネルが出る」可能性がある。
-     *   判定できたら Phase 3 で必ず正しい形へ戻すこと。
-     */
-    noteInlineHostHideReason('autoshow_off_experiment_skipped');
-    /*
      * ★v0.1.1274: 一度でも表示したら、この経路では【二度と消さない】。
      *
      *   実測(2026-08-06・ユーザー速報):
@@ -7957,7 +7603,7 @@ function renderPageFrameOverlay() {
      *   ★「こん太を押すまで出さない」は初回(まだ一度も出していない)だけの話なので、
      *     everShown が false の間は従来どおり消える=既定動作は壊れない。
      */
-    if (!INLINE_AUTOSHOW_HIDE_EXPERIMENT && !_inlineHostEverShown) {
+    if (!_inlineHostEverShown) {
       hidePageFrameOverlay('autoshow_off');
       /*
        * try/finally に入らないため、ここでも監視ルートを取り直す。
@@ -7966,7 +7612,7 @@ function renderPageFrameOverlay() {
       maybeReconnectCommentMutationObserverAfterInlineLayout();
       return;
     }
-    // 実験中はここを素通りし、通常の描画へ進む(=消さない)。
+    // 一度でも表示済みならここを素通りし、通常の描画へ進む(=消さない)。
   }
 
   // autoshow ON のときは「次回だけ表示」にし、1 回表示したら OFF に戻す。
@@ -10042,46 +9688,16 @@ function buildAiSharePageDiagnostics() {
     // v0.1.1124 D-1計器: host移設の実測(reloadCount=iframeリロード実害あり移設・byReason=犯人経路・
     //   venueOpenMoves=会場open中の移設)。ローディングちかちかの真犯人を状態速報の数字で確定する。
     hostMoveDiag: summarizeInlineHostMoveDiag(_inlineHostMoveState, Date.now()),
-      // v0.1.1250: 移設でもscrollでもない「パネルが一瞬消える」を名指しする計器。
-      hostFlipCensus: snapshotHostVisibilityFlipCensus(_hostFlipCensus),
-      hostVisWatch: snapshotHostVisibilityWatch(_hostVisWatch),
-      vanishForensics: (() => {
-        const snap = snapshotVanishForensics(_vanishForensics);
-        if (!snap) return null;
-        // ★v0.1.1267: 位相(どちらの時計か)と、観測対象が現物かの自己申告を併記する。
-        const phase = assessVanishPhase(snap.pollDeltas);
-        return {
-          ...snap,
-          phase,
-          phaseLine: formatVanishPhaseLine(phase, snap.pollDeltas),
-          line: formatVanishForensicsLine(snap) + '\n' + formatVanishPhaseLine(phase, snap.pollDeltas)
-        };
-      })(),
-      hostAncestryTrace: {
-        total: _hostAncestryTrace.total,
-        reattachCount: _hostAncestryTrace.reattachCount,
-        entries: _hostAncestryTrace.entries.slice(-6),
-        // ★「いま現物を見ているか」を毎回自己申告させる(初代固着の再発検知)。
-        watchingCurrentHost: _hostTraceHost === nlsInlinePopupHostSingleton,
-        line: `hostAncestryTrace: 属性変化${_hostAncestryTrace.total}件 / 再attach${_hostAncestryTrace.reattachCount}回 / 観測対象=${_hostTraceHost === nlsInlinePopupHostSingleton ? '現host ✅' : '★別ノード(固着)'}`
-      },
+      /*
+       * ★v0.1.1278: 点滅追跡の計器(hostFlipCensus / hostVisWatch / vanishForensics /
+       *   hostAncestryTrace / hostStyleTrace / hostHideReason / hostRecoveryDiag)を
+       *   速報から外した。点滅は Side Panel 移行(v0.1.1275)で解決済みで、
+       *   用の済んだ計器が速報を長くしていた。
+       * ★styleReattach は残す=計器ではなく【自己修復が働いた回数】(実挙動)。
+       */
       styleReattach: {
         count: _pageFrameStyleReattachCount,
         line: `styleReattach: ${_pageFrameStyleReattachCount}回(拡張の<style>を貼り直した回数)`
-      },
-      hostStyleTrace: (() => {
-        const snap = snapshotHostStyleMutationTrace(_hostStyleTrace);
-        return snap ? { ...snap, line: formatHostStyleMutationLine(snap) } : null;
-      })(),
-      hostHideReason: (() => {
-        const snap = snapshotInlineHostHideReasonCensus(_hostHideReasonCensus);
-        return snap ? { ...snap, line: formatInlineHostHideReasonLine(snap) } : null;
-      })(),
-      hostRecoveryDiag: {
-        checkCount: _inlineHostRecoveryDiag.checkCount,
-        recoverCount: _inlineHostRecoveryDiag.recoverCount,
-        keptOnWatchCount: _inlineHostRecoveryDiag.keptOnWatchCount,
-        line: formatInlineHostRecoveryLine(_inlineHostRecoveryDiag)
       },
     inlinePanel: {
       placementMode: inlinePanelPlacementMode,
@@ -12949,13 +12565,6 @@ async function runThumbCaptureTick() {
 }
 
 function syncLiveIdFromLocation() {
-  /*
-   * ★v0.1.1267 位相計器: ここは LIVE_POLL_MS(4秒)ごとに呼ばれる唯一の入口。
-   *   消失時刻との差 Δ を採ることで「消失を駆動しているのが拡張の時計か外部か」を
-   *   【復帰ゲートを止めずに】二分する(止める案は v0.1.1250 の地雷=唯一の復帰経路)。
-   *   Δがほぼ一定=locked(内部が上流) / Δが歩く=walking(別の時計=外部)。
-   */
-  _lastLivePollTickAt = Date.now();
   const href = window.location.href;
   if (isNicoLiveWatchUrl(href)) {
     rememberWatchPageUrl();
@@ -14361,9 +13970,6 @@ async function start() {
    *   ★既定は表示(従来どおり)。OFF にした人だけ出さない。
    *   ★設定の読み取りに失敗したら【出す】側に倒す(機能が黙って消えるのを避ける)。
    */
-  // ★v0.1.1272: message リスナーは登録済みなので、MAIN world に「聞ける」と伝える。
-  //   これが無いと document_start 側が送った報告を永久に取りこぼす(実測で確定した真因)。
-  helloHostWriteTrap();
   if (isWatchInlinePanelTopFrame() && (await readVenueButtonVisible())) {
     _venueApi = mountVenueBarButton();
   }
@@ -14968,10 +14574,6 @@ async function start() {
       }, LIVE_POLL_MS)
     )
   );
-
-  // ★v0.1.1253: パネル可視の見張りを開始する(idempotent=二重起動しない)。
-  //   ここで始めるのは、この時点で inline panel の土台が作られる経路に必ず乗るため。
-  startHostVisibilityWatch();
 
   livePanelScanIntervalId = /** @type {number} */ (
     /** @type {unknown} */ (
