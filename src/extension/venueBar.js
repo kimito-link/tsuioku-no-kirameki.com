@@ -199,6 +199,11 @@ import {
 import { enrichVenueRowsWithProfileAvatars } from '../lib/venueAvatar.js';
 // v0.1.1118 鏡enrich(P4): ①が解決済みの顔URL(鏡displaySrc)を追加のenrich源にする(新規readゼロ)。
 import { buildVenueMirrorAvatarMap, enrichVenueRowsWithMirrorAvatars } from '../lib/venueMirrorAvatarEnrich.js';
+// ★KEY_LANE_MIRROR の契約(消費者登録簿・段別の不変条件)は src/lib/laneMirrorContract.js が正本。
+//   会場は reader として登録済み。読み口は必ず acceptLaneMirrorSnapshot を通す(受け入れ点は2箇所)。
+import { sanitizeLaneMirrorForRead } from '../lib/laneMirrorContract.js';
+// fallback 経路で「ギフト段が作れない」ことを正直に伝える文言(①③と同じ正本ファイル)。
+import { buildVenueFallbackGiftEmptyNoteHtml } from '../lib/storyUserLaneGuideHtml.js';
 // v0.1.1111 会場=①レーン鏡映(メンバー完全一致): ①の実paint鏡(KEY_LANE_MIRROR)を会場の正本に昇格。
 //   設計正本=memory/reference_pop_venue_parity_SYNTHESIS.md(P層=鏡そのまま/T層=cap溢れの尾/X層=直近発言者)。
 import { KEY_LANE_MIRROR } from '../lib/laneMirrorKey.js';
@@ -210,6 +215,7 @@ import { restoreLaneMirrorBuckets } from '../lib/laneMirror.js';
 import {
   composeVenueLaneBuckets,
   isLaneMirrorUsableForVenue,
+  venueMirrorAgeNotice,
   venueRowsFromLaneMirror,
   venueSeatIndexByUid
 } from '../lib/venueLaneMirrorSupply.js';
@@ -377,6 +383,12 @@ const VENUE_LAYOUT_CLASSES = [
 // v0.1.1127 Patch B: mirror mode の会場は①POP完全一致のため、v0.1.1120で外した
 // キャラ案内帯/空段ノート/フッターを意図的に戻す。不要ならこの1行を false に戻す。
 const VENUE_LANE_GUIDES_EXACT_COPY = true;
+/*
+ * ★v0.1.1280: fallback 経路(①の鏡が無い/古すぎる)のときだけ差し替える gift 段の空文言。
+ *   fallback は席から段を組むため構造上ギフト段を作れない=「該当者がいません」は嘘になる。
+ *   文言の正本は①③と同じ storyUserLaneGuideHtml.js(エスケープ処理も共有する)。
+ */
+const VENUE_FALLBACK_GIFT_EMPTY_HTML = buildVenueFallbackGiftEmptyNoteHtml();
 
 /**
  * 会場の席タイル(buildPersonTileEl)に渡す avatar load guard と I/O。
@@ -2844,6 +2856,31 @@ export function mountVenueBarButton(options = {}) {
   let laneMirrorSnap = null;
   /** @type {Partial<import('../lib/laneMirror.js').LaneMirrorSnapshot>|null} */
   let laneMirrorPaintSnap = null;
+  /**
+   * 関所が直近に落としたセル数(段別の不変条件違反)。既存の診断行に併記するだけで
+   * 新しい観測系統は作らない。通常は 0。0 でなければ①側が契約違反の鏡を書いている。
+   */
+  let _laneMirrorSanitizeDropped = 0;
+  /** 見出しの人数だけの基準文(鏡の鮮度は後段で併記する)。 */
+  let _venueTitleBaseText = '';
+  /** 直近に書いた見出し文(値が変わったときだけ DOM に書くため)。 */
+  let _venueTitleLastText = '';
+  /**
+   * ★鏡snapshotの受け入れ関所。読み口はこの1関数に集約する(受け入れ点は catch-up と
+   *   onChanged の2箇所。wiringテストが呼び出し数で固定する)。
+   *
+   *   なぜ要るか: 会場には鏡経路と fallback 経路があり、fallback(venueLaneBuckets.js)は
+   *   匿名を弾くのに鏡経路(composeVenueLaneBuckets)は鏡の段構成を【無検査で】信じていた。
+   *   どちらを通ったかで画面の「法」が変わる状態だったため、読み口で不変条件を強制する。
+   *
+   * @param {unknown} rawSnap
+   * @returns {Partial<import('../lib/laneMirror.js').LaneMirrorSnapshot>|null} null=使えない(fallbackへ)
+   */
+  function acceptLaneMirrorSnapshot(rawSnap) {
+    const r = sanitizeLaneMirrorForRead(rawSnap);
+    _laneMirrorSanitizeDropped = r.droppedLinkAnon + r.droppedKontaAnon + r.droppedUnkeyed;
+    return /** @type {any} */ (r.snap);
+  }
   // venue-avatar-stale-mirror-DESIGN.md §C-1d: 鏡capturedAtの前進(popup復帰等)を検知する
   //   ための直前値。composeVenueBaseRowsが新しい鏡をpaintに採用するたびに更新する。
   let _lastPaintedMirrorCapturedAt = 0;
@@ -4898,10 +4935,13 @@ export function mountVenueBarButton(options = {}) {
     //   アクティブ参加者」(席に座った人を excludeKeys で除外済み・匿名とは限らず数値IDも含む)。
     //   誤読の核だった「観客」語を外し「ほか N人」に正本化(全員『会場参加者』前提で残りを表す)。
     //   来場者数(PV)の実値取得→二層表示は別途(PV 取得経路の新規配線が要るため範囲外・過剰実装回避)。
-    title.textContent =
+    // ★v0.1.1280: 鏡の鮮度を後段で併記するため、人数だけの基準文を控えておく
+    //   (併記は鏡の判定が確定した後=段割当の直前で行う)。
+    _venueTitleBaseText =
       totalAnonymous > 0
         ? `会場参加者 ${seating.participantCount}人 ・ ほか ${totalAnonymous}人`
         : `会場参加者 ${seating.participantCount}人`;
+    title.textContent = _venueTitleBaseText;
     // PR-C1: 人数ラスタライザ Canvas (Antigravity Enhanced)
     if (totalAnonymous > 0) {
       crowdCanvas.classList.add('nlsb-is-visible');
@@ -4996,6 +5036,30 @@ export function mountVenueBarButton(options = {}) {
       }
     }
     const isLaneMirrorPaintMode = Boolean(lanePaintSnap);
+    /*
+     * ★v0.1.1280: 鏡がどれくらい古いかを見出しに併記する(既存の title 要素に足すだけ・新規DOMなし)。
+     *
+     *   会場と①がずれる最大の原因は【鏡の陳腐化】だった。鏡は①が描画したときにしか
+     *   更新されないので、①を閉じたまま会場を見ると古いまま止まる(実測 656秒)。
+     *   SOFT〜HARD の帯域は「ちらつき防止のため意図的に古い鏡を使い続ける」設計なので、
+     *   降格はさせず【事実だけ伝える】。ユーザーが初めて「なぜずれるか」を画面で知れる。
+     *   ★値が変わったときだけ書く(paint 毎の DOM 書き込みを増やさない)。
+     */
+    try {
+      const nowForAge = Date.now();
+      const ageSec = lanePaintSnap && Number(lanePaintSnap.capturedAt) > 0
+        ? Math.round((nowForAge - Number(lanePaintSnap.capturedAt)) / 1000)
+        : -1;
+      const notice = venueMirrorAgeNotice(
+        isLaneMirrorPaintMode ? 'mirror' : 'fallback',
+        ageSec
+      );
+      const nextTitle = notice ? `${_venueTitleBaseText} ・ ${notice}` : _venueTitleBaseText;
+      if (_venueTitleLastText !== nextTitle) {
+        _venueTitleLastText = nextTitle;
+        title.textContent = nextTitle;
+      }
+    } catch { /* 表示の失敗は描画を止めない */ }
     emptyMessage.hidden = visibleLaneItems.length > 0;
     if (visibleLaneItems.length === 0) {
       resetStoryUserLaneDom(venueLaneEls);
@@ -5016,6 +5080,17 @@ export function mountVenueBarButton(options = {}) {
           // v0.1.1133: fallback でも同じ共有rendererの案内文言を出す。fallback は件数だけ
           //   seating.participantCount に差し替え、a:匿名ルール等の説明文は①POPと同じ正本に揃える。
           guides: VENUE_LANE_GUIDES_EXACT_COPY,
+          /*
+           * ★v0.1.1280: fallback 経路のときだけ gift 段の空文言を差し替える。
+           *   fallback は席から段を組むため【構造上 gift 段を作れない】(①の gift/ad は
+           *   tier 判定を通さない後付けで、席からは導出できない)。
+           *   それを「いまの記録では該当者がいません」と断定するのは嘘なので、
+           *   「①パネルが必要」であることを正直に言う。
+           *   ★mirror 経路(鏡がある)ときは渡さない=鏡が空だと知っている=従来の断定でよい。
+           */
+          emptyTextOverrides: isLaneMirrorPaintMode
+            ? undefined
+            : { gift: VENUE_FALLBACK_GIFT_EMPTY_HTML },
           wrapTileEl: (tileEl, item) => {
             const laneItem = /** @type {{ _venueSeatIndex?: unknown }} */ (item || {});
             // v0.1.1111: 席を持たないアイテム(鏡由来の uid 無し広告主セル等)は _venueSeatIndex=-1
@@ -5208,6 +5283,17 @@ export function mountVenueBarButton(options = {}) {
             dom: domSummary
           })
         );
+        /*
+         * ★関所が落としたセル数を既存の1行に併記する(新しい観測系統は作らない)。
+         *   通常は 0。0 でなければ①側が契約違反の鏡を書いている=書き手を名指しできる。
+         *   [[instrument-spiral-25-versions-2026-08-06]] の反省により、計器の新設はしない。
+         */
+        if (laneParityDiag && _laneMirrorSanitizeDropped > 0) {
+          laneParityDiag = {
+            ...laneParityDiag,
+            line: `${laneParityDiag.line} / 鏡除外${_laneMirrorSanitizeDropped}`
+          };
+        }
         // v0.1.1137(lanescene-structural-review MVP): mirror mode のときだけ、①が発行した鏡世代
         //   (revision/contentHash)と会場が実際にpaintした段(laneBuckets)を突合する。venueLaneParity
         //   の厳密突合(上)とは独立した軽量な代理指標なので、判定に失敗しても laneParityDiag には影響しない。
@@ -5632,9 +5718,10 @@ export function mountVenueBarButton(options = {}) {
             ),
           3000
         );
-        const snap = bag?.[KEY_LANE_MIRROR];
-        if (open && snap && typeof snap === 'object') {
-          laneMirrorSnap = /** @type {Partial<import('../lib/laneMirror.js').LaneMirrorSnapshot>} */ (snap);
+        // ★受け入れ点1/2(開時 catch-up): 関所を必ず通す(laneMirrorContract.js の契約)。
+        const snap = acceptLaneMirrorSnapshot(bag?.[KEY_LANE_MIRROR]);
+        if (open && snap) {
+          laneMirrorSnap = snap;
           scheduleLaneMirrorRecommit();
         }
         const storySnap = bag?.[KEY_STORY_DIAG_MIRROR];
@@ -5960,11 +6047,13 @@ export function mountVenueBarButton(options = {}) {
     // v0.1.1111 会場=①レーン鏡映: ①が publish した実paint鏡の新着を newValue 直採用(追加readゼロ)。
     //   rAF集約で再供給→再描画(①のpaint後 数百msで会場が同じ5段に同化する)。
     const mirrorChange = changes[KEY_LANE_MIRROR];
-    if (mirrorChange && mirrorChange.newValue && typeof mirrorChange.newValue === 'object') {
-      laneMirrorSnap = /** @type {Partial<import('../lib/laneMirror.js').LaneMirrorSnapshot>} */ (
-        mirrorChange.newValue
-      );
-      scheduleLaneMirrorRecommit();
+    if (mirrorChange && mirrorChange.newValue) {
+      // ★受け入れ点2/2(onChanged): 関所を必ず通す(laneMirrorContract.js の契約)。
+      const accepted = acceptLaneMirrorSnapshot(mirrorChange.newValue);
+      if (accepted) {
+        laneMirrorSnap = accepted;
+        scheduleLaneMirrorRecommit();
+      }
     }
     const storyDiagChange = changes[KEY_STORY_DIAG_MIRROR];
     if (storyDiagChange && storyDiagChange.newValue && typeof storyDiagChange.newValue === 'object') {

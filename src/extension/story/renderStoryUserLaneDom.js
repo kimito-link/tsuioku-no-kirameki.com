@@ -415,7 +415,8 @@ function fillLaneTier(el, items, io, wrapTileEl) {
  * @param {{ link: unknown[], gift: unknown[], konta: unknown[], tanu: unknown[] }} buckets
  * @param {number} pickedLength
  * @param {StoryUserLaneDomIo} io
- * @param {{ recordedCommentRowsTotal?: number, totalCandidates?: number, guides?: boolean, wrapTileEl?: (tileEl: HTMLElement, item: unknown, index: number) => HTMLElement }} [opts] 診断の total と同じ記録件数
+ * @param {{ recordedCommentRowsTotal?: number, totalCandidates?: number, guides?: boolean, wrapTileEl?: (tileEl: HTMLElement, item: unknown, index: number) => HTMLElement, emptyTextOverrides?: { gift?: string } }} [opts] 診断の total と同じ記録件数
+ *   emptyTextOverrides: 空段ノートの差し替え(★会場の fallback 専用。①③は渡さない)
  *   （省略時はレーン直下の第2文なし）。totalCandidates=素性が取れた候補総数（cap 前）で「ほか M人」併記用。
  *   guides=false(v0.1.1120 会場用): キャラ案内帯・空段説明ノート・りんくヒント・フッター
  *   (「ほかN人は会場モードで…」=会場内では自己言及)を描画パスから除外する。省略時 true=①③status 完全不変。
@@ -470,10 +471,24 @@ export function paintStoryUserLaneDomFilled(
     showGuides && buckets.link.length === 0,
     buildStoryUserLaneEmptyNoteLinkHtml()
   );
+  /*
+   * ★v0.1.1280: 空ノートの差し替え口(会場の fallback 専用)。
+   *   会場は鏡が無い/古すぎると fallback 経路に落ちるが、fallback は【構造上 gift/ad 段を
+   *   作れない】(①の gift/ad は tier 判定を通さない後付けなので席から導出できない)。
+   *   それなのに「いまの記録では該当者がいません」と断定するのは【嘘】だった
+   *   (知らないことを、知っているかのように言っている)。
+   *   ★①③の描画は1バイトも変えない: overrides を渡すのは venueBar だけ。
+   */
+  const emptyOverrides =
+    opts && opts.emptyTextOverrides && typeof opts.emptyTextOverrides === 'object'
+      ? opts.emptyTextOverrides
+      : null;
   syncStoryUserLaneTierEmptyNote(
     laneGift,
     showGuides && buckets.gift.length === 0,
-    buildStoryUserLaneEmptyNoteGiftHtml()
+    emptyOverrides && typeof emptyOverrides.gift === 'string'
+      ? emptyOverrides.gift
+      : buildStoryUserLaneEmptyNoteGiftHtml()
   );
   syncStoryUserLaneTierEmptyNote(
     laneKonta,

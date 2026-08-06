@@ -7014,9 +7014,14 @@ function renderStoryUserLane() {
       ((typeof performance !== 'undefined' ? performance.now() : Date.now()) - _laneRenderT0) * 10
     ) / 10
   });
-  // 応援レーンの「鏡」: 顔(avatar)含めてそっくり status へ映すための最小データを storage へ。
+  // 応援レーンの「鏡」: 顔(avatar)含めてそっくり映すための最小データを storage へ。
   //   publishLaneDiag と同じ 3秒 min-gap・best-effort。buckets(りんく/こん太/広告/たぬ姉/ギフト)は
-  //   この時点で確定済み。会場には一切関係しない=popup と status だけ。描画は触らない(publish のみ)。
+  //   この時点で確定済み。描画は触らない(publish のみ)。
+  //   ★読者は src/lib/laneMirrorContract.js の LANE_MIRROR_CONSUMERS が正本。
+  //     【会場モード(venueBar.js)もこの鏡を読む】=v0.1.1111 で「会場の正本」に昇格している。
+  //     旧コメントは読者を popup と status だけと書いていたが【誤り】で、
+  //     書き手が読者を知らないまま片側を変えると会場が無言で壊れる状態だった
+  //     (会場パリティが8回再発した構造的真因・2026-08-06)。登録簿はCIが実importと照合する。
   //   ★pickedLength は popup が paint に渡すのと同じ laneDisplayedTotal(全5段=りんく+ギフト+広告+
   //     こん太+たぬ姉の合計枠)を渡す。picked.length(りんく/こん太/たぬ姉だけ)だと鏡のフッター
   //     「いま N 件を表示中」が popup より小さくなり「ほか M人」が過大になる(数字の抜け漏れ)。

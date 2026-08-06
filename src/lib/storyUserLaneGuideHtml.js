@@ -140,6 +140,22 @@ export function buildStoryUserLaneEmptyNoteGiftHtml() {
   );
 }
 
+/**
+ * ★v0.1.1280: 会場が fallback 経路(①パネルの鏡が無い/古すぎる)のときの gift 段。
+ *
+ *   会場の fallback は【席から】段を組むが、①の gift/ad 段は tier 判定を通さない
+ *   後付け(popup-entry.js の buckets.gift = giftPicks)なので、席からは導出できない。
+ *   = fallback は構造上ギフト段を作れない。
+ *   それを「いまの記録では該当者がいません」と断定するのは【知らないことの断定】＝嘘。
+ *   → 「分からない」と正直に言い、どうすれば見えるかを示す。
+ */
+export function buildVenueFallbackGiftEmptyNoteHtml() {
+  return storyUserLaneEmptyNoteTwoLines(
+    'ギフト段は①パネル（こん太のパネル）から受け取っています。いまは受け取れていないので、居るかどうか分かりません。',
+    '①パネルを開いたままにすると、数十秒で反映されます。'
+  );
+}
+
 /** こん太段・件数 0 */
 export function buildStoryUserLaneEmptyNoteKontaHtml() {
   return storyUserLaneEmptyNoteTwoLines(
