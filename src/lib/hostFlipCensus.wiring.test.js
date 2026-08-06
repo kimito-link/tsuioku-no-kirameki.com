@@ -30,26 +30,25 @@ function fnBody(src, decl) {
 }
 
 describe('host flip census + 4s repaint gate wiring', () => {
-  it('★中核: 4秒経路(syncLiveIdFromLocation)が無条件描画をやめている', () => {
-    // ★v0.1.1254 で判定は shouldRenderInlineHostOnPoll(純関数)へ移した。
-    //   条件式の【書き方】ではなく「判定を経てからでないと描かない」ことを断言する
-    //   (書き方を固定すると、正しいリファクタで赤になり実装側を歪めてしまう)。
-    //   復帰の非常口(消えていたら描く)は inlineHostRecovery.wiring.test.js が担当。
-    //   ★2箇所ある(watch / 非watch)。片方だけ無条件に戻す変異を通さないよう
-    //     「ゲート付き呼び出しが2つ」と「裸の呼び出しが0」の両方を数で断言する。
-    const gated = contentSrc.match(
-      /if \(verdict\.render\) \{\n\s*inlineLayoutDirty = false;\n\s*renderPageFrameOverlay\(\);\n\s*\}/g
+  it('★中核: 4秒経路は無条件で描き直す(v0.1.1248 と同じ挙動へ戻した)', () => {
+    /*
+     * ★v0.1.1273 で断言の向きを【反転】した。
+     *
+     *   旧: 「ゲートを経てからでないと描かない」ことを固定していた(v0.1.1250〜)
+     *   新: 「無条件で描く」ことを固定する(v0.1.1248 と同じ=安定していた版の挙動)
+     *
+     *   理由: そのゲート自体が事故の原因だった。v0.1.1250 で足した直後の
+     *   v0.1.1254 のタイトルが「自分が塞いだ非常口を戻す」で、
+     *   4秒経路は【唯一の復帰経路】だったのにゲートで塞いでいた。
+     *   以降28版、そのゲートが生む症状を別の原因と誤認して追い続けた。
+     *   詳細は inlineHostRecovery.wiring.test.js の冒頭コメント。
+     */
+    const unconditional = contentSrc.match(
+      /ensurePageFrameStyleAlive\(\);\n\s*inlineLayoutDirty = false;\n\s*renderPageFrameOverlay\(\);/g
     ) || [];
-    expect(gated.length).toBe(2);
-    const ungated = contentSrc.match(
-      /\n\s*(?:if \(true\) \{\s*\n\s*)?inlineLayoutDirty = false;\n\s*renderPageFrameOverlay\(\);/g
-    ) || [];
-    // 上の gated 2件 + 360msループ(独自ゲート)1件 = 3件を超えたら無条件呼び出しが増えている。
-    expect(ungated.length).toBeLessThanOrEqual(3);
-    // 旧実装(_nonWatchTickCount リセット直後の無条件呼び出し)が戻っていないこと。
-    expect(contentSrc).not.toMatch(
-      /_nonWatchTickCount = 0;\n\s*renderPageFrameOverlay\(\);/
-    );
+    expect(unconditional.length).toBe(2);
+    // ゲートが復活したら赤(=同じ事故を二度やらない歯止め)。
+    expect(contentSrc).not.toMatch(/if \(verdict\.render\) \{/);
   });
 
   it('計器を import して state を作っている', () => {

@@ -69,8 +69,15 @@ describe('inlinePanelShowGate の配線', () => {
     // 立てるのは1箇所だけ(見せる入口)。宣言の初期値 false は別物なので除外して数える。
     const sets = contentSrc.match(/_inlineHostEverShown = true/g) || [];
     expect(sets.length).toBe(1);
-    // ★消す側と復帰側で同じ判定を使っていること(食い違うと競り合いに戻る)。
+    /*
+     * ★v0.1.1273: 2 → 1 に変更。
+     *   復帰側(isInlineHostIntentionallyHidden)は、4秒経路のゲートごと撤去した。
+     *   ゲートが唯一の復帰経路を塞いでいたのが点滅の原因だったため
+     *   (詳細は inlineHostRecovery.wiring.test.js の冒頭コメント)。
+     *   ★「消す側と復帰側で判定を揃える」という元の意図は、復帰側が消えたことで
+     *     そもそも食い違いようが無くなった=競り合いは構造的に起きない。
+     */
     const uses = contentSrc.match(/shouldHideInlinePanelByAutoshow\(\{/g) || [];
-    expect(uses.length).toBe(2);
+    expect(uses.length).toBe(1);
   });
 });
