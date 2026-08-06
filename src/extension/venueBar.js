@@ -199,6 +199,9 @@ import {
 import { enrichVenueRowsWithProfileAvatars } from '../lib/venueAvatar.js';
 // v0.1.1118 鏡enrich(P4): ①が解決済みの顔URL(鏡displaySrc)を追加のenrich源にする(新規readゼロ)。
 import { buildVenueMirrorAvatarMap, enrichVenueRowsWithMirrorAvatars } from '../lib/venueMirrorAvatarEnrich.js';
+// ★KEY_LANE_MIRROR の契約(消費者登録簿・段別の不変条件)は src/lib/laneMirrorContract.js が正本。
+//   会場は reader として登録済み。読み口は必ず acceptLaneMirrorSnapshot を通す(受け入れ点は2箇所)。
+import { sanitizeLaneMirrorForRead } from '../lib/laneMirrorContract.js';
 // v0.1.1111 会場=①レーン鏡映(メンバー完全一致): ①の実paint鏡(KEY_LANE_MIRROR)を会場の正本に昇格。
 //   設計正本=memory/reference_pop_venue_parity_SYNTHESIS.md(P層=鏡そのまま/T層=cap溢れの尾/X層=直近発言者)。
 import { KEY_LANE_MIRROR } from '../lib/laneMirrorKey.js';
@@ -2844,6 +2847,27 @@ export function mountVenueBarButton(options = {}) {
   let laneMirrorSnap = null;
   /** @type {Partial<import('../lib/laneMirror.js').LaneMirrorSnapshot>|null} */
   let laneMirrorPaintSnap = null;
+  /**
+   * 関所が直近に落としたセル数(段別の不変条件違反)。既存の診断行に併記するだけで
+   * 新しい観測系統は作らない。通常は 0。0 でなければ①側が契約違反の鏡を書いている。
+   */
+  let _laneMirrorSanitizeDropped = 0;
+  /**
+   * ★鏡snapshotの受け入れ関所。読み口はこの1関数に集約する(受け入れ点は catch-up と
+   *   onChanged の2箇所。wiringテストが呼び出し数で固定する)。
+   *
+   *   なぜ要るか: 会場には鏡経路と fallback 経路があり、fallback(venueLaneBuckets.js)は
+   *   匿名を弾くのに鏡経路(composeVenueLaneBuckets)は鏡の段構成を【無検査で】信じていた。
+   *   どちらを通ったかで画面の「法」が変わる状態だったため、読み口で不変条件を強制する。
+   *
+   * @param {unknown} rawSnap
+   * @returns {Partial<import('../lib/laneMirror.js').LaneMirrorSnapshot>|null} null=使えない(fallbackへ)
+   */
+  function acceptLaneMirrorSnapshot(rawSnap) {
+    const r = sanitizeLaneMirrorForRead(rawSnap);
+    _laneMirrorSanitizeDropped = r.droppedLinkAnon + r.droppedKontaAnon + r.droppedUnkeyed;
+    return /** @type {any} */ (r.snap);
+  }
   // venue-avatar-stale-mirror-DESIGN.md §C-1d: 鏡capturedAtの前進(popup復帰等)を検知する
   //   ための直前値。composeVenueBaseRowsが新しい鏡をpaintに採用するたびに更新する。
   let _lastPaintedMirrorCapturedAt = 0;
@@ -5208,6 +5232,17 @@ export function mountVenueBarButton(options = {}) {
             dom: domSummary
           })
         );
+        /*
+         * ★関所が落としたセル数を既存の1行に併記する(新しい観測系統は作らない)。
+         *   通常は 0。0 でなければ①側が契約違反の鏡を書いている=書き手を名指しできる。
+         *   [[instrument-spiral-25-versions-2026-08-06]] の反省により、計器の新設はしない。
+         */
+        if (laneParityDiag && _laneMirrorSanitizeDropped > 0) {
+          laneParityDiag = {
+            ...laneParityDiag,
+            line: `${laneParityDiag.line} / 鏡除外${_laneMirrorSanitizeDropped}`
+          };
+        }
         // v0.1.1137(lanescene-structural-review MVP): mirror mode のときだけ、①が発行した鏡世代
         //   (revision/contentHash)と会場が実際にpaintした段(laneBuckets)を突合する。venueLaneParity
         //   の厳密突合(上)とは独立した軽量な代理指標なので、判定に失敗しても laneParityDiag には影響しない。
@@ -5632,9 +5667,10 @@ export function mountVenueBarButton(options = {}) {
             ),
           3000
         );
-        const snap = bag?.[KEY_LANE_MIRROR];
-        if (open && snap && typeof snap === 'object') {
-          laneMirrorSnap = /** @type {Partial<import('../lib/laneMirror.js').LaneMirrorSnapshot>} */ (snap);
+        // ★受け入れ点1/2(開時 catch-up): 関所を必ず通す(laneMirrorContract.js の契約)。
+        const snap = acceptLaneMirrorSnapshot(bag?.[KEY_LANE_MIRROR]);
+        if (open && snap) {
+          laneMirrorSnap = snap;
           scheduleLaneMirrorRecommit();
         }
         const storySnap = bag?.[KEY_STORY_DIAG_MIRROR];
@@ -5960,11 +5996,13 @@ export function mountVenueBarButton(options = {}) {
     // v0.1.1111 会場=①レーン鏡映: ①が publish した実paint鏡の新着を newValue 直採用(追加readゼロ)。
     //   rAF集約で再供給→再描画(①のpaint後 数百msで会場が同じ5段に同化する)。
     const mirrorChange = changes[KEY_LANE_MIRROR];
-    if (mirrorChange && mirrorChange.newValue && typeof mirrorChange.newValue === 'object') {
-      laneMirrorSnap = /** @type {Partial<import('../lib/laneMirror.js').LaneMirrorSnapshot>} */ (
-        mirrorChange.newValue
-      );
-      scheduleLaneMirrorRecommit();
+    if (mirrorChange && mirrorChange.newValue) {
+      // ★受け入れ点2/2(onChanged): 関所を必ず通す(laneMirrorContract.js の契約)。
+      const accepted = acceptLaneMirrorSnapshot(mirrorChange.newValue);
+      if (accepted) {
+        laneMirrorSnap = accepted;
+        scheduleLaneMirrorRecommit();
+      }
     }
     const storyDiagChange = changes[KEY_STORY_DIAG_MIRROR];
     if (storyDiagChange && storyDiagChange.newValue && typeof storyDiagChange.newValue === 'object') {
