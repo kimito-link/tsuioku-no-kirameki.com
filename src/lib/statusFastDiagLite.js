@@ -129,9 +129,6 @@ export function buildStatusFastDiagLite(payload) {
       : null;
   const styleReattach =
     content.styleReattach && typeof content.styleReattach === 'object' ? content.styleReattach : null;
-  // v0.1.1268: 同期トラップが捕らえた「display:none を書いた犯人」も lite へ。
-  const hostWriteTrap =
-    content.hostWriteTrap && typeof content.hostWriteTrap === 'object' ? content.hostWriteTrap : null;
   const hostHideReason =
     content.hostHideReason && typeof content.hostHideReason === 'object' ? content.hostHideReason : null;
   const hostRecoveryDiag =
@@ -183,7 +180,6 @@ export function buildStatusFastDiagLite(payload) {
       vanishForensics,
       hostAncestryTrace,
       styleReattach,
-      hostWriteTrap,
       venueSeatsDiag: venueSeatsDiagLite
     }
   };
