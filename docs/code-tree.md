@@ -630,7 +630,7 @@
     - `trumpet1.mp3`
     - `wallet1.mp3`
   - `SOURCES.md`
-- 📁 **src/** (1514)
+- 📁 **src/** (1515)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -911,7 +911,7 @@
         - `logo_funlink_white_RGB_maru_black.png`
       - `logo_guide_funlink_ol.pdf`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1283)
+  - 📁 **lib/** (1284)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -1406,6 +1406,7 @@
     - `inlineHostRecovery.wiring.test.js`
     - `inlineHostRecoveryGate.js` — パネルが「消えたまま戻らない」を防ぐ復帰ゲート(純関数)。
     - `inlineHostRecoveryGate.test.js`
+    - `inlineHostSelfHeal.wiring.test.js`
     - `inlineHostVisibilityIntent.js` — 応援パネル(inline host)を「見せる/消す」1回分の指示を組み立てる純関数。
     - `inlineHostVisibilityIntent.test.js`
     - `inlineHostVisible.wiring.test.js`
