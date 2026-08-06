@@ -26,6 +26,18 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1277',
+    date: '2026-08-06',
+    summary: 'レポート保存が途中で止まる問題を直しました',
+    items: Object.freeze([
+      'HTMLレポートの保存が「時間切れ」で失敗する問題を直しました。',
+      '原因は、レポートを作る途中の待ち合わせが、画面が裏に回ると止まってしまうことでした。',
+      'サイドパネルは他のタブを見ると裏に回るため、その間ずっと固まっていました。',
+      '今回から、裏に回っても処理が進み続けるようにしています。',
+      'レポート作成中に他のタブを見ても大丈夫です。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1276',
     date: '2026-08-06',
     summary: 'コメント送信が遅い原因を取り除きました',

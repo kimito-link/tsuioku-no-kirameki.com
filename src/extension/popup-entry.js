@@ -18048,12 +18048,13 @@ async function forceRefetchAllCommenterFollowProfiles(liveId, onStatus) {
  * @returns {Promise<void>}
  */
 function yieldToBrowserPaint() {
+  // ★v0.1.1277: rAF だけだとサイドパネルが裏に回った瞬間に凍り
+  //   html_report_build_timeout になる。setTimeout と競走させて必ず進める。
   return new Promise((resolve) => {
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        resolve(undefined);
-      });
-    });
+    let done = false;
+    const finish = () => { if (done) return; done = true; resolve(undefined); };
+    try { requestAnimationFrame(() => { requestAnimationFrame(finish); }); } catch { /* rAF無し */ }
+    setTimeout(finish, 32);
   });
 }
 

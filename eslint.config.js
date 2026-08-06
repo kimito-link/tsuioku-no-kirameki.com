@@ -237,8 +237,11 @@ export default [
     //   計器の状態・判定・整形は src/lib/laneSupplyOriginDiag.js にテスト付きで隔離=popup 側は
     //   import/state/呼び出し3箇所+origin タグ6箇所の最小フックのみ(縮小判定も lib へ寄せた)。
     //   実測22174。ラチェットは実測+50の22224へ。
+    // v0.1.1277: yieldToBrowserPaint に setTimeout の競走を足して +1行(22225)。
+    //   サイドパネルが裏に回ると rAF が凍り html_report_build_timeout になる真因の修正。
+    //   ★機能追加ではなくバグ修正での増加。実測22225 → ラチェットは実測+50の22275へ。
     files: ['src/extension/popup-entry.js'],
-    rules: { 'max-lines': ['error', { max: 22224, skipBlankLines: false, skipComments: false }] }
+    rules: { 'max-lines': ['error', { max: 22275, skipBlankLines: false, skipComments: false }] }
   },
   {
     files: ['src/extension/popup/**/*.js'],
