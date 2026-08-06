@@ -386,11 +386,6 @@ import {
 import {
   classifyVanishSnapshot, assessVanishPhase, formatVanishPhaseLine
 } from '../lib/inlineHostVanishClassifier.js';
-// ★v0.1.1268: MAIN world の同期トラップが捕らえた「display:none を書いた犯人」を集計する。
-import {
-  createHostWriteTrapState, noteHostWriteTrapArmed, noteHostWriteTrapReport,
-  snapshotHostWriteTrap, formatHostWriteTrapLine
-} from '../lib/hostWriteTrap.js';
 import { probeWatchPageDomStructure } from '../lib/probeWatchPageDomStructure.js';
 import { summarizeGiftSubAppHistoryDiag } from '../lib/summarizeGiftSubAppHistoryDiag.js';
 import { createConsoleErrorBuffer } from '../lib/consoleErrorBuffer.js';
@@ -2338,20 +2333,6 @@ window.addEventListener('message', (e) => {
   const expectedToken = readNlsPageToken();
   if (!isNlsInterceptTokenValid(e, expectedToken)) return;
 
-  /*
-   * ★v0.1.1268: MAIN world の同期トラップからの報告。
-   *   armed(装着結果)と捕獲レポートの2種類が同じ type で来る。
-   *   ★armed は「0回」と「未計測」を区別するために必須(0の意味を三分岐にする)。
-   */
-  if (e.data.type === 'NLS_HOST_WRITE_TRAP') {
-    if (typeof e.data.armed === 'boolean') {
-      noteHostWriteTrapArmed(_hostWriteTrap, e.data.armed, e.data.armReason);
-    } else {
-      noteHostWriteTrapReport(_hostWriteTrap, e.data);
-    }
-    return;
-  }
-
   if (e.data.type === 'NLS_INTERCEPT_SCHEDULE') {
     const b = e.data.begin;
     if (typeof b === 'string' && b.length >= 10) {
@@ -2878,8 +2859,6 @@ const _hostAncestryTrace = { entries: [], total: 0, reattachCount: 0 };
 let _pageFrameStyleReattachCount = 0;
 /** 直近の 4秒 poll tick 時刻。消失との位相差 Δ を出すために使う。 */
 let _lastLivePollTickAt = 0;
-/** ★v0.1.1268: MAIN world の同期トラップの集計。犯人を名指しするための計器。 */
-const _hostWriteTrap = createHostWriteTrapState();
 /** トラップを arm 済みの host。差し替わったら1回だけ再 arm する(ポインタ比較のみ)。 */
 let _hwtArmedHost = null;
 
@@ -7357,13 +7336,6 @@ function buildAiShareFastDiagnosticsPayload() {
         count: _pageFrameStyleReattachCount,
         line: `styleReattach: ${_pageFrameStyleReattachCount}回(拡張の<style>を貼り直した回数)`
       },
-      hostWriteTrap: (() => {
-        // ★v0.1.1268: 犯人の名指し。自拡張 origin を渡して「自分/外部」を分類させる。
-        let own = '';
-        try { own = chrome.runtime.getURL(''); } catch { own = ''; }
-        const snap = snapshotHostWriteTrap(_hostWriteTrap, own);
-        return snap ? { ...snap, line: formatHostWriteTrapLine(snap) } : null;
-      })(),
       hostStyleTrace: (() => {
         const snap = snapshotHostStyleMutationTrace(_hostStyleTrace);
         return snap ? { ...snap, line: formatHostStyleMutationLine(snap) } : null;
@@ -10097,13 +10069,6 @@ function buildAiSharePageDiagnostics() {
         count: _pageFrameStyleReattachCount,
         line: `styleReattach: ${_pageFrameStyleReattachCount}回(拡張の<style>を貼り直した回数)`
       },
-      hostWriteTrap: (() => {
-        // ★v0.1.1268: 犯人の名指し。自拡張 origin を渡して「自分/外部」を分類させる。
-        let own = '';
-        try { own = chrome.runtime.getURL(''); } catch { own = ''; }
-        const snap = snapshotHostWriteTrap(_hostWriteTrap, own);
-        return snap ? { ...snap, line: formatHostWriteTrapLine(snap) } : null;
-      })(),
       hostStyleTrace: (() => {
         const snap = snapshotHostStyleMutationTrace(_hostStyleTrace);
         return snap ? { ...snap, line: formatHostStyleMutationLine(snap) } : null;
