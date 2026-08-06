@@ -2859,34 +2859,13 @@ const _hostAncestryTrace = { entries: [], total: 0, reattachCount: 0 };
 let _pageFrameStyleReattachCount = 0;
 /** 直近の 4秒 poll tick 時刻。消失との位相差 Δ を出すために使う。 */
 let _lastLivePollTickAt = 0;
-/** トラップを arm 済みの host。差し替わったら1回だけ再 arm する(ポインタ比較のみ)。 */
-let _hwtArmedHost = null;
-
-/**
- * MAIN world のトラップに「この host を見張れ」と伝える。
- * ★content script(isolated world)からは style の書き込みを捕まえられないため、
- *   トラップ本体は page-intercept-entry.js(world:MAIN)に居る。
- *   CustomEvent は world を跨いで届くので、これが唯一の伝達手段。
- */
-function armHostWriteTrap() {
-  try { window.dispatchEvent(new CustomEvent('nls:hwt-arm')); }
-  catch { /* 計器の失敗で描画を止めない */ }
-}
-
 /*
- * ★v0.1.1272: 「こちらは聞ける状態になった」と MAIN world に伝える。
- *
- *   真因(chrome-devtools MCP で実測して確定): manifest の run_at が
- *     MAIN(page-intercept) = document_start / ISOLATED(content) = document_idle
- *   なので、報告を送る側が【聞く側より先に】走る。postMessage は投げっぱなしなので
- *   リスナー登録前の報告は永久に失われる。実測では
- *   「トラップは装着済み(accessor)なのに armed:null」という形で現れていた。
- *   → 起動を知らせて、保持してある最新の状態を送り直してもらう。
+ * ★v0.1.1278: MAIN world 書き込みトラップ(hwt)の送信口を撤去した。
+ *   受信側(page-intercept 側の 'nls:hwt-arm' / 'nls:hwt-hello' リスナー)は
+ *   v0.1.1276 で既に撤去済みで、送信だけが残っていた=誰も聴かない CustomEvent を
+ *   host 差し替えのたびに dispatch し続ける死コードだった。
+ *   点滅は Side Panel 移行(v0.1.1275)で解決済みのため、トラップ自体が不要。
  */
-function helloHostWriteTrap() {
-  try { window.dispatchEvent(new CustomEvent('nls:hwt-hello')); }
-  catch { /* 計器の失敗で描画を止めない */ }
-}
 
 /**
  * ★v0.1.1261: host の style/class 変化を MutationObserver で見張る。
@@ -3043,12 +3022,6 @@ function startHostVisibilityWatch() {
         if (host !== _hostTraceHost || host.parentElement !== _hostTraceParent) {
           ensureHostAncestryMutationTrace(host);
         }
-        // ★v0.1.1268: host が差し替わったら MAIN world のトラップも張り直させる。
-        //   追加コストはポインタ比較1個(v0.1.1201 の「paint毎のDOM走査」を繰り返さない)。
-        if (host !== _hwtArmedHost) {
-          _hwtArmedHost = host;
-          armHostWriteTrap();
-        }
         const r = host.getBoundingClientRect();
         let cs = null;
         // computed は「消えた瞬間だけ」読みたいが、前フレームとの比較が要るので
@@ -3178,16 +3151,13 @@ function noteInlineHostHideReason(reason) {
  *   実測で「表示中なのに autoshow_off で消される」が 0.4秒周期で起きていたため、
  *   これを最後の砦として使う。★一度 true になったら false に戻さない。
  */
-/**
- * ★v0.1.1263: 二分実験フラグ(一時的)。
- *   true = autoshow_off で【消さない】(判定の記録だけ残す)。
- *   ちらつきが止まるか否かで、このゲートが犯人かを1回で判定するための実験。
- *   ★判定できたら必ず false に戻し、正しい条件を実装すること(Phase 3)。
+/*
+ * ★v0.1.1278: v0.1.1263 の二分実験フラグを撤去した。
+ *   実験は 2026-08-05 に終了し、実測で autoshow_off は【無罪】と確定して恒久 false。
+ *   以降の実効条件は !_inlineHostEverShown だけ = フラグは死んだ分岐だった。
+ *   点滅自体は Side Panel 移行(v0.1.1275)で解決済み。
+ *   ★残す挙動は v0.1.1274 の everShown ガード(下の分岐)。実験ではなく実挙動。
  */
-// ★実験は終了(2026-08-05)。実測で【無罪】と確定したため false に戻す:
-//   実験中(消さないようにした)にも消失6回。犯人は autoshow_off ではなかった。
-//   真犯人は host_created(パネルが同じ1ミリ秒に3個作られていた)。
-const INLINE_AUTOSHOW_HIDE_EXPERIMENT = false;
 
 let _inlineHostEverShown = false;
 
@@ -4303,8 +4273,6 @@ function ensureInlinePopupHost() {
   setInlineHostDisplay(host, 'none', 'host_created');
   // ★v0.1.1261: この host の style 書き換えを経路を問わず見張る(idempotent)。
   ensureHostAncestryMutationTrace(host);
-  // ★v0.1.1268: 生成直後に MAIN world のトラップも張らせる(rAF の追従を待たない)。
-  armHostWriteTrap();
   host.style.pointerEvents = 'auto';
   host.style.width = '100%';
 
@@ -7916,28 +7884,6 @@ function renderPageFrameOverlay() {
     }).hide
   ) {
     /*
-     * ★★★ v0.1.1263 二分実験(一時的・必ず畳む) ★★★
-     *
-     * 会議(4体・全員一致)の裁定:
-     *   「犯人の場所は既に確定している(autoshow_off の出所は本行の1箇所のみ)。
-     *     これ以上の特定作業は不要。特定より先に【止まるか否か】を確かめよ」
-     *
-     * 実測で犯人はこのゲートに絞れている:
-     *   消失4回 と「消した」記録4回が【完全に1対1】
-     *   4.0秒ちょうどの周期・変動係数 0.002
-     *
-     * ★MutationObserver で犯人を特定する案(v0.1.1261)は【原理的に不可能】と確定した。
-     *   コールバックはマイクロタスクで非同期配信され、書き換え元は既にスタックから
-     *   消えている(MDN)。Error().stack を採っても Observer の内部フレームしか出ない。
-     *
-     * → よってここでは【消す実行だけを止め、判定は記録する】。
-     *   止まれば犯人確定。止まらなければこのゲートは無罪でこの線を捨てる。
-     *
-     * ⚠副作用: 「こん太を押す前でもパネルが出る」可能性がある。
-     *   判定できたら Phase 3 で必ず正しい形へ戻すこと。
-     */
-    noteInlineHostHideReason('autoshow_off_experiment_skipped');
-    /*
      * ★v0.1.1274: 一度でも表示したら、この経路では【二度と消さない】。
      *
      *   実測(2026-08-06・ユーザー速報):
@@ -7957,7 +7903,7 @@ function renderPageFrameOverlay() {
      *   ★「こん太を押すまで出さない」は初回(まだ一度も出していない)だけの話なので、
      *     everShown が false の間は従来どおり消える=既定動作は壊れない。
      */
-    if (!INLINE_AUTOSHOW_HIDE_EXPERIMENT && !_inlineHostEverShown) {
+    if (!_inlineHostEverShown) {
       hidePageFrameOverlay('autoshow_off');
       /*
        * try/finally に入らないため、ここでも監視ルートを取り直す。
@@ -7966,7 +7912,7 @@ function renderPageFrameOverlay() {
       maybeReconnectCommentMutationObserverAfterInlineLayout();
       return;
     }
-    // 実験中はここを素通りし、通常の描画へ進む(=消さない)。
+    // 一度でも表示済みならここを素通りし、通常の描画へ進む(=消さない)。
   }
 
   // autoshow ON のときは「次回だけ表示」にし、1 回表示したら OFF に戻す。
@@ -14361,9 +14307,6 @@ async function start() {
    *   ★既定は表示(従来どおり)。OFF にした人だけ出さない。
    *   ★設定の読み取りに失敗したら【出す】側に倒す(機能が黙って消えるのを避ける)。
    */
-  // ★v0.1.1272: message リスナーは登録済みなので、MAIN world に「聞ける」と伝える。
-  //   これが無いと document_start 側が送った報告を永久に取りこぼす(実測で確定した真因)。
-  helloHostWriteTrap();
   if (isWatchInlinePanelTopFrame() && (await readVenueButtonVisible())) {
     _venueApi = mountVenueBarButton();
   }
