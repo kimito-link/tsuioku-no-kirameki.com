@@ -6,37 +6,45 @@
     <title>君斗りんくの追憶のきらめき — サイドパネル</title>
     <style>
       /*
-       * ★v0.1.1279: シェル(このファイル)に背景を持たせる。
-       *   旧実装は背景も color-scheme も未指定だったため、iframe(popup.html)の描画が
-       *   始まる前と、iframe が埋めない余白が【真っ黒】に抜けていた(ユーザー報告・実機)。
-       *   popup.html は `color-scheme: light dark` を宣言しており OS 追従で暗くなるが、
-       *   シェルはその宣言を持たないので「黒」ではなく「色が無い」状態だった。
-       *   → popup.html と同じ既定色(--nl-bg / --nl-bg-soft)をシェルにも置いて揃える。
+       * ★v0.1.1283: サイドパネルが真っ黒になるのを直す(v0.1.1279 の修正は効いていなかった)。
+       *
+       * 真犯人は popup.html の cloak ルール:
+       *   popup.html:2 の <html> に data-nl-popup-primary-cloak="1" が【静的に】書かれており、
+       *   popup.html:1561-1563 が html/body を `background: transparent !important` にする。
+       *   = JS が走る前から背景がゼロ。解除は revealPopupPrimaryOnce()(JS)のみで、
+       *   CSS フェイルセーフ(popup.html:1543)は opacity しか戻さず transparent は解除しない。
+       *   ★あのルールのコメント自身が「親ホストの暗い背景を透かして」と書いているとおり、
+       *     あれは【埋め込み】向けの規則で、サイドパネルには合わない。
+       * そこへ v0.1.1279 が iframe にも transparent を足し、html・body・iframe の
+       * 3層すべてが透明 = 何も塗らない → Chrome のキャンバス地(暗色)が出て【黒】になった。
+       *
+       * ★フェイルセーフの向きを反転させるのが本質:
+       *   旧「既定=透明 / JSが解除」→ JSが遅れると【黒】
+       *   新「既定=不透明 / 必要なときだけ透明」→ JSが失敗しても【クリーム色】
        */
       html,
       body {
         margin: 0;
         height: 100%;
         overflow: hidden;
-        /* iframe 内(popup.html)と同じ配色方針。フォームや scrollbar も OS 追従にする。 */
-        color-scheme: light dark;
+        /* ★light 固定。このアプリに実質ダークモードは無い(popup-entry.js:1069-1070 が
+           nl-skin-panel-dark を無条件 remove する=v0.1.51「完全に light 強制」)。
+           `light dark` だと Chrome のキャンバス既定色が暗色になり、最後の砦が黒くなる。 */
+        color-scheme: light;
         /* popup.html の :root と同値(ライト既定)。 */
         background: linear-gradient(160deg, #fffaf2, #eef8ff);
       }
-      @media (prefers-color-scheme: dark) {
-        html,
-        body {
-          /* popup.html のダーク既定と同値。真っ黒(#000)にはしない。 */
-          background: linear-gradient(160deg, #0b1220, #111827);
-        }
-      }
+      /* ★ダーク時の上書きは置かない(v0.1.1279 の濃紺 #0b1220 が事実上の黒だった)。
+         アプリは常時ライトなので、OS がダークでもここはクリーム色のままが正しい。 */
       iframe {
         display: block;
         width: 100%;
         height: 100%;
         border: 0;
-        /* 読み込み中も背景が透けて黒くならないよう、iframe 自身にも同じ既定を敷く。 */
-        background: transparent;
+        /* ★不透明で塗る(v0.1.1279 の transparent を撤回)。iframe 自身が最後の砦になる。
+           #fffaf2 は popup.html:18 の --nl-bg と同値。★別文書なので CSS 変数を共有できない
+           = 変更するときは popup.html:18 と【両方】直すこと。 */
+        background: #fffaf2;
       }
     </style>
   </head>
