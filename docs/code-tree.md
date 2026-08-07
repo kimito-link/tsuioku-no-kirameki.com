@@ -631,7 +631,7 @@
     - `trumpet1.mp3`
     - `wallet1.mp3`
   - `SOURCES.md`
-- 📁 **src/** (1521)
+- 📁 **src/** (1523)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -912,7 +912,7 @@
         - `logo_funlink_white_RGB_maru_black.png`
       - `logo_guide_funlink_ol.pdf`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1290)
+  - 📁 **lib/** (1292)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -1479,7 +1479,9 @@
     - `laneRosterDelta.test.js`
     - `laneRosterKeeper.js` — 応援レーンの「名簿キーパー」(v0.1.1232・Phase 2 蓄積器)。
     - `laneRosterKeeper.test.js`
+    - `laneSceneEnvelope.fingerprint.test.js`
     - `laneSceneEnvelope.js` — LaneScene一致証明の封筒(純関数)。lanescene-structural-review-DESIGN.md のMVP実装。
+    - `laneSceneEnvelope.receipts.test.js`
     - `laneSceneEnvelope.test.js`
     - `laneShrinkGuardWiring.test.js`
     - `laneSupplyFailClosed.wiring.test.js`
