@@ -17,6 +17,43 @@
  * ★このモジュールが担わないこと
  *   - 鏡の生成(laneMirror.js)・書き出し(mirrorBundleFlushScheduler.js)・描画(各entry)
  *   - DOM/chrome API への依存(純関数のみ=テストしやすさを保つ)
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * ★domSelf の指紋契約(venue-exact-parity-SPEC-2026-08-07 §3-2/§6・v0.1.1284)
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ *   snapshot.domSelf は【①が実際に描いた DOM の要約】であり、次の3フィールドを運ぶ:
+ *
+ *     fingerprint     … ①の可視タイル列の userKey を段別に並べた指紋(laneDomFingerprint)。
+ *                        鍵は共有renderer が刻む `dataset.userKey = venueLaneParityKey(p)`
+ *                        (renderStoryUserLaneDom.js)なので、①実DOM・会場実DOM・鏡キー列の
+ *                        3起点が【同じアルファベット】で読める。
+ *     fingerprintFor  … その指紋が「どの内容」を測ったかの【内容アドレス】= publish 直前の
+ *                        snapshot.contentHash。会場は `fingerprintFor === snap.contentHash` の
+ *                        ときだけ指紋を硬く比較し、それ以外は ⚪(指紋未計測)へ逃がす。
+ *                        ★時計(measuredAt)では判定しない: sig一致で描画をスキップしている間は
+ *                          DOM が不変=指紋は「古くて正しい」ので、時計で切ると正しい値を捨て、
+ *                          切らないと嘘を通す。内容アドレスならどちらの誤りも起きない。
+ *     measuredAt      … 診断表示専用(会場の line に「①DOM齢Ns」)。verdict には影響させない。
+ *
+ *   ★keys(キー列そのもの)は snapshot に載せない。hash だけを運ぶ
+ *     (500人分 ~12KB/publish は 512KB フェイルセーフの守備範囲外・census の
+ *      「keys は storage へ出さない」既定=venueDomCensus.js:20 にも逆行する)。
+ *     「誰が欠けたか」の名指しは既存の parity 層(欠/余サンプル)の縄張りで、
+ *     指紋は【一致の証明】に徹する。
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * ★「会場=①完全一致」の読み方(状態速報の2行を AND で読む)
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ *   「会場一致 ✅」(venueLaneParity.js) ∧ 「scene … 指紋①=会場 ✅」(laneSceneEnvelope.js)
+ *   が【同時に立って初めて】完全一致。どちらか一方の緑は完全一致を意味しない。
+ *     - 会場一致行 = 鏡データ ⇄ 会場の段割当 ⇄ 会場実DOM の突合(件数・寸法・重複)
+ *     - scene 行   = ①実DOM ⇄ 会場実DOM の【顔ぶれ列】突合(世代・内容・指紋の3層)
+ *
+ *   ★関所が①の契約違反セルを落とした場合、scene 行は contentHash 差で 🔴 になる
+ *     (①が焼いた hash は落とす【前】の値のため)。これは嘘の赤ではなく
+ *     【書き手(①)の契約違反の名指し】である。同時に出る `鏡除外N` がその件数。
  */
 
 import { isAnonymousStyleNicoUserId } from '../domain/user/identity.js';

@@ -11,7 +11,10 @@
  * @typedef {{ visible: number, tileW: number, tileH: number }} LaneMirrorDomTier
  * @typedef {{ measured: boolean,
  *   perTier: { link: LaneMirrorDomTier, gift: LaneMirrorDomTier, ad: LaneMirrorDomTier, konta: LaneMirrorDomTier, tanu: LaneMirrorDomTier },
- *   dpr: number }} LaneMirrorDomSelf
+ *   dpr: number,
+ *   measuredAt: number,
+ *   fingerprint: string,
+ *   fingerprintFor: string }} LaneMirrorDomSelf
  * @typedef {{
  *   liveId: string,
  *   capturedAt: number,
@@ -51,7 +54,16 @@ function nonNegativeMetric(value, integer = false) {
   return integer ? Math.floor(n) : Math.round(n * 100) / 100;
 }
 
-/** @param {unknown} input @returns {LaneMirrorDomSelf} */
+/**
+ * ★venue-exact-parity-SPEC-2026-08-07 §3-2/M4: この関数は【個別列挙で作り直す】型なので、
+ *   新しいフィールドを足しても明示的に引き継がない限り黙って落ちる
+ *   ([[venue-mirror-is-the-primary-path-2026-08-01]]の再発類型・v0.1.1280 と同じ穴)。
+ *   measuredAt / fingerprint / fingerprintFor は会場の一致判定が読む=必ず保存する。
+ *   ★perTier の `keys` は【保存しない】。指紋(hash)だけを運ぶ設計
+ *   (500人分のキー列 ~12KB を publish 毎に載せると 512KB フェイルセーフの守備範囲外で
+ *    容量が膨らむ・census の「keys は storage へ出さない」既定=venueDomCensus.js:20 にも逆行)。
+ * @param {unknown} input @returns {LaneMirrorDomSelf}
+ */
 function normalizeDomSelf(input) {
   const source = /** @type {any} */ (input && typeof input === 'object' ? input : {});
   const sourceTiers = source.perTier && typeof source.perTier === 'object' ? source.perTier : {};
@@ -69,7 +81,14 @@ function normalizeDomSelf(input) {
   return {
     measured: source.measured === true,
     perTier: /** @type {LaneMirrorDomSelf['perTier']} */ (perTier),
-    dpr: Number.isFinite(rawDpr) && rawDpr > 0 ? Math.round(rawDpr * 1000) / 1000 : 1
+    dpr: Number.isFinite(rawDpr) && rawDpr > 0 ? Math.round(rawDpr * 1000) / 1000 : 1,
+    // 診断表示専用(会場の line に「①DOM齢Ns」として出す)。verdict には影響させない。
+    measuredAt: nonNegativeMetric(source.measuredAt, true),
+    // ①実DOMのキー列指紋。会場実DOMの指紋と突き合わせる(比較の両辺が別ドキュメント起点)。
+    fingerprint: String(source.fingerprint || ''),
+    // ★この指紋が「どの内容」を測ったかの内容アドレス。会場は
+    //   fingerprintFor === snap.contentHash のときだけ指紋を硬く比較する(§6・時計を使わない)。
+    fingerprintFor: String(source.fingerprintFor || '')
   };
 }
 

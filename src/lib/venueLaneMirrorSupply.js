@@ -160,6 +160,22 @@ export function composeVenueLaneBuckets(input) {
 
 /**
  * visibleSeats(席エントリ)から uid→seatIndex の索引を作る。
+ *
+ * ★join の契約(venue-exact-parity-SPEC-2026-08-07 §5-2・成文化 v0.1.1284):
+ *   【鏡セルが席を得る条件は uid 一致のみ】。uid が無い/名前でしか同定できないセルは
+ *   席と結びつかず `_venueSeatIndex = -1` の生タイルとして段に直接出る=これは【正常】。
+ *   その件数は会場の診断1行に `席なしN` として出る(黙って消えるわけではない)。
+ *
+ * ★なぜ uid だけなのか(席資格 venueParticipantKey は uid→名前の2段なのに、ここは非対称):
+ *   照合鍵のアルファベットが3種あるため。席の第2鍵は `n:${roster生name}`、パリティ鍵の
+ *   第2鍵は `c:${idLine}|${title}`、鏡セルの title は表示名(enrich後)。名前正規化の差で
+ *   【別人ラップ】(席の乗っ取り)が起きると、「同じ人=同じ席」の安定契約(venueSeats.js:25)が
+ *   壊れ、席の顔が入れ替わるちらつきとして現れる。
+ *   ★席は会場独自の【装飾レイヤ】で①に対応物が無く、完全一致の判定対象は段タイルのみ。
+ *     装飾のために顔ぶれの安定を賭けるのは割に合わない。
+ *   → name-join への拡張は identity 一元化([[user-identity-unification-design-2026-07-17]])の
+ *     縄張りとして Phase 3 で裁定する。ここで場当たりに広げないこと。
+ *
  * @param {ReadonlyArray<{ seatIndex?: unknown, participant?: { userId?: unknown } }>} visibleSeats
  * @returns {Map<string, number>}
  */

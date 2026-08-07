@@ -406,11 +406,23 @@ export function buildVenueLaneParity(input) {
       ` / DOM=データ${domGhost > 0 ? `(幽${domGhost})` : ''}` +
       (domDupTotal > 0 || domStrays > 0 ? ` / 重複${domDupTotal} 迷子${domStrays}` : '');
   }
-  const popDomStr = !popDomMeasured
-    ? ' / ①DOM未計測'
-    : popDomMismatchParts.length > 0
-      ? ` / ①DOM≠鏡 ${popDomMismatchParts.join(' ')}`
-      : ' / ①DOM=鏡';
+  /*
+   * ★venue-exact-parity-SPEC-2026-08-07 §6-2: ①DOM計測の「齢」を表示だけする(verdict不変)。
+   *   sig一致で描画をスキップしている間は DOM が不変=寸法も不変なので、古い domSelf は
+   *   【古くて正しい】。だから時計で切り捨ててはいけない(切ると正しい値を捨てる)。
+   *   一方で「①が長時間描いていない」事実は読み手が知りたい情報なので、SOFT 超のときだけ併記する。
+   *   ★顔ぶれ(指紋)の鮮度は時計でなく内容アドレス(domSelf.fingerprintFor)で判定する=scene 行の縄張り。
+   */
+  const popDomMeasuredAt = popDomMeasured ? Math.max(0, Number(popDomIn.measuredAt) || 0) : 0;
+  const popDomAgeMs = popDomMeasuredAt > 0 && capturedAt > 0 ? capturedAt - popDomMeasuredAt : -1;
+  const popDomAgeStr =
+    popDomAgeMs > VENUE_LANE_MIRROR_SOFT_WINDOW_MS ? ` / ①DOM齢${Math.round(popDomAgeMs / 1000)}s` : '';
+  const popDomStr =
+    (!popDomMeasured
+      ? ' / ①DOM未計測'
+      : popDomMismatchParts.length > 0
+        ? ` / ①DOM≠鏡 ${popDomMismatchParts.join(' ')}`
+        : ' / ①DOM=鏡') + popDomAgeStr;
   let geometryStr = '';
   if (popDomMeasured && domMeasured) {
     if (geometryMismatchParts.length > 0) {

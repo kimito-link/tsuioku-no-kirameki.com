@@ -13,7 +13,10 @@ import { fileURLToPath } from 'node:url';
  *   ため、ソース文字列スキャンで配線の実在を断言する(liveviewMirrorSections.wiring.test.js と同型)。
  */
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
-const read = (rel) => readFileSync(path.join(repoRoot, rel), 'utf8');
+// ★CRLF 正規化(Windows チェックアウト)。アンカー付き regex は改行を跨ぐので、
+//   正規化しないと「アンカーを固めたのに素通り/常に赤」になる
+//   ([[wiring-test-mutation-check-2026-08-01]] の罠)。
+const read = (rel) => readFileSync(path.join(repoRoot, rel), 'utf8').replace(/\r\n/g, '\n');
 
 const venueBarSrc = read('src/extension/venueBar.js');
 const aiShareSrc = read('src/lib/aiShareFullText.js');
@@ -232,7 +235,10 @@ describe('会場=①レーン鏡映の配線(配線忘れ=CI赤)', () => {
     expect(paintAt).toBeGreaterThanOrEqual(0);
     expect(measureAt).toBeGreaterThan(paintAt);
     // ★実測値は必ず控える（次回の publish がこれを同梱する）。
-    expect(popupSrc).toMatch(/_laneDomSelfLast = laneDomSelf;/);
+    //   v0.1.1284: 寸法(...laneDomSelf の spread)に加えて指紋3フィールドを足す形になった。
+    //   ★spread であること自体を断言する=個別列挙で作り直して寸法を落とす退行を止める
+    //   ([[venue-mirror-is-the-primary-path-2026-08-01]] の再発類型)。
+    expect(popupSrc).toMatch(/_laneDomSelfLast = \{\n\s*\.\.\.laneDomSelf,/);
     // ★publish は控えた実測値を渡す（幾何の突合が壊れないことの担保）。
     const publishAt = popupSrc.indexOf('publishLaneMirror({');
     expect(publishAt).toBeGreaterThan(-1);
@@ -262,17 +268,84 @@ describe('会場=①レーン鏡映の配線(配線忘れ=CI赤)', () => {
     expect(laneMirrorSrc).toMatch(/contentHash:\s*laneSceneContentHash\(/);
   });
 
-  it('venueBar が鏡世代(SceneEnvelope)と会場paint結果を突合し、sceneReceipt として渡している', () => {
+  /*
+   * ★v0.1.1284(venue-exact-parity-SPEC-2026-08-07 §14-2): 受領証の組み立てを純関数
+   *   buildVenueSceneReceipts へ移したので、旧テスト(buildSceneEnvelope の呼び出しの形を
+   *   丸ごと正規表現で固定していた)は【正しいリファクタなのに赤】になった。
+   *   これは [[wiring-test-must-assert-counts-2026-08-04]] が警告する
+   *   「テストが正しいリファクタで赤になったら書き方を固定していないか疑う」の実例なので、
+   *   実装を戻すのではなくテストを新しい配線へ書き換える。
+   *   ★書き換え後、変異(`if (false)` 前置・自己代入への差し戻し)で赤を確認済み。
+   */
+  it('venueBar が受領証を純関数(buildVenueSceneReceipts)で組み、sceneReceipt として渡している', () => {
     expect(venueBarSrc).toMatch(
-      /import\s*\{\s*buildSceneEnvelope,\s*buildRenderReceipt,\s*compareRenderReceipts\s*\}\s*from\s*'\.\.\/lib\/laneSceneEnvelope\.js'/
+      /import\s*\{\s*laneDomFingerprint,\s*buildVenueSceneReceipts,\s*compareRenderReceipts\s*\}\s*from\s*'\.\.\/lib\/laneSceneEnvelope\.js'/
     );
-    // 会場一致gift/ad根治(2026-07-14 Patch 2a): ①Receiptのhashは復元正準形(restoreLaneMirrorBuckets
-    //   適用後)で取る。snapshot生値のまま署名するとスリムセル(displaySrc空+uid有り)が鏡に載る
-    //   ようになった(laneMirror.js toMirrorCell Patch1)ことで①=会場のhashが恒常的に不一致になるため。
-    expect(venueBarSrc).toMatch(/buildSceneEnvelope\(\{\s*capturedAt:\s*lanePaintSnap\.capturedAt,\s*\.\.\.restoreLaneMirrorBuckets\(lanePaintSnap\)\s*\}\)/);
-    expect(venueBarSrc).toMatch(/buildSceneEnvelope\(\/\*\* @type \{any\} \*\/ \(laneBuckets\)\)/);
-    expect(venueBarSrc).toMatch(/sceneReceiptDiag = compareRenderReceipts\(/);
+    // ★数で断言する(存在の断言だと片方だけ壊す変異を通す)。定義は lib 側なので venueBar では
+    //   呼び出し1箇所のみが正しい。
+    const calls = venueBarSrc.match(/buildVenueSceneReceipts\(/g) || [];
+    expect(calls.length).toBe(1);
+    // ★4つの入力が【別々の起点】から渡っていることを、アンカー付きで1つの塊として固定する。
+    //   acceptedSnap(最新受理) と paintedSnap(実際に描いた鏡)が同じ変数に化けたら赤。
+    expect(venueBarSrc).toMatch(
+      /const sceneReceipts = buildVenueSceneReceipts\(\{\n\s*acceptedSnap: laneMirrorSnap,\n\s*paintedSnap: lanePaintSnap,\n\s*paintedBuckets: laneBuckets,\n\s*venueDomFingerprint: _venueDomFingerprintLast\n\s*\}\);/
+    );
+    // ★無条件文であること(`if (false)` 等の前置で死んでいないこと)を前後アンカーで固定する。
+    expect(venueBarSrc).toMatch(
+      /\}\);\n\s*sceneReceiptDiag = sceneReceipts\n\s*\? compareRenderReceipts\(sceneReceipts\.popReceipt, sceneReceipts\.venueReceipt\)\n\s*: null;/
+    );
     expect(venueBarSrc).toMatch(/sceneReceipt:\s*sceneReceiptDiag/);
+  });
+
+  it('★旧インライン組み立て(C1自己代入)の残骸が存在しない', () => {
+    // venueReceipt の revision に pop 側の値を渡す形=比較が恒真になる書き方。
+    expect(venueBarSrc).not.toMatch(/surface:\s*'venue',\s*\n\s*revision:\s*popEnvelope\.revision/);
+    // 受領証の直接組み立て自体が venueBar から消えていること(純関数に一本化)。
+    expect(venueBarSrc).not.toMatch(/buildRenderReceipt\(/);
+    expect(venueBarSrc).not.toMatch(/buildSceneEnvelope\(/);
+  });
+
+  it('★会場実DOMの指紋を census の生値(summarize前)から採っている', () => {
+    // summarize(venueDomCensusToParityDom)は keys 列を落とすので、生値を1変数受けしてから渡す。
+    expect(venueBarSrc).toMatch(/const rawCensus = collectVenueLaneDomCensus\(\{/);
+    expect(venueBarSrc).toMatch(
+      /_venueDomFingerprintLast = laneDomFingerprint\(\{\n\s*link: rawCensus\.perSection\?\.link\?\.keys,/
+    );
+    expect(venueBarSrc).toMatch(/domSummary = venueDomCensusToParityDom\(rawCensus\);/);
+    // census 失敗時は指紋も捨てる(古い指紋で✅を名乗らない=fail-closed)。
+    expect(venueBarSrc).toMatch(/domSummary = null;\n\s*\/\/[^\n]*\n\s*_venueDomFingerprintLast = '';/);
+  });
+
+  it('★①側が実DOMのキー列指紋を鏡へ同梱している(popup-entry)', () => {
+    expect(popupSrc).toMatch(
+      /import\s*\{\s*measureLaneDomSelf,\s*perTierKeysOf\s*\}\s*from\s*'\.\.\/lib\/laneDomSelfMeasure\.js'/
+    );
+    // paint 直後の控えに指紋と内容アドレスが載ること(アンカーは代入の塊ごと固定)。
+    expect(popupSrc).toMatch(
+      /_laneDomSelfLast = \{\n\s*\.\.\.laneDomSelf,\n[\s\S]{0,400}?fingerprint: laneDomFingerprint\(perTierKeysOf\(laneDomSelf\)\),\n\s*fingerprintFor: _lastPublishedLaneMirrorHash\n\s*\};/
+    );
+    // publish が「この publish の内容アドレス」を控えること(無条件文であることまで固定)。
+    expect(popupSrc).toMatch(
+      /_lastPublishedLaneMirrorHash = String\(snap\?\.contentHash \|\| ''\);\n\s*mergeAndScheduleFlush\('lane',/
+    );
+    // ★リサイズ時は控えを捨てる(内容アドレスで検出できない唯一の経路=§6-3)。
+    expect(popupSrc).toMatch(/window\.addEventListener\('resize', \(\) => \{\n\s*_laneDomSelfLast = null;\n\s*\}\);/);
+  });
+
+  it('★鏡の normalizeDomSelf が指紋3フィールドを保存する(個別列挙で落とさない)', () => {
+    expect(laneMirrorSrc).toMatch(/measuredAt: nonNegativeMetric\(source\.measuredAt, true\)/);
+    expect(laneMirrorSrc).toMatch(/fingerprint: String\(source\.fingerprint \|\| ''\)/);
+    expect(laneMirrorSrc).toMatch(/fingerprintFor: String\(source\.fingerprintFor \|\| ''\)/);
+  });
+
+  it('★席なし件数(unseated)が既存の1行に併記され diag にも載る', () => {
+    // 既存ループの分岐で数える(新規ループを作らない)。
+    expect(venueBarSrc).toMatch(/if \(!Number\.isInteger\(seatIndexRaw\) \|\| seatIndexRaw < 0\) \{ unseatedThisPaint \+= 1; continue; \}/);
+    expect(venueBarSrc).toMatch(/_venueUnseatedCount = unseatedThisPaint;/);
+    // ★状態速報へ届く経路=laneParity.line への併記(aiShareFullText が出すのは line だけ)。
+    expect(venueBarSrc).toMatch(/line: `\$\{laneParityDiag\.line\} \/ 席なし\$\{_venueUnseatedCount\}`/);
+    expect(venueBarSrc).toMatch(/unseated: _venueUnseatedCount/);
+    expect(seatsDiagSrc).toMatch(/unseated: Math\.max\(0, Math\.floor\(num\(d\.unseated, 0\)\)\)/);
   });
 
   it('venueSeatsDiag が sceneReceipt を検証済みの軽量形(match/line)だけ通す', () => {
@@ -284,11 +357,35 @@ describe('会場=①レーン鏡映の配線(配線忘れ=CI赤)', () => {
     expect(aiShareSrc).toMatch(/venueSeatsDiag\)\?\.sceneReceipt\?\.line/);
   });
 
-  it('laneSceneEnvelope.js に4つの純関数が実在する', () => {
+  it('laneSceneEnvelope.js に純関数が実在する(v0.1.1284で指紋2関数を追加)', () => {
     expect(laneSceneEnvelopeSrc).toMatch(/export function laneSceneContentHash\(/);
     expect(laneSceneEnvelopeSrc).toMatch(/export function buildSceneEnvelope\(/);
     expect(laneSceneEnvelopeSrc).toMatch(/export function buildRenderReceipt\(/);
     expect(laneSceneEnvelopeSrc).toMatch(/export function compareRenderReceipts\(/);
+    expect(laneSceneEnvelopeSrc).toMatch(/export function laneDomFingerprint\(/);
+    expect(laneSceneEnvelopeSrc).toMatch(/export function buildVenueSceneReceipts\(/);
+  });
+
+  it('★compareRenderReceipts が指紋分岐を持つ(指紋差=🔴 / 片方空=⚪ match:false)', () => {
+    // 「DOMを写さない✅」を構造的に出せなくする分岐。無条件文であることを前後アンカーで固定する。
+    expect(laneSceneEnvelopeSrc).toMatch(
+      /const popFp = String\(popReceipt\.domFingerprint \|\| ''\);\n\s*const venueFp = String\(venueReceipt\.domFingerprint \|\| ''\);\n\s*if \(!popFp \|\| !venueFp\) \{/
+    );
+    expect(laneSceneEnvelopeSrc).toMatch(/指紋未計測/);
+    expect(laneSceneEnvelopeSrc).toMatch(/if \(popFp !== venueFp\) \{/);
+  });
+
+  it('★buildVenueSceneReceipts の両辺が別の入力から出る(C1自己代入を型で殺す)', () => {
+    // pop = acceptedSnap 起点 / venue = paintedSnap 起点。同じ変数に化けたら赤。
+    expect(laneSceneEnvelopeSrc).toMatch(/revision: Number\(acceptedSnap\.capturedAt\) \|\| 0,/);
+    expect(laneSceneEnvelopeSrc).toMatch(/revision: Number\(paintedSnap\.capturedAt\) \|\| 0,/);
+    // ①が焼いた contentHash を読む(C3) / 会場側は paintedBuckets から再計算する(C2)。
+    expect(laneSceneEnvelopeSrc).toMatch(/const popContentHash = String\(acceptedSnap\.contentHash \|\| ''\);/);
+    expect(laneSceneEnvelopeSrc).toMatch(
+      /const venueContentHash = laneSceneContentHash\(\/\*\* @type \{any\} \*\/ \(inp\.paintedBuckets\)\);/
+    );
+    // fingerprintFor(内容アドレス)ゲート。時計比較へ化けたら赤。
+    expect(laneSceneEnvelopeSrc).toMatch(/fingerprintFor && fingerprintFor === popContentHash/);
   });
 
   // --- 2026-07-14 診断先行(venue-tile-link-parity-diagnose-DESIGN.md): 席リンク一致計器の配線 ---

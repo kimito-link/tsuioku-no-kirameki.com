@@ -23,6 +23,7 @@
  *                               dupIntra: number, dupCross: number, strays: number,
  *                               charFrame: number, crowdOn: boolean, crowdCount: number } }|null,
  *   anonExcluded: number,
+ *   unseated: number,
  *   storyDiagMirror: { present: boolean, ageSec: number|null },
  *   openLatency: { opens: number, mirrorMs: number, aggregateMs: number, firstPaintMs: number,
  *                  firstSeatMs: number, mirrorTimedOut: boolean, mirrorAbsent: boolean, line: string },
@@ -63,6 +64,7 @@ export function makeInitialVenueSeatsDiag() {
     laneParity: /** @type {VenueSeatsDiagState['laneParity']} */ (null),
     sceneReceipt: /** @type {VenueSeatsDiagState['sceneReceipt']} */ (null),
     anonExcluded: 0,
+    unseated: 0,
     storyDiagMirror: { present: false, ageSec: /** @type {number|null} */ (null) },
     // v0.1.1207: 会場の立ち上がり分解(開く→鏡→集計→初描画→初席)。未観測は -1。
     openLatency: {
@@ -253,6 +255,8 @@ export function buildVenueSeatsDiagSnapshot(diag, nowMs) {
     laneParity,
     sceneReceipt,
     anonExcluded: Math.max(0, Math.floor(num(d.anonExcluded, 0))),
+    // venue-exact-parity-SPEC-2026-08-07 §5-3: 席なし(uid で席に結びつかなかった段タイル)件数。
+    unseated: Math.max(0, Math.floor(num(d.unseated, 0))),
     storyDiagMirror,
     openLatency,
     seatLinkParity,

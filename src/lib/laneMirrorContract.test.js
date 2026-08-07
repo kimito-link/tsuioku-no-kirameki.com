@@ -198,6 +198,84 @@ describe('★書き手の実出力 → 関所(統合・形の食い違いを検�
     expect(r.snap.pickedLength).toBe(src.pickedLength);
     expect(r.snap.domSelf).toEqual(src.domSelf);
   });
+
+  /*
+   * ★T-4(venue-exact-parity-SPEC-2026-08-07 §9): domSelf の指紋3フィールドが
+   *   【書き手 → 関所 →(会場受理相当)】で落ちないことの檻。
+   *
+   *   normalizeDomSelf(laneMirror.js)は個別フィールドを列挙して作り直す型なので、
+   *   明示的に引き継がない限り新フィールドを黙って落とす。これはこのリポの再発バグ類型
+   *   ([[venue-mirror-is-the-primary-path-2026-08-01]]・v0.1.1280 と同じ穴)であり、
+   *   落ちると会場は永遠に「指紋未計測 ⚪」になって完全一致を主張できなくなる。
+   */
+  describe('★domSelf の指紋3フィールドが書き手→関所で落ちない', () => {
+    /** ①の paint 経路が実際に渡す domSelf の形(measureLaneDomSelf + 指紋の付与)。 */
+    const DOM_SELF_IN = {
+      measured: true,
+      perTier: {
+        link: { visible: 2, tileW: 44, tileH: 44, tileKey: 'u:4046119', keys: ['u:4046119', 'u:1'] },
+        gift: { visible: 1, tileW: 44, tileH: 44, tileKey: '', keys: [] },
+        ad: { visible: 1, tileW: 44, tileH: 44, tileKey: '', keys: [] },
+        konta: { visible: 1, tileW: 44, tileH: 44, tileKey: 'u:124272691', keys: ['u:124272691'] },
+        tanu: { visible: 1, tileW: 44, tileH: 44, tileKey: 'u:a:abc', keys: ['u:a:abc'] }
+      },
+      dpr: 2,
+      measuredAt: 1754499999000,
+      fingerprint: 'abcd1234',
+      fingerprintFor: 'ef567890'
+    };
+
+    /** 本番の書き手に domSelf を渡した実出力。 */
+    function snapshotWithDomSelf() {
+      return buildLaneMirrorSnapshot(
+        {
+          liveId: 'lv351092763',
+          buckets: { link: [{ entry: { userId: '4046119' }, displaySrc: 'https://x/a.jpg', title: '記名' }], gift: [], ad: [], konta: [], tanu: [] },
+          pickedLength: 1,
+          totalCandidates: 1,
+          domSelf: DOM_SELF_IN
+        },
+        { cap: 48, nowMs: 1754500000000 }
+      );
+    }
+
+    it('★書き手(buildLaneMirrorSnapshot)が measuredAt/fingerprint/fingerprintFor を保存する', () => {
+      const snap = snapshotWithDomSelf();
+      expect(snap.domSelf.fingerprint).toBe('abcd1234');
+      expect(snap.domSelf.fingerprintFor).toBe('ef567890');
+      expect(snap.domSelf.measuredAt).toBe(1754499999000);
+    });
+
+    it('★keys(キー列そのもの)は snapshot に載せない(hash だけ運ぶ=容量/PII の契約)', () => {
+      const snap = snapshotWithDomSelf();
+      for (const tier of LANE_MIRROR_TIERS) {
+        expect(snap.domSelf.perTier[tier].keys).toBeUndefined();
+      }
+      expect(JSON.stringify(snap)).not.toContain('u:a:abc');
+    });
+
+    it('★関所(sanitizeLaneMirrorForRead)を通っても3フィールドが落ちない', () => {
+      const src = snapshotWithDomSelf();
+      const r = sanitizeLaneMirrorForRead(src);
+      expect(r.snap.domSelf.fingerprint).toBe('abcd1234');
+      expect(r.snap.domSelf.fingerprintFor).toBe('ef567890');
+      expect(r.snap.domSelf.measuredAt).toBe(1754499999000);
+    });
+
+    it('旧版の domSelf(指紋なし)でも壊れない(additive-only の互換)', () => {
+      const legacy = buildLaneMirrorSnapshot(
+        {
+          liveId: 'lv1',
+          buckets: { link: [], gift: [], ad: [], konta: [], tanu: [] },
+          domSelf: { measured: true, perTier: {}, dpr: 1 }
+        },
+        { cap: 48, nowMs: 1 }
+      );
+      expect(legacy.domSelf.fingerprint).toBe('');
+      expect(legacy.domSelf.fingerprintFor).toBe('');
+      expect(sanitizeLaneMirrorForRead({ ...legacy, link: [] }).snap.domSelf.fingerprint).toBe('');
+    });
+  });
 });
 
 describe('LANE_MIRROR_CONSUMERS — 登録簿の形', () => {

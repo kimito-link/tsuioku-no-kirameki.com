@@ -54,13 +54,17 @@ describe('buildRenderReceipt', () => {
 });
 
 describe('compareRenderReceipts', () => {
-  const base = { surface: 'pop', revision: 100, contentHash: 'aaaa1111', domFingerprint: '', paintedAt: 0 };
-  it('revision/contentHash両方一致なら match:true', () => {
+  // ★v0.1.1284(venue-exact-parity-SPEC §3-3): ✅ の条件に【指紋(実DOM起点)一致】が加わった。
+  //   revision/contentHash だけの一致は「データが同じ」でしかなく、画面の顔ぶれを保証しない。
+  //   base に指紋を持たせない旧フィクスチャは、今は正しく ⚪(指紋未計測)へ落ちる(下のテスト)。
+  const base = { surface: 'pop', revision: 100, contentHash: 'aaaa1111', domFingerprint: 'ffff9999', paintedAt: 0 };
+  it('revision/contentHash/指紋がすべて一致なら match:true', () => {
     const pop = buildRenderReceipt(base);
     const venue = buildRenderReceipt({ ...base, surface: 'venue' });
     const out = compareRenderReceipts(pop, venue);
     expect(out.match).toBe(true);
     expect(out.line).toContain('✅');
+    expect(out.line).toContain('ffff9999');
   });
   it('revision不一致ならmatch:falseで理由が分かるline', () => {
     const pop = buildRenderReceipt(base);

@@ -240,8 +240,14 @@ export default [
     // v0.1.1277: yieldToBrowserPaint に setTimeout の競走を足して +1行(22225)。
     //   サイドパネルが裏に回ると rAF が凍り html_report_build_timeout になる真因の修正。
     //   ★機能追加ではなくバグ修正での増加。実測22225 → ラチェットは実測+50の22275へ。
+    // v0.1.1284(venue-exact-parity MVP): ①実DOMのキー列指紋を鏡へ同梱する配線を追加=22225→22284。
+    //   内訳は (a)import 2行 (b)_lastPublishedLaneMirrorHash の宣言と控え (c)paint 直後の
+    //   _laneDomSelfLast を指紋つきオブジェクトへ拡張 (d)resize で控えを捨てるリスナー、の4点のみ。
+    //   ★純関数(laneDomFingerprint/perTierKeysOf/buildVenueSceneReceipts)は全て lib 側に
+    //     テスト付きで隔離済みで、popup 側に残るのは chrome/DOM グルーだけ(lib抽出不可)。
+    //   実測22284 → ラチェットは実測+50の22334へ。
     files: ['src/extension/popup-entry.js'],
-    rules: { 'max-lines': ['error', { max: 22275, skipBlankLines: false, skipComments: false }] }
+    rules: { 'max-lines': ['error', { max: 22334, skipBlankLines: false, skipComments: false }] }
   },
   {
     files: ['src/extension/popup/**/*.js'],
