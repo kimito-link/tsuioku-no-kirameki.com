@@ -9946,17 +9946,40 @@
        * 自然。下流で popup window 自体の outer height を primary.scrollHeight + 40
        * に合わせるので、popup window 外側にも内部にも scrollbar が出ない。
        */
+      /*
+       * ★v0.1.1288: cap 解除は【ビューポートに収まる範囲まで】に限る。
+       *
+       * ■ 直した不具合(2026-08-07・e2e が 08-03 から9件落ち続けていた真因の1つ)
+       *   上の 0.1.73 の意図は「popup window の外側の高さを content に合わせるので、
+       *   内側にも外側にもスクロールバーは出ない」。その前提は
+       *   `chrome.windows.update` で外枠を伸ばせるときにしか成立しない。
+       *   実装(popup-entry.js:15188)は `win.type !== 'popup'` で早期 return するので、
+       *   【通常タブで popup.html を開くと外枠は伸びない】。
+       *   その状態で height:auto を !important で通すと、html が content の高さ(855px)まで
+       *   伸びてビューポート(720px)を超え、**html に外側スクロールバーが出る**
+       *   =「二重スクロールを出さない」という設計そのものを破っていた。
+       *
+       * ■ 直し方: auto をやめ、ビューポート上限つきの max-height にする
+       *   - 収まるとき(実 popup window・content が短い)は従来どおり全部見える＝意図は保つ
+       *   - 収まらないときは 100vh で止まり、内側(.nl-main)がスクロールする＝外側バーは出ない
+       *   ★`height` は指定しない(auto のまま content に追従させる)。max-height だけで抑える。
+       */
       html.nl-empty-state:not(.nl-inline) {
         height: auto !important;
-        max-height: none !important;
+        max-height: 100vh !important;
+        overflow-y: hidden !important;
       }
       html.nl-empty-state:not(.nl-inline) body {
         height: auto !important;
-        max-height: none !important;
+        max-height: 100vh !important;
+        overflow-y: hidden !important;
       }
+      /* ★収まらないときだけ内側でスクロールさせる(収まるときは visible と同じ挙動)。 */
       html.nl-empty-state:not(.nl-inline) body .nl-main {
-        flex: 0 0 auto;
-        overflow-y: visible;
+        flex: 1 1 auto;
+        min-height: 0;
+        max-height: 100vh;
+        overflow-y: auto;
       }
 
       html.nl-skin-panel-dark {
