@@ -1,5 +1,7 @@
 // venueBar.js — 会場モード UI 本体。観客の席割り・群衆・吹き出し・ギフト演出・読み上げ連動を描く。
-import { isGenericComeviewName } from '../lib/comeviewRows.js';
+// v0.1.1287: combineCanonicalComeviewRows = チャンクとテールを commentNo で重複排除して合流する
+//   純関数(comeview と同じ正本)。会場の発言パネルがテールを読むために使う。
+import { isGenericComeviewName, combineCanonicalComeviewRows } from '../lib/comeviewRows.js';
 import {
   applyVenuePickupView,
   buildVenuePickupView,
@@ -3668,15 +3670,44 @@ export function mountVenueBarButton(options = {}) {
   const readVenueCommentRowsForSpeech = async (liveId) => {
     const lid = String(liveId || '').trim();
     if (!lid) return [];
+    /** @type {unknown[]} */
+    let rows = [];
     try {
       const result = await runStorageOpWithTimeout(
         () => readChunkedComments(lid, commentsStorageKey(lid), (keys) => chrome.storage.local.get(keys)),
         8000
       );
-      return Array.isArray(result?.rows) ? result.rows : [];
+      rows = Array.isArray(result?.rows) ? result.rows : [];
     } catch {
-      return [];
+      rows = [];
     }
+    /*
+     * ★v0.1.1287: テール(nls_ctail_<lv>)も読む。会場の発言パネルだけが読んでいなかった。
+     *
+     * ■ なぜ「発言がありません」が出続けたか(2026-08-07 実機・ユーザー証言「出たところを見たことがない」)
+     *   コメントはまずテールに溜まり、compaction されて初めてチャンクへ畳まれる。
+     *   しきい値は通常 200件 or 10秒、【巨大メイン(5,000件超)では 1,500件】
+     *   (commentTailBuffer.js:30,33,67)。つまり大配信では
+     *   【直近1,500件がチャンクに存在しない窓】ができる。
+     *   発言数の少ない人がその窓に入ると、チャンクだけ読む会場では total=0 になる。
+     *
+     * ■ 正しい読み方の正本は comeview(comeview-entry.js:1172-1177)
+     *   あちらは「チャンク → テールを合流」の2段で読む。会場だけがこの2段目を欠いていた。
+     *   合流は既存の純関数 combineCanonicalComeviewRows(commentNo で重複排除)をそのまま使う
+     *   =独自実装を作らない。
+     *
+     * ■ テールは任意(失敗しても握る)
+     *   テールが読めなくても、チャンク分だけで従来どおり動く=fail-soft。
+     *   read は【クリックした瞬間だけ】という既存設計を維持する(常時経路には足さない)。
+     */
+    try {
+      const tKey = tailStorageKey(lid);
+      const bag = await chrome.storage.local.get(tKey);
+      rows = combineCanonicalComeviewRows(rows, Array.isArray(bag[tKey]) ? bag[tKey] : []);
+    } catch {
+      /* テールは任意=読めなくてもチャンク分で動く */
+    }
+    return rows;
   };
 
   /** @param {MouseEvent} event */
