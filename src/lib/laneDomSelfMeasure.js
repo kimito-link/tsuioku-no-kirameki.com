@@ -52,9 +52,17 @@ function visibleTilesOf(lane) {
 
 /** @param {Element|null|undefined} lane */
 function measureLane(lane) {
-  if (!lane || lane.hidden === true) return { visible: 0, tileW: 0, tileH: 0, tileKey: '' };
+  if (!lane || lane.hidden === true) return { visible: 0, tileW: 0, tileH: 0, tileKey: '', keys: [] };
   const tiles = visibleTilesOf(lane);
   const firstTile = tiles[0] || null;
+  // venue-exact-parity-SPEC §3-2: 可視タイルの照合キー列。★既存の visibleTilesOf 走査【1回の中】で
+  //   dataset を読むだけ=追加のDOMクエリ・layout強制ゼロ(§7の予算表)。
+  //   空キー(無鍵タイル)は指紋の対象外(laneDomFingerprint が落とすが、ここでも入れない)。
+  const keys = [];
+  for (const tile of tiles) {
+    const key = String(tile.dataset?.userKey || '').trim();
+    if (key) keys.push(key);
+  }
   return {
     visible: tiles.length,
     tileW: firstTile ? nonNegativeNumber(firstTile.offsetWidth) : 0,
@@ -62,7 +70,9 @@ function measureLane(lane) {
     // v0.1.1212: 「誰を測ったか」。①と会場で先頭タイルの人が違えば、CSSが完全一致でも
     //   名前の長さが違うぶんタイル幅が変わる(metaはmax-width上限までの収縮ボックス)。
     //   これが無いと「幾何≠」がCSS不整合なのか測定対象ズレなのか永久に区別できない。
-    tileKey: firstTile ? String(firstTile.dataset?.userKey || '').trim() : ''
+    tileKey: firstTile ? String(firstTile.dataset?.userKey || '').trim() : '',
+    // ★keys は storage へ出さない(laneMirror.js normalizeDomSelf が保存しない=hash だけ運ぶ)。
+    keys
   };
 }
 
@@ -71,12 +81,12 @@ function measureLane(lane) {
  * @param {{ laneLink?: Element|null, laneGift?: Element|null, laneAd?: Element|null,
  *   laneKonta?: Element|null, laneTanu?: Element|null }|null|undefined} els
  * @returns {{ measured: boolean,
- *   perTier: Record<string,{visible:number,tileW:number,tileH:number,tileKey:string}>,
+ *   perTier: Record<string,{visible:number,tileW:number,tileH:number,tileKey:string,keys:string[]}>,
  *   dpr: number }}
  */
 export function measureLaneDomSelf(els) {
   const source = els && typeof els === 'object' ? els : {};
-  /** @type {Record<string, {visible:number,tileW:number,tileH:number,tileKey:string}>} */
+  /** @type {Record<string, {visible:number,tileW:number,tileH:number,tileKey:string,keys:string[]}>} */
   const perTier = {};
   let measured = false;
   for (const tier of TIERS) {
@@ -90,4 +100,23 @@ export function measureLaneDomSelf(els) {
     perTier,
     dpr: Number.isFinite(rawDpr) && rawDpr > 0 ? rawDpr : 1
   };
+}
+
+/**
+ * measureLaneDomSelf の結果から、laneDomFingerprint が食える段別キー列だけを取り出す。
+ *   ★呼び出し側(popup-entry)がフィールド名を手書きしないための小関数
+ *   ([[venue-mirror-is-the-primary-path-2026-08-01]]=個別列挙で値を落とす類型を作らない)。
+ * @param {{ perTier?: Record<string, { keys?: string[] }> }|null|undefined} domSelf
+ * @returns {Record<string, string[]>}
+ */
+export function perTierKeysOf(domSelf) {
+  const perTier = domSelf && typeof domSelf === 'object' && domSelf.perTier && typeof domSelf.perTier === 'object'
+    ? domSelf.perTier
+    : {};
+  /** @type {Record<string, string[]>} */
+  const out = {};
+  for (const tier of TIERS) {
+    out[tier] = Array.isArray(perTier[tier]?.keys) ? perTier[tier].keys : [];
+  }
+  return out;
 }

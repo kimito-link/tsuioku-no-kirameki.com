@@ -154,7 +154,10 @@ describe('会場ホバープレビューカードの配線(配線忘れ=CI赤)',
     const loopAt = venueBarSrc.indexOf('for (const item of visibleLaneItems)');
     expect(loopAt).toBeGreaterThanOrEqual(0);
     const loopHead = venueBarSrc.slice(loopAt, loopAt + 400);
-    expect(loopHead).toMatch(/seatIndexRaw\s*<\s*0\)\s*continue/);
+    // v0.1.1284: 席なしを数える計器(unseated)が同じ分岐に相乗りしたが、
+    //   【席なしは装飾せず continue する】契約自体は不変。分岐の途中に何が入っても
+    //   「席なしなら continue で抜ける」ことを断言する(計数の有無で赤にしない)。
+    expect(loopHead).toMatch(/seatIndexRaw\s*<\s*0\)\s*\{?[^}\n]*continue;/);
   });
 
   // 2026-07-31(ユーザー要望): アイコンをクリックすると全発言を読めるパネル。

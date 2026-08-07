@@ -53,10 +53,16 @@ describe('buildLaneMirrorSnapshot', () => {
       domSelf: {
         measured: true,
         perTier: {
-          link: { visible: 2.9, tileW: 64.125, tileH: 84.5, ignored: 'drop' },
+          // ★keys は①側(measureLaneDomSelf)が実際に載せてくるが、鏡は【保存しない】
+          //   (500人分 ~12KB/publish=容量。指紋 hash だけを運ぶのが契約=laneMirrorContract.js)。
+          link: { visible: 2.9, tileW: 64.125, tileH: 84.5, ignored: 'drop', keys: ['u:1', 'u:2'] },
           tanu: { visible: -1, tileW: '72', tileH: null }
         },
         dpr: 1.25,
+        // v0.1.1284: 指紋3フィールドは【保存する】(会場の一致判定が読む)。
+        measuredAt: 1754499999000,
+        fingerprint: 'abcd1234',
+        fingerprintFor: 'ef567890',
         ignored: { large: true }
       }
     }, { nowMs: 1 });
@@ -69,9 +75,15 @@ describe('buildLaneMirrorSnapshot', () => {
         konta: { visible: 0, tileW: 0, tileH: 0 },
         tanu: { visible: 0, tileW: 72, tileH: 0 }
       },
-      dpr: 1.25
+      dpr: 1.25,
+      measuredAt: 1754499999000,
+      fingerprint: 'abcd1234',
+      fingerprintFor: 'ef567890'
     });
     expect(snap.domSelf).not.toHaveProperty('ignored');
+    // ★keys が storage 側へ漏れていないこと(容量/PII の契約を数字でなく実体で確かめる)。
+    expect(snap.domSelf.perTier.link).not.toHaveProperty('keys');
+    expect(JSON.stringify(snap)).not.toContain('u:1');
   });
 
   it('displaySrc 空+uid 有りは落とさない(スリムセル=読み手B-1識のidentity復元の入口)', () => {

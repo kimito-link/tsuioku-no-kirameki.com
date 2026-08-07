@@ -726,7 +726,9 @@ import { buildLaneDiagSnapshot } from '../lib/laneDiag.js';
 import { KEY_LANE_MIRROR } from '../lib/laneMirrorKey.js';
 import { KEY_PREVIEW_RENDER_ACK, buildPreviewRenderAck } from '../lib/previewRenderAckKey.js';
 import { buildLaneMirrorSnapshot, laneMirrorCapFromBuckets, restoreLaneMirrorBuckets } from '../lib/laneMirror.js';
-import { measureLaneDomSelf } from '../lib/laneDomSelfMeasure.js';
+import { measureLaneDomSelf, perTierKeysOf } from '../lib/laneDomSelfMeasure.js';
+// v0.1.1284: ①実DOMのキー列指紋(会場が別ドキュメント起点で顔ぶれ一致を判定するために同梱)。
+import { laneDomFingerprint } from '../lib/laneSceneEnvelope.js';
 import { createMirrorBundleFlushScheduler } from '../lib/mirrorBundleFlushScheduler.js';
 import { KEY_STAT_CARDS_MIRROR } from '../lib/statCardsMirrorKey.js';
 import { buildStatCardsMirrorSnapshot } from '../lib/statCardsMirror.js';
@@ -6431,6 +6433,8 @@ let storyUserLaneLastRenderSig = '';
  *   会場の parity 判定(venueLaneParity.js)が読む。未描画のうちは null。
  */
 let _laneDomSelfLast = null;
+/** ★v0.1.1284: 直近に publish した鏡の contentHash(=次の paint の指紋の内容アドレス)。 */
+let _lastPublishedLaneMirrorHash = '';
 /** v0.1.1041: 最後に実タイルを描いた liveId。同一配信 backfill 谷間の一瞬空でタイルを畳まない判定の基準(shouldKeepStoryUserLaneTilesOnEmpty)。 */
 let _storyUserLaneLastTiledLid = '';
 /** v0.1.1231 Phase1: 人物集合の増減を測る計器の状態(観測のみ)。 */
@@ -7063,8 +7067,18 @@ function renderStoryUserLane() {
    *   巻き添えで止めており、鏡が 656秒 凍結していた(2026-08-06 実機で確定)。
    *   ★ここでは「今回描けた実DOM計測」を控えるだけにする。次回の publish がこれを同梱する。
    *   描画は触らない(計測値の保存のみ)。
+   *
+   * ★v0.1.1284: 寸法に加えて【キー列の指紋】を控える。fingerprintFor=直前に publish した
+   *   鏡の contentHash=「どの内容を測ったか」の内容アドレス。契約の正本と理由は
+   *   src/lib/laneMirrorContract.js の「domSelf の指紋契約」を読むこと。
    */
-  _laneDomSelfLast = laneDomSelf;
+  _laneDomSelfLast = {
+    ...laneDomSelf,
+    // 診断表示専用(会場の line に「①DOM齢Ns」)。verdict には影響させない(§6-2)。
+    measuredAt: Date.now(),
+    fingerprint: laneDomFingerprint(perTierKeysOf(laneDomSelf)),
+    fingerprintFor: _lastPublishedLaneMirrorHash
+  };
   setTimeout(() => {
     if (typeof window !== 'undefined' && window.__NLS_LANE_DIAG__) {
       window.__NLS_LANE_DIAG__();
@@ -7549,6 +7563,8 @@ function publishLaneMirror(input) {
       cap: laneMirrorCapFromBuckets(input?.buckets),
       nowMs: now
     });
+    // ★v0.1.1284: publish は paint より前なので、この直後の paint が測る DOM = この hash の中身。
+    _lastPublishedLaneMirrorHash = String(snap?.contentHash || '');
     mergeAndScheduleFlush('lane', snap, snap && snap.liveId, now);
   } catch {
     /* no-op */
@@ -19751,6 +19767,11 @@ async function initPopup() {
     if (frameThemeDetails) frameThemeDetails.open = true;
   }
   window.addEventListener('resize', applyResponsivePopupLayout);
+  // ★v0.1.1284: リサイズは【内容アドレスで検出できない唯一の経路】(中身不変のまま寸法だけ変わる)。
+  //   控えを捨てて未計測へ降格させる=会場は「①DOM未計測 ⚪」で fail-closed(嘘の緑を出さない)。
+  window.addEventListener('resize', () => {
+    _laneDomSelfLast = null;
+  });
 
   const toggle = /** @type {HTMLInputElement} */ ($('recordToggle'));
   const exportBtn = /** @type {HTMLButtonElement} */ ($('exportJson'));

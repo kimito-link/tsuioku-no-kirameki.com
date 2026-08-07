@@ -227,7 +227,11 @@ import {
 } from '../lib/venueLaneParity.js';
 // v0.1.1137(lanescene-structural-review MVP): venueLaneParityの厳密突合(P/T/X層・DOM census)とは
 //   独立に、①と会場が同じ鏡世代(revision)を見ているかを1行で確認する軽量な代理指標。
-import { buildSceneEnvelope, buildRenderReceipt, compareRenderReceipts } from '../lib/laneSceneEnvelope.js';
+// ★venue-exact-parity-SPEC-2026-08-07 §3-3: 受領証の組み立ては純関数へ移した。
+//   旧インライン組み立て(venueBar.js:5300-5324)は venueReceipt.revision に pop 側の値を
+//   自己代入していた=revision比較が恒真(C1)。両辺を別の入力から作る関数に閉じ込めることで、
+//   自己代入は【関数の外から作れない】(檻=laneSceneEnvelope.receipts.test.js が変異で赤にする)。
+import { laneDomFingerprint, buildVenueSceneReceipts, compareRenderReceipts } from '../lib/laneSceneEnvelope.js';
 // v0.1.1113 実DOM census(Tri-Parity): ✅の根拠をデータからDOMへ(reference_diag_truth_SYNTHESIS.md)。
 import { collectVenueLaneDomCensus, venueDomCensusToParityDom } from '../lib/venueDomCensus.js';
 import { nicoUserPageUrl, anonymousDisplayLabel } from '../lib/nicoUserPage.js';
@@ -2861,6 +2865,18 @@ export function mountVenueBarButton(options = {}) {
    * 新しい観測系統は作らない。通常は 0。0 でなければ①側が契約違反の鏡を書いている。
    */
   let _laneMirrorSanitizeDropped = 0;
+  /**
+   * ★venue-exact-parity-SPEC-2026-08-07 §3-3: 会場【実DOM】のキー列指紋(diagDue のときだけ更新)。
+   *   census が既に集めている keys 列(venueDomCensus.js:97-98)から作る=追加のDOM走査ゼロ。
+   *   ①の実DOM指紋(鏡の domSelf.fingerprint)と突き合わせる相手。'' は未計測(=⚪)。
+   */
+  let _venueDomFingerprintLast = '';
+  /**
+   * ★席なし(unseated)件数。鏡セルが席を得る条件は【uid一致のみ】(venueSeatIndexByUid)で、
+   *   名前でしか同定できない人は席に結びつかず生タイルとして段に出る=これは正常。
+   *   「段img 19 − 席16 = 3」を説明済みの差分にするための数値(新しい観測系統は作らない)。
+   */
+  let _venueUnseatedCount = 0;
   /** 見出しの人数だけの基準文(鏡の鮮度は後段で併記する)。 */
   let _venueTitleBaseText = '';
   /** 直近に書いた見出し文(値が変わったときだけ DOM に書くため)。 */
@@ -5130,10 +5146,14 @@ export function mountVenueBarButton(options = {}) {
     //   publishは既存publishVenueSeatsDiagの3秒min-gapサイクルに相乗り(新規タイマー/read/writeなし)。
     beginVenueSeatLinkPaint(_seatLinkParity);
     const seatLinkWallNow = Date.now();
+    // ★venue-exact-parity-SPEC §5-3: 席なし(=uid で席に結びつかなかった)件数を既存ループの
+    //   分岐で数える(新規ループを作らない=§7 の予算表)。「段img 19 − 席16 = 3」を
+    //   説明済みの差分にするための数値であり、異常ではない(席は装飾・段が正本)。
+    let unseatedThisPaint = 0;
     for (const item of visibleLaneItems) {
       // v0.1.1111: 席なしアイテム(-1)は席装飾の対象外(wrapTileEl と同じ規則で席0を誤装飾しない)。
       const seatIndexRaw = Number(item?._venueSeatIndex);
-      if (!Number.isInteger(seatIndexRaw) || seatIndexRaw < 0) continue;
+      if (!Number.isInteger(seatIndexRaw) || seatIndexRaw < 0) { unseatedThisPaint += 1; continue; }
       const seatIndex = seatIndexRaw;
       const node = seatNodes[seatIndex];
       const entry = entryBySeatIndex.get(seatIndex);
@@ -5214,6 +5234,7 @@ export function mountVenueBarButton(options = {}) {
         delete node.seat.dataset.streak;
       }
     }
+    _venueUnseatedCount = unseatedThisPaint;
 
     // v0.1.1113 一致計器 v3(Tri-Parity): 鏡データ=段割当データ=【段実DOM】の3点一致で初めて✅。
     //   census は席装飾ループの【後】=この paint の最終DOM(装飾で is-empty が外れた後)を数える。
@@ -5247,28 +5268,39 @@ export function mountVenueBarButton(options = {}) {
         /** @type {ReturnType<typeof venueDomCensusToParityDom>} */
         let domSummary = null;
         try {
-          domSummary = venueDomCensusToParityDom(
-            collectVenueLaneDomCensus({
-              laneEls: {
-                link: venueLaneEls.laneLink,
-                gift: venueLaneEls.laneGift,
-                ad: venueLaneEls.laneAd,
-                konta: venueLaneEls.laneKonta,
-                tanu: venueLaneEls.laneTanu
-              },
-              stackEl: venueLaneEls.stack,
-              extras: {
-                charFrameLayer,
-                crowdOn: totalAnonymous > 0,
-                crowdCount: totalAnonymous,
-                // v0.1.1116 白円計器: 会場の顔プローブ実績(成功/404)を census 経由で状態速報へ。
-                //   getDiagnostics は Set サイズ集計のみ=3秒期日内の1回呼びで hot path 無汚染。
-                avatarProbe: venueAvatarLoadGuard.getDiagnostics()
-              }
-            })
-          );
+          // ★venue-exact-parity-SPEC §3-3: summarize(venueDomCensusToParityDom)は keys 列を
+          //   落とす(PII/容量)。指紋は【落とす前の生値】から作るので、ここで1変数受けする。
+          //   census は既にキー列を集めているので追加のDOM走査はゼロ(§7 予算表)。
+          const rawCensus = collectVenueLaneDomCensus({
+            laneEls: {
+              link: venueLaneEls.laneLink,
+              gift: venueLaneEls.laneGift,
+              ad: venueLaneEls.laneAd,
+              konta: venueLaneEls.laneKonta,
+              tanu: venueLaneEls.laneTanu
+            },
+            stackEl: venueLaneEls.stack,
+            extras: {
+              charFrameLayer,
+              crowdOn: totalAnonymous > 0,
+              crowdCount: totalAnonymous,
+              // v0.1.1116 白円計器: 会場の顔プローブ実績(成功/404)を census 経由で状態速報へ。
+              //   getDiagnostics は Set サイズ集計のみ=3秒期日内の1回呼びで hot path 無汚染。
+              avatarProbe: venueAvatarLoadGuard.getDiagnostics()
+            }
+          });
+          _venueDomFingerprintLast = laneDomFingerprint({
+            link: rawCensus.perSection?.link?.keys,
+            gift: rawCensus.perSection?.gift?.keys,
+            ad: rawCensus.perSection?.ad?.keys,
+            konta: rawCensus.perSection?.konta?.keys,
+            tanu: rawCensus.perSection?.tanu?.keys
+          });
+          domSummary = venueDomCensusToParityDom(rawCensus);
         } catch {
           domSummary = null;
+          // census 自体に失敗した=会場DOMを写せていない。指紋も捨てる(古い指紋で✅を名乗らない)。
+          _venueDomFingerprintLast = '';
         }
         laneParityDiag = toVenueLaneParityDiag(
           buildVenueLaneParity({
@@ -5294,34 +5326,43 @@ export function mountVenueBarButton(options = {}) {
             line: `${laneParityDiag.line} / 鏡除外${_laneMirrorSanitizeDropped}`
           };
         }
-        // v0.1.1137(lanescene-structural-review MVP): mirror mode のときだけ、①が発行した鏡世代
-        //   (revision/contentHash)と会場が実際にpaintした段(laneBuckets)を突合する。venueLaneParity
-        //   の厳密突合(上)とは独立した軽量な代理指標なので、判定に失敗しても laneParityDiag には影響しない。
-        if (lanePaintSnap) {
-          // 会場一致gift/ad根治(2026-07-14 Patch 2a): ①Receiptのhashは「会場が実際に受け取り
-          //   描く中身=復元正準形」で取る。displaySrc空+uid有りのスリムセル(laneMirror.js
-          //   toMirrorCellのPatch1でcapされなくなった)はrestoreLaneMirrorBuckets(B-1)で
-          //   identiconに復元されるため、snapshot生値のまま署名すると会場が正しく描いても
-          //   ①=会場のhashが恒常的に不一致(偽🔴)になる。
-          const popEnvelope = buildSceneEnvelope({
-            capturedAt: lanePaintSnap.capturedAt,
-            ...restoreLaneMirrorBuckets(lanePaintSnap)
-          });
-          const popReceipt = buildRenderReceipt({
-            surface: 'pop',
-            revision: popEnvelope.revision,
-            contentHash: popEnvelope.contentHash
-          });
-          const venueEnvelope = buildSceneEnvelope(/** @type {any} */ (laneBuckets));
-          const venueReceipt = buildRenderReceipt({
-            surface: 'venue',
-            revision: popEnvelope.revision,
-            contentHash: venueEnvelope.contentHash
-          });
-          sceneReceiptDiag = compareRenderReceipts(popReceipt, venueReceipt);
-        } else {
-          sceneReceiptDiag = null;
+        /*
+         * ★venue-exact-parity-SPEC §5-3: 席なし件数も既存の1行に併記する(同上・新設しない)。
+         *   席は uid でしか結びつかない(venueSeatIndexByUid=uid-only join)ので、
+         *   名前でしか同定できない人は席なしの生タイルとして段に出る=これは【正常】。
+         *   0 でなければ「段の枚数と席の枚数がなぜ違うか」がこの数値で説明済みになる。
+         */
+        if (laneParityDiag && _venueUnseatedCount > 0) {
+          laneParityDiag = {
+            ...laneParityDiag,
+            line: `${laneParityDiag.line} / 席なし${_venueUnseatedCount}`
+          };
         }
+        /*
+         * ★venue-exact-parity-SPEC-2026-08-07 §3-3(MVPの中核): 受領証を【3つの独立起点】から組む。
+         *
+         *   旧実装(v0.1.1137〜1283)はここでインラインに組み立てており、
+         *     - venueReceipt.revision に popEnvelope.revision を【自己代入】(C1: revision比較が恒真)
+         *     - pop/venue 両 hash が同じ lanePaintSnap 起点(C2: X と copy(X) の比較)
+         *     - ①が snapshot に焼いた contentHash を誰も読まない(C3)
+         *   の3点で恒真=「①が0件描画でも鏡さえ残れば ✅」という嘘の緑を出していた。
+         *
+         *   新実装の起点:
+         *     ① 側 = laneMirrorSnap(最新の受理済み鏡)の capturedAt / contentHash / domSelf.fingerprint
+         *     会場側 = lanePaintSnap(実際に描いた鏡)の capturedAt + laneBuckets からの再計算 hash
+         *              + _venueDomFingerprintLast(会場【実DOM】census 由来の指紋)
+         *   → revision差=「古い/先の世代を描いた」、hash差=「同世代で中身が違う」、
+         *     指紋差=「データは同じなのに画面の顔ぶれが違う」を別々に名指しできる。
+         */
+        const sceneReceipts = buildVenueSceneReceipts({
+          acceptedSnap: laneMirrorSnap,
+          paintedSnap: lanePaintSnap,
+          paintedBuckets: laneBuckets,
+          venueDomFingerprint: _venueDomFingerprintLast
+        });
+        sceneReceiptDiag = sceneReceipts
+          ? compareRenderReceipts(sceneReceipts.popReceipt, sceneReceipts.venueReceipt)
+          : null;
       } catch {
         /* 計器失敗は描画を止めない(前回値を保持) */
       }
@@ -5379,6 +5420,9 @@ export function mountVenueBarButton(options = {}) {
       sceneReceipt: sceneReceiptDiag,
       // v0.1.1138(「消す側」の計器): fallback時に段から除外された匿名の人数。
       anonExcluded: _anonExcludedCount,
+      // ★venue-exact-parity-SPEC §5-3: 席に結びつかなかった段タイル数(uid-only join の説明済み差分)。
+      //   ★状態速報へは laneParity.line への併記で出る(この構造フィールドは診断パネル/回帰テスト用)。
+      unseated: _venueUnseatedCount,
       // 2026-07-14 席リンク一致計器: タイル実体(鏡uid)⇄席クラス(roster uid)の二重ソース突合(累積)。
       seatLinkParity: toVenueSeatLinkParityDiag(_seatLinkParity, Date.now()),
       // 2026-07-15 診断先行(venue-yukkuri-named-diagnose): 「名前ありゆっくり顔」の実害を数えるだけの1行。
