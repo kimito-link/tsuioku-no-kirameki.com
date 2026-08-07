@@ -1556,11 +1556,55 @@
         }
       }
 
-      /* cloak 中: 親ホストの暗い背景を透かして白フラッシュを防ぐ（JS 読み込み中も有効にするためクラス限定を外す） */
-      html[data-nl-popup-primary-cloak='1'],
-      html[data-nl-popup-primary-cloak='1'] body {
-        background: transparent !important;
-      }
+      /*
+       * cloak 中: 親ホストの暗い背景を透かして白フラッシュを防ぐ（JS 読み込み中も有効にするためクラス限定を外す）
+       *
+       * ★v0.1.1285: この規則を【透明にしてよい場所だけ】に限定する（サイドパネル真っ黒の根治）。
+       *
+       * ■ 何が起きていたか（2026-08-07 実機・v0.1.1279/1283 に続く3度目の黒画面）
+       *   v0.1.1283 は入れ物（sidepanel.html の html/body/iframe）を不透明にしたが、
+       *   【中身】であるこの popup.html は transparent !important のままだった。
+       *   cloak 属性は popup.html:2 に【静的に】書かれているので JS が走る前から背景がゼロ。
+       *   解除は revealPopupPrimaryOnce()（JS）だけで、上の CSS フェイルセーフ（1500ms 自動
+       *   reveal）は opacity しか戻さない＝背景は透明のまま。
+       *   → 中身は見えるのに地の色を塗らない＝下の暗い層が透けて【真っ黒】。
+       *     （実機スクショに横縞＝コンテンツは描画済み、が写っていたのがこの証拠）
+       *
+       * ■ 直し方は v0.1.1283 と同じ原則＝【既定を安全側にし、危険な状態は明示のときだけ】
+       *   透明が要るのは「親ホストの暗い背景に重ねる埋め込み」だけ。
+       *   サイドパネル（dock=sidepanel）と別窓 popup では親が不透明なので透明にする理由がない。
+       *   :has() で自分の URL を見て判定する＝JS を待たずに効く（ここが肝）。
+       *
+       * ★ここを触るときは sidepanel.html の背景色（#fffaf2）と揃える。別文書なので
+       *   CSS 変数を共有できない＝両方直すこと（sidepanel.html:44 のコメントと対）。
+       */
+      /*
+       * ★v0.1.1285: 【この規則は撤去した】。サイドパネル真っ黒（3度目）の根治。
+       *
+       * ■ 旧実装（v0.1.1283 まで）
+       *     html[data-nl-popup-primary-cloak='1'],
+       *     html[...] body { background: transparent !important; }
+       *   意図は「親ホストの暗い背景を透かして白フラッシュを防ぐ」。
+       *
+       * ■ なぜ黒くなったか（2026-08-07 実機・v0.1.1279/1283 に続く3度目）
+       *   cloak 属性は popup.html:2 に【静的に】書かれており、JS が走る前から有効。
+       *   解除は revealPopupPrimaryOnce()（JS）だけ。上の CSS フェイルセーフ（1500ms
+       *   自動 reveal）は opacity しか戻さず、この background は透明のまま残る。
+       *   → 中身は見えるのに【地の色を塗らない】＝下の暗い層が透けて真っ黒。
+       *     （実機スクショに横縞＝コンテンツは描画済み、が写っていたのがその証拠）
+       *   v0.1.1283 は入れ物（sidepanel.html）だけ不透明にしたので中身が残っていた。
+       *
+       * ■ なぜ「撤去」で良いか（弱める・条件を足す、ではなく）
+       *   白フラッシュ防止の本体は上の `.nl-popup-primary { opacity: 0 }`＝中身を隠すこと。
+       *   背景まで透明にする必要はなく、透明にすると「塗る人が誰も居ない」状態を作る。
+       *   ★CSP が `script-src 'self'`＝head のインライン script で URL 判定する案は
+       *     実機で【CSPにブロックされる】ことを確認済み（2026-08-07）。JS に頼る解は取れない。
+       *   → 既定を安全側（＝body の通常背景 linear-gradient をそのまま使う）に倒す。
+       *     [[css-default-should-be-the-safe-state-2026-08-05]] と同じ原則。
+       *
+       * ★埋め込み（watch 重ね）で本当に透明が要るなら、body ではなく
+       *   【その埋め込み専用のクラス】に対して指定すること（html/body を透明にしない）。
+       */
 
       .nl-version-badge {
         display: inline-flex;
