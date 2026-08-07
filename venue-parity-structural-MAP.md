@@ -351,3 +351,25 @@ v0.1.1281 で `publishLaneMirror` は描画前へ移したが、**`domSelf` は�
 - `docHidden: true` 下での測定なので、①が前面のときの値は未取得
 - `venue-parity-structural-SPEC.md`(27KB) / `-IMPLEMENTATION-HANDOFF.md` は本追補では未読
 - `buildVenueSeating`（誰が席資格を得るか）の内部ロジックは未読
+
+## A-10. 【A-9の未確認を1件解消】席資格と join キーの非対称（2026-08-07 追加調査）
+
+A-9 で「uidなし か / uidはあるが roster に居ない か」を未確認としたが、
+**コードで非対称を1つ確定できた。**
+
+- **席資格の正本** `venueParticipantKey`（[venueSeats.js:103-117](src/lib/venueSeats.js)）は
+  **2段構え**: uid があれば `u:${uid}`、**uid が無くても識別可能な名前があれば `n:${name}`**
+  で席に座れる（汎用名・名無しのみ null）。
+- **一方 鏡↔席の橋渡し** `venueSeatIndexByUid`
+  （[venueLaneMirrorSupply.js:165-176](src/lib/venueLaneMirrorSupply.js)）は
+  **uid でしか索引を作らない**（`if (!uid) continue`）。
+
+→ ★**「名前で席に座れる人」は、鏡経路では席と結びつけられない。**
+   席資格の法(2段)と join の法(1段)が食い違っている＝A-3 の二重ソースの具体的な穴。
+   実測の「席を持てなかった3件」の少なくとも一部はこれで説明できる可能性が高い
+   （★どのセルがどちらの理由かは実データ観測が必要＝依然未確認）。
+
+★Q-C（席を持てないタイルの扱い）を設計する際は、
+  **join キーを席資格と同じ2段（uid → 名前）に揃えるか**が最初の選択肢になる。
+  `venueLaneParityKey`（[venueLaneParity.js:61-69](src/lib/venueLaneParity.js)）は
+  既に「uid が無ければ idLine+title」という2段構えを採っており、**先例がある**。
