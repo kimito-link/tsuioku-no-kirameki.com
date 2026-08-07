@@ -284,6 +284,45 @@ export function buildLiveviewPublishSelfDiag(args) {
       consistency.push({ lane, extRows: apiRows, mirrorRows, match: null, skipped: true, reason: `鏡が古い(${northMirrorAgeSec}秒前)` });
       return;
     }
+    // ★2026-08-08: 鏡が【別配信】なら突合しない。
+    //
+    // ■ 実機で出た誤報(状態速報 2026-08-07T20:20 / lv351126026)
+    //     🔴 北極星 貢献度: 拡張 apiRows=0 / 鏡 6 「フルコピーでない」
+    //   しかし拡張側の state は no_ranking_data =【まだギフト無し】(healthCells.js:97)で、
+    //   この配信は広告4,900ptのみ・ギフト0pt = 貢献者0人が【正常】。
+    //   鏡の6件は前の配信(ギフト1,640pt)の残骸だった。
+    //   同じ報告の「投げ一覧 … 🔴別配信」がその証拠。
+    //
+    // ■ 応援レーン側(下の lanePicked 突合)は既に lidMatch で別配信を弾いていたが、
+    //   北極星側だけ liveId を見ていなかった＝同じ穴が片方にだけ残っていた。
+    if (lidMatch(north) === false) {
+      consistency.push({
+        lane,
+        extRows: apiRows,
+        mirrorRows,
+        match: null,
+        skipped: true,
+        reason: '鏡が別配信(前の配信の残骸)'
+      });
+      return;
+    }
+    // ★空が正常な状態(no_ranking_data=まだギフト無し 等)で拡張0なのに【鏡には件数がある】
+    //   ときだけ保留にする。0件が仕様どおりなのに🔴を出さないため。
+    //   ★鏡も0なら従来どおり突合してよい(0/0=一致「元データ無し＝純Webに出なくて正常」)。
+    //     ここを `apiRows===0` だけで弾くと、その正常な一致まで保留にしてしまう
+    //     (既存テスト2件が実際に落ちてそれを教えてくれた)。
+    if (apiRows === 0 && state !== 'ok' && mirrorRows > 0) {
+      consistency.push({
+        lane,
+        extRows: apiRows,
+        mirrorRows,
+        match: null,
+        skipped: true,
+        normal: true,
+        reason: `拡張側は${state}=この配信には元々0件(空が正常)`
+      });
+      return;
+    }
     // ★第2段: 二系統(content apiRows vs popup 鏡)の鮮度差を3段階判定=1件差を誤って『コピー漏れ』にしない。
     const { verdict, reason } = judgeNorthStarConsistency(apiRows, mirrorRows);
     if (verdict === 'match') {
