@@ -46,7 +46,8 @@ function nicoIconUrlForUid(uid) {
  * @param {ReadonlyArray<import('./officialDomRankingRowsToStripRooms.js').OfficialStripRoom>} rooms
  * @param {{
  *   yukkuriFaceFor: (key: string) => string,  // uid/合成キー→ゆっくり顔 data URL(io 注入=テスト可能)
- *   limit?: number                            // 表示上限(0/未指定=全件)
+ *   limit?: number,                           // 表示上限(0/未指定=全件)
+ *   resolveAvatarForUid?: (uid: string) => string  // ★v0.1.1286: 他レーンと同じ正本解決器(任意注入)
  * }} io
  * @returns {Array<{ displaySrc: string, title: string, meta: { idLine: string, nameLine: string }, entry: { userId: string } }>}
  */
@@ -68,13 +69,32 @@ export function adLanePicksFromRooms(rooms, io) {
     if (!name && !uid) continue;
 
     const avatarUrl = String(room.avatarUrl || '').trim();
-    // 解決順(他レーンと同一・2026-06-22 council/lane-show-all-active): ①公式API のサムネ →
-    //   ②数値ID由来の個人アイコン(広告API が thumbnailUrl を返さなくても数値IDがあれば個人サムネを出す。
-    //   「ぱき」のようにサムネ持ちの広告主がゆっくり顔に化けるのを防ぐ) → ③ゆっくり顔(安定生成)。
-    //   ②が 404 等でも本物タイルの load guard が③へフォールバックする=サムネ持ちは出る・無ければゆっくり。
+    /*
+     * 解決順(2026-06-22 council/lane-show-all-active + ★v0.1.1286 で②を追加):
+     *   ①公式API のサムネ(room.avatarUrl)
+     *   ★②【正本の解決器】= 他レーン(りんく/こん太/たぬ姉/ギフト)と同じ resolveStoryLaneAvatarSrc。
+     *     観測済みの実サムネ・記憶したアバター・自分(viewer)の画像 を使える。
+     *   ③数値ID由来の個人アイコン(CDN URL の導出=推測ではなく公式の規則)
+     *   ④ゆっくり顔(安定生成)
+     *   ③が 404 等でも本物タイルの load guard が④へフォールバックする=サムネ持ちは出る・無ければゆっくり。
+     *
+     * ★なぜ②が要るか(2026-08-07 実機で確定した構造的な穴):
+     *   広告段だけが【正本の解決器を通らない】唯一のレーンだった(import が
+     *   deriveAvatarUrlFromUid のみ)。そのため同じ uid の人が
+     *   「りんく段では観測済みの実サムネ / 広告段では白丸」という不一致を起こしていた
+     *   (実機: 君斗りんく@クリエイター応援 uid=4046119 が広告段だけ白丸)。
+     *   ③の CDN 導出は退会/未設定ユーザーだと 404 になるが、②は【実際に観測できた URL】なので強い。
+     *   user-identity-unification-DESIGN.md が「広告列の独自実装」として統合対象に挙げていた箇所。
+     *
+     * ★uid が無い行(匿名広告主)には②を呼ばない=推測で他人の顔を出さない
+     *   (「誤リンクより false negative」の既存方針=nicoadContributionRankingApi.js:155 を維持)。
+     */
     const faceKey = uid || String(room.userKey || `ad${i}`);
+    const resolvedIcon = uid && typeof io?.resolveAvatarForUid === 'function'
+      ? String(io.resolveAvatarForUid(uid) || '').trim()
+      : '';
     const derivedIcon = uid ? nicoIconUrlForUid(uid) : '';
-    const displaySrc = avatarUrl || derivedIcon || yukkuriFaceFor(faceKey);
+    const displaySrc = avatarUrl || resolvedIcon || derivedIcon || yukkuriFaceFor(faceKey);
 
     // ID 行: 記名(uid あり)は短縮 ID を出さず広告主名を主役に(room.hideIdLine と同じ思想)。
     //   ID 無しは順位(#N)を idLine に出して「広告ランキングの何位か」を示す。

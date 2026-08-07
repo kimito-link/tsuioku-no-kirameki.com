@@ -8023,6 +8023,17 @@ async function paintStoryUserLaneCoalesced(liveId, displayEntries, storageRows) 
       yukkuriFaceFor: (key) => anonymousIdenticonDataUrl(String(key || ''), 64),
       // 2026-06-22(council/lane-show-all-active): 数値ID付き広告主の個人サムネ導出は adLanePicksFromRooms
       //   が内蔵(広告API が thumbnailUrl を返さなくても「ぱき」等サムネ持ちがゆっくり顔に化けない)。
+      /*
+       * ★v0.1.1286: 広告段を【他レーンと同じ正本の解決器】に配線する。
+       *   広告段だけが resolveStoryLaneAvatarSrc を通らない唯一のレーンで、そのため
+       *   同じ人が「りんく段では実サムネ / 広告段では白丸」になっていた(2026-08-07 実機)。
+       *   ここで注入するのは他レーンが使うのと【同じ関数】(storyGrowthAvatarSrcCandidate)。
+       *   ★entry 形は {userId, avatarUrl} で足りる(resolveStoryLaneAvatarSrc が読むのはこの2つ)。
+       *     広告 room は avatarUrl を持たない場合があるので uid だけ渡し、
+       *     観測済みサムネ/記憶アバター/本人画像の解決を正本に委ねる。
+       */
+      resolveAvatarForUid: (uid) =>
+        storyGrowthAvatarSrcCandidate({ userId: uid, avatarUrl: '' }, lid, storageRows),
       limit: giftLimit
     }
   );
