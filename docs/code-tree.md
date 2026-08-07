@@ -2230,10 +2230,10 @@
   - 📁 **sound/** (1)
     - `yozora-small-yell.mp3`
   - `speech-recognition-globals.d.ts` — Web Speech API（Chrome は webkit 接頭辞のことがある）
-- 📁 **tests/** (74)
+- 📁 **tests/** (75)
   - 📁 **contract/** (1)
     - `layer-dependency.test.js`
-  - 📁 **e2e/** (73)
+  - 📁 **e2e/** (74)
     - 📁 **fixtures/** (1)
       - 📁 **watch/** (1)
         - 📁 **lv888888888/** (1)
@@ -2309,6 +2309,7 @@
     - `support-timeline-persist-open.spec.js`
     - `thumbnail-capture.spec.js`
     - `timeline-fill-standalone-window.spec.js`
+    - `venue-entry-effect.spec.js`
     - `watch-messaging.spec.js`
 - 📁 **tools/** (5)
   - 📁 **mcp-nicolive/** (3)
