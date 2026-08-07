@@ -162,3 +162,73 @@ test('サイドパネル: 最初の数百msを1フレームずつ記録して黒
       `（このアプリは light 固定のはず／sidepanel.html:29 参照）`
   ).toBe(0);
 });
+
+/*
+ * ★会場モード(venue.html)は【黒が正しい】。
+ *   venueBar.js:2231-2232「スタンドアロン時は背景を黒系に塗り、映像セーフエリアを確保」
+ *   = OBS 配信で映像に載せるための意図的な黒。明るくしてはいけない。
+ *
+ *   なので会場に問うべきは「暗いかどうか」ではなく
+ *   【誰も塗っていない瞬間が無いか】= 意図した黒(#0a0b0c)か、塗り忘れの地か。
+ *   ★最初この test を「暗い地=NG」で書いて 115 フレーム赤にしたが、それは
+ *     仕様の読み違えだった。計器は仕様を確認してから書く。
+ */
+test('会場モード: 起動直後に「誰も塗らない」瞬間が無いこと(黒自体は正しい)', async ({ context }) => {
+  fs.mkdirSync(OUT_DIR, { recursive: true });
+  let sw = context.serviceWorkers().find((w) => w.url().startsWith('chrome-extension://'));
+  if (!sw) sw = await context.waitForEvent('serviceworker', { timeout: 60_000 });
+  const extensionId = new URL(sw.url()).hostname;
+
+  const page = await context.newPage();
+  await page.setViewportSize({ width: 1200, height: 800 });
+  await page.emulateMedia({ colorScheme: 'dark' });
+
+  await page.addInitScript(() => {
+    window.__venueFrames = [];
+    const t0 = performance.now();
+    const isDark = (c) => {
+      const m = String(c).match(/rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([\d.]+))?\)/);
+      if (!m) return false;
+      const a = m[4] === undefined ? 1 : +m[4];
+      return a > 0.5 && 0.2126 * +m[1] + 0.7152 * +m[2] + 0.0722 * +m[3] < 80;
+    };
+    const snap = () => {
+      try {
+        const h = document.documentElement ? getComputedStyle(document.documentElement) : null;
+        const b = document.body ? getComputedStyle(document.body) : null;
+        window.__venueFrames.push({
+          t: Math.round(performance.now() - t0),
+          cs: h ? h.colorScheme : null,
+          htmlDark: h ? isDark(h.backgroundColor) : null,
+          bodyDark: b ? isDark(b.backgroundColor) : null,
+          bodyBg: b ? b.backgroundColor : null
+        });
+      } catch { /* 計器の失敗は本体を止めない */ }
+      if (performance.now() - t0 < 2000) requestAnimationFrame(snap);
+    };
+    requestAnimationFrame(snap);
+  });
+
+  await page.goto(`chrome-extension://${extensionId}/venue.html`, {
+    waitUntil: 'commit',
+    timeout: 45_000
+  });
+  await page.waitForTimeout(2200);
+  const frames = await page.evaluate(() => window.__venueFrames || []);
+  fs.writeFileSync(path.join(OUT_DIR, 'venue-frames.json'), JSON.stringify(frames, null, 2));
+
+  // 会場の黒(#0a0b0c=rgb(10,11,12))は【正しい】。塗っていない透明だけを異常とする。
+  const unpainted = frames.filter((f) => f.bodyBg === 'rgba(0, 0, 0, 0)');
+  const intended = frames.filter((f) => f.bodyBg === 'rgb(10, 11, 12)');
+  console.log(
+    `[venue] 全 ${frames.length} フレーム / 意図した黒 = ${intended.length} / 誰も塗らない = ${unpainted.length}`
+  );
+  if (unpainted.length) console.log('[venue] 塗り忘れ先頭 =', JSON.stringify(unpainted[0]));
+
+  expect(frames.length, 'フレームが取れていること').toBeGreaterThan(5);
+  expect(
+    unpainted.length,
+    `会場で body が透明なフレームが ${unpainted.length} 個ある` +
+      `（意図した黒 #0a0b0c ではなく【塗り忘れ】＝下の層が出る）`
+  ).toBe(0);
+});
