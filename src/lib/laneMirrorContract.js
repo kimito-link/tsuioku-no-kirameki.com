@@ -123,9 +123,13 @@ export function sanitizeLaneMirrorForRead(rawSnap) {
     issues.push('liveIdが空');
     return empty;
   }
-  const buckets = snap.buckets;
-  if (!buckets || typeof buckets !== 'object') {
-    issues.push('bucketsが無い');
+  // ★段は snapshot の【トップレベル】にある(`snap.link` …)。`snap.buckets` は存在しない。
+  //   書き手 laneMirror.js:177-193 が `{ liveId, capturedAt, ...tiers, domSelf, … }` と
+  //   spread で展開するため。v0.1.1280 で `snap.buckets` を探して【鏡を100%捨てていた】
+  //   (会場だけが fallback へ降格し gift/ad 段が消えた真因)。
+  //   ここは restoreLaneMirrorBuckets / venueRowsFromLaneMirror と同じ読み方に揃える。
+  if (!LANE_MIRROR_TIERS.some((tier) => Array.isArray(/** @type {any} */ (snap)[tier]))) {
+    issues.push('段が無い');
     return empty;
   }
 
@@ -134,12 +138,16 @@ export function sanitizeLaneMirrorForRead(rawSnap) {
   let droppedUnkeyed = 0;
 
   /** @type {Record<string, any[]>} */
-  const nextBuckets = {};
+  const nextTiers = {};
   for (const tier of LANE_MIRROR_TIERS) {
-    const rows = asArray(/** @type {any} */ (buckets)[tier]);
+    const rows = asArray(/** @type {any} */ (snap)[tier]);
     const kept = [];
     for (const cell of rows) {
-      const uid = String(cell?.entry?.userId || '').trim();
+      // ★uid は二刀流で読む。鏡セルは laneMirror.js:119 が返す【フラット】形
+      //   `{ displaySrc, title, idLine, nameLine, userId, recentTexts }` で、
+      //   `entry.userId` は復元後(restoreLaneMirrorBuckets)にしか生えない。
+      //   venueLaneParity.js:63 の venueLaneParityKey が既に二刀流=それに揃える。
+      const uid = String(cell?.userId ?? cell?.entry?.userId ?? '').trim();
       if (!uid) {
         // uid 無しは gift/ad(広告主・送り主)だけ許す。
         if (UNKEYED_ALLOWED_TIERS.includes(tier)) {
@@ -156,13 +164,16 @@ export function sanitizeLaneMirrorForRead(rawSnap) {
       }
       kept.push(cell);
     }
-    nextBuckets[tier] = kept;
+    nextTiers[tier] = kept;
   }
 
   // ★他フィールド(capturedAt/pickedLength/totalCandidates/domSelf 等)は spread で丸ごと写す。
   //   旧版が書いた snapshot(新フィールド無し)もそのまま通る=additive-only の互換。
+  // ★段は【トップレベルへ書き戻す】。下流(restoreLaneMirrorBuckets:228-232 /
+  //   venueRowsFromLaneMirror / laneMirrorTierKeySequences)は全て `s[tier]` を読むため、
+  //   `buckets` に入れて返すと関所を通した瞬間に全段が空として扱われる。
   return {
-    snap: { ...snap, buckets: nextBuckets },
+    snap: { ...snap, ...nextTiers },
     droppedLinkAnon,
     droppedKontaAnon,
     droppedUnkeyed,
