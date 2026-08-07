@@ -86,6 +86,7 @@ const VENUE_ROSTER_ENABLED = false;
  */
 const VENUE_SPEECH_PANEL_MAX = 200;
 import { resolveDisplayRows } from '../lib/venueDisplayRows.js';
+import { createVenueEntryQueue, VENUE_ENTRY_FLIGHT_MS } from '../lib/venueEntryQueue.js';
 import { runStorageOpWithTimeout, STORAGE_OP_TIMED_OUT } from '../lib/storageOpTimeout.js';
 import { buildVenueResidents } from '../lib/venueResidents.js';
 import {
@@ -1636,6 +1637,70 @@ const VENUE_CSS = `
     .nlsb-seat.nlsb-seat-speaking .nl-story-userlane-avatar {
       animation: none;
     }
+  }
+  /*
+   * 2026-08-08 入場演出(サイドパネル→会場へ「運ぶ」): 新しく来た人のアイコンが
+   * 画面端から自分の席へ弧を描いて飛び、着弾で席が一度ふくらむ。
+   *
+   * ★これは飾りであると同時に【計器】でもある。会場は「気づいたら居る」ので
+   *   載っていないのか目立たないのか区別できない。入場をイベントにすると
+   *   「飛んでこない＝載っていない」が目視で分かる。
+   *   だから reduced-motion でも【消さずに】ゆっくり出す(検証価値を残す)。
+   *
+   * 正本SPEC: docs/handoff/venue-transport-effect-SPEC-2026-08-08.md
+   */
+  .nlsb-entry-proj {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    overflow: hidden;
+    pointer-events: none;
+    opacity: 0;
+    z-index: 6;
+    box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.85), 0 6px 18px rgba(0, 0, 0, 0.5);
+    filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.5));
+  }
+  .nlsb-entry-proj img,
+  .nlsb-entry-proj .nl-story-userlane-avatar {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+    border-radius: 50%;
+  }
+  .nlsb-entry-proj.is-flying {
+    animation: nlsb-entry-fly var(--nlsb-entry-dur, 900ms) cubic-bezier(0.22, 0.61, 0.36, 1) forwards;
+  }
+  @keyframes nlsb-entry-fly {
+    0%   { transform: translate(-50%, -50%) scale(0.7); opacity: 0; }
+    12%  { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+    60%  { transform: translate(calc(-50% + var(--nlsb-entry-mx)), calc(-50% + var(--nlsb-entry-my))) scale(1.06); opacity: 1; }
+    100% { transform: translate(calc(-50% + var(--nlsb-entry-dx)), calc(-50% + var(--nlsb-entry-dy))) scale(0.92); opacity: 0; }
+  }
+  /* 着弾: 席が一度だけふくらんで「確定」を示す。 */
+  .nlsb-seat.nlsb-seat-entered .nl-story-userlane-avatar {
+    animation: nlsb-seat-enter 0.5s ease-out;
+  }
+  @keyframes nlsb-seat-enter {
+    0%   { transform: scale(0.72); filter: brightness(1.3); }
+    55%  { transform: scale(1.14); filter: brightness(1.12); }
+    100% { transform: scale(1); filter: brightness(1); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    /* ★飛ばさない。ただし【消さない】=着弾点でふわっと出して消える(入場が分かる)。 */
+    .nlsb-entry-proj.is-flying {
+      animation: nlsb-entry-fade var(--nlsb-entry-dur, 900ms) ease-out forwards;
+    }
+    @keyframes nlsb-entry-fade {
+      0%   { transform: translate(calc(-50% + var(--nlsb-entry-dx)), calc(-50% + var(--nlsb-entry-dy))) scale(1); opacity: 0; }
+      25%  { transform: translate(calc(-50% + var(--nlsb-entry-dx)), calc(-50% + var(--nlsb-entry-dy))) scale(1); opacity: 0.95; }
+      75%  { transform: translate(calc(-50% + var(--nlsb-entry-dx)), calc(-50% + var(--nlsb-entry-dy))) scale(1); opacity: 0.95; }
+      100% { transform: translate(calc(-50% + var(--nlsb-entry-dx)), calc(-50% + var(--nlsb-entry-dy))) scale(1); opacity: 0; }
+    }
+    .nlsb-seat.nlsb-seat-entered .nl-story-userlane-avatar { animation: none; }
   }
   /* v0.1.743 「会話の連鎖」(会議の最大多数決の本命・弱点A/C): 同じ人が短い間隔で続けて喋ると、
      その席が段階的に暖色(コーラル)で輝き、連続するほど強く速く脈動する=「溜まっていく感」。
@@ -4302,6 +4367,151 @@ export function mountVenueBarButton(options = {}) {
     el.classList.add('is-flying');
     return true;
   };
+  /* ------------------------------------------------------------------ */
+  /* 入場演出(サイドパネル→会場へ「運ぶ」) 2026-08-08                    */
+  /* 正本SPEC: docs/handoff/venue-transport-effect-SPEC-2026-08-08.md    */
+  /* ------------------------------------------------------------------ */
+  /** 差分検出と間引きの正本(純ロジック・DOM無し)。 */
+  const entryQueue = createVenueEntryQueue();
+  /** 入場投射体のプール(gift と同じ作法)。 @type {HTMLElement[]} */
+  const entryProjPool = [];
+  const ENTRY_PROJ_POOL_SIZE = 8;
+  /** 計器: 入場演出の実績(状態速報に出す)。 */
+  const _entryEffectDiag = { flown: 0, seatedDirect: 0, suppressedFirst: 0, suppressedLiveChange: 0, noSeat: 0 };
+
+  /**
+   * 画面端(サイドパネル側)の座標を bubbleLayer ローカルで返す。
+   * ★サイドパネルと会場は別ウィンドウ/別ドキュメントなので DOM をまたいで実際に飛ばすことは
+   *   できない。「その方向から飛んでくる」見立てで十分伝わる(SPEC §5)。
+   *   Chrome のサイドパネルは既定で【右】なので右端から。
+   * @param {number} seatY 着地点のY(高さを合わせると自然に見える)
+   */
+  const entryOriginPoint = (seatY) => {
+    try {
+      const lr = bubbleLayer.getBoundingClientRect();
+      return { x: lr.width + 40, y: Number.isFinite(seatY) ? seatY : lr.height * 0.5 };
+    } catch {
+      return { x: 900, y: 300 };
+    }
+  };
+
+  /**
+   * 席の中心を bubbleLayer ローカル座標で返す(giftThrowOriginForSpeaker の着地版)。
+   * @param {string} key 席 key
+   * @returns {{ x: number, y: number, node: any } | null}
+   */
+  const entrySeatPoint = (key) => {
+    const seatIndex = seatByKey.get(key);
+    const node = typeof seatIndex === 'number' ? seatNodes[seatIndex] : null;
+    const anchorEl = node ? seatAnchorEl(node) : null;
+    if (!anchorEl || !anchorEl.isConnected) return null;
+    try {
+      const layerRect = bubbleLayer.getBoundingClientRect();
+      const r = anchorEl.getBoundingClientRect();
+      if (r.width <= 0) return null;
+      return {
+        x: r.left - layerRect.left + r.width / 2,
+        y: r.top - layerRect.top + r.height / 2,
+        node
+      };
+    } catch {
+      return null;
+    }
+  };
+
+  /**
+   * 1人ぶんの入場を飛ばす。
+   * ★アイコンは【席タイルの実アバターを複製】する。席タイルは正本の解決器を通って
+   *   作られているので、これで白丸事故(v1286)を構造的に避けられる=自前で解決し直さない。
+   * @param {string} key 席 key
+   * @returns {boolean} true=飛ばした / false=席が無い等で飛ばせなかった(着席はしている)
+   */
+  const launchEntryFlight = (key) => {
+    if (!open) return false;
+    const seat = entrySeatPoint(key);
+    if (!seat) {
+      _entryEffectDiag.noSeat += 1;
+      return false; // 席が見つからない=演出だけ諦める(その人は席に居る)
+    }
+    const el = entryProjPool.pop() || (() => {
+      const d = document.createElement('div');
+      d.className = 'nlsb-entry-proj';
+      bubbleLayer.appendChild(d);
+      return d;
+    })();
+    el.innerHTML = '';
+    // 席の実アバターを複製(解決済みの img をそのまま使う)。
+    const srcEl = seatAnchorEl(seat.node);
+    const srcImg = srcEl ? srcEl.querySelector('img') : null;
+    if (srcImg instanceof HTMLImageElement && srcImg.src) {
+      const img = document.createElement('img');
+      img.alt = '';
+      img.decoding = 'async';
+      img.src = srcImg.src;
+      el.append(img);
+    } else if (srcEl instanceof HTMLElement) {
+      // 画像でない(ゆっくり顔の合成DOM等)ならクローンで見た目を保つ。
+      const clone = /** @type {HTMLElement} */ (srcEl.cloneNode(true));
+      clone.removeAttribute('id');
+      el.append(clone);
+    }
+    const origin = entryOriginPoint(seat.y);
+    const dx = seat.x - origin.x;
+    const dy = seat.y - origin.y;
+    el.style.left = `${origin.x}px`;
+    el.style.top = `${origin.y}px`;
+    el.style.setProperty('--nlsb-entry-dx', `${dx}px`);
+    el.style.setProperty('--nlsb-entry-dy', `${dy}px`);
+    // 中間点を少し上に持ち上げて弧を描く(gift と同じ考え方)。
+    el.style.setProperty('--nlsb-entry-mx', `${dx * 0.55}px`);
+    el.style.setProperty('--nlsb-entry-my', `${dy * 0.55 - 46}px`);
+    el.style.setProperty('--nlsb-entry-dur', `${VENUE_ENTRY_FLIGHT_MS}ms`);
+
+    const recycle = () => {
+      el.removeEventListener('animationend', recycle);
+      el.classList.remove('is-flying');
+      el.style.cssText = '';
+      el.textContent = '';
+      entryQueue.onFlightDone(key);
+      if (entryProjPool.length < ENTRY_PROJ_POOL_SIZE) entryProjPool.push(el);
+      else el.remove();
+      // 着弾: 席を一度ふくらませて「確定」を示す。
+      const landed = entrySeatPoint(key);
+      if (landed && landed.node && landed.node.seat) {
+        const seatEl = landed.node.seat;
+        seatEl.classList.remove('nlsb-seat-entered');
+        void seatEl.offsetWidth; // reflow でアニメ再起動を確実に
+        seatEl.classList.add('nlsb-seat-entered');
+        window.setTimeout(() => seatEl.classList.remove('nlsb-seat-entered'), 700);
+      }
+    };
+    el.addEventListener('animationend', recycle, { once: true });
+    // 保険タイマー(animationend 取りこぼしでもキューを詰まらせない)。
+    window.setTimeout(recycle, VENUE_ENTRY_FLIGHT_MS + 400);
+    void el.offsetWidth;
+    el.classList.add('is-flying');
+    _entryEffectDiag.flown += 1;
+    return true;
+  };
+
+  /**
+   * renderSeats の直後に呼ぶ: 新規入場者を検出して演出を起こす。
+   * ★人は絶対に消さない。演出を間引くだけ(SPEC §4)。
+   * @param {string} liveId
+   */
+  const runEntryEffects = (liveId) => {
+    try {
+      const keys = Array.from(seatByKey.keys()).map((k) => String(k));
+      const r = entryQueue.tick({ keys, liveId: String(liveId || '') });
+      if (r.suppressedReason === 'first_paint') _entryEffectDiag.suppressedFirst += r.seat.length;
+      else if (r.suppressedReason === 'live_changed') _entryEffectDiag.suppressedLiveChange += r.seat.length;
+      else _entryEffectDiag.seatedDirect += r.seat.length;
+      for (const key of r.fly) {
+        if (!launchEntryFlight(key)) entryQueue.onFlightDone(key); // 飛ばせなくても枠は返す
+      }
+    } catch { /* 演出の失敗は会場の描画を止めない */ }
+  };
+
   /** speech.text からギフト/広告を検出して投げる。 @param {{ text?: unknown, speakerKey?: string }} speech */
   const maybeThrowGiftFromSpeech = (speech) => {
     const text = String(speech?.text || '');
@@ -5473,6 +5683,9 @@ export function mountVenueBarButton(options = {}) {
     if (!diagPanel.hidden) renderDiagPanel();
     // v0.1.1053: 会場が生きている間だけプレゼンスを書く(popup側の効果音二重再生防止・3秒min-gap内蔵)。
     if (open) writeVenueEffectSoundPresence();
+    // 2026-08-08 入場演出: 席が DOM に載った【後】に呼ぶ(座標が取れるのはこの時点以降)。
+    //   新規が居なければ何もしない=通常 paint を汚さない。
+    runEntryEffects(String(activeLiveId || liveIdFromPathname() || ''));
   };
 
   /**
