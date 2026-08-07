@@ -630,7 +630,7 @@
     - `trumpet1.mp3`
     - `wallet1.mp3`
   - `SOURCES.md`
-- 📁 **src/** (1518)
+- 📁 **src/** (1520)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -911,7 +911,7 @@
         - `logo_funlink_white_RGB_maru_black.png`
       - `logo_guide_funlink_ol.pdf`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1287)
+  - 📁 **lib/** (1289)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -2090,6 +2090,7 @@
     - `venueIncrementalAggregate.test.js`
     - `venueLaneBuckets.js` — ⚠️ 役割コメント無し
     - `venueLaneBuckets.test.js`
+    - `venueLaneMirrorAccept.wiring.test.js`
     - `venueLaneMirrorSupply.js` — 会場の「鏡優先+同型フォールバック」供給(純関数)。①POP が実 paint した5段 buckets の鏡
     - `venueLaneMirrorSupply.test.js`
     - `venueLaneParity.js` — 会場レーンのパリティ計器(純関数)。会場が実際に paint した段割当列を、①POP の実描画鏡
@@ -2097,6 +2098,7 @@
     - `venueLaneParity.wiring.test.js`
     - `venueLiveRoster.js` — v0.1.754 会場の3時間安定化(星野ロミ・メソッド会議の本質解・6体ほぼ全会一致):
     - `venueLiveRoster.test.js`
+    - `venueMirrorAgeNotice.test.js`
     - `venueMirrorAvatarEnrich.js` — 会場行の avatar を「①の実描画鏡(laneMirror)が解決済みの顔URL」で
     - `venueMirrorAvatarEnrich.test.js`
     - `venueOpenLatency.js` — 会場モードの「開いてから見えるまで」を分解して観測する純関数(v0.1.1207)。

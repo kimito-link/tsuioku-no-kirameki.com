@@ -208,15 +208,35 @@ describe('会場=①レーン鏡映の配線(配線忘れ=CI赤)', () => {
   });
 
   // --- C1: 両端実DOM指紋(件数+寸法) ---
-  it('①POP は paint 直後に実DOMを測り、その同じ指紋を鏡へ渡す', () => {
+  it('①POP は paint 直後に実DOMを測り、その指紋を鏡へ渡す', () => {
+    /*
+     * ★v0.1.1281 で順序を変えた。
+     *   旧: paint → 実測 → publish を同一tickで（TOCTOU防止）
+     *   新: publish（描画より前・無条件） / paint 側は実測して控えるだけ
+     *
+     * ■ なぜ変えたか
+     *   publish が描画の後ろにあったため、「描かない」で早期returnする3経路
+     *   （sig一致 / 縮小ガード / 空ガード）が鏡の更新まで巻き添えで止めていた。
+     *   実機で鏡が656秒凍結し、会場が①と別の顔ぶれを表示していた（2026-08-06）。
+     *
+     * ■ なぜ同一tickでなくても安全か
+     *   measureLaneDomSelf は「そのとき存在するDOMの寸法」を読むだけ。
+     *   描画をスキップした = DOM が変わっていない = 寸法も変わっていない。
+     *   よって持ち回した値は【古い値ではなく正しい値】。
+     *   会議（3モデル全会一致）でこの方針を採用。顔ぶれの鮮度 > 幾何の同一tick厳密性。
+     */
     expect(popupSrc).toMatch(/measureLaneDomSelf/);
     const paintAt = popupSrc.indexOf('paintStoryUserLaneDomFilled(');
     const measureAt = popupSrc.indexOf('const laneDomSelf = measureLaneDomSelf(els)', paintAt);
-    const publishAt = popupSrc.indexOf('publishLaneMirror({', measureAt);
+    // 実測は paint の直後であること（ここは不変＝寸法は描いた直後にしか取れない）。
     expect(paintAt).toBeGreaterThanOrEqual(0);
     expect(measureAt).toBeGreaterThan(paintAt);
-    expect(publishAt).toBeGreaterThan(measureAt);
-    expect(popupSrc.slice(publishAt, publishAt + 500)).toMatch(/domSelf:\s*laneDomSelf/);
+    // ★実測値は必ず控える（次回の publish がこれを同梱する）。
+    expect(popupSrc).toMatch(/_laneDomSelfLast = laneDomSelf;/);
+    // ★publish は控えた実測値を渡す（幾何の突合が壊れないことの担保）。
+    const publishAt = popupSrc.indexOf('publishLaneMirror({');
+    expect(publishAt).toBeGreaterThan(-1);
+    expect(popupSrc.slice(publishAt, publishAt + 300)).toMatch(/domSelf:\s*_laneDomSelfLast/);
   });
 
   it('鏡は domSelf を容量計算に含め、計測器は5段の表示数と寸法を返す', () => {
