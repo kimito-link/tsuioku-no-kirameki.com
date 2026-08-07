@@ -6425,6 +6425,12 @@ const STORY_AVATAR_DIAG_STATE = {
 
 /** renderStoryUserLane の見た目が同じなら DOM を付け直さない（高流量時のちらつき抑制） */
 let storyUserLaneLastRenderSig = '';
+/**
+ * ★v0.1.1281: 直近に「実際に描けたとき」の①実DOM計測(measureLaneDomSelf の結果)。
+ *   鏡の publish は描画より前に行うため、paint 直後にしか取れないこの値は持ち回す。
+ *   会場の parity 判定(venueLaneParity.js)が読む。未描画のうちは null。
+ */
+let _laneDomSelfLast = null;
 /** v0.1.1041: 最後に実タイルを描いた liveId。同一配信 backfill 谷間の一瞬空でタイルを畳まない判定の基準(shouldKeepStoryUserLaneTilesOnEmpty)。 */
 let _storyUserLaneLastTiledLid = '';
 /** v0.1.1231 Phase1: 人物集合の増減を測る計器の状態(観測のみ)。 */
@@ -6925,6 +6931,43 @@ function renderStoryUserLane() {
     [...giftPicks, ...adPicks],
     entries.length
   );
+  /*
+   * ★v0.1.1281: 鏡の publish を【描画より先に・無条件で】行う。
+   *
+   * ■ 直した不具合(2026-08-06 実機で確定)
+   *   v0.1.1111 の設計は「会場の5段を①の実paint鏡に同化＝メンバー完全一致」。
+   *   ところが publish はこの下の描画処理の【後ろ】に置かれており、
+   *   「描かない」で早期 return する3経路がそのまま publish も止めていた:
+   *     (1) sig 一致(中身不変) (2) 縮小ガード (3) 空ガード
+   *   実機では鏡が 656秒 前で凍結し、3回のコピペで寸分違わず同じ値だった。
+   *   会場は凍結時点の中身を握り続けるため、①より多くも少なくもなった。
+   *
+   * ■ なぜここで良いか
+   *   publish が運ぶ buckets / picked / rosteredCandidates は【この行より前】で確定済み。
+   *   描画のスキップは正しい最適化だが、publish は描画ではなく【運搬】なので巻き添えにしない。
+   *
+   * ■ 読者は誰か
+   *   ★src/lib/laneMirrorContract.js の LANE_MIRROR_CONSUMERS が正本。
+   *     【会場モード(venueBar.js)もこの鏡を読む】=v0.1.1111 で「会場の正本」に昇格している。
+   *     書き手が読者を知らないまま片側を変えると会場が無言で壊れる(8回再発した構造的真因)。
+   *     登録簿はCIが実importと照合するので、読者が増えたら必ず気づける。
+   *
+   * ■ domSelf(①の実DOM計測)の扱い ★「古くなる」わけではない
+   *   domSelf は会場の parity 判定(venueLaneParity.js)が読む【タイル寸法の突合】用で、
+   *   顔ぶれ(誰が並ぶか)の判定には使われていない。
+   *   ★measureLaneDomSelf は「そのとき存在するDOMの寸法」を読むだけなので、
+   *     描画をスキップした = DOM が変わっていない = 寸法も変わっていない。
+   *     よって直近に描けたときの値を持ち回しても、それは【古い値ではなく正しい値】。
+   *   描いた直後は下の paint 経路が _laneDomSelfLast を更新する。
+   */
+  publishLaneMirror({
+    liveId,
+    buckets,
+    domSelf: _laneDomSelfLast,
+    pickedLength: picked.length + buckets.gift.length + buckets.ad.length,
+    // ★v0.1.1232: 名簿復活者を含む総数。③は cap 48 で切るため差分は鏡フッターが宣言する。
+    totalCandidates: rosteredCandidates.length
+  });
   if (laneSig === storyUserLaneLastRenderSig) {
     // 自己診断: 内容に変化なし＝再 paint しないが、DOM は前回の描画済み状態（=完了扱い・現 DOM 件数を記録）。
     //   ここで done を記録しないと、skip のたびに「started>completed」になり誤って未完走に見える。
@@ -7014,25 +7057,14 @@ function renderStoryUserLane() {
       ((typeof performance !== 'undefined' ? performance.now() : Date.now()) - _laneRenderT0) * 10
     ) / 10
   });
-  // 応援レーンの「鏡」: 顔(avatar)含めてそっくり映すための最小データを storage へ。
-  //   publishLaneDiag と同じ 3秒 min-gap・best-effort。buckets(りんく/こん太/広告/たぬ姉/ギフト)は
-  //   この時点で確定済み。描画は触らない(publish のみ)。
-  //   ★読者は src/lib/laneMirrorContract.js の LANE_MIRROR_CONSUMERS が正本。
-  //     【会場モード(venueBar.js)もこの鏡を読む】=v0.1.1111 で「会場の正本」に昇格している。
-  //     旧コメントは読者を popup と status だけと書いていたが【誤り】で、
-  //     書き手が読者を知らないまま片側を変えると会場が無言で壊れる状態だった
-  //     (会場パリティが8回再発した構造的真因・2026-08-06)。登録簿はCIが実importと照合する。
-  //   ★pickedLength は popup が paint に渡すのと同じ laneDisplayedTotal(全5段=りんく+ギフト+広告+
-  //     こん太+たぬ姉の合計枠)を渡す。picked.length(りんく/こん太/たぬ姉だけ)だと鏡のフッター
-  //     「いま N 件を表示中」が popup より小さくなり「ほか M人」が過大になる(数字の抜け漏れ)。
-  publishLaneMirror({
-    liveId,
-    buckets,
-    domSelf: laneDomSelf,
-    pickedLength: laneDisplayedTotal,
-    // ★v0.1.1232: 名簿復活者を含む総数。③は cap 48 で切るため差分は鏡フッターが宣言する。
-    totalCandidates: rosteredCandidates.length
-  });
+  /*
+   * ★v0.1.1281: ここにあった publishLaneMirror は【描画より前】へ移した(上部を参照)。
+   *   理由: 描かない経路(sig一致/縮小ガード/空ガード)の early return が publish まで
+   *   巻き添えで止めており、鏡が 656秒 凍結していた(2026-08-06 実機で確定)。
+   *   ★ここでは「今回描けた実DOM計測」を控えるだけにする。次回の publish がこれを同梱する。
+   *   描画は触らない(計測値の保存のみ)。
+   */
+  _laneDomSelfLast = laneDomSelf;
   setTimeout(() => {
     if (typeof window !== 'undefined' && window.__NLS_LANE_DIAG__) {
       window.__NLS_LANE_DIAG__();
