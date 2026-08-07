@@ -1,5 +1,27 @@
 <!DOCTYPE html>
-<html lang="ja" data-nl-usage-terms-ack="1" data-nl-popup-primary-cloak="1" data-nl-recording="on">
+<!--
+  ★v0.1.1289: html の style= と color-scheme を【インライン属性】で先に置く。
+  サイドパネルが「一瞬だけ真っ黒」になるのを根治（v1279/1283/1285 に続く4度目）。
+
+  ■ なぜ <style> ではダメか（計測で確定）
+    tests/e2e/sidepanel-flash-capture.spec.js で rAF ごとに塗り状態を記録したところ、
+    ロード後 9〜21ms に【html も body も何も塗らないフレーム】が実在した。
+    そのフレームの colorScheme は "normal"＝【まだ自前の CSS が適用されていない】。
+    つまり <style> 内の html{background} も :root{color-scheme} も間に合わない。
+    インライン style 属性なら HTML パース時点で効くのでこの窓を塞げる。
+    ★CSP(script-src 'self') が禁じるのは script であって style 属性ではない
+      （v1285 で head inline script 案が潰れた件とは別物）。
+
+  ■ 値は :root の --nl-bg/--nl-bg-soft、body:236、sidepanel.html:34 と同値。
+    ★変更するときは【4箇所とも】直すこと。
+-->
+<html
+  lang="ja"
+  data-nl-usage-terms-ack="1"
+  data-nl-popup-primary-cloak="1"
+  data-nl-recording="on"
+  style="color-scheme: light; background: linear-gradient(160deg, #fffaf2, #eef8ff)"
+>
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -11,7 +33,14 @@
     <link rel="preload" as="image" fetchpriority="high" href="images/yukkuri-charactore-english/tanunee/tanuki-yukkuri-normal-mouth-closed.thumb128.png" />
     <style>
       :root {
-        color-scheme: light dark;
+        /* ★v0.1.1289: `light dark` から `light` に変更（サイドパネル真っ黒・4度目の根治）。
+           このアプリに実質ダークモードは無い（popup-entry.js:1069-1070 が
+           nl-skin-panel-dark を無条件 remove する = v0.1.51「完全に light 強制」）。
+           `light dark` だと OS がダークのとき【Chrome のキャンバス既定色が暗色】になり、
+           下の html 背景が塗られていない隙間から黒が出る。sidepanel.html:29 が同じ理由で
+           既に `light` を宣言済み＝【中身のこの文書だけが取り残されていた】。
+           ★ここと sidepanel.html:29 は対。片方だけ直すと再発する。 */
+        color-scheme: light;
         --nl-pop-width: 420px;
         --nl-pop-height: 780px;
         --nl-base-font: 15.25px;
@@ -222,6 +251,23 @@
         margin: 0;
         padding: 0;
         overflow: hidden;
+        /*
+         * ★v0.1.1289: html 自身にも地の色を塗る（多重防御）。
+         *
+         * ★真因そのものは【上の <html> インライン style】＝ color-scheme:light で潰した。
+         *   ここは "自前 CSS が効き始めた後" に body が覆えない領域が出た場合の保険。
+         *   html/body は height:var(--nl-pop-height)=780px の固定高だが、サイドパネルは
+         *   実機で 1090px 前後になり得るため、body だけが塗る構図を残さない。
+         *
+         * ■ 測って分かったこと（tests/e2e/sidepanel-flash-capture.spec.js）
+         *   ロード直後は colorScheme==='normal'＝【この <style> はまだ効いていない】。
+         *   つまりこの規則だけでは初回フラッシュは塞げない（だからインライン属性が要る）。
+         *   → [[css-default-should-be-the-safe-state-2026-08-05]]：既定を安全側にする。
+         *
+         * ★<html> インライン style と body:236 と sidepanel.html:34 と同値。
+         *   別文書/別規則なので変更するときは【4つとも】直すこと。
+         */
+        background: linear-gradient(160deg, var(--nl-bg, #fffaf2), var(--nl-bg-soft, #eef8ff));
       }
 
       body {

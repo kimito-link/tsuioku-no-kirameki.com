@@ -74,3 +74,6 @@ council-scout/LATEST.md
 /maximize-*.txt
 /snippet-manager-*.txt
 /venue_log.txt
+
+# Playwright: ログイン状態/パネル状態(コミット厳禁・playwright-headless-recording スキル)
+.auth/
