@@ -12,3 +12,32 @@ fi
 # 波及先の機能を警告表示する。【ブロックしない】(摩擦ゼロ)=警告だけ出して必ずコミットは通す。
 # impact-check 自体が exit 0(警告モード)だが、万一こけてもコミットを止めないよう `|| true` で保険。
 npm run impact-check --silent 2>/dev/null || true
+
+# ★tree-map 同梱漏れガード(2026-08-07・同じ穴を2連続で踏んだので機械強制にする)。
+#
+#   踏んだ経緯: 新規ファイルを足した回に `npm run tree-map` を走らせても、
+#   その【前】に docs/ を git add 済みだと再生成分がステージされず、
+#   手元の verify:cc は緑なのに commit だけが drift する(HEAD で tree-map:check が赤)。
+#   ★「再生成したか」ではなく【ステージ済みの内容が最新か】を見ないと防げない。
+#
+#   ここでは新規/削除ファイルを含むコミットのときだけ検査する(件数変化=drift 源)。
+#   ★tree-map:check は【作業ツリー】を見るので、再生成しただけでステージしていない
+#     ときは緑になってしまう(まさに私が踏んだ状態)。よって
+#     「再生成が必要か(=作業ツリーが古いか)」と
+#     「生成物に未ステージの差分が残っていないか」の【両方】を見る。
+#   ブロックする(警告だと同じ見落としが起きる)。緊急時は SKIP_TREE_MAP_GATE=1 で回避。
+if [ -z "$SKIP_TREE_MAP_GATE" ] && git diff --cached --name-only --diff-filter=AD | grep -q .; then
+  TREE_MAP_FILES="docs/repo-tree-map.md docs/repo-tree-map.html docs/code-tree.md docs/code-tree.html docs/feature-sitemap.md docs/feature-sitemap.html"
+  if ! npm run tree-map:check --silent >/dev/null 2>&1; then
+    echo "BLOCKED: tree-map が最新ではありません(新規/削除ファイルを含むコミット)。"
+    echo "  npm run tree-map && git add $TREE_MAP_FILES"
+    exit 1
+  fi
+  # 再生成済みでも【ステージし忘れ】なら commit は drift する。これが実際に2連続で踏んだ穴。
+  if ! git diff --quiet -- $TREE_MAP_FILES 2>/dev/null; then
+    echo "BLOCKED: tree-map の生成物に【未ステージ】の差分があります(再生成したが add し忘れ)。"
+    echo "  git add $TREE_MAP_FILES"
+    echo "  (どうしても回避するなら SKIP_TREE_MAP_GATE=1 git commit ...)"
+    exit 1
+  fi
+fi
