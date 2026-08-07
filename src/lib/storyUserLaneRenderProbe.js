@@ -242,6 +242,14 @@ export function buildStoryUserLaneRenderDiag(probeSnap, ctx) {
   // 「期待件数」= 経路に応じた供給件数（mirror なら鏡、heavy なら entries）。
   const expected = path === 'mirror' ? mirror : path === 'heavy' ? entries : Math.max(mirror, entries, -1);
 
+  // ★2026-08-08: 「まだ落ち着いていない」判定。暫定paintだけで確定paintが0回なら
+  //   読み込み途中＝0件でも異常ではない。heavyEverSettled も併せて見る
+  //   (どちらかでも「確定した」と言えるなら settling ではない)。
+  const provisionalOnly =
+    (Number(s.provisionalTrueCount) || 0) > 0 &&
+    (Number(s.provisionalFalseCount) || 0) === 0 &&
+    s.heavyEverSettled !== true;
+
   // 症状の判定（council の (A)〜(E)）。
   let verdict = 'unknown';
   let reason = '';
@@ -265,6 +273,25 @@ export function buildStoryUserLaneRenderDiag(probeSnap, ctx) {
     //   いない=0タイルが正常。🔴(描画停止)でなく正常扱いにして誤報を消す。
     verdict = 'empty_source_anonymous';
     reason = `供給${expected}件は匿名主体(userId付き率${Math.round(withUidPercent * 10) / 10}%)で顔タイルに乗れる人がいない＝0件で正常（匿名は識別子が無く応援レーンに出ないのは仕様）`;
+  } else if (expected > 0 && dom === 0 && path === 'heavy' && provisionalOnly) {
+    // ★2026-08-08: 「まだ落ち着いていない」を🔴(描画停止)と言わない。
+    //
+    // ■ 実機で踏んだ誤報(状態速報 2026-08-07T15:59)
+    //   heavy が entries26 で走り domTiles0 の瞬間を切り取って
+    //   「供給26件あるのに画面0件＝描画が止まっています」と🔴を出し、
+    //   「開発者に共有してください」まで案内していた。しかし同じ報告の中で
+    //   鏡149件・会場152席は正常に出ており、描画経路は生きていた。
+    //   実態は popup 起動283ms・幕(shade)が出たまま・heavyEverSettled=false
+    //   =【まだ一度も読み切っていない】だけ。
+    //
+    // ■ 見分け方: 全ての paint が provisional(暫定)で、確定 paint が0回。
+    //   確定が一度でもあって0件なら本物の異常なので従来どおり🔴のまま。
+    //   ★これは [[instrument-name-can-mislead]] と同型(計器が正常を犯人と名指しする)。
+    verdict = 'settling';
+    reason =
+      `供給${expected}件・画面0件ですが、まだ暫定描画のみ(確定paint 0回)＝` +
+      '読み込み途中です。popup を数十秒開いたままにして取り直してください' +
+      '（それでも0件なら本物の異常です）';
   } else if (expected > 0 && dom === 0) {
     verdict = 'source_but_no_dom';
     reason = `供給${expected}件あるのに画面0件＝描画が止まっています（最後の到達=${step || '不明'}）`;
@@ -338,7 +365,11 @@ export function formatStoryUserLaneRenderDiagLines(diag, ctx) {
       ? '✅'
       : d.verdict === 'unknown'
         ? ''
-        : '🔴';
+        : // ★2026-08-08: 読み込み途中は🔴(異常)ではなく⏳(待ち)。
+          //   🔴のままだと「開発者に共有してください」まで案内して実機で誤報になった。
+          d.verdict === 'settling'
+          ? '⏳'
+          : '🔴';
   lines.push(
     `応援レーン描画: 経路=${pathLabel(d.path)} / ${supply} → 画面${dom} ${mark}` +
       (d.lastReachedStep ? ` / 最後の到達=${d.lastReachedStep}` : '') +

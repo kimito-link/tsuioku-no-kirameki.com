@@ -633,7 +633,7 @@
     - `trumpet1.mp3`
     - `wallet1.mp3`
   - `SOURCES.md`
-- 📁 **src/** (1530)
+- 📁 **src/** (1531)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -915,7 +915,7 @@
         - `logo_funlink_white_RGB_maru_black.png`
       - `logo_guide_funlink_ol.pdf`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1298)
+  - 📁 **lib/** (1299)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -1967,6 +1967,7 @@
     - `storyUserLaneMeta.test.js`
     - `storyUserLaneRenderProbe.js` — 応援レーン描画の自己診断（council/lane-render-self-diag-SYNTHESIS.md）。
     - `storyUserLaneRenderProbe.test.js`
+    - `storyUserLaneRenderProbeSettling.test.js`
     - `storyUserLaneRenderSignature.js` — 応援レーン(renderStoryUserLane)の「見た目が同じなら DOM を付け直さない」ための描画シグネチャを組む純関数。
     - `storyUserLaneRenderSignature.test.js`
     - `storyUserLaneRowModel.js` — 応援ユーザーレーン: 1 ユーザー候補あたりの tier・サムネ・ソート用スコアを一箇所で組み立てる。
