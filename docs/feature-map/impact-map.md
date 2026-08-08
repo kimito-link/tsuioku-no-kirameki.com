@@ -555,6 +555,7 @@
 | `src/lib/kiramekiAwardsSectionHtml.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/laneDiag.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/laneDomSelfMeasure.js` | 1 | ポップアップ(応援レーン) |
+| `src/lib/lanePublishSkipDiag.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/laneRosterKeeper.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/laneSupplyOriginDiag.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/laneTickProbe.js` | 1 | ポップアップ(応援レーン) |

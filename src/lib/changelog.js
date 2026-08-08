@@ -26,6 +26,16 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1292',
+    date: '2026-08-08',
+    summary: '会場が古くなる原因を調べる計測を追加（表示は不変）',
+    items: Object.freeze([
+      '会場モードや共有ページの表示が古いままになることがある問題について、原因を特定するための計測を追加しました。',
+      '見た目や動作は一切変わりません。状態速報に「応援レーン鏡publish」という行が増えるだけです。',
+      'この計測で「どこで止まっているのか」が分かると、次の修正を正しい場所に当てられます。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1291',
     date: '2026-08-08',
     summary: '★「ギフトがまだ無い配信」を不具合と誤って赤く出していたのを直しました',
