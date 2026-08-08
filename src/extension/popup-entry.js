@@ -668,6 +668,7 @@ import { makeLaneRosterDeltaState, noteLaneRoster, snapshotLaneRosterDelta } fro
 import { shouldSkipLightSupplyOverwrite, formatLightSupplyGuardLine } from '../lib/lightSupplyOverwriteGuard.js';
 // v0.1.1249: 「誰が供給を書いたか」を名指しする計器(provisional 申告漏れの検出込み)。
 import { LANE_SUPPLY_ORIGIN, createLaneSupplyOriginDiag, noteLaneSupplyShrink, noteLaneSupplyWrite, snapshotLaneSupplyOriginDiag } from '../lib/laneSupplyOriginDiag.js';
+import { snapshotLanePublishSkipDiag } from '../lib/lanePublishSkipDiag.js';
 // v0.1.1232 lane-never-drop: 「一度出た人」を覚える名簿(Phase2 蓄積器)。計器とは別モジュール。
 import { applyLaneRosterKeeper, makeLaneRosterKeeperState } from '../lib/laneRosterKeeper.js';
 // 人物タイルの ID 行・名前行の正本(person-tile-unify 第3コミット)。popup と会場で共有。
@@ -6435,6 +6436,14 @@ let storyUserLaneLastRenderSig = '';
 let _laneDomSelfLast = null;
 /** ★v0.1.1284: 直近に publish した鏡の contentHash(=次の paint の指紋の内容アドレス)。 */
 let _lastPublishedLaneMirrorHash = '';
+/** ★2026-08-08 計器: 鏡 publish の到達/見送りを数える。設計と読み方は lanePublishSkipDiag.js。 */
+const _lanePublishSkipDiag = {
+  noEls: 0,
+  entriesEmpty: 0,
+  lastPublishAt: 0,
+  lastSkipAt: 0,
+  lastSkipReason: ''
+};
 /** v0.1.1041: 最後に実タイルを描いた liveId。同一配信 backfill 谷間の一瞬空でタイルを畳まない判定の基準(shouldKeepStoryUserLaneTilesOnEmpty)。 */
 let _storyUserLaneLastTiledLid = '';
 /** v0.1.1231 Phase1: 人物集合の増減を測る計器の状態(観測のみ)。 */
@@ -6709,7 +6718,13 @@ function renderStoryUserLane() {
   //   candidates 全件走査+sort+bucket+paint の合計。全員表示(limit撤廃)で重くなるかの実機ベースライン。
   const _laneRenderT0 = typeof performance !== 'undefined' ? performance.now() : Date.now();
   const els = getStoryUserLaneEls();
-  if (!els) return;
+  if (!els) {
+    // 計器: publish 未到達=①のレーンDOM無し(lanePublishSkipDiag.js 参照)。
+    _lanePublishSkipDiag.noEls += 1;
+    _lanePublishSkipDiag.lastSkipAt = Date.now();
+    _lanePublishSkipDiag.lastSkipReason = 'noEls';
+    return;
+  }
   // 本体で直接触るガード要素だけ分割代入(stack/4段は els 経由で paintStoryUserLaneDomFilled へ渡る)。
   const { guideTop, guideLinesTop, guideBottom, guideLinesBottom } = els;
 
@@ -6746,6 +6761,10 @@ function renderStoryUserLane() {
     ? STORY_SOURCE_STATE.storageRowsForCurrentLive
     : entries;
   if (!entries.length) {
+    // 計器: publish 未到達=供給が空。block 内の return 2本を入口で1回だけ数える。
+    _lanePublishSkipDiag.entriesEmpty += 1;
+    _lanePublishSkipDiag.lastSkipAt = Date.now();
+    _lanePublishSkipDiag.lastSkipReason = 'entriesEmpty';
     // ★v1041: 同一配信 backfill 谷間の一瞬空では既存タイルを畳まない(タイル出入り根治・判定は lib 集約)。
     if (shouldKeepStoryUserLaneTilesOnEmpty(els, STORY_SOURCE_STATE.liveId, _storyUserLaneLastTiledLid)) { recordStoryUserLaneStep(_storyUserLaneRenderProbe, STORY_USER_LANE_STEPS.DONE, { domTilesPainted: countStoryUserLaneDomTiles(els) }); return; }
     recordStoryUserLaneStep(_storyUserLaneRenderProbe, STORY_USER_LANE_STEPS.ENTRIES_EMPTY_RETURN, {
@@ -6964,6 +6983,8 @@ function renderStoryUserLane() {
    *     よって直近に描けたときの値を持ち回しても、それは【古い値ではなく正しい値】。
    *   描いた直後は下の paint 経路が _laneDomSelfLast を更新する。
    */
+  // 計器: publish に到達した時刻(見送りカウンタと対で読む)。
+  _lanePublishSkipDiag.lastPublishAt = Date.now();
   publishLaneMirror({
     liveId,
     buckets,
@@ -19187,6 +19208,8 @@ async function collectAiShareDevMonitorPayloadBundle(watchUrl) {
         line: formatLightSupplyGuardLine(_lightSupplyGuardDiag)
       },
       laneSupplyOrigin: snapshotLaneSupplyOriginDiag(_laneSupplyOriginDiag),
+      // ★2026-08-08 計器: 鏡 publish の到達/見送り。読み方は lanePublishSkipDiag.js の冒頭。
+      lanePublishSkip: snapshotLanePublishSkipDiag(_lanePublishSkipDiag, Date.now()),
       // v0.1.1215: 「積み上げ式にならずアイコンがちらちら変わる」の観測。上の churn は
       //   全消し再構築だけを数えるため、DOM枚数を変えない「中身のすり替え」を取りこぼす。
       storyGrowthCellSwap: (() => {

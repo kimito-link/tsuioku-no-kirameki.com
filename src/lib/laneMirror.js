@@ -26,7 +26,8 @@
  *   domSelf: LaneMirrorDomSelf,
  *   pickedLength: number,
  *   totalCandidates: number,
- *   contentHash: string
+ *   contentHash: string,
+ *   writer: string
  * }} LaneMirrorSnapshot
  *
  * ★pickedLength = popup が paint に渡す laneDisplayedTotal(全5段=りんく+ギフト+広告+こん太+たぬ姉の
@@ -178,7 +179,9 @@ export function laneMirrorCapFromBuckets(buckets) {
  * storage 書き込み用の鏡スナップショット。容量超過時は cap を半減して作り直す(status を重くしない)。
  * @param {{ liveId?: unknown, buckets?: Record<string, unknown[]>, pickedLength?: unknown,
  *   totalCandidates?: unknown, domSelf?: unknown }} input
- * @param {{ cap?: number, nowMs?: number }} [opts]
+ * @param {{ cap?: number, nowMs?: number, writer?: string }} [opts]
+ *   writer: この鏡を焼いた主体('popup' 既定)。★2026-08-08 追加。将来 content 側の
+ *   書き手を足したとき「最後に書いたのは誰か」を読み手が見分けられるようにするための印。
  * @returns {LaneMirrorSnapshot}
  */
 export function buildLaneMirrorSnapshot(input, opts = {}) {
@@ -200,6 +203,12 @@ export function buildLaneMirrorSnapshot(input, opts = {}) {
       domSelf,
       pickedLength,
       totalCandidates,
+      // ★2026-08-08: 誰がこの鏡を焼いたか。既定は 'popup'(=①の描画経路)。
+      //   背景: 会場/③WEBが古い鏡を見る症状の切り分けで「最後に書いたのは誰か」が
+      //   読めないと、書き手を増やしたとき静かな上書き劣化に気づけない。
+      //   ★laneMirrorContract.js:80 の「唯一の書き手」不変条件は現時点では維持している。
+      //     将来 content 側の書き手を足すなら、この値で見分けられるようにしておく。
+      writer: String(opts?.writer || 'popup'),
       // v0.1.1137(lanescene-structural-review MVP): revisionはcapturedAt(壁時計)をそのまま使う
       //   (新規カウンタを作らない)。
       // 会場一致gift/ad根治(2026-07-14 Patch 2b): contentHashは復元正準形(読み手B-1適用後)で
