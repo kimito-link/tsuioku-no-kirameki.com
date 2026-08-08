@@ -157,7 +157,7 @@
     - `2026-07-22.md`
     - `2026-07-23.md`
     - `2026-07-31.md`
-- 📁 **docs/** (248)
+- 📁 **docs/** (249)
   - 📁 **article-assets/** (87)
     - 📁 **venue-frames/** (12)
       - `f01.png`
@@ -267,7 +267,7 @@
     - `storage-bus.md`
     - `venue.md`
     - `web-status.md`
-  - 📁 **handoff/** (84)
+  - 📁 **handoff/** (85)
     - `HANDOFF-backfill-instant-restore.md`
     - `HANDOFF-broadcast-score-panel.md`
     - `HANDOFF-comment-pickup-bsp.md`
@@ -324,6 +324,7 @@
     - `lanescene-structural-review-DESIGN.md`
     - `lanescene-structural-review-IMPLEMENTATION-HANDOFF.md`
     - `marketing-export-tab-IMPLEMENTATION-HANDOFF.md`
+    - `mirror-writer-decoupling-PLAN-2026-08-08.md`
     - `panel-flicker-council-brief-2026-08-05.md`
     - `panel-flicker-culprit-trap-DESIGN.md`
     - `panel-flicker-fable-brief-2026-08-05.md`
