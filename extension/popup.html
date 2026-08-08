@@ -1567,12 +1567,31 @@
              ユーザー実機 18300件で再現)。親+各レーンの二重指定はネストして白化を悪化させる。
          新: レーンは6個程度で描画スキップの利得が小さい一方、白化リスクが大きいので
              content-visibility を外して常時描画にする(白化が構造的に起きなくなる)。
-             単発で重い .nl-stats / .nl-support-visual-details は従来どおり省略を残す。 */
-      .nl-stats,
-      .nl-support-visual-details {
-        content-visibility: auto;
-        contain-intrinsic-size: auto 240px;
-      }
+             単発で重い .nl-stats / .nl-support-visual-details は従来どおり省略を残す。
+
+         ★2026-08-08: .nl-stats から content-visibility を【外した】(クリックが効かない根治)。
+
+         ■ 何が起きていたか(e2e popup-layout:465 が2026-08-05から赤だった真因)
+           `content-visibility: auto` はスキップ中の subtree を【ヒットテスト対象から外す】。
+           そのため .nl-stats の中の要素を狙った elementFromPoint が、子ではなく
+           .nl-stats(SECTION)自身を返していた。実測(同じ点・同じ瞬間で両方向を確認):
+             content-visibility: auto    → elementFromPoint = SECTION            🔴
+             content-visibility: visible → elementFromPoint = DETAILS#supportVisualDetails ✅
+           .nl-stats は button 1個と details 2個(応援タイムライン/応援ビジュアル)を
+           【含む】ので、スキップ中は当たり判定が親に吸われ、1クリックで開かないことがある。
+           = テストの不具合ではなく実害のある製品バグ。
+
+         ■ .nl-support-visual-details も同じ理由で外した
+           当初「<summary> は details の直接の子だから当たり判定は残る」と考えたが、
+           実測で【誤り】と分かった。content-visibility:auto は subtree を丸ごと
+           スキップするので <summary> 自身も当たらない:
+             .nl-support-visual-details: auto    → elementFromPoint = DETAILS  🔴
+             .nl-support-visual-details: visible → elementFromPoint = SUMMARY  ✅
+           開閉トグルの当たり判定そのものが消えるので、ここも外すのが正しい。
+
+         ★教訓: content-visibility:auto は【インタラクティブ要素を含む器】には掛けない。
+           速さのための省略が、当たり判定という機能を黙って削る。
+           ★「直接の子なら残る」は成り立たない(subtree 全体がスキップされる)。 */
 
       /* 初回のみ: メイン UI をハイドレート完了まで覆い、段階描画のちらつきを抑える（#usageTermsGate は外に出す）。
        *
