@@ -26,6 +26,16 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1297',
+    date: '2026-08-09',
+    summary: '広告ランキングが純Web版に出ないことがあったのを直しました',
+    items: Object.freeze([
+      '拡張の画面には広告ランキングが出ているのに、純Web版（共有ページ）だけ空になることがありました。',
+      '広告ランキングの表示には3つの経路があり、そのうち1つだけが純Web版へ運ぶ処理を飛ばしていたためです。',
+      '運べる経路を先に試すよう順番を入れ替えました。表示そのものは変わりません。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1296',
     date: '2026-08-08',
     summary: '自己診断が状態速報に出ていなかったのを直しました',
