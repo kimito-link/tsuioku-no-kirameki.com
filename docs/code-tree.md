@@ -637,7 +637,7 @@
     - `trumpet1.mp3`
     - `wallet1.mp3`
   - `SOURCES.md`
-- 📁 **src/** (1543)
+- 📁 **src/** (1544)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -920,7 +920,7 @@
         - `logo_funlink_white_RGB_maru_black.png`
       - `logo_guide_funlink_ol.pdf`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1310)
+  - 📁 **lib/** (1311)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -940,6 +940,7 @@
     - `acquisitionDashboardChart.test.js`
     - `adLaneAvatarParity.test.js`
     - `adLaneMirrorPublishNotSkipped.wiring.test.js`
+    - `adLaneMirrorShippedBundle.probe.test.js`
     - `adLanePicksFromRooms.js` — 広告ランキング行(officialDomRankingRowsToStripRooms の room)を、popup/会場の人物タイル
     - `adLanePicksFromRooms.test.js`
     - `aiShareDiagSchema.js` — AI 共有診断バンドル（popup が組み立てる JSON / storage の nls_ai_share_fast_diag_v1）の
