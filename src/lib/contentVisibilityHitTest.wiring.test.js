@@ -29,6 +29,43 @@ const popupHtml = fs.readFileSync(
 );
 
 /**
+ * `content-visibility: auto` を含む CSS 宣言ブロックだけを取り出す。
+ *
+ * ★素朴な `/[^{}]+\{[^{}]*content-visibility[^{}]*\}/g` を 22k 行へ当てると
+ *   バックトラックで数秒かかり、【フルラン時だけ】落ちることがある
+ *   (単体では緑=テスト隔離の罠)。出現位置から切り出して線形時間にする。
+ *
+ * @param {string} html
+ * @returns {string[]} 各ブロック(セレクタ + { ... })
+ */
+function collectContentVisibilityBlocks(html) {
+  // ★CSS コメント(/* ... */)を先に落とす。落とさないと、説明文に書いた
+  //   「content-visibility: auto → …」まで規則として拾い、無関係なセレクタ
+  //   (.nl-main 等)を犯人として報告する(実際に一度誤検出した)。
+  const stripped = html.replace(/\/\*[\s\S]*?\*\//g, (m) => ' '.repeat(m.length));
+  /** @type {string[]} */
+  const out = [];
+  const needle = 'content-visibility:';
+  let from = 0;
+  for (;;) {
+    const hit = stripped.indexOf(needle, from);
+    if (hit < 0) break;
+    from = hit + needle.length;
+    if (!/^\s*auto\b/.test(stripped.slice(hit + needle.length, hit + needle.length + 12))) continue;
+    const open = stripped.lastIndexOf('{', hit);
+    const close = stripped.indexOf('}', hit);
+    if (open < 0 || close < 0) continue;
+    // セレクタは直前の } / ; / 冒頭 のいずれかから { まで。
+    const selStart = Math.max(
+      stripped.lastIndexOf('}', open - 1),
+      stripped.lastIndexOf(';', open - 1)
+    );
+    out.push(stripped.slice(selStart + 1, close + 1));
+  }
+  return out;
+}
+
+/**
  * content-visibility: auto を許してよいセレクタ。
  *
  * ★`.nl-story-growth-cell` / `.nl-story-growth-icon` は13pxのアイコン枠で、
@@ -42,7 +79,10 @@ const ALLOWED_SELECTORS = ['.nl-story-growth-icon', '.nl-story-growth-cell'];
 describe('content-visibility: auto の適用先', () => {
   it('★クリック対象を含む器(.nl-stats / .nl-support-visual-details)には掛けない', () => {
     // CSS宣言ブロック単位で「セレクタ群 { ... content-visibility: auto ... }」を拾う。
-    const blocks = popupHtml.match(/[^{}]+\{[^{}]*content-visibility:\s*auto[^{}]*\}/g) || [];
+    // ★正規表現を popup.html 全体(22k行)に当てると数秒かかり、フルラン時に
+    //   タイムアウトで落ちることがある(単体では緑=テスト隔離の罠)。
+    //   `content-visibility` を含む周辺だけに絞ってから解析する。
+    const blocks = collectContentVisibilityBlocks(popupHtml);
     const offenders = [];
     for (const b of blocks) {
       const selectorPart = b.slice(0, b.indexOf('{'));
@@ -59,7 +99,10 @@ describe('content-visibility: auto の適用先', () => {
   });
 
   it('content-visibility を足すなら許可リストに載っている器だけ', () => {
-    const blocks = popupHtml.match(/[^{}]+\{[^{}]*content-visibility:\s*auto[^{}]*\}/g) || [];
+    // ★正規表現を popup.html 全体(22k行)に当てると数秒かかり、フルラン時に
+    //   タイムアウトで落ちることがある(単体では緑=テスト隔離の罠)。
+    //   `content-visibility` を含む周辺だけに絞ってから解析する。
+    const blocks = collectContentVisibilityBlocks(popupHtml);
     const selectors = blocks
       .map((b) => b.slice(0, b.indexOf('{')).replace(/\/\*[\s\S]*?\*\//g, '').trim())
       .filter(Boolean);

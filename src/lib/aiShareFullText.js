@@ -104,7 +104,7 @@ export function formatRenderSectionMsLine(renderSectionMs) {
  * @param {any} args
  * @returns {string}
  */
-export function buildAiShareFullText({ overviewText, livesData, fastDiag, popupDiag, voiceDiag, venueSeatsDiag, laneDiag, laneMirror, reportPreview, trendFindings, jsonBlob, currentLiveId, publishKeys, publishOutcomeRec, previewRenderAck, refreshPerf, renderSectionMs, giftEffectDiag, milestoneEffectDiag, customSoundDiag, voiceEffectDiag, bgmPhaseDiag, opSoundEffectDiag, commentPostDiag, instantPushDiag, channelSwitchDiag, highlightLedger }) {
+export function buildAiShareFullText({ overviewText, livesData, fastDiag, popupDiag, voiceDiag, venueSeatsDiag, laneDiag, laneMirror, reportPreview, trendFindings, jsonBlob, currentLiveId, publishKeys, publishOutcomeRec, previewRenderAck, refreshPerf, renderSectionMs, giftEffectDiag, milestoneEffectDiag, customSoundDiag, voiceEffectDiag, bgmPhaseDiag, opSoundEffectDiag, commentPostDiag, instantPushDiag, channelSwitchDiag, highlightLedger, sidepanelSelfDiag }) {
   const lines = [];
   lines.push('## 君斗りんくの追憶のきらめき 状態速報');
   lines.push(`生成: ${new Date().toISOString()}`);
@@ -517,6 +517,14 @@ export function buildAiShareFullText({ overviewText, livesData, fastDiag, popupD
   try {
     const nsRaceLine = String((popupDiag?.popup ?? popupDiag)?.northStarMirrorPublishRace?.line || '');
     if (nsRaceLine) lines.push(nsRaceLine);
+  } catch {
+    /* no-op: 自己診断の失敗は状態速報を壊さない */
+  }
+  // 2026-08-08: サイドパネルの自己診断(黒画面の切り分け)。パネル自身が3層の塗り状態を
+  //   storage に書く=ユーザーが DevTools を開かずに原因が分かる。開いていなければ出ない。
+  try {
+    const spLine = String(sidepanelSelfDiag?.line || '');
+    if (spLine) lines.push(spLine);
   } catch {
     /* no-op: 自己診断の失敗は状態速報を壊さない */
   }

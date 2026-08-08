@@ -162,6 +162,14 @@ const targets = [
     target: 'chrome100'
   },
   {
+    // 2026-08-08: サイドパネルの自己診断だけを担う極小エントリ(描画には関与しない)。
+    //   黒画面が開発環境で再現せず実機だけで起きるため、パネル自身に状態を書かせて
+    //   いつもの「状態速報コピー」で原因が分かるようにする。
+    entryPoints: ['src/extension/sidepanel-entry.js'],
+    outfile: 'extension/dist/sidepanel.js',
+    target: 'chrome100'
+  },
+  {
     // feat/status-web-mobile-share: スマホ閲覧用 status Web 版(app.tsuioku-no-kirameki.com)。
     //   拡張に依存しない純 Web。api/status から GET した概要 jsonBlob を、拡張の status と
     //   同じ整形(src/lib/statusFormat.js を共用)で描画する。Vercel 静的配信。

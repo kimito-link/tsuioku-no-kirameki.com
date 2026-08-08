@@ -699,6 +699,7 @@
 | `src/lib/shouldRearmBackfillForOfficialGap.js` | 1 | 記録エンジン(watchページ常駐) |
 | `src/lib/shouldSkipDeepHarvest.js` | 1 | 記録エンジン(watchページ常駐) |
 | `src/lib/shouldTriggerOfficialGapDeepHarvest.js` | 1 | 記録エンジン(watchページ常駐) |
+| `src/lib/sidepanelSelfDiagKey.js` | 1 | 状態速報ページ |
 | `src/lib/singleFlightByKey.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/standalonePopupClose.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/statCardsMirror.js` | 1 | ポップアップ(応援レーン) |
