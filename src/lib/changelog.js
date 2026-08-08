@@ -26,6 +26,16 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1295',
+    date: '2026-08-08',
+    summary: 'サイドパネルの自己診断を追加しました',
+    items: Object.freeze([
+      'サイドパネルが黒く見えるとき、その原因を自分で調べて記録するようにしました。',
+      '見た目や動作は変わりません。状態速報に「サイドパネル自己診断」という行が1行増えるだけです。',
+      'これまでは黒い症状を調べるのに開発者ツールを開いていただく必要がありましたが、これからは状態速報をコピーするだけで原因が分かります。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1294',
     date: '2026-08-08',
     summary: '★サイドパネルの黒い一瞬(残り)を直しました',

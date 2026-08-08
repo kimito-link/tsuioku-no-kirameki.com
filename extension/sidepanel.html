@@ -68,5 +68,10 @@
   </head>
   <body>
     <iframe title="ニコ生ログ" src="popup.html?inline=1&amp;dock=sidepanel"></iframe>
+    <!-- 2026-08-08: 自己診断だけを行う極小スクリプト(描画には関与しない)。
+         「いま自分が黒く見える状態か」を storage に書き、状態速報に1行で出す。
+         ★実機だけで起きる黒画面を、DevTools を開かずに切り分けるための計器。
+         CSP は script-src 'self' なので【外部ファイル】であること(インライン不可)。 -->
+    <script src="dist/sidepanel.js"></script>
   </body>
 </html>
