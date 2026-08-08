@@ -1381,7 +1381,7 @@ async function loadBackfillLiveMetricSafe() {
 // v0.1.861: レポートプレビューの信頼度注釈の文脈は純関数 reportPreviewCtxFromFastDiag(src/lib)に抽出済み
 //   (NDGR 接続/userId 付き率/backfill 進行 → 注釈ctx・挙動同値・テストで固定)。import は冒頭。
 
-function renderAll({ lvList, summaries, fastDiag, popupDiag, backfillProgress, backfillLiveMetric, voiceDiag, venueSeatsDiag, laneDiag, laneMirror, statCardsMirror, northStarMirror, reportPreview, trendFindings, watchTabMap, publishOutcomeRec, commentTimelineMirror, giftHistoryMirror, roomHeatMirror, sessionSummaryMirror, previewRenderAck, refreshPerf, renderSectionMs, giftEffectDiag, milestoneEffectDiag, customSoundDiag, voiceEffectDiag, bgmPhaseDiag, opSoundEffectDiag, commentPostDiag, instantPushDiag, channelSwitchDiag, highlightLedger, scoreAnnounceDiag }) {
+function renderAll({ lvList, summaries, fastDiag, popupDiag, backfillProgress, backfillLiveMetric, voiceDiag, venueSeatsDiag, laneDiag, laneMirror, statCardsMirror, northStarMirror, reportPreview, trendFindings, watchTabMap, publishOutcomeRec, commentTimelineMirror, giftHistoryMirror, roomHeatMirror, sessionSummaryMirror, previewRenderAck, refreshPerf, renderSectionMs, giftEffectDiag, milestoneEffectDiag, customSoundDiag, voiceEffectDiag, bgmPhaseDiag, opSoundEffectDiag, commentPostDiag, instantPushDiag, channelSwitchDiag, highlightLedger, scoreAnnounceDiag, sidepanelSelfDiag }) {
   // v0.1.847: 各描画セクションを独立 try/catch で隔離するヘルパ。1つが throw しても他のセクションと
   //   最終更新メタを巻き込まない=「セルが全部消える/最終更新—のまま固まる」を根治。落ちた場所は
   //   console と AI 共有欄に出して真因を追えるようにする(star-romi 失敗体験の除去)。
@@ -1821,7 +1821,7 @@ function renderAll({ lvList, summaries, fastDiag, popupDiag, backfillProgress, b
   // AI 共有用テキスト
   let fullText = '';
   safeSection('AI共有テキスト', () => {
-    fullText = buildAiShareFullText({ overviewText, livesData, fastDiag, popupDiag, voiceDiag, venueSeatsDiag, laneDiag, laneMirror, reportPreview, trendFindings, jsonBlob, currentLiveId, publishKeys, publishOutcomeRec, previewRenderAck, refreshPerf, renderSectionMs, giftEffectDiag, milestoneEffectDiag, customSoundDiag, voiceEffectDiag, bgmPhaseDiag, opSoundEffectDiag, commentPostDiag, instantPushDiag, channelSwitchDiag, highlightLedger, scoreAnnounceDiag });
+    fullText = buildAiShareFullText({ overviewText, livesData, fastDiag, popupDiag, voiceDiag, venueSeatsDiag, laneDiag, laneMirror, reportPreview, trendFindings, jsonBlob, currentLiveId, publishKeys, publishOutcomeRec, previewRenderAck, refreshPerf, renderSectionMs, giftEffectDiag, milestoneEffectDiag, customSoundDiag, voiceEffectDiag, bgmPhaseDiag, opSoundEffectDiag, commentPostDiag, instantPushDiag, channelSwitchDiag, highlightLedger, scoreAnnounceDiag, sidepanelSelfDiag });
     const ta = /** @type {HTMLTextAreaElement|null} */ (
       document.getElementById('aiShareText')
     );
