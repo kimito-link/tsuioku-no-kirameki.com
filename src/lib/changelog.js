@@ -26,6 +26,16 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1296',
+    date: '2026-08-08',
+    summary: '自己診断が状態速報に出ていなかったのを直しました',
+    items: Object.freeze([
+      '前回追加した「サイドパネル自己診断」が、実際には状態速報に表示されていませんでした。',
+      '内部で値の受け渡しが2か所途切れていたためです。部品ごとの確認では気づけない種類の不具合でした。',
+      '今回は「記録してから画面に出るまで」を通しで確認する検査を追加したので、同じ見落としは起きません。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1295',
     date: '2026-08-08',
     summary: 'サイドパネルの自己診断を追加しました',
