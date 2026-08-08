@@ -26,6 +26,16 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1298',
+    date: '2026-08-09',
+    summary: 'サイドパネルの「出た直後だけ黒い」を診断が捕まえられるようにしました',
+    items: Object.freeze([
+      'サイドパネルは開いた直後だけ黒く、しばらくすると直る症状がありました。',
+      'ところが自己診断は毎回「正常」と報告していました。落ち着いた後の状態で先の記録を上書きしていたためです。',
+      '黒い瞬間を見つけたら記録を残すようにし、測る回数も2回から13回に増やしました。次に黒くなったとき、状態速報に原因が名前で出ます。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1297',
     date: '2026-08-09',
     summary: '広告ランキングが純Web版に出ないことがあったのを直しました',
