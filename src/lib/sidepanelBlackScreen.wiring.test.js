@@ -65,6 +65,27 @@ describe('★サイドパネルが真っ黒にならない(CSSだけで担保す
     expect(popupHtml).toMatch(/background: linear-gradient\(160deg, var\(--nl-bg\), var\(--nl-bg-soft\)\)/);
   });
 
+  it('★sidepanel.html の <html> がインライン style で先に塗る(v0.1.1294・黒い一瞬の残り)', () => {
+    /*
+     * 実測(v0.1.1293・ダーク・rAF全フレーム記録):
+     *   t=0ms <html> 未生成=何も塗られていない ← Chrome の地(暗色)が出る窓
+     *   t=4ms ようやく <style> が効いて cs=light / grad
+     * <style> では塞げない(CSS がまだ読まれていない)。塞げるのは html タグの属性だけ。
+     * ★popup.html は v0.1.1289 で同じ手当て済み。その【外側の入れ物】が
+     *   取り残されていたのが今回の残り。サイドパネルは開くたびここから読まれる。
+     */
+    expect(sidepanelHtml).toMatch(
+      /<html[^>]*\sstyle="[^"]*color-scheme:\s*light[^"]*"/
+    );
+    expect(sidepanelHtml).toMatch(
+      /<html[^>]*\sstyle="[^"]*background:\s*linear-gradient\(160deg, #fffaf2, #eef8ff\)[^"]*"/
+    );
+  });
+
+  it('★popup.html の <html> も同じくインライン style で先に塗る(v0.1.1289 を失わない)', () => {
+    expect(popupHtml).toMatch(/<html[^>]*\sstyle="[^"]*color-scheme:\s*light[^"]*"/);
+  });
+
   it('★CSP が inline script を禁じている(head スクリプト解を復活させない歯止め)', () => {
     const manifest = JSON.parse(read('extension/manifest.json'));
     const csp = String(manifest.content_security_policy?.extension_pages || '');
