@@ -12126,11 +12126,6 @@ async function refreshNorthStarAdRankingLane(liveId) {
     publishNorthStarMirror({ liveId: lid, adRanking: adRows, deferWrite: true });
     return;
   }
-  const mirrorHtml = typeof bundle?.adRankingMirrorHtml === 'string' ? bundle.adRankingMirrorHtml : null;
-  if (mirrorHtml) {
-    renderNorthStarLane('adRanking', mirrorHtml);
-    return;
-  }
   // v0.1.617: bundle に広告行が無くても、nicoad API 直叩きが storage に rows を書いていれば
   //   それを使って描画する。bundle 経由(readOfficialEventDomBundleFromStorage のマージ)は
   //   stale bundle / 取得タイミングのずれで null になることがあり(実機 staleDomBundleSuspected)、
@@ -12192,6 +12187,19 @@ async function refreshNorthStarAdRankingLane(liveId) {
     });
     // 北極星レーン鏡(広告・nicoad API 直読み経路)を合流バッファに積む(deferWrite=バースト中は write しない)。
     publishNorthStarMirror({ liveId: lid, adRanking: nicoadApiRows, deferWrite: true });
+    return;
+  }
+  // ★v0.1.1297(鏡publish取りこぼしの根治): 鏡HTML経路は【行を持たない】(mirrorHtml は
+  //   scrape した DOM の HTML 文字列で、northStarMirror が要求する row 配列ではない)。
+  //   この経路は以前ここより【前】にあり、当たると publishNorthStarMirror を呼ばずに return して
+  //   いた=①には広告が描けているのに③WEB鏡は空(0)=状態速報の「拡張3≠鏡0」。
+  //   → 行が取れる2経路(bundle / nicoad API 直読み)を【先に】試し、どちらも行が無いときだけ
+  //     この装飾的な鏡HTMLで描く。行があるのに鏡へ積まない経路を無くす=publish漏れの根を断つ。
+  //   ★行が無い以上ここでは鏡に積めない(積むと空配列で上書きし、直近の正しい鏡を消す)。
+  //     未指定レーンは mergeNorthStarMirrorLanes が温存する=触らないのが正しい。
+  const mirrorHtml = typeof bundle?.adRankingMirrorHtml === 'string' ? bundle.adRankingMirrorHtml : null;
+  if (mirrorHtml) {
+    renderNorthStarLane('adRanking', mirrorHtml);
     return;
   }
   // v0.1.1026(広告列の出たり消えたりチカチカ根治): ポーリングで storage read が一瞬空になるたび広告列を畳む→再表示を
