@@ -42,14 +42,30 @@ describe('publishLaneMirrorPerLive(実行して測る)', () => {
     );
   });
 
-  it('★受領証は鏡の contentHash を指す(内容アドレスで結ばれる)', () => {
+  it('★受領証は「測った本人の申告」を運ぶ(現在の hash で上書きしない)', () => {
+    /*
+     * ★v0.1.1301(Codex レビュー指摘・重大度高)の回帰。
+     *   指紋は前回 paint 時の DOM を測ったもので、その内容アドレスは
+     *   domSelf.fingerprintFor に既に刻まれている(popup-entry.js:7098-7103)。
+     *   publish 時の snapshot.contentHash で上書きすると、
+     *   「別内容を測った指紋」を比較可と誤認させる(恒真化と同じ穴)。
+     */
     const st = spyStorage();
-    const snap = snapFor('lv1234');
+    const snap = snapFor('lv1234'); // domSelf.fingerprintFor は未設定(=空)
     publishLaneMirrorPerLive(snap, 7, st);
     const receipt = st.writes[0][laneReceiptKeyFor('lv1234')];
-    expect(receipt.fingerprintFor).toBe(snap.contentHash);
+    expect(receipt.fingerprintFor).toBe('');
+    expect(receipt.fingerprintFor).not.toBe(snap.contentHash);
     expect(receipt.fingerprint).toBe('fp-lv1234');
     expect(receipt.surface).toBe('popup');
+  });
+
+  it('★domSelf が測った内容を名乗っていればそれを運ぶ', () => {
+    const st = spyStorage();
+    const snap = snapFor('lv1234');
+    snap.domSelf = { ...snap.domSelf, fingerprintFor: 'MEASURED_H1' };
+    publishLaneMirrorPerLive(snap, 7, st);
+    expect(st.writes[0][laneReceiptKeyFor('lv1234')].fingerprintFor).toBe('MEASURED_H1');
   });
 
   it('★鏡そのものは作り変えずに書く(中継で値を落とさない)', () => {

@@ -278,7 +278,10 @@ export function restoreLaneMirrorBuckets(snap) {
  *   ★時計で切ると、sig一致で描画をスキップしている間の「古くて正しい指紋」を
  *     捨ててしまう。内容アドレスならその誤りが起きない。
  *
- * @param {{ liveId?: unknown, domSelf?: unknown, contentHash?: unknown }} input
+ * ★fingerprintFor は domSelf(測った本人)の申告をそのまま運ぶ。
+ *   呼び手が現在の contentHash を渡して上書きする設計にしてはいけない(v0.1.1301 で是正)。
+ *
+ * @param {{ liveId?: unknown, domSelf?: unknown }} input
  * @param {{ nowMs?: number, surface?: string }} [opts] surface=どの表示面の受領証か
  * @returns {{ liveId: string, surface: string, capturedAt: number,
  *   fingerprint: string, fingerprintFor: string, measured: boolean,
@@ -294,9 +297,22 @@ export function buildLaneReceipt(input, opts = {}) {
     surface: String(opts?.surface || 'popup'),
     capturedAt: nowMs,
     fingerprint: dom.fingerprint,
-    // ★この受領証が「どの内容」を測ったかの内容アドレス。
-    //   受け手はこれが snapshot.contentHash と一致するときだけ硬く比較する。
-    fingerprintFor: String(input?.contentHash || dom.fingerprintFor || ''),
+    /*
+     * ★この受領証が「どの内容を測ったか」の内容アドレス。
+     *   受け手はこれが snapshot.contentHash と一致するときだけ硬く比較する。
+     *
+     * ★★v0.1.1301(Codex レビュー指摘・重大度高): ここに現在の snapshot.contentHash を
+     *   入れてはいけない。指紋は【前回 paint 時に測った DOM】の要約で、
+     *   popup-entry.js:7098-7103 が「その指紋が測った内容」を domSelf.fingerprintFor に
+     *   既に刻んでいる。現在の hash で上書きすると:
+     *     H1 を描いた指紋 F1 を持ったまま H2 の snapshot を publish
+     *       → 受領証は「F1 は H2 を測った」と【嘘を名乗る】
+     *       → isReceiptComparable が comparable=true を返す
+     *       → 別内容の指紋で「一致」を判定する = 恒真化と同じ穴
+     *   このリポが何度も踏んだ「比較の両辺が実は別物なのに緑」の類型そのもの。
+     *   → 測った本人(domSelf)の申告を【そのまま】運ぶ。上書きしない。
+     */
+    fingerprintFor: String(dom.fingerprintFor || ''),
     measured: dom.measured,
     perTier: dom.perTier,
     dpr: dom.dpr,

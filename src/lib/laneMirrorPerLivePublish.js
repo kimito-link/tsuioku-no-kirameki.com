@@ -44,8 +44,11 @@ export function publishLaneMirrorPerLive(snap, nowMs, storage) {
   if (!storage || typeof storage.set !== 'function') {
     return { written: false, reason: 'storageが無い', mirrorKey, receiptKey };
   }
+  // ★contentHash は【渡さない】(v0.1.1301・Codex レビュー指摘): 指紋が測ったのは
+  //   前回 paint 時の内容で、その内容アドレスは domSelf.fingerprintFor が既に持っている。
+  //   現在の snapshot の hash で上書きすると「別内容の指紋」を比較可と誤認させる。
   const receipt = buildLaneReceipt(
-    { liveId: lid, domSelf: snap?.domSelf, contentHash: snap?.contentHash },
+    { liveId: lid, domSelf: snap?.domSelf },
     { nowMs, surface: 'popup' }
   );
   // ★鏡と受領証を【同じ set】で書く=片方だけ新しい状態を作らない。

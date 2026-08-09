@@ -38,14 +38,29 @@ describe('buildLaneReceipt', () => {
     expect(buildLaneReceipt(INPUT, { surface: 'venue' }).surface).toBe('venue');
   });
 
-  it('★contentHash を渡したらそれを fingerprintFor にする(内容アドレスで結ぶ)', () => {
+  /*
+   * ★v0.1.1301(Codex レビュー指摘・重大度高)の回帰テスト。
+   *
+   * 受領証の fingerprintFor は【測った本人(domSelf)の申告】でなければならない。
+   * 呼び手が「現在の snapshot の contentHash」で上書きすると:
+   *   H1 を描いた指紋 F1 を持ったまま H2 を publish
+   *     → 受領証が「F1 は H2 を測った」と嘘を名乗る
+   *     → isReceiptComparable が true を返す
+   *     → 別内容の指紋で一致を判定する = 恒真化と同じ穴
+   * このリポが何度も踏んだ「比較の両辺が実は別物なのに緑」の類型。
+   */
+  it('★fingerprintFor は domSelf の申告をそのまま運ぶ(現在の hash で上書きしない)', () => {
     const r = buildLaneReceipt({ ...INPUT, contentHash: 'NEW_HASH' }, {});
-    expect(r.fingerprintFor).toBe('NEW_HASH');
+    expect(r.fingerprintFor).toBe('OLD_HASH');
+    expect(r.fingerprintFor).not.toBe('NEW_HASH');
   });
 
-  it('contentHash が無ければ domSelf 側の fingerprintFor を温存する', () => {
-    const r = buildLaneReceipt(INPUT, {});
-    expect(r.fingerprintFor).toBe('OLD_HASH');
+  it('★指紋が測っていない(fingerprintFor空)なら空のまま=比較不可へ倒す', () => {
+    const r = buildLaneReceipt(
+      { ...INPUT, domSelf: { ...DOM_SELF, fingerprintFor: '' }, contentHash: 'NEW_HASH' },
+      {}
+    );
+    expect(r.fingerprintFor).toBe('');
   });
 
   it('指紋・実測値を落とさずに運ぶ', () => {
@@ -63,7 +78,12 @@ describe('isReceiptComparable(比較してよいかの関所)', () => {
   const snap = buildLaneMirrorSnapshot(INPUT, { nowMs: 1, cap: 48 });
 
   it('★受領証が同じ contentHash を測っていれば比較可', () => {
-    const r = buildLaneReceipt({ ...INPUT, contentHash: snap.contentHash }, {});
+    // ★実機の順序: paint 後に domSelf.fingerprintFor へ「測った内容の hash」が刻まれる
+    //   (popup-entry.js:7098-7103)。受領証はその申告をそのまま運ぶ。
+    const r = buildLaneReceipt(
+      { ...INPUT, domSelf: { ...DOM_SELF, fingerprintFor: snap.contentHash } },
+      {}
+    );
     expect(isReceiptComparable(snap, r).comparable).toBe(true);
   });
 
@@ -90,7 +110,7 @@ describe('isReceiptComparable(比較してよいかの関所)', () => {
 
   it('★時計(measuredAt)が古くても、内容が同じなら比較可(時計で切らない)', () => {
     const stale = buildLaneReceipt(
-      { ...INPUT, contentHash: snap.contentHash, domSelf: { ...DOM_SELF, measuredAt: 1 } },
+      { ...INPUT, domSelf: { ...DOM_SELF, fingerprintFor: snap.contentHash, measuredAt: 1 } },
       {}
     );
     expect(isReceiptComparable(snap, stale).comparable).toBe(true);
