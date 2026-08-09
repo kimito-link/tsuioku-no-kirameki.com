@@ -725,6 +725,8 @@ import { buildStoryUserLaneCandidateRow } from '../lib/storyUserLaneRowModel.js'
 import { KEY_LANE_DIAG } from '../lib/laneDiagKey.js';
 import { buildLaneDiagSnapshot } from '../lib/laneDiag.js';
 import { KEY_LANE_MIRROR } from '../lib/laneMirrorKey.js';
+// ★v0.1.1300: 配信ごと鏡(v2)+受領証の書き出し(storage I/O グルーは lib へ抽出=max-lines ラチェット遵守)。
+import { publishLaneMirrorPerLive } from '../lib/laneMirrorPerLivePublish.js';
 import { KEY_PREVIEW_RENDER_ACK, buildPreviewRenderAck } from '../lib/previewRenderAckKey.js';
 import { buildLaneMirrorSnapshot, laneMirrorCapFromBuckets, restoreLaneMirrorBuckets } from '../lib/laneMirror.js';
 import { measureLaneDomSelf, perTierKeysOf } from '../lib/laneDomSelfMeasure.js';
@@ -7587,6 +7589,11 @@ function publishLaneMirror(input) {
     // ★v0.1.1284: publish は paint より前なので、この直後の paint が測る DOM = この hash の中身。
     _lastPublishedLaneMirrorHash = String(snap?.contentHash || '');
     mergeAndScheduleFlush('lane', snap, snap && snap.liveId, now);
+    // ★v0.1.1300: 配信ごとキー(v2)と受領証も書く(理由と不変条件は lib 側の JSDoc が正本)。
+    //   旧キーへの合流は上の行で継続=既存 reader は無変更のまま(rollback の保険)。
+    publishLaneMirrorPerLive(snap, now, {
+      set: (obj) => void chrome.storage.local.set(obj).catch(() => { /* best-effort */ })
+    });
   } catch {
     /* no-op */
   }

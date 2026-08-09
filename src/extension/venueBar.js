@@ -209,12 +209,16 @@ import { sanitizeLaneMirrorForRead } from '../lib/laneMirrorContract.js';
 import { buildVenueFallbackGiftEmptyNoteHtml } from '../lib/storyUserLaneGuideHtml.js';
 // v0.1.1111 会場=①レーン鏡映(メンバー完全一致): ①の実paint鏡(KEY_LANE_MIRROR)を会場の正本に昇格。
 //   設計正本=memory/reference_pop_venue_parity_SYNTHESIS.md(P層=鏡そのまま/T層=cap溢れの尾/X層=直近発言者)。
-import { KEY_LANE_MIRROR } from '../lib/laneMirrorKey.js';
+// ★v0.1.1300: 配信ごとキー(v2)を優先し、無ければ旧グローバルキーへ落ちる。
+//   旧キーは「最後に書いた配信」が他配信を上書きするため、多配信タブでは
+//   正しい配信の鏡が liveId 照合で弾かれ「鏡なし」に見えていた(=fallback降格)。
+import { KEY_LANE_MIRROR, laneMirrorKeyFor, laneReceiptKeyFor } from '../lib/laneMirrorKey.js';
 import { KEY_STORY_DIAG_MIRROR } from '../lib/storyDiagMirrorKey.js';
 // 記録件数の正本購読(story-diag-realtime-sync-DESIGN.md): ①popup非依存で content-entry.js が
 //   書く nls_panel_summary_<lv> を購読し、①が閉じていても件数だけはリアルタイムで動かす。
 import { panelSummaryStorageKey } from '../lib/panelLiveSummary.js';
-import { restoreLaneMirrorBuckets } from '../lib/laneMirror.js';
+// ★v0.1.1300: isReceiptComparable = 受領証と鏡が同じ内容を指すときだけ比較を許す関所。
+import { isReceiptComparable, restoreLaneMirrorBuckets } from '../lib/laneMirror.js';
 import {
   composeVenueLaneBuckets,
   isLaneMirrorUsableForVenue,
@@ -2933,6 +2937,14 @@ export function mountVenueBarButton(options = {}) {
    */
   let _laneMirrorSanitizeDropped = 0;
   /**
+   * ★v0.1.1300: ①(popup/サイドパネル)が書いた実DOM受領証。
+   *   会場は【別ドキュメントの DOM】を持つので、受領証はデータ本体と分けて運ぶ。
+   *   比較してよいのは isReceiptComparable(snap, receipt) が true のときだけ
+   *   (= receipt.fingerprintFor === snap.contentHash)。時計では判定しない。
+   * @type {any}
+   */
+  let _laneReceiptFromPopup = null;
+  /**
    * ★venue-exact-parity-SPEC-2026-08-07 §3-3: 会場【実DOM】のキー列指紋(diagDue のときだけ更新)。
    *   census が既に集めている keys 列(venueDomCensus.js:97-98)から作る=追加のDOM走査ゼロ。
    *   ①の実DOM指紋(鏡の domSelf.fingerprint)と突き合わせる相手。'' は未計測(=⚪)。
@@ -5595,8 +5607,39 @@ export function mountVenueBarButton(options = {}) {
          *   → revision差=「古い/先の世代を描いた」、hash差=「同世代で中身が違う」、
          *     指紋差=「データは同じなのに画面の顔ぶれが違う」を別々に名指しできる。
          */
+        /*
+         * ★v0.1.1300(受領証の分離): ①の実DOM指紋は、鏡データ本体(domSelf)ではなく
+         *   【別キーの受領証】から取れる場合がある。受領証は表示面固有なので、
+         *   共通データ(鏡)から切り離してある。
+         *   ★使ってよいのは isReceiptComparable が true のときだけ
+         *     = receipt.fingerprintFor === snap.contentHash(内容アドレス一致)。
+         *     時計では判定しない: sig一致で描画スキップ中の DOM は不変=指紋は
+         *     「古くて正しい」ので、時計で切ると正しい値を捨てる。
+         *   鏡本体に domSelf があるならそちらを優先する(既存挙動を変えない)。
+         */
+        let _acceptedForScene = laneMirrorSnap;
+        try {
+          const hasOwnFp = String(laneMirrorSnap?.domSelf?.fingerprint || '').trim() !== '';
+          if (!hasOwnFp && _laneReceiptFromPopup) {
+            const cmp = isReceiptComparable(laneMirrorSnap, _laneReceiptFromPopup);
+            if (cmp.comparable) {
+              const base = laneMirrorSnap?.domSelf;
+              _acceptedForScene = {
+                ...laneMirrorSnap,
+                domSelf: /** @type {import('../lib/laneMirror.js').LaneMirrorDomSelf} */ ({
+                  measured: base?.measured === true || _laneReceiptFromPopup.measured === true,
+                  perTier: base?.perTier ?? _laneReceiptFromPopup.perTier,
+                  dpr: base?.dpr ?? _laneReceiptFromPopup.dpr ?? 1,
+                  measuredAt: base?.measuredAt ?? _laneReceiptFromPopup.measuredAt ?? 0,
+                  fingerprint: String(_laneReceiptFromPopup.fingerprint || ''),
+                  fingerprintFor: String(_laneReceiptFromPopup.fingerprintFor || '')
+                })
+              };
+            }
+          }
+        } catch { /* 受領証の合成失敗は既存経路(鏡のdomSelf)に任せる */ }
         const sceneReceipts = buildVenueSceneReceipts({
-          acceptedSnap: laneMirrorSnap,
+          acceptedSnap: _acceptedForScene,
           paintedSnap: lanePaintSnap,
           paintedBuckets: laneBuckets,
           venueDomFingerprint: _venueDomFingerprintLast
@@ -5997,17 +6040,24 @@ export function mountVenueBarButton(options = {}) {
         if (!hasVenueExtensionContext()) return;
         const _catchUpLiveId = String(activeLiveId || liveIdFromPathname() || '').trim().toLowerCase();
         const _panelKey = _catchUpLiveId ? panelSummaryStorageKey(_catchUpLiveId) : '';
-        const bag = await runStorageOpWithTimeout(
-          () =>
-            chrome.storage.local.get(
-              _panelKey
-                ? [KEY_LANE_MIRROR, KEY_STORY_DIAG_MIRROR, _panelKey]
-                : [KEY_LANE_MIRROR, KEY_STORY_DIAG_MIRROR]
-            ),
-          3000
-        );
+        // ★v0.1.1300: この配信専用の鏡(v2)と受領証も一緒に読む。
+        const _mirrorKey = laneMirrorKeyFor(_catchUpLiveId);
+        const _receiptKey = laneReceiptKeyFor(_catchUpLiveId);
+        const _keys = [KEY_LANE_MIRROR, KEY_STORY_DIAG_MIRROR];
+        if (_panelKey) _keys.push(_panelKey);
+        if (_mirrorKey) _keys.push(_mirrorKey, _receiptKey);
+        const bag = await runStorageOpWithTimeout(() => chrome.storage.local.get(_keys), 3000);
         // ★受け入れ点1/2(開時 catch-up): 関所を必ず通す(laneMirrorContract.js の契約)。
-        const snap = acceptLaneMirrorSnapshot(bag?.[KEY_LANE_MIRROR]);
+        //   ★v0.1.1300: 配信ごとキー(v2)を【優先】する。無ければ旧グローバルキー。
+        //     旧キーは他配信の①が最後に書くと上書きされ、liveId 照合で弾かれて
+        //     「鏡なし」に見える(会場が fallback へ降格し gift/ad 段が消える真因)。
+        const snap =
+          (_mirrorKey ? acceptLaneMirrorSnapshot(bag?.[_mirrorKey]) : null) ||
+          acceptLaneMirrorSnapshot(bag?.[KEY_LANE_MIRROR]);
+        // 受領証(①が実際に描いた DOM の要約)。比較は isReceiptComparable が許すときだけ。
+        if (open && _receiptKey && bag?.[_receiptKey]) {
+          _laneReceiptFromPopup = /** @type {any} */ (bag[_receiptKey]);
+        }
         if (open && snap) {
           laneMirrorSnap = snap;
           scheduleLaneMirrorRecommit();
@@ -6334,7 +6384,12 @@ export function mountVenueBarButton(options = {}) {
     }
     // v0.1.1111 会場=①レーン鏡映: ①が publish した実paint鏡の新着を newValue 直採用(追加readゼロ)。
     //   rAF集約で再供給→再描画(①のpaint後 数百msで会場が同じ5段に同化する)。
-    const mirrorChange = changes[KEY_LANE_MIRROR];
+    // ★v0.1.1300: この配信専用キー(v2)を優先。旧グローバルキーは互換のため後段で見る。
+    //   ★v2 が来たら旧キーの変化は【無視】する: 旧キーは他配信の①も書くので、
+    //     ここで採用すると別配信の鏡で上書きしてしまう(単一グローバルキーの害)。
+    const _perLiveKey = laneMirrorKeyFor(liveId);
+    const perLiveChange = _perLiveKey ? changes[_perLiveKey] : null;
+    const mirrorChange = perLiveChange || changes[KEY_LANE_MIRROR];
     if (mirrorChange && mirrorChange.newValue) {
       // ★受け入れ点2/2(onChanged): 関所を必ず通す(laneMirrorContract.js の契約)。
       const accepted = acceptLaneMirrorSnapshot(mirrorChange.newValue);
@@ -6342,6 +6397,12 @@ export function mountVenueBarButton(options = {}) {
         laneMirrorSnap = accepted;
         scheduleLaneMirrorRecommit();
       }
+    }
+    // ①の実DOM受領証の新着(データ本体とは別キー=表示面固有だから分けている)。
+    const _receiptChangeKey = laneReceiptKeyFor(liveId);
+    const receiptChange = _receiptChangeKey ? changes[_receiptChangeKey] : null;
+    if (receiptChange && receiptChange.newValue && typeof receiptChange.newValue === 'object') {
+      _laneReceiptFromPopup = /** @type {any} */ (receiptChange.newValue);
     }
     const storyDiagChange = changes[KEY_STORY_DIAG_MIRROR];
     if (storyDiagChange && storyDiagChange.newValue && typeof storyDiagChange.newValue === 'object') {

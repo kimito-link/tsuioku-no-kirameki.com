@@ -94,7 +94,6 @@ describe('広告レーン: 出荷バンドルを実行して鏡に積まれる�
       determineNorthStarLaneState: () => 'ok'
     };
     const names = Object.keys(scope);
-    // eslint-disable-next-line no-new-func
     const factory = new Function(...names, `${fnSrc}; return refreshNorthStarAdRankingLane;`);
     await factory(...names.map((n) => scope[n]))(LID);
     return { published, rendered, API_ROWS, LID };

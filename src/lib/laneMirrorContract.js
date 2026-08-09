@@ -77,6 +77,8 @@ export const LANE_MIRROR_CONSUMERS = Object.freeze([
     // 書くのは renderStoryUserLane 内の publishLaneMirror 1箇所のみ。
     // INLINE_PASSIVE(②応援プレビュー)は書かない=受動ビューの不可侵原則。
     // 自身も passive 描画のために read する(7063行)。
+    // ★v0.1.1300: 同じ1箇所から【配信ごとキー(v2)+受領証】も書く
+    //   (publishLaneMirrorPerLive)。書き手は増えていない=単一書き手の不変条件は維持。
     note: '唯一の書き手(publishLaneMirror)。passive時は書かず読むだけ'
   }),
   Object.freeze({
@@ -95,6 +97,15 @@ export const LANE_MIRROR_CONSUMERS = Object.freeze([
     file: 'src/lib/mirrorBundleFlushScheduler.js',
     role: 'writer',
     note: '5鏡を1回の storage.set に合流させる書き出し口(同一tick化の書き側)'
+  }),
+  Object.freeze({
+    file: 'src/lib/laneMirrorPerLivePublish.js',
+    role: 'writer',
+    // ★v0.1.1300: 配信ごとキー(v2)+受領証の書き出し。popup-entry.js の publishLaneMirror
+    //   から1回だけ呼ばれる=書き手の【主体】は増えていない(storage I/O グルーの抽出のみ)。
+    //   ★合流バッファは通さない: あれは全 section を毎回同梱するので、配信が切り替わると
+    //     前の配信の lane を再同梱して巻き戻す。配信ごとキーは単独 set でなければならない。
+    note: '配信ごと鏡(v2)+受領証の書き出し口。popup の publishLaneMirror から1回だけ呼ばれる'
   }),
   Object.freeze({
     file: 'src/lib/statusExtrasBatch.js',

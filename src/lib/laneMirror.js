@@ -260,3 +260,66 @@ export function restoreLaneMirrorBuckets(snap) {
     tanu: restore(s.tanu)
   };
 }
+
+/**
+ * ★v0.1.1300: 実DOM受領証(Receipt)を鏡データ本体から分離して組む純関数。
+ *
+ * ■ なぜ分離するか
+ *   domSelf は「①(サイドパネル)が実際に描いた DOM の要約」= 表示面固有の受領証。
+ *   配信の共通データではない。会場は別ドキュメントの DOM を持つので、
+ *   受領証をデータ本体に同梱したままだと「同じデータなのに hash が違う」を
+ *   構造的に作る(=完全一致を永久に名乗れない)。
+ *   → データ(共通・全 reader が等値で持つ)と受領証(表示面ごと)を分け、
+ *     contentHash で安全に関連付ける。
+ *
+ * ■ 比較のしかた(laneMirrorContract.js の domSelf 指紋契約と同じ規律)
+ *   `receipt.fingerprintFor === snap.contentHash` のときだけ指紋を硬く比較する。
+ *   一致しなければ「⚪指紋未計測」へ逃がす=時計(measuredAt)では判定しない。
+ *   ★時計で切ると、sig一致で描画をスキップしている間の「古くて正しい指紋」を
+ *     捨ててしまう。内容アドレスならその誤りが起きない。
+ *
+ * @param {{ liveId?: unknown, domSelf?: unknown, contentHash?: unknown }} input
+ * @param {{ nowMs?: number, surface?: string }} [opts] surface=どの表示面の受領証か
+ * @returns {{ liveId: string, surface: string, capturedAt: number,
+ *   fingerprint: string, fingerprintFor: string, measured: boolean,
+ *   perTier: object, dpr: number, measuredAt: number }}
+ */
+export function buildLaneReceipt(input, opts = {}) {
+  const dom = normalizeDomSelf(input?.domSelf);
+  const nowMs = Number.isFinite(Number(opts?.nowMs)) ? Number(opts.nowMs) : 0;
+  return {
+    liveId: String(input?.liveId || '').trim().toLowerCase(),
+    // 表示面の名前。①=popup(サイドパネル内) / 会場=venue。
+    // ★受領証は表示面ごとに別物=どの面のものか名乗れないと比較できない。
+    surface: String(opts?.surface || 'popup'),
+    capturedAt: nowMs,
+    fingerprint: dom.fingerprint,
+    // ★この受領証が「どの内容」を測ったかの内容アドレス。
+    //   受け手はこれが snapshot.contentHash と一致するときだけ硬く比較する。
+    fingerprintFor: String(input?.contentHash || dom.fingerprintFor || ''),
+    measured: dom.measured,
+    perTier: dom.perTier,
+    dpr: dom.dpr,
+    measuredAt: dom.measuredAt
+  };
+}
+
+/**
+ * ★v0.1.1300: 受領証と鏡が「同じ内容を指しているか」を判定する純関数。
+ *
+ * @param {{ contentHash?: unknown }|null|undefined} snap 鏡 snapshot
+ * @param {{ fingerprintFor?: unknown, fingerprint?: unknown }|null|undefined} receipt
+ * @returns {{ comparable: boolean, reason: string }}
+ *   comparable=true のときだけ指紋を硬く比較してよい。
+ */
+export function isReceiptComparable(snap, receipt) {
+  const hash = String(snap?.contentHash || '').trim();
+  const forHash = String(receipt?.fingerprintFor || '').trim();
+  const fp = String(receipt?.fingerprint || '').trim();
+  if (!hash) return { comparable: false, reason: '鏡にcontentHashが無い' };
+  if (!receipt) return { comparable: false, reason: '受領証が無い(未描画)' };
+  if (!fp) return { comparable: false, reason: '指紋未計測' };
+  if (!forHash) return { comparable: false, reason: '受領証が対象内容を名乗っていない' };
+  if (forHash !== hash) return { comparable: false, reason: '受領証は別の内容を測っている(世代差)' };
+  return { comparable: true, reason: '' };
+}

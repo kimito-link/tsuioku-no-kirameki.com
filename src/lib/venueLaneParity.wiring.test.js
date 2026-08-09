@@ -179,7 +179,14 @@ describe('会場=①レーン鏡映の配線(配線忘れ=CI赤)', () => {
   // --- v0.1.1126 ①「詳しい状況」診断の会場コピー ---
   it('venueBar が storyDiag 鏡キーを catch-up と onChanged の両方で読む', () => {
     expect(venueBarSrc).toMatch(/KEY_STORY_DIAG_MIRROR/);
-    expect(venueBarSrc).toMatch(/\[KEY_LANE_MIRROR, KEY_STORY_DIAG_MIRROR, _panelKey\]/);
+    /*
+     * ★v0.1.1300: catch-up の読み取りキーは【配列リテラル】から【組み立て】に変わった
+     *   (配信ごとキー v2 と受領証キーを条件付きで足すため)。
+     *   固定するのは「catch-up の get に storyDiag と旧鏡キーが含まれる」という意図。
+     */
+    expect(venueBarSrc).toMatch(/const _keys = \[KEY_LANE_MIRROR, KEY_STORY_DIAG_MIRROR\];/);
+    expect(venueBarSrc).toMatch(/if \(_panelKey\) _keys\.push\(_panelKey\);/);
+    expect(venueBarSrc).toMatch(/chrome\.storage\.local\.get\(_keys\)/);
     expect(venueBarSrc).toMatch(/changes\[KEY_STORY_DIAG_MIRROR\]/);
   });
 
@@ -287,9 +294,20 @@ describe('会場=①レーン鏡映の配線(配線忘れ=CI赤)', () => {
     expect(calls.length).toBe(1);
     // ★4つの入力が【別々の起点】から渡っていることを、アンカー付きで1つの塊として固定する。
     //   acceptedSnap(最新受理) と paintedSnap(実際に描いた鏡)が同じ変数に化けたら赤。
+    /*
+     * ★v0.1.1300: acceptedSnap は laneMirrorSnap そのものではなく
+     *   `_acceptedForScene`(= laneMirrorSnap に【別キーの受領証】の指紋を必要時だけ合成した値)
+     *   になった。受領証は表示面固有なのでデータ本体から分離したため。
+     *   ★守る不変条件は変わらない: accepted(①起点) と painted(会場が実際に描いた鏡)が
+     *     【別の変数=別起点】であること。同じ変数に化けたら恒真比較になるので赤にする。
+     */
     expect(venueBarSrc).toMatch(
-      /const sceneReceipts = buildVenueSceneReceipts\(\{\n\s*acceptedSnap: laneMirrorSnap,\n\s*paintedSnap: lanePaintSnap,\n\s*paintedBuckets: laneBuckets,\n\s*venueDomFingerprint: _venueDomFingerprintLast\n\s*\}\);/
+      /const sceneReceipts = buildVenueSceneReceipts\(\{\n\s*acceptedSnap: _acceptedForScene,\n\s*paintedSnap: lanePaintSnap,\n\s*paintedBuckets: laneBuckets,\n\s*venueDomFingerprint: _venueDomFingerprintLast\n\s*\}\);/
     );
+    // ★_acceptedForScene の起点は laneMirrorSnap(①受理済みの鏡)であり、
+    //   paintedSnap(lanePaintSnap)とは別物であることを固定する。
+    expect(venueBarSrc).toMatch(/let _acceptedForScene = laneMirrorSnap;/);
+    expect(venueBarSrc).not.toMatch(/let _acceptedForScene = lanePaintSnap;/);
     // ★無条件文であること(`if (false)` 等の前置で死んでいないこと)を前後アンカーで固定する。
     expect(venueBarSrc).toMatch(
       /\}\);\n\s*sceneReceiptDiag = sceneReceipts\n\s*\? compareRenderReceipts\(sceneReceipts\.popReceipt, sceneReceipts\.venueReceipt\)\n\s*: null;/
