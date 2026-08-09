@@ -1,5 +1,12 @@
-<!DOCTYPE html>
+<!DOCTYPE html><html lang="ja" data-nl-usage-terms-ack="1" data-nl-popup-primary-cloak="1" data-nl-recording="on" style="color-scheme: light; background: linear-gradient(160deg, #fffaf2, #eef8ff)">
 <!--
+  ★v0.1.1299(6度目): <html> を【1行目・DOCTYPE の直後】へ移した。
+  従来はこの下に約1,233バイトのコメントがあり、ブラウザがそれを読み終わるまで
+  地の色が効かなかった(=面積ゼロ/未生成の瞬間に Chrome の地が出る)。
+  ★属性・値はすべて元のまま(cloak/recording/terms-ack を落とすと別の不具合になる)。
+    移したのは【位置だけ】=見た目は1ピクセルも変わらない。
+
+  ---- 以下は経緯(v0.1.1289・4度目までの記録) ----
   ★v0.1.1289: html の style= と color-scheme を【インライン属性】で先に置く。
   サイドパネルが「一瞬だけ真っ黒」になるのを根治（v1279/1283/1285 に続く4度目）。
 
@@ -15,13 +22,6 @@
   ■ 値は :root の --nl-bg/--nl-bg-soft、body:236、sidepanel.html:34 と同値。
     ★変更するときは【4箇所とも】直すこと。
 -->
-<html
-  lang="ja"
-  data-nl-usage-terms-ack="1"
-  data-nl-popup-primary-cloak="1"
-  data-nl-recording="on"
-  style="color-scheme: light; background: linear-gradient(160deg, #fffaf2, #eef8ff)"
->
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
