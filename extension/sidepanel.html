@@ -1,5 +1,20 @@
-<!DOCTYPE html>
+<!DOCTYPE html><html lang="ja" style="color-scheme: light; background: linear-gradient(160deg, #fffaf2, #eef8ff)">
 <!--
+  ★2026-08-09(6度目・v0.1.1299): <html> を【1行目・DOCTYPE の直後】へ移した。
+
+  ■ なぜ(実機 v0.1.1298 の自己診断が名指しした)
+      サイドパネル自己診断: 🔴黒くなりうる / 0x0 / 外✅ iframe✅ 中✅
+        / 原因=iframeが潰れている(0x0) ★出た直後だけ黒い(immediate時点で検知)
+    3層とも【正しく塗っている】のに黒い=塗る人が居ないのではなく、
+    塗る【面積がゼロ】の瞬間がある=まだ <html> が生まれていない。
+    従来はこの下に約1,045バイトのコメントがあり、
+    ブラウザがそれを読み終わるまで地の色が効かなかった。
+    ★コメントは <html> の【後ろ】に置けば同じ情報量でも露出ゼロにできる。
+
+  ■ 値は下の <style> の html/body と iframe(#fffaf2)、popup.html の1行目と同値。
+    ★変えるときは4箇所とも(sidepanelBlackScreen.wiring.test.js が機械照合する)。
+
+  ---- 以下は経緯(2026-08-08・5度目までの記録) ----
   ★2026-08-08: html に color-scheme と背景を【インライン属性】で置く(黒い一瞬の残り・5度目)。
 
   ■ 実測(v0.1.1293・ダークモード・rAFで全フレーム記録)
@@ -14,10 +29,6 @@
 
   ★値は下の <style> の html/body と iframe(#fffaf2) と同値。変えるときは3箇所とも。
 -->
-<html
-  lang="ja"
-  style="color-scheme: light; background: linear-gradient(160deg, #fffaf2, #eef8ff)"
->
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
