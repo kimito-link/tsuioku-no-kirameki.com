@@ -100,13 +100,15 @@ describe('配信ごとキー: 2配信を同時に開いても混線しない', (
     const st = makeStorage();
     const a = snapFor('lv111', ['134093242']);
     const b = snapFor('lv222', ['61735205']);
+    // ★受領証は domSelf の申告をそのまま運ぶ(v0.1.1301)。実機では paint 後に
+    //   domSelf.fingerprintFor へ「測った内容の hash」が刻まれるので、それを再現する。
     st.set({
       [laneReceiptKeyFor('lv111')]: buildLaneReceipt(
-        { liveId: 'lv111', domSelf: a.domSelf, contentHash: a.contentHash },
+        { liveId: 'lv111', domSelf: { ...a.domSelf, fingerprintFor: a.contentHash } },
         { nowMs: 1, surface: 'popup' }
       ),
       [laneReceiptKeyFor('lv222')]: buildLaneReceipt(
-        { liveId: 'lv222', domSelf: b.domSelf, contentHash: b.contentHash },
+        { liveId: 'lv222', domSelf: { ...b.domSelf, fingerprintFor: b.contentHash } },
         { nowMs: 2, surface: 'popup' }
       )
     });

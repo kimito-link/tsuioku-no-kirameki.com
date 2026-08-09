@@ -33,7 +33,16 @@ export const PRUNABLE_STORAGE_KEY_PREFIXES = Object.freeze([
   'nls_event_voting_ranking_',
   'nls_nicoad_ranking_',
   'nls_broadcaster_profile_',
-  'nls_commenter_follow_live_'
+  'nls_commenter_follow_live_',
+  // ★v0.1.1301(Codex レビュー指摘・重大度中): 応援レーン鏡を配信ごとキーへ分離した
+  //   (v0.1.1300)結果、視聴した配信の数だけキーが増えるようになった。旧実装は
+  //   単一グローバルキー1本だったので lifecycle が要らなかったが、分離した以上
+  //   削除する人が必要=既存の TTL(6h)+LRU(30件) 巡回に相乗りさせる。
+  //   ★どちらの値も capturedAt を持つ(laneMirror.js buildLaneMirrorSnapshot /
+  //     buildLaneReceipt)ので、既存の prune 判定がそのまま使える。
+  //   ★現在視聴中の lv は pruneStaleEventDomLvs が別枠で保護する。
+  'nls_lane_mirror_v2_',
+  'nls_lane_receipt_v1_'
 ]);
 
 /**
