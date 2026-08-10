@@ -1,3 +1,4 @@
+// @ts-nocheck — popup-entry.js から切り出し。DOM/Chrome API が広く any 相当(移設元と同方針)。
 /**
  * renderAcquisitionDashboard — 開発者モニタの「データ取得率」ダッシュボードを描く。
  *

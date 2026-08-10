@@ -3298,6 +3298,16 @@
       ]
     },
     {
+      "file": "src/extension/popup/attachAiDiagButtonHandler.js",
+      "featureCount": 1,
+      "features": [
+        "popup"
+      ],
+      "labels": [
+        "ポップアップ(応援レーン)"
+      ]
+    },
+    {
       "file": "src/extension/popup/renderAcquisitionDashboard.js",
       "featureCount": 1,
       "features": [
