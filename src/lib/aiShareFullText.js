@@ -104,7 +104,7 @@ export function formatRenderSectionMsLine(renderSectionMs) {
  * @param {any} args
  * @returns {string}
  */
-export function buildAiShareFullText({ overviewText, livesData, fastDiag, popupDiag, voiceDiag, venueSeatsDiag, laneDiag, laneMirror, reportPreview, trendFindings, jsonBlob, currentLiveId, publishKeys, publishOutcomeRec, previewRenderAck, refreshPerf, renderSectionMs, giftEffectDiag, milestoneEffectDiag, customSoundDiag, voiceEffectDiag, bgmPhaseDiag, opSoundEffectDiag, commentPostDiag, instantPushDiag, channelSwitchDiag, highlightLedger, sidepanelSelfDiag }) {
+export function buildAiShareFullText({ overviewText, livesData, fastDiag, popupDiag, voiceDiag, venueSeatsDiag, laneDiag, laneMirror, reportPreview, trendFindings, jsonBlob, currentLiveId, publishKeys, publishOutcomeRec, previewRenderAck, refreshPerf, renderSectionMs, giftEffectDiag, milestoneEffectDiag, customSoundDiag, voiceEffectDiag, bgmPhaseDiag, opSoundEffectDiag, commentPostDiag, instantPushDiag, channelSwitchDiag, highlightLedger, sidepanelSelfDiag, extrasAgeMs }) {
   const lines = [];
   lines.push('## 君斗りんくの追憶のきらめき 状態速報');
   lines.push(`生成: ${new Date().toISOString()}`);
@@ -176,6 +176,8 @@ export function buildAiShareFullText({ overviewText, livesData, fastDiag, popupD
       popupDiag: popupDiag || null,
       jsonBlob: jsonBlob || null,
       publishOutcome,
+      // ★v0.1.1302: 鏡を含む補助データの齢(12秒キャッシュ)。表示専用。
+      extrasAgeMs: extrasAgeMs == null ? null : extrasAgeMs,
       nowMs: Date.now()
     });
     // v0.1.985(council/parity-diagnose-SYNTHESIS.md): 状態速報の最先頭に「3画面パリティ」総合判定1行。

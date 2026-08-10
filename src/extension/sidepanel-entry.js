@@ -7,8 +7,47 @@
 //
 // ★描画には一切関与しない(読むだけ・best-effort)。失敗してもパネルは普通に動く。
 
-import { judgeSidepanelBlack } from '../lib/sidepanelSelfDiag.js';
+import {
+  findCenterPainter,
+  judgeSidepanelBlack,
+  summarizeZeroAreaWindow
+} from '../lib/sidepanelSelfDiag.js';
 import { KEY_SIDEPANEL_SELF_DIAG } from '../lib/sidepanelSelfDiagKey.js';
+
+/**
+ * ★v0.1.1302: 画面中央の点から祖先チェーンを集める(判定は純関数 findCenterPainter が行う)。
+ *   CSS 値を層ごとに読むだけでは足りないと実機で確定した(3層✅なのに黒い)ため、
+ *   「その座標に実在する要素」から辿る。elementFromPoint は既存パターン
+ *   (tests/e2e/popup-layout.spec.js / contentVisibilityHitTest.wiring.test.js)。
+ * @returns {{ painter: string|null, chain: string[], hit: string }}
+ */
+function probeCenterPainter() {
+  try {
+    const w = window.innerWidth;
+    const h = window.innerHeight;
+    // 面積が無いときは elementFromPoint が無意味(必ず null)。測らず「未レイアウト」を返す。
+    if (!(w > 0 && h > 0)) return { painter: null, chain: [], hit: 'ZERO_AREA' };
+    const el = document.elementFromPoint(Math.floor(w / 2), Math.floor(h / 2));
+    if (!el) return { painter: null, chain: [], hit: 'NO_ELEMENT' };
+    /** @type {{ tag: string, bgColor: string, bgImage: string }[]} */
+    const chain = [];
+    /** @type {Element|null} */
+    let cur = el;
+    for (let i = 0; cur && i < 12; i += 1) {
+      const cs = getComputedStyle(/** @type {HTMLElement} */ (cur));
+      chain.push({
+        tag: cur.tagName.toLowerCase() + (cur.id ? `#${cur.id}` : ''),
+        bgColor: cs.backgroundColor,
+        bgImage: cs.backgroundImage
+      });
+      cur = cur.parentElement;
+    }
+    const r = findCenterPainter(chain);
+    return { painter: r.painter, chain: r.chain, hit: el.tagName.toLowerCase() };
+  } catch {
+    return { painter: null, chain: [], hit: 'ERROR' };
+  }
+}
 
 /** @param {Element|null} el */
 function sampleLayer(el) {
@@ -31,6 +70,16 @@ function sampleLayer(el) {
 let _worst = null;
 /** この起動で collectAndPublish を呼んだ回数(何回目の測定か)。 */
 let _samples = 0;
+/**
+ * ★v0.1.1302: 各測定点の窓/iframe サイズの【系列】。
+ *   従来は最後の1点(nowSample)しか残らず、「窓が 0x0 だったのは何msか」が消えていた。
+ *   ユーザー証言「でる瞬間黒いが見える感じ」の裏取りに継続時間が要る:
+ *     60ms → 人間に見えない = 黒の正体は別 / 800ms → これが見えている黒。
+ * @type {{ t: number, w: number, h: number, iw: number, ih: number }[]}
+ */
+const _sizeSeries = [];
+/** パネルが開いた時刻(系列の t=0 基準)。 */
+const _bootAt = Date.now();
 
 /**
  * @param {string} phase どの瞬間の測定か('load'=描画直後 / 'settled'=落ち着いた後)
@@ -60,6 +109,8 @@ function collectAndPublish(phase) {
       })(),
       panelW: window.innerWidth,
       panelH: window.innerHeight,
+      // ★v0.1.1302: その座標を実際に塗っているのは誰か(CSS値の層読みでは足りない)。
+      centerPaint: probeCenterPainter(),
       outer: sampleLayer(document.documentElement),
       iframe: ifr
         ? {
@@ -84,24 +135,51 @@ function collectAndPublish(phase) {
 
     const verdict = judgeSidepanelBlack(sample);
     _samples += 1;
+    // ★v0.1.1302: 窓/iframe サイズを系列として残す(継続時間を測る唯一の材料)。
+    _sizeSeries.push({
+      t: Math.max(0, Date.now() - _bootAt),
+      w: Math.max(0, Math.round(Number(sample.panelW) || 0)),
+      h: Math.max(0, Math.round(Number(sample.panelH) || 0)),
+      iw: Math.max(0, Math.round(Number(sample.iframe?.w) || 0)),
+      ih: Math.max(0, Math.round(Number(sample.iframe?.h) || 0))
+    });
+    const zeroArea = summarizeZeroAreaWindow(_sizeSeries);
+    /*
+     * ★窓が未レイアウト(0x0)の測定は【最悪値として記録しない】。
+     *   t=0 の setTimeout はレイアウト前に走りうるので、ここを🔴として保持すると
+     *   ★毎回必ず偽の「黒くなりうる」が残る(実機 v0.1.1298 がまさにこれ)。
+     *   測定自体は続ける=継続時間は上の系列に残るので情報は失わない。
+     */
+    const unlaidOut = String(verdict.cause || '').startsWith('未レイアウト');
     // ★「一瞬だけ黒い」を消さない(2026-08-09 ユーザー報告=出た直後だけ黒く、しばらくすると直る)。
     //   従来は load 直後と 2500ms 後の2回とも【同じキーへ素で set】していたため、
     //   後の落ち着いた✅が先の🔴を上書きし、実機で必ず「✅正常」しか残らなかった
     //   ([[settled-state-hides-flash-bugs-2026-08-07]] を計器自身が踏んだ形)。
     //   → 黒を一度でも観測したらそれを保持し、以後の✅で塗り潰さない。
-    if (!verdict.ok && !_worst) _worst = { phase, verdict, sample, at: Date.now() };
+    if (!verdict.ok && !unlaidOut && !_worst) _worst = { phase, verdict, sample, at: Date.now() };
 
     const worst = _worst;
     const flashed = Boolean(worst);
-    // 出す行: 黒を見たならその瞬間の原因を出し、今は直っているかも併記する。
+    /*
+     * ★v0.1.1302: 1行に「誰が塗っているか」と「窓0x0の継続」を併記する(行は増やさない)。
+     *   - 塗り主=🔴誰も塗っていない … その座標が本物の黒
+     *   - 窓0x0の継続 … 人間に見える長さか(60ms=見えない / 800ms=これが正体)
+     *   ★塗り主は【今の値】を出す。過去の一瞬より「今どうなっているか」が次の一手に効く。
+     */
+    const cp = sample.centerPaint || null;
+    const paintNote = cp
+      ? ` / 中央の塗り主=${cp.painter || '🔴誰も塗っていない'}${cp.hit === 'ZERO_AREA' ? '(未レイアウト)' : ''}`
+      : '';
+    const zeroNote = zeroArea.everZero || _samples > 1 ? ` / ${zeroArea.line}` : '';
     const line = flashed
-      ? `${worst.verdict.line} ★出た直後だけ黒い(${worst.phase}時点で検知・今は${verdict.ok ? '正常' : '黒いまま'})`
-      : verdict.line;
+      ? `${worst.verdict.line} ★出た直後だけ黒い(${worst.phase}時点で検知・今は${verdict.ok ? '正常' : '黒いまま'})${paintNote}${zeroNote}`
+      : `${verdict.line}${paintNote}${zeroNote}`;
 
     void chrome?.storage?.local?.set({
       [KEY_SIDEPANEL_SELF_DIAG]: {
         at: Date.now(),
         // ok は「この起動で一度も黒くなかった」を意味する(瞬間の黒も見逃さない)。
+        // ★未レイアウトは黒として数えない(偽陽性を永久保持しない)。
         ok: verdict.ok && !flashed,
         cause: flashed ? worst.verdict.cause : verdict.cause,
         line,
@@ -109,6 +187,9 @@ function collectAndPublish(phase) {
         samples: _samples,
         flashed,
         flashPhase: flashed ? worst.phase : '',
+        // ★窓0x0の継続(黒の正体を絞る本命の材料)。
+        zeroArea,
+        sizeSeries: _sizeSeries,
         // 黒かった瞬間の生値を残す(原因の裏取り用)。無ければ今の値。
         sample: flashed ? worst.sample : sample,
         nowSample: sample

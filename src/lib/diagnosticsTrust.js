@@ -22,6 +22,13 @@
 /** popup 診断が「新鮮」とみなす上限(3分)。各鏡の MIRROR_FRESH_MS と揃える。 */
 export const POPUP_DIAG_FRESH_MS = 3 * 60 * 1000;
 
+/**
+ * ★v0.1.1302: popup 起動から「まだ構造的にゼロで正常」とみなす猶予。
+ *   値は popupDiagUptimeNote.js:29 の閾値と同一にすること(2箇所で違う定義を作らない)。
+ *   根拠: 鏡の flush は publish の 400ms 後・幕は 800ms 最低表示。
+ */
+export const POPUP_BOOT_GRACE_MS = 3000;
+
 /** ISO/epoch を epoch ms に(取れなければ 0)。 */
 function toEpochMs(v) {
   const n = Number(v);
@@ -86,10 +93,52 @@ export function buildDiagnosticsTrust(args) {
       lidMatch: currentLid && lid ? lid === currentLid : null
     };
   };
+  /*
+   * ★v0.1.1302: 起動直後の「鏡なし」を🔴にしない(誤読の構造的根治)。
+   *
+   * ■ 何が起きていたか(2026-08-09・開発者が3回誤読した)
+   *   起動 3.3秒 で撮った速報が「応援レーン鏡🔴なし ×3」を出し、
+   *   これを「publish の取りこぼし」と読んで書き手側を3回追いかけ、全部空振りした。
+   *   実際は publish は正常(初回 flush は min-gap を待たず 400ms で載る)。
+   *   🔴 の出どころは読み取り側で、補助データは 12秒キャッシュ越しにしか読まれず
+   *   初期値が null=起動直後は構造的に「鏡なし」に見える。
+   *
+   * ■ 対策の正本は既にある
+   *   popupDiagUptimeNote.js が「鏡の flush は publish の 400ms 後」「起動直後を
+   *   ゼロと読むな」と警告しているが、その注記は popup 固有診断セクションにしか
+   *   出ておらず、🔴 が実際に出るこの冒頭ブロックには届いていなかった。
+   *   → 同じ閾値(3秒)・同じ null ガードをここにも効かせる。
+   *
+   * ★null ガードは必須: Number(null)===0 なので、これが無いと
+   *   「値が取れなかった」を「起動0秒」と偽って全部⏳にしてしまう。
+   */
+  /*
+   * ★v0.1.1302: 補助データ(鏡を含む)の齢。status-entry.js の extras は
+   *   12秒キャッシュ越しにしか読まれない(EXTRAS_REFETCH_MS=12000)ので、
+   *   鏡の値は最大12秒古い。これが速報に出ていなかったため、読み手は
+   *   「今この瞬間 鏡が無い」と誤解できた。数字を出すだけ(判定は変えない)。
+   */
+  const extrasAgeRaw = a.extrasAgeMs;
+  const extrasAgeMs =
+    extrasAgeRaw == null || !Number.isFinite(Number(extrasAgeRaw)) || Number(extrasAgeRaw) < 0
+      ? null
+      : Number(extrasAgeRaw);
+  const shadeAgeRaw = pd?.popup?.loadShadeProbe?.shadeAgeMs;
+  const bootAgeMs =
+    shadeAgeRaw == null || !Number.isFinite(Number(shadeAgeRaw)) || Number(shadeAgeRaw) < 0
+      ? null
+      : Number(shadeAgeRaw);
+  const justBooted = bootAgeMs != null && bootAgeMs < POPUP_BOOT_GRACE_MS;
+  /** 起動直後で「まだ書かれていないだけ」なら present:false を保留(pending)に倒す。 */
+  const mirrorOfWithGrace = (m) => {
+    const r = mirrorOf(m);
+    if (!r.present && justBooted) return { ...r, pending: true, bootAgeMs };
+    return r;
+  };
   const mirrors = {
-    lane: mirrorOf(blob.laneMirror),
-    stat: mirrorOf(blob.statCardsMirror),
-    northStar: mirrorOf(blob.northStarMirror)
+    lane: mirrorOfWithGrace(blob.laneMirror),
+    stat: mirrorOfWithGrace(blob.statCardsMirror),
+    northStar: mirrorOfWithGrace(blob.northStarMirror)
   };
 
   // --- 送信結果(根2: storage 由来=ページ横断で読める) ---
@@ -110,6 +159,11 @@ export function buildDiagnosticsTrust(args) {
     verdict = 'popup_other_live'; // 別配信の古い popup 診断が混入
   } else if (!popupFresh) {
     verdict = 'popup_stale'; // popup 診断が古い(開き直しで新鮮化)
+  } else if (justBooted && (mirrors.lane.pending || mirrors.stat.pending || mirrors.northStar.pending)) {
+    // ★v0.1.1302: 起動直後で鏡が未着なら「全部信頼できる」と断言しない。
+    //   ここで trustable を出していたため、🔴 と「🟢そのまま信頼できる」が同居し、
+    //   読み手(開発者)が🔴を本物だと信じて3回空振りした。
+    verdict = 'popup_just_booted';
   } else {
     verdict = 'trustable'; // popup 由来も新鮮・現配信=全て信頼可
   }
@@ -117,6 +171,8 @@ export function buildDiagnosticsTrust(args) {
   return {
     hasWatchTab,
     currentLiveId: currentLid,
+    // ★v0.1.1302: 鏡を含む補助データの齢(最大12秒古い)。表示専用・判定には使わない。
+    extrasAgeMs,
     popup: {
       present: !!pd,
       ageMs: popupAgeMs,
@@ -147,6 +203,14 @@ function verdictLine(t) {
       return '🔴 別配信の古い popup 診断が混ざっています。watch タブを F5 して popup を開き直してください。';
     case 'popup_stale':
       return '🟡 popup 診断が古いです（下の「応援レーン描画/北極星」は現状と違う可能性）。popup を開き直すと新鮮化します。';
+    case 'popup_just_booted':
+      // ★v0.1.1302: 起動直後は鏡が未着で当然。ここで🟢を出すと、同居する⏳/🔴を
+      //   読み手が本物の不具合だと信じてしまう(実際に3回空振りした)。
+      return (
+        '🟡 popup を開いた直後の値です。鏡がまだ書かれていないだけで異常ではありません' +
+        '（鏡の書き出しは publish の 400ms 後・状態速報の補助データは最大12秒キャッシュ）。' +
+        'popup を開いたまま数十秒おいて取り直すと確定します。'
+      );
     case 'trustable':
       return '🟢 watch タブ有・popup 診断も新鮮で現配信＝この状態速報の各診断はそのまま信頼できます。';
     default:
@@ -156,6 +220,12 @@ function verdictLine(t) {
 
 /** 経路1行(present/鮮度/liveId)。 */
 function pathLine(label, m) {
+  // ★v0.1.1302: 起動直後の未着は🔴ではなく⏳(まだ書かれていないだけ=正常)。
+  //   ここを🔴にしていたため、開発者が3回「取りこぼし」と誤読して空振りした。
+  if (m && m.pending) {
+    const sec = m.bootAgeMs != null ? (m.bootAgeMs / 1000).toFixed(1) : '?';
+    return `- ${label}: ⏳ 判定保留(popup起動${sec}秒=まだ書かれていないだけ・数十秒おいて取り直し)`;
+  }
   if (!m || !m.present) return `- ${label}: 🔴 なし`;
   const fresh = m.fresh === false ? `🟡${agoLabel(m.ageMs)}(古い)` : m.ageMs != null ? agoLabel(m.ageMs) : '';
   const lid = m.lidMatch === false ? ' 🔴別配信' : m.lidMatch === true ? ' ✅' : '';
@@ -188,6 +258,15 @@ export function formatDiagnosticsTrustLines(trust) {
   lines.push(pathLine('応援レーン鏡', t.mirrors.lane));
   lines.push(pathLine('数字カード鏡', t.mirrors.stat));
   lines.push(pathLine('北極星鏡', t.mirrors.northStar));
+  /*
+   * ★v0.1.1302: 上の3行が読んだ値の【齢】。status の補助データは12秒キャッシュ越し
+   *   (status-entry.js:312 EXTRAS_REFETCH_MS=12000)なので、鏡は最大12秒古い。
+   *   これが出ていなかったため「今この瞬間 鏡が無い」と読めてしまい、
+   *   開発者が3回「取りこぼし」と誤読して空振りした。数字を出すだけ(判定は変えない)。
+   */
+  if (t.extrasAgeMs != null) {
+    lines.push(`  （上の3つの鏡は補助データ経由＝${agoLabel(t.extrasAgeMs)}の値。最大12秒古くなります）`);
+  }
   // 送信結果(ページ横断 storage)。
   if (t.publish.everSent) {
     const age = t.publish.ageSec != null ? agoLabel(t.publish.ageSec * 1000) : '';
