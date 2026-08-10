@@ -206,6 +206,33 @@ export function buildParityVerdict(input) {
     }
   }
 
+  /*
+   * ★v0.1.1303: 鏡がまだ読めていない時点の突合は【保留】にする。
+   *
+   * ■ 実機(2026-08-10)
+   *     🔴不一致: 北極星 貢献度 拡張3≠鏡0
+   *   ところが同じ速報の trust は「この値を読んだのは popup 起動の3.7秒【前】」。
+   *   = 拡張側(apiRows)は【今】の値、鏡側は【popup が書く前】の値。
+   *   別の瞬間どうしを比べて「取りこぼし」と断定していた。
+   *   ★これを🔴で出したため、開発者が鏡 publish を3回追いかけて全部空振りした。
+   *
+   * ■ 判定
+   *   trust.mirrors.* が pending(=読んだ時点で書けていなかった)なら、
+   *   件数突合は成立しない。保留にして「取り直し」を促す。
+   */
+  const mirrorsPending =
+    trust?.mirrors &&
+    (trust.mirrors.lane?.pending === true ||
+      trust.mirrors.stat?.pending === true ||
+      trust.mirrors.northStar?.pending === true);
+  if (mirrorsPending) {
+    return pend(
+      '鏡がまだ書かれる前の値です(①と鏡が別の瞬間=突合できません)',
+      'popup を開いたまま数十秒おいて取り直してください',
+      'mirror_not_yet_written'
+    );
+  }
+
   // 4. データ整合(拡張 apiRows ≒ 鏡件数・現配信)。consistency に mismatch があれば 🔴。
   const consistency = selfDiag && Array.isArray(selfDiag.consistency) ? selfDiag.consistency : null;
   if (consistency) {
