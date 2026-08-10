@@ -42,6 +42,7 @@ import { detectVersionMismatch } from '../lib/versionMismatch.js';
 import { directHit, makeInitialComboState } from '../lib/effectDirector.js';
 import { readInlineModeFlags } from '../lib/inlineModeFlags.js';
 import { pickWatchUrlFromMultipleSources } from '../lib/popupWatchUrlResolveMultiTab.js';
+import { buildWatchSnapshotKey } from '../lib/watchSnapshotKey.js';
 import { decideNoActiveWatch } from '../lib/noActiveWatchDecision.js';
 import { shouldRevealCloakAfterFirstPaint } from '../lib/popupCloakRevealTiming.js';
 import { resolveCommentPostWatchTarget } from '../lib/commentPostWatchTarget.js';
@@ -15791,7 +15792,8 @@ async function refresh() {
   // 以降のコードは通常の paintWatchPopupUi 経路で cards に live data を流す。
   clearLastBroadcastReviewArtifacts();
 
-  const snapshotKey = `${lv}|${url}|s17`;
+  // ★v0.1.1324 正本=src/lib/watchSnapshotKey.js(旧鍵は url 差で heavy 全件を捨てていた)
+  const snapshotKey = buildWatchSnapshotKey({ liveId: lv, url });
   const key = commentsStorageKey(lv);
   // v0.1.527: 保存系ボタン（HTMLレポート💾／スクショ📷／マーケ📊）を lv 判明のこの時点で
   //   即有効化する。従来は重い snapshot fetch + 巨大コメント配列の storage 読みが終わって
