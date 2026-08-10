@@ -656,7 +656,7 @@
     - `trumpet1.mp3`
     - `wallet1.mp3`
   - `SOURCES.md`
-- 📁 **src/** (1568)
+- 📁 **src/** (1569)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -943,7 +943,7 @@
         - `logo_funlink_white_RGB_maru_black.png`
       - `logo_guide_funlink_ol.pdf`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1331)
+  - 📁 **lib/** (1332)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -1591,6 +1591,7 @@
     - `lpIndexUnifiedSnapshotOverview.test.js`
     - `mangaBroadcastSummary.js` — 放送終了後の HTML レポート / マーケ分析の頭にくる「漫画読み体験」要約。
     - `mangaBroadcastSummary.test.js`
+    - `manifestKnownKeys.test.js`
     - `marketingAggregate.js` — userId: string,
     - `marketingAggregate.test.js`
     - `marketingChartsHtml.js` — マーケ集計(MarketingReport)から HTMLレポート用のグラフ/チャート HTML を組み立てる。
