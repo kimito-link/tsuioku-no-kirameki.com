@@ -56,6 +56,7 @@ graph LR
   ROOT --> d10["tests/ 〔テスト〕"]
   d10 --> d10_0["contract/ 〔テスト/契約〕"]
   d10 --> d10_1["e2e/ 〔テスト/E2E/描画〕"]
+  d10 --> d10_2["helpers/"]
   ROOT --> d11["tools/ 〔ツール〕"]
   d11 --> d11_0["mcp-nicolive/ 〔MCP/診断〕"]
   ROOT --> d12["tsuioku-no-kirameki/ 〔LP/公開〕"]
@@ -250,10 +251,11 @@ graph LR
 - `sound/`（1 件） — 音声素材(src 側)  〔音声〕
 
 ## `tests/` — E2E / contract テスト(layer 依存・描画 spec 等)  〔テスト〕
-<sub>ファイル 76 件</sub>
+<sub>ファイル 78 件</sub>
 
-- `contract/`（1 件） — レイヤ依存などアーキテクチャ契約のテスト  〔テスト / 契約〕
+- `contract/`（2 件） — レイヤ依存などアーキテクチャ契約のテスト  〔テスト / 契約〕
 - `e2e/`（75 件） — Playwright の E2E(描画 spec・クリップ崩れ検出等)  〔テスト / E2E / 描画〕
+- `helpers/`（1 件） — ⚠️ 未記入（ROLES に追記）
 
 ## `tools/` — 補助ツール(LP overflow 監査・MCP サーバ等)  〔ツール〕
 <sub>ファイル 5 件</sub>
@@ -498,7 +500,7 @@ esbuild の import 到達グラフを逆引きし「このファイルを変え�
 
 ---
 
-## ⚠️ 役割が未記入のディレクトリ（6）
+## ⚠️ 役割が未記入のディレクトリ（7）
 
 以下は `ROLES` 辞書に説明が無い。`scripts/repo-tree-map.mjs` の `ROLES` に1行足してから再生成すること。
 
@@ -508,3 +510,4 @@ esbuild の import 到達グラフを逆引きし「このファイルを変え�
 - `docs/patent-unique-voice-reading-filing-final/`
 - `sound-src/`
 - `sound-src/soundeffect-lab/`
+- `tests/helpers/`
