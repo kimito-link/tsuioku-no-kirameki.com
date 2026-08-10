@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 4 / 728 件
+## ⚠️ 役割コメントが無いソース 4 / 732 件
 - `src/lib/laneDomSelfMeasure.js`
 - `src/lib/reportPreviewPublish.js`
 - `src/lib/venueLaneBuckets.js`
@@ -578,10 +578,21 @@
   - `status-guard.js` — 状態速報ページ(status.html)の「何があっても開く」保険。
   - `status.html`
   - `venue.html`
-- 📁 **scripts/** (40)
+- 📁 **scripts/** (53)
+  - 📁 **__pycache__/** (1)
+    - `stage-submission.cpython-311.pyc`
   - 📁 **xserver/** (2)
     - `github-webhook-pull.php.example`
     - `webhook-git-pull-for-upload.php`
+  - `_merge-council-run.ps1`
+  - `_merge-council.mjs` — 3ラウンド分の council JSON を1つの Markdown 議事録に統合する。
+  - `_merge-council.ps1`
+  - `_probe-keys.ps1`
+  - `_run-romi-council.ps1`
+  - `_run-romi-critic.ps1`
+  - `_run-romi-gemma.ps1`
+  - `_run-romi-local.ps1`
+  - `_summarize-council.ps1`
   - `build-sound-preview.mjs` — 開発用: extension/sound/ 配下の全効果音を1枚のHTMLで試聴できるページを生成する。
   - `build-sounds.mjs` — extension/sound/ の効果音mp3を組み立てる。
   - `build-watch.mjs` — watch では起動時刻を埋める（rebuild 毎に再 import される訳ではないので、
@@ -591,10 +602,12 @@
   - `check-root-cause-claim.mjs` — コミットメッセージの「根治」語を検査する。
   - `check-tracked-imports.mjs` — 「コミットし忘れた新規ファイルを import している」ことを機械的に検出するリリース工程ガード(2026-07-06)。
   - `copy-ext.mjs` — 拡張を「同期対象外フォルダ」へコピーする(Chrome の再読み込み固着の根治)。
+  - `council-cleanup.mjs` — 会議ハーネス(meeting.mjs)の後始末。
   - `council-lineup.mjs` — 会議メンバー名簿（クラウドのみ。ローカルOllamaは従来通り meeting.mjs 側の
   - `council-roles.mjs` — 会議ハーネス共通の「役割・出力フォーマット・批判強制」定義。
   - `cws-publish.mjs` — Chrome Web Store Publish API で ZIP をアップロード(+任意で公開申請)する。
   - `delete-dead-lib.mjs` — scripts/delete-dead-lib.mjs — 死蔵lib実装ファイルとそのテストを削除
+  - `dump-panel-state.mjs` — 実機の chrome.storage.local を吸い出して
   - `encode-marketing-html-avatars.mjs` — extension/images/marketing-html-avatars/*.png を data URI にし、
   - `feature-map.mjs` — コードベースの「機能ごとマインドマップ」を自動生成する(2026-06-17 会議結論)。
   - `fix-src-images-mojibake.mjs` — Normalizes known mojibake paths under src/images (mirrored from kimito-link).
@@ -603,6 +616,7 @@
   - `inspect-nicolive-watch-stats.mjs` — ニコ生 watch ページの HTML から、来場・同接まわりの数値がどう埋め込まれているかを CLI で確認する。
   - `install-local-sounds.mjs` — マイ効果音「手動取込」を不要にするローカル自動同梱スクリプト。
   - `install-local-sounds.test.js`
+  - `meeting-roles.mjs` — meeting.mjs の役割注入版。
   - `meeting.mjs` — 会議ハーネス: 同じ問いを「無料クラウド4系統 + ローカル ollama 数体」に投げ、
   - `repo-tree-map.mjs` — リポジトリのディレクトリツリー＋各ディレクトリの「役割」を自動生成する(2026-06-18 ユーザー提案)。
   - `resize-marketing-html-avatars.ps1`
@@ -642,7 +656,7 @@
     - `trumpet1.mp3`
     - `wallet1.mp3`
   - `SOURCES.md`
-- 📁 **src/** (1567)
+- 📁 **src/** (1568)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -929,7 +943,7 @@
         - `logo_funlink_white_RGB_maru_black.png`
       - `logo_guide_funlink_ol.pdf`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1330)
+  - 📁 **lib/** (1331)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -1933,6 +1947,7 @@
     - `sidepanelSelfDiag.test.js`
     - `sidepanelSelfDiagKey.js` — サイドパネル自己診断の storage キー。
     - `sidepanelSelfDiagPipeline.test.js`
+    - `sidepanelThemeColorParity.test.js`
     - `sidepanelZeroArea.test.js`
     - `singleFlightByKey.js` — key 単位の single-flight 実行器(純関数コア)。
     - `singleFlightByKey.test.js`
