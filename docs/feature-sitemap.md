@@ -290,7 +290,7 @@
   - `src/lib/giftThrowProjectile.js`
 - **吹き出し寿命管理** — 会場の吹き出しの表示上限・追い出し(eviction)ライフサイクル
   - `src/lib/venueBubbleLifecycle.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 212</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 213</summary>
 
 - `scripts/encode-marketing-html-avatars.mjs` — extension/images/marketing-html-avatars/*.png を data URI にし、
 - `scripts/split-avatar-parts.mjs` — 偽市松背景の除去 + パーツ切り出し(one-off アセットパイプライン)
@@ -414,6 +414,7 @@
 - `src/lib/northStarLaneVisibility.js` — 北極星レーンの表示/非表示を `data-lane-state` から決める純関数（副作用なし）。
 - `src/lib/northStarLaneWaitingUi.js` — 北極星「公式値レーン」の取得待ち（not_yet / iframe_unrendered）用 UI 断片。
 - `src/lib/officialEventBannerDom.js` — niconico の watch ページに描画される「○○さんが参加しています！」グリーンバナーから
+- `src/lib/paintCompletionProbe.js` — paintCompletionProbe — 「JSが返った時点」でなく【画面に出るまで】を測る(v0.1.1320)。
 - `src/lib/paintPerfLog.js` — v0.1.725: 描画(paint)コストの軽量リングバッファ記録(純関数)。
 - `src/lib/paintTopSupportRankStyleIntoElement.js` — 応援帯・公式値レーン（貢献度等）で共通の `nl-top-support-rank` ブロック描画。
 - `src/lib/parseGiftComment.js` — ニコ生のギフトコメント文字列をパースする純粋関数。
@@ -747,7 +748,7 @@
   - `src/lib/statusTrendKey.js`
   - `src/extension/status-entry.js`
   - `src/lib/statusActionAdvisor.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 146</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 147</summary>
 
 - `app/app.js` — スマホ閲覧用 status Web 版。
 - `app/live-view.js` — global NL_BUILD_ID
@@ -812,6 +813,7 @@
 - `src/lib/isInsideRecommendedLiveSection.js` — v0.1.200: ニコ生 watch ページの「おすすめ生放送」セクション内 DOM を識別する純関数。
 - `src/lib/lengthDelimitedStream.js` — length-delimited（varint 長 + ペイロード）の連続を分割する。
 - `src/lib/liveEndedFlag.js` — 配信終了フラグ。
+- `src/lib/livesCardSignature.js` — livesCardSignature — 配信カードを作り直すべきかの署名(v0.1.1320)。
 - `src/lib/liveviewSnapshotFreshness.js` — 純Web応援ライブビューの「スナップショット丸ごと1枚の鮮度」判定（council/liveview-wholesale-root-SYNTHESIS.md 第1段）。
 - `src/lib/mcpBridge/buildMcpMismatchReasons.js` — MCP L1 snapshot の `diag.mismatchReasons` を組み立てる純関数。
 - `src/lib/mcpBridge/mergeLiveMcpSnapshot.js` — Canonical Snapshot のマージ（Deterministic + Monotonic Sequence）。
@@ -900,7 +902,7 @@
 
 ## 🧬 修正系譜マップ(この系統のバグを過去にどう直したか)
 
-> changelog 全 649 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
+> changelog 全 650 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
 
 ### 💾 記録件数 (91版)
 - `v0.1.1313` 2026-08-10 — サイドパネルがタブ切替で空になるのを直す／記録の二重計上をふさぐ
@@ -1820,7 +1822,8 @@
 - `v0.1.673` 2026-06-10 — コメビュの名前をパネルと同じ情報源で補完
 - `v0.1.670` 2026-06-10 — コメビュのアイコンを本家と同じサムネに
 
-### 🩺 診断・状態速報 (234版)
+### 🩺 診断・状態速報 (235版)
+- `v0.1.1320` 2026-08-10 — 診断ページの重さを直しました(3件)
 - `v0.1.1317` 2026-08-10 — 会場モードが古い情報を映す原因を特定できるようにしました
 - `v0.1.1314` 2026-08-10 — 診断ページが重くなる原因を切り分ける計器を追加
 - `v0.1.1309` 2026-08-10 — サイドパネルの中身が見えるまでの時間を約6秒→1.5秒に短縮
@@ -2056,7 +2059,8 @@
 - `v0.1.735` 2026-06-14 — 診断の「サムネ持ち」数が実際の席表示と一致するように修正
 - `v0.1.693` 2026-06-11 — 左下の記録監視オーバーレイを既定で非表示に
 
-### 🗺 地図・ドキュメント (13版)
+### 🗺 地図・ドキュメント (14版)
+- `v0.1.1320` 2026-08-10 — 診断ページの重さを直しました(3件)
 - `v0.1.983` 2026-06-28 — 地図ページに「← 戻る」を共通設置
 - `v0.1.870` 2026-06-21 — ちくらん/診断タブを上部ナビに移動(地図リンクと同列)
 - `v0.1.856` 2026-06-21 — 「これを共有すれば原因が全部わかる」大ボタンを最上部に
@@ -2079,7 +2083,8 @@
 - `v0.1.806` 2026-06-17 — HTML保存の失敗を根治+完了音声を追加
 - `v0.1.785` 2026-06-16 — 状態ページのタイムアウト警告を拡張エラー欄に出さない
 
-### ⚡ 描画・性能 (135版)
+### ⚡ 描画・性能 (136版)
+- `v0.1.1320` 2026-08-10 — 診断ページの重さを直しました(3件)
 - `v0.1.1314` 2026-08-10 — 診断ページが重くなる原因を切り分ける計器を追加
 - `v0.1.1305` 2026-08-10 — 内部の整理(取得率チャートの切り出し)
 - `v0.1.1293` 2026-08-08 — ★「応援ビジュアル」が1回で開かないのを直しました

@@ -568,6 +568,7 @@
 | `src/lib/liveCommenterStats.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/liveHealthScore.js` | 1 | 状態速報ページ |
 | `src/lib/livePersistInterval.js` | 1 | 記録エンジン(watchページ常駐) |
+| `src/lib/livesCardSignature.js` | 1 | 状態速報ページ |
 | `src/lib/liveStatValuePlaceholder.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/liveviewPublishOutcome.js` | 1 | 状態速報ページ |
 | `src/lib/liveviewPublishOutcomeKey.js` | 1 | 状態速報ページ |
@@ -629,6 +630,7 @@
 | `src/lib/openingFiveMinuteCorrelation.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/opSoundDirector.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/ownPostedUserIdSet.js` | 1 | ポップアップ(応援レーン) |
+| `src/lib/paintCompletionProbe.js` | 1 | 状態速報ページ |
 | `src/lib/paintPerfLog.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/paintTopSupportRankStyleIntoElement.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/parityVerdict.js` | 1 | 状態速報ページ |

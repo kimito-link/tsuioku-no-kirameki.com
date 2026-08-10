@@ -141,6 +141,14 @@ export function buildAiShareFullText({ overviewText, livesData, fastDiag, popupD
   //   体感の重さは初期ロード/スクロール側、という切り分けが状態速報1枚で分かる。
   const perfLine = formatRefreshPerfLine(refreshPerf);
   if (perfLine) lines.push(perfLine);
+  /*
+   * ★v0.1.1320: 上の「更新所要」は【JSが返るまで】しか測っていない。
+   *   style/layout/paint を含む実所要をこの行で出す(status-entry が計測して同梱)。
+   *   ★これが無いと「6ms＝軽い」と誤読する(2026-08-10 に私が実際に誤読した)。
+   *   観測ゼロなら空文字＝行ごと出ない。
+   */
+  const paintLine = String(refreshPerf?.paintCompletionLine || '');
+  if (paintLine) lines.push(paintLine);
   // 2026-07-14: 「更新所要(計器)」のrenderステップだけをさらに分解した内訳(診断ページ軽量化の実測材料)。
   const sectionMsLine = formatRenderSectionMsLine(renderSectionMs);
   if (sectionMsLine) lines.push(sectionMsLine);

@@ -40,6 +40,12 @@ import { buildStorageWriteLedgerLines } from '../lib/storageWriteLedger.js';
 //   重さの真因(council/status-heavy-open-SYNTHESIS.md)。status が使う4フィールドだけの軽量ダイジェスト
 //   (content が同時に書く)を read する=read 回数同じ・サイズ ~40分の1。読み取りパスは full と同形。
 import { KEY_STATUS_FAST_DIAG_LITE } from '../lib/statusFastDiagLite.js';
+import {
+  createPaintProbeState,
+  observePaintCompletion,
+  formatPaintCompletionLine
+} from '../lib/paintCompletionProbe.js';
+import { buildLivesCardSignature } from '../lib/livesCardSignature.js';
 import { buildStatusMindmapModel } from '../lib/statusMindmapModel.js';
 import { copyTextWithFallback } from '../lib/copyTextWithFallback.js';
 import {
@@ -765,6 +771,33 @@ async function refresh(opts = {}) {
     // 2026-07-14: renderAll 内のセクション別内訳(前サイクル計測)も同様に渡す(診断ページ軽量化の実測材料)。
     renderAll({ lvList, summaries, fastDiag, popupDiag, backfillProgress, backfillLiveMetric, voiceDiag, venueSeatsDiag, laneDiag, laneMirror, statCardsMirror, northStarMirror, reportPreview, trendFindings, watchTabMap, publishOutcomeRec, commentTimelineMirror, giftHistoryMirror, roomHeatMirror, sessionSummaryMirror, previewRenderAck, refreshPerf: _lastRefreshPerf, renderSectionMs: _lastRenderSectionMs, giftEffectDiag, milestoneEffectDiag, customSoundDiag, voiceEffectDiag, bgmPhaseDiag, opSoundEffectDiag, commentPostDiag, instantPushDiag, channelSwitchDiag, highlightLedger, scoreAnnounceDiag, sidepanelSelfDiag, extrasAgeMs: _extrasCacheAt ? Math.max(0, Date.now() - _extrasCacheAt) : null });
     _mark('render');
+    /*
+     * ★v0.1.1320: 「JSが返るまで」でなく【画面に出るまで】を測る。
+     *
+     * ■ なぜ必要か(2026-08-10 に判明した計器の欠陥)
+     *   ここより下の _totalMs は renderAll から【JSが返った時点】で確定する。
+     *   style/layout/paint は**その後**にブラウザが走らせるので計器の【外】。
+     *   ＝速報の「更新所要 6ms」は「JSが6msで返った」であって「画面が軽い」ではない。
+     *   ★このファイル自身に反証が残っていた:
+     *     「1回目 12,610ms(extras 12,607 / render 3) → 2回目 5ms」
+     *     ＝render 3ms でも実所要は12秒。render の小ささは軽さを意味しない。
+     *
+     * ■ 測り方: rAF は「次の描画の直前」、その中の setTimeout(0) は「描画の直後」に戻る。
+     *   この2点で JS 復帰→実描画 を挟み込む。計測だけで描画には触らない。
+     */
+    try {
+      if (typeof requestAnimationFrame === 'function') {
+        const _paintT0 = typeof performance !== 'undefined' ? performance.now() : Date.now();
+        requestAnimationFrame(() => {
+          setTimeout(() => {
+            try {
+              const now = typeof performance !== 'undefined' ? performance.now() : Date.now();
+              observePaintCompletion(_paintProbe, now - _paintT0);
+            } catch { /* 計器の失敗は描画を壊さない */ }
+          }, 0);
+        });
+      }
+    } catch { /* no-op */ }
     const _totalMs = Math.round((typeof performance !== 'undefined' ? performance.now() : Date.now()) - _t0);
     updateLastUpdateMeta({ totalMs: _totalMs, stepMs: _stepMs, staleNote });
     // 次サイクルのコピー本文に出すため、この refresh の計器を保持(render 込みの最新 totalMs/stepMs)。
@@ -773,7 +806,10 @@ async function refresh(opts = {}) {
     _lastRefreshPerf = {
       totalMs: _totalMs,
       stepMs: _stepMs.slice(),
-      tabsQuerySlow: { ..._tabsQuerySlowDiag }
+      tabsQuerySlow: { ..._tabsQuerySlowDiag },
+      // ★v0.1.1320: JSが返った後の style/layout/paint まで含めた実所要。
+      //   これが大きければ「重いのはDOMの作り直し」＝拡張の中で直せる、と名指しできる。
+      paintCompletionLine: formatPaintCompletionLine(_paintProbe, { jsMs: _totalMs })
     };
     if (staleCores.length === 0) _statusLastErrorText = '';
   } catch (err) {
@@ -884,6 +920,13 @@ function updateLastUpdateMeta(perf) {
  * @type {{ count: number, worstMs: number, lastMs: number, lastTabCount: number }}
  */
 const _tabsQuerySlowDiag = { count: 0, worstMs: 0, lastMs: 0, lastTabCount: -1 };
+
+/**
+ * ★v0.1.1320: 「JSが返ってから画面に出るまで」の実測(既存計器の盲点を埋める)。
+ *   既存の totalMs は renderAll から JS が返った時点で止まるので、
+ *   style/layout/paint(=DOMを作り直しすぎたときの重さ)が一切写らなかった。
+ */
+const _paintProbe = createPaintProbeState();
 
 async function enumerateActiveLives() {
   /** @type {string[]} */
@@ -1669,12 +1712,28 @@ function renderAll({ extrasAgeMs, lvList, summaries, fastDiag, popupDiag, backfi
       // v0.1.868: 「スムーズじゃない」対策。配信カードは 2 秒ごとに innerHTML 全再構築+<img>再生成で
       //   サムネが毎回チラつき重い。表示に効く値だけの軽い signature を作り、変化が無ければ再構築を
       //   丸ごと skip(描画/画像再取得を止める)。値が動いた時だけ作り直す。
-      const sig = livesData
-        .map((l) => `${l.lv}|${l.recordedCount}|${l.officialCommentCount}|${l.watchCount}|${l.giftPoints}|${l.elapsedSec}|${l.endedAt ? 1 : 0}|${l.thumbnailUrl ? 1 : 0}`)
-        .join('~')
-        // v0.1.869: 応援者データの配信(reportPreview.liveId)と件数も signature に含める=popup の応援者が
-        //   届いたら該当カードを作り直して展開に反映(届くまでは案内のまま)。
-        + `#rp:${String(reportPreview?.liveId || '')}:${Array.isArray(reportPreview?.topSupporters) ? reportPreview.topSupporters.length : 0}`;
+      /*
+       * ★v0.1.1320: signature から `elapsedSec`(経過【秒】)を外し、【分】に丸めて入れる。
+       *
+       * ■ 何が起きていたか(2026-08-10 実測)
+       *   上のコメントが「2秒ごとの innerHTML 全再構築+<img>再生成を止める」と書いている
+       *   その guard の signature に、配信中ずっと増え続ける `elapsedSec` が入っていた。
+       *   ＝**guard が一度も効かない**。止めたかった再構築がそのまま起き続けていた
+       *   (カード1枚30〜60要素・サムネ <img> 再生成つき)。自分で自分の対策を無効化していた。
+       *
+       * ■ 分に丸めてよい根拠
+       *   カードの表示は「経過 2:01:00」＝**分単位**(buildChikuranHeaderEl)。
+       *   秒精度は画面に出ないので、signature に秒を持つ理由が無い。
+       *   分に丸めれば「表示が変わるとき」だけ再構築＝コメントの意図どおりになる。
+       *   ★`null`(未取得)は 'x' に落として 0分 と区別する(未取得→0分の誤判定を防ぐ)。
+       */
+      // v0.1.869: 応援者データ(reportPreview)の変化も署名に含める＝届いたらカードを作り直す。
+      const sig = buildLivesCardSignature(livesData, {
+        liveId: reportPreview?.liveId,
+        topSupportersLength: Array.isArray(reportPreview?.topSupporters)
+          ? reportPreview.topSupporters.length
+          : 0
+      });
       if (sig === _lastLivesSig) return; // 変化なし=再描画しない(チラつき/重さの主因を除去)。
       _lastLivesSig = sig;
       // 画面が広いとき方眼紙のように横へ並べるグリッド(狭いと1列)。
@@ -2246,6 +2305,9 @@ function buildMindNodeEl(node) {
 /**
  * @param {{ overviewText?: string, livesData?: any[], fastDiag?: any, popupDiag?: any }} data
  */
+/** ★v0.1.1320: マインドマップの diff-skip 用。変化が無ければDOMを触らず開いた枝を残す。 */
+let _lastMindmapSig = '';
+
 function renderMindmap(data) {
   const host = document.getElementById('mindmapBody');
   if (!host) return;
@@ -2260,6 +2322,28 @@ function renderMindmap(data) {
       '下の「🤖 AI に貼る用テキスト」をコピーして AI に貼ると原因を調べられます。';
     return;
   }
+  /*
+   * ★v0.1.1320: 中身が同じなら作り直さない(diff-skip)。
+   *
+   * ■ 何が起きていたか(2026-08-10 実測)
+   *   ここには guard が【一つも無く】、2秒ごとに `host.innerHTML=''` で
+   *   100〜200ノードの DOM を全消し→全再生成していた(SVG/canvasではなく純DOM)。
+   *   ★さらに <details> ごと作り直すので、**ユーザーが開いた枝が2秒で閉じる**。
+   *     「全部ひらく」を押しても2秒で元に戻る＝ms以前に「画面が言うことを聞かない」。
+   *
+   * ■ 直し方
+   *   モデルを文字列化した署名で差分を取り、変化が無ければ**DOMに触らない**。
+   *   ＝開いた枝はそのまま残る(ユーザー操作を壊さない)。
+   *   署名はモデル(表示に出る値)そのものなので、表示が変わるときは必ず作り直される。
+   */
+  let sig = '';
+  try {
+    sig = JSON.stringify(model);
+  } catch {
+    sig = ''; // 署名を作れないときは従来どおり毎回描く(安全側)
+  }
+  if (sig && sig === _lastMindmapSig && host.firstChild) return;
+  _lastMindmapSig = sig;
   host.className = 'mind';
   host.innerHTML = '';
   // 根の子(主要枝)を並べる。根自身は見出しに既に出ているので展開済みで描く。
@@ -3688,7 +3772,29 @@ function setupStorageChangeListener() {
           k.startsWith(PANEL_SUMMARY_PREFIX) ||
           k.startsWith(WATCH_SNAPSHOT_PREFIX)
         ) {
-          refresh().catch(() => {});
+          /*
+           * ★v0.1.1320: interval と同じガードを通す(この経路が全部迂回していた)。
+           *
+           * ■ 何が起きていたか(2026-08-10 実測)
+           *   interval 側(startRefreshLoop)は4つのガードを持つ:
+           *     _refreshPausedByUser / document.hidden / **_refreshInFlight(再入防止)** / backoff
+           *   ★この listener は1つ目しか無く、`refresh()` を【直接】呼んでいた。
+           *   content-entry は `nls_panel_summary_<lv>` を 2秒ごと/配信ごとに書くので、
+           *   記録中は interval の2秒に【加えて】書き込みのたびに refresh が走り、
+           *   しかも**再入を許す**。startRefreshLoop のコメントが
+           *   「再入防止＝積み上がりを断つ」と書いた当のものを、この経路が無効化していた。
+           *
+           * ■ 直し方: 画面が見えていないなら描かない・前回が走っていれば重ねない。
+           *   ★鮮度は落ちない(2秒 interval は従来どおり動く)。減るのは【重複した実行】だけ。
+           */
+          if (document.hidden) return;
+          if (_refreshInFlight) return;
+          _refreshInFlight = true;
+          refresh()
+            .catch(() => {})
+            .finally(() => {
+              _refreshInFlight = false;
+            });
           return;
         }
       }
