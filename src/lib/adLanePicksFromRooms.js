@@ -88,12 +88,20 @@ export function adLanePicksFromRooms(rooms, io) {
      *
      * ★uid が無い行(匿名広告主)には②を呼ばない=推測で他人の顔を出さない
      *   (「誤リンクより false negative」の既存方針=nicoadContributionRankingApi.js:155 を維持)。
+     *
+     * ★v0.1.1307(2026-08-10 実機 lv351140568 で真因確定): room.hasNoIcon=true のときは
+     *   ③の導出を行わない。公式が thumbnailUrl=defaults/blank.jpg を返した=そのアカウントは
+     *   アイコン未設定であり、③の CDN URL は【必ず404になる】(実測: uid=138442683→404 /
+     *   アイコン設定済 uid=38947059→200)。従来は404の壊れ画像がそのまま白丸として並んでいた
+     *   (実データ10件中7件が該当=画面の白丸の正体)。
+     *   ②(観測済みの実サムネ)は残す=公式が知らない実サムネを拡張が観測できていれば、それは本物。
      */
     const faceKey = uid || String(room.userKey || `ad${i}`);
+    const hasNoIcon = room.hasNoIcon === true;
     const resolvedIcon = uid && typeof io?.resolveAvatarForUid === 'function'
       ? String(io.resolveAvatarForUid(uid) || '').trim()
       : '';
-    const derivedIcon = uid ? nicoIconUrlForUid(uid) : '';
+    const derivedIcon = uid && !hasNoIcon ? nicoIconUrlForUid(uid) : '';
     const displaySrc = avatarUrl || resolvedIcon || derivedIcon || yukkuriFaceFor(faceKey);
 
     // ID 行: 記名(uid あり)は短縮 ID を出さず広告主名を主役に(room.hideIdLine と同じ思想)。
