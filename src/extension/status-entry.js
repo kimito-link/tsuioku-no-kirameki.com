@@ -763,7 +763,7 @@ async function refresh(opts = {}) {
     step = 'renderAll';
     // v0.1.1005: 前サイクルの所要計器をコピー本文へ渡す(画面ヘッダーだけでなく AI共有テキストにも出す)。
     // 2026-07-14: renderAll 内のセクション別内訳(前サイクル計測)も同様に渡す(診断ページ軽量化の実測材料)。
-    renderAll({ lvList, summaries, fastDiag, popupDiag, backfillProgress, backfillLiveMetric, voiceDiag, venueSeatsDiag, laneDiag, laneMirror, statCardsMirror, northStarMirror, reportPreview, trendFindings, watchTabMap, publishOutcomeRec, commentTimelineMirror, giftHistoryMirror, roomHeatMirror, sessionSummaryMirror, previewRenderAck, refreshPerf: _lastRefreshPerf, renderSectionMs: _lastRenderSectionMs, giftEffectDiag, milestoneEffectDiag, customSoundDiag, voiceEffectDiag, bgmPhaseDiag, opSoundEffectDiag, commentPostDiag, instantPushDiag, channelSwitchDiag, highlightLedger, scoreAnnounceDiag, sidepanelSelfDiag });
+    renderAll({ lvList, summaries, fastDiag, popupDiag, backfillProgress, backfillLiveMetric, voiceDiag, venueSeatsDiag, laneDiag, laneMirror, statCardsMirror, northStarMirror, reportPreview, trendFindings, watchTabMap, publishOutcomeRec, commentTimelineMirror, giftHistoryMirror, roomHeatMirror, sessionSummaryMirror, previewRenderAck, refreshPerf: _lastRefreshPerf, renderSectionMs: _lastRenderSectionMs, giftEffectDiag, milestoneEffectDiag, customSoundDiag, voiceEffectDiag, bgmPhaseDiag, opSoundEffectDiag, commentPostDiag, instantPushDiag, channelSwitchDiag, highlightLedger, scoreAnnounceDiag, sidepanelSelfDiag, extrasAgeMs: _extrasCacheAt ? Math.max(0, Date.now() - _extrasCacheAt) : null });
     _mark('render');
     const _totalMs = Math.round((typeof performance !== 'undefined' ? performance.now() : Date.now()) - _t0);
     updateLastUpdateMeta({ totalMs: _totalMs, stepMs: _stepMs, staleNote });
@@ -1381,7 +1381,7 @@ async function loadBackfillLiveMetricSafe() {
 // v0.1.861: レポートプレビューの信頼度注釈の文脈は純関数 reportPreviewCtxFromFastDiag(src/lib)に抽出済み
 //   (NDGR 接続/userId 付き率/backfill 進行 → 注釈ctx・挙動同値・テストで固定)。import は冒頭。
 
-function renderAll({ lvList, summaries, fastDiag, popupDiag, backfillProgress, backfillLiveMetric, voiceDiag, venueSeatsDiag, laneDiag, laneMirror, statCardsMirror, northStarMirror, reportPreview, trendFindings, watchTabMap, publishOutcomeRec, commentTimelineMirror, giftHistoryMirror, roomHeatMirror, sessionSummaryMirror, previewRenderAck, refreshPerf, renderSectionMs, giftEffectDiag, milestoneEffectDiag, customSoundDiag, voiceEffectDiag, bgmPhaseDiag, opSoundEffectDiag, commentPostDiag, instantPushDiag, channelSwitchDiag, highlightLedger, scoreAnnounceDiag, sidepanelSelfDiag }) {
+function renderAll({ extrasAgeMs, lvList, summaries, fastDiag, popupDiag, backfillProgress, backfillLiveMetric, voiceDiag, venueSeatsDiag, laneDiag, laneMirror, statCardsMirror, northStarMirror, reportPreview, trendFindings, watchTabMap, publishOutcomeRec, commentTimelineMirror, giftHistoryMirror, roomHeatMirror, sessionSummaryMirror, previewRenderAck, refreshPerf, renderSectionMs, giftEffectDiag, milestoneEffectDiag, customSoundDiag, voiceEffectDiag, bgmPhaseDiag, opSoundEffectDiag, commentPostDiag, instantPushDiag, channelSwitchDiag, highlightLedger, scoreAnnounceDiag, sidepanelSelfDiag }) {
   // v0.1.847: 各描画セクションを独立 try/catch で隔離するヘルパ。1つが throw しても他のセクションと
   //   最終更新メタを巻き込まない=「セルが全部消える/最終更新—のまま固まる」を根治。落ちた場所は
   //   console と AI 共有欄に出して真因を追えるようにする(star-romi 失敗体験の除去)。
@@ -1821,7 +1821,7 @@ function renderAll({ lvList, summaries, fastDiag, popupDiag, backfillProgress, b
   // AI 共有用テキスト
   let fullText = '';
   safeSection('AI共有テキスト', () => {
-    fullText = buildAiShareFullText({ overviewText, livesData, fastDiag, popupDiag, voiceDiag, venueSeatsDiag, laneDiag, laneMirror, reportPreview, trendFindings, jsonBlob, currentLiveId, publishKeys, publishOutcomeRec, previewRenderAck, refreshPerf, renderSectionMs, giftEffectDiag, milestoneEffectDiag, customSoundDiag, voiceEffectDiag, bgmPhaseDiag, opSoundEffectDiag, commentPostDiag, instantPushDiag, channelSwitchDiag, highlightLedger, scoreAnnounceDiag, sidepanelSelfDiag });
+    fullText = buildAiShareFullText({ overviewText, livesData, fastDiag, popupDiag, voiceDiag, venueSeatsDiag, laneDiag, laneMirror, reportPreview, trendFindings, jsonBlob, currentLiveId, publishKeys, publishOutcomeRec, previewRenderAck, refreshPerf, renderSectionMs, giftEffectDiag, milestoneEffectDiag, customSoundDiag, voiceEffectDiag, bgmPhaseDiag, opSoundEffectDiag, commentPostDiag, instantPushDiag, channelSwitchDiag, highlightLedger, scoreAnnounceDiag, sidepanelSelfDiag, extrasAgeMs });
     const ta = /** @type {HTMLTextAreaElement|null} */ (
       document.getElementById('aiShareText')
     );

@@ -32,8 +32,18 @@ describe('サイドパネル自己診断: 一瞬の黒を後の✅で消さな�
   });
 
   it('★「黒かつ未記録」のときだけ最悪値を確定する(後の黒で上書きし直さない)', () => {
-    // if (!verdict.ok && !_worst) _worst = ...
-    expect(src).toMatch(/if\s*\(\s*!verdict\.ok\s*&&\s*!_worst\s*\)\s*_worst\s*=/);
+    /*
+     * ★v0.1.1302: 条件に `!unlaidOut` が加わった。
+     *   窓が 0x0(未レイアウト)の測定を最悪値にすると【毎回必ず偽の🔴】が残る
+     *   (t=0 の setTimeout はレイアウト前に走りうる=実機 v0.1.1298 がこれ)。
+     *   守る不変条件は変わらない:
+     *     (a) 黒を見たときだけ記録する         → !verdict.ok
+     *     (b) 一度記録したら上書きしない       → !_worst
+     *     (c) 偽陽性(未レイアウト)は記録しない → !unlaidOut ←追加
+     */
+    expect(src).toMatch(/if\s*\(\s*!verdict\.ok\s*&&\s*!unlaidOut\s*&&\s*!_worst\s*\)\s*_worst\s*=/);
+    // (c) の判定が「未レイアウト」由来であることまで固定する(別の条件に化けたら赤)。
+    expect(src).toMatch(/const unlaidOut = String\(verdict\.cause \|\| ''\)\.startsWith\('未レイアウト'\);/);
   });
 
   it('★storage に書く ok は「今」ではなく「一度も黒くなかったか」である', () => {
