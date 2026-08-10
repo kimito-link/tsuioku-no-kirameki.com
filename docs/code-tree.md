@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 4 / 732 件
+## ⚠️ 役割コメントが無いソース 4 / 734 件
 - `src/lib/laneDomSelfMeasure.js`
 - `src/lib/reportPreviewPublish.js`
 - `src/lib/venueLaneBuckets.js`
@@ -656,7 +656,7 @@
     - `trumpet1.mp3`
     - `wallet1.mp3`
   - `SOURCES.md`
-- 📁 **src/** (1569)
+- 📁 **src/** (1574)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -943,7 +943,7 @@
         - `logo_funlink_white_RGB_maru_black.png`
       - `logo_guide_funlink_ol.pdf`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1332)
+  - 📁 **lib/** (1337)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -1673,6 +1673,9 @@
     - `nlMainScrollReveal.test.js`
     - `nlsInterceptAuth.js` — v0.1.234: page-intercept (MAIN world) → content-entry (ISOLATED world) 経路の
     - `nlsInterceptAuth.test.js`
+    - `noActiveWatchDecision.js` — 「実質アクティブな watch が無い」＝画面を空にするか、を決める純関数(v0.1.1313)。
+    - `noActiveWatchDecision.test.js`
+    - `noActiveWatchDecision.wiring.test.js`
     - `noLobbyString.test.js`
     - `northStarAcquisitionGauge.js` — 北極星レーン左ガジェット「取得率」メーター用の純関数。
     - `northStarAcquisitionGauge.test.js`
@@ -1989,6 +1992,8 @@
     - `storageOpTimeout.test.js`
     - `storageWriteLedger.js` — 2026-07-07 (robust-arch Phase 0 / 計器のみ・挙動不変):
     - `storageWriteLedger.test.js`
+    - `storedCommentDedupeKey.js` — 保存済みコメントの重複判定キーを作る純関数(v0.1.1313)。
+    - `storedCommentDedupeKey.test.js`
     - `storedCommentDedupeMerge.js` — popup normalizeStoredCommentEntries 用: 同一キー重複行のマージ（PII を増やさずフラグのみ統合）
     - `storyAvatarDiagLine.js` — 応援グリッド用・診断表示（PII なし・件数のみ）。
     - `storyAvatarDiagLine.test.js`
