@@ -50,6 +50,61 @@ describe('nicoadContributionRankingApi', () => {
     });
   });
 
+  /*
+   * ★v0.1.1307(2026-08-10 実機 lv351140568 で確定した白丸の真因):
+   *   公式 API はアイコン未設定の広告主にも thumbnailUrl を返すが、中身は
+   *   `usericon/defaults/blank.jpg`(のっぺらぼう)である。実データ10件中7件がこれだった。
+   *
+   *   normalize がこの情報を【捨てて】いたため、下流(adLanePicksFromRooms)は
+   *   「サムネ情報なし」と解釈して uid から CDN URL を導出する。しかしアイコン未設定の
+   *   ユーザーはその URL が存在せず 404 → ブラウザの壊れ画像 = 画面に白丸が並ぶ。
+   *   実測: uid=138442683(未設定)の導出URL=404 / uid=38947059(設定済)=200。
+   *
+   *   公式が「未設定」と教えてくれているのだから、それを hasNoIcon として下流へ伝えれば
+   *   404 を出す前にゆっくり顔へ落とせる(推測ゼロ・公式提供値の検疫のみ)。
+   */
+  describe('アイコン未設定(defaults/blank.jpg)の伝達', () => {
+    const blank = 'https://secure-dcdn.cdn.nimg.jp/nicoaccount/usericon/defaults/blank.jpg';
+    const real = 'https://secure-dcdn.cdn.nimg.jp/nicoaccount/usericon/3894/38947059.jpg?1600603307';
+
+    it('thumbnailUrl が defaults/ なら hasNoIcon:true を立てる(uid はあるが顔が無い人)', () => {
+      const rows = normalizeNicoadRankingResponse({
+        meta: { status: 200 },
+        data: {
+          ranking: [
+            { userId: 138442683, advertiserName: 'アンワル・ビン・イブラヒム', totalContribution: 67039, rank: 1, thumbnailUrl: blank }
+          ]
+        }
+      });
+      expect(rows).toHaveLength(1);
+      expect(rows[0].isAnonymous).toBe(false); // 記名であることは変えない
+      expect(rows[0].userPageUrl).toBe('https://www.nicovideo.jp/user/138442683');
+      expect(rows[0].hasNoIcon).toBe(true);
+    });
+
+    it('本物の個人サムネなら hasNoIcon を立てない(退化防止)', () => {
+      const rows = normalizeNicoadRankingResponse({
+        meta: { status: 200 },
+        data: {
+          ranking: [
+            { userId: 38947059, advertiserName: '足利尊氏', totalContribution: 24431, rank: 4, thumbnailUrl: real }
+          ]
+        }
+      });
+      expect(rows[0].hasNoIcon).toBeUndefined();
+    });
+
+    it('thumbnailUrl が無い行は hasNoIcon を立てない(未知と未設定は別物)', () => {
+      const rows = normalizeNicoadRankingResponse({
+        meta: { status: 200 },
+        data: {
+          ranking: [{ userId: 115734569, advertiserName: 'しいたけ', totalContribution: 100, rank: 1 }]
+        }
+      });
+      expect(rows[0].hasNoIcon).toBeUndefined();
+    });
+  });
+
   describe('isLikelyNicoadRankingShape', () => {
     it('data.ranking 配列を持てば true（koken の rankers ではない点に注意）', () => {
       expect(isLikelyNicoadRankingShape({ data: { ranking: [] } })).toBe(true);
