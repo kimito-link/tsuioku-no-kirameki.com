@@ -746,7 +746,7 @@
   - `src/lib/statusTrendKey.js`
   - `src/extension/status-entry.js`
   - `src/lib/statusActionAdvisor.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 144</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 145</summary>
 
 - `app/app.js` — スマホ閲覧用 status Web 版。
 - `app/live-view.js` — global NL_BUILD_ID
@@ -842,6 +842,7 @@
 - `src/lib/pollUntil.js` — 再読み込み直後など DOM が遅れて現れるまで待つ（純粋な間隔ポーリング）
 - `src/lib/popupBooleanSettingController.js` — popup のブール設定 1 件を管理する純粋コントローラ。
 - `src/lib/popupBooleanSettingsRegistry.js` — popup のブール設定コントローラをまとめて扱うレジストリ。
+- `src/lib/popupCloakRevealTiming.js` — 幕(cloak)をいつ外してよいかを決める純関数(v0.1.1315)。
 - `src/lib/popupFramePresets.js` — popup の配色プリセット（フレーム）管理。
 - `src/lib/popupWatchSnapshotRetry.js` — 視聴タブのリロード直後は content script の readiness が揃わず、
 - `src/lib/popupWindowEmptyHeight.js` — 0.1.71 (BA): popup window の高さを「state（active watch / empty+history /
@@ -897,7 +898,7 @@
 
 ## 🧬 修正系譜マップ(この系統のバグを過去にどう直したか)
 
-> changelog 全 644 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
+> changelog 全 645 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
 
 ### 💾 記録件数 (91版)
 - `v0.1.1313` 2026-08-10 — サイドパネルがタブ切替で空になるのを直す／記録の二重計上をふさぐ
@@ -2213,7 +2214,8 @@
 - `v0.1.840` 2026-06-20 — 機能逆引き地図を全ファイル網羅に
 - `v0.1.835` 2026-06-20 — 自己検証ゲートを追加(版同期+診断文言)
 
-### その他 (72版)
+### その他 (73版)
+- `v0.1.1315` 2026-08-10 — パネルを開いたとき中身が出るまでの約1.2秒を詰めました
 - `v0.1.1312` 2026-08-10 — 「黒く見える」の正体が分かったので、効かなかった対処を取り下げます
 - `v0.1.1311` 2026-08-10 — 拡張の警告表示を解消(前の版で出してしまった設定ミス)
 - `v0.1.1310` 2026-08-10 — サイドパネルが出てくる瞬間の黒への対処（※後日、効いていないと判明）

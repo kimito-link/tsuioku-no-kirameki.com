@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 4 / 734 件
+## ⚠️ 役割コメントが無いソース 4 / 735 件
 - `src/lib/laneDomSelfMeasure.js`
 - `src/lib/reportPreviewPublish.js`
 - `src/lib/venueLaneBuckets.js`
@@ -656,7 +656,7 @@
     - `trumpet1.mp3`
     - `wallet1.mp3`
   - `SOURCES.md`
-- 📁 **src/** (1575)
+- 📁 **src/** (1577)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -943,7 +943,7 @@
         - `logo_funlink_white_RGB_maru_black.png`
       - `logo_guide_funlink_ol.pdf`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1338)
+  - 📁 **lib/** (1340)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -1781,6 +1781,8 @@
     - `popupBooleanSettingsRegistry.test.js`
     - `popupCelebrationGate.js` — popup / watch 埋め込みパネル再描画時の応援演出ゲート（単一の開幕判定）。
     - `popupCelebrationGate.test.js`
+    - `popupCloakRevealTiming.js` — 幕(cloak)をいつ外してよいかを決める純関数(v0.1.1315)。
+    - `popupCloakRevealTiming.test.js`
     - `popupConcurrentEstimateGate.js` — ポップアップ「推定同時接続」カードでローディングを解除するかどうか。
     - `popupConcurrentEstimateGate.test.js`
     - `popupContextBarModel.js` — popup 上部の接続コンテキスト表示・復旧バー表示・stat 表面状態の純粋ロジック。

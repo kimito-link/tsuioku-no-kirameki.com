@@ -43,6 +43,7 @@ import { directHit, makeInitialComboState } from '../lib/effectDirector.js';
 import { readInlineModeFlags } from '../lib/inlineModeFlags.js';
 import { pickWatchUrlFromMultipleSources } from '../lib/popupWatchUrlResolveMultiTab.js';
 import { decideNoActiveWatch } from '../lib/noActiveWatchDecision.js';
+import { shouldRevealCloakAfterFirstPaint } from '../lib/popupCloakRevealTiming.js';
 import { resolveCommentPostWatchTarget } from '../lib/commentPostWatchTarget.js';
 import { shouldCloseStandalonePopupAfterNavigate } from '../lib/standalonePopupClose.js';
 import { shouldRescueEmptyResolvedWatch } from '../lib/popupContextBarModel.js';
@@ -16616,6 +16617,17 @@ async function refresh() {
   resetWatchPopupLoadDiagnostics(lv);
   resetPerBroadcastPopupCachesIfLiveIdChanged(lv);
 
+  /*
+   * ★v0.1.1315: キャッシュヒット経路で【すぐ】幕を外す(黒画面の真因・判定は純関数が正本)。
+   *   実機 v0.1.1314 の計器: t+60ms で面積あり・全層✅・地はクリームなのに
+   *   幕だけ t+1238ms まで残る=約1.2秒「中身が見えない」。冪等なので後続は no-op。
+   */
+  if (shouldRevealCloakAfterFirstPaint({ snapshotCacheHit, freshRefresh: isFreshRefresh() }).revealNow) {
+    paintWatchPopupUi();
+    markPopupRefreshContentPainted();
+    revealPopupPrimaryOnce();
+  }
+
   if (!snapshotCacheHit) {
     // 0.1.19 (T): 取得中フラグを立ててから最初の paint を出す。
     // clearWatchMetaCard が `watchMetaCache.fetchInflight` を読んで「（接続中…）」
@@ -16630,6 +16642,10 @@ async function refresh() {
     watchMetaCache.fetchError = '';
     if (isFreshRefresh()) {
       paintWatchPopupUi();
+      // ★v0.1.1315: 描けた直後に外す(従来は1500msの保険任せ=中身が描けているのに隠れていた)。
+      //   保険は最終防衛として残す。冪等なので二重実行しない。
+      markPopupRefreshContentPainted();
+      revealPopupPrimaryOnce();
       schedulePopupPrimaryRevealFallback(1500);
     }
     // 視聴タブのリロード直後は content script が readiness 揃わず、単発の
@@ -16749,6 +16765,7 @@ async function refresh() {
   paintWatchPopupUi();
   markPopupRefreshContentPainted();
   revealPopupPrimaryOnce();
+  // ★v0.1.1315: ここは heavy read の【後】=実機で t+1238ms。上流で先に外すので通常 no-op。
 
   /*
    * v0.1.414 ウォッチドッグ（standalone popup multitab「中身が空」救済の最終防衛）:

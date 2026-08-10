@@ -642,6 +642,7 @@
 | `src/lib/popupBooleanSettingController.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/popupBooleanSettingsRegistry.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/popupCelebrationGate.js` | 1 | ポップアップ(応援レーン) |
+| `src/lib/popupCloakRevealTiming.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/popupConcurrentEstimateGate.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/popupContextBarModel.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/popupDiagAutoPublish.js` | 1 | ポップアップ(応援レーン) |
