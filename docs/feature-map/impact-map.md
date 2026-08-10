@@ -320,6 +320,7 @@
 | `src/lib/supportTimelineHtml.js` | 2 | コメビュ(別窓) / ポップアップ(応援レーン) |
 | `src/lib/swBackfillStaging.js` | 2 | バックフィル SW / 記録エンジン(watchページ常駐) |
 | `src/lib/thumbSettings.js` | 2 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) |
+| `src/lib/timeAuthority.js` | 2 | ポップアップ(応援レーン) / 状態速報ページ |
 | `src/lib/userProfileLinkHtml.js` | 2 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) |
 | `src/lib/venueAvatar.js` | 2 | 記録エンジン(watchページ常駐) / 会場モード(standalone) |
 | `src/lib/venueAvatarDiagLine.js` | 2 | 記録エンジン(watchページ常駐) / 会場モード(standalone) |
@@ -607,6 +608,7 @@
 | `src/lib/nicoliveDom.js` | 1 | 記録エンジン(watchページ常駐) |
 | `src/lib/niconicoInterceptLearn.js` | 1 | ページ傍受 |
 | `src/lib/nlMainScrollReveal.js` | 1 | ポップアップ(応援レーン) |
+| `src/lib/noActiveWatchDecision.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/northStarAcquisitionGauge.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/northStarCharaTrioConfig.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/northStarFallbackHtml.js` | 1 | ポップアップ(応援レーン) |
@@ -715,6 +717,7 @@
 | `src/lib/statusShareUrls.js` | 1 | 状態速報ページ |
 | `src/lib/statusTrend.js` | 1 | 状態速報ページ |
 | `src/lib/statusTrendKey.js` | 1 | 状態速報ページ |
+| `src/lib/storedCommentDedupeKey.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/storedCommentDedupeMerge.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/storyDetailRelatedEntries.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/storyDiagMonotonic.js` | 1 | ポップアップ(応援レーン) |
@@ -739,7 +742,6 @@
 | `src/lib/tabLeaderLock.js` | 1 | 記録エンジン(watchページ常駐) |
 | `src/lib/thumbDb.js` | 1 | 記録エンジン(watchページ常駐) |
 | `src/lib/thumbFifo.js` | 1 | 記録エンジン(watchページ常駐) |
-| `src/lib/timeAuthority.js` | 1 | 状態速報ページ |
 | `src/lib/tokenBucket.js` | 1 | 記録エンジン(watchページ常駐) |
 | `src/lib/topSupportersMirror.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/topSupportRankAnonymousFold.js` | 1 | ポップアップ(応援レーン) |

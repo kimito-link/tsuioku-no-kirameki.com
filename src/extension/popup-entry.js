@@ -42,6 +42,7 @@ import { detectVersionMismatch } from '../lib/versionMismatch.js';
 import { directHit, makeInitialComboState } from '../lib/effectDirector.js';
 import { readInlineModeFlags } from '../lib/inlineModeFlags.js';
 import { pickWatchUrlFromMultipleSources } from '../lib/popupWatchUrlResolveMultiTab.js';
+import { decideNoActiveWatch } from '../lib/noActiveWatchDecision.js';
 import { resolveCommentPostWatchTarget } from '../lib/commentPostWatchTarget.js';
 import { shouldCloseStandalonePopupAfterNavigate } from '../lib/standalonePopupClose.js';
 import { shouldRescueEmptyResolvedWatch } from '../lib/popupContextBarModel.js';
@@ -543,6 +544,7 @@ import {
 import { mergeProgramStatsWatchIntoWatchMetaSnapshot } from '../lib/mergeProgramStatsWatchIntoWatchMetaSnapshot.js';
 import { buildWatchMetaCardAudienceViewModel } from '../lib/buildWatchMetaCardAudienceViewModel.js';
 import { mergeStoredCommentDedupeVariants } from '../lib/storedCommentDedupeMerge.js';
+import { storedCommentDedupeKey } from '../lib/storedCommentDedupeKey.js';
 import {
   resolveWatchMetaCardState,
   isLiveStatValueAwaitingData
@@ -8599,11 +8601,10 @@ function normalizeStoredCommentEntries(entries) {
 
   for (const raw of list) {
     const entry = /** @type {PopupCommentEntry} */ (raw);
-    const no = String(entry?.commentNo || '').trim();
-    const key =
-      /^\d+$/.test(no)
-        ? `no:${no}`
-        : `${String(entry?.liveId || '').trim().toLowerCase()}|${normalizeCommentText(entry?.text || '')}|${Number(entry?.capturedAt || 0)}`;
+    // ★v0.1.1313: キー生成は純関数 storedCommentDedupeKey が正本(経緯はそちらの冒頭)。
+    //   旧キーは capturedAt をそのまま含み、読み直しで時刻が振り直されると
+    //   同じコメントが別行として数えられていた(＝「記録101%」の残り火)。
+    const key = storedCommentDedupeKey(entry);
     const existingIndex = indexByKey.get(key);
     if (existingIndex == null) {
       indexByKey.set(key, out.length);
@@ -15567,23 +15568,25 @@ async function refresh() {
    *   activeTab / lastFocused で watch が取れたときは非表示（0.1.106）。
    */
   // v0.1.424（再適用・v0.1.421 を単独で・パネル描画と無関係な popup 限定変更）:
-  //   dataBacked（v0.1.414 の「記録のある配信タブを優先」ソース）も storage と同じく
-  //   「実質アクティブ watch ではない」扱いにする。さもないと、ニコ生以外のページ（X 等）で
-  //   standalone POP を開いたとき、別の watch タブの記録（応援○件＋アイコングリッド）が
-  //   フルのアクティブ表示として出る誤情報になる（実機 2026-05-27）。dataBacked は foreground の
-  //   watch ではなく「データのある直近の配信」なので前回配信レビュー(empty-state)として軽く出す。
-  //   ※この変更は standalone popup の refresh() 限定で、watch ページ内の inline パネル描画
+  //   ※この判定は standalone popup の refresh() 限定で、watch ページ内の inline パネル描画
   //     （content-entry.js ensurePageFrameOverlay）には一切触れない。
-  const treatAsNoActiveWatch =
-    !isNicoLiveWatchUrl(url) ||
-    watchUrlPick.source === 'storage' ||
-    watchUrlPick.source === 'dataBacked' ||
-    watchUrlPick.source === 'none';
+  /*
+   * ★v0.1.1313: 判定は純関数 decideNoActiveWatch が正本(v0.1.424 の経緯もそちらの冒頭に集約)。
+   *   要点だけ: サイドパネルは【タブを切り替えても開いたまま】の面なので、
+   *   `activeTab` が watch でないことは「見ていない」を意味しない。
+   *   旧判定はこれを空扱いにし、記録中でもサイドパネルだけが空になっていた。
+   */
+  const noActiveWatchDecision = decideNoActiveWatch({
+    isWatchUrl: isNicoLiveWatchUrl(url),
+    source: watchUrlPick.source,
+    embedWatch: INLINE_EMBED_WATCH,
+    sidePanel: INLINE_SIDE_PANEL
+  });
+  const treatAsNoActiveWatch = noActiveWatchDecision.treatAsNoActiveWatch;
 
   const noWatchHint = $('noWatchRankingHint');
   if (noWatchHint instanceof HTMLElement) {
-    const showNoWatchRankingHint =
-      !INLINE_EMBED_WATCH && treatAsNoActiveWatch;
+    const showNoWatchRankingHint = noActiveWatchDecision.showNoWatchHint;
     if (showNoWatchRankingHint) {
       noWatchHint.removeAttribute('hidden');
       noWatchHint.style.display = 'block';

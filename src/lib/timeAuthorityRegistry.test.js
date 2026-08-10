@@ -10,14 +10,38 @@ const repoRoot = path.resolve(libDir, '..', '..');
 /** 時点フィールドを独自に持つファイルを検出する正本パターン(ハンドオフに固定した実行文と同じ)。 */
 const TIME_FIELD_RE = /capturedAt|persistedAt|measuredAt/;
 
-/** src/lib の実ファイル(テストと正本自身を除く)を走査して、時点フィールドを持つものを返す。 */
+/**
+ * ★timeAuthority に判定を委ねているファイルを見分けるパターン(v0.1.1313)。
+ *
+ * このリストが止めたいのは「時点フィールドを**独自に解釈する**ファイルが増えること」で、
+ * 「時点フィールドを**読む**ファイル」そのものではない。
+ * timeAuthority から import して解釈を委ねているなら、それは【移行後の望ましい姿】であり
+ * 祖父条項リストに載せるべきものではない(リストは単調減少＝追加禁止なので、
+ * 委譲したファイルを載せるとリストが増えて規律が壊れる)。
+ *
+ * ★この免除があっても規律は緩まない: 独自に `Number(x.capturedAt)` 等で判定するファイルは
+ *   import を持たないので、従来どおり赤になる。
+ */
+const DELEGATES_TO_TIME_AUTHORITY_RE =
+  /from\s+'\.\/timeAuthority\.js'|from\s+"\.\/timeAuthority\.js"/;
+
+/**
+ * src/lib の実ファイル(テストと正本自身を除く)を走査して、
+ * 【独自に】時点フィールドを解釈しているものを返す。
+ * timeAuthority へ委譲済みのファイルは除く(=移行のゴール地点)。
+ */
 function scanTimeFieldFiles() {
   return fs
     .readdirSync(libDir)
     .filter((f) => f.endsWith('.js'))
     .filter((f) => !f.includes('.test.'))
     .filter((f) => f !== 'timeAuthority.js' && f !== 'timeAuthorityRegistry.js')
-    .filter((f) => TIME_FIELD_RE.test(fs.readFileSync(path.join(libDir, f), 'utf8')))
+    .filter((f) => {
+      const src = fs.readFileSync(path.join(libDir, f), 'utf8');
+      if (!TIME_FIELD_RE.test(src)) return false;
+      // ★判定を timeAuthority に委ねているなら「独自に持っている」ではない。
+      return !DELEGATES_TO_TIME_AUTHORITY_RE.test(src);
+    })
     .map((f) => `src/lib/${f}`)
     .sort();
 }
@@ -73,6 +97,27 @@ describe('timeAuthority registry(祖父条項の凍結)', () => {
     expect(TIME_FIELD_RE.test('snap.persistedAt')).toBe(true);
     expect(TIME_FIELD_RE.test('domSelf.measuredAt')).toBe(true);
     expect(TIME_FIELD_RE.test('const y = { unrelated: 1 };')).toBe(false);
+  });
+
+  it('★委譲パターン自身の自己検査(免除が広がりすぎると規律が消える)', () => {
+    /*
+     * ★この免除が緩いと「時点を独自に判定するファイル」まで素通りして、
+     *   リストの意味が消える。陽性/陰性を毎回確かめる。
+     */
+    expect(
+      DELEGATES_TO_TIME_AUTHORITY_RE.test("import { toEpochMs } from './timeAuthority.js';")
+    ).toBe(true);
+    expect(
+      DELEGATES_TO_TIME_AUTHORITY_RE.test('import { ageMsOf } from "./timeAuthority.js";')
+    ).toBe(true);
+    // ★独自に判定しているファイル(import 無し)は免除されない=従来どおり検出される。
+    expect(
+      DELEGATES_TO_TIME_AUTHORITY_RE.test('const cap = Number(e.capturedAt) || 0;')
+    ).toBe(false);
+    // ★名前が似ているだけの別モジュールを誤って免除しない。
+    expect(
+      DELEGATES_TO_TIME_AUTHORITY_RE.test("import x from './timeAuthorityRegistry.js';")
+    ).toBe(false);
   });
 
   it('★走査が実際に何かを見つけている(0件で緑にならない)', () => {

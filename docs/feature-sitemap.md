@@ -111,7 +111,7 @@
   - `src/lib/monotonicCommentCount.js`
 - **storage キー定義** — chrome.storage のキー名の正本(nls_comments_<lv> 等)
   - `src/lib/storageKeys.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 45</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 46</summary>
 
 - `scripts/dump-panel-state.mjs` — 実機の chrome.storage.local を吸い出して
 - `src/lib/autoBackupState.js` — v0.1.808(星野ロミ式コンポーネント化・第1弾): content-entry.js の巨大化を抑えるため、
@@ -153,6 +153,7 @@
 - `src/lib/statCardsMirrorDom.js` — 数字カード鏡(記録/推定同時接続/来場者数+公式統計チップ)の【値セット部分】を、
 - `src/lib/statCardsMirrorKey.js` — popup 上部の数字カード群(記録N件・推定同時接続・来場者数・公式統計チップ)を status.html に
 - `src/lib/storageOpTimeout.js` — v0.1.502: 単発の非同期処理（主に chrome.storage.local の get/set/remove）を
+- `src/lib/storedCommentDedupeKey.js` — 保存済みコメントの重複判定キーを作る純関数(v0.1.1313)。
 - `src/lib/storyDetailRelatedEntries.js` — ストーリー詳細／プレビュー脇の「同一ユーザーの直近」リスト用。
 - `src/lib/storyDiagMonotonic.js` — 診断カウンタchurn(内訳・用語の顔一覧が増減して見える)の根治。
 - `src/lib/supportVisualExpanded.js` — 応援ビジュアル（アイコン列・グリッド・診断）の開閉を storage に保存するときの正規化。
@@ -745,7 +746,7 @@
   - `src/lib/statusTrendKey.js`
   - `src/extension/status-entry.js`
   - `src/lib/statusActionAdvisor.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 143</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 144</summary>
 
 - `app/app.js` — スマホ閲覧用 status Web 版。
 - `app/live-view.js` — global NL_BUILD_ID
@@ -819,6 +820,7 @@
 - `src/lib/mirrorBundleFlushScheduler.js` — 鏡バンドルの flush スケジューラ(状態を内部に閉じた純ロジック・タイマー非依存)。
 - `src/lib/mirrorSanitize.js` — v0.1.237: 北極星「鏡のように貼り付け」用の自前最小サニタイザ。
 - `src/lib/nicoCommentPanelAssetLauncher.js` — ニコ生 watch のコメント欄付近から「ギフト / アイテム / スタンプ」等の起動ボタンを推定する。
+- `src/lib/noActiveWatchDecision.js` — 「実質アクティブな watch が無い」＝画面を空にするか、を決める純関数(v0.1.1313)。
 - `src/lib/northStarCharaTrioConfig.js` — 北極星 3 キャラ trio（りんく / こん太 / たぬ姉）の slot 構成と tier 連動 src 解決。
 - `src/lib/northStarMirror.js` — 北極星レーン鏡(公式値レーン)のスナップショット純関数。
 - `src/lib/objectUrlRevokeQueue.js` — `URL.createObjectURL` で作った blob URL を、メモリ滞留を抑えながら revoke する
@@ -895,9 +897,10 @@
 
 ## 🧬 修正系譜マップ(この系統のバグを過去にどう直したか)
 
-> changelog 全 642 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
+> changelog 全 643 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
 
-### 💾 記録件数 (90版)
+### 💾 記録件数 (91版)
+- `v0.1.1313` 2026-08-10 — サイドパネルがタブ切替で空になるのを直す／記録の二重計上をふさぐ
 - `v0.1.1291` 2026-08-08 — ★「ギフトがまだ無い配信」を不具合と誤って赤く出していたのを直しました
 - `v0.1.1247` 2026-08-04 — 読み上げが遅くなる悪循環を断ち切りました
 - `v0.1.1246` 2026-08-04 — 読み上げが「たまにしか読まれない」問題を改善しました
@@ -1153,7 +1156,8 @@
 - `v0.1.664` 2026-06-10 — 複数タブ並列取得を安全に(重い時は自動で絞る)
 - `v0.1.663` 2026-06-06 — 複数タブでも過去ログを並行して一気に取れるように(2配信まで)
 
-### 🙂 匿名(184) (61版)
+### 🙂 匿名(184) (62版)
+- `v0.1.1313` 2026-08-10 — サイドパネルがタブ切替で空になるのを直す／記録の二重計上をふさぐ
 - `v0.1.1282` 2026-08-07 — ★会場モードでギフト・広告の段が消えていたのを直しました
 - `v0.1.1280` 2026-08-06 — 会場モードが①パネルとずれる原因に手を入れました
 - `v0.1.1239` 2026-08-03 — 会場の背景描画のメモリも閉じたときに解放するようにしました
