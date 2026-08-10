@@ -56,6 +56,7 @@ export function isProbeRetryEligible(rec, nowMs, policy) {
 /**
  * @param {{
  *   fallbackSrc: string,
+ *   fallbackSrcFor?: ((requestedSrc: string) => string)|null,
  *   urlKey?: (s: string) => string,
  *   onFallbackApplied?: (img: HTMLImageElement) => void,
  *   onRemoteSuccess?: (img: HTMLImageElement) => void,
@@ -65,6 +66,35 @@ export function isProbeRetryEligible(rec, nowMs, policy) {
  */
 export function createSupportAvatarLoadGuard(options) {
   const fallbackSrc = String(options?.fallbackSrc || '');
+  /*
+   * ★v0.1.1318: 「その人ごとの代替顔」を返せるようにする(会場が白丸だらけになる件)。
+   *
+   * ■ なぜ要るか(2026-08-10 実機・ユーザー報告「サムネがおちてる」)
+   *   アイコン未設定のユーザーは CDN が 404 を返す(実測: 未設定=404 / 設定済=200)。
+   *   guard は失敗時に【全員同じ】fallbackSrc(公式 blank.jpg)を出すので、
+   *   会場が「白丸だらけ」になる。これは v0.1.1307 で広告段に対して直したのと同じ症状で、
+   *   そのときの結論は「404の白丸でなく【ゆっくり顔】にする」だった。
+   *   ★静的な1枚しか返せない構造だったので、会場だけ取り残されていた。
+   *
+   * ■ 加法のみ: 未指定なら従来どおり fallbackSrc(既存の呼び出し元は挙動不変)。
+   */
+  const fallbackSrcFor =
+    typeof options?.fallbackSrcFor === 'function' ? options.fallbackSrcFor : null;
+  /**
+   * 失敗時に出す代替 src を決める。個別解決器があればそれを優先し、
+   * 空を返したら共通の fallbackSrc に倒す(必ず何かを返す=壊れ画像にしない)。
+   * @param {string} requestedSrc
+   * @returns {string}
+   */
+  const resolveFallback = (requestedSrc) => {
+    if (!fallbackSrcFor) return fallbackSrc;
+    try {
+      const s = String(fallbackSrcFor(String(requestedSrc || '')) || '').trim();
+      return s || fallbackSrc;
+    } catch {
+      return fallbackSrc; // 解決器の失敗で画像を壊さない
+    }
+  };
   const urlKeyFn =
     typeof options?.urlKey === 'function' ? options.urlKey : defaultUrlKey;
   // venue-avatar-stale-mirror-DESIGN.md §C-1b/§G-7: 既定は null=従来の恒久負キャッシュ
@@ -104,13 +134,14 @@ export function createSupportAvatarLoadGuard(options) {
    */
   function pickDisplaySrc(requestedSrc) {
     const req = String(requestedSrc || '').trim();
-    if (!req) return fallbackSrc;
+    if (!req) return resolveFallback(req);
     if (!isHttpOrHttpsUrl(req)) return req;
     if (req === fallbackSrc) return req;
     const key = urlKeyFn(req);
-    if (key && failedKeys.has(key)) return fallbackSrc;
+    // ★失敗が確定している URL は、その人ごとの代替顔へ倒す(全員同じ白丸にしない)。
+    if (key && failedKeys.has(key)) return resolveFallback(req);
     if (key && succeededKeys.has(key)) return req;
-    return fallbackSrc;
+    return resolveFallback(req);
   }
 
   /**
@@ -177,6 +208,17 @@ export function createSupportAvatarLoadGuard(options) {
       //   (retrySweepが後で拾えるように)。retryPolicy未指定の呼び出し元でも刻印自体は無害
       //   (retrySweepはretryPolicy無しならno-opで一切参照しない)。
       try { img.dataset.nlsbAvatarRetrySrc = req; } catch { /* no-op: 非DOM環境等 */ }
+      /*
+       * ★v0.1.1318: 失敗が確定したら【その場で代替顔へ差し替える】。
+       *   従来は onFallbackApplied(クラス付与)だけで src を触っておらず、
+       *   img は失敗した URL を指したまま=ブラウザの壊れ画像(白丸)が残っていた。
+       *   ★fallbackSrcFor が無い呼び出し元では resolveFallback が従来の
+       *     fallbackSrc を返すので、実質的な見え方は変わらない(加法)。
+       */
+      const alt = resolveFallback(req);
+      if (alt && img.getAttribute('src') !== alt) {
+        try { img.src = alt; } catch { /* no-op: 非DOM環境等 */ }
+      }
       onFallbackApplied?.(img);
       cleanup();
     };

@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 4 / 736 件
+## ⚠️ 役割コメントが無いソース 4 / 737 件
 - `src/lib/laneDomSelfMeasure.js`
 - `src/lib/reportPreviewPublish.js`
 - `src/lib/venueLaneBuckets.js`
@@ -656,7 +656,7 @@
     - `trumpet1.mp3`
     - `wallet1.mp3`
   - `SOURCES.md`
-- 📁 **src/** (1581)
+- 📁 **src/** (1584)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -943,7 +943,7 @@
         - `logo_funlink_white_RGB_maru_black.png`
       - `logo_guide_funlink_ol.pdf`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1344)
+  - 📁 **lib/** (1347)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -1258,6 +1258,8 @@
     - `deriveAvatarUrlFromUid.equivalence.test.js`
     - `deriveAvatarUrlFromUid.js` — v0.1.203 Patch 1: niconico ユーザー UID から avatar URL を確定パターンで生成する純関数。
     - `deriveAvatarUrlFromUid.test.js`
+    - `devAutoReloadDecision.js` — devAutoReloadDecision — 開発用オートリロードの判定(v0.1.1318)。
+    - `devAutoReloadDecision.test.js`
     - `devMonitorAvatarStats.js` — 開発者向け監視: storage コメント配列からアバター／userId の集計（PII なし・件数のみ）
     - `devMonitorAvatarStats.test.js`
     - `devMonitorDebugSubset.js` — ポップアップ「開発・テスト用 監視」用: watch スナップショット _debug から
@@ -2140,6 +2142,7 @@
     - `venueAvatar.test.js`
     - `venueAvatarDiagLine.js` — 会場モード(venueBar.js)の「🩺 会場の状態」診断ブロックを組み立てる純関数群。
     - `venueAvatarDiagLine.test.js`
+    - `venueAvatarFallbackFace.test.js`
     - `venueAvatarSvgOnly.wiring.test.js`
     - `venueBubbleChurn.js` — 会場「応援TOP」吹き出しchurnの実測計器(診断先行アプローチ)。
     - `venueBubbleChurn.test.js`
