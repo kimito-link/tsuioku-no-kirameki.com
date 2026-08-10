@@ -196,35 +196,25 @@
         animation: none;
       }
 
-      /* システムのダークモード設定時、JS 起動前の初回ロードシェード */
-      @media (prefers-color-scheme: dark) {
-        .nl-init-shade {
-          background: linear-gradient(180deg, var(--nl-bg, #0b1220), var(--nl-bg-soft, #111827));
-        }
-        .nl-init-shade__face {
-          background: var(--nl-surface, #0f172a);
-          border-color: var(--nl-text-sub, #cbd5e1);
-          box-shadow: 2px 2px 0 var(--nl-text-sub, #cbd5e1);
-        }
-        .nl-init-shade__char {
-          background: var(--nl-surface, #0f172a);
-          border-color: color-mix(in srgb, var(--nl-text-sub, #cbd5e1) 55%, transparent);
-          box-shadow: 2px 2px 0 color-mix(in srgb, var(--nl-text-sub, #cbd5e1) 35%, transparent);
-        }
-        .nl-init-shade__char.is-speaking {
-          border-color: var(--nl-accent, #60a5fa);
-          box-shadow: 0 0 0 2px color-mix(in srgb, var(--nl-accent, #60a5fa) 50%, transparent), 2px 3px 0 color-mix(in srgb, var(--nl-accent, #60a5fa) 40%, transparent);
-        }
-        .nl-init-shade__speaker {
-          color: var(--nl-accent, #60a5fa);
-        }
-        .nl-init-shade__msg {
-          color: var(--nl-accent, #60a5fa);
-        }
-        .nl-init-shade__submsg {
-          color: var(--nl-muted, #94a3b8);
-        }
-      }
+      /*
+       * ★v0.1.1319: 初回ロードシェードの【ダーク用フォールバック色を撤去】した。
+       *
+       * ■ なぜ撤去するか(2026-08-10・黒画面をユーザーが何度も報告)
+       *   ここは `var(--nl-bg, #0b1220)` のように【変数が未定義なら濃紺】という書き方だった。
+       *   `#0b1220` は v0.1.1279 で「事実上の黒」と判定して一度撤去した色そのもの。
+       *   通常は <html> のインライン style が --nl-bg をクリーム色に定義するので発火しないが、
+       *   **その定義が間に合わない/失われた瞬間だけ、全画面のシェードが濃紺=黒になる**。
+       *   シェードは position:fixed inset:0 z-index:99999 で【画面全部を覆う】ので、
+       *   ここが黒くなると「パネル全体が黒く、うっすら縞が見える」という見え方になる。
+       *
+       * ■ このアプリに実質ダークモードは無い(v0.1.51 で light 強制)
+       *   だからダーク時だけ色を変える理由が無い。規則ごと消せば
+       *   既定(ライトのクリーム色)がそのまま効く＝「塗る人が必ず居る」状態になる。
+       *   [[css-default-should-be-the-safe-state-2026-08-05]] と同じ原則。
+       *
+       * ★戻すときの注意: 変数のフォールバック値に【暗い色】を書かないこと。
+       *   書くなら明るい既定色にする(未定義時に黒くなる経路を作らない)。
+       */
       @keyframes nl-init-shade-bob {
         0%, 100% { transform: translateY(0); }
         50% { transform: translateY(-6px); }
