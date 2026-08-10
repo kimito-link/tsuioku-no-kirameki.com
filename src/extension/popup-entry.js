@@ -22060,4 +22060,30 @@ if (typeof window !== 'undefined') {
   } else {
     window.addEventListener('load', finalRevealFallback, { once: true });
   }
+
+  /*
+   * ★v0.1.1309(2026-08-10 実機で真因確定): 上の安全網は `window load` を待つが、
+   *   load は【画像など全サブリソースの完了】を待つイベントで、サイドパネルでは遅い。
+   *
+   * ■ 実測(状態速報 v0.1.1308・計器を30秒窓に延ばして初めて見えた)
+   *     幕(cloak) ✅ t+5887ms で解除 ★CSS自動解除(1500ms)より後
+   *   サイドパネルは滑り出るあいだブラウザから hidden 扱いになり(laneTickProbe.docHidden=7)、
+   *   サブリソースの読み込みが進まないので load 自体が t≈5.1秒までずれ込む。
+   *   その間ずっと cloak 属性が残る=ユーザー証言「はじめするっとでるときくろいのがでる」。
+   *   ★CSS の 1500ms 保険は `.nl-popup-primary` の opacity しか戻さず、cloak 属性は残る
+   *     (面積0でもCSSアニメは時間どおり進むことは実ブラウザで実測確認済み=面積は無関係)。
+   *
+   * ■ 直し方: load に依存しない【時間だけの保険】を足す。
+   *   DOM が使える時点から数えるので、hidden でも滑走中でも必ず時間内に外れる。
+   *   1500ms は CSS の auto-reveal と同じ値＝「CSSが中身を見せる瞬間には幕も外す」で揃える。
+   *   revealPopupPrimaryOnce() は冪等(popupPrimaryRevealDone で二重実行しない)なので、
+   *   通常経路が先に外していれば no-op＝既存の挙動を一切変えない(加法のみ)。
+   */
+  setTimeout(() => {
+    try {
+      revealPopupPrimaryOnce();
+    } catch {
+      // no-op
+    }
+  }, 1500);
 }
