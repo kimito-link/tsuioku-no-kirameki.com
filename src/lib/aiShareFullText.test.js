@@ -1,5 +1,44 @@
 import { describe, it, expect } from 'vitest';
-import { formatRefreshPerfLine, formatRenderSectionMsLine } from './aiShareFullText.js';
+import {
+  formatRefreshPerfLine,
+  formatRenderSectionMsLine,
+  formatTabsQuerySlowLine
+} from './aiShareFullText.js';
+
+describe('formatTabsQuerySlowLine（v0.1.1314: 「lives が遅い」の内訳を名指しする）', () => {
+  it('★遅延を観測していなければ1行も出さない(普段の速報を汚さない)', () => {
+    expect(formatTabsQuerySlowLine({ count: 0, worstMs: 0, lastMs: 0, lastTabCount: -1 })).toBe('');
+    expect(formatTabsQuerySlowLine(null)).toBe('');
+    expect(formatTabsQuerySlowLine(undefined)).toBe('');
+    expect(formatTabsQuerySlowLine({})).toBe('');
+  });
+
+  it('★遅延を観測したら回数・最悪値・原因のありかを出す', () => {
+    const line = formatTabsQuerySlowLine({
+      count: 3,
+      worstMs: 5493,
+      lastMs: 1200,
+      lastTabCount: 2
+    });
+    expect(line).toContain('3回');
+    expect(line).toContain('最悪 5493ms');
+    expect(line).toContain('直近 1200ms');
+    expect(line).toContain('watchタブ数 2');
+    // ★症状でなく「原因のありか」を名指しする(storage ではない=拡張の中を直しても無駄)。
+    expect(line).toContain('ブラウザ側の応答待ち');
+  });
+
+  it('タブ数が取れていないときはタブ数を出さない', () => {
+    const line = formatTabsQuerySlowLine({ count: 1, worstMs: 2000, lastMs: 2000, lastTabCount: -1 });
+    expect(line).toContain('1回');
+    expect(line).not.toContain('watchタブ数');
+  });
+
+  it('壊れた入力でも throw しない', () => {
+    expect(() => formatTabsQuerySlowLine({ count: 'x', worstMs: null })).not.toThrow();
+    expect(() => formatTabsQuerySlowLine(123)).not.toThrow();
+  });
+});
 
 describe('formatRefreshPerfLine（v0.1.1005: 更新所要の計器を本文に出す）', () => {
   it('totalMs と重いステップ top3 を降順で出す', () => {
