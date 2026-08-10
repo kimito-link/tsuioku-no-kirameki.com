@@ -24,6 +24,7 @@ graph LR
   n_popup --> n_src_domain_user_avatar_js["domain/user/avatar.js"]
   n_popup --> n_src_domain_user_identity_js["domain/user/identity.js"]:::shared
   n_popup --> n_src_domain_user_nickname_js["domain/user/nickname.js"]:::shared
+  n_popup --> n_src_extension_popup_attachAiDiagButtonHandler_js["extension/popup/attachAiDiagButtonHandler.js"]
   n_popup --> n_src_extension_popup_renderAcquisitionDashboard_js["extension/popup/renderAcquisitionDashboard.js"]
   n_popup --> n_src_extension_popup_report_htmlReportDocument_js["extension/popup/report/htmlReportDocument.js"]
   n_popup --> n_src_extension_story_renderStoryUserLaneDom_js["extension/story/renderStoryUserLaneDom.js"]:::shared
@@ -52,8 +53,7 @@ graph LR
   n_popup --> n_src_lib_broadcastDurationLabel_js["lib/broadcastDurationLabel.js"]
   n_popup --> n_src_lib_broadcastNarrativeBuilder_js["lib/broadcastNarrativeBuilder.js"]
   n_popup --> n_src_lib_broadcastReportSummary_js["lib/broadcastReportSummary.js"]
-  n_popup --> n_src_lib_broadcastScore_js["lib/broadcastScore.js"]:::shared
   classDef shared fill:#eee,stroke:#999,color:#666;
 ```
 
-> ほか 364 ファイル省略（全件は storage-bus.md / metafile 参照）。
+> ほか 365 ファイル省略（全件は storage-bus.md / metafile 参照）。

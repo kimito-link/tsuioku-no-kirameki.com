@@ -246,8 +246,13 @@ export default [
     //   ★純関数(laneDomFingerprint/perTierKeysOf/buildVenueSceneReceipts)は全て lib 側に
     //     テスト付きで隔離済みで、popup 側に残るのは chrome/DOM グルーだけ(lib抽出不可)。
     //   実測22284 → ラチェットは実測+50の22334へ。
+    // 2026-08-10(Phase 2 の実抽出2件): renderAcquisitionDashboard(121行)と
+    //   attachAiDiagButtonHandler(128行・専用の module state 2つも同伴)を
+    //   src/extension/popup/ へ抽出=22332→22064。ラチェットを実測+36の22100へ下げた。
+    //   ★抽出候補は棚卸し済み(依存ゼロの関数が他に6個・約440行)。
+    //     docs/handoff/giant-entry-split-PHASE2-INVENTORY-2026-08-10.md
     files: ['src/extension/popup-entry.js'],
-    rules: { 'max-lines': ['error', { max: 22334, skipBlankLines: false, skipComments: false }] }
+    rules: { 'max-lines': ['error', { max: 22100, skipBlankLines: false, skipComments: false }] }
   },
   {
     files: ['src/extension/popup/**/*.js'],
