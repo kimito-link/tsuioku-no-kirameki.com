@@ -21,7 +21,13 @@ describe('watchSnapshotKey の配線(popup-entry)', () => {
 
   it('buildWatchSnapshotKey を import している', () => {
     expect(src).toMatch(
-      /import\s*\{\s*buildWatchSnapshotKey\s*\}\s*from\s*'\.\.\/lib\/watchSnapshotKey\.js'/
+      /import\s*\{[^}]*\bbuildWatchSnapshotKey\b[^}]*\}\s*from\s*'\.\.\/lib\/watchSnapshotKey\.js'/
+    );
+  });
+
+  it('heavyResultStillTargetsThisWatch を import している(v0.1.1325)', () => {
+    expect(src).toMatch(
+      /import\s*\{[^}]*\bheavyResultStillTargetsThisWatch\b[^}]*\}\s*from\s*'\.\.\/lib\/watchSnapshotKey\.js'/
     );
   });
 
@@ -41,10 +47,23 @@ describe('watchSnapshotKey の配線(popup-entry)', () => {
     expect(assignments.length).toBe(1);
   });
 
-  it('STALE_SNAPSHOT の判定が snapshotKey との比較のままである(関所は残す)', () => {
-    // 鍵を直したので bail は起きにくくなるが、配信切替を捨てる関所自体は必要。
+  /*
+   * ★v0.1.1325 で判定を純関数へ移した。
+   *   旧: `if (watchMetaCache.key !== snapshotKey) bailHeavy(...)`
+   *       → key='' (polling/visibility が再取得を促すため意図的に消す)でも bail し、
+   *         読めた全件を毎回捨てていた(heavyEverSettled:false の残り半分の真因)。
+   *   新: heavyResultStillTargetsThisWatch({cacheKey, snapshotKey}) が false のときだけ bail。
+   *   ★関所自体は残す(本物の配信切替は捨てる必要がある)。
+   */
+  it('STALE_SNAPSHOT の判定に純関数を使っている(関所は残す)', () => {
     expect(src).toMatch(
-      /watchMetaCache\.key\s*!==\s*snapshotKey\)\s*return\s+bailHeavy\(\s*STORY_USER_LANE_HEAVY_SETTLE\.STALE_SNAPSHOT/
+      /if\s*\(\s*!heavyResultStillTargetsThisWatch\(\s*\{\s*cacheKey:\s*watchMetaCache\.key\s*,\s*snapshotKey\s*\}\s*\)\s*\)\s*return\s+bailHeavy\(\s*STORY_USER_LANE_HEAVY_SETTLE\.STALE_SNAPSHOT/
+    );
+  });
+
+  it('★生の !== 比較に戻っていない(key="" で全件を捨てる退行の再発防止)', () => {
+    expect(src).not.toMatch(
+      /watchMetaCache\.key\s*!==\s*snapshotKey\)\s*return\s+bailHeavy/
     );
   });
 });

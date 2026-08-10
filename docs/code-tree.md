@@ -35,6 +35,16 @@
 
 ## 全ファイルツリー
 
+- 📁 **.codex/** (5)
+  - 📁 **agents/** (4)
+    - `code-reviewer.toml`
+    - `codex-impl.toml`
+    - `cursor-impl.toml`
+    - `opencode-local.toml`
+  - `config.toml`
+- 📁 **.codex-osint/** (2)
+  - `cc_pre_request_20220927.warc.gz`
+  - `test-write.txt`
 - 📁 **api/** (1)
   - `status.js` — status 受け口 Vercel Serverless Function。
 - 📁 **app/** (97)
@@ -636,7 +646,7 @@
   - `vendor-visual-explainer.mjs` — Vendors nicobailon/visual-explainer (MIT) into .cursor/skills/visual-explainer/
   - `verify-bump.mjs` — extension bump 後の整合性チェッカー
   - `write-extension-placeholder-icons.mjs` — リポジトリに 256px アイコンしか無い環境向け: manifest 用の小さめ PNG を生成する。
-- 📁 **sound-src/** (20)
+- 📁 **sound-src/** (23)
   - 📁 **soundeffect-lab/** (19)
     - `clearing1.mp3`
     - `cute-pose1.mp3`
@@ -658,6 +668,9 @@
     - `trumpet1.mp3`
     - `wallet1.mp3`
   - `SOURCES.md`
+  - `gift-coin-hq.wav`
+  - `gift-register-hq.wav`
+  - `gift-register.mp3`
 - 📁 **src/** (1594)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
