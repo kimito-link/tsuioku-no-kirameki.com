@@ -157,7 +157,7 @@
     - `2026-07-22.md`
     - `2026-07-23.md`
     - `2026-07-31.md`
-- 📁 **docs/** (255)
+- 📁 **docs/** (256)
   - 📁 **article-assets/** (87)
     - 📁 **venue-frames/** (12)
       - `f01.png`
@@ -267,7 +267,7 @@
     - `storage-bus.md`
     - `venue.md`
     - `web-status.md`
-  - 📁 **handoff/** (91)
+  - 📁 **handoff/** (92)
     - `HANDOFF-backfill-instant-restore.md`
     - `HANDOFF-broadcast-score-panel.md`
     - `HANDOFF-comment-pickup-bsp.md`
@@ -304,6 +304,7 @@
     - `HANDOFF-resume-0808-e2e-content-visibility.md`
     - `HANDOFF-resume-0808-venue-transport.md`
     - `HANDOFF-resume-0809-sidepanel-black.md`
+    - `HANDOFF-resume-0810-cloak-black.md`
     - `HANDOFF-robust-architecture-IMPL.md`
     - `HANDOFF-show-all-participants.md`
     - `HANDOFF-sound-optimization.md`
