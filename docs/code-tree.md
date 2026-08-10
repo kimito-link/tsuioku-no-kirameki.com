@@ -157,7 +157,7 @@
     - `2026-07-22.md`
     - `2026-07-23.md`
     - `2026-07-31.md`
-- 📁 **docs/** (251)
+- 📁 **docs/** (254)
   - 📁 **article-assets/** (87)
     - 📁 **venue-frames/** (12)
       - `f01.png`
@@ -267,7 +267,7 @@
     - `storage-bus.md`
     - `venue.md`
     - `web-status.md`
-  - 📁 **handoff/** (87)
+  - 📁 **handoff/** (90)
     - `HANDOFF-backfill-instant-restore.md`
     - `HANDOFF-broadcast-score-panel.md`
     - `HANDOFF-comment-pickup-bsp.md`
@@ -321,6 +321,9 @@
     - `diagnostic-architecture-strengthen-IMPLEMENTATION-HANDOFF.md`
     - `diagnostic-instrument-strengthen-2-DESIGN.md`
     - `diagnostic-instrument-strengthen-2-IMPLEMENTATION-HANDOFF.md`
+    - `giant-entry-split-IMPLEMENTATION-HANDOFF-2026-08-10.md`
+    - `giant-entry-split-MAP-2026-08-10.md`
+    - `giant-entry-split-SPEC-2026-08-10.md`
     - `gift-lane-thumb-own-posted-mismatch-DESIGN.md`
     - `gift-lane-thumb-own-posted-mismatch-IMPLEMENTATION-HANDOFF.md`
     - `lanescene-structural-review-DESIGN.md`
