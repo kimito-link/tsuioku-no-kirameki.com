@@ -254,8 +254,17 @@ export default [
     //   src/extension/popup/ へ抽出=22332→22064。ラチェットを実測+36の22100へ下げた。
     //   ★抽出候補は棚卸し済み(依存ゼロの関数が他に6個・約440行)。
     //     docs/handoff/giant-entry-split-PHASE2-INVENTORY-2026-08-10.md
+    // 2026-08-10(v0.1.1315・サイドパネル黒画面の根治): 幕(cloak)の解除を
+    //   キャッシュヒット経路にも配線=22100→22117(+17)。
+    //   ★実機の計器が名指しした真因: t+60ms で面積あり・全層✅・地はクリームなのに
+    //     幕だけ t+1238ms まで残る=約1.2秒「中身が見えない」状態が続いていた。
+    //     解除指示が `if (!snapshotCacheHit)` の中と heavy read の後にしか無く、
+    //     キャッシュに当たるとブロックごと飛ばされて遅い経路しか残らなかった。
+    //   ★判定は純関数 src/lib/popupCloakRevealTiming.js(テスト付)に隔離済みで、
+    //     popup 側に残るのは paint/reveal の DOM グルー3行だけ(lib抽出不可)。
+    //   実測22117 → ラチェットは実測ちょうどの22117へ(+εを取らない=次も必ず意識させる)。
     files: ['src/extension/popup-entry.js'],
-    rules: { 'max-lines': ['error', { max: 22100, skipBlankLines: false, skipComments: false }] }
+    rules: { 'max-lines': ['error', { max: 22117, skipBlankLines: false, skipComments: false }] }
   },
   {
     files: ['src/extension/popup/**/*.js'],
