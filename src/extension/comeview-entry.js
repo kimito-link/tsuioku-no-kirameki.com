@@ -109,6 +109,20 @@ const RECONCILE_INTERVAL_MS = 60_000;
  *   を防ぐ。RECONCILE_INTERVAL_MS(60s)より十分短くし、次の tick で自然に再試行される範囲にする。
  */
 const FULL_REFRESH_STORAGE_TIMEOUT_MS = 8000;
+/**
+ * ★v0.1.1321: 起動経路(main)の storage read を有界化する上限。
+ *
+ * ■ なぜ 1.5 秒か
+ *   ここで読むのは【小さな単一キー】(最終watch URL / 読み上げ設定 / NGリスト)で、
+ *   空いていれば数ms〜数十msで返る。1.5秒待って返らない＝storage が混んでいる状態なので、
+ *   待ち続けるより【まず画面を出す】ほうが良い(取れなかった値は onChanged や
+ *   後続の再読み込みで自動的に追いつく)。
+ *   ★full refresh(8秒)より短くする: あちらは本体データで「取れないと意味が無い」が、
+ *     こちらは設定値で「取れなくても画面は出せる」＝止めてよい理由が無い。
+ */
+const COMEVIEW_BOOT_READ_TIMEOUT_MS = 1500;
+/** ★v0.1.1321: onChanged の二重登録防止(キーを動的に引くので1回張れば足りる)。 */
+let _storageChangesWired = false;
 const KEY_LAST_WATCH_URL = 'nls_last_watch_url';
 const VOICE_READING_ENABLED_KEY = 'nls_voice_reading_enabled_v1';
 const VOICE_ASSIGNMENTS_KEY = 'nls_voice_assignments_v1';
@@ -286,12 +300,30 @@ function resolveLiveIdFromUrl() {
 
 async function resolveLiveIdFromStorage() {
   try {
-    const bag = await chrome.storage.local.get(KEY_LAST_WATCH_URL);
-    const url = String(bag[KEY_LAST_WATCH_URL] || '');
+    /*
+     * ★v0.1.1321: 有界化する(コメビュが立ち上がらない実害の根治)。
+     *
+     * ■ 何が起きていたか(2026-08-11 実機)
+     *   過去ログ取り込み(backfill)中は storage が混み、この生の get が返らず
+     *   **main() がここで止まる**。画面は cvLiveMeta が静的既定の「—」のまま、
+     *   本文は「コメントを待っています…」で固まる＝「立ち上がらない」に見えていた。
+     *   (実際 storage が空くと自力で立ち上がった＝壊れてはいなかった)
+     *   ★同型の事故は v0.1.784「storage stall でコメビュが凍結する不具合を根治」で
+     *     一度手当てされているが、**起動経路は素通しのまま残っていた**。
+     *
+     * ■ 直し方: 待ち切らない。取れなければ空を返し、後続の onChanged
+     *   (nls_last_watch_url の変化→switchToLiveId)が拾って自動で追いつく。
+     *   ＝**まず画面を出して、データは後から**。
+     */
+    const bag = await runStorageOpWithTimeout(
+      () => chrome.storage.local.get(KEY_LAST_WATCH_URL),
+      COMEVIEW_BOOT_READ_TIMEOUT_MS
+    );
+    const url = String(bag?.[KEY_LAST_WATCH_URL] || '');
     const m = url.toLowerCase().match(/lv\d{1,15}/);
     if (m) return m[0];
   } catch {
-    /* no-op */
+    /* timeout/失敗は空で続行(起動を止めない) */
   }
   return '';
 }
@@ -768,14 +800,21 @@ async function initializeVoiceReading() {
   if (isObsMode()) return;
   let bag = {};
   try {
-    bag = await chrome.storage.local.get([
-      VOICE_READING_ENABLED_KEY,
-      VOICE_ASSIGNMENTS_KEY,
-      VOICE_READ_NAME_KEY
-    ]);
+    // ★v0.1.1321: 有界化(起動経路)。読み上げ設定が取れなくても画面は出す。
+    //   既定(読み上げOFF・割当なし)で始まり、後で設定変更を onChanged が拾う。
+    bag = await runStorageOpWithTimeout(
+      () =>
+        chrome.storage.local.get([
+          VOICE_READING_ENABLED_KEY,
+          VOICE_ASSIGNMENTS_KEY,
+          VOICE_READ_NAME_KEY
+        ]),
+      COMEVIEW_BOOT_READ_TIMEOUT_MS
+    );
   } catch {
     bag = {};
   }
+  if (!bag || typeof bag !== 'object') bag = {};
   _voiceAssignments = normalizeVoiceAssignments(bag[VOICE_ASSIGNMENTS_KEY]);
   _voiceReadNameEnabled = bag[VOICE_READ_NAME_KEY] === true;
   updateVoiceToggle();
@@ -876,8 +915,15 @@ function updateNgButton() {
 
 async function loadNgList() {
   try {
-    const bag = await chrome.storage.local.get(COMEVIEW_NG_STORAGE_KEY);
-    _ngList = normalizeComeviewNgList(bag[COMEVIEW_NG_STORAGE_KEY]);
+    // ★v0.1.1321: 有界化(起動経路)。NGリストが取れなくても画面は出す。
+    //   ★NGは「出さない」ための設定なので、取れないときに全部出るのは望ましくない。
+    //     ただしここで止めると【何も出ない】=より悪い。空で開始し、
+    //     下の onChanged / 再読み込みで取れ次第すぐ適用される。
+    const bag = await runStorageOpWithTimeout(
+      () => chrome.storage.local.get(COMEVIEW_NG_STORAGE_KEY),
+      COMEVIEW_BOOT_READ_TIMEOUT_MS
+    );
+    _ngList = normalizeComeviewNgList(bag?.[COMEVIEW_NG_STORAGE_KEY]);
     _ngKeys = new Set(_ngList.map((e) => e.key));
   } catch {
     _ngList = [];
@@ -1719,19 +1765,37 @@ function createHoverBar() {
 }
 
 function wireStorageChanges() {
-  if (!_liveId) return;
-  const tKey = tailStorageKey(_liveId);
-  const giftKey = `nls_gift_events_${_liveId}`;
-  const pinKey = comeviewPinStorageKey(_liveId);
+  /*
+   * ★v0.1.1321: `if (!_liveId) return;` を撤去し、キーを【毎回 _liveId から引き直す】。
+   *
+   * ■ なぜ必要か(コメビュが立ち上がらない件の第2の穴)
+   *   旧実装は起動時の `_liveId` からキーを closure で固定し、`_liveId` が
+   *   空なら【何も配線せずに return】していた。
+   *   ＝storage が混んで起動時に liveId を取れないと、**復帰役である
+   *     onChanged 自体が張られず、永久に追いつけない**。
+   *   ★この関数は「配信が変わったら追従する」ための復帰経路そのものなので、
+   *     liveId が未確定のときこそ張っておく必要がある(順序を逆にしていた)。
+   *
+   * ■ 直し方: キーは listener の中で **その時点の _liveId** から作る。
+   *   これで「起動時は空 → 後で switchToLiveId で決まる」でも正しく追従する。
+   *   ★二重登録しないよう _storageChangesWired で1回に固定する
+   *     (switchToLiveId は _liveId を書き換えるだけでよくなる)。
+   */
+  if (_storageChangesWired) return;
+  _storageChangesWired = true;
   chrome.storage.onChanged.addListener((changes, areaName) => {
     if (areaName !== 'local') return;
+    // ★キーは固定しない(配信が変わっても同じ listener で追従できる)。
+    const tKey = _liveId ? tailStorageKey(_liveId) : '';
+    const giftKey = _liveId ? `nls_gift_events_${_liveId}` : '';
+    const pinKey = _liveId ? comeviewPinStorageKey(_liveId) : '';
     // 配信切替に追従(?lv= 明示窓は固定)。watch タブが別配信へ移ったら自動で新配信を読む。
     if (!_explicitLiveId && changes[KEY_LAST_WATCH_URL]) {
       const url = String(changes[KEY_LAST_WATCH_URL].newValue || '');
       const m = url.toLowerCase().match(/lv\d{1,15}/);
       if (m && m[0] !== _liveId) void switchToLiveId(m[0]);
     }
-    if (changes[pinKey]) renderPin(changes[pinKey].newValue);
+    if (pinKey && changes[pinKey]) renderPin(changes[pinKey].newValue);
     if (changes[COMEVIEW_USER_NOTES_KEY]) {
       _userNotes = normalizeComeviewUserNotes(
         changes[COMEVIEW_USER_NOTES_KEY].newValue
@@ -1771,7 +1835,8 @@ function wireStorageChanges() {
         void enableVoiceReading({ persist: false });
       }
     }
-    if (changes[tKey] || changes[giftKey]) {
+    // ★キーが未確定(liveId未取得)のうちは本文の更新はしない(空キーで誤爆させない)。
+    if ((tKey && changes[tKey]) || (giftKey && changes[giftKey])) {
       processHotSnapshots(
         changes[tKey]
           ? Array.isArray(changes[tKey].newValue)
@@ -1906,13 +1971,36 @@ async function main() {
   if (isObsMode()) document.body.classList.add('is-obs');
   const urlLiveId = resolveLiveIdFromUrl();
   _explicitLiveId = !!urlLiveId; // ?lv= 明示窓は配信切替に追従しない(固定窓)
+  /*
+   * ★v0.1.1321: 起動の順序を「まず操作できる画面を出す」に組み替えた。
+   *
+   * ■ 何が起きていたか(2026-08-11 実機・ユーザー報告「コメビュが立ち上がらない」)
+   *   旧: liveId取得 → wireButtons → 読み上げ設定 → NG → **wireStorageChanges** → 全件読み
+   *   起動経路の storage read は無制限に待つ実装だったため、backfill 中は最初の await で
+   *   止まり、画面は cvLiveMeta が静的既定の「—」・本文「コメントを待っています…」で固着。
+   *   ★さらに悪いことに、**復帰役の wireStorageChanges が3つの await の後ろ**にあった。
+   *     ＝止まると「後から自動で追いつく」経路すら張られない=永久に立ち上がらない。
+   *     (実際は storage が空くと自力で回復した＝壊れてはいなかったが、待たされていた)
+   *
+   * ■ 直し方(順序と有界化の両方)
+   *   1) ボタン配線と **wireStorageChanges を最優先**で張る
+   *      ＝storage が詰まっていても操作でき、liveId は後から onChanged で自動追従できる。
+   *   2) 各 read は有界化(COMEVIEW_BOOT_READ_TIMEOUT_MS)＝待ち切らない。
+   *   3) 設定系(読み上げ/NG)は **await しない**＝画面表示を人質にしない。
+   *      取れ次第それぞれが自分で反映する(いずれも冪等)。
+   */
+  wireButtons();
+  wireStorageChanges();
   _liveId = urlLiveId || (await resolveLiveIdFromStorage());
   const meta = document.getElementById('cvLiveMeta');
-  if (meta) meta.textContent = _liveId ? _liveId : '配信が見つかりません';
-  wireButtons();
-  await initializeVoiceReading();
-  await loadNgList();
-  wireStorageChanges();
+  if (meta) {
+    // ★liveId が取れないのは「無い」ではなく「まだ来ていない」ことがある(storage混雑)。
+    //   断定せず、待てば来ると伝える(onChanged が拾ったら switchToLiveId が上書きする)。
+    meta.textContent = _liveId ? _liveId : '配信を探しています…';
+  }
+  // 設定系は画面表示をブロックしない(失敗しても既定で動く)。
+  void initializeVoiceReading();
+  void loadNgList();
   await requestFullRefresh(true);
   // パネルのタイムライン行クリックから ?user= 付きで開かれたら、詳細を自動で開く。
   const detailReq = resolveDetailRequestFromUrl();
