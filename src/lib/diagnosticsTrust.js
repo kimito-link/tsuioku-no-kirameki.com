@@ -19,31 +19,31 @@
  * @module diagnosticsTrust
  */
 
-/** popup 診断が「新鮮」とみなす上限(3分)。各鏡の MIRROR_FRESH_MS と揃える。 */
-export const POPUP_DIAG_FRESH_MS = 3 * 60 * 1000;
+/*
+ * ★v0.1.1304: 時刻と保留の判定は src/lib/timeAuthority.js が唯一の正本。
+ *   ここに独自の定義を置かない(それが7版事件の構造的原因だった)。
+ *   同じ値・同じ判定が複数箇所にあると、片方だけ直しても症状が残る。
+ */
+import {
+  agoLabel,
+  classifyReading,
+  durationMsOf,
+  toEpochMs,
+  VALUE_FRESH_MS,
+  WRITER_BOOT_GRACE_MS
+} from './timeAuthority.js';
+
+/** popup 診断が「新鮮」とみなす上限(3分)。★正本は timeAuthority.VALUE_FRESH_MS。 */
+export const POPUP_DIAG_FRESH_MS = VALUE_FRESH_MS;
 
 /**
- * ★v0.1.1302: popup 起動から「まだ構造的にゼロで正常」とみなす猶予。
- *   値は popupDiagUptimeNote.js:29 の閾値と同一にすること(2箇所で違う定義を作らない)。
- *   根拠: 鏡の flush は publish の 400ms 後・幕は 800ms 最低表示。
+ * popup 起動から「まだ構造的にゼロで正常」とみなす猶予。
+ * ★正本は timeAuthority.WRITER_BOOT_GRACE_MS。ここは互換のための re-export。
+ *   v0.1.1302 では独自定義(3000)を置き、popupDiagUptimeNote.js:29 のリテラルと
+ *   【同じ値が2箇所にある】状態を作っていた(「2箇所で違う定義を作らない」と
+ *   コメントに書きながら)。v0.1.1304 で正本へ一本化。
  */
-export const POPUP_BOOT_GRACE_MS = 3000;
-
-/** ISO/epoch を epoch ms に(取れなければ 0)。 */
-function toEpochMs(v) {
-  const n = Number(v);
-  if (Number.isFinite(n) && n > 0) return n;
-  const t = Date.parse(String(v || ''));
-  return Number.isFinite(t) && t > 0 ? t : 0;
-}
-
-/** 経過 ms → 「N秒前/N分前」(取れなければ '')。 */
-function agoLabel(ms) {
-  const m = Number(ms);
-  if (!Number.isFinite(m) || m < 0) return '';
-  const sec = Math.round(m / 1000);
-  return sec < 90 ? `${sec}秒前` : `${Math.round(sec / 60)}分前`;
-}
+export const POPUP_BOOT_GRACE_MS = WRITER_BOOT_GRACE_MS;
 
 function lc(v) {
   return String(v == null ? '' : v).trim().toLowerCase();
@@ -80,16 +80,21 @@ export function buildDiagnosticsTrust(args) {
   const popupLidMatch = currentLid && popupLid ? popupLid === currentLid : null;
 
   // --- 各鏡(jsonBlob 由来・status が手元に持つ) ---
+  /*
+   * ★v0.1.1304: 鮮度判定は timeAuthority.classifyReading が正本。
+   *   ★戻り値の【形】は凍結する(present/ageMs/fresh/lidMatch)。
+   *     formatDiagnosticsTrustLines・parityVerdict・aiShareFullText が依存しており、
+   *     1フィールド変えるだけで連鎖で壊れる。移設は「判定の場所」だけを動かす。
+   */
   const mirrorOf = (m) => {
     const mm = m && typeof m === 'object' ? m : null;
     if (!mm) return { present: false };
-    const at = toEpochMs(mm.capturedAt);
-    const ageMs = at > 0 && nowMs > 0 ? Math.max(0, nowMs - at) : null;
     const lid = lc(mm.liveId);
+    const r = classifyReading({ present: true, capturedAt: mm.capturedAt, nowMs });
     return {
       present: true,
-      ageMs,
-      fresh: ageMs != null ? ageMs <= POPUP_DIAG_FRESH_MS : null,
+      ageMs: r.ageMs,
+      fresh: r.fresh,
       lidMatch: currentLid && lid ? lid === currentLid : null
     };
   };
@@ -118,16 +123,14 @@ export function buildDiagnosticsTrust(args) {
    *   鏡の値は最大12秒古い。これが速報に出ていなかったため、読み手は
    *   「今この瞬間 鏡が無い」と誤解できた。数字を出すだけ(判定は変えない)。
    */
-  const extrasAgeRaw = a.extrasAgeMs;
-  const extrasAgeMs =
-    extrasAgeRaw == null || !Number.isFinite(Number(extrasAgeRaw)) || Number(extrasAgeRaw) < 0
-      ? null
-      : Number(extrasAgeRaw);
-  const shadeAgeRaw = pd?.popup?.loadShadeProbe?.shadeAgeMs;
-  const bootAgeMs =
-    shadeAgeRaw == null || !Number.isFinite(Number(shadeAgeRaw)) || Number(shadeAgeRaw) < 0
-      ? null
-      : Number(shadeAgeRaw);
+  // ★v0.1.1304: 経過時間のガードは timeAuthority.durationMsOf が正本(null/空文字を 0 と誤読しない)。
+  const extrasAgeMs = durationMsOf(a.extrasAgeMs);
+  /*
+   * ★shadeAgeMs は performance.now() 基準の【経過時間】であり、capturedAt(epoch の時点)とは
+   *   別の量・別の時計。混ぜると「更新56年前」型の事故になる
+   *   ([[venue-seats-lastupdate-clock-mismatch-v1044]])。だから別変数のまま扱う。
+   */
+  const bootAgeMs = durationMsOf(pd?.popup?.loadShadeProbe?.shadeAgeMs);
   /*
    * ★v0.1.1303(v0.1.1302 の設計ミスを是正・実機で効かなかった):
    *
@@ -149,13 +152,19 @@ export function buildDiagnosticsTrust(args) {
    * ★extrasAgeMs が取れない場合は従来どおり popup 起動基準にフォールバックする
    *   (status 以外の呼び手=テスト等で extras の概念が無いことがある)。
    */
-  const readAtRelativeToBootMs =
-    bootAgeMs != null && extrasAgeMs != null ? bootAgeMs - extrasAgeMs : null;
-  const readBeforePopupCouldWrite =
-    readAtRelativeToBootMs != null
-      ? readAtRelativeToBootMs < POPUP_BOOT_GRACE_MS
-      : bootAgeMs != null && bootAgeMs < POPUP_BOOT_GRACE_MS;
-  const justBooted = readBeforePopupCouldWrite;
+  /*
+   * ★v0.1.1304: 「読んだ時点で書き手は書ける状態だったか」の判定は
+   *   timeAuthority.classifyReading が【唯一の正本】。ここで独自に計算しない。
+   *   popupDiagUptimeNote も同じ正本の定数を使うので、3判定者の基準が構造的に一致する。
+   */
+  const absentProbe = classifyReading({
+    present: false,
+    readAgoMs: extrasAgeMs,
+    writerBootAgoMs: bootAgeMs,
+    nowMs
+  });
+  const justBooted = absentProbe.state === 'pending';
+  const readAtRelativeToBootMs = absentProbe.readAtRelativeToBootMs;
   /** 「読んだ時点では書けていなかった」なら present:false を保留(pending)に倒す。 */
   const mirrorOfWithGrace = (m) => {
     const r = mirrorOf(m);

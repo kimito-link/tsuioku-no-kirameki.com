@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 4 / 722 件
+## ⚠️ 役割コメントが無いソース 4 / 724 件
 - `src/lib/laneDomSelfMeasure.js`
 - `src/lib/reportPreviewPublish.js`
 - `src/lib/venueLaneBuckets.js`
@@ -640,7 +640,7 @@
     - `trumpet1.mp3`
     - `wallet1.mp3`
   - `SOURCES.md`
-- 📁 **src/** (1554)
+- 📁 **src/** (1559)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -923,7 +923,7 @@
         - `logo_funlink_white_RGB_maru_black.png`
       - `logo_guide_funlink_ol.pdf`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1321)
+  - 📁 **lib/** (1326)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -1466,6 +1466,7 @@
     - `isInsideRecommendedLiveSection.test.js`
     - `isInsideRecommendedUserSection.js` — ニコニコ視聴ページ周辺に出る「おすすめユーザー／フォロー候補」系 UI の子孫かを粗く判定する。
     - `isInsideRecommendedUserSection.test.js`
+    - `judgeConsistency.test.js`
     - `keyboardTypeDiagnostic.js` — L12: キーボード型診断（コメンターを 5 つの型に分類）。
     - `keyboardTypeDiagnostic.test.js`
     - `kiramekiAwards.js` — 「きらめきの賞」判定ロジック（純関数）。
@@ -2054,6 +2055,10 @@
     - `thumbFifo.test.js`
     - `thumbSettings.js` — 定期サムネイル設定（ストレージ値の正規化）
     - `thumbSettings.test.js`
+    - `timeAuthority.js` — timeAuthority — 「その値がいつ真だったか」と「その値は判定に使えるか」の【唯一の正本】。
+    - `timeAuthority.test.js`
+    - `timeAuthorityRegistry.js` — timeAuthorityRegistry — 「独自に時点フィールドを持つファイル」の凍結リスト(祖父条項)。
+    - `timeAuthorityRegistry.test.js`
     - `timingConstants.js` — content-entry.js に散在していたマジックナンバーを集約した定数テーブル。
     - `timingConstants.test.js`
     - `tokenBucket.js` — PR5（feat/multitab-scale-ultraC）: トークンバケットによるグローバル流量制御の純ロジック。

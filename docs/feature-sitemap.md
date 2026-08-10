@@ -741,7 +741,7 @@
   - `src/lib/statusTrendKey.js`
   - `src/extension/status-entry.js`
   - `src/lib/statusActionAdvisor.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 137</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 139</summary>
 
 - `app/app.js` — スマホ閲覧用 status Web 版。
 - `app/live-view.js` — global NL_BUILD_ID
@@ -858,6 +858,8 @@
 - `src/lib/supportTimelineGuard.js` — 応援タイムラインの重い全件読み込みを実行してよいか判定する。
 - `src/lib/swCrawlSlots.js` — SW backfill の per-lid 並列スロット判定。
 - `src/lib/tabLeaderLock.js` — PR1-b/PR2（feat/multitab-scale-ultraC）: 同一 origin の複数タブのうち「1タブだけ」が
+- `src/lib/timeAuthority.js` — timeAuthority — 「その値がいつ真だったか」と「その値は判定に使えるか」の【唯一の正本】。
+- `src/lib/timeAuthorityRegistry.js` — timeAuthorityRegistry — 「独自に時点フィールドを持つファイル」の凍結リスト(祖父条項)。
 - `src/lib/tokenBucket.js` — PR5（feat/multitab-scale-ultraC）: トークンバケットによるグローバル流量制御の純ロジック。
 - `src/lib/topSupportRankAnonymousFold.js` — userKey: string,
 - `src/lib/trackedImports.js` — 「コミットし忘れた新規ファイルを import しているソース」を検出する純ロジック(2026-07-06)。
@@ -885,7 +887,7 @@
 
 ## 🧬 修正系譜マップ(この系統のバグを過去にどう直したか)
 
-> changelog 全 633 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
+> changelog 全 634 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
 
 ### 💾 記録件数 (90版)
 - `v0.1.1291` 2026-08-08 — ★「ギフトがまだ無い配信」を不具合と誤って赤く出していたのを直しました
@@ -1797,7 +1799,8 @@
 - `v0.1.673` 2026-06-10 — コメビュの名前をパネルと同じ情報源で補完
 - `v0.1.670` 2026-06-10 — コメビュのアイコンを本家と同じサムネに
 
-### 🩺 診断・状態速報 (228版)
+### 🩺 診断・状態速報 (229版)
+- `v0.1.1304` 2026-08-10 — 診断どうしが食い違わないようにしました
 - `v0.1.1303` 2026-08-10 — 前回の診断修正が効いていなかったのを直しました
 - `v0.1.1302` 2026-08-10 — 不具合を正しく見つけられるように、診断のしかたを直しました
 - `v0.1.1298` 2026-08-09 — サイドパネルの「出た直後だけ黒い」を診断が捕まえられるようにしました
