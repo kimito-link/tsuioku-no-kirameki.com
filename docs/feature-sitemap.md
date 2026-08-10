@@ -41,7 +41,7 @@
   - `src/lib/ndgrBackfillCrawl.js`
 - **コメント重複除去(NDGR)** — 再送/再接続/relay overlap の重複を liveId+messageId の canonical key で排除
   - `src/lib/ndgrMessageDedupe.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 54</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 55</summary>
 
 - `src/domain/observations/StatObservation.js` — StatObservation - ニコ生から取得する数値の「契約付き観測値」純関数 factory。
 - `src/domain/observations/vocabulary.js` — 観測層 (StatObservation) の語彙集 - 不変な enum 定義のみ。
@@ -97,6 +97,7 @@
 - `src/lib/swBackfillStaging.js` — Service Worker backfill の取り置きペイロードを扱う純関数群。
 - `src/lib/swBackfillTrigger.js` — SW backfill モード(実験)の起動判定純関数。
 - `src/lib/userIdPreference.js` — コメント記録まわり: userId の「観測強度」（数字 ID を匿名系より優先する等）
+- `tests/helpers/wiringTestSource.js` — wiringTestSource — wiring テストが「関数の本体」を、置き場所に依らず取得するための正本。
 
 </details>
 

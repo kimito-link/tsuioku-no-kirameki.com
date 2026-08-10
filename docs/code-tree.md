@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 4 / 724 件
+## ⚠️ 役割コメントが無いソース 4 / 725 件
 - `src/lib/laneDomSelfMeasure.js`
 - `src/lib/reportPreviewPublish.js`
 - `src/lib/venueLaneBuckets.js`
@@ -2267,9 +2267,10 @@
   - 📁 **sound/** (1)
     - `yozora-small-yell.mp3`
   - `speech-recognition-globals.d.ts` — Web Speech API（Chrome は webkit 接頭辞のことがある）
-- 📁 **tests/** (76)
-  - 📁 **contract/** (1)
+- 📁 **tests/** (78)
+  - 📁 **contract/** (2)
     - `layer-dependency.test.js`
+    - `wiringTestSource.test.js`
   - 📁 **e2e/** (75)
     - 📁 **fixtures/** (1)
       - 📁 **watch/** (1)
@@ -2349,6 +2350,8 @@
     - `timeline-fill-standalone-window.spec.js`
     - `venue-entry-effect.spec.js`
     - `watch-messaging.spec.js`
+  - 📁 **helpers/** (1)
+    - `wiringTestSource.js` — wiringTestSource — wiring テストが「関数の本体」を、置き場所に依らず取得するための正本。
 - 📁 **tools/** (5)
   - 📁 **mcp-nicolive/** (3)
     - `README.md`
