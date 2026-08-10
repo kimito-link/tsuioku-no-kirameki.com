@@ -26,6 +26,16 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1304',
+    date: '2026-08-10',
+    summary: '診断どうしが食い違わないようにしました',
+    items: Object.freeze([
+      '状態速報の中で「まだ読み込み中です」と「データが足りません」が同時に出ることがありました。同じことを判定する処理が3か所にあり、それぞれ基準が違ったためです。',
+      '判定を1か所にまとめ、3つの表示が必ず同じ基準を見るようにしました。',
+      '見た目や動作は変わりません。今後この種の食い違いは検査で自動的に止まります。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1303',
     date: '2026-08-10',
     summary: '前回の診断修正が効いていなかったのを直しました',

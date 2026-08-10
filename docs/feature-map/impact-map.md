@@ -737,6 +737,7 @@
 | `src/lib/tabLeaderLock.js` | 1 | 記録エンジン(watchページ常駐) |
 | `src/lib/thumbDb.js` | 1 | 記録エンジン(watchページ常駐) |
 | `src/lib/thumbFifo.js` | 1 | 記録エンジン(watchページ常駐) |
+| `src/lib/timeAuthority.js` | 1 | 状態速報ページ |
 | `src/lib/tokenBucket.js` | 1 | 記録エンジン(watchページ常駐) |
 | `src/lib/topSupportersMirror.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/topSupportRankAnonymousFold.js` | 1 | ポップアップ(応援レーン) |
