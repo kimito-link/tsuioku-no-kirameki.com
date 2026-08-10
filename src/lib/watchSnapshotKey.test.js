@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   buildWatchSnapshotKey,
+  heavyResultStillTargetsThisWatch,
   normalizeWatchUrlForKey,
   WATCH_SNAPSHOT_KEY_SCHEMA
 } from './watchSnapshotKey.js';
@@ -95,5 +96,38 @@ describe('buildWatchSnapshotKey', () => {
     expect(() => buildWatchSnapshotKey(/** @type {any} */ (null))).not.toThrow();
     expect(() => buildWatchSnapshotKey(/** @type {any} */ (undefined))).not.toThrow();
     expect(() => buildWatchSnapshotKey(/** @type {any} */ ({ liveId: 123 }))).not.toThrow();
+  });
+});
+
+describe('heavyResultStillTargetsThisWatch', () => {
+  /*
+   * ★これが v0.1.1325 の本丸。
+   *   v1324 で鍵から url を外しても heavyEverSettled:false が消えなかった理由:
+   *   watchMetaCache.key は heavy 読み込み中に polling/visibilitychange が
+   *   【意図的に '' へリセット】する(stale-while-revalidate)。
+   *   その後 heavy が完了すると key('') !== snapshotKey で全件を捨てていた。
+   */
+  const KEY = buildWatchSnapshotKey({ liveId: 'lv351134082' });
+
+  it('鍵が一致していれば採用する', () => {
+    expect(heavyResultStillTargetsThisWatch({ cacheKey: KEY, snapshotKey: KEY })).toBe(true);
+  });
+
+  it('★key が空でも採用する(polling/visibility の再取得合図であって配信切替ではない)', () => {
+    expect(heavyResultStillTargetsThisWatch({ cacheKey: '', snapshotKey: KEY })).toBe(true);
+  });
+
+  it('★本物の配信切替(別 lv の鍵)は捨てる', () => {
+    const other = buildWatchSnapshotKey({ liveId: 'lv999999999' });
+    expect(heavyResultStillTargetsThisWatch({ cacheKey: other, snapshotKey: KEY })).toBe(false);
+  });
+
+  it('snapshotKey が作れていないときは採用しない(判定不能)', () => {
+    expect(heavyResultStillTargetsThisWatch({ cacheKey: KEY, snapshotKey: '' })).toBe(false);
+  });
+
+  it('入力が壊れていても例外を投げない', () => {
+    expect(() => heavyResultStillTargetsThisWatch(/** @type {any} */ (null))).not.toThrow();
+    expect(heavyResultStillTargetsThisWatch(/** @type {any} */ (null))).toBe(false);
   });
 });

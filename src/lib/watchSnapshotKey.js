@@ -69,6 +69,45 @@ export function normalizeWatchUrlForKey(rawUrl) {
 }
 
 /**
+ * heavy read の結果を「まだ採用してよいか」を判定する。
+ *
+ * ★2026-08-11(v0.1.1325) v1324 で鍵から url を外しても
+ *   `heavyEverSettled:false / heavySettleState:"stale-snapshot"` が消えなかった。
+ *   実機(v0.1.1324)で再測定して分かった【もう半分の真因】:
+ *
+ *   `watchMetaCache.key` は heavy 読み込みの最中に **意図的に '' へリセットされる**。
+ *     - 3秒 polling(interval_poll): stale-while-revalidate で「fetch を促す」ため
+ *       key だけ空にする(snapshot は残す)。popup-entry の `heavyReadActive` ガードは
+ *       あるが、**snapshot fetch 中(fetchInflight)や別経路では通り抜ける**。
+ *     - visibilitychange(タブ復帰): 同じく key を空にする(ガード無し)。
+ *   その後 heavy が完了すると `watchMetaCache.key('') !== snapshotKey` が成立し、
+ *   **読めた全件を捨てて** STALE_SNAPSHOT で bail していた。
+ *   → 鍵の中身を直しても、鍵が「消される」経路が残っていたので症状は変わらなかった。
+ *
+ * ■ 空文字は「別配信になった」ではなく「再取得を促す合図」
+ *   同じ判断は既に snapshot fetch 側(popup-entry の
+ *   `cacheKeyStillTargetsThisRefresh`)が持っていた:
+ *     `key === snapshotKey || (key === '' && snapshotKey.startsWith(lv + '|'))`
+ *   heavy 側だけがこの救済を持っていなかった。ここで同じ規則を共有する。
+ *
+ * ■ 本物の配信切替は必ず捨てる
+ *   key が空でなく、かつ snapshotKey と違う = 別配信へ移った = bail が正しい。
+ *
+ * @param {{ cacheKey?: unknown, snapshotKey?: unknown }} input
+ * @returns {boolean} true=この heavy 結果を採用してよい / false=捨てる(STALE_SNAPSHOT)
+ */
+export function heavyResultStillTargetsThisWatch(input) {
+  const cacheKey = String(input?.cacheKey ?? '');
+  const snapKey = String(input?.snapshotKey ?? '');
+  if (!snapKey) return false; // 鍵が作れていない=判定不能なので採用しない
+  if (cacheKey === snapKey) return true;
+  // ★空 = polling / visibilitychange が「再取得を促す」ために消しただけ。
+  //   配信が変わったわけではないので、読めた全件は採用してよい。
+  if (cacheKey === '') return true;
+  return false; // 別配信へ移った
+}
+
+/**
  * heavy read 用の snapshotKey を作る。
  *
  * ★lv があるときは **lv だけ**で同一性を決める(url は鍵に入れない)。

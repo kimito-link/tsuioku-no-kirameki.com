@@ -42,7 +42,7 @@ import { detectVersionMismatch } from '../lib/versionMismatch.js';
 import { directHit, makeInitialComboState } from '../lib/effectDirector.js';
 import { readInlineModeFlags } from '../lib/inlineModeFlags.js';
 import { pickWatchUrlFromMultipleSources } from '../lib/popupWatchUrlResolveMultiTab.js';
-import { buildWatchSnapshotKey } from '../lib/watchSnapshotKey.js';
+import { buildWatchSnapshotKey, heavyResultStillTargetsThisWatch } from '../lib/watchSnapshotKey.js';
 import { decideNoActiveWatch } from '../lib/noActiveWatchDecision.js';
 import { shouldRevealCloakAfterFirstPaint } from '../lib/popupCloakRevealTiming.js';
 import { resolveCommentPostWatchTarget } from '../lib/commentPostWatchTarget.js';
@@ -16564,7 +16564,7 @@ async function refresh() {
   //   同一 liveId のときだけ再描画。v0.1.509: heavyDataPromise は配列 or null を resolve する。
   void heavyDataPromise.then(async (nextArr) => {
     const bailHeavy = (state) => { recordStoryUserLaneHeavySettle(_storyUserLaneRenderProbe, state); }; // v0.1.1033 計器
-    if (watchMetaCache.key !== snapshotKey) return bailHeavy(STORY_USER_LANE_HEAVY_SETTLE.STALE_SNAPSHOT);
+    if (!heavyResultStillTargetsThisWatch({ cacheKey: watchMetaCache.key, snapshotKey })) return bailHeavy(STORY_USER_LANE_HEAVY_SETTLE.STALE_SNAPSHOT); // v1325: key='' は再取得の合図(正本=lib/watchSnapshotKey.js)
     if (!Array.isArray(nextArr)) return bailHeavy(STORY_USER_LANE_HEAVY_SETTLE.NULL_RESP);
     if (refreshGen !== watchPopupRefreshGeneration) {
       // v0.1.1035(レビュー指摘=初回レース残存): 追い越された古い callback でも snapshotKey は一致(上)=nextArr は現配信の
