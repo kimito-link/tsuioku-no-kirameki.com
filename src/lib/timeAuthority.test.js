@@ -36,6 +36,22 @@ describe('移設の恒等(旧 diagnosticsTrust 実装と同値)', () => {
     expect(toEpochMs(NaN)).toBe(0);
   });
 
+  it('★負値は 0 に落ちず Date.parse へ流れる(奇妙だが既存挙動・reality-checker 指摘で追加)', () => {
+    /*
+     * toEpochMs(-1) は n>0 を満たさず Date.parse('-1') へ落ち、日付として解釈される。
+     * 移設前の実測(JST)では 978274800000(=2001-01-01 00:00 JST)だった。
+     *
+     * ★具体値をそのまま固定しない: Date.parse('-1') は【ローカルTZ依存】で、
+     *   TZ の違う CI で落ちる(実測: UTC では 2000-12-31T15:00Z)。
+     *   固定すべきは「0 に落ちない=Date.parse へ流れる」という【挙動】の方。
+     *   ここを数値で固定すると、環境差で赤くなる嘘のテストになる。
+     */
+    const v = toEpochMs(-1);
+    expect(v).not.toBe(0);
+    expect(Number.isFinite(v)).toBe(true);
+    expect(v).toBe(Date.parse('-1')); // 実装が Date.parse 経路を通っていることの断言
+  });
+
   it('agoLabel: 移設前に採取した入出力と一致する(境界と非対称も含む)', () => {
     expect(agoLabel(0)).toBe('0秒前');
     expect(agoLabel(999)).toBe('1秒前');
