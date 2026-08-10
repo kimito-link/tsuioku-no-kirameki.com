@@ -82,6 +82,34 @@ export function formatRefreshPerfLine(refreshPerf) {
 }
 
 /**
+ * ★v0.1.1314: `chrome.tabs.query` が遅かったことを1行で名指しする純関数。
+ *
+ * ■ なぜ要るか(2026-08-06 から未解明で残っている数字)
+ *   診断ページ 9,812ms の内訳で `lives` が 5,493ms を占めていたが、`lives` は
+ *   【tabs.query + fastDiag フォールバック】の合計なのでどちらが遅いか名指しできなかった。
+ *   ★tabs.query は storage を触らない(browser プロセスが応える)ので、
+ *     ここが遅い＝真因は【拡張の外・browser プロセスの混雑】と切り分けられる。
+ *     逆にここが速いのに lives が遅いなら、遅いのは storage 側と確定する。
+ *   ＝計器は症状(遅い)でなく【原因のありか】を出す([[instrument-must-name-the-cause-2026-08-01]])。
+ *
+ * @param {{ count?: number, worstMs?: number, lastMs?: number, lastTabCount?: number }|null|undefined} diag
+ * @returns {string} 遅延を観測していなければ ''(常時出さない)
+ */
+export function formatTabsQuerySlowLine(diag) {
+  const d = diag && typeof diag === 'object' ? diag : null;
+  const count = d ? Number(d.count) || 0 : 0;
+  if (count <= 0) return '';
+  const worst = Number(d.worstMs) || 0;
+  const last = Number(d.lastMs) || 0;
+  const tabCount = Number.isFinite(Number(d.lastTabCount)) ? Number(d.lastTabCount) : -1;
+  const tabPart = tabCount >= 0 ? ` / 直近のwatchタブ数 ${tabCount}` : '';
+  return (
+    `★タブ一覧の取得が遅い: ${count}回(最悪 ${worst}ms / 直近 ${last}ms${tabPart})` +
+    ' — これは storage でなくブラウザ側の応答待ちです(拡張の中を直しても速くなりません)'
+  );
+}
+
+/**
  * 2026-07-14: renderAll 内のセクション別所要(計器)を1行に整形する純関数。
  *   診断ページ軽量化(lazy details 化)の対象を推測でなく実測で決めるための材料。材料が無ければ ''。
  * @param {Array<[string, number]>|null|undefined} renderSectionMs
@@ -116,6 +144,10 @@ export function buildAiShareFullText({ overviewText, livesData, fastDiag, popupD
   // 2026-07-14: 「更新所要(計器)」のrenderステップだけをさらに分解した内訳(診断ページ軽量化の実測材料)。
   const sectionMsLine = formatRenderSectionMsLine(renderSectionMs);
   if (sectionMsLine) lines.push(sectionMsLine);
+  // ★v0.1.1314: 「lives が遅い」の内訳を名指しする(storage 側か browser 側かの切り分け)。
+  //   遅延を観測していないときは1行も出さない=普段の速報を汚さない。
+  const tabsQueryLine = formatTabsQuerySlowLine(refreshPerf?.tabsQuerySlow);
+  if (tabsQueryLine) lines.push(tabsQueryLine);
   // v0.1.1020: 更新所要が重い×②応援プレビューが開いている(ack 新鮮)を突合し「②が重さの原因」を名指しする。
   //   ユーザー実機「応援プレビュー出すとめちゃ重い」への対応=体感でなく状態速報1枚で原因が分かる。
   try {

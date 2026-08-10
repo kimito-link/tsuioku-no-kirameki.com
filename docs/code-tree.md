@@ -656,7 +656,7 @@
     - `trumpet1.mp3`
     - `wallet1.mp3`
   - `SOURCES.md`
-- 📁 **src/** (1574)
+- 📁 **src/** (1575)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -943,7 +943,7 @@
         - `logo_funlink_white_RGB_maru_black.png`
       - `logo_guide_funlink_ol.pdf`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1337)
+  - 📁 **lib/** (1338)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -2081,6 +2081,7 @@
     - `swCrawlSlots.test.js`
     - `tabLeaderLock.js` — PR1-b/PR2（feat/multitab-scale-ultraC）: 同一 origin の複数タブのうち「1タブだけ」が
     - `tabLeaderLock.test.js`
+    - `tabsQuerySlowPipeline.test.js`
     - `thumbDb.js` — サムネイル用 IndexedDB（コンテンツスクリプトのみで使用）
     - `thumbFifo.js` — サムネ IndexedDB の FIFO トリム用純関数（古い capturedAt 順＝先頭が最古）
     - `thumbFifo.test.js`

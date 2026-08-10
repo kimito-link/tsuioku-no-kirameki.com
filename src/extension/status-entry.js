@@ -354,7 +354,7 @@ const _watchTabMapGuard = createStaleGuardedRead(() => queryWatchTabMap(), {
 });
 /** v0.1.1005: 直近 refresh の所要計器(totalMs と重いステップ)。コピー本文(AI共有)にも出すため保持。
  *   renderAll は当該 refresh の render 計測【前】に走るので、前サイクルの値を本文に載せる(代表値として十分)。 */
-let _lastRefreshPerf = /** @type {{ totalMs: number|null, stepMs: Array<[string, number]> }} */ ({ totalMs: null, stepMs: [] });
+let _lastRefreshPerf = /** @type {{ totalMs: number|null, stepMs: Array<[string, number]>, tabsQuerySlow?: { count: number, worstMs: number, lastMs: number, lastTabCount: number } }} */ ({ totalMs: null, stepMs: [] });
 /** 2026-07-14: renderAll 内の各セクション(配信カード/マインドマップ/AI共有テキスト等)の所要 ms
  *   (降順)。診断ページ軽量化(lazy details 化)の対象を実測で決めるための自己計測(観測のみ)。 */
 let _lastRenderSectionMs = /** @type {Array<[string, number]>} */ ([]);
@@ -768,7 +768,13 @@ async function refresh(opts = {}) {
     const _totalMs = Math.round((typeof performance !== 'undefined' ? performance.now() : Date.now()) - _t0);
     updateLastUpdateMeta({ totalMs: _totalMs, stepMs: _stepMs, staleNote });
     // 次サイクルのコピー本文に出すため、この refresh の計器を保持(render 込みの最新 totalMs/stepMs)。
-    _lastRefreshPerf = { totalMs: _totalMs, stepMs: _stepMs.slice() };
+    // ★v0.1.1314: tabs.query の遅延計器を同梱する(「lives が遅い」の内訳を名指しするため)。
+    //   遅延を1度も観測していなければ count=0 で、速報には1行も出ない。
+    _lastRefreshPerf = {
+      totalMs: _totalMs,
+      stepMs: _stepMs.slice(),
+      tabsQuerySlow: { ..._tabsQuerySlowDiag }
+    };
     if (staleCores.length === 0) _statusLastErrorText = '';
   } catch (err) {
     // v0.1.797: timeout は「ストレージ混雑(記録は別途継続)」の想定内 degrade=不安にさせない文言に。
@@ -872,14 +878,46 @@ function updateLastUpdateMeta(perf) {
  *   タブの last_watch_url が「視聴中」に居座る誤表示を防ぐ([[watchUrlFreshness]])。
  * ========================================================================== */
 
+/**
+ * ★v0.1.1314: `chrome.tabs.query` が遅かった回数と最悪値(診断ページ 9.8 秒の切り分け用)。
+ *   storage を触らない API なので、ここが遅いなら真因は storage 競合ではない。
+ * @type {{ count: number, worstMs: number, lastMs: number, lastTabCount: number }}
+ */
+const _tabsQuerySlowDiag = { count: 0, worstMs: 0, lastMs: 0, lastTabCount: -1 };
+
 async function enumerateActiveLives() {
   /** @type {string[]} */
   const lvList = [];
   // 経路1: 実際に開いているニコ生 watch タブから lv 抽出
   try {
+    /*
+     * ★v0.1.1314: `chrome.tabs.query` だけの所要を単独で測る。
+     *
+     * ■ なぜ要るか(2026-08-06 に測って未解明のまま残っている数字)
+     *   診断ページ 9,812ms の内訳で `lives` が 5,493ms を占めていた。
+     *   しかし `lives` は【tabs.query + fastDiag フォールバック】の合計なので、
+     *   どちらが遅いのか名指しできない＝計器が症状しか出していない。
+     *   ★tabs.query は storage を触らない(browser プロセスが応える)ので、
+     *     もし tabs.query 単独が遅いなら【storage競合説では説明できない】=
+     *     真因は拡張の外(browser プロセスの混雑)側にある、と切り分けられる。
+     *   逆に tabs.query が速ければ、遅いのは fastDiag 経路＝storage 側と確定する。
+     *
+     * ★この計器は「遅いときだけ」記録する(常時書くと storage を汚す)。
+     */
+    const _tq0 = typeof performance !== 'undefined' ? performance.now() : Date.now();
     const tabs = await chrome.tabs.query({
       url: ['https://live.nicovideo.jp/watch/*', 'https://sp.live.nicovideo.jp/watch/*']
     });
+    const _tqMs = Math.round(
+      (typeof performance !== 'undefined' ? performance.now() : Date.now()) - _tq0
+    );
+    // 1秒以上かかったら記録する(通常は数ms。閾値を超えた回数と最悪値だけ持つ)。
+    if (_tqMs >= 1000) {
+      _tabsQuerySlowDiag.count += 1;
+      if (_tqMs > _tabsQuerySlowDiag.worstMs) _tabsQuerySlowDiag.worstMs = _tqMs;
+      _tabsQuerySlowDiag.lastMs = _tqMs;
+      _tabsQuerySlowDiag.lastTabCount = Array.isArray(tabs) ? tabs.length : -1;
+    }
     for (const tab of tabs || []) {
       const url = String(tab?.url || '');
       const m = url.match(/\/watch\/(lv\d{1,15})/);
