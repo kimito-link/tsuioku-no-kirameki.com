@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 4 / 725 件
+## ⚠️ 役割コメントが無いソース 4 / 726 件
 - `src/lib/laneDomSelfMeasure.js`
 - `src/lib/reportPreviewPublish.js`
 - `src/lib/venueLaneBuckets.js`
@@ -641,7 +641,7 @@
     - `trumpet1.mp3`
     - `wallet1.mp3`
   - `SOURCES.md`
-- 📁 **src/** (1559)
+- 📁 **src/** (1561)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -676,11 +676,13 @@
       - `avatarResolver.test.js`
       - `identity.js` — ニコ生ユーザー ID の「匿名性」判定と関連アイデンティティ・ユーティリティ。
       - `nickname.js` — 表示名（ニックネーム）の「強弱」判定。
-  - 📁 **extension/** (33)
-    - 📁 **popup/** (2)
+  - 📁 **extension/** (35)
+    - 📁 **popup/** (4)
       - 📁 **report/** (2)
         - `htmlReportDocument.js` — HTMLレポート(振り返り用の保存HTML)組み立てクラスタ。
         - `htmlReportDocument.test.js`
+      - `renderAcquisitionDashboard.js` — renderAcquisitionDashboard — 開発者モニタの「データ取得率」ダッシュボードを描く。
+      - `renderAcquisitionDashboard.test.js`
     - 📁 **story/** (3)
       - `laneShrinkScenario.test.js`
       - `renderStoryUserLaneDom.js` — 応援ユーザーレーン DOM の同期（popup-entry から切り出し・状態は引数で受け取る）。
@@ -2267,9 +2269,10 @@
   - 📁 **sound/** (1)
     - `yozora-small-yell.mp3`
   - `speech-recognition-globals.d.ts` — Web Speech API（Chrome は webkit 接頭辞のことがある）
-- 📁 **tests/** (78)
-  - 📁 **contract/** (2)
+- 📁 **tests/** (79)
+  - 📁 **contract/** (3)
     - `layer-dependency.test.js`
+    - `popupEntryFunctionBudget.test.js`
     - `wiringTestSource.test.js`
   - 📁 **e2e/** (75)
     - 📁 **fixtures/** (1)

@@ -26,6 +26,16 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1305',
+    date: '2026-08-10',
+    summary: '内部の整理(取得率チャートの切り出し)',
+    items: Object.freeze([
+      '一番大きなファイルから「データ取得率」チャートの描画を別ファイルへ移しました。',
+      '見た目や動作は一切変わりません。今後の修正で他の機能を巻き込みにくくするための整理です。',
+      '切り出したことで、この部分だけを単独で検査できるようになりました。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1304',
     date: '2026-08-10',
     summary: '診断どうしが食い違わないようにしました',
