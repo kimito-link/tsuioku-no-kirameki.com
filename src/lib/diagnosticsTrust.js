@@ -128,11 +128,40 @@ export function buildDiagnosticsTrust(args) {
     shadeAgeRaw == null || !Number.isFinite(Number(shadeAgeRaw)) || Number(shadeAgeRaw) < 0
       ? null
       : Number(shadeAgeRaw);
-  const justBooted = bootAgeMs != null && bootAgeMs < POPUP_BOOT_GRACE_MS;
-  /** 起動直後で「まだ書かれていないだけ」なら present:false を保留(pending)に倒す。 */
+  /*
+   * ★v0.1.1303(v0.1.1302 の設計ミスを是正・実機で効かなかった):
+   *
+   * ■ 何を間違えたか
+   *   v0.1.1302 は「popup 起動から3秒未満か」だけで保留を決めた。
+   *   ところが実機は【popup起動4.3秒・鏡は8秒前の値】で🔴のまま。
+   *   時系列に直すと:
+   *     status が鏡を読んだ = popup 起動の【3.7秒前】
+   *   = まだ存在しないものを読んだので null なのは当然。
+   *   しかし猶予は popup 起動基準なので一切効かなかった。
+   *
+   * ■ 正しい問い
+   *   「popup が若いか」ではなく
+   *   【その鏡の値を読んだ時点で、popup は書ける状態だったか】。
+   *   読んだ時刻 = now - extrasAgeMs / popup 起動時刻 = now - bootAgeMs。
+   *   読んだ時刻が popup 起動より前(または直後 GRACE 未満)なら、
+   *   鏡が無いのは【計器の順序の問題】であって不具合ではない。
+   *
+   * ★extrasAgeMs が取れない場合は従来どおり popup 起動基準にフォールバックする
+   *   (status 以外の呼び手=テスト等で extras の概念が無いことがある)。
+   */
+  const readAtRelativeToBootMs =
+    bootAgeMs != null && extrasAgeMs != null ? bootAgeMs - extrasAgeMs : null;
+  const readBeforePopupCouldWrite =
+    readAtRelativeToBootMs != null
+      ? readAtRelativeToBootMs < POPUP_BOOT_GRACE_MS
+      : bootAgeMs != null && bootAgeMs < POPUP_BOOT_GRACE_MS;
+  const justBooted = readBeforePopupCouldWrite;
+  /** 「読んだ時点では書けていなかった」なら present:false を保留(pending)に倒す。 */
   const mirrorOfWithGrace = (m) => {
     const r = mirrorOf(m);
-    if (!r.present && justBooted) return { ...r, pending: true, bootAgeMs };
+    if (!r.present && justBooted) {
+      return { ...r, pending: true, bootAgeMs, readAtRelativeToBootMs };
+    }
     return r;
   };
   const mirrors = {
@@ -223,6 +252,16 @@ function pathLine(label, m) {
   // ★v0.1.1302: 起動直後の未着は🔴ではなく⏳(まだ書かれていないだけ=正常)。
   //   ここを🔴にしていたため、開発者が3回「取りこぼし」と誤読して空振りした。
   if (m && m.pending) {
+    /*
+     * ★v0.1.1303: 「なぜ保留なのか」を時系列で書く。
+     *   実機では status が鏡を読んだのが popup 起動の【3.7秒前】だった
+     *   = まだ存在しないものを読んだので null。これは不具合ではない。
+     */
+    const rel = m.readAtRelativeToBootMs;
+    if (rel != null && rel < 0) {
+      const before = (Math.abs(rel) / 1000).toFixed(1);
+      return `- ${label}: ⏳ 判定保留(この値を読んだのは popup 起動の${before}秒【前】=まだ書かれていない・数十秒おいて取り直し)`;
+    }
     const sec = m.bootAgeMs != null ? (m.bootAgeMs / 1000).toFixed(1) : '?';
     return `- ${label}: ⏳ 判定保留(popup起動${sec}秒=まだ書かれていないだけ・数十秒おいて取り直し)`;
   }
