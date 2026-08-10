@@ -26,8 +26,16 @@ const manifest = JSON.parse(readFileSync(join(root, 'extension/manifest.json'), 
 const EXPECTED = '#fffaf2';
 
 describe('パネル枠の地色(theme-color)の一致', () => {
-  it('manifest.json に theme_color がある', () => {
-    expect(manifest.theme_color).toBe(EXPECTED);
+  /*
+   * ★v0.1.1311(2026-08-10): manifest の `theme_color` は【拡張では認識されない】。
+   *   一度これを追加して実機で
+   *     Unrecognized manifest key 'theme_color'.
+   *   の警告を出した(拡張カードに黄色い「警告」ボタンが付く)。
+   *   Chrome 拡張の manifest は許可キーのみ受理する＝Web App Manifest とは別物。
+   *   ★確認せずに追加した私の誤り。以後、増やしたキーは実機の警告まで見ること。
+   */
+  it('★manifest.json に theme_color を入れない(拡張では未対応キー＝警告になる)', () => {
+    expect(manifest.theme_color).toBeUndefined();
   });
 
   it('sidepanel.html に <meta name="theme-color"> がある', () => {

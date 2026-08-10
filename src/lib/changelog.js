@@ -26,6 +26,16 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1311',
+    date: '2026-08-10',
+    summary: '拡張の警告表示を解消(前の版で出してしまった設定ミス)',
+    items: Object.freeze([
+      '前の版(v0.1.1310)で拡張機能の管理画面に黄色い「警告」が出るようになっていました。原因は、サイドパネルの色指定に使えない設定項目を追加してしまったことです。取り除きました。',
+      '同じ設定ミスが二度と入らないよう、使えない項目が混ざったら検査で止まるようにしました。',
+      'サイドパネルの表示そのものへの影響はありません。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1310',
     date: '2026-08-10',
     summary: 'サイドパネルが出てくる瞬間の黒をクリーム色にする',
