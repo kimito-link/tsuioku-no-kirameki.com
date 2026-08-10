@@ -205,6 +205,8 @@ import { buildVenueMirrorAvatarMap, enrichVenueRowsWithMirrorAvatars } from '../
 // ★KEY_LANE_MIRROR の契約(消費者登録簿・段別の不変条件)は src/lib/laneMirrorContract.js が正本。
 //   会場は reader として登録済み。読み口は必ず acceptLaneMirrorSnapshot を通す(受け入れ点は2箇所)。
 import { sanitizeLaneMirrorForRead } from '../lib/laneMirrorContract.js';
+// ★v0.1.1318: アイコン未設定(404)の人を白丸でなく「その人ごとのゆっくり顔」にするため。
+import { anonymousIdenticonDataUrl } from '../lib/anonymousIdenticon.js';
 import {
   createVenueMirrorIntakeState,
   observeVenueMirrorChange,
@@ -418,8 +420,36 @@ const VENUE_FALLBACK_GIFT_EMPTY_HTML = buildVenueFallbackGiftEmptyNoteHtml();
 //   ことがあり、一度の一時的プローブ失敗(timeout/error)が永久固着して白丸のまま=真因確定済み。
 //   retryPolicy を opt-in(会場のみ・既定値のまま)で有効化し、TTL+指数バックオフで再プローブ
 //   の機会を与える。popup側は§Eの段階3判断まで既定null(従来の恒久負キャッシュ)のまま。
+/*
+ * ★v0.1.1318: アイコン未設定の人を「全員同じ白丸」にしない(実機報告「サムネがおちてる」)。
+ *
+ * ■ 実測(2026-08-10・curl で確認)
+ *     未設定ユーザー(135315894/138512750/138339168) → 404
+ *     設定済ユーザー(128121142/4046119)             → 200
+ *   ＝URL の作り方は正しく、404 は【本当にアイコンを設定していない人】。
+ *   guard は失敗時に全員へ同じ blank.jpg(公式の未設定アイコン)を出すので、
+ *   未設定の人が多い配信では会場が【白丸だらけ】になる。
+ *
+ * ■ 直し方は v0.1.1307(広告段)と同じ結論
+ *   「404 の白丸でなく【ゆっくり顔】にする」。今回は会場にも同じ扱いを与える。
+ *   失敗した URL には uid が含まれる(usericon/s/<uid/10000>/<uid>.jpg)ので、
+ *   そこから uid を復元して【その人ごとの identicon】を生成する
+ *   ＝全員違う顔になり、誰が誰か見分けられる(白丸だらけにならない)。
+ */
+/** @param {string} requestedSrc @returns {string} 解決できなければ ''(共通fallbackへ倒れる) */
+const venueAvatarFallbackFor = (requestedSrc) => {
+  try {
+    const m = /\/usericon\/(?:[sm]\/)?\d+\/(\d{1,14})\.jpg/i.exec(String(requestedSrc || ''));
+    const uid = m ? m[1] : '';
+    if (!uid) return '';
+    return anonymousIdenticonDataUrl(uid, 64) || '';
+  } catch {
+    return ''; // 失敗時は共通 fallback(blank.jpg)へ倒れる
+  }
+};
 const venueAvatarLoadGuard = createSupportAvatarLoadGuard({
   fallbackSrc: NICONICO_OFFICIAL_DEFAULT_USERICON_HTTPS,
+  fallbackSrcFor: venueAvatarFallbackFor,
   onFallbackApplied: applyStoryAvatarTvFallbackClass,
   onRemoteSuccess: removeStoryAvatarTvFallbackClass,
   retryPolicy: {}
