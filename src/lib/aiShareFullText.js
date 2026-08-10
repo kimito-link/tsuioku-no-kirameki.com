@@ -263,6 +263,23 @@ export function buildAiShareFullText({ overviewText, livesData, fastDiag, popupD
   } catch {
     /* no-op: 信頼性ブロックの失敗は状態速報を壊さない */
   }
+  /*
+   * ★v0.1.1317: 会場の鏡うけとりは【概要ブロックの外】で出す。
+   *
+   * ■ なぜ外に出すか(通し検査が教えてくれた)
+   *   会場系の診断行は全部 `if (overviewText)` の中にあり、overviewText は
+   *   「視聴中の配信が無い」と空になる(status-entry.js:1477-1479)。
+   *   ＝**会場が同期していないときほど、その診断が消える**という逆立ちした構造だった。
+   *   この行は「会場が鏡を受け取れているか」を測るものなので、
+   *   配信の有無に関係なく出せなければ意味がない。
+   *   ★観測ゼロなら空文字=行ごと出ないので、普段の速報は汚さない。
+   */
+  try {
+    const miLine = String(/** @type {any} */ (venueSeatsDiag)?.mirrorIntakeLine || '');
+    if (miLine) lines.push(miLine);
+  } catch {
+    /* no-op */
+  }
   if (overviewText) {
     lines.push('### 概要');
     lines.push(overviewText);

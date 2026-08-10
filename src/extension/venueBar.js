@@ -205,6 +205,12 @@ import { buildVenueMirrorAvatarMap, enrichVenueRowsWithMirrorAvatars } from '../
 // ★KEY_LANE_MIRROR の契約(消費者登録簿・段別の不変条件)は src/lib/laneMirrorContract.js が正本。
 //   会場は reader として登録済み。読み口は必ず acceptLaneMirrorSnapshot を通す(受け入れ点は2箇所)。
 import { sanitizeLaneMirrorForRead } from '../lib/laneMirrorContract.js';
+import {
+  createVenueMirrorIntakeState,
+  observeVenueMirrorChange,
+  observeVenueMirrorAccept,
+  formatVenueMirrorIntakeLine
+} from '../lib/venueMirrorIntakeDiag.js';
 // fallback 経路で「ギフト段が作れない」ことを正直に伝える文言(①③と同じ正本ファイル)。
 import { buildVenueFallbackGiftEmptyNoteHtml } from '../lib/storyUserLaneGuideHtml.js';
 // v0.1.1111 会場=①レーン鏡映(メンバー完全一致): ①の実paint鏡(KEY_LANE_MIRROR)を会場の正本に昇格。
@@ -2971,9 +2977,20 @@ export function mountVenueBarButton(options = {}) {
    * @param {unknown} rawSnap
    * @returns {Partial<import('../lib/laneMirror.js').LaneMirrorSnapshot>|null} null=使えない(fallbackへ)
    */
+  /*
+   * ★v0.1.1317: 会場の鏡うけとり計器(なぜ更新が止まったかを名指しするため)。
+   *   書き手は動いているのに会場の鏡が古い、という実測から「読み手が真因」まで
+   *   絞れているが、その先(通知が来ない/キー不一致/関所却下)は測らないと決まらない。
+   */
+  const _venueMirrorIntake = createVenueMirrorIntakeState();
+  /** 関所が捨てた理由(sanitize の issues を1行に。計器が原因を名乗るために持つ)。 */
+  let _laneMirrorSanitizeIssues = '';
+  /** @param {unknown} rawSnap */
   function acceptLaneMirrorSnapshot(rawSnap) {
     const r = sanitizeLaneMirrorForRead(rawSnap);
     _laneMirrorSanitizeDropped = r.droppedLinkAnon + r.droppedKontaAnon + r.droppedUnkeyed;
+    // ★関所が null を返した理由を保存する(「捨てられた」だけでは次の一手が決まらない)。
+    _laneMirrorSanitizeIssues = Array.isArray(r.issues) ? r.issues.join('/') : '';
     return /** @type {any} */ (r.snap);
   }
   // venue-avatar-stale-mirror-DESIGN.md §C-1d: 鏡capturedAtの前進(popup復帰等)を検知する
@@ -5717,7 +5734,11 @@ export function mountVenueBarButton(options = {}) {
       // v0.1.1207: 会場の立ち上がり分解(開く→鏡→集計→初描画→初席)。ユーザー報告
       //   「立ち上がりが遅い/出ないときがある」を体感でなく数字で切り分けるため。
       //   ★ここに載せないと状態速報に出ない([[fastdiag-lite-is-the-printer-subset]]の同型)。
-      openLatency: summarizeVenueOpenLatency(_openLatency)
+      openLatency: summarizeVenueOpenLatency(_openLatency),
+      // ★v0.1.1317: 会場が鏡を受け取れているか(通知/キー一致/関所)を1行で出す。
+      //   ★ここに載せないと状態速報に出ない([[fastdiag-lite-is-the-printer-subset]]の同型)。
+      //   観測ゼロなら空文字=行ごと出ない(普段の速報を汚さない)。
+      mirrorIntakeLine: formatVenueMirrorIntakeLine(_venueMirrorIntake, Date.now())
     };
     publishVenueSeatsDiag(seatsDiagObs);
     // 2026-07-01 会議(venue-diag): 「🩺 会場の状態」パネル用に最新の観測値を保持。
@@ -6390,9 +6411,34 @@ export function mountVenueBarButton(options = {}) {
     const _perLiveKey = laneMirrorKeyFor(liveId);
     const perLiveChange = _perLiveKey ? changes[_perLiveKey] : null;
     const mirrorChange = perLiveChange || changes[KEY_LANE_MIRROR];
+    /*
+     * ★v0.1.1317: 会場が鏡を「受け取れているか」を経路ごとに数える(会場が完全一致しない件)。
+     *
+     * ■ なぜ要るか
+     *   書き手は毎秒 publish していて見送り0なのに、会場の鏡は実測 656秒古かった。
+     *   ＝読み手が真因と確定済み(lanePublishSkipDiag.js の判断表)。しかし既存の計器は
+     *   「鏡が何秒古いか」しか言わず、【なぜ更新が止まったか】を名指しできない。
+     *   候補は (a)通知が来ない (b)キー不一致(liveId食い違い) (c)関所で却下 で、
+     *   打ち手が正反対なので推測で直すと必ず外す。だから測る。
+     *   ★特に (b): 会場の liveId は location.pathname 由来、書き手は popup が解決した値。
+     */
+    try {
+      observeVenueMirrorChange(_venueMirrorIntake, {
+        changedKeys: Object.keys(changes || {}),
+        expectedKey: _perLiveKey || KEY_LANE_MIRROR,
+        matched: Boolean(mirrorChange && mirrorChange.newValue)
+      });
+    } catch { /* 計器失敗は受け取りを止めない */ }
     if (mirrorChange && mirrorChange.newValue) {
       // ★受け入れ点2/2(onChanged): 関所を必ず通す(laneMirrorContract.js の契約)。
       const accepted = acceptLaneMirrorSnapshot(mirrorChange.newValue);
+      try {
+        observeVenueMirrorAccept(_venueMirrorIntake, {
+          accepted: Boolean(accepted),
+          nowMs: Date.now(),
+          reason: accepted ? '' : (_laneMirrorSanitizeIssues || '関所が捨てた')
+        });
+      } catch { /* 計器失敗は受け取りを止めない */ }
       if (accepted) {
         laneMirrorSnap = accepted;
         scheduleLaneMirrorRecommit();
