@@ -10,27 +10,56 @@
   .nlsb-root.nlsb-is-open {
     pointer-events: auto;
   }
+  /* \u26052026-08-11 v0.1.1323 \u30E6\u30FC\u30B6\u30FC\u5831\u544A\u300C\u4F1A\u5834\u30E2\u30FC\u30C9\u306B\u3059\u308B\u30DC\u30BF\u30F3\u304C\u306A\u3044\u304B\u3082\uFF1F\u3069\u3053\uFF1F\u300D:
+     \u898B\u3064\u3051\u3089\u308C\u306A\u304B\u3063\u305F\u306E\u306F position:absolute + \u6697\u8272 + 13px \u306E\u4E09\u91CD\u82E6\u3060\u3063\u305F\u3002
+       \u2460 absolute = .nlsb-root(\u30DA\u30FC\u30B8\u5185)\u306E\u53F3\u4E0B = \u30B9\u30AF\u30ED\u30FC\u30EB\u3059\u308B\u3068\u6D41\u308C\u3066\u753B\u9762\u5916\u3078\u51FA\u308B
+       \u2461 \u80CC\u666F rgba(20,24,30,.82) \u306F\u30CB\u30B3\u751F\u306E\u6697\u3044\u30DA\u30FC\u30B8\u306B\u6EB6\u3051\u308B(\u540C\u7CFB\u8272)
+       \u2462 13px\u30FB\u30D1\u30C7\u30A3\u30F3\u30B07px = \u8996\u7DDA\u304C\u62FE\u3046\u524D\u306B\u4ED6\u306EUI\u306B\u57CB\u3082\u308C\u308B
+     \u2192 fixed \u3067\u753B\u9762\u53F3\u4E0B\u306B\u5E38\u99D0\u3055\u305B\u3001\u685C\u30D4\u30F3\u30AF(DESIGN.md \u306E\u4E3B\u30A2\u30AF\u30BB\u30F3\u30C8)\u3067\u5FC5\u305A\u76EE\u306B\u5165\u308B\u3088\u3046\u306B\u3059\u308B\u3002
+     \u2605\u4F1A\u5834\u3092\u958B\u3044\u3066\u3044\u308B\u9593\u306F\u96A0\u3059(html.nlsb-venue-open \u3067\u5236\u5FA1)\u3002\u9589\u3058\u308B\u306E\u306F\u30D8\u30C3\u30C0\u30FC\u306E\u300C\u2715 \u9589\u3058\u308B\u300D\u3002 */
   .nlsb-toggle {
-    position: absolute;
-    right: 16px;
-    bottom: 16px;
-    z-index: 3;
-    min-height: 34px;
-    padding: 7px 12px;
-    border: 1px solid rgba(255, 255, 255, 0.22);
+    position: fixed;
+    right: 20px;
+    bottom: 20px;
+    z-index: 2147483000;
+    min-height: 44px;
+    padding: 12px 20px;
+    border: 2px solid rgba(255, 255, 255, 0.9);
     border-radius: 999px;
-    background: rgba(20, 24, 30, 0.82);
+    background: linear-gradient(135deg, #ff8fb1, #ff6f9c);
     color: #fff;
-    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.24);
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    box-shadow: 0 6px 20px rgba(214, 51, 108, 0.45), 0 2px 6px rgba(0, 0, 0, 0.25);
     cursor: pointer;
     pointer-events: auto;
     font: inherit;
-    font-size: 13px;
+    font-size: 15px;
+    font-weight: 700;
     line-height: 1;
-    transition: background-color 180ms ease;
+    transition: transform 180ms ease, box-shadow 180ms ease, background-color 180ms ease;
   }
   .nlsb-toggle:hover {
-    background: rgba(36, 43, 53, 0.94);
+    background: linear-gradient(135deg, #ff7ea6, #ff5e91);
+    transform: translateY(-2px);
+    box-shadow: 0 10px 26px rgba(214, 51, 108, 0.55), 0 2px 6px rgba(0, 0, 0, 0.25);
+  }
+  /* \u4F1A\u5834\u3092\u958B\u3044\u3066\u3044\u308B\u9593\u306F\u30DC\u30BF\u30F3\u3092\u96A0\u3059(\u30D8\u30C3\u30C0\u30FC\u306E\u300C\u2715 \u9589\u3058\u308B\u300D\u304C\u9589\u3058\u308B\u624B\u6BB5)\u3002
+     fixed \u5316\u3067\u6700\u524D\u9762\u306B\u6765\u305F\u305F\u3081\u3001\u958B\u3044\u3066\u3044\u308B\u9593\u3082\u51FA\u3057\u305F\u307E\u307E\u3060\u3068\u4F1A\u5834\u306E\u4E0A\u306B\u6D6E\u3044\u3066\u90AA\u9B54\u306B\u306A\u308B\u3002
+     \u2605\u30BB\u30EC\u30AF\u30BF\u306F html.nlsb-venue-open(\u65E2\u5B58\u306E\u6587\u5B57\u5217\u5951\u7D04\u30FBcontent-entry.js:2923 \u304C
+       \u300CvenueBar.js \u304C open \u4E2D\u306B\u7ACB\u3066\u308B documentElement \u30AF\u30E9\u30B9\u300D\u3068\u3057\u3066 wiring \u30C6\u30B9\u30C8\u3067\u56FA\u5B9A)\u3002
+       \u4F1A\u5834\u5074\u306E\u72EC\u81EA\u30AF\u30E9\u30B9\u3092\u65B0\u8A2D\u3057\u306A\u3044=\u5951\u7D04\u30921\u672C\u306B\u4FDD\u3064\u3002 */
+  html.nlsb-venue-open .nlsb-toggle {
+    display: none;
+  }
+  /* \u52D5\u304D\u3092\u6E1B\u3089\u3059\u8A2D\u5B9A\u306E\u4EBA\u306B\u306F\u62E1\u5927\u30A2\u30CB\u30E1\u3092\u51FA\u3055\u306A\u3044(a11y)\u3002 */
+  @media (prefers-reduced-motion: reduce) {
+    .nlsb-toggle {
+      transition: none;
+    }
+    .nlsb-toggle:hover {
+      transform: none;
+    }
   }
   .nlsb-toggle:focus-visible {
     outline: 2px solid #8dc8ff;
@@ -1460,8 +1489,13 @@
     opacity: 1;
   }
   @media (max-width: 900px) {
+    /* \u26052026-08-11: fixed \u5316\u306B\u4F34\u3044\u3001\u72ED\u3044\u7A93\u3067\u306F\u5C11\u3057\u5185\u5074+\u4E0A\u306B\u5BC4\u305B\u308B\u3002
+       \u30CB\u30B3\u751F\u306E\u53F3\u4E0BUI(\u30B3\u30E1\u30F3\u30C8\u5165\u529B\u6B04\u307E\u308F\u308A)\u3068\u91CD\u306A\u3063\u3066\u62BC\u305B\u306A\u304F\u306A\u308B\u306E\u3092\u907F\u3051\u308B\u3002 */
     .nlsb-toggle {
-      right: 10px;
+      right: 12px;
+      bottom: 76px;
+      font-size: 14px;
+      padding: 10px 16px;
     }
     .nlsb-stage {
       padding-right: 10px;

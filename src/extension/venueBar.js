@@ -577,27 +577,56 @@ const VENUE_CSS = `
   .nlsb-root.nlsb-is-open {
     pointer-events: auto;
   }
+  /* ★2026-08-11 v0.1.1323 ユーザー報告「会場モードにするボタンがないかも？どこ？」:
+     見つけられなかったのは position:absolute + 暗色 + 13px の三重苦だった。
+       ① absolute = .nlsb-root(ページ内)の右下 = スクロールすると流れて画面外へ出る
+       ② 背景 rgba(20,24,30,.82) はニコ生の暗いページに溶ける(同系色)
+       ③ 13px・パディング7px = 視線が拾う前に他のUIに埋もれる
+     → fixed で画面右下に常駐させ、桜ピンク(DESIGN.md の主アクセント)で必ず目に入るようにする。
+     ★会場を開いている間は隠す(html.nlsb-venue-open で制御)。閉じるのはヘッダーの「✕ 閉じる」。 */
   .nlsb-toggle {
-    position: absolute;
-    right: 16px;
-    bottom: 16px;
-    z-index: 3;
-    min-height: 34px;
-    padding: 7px 12px;
-    border: 1px solid rgba(255, 255, 255, 0.22);
+    position: fixed;
+    right: 20px;
+    bottom: 20px;
+    z-index: 2147483000;
+    min-height: 44px;
+    padding: 12px 20px;
+    border: 2px solid rgba(255, 255, 255, 0.9);
     border-radius: 999px;
-    background: rgba(20, 24, 30, 0.82);
+    background: linear-gradient(135deg, #ff8fb1, #ff6f9c);
     color: #fff;
-    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.24);
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    box-shadow: 0 6px 20px rgba(214, 51, 108, 0.45), 0 2px 6px rgba(0, 0, 0, 0.25);
     cursor: pointer;
     pointer-events: auto;
     font: inherit;
-    font-size: 13px;
+    font-size: 15px;
+    font-weight: 700;
     line-height: 1;
-    transition: background-color 180ms ease;
+    transition: transform 180ms ease, box-shadow 180ms ease, background-color 180ms ease;
   }
   .nlsb-toggle:hover {
-    background: rgba(36, 43, 53, 0.94);
+    background: linear-gradient(135deg, #ff7ea6, #ff5e91);
+    transform: translateY(-2px);
+    box-shadow: 0 10px 26px rgba(214, 51, 108, 0.55), 0 2px 6px rgba(0, 0, 0, 0.25);
+  }
+  /* 会場を開いている間はボタンを隠す(ヘッダーの「✕ 閉じる」が閉じる手段)。
+     fixed 化で最前面に来たため、開いている間も出したままだと会場の上に浮いて邪魔になる。
+     ★セレクタは html.nlsb-venue-open(既存の文字列契約・content-entry.js:2923 が
+       「venueBar.js が open 中に立てる documentElement クラス」として wiring テストで固定)。
+       会場側の独自クラスを新設しない=契約を1本に保つ。 */
+  html.nlsb-venue-open .nlsb-toggle {
+    display: none;
+  }
+  /* 動きを減らす設定の人には拡大アニメを出さない(a11y)。 */
+  @media (prefers-reduced-motion: reduce) {
+    .nlsb-toggle {
+      transition: none;
+    }
+    .nlsb-toggle:hover {
+      transform: none;
+    }
   }
   .nlsb-toggle:focus-visible {
     outline: 2px solid #8dc8ff;
@@ -2027,8 +2056,13 @@ const VENUE_CSS = `
     opacity: 1;
   }
   @media (max-width: 900px) {
+    /* ★2026-08-11: fixed 化に伴い、狭い窓では少し内側+上に寄せる。
+       ニコ生の右下UI(コメント入力欄まわり)と重なって押せなくなるのを避ける。 */
     .nlsb-toggle {
-      right: 10px;
+      right: 12px;
+      bottom: 76px;
+      font-size: 14px;
+      padding: 10px 16px;
     }
     .nlsb-stage {
       padding-right: 10px;
