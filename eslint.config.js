@@ -263,8 +263,16 @@ export default [
     //   ★判定は純関数 src/lib/popupCloakRevealTiming.js(テスト付)に隔離済みで、
     //     popup 側に残るのは paint/reveal の DOM グルー3行だけ(lib抽出不可)。
     //   実測22117 → ラチェットは実測ちょうどの22117へ(+εを取らない=次も必ず意識させる)。
+    //
+    // ★2026-08-11(v0.1.1324) 22117 → 22119(+2)。会場の鏡が映らない真因
+    //   (heavy read を毎回 STALE_SNAPSHOT で捨てていた)の根治で、
+    //     ① `import { buildWatchSnapshotKey } from '../lib/watchSnapshotKey.js';`(1行)
+    //     ② snapshotKey 生成箇所の由来コメント(1行)
+    //   の2行だけ増えた。★判定ロジック本体は純関数 src/lib/watchSnapshotKey.js
+    //   (単体11+配線5テスト付)へ隔離済みで、popup 側に残るのは呼び出し1行のみ。
+    //   = このファイルを太らせる変更ではない(むしろ鍵の作り方を lib へ出した)。
     files: ['src/extension/popup-entry.js'],
-    rules: { 'max-lines': ['error', { max: 22117, skipBlankLines: false, skipComments: false }] }
+    rules: { 'max-lines': ['error', { max: 22119, skipBlankLines: false, skipComments: false }] }
   },
   {
     files: ['src/extension/popup/**/*.js'],
