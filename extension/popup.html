@@ -24,6 +24,14 @@
 -->
   <head>
     <meta charset="UTF-8" />
+    <!--
+      ★v0.1.1316: color-scheme を【meta でも】宣言する(sidepanel.html と対)。
+        インラインの style は【CSS 適用後】、meta は【パース初期】に効く。
+        その差の区間で、ダーク環境のブラウザはキャンバスを暗色で塗る。
+        ★実測(2026-08-10)で、出荷ビルドの popup.html にも meta が【無かった】。
+        light 固定の理由: このアプリに実質ダークモードは無い(v0.1.51)。
+    -->
+    <meta name="color-scheme" content="light" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>君斗りんくの追憶のきらめき</title>
     <!-- ローディング幕で最初に出る3キャラ（通常顔）のサムネだけ最優先で先読み（空丸を防ぐ）。

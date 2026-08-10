@@ -32,6 +32,26 @@
   <head>
     <meta charset="utf-8" />
     <!--
+      ★v0.1.1316: color-scheme を【meta でも】宣言する(黒画面・実機で7版追った件)。
+
+      ■ なぜインラインの style だけでは足りないか
+        <html style="color-scheme: light"> は【CSS が適用された後】に効く。
+        `<meta name="color-scheme">` は【パースの初期段階】でブラウザに伝わる。
+        その差の区間で、ユーザー環境がダークだとブラウザは
+        キャンバス(=まだ何も描かれていない地)を暗色で塗る。
+
+      ■ 実測(2026-08-10・実ブラウザ prefers-color-scheme: dark で確認)
+        出荷ビルドの sidepanel.html / popup.html には
+        `<meta name="color-scheme">` が【どちらにも無かった】。
+        (インライン style は両方にあるので、CSS 適用後は正しく light になる=
+         だから settled state を測ると毎回「正常」に見えていた)
+
+      ★light 固定にする理由: このアプリに実質ダークモードは無い
+        (popup-entry.js が nl-skin-panel-dark を無条件 remove する=v0.1.51)。
+        `light dark` と書くとダーク環境でキャンバス既定が暗色になり、同じ穴に戻る。
+    -->
+    <meta name="color-scheme" content="light" />
+    <!--
       ★2026-08-10(v0.1.1312): ここに theme-color の meta を置かないこと。
       (検査 sidepanelThemeColorParity.test.js がタグの実在を機械で禁じている。
        このコメント自身が引っかからないよう、ここでは山括弧付きで書かない)

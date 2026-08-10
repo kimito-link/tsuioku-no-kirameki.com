@@ -656,7 +656,7 @@
     - `trumpet1.mp3`
     - `wallet1.mp3`
   - `SOURCES.md`
-- 📁 **src/** (1577)
+- 📁 **src/** (1578)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -943,7 +943,7 @@
         - `logo_funlink_white_RGB_maru_black.png`
       - `logo_guide_funlink_ol.pdf`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1340)
+  - 📁 **lib/** (1341)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -1124,6 +1124,7 @@
     - `cleanNdgrChatRows.js` — NDGR チャット行の正規化純関数。
     - `cleanNdgrChatRows.test.js`
     - `cloakRevealNotBehindLoad.wiring.test.js`
+    - `colorSchemeMetaPresent.test.js`
     - `comeviewActions.js` — v0.1.666: コメビュのコメント単位アクション(わんコメ同等+追憶独自)の純ロジック。
     - `comeviewActions.test.js`
     - `comeviewInstantRender.js` — コメビュ別窓で行を即時描画する純ロジック(本文の切り詰め・行の隠し判定など)。
