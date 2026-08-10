@@ -54,10 +54,18 @@
         なお manifest.theme_color は Chrome 拡張では未対応キーで、実機で
         「Unrecognized manifest key」警告を出した(v0.1.1311 で撤去・許可リストで再発防止)。
 
-      ■ 残っている実物（未着手・実害小）
-        パネルが開いた瞬間の純白 0.2 秒。Chrome が枠を白で塗ってから中身が来る区間。
-        これを追うなら、まず「拡張からパネル枠の色を指定する正規の方法が実在するか」を
-        推測でなく仕様で裏取りすること。theme-color は既に否定済み。
+      ■ 残っている実物＝パネルが開いた瞬間の純白 0.2 秒（★調査済み・直せない）
+        2026-08-10 に公式ドキュメントで裏取りした結論:【拡張から指定する手段は存在しない】。
+          ・拡張の manifest に色のキーは無い(theme_color/background_color は PWA 専用)
+          ・side_panel キーは default_path のみ＝色の項目なし
+          ・chrome.sidePanel API の全API面に appearance/background/color 系は一つも無い
+            (公式の言う「スタイルはHTML/CSSで」は文書ロード【後】＝白が出る窓の外)
+          ・theme-color の meta も Web App Manifest 系＝ブラウザUIの色で、ここには効かない
+          ・Chromium 既知の挙動: issue 40190899「未描画フレームはテーマに関係なく白」
+            (Firefox にも同型 Bugzilla 1408122)。サイドパネル向けの回避手段は提供されていない
+        ★したがってこの 0.2 秒は追わない。残る道は「パースを速くして本描画を早める」
+          最適化のみで、色の上書きではない。実害も小さい。
+          詳細はメモリ [[sidepanel-white-flash-is-unfixable-2026-08-10]]。
     -->
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>君斗りんくの追憶のきらめき — サイドパネル</title>
