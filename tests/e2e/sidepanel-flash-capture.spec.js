@@ -118,7 +118,10 @@ test('サイドパネル: 最初の数百msを1フレームずつ記録して黒
       } catch (e) {
         window.__flashFrames.push({ t: Math.round(performance.now() - t0), err: String(e).slice(0, 80) });
       }
-      if (performance.now() - t0 < 3000) requestAnimationFrame(snap);
+      // ★v0.1.1309: 3000ms 打ち切りでは幕(cloak)の解除を捉えられなかった。
+      //   実機は t+5887ms で解除されており、この窓の【外】で起きていた。
+      //   ([[zero-count-may-mean-unmeasured]] と同型＝観測窓が症状の姿を決めていた)
+      if (performance.now() - t0 < 8000) requestAnimationFrame(snap);
     };
     requestAnimationFrame(snap);
   });
@@ -132,7 +135,7 @@ test('サイドパネル: 最初の数百msを1フレームずつ記録して黒
     await page.waitForTimeout(60);
   }
 
-  await page.waitForTimeout(2600);
+  await page.waitForTimeout(8200);
   const frames = await page.evaluate(() => window.__flashFrames || []);
   fs.writeFileSync(path.join(OUT_DIR, 'frames.json'), JSON.stringify(frames, null, 2));
 
@@ -147,7 +150,54 @@ test('サイドパネル: 最初の数百msを1フレームずつ記録して黒
   }
   console.log(`[result] color-scheme が 'light dark' のフレーム = ${darkScheme.length}`);
 
+  /*
+   * ★v0.1.1309: 幕(cloak)がいつ外れるかを【検査に昇格】する。
+   *
+   * ■ 経緯(2026-08-10 実機で確定)
+   *     幕(cloak) ✅ t+5887ms で解除 ★CSS自動解除(1500ms)より後
+   *   幕を外す最終安全網が `window load + 800ms` に乗っており、load は全サブリソースの
+   *   完了を待つ。サイドパネルは滑り出るあいだ hidden 扱いで load 自体が遅れるため、
+   *   その間ずっと幕が残る＝【中身が見えるまでが遅い】。
+   *
+   * ★訂正(2026-08-10・v0.1.1312): 当初これを「ユーザー証言の黒の正体」と考えていたが、
+   *   画面録画の219フレーム解析で黒は拡張の外側(ニコ生のページ)と確定した＝幕は黒の原因では
+   *   【ない】。ただし「中身が見えるまで約5.9秒」は実測どおりで、それ自体が直すべき遅さ。
+   *   この検査は黒ではなく【中身が出るまでの時間】を守るものとして残す。
+   *
+   * ■ この検査の意味
+   *   幕は記録していたのに【判定していなかった】ので、ハーネスは緑のまま素通ししていた。
+   *   実データが無い環境でも幕の解除時刻は測れる(JSタイマーの問題であってデータ量ではない)。
+   */
+  const realDocFrames = frames.filter((f) => f.isRealDoc === true);
+  const cloaked = realDocFrames.filter((f) => f.cloak === '1');
+  const lastCloakedT = cloaked.length ? cloaked[cloaked.length - 1].t : null;
+  const firstClearT = (() => {
+    if (!cloaked.length) return null;
+    const after = realDocFrames.find((f) => f.t > lastCloakedT);
+    return after ? after.t : null;
+  })();
+  console.log(
+    `[cloak] 実文書フレーム=${realDocFrames.length} / 幕ありフレーム=${cloaked.length}` +
+      ` / 最後に幕を見た t=${lastCloakedT ?? '-'}ms / 解除 t=${firstClearT ?? '(観測窓内で解除されず)'}ms`
+  );
+
   expect(frames.length, 'フレームが取れていること(取れないなら計器の失敗)').toBeGreaterThan(10);
+
+  // ★幕は CSS の auto-reveal(1500ms)+余裕 のうちに必ず外れること。
+  //   v0.1.1309 で load 非依存の 1500ms 保険を足した＝これが効いていれば通る。
+  //   保険を外す変異を入れると、ここが実測値付きで赤くなる。
+  if (cloaked.length) {
+    expect(
+      firstClearT,
+      `幕(cloak)が観測窓(8秒)内に外れていない＝中身が見えないまま居座る` +
+        `（最後に幕を見た t=${lastCloakedT}ms）`
+    ).not.toBeNull();
+    expect(
+      firstClearT,
+      `幕(cloak)の解除が ${firstClearT}ms＝CSS の auto-reveal(1500ms)より大幅に遅い。` +
+        `window load 待ちに戻っていないか popup-entry.js の保険を確認すること`
+    ).toBeLessThanOrEqual(2500);
+  }
 
   // ★この2本が「黒フラッシュが起こりうる」ことの機械的な証拠。
   //   直っていれば 0 になる。直っていなければ件数と時間窓が出る。
