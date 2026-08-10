@@ -31,6 +31,27 @@
 -->
   <head>
     <meta charset="utf-8" />
+    <!--
+      ★v0.1.1310(2026-08-10): パネル枠の地色をブラウザに宣言する。
+
+      ■ なぜ必要か（実データで測って分かったこと）
+        実プロファイル(14,407キー/35,172コメント)を再現して測った結果:
+          ・幕(cloak)は t+1,082〜1,285ms で解除されており、修正前後で差が無い
+          ・page.goto で直接開くと t=16ms から既にクリーム色＝黒は【一度も出ない】
+        つまり黒は拡張の中身ではなく、Chrome が【パネル枠を滑り出させている間】に
+        見えている地の色。ユーザー証言「はじめくろいのがぬーとでて、そのあと読み込み中」
+        の順序と一致する（読み込み中＝キャラ画面は t+358ms で正常に出ている）。
+
+      ■ なぜ HTML の背景では埋まらないか
+        <html> の style 背景は v0.1.1299 で1行目に置いたが、それでも
+        【HTML をパースする前】のフレームには効かない。ブラウザはその瞬間、
+        自分のテーマ(ユーザー環境はダーク)の地色＝黒を塗る。
+        → 枠を描く側に色を教えるしかない＝theme-color と manifest.theme_color。
+
+      ★色は sidepanel.html の html/body・iframe・popup.html の1行目と同値(#fffaf2)。
+        変えるときは manifest.json の theme_color も含めて全部そろえること。
+    -->
+    <meta name="theme-color" content="#fffaf2" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>君斗りんくの追憶のきらめき — サイドパネル</title>
     <style>

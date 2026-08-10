@@ -77,3 +77,6 @@ council-scout/LATEST.md
 
 # Playwright: ログイン状態/パネル状態(コミット厳禁・playwright-headless-recording スキル)
 .auth/
+
+# 実機再現の使い捨て計測スクリプト置き場(2026-08-10)
+tests-tmp/
