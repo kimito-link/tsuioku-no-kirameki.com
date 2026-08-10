@@ -94,6 +94,45 @@ describe('nicoadContributionRankingApi', () => {
       expect(rows[0].hasNoIcon).toBeUndefined();
     });
 
+    /*
+     * ★AGENTS.md §3.6(外部APIはいつか落ちる・いつか形が変わる)の実行可能な担保。
+     *   「thumbnailUrl が来る」前提で書いた hasNoIcon が、公式の仕様変更で
+     *   壊れない(=白丸に静かに戻らない・例外で全件落とさない)ことを固定する。
+     */
+    it('公式が thumbnailUrl の型を変えても落ちず、記名判定は生き残る', () => {
+      const weird = [
+        { userId: 1, advertiserName: 'a', totalContribution: 1, rank: 1, thumbnailUrl: null },
+        { userId: 2, advertiserName: 'b', totalContribution: 1, rank: 2, thumbnailUrl: 123 },
+        { userId: 3, advertiserName: 'c', totalContribution: 1, rank: 3, thumbnailUrl: { url: 'x' } },
+        { userId: 4, advertiserName: 'd', totalContribution: 1, rank: 4, thumbnailUrl: [] }
+      ];
+      const rows = normalizeNicoadRankingResponse({ meta: { status: 200 }, data: { ranking: weird } });
+      expect(rows).toHaveLength(4);
+      // 形が変わっても「アイコン未設定」と誤検知しない(誤って全員ゆっくり顔にしない)
+      for (const r of rows) expect(r.hasNoIcon).toBeUndefined();
+      // 記名・リンクの本筋は維持される
+      expect(rows[0].isAnonymous).toBe(false);
+      expect(rows[0].userPageUrl).toBe('https://www.nicovideo.jp/user/1');
+    });
+
+    it('壊れた行が混ざっても、正常な行は捨てずに残す(1件で全滅させない)', () => {
+      const rows = normalizeNicoadRankingResponse({
+        meta: { status: 200 },
+        data: {
+          ranking: [
+            null,
+            'ゴミ',
+            { userId: 38947059, advertiserName: '足利尊氏', totalContribution: 24431, rank: 4 },
+            undefined,
+            { /* 空オブジェクト */ }
+          ]
+        }
+      });
+      expect(rows).not.toBeNull();
+      const named = rows.filter((r) => r.name === '足利尊氏');
+      expect(named).toHaveLength(1);
+    });
+
     it('thumbnailUrl が無い行は hasNoIcon を立てない(未知と未設定は別物)', () => {
       const rows = normalizeNicoadRankingResponse({
         meta: { status: 200 },
