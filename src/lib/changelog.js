@@ -26,6 +26,16 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1323',
+    date: '2026-08-11',
+    summary: '「会場モード」のボタンを見つけやすくしました',
+    items: Object.freeze([
+      '「会場モードのボタンがどこにあるか分からない」というご指摘を受けて、画面の右下に固定表示し、桜色の大きなボタンにしました。',
+      'これまでは色がページに溶けこんでいたうえ、ページを下にたどると画面の外へ流れていってしまう作りでした。',
+      '会場モードを開いている間はこのボタンを隠します(閉じるときは会場の上にある「✕ 閉じる」を押してください)。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1322',
     date: '2026-08-11',
     summary: '会場モードで配信の映像が見えるようにしました',
