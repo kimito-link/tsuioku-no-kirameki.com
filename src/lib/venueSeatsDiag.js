@@ -33,7 +33,8 @@
  *     lastSample: null | { kind: string, seatIndex: number, mirrorUid: string, rosterUid: string,
  *       tileTag: string, seatLinkOn: boolean, mode: string, atWall: number } }|null,
  *   yukkuriNamedCensus: { line: string, checked: number, yukkuriNamed: number, outOfRangeDigits: number,
- *     lastSample: null | { uid: string, name: string, digits: number } }|null
+ *     lastSample: null | { uid: string, name: string, digits: number } }|null,
+ *   mirrorIntakeLine: string
  * }} VenueSeatsDiagState
  *
  * laneParity は v0.1.1111 の「会場=①レーンのメンバー一致トークン」(venueLaneParity.js)。null=未観測。
@@ -72,7 +73,9 @@ export function makeInitialVenueSeatsDiag() {
       mirrorTimedOut: false, mirrorAbsent: false, line: '会場立ち上がり ⚪ 未観測'
     },
     seatLinkParity: /** @type {VenueSeatsDiagState['seatLinkParity']} */ (null),
-    yukkuriNamedCensus: /** @type {VenueSeatsDiagState['yukkuriNamedCensus']} */ (null)
+    yukkuriNamedCensus: /** @type {VenueSeatsDiagState['yukkuriNamedCensus']} */ (null),
+    // ★v0.1.1317: 会場が鏡を受け取れているかの1行(未観測は空文字=状態速報に出ない)。
+    mirrorIntakeLine: ''
   };
 }
 
@@ -261,6 +264,12 @@ export function buildVenueSeatsDiagSnapshot(diag, nowMs) {
     openLatency,
     seatLinkParity,
     yukkuriNamedCensus,
+    /*
+     * ★v0.1.1317: 会場が鏡を受け取れているかの1行(会場が完全一致しない件の切り分け)。
+     *   文字列1本だけ通す(未知の巨大オブジェクトを写さない=このファイルの既存方針)。
+     *   空文字なら状態速報側で行ごと出さない=普段の速報を汚さない。
+     */
+    mirrorIntakeLine: String(d.mirrorIntakeLine || ''),
     capturedAt: now
   };
 }
