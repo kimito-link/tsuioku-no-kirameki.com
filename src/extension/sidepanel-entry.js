@@ -12,6 +12,7 @@ import {
   judgeSidepanelBlack,
   summarizeZeroAreaWindow
 } from '../lib/sidepanelSelfDiag.js';
+import { summarizeCloakDuration } from '../lib/sidepanelCloakDuration.js';
 import { KEY_SIDEPANEL_SELF_DIAG } from '../lib/sidepanelSelfDiagKey.js';
 
 /**
@@ -78,6 +79,15 @@ let _samples = 0;
  * @type {{ t: number, w: number, h: number, iw: number, ih: number }[]}
  */
 const _sizeSeries = [];
+/**
+ * ★v0.1.1307: 幕(cloak)の観測列。
+ *   2026-08-10 実機のスクショは【配信5時間45分経過】で真っ黒だった=黒は居座っている。
+ *   しかし従来の観測窓は 3500ms 打ち切りで、居座る黒を構造的に測れず、速報は必ず
+ *   「★出た直後だけ黒い」としか言えなかった([[zero-count-may-mean-unmeasured]] と同型)。
+ *   幕が「1.5秒で解除されるのか / 永久に残るのか」が次の一手を決めるので系列で残す。
+ * @type {{ t: number, cloak: string }[]}
+ */
+const _cloakSeries = [];
 /** パネルが開いた時刻(系列の t=0 基準)。 */
 const _bootAt = Date.now();
 
@@ -144,6 +154,15 @@ function collectAndPublish(phase) {
       ih: Math.max(0, Math.round(Number(sample.iframe?.h) || 0))
     });
     const zeroArea = summarizeZeroAreaWindow(_sizeSeries);
+    // ★v0.1.1307: 幕の観測列を積む(iframe を読めない間は測れないので記録しない=
+    //   「読めない」を「外れている」と誤読しないため)。
+    if (sample.inner) {
+      _cloakSeries.push({
+        t: Math.max(0, Date.now() - _bootAt),
+        cloak: String(sample.inner.cloak || '')
+      });
+    }
+    const cloakDuration = summarizeCloakDuration(_cloakSeries);
     /*
      * ★窓が未レイアウト(0x0)の測定は【最悪値として記録しない】。
      *   t=0 の setTimeout はレイアウト前に走りうるので、ここを🔴として保持すると
@@ -171,9 +190,16 @@ function collectAndPublish(phase) {
       ? ` / 中央の塗り主=${cp.painter || '🔴誰も塗っていない'}${cp.hit === 'ZERO_AREA' ? '(未レイアウト)' : ''}`
       : '';
     const zeroNote = zeroArea.everZero || _samples > 1 ? ` / ${zeroArea.line}` : '';
+    /*
+     * ★v0.1.1307: 幕の継続を必ず1行に混ぜる。
+     *   「★出た直後だけ黒い」という文言は観測窓(旧3500ms)が作っていた見え方で、
+     *   実機は5時間45分経過でも黒かった。幕が残り続けているかどうかを速報から
+     *   直接読めるようにする(次の一手=CSSで救えているのか/JSの解除が届いていないのか)。
+     */
+    const cloakNote = cloakDuration.everCloaked ? ` / ${cloakDuration.line}` : '';
     const line = flashed
-      ? `${worst.verdict.line} ★出た直後だけ黒い(${worst.phase}時点で検知・今は${verdict.ok ? '正常' : '黒いまま'})${paintNote}${zeroNote}`
-      : `${verdict.line}${paintNote}${zeroNote}`;
+      ? `${worst.verdict.line} ★出た直後だけ黒い(${worst.phase}時点で検知・今は${verdict.ok ? '正常' : '黒いまま'})${paintNote}${zeroNote}${cloakNote}`
+      : `${verdict.line}${paintNote}${zeroNote}${cloakNote}`;
 
     void chrome?.storage?.local?.set({
       [KEY_SIDEPANEL_SELF_DIAG]: {
@@ -190,6 +216,9 @@ function collectAndPublish(phase) {
         // ★窓0x0の継続(黒の正体を絞る本命の材料)。
         zeroArea,
         sizeSeries: _sizeSeries,
+        // ★v0.1.1307: 幕の継続(居座る黒か・CSSで救えているか)。
+        cloakDuration,
+        cloakSeries: _cloakSeries,
         // 黒かった瞬間の生値を残す(原因の裏取り用)。無ければ今の値。
         sample: flashed ? worst.sample : sample,
         nowSample: sample
@@ -204,7 +233,26 @@ function collectAndPublish(phase) {
 //   2点(load+50ms / 2500ms)だけだと、その【あいだ】で起きる黒を丸ごと取り逃がす。
 //   黒は最初の数百msに出るので、序盤を密に・後半を粗く見る。
 //   ★上のロジックが「一度でも黒ければ保持」するので、何度測っても✅で塗り潰されない。
-const SAMPLE_AT_MS = [0, 60, 120, 200, 300, 450, 600, 800, 1100, 1500, 2000, 2500, 3500];
+/*
+ * ★v0.1.1307: 観測窓を 3.5秒 → 30秒 へ延ばす(居座る黒を測れるようにする)。
+ *
+ * ■ なぜ必要か(2026-08-10 実機で確定)
+ *   ユーザーのスクリーンショットは【配信5時間45分経過】の時点で真っ黒だった。
+ *   つまり黒は「開いた直後の一瞬」ではなく【居座っている】。
+ *   ところが従来の最終観測点は 3500ms で、それ以降を一切見ていなかった。
+ *   そのため速報はどれだけ黒くても「★出た直後だけ黒い(今は正常)」としか言えず、
+ *   5セッションのあいだ「一瞬の黒」を追い続けることになった。
+ *   ★計器の観測窓が症状の姿を決めてしまっていた([[zero-count-may-mean-unmeasured]] と同型)。
+ *
+ * ■ なぜ 30秒で十分か
+ *   CSS の自動解除は 1500ms・JS の最終安全網は window load 後 800ms。
+ *   どちらの保険も効かずに 30秒残っていれば、それは【恒久的に残る】と断定してよい。
+ *   後半は粗く間引くので測定コストはほぼ増えない(合計19点)。
+ */
+const SAMPLE_AT_MS = [
+  0, 60, 120, 200, 300, 450, 600, 800, 1100, 1500, 2000, 2500, 3500,
+  5000, 8000, 12000, 18000, 25000, 30000
+];
 for (const ms of SAMPLE_AT_MS) {
   setTimeout(() => collectAndPublish(ms === 0 ? 'immediate' : `t+${ms}ms`), ms);
 }
