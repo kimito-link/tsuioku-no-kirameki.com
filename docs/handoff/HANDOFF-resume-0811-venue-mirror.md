@@ -7,9 +7,10 @@
 
 ## いまどこ
 
-- ブランチ: `feat/sidepanel-first-layout` / 最新 **v0.1.1323**(push + copy:ext 済み)
-- 出荷済み: v0.1.1322(会場の高さ48vh固定) / v0.1.1323(会場ボタンを見つけやすく)
-- **ユーザー未確認**: 1322 の効果(会場を開いた実機評価がまだ)・1323 の見た目
+- ブランチ: `feat/sidepanel-first-layout` / 最新 **v0.1.1324**(push + copy:ext 済み)
+- 出荷済み: v0.1.1322(会場の高さ48vh固定) / v0.1.1323(会場ボタンを見つけやすく) /
+  **v0.1.1324(会場の鏡が映らない真因を根治=heavy read を捨てていた鍵の修正)**
+- ★**3つとも実機未確認**。次セッションは「効いたか」の確認から始める(下に見るべき計器を明記)
 
 ---
 
@@ -61,7 +62,7 @@
 
 ---
 
-## ★次の最優先: 会場の鏡が映らない(未解決・真因未特定)
+## ★会場の鏡が映らない → 真因を特定して根治(v0.1.1324・**実機未確認**)
 
 ### 症状(ユーザーの言葉 + 計器)
 
@@ -73,33 +74,48 @@
 heavySettleState: "stale-snapshot" / heavyEverSettled: false / heavyRaceReturns: 36
 ```
 
-### ★私の仮説は【外れた】。同じ道を辿らないこと
+### ★真因(コードで確定)
 
-私は「provisional フラグが立たずガードが素通りしている」と考えたが、**コードは正しかった**:
+`snapshotKey = ${lv}|${url}|s17` が **url を生のまま鍵に入れていた**。
+url は `pickWatchUrlFromMultipleSources`(`popupWatchUrlResolveMultiTab.js`)の戻り値で、
+**勝った供給元によって同じ配信でも文字列が違う**:
 
-- `renderStoryUserLaneDom.js:222` `if (entriesProvisional !== true) return false;`
-  → 暫定でなければ守らない(設計どおり)
-- `renderStoryUserLaneDom.js:239` `return next < prev;`
-  → **1枚でも減れば見送る**(v0.1.1233 で厳格化済み)
-- `popup-entry.js:7352` light は `{ provisional: true, origin: LIGHT }` を**正しく渡している**
-- `popup-entry.js:8078` `entriesProvisional = !(opts.provisional === false)`
-  → **fail-closed 済み**(無指定=暫定)。`provisional:false` を渡すのは
-  `RESET_NO_WATCH`(watchタブ無しのリセット)**だけ**
+| 供給元 | url の形 |
+|---|---|
+| `inlineParam` | `buildInlineOwnWatchUrlFromLv` が lv から組む正規形 `https://live.nicovideo.jp/watch/lvNNN` |
+| `activeTab` 等 | ブラウザの実URL(`?ref=` 等・末尾スラッシュ・ハッシュが付く) |
 
-→ つまり「ガードが素通り」では 98→1 を説明できない。**別の経路がある。**
+heavy read は数百ms〜秒かかる。その間に供給元が入れ替わると
+`watchMetaCache.key !== snapshotKey` が成立し、**読めた全件を捨てて**
+`STALE_SNAPSHOT` で bail(`popup-entry.js` の `heavyDataPromise.then` 冒頭)。
+→ heavy が永遠に settle せず、light の暫定供給だけが画面を上書き = 98枚→1枚。
 
-### 次に読むべきはここ(本丸は heavy 側)
+### 修正(v0.1.1324)
 
-**`heavy` が一度も settle していない**(`heavyEverSettled: false`)ことが根。
-`heavySettleState: 'stale-snapshot'` = `snapshotKey` 不一致で早期 return
-(定義は `storyUserLaneRenderProbe.js:90` / 実装は popup-entry の 14530 番台コメント参照)。
+配信の同一性は **liveId が決める**。クエリ・ハッシュ・末尾スラッシュは同じ配信の
+同じページを指すので同一性の材料にしない。
+→ 純関数 **`src/lib/watchSnapshotKey.js`** に集約(`lv|s18`・url は鍵に入れない)。
+- 単体11 + 配線5 = 16 green。**配線テストは変異で赤を確認済み**(旧鍵に戻すと2件落ちる)
+- 全体 9,431 tests green / typecheck clean / verify:bump 全6 OK / dist に新鍵を確認
+- `eslint.config.js` の max-lines ラチェットを 22117→22119(+2) に更新(理由をコメントに明記)
 
-読む順:
-1. なぜ毎回 `snapshotKey` が食い違うのか(= stale-snapshot の発生条件)
-2. `light` の 98→1 が **guard を通った実際の経路**(`_shrinkGuardHit` が false になる条件を
-   実データで確かめる。`prev`(DOM実タイル)が 0 と数えられている可能性=`countStoryUserLaneDomTiles`
-   が会場側DOMを数えていない、など)
-3. `laneShrinkKeepExpired` の10分非常口が誤発火していないか(`popup-entry.js:7005`)
+### ★私の初期仮説は【外れた】。同じ道を辿らないこと
+
+「provisional フラグが立たずガードが素通り」と考えたが**コードは正しかった**:
+- `renderStoryUserLaneDom.js:222` 暫定でなければ守らない(設計どおり)
+- 同 `:239` **1枚でも減れば見送る**(v0.1.1233 で厳格化済み)
+- `popup-entry.js:7352` light は `{ provisional: true }` を**正しく渡している**
+- 同 `:8078` **fail-closed 済み**(無指定=暫定)。`provisional:false` は `RESET_NO_WATCH` だけ
+
+→ **ガードは被害者側**。真因は heavy が settle できないことだった。
+
+### ★次セッションで最初にやること
+
+**実機で効果を確認する**(この修正はユーザー未確認)。状態速報で見るべきは:
+- `heavyEverSettled` が **true** になったか(false のままなら別経路が残っている)
+- `heavySettleState` が `settled` に到達するか
+- `★タイルが減った直前の供給元` の行が**消えるか**(98→1 が起きなくなる)
+- `会場一致 ⚪鏡stale(NNNs)` の秒数が小さくなるか
 
 ★**触ってはいけない**: `selectStableVisibleMembers` / diff-skip 機構(ちらつき7版の資産)
 
