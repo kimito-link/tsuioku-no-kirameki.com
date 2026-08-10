@@ -818,9 +818,16 @@ const VENUE_CSS = `
     align-self: end;
     display: grid;
     width: 100%;
-    /* 2026-06-14 会議(表示領域拡大): 高さを人数連動で可変。少人数は低く映像を広く見せ、
-       満員は高くして客席を奥まで見せる。JS が --nlsb-venue-max-h を人数で注入(既定55vh)。 */
-    max-height: var(--nlsb-venue-max-h, 55vh);
+    /* ★2026-08-11: 人数連動(旧 48→72vh)を撤回し 48vh 固定にした(会議4体・3対1)。
+       ユーザー実機2,769人で「配信の映像はちゃんとみたい」＝映像が実質ゼロだったため。
+       正本の経緯は src/lib/venueViewport.js の resolveVenueMaxHeightVh JSDoc。
+
+       ★fallback を 55vh → 48vh に変更した理由(css_default_should_be_the_safe_state):
+       JS の注入(renderSeats 内)が走る前や、何らかの理由で注入が失敗した場合、
+       この fallback がそのまま効く。55vh のままだと「注入が失敗したときだけ
+       映像が余計に潰れる」= 直したはずの症状が経路によって復活する。
+       CSS 既定は常に【安全な側】に置く。 */
+    max-height: var(--nlsb-venue-max-h, 48vh);
     min-height: 0;
     box-sizing: border-box;
     grid-template-areas:
@@ -5176,8 +5183,12 @@ export function mountVenueBarButton(options = {}) {
     renderTopBar(seating.topSupporters);
     seatsHost.classList.remove(...VENUE_LAYOUT_CLASSES);
     seatsHost.classList.add(`nlsb-mode-${seating.layoutMode}`);
-    // 2026-06-14 会議(表示領域拡大): 会場の最大高さを人数連動で注入。少人数は低く映像を広く、
-    //   満員は高く客席を奥まで。.nlsb-seating(=seatsHost の親)の var(--nlsb-venue-max-h) を更新。
+    // ★2026-08-11: 人数連動を撤回し 48vh 固定を注入する(関数側で固定)。
+    //   旧: 少人数は低く映像を広く、満員は高く客席を奥まで(人数↑→会場↑)。
+    //   撤回理由: 2,769人の実機で 72vh となり配信映像が実質ゼロ=ユーザー不満の直接原因。
+    //   満席感は面積でなく「全員の顔(overflow-y)+入場演出」で表現する方針に変更。
+    //   経緯の正本は src/lib/venueViewport.js の resolveVenueMaxHeightVh JSDoc。
+    //   ここは呼び出し署名を変えずに残す(参加者数は将来の密度表現で使う余地がある)。
     const seatingHostEl = seatsHost.parentElement;
     if (seatingHostEl) {
       seatingHostEl.style.setProperty(
