@@ -390,6 +390,7 @@
 | `src/lib/autoPublishDecision.js` | 1 | 状態速報ページ |
 | `src/lib/avatarEntryCounts.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/avatarLoadReport.js` | 1 | 状態速報ページ |
+| `src/lib/avatarRetrySweepThrottle.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/backfillFlushThreshold.js` | 1 | 記録エンジン(watchページ常駐) |
 | `src/lib/backfillHeartbeat.js` | 1 | 記録エンジン(watchページ常駐) |
 | `src/lib/backfillRemoveGiftSystemMessages.js` | 1 | ポップアップ(応援レーン) |
@@ -763,6 +764,7 @@
 | `src/lib/userLaneMergeGiftThrowers.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/userSupportGridAccent.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/userThumbGrid.js` | 1 | ポップアップ(応援レーン) |
+| `src/lib/viewerCountProbeMerge.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/viewerSelfLaneAggregate.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/voiceComment.js` | 1 | 記録エンジン(watchページ常駐) |
 | `src/lib/voiceReachabilityProbe.js` | 1 | 状態速報ページ |
@@ -783,4 +785,5 @@
 | `src/lib/watchSnapshotPartialMerge.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/watchTabPrioritize.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/watchUrlFreshness.js` | 1 | 状態速報ページ |
+| `src/lib/yieldToBrowserPaint.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/yukkuriBroadcastSummary.js` | 1 | ポップアップ(応援レーン) |
