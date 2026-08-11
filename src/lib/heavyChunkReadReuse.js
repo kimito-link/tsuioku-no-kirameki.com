@@ -15,6 +15,19 @@
  *
  * ★純データ判定: 配列本体は渡さず arrLength/chunkTotal/readAtMs の縮約だけ受ける(軽い・テスト容易)。
  *
+ * ★★呼び出し側で条件を重ねないこと(2026-08-12・v0.1.1344 で判明した真因)
+ *   popup-entry.js は長らくこう書いていた:
+ *     canReuse = (idbMode || commentsChunked) && currentChunkTotal != null && … && decision.reuse
+ *   currentChunkTotal は `idbMode ? … : commentsChunked ? … : null` で作られるため、
+ *   `currentChunkTotal != null` は **`idbMode || commentsChunked` と等価**＝同じ条件の二重掛け。
+ *   実効は「非チャンク配信を締め出す」ことだけだった。
+ *   ところが本関数は currentChunkTotal == null のとき **常に reuse:true(coverage)** を返す。
+ *   ＝非チャンク配信では【判定が「再利用してよい」と言っているのに呼び出し側が必ず無視】し、
+ *   毎 refresh で heavy 全件を読み直す → 次 refresh に追い越されて race →
+ *   heavyEverSettled が永久に false(実測 race 26回 / freshReadReuse 0回)。
+ *   ★lv 一致・件数>0 も本関数が見ている(下の early return)。呼び出し側で重複させない。
+ *   検査: src/extension/heavyReuseNotDoubleGated.wiring.test.js が二重ゲートの復活を禁じる。
+ *
  * @module heavyChunkReadReuse
  */
 

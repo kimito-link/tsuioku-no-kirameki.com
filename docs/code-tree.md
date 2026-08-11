@@ -676,7 +676,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (1609)
+- 📁 **src/** (1610)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -711,7 +711,7 @@
       - `avatarResolver.test.js`
       - `identity.js` — ニコ生ユーザー ID の「匿名性」判定と関連アイデンティティ・ユーティリティ。
       - `nickname.js` — 表示名（ニックネーム）の「強弱」判定。
-  - 📁 **extension/** (39)
+  - 📁 **extension/** (40)
     - 📁 **popup/** (6)
       - 📁 **report/** (2)
         - `htmlReportDocument.js` — HTMLレポート(振り返り用の保存HTML)組み立てクラスタ。
@@ -730,6 +730,7 @@
     - `content-entry.js` — watch ページ常駐の記録エンジン本体。コメント取得(NDGR+DOM)・記録・バックフィル・パネル描画の中枢。
     - `dedupeSeedDiag.wiring.test.js`
     - `giftHistoryLaneStateWiring.test.js`
+    - `heavyReuseNotDoubleGated.wiring.test.js`
     - `inlineHostMoveProbe.wiring.test.js`
     - `live-view-entry.js` — 応援ライブビュー(live-view.html)のエントリ。
     - `marketing-export-entry.js` — マーケ分析レポートの別タブ化(marketing-export.html)のエントリ。
