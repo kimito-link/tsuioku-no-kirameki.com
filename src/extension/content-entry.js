@@ -7008,6 +7008,24 @@ function buildAiShareFastDiagnosticsPayload() {
     // v0.1.1124 D-1計器: host移設の実測(reloadCount=iframeリロード実害あり移設・byReason=犯人経路・
     //   venueOpenMoves=会場open中の移設)。ローディングちかちかの真犯人を状態速報の数字で確定する。
     hostMoveDiag: summarizeInlineHostMoveDiag(_inlineHostMoveState, Date.now()),
+    /*
+     * ★v0.1.1330 読み上げ到達可能性(会議4体・全員一致の一手)
+     *   読み上げの計器(KEY_VOICE_DIAG)は【コメビュ/会場を開いている間だけ】書かれる。
+     *   ユーザーは普段どちらも開いていないため、v0.1.1326/1327/1329 と3版修正を出しても
+     *   状態速報は毎回「化石値」しか出さず【効いたかを1度も確認できなかった】。
+     *   そこで【常駐している content script】から「読み上げが動きうる状態か」を毎回書く。
+     *   これで「面を開いていないだけ」か「開いているのに壊れている」かが1回で確定する。
+     *   ★content は読み上げのキュー自体は持てない(別の面に居る)。持てるのは到達可能性だけ。
+     */
+    voiceReachRaw: {
+      venueOpen: (() => {
+        try {
+          return document.documentElement.classList.contains('nlsb-venue-open');
+        } catch {
+          return false;
+        }
+      })()
+    },
       /*
        * ★v0.1.1278: 点滅追跡の計器(hostFlipCensus / hostVisWatch / vanishForensics /
        *   hostAncestryTrace / hostStyleTrace / hostHideReason / hostRecoveryDiag)を
@@ -9688,6 +9706,24 @@ function buildAiSharePageDiagnostics() {
     // v0.1.1124 D-1計器: host移設の実測(reloadCount=iframeリロード実害あり移設・byReason=犯人経路・
     //   venueOpenMoves=会場open中の移設)。ローディングちかちかの真犯人を状態速報の数字で確定する。
     hostMoveDiag: summarizeInlineHostMoveDiag(_inlineHostMoveState, Date.now()),
+    /*
+     * ★v0.1.1330 読み上げ到達可能性(会議4体・全員一致の一手)
+     *   読み上げの計器(KEY_VOICE_DIAG)は【コメビュ/会場を開いている間だけ】書かれる。
+     *   ユーザーは普段どちらも開いていないため、v0.1.1326/1327/1329 と3版修正を出しても
+     *   状態速報は毎回「化石値」しか出さず【効いたかを1度も確認できなかった】。
+     *   そこで【常駐している content script】から「読み上げが動きうる状態か」を毎回書く。
+     *   これで「面を開いていないだけ」か「開いているのに壊れている」かが1回で確定する。
+     *   ★content は読み上げのキュー自体は持てない(別の面に居る)。持てるのは到達可能性だけ。
+     */
+    voiceReachRaw: {
+      venueOpen: (() => {
+        try {
+          return document.documentElement.classList.contains('nlsb-venue-open');
+        } catch {
+          return false;
+        }
+      })()
+    },
       /*
        * ★v0.1.1278: 点滅追跡の計器(hostFlipCensus / hostVisWatch / vanishForensics /
        *   hostAncestryTrace / hostStyleTrace / hostHideReason / hostRecoveryDiag)を
