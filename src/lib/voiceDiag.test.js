@@ -61,6 +61,65 @@ describe('buildVoiceDiagLine 化石値ガード', () => {
   });
 });
 
+/*
+ * ★v0.1.1331: ユーザー報告「読み上げONボタンをおしても一瞬かわるだけでもどされます」に
+ *   対して、状態速報が【理由を1文字も持っていなかった】ことへの対策。
+ *   画面にしか出していない情報は報告に乗らない=無いのと同じ。
+ */
+describe('ON失敗の理由を計器に出す', () => {
+  const NOW = 5_000_000;
+
+  it('★失敗理由が行に出る(timeout=起動しているが応答しない)', () => {
+    const line = buildVoiceDiagLine(
+      { enabled: false, lastEnableFailReason: 'timeout', enableFailTotal: 3, capturedAt: NOW },
+      NOW + 1000
+    );
+    expect(line).toContain('ON失敗3回');
+    expect(line).toContain('応答しない');
+  });
+
+  it('refused は未起動の可能性として出す', () => {
+    const line = buildVoiceDiagLine(
+      { enabled: false, lastEnableFailReason: 'refused', enableFailTotal: 1, capturedAt: NOW },
+      NOW + 1000
+    );
+    expect(line).toContain('接続できない');
+  });
+
+  it('★これが本命: ON失敗だけの状態でも診断行が消えない', () => {
+    /*
+     * enabled=false / spoken=0 / queueMax=0 は「押しても戻る」状態そのもの。
+     * 早期returnがここで効くと【壊れているときだけ行が消える】ことになる
+     * (同じ罠を v0.1.1213 が別フィールドで踏んでいた)。
+     */
+    const line = buildVoiceDiagLine(
+      {
+        enabled: false, spokenTotal: 0, queueMax: 0, synthNullTotal: 0,
+        lastEnableFailReason: 'timeout', enableFailTotal: 1, capturedAt: NOW
+      },
+      NOW + 1000
+    );
+    expect(line).not.toBe('');
+    expect(line).toContain('ON失敗');
+  });
+
+  it('成功していれば理由は出ない(古い失敗を引きずらない)', () => {
+    const line = buildVoiceDiagLine(
+      { enabled: true, spokenTotal: 1, lastEnableFailReason: '', enableFailTotal: 2, capturedAt: NOW },
+      NOW + 1000
+    );
+    expect(line).not.toContain('ON失敗');
+  });
+
+  it('スナップショットが2フィールドを落とさない(allowlist漏れ防止)', () => {
+    const snap = buildVoiceDiagSnapshot(
+      { lastEnableFailReason: 'refused', enableFailTotal: 4 }, 1
+    );
+    expect(snap.lastEnableFailReason).toBe('refused');
+    expect(snap.enableFailTotal).toBe(4);
+  });
+});
+
 describe('buildVoiceDiagSnapshot source', () => {
   it('source を載せる(どちらの面が書いたか)', () => {
     expect(buildVoiceDiagSnapshot({ source: 'comeview' }, 1).source).toBe('comeview');
