@@ -327,6 +327,9 @@ export function buildStoryUserLaneRenderDiag(probeSnap, ctx) {
     paintSkipReasons: s.paintSkipReasons && typeof s.paintSkipReasons === 'object' ? s.paintSkipReasons : {},
     // heavyRace根治(B)計器: fresh-read で heavy 全件再読みを省いた累計(popup-entry が snap に直接載せる)。
     heavyFreshReadReuseCount: Number(s.heavyFreshReadReuseCount) || 0,
+    // ★v0.1.1341: 再利用が0回のとき【なぜ0なのか】を言うための最後の判定理由
+    //   ('coverage' | 'fresh-read' | '')。0のときこそ出す(異常時に診断が消えるのを防ぐ)。
+    heavyReuseLastReason: String(s.heavyReuseLastReason || ''),
     lastRunAgoMs: s.lastRunAgoMs ?? null,
     // v0.1.1040 計器: 段ごとの実 replaceChildren 回数(churn 実測)をそのまま持ち越す。
     laneRepaintCounts: s.laneRepaintCounts && typeof s.laneRepaintCounts === 'object' ? s.laneRepaintCounts : null,
@@ -429,9 +432,28 @@ export function formatStoryUserLaneRenderDiagLines(diag, ctx) {
       );
     }
   }
-  // heavyRace根治(B): fresh-read で heavy 全件再読みを省いた回数(>0=backfill中の re-read ループが切れている証拠)。
-  if (Number(d.heavyFreshReadReuseCount) > 0) {
-    lines.push(`  → heavy 全件再読み省略(fresh-read再利用): ${d.heavyFreshReadReuseCount} 回(backfill中の re-read ループ抑止が効いている)`);
+  /*
+   * heavyRace根治(B): fresh-read で heavy 全件再読みを省いた回数。
+   *
+   * ★v0.1.1341: 【0のときこそ理由を出す】。
+   *   旧実装は `> 0` のときだけ行を出していたため、**効いていないときに限って
+   *   速報から消える**という逆立ちだった(異常時ほど診断が消える型)。
+   *   実測(2026-08-12): heavyFreshReadReuseCount=0 / heavyRaceReturns=26 で
+   *   「再利用が一度も成立していない」のに、その事実が速報に1文字も出なかった。
+   *   ★再利用が成立しない原因は入力側にあるので、最後の判定理由を併記する。
+   */
+  const freshReuse = Number(d.heavyFreshReadReuseCount) || 0;
+  const raceN = Number(d.heavyRaceReturns) || 0;
+  if (freshReuse > 0) {
+    lines.push(`  → heavy 全件再読み省略(fresh-read再利用): ${freshReuse} 回(backfill中の re-read ループ抑止が効いている)`);
+  } else if (raceN > 0) {
+    const why = String(d.heavyReuseLastReason || '').trim();
+    const whyLabel = why === 'coverage'
+      ? 'coverage(80%カバー)で再利用済み=fresh-readの出番が無い'
+      : why
+        ? `最後の判定理由=${why}`
+        : '★再利用が一度も判定されていない(cachedが無い/lv不一致/件数0のいずれか)';
+    lines.push(`  → ⚠ heavy 全件再読みの省略が0回(race ${raceN}回) ${whyLabel}`);
   }
   return lines;
 }

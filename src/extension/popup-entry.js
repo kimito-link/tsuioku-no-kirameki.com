@@ -10834,6 +10834,8 @@ let _lastGiftEventsForMirror = { liveId: '', events: [] };
 /** heavyRace再発の根治(HANDOFF-heavyrace-backfill-IMPL.md B): fresh-read で heavy 全件再読みを省いた累計回数。
  *   getHeavyFreshReadReuseCount で状態速報が読む(実配信で「fresh-read が効いているか/12秒ギャップが適正か」を判定)。 */
 let _heavyFreshReadReuseCount = 0;
+/** ★v1341: 再利用の最後の判定理由(0回のとき「なぜ0か」を速報で言うため)。 */
+let _heavyReuseLastReason = '';
 /** heavyRace再発の根治(HANDOFF-heavyrace-backfill-IMPL.md C-1): 同一 lv の heavy 全件 read を
  *   多重に張らない single-flight 実行器(src/lib/singleFlightByKey.js)。onChanged coalesced 経由の
  *   頻繁な refresh で read が多重発生し追い越しレースを起こしていた主因への対処。
@@ -15975,6 +15977,7 @@ async function refresh() {
     minGapMs: HEAVY_FULL_REREAD_MIN_GAP_MS
   });
   if (heavyReuseDecision.reason === 'fresh-read') _heavyFreshReadReuseCount += 1; // 計器(実配信で fresh-read の効きを見る)
+  _heavyReuseLastReason = heavyReuseDecision.reason || ''; // ★v1341: 0回のとき「なぜ0か」を言うため
   const canReuseHeavyChunkRead =
     (idbMode || commentsChunked) &&
     currentChunkTotal != null &&
@@ -18994,7 +18997,7 @@ async function collectAiShareDevMonitorPayloadBundle(watchUrl) {
           const snap = snapshotStoryUserLaneRenderProbe(_storyUserLaneRenderProbe, Date.now());
           if (snap) snap.laneRepaintCounts = getStoryLaneRepaintCounts(); // v0.1.1040 計器: 段別 churn 実測
           // heavyRace根治(B)計器: fresh-read で heavy 全件再読みを省いた累計(実配信で効きと12秒ギャップの適正を判定)。
-          if (snap) snap.heavyFreshReadReuseCount = _heavyFreshReadReuseCount;
+          if (snap) { snap.heavyFreshReadReuseCount = _heavyFreshReadReuseCount; snap.heavyReuseLastReason = _heavyReuseLastReason; }
           // heavyRace根治(C-1)計器: 進行中read への合流で新規readを張らずに済んだ累計(single-flightの効き)。
           if (snap) snap.heavyReadInflightJoinCount = _heavyReadSingleFlight.joinCount();
           return snap;

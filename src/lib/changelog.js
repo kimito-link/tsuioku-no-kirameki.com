@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1341',
+    date: '2026-08-12',
+    summary: 'fix(diag): 効いていない時こそ理由を出す',
+    items: Object.freeze([
+      '応援レーンの読み込みが競合しているとき、その理由を状態速報に出すようにしました。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1340',
     date: '2026-08-12',
     summary: 'feat(diag): 描き直しの引き金を名指し',

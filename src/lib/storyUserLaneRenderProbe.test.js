@@ -163,6 +163,45 @@ describe('buildStoryUserLaneRenderDiag', () => {
     expect(text).not.toContain('暫定縮小の上書き');
     expect(text).not.toContain('fresh-read再利用');
   });
+
+  /*
+   * ★v0.1.1341: 「効いていないときこそ出す」。
+   *   旧実装は heavyFreshReadReuseCount > 0 のときだけ行を出していたため、
+   *   再利用が一度も成立していない=まさに異常な状態のときに限って
+   *   速報から診断が消えていた(異常時ほど診断が消える型)。
+   *   実測(2026-08-12): freshRead=0 / race=26 で、その事実が1文字も出なかった。
+   */
+  it('★race が起きているのに再利用0回なら【理由つきで】警告を出す', () => {
+    const d = buildStoryUserLaneRenderDiag({
+      activePath: 'heavy', started: 5, completed: 5, entriesLen: 100, domTilesPainted: 30,
+      lastReachedStep: 'done',
+      heavyFreshReadReuseCount: 0, heavyRaceReturns: 26, heavyReuseLastReason: 'coverage'
+    });
+    const text = formatStoryUserLaneRenderDiagLines(d).join('\n');
+    expect(text).toContain('省略が0回');
+    expect(text).toContain('race 26回');
+    expect(text).toContain('coverage');
+  });
+
+  it('★判定理由が空なら「一度も判定されていない」と名指しする', () => {
+    const d = buildStoryUserLaneRenderDiag({
+      activePath: 'heavy', started: 5, completed: 5, entriesLen: 100, domTilesPainted: 30,
+      lastReachedStep: 'done',
+      heavyFreshReadReuseCount: 0, heavyRaceReturns: 12, heavyReuseLastReason: ''
+    });
+    const text = formatStoryUserLaneRenderDiagLines(d).join('\n');
+    expect(text).toContain('一度も判定されていない');
+  });
+
+  it('race が無ければ0でも警告を出さない(正常時のノイズにしない)', () => {
+    const d = buildStoryUserLaneRenderDiag({
+      activePath: 'heavy', started: 1, completed: 1, entriesLen: 5, domTilesPainted: 5,
+      lastReachedStep: 'done',
+      heavyFreshReadReuseCount: 0, heavyRaceReturns: 0
+    });
+    const text = formatStoryUserLaneRenderDiagLines(d).join('\n');
+    expect(text).not.toContain('省略が0回');
+  });
 });
 
 describe('formatStoryUserLaneRenderDiagLines', () => {
