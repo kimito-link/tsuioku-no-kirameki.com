@@ -344,6 +344,16 @@ export class VoicePlayer {
       }
     }
     if (!probe.ok) {
+      /*
+       * ★v0.1.1331: 失敗理由を【計器にも】残す。
+       *   従来は onLoadingState(画面表示)にしか渡しておらず、ユーザーが
+       *   「押しても一瞬で戻る」と報告しても、状態速報には理由が1文字も出なかった
+       *   =受け取った側(私)が原因を特定できず、推測で版を重ねることになった。
+       *   ★画面に出すだけの情報は、報告に乗らない=無いのと同じ。
+       */
+      this.diag.lastEnableFailReason = String(probe.reason || 'unknown');
+      this.diag.enableFailTotal = (Number(this.diag.enableFailTotal) || 0) + 1;
+      this._emitDiag();
       // ★persist:false = ユーザーの意思を消さない。次に押せばまた試せる。
       this.disable({ persist: false });
       this.onLoadingState('notfound', probe.reason);
@@ -355,6 +365,9 @@ export class VoicePlayer {
     this.styleIds = await this.fetchVoiceStyleIds();
     this.generation += 1;
     this.enabled = true;
+    // ★v0.1.1331: 成功したら理由を消す(古い失敗が残り続けて誤診させない)。
+    this.diag.lastEnableFailReason = '';
+    this._emitDiag();
     this.toggleBusy = false;
     this.onLoadingState('ready');
     this._emitToggle();

@@ -51,6 +51,8 @@ export const VOICE_DIAG_FRESH_MS = 60_000;
  *   synthNullTotal: number,      // 2026-08-01計器: 合成がnullで返り読まれずに消えた累計
  *   synthNullNearTimeout: number,// 同上のうち時間切れ(8000ms上限付近)由来の件数
  *   audioBlockedTotal: number,   // v0.1.1327計器: ブラウザの自動再生ブロック(NotAllowedError)で鳴らせなかった累計
+ *   lastEnableFailReason: string,// v0.1.1331計器: 読み上げONに失敗した理由(timeout/refused/http-error/no-fetch)
+ *   enableFailTotal: number,     // v0.1.1331計器: 読み上げONに失敗した累計回数
  *   lagVerdict: string,          // 2026-07-28計器: 体感遅延の真因判定トークン(印字専用・挙動に不使用)
  *   diagBornAt: number           // 2026-07-28計器: この診断stateが生まれた時刻(epoch ms・世代識別用)
  * }} VoiceDiagState
@@ -102,6 +104,10 @@ export function makeInitialVoiceDiag() {
     // v0.1.1327: 自動再生ブロックで鳴らせなかった件。「読み上げONなのに無音」の切り分け用
     //   (合成は成功しているのに音が出ない=ブラウザ側の制約、という状態を名指しする)。
     audioBlockedTotal: 0,
+    // v0.1.1331: 「押しても一瞬で戻る」の理由。画面にしか出していなかったため
+    //   ユーザー報告に理由が乗らず、原因特定ができなかった反省から計器へ載せる。
+    lastEnableFailReason: '',
+    enableFailTotal: 0,
     lagVerdict: '',
     diagBornAt: 0
   };
@@ -157,6 +163,8 @@ export function buildVoiceDiagSnapshot(diag, nowMs) {
     synthNullTotal: num(d.synthNullTotal, base.synthNullTotal),
     synthNullNearTimeout: num(d.synthNullNearTimeout, base.synthNullNearTimeout),
     audioBlockedTotal: num(d.audioBlockedTotal, base.audioBlockedTotal),
+    lastEnableFailReason: String(d.lastEnableFailReason || base.lastEnableFailReason),
+    enableFailTotal: num(d.enableFailTotal, base.enableFailTotal),
     dropCountGateTotal: num(d.dropCountGateTotal, base.dropCountGateTotal),
     dropHeadStaleTotal: num(d.dropHeadStaleTotal, base.dropHeadStaleTotal),
     dropSweepStaleTotal: num(d.dropSweepStaleTotal, base.dropSweepStaleTotal),
@@ -229,7 +237,14 @@ export function buildVoiceDiagLine(snap, nowMs) {
   //   spokenTotal が 0 のままなので、この早期returnは「読み上げが最も壊れているときほど
   //   診断行が丸ごと消える」向きに効いてしまう(実配信で約34件が行方不明だった件と同根)。
   const synthNull = Number(snap.synthNullTotal) || 0;
-  if (!enabled && spoken === 0 && queueMax === 0 && synthNull === 0) return '';
+  /*
+   * ★v0.1.1331: ON失敗も早期returnの例外に加える。
+   *   ユーザーが「押しても一瞬で戻る」状態は enabled=false・spoken=0・queueMax=0 に
+   *   なるため、この早期returnが【まさに壊れているときだけ診断行を丸ごと消す】。
+   *   上の v0.1.1213 コメントが警告していた同じ罠を、別のフィールドで踏んでいた。
+   */
+  const enableFail = Number(snap.enableFailTotal) || 0;
+  if (!enabled && spoken === 0 && queueMax === 0 && synthNull === 0 && enableFail === 0) return '';
   const parts = [];
   parts.push(enabled ? '読み上げ:ON' : '読み上げ:OFF');
   parts.push(`待機${queueNow}(最大${queueMax})`);
@@ -273,6 +288,26 @@ export function buildVoiceDiagLine(snap, nowMs) {
     //   v0.1.1180(段階0=shadow)当時の名残で、実適用後もこの文言が残っていたのは表示上の
     //   不整合(実害は無いが誤解を招く)。
     if (Number.isFinite(effectiveMax)) parts.push(`実効上限${effectiveMax}`);
+  }
+  /*
+   * ★v0.1.1331: 読み上げONに失敗した理由。ユーザー報告「押しても一瞬で戻る」に対して
+   *   状態速報が理由を1文字も持っておらず、原因特定ができなかったので載せる。
+   *   ★enabled が false のときほど重要なので、他の行より前に出す。
+   */
+  const failReason = String(snap.lastEnableFailReason || '').trim();
+  const failTotal = Number(snap.enableFailTotal) || 0;
+  if (failReason) {
+    const why =
+      failReason === 'timeout'
+        ? 'VOICEVOXが応答しない(起動はしている)'
+        : failReason === 'refused'
+          ? 'VOICEVOXに接続できない(未起動の可能性)'
+          : failReason === 'http-error'
+            ? 'VOICEVOXがエラーを返した'
+            : failReason === 'no-fetch'
+              ? '拡張の通信経路が切れている(ページ再読み込みが要る)'
+              : failReason;
+    parts.push(`★ON失敗${failTotal}回: ${why}`);
   }
   // v0.1.1327: 自動再生ブロック。合成は通っているのに音が出ない状態を名指しする
   //   (ユーザー実機「一瞬ONになって戻る」の正体。0なら何も言わない)。
