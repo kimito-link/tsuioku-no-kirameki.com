@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1344',
+    date: '2026-08-12',
+    summary: 'fix(lane): 応援レーンが途中で固まる',
+    items: Object.freeze([
+      '応援レーンが読み込みを何度もやり直して途中件数で固まることがあったのを直しました。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1343',
     date: '2026-08-12',
     summary: 'fix(diag): 該当なしを取得エラーと誤称',

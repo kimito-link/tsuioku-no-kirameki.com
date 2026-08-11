@@ -15981,14 +15981,9 @@ async function refresh() {
   });
   if (heavyReuseDecision.reason === 'fresh-read') _heavyFreshReadReuseCount += 1; // 計器(実配信で fresh-read の効きを見る)
   _heavyReuseLastReason = heavyReuseDecision.reason || ''; // ★v1341: 0回のとき「なぜ0か」を言うため
-  const canReuseHeavyChunkRead =
-    (idbMode || commentsChunked) &&
-    currentChunkTotal != null &&
-    cachedHeavy &&
-    cachedHeavy.lv === lv &&
-    Array.isArray(cachedHeavy.arr) &&
-    cachedHeavy.arr.length > 0 &&
-    heavyReuseDecision.reuse;
+  // ★v0.1.1344: 判定は純関数に一本化(旧条件は idbMode||commentsChunked の二重掛けで
+  //   非チャンク配信を締め出し、自己修復が構造的に働かなかった。正本=heavyChunkReadReuse.js)。
+  const canReuseHeavyChunkRead = Boolean(cachedHeavy) && heavyReuseDecision.reuse;
   /** heavy 全件読み完了前はマイルストーン／ギフト Bahamut の誤爆を抑止 */
   let watchPopupHeavyCommentsSettled = canReuseHeavyChunkRead;
   // v0.1.509: 本体は追記専用チャンク（無ければ従来 main にフォールバック）から読む。
