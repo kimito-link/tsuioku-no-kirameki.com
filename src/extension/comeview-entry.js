@@ -86,6 +86,7 @@ import {
 } from '../lib/voiceReadQueue.js';
 import { makeInitialVoiceDiag, buildVoiceDiagSnapshot } from '../lib/voiceDiag.js';
 import { KEY_VOICE_DIAG } from '../lib/voiceDiagKey.js';
+import { classifyVoiceSynthFailureReason } from '../lib/voiceSynthFailureReason.js';
 import {
   upgradeAnonymousAvatarImage,
   upgradeAnonymousAvatarImages
@@ -259,6 +260,15 @@ function publishVoiceDiag() {
   } catch {
     /* no-op */
   }
+}
+
+/** 会場と同じ分類で、合成失敗の理由を1件記録する。 */
+function recordVoiceSynthFailureReason(info) {
+  try {
+    const reason = classifyVoiceSynthFailureReason(info);
+    const bag = _voiceDiag.synthFailReasons || (_voiceDiag.synthFailReasons = {});
+    bag[reason] = (Number(bag[reason]) || 0) + 1;
+  } catch { /* 計器の失敗は読み上げを止めない */ }
 }
 
 /** @type {Array<{key:string,name:string,at:number}>} ユーザーNG リスト(storage 永続)。 */
@@ -568,7 +578,8 @@ function ensureVoicePrefetch(item, generation) {
     {
       ...assigned,
       speedOffset: assigned.speedOffset + congestion.speedBoost
-    }
+    },
+    { onFailure: (info) => recordVoiceSynthFailureReason(info) }
   ).catch(() => null);
   _voicePrefetches.set(item, { generation, promise });
   return promise;
@@ -687,10 +698,15 @@ async function drainVoiceQueue() {
             {
               ...assigned,
               speedOffset: assigned.speedOffset + congestion.speedBoost
-            }
+            },
+            { onFailure: (info) => recordVoiceSynthFailureReason(info) }
           );
       _voiceDiag.lastSynthMs = Math.max(0, Date.now() - _synthStart);
       markVoicePhase('synth_done'); // v0.1.895: 合成は通過した(ここで止まれば下の continue/再生で詰まり)。
+      if (!wav) {
+        _voiceDiag.synthNullTotal = (Number(_voiceDiag.synthNullTotal) || 0) + 1;
+        publishVoiceDiag();
+      }
       if (
         !wav ||
         !_voiceReadingEnabled ||

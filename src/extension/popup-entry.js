@@ -594,6 +594,7 @@ import {
 import { yieldToBrowserPaint } from '../lib/yieldToBrowserPaint.js';
 import { buildStorageRefreshTriggerTag } from '../lib/storageRefreshTriggerKey.js';
 import { prefersReducedMotion } from '../lib/prefersReducedMotion.js';
+import { makeLaneResult } from '../lib/northStarLaneResult.js';
 import {
   buildTickerTextAndTip,
   decorateTickerLine,
@@ -2114,7 +2115,7 @@ async function loadSupportCelebrationState() {
 /** 節目・自分操作の shower／豪雨／飛び文字。OS の reduced-motion のみ尊重（nl-calm-motion では止めない）。 */
 function supportCelebrationMotionEnabled() {
   try {
-    if (window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches) return false;
+    if (prefersReducedMotion()) return false;
   } catch {
     /* no-op */
   }
@@ -5954,10 +5955,7 @@ const STORY_REACTION_STATE = {
   liveId: '',
   lastCount: null,
   clearTimer: null,
-  reducedMotion:
-    typeof window.matchMedia === 'function'
-      ? window.matchMedia('(prefers-reduced-motion: reduce)').matches
-      : false
+  reducedMotion: prefersReducedMotion()
 };
 
 /**
@@ -7081,6 +7079,7 @@ function renderStoryUserLane() {
   // comment-post-speed-DESIGN.md §F(Phase 0計器): この paint で pending-self が実際に
   //   表示されたか mark と突合する(観測のみ・描画は変えない)。
   try { consumeCommentPostOptimisticPaintSamples(); } catch { /* no-op: 計器の失敗で描画を止めない */ }
+  sweepStoryAvatarRetryThrottled(els);
   // v0.1.987(状態速報「描画済みなのにローディング継続」の根治): レーンが実際にタイルを描けた瞬間=
   //   「中身が画面に出た」確定シグナル。従来の幕撤去は inlineWatchPanelHasRealDataForShade/失敗時タイマー
   //   依存で、heavy 経路が詰まり気味だと幕が残ることがあった(実機 perfDiag.shadeActive=true・painted)。
@@ -7231,8 +7230,7 @@ async function applyLaneMirrorForPassive() {
     domTilesPainted: countStoryUserLaneDomTiles(els)
   });
   recordStoryUserLaneStep(_storyUserLaneRenderProbe, STORY_USER_LANE_STEPS.DONE);
-  // ★v0.1.1338: 失敗アイコンの再プローブ掃引(理由は lib/avatarRetrySweepThrottle.js が正本)。
-  sweepStoryAvatarRetryThrottled(els);
+  sweepStoryAvatarRetryThrottled(els); // ★v1338: 失敗アイコンの再プローブ(正本=lib)
   // v0.1.985(council/parity-diagnose): ②応援プレビューが「描画できた」を status へ伝える ack を
   //   【専用キー】(本物の鏡とは別・passive だけが書く片方向)に best-effort で書く。3画面パリティ判定の
   //   ②描画OK 観測に使う。本物の鏡(KEY_LANE_MIRROR)は上書きしない=passive の不可侵原則を守る。
@@ -7311,7 +7309,6 @@ async function applyLaneMirrorForMainPopupFallback(resolvedLid = '') {
   });
   recordStoryUserLaneStep(_storyUserLaneRenderProbe, STORY_USER_LANE_STEPS.DONE);
   // ★v0.1.1338: 鏡由来の描画経路にも【同じ】掃引を配線する(片肺を作らない)。
-  sweepStoryAvatarRetryThrottled(els);
   // v0.1.987: 鏡フォールバックで描けたら幕も畳む(描けたのにローディングを構造的に消す)。冪等。
   if (countStoryUserLaneDomTiles(els) > 0) {
     try { dismissInitialLoadShade(); } catch { /* no-op */ }
@@ -10836,6 +10833,7 @@ let _lastGiftEventsForMirror = { liveId: '', events: [] };
 let _heavyFreshReadReuseCount = 0;
 /** ★v1341: 再利用の最後の判定理由(0回のとき「なぜ0か」を速報で言うため)。 */
 let _heavyReuseLastReason = '';
+let _kokenLaneResult = null;
 /** heavyRace再発の根治(HANDOFF-heavyrace-backfill-IMPL.md C-1): 同一 lv の heavy 全件 read を
  *   多重に張らない single-flight 実行器(src/lib/singleFlightByKey.js)。onChanged coalesced 経由の
  *   頻繁な refresh で read が多重発生し追い越しレースを起こしていた主因への対処。
@@ -11645,6 +11643,8 @@ async function resolveOfficialContributionRankingRows(liveId) {
       const bag = await chrome.storage.local.get([kKey, iKey]);
       kokenStorage = bag[kKey] ?? null;
       iframeStorage = bag[iKey] ?? null;
+      const kv = /** @type {any} */ (kokenStorage);
+      _kokenLaneResult = kv && typeof kv === 'object' ? makeLaneResult({ ok: kv.lastOk, status: kv.lastStatus, rows: kv.rows }) : null;
     } catch {
       /* no-op */
     }
@@ -12165,11 +12165,15 @@ async function refreshNorthStarAdRankingLane(liveId) {
   const lidForApi = String(lid || '').trim().toLowerCase();
   let nicoadApiRows = null;
   let nicoadApiCapturedAt = null;
+  let nicoadApiResult = null; // ★v1343: 取得の成否(成功0件と失敗を分ける)
   if (/^lv\d{1,15}$/.test(lidForApi) && body instanceof HTMLElement) {
     try {
       const apiKey = `nls_nicoad_api_ranking_${lidForApi}`;
       const apiBag = await chrome.storage.local.get([apiKey]);
       const apiVal = apiBag?.[apiKey];
+      if (apiVal && typeof apiVal === 'object' && String(apiVal.liveId || '').trim().toLowerCase() === lidForApi) {
+        nicoadApiResult = makeLaneResult({ ok: apiVal.lastOk, status: apiVal.lastStatus, rows: apiVal.rows });
+      }
       if (
         apiVal &&
         typeof apiVal === 'object' &&
@@ -12238,7 +12242,7 @@ async function refreshNorthStarAdRankingLane(liveId) {
   //   (配信切替は refresh が新lidの実データで上書き)。
   const adBody = body instanceof HTMLElement ? body : document.getElementById('northStarLaneBody-adRanking');
   if (adBody instanceof HTMLElement && adBody.querySelector('[role="listitem"]')) return;
-  const state = determineNorthStarLaneState('adRanking', { bundle, snap, nicoadApiRows });
+  const state = determineNorthStarLaneState('adRanking', { bundle, snap, nicoadApiRows, adResult: nicoadApiResult });
   renderNorthStarLane('adRanking', null, state);
 }
 
@@ -12290,7 +12294,7 @@ async function refreshNorthStarContributionRankingLaneAsync(liveId) {
   body.classList.remove('nl-contrib-ranking-list-host');
   // ★v0.1.1339: kokenApiRows を渡す(giftHistory と同じ片肺がここにもあった)。
   const kokenApiRows = Array.isArray(ranking) && ranking.length > 0 ? ranking : null;
-  const state = determineNorthStarLaneState('contributionRanking', { bundle, snap, kokenApiRows });
+  const state = determineNorthStarLaneState('contributionRanking', { bundle, snap, kokenApiRows, contribResult: _kokenLaneResult });
   renderNorthStarLane('contributionRanking', null, state);
 }
 
@@ -12773,8 +12777,7 @@ async function refreshNorthStarGiftHistoryLaneAsync(liveId) {
   _giftHistoryThrowsPanelHtmlKey = '';
   _giftHistoryNorthStarCapturedAtMs = 0;
   clearNorthStarGiftThrowsPanel();
-  // ★v0.1.1339: API経路の実データを判定へ渡す(理由は northStarLaneReason.js が正本)。
-  //   新しい storage read は足さない(ctxRaw は上で取得済み)。
+  // ★v1339: API経路の実データを判定へ渡す(理由は northStarLaneReason.js が正本)。
   const giftHistoryApiRows = Array.isArray(ctxRaw?.ledgerRows) && ctxRaw.ledgerRows.length > 0
     ? ctxRaw.ledgerRows
     : (Array.isArray(ctxRaw?.rooms) ? ctxRaw.rooms : null);
@@ -18321,8 +18324,6 @@ function initShadeFrameSrc(who, frame) {
   return set[frame] || set.idle || '';
 }
 
-// ★v0.1.1340: lib/prefersReducedMotion.js へ集約(同じ判定が4箇所に散っていた)。
-const initShadePrefersReducedMotion = prefersReducedMotion;
 
 let initShadeCharCycleTimer = null;
 let initShadeLipTimer = null;
@@ -18395,7 +18396,7 @@ function startInitShadeCharCycle() {
     if (who && el instanceof HTMLElement) initShadeCharEls[who] = el;
   }
   if (!serif || Object.keys(initShadeCharEls).length === 0) return;
-  const reduceMotion = initShadePrefersReducedMotion();
+  const reduceMotion = prefersReducedMotion();
   let idx = 0;
   const applyLine = (i) => {
     const line = INIT_SHADE_LINES[i % INIT_SHADE_LINES.length];
@@ -18468,7 +18469,7 @@ function exportWaitStopLipSync() {
 
 function exportWaitStartLipSync(who) {
   exportWaitStopLipSync();
-  if (initShadePrefersReducedMotion()) return;
+  if (prefersReducedMotion()) return;
   exportWaitLipTimer = setInterval(() => {
     const open = Math.random() < 0.45;
     exportWaitSetFrame(who, open ? 'talk' : 'idle');
@@ -18515,7 +18516,7 @@ function exportWaitApplyLine(line) {
     }
     if (who !== line.who) exportWaitSetFrame(who, 'idle');
   }
-  if (initShadePrefersReducedMotion()) {
+  if (prefersReducedMotion()) {
     exportWaitSetFrame(line.who, 'talk');
   } else {
     exportWaitStartLipSync(line.who);
@@ -18543,7 +18544,7 @@ function startExportWaitCharCycle(lines) {
   if (!exportWaitActiveLines.length || Object.keys(exportWaitCharEls).length === 0) return;
   let idx = 0;
   exportWaitApplyLine(exportWaitActiveLines[0]);
-  if (!initShadePrefersReducedMotion()) {
+  if (!prefersReducedMotion()) {
     for (const who of Object.keys(exportWaitCharEls)) exportWaitScheduleBlink(who);
   }
   exportWaitCharCycleTimer = setInterval(() => {

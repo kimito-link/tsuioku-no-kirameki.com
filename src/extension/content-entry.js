@@ -14982,7 +14982,10 @@ function maybeFetchKokenContribRankingMirrorOnce() {
         _externalFetchProbe.kokenLastRows = Array.isArray(rows) ? rows.length : 0;
         // v0.1.621: 診断 state 用に rows 配列もキャッシュ(残課題3根治)。
         _externalFetchProbe.kokenLastRowsArr = Array.isArray(rows) && rows.length > 0 ? rows : null;
-        if (!Array.isArray(rows) || rows.length === 0) return;
+        // ★v0.1.1343: 【成功して0件】でも保存する(nicoad 側と同じ真因・詳細はそちらのコメント)。
+        //   旧実装は早期 return で書き込みごと飛ばしており、popup からは
+        //   「取得失敗」と区別がつかず fetch_error(赤) と誤称していた。
+        const rowsSafe = Array.isArray(rows) ? rows : [];
         // 応答到着までに別 liveId へ遷移していたら stale 書込しない
         const curLid = String(liveId || '')
           .trim()
@@ -14992,9 +14995,11 @@ function maybeFetchKokenContribRankingMirrorOnce() {
           chrome.storage.local
             .set({
               [kokenContribStorageKey(lid)]: {
-                rows,
+                rows: rowsSafe,
                 capturedAt: Date.now(),
-                liveId: lid
+                liveId: lid,
+                lastOk: _externalFetchProbe.kokenLastOk === true,
+                lastStatus: Number(_externalFetchProbe.kokenLastStatus) || null
               }
             })
             .catch((err) => {
@@ -15078,7 +15083,20 @@ function maybeFetchNicoadContribRankingMirrorOnce() {
         _externalFetchProbe.nicoadLastRows = Array.isArray(rows) ? rows.length : 0;
         // v0.1.621: 診断 state 用に rows 配列もキャッシュ(残課題3根治)。
         _externalFetchProbe.nicoadLastRowsArr = Array.isArray(rows) && rows.length > 0 ? rows : null;
-        if (!Array.isArray(rows) || rows.length === 0) return;
+        /*
+         * ★v0.1.1343: 【成功して0件】のときも記録する(popup が「取得失敗」と誤称する真因)。
+         *
+         * ■ 旧: `if (!Array.isArray(rows) || rows.length === 0) return;`
+         *   ＝成功0件だと storage に何も書かれず、popup からは「取得できなかった」と
+         *   区別がつかなかった。結果 popup の判定は fetch_error(赤) へ落ちる。
+         *   ★v0.1.851 が content 側で根治した「成功0件=該当無し(灰)」が、
+         *     popup 側にだけ残っていた真因はこれ(引数の配線ではなくデータの不在)。
+         *
+         * ■ 読み手は rows.length > 0 を要求しているので、空配列を保存しても
+         *   既存の描画挙動は一切変わらない(popup-entry.js:12172-12178 で確認済み)。
+         *   足すのは「成功したという事実」だけ。
+         */
+        const rowsSafe = Array.isArray(rows) ? rows : [];
         const curLid = String(liveId || '')
           .trim()
           .toLowerCase();
@@ -15087,9 +15105,12 @@ function maybeFetchNicoadContribRankingMirrorOnce() {
           chrome.storage.local
             .set({
               [nicoadContribStorageKey(lid)]: {
-                rows,
+                rows: rowsSafe,
                 capturedAt: Date.now(),
-                liveId: lid
+                liveId: lid,
+                // ★取得の成否(popup が「成功0件」と「取得失敗」を分けるために要る)。
+                lastOk: _externalFetchProbe.nicoadLastOk === true,
+                lastStatus: Number(_externalFetchProbe.nicoadLastStatus) || null
               }
             })
             .catch((err) => {

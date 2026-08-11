@@ -34,8 +34,11 @@ describe('popup のアイコン再プローブ配線', () => {
      * ★定義行 `function sweepStoryAvatarRetryThrottled(els) {` を数えないよう、
      *   行頭が空白+呼び出しの形だけを拾う(定義は行頭が `function`)。
      *   ここを雑に数えると定義1件を呼び出しと誤認して 3 になる(実際に踏んだ)。
+     * ★行末コメントの有無で壊れないこと(`;` の後は問わない)。
+     *   v0.1.1343 で1行にコメントを畳んだ際、`;$` 固定の正規表現が空振りして
+     *   「片肺になった」と誤検出した(配線は2箇所とも生きていた)。
      */
-    const calls = SRC.match(/^\s+sweepStoryAvatarRetryThrottled\(els\);$/gm) || [];
+    const calls = SRC.match(/^\s+sweepStoryAvatarRetryThrottled\(els\);/gm) || [];
     expect(calls.length).toBe(2);
   });
 
