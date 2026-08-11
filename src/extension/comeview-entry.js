@@ -248,7 +248,9 @@ function publishVoiceDiag() {
     const now = Date.now();
     if (now - _voiceDiagLastWriteAt < 3000) return; // 3秒 min-gap=書き過ぎない。
     _voiceDiagLastWriteAt = now;
-    const snap = buildVoiceDiagSnapshot(_voiceDiag, now);
+    // ★v0.1.1328: どの面が書いたかを残す(会場は 'venue' を書いている)。
+    //   化石値を見たとき「どちらの実装のものか」が分からないと調査が始められない。
+    const snap = { ...buildVoiceDiagSnapshot(_voiceDiag, now), source: 'comeview' };
     chrome.storage.local.set({ [KEY_VOICE_DIAG]: snap }).catch(() => {
       /* best-effort: storage 不可・context 消失 */
     });
