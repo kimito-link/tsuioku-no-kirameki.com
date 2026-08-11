@@ -26,6 +26,16 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1333',
+    date: '2026-08-11',
+    summary: 'feat(diag): コメビュのON失敗理由を状態速報へ',
+    items: Object.freeze([
+      'コメビュで読み上げをONにできなかったとき、その失敗理由と累計回数が状態速報に残るようにしました。',
+      '会場モードと同じ診断フィールドを、既存の読み上げ診断の書き出し経路へ配線しています。新しい保存キーや書き手は増やしていません。',
+      '読み上げをONにできたときは古い失敗理由を消し、以前の失敗を現在の原因として誤診しないようにしました。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1332',
     date: '2026-08-11',
     summary: 'refactor(voice): 失敗分類taxonomyの正本を新設',

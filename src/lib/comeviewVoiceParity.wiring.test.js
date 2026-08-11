@@ -35,9 +35,11 @@ describe('読み上げ2実装の修正パリティ(会場 ⇄ コメビュ)', ()
    *   実際に変異テストで素通りして発覚した。判定は該当分岐に限定する。
    */
   const probeFailBranch = (() => {
-    const i = cv.indexOf('if (!probe.ok) {\n    // ★persist:false');
-    if (i < 0) return '';
-    return cv.slice(i, i + 400);
+    const enableAt = cv.indexOf('async function enableVoiceReading');
+    const disableAt = cv.indexOf('disableVoiceReading({ persist: false })', enableAt);
+    const i = cv.lastIndexOf('if (!probe.ok) {', disableAt);
+    if (enableAt < 0 || disableAt < 0 || i < enableAt) return '';
+    return cv.slice(i, disableAt + 120);
   })();
 
   it('★コメビュ: 生存確認の失敗分岐で OFF を永続保存しない', () => {
@@ -97,5 +99,33 @@ describe('読み上げ2実装の修正パリティ(会場 ⇄ コメビュ)', ()
 
   it('★コメビュ: source を書く(どちらの実装の記録か分かる)', () => {
     expect(cv).toMatch(/source:\s*'comeview'/);
+  });
+
+  it('★8項目目: コメビュのON失敗理由を既存計器へ配線する', () => {
+    const start = cv.indexOf('async function enableVoiceReading');
+    const end = cv.indexOf('\nfunction voiceUserKeyForItem', start);
+    expect(start).toBeGreaterThan(-1);
+    expect(end).toBeGreaterThan(start);
+    const enableBranch = cv.slice(start, end);
+
+    // 失敗時の記録と成功時のクリアだけ=ちょうど2箇所。別経路への散在を許さない。
+    expect(enableBranch.match(/_voiceDiag\.lastEnableFailReason\s*=/g) || []).toHaveLength(2);
+    expect(enableBranch.match(/publishVoiceDiag\(\)/g) || []).toHaveLength(2);
+
+    const failReasonAt = enableBranch.indexOf(
+      "_voiceDiag.lastEnableFailReason = String(probe.reason || 'unknown')"
+    );
+    const failTotalAt = enableBranch.indexOf('_voiceDiag.enableFailTotal =', failReasonAt);
+    const failPublishAt = enableBranch.indexOf('publishVoiceDiag()', failTotalAt);
+    const disableAt = enableBranch.indexOf('disableVoiceReading({ persist: false })', failPublishAt);
+    expect(failReasonAt).toBeGreaterThan(-1);
+    expect(failTotalAt).toBeGreaterThan(failReasonAt);
+    expect(failPublishAt).toBeGreaterThan(failTotalAt);
+    expect(disableAt).toBeGreaterThan(failPublishAt);
+
+    const successClearAt = enableBranch.indexOf("_voiceDiag.lastEnableFailReason = ''");
+    const successPublishAt = enableBranch.indexOf('publishVoiceDiag()', successClearAt);
+    expect(successClearAt).toBeGreaterThan(disableAt);
+    expect(successPublishAt).toBeGreaterThan(successClearAt);
   });
 });
