@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { VoicePlayer } from './voicePlayer.js';
+import { VoicePlayer, VOICE_ALIVE_RETRY_BACKOFF_MS } from './voicePlayer.js';
 
 describe('VoicePlayer', () => {
   let mockStorage;
@@ -33,6 +33,110 @@ describe('VoicePlayer', () => {
       fetchVoiceStyleIds: vi.fn().mockResolvedValue([1, 2, 3]),
       fetchSynthesizeVoice: vi.fn().mockResolvedValue(new ArrayBuffer(8)),
       resolveVoice: vi.fn().mockReturnValue({ speaker: 1, speedOffset: 0 })
+    });
+  });
+
+  /*
+   * ★v0.1.1326: ユーザー実機「読み上げONボタンおしてもONにならない」の根治。
+   *   従来は生存確認に失敗すると disable({persist:true}) で【OFFをstorageに保存】し、
+   *   ユーザーの「ONにしたい」意思を消していた。VOICEVOX は起動しているのに
+   *   プロキシ(MV3 SW)のコールド起床が間に合わず失敗する経路があるため、
+   *   失敗のたびに設定が OFF に書き換わっていた。
+   */
+  describe('enable() 失敗時のふるまい', () => {
+    it('★失敗しても OFF を storage に永続保存しない(ユーザーの意思を消さない)', async () => {
+      const p = new VoicePlayer({
+        storage: mockStorage,
+        isObsMode: () => false,
+        audioConstructor: function () { return mockAudio; },
+        createObjectURL: vi.fn(),
+        revokeObjectURL: vi.fn(),
+        fetchVoicevoxAlive: vi.fn().mockResolvedValue(false),
+        fetchVoiceStyleIds: vi.fn().mockResolvedValue([]),
+        fetchSynthesizeVoice: vi.fn(),
+        resolveVoice: vi.fn()
+      });
+      mockStorage.set.mockClear();
+      await p.enable();
+      expect(p.enabled).toBe(false);
+      // 読み上げON/OFFキーへの書き込みが起きていないこと。
+      const wroteEnabledKey = mockStorage.set.mock.calls.some(
+        (c) => c[0] && Object.prototype.hasOwnProperty.call(c[0], p.VOICE_READING_ENABLED_KEY)
+      );
+      expect(wroteEnabledKey).toBe(false);
+    });
+
+    it('★失敗後もボタンが押せる状態に戻る(toggleBusy が解除される)', async () => {
+      const p = new VoicePlayer({
+        storage: mockStorage,
+        isObsMode: () => false,
+        audioConstructor: function () { return mockAudio; },
+        createObjectURL: vi.fn(),
+        revokeObjectURL: vi.fn(),
+        fetchVoicevoxAlive: vi.fn().mockResolvedValue(false),
+        fetchVoiceStyleIds: vi.fn().mockResolvedValue([]),
+        fetchSynthesizeVoice: vi.fn(),
+        resolveVoice: vi.fn()
+      });
+      await p.enable();
+      expect(p.toggleBusy).toBe(false);
+    });
+
+    it('★失敗理由を onLoadingState の第2引数で渡す(timeout を「見つかりません」と言わせない)', async () => {
+      const onLoadingState = vi.fn();
+      const p = new VoicePlayer({
+        storage: mockStorage,
+        isObsMode: () => false,
+        audioConstructor: function () { return mockAudio; },
+        createObjectURL: vi.fn(),
+        revokeObjectURL: vi.fn(),
+        fetchVoicevoxAlive: vi.fn().mockResolvedValue(false),
+        probeVoicevoxAlive: vi.fn().mockResolvedValue({ ok: false, reason: 'timeout' }),
+        fetchVoiceStyleIds: vi.fn().mockResolvedValue([]),
+        fetchSynthesizeVoice: vi.fn(),
+        resolveVoice: vi.fn(),
+        onLoadingState
+      });
+      await p.enable();
+      expect(onLoadingState).toHaveBeenCalledWith('notfound', 'timeout');
+    });
+
+    it('再試行で復帰したら ON になる(SW コールド起床の取りこぼしを拾う)', async () => {
+      const probe = vi.fn()
+        .mockResolvedValueOnce({ ok: false, reason: 'timeout' })
+        .mockResolvedValueOnce({ ok: false, reason: 'timeout' })
+        .mockResolvedValue({ ok: true, reason: '' });
+      const p = new VoicePlayer({
+        storage: mockStorage,
+        isObsMode: () => false,
+        audioConstructor: function () { return mockAudio; },
+        createObjectURL: vi.fn(),
+        revokeObjectURL: vi.fn(),
+        fetchVoicevoxAlive: vi.fn().mockResolvedValue(false),
+        probeVoicevoxAlive: probe,
+        fetchVoiceStyleIds: vi.fn().mockResolvedValue([1]),
+        fetchSynthesizeVoice: vi.fn(),
+        resolveVoice: vi.fn()
+      });
+      await p.enable();
+      expect(p.enabled).toBe(true);
+      expect(probe.mock.calls.length).toBeGreaterThan(1);
+    });
+
+    it('probeVoicevoxAlive 未配線でも従来どおり動く(後方互換)', async () => {
+      const p = new VoicePlayer({
+        storage: mockStorage,
+        isObsMode: () => false,
+        audioConstructor: function () { return mockAudio; },
+        createObjectURL: vi.fn(),
+        revokeObjectURL: vi.fn(),
+        fetchVoicevoxAlive: vi.fn().mockResolvedValue(true),
+        fetchVoiceStyleIds: vi.fn().mockResolvedValue([1]),
+        fetchSynthesizeVoice: vi.fn(),
+        resolveVoice: vi.fn()
+      });
+      await p.enable();
+      expect(p.enabled).toBe(true);
     });
   });
 
@@ -286,14 +390,20 @@ describe('VoicePlayer', () => {
     expect(player.enabled).toBe(true);
   });
 
-  it('2回とも alive-check 失敗なら無効化して notfound を通知(VOICEVOX 未起動)', async () => {
+  it('alive-check 全滅なら無効化して notfound を通知(VOICEVOX 未起動)', async () => {
     const aliveProbe = vi.fn().mockResolvedValue(false);
     player.fetchVoicevoxAlive = aliveProbe;
     // v0.1.770: 起動待ちの状態は onLoadingState が所有(表示は遅延ガード付きの driver 側)。
     const states = [];
     player.onLoadingState = (s) => states.push(s);
     await player.enable({ persist: false });
-    expect(aliveProbe).toHaveBeenCalledTimes(2); // 初回 + リトライ1回
+    /*
+     * ★v0.1.1326: 初回 + リトライ1回(計2) → 初回 + リトライ3回(計4)へ増やした。
+     *   会場モードは MV3 SW のコールド起床が既定タイムアウト(5000ms)に間に合わず
+     *   落ちることがあり、リトライ1回では取りこぼして「押してもONにならない」に
+     *   なっていた(ユーザー実機)。未起動なら各回とも即 refused で返るので待ちは増えない。
+     */
+    expect(aliveProbe).toHaveBeenCalledTimes(1 + VOICE_ALIVE_RETRY_BACKOFF_MS.length);
     expect(player.enabled).toBe(false);
     // checking → connecting(再試行) → (disable で idle) → notfound の順。最後は notfound。
     expect(states[0]).toBe('checking');

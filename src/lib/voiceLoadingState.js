@@ -48,14 +48,41 @@ export function shouldRenderLoading(state, elapsedMs) {
  *
  * @param {string} state  VoiceLoadingState のいずれか
  * @param {'venue'|'comeview'} surface
+ * @param {'timeout'|'refused'|'http-error'|'no-fetch'|''} [reason]
+ *   ★v0.1.1326: 失敗理由(probeVoicevoxAlive の戻り)。省略時は従来文言=後方互換。
  * @returns {{ kind: 'hidden'|'loading'|'error', text: string }}
  *   kind=hidden: 何も出さない(空) / loading: 楽しい演出 / error: 起動案内
  */
-export function resolveVoiceLoadingView(state, surface) {
+export function resolveVoiceLoadingView(state, surface, reason) {
   if (state === 'ready' || state === 'idle') return { kind: 'hidden', text: '' };
 
   if (state === 'notfound') {
-    // 失敗は両画面共通で行動喚起(楽しさは引っ込める)。
+    /*
+     * ★v0.1.1326: 理由で文言を出し分ける。
+     *   ユーザー実機で VOICEVOX 0.25.2 が【起動しているのに】この行が
+     *   「VOICEVOXが見つかりません」と出て、ユーザーに「たちあがってるけどね」と
+     *   指摘された。起動しているのに応答が無い(timeout)のと、そもそも居ない(refused)
+     *   のは打つ手が違うので、同じ文言で済ませてはいけない。
+     */
+    if (reason === 'timeout') {
+      return {
+        kind: 'error',
+        text: 'VOICEVOXは起動していますが応答がありません(重い処理中かもしれません。もう一度押すと再接続します)'
+      };
+    }
+    if (reason === 'http-error') {
+      return {
+        kind: 'error',
+        text: 'VOICEVOXが応答しましたがエラーでした(バージョンを確認してください)'
+      };
+    }
+    if (reason === 'no-fetch') {
+      return {
+        kind: 'error',
+        text: '拡張の接続が切れています(ページを再読み込みしてください)'
+      };
+    }
+    // refused / 不明 = 従来どおり「起動して押し直す」を案内。
     return {
       kind: 'error',
       text: 'VOICEVOXが見つかりません(起動して読み上げを押し直してください)'

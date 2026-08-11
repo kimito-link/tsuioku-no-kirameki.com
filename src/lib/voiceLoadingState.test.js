@@ -48,6 +48,38 @@ describe('resolveVoiceLoadingView (文言の出し分け)', () => {
     expect(v.text).toBe(c.text); // 失敗時は共通文言
   });
 
+  /*
+   * ★v0.1.1326: ユーザー実機で VOICEVOX 0.25.2 が起動しているのに
+   *   「VOICEVOXが見つかりません」と出た(ユーザー指摘「たちあがってるけどね」)。
+   *   起動しているのに応答が無い(timeout)と、そもそも居ない(refused)は打つ手が違う。
+   */
+  it('★timeout は「見つかりません」と言わない(起動している前提の案内にする)', () => {
+    const v = resolveVoiceLoadingView('notfound', 'venue', 'timeout');
+    expect(v.kind).toBe('error');
+    expect(v.text).toContain('起動していますが応答がありません');
+    expect(v.text).not.toContain('見つかりません');
+  });
+
+  it('refused は従来どおり「見つかりません(起動して押し直す)」', () => {
+    const v = resolveVoiceLoadingView('notfound', 'venue', 'refused');
+    expect(v.text).toContain('VOICEVOXが見つかりません');
+  });
+
+  it('http-error はバージョン確認を促す', () => {
+    expect(resolveVoiceLoadingView('notfound', 'venue', 'http-error').text)
+      .toContain('エラーでした');
+  });
+
+  it('no-fetch は拡張側の再読み込みを促す', () => {
+    expect(resolveVoiceLoadingView('notfound', 'venue', 'no-fetch').text)
+      .toContain('再読み込み');
+  });
+
+  it('reason 省略時は従来文言(後方互換)', () => {
+    expect(resolveVoiceLoadingView('notfound', 'venue').text)
+      .toBe(resolveVoiceLoadingView('notfound', 'venue', 'refused').text);
+  });
+
   it('venue は会場の世界観(開演前/ステージ準備)', () => {
     expect(resolveVoiceLoadingView('checking', 'venue')).toEqual({
       kind: 'loading',
