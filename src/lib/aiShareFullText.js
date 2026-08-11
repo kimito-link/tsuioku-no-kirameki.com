@@ -35,6 +35,8 @@ import { buildHealthCells, summarizeHealthVerdict } from './healthCells.js';
 //   diagnosisRegistry の category/weight/mandatory で集計し「カテゴリ別スコア+完璧判定」を出す。
 import { buildCompletenessScore, formatCompletenessScoreLines } from './completenessScore.js';
 import { buildVoiceDiagLine } from './voiceDiag.js';
+// v0.1.1330: 読み上げの到達可能性(面が開いているか・計器はいつのものか)を先に断定する。
+import { judgeVoiceReachability } from './voiceReachabilityProbe.js';
 import { buildGiftEffectDiagLines, giftEffectDiagToActionCards } from './giftEffectDiag.js';
 import { buildMilestoneEffectDiagLines, milestoneEffectDiagToActionCards } from './milestoneEffectDiag.js';
 // v0.1.1072: マイ効果音(customSoundStore.js)の取込状況(extras 12秒間引き)をAI共有本文にも併記。
@@ -308,6 +310,26 @@ export function buildAiShareFullText({ overviewText, livesData, fastDiag, popupD
       const storyDiagSnap = (popupDiag?.popup ?? popupDiag)?.storyDiag || null;
       const storyDiagStr = storyDiagSnap ? formatStoryAvatarDiagLine(storyDiagSnap) : null;
       if (storyDiagStr) lines.push(storyDiagStr);
+    } catch {
+      /* no-op */
+    }
+    /*
+     * ★v0.1.1330: 読み上げは【到達可能性 → 中身】の順に出す。
+     *   従来は中身(voiceDiag)だけを出しており、面を開いていないと化石値になり、
+     *   「開いていないだけ」なのか「壊れている」のかが区別できなかった
+     *   (これで3版ぶん空振りした)。常駐側の観測を先に出して、まずそこを断定する。
+     */
+    try {
+      // 時点→経過の変換はここで行う(判定側に時点フィールドを増やさない=timeAuthorityRegistry の方針)。
+      const _vCapturedAt = Number(/** @type {any} */ (voiceDiag)?.capturedAt) || 0;
+      const reach = judgeVoiceReachability({
+        // 常駐(content script)の観測は fastDiag.content 配下に届く(他の content 計器と同じ経路)。
+        venueOpen: fastDiag?.content?.voiceReachRaw?.venueOpen === true,
+        diagAgeMs: _vCapturedAt > 0 ? Math.max(0, Date.now() - _vCapturedAt) : -1,
+        diagSource: /** @type {any} */ (voiceDiag)?.source,
+        diagEnabled: /** @type {any} */ (voiceDiag)?.enabled
+      });
+      if (reach.line) lines.push(reach.line);
     } catch {
       /* no-op */
     }

@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 4 / 740 件
+## ⚠️ 役割コメントが無いソース 4 / 741 件
 - `src/lib/laneDomSelfMeasure.js`
 - `src/lib/reportPreviewPublish.js`
 - `src/lib/venueLaneBuckets.js`
@@ -671,7 +671,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (1595)
+- 📁 **src/** (1598)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -958,7 +958,7 @@
         - `logo_funlink_white_RGB_maru_black.png`
       - `logo_guide_funlink_ol.pdf`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1358)
+  - 📁 **lib/** (1361)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -2270,6 +2270,9 @@
     - `voicePlayer.js` — comeview-entry.js と同じ方針(@ts-nocheck)。ロジックは変更しない。
     - `voicePlayer.lagDecomposition.test.js`
     - `voicePlayer.test.js`
+    - `voiceReachabilityProbe.js` — 「読み上げは今どういう状態か」を1行で断定する純関数。
+    - `voiceReachabilityProbe.test.js`
+    - `voiceReachabilityWiring.test.js`
     - `voiceReadQueue.js` — 読み上げキュー末尾へ追加し、上限超過分を古い順に返す。
     - `voiceReadQueue.test.js`
     - `voiceSustainedBoost.integration.test.js`
