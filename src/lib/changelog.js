@@ -26,6 +26,22 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1343',
+    date: '2026-08-12',
+    summary: 'fix(diag): 該当なしを取得エラーと誤称',
+    items: Object.freeze([
+      'ランキングに該当者がいないだけなのに「取得エラー」と赤く出ていたのを直しました。'
+    ])
+  }),
+  Object.freeze({
+    version: '0.1.1342',
+    date: '2026-08-12',
+    summary: 'feat(diag): コメビュにも合成失敗の理由を記録する',
+    items: Object.freeze([
+      'コメビュの読み上げでも、音声合成に失敗した理由と件数を状態速報へ記録するようにしました。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1341',
     date: '2026-08-12',
     summary: 'fix(diag): 効いていない時こそ理由を出す',

@@ -13,6 +13,7 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
 const SRC = readFileSync(new URL('./popup-entry.js', import.meta.url), 'utf8');
+const CONTENT_SRC = readFileSync(new URL('./content-entry.js', import.meta.url), 'utf8');
 
 describe('北極星レーンの state 判定への API 経路の配線', () => {
   it('★giftHistory が giftHistoryApiRows を渡している(v0.1.1339 で解消した片肺)', () => {
@@ -47,5 +48,45 @@ describe('北極星レーンの state 判定への API 経路の配線', () => {
     ) || [];
     expect(calls.length).toBeGreaterThan(0);
     for (const c of calls) expect(c).toContain('nicoadApiRows');
+  });
+
+  /*
+   * ★v0.1.1343: adResult(取得の成否)の配線。
+   *   v0.1.851 で判定側に「成功0件=no_ranking_data(灰) / 失敗=fetch_error(赤)」の
+   *   分岐を足したが、popup 経路では渡されておらず【一度も発火していなかった】。
+   *   ★真因は引数の配線だけではなく、content 側が【成功0件のとき storage に何も
+   *     書いていなかった】こと。データが無ければ popup は成否を知りようがない。
+   *   ★この検査が無かったせいで、v0.1.1339 で書いた配線テストが隣の片肺を見逃した。
+   */
+  it('★adRanking は adResult(取得の成否)も渡している(成功0件を赤と誤称しない)', () => {
+    const calls = SRC.match(
+      /determineNorthStarLaneState\('adRanking',\s*\{[^}]*\}/g
+    ) || [];
+    expect(calls.length).toBeGreaterThan(0);
+    for (const c of calls) expect(c).toContain('adResult');
+  });
+
+  it('adResult は storage に保存された成否から作っている(新規 read を足さない)', () => {
+    expect(SRC).toContain('makeLaneResult({ ok: apiVal.lastOk');
+  });
+
+  /*
+   * ★これが v0.1.1343 の真因。配線より手前の問題だったので必ず検査する。
+   *   content 側は旧実装で `rows.length === 0` なら早期 return しており、
+   *   【成功して0件のとき storage に何も書かれなかった】。
+   *   データが無ければ popup は成否を知りようがなく、配線を足しても直らない。
+   */
+  it('★content は「成功0件」でも storage に成否を保存する(データが無ければ配線しても無意味)', () => {
+    // 成否そのものを保存していること(nicoad / koken の両方)。
+    expect(CONTENT_SRC).toContain('lastOk: _externalFetchProbe.nicoadLastOk === true');
+    expect(CONTENT_SRC).toContain('lastOk: _externalFetchProbe.kokenLastOk === true');
+  });
+
+  it('★contributionRanking も contribResult を渡している(adRanking と同じ穴を残さない)', () => {
+    const calls = SRC.match(
+      /determineNorthStarLaneState\('contributionRanking',\s*\{[^}]*\}/g
+    ) || [];
+    expect(calls.length).toBeGreaterThan(0);
+    for (const c of calls) expect(c).toContain('contribResult');
   });
 });

@@ -91,7 +91,15 @@ describe('広告レーン: 出荷バンドルを実行して鏡に積まれる�
       trackAdAdvertiserCountForCelebration: () => {},
       buildNorthStarAdRankingStatsHtml: () => '',
       formatCardFreshnessNote: () => '',
-      determineNorthStarLaneState: () => 'ok'
+      determineNorthStarLaneState: () => 'ok',
+      // ★v0.1.1343: 広告レーンが「成功0件」と「取得失敗」を分けるために使う純関数。
+      //   ここで stub しないと ReferenceError で関数ごと落ち、鏡0件=症状の再現と
+      //   区別がつかなくなる(実際に踏んだ)。判定内容はこのテストの対象外。
+      makeLaneResult: (input) => ({
+        ok: input?.ok ?? null,
+        status: input?.status ?? null,
+        rows: Array.isArray(input?.rows) ? input.rows : null
+      })
     };
     const names = Object.keys(scope);
     const factory = new Function(...names, `${fnSrc}; return refreshNorthStarAdRankingLane;`);

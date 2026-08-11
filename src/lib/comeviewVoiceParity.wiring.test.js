@@ -128,4 +128,26 @@ describe('読み上げ2実装の修正パリティ(会場 ⇄ コメビュ)', ()
     expect(successClearAt).toBeGreaterThan(disableAt);
     expect(successPublishAt).toBeGreaterThan(successClearAt);
   });
+
+  it('★9項目目: コメビュも合成失敗の理由とnull件数を既存計器へ配線する', () => {
+    const start = cv.indexOf('function recordVoiceSynthFailureReason');
+    const end = cv.indexOf('\nfunction enqueueVoiceTimelineItems', start);
+    expect(start).toBeGreaterThan(-1);
+    expect(end).toBeGreaterThan(start);
+    const synthBranch = cv.slice(start, end);
+
+    // 合成経路は先読みとその場合成の2つだけ。両方に同じ失敗理由計器を固定する。
+    expect((synthBranch.match(/synthesizeVoice\(/g) || []).length).toBe(2);
+    expect((synthBranch.match(/onFailure:\s*\(info\)\s*=>\s*recordVoiceSynthFailureReason\(info\)/g) || []).length).toBe(2);
+    // 理由bagは初期化を含む2参照、null累計は1つの失敗分岐だけに限定する。
+    expect((synthBranch.match(/_voiceDiag\.synthFailReasons/g) || []).length).toBe(2);
+    expect((synthBranch.match(/_voiceDiag\.synthNullTotal\s*=/g) || []).length).toBe(1);
+
+    const nullAt = synthBranch.indexOf('if (!wav) {');
+    const nullTotalAt = synthBranch.indexOf('_voiceDiag.synthNullTotal =', nullAt);
+    const publishAt = synthBranch.indexOf('publishVoiceDiag()', nullTotalAt);
+    expect(nullAt).toBeGreaterThan(-1);
+    expect(nullTotalAt).toBeGreaterThan(nullAt);
+    expect(publishAt).toBeGreaterThan(nullTotalAt);
+  });
 });
