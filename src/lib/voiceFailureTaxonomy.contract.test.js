@@ -44,9 +44,9 @@ const ALIVE_TOKEN_CONTRACT = [
 const SYNTH_TOKEN_CONTRACT = [
   { token: 'timeout', normalized: { cause: 'timeout', stage: 'synth' }, label: '音声合成が時間切れ' },
   { token: 'unreachable', normalized: { cause: 'down', stage: 'synth' }, label: '音声合成時にVOICEVOXへ接続できない' },
-  { token: 'query_http', normalized: { cause: 'http', stage: 'query' }, label: '音声解析がエラーを返した' },
+  { token: 'query_http', normalized: { cause: 'http', stage: 'query' }, label: '音声解析がエラーを返した(過負荷の疑い)' },
   { token: 'query_body', normalized: { cause: 'payload', stage: 'query' }, label: '音声解析の応答が不正' },
-  { token: 'synth_http', normalized: { cause: 'http', stage: 'synth' }, label: '音声合成がエラーを返した' },
+  { token: 'synth_http', normalized: { cause: 'http', stage: 'synth' }, label: '音声合成がエラーを返した(過負荷の疑い)' },
   { token: 'synth_body', normalized: { cause: 'payload', stage: 'synth' }, label: '音声の受信に失敗' },
   { token: 'unknown', normalized: { cause: 'unknown', stage: 'synth' }, label: '音声合成に失敗(理由不明)' }
 ];
