@@ -26,6 +26,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1334',
+    date: '2026-08-11',
+    summary: 'refactor(voice): 合成失敗ラベルをtaxonomy化',
+    items: Object.freeze([
+      '読み上げの合成失敗理由を日本語にする処理を、共通の失敗分類taxonomyへ一本化しました。',
+      '既存の公開関数や失敗理由トークンは変えず、全7種類の変更前後ラベルを契約テストに固定しています。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1333',
     date: '2026-08-11',
     summary: 'feat(diag): コメビュのON失敗理由を状態速報へ',

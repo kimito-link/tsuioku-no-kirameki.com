@@ -2,8 +2,23 @@ import { describe, expect, it } from 'vitest';
 import {
   adviseVoiceSynthFailure,
   classifyVoiceSynthFailureReason,
-  formatVoiceSynthFailureReasonLine
+  formatVoiceSynthFailureReasonLine,
+  VOICE_SYNTH_FAIL_REASONS
 } from './voiceSynthFailureReason.js';
+
+/**
+ * v0.1.1334: 旧ラベルから taxonomy の canonicalLabel へ切り替えた対応表。
+ * 旧ラベルもリテラルで残し、文言変更を「同じ関数同士の比較」で恒真にしない。
+ */
+const SYNTH_LABEL_CONTRACT = Object.freeze([
+  { reason: 'timeout', oldLabel: '時間切れ', newLabel: '音声合成が時間切れ' },
+  { reason: 'unreachable', oldLabel: '接続不能(VOICEVOX未起動/落ちた)', newLabel: '音声合成時にVOICEVOXへ接続できない' },
+  { reason: 'query_http', oldLabel: '解析拒否(過負荷の疑い)', newLabel: '音声解析がエラーを返した' },
+  { reason: 'query_body', oldLabel: '解析応答が不正', newLabel: '音声解析の応答が不正' },
+  { reason: 'synth_http', oldLabel: '合成拒否(過負荷の疑い)', newLabel: '音声合成がエラーを返した' },
+  { reason: 'synth_body', oldLabel: '音声の受信失敗', newLabel: '音声の受信に失敗' },
+  { reason: 'unknown', oldLabel: '不明', newLabel: '音声合成に失敗(理由不明)' }
+]);
 
 /**
  * v0.1.1224: 「合成失敗17件(時間切れ1/その他16)」の【その他16】を名前で割る。
@@ -40,6 +55,19 @@ describe('classifyVoiceSynthFailureReason', () => {
 });
 
 describe('formatVoiceSynthFailureReasonLine', () => {
+  it('公開理由トークンの全7値域を契約表に固定する', () => {
+    expect(VOICE_SYNTH_FAIL_REASONS).toEqual(SYNTH_LABEL_CONTRACT.map(({ reason }) => reason));
+  });
+
+  it.each(SYNTH_LABEL_CONTRACT)(
+    '$reason のラベルを旧「$oldLabel」から新「$newLabel」へ対応づける',
+    ({ reason, oldLabel, newLabel }) => {
+      expect(oldLabel).not.toBe(newLabel);
+      expect(formatVoiceSynthFailureReasonLine({ [reason]: 1 }))
+        .toBe(`合成失敗の内訳(1件): ${newLabel}1`);
+    }
+  );
+
   it('0件なら何も出さない(静かな計器)', () => {
     expect(formatVoiceSynthFailureReasonLine({})).toBe('');
     expect(formatVoiceSynthFailureReasonLine(null)).toBe('');
@@ -49,7 +77,7 @@ describe('formatVoiceSynthFailureReasonLine', () => {
     const line = formatVoiceSynthFailureReasonLine({ timeout: 1, unreachable: 16 });
     expect(line).toContain('17件');
     expect(line).toContain('時間切れ1');
-    expect(line).toContain('接続不能');
+    expect(line).toContain('音声合成時にVOICEVOXへ接続できない16');
   });
 
   it('合計は各理由の和(帳尻が合う)', () => {
