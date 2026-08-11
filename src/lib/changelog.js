@@ -26,6 +26,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1338',
+    date: '2026-08-12',
+    summary: 'fix(icon): 消えたアイコンを再取得する',
+    items: Object.freeze([
+      '一度読み込みに失敗したアイコンを、時間をおいて自動で取り直すようにしました。',
+      'これまでは一度でも失敗すると、その人のアイコンは灰色の丸のまま戻りませんでした。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1337',
     date: '2026-08-12',
     summary: 'fix(venue): PICK UP枠が読めない/出ない',

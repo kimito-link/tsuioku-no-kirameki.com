@@ -587,7 +587,11 @@ import {
   matchesAnySelfPostedRecent,
   prepareSelfPostedMatchRecents
 } from '../lib/selfPostedMatcher.js';
-import { parseViewerCountFromLooseText } from '../lib/liveAudienceDom.js';
+import {
+  mergeViewerProbeIntoSnapshot,
+  probeViewerCountFromFrameTexts
+} from '../lib/viewerCountProbeMerge.js';
+import { yieldToBrowserPaint } from '../lib/yieldToBrowserPaint.js';
 import {
   buildTickerTextAndTip,
   decorateTickerLine,
@@ -691,6 +695,7 @@ import {
 } from '../lib/exportWaitNarration.js';
 import { playReportCompleteVoiceSequence } from '../lib/reportCompleteVoice.js';
 import { createSupportAvatarLoadGuard } from '../lib/supportGrowthAvatarLoad.js';
+import { shouldSweepAvatarRetry } from '../lib/avatarRetrySweepThrottle.js';
 // avatar load guard のコールバック(TV-fallback クラス付け外し)の正本。popup と会場で共有。
 import {
   applyStoryAvatarTvFallbackClass,
@@ -4976,11 +4981,34 @@ const STORY_REMOTE_FAILED_PLACEHOLDER_IMG = NICONICO_OFFICIAL_DEFAULT_USERICON_H
 //   person-tile-unify 第3コミット(2026-06-22)で src/lib/storyAvatarTvFallbackClass.js に抽出し、
 //   popup と会場(venueBar.js)で同じ本物を avatar load guard のコールバックに渡す(上部で import)。
 
+// ★v0.1.1338: retryPolicy を popup でも opt-in(会場は v0.1.1318 で先行導入済み)。
+//   理由と実測は avatarRetrySweepThrottle.js のヘッダが正本。値は会場と同じ既定。
 const storyAvatarLoadGuard = createSupportAvatarLoadGuard({
   fallbackSrc: STORY_REMOTE_FAILED_PLACEHOLDER_IMG,
   onFallbackApplied: applyStoryAvatarTvFallbackClass,
-  onRemoteSuccess: removeStoryAvatarTvFallbackClass
+  onRemoteSuccess: removeStoryAvatarTvFallbackClass,
+  retryPolicy: {}
 });
+
+/** アイコン再プローブ掃引の最終実行時刻(ms)。間引き判定は lib が正本。 */
+let _storyAvatarRetrySweepAt = 0;
+
+/**
+ * 失敗アイコンの再プローブ掃引(間引きつき)。★描画経路2つの【両方】から呼ぶ。
+ * @param {{ stack?: unknown, root?: unknown }|null|undefined} els
+ * @returns {void}
+ */
+function sweepStoryAvatarRetryThrottled(els) {
+  const now = Date.now();
+  if (!shouldSweepAvatarRetry(_storyAvatarRetrySweepAt, now)) return;
+  _storyAvatarRetrySweepAt = now;
+  try {
+    const root = /** @type {any} */ (els)?.stack || /** @type {any} */ (els)?.root || null;
+    if (root) storyAvatarLoadGuard.retrySweep(root, now);
+  } catch {
+    // 再試行の失敗は描画を止めない(観測は retriedTotal に残る)
+  }
+}
 
 /** @type {boolean} */
 let anonymousIdenticonRuntimeEnabled = true;
@@ -7201,6 +7229,8 @@ async function applyLaneMirrorForPassive() {
     domTilesPainted: countStoryUserLaneDomTiles(els)
   });
   recordStoryUserLaneStep(_storyUserLaneRenderProbe, STORY_USER_LANE_STEPS.DONE);
+  // ★v0.1.1338: 失敗アイコンの再プローブ掃引(理由は lib/avatarRetrySweepThrottle.js が正本)。
+  sweepStoryAvatarRetryThrottled(els);
   // v0.1.985(council/parity-diagnose): ②応援プレビューが「描画できた」を status へ伝える ack を
   //   【専用キー】(本物の鏡とは別・passive だけが書く片方向)に best-effort で書く。3画面パリティ判定の
   //   ②描画OK 観測に使う。本物の鏡(KEY_LANE_MIRROR)は上書きしない=passive の不可侵原則を守る。
@@ -7278,6 +7308,8 @@ async function applyLaneMirrorForMainPopupFallback(resolvedLid = '') {
     domTilesPainted: countStoryUserLaneDomTiles(els)
   });
   recordStoryUserLaneStep(_storyUserLaneRenderProbe, STORY_USER_LANE_STEPS.DONE);
+  // ★v0.1.1338: 鏡由来の描画経路にも【同じ】掃引を配線する(片肺を作らない)。
+  sweepStoryAvatarRetryThrottled(els);
   // v0.1.987: 鏡フォールバックで描けたら幕も畳む(描けたのにローディングを構造的に消す)。冪等。
   if (countStoryUserLaneDomTiles(els) > 0) {
     try { dismissInitialLoadShade(); } catch { /* no-op */ }
@@ -17403,29 +17435,8 @@ async function listWatchFramesWithInnerText(tabId, opts = {}) {
   }
 }
 
-/**
- * innerText 断片から視聴者数を拾う（content より先にポップアップ側で試す）
- * @param {{ frameId: number, score: number, text: string }[]} frames
- * @returns {number|null}
- */
-function probeViewerCountFromFrameTexts(frames) {
-  for (const f of frames) {
-    const n = parseViewerCountFromLooseText(f.text);
-    if (n != null) return n;
-  }
-  return null;
-}
-
-/**
- * @param {WatchPageSnapshot} snap
- * @param {number|null} probe
- */
-function mergeViewerProbeIntoSnapshot(snap, probe) {
-  if (!snap || probe == null) return snap;
-  const cur = snap.viewerCountFromDom;
-  if (typeof cur === 'number' && Number.isFinite(cur) && cur >= 0) return snap;
-  return { ...snap, viewerCountFromDom: probe };
-}
+// ★v0.1.1338: probeViewerCountFromFrameTexts / mergeViewerProbeIntoSnapshot は
+//   純粋関数なので lib/viewerCountProbeMerge.js へ移設した(挙動不変)。
 
 /**
  * content script 注入直後はReceiving end does not existになりやすいので再試行
@@ -17895,21 +17906,7 @@ async function forceRefetchAllCommenterFollowProfiles(liveId, onStatus) {
   return { totalCommenters: allUids.length, fetched, errors };
 }
 
-
-/**
- * disable / status 文言を先にペイントしてから重い処理に入る（体感ラグ軽減）。
- * @returns {Promise<void>}
- */
-function yieldToBrowserPaint() {
-  // ★v0.1.1277: rAF だけだとサイドパネルが裏に回った瞬間に凍り
-  //   html_report_build_timeout になる。setTimeout と競走させて必ず進める。
-  return new Promise((resolve) => {
-    let done = false;
-    const finish = () => { if (done) return; done = true; resolve(undefined); };
-    try { requestAnimationFrame(() => { requestAnimationFrame(finish); }); } catch { /* rAF無し */ }
-    setTimeout(finish, 32);
-  });
-}
+// ★v0.1.1338: yieldToBrowserPaint は lib/yieldToBrowserPaint.js へ移設(挙動不変)。
 
 /**
  * HTML レポート用: popup が既に持つ snapshot が watch と整合していれば

@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 4 / 742 件
+## ⚠️ 役割コメントが無いソース 4 / 745 件
 - `src/lib/laneDomSelfMeasure.js`
 - `src/lib/reportPreviewPublish.js`
 - `src/lib/venueLaneBuckets.js`
@@ -675,7 +675,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (1600)
+- 📁 **src/** (1605)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -710,7 +710,7 @@
       - `avatarResolver.test.js`
       - `identity.js` — ニコ生ユーザー ID の「匿名性」判定と関連アイデンティティ・ユーティリティ。
       - `nickname.js` — 表示名（ニックネーム）の「強弱」判定。
-  - 📁 **extension/** (37)
+  - 📁 **extension/** (38)
     - 📁 **popup/** (6)
       - 📁 **report/** (2)
         - `htmlReportDocument.js` — HTMLレポート(振り返り用の保存HTML)組み立てクラスタ。
@@ -736,6 +736,7 @@
     - `page-intercept-entry.js` — MAIN world エントリ（esbuild で単一 IIFE にバンドルされる）
     - `pageInterceptFetchHookCatch.wiring.test.js`
     - `popup-entry.js` — ポップアップ UI 本体。応援レーン描画・HTMLレポート生成・各種診断/共有のまとめ役。
+    - `popupAvatarRetry.wiring.test.js`
     - `popupBackfillCompleteState.wiring.test.js`
     - `popupUserLaneAvatarObservedFlow.test.js`
     - `repaintLoopGuard.wiring.test.js`
@@ -962,7 +963,7 @@
         - `logo_funlink_white_RGB_maru_black.png`
       - `logo_guide_funlink_ol.pdf`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1363)
+  - 📁 **lib/** (1367)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -1019,6 +1020,8 @@
     - `avatarLoadReport.test.js`
     - `avatarPartsComposer.js` — 匿名ユーザー用アバターのパーツ(髪/目/口など)定義と組み合わせ合成。
     - `avatarPartsComposer.test.js`
+    - `avatarRetrySweepThrottle.js` — 【層】L0 判定層(純粋関数・I/O禁止)
+    - `avatarRetrySweepThrottle.test.js`
     - `avatarUrlCompare.js` — アバター URL の比較用ヘルパ（純粋関数）。
     - `avatarUrlCompare.test.js`
     - `backfillBgKickSwMirror.test.js`
@@ -2249,6 +2252,7 @@
     - `videoCapture.test.js`
     - `viewerCelebrationMatch.js` — 視聴者本人のギフト／広告システムコメント判定（ニコ生の表記揺れに耐える）。
     - `viewerCelebrationMatch.test.js`
+    - `viewerCountProbeMerge.js` — 【層】L0 判定層(純粋関数・I/O禁止)
     - `viewerSelfLaneAggregate.js` — v0.1.775: popup の応援アイコン列(りんく段)に「自分(視聴者)」を出すための合成集約。
     - `viewerSelfLaneAggregate.test.js`
     - `voiceAgeGate.js` — 読み上げアイテムが鮮度切れかどうか判定する純関数。
@@ -2326,6 +2330,7 @@
     - `watchTabPrioritize.test.js`
     - `watchUrlFreshness.js` — 「最後に視聴した URL（nls_last_watch_url）」フォールバックの鮮度判定。
     - `watchUrlFreshness.test.js`
+    - `yieldToBrowserPaint.js` — 【層】L0 判定層(依存ゼロ・chrome.* 非依存)
     - `yukkuriBroadcastSummary.js` — 放送終了後の HTML レポート / マーケ分析の頭にくる「ゆっくり解説風」要約セクション。
     - `yukkuriBroadcastSummary.test.js`
   - 📁 **shared/** (7)

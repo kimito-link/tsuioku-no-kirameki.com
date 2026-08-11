@@ -290,7 +290,7 @@
   - `src/lib/giftThrowProjectile.js`
 - **吹き出し寿命管理** — 会場の吹き出しの表示上限・追い出し(eviction)ライフサイクル
   - `src/lib/venueBubbleLifecycle.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 213</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 215</summary>
 
 - `scripts/encode-marketing-html-avatars.mjs` — extension/images/marketing-html-avatars/*.png を data URI にし、
 - `scripts/split-avatar-parts.mjs` — 偽市松背景の除去 + パーツ切り出し(one-off アセットパイプライン)
@@ -314,6 +314,7 @@
 - `src/lib/avatarEntryCounts.js` — コメントエントリ配列から avatar の数を数える純関数。
 - `src/lib/avatarLoadReport.js` — アイコン画像(usericon)の【実際のロード失敗】を状態速報の対処候補カードに出す純関数(v0.1.1026)。
 - `src/lib/avatarPartsComposer.js` — 匿名ユーザー用アバターのパーツ(髪/目/口など)定義と組み合わせ合成。
+- `src/lib/avatarRetrySweepThrottle.js` — 【層】L0 判定層(純粋関数・I/O禁止)
 - `src/lib/avatarUrlCompare.js` — アバター URL の比較用ヘルパ（純粋関数）。
 - `src/lib/cardFreshnessNote.js` — カードの「鮮度」表示（最終更新からの経過）を作る純関数。
 - `src/lib/celebrationCharaAssets.js` — お祝い演出で使う3キャラ(りんく/こんた/混在)の画像パス定義。
@@ -502,6 +503,7 @@
 - `src/lib/watchMetaCardStateGate.js` — watch メタカードの「来場者数 / 推定同時接続」表示状態を、
 - `src/lib/watchPageViewerProfile.js` — watch ページのサイトヘッダー付近からログイン中ユーザーのアイコン・表示名を推定。
 - `src/lib/watchPopupCelebrationGuard.js` — popup 再描画時の応援演出ガード（純関数）。
+- `src/lib/yieldToBrowserPaint.js` — 【層】L0 判定層(依存ゼロ・chrome.* 非依存)
 - `src/shared/avatar/avatarUrlGuard.js` — avatar URL 比較・抽出・整合性判定の純粋関数群（shared レイヤ）。
 - `src/shared/avatar/clampAvatarUrl.js` — avatar URL の長さ上限を一元適用する純関数（H2 / D-5 / S-13 の根治）。
 - `tools/render-og.js` — 追憶の煌めき LP 用 OG 画像（1200×630）を生成する。
@@ -750,7 +752,7 @@
   - `src/lib/statusTrendKey.js`
   - `src/extension/status-entry.js`
   - `src/lib/statusActionAdvisor.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 148</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 149</summary>
 
 - `app/app.js` — スマホ閲覧用 status Web 版。
 - `app/live-view.js` — global NL_BUILD_ID
@@ -883,6 +885,7 @@
 - `src/lib/trimMap.js` — Map のサイズを max 以下に制限し、先頭（最古挿入順）から削除する。
 - `src/lib/versionMismatch.js` — 「本体とページで版がズレている」を検知する純関数(2026-07-06)。
 - `src/lib/videoCapture.js` — watch ページの video から PNG を取るためのユーティリティ。
+- `src/lib/viewerCountProbeMerge.js` — 【層】L0 判定層(純粋関数・I/O禁止)
 - `src/lib/watchAudienceCopy.js` — watch パネル「観客メモ」用の短文・ツールチップ文言（DOM 非依存）。
 - `src/lib/watchContext.js` — watch ページ URL と直前の lv から、コンテンツスクリプト用の文脈を純関数で求める
 - `src/lib/watchFrameCommentPostGate.js` — watch 上の各フレームが `NLS_POST_COMMENT` / コメント欄系操作を受けてよいかの判定。
@@ -905,7 +908,7 @@
 
 ## 🧬 修正系譜マップ(この系統のバグを過去にどう直したか)
 
-> changelog 全 667 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
+> changelog 全 668 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
 
 ### 💾 記録件数 (92版)
 - `v0.1.1327` 2026-08-11 — 読み上げが一瞬ONになって戻るのを直しました
@@ -1001,7 +1004,8 @@
 - `v0.1.672` 2026-06-10 — コメビュの二重表示の残りを根治
 - `v0.1.665` 2026-06-10 — 長い配信が7割等で止まったままになるのを根治
 
-### 📥 コメント取得 (165版)
+### 📥 コメント取得 (166版)
+- `v0.1.1338` 2026-08-12 — fix(icon): 消えたアイコンを再取得する
 - `v0.1.1321` 2026-08-11 — コメビュが立ち上がらないのを直しました
 - `v0.1.1318` 2026-08-10 — 会場の白丸(アイコン未設定の人)をゆっくり顔にしました
 - `v0.1.1314` 2026-08-10 — 診断ページが重くなる原因を切り分ける計器を追加
