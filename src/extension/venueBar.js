@@ -644,12 +644,24 @@ const VENUE_CSS = `
     padding: 6px 10px;
     border-radius: 8px;
     border: 1px solid rgba(255, 190, 90, 0.55);
-    background: linear-gradient(90deg, rgba(255, 176, 62, 0.22), rgba(255, 176, 62, 0.06));
+    /*
+     * ★v0.1.1337: 地の色を【不透明で】敷く(実機で読めなくなっていた)。
+     *   旧: linear-gradient のみ = 透明度 0.22〜0.06 の帯だけ。
+     *   会場の暗い背景の上なら成立するが、後ろにニコ生のページ(カテゴリタグ等)が
+     *   透けると文字と背景が重なって【判読不能】になる。実機スクリーンショットで確認。
+     *   さらに data-empty の opacity:0.55 が乗ると実質 0.03〜0.12 まで薄くなっていた。
+     *   → 不透明の下地(#2a2118 相当)を先に置き、その上に既存のグラデを重ねる。
+     *     色は会場の暗色系に馴染ませる(白背景でも黒背景でも読める濃さ)。
+     */
+    background-color: rgba(38, 30, 20, 0.92);
+    background-image: linear-gradient(90deg, rgba(255, 176, 62, 0.28), rgba(255, 176, 62, 0.1));
+    color: #fff5e8;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.18);
     font-size: 13px;
     line-height: 1.35;
   }
-  .nlsb-pickup[data-empty='1'] { opacity: 0.55; }
+  /* ★空のときも【薄くしすぎない】(0.55 だと下地ごと透けて読めなくなる)。 */
+  .nlsb-pickup[data-empty='1'] { opacity: 0.85; }
   .nlsb-pickup__badge {
     flex: 0 0 auto;
     font-size: 10px;

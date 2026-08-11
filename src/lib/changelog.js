@@ -26,6 +26,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1337',
+    date: '2026-08-12',
+    summary: 'fix(venue): PICK UP枠が読めない/出ない',
+    items: Object.freeze([
+      'ピックアップ枠の地の色が薄すぎて、後ろのページが透けて読めなくなっていたのを直しました。',
+      '「うゆゆ」のような3文字のコメントも拾えるようにしました(これまで4文字未満は全部捨てていました)。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1336',
     date: '2026-08-12',
     summary: 'fix(voice): 過負荷の手がかりを戻す',
