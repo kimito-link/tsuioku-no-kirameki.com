@@ -111,6 +111,29 @@ describe('ON失敗の理由を計器に出す', () => {
     expect(line).not.toContain('ON失敗');
   });
 
+  /*
+   * ★v0.1.1335: 日本語ラベルを taxonomy へ寄せた版の契約。
+   *   生の値(refused 等)を消さず【併記】することが要件。生の値は次のセッションが
+   *   storage に書かれた lastEnableFailReason と突き合わせるための材料で、
+   *   日本語だけにすると grep できなくなる。
+   *   → 5値域すべてで「生の値」と「日本語」の両方が同じ行に出ることを断言する。
+   */
+  it.each([
+    ['no-fetch', '拡張の通信経路が切れている(ページ再読み込みが必要)'],
+    ['timeout', 'VOICEVOXが応答しない(起動はしている)'],
+    ['refused', 'VOICEVOXに接続できない(未起動の可能性)'],
+    ['http-error', 'VOICEVOXがエラーを返した'],
+    ['weird-unseen-token', 'VOICEVOXの接続確認に失敗(理由不明)']
+  ])('%s は生の値と日本語ラベルの両方を行に出す', (reason, label) => {
+    const line = buildVoiceDiagLine(
+      { enabled: false, lastEnableFailReason: reason, enableFailTotal: 2, capturedAt: NOW },
+      NOW + 1000
+    );
+    expect(line).toContain(reason);
+    expect(line).toContain(label);
+    expect(line).toContain(`★ON失敗2回: ${reason}(${label})`);
+  });
+
   it('スナップショットが2フィールドを落とさない(allowlist漏れ防止)', () => {
     const snap = buildVoiceDiagSnapshot(
       { lastEnableFailReason: 'refused', enableFailTotal: 4 }, 1

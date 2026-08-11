@@ -1,4 +1,5 @@
 import { judgeValueFreshness } from './anomalyVerdict.js';
+import { canonicalLabel, fromAliveFailure } from './voiceFailureTaxonomy.js';
 
 /**
  * ★v0.1.1328: この診断を「新鮮」とみなす上限。これを大きく超えたら化石値として数値を伏せる。
@@ -297,17 +298,15 @@ export function buildVoiceDiagLine(snap, nowMs) {
   const failReason = String(snap.lastEnableFailReason || '').trim();
   const failTotal = Number(snap.enableFailTotal) || 0;
   if (failReason) {
-    const why =
-      failReason === 'timeout'
-        ? 'VOICEVOXが応答しない(起動はしている)'
-        : failReason === 'refused'
-          ? 'VOICEVOXに接続できない(未起動の可能性)'
-          : failReason === 'http-error'
-            ? 'VOICEVOXがエラーを返した'
-            : failReason === 'no-fetch'
-              ? '拡張の通信経路が切れている(ページ再読み込みが要る)'
-              : failReason;
-    parts.push(`★ON失敗${failTotal}回: ${why}`);
+    /*
+     * ★v0.1.1335: 日本語ラベルは taxonomy(voiceFailureTaxonomy.js)が正本。
+     *   ここで三項演算子を並べると、同じ cause が別の場所で別の日本語になる
+     *   (実際に voiceLoadingState.js と文言が食い違っていた)。
+     * ★生の値(refused 等)は消さずに併記する。次のセッションが grep で原因を追う材料であり、
+     *   日本語だけにすると storage に書かれた値と突き合わせられなくなる。
+     */
+    const why = canonicalLabel(fromAliveFailure(failReason));
+    parts.push(why ? `★ON失敗${failTotal}回: ${failReason}(${why})` : `★ON失敗${failTotal}回: ${failReason}`);
   }
   // v0.1.1327: 自動再生ブロック。合成は通っているのに音が出ない状態を名指しする
   //   (ユーザー実機「一瞬ONになって戻る」の正体。0なら何も言わない)。
