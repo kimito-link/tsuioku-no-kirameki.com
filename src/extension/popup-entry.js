@@ -592,6 +592,8 @@ import {
   probeViewerCountFromFrameTexts
 } from '../lib/viewerCountProbeMerge.js';
 import { yieldToBrowserPaint } from '../lib/yieldToBrowserPaint.js';
+import { buildStorageRefreshTriggerTag } from '../lib/storageRefreshTriggerKey.js';
+import { prefersReducedMotion } from '../lib/prefersReducedMotion.js';
 import {
   buildTickerTextAndTip,
   decorateTickerLine,
@@ -18316,16 +18318,8 @@ function initShadeFrameSrc(who, frame) {
   return set[frame] || set.idle || '';
 }
 
-function initShadePrefersReducedMotion() {
-  try {
-    return (
-      typeof matchMedia === 'function' &&
-      matchMedia('(prefers-reduced-motion: reduce)').matches
-    );
-  } catch {
-    return false;
-  }
-}
+// ★v0.1.1340: lib/prefersReducedMotion.js へ集約(同じ判定が4箇所に散っていた)。
+const initShadePrefersReducedMotion = prefersReducedMotion;
 
 let initShadeCharCycleTimer = null;
 let initShadeLipTimer = null;
@@ -21722,8 +21716,10 @@ async function initPopup() {
         const onlyVisualExpanded =
           changedKeys.length === 1 && changedKeys[0] === KEY_SUPPORT_VISUAL_EXPANDED;
         if (!skipVisualExternalSync || !onlyVisualExpanded) {
+          // ★v0.1.1340: どのキーが引き金かまで名指しする(内訳が読めないと原因が特定できない)。
+          const trigTag = buildStorageRefreshTriggerTag(changedKeys);
           scheduleCoalescedStorageRefresh(changes, () => {
-            tagRefreshReason('storage_changed'); safeRefresh();
+            tagRefreshReason(trigTag); safeRefresh();
           });
         }
       };

@@ -55,10 +55,24 @@ describe('repaint loop guard wiring (popup-entry.js)', () => {
   });
 
   it('主要な自動経路に引き金タグが立っている(犯人を名指しするため)', () => {
-    for (const tag of ['storage_changed', 'interval_poll', 'visibility_resume', 'cdb_summary_push']) {
+    for (const tag of ['interval_poll', 'visibility_resume', 'cdb_summary_push']) {
       expect(popupSrc).toContain(`tagRefreshReason('${tag}')`);
     }
     // paint 実行時にタグが計上されること。
     expect(popupSrc).toMatch(/noteRepaintReason\(_refreshReasonTag \|\| 'unknown'\);/);
+  });
+
+  /*
+   * ★v0.1.1340: storage_changed だけは【引き金キー付き】のタグに格上げした。
+   *   実測(2026-08-12): storage_changed が全体の83%(1,891回)を占めるところまでは
+   *   分かったが、どのキーが引き金かが分からず内訳が読めなかった。
+   *   リテラル 'storage_changed' 固定の断言に戻すと格上げが失われるので、
+   *   「タグをキーから組み立てていること」を断言する。
+   */
+  it("★storage_changed は引き金キー付きタグになっている(内訳が読めないと原因が特定できない)", () => {
+    expect(popupSrc).toContain('buildStorageRefreshTriggerTag(changedKeys)');
+    expect(popupSrc).toContain('tagRefreshReason(trigTag)');
+    // 素の 'storage_changed' リテラルへ後退していないこと(格上げの取り消し防止)。
+    expect(popupSrc).not.toContain("tagRefreshReason('storage_changed')");
   });
 });

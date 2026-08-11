@@ -752,7 +752,7 @@
   - `src/lib/statusTrendKey.js`
   - `src/extension/status-entry.js`
   - `src/lib/statusActionAdvisor.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 149</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 151</summary>
 
 - `app/app.js` — スマホ閲覧用 status Web 版。
 - `app/live-view.js` — global NL_BUILD_ID
@@ -854,6 +854,7 @@
 - `src/lib/popupFramePresets.js` — popup の配色プリセット（フレーム）管理。
 - `src/lib/popupWatchSnapshotRetry.js` — 視聴タブのリロード直後は content script の readiness が揃わず、
 - `src/lib/popupWindowEmptyHeight.js` — 0.1.71 (BA): popup window の高さを「state（active watch / empty+history /
+- `src/lib/prefersReducedMotion.js` — 【層】L0 判定層(依存ゼロ・chrome.* 非依存)
 - `src/lib/prewarmCoordinator.js` — 複数 watch タブで popup.html の prewarm が同時に走るのを防ぐ
 - `src/lib/profileResolveState.js` — v0.1.720 PR-T2: プロフィール解決の状態管理（純関数）。
 - `src/lib/protobufVarint.js` — Protobuf の非負 varint を読み取る（length-delimited の長さ用）。
@@ -871,6 +872,7 @@
 - `src/lib/singleFlightByKey.js` — key 単位の single-flight 実行器(純関数コア)。
 - `src/lib/standalonePopupClose.js` — v0.1.433: 別ウィンドウ POP（standalone popup window）を「配信に飛ばしたら閉じる」判定（純ロジック）。
 - `src/lib/storageErrorState.js` — ストレージ書き込みエラーをポップアップ向けにシリアライズする純関数
+- `src/lib/storageRefreshTriggerKey.js` — 【層】L0 判定層(純粋関数・I/O禁止)
 - `src/lib/storageWriteLedger.js` — 2026-07-07 (robust-arch Phase 0 / 計器のみ・挙動不変):
 - `src/lib/storedCommentDedupeMerge.js` — popup normalizeStoredCommentEntries 用: 同一キー重複行のマージ（PII を増やさずフラグのみ統合）
 - `src/lib/supportActivityTimeline.js` — 応援タイムライン: コメントとギフト着弾を時刻順に統合する純関数（v0.1.340）。
@@ -908,7 +910,7 @@
 
 ## 🧬 修正系譜マップ(この系統のバグを過去にどう直したか)
 
-> changelog 全 669 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
+> changelog 全 670 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
 
 ### 💾 記録件数 (92版)
 - `v0.1.1327` 2026-08-11 — 読み上げが一瞬ONになって戻るのを直しました
@@ -1855,7 +1857,8 @@
 - `v0.1.673` 2026-06-10 — コメビュの名前をパネルと同じ情報源で補完
 - `v0.1.670` 2026-06-10 — コメビュのアイコンを本家と同じサムネに
 
-### 🩺 診断・状態速報 (243版)
+### 🩺 診断・状態速報 (244版)
+- `v0.1.1340` 2026-08-12 — feat(diag): 描き直しの引き金を名指し
 - `v0.1.1339` 2026-08-12 — fix(diag): 取れているのに取得中の表示
 - `v0.1.1336` 2026-08-12 — fix(voice): 過負荷の手がかりを戻す
 - `v0.1.1335` 2026-08-11 — refactor(voice): ON失敗理由もtaxonomy化

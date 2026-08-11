@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1340',
+    date: '2026-08-12',
+    summary: 'feat(diag): 描き直しの引き金を名指し',
+    items: Object.freeze([
+      '画面の描き直しが多いとき、どのデータ更新が引き金かを状態速報に出すようにしました。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1339',
     date: '2026-08-12',
     summary: 'fix(diag): 取れているのに取得中の表示',

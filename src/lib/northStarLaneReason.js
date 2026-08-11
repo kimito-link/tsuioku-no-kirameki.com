@@ -80,6 +80,16 @@ export function hasEventParticipationSignal(bundle, snap) {
  *   v0.1.851: contribResult / adResult(makeLaneResult の戻り)が渡されたら、0件フォールバックを
  *   「成功0件=no_ranking_data(該当無し)」「失敗=fetch_error」「未取得=not_yet」に正しく分ける。
  *   省略時は従来の rows のみ経路(等価)＝後方互換。
+ *
+ *   ★★未解決(2026-08-12 調査で判明・v0.1.1340 時点):
+ *     contribResult / adResult を渡しているのは content-entry.js:6782-6789 だけ。
+ *     **popup 経路(popup-entry.js の3レーン)は渡していない＝この分岐が発火しない**。
+ *     結果、popup では「API が200で成功したが0件」を fetch_error / iframe_unrendered と
+ *     誤称する(v0.1.851 が根治したはずの症状が popup にだけ残っている)。
+ *     ★ただし単純な配線漏れ【ではない】: 成否(ok/status)の出所である `_externalFetchProbe`
+ *       は content script 側の状態で、**popup にはその情報が存在しない**(grep 0件)。
+ *       渡すには「取得の成否を popup まで運ぶ経路」を先に作る必要がある＝別版の仕事。
+ *     ★暫定で嘘の値を渡さないこと(成功と誤判定すると本物の失敗を隠す)。
  * @returns {NorthStarLaneState}
  */
 export function determineNorthStarLaneState(laneId, ctx) {
