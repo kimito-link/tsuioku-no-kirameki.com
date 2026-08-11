@@ -372,6 +372,7 @@ import {
 } from '../lib/giftDeltaFallback.js';
 import {
   isVoicevoxAlive,
+  probeVoicevoxAlive,
   listVoicevoxStyleIds,
   synthesizeVoice
 } from '../lib/voicevoxClient.js';
@@ -2859,13 +2860,20 @@ export function mountVenueBarButton(options = {}) {
   //   状態を受け、checking は 180ms 経ってもまだ ready で無ければ初めて演出を描く。connecting(再試行中)は
   //   即描く。ready/idle で空にし、notfound で起動案内に切替。voiceStatus の内容/見た目はこの driver が所有。
   let voiceLoadingTimer = 0;
-  const renderVoiceLoading = (/** @type {string} */ state) => {
-    const view = resolveVoiceLoadingView(state, 'venue');
+  // ★v0.1.1326: 第2引数 reason(timeout/refused/http-error)で文言を出し分ける。
+  const renderVoiceLoading = (
+    /** @type {string} */ state,
+    /** @type {'timeout'|'refused'|'http-error'|'no-fetch'|''} */ reason
+  ) => {
+    const view = resolveVoiceLoadingView(state, 'venue', reason);
     voiceStatus.classList.toggle('is-loading', view.kind === 'loading');
     voiceStatus.classList.toggle('is-error', view.kind === 'error');
     voiceStatus.textContent = view.text;
   };
-  const driveVoiceLoading = (/** @type {string} */ state) => {
+  const driveVoiceLoading = (
+    /** @type {string} */ state,
+    /** @type {'timeout'|'refused'|'http-error'|'no-fetch'|''} */ reason = ''
+  ) => {
     if (voiceLoadingTimer) {
       window.clearTimeout(voiceLoadingTimer);
       voiceLoadingTimer = 0;
@@ -2876,11 +2884,11 @@ export function mountVenueBarButton(options = {}) {
       voiceStatus.textContent = '';
       voiceLoadingTimer = window.setTimeout(() => {
         voiceLoadingTimer = 0;
-        if (shouldRenderLoading('checking', VOICE_LOADING_FLICKER_GUARD_MS)) renderVoiceLoading('checking');
+        if (shouldRenderLoading('checking', VOICE_LOADING_FLICKER_GUARD_MS)) renderVoiceLoading('checking', '');
       }, VOICE_LOADING_FLICKER_GUARD_MS);
       return;
     }
-    renderVoiceLoading(state);
+    renderVoiceLoading(state, reason);
   };
 
   // v0.1.1065: 会場読み上げの計器を KEY_VOICE_DIAG へ書く(3秒min-gap・他診断と同型)。
@@ -2911,7 +2919,10 @@ export function mountVenueBarButton(options = {}) {
       voiceStatus.classList.toggle('is-error', /見つかりません|ブロック/.test(msg));
       voiceStatus.textContent = msg;
     },
-    onLoadingState: (/** @type {string} */ state) => driveVoiceLoading(state),
+    onLoadingState: (
+      /** @type {string} */ state,
+      /** @type {'timeout'|'refused'|'http-error'|'no-fetch'|''} */ reason = ''
+    ) => driveVoiceLoading(state, reason),
     onSkip: () => {},
     isObsMode: () => {
       return (window.name || '').includes('OBS') || window.location.search.includes('obs=');
@@ -2920,6 +2931,9 @@ export function mountVenueBarButton(options = {}) {
     createObjectURL: typeof URL !== 'undefined' ? URL.createObjectURL.bind(URL) : null,
     revokeObjectURL: typeof URL !== 'undefined' ? URL.revokeObjectURL.bind(URL) : null,
     fetchVoicevoxAlive: isVoicevoxAlive,
+    // ★v0.1.1326: 理由付きの生存確認を配線(未配線だと reason が常に 'refused' になり、
+    //   起動しているのに「見つかりません」と言い続ける従来の誤案内が残る)。
+    probeVoicevoxAlive,
     fetchVoiceStyleIds: listVoicevoxStyleIds,
     fetchSynthesizeVoice: synthesizeVoice,
     resolveVoice: resolveVoiceForUser

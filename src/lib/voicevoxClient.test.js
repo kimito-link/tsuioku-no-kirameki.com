@@ -3,8 +3,10 @@ import {
   VOICEVOX_BASE_URL,
   buildMergedVoiceText,
   buildVoiceReadingText,
+  classifyVoicevoxAliveFailure,
   defaultVoicevoxAliveTimeoutMs,
   isVoicevoxAlive,
+  probeVoicevoxAlive,
   isWhisperStyleName,
   listVoicevoxStyleIds,
   synthesizeVoice
@@ -35,6 +37,70 @@ describe('isVoicevoxAlive', () => {
     const pending = isVoicevoxAlive({ fetchFn, timeoutMs: 10 });
     await vi.advanceTimersByTimeAsync(10);
     await expect(pending).resolves.toBe(false);
+  });
+});
+
+/*
+ * ★v0.1.1326: ユーザー実機で VOICEVOX 0.25.2 が【起動しているのに】
+ *   「VOICEVOXが見つかりません」と表示され、読み上げが ON にならなかった。
+ *   ユーザーの言葉「たちあがってるけどね」。理由を区別しないと次の一手が決まらない。
+ */
+describe('classifyVoicevoxAliveFailure', () => {
+  it('タイムアウトは timeout(起動しているが応答が無い)', () => {
+    expect(classifyVoicevoxAliveFailure({ error: new Error('voicevox_timeout') })).toBe('timeout');
+  });
+
+  it('AbortError も timeout に寄せる(待ちきれず打ち切った)', () => {
+    const err = new Error('The operation was aborted');
+    err.name = 'AbortError';
+    expect(classifyVoicevoxAliveFailure({ error: err })).toBe('timeout');
+  });
+
+  it('接続できない例外は refused(そもそも居ない)', () => {
+    expect(classifyVoicevoxAliveFailure({ error: new TypeError('Failed to fetch') })).toBe('refused');
+  });
+
+  it('応答したが ok:false は http-error(起動しているがエラー)', () => {
+    expect(classifyVoicevoxAliveFailure({ response: { ok: false } })).toBe('http-error');
+  });
+
+  it('fetchFn が無いときは no-fetch', () => {
+    expect(classifyVoicevoxAliveFailure({ hasFetch: false })).toBe('no-fetch');
+  });
+
+  it('成功時は空文字(失敗していない)', () => {
+    expect(classifyVoicevoxAliveFailure({ response: { ok: true } })).toBe('');
+    expect(classifyVoicevoxAliveFailure({})).toBe('');
+  });
+
+  it('壊れた入力でも例外を投げない', () => {
+    expect(() => classifyVoicevoxAliveFailure(/** @type {any} */ (null))).not.toThrow();
+    expect(() => classifyVoicevoxAliveFailure(/** @type {any} */ (undefined))).not.toThrow();
+  });
+});
+
+describe('probeVoicevoxAlive', () => {
+  it('成功なら ok:true・reason は空', async () => {
+    const fetchFn = vi.fn().mockResolvedValue({ ok: true });
+    await expect(probeVoicevoxAlive({ fetchFn })).resolves.toEqual({ ok: true, reason: '' });
+  });
+
+  it('★タイムアウトは reason=timeout(「見つかりません」と言わせないための根拠)', async () => {
+    vi.useFakeTimers();
+    const fetchFn = vi.fn(() => new Promise(() => {}));
+    const pending = probeVoicevoxAlive({ fetchFn, timeoutMs: 10 });
+    await vi.advanceTimersByTimeAsync(10);
+    await expect(pending).resolves.toEqual({ ok: false, reason: 'timeout' });
+  });
+
+  it('接続失敗は reason=refused', async () => {
+    const fetchFn = vi.fn().mockRejectedValue(new TypeError('Failed to fetch'));
+    await expect(probeVoicevoxAlive({ fetchFn })).resolves.toEqual({ ok: false, reason: 'refused' });
+  });
+
+  it('ok:false は reason=http-error', async () => {
+    const fetchFn = vi.fn().mockResolvedValue({ ok: false });
+    await expect(probeVoicevoxAlive({ fetchFn })).resolves.toEqual({ ok: false, reason: 'http-error' });
   });
 });
 

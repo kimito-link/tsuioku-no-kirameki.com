@@ -24,6 +24,17 @@ import {
   computeSustainedPressureBoost, mergeVoiceSpeedBoost
 } from './voiceLagBudget.js';
 
+/**
+ * ★v0.1.1326: 生存確認の再試行バックオフ(ms)。初回失敗後にこの間隔で最大3回試す。
+ *
+ * なぜ増やしたか: 会場モードは content script → MV3 SW プロキシ経由で、SW のコールド
+ *   起床が既定タイムアウト(5000ms)に間に合わないことがある。従来は再試行1回だけで
+ *   諦めて「VOICEVOXが見つかりません」を出し、ボタンが OFF に戻っていた。
+ *   VOICEVOX が本当に未起動なら3回とも即座に refused で返るので、待ち時間は増えない
+ *   (待つのは「応答が遅いだけ」のときだけ=直したい状況とコストが一致する)。
+ */
+export const VOICE_ALIVE_RETRY_BACKOFF_MS = Object.freeze([0, 500, 1500]);
+
 export class VoicePlayer {
   constructor(deps = {}) {
     this.storage = deps.storage;
@@ -39,6 +50,17 @@ export class VoicePlayer {
     this.createObjectURL = deps.createObjectURL;
     this.revokeObjectURL = deps.revokeObjectURL;
     this.fetchVoicevoxAlive = deps.fetchVoicevoxAlive;
+    /*
+     * ★v0.1.1326: 理由付きの生存確認。未配線(既存の呼び出し側・テスト)なら
+     *   従来の fetchVoicevoxAlive を包んで {ok, reason:'refused'} に均す=後方互換。
+     *   reason が要るのは表示だけなので、未配線でも挙動は壊れない。
+     */
+    this.probeVoicevoxAlive =
+      deps.probeVoicevoxAlive ||
+      (async () => {
+        const ok = await this.fetchVoicevoxAlive();
+        return { ok: !!ok, reason: ok ? '' : 'refused' };
+      });
     this.fetchVoiceStyleIds = deps.fetchVoiceStyleIds;
     this.fetchSynthesizeVoice = deps.fetchSynthesizeVoice;
     this.resolveVoice = deps.resolveVoice;
@@ -233,16 +255,32 @@ export class VoicePlayer {
     this.onLoadingState('checking');
 
     // 2026-06-14: 会場モード(content script・SW プロキシ経由)では MV3 SW のコールド起床で
-    //   初回の生存確認がタイムアウトしやすい。初回失敗時に1回だけ再試行する(SW が起きた後の
-    //   2回目はほぼ通る)。VOICEVOX が本当に未起動なら2回とも失敗して従来どおり案内を出す。
-    let alive = await this.fetchVoicevoxAlive();
-    if (!alive) {
+    //   初回の生存確認がタイムアウトしやすい。初回失敗時に再試行する(SW が起きた後の
+    //   2回目はほぼ通る)。VOICEVOX が本当に未起動なら全部失敗して従来どおり案内を出す。
+    //
+    // ★v0.1.1326(ユーザー実機「押してもONにならない」の根治):
+    //   ① 再試行を 1回 → 3回(バックオフ 0/500/1500ms)。MV3 SW の起床が 5000ms でも
+    //      間に合わないことがあり、1回の再試行では取りこぼしていた。
+    //   ② 失敗しても【OFF を永続保存しない】(persist:false)。従来は disable({persist:true})
+    //      でユーザーの「ONにしたい」意思を storage に消しに行っており、これが
+    //      「押しても勝手にOFFに戻る」の直接原因だった。
+    //   ③ 失敗理由(timeout/refused/http-error)を画面に渡す。VOICEVOX が起動しているのに
+    //      「見つかりません」と言っていた誤案内の是正(ユーザー指摘「たちあがってるけどね」)。
+    let probe = await this.probeVoicevoxAlive();
+    if (!probe.ok) {
       this.onLoadingState('connecting');
-      alive = await this.fetchVoicevoxAlive();
+      for (const waitMs of VOICE_ALIVE_RETRY_BACKOFF_MS) {
+        if (waitMs > 0) await new Promise((r) => setTimeout(r, waitMs));
+        probe = await this.probeVoicevoxAlive();
+        if (probe.ok) break;
+      }
     }
-    if (!alive) {
-      this.disable({ persist: true });
-      this.onLoadingState('notfound');
+    if (!probe.ok) {
+      // ★persist:false = ユーザーの意思を消さない。次に押せばまた試せる。
+      this.disable({ persist: false });
+      this.onLoadingState('notfound', probe.reason);
+      this.toggleBusy = false;
+      this._emitToggle();
       return;
     }
 
