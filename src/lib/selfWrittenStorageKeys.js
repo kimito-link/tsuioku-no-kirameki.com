@@ -59,7 +59,31 @@ const SELF_WRITTEN_PATTERNS = Object.freeze([
   /^nls_lane_mirror_v\d+$/i,
   /^nls_stat_cards_mirror_v\d+$/i,
   /^nls_north_star_mirror_v\d+$/i,
-  /^nls_comment_timeline_mirror_v\d+$/i
+  /^nls_comment_timeline_mirror_v\d+$/i,
+  /*
+   * ★v0.1.1344: 鏡バンドルの【残り5種】を追加(2026-08-04 の根治後に鏡が増え、
+   *   このリストの更新が漏れていた)。
+   *
+   * ■ 実測(2026-08-12 状態速報)
+   *     描き直しの内訳(計2285回): storage_changed1891 / self_write_skipped352
+   *     1コメントあたり30回(正常は3回以下)・表示遅延5秒
+   *   ＝2026-08-04 に一度根治したはずの自己フィードバックループが再発していた。
+   *
+   * ■ 真因(コードだけで確定・実データ不要だった)
+   *   mirrorBundleFlushScheduler.js:36-44 は【9種】の鏡を同じバンドルで書くが、
+   *   ここには4種しか無かった。isAllSelfWrittenRenderArtifacts は every() なので
+   *   **未登録の鏡が1つ混ざるだけでスキップ判定が丸ごと false** になり、
+   *   さらに popupStorageRefreshCoalesce の allHighFreq も false になって
+   *   450ms スロットルまで素通りする(穴1と穴2が再び噛み合った)。
+   *
+   * ★検査 selfWrittenCoversMirrorBundle.test.js が「バンドルの全キーがここに載ること」を
+   *   機械照合する。鏡を足したらこのリストも足す、を人間の記憶に頼らない。
+   */
+  /^nls_top_supporters_mirror_v\d+$/i,
+  /^nls_gift_history_mirror_v\d+$/i,
+  /^nls_room_heat_mirror_v\d+$/i,
+  /^nls_session_summary_mirror_v\d+$/i,
+  /^nls_story_diag_mirror_v\d+$/i
 ]);
 
 /**
