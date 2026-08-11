@@ -1,5 +1,74 @@
 import { describe, it, expect } from 'vitest';
-import { makeInitialVoiceDiag, buildVoiceDiagSnapshot, buildVoiceDiagLine } from './voiceDiag.js';
+import {
+  makeInitialVoiceDiag,
+  buildVoiceDiagSnapshot,
+  buildVoiceDiagLine,
+  VOICE_DIAG_FRESH_MS
+} from './voiceDiag.js';
+
+/*
+ * ★v0.1.1328 化石値ガード。2026-08-11 に司令塔が実際に2回誤診してから入れた。
+ *   KEY_VOICE_DIAG は永続化されリセット経路が無いため、コメビュ/会場を閉じると
+ *   スナップショットが凍り、状態速報は8日前の数字を「今の値」として表示していた。
+ */
+describe('buildVoiceDiagLine 化石値ガード', () => {
+  const FRESH = {
+    enabled: true, spokenTotal: 5, queueNow: 1, queueMax: 3,
+    serviceTimeEmaMs: 900, effectiveQueueMax: 8, capturedAt: 1_000_000
+  };
+
+  it('新鮮な値はそのまま数値を出す', () => {
+    const line = buildVoiceDiagLine(FRESH, FRESH.capturedAt + 5_000);
+    expect(line).toContain('読み上げ:ON');
+    expect(line).toContain('実効上限8');
+    expect(line).not.toContain('化石値');
+  });
+
+  it('★8日前の実データ形状は化石値として数値を伏せる(実際に誤診した状況)', () => {
+    const EIGHT_DAYS = 8 * 24 * 60 * 60 * 1000;
+    const fossil = {
+      ...FRESH,
+      // 当時の実測値。床5の現行コードでは実効上限2も coldsynth も到達不能=化石の証明。
+      effectiveQueueMax: 2, serviceTimeEmaMs: 4405, lagVerdict: 'coldsynth',
+      source: 'venue'
+    };
+    const line = buildVoiceDiagLine(fossil, fossil.capturedAt + EIGHT_DAYS);
+    expect(line).toContain('化石値');
+    // ★数値を出さない(出すから読んでしまう)。
+    expect(line).not.toContain('実効上限2');
+    expect(line).not.toContain('coldsynth');
+    expect(line).not.toContain('4405');
+    // どちらの面が書いたかは残す(調査の出発点)。
+    expect(line).toContain('venue');
+  });
+
+  it('10分ちょうど超で化石値に切り替わる(judgeValueFreshness の閾値に従う)', () => {
+    const line = buildVoiceDiagLine(FRESH, FRESH.capturedAt + 11 * 60_000);
+    expect(line).toContain('化石値');
+  });
+
+  it('しきい値内(60秒)は通常表示', () => {
+    const line = buildVoiceDiagLine(FRESH, FRESH.capturedAt + VOICE_DIAG_FRESH_MS - 1);
+    expect(line).not.toContain('化石値');
+  });
+
+  it('capturedAt が無い古いスナップショットは従来どおり表示(後方互換)', () => {
+    const noCaptured = { ...FRESH };
+    delete noCaptured.capturedAt;
+    const line = buildVoiceDiagLine(noCaptured, 9_999_999);
+    expect(line).not.toContain('化石値');
+    expect(line).toContain('読み上げ:ON');
+  });
+});
+
+describe('buildVoiceDiagSnapshot source', () => {
+  it('source を載せる(どちらの面が書いたか)', () => {
+    expect(buildVoiceDiagSnapshot({ source: 'comeview' }, 1).source).toBe('comeview');
+  });
+  it('未指定なら空文字(壊れない)', () => {
+    expect(buildVoiceDiagSnapshot({}, 1).source).toBe('');
+  });
+});
 
 describe('makeInitialVoiceDiag', () => {
   it('全項目が安全な初期値', () => {

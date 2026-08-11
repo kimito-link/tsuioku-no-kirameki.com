@@ -1,3 +1,12 @@
+import { judgeValueFreshness } from './anomalyVerdict.js';
+
+/**
+ * ★v0.1.1328: この診断を「新鮮」とみなす上限。これを大きく超えたら化石値として数値を伏せる。
+ *   judgeValueFreshness は 10分以上で level='bad'(化石値)を返す。
+ *   読み上げ診断は3秒 min-gap で書かれるので、60秒あれば通常運用では十分に新しい。
+ */
+export const VOICE_DIAG_FRESH_MS = 60_000;
+
 /**
  * 会場モード(comeview)の読み上げ発話キュー診断。リアルタイム性(「たまに遅れて出る」)の
  * 真因切り分け用の純観測値を組み立てる純関数群。記録/発話には一切触れない。
@@ -102,7 +111,7 @@ export function makeInitialVoiceDiag() {
  * storage 書き込み用の軽量スナップショット(ago は読み手側で算出するため base を渡す)。
  * @param {Partial<VoiceDiagState>|null|undefined} diag
  * @param {number} [nowMs]
- * @returns {VoiceDiagState & { capturedAt: number }}
+ * @returns {VoiceDiagState & { capturedAt: number, source: string }}
  */
 export function buildVoiceDiagSnapshot(diag, nowMs) {
   const base = makeInitialVoiceDiag();
@@ -153,7 +162,16 @@ export function buildVoiceDiagSnapshot(diag, nowMs) {
     dropSweepStaleTotal: num(d.dropSweepStaleTotal, base.dropSweepStaleTotal),
     lagVerdict: String(d.lagVerdict || base.lagVerdict),
     diagBornAt: num(d.diagBornAt, base.diagBornAt),
-    capturedAt: now
+    capturedAt: now,
+    /*
+     * ★v0.1.1328: どちらの面が書いたスナップショットかを必ず残す。
+     *   読み上げは【会場(VoicePlayer)】と【コメビュ(独自実装)】の2実装が同じ
+     *   storage キーを奪い合っており(last-writer-wins)、化石値を見たときに
+     *   「どちらが書いたか」が分からないと調査の出発点が決まらない。
+     *   venueBar は従来から 'venue' を後付けしていたが、comeview は無印だった=非対称。
+     *   ここで既定を持たせ、呼び出し側が上書きする形に揃える。
+     */
+    source: String(d.source || '')
   };
 }
 
@@ -161,12 +179,46 @@ export function buildVoiceDiagSnapshot(diag, nowMs) {
  * 状態速報の概要に出す1行を作る純関数。voice が一度も動いていない(未取得)なら ''。
  * 「たまに遅れる」を一目で掴めるよう、待機ピーク・間引き・最終発話からの経過を出す。
  *
- * @param {(VoiceDiagState & { capturedAt?: number })|null|undefined} snap
+ * @param {(VoiceDiagState & { capturedAt?: number, source?: string })|null|undefined} snap
  * @param {number} nowMs 現在時刻(最終発話 ago の算出用)
  * @returns {string}
  */
 export function buildVoiceDiagLine(snap, nowMs) {
   if (!snap || typeof snap !== 'object') return '';
+  /*
+   * ★v0.1.1328 化石値ガード(2026-08-11・実際に2回誤診してから入れた)
+   *
+   * ■ 何が起きたか
+   *   KEY_VOICE_DIAG は chrome.storage.local に永続化され、リポジトリ内に
+   *   リセット経路が1つも無い。コメビュ/会場を閉じるとスナップショットはそのまま凍り、
+   *   読み手(状態速報)は【8日前の数字】を今の値として表示し続けていた。
+   *   実際に出ていた「実効上限2 / 判定=coldsynth / 需要28.3 vs 供給13.6」は
+   *   すべて 2026-08-03 頃の値。★床は 2026-08-04 に 5 へ上げてあり、
+   *   現行コードでは実効上限2も coldsynth(cap<=3が条件)も【到達不能】=化石の証明。
+   *
+   * ■ 同じ誤読が既に2回起きている
+   *   1回目 2026-08-04: 「まだ実効上限2だ、変更が効いていない」と誤読して版を重ねた
+   *     (対策として judgeValueFreshness が書かれたが【どこからも呼ばれていなかった】)
+   *   2回目 2026-08-11: 司令塔が同じ数字を根拠に「読み上げが重い」とユーザーに説明した
+   *
+   * ■ なぜ数値を隠すのか(警告を添えるだけにしない)
+   *   数字が見えれば人は読む。1回目の対策(文書化)は2回目を止められなかった。
+   *   止まるのは判定を共有したときだけなので、古い値は【出さない】。
+   */
+  const capturedAt = Number(snap.capturedAt) || 0;
+  const nowForAge = Number.isFinite(Number(nowMs)) ? Number(nowMs) : 0;
+  if (capturedAt > 0 && nowForAge > 0) {
+    const verdict = judgeValueFreshness(nowForAge - capturedAt, VOICE_DIAG_FRESH_MS);
+    if (verdict.level === 'bad') {
+      const min = Math.max(0, Math.round((nowForAge - capturedAt) / 60000));
+      const src = String(snap.source || '').trim();
+      const who = src ? `・${src}` : '';
+      return (
+        `会場読み上げ: ⚠化石値(${min}分前${who}) この数字で判断してはいけません` +
+        `(会場モードかコメビュを開き直すと今の値になります)`
+      );
+    }
+  }
   const enabled = !!snap.enabled;
   const spoken = Number(snap.spokenTotal) || 0;
   const queueNow = Number(snap.queueNow) || 0;
