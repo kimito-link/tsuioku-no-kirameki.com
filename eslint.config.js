@@ -27,6 +27,9 @@ export default [
       // バンドル等）の作業用スクラッチ置き場。git-ignore 済みだが lint 対象だと
       // 展開した minified コードで数千 error になるため除外する。
       '.artifacts/**',
+      // tests-tmp/** は実機再現の使い捨て計測スクリプト置き場（git-ignore 済み）。
+      // ブラウザ実行される evaluate 断片を含むため Node の globals では必ず no-undef になる。
+      'tests-tmp/**',
       'build/**',
       'test-results/**',
       'playwright-report/**',
