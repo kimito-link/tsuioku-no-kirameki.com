@@ -517,6 +517,10 @@ async function enableVoiceReading({ persist = true } = {}) {
     }
   }
   if (!probe.ok) {
+    // ★v0.1.1333: 会場と同じ失敗理由を既存計器へ残す(新しいstorage書き手は増やさない)。
+    _voiceDiag.lastEnableFailReason = String(probe.reason || 'unknown');
+    _voiceDiag.enableFailTotal = (Number(_voiceDiag.enableFailTotal) || 0) + 1;
+    publishVoiceDiag();
     // ★persist:false = 次に押せばまた試せる(OFFで固定しない)。
     disableVoiceReading({ persist: false });
     driveCvVoiceLoading('notfound', probe.reason);
@@ -527,6 +531,9 @@ async function enableVoiceReading({ persist = true } = {}) {
   _voiceGeneration += 1;
   _voiceReadingEnabled = true;
   _voiceToggleBusy = false;
+  // ★v0.1.1333: 成功時は古い失敗理由を消し、次の状態速報で誤診させない。
+  _voiceDiag.lastEnableFailReason = '';
+  publishVoiceDiag();
   driveCvVoiceLoading('ready');
   updateVoiceToggle();
   if (persist) persistVoiceReadingEnabled(true);
