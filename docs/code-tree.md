@@ -676,7 +676,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (1610)
+- 📁 **src/** (1611)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -966,7 +966,7 @@
         - `logo_funlink_white_RGB_maru_black.png`
       - `logo_guide_funlink_ol.pdf`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1370)
+  - 📁 **lib/** (1371)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -1962,6 +1962,7 @@
     - `selfActionCelebration.test.js`
     - `selfPostedMatcher.js` — 自己投稿コメント（self-posted recents）と、保存済みコメント一覧の
     - `selfPostedMatcher.test.js`
+    - `selfWrittenCoversMirrorBundle.test.js`
     - `selfWrittenStorageKeys.js` — refresh() 自身が書くキー(=再描画を誘発してはいけないキー)の判定。
     - `selfWrittenStorageKeys.test.js`
     - `sessionCommentCache.js` — v0.1.650: JSONキャッシュ即時表示の本丸。「開いた瞬間に全コメント表示・ローディングなし」。
