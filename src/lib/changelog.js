@@ -26,6 +26,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1335',
+    date: '2026-08-11',
+    summary: 'refactor(voice): ON失敗理由もtaxonomy化',
+    items: Object.freeze([
+      '読み上げONに失敗した理由の日本語を、共通の失敗分類taxonomyから出すようにしました。',
+      '元の理由コード(refused など)は消さず併記するため、状態速報から原因を追えます。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1334',
     date: '2026-08-11',
     summary: 'refactor(voice): 合成失敗ラベルをtaxonomy化',
