@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1339',
+    date: '2026-08-12',
+    summary: 'fix(diag): 取れているのに取得中の表示',
+    items: Object.freeze([
+      'ギフト履歴と貢献度ランキングが、実際は取れているのに状態速報で「取得中」のままになる問題を直しました。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1338',
     date: '2026-08-12',
     summary: 'fix(icon): 消えたアイコンを再取得する',

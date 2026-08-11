@@ -69,6 +69,7 @@ export function hasEventParticipationSignal(bundle, snap) {
  *   snap?: any,
  *   kokenApiRows?: any[]|null,
  *   nicoadApiRows?: any[]|null,
+ *   giftHistoryApiRows?: any[]|null,
  *   contribResult?: { ok: boolean|null, status: number|null, rows: any[]|null }|null,
  *   adResult?: { ok: boolean|null, status: number|null, rows: any[]|null }|null
  * }} ctx
@@ -86,6 +87,17 @@ export function determineNorthStarLaneState(laneId, ctx) {
   const snap = ctx?.snap || null;
   const kokenApiRows = Array.isArray(ctx?.kokenApiRows) ? ctx.kokenApiRows : null;
   const nicoadApiRows = Array.isArray(ctx?.nicoadApiRows) ? ctx.nicoadApiRows : null;
+  /*
+   * ★v0.1.1339: giftHistory の API 直読み経路(kokenApiRows/nicoadApiRows と同じ流儀)。
+   *
+   * ★このとき呼び出し側にも【2件の片肺】が見つかったので併記する(popup-entry.js):
+   *   - giftHistory: この引数自体が無く、判定は公式DOMしか見られなかった
+   *   - contributionRanking: v0.1.617 で kokenApiRows の分岐を足したのに、
+   *     呼び出し側が { bundle, snap } しか渡しておらず【一度も発火していなかった】
+   *   ＝3レーン中2つで「判定コードはあるが配線が無い」状態だった。
+   *   検査: src/extension/giftHistoryLaneStateWiring.test.js が3レーン全部を断言する。
+   */
+  const giftHistoryApiRows = Array.isArray(ctx?.giftHistoryApiRows) ? ctx.giftHistoryApiRows : null;
   const contribResult = ctx?.contribResult || null;
   const adResult = ctx?.adResult || null;
 
@@ -111,6 +123,25 @@ export function determineNorthStarLaneState(laneId, ctx) {
       return 'iframe_unrendered';
     }
     case 'giftHistory': {
+      /*
+       * ★v0.1.1339: koken API / sub-app 経由で履歴が取れていれば ok(片肺の解消)。
+       *
+       * ■ 症状(2026-08-12 実機・状態速報)
+       *     公式値レーン: ... / ギフト履歴:⏳取得中 / ...
+       *   ギフトが実際に投げられ、レーンも投げ一覧も【正しく描けている】のに
+       *   速報だけが永久に「取得中」と言い続けていた。
+       *
+       * ■ 真因: この case が `bundle.giftHistory`(公式サイドバーの DOM scrape)しか
+       *   見ておらず、koken API 経路(nls_gift_subapp_history_<lv> 由来)を無視していた。
+       *   ★同じ v0.1.617 で contributionRanking には kokenApiRows、adRanking には
+       *     nicoadApiRows という API 直読みの分岐が【追加済み】だったのに、
+       *     giftHistory だけ取り残されていた＝典型的な片肺。
+       *   ＝サイドバーのギフトタブを開いていない配信では、取れていても「取得中」。
+       *
+       * ★画面は正しい(描画に成功した経路はこの判定に到達しない)。
+       *   壊れていたのは【報告】だけ。だが速報が嘘をつくのは誤診の直接の原因になる。
+       */
+      if (giftHistoryApiRows && giftHistoryApiRows.length > 0) return 'ok';
       const count = Array.isArray(bundle?.giftHistory)
         ? bundle.giftHistory.length
         : 0;

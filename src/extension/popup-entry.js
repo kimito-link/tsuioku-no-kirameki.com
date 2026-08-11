@@ -12284,7 +12284,9 @@ async function refreshNorthStarContributionRankingLaneAsync(liveId) {
   }
   // ranking 取れない時は既存 host class を付け直して reason 経由 placeholder へ。
   body.classList.remove('nl-contrib-ranking-list-host');
-  const state = determineNorthStarLaneState('contributionRanking', { bundle, snap });
+  // ★v0.1.1339: kokenApiRows を渡す(giftHistory と同じ片肺がここにもあった)。
+  const kokenApiRows = Array.isArray(ranking) && ranking.length > 0 ? ranking : null;
+  const state = determineNorthStarLaneState('contributionRanking', { bundle, snap, kokenApiRows });
   renderNorthStarLane('contributionRanking', null, state);
 }
 
@@ -12767,7 +12769,12 @@ async function refreshNorthStarGiftHistoryLaneAsync(liveId) {
   _giftHistoryThrowsPanelHtmlKey = '';
   _giftHistoryNorthStarCapturedAtMs = 0;
   clearNorthStarGiftThrowsPanel();
-  const state = determineNorthStarLaneState('giftHistory', { bundle, snap });
+  // ★v0.1.1339: API経路の実データを判定へ渡す(理由は northStarLaneReason.js が正本)。
+  //   新しい storage read は足さない(ctxRaw は上で取得済み)。
+  const giftHistoryApiRows = Array.isArray(ctxRaw?.ledgerRows) && ctxRaw.ledgerRows.length > 0
+    ? ctxRaw.ledgerRows
+    : (Array.isArray(ctxRaw?.rooms) ? ctxRaw.rooms : null);
+  const state = determineNorthStarLaneState('giftHistory', { bundle, snap, giftHistoryApiRows });
   renderNorthStarLane('giftHistory', null, state);
 }
 
@@ -17435,9 +17442,6 @@ async function listWatchFramesWithInnerText(tabId, opts = {}) {
   }
 }
 
-// ★v0.1.1338: probeViewerCountFromFrameTexts / mergeViewerProbeIntoSnapshot は
-//   純粋関数なので lib/viewerCountProbeMerge.js へ移設した(挙動不変)。
-
 /**
  * content script 注入直後はReceiving end does not existになりやすいので再試行
  * @param {number} tabId
@@ -17906,7 +17910,6 @@ async function forceRefetchAllCommenterFollowProfiles(liveId, onStatus) {
   return { totalCommenters: allUids.length, fetched, errors };
 }
 
-// ★v0.1.1338: yieldToBrowserPaint は lib/yieldToBrowserPaint.js へ移設(挙動不変)。
 
 /**
  * HTML レポート用: popup が既に持つ snapshot が watch と整合していれば

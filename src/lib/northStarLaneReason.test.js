@@ -59,6 +59,44 @@ describe('determineNorthStarLaneState', () => {
       const bundle = { giftHistory: [], programStats: { giftPoints: 550 } };
       expect(determineNorthStarLaneState('giftHistory', { bundle })).toBe('iframe_unrendered');
     });
+
+    /*
+     * ★v0.1.1339: 実機で起きていた片肺の再現(2026-08-12)。
+     *   koken API 経由で履歴が取れていて画面は正しく描けているのに、
+     *   判定が bundle.giftHistory(公式サイドバーのDOM)しか見ないため
+     *   速報だけが永久に「取得中」と言い続けていた。
+     *   contributionRanking / adRanking は v0.1.617 で同じ配線が済んでいた。
+     */
+    it('★API経路(ledgerRows)で取れていれば ok(公式DOMが空でも)', () => {
+      const bundle = { giftHistory: [], programStats: { giftPoints: 2950 } };
+      const giftHistoryApiRows = [{ points: 500, senderLabel: 'テスト' }];
+      expect(
+        determineNorthStarLaneState('giftHistory', { bundle, giftHistoryApiRows })
+      ).toBe('ok');
+    });
+
+    it('★API経路(rooms)でも ok になる(投げ一覧が無く送り主別だけの場合)', () => {
+      const bundle = { giftHistory: [], programStats: { giftPoints: 2950 } };
+      const giftHistoryApiRows = [{ userKey: '123', nickname: 'テスト', count: 500 }];
+      expect(
+        determineNorthStarLaneState('giftHistory', { bundle, giftHistoryApiRows })
+      ).toBe('ok');
+    });
+
+    it('API経路が空配列なら従来どおり iframe_unrendered(誤って ok にしない)', () => {
+      const bundle = { giftHistory: [], programStats: { giftPoints: 2950 } };
+      expect(
+        determineNorthStarLaneState('giftHistory', { bundle, giftHistoryApiRows: [] })
+      ).toBe('iframe_unrendered');
+    });
+
+    it('★ギフト0件配信の判定はAPI経路より優先されない(0件なら no_program_gift のまま)', () => {
+      // giftPoints=0 = 本当にギフトが無い配信。API rows も当然空。
+      const bundle = { giftHistory: [], programStats: { giftPoints: 0 } };
+      expect(
+        determineNorthStarLaneState('giftHistory', { bundle, giftHistoryApiRows: [] })
+      ).toBe('no_program_gift');
+    });
   });
 
   describe('eventScore レーン', () => {
