@@ -41,6 +41,7 @@
  *   dropSweepStaleTotal: number, // 2026-07-28計器: 全stale時の先頭群破棄の累計
  *   synthNullTotal: number,      // 2026-08-01計器: 合成がnullで返り読まれずに消えた累計
  *   synthNullNearTimeout: number,// 同上のうち時間切れ(8000ms上限付近)由来の件数
+ *   audioBlockedTotal: number,   // v0.1.1327計器: ブラウザの自動再生ブロック(NotAllowedError)で鳴らせなかった累計
  *   lagVerdict: string,          // 2026-07-28計器: 体感遅延の真因判定トークン(印字専用・挙動に不使用)
  *   diagBornAt: number           // 2026-07-28計器: この診断stateが生まれた時刻(epoch ms・世代識別用)
  * }} VoiceDiagState
@@ -89,6 +90,9 @@ export function makeInitialVoiceDiag() {
     // v0.1.1213: 合成が null で返って消えた件(時間切れ内訳つき)。
     synthNullTotal: 0,
     synthNullNearTimeout: 0,
+    // v0.1.1327: 自動再生ブロックで鳴らせなかった件。「読み上げONなのに無音」の切り分け用
+    //   (合成は成功しているのに音が出ない=ブラウザ側の制約、という状態を名指しする)。
+    audioBlockedTotal: 0,
     lagVerdict: '',
     diagBornAt: 0
   };
@@ -143,6 +147,7 @@ export function buildVoiceDiagSnapshot(diag, nowMs) {
     voicedRecentRatio: num(d.voicedRecentRatio, base.voicedRecentRatio),
     synthNullTotal: num(d.synthNullTotal, base.synthNullTotal),
     synthNullNearTimeout: num(d.synthNullNearTimeout, base.synthNullNearTimeout),
+    audioBlockedTotal: num(d.audioBlockedTotal, base.audioBlockedTotal),
     dropCountGateTotal: num(d.dropCountGateTotal, base.dropCountGateTotal),
     dropHeadStaleTotal: num(d.dropHeadStaleTotal, base.dropHeadStaleTotal),
     dropSweepStaleTotal: num(d.dropSweepStaleTotal, base.dropSweepStaleTotal),
@@ -216,6 +221,12 @@ export function buildVoiceDiagLine(snap, nowMs) {
     //   v0.1.1180(段階0=shadow)当時の名残で、実適用後もこの文言が残っていたのは表示上の
     //   不整合(実害は無いが誤解を招く)。
     if (Number.isFinite(effectiveMax)) parts.push(`実効上限${effectiveMax}`);
+  }
+  // v0.1.1327: 自動再生ブロック。合成は通っているのに音が出ない状態を名指しする
+  //   (ユーザー実機「一瞬ONになって戻る」の正体。0なら何も言わない)。
+  const audioBlocked = Number(snap.audioBlockedTotal) || 0;
+  if (audioBlocked > 0) {
+    parts.push(`再生ブロック${audioBlocked}件(ページを一度クリックすると鳴ります)`);
   }
   const rateClamp = Number(snap.rateClampTotal) || 0;
   if (rateClamp > 0) parts.push(`速度飽和${rateClamp}件`); // playbackRateが上限で追いつけていない兆候。

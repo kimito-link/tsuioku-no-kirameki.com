@@ -140,6 +140,109 @@ describe('VoicePlayer', () => {
     });
   });
 
+  /*
+   * ★v0.1.1327: ユーザー実機「読み上げONボタンをおしても一瞬ONになって戻ってしまう」。
+   *   v1326 で enable() の失敗経路は直したが、この症状は【一度ONになってから】戻るので
+   *   別経路だった。真犯人は再生パスの NotAllowedError ハンドラが disable() を
+   *   呼んでいたこと(voicePlayer.js の playResult.catch)。
+   *   Chrome の自動再生ブロックは「この1件が鳴らせなかった」だけで、機能が壊れた
+   *   わけではないのに、読み上げごと OFF に落としていた。
+   */
+  describe('自動再生ブロック(NotAllowedError)のふるまい', () => {
+    function makeBlockedPlayer(extra = {}) {
+      const blockedAudio = {
+        play: vi.fn().mockRejectedValue(Object.assign(new Error('blocked'), { name: 'NotAllowedError' })),
+        pause: vi.fn(),
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn()
+      };
+      return new VoicePlayer({
+        storage: mockStorage,
+        isObsMode: () => false,
+        audioConstructor: function () { return blockedAudio; },
+        createObjectURL: vi.fn().mockReturnValue('blob:test'),
+        revokeObjectURL: vi.fn(),
+        fetchVoicevoxAlive: vi.fn().mockResolvedValue(true),
+        fetchVoiceStyleIds: vi.fn().mockResolvedValue([1]),
+        fetchSynthesizeVoice: vi.fn().mockResolvedValue(new ArrayBuffer(8)),
+        resolveVoice: vi.fn().mockReturnValue({ speaker: 1, speedOffset: 0 }),
+        ...extra
+      });
+    }
+
+    it('★解錠が失敗しても enable は成功する(ブロックで諦めない)', async () => {
+      const p = makeBlockedPlayer();
+      await p.enable({ persist: false });
+      expect(p.enabled).toBe(true);
+    });
+
+    it('primeAudioUnlock はブロックされても false を返すだけで投げない', async () => {
+      const blocked = {
+        play: vi.fn().mockRejectedValue(Object.assign(new Error('x'), { name: 'NotAllowedError' })),
+        pause: vi.fn()
+      };
+      const p = makeBlockedPlayer({ unlockAudioConstructor: function () { return blocked; } });
+      await expect(p.primeAudioUnlock()).resolves.toBe(false);
+    });
+
+    it('解錠できるときは true(無音を1回鳴らして以後を解錠する)', async () => {
+      const okAudio = { play: vi.fn().mockResolvedValue(undefined), pause: vi.fn() };
+      const p = makeBlockedPlayer({ unlockAudioConstructor: function () { return okAudio; } });
+      await expect(p.primeAudioUnlock()).resolves.toBe(true);
+      expect(okAudio.play).toHaveBeenCalled();
+    });
+
+    it('★解錠用 Audio は再生用の audioConstructor を消費しない(計測をずらさない)', async () => {
+      let playbackAudioCount = 0;
+      const okAudio = { play: vi.fn().mockResolvedValue(undefined), pause: vi.fn() };
+      const p = makeBlockedPlayer({
+        audioConstructor: function () {
+          playbackAudioCount += 1;
+          return { play: vi.fn().mockResolvedValue(), pause: vi.fn(), addEventListener: vi.fn(), removeEventListener: vi.fn() };
+        },
+        unlockAudioConstructor: function () { return okAudio; }
+      });
+      await p.primeAudioUnlock();
+      expect(playbackAudioCount).toBe(0);
+    });
+
+    /*
+     * ★これが本命の断言。上の enable 系だけでは【再生パスの disable()】を捕まえられず、
+     *   変異(disable を戻す)がすり抜けた=偽陽性の緑だった。実際に1件流し込んで
+     *   NotAllowedError を起こし、それでも enabled が落ちないことを固定する。
+     */
+    it('★再生がブロックされても読み上げはONのまま(一瞬ONになって戻る の再発防止)', async () => {
+      const p = makeBlockedPlayer();
+      await p.enable({ persist: false });
+      expect(p.enabled).toBe(true);
+      p.enqueue([{ kind: 'comment', text: 'てすと', nickname: 'ゆーざー', userId: '1' }]);
+      // 合成→再生(reject)まで走らせる。
+      await vi.waitFor(() => {
+        expect(Number(p.diag.audioBlockedTotal) || 0).toBeGreaterThan(0);
+      }, { timeout: 3000 });
+      // ★ブロックされても OFF に落ちない。
+      expect(p.enabled).toBe(true);
+    });
+
+    it('★ブロックされた件数が計器に残る(無音の切り分けができる)', async () => {
+      const p = makeBlockedPlayer();
+      await p.enable({ persist: false });
+      p.enqueue([{ kind: 'comment', text: 'てすと2', nickname: 'ゆーざー', userId: '2' }]);
+      await vi.waitFor(() => {
+        expect(Number(p.diag.audioBlockedTotal) || 0).toBeGreaterThan(0);
+      }, { timeout: 3000 });
+    });
+
+    it('enable() は非同期処理の前に解錠を試みる(クリックの延長でいられる唯一の瞬間)', async () => {
+      const p = makeBlockedPlayer();
+      const order = [];
+      p.primeAudioUnlock = vi.fn(async () => { order.push('unlock'); return true; });
+      p.probeVoicevoxAlive = vi.fn(async () => { order.push('probe'); return { ok: true, reason: '' }; });
+      await p.enable({ persist: false });
+      expect(order).toEqual(['unlock', 'probe']);
+    });
+  });
+
   it('initializes disabled by default', async () => {
     await player.initialize();
     expect(player.enabled).toBe(false);
