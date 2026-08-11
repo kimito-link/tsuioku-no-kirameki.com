@@ -83,7 +83,23 @@ const SELF_WRITTEN_PATTERNS = Object.freeze([
   /^nls_gift_history_mirror_v\d+$/i,
   /^nls_room_heat_mirror_v\d+$/i,
   /^nls_session_summary_mirror_v\d+$/i,
-  /^nls_story_diag_mirror_v\d+$/i
+  /^nls_story_diag_mirror_v\d+$/i,
+  /*
+   * ★v0.1.1345: per-live 版の鏡(配信IDが末尾に付く)を追加。
+   *
+   * ■ v0.1.1344 の修正は【不完全だった】。実機の計器が名指しした:
+   *     storage_changed:nls_lane_mirror_v2_*+nls_lane_receipt_v1_* が 3,456回(69%)
+   *   上の `/^nls_lane_mirror_v\d+$/` は **`$` で終わる**ため、実際に書かれている
+   *   `nls_lane_mirror_v2_lv351156267` に**一致しない**(旧 v1 の配信ID無しキー専用だった)。
+   *   `nls_lane_receipt_v1_<lv>` に至っては登録すら無かった。
+   *   → 1コメントあたり31回の描き直しが残っていた(v1344 出荷後の実測)。
+   *
+   * ★教訓: パターンを足すときは【実際に書かれているキー文字列】で照合すること。
+   *   定数名(KEY_LANE_MIRROR)だけ見て正規表現を書くと、per-live 版の存在を見落とす。
+   *   正本: laneMirrorKey.js の laneMirrorKeyFor / laneReceiptKeyFor。
+   */
+  /^nls_lane_mirror_v\d+_lv\d{1,15}$/i,
+  /^nls_lane_receipt_v\d+_lv\d{1,15}$/i
 ]);
 
 /**

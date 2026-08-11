@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1345',
+    date: '2026-08-12',
+    summary: 'fix(perf): 描き直しの主因を塞ぐ(残り)',
+    items: Object.freeze([
+      '応援レーンの鏡を書くたびに画面全体を描き直していたのを止めました(描き直しの69%)。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1344',
     date: '2026-08-12',
     summary: 'fix(lane): 応援レーンが途中で固まる',

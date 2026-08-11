@@ -17,6 +17,7 @@
  */
 import { describe, expect, it } from 'vitest';
 import { SECTION_TO_LEGACY_KEY } from './mirrorBundleFlushScheduler.js';
+import { laneMirrorKeyFor, laneReceiptKeyFor } from './laneMirrorKey.js';
 import { isSelfWrittenRenderArtifactKey } from './selfWrittenStorageKeys.js';
 
 describe('鏡バンドル ⇄ 自己書き込みリストの網羅', () => {
@@ -30,6 +31,25 @@ describe('鏡バンドル ⇄ 自己書き込みリストの網羅', () => {
 
   it('鏡は9種ある(増減したらこのテストごと見直す合図)', () => {
     expect(Object.keys(SECTION_TO_LEGACY_KEY || {}).length).toBe(9);
+  });
+
+  /*
+   * ★v0.1.1345: per-live 版(配信IDが末尾に付く)も必ず登録されていること。
+   *
+   * v0.1.1344 はここを見落とし、実機で 1コメントあたり31回の描き直しが残った。
+   *   計器の名指し: storage_changed:nls_lane_mirror_v2_*+nls_lane_receipt_v1_* が 69%
+   * 原因は `/^nls_lane_mirror_v\d+$/` の **`$` 終端**。定数名だけ見て正規表現を書くと
+   * per-live 版(実際に高頻度で書かれている方)に一致しない。
+   * ★だから「定数」ではなく【キービルダーの実出力】で照合する。
+   */
+  it('★per-live 版の鏡キー(実出力)も自己書き込みとして登録されている', () => {
+    const lid = 'lv351156267';
+    const perLive = [laneMirrorKeyFor(lid), laneReceiptKeyFor(lid)];
+    // ビルダーが実際に返す文字列であることを固定(名前だけの照合にしない)。
+    expect(perLive[0]).toBe('nls_lane_mirror_v2_lv351156267');
+    expect(perLive[1]).toBe('nls_lane_receipt_v1_lv351156267');
+    const missing = perLive.filter((k) => !isSelfWrittenRenderArtifactKey(k));
+    expect(missing).toEqual([]);
   });
 
   it('無関係なキーは自己書き込み扱いにしない(取りこぼしを作らない)', () => {
