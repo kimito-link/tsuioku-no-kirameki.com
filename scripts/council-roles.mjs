@@ -43,6 +43,16 @@ export function roleOf(name) {
   if (n.includes("glm")) return "critic";
   // Kimi K2.7 Code 等のコード特化モデル → 実装(implement)。"code" は "coder" に一致しないため別途。
   if (n.includes("coder") || (n.includes("kimi") && n.includes("code"))) return "implement";
+  // 2026-08-11 追加: Mistral自社のコード特化モデル devstral → 実装(implement)。
+  // "devstral" は "coder" にも "code" にも一致しないため独立の分岐が必要。上下の既存分岐との
+  // 衝突なし（"mistral/devstral-medium" は下の "mistral-large"→lead 判定にも一致しない。
+  // 逆に "devstral" が既存Mistral 2体のlabelに含まれることも無い）。2026-07-31に
+  // cloudflare/kimi-k2.7-codeが有料化で撤去されて以来、implement役はローカル
+  // qwen2.5-coder:14b単騎で、Ollama停止時はROLE_FALLBACK(implement→fast→generalist)の
+  // 代打頼みだった穴を、クラウド初のコード特化頭脳で埋める（採用の経緯・撤去条件は
+  // council-lineup.mjs のエントリコメント参照）。weightOfは既存の"mistral"判定(weight3)が
+  // 自動適用されるため変更不要。
+  if (n.includes("devstral")) return "implement";
   // Groq compound(/-mini) は Web検索内蔵のエージェント型 → 汎用(generalist)。
   // fact カテゴリの「会議内で最新情報を取りに行く」担当。2026-07-01 ライブAPIで実在確認・2リポ同期。
   // gpt-oss 判定より先に置く（"compound" は "gpt-oss" に非一致だが、意図を明示するため上に）。

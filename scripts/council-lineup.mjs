@@ -213,6 +213,33 @@ export const LINEUP = [
   { label: 'mistral/mistral-large', provider: 'mistral', rawId: 'mistral-large-latest', apiModel: 'mistral-large-latest', opts: {}, requires: ['MI'], liveProbe: true },
   { label: 'mistral/magistral-small', provider: 'mistral', rawId: 'magistral-small-latest', apiModel: 'magistral-small-latest', opts: {}, requires: ['MI'], liveProbe: true },
 
+  // 2026-08-11 追加（Mistral 3体目）: devstral-medium-latest → implementの予備。
+  //  2026-07-31にcloudflare/kimi-k2.7-codeが有料化で撤去されて以来、implement役はローカル
+  //  qwen2.5-coder:14b単騎（Ollama停止時はROLE_FALLBACKで代打）で、CATEGORIESのcodeカテゴリは
+  //  want筆頭がimplementのためコード系のお題で毎回この穴を踏んでいた。roleOfがimplementを返す
+  //  クラウドエントリはゼロであり、コード特化頭脳の追加はCF採用基準「会議に無い能力を足す
+  //  ものだけ」に適合する（経路の冗長化でなく頭脳の追加）。2026-08-05の実機調査で
+  //  200 OK・応答500〜790ms・2並列200 OK・カード登録不要を裏取り済み（上記Mistral採用コメントの
+  //  6モデル一斉調査に含まれる）。roleOfに"devstral"→implementの判定行を追加済み
+  //  （council-roles.mjs。"devstral"は"coder"にも"code"にも一致しないため）。weightOfは
+  //  既存の"mistral"判定でweight3が自動適用（変更不要・実装前に現行コードで検証済み）。
+  //  恒久ルール5との関係: Mistralはこれでlead予備・critic予備・implement予備の3役割に散るが、
+  //  全て予備で同役割への重ね積みは無く条文適合。Mistralが死んだ日はlead/criticが予備1体ずつ
+  //  減るだけ（leadはnvidia正規+openrouter予備、criticはgroq/glm/deepseek系が健在）で、
+  //  implementは今日の構成（ローカル単騎+FALLBACK）に戻るだけ＝どの役割も採用前より悪化しない。
+  //  優先順位の注意: implement役の競合はlocal/qwen2.5-coder:14b(weight5)のみのため、weight3の
+  //  本モデルが事実上のimplement一番手になる（nemotron-3-ultraのlead weight2と同じ「予備の
+  //  重みのまま事実上の主力」構図を意図的に受け入れる。LINEUP配列順はこのタイブレークに
+  //  関与しない＝weight差で決まる）。ゆえに死んだ場合は「死に枠がimplement席を先取りして
+  //  FAILEDさせる」kimi-k2.7-code型の実害が再現し得る——liveProbe:true必須はその検知線。
+  //  devstral-small系は見送り: 小型コードモデルの席はローカルqwen2.5-coder:14bで充足しており
+  //  「会議に無い能力」にならない。-latestエイリアスは既存Mistral 2体と同じ流儀。
+  //  昇格: ルール3の基準(7日以上空けた実会議2回でFAILEDゼロ)を満たしても当面weight3据え置き
+  //  （implement役内にweight1〜2の競合が居らず昇格の実益が無い。weightOfのプロバイダ一括判定の
+  //  簡潔さを優先）。撤去: liveProbe2日連続失敗／実会議でimplement役として2回連続FAILED
+  //  （kimi型実害の再発防止のため標準より厳しく）／カタログ消滅streak>=2 のいずれかで撤去会議へ。
+  { label: 'mistral/devstral-medium', provider: 'mistral', rawId: 'devstral-medium-latest', apiModel: 'devstral-medium-latest', opts: {}, requires: ['MI'], liveProbe: true },
+
   { label: 'gemini-2.5-flash', provider: 'gemini', rawId: 'gemini-2.5-flash', apiModel: 'gemini-2.5-flash', opts: {}, requires: ['E'] },
 
   // 2026-07-04 追加: 2026-06-25には429/503で常用不可だったが、今回の再検証で単発・4並列とも
