@@ -21,6 +21,7 @@ graph LR
   n_content --> n_src_domain_user_nickname_js["domain/user/nickname.js"]:::shared
   n_content --> n_src_extension_story_renderStoryUserLaneDom_js["extension/story/renderStoryUserLaneDom.js"]:::shared
   n_content --> n_src_extension_venueBar_js["extension/venueBar.js"]:::shared
+  n_content --> n_src_lib_anomalyVerdict_js["lib/anomalyVerdict.js"]:::shared
   n_content --> n_src_lib_anonymousIdenticon_js["lib/anonymousIdenticon.js"]:::shared
   n_content --> n_src_lib_arrivalEffect_js["lib/arrivalEffect.js"]:::shared
   n_content --> n_src_lib_auditionEventRankingApi_js["lib/auditionEventRankingApi.js"]:::shared
@@ -52,8 +53,7 @@ graph LR
   n_content --> n_src_lib_channelBroadcasterMeta_js["lib/channelBroadcasterMeta.js"]
   n_content --> n_src_lib_channelSwitchDiag_js["lib/channelSwitchDiag.js"]:::shared
   n_content --> n_src_lib_channelSwitchDiagKey_js["lib/channelSwitchDiagKey.js"]:::shared
-  n_content --> n_src_lib_cleanNdgrChatRows_js["lib/cleanNdgrChatRows.js"]
   classDef shared fill:#eee,stroke:#999,color:#666;
 ```
 
-> ほか 273 ファイル省略（全件は storage-bus.md / metafile 参照）。
+> ほか 274 ファイル省略（全件は storage-bus.md / metafile 参照）。

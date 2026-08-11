@@ -518,7 +518,7 @@
   - `src/lib/voicePlayer.js`
   - `src/lib/voiceReadQueue.js`
   - `src/lib/voiceAgeGate.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 13</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 14</summary>
 
 - `src/lib/reportCompleteVoice.js` — v0.1.806: レポート(HTML/マーケ/メディアキット)の保存が【成功した直後】に、完了の合図として
 - `src/lib/voiceAssignment.js` — コメント者ごとに読み上げ声(styleId/ピッチ/速度オフセット)を決定論的に割り当てる純ロジック。
@@ -526,6 +526,7 @@
 - `src/lib/voiceDirector.js` — council/pachinko-ultimate-SYNTHESIS.md §4(ボイスの歯止め)+§6 Phase B の実装。
 - `src/lib/voiceEffectDiag.js` — パチンコボイス演出(voiceDirector.js・Phase B)の発火/スキップ観測値を組み立てる純関数群。
 - `src/lib/voiceEffectDiagKey.js` — パチンコボイス演出(voiceDirector.js・Phase B)の「発火/スキップ内訳」観測値を
+- `src/lib/voiceFailureTaxonomy.js` — 【層】L0 判定層（純粋関数・I/O禁止）
 - `src/lib/voiceInputDevices.js` — マイク確認でサンプルする時間（ms）
 - `src/lib/voiceLagBudget.js` — 会場読み上げの件数ゲート実効上限を、処理時間EMA(実測)から動的に
 - `src/lib/voiceLoadingState.js` — VOICEVOX 起動待ちのローディング表示を決める純関数群。
@@ -904,7 +905,7 @@
 
 ## 🧬 修正系譜マップ(この系統のバグを過去にどう直したか)
 
-> changelog 全 661 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
+> changelog 全 662 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
 
 ### 💾 記録件数 (92版)
 - `v0.1.1327` 2026-08-11 — 読み上げが一瞬ONになって戻るのを直しました
@@ -1602,7 +1603,8 @@
 - `v0.1.676` 2026-06-10 — コメビュをパネルのタイムラインと完全同一に
 - `v0.1.674` 2026-06-10 — タイムラインから人を開ける+匿名の見分け復活
 
-### 🔊 読み上げ (75版)
+### 🔊 読み上げ (76版)
+- `v0.1.1332` 2026-08-11 — refactor(voice): 失敗分類taxonomyの正本を新設
 - `v0.1.1331` 2026-08-11 — 読み上げがONにならない理由を状態速報に出します
 - `v0.1.1330` 2026-08-11 — 読み上げが「なぜ動かないか」を1行で出すようにしました
 - `v0.1.1329` 2026-08-11 — コメビュの読み上げも直しました(会場と同じ修正)

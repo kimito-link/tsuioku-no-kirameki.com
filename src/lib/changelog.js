@@ -26,6 +26,16 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1332',
+    date: '2026-08-11',
+    summary: 'refactor(voice): 失敗分類taxonomyの正本を新設',
+    items: Object.freeze([
+      '読み上げの失敗理由を「原因」と「失敗した段階」の2つに分けて扱う、内部の共通分類を追加しました。',
+      '既存の2種類の失敗分類は変更せず、全12通りの旧トークンが新分類へ同じ意味で変換されることを契約テストで固定しました。',
+      'この版では新分類をまだ実際の読み上げへ配線していないため、読み上げの挙動や表示文言は変わりません。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1331',
     date: '2026-08-11',
     summary: '読み上げがONにならない理由を状態速報に出します',
