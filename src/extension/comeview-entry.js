@@ -72,10 +72,12 @@ import { resolveVoiceForUser } from '../lib/voiceAssignment.js';
 import {
   buildMergedVoiceText,
   buildVoiceReadingText,
-  isVoicevoxAlive,
   listVoicevoxStyleIds,
+  probeVoicevoxAlive,
   synthesizeVoice
 } from '../lib/voicevoxClient.js';
+// ★v0.1.1329: 会場と同じ「再試行バックオフ」「無音WAV」をコメビュでも使う(二重定義しない)。
+import { VOICE_ALIVE_RETRY_BACKOFF_MS, SILENT_WAV_DATA_URI } from '../lib/voicePlayer.js';
 import {
   computeVoiceCongestion,
   mergeRepeatedVoiceItem,
@@ -395,15 +397,16 @@ function setVoiceStatus(message) {
 // v0.1.770 起動待ちの「楽しいローディング」(会議 2026-06-16・遅延ガードで一瞬成功はチラつかせない)。
 //   会場(venueBar)と同じ純関数(voiceLoadingState)を共用。文言だけ comeview 用。
 let _cvVoiceLoadingTimer = null;
-function renderCvVoiceLoading(state) {
+function renderCvVoiceLoading(state, reason) {
   const status = document.getElementById('cvVoiceStatus');
   if (!status) return;
-  const view = resolveVoiceLoadingView(state, 'comeview');
+  // ★v0.1.1329: 失敗理由で文言を出し分ける(timeout を「見つかりません」と言わない)。
+  const view = resolveVoiceLoadingView(state, 'comeview', reason);
   status.classList.toggle('is-loading', view.kind === 'loading');
   status.classList.toggle('is-error', view.kind === 'error');
   status.textContent = view.text;
 }
-function driveCvVoiceLoading(state) {
+function driveCvVoiceLoading(state, reason) {
   if (_cvVoiceLoadingTimer != null) {
     clearTimeout(_cvVoiceLoadingTimer);
     _cvVoiceLoadingTimer = null;
@@ -421,7 +424,7 @@ function driveCvVoiceLoading(state) {
     }, VOICE_LOADING_FLICKER_GUARD_MS);
     return;
   }
-  renderCvVoiceLoading(state);
+  renderCvVoiceLoading(state, reason);
 }
 
 function showVoiceSkipped(count) {
@@ -464,22 +467,59 @@ function disableVoiceReading({ persist = true } = {}) {
   if (persist) persistVoiceReadingEnabled(false);
 }
 
+/**
+ * ★v0.1.1329: 音声解錠(会場の primeAudioUnlock と同じ手法をコメビュにも)。
+ *   クリック直後に無音を1回鳴らして、以後の play() を解錠しておく。
+ *   失敗しても握って続行する(悪化させない)。
+ * @returns {Promise<boolean>}
+ */
+async function primeCvAudioUnlock() {
+  try {
+    if (typeof Audio !== 'function') return false;
+    const a = new Audio();
+    a.src = SILENT_WAV_DATA_URI;
+    a.volume = 0;
+    const p = a.play();
+    if (p && typeof p.then === 'function') await p;
+    try { a.pause(); } catch { /* no-op */ }
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 async function enableVoiceReading({ persist = true } = {}) {
   if (isObsMode() || _voiceToggleBusy) return;
   _voiceToggleBusy = true;
   updateVoiceToggle();
   // v0.1.770: 起動待ちは状態駆動の楽しいローディング(遅延ガードで一瞬成功はチラつかせない)。
   driveCvVoiceLoading('checking');
-  // v0.1.770: 会場(VoicePlayer)と非対称だったのを解消。初回が空振りしても1回だけ再試行する
-  //   (MV3 SW コールド起床で初回 alive-check がタイムアウトしやすい)。本当に未起動なら2回とも失敗。
-  let alive = await isVoicevoxAlive();
-  if (!alive) {
+  /*
+   * ★v0.1.1329: 会場(VoicePlayer)に入れた3つの修正を【コメビュにも】移す。
+   *   v1326/v1327 は VoicePlayer だけを直しており、独自実装のこちらは素通しだった
+   *   =ユーザーがコメビュのボタンを押している限り「何も変わらない」状態だった。
+   *   (読み上げは2実装に分岐している。同じ症状は両方に出る前提で直す)
+   *
+   *   ① 解錠を最初にやる: クリックの延長でいられる唯一の瞬間。await を挟んだ後では
+   *      Chrome の自動再生ブロックに掛かる。
+   *   ② 再試行 1回 → 3回(バックオフ)。MV3 SW のコールド起床が既定タイムアウトに
+   *      間に合わないことがある。未起動なら即 refused で返るので待ちは増えない。
+   *   ③ 失敗しても OFF を永続保存しない。ユーザーの「ONにしたい」意思を消さない。
+   */
+  await primeCvAudioUnlock();
+  let probe = await probeVoicevoxAlive();
+  if (!probe.ok) {
     driveCvVoiceLoading('connecting');
-    alive = await isVoicevoxAlive();
+    for (const waitMs of VOICE_ALIVE_RETRY_BACKOFF_MS) {
+      if (waitMs > 0) await new Promise((r) => setTimeout(r, waitMs));
+      probe = await probeVoicevoxAlive();
+      if (probe.ok) break;
+    }
   }
-  if (!alive) {
-    disableVoiceReading({ persist: true });
-    driveCvVoiceLoading('notfound');
+  if (!probe.ok) {
+    // ★persist:false = 次に押せばまた試せる(OFFで固定しない)。
+    disableVoiceReading({ persist: false });
+    driveCvVoiceLoading('notfound', probe.reason);
     return;
   }
 
@@ -712,10 +752,16 @@ async function drainVoiceQueue() {
             if (playResult && typeof playResult.catch === 'function') {
               playResult.catch((err) => {
                 if (err && err.name === 'NotAllowedError') {
-                  // リネーム漏れ修正: setVoiceStatus / updateVoiceToggle が正しい関数名。
-                  setVoiceStatus('⚠️ブラウザによりブロックされました。押し直してください');
-                  _voiceReadingEnabled = false;
-                  updateVoiceToggle();
+                  /*
+                   * ★v0.1.1329: ここで読み上げを OFF にしない(会場と同じ修正)。
+                   *   ブロックは【この1件が鳴らせなかった】だけで、機能が壊れたわけではない。
+                   *   従来は _voiceReadingEnabled=false にしていたため、ユーザーには
+                   *   「ONにした直後に戻る」と見えていた(実機報告)。
+                   *   ONのまま案内を出し、ページを一度クリックすれば自然に復帰する。
+                   */
+                  _voiceDiag.audioBlockedTotal = (Number(_voiceDiag.audioBlockedTotal) || 0) + 1;
+                  publishVoiceDiag();
+                  setVoiceStatus('⚠️ブラウザが音声をブロックしています。ページのどこかを一度クリックすると鳴ります');
                 }
                 finish();
               });
