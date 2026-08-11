@@ -6258,6 +6258,16 @@
       ]
     },
     {
+      "file": "src/lib/prefersReducedMotion.js",
+      "featureCount": 1,
+      "features": [
+        "popup"
+      ],
+      "labels": [
+        "ポップアップ(応援レーン)"
+      ]
+    },
+    {
       "file": "src/lib/previewHeavyHint.js",
       "featureCount": 1,
       "features": [
@@ -6855,6 +6865,16 @@
       ],
       "labels": [
         "状態速報ページ"
+      ]
+    },
+    {
+      "file": "src/lib/storageRefreshTriggerKey.js",
+      "featureCount": 1,
+      "features": [
+        "popup"
+      ],
+      "labels": [
+        "ポップアップ(応援レーン)"
       ]
     },
     {
