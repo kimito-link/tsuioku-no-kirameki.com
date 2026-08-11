@@ -75,7 +75,7 @@ export function canonicalLabel(failure) {
   if (stage === 'query') {
     if (cause === 'timeout') return '音声解析が時間切れ';
     if (cause === 'down') return '音声解析時にVOICEVOXへ接続できない';
-    if (cause === 'http') return '音声解析がエラーを返した';
+    if (cause === 'http') return '音声解析がエラーを返した(過負荷の疑い)';
     if (cause === 'payload') return '音声解析の応答が不正';
     if (cause === 'not_wired') return '音声解析の通信経路が切れている';
     return '音声解析に失敗(理由不明)';
@@ -84,7 +84,7 @@ export function canonicalLabel(failure) {
   if (stage === 'synth') {
     if (cause === 'timeout') return '音声合成が時間切れ';
     if (cause === 'down') return '音声合成時にVOICEVOXへ接続できない';
-    if (cause === 'http') return '音声合成がエラーを返した';
+    if (cause === 'http') return '音声合成がエラーを返した(過負荷の疑い)';
     if (cause === 'payload') return '音声の受信に失敗';
     if (cause === 'not_wired') return '音声合成の通信経路が切れている';
     return '音声合成に失敗(理由不明)';

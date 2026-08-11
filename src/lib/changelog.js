@@ -26,6 +26,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1336',
+    date: '2026-08-12',
+    summary: 'fix(voice): 過負荷の手がかりを戻す',
+    items: Object.freeze([
+      '読み上げの失敗理由から「(過負荷の疑い)」の但し書きが消えていたので戻しました。',
+      'VOICEVOXが重いのか壊れているのかを、状態速報の1行で見分けられます。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1335',
     date: '2026-08-11',
     summary: 'refactor(voice): ON失敗理由もtaxonomy化',

@@ -13,9 +13,9 @@ import {
 const SYNTH_LABEL_CONTRACT = Object.freeze([
   { reason: 'timeout', oldLabel: '時間切れ', newLabel: '音声合成が時間切れ' },
   { reason: 'unreachable', oldLabel: '接続不能(VOICEVOX未起動/落ちた)', newLabel: '音声合成時にVOICEVOXへ接続できない' },
-  { reason: 'query_http', oldLabel: '解析拒否(過負荷の疑い)', newLabel: '音声解析がエラーを返した' },
+  { reason: 'query_http', oldLabel: '解析拒否(過負荷の疑い)', newLabel: '音声解析がエラーを返した(過負荷の疑い)' },
   { reason: 'query_body', oldLabel: '解析応答が不正', newLabel: '音声解析の応答が不正' },
-  { reason: 'synth_http', oldLabel: '合成拒否(過負荷の疑い)', newLabel: '音声合成がエラーを返した' },
+  { reason: 'synth_http', oldLabel: '合成拒否(過負荷の疑い)', newLabel: '音声合成がエラーを返した(過負荷の疑い)' },
   { reason: 'synth_body', oldLabel: '音声の受信失敗', newLabel: '音声の受信に失敗' },
   { reason: 'unknown', oldLabel: '不明', newLabel: '音声合成に失敗(理由不明)' }
 ]);
