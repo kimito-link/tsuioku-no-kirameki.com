@@ -806,6 +806,22 @@
     font-size: 9px;
     max-width: 72px;
   }
+  /* \u2605v0.1.1376: \u305F\u306C\u59C9\u6BB5\u306E\u6BB5\u5185LOD(\u9060\u8FD1\u6CD5)\u3002popup.html \u3068\u540C\u3058\u898F\u7D04\u3092\u4F1A\u5834\u306B\u3082\u3002
+     \u5148\u982D24\u4EBA\u306F\u8AAD\u3081\u308Bpill / 25\u4EBA\u76EE\u4EE5\u964D\u306E\u533F\u540D\u306F\u30A2\u30A4\u30B3\u30F3\u306E\u307F=\u7FA4\u308C\u3068\u3057\u3066\u898B\u305B\u308B\u3002
+     \u2605\u4F1A\u5834\u306F\u30BF\u30A4\u30EB\u304C wrapTileEl \u3067\u30E9\u30C3\u30D7\u3055\u308C\u308B(renderStoryUserLaneDom.js:402)\u306E\u3067
+     \u3010\u5B50\u5B6B\u5F62\u3011\u3067\u66F8\u304F(\u2460popup \u306F\u76F4\u63A5\u5B50\u5F62)\u3002\u3053\u3053\u3092\u76F4\u63A5\u5B50\u5F62\u306B\u3059\u308B\u3068\u4F1A\u5834\u3060\u3051\u52B9\u304B\u306A\u3044\u3002
+     \u6839\u62E0\u3068\u5B9F\u6E2C(1,615px\u2192598px)\u306F popup.html \u306E\u540C\u540D\u30D6\u30ED\u30C3\u30AF\u306E\u30B3\u30E1\u30F3\u30C8\u53C2\u7167\u3002 */
+  .nlsb-venue-lane-stack .nl-story-userlane--tanu > :nth-child(n + 25) .nl-story-userlane-cell[data-thumb="0"] {
+    gap: 0;
+    padding-right: 0;
+  }
+  .nlsb-venue-lane-stack .nl-story-userlane--tanu > :nth-child(n + 25) .nl-story-userlane-cell[data-thumb="0"] .nl-story-userlane-meta {
+    display: none;
+  }
+  .nlsb-venue-lane-stack .nl-story-userlane--tanu > :nth-child(n + 25) .nl-story-userlane-cell[data-thumb="0"] .nl-story-userlane-avatar {
+    width: 22px;
+    height: 22px;
+  }
   .nlsb-venue-lane-stack .nl-story-userlane-guide {
     display: flex;
     flex-direction: column;
