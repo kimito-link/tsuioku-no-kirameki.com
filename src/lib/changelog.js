@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1366',
+    date: '2026-08-12',
+    summary: 'fix(diag): ゲスト表示を誤検知しない',
+    items: Object.freeze([
+      '名前を設定していない人の既定表示「ゲスト」を、診断が「名前があるのにゆっくり顔」と誤って警告していたのを直しました。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1365',
     date: '2026-08-12',
     summary: 'fix(panel): 見えた瞬間に塗り直す',

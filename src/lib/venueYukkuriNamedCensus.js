@@ -23,6 +23,13 @@
  * @module venueYukkuriNamedCensus
  */
 
+// ★v0.1.1366: 「ゲスト」「user XXXX」はニコ既定の placeholder=本人の名前ではない。
+//   判定はこのファイルで再実装せず正本を使う(文字列比較を散らさない)。
+import {
+  isNiconicoGuestPlaceholderNickname,
+  isNiconicoAutoUserPlaceholderNickname
+} from './nicoAnonymousDisplay.js';
+
 /** identicon(anonymousIdenticon.js の出力)の data URI 先頭。 */
 const IDENTICON_SRC_PREFIX = 'data:image/svg+xml';
 /** 本登録の数値ID(このレンジ内だけ displaySrc が実写/CDN合成URLになりうる)。 */
@@ -83,6 +90,22 @@ export function observeVenueYukkuriNamedTile(state, obs) {
   //   ではなく displayUserLabel/anonymousDisplayLabel が合成したフォールバックラベル
   //   (「匿名123」「匿名（a:xxx）」)。これは↑と同じ「仕様どおりで実害ではない」ケースの亜種なので対象外。
   if (rawName.startsWith('匿名')) return;
+  /*
+   * ★v0.1.1366: ニコ既定の placeholder を「名前あり」と数えない(v1358 の偽陽性)。
+   *
+   * ■ 実機(2026-08-12・v0.1.1365 の速報)
+   *     名前ありゆっくり顔 🔴 ID無1件 / 直近ID無{ゲスト}
+   *   「ゲスト」はハンドル未設定のときニコ側が出す既定表示で、本人が付けた名前ではない。
+   *   ＝ゆっくり顔で正しいのに🔴を出していた=誤誘導(価値が負)。
+   *   ★判定は nicoAnonymousDisplay.js の正本を使う(ここで文字列比較を再実装しない)。
+   *     「ゲスト123」「ゲストさん」等の派生は本人設定なので対象に残る(完全一致のみ除外)。
+   */
+  if (
+    isNiconicoGuestPlaceholderNickname(rawName) ||
+    isNiconicoAutoUserPlaceholderNickname(rawName)
+  ) {
+    return;
+  }
 
   if (!NUMERIC_UID_RE.test(uid)) {
     // a:系・ハッシュ系(カスタム表示名を持つ匿名スタイルユーザー)。従来は完全対象外だったが、
