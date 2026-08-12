@@ -167,7 +167,7 @@
     - `2026-07-22.md`
     - `2026-07-23.md`
     - `2026-07-31.md`
-- 📁 **docs/** (263)
+- 📁 **docs/** (264)
   - 📁 **article-assets/** (87)
     - 📁 **venue-frames/** (12)
       - `f01.png`
@@ -277,7 +277,7 @@
     - `storage-bus.md`
     - `venue.md`
     - `web-status.md`
-  - 📁 **handoff/** (99)
+  - 📁 **handoff/** (100)
     - `CODEX-TASK-voice-v1332.md`
     - `CODEX-TASK-voice-v1334.md`
     - `CODEX-TASK-voice-v1342.md`
@@ -286,6 +286,7 @@
     - `HANDOFF-comment-pickup-bsp.md`
     - `HANDOFF-diag-truth-IMPL.md`
     - `HANDOFF-heavyrace-backfill-IMPL.md`
+    - `HANDOFF-instrument-channels-2026-08-12.md`
     - `HANDOFF-lane-churn-2026-08-02.md`
     - `HANDOFF-liveview-copy.md`
     - `HANDOFF-perfect-parity-diag.md`
