@@ -677,7 +677,7 @@ import {
 } from '../lib/storyUserLaneRenderProbe.js';
 // v0.1.1231 Phase1: レーンの人物集合の増減(誰が消えたか)を測る計器。観測のみ。
 import { makeLaneRosterDeltaState, noteLaneRoster, snapshotLaneRosterDelta } from '../lib/laneRosterDelta.js';
-import { shouldSkipLightSupplyOverwrite, formatLightSupplyGuardLine } from '../lib/lightSupplyOverwriteGuard.js';
+import { shouldSkipLightSupplyOverwrite, shouldSkipLightSupplyAfterAwait, formatLightSupplyGuardLine } from '../lib/lightSupplyOverwriteGuard.js';
 // v0.1.1249: 「誰が供給を書いたか」を名指しする計器(provisional 申告漏れの検出込み)。
 import { LANE_SUPPLY_ORIGIN, createLaneSupplyOriginDiag, noteLaneSupplyShrink, noteLaneSupplyWrite, snapshotLaneSupplyOriginDiag } from '../lib/laneSupplyOriginDiag.js';
 import { snapshotLanePublishSkipDiag } from '../lib/lanePublishSkipDiag.js';
@@ -6469,9 +6469,8 @@ let _storyUserLaneLastTiledLid = '';
 /** v0.1.1231 Phase1: 人物集合の増減を測る計器の状態(観測のみ)。 */
 const _laneRosterDeltaState = makeLaneRosterDeltaState();
 // v0.1.1251: 軽い供給(summary+tail)の上書きを見送った回数を数える計器。
-//   ★件数0の意味を区別するため observedCount(暫定供給を何回判定したか)も持つ
-//   ([[zero-count-may-mean-unmeasured-2026-08-04]])。
-const _lightSupplyGuardDiag = { skipCount: 0, observedCount: 0, worst: null };
+//   ★件数0の意味を区別するため observedCount も持つ([[zero-count-may-mean-unmeasured-2026-08-04]])。
+const _lightSupplyGuardDiag = { skipCount: 0, observedCount: 0, worst: null, paintedDuringAwaitCount: 0 };
 const _laneSupplyOriginDiag = createLaneSupplyOriginDiag();
 /** v0.1.1232 Phase2: 「一度出た人」を覚える名簿(描画に使う・計器とは別物)。 */
 const _laneRosterKeeperState = makeLaneRosterKeeperState();
@@ -7382,6 +7381,7 @@ async function renderStoryUserLaneFromLightCommentsForCurrentLive(lid) {
       return; // 不完全な軽い供給で完全描画を潰さない(heavy/onChanged の次回に委ねる)
     }
   }
+  if (shouldSkipLightSupplyAfterAwait(_lightSupplyGuardDiag, { domTiles: countStoryUserLaneDomTiles(els), stateLiveId: STORY_SOURCE_STATE.liveId, liveId: live })) return; // ★v1359: awaitをまたいだので再判定(39→3の根治)
   // 既存の描画トリガに軽い entries を渡す=renderStoryUserLane が走り、末尾で現配信 lane mirror も publish。
   //   ★provisional: true = summary+tail 由来の軽い候補=定義上暫定(HANDOFF-heavyrace A-2)。
   //   heavy が settle するまでは、この短い候補で完全描画を上書きしない(単調性ガード)。
@@ -18970,7 +18970,7 @@ async function collectAiShareDevMonitorPayloadBundle(watchUrl) {
       lightSupplyGuard: {
         skipCount: _lightSupplyGuardDiag.skipCount,
         observedCount: _lightSupplyGuardDiag.observedCount,
-        worst: _lightSupplyGuardDiag.worst,
+        worst: _lightSupplyGuardDiag.worst, paintedDuringAwaitCount: _lightSupplyGuardDiag.paintedDuringAwaitCount,
         line: formatLightSupplyGuardLine(_lightSupplyGuardDiag)
       },
       laneSupplyOrigin: snapshotLaneSupplyOriginDiag(_laneSupplyOriginDiag),
