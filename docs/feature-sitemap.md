@@ -757,7 +757,7 @@
   - `src/lib/statusTrendKey.js`
   - `src/extension/status-entry.js`
   - `src/lib/statusActionAdvisor.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 151</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 152</summary>
 
 - `app/app.js` — スマホ閲覧用 status Web 版。
 - `app/live-view.js` — global NL_BUILD_ID
@@ -788,6 +788,7 @@
 - `scripts/sync-lp-twitter-icon.mjs` — LP 右端コラボ用: src/images/icon/twitter-icon.png → extension/images/lp/twitter-icon.png
 - `scripts/vendor-visual-explainer.mjs` — Vendors nicobailon/visual-explainer (MIT) into .cursor/skills/visual-explainer/
 - `scripts/write-extension-placeholder-icons.mjs` — リポジトリに 256px アイコンしか無い環境向け: manifest 用の小さめ PNG を生成する。
+- `src/extension/cloak-failsafe-entry.js` — 幕(cloak)を外す【最速の保険】だけを担う極小エントリ。
 - `src/extension/offscreen-entry.js` — feat/multitab-scale-globalcap（2026-05-31）: コメント IDB の「常駐・単一書き手」を担う
 - `src/lib/anomalyVerdict.js` — 計器の値に「正常域」を持たせ、異常を【名指し】する純関数群。
 - `src/lib/arrivalEffect.js` — ニコ生「来場」システムメッセージ(parseArrivalComment.js でパース済み)を、パチンコの
@@ -915,7 +916,7 @@
 
 ## 🧬 修正系譜マップ(この系統のバグを過去にどう直したか)
 
-> changelog 全 683 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
+> changelog 全 684 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
 
 ### 💾 記録件数 (94版)
 - `v0.1.1344` 2026-08-12 — fix(lane): 応援レーンが途中で固まる
@@ -2295,7 +2296,8 @@
 - `v0.1.840` 2026-06-20 — 機能逆引き地図を全ファイル網羅に
 - `v0.1.835` 2026-06-20 — 自己検証ゲートを追加(版同期+診断文言)
 
-### その他 (79版)
+### その他 (80版)
+- `v0.1.1354` 2026-08-12 — fix(panel): 前版のエラーを直し検査を追加
 - `v0.1.1353` 2026-08-12 — fix(panel): 黒い時間をさらに短くする
 - `v0.1.1351` 2026-08-12 — feat(diag): あとから黒くなるパネルを検知
 - `v0.1.1350` 2026-08-12 — chore(diag): コメント送信の計器を新しい作り方へ移行

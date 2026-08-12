@@ -26,6 +26,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1354',
+    date: '2026-08-12',
+    summary: 'fix(panel): 前版のエラーを直し検査を追加',
+    items: Object.freeze([
+      '前版で追加した処理が Chrome にブロックされてエラーになっていたのを直しました(黒い時間を短くする修正が効いていませんでした)。',
+      '同じ種類のエラーが二度と出荷されないよう、拡張のページを機械で検査するようにしました。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1353',
     date: '2026-08-12',
     summary: 'fix(panel): 黒い時間をさらに短くする',
