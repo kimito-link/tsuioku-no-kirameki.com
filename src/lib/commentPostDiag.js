@@ -34,24 +34,42 @@
  * }} CommentPostDiagState
  */
 
-/** 初期 コメント送信診断 state。 */
+import { makeInitialFromSchema } from './diagSchemaCopy.js';
+
+/**
+ * ★フィールド表(唯一の正本)。HANDOFF-instrument-channels-2026-08-12.md §2 の必須5点セット①。
+ *   makeInitialCommentPostDiag はこの表から機械生成する(v1349 で導入・値は移行前と同一)。
+ *
+ * ★kind の使い分け: 'ms' は既定 -1(未計測)。「0=観測して0ms」と区別するため。
+ *   ただし lastTotalMs だけは移行前から既定 0 だったので default:0 を明示して**挙動同値**を保つ
+ *   (ここを -1 に変えると行の文言が変わる=v1349 の「挙動変更ゼロ」を破る。
+ *    意味の是正が要るなら別版で、ゴールデン出力の差分とセットで行うこと)。
+ *   lastEventAt も「時点(epoch)」であり所要msではないので既定 0。
+ *
+ * @type {import('./diagSchemaCopy.js').DiagSchema}
+ */
+export const COMMENT_POST_DIAG_SCHEMA = [
+  { name: 'attempts', kind: 'count' },
+  { name: 'okCount', kind: 'count' },
+  { name: 'failCount', kind: 'count' },
+  { name: 'timeoutCount', kind: 'count' },
+  { name: 'revertCount', kind: 'count' },
+  { name: 'totalRetryAttempts', kind: 'count' },
+  { name: 'lastTotalMs', kind: 'ms', default: 0 },
+  { name: 'lastOutcome', kind: 'text' },
+  { name: 'lastEventAt', kind: 'count', default: 0 },
+  { name: 'lastEchoMs', kind: 'ms' },
+  { name: 'avgEchoMs', kind: 'ms' },
+  { name: 'lastOptimisticPaintMs', kind: 'ms' },
+  { name: 'avgOptimisticPaintMs', kind: 'ms' },
+  { name: 'instantPaintRuns', kind: 'count' }
+];
+
+/** 初期 コメント送信診断 state(schema から機械生成)。 */
 export function makeInitialCommentPostDiag() {
-  return {
-    attempts: 0,
-    okCount: 0,
-    failCount: 0,
-    timeoutCount: 0,
-    revertCount: 0,
-    totalRetryAttempts: 0,
-    lastTotalMs: 0,
-    lastOutcome: '',
-    lastEventAt: 0,
-    lastEchoMs: -1,
-    avgEchoMs: -1,
-    lastOptimisticPaintMs: -1,
-    avgOptimisticPaintMs: -1,
-    instantPaintRuns: 0
-  };
+  return /** @type {CommentPostDiagState} */ (
+    /** @type {unknown} */ (makeInitialFromSchema(COMMENT_POST_DIAG_SCHEMA))
+  );
 }
 
 /**

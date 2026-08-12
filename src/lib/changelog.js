@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1349',
+    date: '2026-08-12',
+    summary: 'chore(diag): 計器の土台(台帳と共通部品)を用意',
+    items: Object.freeze([
+      '不具合の原因を早く見つけられるよう、計器の作り方を揃える土台を用意しました(見た目や動作は変わりません)。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1348',
     date: '2026-08-12',
     summary: 'fix(diag): 会場アイコンの行が出ない断線',
