@@ -34,7 +34,8 @@
  *       tileTag: string, seatLinkOn: boolean, mode: string, atWall: number } }|null,
  *   yukkuriNamedCensus: { line: string, checked: number, yukkuriNamed: number, outOfRangeDigits: number,
  *     lastSample: null | { uid: string, name: string, digits: number } }|null,
- *   mirrorIntakeLine: string
+ *   mirrorIntakeLine: string,
+ *   avatarProbe: {usericonSucceeded:number,usericonFailed:number,failedTimeout:number,failedError:number,retriedTotal:number,lastFailAgoMs:number}|null
  * }} VenueSeatsDiagState
  *
  * laneParity は v0.1.1111 の「会場=①レーンのメンバー一致トークン」(venueLaneParity.js)。null=未観測。
@@ -75,7 +76,9 @@ export function makeInitialVenueSeatsDiag() {
     seatLinkParity: /** @type {VenueSeatsDiagState['seatLinkParity']} */ (null),
     yukkuriNamedCensus: /** @type {VenueSeatsDiagState['yukkuriNamedCensus']} */ (null),
     // ★v0.1.1317: 会場が鏡を受け取れているかの1行(未観測は空文字=状態速報に出ない)。
-    mirrorIntakeLine: ''
+    mirrorIntakeLine: '',
+    // ★v0.1.1348: 会場のアイコン実績(初期は未計測=null)。
+    avatarProbe: /** @type {VenueSeatsDiagState['avatarProbe']} */ (null)
   };
 }
 
@@ -270,6 +273,28 @@ export function buildVenueSeatsDiagSnapshot(diag, nowMs) {
      *   空文字なら状態速報側で行ごと出さない=普段の速報を汚さない。
      */
     mirrorIntakeLine: String(d.mirrorIntakeLine || ''),
+    /*
+     * ★v0.1.1348: 会場のアイコン実績(6値だけ)を通す。
+     *
+     * ■ なぜ必要か: v0.1.1347 で読み手に `venueSeatsDiag.avatarProbe` を読む行を足したが、
+     *   ここを通していなかったため【永久に出ない行】だった(書き手の実出力で通し確認せず出荷)。
+     *   ★このファイルは「個別列挙して作り直す」方式なので、
+     *     載せ忘れた値は静かに消える([[venue-mirror-is-the-primary-path]]・6回目)。
+     *
+     * ★未知フィールドは通さない既存方針を守り、数値6つだけを検証して写す。
+     */
+    avatarProbe: (() => {
+      const p = d.avatarProbe;
+      if (!p || typeof p !== 'object') return null;
+      return {
+        usericonSucceeded: Math.max(0, Math.floor(num(p.usericonSucceeded, 0))),
+        usericonFailed: Math.max(0, Math.floor(num(p.usericonFailed, 0))),
+        failedTimeout: Math.max(0, Math.floor(num(p.failedTimeout, 0))),
+        failedError: Math.max(0, Math.floor(num(p.failedError, 0))),
+        retriedTotal: Math.max(0, Math.floor(num(p.retriedTotal, 0))),
+        lastFailAgoMs: Math.max(-1, Math.floor(num(p.lastFailAgoMs, -1)))
+      };
+    })(),
     capturedAt: now
   };
 }

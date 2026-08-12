@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1348',
+    date: '2026-08-12',
+    summary: 'fix(diag): 会場アイコンの行が出ない断線',
+    items: Object.freeze([
+      '前版で追加した「会場のアイコン」の行が、実際には出ない状態だったのを直しました。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1347',
     date: '2026-08-12',
     summary: 'feat(diag): 会場のアイコンを計器に載せる',
