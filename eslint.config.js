@@ -295,8 +295,17 @@ export default [
     //     行数を削るためにコメントから根拠を削るのは本末転倒(前回の判断を踏襲)。
     //   ★判定・要約の本体は純関数へ隔離済み(src/lib/cloakFailsafeMarker.js /
     //     eventLoopStallSummary.js・単体+配線テスト付)。popup 側は呼び出しのみ。
+    // ★2026-08-12(v0.1.1382) 22200 → 22243(+43)。storage 全件読みの根治。
+    //   migration 4本が各自 `get(null)`(20.7MBで実測1,157ms)を叩いていたのを、
+    //   `readCommentBagForMigrationCheap()` 1本に集約(getKeys()でキー名だけ取り→
+    //   `nls_comments_lv*` だけ読む。getKeys が無い旧Chromeは従来どおり全件読みへ倒す)。
+    //   ★新規発明ではなく content-entry.js の readPrunableStorageBagCheap(v0.1.419)の横展開。
+    //   ★増分の大半は【なぜ全件読みが危険か】の根拠コメント(実測値つき)。
+    //     拡張の全ページが同一メインスレッドを共有する事実は、次に触る人が
+    //     知らないと必ず同じ穴を掘る(現に popup 側だけ3ヶ月取り残されていた)。
+    //   検査: src/lib/storageFullReadCensus.test.js が全件読みの箇所を【数で固定】する。
     files: ['src/extension/popup-entry.js'],
-    rules: { 'max-lines': ['error', { max: 22200, skipBlankLines: false, skipComments: false }] }
+    rules: { 'max-lines': ['error', { max: 22243, skipBlankLines: false, skipComments: false }] }
   },
   {
     files: ['src/extension/popup/**/*.js'],

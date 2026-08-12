@@ -164,6 +164,7 @@ import {
   planAppendRowsAsChunks,
   readChunkedComments
 } from '../lib/commentChunkStore.js';
+import { KEY_COMMENT_WRITE_MODE_DIAG } from '../lib/commentWriteModeDiagKey.js';
 import { anonymousNicknameFallback } from '../lib/nicoAnonymousDisplay.js';
 import {
   applyUserCommentProfileMapToEntries,
@@ -10795,6 +10796,28 @@ let liveChunkIndex = null;
 let liveChunkMigrated = false;
 
 /**
+ * ★v0.1.1382: コメント書き込みモードの観測値。
+ *
+ * 「巨大配列を丸ごと書き戻しているか / チャンクに追記しているか」を数える。
+ * 会議(2026-08-12)で【真犯人が計器の死角にいる】と確定したため追加した:
+ * chunkMode が false になると畳み込みのたびに O(N) の構造化クローンが走り
+ * (実測: 停止410ms vs チャンク63ms=6.8倍)、同一スレッドのパネル/診断を巻き込んで固める。
+ * それなのに chunkMode の状態は速報に1文字も出ていなかった。
+ *
+ * @type {{ wholeWrites: number, chunkWrites: number, fallbackReason: string }}
+ */
+const _commentWriteModeCensus = { wholeWrites: 0, chunkWrites: 0, fallbackReason: '' };
+
+/**
+ * ★チャンク運用に乗れなかった理由を記録する(空振りの理由を捨てない)。
+ * [[discarded-pass-reason-makes-greens-unreadable-2026-08-12]]
+ * @param {string} reason
+ */
+function noteCommentChunkModeFallback(reason) {
+  _commentWriteModeCensus.fallbackReason = String(reason || '').slice(0, 40);
+}
+
+/**
  * v0.1.513: チャンクモードの dedupe をインメモリ・インクリメンタル化するフラグ。
  * 全チャンク read + O(N) merge を初回 seed 後の O(追加分)照合へ置き換え、頭打ちを防ぐ。
  * 明示的に false が保存された環境だけ従来経路へ戻す。
@@ -10978,9 +11001,35 @@ async function seedTailFromMain(lid) {
       liveChunkIndex = /** @type {any} */ (idx);
       liveChunkMigrated = true;
     } else if (metaBag[chunkMigratedKey(lid)] === true) {
-      // フラグだけ立つがインデックス破損＝安全側で従来 main 運用に戻す（チャンク無効）。
+      /*
+       * フラグだけ立つがインデックス破損。
+       *
+       * ★v0.1.1382(fail-open 6件目の根治・2026-08-12 実測で確定):
+       *   旧実装は「安全側で従来 main 運用に戻す」として liveChunkMigrated を false のままにしていた。
+       *   しかし false は chunkMode=false を意味し(12151行)、以後この配信は
+       *   **畳み込みのたびに巨大配列を丸ごと書き戻す**(12476行の `{ [key]: next }` 経路)。
+       *
+       * ■ 実測(chrome-devtools・24,000件の配列・出荷ビルド)
+       *     丸ごと書き戻し ×5 = 2,522ms / イベントループ停止 410ms
+       *     末尾チャンクだけ×5 =   371ms / イベントループ停止  63ms   ＝6.8倍
+       *   ＝この分岐に落ちた配信は、記録が伸びるほど重くなり、
+       *     同一スレッドを共有するパネル/診断ページを巻き込んで固める。
+       *
+       * ★これは v0.1.769 が「storage stall spiral の根治」として塞いだのと【同じ穴】。
+       *   当時は timeout 経路(下の catch)だけを塞ぎ、この破損経路は残っていた
+       *   ＝[[fail-open-recurs-under-new-names-2026-08-12]] が別名で再発していた形。
+       *   「守るものが壊れているから通す」も fail-open である。
+       *
+       * ■ 直し方: timeout 経路(下の catch)と【同じ扱い】に揃える。
+       *   空の in-memory チャンク状態を立てて bounded(追記専用)で書き続ける。
+       *   既存 main は削除せず温存され、読めなかった dedup キーは
+       *   mergeNewComments / incrementalMode が前方向に再構築して取りこぼしを担保する。
+       */
       const bag = await chunkGetMany([mainKey]);
       main = Array.isArray(bag[mainKey]) ? bag[mainKey] : [];
+      liveChunkIndex = /** @type {any} */ (planMigrateMainToChunks(lid, []).index);
+      liveChunkMigrated = true;
+      noteCommentChunkModeFallback('index_broken');
     } else {
       // 未移行: 従来 main を読んで、読めたら冪等にチャンクへ移行する。
       const bag = await chunkGetMany([mainKey]);
@@ -12469,6 +12518,18 @@ async function persistCommentRowsImpl(rows, opts = {}) {
       }
     }
     if (storageTouched || pendingTouched) {
+      /*
+       * ★v0.1.1382: どちらの経路で書いたかを数える(真犯人が計器の死角にいた)。
+       *   `chunkMode=false` の書きは巨大配列の丸ごと書き戻し＝O(N)の構造化クローン。
+       *   実測で停止410ms(チャンクは63ms)＝同一スレッドのパネル/診断を巻き込んで固める。
+       *   ★数えるのは【実際に本体を書く分岐に入ったとき】だけ(storageTouched の中)。
+       *     外で数えると「書いていないのに whole」と嘘をつく。
+       */
+      if (chunkMode) {
+        if (chunkCommentWrite) _commentWriteModeCensus.chunkWrites += 1;
+      } else {
+        _commentWriteModeCensus.wholeWrites += 1;
+      }
       try {
         await runStorageOpWithTimeout(
           () =>
@@ -12478,6 +12539,15 @@ async function persistCommentRowsImpl(rows, opts = {}) {
                   ? chunkCommentWrite.writes
                   : {}
                 : { [key]: next }),
+              [KEY_COMMENT_WRITE_MODE_DIAG]: {
+                mode: chunkMode ? 'chunk' : 'whole',
+                liveId: String(liveId || ''),
+                rows: Array.isArray(next) ? next.length : 0,
+                wholeWrites: _commentWriteModeCensus.wholeWrites,
+                chunkWrites: _commentWriteModeCensus.chunkWrites,
+                fallbackReason: _commentWriteModeCensus.fallbackReason,
+                at: Date.now()
+              },
               [KEY_AUTO_BACKUP_STATE]: autoBackupState,
               ...(ingestLogPayload ? { [KEY_COMMENT_INGEST_LOG]: ingestLogPayload } : {}),
               ...(pendingTouched

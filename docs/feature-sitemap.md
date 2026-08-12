@@ -625,7 +625,7 @@
 - **影響範囲ゲート(規律を自動化)** — 星野ロミ式「規律を自動ゲートに」。diff から影響大(複数機能波及)の変更ファイルを検出し波及先機能を列挙。警告のみ(摩擦ゼロ)・--strict で exit1。AGENTS.md §10 のルールを diff 発火に
   - `scripts/impact-check.mjs`
   - `docs/feature-map/impact-map.json`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 71</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 73</summary>
 
 - `api/status.js` — status 受け口 Vercel Serverless Function。
 - `extension/status-guard.js` — 状態速報ページ(status.html)の「何があっても開く」保険。
@@ -652,6 +652,8 @@
 - `src/lib/commentPostDiag.js` — コメント送信(requestPostCommentToOpenTab)の「所要ms/結果/リトライ回数」観測値を
 - `src/lib/commentPostDiagKey.js` — コメント送信(requestPostCommentToOpenTab)の「所要ms/結果/リトライ回数」観測値を
 - `src/lib/commentPostStatusPresentation.js` — コメント送信 UI の「最終ステータス表示」と aria-describedby を決める純関数群。
+- `src/lib/commentWriteModeDiag.js` — コメント記録の「書き込みモード」を1行に要約する純関数。
+- `src/lib/commentWriteModeDiagKey.js` — コメント記録の【書き込みモード】(チャンク追記 or 巨大配列の丸ごと書き戻し)を
 - `src/lib/customSoundDiag.js` — 「マイ効果音」(customSoundStore.js・Phase A)の取込状況を状態速報 extras(12秒間引き)に
 - `src/lib/diagFlushThrottle.js` — 2026-07-06: 即時プッシュ計器(instantPushDiag)が「コメント送信バッチ毎に
 - `src/lib/diagnosisRegistry.js` — 状態速報「網羅的完全性診断」の【真実の源泉(Source of Truth)】。
@@ -922,7 +924,7 @@
 
 ## 🧬 修正系譜マップ(この系統のバグを過去にどう直したか)
 
-> changelog 全 711 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
+> changelog 全 712 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
 
 ### 💾 記録件数 (96版)
 - `v0.1.1367` 2026-08-12 — 応援レーンが途中件数で止まる問題の根治（78件中19件しか出ない）
@@ -1900,7 +1902,8 @@
 - `v0.1.673` 2026-06-10 — コメビュの名前をパネルと同じ情報源で補完
 - `v0.1.670` 2026-06-10 — コメビュのアイコンを本家と同じサムネに
 
-### 🩺 診断・状態速報 (267版)
+### 🩺 診断・状態速報 (268版)
+- `v0.1.1382` 2026-08-12 — 記録が重くなり画面が固まる問題を修正
 - `v0.1.1381` 2026-08-12 — パネルの中身が出るまでを短縮し、原因を速報に表示
 - `v0.1.1379` 2026-08-12 — サムネが「推測URL」か「実物」かを区別して表示
 - `v0.1.1378` 2026-08-12 — サムネ・ID・名前がどれだけ取れているか出すように

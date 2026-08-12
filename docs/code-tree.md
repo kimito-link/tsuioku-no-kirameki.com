@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 4 / 759 件
+## ⚠️ 役割コメントが無いソース 4 / 761 件
 - `src/lib/laneDomSelfMeasure.js`
 - `src/lib/reportPreviewPublish.js`
 - `src/lib/venueLaneBuckets.js`
@@ -167,7 +167,7 @@
     - `2026-07-22.md`
     - `2026-07-23.md`
     - `2026-07-31.md`
-- 📁 **docs/** (274)
+- 📁 **docs/** (276)
   - 📁 **article-assets/** (87)
     - 📁 **venue-frames/** (12)
       - `f01.png`
@@ -277,7 +277,7 @@
     - `storage-bus.md`
     - `venue.md`
     - `web-status.md`
-  - 📁 **handoff/** (110)
+  - 📁 **handoff/** (112)
     - `CODEX-TASK-voice-v1332.md`
     - `CODEX-TASK-voice-v1334.md`
     - `CODEX-TASK-voice-v1342.md`
@@ -369,6 +369,8 @@
     - `sound-optimization-DESIGN.md`
     - `status-diag-608s-freeze-DESIGN.md`
     - `status-diag-608s-freeze-IMPLEMENTATION-HANDOFF.md`
+    - `storage-stall-council-MATERIAL.md`
+    - `storage-stall-council-MINUTES.md`
     - `story-diag-realtime-sync-DESIGN.md`
     - `story-diag-realtime-sync-IMPLEMENTATION-HANDOFF.md`
     - `user-identity-unification-DESIGN.md`
@@ -687,7 +689,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (1650)
+- 📁 **src/** (1655)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -978,7 +980,7 @@
         - `logo_funlink_white_RGB_maru_black.png`
       - `logo_guide_funlink_ol.pdf`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1409)
+  - 📁 **lib/** (1414)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -1179,6 +1181,7 @@
     - `comeviewUserNotes.js` — v0.1.667: コメビュのユーザー詳細(わんコメ式 ニックネーム/ラベル/メモ)の純ロジック。
     - `comeviewUserNotes.test.js`
     - `comeviewVoiceParity.wiring.test.js`
+    - `commentChunkModeFailOpen.wiring.test.js`
     - `commentChunkStore.js` — v0.1.509: コメント本体の「追記専用チャンク分割」純関数群＋ストレージ orchestration。
     - `commentChunkStore.test.js`
     - `commentComposeShortcuts.js` — コメント欄の Enter 系キーで送信するか／既定動作に任せるか。
@@ -1257,6 +1260,9 @@
     - `commentVelocityTimeline.test.js`
     - `commentVelocityWindow.js` — 直近ウィンドウ内のコメント件数と「件/分」換算（純関数）
     - `commentVelocityWindow.test.js`
+    - `commentWriteModeDiag.js` — コメント記録の「書き込みモード」を1行に要約する純関数。
+    - `commentWriteModeDiag.test.js`
+    - `commentWriteModeDiagKey.js` — コメント記録の【書き込みモード】(チャンク追記 or 巨大配列の丸ごと書き戻し)を
     - `commenterCulturalAnalytics.js` — L6 / L10 / L11 / L14 / L15 — 文化分析系の純粋関数を 1 ファイルに集約。
     - `commenterCulturalAnalytics.test.js`
     - `commenterFollowAnalytics.js` — 数値IDコメンターのフォロー情報を、マーケ分析HTMLで扱いやすい形へ整える純関数群。
@@ -2073,6 +2079,7 @@
     - `statusTrendKey.js` — 状態トレンド(時系列KPI)の storage キー正本。status が自分で読み書きする(producer=consumer=status)。
     - `storageErrorState.js` — ストレージ書き込みエラーをポップアップ向けにシリアライズする純関数
     - `storageErrorState.test.js`
+    - `storageFullReadCensus.test.js`
     - `storageKeys.js` — chrome.storage.local キー（プレフィックスで衝突回避）
     - `storageKeys.test.js`
     - `storageOpTimeout.js` — v0.1.502: 単発の非同期処理（主に chrome.storage.local の get/set/remove）を

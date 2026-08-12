@@ -118,6 +118,13 @@ const STORAGE_DISCONNECT_BASELINE = new Set([
   //   changes[key] で参照するため、fn:tailStorageKey/fn:commentDbSummaryKeyと同型の静的解析の
   //   取りこぼし(呼び出しがget/set呼び出しの引数領域の外)。経路自体は実在。
   'fn:officialGiftPointsAggregateStorageKey',
+  // v0.1.1382: コメント書込モード計器(丸ごと書き戻し か チャンク追記か)。
+  //   producer=content-entry.js:12542(storage.local.set の中で直接書く=検出される)。
+  //   consumer=sidepanel-entry.js:644 は `chrome?.storage?.local?.get?.(KEY)` と
+  //   **オプショナルチェーン呼び出し**で読むため、静的解析が consumer 側を取りこぼす偽陽性。
+  //   ★経路は実在する(2026-08-12 に両側を目視確認・配線テスト
+  //   src/lib/commentChunkModeFailOpen.wiring.test.js が producer/consumer の両方を断言する)。
+  'KEY_COMMENT_WRITE_MODE_DIAG',
   // popup が optional-chaining + computed key で set するため producer を静的解析が取りこぼす偽陽性
   // (実書込は popup-entry.js:collectAiShareDevMonitorPayloadBundle・status-entry.js が読む。2026-06-18 確認)
   'KEY_AI_SHARE_POPUP_DIAG',
