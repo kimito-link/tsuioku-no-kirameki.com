@@ -624,6 +624,65 @@ describe('summarizeHealthVerdict v0.1.846 満点=「異常ゼロ」(進行中/�
   });
 
   // 2026-06-22(council/lane-show-all-active): 応援レーンの人数整合セル。
+  describe('★名前ありゆっくり顔セル(ID無し=広告主・ゲストも数える)', () => {
+    /*
+     * ★v0.1.1361: v1358 で計器に checkedNoUid/yukkuriNamedNoUid を足したのに、
+     *   このセルのゲートが  のままで【広告列だけの症状では出なかった】。
+     *   実機スクショ(2026-08-12)は広告列に「名前ありゆっくり顔」が並んでいたのに
+     *   速報は「✅ 実害0」。判定はあるが配線されていない、の再発。
+     */
+    it('★ID無し(広告主)だけでもセルが出て warn になる', () => {
+      const cells = buildHealthCells({
+        venueSeatsDiag: {
+          enabled: true,
+          participantCount: 5,
+          yukkuriNamedCensus: { checked: 0, yukkuriNamed: 0, checkedNoUid: 2, yukkuriNamedNoUid: 2 }
+        }
+      });
+      const c = cellById(cells, 'venue-yukkuri-face');
+      expect(c).toBeDefined();
+      expect(c.level).toBe('warn');
+      expect(c.text).toContain('2件');
+    });
+
+    it('★分母(検査した数)を必ず出す=「0件」が未計測かどうか読み分けられる', () => {
+      const cells = buildHealthCells({
+        venueSeatsDiag: {
+          enabled: true,
+          participantCount: 5,
+          yukkuriNamedCensus: { checked: 12, yukkuriNamed: 0, checkedNoUid: 3, yukkuriNamedNoUid: 0 }
+        }
+      });
+      const c = cellById(cells, 'venue-yukkuri-face');
+      expect(c.level).toBe('ok');
+      expect(c.text).toContain('検15'); // 12 + 3 = 全部の分母
+    });
+
+    it('匿名スタイル(a:系)の実害も件数に入る', () => {
+      const cells = buildHealthCells({
+        venueSeatsDiag: {
+          enabled: true,
+          participantCount: 5,
+          yukkuriNamedCensus: { checked: 0, checkedAnonymousStyle: 4, yukkuriNamedAnonymousStyle: 1 }
+        }
+      });
+      const c = cellById(cells, 'venue-yukkuri-face');
+      expect(c.level).toBe('warn');
+      expect(c.text).toContain('1件');
+    });
+
+    it('一度も検査していなければセルを出さない(死にセルにしない)', () => {
+      const cells = buildHealthCells({
+        venueSeatsDiag: {
+          enabled: true,
+          participantCount: 5,
+          yukkuriNamedCensus: { checked: 0, checkedNoUid: 0, checkedAnonymousStyle: 0 }
+        }
+      });
+      expect(cellById(cells, 'venue-yukkuri-face')).toBeUndefined();
+    });
+  });
+
   describe('応援レーン人数整合セル(laneDiag)', () => {
     it('laneDiag 未指定/liveId 空=セルを足さない(死にセルにしない)', () => {
       expect(cellById(buildHealthCells({ livesData: [] }), 'lane-count')).toBeUndefined();

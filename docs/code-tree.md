@@ -167,7 +167,7 @@
     - `2026-07-22.md`
     - `2026-07-23.md`
     - `2026-07-31.md`
-- 📁 **docs/** (264)
+- 📁 **docs/** (266)
   - 📁 **article-assets/** (87)
     - 📁 **venue-frames/** (12)
       - `f01.png`
@@ -277,7 +277,7 @@
     - `storage-bus.md`
     - `venue.md`
     - `web-status.md`
-  - 📁 **handoff/** (100)
+  - 📁 **handoff/** (102)
     - `CODEX-TASK-voice-v1332.md`
     - `CODEX-TASK-voice-v1334.md`
     - `CODEX-TASK-voice-v1342.md`
@@ -346,6 +346,8 @@
     - `giant-entry-split-SPEC-2026-08-10.md`
     - `gift-lane-thumb-own-posted-mismatch-DESIGN.md`
     - `gift-lane-thumb-own-posted-mismatch-IMPLEMENTATION-HANDOFF.md`
+    - `health-cells-4domains-DESIGN.md`
+    - `health-cells-4domains-IMPLEMENTATION-HANDOFF.md`
     - `lanescene-structural-review-DESIGN.md`
     - `lanescene-structural-review-IMPLEMENTATION-HANDOFF.md`
     - `marketing-export-tab-IMPLEMENTATION-HANDOFF.md`

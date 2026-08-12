@@ -330,15 +330,33 @@ function buildVenueSeatsHealthCells(venueSeatsDiag, nowMs) {
 
   // ⑤ 2026-07-15 診断先行(venue-yukkuri-named-diagnose): 「名前ありゆっくり顔」実害計器。
   //   真因(桁レンジ境界)は意図的仕様のため修正しない。実害の有無だけを可視化する(赤にしない=warn止め)。
+  /*
+   * ★v0.1.1361: v1358 で計器に足した「ID無し(広告主・ゲスト)」をセルにも通す。
+   *
+   * ■ v1358 の片肺(=このセルが v1358 の修正を殺していた)
+   *   計器側は checkedNoUid / yukkuriNamedNoUid を数えるようにしたのに、
+   *   ここのゲートは `checked > 0` のままだった。広告列だけで症状が出ている配信では
+   *   checked=0 / checkedNoUid>0 になるため【セルごと出ない】。
+   *   件数も yukkuriNamed だけを見ており、ID無しの実害が 0件 と表示されていた。
+   *   ★[[unwired-judgement-is-systemic-2026-08-12]]: 判定はあるが配線されていない、の再発。
+   *   ★分母(検査した数)を text に必ず出す=「0件」が「異常なし」か「測っていない」か読み分けられる。
+   */
   const yn = /** @type {any} */ (snap).yukkuriNamedCensus;
-  if (yn && typeof yn === 'object' && num(yn.checked) > 0) {
-    const yukkuriNamed = Math.max(0, Math.floor(num(yn.yukkuriNamed) || 0));
+  const ynChecked =
+    Math.max(0, Math.floor(num(yn?.checked) || 0)) +
+    Math.max(0, Math.floor(num(yn?.checkedAnonymousStyle) || 0)) +
+    Math.max(0, Math.floor(num(yn?.checkedNoUid) || 0));
+  if (yn && typeof yn === 'object' && ynChecked > 0) {
+    const yukkuriNamed =
+      Math.max(0, Math.floor(num(yn.yukkuriNamed) || 0)) +
+      Math.max(0, Math.floor(num(yn.yukkuriNamedAnonymousStyle) || 0)) +
+      Math.max(0, Math.floor(num(yn.yukkuriNamedNoUid) || 0));
     out.push(
       stateCell(
         'venue-yukkuri-face',
         '名前ありゆっくり顔',
         yukkuriNamed > 0 ? 'warn' : 'ok',
-        yukkuriNamed > 0 ? `${yukkuriNamed}件` : 'なし'
+        yukkuriNamed > 0 ? `${yukkuriNamed}件/検${ynChecked}` : `なし(検${ynChecked})`
       )
     );
   }

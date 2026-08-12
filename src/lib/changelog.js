@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1361',
+    date: '2026-08-12',
+    summary: 'fix(diag): 広告のゆっくり顔を診断ページにも出す',
+    items: Object.freeze([
+      '前バージョンで数えるようにした「広告主の名前ありゆっくり顔」が、診断ページの健全度パネルには出ていなかったのを直しました。検査した数も併記するので「0件」が本当に問題なしなのか確認できます。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1360',
     date: '2026-08-12',
     summary: 'fix(diag): 古い記録で注意を出さない',
