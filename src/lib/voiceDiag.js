@@ -5,6 +5,10 @@ import { canonicalLabel, fromAliveFailure } from './voiceFailureTaxonomy.js';
  * ★v0.1.1328: この診断を「新鮮」とみなす上限。これを大きく超えたら化石値として数値を伏せる。
  *   judgeValueFreshness は 10分以上で level='bad'(化石値)を返す。
  *   読み上げ診断は3秒 min-gap で書かれるので、60秒あれば通常運用では十分に新しい。
+ *
+ * ★v0.1.1367: healthCells.js の VOICE_LIVE_JUDGE_WINDOW_MS(90秒・旧同名)と統合しないこと。
+ *   こちらは judgeValueFreshness に渡す【基準値】で、化石値と出る実効境界は10分。
+ *   向こうは live 固着判定を適用するか否かの【境界そのもの】(実効90秒)。名前が同じだっただけで別物。
  */
 export const VOICE_DIAG_FRESH_MS = 60_000;
 

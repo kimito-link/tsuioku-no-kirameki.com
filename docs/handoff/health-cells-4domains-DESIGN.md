@@ -196,7 +196,7 @@ ON操作時に発火して失敗理由が `lastEnableFailReason` に、走行中
 | 5 | 新セルと既存の文章行が別判定で食い違う | 同じ純関数の verdict を両方が整形する(A-2) |
 | 6 | 新セルを「異常時だけ描画」で実装 | A-3を契約テストに:「diag存在＋異常入力→セルが配列に**必ず**含まれる」を assert |
 | 7 | lane-drop が未配線のまま「実装完了」と誤認 | wiringテスト＋**変異で赤**をDoDに。配線が複数箇所なら `toBe(n)` で数を断言 |
-| 9 | `VOICE_DIAG_FRESH_MS` が2ファイルに別値(60/90秒) | voiceDiag.js を正本に一本化し healthCells.js は import。再発は grep ゲートで検査 |
+| 9 | ~~`VOICE_DIAG_FRESH_MS` が2ファイルに別値(60/90秒)~~ | ★**v0.1.1367 訂正: 一本化しない**。同名だが役割が別(healthCells=判定適用の境界・実効90秒 / voiceDiag=judgeValueFreshness の基準値・実効10分)。統合すると v0.1.1004 の誤発火が戻る。`VOICE_LIVE_JUDGE_WINDOW_MS` へ改名して衝突のみ解消済 |
 | 10 | 鮮度判定に rAF/performance.now 由来の時刻を混ぜる | 比較は「書き手 Date.now vs 読み手 Date.now」のみ。`ts` の生成元を(要確認)し契約テストで固定 |
 | 2 | 新セル自身が化石値で色を出す | §Dの統一規則を各セルの**最初の分岐**に置く(判定より先に鮮度) |
 | 3 | lane-drop が候補数履歴だけ見て実DOMとずれる | 既存の `domShrinkCount` 優先を維持。文言に供給元を必ず含める |

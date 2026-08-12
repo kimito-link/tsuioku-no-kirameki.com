@@ -33,12 +33,18 @@ function num(x) {
 }
 
 /**
- * v0.1.1004: voiceDiag(会場読み上げ観測値)が「今の状態」と見なせる鮮度上限(ms)。
+ * v0.1.1004: voiceDiag(会場読み上げ観測値)を使って「live 固着判定をする」適用窓(ms)。
  *   会場が稼働中は comeview が頻繁に publishVoiceDiag するので capturedAt は新しい。これより古ければ
  *   会場非稼働(watch タブ無し/会場閉じた)=過去セッションの待機/沈黙が残存しているだけ=live 固着判定を
  *   しない(stale な「待機8・最終発話5.5日前」で🔴を誤発火しないため)。90秒=数十秒間隔の publish に余裕。
+ *
+ * ★v0.1.1367 改名(旧名 VOICE_DIAG_FRESH_MS): voiceDiag.js の同名定数と【役割が違う】。
+ *   ここ         = 判定を適用するか否かの境界。超えたら na('会場休止中') に落とす(実効90秒)。
+ *   voiceDiag.js = judgeValueFreshness に渡す【基準値】。化石値と出るのは実効10分。
+ *   ★同名ゆえ設計書(health-cells-4domains-DESIGN.md §9)は「一本化せよ」としていたが、
+ *   統合すると此処の境界が 90秒→60秒 に縮み v0.1.1004 の誤発火が戻る=退化。統合しないこと。
  */
-const VOICE_DIAG_FRESH_MS = 90 * 1000;
+const VOICE_LIVE_JUDGE_WINDOW_MS = 90 * 1000;
 
 /**
  * ★v0.1.1360: 会場座席の観測がこれより古ければ【会場を開いていない】と見なす(na)。
@@ -167,9 +173,9 @@ function buildVoiceHealthCells(voiceDiag, nowMs) {
   // ★v0.1.1004 stale 誤検知の根治: voiceDiag が古い(comeview が長く書いていない=会場非稼働/
   //   watch タブ無し)ときは、queueNow/lastSpokenBase が過去セッションの値のまま残り「待機8・
   //   最終発話5.5日前」で🔴を誤発火する(番犬は発火していない=今まさに固着ではない)。
-  //   capturedAt が VOICE_DIAG_FRESH_MS より古ければ「今の状態は不明」として live 固着判定をしない。
+  //   capturedAt が VOICE_LIVE_JUDGE_WINDOW_MS より古ければ「今の状態は不明」として live 固着判定をしない。
   const capturedAt = num(snap.capturedAt) || 0;
-  const diagFresh = capturedAt > 0 && now > 0 ? now - capturedAt <= VOICE_DIAG_FRESH_MS : true;
+  const diagFresh = capturedAt > 0 && now > 0 ? now - capturedAt <= VOICE_LIVE_JUDGE_WINDOW_MS : true;
 
   // ① 読み上げ追従(タイミング)。判定は【今の状態】を最優先にする(v0.1.895)。
   //   重要: playbackTimeoutTotal は【累計】=一度でも再生TO/固着回復が起きると永久に増えたまま。

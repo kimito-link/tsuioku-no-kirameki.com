@@ -153,6 +153,11 @@ npm run verify:cc
    `buildHealthCells` の入力に乗っているか。乗っていなければ `capturedAt` 付きで同梱する配線から
 3. **`voice-engine` セル**（設計§C-4）— ★先に(要確認): ON成功時に `lastEnableFailReason` が
    クリアされるか。されないなら分岐順で誤発火を防ぐ
-4. **`VOICE_DIAG_FRESH_MS` の一本化** — `healthCells.js:39`(90秒) と `voiceDiag.js:9`(60秒)が
-   **同名別値で二重に存在**（裏取り済）。voiceDiag.js を正本にして import へ
+4. ~~**`VOICE_DIAG_FRESH_MS` の一本化**~~ → ★**v0.1.1367 で「統合しない」に訂正・完了**。
+   コードを読んだ結果、同名だが**別物**だった(重複ではない):
+   - `healthCells.js` = live 固着判定を**適用するかの境界そのもの**(実効90秒)
+   - `voiceDiag.js` = `judgeValueFreshness` に渡す**基準値**。化石値と出る実効境界は**10分**
+   一本化すると healthCells 側が 90秒→60秒 に縮み、**v0.1.1004 の誤発火(「待機8・最終発話
+   5.5日前」で🔴)が戻る=退化**。よって値は統合せず、`healthCells.js` を
+   `VOICE_LIVE_JUDGE_WINDOW_MS` へ**改名**して名前の衝突だけ解消した(実効境界は不変)。
 5. **`mark` フィールドのレンダラー対応**（設計§B）— グリフ＋ARIA

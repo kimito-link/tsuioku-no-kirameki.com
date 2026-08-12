@@ -26,6 +26,16 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1367',
+    date: '2026-08-12',
+    summary: '応援レーンが途中件数で止まる問題の根治（78件中19件しか出ない）',
+    items: Object.freeze([
+      '応援レーンに全員が出るようにしました。軽い読み込みが重い読み込みの成果を上書きしてしまい、全員分を読めていても画面には一部しか出ない状態が続いていました。',
+      'タイルが急に減る（19枚→9枚）現象も同じ原因だったため、あわせて解消します。',
+      '内部: 読み上げ診断の鮮度定数の名前衝突を解消（実際の判定時間は変更なし）。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1366',
     date: '2026-08-12',
     summary: 'fix(diag): ゲスト表示を誤検知しない',

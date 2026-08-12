@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 4 / 754 件
+## ⚠️ 役割コメントが無いソース 4 / 755 件
 - `src/lib/laneDomSelfMeasure.js`
 - `src/lib/reportPreviewPublish.js`
 - `src/lib/venueLaneBuckets.js`
@@ -680,7 +680,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (1633)
+- 📁 **src/** (1636)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -971,7 +971,7 @@
         - `logo_funlink_white_RGB_maru_black.png`
       - `logo_guide_funlink_ol.pdf`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1392)
+  - 📁 **lib/** (1395)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -1449,6 +1449,9 @@
     - `healthCells.test.js`
     - `heatLevel.js` — 「盛り上がり(熱量)」を判定する純関数(v0.1.871)。
     - `heatLevel.test.js`
+    - `heavyCachePreserve.js` — 軽い read が heavy read の証跡を消さないための純関数(v0.1.1367)。
+    - `heavyCachePreserve.test.js`
+    - `heavyCachePreserveWiring.test.js`
     - `heavyChunkReadReuse.js` — heavy 全件コメント read の再利用判定純関数
     - `heavyChunkReadReuse.test.js`
     - `heavyRacePaintFromCache.wiring.test.js`
