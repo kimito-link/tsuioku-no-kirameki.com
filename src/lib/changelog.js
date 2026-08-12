@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1359',
+    date: '2026-08-12',
+    summary: 'fix(lane): アイコンが一気に減るのを直す',
+    items: Object.freeze([
+      '応援レーンのアイコンが39枚から3枚に一気に減ることがあったのを直しました。読み込み待ちのあいだに全件表示が完成しても、待つ前の古い判断のまま少ない候補で上書きしていたためです。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1358',
     date: '2026-08-12',
     summary: 'fix(diag): 広告主のゆっくり顔を数える',

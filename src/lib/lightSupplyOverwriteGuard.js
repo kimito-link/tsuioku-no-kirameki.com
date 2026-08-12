@@ -72,7 +72,8 @@ export function shouldSkipLightSupplyOverwrite(args) {
  * ★[[zero-count-may-mean-unmeasured-2026-08-04]]: 0 が「異常なし」か「未計測」かを
  *   区別できるよう、判定に使ったサンプル数(観測した暫定供給の回数)を必ず併記する。
  *
- * @param {{ skipCount?: number, observedCount?: number, worst?: { next?: number, roster?: number }|null }|null|undefined} diag
+ * @param {{ skipCount?: number, observedCount?: number, paintedDuringAwaitCount?: number,
+ *   worst?: { next?: number, roster?: number }|null }|null|undefined} diag
  * @returns {string}
  */
 export function formatLightSupplyGuardLine(diag) {
@@ -80,15 +81,56 @@ export function formatLightSupplyGuardLine(diag) {
   if (!d) return '';
   const skip = Math.max(0, Math.floor(Number(d.skipCount) || 0));
   const observed = Math.max(0, Math.floor(Number(d.observedCount) || 0));
+  /*
+   * ★v0.1.1359: await 中に heavy が描き切ったため軽い供給が降りた回数。
+   *   これはタイル消失(39→3)の根治が実際に効いた回数=出るのは正常な防御。
+   *   ★observed(名簿との食い違い判定)とは別経路なので、observed=0 でも出す。
+   */
+  const paintedDuringAwait = Math.max(0, Math.floor(Number(d.paintedDuringAwaitCount) || 0));
+  const awaitNote = paintedDuringAwait > 0
+    ? ` / 🛡描画済みのため降りた${paintedDuringAwait}回(await中にheavyが完成=完全描画を守った)`
+    : '';
   if (observed <= 0) {
-    return '軽い供給の上書き ⚪ 未計測(暫定供給の観測0回=判定していません)';
+    return `軽い供給の上書き ⚪ 未計測(暫定供給の観測0回=判定していません)${awaitNote}`;
   }
   if (skip <= 0) {
-    return `軽い供給の上書き ✅ 見送り0回(暫定供給を${observed}回観測=判定済み)`;
+    return `軽い供給の上書き ✅ 見送り0回(暫定供給を${observed}回観測=判定済み)${awaitNote}`;
   }
   const worst = d.worst && typeof d.worst === 'object' ? d.worst : null;
   const detail = worst
     ? ` / 最大の食い違い: 名簿${Math.floor(Number(worst.roster) || 0)}人に対し供給${Math.floor(Number(worst.next) || 0)}件`
     : '';
-  return `軽い供給の上書き 🛡 ${skip}回見送り(暫定供給を${observed}回観測)${detail}\n  → 不完全な軽い供給がタイルを消すのを止めました(これが出るのは正常な防御)`;
+  return `軽い供給の上書き 🛡 ${skip}回見送り(暫定供給を${observed}回観測)${detail}${awaitNote}\n  → 不完全な軽い供給がタイルを消すのを止めました(これが出るのは正常な防御)`;
+}
+
+/**
+ * ★v0.1.1359: 「storage read の await をまたいだ後に、まだ書いてよいか」を判定する。
+ *
+ * ■ なぜ要るか(2026-08-12 実機・複数配信で再現したタイル消失 39→3)
+ *   軽い供給(light_summary)は冒頭で「既に描けているなら何もしない」と判定するが、
+ *   その判定は storage read の await より【前】にある。await 中に heavy_refresh が
+ *   39枚を描き切ると、復帰した軽い経路は「まだ0枚だった頃の判定」のまま
+ *   短い候補(3枚)を書き込み、完全描画を潰す。
+ *   ★入口で1回見ただけの判定は、await をまたいだ時点で古い。
+ *   ★実機の provisional 食い違い(shrinkCulprit:1 vs paintSkipReasons:provisional-false)は
+ *     heavy が共有フラグを上書きした後に読んだ値=この時間差の指紋だった。
+ *
+ * 掟: 数えるだけ・DOM/データを触らない(枚数と liveId は呼び出し側が読んで渡す)。
+ *
+ * @param {{ skipCount?: number, paintedDuringAwaitCount?: number }|null|undefined} diag 計器(副作用でカウントを進める)
+ * @param {{ domTiles?: unknown, stateLiveId?: unknown, liveId?: unknown }} args
+ * @returns {boolean} true=もう描かれているので軽い供給は降りる / false=書いてよい
+ */
+export function shouldSkipLightSupplyAfterAwait(diag, args) {
+  const tiles = Math.max(0, Math.floor(Number(args?.domTiles) || 0));
+  if (tiles <= 0) return false; // まだ誰も描いていない=軽い供給で描いてよい
+  const cur = String(args?.stateLiveId ?? '').trim().toLowerCase();
+  const live = String(args?.liveId ?? '').trim().toLowerCase();
+  // ★同一配信のときだけ降りる。配信切替なら前の配信の描画を守る理由が無い。
+  if (!live || cur !== live) return false;
+  if (diag && typeof diag === 'object') {
+    diag.skipCount = (Number(diag.skipCount) || 0) + 1;
+    diag.paintedDuringAwaitCount = (Number(diag.paintedDuringAwaitCount) || 0) + 1;
+  }
+  return true;
 }
