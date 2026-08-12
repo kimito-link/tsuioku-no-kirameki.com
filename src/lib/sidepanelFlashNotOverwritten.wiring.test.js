@@ -47,12 +47,27 @@ describe('サイドパネル自己診断: 一瞬の黒を後の✅で消さな�
   });
 
   it('★storage に書く ok は「今」ではなく「一度も黒くなかったか」である', () => {
-    // ok: verdict.ok && !flashed  ← flashed を無視すると flash が✅で消える
-    expect(src).toMatch(/ok:\s*verdict\.ok\s*&&\s*!flashed/);
+    /*
+     * ok: verdict.ok && !flashed && !_lateBlack
+     *   - flashed を無視すると起動直後の一瞬の黒が✅で消える
+     *   - ★v0.1.1351: _lateBlack を無視すると「あとから黒くなった」実機が✅になる
+     *     (行には出るのに ok=true という食い違いが起きる)
+     * ★行末まで固定する: 末尾を開けたままだと「&& !_lateBlack」を消しても
+     *   前半だけ一致して素通りする([[mutation-test-needs-anchored-regex]])。
+     */
+    expect(src).toMatch(/ok:\s*verdict\.ok\s*&&\s*!flashed\s*&&\s*!_lateBlack,/);
   });
 
   it('★黒を見たら cause / sample も黒かった瞬間のものを出す', () => {
-    expect(src).toMatch(/cause:\s*flashed\s*\?\s*worst\.verdict\.cause\s*:\s*verdict\.cause/);
+    /*
+     * ★v0.1.1351: cause の優先順位は3段になった。
+     *   flashed(起動直後の一瞬) > _lateBlack(あとから黒くなった) > 今の値
+     *   flash が最優先である点は不変(ここが崩れると一瞬の黒が消える)。
+     *   late を足したのは「30秒より後に黒くなった実機」を✅と report しないため。
+     */
+    expect(src).toMatch(
+      /cause:\s*flashed\s*\?\s*worst\.verdict\.cause\s*:\s*_lateBlack\s*\?\s*_lateBlack\.verdict\.cause\s*:\s*verdict\.cause/
+    );
     expect(src).toMatch(/sample:\s*flashed\s*\?\s*worst\.sample\s*:\s*sample/);
   });
 

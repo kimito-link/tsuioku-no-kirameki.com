@@ -69,6 +69,16 @@ function sampleLayer(el) {
 /** この起動で観測した「最悪の瞬間」(黒かった1回目)。null=まだ黒を見ていない。
  *  @type {{ phase: string, verdict: { ok: boolean, line: string, cause: string }, sample: any, at: number }|null} */
 let _worst = null;
+/**
+ * ★v0.1.1351: 起動から30秒より【後】に観測した黒(最後の1回)。
+ *   2026-08-12 のユーザー実機は「ニコ生でない普通のページを開いた状態で真っ黒」だった。
+ *   従来の観測点は30秒で打ち切りのため、この経路は**構造的に観測できていなかった**
+ *   (速報は永久に「✅正常」と言い続ける)。_worst と混ぜると「出た直後だけ黒い」と
+ *   誤表示されるので別の箱に分ける。
+ * @type {{ phase: string, verdict: { ok: boolean, line: string, cause: string },
+ *   at: number, sinceBootMs: number, count: number }|null}
+ */
+let _lateBlack = null;
 /** この起動で collectAndPublish を呼んだ回数(何回目の測定か)。 */
 let _samples = 0;
 /**
@@ -177,6 +187,23 @@ function collectAndPublish(phase) {
     //   → 黒を一度でも観測したらそれを保持し、以後の✅で塗り潰さない。
     if (!verdict.ok && !unlaidOut && !_worst) _worst = { phase, verdict, sample, at: Date.now() };
 
+    /*
+     * ★v0.1.1351: 「起動直後の一瞬の黒」と「あとから黒くなった」を別の事実として持つ。
+     *   混ぜると late の黒が「★出た直後だけ黒い(今は正常)」と誤って表示され、
+     *   ユーザーのスクショ(30秒より後に黒い)を計器が否定してしまう。
+     *   late 側は【最後に観測した黒】を上書きで持つ(今どうなっているかが次の一手に効く)。
+     */
+    const isLatePhase = phase === 'late' || phase === 'visible' || phase === 'reload';
+    if (!verdict.ok && !unlaidOut && isLatePhase) {
+      _lateBlack = {
+        phase,
+        verdict,
+        at: Date.now(),
+        sinceBootMs: Math.max(0, Date.now() - _bootAt),
+        count: (_lateBlack?.count || 0) + 1
+      };
+    }
+
     const worst = _worst;
     const flashed = Boolean(worst);
     /*
@@ -197,17 +224,28 @@ function collectAndPublish(phase) {
      *   直接読めるようにする(次の一手=CSSで救えているのか/JSの解除が届いていないのか)。
      */
     const cloakNote = cloakDuration.everCloaked ? ` / ${cloakDuration.line}` : '';
+    /*
+     * ★v0.1.1351: 「あとから黒くなった」を必ず1行に混ぜる。
+     *   これが無いと、30秒より後に黒くなった実機を計器が「✅正常」と報告してしまう
+     *   (画面にしか出ない情報は報告に乗らない=無いのと同じ)。
+     *   起動からの経過を秒で併記する=「開いた直後の話ではない」ことが一目で分かる。
+     */
+    const lateNote = _lateBlack
+      ? ` / ★あとから黒くなった(起動${Math.round(_lateBlack.sinceBootMs / 1000)}秒後の${_lateBlack.phase}で検知・${_lateBlack.count}回・原因=${_lateBlack.verdict.cause || '不明'})`
+      : '';
     const line = flashed
-      ? `${worst.verdict.line} ★出た直後だけ黒い(${worst.phase}時点で検知・今は${verdict.ok ? '正常' : '黒いまま'})${paintNote}${zeroNote}${cloakNote}`
-      : `${verdict.line}${paintNote}${zeroNote}${cloakNote}`;
+      ? `${worst.verdict.line} ★出た直後だけ黒い(${worst.phase}時点で検知・今は${verdict.ok ? '正常' : '黒いまま'})${paintNote}${zeroNote}${cloakNote}${lateNote}`
+      : `${verdict.line}${paintNote}${zeroNote}${cloakNote}${lateNote}`;
 
     void chrome?.storage?.local?.set({
       [KEY_SIDEPANEL_SELF_DIAG]: {
         at: Date.now(),
         // ok は「この起動で一度も黒くなかった」を意味する(瞬間の黒も見逃さない)。
         // ★未レイアウトは黒として数えない(偽陽性を永久保持しない)。
-        ok: verdict.ok && !flashed,
-        cause: flashed ? worst.verdict.cause : verdict.cause,
+        // ★v0.1.1351: あとから黒くなった場合も ok=false。ここを入れ忘れると、行には
+        //   「★あとから黒くなった」と出るのに ok=true のままになり、判定と表示が食い違う。
+        ok: verdict.ok && !flashed && !_lateBlack,
+        cause: flashed ? worst.verdict.cause : _lateBlack ? _lateBlack.verdict.cause : verdict.cause,
         line,
         phase,
         samples: _samples,
@@ -219,6 +257,9 @@ function collectAndPublish(phase) {
         // ★v0.1.1307: 幕の継続(居座る黒か・CSSで救えているか)。
         cloakDuration,
         cloakSeries: _cloakSeries,
+        // ★v0.1.1351: 30秒より後に黒くなった事実(null=起きていない)。
+        //   起動直後の一瞬(flashed)とは別物として読むこと。
+        lateBlack: _lateBlack,
         // 黒かった瞬間の生値を残す(原因の裏取り用)。無ければ今の値。
         sample: flashed ? worst.sample : sample,
         nowSample: sample
@@ -260,6 +301,67 @@ for (const ms of SAMPLE_AT_MS) {
 try {
   const ifr = document.querySelector('iframe');
   if (ifr) ifr.addEventListener('load', () => setTimeout(() => collectAndPublish('load'), 50), { once: true });
+} catch {
+  /* no-op */
+}
+
+/*
+ * ─────────────────────────────────────────────────────────────────────
+ * ★v0.1.1351: 起動から30秒より【後】に黒くなる場合を測る。
+ * ─────────────────────────────────────────────────────────────────────
+ *
+ * ■ なぜ要るか(2026-08-12 ユーザー実機スクショ)
+ *   パネルは【ニコ生でない普通のページ】(chikuwachan.com)を開いた状態で真っ黒だった。
+ *   従来の観測点は SAMPLE_AT_MS の最後=30秒で終わりで、それ以降は一度も測らない。
+ *   つまり「起動時は正常→あとから黒くなる」経路が**構造的に観測できず**、
+ *   速報は永久に「✅正常」と言い続ける。
+ *
+ *   ★これは v0.1.1307 で 3500ms→30000ms に伸ばしたときと**同じ型の穴**である。
+ *     観測窓の端を伸ばしただけでは「窓の外で起きる症状」は消えない。
+ *     → 端を伸ばすのではなく【今の状態を測り直す契機】を作るのが正しい直し方。
+ *
+ * ■ 3つの契機
+ *   1. 遅い定期観測(30秒ごと): 居座る黒を必ず1回は捕まえる。
+ *      ★rAF は使わない(タブ非表示で止まる=G5)。setInterval + 実時刻で測る。
+ *   2. 可視化(visibilitychange): 隠れている間は測っても意味がないので、
+ *      見えた瞬間に測り直す。ユーザーが「見て黒い」と気づく瞬間と一致する。
+ *   3. iframe の再 load: パネル内の遷移(配信を移る/別ページを開く)ごとに測り直す。
+ *      ★これが今回のスクショの経路。once:true の初回 load しか見ていなかった。
+ *
+ * ■ 「あとから黒くなった」を別の事実として残す
+ *   _worst は「起動直後の一瞬の黒」を保持するための箱で、これに late の黒を混ぜると
+ *   区別が消える(「出た直後だけ黒い」と誤って表示される)。別の箱に分けて記録する。
+ */
+const LATE_PROBE_INTERVAL_MS = 30000;
+
+try {
+  setInterval(() => {
+    // 隠れている間の測定は無意味(かつタイマー間引きで時刻もぶれる)。見えているときだけ測る。
+    if (document.visibilityState === 'visible') collectAndPublish('late');
+  }, LATE_PROBE_INTERVAL_MS);
+} catch {
+  /* no-op */
+}
+
+try {
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') {
+      // 表示された直後はレイアウトが確定していないことがあるので少し待つ。
+      setTimeout(() => collectAndPublish('visible'), 120);
+    }
+  });
+} catch {
+  /* no-op */
+}
+
+try {
+  const ifr = document.querySelector('iframe');
+  // ★once を付けない(初回 load 以降の遷移こそが今回の症状の経路)。
+  if (ifr) {
+    ifr.addEventListener('load', () => {
+      setTimeout(() => collectAndPublish('reload'), 120);
+    });
+  }
 } catch {
   /* no-op */
 }
