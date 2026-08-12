@@ -167,7 +167,7 @@
     - `2026-07-22.md`
     - `2026-07-23.md`
     - `2026-07-31.md`
-- 📁 **docs/** (268)
+- 📁 **docs/** (271)
   - 📁 **article-assets/** (87)
     - 📁 **venue-frames/** (12)
       - `f01.png`
@@ -277,7 +277,7 @@
     - `storage-bus.md`
     - `venue.md`
     - `web-status.md`
-  - 📁 **handoff/** (104)
+  - 📁 **handoff/** (107)
     - `CODEX-TASK-voice-v1332.md`
     - `CODEX-TASK-voice-v1334.md`
     - `CODEX-TASK-voice-v1342.md`
@@ -375,6 +375,9 @@
     - `venue-exact-parity-SPEC-2026-08-07.md`
     - `venue-gift-ad-mirror-mismatch-DESIGN.md`
     - `venue-gift-ad-mirror-mismatch-IMPLEMENTATION-HANDOFF.md`
+    - `venue-lane-readable-IMPLEMENTATION-HANDOFF.md`
+    - `venue-lane-readable-MAP.md`
+    - `venue-lane-readable-SPEC.md`
     - `venue-lobby-removal-DESIGN.md`
     - `venue-lobby-removal-IMPLEMENTATION-HANDOFF.md`
     - `venue-tile-link-parity-diagnose-DESIGN.md`
