@@ -105,6 +105,78 @@ let _shadeCoveringSamples = 0;
 /** パネルが開いた時刻(系列の t=0 基準)。 */
 const _bootAt = Date.now();
 
+/** ★v0.1.1372: 自己診断オーバーレイの id(重複生成を防ぐ)。 */
+const SELF_DIAG_OVERLAY_ID = 'nlSidepanelSelfDiagOverlay';
+
+/**
+ * ★v0.1.1373: この時間以上「中身が見えない」なら異常とみなす[ms]。
+ *
+ * 実機(2026-08-12)は 12,773ms 中身が出ていないのに ✅正常 と出ていた。
+ * ★人が気づく目安は 200ms([[sidepanel-white-flash-is-unfixable]] の基準)だが、
+ *   起動直後の正常な読み込みも数百ms かかるため、ここは体感に直結する 1秒 を境にする。
+ *   1秒以上「パネルは開いているのに中身が無い」なら、ユーザーには不具合に見える。
+ */
+const CONTENT_BLIND_ALERT_MS = 1_000;
+
+/**
+ * ★v0.1.1372: 「いま黒い/中身が出ていない」を【パネル自身の画面】に出す。
+ *
+ * ■ 設計の掟(どれも実機の失敗から来ている)
+ *   1. 異常のときだけ出す。正常なら要素ごと消す=通常利用を1px も邪魔しない。
+ *   2. 色は自前で完結させる(CSS変数や親の色に依存しない)。
+ *      ★黒画面の状況では「地の色が出ない」こと自体が症状なので、
+ *        var(--nl-bg) 等に頼ると【症状のときだけ読めない表示】になる。
+ *   3. iframe の【外】(sidepanel.html 側)に置く。中の popup が死んでいても出る。
+ *   4. pointer-events:none=操作を一切奪わない(閉じるボタンも作らない=押させない)。
+ *
+ * @param {{ ok: boolean, line: string }} v 判定結果
+ */
+function renderSelfDiagOverlay(v) {
+  const doc = document;
+  if (!doc || !doc.body) return;
+  const existing = doc.getElementById(SELF_DIAG_OVERLAY_ID);
+  // 正常なら出さない(既に出ていれば下ろす)。
+  if (v.ok) {
+    if (existing) existing.remove();
+    return;
+  }
+  const el = existing || doc.createElement('div');
+  if (!existing) {
+    el.id = SELF_DIAG_OVERLAY_ID;
+    /*
+     * ★色は固定値でベタ書きする(理由は上の掟2)。
+     *   薄い黄色地＋濃い文字＝黒背景でも白背景でも読める組み合わせ。
+     */
+    el.style.cssText = [
+      'position:fixed',
+      'left:8px',
+      'right:8px',
+      'bottom:8px',
+      'z-index:2147483647',
+      'padding:10px 12px',
+      'border-radius:8px',
+      'border:1px solid #b45309',
+      'background:#fffbeb',
+      'color:#7c2d12',
+      'font:12px/1.55 system-ui,sans-serif',
+      'white-space:pre-wrap',
+      'word-break:break-word',
+      'box-shadow:0 4px 16px rgba(0,0,0,.35)',
+      'pointer-events:none'
+    ].join(';');
+    doc.body.appendChild(el);
+  }
+  /*
+   * ★1行目は「ユーザーが次に何をすればいいか」。判定文字列(開発者向け)はその下。
+   *   計器の価値は【読んで直せたか】で測る([[instrument-value-is-measured-by-fixes]])ので、
+   *   専門用語だけの行は出さない。
+   */
+  el.textContent =
+    '⚠ パネルの中身が出ていません（この表示は異常時だけ出ます）\n' +
+    'まず: このパネルを一度閉じて開き直してください。直らなければ下の行をコピーして伝えてください。\n' +
+    v.line;
+}
+
 /**
  * @param {string} phase どの瞬間の測定か('load'=描画直後 / 'settled'=落ち着いた後)
  */
@@ -290,9 +362,54 @@ function collectAndPublish(phase) {
     const lateNote = _lateBlack
       ? ` / ★あとから黒くなった(起動${Math.round(_lateBlack.sinceBootMs / 1000)}秒後の${_lateBlack.phase}で検知・${_lateBlack.count}回・原因=${_lateBlack.verdict.cause || '不明'})`
       : '';
+    /*
+     * ★v0.1.1373: 【中身が見えなかった時間】そのものを異常として扱う。
+     *
+     * ■ 実機がこう出した(2026-08-12・ユーザーの黒いパネル):
+     *     サイドパネル自己診断: ✅正常 ... ★中身が見えなかった合計=12773ms 主因=初回シェード
+     *   ★12.7秒も中身が出ていないのに【✅正常】。ユーザーには黒く見えているのに、
+     *     計器は「正常」と言い張っていた=判定の穴。
+     *
+     * ■ なぜ漏れたか
+     *   judgeSidepanelBlack は【その瞬間のサンプル】(塗り主・層の色)だけを見る。
+     *   「誰かが塗っているか」は満たすが、シェードが上に乗って中身を隠している時間は
+     *   評価に入っていなかった。合算値(summarizeContentBlindTime)は v0.1.1370 で
+     *   作ったのに、【判定には配線していなかった】
+     *   ([[unwired-judgement-is-systemic-2026-08-12]] を私がまた踏んだ)。
+     *
+     * ■ 判定: 人が気づく長さ(200ms)を大きく超えて中身が出ないなら、それは正常ではない。
+     *   ここでは体感に直結する 1秒 を境にする(瞬きでは見逃せない長さ)。
+     */
+    const blindTooLong = blind.blindMs >= CONTENT_BLIND_ALERT_MS;
+    const blindVerdictNote = blindTooLong
+      ? ` 🔴この間ユーザーには中身が出ていません(${Math.round(blind.blindMs / 100) / 10}秒)`
+      : '';
     const line = flashed
-      ? `${worst.verdict.line} ★出た直後だけ黒い(${worst.phase}時点で検知・今は${verdict.ok ? '正常' : '黒いまま'})${paintNote}${zeroNote}${cloakNote}${shadeNote}${blindNote}${lateNote}`
-      : `${verdict.line}${paintNote}${zeroNote}${cloakNote}${shadeNote}${blindNote}${lateNote}`;
+      ? `${worst.verdict.line} ★出た直後だけ黒い(${worst.phase}時点で検知・今は${verdict.ok ? '正常' : '黒いまま'})${paintNote}${zeroNote}${cloakNote}${shadeNote}${blindNote}${blindVerdictNote}${lateNote}`
+      : `${verdict.line}${paintNote}${zeroNote}${cloakNote}${shadeNote}${blindNote}${blindVerdictNote}${lateNote}`;
+
+    /*
+     * ★v0.1.1372: 判定結果を【このパネル自身の画面】に出す。
+     *
+     * ■ なぜ要るか(2026-08-12 ユーザー指摘・私が忘れていた宿題)
+     *   「診断ページなくても理解できる仕組みをつくる、というのも忘れられた」
+     *   従来この判定は storage に書くだけで、読むのは status ページ【だけ】だった。
+     *   ＝パネルが黒いとき、当のパネルには何も出ない。ユーザーは別ページを開いて
+     *   コピーしないと何も分からない。そしてその status が重い/白紙だと詰む
+     *   (実際 2026-08-12 に詰んだ=「どうやってこれで伝えるの」)。
+     *   ★[[screen-only-info-never-reaches-the-report]] の【逆】: 報告にしか出ない情報は、
+     *     報告を開けない人には無いのと同じ。
+     *
+     * ■ 掟: 黒いときだけ出す(正常時は1px も足さない=通常利用の邪魔をしない)。
+     *   描画には関与せず、最前面に小さく重ねるだけ。失敗してもパネルは動く。
+     */
+    // ★v0.1.1373: 「中身が長時間出ていない」を ok の条件に含める(表示と保存で同じ値を使う)。
+    const overallOk = verdict.ok && !flashed && !_lateBlack && !blindTooLong;
+    try {
+      renderSelfDiagOverlay({ ok: overallOk, line });
+    } catch {
+      /* best-effort: 表示に失敗しても診断の保存は続ける */
+    }
 
     void chrome?.storage?.local?.set({
       [KEY_SIDEPANEL_SELF_DIAG]: {
@@ -301,8 +418,15 @@ function collectAndPublish(phase) {
         // ★未レイアウトは黒として数えない(偽陽性を永久保持しない)。
         // ★v0.1.1351: あとから黒くなった場合も ok=false。ここを入れ忘れると、行には
         //   「★あとから黒くなった」と出るのに ok=true のままになり、判定と表示が食い違う。
-        ok: verdict.ok && !flashed && !_lateBlack,
-        cause: flashed ? worst.verdict.cause : _lateBlack ? _lateBlack.verdict.cause : verdict.cause,
+        // ★v0.1.1373: blindTooLong(中身が長時間出ない)も異常に含める=表示と同じ判断。
+        ok: overallOk,
+        cause: flashed
+          ? worst.verdict.cause
+          : _lateBlack
+            ? _lateBlack.verdict.cause
+            : blindTooLong
+              ? `中身が${Math.round(blind.blindMs / 100) / 10}秒出ていない(主因=${blind.dominant === 'shade' ? '初回シェード' : '幕(cloak)'})`
+              : verdict.cause,
         line,
         phase,
         samples: _samples,

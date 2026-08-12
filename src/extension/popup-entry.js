@@ -18678,11 +18678,16 @@ function dismissInitialLoadShade() {
  */
 let inlineShadeDataPollTimer = null;
 let inlineShadeDataFallbackTimer = null;
-// INLINE 幕の安全上限。データが来なくてもこの時間で必ず外す（永久ローディング防止）。
-//   記録済みコメント／レーン候補が乗れば inlineWatchPanelHasRealDataForShade() が即 true を
-//   返して早期解除されるため、この上限は「初回かつ完全に空」の最悪ケースだけに効く。
-//   20 秒は体感が長すぎたので 10 秒に短縮（prewarm 表示でも十分キャラ幕が見える）。
-const INLINE_SHADE_DATA_FALLBACK_MS = 10_000;
+/*
+ * INLINE 幕の安全上限。データが来なくてもこの時間で必ず外す（永久ローディング防止）。
+ * ★v0.1.1373: 10秒 → 2.5秒。実機(2026-08-12)の「黒いパネル」の正体がこれだった:
+ *   ★中身が見えなかった合計=12773ms(幕660ms / シェード12773ms) 主因=初回シェード
+ *   更新所要48820ms / 記録中2配信 ＝storage 飽和でシェードが待つデータが来ない。
+ *   旧コメントは10秒を「最悪ケースだけ」としていたが、★飽和時はこれが通常ケース＝
+ *   上限そのものが体感の黒時間を決めていた。幕の目的(初期レイアウトのガタつき隠し)は
+ *   2.5秒で足り、それ以上は待つほど黒く見えるだけ。中身が薄くても出す方が必ず良い。
+ */
+const INLINE_SHADE_DATA_FALLBACK_MS = 2_500;
 
 function inlineWatchPanelHasRealDataForShade() {
   try {
