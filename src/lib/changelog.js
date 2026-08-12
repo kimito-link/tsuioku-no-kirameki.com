@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1357',
+    date: '2026-08-12',
+    summary: 'fix(diag): 減ったのに正常と出る誤りを修正',
+    items: Object.freeze([
+      '前バージョンで追加した「アイコンが減った」検知が、実際に減っているのに「正常」と表示することがあったのを直しました。画面に出ている枚数ではなく、これから出そうとした枚数を数えていたためです。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1356',
     date: '2026-08-12',
     summary: 'fix(diag): 取得が詰まった時こそ計器を出す',
