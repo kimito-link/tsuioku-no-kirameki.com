@@ -839,6 +839,7 @@ import { maybeFlushBroadcastSessionSummarySample } from '../lib/broadcastSession
 import { isContextInvalidatedError as isExtensionContextInvalidatedError } from '../lib/reportSilentError.js';
 import { createConsoleErrorBuffer } from '../lib/consoleErrorBuffer.js';
 import { buildPopupErrorProbe } from '../lib/popupErrorLine.js';
+import { countIdentityFromLanePicks, buildIdentityAcquisitionProbe } from '../lib/identityAcquisitionCensus.js';
 import {
   listBroadcastSessionSummaryForLive,
   openBroadcastSessionSummaryDb
@@ -3805,6 +3806,8 @@ function hasExtensionContext() {
 
 // ★v0.1.1377: popup の例外を記録する(経緯と掟は src/lib/popupErrorLine.js のヘッダ)。
 const _popupErrorBuffer = createConsoleErrorBuffer({ capacity: 20 });
+/** ★v0.1.1378: サムネ/ID/名前の取得率。@type {ReturnType<typeof countIdentityFromLanePicks>} */
+let _identityAcquisition = null;
 
 let extensionContextErrorGuardInstalled = false;
 function installExtensionContextErrorGuard() {
@@ -6958,6 +6961,8 @@ function renderStoryUserLane() {
   const picked = flattenStoryUserLaneBuckets(buckets);
   // v0.1.1231 Phase1 計器: 誰が消えたかを測る(挙動不変・個数だけでは入れ替わりが見えないため)。
   noteLaneRoster(_laneRosterDeltaState, { liveId: STORY_SOURCE_STATE.liveId, picks: picked, candidateTotal: rosteredCandidates.length });
+  // ★v0.1.1378: サムネ/ID/名前の取得率。picked=【いま画面に出ている人】が母数。
+  _identityAcquisition = countIdentityFromLanePicks(picked);
   const giftPicks = Array.isArray(STORY_SOURCE_STATE.giftThrowerPicks)
     ? STORY_SOURCE_STATE.giftThrowerPicks
     : [];
@@ -18961,6 +18966,8 @@ async function collectAiShareDevMonitorPayloadBundle(watchUrl) {
       // ★v0.1.1377: popup の例外。ここに載せないと速報に出ない=起きたことすら分からない
       //   ([[fastdiag-lite-is-the-printer-subset]] / [[unwired-judgement-is-systemic-2026-08-12]])。
       popupErrorProbe: buildPopupErrorProbe(_popupErrorBuffer),
+      // ★v0.1.1378: サムネ/ID/名前の取得率(ユーザー確定の価値指標)。
+      identityAcquisition: buildIdentityAcquisitionProbe(_identityAcquisition),
       // v0.1.1226: ティッカーのピックアップ計器(gift+scored=0 なら未発火と断言できる)。
       tickerPick: { ..._tickerPickDiag },
       // v0.1.1231 Phase1: 人物集合の増減。「消えた人数」が本丸/everSeenMax は上限判断の実測。

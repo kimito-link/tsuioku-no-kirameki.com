@@ -601,6 +601,15 @@ export function buildAiShareFullText({ overviewText, livesData, fastDiag, popupD
     if (errLine) { lines.push(errLine); lines.push(''); }
   } catch { /* no-op: 計器の失敗は状態速報を壊さない */ }
   /*
+   * ★v0.1.1378: サムネ/ID/アカウント名の取得率(ユーザー確定「これが価値高い」)。
+   *   ★分母は【取れるはずの人=数値ID保持者】。匿名は仕様上ありえないので対象外にする
+   *   =匿名中心の配信で永久に赤くなる(読んでも直せない)計器にしない。
+   */
+  try {
+    const idLine = String((popupDiag?.popup ?? popupDiag)?.identityAcquisition?.line || '');
+    if (idLine) { lines.push(idLine); lines.push(''); }
+  } catch { /* no-op: 計器の失敗は状態速報を壊さない */ }
+  /*
    * ★v0.1.1278: 点滅追跡の計器7行(vanishForensics / hostAncestryTrace /
    *   hostStyleTrace / hostHideReason / hostRecoveryDiag / hostVisWatch /
    *   hostFlipCensus)を速報から外した。点滅は Side Panel 移行(v0.1.1275)で

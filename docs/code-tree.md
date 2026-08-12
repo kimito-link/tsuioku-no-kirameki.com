@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 4 / 756 件
+## ⚠️ 役割コメントが無いソース 4 / 757 件
 - `src/lib/laneDomSelfMeasure.js`
 - `src/lib/reportPreviewPublish.js`
 - `src/lib/venueLaneBuckets.js`
@@ -684,7 +684,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (1643)
+- 📁 **src/** (1645)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -975,7 +975,7 @@
         - `logo_funlink_white_RGB_maru_black.png`
       - `logo_guide_funlink_ol.pdf`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1402)
+  - 📁 **lib/** (1404)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -1475,6 +1475,8 @@
     - `htmlReportCommenterFollowSection.test.js`
     - `htmlReportConceptGuide.js` — HTML レポート用キャラガイド（この拡張の説明／保存ページの使い方）
     - `htmlReportConceptGuide.test.js`
+    - `identityAcquisitionCensus.js` — サムネ / 数値ID / アカウント名 の【取得率】を数える純関数。
+    - `identityAcquisitionCensus.test.js`
     - `iframeOfficialDomFromRelay.js` — v0.1.231: iframe relay (NLS_GIFT_HISTORY_FROM_IFRAME) 受信時の
     - `iframeOfficialDomFromRelay.test.js`
     - `inFlightGuard.js` — 状態速報「重さ根治 P3」: runStorageOpWithTimeout(storageOpTimeout.js)は Promise.race で
