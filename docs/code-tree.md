@@ -167,7 +167,7 @@
     - `2026-07-22.md`
     - `2026-07-23.md`
     - `2026-07-31.md`
-- 📁 **docs/** (271)
+- 📁 **docs/** (273)
   - 📁 **article-assets/** (87)
     - 📁 **venue-frames/** (12)
       - `f01.png`
@@ -277,7 +277,7 @@
     - `storage-bus.md`
     - `venue.md`
     - `web-status.md`
-  - 📁 **handoff/** (107)
+  - 📁 **handoff/** (109)
     - `CODEX-TASK-voice-v1332.md`
     - `CODEX-TASK-voice-v1334.md`
     - `CODEX-TASK-voice-v1342.md`
@@ -362,6 +362,8 @@
     - `panel-flicker-round2-brief-2026-08-05.md`
     - `scroll-whiteout-freeze-DESIGN.md`
     - `side-panel-spike-HOWTO.md`
+    - `sidepanel-black-council-MATERIAL.md`
+    - `sidepanel-black-council-MINUTES.md`
     - `snippet-manager-clibor-parity-synthesis.md`
     - `sound-optimization-DESIGN.md`
     - `status-diag-608s-freeze-DESIGN.md`
