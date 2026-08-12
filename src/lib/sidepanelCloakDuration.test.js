@@ -34,10 +34,12 @@ describe('summarizeCloakDuration', () => {
     expect(r.line).toContain('JSの解除が届いていない');
   });
 
+  // ★v0.1.1352: CSS保険を 1500ms → 400ms に短縮したため、
+  //   「保険より前」を表す観測時刻を 600ms → 200ms に合わせた(意図は不変)。
   it('CSSフェイルセーフより前しか観測していない場合は断定しない(偽陽性を作らない)', () => {
     const r = summarizeCloakDuration([
       { t: 0, cloak: '1' },
-      { t: 600, cloak: '1' }
+      { t: 200, cloak: '1' }
     ]);
     expect(r.stillCloaked).toBe(true);
     expect(r.outlivedCssFailsafe).toBe(false);
@@ -47,14 +49,14 @@ describe('summarizeCloakDuration', () => {
   it('途中で外れたら解除時刻を出す', () => {
     const r = summarizeCloakDuration([
       { t: 0, cloak: '1' },
-      { t: 300, cloak: '1' },
-      { t: 600, cloak: '' },
+      { t: 100, cloak: '1' },
+      { t: 300, cloak: '' },
       { t: 1500, cloak: '' }
     ]);
     expect(r.stillCloaked).toBe(false);
-    expect(r.clearedAtMs).toBe(600);
+    expect(r.clearedAtMs).toBe(300);
     expect(r.outlivedCssFailsafe).toBe(false);
-    expect(r.line).toContain('t+600ms で解除');
+    expect(r.line).toContain('t+300ms で解除');
   });
 
   it('CSS自動解除より後に外れたら「JS解除が遅い」と分かる', () => {
@@ -96,7 +98,13 @@ describe('summarizeCloakDuration', () => {
     expect(summarizeCloakDuration(['x', null, { t: -1, cloak: '1' }]).observed).toBe(0);
   });
 
-  it('CSSフェイルセーフの定数は popup.html の 1500ms と同期', () => {
-    expect(CLOAK_CSS_FAILSAFE_MS).toBe(1500);
+  /*
+   * ★v0.1.1352: 1500 → 400 に短縮(実機で「JS解除1507ms / CSS保険1500ms」=
+   *   0〜1500ms のあいだ誰も中身を見せておらず、パネルを開いた瞬間が真っ黒だった)。
+   * ★popup.html の実値との一致は cloakFailsafeContract.test.js が機械で断言する
+   *   (ここは「意図した値であること」だけを固定し、二重管理にしない)。
+   */
+  it('CSSフェイルセーフの定数は popup.html と同期(実値の照合は契約テスト側)', () => {
+    expect(CLOAK_CSS_FAILSAFE_MS).toBe(400);
   });
 });

@@ -51,6 +51,43 @@ describe('decideHeavyChunkReadReuse', () => {
     expect(decideHeavyChunkReadReuse({ lv: 'lv1', cached: cached({ arrLength: 0 }), currentChunkTotal: 320, nowMs: NOW }).reuse).toBe(false);
   });
 
+  /*
+   * ★v0.1.1352: 不成立の理由を名指しする(3択のまま返さない)。
+   *   速報が「cachedが無い/lv不一致/件数0のいずれか」としか言えず、ユーザーが
+   *   聞き返さないと次の一手が決まらなかった(2026-08-12 指摘)。
+   *   ★reuse:false は不変=挙動は変えず、理由の粒度だけ上げる。
+   */
+  describe('★不成立の理由を名指しする(reuse は false のまま)', () => {
+    it('cached が無い → no-cache', () => {
+      const r = decideHeavyChunkReadReuse({ lv: 'lv1', cached: null, currentChunkTotal: 320, nowMs: NOW });
+      expect(r).toEqual({ reuse: false, reason: 'no-cache' });
+    });
+
+    it('別配信のキャッシュ → lv-mismatch', () => {
+      const r = decideHeavyChunkReadReuse({ lv: 'lv2', cached: cached({ lv: 'lv1' }), currentChunkTotal: 320, nowMs: NOW });
+      expect(r).toEqual({ reuse: false, reason: 'lv-mismatch' });
+    });
+
+    it('lv が空のキャッシュも lv-mismatch(不明を成立と偽らない)', () => {
+      const r = decideHeavyChunkReadReuse({ lv: 'lv1', cached: cached({ lv: '' }), currentChunkTotal: 320, nowMs: NOW });
+      expect(r).toEqual({ reuse: false, reason: 'lv-mismatch' });
+    });
+
+    it('★件数0のキャッシュ → empty-cache(lv一致より後に判定する)', () => {
+      const r = decideHeavyChunkReadReuse({ lv: 'lv1', cached: cached({ arrLength: 0 }), currentChunkTotal: 320, nowMs: NOW });
+      expect(r).toEqual({ reuse: false, reason: 'empty-cache' });
+    });
+
+    it('3つの理由は互いに異なる(同じ語に潰れていない=名指しの意味がある)', () => {
+      const reasons = new Set([
+        decideHeavyChunkReadReuse({ lv: 'lv1', cached: null, currentChunkTotal: 320, nowMs: NOW }).reason,
+        decideHeavyChunkReadReuse({ lv: 'lv2', cached: cached({ lv: 'lv1' }), currentChunkTotal: 320, nowMs: NOW }).reason,
+        decideHeavyChunkReadReuse({ lv: 'lv1', cached: cached({ arrLength: 0 }), currentChunkTotal: 320, nowMs: NOW }).reason
+      ]);
+      expect(reasons.size).toBe(3);
+    });
+  });
+
   it('minGap境界: 読了ちょうど12秒前は不成立、11.999秒前は成立', () => {
     const base = { lv: 'lv1', cached: cached({ arrLength: 300, chunkTotal: 320 }), currentChunkTotal: 450 };
     expect(decideHeavyChunkReadReuse({ ...base, cached: cached({ arrLength: 300, chunkTotal: 320, readAtMs: NOW - HEAVY_FULL_REREAD_MIN_GAP_MS }), nowMs: NOW }).reuse).toBe(false);

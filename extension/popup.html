@@ -1600,10 +1600,29 @@
        * 新実装は JS state に依存しない CSS アニメーションを保険として走らせ、1500ms 後には必ず自動で
        * fade-in する。JS が通常ルートで reveal すれば removeAttribute でこのブロックが外れて即可視。
        * 例外ルートでも「見えない UI」が延々と続くことを CSS 側で防ぐ。 */
+      /*
+       * ★v0.1.1352: 自動 reveal の遅延を 1500ms → 400ms に短縮。
+       *
+       * ■ 実機で確定したこと(2026-08-12 の状態速報)
+       *     幕(cloak) ✅ t+1507ms で解除 ★CSS自動解除(1500ms)より後=JS解除が遅い
+       *   JS の解除は 1507ms、CSS の保険は 1500ms から 260ms かけて fade する。
+       *   つまり **0〜1500ms のあいだ、誰も中身を見せていない**。
+       *   ユーザーはサイドパネルを引っ張って開いた瞬間そこを見るので「真っ黒」になる。
+       *
+       * ■ なぜ 1500ms が長すぎたか
+       *   この値は「ちらつき(段階描画)を隠す」ために置かれたもので、
+       *   ちらつきを隠す時間 = ユーザーが黒を見る時間 でもある。
+       *   ★ちらつき対策と黒対策はトレードオフで、1500ms は黒の側に振れすぎていた。
+       *   400ms なら段階描画のちらつきは大半が終わっており、かつ人が「黒い画面」として
+       *   認識する前に中身が出る。
+       *
+       * ★JS が通常ルートで reveal すれば removeAttribute で即可視(従来どおり)。
+       *   これは「JS が遅れた/落ちた」ときの保険の発動を早めるだけの変更。
+       */
       html[data-nl-popup-primary-cloak='1'] .nl-popup-primary {
         opacity: 0;
         pointer-events: none;
-        animation: nl-popup-primary-cloak-auto-reveal 260ms 1500ms ease-out forwards;
+        animation: nl-popup-primary-cloak-auto-reveal 260ms 400ms ease-out forwards;
       }
       @keyframes nl-popup-primary-cloak-auto-reveal {
         to {
@@ -1615,7 +1634,9 @@
       @media (prefers-reduced-motion: reduce) {
         html[data-nl-popup-primary-cloak='1'] .nl-popup-primary {
           animation-duration: 0ms;
-          animation-delay: 700ms;
+          /* ★v0.1.1352: 通常時(400ms)より遅くしない。ここが長いと reduced-motion の
+             ユーザーだけ黒を長く見ることになる(従来は 700ms で通常より遅かった)。 */
+          animation-delay: 200ms;
         }
       }
 

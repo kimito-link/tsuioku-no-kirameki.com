@@ -193,6 +193,48 @@ describe('buildStoryUserLaneRenderDiag', () => {
     expect(text).toContain('一度も判定されていない');
   });
 
+  /*
+   * ★v0.1.1352: 3択のまま出さない。
+   *   旧実装は理由が空のとき「cachedが無い/lv不一致/件数0のいずれか」と出しており、
+   *   ユーザーが聞き返さないと次の一手が決まらなかった(2026-08-12 指摘
+   *   「全部質問しなくても分かるようにならないと困る」)。
+   *   decideHeavyChunkReadReuse が理由を名指しするようになったので、人語まで翻訳する。
+   */
+  describe('★不成立の理由を人語で名指しする', () => {
+    /** @param {string} reason */
+    const lineFor = (reason) => {
+      const d = buildStoryUserLaneRenderDiag({
+        activePath: 'heavy', started: 5, completed: 5, entriesLen: 100, domTilesPainted: 30,
+        lastReachedStep: 'done',
+        heavyFreshReadReuseCount: 0, heavyRaceReturns: 8, heavyReuseLastReason: reason
+      });
+      return formatStoryUserLaneRenderDiagLines(d).join('\n');
+    };
+
+    it('no-cache: 全件読みが残っていないと言う', () => {
+      const t = lineFor('no-cache');
+      expect(t).toContain('前回の全件読みが1度も残っていない');
+      expect(t).not.toContain('いずれか'); // ★3択のまま出さない
+    });
+
+    it('lv-mismatch: 別配信のキャッシュだと言う', () => {
+      const t = lineFor('lv-mismatch');
+      expect(t).toContain('別配信のもの');
+      expect(t).not.toContain('いずれか');
+    });
+
+    it('empty-cache: 0件で終わっていると言う', () => {
+      const t = lineFor('empty-cache');
+      expect(t).toContain('0件で終わっている');
+      expect(t).not.toContain('いずれか');
+    });
+
+    it('★3つの理由がそれぞれ違う文言になる(同じ説明に潰れていない)', () => {
+      const texts = ['no-cache', 'lv-mismatch', 'empty-cache'].map(lineFor);
+      expect(new Set(texts).size).toBe(3);
+    });
+  });
+
   it('race が無ければ0でも警告を出さない(正常時のノイズにしない)', () => {
     const d = buildStoryUserLaneRenderDiag({
       activePath: 'heavy', started: 1, completed: 1, entriesLen: 5, domTilesPainted: 5,

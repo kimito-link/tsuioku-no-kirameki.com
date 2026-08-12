@@ -24,8 +24,28 @@
  * @module sidepanelCloakDuration
  */
 
-/** CSS フェイルセーフ(popup.html の nl-popup-primary-cloak-auto-reveal)の遅延。 */
-export const CLOAK_CSS_FAILSAFE_MS = 1500;
+/**
+ * CSS フェイルセーフ(popup.html の nl-popup-primary-cloak-auto-reveal)の遅延。
+ * ★v0.1.1352: 1500 → 400。実機で「JS解除1507ms / CSS保険1500ms」= 0〜1500ms のあいだ
+ *   誰も中身を見せておらず、パネルを開いた瞬間が真っ黒だったため。
+ *   ★popup.html の animation-delay と**必ず同じ値**にすること(片方だけ変えると
+ *   計器が嘘をつく)。下の contract テストが両者の一致を機械で断言する。
+ */
+export const CLOAK_CSS_FAILSAFE_MS = 400;
+
+/**
+ * 幕の fade にかかる時間(popup.html の animation-duration)。
+ * ★「解除が始まった時刻」と「中身が完全に見える時刻」は別物。
+ *   ユーザーが黒を見る長さは failsafe + duration で決まる。
+ */
+export const CLOAK_CSS_FADE_MS = 260;
+
+/**
+ * 人が「黒い画面」として認識する目安(ms)。これ未満は瞬きに紛れて気づかない。
+ * ★出典は本リポの実績: [[sidepanel-white-flash-is-unfixable-2026-08-10]] で
+ *   白0.2秒は「見えるが直せない」と結論した=0.2秒は見える長さ、という基準に揃える。
+ */
+export const HUMAN_PERCEPTIBLE_MS = 200;
 
 /**
  * @typedef {{ t: number, cloak: string }} CloakSample
@@ -43,6 +63,8 @@ export const CLOAK_CSS_FAILSAFE_MS = 1500;
  *   clearedAtMs: number|null,
  *   lastObservedAtMs: number|null,
  *   outlivedCssFailsafe: boolean,
+ *   visibleBlackMs: number,
+ *   humanVisible: boolean,
  *   line: string
  * }}
  */
@@ -68,6 +90,9 @@ export function summarizeCloakDuration(series) {
       clearedAtMs: null,
       lastObservedAtMs: null,
       outlivedCssFailsafe: false,
+      // 未観測=黒を見ていない。0 と false で「測っていない」を素直に表す。
+      visibleBlackMs: 0,
+      humanVisible: false,
       line: '幕(cloak) ⚪ 未観測'
     };
   }
@@ -100,6 +125,27 @@ export function summarizeCloakDuration(series) {
       ? lastObservedAtMs > CLOAK_CSS_FAILSAFE_MS
       : clearedAtMs != null && clearedAtMs > CLOAK_CSS_FAILSAFE_MS);
 
+  /*
+   * ★v0.1.1352: 「ユーザーが黒を見ていた長さ」を計器が自分で言う。
+   *
+   * ■ なぜ要るか(2026-08-12 ユーザー指摘「全部質問しなくても分かるようにならないと困る」)
+   *   従来の行は「t+1507ms で解除」としか言わず、CSS保険(1500ms)と突き合わせて
+   *   初めて「0〜1500ms は誰も見せていない=そこが黒」と分かる形だった。
+   *   ★読み手に引き算をさせる計器は、原因を名指ししていないのと同じ。
+   *   人が黒として認識する目安(200ms)を超えたかどうかまで、この行で断定する。
+   */
+  const visibleBlackMs = everCloaked
+    ? stillCloaked
+      ? lastObservedAtMs
+      : Math.min(clearedAtMs ?? 0, CLOAK_CSS_FAILSAFE_MS + CLOAK_CSS_FADE_MS)
+    : 0;
+  const humanVisible = visibleBlackMs >= HUMAN_PERCEPTIBLE_MS;
+  const blackNote = everCloaked
+    ? ` / ★この間パネルは黒く見えていた=${visibleBlackMs}ms${
+        humanVisible ? '(人が気づく長さ)' : '(一瞬=気づかない)'
+      }`
+    : '';
+
   let line;
   if (!everCloaked) {
     line = `幕(cloak) ✅ 一度も残っていない(観測${observed}点)`;
@@ -108,11 +154,13 @@ export function summarizeCloakDuration(series) {
       `幕(cloak) 🔴 まだ残っている(最後の観測 t+${lastObservedAtMs}ms)` +
       (outlivedCssFailsafe
         ? ` ★CSSの自動解除(${CLOAK_CSS_FAILSAFE_MS}ms)を越えて残存=JSの解除が届いていない`
-        : ' (まだCSS自動解除の前=この時点では異常と断定できない)');
+        : ' (まだCSS自動解除の前=この時点では異常と断定できない)') +
+      blackNote;
   } else {
     line =
       `幕(cloak) ✅ t+${clearedAtMs}ms で解除(観測${observed}点)` +
-      (outlivedCssFailsafe ? ` ★CSS自動解除(${CLOAK_CSS_FAILSAFE_MS}ms)より後=JS解除が遅い` : '');
+      (outlivedCssFailsafe ? ` ★CSS自動解除(${CLOAK_CSS_FAILSAFE_MS}ms)より後=JS解除が遅い` : '') +
+      blackNote;
   }
 
   return {
@@ -123,6 +171,9 @@ export function summarizeCloakDuration(series) {
     clearedAtMs,
     lastObservedAtMs,
     outlivedCssFailsafe,
+    // ★v0.1.1352: ユーザーが実際に黒を見ていた長さ(ms)と、それが人に見える長さか。
+    visibleBlackMs,
+    humanVisible,
     line
   };
 }

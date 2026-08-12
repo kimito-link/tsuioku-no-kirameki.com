@@ -26,6 +26,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1352',
+    date: '2026-08-12',
+    summary: 'fix(panel): 開いた瞬間の黒を短くする',
+    items: Object.freeze([
+      'サイドパネルを開いた瞬間、中身が出るまで最大1.5秒ほど黒いままだったのを、0.4秒で出るようにしました。',
+      '会場や応援レーンが揃わないとき、その原因を状態速報がはっきり書くようにしました。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1351',
     date: '2026-08-12',
     summary: 'feat(diag): あとから黒くなるパネルを検知',

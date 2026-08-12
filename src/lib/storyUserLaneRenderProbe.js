@@ -463,11 +463,24 @@ export function formatStoryUserLaneRenderDiagLines(diag, ctx) {
     lines.push(`  → heavy 全件再読み省略(fresh-read再利用): ${freshReuse} 回(backfill中の re-read ループ抑止が効いている)`);
   } else if (raceN > 0) {
     const why = String(d.heavyReuseLastReason || '').trim();
+    /*
+     * ★v0.1.1352: 理由を【原因語+次の一手】まで翻訳する。
+     *   旧実装は「cachedが無い/lv不一致/件数0のいずれか」と3択のまま出しており、
+     *   ユーザーが「どれ?」と聞き返さないと次に進めなかった
+     *   (2026-08-12 指摘「全部質問しなくても分かるようにならないと困る」)。
+     *   decideHeavyChunkReadReuse が理由を名指しするようになったので、ここで人語にする。
+     */
     const whyLabel = why === 'coverage'
       ? 'coverage(80%カバー)で再利用済み=fresh-readの出番が無い'
-      : why
-        ? `最後の判定理由=${why}`
-        : '★再利用が一度も判定されていない(cachedが無い/lv不一致/件数0のいずれか)';
+      : why === 'no-cache'
+        ? '★原因=前回の全件読みが1度も残っていない(popupを開き直した直後/heavy readが毎回失敗)'
+        : why === 'lv-mismatch'
+          ? '★原因=キャッシュが別配信のもの(配信を移った直後なら次の全件読みで解消)'
+          : why === 'empty-cache'
+            ? '★原因=前回の全件読みが0件で終わっている(読めていないのにキャッシュだけ残った)'
+            : why
+              ? `最後の判定理由=${why}`
+              : '★再利用が一度も判定されていない(判定関数まで到達していない)';
     lines.push(`  → ⚠ heavy 全件再読みの省略が0回(race ${raceN}回) ${whyLabel}`);
   }
   return lines;

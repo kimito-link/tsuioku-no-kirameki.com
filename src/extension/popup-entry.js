@@ -22105,9 +22105,9 @@ if (typeof window !== 'undefined') {
    *
    * ■ 直し方: load に依存しない【時間だけの保険】を足す。
    *   DOM が使える時点から数えるので、hidden でも滑走中でも必ず時間内に外れる。
-   *   1500ms は CSS の auto-reveal と同じ値＝「CSSが中身を見せる瞬間には幕も外す」で揃える。
-   *   revealPopupPrimaryOnce() は冪等(popupPrimaryRevealDone で二重実行しない)なので、
-   *   通常経路が先に外していれば no-op＝既存の挙動を一切変えない(加法のみ)。
+   *   この値は CSS の auto-reveal と同じ値＝「CSSが中身を見せる瞬間には幕も外す」で揃える。
+   *   ★v0.1.1352: 1500→400ms に短縮(実機は0〜1500msのあいだ誰も中身を見せず真っ黒
+   *   だった)。片方だけ変えると幕が残るので wiring test が CSS との一致を断言する。
    */
   setTimeout(() => {
     try {
@@ -22115,5 +22115,5 @@ if (typeof window !== 'undefined') {
     } catch {
       // no-op
     }
-  }, 1500);
+  }, 400);
 }
