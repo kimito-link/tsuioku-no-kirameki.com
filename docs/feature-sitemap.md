@@ -290,7 +290,7 @@
   - `src/lib/giftThrowProjectile.js`
 - **吹き出し寿命管理** — 会場の吹き出しの表示上限・追い出し(eviction)ライフサイクル
   - `src/lib/venueBubbleLifecycle.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 215</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 216</summary>
 
 - `scripts/encode-marketing-html-avatars.mjs` — extension/images/marketing-html-avatars/*.png を data URI にし、
 - `scripts/split-avatar-parts.mjs` — 偽市松背景の除去 + パーツ切り出し(one-off アセットパイプライン)
@@ -395,6 +395,7 @@
 - `src/lib/laneSceneEnvelope.js` — LaneScene一致証明の封筒(純関数)。lanescene-structural-review-DESIGN.md のMVP実装。
 - `src/lib/laneSupplyOriginDiag.js` — 応援レーンの供給元(誰が entriesProvisional を書いたか)を名指しする計器。
 - `src/lib/laneTickProbe.js` — ①popup の独立描画トリガ(tickIndependentNorthStar)の自己診断(v0.1.1123)。
+- `src/lib/laneTileOscillation.js` — 【層】L0 判定層(純粋関数・I/O禁止)
 - `src/lib/lightSupplyOverwriteGuard.js` — 軽い供給(summary+tail)が完全描画を上書きするのを止める判定(純関数)。
 - `src/lib/liveAudienceDom.js` — watch ページ DOM から「同時接続（ページ表示）」に近い視聴者数を読む（純関数・ベストエフォート）
 - `src/lib/liveStatValuePlaceholder.js` — `.nl-live-stat-value` 向け: 数字表示かプレースホルダー文言かを判定（0.1.68 の極太フォント切替と共通）。
@@ -910,7 +911,7 @@
 
 ## 🧬 修正系譜マップ(この系統のバグを過去にどう直したか)
 
-> changelog 全 675 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
+> changelog 全 676 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
 
 ### 💾 記録件数 (94版)
 - `v0.1.1344` 2026-08-12 — fix(lane): 応援レーンが途中で固まる
@@ -1699,7 +1700,8 @@
 - `v0.1.699` 2026-06-12 — 読み上げの名前ON/OFF切替を追加
 - `v0.1.698` 2026-06-12 — コメビュにユーザー別の声で読み上げ機能を追加
 
-### 🪟 応援レーン・タイル (163版)
+### 🪟 応援レーン・タイル (164版)
+- `v0.1.1346` 2026-08-12 — feat(diag): レーンの点滅を測る
 - `v0.1.1345` 2026-08-12 — fix(perf): 描き直しの主因を塞ぐ(残り)
 - `v0.1.1344` 2026-08-12 — fix(lane): 応援レーンが途中で固まる
 - `v0.1.1341` 2026-08-12 — fix(diag): 効いていない時こそ理由を出す
@@ -1864,7 +1866,8 @@
 - `v0.1.673` 2026-06-10 — コメビュの名前をパネルと同じ情報源で補完
 - `v0.1.670` 2026-06-10 — コメビュのアイコンを本家と同じサムネに
 
-### 🩺 診断・状態速報 (246版)
+### 🩺 診断・状態速報 (247版)
+- `v0.1.1346` 2026-08-12 — feat(diag): レーンの点滅を測る
 - `v0.1.1342` 2026-08-12 — feat(diag): コメビュにも合成失敗の理由を記録する
 - `v0.1.1341` 2026-08-12 — fix(diag): 効いていない時こそ理由を出す
 - `v0.1.1340` 2026-08-12 — feat(diag): 描き直しの引き金を名指し

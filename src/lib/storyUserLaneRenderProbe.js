@@ -330,6 +330,11 @@ export function buildStoryUserLaneRenderDiag(probeSnap, ctx) {
     // ★v0.1.1341: 再利用が0回のとき【なぜ0なのか】を言うための最後の判定理由
     //   ('coverage' | 'fresh-read' | '')。0のときこそ出す(異常時に診断が消えるのを防ぐ)。
     heavyReuseLastReason: String(s.heavyReuseLastReason || ''),
+    // ★v0.1.1346: タイル数の往復(点滅)の要約。popup が summarize 済みの物を載せる。
+    laneTileOscillation:
+      s.laneTileOscillation && typeof s.laneTileOscillation === 'object'
+        ? s.laneTileOscillation
+        : null,
     lastRunAgoMs: s.lastRunAgoMs ?? null,
     // v0.1.1040 計器: 段ごとの実 replaceChildren 回数(churn 実測)をそのまま持ち越す。
     laneRepaintCounts: s.laneRepaintCounts && typeof s.laneRepaintCounts === 'object' ? s.laneRepaintCounts : null,
@@ -442,6 +447,16 @@ export function formatStoryUserLaneRenderDiagLines(diag, ctx) {
    *   「再利用が一度も成立していない」のに、その事実が速報に1文字も出なかった。
    *   ★再利用が成立しない原因は入力側にあるので、最後の判定理由を併記する。
    */
+  /*
+   * ★v0.1.1346: タイル数の【往復】= 点滅。
+   *   既存の縮小ガードは「前回より減ったか」しか見ないので、
+   *   2⇄30 の往復も 2→2 の停滞も同じ「縮小0回」に見えていた。
+   *   往復が観測されたときだけ出す(正常時のノイズにしない)。
+   */
+  const osc = d.laneTileOscillation;
+  if (osc && Number(osc.reversals) > 0 && osc.line) {
+    lines.push(`  → ${osc.line}`);
+  }
   const freshReuse = Number(d.heavyFreshReadReuseCount) || 0;
   const raceN = Number(d.heavyRaceReturns) || 0;
   if (freshReuse > 0) {

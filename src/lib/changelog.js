@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1346',
+    date: '2026-08-12',
+    summary: 'feat(diag): レーンの点滅を測る',
+    items: Object.freeze([
+      '応援レーンのアイコンが出たり消えたりする「点滅」を検知して、状態速報に出すようにしました。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1345',
     date: '2026-08-12',
     summary: 'fix(perf): 描き直しの主因を塞ぐ(残り)',
