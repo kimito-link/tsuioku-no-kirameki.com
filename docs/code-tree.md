@@ -677,7 +677,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (1625)
+- 📁 **src/** (1626)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -968,7 +968,7 @@
         - `logo_funlink_white_RGB_maru_black.png`
       - `logo_guide_funlink_ol.pdf`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1384)
+  - 📁 **lib/** (1385)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -1036,6 +1036,7 @@
     - `backfillFlushThreshold.test.js`
     - `backfillHeartbeat.js` — v0.1.795: 裏(背面)タブでも過去ログ backfill を取り切るための「ハートビート」純ロジック。
     - `backfillHeartbeat.test.js`
+    - `backfillLiveMetricHeartbeat.wiring.test.js`
     - `backfillOptIn.js` — v0.1.405: 過去ログ一括バックフィル（NDGR backward 巡回）の opt-in 判定 純関数群。
     - `backfillOptIn.test.js`
     - `backfillRemoveGiftSystemMessages.js` — v0.1.172 〜 v0.1.194 までの間に NDGR ギフトシステムメッセージが

@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1356',
+    date: '2026-08-12',
+    summary: 'fix(diag): 取得が詰まった時こそ計器を出す',
+    items: Object.freeze([
+      '過去コメントの取り込みが詰まっているとき、状態速報から「取得速度」の行が消えてしまい原因が分からなくなっていたのを直しました。詰まっている最中も速度が出続けます。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1355',
     date: '2026-08-12',
     summary: 'feat(diag): アイコンが減ったことを検知',
