@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1347',
+    date: '2026-08-12',
+    summary: 'feat(diag): 会場のアイコンを計器に載せる',
+    items: Object.freeze([
+      '会場モードでアイコンが出ない/診断が届かないことを、状態速報に出すようにしました。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1346',
     date: '2026-08-12',
     summary: 'feat(diag): レーンの点滅を測る',
