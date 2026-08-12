@@ -31,6 +31,33 @@
  *   - 配信が変わったら通す=前の配信の名簿で新配信を縛らない。
  *   - 名簿が空(まだ誰も見ていない)なら通す=初回描画を止めない。
  *   - 供給が名簿と同数以上なら通す=正常な更新は一切止めない。
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * ★v0.1.1370(2026-08-12 実機で再発): 「守るものが無いから通す」は【4箇所目】だった
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * 実機速報:
+ *     ★減った1回(最大24→3枚=21枚減・直前の供給元light_summary)
+ *     軽い供給の上書き ✅ 見送り0回(暫定供給を1回観測=判定済み)
+ *   名簿19人に対し供給3件=本来 incomplete-light-supply で止まるはずが skipCount:0。
+ *
+ * ■ 真因: 名簿がまだこの配信を記録していない瞬間、rosterLiveId が空になり
+ *   `!rosterLid` が【配信切替】と同じ扱いで通していた(旧55行)。
+ *   起動直後(laneTickProbe.runs:4)はまさにその窓。
+ *   ★roster-empty の穴を塞いだのに、同じ「守るものが無いから通す」判断が
+ *     live-switch という【別の名前】で残っていた。
+ *
+ * ■ なぜ「空=切替」が危ないか(意味が違うものを同じ枝に入れた)
+ *     別ID   = 守る対象が【別物】     → 通してよい(前の配信で新配信を縛らない)
+ *     空     = 守る対象が【未確定】   → 通してはいけない(まだ何も分からないだけ)
+ *   両者を `!rosterLid || cur !== rosterLid` で1本にまとめたのが穴。
+ *   ★[[decisions-accumulate-into-regressions-2026-08-11]]: 単体では正しい判断
+ *     (「配信IDが不明なら通す」)が積み重なって症状になった。
+ *
+ * ■ 直し: 空(未確立)は切替と分けて判定する。未確立でも【名簿に人数がある】なら
+ *   守る対象は在る=名簿基準で判定する。名簿も0なら従来どおり通す(初回描画を止めない)。
+ *
+ * ★DOM は依然として一切見ない(12-27行の原則を維持)。
  */
 
 /**
@@ -51,12 +78,23 @@ export function shouldSkipLightSupplyOverwrite(args) {
 
   const cur = String(args?.currentLiveId || '').trim().toLowerCase();
   const rosterLid = String(args?.rosterLiveId || '').trim().toLowerCase();
-  // 配信切替(または配信不明)は通す。前の配信の名簿で新しい配信を縛らない。
-  if (!cur || !rosterLid || cur !== rosterLid) return { skip: false, reason: 'live-switch' };
-
   const roster = Math.max(0, Math.floor(Number(args?.rosterEverSeen) || 0));
+
+  // 現配信が不明=何を守るべきかが決まらない。従来どおり通す(初回描画を止めない)。
+  if (!cur) return { skip: false, reason: 'live-unknown' };
+
+  /*
+   * ★v0.1.1370: 【別ID=切替】と【空=未確立】を分ける(旧実装は1本の枝だった)。
+   *   別IDは守る対象が別物なので通す。空は「まだ分からない」だけで、
+   *   名簿に人数があるなら守る対象は在る=下の名簿基準へ落として判定する。
+   */
+  if (rosterLid && cur !== rosterLid) return { skip: false, reason: 'live-switch' };
+
   // 名簿が空=まだ誰も観測していない=初回描画。守るものが無いので通す。
-  if (roster <= 0) return { skip: false, reason: 'roster-empty' };
+  // ★ここは rosterLid の有無に関わらず【人数】だけで決める(名前が無くても人数は守れる)。
+  if (roster <= 0) {
+    return { skip: false, reason: rosterLid ? 'roster-empty' : 'roster-unestablished' };
+  }
 
   const next = Math.max(0, Math.floor(Number(args?.nextSupplyCount) || 0));
   // 供給が名簿に追いついているなら通す(同数・増加は正常な更新)。
@@ -67,12 +105,50 @@ export function shouldSkipLightSupplyOverwrite(args) {
 }
 
 /**
+ * ★v0.1.1370: 判定と記録を【1回の呼び出し】にまとめる。
+ *
+ * ■ なぜ関数にするか(呼び出し側の書き忘れを構造で防ぐ)
+ *   旧実装は呼び出し側が observedCount++ と skipCount++ を手で書いており、
+ *   通した理由(reason)を記録する場所がどこにも無かった=書き忘れではなく
+ *   【書く場所が用意されていなかった】。計器を足しても呼び出し側が拾わなければ
+ *   画面に出ない([[unwired-judgement-is-systemic-2026-08-12]] の片肺と同型)。
+ *   → 判定結果と計器更新を必ず同時に行う入口を1つにする。
+ *
+ * @param {{ observedCount?: number, skipCount?: number, passReasons?: Record<string, number>,
+ *   worst?: { next?: number, roster?: number }|null }} diag 計器(副作用で更新する)
+ * @param {Parameters<typeof shouldSkipLightSupplyOverwrite>[0]} args 判定の入力
+ * @returns {{ skip: boolean, reason: string }}
+ */
+export function judgeAndRecordLightSupply(diag, args) {
+  const verdict = shouldSkipLightSupplyOverwrite(args);
+  if (diag && typeof diag === 'object') {
+    diag.observedCount = (Number(diag.observedCount) || 0) + 1;
+    if (verdict.skip) {
+      diag.skipCount = (Number(diag.skipCount) || 0) + 1;
+      const roster = Math.max(0, Math.floor(Number(args?.rosterEverSeen) || 0));
+      const next = Math.max(0, Math.floor(Number(args?.nextSupplyCount) || 0));
+      const worst = diag.worst && typeof diag.worst === 'object' ? diag.worst : null;
+      if (!worst || roster - next > (Number(worst.roster) || 0) - (Number(worst.next) || 0)) {
+        diag.worst = { next, roster };
+      }
+    } else {
+      // ★通した理由を必ず残す。ここが無いと「なぜ素通りしたか」が永久に分からない。
+      if (!diag.passReasons || typeof diag.passReasons !== 'object') diag.passReasons = {};
+      const key = String(verdict.reason || 'unknown');
+      diag.passReasons[key] = (Number(diag.passReasons[key]) || 0) + 1;
+    }
+  }
+  return verdict;
+}
+
+/**
  * 見送り計器のスナップショットから速報の1行を作る。
  * 件数0でも「観測できている(=計器は動いている)」ことが読めるよう、必ず判定文言を出す。
  * ★[[zero-count-may-mean-unmeasured-2026-08-04]]: 0 が「異常なし」か「未計測」かを
  *   区別できるよう、判定に使ったサンプル数(観測した暫定供給の回数)を必ず併記する。
  *
  * @param {{ skipCount?: number, observedCount?: number, paintedDuringAwaitCount?: number,
+ *   passReasons?: Record<string, number>,
  *   worst?: { next?: number, roster?: number }|null }|null|undefined} diag
  * @returns {string}
  */
@@ -90,17 +166,44 @@ export function formatLightSupplyGuardLine(diag) {
   const awaitNote = paintedDuringAwait > 0
     ? ` / 🛡描画済みのため降りた${paintedDuringAwait}回(await中にheavyが完成=完全描画を守った)`
     : '';
+  /*
+   * ★v0.1.1370: 【通した理由】を必ず出す。
+   *
+   * ■ なぜ要るか(2026-08-12: この計器が私を誤誘導した)
+   *   旧実装は _verdict.reason を skip したときしか使わず、通したときは捨てていた。
+   *   実機で「名簿19人に対し供給3件」が素通りしたのに、速報は
+   *     軽い供給の上書き ✅ 見送り0回(暫定供給を1回観測=判定済み)
+   *   としか言わず、【どの枝で通ったか】が永久に分からなかった。
+   *   ★消去法で live-switch と推定するしかなく、観測ではなく推測になった
+   *     ([[screen-only-info-never-reaches-the-report-2026-08-11]] と同型)。
+   *   ★「✅見送り0回」は【正常】にも【穴で素通り】にも出る=区別できない表示は嘘に近い。
+   *
+   * ■ 判定: 縮小が起きているのに見送り0回なら、それは正常ではない。
+   *   passReasons を並べれば「どの fail-open を通ったか」がそのまま次の一手になる。
+   */
+  const passReasons = d.passReasons && typeof d.passReasons === 'object' ? d.passReasons : null;
+  const passNote = passReasons
+    ? (() => {
+        /** @type {Array<{ key: string, n: number }>} */
+        const pairs = Object.keys(passReasons)
+          .map((k) => ({ key: k, n: Math.max(0, Math.floor(Number(passReasons[k]) || 0)) }))
+          .filter((p) => p.n > 0)
+          .sort((a, b) => b.n - a.n);
+        if (!pairs.length) return '';
+        return `\n  → 通した理由の内訳: ${pairs.map((p) => `${p.key}${p.n}`).join(' / ')}`;
+      })()
+    : '';
   if (observed <= 0) {
     return `軽い供給の上書き ⚪ 未計測(暫定供給の観測0回=判定していません)${awaitNote}`;
   }
   if (skip <= 0) {
-    return `軽い供給の上書き ✅ 見送り0回(暫定供給を${observed}回観測=判定済み)${awaitNote}`;
+    return `軽い供給の上書き ✅ 見送り0回(暫定供給を${observed}回観測=判定済み)${awaitNote}${passNote}`;
   }
   const worst = d.worst && typeof d.worst === 'object' ? d.worst : null;
   const detail = worst
     ? ` / 最大の食い違い: 名簿${Math.floor(Number(worst.roster) || 0)}人に対し供給${Math.floor(Number(worst.next) || 0)}件`
     : '';
-  return `軽い供給の上書き 🛡 ${skip}回見送り(暫定供給を${observed}回観測)${detail}${awaitNote}\n  → 不完全な軽い供給がタイルを消すのを止めました(これが出るのは正常な防御)`;
+  return `軽い供給の上書き 🛡 ${skip}回見送り(暫定供給を${observed}回観測)${detail}${awaitNote}${passNote}\n  → 不完全な軽い供給がタイルを消すのを止めました(これが出るのは正常な防御)`;
 }
 
 /**

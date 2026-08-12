@@ -678,7 +678,7 @@ import {
 } from '../lib/storyUserLaneRenderProbe.js';
 // v0.1.1231 Phase1: レーンの人物集合の増減(誰が消えたか)を測る計器。観測のみ。
 import { makeLaneRosterDeltaState, noteLaneRoster, snapshotLaneRosterDelta } from '../lib/laneRosterDelta.js';
-import { shouldSkipLightSupplyOverwrite, shouldSkipLightSupplyAfterAwait, formatLightSupplyGuardLine } from '../lib/lightSupplyOverwriteGuard.js';
+import { judgeAndRecordLightSupply, shouldSkipLightSupplyAfterAwait, formatLightSupplyGuardLine } from '../lib/lightSupplyOverwriteGuard.js';
 // v0.1.1249: 「誰が供給を書いたか」を名指しする計器(provisional 申告漏れの検出込み)。
 import { LANE_SUPPLY_ORIGIN, createLaneSupplyOriginDiag, noteLaneSupplyShrink, noteLaneSupplyWrite, snapshotLaneSupplyOriginDiag } from '../lib/laneSupplyOriginDiag.js';
 import { snapshotLanePublishSkipDiag } from '../lib/lanePublishSkipDiag.js';
@@ -6471,7 +6471,8 @@ let _storyUserLaneLastTiledLid = '';
 const _laneRosterDeltaState = makeLaneRosterDeltaState();
 // v0.1.1251: 軽い供給(summary+tail)の上書きを見送った回数を数える計器。
 //   ★件数0の意味を区別するため observedCount も持つ([[zero-count-may-mean-unmeasured-2026-08-04]])。
-const _lightSupplyGuardDiag = { skipCount: 0, observedCount: 0, worst: null, paintedDuringAwaitCount: 0 };
+// ★v0.1.1370: passReasons=通した理由の内訳(素通りの原因を速報に残す)。
+const _lightSupplyGuardDiag = { skipCount: 0, observedCount: 0, worst: null, paintedDuringAwaitCount: 0, passReasons: {} };
 const _laneSupplyOriginDiag = createLaneSupplyOriginDiag();
 /** v0.1.1232 Phase2: 「一度出た人」を覚える名簿(描画に使う・計器とは別物)。 */
 const _laneRosterKeeperState = makeLaneRosterKeeperState();
@@ -7365,22 +7366,15 @@ async function renderStoryUserLaneFromLightCommentsForCurrentLive(lid) {
   //   → 守りの基準を DOM でなく【名簿(この配信で一度でも見た人数・単調増加)】に移す。
   {
     const _roster = snapshotLaneRosterDelta(_laneRosterDeltaState);
-    const _verdict = shouldSkipLightSupplyOverwrite({
+    // ★v0.1.1370: 判定と計器更新を1呼び出しに統合(通した理由の記録漏れを構造で防ぐ)。
+    const _verdict = judgeAndRecordLightSupply(_lightSupplyGuardDiag, {
       provisional: true, // この経路の供給は定義上つねに暫定
       nextSupplyCount: entries.length,
       rosterEverSeen: Number(_roster?.everSeenMax) || 0,
       currentLiveId: live,
       rosterLiveId: String(_roster?.lastLid || '')
     });
-    _lightSupplyGuardDiag.observedCount += 1;
-    if (_verdict.skip) {
-      _lightSupplyGuardDiag.skipCount += 1;
-      const _r = Number(_roster?.everSeenMax) || 0;
-      if (!_lightSupplyGuardDiag.worst || _r - entries.length > _lightSupplyGuardDiag.worst.roster - _lightSupplyGuardDiag.worst.next) {
-        _lightSupplyGuardDiag.worst = { next: entries.length, roster: _r };
-      }
-      return; // 不完全な軽い供給で完全描画を潰さない(heavy/onChanged の次回に委ねる)
-    }
+    if (_verdict.skip) return; // 不完全な軽い供給で完全描画を潰さない(heavy/onChanged の次回に委ねる)
   }
   if (shouldSkipLightSupplyAfterAwait(_lightSupplyGuardDiag, { domTiles: countStoryUserLaneDomTiles(els), stateLiveId: STORY_SOURCE_STATE.liveId, liveId: live })) return; // ★v1359: awaitをまたいだので再判定(39→3の根治)
   // 既存の描画トリガに軽い entries を渡す=renderStoryUserLane が走り、末尾で現配信 lane mirror も publish。
@@ -18967,6 +18961,8 @@ async function collectAiShareDevMonitorPayloadBundle(watchUrl) {
         skipCount: _lightSupplyGuardDiag.skipCount,
         observedCount: _lightSupplyGuardDiag.observedCount,
         worst: _lightSupplyGuardDiag.worst, paintedDuringAwaitCount: _lightSupplyGuardDiag.paintedDuringAwaitCount,
+        // ★v0.1.1370: 通した理由の内訳。これが無いと「✅見送り0回」が正常か穴かを区別できない。
+        passReasons: { ..._lightSupplyGuardDiag.passReasons },
         line: formatLightSupplyGuardLine(_lightSupplyGuardDiag)
       },
       laneSupplyOrigin: snapshotLaneSupplyOriginDiag(_laneSupplyOriginDiag),

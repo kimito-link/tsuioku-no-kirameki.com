@@ -12,7 +12,7 @@ import {
   judgeSidepanelBlack,
   summarizeZeroAreaWindow
 } from '../lib/sidepanelSelfDiag.js';
-import { summarizeCloakDuration } from '../lib/sidepanelCloakDuration.js';
+import { summarizeCloakDuration, summarizeContentBlindTime } from '../lib/sidepanelCloakDuration.js';
 import { KEY_SIDEPANEL_SELF_DIAG } from '../lib/sidepanelSelfDiagKey.js';
 
 /**
@@ -279,12 +279,20 @@ function collectAndPublish(phase) {
     const shadeNote = _shadeCoveringLastT >= 0
       ? ` / 初回シェード t+${_shadeCoveringLastT}ms まで中身を覆っていた(観測${_shadeCoveringSamples}点)`
       : '';
+    /*
+     * ★v0.1.1370: 幕とシェードを【合算】して体感を1つの数字で言う。
+     *   旧実装は両者を別々に計算して連結するだけで、誰も足し合わせていなかった。
+     *   その結果「黒く見えていた=601ms」と出しながら、実際に中身が出ないのは
+     *   シェード込みで 1204ms だった=計器が過小申告し、私を cloak 追跡へ誤誘導した。
+     */
+    const blind = summarizeContentBlindTime(cloakDuration.visibleBlackMs, _shadeCoveringLastT);
+    const blindNote = blind.line ? ` / ${blind.line}` : '';
     const lateNote = _lateBlack
       ? ` / ★あとから黒くなった(起動${Math.round(_lateBlack.sinceBootMs / 1000)}秒後の${_lateBlack.phase}で検知・${_lateBlack.count}回・原因=${_lateBlack.verdict.cause || '不明'})`
       : '';
     const line = flashed
-      ? `${worst.verdict.line} ★出た直後だけ黒い(${worst.phase}時点で検知・今は${verdict.ok ? '正常' : '黒いまま'})${paintNote}${zeroNote}${cloakNote}${shadeNote}${lateNote}`
-      : `${verdict.line}${paintNote}${zeroNote}${cloakNote}${shadeNote}${lateNote}`;
+      ? `${worst.verdict.line} ★出た直後だけ黒い(${worst.phase}時点で検知・今は${verdict.ok ? '正常' : '黒いまま'})${paintNote}${zeroNote}${cloakNote}${shadeNote}${blindNote}${lateNote}`
+      : `${verdict.line}${paintNote}${zeroNote}${cloakNote}${shadeNote}${blindNote}${lateNote}`;
 
     void chrome?.storage?.local?.set({
       [KEY_SIDEPANEL_SELF_DIAG]: {

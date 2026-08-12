@@ -15,9 +15,25 @@ const entrySrc = readFileSync(join(here, '../extension/sidepanel-entry.js'), 'ut
 describe('sidepanel 幕(cloak)計器の配線', () => {
   it('summarizeCloakDuration を import して呼んでいる', () => {
     expect(entrySrc).toMatch(
-      /import \{ summarizeCloakDuration \} from '\.\.\/lib\/sidepanelCloakDuration\.js';/
+      /import \{ summarizeCloakDuration, summarizeContentBlindTime \} from '\.\.\/lib\/sidepanelCloakDuration\.js';/
     );
     expect(entrySrc).toMatch(/const cloakDuration = summarizeCloakDuration\(_cloakSeries\);/);
+  });
+
+  /*
+   * ★v0.1.1370: 合算(幕+シェード)が【速報の行に載る】ことまで断言する。
+   *   計算しても行に混ぜ忘れれば画面に出ない=無いのと同じ
+   *   ([[screen-only-info-never-reaches-the-report-2026-08-11]])。
+   *   実際 v1364 のシェード計器は「連結されているが誰も合算しない」状態で、
+   *   幕601ms を体感として断言し、シェード1204ms を隠していた。
+   */
+  it('★幕とシェードの合算を計算し、速報の行に混ぜている', () => {
+    expect(entrySrc).toMatch(
+      /const blind = summarizeContentBlindTime\(cloakDuration\.visibleBlackMs, _shadeCoveringLastT\);/
+    );
+    // 行テンプレートの両方(黒を観測した側/していない側)に blindNote が入っていること。
+    const noteUses = entrySrc.match(/\$\{blindNote\}/g) || [];
+    expect(noteUses.length).toBe(2);
   });
 
   it('★観測窓が居座る黒を測れる長さ(30秒以上)まで伸びている', () => {
