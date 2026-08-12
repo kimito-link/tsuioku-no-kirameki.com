@@ -5839,7 +5839,20 @@ export function mountVenueBarButton(options = {}) {
       // ★v0.1.1317: 会場が鏡を受け取れているか(通知/キー一致/関所)を1行で出す。
       //   ★ここに載せないと状態速報に出ない([[fastdiag-lite-is-the-printer-subset]]の同型)。
       //   観測ゼロなら空文字=行ごと出ない(普段の速報を汚さない)。
-      mirrorIntakeLine: formatVenueMirrorIntakeLine(_venueMirrorIntake, Date.now())
+      mirrorIntakeLine: formatVenueMirrorIntakeLine(_venueMirrorIntake, Date.now()),
+      /*
+       * ★v0.1.1348: 会場のアイコン実績を【トップレベル】にも載せる(v0.1.1347 の断線修理)。
+       *
+       * ■ v0.1.1347 で読み手(aiShareFullText)に `venueSeatsDiag.avatarProbe` を読む行を足したが、
+       *   書き手はここに載せておらず【永久に出ない行】だった(通し確認を怠った)。
+       *   avatarProbe は census の extras 経由で laneParity.dom へ平坦化されるだけで、
+       *   しかも whitelist は probeFail 1個しか通していない。
+       *   ＝[[venue-mirror-is-the-primary-path]]「個別列挙して作り直す関数が値を落とす」の再演。
+       *
+       * ★census 側(extras.avatarProbe)は現状維持で、ここに【追加で】貫通させる
+       *   (既存契約を壊さない)。同じ 3秒 min-gap 内の1回呼びなので hot path は汚さない。
+       */
+      avatarProbe: venueAvatarLoadGuard.getDiagnostics()
     };
     publishVenueSeatsDiag(seatsDiagObs);
     // 2026-07-01 会議(venue-diag): 「🩺 会場の状態」パネル用に最新の観測値を保持。

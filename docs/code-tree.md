@@ -676,7 +676,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (1615)
+- 📁 **src/** (1616)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -966,7 +966,7 @@
         - `logo_funlink_white_RGB_maru_black.png`
       - `logo_guide_funlink_ol.pdf`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1375)
+  - 📁 **lib/** (1376)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -2182,6 +2182,7 @@
     - `venueAvatarDiagLine.js` — 会場モード(venueBar.js)の「🩺 会場の状態」診断ブロックを組み立てる純関数群。
     - `venueAvatarDiagLine.test.js`
     - `venueAvatarFallbackFace.test.js`
+    - `venueAvatarPassthrough.test.js`
     - `venueAvatarReport.js` — 【層】L0 判定層(純粋関数・I/O禁止)
     - `venueAvatarReport.test.js`
     - `venueAvatarSvgOnly.wiring.test.js`
