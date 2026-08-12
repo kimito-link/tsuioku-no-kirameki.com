@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1360',
+    date: '2026-08-12',
+    summary: 'fix(diag): 古い記録で注意を出さない',
+    items: Object.freeze([
+      '会場モードを開いていないだけなのに診断ページが「注意」を出し続けていたのを直しました。8日前の記録を今の異常として表示していたためです。ギフト演出の判定も同じく、前回の配信の記録では注意を出さないようにしました。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1359',
     date: '2026-08-12',
     summary: 'fix(lane): アイコンが一気に減るのを直す',

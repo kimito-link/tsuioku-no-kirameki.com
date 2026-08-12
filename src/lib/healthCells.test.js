@@ -547,6 +547,48 @@ describe('summarizeHealthVerdict v0.1.846 満点=「異常ゼロ」(進行中/�
       expect(cellById(cells, 'venue-seats').text).toContain('他70');
     });
 
+    /*
+     * ★v0.1.1360(ユーザー実機 2026-08-12・診断ページのスクショ)
+     *   会場座席セルが「更新737644秒前(=8.5日前)」を🟡warn として出し続け、
+     *   総合判定まで「注意: 会場座席」に引きずっていた。
+     *   会場モードを開いていないだけなので、これは異常ではなく【対象外】。
+     *   ★上限を設けずに warn にしていたため、化石値が永久に黄色を出していた。
+     */
+    it('★8.5日前の化石値は warn でなく na(会場を開いていないだけ)', () => {
+      const now = 1000000000;
+      const cells = buildHealthCells({
+        venueSeatsDiag: {
+          enabled: true,
+          seatsShown: 0,
+          participantCount: 0,
+          broadcasterInSeats: false,
+          broadcasterKnown: true,
+          lastUpdateAt: now - 737644 * 1000 // 実機の値そのまま
+        },
+        nowMs: now
+      });
+      const c = cellById(cells, 'venue-seats');
+      expect(c.level).toBe('na');
+      expect(c.text).toContain('会場を開いていません');
+    });
+
+    it('★60秒〜5分の遅れは本物の warn として残す(開いているのに遅い)', () => {
+      const now = 1000000000;
+      const cells = buildHealthCells({
+        venueSeatsDiag: {
+          enabled: true,
+          seatsShown: 10,
+          participantCount: 12,
+          broadcasterInSeats: false,
+          broadcasterKnown: true,
+          lastUpdateAt: now - 90 * 1000
+        },
+        nowMs: now
+      });
+      expect(cellById(cells, 'venue-seats').level).toBe('warn');
+      expect(cellById(cells, 'venue-seats').text).toContain('更新90秒前');
+    });
+
     it('配信者 uid 未取得=混入判定不能で na(赤にしない)', () => {
       const now = 1000000;
       const cells = buildHealthCells({
@@ -679,6 +721,38 @@ describe('summarizeHealthVerdict v0.1.846 満点=「異常ゼロ」(進行中/�
       const c = cellById(cells, 'gift-effect');
       expect(c.level).toBe('warn');
       expect(c.text).toContain('演出漏れ2件');
+    });
+
+    /*
+     * ★v0.1.1360(ユーザー実機 2026-08-12・診断ページのスクショ)
+     *    が🟡のまま出続け、総合判定を
+     *   「注意: ギフト演出/効果音」に引きずっていた。しかし観測は 753,314秒前(8.7日前)で、
+     *   今日の配信の話ではない。★過去の記録を今日の異常として出さない。
+     */
+    it('★8.7日前の化石値は warn でなく na(前回の配信の記録)', () => {
+      const cells = buildHealthCells({
+        livesData: [],
+        giftEffectDiag: {
+          giftDetected: 8, giftThrown: 8, giftSoundPlayed: 7, soundEnabled: true,
+          lastEventAt: Date.now() - 753314 * 1000 // 実機の値そのまま
+        }
+      });
+      const c = cellById(cells, 'gift-effect');
+      expect(c.level).toBe('na');
+      expect(c.text).toContain('前回の配信の記録');
+    });
+
+    it('★直近(2時間以内)の取りこぼしは従来どおり warn(見逃さない)', () => {
+      const cells = buildHealthCells({
+        livesData: [],
+        giftEffectDiag: {
+          giftDetected: 8, giftThrown: 8, giftSoundPlayed: 7, soundEnabled: true,
+          lastEventAt: Date.now() - 60 * 1000
+        }
+      });
+      const c = cellById(cells, 'gift-effect');
+      expect(c.level).toBe('warn');
+      expect(c.text).toContain('音漏れ1件');
     });
 
     it('効果音OFFなら音0件でも warn にしない(誤診断防止)', () => {
