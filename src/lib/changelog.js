@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1351',
+    date: '2026-08-12',
+    summary: 'feat(diag): あとから黒くなるパネルを検知',
+    items: Object.freeze([
+      'サイドパネルが、開いてしばらく経ってから真っ黒になる場合も検知できるようにしました。これまでは開いた直後の30秒しか見ておらず、あとから黒くなっても「正常」と表示されていました。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1350',
     date: '2026-08-12',
     summary: 'chore(diag): コメント送信の計器を新しい作り方へ移行',

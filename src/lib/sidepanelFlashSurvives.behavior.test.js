@@ -70,7 +70,14 @@ describe('サイドパネル自己診断: 黒→正常 の経過で🔴が残る
       vi.setSystemTime(step);
       vi.advanceTimersToNextTimer();
     }
-    vi.runAllTimers();
+    /*
+     * ★v0.1.1351: runAllTimers() は使えない。
+     *   sidepanel-entry.js は「あとから黒くなる」を捕まえるため setInterval(30秒)を
+     *   持つようになった。繰り返しタイマーがあると runAllTimers() は永久に終わらず
+     *   「10000 timers = infinite loop」で落ちる(実際にこれで赤くなった)。
+     *   起動直後の経過を見るこのテストでは、有限の時間だけ進めれば十分。
+     */
+    vi.advanceTimersByTime(30000);
     vi.useRealTimers();
     return writes;
   }

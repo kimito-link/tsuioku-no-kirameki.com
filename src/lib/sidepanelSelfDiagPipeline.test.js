@@ -72,6 +72,76 @@ describe('サイドパネル自己診断: storage → 状態速報 の通し', (
     expect(text).toContain('iframeが潰れている');
   });
 
+  /*
+   * ★v0.1.1351: 「起動から30秒より後に黒くなる」経路の配線検査。
+   *
+   * ■ 2026-08-12 のユーザー実機
+   *   ニコ生でない普通のページ(chikuwachan.com)を開いた状態でパネルが真っ黒だった。
+   *   ところが従来の観測点は SAMPLE_AT_MS の最後=30秒で打ち切りで、それ以降を
+   *   一度も測らない。つまりこの経路は【構造的に観測できず】、速報は永久に
+   *   「✅正常」と言い続ける([[zero-count-may-mean-unmeasured]] と同型)。
+   *
+   *   ★v0.1.1307 で 3500ms→30000ms に伸ばしたのと同じ型の穴である。
+   *     端を伸ばすだけでは窓の外の症状は消えない=【測り直す契機】が要る。
+   */
+  describe('★あとから黒くなる経路(30秒より後)', () => {
+    const panelSrc = fs.readFileSync(
+      path.resolve(__dirname, '../extension/sidepanel-entry.js'),
+      'utf8'
+    );
+
+    it('遅い定期観測がある(居座る黒を必ず1回は捕まえる)', () => {
+      expect(panelSrc).toContain('LATE_PROBE_INTERVAL_MS');
+      expect(panelSrc).toMatch(/setInterval\(/);
+      expect(panelSrc).toContain("collectAndPublish('late')");
+    });
+
+    it('可視化された瞬間に測り直す(ユーザーが「見て黒い」と気づく瞬間と一致)', () => {
+      expect(panelSrc).toContain('visibilitychange');
+      expect(panelSrc).toContain("collectAndPublish('visible')");
+    });
+
+    it('★iframe の再 load でも測り直す(once を付けない=今回のスクショの経路)', () => {
+      expect(panelSrc).toContain("collectAndPublish('reload')");
+      // 初回 load 用の once:true とは別に、once の付かない load 監視があること。
+      const loadHandlers = panelSrc.match(/addEventListener\('load'/g) || [];
+      expect(loadHandlers.length).toBeGreaterThanOrEqual(2);
+    });
+
+    it('★rAF で経過を測らない(タブ非表示で止まる=G5)', () => {
+      expect(panelSrc).not.toContain('requestAnimationFrame');
+    });
+
+    it('late の黒は _worst と別の箱に持つ(「出た直後だけ黒い」と誤表示しない)', () => {
+      expect(panelSrc).toContain('_lateBlack');
+      expect(panelSrc).toContain('あとから黒くなった');
+    });
+
+    it('★late を観測したら ok=false になる(行と判定が食い違わない)', () => {
+      expect(panelSrc).toContain('ok: verdict.ok && !flashed && !_lateBlack');
+    });
+
+    it('lateBlack が storage の payload に載る(画面止まりにしない)', () => {
+      expect(panelSrc).toContain('lateBlack: _lateBlack');
+    });
+
+    it('★整形結果に「あとから黒くなった」が1行として現れる(端から端まで)', () => {
+      const lateLine =
+        'サイドパネル自己診断: 🔴黒くなりうる / v0.1.1351 / 400x1100 / 外✅ iframe✅ 中🔴 ' +
+        '/ ★あとから黒くなった(起動312秒後のreloadで検知・2回・原因=中身が塗っていない)';
+      const out = buildAiShareFullText({
+        overviewText: 'x',
+        livesData: [],
+        fastDiag: {},
+        popupDiag: {},
+        sidepanelSelfDiag: { line: lateLine }
+      });
+      const text = typeof out === 'string' ? out : String(out?.text || '');
+      expect(text).toContain('あとから黒くなった');
+      expect(text).toContain('起動312秒後');
+    });
+  });
+
   it('自己診断が無い(サイドパネル未使用)なら行を出さない=通常時のノイズにしない', () => {
     const out = buildAiShareFullText({
       overviewText: 'x',
