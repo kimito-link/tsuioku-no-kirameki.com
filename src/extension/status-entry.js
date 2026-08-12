@@ -221,6 +221,14 @@ import { PERF_DIAG_PREFIX, isPerfDiag } from '../lib/perfDiag.js';
 import { LIVE_ENDED_PREFIX, isLiveEndedFlag } from '../lib/liveEndedFlag.js';
 import { buildLiveHealth, scoreToDots } from '../lib/liveHealthScore.js';
 import { runStorageOpWithTimeout, STORAGE_OP_TIMED_OUT } from '../lib/storageOpTimeout.js';
+/*
+ * ★v0.1.1371: boot(init)で await する storage read の上限[ms]。
+ *   ここが無界だと storage stall のとき init が止まり、refresh にも到達せず【画面が白紙】になる
+ *   (2026-08-12 実機の真因: init 冒頭の2つの await が timeout 無しだった)。
+ *   短く倒す=読めなくても既定値で先へ進む方が必ず良い。
+ *   ★既定値は fail-closed(送らない/未設定扱い)なので、timeout しても安全側に倒れる。
+ */
+const BOOT_STORAGE_TIMEOUT_MS = 1_500;
 // 重さ根治 P3(2026-07-06): runStorageOpWithTimeout はタイムアウトしても opFn 自体は裏で生き続ける
 //   (Promise.race の性質)。次 tick が同じ opFn を再発行すると幽霊 read と多重競合するため、
 //   loadCustomSoundDiagSafe(IndexedDB open+count+fetch を伴う唯一の重い extras 処理)に
@@ -287,10 +295,29 @@ let _webPublishOptIn = false;
 /** 同意フラグを storage から読み直してキャッシュする(失敗時は false=送らない側に倒す)。 */
 async function refreshWebPublishOptInCache() {
   try {
-    const bag = await chrome.storage.local.get(KEY_WEB_PUBLISH_OPT_IN);
+    /*
+     * ★v0.1.1371: 【必ず timeout で有界化する】。
+     *
+     * ■ 何が起きていたか(2026-08-12 実機・status.html が真っ白のまま返らない)
+     *   この関数は boot の最初(init)で `await` されており、しかも生の
+     *   `chrome.storage.local.get` を timeout 無しで待っていた。
+     *   chrome.storage.local は単一 LevelDB で、他タブの巨大 read-merge-write が
+     *   走ると **settle せず永久 pending** になりうる(storageOpTimeout.js の背景)。
+     *   ＝storage が詰まると **init がここで止まり、下の refresh()/startRefreshLoop に
+     *   一生到達しない**。画面は白紙のまま、速報も書かれない(=コピーする物が無い)。
+     *   ★このページの他の read は全て有界化済みで、ここだけが非対称に無防備だった
+     *     ([[shared-helper-hides-canonical-bugs-2026-08-07]] と同じ「1箇所だけ素通し」)。
+     *
+     * ■ fail-closed は維持: 読めないなら false(送らない)。
+     *   ★同意フラグを「読めなかった」ことを「同意した」に倒してはいけない。
+     */
+    const bag = await runStorageOpWithTimeout(
+      () => chrome.storage.local.get(KEY_WEB_PUBLISH_OPT_IN),
+      BOOT_STORAGE_TIMEOUT_MS
+    );
     _webPublishOptIn = bag?.[KEY_WEB_PUBLISH_OPT_IN] === true;
   } catch {
-    _webPublishOptIn = false; // fail-closed: 読めないなら送らない
+    _webPublishOptIn = false; // fail-closed: 読めない/timeout なら送らない
   }
   return _webPublishOptIn;
 }
@@ -575,38 +602,85 @@ function updateAutoRefreshMeta() {
   meta.textContent = `自動更新: 混雑中→約${waitSec}秒に自動調整`;
 }
 
+/**
+ * ★v0.1.1371: 初回描画までの「読み込み中」表示を消す(初回 render 成功時に1回だけ)。
+ *
+ * ★status.html に【静的に】置いてある(JSが1行も動かなくても出る)ので、
+ *   消すのはここだけ。失敗しても描画は壊さない。
+ */
+function dismissStatusBootNotice() {
+  try {
+    const el = document.getElementById('nlStatusBootNotice');
+    if (el && !el.classList.contains('nl-status-boot-notice--done')) {
+      el.classList.add('nl-status-boot-notice--done');
+    }
+  } catch {
+    /* no-op: 表示の後始末が失敗しても本体を止めない */
+  }
+}
+
+/**
+ * ★v0.1.1371: 「開いた瞬間の1回」と「2秒ごとの1回」を同じ処理にする。
+ *
+ * ■ 何が起きていたか(2026-08-12 実機・ユーザーのスクショは【真っ白のまま】)
+ *   描画経路は setInterval で回る refresh() 【だけ】だった。
+ *   ＝ページを開いてから最初の描画まで **最低 REFRESH_INTERVAL_MS(2秒)** 何も出ない。
+ *   さらに初回は _lastRefreshPerf が空なので下の congested 判定が必ず false になり、
+ *   ★**初回だけ「一番遅い条件(記録中のstorage競合)」を「一番長いtimeout」で走る**。
+ *   実測はコード内に残っていた: backfill 1918ms / fastDiagLite 1749ms / summaries 1724ms。
+ *   2秒の空白 + 混雑した初回read = ユーザーが見た「白いまま返ってこない」。
+ *
+ * ■ なぜ速報で捕まえられなかったか(ユーザー指摘「状態速報なくても分かるようにして」)
+ *   速報は refresh() が**成功して初めて**書かれる。初回が終わらない間は速報が存在しない。
+ *   ＝**一番知りたい時間帯に計器が黙る**([[instrument-must-not-overwrite-its-own-evidence]] と同型)。
+ *
+ * @param {{ first?: boolean }} [opts] first=true なら初回(混雑を仮定して短いtimeoutで走る)
+ */
+function runRefreshTick(opts) {
+  const first = opts?.first === true;
+  if (_refreshPausedByUser) return;
+  // ★初回は hidden でも描く。開いた直後は hidden 判定が true になりうるうえ、
+  //   ここで降りると「開いたのに永久に白い」を作る(降りた後に誰も再挑戦しない)。
+  if (!first && document.hidden) return;
+  if (_refreshInFlight) return;
+  if (!first && _refreshBackoffTicks > 0) { _refreshBackoffTicks -= 1; return; }
+  _refreshInFlight = true;
+  const prevTotalMs = Number(_lastRefreshPerf?.totalMs);
+  /*
+   * ★初回は「未知」であって「軽い」ではない。
+   *   従来は prevTotalMs が無い=congested false=通常の長いtimeout(8000ms)だった。
+   *   未知を軽い側に倒すと、一番混んでいる初回が一番長く待つ。短い側に倒して素早くdegradeする
+   *   (degradeしても画面は出る=白いままより必ず良い)。
+   */
+  const congested = first
+    ? true
+    : Number.isFinite(prevTotalMs) && prevTotalMs > REFRESH_CONGESTED_MS;
+  refresh(congested ? { timeoutMs: CONGESTED_TIMEOUT_MS } : {})
+    .catch((err) => console.debug('[status] refresh err', err))
+    .finally(() => {
+      _refreshInFlight = false;
+      _refreshBackoffTicks = computeRefreshBackoffTicks(Number(_lastRefreshPerf?.totalMs));
+      updateAutoRefreshMeta();
+    });
+}
+
 function startRefreshLoop() {
   if (_refreshTimerId != null) return;
+  // ★v0.1.1371: interval の登録と同時に【1回すぐ描く】。2秒の空白を消す。
+  runRefreshTick({ first: true });
+  /*
+   * ★v0.1.1009/1010「過去ログ取り込み中に状態速報が重い(1819→7071ms)」の緩和: backfill SW/content が
+   *   単一 LevelDB に大きな staged 書込(最大2000行/2.5秒)を、2配信同時記録中はさらに倍で出すため、
+   *   status の read がそれと競合して 1 refresh が数百ms〜7秒に膨れる(実機 backfill 1918ms/
+   *   fastDiagLite 1749ms/summaries 1724ms=小さな read すら競合で待たされる)。
+   *   そこで (a)前回の refresh が終わるまで次を走らせない(再入防止=積み上がりを断つ)、
+   *   (b)前回の所要に【比例して】次の tick を間引く(v0.1.1010・computeRefreshBackoffTicks)=
+   *      重いほど控えめにして書込が drain する余地を作る。通常時(軽い)は2秒のまま=鮮度不変。
+   *   記録/取り込みには触らない(status の更新頻度だけ)。
+   * ★v0.1.1371: 上記のガードは runRefreshTick に集約(初回と同じ経路を通す=判断が2箇所に割れない)。
+   */
   _refreshTimerId = window.setInterval(() => {
-    if (_refreshPausedByUser) return;
-    if (document.hidden) return;
-    // ★v0.1.1009/1010「過去ログ取り込み中に状態速報が重い(1819→7071ms)」の緩和: backfill SW/content が
-    //   単一 LevelDB に大きな staged 書込(最大2000行/2.5秒)を、2配信同時記録中はさらに倍で出すため、
-    //   status の read がそれと競合して 1 refresh が数百ms〜7秒に膨れる(実機 backfill 1918ms/
-    //   fastDiagLite 1749ms/summaries 1724ms=小さな read すら競合で待たされる)。
-    //   そこで (a)前回の refresh が終わるまで次を走らせない(再入防止=積み上がりを断つ)、
-    //   (b)前回の所要に【比例して】次の tick を間引く(v0.1.1010・computeRefreshBackoffTicks)=
-    //      重いほど控えめにして書込が drain する余地を作る。通常時(軽い)は2秒のまま=鮮度不変。
-    //   記録/取り込みには触らない(status の更新頻度だけ)。
-    if (_refreshInFlight) return;
-    if (_refreshBackoffTicks > 0) { _refreshBackoffTicks -= 1; return; }
-    _refreshInFlight = true;
-    // v0.1.785: storage stall(storage_op_timeout)は status の自己診断 UI に画面表示済みで
-    //   グレースフルに degrade する想定内の事象。console.warn は chrome://extensions のエラー欄に
-    //   収集され「これ見てどうすればいいの?」を生むため console.debug に下げる(v0.1.776 と同方針=
-    //   行動につながらない警告を目立つ場所に出さない)。実エラーは画面の概要欄/AI共有欄で確認できる。
-    // v0.1.1062: 前回が混雑(10秒超)なら、次回は各readを3秒で有界化して素早くdegradeする
-    //   (62秒級のマラソン更新がstorageを占有し続け、Chrome全体を固める実機事象への対応)。
-    const prevTotalMs = Number(_lastRefreshPerf?.totalMs);
-    const congested = Number.isFinite(prevTotalMs) && prevTotalMs > REFRESH_CONGESTED_MS;
-    refresh(congested ? { timeoutMs: CONGESTED_TIMEOUT_MS } : {})
-      .catch((err) => console.debug('[status] refresh err', err))
-      .finally(() => {
-        _refreshInFlight = false;
-        // 直近 refresh の所要に比例して次の数 tick を間引く(重いほど大きく控える)。
-        _refreshBackoffTicks = computeRefreshBackoffTicks(Number(_lastRefreshPerf?.totalMs));
-        updateAutoRefreshMeta();
-      });
+    runRefreshTick();
   }, REFRESH_INTERVAL_MS);
 }
 
@@ -767,6 +841,12 @@ async function refresh(opts = {}) {
         `  数秒ごとに自動で再読み込みします。このまま少しお待ちください。`;
     }
     step = 'renderAll';
+    /*
+     * ★v0.1.1371: ここまで来れば「画面に何かが出る」ことが確定=読み込み表示を下ろす。
+     *   ★degrade(stale値/空)でも下ろす。中身が薄くても【画面が出ている】方が、
+     *     「読み込み中」が居座り続けるより正しい(永久ローディングを作らない)。
+     */
+    dismissStatusBootNotice();
     // v0.1.1005: 前サイクルの所要計器をコピー本文へ渡す(画面ヘッダーだけでなく AI共有テキストにも出す)。
     // 2026-07-14: renderAll 内のセクション別内訳(前サイクル計測)も同様に渡す(診断ページ軽量化の実測材料)。
     renderAll({ lvList, summaries, fastDiag, popupDiag, backfillProgress, backfillLiveMetric, voiceDiag, venueSeatsDiag, laneDiag, laneMirror, statCardsMirror, northStarMirror, reportPreview, trendFindings, watchTabMap, publishOutcomeRec, commentTimelineMirror, giftHistoryMirror, roomHeatMirror, sessionSummaryMirror, previewRenderAck, refreshPerf: _lastRefreshPerf, renderSectionMs: _lastRenderSectionMs, giftEffectDiag, milestoneEffectDiag, customSoundDiag, voiceEffectDiag, bgmPhaseDiag, opSoundEffectDiag, commentPostDiag, instantPushDiag, channelSwitchDiag, highlightLedger, scoreAnnounceDiag, sidepanelSelfDiag, extrasAgeMs: _extrasCacheAt ? Math.max(0, Date.now() - _extrasCacheAt) : null });
@@ -826,6 +906,13 @@ async function refresh(opts = {}) {
         `⚠ 状態の読み込みでつまずきました\n  つまずいた処理: ${step}\n  原因: ${String(err?.message || err)}\n` +
         `  (記録自体は watch タブ側で継続中です。storage が大きいと status の表示だけ遅れることがあります)`;
     }
+    /*
+     * ★v0.1.1371: 失敗経路でも読み込み表示を下ろす。
+     *   ここは renderAll に到達しないので、下ろさないと「読み込み中」が【永久に居座る】。
+     *   下の _statusLastErrorText が理由を画面に出すので、消しても情報は失われない
+     *   (むしろ「読み込み中」が理由を覆い隠す方が悪い)。
+     */
+    dismissStatusBootNotice();
     try {
       const ovEl = document.getElementById('overviewBody');
       if (ovEl && /読み込み中/.test(ovEl.textContent || '')) {
@@ -2880,7 +2967,12 @@ function getUploadConfig() {
 /** storage から共有キーを読み直してキャッシュする(失敗時は未設定=公開機能を出さない側に倒す)。 */
 async function refreshUploadConfigCache() {
   try {
-    const bag = await chrome.storage.local.get(KEY_STATUS_UPLOAD_CONFIG);
+    // ★v0.1.1371: boot で await されるので必ず有界化する(理由は
+    //   refreshWebPublishOptInCache のコメント参照=storage stall で init が止まり白紙になる)。
+    const bag = await runStorageOpWithTimeout(
+      () => chrome.storage.local.get(KEY_STATUS_UPLOAD_CONFIG),
+      BOOT_STORAGE_TIMEOUT_MS
+    );
     const raw = bag?.[KEY_STATUS_UPLOAD_CONFIG];
     const src = raw && typeof raw === 'object' ? raw : {};
     _uploadConfigCache = {
