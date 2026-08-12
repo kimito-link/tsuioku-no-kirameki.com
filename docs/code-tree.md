@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 4 / 753 件
+## ⚠️ 役割コメントが無いソース 4 / 754 件
 - `src/lib/laneDomSelfMeasure.js`
 - `src/lib/reportPreviewPublish.js`
 - `src/lib/venueLaneBuckets.js`
@@ -679,7 +679,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (1628)
+- 📁 **src/** (1631)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -970,7 +970,7 @@
         - `logo_funlink_white_RGB_maru_black.png`
       - `logo_guide_funlink_ol.pdf`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1387)
+  - 📁 **lib/** (1390)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -1032,6 +1032,9 @@
     - `avatarUrlCompare.js` — アバター URL の比較用ヘルパ（純粋関数）。
     - `avatarUrlCompare.test.js`
     - `backfillBgKickSwMirror.test.js`
+    - `backfillBottleneck.js` — 【層】L0 判定層(純粋関数・I/O禁止)
+    - `backfillBottleneck.test.js`
+    - `backfillBottleneckWiring.test.js`
     - `backfillCapturedAt.js` — v0.1.405: バックフィルした過去コメントの「実時刻 capturedAt」を推定する純関数。
     - `backfillCapturedAt.test.js`
     - `backfillFlushThreshold.js` — バックフィル（過去ログ一括取り込み）の persist フラッシュ閾値を、

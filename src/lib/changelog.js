@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1362',
+    date: '2026-08-12',
+    summary: 'feat(diag): 取り込みが遅い原因を名指しする',
+    items: Object.freeze([
+      '過去コメントの取り込みが遅いとき、その原因（タブが裏にある・他の処理に邪魔されている・空の区間を探し続けている）を診断ページが名指しするようにしました。これまでは数字だけが並び、どれが原因か分かりませんでした。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1361',
     date: '2026-08-12',
     summary: 'fix(diag): 広告のゆっくり顔を診断ページにも出す',

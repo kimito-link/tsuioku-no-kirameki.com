@@ -46,6 +46,10 @@ export const DIAGNOSIS_REGISTRY = Object.freeze([
   reg('ndgr', 'NDGR接続', 'ingest', 2, true),
   reg('ingest', 'リアルタイム取込', 'ingest', 1, false),
   reg('backfill', '過去ログ取得', 'ingest', 1, false),
+  // ★v0.1.1362: 取り込みの【律速】を名指しするセル(裏タブ/譲りすぎ/空区画/計器沈黙)。
+  //   weight=1・mandatory=false: 取り込みが走っていない時間帯は na なので、
+  //   達成率の分母に固定で入れると「取り込みしていない=未達」に見えてしまう。
+  reg('backfill-bottleneck', '取り込み律速', 'ingest', 1, false),
   reg('storage', 'storage安定', 'ingest', 2, true),
   // ③ 描画・UI健全性。
   reg('paint', '描画', 'render', 1, false),

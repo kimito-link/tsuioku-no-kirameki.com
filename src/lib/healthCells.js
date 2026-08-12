@@ -1,6 +1,8 @@
 // v0.1.1056: パリティ根本修正 Phase4(この修正自体が動いているかを診断シートで検証可能にする)。
 //   parityVerdict.js の世代パリティ判定を再利用(一方向 import・循環なし)。
 import { judgePreviewGenerationParity } from './parityVerdict.js';
+// ★v0.1.1362: 取り込みの律速判定は backfillBottleneck.js が正本(ここでは再判定しない)。
+import { judgeBackfillBottleneck } from './backfillBottleneck.js';
 
 /**
  * healthCells.js — status ファーストビューの「健全度セル」を作る純関数(v0.1.843)。
@@ -412,11 +414,17 @@ function buildLaneHealthCells(laneDiag) {
 
 /**
  * 健全度セル配列を作る。
- * @param {{ livesData?: any[], fastDiag?: any, popupDiag?: any, voiceDiag?: any, venueSeatsDiag?: any, laneDiag?: any, giftEffectDiag?: any, milestoneEffectDiag?: any, previewRenderAck?: any, laneMirror?: any, nowMs?: number }} data
+ * @param {{ livesData?: any[], fastDiag?: any, popupDiag?: any, voiceDiag?: any, venueSeatsDiag?: any, laneDiag?: any, giftEffectDiag?: any, milestoneEffectDiag?: any, previewRenderAck?: any, laneMirror?: any, backfillLiveMetric?: any, nowMs?: number }} data
  * @returns {HealthCell[]}
  */
 export function buildHealthCells(data) {
   const livesData = Array.isArray(data?.livesData) ? data.livesData : [];
+  // ★v0.1.1362: 取り込み律速セルの入力(KEY_BACKFILL_LIVE_METRIC の値そのまま)。
+  const backfillLiveMetric = data?.backfillLiveMetric ?? null;
+  //   nowMs は ago 算出用(テスト固定可能なように引数で受ける・未指定は実行時刻)。
+  //   ★関数の先頭で確定させる: 途中で宣言すると、それより前で使う判定が
+  //     「初期化前アクセス」で落ちる(v0.1.1362 の実装時に実際に踏んだ)。
+  const nowMs = Number.isFinite(Number(data?.nowMs)) ? Number(data.nowMs) : safeNow();
   const fast = data?.fastDiag?.content && typeof data.fastDiag.content === 'object' ? data.fastDiag.content : null;
   const gift = fast?.giftDiagnostics && typeof fast.giftDiagnostics === 'object' ? fast.giftDiagnostics : null;
   const obs = gift?.commentObservability || {};
@@ -509,6 +517,21 @@ export function buildHealthCells(data) {
     cells.push(stateCell('backfill', '過去ログ取得', 'na', '—'));
   }
 
+  /*
+   * 5-b. ★v0.1.1362: 取り込みの【律速】を1つ名指しする(設計 §C-1・MVP)。
+   *
+   * ■ なぜ「過去ログ取得: 取得中」だけでは足りないか(2026-08-12 ユーザー実機)
+   *   3000件が0.5件/秒で33%停滞したとき、律速3候補(裏タブ/譲りすぎ/空区画)の
+   *   数字は速報に出ていたが【どれが律速かは人間が毎回暗算していた】。
+   *   ★「計器をみれば解決しないなら測定値がひくい」(ユーザー確定の判定基準)。
+   *
+   * ★判定は backfillBottleneck.js が正本。ここは色と文言に載せ替えるだけ
+   *   (同じ観測値を2箇所で別々に判定しない=報告内矛盾の構造的封じ)。
+   * ★異常時必出: running=0 でも na セルを出す。if(値>0) で行ごと消さない。
+   */
+  const bfVerdict = judgeBackfillBottleneck(backfillLiveMetric, nowMs);
+  cells.push(stateCell('backfill-bottleneck', '取り込み律速', bfVerdict.level, bfVerdict.text));
+
   // 6. アバター解決率。観測0(intercept0)は na。
   //   v0.1.845: アバターは観測ユーザーの後を追って非同期取得=構造的に遅れて埋まる「追いつき」で、
   //   ハード失敗しない(時間で埋まる・status の対処候補も ⚪ 扱い)。よって ok 未満は warn でなく
@@ -600,8 +623,6 @@ export function buildHealthCells(data) {
   cells.push(pctCell('match', '記録↔公式一致', rates.length ? Math.min(...rates) : null, { okAt: 90, warnAt: 60, processing: ratesInProgress }));
 
   // 19-20. 会場モード読み上げ(タイミング・抜け漏れ)。voiceDiag 未使用なら空=セルを足さない。
-  //   nowMs は ago 算出用(テスト固定可能なように引数で受ける・未指定は実行時刻)。
-  const nowMs = Number.isFinite(Number(data?.nowMs)) ? Number(data.nowMs) : safeNow();
   for (const c of buildVoiceHealthCells(data?.voiceDiag, nowMs)) cells.push(c);
 
   // 21-22. 会場モード座席(配信者混入・固着)。venueSeatsDiag 未使用なら空=セルを足さない。

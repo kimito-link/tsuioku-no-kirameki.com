@@ -41,13 +41,14 @@
   - `src/lib/ndgrBackfillCrawl.js`
 - **コメント重複除去(NDGR)** — 再送/再接続/relay overlap の重複を liveId+messageId の canonical key で排除
   - `src/lib/ndgrMessageDedupe.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 55</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 56</summary>
 
 - `src/domain/observations/StatObservation.js` — StatObservation - ニコ生から取得する数値の「契約付き観測値」純関数 factory。
 - `src/domain/observations/vocabulary.js` — 観測層 (StatObservation) の語彙集 - 不変な enum 定義のみ。
 - `src/extension/backfill-sw-entry.js` — Service Worker 側の過去ログ取得(バックフィル)エンジン。NDGR を遡って取り込む。
 - `src/extension/page-intercept-entry.js` — MAIN world エントリ（esbuild で単一 IIFE にバンドルされる）
 - `src/lib/acquisitionDashboardChart.js` — 「データ取得率」ダッシュボードのチャート計算（純関数）。
+- `src/lib/backfillBottleneck.js` — 【層】L0 判定層(純粋関数・I/O禁止)
 - `src/lib/backfillCapturedAt.js` — v0.1.405: バックフィルした過去コメントの「実時刻 capturedAt」を推定する純関数。
 - `src/lib/backfillFlushThreshold.js` — バックフィル（過去ログ一括取り込み）の persist フラッシュ閾値を、
 - `src/lib/backfillHeartbeat.js` — v0.1.795: 裏(背面)タブでも過去ログ backfill を取り切るための「ハートビート」純ロジック。
@@ -916,7 +917,7 @@
 
 ## 🧬 修正系譜マップ(この系統のバグを過去にどう直したか)
 
-> changelog 全 691 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
+> changelog 全 692 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
 
 ### 💾 記録件数 (95版)
 - `v0.1.1358` 2026-08-12 — fix(diag): 広告主のゆっくり顔を数える
@@ -1881,7 +1882,8 @@
 - `v0.1.673` 2026-06-10 — コメビュの名前をパネルと同じ情報源で補完
 - `v0.1.670` 2026-06-10 — コメビュのアイコンを本家と同じサムネに
 
-### 🩺 診断・状態速報 (254版)
+### 🩺 診断・状態速報 (255版)
+- `v0.1.1362` 2026-08-12 — feat(diag): 取り込みが遅い原因を名指しする
 - `v0.1.1361` 2026-08-12 — fix(diag): 広告のゆっくり顔を診断ページにも出す
 - `v0.1.1360` 2026-08-12 — fix(diag): 古い記録で注意を出さない
 - `v0.1.1358` 2026-08-12 — fix(diag): 広告主のゆっくり顔を数える
