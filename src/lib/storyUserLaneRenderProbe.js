@@ -453,8 +453,14 @@ export function formatStoryUserLaneRenderDiagLines(diag, ctx) {
    *   2⇄30 の往復も 2→2 の停滞も同じ「縮小0回」に見えていた。
    *   往復が観測されたときだけ出す(正常時のノイズにしない)。
    */
+  /*
+   * ★v0.1.1355: 「減った」ときも必ず出す(ユーザー実機「途中で増えたり減ったりしてる」)。
+   *   旧実装は reversals>0(往復した)ときだけ出していたため、
+   *   **17→2 に減ったまま戻らない**経過が「✅往復なし」として黙殺されていた
+   *   (異常時ほど診断が消える型)。減少は往復に数えられないので条件に足す。
+   */
   const osc = d.laneTileOscillation;
-  if (osc && Number(osc.reversals) > 0 && osc.line) {
+  if (osc && osc.line && (Number(osc.reversals) > 0 || Number(osc.drops) > 0)) {
     lines.push(`  → ${osc.line}`);
   }
   const freshReuse = Number(d.heavyFreshReadReuseCount) || 0;

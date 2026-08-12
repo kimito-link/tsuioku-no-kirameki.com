@@ -41,7 +41,10 @@ describe('summarizeLaneTileOscillation — 点滅(往復)の検出', () => {
   it('★単調に増えるだけは点滅ではない(入場が続いているだけ)', () => {
     const r = summarizeLaneTileOscillation([s(2), s(10), s(20), s(30)]);
     expect(r.reversals).toBe(0);
-    expect(r.line).toContain('往復なし');
+    // ★v0.1.1355: 文言を「増え続けている」へ変更(減少も見るようになったため)。
+    //   判定の意味は不変=往復0かつ減少0なら正常。
+    expect(r.line).toContain('増え続けている');
+    expect(r.drops).toBe(0);
   });
 
   it('★増→減→増 は往復2回として数える(これが点滅)', () => {
@@ -109,7 +112,9 @@ describe('★通し: 点滅の行が状態速報のテキストに現れる', ()
     ]);
     const d = buildStoryUserLaneRenderDiag({ ...base, laneTileOscillation: oscillation });
     const text = formatStoryUserLaneRenderDiagLines(d).join('\n');
-    expect(text).toContain('レーンの点滅');
+    // ★v0.1.1355: 2→30→2 は【減少も含む】ので「増え続けていない」側で名指しする。
+    //   往復回数も併記されるので、点滅の情報は失われていない。
+    expect(text).toContain('増え続けていない');
     expect(text).toContain('往復');
     expect(text).toContain('供給元が2種');
   });
@@ -124,5 +129,83 @@ describe('★通し: 点滅の行が状態速報のテキストに現れる', ()
   it('計器が無い(旧版の値)でも壊れない', () => {
     const d = buildStoryUserLaneRenderDiag({ ...base });
     expect(() => formatStoryUserLaneRenderDiagLines(d)).not.toThrow();
+  });
+
+  /*
+   * ★v0.1.1355(ユーザー実機 2026-08-12「途中で増えたり減ったりしてる」「ふえつづけるように」)
+   *   往復(reversals)は「増→減→増」と戻ってきたときだけ数える。
+   *   戻ってこない減少は数えられず、実測の速報は
+   *     レーンの点滅 ✅ 往復なし(2〜67枚・観測3回)
+   *     ★タイルが減った直前の供給元: light_summary(暫定) 17枚→2枚
+   *   と、17→2 の脱落を抱えたまま ✅ を出していた。
+   *   ★名簿は増え続けるのが正しいので、減少は方向を問わず全部異常として数える。
+   */
+  describe('★増え続けているか(減少は往復でなくても異常)', () => {
+    it('減ったまま戻らなくても🔴になる(17→2の実機ケース)', () => {
+      const r = summarizeLaneTileOscillation([s(17, 'light_summary'), s(2, 'light_summary')]);
+      expect(r.drops).toBe(1);
+      expect(r.monotonicGrowth).toBe(false);
+      expect(r.reversals).toBe(0); // ★往復では数えられない=だからこの検査が要る
+      expect(r.line).toContain('🔴');
+      expect(r.line).toContain('増え続けていない');
+      expect(r.line).toContain('17→2枚');
+    });
+
+    it('最大の脱落幅と直前の供給元を名指しする', () => {
+      const r = summarizeLaneTileOscillation([
+        s(10, 'heavy_refresh'),
+        s(8, 'heavy_refresh'),
+        s(60, 'heavy_refresh'),
+        s(3, 'light_summary')
+      ]);
+      expect(r.drops).toBe(2);
+      expect(r.worstDrop).toBe(57);
+      expect(r.worstDropFrom).toBe(60);
+      expect(r.worstDropTo).toBe(3);
+      expect(r.worstDropOrigin).toBe('light_summary');
+      expect(r.line).toContain('light_summary');
+    });
+
+    it('★増えるだけなら正常(入場が続いているだけ)', () => {
+      const r = summarizeLaneTileOscillation([s(2), s(17), s(67)]);
+      expect(r.drops).toBe(0);
+      expect(r.monotonicGrowth).toBe(true);
+      expect(r.line).toContain('✅');
+      expect(r.line).toContain('増え続けている');
+    });
+
+    it('据え置き(同数)は減少に数えない', () => {
+      const r = summarizeLaneTileOscillation([s(5), s(5), s(5)]);
+      expect(r.drops).toBe(0);
+      expect(r.monotonicGrowth).toBe(true);
+    });
+
+    it('★1枚だけの減少も見逃さない(往復の閾値とは別)', () => {
+      // 往復判定は OSC_MIN_DELTA=2 未満を無視するが、名簿が減るのは1人でも異常。
+      const r = summarizeLaneTileOscillation([s(10), s(9)]);
+      expect(r.drops).toBe(1);
+      expect(r.monotonicGrowth).toBe(false);
+    });
+
+    it('未観測は「増え続けている」と言い切らない(測っていないだけ)', () => {
+      const r = summarizeLaneTileOscillation([]);
+      expect(r.monotonicGrowth).toBe(false);
+      expect(r.line).toContain('⚪');
+    });
+
+    it('★減ったら速報に行が出る(往復0でも黙らない)', () => {
+      const oscillation = summarizeLaneTileOscillation([s(17, 'light_summary'), s(2, 'light_summary')]);
+      const d = buildStoryUserLaneRenderDiag({ ...base, laneTileOscillation: oscillation });
+      const text = formatStoryUserLaneRenderDiagLines(d).join('\n');
+      expect(text).toContain('増え続けていない');
+      expect(text).toContain('17→2枚');
+    });
+
+    it('増えるだけなら行を出さない(正常時のノイズにしない)', () => {
+      const oscillation = summarizeLaneTileOscillation([s(2), s(17), s(67)]);
+      const d = buildStoryUserLaneRenderDiag({ ...base, laneTileOscillation: oscillation });
+      const text = formatStoryUserLaneRenderDiagLines(d).join('\n');
+      expect(text).not.toContain('レーンの人数');
+    });
   });
 });

@@ -59,6 +59,12 @@ export function pushLaneTileSample(history, sample) {
  *   minTiles: number,
  *   amplitude: number,
  *   originsSeen: string[],
+ *   drops: number,
+ *   worstDrop: number,
+ *   worstDropFrom: number,
+ *   worstDropTo: number,
+ *   worstDropOrigin: string,
+ *   monotonicGrowth: boolean,
  *   line: string
  * }}
  */
@@ -75,7 +81,14 @@ export function summarizeLaneTileOscillation(history) {
       minTiles: 0,
       amplitude: 0,
       originsSeen: [],
-      line: 'レーンの点滅 ⚪ 未観測'
+      drops: 0,
+      worstDrop: 0,
+      worstDropFrom: 0,
+      worstDropTo: 0,
+      worstDropOrigin: '',
+      // ★未観測は「増え続けている」と言い切らない(測っていないだけ)。
+      monotonicGrowth: false,
+      line: 'レーンの人数 ⚪ 未観測'
     };
   }
 
@@ -103,10 +116,68 @@ export function summarizeLaneTileOscillation(history) {
     if (o && !originsSeen.includes(o)) originsSeen.push(o);
   }
 
-  const originNote = originsSeen.length > 1 ? ` / 供給元が${originsSeen.length}種(${originsSeen.join('⇄')})` : '';
-  const line = reversals > 0
-    ? `レーンの点滅 🔴 往復${reversals}回(${minTiles}⇄${maxTiles}枚・振れ幅${amplitude})${originNote}`
-    : `レーンの点滅 ✅ 往復なし(${minTiles}〜${maxTiles}枚・観測${samples}回)${originNote}`;
+  /*
+   * ★v0.1.1355「途中で増えたり減ったりしてる/ふえつづけるように」(ユーザー実機・2026-08-12)
+   *
+   * ■ なぜ reversals(往復)だけでは足りないか
+   *   往復は「増→減→増」と**戻ってきた**ときだけ数える。実測の速報はこうだった:
+   *     レーンの点滅 ✅ 往復なし(2〜67枚・観測3回)
+   *     ★タイルが減った直前の供給元: light_summary(暫定) 17枚→2枚
+   *   ★17→2 の脱落が起きているのに「✅往復なし」と報告されていた。
+   *   戻ってこない減少(=減ったまま)は往復に数えられず、計器が正常だと言ってしまう。
+   *
+   * ■ 設計原則(ユーザー確定): 応援レーンの名簿は**増え続ける**のが正しい。
+   *   一度出た人は消えない([[lane-has-no-roster-accumulator-2026-08-02]] の狙い)。
+   *   だから【減少は方向を問わず全部異常】として数え、最大の脱落幅を名指しする。
+   *   ★増加だけの経過は正常(入場が続いているだけ)。
+   */
+  let drops = 0;
+  let worstDrop = 0;
+  let worstDropFrom = 0;
+  let worstDropTo = 0;
+  let worstDropOrigin = '';
+  for (let i = 1; i < counts.length; i += 1) {
+    const delta = counts[i] - counts[i - 1];
+    if (delta >= 0) continue; // 増加・据え置きは正常(名簿は増え続ける)
+    drops += 1;
+    const size = -delta;
+    if (size > worstDrop) {
+      worstDrop = size;
+      worstDropFrom = counts[i - 1];
+      worstDropTo = counts[i];
+      worstDropOrigin = String(list[i]?.origin || '').trim();
+    }
+  }
+  const monotonicGrowth = drops === 0;
 
-  return { samples, reversals, maxTiles, minTiles, amplitude, originsSeen, line };
+  const originNote = originsSeen.length > 1 ? ` / 供給元が${originsSeen.length}種(${originsSeen.join('⇄')})` : '';
+  /*
+   * ★減少は往復より重い。往復(戻ってきた)より「減ったまま」の方がユーザーには
+   *   「消えた」と見えるので、行の先頭で名指しする。
+   */
+  const dropNote = drops > 0
+    ? ` / ★減った${drops}回(最大${worstDropFrom}→${worstDropTo}枚=${worstDrop}枚減${worstDropOrigin ? `・直前の供給元${worstDropOrigin}` : ''})`
+    : '';
+  const line = drops > 0
+    ? `レーンの人数 🔴 増え続けていない${dropNote}${reversals > 0 ? ` / 往復${reversals}回` : ''}${originNote}`
+    : reversals > 0
+      ? `レーンの点滅 🔴 往復${reversals}回(${minTiles}⇄${maxTiles}枚・振れ幅${amplitude})${originNote}`
+      : `レーンの人数 ✅ 増え続けている(${minTiles}→${maxTiles}枚・観測${samples}回)${originNote}`;
+
+  return {
+    samples,
+    reversals,
+    maxTiles,
+    minTiles,
+    amplitude,
+    originsSeen,
+    // ★v0.1.1355: 「増え続けているか」を直接の事実として返す。
+    drops,
+    worstDrop,
+    worstDropFrom,
+    worstDropTo,
+    worstDropOrigin,
+    monotonicGrowth,
+    line
+  };
 }
