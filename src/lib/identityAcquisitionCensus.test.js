@@ -62,7 +62,13 @@ describe('countIdentityAcquisition — 「取れない」と「取れなかっ�
     expect(c.allPercent).toBe(100);
   });
 
-  it('合成既定サムネ(thumbScore=1)は「取れた」に数えない', () => {
+  it('推測URL(thumbScore=1)は「取れた」に数えず、別に数える', () => {
+    /*
+     * ★実機(2026-08-12)の実例: りんく段4人が全員 thumbScore=1 で「サムネ0%」。
+     *   画面にはアイコンが出ているが、それは
+     *   `https://.../usericon/s/<上位>/<uid>.jpg` を式で組んだだけ(実在未確認)。
+     *   同じ速報で1件が実際に404していた。ここを成功に数えると嘘の緑になる。
+     */
     const c = countIdentityAcquisition([
       { userId: '11111', nickname: '太郎', thumbScore: 1 },
       { userId: '22222', nickname: '花子', thumbScore: 2 }
@@ -70,6 +76,19 @@ describe('countIdentityAcquisition — 「取れない」と「取れなかっ�
     expect(c.withThumb).toBe(1);
     expect(c.thumbPercent).toBe(50);
     expect(c.missingThumb).toBe(1);
+    expect(c.guessedThumb).toBe(1);
+  });
+
+  it('★推測URLの人数を行に出す(画面に絵が出るのに0%の理由を説明する)', () => {
+    const line = formatIdentityAcquisitionLine(
+      countIdentityAcquisition([
+        { userId: '11111', nickname: '太郎', thumbScore: 1 },
+        { userId: '22222', nickname: '花子', thumbScore: 1 }
+      ])
+    );
+    expect(line).toContain('推測URL');
+    expect(line).toContain('2人');
+    expect(line).toContain('404');
   });
 
   it('サムネと名前を別々に数える(どちらが欠けているか分かる)', () => {

@@ -26,6 +26,16 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1379',
+    date: '2026-08-12',
+    summary: 'サムネが「推測URL」か「実物」かを区別して表示',
+    items: Object.freeze([
+      'アイコンが画面に出ていても、それがユーザーIDから組み立てた推測のURLである場合は「推測URL」と表示するようになりました。',
+      '推測URLは実在を確認していないため、読み込めずアイコンが欠けることがあります。',
+      '「サムネ0%なのに画面には出ている」という一見矛盾した表示の理由が、状態速報を読めば分かります。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1378',
     date: '2026-08-12',
     summary: 'サムネ・ID・名前がどれだけ取れているか出すように',
