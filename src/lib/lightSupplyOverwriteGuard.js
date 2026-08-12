@@ -57,7 +57,28 @@
  * ■ 直し: 空(未確立)は切替と分けて判定する。未確立でも【名簿に人数がある】なら
  *   守る対象は在る=名簿基準で判定する。名簿も0なら従来どおり通す(初回描画を止めない)。
  *
- * ★DOM は依然として一切見ない(12-27行の原則を維持)。
+ * ─────────────────────────────────────────────────────────────────────────
+ * ★v0.1.1380: 【5件目】。v1370 は「名前を分けた」だけで、両方とも通していた
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * 実機(lv351160666)で 58→17枚(41枚減)が `roster-unestablished` を通り抜けた。
+ * ★同じ速報の名簿は everSeenMax 51 / lastLid 一致=名簿は育っている。
+ *   つまり【ガードが呼ばれた瞬間だけ】名簿が空だった。
+ *
+ * ■ なぜ空なのか(コードで確定・推測ではない)
+ *   noteLaneRoster は【描画の後】(popup-entry.js:6960)に呼ばれる。
+ *   配信の最初の light 供給では、既に58枚描いてあるのに名簿はまだ0件。
+ *   ＝名簿は「描画済みの事実」より常に1周遅れる。
+ *
+ * ■ 直し: 名簿が使えない窓では【実表示枚数(paintedTiles)】を補助材料にする。
+ *   ★冒頭(12-27行)の「DOM は見ない」原則との整合:
+ *     DOM を【主】の判断材料にはしない。名簿が使えないときだけ・
+ *     「減っているか」だけを見る(増加/同数は通す)。paintedTiles 未指定なら従来動作。
+ *   ★これで「守るものが無い」と「まだ分からない」の取り違えが、
+ *     名簿・DOM の両方が空のとき(=本当に初回)に限定される。
+ *
+ * ★教訓: fail-open は【名前を分けても塞がらない】。通す条件そのものを狭めること。
+ *   → [[fail-open-recurs-under-new-names-2026-08-12]]
  */
 
 /**
@@ -69,6 +90,8 @@
  * @param {number} args.rosterEverSeen この配信で一度でも観測したユーザー数(単調増加・DOM非依存)。
  * @param {string} args.currentLiveId 今回の配信 ID。
  * @param {string} args.rosterLiveId 名簿が対象にしている配信 ID。
+ * @param {number} [args.paintedTiles] v0.1.1380: いま画面に出ている実タイル数。
+ *   名簿がまだ空(描画の後に育つ)ときだけ使う補助材料。未指定なら従来動作。
  * @returns {{ skip: boolean, reason: string }} skip=true なら描かない。reason は計器/速報用。
  */
 export function shouldSkipLightSupplyOverwrite(args) {
@@ -90,9 +113,33 @@ export function shouldSkipLightSupplyOverwrite(args) {
    */
   if (rosterLid && cur !== rosterLid) return { skip: false, reason: 'live-switch' };
 
-  // 名簿が空=まだ誰も観測していない=初回描画。守るものが無いので通す。
-  // ★ここは rosterLid の有無に関わらず【人数】だけで決める(名前が無くても人数は守れる)。
+  /*
+   * ★v0.1.1380: 名簿が空でも【いま画面に出ている枚数】があるなら守る(fail-open 5件目の根治)。
+   *
+   * ■ 実機(2026-08-12・lv351160666)がこう出した:
+   *     ★減った1回(最大58→17枚=41枚減・直前の供給元light_summary)
+   *     軽い供給の上書き ✅ 見送り0回 → 通した理由の内訳: roster-unestablished1
+   *     laneRosterDelta: everSeenMax 51 / lastLid lv351160666(=名簿は育っている)
+   *   ＝ガードが呼ばれた【その瞬間】だけ名簿が空で、41枚の縮小がここを通り抜けた。
+   *
+   * ■ なぜ名簿が空だったか(コードで確定)
+   *   noteLaneRoster は【描画の後】(popup-entry.js:6960)に呼ばれる。
+   *   配信の最初の light 供給では、既に58枚描いてあるのに名簿はまだ0件。
+   *   ★v0.1.1370 で roster-empty と roster-unestablished を【名前だけ分けて
+   *     両方とも通していた】のが誤り。名前を分けても通せば同じ穴。
+   *
+   * ■ 直し: 名簿が使えないときの代替として paintedTiles(実表示枚数)を見る。
+   *   ★DOM は「消える側の値」なので単独では判断材料にできない(冒頭の原則)。
+   *     だからここでは【名簿が使えないときの補助】に限定し、
+   *     かつ「減っているか」だけを見る(増加・同数は通す=初回描画を止めない)。
+   *   ★paintedTiles が渡されない/0 なら従来どおり通す=既存の呼び出しは挙動不変。
+   */
+  const painted = Math.max(0, Math.floor(Number(args?.paintedTiles) || 0));
   if (roster <= 0) {
+    const next0 = Math.max(0, Math.floor(Number(args?.nextSupplyCount) || 0));
+    if (painted > 0 && next0 < painted) {
+      return { skip: true, reason: 'shrink-vs-painted' };
+    }
     return { skip: false, reason: rosterLid ? 'roster-empty' : 'roster-unestablished' };
   }
 

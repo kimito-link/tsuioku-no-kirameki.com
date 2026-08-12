@@ -280,8 +280,12 @@ export default [
     //     popup 側に残るのは呼び出しだけ=このファイルを太らせる変更ではない。
     //   ★行数を削るためにコメントから根拠を削るのは本末転倒なので、
     //     実測ちょうど(22126)へラチェットする(+εを取らない=次も必ず意識させる)。
+    // ★2026-08-12(v0.1.1380) 22126 → 22129(+3)。fail-open 5件目(58→17枚の縮小が
+    //   `roster-unestablished` を通り抜けた)の根治で、ガードへ paintedTiles を渡す
+    //   1行と、その理由コメント2行が増えた。判定ロジック本体は純関数
+    //   src/lib/lightSupplyOverwriteGuard.js(実機値を再現する単体テスト付)にある。
     files: ['src/extension/popup-entry.js'],
-    rules: { 'max-lines': ['error', { max: 22126, skipBlankLines: false, skipComments: false }] }
+    rules: { 'max-lines': ['error', { max: 22129, skipBlankLines: false, skipComments: false }] }
   },
   {
     files: ['src/extension/popup/**/*.js'],
