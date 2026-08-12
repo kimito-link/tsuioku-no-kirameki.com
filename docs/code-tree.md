@@ -679,7 +679,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (1631)
+- 📁 **src/** (1632)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -970,7 +970,7 @@
         - `logo_funlink_white_RGB_maru_black.png`
       - `logo_guide_funlink_ol.pdf`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1390)
+  - 📁 **lib/** (1391)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -1450,6 +1450,7 @@
     - `heatLevel.test.js`
     - `heavyChunkReadReuse.js` — heavy 全件コメント read の再利用判定純関数
     - `heavyChunkReadReuse.test.js`
+    - `heavyRacePaintFromCache.wiring.test.js`
     - `hiddenOfficialIframeReinjectGate.js` — hidden audition iframe を「再 inject してよいか」を判定する純関数（v0.1.394）。
     - `hiddenOfficialIframeReinjectGate.test.js`
     - `hiddenTabExternalFetchGate.js` — v0.1.616: 非可視タブでも外部 API fetch（koken 貢献度 / nicoad 広告 / ギフト履歴 /

@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1363',
+    date: '2026-08-12',
+    summary: 'fix(lane): 応援レーンが全員そろわないのを直す',
+    items: Object.freeze([
+      '応援レーンと会場モードに一部の人しか出ないことがあったのを直しました。全員分のデータは手元にあるのに、画面の更新と読み込みが競合して毎回やり直しになり、一度も完成していませんでした。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1362',
     date: '2026-08-12',
     summary: 'feat(diag): 取り込みが遅い原因を名指しする',

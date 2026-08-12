@@ -330,6 +330,9 @@ export function buildStoryUserLaneRenderDiag(probeSnap, ctx) {
     // ★v0.1.1341: 再利用が0回のとき【なぜ0なのか】を言うための最後の判定理由
     //   ('coverage' | 'fresh-read' | '')。0のときこそ出す(異常時に診断が消えるのを防ぐ)。
     heavyReuseLastReason: String(s.heavyReuseLastReason || ''),
+    // ★v0.1.1363: 世代が進んでも手元の全件で描いた回数(race固着の回避が効いた証拠)。
+    //   ★ここに足し忘れると、popup が snap に載せても行に出ない=個別列挙が値を落とす型。
+    heavyRacePaintedFromCache: Number(s.heavyRacePaintedFromCache) || 0,
     // ★v0.1.1346: タイル数の往復(点滅)の要約。popup が summarize 済みの物を載せる。
     laneTileOscillation:
       s.laneTileOscillation && typeof s.laneTileOscillation === 'object'
@@ -462,6 +465,17 @@ export function formatStoryUserLaneRenderDiagLines(diag, ctx) {
   const osc = d.laneTileOscillation;
   if (osc && osc.line && (Number(osc.reversals) > 0 || Number(osc.drops) > 0)) {
     lines.push(`  → ${osc.line}`);
+  }
+  /*
+   * ★v0.1.1363: 世代が進んでいても【手元の全件】で描いた回数。
+   *   実機(2026-08-12)は race 46回・settled 0回で、158件あるのに18件しか描けていなかった
+   *   (会場は①の鏡なので会場も18件=「会場モードがりんくしかない」)。
+   *   再利用が成立していても .then() のマイクロタスク1回で世代が進み、必ず bail していた。
+   *   この行が出る=その固着を抜けた証拠。
+   */
+  const fromCache = Number(d.heavyRacePaintedFromCache) || 0;
+  if (fromCache > 0) {
+    lines.push(`  → 🛡 世代が進んでも手元の全件で描いた: ${fromCache}回(race固着の回避が効いている)`);
   }
   const freshReuse = Number(d.heavyFreshReadReuseCount) || 0;
   const raceN = Number(d.heavyRaceReturns) || 0;
