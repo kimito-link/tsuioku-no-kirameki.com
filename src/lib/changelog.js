@@ -26,6 +26,16 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1378',
+    date: '2026-08-12',
+    summary: 'サムネ・ID・名前がどれだけ取れているか出すように',
+    items: Object.freeze([
+      '応援レーンに出ている方について、サムネイル・ユーザーID・アカウント名がどれだけ取れているかを状態速報に出すようになりました。',
+      '匿名（184）の方はもともとIDもサムネも存在しないため、取得率の対象から外して数えます。匿名が多い配信でも正しい数字が出ます。',
+      '取れていない人がいる場合は「サムネ◯人・名前◯人」と内訳が出るので、どこを直せばよいかが分かります。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1377',
     date: '2026-08-12',
     summary: '不具合が起きたとき状態速報に記録が残るように',

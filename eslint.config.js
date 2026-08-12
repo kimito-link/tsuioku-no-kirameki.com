@@ -271,8 +271,17 @@ export default [
     //   の2行だけ増えた。★判定ロジック本体は純関数 src/lib/watchSnapshotKey.js
     //   (単体11+配線5テスト付)へ隔離済みで、popup 側に残るのは呼び出し1行のみ。
     //   = このファイルを太らせる変更ではない(むしろ鍵の作り方を lib へ出した)。
+    // ★2026-08-12(v0.1.1377-1378) 22119 → 22126(+7)。バグ検出の計器2つを配線した分。
+    //   ① popup の例外記録(旧実装は握り潰すだけで何も残さず、一番見る画面の例外が
+    //      どこにも残らなかった): import 2行 + buffer 1行 + install 1行 + snapshot 1行
+    //   ② サムネ/ID/名前の取得率(ユーザー確定「これが価値高い」): 集計1行 + snapshot 1行
+    //   ★どちらも判定・整形・組み立ての本体は純関数へ隔離済み
+    //     (src/lib/popupErrorLine.js / src/lib/identityAcquisitionCensus.js・テスト付)。
+    //     popup 側に残るのは呼び出しだけ=このファイルを太らせる変更ではない。
+    //   ★行数を削るためにコメントから根拠を削るのは本末転倒なので、
+    //     実測ちょうど(22126)へラチェットする(+εを取らない=次も必ず意識させる)。
     files: ['src/extension/popup-entry.js'],
-    rules: { 'max-lines': ['error', { max: 22119, skipBlankLines: false, skipComments: false }] }
+    rules: { 'max-lines': ['error', { max: 22126, skipBlankLines: false, skipComments: false }] }
   },
   {
     files: ['src/extension/popup/**/*.js'],
