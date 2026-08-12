@@ -135,6 +135,8 @@ export function layerPaints(L) {
  *   iframe?: (LayerSample & { w?: unknown, h?: unknown, canRead?: unknown, ready?: unknown })|null,
  *   inner?: (LayerSample & { bodyKids?: unknown, cloak?: unknown })|null
  * }} s
+ *   ★iframe.ready は readyState('loading'|'interactive'|'complete')。v0.1.1368 で
+ *   「幕が残っている=JS停止」と「まだ読み込み中=JS起動前」を分けるのに使う。
  * @returns {{ ok: boolean, line: string, cause: string }}
  */
 export function judgeSidepanelBlack(s) {
@@ -152,6 +154,9 @@ export function judgeSidepanelBlack(s) {
   const canRead = v.iframe?.canRead === true;
   const bodyKids = Math.max(0, Math.round(Number(v.inner?.bodyKids) || 0));
   const cloak = String(v.inner?.cloak || '');
+  // ★v0.1.1368: 幕の名指しを「JS停止」と「まだ読み込み中」に分けるために使う(下の分岐参照)。
+  //   sidepanel-entry.js が既に sample.iframe.ready として集めている値(新規計測ではない)。
+  const ready = String(v.iframe?.ready || '');
 
   const outerCS = String(v.outer?.colorScheme || '');
   const innerCS = String(v.inner?.colorScheme || '');
@@ -183,7 +188,31 @@ export function judgeSidepanelBlack(s) {
   else if (ifrW === 0 || ifrH === 0) cause = `iframeが潰れている(${ifrW}x${ifrH})`;
   else if (!canRead) cause = 'iframeの中身を読めない(別オリジン/未ロード)';
   else if (bodyKids === 0) cause = '中身が空(bodyの子要素0=描画前か失敗)';
-  else if (cloak === '1') cause = '幕(cloak)が残っている=JSが途中で止まった疑い';
+  /*
+   * ★v0.1.1368(誤誘導していた計器の是正・実機 v1366 のスクショで発覚)
+   *
+   * ■ 何が嘘だったか
+   *   速報が同じ1行の中で矛盾していた:
+   *     幕(cloak) ✅ t+731ms で解除(観測23点)      ← 系列は「外れている」
+   *     ★あとから黒くなった(...原因=幕(cloak)が残っている=JSが途中で止まった疑い)
+   *   ★幕が外れているのに「残っている」と名指ししていた=判定の穴のサイン
+   *   ([[instrument-can-name-the-wrong-culprit-2026-08-10]])。
+   *
+   * ■ 真因(コードで確定・実データ不要だった)
+   *   cloak 属性は popup.html:1 の <html> に【静的に】書かれている。
+   *   ＝iframe が(再)ロードされた直後は、JS が走る前から必ず cloak==='1'。
+   *   visible/reload フェーズはまさにその瞬間を捉えるため、
+   *   「JSが途中で止まった疑い」と名乗ってしまう。実際は【まだ起動していない】だけで、
+   *   その後 t+731ms で正常に解除されている。
+   *
+   * ■ 直し: 文書が読み込み中(readyState!=='complete')なら幕を犯人にしない。
+   *   この状態は「描画前」であって「JSが止まった」ではない。名指しを分ける。
+   *   ★判定を緩めるのではなく【別の名前を付ける】: 本物の固着(complete なのに幕が
+   *   残っている)は従来どおり🔴で名指しし続ける=退化させない。
+   */
+  else if (cloak === '1' && ready !== '' && ready !== 'complete') {
+    cause = `中身がまだ読み込み中(${ready}・幕は初期値=JS起動前。黒ではなく未起動)`;
+  } else if (cloak === '1') cause = '幕(cloak)が残っている=JSが途中で止まった疑い';
   else if (!innerPaints) cause = '中身(popup.html)が塗っていない';
   else if (darkish(outerCS) || darkish(innerCS)) {
     cause = `color-schemeがlightでない(外${outerCS || '?'}/中${innerCS || '?'})`;

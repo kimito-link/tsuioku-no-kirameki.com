@@ -26,6 +26,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1368',
+    date: '2026-08-12',
+    summary: 'サイドパネルの自己診断が誤った原因を名指ししていたのを是正',
+    items: Object.freeze([
+      '状態速報が「幕が残っている＝JSが止まった疑い」と誤って表示することがあった問題を直しました。実際には読み込み中で、まだ起動していないだけの状態でした。',
+      '本当に固まっている場合の警告は今までどおり出ます。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1367',
     date: '2026-08-12',
     summary: '応援レーンが途中件数で止まる問題の根治（78件中19件しか出ない）',
