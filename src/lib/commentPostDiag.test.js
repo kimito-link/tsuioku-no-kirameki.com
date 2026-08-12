@@ -112,6 +112,99 @@ describe('commentPostOutcomeKindForResult(嘘をつかない分類)', () => {
   });
 });
 
+/**
+ * ★v0.1.1350 移行ゴールデン(capture-behavior-before-moving-code)。
+ *
+ * buildCommentPostDiagSnapshot を「手書きの個別列挙14行」から
+ * copyDiagBySchema(schema の反復)へ置き換えた。ここに固定してあるのは
+ * **移行前の実装が実際に返していた値**(移行直前に実行して採取したもの)。
+ *
+ * 移行後の実装がこの表と1文字でも違えば赤になる=「挙動同値」を毎回機械で担保する。
+ * ★ここを更新してよいのは「意図的に出力を変える版」だけ。差分が出たら、まず
+ *   自分が意図した変更かを疑うこと(意図しない差分は退行)。
+ */
+describe('★移行ゴールデン: schema 方式でも移行前と完全同一の出力', () => {
+  const NOW = 5000;
+  const LINES_NOW = 9000;
+
+  it('empty/null: 初期値 + capturedAt、行は空', () => {
+    for (const input of [{}, null]) {
+      const snap = buildCommentPostDiagSnapshot(input, NOW);
+      expect(snap).toEqual({
+        attempts: 0,
+        okCount: 0,
+        failCount: 0,
+        timeoutCount: 0,
+        revertCount: 0,
+        totalRetryAttempts: 0,
+        lastTotalMs: 0,
+        lastOutcome: '',
+        lastEventAt: 0,
+        lastEchoMs: -1,
+        avgEchoMs: -1,
+        lastOptimisticPaintMs: -1,
+        avgOptimisticPaintMs: -1,
+        instantPaintRuns: 0,
+        capturedAt: NOW
+      });
+      expect(buildCommentPostDiagLines(snap, LINES_NOW)).toEqual([]);
+    }
+  });
+
+  it('typical: 全フィールドが載り、3行が移行前と同一文字列', () => {
+    const snap = buildCommentPostDiagSnapshot(
+      {
+        attempts: 3,
+        okCount: 2,
+        failCount: 0,
+        timeoutCount: 1,
+        lastTotalMs: 1500,
+        lastOutcome: 'timeout',
+        lastEventAt: 1000,
+        totalRetryAttempts: 4,
+        revertCount: 1,
+        lastEchoMs: 2200,
+        avgEchoMs: 2000,
+        lastOptimisticPaintMs: 120,
+        avgOptimisticPaintMs: 150,
+        instantPaintRuns: 7
+      },
+      NOW
+    );
+    expect(buildCommentPostDiagLines(snap, LINES_NOW)).toEqual([
+      'コメント送信: 試行3(ok2/失敗0/締切1) / 最終8秒前(timeout)',
+      '  → 送信応答 直近1.5秒 / 画面実着(echo) 直近2.2秒(平均2.0秒) / フレーム試行累計4 / 取消1',
+      '  → 楽観表示 直近0.1秒(平均0.1秒) / 即時paint7回'
+    ]);
+  });
+
+  it('garbage: 壊れた値は移行前と同じ既定値へ落ちる', () => {
+    const snap = buildCommentPostDiagSnapshot(
+      { attempts: 'x', okCount: null, lastTotalMs: undefined, lastOutcome: 42, lastEchoMs: 'nope' },
+      NOW
+    );
+    expect(snap.attempts).toBe(0);
+    expect(snap.okCount).toBe(0);
+    expect(snap.lastTotalMs).toBe(0);
+    expect(snap.lastOutcome).toBe('42'); // 移行前の String(d.lastOutcome || '') と同値
+    expect(snap.lastEchoMs).toBe(-1);
+  });
+
+  it('★zero-ms: 「観測して0ms」は -1(未計測)に化けない', () => {
+    const snap = buildCommentPostDiagSnapshot(
+      { attempts: 1, lastTotalMs: 0, lastEchoMs: 0, lastOptimisticPaintMs: 0 },
+      NOW
+    );
+    expect(snap.lastTotalMs).toBe(0);
+    expect(snap.lastEchoMs).toBe(0);
+    expect(snap.lastOptimisticPaintMs).toBe(0);
+    // 0 は有効値なので echo/楽観表示の行が出る(未計測なら出ない)
+    const lines = buildCommentPostDiagLines(snap, LINES_NOW);
+    expect(lines.some((l) => l.includes('画面実着'))).toBe(true);
+    expect(lines.some((l) => l.includes('楽観表示'))).toBe(true);
+  });
+});
+
 describe('buildCommentPostDiagSnapshot', () => {
   it('欠損フィールドは初期値で埋める', () => {
     const snap = buildCommentPostDiagSnapshot({ attempts: 3 });

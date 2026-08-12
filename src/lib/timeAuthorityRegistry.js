@@ -61,7 +61,6 @@ export const TIME_JUDGE_GRANDFATHERED = Object.freeze([
   "src/lib/commentEchoDetector.js",
   "src/lib/commentFatigue.js",
   "src/lib/commentObservabilityDiag.js",
-  "src/lib/commentPostDiag.js",
   "src/lib/commentRecord.js",
   "src/lib/commentSilenceZones.js",
   "src/lib/commentSummary.js",
