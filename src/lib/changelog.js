@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1358',
+    date: '2026-08-12',
+    summary: 'fix(diag): 広告主のゆっくり顔を数える',
+    items: Object.freeze([
+      '広告列などで「名前が出ているのにゆっくり顔」になっている件数が、状態速報でずっと0件と表示されていたのを直しました。IDが取れない人は数える対象から外れていたためです。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1357',
     date: '2026-08-12',
     summary: 'fix(diag): 減ったのに正常と出る誤りを修正',
