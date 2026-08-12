@@ -10835,8 +10835,8 @@ let _lastGiftEventsForMirror = { liveId: '', events: [] };
 /** heavyRace再発の根治(HANDOFF-heavyrace-backfill-IMPL.md B): fresh-read で heavy 全件再読みを省いた累計回数。
  *   getHeavyFreshReadReuseCount で状態速報が読む(実配信で「fresh-read が効いているか/12秒ギャップが適正か」を判定)。 */
 let _heavyFreshReadReuseCount = 0;
-/** ★v1341: 再利用の最後の判定理由(0回のとき「なぜ0か」を速報で言うため)。 */
-let _heavyReuseLastReason = '';
+/** ★v1341: 再利用の最後の判定理由 / ★v1363: 世代が進んでも手元の全件で描いた回数(根治の証拠)。 */
+let _heavyReuseLastReason = ''; let _heavyRacePaintedFromCacheCount = 0;
 let _laneTileHistory = [];
 let _kokenLaneResult = null;
 /** heavyRace再発の根治(HANDOFF-heavyrace-backfill-IMPL.md C-1): 同一 lv の heavy 全件 read を
@@ -16614,13 +16614,13 @@ async function refresh() {
     if (!heavyResultStillTargetsThisWatch({ cacheKey: watchMetaCache.key, snapshotKey })) return bailHeavy(STORY_USER_LANE_HEAVY_SETTLE.STALE_SNAPSHOT); // v1325: key='' は再取得の合図(正本=lib/watchSnapshotKey.js)
     if (!Array.isArray(nextArr)) return bailHeavy(STORY_USER_LANE_HEAVY_SETTLE.NULL_RESP);
     if (refreshGen !== watchPopupRefreshGeneration) {
-      // v0.1.1035(レビュー指摘=初回レース残存): 追い越された古い callback でも snapshotKey は一致(上)=nextArr は現配信の
-      //   有効な全件。stale 描画はせず、キャッシュだけ最新化→次 refresh が v0.1.1034 の80%再利用で settled で始まれる
-      //   (初回が何度追い越されても「一度読めた全件」が次に活きる=自己修復の起点)。
-      //   ★heavyRace根治(B): readAtMs を打つ=次 refresh(450ms後)が fresh-read で reuse=即 settled で始まれる。
-      //   これが「race で bail しても A+B だけで全件re-readループが切れる」自己修復の起点。
+      // v0.1.1035: 追い越された古い callback でも snapshotKey は一致(上)=nextArr は現配信の有効な全件。
+      //   キャッシュだけ最新化→次 refresh が80%再利用で settled で始まれる(自己修復の起点)。
+      //   ★heavyRace根治(B): readAtMs を打つ=次 refresh が fresh-read で reuse=即 settled で始まれる(v1363 で下の分岐も追加)。
       if (nextArr.length > 0) watchMetaCache.lastCommentsArr = { lv, arr: nextArr, chunkTotal: idbMode || commentsChunked ? currentChunkTotal : null, readAtMs: Date.now() };
-      return bailHeavy(STORY_USER_LANE_HEAVY_SETTLE.RACE);
+      // ★v1363 race固着の根治(実機 race46回/settled0回・158件中18件): 再利用時も .then() が1マイクロタスク遅れ、その間に refresh で世代が進み必ず bail していた。手元に全件があれば描く。
+      if (!(canReuseHeavyChunkRead && nextArr.length > 0)) return bailHeavy(STORY_USER_LANE_HEAVY_SETTLE.RACE);
+      _heavyRacePaintedFromCacheCount += 1; // 発動証拠を速報に出す
     }
     // v0.1.625: nextArr が空でも、現 arr が currentChunkTotal を満たしていない
     //   (cached が短い arr で固まっている)なら skip しない(=空応援帯固まり防止)。
@@ -18998,7 +18998,7 @@ async function collectAiShareDevMonitorPayloadBundle(watchUrl) {
           const snap = snapshotStoryUserLaneRenderProbe(_storyUserLaneRenderProbe, Date.now());
           if (snap) snap.laneRepaintCounts = getStoryLaneRepaintCounts(); // v0.1.1040 計器: 段別 churn 実測
           // heavyRace根治(B)計器: fresh-read で heavy 全件再読みを省いた累計(実配信で効きと12秒ギャップの適正を判定)。
-          if (snap) { /* ★v1357: 実DOM起点の縮小観測も渡す(履歴だけだと嘘をつく) */ snap.heavyFreshReadReuseCount = _heavyFreshReadReuseCount; snap.heavyReuseLastReason = _heavyReuseLastReason; snap.laneTileOscillation = summarizeLaneTileOscillation(_laneTileHistory, { domShrinkCount: _laneSupplyOriginDiag?.shrinkObservedCount, domShrinkCulprit: _laneSupplyOriginDiag?.shrinkCulprit }); }
+          if (snap) { /* ★v1357: 実DOM起点の縮小観測も渡す(履歴だけだと嘘をつく) */ snap.heavyFreshReadReuseCount = _heavyFreshReadReuseCount; snap.heavyReuseLastReason = _heavyReuseLastReason; snap.heavyRacePaintedFromCache = _heavyRacePaintedFromCacheCount; snap.laneTileOscillation = summarizeLaneTileOscillation(_laneTileHistory, { domShrinkCount: _laneSupplyOriginDiag?.shrinkObservedCount, domShrinkCulprit: _laneSupplyOriginDiag?.shrinkCulprit }); }
           // heavyRace根治(C-1)計器: 進行中read への合流で新規readを張らずに済んだ累計(single-flightの効き)。
           if (snap) snap.heavyReadInflightJoinCount = _heavyReadSingleFlight.joinCount();
           return snap;
