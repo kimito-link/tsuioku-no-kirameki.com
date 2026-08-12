@@ -119,6 +119,7 @@ import { buildGiftHistoryMirrorSnapshot } from '../lib/giftHistoryMirror.js';
 // heavyRace再発の根治(HANDOFF-heavyrace-backfill-IMPL.md B): backfill中の全件re-readループを断つ
 //   canReuse fresh-read 判定(現total 80%coverage に加え「前回読了時完全 かつ 直近12秒以内」なら再利用)。
 import { decideHeavyChunkReadReuse, HEAVY_FULL_REREAD_MIN_GAP_MS } from '../lib/heavyChunkReadReuse.js';
+import { decideLightWriteKeepsHeavyTrace } from '../lib/heavyCachePreserve.js';
 import { createSingleFlightByKey } from '../lib/singleFlightByKey.js';
 // ③WEB室温丸写し(第4号・reference_full_mirror_SYNTHESIS.md M3): 室温パネル(直近5分の応援増加=件数/人数/
 //   熱度%/文言)を純Web③にも丸写しするための鏡スナップショット純関数。renderRoomHeatSummary で計算済みの
@@ -15962,19 +15963,11 @@ async function refresh() {
     ? Math.max(0, Number(/** @type {any} */ (lightChunkIndexRaw).total) || 0)
     : null;
   const cachedHeavy = watchMetaCache.lastCommentsArr;
-  // v0.1.625: cached arr が currentChunkTotal を「ほぼ全部カバーしている」場合のみ再利用する
-  //   厳密化を追加。従来は chunkTotal が一致するだけで再利用していたが、cached arr が
-  //   初期 paint の短い summary or empty で固まっていて、再 paint も heavy 取得 catch→null
-  //   の経路でスキップされると「5枠だけ表示」が永続化していた(実機 lv350676215・
-  //   記録カードは 716 表示・応援帯は 5名固まり)。80% 以上カバーしていなければ
-  //   cached を捨てて heavy 再読みする(冷スタート扱い)=確実に 716 件で塗り直す。
-  // v0.1.1034(council/tanu-lane-heavy-stall・実機 heavySettleState:race 6回で確認): 旧 chunkTotal【完全一致】は
-  //   総数が増え続ける重い配信で毎回不一致=heavy 全件再読み→完了(5秒)前に次 refresh に追い越され settled が永遠に
-  //   立たず、応援レーンが途中件数で固着(たぬ姉少ない/数字増えない/全員出ない)。→ 完全一致をやめ「現 total の80%以上を
-  //   カバー」なら再利用(coverage)。
-  // ★heavyRace再発の根治(HANDOFF-heavyrace-backfill-IMPL.md B): 過去ログ遡り中(backfill)は total が秒単位で
-  //   増え続け coverage(80%) が永久に割れ→毎poll全件re-read→race固着。coverage に加え「前回読了時点では完全 かつ
-  //   読了が直近12秒以内」なら再利用する fresh-read 条件を decideHeavyChunkReadReuse で足す(全件re-readループを断つ)。
+  // 再利用判定の歴史(正本=lib/heavyChunkReadReuse.js に全文): v0.1.625 chunkTotal 一致のみ→短い cached で
+  //   「5枠だけ表示」が永続(実機 lv350676215)→80%カバー必須に厳格化。v0.1.1034 完全一致は total 増加配信で
+  //   毎回不一致=全件re-read→次 refresh に追い越され settled が永久に立たない→「現 total の80%以上」(coverage)へ。
+  //   ★heavyRace再発の根治(HANDOFF-heavyrace-backfill-IMPL.md B): backfill 中は total が秒単位で増え coverage が
+  //   永久に割れる→「読了時点で完全 かつ 12秒以内」なら再利用する fresh-read を追加(全件re-readループを断つ)。
   const heavyReuseDecision = decideHeavyChunkReadReuse({
     lv,
     cached: cachedHeavy
@@ -16142,8 +16135,11 @@ async function refresh() {
   let arr = readCommentsOk ? /** @type {unknown[]} */ (data[key]) : [];
   let commentReadState = readCommentsOk ? 'storage_ok' : 'missing';
   if (readCommentsOk) {
-    // 従来 main 経路（非チャンク）。chunkTotal は持たない（チャンク再利用判定の対象外）。
-    watchMetaCache.lastCommentsArr = { lv, arr, chunkTotal: null };
+    // ★v0.1.1367: 軽い read が heavy の読了証跡(readAtMs/chunkTotal)を消すと、v1363 の race 救済が
+    //   【構造的に一度も発動できない】(実機 v1366: fromCache 0回 / no-cache / 78件中19件)。正本=lib/heavyCachePreserve.js
+    const keep = decideLightWriteKeepsHeavyTrace({ lv, lightArr: /** @type {unknown[]} */ (arr), cached: watchMetaCache.lastCommentsArr });
+    if (keep.preserved) arr = keep.arr; // heavy の全件を表示にも使う(軽い部分供給での縮小を防ぐ)
+    watchMetaCache.lastCommentsArr = { lv, arr: keep.arr, chunkTotal: keep.chunkTotal, readAtMs: keep.readAtMs };
   } else if (
     watchMetaCache.lastCommentsArr &&
     watchMetaCache.lastCommentsArr.lv === lv &&
