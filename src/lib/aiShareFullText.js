@@ -36,6 +36,7 @@ import { buildHealthCells, summarizeHealthVerdict } from './healthCells.js';
 import { buildCompletenessScore, formatCompletenessScoreLines } from './completenessScore.js';
 import { buildVoiceDiagLine } from './voiceDiag.js';
 // v0.1.1330: 読み上げの到達可能性(面が開いているか・計器はいつのものか)を先に断定する。
+import { formatVenueAvatarLine, formatVenueDiagReachLine } from './venueAvatarReport.js';
 import { judgeVoiceReachability } from './voiceReachabilityProbe.js';
 import { buildGiftEffectDiagLines, giftEffectDiagToActionCards } from './giftEffectDiag.js';
 import { buildMilestoneEffectDiagLines, milestoneEffectDiagToActionCards } from './milestoneEffectDiag.js';
@@ -345,6 +346,28 @@ export function buildAiShareFullText({ overviewText, livesData, fastDiag, popupD
     try {
       const vpLine = String(/** @type {any} */ (venueSeatsDiag)?.laneParity?.line || '');
       if (vpLine) lines.push(vpLine);
+    } catch {
+      /* no-op */
+    }
+    /*
+     * ★v0.1.1347: 会場のアイコン実績と、診断そのものの到達を出す。
+     *   ユーザー報告「サムネイルが会場モードで出てない。これも計器に入ってないの?」
+     *   → 入っていなかった。速報の avatarLoadDiag は popup の数字だけで、
+     *     会場(別バンドル)の成否は venueSeatsDiag.avatarProbe にしか無く、
+     *     しかも実測では venueSeatsDiag:null で1文字も出ていなかった。
+     *   ★上の行は `if (line)` なので【届いていないときほど消える】。
+     *     だから「届いていない」こと自体を名指しする行を別に出す。
+     */
+    try {
+      const vsd = /** @type {any} */ (venueSeatsDiag);
+      const avLine = formatVenueAvatarLine(vsd?.avatarProbe);
+      if (avLine) lines.push(avLine);
+      const reachLine = formatVenueDiagReachLine({
+        venueOpen: fastDiag?.content?.voiceReachRaw?.venueOpen === true,
+        venueSeatsDiag: vsd,
+        diagAgeMs: vsd?.lastUpdateAt > 0 ? Date.now() - Number(vsd.lastUpdateAt) : -1
+      });
+      if (reachLine) lines.push(reachLine);
     } catch {
       /* no-op */
     }
