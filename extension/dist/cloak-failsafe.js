@@ -1,1 +1,1 @@
-(()=>{try{setTimeout(()=>{try{document.documentElement.removeAttribute("data-nl-popup-primary-cloak")}catch{}},400)}catch{}})();
+(()=>{var CLOAK_FAILSAFE_FIRED_FLAG="__nlPopupCloakFailsafeFired";try{setTimeout(()=>{try{document.documentElement.removeAttribute("data-nl-popup-primary-cloak"),window[CLOAK_FAILSAFE_FIRED_FLAG]=!0}catch{}},400)}catch{}})();

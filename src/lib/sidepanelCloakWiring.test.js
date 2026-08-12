@@ -52,9 +52,15 @@ describe('sidepanel 幕(cloak)計器の配線', () => {
 
   it('★幕の観測列を積む処理が無条件に実行される(if(false) 前置の変異を弾く)', () => {
     // `if (sample.inner) { _cloakSeries.push({...}) }` の形で、直前に別の条件が
-    // 挟まっていないこと(zeroArea の直後に置かれている)まで固定する。
+    // 挟まっていないこと(要約群の直後に置かれている)まで固定する。
+    //
+    // ★v0.1.1381: zeroArea と cloak push のあいだに `stall`(タイマー遅延の要約)が
+    //   入ったのでアンカーを1行ぶん広げた。**緩めていない**: 依然として
+    //   「summarizeZeroAreaWindow → summarizeEventLoopStall → コメント2行 →
+    //   if (sample.inner) の push」という連続を固定しており、あいだに条件を
+    //   挟む変異は弾かれる([[mutation-test-needs-anchored-regex-2026-08-05]])。
     expect(entrySrc).toMatch(
-      /const zeroArea = summarizeZeroAreaWindow\(_sizeSeries\);\n\s*\/\/[^\n]*\n\s*\/\/[^\n]*\n\s*if \(sample\.inner\) \{\n\s*_cloakSeries\.push\(\{/
+      /const zeroArea = summarizeZeroAreaWindow\(_sizeSeries\);\n\s*const stall = summarizeEventLoopStall\(_sizeSeries\);\n\s*\/\/[^\n]*\n\s*\/\/[^\n]*\n\s*if \(sample\.inner\) \{\n\s*_cloakSeries\.push\(\{/
     );
   });
 

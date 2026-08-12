@@ -3892,6 +3892,16 @@
       ]
     },
     {
+      "file": "src/lib/cloakFailsafeMarker.js",
+      "featureCount": 1,
+      "features": [
+        "popup"
+      ],
+      "labels": [
+        "ポップアップ(応援レーン)"
+      ]
+    },
+    {
       "file": "src/lib/comeviewInstantRender.js",
       "featureCount": 1,
       "features": [
