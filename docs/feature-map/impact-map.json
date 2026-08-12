@@ -3520,6 +3520,16 @@
       ]
     },
     {
+      "file": "src/lib/backfillBottleneck.js",
+      "featureCount": 1,
+      "features": [
+        "status"
+      ],
+      "labels": [
+        "状態速報ページ"
+      ]
+    },
+    {
       "file": "src/lib/backfillFlushThreshold.js",
       "featureCount": 1,
       "features": [

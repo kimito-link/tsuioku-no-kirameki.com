@@ -1812,7 +1812,9 @@ function renderAll({ extrasAgeMs, lvList, summaries, fastDiag, popupDiag, backfi
 
   // 健全度パネル(ファーストビュー・正常100/異常だけ色・対象外は—)
   //   v0.1.894: 会場モード読み上げセル(タイミング・抜け漏れ)を出すため voiceDiag も渡す。
-  safeSection('健全度パネル', () => renderHealthCells({ livesData, fastDiag, popupDiag, voiceDiag, venueSeatsDiag, laneDiag, giftEffectDiag, milestoneEffectDiag, previewRenderAck, laneMirror }));
+  //   ★v0.1.1362: backfillLiveMetric を渡す=「取り込み律速」セルの入力。
+  //     渡し忘れると判定はあるのにセルが na のまま=配線されていない片肺になる。
+  safeSection('健全度パネル', () => renderHealthCells({ livesData, fastDiag, popupDiag, voiceDiag, venueSeatsDiag, laneDiag, giftEffectDiag, milestoneEffectDiag, previewRenderAck, laneMirror, backfillLiveMetric }));
 
   // popup 埋め込み(本物 iframe・v0.1.916 試作): popup.html?inline=1&dock=status&lv=<lv> を iframe で
   //   丸ごと出し「見た目も操作も popup そっくり」を本物のまま映す。下の鏡(間引き)より上に置き、出たら

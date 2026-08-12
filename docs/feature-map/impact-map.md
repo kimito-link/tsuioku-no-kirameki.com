@@ -392,6 +392,7 @@
 | `src/lib/avatarEntryCounts.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/avatarLoadReport.js` | 1 | 状態速報ページ |
 | `src/lib/avatarRetrySweepThrottle.js` | 1 | ポップアップ(応援レーン) |
+| `src/lib/backfillBottleneck.js` | 1 | 状態速報ページ |
 | `src/lib/backfillFlushThreshold.js` | 1 | 記録エンジン(watchページ常駐) |
 | `src/lib/backfillHeartbeat.js` | 1 | 記録エンジン(watchページ常駐) |
 | `src/lib/backfillRemoveGiftSystemMessages.js` | 1 | ポップアップ(応援レーン) |
