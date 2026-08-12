@@ -10289,6 +10289,43 @@
         border-color: rgb(248 113 113 / 38%);
       }
     </style>
+    <script>
+      /*
+       * ★v0.1.1353: 幕(cloak)を外す【最速の保険】。dist/popup.js より前に必ず走る。
+       *
+       * ■ 実機で確定したこと(2026-08-12 の状態速報)
+       *     幕(cloak) ✅ t+922ms で解除 ★CSS自動解除(400ms)より後=JS解除が遅い
+       *     ★この間パネルは黒く見えていた=660ms(人が気づく長さ)
+       *   v1352 で JS 保険を 400ms に縮めたのに、実測の解除は 922ms のままだった。
+       *
+       * ■ なぜ 400ms の setTimeout が 400ms に効かないのか(真因)
+       *   その setTimeout は popup-entry.js の末尾(22118行目)にある。
+       *   dist/popup.js は **2.3MB** あり、ダウンロード+パース+実行が終わるまで
+       *   そこへ到達しない。つまりタイマーの起点自体が数百ms遅れる。
+       *   ★「400ms後に外す」ではなく「バンドルを読み終えてから400ms後に外す」だった。
+       *   計器の 922ms − CSS の 400ms ≒ その到達遅れ。
+       *
+       * ■ 直し方: バンドルに依存しない場所(head の同期スクリプト)へ保険を置く。
+       *   ここは HTML パース時点で即実行されるので、起点が確実に t≈0 になる。
+       *   popup-entry.js 側の保険は最終安全網としてそのまま残す(冪等・二重実行しても無害)。
+       *
+       * ★属性を消すだけ。描画・状態には一切触れない(失敗しても本体を止めない)。
+       */
+      (function () {
+        try {
+          var CLOAK_FAILSAFE_MS = 400; // ★sidepanelCloakDuration.js の CLOAK_CSS_FAILSAFE_MS と同値
+          setTimeout(function () {
+            try {
+              document.documentElement.removeAttribute('data-nl-popup-primary-cloak');
+            } catch (e) {
+              /* no-op */
+            }
+          }, CLOAK_FAILSAFE_MS);
+        } catch (e) {
+          /* no-op */
+        }
+      })();
+    </script>
   </head>
   <body>
     <!--
