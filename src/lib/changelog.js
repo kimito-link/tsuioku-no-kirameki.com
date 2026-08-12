@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1353',
+    date: '2026-08-12',
+    summary: 'fix(panel): 黒い時間をさらに短くする',
+    items: Object.freeze([
+      'サイドパネルを開いた瞬間の黒が、前回の修正でも0.66秒ほど残っていたのを短くしました。中身を出す保険が、大きなファイルの読み込みを待ってから動いていたのが原因です。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1352',
     date: '2026-08-12',
     summary: 'fix(panel): 開いた瞬間の黒を短くする',

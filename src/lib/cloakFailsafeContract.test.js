@@ -54,6 +54,55 @@ describe('幕(cloak)の CSS 実値と計器の名乗りが一致する', () => {
   });
 });
 
+/*
+ * ★v0.1.1353: 幕を外す保険が【バンドルの読み込みに依存しない】ことを固定する。
+ *
+ * ■ 実機(2026-08-12)
+ *   v1352 で JS 保険を 400ms に縮めたのに、実測の解除は t+922ms のままだった。
+ *   真因は setTimeout の【起点】: その保険は popup-entry.js の末尾にあり、
+ *   dist/popup.js(2.3MB)のダウンロード+パース+実行が終わるまで登録されない。
+ *   ＝「400ms後に外す」ではなく「バンドルを読み終えてから400ms後に外す」だった。
+ *   ★タイマーの値だけ見て「400msで外れる」と信じてはいけない(起点を見る)。
+ */
+describe('★幕の保険はバンドル読み込みに依存しない(head の同期スクリプト)', () => {
+  it('head 内に幕を外す同期スクリプトがある', () => {
+    const headEnd = popupHtml.indexOf('</head>');
+    expect(headEnd).toBeGreaterThan(0);
+    const head = popupHtml.slice(0, headEnd);
+    expect(head).toContain("removeAttribute('data-nl-popup-primary-cloak')");
+  });
+
+  it('★その保険は dist/popup.js より【前】にある(後ろだと起点が遅れる=無意味)', () => {
+    // ★同じ文字列は popup-entry.js 側にもあるので、head 内に限って探す
+    //   (indexOf を素で使うと別の出現を掴んで恒真/恒偽になる)。
+    const headEnd = popupHtml.indexOf('</head>');
+    const failsafeIdx = popupHtml.indexOf('var CLOAK_FAILSAFE_MS');
+    // ★実際の <script src> タグを探す。'dist/popup.js' を素で探すと
+    //   コメント中の言及を掴んでしまい、順序判定が嘘になる(この検査自身が1回踏んだ)。
+    const bundleIdx = popupHtml.indexOf('<script src="dist/popup.js"');
+    expect(failsafeIdx).toBeGreaterThan(0);
+    expect(bundleIdx).toBeGreaterThan(0);
+    expect(failsafeIdx).toBeLessThan(headEnd);
+    expect(failsafeIdx).toBeLessThan(bundleIdx);
+  });
+
+  it('インライン保険の遅延は CLOAK_CSS_FAILSAFE_MS と同値', () => {
+    const m = popupHtml.match(/var CLOAK_FAILSAFE_MS = (\d+);/);
+    expect(m, 'インライン保険の定数が見つからない').toBeTruthy();
+    expect(Number(m[1])).toBe(CLOAK_CSS_FAILSAFE_MS);
+  });
+
+  it('★保険は defer/async でない(同期実行=起点が t≈0 になる)', () => {
+    const headEnd = popupHtml.indexOf('</head>');
+    const head = popupHtml.slice(0, headEnd);
+    const scriptIdx = head.lastIndexOf('<script', head.indexOf('CLOAK_FAILSAFE_MS'));
+    const tag = head.slice(scriptIdx, head.indexOf('>', scriptIdx) + 1);
+    expect(tag).not.toContain('defer');
+    expect(tag).not.toContain('async');
+    expect(tag).not.toContain('src=');
+  });
+});
+
 describe('★計器が「黒く見えていた長さ」を自分で言う(読み手に引き算をさせない)', () => {
   it('幕がCSS保険より早く外れたら、その時刻がそのまま黒の長さ', () => {
     const r = summarizeCloakDuration([
