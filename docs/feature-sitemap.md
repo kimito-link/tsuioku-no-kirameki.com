@@ -758,7 +758,7 @@
   - `src/lib/statusTrendKey.js`
   - `src/extension/status-entry.js`
   - `src/lib/statusActionAdvisor.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 153</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 154</summary>
 
 - `app/app.js` — スマホ閲覧用 status Web 版。
 - `app/live-view.js` — global NL_BUILD_ID
@@ -859,6 +859,7 @@
 - `src/lib/popupBooleanSettingController.js` — popup のブール設定 1 件を管理する純粋コントローラ。
 - `src/lib/popupBooleanSettingsRegistry.js` — popup のブール設定コントローラをまとめて扱うレジストリ。
 - `src/lib/popupCloakRevealTiming.js` — 幕(cloak)をいつ外してよいかを決める純関数(v0.1.1315)。
+- `src/lib/popupErrorLine.js` — popupErrorProbe の速報1行を作る純関数(v0.1.1377)。
 - `src/lib/popupFramePresets.js` — popup の配色プリセット（フレーム）管理。
 - `src/lib/popupWatchSnapshotRetry.js` — 視聴タブのリロード直後は content script の readiness が揃わず、
 - `src/lib/popupWindowEmptyHeight.js` — 0.1.71 (BA): popup window の高さを「state（active watch / empty+history /
@@ -918,7 +919,7 @@
 
 ## 🧬 修正系譜マップ(この系統のバグを過去にどう直したか)
 
-> changelog 全 706 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
+> changelog 全 707 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
 
 ### 💾 記録件数 (96版)
 - `v0.1.1367` 2026-08-12 — 応援レーンが途中件数で止まる問題の根治（78件中19件しか出ない）
@@ -1892,7 +1893,8 @@
 - `v0.1.673` 2026-06-10 — コメビュの名前をパネルと同じ情報源で補完
 - `v0.1.670` 2026-06-10 — コメビュのアイコンを本家と同じサムネに
 
-### 🩺 診断・状態速報 (263版)
+### 🩺 診断・状態速報 (264版)
+- `v0.1.1377` 2026-08-12 — 不具合が起きたとき状態速報に記録が残るように
 - `v0.1.1374` 2026-08-12 — 正常なのに警告が出っぱなしになるのを修正
 - `v0.1.1372` 2026-08-12 — 不具合のときパネル自身が理由を表示するように
 - `v0.1.1371` 2026-08-12 — 状態速報ページが真っ白のまま開かないことがある問題の根治

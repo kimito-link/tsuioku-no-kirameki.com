@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 4 / 755 件
+## ⚠️ 役割コメントが無いソース 4 / 756 件
 - `src/lib/laneDomSelfMeasure.js`
 - `src/lib/reportPreviewPublish.js`
 - `src/lib/venueLaneBuckets.js`
@@ -684,7 +684,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (1641)
+- 📁 **src/** (1643)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -975,7 +975,7 @@
         - `logo_funlink_white_RGB_maru_black.png`
       - `logo_guide_funlink_ol.pdf`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1400)
+  - 📁 **lib/** (1402)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -1862,6 +1862,8 @@
     - `popupDiagUptimeNote.wiring.test.js`
     - `popupEntryPendingSelfPost.js` — popup の表示経路で「pending self-post entry（ndgr 観測前の自コメ仮置き）」を
     - `popupEntryPendingSelfPost.test.js`
+    - `popupErrorLine.js` — popupErrorProbe の速報1行を作る純関数(v0.1.1377)。
+    - `popupErrorLine.test.js`
     - `popupFrameCodec.js` — popup の配色フレーム「共有コード」の エンコード／デコード。
     - `popupFrameCodec.test.js`
     - `popupFramePresets.js` — popup の配色プリセット（フレーム）管理。

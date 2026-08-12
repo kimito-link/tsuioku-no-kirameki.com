@@ -837,6 +837,8 @@ import {
 } from '../lib/commentVelocityWindow.js';
 import { maybeFlushBroadcastSessionSummarySample } from '../lib/broadcastSessionSummaryFlush.js';
 import { isContextInvalidatedError as isExtensionContextInvalidatedError } from '../lib/reportSilentError.js';
+import { createConsoleErrorBuffer } from '../lib/consoleErrorBuffer.js';
+import { buildPopupErrorProbe } from '../lib/popupErrorLine.js';
 import {
   listBroadcastSessionSummaryForLive,
   openBroadcastSessionSummaryDb
@@ -3801,18 +3803,16 @@ function hasExtensionContext() {
   }
 }
 
+// ★v0.1.1377: popup の例外を記録する(経緯と掟は src/lib/popupErrorLine.js のヘッダ)。
+const _popupErrorBuffer = createConsoleErrorBuffer({ capacity: 20 });
+
 let extensionContextErrorGuardInstalled = false;
 function installExtensionContextErrorGuard() {
   if (extensionContextErrorGuardInstalled) return;
   extensionContextErrorGuardInstalled = true;
-  globalThis.addEventListener('unhandledrejection', (ev) => {
-    if (!isExtensionContextInvalidatedError(ev.reason)) return;
-    ev.preventDefault();
-  });
-  globalThis.addEventListener('error', (ev) => {
-    if (!isExtensionContextInvalidatedError(ev.error || ev.message)) return;
-    ev.preventDefault();
-  });
+  try {
+    _popupErrorBuffer.install(globalThis);
+  } catch { /* 観測の失敗で popup を止めない */ }
 }
 
 /**
@@ -18958,6 +18958,9 @@ async function collectAiShareDevMonitorPayloadBundle(watchUrl) {
           return null;
         }
       })(),
+      // ★v0.1.1377: popup の例外。ここに載せないと速報に出ない=起きたことすら分からない
+      //   ([[fastdiag-lite-is-the-printer-subset]] / [[unwired-judgement-is-systemic-2026-08-12]])。
+      popupErrorProbe: buildPopupErrorProbe(_popupErrorBuffer),
       // v0.1.1226: ティッカーのピックアップ計器(gift+scored=0 なら未発火と断言できる)。
       tickerPick: { ..._tickerPickDiag },
       // v0.1.1231 Phase1: 人物集合の増減。「消えた人数」が本丸/everSeenMax は上限判断の実測。
