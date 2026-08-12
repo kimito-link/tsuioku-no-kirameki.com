@@ -81,6 +81,7 @@ export function hasRealNickname(nickname, userId) {
  *   withThumb: number,
  *   withName: number,
  *   withAll: number,
+ *   guessedThumb: number,
  *   thumbPercent: number,
  *   namePercent: number,
  *   allPercent: number,
@@ -96,6 +97,8 @@ export function countIdentityAcquisition(candidates) {
   let withThumb = 0;
   let withName = 0;
   let withAll = 0;
+  // ★IDから式で組んだ推測URL(実在未確認)。画面には絵が出るが「取れた」ではない。
+  let guessedThumb = 0;
 
   for (const raw of list) {
     if (!raw || typeof raw !== 'object') continue;
@@ -107,9 +110,16 @@ export function countIdentityAcquisition(candidates) {
       continue;
     }
     identifiable += 1;
-    // thumbScore: 0=無効 / 1=合成既定(弱) / 2=個人サムネ。2 だけを「取れた」とする。
+    /*
+     * thumbScore: 0=無効 / 1=【IDから組んだ推測URL】/ 2=個人サムネ(実取得)。
+     * ★2 だけを「取れた」とする。1 は画面に絵が出るが、それは
+     *   `https://.../usericon/s/<上位>/<uid>.jpg` を式で組んだだけで、
+     *   実在を確認していない=404 になりうる(実機速報で実際に1件404していた)。
+     * ★ここを 1 も成功に数えると「サムネ100%」という嘘の緑になる。
+     */
     const score = Math.floor(Number(raw.thumbScore) || 0);
     const thumbOk = score >= 2;
+    if (score === 1) guessedThumb += 1;
     const nameOk = hasRealNickname(raw.nickname, uid);
     if (thumbOk) withThumb += 1;
     if (nameOk) withName += 1;
@@ -125,6 +135,7 @@ export function countIdentityAcquisition(candidates) {
     withThumb,
     withName,
     withAll,
+    guessedThumb,
     thumbPercent: pct(withThumb),
     namePercent: pct(withName),
     allPercent: pct(withAll),
@@ -193,6 +204,21 @@ export function formatIdentityAcquisitionLine(c) {
   }
   const mark = c.allPercent >= 80 ? '✅' : c.allPercent >= 50 ? '🟡' : '🔴';
   const anonNote = anon > 0 ? ` / 匿名${anon}人は対象外(仕様)` : '';
+  const guessed = Math.max(0, Math.floor(Number(c.guessedThumb) || 0));
+
+  /*
+   * ★実機(2026-08-12)で「サムネ0% なのに画面にはアイコンが出ている」という
+   *   一見矛盾する状態が出た。実態は【IDから式で組んだ推測URLを表示している】。
+   *   同じ速報に `アイコン画像が1件読み込めていません(.../142381212.jpg)` が出ており、
+   *   推測URLが 404 になりうることが実証されていた。
+   *   ★この事情を書かないと「計器が壊れている」と誤読される=誤誘導は価値が負
+   *     ([[instrument-value-is-measured-by-fixes-2026-08-12]])。
+   */
+  const guessNote =
+    guessed > 0
+      ? `\n  → うち${guessed}人は【IDから組んだ推測URL】を表示中です` +
+        '(実在未確認=404で欠けることがあります。画面に絵が出ていても「取れた」ではありません)'
+      : '';
   const detail =
     c.missingThumb > 0 || c.missingName > 0
       ? `\n  → 未取得: サムネ${c.missingThumb}人 / 名前${c.missingName}人` +
@@ -200,6 +226,6 @@ export function formatIdentityAcquisitionLine(c) {
       : '\n  → 3点セットが全員そろっています';
   return (
     `本人情報の取得 ${mark} サムネ${c.thumbPercent}% / 名前${c.namePercent}% / 両方${c.allPercent}%` +
-    ` (対象${ident}人${anonNote})${detail}`
+    ` (対象${ident}人${anonNote})${detail}${guessNote}`
   );
 }
