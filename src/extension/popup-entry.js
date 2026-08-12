@@ -594,6 +594,7 @@ import {
 import { yieldToBrowserPaint } from '../lib/yieldToBrowserPaint.js';
 import { buildStorageRefreshTriggerTag } from '../lib/storageRefreshTriggerKey.js';
 import { prefersReducedMotion } from '../lib/prefersReducedMotion.js';
+import { pushLaneTileSample, summarizeLaneTileOscillation } from '../lib/laneTileOscillation.js';
 import { makeLaneResult } from '../lib/northStarLaneResult.js';
 import {
   buildTickerTextAndTip,
@@ -7036,6 +7037,9 @@ function renderStoryUserLane() {
   const _shrinkGuardHit = _rawKeep && !_keepExpired;
   notePaintDecision(_storyUserLaneRenderProbe,
     { els, nextTileCount, provisional: _prov, guardHit: _shrinkGuardHit });
+  // ★v0.1.1346: タイル数の【往復】を記録(縮小ガードは「減ったか」しか見ず点滅を見逃す)。
+  _laneTileHistory = pushLaneTileSample(_laneTileHistory,
+    { tiles: nextTileCount, origin: _laneSupplyOriginDiag?.lastOrigin || '' });
   // ★v0.1.1249 現行犯記録: 実際に減る瞬間、直前に供給を書いた者を名指しで残す(判定は計器側)。
   noteLaneSupplyShrink(_laneSupplyOriginDiag,
     { prevTiles: countStoryUserLaneDomTiles(els), nextTiles: nextTileCount, guardHit: _shrinkGuardHit });
@@ -10833,6 +10837,7 @@ let _lastGiftEventsForMirror = { liveId: '', events: [] };
 let _heavyFreshReadReuseCount = 0;
 /** ★v1341: 再利用の最後の判定理由(0回のとき「なぜ0か」を速報で言うため)。 */
 let _heavyReuseLastReason = '';
+let _laneTileHistory = [];
 let _kokenLaneResult = null;
 /** heavyRace再発の根治(HANDOFF-heavyrace-backfill-IMPL.md C-1): 同一 lv の heavy 全件 read を
  *   多重に張らない single-flight 実行器(src/lib/singleFlightByKey.js)。onChanged coalesced 経由の
@@ -18993,7 +18998,7 @@ async function collectAiShareDevMonitorPayloadBundle(watchUrl) {
           const snap = snapshotStoryUserLaneRenderProbe(_storyUserLaneRenderProbe, Date.now());
           if (snap) snap.laneRepaintCounts = getStoryLaneRepaintCounts(); // v0.1.1040 計器: 段別 churn 実測
           // heavyRace根治(B)計器: fresh-read で heavy 全件再読みを省いた累計(実配信で効きと12秒ギャップの適正を判定)。
-          if (snap) { snap.heavyFreshReadReuseCount = _heavyFreshReadReuseCount; snap.heavyReuseLastReason = _heavyReuseLastReason; }
+          if (snap) { snap.heavyFreshReadReuseCount = _heavyFreshReadReuseCount; snap.heavyReuseLastReason = _heavyReuseLastReason; snap.laneTileOscillation = summarizeLaneTileOscillation(_laneTileHistory); }
           // heavyRace根治(C-1)計器: 進行中read への合流で新規readを張らずに済んだ累計(single-flightの効き)。
           if (snap) snap.heavyReadInflightJoinCount = _heavyReadSingleFlight.joinCount();
           return snap;
