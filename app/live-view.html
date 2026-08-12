@@ -992,6 +992,34 @@
         height: 38px;
       }
 
+      /*
+       * ★v0.1.1376: たぬ姉段の段内LOD(遠近法)。popup.html と同じ規約を純Webにも。
+       *   先頭24人は読めるpill / 25人目以降の匿名はアイコンのみ=群れとして見せる。
+       *   ★live-view.js は renderStoryUserLaneDom を wrapTileEl 無しで呼ぶので
+       *   ①popup と同じ【直接子形】でよい(会場だけが子孫形)。
+       *   根拠と実測(332人 1,615px→598px)は popup.html の同名ブロック参照。
+       *   ★このページの avatar 既定は 38px(上)なので、後列は 26px にして
+       *   相対差を保つ(popup は 20px→22px)。
+       */
+      #sceneStoryUserLaneTanu {
+        gap: 4px;
+      }
+      #sceneStoryUserLaneTanu > .nl-story-userlane-cell:nth-child(n + 25)[data-thumb='0'] {
+        gap: 0;
+        padding-right: 0;
+      }
+      #sceneStoryUserLaneTanu
+        > .nl-story-userlane-cell:nth-child(n + 25)[data-thumb='0']
+        .nl-story-userlane-meta {
+        display: none;
+      }
+      #sceneStoryUserLaneTanu
+        > .nl-story-userlane-cell:nth-child(n + 25)[data-thumb='0']
+        .nl-story-userlane-avatar {
+        width: 26px;
+        height: 26px;
+      }
+
       .nl-story-userlane-guide {
         display: flex;
         flex-direction: column;

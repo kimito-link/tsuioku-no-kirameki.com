@@ -1104,6 +1104,79 @@
         max-width: 72px;
       }
 
+      /*
+       * ★v0.1.1376: たぬ姉段の【段内LOD(遠近法)】。
+       *
+       * ■ 何を解くか(2026-08-12 ユーザー確定)
+       *   v0.1.1375 で匿名がたぬ姉段に出るようになり、実配信で 332人が並ぶ。
+       *   ユーザー「たぬ姉段が匿名332人で埋まること自体は望ましい。ただしレスポンシブで
+       *   うまく見せやすい形を。SHOWROOMがヒントだがごちゃごちゃして見にくい」
+       *   ＝★人数を減らす解は禁止。密度と階層で解く。
+       *
+       * ■ 実測(出荷ビルド・幅461px・332タイル・chrome-devtools)
+       *     適用前 1,615px → 適用後 598px(63%減)。1行7個 → 後列は1行17個相当。
+       *   ★推定(1,900〜2,100px)ではなく【実測1,615px】が基準。
+       *
+       * ■ なぜ CSS だけでやるか(ちらつき対策を壊さないため)
+       *   diff-skip の鍵 storyLaneTierBodyKey(renderStoryUserLaneDom.js:248)は
+       *   userId+displaySrc+idLine+nameLine+title のみで【位置を含まない】。
+       *   ＝:nth-child で見た目を変えても鍵は1バイトも動かない=再描画を誘発しない。
+       *   ★JS で層を判定すると鍵に位置を混ぜたくなり、ちらつき再発の典型経路になる
+       *     (7版かけて直した churn 対策・[[story-userlane-churn-filllanetier-v1039]])。
+       *   ★同ファイル 392-394 行の既存コメントが同じ論理を独立に述べており、
+       *     v0.1.1049(上のブロック)が同じ [data-thumb] 手法で実装済み=本規則はその延長。
+       *
+       * ■ 個体識別は失わない
+       *   全タイルに title ツールチップがある(personTileDom.js:85)。
+       *   identicon は uid ごとに柄が違う(venueLaneBuckets.js:104)。
+       *   ＝情報を「足す」のではなく「求めに応じて出す」。
+       *
+       * ★セレクタは [data-thumb="0"](匿名/identicon)のみ。実サムネ持ち(=1)は
+       *   名前を隠さない。属性が付かない旧タイルは既定(pill)に安全に倒れる。
+       */
+      #sceneStoryUserLaneTanu {
+        gap: 4px;
+      }
+      #sceneStoryUserLaneTanu > .nl-story-userlane-cell:nth-child(n + 25)[data-thumb='0'] {
+        gap: 0;
+        padding-right: 0;
+      }
+      #sceneStoryUserLaneTanu
+        > .nl-story-userlane-cell:nth-child(n + 25)[data-thumb='0']
+        .nl-story-userlane-meta {
+        display: none;
+      }
+      #sceneStoryUserLaneTanu
+        > .nl-story-userlane-cell:nth-child(n + 25)[data-thumb='0']
+        .nl-story-userlane-avatar {
+        width: 22px;
+        height: 22px;
+      }
+      /*
+       * ★③会場(venueBar のレーンバー)はタイルが wrapTileEl でラップされる
+       *   (renderStoryUserLaneDom.js:402)ので【子孫形】が要る。①は直接子形。
+       *   両方書かないと画面ごとに見た目が食い違う。
+       */
+      .nlsb-venue-lane-stack .nl-story-userlane--tanu > :nth-child(n + 25) .nl-story-userlane-cell[data-thumb='0'] {
+        gap: 0;
+        padding-right: 0;
+      }
+      .nlsb-venue-lane-stack
+        .nl-story-userlane--tanu
+        > :nth-child(n + 25)
+        .nl-story-userlane-cell[data-thumb='0']
+        .nl-story-userlane-meta {
+        display: none;
+      }
+      .nlsb-venue-lane-stack
+        .nl-story-userlane--tanu
+        > :nth-child(n + 25)
+        .nl-story-userlane-cell[data-thumb='0']
+        .nl-story-userlane-avatar {
+        width: 22px;
+        height: 22px;
+      }
+
       .nl-story-userlane-guide {
         display: flex;
         flex-direction: column;

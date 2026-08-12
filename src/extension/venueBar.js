@@ -1374,6 +1374,22 @@ const VENUE_CSS = `
     font-size: 9px;
     max-width: 72px;
   }
+  /* ★v0.1.1376: たぬ姉段の段内LOD(遠近法)。popup.html と同じ規約を会場にも。
+     先頭24人は読めるpill / 25人目以降の匿名はアイコンのみ=群れとして見せる。
+     ★会場はタイルが wrapTileEl でラップされる(renderStoryUserLaneDom.js:402)ので
+     【子孫形】で書く(①popup は直接子形)。ここを直接子形にすると会場だけ効かない。
+     根拠と実測(1,615px→598px)は popup.html の同名ブロックのコメント参照。 */
+  .nlsb-venue-lane-stack .nl-story-userlane--tanu > :nth-child(n + 25) .nl-story-userlane-cell[data-thumb="0"] {
+    gap: 0;
+    padding-right: 0;
+  }
+  .nlsb-venue-lane-stack .nl-story-userlane--tanu > :nth-child(n + 25) .nl-story-userlane-cell[data-thumb="0"] .nl-story-userlane-meta {
+    display: none;
+  }
+  .nlsb-venue-lane-stack .nl-story-userlane--tanu > :nth-child(n + 25) .nl-story-userlane-cell[data-thumb="0"] .nl-story-userlane-avatar {
+    width: 22px;
+    height: 22px;
+  }
   .nlsb-venue-lane-stack .nl-story-userlane-guide {
     display: flex;
     flex-direction: column;
