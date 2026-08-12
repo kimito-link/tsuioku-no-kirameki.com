@@ -112,11 +112,48 @@ const SELF_DIAG_OVERLAY_ID = 'nlSidepanelSelfDiagOverlay';
  * ★v0.1.1373: この時間以上「中身が見えない」なら異常とみなす[ms]。
  *
  * 実機(2026-08-12)は 12,773ms 中身が出ていないのに ✅正常 と出ていた。
- * ★人が気づく目安は 200ms([[sidepanel-white-flash-is-unfixable]] の基準)だが、
- *   起動直後の正常な読み込みも数百ms かかるため、ここは体感に直結する 1秒 を境にする。
- *   1秒以上「パネルは開いているのに中身が無い」なら、ユーザーには不具合に見える。
+ * ★v0.1.1374: 1秒 → 4秒。v1373 の 2.5秒シェード上限を踏まえた値。
+ *   実機は改善後 909ms(正常な起動時の読み込み)で、1秒だと【正常な起動を異常と呼ぶ】。
+ *   シェード上限(2.5s)+CSS保険の余裕を越えたときだけ異常＝出るなら本物。
  */
-const CONTENT_BLIND_ALERT_MS = 1_000;
+const CONTENT_BLIND_ALERT_MS = 4_000;
+
+/**
+ * ★v0.1.1374: オーバーレイを出してよいのは【いま異常なとき】だけ。
+ *
+ * ■ 何が起きたか(2026-08-12 実機・私が作った直後のノイズ)
+ *   v1373 適用後の実機は「中身が見えなかった合計=909ms」で、パネルは正常に
+ *   描けているのに ⚠オーバーレイが【出っぱなし】になった。
+ *   ★blindMs は【累積値】なので一度超えたら永久に超えたまま。
+ *     つまり「いま異常か」ではなく「起動時に何msかかったか」を表示し続けていた。
+ *   ★[[settled-state-hides-flash-bugs-2026-08-07]] の【逆】: 過去の一瞬を
+ *     現在の状態として出し続けると、正常なのに警告が居座る=ノイズ=価値が負。
+ *
+ * ■ 判定: 過去の記録(flashed/blind)は【行(速報)】に残す。画面に出すのは
+ *   「いま現に中身が無い」場合だけ。両者は目的が違う(記録 vs 通知)。
+ *
+ * @param {{ ok?: boolean, cause?: string }|null|undefined} verdict 今回の判定
+ * @param {any} sample 今回の生サンプル(独自判定には使わない・将来の拡張用)
+ * @returns {boolean} true=いま黒い(オーバーレイを出す)
+ */
+function isBlackRightNow(verdict, sample) {
+  if (!verdict || verdict.ok === true) return false;
+  const cause = String(verdict.cause || '');
+  // 未レイアウト(窓0x0)は Chrome の滑り出し中=拡張からは塗れない。異常と呼ばない。
+  if (cause.startsWith('未レイアウト')) return false;
+  /*
+   * ★v0.1.1374 の実測で分かったこと: bodyKids だけでは判定できない。
+   *   about:blank(=中身が読めていない最悪の状態)でも body の子要素は存在しうる
+   *   ＝「kids>0 なら正常」とすると【本物の異常で警告が出なくなる】。実際そうなった。
+   *   ★判定は verdict.cause(判定済みの名指し)に委ねる。ここで独自の閾値を作らない
+   *     ([[measure-the-region-you-claim-2026-08-10]]: 決め打ちの計器は別物を測る)。
+   *
+   * ★verdict.ok=false かつ未レイアウトでない＝いま現に「黒くなりうる」状態。
+   *   これが表示条件。累積値(blindMs)は使わない=正常に戻れば次の測定で消える。
+   */
+  void sample;
+  return true;
+}
 
 /**
  * ★v0.1.1372: 「いま黒い/中身が出ていない」を【パネル自身の画面】に出す。
@@ -403,10 +440,15 @@ function collectAndPublish(phase) {
      * ■ 掟: 黒いときだけ出す(正常時は1px も足さない=通常利用の邪魔をしない)。
      *   描画には関与せず、最前面に小さく重ねるだけ。失敗してもパネルは動く。
      */
-    // ★v0.1.1373: 「中身が長時間出ていない」を ok の条件に含める(表示と保存で同じ値を使う)。
+    // ★v0.1.1373: 「中身が長時間出ていない」を ok の条件に含める(記録用の総合判定)。
     const overallOk = verdict.ok && !flashed && !_lateBlack && !blindTooLong;
     try {
-      renderSelfDiagOverlay({ ok: overallOk, line });
+      /*
+       * ★v0.1.1374: 画面に出すのは【いま現に中身が無い】ときだけ。
+       *   overallOk は「この起動で一度でも異常があったか」の記録用なので、
+       *   これを表示条件にすると正常に戻っても警告が居座る(実機で実際にそうなった)。
+       */
+      renderSelfDiagOverlay({ ok: !isBlackRightNow(verdict, sample), line });
     } catch {
       /* best-effort: 表示に失敗しても診断の保存は続ける */
     }

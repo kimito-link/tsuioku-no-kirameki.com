@@ -46,23 +46,65 @@ describe('★「中身が見えない時間」を異常として判定する', (
     expect(panelSrc).toMatch(/const overallOk =[^;]*!blindTooLong/);
   });
 
-  it('★保存する ok と画面に出す ok が同じ値(判定と表示が食い違わない)', () => {
-    // 表示・保存の両方が overallOk を使うこと。片方だけだと
-    // 「行には異常と書いてあるのに ok=true」という食い違いが再発する。
-    expect(panelSrc).toContain('renderSelfDiagOverlay({ ok: overallOk');
+  it('★記録(保存)は overallOk=この起動で一度でも異常があったか', () => {
     expect(panelSrc).toMatch(/ok: overallOk,/);
+  });
+
+  /*
+   * ★v0.1.1374: 記録と通知は目的が違う。
+   *   実機で v1373 を入れた直後、「合計909ms」(正常な起動時の読み込み)なのに
+   *   ⚠オーバーレイが【出っぱなし】になった。blindMs は累積値なので、
+   *   一度超えたら永久に超えたまま=「いま異常か」を表せない。
+   *   ★正常なのに警告が居座るのはノイズ＝価値が負
+   *     ([[instrument-value-is-measured-by-fixes-2026-08-12]])。
+   */
+  it('★画面に出すのは「いま現に中身が無い」ときだけ(累積値で居座らせない)', () => {
+    expect(panelSrc).toContain('function isBlackRightNow(');
+    expect(panelSrc).toContain('renderSelfDiagOverlay({ ok: !isBlackRightNow(verdict, sample)');
+    // overallOk(累積)を表示条件に使っていないこと=居座りの再発防止。
+    expect(panelSrc).not.toContain('renderSelfDiagOverlay({ ok: overallOk');
+  });
+
+  it('★未レイアウト(窓0x0)は異常と呼ばない(拡張からは塗れない時間帯)', () => {
+    const start = panelSrc.indexOf('function isBlackRightNow(');
+    const body = panelSrc.slice(start, panelSrc.indexOf('\n}\n', start));
+    expect(body).toMatch(/startsWith\('未レイアウト'\)/);
+  });
+
+  /*
+   * ★v0.1.1374 の実測で棄却した案: 「bodyKids>0 なら正常とみなす」。
+   *   about:blank(中身が読めていない最悪の状態)でも body の子要素は存在しうるため、
+   *   これを正常判定に使うと【本物の異常で警告が出なくなる】。実ブラウザで実際にそうなった。
+   *   ★独自の閾値を作らず、判定済みの verdict.cause に委ねるのが正しい
+   *     ([[measure-the-region-you-claim-2026-08-10]]: 決め打ちの計器は別物を測る)。
+   */
+  it('★独自の閾値を作らず verdict に委ねる(bodyKidsで正常判定しない)', () => {
+    const start = panelSrc.indexOf('function isBlackRightNow(');
+    const body = panelSrc.slice(start, panelSrc.indexOf('\n}\n', start));
+    // 「子要素があるから正常」という判定を持たないこと(本物の異常を隠すため)。
+    expect(body).not.toMatch(/kids > 0\) return false/);
+    // 判定の根拠は verdict.ok / verdict.cause であること。
+    expect(body).toMatch(/verdict\.ok === true/);
   });
 
   it('cause が「何秒出ていないか」と主因を名指しする', () => {
     expect(panelSrc).toMatch(/中身が\$\{[^}]+\}秒出ていない/);
   });
 
-  it('閾値は人が気づく長さ(200ms)以上・体感の1秒以下ではない', () => {
+  it('★閾値はシェード上限(2.5秒)より後(正常な起動を異常と呼ばない)', () => {
+    /*
+     * ★v0.1.1374: 実機の改善後は 909ms(正常な起動時の読み込み)。
+     *   1秒だと正常な起動が毎回「異常」になる=オオカミ少年。
+     *   シェード上限(INLINE_SHADE_DATA_FALLBACK_MS=2.5s)を越えて中身が無いなら本物。
+     */
     const m = panelSrc.match(/const CONTENT_BLIND_ALERT_MS = ([\d_]+);/);
     expect(m).toBeTruthy();
     const ms = Number(String(m[1]).replace(/_/g, ''));
-    expect(ms).toBeGreaterThanOrEqual(200);
-    expect(ms).toBeLessThanOrEqual(2000);
+    const shade = Number(
+      String(popupSrc.match(/const INLINE_SHADE_DATA_FALLBACK_MS = ([\d_]+);/)[1]).replace(/_/g, '')
+    );
+    expect(ms).toBeGreaterThan(shade);
+    expect(ms).toBeLessThanOrEqual(8000);
   });
 });
 
