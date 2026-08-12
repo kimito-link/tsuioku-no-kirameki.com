@@ -55,10 +55,21 @@ export function decideHeavyChunkReadReuse(args) {
     ? Number(a.minGapMs)
     : HEAVY_FULL_REREAD_MIN_GAP_MS;
 
-  if (!cached) return { reuse: false, reason: '' };
+  /*
+   * ★v0.1.1352: 不成立の理由を【3択のまま返さず名指しする】。
+   *
+   * ■ なぜ(2026-08-12 ユーザー指摘「全部質問しなくても分かるようにならないと困る」)
+   *   従来は不成立をすべて reason:'' で返していたため、速報は
+   *   「cachedが無い/lv不一致/件数0のいずれか」としか言えなかった。
+   *   ★3つのうちどれかが分からないと次の一手が決まらない=原因を名指ししていない
+   *   ([[instrument-must-name-the-cause-2026-08-01]])。
+   *   reuse:false は不変なので、挙動は変えずに理由だけ細かくする。
+   */
+  if (!cached) return { reuse: false, reason: 'no-cache' };
   const cachedLv = String(cached.lv || '').trim().toLowerCase();
   const arrLength = Math.max(0, Math.floor(Number(cached.arrLength) || 0));
-  if (!cachedLv || cachedLv !== lv || arrLength <= 0) return { reuse: false, reason: '' };
+  if (!cachedLv || cachedLv !== lv) return { reuse: false, reason: 'lv-mismatch' };
+  if (arrLength <= 0) return { reuse: false, reason: 'empty-cache' };
 
   // 条件1(現行そのまま=coverage): 現 total の80%以上を持つ。非チャンク(null/0)は常に成立。
   const curTotal = currentChunkTotal;

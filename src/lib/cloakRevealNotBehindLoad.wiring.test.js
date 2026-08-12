@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import { CLOAK_CSS_FAILSAFE_MS, CLOAK_CSS_FADE_MS } from './sidepanelCloakDuration.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const src = readFileSync(join(here, '../extension/popup-entry.js'), 'utf8');
@@ -21,8 +22,11 @@ const src = readFileSync(join(here, '../extension/popup-entry.js'), 'utf8');
 describe('幕(cloak)解除は window load に依存しない', () => {
   it('load を待たない時間ベースの保険が存在する', () => {
     // `window.addEventListener('load', ...)` の外側に、素の setTimeout 保険があること。
+    // ★v0.1.1352: 遅延は CLOAK_CSS_FAILSAFE_MS(正本)から組み立てる=数字を直書きしない。
     expect(src).toMatch(
-      /setTimeout\(\(\) => \{\n\s*try \{\n\s*revealPopupPrimaryOnce\(\);\n\s*\} catch \{\n\s*\/\/ no-op\n\s*\}\n\s*\}, 1500\);/
+      new RegExp(
+        `setTimeout\\(\\(\\) => \\{\\n\\s*try \\{\\n\\s*revealPopupPrimaryOnce\\(\\);\\n\\s*\\} catch \\{\\n\\s*// no-op\\n\\s*\\}\\n\\s*\\}, ${CLOAK_CSS_FAILSAFE_MS}\\);`
+      )
     );
   });
 
@@ -33,11 +37,22 @@ describe('幕(cloak)解除は window load に依存しない', () => {
     );
   });
 
-  it('CSS の auto-reveal と同じ 1500ms で揃っている(中身が見える瞬間に幕も外す)', () => {
+  /*
+   * ★v0.1.1352: 1500ms → 400ms(CLOAK_CSS_FAILSAFE_MS)へ短縮。
+   *   実機で「JS解除1507ms / CSS保険1500ms」= 0〜1500ms は誰も中身を見せておらず、
+   *   サイドパネルを引っ張って開いた瞬間が真っ黒だった。
+   *   ★数字は正本(CLOAK_CSS_FAILSAFE_MS)から組み立てる。3箇所に直書きすると
+   *     次に変えるとき必ずどれかが取り残される(=計器が嘘をつく)。
+   */
+  it('CSS の auto-reveal と JS 保険が同じ値で揃っている(中身が見える瞬間に幕も外す)', () => {
     const popupHtml = readFileSync(join(here, '../../extension/popup.html'), 'utf8');
-    expect(popupHtml).toMatch(/animation: nl-popup-primary-cloak-auto-reveal 260ms 1500ms/);
-    // JS 側の保険も同じ 1500ms(片方だけ変えると「中身は見えるが幕は残る」が復活する)
-    expect(src).toMatch(/\}, 1500\);/);
+    expect(popupHtml).toMatch(
+      new RegExp(
+        `animation: nl-popup-primary-cloak-auto-reveal ${CLOAK_CSS_FADE_MS}ms ${CLOAK_CSS_FAILSAFE_MS}ms`
+      )
+    );
+    // JS 側の保険も同じ値(片方だけ変えると「中身は見えるが幕は残る」が復活する)
+    expect(src).toMatch(new RegExp(`\\}, ${CLOAK_CSS_FAILSAFE_MS}\\);`));
   });
 
   it('revealPopupPrimaryOnce は冪等(二重実行で挙動が変わらない)', () => {

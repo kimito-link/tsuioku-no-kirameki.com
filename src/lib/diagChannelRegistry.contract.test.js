@@ -87,7 +87,6 @@ describe('diagChannelRegistry: 台帳そのものの健全性', () => {
   it('planned チャンネルを一覧表示する(黙って許さないための可視化)', () => {
     const planned = channelsByStatus('planned');
     // planned は許されるが、存在するなら必ずここに出る。
-    // eslint-disable-next-line no-console
     if (planned.length > 0) console.info('[registry] planned(未配線):', planned.map((c) => c.id).join(', '));
     expect(Array.isArray(planned)).toBe(true);
   });
@@ -179,7 +178,6 @@ describe('G4: 書き手は createDiagPublisher 経由(移行状況を台帳化)'
       const writerSrc = readRepoFile(c.writerFile);
       if (!writerSrc.includes('createDiagPublisher')) notMigrated.push(c.id);
     }
-    // eslint-disable-next-line no-console
     if (notMigrated.length > 0) console.info('[registry] G4未移行:', notMigrated.join(', '));
     // v1349 は配線ゼロなので「全部未移行」が正。移行が進むにつれこの配列は縮む。
     expect(Array.isArray(notMigrated)).toBe(true);
