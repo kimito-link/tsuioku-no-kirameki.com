@@ -26,6 +26,16 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1380',
+    date: '2026-08-12',
+    summary: '応援レーンのタイルが58人から17人に減る問題を修正',
+    items: Object.freeze([
+      '応援レーンに並んでいた方が、58人から17人へ急に減ることがある問題を直しました。',
+      '原因は、名簿ができあがる前の一瞬に、少ない人数のデータで上書きされていたことです。名簿は画面を描いたあとに作られるため、最初の1回だけ間に合っていませんでした。',
+      '名簿がまだ無いときは、いま画面に出ている人数と比べて、減る場合は上書きしないようにしました。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1379',
     date: '2026-08-12',
     summary: 'サムネが「推測URL」か「実物」かを区別して表示',

@@ -119,6 +119,65 @@ describe('★v0.1.1370 — 2026-08-12 実機の再発(24枚→3枚)を再現し�
   });
 });
 
+/*
+ * ★v0.1.1380: fail-open【5件目】。v1370 で塞いだつもりが名前を分けただけだった。
+ *
+ * 実機(2026-08-12・lv351160666):
+ *   ★減った1回(最大58→17枚=41枚減・直前の供給元light_summary)
+ *   軽い供給の上書き ✅ 見送り0回 → 通した理由の内訳: roster-unestablished1
+ *   laneRosterDelta: everSeenMax 51 / lastLid lv351160666(=名簿は育っている)
+ * ＝ガードが呼ばれた【その瞬間】だけ名簿が空で、41枚の縮小が通り抜けた。
+ *
+ * 真因(コードで確定): noteLaneRoster は【描画の後】(popup-entry.js:6960)に呼ばれる。
+ *   配信の最初の light 供給では、既に58枚描いてあるのに名簿はまだ0件。
+ */
+describe('★v0.1.1380 — 名簿が空の窓で縮小が通り抜けるのを止める', () => {
+  const field = {
+    provisional: true,
+    nextSupplyCount: 17, // 実機の供給
+    rosterEverSeen: 0, // ★この瞬間だけ名簿は空
+    currentLiveId: 'lv351160666',
+    rosterLiveId: '',
+    paintedTiles: 58 // ★実際には58枚描かれている
+  };
+
+  it('★58枚描いてあるのに17件の供給なら止める(実機の再現)', () => {
+    const r = shouldSkipLightSupplyOverwrite(field);
+    expect(r.skip).toBe(true);
+    expect(r.reason).toBe('shrink-vs-painted');
+  });
+
+  it('増加・同数は通す(初回描画を止めない)', () => {
+    expect(shouldSkipLightSupplyOverwrite({ ...field, nextSupplyCount: 58 }).skip).toBe(false);
+    expect(shouldSkipLightSupplyOverwrite({ ...field, nextSupplyCount: 100 }).skip).toBe(false);
+  });
+
+  it('★まだ1枚も描いていないなら通す(本当の初回描画)', () => {
+    const r = shouldSkipLightSupplyOverwrite({ ...field, paintedTiles: 0 });
+    expect(r.skip).toBe(false);
+    expect(r.reason).toBe('roster-unestablished');
+  });
+
+  it('★paintedTiles 未指定なら従来動作(既存の呼び出しは挙動不変)', () => {
+    const { paintedTiles, ...noPainted } = field;
+    void paintedTiles;
+    const r = shouldSkipLightSupplyOverwrite(noPainted);
+    expect(r.skip).toBe(false);
+    expect(r.reason).toBe('roster-unestablished');
+  });
+
+  it('名簿が育っていれば従来どおり名簿基準で判定する(paintedTilesに依存しない)', () => {
+    const r = shouldSkipLightSupplyOverwrite({
+      ...field,
+      rosterEverSeen: 51,
+      rosterLiveId: 'lv351160666',
+      paintedTiles: 0
+    });
+    expect(r.skip).toBe(true);
+    expect(r.reason).toBe('incomplete-light-supply');
+  });
+});
+
 describe('judgeAndRecordLightSupply — 通した理由を必ず残す', () => {
   it('通したら passReasons に理由が記録される(旧実装は捨てていた)', () => {
     const diag = { skipCount: 0, observedCount: 0, worst: null, passReasons: {} };

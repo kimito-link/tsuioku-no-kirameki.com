@@ -42,14 +42,39 @@ describe('lightSupplyOverwriteGuard の配線', () => {
     expect(popup).not.toContain('shouldSkipLightSupplyOverwrite(');
   });
 
-  it('★判定に DOM 由来の値を渡していない(DOM は消える側=判断材料にできない)', () => {
+  /*
+   * ★v0.1.1380: 契約を「DOMを渡さない」→「DOMを【主】の判断材料にしない」へ更新。
+   *
+   * ■ なぜ緩めたか(実機で穴が実証されたため・緩めたのではなく穴を塞いだ)
+   *   58→17枚(41枚減)が `roster-unestablished` を通り抜けた。
+   *   真因は名簿の更新順序: noteLaneRoster は【描画の後】に呼ばれるので、
+   *   配信の最初の light 供給では 58枚描いてあるのに名簿は0件=名簿が使えない窓が実在する。
+   *   ★「DOMを一切見ない」を守り切ると、この窓を塞ぐ材料が【何も無い】。
+   *
+   * ■ 新しい契約(この検査が守るもの)
+   *   1. rosterEverSeen(名簿)が主の材料であり続けること
+   *   2. DOM(paintedTiles)は名簿が使えないときの【補助】に限ること
+   *   3. 補助は「減っているか」だけに使うこと(増加/同数は通す=初回描画を止めない)
+   *   ＝DOM が 0枚の瞬間に判断が引きずられる旧来の穴は開かない
+   *     (0枚なら painted=0 で従来どおり通すため)。
+   */
+  it('★名簿(rosterEverSeen)が主の判断材料であり続ける', () => {
     const fn = popup.slice(popup.indexOf('async function renderStoryUserLaneFromLightCommentsForCurrentLive'));
     const body = fn.slice(0, fn.indexOf('\n}\n'));
     const argsStart = body.indexOf('judgeAndRecordLightSupply(_lightSupplyGuardDiag, {');
     const argsEnd = body.indexOf('});', argsStart);
     const argsBlock = body.slice(argsStart, argsEnd);
-    expect(argsBlock).not.toContain('countStoryUserLaneDomTiles');
     expect(argsBlock).toContain('rosterEverSeen');
+    // DOM は補助として渡してよいが、名前で用途が分かること(paintedTiles)。
+    expect(argsBlock).toContain('paintedTiles');
+  });
+
+  it('★DOMは「減っているか」の判定にしか使わない(0枚では通す=初回描画を止めない)', () => {
+    const src = read('src/lib/lightSupplyOverwriteGuard.js');
+    // painted>0 のときだけ縮小判定に入る=0枚なら従来どおり通る。
+    expect(src).toMatch(/if \(painted > 0 && next0 < painted\)/);
+    // 増加・同数で止めない(next0 < painted の比較であること)。
+    expect(src).not.toMatch(/next0 <= painted/);
   });
 
   it('★通した理由(passReasons)を速報のスナップショットに載せている', () => {

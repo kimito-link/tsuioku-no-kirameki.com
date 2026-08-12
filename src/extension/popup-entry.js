@@ -7377,7 +7377,10 @@ async function renderStoryUserLaneFromLightCommentsForCurrentLive(lid) {
       nextSupplyCount: entries.length,
       rosterEverSeen: Number(_roster?.everSeenMax) || 0,
       currentLiveId: live,
-      rosterLiveId: String(_roster?.lastLid || '')
+      rosterLiveId: String(_roster?.lastLid || ''),
+      // ★v0.1.1380: 名簿は描画の【後】に育つ(6960行)ので、配信の最初の light 供給では空。
+      //   その窓で41枚の縮小が通り抜けた実機報告があるため、実表示枚数を補助材料に渡す。
+      paintedTiles: countStoryUserLaneDomTiles(els)
     });
     if (_verdict.skip) return; // 不完全な軽い供給で完全描画を潰さない(heavy/onChanged の次回に委ねる)
   }
