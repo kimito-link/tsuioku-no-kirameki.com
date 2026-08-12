@@ -97,9 +97,13 @@ describe('サイドパネル自己診断: 一瞬の黒を後の✅で消さな�
      * ★文字列の存在だけでは `if (false)` 前置を検知できない
      *   ([[wiring-test-mutation-check-2026-08-01]])。
      *   for 文の直前の改行と本体の setTimeout までアンカーする。
+     *
+     * ★v0.1.1381: ループ本体にコメント1行(予定時刻を渡す理由)が入ったので
+     *   その1行ぶんだけ許す。**緩めていない**: 直前の改行 + for 文 + 本体先頭が
+     *   setTimeout であることは依然として固定で、`if (false)` 前置は弾かれる。
      */
     expect(src).toMatch(
-      /\nfor \(const ms of SAMPLE_AT_MS\) \{\n {2}setTimeout\(/
+      /\nfor \(const ms of SAMPLE_AT_MS\) \{\n {2}(?:\/\/[^\n]*\n {2})?setTimeout\(/
     );
   });
 });

@@ -284,8 +284,19 @@ export default [
     //   `roster-unestablished` を通り抜けた)の根治で、ガードへ paintedTiles を渡す
     //   1行と、その理由コメント2行が増えた。判定ロジック本体は純関数
     //   src/lib/lightSupplyOverwriteGuard.js(実機値を再現する単体テスト付)にある。
+    // ★2026-08-12(v0.1.1381) 22129 → 22200(+71)。黒画面8版目(会議で設計・正本=
+    //   docs/handoff/sidepanel-black-council-MINUTES.md)の2件。
+    //   ① 幕(cloak)の判定共有: import 1行 + ensurePopupPrimaryCloakedBeforeFirstReveal の
+    //      ガード分岐(外部保険が既に外していたら付け直さない)。
+    //   ② シェード締切を「初回可視」起点へ: armInlineShadeDeadlineOnFirstVisible の追加
+    //      (prewarm では締切を始めず、見えた瞬間から2.5秒)+ 再入時のタイマー掃除1行。
+    //   ★増分の大半は【なぜそうするか】のコメント。7版空振りした症状なので、
+    //     次に触る人が「窓0x0は不可侵」「これは黒を消す版ではない」を読めることに価値がある。
+    //     行数を削るためにコメントから根拠を削るのは本末転倒(前回の判断を踏襲)。
+    //   ★判定・要約の本体は純関数へ隔離済み(src/lib/cloakFailsafeMarker.js /
+    //     eventLoopStallSummary.js・単体+配線テスト付)。popup 側は呼び出しのみ。
     files: ['src/extension/popup-entry.js'],
-    rules: { 'max-lines': ['error', { max: 22129, skipBlankLines: false, skipComments: false }] }
+    rules: { 'max-lines': ['error', { max: 22200, skipBlankLines: false, skipComments: false }] }
   },
   {
     files: ['src/extension/popup/**/*.js'],

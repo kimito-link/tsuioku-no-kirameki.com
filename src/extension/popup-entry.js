@@ -840,6 +840,7 @@ import { isContextInvalidatedError as isExtensionContextInvalidatedError } from 
 import { createConsoleErrorBuffer } from '../lib/consoleErrorBuffer.js';
 import { buildPopupErrorProbe } from '../lib/popupErrorLine.js';
 import { countIdentityFromLanePicks, buildIdentityAcquisitionProbe } from '../lib/identityAcquisitionCensus.js';
+import { hasCloakFailsafeFired } from '../lib/cloakFailsafeMarker.js';
 import {
   listBroadcastSessionSummaryForLive,
   openBroadcastSessionSummaryDb
@@ -4042,6 +4043,17 @@ function clearPopupPrimaryRevealFallback() {
 
 function ensurePopupPrimaryCloakedBeforeFirstReveal() {
   if (popupPrimaryRevealDone) return;
+  /*
+   * ★v0.1.1381: 外部保険(cloak-failsafe-entry.js)が既に幕を外していたら【付け直さない】。
+   *   保険は別スクリプトなので popupPrimaryRevealDone を立てられず、従来はここが
+   *   「まだ誰も見せていない」と誤認して幕を再付与していた(一度見えたのにまた隠れる)。
+   *   印を見て同じ結論(=もう見せてよい)へ倒すことで初めて止まる。
+   *   [[shared-knowledge-is-not-shared-judgment-2026-08-10]]
+   */
+  if (hasCloakFailsafeFired(typeof window !== 'undefined' ? window : null)) {
+    revealPopupPrimaryOnce();
+    return;
+  }
   try {
     document.documentElement.setAttribute('data-nl-popup-primary-cloak', '1');
     const el = /** @type {HTMLElement|null} */ ($('nlPopupPrimary'));
@@ -18738,6 +18750,14 @@ function dismissInlineShadeWhenDataReady(fallbackMs) {
     dismissInitialLoadShade();
     return;
   }
+  /*
+   * ★v0.1.1381: 再入時に既存タイマーを掃除する。
+   *   従来は2つの呼び出し元(初回 refresh の finally / 5秒の安全網)が両方走ると
+   *   setInterval/setTimeout が**上書きされて前のハンドルが迷子**になり、
+   *   古い interval が 200ms ごとに回り続けた(誰も clear できない)。
+   *   締切そのものも後勝ちで伸びる=上限が上限として働いていなかった。
+   */
+  clearInlineShadeDataWaiters();
   const cap = Math.max(0, Number(fallbackMs) || 0);
   inlineShadeDataPollTimer = setInterval(() => {
     if (inlineWatchPanelHasRealDataForShade()) {
@@ -18749,6 +18769,55 @@ function dismissInlineShadeWhenDataReady(fallbackMs) {
     clearInlineShadeDataWaiters();
     dismissInitialLoadShade();
   }, cap);
+}
+
+/*
+ * ★v0.1.1381: シェードの締切を【初回可視】起点にする(会議 Q3)。
+ *
+ * ■ 何が壊れていたか
+ *   安全網は `setTimeout(..., 5000)` の中で `dismissInlineShadeWhenDataReady(2500)` を
+ *   呼んでいた。＝上限は「呼ばれた時刻からの相対」なので、実データが来ない最悪系では
+ *   **5000 + 2500 = 最短7.5秒**シェードが中身を覆う。ユーザーにはその間ずっと
+ *   「パネルは開いているのに中身が出ない」＝黒に見える。
+ *   ★[[timer-delay-is-not-timer-origin-2026-08-12]] を私が同じ日にまた踏んでいた。
+ *
+ * ■ なぜ boot 起点ではなく可視起点か
+ *   5秒待っていたのは prewarm(画面外先読み)対策で、これ自体は正しい:
+ *   画面外で幕を外すと「表示された時には空白」になる。
+ *   ★しかし守りたいのは「**見えている**あいだに空白を見せない」ことなので、
+ *   起点を boot ではなく【初回可視】に置けば prewarm 対策と短い締切は両立する。
+ *   見えていない間は1秒も消費されず、見えた瞬間から 2.5秒の締切が始まる。
+ *
+ * ■ これは「黒が消える」対策ではない(過大申告しない)
+ *   凍結レジーム(イベントループ停止)では、この setTimeout 自体が遅れて発火する。
+ *   効くのは JS が生きている場合の最短7.5秒→2.5秒だけ。
+ */
+let inlineShadeVisibleDeadlineArmed = false;
+
+function armInlineShadeDeadlineOnFirstVisible() {
+  if (!INLINE_MODE || inlineShadeVisibleDeadlineArmed) return;
+  const arm = () => {
+    if (inlineShadeVisibleDeadlineArmed) return;
+    inlineShadeVisibleDeadlineArmed = true;
+    dismissInlineShadeWhenDataReady(INLINE_SHADE_DATA_FALLBACK_MS);
+  };
+  try {
+    if (document.visibilityState === 'visible') {
+      arm();
+      return;
+    }
+    // まだ画面外(prewarm)。見えた瞬間に締切を開始する。
+    document.addEventListener(
+      'visibilitychange',
+      () => {
+        if (document.visibilityState === 'visible') arm();
+      },
+      { once: true }
+    );
+  } catch {
+    // visibilityState を読めない環境では従来どおり即アーム(永久ローディングを作らない)。
+    arm();
+  }
 }
 
 /** @param {string} key */
@@ -22062,17 +22131,19 @@ if (!INLINE_PASSIVE) {
 }
 
 // 安全網：万が一 initPopup が throw して initialRefreshDone が立たなくても、
-// 最大 5 秒でロードシェードを撤去する（ユーザーが永遠に「読み込み中…」を見続けるのを防ぐ）。
-//   ただし INLINE_MODE は prewarm（画面外先読み）でこの 5 秒が表示前に経過し得る。
-//   その場合は実データが乗るまでキャラ幕を維持し、長めの上限でだけ外す
-//   （短い 5 秒固定だと「表示時には空白」になるため）。
-setTimeout(() => {
-  if (INLINE_MODE) {
-    dismissInlineShadeWhenDataReady(INLINE_SHADE_DATA_FALLBACK_MS);
-  } else {
+// ロードシェードを撤去する（ユーザーが永遠に「読み込み中…」を見続けるのを防ぐ）。
+//   ★v0.1.1381: INLINE_MODE の締切を【初回可視】起点へ付け替えた(会議 Q3)。
+//   旧実装は 5秒待ってから 2.5秒の上限を開始＝最短7.5秒シェードが中身を覆っていた。
+//   prewarm(画面外先読み)対策は「見えた瞬間から数える」ことで両立する
+//   ＝画面外では1秒も消費せず、見えたら 2.5秒で必ず外れる。
+//   standalone popup は prewarm が無いので従来どおり 5秒固定でよい。
+if (INLINE_MODE) {
+  armInlineShadeDeadlineOnFirstVisible();
+} else {
+  setTimeout(() => {
     dismissInitialLoadShade();
-  }
-}, 5000);
+  }, 5000);
+}
 
 // 最終安全網: initPopup や refresh が throw / 中断しても、window load 後に
 // 800ms（CSS の auto-reveal 後）で必ず cloak を外す。JS state に依らない

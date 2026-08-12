@@ -19,12 +19,28 @@
 //   ★拡張ページに足すスクリプトは必ず別ファイル(=self)にすること。
 //   検査: src/lib/extensionCspInlineScript.test.js が全 HTML のインライン script を禁じる。
 
+// ■ なぜ「外した」という印を残すのか(★v0.1.1381・会議 Q2)
+//   この保険は幕を外すが、本体(popup-entry.js)はそれを知らない。
+//   本体の ensurePopupPrimaryCloakedBeforeFirstReveal() は
+//   `popupPrimaryRevealDone` という【自分が外したか】のフラグしか見ないので、
+//   保険が外した後の refresh で幕を**付け直してしまう**。
+//   ＝知識(コメント)を共有しても誤読は止まらない。止まるのは【判定を共有したとき】だけ。
+//     [[shared-knowledge-is-not-shared-judgment-2026-08-10]]
+//   window に印を置くのは、この極小ファイルと本体バンドルが別スクリプト＝
+//   モジュール変数を共有できないため(両者が確実に見られる唯一の場所)。
+
 import { CLOAK_CSS_FAILSAFE_MS } from '../lib/sidepanelCloakDuration.js';
+import { CLOAK_FAILSAFE_FIRED_FLAG } from '../lib/cloakFailsafeMarker.js';
 
 try {
   setTimeout(() => {
     try {
       document.documentElement.removeAttribute('data-nl-popup-primary-cloak');
+      // ★印は removeAttribute の【後】に立てる(先に立てると、removeAttribute が
+      //   throw した場合に「外した」と嘘をつく=本体が幕を外れたものとして扱う)。
+      /** @type {{[k: string]: unknown}} */ (/** @type {unknown} */ (window))[
+        CLOAK_FAILSAFE_FIRED_FLAG
+      ] = true;
     } catch {
       /* no-op: 保険の失敗は本体を止めない */
     }

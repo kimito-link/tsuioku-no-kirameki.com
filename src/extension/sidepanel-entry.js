@@ -13,6 +13,7 @@ import {
   summarizeZeroAreaWindow
 } from '../lib/sidepanelSelfDiag.js';
 import { summarizeCloakDuration, summarizeContentBlindTime } from '../lib/sidepanelCloakDuration.js';
+import { summarizeEventLoopStall } from '../lib/eventLoopStallSummary.js';
 import { KEY_SIDEPANEL_SELF_DIAG } from '../lib/sidepanelSelfDiagKey.js';
 
 /**
@@ -86,7 +87,9 @@ let _samples = 0;
  *   従来は最後の1点(nowSample)しか残らず、「窓が 0x0 だったのは何msか」が消えていた。
  *   ユーザー証言「でる瞬間黒いが見える感じ」の裏取りに継続時間が要る:
  *     60ms → 人間に見えない = 黒の正体は別 / 800ms → これが見えている黒。
- * @type {{ t: number, w: number, h: number, iw: number, ih: number }[]}
+ * ★v0.1.1381: sched(予定時刻)を追加。実発火 t との差が「イベントループが止まっていた長さ」。
+ *   予定を持たない点(load/visible/reload)は null＝遅延を計算しない。
+ * @type {{ t: number, sched: number|null, w: number, h: number, iw: number, ih: number }[]}
  */
 const _sizeSeries = [];
 /**
@@ -216,8 +219,11 @@ function renderSelfDiagOverlay(v) {
 
 /**
  * @param {string} phase どの瞬間の測定か('load'=描画直後 / 'settled'=落ち着いた後)
+ * @param {number|null} [schedMs] この測定の【予定時刻】(起動からのms)。
+ *   タイマー格子の点だけが持つ。イベント起点(load/visible/reload)は予定が無いので null。
+ *   ★実発火時刻との差が「イベントループが止まっていた長さ」になる。
  */
-function collectAndPublish(phase) {
+function collectAndPublish(phase, schedMs = null) {
   try {
     const ifr = document.querySelector('iframe');
     const rect = ifr ? ifr.getBoundingClientRect() : null;
@@ -302,12 +308,20 @@ function collectAndPublish(phase) {
     // ★v0.1.1302: 窓/iframe サイズを系列として残す(継続時間を測る唯一の材料)。
     _sizeSeries.push({
       t: Math.max(0, Date.now() - _bootAt),
+      /*
+       * ★v0.1.1381: 予定時刻を残す(実発火 t との差=イベントループの停止時間)。
+       *   これが無かったせいで7版のあいだ「窓0x0が長い」としか読めず、
+       *   第一現象が【メインスレッド停止】であることに気づけなかった。
+       *   予定を持たない点(load/visible/reload)は null＝遅延を計算しない。
+       */
+      sched: Number.isFinite(Number(schedMs)) ? Math.max(0, Math.round(Number(schedMs))) : null,
       w: Math.max(0, Math.round(Number(sample.panelW) || 0)),
       h: Math.max(0, Math.round(Number(sample.panelH) || 0)),
       iw: Math.max(0, Math.round(Number(sample.iframe?.w) || 0)),
       ih: Math.max(0, Math.round(Number(sample.iframe?.h) || 0))
     });
     const zeroArea = summarizeZeroAreaWindow(_sizeSeries);
+    const stall = summarizeEventLoopStall(_sizeSeries);
     // ★v0.1.1307: 幕の観測列を積む(iframe を読めない間は測れないので記録しない=
     //   「読めない」を「外れている」と誤読しないため)。
     if (sample.inner) {
@@ -421,9 +435,25 @@ function collectAndPublish(phase) {
     const blindVerdictNote = blindTooLong
       ? ` 🔴この間ユーザーには中身が出ていません(${Math.round(blind.blindMs / 100) / 10}秒)`
       : '';
+    /*
+     * ★v0.1.1381: タイマー遅延を1項目足す(会議 Q1(b)・この版の中核)。
+     *
+     * ■ なぜこの1項目が要るか
+     *   黒画面に7版を費やして直らなかったのは、幕・シェード・窓0x0という【下流】を
+     *   直し続けていたから。第一現象は「メインスレッドが止まっていた」ことだった。
+     *   ★この行は次の一手を分岐させる: 遅延が小さいなら描画側を詰める価値があり、
+     *     大きいなら描画側をいくら直しても消えない(＝版を重ねない)。
+     *   [[stalled-event-loop-masquerades-as-paint-bug-2026-08-12]]
+     *
+     * ■ 常に出す(異常時だけにしない)
+     *   これは「異常の通知」ではなく【どちらのレジームで合否を判定するか】を決める値。
+     *   ✅のときに消えると、健全レジームだったことが速報から読めなくなる
+     *   ＝合否そのものが判定できない。
+     */
+    const stallNote = stall.observed > 0 ? ` / ${stall.line}` : '';
     const line = flashed
-      ? `${worst.verdict.line} ★出た直後だけ黒い(${worst.phase}時点で検知・今は${verdict.ok ? '正常' : '黒いまま'})${paintNote}${zeroNote}${cloakNote}${shadeNote}${blindNote}${blindVerdictNote}${lateNote}`
-      : `${verdict.line}${paintNote}${zeroNote}${cloakNote}${shadeNote}${blindNote}${blindVerdictNote}${lateNote}`;
+      ? `${worst.verdict.line} ★出た直後だけ黒い(${worst.phase}時点で検知・今は${verdict.ok ? '正常' : '黒いまま'})${paintNote}${zeroNote}${cloakNote}${shadeNote}${blindNote}${blindVerdictNote}${stallNote}${lateNote}`
+      : `${verdict.line}${paintNote}${zeroNote}${cloakNote}${shadeNote}${blindNote}${blindVerdictNote}${stallNote}${lateNote}`;
 
     /*
      * ★v0.1.1372: 判定結果を【このパネル自身の画面】に出す。
@@ -480,6 +510,12 @@ function collectAndPublish(phase) {
         // ★v0.1.1307: 幕の継続(居座る黒か・CSSで救えているか)。
         cloakDuration,
         cloakSeries: _cloakSeries,
+        /*
+         * ★v0.1.1381: イベントループの停止(=この版の合否をどちらのレジームで
+         *   判定するかを決める値)。stalled=true なら幕/シェードは下流なので、
+         *   黒が残っても「この版が外れ」とは呼ばない。
+         */
+        eventLoopStall: stall,
         // ★v0.1.1351: 30秒より後に黒くなった事実(null=起きていない)。
         //   起動直後の一瞬(flashed)とは別物として読むこと。
         lateBlack: _lateBlack,
@@ -521,7 +557,8 @@ const SAMPLE_AT_MS = [
   5000, 8000, 12000, 18000, 25000, 30000
 ];
 for (const ms of SAMPLE_AT_MS) {
-  setTimeout(() => collectAndPublish(ms === 0 ? 'immediate' : `t+${ms}ms`), ms);
+  // ★予定時刻(ms)を渡す=実発火との差でイベントループの停止を測る唯一の材料。
+  setTimeout(() => collectAndPublish(ms === 0 ? 'immediate' : `t+${ms}ms`, ms), ms);
 }
 // iframe の load 直後も1点(タイマー格子とズレた瞬間を拾う)。
 try {

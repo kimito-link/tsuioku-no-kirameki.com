@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 4 / 757 件
+## ⚠️ 役割コメントが無いソース 4 / 759 件
 - `src/lib/laneDomSelfMeasure.js`
 - `src/lib/reportPreviewPublish.js`
 - `src/lib/venueLaneBuckets.js`
@@ -687,7 +687,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (1645)
+- 📁 **src/** (1650)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -978,7 +978,7 @@
         - `logo_funlink_white_RGB_maru_black.png`
       - `logo_guide_funlink_ol.pdf`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1404)
+  - 📁 **lib/** (1409)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -1165,6 +1165,8 @@
     - `cleanNdgrChatRows.js` — NDGR チャット行の正規化純関数。
     - `cleanNdgrChatRows.test.js`
     - `cloakFailsafeContract.test.js`
+    - `cloakFailsafeMarker.js` — 外部保険(cloak-failsafe-entry.js)と本体(popup-entry.js)が
+    - `cloakFailsafeMarker.test.js`
     - `cloakRevealNotBehindLoad.wiring.test.js`
     - `colorSchemeMetaPresent.test.js`
     - `comeviewActions.js` — v0.1.666: コメビュのコメント単位アクション(わんコメ同等+追憶独自)の純ロジック。
@@ -1358,6 +1360,8 @@
     - `enrichmentAvatarFallback.test.js`
     - `errorAutoDiagnosis.js` — v0.1.205 Phase D: 既存の診断データ（consoleErrors / networkErrors / diagWarnings）から
     - `errorAutoDiagnosis.test.js`
+    - `eventLoopStallSummary.js` — 観測列の「予定時刻 vs 実発火時刻」から
+    - `eventLoopStallSummary.test.js`
     - `eventParticipationProgramsApi.js` — ニコ生「企画イベント参加番組一覧」公式 JSON API の URL 組立 & 正規化（純関数）。
     - `eventParticipationProgramsApi.test.js`
     - `eventRankingMarketingIntegration.test.js`
@@ -2021,6 +2025,7 @@
     - `sidePanelWatchTarget.js` — サイドパネルを「どの配信に紐づけるか」を決める純関数。
     - `sidePanelWatchTarget.test.js`
     - `sidepanelBlackScreen.wiring.test.js`
+    - `sidepanelBlackV8.wiring.test.js`
     - `sidepanelCloakDuration.js` — 幕(cloak)が「いつ外れたか / まだ残っているか」を要約する純関数。
     - `sidepanelCloakDuration.test.js`
     - `sidepanelCloakWiring.test.js`
