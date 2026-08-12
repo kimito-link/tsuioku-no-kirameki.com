@@ -146,9 +146,32 @@ export function venueSeatEntryToLaneItem(seatEntry, opts = {}) {
 }
 
 /**
- * v0.1.1138(2026-07-14 会場独自受け皿の撤去): 段(5段)には常に①と同じ判定基準を適用し、匿名系ID(a:等)と
+ * v0.1.1138(2026-07-14 会場独自受け皿の撤去): 段(5段)には常に①と同じ判定基準を適用し、
  *   uid 無しは段から除外する(会場独自の受け皿は持たない=①と完全に同じ顔ぶれだけを描く)。
  *   境界は【ID種別のみ】で機械判定(表示名は使わない=enrich後着で籍が揺れる churn 源を作らない)。
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * ★v0.1.1375: 【匿名系IDの除外を撤回】。会場が「りんくのみ」になる真因だった。
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * ■ ユーザー実機(2026-08-12)
+ *   「会場モードが りんくのみで こん太 たぬ姉が反映されてない」
+ *   速報の会場行も `link7 gift0 ad4 konta0 tanu332` と konta0 を示していた。
+ *
+ * ■ 真因: 旧実装は bucket に渡す【前】に匿名系IDを全除外していた。
+ *   ところが段の正本 `src/domain/lane/tier.js` は **匿名を必ず たぬ姉段(tier1)に置く**
+ *   のが契約(`matchesTanuPolicy` が最優先で評価される=たぬ姉段の存在理由そのもの)。
+ *   ＝会場だけが「たぬ姉段に入るはずの人」を消していたので、
+ *   たぬ姉段が空になり、結果として りんく段しか見えなかった。
+ *
+ * ■ なぜ「①と同じ」の意図に反していたか
+ *   ①POP(popup-entry.js:6957)は候補をそのまま bucketStoryUserLanePicks に渡し、
+ *   **匿名を除外していない**。つまり旧実装のこの行こそが【会場独自のルール】で、
+ *   コメントが掲げた「①と完全に同じ顔ぶれ」を自分で破っていた。
+ *   ★uid 無しの除外(tier=0)は正本と一致するので**維持**する。
+ *
+ * ★[[venue-equals-lane-same-layout]] / [[venue-mirror-is-the-primary-path-2026-08-01]]:
+ *   会場は①の鏡。①に無いフィルタを会場側に足すと必ず顔ぶれがズレる。
  *
  * @param {Array<{ seatIndex?: number, participant?: object, venueRank?: number }>} seatEntries
  * @param {{ maxTotal?: number, pickCtx?: { yukkuriSrc?: string, tvSrc?: string, anonymousIdenticonEnabled?: boolean } }} [opts]
@@ -163,12 +186,12 @@ export function bucketVenueLaneSeats(seatEntries, opts = {}) {
     .map((entry) => venueSeatEntryToLaneItem(entry, { pickCtx: opts.pickCtx }))
     .filter(Boolean)
     .sort(compareStoryUserLaneCandidates);
-  /** @param {any} it */
-  const isAnonymousEntry = (it) => {
-    const uid = String(it?.entry?.userId || '').trim();
-    return uid === '' || isAnonymousStyleNicoUserId(uid);
-  };
-  const laneCands = candidates.filter((it) => !isAnonymousEntry(it));
+  /*
+   * ★v0.1.1375: uid 無し【だけ】を落とす(匿名系IDは落とさない)。
+   *   uid 無しは正本 resolveLaneTier でも tier=0(候補除外)なので①と一致する。
+   *   匿名系IDは正本では tier=1(たぬ姉段)＝落としてはいけない。
+   */
+  const laneCands = candidates.filter((it) => String(it?.entry?.userId || '').trim() !== '');
   const b = bucketStoryUserLanePicks(laneCands, maxTotal);
   return { link: b.link, gift: [], ad: [], konta: b.konta, tanu: b.tanu };
 }
