@@ -46,6 +46,30 @@ sidepanel.html t+16ms〜3500ms すべて iframe が rgb(255,250,242) を塗っ�
 - 「中身が空(bodyの子要素0)」→ popup.html 自体が読めていない
 ★どれが出たかで次の一手が変わる。**v1367以前の速報の cloak 名指しは信用しない**(誤診断)。
 
+### ★★黒画面の真因を特定・根治(v1369)— 5件目にして再現できた
+
+**真因 = `about:blank` の隙間**。iframe は src が読まれる前に**about:blank の文書**として
+存在し、そこには popup.html の手当ても sidepanel.html の `<style>` も**届かない**。
+`color-scheme` が `normal` のまま＝OSダークだと Chrome がその文書のキャンバスを暗色で塗る。
+
+**実測(chrome-devtools・出荷ビルドを拡張として実ロード・dark・460x1000)**:
+```
+t+4〜8ms  url=about:blank  cs=normal  inlineStyle=NO  kids=0  ← ここが黒
+t+12ms〜  url=popup.html   cs=light   inlineStyle=yes
+```
+**直し**: iframe【要素】に `color-scheme: light` を1行(sidepanel.html)。
+★iframe 要素の `background:#fffaf2` は既にあったが、**要素の地であって
+中の文書のキャンバスはその上に合成される**ため救えなかった。ここが7版外し続けた理由。
+
+★**なぜ今まで見つからなかったか**: popup.html(v1289) と sidepanel.html(v1294/1316) は
+既に手当て済みで、**どちらの文書にも属さない隙間**だけが残っていた。さらに自己診断は
+`iframe.contentDocument` を読むので、この時間帯は「読めない/未レイアウト」に落ちて
+**構造的に観測から漏れていた**([[zero-count-may-mean-unmeasured-2026-08-04]] と同型)。
+
+★**測り方の教訓**: `file://` で popup.html を開く検証では**再現しなかった**。
+拡張として**実ロード**(`install_extension` → `chrome-extension://`)して初めて
+about:blank の隙間が現れた。**出荷ビルドを実ブラウザに拡張として読ませること**。
+
 ### ★未解決(次の一手)— サイドパネルの黒
 **ユーザー報告(スクショあり)「サイドパネルを出すタイミングで黒くなる」は未解決。**
 ★私は一度「残り660msは追わない」と言ったが、**スクショで撤回した**。理由:
