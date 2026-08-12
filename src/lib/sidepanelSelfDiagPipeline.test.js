@@ -118,7 +118,10 @@ describe('サイドパネル自己診断: storage → 状態速報 の通し', (
     });
 
     it('★late を観測したら ok=false になる(行と判定が食い違わない)', () => {
-      expect(panelSrc).toContain('ok: verdict.ok && !flashed && !_lateBlack');
+      // ★v0.1.1373: 判定式は overallOk に切り出した(表示と保存で同じ値を使うため)。
+      //   !_lateBlack が条件から落ちたら赤になるよう、式そのものを固定する。
+      expect(panelSrc).toContain('!_lateBlack && !blindTooLong');
+      expect(panelSrc).toMatch(/ok:\s*overallOk,/);
     });
 
     it('lateBlack が storage の payload に載る(画面止まりにしない)', () => {

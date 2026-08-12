@@ -680,7 +680,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (1638)
+- 📁 **src/** (1640)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -971,7 +971,7 @@
         - `logo_funlink_white_RGB_maru_black.png`
       - `logo_guide_funlink_ol.pdf`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1397)
+  - 📁 **lib/** (1399)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -1276,6 +1276,7 @@
     - `concurrentTimelineSeries.test.js`
     - `consoleErrorBuffer.js` — v0.1.201: window.error / unhandledrejection を捕捉する ring buffer。
     - `consoleErrorBuffer.test.js`
+    - `contentBlindTime.wiring.test.js`
     - `contentViewerNicoadCelebration.js` — watch ページ（content）上で、自分のニコニ広告を DOM から即検知して演出する。
     - `contentVisibilityHitTest.wiring.test.js`
     - `copyTextWithFallback.js` — テキストを「確実に」クリップボードへ入れるためのフォールバック付きコピー。
@@ -2016,6 +2017,7 @@
     - `sidepanelSelfDiag.js` — sidepanelSelfDiag — サイドパネルが「自分がいま黒くないか」を自己申告するための純ロジック。
     - `sidepanelSelfDiag.test.js`
     - `sidepanelSelfDiagKey.js` — サイドパネル自己診断の storage キー。
+    - `sidepanelSelfDiagOverlay.wiring.test.js`
     - `sidepanelSelfDiagPipeline.test.js`
     - `sidepanelThemeColorParity.test.js`
     - `sidepanelVisibilityCatchup.wiring.test.js`

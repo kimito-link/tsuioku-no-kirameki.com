@@ -129,7 +129,13 @@
         background: linear-gradient(180deg, var(--nl-bg, #f6fff8), var(--nl-bg-soft, #eef9f3));
         transition: opacity 220ms ease-out;
         will-change: opacity;
-        animation: nl-init-shade-css-failsafe 15s ease-out forwards;
+        /*
+         * ★v0.1.1373: 15s → 5s。JS 側の上限(INLINE_SHADE_DATA_FALLBACK_MS=2.5s)より後だが、
+         *   「JS が完全に止まった場合」の最後の保険なので少し余裕を持たせる。
+         *   ★旧 15s は、実機で「中身が見えなかった合計=12.7秒」を許してしまう長さだった
+         *   (storage 飽和時は JS 側の解除も遅れるため、この保険が体感時間を決めていた)。
+         */
+        animation: nl-init-shade-css-failsafe 5s ease-out forwards;
       }
       .nl-init-shade__face {
         width: clamp(56px, 14vw, 72px);
