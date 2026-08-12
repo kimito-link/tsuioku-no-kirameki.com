@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1364',
+    date: '2026-08-12',
+    summary: 'feat(diag): 中身を覆う幕をもう一枚測る',
+    items: Object.freeze([
+      'サイドパネルの中身が出ないとき、その原因になりうる読み込み中の覆い(最大15秒)を状態速報に出すようにしました。これまで観測しておらず、原因の切り分けができませんでした。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1363',
     date: '2026-08-12',
     summary: 'fix(lane): 応援レーンが全員そろわないのを直す',

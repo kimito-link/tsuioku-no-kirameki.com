@@ -142,6 +142,48 @@ describe('サイドパネル自己診断: storage → 状態速報 の通し', (
     });
   });
 
+  /*
+   * ★v0.1.1364(ユーザー実機 2026-08-12・パネルが全面暗いまま中身が出ない)
+   *   自己診断は【幕(cloak)】だけを見ており、初回ロードシェード
+   *   (nlInitialLoadShade)を1度も観測していなかった。
+   *   ところが画面を覆う時間はシェードの方が長い:
+   *     JS=実データが乗るまで最大10秒 / CSSの保険=15秒
+   *   ＝「開いているのに中身が出ない」の主因になりうるのに速報に1文字も出ていなかった。
+   *   ★計器の無い欠落は永久に出ない。
+   */
+  describe('★初回シェードの観測(幕より長く中身を覆う)', () => {
+    const panelSrc = fs.readFileSync(
+      path.resolve(__dirname, '../extension/sidepanel-entry.js'),
+      'utf8'
+    );
+
+    it('シェード要素を観測している', () => {
+      expect(panelSrc).toContain('nlInitialLoadShade');
+    });
+
+    it('★覆っている/フェード中/完了 を区別する(見えていない状態を覆っていると誤報しない)', () => {
+      expect(panelSrc).toContain("'covering'");
+      expect(panelSrc).toContain("'fading'");
+      expect(panelSrc).toContain("'done'");
+      // opacity がほぼ0なら覆っていない扱いにしていること。
+      expect(panelSrc).toMatch(/opacity\)\s*<\s*0\.05/);
+    });
+
+    it('覆っていた最後の時刻を残す(継続時間が読める)', () => {
+      expect(panelSrc).toContain('_shadeCoveringLastT');
+      expect(panelSrc).toContain('shadeCoveringLastT:');
+    });
+
+    it('★行に出す(画面止まりにしない)', () => {
+      expect(panelSrc).toContain('初回シェード');
+      expect(panelSrc).toContain('${shadeNote}');
+    });
+
+    it('一度も覆っていなければ注記を出さない(正常時のノイズにしない)', () => {
+      expect(panelSrc).toMatch(/_shadeCoveringLastT >= 0[\s\S]{0,200}?:\s*''/);
+    });
+  });
+
   it('自己診断が無い(サイドパネル未使用)なら行を出さない=通常時のノイズにしない', () => {
     const out = buildAiShareFullText({
       overviewText: 'x',

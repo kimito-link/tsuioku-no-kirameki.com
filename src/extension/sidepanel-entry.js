@@ -98,6 +98,10 @@ const _sizeSeries = [];
  * @type {{ t: number, cloak: string }[]}
  */
 const _cloakSeries = [];
+/** ★v0.1.1364: 初回シェードが覆っていた最後の時刻[ms](-1=一度も覆っていない)。 */
+let _shadeCoveringLastT = -1;
+/** ★v0.1.1364: シェードが覆っている状態を観測した回数。 */
+let _shadeCoveringSamples = 0;
 /** パネルが開いた時刻(系列の t=0 基準)。 */
 const _bootAt = Date.now();
 
@@ -148,7 +152,38 @@ function collectAndPublish(phase) {
             cloak:
               innerDoc && innerDoc.documentElement
                 ? innerDoc.documentElement.getAttribute('data-nl-popup-primary-cloak') || ''
-                : ''
+                : '',
+            /*
+             * ★v0.1.1364: 初回ロードシェード(nlInitialLoadShade)を観測する。
+             *
+             * ■ なぜこれが盲点だったか(2026-08-12 ユーザー実機)
+             *   自己診断は【幕(cloak)】だけを見ており、シェードを1度も見ていなかった。
+             *   ところが画面を覆っている時間はシェードの方が長い:
+             *     - JS: 実データが乗るまで最大 10秒(INLINE_SHADE_DATA_FALLBACK_MS)
+             *     - CSS の保険: 15秒
+             *   ＝「パネルが開いているのに中身が出ない」の主因になりうるのに、
+             *   速報には1文字も出ていなかった(計器の無い欠落は永久に出ない)。
+             *   ★シェード自体はクリーム色なので「黒」ではない。だが中身を隠す時間は
+             *     幕より長いので、黒/空の切り分けにはこの観測が要る。
+             */
+            shade: (() => {
+              try {
+                const el = innerDoc && innerDoc.getElementById
+                  ? innerDoc.getElementById('nlInitialLoadShade')
+                  : null;
+                if (!el) return 'none';
+                if (el.classList && el.classList.contains('nl-init-shade--done')) return 'done';
+                const cs = innerDoc.defaultView
+                  ? innerDoc.defaultView.getComputedStyle(el)
+                  : null;
+                if (!cs) return 'unknown';
+                if (cs.display === 'none') return 'hidden';
+                // opacity が 0 に近ければ実質見えていない(フェード中)。
+                return Number(cs.opacity) < 0.05 ? 'fading' : 'covering';
+              } catch {
+                return 'unknown';
+              }
+            })()
           }
         : null
     };
@@ -171,6 +206,11 @@ function collectAndPublish(phase) {
         t: Math.max(0, Date.now() - _bootAt),
         cloak: String(sample.inner.cloak || '')
       });
+      // ★v0.1.1364: シェードが覆っていた最後の時刻を残す(幕より長く中身を隠す)。
+      if (String(sample.inner.shade || '') === 'covering') {
+        _shadeCoveringLastT = Math.max(0, Date.now() - _bootAt);
+        _shadeCoveringSamples += 1;
+      }
     }
     const cloakDuration = summarizeCloakDuration(_cloakSeries);
     /*
@@ -230,12 +270,21 @@ function collectAndPublish(phase) {
      *   (画面にしか出ない情報は報告に乗らない=無いのと同じ)。
      *   起動からの経過を秒で併記する=「開いた直後の話ではない」ことが一目で分かる。
      */
+    /*
+     * ★v0.1.1364: シェードが中身を覆っていた時間を出す。
+     *   幕(cloak)は数百ms〜1.5秒だが、シェードは実データが乗るまで最大10秒(CSS保険15秒)
+     *   覆い続ける。「パネルは開いているのに中身が出ない」の主因になりうるのに、
+     *   これまで速報に1文字も出ていなかった=計器の無い欠落は永久に出ない。
+     */
+    const shadeNote = _shadeCoveringLastT >= 0
+      ? ` / 初回シェード t+${_shadeCoveringLastT}ms まで中身を覆っていた(観測${_shadeCoveringSamples}点)`
+      : '';
     const lateNote = _lateBlack
       ? ` / ★あとから黒くなった(起動${Math.round(_lateBlack.sinceBootMs / 1000)}秒後の${_lateBlack.phase}で検知・${_lateBlack.count}回・原因=${_lateBlack.verdict.cause || '不明'})`
       : '';
     const line = flashed
-      ? `${worst.verdict.line} ★出た直後だけ黒い(${worst.phase}時点で検知・今は${verdict.ok ? '正常' : '黒いまま'})${paintNote}${zeroNote}${cloakNote}${lateNote}`
-      : `${verdict.line}${paintNote}${zeroNote}${cloakNote}${lateNote}`;
+      ? `${worst.verdict.line} ★出た直後だけ黒い(${worst.phase}時点で検知・今は${verdict.ok ? '正常' : '黒いまま'})${paintNote}${zeroNote}${cloakNote}${shadeNote}${lateNote}`
+      : `${verdict.line}${paintNote}${zeroNote}${cloakNote}${shadeNote}${lateNote}`;
 
     void chrome?.storage?.local?.set({
       [KEY_SIDEPANEL_SELF_DIAG]: {
@@ -260,6 +309,9 @@ function collectAndPublish(phase) {
         // ★v0.1.1351: 30秒より後に黒くなった事実(null=起きていない)。
         //   起動直後の一瞬(flashed)とは別物として読むこと。
         lateBlack: _lateBlack,
+        // ★v0.1.1364: 初回シェードが中身を覆っていた最後の時刻(-1=覆っていない)。
+        shadeCoveringLastT: _shadeCoveringLastT,
+        shadeCoveringSamples: _shadeCoveringSamples,
         // 黒かった瞬間の生値を残す(原因の裏取り用)。無ければ今の値。
         sample: flashed ? worst.sample : sample,
         nowSample: sample
