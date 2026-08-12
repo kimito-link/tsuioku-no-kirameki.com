@@ -64,42 +64,45 @@ describe('幕(cloak)の CSS 実値と計器の名乗りが一致する', () => {
  *   ＝「400ms後に外す」ではなく「バンドルを読み終えてから400ms後に外す」だった。
  *   ★タイマーの値だけ見て「400msで外れる」と信じてはいけない(起点を見る)。
  */
-describe('★幕の保険はバンドル読み込みに依存しない(head の同期スクリプト)', () => {
-  it('head 内に幕を外す同期スクリプトがある', () => {
+describe('★幕の保険はバンドル読み込みに依存しない(popup.js より前の極小ファイル)', () => {
+  /*
+   * ★v0.1.1354: インライン <script> から**別ファイル**へ変更した。
+   *   v1353 でインラインに書いたら拡張CSP(script-src 'self')でブロックされ、
+   *   保険が一度も実行されなかった(実機の chrome://extensions エラーで判明)。
+   *   CSP 違反そのものの検査は extensionCspInlineScript.test.js が全HTMLに掛ける。
+   *   ここでは「順序」と「実体がビルドされること」を見る。
+   */
+  it('head 内で dist/cloak-failsafe.js を読んでいる', () => {
     const headEnd = popupHtml.indexOf('</head>');
     expect(headEnd).toBeGreaterThan(0);
-    const head = popupHtml.slice(0, headEnd);
-    expect(head).toContain("removeAttribute('data-nl-popup-primary-cloak')");
+    expect(popupHtml.slice(0, headEnd)).toContain('<script src="dist/cloak-failsafe.js"></script>');
   });
 
   it('★その保険は dist/popup.js より【前】にある(後ろだと起点が遅れる=無意味)', () => {
-    // ★同じ文字列は popup-entry.js 側にもあるので、head 内に限って探す
-    //   (indexOf を素で使うと別の出現を掴んで恒真/恒偽になる)。
-    const headEnd = popupHtml.indexOf('</head>');
-    const failsafeIdx = popupHtml.indexOf('var CLOAK_FAILSAFE_MS');
-    // ★実際の <script src> タグを探す。'dist/popup.js' を素で探すと
+    // ★実際の <script src> タグで探す。'dist/popup.js' を素で探すと
     //   コメント中の言及を掴んでしまい、順序判定が嘘になる(この検査自身が1回踏んだ)。
+    const failsafeIdx = popupHtml.indexOf('<script src="dist/cloak-failsafe.js"');
     const bundleIdx = popupHtml.indexOf('<script src="dist/popup.js"');
     expect(failsafeIdx).toBeGreaterThan(0);
     expect(bundleIdx).toBeGreaterThan(0);
-    expect(failsafeIdx).toBeLessThan(headEnd);
     expect(failsafeIdx).toBeLessThan(bundleIdx);
   });
 
-  it('インライン保険の遅延は CLOAK_CSS_FAILSAFE_MS と同値', () => {
-    const m = popupHtml.match(/var CLOAK_FAILSAFE_MS = (\d+);/);
-    expect(m, 'インライン保険の定数が見つからない').toBeTruthy();
-    expect(Number(m[1])).toBe(CLOAK_CSS_FAILSAFE_MS);
+  it('保険は遅延の正本を import する=数字を直書きしない', () => {
+    const entry = fs.readFileSync(
+      path.resolve(__dirname, '../extension/cloak-failsafe-entry.js'),
+      'utf8'
+    );
+    expect(entry).toContain("import { CLOAK_CSS_FAILSAFE_MS } from '../lib/sidepanelCloakDuration.js'");
+    expect(entry).toContain('}, CLOAK_CSS_FAILSAFE_MS);');
+    expect(CLOAK_CSS_FAILSAFE_MS).toBeGreaterThan(0);
   });
 
-  it('★保険は defer/async でない(同期実行=起点が t≈0 になる)', () => {
-    const headEnd = popupHtml.indexOf('</head>');
-    const head = popupHtml.slice(0, headEnd);
-    const scriptIdx = head.lastIndexOf('<script', head.indexOf('CLOAK_FAILSAFE_MS'));
-    const tag = head.slice(scriptIdx, head.indexOf('>', scriptIdx) + 1);
+  it('★保険は defer/async でない(起点を遅らせない)', () => {
+    const idx = popupHtml.indexOf('<script src="dist/cloak-failsafe.js"');
+    const tag = popupHtml.slice(idx, popupHtml.indexOf('>', idx) + 1);
     expect(tag).not.toContain('defer');
     expect(tag).not.toContain('async');
-    expect(tag).not.toContain('src=');
   });
 });
 
