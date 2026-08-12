@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1355',
+    date: '2026-08-12',
+    summary: 'feat(diag): アイコンが減ったことを検知',
+    items: Object.freeze([
+      '応援レーンのアイコンが途中で減ったとき、状態速報が「増え続けていない」と何枚減ったかを出すようにしました。これまでは減ったまま戻らないと「正常」と表示されていました。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1354',
     date: '2026-08-12',
     summary: 'fix(panel): 前版のエラーを直し検査を追加',
