@@ -19288,6 +19288,49 @@ const schedulePopupDiagAutoPublish = createPopupDiagAutoPublisher(
  * - 失敗してもユーザー操作を妨げない（try/catch で握り潰し）
  * - chrome.storage.local 権限がない環境（テスト等）では noop
  */
+/**
+ * ★v0.1.1382: migration が読むのは `nls_comments_lv*` だけなので、
+ *   **全 storage を読まずにそのキーだけ**を取る。
+ *
+ * ■ なぜ(2026-08-12 実測・chrome-devtools で出荷ビルドを計測)
+ *     get(null) 全件読み(20.7MB) = 1,157ms   ← これを4本が別々に叩いていた
+ *     getKeys() キー名だけ       =    81ms   ← 14倍軽い
+ *   拡張の全ページは同一メインスレッドを共有するので、パネルの初期化で撃つ全件読みは
+ *   そのまま黒画面・診断ページの固まりとして出る
+ *   ([[stalled-event-loop-masquerades-as-paint-bug-2026-08-12]])。
+ *
+ * ■ これは新しい発明ではない
+ *   `content-entry.js` の `readPrunableStorageBagCheap()`(v0.1.419)が同じ手順を
+ *   既に実装しており、記録エンジン側では解決済みだった。popup 側だけ取り残されていた
+ *   ＝既存資産の横展開(作り直さず薄く束ねる)。
+ *
+ * ★getKeys() は Chrome 130+。無い/失敗した環境では従来どおり全件読みに倒す
+ *   (挙動は不変・重いだけ)。fallback は content 側と同じ形に揃える。
+ *
+ * @param {{ get: (k: any) => Promise<Record<string, any>>, getKeys?: () => Promise<string[]> }} local
+ * @returns {Promise<Record<string, any>>} `nls_comments_lv*` だけを含む bag
+ */
+async function readCommentBagForMigrationCheap(local) {
+  /** @type {string[]} */
+  let allKeys = [];
+  if (typeof (/** @type {any} */ (local).getKeys) === 'function') {
+    try {
+      allKeys = await (/** @type {any} */ (local).getKeys());
+    } catch {
+      allKeys = [];
+    }
+  }
+  if (!allKeys || allKeys.length === 0) {
+    // fallback(旧 Chrome / getKeys 失敗): 従来どおり全部読む。
+    const all = await local.get(null);
+    return all && typeof all === 'object' ? all : {};
+  }
+  const wanted = allKeys.filter((k) => String(k).startsWith('nls_comments_lv'));
+  if (wanted.length === 0) return {};
+  const bag = await local.get(wanted);
+  return bag && typeof bag === 'object' ? bag : {};
+}
+
 const KEY_BACKFILL_REMOVE_GIFT_SYSTEM_MSGS_DONE = 'nls_backfill_remove_gift_system_msgs_v1';
 async function runOneTimeBackfillRemoveGiftSystemMessages() {
   const local = globalThis.chrome?.storage?.local;
@@ -19296,7 +19339,7 @@ async function runOneTimeBackfillRemoveGiftSystemMessages() {
     const flagBag = await local.get(KEY_BACKFILL_REMOVE_GIFT_SYSTEM_MSGS_DONE);
     if (flagBag?.[KEY_BACKFILL_REMOVE_GIFT_SYSTEM_MSGS_DONE]) return;
 
-    const all = await local.get(null);
+    const all = await readCommentBagForMigrationCheap(local);
     let totalRemoved = 0;
     /** @type {Record<string, unknown>} */
     const updates = {};
@@ -19351,7 +19394,7 @@ async function runOneTimeBackfillRemoveRecommendedLivePollution() {
     const flagBag = await local.get(KEY_BACKFILL_REMOVE_RECOMMENDED_LIVE_POLLUTION_DONE);
     if (flagBag?.[KEY_BACKFILL_REMOVE_RECOMMENDED_LIVE_POLLUTION_DONE]) return;
 
-    const all = await local.get(null);
+    const all = await readCommentBagForMigrationCheap(local);
     let totalRemoved = 0;
     /** @type {Record<string, unknown>} */
     const updates = {};
@@ -19397,7 +19440,7 @@ async function runOneTimeBackfillRemoveRecommendedLivePollutionV2() {
     const flagBag = await local.get(KEY_BACKFILL_REMOVE_RECOMMENDED_LIVE_POLLUTION_V2_DONE);
     if (flagBag?.[KEY_BACKFILL_REMOVE_RECOMMENDED_LIVE_POLLUTION_V2_DONE]) return;
 
-    const all = await local.get(null);
+    const all = await readCommentBagForMigrationCheap(local);
     let totalRemoved = 0;
     /** @type {Record<string, unknown>} */
     const updates = {};
@@ -19444,7 +19487,7 @@ async function runOneTimeBackfillRemoveRecommendedUserChipPollution() {
     );
     if (flagBag?.[KEY_BACKFILL_REMOVE_RECOMMENDED_USER_CHIP_POLLUTION_V1_DONE]) return;
 
-    const all = await local.get(null);
+    const all = await readCommentBagForMigrationCheap(local);
     let totalRemoved = 0;
     /** @type {Record<string, unknown>} */
     const updates = {};

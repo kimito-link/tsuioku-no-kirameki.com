@@ -463,6 +463,7 @@
 | `src/lib/commentTimelineReport.js` | 1 | 状態速報ページ |
 | `src/lib/commentVelocityTimeline.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/commentVelocityWindow.js` | 1 | ポップアップ(応援レーン) |
+| `src/lib/commentWriteModeDiagKey.js` | 1 | 記録エンジン(watchページ常駐) |
 | `src/lib/completenessScore.js` | 1 | 状態速報ページ |
 | `src/lib/concurrentCalibrationFit.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/concurrentPeakAnalysis.js` | 1 | ポップアップ(応援レーン) |

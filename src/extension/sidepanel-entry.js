@@ -14,6 +14,8 @@ import {
 } from '../lib/sidepanelSelfDiag.js';
 import { summarizeCloakDuration, summarizeContentBlindTime } from '../lib/sidepanelCloakDuration.js';
 import { summarizeEventLoopStall } from '../lib/eventLoopStallSummary.js';
+import { buildCommentWriteModeDiagLine } from '../lib/commentWriteModeDiag.js';
+import { KEY_COMMENT_WRITE_MODE_DIAG } from '../lib/commentWriteModeDiagKey.js';
 import { KEY_SIDEPANEL_SELF_DIAG } from '../lib/sidepanelSelfDiagKey.js';
 
 /**
@@ -92,6 +94,12 @@ let _samples = 0;
  * @type {{ t: number, sched: number|null, w: number, h: number, iw: number, ih: number }[]}
  */
 const _sizeSeries = [];
+/**
+ * ★v0.1.1382: コメント書き込みモードの最新観測値(記録エンジンが書く)。
+ *   非同期で読むので、読めるまでは null=「未観測」として扱う(「正常」とは言わない)。
+ * @type {import('../lib/commentWriteModeDiag.js').CommentWriteModeDiag|null}
+ */
+let _commentWriteModeDiag = null;
 /**
  * ★v0.1.1307: 幕(cloak)の観測列。
  *   2026-08-10 実機のスクショは【配信5時間45分経過】で真っ黒だった=黒は居座っている。
@@ -224,6 +232,9 @@ function renderSelfDiagOverlay(v) {
  *   ★実発火時刻との差が「イベントループが止まっていた長さ」になる。
  */
 function collectAndPublish(phase, schedMs = null) {
+  // ★v0.1.1382: 測るたびに最新値を取りに行く(記録中は値が動く)。
+  //   await しない=この読みが遅くても観測そのものは止まらない。
+  refreshCommentWriteModeDiag();
   try {
     const ifr = document.querySelector('iframe');
     const rect = ifr ? ifr.getBoundingClientRect() : null;
@@ -451,9 +462,26 @@ function collectAndPublish(phase, schedMs = null) {
      *   ＝合否そのものが判定できない。
      */
     const stallNote = stall.observed > 0 ? ` / ${stall.line}` : '';
+    /*
+     * ★v0.1.1382: 記録エンジンの書き込みモードを【パネル自身の速報行】に混ぜる。
+     *
+     * ■ なぜパネル側に出すのか(status に出すだけでは足りない)
+     *   現症状は「パネルが黒く、**状態速報ページも開かない**」。
+     *   status にしか出さない情報は、status を開けない人には無いのと同じ
+     *   ([[symptom-owner-must-be-told-2026-08-12]]・2回言われて2回忘れた宿題)。
+     *
+     * ■ なぜこれが要るのか(会議で「真犯人が計器の死角にいる」と確定)
+     *   chunkMode=false の配信は畳み込みのたびに巨大配列を丸ごと書き戻す
+     *   (実測: 停止410ms vs チャンク63ms=6.8倍)。同一メインスレッドなので
+     *   その重さがそのままパネルの凍結として出る。
+     *   ★それなのに chunkMode の状態は速報に1文字も出ていなかった。
+     */
+    const writeMode = buildCommentWriteModeDiagLine(_commentWriteModeDiag, Date.now());
+    // ★未観測(⚪)のときは行に出さない=「測っていない」を「正常」と誤読させない。
+    const writeModeNote = _commentWriteModeDiag ? ` / ${writeMode.line}` : '';
     const line = flashed
-      ? `${worst.verdict.line} ★出た直後だけ黒い(${worst.phase}時点で検知・今は${verdict.ok ? '正常' : '黒いまま'})${paintNote}${zeroNote}${cloakNote}${shadeNote}${blindNote}${blindVerdictNote}${stallNote}${lateNote}`
-      : `${verdict.line}${paintNote}${zeroNote}${cloakNote}${shadeNote}${blindNote}${blindVerdictNote}${stallNote}${lateNote}`;
+      ? `${worst.verdict.line} ★出た直後だけ黒い(${worst.phase}時点で検知・今は${verdict.ok ? '正常' : '黒いまま'})${paintNote}${zeroNote}${cloakNote}${shadeNote}${blindNote}${blindVerdictNote}${stallNote}${writeModeNote}${lateNote}`
+      : `${verdict.line}${paintNote}${zeroNote}${cloakNote}${shadeNote}${blindNote}${blindVerdictNote}${stallNote}${writeModeNote}${lateNote}`;
 
     /*
      * ★v0.1.1372: 判定結果を【このパネル自身の画面】に出す。
@@ -516,6 +544,11 @@ function collectAndPublish(phase, schedMs = null) {
          *   黒が残っても「この版が外れ」とは呼ばない。
          */
         eventLoopStall: stall,
+        /*
+         * ★v0.1.1382: 記録エンジンの書き込みモード(真犯人候補)。
+         *   whole=巨大配列の丸ごと書き戻し＝O(N)。chunk=追記だけ＝件数非依存。
+         */
+        commentWriteMode: _commentWriteModeDiag,
         // ★v0.1.1351: 30秒より後に黒くなった事実(null=起きていない)。
         //   起動直後の一瞬(flashed)とは別物として読むこと。
         lateBlack: _lateBlack,
@@ -595,6 +628,35 @@ try {
  *   _worst は「起動直後の一瞬の黒」を保持するための箱で、これに late の黒を混ぜると
  *   区別が消える(「出た直後だけ黒い」と誤って表示される)。別の箱に分けて記録する。
  */
+/*
+ * ★v0.1.1382: 記録エンジンが書いた「コメント書き込みモード」を定期的に読む。
+ *
+ * ■ 掟(過去に踏んだ地雷を避ける)
+ *   1. **1キーだけ**読む(`get([1キー])`=数ms)。全件読みは絶対にしない
+ *      ＝この計器自身が症状(スレッド凍結)の原因になっては本末転倒。
+ *   2. **await を boot の直列経路に置かない**(fire-and-forget)。
+ *      [[unbounded-await-at-boot-makes-page-blank-2026-08-12]]:
+ *      boot の無界awaitは1箇所でもページを永久に白紙にする。
+ *   3. 失敗しても黙って諦める(値は null のまま=「未観測」と正しく表示される)。
+ */
+function refreshCommentWriteModeDiag() {
+  try {
+    const p = chrome?.storage?.local?.get?.(KEY_COMMENT_WRITE_MODE_DIAG);
+    if (!p || typeof p.then !== 'function') return;
+    p.then((bag) => {
+      const v = bag && bag[KEY_COMMENT_WRITE_MODE_DIAG];
+      if (v && typeof v === 'object') _commentWriteModeDiag = v;
+    }).catch(() => {
+      /* no-op: 読めなければ未観測のまま(嘘の✅を出さない) */
+    });
+  } catch {
+    /* no-op */
+  }
+}
+
+// 初回 + 以後は観測のたびに更新する(記録中は値が動くので最新を出す)。
+refreshCommentWriteModeDiag();
+
 const LATE_PROBE_INTERVAL_MS = 30000;
 
 try {

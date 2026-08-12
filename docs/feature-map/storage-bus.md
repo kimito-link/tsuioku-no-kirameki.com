@@ -14,6 +14,7 @@
 > それでも **今回の broadcaster バグのような「経路がそもそも無い」断線はここに出る**。
 > 1件ずつ実コードで確認すること(将来は `verify:map` で機械判定する=会議 Q4)。
 
+- 🟠 **KEY_COMMENT_WRITE_MODE_DIAG** — 書く人だけ（読む経路が無い疑い）: src/extension/content-entry.js
 - 🟠 **KEY_PAINT_PERF_RING_V1** — 書く人だけ（読む経路が無い疑い）: src/extension/popup-entry.js
 - 🟠 **KEY_SCORE_ANNOUNCE_DIAG** — 書く人だけ（読む経路が無い疑い）: src/extension/popup-entry.js
 - 🟠 **KEY_SW_PROGRESS** — 書く人だけ（読む経路が無い疑い）: src/extension/backfill-sw-entry.js
@@ -101,6 +102,7 @@
 | `KEY_COMMENT_PANEL_STATUS` | extension/content-entry.js | extension/popup-entry.js |
 | `KEY_COMMENT_POST_DIAG` | extension/popup-entry.js | extension/status-entry.js |
 | `KEY_COMMENT_TIMELINE_MIRROR` | extension/content-entry.js | extension/popup-entry.js<br>extension/status-entry.js |
+| `KEY_COMMENT_WRITE_MODE_DIAG` | extension/content-entry.js | — |
 | `KEY_CONCURRENT_CALIBRATION_RING_V1` | extension/content-entry.js<br>extension/popup-entry.js | extension/content-entry.js<br>extension/popup-entry.js |
 | `KEY_CUSTOM_SOUND_REV` | — | extension/status-entry.js |
 | `KEY_DEEP_HARVEST_QUIET_UI` | — | extension/content-entry.js<br>extension/popup-entry.js |
