@@ -266,6 +266,7 @@
 | `src/lib/commentTickerNameLink.js` | 2 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) |
 | `src/lib/concurrentCalibrationLog.js` | 2 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) |
 | `src/lib/concurrentEstimate.js` | 2 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) |
+| `src/lib/consoleErrorBuffer.js` | 2 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) |
 | `src/lib/crowdRasterizer.js` | 2 | 記録エンジン(watchページ常駐) / 会場モード(standalone) |
 | `src/lib/diagFlushThrottle.js` | 2 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) |
 | `src/lib/diagSchemaCopy.js` | 2 | ポップアップ(応援レーン) / 状態速報ページ |
@@ -466,7 +467,6 @@
 | `src/lib/concurrentPeakAnalysis.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/concurrentResolvedFromSnapshot.js` | 1 | 記録エンジン(watchページ常駐) |
 | `src/lib/concurrentTimelineSeries.js` | 1 | ポップアップ(応援レーン) |
-| `src/lib/consoleErrorBuffer.js` | 1 | 記録エンジン(watchページ常駐) |
 | `src/lib/contentViewerNicoadCelebration.js` | 1 | 記録エンジン(watchページ常駐) |
 | `src/lib/copyTextWithFallback.js` | 1 | 状態速報ページ |
 | `src/lib/customSoundDiag.js` | 1 | 状態速報ページ |
@@ -660,6 +660,7 @@
 | `src/lib/popupDiagAutoPublish.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/popupDiagUptimeNote.js` | 1 | 状態速報ページ |
 | `src/lib/popupEntryPendingSelfPost.js` | 1 | ポップアップ(応援レーン) |
+| `src/lib/popupErrorLine.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/popupFrameCodec.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/popupFramePresets.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/popupMainScrollDefer.js` | 1 | ポップアップ(応援レーン) |

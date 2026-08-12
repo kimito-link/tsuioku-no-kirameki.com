@@ -26,6 +26,16 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1377',
+    date: '2026-08-12',
+    summary: '不具合が起きたとき状態速報に記録が残るように',
+    items: Object.freeze([
+      'パネル内でエラーが起きたとき、状態速報にその内容が出るようになりました。これまでは何も残らず、起きたこと自体が分かりませんでした。',
+      'エラーが無いときは「0件（観測中）」と出ます。異常が無いのか、そもそも見ていないのかを区別できます。',
+      '広告ブロック等が原因の無害なものは別に数え、実害のあるエラーだけを表示します。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1376',
     date: '2026-08-12',
     summary: 'たぬ姉段がぎっしり並んで見にくいのを改善',

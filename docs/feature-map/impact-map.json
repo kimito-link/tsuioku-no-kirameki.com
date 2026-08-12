@@ -2064,6 +2064,18 @@
       ]
     },
     {
+      "file": "src/lib/consoleErrorBuffer.js",
+      "featureCount": 2,
+      "features": [
+        "content",
+        "popup"
+      ],
+      "labels": [
+        "記録エンジン(watchページ常駐)",
+        "ポップアップ(応援レーン)"
+      ]
+    },
+    {
       "file": "src/lib/crowdRasterizer.js",
       "featureCount": 2,
       "features": [
@@ -4260,16 +4272,6 @@
       ]
     },
     {
-      "file": "src/lib/consoleErrorBuffer.js",
-      "featureCount": 1,
-      "features": [
-        "content"
-      ],
-      "labels": [
-        "記録エンジン(watchページ常駐)"
-      ]
-    },
-    {
       "file": "src/lib/contentViewerNicoadCelebration.js",
       "featureCount": 1,
       "features": [
@@ -6191,6 +6193,16 @@
     },
     {
       "file": "src/lib/popupEntryPendingSelfPost.js",
+      "featureCount": 1,
+      "features": [
+        "popup"
+      ],
+      "labels": [
+        "ポップアップ(応援レーン)"
+      ]
+    },
+    {
+      "file": "src/lib/popupErrorLine.js",
       "featureCount": 1,
       "features": [
         "popup"

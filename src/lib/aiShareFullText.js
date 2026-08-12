@@ -591,6 +591,16 @@ export function buildAiShareFullText({ overviewText, livesData, fastDiag, popupD
     if (lightLine) { lines.push(lightLine); lines.push(''); }
   } catch { /* no-op: 計器の失敗は状態速報を壊さない */ }
   /*
+   * ★v0.1.1377: popup で起きた例外(バグ検出の本命)。
+   *   旧実装は popup の error/unhandledrejection を握り潰すだけで記録しておらず、
+   *   ★一番見る画面の例外が【どこにも残らなかった】。ここに出して初めて気づける。
+   *   0件でも「観測中」と出す=沈黙と正常を区別する([[zero-count-may-mean-unmeasured-2026-08-04]])。
+   */
+  try {
+    const errLine = String((popupDiag?.popup ?? popupDiag)?.popupErrorProbe?.line || '');
+    if (errLine) { lines.push(errLine); lines.push(''); }
+  } catch { /* no-op: 計器の失敗は状態速報を壊さない */ }
+  /*
    * ★v0.1.1278: 点滅追跡の計器7行(vanishForensics / hostAncestryTrace /
    *   hostStyleTrace / hostHideReason / hostRecoveryDiag / hostVisWatch /
    *   hostFlipCensus)を速報から外した。点滅は Side Panel 移行(v0.1.1275)で
