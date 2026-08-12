@@ -16584,6 +16584,17 @@ function publishBackfillProgress() {
 let _lastLiveMetricWroteAt = 0;
 
 /**
+ * ★v0.1.1356: 走行中スループット計器の心拍間隔[ms]。
+ *   status 側は ts が15秒以内のときだけ「⏱ 取得速度(走行中)」を出すので、
+ *   それより十分短くする(5秒)。★詰まっている最中こそ更新が要る=
+ *   generator が返ってこない間も ts を進め続けるのがこの心拍の目的。
+ */
+const BACKFILL_LIVE_METRIC_HEARTBEAT_MS = 5000;
+
+/** ★v0.1.1356: 心拍タイマーのID(finally で必ず止める。止め忘れると嘘の走行中が残る)。 */
+let _backfillLiveMetricHeartbeatTid = /** @type {ReturnType<typeof setInterval>|null} */ (null);
+
+/**
  * v0.1.1045 段1: 走行中スループット計器を KEY_BACKFILL_LIVE_METRIC へ書く(観測のみ・1Hz間引き)。
  *
  * ⚠️ KEY_BACKFILL_PROGRESS には【一切触れない】。popup 実況(v0.1.657 で完走時だけに絞った)を
@@ -16968,6 +16979,49 @@ async function runNdgrBackfillOnce(ctx = {}) {
     _backfillRoundDiag.genSteps = 0;
     _backfillRoundDiag.roundStartedAt = Date.now();
 
+    /*
+     * ★v0.1.1356: 走行中スループット計器の【心拍】。
+     *
+     * ■ 実機で確定したこと(2026-08-12 の状態速報)
+     *   「⏳ 取り込み中 33%・過去のコメントを取得中」= backfill は走っているのに、
+     *   状態速報に「⏱ 取得速度(走行中)」の行が【1行も出ていなかった】。
+     *   status 側は running===1 かつ ts が15秒以内のときだけ出す(嘘の走行中を残さないため)。
+     *
+     * ■ 真因: 計器の更新が `await gen.next()` の【後】にしか無い。
+     *   generator の中で待ち(ネットワーク・リトライ・バックオフ)が起きると
+     *   ループが戻ってこない=計器が更新されない=15秒で ts が古くなり行が消える。
+     *   ★つまり【詰まっているときに限って計器が黙る】(異常時ほど診断が消える型)。
+     *   ユーザーが一番知りたい「なぜ止まったか」の瞬間に、計器が自分を消していた。
+     *
+     * ■ 直し: 生成器の歩みとは独立した心拍で ts を更新し続ける。
+     *   値(seg/rows/dataSegs...)は最後に観測したものをそのまま再送する=嘘を足さない。
+     *   ★running:1 のまま止まっている、が速報から読めるようになるのが目的。
+     *   ★rAF は使わない(タブ非表示で止まる)。setInterval + 実時刻。
+     */
+    const liveMetricHeartbeat = setInterval(() => {
+      try {
+        publishBackfillLiveMetric({
+          lid: String(liveId || ''),
+          running: 1,
+          seg: _backfillProgress.seg,
+          rows: _backfillProgress.rows,
+          genSteps: _backfillRoundDiag.genSteps,
+          dataSegs: _liveDataSegs,
+          bridgingSteps: _liveBridgingSteps,
+          yields: _liveYields,
+          yieldWaitMsTotal: _liveYieldWaitMsTotal,
+          elapsedMs: _backfillRoundDiag.roundStartedAt
+            ? Date.now() - _backfillRoundDiag.roundStartedAt
+            : 0,
+          fg: isForegroundWatchTab ? 1 : 0,
+          force: true
+        });
+      } catch {
+        /* best-effort: 計器は取り込みに影響させない */
+      }
+    }, BACKFILL_LIVE_METRIC_HEARTBEAT_MS);
+    _backfillLiveMetricHeartbeatTid = liveMetricHeartbeat;
+
     for (;;) {
       const step = await gen.next();
       _backfillRoundDiag.genSteps += 1; // v0.1.892: gen.next() を回した回数(初回 pending 切り分け用)。
@@ -17142,6 +17196,16 @@ async function runNdgrBackfillOnce(ctx = {}) {
     try { _backfillProgress.errMsg = String(e?.message || e || '').slice(0, 120); } catch { /* no-op */ }
   } finally {
     clearTimeout(rotationTid);
+    // ★v0.1.1356: 計器の心拍を必ず止める(例外・中断・完走のどの経路でも)。
+    //   止め忘れると走行終了後も running:1 を書き続け、速報が「まだ走っている」と嘘をつく。
+    try {
+      if (_backfillLiveMetricHeartbeatTid != null) {
+        clearInterval(_backfillLiveMetricHeartbeatTid);
+        _backfillLiveMetricHeartbeatTid = null;
+      }
+    } catch {
+      /* no-op */
+    }
     // v0.1.1045 段1: 走行終了を計器で締める(running:0・force で min-gap 無視)。status の
     //   「⏱ 取得速度(走行中)」は running:0 or ts 古で自動的に消える=固着時に嘘の走行中を残さない。
     try {
