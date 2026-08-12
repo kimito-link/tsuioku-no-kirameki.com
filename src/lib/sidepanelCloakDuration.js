@@ -52,6 +52,51 @@ export const HUMAN_PERCEPTIBLE_MS = 200;
  */
 
 /**
+ * ★v0.1.1370: 「ユーザーが中身を見られなかった時間」を幕とシェードの【両方】から出す。
+ *
+ * ■ なぜ要るか(2026-08-12: この計器が私を誤誘導した)
+ *   実機速報:
+ *     幕(cloak) ✅ t+601ms で解除 / ★この間パネルは黒く見えていた=601ms(人が気づく長さ)
+ *     初回シェード t+1204ms まで中身を覆っていた(観測10点)
+ *   ★幕とシェードは【別々に計算して文字列連結】していただけで、誰も合算していなかった。
+ *   その結果「黒く見えていた=601ms」と断言され、実際に中身が出ない 1204ms を過小申告した。
+ *   私はこの 601ms を真に受けて cloak の解除経路だけを追いかけた。
+ *   ★[[instrument-value-is-measured-by-fixes-2026-08-12]]: 誤誘導する計器は価値が【負】。
+ *
+ * ■ 判定: 人が見るのは「中身が出ていない時間」であって幕の寿命ではない。
+ *   幕が 601ms で外れてもシェードが 1204ms まで覆っていれば、体感は 1204ms。
+ *
+ * @param {number} cloakVisibleMs 幕による不可視時間(summarizeCloakDuration の visibleBlackMs)
+ * @param {number} shadeCoveringLastMs シェードが覆っていた最後の時刻(-1=覆っていない)
+ * @returns {{ blindMs: number, dominant: 'cloak'|'shade'|'none', humanVisible: boolean, line: string }}
+ */
+export function summarizeContentBlindTime(cloakVisibleMs, shadeCoveringLastMs) {
+  const cloak = Math.max(0, Math.floor(Number(cloakVisibleMs) || 0));
+  const shadeRaw = Math.floor(Number(shadeCoveringLastMs));
+  const shade = Number.isFinite(shadeRaw) && shadeRaw >= 0 ? shadeRaw : 0;
+  const blindMs = Math.max(cloak, shade);
+  const dominant = blindMs <= 0 ? 'none' : shade >= cloak ? 'shade' : 'cloak';
+  const humanVisible = blindMs >= HUMAN_PERCEPTIBLE_MS;
+  if (blindMs <= 0) {
+    return { blindMs: 0, dominant: 'none', humanVisible: false, line: '' };
+  }
+  /*
+   * ★「主因」を必ず名指しする。読み手に引き算をさせない(原因を言わない計器は症状しか言えない)。
+   *   [[instrument-must-name-the-cause-2026-08-01]]
+   */
+  const who = dominant === 'shade' ? '初回シェード' : '幕(cloak)';
+  const detail = cloak > 0 && shade > 0 ? `(幕${cloak}ms / シェード${shade}ms)` : '';
+  return {
+    blindMs,
+    dominant,
+    humanVisible,
+    line:
+      `★中身が見えなかった合計=${blindMs}ms${detail} 主因=${who}` +
+      (humanVisible ? '(人が気づく長さ)' : '(一瞬=気づかない)')
+  };
+}
+
+/**
  * 観測列から幕の継続を要約する。
  *
  * @param {ReadonlyArray<CloakSample>|null|undefined} series 観測列(t=起動からのms・昇順でなくてよい)
@@ -140,8 +185,13 @@ export function summarizeCloakDuration(series) {
       : Math.min(clearedAtMs ?? 0, CLOAK_CSS_FAILSAFE_MS + CLOAK_CSS_FADE_MS)
     : 0;
   const humanVisible = visibleBlackMs >= HUMAN_PERCEPTIBLE_MS;
+  /*
+   * ★v0.1.1370: 文言を【幕による分】に限定する(旧: 「この間パネルは黒く見えていた」)。
+   *   旧文言は全体の体感を断言しているように読めるが、実際は幕しか見ておらず、
+   *   シェードが更に長く覆っていても過小申告した。合算は summarizeContentBlindTime が言う。
+   */
   const blackNote = everCloaked
-    ? ` / ★この間パネルは黒く見えていた=${visibleBlackMs}ms${
+    ? ` / ★幕で中身が隠れていた=${visibleBlackMs}ms${
         humanVisible ? '(人が気づく長さ)' : '(一瞬=気づかない)'
       }`
     : '';

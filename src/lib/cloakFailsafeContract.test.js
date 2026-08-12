@@ -18,7 +18,8 @@ import {
   CLOAK_CSS_FAILSAFE_MS,
   CLOAK_CSS_FADE_MS,
   HUMAN_PERCEPTIBLE_MS,
-  summarizeCloakDuration
+  summarizeCloakDuration,
+  summarizeContentBlindTime
 } from './sidepanelCloakDuration.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -114,7 +115,13 @@ describe('★計器が「黒く見えていた長さ」を自分で言う(読み
       { t: 300, cloak: '' }
     ]);
     expect(r.visibleBlackMs).toBe(300);
-    expect(r.line).toContain('この間パネルは黒く見えていた=300ms');
+    /*
+     * ★v0.1.1370: 文言を【幕による分】に限定した。
+     *   旧「この間パネルは黒く見えていた」は全体の体感を断言しているように読めるが、
+     *   実際は幕しか見ておらず、シェードが更に長く覆っていても過小申告していた
+     *   (実機: 幕601ms と出しながら中身が出ないのは1204ms)。合算は別関数が言う。
+     */
+    expect(r.line).toContain('幕で中身が隠れていた=300ms');
   });
 
   it('★幕がCSS保険より後まで残っても、黒の長さは保険+fadeで頭打ち(CSSが見せるため)', () => {
@@ -150,10 +157,57 @@ describe('★計器が「黒く見えていた長さ」を自分で言う(読み
       { t: 100, cloak: '' }
     ]);
     expect(r.visibleBlackMs).toBe(0);
-    expect(r.line).not.toContain('黒く見えていた');
+    expect(r.line).not.toContain('幕で中身が隠れていた');
   });
 
   it('HUMAN_PERCEPTIBLE_MS は白フラッシュの結論(0.2秒は見える)と揃っている', () => {
     expect(HUMAN_PERCEPTIBLE_MS).toBe(200);
+  });
+});
+
+/*
+ * ★v0.1.1370: 幕とシェードの【合算】。
+ *
+ * 2026-08-12 実機で、この計器が私を誤誘導した:
+ *   幕(cloak) ✅ t+601ms で解除 / ★この間パネルは黒く見えていた=601ms
+ *   初回シェード t+1204ms まで中身を覆っていた
+ * 両者は別々に計算して文字列連結されるだけで、誰も足していなかった。
+ * その 601ms を真に受けて cloak の解除経路だけを追いかけた=誤誘導する計器は価値が負。
+ */
+describe('★summarizeContentBlindTime — 体感は幕とシェードの長い方', () => {
+  it('実機の数値(幕601ms / シェード1204ms)でシェードを主因と名指しする', () => {
+    const r = summarizeContentBlindTime(601, 1204);
+    expect(r.blindMs).toBe(1204);
+    expect(r.dominant).toBe('shade');
+    expect(r.line).toContain('主因=初回シェード');
+    expect(r.line).toContain('幕601ms');
+    expect(r.line).toContain('シェード1204ms');
+  });
+
+  it('幕の方が長ければ幕を主因にする', () => {
+    const r = summarizeContentBlindTime(900, 200);
+    expect(r.blindMs).toBe(900);
+    expect(r.dominant).toBe('cloak');
+    expect(r.line).toContain('主因=幕(cloak)');
+  });
+
+  it('シェード未観測(-1)は0として扱う(未観測を長さに化けさせない)', () => {
+    const r = summarizeContentBlindTime(300, -1);
+    expect(r.blindMs).toBe(300);
+    expect(r.dominant).toBe('cloak');
+  });
+
+  it('どちらも無ければ行を出さない(ノイズにしない)', () => {
+    const r = summarizeContentBlindTime(0, -1);
+    expect(r.blindMs).toBe(0);
+    expect(r.dominant).toBe('none');
+    expect(r.line).toBe('');
+  });
+
+  it('人が気づく長さかを合算値で判定する(幕単独では気づかなくても合算で気づく)', () => {
+    // 幕120ms単独なら「一瞬」だが、シェード1204msを足せば人が気づく長さ。
+    const r = summarizeContentBlindTime(120, 1204);
+    expect(r.humanVisible).toBe(true);
+    expect(r.line).toContain('人が気づく長さ');
   });
 });
