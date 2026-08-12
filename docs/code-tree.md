@@ -680,7 +680,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (1637)
+- 📁 **src/** (1638)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -971,7 +971,7 @@
         - `logo_funlink_white_RGB_maru_black.png`
       - `logo_guide_funlink_ol.pdf`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1396)
+  - 📁 **lib/** (1397)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -2039,6 +2039,7 @@
     - `statusExtrasBatch.test.js`
     - `statusFastDiagLite.js` — status.html 用「軽量 fastDiag ダイジェスト」。
     - `statusFastDiagLite.test.js`
+    - `statusFirstPaint.wiring.test.js`
     - `statusFormat.js` — status 整形の純関数群。
     - `statusFormat.test.js`
     - `statusInitCost.wiring.test.js`

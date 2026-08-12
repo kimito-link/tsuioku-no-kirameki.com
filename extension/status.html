@@ -452,6 +452,32 @@
       .nl-extension-context-banner:not([hidden]) {
         display: block;
       }
+      /*
+       * ★v0.1.1371: 初回描画までの読み込み表示。
+       *   ★JS が1行も動かなくても出ること が唯一の役目なので、既定は【表示】。
+       *   初回 render が成功したときだけ JS が --done を付けて消す。
+       *   (既定を hidden にすると「JSが死んだら何も出ない」= 直そうとしている症状に戻る)
+       */
+      .nl-status-boot-notice {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        margin: 0 0 12px;
+        padding: 12px 14px;
+        font-size: 13px;
+        line-height: 1.6;
+        color: #1e3a5f;
+        background: #eef7ff;
+        border: 1px solid #93c5fd;
+        border-radius: 8px;
+      }
+      .nl-status-boot-notice__hint {
+        color: #475569;
+        font-size: 12px;
+      }
+      .nl-status-boot-notice--done {
+        display: none;
+      }
       /* 健全度パネル: 正常は淡い緑、異常(黄/赤)だけ目を引く。対象外は灰の「—」。 */
       section.health-panel { margin: 0 0 14px; }
       /* ★v0.1.1230: 健全度カードは件数が更新のたびに変わり、グリッドの行数が増減して
@@ -894,6 +920,30 @@
       <span class="status-meta" id="metaLastUpdate">最終更新 —</span>
       <span class="status-meta" id="metaAutoRefresh">自動更新: 2秒</span>
     </header>
+
+    <!--
+      ★v0.1.1371: 初回描画までの「読み込み中」表示(静的・JS不要)。
+
+      ■ なぜ要るか(2026-08-12 ユーザー実機・スクショは【真っ白】)
+        描画経路は setInterval の refresh() だけで、開いてから最初の描画まで
+        最低2秒(+storage混雑分)何も出なかった。その間ユーザーには真っ白で、
+        ★状態速報は refresh() が成功して初めて書かれるので【コピーする物も無い】。
+        ユーザー指摘「どうやってこれで伝えるの・状態速報なくても分かるようにして」。
+
+      ■ 掟: この要素は【HTMLに静的に書く】。JS が1行も動かなくても必ず出る。
+        (拡張の CSP は script-src 'self'=インライン script は不可。
+         [[static-attribute-makes-instrument-lie-2026-08-12]] の逆で、
+         ここは「JSが動かなくても出る」ことが目的なので静的が正しい)
+      ★消すのは初回 render の成功時だけ(status-entry.js の dismissStatusBootNotice)。
+    -->
+    <div id="nlStatusBootNotice" class="nl-status-boot-notice">
+      <strong>読み込み中です…</strong>
+      <span>記録は各 watch タブで続いています（止まっていません）。</span>
+      <span class="nl-status-boot-notice__hint">
+        10秒たっても変わらないときは、ストレージが混雑しています。
+        watch タブを1つ閉じるか、少し待ってから再読み込みしてください。
+      </span>
+    </div>
 
     <!--
       版混在検知バナー(2026-07-06): 未パック拡張は「本体(manifest/SW)=リロード時のまま、
