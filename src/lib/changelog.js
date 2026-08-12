@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1350',
+    date: '2026-08-12',
+    summary: 'chore(diag): コメント送信の計器を新しい作り方へ移行',
+    items: Object.freeze([
+      'コメント送信の計器を内部的に作り直しました(表示される内容はこれまでと同じです)。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1349',
     date: '2026-08-12',
     summary: 'chore(diag): 計器の土台(台帳と共通部品)を用意',

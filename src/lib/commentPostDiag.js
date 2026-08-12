@@ -34,7 +34,8 @@
  * }} CommentPostDiagState
  */
 
-import { makeInitialFromSchema } from './diagSchemaCopy.js';
+import { makeInitialFromSchema, copyDiagBySchema } from './diagSchemaCopy.js';
+import { CANONICAL_TIME_FIELD } from './timeAuthority.js';
 
 /**
  * ★フィールド表(唯一の正本)。HANDOFF-instrument-channels-2026-08-12.md §2 の必須5点セット①。
@@ -148,31 +149,15 @@ export function commentPostOutcomeKindForResult(result) {
  * @returns {CommentPostDiagState & { capturedAt: number }}
  */
 export function buildCommentPostDiagSnapshot(diag, nowMs) {
-  const base = makeInitialCommentPostDiag();
-  const d = /** @type {any} */ (diag && typeof diag === 'object' ? diag : {});
-  /** @param {unknown} x @param {number} fallback @returns {number} */
-  const num = (x, fallback) => {
-    const n = Number(x);
-    return Number.isFinite(n) ? n : fallback;
-  };
+  // ★v0.1.1350: 個別列挙(14行の手書き)を廃止し schema の反復に置き換えた。
+  //   これで「schema にフィールドを足したのに snapshot に足し忘れる」事故が構造的に起きない
+  //   (失敗#3・2026-08-12 時点で6回踏んだ型)。挙動は移行前と同値(ゴールデン検査で担保)。
   const now = Number.isFinite(Number(nowMs)) ? Number(nowMs) : 0;
-  return {
-    attempts: num(d.attempts, base.attempts),
-    okCount: num(d.okCount, base.okCount),
-    failCount: num(d.failCount, base.failCount),
-    timeoutCount: num(d.timeoutCount, base.timeoutCount),
-    revertCount: num(d.revertCount, base.revertCount),
-    totalRetryAttempts: num(d.totalRetryAttempts, base.totalRetryAttempts),
-    lastTotalMs: num(d.lastTotalMs, base.lastTotalMs),
-    lastOutcome: String(d.lastOutcome || ''),
-    lastEventAt: num(d.lastEventAt, base.lastEventAt),
-    lastEchoMs: num(d.lastEchoMs, base.lastEchoMs),
-    avgEchoMs: num(d.avgEchoMs, base.avgEchoMs),
-    lastOptimisticPaintMs: num(d.lastOptimisticPaintMs, base.lastOptimisticPaintMs),
-    avgOptimisticPaintMs: num(d.avgOptimisticPaintMs, base.avgOptimisticPaintMs),
-    instantPaintRuns: num(d.instantPaintRuns, base.instantPaintRuns),
-    capturedAt: now
-  };
+  return /** @type {CommentPostDiagState & { capturedAt: number }} */ (
+    /** @type {unknown} */ (
+      copyDiagBySchema(COMMENT_POST_DIAG_SCHEMA, diag, { [CANONICAL_TIME_FIELD]: now })
+    )
+  );
 }
 
 /**
