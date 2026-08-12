@@ -21969,7 +21969,7 @@ async function initPopup() {
       const now = Date.now();
       // 多タブで background 化中は storage.onChanged を抑止しているため、可視復帰は
       // 即 catch-up（埋め込みは 400ms、サイドパネルは従来どおり poll 周期）。
-      const visGapMs = INLINE_EMBED_WATCH ? 400 : POLL_INTERVAL_MS;
+      const visGapMs = INLINE_EMBED_WATCH || INLINE_SIDE_PANEL ? 400 : POLL_INTERVAL_MS; // ★v1365: sidepanel も 400ms 側へ(復帰が3秒スロットルで捨てられ暗いままだった)
       if (now - lastVisibilityRefresh < visGapMs) return;
       lastVisibilityRefresh = now;
       // 0.1.94: 0.1.92 polling 側で snapshot=null を撤去したのに合わせて

@@ -26,6 +26,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1365',
+    date: '2026-08-12',
+    summary: 'fix(panel): 見えた瞬間に塗り直す',
+    items: Object.freeze([
+      'サイドパネルが暗いまま中身が出ないことがあったのを直しました。裏で描画を省いたあと、見えた瞬間に塗り直す処理がサイドパネルだけ最大3秒待たされ、条件によっては塗り直し自体が省かれていました。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1364',
     date: '2026-08-12',
     summary: 'feat(diag): 中身を覆う幕をもう一枚測る',
