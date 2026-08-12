@@ -1,8 +1,50 @@
 # 引き継ぎ 2026-08-12 夕 — レーン/パネル/計器の整理
 
 > 次のセッションはこの1枚から始める。ブランチ **`feat/sidepanel-first-layout`**(push済)
-> 現在 **v0.1.1366** / commit `b3629da7`
+> 現在 **v0.1.1367** / commit `9fcf20bd`
 > ★dist の差分は pre-push フックのビルドで必ず1つずれる。追いかけない。
+
+---
+
+## ★★続き(2026-08-12 夜・v1367 まで)— 次はここから
+
+### 済(v1367・verify:cc 全ゲート緑・push済)
+1. **レーン78件中19件の根治**。真因=**v1363 は構造的に一度も発動できなかった**。
+   軽い read 成功時(popup-entry.js:16146)が `readAtMs` 無しでキャッシュを丸ごと上書き
+   →`decideHeavyChunkReadReuse` が fresh-read 不成立→次 refresh は必ず reuse:false
+   →v1363 の救済分岐が bail(RACE)。`heavyRacePaintedFromCache:0` は偶然ではない。
+   直し=`lib/heavyCachePreserve.js`(新設・純関数)。**タイル19→9の縮小も同一原因**
+   (heavy が bail し続け light_summary の暫定がそのまま出ていた)。
+2. **`VOICE_DIAG_FRESH_MS` は「一本化しない」に訂正**(設計書2件も訂正済)。
+   同名だが別物: healthCells=判定適用の境界(実効90秒) / voiceDiag=judgeValueFreshness の
+   基準値(実効10分)。統合すると v0.1.1004 の誤発火が戻る=退化。改名のみで衝突解消。
+3. **黒画面 v1365 は効いた**(表示遅延 18,137ms→44ms)。①は決着。
+
+### ★未解決(次の一手)— サイドパネルの黒
+**ユーザー報告(スクショあり)「サイドパネルを出すタイミングで黒くなる」は未解決。**
+★私は一度「残り660msは追わない」と言ったが、**スクショで撤回した**。理由:
+パネルは一瞬でなく**開いている間ずっと暗く**、タイトルは出るのに**中身が空でグレーの帯だけ**
+=[[cloak-hides-content-not-background-2026-08-10]]の「地の色だけで中身が無い」。
+窓0x0(49msで終了)でも白フラッシュでもない。**これは黒画面の4件目の系統**。
+
+調査済(ここまで判明・次はこの続きから):
+- `.nl-init-shade` の背景は `var(--nl-bg, #f6fff8)`。**ダーク用フォールバックは v0.1.1319 で撤去済**
+  =シェードは犯人ではない(popup.html:199-217 のコメントが根拠)
+- `prefers-color-scheme: dark` は popup.html に**2箇所だけ**(3068行 .nl-top-support-rank /
+  8083行 .nl-export-wait)。**どちらもパネル地の色ではない**=犯人ではない
+- `:root` は `color-scheme: light` 宣言済(popup.html:52・v0.1.1289 で light 固定)
+- ★**次に見るべき**: 速報の `サイドパネル自己診断` が **🔴黒くなりうる / 原因=幕(cloak)が
+  残っている=JSが途中で止まった疑い / ★あとから黒くなった(起動1秒後のvisibleで検知・2回)**
+  と出ている。**「あとから黒くなった」が2回**=起動直後ではなく**後発**。
+  cloak 解除は `revealPopupPrimaryOnce()`(popup-entry.js:4056 の removeAttribute)だけ。
+  **誰かが cloak 属性を再付与しているか**(4043行 setAttribute の呼び元)を追うのが本線。
+- ★注意: 幕は `opacity:0` で**中身だけ**隠す(背景は塗る)。スクショが「グレーの帯」なのは
+  中身が消えた状態と整合する。**版を重ねる前に「再付与の呼び元」をコードで確定させること**
+  ([[code-can-confirm-without-field-data-2026-08-12]])。
+
+### 未着手(据え置き)
+- 健全度セル残り2領域(`lane-drop` / `voice-engine`)= `health-cells-4domains-*.md`
+- 計器チャンネル基盤 v1352以降 = `HANDOFF-instrument-channels-2026-08-12.md`
 
 ---
 
