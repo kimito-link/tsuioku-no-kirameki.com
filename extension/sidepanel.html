@@ -130,6 +130,28 @@
            #fffaf2 は popup.html:18 の --nl-bg と同値。★別文書なので CSS 変数を共有できない
            = 変更するときは popup.html:18 と【両方】直すこと。 */
         background: #fffaf2;
+        /*
+         * ★v0.1.1369(黒画面の真因・実ブラウザで実測して確定): iframe 【要素】にも
+         *   color-scheme を宣言する。ここが無いと OS ダーク環境で最初の数十msだけ黒くなる。
+         *
+         * ■ 実測(chrome-devtools・出荷ビルドを拡張として実ロード・prefers-color-scheme:dark)
+         *     t+4〜8ms  url=about:blank  html=rgba(0,0,0,0)/none  cs=normal  inlineStyle=NO
+         *     t+12ms〜  url=popup.html   html=.../grad            cs=light   inlineStyle=yes
+         *   ★iframe は src が読み込まれる前に【about:blank の文書】として存在する。
+         *   その空文書には拡張の CSS も inline style も届かない(inlineStyle=NO)ので
+         *   color-scheme が 'normal' のまま＝OSダークだと Chrome が
+         *   【その文書のキャンバス】を暗色で塗る。iframe 要素の background は
+         *   要素の地であって、中の文書のキャンバスはその上に合成されるため救えない。
+         *
+         * ■ なぜ今まで見つからなかったか
+         *   popup.html / sidepanel.html には既に color-scheme:light がある(v0.1.1289/1316)。
+         *   ★どちらにも属さない【about:blank の隙間】だけが取り残されていた。
+         *   sidepanel-entry.js の自己診断も iframe.contentDocument を読むので、
+         *   この時間帯は「読めない/未レイアウト」に落ちて観測から漏れていた。
+         *
+         * ★これは color-scheme を【継承させる】ための宣言。値は他2箇所と必ず同じ light。
+         */
+        color-scheme: light;
       }
     </style>
   </head>

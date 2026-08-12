@@ -61,6 +61,24 @@ describe('★サイドパネルが真っ黒にならない(CSSだけで担保す
     expect(sidepanelHtml).not.toMatch(/iframe \{[\s\S]*?background: transparent/);
   });
 
+  /*
+   * ★v0.1.1369: iframe【要素】の color-scheme(黒画面の残り・実ブラウザで実測して確定)。
+   *
+   * ■ 実測(chrome-devtools・拡張として実ロード・prefers-color-scheme:dark)
+   *     t+4〜8ms  url=about:blank  cs=normal  inlineStyle=NO  ← 拡張のCSSが届かない隙間
+   *     t+12ms〜  url=popup.html   cs=light   inlineStyle=yes
+   *   iframe は src が読まれる前に【about:blank の文書】として存在する。
+   *   その文書には popup.html の手当ても sidepanel.html の <style> も届かない。
+   *   ★popup.html(v1289) と sidepanel.html(v1294/1316) は既に手当て済みで、
+   *   【どちらにも属さない about:blank の隙間】だけが最後まで取り残されていた。
+   */
+  it('★iframe 要素にも color-scheme: light がある(about:blank の隙間を暗色にしない)', () => {
+    // ★宣言の終端(;)まで固定する=値が light 単独であることを断言する。
+    expect(sidepanelHtml).toMatch(/iframe \{[\s\S]*?color-scheme:\s*light\s*;/);
+    // ★`light dark` / dark / normal への変異を拒否する(この1語で隙間が暗色に戻る)。
+    expect(sidepanelHtml).not.toMatch(/iframe \{[\s\S]*?color-scheme:\s*(?:dark|normal|light\s+dark)\s*;/);
+  });
+
   it('★popup 本体の通常背景(body)が塗る指定を持っている=最後に効く地の色', () => {
     expect(popupHtml).toMatch(/background: linear-gradient\(160deg, var\(--nl-bg\), var\(--nl-bg-soft\)\)/);
   });

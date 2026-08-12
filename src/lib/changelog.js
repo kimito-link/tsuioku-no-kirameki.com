@@ -26,6 +26,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1369',
+    date: '2026-08-12',
+    summary: 'サイドパネルを開いた瞬間に黒くなる問題の根治(OSがダーク設定のとき)',
+    items: Object.freeze([
+      'サイドパネルを開いた直後に一瞬黒くなることがある問題を直しました。パソコンの表示設定がダークのときだけ起きていました。',
+      '原因は、中身が読み込まれる前の「空っぽの枠」だけが明るい色の指定から漏れていたことです。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1368',
     date: '2026-08-12',
     summary: 'サイドパネルの自己診断が誤った原因を名指ししていたのを是正',
