@@ -39,6 +39,23 @@ function num(x) {
 const VOICE_DIAG_FRESH_MS = 90 * 1000;
 
 /**
+ * ★v0.1.1360: 会場座席の観測がこれより古ければ【会場を開いていない】と見なす(na)。
+ *   実機で 737,644秒前(8.5日)の化石値が🟡warn のまま出続け、総合判定を「注意」に
+ *   引きずっていた。会場モードを開いていないのは異常ではないので色もスコアも付けない。
+ *   ★5分: 会場が開いていれば数秒ごとに publish されるので、5分空くのは「閉じた」で確定。
+ *     60秒〜5分は「開いているのに遅れている」=本物の warn として残す。
+ */
+const VENUE_SEATS_CLOSED_MS = 5 * 60 * 1000;
+
+/**
+ * ★v0.1.1360: ギフト/広告演出の観測がこれより古ければ【前回の配信の記録】と見なす(na)。
+ *   実機で 753,314秒前(8.7日)の「音漏れ1件」が🟡のまま出続け、総合判定を
+ *   「注意: ギフト演出/効果音」に引きずっていた。今日の配信の話ではないものを
+ *   今日の異常として出さない。★2時間: 同一配信中なら十分短い間隔で更新される。
+ */
+const GIFT_EFFECT_FOSSIL_MS = 2 * 60 * 60 * 1000;
+
+/**
  * % セル: value(0-100) と 80/40 閾値で level。value=null は na('—')。
  * v0.1.845: opts.processing=true なら閾値評価をせず level='processing'(青・進行中=正常な途中)。
  *   数値(value)はそのまま保持=嘘をつかない(率70%は70%のまま色だけ青)。
@@ -245,9 +262,21 @@ function buildVenueSeatsHealthCells(venueSeatsDiag, nowMs) {
     out.push(stateCell('venue-broadcaster', '配信者混入', 'ok', 'なし'));
   }
 
-  // ② 会場座席(固着検出+稼働状況)。更新が古い=会場が止まっている兆候。
+  /*
+   * ② 会場座席(固着検出+稼働状況)。更新が古い=会場が止まっている兆候。
+   *
+   * ★v0.1.1360: 「会場を閉じている」と「会場が固まっている」を分ける。
+   *   実機(2026-08-12)は `会場座席 更新737644秒前`(=8.5日前)を🟡warn として出し続け、
+   *   総合判定まで「注意: 会場座席」に引きずっていた。会場モードを開いていないのだから
+   *   これは異常ではなく【対象外】。上限を設けずに warn にしていたため、化石値が
+   *   永久に黄色を出し続けていた([[status-report-fossil-value-guard]] と同じ型)。
+   *   ★60秒〜VENUE_SEATS_CLOSED_MS は「開いているのに遅れている」=本物の warn。
+   *     それより古い=会場が閉じている=na('—')にして色もスコアも付けない。
+   */
   const otherSuffix = otherCount > 0 ? `+他${otherCount}` : '';
-  if (sinceUpdateMs != null && sinceUpdateMs >= 60000) {
+  if (sinceUpdateMs != null && sinceUpdateMs >= VENUE_SEATS_CLOSED_MS) {
+    out.push(stateCell('venue-seats', '会場座席', 'na', '会場を開いていません'));
+  } else if (sinceUpdateMs != null && sinceUpdateMs >= 60000) {
     out.push(stateCell('venue-seats', '会場座席', 'warn', `更新${Math.round(sinceUpdateMs / 1000)}秒前`));
   } else {
     out.push(stateCell('venue-seats', '会場座席', 'ok', `${seatsShown}席/${participants}人${otherSuffix}`));
@@ -647,6 +676,18 @@ function buildGiftEffectHealthCells(giftEffectDiag) {
     : 0; // 効果音OFFは鳴らないのが正常=不合格にしない(誤診断防止)
 
   const missing = throwMissing + soundMissing;
+  /*
+   * ★v0.1.1360: 化石値で🟡を出し続けない。
+   *   実機(2026-08-12)は `最終753314秒前`(=8.7日前)の観測なのに「音漏れ1件」で
+   *   🟡を出し、総合判定まで「注意: ギフト演出/効果音」に引きずっていた。
+   *   ★今日の配信の話ではないものを今日の異常として出さない。
+   *   古い観測は na('—') にして色もスコアも付けない(数字自体は速報の本文に残る)。
+   */
+  const lastEventAt = num(snap.lastEventAt) || 0;
+  const ageMs = lastEventAt > 0 ? Date.now() - lastEventAt : null;
+  if (ageMs != null && ageMs >= GIFT_EFFECT_FOSSIL_MS) {
+    return [stateCell('gift-effect', 'ギフト演出/効果音', 'na', `前回の配信の記録(${Math.round(ageMs / 86400000)}日前)`)];
+  }
   const detail =
     missing > 0
       ? `演出漏れ${throwMissing}件・音漏れ${soundMissing}件`
