@@ -85,6 +85,14 @@ export function dominantRepaintReason(counts) {
 }
 
 /**
+ * ★v0.1.1374: 「描き直しを止めた」側の理由(=防御が効いた記録)。
+ *   これらが多いのは正常。犯人として名指ししてはいけない。
+ *   ★新しく抑制系の理由を足すときは【必ずここにも足す】。
+ *     足し忘れると「防御が効いているのに原因扱い」の誤誘導が復活する。
+ */
+const SUPPRESSION_REASONS = new Set(['self_write_skipped']);
+
+/**
  * 速報に出す1行を組み立てる。0件なら空文字(静かな計器)。
  *
  * @param {RepaintReasonCounts|null|undefined} counts
@@ -108,8 +116,24 @@ export function formatRepaintReasonLine(counts, commentCount) {
     perComment = ` / 1コメントあたり${ratio >= 10 ? Math.round(ratio) : ratio.toFixed(1)}回`;
   }
   const dom = dominantRepaintReason(counts);
+  /*
+   * ★v0.1.1374: 「ここが原因」と名指してよい理由と、そうでない理由を区別する。
+   *
+   * ■ 何が嘘だったか(2026-08-12 実機・私がこの計器に誤誘導された)
+   *     描き直しの内訳(計2973回): self_write_skipped2128 ...
+   *       ← self_write_skippedが72%を占める(ここが原因)
+   *   ★self_write_skipped は【描画を止めた回数】=防御が効いた記録であって、
+   *     再描画そのものではない。多いほど良い数字なのに「原因」と名指ししていた。
+   *   実際 storage 飽和(更新48.8秒)を追うとき、この行に従うと**防御を疑いに行く**。
+   *
+   * ■ 判定: 止めた回数は分母(描き直し)に数えつつ、犯人としては名指ししない。
+   *   [[instrument-value-is-measured-by-fixes-2026-08-12]]: 誤誘導する計器は価値が負。
+   *   [[instrument-can-name-the-wrong-culprit-2026-08-10]]: 名指しに従う前に分岐順を読む。
+   */
   const blame = dom
-    ? ` ← ${dom.reason}が${Math.round(dom.share * 100)}%を占める(ここが原因)`
+    ? SUPPRESSION_REASONS.has(dom.reason)
+      ? ` ← ${dom.reason}が${Math.round(dom.share * 100)}%(=描き直しを【止めた】回数。防御が効いている証拠で、原因ではありません)`
+      : ` ← ${dom.reason}が${Math.round(dom.share * 100)}%を占める(ここが原因)`
     : '';
   return `描き直しの内訳(計${total}回): ${parts.join(' / ')}${perComment}${blame}`;
 }

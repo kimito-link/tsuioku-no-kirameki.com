@@ -26,6 +26,16 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1374',
+    date: '2026-08-12',
+    summary: '正常なのに警告が出っぱなしになるのを修正',
+    items: Object.freeze([
+      'パネルが正常に表示されているのに「中身が出ていません」の警告が消えないことがある問題を直しました。',
+      '警告は「いま実際に中身が出ていないとき」だけ表示します。過去に一度遅かっただけでは出しません。',
+      '状態速報の「描き直しの内訳」で、描画を止めた回数（防御が効いた記録）を「原因」と表示していたのを直しました。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1373',
     date: '2026-08-12',
     summary: 'サイドパネルが黒いまま待たされる時間を短縮',
