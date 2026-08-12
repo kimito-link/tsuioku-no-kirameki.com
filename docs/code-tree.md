@@ -679,7 +679,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (1632)
+- 📁 **src/** (1633)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -970,7 +970,7 @@
         - `logo_funlink_white_RGB_maru_black.png`
       - `logo_guide_funlink_ol.pdf`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1391)
+  - 📁 **lib/** (1392)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -2013,6 +2013,7 @@
     - `sidepanelSelfDiagKey.js` — サイドパネル自己診断の storage キー。
     - `sidepanelSelfDiagPipeline.test.js`
     - `sidepanelThemeColorParity.test.js`
+    - `sidepanelVisibilityCatchup.wiring.test.js`
     - `sidepanelZeroArea.test.js`
     - `singleFlightByKey.js` — key 単位の single-flight 実行器(純関数コア)。
     - `singleFlightByKey.test.js`
