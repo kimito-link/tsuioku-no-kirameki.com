@@ -677,7 +677,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (1626)
+- 📁 **src/** (1627)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -968,7 +968,7 @@
         - `logo_funlink_white_RGB_maru_black.png`
       - `logo_guide_funlink_ol.pdf`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1385)
+  - 📁 **lib/** (1386)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -1579,6 +1579,7 @@
     - `laneSupplyOriginDiag.test.js`
     - `laneTickProbe.js` — ①popup の独立描画トリガ(tickIndependentNorthStar)の自己診断(v0.1.1123)。
     - `laneTickProbe.test.js`
+    - `laneTileHistoryUsesDom.wiring.test.js`
     - `laneTileOscillation.js` — 【層】L0 判定層(純粋関数・I/O禁止)
     - `laneTileOscillation.test.js`
     - `lengthDelimitedStream.js` — length-delimited（varint 長 + ペイロード）の連続を分割する。

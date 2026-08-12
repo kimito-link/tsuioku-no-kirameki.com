@@ -201,6 +201,48 @@ describe('★通し: 点滅の行が状態速報のテキストに現れる', ()
       expect(text).toContain('17→2枚');
     });
 
+    /*
+     * ★v0.1.1357: 私が入れた v1355 の計器が実機で嘘をついた。同じ報告の中に
+     *     レーンの人数 ✅ 増え続けている(0→67枚・観測3回)
+     *     ★タイルが減った直前の供給元: light_summary(暫定) 13枚→8枚 / shrinkObservedCount:2
+     *   が同居していた。履歴は【描こうとした候補数】を積んでおり、縮小ガードで
+     *   描かなかった回も候補で埋まるため、実際の画面の増減とずれる。
+     *   → 実DOM を見ている laneSupplyOriginDiag の観測を優先する。
+     */
+    describe('★実DOM起点の縮小観測を優先する(報告内の矛盾を作らない)', () => {
+      it('履歴が「増え続けている」でも、実DOMが縮小を見ていれば🔴', () => {
+        // 実機の再現: 履歴は 0→67 と単調増加に見えるが、実DOMは 13→8 の縮小を2回観測。
+        const r = summarizeLaneTileOscillation([s(0), s(13), s(67)], {
+          domShrinkCount: 2,
+          domShrinkCulprit: { origin: 'light_summary', prevTiles: 13, nextTiles: 8 }
+        });
+        expect(r.drops).toBe(2);
+        expect(r.monotonicGrowth).toBe(false);
+        expect(r.worstDropFrom).toBe(13);
+        expect(r.worstDropTo).toBe(8);
+        expect(r.worstDropOrigin).toBe('light_summary');
+        expect(r.line).toContain('増え続けていない');
+        expect(r.line).toContain('13→8枚');
+      });
+
+      it('実DOMが縮小0なら履歴どおり(過剰に🔴にしない)', () => {
+        const r = summarizeLaneTileOscillation([s(2), s(17), s(67)], { domShrinkCount: 0 });
+        expect(r.drops).toBe(0);
+        expect(r.monotonicGrowth).toBe(true);
+        expect(r.line).toContain('✅');
+      });
+
+      it('履歴が既に多く減っていれば、そちらを下回らない(実DOMで上書きしない)', () => {
+        const r = summarizeLaneTileOscillation([s(60), s(3), s(50), s(1)], { domShrinkCount: 1 });
+        expect(r.drops).toBe(2); // 履歴の2回 > 実DOMの1回
+      });
+
+      it('第2引数が無くても壊れない(後方互換)', () => {
+        const r = summarizeLaneTileOscillation([s(17), s(2)]);
+        expect(r.drops).toBe(1);
+      });
+    });
+
     it('増えるだけなら行を出さない(正常時のノイズにしない)', () => {
       const oscillation = summarizeLaneTileOscillation([s(2), s(17), s(67)]);
       const d = buildStoryUserLaneRenderDiag({ ...base, laneTileOscillation: oscillation });

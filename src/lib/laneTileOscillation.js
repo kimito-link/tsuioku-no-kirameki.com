@@ -68,7 +68,12 @@ export function pushLaneTileSample(history, sample) {
  *   line: string
  * }}
  */
-export function summarizeLaneTileOscillation(history) {
+/**
+ * @param {ReadonlyArray<{tiles:number, origin:string}>|null|undefined} history
+ * @param {{ domShrinkCount?: unknown, domShrinkCulprit?: { origin?: unknown, prevTiles?: unknown, nextTiles?: unknown }|null }} [authoritative]
+ *   ★v0.1.1357: 実DOM起点の縮小観測(laneSupplyOriginDiag)。履歴と食い違ったら【実DOM を採る】。
+ */
+export function summarizeLaneTileOscillation(history, authoritative) {
   const list = (Array.isArray(history) ? history : []).filter(
     (h) => h && typeof h === 'object' && Number.isFinite(Number(h.tiles))
   );
@@ -146,6 +151,31 @@ export function summarizeLaneTileOscillation(history) {
       worstDropFrom = counts[i - 1];
       worstDropTo = counts[i];
       worstDropOrigin = String(list[i]?.origin || '').trim();
+    }
+  }
+  /*
+   * ★v0.1.1357: 実DOM起点の縮小観測を最優先する。
+   *
+   * ■ なぜ(2026-08-12 実機・私が入れた v1355 の計器が嘘をついた)
+   *     レーンの人数 ✅ 増え続けている(0→67枚・観測3回)
+   *     ★タイルが減った直前の供給元: light_summary(暫定) 13枚→8枚 / shrinkObservedCount:2
+   *   同じ報告の中で「増え続けている」と「13→8に減った」が同居していた。
+   *   履歴(_laneTileHistory)は【描こうとした候補数】を積んでおり、縮小ガードで
+   *   描かなかった回も候補で埋まる=実際の画面の増減とずれる。
+   *   ★報告内の矛盾は判定の穴のサイン([[instrument-can-name-the-wrong-culprit-2026-08-10]])。
+   *   → 実DOM を見ている laneSupplyOriginDiag の観測があればそれを採る。
+   */
+  const domShrinkCount = Math.max(0, Math.floor(Number(authoritative?.domShrinkCount) || 0));
+  if (domShrinkCount > drops) {
+    drops = domShrinkCount;
+    const c = authoritative?.domShrinkCulprit;
+    const from = Math.max(0, Math.floor(Number(c?.prevTiles) || 0));
+    const to = Math.max(0, Math.floor(Number(c?.nextTiles) || 0));
+    if (from - to > worstDrop) {
+      worstDrop = from - to;
+      worstDropFrom = from;
+      worstDropTo = to;
+      worstDropOrigin = String(c?.origin || '').trim();
     }
   }
   const monotonicGrowth = drops === 0;

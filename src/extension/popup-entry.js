@@ -7037,9 +7037,9 @@ function renderStoryUserLane() {
   const _shrinkGuardHit = _rawKeep && !_keepExpired;
   notePaintDecision(_storyUserLaneRenderProbe,
     { els, nextTileCount, provisional: _prov, guardHit: _shrinkGuardHit });
-  // ★v0.1.1346: タイル数の【往復】を記録(縮小ガードは「減ったか」しか見ず点滅を見逃す)。
+  // ★v0.1.1346: タイル数の【往復】を記録。★v1357訂正: 候補数だとガード時(描かずreturn)に実機で嘘をつくため実DOM枚数。
   _laneTileHistory = pushLaneTileSample(_laneTileHistory,
-    { tiles: nextTileCount, origin: _laneSupplyOriginDiag?.lastOrigin || '' });
+    { tiles: _shrinkGuardHit ? countStoryUserLaneDomTiles(els) : nextTileCount, origin: _laneSupplyOriginDiag?.lastOrigin || '' });
   // ★v0.1.1249 現行犯記録: 実際に減る瞬間、直前に供給を書いた者を名指しで残す(判定は計器側)。
   noteLaneSupplyShrink(_laneSupplyOriginDiag,
     { prevTiles: countStoryUserLaneDomTiles(els), nextTiles: nextTileCount, guardHit: _shrinkGuardHit });
@@ -18998,7 +18998,7 @@ async function collectAiShareDevMonitorPayloadBundle(watchUrl) {
           const snap = snapshotStoryUserLaneRenderProbe(_storyUserLaneRenderProbe, Date.now());
           if (snap) snap.laneRepaintCounts = getStoryLaneRepaintCounts(); // v0.1.1040 計器: 段別 churn 実測
           // heavyRace根治(B)計器: fresh-read で heavy 全件再読みを省いた累計(実配信で効きと12秒ギャップの適正を判定)。
-          if (snap) { snap.heavyFreshReadReuseCount = _heavyFreshReadReuseCount; snap.heavyReuseLastReason = _heavyReuseLastReason; snap.laneTileOscillation = summarizeLaneTileOscillation(_laneTileHistory); }
+          if (snap) { /* ★v1357: 実DOM起点の縮小観測も渡す(履歴だけだと嘘をつく) */ snap.heavyFreshReadReuseCount = _heavyFreshReadReuseCount; snap.heavyReuseLastReason = _heavyReuseLastReason; snap.laneTileOscillation = summarizeLaneTileOscillation(_laneTileHistory, { domShrinkCount: _laneSupplyOriginDiag?.shrinkObservedCount, domShrinkCulprit: _laneSupplyOriginDiag?.shrinkCulprit }); }
           // heavyRace根治(C-1)計器: 進行中read への合流で新規readを張らずに済んだ累計(single-flightの効き)。
           if (snap) snap.heavyReadInflightJoinCount = _heavyReadSingleFlight.joinCount();
           return snap;
