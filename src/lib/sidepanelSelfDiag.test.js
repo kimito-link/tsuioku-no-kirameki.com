@@ -73,6 +73,54 @@ describe('judgeSidepanelBlack — 原因を1つに名指しする', () => {
     expect(r.cause).toContain('幕(cloak)');
   });
 
+  /*
+   * ★v0.1.1368: 誤誘導していた名指しの是正(実機 v1366)。
+   *   速報が同じ行で矛盾していた: 「幕✅ t+731msで解除」なのに
+   *   「あとから黒くなった(原因=幕が残っている=JSが途中で止まった疑い)」。
+   *   真因は cloak が popup.html:1 の <html> に【静的に】書かれていること=
+   *   iframe 再ロード直後は JS 起動前から必ず '1'。visible/reload フェーズが
+   *   その瞬間を捉えて「JSが止まった」と誤って名指ししていた。
+   */
+  it('★読み込み中(loading)に幕が見えても「JSが止まった」と名指ししない', () => {
+    const r = judgeSidepanelBlack(base({
+      iframe: { ...PAINT, w: 400, h: 900, canRead: true, ready: 'loading' },
+      inner: { ...PAINT, bodyKids: 3, cloak: '1' }
+    }));
+    expect(r.cause).toContain('まだ読み込み中');
+    expect(r.cause).not.toContain('JSが途中で止まった');
+  });
+
+  it('★interactive でも同じ(まだ起動前)', () => {
+    const r = judgeSidepanelBlack(base({
+      iframe: { ...PAINT, w: 400, h: 900, canRead: true, ready: 'interactive' },
+      inner: { ...PAINT, bodyKids: 3, cloak: '1' }
+    }));
+    expect(r.cause).toContain('まだ読み込み中');
+  });
+
+  it('★complete なのに幕が残っている=本物の固着は従来どおり名指しする(退化させない)', () => {
+    const r = judgeSidepanelBlack(base({
+      iframe: { ...PAINT, w: 400, h: 900, canRead: true, ready: 'complete' },
+      inner: { ...PAINT, bodyKids: 3, cloak: '1' }
+    }));
+    expect(r.cause).toContain('幕(cloak)');
+    expect(r.cause).toContain('JSが途中で止まった');
+    expect(r.ok).toBe(false);
+  });
+
+  it('ready 不明(旧形式)は従来どおり幕を名指し(後方互換)', () => {
+    const r = judgeSidepanelBlack(base({ inner: { ...PAINT, bodyKids: 3, cloak: '1' } }));
+    expect(r.cause).toContain('幕(cloak)');
+  });
+
+  it('読み込み中でも幕が無ければ正常(読み込み中だけで🔴にしない)', () => {
+    const r = judgeSidepanelBlack(base({
+      iframe: { ...PAINT, w: 400, h: 900, canRead: true, ready: 'loading' },
+      inner: { ...PAINT, bodyKids: 3, cloak: '' }
+    }));
+    expect(r.ok).toBe(true);
+  });
+
   it('★color-scheme が light でない → v0.1.1289 で直した退行を検出', () => {
     const r = judgeSidepanelBlack(base({ outer: { ...PAINT, colorScheme: 'light dark' } }));
     expect(r.cause).toContain('color-scheme');
