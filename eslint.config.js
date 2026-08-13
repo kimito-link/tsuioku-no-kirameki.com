@@ -305,7 +305,17 @@ export default [
     //     知らないと必ず同じ穴を掘る(現に popup 側だけ3ヶ月取り残されていた)。
     //   検査: src/lib/storageFullReadCensus.test.js が全件読みの箇所を【数で固定】する。
     files: ['src/extension/popup-entry.js'],
-    rules: { 'max-lines': ['error', { max: 22243, skipBlankLines: false, skipComments: false }] }
+    // ★2026-08-13(v0.1.1386) 22243 → 22311(+68)。「サムネが白い」の実害根治。
+    //   uid から式で組んだサムネURLは実在未確認のため score=1 のままで、速報は
+    //   「実サムネ0%」と言い続けていた。しかし実測では推測URLの多くが実在した
+    //   (curl で5件中3件が HTTP 200・4KBの画像が返る)。
+    //   ＝白いのはURLが悪いのではなく【実在を確認する経路が無かった】。
+    //   ★直し方の肝は「追加の通信をしない」こと: 画面は既にその URL で <img> を
+    //     描いており onload で成功が分かる。その事実を拾うだけで実在確認になる。
+    //   増分は onRemoteSuccess の記録フック + 間引き保存の2関数と、その根拠コメント。
+    //   ★判定・正規化・上限の本体は純関数 src/lib/verifiedAvatarRegistry.js
+    //     (単体11 + 配線5テスト)に隔離済み。popup 側は DOM/storage グルーのみ。
+    rules: { 'max-lines': ['error', { max: 22311, skipBlankLines: false, skipComments: false }] }
   },
   {
     files: ['src/extension/popup/**/*.js'],

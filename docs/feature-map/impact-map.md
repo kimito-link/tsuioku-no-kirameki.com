@@ -776,6 +776,7 @@
 | `src/lib/userSupportGridAccent.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/userThumbGrid.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/venueAvatarReport.js` | 1 | 状態速報ページ |
+| `src/lib/verifiedAvatarRegistry.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/viewerCountProbeMerge.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/viewerSelfLaneAggregate.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/voiceComment.js` | 1 | 記録エンジン(watchページ常駐) |
