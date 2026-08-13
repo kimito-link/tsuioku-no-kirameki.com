@@ -26,6 +26,16 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1384',
+    date: '2026-08-13',
+    summary: '更新のたびの手作業（リロード・F5）を減らします',
+    items: Object.freeze([
+      '拡張を更新したとき、視聴中のタブが自動で読み込み直されたかどうかを状態速報に表示するようにしました。',
+      '自動で読み込み直されていれば、手動でのF5は不要です。これまで毎回お願いしていた手順を減らせます。',
+      '自動リロードが働かなかった場合も、その理由が分かるように記録します。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1383',
     date: '2026-08-13',
     summary: '診断が「3時間半フリーズ」と誤表示する問題を修正',

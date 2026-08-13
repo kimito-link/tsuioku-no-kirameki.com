@@ -30,9 +30,34 @@ node scripts/cws-publish.mjs build/tsuioku-no-kirameki-<version>.zip --publish
    - 設計判断(「ゆっくり」の扱い・3キャラの役割・プライバシー方針)
    - 開発フロー・テスト方針・PR運用
    - **AI ツール役割分担**(下記の§T を参照)
-   - **version bump の粒度+ユーザー反映3手順**(§12.5)= 1変更=patch 1つ・manifest/package/changelog
-     を同期(`npm run verify:bump`)・**push しただけでは Chrome に届かない**(ユーザーが pull→拡張
-     リロード→watch タブ F5 を踏んで初めて反映)。司令塔は push 報告のたびにこの3手順を併記する。
+   - **version bump の粒度**(§12.5)= 1変更=patch 1つ・manifest/package/changelog を同期
+     (`npm run verify:bump`)。
+
+### ★反映は【司令塔が全部やる】(2026-08-13 変更・ユーザーに手作業を残さない)
+
+**旧ルール**「ユーザーが pull→拡張リロード→watch タブ F5」は**廃止**。
+ユーザーの言葉:「毎回ここを読み込みして繰り返すことが多い」「戻す作業が大変」
+＝**私が依頼していた回数がそのまま負担になっていた**(1日11版=11回)。
+
+司令塔は push 後に**自分で最後まで反映する**:
+
+```
+1. git pull + npm run copy:ext            ← Bash(既に実行している)
+2. mcp__chrome-devtools__reload_extension ← ★これを使う(今まで使わずに依頼していた)
+3. 必要なら navigate_page でwatchタブ再読込
+```
+
+★**`install_extension` は初回だけ**。2回目以降は必ず `reload_extension` を使う。
+　install 扱いだと `onInstalled` の reason が 'install' になり、
+　`reloadExistingWatchTabs()`(background.js:1008 の update 分岐)に**乗らない**
+　＝タブが自動リロードされず「効かない」ように見える(2026-08-13 に司令塔が自分で踏んだ)。
+
+★**メイン世界で `chrome.runtime.id` を読んで生死を判定しない**。
+　`externally_connectable` が無いので**健全でも常に null**＝正常と異常を区別できない。
+　判定するなら content script の隔離世界か、状態速報の値を見ること。
+　([[measure-the-region-you-claim-2026-08-10]])
+
+★ユーザーに操作を頼むのは**私の手段が全部尽きたときだけ**。頼む前に一度考える。
 
 ## §T: AI ツール役割分担(Claude Code 司令塔アーキテクチャ・2026-05-29 確立)
 
