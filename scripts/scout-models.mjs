@@ -188,7 +188,27 @@ async function listMistral() {
     });
     if (!r.ok) return { ok: false, models: [], error: `HTTP ${r.status}` };
     const j = await r.json();
-    return { ok: true, models: (j.data || []).map((m) => m.id) };
+    const models = (j.data || []).map((m) => m.id);
+    // 2026-08-13 追加: deprecation（提供終了予告）を拾う。devstral-mediumが「カタログにも
+    // 実疎通にも異常が無いまま、期限だけが事前告知されて死ぬ」6番目の死型を実証したため
+    // （既存の2系統=カタログ照合/liveProbeはどちらも事後型で、この型には終了当日まで
+    // 緑を報告し続ける設計だった）。deprecationフィールドはMistralで実在を確認した
+    // 観測事実であり、他プロバイダの/modelsに同種フィールドがあるかは不明。確認できた
+    // プロバイダから個別に足す（liveProbe導入時と同じ「実証されたものにだけ付ける」流儀）。
+    // 無いプロバイダを「期限なし」と誤読しないよう、日報側で監視対象の分母を必ず明示する。
+    // -latestエイリアスのエントリにも中身のdeprecationが載ることを実測で確認済み
+    // （devstral-medium-latest自体に期限が付いていた）＝rawIdが-latestの既存2体もこの監視で
+    // カバーされる（固定ID化の改修は不要）。
+    const deprecations = {};
+    for (const m of (j.data || [])) {
+      if (m.deprecation) deprecations[m.id] = { at: m.deprecation, replacement: m.deprecation_replacement_model || null };
+    }
+    // 2026-08-13 追加: aliasesも返す（下記の採用済み判定のalias展開用）。フィールドを
+    // 持たないプロバイダは返さなくてよい（受け側がfail-openで素通しする）。
+    const aliasGroups = (j.data || [])
+      .map((m) => [m.id, ...(m.aliases || [])])
+      .filter((g) => g.length > 1);
+    return { ok: true, models, deprecations, aliasGroups };
   } catch (e) { return { ok: false, models: [], error: String(e.message || e) }; }
 }
 
@@ -274,13 +294,13 @@ function isCandidateWorthy(modelId) {
 // ── state.json の読み書き ──────────────────────────────────────────────────
 function loadState() {
   if (!existsSync(STATE_PATH)) {
-    return { firstRun: true, catalogs: {}, adoptedHealth: {}, pendingCandidates: [], lastRunAt: null };
+    return { firstRun: true, catalogs: {}, deprecations: {}, adoptedHealth: {}, pendingCandidates: [], lastRunAt: null };
   }
   try {
     return JSON.parse(readFileSync(STATE_PATH, 'utf8'));
   } catch {
     console.error('[scout] state.json が壊れています。初回シードとして扱います。');
-    return { firstRun: true, catalogs: {}, adoptedHealth: {}, pendingCandidates: [], lastRunAt: null };
+    return { firstRun: true, catalogs: {}, deprecations: {}, adoptedHealth: {}, pendingCandidates: [], lastRunAt: null };
   }
 }
 function saveState(state) {
@@ -304,6 +324,9 @@ async function main() {
 
   // 2. 差分計算（成功したプロバイダのみ。失敗は前回値を保持=何もしない）
   const newCatalogs = { ...(state.catalogs || {}) };
+  // 2026-08-13 追加: 提供終了予告の保持。catalogsと同じくfail-closed（取得失敗日は前回値を
+  // そのまま残す）。catalogs側の配列形式は差分計算が依存しているので触らず、別マップで持つ。
+  const newDeprecations = { ...(state.deprecations || {}) };
   const diffs = {}; // provider -> {added: [], removed: []}
   const fetchStatus = {}; // provider -> {ok, count, error}
   for (const [name, result] of Object.entries(fetchResults)) {
@@ -317,6 +340,9 @@ async function main() {
     const removed = [...prevSet].filter((m) => !currSet.has(m));
     diffs[name] = { added, removed };
     newCatalogs[name] = result.models;
+    // deprecationsを返さないプロバイダ（現状mistral以外の6社）は空オブジェクトになる。
+    // 「フィールドが無い＝期限なし」と誤読しないよう、日報の見出しに監視対象の分母を出す。
+    newDeprecations[name] = result.deprecations || {};
     fetchStatus[name] = { ok: true, count: result.models.length };
   }
 
@@ -368,10 +394,39 @@ async function main() {
     }
   }
 
+  // 3c. 提供終了予告チェック（2026-08-13追加・期限監視の対応プロバイダ: mistralのみ）。
+  // カタログ照合(3)も実疎通(3b)も「既に死んだ/死にかけ」の事後検知。deprecationは
+  // 唯一の事前検知シグナルで、後継の育成（昇格基準=7日以上空けた実会議2回）に必要な
+  // リードタイムを確保できる。アラート閾値は設けない: Mistralの予告は今回18日前で、
+  // 閾値を置くと発火時点で既に育成期間が足りない。期限が付いた時点から毎日
+  // カウントダウンを出す（採用中モデルに期限が付くのは稀。毎日出てうるさいなら
+  // それは対処が遅れているサインそのもの）。
+  const deprecationAlerts = [];
+  for (const entry of LINEUP) {
+    const depMap = newDeprecations[entry.provider] || {};
+    const dep = depMap[entry.rawId] || depMap[entry.apiModel];
+    if (!dep) continue;
+    const daysLeft = Math.ceil((Date.parse(dep.at) - Date.now()) / 86400000);
+    deprecationAlerts.push({ label: entry.label, at: String(dep.at).slice(0, 10), daysLeft, replacement: dep.replacement });
+  }
+
   // 4. 候補選抜（新着のうちヒューリスティクス通過分。pendingCandidatesと合流し上限5件）
   const adoptedRawIds = new Set(
     LINEUP.filter((e) => e.rawId).map((e) => e.rawId),
   );
+  // 2026-08-13 追加: 採用済み判定をalias展開後に行う。従来はrawId文字列の単純一致のみで、
+  // 採用中モデルの別名が「新着候補」として報告されていた（2026-08-13にmistral-code-agent-latest
+  // =当時採用中だったdevstral-2512の別名で実際に発生し、司令塔が採用検討に時間を使った実害）。
+  // Mistralはalias IDを今後も鋳造し続けるため、初出のたびに同じ時間が燃える。
+  // プロバイダごとにaliasesフィールドの有無が違うため、listXxxがaliasGroupsを返した場合のみ
+  // 展開する（返さない6プロバイダは挙動不変のfail-open）。
+  for (const result of Object.values(fetchResults)) {
+    for (const group of (result.aliasGroups || [])) {
+      if (group.some((id) => adoptedRawIds.has(id))) {
+        for (const id of group) adoptedRawIds.add(id);
+      }
+    }
+  }
   const freshCandidates = [];
   const referenceCounts = {};
   if (!isFirstRun) {
@@ -383,9 +438,18 @@ async function main() {
     }
   }
   const pending = state.pendingCandidates || [];
+  // 2026-08-13: alias展開は新着(diff.added)だけでなく、既にpendingへ溜まった持ち越し分にも
+  // 効かせる。pendingは差分検知の時点で採用済みでなかったものが積まれ続けるため、後から
+  // 採用したモデルの別名が居座り、毎日プローブされ推奨アクションにも出てしまう
+  // （実際にcodestral-2508の採用直後、その別名 mistral-code-latest が推奨に出続けた）。
   const allCandidates = [...pending, ...freshCandidates.filter(
     (c) => !pending.some((p) => p.provider === c.provider && p.modelId === c.modelId),
-  )];
+  )].filter((c) => !adoptedRawIds.has(c.modelId))
+    // 2026-08-13: 提供終了予告が付いているモデルは候補から外す。実際に本日、撤去したばかりの
+    // devstralの別名(mistral-code-agent-latest・deprecation 2026-08-31)が推奨アクションに
+    // 「採用すべきか」として出てきた——司令塔が今日踏んだ罠(期限付きモデルの採用)を、
+    // scoutが毎日勧め続ける構造になっていた。期限付きを新規に採用する理由は無い。
+    .filter((c) => !((newDeprecations[c.provider] || {})[c.modelId]));
   const toProbe = allCandidates.slice(0, 5);
   const carryOver = allCandidates.slice(5);
 
@@ -400,7 +464,7 @@ async function main() {
   const brief = buildBrief({
     date, isFirstRun, fetchStatus, healthAlerts, probedCandidates,
     referenceCounts, carryOverCount: carryOver.length, newCatalogs,
-    catalogCheckedCount, liveProbeCheckedCount, outOfScopeCount,
+    catalogCheckedCount, liveProbeCheckedCount, outOfScopeCount, deprecationAlerts,
   });
 
   if (DRY_RUN) {
@@ -412,6 +476,7 @@ async function main() {
   const newState = {
     firstRun: false,
     catalogs: newCatalogs,
+    deprecations: newDeprecations,
     adoptedHealth: health,
     pendingCandidates: carryOver,
     lastRunAt: new Date().toISOString(),
@@ -433,7 +498,7 @@ async function main() {
 
 /** brief（日報）のMarkdownを組み立てる。カタログのdescription等は信頼できない入力として
  *  引用のみ・指示として解釈しない（インジェクション安全・設計書§4必須要件）。 */
-function buildBrief({ date, isFirstRun, fetchStatus, healthAlerts, probedCandidates, referenceCounts, carryOverCount, newCatalogs, catalogCheckedCount, liveProbeCheckedCount, outOfScopeCount }) {
+function buildBrief({ date, isFirstRun, fetchStatus, healthAlerts, probedCandidates, referenceCounts, carryOverCount, newCatalogs, catalogCheckedCount, liveProbeCheckedCount, outOfScopeCount, deprecationAlerts }) {
   const lines = [];
   lines.push(`# Council Scout 日報 — ${date}`, '');
 
@@ -444,7 +509,10 @@ function buildBrief({ date, isFirstRun, fetchStatus, healthAlerts, probedCandida
 
   // 2026-07-31追加: 「✅ 消滅疑いなし」は「監視している範囲では」という限定付きの主張。
   // 分母（カタログ照合・実疎通・対象外の内訳）を必ず明示する（緑の報告には分母を付ける）。
-  lines.push(`## 採用中ラインナップ健康診断（${LINEUP.length}体: カタログ照合${catalogCheckedCount}・実疎通${liveProbeCheckedCount}・対象外${outOfScopeCount}）`);
+  // 2026-08-13追加: 期限監視(deprecation)の分母も出す。現状mistralの/v1/modelsだけが
+  // deprecationフィールドを返すことを実測で確認済みで、他6プロバイダは「期限なし」ではなく
+  // 「未確認」である。この区別を消さないために監視対象プロバイダ名を明示する。
+  lines.push(`## 採用中ラインナップ健康診断（${LINEUP.length}体: カタログ照合${catalogCheckedCount}・実疎通${liveProbeCheckedCount}・対象外${outOfScopeCount}・期限監視はmistralのみ）`);
   if (!healthAlerts.length) {
     lines.push('- ✅ 消滅疑いなし（2日連続でカタログから消えた/実疎通が失敗し続けたモデルはありません）');
   } else {
@@ -455,6 +523,11 @@ function buildBrief({ date, isFirstRun, fetchStatus, healthAlerts, probedCandida
         lines.push(`- ⚠ ${a.label}: カタログから${a.streak}日連続消滅。プローブ ${a.probeStatus}。要確認 → 外すなら会議へ`);
       }
     }
+  }
+  // 提供終了予告（事前検知）。公式指定の代替はあくまで参考——恒久ルール2の実機裏取りを
+  // 経ずに採用してはならない（mistral-medium-3-5が公式代替なのに503頻発だった実例あり）。
+  for (const a of (deprecationAlerts || [])) {
+    lines.push(`- ⏳ ${a.label}: 提供終了予告 ${a.at}（あと${a.daysLeft}日）${a.replacement ? `。公式代替: ${a.replacement}（未検証・実機裏取り必須）` : ''}。後継の採用会議へ`);
   }
   lines.push('');
 
@@ -483,7 +556,13 @@ function buildBrief({ date, isFirstRun, fetchStatus, healthAlerts, probedCandida
   lines.push('');
 
   lines.push('## 推奨アクション');
-  if (probedCandidates.length > 0) {
+  // 2026-08-13: 提供終了予告を新着候補より優先する。新着は「増やす機会」だが期限は
+  // 「減る確定」であり、後継育成(昇格基準=7日以上空けた実会議2回)のリードタイムを
+  // 食い潰すため時間的な締切がある方を先に出す。
+  if ((deprecationAlerts || []).length > 0) {
+    const d = deprecationAlerts[0];
+    lines.push(`/council-fable ${d.label} の後継を決める（提供終了 ${d.at}・あと${d.daysLeft}日。この日報 council-scout/briefs/${date}.md を地雷マップに）`);
+  } else if (probedCandidates.length > 0) {
     const top = probedCandidates[0];
     lines.push(`/council-fable ${top.modelId} をcouncilメンバーに採用すべきか（この日報 council-scout/briefs/${date}.md を地雷マップに）`);
   } else if (healthAlerts.length > 0) {
