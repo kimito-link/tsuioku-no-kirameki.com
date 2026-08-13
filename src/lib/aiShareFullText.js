@@ -25,6 +25,8 @@ import {
 } from './commentCountProvenance.js';
 // 応援コメント(最新N件・本文)を状態速報にも載せる(jsonBlob 同梱の鏡を貼るだけ=新規 read なし)。
 import { formatCommentTimelineReportLines } from './commentTimelineReport.js';
+// v0.1.1385: 症状名で引ける特化判定を【複数】出す(総合1個では埋もれるため)。
+import { buildSymptomVerdicts, formatSymptomVerdictsBlock } from './symptomVerdicts.js';
 // スクロール白化(重い・一瞬白くなる)を状態速報の読める所に出す(fastDiag に既にある値を貼るだけ)。
 import {
   formatScrollWhiteoutReportLines,
@@ -258,6 +260,32 @@ export function buildAiShareFullText({ overviewText, livesData, fastDiag, popupD
       }
     } catch {
       /* no-op: パリティ判定の失敗は状態速報を壊さない */
+    }
+    /*
+     * ★v0.1.1385: 症状別の特化判定を【複数】出す(ユーザー指摘への回答)。
+     *
+     *   ユーザーの言葉:「特化したものを複数つくれといっているのに、総合1個しかない」
+     *   従来は33セルを `総合判定: 🟢 取り込み中 ✓` の1行に畳んでおり、
+     *   **サムネが全部白くてもレーンが空でも総合は緑になりうる**構造だった
+     *   (2026-08-13 の実機がまさにそれ: 総合=取り込み中✓ / サムネ0% / レーン未描画)。
+     *
+     *   ここでは「サムネが白い」「レーンが空」「診断が重い」など
+     *   **ユーザーが困ったときに使う言葉**で引ける判定を、異常な分だけ列挙する。
+     *   ★正常なものは1行も出さない(ノイズを作らない)。
+     */
+    try {
+      const popupSnap = popupDiag?.popup ?? popupDiag;
+      const symptomBlock = formatSymptomVerdictsBlock(
+        buildSymptomVerdicts({
+          identityAcquisition: popupSnap?.identityAcquisition || null,
+          laneRenderProbe: popupSnap?.storyUserLaneRenderProbe || null,
+          avatarLoadDiag: popupSnap?.avatarLoadDiag || null,
+          updateMs: refreshPerf?.totalMs
+        })
+      );
+      if (symptomBlock) { lines.push(symptomBlock); lines.push(''); }
+    } catch {
+      /* no-op: 症状別判定の失敗は状態速報を壊さない */
     }
     const trustLines = formatDiagnosticsTrustLines(trust);
     if (trustLines.length) { for (const l of trustLines) lines.push(l); lines.push(''); }
