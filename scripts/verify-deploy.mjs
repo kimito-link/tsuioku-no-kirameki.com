@@ -15,7 +15,7 @@
  * 使い方: node scripts/verify-deploy.mjs [配布先]
  *   既定の配布先: C:/nicolive-ext
  */
-import { readFileSync, existsSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 const DEST = process.argv[2] || 'C:/nicolive-ext';
