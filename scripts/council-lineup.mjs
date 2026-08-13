@@ -141,7 +141,20 @@ export const LINEUP = [
   //    ※ nvidia/llama-3.1-nemotron-ultra-253b-v1 は404で現在アクセス不可・採用禁止。
   //   2026-07-31: rawIdをapiModelと同値で埋めた（NVIDIA NIMのカタログ取得自体は毎日
   //   安定成功しているため、rawId空にしていたことに合理的理由が無かった）。
-  { label: 'nvidia/nemotron-3-ultra-550b', provider: 'nvidia', rawId: 'nvidia/nemotron-3-ultra-550b-a55b', apiModel: 'nvidia/nemotron-3-ultra-550b-a55b', opts: {}, timeoutMs: 90000, requires: ['N'] },
+  // 2026-08-13: timeoutMs: 90000 を撤去し openaiChat の既定(150秒)に委ねる。
+  //  実測(150秒制限で単発5回): 69592ms / 104469ms / 88884ms / 52025ms / 150秒超abort。
+  //  ＝旧90秒制限では5回中2回がFAILED、うち1回(88884ms)は1.1秒差の薄氷だった。
+  //  COUNCIL_QUALITY=1の実会議でも「[FAILED: This operation was aborted]」が実際に発生し、
+  //  修正後の会議では103999msで成功＝旧制限なら確実に落ちていた回を拾えている。
+  //  ただし150秒でも5回に1回は落ちる＝このモデルは本質的に不安定で、タイムアウト延長は
+  //  「落ちる頻度を2/5から1/5に減らす」改善であって根治ではない（根治するならlead役の
+  //  振替か、敗者復活の発動条件見直しが必要。本コミットの範囲外）。leadは会議で最も地頭の要る
+  //  統括役であり、しかもmeeting.mjsの敗者復活は「有効回答が3体未満」でしか発動しないため、
+  //  5体中leadだけが落ちた会議(有効4体)では何の救済も働かない＝最も重要な1票が無言で欠ける。
+  //  90秒は既定150秒より厳しい自己制限であり、この縛りは自傷だった（他のNIMエントリは
+  //  timeoutMs無指定で既定150秒に委ねている）。weightOfのNIM「やや不安定枠」(weight2)の
+  //  扱いは従来どおり変更しない——遅さの評価と、遅い時に殺すかどうかは別の判断。
+  { label: 'nvidia/nemotron-3-ultra-550b', provider: 'nvidia', rawId: 'nvidia/nemotron-3-ultra-550b-a55b', apiModel: 'nvidia/nemotron-3-ultra-550b-a55b', opts: {}, requires: ['N'] },
   { label: 'nvidia/deepseek-v4-pro', provider: 'nvidia', rawId: 'deepseek-ai/deepseek-v4-pro', apiModel: 'deepseek-ai/deepseek-v4-pro', opts: {}, timeoutMs: 120000, requires: ['N'] },
 
   // 2026-07-31 追加: NVIDIA lead正規(nemotron-3-ultra-550b)の別経路予備。OpenRouterの無料
@@ -153,7 +166,9 @@ export const LINEUP = [
   // 出やすい実績があるため個別に軽い重みは与えない）。liveProbeは不要（OpenRouterの無料枠
   // 終了は「カタログから:freeスラッグが消える」形で現れることが本改修のopenrouter/gpt-oss-120b
   // 撤去で実証済みのため、カタログ照合で十分）。
-  { label: 'openrouter/nemotron-3-ultra-550b', provider: 'openrouter', rawId: 'nvidia/nemotron-3-ultra-550b-a55b:free', apiModel: 'nvidia/nemotron-3-ultra-550b-a55b:free', opts: {}, timeoutMs: 90000, requires: ['O'] },
+  // 2026-08-13: 上のnvidia本線と同一モデル・同一理由で timeoutMs: 90000 を撤去（既定150秒へ）。
+  //  こちらはlead予備だが、本線が落ちた日の代打がまた90秒で落ちては冗長化の意味がない。
+  { label: 'openrouter/nemotron-3-ultra-550b', provider: 'openrouter', rawId: 'nvidia/nemotron-3-ultra-550b-a55b:free', apiModel: 'nvidia/nemotron-3-ultra-550b-a55b:free', opts: {}, requires: ['O'] },
 
   // 2026-07-31 追加: SambaNova Cloud（新規プロバイダ）。Free Tierは支払い方法未登録時に
   // 自動適用されカード登録不要（docs.sambanova.ai/docs/en/models/rate-limitsで確認済み）。

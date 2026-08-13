@@ -709,7 +709,13 @@ async function council(members, label, key) {
       // 2026-07-14: nvidia/mistral-large-3-675bは統合失敗時にリトライが無い一発工程のため
       // 即座にpriority先頭へは入れない。QUALITY会議2回連続でFAILEDゼロなら先頭に昇格させる
       // （cloudflare/glm-4.7-flashのトライアル方式と同じ流儀）。
-      const priority = ['groq/gpt-oss-120b', 'cloudflare/nemotron-120b', 'groq/llama-3.3-70b', 'gemini-2.5-flash', 'cloudflare/glm-5.2'];
+      // 2026-08-13: 末尾の 'cloudflare/glm-5.2' を撤去。2026-07-31にWorkers有料プラン専用化で
+      // LINEUPから撤去済みのラベルで、findが永久に外れる死に要素だった（council-lineup.mjsの
+      // 撤去コメント参照）。挙動は変わらないが、統合はリトライ無しの一発工程であり、
+      // 候補列に「絶対に当たらない選択肢」が混ざっていること自体が次に読む人を誤らせる。
+      // 2番手のcloudflare/nemotron-120bは残す: weight4でCF勢は並列FAILED実績があるものの、
+      // groqがTPD枯渇した日に統合役が全滅するのを防ぐ最後の砦として機能する（順序も変えない）。
+      const priority = ['groq/gpt-oss-120b', 'cloudflare/nemotron-120b', 'groq/llama-3.3-70b', 'gemini-2.5-flash'];
       synth = priority.map(l => allMembers.find(m => m.label === l && !exhaustedLabels.has(l))).find(Boolean)
         || allMembers.find(m => m.kind === 'cloud' && !exhaustedLabels.has(m.label));
       if (synth) console.error(`[${label}] ②統合役(能力優先): ${synth.label}`);
