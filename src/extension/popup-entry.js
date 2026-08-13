@@ -891,7 +891,7 @@ import { countUniqueAvatarEntries } from '../lib/avatarEntryCounts.js';
 import { resolveStoryLaneAvatarSrc } from '../lib/storyLaneAvatarSrc.js';
 import { pickAvatarUrlForUid, extractUidFromAvatarUrl } from '../lib/deriveAvatarUrlFromUid.js';
 // v0.1.1386: 実在が確認できたサムネ(uid)を覚えて、次から本物として数える。
-import { addVerifiedAvatarUids, KEY_VERIFIED_AVATAR_UIDS } from '../lib/verifiedAvatarRegistry.js';
+import { addVerifiedAvatarUids, verifiedAvatarUidSet, KEY_VERIFIED_AVATAR_UIDS } from '../lib/verifiedAvatarRegistry.js';
 import { attachAiDiagButtonHandler } from './popup/attachAiDiagButtonHandler.js';
 import { mergeWatchSnapshotPreservingBroadcaster } from '../lib/watchSnapshotPartialMerge.js';
 import { persistFreshlyFetchedSnapshot } from '../lib/popupWatchSnapshotPersist.js';
@@ -5019,6 +5019,28 @@ const STORY_REMOTE_FAILED_PLACEHOLDER_IMG = NICONICO_OFFICIAL_DEFAULT_USERICON_H
  *   - 書き込みは間引く(成功のたびに set すると storage を圧迫する=過去に固まった原因)
  *   - 失敗しても描画を止めない(全て try/catch)
  */
+/**
+ * ★v0.1.1387: 実在確認済み uid の集合(描画の thumbScore 判定に使う)。
+ *   ここが空だと「記録はしたが誰も読んでいない」＝v0.1.1378 と同じ失敗になる
+ *   ([[unwired-judgement-is-systemic-2026-08-12]])。
+ * @type {Set<string>}
+ */
+let _verifiedAvatarUidSet = new Set();
+
+/** 起動時に一度だけ storage から読み込む(1キーのみ・失敗しても描画を止めない)。 */
+function loadVerifiedAvatarUidsOnce() {
+  try {
+    const local = globalThis.chrome?.storage?.local;
+    if (!local?.get) return;
+    void local.get(KEY_VERIFIED_AVATAR_UIDS).then((bag) => {
+      _verifiedAvatarUidSet = verifiedAvatarUidSet(bag?.[KEY_VERIFIED_AVATAR_UIDS]);
+    }).catch(() => { /* no-op */ });
+  } catch {
+    // no-op
+  }
+}
+loadVerifiedAvatarUidsOnce();
+
 /** @type {Set<string>} この起動で新たに実在確認できた uid(未保存分)。 */
 const _verifiedAvatarPending = new Set();
 /** 直近の保存時刻(ms)。間引きの基準。 */
@@ -5036,6 +5058,12 @@ function noteVerifiedAvatarFromImg(img) {
   const uid = extractUidFromAvatarUrl(src);
   if (!uid) return;
   _verifiedAvatarPending.add(String(uid));
+  /*
+   * ★v0.1.1387: 覚えた瞬間に判定用の集合へも入れる。
+   *   storage 保存は10秒間引きなので、これが無いと「表示できたのに次の描画でも
+   *   まだ推測URL扱い」になり、最大10秒ぶん判定が遅れる。
+   */
+  try { _verifiedAvatarUidSet.add(String(uid)); } catch { /* no-op */ }
   maybeFlushVerifiedAvatars();
 }
 
@@ -6846,7 +6874,9 @@ function renderStoryUserLane() {
     yukkuriSrc: STORY_GRID_DEFAULT_TILE_IMG,
     tvSrc: STORY_REMOTE_FAILED_PLACEHOLDER_IMG,
     anonymousIdenticonEnabled: anonymousIdenticonRuntimeEnabled,
-    anonymousIdenticonDataUrl: ''
+    anonymousIdenticonDataUrl: '',
+    // ★v0.1.1387: 実在確認済みの uid 集合を渡す(推測URLでも実績があれば本物として数える)。
+    verifiedAvatarUids: _verifiedAvatarUidSet
   };
 
   const entries = Array.isArray(STORY_SOURCE_STATE.entries)
@@ -8009,7 +8039,9 @@ function buildStoryGiftThrowerLanePicks(giftUsers, liveId, storageCtx, limit) {
     yukkuriSrc: STORY_GRID_DEFAULT_TILE_IMG,
     tvSrc: STORY_REMOTE_FAILED_PLACEHOLDER_IMG,
     anonymousIdenticonEnabled: anonymousIdenticonRuntimeEnabled,
-    anonymousIdenticonDataUrl: ''
+    anonymousIdenticonDataUrl: '',
+    // ★v0.1.1387: 実在確認済みの uid 集合を渡す(推測URLでも実績があれば本物として数える)。
+    verifiedAvatarUids: _verifiedAvatarUidSet
   };
   const seen = new Set();
   /** @type {ReturnType<typeof buildStoryGiftThrowerLanePicks>} */
