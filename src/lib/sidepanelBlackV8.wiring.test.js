@@ -107,7 +107,21 @@ describe('② シェードの締切を「初回可視」起点にする', () => 
 
 describe('③ タイマー遅延(=イベントループ停止)を速報に出す', () => {
   it('観測列に予定時刻 sched を積んでいる', () => {
-    expect(panelSrc).toMatch(/sched: Number\.isFinite\(Number\(schedMs\)\)/);
+    /*
+     * ★v0.1.1383: `Number.isFinite(Number(schedMs))` は **null を弾けない**
+     *   (`Number(null)===0` は finite)。旧式だと late/visible/reload が
+     *   「予定0msの点」になり、実機で12,750,002msという巨大な嘘を報告した。
+     *   ★null を先に落とす形であることまで固定する(旧式に戻ったら赤)。
+     */
+    expect(panelSrc).toMatch(/sched: schedMs == null \|\| !Number\.isFinite\(Number\(schedMs\)\)/);
+    expect(panelSrc).not.toMatch(/sched: Number\.isFinite\(Number\(schedMs\)\)/);
+  });
+
+  it('★観測系列が有界(パネルを開きっぱなしでも伸び続けない)', () => {
+    expect(panelSrc).toContain('trimObservationSeries(_sizeSeries)');
+    expect(panelSrc).toContain('trimObservationSeries(_cloakSeries)');
+    // ★起動直後の格子は温存する(黒は起動直後に出るので頭を捨ててはいけない)。
+    expect(panelSrc).toMatch(/arr\.length = SERIES_HEAD_KEEP;/);
   });
 
   it('★タイマー格子の各点が予定時刻を渡している(渡さないと永久に測れない)', () => {
