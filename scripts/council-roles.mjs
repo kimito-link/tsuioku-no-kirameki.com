@@ -52,7 +52,19 @@ export function roleOf(name) {
   // 代打頼みだった穴を、クラウド初のコード特化頭脳で埋める（採用の経緯・撤去条件は
   // council-lineup.mjs のエントリコメント参照）。weightOfは既存の"mistral"判定(weight3)が
   // 自動適用されるため変更不要。
+  // 2026-08-13 注記: mistral/devstral-mediumは提供終了予告(2026-08-31)により撤去済み。
+  // この判定行はmistral-large行の前例に倣い温存（LINEUPに該当labelが無ければ発火しない
+  // 無害な行で、将来devstral後継系が復活した際にそのまま効くため）。
   if (n.includes("devstral")) return "implement";
+  // 2026-08-13 追加: Mistral自社のコード生成モデル codestral → 実装(implement)。
+  // 2026-08-11採用のdevstral-mediumが提供終了予告(2026-08-31)で即日撤去された後継
+  // （経緯・実測はcouncil-lineup.mjsのエントリコメント参照）。"codestral"は"coder"にも
+  // "devstral"にも"magistral"にも非一致のため独立の分岐が必要——この行が無いと
+  // mistral/codestralはgeneralist落ちし、implement席がローカルqwen2.5-coder:14b単騎に
+  // 戻ることをmaster実コードのselectMembersで実行検証済み。この行の追加で既存全ラベルの
+  // 役割が1つも変わらないことも全数で実行検証済み。weightOfは既存の"mistral"判定(weight3)が
+  // 自動適用されるため変更不要。
+  if (n.includes("codestral")) return "implement";
   // Groq compound(/-mini) は Web検索内蔵のエージェント型 → 汎用(generalist)。
   // fact カテゴリの「会議内で最新情報を取りに行く」担当。2026-07-01 ライブAPIで実在確認・2リポ同期。
   // gpt-oss 判定より先に置く（"compound" は "gpt-oss" に非一致だが、意図を明示するため上に）。
