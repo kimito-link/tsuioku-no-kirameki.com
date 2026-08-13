@@ -705,6 +705,9 @@ async function council(members, label, key) {
   // routedMembers に参加していないモデルが統合するのは問題ない（digest を読むだけの独立工程）。
   if (SYNTH) {
     let synth = null;
+    // 2026-08-13: priority は下の統合チェーン（次点フォールバック）からも参照するため
+    // SYNTH_STRONG ブロックの外へ引き上げた（値・順序は不変）。
+    let priority = [];
     if (SYNTH_STRONG) {
       // 2026-07-14: nvidia/mistral-large-3-675bは統合失敗時にリトライが無い一発工程のため
       // 即座にpriority先頭へは入れない。QUALITY会議2回連続でFAILEDゼロなら先頭に昇格させる
@@ -715,7 +718,7 @@ async function council(members, label, key) {
       // 候補列に「絶対に当たらない選択肢」が混ざっていること自体が次に読む人を誤らせる。
       // 2番手のcloudflare/nemotron-120bは残す: weight4でCF勢は並列FAILED実績があるものの、
       // groqがTPD枯渇した日に統合役が全滅するのを防ぐ最後の砦として機能する（順序も変えない）。
-      const priority = ['groq/gpt-oss-120b', 'cloudflare/nemotron-120b', 'groq/llama-3.3-70b', 'gemini-2.5-flash'];
+      priority = ['groq/gpt-oss-120b', 'cloudflare/nemotron-120b', 'groq/llama-3.3-70b', 'gemini-2.5-flash'];
       synth = priority.map(l => allMembers.find(m => m.label === l && !exhaustedLabels.has(l))).find(Boolean)
         || allMembers.find(m => m.kind === 'cloud' && !exhaustedLabels.has(m.label));
       if (synth) console.error(`[${label}] ②統合役(能力優先): ${synth.label}`);
@@ -723,18 +726,56 @@ async function council(members, label, key) {
     if (!synth) synth = members.find(m => m.role === 'lead' && shown.some(r => r.label === m.label && !r.error));
     if (!synth) synth = members.find(m => shown.some(r => r.label === m.label && !r.error));
     if (synth) {
-      console.error(`[${label}] ②統合: ${synth.label} が1案に束ねる`);
+      // 2026-08-13設計（実測対応）: 統合は従来「候補1体を選んで一発・失敗は無言」だった。
+      // groq gpt-oss-120bのTPM(分あたり8000)超過による429を実会議で観測しており
+      // （"Limit 8000, Used 4520, Requested 7046"）、一発工程のままでは会議の最終成果物が
+      // 丸ごと消える。TPMはTPDと違い60秒以内に回復する（isTpdExhaustedErrorのコメント参照）ため:
+      //  (1) 筆頭候補がTPM 429のときだけ、エラー文の "try again in Xs" に従い1回だけ待って再試行する
+      //      （最強頭脳を安易に手放して統合の質を下げないため。待ちは上限70秒・取れなければ65秒）。
+      //  (2) それでも失敗なら priority の次点へ一発ずつフォールバック（別プロバイダ=別TPM枠なので待ち不要）。
+      //  縮退入力での再試行はしない: 入力を削った統合を同格の成果物として記録するのは
+      //  fail-closed 違反（「全員の回答を読んだ統合」だと後から誤認される）。同一入力でのみ再試行する。
+      //  全滅時は「統合なし」を明示ログし、素の回答だけを記録する（司令塔が手動統合する既存運用へ落ちる）。
+      //  従来は失敗時に無言で握り潰しており、統合が消えたことに気づけなかった。
+      const chain = [];
+      for (const c of [synth, ...(SYNTH_STRONG ? priority.map(l => allMembers.find(m => m.label === l && !exhaustedLabels.has(l))).filter(Boolean) : [])]) {
+        if (c && !chain.some(x => x.label === c.label)) chain.push(c);
+      }
+      const isTpmError = (msg) => /tokens per minute|\bTPM\b/i.test(String(msg || ''));
+      const tpmWaitMs = (msg) => {
+        const m = String(msg || '').match(/try again in ([\d.]+)s/i);
+        return Math.min(70000, m ? (Number(m[1]) + 5) * 1000 : 65000);
+      };
       const all = digestOf(shown, 900); // 重複を畳んだ後の回答で統合（ノイズ・重複を統括に見せない）
-      const sres = await runRound([{ ...synth, role: 'lead' }], question, () =>
+      // 1.3tok/字の見積もり仮説を実会議で校正するための材料（429の Requested 値と突き合わせる）。
+      console.error(`[${label}] ②統合digest ${all.length}字`);
+      const synthPrompt = () =>
         `【会議メンバー全員の回答（批判・修正済み）】\n${all}\n\n` +
         `あなたは統括役。次の手順で統合すること:\n` +
         `(1)対立点の列挙: メンバー間で結論が食い違う点を箇条書きで挙げる。批判役同士の指摘が食い違う場合も対立点として挙げ、どちらが正しいか判定する。無ければ「対立なし」と書く。\n` +
         `(2)判定: 各対立点についてどちらを採るか理由付きで決める。単なる折衷は禁止。両者の前提を組み替えて両立させる第三案が実在する場合のみ、それを採ってよい。\n` +
         `(3)少数意見の検分: 多数派の前提そのものを否定する意見があれば、無視せず「採用/却下＋理由」を明示する。【最重要】印の付いた批判が最終案で解決されているかを必ず確認する。\n` +
         `(4)自己検証: 自分の統合ロジックを2文で要約し、(2)の判定と矛盾していないことを確かめてから最終案を書く。\n` +
-        `最終案は ${DEFAULT_FORMAT_HINT} の4見出しで。優先順位を付け、何を捨てるかまで決める。あれもこれもにしない。`);
-      if (sres[0] && !sres[0].error) {
-        shown.push({ ...sres[0], label: synth.label + ' [統合]', role: 'lead', ms: sres[0].ms, synthesis: true });
+        `最終案は ${DEFAULT_FORMAT_HINT} の4見出しで。優先順位を付け、何を捨てるかまで決める。あれもこれもにしない。`;
+      for (let ci = 0; ci < chain.length; ci++) {
+        const cand = chain[ci];
+        console.error(`[${label}] ②統合: ${cand.label} が1案に束ねる${ci > 0 ? '（次点フォールバック）' : ''}`);
+        let sres = await runRound([{ ...cand, role: 'lead' }], question, synthPrompt);
+        if (sres[0]?.error && ci === 0 && isTpmError(sres[0].error)) {
+          const w = tpmWaitMs(sres[0].error);
+          console.error(`[${label}] ②統合: 筆頭 ${cand.label} がTPM 429 → ${Math.round(w / 1000)}秒待って同一入力で1回だけ再試行`);
+          await new Promise(r => setTimeout(r, w));
+          sres = await runRound([{ ...cand, role: 'lead' }], question, synthPrompt);
+        }
+        if (sres[0] && !sres[0].error) {
+          shown.push({ ...sres[0], label: cand.label + ' [統合]', role: 'lead', ms: sres[0].ms, synthesis: true });
+          break;
+        }
+        console.error(`[${label}] ②統合失敗: ${cand.label}: ${String(sres[0]?.error || '(no result)').slice(0, 120)}`
+          + (ci < chain.length - 1 ? ' → 次点へ' : ''));
+        if (ci === chain.length - 1) {
+          console.error(`[${label}] ②統合: 全候補失敗。統合なしで素の回答のみ記録する（司令塔が手動で統合すること）`);
+        }
       }
     }
   }
@@ -817,7 +858,17 @@ if (FULL && !AB) {
   // 重いローカルは増やさない（TO悪化を避ける）。枠が満杯なら critic/lead 以外を1体落として空ける。
   while (CRITICS > 1 && routedMembers.filter(m => m.role === 'critic').length < CRITICS) {
     const usedLabels = new Set(routedMembers.map(m => m.label));
-    const cand = allMembers.find(m => m.kind === 'cloud' && !usedLabels.has(m.label))
+    // 2026-08-13 修正: 従来は label 重複しか見ておらず、コメントの意図（「違う頭脳を狙って」）に
+    // 反して同一プロバイダから2体目を選んでいた。実会議で design カテゴリの召集が
+    // groq 3体+nvidia 1体のとき、2体目の批判役に groq/compound（4人目のgroq）が選ばれ、
+    // 既存の groq/gpt-oss-120b と同じ TPM 枠（分あたり8000）を食い合って
+    // 「429 Rate limit ... Limit 8000, Used 2101, Requested 6981」で丸ごと落ちた。
+    // ＝多視点のために足した1体が、レート制限で自滅して視点ゼロになっていた。
+    // プロバイダ未使用のクラウドを最優先し、無ければ従来どおり label 重複回避のみで選ぶ
+    // （fail-open。候補が尽きて2体目を諦めるより、同一プロバイダでも試す方がまし）。
+    const usedProviders = new Set(routedMembers.map(m => m.provider).filter(Boolean));
+    const cand = allMembers.find(m => m.kind === 'cloud' && !usedLabels.has(m.label) && !usedProviders.has(m.provider))
+              || allMembers.find(m => m.kind === 'cloud' && !usedLabels.has(m.label))
               || allMembers.find(m => m.kind !== 'local' && !usedLabels.has(m.label)); // ローカルは増やさない
     if (!cand) { console.error('[③多視点] 別頭脳の空きクラウドが無いため2体目の批判役は見送り'); break; }
     if (routedMembers.length >= MAX_MEMBERS) {
