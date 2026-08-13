@@ -792,15 +792,53 @@ async function injectIntoExistingTabs() {
   }
 }
 
-async function reloadExistingWatchTabs() {
+/**
+ * ★v0.1.1384: 拡張更新時に watch タブを自動リロードする(既存機能)。
+ *   ここに【実行痕跡】を残す。
+ *
+ * ■ なぜ計器が要るか(2026-08-13 ユーザーの困りごとから)
+ *   ユーザーは拡張を更新するたび「chrome://extensions で🔄 → watch タブで F5」を
+ *   手作業でやっていた(1日11版=11回)。「戻す作業が大変」。
+ *   ★しかしこの関数が効いているなら **F5 は元々不要**。
+ *   ところが「効いているか」を誰も測っておらず、私(司令塔)は毎回 F5 を依頼し続けていた。
+ *   ＝**余計な1手を私が生み出していた疑い**がある。
+ *
+ * ■ 判定の仕方
+ *   拡張更新の直後に状態速報を見て、`nls_last_auto_tab_reload` が
+ *   「更新時刻とほぼ同時 / tabCount≧1 / reason:'update'」なら**自動で効いている**
+ *   → 反映手順から F5 を消してよい。
+ *   逆に痕跡が無ければ、この経路に到達していない(SW停止 or reason 不一致)と分かる。
+ *   ★どちらに転んでも次の一手が決まる([[instrument-value-is-measured-by-fixes-2026-08-12]])。
+ *
+ * @param {string} reason onInstalled の details.reason(痕跡に残して経路を特定する)
+ */
+async function reloadExistingWatchTabs(reason = '') {
   const tabs = await queryTargetTabs();
+  let reloaded = 0;
   for (const tab of tabs) {
     if (!tab.id || tab.id === chrome.tabs.TAB_ID_NONE) continue;
     try {
       await chrome.tabs.reload(tab.id);
+      reloaded += 1;
     } catch {
       // no-op
     }
+  }
+  /*
+   * ★痕跡は【リロードの後】に書く(先に書くと、失敗したのに「やった」と嘘をつく)。
+   *   1キーだけの小さな書き込み=storage を圧迫しない。
+   */
+  try {
+    await chrome.storage.local.set({
+      nls_last_auto_tab_reload: {
+        at: Date.now(),
+        reason: String(reason || ''),
+        tabCount: tabs.length,
+        reloaded
+      }
+    });
+  } catch {
+    // no-op: 痕跡が残せなくてもリロード自体は済んでいる
   }
 }
 
@@ -1006,7 +1044,7 @@ chrome.runtime.onInstalled.addListener((details) => {
     //   reload より前に消すことで「孤児を reload して延命」を避ける。前面/手動視聴タブは触らない。
     await sweepOrphanAutopatrolTabsOnce();
     if (details?.reason === 'update') {
-      await reloadExistingWatchTabs();
+      await reloadExistingWatchTabs(String(details?.reason || ''));
     } else {
       await injectIntoExistingTabs();
     }

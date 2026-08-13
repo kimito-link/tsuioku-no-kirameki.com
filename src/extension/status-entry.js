@@ -344,6 +344,12 @@ let _refreshTimerId = /** @type {number|null} */ (null);
 //   storage を読むと重い=12 秒間引きでキャッシュし、間は前回値を再利用(コア表示は毎回更新のまま)。
 const EXTRAS_REFETCH_MS = 12000;
 let _extrasCacheAt = 0;
+/**
+ * ★v0.1.1384: 拡張更新時の自動タブリロードの痕跡(background.js が書く)。
+ *   これが出れば「手動F5は不要」と確定でき、ユーザーへの依頼を1手減らせる。
+ * @type {{ at?: number, reason?: string, tabCount?: number, reloaded?: number }|null}
+ */
+let _autoTabReloadRec = null;
 // 重さ根治 P3(2026-07-06): loadCustomSoundDiagSafe(IndexedDB open+count+fetch)の幽霊 read 対策。
 //   前回発行分が未解決の間は新規発行せず、直近スナップショット(fallback)を呼び出し側で渡す。
 const _customSoundDiagGuard = createInFlightGuard(() => loadCustomSoundDiagSafe(), { ceilingMs: 15000 });
@@ -813,6 +819,17 @@ async function refresh(opts = {}) {
         () => _customSoundDiagGuard.run(customSoundDiagFallback),
         tmo
       ).catch(() => customSoundDiagFallback);
+      /*
+       * ★v0.1.1384: 自動タブリロードの痕跡(1キーだけ・extras 側=12秒間引き)。
+       *   コアには足さない([[status-extras-read-not-core-read]])。
+       *   失敗しても null のまま=行が出ないだけで、速報全体は止めない。
+       */
+      step = 'autoTabReload';
+      _autoTabReloadRec = await runStorageOpWithTimeout(
+        () => chrome.storage.local.get('nls_last_auto_tab_reload')
+          .then((b) => (b && b.nls_last_auto_tab_reload) || null),
+        tmo
+      ).catch(() => _autoTabReloadRec);
       _extrasCache = { reportPreview, watchTabMap, trendFindings, laneDiag, laneMirror, statCardsMirror, northStarMirror, voiceDiag, venueSeatsDiag, publishOutcomeRec, commentTimelineMirror, giftHistoryMirror, roomHeatMirror, sessionSummaryMirror, previewRenderAck, backfillLiveMetric, giftEffectDiag, milestoneEffectDiag, customSoundDiag, voiceEffectDiag, bgmPhaseDiag, opSoundEffectDiag, commentPostDiag, instantPushDiag, channelSwitchDiag, highlightLedger, scoreAnnounceDiag, sidepanelSelfDiag };
       _extrasCacheAt = Date.now();
       _mark('extras');
@@ -1750,6 +1767,28 @@ function renderAll({ extrasAgeMs, lvList, summaries, fastDiag, popupDiag, backfi
     const sLines = buildChannelSwitchDiagLines(channelSwitchDiag, Date.now());
     channelSwitchLine = sLines.length ? `\n${sLines.join('\n')}` : '';
   });
+  /*
+   * ★v0.1.1384: 拡張更新時に watch タブが【自動リロードされたか】を出す。
+   *
+   * ■ なぜ(2026-08-13 ユーザーの困りごと)
+   *   ユーザーは更新のたび「🔄 → watch タブ F5」を手作業でやっていた(1日11版=11回)。
+   *   しかし background.js の reloadExistingWatchTabs() が効いているなら **F5 は不要**。
+   *   ★「効いているか」を誰も測っていなかったため、私(司令塔)は毎回 F5 を依頼し続けた。
+   *   この行が出れば、次からその依頼を**やめられる**。
+   */
+  let autoTabReloadLine = '';
+  safeSection('自動タブリロード計器', () => {
+    const rec = _autoTabReloadRec;
+    if (!rec || typeof rec !== 'object') return;
+    const at = Number(rec.at) || 0;
+    if (at <= 0) return;
+    const agoSec = Math.max(0, Math.round((Date.now() - at) / 1000));
+    const reloaded = Math.max(0, Number(rec.reloaded) || 0);
+    autoTabReloadLine =
+      `\n拡張更新時の自動タブリロード: ${reloaded > 0 ? '✅' : '⚠'}${reloaded}枚を再読込` +
+      `(${agoSec}秒前・経路=${String(rec.reason || '?')})` +
+      (reloaded > 0 ? ' ★手動F5は不要です' : ' ★対象タブが無かった(watchを開く前の更新)');
+  });
   // SC2(council/broadcast-scoring-SYNTHESIS.md §2.2): ハイライト台帳(実際に発火した演出の
   //   件数/最終記録ago/上位ラベル)を概要に併記(台帳が空の配信なら空=ノイズにしない)。
   let highlightLedgerLine = '';
@@ -1768,7 +1807,7 @@ function renderAll({ extrasAgeMs, lvList, summaries, fastDiag, popupDiag, backfi
   if (overviewEl) {
     overviewEl.textContent =
       (overviewText || '視聴中の配信はありません。') +
-      backfillLine + laneLine + voiceLine + reportPreviewLine + giftEffectLine + milestoneEffectLine + customSoundLine + voiceEffectLine + bgmPhaseLine + opSoundEffectLine + commentPostLine + instantPushLine + writeLedgerLine + prunePublishLine + channelSwitchLine + highlightLedgerLine + scoreAnnounceLine;
+      backfillLine + laneLine + voiceLine + reportPreviewLine + giftEffectLine + milestoneEffectLine + customSoundLine + voiceEffectLine + bgmPhaseLine + opSoundEffectLine + commentPostLine + instantPushLine + writeLedgerLine + prunePublishLine + channelSwitchLine + autoTabReloadLine + highlightLedgerLine + scoreAnnounceLine;
     overviewEl.classList.toggle('empty-note', !overviewText);
   }
 

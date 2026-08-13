@@ -68,6 +68,7 @@
 - 🔵 **fn:summaryStorageKey** — 読む人だけ（書く経路が無い疑い）: src/extension/popup-entry.js
 - 🔵 **fn:watchSnapshotStorageKey** — 読む人だけ（書く経路が無い疑い）: src/extension/popup/report/htmlReportDocument.js
 - 🔵 **nls_backfill_progress_v1** — 読む人だけ（書く経路が無い疑い）: src/extension/status-entry.js
+- 🔵 **nls_last_auto_tab_reload** — 読む人だけ（書く経路が無い疑い）: src/extension/status-entry.js
 - 🔵 **nls_mcp_live_latest_v1** — 読む人だけ（書く経路が無い疑い）: src/extension/popup-entry.js
 
 ## 全 storage キー
@@ -175,4 +176,5 @@
 | `fn:tailStorageKey` | extension/content-entry.js | extension/popup-entry.js |
 | `fn:watchSnapshotStorageKey` | — | extension/popup/report/htmlReportDocument.js |
 | `nls_backfill_progress_v1` | — | extension/status-entry.js |
+| `nls_last_auto_tab_reload` | — | extension/status-entry.js |
 | `nls_mcp_live_latest_v1` | — | extension/popup-entry.js |

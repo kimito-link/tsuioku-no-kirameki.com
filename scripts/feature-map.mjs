@@ -125,6 +125,12 @@ const STORAGE_DISCONNECT_BASELINE = new Set([
   //   ★経路は実在する(2026-08-12 に両側を目視確認・配線テスト
   //   src/lib/commentChunkModeFailOpen.wiring.test.js が producer/consumer の両方を断言する)。
   'KEY_COMMENT_WRITE_MODE_DIAG',
+  // v0.1.1384: 拡張更新時の自動タブリロードの実行痕跡。
+  //   producer=extension/background.js:833(SW 側の素のスクリプト=この検査の走査対象外)。
+  //   consumer=src/extension/status-entry.js:829(extras で1キーだけ読み、速報の行に出す)。
+  //   ★経路は実在する(2026-08-13 に両側を目視確認・配線テスト
+  //   src/lib/autoTabReloadTrace.wiring.test.js が producer/consumer の両方を断言する)。
+  'nls_last_auto_tab_reload',
   // popup が optional-chaining + computed key で set するため producer を静的解析が取りこぼす偽陽性
   // (実書込は popup-entry.js:collectAiShareDevMonitorPayloadBundle・status-entry.js が読む。2026-06-18 確認)
   'KEY_AI_SHARE_POPUP_DIAG',
