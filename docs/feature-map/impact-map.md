@@ -758,6 +758,7 @@
 | `src/lib/supportVisualExpanded.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/swBackfillTrigger.js` | 1 | 記録エンジン(watchページ常駐) |
 | `src/lib/swCrawlSlots.js` | 1 | バックフィル SW |
+| `src/lib/symptomVerdicts.js` | 1 | 状態速報ページ |
 | `src/lib/tabLeaderLock.js` | 1 | 記録エンジン(watchページ常駐) |
 | `src/lib/thumbDb.js` | 1 | 記録エンジン(watchページ常駐) |
 | `src/lib/thumbFifo.js` | 1 | 記録エンジン(watchページ常駐) |

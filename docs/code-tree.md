@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 4 / 761 件
+## ⚠️ 役割コメントが無いソース 4 / 762 件
 - `src/lib/laneDomSelfMeasure.js`
 - `src/lib/reportPreviewPublish.js`
 - `src/lib/venueLaneBuckets.js`
@@ -692,7 +692,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (1656)
+- 📁 **src/** (1659)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -983,7 +983,7 @@
         - `logo_funlink_white_RGB_maru_black.png`
       - `logo_guide_funlink_ol.pdf`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1415)
+  - 📁 **lib/** (1418)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -2179,6 +2179,9 @@
     - `swBackfillTrigger.test.js`
     - `swCrawlSlots.js` — SW backfill の per-lid 並列スロット判定。
     - `swCrawlSlots.test.js`
+    - `symptomVerdicts.js` — 「症状名でそのまま引ける」特化判定を**複数**出す純関数。
+    - `symptomVerdicts.test.js`
+    - `symptomVerdicts.wiring.test.js`
     - `tabLeaderLock.js` — PR1-b/PR2（feat/multitab-scale-ultraC）: 同一 origin の複数タブのうち「1タブだけ」が
     - `tabLeaderLock.test.js`
     - `tabsQuerySlowPipeline.test.js`

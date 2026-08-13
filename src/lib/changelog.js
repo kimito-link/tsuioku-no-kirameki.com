@@ -26,6 +26,16 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1385',
+    date: '2026-08-13',
+    summary: '症状ごとの判定を出すようにしました',
+    items: Object.freeze([
+      '状態速報に「症状別の判定」を追加しました。サムネが白い・レーンが空・診断が重い、といった困りごとが、それぞれ独立した行で出ます。',
+      'これまでは総合判定が1行あるだけで、実際にはサムネが出ていなくても「取り込み中（正常）」と表示されることがありました。',
+      '異常が無いときは1行も出しません。出ている行には必ず「次の一手」が付きます。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1384',
     date: '2026-08-13',
     summary: '更新のたびの手作業（リロード・F5）を減らします',
