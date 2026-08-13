@@ -313,9 +313,14 @@ export default [
     //   ★直し方の肝は「追加の通信をしない」こと: 画面は既にその URL で <img> を
     //     描いており onload で成功が分かる。その事実を拾うだけで実在確認になる。
     //   増分は onRemoteSuccess の記録フック + 間引き保存の2関数と、その根拠コメント。
+    // ★2026-08-13(v0.1.1387) 22311 → 22343(+32)。上の記録を【読む側】を配線した。
+    //   記録しただけでは v0.1.1378(サムネ0%を数えただけで直さなかった)と同じ失敗になる
+    //   ([[unwired-judgement-is-systemic-2026-08-12]])。起動時に1キー読んで集合を作り、
+    //   lanePickCtx 経由で thumbScore 判定に渡す。覚えた瞬間にも集合へ入れる
+    //   (storage保存は10秒間引きなので、無いと最大10秒판定が遅れる)。
     //   ★判定・正規化・上限の本体は純関数 src/lib/verifiedAvatarRegistry.js
     //     (単体11 + 配線5テスト)に隔離済み。popup 側は DOM/storage グルーのみ。
-    rules: { 'max-lines': ['error', { max: 22311, skipBlankLines: false, skipComments: false }] }
+    rules: { 'max-lines': ['error', { max: 22343, skipBlankLines: false, skipComments: false }] }
   },
   {
     files: ['src/extension/popup/**/*.js'],

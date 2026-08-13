@@ -692,7 +692,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (1662)
+- 📁 **src/** (1663)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -983,7 +983,7 @@
         - `logo_funlink_white_RGB_maru_black.png`
       - `logo_guide_funlink_ol.pdf`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1421)
+  - 📁 **lib/** (1422)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -2320,6 +2320,7 @@
     - `verifiedAvatar.wiring.test.js`
     - `verifiedAvatarRegistry.js` — 「推測URLだが**実際に画像が出た**」を覚えて、次から本物として扱う純関数群。
     - `verifiedAvatarRegistry.test.js`
+    - `verifiedAvatarScore.wiring.test.js`
     - `versionMismatch.js` — 「本体とページで版がズレている」を検知する純関数(2026-07-06)。
     - `versionMismatch.test.js`
     - `videoCapture.js` — watch ページの video から PNG を取るためのユーティリティ。

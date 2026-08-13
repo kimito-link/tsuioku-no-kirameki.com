@@ -58,7 +58,8 @@ export function userLaneProfileCompletenessTier(entry, httpAvatarCandidate) {
  *   yukkuriSrc: string,
  *   tvSrc: string,
  *   anonymousIdenticonEnabled: boolean,
- *   anonymousIdenticonDataUrl?: string
+ *   anonymousIdenticonDataUrl?: string,
+ *   verifiedAvatarUids?: Set<string>
  * }} StoryUserLanePickContext
  */
 
@@ -93,7 +94,9 @@ export function buildStoryUserLaneCandidateRow(
     }
   });
   if (!displaySrc) return null;
-  const thumbScore = userLaneResolvedThumbScore(entry?.userId, httpForLane);
+  // ★v0.1.1387: 実在確認済み(onload成功の実績がある)uid は推測URLでも 2(本物)に上げる。
+  //   pickCtx.verifiedAvatarUids が無ければ従来どおり(呼び出し側を壊さない)。
+  const thumbScore = userLaneResolvedThumbScore(entry?.userId, httpForLane, pickCtx?.verifiedAvatarUids);
   return {
     entryIndex,
     profileTier,

@@ -26,6 +26,16 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1387',
+    date: '2026-08-13',
+    summary: 'アイコンの判定に「表示できた実績」を反映',
+    items: Object.freeze([
+      '前回覚えた「実際に表示できたアイコン」を、実際の判定に使うようにしました。',
+      'これまでは記録するだけで判定に反映されておらず、表示できているアイコンでも「取得できていない」と数え続けていました。',
+      '一度表示できた人は、次からは推測ではなく本物のアイコンとして扱います。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1386',
     date: '2026-08-13',
     summary: 'アイコンが白いままになる問題を改善',
