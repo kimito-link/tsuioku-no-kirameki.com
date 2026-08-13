@@ -167,7 +167,7 @@
     - `2026-07-22.md`
     - `2026-07-23.md`
     - `2026-07-31.md`
-- 📁 **docs/** (280)
+- 📁 **docs/** (281)
   - 📁 **article-assets/** (87)
     - 📁 **venue-frames/** (12)
       - `f01.png`
@@ -277,11 +277,12 @@
     - `storage-bus.md`
     - `venue.md`
     - `web-status.md`
-  - 📁 **handoff/** (116)
+  - 📁 **handoff/** (117)
     - `CODEX-TASK-voice-v1332.md`
     - `CODEX-TASK-voice-v1334.md`
     - `CODEX-TASK-voice-v1342.md`
     - `HANDOFF-2026-08-14-deploy-path-and-status-hang.md`
+    - `HANDOFF-2026-08-14b-venue-gift-missing.md`
     - `HANDOFF-backfill-instant-restore.md`
     - `HANDOFF-broadcast-score-panel.md`
     - `HANDOFF-comment-pickup-bsp.md`
