@@ -103,8 +103,45 @@ npm run verify:deploy              # version + buildId + サイズを照合
 - `scripts/meeting.mjs` にユーザーの未コミット変更(**41行**)がある
 - 今日**2回**消した(`git checkout --` と `stash pop` のコンフリクト)。両方バックアップから復元
 - バックアップ: `/tmp/sv/meeting.mjs.USER`(md5: fab70b243ef1dbc250cf52d335c7a348)
-- ★**現在この変更は stash に退避中**(`USER-WIP(Claude退避6回目)`)。
+- ★**現在この変更は stash に退避中**(`stash@{0}` = `USER-WIP(Claude退避6回目)`)。
   **master に戻すときは必ず `git stash pop` して md5 を照合する**
+
+★**2026-08-14 に二重化を検証済み**(次のセッションは信用してよい):
+
+```bash
+git show 'stash@{0}:scripts/meeting.mjs' | md5sum   # fab70b243ef1dbc250cf52d335c7a348
+md5sum /tmp/sv/meeting.mjs.USER                     # fab70b243ef1dbc250cf52d335c7a348
+```
+
+＝stash とバックアップが**一致**。`stash@{0}` の中身は `scripts/meeting.mjs` 1本のみ。
+★stash は36件溜まっているので、**必ず `stash@{0}` と番号で指定せず、
+　`git stash list | head -1` でメッセージを確認してから pop する**(他を誤って消さないため)。
+
+## 4.5 ★未コミットの3ファイルは「追わなくていい」(照合済)
+
+`git status` に出る以下3件は **pre-push フックの再ビルドによる buildId ずれだけ**。
+中身の変更はゼロ。**調べ直さないこと**(既知の地雷・毎回出る)。
+
+```
+ M app/dist/live-view.js
+ M extension/dist/popup.js
+ M extension/dist/status.js
+```
+
+照合結果(2026-08-14 実行):
+
+| | commit 側 | 作業ツリー側 |
+|---|---|---|
+| buildId | `0814-003729` | **`0814-005304`** |
+
+＝**作業ツリーの方が新しい**。Chrome は `extension/` を直接読むので、
+このまま置いておくのが正しい(revert すると古い版を配ることになる)。
+
+確認コマンド(差分が buildId だけであることの証明):
+
+```bash
+git diff -U0 -- extension/dist/popup.js | grep -oE 'buildId="[0-9-]+"' | sort -u
+```
 
 ## 5. 次にやること(優先順)
 
