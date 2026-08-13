@@ -26,6 +26,16 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1386',
+    date: '2026-08-13',
+    summary: 'アイコンが白いままになる問題を改善',
+    items: Object.freeze([
+      'ユーザーIDから組み立てたアイコンURLについて、実際に画像が表示できたものを覚えるようにしました。次からは「推測」ではなく「実物」として扱います。',
+      'これまでは実在するアイコンでも「取得できていない」と数えていたため、状態速報が「サムネ0%」と表示していました。',
+      '確認のために新しく通信することはありません。すでに画面に表示された結果を記録するだけです。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1385',
     date: '2026-08-13',
     summary: '症状ごとの判定を出すようにしました',

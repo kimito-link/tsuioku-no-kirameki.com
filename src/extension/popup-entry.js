@@ -889,7 +889,9 @@ import { avatarCompareKey, isSameAvatarUrl } from '../lib/avatarUrlCompare.js';
 // 一意アバター数の集計(純関数・挙動同値で popup-entry から切り出し)。
 import { countUniqueAvatarEntries } from '../lib/avatarEntryCounts.js';
 import { resolveStoryLaneAvatarSrc } from '../lib/storyLaneAvatarSrc.js';
-import { pickAvatarUrlForUid } from '../lib/deriveAvatarUrlFromUid.js';
+import { pickAvatarUrlForUid, extractUidFromAvatarUrl } from '../lib/deriveAvatarUrlFromUid.js';
+// v0.1.1386: 実在が確認できたサムネ(uid)を覚えて、次から本物として数える。
+import { addVerifiedAvatarUids, KEY_VERIFIED_AVATAR_UIDS } from '../lib/verifiedAvatarRegistry.js';
 import { attachAiDiagButtonHandler } from './popup/attachAiDiagButtonHandler.js';
 import { mergeWatchSnapshotPreservingBroadcaster } from '../lib/watchSnapshotPartialMerge.js';
 import { persistFreshlyFetchedSnapshot } from '../lib/popupWatchSnapshotPersist.js';
@@ -5003,10 +5005,76 @@ const STORY_REMOTE_FAILED_PLACEHOLDER_IMG = NICONICO_OFFICIAL_DEFAULT_USERICON_H
 
 // ★v0.1.1338: retryPolicy を popup でも opt-in(会場は v0.1.1318 で先行導入済み)。
 //   理由と実測は avatarRetrySweepThrottle.js のヘッダが正本。値は会場と同じ既定。
+/*
+ * ★v0.1.1386: 実在が確認できたサムネ(uid)を貯めて storage に間引き保存する。
+ *
+ * ■ なぜ(2026-08-13 ユーザー「会場モードのサムネがしろい 一体なんのため」)
+ *   uid から式で組んだサムネURLは【実在を確認していない】ため score=1 のままで、
+ *   速報は「実サムネ0%」と言い続けていた。しかし実測では推測URLの多くが実在した
+ *   (curl で5件中3件が HTTP 200・4KBの画像が返る)。
+ *   ＝白いのはURLが悪いのではなく【実在を確認する経路が無かった】。
+ *
+ * ■ 掟
+ *   - 追加の通信をしない(既に描いた <img> の onload 結果だけを使う)
+ *   - 書き込みは間引く(成功のたびに set すると storage を圧迫する=過去に固まった原因)
+ *   - 失敗しても描画を止めない(全て try/catch)
+ */
+/** @type {Set<string>} この起動で新たに実在確認できた uid(未保存分)。 */
+const _verifiedAvatarPending = new Set();
+/** 直近の保存時刻(ms)。間引きの基準。 */
+let _verifiedAvatarSavedAt = 0;
+/** 保存の最小間隔[ms]。 */
+const VERIFIED_AVATAR_SAVE_GAP_MS = 10_000;
+
+/**
+ * 実際に表示できた <img> から uid を拾って控える。
+ * @param {any} img
+ */
+function noteVerifiedAvatarFromImg(img) {
+  const src = String(img?.currentSrc || img?.src || '').trim();
+  if (!src) return;
+  const uid = extractUidFromAvatarUrl(src);
+  if (!uid) return;
+  _verifiedAvatarPending.add(String(uid));
+  maybeFlushVerifiedAvatars();
+}
+
+/** 間引きつきで storage へ流す(失敗は無視)。 */
+function maybeFlushVerifiedAvatars() {
+  if (_verifiedAvatarPending.size === 0) return;
+  const now = Date.now();
+  if (now - _verifiedAvatarSavedAt < VERIFIED_AVATAR_SAVE_GAP_MS) return;
+  _verifiedAvatarSavedAt = now;
+  const batch = Array.from(_verifiedAvatarPending);
+  _verifiedAvatarPending.clear();
+  try {
+    const local = globalThis.chrome?.storage?.local;
+    if (!local?.get) return;
+    void local.get(KEY_VERIFIED_AVATAR_UIDS).then((bag) => {
+      const merged = addVerifiedAvatarUids(bag?.[KEY_VERIFIED_AVATAR_UIDS], batch);
+      if (!merged.changed) return;
+      void local.set({ [KEY_VERIFIED_AVATAR_UIDS]: merged.uids });
+    }).catch(() => { /* no-op */ });
+  } catch {
+    // no-op
+  }
+}
+
 const storyAvatarLoadGuard = createSupportAvatarLoadGuard({
   fallbackSrc: STORY_REMOTE_FAILED_PLACEHOLDER_IMG,
   onFallbackApplied: applyStoryAvatarTvFallbackClass,
-  onRemoteSuccess: removeStoryAvatarTvFallbackClass,
+  onRemoteSuccess: (img) => {
+    removeStoryAvatarTvFallbackClass(img);
+    /*
+     * ★v0.1.1386: onload が成功した瞬間＝そのURLが実在する生きた証拠。
+     *   追加の fetch は一切しない(既に描いた <img> の結果を拾うだけ)。
+     */
+    try {
+      noteVerifiedAvatarFromImg(img);
+    } catch {
+      // no-op: 記録の失敗は描画を止めない
+    }
+  },
   retryPolicy: {}
 });
 
