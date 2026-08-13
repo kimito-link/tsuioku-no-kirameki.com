@@ -66,3 +66,36 @@ describe('summarizeEventLoopStall', () => {
     expect(r.stalled).toBe(false);
   });
 });
+
+/**
+ * ★v0.1.1383: 実機が出した【嘘の値】をテストに焼き付ける。
+ *
+ * 2026-08-13 の実機速報:
+ *   最大タイマー遅延=12750002ms 🔴イベントループ停止(予定t+0msの点で検知)
+ *   幕(cloak) ✅ t+2106ms で解除(観測447点)
+ *
+ * 真相はイベントループ停止ではなく【パネルを3時間半開いたまま】だった。
+ * 原因は sidepanel-entry.js 側で `Number.isFinite(Number(null))` を使っており、
+ * `Number(null)===0` なので **sched:null が sched:0 に潰されていた**こと。
+ * ＝この純関数の null ガードを、上流が無効化していた。
+ */
+describe('★実機が出した嘘の再現(v0.1.1383 で根治)', () => {
+  it('3時間半後の late 点が sched:0 だと巨大な偽の停止になる(旧挙動の再現)', () => {
+    const bad = summarizeEventLoopStall([
+      { t: 0, sched: 0 },
+      { t: 12_750_002, sched: 0 } // ← 潰された late 点
+    ]);
+    expect(bad.maxDelayMs).toBe(12_750_002);
+    expect(bad.stalled).toBe(true); // 旧: これを「停止」と報告していた
+  });
+
+  it('★sched:null なら同じ点でも遅延に数えない(正しい挙動)', () => {
+    const good = summarizeEventLoopStall([
+      { t: 0, sched: 0 },
+      { t: 12_750_002, sched: null } // ← 予定を持たない late 点
+    ]);
+    expect(good.maxDelayMs).toBe(0);
+    expect(good.stalled).toBe(false);
+    expect(good.observed).toBe(1); // 予定を持つ点だけ数える
+  });
+});

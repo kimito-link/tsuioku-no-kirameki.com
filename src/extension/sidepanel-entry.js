@@ -120,6 +120,32 @@ const _bootAt = Date.now();
 const SELF_DIAG_OVERLAY_ID = 'nlSidepanelSelfDiagOverlay';
 
 /**
+ * ★v0.1.1383: 観測系列の上限。
+ *   起動格子(SAMPLE_AT_MS=19点)は黒の判定に必須なので必ず残し、
+ *   それ以降の late/visible/reload 点は直近ぶんだけ保持する。
+ */
+const SERIES_HEAD_KEEP = 24;
+const SERIES_TAIL_KEEP = 16;
+
+/**
+ * 系列を有界に保つ(先頭=起動直後は温存し、古い中間だけ捨てる)。
+ *
+ * ★なぜ「先頭を残す」のか: 黒は起動直後に出るので、頭を捨てると
+ *   [[observation-window-edge-hides-late-symptoms-2026-08-12]] の逆で
+ *   **症状そのものの記録**を失う。捨ててよいのは「その後ずっと正常だった」中間だけ。
+ *
+ * @param {any[]} arr 破壊的に切り詰める配列
+ */
+function trimObservationSeries(arr) {
+  if (!Array.isArray(arr)) return;
+  const max = SERIES_HEAD_KEEP + SERIES_TAIL_KEEP;
+  if (arr.length <= max) return;
+  const tail = arr.slice(arr.length - SERIES_TAIL_KEEP);
+  arr.length = SERIES_HEAD_KEEP;
+  for (const row of tail) arr.push(row);
+}
+
+/**
  * ★v0.1.1373: この時間以上「中身が見えない」なら異常とみなす[ms]。
  *
  * 実機(2026-08-12)は 12,773ms 中身が出ていないのに ✅正常 と出ていた。
@@ -325,12 +351,33 @@ function collectAndPublish(phase, schedMs = null) {
        *   第一現象が【メインスレッド停止】であることに気づけなかった。
        *   予定を持たない点(load/visible/reload)は null＝遅延を計算しない。
        */
-      sched: Number.isFinite(Number(schedMs)) ? Math.max(0, Math.round(Number(schedMs))) : null,
+      /*
+       * ★v0.1.1383(実機が嘘の値を出して発覚): `Number(null)` は **0(finite!)** なので、
+       *   `Number.isFinite(Number(schedMs))` では null を弾けない。
+       *   その結果 late/visible/reload(予定なし)が全部「予定0msの点」として記録され、
+       *   パネルを3時間半開いたままにしただけで
+       *   「最大タイマー遅延=12,750,002ms 🔴イベントループ停止」という**巨大な嘘**を報告した。
+       *   ★私は同じ罠を eventLoopStallSummary.js 側では正しく塞いでいた(null を先に落とす)のに、
+       *     **その手前のここで 0 に潰していた**＝下流の防御を上流が無効化していた。
+       *   [[instrument-value-is-measured-by-fixes-2026-08-12]]: 誤誘導する計器は価値が【負】。
+       */
+      sched: schedMs == null || !Number.isFinite(Number(schedMs))
+        ? null
+        : Math.max(0, Math.round(Number(schedMs))),
       w: Math.max(0, Math.round(Number(sample.panelW) || 0)),
       h: Math.max(0, Math.round(Number(sample.panelH) || 0)),
       iw: Math.max(0, Math.round(Number(sample.iframe?.w) || 0)),
       ih: Math.max(0, Math.round(Number(sample.iframe?.h) || 0))
     });
+    /*
+     * ★v0.1.1383: 系列を有界にする(実機で観測447点=3時間半ぶんが溜まっていた)。
+     *   late 観測は30秒ごとに永久に走るので、パネルを開きっぱなしにすると
+     *   配列が無限に伸び、要約のたびに全件を舐める＝**計器自身が重くなる**。
+     *   起動直後の格子(19点)は黒の判定に必須なので【先頭は必ず残し】、
+     *   古い late 点だけを間引く。
+     */
+    trimObservationSeries(_sizeSeries);
+    trimObservationSeries(_cloakSeries);
     const zeroArea = summarizeZeroAreaWindow(_sizeSeries);
     const stall = summarizeEventLoopStall(_sizeSeries);
     // ★v0.1.1307: 幕の観測列を積む(iframe を読めない間は測れないので記録しない=
