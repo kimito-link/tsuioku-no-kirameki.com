@@ -213,7 +213,7 @@ export const LINEUP = [
   { label: 'mistral/mistral-large', provider: 'mistral', rawId: 'mistral-large-latest', apiModel: 'mistral-large-latest', opts: {}, requires: ['MI'], liveProbe: true },
   { label: 'mistral/magistral-small', provider: 'mistral', rawId: 'magistral-small-latest', apiModel: 'magistral-small-latest', opts: {}, requires: ['MI'], liveProbe: true },
 
-  // 2026-08-11 追加（Mistral 3体目）: devstral-medium-latest → implementの予備。
+  // 2026-08-11 追加 → 2026-08-13 撤去（mistral/devstral-medium）: devstral-medium-latest → implementの予備。
   //  2026-07-31にcloudflare/kimi-k2.7-codeが有料化で撤去されて以来、implement役はローカル
   //  qwen2.5-coder:14b単騎（Ollama停止時はROLE_FALLBACKで代打）で、CATEGORIESのcodeカテゴリは
   //  want筆頭がimplementのためコード系のお題で毎回この穴を踏んでいた。roleOfがimplementを返す
@@ -238,7 +238,58 @@ export const LINEUP = [
   //  （implement役内にweight1〜2の競合が居らず昇格の実益が無い。weightOfのプロバイダ一括判定の
   //  簡潔さを優先）。撤去: liveProbe2日連続失敗／実会議でimplement役として2回連続FAILED
   //  （kimi型実害の再発防止のため標準より厳しく）／カタログ消滅streak>=2 のいずれかで撤去会議へ。
-  { label: 'mistral/devstral-medium', provider: 'mistral', rawId: 'devstral-medium-latest', apiModel: 'devstral-medium-latest', opts: {}, requires: ['MI'], liveProbe: true },
+  //  2026-08-13 撤去: 採用のわずか2日後、Mistral /v1/models の実測で devstral 全系列
+  //  (devstral-medium-latest / devstral-2512 / devstral-latest / mistral-code-agent-latest)に
+  //  deprecation: 2026-08-31T12:00:00Z が付いていることが判明（あと18日で確実に提供終了。
+  //  公式ページにも deprecated 明記。無料提供は当初から期間限定と公式発表されており、
+  //  採用時の裏取りで見落としていた）。上記コメントが自ら予告していた「死に枠がimplement席を
+  //  先取りしてFAILEDさせるkimi-k2.7-code型の実害」が、今回は死亡日が事前に分かっている状態で
+  //  確定していたため、liveProbeの事後検知(2日連続失敗)を待たず即日撤去し、下記の
+  //  codestral-2508 に置き換えた。8/31まで併用する案は却下: 恒久ルール5（同役割の予備に
+  //  同一プロバイダを重ね積みしない）に真正面から抵触する上、selectMembersはimplement席を
+  //  1つしか取らずweight3同士のタイブレークは配列順のため、併用しても後継は一度も実会議に
+  //  出られない（＝様子見の実益がゼロ）。撤去時点でdevstral自体はまだ動いていた
+  //  （実測4並列4/4成功・ただし2968〜34890msと遅くバラつく）が、後継codestralが速度・安定性の
+  //  実測で明確に上回るため、稼働期間を残して撤去することに損失は無い。
+  //  この「期限が事前告知されて死ぬ」型は既知の死型5パターンのどれとも違う6番目の型で、
+  //  唯一の事前検知可能な型。scout-models.mjs の deprecation 監視新設の直接の動機。
+
+  // 2026-08-13 追加（devstral-mediumの後継・implementの予備）: codestral-2508。
+  //  経緯は上記devstral撤去コメント参照。implement役「クラウド初のコード特化頭脳」枠を引き継ぐ。
+  //  実測裏取り(2026-08-13): 4並列すべて200 OK(1207/1285/1359/1229ms)。実物のimplement役
+  //  プロンプト(ROLE_DIRECTIVE+DEFAULT_FORMAT)での日本語実装レビューも200/10084〜12206ms/
+  //  3052字/見出し4/4/日本語OK。同条件のdevstralは24110〜62601msだったため速度・安定性は改善。
+  //  公式の位置づけは「FIM・低レイテンシのコード生成向け」でSWE-bench等の推論ベンチは非公開
+  //  だが、この席の仕事はコードの自律編集ではなく『実現性レビュー』(council-roles.mjs
+  //  ROLE_DIRECTIVE.implement)であり、その仕事そのものを実物プロンプトで測って合格している
+  //  （別職務のベンチ非公開を理由に実測合格を却下しない）。chat/completionsは公式に対応
+  //  エンドポイントとして明記＝想定外の使い方ではない。
+  //  IDは固定のcodestral-2508を採用し-latestを使わない: devstralは-latestを使っていたのに
+  //  中身に期限が付いていた＝エイリアスは死を防がない。一方で無通知の中身差し替わりにより
+  //  「実測で裏取りした個体」と「実戦で走る個体」が食い違う害はエイリアス固有。固定IDが
+  //  deprecatedになる時はdeprecationフィールド/カタログ差分として観測できる（scout側の
+  //  期限監視とセットで-latestより厳密に安全）。mistral-code-latestというエイリアスは
+  //  公式ドキュメント・価格ページ・changelogに記載の無い非公式名（出典は第三者のみ。
+  //  "Mistral Code"は企業向け有料IDE製品名でもある）のため使用禁止。
+  //  labelは必ず'mistral/codestral'とし'codestral'単体にしないこと——"codestral"は
+  //  weightOfの"mistral"判定に非一致でweight1(安定クラウド本線)に誤爆し恒久ルール3違反に
+  //  なることをmaster実コードで実行検証済み。roleOfに"codestral"→implementの判定行を追加
+  //  （"codestral"は"coder"にも"devstral"にも"magistral"にも非一致。行が無いとgeneralist
+  //  落ちしimplement席がローカル単騎に戻ることも実行検証済み）。weightOfは既存の"mistral"
+  //  判定でweight3が自動適用（変更不要）。
+  //  価格ページ上はPremier(有料)ティア表記だが実機では無料枠キーで呼べている＝
+  //  「カタログに残ったまま呼べなくなる」型で死に得るため liveProbe:true 必須。
+  //  公式が指定するdevstralの代替 mistral-medium-3-5 は不採用: 実測4並列で成功1/4
+  //  (200×1・503×3)、単発の軽いプローブでも3回中2回503、実物のimplement役プロンプトでは
+  //  503で回答取得不能。恒久ルール2(実機2並列以上の200 OK)を満たさない。gemini-3.5-flashの
+  //  前例(2026-06-25見送り→07-04再検証で採用)に倣い恒久拒否はしない——7日以上空けた
+  //  2回の再測定で2並列200 OKかつ503ゼロなら再検討可。ただし同モデルはroleOf上generalistで
+  //  implementの穴を埋めず、健康でも採用動機が弱い。
+  //  昇格: devstral同様、当面weight3据え置き（implement役内にweight1〜2の競合が居らず
+  //  昇格の実益が無い）。撤去: devstralの条件を引き継ぎ標準より厳しく——liveProbe2日連続失敗／
+  //  実会議でimplement役として2回連続FAILED／カタログ消滅streak>=2／deprecation付与を検知、
+  //  のいずれかで撤去会議へ。
+  { label: 'mistral/codestral', provider: 'mistral', rawId: 'codestral-2508', apiModel: 'codestral-2508', opts: {}, requires: ['MI'], liveProbe: true },
 
   { label: 'gemini-2.5-flash', provider: 'gemini', rawId: 'gemini-2.5-flash', apiModel: 'gemini-2.5-flash', opts: {}, requires: ['E'] },
 
