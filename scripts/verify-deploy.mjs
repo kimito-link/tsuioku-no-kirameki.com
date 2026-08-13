@@ -18,7 +18,19 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-const DEST = process.argv[2] || 'C:/nicolive-ext';
+/*
+ * ★2026-08-14: 既定を「Chrome が実際に読んでいる場所」にする。
+ *
+ *   2026-08-13、司令塔は C:/nicolive-ext へコピーして「✅反映OK」と報告し続けたが、
+ *   Chrome が読んでいたのは **リポジトリ直下の extension/** だった
+ *   (Secure Preferences の path で確認)。
+ *   ＝**無関係な場所を照合して OK と言っていた**。ユーザーの実機は
+ *   v0.1.1283 / build 0807-101955 のまま7版ぶん取り残された。
+ *
+ *   ★unpacked 拡張は「リポの extension/ を直接読む」構成なので、
+ *     照合対象も既定でそこにする。別フォルダへ配る運用なら引数で渡す。
+ */
+const DEST = process.argv[2] || 'extension';
 const ROOT = process.cwd();
 
 const read = (p) => { try { return readFileSync(p, 'utf8'); } catch { return ''; } };
@@ -52,4 +64,8 @@ if (problems.length) {
   console.error('\n対処: 作業ブランチ上で `npm run build` してから dist をコピーし直す');
   process.exit(1);
 }
-console.log(`✅ 反映OK: v${srcVer} / buildId ${srcBuild} が ${DEST} に届いています`);
+const same = join(ROOT, 'extension') === join(ROOT, DEST);
+console.log(
+  `✅ 反映OK: v${srcVer} / buildId ${srcBuild} が ${DEST} に届いています` +
+  (same ? '(Chrome はこのフォルダを直接読む構成)' : '')
+);
