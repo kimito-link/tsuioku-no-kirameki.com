@@ -593,6 +593,8 @@
 | `src/lib/liveViewPublishSignature.js` | 1 | 状態速報ページ |
 | `src/lib/loadLastBroadcastSummary.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/longTaskTracker.js` | 1 | 記録エンジン(watchページ常駐) |
+| `src/lib/mainThreadBlockerBoot.js` | 1 | ポップアップ(応援レーン) |
+| `src/lib/mainThreadBlockerCensus.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/mangaBroadcastSummary.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/marketingAggregate.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/marketingChartsHtml.js` | 1 | ポップアップ(応援レーン) |
