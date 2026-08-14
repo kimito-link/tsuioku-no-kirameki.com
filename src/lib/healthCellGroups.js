@@ -21,10 +21,17 @@
  *   1. **1セルは1枠**(どこにも出ないセルを作らない・二重に出さない)
  *   2. 未知のセルは「その他」へ落とす(**取りこぼして消さない**)
  *      ★新セルを足した人がここへの登録を忘れても、画面から消えないこと
- *   3. 空の枠は出さない(その配信で対象外のセルしか無い枠はノイズ)
+ *   3. ★v0.1.1401: **固定テーブル**にする(枠もセルも消さない)。
+ *      ユーザー指摘:「隠れるんじゃなくて固定のテーブル組んでおくべき。
+ *      DOM構造が変化するので上に行ったり下に行ったりで見づらくなる」
+ *      ＝配信の状態でセルが増減すると**毎回どこにあったか探し直す**ことになる。
+ *      registry の全セルを常に同じ順・同じ位置に出し、**値だけ**が変わる。
+ *      観測が無いセルは ⚪「—」で置く(存在は消さない)。
  *
  * @module healthCellGroups
  */
+
+import { DIAGNOSIS_BY_ID } from './diagnosisRegistry.js';
 
 /**
  * 表示用の枠。**ユーザーが困ったときに使う言葉**で並べる。
@@ -148,21 +155,49 @@ export function groupIdForCell(cellId) {
  */
 export function groupHealthCells(cells) {
   const list = Array.isArray(cells) ? cells : [];
-  /** @type {Record<string, any[]>} */
-  const bucket = Object.create(null);
+  /** @type {Record<string, any>} */
+  const byId = Object.create(null);
   for (const c of list) {
     if (!c || typeof c !== 'object') continue;
-    const gid = groupIdForCell(c.id);
-    (bucket[gid] || (bucket[gid] = [])).push(c);
+    if (c.id != null) byId[String(c.id)] = c;
   }
-  const defs = [...HEALTH_CELL_GROUPS, FALLBACK_GROUP].sort((a, b) => a.order - b.order);
+
+  /*
+   * ★v0.1.1401 固定テーブル: 枠の cellIds の【定義順】に並べる。
+   *   出力に無いセルは ⚪「—」のプレースホルダで埋める=位置が動かない。
+   *   ＝いつ見ても同じ場所に同じ項目があり、値だけが変わる。
+   */
   const out = [];
-  for (const g of defs) {
-    const got = bucket[g.id];
-    if (!got || got.length === 0) continue; // 空の枠は出さない
-    out.push({ id: g.id, label: g.label, hint: g.hint, cells: got });
+  for (const g of [...HEALTH_CELL_GROUPS].sort((a, b) => a.order - b.order)) {
+    const cellsInGroup = g.cellIds.map((cid) => byId[cid] || {
+      id: cid, label: labelForCellId(cid), kind: 'state', value: null, level: 'na', text: '—'
+    });
+    out.push({ id: g.id, label: g.label, hint: g.hint, cells: cellsInGroup });
+  }
+
+  /*
+   * 枠に未登録のセル(将来の追加漏れ)は「その他」へ。
+   * ★ここは動的=登録漏れが無ければ空になり、枠ごと出ない。
+   *   固定テーブルの原則より「消さない」を優先する例外。
+   */
+  const stray = Object.keys(byId).filter((id) => groupIdForCell(id) === FALLBACK_GROUP.id);
+  if (stray.length > 0) {
+    out.push({
+      id: FALLBACK_GROUP.id, label: FALLBACK_GROUP.label, hint: FALLBACK_GROUP.hint,
+      cells: stray.map((id) => byId[id])
+    });
   }
   return out;
+}
+
+/**
+ * セル id の表示名(プレースホルダ用)。registry を正本にする。
+ * @param {string} cellId
+ * @returns {string}
+ */
+function labelForCellId(cellId) {
+  const meta = DIAGNOSIS_BY_ID[cellId];
+  return meta && meta.label ? meta.label : cellId;
 }
 
 /**
