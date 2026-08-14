@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 4 / 765 件
+## ⚠️ 役割コメントが無いソース 4 / 766 件
 - `src/lib/laneDomSelfMeasure.js`
 - `src/lib/reportPreviewPublish.js`
 - `src/lib/venueLaneBuckets.js`
@@ -695,7 +695,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (1666)
+- 📁 **src/** (1668)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -987,7 +987,7 @@
         - `logo_funlink_white_RGB_maru_black.png`
       - `logo_guide_funlink_ol.pdf`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1424)
+  - 📁 **lib/** (1426)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -1472,6 +1472,8 @@
     - `globalFetchRateLimiter.test.js`
     - `googleSuggest.js` — Google サジェスト取得の契約 (URL組み立て + レスポンスパース + message type)
     - `googleSuggest.test.js`
+    - `healthCellGroups.js` — 健全度セルを【症状の言葉】で枠に分ける(純関数)。
+    - `healthCellGroups.test.js`
     - `healthCells.js` — v0.1.1056: パリティ根本修正 Phase4(この修正自体が動いているかを診断シートで検証可能にする)。
     - `healthCells.test.js`
     - `heatLevel.js` — 「盛り上がり(熱量)」を判定する純関数(v0.1.871)。

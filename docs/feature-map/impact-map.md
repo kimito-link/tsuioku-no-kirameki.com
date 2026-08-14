@@ -529,6 +529,7 @@
 | `src/lib/giftThrowLedgerTableHtml.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/globalFetchRateLimiter.js` | 1 | 記録エンジン(watchページ常駐) |
 | `src/lib/googleSuggest.js` | 1 | 状態速報ページ |
+| `src/lib/healthCellGroups.js` | 1 | 状態速報ページ |
 | `src/lib/healthCells.js` | 1 | 状態速報ページ |
 | `src/lib/heavyCachePreserve.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/heavyChunkReadReuse.js` | 1 | ポップアップ(応援レーン) |
