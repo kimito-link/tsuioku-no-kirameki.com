@@ -770,7 +770,7 @@
   - `src/lib/statusTrendKey.js`
   - `src/extension/status-entry.js`
   - `src/lib/statusActionAdvisor.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 162</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 163</summary>
 
 - `app/app.js` — スマホ閲覧用 status Web 版。
 - `app/live-view.js` — global NL_BUILD_ID
@@ -843,6 +843,7 @@
 - `src/lib/liveEndedFlag.js` — 配信終了フラグ。
 - `src/lib/livesCardSignature.js` — livesCardSignature — 配信カードを作り直すべきかの署名(v0.1.1320)。
 - `src/lib/liveviewSnapshotFreshness.js` — 純Web応援ライブビューの「スナップショット丸ごと1枚の鮮度」判定（council/liveview-wholesale-root-SYNTHESIS.md 第1段）。
+- `src/lib/mainThreadBlockerBoot.js` — メインスレッドを止めた区間を【実測】する(副作用モジュール)。
 - `src/lib/mainThreadBlockerCensus.js` — メインスレッドを止めた【当人】を名指しする計器(純関数)。
 - `src/lib/mcpBridge/buildMcpMismatchReasons.js` — MCP L1 snapshot の `diag.mismatchReasons` を組み立てる純関数。
 - `src/lib/mcpBridge/mergeLiveMcpSnapshot.js` — Canonical Snapshot のマージ（Deterministic + Monotonic Sequence）。

@@ -97,12 +97,10 @@ import { aggregateGiftSenderTotals } from '../lib/giftEventStore.js';
 import { kokenContribStorageKey } from '../lib/kokenContributionRankingApi.js';
 import {
   giftHistoryThrowsStorageKey,
-  buildKokenGiftPersistPayload
-} from '../lib/kokenGiftHistoryApi.js';
+  buildKokenGiftPersistPayload } from '../lib/kokenGiftHistoryApi.js';
 import {
   shouldDeferCelebrationsUntilHeavySettled,
-  shouldReprimeCommentMilestones
-} from '../lib/watchPopupCelebrationGuard.js';
+  shouldReprimeCommentMilestones } from '../lib/watchPopupCelebrationGuard.js';
 import { createPopupCelebrationGate } from '../lib/popupCelebrationGate.js';
 import { nicoadCommentCelebrationKey } from '../lib/nicoadCelebrationKey.js';
 import { buildGiftHistoryNorthStarViewModel } from '../lib/giftHistoryViewModel.js';
@@ -476,6 +474,7 @@ import {
 import { isGiftRankingLaneEnabledFromStorage } from '../lib/giftRankingLaneOptIn.js';
 import { decideHiddenWork } from '../lib/hiddenPublishPolicy.js'; // ★v1394 隠れていても会場へ供給
 import { isVenueOpenCached } from '../lib/venueOpenCache.js';
+import { mainThreadBlocker } from '../lib/mainThreadBlockerBoot.js';
 import '../lib/bandScaleBoot.js'; // ★v1392帯拡大/v1393なふだ/v1394会場購読(本体はlib側)
 import '../lib/nameplateToggleBoot.js';
 // v0.1.450 (PR4): isBackfillEnabledFromStorage は refreshBackfillFetchPrompt（B 用）で使われ
@@ -19151,6 +19150,7 @@ async function collectAiShareDevMonitorPayloadBundle(watchUrl) {
       laneSupplyOrigin: snapshotLaneSupplyOriginDiag(_laneSupplyOriginDiag),
       // ★2026-08-08 計器: 鏡 publish の到達/見送り。読み方は lanePublishSkipDiag.js の冒頭。
       lanePublishSkip: snapshotLanePublishSkipDiag(_lanePublishSkipDiag, Date.now()),
+      mainThreadBlocker, // ★v1394: 黒くなる件の【当人】(longtask 実測・boot 側で観測)
       // v0.1.1215: 「積み上げ式にならずアイコンがちらちら変わる」の観測。上の churn は
       //   全消し再構築だけを数えるため、DOM枚数を変えない「中身のすり替え」を取りこぼす。
       storyGrowthCellSwap: (() => {

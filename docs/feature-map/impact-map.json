@@ -5532,6 +5532,26 @@
       ]
     },
     {
+      "file": "src/lib/mainThreadBlockerBoot.js",
+      "featureCount": 1,
+      "features": [
+        "popup"
+      ],
+      "labels": [
+        "ポップアップ(応援レーン)"
+      ]
+    },
+    {
+      "file": "src/lib/mainThreadBlockerCensus.js",
+      "featureCount": 1,
+      "features": [
+        "popup"
+      ],
+      "labels": [
+        "ポップアップ(応援レーン)"
+      ]
+    },
+    {
       "file": "src/lib/mangaBroadcastSummary.js",
       "featureCount": 1,
       "features": [
