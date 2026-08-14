@@ -401,6 +401,8 @@
 | `src/lib/backfillSlotAutoThrottle.js` | 1 | 記録エンジン(watchページ常駐) |
 | `src/lib/backfillVisibilityRearm.js` | 1 | 記録エンジン(watchページ常駐) |
 | `src/lib/backgroundWatchTab.js` | 1 | 状態速報ページ |
+| `src/lib/bandScale.js` | 1 | ポップアップ(応援レーン) |
+| `src/lib/bandScaleBoot.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/blobDownload.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/broadcastCrossCompare.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/broadcastDurationLabel.js` | 1 | ポップアップ(応援レーン) |

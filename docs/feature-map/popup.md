@@ -46,14 +46,14 @@ graph LR
   n_popup --> n_src_lib_backfillRemoveGiftSystemMessages_js["lib/backfillRemoveGiftSystemMessages.js"]
   n_popup --> n_src_lib_backfillRemoveRecommendedLivePollution_js["lib/backfillRemoveRecommendedLivePollution.js"]:::shared
   n_popup --> n_src_lib_backfillRinkuNarration_js["lib/backfillRinkuNarration.js"]:::shared
+  n_popup --> n_src_lib_bandScale_js["lib/bandScale.js"]
+  n_popup --> n_src_lib_bandScaleBoot_js["lib/bandScaleBoot.js"]
   n_popup --> n_src_lib_bgmDirector_js["lib/bgmDirector.js"]:::shared
   n_popup --> n_src_lib_bgmPhaseDiag_js["lib/bgmPhaseDiag.js"]:::shared
   n_popup --> n_src_lib_bgmPhaseDiagKey_js["lib/bgmPhaseDiagKey.js"]:::shared
   n_popup --> n_src_lib_blobDownload_js["lib/blobDownload.js"]
   n_popup --> n_src_lib_broadcastCrossCompare_js["lib/broadcastCrossCompare.js"]
-  n_popup --> n_src_lib_broadcastDurationLabel_js["lib/broadcastDurationLabel.js"]
-  n_popup --> n_src_lib_broadcastNarrativeBuilder_js["lib/broadcastNarrativeBuilder.js"]
   classDef shared fill:#eee,stroke:#999,color:#666;
 ```
 
-> ほか 383 ファイル省略（全件は storage-bus.md / metafile 参照）。
+> ほか 385 ファイル省略（全件は storage-bus.md / metafile 参照）。

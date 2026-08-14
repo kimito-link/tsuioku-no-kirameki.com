@@ -3612,6 +3612,26 @@
       ]
     },
     {
+      "file": "src/lib/bandScale.js",
+      "featureCount": 1,
+      "features": [
+        "popup"
+      ],
+      "labels": [
+        "ポップアップ(応援レーン)"
+      ]
+    },
+    {
+      "file": "src/lib/bandScaleBoot.js",
+      "featureCount": 1,
+      "features": [
+        "popup"
+      ],
+      "labels": [
+        "ポップアップ(応援レーン)"
+      ]
+    },
+    {
       "file": "src/lib/blobDownload.js",
       "featureCount": 1,
       "features": [

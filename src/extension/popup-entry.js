@@ -479,9 +479,9 @@ import {
   storagePatchInlineFloatingAnchor,
   storagePatchInlinePanelPlacementWithExplicit,
   storagePatchInlinePanelViewportWidePolicy,
-  storagePatchInlinePanelWidthMode
-} from '../lib/inlinePanelPlacementStorage.js';
+  storagePatchInlinePanelWidthMode } from '../lib/inlinePanelPlacementStorage.js';
 import { isGiftRankingLaneEnabledFromStorage } from '../lib/giftRankingLaneOptIn.js';
+import '../lib/bandScaleBoot.js'; // ★v0.1.1392 PICK UP帯拡大(本体はlib側)
 // v0.1.450 (PR4): isBackfillEnabledFromStorage は refreshBackfillFetchPrompt（B 用）で使われ
 //   ていたが、B 廃止により未使用。自動取り込みトグル hydrate は isBackfillAutoStartEnabled のみ
 //   で完結する。

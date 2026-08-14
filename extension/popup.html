@@ -5970,7 +5970,19 @@
 
       .nl-comment-ticker__viewport {
         overflow: hidden;
-        height: clamp(32px, 9vw, 44px);
+        /*
+         * ★v0.1.1392(ユーザー要望「顔を近づけないと読めない」の根治・会議 design 系4体):
+         *   PICK UP 帯は「1件ずつ【大きく】出る」と自称しているのに、実測で
+         *   font-size 最大13px・高さ最大44px しかなかった=名前と実体が食い違っていた。
+         *   ★全体 zoom は却下(ユーザー:「ぜんたいじゃなくて」)。情報量を減らすため。
+         *     この帯【だけ】を大きくする=他の密度は1pxも変えない。
+         *
+         *   ★高さと文字を【同じ倍率】で上げる(--nl-band-scale)。
+         *     文字だけ上げると overflow:hidden で上下が切れる(会議の批判役が指摘)。
+         *   ★アニメーションは translateX(横流れ)なので、縦に伸ばしても壊れない
+         *     (批判役は translateY と述べたが実コードは translateX = 裏取りで否定)。
+         */
+        height: calc(clamp(32px, 9vw, 44px) * var(--nl-band-scale, 1.6));
         border-radius: 10px;
         background: linear-gradient(180deg, #eff6ff 0%, #dbeafe 100%);
         border: 1px solid #93c5fd;
@@ -6042,7 +6054,9 @@
         gap: 0 1.75rem;
         padding: 0 1rem;
         white-space: nowrap;
-        font-size: clamp(10.5px, 3.1vw, 13px);
+        /* ★v0.1.1392: 帯の文字。高さと同じ --nl-band-scale で拡大する。
+           既定1.6倍=最大13px→約21px(離れて読める下限)。設定で 1.0〜2.4 に変更可。 */
+        font-size: calc(clamp(10.5px, 3.1vw, 13px) * var(--nl-band-scale, 1.6));
         font-weight: 700;
         color: #0f172a;
       }
