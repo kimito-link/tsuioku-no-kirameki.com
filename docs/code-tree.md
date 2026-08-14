@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 4 / 764 件
+## ⚠️ 役割コメントが無いソース 4 / 765 件
 - `src/lib/laneDomSelfMeasure.js`
 - `src/lib/reportPreviewPublish.js`
 - `src/lib/venueLaneBuckets.js`
@@ -695,7 +695,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (1663)
+- 📁 **src/** (1666)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -730,7 +730,7 @@
       - `avatarResolver.test.js`
       - `identity.js` — ニコ生ユーザー ID の「匿名性」判定と関連アイデンティティ・ユーティリティ。
       - `nickname.js` — 表示名（ニックネーム）の「強弱」判定。
-  - 📁 **extension/** (41)
+  - 📁 **extension/** (42)
     - 📁 **popup/** (6)
       - 📁 **report/** (2)
         - `htmlReportDocument.js` — HTMLレポート(振り返り用の保存HTML)組み立てクラスタ。
@@ -768,6 +768,7 @@
     - `statusCopyFreshness.wiring.test.js`
     - `storyDiagTotalSourcePopupEntry.wiring.test.js`
     - `storyGrowthSameUserBlurb.wiring.test.js`
+    - `symptomVerdictsOnScreen.wiring.test.js`
     - `venue-entry.js` — 会場モード(standalone)のエントリ。venueBar をページに mount するだけの薄い起動点。
     - `venueAvatarRetry.wiring.test.js`
     - `venueBar.js` — 会場モード UI 本体。観客の席割り・群衆・吹き出し・ギフト演出・読み上げ連動を描く。
@@ -986,7 +987,7 @@
         - `logo_funlink_white_RGB_maru_black.png`
       - `logo_guide_funlink_ol.pdf`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1422)
+  - 📁 **lib/** (1424)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -1945,6 +1946,8 @@
     - `recordRate.test.js`
     - `recordingStallWatchdog.js` — 記録停止ウォッチドッグの純粋判定ロジック。
     - `recordingStallWatchdog.test.js`
+    - `refreshCycleDeadline.js` — 1サイクル全体の締切を持ち、各 read の timeout を残り時間に切り詰める。
+    - `refreshCycleDeadline.test.js`
     - `refreshTaskGuard.js` — v0.1.437: popup の `refresh()` で chrome API が永久 pending になっても全カード「—」固定にしない
     - `refreshTaskGuard.test.js`
     - `repaintReasonCensus.js` — 「描き直しが何回・どの理由で起きたか」を数える純関数群。

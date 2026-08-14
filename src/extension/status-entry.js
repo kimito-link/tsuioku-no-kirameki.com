@@ -262,6 +262,10 @@ import { isLastWatchUrlFresh } from '../lib/watchUrlFreshness.js';
 // 2026-06-23: Alt+Tab に出ない裏 watch タブ(active:false・過去 autopatrol/古い重複拡張の遺物)を
 //   検出して手動クローズ導線を出す(council/orphan-tab-survivor-SYNTHESIS.md)。自動では閉じない。
 import { isBackgroundWatchTab } from '../lib/backgroundWatchTab.js';
+// ★v0.1.1388: 1サイクル全体の締切。個別 timeout(10本×8秒=80秒)の合計に天井を付ける。
+import { createRefreshDeadline, REFRESH_CYCLE_BUDGET_MS } from '../lib/refreshCycleDeadline.js';
+// ★v0.1.1388: 症状別判定を【画面に】出す(v0.1.1385 はコピー本文にしか配線されていなかった)。
+import { buildSymptomVerdicts } from '../lib/symptomVerdicts.js';
 
 /** 自動更新間隔(ms)。 */
 const REFRESH_INTERVAL_MS = 2000;
@@ -701,9 +705,29 @@ function startRefreshLoop() {
  *   storage stall でも「重くて開かない」を作らず即 degrade 表示する。通常更新は 8000ms のまま。
  */
 async function refresh(opts = {}) {
-  const tmo = Number.isFinite(Number(opts.timeoutMs)) && Number(opts.timeoutMs) > 0
+  const tmoBase = Number.isFinite(Number(opts.timeoutMs)) && Number(opts.timeoutMs) > 0
     ? Number(opts.timeoutMs)
     : 8000;
+  /*
+   * ★v0.1.1388(ユーザー実機「診断おもくてひらかない」の根治):
+   *   ここから下は timeout 付きの read を **10本、直列に await** する。
+   *   1本ずつは有界(既定8000ms)でも **合計に上限が無かった**=最悪 10×8000=80秒/サイクル。
+   *   refresh は2秒ごとに回るので数サイクルで180秒を超える(ユーザー実機と一致)。
+   *
+   *   ★並列化(Promise.all)では解かない。v0.1.867 で並列化して **退行**させた実績があり
+   *     (単一LevelDBの並行readがstall→fastDiag={}・記録0)、v0.1.868 で直列へ戻している
+   *     (上のコメントが正本)。＝**直列のまま、合計に天井を付ける**。
+   *
+   *   `_slice(既定値)` が「残り予算と既定値の小さい方」を返す。残りが尽きたら 0 =
+   *   read を発行せず、ガードの直近値(stale)で描く。画面が出ないより古い値の方が良い。
+   */
+  const _deadline = createRefreshDeadline({
+    totalMs: Number.isFinite(Number(opts.budgetMs)) && Number(opts.budgetMs) > 0
+      ? Number(opts.budgetMs)
+      : REFRESH_CYCLE_BUDGET_MS
+  });
+  /** @param {number} [want] @returns {number} この read に許す timeout[ms](0=読まない) */
+  const _slice = (want) => _deadline.next(Number(want) || tmoBase);
   let step = 'init';
   // v0.1.890: 「状態速報が重い」の真因可視化。refresh 全体と各ステップの所要 ms を測り、最終更新メタに
   //   出す(self-verifying: 推測で重さ対策をする前に、どのステップが重いかを実データで見る)。
@@ -726,25 +750,25 @@ async function refresh(opts = {}) {
     // 2026-07-14 診断ページ608秒固まり根治: コア5readはガード経由(timeoutでもthrowしない)。
     //   幽霊readが多重に競合していた旧実装(runStorageOpWithTimeout直呼び)から置換。
     step = 'enumerateActiveLives';
-    const lvRes = await _livesGuard.read({ timeoutMs: tmo });
+    const lvRes = await _livesGuard.read({ timeoutMs: _slice() });
     const lvList = lvRes.value;
     _mark(lvRes.stale ? 'lives(stale)' : 'lives');
     step = `loadAllSummaries(${lvList.length}件)`;
-    const sumRes = await _summariesGuard.read({ timeoutMs: tmo, arg: lvList });
+    const sumRes = await _summariesGuard.read({ timeoutMs: _slice(), arg: lvList });
     const summaries = sumRes.value;
     _mark(sumRes.stale ? `summaries×${lvList.length}(stale)` : `summaries×${lvList.length}`);
     // 2026-06-23: 2秒ループは full(~40KB)でなく軽量ダイジェスト(~1KB)を read=重さの真因を断つ。
     //   読み取りパスは full と同形なので renderAll 以下の consumer は無変更(council/status-heavy-open-SYNTHESIS.md)。
     step = 'loadStatusFastDiagLiteSafe';
-    const fdRes = await _fastDiagGuard.read({ timeoutMs: tmo });
+    const fdRes = await _fastDiagGuard.read({ timeoutMs: _slice() });
     const fastDiag = fdRes.value;
     _mark(fdRes.stale ? 'fastDiagLite(stale)' : 'fastDiagLite');
     step = 'loadPopupDiagSafe';
-    const pdRes = await _popupDiagGuard.read({ timeoutMs: tmo });
+    const pdRes = await _popupDiagGuard.read({ timeoutMs: _slice() });
     const popupDiag = pdRes.value;
     _mark(pdRes.stale ? 'popupDiag(stale)' : 'popupDiag');
     step = 'loadBackfillProgress';
-    const bfRes = await _backfillGuard.read({ timeoutMs: tmo });
+    const bfRes = await _backfillGuard.read({ timeoutMs: _slice() });
     const backfillProgress = bfRes.value;
     _mark(bfRes.stale ? 'backfill(stale)' : 'backfill');
     const coreReads = [lvRes, sumRes, fdRes, pdRes, bfRes];
@@ -768,7 +792,7 @@ async function refresh(opts = {}) {
       // 2026-07-15: コア5readと同じstale-while-revalidateガード経由に変更(旧runStorageOpWithTimeout
       //   直呼びは幽霊readの多重競合を止められなかった)。
       step = 'loadExtrasBatch';
-      const extrasRes = await _extrasBatchGuard.read({ timeoutMs: tmo });
+      const extrasRes = await _extrasBatchGuard.read({ timeoutMs: _slice() });
       const extrasBag = extrasRes.value;
       _mark(extrasRes.stale ? 'extrasBatch(stale)' : 'extrasBatch');
       const {
@@ -799,13 +823,13 @@ async function refresh(opts = {}) {
         sidepanelSelfDiag
       } = pickExtrasBatchValues(extrasBag, Date.now());
       step = 'queryWatchTabMap';
-      const wtRes = await _watchTabMapGuard.read({ timeoutMs: tmo });
+      const wtRes = await _watchTabMapGuard.read({ timeoutMs: _slice() });
       const watchTabMap = wtRes.value;
       _mark(wtRes.stale ? 'watchTabMap(stale)' : 'watchTabMap');
       step = 'recordAndAnalyzeTrend';
       const trendFindings = await runStorageOpWithTimeout(
         () => recordAndAnalyzeTrendSafe(lvList, summaries),
-        tmo
+        _slice()
       ).catch(() => []);
       // v0.1.1072: マイ効果音(取込件数/割当キー数/rev)も extras(12秒間引き)へ。IDB read のため
       //   コアには絶対足さない(既知の地雷=v1045/v1046と同型)。失敗時は「-」表示スナップショットへ。
@@ -817,7 +841,7 @@ async function refresh(opts = {}) {
         _extrasCache.customSoundDiag || buildCustomSoundDiagSnapshot({ dbAvailable: false });
       const customSoundDiag = await runStorageOpWithTimeout(
         () => _customSoundDiagGuard.run(customSoundDiagFallback),
-        tmo
+        _slice()
       ).catch(() => customSoundDiagFallback);
       /*
        * ★v0.1.1384: 自動タブリロードの痕跡(1キーだけ・extras 側=12秒間引き)。
@@ -828,7 +852,7 @@ async function refresh(opts = {}) {
       _autoTabReloadRec = await runStorageOpWithTimeout(
         () => chrome.storage.local.get('nls_last_auto_tab_reload')
           .then((b) => (b && b.nls_last_auto_tab_reload) || null),
-        tmo
+        _slice()
       ).catch(() => _autoTabReloadRec);
       _extrasCache = { reportPreview, watchTabMap, trendFindings, laneDiag, laneMirror, statCardsMirror, northStarMirror, voiceDiag, venueSeatsDiag, publishOutcomeRec, commentTimelineMirror, giftHistoryMirror, roomHeatMirror, sessionSummaryMirror, previewRenderAck, backfillLiveMetric, giftEffectDiag, milestoneEffectDiag, customSoundDiag, voiceEffectDiag, bgmPhaseDiag, opSoundEffectDiag, commentPostDiag, instantPushDiag, channelSwitchDiag, highlightLedger, scoreAnnounceDiag, sidepanelSelfDiag };
       _extrasCacheAt = Date.now();
@@ -2201,8 +2225,26 @@ function renderHealthCells(data) {
   //   表示に効く値(label/level/value/text)だけで署名し、変化が無ければ DOM を触らない=
   //   健全度パネル(基本6+北極星6+その他=~18セル)の毎回 replaceChildren+createElement ループを skip。
   //   値が変われば再構築されるので表示は常に最新。「状態速報が重い」の render 側ボトルネックを軽くする。
+  /*
+   * ★v0.1.1388: 症状別判定も署名に入れる。
+   *   入れないと「セルは同じだが症状別が変わった」paint が diff-skip で捨てられ、
+   *   **足した判定が画面に永久に出ない**([[verify-output-appears-before-shipping-2026-08-09]])。
+   *   ここは計器を足す版で必ず踏む穴なので、判定の生成を署名の前に置く。
+   */
+  const _popupSnapForSig = data?.popupDiag?.popup ?? data?.popupDiag;
+  let _symptomSig = '';
+  try {
+    _symptomSig = buildSymptomVerdicts({
+      identityAcquisition: _popupSnapForSig?.identityAcquisition || null,
+      laneRenderProbe: _popupSnapForSig?.storyUserLaneRenderProbe || null,
+      avatarLoadDiag: _popupSnapForSig?.avatarLoadDiag || null,
+      updateMs: _lastRefreshPerf?.totalMs
+    }).map((s) => `${s.id}:${s.level}`).join('~');
+  } catch {
+    _symptomSig = '';
+  }
   const sig =
-    `${v.level}|${v.text}|` +
+    `${v.level}|${v.text}|${_symptomSig}|` +
     cells.map((c) => `${c.label}:${c.level}:${c.kind === 'pct' ? c.value : c.text || ''}`).join('~');
   if (sig === _lastHealthSig) return; // 変化なし=再描画しない。
   _lastHealthSig = sig;
@@ -2215,6 +2257,62 @@ function renderHealthCells(data) {
     const span = document.createElement('span');
     span.textContent = `${mark} 総合判定: ${v.text}`;
     verdictHost.appendChild(span);
+    /*
+     * ★v0.1.1388(ユーザー実機「診断の箇所が1つしかない」の根治):
+     *   症状別判定(v0.1.1385 で新設)は **コピー本文(aiShareFullText.js)にしか配線されて
+     *   おらず、この画面から一度も呼ばれていなかった**＝ユーザーの指摘は完全に正しい。
+     *   私は「症状別判定を新設した」と報告したが、**画面上は存在していなかった**。
+     *   → [[unwired-judgement-is-systemic-2026-08-12]] を書いた本人が同じ穴を作った。
+     *
+     *   ★掟(symptomVerdicts.js の JSDoc が正本):
+     *     - 異常だけ出す(正常なら1行も出さない=ノイズを作らない)
+     *     - 1行目に次の一手(読んで直せない判定は価値が低い)
+     *     - 仕様上取れないもの(匿名のサムネ)を異常と呼ばない
+     *   ＝**総合判定が緑でも、症状別が赤ならここに出る**のが本来の姿。
+     */
+    try {
+      // 署名計算で既に解いた同じスナップショットを使う(二重に解かない・スコープも揃える)。
+      const popupSnap = _popupSnapForSig;
+      const verdicts = buildSymptomVerdicts({
+        identityAcquisition: popupSnap?.identityAcquisition || null,
+        laneRenderProbe: popupSnap?.storyUserLaneRenderProbe || null,
+        avatarLoadDiag: popupSnap?.avatarLoadDiag || null,
+        updateMs: _lastRefreshPerf?.totalMs
+      });
+      for (const sv of verdicts) {
+        const row = document.createElement('div');
+        row.className = `health-symptom hs-${sv.level}`;
+        row.textContent = `${sv.level === 'bad' ? '🔴' : '🟡'} ${sv.symptom}: ${sv.line}`;
+        row.title = sv.line;
+        verdictHost.appendChild(row);
+      }
+    } catch {
+      /* 症状別判定の失敗で総合判定まで消さない(画面を白くしない) */
+    }
+    /*
+     * ★v0.1.1388(ユーザー実機「サムネイルとんでる」への回答を画面に出す):
+     *   会場参加者が全員 匿名(a:) の配信では、**数値IDも個人サムネも仕様上存在しない**
+     *   (identityAcquisitionCensus.js:19)＝ゆっくり顔で出るのが正しい挙動。
+     *   ところがその理由は `identityAcquisition.line` に書いてあるのに
+     *   **コピー本文にしか出ておらず、画面には一度も出ていなかった**
+     *   ＝ユーザーには「サムネが飛んでいる不具合」にしか見えない。
+     *   → [[symptom-owner-must-be-told-2026-08-12]](症状が出ている当の画面に出す)
+     *
+     *   ★ここは「直すのは表示ではなく説明」。挙動(ゆっくり顔)は正しいので変えない。
+     *     赤くもしない(仕様上取れないものを異常と呼ばない)。
+     */
+    try {
+      const idLine = String(_popupSnapForSig?.identityAcquisition?.line || '').trim();
+      if (idLine) {
+        const note = document.createElement('div');
+        note.className = 'health-idnote';
+        note.textContent = idLine;
+        note.title = idLine;
+        verdictHost.appendChild(note);
+      }
+    } catch {
+      /* 説明行の失敗で画面を壊さない */
+    }
   }
   host.replaceChildren();
   for (const c of cells) {

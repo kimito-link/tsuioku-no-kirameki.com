@@ -525,6 +525,16 @@
       /* v0.1.846 総合判定バッジ: 満点=「異常ゼロ」。進行中/対象外は正常扱い=緑。 */
       .health-verdict { font-size: 14px; font-weight: 700; padding: 7px 12px; border-radius: 8px; margin-bottom: 8px; border: 1px solid var(--nl-border); }
       .health-verdict:empty { display: none; }
+      /* ★v0.1.1388 症状別判定(異常時のみ出る・総合判定の下に積む)。
+         色はベタ書き(テーマ変数が無くても必ず読める=判定が読めないのは判定が無いのと同じ)。 */
+      .health-symptom { display: block; font-size: 13px; font-weight: 600; line-height: 1.5;
+        margin-top: 6px; padding: 6px 10px; border-radius: 6px; white-space: pre-wrap; }
+      .health-symptom.hs-bad { background: #fdecea; color: #8a1c12; border: 1px solid #f2b8b1; }
+      .health-symptom.hs-warn { background: #fff6e0; color: #7a5200; border: 1px solid #f0d79a; }
+      /* ★v0.1.1388 本人情報の取得(匿名は仕様上サムネが無い、の説明)。異常ではないので淡色。 */
+      .health-idnote { display: block; font-size: 12px; font-weight: 500; line-height: 1.5;
+        margin-top: 6px; padding: 6px 10px; border-radius: 6px; white-space: pre-wrap;
+        background: #eef4fb; color: #33506e; border: 1px solid #cfe0f2; }
       .hv-ok { color: #2f9e57; border-color: rgba(47, 125, 74, 0.35); background: rgba(47, 125, 74, 0.06); }
       .hv-warn { color: #c8861f; border-color: #e0a93f; background: rgba(224, 169, 63, 0.08); }
       .hv-bad { color: #d4495f; border-color: #d4495f; background: rgba(212, 73, 95, 0.10); }
