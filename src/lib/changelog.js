@@ -26,6 +26,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1395',
+    date: '2026-08-14',
+    summary: '追加した診断項目が実際に表示されるようにしました',
+    items: Object.freeze([
+      '前回追加した「コメント送信」「会場モードの鮮度」「ギフト/広告の通り道」「メインスレッド」の各項目が、実際には表示されていませんでした。必要な情報が画面まで渡っていなかったためです。',
+      '画面が黒くなる原因を突き止めるため、動作を止めている処理を実際に計測するようにしました（これまで仕組みだけ作って計測していませんでした）。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1394',
     date: '2026-08-14',
     summary: '会場モードにギフトや新しい参加者が出ない問題を直しました',

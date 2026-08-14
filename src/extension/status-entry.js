@@ -1967,7 +1967,39 @@ function renderAll({ extrasAgeMs, lvList, summaries, fastDiag, popupDiag, backfi
   //   v0.1.894: 会場モード読み上げセル(タイミング・抜け漏れ)を出すため voiceDiag も渡す。
   //   ★v0.1.1362: backfillLiveMetric を渡す=「取り込み律速」セルの入力。
   //     渡し忘れると判定はあるのにセルが na のまま=配線されていない片肺になる。
-  safeSection('健全度パネル', () => renderHealthCells({ livesData, fastDiag, popupDiag, voiceDiag, venueSeatsDiag, laneDiag, giftEffectDiag, milestoneEffectDiag, previewRenderAck, laneMirror, backfillLiveMetric }));
+  /*
+   * ★v0.1.1395: v1390 で足した特化セル5種の入力を【実際に渡す】。
+   *   渡していなかったので、registry にもテストにも居るのに
+   *   実機では4つが出ていなかった(作っただけ=同じ穴を自分でまた作った)。
+   *   → [[unwired-judgement-is-systemic-2026-08-12]]
+   */
+  const _popupSnapForCells = popupDiag?.popup ?? popupDiag;
+  const _liveElapsedMs = (() => {
+    // 「取得中」が詰まりかどうかは配信の経過時間で決まる(giftAdPipelineCensus)。
+    const openedAt = Number(livesData?.[0]?.openTime || livesData?.[0]?.startedAt || 0);
+    return openedAt > 0 ? Math.max(0, Date.now() - openedAt) : 0;
+  })();
+  const _mirrorAgeMs = (() => {
+    const cap = Number(laneMirror?.capturedAt || 0);
+    return cap > 0 ? Math.max(0, Date.now() - cap) : 0;
+  })();
+  safeSection('健全度パネル', () => renderHealthCells({
+    livesData, fastDiag, popupDiag, voiceDiag, venueSeatsDiag, laneDiag,
+    giftEffectDiag, milestoneEffectDiag, previewRenderAck, laneMirror, backfillLiveMetric,
+    // ★v0.1.1395 追加分(特化セル5種の入力)
+    commentPostDiag: _extrasCache?.commentPostDiag ?? null,
+    instantPushDiag: _extrasCache?.instantPushDiag ?? null,
+    mainThreadBlocker: _popupSnapForCells?.mainThreadBlocker ?? null,
+    liveElapsedMs: _liveElapsedMs,
+    venueOpen: Boolean(venueSeatsDiag?.enabled),
+    venueMirrorAgeMs: _mirrorAgeMs,
+    venueTiers: {
+      link: laneMirror?.link?.length || 0, gift: laneMirror?.gift?.length || 0,
+      ad: laneMirror?.ad?.length || 0, konta: laneMirror?.konta?.length || 0,
+      tanu: laneMirror?.tanu?.length || 0
+    },
+    venueHasGiftData: Number(fastDiag?.content?.giftDiagnostics?.['北極星レーン']?.['1_貢献度ランキング']?.apiRows || 0) > 0
+  }));
 
   // popup 埋め込み(本物 iframe・v0.1.916 試作): popup.html?inline=1&dock=status&lv=<lv> を iframe で
   //   丸ごと出し「見た目も操作も popup そっくり」を本物のまま映す。下の鏡(間引き)より上に置き、出たら
