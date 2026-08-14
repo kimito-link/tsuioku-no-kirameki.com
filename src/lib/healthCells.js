@@ -7,6 +7,8 @@ import { judgeBackfillBottleneck } from './backfillBottleneck.js';
 import { buildVoiceBubbleParity } from './voiceBubbleRealtimeParity.js';
 import { buildGiftAdPipeline } from './giftAdPipelineCensus.js';
 import { buildVenueModeCensus } from './venueModeCensus.js';
+// ★v0.1.1400: 速報に埋もれていた判定のセル化(在庫の棚卸し・14セル)。
+import { buildBuriedCells } from './buriedInstrumentCells.js';
 
 /**
  * healthCells.js — status ファーストビューの「健全度セル」を作る純関数(v0.1.843)。
@@ -773,6 +775,11 @@ export function buildHealthCells(data) {
       ));
     }
   } catch { /* no-op */ }
+
+  // ★v0.1.1400: 埋もれていた判定を掘り起こす(未観測は返らない)。
+  try {
+    for (const c of buildBuriedCells(data)) cells.push(c);
+  } catch { /* 掘り起こしの失敗でパネル全体を壊さない */ }
 
   return cells;
 }

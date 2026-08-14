@@ -31,6 +31,7 @@ graph LR
   n_status --> n_src_lib_broadcastScorePanelViewModel_js["lib/broadcastScorePanelViewModel.js"]:::shared
   n_status --> n_src_lib_broadcasterReputationKeywords_js["lib/broadcasterReputationKeywords.js"]
   n_status --> n_src_lib_broadcasterReputationView_js["lib/broadcasterReputationView.js"]
+  n_status --> n_src_lib_buriedInstrumentCells_js["lib/buriedInstrumentCells.js"]
   n_status --> n_src_lib_channelSwitchDiag_js["lib/channelSwitchDiag.js"]:::shared
   n_status --> n_src_lib_channelSwitchDiagKey_js["lib/channelSwitchDiagKey.js"]:::shared
   n_status --> n_src_lib_chikuranCard_js["lib/chikuranCard.js"]
@@ -52,8 +53,7 @@ graph LR
   n_status --> n_src_lib_diagnosisRegistry_js["lib/diagnosisRegistry.js"]
   n_status --> n_src_lib_diagnosticsTrust_js["lib/diagnosticsTrust.js"]
   n_status --> n_src_lib_effectSoundPlayer_js["lib/effectSoundPlayer.js"]:::shared
-  n_status --> n_src_lib_giftAdPipelineCensus_js["lib/giftAdPipelineCensus.js"]
   classDef shared fill:#eee,stroke:#999,color:#666;
 ```
 
-> ほか 105 ファイル省略（全件は storage-bus.md / metafile 参照）。
+> ほか 106 ファイル省略（全件は storage-bus.md / metafile 参照）。

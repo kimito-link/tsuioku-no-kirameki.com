@@ -35,22 +35,25 @@ export const HEALTH_CELL_GROUPS = Object.freeze([
   Object.freeze({
     id: 'comment', label: 'コメント記録', order: 1,
     hint: 'コメントが取れているか・公式と一致しているか',
-    cellIds: Object.freeze(['capture-rate', 'match', 'ndgr-chats'])
+    cellIds: Object.freeze(['capture-rate', 'match', 'ndgr-chats', 'dedupe-seed'])
   }),
   Object.freeze({
     id: 'ingest', label: '取り込み（接続・過去ログ）', order: 2,
     hint: '今つながっているか・過去のコメントを追えているか',
-    cellIds: Object.freeze(['ndgr', 'ingest', 'backfill', 'backfill-bottleneck'])
+    cellIds: Object.freeze(['ndgr', 'ingest', 'backfill', 'backfill-bottleneck', 'host-move'])
   }),
   Object.freeze({
     id: 'identity', label: '人の識別（ID・サムネ・名前の紐づけ）', order: 3,
     hint: '誰が言ったかを結びつけられているか。匿名は仕様上ここに出ません',
-    cellIds: Object.freeze(['uid-rate', 'avatar', 'venue-yukkuri-face'])
+    cellIds: Object.freeze(['uid-rate', 'avatar', 'venue-yukkuri-face', 'avatar-cache'])
   }),
   Object.freeze({
     id: 'lane', label: '応援レーン（誰が並ぶか）', order: 4,
     hint: '何人出るか・描画が追いついているか',
-    cellIds: Object.freeze(['lane-count', 'lane-paint'])
+    cellIds: Object.freeze([
+      'lane-count', 'lane-paint', 'lane-tick', 'lane-settle',
+      'lane-dropped', 'lane-oscillation', 'lane-supply-guard'
+    ])
   }),
   Object.freeze({
     id: 'venue', label: '会場モード', order: 5,
@@ -80,6 +83,11 @@ export const HEALTH_CELL_GROUPS = Object.freeze([
     cellIds: Object.freeze(['voice-bubble-parity', 'voice-timing', 'voice-coverage'])
   }),
   Object.freeze({
+    id: 'display', label: '画面の見せ方（PICK UP・クリック）', order: 9.5,
+    hint: '大きく出す帯や、押せる見た目になっているか',
+    cellIds: Object.freeze(['pickup-write', 'click-affordance'])
+  }),
+  Object.freeze({
     id: 'post', label: 'コメント送信', order: 10,
     hint: '自分が送ったコメントが届いて画面に出たか',
     cellIds: Object.freeze(['comment-post'])
@@ -92,13 +100,16 @@ export const HEALTH_CELL_GROUPS = Object.freeze([
   Object.freeze({
     id: 'speed', label: '重さ・黒画面', order: 12,
     hint: '★黒くなる・固まる件はここ。「メインスレッド」が止めている当人を名指しします',
-    cellIds: Object.freeze(['main-thread', 'paint', 'scroll-whiteout'])
+    cellIds: Object.freeze([
+      'main-thread', 'paint', 'scroll-whiteout', 'boot-shade', 'grid-rebuild'
+    ])
   }),
   Object.freeze({
     id: 'health', label: '保存・内部の整合', order: 13,
     hint: '記録が保存できているか・画面どうしの同期がずれていないか',
     cellIds: Object.freeze([
-      'storage', 'stale', 'console', 'diag-stability', 'mirror-gen-stamp', 'preview-gen-sync'
+      'storage', 'stale', 'console', 'diag-stability', 'mirror-gen-stamp', 'preview-gen-sync',
+      'mirror-publish', 'northstar-render'
     ])
   })
 ]);

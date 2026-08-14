@@ -3802,6 +3802,16 @@
       ]
     },
     {
+      "file": "src/lib/buriedInstrumentCells.js",
+      "featureCount": 1,
+      "features": [
+        "status"
+      ],
+      "labels": [
+        "状態速報ページ"
+      ]
+    },
+    {
       "file": "src/lib/capCommentsForAnalytics.js",
       "featureCount": 1,
       "features": [

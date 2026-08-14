@@ -420,6 +420,7 @@
 | `src/lib/broadcastWaveformFingerprint.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/buildNorthStarAdRankingStatsHtml.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/buildWatchMetaCardAudienceViewModel.js` | 1 | ポップアップ(応援レーン) |
+| `src/lib/buriedInstrumentCells.js` | 1 | 状態速報ページ |
 | `src/lib/capCommentsForAnalytics.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/captureAuditionRichviewEventScoreDiagProbe.js` | 1 | 記録エンジン(watchページ常駐) |
 | `src/lib/cardFreshnessNote.js` | 1 | ポップアップ(応援レーン) |
