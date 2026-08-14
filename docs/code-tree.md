@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 4 / 770 件
+## ⚠️ 役割コメントが無いソース 4 / 772 件
 - `src/lib/laneDomSelfMeasure.js`
 - `src/lib/reportPreviewPublish.js`
 - `src/lib/venueLaneBuckets.js`
@@ -167,7 +167,7 @@
     - `2026-07-22.md`
     - `2026-07-23.md`
     - `2026-07-31.md`
-- 📁 **docs/** (281)
+- 📁 **docs/** (282)
   - 📁 **article-assets/** (87)
     - 📁 **venue-frames/** (12)
       - `f01.png`
@@ -277,7 +277,7 @@
     - `storage-bus.md`
     - `venue.md`
     - `web-status.md`
-  - 📁 **handoff/** (117)
+  - 📁 **handoff/** (118)
     - `CODEX-TASK-voice-v1332.md`
     - `CODEX-TASK-voice-v1334.md`
     - `CODEX-TASK-voice-v1342.md`
@@ -365,6 +365,7 @@
     - `panel-flicker-resolution-DESIGN.md`
     - `panel-flicker-resolution-IMPLEMENTATION-HANDOFF.md`
     - `panel-flicker-round2-brief-2026-08-05.md`
+    - `readability-council-BRIEF-2026-08-14.md`
     - `scroll-whiteout-freeze-DESIGN.md`
     - `side-panel-spike-HOWTO.md`
     - `sidepanel-black-council-MATERIAL.md`
@@ -695,7 +696,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (1677)
+- 📁 **src/** (1681)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -987,7 +988,7 @@
         - `logo_funlink_white_RGB_maru_black.png`
       - `logo_guide_funlink_ol.pdf`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1435)
+  - 📁 **lib/** (1439)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -1082,6 +1083,10 @@
     - `backfillVisibilityRearm.test.js`
     - `backgroundWatchTab.js` — 「Alt+Tab に出てこない裏 watch タブ(active:false)」の判定。
     - `backgroundWatchTab.test.js`
+    - `bandScale.js` — 「大きく見せる枠(PICK UP 帯)」の倍率(純関数)。
+    - `bandScale.test.js`
+    - `bandScale.wiring.test.js`
+    - `bandScaleBoot.js` — PICK UP 帯の倍率を起動時に適用する(副作用モジュール)。
     - `bgmDirector.js` — council/pachinko-ultimate-SYNTHESIS.md §5(BGM設計)+§6 Phase C の実装。
     - `bgmDirector.test.js`
     - `bgmPhaseDiag.js` — BGMディレクター(bgmDirector.js)+フェーズディレクター(phaseDirector.js)の観測値を組み立てる

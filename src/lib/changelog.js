@@ -26,6 +26,16 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1392',
+    date: '2026-08-14',
+    summary: 'コメントを大きく見せる枠（PICK UP 帯）を実際に大きくしました',
+    items: Object.freeze([
+      '「コメントが流れると、ここに1件ずつ大きく出るよ」の帯が、実際には最大13pxしかなく大きくありませんでした。約21pxまで拡大し、画面から離れても読めるようにしました。',
+      '文字だけでなく帯の高さも同じ比率で広げているので、文字が切れることはありません。',
+      '応援レーンやアイコンの表示は1pxも変えていません。全体を拡大すると一度に見える人数が減ってしまうためです。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1391',
     date: '2026-08-14',
     summary: '「描き直しの回数」の数え方を修正（防いだ回数を含めていました）',
