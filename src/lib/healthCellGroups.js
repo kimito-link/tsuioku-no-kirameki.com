@@ -61,24 +61,45 @@ export const HEALTH_CELL_GROUPS = Object.freeze([
     hint: 'ニコ生公式から取ってくる値。取得中は薄く出ます',
     order: 4,
     cellIds: Object.freeze([
+      'gift-ad-pipeline',
       'ns-contrib', 'ns-ad', 'ns-gift-hist', 'ns-escore', 'ns-prog-pt', 'ns-erank'
     ])
   }),
   Object.freeze({
-    id: 'effect',
-    label: '演出・効果音・読み上げ',
-    hint: '鳴るはずのものが鳴っているか',
+    id: 'venue',
+    label: '会場モード',
+    hint: '★会場は①ポップアップが書いた情報を映します。古いとここに出ます',
+    order: 4.5,
+    cellIds: Object.freeze(['venue-mode'])
+  }),
+  Object.freeze({
+    id: 'voice',
+    label: '読み上げ（声と吹き出しの一致）',
+    hint: '★声と画面表示が同じタイミングか。個別の速さでなく「揃っているか」を見ます',
     order: 5,
-    cellIds: Object.freeze([
-      'gift-effect', 'milestone-effect', 'voice-timing', 'voice-coverage'
-    ])
+    cellIds: Object.freeze(['voice-bubble-parity', 'voice-timing', 'voice-coverage'])
+  }),
+  Object.freeze({
+    id: 'post',
+    label: 'コメント送信',
+    hint: '自分が送ったコメントが届いて画面に出たか',
+    order: 6,
+    cellIds: Object.freeze(['comment-post'])
+  }),
+  Object.freeze({
+    id: 'effect',
+    label: '演出・効果音',
+    hint: '鳴るはずのものが鳴っているか',
+    order: 7,
+    cellIds: Object.freeze(['gift-effect', 'milestone-effect'])
   }),
   Object.freeze({
     id: 'health',
     label: '動作の健全性（重さ・描画・保存）',
-    hint: '固まる・白くなる・保存できない等の土台',
-    order: 6,
+    hint: '固まる・白くなる・保存できない等の土台。★黒くなる件はここの「メインスレッド」を見ます',
+    order: 8,
     cellIds: Object.freeze([
+      'main-thread',
       'paint', 'stale', 'console', 'scroll-whiteout', 'diag-stability',
       'storage', 'mirror-gen-stamp', 'preview-gen-sync'
     ])
