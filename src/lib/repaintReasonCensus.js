@@ -153,7 +153,13 @@ export function formatRepaintReasonLine(counts, commentCount) {
    */
   const blame = dom
     ? SUPPRESSION_REASONS.has(dom.reason)
-      ? ` ← ${dom.reason}が${Math.round(dom.share * 100)}%(=描き直しを【止めた】回数。防御が効いている証拠で、原因ではありません)`
+      /*
+       * ★v0.1.1396: 分子から除いた後は、この節を「原因の話」として続けない。
+       *   実機で `実際に描いたのは1コメントあたり17回 ← self_write_skippedが75%
+       *   (…原因ではありません)` と出て、直した数字と打ち消し文が並び読者が混乱した。
+       *   止めた回数は【内訳】には残す(隠さない)が、比の後ろに置かない。
+       */
+      ? ` ／ うち${dom.reason}${Math.round(dom.share * 100)}%は描き直しを【止めた】回数(分子から除外済み)`
       : ` ← ${dom.reason}が${Math.round(dom.share * 100)}%を占める(ここが原因)`
     : '';
   return `描き直しの内訳(計${total}回): ${parts.join(' / ')}${perComment}${blame}`;

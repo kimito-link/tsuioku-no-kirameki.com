@@ -239,9 +239,10 @@ function buildVoiceHealthCells(voiceDiag, nowMs) {
  *
  * @param {(import('./venueSeatsDiag.js').VenueSeatsDiagState & { capturedAt?: number })|null|undefined} venueSeatsDiag
  * @param {number} nowMs 更新 ago の算出用(現在時刻)
+ * @param {boolean} [freshVenueOpen] v1396: いま会場が開いているか(古い snap 以外の情報源から)
  * @returns {HealthCell[]}
  */
-function buildVenueSeatsHealthCells(venueSeatsDiag, nowMs) {
+function buildVenueSeatsHealthCells(venueSeatsDiag, nowMs, freshVenueOpen) {
   const snap = venueSeatsDiag && typeof venueSeatsDiag === 'object' ? venueSeatsDiag : null;
   if (!snap) return [];
   const enabled = !!snap.enabled;
@@ -302,11 +303,23 @@ function buildVenueSeatsHealthCells(venueSeatsDiag, nowMs) {
    *   証拠があるのに計器が古い場合は「閉じている」ではなく
    *   【計器が届いていない】と正直に言う(直せる情報を出す)。
    */
-  const venueLooksOpen = participants > 0 || seatsShown > 0;
+  /*
+   * ★v0.1.1396(前版の直しが不十分だった): 「開いている証拠」を
+   *   **同じ古いスナップショット**から取ってはいけない。
+   *   v1395 は participants>0 を根拠にしたが、その participants 自体が
+   *   11日前の化石値だった → 実機で「計器が届いていません(944648秒前)」と
+   *   出続けた(＝閉じているのに開いている扱い)。
+   *   ★**古い値は自分の新しさを証明できない**。証拠は【別の新しい情報源】から取る。
+   *
+   *   ここでは freshVenueOpen(呼び出し側が今の状態を渡す)だけを信じる。
+   *   渡されていない(undefined)なら判定材料が無いので、従来どおり
+   *   「開いていません」に倒す(古い値で warn を居座らせない)。
+   */
+  const venueLooksOpen = freshVenueOpen === true;
   if (sinceUpdateMs != null && sinceUpdateMs >= VENUE_SEATS_CLOSED_MS && venueLooksOpen) {
     out.push(stateCell(
       'venue-seats', '会場座席', 'warn',
-      `計器が届いていません(${Math.round(sinceUpdateMs / 1000)}秒前・会場は開いています)`
+      `計器が届いていません(会場は開いています)`
     ));
   } else if (sinceUpdateMs != null && sinceUpdateMs >= VENUE_SEATS_CLOSED_MS) {
     out.push(stateCell('venue-seats', '会場座席', 'na', '会場を開いていません'));
@@ -662,7 +675,7 @@ export function buildHealthCells(data) {
   for (const c of buildVoiceHealthCells(data?.voiceDiag, nowMs)) cells.push(c);
 
   // 21-22. 会場モード座席(配信者混入・固着)。venueSeatsDiag 未使用なら空=セルを足さない。
-  for (const c of buildVenueSeatsHealthCells(data?.venueSeatsDiag, nowMs)) cells.push(c);
+  for (const c of buildVenueSeatsHealthCells(data?.venueSeatsDiag, nowMs, data?.venueOpen)) cells.push(c);
 
   // 23. 応援レーン人数整合(素性 N / 表示 M)。laneDiag 未観測なら空=セルを足さない。
   for (const c of buildLaneHealthCells(data?.laneDiag)) cells.push(c);
