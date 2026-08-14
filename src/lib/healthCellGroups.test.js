@@ -30,8 +30,9 @@ describe('healthCellGroups', () => {
   it('★未知のセルでも消えない(その他へ落ちる)', () => {
     expect(groupIdForCell('brand-new-cell-not-registered')).toBe('other');
     const groups = groupHealthCells([{ id: 'brand-new-cell-not-registered', level: 'ok' }]);
-    expect(groups.length).toBe(1);
-    expect(groups[0].id).toBe('other');
+    const other = groups.find((g) => g.id === 'other');
+    expect(other).toBeTruthy();
+    expect(other.cells.map((c) => c.id)).toContain('brand-new-cell-not-registered');
   });
 
   it('★入力セルは1枚も失われない(枠に分けても総数が同じ)', () => {
@@ -40,9 +41,32 @@ describe('healthCellGroups', () => {
     expect(total).toBe(cells.length);
   });
 
-  it('空の枠は出さない', () => {
+  it('★registry の全セルが必ず枠に現れる(入力ゼロでも)', () => {
+    const groups = groupHealthCells([]);
+    const shown = new Set(groups.flatMap((g) => g.cells.map((c) => c.id)));
+    for (const r of DIAGNOSIS_REGISTRY) expect(shown.has(r.id), r.id).toBe(true);
+  });
+
+  /*
+   * ★v0.1.1401: 「空の枠は出さない」を【撤回】。ユーザー指摘:
+   *   「隠れるんじゃなくて固定のテーブル組んでおくべき。DOM構造が変化するので
+   *     上に行ったり下に行ったりで見づらくなる」
+   *   → 枠もセルも常に同じ位置。観測が無ければ ⚪「—」で埋める。
+   */
+  it('★固定テーブル: 観測が1つでも全枠が出る(位置が動かない)', () => {
     const groups = groupHealthCells([{ id: 'uid-rate', level: 'ok' }]);
-    expect(groups.map((g) => g.id)).toEqual(['identity']);
+    expect(groups.length).toBe(HEALTH_CELL_GROUPS.length);
+    const identity = groups.find((g) => g.id === 'identity');
+    expect(identity.cells.find((c) => c.id === 'uid-rate').level).toBe('ok');
+    // 観測が無いセルは消えず「—」で残る
+    expect(identity.cells.find((c) => c.id === 'avatar').text).toBe('—');
+  });
+
+  it('★セルの並び順は枠の定義順で固定(値が変わっても動かない)', () => {
+    const a = groupHealthCells([{ id: 'uid-rate', level: 'ok' }]);
+    const b = groupHealthCells([{ id: 'avatar', level: 'bad' }]);
+    const ids = (gs) => gs.map((g) => g.cells.map((c) => c.id).join(',')).join('|');
+    expect(ids(a)).toBe(ids(b)); // 中身が違っても並びは同一
   });
 
   it('★枠は十分に細かい(12前後)=会場やギフトが1枠1セルで終わらない', () => {
@@ -58,7 +82,10 @@ describe('healthCellGroups', () => {
       { id: 'uid-rate', level: 'ok' },
       { id: 'capture-rate', level: 'ok' }
     ];
-    expect(groupHealthCells(cells).map((g) => g.id)).toEqual(['comment', 'identity', 'speed']);
+    // 固定テーブルなので全枠が出る。順序だけを見る。
+    const ids = groupHealthCells(cells).map((g) => g.id);
+    expect(ids.indexOf('comment')).toBeLessThan(ids.indexOf('identity'));
+    expect(ids.indexOf('identity')).toBeLessThan(ids.indexOf('speed'));
   });
 
   it('★「人の識別」枠に ID/サムネ/名前が揃う(ユーザー要望の当の枠)', () => {

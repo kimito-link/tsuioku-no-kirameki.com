@@ -9,8 +9,13 @@
  *   ＝**150以上が既に存在するのに、速報の本文に埋もれて枠から引けない**。
  *   100個への道は「新しく作る」ではなく **在庫の棚卸し**。
  *
- * ■ このモジュールの掟(既存セルと同じ)
- *   1. **未観測は出さない**(使っていない機能を赤くしない)
+ * ■ このモジュールの掟
+ *   1. ★v0.1.1401 訂正: **「使っていない」と「動くはずなのに0」を区別する**。
+ *      記録中の配信があるなら、レーンや描画は【動くはず】。それが0件なら
+ *      それ自体が症状なので **⚪未観測として枠に出す**(消さない)。
+ *      v1400 は10箇所で「0なら出さない」にしてしまい、14セル中12個が
+ *      画面から消えた＝ユーザーに「なにもかわってない」と言わせた。
+ *      ★**一番知りたい異常時ほどセルが消える**という最悪の挙動だった。
  *   2. **仕様上そうなるものを異常と呼ばない**(匿名にサムネは無い、等)
  *   3. **症状の言葉**で名前を付ける(「heavy race」ではなく「レーンが揃わない」)
  *   4. 純関数・DOM を触らない・時刻は呼び出し側が渡す
@@ -51,10 +56,24 @@ export function buildBuriedCells(data) {
   const out = [];
   const p = data?.popupDiag?.popup ?? data?.popupDiag ?? null;
   const fast = data?.fastDiag?.content ?? null;
+  /*
+   * ★記録中の配信があるか。あるなら「レーンが動くはず」なので、
+   *   観測0でも **⚪未観測** として枠に出す(消さない=空欄が症状を語る)。
+   */
+  const recording = Array.isArray(data?.livesData)
+    && data.livesData.some((/** @type {any} */ l) => l && l.recording);
+  /**
+   * 観測が無いときのセル(記録中なら出す)。
+   * @param {string} id @param {string} label
+   */
+  const naCell = (id, label) => (recording ? cell(id, label, 'na', '—') : null);
+  /** @param {any} c */
+  const push = (c) => { if (c) out.push(c); };
 
   /* ── 応援レーン: なぜ描かれなかったか ───────────────────── */
   const tick = p?.laneTickProbe;
-  if (tick && num(tick.ticks) != null && (num(tick.ticks) || 0) > 0) {
+  if (!tick || !(num(tick.ticks) || 0)) push(naCell('lane-tick', 'レーン描画の起動'));
+  else {
     const ticks = num(tick.ticks) || 0;
     const runs = num(tick.runs) || 0;
     const skipped = Math.max(0, ticks - runs);
@@ -72,7 +91,8 @@ export function buildBuriedCells(data) {
 
   /* ── レーンの取りこぼし(消えた人) ───────────────────────── */
   const roster = p?.laneRosterDelta;
-  if (roster && num(roster.everSeenMax) != null && (num(roster.everSeenMax) || 0) > 0) {
+  if (!roster || !(num(roster.everSeenMax) || 0)) push(naCell('lane-dropped', 'レーンから消えた人'));
+  else {
     const dropped = num(roster.droppedTotal) || 0;
     out.push(cell(
       'lane-dropped', 'レーンから消えた人',
@@ -83,7 +103,8 @@ export function buildBuriedCells(data) {
 
   /* ── 不完全な供給がタイルを消すのを止めた回数(防御) ───────── */
   const guard = p?.lightSupplyGuard;
-  if (guard && num(guard.observedCount) != null && (num(guard.observedCount) || 0) > 0) {
+  if (!guard || !(num(guard.observedCount) || 0)) push(naCell('lane-supply-guard', 'レーン保護'));
+  else {
     const skip = num(guard.skipCount) || 0;
     out.push(cell(
       'lane-supply-guard', 'レーン保護',
@@ -94,7 +115,8 @@ export function buildBuriedCells(data) {
 
   /* ── 起動時の暗さ(黒画面の直接の材料) ─────────────────── */
   const shade = p?.loadShadeProbe;
-  if (shade && num(shade.shadeAgeMs) != null) {
+  if (!shade || num(shade.shadeAgeMs) == null) push(naCell('boot-shade', '起動時のシェード'));
+  else {
     const ageMs = num(shade.shadeAgeMs) || 0;
     const present = shade.shadePresent === true;
     // ★出たまま長い=中身が見えない時間。1秒超で人が気づく。
@@ -109,7 +131,8 @@ export function buildBuriedCells(data) {
 
   /* ── PICK UP に何が選ばれたか ─────────────────────────── */
   const ticker = p?.tickerPick;
-  if (ticker && num(ticker.domWriteTotal) != null && (num(ticker.domWriteTotal) || 0) > 0) {
+  if (!ticker || !(num(ticker.domWriteTotal) || 0)) push(naCell('pickup-write', 'PICK UPの更新'));
+  else {
     const wrote = num(ticker.domWriteTotal) || 0;
     const short = num(ticker.filteredTooShort) || 0;
     out.push(cell(
@@ -121,7 +144,8 @@ export function buildBuriedCells(data) {
 
   /* ── アイコングリッドの作り直し(重さの材料) ───────────────── */
   const churn = p?.storyGrowthChurn;
-  if (churn && num(churn.rebuilds) != null && (num(churn.rebuilds) || 0) > 0) {
+  if (!churn || !(num(churn.rebuilds) || 0)) push(naCell('grid-rebuild', 'アイコングリッド'));
+  else {
     const maxMs = num(churn.maxMs) || 0;
     out.push(cell(
       'grid-rebuild', 'アイコングリッド',
@@ -132,11 +156,13 @@ export function buildBuriedCells(data) {
 
   /* ── サムネをキャッシュから引けたか ─────────────────────── */
   const remembered = p?.avatarRememberedDiag;
-  if (remembered) {
+  if (!remembered) push(naCell('avatar-cache', 'サムネの記憶'));
+  else {
     const cacheHit = num(remembered.hitProfileCache) || 0;
     const synth = num(remembered.hitSynth) || 0;
     const total = cacheHit + synth;
-    if (total > 0) {
+    if (total <= 0) push(naCell('avatar-cache', 'サムネの記憶'));
+    else {
       const pct = Math.round((cacheHit / total) * 100);
       out.push(cell(
         'avatar-cache', 'サムネの記憶',
@@ -148,7 +174,8 @@ export function buildBuriedCells(data) {
 
   /* ── 重複除去の種が壊れていないか ───────────────────────── */
   const seed = fast?.giftDiagnostics?.commentObservability?.dedupeSeedDiag;
-  if (seed && num(seed.addedTotalCount) != null && (num(seed.addedTotalCount) || 0) > 0) {
+  if (!seed || !(num(seed.addedTotalCount) || 0)) push(naCell('dedupe-seed', '重複の見分け'));
+  else {
     const suspicious = num(seed.suspiciousAddedCount) || 0;
     out.push(cell(
       'dedupe-seed', '重複の見分け',
@@ -172,7 +199,8 @@ export function buildBuriedCells(data) {
 
   /* ── 北極星の描画がどこまで進んだか ─────────────────────── */
   const ns = p?.northStarRenderProbe;
-  if (ns && num(ns.refreshAllStarted) != null && (num(ns.refreshAllStarted) || 0) > 0) {
+  if (!ns || !(num(ns.refreshAllStarted) || 0)) push(naCell('northstar-render', '公式値の描画'));
+  else {
     const started = num(ns.refreshAllStarted) || 0;
     const done = num(ns.refreshAllCompleted) || 0;
     out.push(cell(
@@ -184,7 +212,8 @@ export function buildBuriedCells(data) {
 
   /* ── 鏡publishの競合 ────────────────────────────────── */
   const race = p?.northStarMirrorPublishRace;
-  if (race && num(race.publishCalls) != null && (num(race.publishCalls) || 0) > 0) {
+  if (!race || !(num(race.publishCalls) || 0)) push(naCell('mirror-publish', '鏡の書き出し'));
+  else {
     const skipped = num(race.flushSkipped) || 0;
     out.push(cell(
       'mirror-publish', '鏡の書き出し',
@@ -195,7 +224,8 @@ export function buildBuriedCells(data) {
 
   /* ── クリックできる見た目になっているか ───────────────────── */
   const affordance = p?.storyUserLaneClickAffordanceParity;
-  if (affordance && num(affordance.checked) != null && (num(affordance.checked) || 0) > 0) {
+  if (!affordance || !(num(affordance.checked) || 0)) push(naCell('click-affordance', 'クリックの見た目'));
+  else {
     const bad = num(affordance.mismatched) || 0;
     out.push(cell(
       'click-affordance', 'クリックの見た目',
@@ -206,7 +236,8 @@ export function buildBuriedCells(data) {
 
   /* ── レーンが揃わない(heavy race) ───────────────────────── */
   const lane = p?.storyUserLaneRenderProbe;
-  if (lane && String(lane.heavySettleState || '')) {
+  if (!lane || !String(lane.heavySettleState || '')) push(naCell('lane-settle', 'レーンの読み切り'));
+  else {
     const st = String(lane.heavySettleState);
     out.push(cell(
       'lane-settle', 'レーンの読み切り',
@@ -217,7 +248,8 @@ export function buildBuriedCells(data) {
 
   /* ── 表示件数の増減(ちらつきの直接指標) ─────────────────── */
   const osc = lane?.laneTileOscillation;
-  if (osc && num(osc.samples) != null && (num(osc.samples) || 0) > 0) {
+  if (!osc || !(num(osc.samples) || 0)) push(naCell('lane-oscillation', 'レーンの増減'));
+  else {
     const drops = num(osc.drops) || 0;
     out.push(cell(
       'lane-oscillation', 'レーンの増減',
