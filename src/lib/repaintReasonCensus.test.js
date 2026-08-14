@@ -118,3 +118,35 @@ describe('formatRepaintReasonLine — 速報に出す1行', () => {
     expect(formatRepaintReasonLine(null, 100)).toBe('');
   });
 });
+
+/*
+ * ★v0.1.1391(ユーザー実機 2026-08-14): 分子から「止めた回数」を除く。
+ *   同じ速報に「1コメントあたり6.5回」と「1コメントあたり26回」が併記されていた。
+ */
+describe('1コメントあたりの比は【実際に描いた分】で出す', () => {
+  it('★self_write_skipped(止めた回数)を分子に含めない', () => {
+    // 実機の数字: total 6875 / 止めた 5133 / コメント 268 → 実 paint 1742 = 6.5回
+    const line = formatRepaintReasonLine(
+      { self_write_skipped: 5133, 'storage_changed:nls_watch_snapshot_*': 1742 },
+      268
+    );
+    expect(line).toContain('実際に描いたのは1コメントあたり6.5回');
+    // 止めた分を含めた 25.7/26 回が出てはいけない(これが誤誘導の正体)。
+    expect(line).not.toContain('あたり26回');
+    expect(line).not.toContain('あたり25.7回');
+  });
+
+  it('内訳の総数は従来どおり(止めた回数も分母には残す=隠さない)', () => {
+    const line = formatRepaintReasonLine(
+      { self_write_skipped: 5133, 'storage_changed:x': 1742 },
+      268
+    );
+    expect(line).toContain('計6875回');
+    expect(line).toContain('self_write_skipped5133');
+  });
+
+  it('抑制系が無ければ従来と同じ比', () => {
+    const line = formatRepaintReasonLine({ 'storage_changed:x': 536 }, 268);
+    expect(line).toContain('実際に描いたのは1コメントあたり2.0回');
+  });
+});

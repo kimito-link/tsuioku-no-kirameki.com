@@ -112,8 +112,29 @@ export function formatRepaintReasonLine(counts, commentCount) {
   const comments = Number(commentCount);
   let perComment = '';
   if (Number.isFinite(comments) && comments >= 20) {
-    const ratio = total / comments;
-    perComment = ` / 1コメントあたり${ratio >= 10 ? Math.round(ratio) : ratio.toFixed(1)}回`;
+    /*
+     * ★v0.1.1391(ユーザー実機 2026-08-14 で発覚): 分子から【止めた回数】を除く。
+     *
+     * ■ 何が嘘だったか
+     *   実機の速報にこの2つが同時に出ていた:
+     *       ⚠描き直しが多い(1コメントあたり6.5回描き直しています(正常は3回以下))
+     *       ... / 1コメントあたり26回 ← self_write_skippedが75%
+     *   ＝**同じものに2つの違う比**が出ていた。26回の方は
+     *     self_write_skipped(=描画を【止めた】回数)を分子に含めていたため。
+     *   実測: total 6875 - 止めた 5133 = 1742 = 実 paint 回数(速報の「描画1742回」と一致)。
+     *
+     * ★v0.1.1374 は「止めた回数を犯人として名指ししない」ところまで直したが、
+     *   **分子から外すのを忘れていた**=片肺だった。防御が効くほど比が悪化し、
+     *   「描き直しが多い」と誤って警告する(誤誘導は価値が負)。
+     *   → [[instrument-value-is-measured-by-fixes-2026-08-12]]
+     */
+    const suppressed = rows
+      .filter(([k]) => SUPPRESSION_REASONS.has(k))
+      .reduce((a, [, n]) => a + n, 0);
+    const effective = Math.max(0, total - suppressed);
+    const ratio = effective / comments;
+    // ★「実際に描いた分」と明記する(止めた回数を含む数字と取り違えられないように)。
+    perComment = ` / 実際に描いたのは1コメントあたり${ratio >= 10 ? Math.round(ratio) : ratio.toFixed(1)}回`;
   }
   const dom = dominantRepaintReason(counts);
   /*

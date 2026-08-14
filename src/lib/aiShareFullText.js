@@ -280,7 +280,9 @@ export function buildAiShareFullText({ overviewText, livesData, fastDiag, popupD
           identityAcquisition: popupSnap?.identityAcquisition || null,
           laneRenderProbe: popupSnap?.storyUserLaneRenderProbe || null,
           avatarLoadDiag: popupSnap?.avatarLoadDiag || null,
-          updateMs: refreshPerf?.totalMs
+          updateMs: refreshPerf?.totalMs,
+          // ★v0.1.1391: popup 起動からの経過。起動直後の値でレーンを 🔴 と断定しない。
+          popupAgeMs: popupSnapshotAgeMs(popupSnap)
         })
       );
       if (symptomBlock) { lines.push(symptomBlock); lines.push(''); }
@@ -731,4 +733,23 @@ export function buildAiShareFullText({ overviewText, livesData, fastDiag, popupD
     lines.push('未取得。ニコ生 watch を開いた状態で拡張ポップアップの「AI診断コピー」を一度押すと、ここに集約されます。');
   }
   return lines.join('\n');
+}
+
+
+/**
+ * ★v0.1.1391: popup スナップショットの「起動からの経過ms」。
+ *   exportedAt(採取時刻) - popupBootAtIso(起動時刻)。どちらか欠ければ null。
+ *   ＝起動直後(数百ms)の値で「描画されていない」と断定しないための材料。
+ * @param {any} popupSnap
+ * @returns {number|null}
+ */
+export function popupSnapshotAgeMs(popupSnap) {
+  try {
+    const boot = Date.parse(String(popupSnap?.loadShadeProbe?.popupBootAtIso || ''));
+    const exported = Date.parse(String(popupSnap?.exportedAt || ''));
+    if (!Number.isFinite(boot) || !Number.isFinite(exported)) return null;
+    return Math.max(0, exported - boot);
+  } catch {
+    return null;
+  }
 }
