@@ -65,3 +65,31 @@ describe('症状別判定の画面配線', () => {
     expect(html).toContain('.health-idnote');
   });
 });
+
+/*
+ * ★v0.1.1389: 健全度セルを症状の言葉で枠に分ける配線。
+ *   ユーザーに10回近く「枠を分けて増やして」と言わせた項目なので、
+ *   平坦なグリッドに戻ったら必ず赤にする。
+ */
+describe('健全度セルの枠分け(症状の言葉)', () => {
+  it('status-entry.js が healthCellGroups を import している', () => {
+    expect(statusEntry).toMatch(
+      /import\s*\{[^}]*groupHealthCells[^}]*\}\s*from\s*['"]\.\.\/lib\/healthCellGroups\.js['"]/
+    );
+  });
+
+  it('★描画で実際に枠へ分けている(平坦な for ループに戻したら赤)', () => {
+    expect(statusEntry).toContain('groupHealthCells(cells)');
+    expect(statusEntry).toContain('hc-group');
+    // 異常件数バッジ(枠が増えても見落とさないため)。
+    expect(statusEntry).toContain('summarizeGroup(');
+  });
+
+  it('枠の CSS が status.html にある(#healthCells の grid 解除を含む)', () => {
+    const html = readFileSync(join(here, '../../extension/status.html'), 'utf8');
+    expect(html).toContain('.hc-group');
+    expect(html).toContain('.hc-group-title');
+    // これが無いと枠が横に潰れる。
+    expect(html).toMatch(/#healthCells\s*\{[^}]*display:\s*block/);
+  });
+});

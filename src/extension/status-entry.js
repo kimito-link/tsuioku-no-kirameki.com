@@ -266,6 +266,8 @@ import { isBackgroundWatchTab } from '../lib/backgroundWatchTab.js';
 import { createRefreshDeadline, REFRESH_CYCLE_BUDGET_MS } from '../lib/refreshCycleDeadline.js';
 // ★v0.1.1388: 症状別判定を【画面に】出す(v0.1.1385 はコピー本文にしか配線されていなかった)。
 import { buildSymptomVerdicts } from '../lib/symptomVerdicts.js';
+// ★v0.1.1389: 33セルを症状の言葉(コメント記録/人の識別/レーン/公式値/演出/健全性)で枠に分ける。
+import { groupHealthCells, summarizeGroup } from '../lib/healthCellGroups.js';
 
 /** 自動更新間隔(ms)。 */
 const REFRESH_INTERVAL_MS = 2000;
@@ -2315,21 +2317,67 @@ function renderHealthCells(data) {
     }
   }
   host.replaceChildren();
-  for (const c of cells) {
-    const div = document.createElement('div');
-    div.className = `hc hc-${c.level}`;
-    const label = document.createElement('div');
-    label.className = 'hc-label';
-    label.textContent = c.label;
-    const val = document.createElement('div');
-    val.className = 'hc-val';
-    val.textContent = c.kind === 'pct'
-      ? (c.value == null ? '—' : `${c.value}%`)
-      : (c.text || '—');
-    div.title = `${c.label}: ${val.textContent}`;
-    div.appendChild(label);
-    div.appendChild(val);
-    host.appendChild(div);
+  /*
+   * ★v0.1.1389: 33セルを【症状の言葉】で枠に分ける。
+   *
+   * ■ ユーザーに何度も言わせた要望(これが本来の姿)
+   *   「この枠をコメント関連・ID・サムネ・アカウント名・紐づけ関連などで
+   *     区分して枠を増やしてほしい」
+   *   従来は33セルが1枚の平坦なグリッドで、探している項目に辿り着けなかった。
+   *   ★特に「ID・サムネ・名前」は uid-rate(record) / avatar(northstar) /
+   *     venue-yukkuri-face(venue) と**3カテゴリに散っていた**=並べても集まらない。
+   *
+   * ■ ここでやらないこと(壊さないための境界)
+   *   - セルの中身・判定・色は変えない(buildHealthCells の出力をそのまま描く)
+   *   - diagnosisRegistry の category は変えない(完全性スコアの集計を壊さない)
+   *   ＝**並べ替えと見出しだけ**の層。分類表は src/lib/healthCellGroups.js が正本。
+   *
+   * ★未知のセルは「その他」に落ちる(登録漏れでも画面から消えない)。
+   */
+  const groups = groupHealthCells(cells);
+  for (const g of groups) {
+    const sec = document.createElement('div');
+    sec.className = 'hc-group';
+    const head = document.createElement('div');
+    head.className = 'hc-group-head';
+    const title = document.createElement('span');
+    title.className = 'hc-group-title';
+    title.textContent = g.label;
+    head.appendChild(title);
+    // 異常件数を見出しに出す(枠が増えても異常を見落とさないため)。
+    const sum = summarizeGroup(g.cells);
+    if (sum.bad > 0 || sum.warn > 0) {
+      const badge = document.createElement('span');
+      badge.className = `hc-group-badge hcg-${sum.level}`;
+      badge.textContent = sum.bad > 0 ? `要確認 ${sum.bad}` : `注意 ${sum.warn}`;
+      head.appendChild(badge);
+    }
+    const hint = document.createElement('span');
+    hint.className = 'hc-group-hint';
+    hint.textContent = g.hint;
+    head.appendChild(hint);
+    sec.appendChild(head);
+
+    const grid = document.createElement('div');
+    grid.className = 'health-cells';
+    for (const c of g.cells) {
+      const div = document.createElement('div');
+      div.className = `hc hc-${c.level}`;
+      const label = document.createElement('div');
+      label.className = 'hc-label';
+      label.textContent = c.label;
+      const val = document.createElement('div');
+      val.className = 'hc-val';
+      val.textContent = c.kind === 'pct'
+        ? (c.value == null ? '—' : `${c.value}%`)
+        : (c.text || '—');
+      div.title = `${c.label}: ${val.textContent}`;
+      div.appendChild(label);
+      div.appendChild(val);
+      grid.appendChild(div);
+    }
+    sec.appendChild(grid);
+    host.appendChild(sec);
   }
 }
 

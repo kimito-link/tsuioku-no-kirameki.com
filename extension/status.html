@@ -488,6 +488,26 @@
         grid-template-columns: repeat(auto-fill, minmax(108px, 1fr));
         gap: 6px;
       }
+      /* ★v0.1.1389 症状ごとの枠。#healthCells は枠(hc-group)を縦に積む器へ変わるので、
+         この要素自身の grid は解除する(中の .health-cells が実際のセル格子)。 */
+      #healthCells {
+        display: block;
+        min-height: 0;
+      }
+      .hc-group { margin: 0 0 12px; }
+      .hc-group:last-child { margin-bottom: 0; }
+      .hc-group-head {
+        display: flex; align-items: baseline; flex-wrap: wrap; gap: 8px;
+        margin: 0 0 5px; padding: 0 2px;
+      }
+      .hc-group-title { font-size: 13px; font-weight: 700; color: var(--nl-fg, #33506e); }
+      .hc-group-hint { font-size: 11px; font-weight: 400; color: #7a8aa0; }
+      .hc-group-badge {
+        font-size: 11px; font-weight: 700; padding: 1px 7px; border-radius: 999px;
+      }
+      /* 色はベタ書き(テーマ変数が無くても必ず読める)。 */
+      .hc-group-badge.hcg-bad { background: #fdecea; color: #8a1c12; border: 1px solid #f2b8b1; }
+      .hc-group-badge.hcg-warn { background: #fff6e0; color: #7a5200; border: 1px solid #f0d79a; }
       .hc {
         /* 健全度カードは数が多く地に溶けやすい=境界を borderStrong ではっきり見せる(DESIGN.md)。 */
         border: 1px solid #d8b89f;
