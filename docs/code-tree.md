@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 4 / 774 件
+## ⚠️ 役割コメントが無いソース 4 / 776 件
 - `src/lib/laneDomSelfMeasure.js`
 - `src/lib/reportPreviewPublish.js`
 - `src/lib/venueLaneBuckets.js`
@@ -696,7 +696,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (1685)
+- 📁 **src/** (1689)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -988,7 +988,7 @@
         - `logo_funlink_white_RGB_maru_black.png`
       - `logo_guide_funlink_ol.pdf`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1443)
+  - 📁 **lib/** (1447)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -1493,6 +1493,9 @@
     - `heavyRacePaintFromCache.wiring.test.js`
     - `hiddenOfficialIframeReinjectGate.js` — hidden audition iframe を「再 inject してよいか」を判定する純関数（v0.1.394）。
     - `hiddenOfficialIframeReinjectGate.test.js`
+    - `hiddenPublish.wiring.test.js`
+    - `hiddenPublishPolicy.js` — 「画面が隠れているとき、鏡の publish まで止めてよいか」の判定(純関数)。
+    - `hiddenPublishPolicy.test.js`
     - `hiddenTabExternalFetchGate.js` — v0.1.616: 非可視タブでも外部 API fetch（koken 貢献度 / nicoad 広告 / ギフト履歴 /
     - `hiddenTabExternalFetchGate.test.js`
     - `highlightLedger.js` — 配信採点「発表演出」用のハイライト台帳(council/broadcast-scoring-SYNTHESIS.md §2.2・SC2)。
@@ -2316,6 +2319,7 @@
     - `venueMirrorIntakePipeline.test.js`
     - `venueModeCensus.js` — 会場モード専用の計器(純関数)。
     - `venueModeCensus.test.js`
+    - `venueOpenCache.js` — 「会場モードが開いているか」を安く保持する。
     - `venueOpenLatency.js` — 会場モードの「開いてから見えるまで」を分解して観測する純関数(v0.1.1207)。
     - `venueOpenLatency.test.js`
     - `venuePickupBanner.js` — 会場モードの「ピックアップ枠」(BSP風・v0.1.1230)。

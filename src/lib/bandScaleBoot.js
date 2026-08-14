@@ -12,6 +12,8 @@
  * @module bandScaleBoot
  */
 import { KEY_BAND_SCALE, applyBandScale, DEFAULT_BAND_SCALE } from './bandScale.js';
+// ★v0.1.1394: 会場が開いているかの購読もここで起動する(popup-entry は max-lines 上限のため)。
+import { watchVenueOpen } from './venueOpenCache.js';
 
 try {
   const doc = typeof document !== 'undefined' ? document : null;
@@ -30,3 +32,6 @@ try {
 } catch {
   /* 適用に失敗しても画面は出す */
 }
+
+// ★v0.1.1394: 会場の開閉を購読(隠れていても会場が開いていれば鏡を書き続けるため)。
+try { watchVenueOpen(globalThis.chrome); } catch { /* 既定で動く */ }

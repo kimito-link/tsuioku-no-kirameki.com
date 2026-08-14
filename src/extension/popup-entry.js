@@ -29,8 +29,7 @@ import { KEY_INSTANT_PUSH_DIAG } from '../lib/instantPushDiagKey.js';
 //   postMessage で新 lv を通知する経路(content-entry.js の notifyInlineIframeOfChannelSwitch)。
 import {
   isLiveChannelSwitchMessageValid,
-  extractSwitchedLiveIdFromMessage
-} from '../lib/liveChannelSwitch.js';
+  extractSwitchedLiveIdFromMessage } from '../lib/liveChannelSwitch.js';
 import { applyChannelSwitchDiagDelta, computeChannelSwitchPaintGapAverage } from '../lib/channelSwitchDiag.js';
 import { KEY_CHANNEL_SWITCH_DIAG } from '../lib/channelSwitchDiagKey.js';
 import { createThrottledDiagFlusher } from '../lib/diagFlushThrottle.js';
@@ -55,8 +54,7 @@ import { executeScriptWithTimeout } from '../lib/executeScriptWithTimeout.js';
 import { backfillRemoveGiftSystemMessages } from '../lib/backfillRemoveGiftSystemMessages.js';
 import {
   backfillRemoveRecommendedLivePollution,
-  backfillRemoveRecommendedUserChipPollution
-} from '../lib/backfillRemoveRecommendedLivePollution.js';
+  backfillRemoveRecommendedUserChipPollution } from '../lib/backfillRemoveRecommendedLivePollution.js';
 import { summarizeDevMonitorGiftRanking } from '../lib/summarizeDevMonitorGiftRanking.js';
 import { AI_SHARE_DIAG_SCHEMA_VERSION } from '../lib/aiShareDiagSchema.js';
 import { buildStorageWriteErrorPayload } from '../lib/storageErrorState.js';
@@ -67,12 +65,10 @@ import { addRepaintReason } from '../lib/repaintReasonCensus.js';
 import { deriveCommentPostUiState } from '../lib/commentPostUi.js';
 import {
   resolveCommentPostStatus,
-  commentComposeAriaDescribedBy
-} from '../lib/commentPostStatusPresentation.js';
+  commentComposeAriaDescribedBy } from '../lib/commentPostStatusPresentation.js';
 import {
   createCommentSubmitProfiler,
-  recordCommentSubmitTotal
-} from '../lib/commentSubmitProfiling.js';
+  recordCommentSubmitTotal } from '../lib/commentSubmitProfiling.js';
 import { commentPostErrorWarrantsFrameDiscovery } from '../lib/commentPostRetriable.js';
 import { capCommentsForAnalytics } from '../lib/capCommentsForAnalytics.js';
 import { pickCommentsForExport } from '../lib/pickCommentsForExport.js';
@@ -80,16 +76,14 @@ import { selectLaneFeedCommentRows } from '../lib/provisionalLaneCommentRows.js'
 import {
   markWatchPopupLoadPhase,
   resetWatchPopupLoadDiagnostics,
-  snapshotWatchPopupLoadPhase
-} from '../lib/watchPopupLoadDiagnostics.js';
+  snapshotWatchPopupLoadPhase } from '../lib/watchPopupLoadDiagnostics.js';
 // v0.1.1123 計器(D-0): 独立描画トリガ(tick)の結末を理由別に数える(started=0 の真因実測)。
 import {
   createLaneTickProbe,
   recordLaneTick,
   snapshotLaneTickProbe,
   LANE_TICK_REASONS,
-  LANE_TICK_LID_SOURCES
-} from '../lib/laneTickProbe.js';
+  LANE_TICK_LID_SOURCES } from '../lib/laneTickProbe.js';
 import { sanitizeRoomAvatarsForBroadcaster } from '../lib/sanitizeRoomAvatarsForBroadcaster.js';
 import { excludeBroadcasterFromRankedRooms } from '../lib/excludeBroadcasterFromRankedRooms.js';
 import { excludeBroadcasterFromCommentEntries } from '../lib/excludeBroadcasterFromCommentEntries.js';
@@ -480,7 +474,9 @@ import {
   storagePatchInlinePanelViewportWidePolicy,
   storagePatchInlinePanelWidthMode } from '../lib/inlinePanelPlacementStorage.js';
 import { isGiftRankingLaneEnabledFromStorage } from '../lib/giftRankingLaneOptIn.js';
-import '../lib/bandScaleBoot.js'; // ★v1392 PICK UP帯拡大 / ★v1393 なふだ切替(本体はlib側)
+import { decideHiddenWork } from '../lib/hiddenPublishPolicy.js'; // ★v1394 隠れていても会場へ供給
+import { isVenueOpenCached } from '../lib/venueOpenCache.js';
+import '../lib/bandScaleBoot.js'; // ★v1392帯拡大/v1393なふだ/v1394会場購読(本体はlib側)
 import '../lib/nameplateToggleBoot.js';
 // v0.1.450 (PR4): isBackfillEnabledFromStorage は refreshBackfillFetchPrompt（B 用）で使われ
 //   ていたが、B 廃止により未使用。自動取り込みトグル hydrate は isBackfillAutoStartEnabled のみ
@@ -22089,6 +22085,10 @@ async function initPopup() {
     }
     if (typeof document !== 'undefined' && document.hidden) {
       recordLaneTick(_laneTickProbe, LANE_TICK_REASONS.DOC_HIDDEN);
+      // ★v1394: 隠れていても会場が開いていれば鏡は書く(正本 hiddenPublishPolicy.js)。
+      try {
+        if (decideHiddenWork({ docHidden: true, venueOpen: isVenueOpenCached() }).publish) renderStoryUserLane();
+      } catch { /* 供給に失敗しても tick は落とさない */ }
       return;
     }
     // v0.1.981(回帰修正): スクロール中は重い再描画を見送る。独立 tick(v0.1.977/979)が

@@ -294,7 +294,7 @@
   - `src/lib/giftThrowProjectile.js`
 - **吹き出し寿命管理** — 会場の吹き出しの表示上限・追い出し(eviction)ライフサイクル
   - `src/lib/venueBubbleLifecycle.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 221</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 222</summary>
 
 - `scripts/encode-marketing-html-avatars.mjs` — extension/images/marketing-html-avatars/*.png を data URI にし、
 - `scripts/split-avatar-parts.mjs` — 偽市松背景の除去 + パーツ切り出し(one-off アセットパイプライン)
@@ -496,6 +496,7 @@
 - `src/lib/venueMirrorAvatarEnrich.js` — 会場行の avatar を「①の実描画鏡(laneMirror)が解決済みの顔URL」で
 - `src/lib/venueMirrorIntakeDiag.js` — venueMirrorIntakeDiag — 会場が鏡を「受け取れているか」を経路ごとに数える純関数(v0.1.1317)。
 - `src/lib/venueModeCensus.js` — 会場モード専用の計器(純関数)。
+- `src/lib/venueOpenCache.js` — 「会場モードが開いているか」を安く保持する。
 - `src/lib/venueOpenLatency.js` — 会場モードの「開いてから見えるまで」を分解して観測する純関数(v0.1.1207)。
 - `src/lib/venuePickupBanner.js` — 会場モードの「ピックアップ枠」(BSP風・v0.1.1230)。
 - `src/lib/venueResidents.js` — 会場モードの常駐3キャラ(りんく・こん太・たぬ姉)の描画モデル(純関数)。
@@ -769,7 +770,7 @@
   - `src/lib/statusTrendKey.js`
   - `src/extension/status-entry.js`
   - `src/lib/statusActionAdvisor.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 161</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 162</summary>
 
 - `app/app.js` — スマホ閲覧用 status Web 版。
 - `app/live-view.js` — global NL_BUILD_ID
@@ -834,6 +835,7 @@
 - `src/lib/geminiNanoBridge.js` — v0.1.205 Phase C: Built-in AI (Gemini Nano, Chrome 138+) の薄いラッパー。
 - `src/lib/globalFetchRateLimiter.js` — v0.1.664 PR4: tokenBucket.js を用いた全タブ横断の fetch レートリミッター(土台)。
 - `src/lib/heavyCachePreserve.js` — 軽い read が heavy read の証跡を消さないための純関数(v0.1.1367)。
+- `src/lib/hiddenPublishPolicy.js` — 「画面が隠れているとき、鏡の publish まで止めてよいか」の判定(純関数)。
 - `src/lib/htmlEscape.js` — 旧パス：`src/lib/htmlEscape.js`
 - `src/lib/initShadeFailsafe.js` — 初回ロード幕(.nl-init-shade)の CSS フェイルセーフとクラスの乖離を断つ純関数。
 - `src/lib/isInsideRecommendedLiveSection.js` — v0.1.200: ニコ生 watch ページの「おすすめ生放送」セクション内 DOM を識別する純関数。
@@ -937,7 +939,7 @@
 
 ## 🧬 修正系譜マップ(この系統のバグを過去にどう直したか)
 
-> changelog 全 723 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
+> changelog 全 724 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
 
 ### 💾 記録件数 (96版)
 - `v0.1.1367` 2026-08-12 — 応援レーンが途中件数で止まる問題の根治（78件中19件しか出ない）
@@ -1280,7 +1282,8 @@
 - `v0.1.668` 2026-06-10 — パネルに「💬コメビュ」ボタンを追加
 - `v0.1.667` 2026-06-10 — コメビュに匿名OKのニックネーム・ラベル・メモ
 
-### 🏟 会場・席 (236版)
+### 🏟 会場・席 (237版)
+- `v0.1.1394` 2026-08-14 — 会場モードにギフトや新しい参加者が出ない問題を直しました
 - `v0.1.1391` 2026-08-14 — 「描き直しの回数」の数え方を修正（防いだ回数を含めていました）
 - `v0.1.1390` 2026-08-14 — 読み上げ・コメント送信・会場モード・ギフト/広告の専用チェックを追加
 - `v0.1.1389` 2026-08-14 — 状態ページの項目を「症状ごとの枠」に分けました
@@ -1547,7 +1550,8 @@
 - `v0.1.713` 2026-06-13 — 会場モードを明るくして発言を吹き出し表示
 - `v0.1.711` 2026-06-13 — 会場モードで発言を吹き出し表示
 
-### 🎁 ギフト (118版)
+### 🎁 ギフト (119版)
+- `v0.1.1394` 2026-08-14 — 会場モードにギフトや新しい参加者が出ない問題を直しました
 - `v0.1.1390` 2026-08-14 — 読み上げ・コメント送信・会場モード・ギフト/広告の専用チェックを追加
 - `v0.1.1360` 2026-08-12 — fix(diag): 古い記録で注意を出さない
 - `v0.1.1339` 2026-08-12 — fix(diag): 取れているのに取得中の表示

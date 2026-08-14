@@ -4972,6 +4972,16 @@
       ]
     },
     {
+      "file": "src/lib/hiddenPublishPolicy.js",
+      "featureCount": 1,
+      "features": [
+        "popup"
+      ],
+      "labels": [
+        "ポップアップ(応援レーン)"
+      ]
+    },
+    {
       "file": "src/lib/hiddenTabExternalFetchGate.js",
       "featureCount": 1,
       "features": [
@@ -7439,6 +7449,16 @@
       ],
       "labels": [
         "状態速報ページ"
+      ]
+    },
+    {
+      "file": "src/lib/venueOpenCache.js",
+      "featureCount": 1,
+      "features": [
+        "popup"
+      ],
+      "labels": [
+        "ポップアップ(応援レーン)"
       ]
     },
     {
