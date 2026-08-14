@@ -33,75 +33,72 @@
  */
 export const HEALTH_CELL_GROUPS = Object.freeze([
   Object.freeze({
-    id: 'comment',
-    label: 'コメント記録',
+    id: 'comment', label: 'コメント記録', order: 1,
     hint: 'コメントが取れているか・公式と一致しているか',
-    order: 1,
-    cellIds: Object.freeze(['capture-rate', 'match', 'ndgr-chats', 'ndgr', 'ingest', 'backfill', 'backfill-bottleneck'])
+    cellIds: Object.freeze(['capture-rate', 'match', 'ndgr-chats'])
   }),
   Object.freeze({
-    id: 'identity',
-    label: '人の識別（ID・サムネ・名前の紐づけ）',
+    id: 'ingest', label: '取り込み（接続・過去ログ）', order: 2,
+    hint: '今つながっているか・過去のコメントを追えているか',
+    cellIds: Object.freeze(['ndgr', 'ingest', 'backfill', 'backfill-bottleneck'])
+  }),
+  Object.freeze({
+    id: 'identity', label: '人の識別（ID・サムネ・名前の紐づけ）', order: 3,
     hint: '誰が言ったかを結びつけられているか。匿名は仕様上ここに出ません',
-    order: 2,
     cellIds: Object.freeze(['uid-rate', 'avatar', 'venue-yukkuri-face'])
   }),
   Object.freeze({
-    id: 'lane',
-    label: '応援レーン・会場の見た目',
-    hint: '誰が並ぶか・何人出るか・描画が追いついているか',
-    order: 3,
+    id: 'lane', label: '応援レーン（誰が並ぶか）', order: 4,
+    hint: '何人出るか・描画が追いついているか',
+    cellIds: Object.freeze(['lane-count', 'lane-paint'])
+  }),
+  Object.freeze({
+    id: 'venue', label: '会場モード', order: 5,
+    hint: '★会場は①ポップアップが書いた情報を映します。席・一致・鮮度をここで見ます',
     cellIds: Object.freeze([
-      'lane-count', 'lane-paint', 'venue-parity', 'venue-seats', 'venue-seats-visible', 'venue-broadcaster'
+      'venue-mode', 'venue-seats', 'venue-seats-visible', 'venue-parity', 'venue-broadcaster'
     ])
   }),
   Object.freeze({
-    id: 'external',
-    label: '公式の数字（ギフト・広告・イベント）',
-    hint: 'ニコ生公式から取ってくる値。取得中は薄く出ます',
-    order: 4,
-    cellIds: Object.freeze([
-      'gift-ad-pipeline',
-      'ns-contrib', 'ns-ad', 'ns-gift-hist', 'ns-escore', 'ns-prog-pt', 'ns-erank'
-    ])
+    id: 'gift', label: 'ギフト', order: 6,
+    hint: 'ギフトが取れて・出て・鳴っているか',
+    cellIds: Object.freeze(['ns-contrib', 'ns-gift-hist', 'gift-ad-pipeline'])
   }),
   Object.freeze({
-    id: 'venue',
-    label: '会場モード',
-    hint: '★会場は①ポップアップが書いた情報を映します。古いとここに出ます',
-    order: 4.5,
-    cellIds: Object.freeze(['venue-mode'])
+    id: 'ad', label: '広告', order: 7,
+    hint: 'ニコニ広告のランキングが取れているか',
+    cellIds: Object.freeze(['ns-ad'])
   }),
   Object.freeze({
-    id: 'voice',
-    label: '読み上げ（声と吹き出しの一致）',
+    id: 'event', label: 'イベント・番組ポイント', order: 8,
+    hint: 'イベント順位・スコア・番組累計pt（イベント無しの配信では出ません）',
+    cellIds: Object.freeze(['ns-escore', 'ns-erank', 'ns-prog-pt'])
+  }),
+  Object.freeze({
+    id: 'voice', label: '読み上げ（声と吹き出しの一致）', order: 9,
     hint: '★声と画面表示が同じタイミングか。個別の速さでなく「揃っているか」を見ます',
-    order: 5,
     cellIds: Object.freeze(['voice-bubble-parity', 'voice-timing', 'voice-coverage'])
   }),
   Object.freeze({
-    id: 'post',
-    label: 'コメント送信',
+    id: 'post', label: 'コメント送信', order: 10,
     hint: '自分が送ったコメントが届いて画面に出たか',
-    order: 6,
     cellIds: Object.freeze(['comment-post'])
   }),
   Object.freeze({
-    id: 'effect',
-    label: '演出・効果音',
+    id: 'effect', label: '演出・効果音', order: 11,
     hint: '鳴るはずのものが鳴っているか',
-    order: 7,
     cellIds: Object.freeze(['gift-effect', 'milestone-effect'])
   }),
   Object.freeze({
-    id: 'health',
-    label: '動作の健全性（重さ・描画・保存）',
-    hint: '固まる・白くなる・保存できない等の土台。★黒くなる件はここの「メインスレッド」を見ます',
-    order: 8,
+    id: 'speed', label: '重さ・黒画面', order: 12,
+    hint: '★黒くなる・固まる件はここ。「メインスレッド」が止めている当人を名指しします',
+    cellIds: Object.freeze(['main-thread', 'paint', 'scroll-whiteout'])
+  }),
+  Object.freeze({
+    id: 'health', label: '保存・内部の整合', order: 13,
+    hint: '記録が保存できているか・画面どうしの同期がずれていないか',
     cellIds: Object.freeze([
-      'main-thread',
-      'paint', 'stale', 'console', 'scroll-whiteout', 'diag-stability',
-      'storage', 'mirror-gen-stamp', 'preview-gen-sync'
+      'storage', 'stale', 'console', 'diag-stability', 'mirror-gen-stamp', 'preview-gen-sync'
     ])
   })
 ]);
