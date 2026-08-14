@@ -30,21 +30,42 @@ function maximalInput() {
       networkErrorProbe: { ndgrConnectStatus: 'connected' },
       scrollWhiteoutDiag: { whiteoutCount: 3 },
       styleReattach: { count: 1 },
-      giftDiagnostics: { '北極星レーン': {
+      hostMoveDiag: { moveCount: 3 },
+      giftDiagnostics: {
+        '北極星レーン': {
         '1_貢献度ランキング': { state: 'ok', apiRows: 5 },
         '+α_広告ランキング': { state: 'ok', apiRows: 5 },
         '2_ギフト履歴': { state: 'iframe_unrendered', count: 0 },
         '3_イベント累計スコア': { state: 'ok', value: 10 },
         '4_番組累計ポイント': { state: 'ok', value: 100 },
         '5_イベント現在順位': { state: 'ok', value: 3 }
-      } },
-      commentObservability: { savedCommentsUidStats: { withUidPercent: 50, totalSaved: 100 } }
+        },
+        // ★実際の速報と同じ入れ子(giftDiagnostics の中)。ここを間違えると出ない。
+        commentObservability: {
+          savedCommentsUidStats: { withUidPercent: 50, totalSaved: 100 },
+          dedupeSeedDiag: { addedTotalCount: 100, suspiciousAddedCount: 2 }
+        }
+      }
     } },
     popupDiag: { popup: {
-      storyUserLaneRenderProbe: { started: 5, domTilesPainted: 10, heavySettleState: 'race' },
+      storyUserLaneRenderProbe: {
+        started: 5, domTilesPainted: 10, heavySettleState: 'race',
+        laneTileOscillation: { samples: 3, drops: 1 }
+      },
       identityAcquisition: { identifiable: 5, withThumb: 1, anonymous: 2 },
       avatarLoadDiag: { usericonFailed: 1, usericonSucceeded: 5 },
-      mainThreadBlocker: { count: 3, worstMs: 900, worstName: 'grid' }
+      mainThreadBlocker: { count: 3, worstMs: 900, worstName: 'grid' },
+      // ★v0.1.1400 で掘り起こした14セルの入力(埋もれていた観測群)
+      laneTickProbe: { ticks: 10, runs: 7, lastReason: 'defer-heavy' },
+      laneRosterDelta: { everSeenMax: 20, droppedTotal: 2 },
+      lightSupplyGuard: { observedCount: 2, skipCount: 1 },
+      loadShadeProbe: { shadeAgeMs: 2500, shadePresent: true },
+      tickerPick: { domWriteTotal: 12, filteredTooShort: 30 },
+      storyGrowthChurn: { rebuilds: 2, maxMs: 150 },
+      avatarRememberedDiag: { hitProfileCache: 10, hitSynth: 40 },
+      storyUserLaneClickAffordanceParity: { checked: 20, mismatched: 1 },
+      northStarRenderProbe: { refreshAllStarted: 3, refreshAllCompleted: 2 },
+      northStarMirrorPublishRace: { publishCalls: 3, flushSkipped: 1 }
     } },
     voiceDiag: { enabled: true, spokenTotal: 10, lastE2eMs: 6000, staleDropTotal: 2 },
     instantPushDiag: { lastGapMs: 20, avgGapMs: 30 },

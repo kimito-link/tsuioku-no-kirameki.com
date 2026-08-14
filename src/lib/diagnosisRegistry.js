@@ -105,7 +105,26 @@ export const DIAGNOSIS_REGISTRY = Object.freeze([
   reg('venue-mode', '会場モードの鮮度', 'venue', 1, false),
   // ★v0.1.1390(ユーザー要望): ギフト/広告の通り道(取得→反映→演出)。
   //   「取得中」のまま数分続くのは詰まり、を名指しする(giftAdPipelineCensus.js)。
-  reg('gift-ad-pipeline', 'ギフト/広告の通り道', 'northstar', 1, false)
+  reg('gift-ad-pipeline', 'ギフト/広告の通り道', 'northstar', 1, false),
+  /*
+   * ★v0.1.1400: 速報の本文に埋もれていた判定を掘り起こしてセル化(在庫の棚卸し)。
+   *   判定は buriedInstrumentCells.js が正本。weight=1・mandatory=false
+   *   (どれも「観測できたときだけ出る」補助情報なので、達成率の分母を歪めない)。
+   */
+  reg('lane-tick', 'レーン描画の起動', 'render', 1, false),
+  reg('lane-dropped', 'レーンから消えた人', 'northstar', 1, false),
+  reg('lane-supply-guard', 'レーン保護', 'render', 1, false),
+  reg('lane-settle', 'レーンの読み切り', 'northstar', 1, false),
+  reg('lane-oscillation', 'レーンの増減', 'render', 1, false),
+  reg('boot-shade', '起動時のシェード', 'render', 1, false),
+  reg('grid-rebuild', 'アイコングリッド', 'render', 1, false),
+  reg('pickup-write', 'PICK UPの更新', 'render', 1, false),
+  reg('click-affordance', 'クリックの見た目', 'render', 1, false),
+  reg('avatar-cache', 'サムネの記憶', 'northstar', 1, false),
+  reg('dedupe-seed', '重複の見分け', 'record', 1, false),
+  reg('host-move', '記録役の引っ越し', 'ingest', 1, false),
+  reg('northstar-render', '公式値の描画', 'northstar', 1, false),
+  reg('mirror-publish', '鏡の書き出し', 'render', 1, false)
 ]);
 
 /** id → 観点 の索引(集計で O(1) 参照)。 */

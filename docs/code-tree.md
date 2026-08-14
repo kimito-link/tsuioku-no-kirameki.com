@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 4 / 777 件
+## ⚠️ 役割コメントが無いソース 4 / 778 件
 - `src/lib/laneDomSelfMeasure.js`
 - `src/lib/reportPreviewPublish.js`
 - `src/lib/venueLaneBuckets.js`
@@ -698,7 +698,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (1694)
+- 📁 **src/** (1696)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -990,7 +990,7 @@
         - `logo_funlink_white_RGB_maru_black.png`
       - `logo_guide_funlink_ol.pdf`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1452)
+  - 📁 **lib/** (1454)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -1144,6 +1144,8 @@
     - `bundleBuildId.js` — dist バンドル本文から NL_BUILD_ID(JST, MMDD-HHmmss)の焼き込み値を
     - `bundleBuildId.test.js`
     - `bundleFixesPresent.test.js`
+    - `buriedInstrumentCells.js` — 速報の文章に埋もれていた判定を【セル】として掘り起こす(純関数)。
+    - `buriedInstrumentCells.test.js`
     - `capCommentsForAnalytics.js` — マーケ分析・タイムライン用のコメント上限（heavy 時の全件再走査を防ぐ）
     - `capCommentsForAnalytics.test.js`
     - `captureAuditionRichviewEventScoreDiagProbe.js` — audition.nicovideo.jp `/embedded/richview/live` 向けの診断ペイロード（PR1）。
