@@ -91,3 +91,30 @@ describe('特化セル5種の配線(実データに近い入力)', () => {
     expect(ids).not.toContain('main-thread');
   });
 });
+
+/*
+ * ★v0.1.1391(ユーザー実機):「会場ひらいてるけど『ひらいてません』ってでてます」
+ *   計器の古さだけで「閉じている」と断定していた=計器が無いことを会場が無いと読み替えていた。
+ */
+describe('会場が開いているのに「開いていません」と言わない', () => {
+  function cellsWith(venueSeatsDiag) {
+    return buildHealthCells({ livesData: [{ recording: true }], nowMs: Date.now(), venueSeatsDiag });
+  }
+
+  it('★参加者が居るのに計器が古い→「計器が届いていません」(閉じている扱いにしない)', () => {
+    const old = Date.now() - 10 * 60 * 1000; // CLOSED 閾値(5分)超
+    const c = cellsWith({ enabled: true, lastUpdateAt: old, participantCount: 15, seatsShown: 15 })
+      .find((x) => x.id === 'venue-seats');
+    expect(c.level).toBe('warn');
+    expect(c.text).toContain('会場は開いています');
+    expect(c.text).not.toContain('開いていません');
+  });
+
+  it('本当に閉じている(参加者0・席0)なら従来どおり「開いていません」', () => {
+    const old = Date.now() - 10 * 60 * 1000;
+    const c = cellsWith({ enabled: true, lastUpdateAt: old, participantCount: 0, seatsShown: 0 })
+      .find((x) => x.id === 'venue-seats');
+    expect(c.level).toBe('na');
+    expect(c.text).toContain('開いていません');
+  });
+});

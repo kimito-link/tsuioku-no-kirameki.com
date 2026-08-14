@@ -286,7 +286,29 @@ function buildVenueSeatsHealthCells(venueSeatsDiag, nowMs) {
    *     それより古い=会場が閉じている=na('—')にして色もスコアも付けない。
    */
   const otherSuffix = otherCount > 0 ? `+他${otherCount}` : '';
-  if (sinceUpdateMs != null && sinceUpdateMs >= VENUE_SEATS_CLOSED_MS) {
+  /*
+   * ★v0.1.1391(ユーザー実機):「会場ひらいてるけど『ひらいてません』ってでてます」
+   *
+   * ■ 何が嘘だったか
+   *   この判定は【計器の古さ】だけで「閉じている」と断定していた。
+   *   ところが会場が開いていても、この計器が書かれない/届かない状況はある
+   *   (実機の fastDiag は venueSeatsDiag:null のまま、画面には「会場参加者 15人」)。
+   *   ＝**計器が無い**ことを**会場が無い**と読み替えていた
+   *     ([[zero-count-may-mean-unmeasured-2026-08-04]] と同型)。
+   *
+   * ■ 直し方: 開いている【別の証拠】があるなら「閉じている」と言わない。
+   *   同じパネルの `venue-seats-visible`(会場席の網羅)は実DOM由来で、
+   *   実機では 356/356 描画=緑だった。**同じ画面の中で矛盾していた**。
+   *   証拠があるのに計器が古い場合は「閉じている」ではなく
+   *   【計器が届いていない】と正直に言う(直せる情報を出す)。
+   */
+  const venueLooksOpen = participants > 0 || seatsShown > 0;
+  if (sinceUpdateMs != null && sinceUpdateMs >= VENUE_SEATS_CLOSED_MS && venueLooksOpen) {
+    out.push(stateCell(
+      'venue-seats', '会場座席', 'warn',
+      `計器が届いていません(${Math.round(sinceUpdateMs / 1000)}秒前・会場は開いています)`
+    ));
+  } else if (sinceUpdateMs != null && sinceUpdateMs >= VENUE_SEATS_CLOSED_MS) {
     out.push(stateCell('venue-seats', '会場座席', 'na', '会場を開いていません'));
   } else if (sinceUpdateMs != null && sinceUpdateMs >= 60000) {
     out.push(stateCell('venue-seats', '会場座席', 'warn', `更新${Math.round(sinceUpdateMs / 1000)}秒前`));

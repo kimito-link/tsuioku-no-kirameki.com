@@ -86,3 +86,27 @@ describe('buildSymptomVerdicts', () => {
     expect(() => buildSymptomVerdicts({ identityAcquisition: 'x', laneRenderProbe: 9 })).not.toThrow();
   });
 });
+
+/*
+ * ★v0.1.1391(ユーザー実機の偽陽性): popup 起動 0.2 秒後の値で
+ *   「描画関数が一度も呼ばれていません」を 🔴 として出していた。
+ *   同じ速報に「応援レーン 23人 全員表示」が緑で出ていた=矛盾。
+ */
+describe('起動直後は「レーンが空」と断定しない', () => {
+  const probeNotStarted = { started: 0, domTilesPainted: -1 };
+
+  it('★popup 起動 0.2 秒後なら判定しない(実機の偽陽性)', () => {
+    const v = buildSymptomVerdicts({ laneRenderProbe: probeNotStarted, popupAgeMs: 200 });
+    expect(v.find((x) => x.id === 'lane-never-rendered')).toBeUndefined();
+  });
+
+  it('十分に時間が経っていれば従来どおり 🔴 を出す', () => {
+    const v = buildSymptomVerdicts({ laneRenderProbe: probeNotStarted, popupAgeMs: 30_000 });
+    expect(v.find((x) => x.id === 'lane-never-rendered')).toBeTruthy();
+  });
+
+  it('popupAgeMs が無ければ従来どおり判定する(後方互換)', () => {
+    const v = buildSymptomVerdicts({ laneRenderProbe: probeNotStarted });
+    expect(v.find((x) => x.id === 'lane-never-rendered')).toBeTruthy();
+  });
+});

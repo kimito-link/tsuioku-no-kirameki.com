@@ -31,6 +31,13 @@
 /** @typedef {{ id:string, symptom:string, level:'bad'|'warn', line:string }} SymptomVerdict */
 
 /**
+ * ★v0.1.1391: popup 起動から この時間 未満のスナップショットでは
+ *   レーン系を判定しない(起動直後は「まだ動いていない」が正常)。
+ *   実機の偽陽性は popup 起動 0.2 秒後の値で 🔴 を出していた。
+ */
+export const LANE_JUDGE_MIN_AGE_MS = 5000;
+
+/**
  * 数値化(取れなければ null=未観測。0 と混同しない)。
  * @param {unknown} v
  * @returns {number|null}
@@ -49,6 +56,9 @@ function num(v) {
  * @param {any} [input.sidepanelSelfDiag] サイドパネル自己診断
  * @param {any} [input.avatarLoadDiag] アイコン画像のロード結果
  * @param {number} [input.updateMs] 状態速報の更新所要(ms)
+ * @param {number} [input.popupAgeMs] popup 起動からの経過(ms)。v0.1.1391 で追加。
+ *   未指定/null は不明として従来どおり判定する。短い値のときだけレーン系を見送る
+ *   (起動直後の「まだ動いていない」を異常と誤判定しないため)。
  * @returns {SymptomVerdict[]} 異常だけ・重い順
  */
 export function buildSymptomVerdicts(input) {
@@ -97,7 +107,30 @@ export function buildSymptomVerdicts(input) {
 
   /* ────────────── ③ レーンが空 ────────────── */
   const lp = input.laneRenderProbe;
-  if (lp && typeof lp === 'object') {
+  /*
+   * ★v0.1.1391(ユーザー実機で偽陽性): popup 起動【直後】のスナップショットで
+   *   「描画関数が一度も呼ばれていません」と断定していた。
+   *
+   * ■ 何が嘘だったか
+   *   実機の速報は `popup 起動から 0.2 秒後の値` で、当然まだ何も走っていない。
+   *   それを 🔴 として出したうえ、3画面パリティまで「①が起動していない」と
+   *   引きずっていた。★同じ画面には「応援レーン 23人 全員表示」が緑で出ていた
+   *   =**同じ速報の中で矛盾**([[red-may-be-snapshot-too-early-2026-08-08]])。
+   *
+   * ■ 直し方: 起動直後は判定しない。**まだ分からない**と**壊れている**を混ぜない。
+   *   popupAgeMs が短い間は「起動直後」として黙る(呼び出し側が渡せないときは
+   *   従来どおり判定する=後方互換)。
+   */
+  /*
+   * ★`num()` は Number(null)===0 のため **null を 0 に化かす**。
+   *   そのまま使うと「経過不明」が「経過0ms=起動直後」になり、
+   *   **常に判定を見送る**=足した判定が永久に出ない(自分で踏んだ)。
+   *   → null/undefined は明示的に「不明」として扱い、従来どおり判定する。
+   */
+  const rawAge = input.popupAgeMs;
+  const popupAgeMs = rawAge == null ? null : num(rawAge);
+  const tooEarly = popupAgeMs != null && popupAgeMs >= 0 && popupAgeMs < LANE_JUDGE_MIN_AGE_MS;
+  if (lp && typeof lp === 'object' && !tooEarly) {
     const started = num(lp.started) ?? 0;
     const painted = num(lp.domTilesPainted);
     if (started === 0) {

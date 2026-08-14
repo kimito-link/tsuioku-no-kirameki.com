@@ -266,6 +266,7 @@ import { isBackgroundWatchTab } from '../lib/backgroundWatchTab.js';
 import { createRefreshDeadline, REFRESH_CYCLE_BUDGET_MS } from '../lib/refreshCycleDeadline.js';
 // ★v0.1.1388: 症状別判定を【画面に】出す(v0.1.1385 はコピー本文にしか配線されていなかった)。
 import { buildSymptomVerdicts } from '../lib/symptomVerdicts.js';
+import { popupSnapshotAgeMs } from '../lib/aiShareFullText.js';
 // ★v0.1.1389: 33セルを症状の言葉(コメント記録/人の識別/レーン/公式値/演出/健全性)で枠に分ける。
 import { groupHealthCells, summarizeGroup } from '../lib/healthCellGroups.js';
 
@@ -2240,7 +2241,8 @@ function renderHealthCells(data) {
       identityAcquisition: _popupSnapForSig?.identityAcquisition || null,
       laneRenderProbe: _popupSnapForSig?.storyUserLaneRenderProbe || null,
       avatarLoadDiag: _popupSnapForSig?.avatarLoadDiag || null,
-      updateMs: _lastRefreshPerf?.totalMs
+      updateMs: _lastRefreshPerf?.totalMs,
+      popupAgeMs: popupSnapshotAgeMs(_popupSnapForSig)
     }).map((s) => `${s.id}:${s.level}`).join('~');
   } catch {
     _symptomSig = '';
@@ -2279,7 +2281,8 @@ function renderHealthCells(data) {
         identityAcquisition: popupSnap?.identityAcquisition || null,
         laneRenderProbe: popupSnap?.storyUserLaneRenderProbe || null,
         avatarLoadDiag: popupSnap?.avatarLoadDiag || null,
-        updateMs: _lastRefreshPerf?.totalMs
+        updateMs: _lastRefreshPerf?.totalMs,
+        popupAgeMs: popupSnapshotAgeMs(popupSnap)
       });
       for (const sv of verdicts) {
         const row = document.createElement('div');
