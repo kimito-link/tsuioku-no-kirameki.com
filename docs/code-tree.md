@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 4 / 772 件
+## ⚠️ 役割コメントが無いソース 4 / 774 件
 - `src/lib/laneDomSelfMeasure.js`
 - `src/lib/reportPreviewPublish.js`
 - `src/lib/venueLaneBuckets.js`
@@ -696,7 +696,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (1681)
+- 📁 **src/** (1685)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -988,7 +988,7 @@
         - `logo_funlink_white_RGB_maru_black.png`
       - `logo_guide_funlink_ol.pdf`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1439)
+  - 📁 **lib/** (1443)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -1731,6 +1731,10 @@
     - `mirrorSanitize.test.js`
     - `monotonicCommentCount.js` — v0.1.645: コメント記録件数の「数値ズレ」根治。
     - `monotonicCommentCount.test.js`
+    - `nameplateToggle.wiring.test.js`
+    - `nameplateToggleBoot.js` — ①POP の「なふだ」ボタンを配線する(副作用モジュール)。
+    - `nameplateToggleFinder.js` — ニコ生公式の「なふだを表示」トグルを見つける(純関数)。
+    - `nameplateToggleFinder.test.js`
     - `ndgrBackfillCrawl.js` — v0.1.404: コメント過去ログ一括バックフィルの「巡回エンジン」（純ロジック）。
     - `ndgrBackfillCrawl.test.js`
     - `ndgrBacklog.js` — NDGR flush を liveId 確定まで遅延するかを判定する純関数。

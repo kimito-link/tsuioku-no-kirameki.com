@@ -615,6 +615,8 @@
 | `src/lib/mirrorBundle.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/mirrorBundleFlushScheduler.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/mirrorSanitize.js` | 1 | ポップアップ(応援レーン) |
+| `src/lib/nameplateToggleBoot.js` | 1 | ポップアップ(応援レーン) |
+| `src/lib/nameplateToggleFinder.js` | 1 | 記録エンジン(watchページ常駐) |
 | `src/lib/ndgrBacklog.js` | 1 | 記録エンジン(watchページ常駐) |
 | `src/lib/ndgrFlushDedupKey.js` | 1 | 記録エンジン(watchページ常駐) |
 | `src/lib/ndgrForwardCrawl.js` | 1 | 記録エンジン(watchページ常駐) |
