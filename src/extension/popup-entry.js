@@ -22,8 +22,7 @@ import {
   mergeInstantPushBuffer,
   composeDisplayEntriesWithInstantPush,
   computeInstantPushGapAverage,
-  NLS_LIVE_COMMENT_PUSH_NONCE_PARAM
-} from '../lib/instantCommentPush.js';
+  NLS_LIVE_COMMENT_PUSH_NONCE_PARAM } from '../lib/instantCommentPush.js';
 import { applyInstantPushDiagDelta } from '../lib/instantPushDiag.js';
 import { KEY_INSTANT_PUSH_DIAG } from '../lib/instantPushDiagKey.js';
 // 2026-07-06: 「別の配信へ移動(SPA遷移)するとパネルが壊れる」修正。iframe を作り直さず
@@ -481,7 +480,8 @@ import {
   storagePatchInlinePanelViewportWidePolicy,
   storagePatchInlinePanelWidthMode } from '../lib/inlinePanelPlacementStorage.js';
 import { isGiftRankingLaneEnabledFromStorage } from '../lib/giftRankingLaneOptIn.js';
-import '../lib/bandScaleBoot.js'; // ★v0.1.1392 PICK UP帯拡大(本体はlib側)
+import '../lib/bandScaleBoot.js'; // ★v1392 PICK UP帯拡大 / ★v1393 なふだ切替(本体はlib側)
+import '../lib/nameplateToggleBoot.js';
 // v0.1.450 (PR4): isBackfillEnabledFromStorage は refreshBackfillFetchPrompt（B 用）で使われ
 //   ていたが、B 廃止により未使用。自動取り込みトグル hydrate は isBackfillAutoStartEnabled のみ
 //   で完結する。

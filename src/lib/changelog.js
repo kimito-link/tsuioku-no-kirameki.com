@@ -26,6 +26,16 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1393',
+    date: '2026-08-14',
+    summary: '公式の「なふだを表示」をポップアップから切り替えられるようにしました',
+    items: Object.freeze([
+      'ニコ生公式の「なふだを表示」（ONにすると放送者だけにあなたのアイコンと名前が見えます）を、ポップアップの「表示する / 隠す」ボタンで切り替えられるようにしました。',
+      '公式の設定パネルをいちいち開かずに切り替えられます。',
+      '現在ONかOFFか読み取れないときは、誤って逆に切り替えないよう何もしません。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1392',
     date: '2026-08-14',
     summary: 'コメントを大きく見せる枠（PICK UP 帯）を実際に大きくしました',

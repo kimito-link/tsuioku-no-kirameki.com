@@ -227,6 +227,10 @@ import {
   validateEventScoreRankingRelayPayload
 } from '../lib/eventScoreRankingRelay.js';
 import { pickPrunableStorageKeys } from '../lib/prunableStorageKeys.js';
+// ★v0.1.1393: 公式「なふだを表示」トグルをPOPから操作する(探し方は lib 側=テスト可能)。
+import {
+  findNameplateToggle, readToggleState, decideNameplateClick
+} from '../lib/nameplateToggleFinder.js';
 import { decideHiddenOfficialIframeInject } from '../lib/hiddenOfficialIframeReinjectGate.js';
 import { classifyGiftSubAppFrameSource } from '../lib/giftSubAppFrameSource.js';
 import { captureSameOriginContributionRankingDomShape } from '../lib/sameOriginContribRankingDomShape.js';
@@ -10159,6 +10163,47 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
       (hasPanel ? 4_000_000 : 0) +
       (/\/watch\/lv\d+/i.test(href) ? 50_000 : 0);
     sendResponse({ ok: true, score, href, hasEditor, hasPanel });
+    return true;
+  }
+
+  /*
+   * ★v0.1.1393(ユーザー要望「公式のこれも POPで操作できるようにしたい」):
+   *   公式の「なふだを表示」トグルを①POPから ON/OFF する。
+   *
+   *   ★状態が読めないときは【押さない】。OFFだと思って押したら実はONで
+   *     逆に消す、という事故の方が高くつく(判定は decideNameplateClick が正本)。
+   *   ★見つからない場合は「公式UIを開いてください」と理由を返す
+   *     (公式の設定パネルが閉じていると DOM に存在しないため)。
+   */
+  if (msg.type === 'NLS_NAMEPLATE_TOGGLE') {
+    try {
+      const want = Boolean(/** @type {{ on?: unknown }} */ (msg).on);
+      const el = findNameplateToggle(document);
+      if (!el) {
+        sendResponse({
+          ok: false,
+          error: '公式の「なふだを表示」が見つかりません。コメント欄の設定を一度開いてください。'
+        });
+        return true;
+      }
+      const current = readToggleState(el);
+      const decision = decideNameplateClick(current, want);
+      if (!decision.shouldClick) {
+        sendResponse({
+          ok: decision.reason === 'already',
+          current,
+          reason: decision.reason,
+          error: decision.reason === 'unknown-state'
+            ? '「なふだ」のON/OFFが読み取れませんでした(誤操作を避けるため押していません)。'
+            : ''
+        });
+        return true;
+      }
+      el.click();
+      sendResponse({ ok: true, current, changedTo: want, reason: decision.reason });
+    } catch (err) {
+      sendResponse({ ok: false, error: String(err && err.message || err) });
+    }
     return true;
   }
 

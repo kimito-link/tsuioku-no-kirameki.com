@@ -11537,6 +11537,22 @@
               </span>
             </label>
           </div>
+          <!-- ★v0.1.1393(ユーザー要望「公式のこれも POPで操作できるようにしたい」):
+               公式コメント欄の「なふだを表示」を①POPから切り替える。
+               ★これは公式側の設定なので、拡張が状態を保存しない(公式が正本)。
+                 押すたびに公式トグルを叩き、結果を下の #nameplateToggleNote に出す。 -->
+          <div class="nl-record-sub">
+            <div class="nl-record-sub__label" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+              <span>なふだ（放送者にあなたのアイコン・名前を見せる）</span>
+              <button type="button" id="nameplateOnBtn" class="nl-mini-btn">表示する</button>
+              <button type="button" id="nameplateOffBtn" class="nl-mini-btn">隠す</button>
+              <span class="nl-record-sub__hint" id="nameplateToggleNote"></span>
+            </div>
+            <div class="nl-record-sub__hint">
+              公式の「なふだを表示」を切り替えます。ONにすると放送者だけにあなたのアイコンとニックネームが見えます（他の視聴者には見えません）。
+              ★公式の設定パネルを一度も開いていないと切り替えられません。
+            </div>
+          </div>
           <!-- Phase D1(2026-07-05・council/operation-sound-SYNTHESIS.md §4.2): 操作音（コメント送信の
                打ち出し音等・既定ON）。ユーザー自身のジェスチャ起点なのでautoplay制約が無く、
                確認音を兼ねるため既定ONが妥当。 -->

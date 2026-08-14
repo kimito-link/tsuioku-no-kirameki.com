@@ -5752,6 +5752,26 @@
       ]
     },
     {
+      "file": "src/lib/nameplateToggleBoot.js",
+      "featureCount": 1,
+      "features": [
+        "popup"
+      ],
+      "labels": [
+        "ポップアップ(応援レーン)"
+      ]
+    },
+    {
+      "file": "src/lib/nameplateToggleFinder.js",
+      "featureCount": 1,
+      "features": [
+        "content"
+      ],
+      "labels": [
+        "記録エンジン(watchページ常駐)"
+      ]
+    },
+    {
       "file": "src/lib/ndgrBacklog.js",
       "featureCount": 1,
       "features": [
