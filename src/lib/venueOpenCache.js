@@ -7,11 +7,19 @@
  *   ([[status-extras-read-not-core-read]])。
  *   → **onChanged で更新される変数**を持ち、tick は同期で読むだけにする。
  *
- * ★fail-open にする理由
- *   読めないとき `false`(会場は閉じている)に倒すと、
- *   **会場が開いているのに鏡を書かない**=いま直している症状そのものが再発する。
- *   ここは「分からないなら書く」が安全側([[fail-open-recurs-under-new-names-2026-08-12]]
- *   の逆で、こちらは書く方が無害=storage set 1回で済む)。
+ * ★v0.1.1397: fail-open を【撤回】した(私の退行だったため)。
+ *
+ * ■ 何が起きたか(2026-08-14 実機・ユーザー「とんでもないひどい状態です」)
+ *   v1394 は「分からないなら書く」に倒した。ところが会場を一度も開いていない
+ *   環境では既定 true のまま = **隠れている popup が毎tick renderStoryUserLane を
+ *   走らせ続けた**。2配信を同時に開くと両方が storage を奪い合い、
+ *   描き直し14,965回・self_write_skipped 89% という異常値になった。
+ *   ＝「書く方が無害」は**誤り**。書く側にも実コストがある。
+ *
+ * ■ いまの方針: **確認できたときだけ書く**(既定は書かない)。
+ *   会場が開いていることを storage で確認できた場合のみ true。
+ *   ★これで v1394 の根治(会場が開いていれば鏡を書く)は維持したまま、
+ *     会場を使っていない人に余計な負荷を掛けない。
  *
  * @module venueOpenCache
  */
@@ -19,8 +27,8 @@
 /** 会場が開いているかの storage キー(venueBar.js の OPEN_STORAGE_KEY と同値)。 */
 export const KEY_VENUE_OPEN = 'nls_venue_open';
 
-/** @type {boolean} 直近の値。初期値 true=不明なら書く(fail-open)。 */
-let _venueOpen = true;
+/** @type {boolean} 直近の値。★初期値 false=確認できるまで書かない(v1397で反転)。 */
+let _venueOpen = false;
 
 /** @returns {boolean} */
 export function isVenueOpenCached() {
@@ -45,7 +53,8 @@ export function setVenueOpenFromRaw(raw) {
     const o = /** @type {any} */ (raw);
     if (typeof o.open === 'boolean') { _venueOpen = o.open; return _venueOpen; }
     if (typeof o.enabled === 'boolean') { _venueOpen = o.enabled; return _venueOpen; }
-    _venueOpen = true; // 形が不明=書く側に倒す
+    // ★形が不明でも true にしない(v1394の退行の元)。開いている確証だけを信じる。
+    _venueOpen = false;
     return _venueOpen;
   }
   _venueOpen = Boolean(raw);
@@ -54,7 +63,7 @@ export function setVenueOpenFromRaw(raw) {
 
 /** テスト用リセット。 */
 export function _resetVenueOpenCache() {
-  _venueOpen = true;
+  _venueOpen = false;
 }
 
 /**
@@ -69,12 +78,12 @@ export function watchVenueOpen(chromeApi) {
     if (!local?.get) return;
     void local.get(KEY_VENUE_OPEN)
       .then((/** @type {any} */ bag) => setVenueOpenFromRaw(bag?.[KEY_VENUE_OPEN]))
-      .catch(() => { /* 不明のまま=書く側に倒れる */ });
+      .catch(() => { /* 読めない=書かない側のまま */ });
     api?.storage?.onChanged?.addListener?.((/** @type {any} */ changes, /** @type {any} */ area) => {
       if (area !== 'local' || !changes || !(KEY_VENUE_OPEN in changes)) return;
       setVenueOpenFromRaw(changes[KEY_VENUE_OPEN]?.newValue);
     });
   } catch {
-    /* 購読に失敗しても既定(書く)で動く */
+    /* 購読に失敗しても既定(書かない)で動く */
   }
 }
