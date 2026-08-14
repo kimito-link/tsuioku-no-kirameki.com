@@ -204,4 +204,32 @@ describe('bucketVenueLaneSeats', () => {
       'tanu'
     ]);
   });
+
+  /*
+   * ★2026-08-14(ユーザー実機「自分でギフト投げてPOPには出るが会場に出ない」)
+   *
+   *   この test ファイルは長らく **flatten(並べる側)に gift を手渡しして**検査するだけで、
+   *   `bucketVenueLaneSeats`(作る側)が gift を**空で返すこと自体**は誰も断言していなかった
+   *   → [[wiring-test-must-assert-counts-2026-08-04]] と同型の穴。
+   *
+   *   ★事実の記録: フォールバック経路には**ギフト段を作る能力が無い**。
+   *     供給元 `bucketStoryUserLanePicks` の返り値は {link, konta, tanu} だけで
+   *     `gift`/`ad` は存在しない(= 値を落としているのではなく、経路が無い)。
+   *     ギフト段は主経路である **鏡(laneMirror)** から供給される。
+   *
+   *   ここでは「いまそうなっている」を固定して、将来この前提が変わったら気づけるようにする。
+   *   ★会場にギフトを出す実装をするときは、この test が赤くなるのが正しい(仕様変更の合図)。
+   */
+  it('★フォールバック経路は gift/ad 段を作らない(鏡が主経路・仕様の固定)', () => {
+    const seats = [
+      { seatIndex: 0, participant: { userId: '12345678', nickname: 'ギフト投げた人' } },
+      { seatIndex: 1, participant: { userId: 'a:anon1', nickname: '匿名' } }
+    ];
+    const b = bucketVenueLaneSeats(seats, { maxTotal: 10 });
+    // 作る側は gift/ad を常に空で返す(=会場のギフト段はフォールバックでは出ない)。
+    expect(b.gift).toEqual([]);
+    expect(b.ad).toEqual([]);
+    // 一方で uid のある人は link/konta/tanu のどこかには載る(段ごと消えてはいない)。
+    expect(b.link.length + b.konta.length + b.tanu.length).toBeGreaterThan(0);
+  });
 });

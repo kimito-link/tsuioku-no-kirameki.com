@@ -690,6 +690,7 @@
 | `src/lib/recentBroadcastLiveIds.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/recordingStallWatchdog.js` | 1 | 記録エンジン(watchページ常駐) |
 | `src/lib/recordRate.js` | 1 | ポップアップ(応援レーン) |
+| `src/lib/refreshCycleDeadline.js` | 1 | 状態速報ページ |
 | `src/lib/refreshTaskGuard.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/reportCommentsCsv.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/reportCommentsTableSection.js` | 1 | ポップアップ(応援レーン) |
