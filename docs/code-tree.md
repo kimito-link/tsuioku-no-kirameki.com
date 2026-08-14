@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 4 / 766 件
+## ⚠️ 役割コメントが無いソース 4 / 770 件
 - `src/lib/laneDomSelfMeasure.js`
 - `src/lib/reportPreviewPublish.js`
 - `src/lib/venueLaneBuckets.js`
@@ -695,7 +695,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (1668)
+- 📁 **src/** (1677)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -987,7 +987,7 @@
         - `logo_funlink_white_RGB_maru_black.png`
       - `logo_guide_funlink_ol.pdf`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1426)
+  - 📁 **lib/** (1435)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -1413,6 +1413,8 @@
     - `forwardReactivation.test.js`
     - `geminiNanoBridge.js` — v0.1.205 Phase C: Built-in AI (Gemini Nano, Chrome 138+) の薄いラッパー。
     - `geminiNanoBridge.test.js`
+    - `giftAdPipelineCensus.js` — ギフト/広告が「取れて→出て→鳴る」まで通っているかを
+    - `giftAdPipelineCensus.test.js`
     - `giftBahamutCelebration.js` — ギフト到着時の「画面ズームイン」演出 spec（純関数）。
     - `giftBahamutCelebration.test.js`
     - `giftDeltaFallback.js` — 「ギフト個別イベント欠落配信」のフォールバック検知(2026-07-06)。
@@ -1678,6 +1680,8 @@
     - `lpIndexSnapshotRanking.test.js`
     - `lpIndexUnifiedSnapshotIntegration.test.js`
     - `lpIndexUnifiedSnapshotOverview.test.js`
+    - `mainThreadBlockerCensus.js` — メインスレッドを止めた【当人】を名指しする計器(純関数)。
+    - `mainThreadBlockerCensus.test.js`
     - `mangaBroadcastSummary.js` — 放送終了後の HTML レポート / マーケ分析の頭にくる「漫画読み体験」要約。
     - `mangaBroadcastSummary.test.js`
     - `manifestKnownKeys.test.js`
@@ -2061,6 +2065,7 @@
     - `singleFlightByKey.test.js`
     - `siteLinkHealth.js` — 公開ページ(LP/記事/docs)の「内部リンク健全性」を検証する純ロジック(2026-06-18)。
     - `siteLinkHealth.test.js`
+    - `specializedCells.wiring.test.js`
     - `standalonePopupClose.js` — v0.1.433: 別ウィンドウ POP（standalone popup window）を「配信に飛ばしたら閉じる」判定（純ロジック）。
     - `standalonePopupClose.test.js`
     - `statCardsMirror.js` — 数字カード鏡のスナップショット純関数。popup 上部の数字カード(記録N件・推定同時接続・来場者数)と
@@ -2300,6 +2305,8 @@
     - `venueMirrorIntakeDiag.js` — venueMirrorIntakeDiag — 会場が鏡を「受け取れているか」を経路ごとに数える純関数(v0.1.1317)。
     - `venueMirrorIntakeDiag.test.js`
     - `venueMirrorIntakePipeline.test.js`
+    - `venueModeCensus.js` — 会場モード専用の計器(純関数)。
+    - `venueModeCensus.test.js`
     - `venueOpenLatency.js` — 会場モードの「開いてから見えるまで」を分解して観測する純関数(v0.1.1207)。
     - `venueOpenLatency.test.js`
     - `venuePickupBanner.js` — 会場モードの「ピックアップ枠」(BSP風・v0.1.1230)。
@@ -2342,6 +2349,8 @@
     - `voiceAgeGate.test.js`
     - `voiceAssignment.js` — コメント者ごとに読み上げ声(styleId/ピッチ/速度オフセット)を決定論的に割り当てる純ロジック。
     - `voiceAssignment.test.js`
+    - `voiceBubbleRealtimeParity.js` — 「読み上げ」と「吹き出し(画面表示)」が
+    - `voiceBubbleRealtimeParity.test.js`
     - `voiceComment.js` — ニコ生コメント欄の最大文字数（textarea maxlength と一致）
     - `voiceComment.test.js`
     - `voiceDiag.js` — ★v0.1.1328: この診断を「新鮮」とみなす上限。これを大きく超えたら化石値として数値を伏せる。

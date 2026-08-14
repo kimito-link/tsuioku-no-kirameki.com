@@ -294,7 +294,7 @@
   - `src/lib/giftThrowProjectile.js`
 - **吹き出し寿命管理** — 会場の吹き出しの表示上限・追い出し(eviction)ライフサイクル
   - `src/lib/venueBubbleLifecycle.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 218</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 220</summary>
 
 - `scripts/encode-marketing-html-avatars.mjs` — extension/images/marketing-html-avatars/*.png を data URI にし、
 - `scripts/split-avatar-parts.mjs` — 偽市松背景の除去 + パーツ切り出し(one-off アセットパイプライン)
@@ -345,6 +345,7 @@
 - `src/lib/effectDirector.js` — 「演出ディレクター」層(パチンコ的ゲーム性 Phase 1・Fable設計 2026-07-04)。
 - `src/lib/enrichmentAvatarFallback.js` — enrichRowsWithInterceptedUserIds 内で、全ソースにアバターURLがない場合に
 - `src/lib/formatGiftSubAppHistory.js` — v0.1.198: gift sub-app DOM 由来の history / totalCounts を popup 表示用に
+- `src/lib/giftAdPipelineCensus.js` — ギフト/広告が「取れて→出て→鳴る」まで通っているかを
 - `src/lib/giftBahamutCelebration.js` — ギフト到着時の「画面ズームイン」演出 spec（純関数）。
 - `src/lib/giftDeltaFallback.js` — 「ギフト個別イベント欠落配信」のフォールバック検知(2026-07-06)。
 - `src/lib/giftDisplayNickname.js` — NDGR ギフト protobuf から拾いがちな「内部用ラベル」を表示名から除外する。
@@ -493,6 +494,7 @@
 - `src/lib/venueLiveRoster.js` — v0.1.754 会場の3時間安定化(星野ロミ・メソッド会議の本質解・6体ほぼ全会一致):
 - `src/lib/venueMirrorAvatarEnrich.js` — 会場行の avatar を「①の実描画鏡(laneMirror)が解決済みの顔URL」で
 - `src/lib/venueMirrorIntakeDiag.js` — venueMirrorIntakeDiag — 会場が鏡を「受け取れているか」を経路ごとに数える純関数(v0.1.1317)。
+- `src/lib/venueModeCensus.js` — 会場モード専用の計器(純関数)。
 - `src/lib/venueOpenLatency.js` — 会場モードの「開いてから見えるまで」を分解して観測する純関数(v0.1.1207)。
 - `src/lib/venuePickupBanner.js` — 会場モードの「ピックアップ枠」(BSP風・v0.1.1230)。
 - `src/lib/venueResidents.js` — 会場モードの常駐3キャラ(りんく・こん太・たぬ姉)の描画モデル(純関数)。
@@ -527,10 +529,11 @@
   - `src/lib/voicePlayer.js`
   - `src/lib/voiceReadQueue.js`
   - `src/lib/voiceAgeGate.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 14</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 15</summary>
 
 - `src/lib/reportCompleteVoice.js` — v0.1.806: レポート(HTML/マーケ/メディアキット)の保存が【成功した直後】に、完了の合図として
 - `src/lib/voiceAssignment.js` — コメント者ごとに読み上げ声(styleId/ピッチ/速度オフセット)を決定論的に割り当てる純ロジック。
+- `src/lib/voiceBubbleRealtimeParity.js` — 「読み上げ」と「吹き出し(画面表示)」が
 - `src/lib/voiceComment.js` — ニコ生コメント欄の最大文字数（textarea maxlength と一致）
 - `src/lib/voiceDirector.js` — council/pachinko-ultimate-SYNTHESIS.md §4(ボイスの歯止め)+§6 Phase B の実装。
 - `src/lib/voiceEffectDiag.js` — パチンコボイス演出(voiceDirector.js・Phase B)の発火/スキップ観測値を組み立てる純関数群。
@@ -765,7 +768,7 @@
   - `src/lib/statusTrendKey.js`
   - `src/extension/status-entry.js`
   - `src/lib/statusActionAdvisor.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 157</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 158</summary>
 
 - `app/app.js` — スマホ閲覧用 status Web 版。
 - `app/live-view.js` — global NL_BUILD_ID
@@ -835,6 +838,7 @@
 - `src/lib/liveEndedFlag.js` — 配信終了フラグ。
 - `src/lib/livesCardSignature.js` — livesCardSignature — 配信カードを作り直すべきかの署名(v0.1.1320)。
 - `src/lib/liveviewSnapshotFreshness.js` — 純Web応援ライブビューの「スナップショット丸ごと1枚の鮮度」判定（council/liveview-wholesale-root-SYNTHESIS.md 第1段）。
+- `src/lib/mainThreadBlockerCensus.js` — メインスレッドを止めた【当人】を名指しする計器(純関数)。
 - `src/lib/mcpBridge/buildMcpMismatchReasons.js` — MCP L1 snapshot の `diag.mismatchReasons` を組み立てる純関数。
 - `src/lib/mcpBridge/mergeLiveMcpSnapshot.js` — Canonical Snapshot のマージ（Deterministic + Monotonic Sequence）。
 - `src/lib/mcpBridge/schema.js` — L1 Canonical Snapshot の schema 定義（MCP Bridge から AI に返す正準形）。
@@ -929,7 +933,7 @@
 
 ## 🧬 修正系譜マップ(この系統のバグを過去にどう直したか)
 
-> changelog 全 719 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
+> changelog 全 720 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
 
 ### 💾 記録件数 (96版)
 - `v0.1.1367` 2026-08-12 — 応援レーンが途中件数で止まる問題の根治（78件中19件しか出ない）
@@ -1029,7 +1033,8 @@
 - `v0.1.672` 2026-06-10 — コメビュの二重表示の残りを根治
 - `v0.1.665` 2026-06-10 — 長い配信が7割等で止まったままになるのを根治
 
-### 📥 コメント取得 (172版)
+### 📥 コメント取得 (173版)
+- `v0.1.1390` 2026-08-14 — 読み上げ・コメント送信・会場モード・ギフト/広告の専用チェックを追加
 - `v0.1.1387` 2026-08-13 — アイコンの判定に「表示できた実績」を反映
 - `v0.1.1386` 2026-08-13 — アイコンが白いままになる問題を改善
 - `v0.1.1378` 2026-08-12 — サムネ・ID・名前がどれだけ取れているか出すように
@@ -1271,7 +1276,8 @@
 - `v0.1.668` 2026-06-10 — パネルに「💬コメビュ」ボタンを追加
 - `v0.1.667` 2026-06-10 — コメビュに匿名OKのニックネーム・ラベル・メモ
 
-### 🏟 会場・席 (234版)
+### 🏟 会場・席 (235版)
+- `v0.1.1390` 2026-08-14 — 読み上げ・コメント送信・会場モード・ギフト/広告の専用チェックを追加
 - `v0.1.1389` 2026-08-14 — 状態ページの項目を「症状ごとの枠」に分けました
 - `v0.1.1388` 2026-08-14 — 状態ページが開かない問題の修正と、症状別の判定を画面に表示
 - `v0.1.1375` 2026-08-12 — 会場モードに こん太・たぬ姉 の段が出るように
@@ -1507,7 +1513,8 @@
 - `v0.1.707` 2026-06-13 — ニコ生に会場モードを追加
 - `v0.1.678` 2026-06-10 — 配信実績を共有できるメディアキットを追加
 
-### 🎈 吹き出し (26版)
+### 🎈 吹き出し (27版)
+- `v0.1.1390` 2026-08-14 — 読み上げ・コメント送信・会場モード・ギフト/広告の専用チェックを追加
 - `v0.1.1047` 2026-07-03 — 会場を応援レーン段組みに統一(第1段=りんく/こん太/たぬ姉)
 - `v0.1.840` 2026-06-20 — 機能逆引き地図を全ファイル網羅に
 - `v0.1.832` 2026-06-20 — 「はじめての方へ」をLPと同じキャラ吹き出し会話に
@@ -1535,7 +1542,8 @@
 - `v0.1.713` 2026-06-13 — 会場モードを明るくして発言を吹き出し表示
 - `v0.1.711` 2026-06-13 — 会場モードで発言を吹き出し表示
 
-### 🎁 ギフト (117版)
+### 🎁 ギフト (118版)
+- `v0.1.1390` 2026-08-14 — 読み上げ・コメント送信・会場モード・ギフト/広告の専用チェックを追加
 - `v0.1.1360` 2026-08-12 — fix(diag): 古い記録で注意を出さない
 - `v0.1.1339` 2026-08-12 — fix(diag): 取れているのに取得中の表示
 - `v0.1.1300` 2026-08-09 — 複数の配信を同時に開いても、会場の表示が混ざらないようにしました
@@ -1654,7 +1662,8 @@
 - `v0.1.676` 2026-06-10 — コメビュをパネルのタイムラインと完全同一に
 - `v0.1.674` 2026-06-10 — タイムラインから人を開ける+匿名の見分け復活
 
-### 🔊 読み上げ (83版)
+### 🔊 読み上げ (84版)
+- `v0.1.1390` 2026-08-14 — 読み上げ・コメント送信・会場モード・ギフト/広告の専用チェックを追加
 - `v0.1.1389` 2026-08-14 — 状態ページの項目を「症状ごとの枠」に分けました
 - `v0.1.1367` 2026-08-12 — 応援レーンが途中件数で止まる問題の根治（78件中19件しか出ない）
 - `v0.1.1342` 2026-08-12 — feat(diag): コメビュにも合成失敗の理由を記録する

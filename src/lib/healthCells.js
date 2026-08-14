@@ -3,6 +3,10 @@
 import { judgePreviewGenerationParity } from './parityVerdict.js';
 // ★v0.1.1362: 取り込みの律速判定は backfillBottleneck.js が正本(ここでは再判定しない)。
 import { judgeBackfillBottleneck } from './backfillBottleneck.js';
+// ★v0.1.1390(ユーザー要望の特化計器5種)。判定は各 lib が正本=ここは束ねるだけ。
+import { buildVoiceBubbleParity } from './voiceBubbleRealtimeParity.js';
+import { buildGiftAdPipeline } from './giftAdPipelineCensus.js';
+import { buildVenueModeCensus } from './venueModeCensus.js';
 
 /**
  * healthCells.js — status ファーストビューの「健全度セル」を作る純関数(v0.1.843)。
@@ -420,7 +424,11 @@ function buildLaneHealthCells(laneDiag) {
 
 /**
  * 健全度セル配列を作る。
- * @param {{ livesData?: any[], fastDiag?: any, popupDiag?: any, voiceDiag?: any, venueSeatsDiag?: any, laneDiag?: any, giftEffectDiag?: any, milestoneEffectDiag?: any, previewRenderAck?: any, laneMirror?: any, backfillLiveMetric?: any, nowMs?: number }} data
+ * @param {{ livesData?: any[], fastDiag?: any, popupDiag?: any, voiceDiag?: any, venueSeatsDiag?: any, laneDiag?: any, giftEffectDiag?: any, milestoneEffectDiag?: any, previewRenderAck?: any, laneMirror?: any, backfillLiveMetric?: any, nowMs?: number,
+ *   instantPushDiag?: any, commentPostDiag?: any, mainThreadBlocker?: any, liveElapsedMs?: number,
+ *   venueOpen?: boolean, venueMirrorAgeMs?: number, venueTiers?: any, venueHasGiftData?: boolean }} data
+ *   ★v0.1.1390 で追加した後半7つは、ユーザー要望の特化セル5種の入力
+ *   (読み上げ⇄吹き出し / コメント送信 / 会場モードの鮮度 / ギフト広告の通り道 / メインスレッド)。
  * @returns {HealthCell[]}
  */
 export function buildHealthCells(data) {
@@ -645,6 +653,91 @@ export function buildHealthCells(data) {
 
   // 27. v0.1.1058: コメント数マイルストーンの「検知→演出→効果音」整合(milestoneEffectDiag 未観測なら空)。
   for (const c of buildMilestoneEffectHealthCells(data?.milestoneEffectDiag)) cells.push(c);
+
+  /* ────────────────────────────────────────────────────────────────
+   * ★v0.1.1390: ユーザー要望の特化セル(読み上げ/送信/会場/ギフト広告/メインスレッド)。
+   *   ★registry 登録と【同じ版】でここに足す。片方だけだと
+   *     「登録したのに画面に出ない」になる([[unwired-judgement-is-systemic-2026-08-12]])。
+   *   ★判定ロジックは各 lib(純関数・test 付き)が正本。ここは呼ぶだけ。
+   *   ★未観測なら push しない=「使っていないのに赤い」を作らない。
+   * ──────────────────────────────────────────────────────────────── */
+  // ① 読み上げ⇄吹き出しのリアルタイム一致(ユーザー:「よみあげと吹き出しはリアルタイム一致がいい」)
+  try {
+    const vb = buildVoiceBubbleParity({
+      voiceDiag: data?.voiceDiag ?? null,
+      instantPush: fast?.instantPushDiag ?? data?.instantPushDiag ?? null
+    });
+    if (vb.state !== 'unused') {
+      cells.push(stateCell(
+        'voice-bubble-parity', '読み上げ⇄吹き出し',
+        vb.state === 'bad' ? 'bad' : vb.state === 'warn' ? 'warn' : 'ok',
+        vb.gapMs == null ? '—' : `差${Math.abs(vb.gapMs)}ms`
+      ));
+    }
+  } catch { /* 計器の失敗でパネルを壊さない */ }
+
+  // ② コメント送信(従来は「操作音」等と混ざって埋もれていた)
+  try {
+    const cp = data?.commentPostDiag ?? null;
+    const attempts = Math.max(0, Math.floor(num(cp?.attempts) || 0));
+    if (attempts > 0) {
+      const okN = Math.max(0, Math.floor(num(cp?.okCount) || 0));
+      const failN = Math.max(0, Math.floor(num(cp?.failCount) || 0));
+      const toN = Math.max(0, Math.floor(num(cp?.timeoutCount) || 0));
+      cells.push(stateCell(
+        'comment-post', 'コメント送信',
+        failN + toN > 0 ? 'warn' : 'ok',
+        failN + toN > 0 ? `${okN}/${attempts}成功(失敗${failN}/締切${toN})` : `${okN}/${attempts}成功`
+      ));
+    }
+  } catch { /* no-op */ }
+
+  // ③ 会場モードの鮮度(会場は鏡ごしにしか見えない=古い鏡を会場の言葉で名指し)
+  try {
+    const vm = buildVenueModeCensus({
+      venueOpen: data?.venueOpen === true,
+      mirrorAgeMs: num(data?.venueMirrorAgeMs) || 0,
+      tiers: data?.venueTiers ?? null,
+      hasGiftData: data?.venueHasGiftData === true
+    });
+    if (vm.level !== 'na') {
+      cells.push(stateCell(
+        'venue-mode', '会場モードの鮮度', vm.level,
+        vm.mirrorState === 'fresh' ? '最新' : `${Math.round(vm.mirrorAgeMs / 1000)}秒前`
+      ));
+    }
+  } catch { /* no-op */ }
+
+  // ④ ギフト/広告の通り道(「取得中」のまま数分続くのは詰まり)
+  try {
+    const gp = buildGiftAdPipeline({
+      northStar: fast?.giftDiagnostics?.['北極星レーン'] ?? null,
+      giftEffect: data?.giftEffectDiag ?? null,
+      liveElapsedMs: num(data?.liveElapsedMs) || 0
+    });
+    const warnN = gp.stages.filter((x) => x.level === 'warn' || x.level === 'bad').length;
+    const okN2 = gp.stages.filter((x) => x.level === 'ok').length;
+    if (warnN + okN2 > 0) {
+      cells.push(stateCell(
+        'gift-ad-pipeline', 'ギフト/広告の通り道',
+        warnN > 0 ? 'warn' : 'ok',
+        warnN > 0 ? `${warnN}段で詰まり` : '通っています'
+      ));
+    }
+  } catch { /* no-op */ }
+
+  // ⑤ メインスレッド(黒くなる件の【当人】。速報は「探すこと」で終わっていた)
+  try {
+    const mt = data?.mainThreadBlocker ?? null;
+    if (mt && (num(mt.count) || 0) > 0) {
+      const worst = Math.round(num(mt.worstMs) || 0);
+      cells.push(stateCell(
+        'main-thread', 'メインスレッド',
+        worst >= 500 ? 'bad' : worst >= 200 ? 'warn' : 'ok',
+        `${String(mt.worstName || '?')} ${worst}ms`
+      ));
+    }
+  } catch { /* no-op */ }
 
   return cells;
 }

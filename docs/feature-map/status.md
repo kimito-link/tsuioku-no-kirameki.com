@@ -52,8 +52,8 @@ graph LR
   n_status --> n_src_lib_diagnosisRegistry_js["lib/diagnosisRegistry.js"]
   n_status --> n_src_lib_diagnosticsTrust_js["lib/diagnosticsTrust.js"]
   n_status --> n_src_lib_effectSoundPlayer_js["lib/effectSoundPlayer.js"]:::shared
-  n_status --> n_src_lib_giftDisplayNickname_js["lib/giftDisplayNickname.js"]:::shared
+  n_status --> n_src_lib_giftAdPipelineCensus_js["lib/giftAdPipelineCensus.js"]
   classDef shared fill:#eee,stroke:#999,color:#666;
 ```
 
-> ほか 102 ファイル省略（全件は storage-bus.md / metafile 参照）。
+> ほか 105 ファイル省略（全件は storage-bus.md / metafile 参照）。

@@ -91,7 +91,21 @@ export const DIAGNOSIS_REGISTRY = Object.freeze([
   //   venue-parity セルと同時に登録する(v0.1.1054 のレジストリ・ドリフトを繰り返さない)。
   reg('venue-parity', '会場一致', 'venue', 2, false),
   // 2026-07-15 診断先行(venue-yukkuri-named-diagnose): 「名前ありゆっくり顔」実害計器。
-  reg('venue-yukkuri-face', '名前ありゆっくり顔', 'venue', 1, false)
+  reg('venue-yukkuri-face', '名前ありゆっくり顔', 'venue', 1, false),
+  // ★v0.1.1390(ユーザー要望): 読み上げ特化。「よみあげと吹き出しはリアルタイム一致がいい」
+  //   個別の速さでなく【2つが揃っているか】を1セルで見る(voiceBubbleRealtimeParity.js)。
+  reg('voice-bubble-parity', '読み上げ⇄吹き出し', 'venue', 1, false),
+  // ★v0.1.1390(ユーザー要望): コメント送信特化。従来は「操作音」等と混ざって埋もれていた。
+  reg('comment-post', 'コメント送信', 'render', 1, false),
+  // ★v0.1.1390: メインスレッドを止めた【当人】。速報は「探すこと」で終わっており
+  //   誰が止めたかを名指ししていなかった(mainThreadBlockerCensus.js)。
+  reg('main-thread', 'メインスレッド', 'render', 1, false),
+  // ★v0.1.1390(ユーザー要望): 会場モード専用。会場は鏡ごしにしか見えないので
+  //   「鏡が古い」を会場の言葉で出す(venueModeCensus.js)。
+  reg('venue-mode', '会場モードの鮮度', 'venue', 1, false),
+  // ★v0.1.1390(ユーザー要望): ギフト/広告の通り道(取得→反映→演出)。
+  //   「取得中」のまま数分続くのは詰まり、を名指しする(giftAdPipelineCensus.js)。
+  reg('gift-ad-pipeline', 'ギフト/広告の通り道', 'northstar', 1, false)
 ]);
 
 /** id → 観点 の索引(集計で O(1) 参照)。 */

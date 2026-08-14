@@ -510,6 +510,7 @@
 | `src/lib/formatOfficialStreamAgeMinutes.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/forwardReactivation.js` | 1 | 記録エンジン(watchページ常駐) |
 | `src/lib/geminiNanoBridge.js` | 1 | ポップアップ(応援レーン) |
+| `src/lib/giftAdPipelineCensus.js` | 1 | 状態速報ページ |
 | `src/lib/giftBahamutCelebration.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/giftHistoryMirror.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/giftHistoryNorthStarPaintKey.js` | 1 | ポップアップ(応援レーン) |
@@ -778,9 +779,11 @@
 | `src/lib/userSupportGridAccent.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/userThumbGrid.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/venueAvatarReport.js` | 1 | 状態速報ページ |
+| `src/lib/venueModeCensus.js` | 1 | 状態速報ページ |
 | `src/lib/verifiedAvatarRegistry.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/viewerCountProbeMerge.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/viewerSelfLaneAggregate.js` | 1 | ポップアップ(応援レーン) |
+| `src/lib/voiceBubbleRealtimeParity.js` | 1 | 状態速報ページ |
 | `src/lib/voiceComment.js` | 1 | 記録エンジン(watchページ常駐) |
 | `src/lib/voiceReachabilityProbe.js` | 1 | 状態速報ページ |
 | `src/lib/watchAudienceCopy.js` | 1 | ポップアップ(応援レーン) |
