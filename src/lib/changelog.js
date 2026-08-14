@@ -26,6 +26,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1397',
+    date: '2026-08-15',
+    summary: '【不具合修正】前回の更新で動作が重くなっていた問題を戻しました',
+    items: Object.freeze([
+      'v0.1.1394 の変更で、会場モードを使っていない場合でも裏で描き直しが走り続け、複数の配信を同時に開くと動作が重くなっていました。申し訳ありません。',
+      '会場モードを開いていることが確認できたときだけ裏の処理を行うように直しました。会場にギフトが出るようになった修正はそのまま維持しています。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1396',
     date: '2026-08-15',
     summary: '「会場座席」の誤った警告と、描き直し回数の紛らわしい表示を直しました',

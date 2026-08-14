@@ -40,10 +40,16 @@ describe('隠れていても会場へ供給する配線', () => {
     expect(isVenueOpenCached()).toBe(false);
   });
 
-  it('★形が不明なら「書く」側に倒す(会場が開いてるのに止める事故を作らない)', () => {
+  /*
+   * ★v0.1.1397 で判断を反転(v1394 の私の退行を撤回)。
+   *   「分からないなら書く」にしたら、会場を開いていない人の隠れた popup が
+   *   毎tick 描画を走らせ、2配信同時で storage を奪い合った(描き直し14,965回)。
+   *   ＝書く側にも実コストがある。**確証があるときだけ書く**。
+   */
+  it('★形が不明なら書かない(v1394 の fail-open を撤回)', () => {
     _resetVenueOpenCache();
     setVenueOpenFromRaw({ weird: 1 });
-    expect(isVenueOpenCached()).toBe(true);
+    expect(isVenueOpenCached()).toBe(false);
   });
 
   it('真偽値/オブジェクトのどちらでも読める', () => {
