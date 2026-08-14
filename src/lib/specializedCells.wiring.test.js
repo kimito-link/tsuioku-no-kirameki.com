@@ -97,13 +97,15 @@ describe('特化セル5種の配線(実データに近い入力)', () => {
  *   計器の古さだけで「閉じている」と断定していた=計器が無いことを会場が無いと読み替えていた。
  */
 describe('会場が開いているのに「開いていません」と言わない', () => {
-  function cellsWith(venueSeatsDiag) {
-    return buildHealthCells({ livesData: [{ recording: true }], nowMs: Date.now(), venueSeatsDiag });
+  function cellsWith(venueSeatsDiag, venueOpen) {
+    return buildHealthCells({
+      livesData: [{ recording: true }], nowMs: Date.now(), venueSeatsDiag, venueOpen
+    });
   }
 
   it('★参加者が居るのに計器が古い→「計器が届いていません」(閉じている扱いにしない)', () => {
     const old = Date.now() - 10 * 60 * 1000; // CLOSED 閾値(5分)超
-    const c = cellsWith({ enabled: true, lastUpdateAt: old, participantCount: 15, seatsShown: 15 })
+    const c = cellsWith({ enabled: true, lastUpdateAt: old, participantCount: 15, seatsShown: 15 }, true)
       .find((x) => x.id === 'venue-seats');
     expect(c.level).toBe('warn');
     expect(c.text).toContain('会場は開いています');
@@ -112,8 +114,25 @@ describe('会場が開いているのに「開いていません」と言わな�
 
   it('本当に閉じている(参加者0・席0)なら従来どおり「開いていません」', () => {
     const old = Date.now() - 10 * 60 * 1000;
-    const c = cellsWith({ enabled: true, lastUpdateAt: old, participantCount: 0, seatsShown: 0 })
+    const c = cellsWith({ enabled: true, lastUpdateAt: old, participantCount: 0, seatsShown: 0 }, false)
       .find((x) => x.id === 'venue-seats');
+    expect(c.level).toBe('na');
+    expect(c.text).toContain('開いていません');
+  });
+
+  /*
+   * ★v0.1.1396(実機で v1395 の直しが不十分と判明):
+   *   「開いている証拠」を同じ古いスナップショットから取ると、化石値が
+   *   自分の新しさを証明してしまう。実機は 944648秒(11日)前の値で
+   *   「計器が届いていません・会場は開いています」と出続けた。
+   */
+  it('★古いsnapのparticipantsだけでは「開いている」と言わない(化石値の自己証明を断つ)', () => {
+    const old = Date.now() - 11 * 24 * 60 * 60 * 1000; // 11日前
+    const c = buildHealthCells({
+      livesData: [{ recording: true }], nowMs: Date.now(),
+      venueSeatsDiag: { enabled: true, lastUpdateAt: old, participantCount: 15, seatsShown: 15 }
+      // venueOpen は渡さない=いまの証拠が無い
+    }).find((x) => x.id === 'venue-seats');
     expect(c.level).toBe('na');
     expect(c.text).toContain('開いていません');
   });

@@ -1991,7 +1991,10 @@ function renderAll({ extrasAgeMs, lvList, summaries, fastDiag, popupDiag, backfi
     instantPushDiag: _extrasCache?.instantPushDiag ?? null,
     mainThreadBlocker: _popupSnapForCells?.mainThreadBlocker ?? null,
     liveElapsedMs: _liveElapsedMs,
-    venueOpen: Boolean(venueSeatsDiag?.enabled),
+    // ★v0.1.1396: 会場が「いま」開いているかは、古い venueSeatsDiag ではなく
+    //   【鏡の新しさ】で判断する(鏡は会場が開いている間だけ更新され続ける)。
+    //   古い snap の enabled を使うと、11日前の化石値で「開いている」と誤判定する。
+    venueOpen: _mirrorAgeMs > 0 && _mirrorAgeMs < 180_000,
     venueMirrorAgeMs: _mirrorAgeMs,
     venueTiers: {
       link: laneMirror?.link?.length || 0, gift: laneMirror?.gift?.length || 0,
