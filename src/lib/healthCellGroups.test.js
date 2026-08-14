@@ -45,13 +45,20 @@ describe('healthCellGroups', () => {
     expect(groups.map((g) => g.id)).toEqual(['identity']);
   });
 
+  it('★枠は十分に細かい(12前後)=会場やギフトが1枠1セルで終わらない', () => {
+    // ユーザー指摘:「会場モードの計器が鮮度しかない」「項目を全部12個ぐらいに」
+    expect(HEALTH_CELL_GROUPS.length).toBeGreaterThanOrEqual(11);
+    const venue = HEALTH_CELL_GROUPS.find((g) => g.id === 'venue');
+    expect(venue.cellIds.length).toBeGreaterThanOrEqual(4); // 鮮度だけにしない
+  });
+
   it('order 順に並ぶ(コメント記録が先頭・人の識別が2番目)', () => {
     const cells = [
       { id: 'paint', level: 'ok' },
       { id: 'uid-rate', level: 'ok' },
       { id: 'capture-rate', level: 'ok' }
     ];
-    expect(groupHealthCells(cells).map((g) => g.id)).toEqual(['comment', 'identity', 'health']);
+    expect(groupHealthCells(cells).map((g) => g.id)).toEqual(['comment', 'identity', 'speed']);
   });
 
   it('★「人の識別」枠に ID/サムネ/名前が揃う(ユーザー要望の当の枠)', () => {

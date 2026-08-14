@@ -1,22 +1,31 @@
 /**
  * mainThreadBlockerBoot.js — メインスレッドを止めた区間を【実測】する(副作用モジュール)。
  *
- * ★なぜ要るか
- *   v0.1.1390 で mainThreadBlockerCensus.js(集計の純関数)を作ったが、
- *   **どこからも呼んでいなかった**＝計器を足しただけで永久に 0 件のままだった
- *   ([[unwired-judgement-is-systemic-2026-08-12]] / [[counting-is-not-fixing-2026-08-13]])。
- *   ここで実際の観測につなぐ。
+ * ★v0.1.1398: 観測方法を longtask から【自前のハートビート】へ差し替えた。
  *
- * ■ 何で測るか: PerformanceObserver('longtask')
- *   ★自前で setTimeout の遅れを測る方式は「遅れた事実」しか分からず、
- *     **誰が止めたか**が出ない(速報が「探すこと」で終わっていた原因)。
- *   longtask エントリは `attribution` を持ち、どのフレーム/スクリプトが
- *   長時間占有したかの手がかりが付く。取れないブラウザでは黙って何もしない。
+ * ■ 何が起きていたか(2026-08-14 実機・ユーザー「計器いれたの？」)
+ *   同じ速報にこの2つが並んでいた:
+ *       最大タイマー遅延=1354ms 🔴イベントループ停止
+ *       mainThreadBlocker: count 0        ← 私の計器
+ *   ＝**1.35秒止まったのに、私の計器はゼロ**。計器が測れていなかった。
  *
- * ■ 可視復帰との相関
- *   ユーザー観測「しばらく配信を見ないとスリープ→戻ると黒→しばらくすると戻る」を
- *   検証するため、**可視復帰からの経過**を各サンプルに付ける。
- *   復帰直後に偏るなら「まとめ描き」が主因だと数字で言える。
+ * ■ 理由: `longtask` は【トップレベル文書にしか配送されない】。
+ *   ①POPは sidepanel.html の中の **iframe** で動くので、
+ *   PerformanceObserver('longtask') は原理的に何も受け取れない。
+ *   ★「observe を書いた」=「測れている」ではない。出荷後に数字が0のままなら疑う
+ *     ([[zero-count-may-mean-unmeasured-2026-08-04]] を自分で踏んだ)。
+ *
+ * ■ 直し方: **同じフレームの中で**測る。
+ *   一定間隔でタイマーを鳴らし、予定時刻からの遅れを見る。遅れ=その間
+ *   メインスレッドが他の何かに占有されていた、ということ。
+ *   ★これは sidepanel-entry.js の「最大タイマー遅延」と同じ原理で、
+ *     そちらは実際に 1354ms を検出できている=iframe 内でも有効だと実証済み。
+ *
+ * ■ 誰が止めたかをどう出すか
+ *   タイマーの遅れだけでは「誰が」が出ない(それが従来の速報の限界だった)。
+ *   → 拡張の重い処理を `markBlockerSection()` で囲み、**遅延が観測された瞬間に
+ *     実行中だった区間名**を犯人として記録する。囲っていない区間で遅れたら
+ *     `(拡張の外)` と出る=それ自体が「ページ側が犯人」という情報になる。
  *
  * @module mainThreadBlockerBoot
  */
@@ -25,8 +34,32 @@ import { createBlockerCensus, noteBlocker, LONG_TASK_MS } from './mainThreadBloc
 /** 集計(状態速報が読む)。 */
 export const mainThreadBlocker = createBlockerCensus();
 
+/** ハートビートの間隔[ms]。短すぎると自分が負荷になるので 250ms。 */
+const HEARTBEAT_MS = 250;
+
 /** 直近の可視復帰時刻(ms)。-1=まだ復帰していない。 */
 let _lastVisibleAt = -1;
+
+/** いま実行中の区間名(入れ子は最後に入ったものが勝つ)。 */
+let _currentSection = '';
+
+/**
+ * 重い処理を区間名で囲む。遅延が出たときの【犯人】になる。
+ *
+ * @template T
+ * @param {string} name
+ * @param {() => T} fn
+ * @returns {T}
+ */
+export function markBlockerSection(name, fn) {
+  const prev = _currentSection;
+  _currentSection = String(name || '') || prev;
+  try {
+    return fn();
+  } finally {
+    _currentSection = prev;
+  }
+}
 
 /** @returns {number} 可視復帰からの経過ms(-1=不明) */
 function sinceVisible() {
@@ -36,45 +69,35 @@ function sinceVisible() {
 
 try {
   if (typeof document !== 'undefined') {
-    // 起動時に見えていれば、その時点を復帰とみなす。
     if (!document.hidden) _lastVisibleAt = Date.now();
     document.addEventListener('visibilitychange', () => {
       if (!document.hidden) _lastVisibleAt = Date.now();
     });
   }
 
-  if (typeof PerformanceObserver === 'function') {
-    const obs = new PerformanceObserver((list) => {
-      for (const e of list.getEntries()) {
-        const ms = Number(e.duration) || 0;
-        if (ms < LONG_TASK_MS) continue;
-        /*
-         * ★名前は attribution から取る。取れないときは entryType で代替する。
-         *   ここで「(無名)」ばかりになるなら、それ自体が
-         *   「拡張の外(ページ側)が止めている」という情報になる。
-         */
-        let name = String(e.name || 'longtask');
-        try {
-          const attr = /** @type {any} */ (e).attribution;
-          if (Array.isArray(attr) && attr.length > 0) {
-            const a = attr[0];
-            const src = String(a?.containerName || a?.containerId || a?.containerSrc || '').trim();
-            if (src) name = src;
-            else if (a?.name) name = String(a.name);
-          }
-        } catch {
-          /* 名前が取れなくても計測は続ける */
-        }
+  if (typeof setTimeout === 'function') {
+    let expected = Date.now() + HEARTBEAT_MS;
+    const tick = () => {
+      const now = Date.now();
+      const delay = now - expected;
+      /*
+       * ★遅れ = その間スレッドが空かなかった時間。
+       *   タブが hidden だと Chrome がタイマーを間引くので、その分は数えない
+       *   (間引きは正常動作であって「止まった」ではない)。
+       */
+      const hidden = typeof document !== 'undefined' && document.hidden;
+      if (!hidden && delay >= LONG_TASK_MS) {
         noteBlocker(mainThreadBlocker, {
-          name,
-          ms,
-          atMs: Date.now(),
+          name: _currentSection || '(拡張の外)',
+          ms: delay,
+          atMs: now,
           sinceVisibleMs: sinceVisible()
         });
       }
-    });
-    // buffered:true で、この行より前に起きた長時間タスクも拾う(起動直後の黒が本題のため)。
-    obs.observe({ type: 'longtask', buffered: true });
+      expected = Date.now() + HEARTBEAT_MS;
+      setTimeout(tick, HEARTBEAT_MS);
+    };
+    setTimeout(tick, HEARTBEAT_MS);
   }
 } catch {
   /* 観測できない環境では黙って何もしない(画面は止めない) */
