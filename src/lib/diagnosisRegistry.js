@@ -124,7 +124,19 @@ export const DIAGNOSIS_REGISTRY = Object.freeze([
   reg('dedupe-seed', '重複の見分け', 'record', 1, false),
   reg('host-move', '記録役の引っ越し', 'ingest', 1, false),
   reg('northstar-render', '公式値の描画', 'northstar', 1, false),
-  reg('mirror-publish', '鏡の書き出し', 'render', 1, false)
+  reg('mirror-publish', '鏡の書き出し', 'render', 1, false),
+  /*
+   * ★v0.1.1403 第1弾「無音で死ぬ」故障(silentFailureCells.js が判定の正本)。
+   *   会議3席が独立に一致した最優先群=**既に測れているのに画面が無言**だったもの。
+   *   例: customSoundDiag.dbAvailable=false は '-' としか出ておらず、
+   *   カスタム音源が全滅しても誰も気づけなかった。
+   *   weight=1・mandatory=false: 使っていない機能で達成率を下げないため。
+   */
+  reg('custom-sound-db', 'マイ効果音の保管庫', 'render', 1, false),
+  reg('voice-start-fail', '読み上げのON失敗', 'venue', 1, false),
+  reg('voice-audio-blocked', '音の再生ブロック', 'venue', 1, false),
+  reg('gift-sound-fail', 'ギフト音の失敗', 'northstar', 1, false),
+  reg('comment-revert', '送信の取り消し', 'render', 1, false)
 ]);
 
 /** id → 観点 の索引(集計で O(1) 参照)。 */

@@ -1989,6 +1989,13 @@ function renderAll({ extrasAgeMs, lvList, summaries, fastDiag, popupDiag, backfi
     // ★v0.1.1395 追加分(特化セル5種の入力)
     commentPostDiag: _extrasCache?.commentPostDiag ?? null,
     instantPushDiag: _extrasCache?.instantPushDiag ?? null,
+    /*
+     * ★v0.1.1403「無音で死ぬ」セルの入力(silentFailureCells.js)。
+     *   ★どれも extras(12秒間引き)で **既に読んでいる** 値なので storage 読み取りは増えない。
+     *   ★ここへ足し忘れると registry・純関数・test を作っても **画面に出ない**
+     *     (v0.1.1390 で実際に4セルが出なかった穴。ゲートが赤くなるので気づける)。
+     */
+    customSoundDiag,
     mainThreadBlocker: _popupSnapForCells?.mainThreadBlocker ?? null,
     liveElapsedMs: _liveElapsedMs,
     // ★v0.1.1396: 会場が「いま」開いているかは、古い venueSeatsDiag ではなく

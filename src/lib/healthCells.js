@@ -9,6 +9,8 @@ import { buildGiftAdPipeline } from './giftAdPipelineCensus.js';
 import { buildVenueModeCensus } from './venueModeCensus.js';
 // ★v0.1.1400: 速報に埋もれていた判定のセル化(在庫の棚卸し・14セル)。
 import { buildBuriedCells } from './buriedInstrumentCells.js';
+// ★v0.1.1403: 無音で死ぬ故障(カスタム音源全滅・読み上げON失敗など)を画面へ。
+import { buildSilentFailureCells } from './silentFailureCells.js';
 
 /**
  * healthCells.js — status ファーストビューの「健全度セル」を作る純関数(v0.1.843)。
@@ -780,6 +782,15 @@ export function buildHealthCells(data) {
   try {
     for (const c of buildBuriedCells(data)) cells.push(c);
   } catch { /* 掘り起こしの失敗でパネル全体を壊さない */ }
+
+  /*
+   * ★v0.1.1403: 【無音で死ぬ】故障(判定は silentFailureCells.js が正本)。
+   *   既に測れているのに画面が無言だったものだけを扱う。
+   *   ここは観測が無くても ⚪「—」で必ず出す(掟5: 異常時ほど消えるのを防ぐ)。
+   */
+  try {
+    for (const c of buildSilentFailureCells(data)) cells.push(c);
+  } catch { /* 同上: 1系統の失敗でパネル全体を壊さない */ }
 
   return cells;
 }

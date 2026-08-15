@@ -17,13 +17,43 @@ import { buildHealthCells } from './healthCells.js';
 import { groupHealthCells, HEALTH_CELL_GROUPS } from './healthCellGroups.js';
 import { DIAGNOSIS_REGISTRY } from './diagnosisRegistry.js';
 
+/**
+ * ★v0.1.1403: 「最大入力でも na のまま」＝ fixture が実フィールド名を
+ *   与えられていないセル(＝判定ロジックが一度も走っていない)。
+ *
+ * ★これは **借金の可視化** であって、正常の宣言ではない。
+ *   v1403 で capture-rate / match の2件を返済した(fixture が
+ *   `savedCount`/`officialCount` という存在しない名前を与えていた)。
+ *   残りは実フィールド名を1件ずつ突き止めて減らす。**増やさないこと**。
+ *
+ * ★なぜ即座に全部直さないか: 各セルの実フィールド名を製品コードから
+ *   確定する作業が要り(推測で書くと [[check-what-the-number-counts]] を踏む)、
+ *   第1弾の範囲を超えるため。数で固定して次セッションへ引き継ぐ。
+ */
+const KNOWN_NA_DEBT = new Set([
+  'uid-rate', 'ingest', 'backfill', 'backfill-bottleneck', 'avatar', 'paint',
+  'diag-stability', 'console', 'storage', 'ndgr-chats', 'voice-coverage',
+  'venue-broadcaster', 'lane-count', 'preview-gen-sync'
+]);
+
 /** 全セルが出るように、あらゆる入力を「異常あり」で与える。 */
 function maximalInput() {
   return {
     nowMs: Date.now(),
+    /*
+     * ★v0.1.1403 修正: 従来の fixture は `savedCount` / `officialCount` という
+     *   **存在しないフィールド名**を与えていた(実名は recordedCount /
+     *   officialCommentCount = healthCells.js:522-523)。
+     *   そのためコア中のコアである capture-rate・match が
+     *   「最大入力」でも na のままだった＝**判定ロジックが一度も走っていなかった**。
+     *   旧ゲートは「出力に現れるか」しか見ないので気づけなかった
+     *   ([[check-what-the-number-counts-2026-08-09]] の型)。
+     */
     livesData: [{
-      recording: true, liveId: 'lv1', savedCount: 10, officialCount: 100,
+      recording: true, liveId: 'lv1',
+      recordedCount: 10, officialCommentCount: 100, officialRatePct: 10,
       paintCount: 999, commentCount: 30, repaintReasons: { storage_changed: 500 },
+      lastPaintMs: 1200, tabCount: 2,
       ended: true, backfillDone: false
     }],
     fastDiag: { content: {
@@ -67,9 +97,13 @@ function maximalInput() {
       northStarRenderProbe: { refreshAllStarted: 3, refreshAllCompleted: 2 },
       northStarMirrorPublishRace: { publishCalls: 3, flushSkipped: 1 }
     } },
-    voiceDiag: { enabled: true, spokenTotal: 10, lastE2eMs: 6000, staleDropTotal: 2 },
+    voiceDiag: {
+      enabled: true, spokenTotal: 10, lastE2eMs: 6000, staleDropTotal: 2,
+      // ★v0.1.1403: ON失敗と再生ブロック(無音で死ぬ系)
+      enableFailTotal: 2, lastEnableFailReason: 'refused', audioBlockedTotal: 3
+    },
     instantPushDiag: { lastGapMs: 20, avgGapMs: 30 },
-    commentPostDiag: { attempts: 4, okCount: 1, failCount: 0, timeoutCount: 3 },
+    commentPostDiag: { attempts: 4, okCount: 1, failCount: 0, timeoutCount: 3, revertCount: 1 },
     venueSeatsDiag: {
       enabled: true, lastUpdateAt: Date.now() - 1000, participantCount: 20, seatsShown: 20,
       perRow: 12, venueMaxRows: 30, seatAreaWidth: 958, capReason: 'participant',
@@ -87,7 +121,9 @@ function maximalInput() {
       detected: 8, played: 5, sound: 5,
       giftDetected: 8, adDetected: 2, giftThrown: 8, giftSoundPlayed: 5,
       adThrown: 2, adSoundPlayed: 2, soundEnabled: true,
-      lastEventAt: Date.now() - 1000
+      lastEventAt: Date.now() - 1000,
+      // ★v0.1.1403: 鳴らそうとして失敗した件数(防御=coalesced/guarded は異常にしない)
+      giftSoundError: 1, giftSoundNoPath: 2
     },
     milestoneEffectDiag: {
       detected: 3, played: 3, sound: 3,
@@ -105,7 +141,13 @@ function maximalInput() {
     northStarMirror: { capturedAt: Date.now() },
     previewRenderAck: { gen: 5, ackGen: 4 },
     backfillLiveMetric: { stalled: true, remaining: 100 },
-    mainThreadBlocker: { count: 3, worstMs: 900, worstName: 'grid-rebuild' }
+    mainThreadBlocker: { count: 3, worstMs: 900, worstName: 'grid-rebuild' },
+    // ★v0.1.1403「無音で死ぬ」セルの入力(silentFailureCells.js)。
+    //   ここを足し忘れると registry に登録しても出力されず、上のゲートが赤くなる。
+    customSoundDiag: {
+      dbAvailable: true, assignedKeyCount: 0, totalKeyCount: 38,
+      localBundledCount: 90, blobCount: 0, rev: 0
+    }
   };
 }
 
@@ -119,6 +161,40 @@ describe('計器の網羅ゲート(登録=表示)', () => {
       .filter((id) => !producedIds.has(id));
     // 出ないセルがあれば、それは入力の配線漏れか、生成コードの欠落。
     expect(never, `出力に現れないセル: ${never.join(', ')}`).toEqual([]);
+  });
+
+  it('★全セルが「入力を与えれば na を脱する」(存在するだけの緑を却下)', () => {
+    /*
+     * ★v0.1.1403: 上の検査だけでは **足りない** ことが実際に判明した。
+     *
+     *   v1401 の掟5「観測が無くても ⚪『—』で必ず出す」に従うセルは、
+     *   **入力が配線されていなくても出力に現れる**(na で出る)。
+     *   よって「出力に現れるか」だけを見る上の検査は、
+     *   silentFailureCells 系に対しては **恒真** になる。
+     *   実際に fixture から customSoundDiag を外しても 6件緑のままだった
+     *   ＝ v0.1.1390 の「registry も純関数も test もあるのに画面に出ない」を
+     *   検出できない。**ゲートが守っているつもりで守っていない**。
+     *
+     *   maximalInput は全項目を異常値で与えているので、
+     *   **na のままのセルがあれば入力の配線漏れ**と断定できる。
+     */
+    const stillNa = cells
+      .filter((c) => c.level === 'na')
+      .map((c) => c.id)
+      .filter((id) => !KNOWN_NA_DEBT.has(id));
+    expect(
+      stillNa,
+      `入力を与えたのに na のまま(=入力の配線漏れの疑い): ${stillNa.join(', ')}`
+    ).toEqual([]);
+  });
+
+  it('★借金リストが増えていない(減らすのは歓迎・増やすのは禁止)', () => {
+    /*
+     * 借金を「隠す」のではなく **数で固定** する。
+     * 新しいセルが na のまま紛れ込むのを防ぐ
+     * ([[fail-open-recurs-under-new-names-2026-08-12]]: 個別に塞ぐと別名で再発する)。
+     */
+    expect(KNOWN_NA_DEBT.size).toBeLessThanOrEqual(14);
   });
 
   it('★出たセルは1枚も失われず、必ずどれかの枠に入る', () => {
