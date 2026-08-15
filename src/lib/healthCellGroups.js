@@ -84,6 +84,16 @@ export const HEALTH_CELL_GROUPS = Object.freeze([
     hint: 'イベント順位・スコア・番組累計pt（イベント無しの配信では出ません）',
     cellIds: Object.freeze(['ns-escore', 'ns-erank', 'ns-prog-pt'])
   }),
+  /*
+   * ★v0.1.1403: 読み上げを【始まらない】と【ずれる】で分ける。
+   *   打ち手が正反対なので同じ枠に置くと探せない
+   *   (始まらない=接続/権限の問題・ずれる=速度と量の問題)。
+   */
+  Object.freeze({
+    id: 'voice-start', label: '読み上げ（始まらない・音が出ない）', order: 8.8,
+    hint: '★声が出ないときはここ。ONにできない理由と、音がブロックされていないかを見ます',
+    cellIds: Object.freeze(['voice-start-fail', 'voice-audio-blocked'])
+  }),
   Object.freeze({
     id: 'voice', label: '読み上げ（声と吹き出しの一致）', order: 9,
     hint: '★声と画面表示が同じタイミングか。個別の速さでなく「揃っているか」を見ます',
@@ -97,12 +107,12 @@ export const HEALTH_CELL_GROUPS = Object.freeze([
   Object.freeze({
     id: 'post', label: 'コメント送信', order: 10,
     hint: '自分が送ったコメントが届いて画面に出たか',
-    cellIds: Object.freeze(['comment-post'])
+    cellIds: Object.freeze(['comment-post', 'comment-revert'])
   }),
   Object.freeze({
     id: 'effect', label: '演出・効果音', order: 11,
-    hint: '鳴るはずのものが鳴っているか',
-    cellIds: Object.freeze(['gift-effect', 'milestone-effect'])
+    hint: '鳴るはずのものが鳴っているか。鳴らないときは「保管庫」と「失敗」を見ます',
+    cellIds: Object.freeze(['gift-effect', 'milestone-effect', 'custom-sound-db', 'gift-sound-fail'])
   }),
   Object.freeze({
     id: 'speed', label: '重さ・黒画面', order: 12,
