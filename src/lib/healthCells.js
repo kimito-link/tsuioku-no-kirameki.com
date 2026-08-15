@@ -17,6 +17,10 @@ import { buildBuildAgeCell } from './buildAgeCell.js';
 // ★v0.1.1406: 既存プローブを打ち手が変わる単位に割る(レーン/演出・送信)。
 import { buildLaneDetailCells } from './laneDetailCells.js';
 import { buildEffectDetailCells } from './effectDetailCells.js';
+// ★v0.1.1407: 公式値の取得実績 / 読み上げの内訳 / 外部APIの生死。
+import { buildNorthStarDetailCells } from './northStarDetailCells.js';
+import { buildVoiceDetailCells } from './voiceDetailCells.js';
+import { buildExternalFetchCells } from './externalFetchCells.js';
 
 /**
  * healthCells.js — status ファーストビューの「健全度セル」を作る純関数(v0.1.843)。
@@ -829,6 +833,20 @@ export function buildHealthCells(data) {
   } catch { /* 同上 */ }
   try {
     for (const c of buildEffectDetailCells(data)) cells.push(c);
+  } catch { /* 同上 */ }
+
+  /*
+   * ★v0.1.1407: 公式値の実績 / 読み上げの内訳 / 外部APIの生死。
+   *   ★読み上げは「使っていなければ出さない」(voiceDetailCells が空配列を返す)。
+   */
+  try {
+    for (const c of buildNorthStarDetailCells(data)) cells.push(c);
+  } catch { /* 同上 */ }
+  try {
+    for (const c of buildVoiceDetailCells(data)) cells.push(c);
+  } catch { /* 同上 */ }
+  try {
+    for (const c of buildExternalFetchCells(data)) cells.push(c);
   } catch { /* 同上 */ }
 
   return cells;

@@ -4704,6 +4704,16 @@
       ]
     },
     {
+      "file": "src/lib/externalFetchCells.js",
+      "featureCount": 1,
+      "features": [
+        "status"
+      ],
+      "labels": [
+        "状態速報ページ"
+      ]
+    },
+    {
       "file": "src/lib/externalLinksSectionHtml.js",
       "featureCount": 1,
       "features": [
@@ -5991,6 +6001,16 @@
       ],
       "labels": [
         "ポップアップ(応援レーン)"
+      ]
+    },
+    {
+      "file": "src/lib/northStarDetailCells.js",
+      "featureCount": 1,
+      "features": [
+        "status"
+      ],
+      "labels": [
+        "状態速報ページ"
       ]
     },
     {
@@ -7591,6 +7611,16 @@
       ],
       "labels": [
         "記録エンジン(watchページ常駐)"
+      ]
+    },
+    {
+      "file": "src/lib/voiceDetailCells.js",
+      "featureCount": 1,
+      "features": [
+        "status"
+      ],
+      "labels": [
+        "状態速報ページ"
       ]
     },
     {

@@ -511,6 +511,7 @@
 | `src/lib/exportDownloadFilename.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/exportStageProfiler.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/exportWaitNarration.js` | 1 | ポップアップ(応援レーン) |
+| `src/lib/externalFetchCells.js` | 1 | 状態速報ページ |
 | `src/lib/externalLinksSectionHtml.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/formatDateTime.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/formatGiftSubAppHistory.js` | 1 | ポップアップ(応援レーン) |
@@ -640,6 +641,7 @@
 | `src/lib/noActiveWatchDecision.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/northStarAcquisitionGauge.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/northStarCharaTrioConfig.js` | 1 | ポップアップ(応援レーン) |
+| `src/lib/northStarDetailCells.js` | 1 | 状態速報ページ |
 | `src/lib/northStarFallbackHtml.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/northStarLaneGadgetChara.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/northStarLaneVisibility.js` | 1 | ポップアップ(応援レーン) |
@@ -800,6 +802,7 @@
 | `src/lib/viewerSelfLaneAggregate.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/voiceBubbleRealtimeParity.js` | 1 | 状態速報ページ |
 | `src/lib/voiceComment.js` | 1 | 記録エンジン(watchページ常駐) |
+| `src/lib/voiceDetailCells.js` | 1 | 状態速報ページ |
 | `src/lib/voiceReachabilityProbe.js` | 1 | 状態速報ページ |
 | `src/lib/watchAudienceCopy.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/watchConcurrentEstimateUiCopy.js` | 1 | ポップアップ(応援レーン) |

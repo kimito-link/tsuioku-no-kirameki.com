@@ -63,12 +63,23 @@ function maximalInput() {
       hostMoveDiag: { moveCount: 3 },
       giftDiagnostics: {
         '北極星レーン': {
-        '1_貢献度ランキング': { state: 'ok', apiRows: 5 },
+        // ★v0.1.1407: foundCountLifetime = 「一度でも取れたか」(ns-ever-got の入力)
+        '1_貢献度ランキング': { state: 'ok', apiRows: 5, foundCountLifetime: 3 },
         '+α_広告ランキング': { state: 'ok', apiRows: 5 },
-        '2_ギフト履歴': { state: 'iframe_unrendered', count: 0 },
-        '3_イベント累計スコア': { state: 'ok', value: 10 },
+        '2_ギフト履歴': { state: 'iframe_unrendered', count: 0, foundCountLifetime: 0 },
+        '3_イベント累計スコア': {
+          state: 'ok', value: 10, bannerFoundCountLifetime: 2, balloonFoundCountLifetime: 0
+        },
         '4_番組累計ポイント': { state: 'ok', value: 100 },
         '5_イベント現在順位': { state: 'ok', value: 3 }
+        },
+        // ★v0.1.1407: 外部API(貢献度/広告)の生死セルの入力
+        externalFetchProbe: {
+          intervalTicks: 20, leaderRan: 15, leaderSkipped: 5,
+          kokenSent: 10, kokenLastOk: true, kokenLastStatus: 200, kokenLastRows: 5,
+          kokenLastError: '', kokenLastAgoMs: 4000,
+          nicoadSent: 8, nicoadLastOk: false, nicoadLastStatus: 500,
+          nicoadLastRows: 0, nicoadLastError: 'server error'
         },
         // ★実際の速報と同じ入れ子(giftDiagnostics の中)。ここを間違えると出ない。
         commentObservability: {
@@ -110,7 +121,12 @@ function maximalInput() {
     voiceDiag: {
       enabled: true, spokenTotal: 10, lastE2eMs: 6000, staleDropTotal: 2,
       // ★v0.1.1403: ON失敗と再生ブロック(無音で死ぬ系)
-      enableFailTotal: 2, lastEnableFailReason: 'refused', audioBlockedTotal: 3
+      enableFailTotal: 2, lastEnableFailReason: 'refused', audioBlockedTotal: 3,
+      // ★v0.1.1407: 読み上げの内訳セルの入力
+      synthFailReasons: { timeout: 3, http: 1 }, synthNullTotal: 2, synthNullNearTimeout: 1,
+      mergeTotal: 12, rateClampTotal: 4, sustainedBoostTotal: 2,
+      dropCountGateTotal: 6, dropHeadStaleTotal: 1, dropSweepStaleTotal: 1,
+      queueNow: 9, queueMax: 10, effectiveQueueMax: 10, playbackTimeoutTotal: 6
     },
     // ★v0.1.1406: 即時表示の取りこぼし / 送信から表示まで / 再試行 の入力
     instantPushDiag: { lastGapMs: 20, avgGapMs: 30, sentCount: 10, rejectedCount: 6 },
