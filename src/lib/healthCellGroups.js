@@ -66,7 +66,8 @@ export const HEALTH_CELL_GROUPS = Object.freeze([
     id: 'venue', label: '会場モード', order: 5,
     hint: '★会場は①ポップアップが書いた情報を映します。席・一致・鮮度をここで見ます',
     cellIds: Object.freeze([
-      'venue-mode', 'venue-seats', 'venue-seats-visible', 'venue-parity', 'venue-broadcaster'
+      // ★v0.1.1405: 「鏡が古い」の原因を名指しするセルを鮮度の直後に置く。
+      'venue-mode', 'venue-intake', 'venue-seats', 'venue-seats-visible', 'venue-parity', 'venue-broadcaster'
     ])
   }),
   Object.freeze({

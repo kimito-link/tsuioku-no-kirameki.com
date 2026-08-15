@@ -145,7 +145,13 @@ export const DIAGNOSIS_REGISTRY = Object.freeze([
   reg('mt-owner', '止めている当人', 'render', 1, false),
   reg('mt-total', '止まった合計時間', 'render', 1, false),
   reg('mt-resume', 'スリープ明けの詰まり', 'render', 1, false),
-  reg('build-age', 'このビルドの新しさ', 'render', 1, false)
+  reg('build-age', 'このビルドの新しさ', 'render', 1, false),
+  /*
+   * ★v0.1.1405: 会場が鏡を受け取れているか。
+   *   (a)通知が来ない /(b)別配信の鏡を見ている /(c)関所で全却下 を名指しする。
+   *   未解決の「会場一致が鏡stale(656s)で固定」を肯定/否定できる唯一の計器。
+   */
+  reg('venue-intake', '会場の鏡うけとり', 'venue', 1, false)
 ]);
 
 /** id → 観点 の索引(集計で O(1) 参照)。 */

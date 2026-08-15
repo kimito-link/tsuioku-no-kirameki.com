@@ -112,6 +112,12 @@ function maximalInput() {
       laneParity: { verdict: '✅', unexplained: 0, dom: { ghost: 0 } },
       yukkuriNamedCensus: {
         checked: 5, yukkuriNamed: 2, yukkuriNamedAnonymousStyle: 0, yukkuriNamedNoUid: 1
+      },
+      // ★v0.1.1405: 会場の鏡うけとり(b=別配信の鏡を見ている の再現)
+      mirrorIntake: {
+        changedEvents: 5, keyMatched: 0, keyMissed: 3, accepted: 0, rejectedByGate: 0,
+        lastMissedKeys: ['nls_lane_mirror_lv999'], lastExpectedKey: 'nls_lane_mirror_lv1',
+        lastAcceptedAt: 0, lastRejectReason: ''
       }
     },
     venueOpen: true, venueMirrorAgeMs: 5000,

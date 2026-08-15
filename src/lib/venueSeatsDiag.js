@@ -35,6 +35,9 @@
  *   yukkuriNamedCensus: { line: string, checked: number, yukkuriNamed: number, outOfRangeDigits: number,
  *     lastSample: null | { uid: string, name: string, digits: number } }|null,
  *   mirrorIntakeLine: string,
+ *   mirrorIntake: { changedEvents:number, keyMatched:number, keyMissed:number, accepted:number,
+ *     rejectedByGate:number, lastMissedKeys:string[], lastExpectedKey:string,
+ *     lastAcceptedAt:number, lastRejectReason:string }|null,
  *   avatarProbe: {usericonSucceeded:number,usericonFailed:number,failedTimeout:number,failedError:number,retriedTotal:number,lastFailAgoMs:number}|null
  * }} VenueSeatsDiagState
  *
@@ -77,6 +80,13 @@ export function makeInitialVenueSeatsDiag() {
     yukkuriNamedCensus: /** @type {VenueSeatsDiagState['yukkuriNamedCensus']} */ (null),
     // ★v0.1.1317: 会場が鏡を受け取れているかの1行(未観測は空文字=状態速報に出ない)。
     mirrorIntakeLine: '',
+    /*
+     * ★v0.1.1405: 判定の【材料】(行だけでは画面のセルが作れない)。
+     *   ★この関数は「フィールドを個別列挙して作り直す」型なので、
+     *     ここに足さないと venueBar が載せても **黙って落ちる**
+     *     ([[venue-mirror-is-the-primary-path-2026-08-01]] を5回踏んだ箇所)。
+     */
+    mirrorIntake: /** @type {VenueSeatsDiagState['mirrorIntake']} */ (null),
     // ★v0.1.1348: 会場のアイコン実績(初期は未計測=null)。
     avatarProbe: /** @type {VenueSeatsDiagState['avatarProbe']} */ (null)
   };
@@ -273,6 +283,23 @@ export function buildVenueSeatsDiagSnapshot(diag, nowMs) {
      *   空文字なら状態速報側で行ごと出さない=普段の速報を汚さない。
      */
     mirrorIntakeLine: String(d.mirrorIntakeLine || ''),
+    // ★v0.1.1405: 判定の材料を素通しする(数値/文字列のみ・構造は固定)。
+    mirrorIntake: (() => {
+      const mi = /** @type {any} */ (d.mirrorIntake);
+      if (!mi || typeof mi !== 'object') return null;
+      const num = (/** @type {unknown} */ x) => (Number.isFinite(Number(x)) ? Number(x) : 0);
+      return {
+        changedEvents: num(mi.changedEvents),
+        keyMatched: num(mi.keyMatched),
+        keyMissed: num(mi.keyMissed),
+        accepted: num(mi.accepted),
+        rejectedByGate: num(mi.rejectedByGate),
+        lastMissedKeys: Array.isArray(mi.lastMissedKeys) ? mi.lastMissedKeys.slice(0, 3).map(String) : [],
+        lastExpectedKey: String(mi.lastExpectedKey || ''),
+        lastAcceptedAt: num(mi.lastAcceptedAt),
+        lastRejectReason: String(mi.lastRejectReason || '')
+      };
+    })(),
     /*
      * ★v0.1.1348: 会場のアイコン実績(6値だけ)を通す。
      *
