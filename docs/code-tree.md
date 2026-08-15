@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 4 / 779 件
+## ⚠️ 役割コメントが無いソース 4 / 781 件
 - `src/lib/laneDomSelfMeasure.js`
 - `src/lib/reportPreviewPublish.js`
 - `src/lib/venueLaneBuckets.js`
@@ -700,7 +700,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (1698)
+- 📁 **src/** (1702)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -992,7 +992,7 @@
         - `logo_funlink_white_RGB_maru_black.png`
       - `logo_guide_funlink_ol.pdf`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1456)
+  - 📁 **lib/** (1460)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -1096,6 +1096,8 @@
     - `bgmPhaseDiag.js` — BGMディレクター(bgmDirector.js)+フェーズディレクター(phaseDirector.js)の観測値を組み立てる
     - `bgmPhaseDiag.test.js`
     - `bgmPhaseDiagKey.js` — BGMディレクター(bgmDirector.js)+フェーズディレクター(phaseDirector.js・Phase C)の
+    - `blackScreenOwnerCells.js` — 黒画面の【止めている当人】をセルにする(純関数)。
+    - `blackScreenOwnerCells.test.js`
     - `blobDownload.js` — Blob を指定ファイル名で保存する。
     - `blobDownload.test.js`
     - `broadcastContext.js` — v0.1.793: 「この配信の配信者(broadcaster)情報」を 1 か所で型定義し、storage キー・
@@ -1139,6 +1141,8 @@
     - `broadcasterUidTracker.test.js`
     - `broadcasterUserId.js` — 配信者 userId を embedded-data / DOM から純粋関数で抽出する。
     - `broadcasterUserId.test.js`
+    - `buildAgeCell.js` — いま動いているビルドが【いつのものか】を出す(純関数)。
+    - `buildAgeCell.test.js`
     - `buildNorthStarAdRankingStatsHtml.js` — 北極星「広告ランキング」レーン用: watch の番組統計と一覧の「貢」の内訳を短い HTML にする。
     - `buildNorthStarAdRankingStatsHtml.test.js`
     - `buildWatchMetaCardAudienceViewModel.js` — Watch メタカード「観客」ブロック用 ViewModel（DOM 非依存）。

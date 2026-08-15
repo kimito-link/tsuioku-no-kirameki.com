@@ -770,7 +770,7 @@
   - `src/lib/statusTrendKey.js`
   - `src/extension/status-entry.js`
   - `src/lib/statusActionAdvisor.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 165</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 167</summary>
 
 - `app/app.js` — スマホ閲覧用 status Web 版。
 - `app/live-view.js` — global NL_BUILD_ID
@@ -810,6 +810,8 @@
 - `src/lib/bandScale.js` — 「大きく見せる枠(PICK UP 帯)」の倍率(純関数)。
 - `src/lib/bandScaleBoot.js` — PICK UP 帯の倍率を起動時に適用する(副作用モジュール)。
 - `src/lib/bgmDirector.js` — council/pachinko-ultimate-SYNTHESIS.md §5(BGM設計)+§6 Phase C の実装。
+- `src/lib/blackScreenOwnerCells.js` — 黒画面の【止めている当人】をセルにする(純関数)。
+- `src/lib/buildAgeCell.js` — いま動いているビルドが【いつのものか】を出す(純関数)。
 - `src/lib/buildWatchMetaCardAudienceViewModel.js` — Watch メタカード「観客」ブロック用 ViewModel（DOM 非依存）。
 - `src/lib/bundleBuildId.js` — dist バンドル本文から NL_BUILD_ID(JST, MMDD-HHmmss)の焼き込み値を
 - `src/lib/buriedInstrumentCells.js` — 速報の文章に埋もれていた判定を【セル】として掘り起こす(純関数)。
@@ -942,7 +944,7 @@
 
 ## 🧬 修正系譜マップ(この系統のバグを過去にどう直したか)
 
-> changelog 全 733 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
+> changelog 全 734 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
 
 ### 💾 記録件数 (97版)
 - `v0.1.1403` 2026-08-15 — 音が鳴らない・読み上げが始まらない理由を診断に追加
@@ -2408,7 +2410,8 @@
 - `v0.1.840` 2026-06-20 — 機能逆引き地図を全ファイル網羅に
 - `v0.1.835` 2026-06-20 — 自己検証ゲートを追加(版同期+診断文言)
 
-### その他 (84版)
+### その他 (85版)
+- `v0.1.1404` 2026-08-15 — 黒画面を止めている当人と、ビルドの古さを表示
 - `v0.1.1393` 2026-08-14 — 公式の「なふだを表示」をポップアップから切り替えられるようにしました
 - `v0.1.1373` 2026-08-12 — サイドパネルが黒いまま待たされる時間を短縮
 - `v0.1.1369` 2026-08-12 — サイドパネルを開いた瞬間に黒くなる問題の根治(OSがダーク設定のとき)

@@ -11,6 +11,9 @@ import { buildVenueModeCensus } from './venueModeCensus.js';
 import { buildBuriedCells } from './buriedInstrumentCells.js';
 // ★v0.1.1403: 無音で死ぬ故障(カスタム音源全滅・読み上げON失敗など)を画面へ。
 import { buildSilentFailureCells } from './silentFailureCells.js';
+// ★v0.1.1404: 黒画面の当人(累計/合計/スリープ明け)とビルドの古さ。
+import { buildBlackScreenOwnerCells } from './blackScreenOwnerCells.js';
+import { buildBuildAgeCell } from './buildAgeCell.js';
 
 /**
  * healthCells.js — status ファーストビューの「健全度セル」を作る純関数(v0.1.843)。
@@ -465,7 +468,8 @@ function buildLaneHealthCells(laneDiag) {
  * 健全度セル配列を作る。
  * @param {{ livesData?: any[], fastDiag?: any, popupDiag?: any, voiceDiag?: any, venueSeatsDiag?: any, laneDiag?: any, giftEffectDiag?: any, milestoneEffectDiag?: any, previewRenderAck?: any, laneMirror?: any, backfillLiveMetric?: any, nowMs?: number,
  *   instantPushDiag?: any, commentPostDiag?: any, mainThreadBlocker?: any, liveElapsedMs?: number,
- *   venueOpen?: boolean, venueMirrorAgeMs?: number, venueTiers?: any, venueHasGiftData?: boolean }} data
+ *   venueOpen?: boolean, venueMirrorAgeMs?: number, venueTiers?: any, venueHasGiftData?: boolean,
+ *   customSoundDiag?: any, buildId?: unknown, appVersion?: unknown }} data
  *   ★v0.1.1390 で追加した後半7つは、ユーザー要望の特化セル5種の入力
  *   (読み上げ⇄吹き出し / コメント送信 / 会場モードの鮮度 / ギフト広告の通り道 / メインスレッド)。
  * @returns {HealthCell[]}
@@ -791,6 +795,26 @@ export function buildHealthCells(data) {
   try {
     for (const c of buildSilentFailureCells(data)) cells.push(c);
   } catch { /* 同上: 1系統の失敗でパネル全体を壊さない */ }
+
+  /*
+   * ★v0.1.1404: 黒画面の【当人】(blackScreenOwnerCells.js が正本)。
+   *   既存 main-thread は「最悪の1件」しか出さないので、
+   *   累計・合計・スリープ明けを別セルにして打ち手を分ける。
+   */
+  try {
+    for (const c of buildBlackScreenOwnerCells(data)) cells.push(c);
+  } catch { /* 同上 */ }
+
+  /*
+   * ★v0.1.1404: いま動いているビルドの古さ。
+   *   2026-08-14 に「7版届いていなかった」を8日間見逃した反省
+   *   (速報が自分の古さを言えば1往復で終わっていた)。
+   */
+  try {
+    cells.push(buildBuildAgeCell({
+      buildId: data?.buildId, version: data?.appVersion, nowMs: data?.nowMs || Date.now()
+    }));
+  } catch { /* 同上 */ }
 
   return cells;
 }

@@ -403,6 +403,7 @@
 | `src/lib/backgroundWatchTab.js` | 1 | 状態速報ページ |
 | `src/lib/bandScale.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/bandScaleBoot.js` | 1 | ポップアップ(応援レーン) |
+| `src/lib/blackScreenOwnerCells.js` | 1 | 状態速報ページ |
 | `src/lib/blobDownload.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/broadcastCrossCompare.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/broadcastDurationLabel.js` | 1 | ポップアップ(応援レーン) |
@@ -418,6 +419,7 @@
 | `src/lib/broadcastSessionSummaryDb.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/broadcastSessionSummaryFlush.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/broadcastWaveformFingerprint.js` | 1 | ポップアップ(応援レーン) |
+| `src/lib/buildAgeCell.js` | 1 | 状態速報ページ |
 | `src/lib/buildNorthStarAdRankingStatsHtml.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/buildWatchMetaCardAudienceViewModel.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/buriedInstrumentCells.js` | 1 | 状態速報ページ |

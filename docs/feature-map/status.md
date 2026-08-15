@@ -27,10 +27,12 @@ graph LR
   n_status --> n_src_lib_backgroundWatchTab_js["lib/backgroundWatchTab.js"]
   n_status --> n_src_lib_bgmPhaseDiag_js["lib/bgmPhaseDiag.js"]:::shared
   n_status --> n_src_lib_bgmPhaseDiagKey_js["lib/bgmPhaseDiagKey.js"]:::shared
+  n_status --> n_src_lib_blackScreenOwnerCells_js["lib/blackScreenOwnerCells.js"]
   n_status --> n_src_lib_broadcastScore_js["lib/broadcastScore.js"]:::shared
   n_status --> n_src_lib_broadcastScorePanelViewModel_js["lib/broadcastScorePanelViewModel.js"]:::shared
   n_status --> n_src_lib_broadcasterReputationKeywords_js["lib/broadcasterReputationKeywords.js"]
   n_status --> n_src_lib_broadcasterReputationView_js["lib/broadcasterReputationView.js"]
+  n_status --> n_src_lib_buildAgeCell_js["lib/buildAgeCell.js"]
   n_status --> n_src_lib_buriedInstrumentCells_js["lib/buriedInstrumentCells.js"]
   n_status --> n_src_lib_channelSwitchDiag_js["lib/channelSwitchDiag.js"]:::shared
   n_status --> n_src_lib_channelSwitchDiagKey_js["lib/channelSwitchDiagKey.js"]:::shared
@@ -51,9 +53,7 @@ graph LR
   n_status --> n_src_lib_deriveAvatarUrlFromUid_js["lib/deriveAvatarUrlFromUid.js"]:::shared
   n_status --> n_src_lib_diagSchemaCopy_js["lib/diagSchemaCopy.js"]:::shared
   n_status --> n_src_lib_diagnosisRegistry_js["lib/diagnosisRegistry.js"]
-  n_status --> n_src_lib_diagnosticsTrust_js["lib/diagnosticsTrust.js"]
-  n_status --> n_src_lib_effectSoundPlayer_js["lib/effectSoundPlayer.js"]:::shared
   classDef shared fill:#eee,stroke:#999,color:#666;
 ```
 
-> ほか 107 ファイル省略（全件は storage-bus.md / metafile 参照）。
+> ほか 109 ファイル省略（全件は storage-bus.md / metafile 参照）。
