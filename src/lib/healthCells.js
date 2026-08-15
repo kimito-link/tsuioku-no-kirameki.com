@@ -14,6 +14,9 @@ import { buildSilentFailureCells } from './silentFailureCells.js';
 // ★v0.1.1404: 黒画面の当人(累計/合計/スリープ明け)とビルドの古さ。
 import { buildBlackScreenOwnerCells } from './blackScreenOwnerCells.js';
 import { buildBuildAgeCell } from './buildAgeCell.js';
+// ★v0.1.1406: 既存プローブを打ち手が変わる単位に割る(レーン/演出・送信)。
+import { buildLaneDetailCells } from './laneDetailCells.js';
+import { buildEffectDetailCells } from './effectDetailCells.js';
 
 /**
  * healthCells.js — status ファーストビューの「健全度セル」を作る純関数(v0.1.843)。
@@ -814,6 +817,18 @@ export function buildHealthCells(data) {
     cells.push(buildBuildAgeCell({
       buildId: data?.buildId, version: data?.appVersion, nowMs: data?.nowMs || Date.now()
     }));
+  } catch { /* 同上 */ }
+
+  /*
+   * ★v0.1.1406: 既存プローブの分解(laneDetailCells / effectDetailCells が正本)。
+   *   在庫の棚卸し=新しい観測は作らず、2〜3割しか読んでいなかった観測を
+   *   「打ち手が変わる単位」に割る。
+   */
+  try {
+    for (const c of buildLaneDetailCells(data)) cells.push(c);
+  } catch { /* 同上 */ }
+  try {
+    for (const c of buildEffectDetailCells(data)) cells.push(c);
   } catch { /* 同上 */ }
 
   return cells;

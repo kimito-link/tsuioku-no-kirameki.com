@@ -151,7 +151,23 @@ export const DIAGNOSIS_REGISTRY = Object.freeze([
    *   (a)通知が来ない /(b)別配信の鏡を見ている /(c)関所で全却下 を名指しする。
    *   未解決の「会場一致が鏡stale(656s)で固定」を肯定/否定できる唯一の計器。
    */
-  reg('venue-intake', '会場の鏡うけとり', 'venue', 1, false)
+  reg('venue-intake', '会場の鏡うけとり', 'venue', 1, false),
+  /*
+   * ★v0.1.1406 第4弾: 既存プローブを【打ち手が変わる単位】に割る。
+   *   laneDetailCells.js / effectDetailCells.js が判定の正本。
+   *   ★単独では打ち手の無い内訳(docHidden 等)はセルにしない(会議の判定)。
+   */
+  reg('lane-last-run', 'レーンの最終描画', 'render', 1, false),
+  reg('lane-capped', '上限で表示できなかった人', 'northstar', 1, false),
+  reg('lane-drop-burst', '一度に消えた最大人数', 'northstar', 1, false),
+  reg('lane-amplitude', 'レーンの振れ幅', 'render', 1, false),
+  reg('lane-worst-drop', '一番大きく減った瞬間', 'render', 1, false),
+  reg('lane-publish-skip', 'レーンの書き出し見送り', 'render', 1, false),
+  reg('arrival-effect', '到着の演出', 'northstar', 1, false),
+  reg('effect-throttle', '演出の間引き', 'northstar', 1, false),
+  reg('comment-echo', '送信から表示まで', 'render', 1, false),
+  reg('comment-retry', '送信の再試行', 'render', 1, false),
+  reg('instant-reject', '即時表示の取りこぼし', 'render', 1, false)
 ]);
 
 /** id → 観点 の索引(集計で O(1) 参照)。 */

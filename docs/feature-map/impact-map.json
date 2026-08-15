@@ -4564,6 +4564,16 @@
       ]
     },
     {
+      "file": "src/lib/effectDetailCells.js",
+      "featureCount": 1,
+      "features": [
+        "status"
+      ],
+      "labels": [
+        "状態速報ページ"
+      ]
+    },
+    {
       "file": "src/lib/embeddedDataExtract.js",
       "featureCount": 1,
       "features": [
@@ -5361,6 +5371,16 @@
       ],
       "labels": [
         "ポップアップ(応援レーン)"
+      ]
+    },
+    {
+      "file": "src/lib/laneDetailCells.js",
+      "featureCount": 1,
+      "features": [
+        "status"
+      ],
+      "labels": [
+        "状態速報ページ"
       ]
     },
     {
