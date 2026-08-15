@@ -54,12 +54,33 @@ export const HEALTH_CELL_GROUPS = Object.freeze([
     hint: '誰が言ったかを結びつけられているか。匿名は仕様上ここに出ません',
     cellIds: Object.freeze(['uid-rate', 'avatar', 'venue-yukkuri-face', 'avatar-cache'])
   }),
+  /*
+   * ★v0.1.1406: レーンを【症状の言葉】で3枠に割る(会議 UX の判定)。
+   *   1枠に10個以上並べると探せない。打ち手が違うものを分ける:
+   *     人の出入り = 誰が消えた/入れなかった
+   *     タイルの揺れ = ちらつき(見た目が落ち着かない)
+   *     描画が動いたか = そもそも描かれているか
+   *   ★既存14枠の相対順は動かさず、小数 order で隣に挿す。
+   */
   Object.freeze({
-    id: 'lane', label: '応援レーン（誰が並ぶか）', order: 4,
-    hint: '何人出るか・描画が追いついているか',
+    id: 'lane', label: '応援レーン（人の出入り）', order: 4,
+    hint: '誰が並ぶか・消えていないか',
     cellIds: Object.freeze([
-      'lane-count', 'lane-paint', 'lane-tick', 'lane-settle',
-      'lane-dropped', 'lane-oscillation', 'lane-supply-guard'
+      'lane-count', 'lane-dropped', 'lane-drop-burst', 'lane-capped'
+    ])
+  }),
+  Object.freeze({
+    id: 'lane-flicker', label: '応援レーン（ちらつき・増減）', order: 4.3,
+    hint: '★人数が増えたり減ったりして落ち着かないときはここ',
+    cellIds: Object.freeze([
+      'lane-oscillation', 'lane-amplitude', 'lane-worst-drop', 'lane-settle'
+    ])
+  }),
+  Object.freeze({
+    id: 'lane-paint-group', label: '応援レーン（描画が動いたか）', order: 4.6,
+    hint: '★レーンが空・古いままのときはここ。最後に描かれた時刻を見ます',
+    cellIds: Object.freeze([
+      'lane-tick', 'lane-last-run', 'lane-paint', 'lane-publish-skip', 'lane-supply-guard'
     ])
   }),
   Object.freeze({
@@ -108,12 +129,17 @@ export const HEALTH_CELL_GROUPS = Object.freeze([
   Object.freeze({
     id: 'post', label: 'コメント送信', order: 10,
     hint: '自分が送ったコメントが届いて画面に出たか',
-    cellIds: Object.freeze(['comment-post', 'comment-revert'])
+    cellIds: Object.freeze([
+      'comment-post', 'comment-revert', 'comment-echo', 'comment-retry', 'instant-reject'
+    ])
   }),
   Object.freeze({
     id: 'effect', label: '演出・効果音', order: 11,
     hint: '鳴るはずのものが鳴っているか。鳴らないときは「保管庫」と「失敗」を見ます',
-    cellIds: Object.freeze(['gift-effect', 'milestone-effect', 'custom-sound-db', 'gift-sound-fail'])
+    cellIds: Object.freeze([
+      'gift-effect', 'milestone-effect', 'arrival-effect',
+      'custom-sound-db', 'gift-sound-fail', 'effect-throttle'
+    ])
   }),
   Object.freeze({
     id: 'speed', label: '重さ・黒画面', order: 12,

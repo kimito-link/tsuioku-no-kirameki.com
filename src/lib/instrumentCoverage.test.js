@@ -80,14 +80,24 @@ function maximalInput() {
     popupDiag: { popup: {
       storyUserLaneRenderProbe: {
         started: 5, domTilesPainted: 10, heavySettleState: 'race',
-        laneTileOscillation: { samples: 3, drops: 1 }
+        laneTileOscillation: {
+          samples: 3, drops: 1,
+          // ★v0.1.1406: 振れ幅・最悪の落ち込みセルの入力
+          reversals: 5, amplitude: 14, maxTiles: 20, minTiles: 6,
+          worstDrop: 12, worstDropFrom: 20, worstDropTo: 8, worstDropOrigin: 'light_summary'
+        }
       },
       identityAcquisition: { identifiable: 5, withThumb: 1, anonymous: 2 },
       avatarLoadDiag: { usericonFailed: 1, usericonSucceeded: 5 },
       mainThreadBlocker: { count: 3, worstMs: 900, worstName: 'grid' },
       // ★v0.1.1400 で掘り起こした14セルの入力(埋もれていた観測群)
-      laneTickProbe: { ticks: 10, runs: 7, lastReason: 'defer-heavy' },
-      laneRosterDelta: { everSeenMax: 20, droppedTotal: 2 },
+      // ★v0.1.1406: 分解セルの入力(lastRunAgoMs / cappedOut / maxDroppedAtOnce ほか)
+      laneTickProbe: { ticks: 10, runs: 7, lastReason: 'defer-heavy', lastRunAgoMs: 200_000 },
+      laneRosterDelta: {
+        everSeenMax: 20, droppedTotal: 2,
+        cappedOutTotal: 5, maxDroppedAtOnce: 12, droppedEventCount: 3
+      },
+      lanePublishSkip: { noEls: 2, entriesEmpty: 1, lastSkipReason: 'els無し', lastPublishAgoSec: 3 },
       lightSupplyGuard: { observedCount: 2, skipCount: 1 },
       loadShadeProbe: { shadeAgeMs: 2500, shadePresent: true },
       tickerPick: { domWriteTotal: 12, filteredTooShort: 30 },
@@ -102,8 +112,12 @@ function maximalInput() {
       // ★v0.1.1403: ON失敗と再生ブロック(無音で死ぬ系)
       enableFailTotal: 2, lastEnableFailReason: 'refused', audioBlockedTotal: 3
     },
-    instantPushDiag: { lastGapMs: 20, avgGapMs: 30 },
-    commentPostDiag: { attempts: 4, okCount: 1, failCount: 0, timeoutCount: 3, revertCount: 1 },
+    // ★v0.1.1406: 即時表示の取りこぼし / 送信から表示まで / 再試行 の入力
+    instantPushDiag: { lastGapMs: 20, avgGapMs: 30, sentCount: 10, rejectedCount: 6 },
+    commentPostDiag: {
+      attempts: 4, okCount: 1, failCount: 0, timeoutCount: 3, revertCount: 1,
+      avgEchoMs: 3500, lastEchoMs: 4000, totalRetryAttempts: 5
+    },
     venueSeatsDiag: {
       enabled: true, lastUpdateAt: Date.now() - 1000, participantCount: 20, seatsShown: 20,
       perRow: 12, venueMaxRows: 30, seatAreaWidth: 958, capReason: 'participant',
@@ -129,7 +143,10 @@ function maximalInput() {
       adThrown: 2, adSoundPlayed: 2, soundEnabled: true,
       lastEventAt: Date.now() - 1000,
       // ★v0.1.1403: 鳴らそうとして失敗した件数(防御=coalesced/guarded は異常にしない)
-      giftSoundError: 1, giftSoundNoPath: 2
+      giftSoundError: 1, giftSoundNoPath: 2,
+      // ★v0.1.1406: 到着演出・間引きセルの入力
+      arrivalDetected: 10, arrivalThrown: 6, arrivalSkippedCd: 2,
+      giftSoundCoalesced: 4, giftSoundGuarded: 3, giftThrowCapGuarded: 1, adThrowCapGuarded: 1
     },
     milestoneEffectDiag: {
       detected: 3, played: 3, sound: 3,

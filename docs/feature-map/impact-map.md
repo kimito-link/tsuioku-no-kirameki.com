@@ -497,6 +497,7 @@
 | `src/lib/diagPaintDeferGate.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/diagWarnings.js` | 1 | 記録エンジン(watchページ常駐) |
 | `src/lib/domHarvestScrollDefer.js` | 1 | 記録エンジン(watchページ常駐) |
+| `src/lib/effectDetailCells.js` | 1 | 状態速報ページ |
 | `src/lib/embeddedDataExtract.js` | 1 | 記録エンジン(watchページ常駐) |
 | `src/lib/enrichmentAvatarFallback.js` | 1 | 記録エンジン(watchページ常駐) |
 | `src/lib/errorAutoDiagnosis.js` | 1 | ポップアップ(応援レーン) |
@@ -577,6 +578,7 @@
 | `src/lib/keyboardTypeDiagnostic.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/kiramekiAwards.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/kiramekiAwardsSectionHtml.js` | 1 | ポップアップ(応援レーン) |
+| `src/lib/laneDetailCells.js` | 1 | 状態速報ページ |
 | `src/lib/laneDiag.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/laneDomSelfMeasure.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/laneMirrorPerLivePublish.js` | 1 | ポップアップ(応援レーン) |

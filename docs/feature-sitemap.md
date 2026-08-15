@@ -113,7 +113,7 @@
   - `src/lib/monotonicCommentCount.js`
 - **storage キー定義** — chrome.storage のキー名の正本(nls_comments_<lv> 等)
   - `src/lib/storageKeys.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 46</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 47</summary>
 
 - `scripts/dump-panel-state.mjs` — 実機の chrome.storage.local を吸い出して
 - `src/lib/autoBackupState.js` — v0.1.808(星野ロミ式コンポーネント化・第1弾): content-entry.js の巨大化を抑えるため、
@@ -130,6 +130,7 @@
 - `src/lib/commentTimelineMirrorKey.js` — コメントタイムライン鏡の storage キー正本（council/liveview-wholesale-root-SYNTHESIS.md 第2段）。
 - `src/lib/devMonitorTrendSession.js` — 開発監視トレンド: sessionStorage（セッション）+ chrome.storage.local（永続・最大7日）
 - `src/lib/displayRecordedCount.js` — 「画面に出す記録件数」の正本を1つに固定する純関数(v0.1.839・第1)。
+- `src/lib/effectDetailCells.js` — 演出・効果音・コメント送信の観測を割る(純関数)。
 - `src/lib/giftRecord.js` — ギフト/広告ユーザーの永続化（純関数）
 - `src/lib/heavyChunkReadReuse.js` — heavy 全件コメント read の再利用判定純関数
 - `src/lib/inFlightGuard.js` — 状態速報「重さ根治 P3」: runStorageOpWithTimeout(storageOpTimeout.js)は Promise.race で
@@ -294,7 +295,7 @@
   - `src/lib/giftThrowProjectile.js`
 - **吹き出し寿命管理** — 会場の吹き出しの表示上限・追い出し(eviction)ライフサイクル
   - `src/lib/venueBubbleLifecycle.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 222</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 223</summary>
 
 - `scripts/encode-marketing-html-avatars.mjs` — extension/images/marketing-html-avatars/*.png を data URI にし、
 - `scripts/split-avatar-parts.mjs` — 偽市松背景の除去 + パーツ切り出し(one-off アセットパイプライン)
@@ -388,6 +389,7 @@
 - `src/lib/interceptAvatarHydration.js` — profile cache の強い avatar を intercept avatar map へ補完する。
 - `src/lib/kokenGiftHistoryApi.js` — koken 公式「ギフト履歴（個別イベント）」無認証 JSON API の URL 組立 & 正規化（純関数）。
 - `src/lib/kokenGiftHistoryFetchClient.js` — popup / content から service-worker 経由で koken ギフト履歴 API を叩く薄いクライアント。
+- `src/lib/laneDetailCells.js` — 応援レーンの観測を【打ち手が変わる単位】に割る(純関数)。
 - `src/lib/laneDiag.js` — 応援アイコン列(popup レーン)の「人数整合」診断。popup が描いたレーンの純観測値を組み立てる純関数群。
 - `src/lib/laneDiagKey.js` — 応援アイコン列(popup レーン)の「人数整合」観測値を popup が書き、status が読む storage キー。
 - `src/lib/laneMirror.js` — 応援レーンの「鏡」スナップショット純関数。popup がレーンを描いた buckets を、status が本物の
@@ -944,7 +946,7 @@
 
 ## 🧬 修正系譜マップ(この系統のバグを過去にどう直したか)
 
-> changelog 全 735 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
+> changelog 全 736 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
 
 ### 💾 記録件数 (97版)
 - `v0.1.1403` 2026-08-15 — 音が鳴らない・読み上げが始まらない理由を診断に追加
@@ -1773,7 +1775,8 @@
 - `v0.1.699` 2026-06-12 — 読み上げの名前ON/OFF切替を追加
 - `v0.1.698` 2026-06-12 — コメビュにユーザー別の声で読み上げ機能を追加
 
-### 🪟 応援レーン・タイル (178版)
+### 🪟 応援レーン・タイル (179版)
+- `v0.1.1406` 2026-08-15 — 診断を63→74項目に増やし、レーンを3枠に分けました
 - `v0.1.1400` 2026-08-15 — 診断項目を40→54に増やし、枠も14に増やしました
 - `v0.1.1392` 2026-08-14 — コメントを大きく見せる枠（PICK UP 帯）を実際に大きくしました
 - `v0.1.1391` 2026-08-14 — 「描き直しの回数」の数え方を修正（防いだ回数を含めていました）
@@ -1953,7 +1956,8 @@
 - `v0.1.673` 2026-06-10 — コメビュの名前をパネルと同じ情報源で補完
 - `v0.1.670` 2026-06-10 — コメビュのアイコンを本家と同じサムネに
 
-### 🩺 診断・状態速報 (280版)
+### 🩺 診断・状態速報 (281版)
+- `v0.1.1406` 2026-08-15 — 診断を63→74項目に増やし、レーンを3枠に分けました
 - `v0.1.1405` 2026-08-15 — 会場の鏡が古いままになる原因を名指しします
 - `v0.1.1403` 2026-08-15 — 音が鳴らない・読み上げが始まらない理由を診断に追加
 - `v0.1.1402` 2026-08-15 — 診断項目の「登録＝表示」検査が働いていなかったのを修正しました
@@ -2259,7 +2263,8 @@
 - `v0.1.806` 2026-06-17 — HTML保存の失敗を根治+完了音声を追加
 - `v0.1.785` 2026-06-16 — 状態ページのタイムアウト警告を拡張エラー欄に出さない
 
-### ⚡ 描画・性能 (146版)
+### ⚡ 描画・性能 (147版)
+- `v0.1.1406` 2026-08-15 — 診断を63→74項目に増やし、レーンを3枠に分けました
 - `v0.1.1400` 2026-08-15 — 診断項目を40→54に増やし、枠も14に増やしました
 - `v0.1.1391` 2026-08-14 — 「描き直しの回数」の数え方を修正（防いだ回数を含めていました）
 - `v0.1.1385` 2026-08-13 — 症状ごとの判定を出すようにしました
