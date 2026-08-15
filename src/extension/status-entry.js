@@ -1996,6 +1996,15 @@ function renderAll({ extrasAgeMs, lvList, summaries, fastDiag, popupDiag, backfi
      *     (v0.1.1390 で実際に4セルが出なかった穴。ゲートが赤くなるので気づける)。
      */
     customSoundDiag,
+    /*
+     * ★v0.1.1404: ビルドの古さセル(buildAgeCell.js)の入力。
+     *   NL_BUILD_ID はビルド時に埋め込まれる定数(識別子は残らない)。
+     *   ★ここで渡さないとセルが永久に na になる=「登録したのに出ない」の再演。
+     */
+    buildId: typeof NL_BUILD_ID !== 'undefined' ? NL_BUILD_ID : '',
+    appVersion: (() => {
+      try { return String(chrome.runtime.getManifest()?.version || ''); } catch { return ''; }
+    })(),
     mainThreadBlocker: _popupSnapForCells?.mainThreadBlocker ?? null,
     liveElapsedMs: _liveElapsedMs,
     // ★v0.1.1396: 会場が「いま」開いているかは、古い venueSeatsDiag ではなく

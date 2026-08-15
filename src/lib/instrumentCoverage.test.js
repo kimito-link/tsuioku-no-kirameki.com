@@ -141,13 +141,21 @@ function maximalInput() {
     northStarMirror: { capturedAt: Date.now() },
     previewRenderAck: { gen: 5, ackGen: 4 },
     backfillLiveMetric: { stalled: true, remaining: 100 },
-    mainThreadBlocker: { count: 3, worstMs: 900, worstName: 'grid-rebuild' },
+    mainThreadBlocker: {
+      count: 3, worstMs: 900, worstName: 'grid-rebuild', totalMs: 2400,
+      byName: { 'grid-rebuild': { ms: 1800, count: 2, worstMs: 900 } },
+      afterResumeMs: 1500, afterResumeCount: 2
+    },
     // ★v0.1.1403「無音で死ぬ」セルの入力(silentFailureCells.js)。
     //   ここを足し忘れると registry に登録しても出力されず、上のゲートが赤くなる。
     customSoundDiag: {
       dbAvailable: true, assignedKeyCount: 0, totalKeyCount: 38,
       localBundledCount: 90, blobCount: 0, rev: 0
-    }
+    },
+    // ★v0.1.1404: 黒画面の当人セル(blackScreenOwnerCells.js)の入力。
+    //   mainThreadBlocker は上でも与えているが、byName/afterResume まで持たせる。
+    buildId: '0101-000000',
+    appVersion: '0.1.1404'
   };
 }
 

@@ -118,6 +118,8 @@ export const HEALTH_CELL_GROUPS = Object.freeze([
     id: 'speed', label: '重さ・黒画面', order: 12,
     hint: '★黒くなる・固まる件はここ。「メインスレッド」が止めている当人を名指しします',
     cellIds: Object.freeze([
+      // ★v0.1.1404: 「誰が止めているか」を先頭に置く(黒画面はここから読む)。
+      'mt-owner', 'mt-total', 'mt-resume',
       'main-thread', 'paint', 'scroll-whiteout', 'boot-shade', 'grid-rebuild'
     ])
   }),
@@ -125,6 +127,9 @@ export const HEALTH_CELL_GROUPS = Object.freeze([
     id: 'health', label: '保存・内部の整合', order: 13,
     hint: '記録が保存できているか・画面どうしの同期がずれていないか',
     cellIds: Object.freeze([
+      // ★v0.1.1404: 「いま動いている版はいつのものか」を先頭に。
+      //   「なにもかわってない」の第一容疑者を最初に潰せるようにする。
+      'build-age',
       'storage', 'stale', 'console', 'diag-stability', 'mirror-gen-stamp', 'preview-gen-sync',
       'mirror-publish', 'northstar-render'
     ])

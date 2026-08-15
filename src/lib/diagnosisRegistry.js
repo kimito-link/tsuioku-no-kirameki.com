@@ -136,7 +136,16 @@ export const DIAGNOSIS_REGISTRY = Object.freeze([
   reg('voice-start-fail', '読み上げのON失敗', 'venue', 1, false),
   reg('voice-audio-blocked', '音の再生ブロック', 'venue', 1, false),
   reg('gift-sound-fail', 'ギフト音の失敗', 'northstar', 1, false),
-  reg('comment-revert', '送信の取り消し', 'render', 1, false)
+  reg('comment-revert', '送信の取り消し', 'render', 1, false),
+  /*
+   * ★v0.1.1404 第2弾: 黒画面の【当人】と、ビルドの古さ。
+   *   どちらも「過去に往復を何度も生んだ症状」を1行で終わらせるための計器
+   *   (blackScreenOwnerCells.js / buildAgeCell.js が判定の正本)。
+   */
+  reg('mt-owner', '止めている当人', 'render', 1, false),
+  reg('mt-total', '止まった合計時間', 'render', 1, false),
+  reg('mt-resume', 'スリープ明けの詰まり', 'render', 1, false),
+  reg('build-age', 'このビルドの新しさ', 'render', 1, false)
 ]);
 
 /** id → 観点 の索引(集計で O(1) 参照)。 */
