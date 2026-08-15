@@ -14,7 +14,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import { buildHealthCells } from './healthCells.js';
-import { groupHealthCells } from './healthCellGroups.js';
+import { groupHealthCells, HEALTH_CELL_GROUPS } from './healthCellGroups.js';
 import { DIAGNOSIS_REGISTRY } from './diagnosisRegistry.js';
 
 /** 全セルが出るように、あらゆる入力を「異常あり」で与える。 */
@@ -122,9 +122,40 @@ describe('計器の網羅ゲート(登録=表示)', () => {
   });
 
   it('★出たセルは1枚も失われず、必ずどれかの枠に入る', () => {
+    /*
+     * ★v0.1.1402: 【実際に出たセル】だけを見る。
+     *   v1401 の固定テーブル化で、枠に無いセルは ⚪「—」のプレースホルダで
+     *   埋まるようになった。その結果、旧実装の
+     *     expect(total).toBe(cells.length)
+     *   は **入力に関係なく常に registry 総数** になり、恒真＝何も検査して
+     *   いなかった(空配列を渡しても 53 セルが返る)。
+     *   ＝ v1390/v1400 で踏んだ「作ったのに画面に出ない」を検出できない状態に
+     *   静かに戻っていた。プレースホルダと実セルを **id で区別** して数える。
+     */
     const groups = groupHealthCells(cells);
-    const total = groups.reduce((a, g) => a + g.cells.length, 0);
-    expect(total).toBe(cells.length);
+    const producedInGroups = groups
+      .flatMap((g) => g.cells)
+      .filter((c) => producedIds.has(c.id));
+    const foundIds = new Set(producedInGroups.map((c) => c.id));
+    const lost = [...producedIds].filter((id) => !foundIds.has(id));
+    expect(lost, `出力されたのに枠から消えたセル: ${lost.join(', ')}`).toEqual([]);
+    // 実セルが1枚も欠けず、水増しもされていない(プレースホルダは除外して数える)
+    expect(producedInGroups.length).toBe(cells.length);
+  });
+
+  it('★プレースホルダは registry のセルだけ(知らない id を捏造しない)', () => {
+    /*
+     * 固定テーブルは「観測が無くても枠を残す」ための仕組みだが、
+     * 枠側に registry 未登録の id を書くと **永久に埋まらない空セル** が
+     * 画面に居座る(ユーザーには「壊れている項目」に見える)。
+     */
+    const groups = groupHealthCells(cells);
+    const known = new Set(DIAGNOSIS_REGISTRY.map((r) => r.id));
+    const ghosts = groups
+      .flatMap((g) => g.cells)
+      .map((c) => c.id)
+      .filter((id) => !known.has(id));
+    expect(ghosts, `registry に無い枠セル: ${ghosts.join(', ')}`).toEqual([]);
   });
 
   it('★二重表示しない(同じidが2つの枠に出ない)', () => {
@@ -142,5 +173,19 @@ describe('計器の網羅ゲート(登録=表示)', () => {
     const other = groupHealthCells(cells).find((g) => g.id === 'other');
     const stray = other ? other.cells.map((c) => c.id) : [];
     expect(stray, `枠に未登録: ${stray.join(', ')}`).toEqual([]);
+  });
+
+  it('★registry の全セルが【枠にも】登録されている(片肺を作らない)', () => {
+    /*
+     * ★v0.1.1402: registry と healthCellGroups の**両方**に入って初めて
+     *   画面に出る。片方だけの登録は、固定テーブル化以降
+     *   「その他」検査にも引っかからない(出力されなければ stray にならない)。
+     *   ＝ 100個へ増やす作業で最も踏みやすい穴なので、id 集合を直接突き合わせる。
+     */
+    const inGroups = new Set(HEALTH_CELL_GROUPS.flatMap((g) => [...g.cellIds]));
+    const missing = DIAGNOSIS_REGISTRY
+      .map((r) => r.id)
+      .filter((id) => !inGroups.has(id));
+    expect(missing, `registry にあるが枠に無い: ${missing.join(', ')}`).toEqual([]);
   });
 });
