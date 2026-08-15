@@ -41,7 +41,7 @@
   - `src/lib/ndgrBackfillCrawl.js`
 - **コメント重複除去(NDGR)** — 再送/再接続/relay overlap の重複を liveId+messageId の canonical key で排除
   - `src/lib/ndgrMessageDedupe.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 57</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 58</summary>
 
 - `src/domain/observations/StatObservation.js` — StatObservation - ニコ生から取得する数値の「契約付き観測値」純関数 factory。
 - `src/domain/observations/vocabulary.js` — 観測層 (StatObservation) の語彙集 - 不変な enum 定義のみ。
@@ -68,6 +68,7 @@
 - `src/lib/commentPipelineLog.js` — コメント取り込みパイプラインの構造化デバッグログ（純関数フォーマッタ）。
 - `src/lib/deepHarvestReason.js` — 深掘り収穫(deep harvest)の発動理由(起動/記録ON/配信切替/タブ可視)の定義と判定。
 - `src/lib/eventLoopStallSummary.js` — 観測列の「予定時刻 vs 実発火時刻」から
+- `src/lib/externalFetchCells.js` — 外部API(貢献度/ニコニ広告)の取得をセルにする(純関数)。
 - `src/lib/giftRelayStorageLiveId.js` — ギフト sub-app iframe からの postMessage を storage に書くときの liveId 解決。
 - `src/lib/giftSubAppRelayDiag.js` — v0.1.226: ギフトサイドバー cross-origin iframe relay 経路の生存確認用 純関数。
 - `src/lib/giftSubAppRelayTrust.js` — Cross-frame gift relay messages are accepted only from NicoNico/local-dev
@@ -113,7 +114,7 @@
   - `src/lib/monotonicCommentCount.js`
 - **storage キー定義** — chrome.storage のキー名の正本(nls_comments_<lv> 等)
   - `src/lib/storageKeys.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 47</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 48</summary>
 
 - `scripts/dump-panel-state.mjs` — 実機の chrome.storage.local を吸い出して
 - `src/lib/autoBackupState.js` — v0.1.808(星野ロミ式コンポーネント化・第1弾): content-entry.js の巨大化を抑えるため、
@@ -139,6 +140,7 @@
 - `src/lib/liveviewPublishOutcome.js` — 純Web公開（応援ライブビューの /api/status への POST）の直近結果を記録・要約する。
 - `src/lib/longTaskTracker.js` — メインスレッドを長時間ブロックした「Long Task」を有界に記録する純関数群。
 - `src/lib/mirrorBundleKey.js` — 鏡バンドルの storage キー。
+- `src/lib/northStarDetailCells.js` — 公式値レーン(ギフト/広告/イベント)の【実績】をセルにする(純関数)。
 - `src/lib/northStarMirrorKey.js` — 北極星レーン鏡(公式値レーン)の storage キー。
 - `src/lib/persistableCommentRow.js` — v0.1.362: DOM ハーベスト経路で拾ったコメント行を `nls_comments_<lv>` に保存して
 - `src/lib/persistThrottle.js` — v0.1.431: 連続フラッシュの合間にイベントループへ制御を返す既定の yield。
@@ -533,12 +535,13 @@
   - `src/lib/voicePlayer.js`
   - `src/lib/voiceReadQueue.js`
   - `src/lib/voiceAgeGate.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 15</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 16</summary>
 
 - `src/lib/reportCompleteVoice.js` — v0.1.806: レポート(HTML/マーケ/メディアキット)の保存が【成功した直後】に、完了の合図として
 - `src/lib/voiceAssignment.js` — コメント者ごとに読み上げ声(styleId/ピッチ/速度オフセット)を決定論的に割り当てる純ロジック。
 - `src/lib/voiceBubbleRealtimeParity.js` — 「読み上げ」と「吹き出し(画面表示)」が
 - `src/lib/voiceComment.js` — ニコ生コメント欄の最大文字数（textarea maxlength と一致）
+- `src/lib/voiceDetailCells.js` — 読み上げの観測を【打ち手が変わる単位】に割る(純関数)。
 - `src/lib/voiceDirector.js` — council/pachinko-ultimate-SYNTHESIS.md §4(ボイスの歯止め)+§6 Phase B の実装。
 - `src/lib/voiceEffectDiag.js` — パチンコボイス演出(voiceDirector.js・Phase B)の発火/スキップ観測値を組み立てる純関数群。
 - `src/lib/voiceEffectDiagKey.js` — パチンコボイス演出(voiceDirector.js・Phase B)の「発火/スキップ内訳」観測値を
@@ -946,9 +949,10 @@
 
 ## 🧬 修正系譜マップ(この系統のバグを過去にどう直したか)
 
-> changelog 全 736 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
+> changelog 全 737 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
 
-### 💾 記録件数 (97版)
+### 💾 記録件数 (98版)
+- `v0.1.1407` 2026-08-16 — 診断を74→85項目に。読み上げと公式値の原因を分離
 - `v0.1.1403` 2026-08-15 — 音が鳴らない・読み上げが始まらない理由を診断に追加
 - `v0.1.1367` 2026-08-12 — 応援レーンが途中件数で止まる問題の根治（78件中19件しか出ない）
 - `v0.1.1358` 2026-08-12 — fix(diag): 広告主のゆっくり顔を数える
@@ -1047,7 +1051,8 @@
 - `v0.1.672` 2026-06-10 — コメビュの二重表示の残りを根治
 - `v0.1.665` 2026-06-10 — 長い配信が7割等で止まったままになるのを根治
 
-### 📥 コメント取得 (173版)
+### 📥 コメント取得 (174版)
+- `v0.1.1407` 2026-08-16 — 診断を74→85項目に。読み上げと公式値の原因を分離
 - `v0.1.1390` 2026-08-14 — 読み上げ・コメント送信・会場モード・ギフト/広告の専用チェックを追加
 - `v0.1.1387` 2026-08-13 — アイコンの判定に「表示できた実績」を反映
 - `v0.1.1386` 2026-08-13 — アイコンが白いままになる問題を改善
@@ -1563,7 +1568,8 @@
 - `v0.1.713` 2026-06-13 — 会場モードを明るくして発言を吹き出し表示
 - `v0.1.711` 2026-06-13 — 会場モードで発言を吹き出し表示
 
-### 🎁 ギフト (123版)
+### 🎁 ギフト (124版)
+- `v0.1.1407` 2026-08-16 — 診断を74→85項目に。読み上げと公式値の原因を分離
 - `v0.1.1403` 2026-08-15 — 音が鳴らない・読み上げが始まらない理由を診断に追加
 - `v0.1.1398` 2026-08-15 — 黒画面の計測が機能していなかったのを修正 + 診断の枠を13個に細分化
 - `v0.1.1397` 2026-08-15 — 【不具合修正】前回の更新で動作が重くなっていた問題を戻しました
@@ -1688,7 +1694,8 @@
 - `v0.1.676` 2026-06-10 — コメビュをパネルのタイムラインと完全同一に
 - `v0.1.674` 2026-06-10 — タイムラインから人を開ける+匿名の見分け復活
 
-### 🔊 読み上げ (85版)
+### 🔊 読み上げ (86版)
+- `v0.1.1407` 2026-08-16 — 診断を74→85項目に。読み上げと公式値の原因を分離
 - `v0.1.1403` 2026-08-15 — 音が鳴らない・読み上げが始まらない理由を診断に追加
 - `v0.1.1390` 2026-08-14 — 読み上げ・コメント送信・会場モード・ギフト/広告の専用チェックを追加
 - `v0.1.1389` 2026-08-14 — 状態ページの項目を「症状ごとの枠」に分けました
@@ -1956,7 +1963,8 @@
 - `v0.1.673` 2026-06-10 — コメビュの名前をパネルと同じ情報源で補完
 - `v0.1.670` 2026-06-10 — コメビュのアイコンを本家と同じサムネに
 
-### 🩺 診断・状態速報 (281版)
+### 🩺 診断・状態速報 (282版)
+- `v0.1.1407` 2026-08-16 — 診断を74→85項目に。読み上げと公式値の原因を分離
 - `v0.1.1406` 2026-08-15 — 診断を63→74項目に増やし、レーンを3枠に分けました
 - `v0.1.1405` 2026-08-15 — 会場の鏡が古いままになる原因を名指しします
 - `v0.1.1403` 2026-08-15 — 音が鳴らない・読み上げが始まらない理由を診断に追加

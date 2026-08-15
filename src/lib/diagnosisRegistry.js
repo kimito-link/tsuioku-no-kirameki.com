@@ -167,7 +167,22 @@ export const DIAGNOSIS_REGISTRY = Object.freeze([
   reg('effect-throttle', '演出の間引き', 'northstar', 1, false),
   reg('comment-echo', '送信から表示まで', 'render', 1, false),
   reg('comment-retry', '送信の再試行', 'render', 1, false),
-  reg('instant-reject', '即時表示の取りこぼし', 'render', 1, false)
+  reg('instant-reject', '即時表示の取りこぼし', 'render', 1, false),
+  /*
+   * ★v0.1.1407 第5弾: 公式値の実績 / 読み上げの内訳 / 外部APIの生死。
+   *   northStarDetailCells.js / voiceDetailCells.js / externalFetchCells.js が正本。
+   */
+  reg('ns-ever-got', '公式値の取得実績', 'northstar', 1, false),
+  reg('ns-pending', '取得中のまま', 'northstar', 1, false),
+  reg('voice-synth-fail', '声の合成の失敗', 'venue', 1, false),
+  reg('voice-synth-null', '声が空で返った', 'venue', 1, false),
+  reg('voice-catchup', '追いつくための調整', 'venue', 1, false),
+  reg('voice-drop-reason', '読み飛ばしの理由', 'venue', 1, false),
+  reg('voice-queue', '読み上げの待ち', 'venue', 1, false),
+  reg('voice-playback-timeout', '再生の打ち切り', 'venue', 1, false),
+  reg('fetch-koken', 'ギフト貢献度の取得', 'northstar', 1, false),
+  reg('fetch-nicoad', '広告ランキングの取得', 'northstar', 1, false),
+  reg('fetch-leader', '取得役の選出', 'ingest', 1, false)
 ]);
 
 /** id → 観点 の索引(集計で O(1) 参照)。 */

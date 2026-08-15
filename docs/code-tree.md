@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 4 / 783 件
+## ⚠️ 役割コメントが無いソース 4 / 786 件
 - `src/lib/laneDomSelfMeasure.js`
 - `src/lib/reportPreviewPublish.js`
 - `src/lib/venueLaneBuckets.js`
@@ -700,7 +700,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (1706)
+- 📁 **src/** (1712)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -992,7 +992,7 @@
         - `logo_funlink_white_RGB_maru_black.png`
       - `logo_guide_funlink_ol.pdf`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1464)
+  - 📁 **lib/** (1470)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -1417,6 +1417,8 @@
     - `exportWaitNarration.js` — HTML / マーケ DL 待ち中の りんく・こん太・たぬ姉 セリフ（popup 吹き出し用）。
     - `exportWaitNarration.test.js`
     - `extensionCspInlineScript.test.js`
+    - `externalFetchCells.js` — 外部API(貢献度/ニコニ広告)の取得をセルにする(純関数)。
+    - `externalFetchCells.test.js`
     - `externalLinksSectionHtml.js` — v0.1.812(星野ロミ式コンポーネント化・第5弾): buildHtmlReportDocument 内の
     - `externalLinksSectionHtml.test.js`
     - `failOpenGuardCensus.test.js`
@@ -1804,6 +1806,8 @@
     - `northStarAcquisitionGauge.test.js`
     - `northStarCharaTrioConfig.js` — 北極星 3 キャラ trio（りんく / こん太 / たぬ姉）の slot 構成と tier 連動 src 解決。
     - `northStarCharaTrioConfig.test.js`
+    - `northStarDetailCells.js` — 公式値レーン(ギフト/広告/イベント)の【実績】をセルにする(純関数)。
+    - `northStarDetailCells.test.js`
     - `northStarFallbackHtml.js` — v0.1.241: 北極星「鏡のように貼り付け」レーンの fallback HTML 生成。
     - `northStarFallbackHtml.test.js`
     - `northStarLaneDom.js` — 北極星レーン(公式値レーン)の body へ mirrorHtml を sanitize して流し込むコア。
@@ -2387,6 +2391,8 @@
     - `voiceBubbleRealtimeParity.test.js`
     - `voiceComment.js` — ニコ生コメント欄の最大文字数（textarea maxlength と一致）
     - `voiceComment.test.js`
+    - `voiceDetailCells.js` — 読み上げの観測を【打ち手が変わる単位】に割る(純関数)。
+    - `voiceDetailCells.test.js`
     - `voiceDiag.js` — ★v0.1.1328: この診断を「新鮮」とみなす上限。これを大きく超えたら化石値として数値を伏せる。
     - `voiceDiag.test.js`
     - `voiceDiagKey.js` — 会場モード(comeview)の読み上げ診断 storage キーの正本(producer=comeview / consumer=status で共有)。

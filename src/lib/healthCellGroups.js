@@ -94,17 +94,29 @@ export const HEALTH_CELL_GROUPS = Object.freeze([
   Object.freeze({
     id: 'gift', label: 'ギフト', order: 6,
     hint: 'ギフトが取れて・出て・鳴っているか',
-    cellIds: Object.freeze(['ns-contrib', 'ns-gift-hist', 'gift-ad-pipeline'])
+    cellIds: Object.freeze([
+      'ns-contrib', 'ns-gift-hist', 'gift-ad-pipeline', 'fetch-koken'
+    ])
   }),
   Object.freeze({
     id: 'ad', label: '広告', order: 7,
     hint: 'ニコニ広告のランキングが取れているか',
-    cellIds: Object.freeze(['ns-ad'])
+    cellIds: Object.freeze(['ns-ad', 'fetch-nicoad'])
   }),
   Object.freeze({
     id: 'event', label: 'イベント・番組ポイント', order: 8,
     hint: 'イベント順位・スコア・番組累計pt（イベント無しの配信では出ません）',
     cellIds: Object.freeze(['ns-escore', 'ns-erank', 'ns-prog-pt'])
+  }),
+  /*
+   * ★v0.1.1407: 公式値が「そもそも取れているか」を1枠に集める。
+   *   個別レーンの state(上の3枠)とは別で、
+   *   **取得の実績と外部APIの生死**=拡張の外の問題を切り分ける層。
+   */
+  Object.freeze({
+    id: 'northstar-fetch', label: '公式値の取得（外部から取れているか）', order: 8.5,
+    hint: '★ギフト/広告/イベントの数字が出ないときはここ。拡張の外の問題かが分かります',
+    cellIds: Object.freeze(['ns-ever-got', 'ns-pending', 'fetch-leader'])
   }),
   /*
    * ★v0.1.1403: 読み上げを【始まらない】と【ずれる】で分ける。
@@ -114,12 +126,25 @@ export const HEALTH_CELL_GROUPS = Object.freeze([
   Object.freeze({
     id: 'voice-start', label: '読み上げ（始まらない・音が出ない）', order: 8.8,
     hint: '★声が出ないときはここ。ONにできない理由と、音がブロックされていないかを見ます',
-    cellIds: Object.freeze(['voice-start-fail', 'voice-audio-blocked'])
+    cellIds: Object.freeze([
+      'voice-start-fail', 'voice-audio-blocked', 'voice-synth-fail', 'voice-synth-null'
+    ])
   }),
   Object.freeze({
     id: 'voice', label: '読み上げ（声と吹き出しの一致）', order: 9,
     hint: '★声と画面表示が同じタイミングか。個別の速さでなく「揃っているか」を見ます',
     cellIds: Object.freeze(['voice-bubble-parity', 'voice-timing', 'voice-coverage'])
+  }),
+  /*
+   * ★v0.1.1407: 「全部読まれない/遅れる」の原因を分ける枠。
+   *   読み飛ばしは理由で打ち手が変わる(件数上限=設定で直る / 鮮度切れ=合成が追いつかない)。
+   */
+  Object.freeze({
+    id: 'voice-flow', label: '読み上げ（追いつきと読み飛ばし）', order: 9.2,
+    hint: '★コメントが多いときに読まれない・遅れる場合はここ',
+    cellIds: Object.freeze([
+      'voice-drop-reason', 'voice-catchup', 'voice-queue', 'voice-playback-timeout'
+    ])
   }),
   Object.freeze({
     id: 'display', label: '画面の見せ方（PICK UP・クリック）', order: 9.5,
