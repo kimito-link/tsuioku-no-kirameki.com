@@ -124,10 +124,70 @@ describe('無音で死ぬ故障のセル', () => {
     });
   });
 
+  describe('会場の鏡うけとり(venue-intake)', () => {
+    /** @param {any} mirrorIntake @param {boolean} [venueOpen] */
+    const venueCell = (mirrorIntake, venueOpen = true) =>
+      cellOf({ venueSeatsDiag: { mirrorIntake }, venueOpen, nowMs: 1_000_000 }, 'venue-intake');
+
+    it('★(b)別配信の鏡を見ているとき bad + 次の一手', () => {
+      const c = venueCell({
+        changedEvents: 5, keyMatched: 0, keyMissed: 3,
+        lastMissedKeys: ['nls_lane_mirror_lv999'], lastExpectedKey: 'nls_lane_mirror_lv1'
+      });
+      expect(c?.level).toBe('bad');
+      expect(c?.text).toContain('別の配信');
+      // 期待キーと実際のキーを両方出す(どちらがズレたか分かる)
+      expect(c?.text).toContain('lv1');
+      expect(c?.text).toContain('lv999');
+      expect(c?.text).toContain('開き直');
+    });
+
+    it('★(a)通知が一度も来ていないとき bad', () => {
+      const c = venueCell({ changedEvents: 3, keyMatched: 0, keyMissed: 0, accepted: 0 });
+      expect(c?.level).toBe('bad');
+      expect(c?.text).toContain('届いていません');
+    });
+
+    it('★(c)関所で全部捨てているとき bad + 理由', () => {
+      const c = venueCell({
+        changedEvents: 4, keyMatched: 4, keyMissed: 0, accepted: 0,
+        rejectedByGate: 4, lastRejectReason: 'liveId不一致'
+      });
+      expect(c?.level).toBe('bad');
+      expect(c?.text).toContain('liveId不一致');
+    });
+
+    it('★受け取れていれば ok(正常時に警告を居座らせない)', () => {
+      const c = venueCell({
+        changedEvents: 10, keyMatched: 10, keyMissed: 0, accepted: 10,
+        rejectedByGate: 0, lastAcceptedAt: 999_000
+      });
+      expect(c?.level).toBe('ok');
+    });
+
+    it('★一部却下は正常(掟3: 全部却下のときだけ異常)', () => {
+      const c = venueCell({
+        changedEvents: 10, keyMatched: 10, accepted: 8, rejectedByGate: 2, lastAcceptedAt: 999_000
+      });
+      expect(c?.level).toBe('ok');
+    });
+
+    it('★会場を開いていなければ na(使っていない0は異常ではない)', () => {
+      const c = venueCell(null, false);
+      expect(c?.level).toBe('na');
+    });
+
+    it('★会場は開いているのに記録が無ければ warn(動くはずの0)', () => {
+      const c = venueCell(null, true);
+      expect(c?.level).toBe('warn');
+    });
+  });
+
   it('★全セルが常に出る(観測ゼロでも消えない=掟5)', () => {
     const ids = buildSilentFailureCells({}).map((c) => c.id).sort();
     expect(ids).toEqual([
-      'comment-revert', 'custom-sound-db', 'gift-sound-fail', 'voice-audio-blocked', 'voice-start-fail'
+      'comment-revert', 'custom-sound-db', 'gift-sound-fail',
+      'venue-intake', 'voice-audio-blocked', 'voice-start-fail'
     ]);
   });
 });

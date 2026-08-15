@@ -26,6 +26,16 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1405',
+    date: '2026-08-15',
+    summary: '会場の鏡が古いままになる原因を名指しします',
+    items: Object.freeze([
+      '会場モードの表示が古いまま止まるとき、その原因を3つに分けて表示します。①通知が届いていない ②別の配信の情報を見ている ③受け取ったが捨てている、で対処が正反対のためです。',
+      '②の場合は、期待している配信IDと実際に届いた配信IDの両方を表示します。',
+      'これまで会場は判定結果を文章でしか出しておらず、診断画面が原因を名指しできませんでした。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1404',
     date: '2026-08-15',
     summary: '黒画面を止めている当人と、ビルドの古さを表示',

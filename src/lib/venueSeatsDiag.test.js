@@ -63,6 +63,38 @@ describe('classifyVenueVisibleCapReason', () => {
   });
 });
 
+describe('mirrorIntake の素通し(v0.1.1405)', () => {
+  /*
+   * ★この関数は「フィールドを個別列挙して作り直す」型。
+   *   ここに足し忘れると venueBar が載せても **黙って落ちる**
+   *   ([[venue-mirror-is-the-primary-path-2026-08-01]] を5回踏んだ箇所)。
+   *   ＝ 書き手が載せたものが読み手に届くことを、この test で固定する。
+   */
+  it('★書き手が載せた判定材料が落ちずに通る', () => {
+    const snap = buildVenueSeatsDiagSnapshot(
+      {
+        enabled: true,
+        mirrorIntake: {
+          changedEvents: 5, keyMatched: 0, keyMissed: 3, accepted: 0, rejectedByGate: 1,
+          lastMissedKeys: ['nls_lane_mirror_lv999'], lastExpectedKey: 'nls_lane_mirror_lv1',
+          lastAcceptedAt: 123, lastRejectReason: 'liveId不一致'
+        }
+      },
+      1000
+    );
+    expect(snap.mirrorIntake).not.toBeNull();
+    expect(snap.mirrorIntake?.keyMissed).toBe(3);
+    expect(snap.mirrorIntake?.lastExpectedKey).toBe('nls_lane_mirror_lv1');
+    expect(snap.mirrorIntake?.lastMissedKeys).toEqual(['nls_lane_mirror_lv999']);
+    expect(snap.mirrorIntake?.lastRejectReason).toBe('liveId不一致');
+  });
+
+  it('未観測なら null(嘘の0を作らない)', () => {
+    const snap = buildVenueSeatsDiagSnapshot({ enabled: true }, 1000);
+    expect(snap.mirrorIntake).toBeNull();
+  });
+});
+
 describe('buildVenueSeatsDiagSnapshot 新フィールド', () => {
   it('perRow/venueMaxRows/seatAreaWidth を数値で載せ、reason を導出する', () => {
     const snap = buildVenueSeatsDiagSnapshot(

@@ -27,6 +27,8 @@
  */
 
 import { canonicalLabel, fromAliveFailure } from './voiceFailureTaxonomy.js';
+// ★v0.1.1405: 会場が鏡を受け取れているかの判定(a/b/c)。判定はあちらが正本。
+import { judgeVenueMirrorIntake } from './venueMirrorIntakeDiag.js';
 
 /** @param {unknown} v @returns {number} */
 function n0(v) {
@@ -172,6 +174,36 @@ export function buildSilentFailureCells(data) {
     } else {
       out.push(cell('comment-revert', '送信の取り消し', 'ok', attempts > 0 ? `取り消しなし(送信${attempts}件)` : '取り消しなし'));
     }
+  }
+
+  /* ── 会場が鏡を受け取れているか ─────────────────────────
+   * ★未解決の「会場一致が鏡stale(656s)で固定・別配信の値が残っている疑い」を
+   *   **肯定/否定できる**セル。書き手(publish)は毎秒動いて見送り0なのに
+   *   会場が見ている鏡が11分古い、という状況で読み手のどこが詰まったかを名指しする。
+   *
+   * ★判定は venueMirrorIntakeDiag.judgeVenueMirrorIntake が正本。
+   *   (a)通知が来ない /(b)別配信の鏡 /(c)関所で全却下 で **打ち手が正反対** なので、
+   *   ここで再判定すると速報と食い違う。
+   */
+  const intake = data?.venueSeatsDiag?.mirrorIntake ?? null;
+  const venueOpen = data?.venueOpen === true;
+  if (!intake) {
+    /*
+     * ★会場を開いていなければ「使っていないから0」= 異常ではない(掟5の左側)。
+     *   開いているのに観測が無いなら、それ自体が症状なので警告にする。
+     */
+    out.push(venueOpen
+      ? cell('venue-intake', '会場の鏡うけとり', 'warn', '会場は開いていますが受け取りの記録がありません')
+      : cell('venue-intake', '会場の鏡うけとり', 'na', '—'));
+  } else {
+    const v = judgeVenueMirrorIntake(intake, Number(data?.nowMs) || Date.now());
+    out.push(cell(
+      'venue-intake', '会場の鏡うけとり',
+      /** @type {'ok'|'warn'|'bad'|'na'} */ (v.level),
+      v.level === 'na'
+        ? '—'
+        : v.nextAction ? `${v.detail} → ${v.nextAction}` : v.detail
+    ));
   }
 
   return out;

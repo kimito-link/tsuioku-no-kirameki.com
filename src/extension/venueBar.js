@@ -5857,6 +5857,31 @@ export function mountVenueBarButton(options = {}) {
       //   観測ゼロなら空文字=行ごと出ない(普段の速報を汚さない)。
       mirrorIntakeLine: formatVenueMirrorIntakeLine(_venueMirrorIntake, Date.now()),
       /*
+       * ★v0.1.1405: 判定の【材料】も載せる(行だけでは画面のセルが作れない)。
+       *
+       * ■ なぜ必要か
+       *   会場が publish していたのは整形済みの1行だけで、(a)通知が来ない /
+       *   (b)別配信の鏡 / (c)関所で却下 を区別するカウンタは会場の外に出ていなかった。
+       *   ＝ 状態速報の本文を人が読む以外に使い道がなく、未解決の
+       *   「会場一致が鏡stale(656s)で固定」を **画面が名指しできなかった**。
+       *   ★[[screen-only-info-never-reaches-the-report-2026-08-11]] の逆向きの穴
+       *     (報告にしか出さない情報は画面に届かない)。
+       *
+       * ★構造のまま渡す=読み手(healthCells)が judgeVenueMirrorIntake で判定する。
+       *   ここで判定結果を文字列化して渡すと、また同じ穴を作る。
+       */
+      mirrorIntake: {
+        changedEvents: _venueMirrorIntake.changedEvents,
+        keyMatched: _venueMirrorIntake.keyMatched,
+        keyMissed: _venueMirrorIntake.keyMissed,
+        accepted: _venueMirrorIntake.accepted,
+        rejectedByGate: _venueMirrorIntake.rejectedByGate,
+        lastMissedKeys: (_venueMirrorIntake.lastMissedKeys || []).slice(0, 3),
+        lastExpectedKey: _venueMirrorIntake.lastExpectedKey,
+        lastAcceptedAt: _venueMirrorIntake.lastAcceptedAt,
+        lastRejectReason: _venueMirrorIntake.lastRejectReason
+      },
+      /*
        * ★v0.1.1348: 会場のアイコン実績を【トップレベル】にも載せる(v0.1.1347 の断線修理)。
        *
        * ■ v0.1.1347 で読み手(aiShareFullText)に `venueSeatsDiag.avatarProbe` を読む行を足したが、
