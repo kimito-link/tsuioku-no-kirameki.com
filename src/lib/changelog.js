@@ -26,6 +26,16 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1409',
+    date: '2026-08-16',
+    summary: '診断タブが重すぎて開かない問題を修正',
+    items: Object.freeze([
+      '項目を100個に増やした際、「◯秒前」のように時間で変わる表示を持つ項目を追加したため、中身が変わっていなくても2秒ごとに画面全体を作り直していました。',
+      '作り直すかどうかの判定を、時間で変わらない値だけで行うようにしました。異常の状態が変われば従来どおり即座に反映されます。',
+      '経過秒数の表示は次の更新で追いつきます。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1408',
     date: '2026-08-16',
     summary: '診断項目が100個になりました（19の枠に分類）',

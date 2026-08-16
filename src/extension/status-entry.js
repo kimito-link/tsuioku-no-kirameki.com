@@ -2304,9 +2304,29 @@ function renderHealthCells(data) {
   } catch {
     _symptomSig = '';
   }
+  /*
+   * ★v0.1.1409(退化の修理): 署名から【毎秒変わる値】を外す。
+   *
+   * ■ 何が起きたか
+   *   v0.1.1403〜1408 で 53→100 セルに増やした際、
+   *   「◯秒前」「◯分経過」のような **時刻由来の文字列** を text に持つセルを
+   *   多数足した。署名は text をそのまま含んでいたので、
+   *   **中身が何も変わっていなくても毎tick 署名が変わる**。
+   *   ＝ diff-skip が一度も効かず、19枠×100セル(約500 DOMノード)を
+   *   **2秒ごとに全再構築**していた。ユーザー実機「診断タブが重すぎて開かない」。
+   *
+   * ★[[status-slow-correlates-with-record-count-2026-08-06]] の教訓どおり、
+   *   重さの原因は件数ではなく **再構築の頻度**。
+   *   ★[[timestamp-in-dedupe-key-double-counts-2026-08-10]] と同じ型＝
+   *     「鍵に時刻を混ぜると毎回別物になる」。
+   *
+   * ■ 直し方: 署名は **level と数値** だけで作る(表示は従来どおり text を出す)。
+   *   level が変われば必ず再描画されるので、**異常の見落としは起きない**。
+   *   秒数の刻みだけが画面に反映されなくなるが、それは次の tick で追いつく。
+   */
   const sig =
     `${v.level}|${v.text}|${_symptomSig}|` +
-    cells.map((c) => `${c.label}:${c.level}:${c.kind === 'pct' ? c.value : c.text || ''}`).join('~');
+    cells.map((c) => `${c.id}:${c.level}:${c.kind === 'pct' ? c.value : ''}`).join('~');
   if (sig === _lastHealthSig) return; // 変化なし=再描画しない。
   _lastHealthSig = sig;
   // v0.1.846: 先頭に総合判定バッジ。満点=「全部緑」でなく「異常ゼロ」(進行中/対象外は正常)。
