@@ -114,7 +114,7 @@
   - `src/lib/monotonicCommentCount.js`
 - **storage キー定義** — chrome.storage のキー名の正本(nls_comments_<lv> 等)
   - `src/lib/storageKeys.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 49</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 50</summary>
 
 - `scripts/dump-panel-state.mjs` — 実機の chrome.storage.local を吸い出して
 - `src/lib/autoBackupState.js` — v0.1.808(星野ロミ式コンポーネント化・第1弾): content-entry.js の巨大化を抑えるため、
@@ -155,6 +155,7 @@
 - `src/lib/sessionSummaryCompareTableHtml.js` — セッションサマリ推移テーブル（renderSessionSummaryComparePanel の <table>）の HTML を組む純関数。
 - `src/lib/sessionSummaryMirror.js` — セッション比較(記録サマリの推移)の「鏡」スナップショット純関数
 - `src/lib/sessionSummaryMirrorKey.js` — セッション比較(記録サマリの推移)鏡の storage キー正本
+- `src/lib/sourceProvenance.js` — 値を「**どの経路で取れたか**」で記録し、経路の劣化を検出する(純関数)。
 - `src/lib/statCardsMirror.js` — 数字カード鏡のスナップショット純関数。popup 上部の数字カード(記録N件・推定同時接続・来場者数)と
 - `src/lib/statCardsMirrorDom.js` — 数字カード鏡(記録/推定同時接続/来場者数+公式統計チップ)の【値セット部分】を、
 - `src/lib/statCardsMirrorKey.js` — popup 上部の数字カード群(記録N件・推定同時接続・来場者数・公式統計チップ)を status.html に
@@ -950,7 +951,7 @@
 
 ## 🧬 修正系譜マップ(この系統のバグを過去にどう直したか)
 
-> changelog 全 741 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
+> changelog 全 742 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
 
 ### 💾 記録件数 (98版)
 - `v0.1.1407` 2026-08-16 — 診断を74→85項目に。読み上げと公式値の原因を分離
@@ -1052,7 +1053,8 @@
 - `v0.1.672` 2026-06-10 — コメビュの二重表示の残りを根治
 - `v0.1.665` 2026-06-10 — 長い配信が7割等で止まったままになるのを根治
 
-### 📥 コメント取得 (175版)
+### 📥 コメント取得 (176版)
+- `v0.1.1412` 2026-08-16 — ニコ生の作りが変わる前に気づく仕組みを追加
 - `v0.1.1408` 2026-08-16 — 診断項目が100個になりました（19の枠に分類）
 - `v0.1.1407` 2026-08-16 — 診断を74→85項目に。読み上げと公式値の原因を分離
 - `v0.1.1390` 2026-08-14 — 読み上げ・コメント送信・会場モード・ギフト/広告の専用チェックを追加

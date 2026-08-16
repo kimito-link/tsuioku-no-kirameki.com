@@ -208,7 +208,15 @@ export const DIAGNOSIS_REGISTRY = Object.freeze([
   reg('whiteout-culprit', 'スクロール時の犯人', 'render', 1, false),
   reg('mt-owner2', '2番目に止めている処理', 'render', 1, false),
   reg('mt-spread', '止めている処理の数', 'render', 1, false),
-  reg('mt-average', '1回あたりの停止', 'render', 1, false)
+  reg('mt-average', '1回あたりの停止', 'render', 1, false),
+  /*
+   * ★v0.1.1412: 取得経路の劣化。**他の100セルと役割が違う唯一のセル**。
+   *   他は「いま壊れているか」を見るが、これは **「これから壊れそうか」** を見る。
+   *   ニコ生が構造を変えると、症状が出る前にまず取得経路が
+   *   embedded-data(JSON) → dom-text(画面文字) へ落ちる。そこで鳴らす。
+   *   判定の正本は sourceProvenance.js。
+   */
+  reg('source-provenance', 'データの取り方', 'ingest', 1, false)
 ]);
 
 /** id → 観点 の索引(集計で O(1) 参照)。 */

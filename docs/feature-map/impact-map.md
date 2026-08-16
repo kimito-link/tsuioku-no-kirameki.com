@@ -371,6 +371,7 @@
 | `src/data/sources/laneFromStoredComments.js` | 1 | ポップアップ(応援レーン) |
 | `src/data/store/laneStore.js` | 1 | ポップアップ(応援レーン) |
 | `src/domain/lane/aggregate.js` | 1 | ポップアップ(応援レーン) |
+| `src/domain/observations/vocabulary.js` | 1 | 状態速報ページ |
 | `src/domain/user/avatar.js` | 1 | ポップアップ(応援レーン) |
 | `src/extension/backfill-sw-entry.js` | 1 | バックフィル SW |
 | `src/extension/comeview-entry.js` | 1 | コメビュ(別窓) |
@@ -744,6 +745,7 @@
 | `src/lib/sidepanelSelfDiagKey.js` | 1 | 状態速報ページ |
 | `src/lib/silentFailureCells.js` | 1 | 状態速報ページ |
 | `src/lib/singleFlightByKey.js` | 1 | ポップアップ(応援レーン) |
+| `src/lib/sourceProvenance.js` | 1 | 状態速報ページ |
 | `src/lib/standalonePopupClose.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/statCardsMirror.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/statCardsMirrorDom.js` | 1 | ポップアップ(応援レーン) |

@@ -54,8 +54,17 @@ function maximalInput() {
       recordedCount: 10, officialCommentCount: 100, officialRatePct: 10,
       paintCount: 999, commentCount: 30, repaintReasons: { storage_changed: 500 },
       lastPaintMs: 1200, tabCount: 2,
-      ended: true, backfillDone: false
+      ended: true, backfillDone: false,
+      // ★v0.1.1412: 取得経路(content が既に付けている値)。dom=弱い経路へ落ちた状態
+      viewerCountSource: 'dom'
     }],
+    /*
+     * ★v0.1.1412: 前回までの経路の履歴。embedded で取れていた記録があるので、
+     *   上の 'dom' は **降格** と判定される＝セルが na を脱する。
+     */
+    sourceProvenanceStored: {
+      viewerCount: { best: 'embedded-data', current: 'embedded-data', samples: 5, lastAt: 1 }
+    },
     fastDiag: { content: {
       networkErrorProbe: { ndgrConnectStatus: 'connected' },
       // ★v0.1.1408: スクロール白化の犯人(移動 vs 描き直し)
@@ -254,6 +263,21 @@ describe('計器の網羅ゲート(登録=表示)', () => {
       stillNa,
       `入力を与えたのに na のまま(=入力の配線漏れの疑い): ${stillNa.join(', ')}`
     ).toEqual([]);
+  });
+
+  it('★取得経路の履歴が届いていること(降格を判定できる状態か)', () => {
+    /*
+     * ★v0.1.1412: このセルは履歴が無くても `warn`(脆い)で出るため、
+     *   「na を脱するか」の検査では **履歴の配線漏れを検出できない**。
+     *   ＝ 上のゲートを通っても「降格を判定できない状態」がありうる。
+     *   降格(bad)まで到達することを別に断言する。
+     */
+    const cell = cells.find((c) => c.id === 'source-provenance');
+    expect(cell, 'source-provenance セルが出ていない').toBeTruthy();
+    expect(
+      cell?.level,
+      '履歴(sourceProvenanceStored)が届いていないと bad にならない＝降格を検出できない'
+    ).toBe('bad');
   });
 
   it('★借金リストが増えていない(減らすのは歓迎・増やすのは禁止)', () => {

@@ -74,6 +74,8 @@ import {
 } from '../lib/liveviewPublishOutcomeKey.js';
 // KEY_PREVIEW_RENDER_ACK は statusExtrasBatch.js の1バッチ get 内で読む(重さ根治 P2・2026-07-06)。
 import { buildHealthCells, summarizeHealthVerdict } from '../lib/healthCells.js';
+// ★v0.1.1412: 取得経路の履歴(降格＝ニコ生の構造変更の予兆 を検出する)。
+import { fromStorable, toStorable, noteSource } from '../lib/sourceProvenance.js';
 import { buildVoiceDiagLine } from '../lib/voiceDiag.js';
 import { KEY_VOICE_DIAG } from '../lib/voiceDiagKey.js';
 // v0.1.1010: 取り込み中の更新激重(7071ms)を所要比例の間引きで緩和する純関数。
@@ -359,6 +361,13 @@ let _extrasCacheAt = 0;
  * @type {{ at?: number, reason?: string, tabCount?: number, reloaded?: number }|null}
  */
 let _autoTabReloadRec = null;
+/**
+ * ★v0.1.1412: 取得経路の履歴(storage 由来)。
+ *   「先週は embedded-data で取れていた」を覚えていないと降格を判定できない。
+ */
+const KEY_SOURCE_PROVENANCE = 'nls_source_provenance_v1';
+/** @type {Record<string, any>|null} */
+let _sourceProvenanceStored = null;
 // 重さ根治 P3(2026-07-06): loadCustomSoundDiagSafe(IndexedDB open+count+fetch)の幽霊 read 対策。
 //   前回発行分が未解決の間は新規発行せず、直近スナップショット(fallback)を呼び出し側で渡す。
 const _customSoundDiagGuard = createInFlightGuard(() => loadCustomSoundDiagSafe(), { ceilingMs: 15000 });
@@ -870,6 +879,17 @@ async function refresh(opts = {}) {
           .then((b) => (b && b.nls_last_auto_tab_reload) || null),
         _slice()
       ).catch(() => _autoTabReloadRec);
+      /*
+       * ★v0.1.1412: 取得経路の履歴(1キー・extras=12秒間引き)。
+       *   ★コアには足さない([[status-extras-read-not-core-read]])。
+       *   降格は**時間をまたいで**起きるので、これが無いと計器は永久に鳴らない。
+       */
+      step = 'sourceProvenance';
+      _sourceProvenanceStored = await runStorageOpWithTimeout(
+        () => chrome.storage.local.get(KEY_SOURCE_PROVENANCE)
+          .then((b) => (b && b[KEY_SOURCE_PROVENANCE]) || null),
+        _slice()
+      ).catch(() => _sourceProvenanceStored);
       _extrasCache = { reportPreview, watchTabMap, trendFindings, laneDiag, laneMirror, statCardsMirror, northStarMirror, voiceDiag, venueSeatsDiag, publishOutcomeRec, commentTimelineMirror, giftHistoryMirror, roomHeatMirror, sessionSummaryMirror, previewRenderAck, backfillLiveMetric, giftEffectDiag, milestoneEffectDiag, customSoundDiag, voiceEffectDiag, bgmPhaseDiag, opSoundEffectDiag, commentPostDiag, instantPushDiag, channelSwitchDiag, highlightLedger, scoreAnnounceDiag, sidepanelSelfDiag };
       _extrasCacheAt = Date.now();
       _mark('extras');
@@ -1996,6 +2016,28 @@ function renderAll({ extrasAgeMs, lvList, summaries, fastDiag, popupDiag, backfi
     const cap = Number(laneMirror?.capturedAt || 0);
     return cap > 0 ? Math.max(0, Date.now() - cap) : 0;
   })();
+  /*
+   * ★v0.1.1412: 取得経路の履歴を更新して保存する。
+   *
+   *   ★これが無いと「先週は embedded-data だった」を誰も覚えず、
+   *     降格(=ニコ生が構造を変えた)を**永久に検出できない**。
+   *   ★書き込みは値が変わったときだけ(毎回書くと storage 競合を自分で増やす。
+   *     今セッションで「診断が重い」の真因が**書き込み競合**だと実測済み)。
+   */
+  safeSection('取得経路の記録', () => {
+    const st = fromStorable(_sourceProvenanceStored);
+    for (const lv of livesData) {
+      if (!lv) continue;
+      noteSource(st, { field: 'viewerCount', source: lv.viewerCountSource, at: Date.now() });
+    }
+    const next = toStorable(st);
+    const prevJson = JSON.stringify(_sourceProvenanceStored || {});
+    const nextJson = JSON.stringify(next);
+    if (nextJson === prevJson) return; // 変化なし=書かない
+    _sourceProvenanceStored = next;
+    chrome.storage.local.set({ [KEY_SOURCE_PROVENANCE]: next }).catch(() => { /* 保存失敗は無害 */ });
+  });
+
   safeSection('健全度パネル', () => renderHealthCells({
     livesData, fastDiag, popupDiag, voiceDiag, venueSeatsDiag, laneDiag,
     giftEffectDiag, milestoneEffectDiag, previewRenderAck, laneMirror, backfillLiveMetric,
@@ -2020,6 +2062,8 @@ function renderAll({ extrasAgeMs, lvList, summaries, fastDiag, popupDiag, backfi
      */
     opSoundEffectDiag,
     bgmPhaseDiag,
+    // ★v0.1.1412: 取得経路の履歴(降格＝ニコ生の構造変更の予兆 を判定する材料)
+    sourceProvenanceStored: _sourceProvenanceStored,
     buildId: typeof NL_BUILD_ID !== 'undefined' ? NL_BUILD_ID : '',
     appVersion: (() => {
       try { return String(chrome.runtime.getManifest()?.version || ''); } catch { return ''; }
@@ -3178,6 +3222,13 @@ function summarizeOneLive(lv, summary, snapshot, perfDiag, endedFlag) {
     broadcasterName,
     title,
     thumbnailUrl,
+    /*
+     * ★v0.1.1412: 視聴者数を「どの経路で取れたか」。
+     *   content-entry が既に付けている値('ws'|'embedded'|'dom'|'none')をそのまま運ぶ。
+     *   embedded(JSON) → dom(画面文字) へ落ちたら**ニコ生が構造を変えた予兆**として鳴らす
+     *   (判定は sourceProvenance.js)。ここで落とすと計器が永久に鳴らない。
+     */
+    viewerCountSource: snap?.viewerCountSource,
     recordedCount,
     officialCommentCount,
     officialRatePct,

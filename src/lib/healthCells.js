@@ -23,6 +23,11 @@ import { buildVoiceDetailCells } from './voiceDetailCells.js';
 import { buildExternalFetchCells } from './externalFetchCells.js';
 // ★v0.1.1408: 最終弾(識別・操作音・BGM・記録の質・多タブ)。
 import { buildFinalDetailCells } from './finalDetailCells.js';
+/*
+ * ★v0.1.1412: 取得経路の劣化検出（「これから壊れそうか」を見る唯一のセル）。
+ *   他のセルは「いま壊れているか」を見るが、これは**壊れる前に鳴る**。
+ */
+import { buildSourceProvenanceCell, fromStorable, noteSource } from './sourceProvenance.js';
 
 /**
  * healthCells.js — status ファーストビューの「健全度セル」を作る純関数(v0.1.843)。
@@ -478,7 +483,8 @@ function buildLaneHealthCells(laneDiag) {
  * @param {{ livesData?: any[], fastDiag?: any, popupDiag?: any, voiceDiag?: any, venueSeatsDiag?: any, laneDiag?: any, giftEffectDiag?: any, milestoneEffectDiag?: any, previewRenderAck?: any, laneMirror?: any, backfillLiveMetric?: any, nowMs?: number,
  *   instantPushDiag?: any, commentPostDiag?: any, mainThreadBlocker?: any, liveElapsedMs?: number,
  *   venueOpen?: boolean, venueMirrorAgeMs?: number, venueTiers?: any, venueHasGiftData?: boolean,
- *   customSoundDiag?: any, buildId?: unknown, appVersion?: unknown }} data
+ *   customSoundDiag?: any, buildId?: unknown, appVersion?: unknown,
+ *   opSoundEffectDiag?: any, bgmPhaseDiag?: any, sourceProvenanceStored?: any }} data
  *   ★v0.1.1390 で追加した後半7つは、ユーザー要望の特化セル5種の入力
  *   (読み上げ⇄吹き出し / コメント送信 / 会場モードの鮮度 / ギフト広告の通り道 / メインスレッド)。
  * @returns {HealthCell[]}
@@ -854,6 +860,29 @@ export function buildHealthCells(data) {
   // ★v0.1.1408: 最終弾(識別・操作音・BGM・記録の質・多タブ)。
   try {
     for (const c of buildFinalDetailCells(data)) cells.push(c);
+  } catch { /* 同上 */ }
+
+  /*
+   * ★v0.1.1412: 取得経路の劣化（ニコ生が構造を変えた予兆）。
+   *
+   *   ★入力は **既に publish 済みの値**だけを使う（新しい read を増やさない）。
+   *     - `sourceProvenanceStored`: 前回までの経路の履歴（storage 由来）
+   *     - 各配信の `viewerCountSource`: content が既に付けている 'ws'|'embedded'|'dom'
+   *   ＝ 診断が本体より重くならないようにする（observer effect の回避）。
+   */
+  try {
+    const provState = fromStorable(data?.sourceProvenanceStored);
+    const lives = Array.isArray(data?.livesData) ? data.livesData : [];
+    for (const lv of lives) {
+      if (!lv) continue;
+      // ★配信ごとに別フィールドにはしない（同じ「視聴者数の取り方」を見たい）
+      noteSource(provState, {
+        field: 'viewerCount',
+        source: lv.viewerCountSource,
+        at: num(lv.watchSnapshotAt) || num(data?.nowMs) || Date.now()
+      });
+    }
+    cells.push(buildSourceProvenanceCell(provState));
   } catch { /* 同上 */ }
 
   return cells;
