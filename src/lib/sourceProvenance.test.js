@@ -172,7 +172,31 @@ describe('取得経路の記録と劣化検出', () => {
       const stored = toStorable(s);
       const json = JSON.stringify(stored);
       expect(json).not.toContain('value');
-      expect(Object.keys(stored.viewerCount).sort()).toEqual(['best', 'current', 'lastAt', 'samples']);
+      expect(Object.keys(stored.viewerCount).sort()).toEqual(['best', 'current']);
+    });
+
+    it('★経路が変わらなければ保存値は同一＝storageに書かない(v0.1.1414の退化防止)', () => {
+      /*
+       * ■ v0.1.1412 で私が出した退化(実機 更新17.1秒)
+       *   toStorable が samples(毎tick+1) と lastAt(毎tick変化) を含んでいたため、
+       *   呼び出し側の「前回と同じなら書かない」判定が**一度も効かず**、
+       *   2秒ごとに storage へ書き続けていた。
+       *   ★診断が重い真因は書き込み競合だと実測済みなのに、自分で競合を増やしていた。
+       *
+       * ★経路が同じなら JSON も同一であることを固定する。
+       */
+      let stored = null;
+      const writes = [];
+      for (const src of ['embedded', 'embedded', 'embedded', 'dom', 'dom']) {
+        const st = fromStorable(stored);
+        // at は毎回違う値を渡す(実運用と同じ)。これで保存値が変わってはいけない。
+        noteSource(st, { field: 'viewerCount', source: src, at: Date.now() + Math.random() * 1000 });
+        const next = toStorable(st);
+        writes.push(JSON.stringify(next) !== JSON.stringify(stored || {}));
+        stored = next;
+      }
+      // 1回目(初回)と4回目(経路が落ちた)だけ書く
+      expect(writes).toEqual([true, false, false, true, false]);
     });
   });
 
