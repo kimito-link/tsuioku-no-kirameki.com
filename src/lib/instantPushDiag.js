@@ -19,14 +19,34 @@
  *   avgGapMs: number,       // gapMs(描画完了まで)の EMA 平均ms(-1=未計測)
  *   lastDeliveryGapMs: number, // 直近1回の「送信→ハンドラ受信」ms=配達のみ(-1=未計測)
  *   avgDeliveryGapMs: number,  // deliveryGapMs の EMA 平均ms(-1=未計測)
+ *   hiddenDeliveries: number,  // 受信時に document.hidden だったバッチ数(累計)
+ *   visibleDeliveries: number, // 受信時に可視だったバッチ数(累計)
+ *   avgVisibleDeliveryGapMs: number, // 可視中だけの配達 EMA 平均ms(-1=未計測)
  *   lastEventAt: number     // 最後にイベントが起きた時刻(epoch ms・0=未観測)
  * }} InstantPushDiagState
  *
+ * ★v0.1.1416 (2026-08-16 実機の矛盾を解くために追加):
+ *   速報に「最大タイマー遅延=753ms ✅健全」と「配達平均47,686ms」が同時に出た。
+ *   どちらも嘘ではなく、**測っている時間帯が違う**だけだった:
+ *     - タイマー計器は hidden 中を数えない(Chrome の間引きを停止と誤報しないため)
+ *     - postMessage は間引かれないので、配達 gap だけが hidden 中も伸び続ける
+ *   ＝配達平均を1つの数で出す限り、「裏タブで溜まっただけ(正常)」と
+ *     「可視なのに詰まっている(異常)」が混ざって**次の一手が決まらない**。
+ *   可視中だけの平均を併記して、この2つを数字で分離する。
+ *   ★新しい storage read は足さない(既存 delta に相乗り)=[[instrument-can-kill-the-page-it-measures-2026-08-16]]
+ *
  * robust-arch Phase 0 (2026-07-07): lastGapMs/avgGapMs は「送信→**描画完了**」の全経路。
  *   これを「配達(送信→ハンドラ受信)」と「描画(受信→描画完了)」に分けるため
- *   lastDeliveryGapMs/avgDeliveryGapMs(配達のみ)を追加した。描画分 ≈ avgGapMs - avgDeliveryGapMs。
- *   MVP(min-gap 3000→12000+prune)が外れた場合、この2値の大小で次の1手が数値で確定する
- *   (配達支配→書込輻輳=設計通り / 描画支配→Phase3 を繰り上げ)。既存 avgGapMs の意味は不変。
+ *   lastDeliveryGapMs/avgDeliveryGapMs(配達のみ)を追加した。
+ *
+ * ★v0.1.1416 で【撤回】: 「描画分 ≈ avgGapMs - avgDeliveryGapMs」は**誤り**だった。
+ *   この2つは母集団が違う EMA なので引いてはいけない:
+ *     - avgDeliveryGapMs … 受信ハンドラで【毎バッチ】更新
+ *     - avgGapMs         … 描画時に、バッファ内で commentNo を持つ【最後の1行だけ】が
+ *                          sample になる(popup-entry.js のループが毎回上書きする)
+ *   実機(2026-08-16)で両者が同程度に大きくなり、差が0付近に落ちて
+ *   「描画平均0ms＝描画は無罪」と読めてしまった(そう読んで調査が止まった)。
+ *   → 引き算は廃止し、両方をそのまま並べる。[[check-what-the-number-counts-2026-08-09]]
  */
 
 /** 初期 即時プッシュ診断 state。 */
@@ -42,6 +62,9 @@ export function makeInitialInstantPushDiag() {
     avgGapMs: -1,
     lastDeliveryGapMs: -1,
     avgDeliveryGapMs: -1,
+    hiddenDeliveries: 0,
+    visibleDeliveries: 0,
+    avgVisibleDeliveryGapMs: -1,
     lastEventAt: 0
   };
 }
@@ -55,7 +78,8 @@ export function makeInitialInstantPushDiag() {
  * @param {Partial<InstantPushDiagState>|null|undefined} prev
  * @param {{ sentCount?: number, sentRows?: number, receivedCount?: number, receivedRows?: number,
  *   rejectedCount?: number, paintedRows?: number, lastGapMs?: number, avgGapMs?: number,
- *   lastDeliveryGapMs?: number, avgDeliveryGapMs?: number, lastEventAt?: number }} delta
+ *   lastDeliveryGapMs?: number, avgDeliveryGapMs?: number, hiddenDeliveries?: number,
+ *   visibleDeliveries?: number, avgVisibleDeliveryGapMs?: number, lastEventAt?: number }} delta
  * @returns {InstantPushDiagState}
  */
 export function applyInstantPushDiagDelta(prev, delta) {
@@ -79,6 +103,13 @@ export function applyInstantPushDiagDelta(prev, delta) {
     avgGapMs: replaceOrKeep(d.avgGapMs, base.avgGapMs),
     lastDeliveryGapMs: replaceOrKeep(d.lastDeliveryGapMs, base.lastDeliveryGapMs),
     avgDeliveryGapMs: replaceOrKeep(d.avgDeliveryGapMs, base.avgDeliveryGapMs),
+    // 可視/hidden の件数は累計(加算)、可視平均は EMA なので置換。
+    hiddenDeliveries: base.hiddenDeliveries + addend(d.hiddenDeliveries),
+    visibleDeliveries: base.visibleDeliveries + addend(d.visibleDeliveries),
+    avgVisibleDeliveryGapMs: replaceOrKeep(
+      d.avgVisibleDeliveryGapMs,
+      base.avgVisibleDeliveryGapMs
+    ),
     lastEventAt: replaceOrKeep(d.lastEventAt, base.lastEventAt)
   };
 }
@@ -103,6 +134,9 @@ function buildInstantPushDiagSnapshotInternal(diag) {
     avgGapMs: num(d.avgGapMs, base.avgGapMs),
     lastDeliveryGapMs: num(d.lastDeliveryGapMs, base.lastDeliveryGapMs),
     avgDeliveryGapMs: num(d.avgDeliveryGapMs, base.avgDeliveryGapMs),
+    hiddenDeliveries: num(d.hiddenDeliveries, base.hiddenDeliveries),
+    visibleDeliveries: num(d.visibleDeliveries, base.visibleDeliveries),
+    avgVisibleDeliveryGapMs: num(d.avgVisibleDeliveryGapMs, base.avgVisibleDeliveryGapMs),
     lastEventAt: num(d.lastEventAt, base.lastEventAt)
   };
 }
@@ -152,11 +186,48 @@ export function buildInstantPushDiagLines(snap, nowMs) {
   // robust-arch Phase 0: 配達(送信→受信) と 描画(受信→描画完了) の内訳を1行で見せる。
   //   どちらが支配的かで MVP 後の次の一手が数値で決まる(嘘をつかないため未計測は出さない)。
   if (Number.isFinite(avgDeliveryGapMs) && avgDeliveryGapMs >= 0) {
+    /*
+     * ★v0.1.1416: 「描画平均」を引き算で出すのをやめた。
+     *   avgGapMs と avgDeliveryGapMs は **母集団が違う** EMA:
+     *     - avgDeliveryGapMs … 受信ハンドラで【毎バッチ】更新
+     *     - avgGapMs         … 描画時に、バッファ内で commentNo を持つ
+     *                          【最後の1行だけ】が gapSample になる(popup-entry.js の
+     *                          ループが毎回上書きするため)
+     *   引いてよい2数ではないのに引いていたので、両者が同程度に大きいと
+     *   差が0付近に落ち、実機で「描画平均0ms」=**描画は無罪**と読めてしまった。
+     *   ＝無罪の証明になっていない。引き算をやめ、両方をそのまま並べる。
+     *   [[check-what-the-number-counts-2026-08-09]]
+     */
     const paintPart =
-      Number.isFinite(avgGapMs) && avgGapMs >= 0
-        ? ` / 描画平均${Math.max(0, avgGapMs - avgDeliveryGapMs)}ms`
-        : '';
+      Number.isFinite(avgGapMs) && avgGapMs >= 0 ? ` / 送信→描画平均${avgGapMs}ms` : '';
     lines.push(`  → 内訳: 配達平均${avgDeliveryGapMs}ms${paintPart}`);
+
+    /*
+     * ★配達が遅いとき、それが「裏タブで溜まっただけ(正常)」なのか
+     *   「可視なのに詰まっている(異常)」なのかを分ける。ここが次の一手の分岐点。
+     */
+    const hiddenN = Number(snap.hiddenDeliveries) || 0;
+    const visibleN = Number(snap.visibleDeliveries) || 0;
+    const avgVisible = Number(snap.avgVisibleDeliveryGapMs);
+    if (hiddenN > 0 || visibleN > 0) {
+      const visiblePart =
+        Number.isFinite(avgVisible) && avgVisible >= 0
+          ? `可視中の配達平均${avgVisible}ms`
+          : '可視中の配達は未計測';
+      lines.push(`  → ${visiblePart}(可視${visibleN}件 / 裏タブ${hiddenN}件)`);
+      /*
+       * 次の一手を1行で言う([[instrument-must-name-the-cause-2026-08-01]])。
+       * 全体平均が大きくても可視中が小さいなら、それは裏タブのタイマー間引きで
+       * 説明が付く=体感には出ない。追うべきは可視中の値。
+       */
+      if (Number.isFinite(avgVisible) && avgVisible >= 0) {
+        lines.push(
+          avgVisible >= 1000
+            ? '  → 🔴可視中でも配達が1秒超=iframeのイベントループが詰まっている(描画側を直しても消えない)'
+            : '  → ✅可視中の配達は健全=全体平均の大きさは裏タブ滞留で説明が付く(体感には出ない)'
+        );
+      }
+    }
   }
   return lines;
 }

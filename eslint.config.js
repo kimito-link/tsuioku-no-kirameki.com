@@ -320,7 +320,19 @@ export default [
     //   (storage保存は10秒間引きなので、無いと最大10秒판定が遅れる)。
     //   ★判定・正規化・上限の本体は純関数 src/lib/verifiedAvatarRegistry.js
     //     (単体11 + 配線5テスト)に隔離済み。popup 側は DOM/storage グルーのみ。
-    rules: { 'max-lines': ['error', { max: 22343, skipBlankLines: false, skipComments: false }] }
+    // ★2026-08-17(v0.1.1416) 22343 → 22381(+38)。コメント47秒遅延の調査を止めていた
+    //   【計器の矛盾】を解いた。同じ速報に「最大タイマー遅延=753ms ✅健全」と
+    //   「即時プッシュ 配達平均47,686ms」が並んでいたが、**どちらも嘘ではなかった**:
+    //     - タイマー計器は hidden 中を数えない(Chrome の間引きを停止と誤報しないため・正しい)
+    //     - postMessage は間引かれないので、配達 gap だけが hidden 中も伸び続ける
+    //   ＝配達平均が1つの数のままでは「裏タブで溜まっただけ(正常)」と
+    //     「可視なのに詰まっている(異常)」が混ざり、次の一手が決まらなかった。
+    //   増分は可視中だけの EMA 変数1本と、受信ハンドラでの可視/hidden 振り分け + 根拠コメント。
+    //   ★新しい storage read は足していない(既存 delta に相乗り)。計器を足して診断を
+    //     重くした v1403-1408 の再演を避けるため
+    //     ([[instrument-can-kill-the-page-it-measures-2026-08-16]])。
+    //   ★判定・文言の本体は純関数 src/lib/instantPushDiag.js(変異で赤を確認済)。
+    rules: { 'max-lines': ['error', { max: 22381, skipBlankLines: false, skipComments: false }] }
   },
   {
     files: ['src/extension/popup/**/*.js'],

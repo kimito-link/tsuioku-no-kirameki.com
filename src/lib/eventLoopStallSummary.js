@@ -108,7 +108,19 @@ export function summarizeEventLoopStall(series) {
   const line = stalled
     ? `最大タイマー遅延=${maxDelayMs}ms 🔴イベントループ停止(予定t+${maxDelayAtSchedMs}msの点で検知)` +
       ' ★幕/シェードは下流=描画側を直しても消えない。スレッドを止めている処理を探すこと'
-    : `最大タイマー遅延=${maxDelayMs}ms ✅イベントループは健全(観測${observed}点)`;
+    : /*
+       * ★v0.1.1416: 「健全」を全称で言わない(2026-08-16 実機・この1行が調査を止めた)。
+       *   同じ速報に「最大タイマー遅延=753ms ✅イベントループは健全」と
+       *   「即時プッシュ 配達平均47,686ms」が並び、両方とも嘘ではなかった。
+       *   この計器が見ているのは【この文書の・タイマーが動く時間帯だけ】:
+       *     - iframe の子(popup.html)は別勘定(longtask も別・親が健全でも子は詰まりうる)
+       *     - hidden 中は Chrome がタイマーを間引くので観測から落ちる。
+       *       ところが postMessage は間引かれない=配達 gap だけが hidden 中も伸び続ける。
+       *   ＝「健全」と言い切れるのは可視かつ同一文書のときだけ。範囲を名乗る。
+       *   [[measure-the-region-you-claim-2026-08-10]]
+       */
+      `最大タイマー遅延=${maxDelayMs}ms ✅この文書の可視中は健全(観測${observed}点)` +
+      ' ※hidden中と子iframeは対象外=配達遅延の無罪証明にはならない';
 
   return { observed, maxDelayMs, maxDelayAtSchedMs, stalled, line };
 }

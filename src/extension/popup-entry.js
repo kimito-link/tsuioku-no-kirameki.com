@@ -6288,11 +6288,28 @@ let _instantPushAvgGapMsLocal = -1;
 
 /**
  * robust-arch Phase 0 (2026-07-07・計器のみ・挙動不変): 「配達のみ」(送信→ハンドラ受信)の
- * EMA 平均をメモリ上だけで追跡する。_instantPushAvgGapMsLocal(送信→描画完了=全経路)から
- * これを引けば「描画分」が出る。どちらが支配的かで MVP 後の次の一手が数値で決まる。
+ * EMA 平均をメモリ上だけで追跡する。
+ *
+ * ★v0.1.1416 訂正: 旧コメントは「_instantPushAvgGapMsLocal から これを引けば描画分が出る」と
+ *   書いていたが、**引いてはいけない2数**だった。母集団が違う:
+ *     - この値              … 受信ハンドラで【毎バッチ】更新
+ *     - _instantPushAvgGapMsLocal … 描画時に、バッファ内で commentNo を持つ
+ *                            【最後の1行だけ】が sample になる(下のループが毎回上書きする)
+ *   実機(2026-08-16)で両者が同程度に大きくなり、差が0付近に落ちて
+ *   「描画平均0ms=描画は無罪」と読めてしまった。引き算は instantPushDiag.js 側で廃止済。
  * @type {number} -1=未計測
  */
 let _instantPushAvgDeliveryGapMsLocal = -1;
+
+/**
+ * ★v0.1.1416: 【可視中だけ】の配達 EMA 平均。
+ * 裏タブでは Chrome がタイマーを間引くので配達 gap は正常でも伸びる(postMessage 自体は
+ * 間引かれないので、この経路の gap には裏タブ滞留がそのまま乗る)。
+ * 全体平均だけでは「裏タブで溜まっただけ(正常)」と「可視なのに詰まっている(異常)」が
+ * 混ざり、次の一手が決まらない。可視中だけを別に持って分離する。
+ * @type {number} -1=未計測
+ */
+let _instantPushAvgVisibleDeliveryGapMsLocal = -1;
 
 /**
  * v0.1.1092: 即時プッシュバッファの内容を STORY_SOURCE_STATE へ合流し、レーンだけを軽量に再描画する。
@@ -6407,9 +6424,30 @@ function handleInstantCommentPushMessage(event) {
       _instantPushAvgDeliveryGapMsLocal,
       deliveryGapMs
     );
+    /*
+     * ★v0.1.1416: 可視/裏タブを分けて数える(新しい storage read は足さない=
+     *   既存 delta に相乗りさせるだけ)。
+     *   裏タブでは Chrome がタイマーを間引くので配達 gap は正常でも伸びる。
+     *   一方 postMessage 自体は間引かれないため、この経路の gap だけが
+     *   「裏タブ滞留」と「本当に詰まっている」を混ぜて持ってしまう。
+     *   ＝可視中だけの平均を別に持たないと、47秒が異常なのか正常なのか判定できない。
+     */
+    const hiddenNow = typeof document !== 'undefined' && document.hidden === true;
+    if (!hiddenNow) {
+      _instantPushAvgVisibleDeliveryGapMsLocal = computeInstantPushGapAverage(
+        _instantPushAvgVisibleDeliveryGapMsLocal,
+        deliveryGapMs
+      );
+    }
     deliveryGapDelta = {
       lastDeliveryGapMs: deliveryGapMs,
-      avgDeliveryGapMs: _instantPushAvgDeliveryGapMsLocal
+      avgDeliveryGapMs: _instantPushAvgDeliveryGapMsLocal,
+      ...(hiddenNow
+        ? { hiddenDeliveries: 1 }
+        : {
+            visibleDeliveries: 1,
+            avgVisibleDeliveryGapMs: _instantPushAvgVisibleDeliveryGapMsLocal
+          })
     };
   }
   noteInstantPushDiagReceived({
