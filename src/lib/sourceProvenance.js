@@ -224,11 +224,22 @@ export function toStorable(state) {
   for (const f of fields) {
     const p = state.byField[f];
     if (!p || !p.best) continue;
+    /*
+     * ★v0.1.1414: **経路だけを保存する**(samples/lastAt は保存しない)。
+     *
+     * ■ なぜ外したか(v0.1.1412 で私が出した退化・実機 更新17.1秒)
+     *   samples は毎tick +1、lastAt は毎tick 変わるので、
+     *   呼び出し側の「前回と同じなら書かない」判定が**一度も効かなかった**。
+     *   ＝ 2秒ごとに storage へ書き続けていた。
+     *   ★診断が重い真因は **書き込み競合**(同じreadが1ms→217ms)だと
+     *     自分で実測しておきながら、その競合を自分で増やしていた。
+     *
+     * ★保存するのは「どの経路だったか」だけでよい。降格判定に必要なのは best と current。
+     *   経路が変わらない限り JSON が同一になり、**書き込みが止まる**。
+     */
     out[f] = {
       best: String(p.best),
-      current: String(p.current || p.best),
-      samples: Number(p.samples) || 0,
-      lastAt: Number(p.lastAt) || 0
+      current: String(p.current || p.best)
     };
   }
   return out;

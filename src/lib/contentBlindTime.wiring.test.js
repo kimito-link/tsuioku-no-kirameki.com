@@ -133,4 +133,70 @@ describe('★シェードの上限 — 待たせるほど黒く見える', () =>
     const css = Number(popupHtml.match(/animation: nl-init-shade-css-failsafe (\d+)s/)[1]) * 1000;
     expect(css).toBeGreaterThan(js);
   });
+
+  it('★CSS保険は「不透明のまま待ち続けない」(v0.1.1414・実機で黒かった真因)', () => {
+    /*
+     * ■ 何が起きていたか
+     *   旧 keyframes は `0%, 93% { opacity: 1 }` = 5秒のうち **4.65秒は完全不透明**。
+     *   JS 上限は 2.5秒に短縮済みだったが、JS の解除が遅れると
+     *   **この CSS が体感の黒時間を決めていた**。
+     *   実機速報: shadeAgeMs 427 / shadeDone false / dismissCalls 0
+     *   ＝JS がまだ解除を呼べていない区間で全面が覆われていた。
+     *
+     * ★総時間(5s)だけを見る上の検査では**この穴を検出できなかった**。
+     *   「いつ薄れ始めるか」を別に固定する。
+     */
+    /*
+     * ★ブロック全体を取る。`[\s\S]*?\}` だと **最初の } で止まり**、
+     *   1行目しか読めずに検査が素通りする(実際にこれで変異が緑になった)。
+     *   ネストの無い keyframes なので「最後の }」まで貪欲に取り、
+     *   宣言行(`N% { ... }`)だけを対象にする。
+     */
+    const start = popupHtml.indexOf('@keyframes nl-init-shade-css-failsafe');
+    expect(start, 'keyframes が見つからない').toBeGreaterThan(-1);
+    const open = popupHtml.indexOf('{', start);
+    // 閉じ括弧を数えてブロック末尾を求める
+    let depth = 0;
+    let end = -1;
+    for (let i = open; i < popupHtml.length; i += 1) {
+      const ch = popupHtml[i];
+      if (ch === '{') depth += 1;
+      else if (ch === '}') {
+        depth -= 1;
+        if (depth === 0) { end = i; break; }
+      }
+    }
+    expect(end, 'keyframes の終端が読めない').toBeGreaterThan(open);
+    const body = popupHtml.slice(open + 1, end);
+
+    /*
+     * opacity:1 を保つ最後の停止点(%)を取る。
+     * ★`0%, 93% { opacity: 1 }` のように**セレクタに複数の%が並ぶ**ので、
+     *   1個目だけ拾うと 0 になり検査が恒真化する(実際にこれで変異が緑になった)。
+     *   宣言ごとに「セレクタ部分の全ての%」を見る。
+     */
+    const holdStops = [];
+    for (const decl of body.matchAll(/([^{}]+)\{([^}]*)\}/g)) {
+      const selector = decl[1];
+      const props = decl[2];
+      if (!/opacity:\s*1\b/.test(props)) continue;
+      for (const pct of selector.matchAll(/([\d.]+)%/g)) {
+        const n = Number(pct[1]);
+        if (Number.isFinite(n)) holdStops.push(n);
+      }
+    }
+    const lastHold = Math.max(...holdStops, 0);
+
+    const totalMs = Number(popupHtml.match(/animation: nl-init-shade-css-failsafe (\d+)s/)[1]) * 1000;
+    const jsMs = Number(
+      String(popupSrc.match(/const INLINE_SHADE_DATA_FALLBACK_MS = ([\d_]+);/)[1]).replace(/_/g, '')
+    );
+
+    // ★JS の上限を過ぎたら薄れ始めていること
+    const holdMs = (lastHold / 100) * totalMs;
+    expect(
+      holdMs,
+      `幕が不透明のまま ${holdMs}ms 待っている(JS上限 ${jsMs}ms を過ぎたら薄れ始めるべき)`
+    ).toBeLessThanOrEqual(jsMs);
+  });
 });
