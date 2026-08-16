@@ -50,7 +50,9 @@ export const HEALTH_CELL_GROUPS = Object.freeze([
     id: 'ingest', label: '取り込み（接続・過去ログ）', order: 2,
     hint: '今つながっているか・過去のコメントを追えているか',
     cellIds: Object.freeze([
-      'ndgr', 'ingest', 'backfill', 'backfill-bottleneck', 'host-move', 'multi-tab'
+      'ndgr', 'ingest', 'backfill', 'backfill-bottleneck', 'host-move', 'multi-tab',
+      // ★v0.1.1412: 取得経路が弱い方へ落ちていないか(ニコ生の構造変更の予兆)
+      'source-provenance'
     ])
   }),
   Object.freeze({

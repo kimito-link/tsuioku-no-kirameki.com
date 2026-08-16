@@ -5,14 +5,15 @@
 
 ## storage の出入り
 
-- 書くキー: `KEY_BGM_ENABLED`, `KEY_BGM_VOLUME_FEVER`, `KEY_BGM_VOLUME_REACH`, `KEY_LIVEVIEW_PUBLISH_PAYLOAD`, `KEY_STATUS_TREND`, `KEY_STATUS_UPLOAD_CONFIG`, `KEY_WEB_PUBLISH_OPT_IN`
-- 読むキー: `KEY_AI_SHARE_POPUP_DIAG`, `KEY_BACKFILL_LIVE_METRIC`, `KEY_BGM_ENABLED`, `KEY_BGM_PHASE_DIAG`, `KEY_BGM_VOLUME_FEVER`, `KEY_BGM_VOLUME_REACH`, `KEY_COMMENT_POST_DIAG`, `KEY_COMMENT_TIMELINE_MIRROR`, `KEY_CUSTOM_SOUND_REV`, `KEY_GIFT_EFFECT_DIAG`, `KEY_LANE_DIAG`, `KEY_LANE_MIRROR`, `KEY_LAST_WATCH_URL`, `KEY_LIVEVIEW_PUBLISH_OUTCOME`, `KEY_MILESTONE_EFFECT_DIAG`, `KEY_NORTH_STAR_MIRROR`, `KEY_OP_SOUND_EFFECT_DIAG`, `KEY_REPORT_PREVIEW`, `KEY_STATUS_FAST_DIAG_LITE`, `KEY_STATUS_TREND`, `KEY_STATUS_UPLOAD_CONFIG`, `KEY_STAT_CARDS_MIRROR`, `KEY_VENUE_SEATS_DIAG`, `KEY_VOICE_DIAG`, `KEY_VOICE_EFFECT_DIAG`, `KEY_WEB_PUBLISH_OPT_IN`, `nls_backfill_progress_v1`, `nls_last_auto_tab_reload`
+- 書くキー: `KEY_BGM_ENABLED`, `KEY_BGM_VOLUME_FEVER`, `KEY_BGM_VOLUME_REACH`, `KEY_LIVEVIEW_PUBLISH_PAYLOAD`, `KEY_SOURCE_PROVENANCE`, `KEY_STATUS_TREND`, `KEY_STATUS_UPLOAD_CONFIG`, `KEY_WEB_PUBLISH_OPT_IN`
+- 読むキー: `KEY_AI_SHARE_POPUP_DIAG`, `KEY_BACKFILL_LIVE_METRIC`, `KEY_BGM_ENABLED`, `KEY_BGM_PHASE_DIAG`, `KEY_BGM_VOLUME_FEVER`, `KEY_BGM_VOLUME_REACH`, `KEY_COMMENT_POST_DIAG`, `KEY_COMMENT_TIMELINE_MIRROR`, `KEY_CUSTOM_SOUND_REV`, `KEY_GIFT_EFFECT_DIAG`, `KEY_LANE_DIAG`, `KEY_LANE_MIRROR`, `KEY_LAST_WATCH_URL`, `KEY_LIVEVIEW_PUBLISH_OUTCOME`, `KEY_MILESTONE_EFFECT_DIAG`, `KEY_NORTH_STAR_MIRROR`, `KEY_OP_SOUND_EFFECT_DIAG`, `KEY_REPORT_PREVIEW`, `KEY_SOURCE_PROVENANCE`, `KEY_STATUS_FAST_DIAG_LITE`, `KEY_STATUS_TREND`, `KEY_STATUS_UPLOAD_CONFIG`, `KEY_STAT_CARDS_MIRROR`, `KEY_VENUE_SEATS_DIAG`, `KEY_VOICE_DIAG`, `KEY_VOICE_EFFECT_DIAG`, `KEY_WEB_PUBLISH_OPT_IN`, `nls_backfill_progress_v1`, `nls_last_auto_tab_reload`
 
 ## 構成ファイル（import 到達・最大40件表示）
 
 ```mermaid
 graph LR
   n_status["状態速報ページ"]
+  n_status --> n_src_domain_observations_vocabulary_js["domain/observations/vocabulary.js"]
   n_status --> n_src_domain_user_identity_js["domain/user/identity.js"]:::shared
   n_status --> n_src_lib_aiShareFullText_js["lib/aiShareFullText.js"]
   n_status --> n_src_lib_aiSharePopupDiagKey_js["lib/aiSharePopupDiagKey.js"]:::shared
@@ -52,8 +53,7 @@ graph LR
   n_status --> n_src_lib_customSoundStore_js["lib/customSoundStore.js"]:::shared
   n_status --> n_src_lib_deriveAvatarUrlFromUid_js["lib/deriveAvatarUrlFromUid.js"]:::shared
   n_status --> n_src_lib_diagSchemaCopy_js["lib/diagSchemaCopy.js"]:::shared
-  n_status --> n_src_lib_diagnosisRegistry_js["lib/diagnosisRegistry.js"]
   classDef shared fill:#eee,stroke:#999,color:#666;
 ```
 
-> ほか 116 ファイル省略（全件は storage-bus.md / metafile 参照）。
+> ほか 118 ファイル省略（全件は storage-bus.md / metafile 参照）。

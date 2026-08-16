@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 4 / 787 件
+## ⚠️ 役割コメントが無いソース 4 / 788 件
 - `src/lib/laneDomSelfMeasure.js`
 - `src/lib/reportPreviewPublish.js`
 - `src/lib/venueLaneBuckets.js`
@@ -167,7 +167,7 @@
     - `2026-07-22.md`
     - `2026-07-23.md`
     - `2026-07-31.md`
-- 📁 **docs/** (288)
+- 📁 **docs/** (289)
   - 📁 **article-assets/** (87)
     - 📁 **venue-frames/** (12)
       - `f01.png`
@@ -277,7 +277,7 @@
     - `storage-bus.md`
     - `venue.md`
     - `web-status.md`
-  - 📁 **handoff/** (124)
+  - 📁 **handoff/** (125)
     - `CODEX-TASK-voice-v1332.md`
     - `CODEX-TASK-voice-v1334.md`
     - `CODEX-TASK-voice-v1342.md`
@@ -338,6 +338,7 @@
     - `HANDOFF-venue-exact-copy-IMPL.md`
     - `HANDOFF-venue-pop-copy-IMPL.md`
     - `HANDOFF-web-same-as-ext.md`
+    - `MEASURED-2026-08-16-diag-heavy-ROOTCAUSE.md`
     - `NOTEPC-CHECK-PROMPT.md`
     - `ROOT-CAUSE-CLAIM-RULE.md`
     - `VOICE-BASELINE-2026-08-11.md`
@@ -702,7 +703,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (1715)
+- 📁 **src/** (1717)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -994,7 +995,7 @@
         - `logo_funlink_white_RGB_maru_black.png`
       - `logo_guide_funlink_ol.pdf`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1473)
+  - 📁 **lib/** (1475)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -2105,6 +2106,8 @@
     - `singleFlightByKey.test.js`
     - `siteLinkHealth.js` — 公開ページ(LP/記事/docs)の「内部リンク健全性」を検証する純ロジック(2026-06-18)。
     - `siteLinkHealth.test.js`
+    - `sourceProvenance.js` — 値を「**どの経路で取れたか**」で記録し、経路の劣化を検出する(純関数)。
+    - `sourceProvenance.test.js`
     - `specializedCells.wiring.test.js`
     - `specializedCellsInputs.wiring.test.js`
     - `standalonePopupClose.js` — v0.1.433: 別ウィンドウ POP（standalone popup window）を「配信に飛ばしたら閉じる」判定（純ロジック）。
