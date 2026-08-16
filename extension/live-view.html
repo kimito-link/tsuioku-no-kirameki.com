@@ -1,6 +1,13 @@
-<!DOCTYPE html>
-<html lang="ja">
+<!DOCTYPE html><html lang="ja" style="color-scheme: light; background: #fffaf2">
   <head>
+    <!--
+      ★v0.1.1413: 黒画面対策(sidepanel.html と同じ)。
+      ★このページも popup.html を iframe で全面に埋める構造なので、
+        sidepanel と同じ「src 読込前の about:blank が暗色になる」穴を持つ
+        ([[about-blank-gap-is-the-black-2026-08-12]])。
+        iframe 自身の transparent(32行目)は残す=入れ物の地をここで塗る。
+    -->
+    <meta name="color-scheme" content="light" />
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>応援ライブビュー — 君斗りんくの追憶のきらめき</title>
