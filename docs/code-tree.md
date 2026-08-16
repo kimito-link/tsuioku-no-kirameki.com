@@ -27,7 +27,9 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 4 / 788 件
+## ⚠️ 役割コメントが無いソース 6 / 790 件
+- `docs/handoff/bench/bench-interval.mjs`
+- `docs/handoff/bench/bench-lane.mjs`
 - `src/lib/laneDomSelfMeasure.js`
 - `src/lib/reportPreviewPublish.js`
 - `src/lib/venueLaneBuckets.js`
@@ -167,7 +169,7 @@
     - `2026-07-22.md`
     - `2026-07-23.md`
     - `2026-07-31.md`
-- 📁 **docs/** (290)
+- 📁 **docs/** (293)
   - 📁 **article-assets/** (87)
     - 📁 **venue-frames/** (12)
       - `f01.png`
@@ -277,7 +279,10 @@
     - `storage-bus.md`
     - `venue.md`
     - `web-status.md`
-  - 📁 **handoff/** (126)
+  - 📁 **handoff/** (129)
+    - 📁 **bench/** (2)
+      - `bench-interval.mjs` — ⚠️ 役割コメント無し
+      - `bench-lane.mjs` — ⚠️ 役割コメント無し
     - `CODEX-TASK-voice-v1332.md`
     - `CODEX-TASK-voice-v1334.md`
     - `CODEX-TASK-voice-v1342.md`
@@ -288,6 +293,7 @@
     - `HANDOFF-2026-08-16-diag-heavy-NEXT.md`
     - `HANDOFF-2026-08-16-instruments-100-done.md`
     - `HANDOFF-2026-08-16-night-NEXT.md`
+    - `HANDOFF-2026-08-17-comment-delay-investigation.md`
     - `HANDOFF-backfill-instant-restore.md`
     - `HANDOFF-broadcast-score-panel.md`
     - `HANDOFF-comment-pickup-bsp.md`
