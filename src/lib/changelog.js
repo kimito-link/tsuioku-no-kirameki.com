@@ -26,6 +26,16 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1411',
+    date: '2026-08-16',
+    summary: '前版の「読み込み中のまま」を修正（待ち時間の設定を戻しました）',
+    items: Object.freeze([
+      '前版で読み込みの制限時間を短くしすぎたため、最初の読み取りが時間を使い切ると残りが読めなくなり、「読み込み中です...」から進まなくなっていました。',
+      '制限時間を実際にかかる時間より長い値へ戻しました。',
+      '開くまでの体感短縮は、制限時間ではなく別の方法（必要な項目を先に表示する）で改めて対応します。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1410',
     date: '2026-08-16',
     summary: '診断ページが開くまでの待ち時間を短縮',

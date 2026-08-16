@@ -85,27 +85,45 @@ describe('refreshCycleDeadline', () => {
     expect(worstCaseSerialMs(-1, 8000)).toBe(0);
   });
 
-  describe('★予算は【体感】を守る値に固定する(v0.1.1410)', () => {
+  describe('★予算を締めすぎると read が枯渇する(v0.1.1411・退化の再発防止)', () => {
     /*
-     * 2026-08-16 実機「診断ページがまた重い」の真因:
-     *   更新所要 6004ms は **12秒予算の内側なので何にも止められていなかった**。
-     *   予算は「事故(80秒)を防ぐ上限」としては効いていたが、
-     *   「体感を守る上限」としては緩すぎた。
-     * ★緩める変更を入れたらこのテストが赤くなる(数で固定する)。
+     * ■ v0.1.1410 で出した退化(実機「読み込み中です...」が居座った)
+     *   体感を短くするつもりで予算を 12,000→4,000 / 初回 1,500 に締めた。
+     *   ところが status-entry のコア5read は `_slice()` を **引数なし**で呼ぶ。
+     *   next(0) は「残り全部」を返す仕様なので、
+     *   **最初の1本が予算を丸ごと持っていく** → 後続が全部 0(読まない)。
+     *   初回はキャッシュ(stale)も無いので空のまま描画され、
+     *   「読み込み中」が消えなくなった。
+     *
+     * ★教訓: 予算は「事故の上限」であって「体感の調整つまみ」ではない。
+     *   正常系の実測合計(≒4.2秒)を下回らせない。
      */
-    it('通常サイクルは refresh 間隔(2秒)の2倍以内', () => {
-      expect(REFRESH_CYCLE_BUDGET_MS).toBeLessThanOrEqual(4_000);
+    /** 実測の正常系合計[ms]（popupDiag 1471 + extras 1454 + summaries 1278 ≒ 4.2秒）。 */
+    const OBSERVED_NORMAL_TOTAL_MS = 4_200;
+
+    it('通常サイクルの予算は正常系の実測合計を下回らない', () => {
+      expect(REFRESH_CYCLE_BUDGET_MS).toBeGreaterThanOrEqual(OBSERVED_NORMAL_TOTAL_MS);
     });
 
-    it('★初回サイクルはさらに短い(ページが開くまでの時間そのもの)', () => {
-      expect(REFRESH_FIRST_CYCLE_BUDGET_MS).toBeLessThanOrEqual(2_000);
-      expect(REFRESH_FIRST_CYCLE_BUDGET_MS).toBeLessThan(REFRESH_CYCLE_BUDGET_MS);
+    it('★初回サイクルの予算も正常系を通せる(初回は stale が無い＝枯渇が即・空表示になる)', () => {
+      expect(REFRESH_FIRST_CYCLE_BUDGET_MS).toBeGreaterThanOrEqual(OBSERVED_NORMAL_TOTAL_MS);
     });
 
-    it('初回予算でも最低1本は read を発行できる(全部スキップにしない)', () => {
+    it('★引数なし _slice() を5本直列に呼んでも、最後の1本が0にならない', () => {
+      /*
+       * status-entry のコア5read と同じ呼び方を再現する。
+       * 各 read が「実測どおりの時間」を使ったとき、5本目まで生き残るか。
+       */
       const clock = { t: 0, now: () => clock.t };
       const d = createRefreshDeadline({ totalMs: REFRESH_FIRST_CYCLE_BUDGET_MS, now: clock.now });
-      expect(d.next(8000)).toBeGreaterThan(MIN_SLICE_MS);
+      const spend = [200, 1278, 300, 1471, 200]; // lives/summaries/fastDiag/popupDiag/backfill
+      const slices = [];
+      for (const ms of spend) {
+        slices.push(d.next());   // ★引数なし＝残り全部を要求する(実装と同じ)
+        clock.t += ms;
+      }
+      // 5本とも「読まない(0)」にならないこと＝空表示にならない
+      expect(slices.every((s) => s > 0)).toBe(true);
     });
   });
 });
