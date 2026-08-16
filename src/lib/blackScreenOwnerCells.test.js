@@ -87,8 +87,66 @@ describe('黒画面の当人セル', () => {
     });
   });
 
-  it('★3セルとも常に出る(黒いのにセルが消えるのを防ぐ)', () => {
+  it('★全セルが常に出る(黒いのにセルが消えるのを防ぐ)', () => {
     const ids = buildBlackScreenOwnerCells({}).map((c) => c.id).sort();
-    expect(ids).toEqual(['mt-owner', 'mt-resume', 'mt-total']);
+    expect(ids).toEqual([
+      'boot-phase', 'boot-remount', 'mt-average', 'mt-owner', 'mt-owner2',
+      'mt-resume', 'mt-spread', 'mt-total', 'whiteout-culprit'
+    ]);
+  });
+
+  describe('黒画面の追い込み(v0.1.1408)', () => {
+    it('★起動が途中で止まっていれば bad + どの段階か', () => {
+      const c = buildBlackScreenOwnerCells({
+        popupDiag: { popup: { loadShadeProbe: { lastLoadPhase: { phase: 'awaiting-first-paint', agoMs: 9000 } } } }
+      }).find((x) => x.id === 'boot-phase');
+      expect(c?.level).toBe('bad');
+      expect(c?.text).toContain('awaiting-first-paint');
+      expect(c?.text).toContain('9秒');
+    });
+
+    it('★画面の作り直しが多ければ warn(黒く見える原因)', () => {
+      const c = buildBlackScreenOwnerCells({
+        popupDiag: { popup: { loadShadeProbe: { dismissCalls: 8 } } }
+      }).find((x) => x.id === 'boot-remount');
+      expect(c?.level).toBe('warn');
+      expect(c?.text).toContain('8回');
+    });
+
+    it('★スクロール白化は移動と描き直しを分けて名指しする(打ち手が違う)', () => {
+      const c = buildBlackScreenOwnerCells({
+        fastDiag: { content: { scrollWhiteoutDiag: { whiteoutCount: 5, culpritMove: 4, culpritRepaint: 1 } } }
+      }).find((x) => x.id === 'whiteout-culprit');
+      expect(c?.text).toContain('移動が主因');
+    });
+
+    it('★2番目の当人も出す(1番だけ直しても黒は消えない)', () => {
+      const c = buildBlackScreenOwnerCells({
+        mainThreadBlocker: {
+          count: 6, worstMs: 900, totalMs: 2400,
+          byName: {
+            'grid-rebuild': { ms: 1800, count: 2 },
+            'lane-paint': { ms: 600, count: 4 }
+          }
+        }
+      }).find((x) => x.id === 'mt-owner2');
+      expect(c?.text).toContain('lane-paint');
+    });
+
+    it('★1種類に集中していれば「直しやすい」と言う', () => {
+      const c = buildBlackScreenOwnerCells({
+        mainThreadBlocker: { count: 3, totalMs: 900, byName: { 'grid-rebuild': { ms: 900, count: 3 } } }
+      }).find((x) => x.id === 'mt-spread');
+      expect(c?.level).toBe('ok');
+      expect(c?.text).toContain('直しやすい');
+    });
+
+    it('★平均で「たまに長い」と「常に少し長い」を分ける', () => {
+      const c = buildBlackScreenOwnerCells({
+        mainThreadBlocker: { count: 10, totalMs: 4000, byName: { x: { ms: 4000, count: 10 } } }
+      }).find((x) => x.id === 'mt-average');
+      expect(c?.level).toBe('warn');
+      expect(c?.text).toContain('400ms');
+    });
   });
 });
