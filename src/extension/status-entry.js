@@ -873,23 +873,31 @@ async function refresh(opts = {}) {
        *   コアには足さない([[status-extras-read-not-core-read]])。
        *   失敗しても null のまま=行が出ないだけで、速報全体は止めない。
        */
-      step = 'autoTabReload';
-      _autoTabReloadRec = await runStorageOpWithTimeout(
-        () => chrome.storage.local.get('nls_last_auto_tab_reload')
-          .then((b) => (b && b.nls_last_auto_tab_reload) || null),
-        _slice()
-      ).catch(() => _autoTabReloadRec);
       /*
-       * ★v0.1.1412: 取得経路の履歴(1キー・extras=12秒間引き)。
-       *   ★コアには足さない([[status-extras-read-not-core-read]])。
-       *   降格は**時間をまたいで**起きるので、これが無いと計器は永久に鳴らない。
+       * ★v0.1.1415: 小さな1キー read を【1本にまとめる】。
+       *
+       * ■ なぜ
+       *   実測で分かった重さの正体は「読む量」ではなく **read の本数 ×
+       *   書き込みとの競合**(同じreadが 平常1ms → backfill中217ms)。
+       *   ＝ **直列に並べた本数がそのまま体感になる**。
+       *   `chrome.storage.local.get` は複数キーを1回で取れるので、
+       *   情報量を1bitも減らさずに本数だけ減らせる。
+       *
+       *   ★v0.1.1412 で私が sourceProvenance を**独立した1本**として足したのは誤り。
+       *     計器を足すたびに read が1本増えるなら、計器が診断を殺す
+       *     (observer effect)。**足すときは既存のバッチに相乗りさせる**。
        */
-      step = 'sourceProvenance';
-      _sourceProvenanceStored = await runStorageOpWithTimeout(
-        () => chrome.storage.local.get(KEY_SOURCE_PROVENANCE)
-          .then((b) => (b && b[KEY_SOURCE_PROVENANCE]) || null),
-        _slice()
-      ).catch(() => _sourceProvenanceStored);
+      step = 'smallKeysBatch';
+      {
+        const _small = await runStorageOpWithTimeout(
+          () => chrome.storage.local.get(['nls_last_auto_tab_reload', KEY_SOURCE_PROVENANCE]),
+          _slice()
+        ).catch(() => null);
+        if (_small) {
+          _autoTabReloadRec = _small.nls_last_auto_tab_reload || null;
+          _sourceProvenanceStored = _small[KEY_SOURCE_PROVENANCE] || null;
+        }
+      }
       _extrasCache = { reportPreview, watchTabMap, trendFindings, laneDiag, laneMirror, statCardsMirror, northStarMirror, voiceDiag, venueSeatsDiag, publishOutcomeRec, commentTimelineMirror, giftHistoryMirror, roomHeatMirror, sessionSummaryMirror, previewRenderAck, backfillLiveMetric, giftEffectDiag, milestoneEffectDiag, customSoundDiag, voiceEffectDiag, bgmPhaseDiag, opSoundEffectDiag, commentPostDiag, instantPushDiag, channelSwitchDiag, highlightLedger, scoreAnnounceDiag, sidepanelSelfDiag };
       _extrasCacheAt = Date.now();
       _mark('extras');
