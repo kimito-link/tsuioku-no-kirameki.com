@@ -535,6 +535,8 @@ import { migrateBelowInlinePanelToDockOnce } from '../lib/migrateInlinePanelBelo
 import { migrateSuggestInitialInlinePanelPlacementOnce } from '../lib/migrateSuggestInitialInlinePanelPlacement.js';
 import { createPersistCoalescer } from '../lib/persistThrottle.js';
 import { computeLivePersistIntervalMs } from '../lib/livePersistInterval.js';
+// v0.1.1417: 裏タブの setTimeout クランプ(1/分)でコメントが数十秒遅れるのを止める。
+import { resolveNdgrPendingThreshold } from '../lib/ndgrHiddenFlushThreshold.js';
 import { isInsideRecommendedLiveSection } from '../lib/isInsideRecommendedLiveSection.js';
 import { resolveUserEntryAvatarSignals } from '../lib/userEntryAvatarResolve.js';
 import { recordDiagnosticException } from '../lib/diagnosticRingStore.js';
@@ -1939,7 +1941,26 @@ function schedulePersistNdgrChatRows(rows) {
     stamped,
     NDGR_PENDING_MAX
   );
-  if (ndgrChatRowsPending.length >= NDGR_PENDING_FLUSH_THRESHOLD) {
+  /*
+   * ★v0.1.1417「コメントが裏タブで数十秒遅れて出る」根治:
+   *   下の flush は setTimeout(150ms) に載っているが、Chrome は hidden タブの
+   *   setTimeout を【約1分に1回】までクランプする。
+   *   ＝可視中150msの吐き出しが裏タブでは最大60秒に1回になり、
+   *   逃げ道のこのしきい値(240行)にも届かないまま数十秒溜まる。
+   *   実機(2026-08-16)の「即時プッシュ 配達平均47,686ms」がこれ。
+   *   ★受信側は健全だった(実測 配達5ms)＝遅いのは【送る側が起きられないこと】。
+   *   ★このリポは同じクランプを v0.1.795 で踏んで backfill を chrome.alarms へ
+   *     逃がしている。コメント側だけ横展開されていなかった(配線漏れ)。
+   *   対処: 裏タブのときだけ「溜まったら吐く」しきい値を下げる。
+   *     タイマー側を常時駆動へ変えると裏タブで電池/CPUを食い続けるが、
+   *     しきい値ならコメントが来ないときは何も動かない(イベント駆動のまま)。
+   *   判定は純関数 ndgrHiddenFlushThreshold.js(単体7テスト)に隔離。
+   */
+  const pendingFlushThreshold = resolveNdgrPendingThreshold({
+    hidden: typeof document !== 'undefined' && document.hidden === true,
+    visibleThreshold: NDGR_PENDING_FLUSH_THRESHOLD
+  });
+  if (ndgrChatRowsPending.length >= pendingFlushThreshold) {
     if (ndgrChatRowsFlushTimer != null) {
       clearTimeout(ndgrChatRowsFlushTimer);
       ndgrChatRowsFlushTimer = null;

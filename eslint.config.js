@@ -405,7 +405,15 @@ export default [
     }
   },
   {
-    files: ['playwright.config.js', 'scripts/**/*.mjs', 'tests/e2e/**/*.js'],
+    // v0.1.1417: docs/handoff/bench/*.mjs は調査の再現用 Node スクリプト。
+    //   引き継ぎ本文から参照しており、次の担当者がそのまま実行できるよう残す
+    //   (仮説を落とした根拠＝計測コードを消すと「30ms だった」が検証不能になる)。
+    files: [
+      'playwright.config.js',
+      'scripts/**/*.mjs',
+      'docs/handoff/bench/**/*.mjs',
+      'tests/e2e/**/*.js'
+    ],
     languageOptions: {
       ecmaVersion: 2022,
       sourceType: 'module',

@@ -5914,6 +5914,16 @@
       ]
     },
     {
+      "file": "src/lib/ndgrHiddenFlushThreshold.js",
+      "featureCount": 1,
+      "features": [
+        "content"
+      ],
+      "labels": [
+        "記録エンジン(watchページ常駐)"
+      ]
+    },
+    {
       "file": "src/lib/ndgrMessageDedupe.js",
       "featureCount": 1,
       "features": [

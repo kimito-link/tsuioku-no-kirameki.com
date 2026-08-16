@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 6 / 790 件
+## ⚠️ 役割コメントが無いソース 6 / 791 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `src/lib/laneDomSelfMeasure.js`
@@ -710,7 +710,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (1718)
+- 📁 **src/** (1721)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -745,7 +745,7 @@
       - `avatarResolver.test.js`
       - `identity.js` — ニコ生ユーザー ID の「匿名性」判定と関連アイデンティティ・ユーティリティ。
       - `nickname.js` — 表示名（ニックネーム）の「強弱」判定。
-  - 📁 **extension/** (42)
+  - 📁 **extension/** (43)
     - 📁 **popup/** (6)
       - 📁 **report/** (2)
         - `htmlReportDocument.js` — HTMLレポート(振り返り用の保存HTML)組み立てクラスタ。
@@ -769,6 +769,7 @@
     - `inlineHostMoveProbe.wiring.test.js`
     - `live-view-entry.js` — 応援ライブビュー(live-view.html)のエントリ。
     - `marketing-export-entry.js` — マーケ分析レポートの別タブ化(marketing-export.html)のエントリ。
+    - `ndgrHiddenFlush.wiring.test.js`
     - `ndgrStatisticsPointsSanityGuard.wiring.test.js`
     - `offscreen-entry.js` — feat/multitab-scale-globalcap（2026-05-31）: コメント IDB の「常駐・単一書き手」を担う
     - `page-intercept-entry.js` — MAIN world エントリ（esbuild で単一 IIFE にバンドルされる）
@@ -1002,7 +1003,7 @@
         - `logo_funlink_white_RGB_maru_black.png`
       - `logo_guide_funlink_ol.pdf`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1476)
+  - 📁 **lib/** (1478)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -1782,6 +1783,8 @@
     - `ndgrFlushDedupKey.test.js`
     - `ndgrForwardCrawl.js` — v0.1.511: NDGR コメントの「前方向（forward）継続取得」巡回エンジン（純ロジック）。
     - `ndgrForwardCrawl.test.js`
+    - `ndgrHiddenFlushThreshold.js` — 裏タブで「コメントが数十秒遅れて出る」のを止める純関数。
+    - `ndgrHiddenFlushThreshold.test.js`
     - `ndgrMessageDedupe.js` — v0.1.238: NDGR Message ID dedupe
     - `ndgrMessageDedupe.test.js`
     - `networkErrorProbe.js` — v0.1.201: 拡張の network 層異常を診断 JSON 用に集約する純関数。
