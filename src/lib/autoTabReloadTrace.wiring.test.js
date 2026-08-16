@@ -65,13 +65,22 @@ describe('★自動タブリロードの実行痕跡(手動F5が要るかを判�
   });
 
   it('★status の読みは extras 側(コアに足すと大配信で固まる)', () => {
-    const idx = statusSrc.indexOf("step = 'autoTabReload'");
-    expect(idx).toBeGreaterThan(-1);
-    const around = statusSrc.slice(idx, idx + 400);
+    /*
+     * ★v0.1.1415: 単独 read から **小キーの1バッチ**へ統合した。
+     *   実測で分かった重さの正体は「読む量」でなく **直列 read の本数**なので、
+     *   1キーずつ読むのはむしろ悪手だった。
+     *   ★検査の意図(有界化されている・全件読みを持ち込まない・extras側)は不変。
+     *     **記述の形ではなく意図を検査する**([[mutation-test-needs-anchored-regex]]の逆で、
+     *     形に固定しすぎると正しいリファクタで赤くなる)。
+     */
+    const idx = statusSrc.indexOf("step = 'smallKeysBatch'");
+    expect(idx, "smallKeysBatch ステップが見つからない").toBeGreaterThan(-1);
+    const around = statusSrc.slice(idx, idx + 500);
     // 有界化(timeout)されていること。
     expect(around).toContain('runStorageOpWithTimeout');
-    // 1キーだけ読む(全件読みを持ち込まない)。
-    expect(around).toContain("get('nls_last_auto_tab_reload')");
+    // このキーを読んでいること(バッチの中でよい)。
+    expect(around).toContain('nls_last_auto_tab_reload');
+    // 全件読みを持ち込まないこと。
     expect(around).not.toMatch(/\.get\(\s*null\s*\)/);
   });
 });

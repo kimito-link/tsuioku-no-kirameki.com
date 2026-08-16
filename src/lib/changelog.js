@@ -26,6 +26,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1415',
+    date: '2026-08-16',
+    summary: '診断の読み取りを1本にまとめました',
+    items: Object.freeze([
+      '小さな設定値を2回に分けて読んでいたのを、1回にまとめました。読み取りの回数がそのまま待ち時間になるためです。',
+      '前版で診断の更新は17秒から4ミリ秒に改善しています。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1414',
     date: '2026-08-16',
     summary: 'サイドパネルの黒さと、前版で増えた書き込みを修正',
