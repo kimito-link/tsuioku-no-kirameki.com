@@ -65,8 +65,29 @@ export const LINEUP = [
   //    エージェント型ゆえ通常チャットより遅い/長い → タイムアウトを広め(150s)に。役割は roleOf で generalist。
   //  - groq/compound-mini: その速い版。軽い fact 確認向け。
   //  ※ 同日、会議が推した "Mistral-7B-Instruct" / "Llama-3-8b-Instruct" は Groq のライブ一覧に無く【幻覚】→ 不採用。
-  { label: 'groq/compound', provider: 'groq', rawId: 'groq/compound', apiModel: 'groq/compound', opts: {}, timeoutMs: 180000, requires: ['G'] },
-  { label: 'groq/compound-mini', provider: 'groq', rawId: 'groq/compound-mini', apiModel: 'groq/compound-mini', opts: {}, timeoutMs: 150000, requires: ['G'] },
+  //
+  // 2026-08-16 撤去（上の2体・compound / compound-mini）: council/*.json 84件の実績解析で発覚。
+  //   ★実績: compound は 9回召集され 9回とも HTTP 413 Request Entity Too Large で失敗（成功ゼロ）。
+  //     compound-mini は1回召集され429。＝会議に呼ぶたびに必ず落ちる死に枠だった。
+  //   ★413は入力サイズを絞っても避けられない: 本日の実機プローブで「あ」×1200字は200、
+  //     一方 council に残る実問い1231字は413で再現した。compoundはWeb検索・エージェント展開を
+  //     内部で行うため、実効リクエスト量が呼ぶ側から制御不能。「digestを渡さない配置」でも救えない。
+  //   ★成功しても害がある: compound系のエラー原文が "Rate limit reached for model
+  //     `openai/gpt-oss-120b` ... TPM: Limit 8000" ＝ compound を呼ぶこと自体が、批判役主力かつ
+  //     統合役筆頭である gpt-oss-120b の分あたり8000トークンを食う（心臓の酸素を吸う枠だった）。
+  //   ★存在理由が発火していない: 採用目的の fact カテゴリは84会議で0回（design 56 / code 16 /
+  //     general 5 / writing 2）。「会議内で最新を取りに行く」担当として一度も出番が無かった。
+  //   ★weight1のため4経路の先頭に座る地雷だった: weightOfのどの分岐にも掛からず既定1になるため、
+  //     (a)generalistプールの先頭＝ROLE_FALLBACK(lead→generalist)が発動するたび必ず選ばれる
+  //     （実際7月上旬のOllama停止時にこの経路で召集され413を量産した）、(b)敗者復活の候補
+  //     (weightOf<=2)、(c)swapToCloudのanyCloud先頭圏、(d)2体目批判役のfail-open側。
+  //   役割の穴: generalist は gemini-2.5-flash(weight1) が先頭に繰り上がり健全。
+  //     fact カテゴリの want は generalist/fast/lead で、いずれも他メンバーが埋める。
+  //   再採用の条件: 会議メンバーとしては永久に不適（長文の問いで413が本質的・TPMを
+  //     gpt-oss-120bと共有）。使うなら classifierOnly と同型の「会議外・短文専用のfact確認
+  //     ツール」として別枠で。目安は問い数百字以下で実測413ゼロを2回確認してから。
+  //   roleOf の "compound"→generalist 判定行は削除しない（mistral-large行の前例に倣う。
+  //     LINEUPに該当labelが無ければ発火しない無害な行）。
 
   // 2026-06-25 追加（会議ハーネス自身で採否を合議→司令塔Claudeが実機裏取り）:
   //  - qwen3.6-27b: Groq の新世代 thinking モデル。発散(diverge)。実機で <think>…</think>＋本文を返す
