@@ -41,7 +41,7 @@
   - `src/lib/ndgrBackfillCrawl.js`
 - **コメント重複除去(NDGR)** — 再送/再接続/relay overlap の重複を liveId+messageId の canonical key で排除
   - `src/lib/ndgrMessageDedupe.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 58</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 59</summary>
 
 - `src/domain/observations/StatObservation.js` — StatObservation - ニコ生から取得する数値の「契約付き観測値」純関数 factory。
 - `src/domain/observations/vocabulary.js` — 観測層 (StatObservation) の語彙集 - 不変な enum 定義のみ。
@@ -85,6 +85,7 @@
 - `src/lib/ndgrDecode.js` — NDGR (のどぐろ) Protobuf 軽量デコーダー
 - `src/lib/ndgrFlushDedupKey.js` — NDGR フラッシュ時の重複排除キーを作る純関数(v0.1.836)。
 - `src/lib/ndgrForwardCrawl.js` — v0.1.511: NDGR コメントの「前方向（forward）継続取得」巡回エンジン（純ロジック）。
+- `src/lib/ndgrHiddenFlushThreshold.js` — 裏タブで「コメントが数十秒遅れて出る」のを止める純関数。
 - `src/lib/niconicoInterceptLearn.js` — page-intercept が JSON から拾う userId / nickname / avatar / commentNo の走査（純関数）
 - `src/lib/nicoUserProfileApi.js` — ニコニコのユーザープロフィール取得用メッセージ型と uid 妥当性判定(background と文字列同期)。
 - `src/lib/nlsInterceptAuth.js` — v0.1.234: page-intercept (MAIN world) → content-entry (ISOLATED world) 経路の
@@ -951,7 +952,7 @@
 
 ## 🧬 修正系譜マップ(この系統のバグを過去にどう直したか)
 
-> changelog 全 746 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
+> changelog 全 747 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
 
 ### 💾 記録件数 (98版)
 - `v0.1.1407` 2026-08-16 — 診断を74→85項目に。読み上げと公式値の原因を分離
@@ -2440,7 +2441,8 @@
 - `v0.1.840` 2026-06-20 — 機能逆引き地図を全ファイル網羅に
 - `v0.1.835` 2026-06-20 — 自己検証ゲートを追加(版同期+診断文言)
 
-### その他 (86版)
+### その他 (87版)
+- `v0.1.1417` 2026-08-17 — 裏タブのコメント遅れを短縮
 - `v0.1.1411` 2026-08-16 — 前版の「読み込み中のまま」を修正（待ち時間の設定を戻しました）
 - `v0.1.1404` 2026-08-15 — 黒画面を止めている当人と、ビルドの古さを表示
 - `v0.1.1393` 2026-08-14 — 公式の「なふだを表示」をポップアップから切り替えられるようにしました
