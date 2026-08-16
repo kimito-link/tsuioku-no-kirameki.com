@@ -1,7 +1,27 @@
-<!DOCTYPE html>
-<html lang="ja">
+<!DOCTYPE html><html lang="ja" style="color-scheme: light; background: #fffaf2">
   <head>
     <meta charset="UTF-8" />
+    <!--
+      ★v0.1.1413: 黒画面対策を status.html にも入れる(sidepanel.html と同じ対策)。
+
+      ■ 何が起きていたか(2026-08-16 実機・ユーザーのスクショは【全面が真っ黒】)
+        status.html は `color-scheme: light` を **<style> の中(13行目付近)にしか**
+        持っていなかった。CSS が適用されるまでの区間、ユーザー環境がダークだと
+        ブラウザはキャンバス(=まだ何も描かれていない地)を**暗色で塗る**。
+        ＝ 読み込みが遅いほど黒い時間が長い。診断ページは storage read が重いので
+        その区間が長く、実機で全面が黒くなった。
+
+      ■ なぜ <html> のインライン style と meta の【両方】が要るか
+        <html style="color-scheme: light"> は【CSS が適用された後】に効く。
+        `<meta name="color-scheme">` は【パースの初期段階】でブラウザに伝わる。
+        その差の区間を埋めるために両方置く。
+
+      ★sidepanel.html は v0.1.1299〜1316 の7版でこれを確立済み。
+        status.html には**一度も入っていなかった**(実測: meta 0件)。
+      ★light 固定にする理由: このアプリに実質ダークモードは無い。
+        `light dark` と書くとダーク環境でキャンバス既定が暗色になり同じ穴に戻る。
+    -->
+    <meta name="color-scheme" content="light" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>君斗りんく 状態 (AI共有用)</title>
     <style>
