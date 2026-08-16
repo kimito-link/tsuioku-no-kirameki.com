@@ -167,7 +167,7 @@
     - `2026-07-22.md`
     - `2026-07-23.md`
     - `2026-07-31.md`
-- 📁 **docs/** (286)
+- 📁 **docs/** (287)
   - 📁 **article-assets/** (87)
     - 📁 **venue-frames/** (12)
       - `f01.png`
@@ -277,7 +277,7 @@
     - `storage-bus.md`
     - `venue.md`
     - `web-status.md`
-  - 📁 **handoff/** (122)
+  - 📁 **handoff/** (123)
     - `CODEX-TASK-voice-v1332.md`
     - `CODEX-TASK-voice-v1334.md`
     - `CODEX-TASK-voice-v1342.md`
@@ -285,6 +285,7 @@
     - `HANDOFF-2026-08-14b-venue-gift-missing.md`
     - `HANDOFF-2026-08-14c-v1388-1395.md`
     - `HANDOFF-2026-08-15-instruments-and-black.md`
+    - `HANDOFF-2026-08-16-instruments-100-done.md`
     - `HANDOFF-backfill-instant-restore.md`
     - `HANDOFF-broadcast-score-panel.md`
     - `HANDOFF-comment-pickup-bsp.md`
