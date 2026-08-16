@@ -701,7 +701,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (1714)
+- 📁 **src/** (1715)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -993,7 +993,7 @@
         - `logo_funlink_white_RGB_maru_black.png`
       - `logo_guide_funlink_ol.pdf`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1472)
+  - 📁 **lib/** (1473)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -1500,6 +1500,7 @@
     - `healthCellGroups.test.js`
     - `healthCells.js` — v0.1.1056: パリティ根本修正 Phase4(この修正自体が動いているかを診断シートで検証可能にする)。
     - `healthCells.test.js`
+    - `healthCellsSignature.test.js`
     - `heatLevel.js` — 「盛り上がり(熱量)」を判定する純関数(v0.1.871)。
     - `heatLevel.test.js`
     - `heavyCachePreserve.js` — 軽い read が heavy read の証跡を消さないための純関数(v0.1.1367)。
