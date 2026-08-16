@@ -42,17 +42,25 @@ export const HEALTH_CELL_GROUPS = Object.freeze([
   Object.freeze({
     id: 'comment', label: 'コメント記録', order: 1,
     hint: 'コメントが取れているか・公式と一致しているか',
-    cellIds: Object.freeze(['capture-rate', 'match', 'ndgr-chats', 'dedupe-seed'])
+    cellIds: Object.freeze([
+      'capture-rate', 'match', 'ndgr-chats', 'dedupe-seed', 'ndgr-persist', 'uid-detail'
+    ])
   }),
   Object.freeze({
     id: 'ingest', label: '取り込み（接続・過去ログ）', order: 2,
     hint: '今つながっているか・過去のコメントを追えているか',
-    cellIds: Object.freeze(['ndgr', 'ingest', 'backfill', 'backfill-bottleneck', 'host-move'])
+    cellIds: Object.freeze([
+      'ndgr', 'ingest', 'backfill', 'backfill-bottleneck', 'host-move', 'multi-tab'
+    ])
   }),
   Object.freeze({
     id: 'identity', label: '人の識別（ID・サムネ・名前の紐づけ）', order: 3,
     hint: '誰が言ったかを結びつけられているか。匿名は仕様上ここに出ません',
-    cellIds: Object.freeze(['uid-rate', 'avatar', 'venue-yukkuri-face', 'avatar-cache'])
+    cellIds: Object.freeze([
+      'uid-rate', 'avatar', 'venue-yukkuri-face', 'avatar-cache',
+      // ★v0.1.1408: 匿名は分母から外して見る(匿名にサムネ/名前は原理的に無い=仕様)
+      'identity-anon', 'identity-name', 'identity-thumb', 'identity-complete'
+    ])
   }),
   /*
    * ★v0.1.1406: レーンを【症状の言葉】で3枠に割る(会議 UX の判定)。
@@ -163,7 +171,8 @@ export const HEALTH_CELL_GROUPS = Object.freeze([
     hint: '鳴るはずのものが鳴っているか。鳴らないときは「保管庫」と「失敗」を見ます',
     cellIds: Object.freeze([
       'gift-effect', 'milestone-effect', 'arrival-effect',
-      'custom-sound-db', 'gift-sound-fail', 'effect-throttle'
+      'custom-sound-db', 'gift-sound-fail', 'effect-throttle',
+      'op-sound', 'bgm-phase'
     ])
   }),
   Object.freeze({
@@ -171,8 +180,10 @@ export const HEALTH_CELL_GROUPS = Object.freeze([
     hint: '★黒くなる・固まる件はここ。「メインスレッド」が止めている当人を名指しします',
     cellIds: Object.freeze([
       // ★v0.1.1404: 「誰が止めているか」を先頭に置く(黒画面はここから読む)。
-      'mt-owner', 'mt-total', 'mt-resume',
-      'main-thread', 'paint', 'scroll-whiteout', 'boot-shade', 'grid-rebuild'
+      // ★v0.1.1408: 2番目・種類数・平均・起動段階・作り直しを追加。
+      'mt-owner', 'mt-owner2', 'mt-total', 'mt-average', 'mt-spread', 'mt-resume',
+      'boot-phase', 'boot-remount',
+      'main-thread', 'paint', 'scroll-whiteout', 'whiteout-culprit', 'boot-shade', 'grid-rebuild'
     ])
   }),
   Object.freeze({

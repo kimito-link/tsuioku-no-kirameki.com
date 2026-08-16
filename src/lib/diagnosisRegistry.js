@@ -182,7 +182,33 @@ export const DIAGNOSIS_REGISTRY = Object.freeze([
   reg('voice-playback-timeout', '再生の打ち切り', 'venue', 1, false),
   reg('fetch-koken', 'ギフト貢献度の取得', 'northstar', 1, false),
   reg('fetch-nicoad', '広告ランキングの取得', 'northstar', 1, false),
-  reg('fetch-leader', '取得役の選出', 'ingest', 1, false)
+  reg('fetch-leader', '取得役の選出', 'ingest', 1, false),
+  /*
+   * ★v0.1.1408 最終弾: 識別・操作音・BGM・記録の質・多タブ。
+   *   finalDetailCells.js が判定の正本。
+   *   ★匿名にサムネ/名前が無いのは【仕様】なので異常にしない(掟2)。
+   *     識別可能な人だけを分母にする。
+   */
+  reg('identity-anon', '匿名の割合', 'record', 1, false),
+  reg('identity-name', '名前の取得', 'northstar', 1, false),
+  reg('identity-thumb', 'サムネの取得', 'northstar', 1, false),
+  reg('identity-complete', '名前とサムネが揃った人', 'northstar', 1, false),
+  reg('op-sound', '操作音', 'render', 1, false),
+  reg('bgm-phase', 'BGMの盛り上がり', 'render', 1, false),
+  reg('ndgr-persist', '受信から保存まで', 'record', 1, false),
+  reg('uid-detail', 'あとから人を辿れる記録', 'record', 1, false),
+  reg('multi-tab', '複数タブの混線', 'ingest', 1, false),
+  /*
+   * ★v0.1.1408: 黒画面の追い込み(ユーザー実機で継続中のため厚くする)。
+   *   ★幕/シェードの【消し方】は触らない(下流・7版空振り済)。
+   *     出直した回数・どの段階で止まったか=上流の情報だけを出す。
+   */
+  reg('boot-phase', '起動の進み具合', 'render', 1, false),
+  reg('boot-remount', '画面の作り直し', 'render', 1, false),
+  reg('whiteout-culprit', 'スクロール時の犯人', 'render', 1, false),
+  reg('mt-owner2', '2番目に止めている処理', 'render', 1, false),
+  reg('mt-spread', '止めている処理の数', 'render', 1, false),
+  reg('mt-average', '1回あたりの停止', 'render', 1, false)
 ]);
 
 /** id → 観点 の索引(集計で O(1) 参照)。 */

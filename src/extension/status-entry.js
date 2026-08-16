@@ -2001,6 +2001,12 @@ function renderAll({ extrasAgeMs, lvList, summaries, fastDiag, popupDiag, backfi
      *   NL_BUILD_ID はビルド時に埋め込まれる定数(識別子は残らない)。
      *   ★ここで渡さないとセルが永久に na になる=「登録したのに出ない」の再演。
      */
+    /*
+     * ★v0.1.1408: 操作音/BGM セル(finalDetailCells.js)の入力。
+     *   どちらも extras(12秒間引き)で既に読んでいる=storage 読み取りは増えない。
+     */
+    opSoundEffectDiag,
+    bgmPhaseDiag,
     buildId: typeof NL_BUILD_ID !== 'undefined' ? NL_BUILD_ID : '',
     appVersion: (() => {
       try { return String(chrome.runtime.getManifest()?.version || ''); } catch { return ''; }

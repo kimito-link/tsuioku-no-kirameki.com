@@ -21,6 +21,8 @@ import { buildEffectDetailCells } from './effectDetailCells.js';
 import { buildNorthStarDetailCells } from './northStarDetailCells.js';
 import { buildVoiceDetailCells } from './voiceDetailCells.js';
 import { buildExternalFetchCells } from './externalFetchCells.js';
+// ★v0.1.1408: 最終弾(識別・操作音・BGM・記録の質・多タブ)。
+import { buildFinalDetailCells } from './finalDetailCells.js';
 
 /**
  * healthCells.js — status ファーストビューの「健全度セル」を作る純関数(v0.1.843)。
@@ -847,6 +849,11 @@ export function buildHealthCells(data) {
   } catch { /* 同上 */ }
   try {
     for (const c of buildExternalFetchCells(data)) cells.push(c);
+  } catch { /* 同上 */ }
+
+  // ★v0.1.1408: 最終弾(識別・操作音・BGM・記録の質・多タブ)。
+  try {
+    for (const c of buildFinalDetailCells(data)) cells.push(c);
   } catch { /* 同上 */ }
 
   return cells;

@@ -150,5 +150,148 @@ export function buildBlackScreenOwnerCells(data) {
     }
   }
 
+  /* ── 4. 起動のどこで止まっているか ───────────────────────
+   * ★v0.1.1408: 黒いまま戻らないとき、**どの段階で止まったか**が分かれば
+   *   直す場所が決まる。幕(シェード)そのものは下流なので触らないが、
+   *   「どのフェーズで止まったか」は上流の情報として使える。
+   */
+  const shade = p_(data)?.loadShadeProbe ?? null;
+  const phase = shade?.lastLoadPhase ?? null;
+  if (!phase || !String(phase.phase || '')) {
+    out.push(cell('boot-phase', '起動の進み具合', 'na', '—'));
+  } else {
+    const ph = String(phase.phase);
+    const agoMs = Number(phase.agoMs);
+    const stuck = Number.isFinite(agoMs) && agoMs >= 5000;
+    out.push(cell(
+      'boot-phase', '起動の進み具合',
+      stuck ? 'bad' : 'ok',
+      stuck
+        ? `「${ph}」で${Math.round(agoMs / 1000)}秒 止まっています`
+        : `「${ph}」まで進みました`
+    ));
+  }
+
+  /* ── 5. 幕が何回出直したか(iframe の作り直し) ─────────────
+   * ★[[about-blank-gap-is-the-black-2026-08-12]]:
+   *   iframe が作り直されると about:blank の隙間が再び現れる。
+   *   ★幕の【消し方】は触らない。作り直しの【回数】だけを出す。
+   */
+  if (!shade) {
+    out.push(cell('boot-remount', '画面の作り直し', 'na', '—'));
+  } else {
+    const dismissCalls = n0(shade.dismissCalls);
+    out.push(cell(
+      'boot-remount', '画面の作り直し',
+      dismissCalls >= 5 ? 'warn' : 'ok',
+      dismissCalls > 1
+        ? `${dismissCalls}回 出直しました(作り直しが多いと黒く見えます)`
+        : '出直しなし'
+    ));
+  }
+
+  /* ── 6. スクロールで白く/黒くなる犯人 ─────────────────────
+   * ★classifyWhiteoutCulprit は「移動が原因」か「描き直しが原因」かを
+   *   判定できるのに、既存 scroll-whiteout セルは件数しか出さない。
+   *   ★打ち手が違う: 移動=スクロール処理 / 描き直し=再描画の重さ。
+   */
+  const wo = data?.fastDiag?.content?.scrollWhiteoutDiag ?? null;
+  if (!wo || !n0(wo.whiteoutCount)) {
+    out.push(cell('whiteout-culprit', 'スクロール時の犯人', 'na', '—'));
+  } else {
+    const move = n0(wo.culpritMove);
+    const repaint = n0(wo.culpritRepaint);
+    if (move === 0 && repaint === 0) {
+      out.push(cell('whiteout-culprit', 'スクロール時の犯人', 'warn', '原因を特定できていません'));
+    } else {
+      const moveDominant = move >= repaint;
+      out.push(cell(
+        'whiteout-culprit', 'スクロール時の犯人',
+        'warn',
+        moveDominant
+          ? `スクロール直後の移動が主因(${move}件/描き直し${repaint}件)`
+          : `描き直しが主因(${repaint}件/移動${move}件)`
+      ));
+    }
+  }
+
+  /* ── 7. 2番目に止めている当人 ───────────────────────────
+   * ★1番だけ直しても2番が残っていれば黒は消えない。
+   *   「次に何を短くするか」を先に見せる。
+   */
+  if (!has) {
+    out.push(cell('mt-owner2', '2番目に止めている処理', 'na', '—'));
+  } else {
+    const list = ownersByMs(mt.byName);
+    if (list.length < 2) {
+      out.push(cell('mt-owner2', '2番目に止めている処理', 'ok', '1つだけです'));
+    } else {
+      const second = list[1];
+      out.push(cell(
+        'mt-owner2', '2番目に止めている処理',
+        second.ms >= 500 ? 'warn' : 'ok',
+        `${second.name} 累計${Math.round(second.ms)}ms(${second.count}回)`
+      ));
+    }
+  }
+
+  /* ── 8. 止めている処理が何種類あるか ───────────────────
+   * ★1つに集中しているなら直しやすい。散っているなら構造の問題。
+   */
+  if (!has) {
+    out.push(cell('mt-spread', '止めている処理の数', 'na', '—'));
+  } else {
+    const list = ownersByMs(mt.byName);
+    const kinds = list.length;
+    out.push(cell(
+      'mt-spread', '止めている処理の数',
+      kinds >= 5 ? 'warn' : 'ok',
+      kinds === 0
+        ? '名前が取れていません(拡張の外)'
+        : kinds === 1
+          ? '1種類に集中(直しやすい状態です)'
+          : `${kinds}種類${kinds >= 5 ? '(広く散っています)' : ''}`
+    ));
+  }
+
+  /* ── 9. 1回あたりの平均停止 ───────────────────────────
+   * ★最悪1件と合計だけでは「たまに長い」と「常に少し長い」が区別できない。
+   *   体感が違う(前者はカクつき・後者は全体が重い)。
+   */
+  if (!has) {
+    out.push(cell('mt-average', '1回あたりの停止', 'na', '—'));
+  } else {
+    const count = n0(mt.count);
+    const totalMs = n0(mt.totalMs);
+    const avg = count > 0 ? Math.round(totalMs / count) : 0;
+    out.push(cell(
+      'mt-average', '1回あたりの停止',
+      avg >= 300 ? 'warn' : 'ok',
+      `平均${avg}ms(${count}回)`
+    ));
+  }
+
   return out;
+}
+
+/**
+ * byName を累計の多い順に並べる。
+ * @param {Record<string, { ms?: number, count?: number }>|null|undefined} byName
+ * @returns {Array<{ name:string, ms:number, count:number }>}
+ */
+function ownersByMs(byName) {
+  if (!byName || typeof byName !== 'object') return [];
+  return Object.keys(byName)
+    .map((k) => ({ name: k, ms: n0(byName[k]?.ms), count: n0(byName[k]?.count) }))
+    .filter((e) => e.ms > 0)
+    .sort((a, b) => b.ms - a.ms);
+}
+
+/**
+ * popup スナップショットを取り出す(呼び出し側の形ゆれを吸収)。
+ * @param {any} data
+ * @returns {any}
+ */
+function p_(data) {
+  return data?.popupDiag?.popup ?? data?.popupDiag ?? null;
 }

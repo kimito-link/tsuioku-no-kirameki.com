@@ -58,7 +58,8 @@ function maximalInput() {
     }],
     fastDiag: { content: {
       networkErrorProbe: { ndgrConnectStatus: 'connected' },
-      scrollWhiteoutDiag: { whiteoutCount: 3 },
+      // ★v0.1.1408: スクロール白化の犯人(移動 vs 描き直し)
+      scrollWhiteoutDiag: { whiteoutCount: 3, culpritMove: 2, culpritRepaint: 1 },
       styleReattach: { count: 1 },
       hostMoveDiag: { moveCount: 3 },
       giftDiagnostics: {
@@ -83,9 +84,13 @@ function maximalInput() {
         },
         // ★実際の速報と同じ入れ子(giftDiagnostics の中)。ここを間違えると出ない。
         commentObservability: {
-          savedCommentsUidStats: { withUidPercent: 50, totalSaved: 100 },
-          dedupeSeedDiag: { addedTotalCount: 100, suspiciousAddedCount: 2 }
-        }
+          savedCommentsUidStats: { withUidPercent: 50, totalSaved: 100, withUid: 50 },
+          dedupeSeedDiag: { addedTotalCount: 100, suspiciousAddedCount: 2 },
+          // ★v0.1.1408: 受信から保存までのセルの入力
+          ndgrChatToPersistRatio: { decodedChats: 100, ndgrPersistedRows: 40, ratioPercent: 40 }
+        },
+        // ★v0.1.1408: 多タブ混線セルの入力
+        multiTabDiag: { eventDomLvCount: 2, staleDomBundleSuspected: true }
       }
     } },
     popupDiag: { popup: {
@@ -98,7 +103,12 @@ function maximalInput() {
           worstDrop: 12, worstDropFrom: 20, worstDropTo: 8, worstDropOrigin: 'light_summary'
         }
       },
-      identityAcquisition: { identifiable: 5, withThumb: 1, anonymous: 2 },
+      // ★v0.1.1408: 識別セルの入力(匿名は分母から外す=掟2)
+      identityAcquisition: {
+        total: 10, anonymous: 5, identifiable: 5, withThumb: 1, withName: 2, withAll: 1,
+        guessedThumb: 4, thumbPercent: 20, namePercent: 40, allPercent: 20,
+        missingThumb: 4, missingName: 3
+      },
       avatarLoadDiag: { usericonFailed: 1, usericonSucceeded: 5 },
       mainThreadBlocker: { count: 3, worstMs: 900, worstName: 'grid' },
       // ★v0.1.1400 で掘り起こした14セルの入力(埋もれていた観測群)
@@ -110,7 +120,11 @@ function maximalInput() {
       },
       lanePublishSkip: { noEls: 2, entriesEmpty: 1, lastSkipReason: 'els無し', lastPublishAgoSec: 3 },
       lightSupplyGuard: { observedCount: 2, skipCount: 1 },
-      loadShadeProbe: { shadeAgeMs: 2500, shadePresent: true },
+      // ★v0.1.1408: 起動段階・作り直し回数(黒画面の追い込み)
+      loadShadeProbe: {
+        shadeAgeMs: 2500, shadePresent: true, dismissCalls: 6,
+        lastLoadPhase: { phase: 'awaiting-first-paint', agoMs: 8000 }
+      },
       tickerPick: { domWriteTotal: 12, filteredTooShort: 30 },
       storyGrowthChurn: { rebuilds: 2, maxMs: 150 },
       avatarRememberedDiag: { hitProfileCache: 10, hitSynth: 40 },
@@ -182,7 +196,11 @@ function maximalInput() {
     backfillLiveMetric: { stalled: true, remaining: 100 },
     mainThreadBlocker: {
       count: 3, worstMs: 900, worstName: 'grid-rebuild', totalMs: 2400,
-      byName: { 'grid-rebuild': { ms: 1800, count: 2, worstMs: 900 } },
+      byName: {
+        'grid-rebuild': { ms: 1800, count: 2, worstMs: 900 },
+        // ★v0.1.1408: 2番目の当人・種類数セルの入力(2種類以上が必要)
+        'lane-paint': { ms: 600, count: 4, worstMs: 200 }
+      },
       afterResumeMs: 1500, afterResumeCount: 2
     },
     // ★v0.1.1403「無音で死ぬ」セルの入力(silentFailureCells.js)。
@@ -194,7 +212,10 @@ function maximalInput() {
     // ★v0.1.1404: 黒画面の当人セル(blackScreenOwnerCells.js)の入力。
     //   mainThreadBlocker は上でも与えているが、byName/afterResume まで持たせる。
     buildId: '0101-000000',
-    appVersion: '0.1.1404'
+    appVersion: '0.1.1404',
+    // ★v0.1.1408: 操作音 / BGM セルの入力
+    opSoundEffectDiag: { handlePressed: 10, handleFired: 7, noPathCount: 2, soundEnabled: true },
+    bgmPhaseDiag: { bgmEnabled: true, phase: 'fever', reachCount: 3, jackpotCount: 1 }
   };
 }
 
