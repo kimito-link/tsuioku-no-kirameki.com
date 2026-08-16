@@ -35,6 +35,31 @@ describe('summarizeEventLoopStall', () => {
     expect(r.line).toContain('✅');
   });
 
+  /**
+   * ★v0.1.1416: 実機(2026-08-16)で同じ速報にこの2行が並んだ:
+   *     最大タイマー遅延=753ms ✅イベントループは健全
+   *     即時プッシュ 配達平均47,686ms
+   *   両方とも嘘ではない。測っている時間帯と文書が違うだけ:
+   *     - この計器は hidden 中を数えない(Chrome の間引きを停止と誤報しないため・正しい)
+   *     - postMessage は間引かれない=配達 gap だけが hidden 中も伸びる
+   *     - さらにこの計器は親(sidepanel.html)、配達は子(popup.html の iframe)
+   *   ＝「イベントループは健全」と全称で言うと、配達47秒の無罪証明に読めてしまい
+   *     調査が止まる。範囲を名乗らせる。
+   */
+  it('★✅のとき「範囲」を名乗る=配達遅延の無罪証明に読ませない', () => {
+    const r = summarizeEventLoopStall([
+      { t: 3, sched: 0 },
+      { t: 753, sched: 0 }
+    ]);
+    expect(r.stalled).toBe(false);
+    // 全称の「イベントループは健全」で終わってはいけない。
+    expect(r.line).not.toMatch(/✅イベントループは健全/);
+    // 測った範囲(この文書・可視中)を明示する。
+    expect(r.line).toContain('この文書の可視中');
+    // 対象外を明示して、他の計器の赤を打ち消さないようにする。
+    expect(r.line).toContain('hidden中と子iframeは対象外');
+  });
+
   it('★予定を持たない点(load/visible/reload)は数えない=遅延0と嘘をつかない', () => {
     // sched が無い点しか無ければ「未観測」であって「遅延なし」ではない。
     const r = summarizeEventLoopStall([
