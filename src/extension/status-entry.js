@@ -263,7 +263,9 @@ import { isLastWatchUrlFresh } from '../lib/watchUrlFreshness.js';
 //   検出して手動クローズ導線を出す(council/orphan-tab-survivor-SYNTHESIS.md)。自動では閉じない。
 import { isBackgroundWatchTab } from '../lib/backgroundWatchTab.js';
 // ★v0.1.1388: 1サイクル全体の締切。個別 timeout(10本×8秒=80秒)の合計に天井を付ける。
-import { createRefreshDeadline, REFRESH_CYCLE_BUDGET_MS } from '../lib/refreshCycleDeadline.js';
+import {
+  createRefreshDeadline, REFRESH_CYCLE_BUDGET_MS, REFRESH_FIRST_CYCLE_BUDGET_MS
+} from '../lib/refreshCycleDeadline.js';
 // ★v0.1.1388: 症状別判定を【画面に】出す(v0.1.1385 はコピー本文にしか配線されていなかった)。
 import { buildSymptomVerdicts } from '../lib/symptomVerdicts.js';
 import { popupSnapshotAgeMs } from '../lib/aiShareFullText.js';
@@ -668,7 +670,18 @@ function runRefreshTick(opts) {
   const congested = first
     ? true
     : Number.isFinite(prevTotalMs) && prevTotalMs > REFRESH_CONGESTED_MS;
-  refresh(congested ? { timeoutMs: CONGESTED_TIMEOUT_MS } : {})
+  /*
+   * ★v0.1.1410: 初回は【開くまでの時間】が体感そのものなので予算を強く締める。
+   *   実測 6004ms の refresh が 12秒予算に収まっていた=何にも止められず、
+   *   その間ページが出なかった。1.5秒で切り上げ、残りは次のtick(2秒後)が埋める。
+   */
+  refresh(
+    first
+      ? { timeoutMs: CONGESTED_TIMEOUT_MS, budgetMs: REFRESH_FIRST_CYCLE_BUDGET_MS }
+      : congested
+        ? { timeoutMs: CONGESTED_TIMEOUT_MS }
+        : {}
+  )
     .catch((err) => console.debug('[status] refresh err', err))
     .finally(() => {
       _refreshInFlight = false;
