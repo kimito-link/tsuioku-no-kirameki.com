@@ -18,7 +18,7 @@
  *
  * exit codes: 0=正常（プロバイダ一部失敗を含む） / 2=state・briefの書き込み自体に失敗
  */
-import { readFileSync, writeFileSync, existsSync, mkdirSync, unlinkSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync, mkdirSync, unlinkSync, readdirSync, statSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -465,6 +465,7 @@ async function main() {
     date, isFirstRun, fetchStatus, healthAlerts, probedCandidates,
     referenceCounts, carryOverCount: carryOver.length, newCatalogs,
     catalogCheckedCount, liveProbeCheckedCount, outOfScopeCount, deprecationAlerts,
+    meetingStats: summarizeMeetingRecords(30),
   });
 
   if (DRY_RUN) {
@@ -498,7 +499,48 @@ async function main() {
 
 /** brief（日報）のMarkdownを組み立てる。カタログのdescription等は信頼できない入力として
  *  引用のみ・指示として解釈しない（インジェクション安全・設計書§4必須要件）。 */
-function buildBrief({ date, isFirstRun, fetchStatus, healthAlerts, probedCandidates, referenceCounts, carryOverCount, newCatalogs, catalogCheckedCount, liveProbeCheckedCount, outOfScopeCount, deprecationAlerts }) {
+/**
+ * 実会議の記録(council/*.json)から直近N日のメンバー別 発言数/失敗数 を集計する（2026-08-16追加）。
+ * 動機: 84件の実績が「あるのに誰も見ていない」状態で、その間 groq/compound が
+ * 9回中9回失敗し続けていた（会議のたびに必ず落ちる死に枠が現役で在籍していた）。
+ * 日報に毎日1表出しておけば、次の「死に枠」は撤去済みモデルのノイズに埋もれず見つかる。
+ * 直近30日で切る理由: 全期間集計だと撤去済みメンバー（qwen3.5-122b 24%等）が上位を占めて
+ * 現役の異常が霞むため（実際84件の失敗36件はその過半が撤去済みメンバー由来だった）。
+ * 何も自動では変えない——判断材料を人間に出すだけ（既存healthAlertsと同じ流儀）。
+ * @param {number} days 集計対象の日数
+ */
+function summarizeMeetingRecords(days = 30) {
+  const dir = join(REPO_ROOT, 'council');
+  if (!existsSync(dir)) return { total: 0, rows: [], files: 0 };
+  const since = Date.now() - days * 86400000;
+  const byLabel = {};
+  let total = 0, files = 0;
+  for (const f of readdirSync(dir)) {
+    if (!f.endsWith('.json')) continue;
+    let j;
+    try { j = JSON.parse(readFileSync(join(dir, f), 'utf8')); } catch { continue; }
+    // recordのat（ISO文字列）で期間を絞る。at が無い旧形式はファイル更新時刻で代用。
+    const at = Date.parse(j.at || '') || (() => { try { return statSync(join(dir, f)).mtimeMs; } catch { return 0; } })();
+    if (!at || at < since) continue;
+    files++;
+    for (const key of Object.keys(j.rounds || {})) {
+      for (const r of (j.rounds[key] || [])) {
+        if (!r || !r.label) continue;
+        // 「[統合]」等の付与ラベルは素のメンバー名に寄せる（同一モデルの実績を分断しない）。
+        const label = String(r.label).replace(/\s*\[[^\]]+\]\s*$/, '');
+        byLabel[label] = byLabel[label] || { n: 0, ng: 0 };
+        byLabel[label].n++; total++;
+        if (r.error) byLabel[label].ng++;
+      }
+    }
+  }
+  const rows = Object.entries(byLabel)
+    .map(([label, v]) => ({ label, n: v.n, ng: v.ng, rate: v.n ? v.ng / v.n : 0 }))
+    .sort((a, b) => b.rate - a.rate || b.n - a.n);
+  return { total, rows, files };
+}
+
+function buildBrief({ date, isFirstRun, fetchStatus, healthAlerts, probedCandidates, referenceCounts, carryOverCount, newCatalogs, catalogCheckedCount, liveProbeCheckedCount, outOfScopeCount, deprecationAlerts, meetingStats }) {
   const lines = [];
   lines.push(`# Council Scout 日報 — ${date}`, '');
 
@@ -549,6 +591,19 @@ function buildBrief({ date, isFirstRun, fetchStatus, healthAlerts, probedCandida
     lines.push(`## 新着（参考・候補基準未満）: ${refTotal}件（${breakdown}）`, '');
   }
 
+  // 2026-08-16追加: 実会議の成績（council/*.json の直近30日）。カタログ健康診断が
+  // 「呼べるか」を見るのに対し、こちらは「会議で実際に使えているか」を見る別軸。
+  // groq/compoundは9回中9回413で落ちながら現役だった——カタログ上は健全だったため、
+  // この軸が無いと永久に気づけない型の異常だった。
+  if (meetingStats && meetingStats.files > 0) {
+    lines.push(`## 実会議の成績（直近30日・${meetingStats.files}会議 / ${meetingStats.total}発言）`);
+    lines.push('| メンバー | 発言 | 失敗 | 失敗率 |', '|---|---|---|---|');
+    for (const r of meetingStats.rows.filter((x) => x.n >= 3).slice(0, 10)) {
+      lines.push(`| ${r.label} | ${r.n} | ${r.ng} | ${(r.rate * 100).toFixed(0)}% |`);
+    }
+    lines.push('', '※ 発言3回未満は割愛。撤去の目安は「発言10回以上で失敗率50%以上」（下の推奨アクション参照）。', '');
+  }
+
   lines.push('## 取得状況');
   for (const [name, s] of Object.entries(fetchStatus)) {
     lines.push(s.ok ? `- ✅ ${name}（${s.count}件）` : `- ⚠ ${name}: ${s.error}（＝情報無し。変化無しの意味ではない）`);
@@ -559,7 +614,12 @@ function buildBrief({ date, isFirstRun, fetchStatus, healthAlerts, probedCandida
   // 2026-08-13: 提供終了予告を新着候補より優先する。新着は「増やす機会」だが期限は
   // 「減る確定」であり、後継育成(昇格基準=7日以上空けた実会議2回)のリードタイムを
   // 食い潰すため時間的な締切がある方を先に出す。
-  if ((deprecationAlerts || []).length > 0) {
+  // 2026-08-16: 実会議で壊れているメンバーは、期限予告と同格の「確定した損失」として
+  // 新着候補より優先する（発言10回以上で失敗率50%以上＝偶然では説明できない水準）。
+  const broken = (meetingStats?.rows || []).find((r) => r.n >= 10 && r.rate >= 0.5);
+  if (broken) {
+    lines.push(`/council-fable ${broken.label} をラインナップから外すべきか（直近30日で${broken.n}回中${broken.ng}回失敗＝${(broken.rate * 100).toFixed(0)}%。この日報 council-scout/briefs/${date}.md を地雷マップに）`);
+  } else if ((deprecationAlerts || []).length > 0) {
     const d = deprecationAlerts[0];
     lines.push(`/council-fable ${d.label} の後継を決める（提供終了 ${d.at}・あと${d.daysLeft}日。この日報 council-scout/briefs/${date}.md を地雷マップに）`);
   } else if (probedCandidates.length > 0) {

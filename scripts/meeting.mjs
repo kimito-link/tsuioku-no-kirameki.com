@@ -118,7 +118,19 @@ const QUALITY = process.env.COUNCIL_QUALITY === '1';
 const SAMPLES = Math.max(1, Number(process.env.COUNCIL_SAMPLES) || 1);
 const CRITICS = Math.max(1, Number(process.env.COUNCIL_CRITICS) || (QUALITY ? 2 : 1));
 const REVISE = process.env.COUNCIL_REVISE === '1' || QUALITY;
-const SYNTH = process.env.COUNCIL_SYNTH === '1' || QUALITY;
+// 2026-08-16: SYNTH(②統合)を既定ONに反転（退避弁 COUNCIL_SYNTH=0 で従来動作）。
+//  根拠: 統合は「全員の回答を1案に束ねる」会議の最終成果物であり、+1コールで得られる
+//  費用対効果が最も高い。従来は QUALITY を明示した会議でしか走らず、84件の実績では
+//  30件がQUALITY痕跡を持ちながら統合がJSONに残ったのは10件だけだった——原因は
+//  「統合が一発勝負でリトライ無し・失敗しても無言」という欠陥（2026-08-13に修正済み。
+//  TPM 429なら待って再試行→priority次点へフォールバック→全滅時は明示ログ）。
+//  反転のゲート（Fable設計の基準）: 修正後のQUALITY実会議2回で統合が2/2成立すること。
+//  実測: 2回とも groq/gpt-oss-120b が統合を成立させ「成功 6/6」（歴史値は6/12＝50%）。
+//  なお CRITICS(批判2体)・REVISE(2巡目)・MAX_MEMBERS までを含む QUALITY 全体の既定化は
+//  まだ行わない: 1会議あたりのトークン消費が概ね2倍になりTPD枯渇のリスクがあるため、
+//  本反転の運用実績（record.meta.events の tpd-exhausted 件数）を見てから判断する
+//  （「1つ直したら測ってから次」）。
+const SYNTH = process.env.COUNCIL_SYNTH !== '0' || QUALITY;
 // 統合役を「最強クラウド」に固定するか（2026-07-04設計・既定ON）。0で従来のlead選出に戻す。
 const SYNTH_STRONG = process.env.COUNCIL_SYNTH_STRONG !== '0';
 // ②統合の出力指定（council-roles の DEFAULT_FORMAT と同じ4ブロックを短文で示す）。
@@ -292,6 +304,7 @@ const push = (label, kind, run, rawId = '', provider = '') => {
       if (e?.tpdExhausted && !exhaustedLabels.has(label)) {
         exhaustedLabels.add(label);
         console.error(`[TPD枯渇] ${label} を本セッション除外（${String(e.message).slice(0, 100)}）`);
+        noteEvent('tpd-exhausted', { label });
       }
       throw e;
     }
@@ -520,7 +533,26 @@ function printResults(title, results) {
 
 // ── メイン ───────────────────────────────────────────────────────────────
 const t0 = Date.now();
-const record = { question, mode: '', category: '', classifier: '', rounds: {}, at: new Date().toISOString() };
+// 2026-08-16 追加: record を「それ単体で会議を再現・評価できる」自己記述型にする。
+// 動機: council/*.json 84件を初めて解析したとき、JSONだけでは
+//   「QUALITYだったのか」「統合は試みて失敗したのか、そもそも走らなかったのか」
+//   「誰が召集されたのか」が一切分からず、stderrログ54件との突合が必要だった。
+//   その結果「統合10回＝QUALITYがほぼ使われていない」と誤読しかけた（実際は30/84回で
+//   使われており、統合の2/3が無言で消えていただけ）。記録の穴が判断を歪めた実例。
+// 方針: 自動で何かを変える機構は作らない（30年後楽＝足すコードを増やさない）。
+//   人間が節目に解析するための材料を、既存recordに相乗りさせるだけに留める。
+const record = {
+  question, mode: '', category: '', classifier: '', rounds: {}, at: new Date().toISOString(),
+  meta: {
+    flags: { quality: QUALITY, critics: CRITICS, revise: REVISE, synth: SYNTH, samples: SAMPLES, maxMembers: MAX_MEMBERS },
+    members: [],  // 実際に召集された {label, role} （stderrにしか出ていなかった）
+    events: [],   // 統合失敗/敗者復活/振替/TPD枯渇。安全網が発動したかを後から数えられる
+  },
+};
+/** 会議中の特筆イベントを record に残す（stderr出力と対で呼ぶ）。 */
+function noteEvent(type, detail) {
+  try { record.meta.events.push({ type, ...detail }); } catch { /* 記録失敗で会議を止めない */ }
+}
 
 if (!allMembers.length) {
   console.error('利用可能なメンバーが0体です。env キーと Ollama を確認してください。');
@@ -597,6 +629,7 @@ function dedupResults(results, label) {
   if (!folds.length) return results;
   for (const f of folds) console.error(`[dedup] ${f.gone} は ${f.keep} とほぼ同一(≥${DEDUP_THRESHOLD})→統合前に畳む`);
   console.error(`[dedup] ${label}: ${folds.length}件を重複として畳んだ（残 ${results.length - dropped.size}/${results.length}）`);
+  noteEvent('dedup', { round: label, folded: folds.length, kept: results.length - dropped.size });
   // 代表行に「畳んだ相手」を注記（記録に残す）。
   for (const f of folds) {
     const k = results.find(r => r.label === f.keep);
@@ -709,6 +742,7 @@ async function council(members, label, key) {
       .sort((a, b) => weightOf(a.label) - weightOf(b.label))[0];
     if (rescueCand) {
       console.error(`[${label}] 敗者復活: 有効回答${okCount}体のため ${rescueCand.label} に1回だけ追加依頼`);
+      noteEvent('rescue', { round: label, okCount, cand: rescueCand.label });
       const rescued = await runRound([rescueCand], question);
       if (rescued[0] && !rescued[0].error) {
         shown = [...shown, rescued[0]];
@@ -789,10 +823,12 @@ async function council(members, label, key) {
           shown.push({ ...sres[0], label: cand.label + ' [統合]', role: 'lead', ms: sres[0].ms, synthesis: true });
           break;
         }
+        noteEvent('synth-failed', { round: label, cand: cand.label, error: String(sres[0]?.error || '(no result)').slice(0, 120) });
         console.error(`[${label}] ②統合失敗: ${cand.label}: ${String(sres[0]?.error || '(no result)').slice(0, 120)}`
           + (ci < chain.length - 1 ? ' → 次点へ' : ''));
         if (ci === chain.length - 1) {
           console.error(`[${label}] ②統合: 全候補失敗。統合なしで素の回答のみ記録する（司令塔が手動で統合すること）`);
+          noteEvent('synth-none', { round: label, tried: chain.length });
         }
       }
     }
@@ -823,10 +859,12 @@ function swapToCloud(member, routedMembers, allMembers, reason) {
   if (!spare) { console.error(`[振替] ${member.label} の代替クラウドが無く、そのまま残す（${reason}）`); return; }
   routedMembers.splice(idx, 1, { ...spare, role: member.role });
   console.error(`[振替] ${member.label} → ${spare.label}（${ROLE_LABEL[member.role]}・理由:${reason}）`);
+  noteEvent('swap', { from: member.label, to: spare.label, role: member.role, reason });
 }
 
 if (FULL && !AB) {
   record.mode = 'full';
+  record.meta.members = allMembers.map(m => ({ label: m.label, role: m.role })); // routed経路と同様に残す
   await council(allMembers, '全員集合（COUNCIL_FULL）', 'full');
 } else {
   const { category, by, raw } = await classify(question);
@@ -919,6 +957,8 @@ if (FULL && !AB) {
   }
 
   console.error(`召集 ${routedMembers.length}体（最大${MAX_MEMBERS}）: ${routedMembers.map(m => `${m.label}[${ROLE_LABEL[m.role]}]`).join(', ')}\n`);
+  // 誰が召集されたかは従来stderrにしか出ておらず、JSONだけでは会議を再現できなかった。
+  record.meta.members = routedMembers.map(m => ({ label: m.label, role: m.role }));
 
   await council(routedMembers, `ルーティング選抜・${category}`, 'routed');
 
