@@ -25,8 +25,29 @@
  * @module refreshCycleDeadline
  */
 
-/** 1サイクルの既定の総予算[ms]。REFRESH_INTERVAL_MS(2秒)の数倍までは許容し、それ以上は切る。 */
-export const REFRESH_CYCLE_BUDGET_MS = 12_000;
+/**
+ * 1サイクルの既定の総予算[ms]。
+ *
+ * ★v0.1.1410: 12,000 → 4,000 に締める(2026-08-16 実機「診断ページがまた重い」)。
+ *   実測 `更新所要 6004ms(popupDiag 1471 / extras 1454 / summaries 1278)` は
+ *   **12秒の予算内なので何にも止められていなかった**。
+ *   ＝ 予算が「事故を防ぐ上限」としては機能していたが、
+ *     「体感を守る上限」としては緩すぎた。
+ *   ★REFRESH_INTERVAL_MS(2秒)の2倍。これを超えるなら、その回は
+ *     stale(直近値)で描く方が**画面が出ない時間より必ず良い**。
+ */
+export const REFRESH_CYCLE_BUDGET_MS = 4_000;
+
+/**
+ * ★v0.1.1410: 初回サイクルの予算[ms]。**ページが開くまでの時間はこれで決まる**。
+ *
+ *   初回は `first: true` で congested 扱いになり、全 read を通そうとするが、
+ *   ユーザーが待っているのは「開くこと」であって「完全な値」ではない。
+ *   1.5秒で切り上げ、足りない分は次のサイクル(2秒後)が埋める。
+ *   ★初回に限り stale すら無い(キャッシュ空)ので一部が「—」になるが、
+ *     **白い画面より必ず良い**([[unbounded-await-at-boot-makes-page-blank]])。
+ */
+export const REFRESH_FIRST_CYCLE_BUDGET_MS = 1_500;
 
 /** これを下回る残り時間では read を発行しない[ms](発行しても実質間に合わないため)。 */
 export const MIN_SLICE_MS = 150;

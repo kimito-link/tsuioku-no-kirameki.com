@@ -26,6 +26,16 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1410',
+    date: '2026-08-16',
+    summary: '診断ページが開くまでの待ち時間を短縮',
+    items: Object.freeze([
+      '診断ページを開くとき、データの読み込みに最大12秒まで待つ設定になっていました。実測で6秒かかっており、その間ページが表示されませんでした。',
+      '初回は1.5秒で切り上げて先に画面を出し、足りない分は次の更新（2秒後）で埋めるようにしました。',
+      '通常の更新も最大4秒までに制限しました。間に合わない項目は前回の値で表示します。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1409',
     date: '2026-08-16',
     summary: '診断タブが重すぎて開かない問題を修正',

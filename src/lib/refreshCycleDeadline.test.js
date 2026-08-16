@@ -3,6 +3,7 @@ import {
   createRefreshDeadline,
   worstCaseSerialMs,
   REFRESH_CYCLE_BUDGET_MS,
+  REFRESH_FIRST_CYCLE_BUDGET_MS,
   MIN_SLICE_MS
 } from './refreshCycleDeadline.js';
 
@@ -82,5 +83,29 @@ describe('refreshCycleDeadline', () => {
     expect(worstCaseSerialMs(Number.NaN, 8000)).toBe(0);
     expect(worstCaseSerialMs(10, Number.NaN)).toBe(0);
     expect(worstCaseSerialMs(-1, 8000)).toBe(0);
+  });
+
+  describe('★予算は【体感】を守る値に固定する(v0.1.1410)', () => {
+    /*
+     * 2026-08-16 実機「診断ページがまた重い」の真因:
+     *   更新所要 6004ms は **12秒予算の内側なので何にも止められていなかった**。
+     *   予算は「事故(80秒)を防ぐ上限」としては効いていたが、
+     *   「体感を守る上限」としては緩すぎた。
+     * ★緩める変更を入れたらこのテストが赤くなる(数で固定する)。
+     */
+    it('通常サイクルは refresh 間隔(2秒)の2倍以内', () => {
+      expect(REFRESH_CYCLE_BUDGET_MS).toBeLessThanOrEqual(4_000);
+    });
+
+    it('★初回サイクルはさらに短い(ページが開くまでの時間そのもの)', () => {
+      expect(REFRESH_FIRST_CYCLE_BUDGET_MS).toBeLessThanOrEqual(2_000);
+      expect(REFRESH_FIRST_CYCLE_BUDGET_MS).toBeLessThan(REFRESH_CYCLE_BUDGET_MS);
+    });
+
+    it('初回予算でも最低1本は read を発行できる(全部スキップにしない)', () => {
+      const clock = { t: 0, now: () => clock.t };
+      const d = createRefreshDeadline({ totalMs: REFRESH_FIRST_CYCLE_BUDGET_MS, now: clock.now });
+      expect(d.next(8000)).toBeGreaterThan(MIN_SLICE_MS);
+    });
   });
 });
