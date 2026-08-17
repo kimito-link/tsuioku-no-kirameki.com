@@ -26,6 +26,16 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1419',
+    date: '2026-08-17',
+    summary: 'サイドパネルの応援レーンが空になるのを修正',
+    items: Object.freeze([
+      'サイドパネルで応援レーン（アイコンが並ぶ列）が空のままになり、サムネイルが出ない問題を直しました。',
+      '原因は、どの配信を見ているかの情報がサイドパネルの中まで届いていなかったことです。渡す側は正しく用意していましたが、受け取る手前で捨てられていました。',
+      'この修正により、サイドパネルでも配信が正しく認識され、応援レーンが描画されるようになります。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1418',
     date: '2026-08-17',
     summary: 'パネルを開いた時の暗い時間を短縮',
