@@ -23,6 +23,16 @@
  *
  * @module venueOpenCache
  */
+/*
+ * ★v0.1.1425: 実際に購読するのは【現在状態キー】(venueLiveOpenFlag.js)。
+ *   下の KEY_VENUE_OPEN は【復元用】で、venueBar.js の書き込みが
+ *   「状態を復元しない」というユーザー要望のためコメントアウトされている。
+ *   ＝このキーは永久に undefined → isVenueOpenCached() が常に false →
+ *     v0.1.1394 の「会場が開いていれば鏡を書く」分岐が一度も通らなかった。
+ *   実機: 会場は3人なのに `鏡stale(656s) … tanu332`(11分前・別配信)が居座る。
+ *   ★旧キーも読み続ける(将来 venueBar 側で復元が復活したとき両方効くように)。
+ */
+import { KEY_VENUE_LIVE_OPEN, isVenueLiveOpen } from './venueLiveOpenFlag.js';
 
 /** 会場が開いているかの storage キー(venueBar.js の OPEN_STORAGE_KEY と同値)。 */
 export const KEY_VENUE_OPEN = 'nls_venue_open';
@@ -76,12 +86,24 @@ export function watchVenueOpen(chromeApi) {
     const api = chromeApi || globalThis.chrome;
     const local = api?.storage?.local;
     if (!local?.get) return;
-    void local.get(KEY_VENUE_OPEN)
-      .then((/** @type {any} */ bag) => setVenueOpenFromRaw(bag?.[KEY_VENUE_OPEN]))
+    void local.get([KEY_VENUE_OPEN, KEY_VENUE_LIVE_OPEN])
+      .then((/** @type {any} */ bag) => {
+        // ★現在状態キーを優先。無ければ旧キー(将来復活したときのため)。
+        if (isVenueLiveOpen(bag?.[KEY_VENUE_LIVE_OPEN], Date.now())) {
+          _venueOpen = true;
+          return;
+        }
+        setVenueOpenFromRaw(bag?.[KEY_VENUE_OPEN]);
+      })
       .catch(() => { /* 読めない=書かない側のまま */ });
     api?.storage?.onChanged?.addListener?.((/** @type {any} */ changes, /** @type {any} */ area) => {
-      if (area !== 'local' || !changes || !(KEY_VENUE_OPEN in changes)) return;
-      setVenueOpenFromRaw(changes[KEY_VENUE_OPEN]?.newValue);
+      if (area !== 'local' || !changes) return;
+      if (KEY_VENUE_LIVE_OPEN in changes) {
+        // ★会場が「開いた/閉じた」を押すたびにここへ来る(ハートビート含む)。
+        _venueOpen = isVenueLiveOpen(changes[KEY_VENUE_LIVE_OPEN]?.newValue, Date.now());
+        return;
+      }
+      if (KEY_VENUE_OPEN in changes) setVenueOpenFromRaw(changes[KEY_VENUE_OPEN]?.newValue);
     });
   } catch {
     /* 購読に失敗しても既定(書かない)で動く */
