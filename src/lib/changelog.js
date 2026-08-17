@@ -26,6 +26,16 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1418',
+    date: '2026-08-17',
+    summary: 'パネルを開いた時の暗い時間を短縮',
+    items: Object.freeze([
+      'サイドパネルを開いた直後、中身が出るまで暗いままだった時間を 2.5秒 から 0.9秒 に短縮しました。',
+      '中身の準備ができたかを確認する間隔も短くしました（0.2秒ごと→0.06秒ごと）。準備できているのに待たされる時間がなくなります。',
+      '★中身が出そろってから見せる仕組み自体は変えていません。データが早く届いた場合はこれまで通りすぐ表示されます。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1417',
     date: '2026-08-17',
     summary: '裏タブのコメント遅れを短縮',

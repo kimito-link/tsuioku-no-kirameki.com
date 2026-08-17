@@ -18839,8 +18839,26 @@ let inlineShadeDataFallbackTimer = null;
  *   旧コメントは10秒を「最悪ケースだけ」としていたが、★飽和時はこれが通常ケース＝
  *   上限そのものが体感の黒時間を決めていた。幕の目的(初期レイアウトのガタつき隠し)は
  *   2.5秒で足り、それ以上は待つほど黒く見えるだけ。中身が薄くても出す方が必ず良い。
+ *
+ * ★v0.1.1418: 2.5秒 → 0.9秒。ユーザー実機で「まだ黒い」が続いていたため。
+ *
+ * 【なぜ下げてよいと言えるか】この上限が効くのは【データが最後まで来なかった】ときだけ。
+ *   データが来た場合はポーリング(下の 200ms→60ms)と、実際に中身を描いた5経路
+ *   (countStoryUserLaneDomTiles>0 等・7172/7202/7241/7404/7467行)が先に外す。
+ *   ＝上限を下げても「データが来ているのに早く外れる」ことは起きない。
+ *   下げて変わるのは【来なかったとき何秒黒いままか】だけ。
+ *
+ * 【なぜ0.9秒か】幕の本来の目的は「初期レイアウトのガタつきを隠す」こと。
+ *   実測(2026-08-17・実ブラウザ)では popup.html の文書生成〜色確定が 72ms、
+ *   about:blank の隙間は 11ms。★レイアウトが落ち着くのに2.5秒は要らない。
+ *   一方で 0 にはしない: prewarm 直後や低速環境で「空の枠が一瞬見える」のを
+ *   避ける最小限の余裕として 0.9秒を残す(体感1秒未満に収める)。
+ *
+ * ★トレードオフ(正直に): データが遅い環境では、以前より
+ *   「中身が薄い状態」が見える時間が長くなる。ただし黒いまま待たせるより良い
+ *   というのは v0.1.1373 で既に確定した方針で、その延長。
  */
-const INLINE_SHADE_DATA_FALLBACK_MS = 2_500;
+const INLINE_SHADE_DATA_FALLBACK_MS = 900;
 
 function inlineWatchPanelHasRealDataForShade() {
   try {
@@ -18892,12 +18910,21 @@ function dismissInlineShadeWhenDataReady(fallbackMs) {
    */
   clearInlineShadeDataWaiters();
   const cap = Math.max(0, Number(fallbackMs) || 0);
+  /*
+   * ★v0.1.1418: 200ms → 60ms。
+   *   データが揃っていても、次のポーリングまで最大200ms シェードが覆ったままだった。
+   *   ＝「データは来ているのに黒い」時間が毎回上乗せされていた。
+   *   inlineWatchPanelHasRealDataForShade() は DOM 参照とキャッシュ読みだけで
+   *   storage を触らないため、間隔を詰めても輻輳源にならない
+   *   ([[instrument-can-kill-the-page-it-measures-2026-08-16]] を踏まないこと)。
+   *   上限(下の cap)に達すれば必ず止まるので、回り続けることもない。
+   */
   inlineShadeDataPollTimer = setInterval(() => {
     if (inlineWatchPanelHasRealDataForShade()) {
       clearInlineShadeDataWaiters();
       dismissInitialLoadShade();
     }
-  }, 200);
+  }, 60);
   inlineShadeDataFallbackTimer = setTimeout(() => {
     clearInlineShadeDataWaiters();
     dismissInitialLoadShade();
