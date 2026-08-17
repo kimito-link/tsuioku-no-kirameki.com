@@ -26,6 +26,16 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1421',
+    date: '2026-08-17',
+    summary: 'サイドパネルが真っ黒になるのを修正',
+    items: Object.freeze([
+      'サイドパネルが何も表示されず真っ黒になる問題を直しました。',
+      '★これは 0.1.1419 で私が持ち込んだ不具合です。配信IDを渡すために、パネルの中身の読み込みをスクリプト任せにしたところ、そのスクリプトが動かない場合にパネルが永久に空のままになっていました。',
+      '中身は最初から読み込まれるように戻しました。スクリプトが失敗しても、パネルは必ず表示されます。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1420',
     date: '2026-08-17',
     summary: 'サイドパネルの黒い一瞬をなくす',
