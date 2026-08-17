@@ -778,7 +778,7 @@
   - `src/lib/statusTrendKey.js`
   - `src/extension/status-entry.js`
   - `src/lib/statusActionAdvisor.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 169</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 170</summary>
 
 - `app/app.js` — スマホ閲覧用 status Web 版。
 - `app/live-view.js` — global NL_BUILD_ID
@@ -831,6 +831,7 @@
 - `src/lib/commentTimelineMirror.js` — コメントタイムラインの「鏡」スナップショット純関数（council/liveview-wholesale-root-SYNTHESIS.md 第2段）。
 - `src/lib/consoleErrorBuffer.js` — v0.1.201: window.error / unhandledrejection を捕捉する ring buffer。
 - `src/lib/copyTextWithFallback.js` — テキストを「確実に」クリップボードへ入れるためのフォールバック付きコピー。
+- `src/lib/currentLiveIdOrigin.js` — 「いま視聴中の配信」を【鏡とは別の起点】から決める純関数。
 - `src/lib/customSoundPreset.js` — council/pachinko-ultimate-SYNTHESIS.md §2 の「85素材の完全割り当て表」をそのままJSON化した
 - `src/lib/customSoundStore.js` — council/pachinko-ultimate-SYNTHESIS.md §1.2/§1.4/§1.5(Phase A)の実装。
 - `src/lib/devAutoReloadDecision.js` — devAutoReloadDecision — 開発用オートリロードの判定(v0.1.1318)。
@@ -954,7 +955,7 @@
 
 ## 🧬 修正系譜マップ(この系統のバグを過去にどう直したか)
 
-> changelog 全 753 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
+> changelog 全 754 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
 
 ### 💾 記録件数 (98版)
 - `v0.1.1407` 2026-08-16 — 診断を74→85項目に。読み上げと公式値の原因を分離
@@ -2446,7 +2447,8 @@
 - `v0.1.840` 2026-06-20 — 機能逆引き地図を全ファイル網羅に
 - `v0.1.835` 2026-06-20 — 自己検証ゲートを追加(版同期+診断文言)
 
-### その他 (91版)
+### その他 (92版)
+- `v0.1.1424` 2026-08-17 — 前の配信の値が混ざる誤検知を修正
 - `v0.1.1423` 2026-08-17 — 中身を隠す仕組みをやめました
 - `v0.1.1421` 2026-08-17 — サイドパネルが真っ黒になるのを修正
 - `v0.1.1420` 2026-08-17 — サイドパネルの黒い一瞬をなくす

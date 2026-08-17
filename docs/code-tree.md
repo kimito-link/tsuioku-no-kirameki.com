@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 6 / 793 件
+## ⚠️ 役割コメントが無いソース 6 / 794 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `src/lib/laneDomSelfMeasure.js`
@@ -711,7 +711,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (1728)
+- 📁 **src/** (1730)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1004,7 +1004,7 @@
         - `logo_funlink_white_RGB_maru_black.png`
       - `logo_guide_funlink_ol.pdf`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1485)
+  - 📁 **lib/** (1487)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -1336,6 +1336,8 @@
     - `copyTextWithFallback.test.js`
     - `crowdRasterizer.js` — 人数ラスタライザ Canvas (Antigravity Enhanced Version)
     - `crowdRasterizer.test.js`
+    - `currentLiveIdOrigin.js` — 「いま視聴中の配信」を【鏡とは別の起点】から決める純関数。
+    - `currentLiveIdOrigin.test.js`
     - `customSoundDiag.js` — 「マイ効果音」(customSoundStore.js・Phase A)の取込状況を状態速報 extras(12秒間引き)に
     - `customSoundDiag.test.js`
     - `customSoundPreset.js` — council/pachinko-ultimate-SYNTHESIS.md §2 の「85素材の完全割り当て表」をそのままJSON化した

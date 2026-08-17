@@ -478,6 +478,7 @@
 | `src/lib/concurrentTimelineSeries.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/contentViewerNicoadCelebration.js` | 1 | 記録エンジン(watchページ常駐) |
 | `src/lib/copyTextWithFallback.js` | 1 | 状態速報ページ |
+| `src/lib/currentLiveIdOrigin.js` | 1 | 状態速報ページ |
 | `src/lib/customSoundDiag.js` | 1 | 状態速報ページ |
 | `src/lib/customSoundPreset.js` | 1 | 状態速報ページ |
 | `src/lib/deepExportPolicy.js` | 1 | 記録エンジン(watchページ常駐) |
