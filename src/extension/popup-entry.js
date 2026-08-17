@@ -4051,8 +4051,26 @@ function ensurePopupPrimaryCloakedBeforeFirstReveal() {
     revealPopupPrimaryOnce();
     return;
   }
+  /*
+   * ★v0.1.1423: 幕(cloak)を【付けない】。
+   *
+   * ■ ユーザーの証言(これが根拠・2026-08-17)
+   *   「サイドパネル導入時は問題なかった」「前に進んでる気がしない」
+   *   git log で裏付け: 導入時(795c41b3)の sidepanel.html は【25行】で
+   *   幕は存在せず、黒くなかった。v0.1.1279 で
+   *   `data-nl-popup-primary-cloak="1"` を静的に足した版から黒が始まり、
+   *   以後 **12版** 黒を消す工夫を足し続けて sidepanel.html は 200行に膨れたが、
+   *   実機の黒は一度も消えなかった。
+   *   ＝足すのをやめ、**始まりの状態へ戻す**。
+   *
+   * ■ 幕の目的は「白フラッシュ防止」だったが
+   *   サイドパネルの白0.2秒は Chromium issue 40190899 で拡張からは直せないと
+   *   結論済み([[sidepanel-white-flash-is-unfixable-2026-08-10]])。
+   *   ＝防げない白のために、中身を隠す仕組みを全画面に入れていた。
+   *
+   * ★aria-busy だけは残す(支援技術向けの正しい表明で、見た目を隠さない)。
+   */
   try {
-    document.documentElement.setAttribute('data-nl-popup-primary-cloak', '1');
     const el = /** @type {HTMLElement|null} */ ($('nlPopupPrimary'));
     if (el) el.setAttribute('aria-busy', 'true');
   } catch {
