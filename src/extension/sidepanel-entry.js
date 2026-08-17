@@ -17,6 +17,35 @@ import { summarizeEventLoopStall } from '../lib/eventLoopStallSummary.js';
 import { buildCommentWriteModeDiagLine } from '../lib/commentWriteModeDiag.js';
 import { KEY_COMMENT_WRITE_MODE_DIAG } from '../lib/commentWriteModeDiagKey.js';
 import { KEY_SIDEPANEL_SELF_DIAG } from '../lib/sidepanelSelfDiagKey.js';
+import { buildSidePanelIframeSrc } from '../lib/sidepanelIframeSrc.js';
+
+/*
+ * ★v0.1.1419: iframe に配信ID(lv)を渡してから読み込ませる。【描画に関与する唯一の処理】。
+ *
+ * ■ 実機(2026-08-17)の状態速報が名指しした真因
+ *     🔴 レーンが空: 描画関数が一度も呼ばれていません
+ *     laneTickProbe: lidMiss=4 / lidFromInline=0 / lidFromSnapshot=0 / lidFromLastPainted=0
+ *   background.js は `sidepanel.html?lv=lv351195145` と正しく渡していたが、
+ *   iframe の src が静的で lv を持たず【この境界で捨てられていた】。
+ *   popup 側の INLINE_OWN_WATCH_URL は `if (!INLINE_EMBED_WATCH) return ''`
+ *   (popup-entry.js:1027)＝サイドパネルでは構造上【常に空】なので、
+ *   lv を渡す道はここしか無い。
+ *
+ * ★このファイルの「描画に関与しない」原則の唯一の例外。ここでしか直せないため。
+ *   失敗しても素の src で読み込む(=従来どおり)ので、パネルが出なくなることはない。
+ * ★src ではなく data-nl-src に書いてあるのは、lv を足す【前】に popup が
+ *   読み込まれて二重ロードになるのを防ぐため(sidepanel.html のコメント参照)。
+ */
+try {
+  const ifr = document.querySelector('iframe[data-nl-src]');
+  if (ifr) {
+    const base = ifr.getAttribute('data-nl-src') || '';
+    const next = buildSidePanelIframeSrc(base, window.location.search);
+    if (next) ifr.setAttribute('src', next);
+  }
+} catch {
+  /* no-op: 失敗しても下の自己診断は続ける(パネル自体は素の src で出る) */
+}
 
 /**
  * ★v0.1.1302: 画面中央の点から祖先チェーンを集める(判定は純関数 findCenterPainter が行う)。

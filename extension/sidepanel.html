@@ -156,7 +156,23 @@
     </style>
   </head>
   <body>
-    <iframe title="ニコ生ログ" src="popup.html?inline=1&amp;dock=sidepanel"></iframe>
+    <!--
+      ★v0.1.1419: src に lv を焼かない(空のまま)。dist/sidepanel.js が
+      sidepanel.html 自身の `?lv=` を読んで、【最初の読み込みの前に】ここへ足す。
+
+      ■ なぜ必要か(2026-08-17 実機の状態速報が名指しした)
+          🔴 レーンが空: 描画関数が一度も呼ばれていません
+          laneTickProbe: lidMiss=4 / lidFromInline=0 / lidFromSnapshot=0 / lidFromLastPainted=0
+        ＝配信IDを解決する3経路が全滅していた。真因はここ:
+        background.js は `sidepanel.html?lv=lv351195145` と**ちゃんと渡している**のに、
+        この iframe の src が静的で lv を持たないため、**境界で捨てられていた**。
+        popup 側の INLINE_OWN_WATCH_URL は `if (!INLINE_EMBED_WATCH) return ''`
+        (popup-entry.js:1027)＝サイドパネルでは構造上【常に空】なので、
+        lv はこの経路でしか渡せない。
+      ★src を空にしておくのは、JS が lv を足す前に popup が読み込まれて
+        「lv 無しで起動 → 後から付け直し = 二重ロード」になるのを防ぐため。
+    -->
+    <iframe title="ニコ生ログ" data-nl-src="popup.html?inline=1&amp;dock=sidepanel"></iframe>
     <!-- 2026-08-08: 自己診断だけを行う極小スクリプト(描画には関与しない)。
          「いま自分が黒く見える状態か」を storage に書き、状態速報に1行で出す。
          ★実機だけで起きる黒画面を、DevTools を開かずに切り分けるための計器。
