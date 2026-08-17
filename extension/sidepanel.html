@@ -1,200 +1,56 @@
 <!DOCTYPE html><html lang="ja" style="color-scheme: light; background: linear-gradient(160deg, #fffaf2, #eef8ff)">
 <!--
-  ★2026-08-09(6度目・v0.1.1299): <html> を【1行目・DOCTYPE の直後】へ移した。
+  ★v0.1.1423: 導入時(795c41b3・25行)の姿へ戻した。
 
-  ■ なぜ(実機 v0.1.1298 の自己診断が名指しした)
-      サイドパネル自己診断: 🔴黒くなりうる / 0x0 / 外✅ iframe✅ 中✅
-        / 原因=iframeが潰れている(0x0) ★出た直後だけ黒い(immediate時点で検知)
-    3層とも【正しく塗っている】のに黒い=塗る人が居ないのではなく、
-    塗る【面積がゼロ】の瞬間がある=まだ <html> が生まれていない。
-    従来はこの下に約1,045バイトのコメントがあり、
-    ブラウザがそれを読み終わるまで地の色が効かなかった。
-    ★コメントは <html> の【後ろ】に置けば同じ情報量でも露出ゼロにできる。
+  ■ なぜ戻すか(ユーザーの証言・2026-08-17)
+    「サイドパネル導入時は問題なかった」「前に進んでる気がしない」
+    git log で裏付け: 導入時の sidepanel.html は 25行・幕なしで、黒くなかった。
+    v0.1.1279 で幕(cloak)を足した版から黒が始まり、以後12版・200行まで
+    「黒を消す工夫」を積み上げたが、実機の黒は一度も消えなかった。
+    ＝足すのをやめ、始まりへ戻す。
 
-  ■ 値は下の <style> の html/body と iframe(#fffaf2)、popup.html の1行目と同値。
-    ★変えるときは4箇所とも(sidepanelBlackScreen.wiring.test.js が機械照合する)。
-
-  ---- 以下は経緯(2026-08-08・5度目までの記録) ----
-  ★2026-08-08: html に color-scheme と背景を【インライン属性】で置く(黒い一瞬の残り・5度目)。
-
-  ■ 実測(v0.1.1293・ダークモード・rAFで全フレーム記録)
-      t=0ms  : <html> すら未生成 = 何も塗られていない ← ここで Chrome の地(暗色)が出る
-      t=4ms  : ようやく cs=light / グラデが効く
-    つまり【HTMLパース開始前の数ms】だけ地が露出する。<style> では塞げない
-    (CSS 自体がまだ読まれていないため)。塞げるのは html タグ自身の属性だけ。
-
-  ■ v0.1.1289 で popup.html に同じ手当てをして「一瞬の黒」は消えたが、
-    その【外側の入れ物】である sidepanel.html は取り残されていた。
-    サイドパネルは開くたびにこの文書から読み込まれるので、ここが最前線。
-
-  ★値は下の <style> の html/body と iframe(#fffaf2) と同値。変えるときは3箇所とも。
+  ■ ただし【色の宣言だけは残す】(消してはいけないもの)
+    `color-scheme: light` と地の色は、OSがダークのときChromeが
+    キャンバスを暗色で塗るのを止める唯一の手段(v0.1.1289/1294/1316/1369)。
+    これは「中身を隠す」幕とは別物で、隠さずに色だけ決める。
+    ★検査 pageColorSchemeGate / colorSchemeMetaPresent /
+      sidepanelBlackScreen が機械照合する(消すと赤くなる=実際に赤で気づいた)。
+    ★値は popup.html の1行目と同値。変えるときは両方。
 -->
   <head>
     <meta charset="utf-8" />
-    <!--
-      ★v0.1.1316: color-scheme を【meta でも】宣言する(黒画面・実機で7版追った件)。
-
-      ■ なぜインラインの style だけでは足りないか
-        <html style="color-scheme: light"> は【CSS が適用された後】に効く。
-        `<meta name="color-scheme">` は【パースの初期段階】でブラウザに伝わる。
-        その差の区間で、ユーザー環境がダークだとブラウザは
-        キャンバス(=まだ何も描かれていない地)を暗色で塗る。
-
-      ■ 実測(2026-08-10・実ブラウザ prefers-color-scheme: dark で確認)
-        出荷ビルドの sidepanel.html / popup.html には
-        `<meta name="color-scheme">` が【どちらにも無かった】。
-        (インライン style は両方にあるので、CSS 適用後は正しく light になる=
-         だから settled state を測ると毎回「正常」に見えていた)
-
-      ★light 固定にする理由: このアプリに実質ダークモードは無い
-        (popup-entry.js が nl-skin-panel-dark を無条件 remove する=v0.1.51)。
-        `light dark` と書くとダーク環境でキャンバス既定が暗色になり、同じ穴に戻る。
-    -->
+    <!-- パース初期にブラウザへ伝える層(インライン style は CSS 適用後に効くため二段構え)。 -->
     <meta name="color-scheme" content="light" />
-    <!--
-      ★2026-08-10(v0.1.1312): ここに theme-color の meta を置かないこと。
-      (検査 sidepanelThemeColorParity.test.js がタグの実在を機械で禁じている。
-       このコメント自身が引っかからないよう、ここでは山括弧付きで書かない)
-
-      v0.1.1310 で「パネル枠の地色をブラウザに宣言する」目的で足したが、
-      その【前提そのものが誤り】だったので撤去した。同じ発想で戻さないための碑。
-
-      ■ 前提が誤りだと分かった経緯（画面録画のフレーム解析・219フレーム）
-        ユーザー撮影の動画(11秒)を ffmpeg でフレーム分解し、パネル領域の実測色を追った:
-          〜4.65秒 : (94,94,94)    ← ニコ生のページ。パネルはまだ開いていない
-           4.70秒 : (255,255,255) ← パネルが開いた瞬間＝【白】
-           4.90秒 : (251,249,245) ← 拡張の HTML(クリーム色)
-        つまり「ぬーと出てくる黒」の正体は【ニコ生の暗いページ】で、拡張の外側。
-        拡張が塗る領域に黒い瞬間は【一度も存在しない】。
-        ★v0.1.1310 の「Chrome がパネル枠を暗色で塗っている」は測る前の推測だった。
-
-      ■ 効果も実測で否定されている
-        この meta が入った v0.1.1311 で撮った動画で、開いた瞬間の白(255,255,255)は
-        依然 0.2 秒出ている＝【効いていない】。
-        なお manifest.theme_color は Chrome 拡張では未対応キーで、実機で
-        「Unrecognized manifest key」警告を出した(v0.1.1311 で撤去・許可リストで再発防止)。
-
-      ■ 残っている実物＝パネルが開いた瞬間の純白 0.2 秒（★調査済み・直せない）
-        2026-08-10 に公式ドキュメントで裏取りした結論:【拡張から指定する手段は存在しない】。
-          ・拡張の manifest に色のキーは無い(theme_color/background_color は PWA 専用)
-          ・side_panel キーは default_path のみ＝色の項目なし
-          ・chrome.sidePanel API の全API面に appearance/background/color 系は一つも無い
-            (公式の言う「スタイルはHTML/CSSで」は文書ロード【後】＝白が出る窓の外)
-          ・theme-color の meta も Web App Manifest 系＝ブラウザUIの色で、ここには効かない
-          ・Chromium 既知の挙動: issue 40190899「未描画フレームはテーマに関係なく白」
-            (Firefox にも同型 Bugzilla 1408122)。サイドパネル向けの回避手段は提供されていない
-        ★したがってこの 0.2 秒は追わない。残る道は「パースを速くして本描画を早める」
-          最適化のみで、色の上書きではない。実害も小さい。
-          詳細はメモリ [[sidepanel-white-flash-is-unfixable-2026-08-10]]。
-    -->
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>君斗りんくの追憶のきらめき — サイドパネル</title>
     <style>
-      /*
-       * ★v0.1.1283: サイドパネルが真っ黒になるのを直す(v0.1.1279 の修正は効いていなかった)。
-       *
-       * 真犯人は popup.html の cloak ルール:
-       *   popup.html:2 の <html> に data-nl-popup-primary-cloak="1" が【静的に】書かれており、
-       *   popup.html:1561-1563 が html/body を `background: transparent !important` にする。
-       *   = JS が走る前から背景がゼロ。解除は revealPopupPrimaryOnce()(JS)のみで、
-       *   CSS フェイルセーフ(popup.html:1543)は opacity しか戻さず transparent は解除しない。
-       *   ★あのルールのコメント自身が「親ホストの暗い背景を透かして」と書いているとおり、
-       *     あれは【埋め込み】向けの規則で、サイドパネルには合わない。
-       * そこへ v0.1.1279 が iframe にも transparent を足し、html・body・iframe の
-       * 3層すべてが透明 = 何も塗らない → Chrome のキャンバス地(暗色)が出て【黒】になった。
-       *
-       * ★フェイルセーフの向きを反転させるのが本質:
-       *   旧「既定=透明 / JSが解除」→ JSが遅れると【黒】
-       *   新「既定=不透明 / 必要なときだけ透明」→ JSが失敗しても【クリーム色】
-       */
       html,
       body {
         margin: 0;
         height: 100%;
         overflow: hidden;
-        /* ★light 固定。このアプリに実質ダークモードは無い(popup-entry.js:1069-1070 が
-           nl-skin-panel-dark を無条件 remove する=v0.1.51「完全に light 強制」)。
-           `light dark` だと Chrome のキャンバス既定色が暗色になり、最後の砦が黒くなる。 */
         color-scheme: light;
-        /* popup.html の :root と同値(ライト既定)。 */
         background: linear-gradient(160deg, #fffaf2, #eef8ff);
       }
-      /* ★ダーク時の上書きは置かない(v0.1.1279 の濃紺 #0b1220 が事実上の黒だった)。
-         アプリは常時ライトなので、OS がダークでもここはクリーム色のままが正しい。 */
       iframe {
         display: block;
         width: 100%;
         height: 100%;
         border: 0;
-        /* ★不透明で塗る(v0.1.1279 の transparent を撤回)。iframe 自身が最後の砦になる。
-           #fffaf2 は popup.html:18 の --nl-bg と同値。★別文書なので CSS 変数を共有できない
-           = 変更するときは popup.html:18 と【両方】直すこと。 */
+        /* iframe 自身も不透明で塗る(最後の砦)。#fffaf2 は popup.html の --nl-bg と同値。 */
         background: #fffaf2;
-        /*
-         * ★v0.1.1369(黒画面の真因・実ブラウザで実測して確定): iframe 【要素】にも
-         *   color-scheme を宣言する。ここが無いと OS ダーク環境で最初の数十msだけ黒くなる。
-         *
-         * ■ 実測(chrome-devtools・出荷ビルドを拡張として実ロード・prefers-color-scheme:dark)
-         *     t+4〜8ms  url=about:blank  html=rgba(0,0,0,0)/none  cs=normal  inlineStyle=NO
-         *     t+12ms〜  url=popup.html   html=.../grad            cs=light   inlineStyle=yes
-         *   ★iframe は src が読み込まれる前に【about:blank の文書】として存在する。
-         *   その空文書には拡張の CSS も inline style も届かない(inlineStyle=NO)ので
-         *   color-scheme が 'normal' のまま＝OSダークだと Chrome が
-         *   【その文書のキャンバス】を暗色で塗る。iframe 要素の background は
-         *   要素の地であって、中の文書のキャンバスはその上に合成されるため救えない。
-         *
-         * ■ なぜ今まで見つからなかったか
-         *   popup.html / sidepanel.html には既に color-scheme:light がある(v0.1.1289/1316)。
-         *   ★どちらにも属さない【about:blank の隙間】だけが取り残されていた。
-         *   sidepanel-entry.js の自己診断も iframe.contentDocument を読むので、
-         *   この時間帯は「読めない/未レイアウト」に落ちて観測から漏れていた。
-         *
-         * ★これは color-scheme を【継承させる】ための宣言。値は他2箇所と必ず同じ light。
-         */
+        /* src 読込前の about:blank 文書へ color-scheme を継承させる(v0.1.1369)。 */
         color-scheme: light;
       }
     </style>
   </head>
   <body>
-    <!--
-      ★v0.1.1419: src に lv を焼かない(空のまま)。dist/sidepanel.js が
-      sidepanel.html 自身の `?lv=` を読んで、【最初の読み込みの前に】ここへ足す。
-
-      ■ なぜ必要か(2026-08-17 実機の状態速報が名指しした)
-          🔴 レーンが空: 描画関数が一度も呼ばれていません
-          laneTickProbe: lidMiss=4 / lidFromInline=0 / lidFromSnapshot=0 / lidFromLastPainted=0
-        ＝配信IDを解決する3経路が全滅していた。真因はここ:
-        background.js は `sidepanel.html?lv=lv351195145` と**ちゃんと渡している**のに、
-        この iframe の src が静的で lv を持たないため、**境界で捨てられていた**。
-        popup 側の INLINE_OWN_WATCH_URL は `if (!INLINE_EMBED_WATCH) return ''`
-        (popup-entry.js:1027)＝サイドパネルでは構造上【常に空】なので、
-        lv はこの経路でしか渡せない。
-      ★src を空にしておくのは、JS が lv を足す前に popup が読み込まれて
-        「lv 無しで起動 → 後から付け直し = 二重ロード」になるのを防ぐため。
-    -->
-    <!--
-      ★v0.1.1421: src を必ず持たせる(v0.1.1419 の data-nl-src 方式を【撤回】)。
-
-      ■ なぜ撤回するか(2026-08-17・ユーザー実機で真っ黒が継続)
-        v1419 は lv を渡すため src を空にし、dist/sidepanel.js が後から立てる形にした。
-        ★これは【単一障害点】を作っていた: そのスクリプトが何かの理由で走らなければ
-        iframe は永久に空=パネルが真っ黒のまま。実機のスクショはまさにこの状態
-        (ヘッダも中身も何も無い全面黒)で、同じ拡張の診断ページは正常に描けていた。
-        ＝「拡張が壊れている」のではなく【この iframe だけが空】だった。
-
-      ■ 直し方の原則
-        描画は【JS を1行も待たずに】始まらなければならない。
-        lv の受け渡し(v1419 の目的)は、src を消さずに sidepanel.js が
-        `src` を書き換える形でも達成できる(下の script 参照)。
-        読み込みが二重になるのを避けるため、書き換えは lv がある時だけ行う。
-        [[css-default-should-be-the-safe-state-2026-08-05]] と同じ:
-        既定を安全側(必ず出る)にし、上乗せは失敗しても既定を壊さない。
-    -->
     <iframe title="ニコ生ログ" src="popup.html?inline=1&amp;dock=sidepanel"></iframe>
-    <!-- 2026-08-08: 自己診断だけを行う極小スクリプト(描画には関与しない)。
-         「いま自分が黒く見える状態か」を storage に書き、状態速報に1行で出す。
-         ★実機だけで起きる黒画面を、DevTools を開かずに切り分けるための計器。
-         CSP は script-src 'self' なので【外部ファイル】であること(インライン不可)。 -->
+    <!--
+      自己診断だけ残す(描画には一切関与しない)。
+      これが無いと「いま黒いか」を測る手段が消え、また推測に戻ってしまう。
+      CSP は script-src 'self' なので外部ファイルであること(インライン不可)。
+    -->
     <script src="dist/sidepanel.js"></script>
   </body>
 </html>
