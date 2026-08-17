@@ -37,14 +37,20 @@ import { buildSidePanelIframeSrc } from '../lib/sidepanelIframeSrc.js';
  *   読み込まれて二重ロードになるのを防ぐため(sidepanel.html のコメント参照)。
  */
 try {
-  const ifr = document.querySelector('iframe[data-nl-src]');
+  const ifr = document.querySelector('iframe[src]');
   if (ifr) {
-    const base = ifr.getAttribute('data-nl-src') || '';
+    const base = ifr.getAttribute('src') || '';
     const next = buildSidePanelIframeSrc(base, window.location.search);
-    if (next) ifr.setAttribute('src', next);
+    /*
+     * ★lv が付くときだけ書き換える(next !== base のときだけ)。
+     *   常に書き換えると同じ URL でも再読み込みが走り、二重ロードになる。
+     *   ★lv が無い/このスクリプトが落ちる場合でも、HTML の src で
+     *   パネルは必ず出る(v0.1.1419 の単一障害点を撤回した理由)。
+     */
+    if (next && next !== base) ifr.setAttribute('src', next);
   }
 } catch {
-  /* no-op: 失敗しても下の自己診断は続ける(パネル自体は素の src で出る) */
+  /* no-op: 失敗してもパネルは HTML の src で出る(描画を JS に依存させない) */
 }
 
 /**

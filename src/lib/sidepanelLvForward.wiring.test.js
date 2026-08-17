@@ -24,18 +24,27 @@ describe('サイドパネルの lv 受け渡し', () => {
     expect(backgroundJs).toMatch(/sidepanel\.html\?lv=/);
   });
 
-  it('★iframe は素の src を持たない(lv を足す前に読み込ませない)', () => {
-    // src="popup.html..." が直に書かれていると、JS が lv を足す前にロードが始まり
-    // 「lv 無しで起動 → 後から付け直し = 二重ロード」になる。
-    expect(sidepanelHtml).not.toMatch(/<iframe[^>]*\ssrc="popup\.html/);
-    // 代わりに data-nl-src で持つ。
-    expect(sidepanelHtml).toMatch(/<iframe[^>]*data-nl-src="popup\.html\?inline=1&amp;dock=sidepanel"/);
+  /**
+   * ★v0.1.1421: v1419 の data-nl-src 方式は【撤回】した。
+   *
+   * 実機で「パネルが全面真っ黒(ヘッダも中身も無い)」が続き、
+   * 同じ拡張の診断ページは正常だった＝この iframe だけが空だった。
+   * src を JS で立てる設計は【単一障害点】で、スクリプトが走らなければ
+   * パネルが永久に出ない。描画は JS を1行も待たずに始まらねばならない。
+   */
+  it('★★iframe は必ず src を持つ(描画を JS に依存させない=単一障害点を作らない)', () => {
+    expect(sidepanelHtml).toMatch(
+      /<iframe[^>]*\ssrc="popup\.html\?inline=1&amp;dock=sidepanel"/
+    );
+    // data-nl-src 方式へ戻していないこと(戻すと黒が再発する)。
+    expect(sidepanelHtml).not.toMatch(/<iframe[^>]*data-nl-src=/);
   });
 
-  it('★受け手(sidepanel-entry)が data-nl-src を読んで src を立てている', () => {
-    expect(sidepanelEntry).toMatch(/querySelector\(\s*['"]iframe\[data-nl-src\]['"]\s*\)/);
+  it('★lv があるときだけ src を書き換える(無いときは触らない=二重ロード防止)', () => {
+    expect(sidepanelEntry).toMatch(/querySelector\(\s*['"]iframe\[src\]['"]\s*\)/);
     expect(sidepanelEntry).toMatch(/buildSidePanelIframeSrc\(/);
-    expect(sidepanelEntry).toMatch(/setAttribute\(\s*['"]src['"]/);
+    // 「変わったときだけ」書き換える条件があること。
+    expect(sidepanelEntry).toMatch(/next\s*&&\s*next\s*!==\s*base/);
   });
 
   it('★判定は純関数へ隔離されている(entry に正規表現を書かない)', () => {
@@ -53,8 +62,8 @@ describe('サイドパネルの lv 受け渡し', () => {
   });
 
   it('★dock=sidepanel は保たれる(モード判定を変えない)', () => {
-    // data-nl-src 側に dock=sidepanel が入っていること。ここが消えると
+    // src に dock=sidepanel が入っていること。ここが消えると
     // popup が INLINE_SIDE_PANEL ではなく embedWatch と誤判定される。
-    expect(sidepanelHtml).toMatch(/data-nl-src="[^"]*dock=sidepanel/);
+    expect(sidepanelHtml).toMatch(/<iframe[^>]*src="[^"]*dock=sidepanel/);
   });
 });
