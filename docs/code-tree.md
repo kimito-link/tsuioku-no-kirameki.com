@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 6 / 792 件
+## ⚠️ 役割コメントが無いソース 6 / 793 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `src/lib/laneDomSelfMeasure.js`
@@ -711,7 +711,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (1724)
+- 📁 **src/** (1727)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1004,7 +1004,7 @@
         - `logo_funlink_white_RGB_maru_black.png`
       - `logo_guide_funlink_ol.pdf`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1481)
+  - 📁 **lib/** (1484)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -1204,7 +1204,10 @@
     - `cloakFailsafeContract.test.js`
     - `cloakFailsafeMarker.js` — 外部保険(cloak-failsafe-entry.js)と本体(popup-entry.js)が
     - `cloakFailsafeMarker.test.js`
+    - `cloakNotForSidePanel.js` — 「この画面で幕(cloak)を使うべきか」を言う純関数。
+    - `cloakNotForSidePanel.test.js`
     - `cloakRevealNotBehindLoad.wiring.test.js`
+    - `cloakSkippedOnSidePanel.wiring.test.js`
     - `colorSchemeMetaPresent.test.js`
     - `comeviewActions.js` — v0.1.666: コメビュのコメント単位アクション(わんコメ同等+追憶独自)の純ロジック。
     - `comeviewActions.test.js`

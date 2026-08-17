@@ -778,7 +778,7 @@
   - `src/lib/statusTrendKey.js`
   - `src/extension/status-entry.js`
   - `src/lib/statusActionAdvisor.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 168</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 169</summary>
 
 - `app/app.js` — スマホ閲覧用 status Web 版。
 - `app/live-view.js` — global NL_BUILD_ID
@@ -826,6 +826,7 @@
 - `src/lib/chikuranHeaderDom.js` — 「ちくらん風」配信者カードのヘッダー DOM ビルダー。
 - `src/lib/classifyFeatureCategory.js` — ファイルを機能カテゴリへ自動分類する純関数(v0.1.840・マップ網羅化 第1)。
 - `src/lib/cloakFailsafeMarker.js` — 外部保険(cloak-failsafe-entry.js)と本体(popup-entry.js)が
+- `src/lib/cloakNotForSidePanel.js` — 「この画面で幕(cloak)を使うべきか」を言う純関数。
 - `src/lib/commentMirrorPublishGate.js` — コメント鏡 publish の provisional ガード(純関数 + 状態ファクトリ・v0.1.1018)。
 - `src/lib/commentTimelineMirror.js` — コメントタイムラインの「鏡」スナップショット純関数（council/liveview-wholesale-root-SYNTHESIS.md 第2段）。
 - `src/lib/consoleErrorBuffer.js` — v0.1.201: window.error / unhandledrejection を捕捉する ring buffer。
@@ -953,7 +954,7 @@
 
 ## 🧬 修正系譜マップ(この系統のバグを過去にどう直したか)
 
-> changelog 全 749 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
+> changelog 全 750 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
 
 ### 💾 記録件数 (98版)
 - `v0.1.1407` 2026-08-16 — 診断を74→85項目に。読み上げと公式値の原因を分離
@@ -2444,7 +2445,8 @@
 - `v0.1.840` 2026-06-20 — 機能逆引き地図を全ファイル網羅に
 - `v0.1.835` 2026-06-20 — 自己検証ゲートを追加(版同期+診断文言)
 
-### その他 (88版)
+### その他 (89版)
+- `v0.1.1420` 2026-08-17 — サイドパネルの黒い一瞬をなくす
 - `v0.1.1418` 2026-08-17 — パネルを開いた時の暗い時間を短縮
 - `v0.1.1417` 2026-08-17 — 裏タブのコメント遅れを短縮
 - `v0.1.1411` 2026-08-16 — 前版の「読み込み中のまま」を修正（待ち時間の設定を戻しました）
