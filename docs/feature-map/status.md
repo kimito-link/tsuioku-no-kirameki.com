@@ -48,12 +48,12 @@ graph LR
   n_status --> n_src_lib_commentTimelineReport_js["lib/commentTimelineReport.js"]
   n_status --> n_src_lib_completenessScore_js["lib/completenessScore.js"]
   n_status --> n_src_lib_copyTextWithFallback_js["lib/copyTextWithFallback.js"]
+  n_status --> n_src_lib_currentLiveIdOrigin_js["lib/currentLiveIdOrigin.js"]
   n_status --> n_src_lib_customSoundDiag_js["lib/customSoundDiag.js"]
   n_status --> n_src_lib_customSoundPreset_js["lib/customSoundPreset.js"]
   n_status --> n_src_lib_customSoundStore_js["lib/customSoundStore.js"]:::shared
   n_status --> n_src_lib_deriveAvatarUrlFromUid_js["lib/deriveAvatarUrlFromUid.js"]:::shared
-  n_status --> n_src_lib_diagSchemaCopy_js["lib/diagSchemaCopy.js"]:::shared
   classDef shared fill:#eee,stroke:#999,color:#666;
 ```
 
-> ほか 118 ファイル省略（全件は storage-bus.md / metafile 参照）。
+> ほか 119 ファイル省略（全件は storage-bus.md / metafile 参照）。

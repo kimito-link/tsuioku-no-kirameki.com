@@ -58,6 +58,9 @@ import { buildStatusActions } from '../lib/statusActionAdvisor.js';
 //   =新規 storage read ゼロ。致命は症状カードにも昇格する。
 // AI共有(状態速報)本文ビルダーを lib に切り出し(②応援ライブビュー/③WEB で再利用)。挙動同値。
 import { buildAiShareFullText } from '../lib/aiShareFullText.js';
+// ★v0.1.1424: 「いま視聴中の lv」を鏡とは別の起点(watch タブ)から決める。
+//   鏡から取ると別配信ガードが恒真になり、前の配信の鏡と突合して誤検知する。
+import { resolveCurrentLiveId, canCompareMirrorCounts } from '../lib/currentLiveIdOrigin.js';
 // v0.1.1016: ③WEB が古くなる前に自動で再 publish すべきかの判定(手動ボタンの往復を無くす)。
 import { shouldAutoPublish } from '../lib/autoPublishDecision.js';
 // 直近の公開送信(POST)結果を globalThis に集計(read を増やさない)→送信時の記録に使う。
@@ -2165,10 +2168,44 @@ function renderAll({ extrasAgeMs, lvList, summaries, fastDiag, popupDiag, backfi
     //   R-1: HTML は載せない=数値行を運ぶ(③で escapeHtml 済み lib が HTML 化)。24行≈5KB でコンパクト。
     sessionSummaryMirror: sessionSummaryMirror || null
   };
-  // 自己診断の「いま視聴中の lv」= 鏡(北極星/lane/数字)の liveId を優先採用(read を増やさない)。
-  const currentLiveId = String(
-    northStarMirror?.liveId || laneMirror?.liveId || statCardsMirror?.liveId || ''
-  );
+  /*
+   * ★v0.1.1424: 「いま視聴中の lv」を【鏡とは別の起点】から決める。
+   *
+   * ■ 何が壊れていたか(2026-08-17 実機・ユーザー速報で確定)
+   *   旧: const currentLiveId = northStarMirror?.liveId || laneMirror?.liveId || ...
+   *   ＝**いま視聴中の配信を鏡自身から取っていた**。
+   *   すると別配信を弾くガード(liveviewPublishSelfDiag.js の lidMatch)は
+   *     鏡.liveId === currentLiveId(=鏡.liveId)
+   *   で【常に一致】＝恒真。一度も発動しなかった。
+   *   実機: watch は lv351196729 なのに 対象配信 lv351196674(前の配信の鏡)で
+   *   「北極星 広告: 拡張1 / 鏡5 🔴不一致」と誤検知していた。
+   *   ★[[comparison-needs-two-origins-2026-08-07]]: 一致判定は両辺の起点が
+   *     別でなければ恒真。まさにその型を踏んでいた。
+   *
+   * ■ 直し方
+   *   実際に開いている watch タブ(livesData)を第一の起点にする。
+   *   鏡が古ければ「鏡≠現在」と正しく出る。watch が無いときだけ鏡へ落とすが、
+   *   その場合は origin='mirror' を返して件数突合を保留させる(恒真を避ける)。
+   */
+  const _currentLive = resolveCurrentLiveId({
+    lives: livesData,
+    northStarMirror,
+    laneMirror,
+    statCardsMirror
+  });
+  const currentLiveId = _currentLive.liveId;
+  /*
+   * ★突合してよいのは watch 起点のときだけ(canCompareMirrorCounts)。
+   *   watch タブが無く鏡へフォールバックした場合、currentLiveId と鏡の liveId は
+   *   同じ値になるので「一致」しか出ない=判定に意味が無い。
+   *   その状態で件数を比べると、前の配信の鏡を現配信のものとして扱ってしまう。
+   *   → 鏡由来のときは currentLiveId を渡さない(空にする)ことで、
+   *     下流(liveviewPublishSelfDiag)の lidMatch が「判定不能=null」となり
+   *     件数突合そのものが保留される(既存の設計に乗る)。
+   */
+  const currentLiveIdForDiag = canCompareMirrorCounts(_currentLive.origin)
+    ? currentLiveId
+    : '';
 
   // ③WEB配信採点丸写し(第3号・reference_full_mirror_SYNTHESIS.md M2・路線2): status 既読の5値から①と同じ
   //   純lib(buildBroadcastScorePanelViewModel)で view-model を組み、jsonBlob に載せる。③は
@@ -2195,7 +2232,7 @@ function renderAll({ extrasAgeMs, lvList, summaries, fastDiag, popupDiag, backfi
   // AI 共有用テキスト
   let fullText = '';
   safeSection('AI共有テキスト', () => {
-    fullText = buildAiShareFullText({ overviewText, livesData, fastDiag, popupDiag, voiceDiag, venueSeatsDiag, laneDiag, laneMirror, reportPreview, trendFindings, jsonBlob, currentLiveId, publishKeys, publishOutcomeRec, previewRenderAck, refreshPerf, renderSectionMs, giftEffectDiag, milestoneEffectDiag, customSoundDiag, voiceEffectDiag, bgmPhaseDiag, opSoundEffectDiag, commentPostDiag, instantPushDiag, channelSwitchDiag, highlightLedger, scoreAnnounceDiag, sidepanelSelfDiag, extrasAgeMs });
+    fullText = buildAiShareFullText({ overviewText, livesData, fastDiag, popupDiag, voiceDiag, venueSeatsDiag, laneDiag, laneMirror, reportPreview, trendFindings, jsonBlob, currentLiveId: currentLiveIdForDiag, publishKeys, publishOutcomeRec, previewRenderAck, refreshPerf, renderSectionMs, giftEffectDiag, milestoneEffectDiag, customSoundDiag, voiceEffectDiag, bgmPhaseDiag, opSoundEffectDiag, commentPostDiag, instantPushDiag, channelSwitchDiag, highlightLedger, scoreAnnounceDiag, sidepanelSelfDiag, extrasAgeMs });
     const ta = /** @type {HTMLTextAreaElement|null} */ (
       document.getElementById('aiShareText')
     );
