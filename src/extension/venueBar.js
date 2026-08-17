@@ -2360,6 +2360,37 @@ export function mountVenueBarButton(options = {}) {
   const parent = isStandalone ? document.body : document.documentElement;
   if (!parent) return NOOP_API;
 
+  /*
+   * ★v0.1.1422: 前回の残骸 `html.nlsb-venue-open` を必ず落としてから始める。
+   *
+   * ■ ユーザー実機の症状(2026-08-17・「ずっと前から」)
+   *   「常に会場モードがONになっている」
+   *   「拡張のこん太ボタンを押しても動かない」
+   *   「何度もリロードしてやっとサイドボタンを押して引っ張れる」
+   *
+   * ■ 真因: このクラスを【消す経路が setOpen(false) の1本しか無かった】
+   *   :2144 の CSS が効いている間、①POPホストは
+   *     visibility: hidden !important; pointer-events: none !important;
+   *   ＝**見えない上にクリックも通らない**。
+   *   会場バーが作り直される / SPA遷移 / 途中でエラー終了 のいずれでも
+   *   setOpen(false) は呼ばれず、クラスが <html> に残り続ける。
+   *   一度残ると、次にページを開いてもこの CSS が最初から効いた状態で始まる
+   *   ＝「常にON」「押しても動かない」「真っ黒」が全部説明できる。
+   *
+   * ■ なぜ mount 時に落とすのが正しいか
+   *   会場は必ず「閉じた状態から始まる」設計(:6839 の setOpen(false,false))。
+   *   ＝mount 時点で open な状態は【定義上あり得ない】ので、残っていれば残骸。
+   *   ★消す方向にしか倒さない(付ける処理は setOpen が握ったまま)ので、
+   *     会場の挙動は一切変わらない。
+   *   [[css-default-should-be-the-safe-state-2026-08-05]]:
+   *     既定(=クラス無し)が安全側。危険な状態は明示のときだけ。
+   */
+  try {
+    document.documentElement.classList.remove('nlsb-venue-open');
+  } catch {
+    /* documentElement 不在環境でも会場は止めない */
+  }
+
   ensureVenueStyle();
 
   const root = document.createElement('div');
@@ -6819,6 +6850,16 @@ export function mountVenueBarButton(options = {}) {
       stopCrowdMotion();
       resetSpeechTracking();
       removeEscapeListener();
+      /*
+       * ★v0.1.1422: 離脱時に `nlsb-venue-open` を必ず落とす。
+       *   ここが無いと、会場を開いたままページを離れた場合にクラスが残り、
+       *   次に開いたとき①POPが visibility:hidden + pointer-events:none で
+       *   始まる=「常に会場モードON・押しても動かない・真っ黒」になる。
+       *   ★bfcache から復帰する場合も mount 時の掃除で二重に守られる。
+       */
+      try {
+        document.documentElement.classList.remove('nlsb-venue-open');
+      } catch { /* no-op */ }
     },
     { once: true }
   );
