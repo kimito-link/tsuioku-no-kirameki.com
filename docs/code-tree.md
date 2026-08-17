@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 6 / 794 件
+## ⚠️ 役割コメントが無いソース 6 / 795 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `src/lib/laneDomSelfMeasure.js`
@@ -711,7 +711,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (1730)
+- 📁 **src/** (1733)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1004,7 +1004,7 @@
         - `logo_funlink_white_RGB_maru_black.png`
       - `logo_guide_funlink_ol.pdf`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1487)
+  - 📁 **lib/** (1490)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -2361,6 +2361,9 @@
     - `venueLaneParity.js` — 会場レーンのパリティ計器(純関数)。会場が実際に paint した段割当列を、①POP の実描画鏡
     - `venueLaneParity.test.js`
     - `venueLaneParity.wiring.test.js`
+    - `venueLiveOpenFlag.js` — 「会場モードがいま開いているか」を鏡の供給側へ伝える値。
+    - `venueLiveOpenFlag.test.js`
+    - `venueLiveOpenWiring.wiring.test.js`
     - `venueLiveRoster.js` — v0.1.754 会場の3時間安定化(星野ロミ・メソッド会議の本質解・6体ほぼ全会一致):
     - `venueLiveRoster.test.js`
     - `venueMirrorAgeNotice.test.js`

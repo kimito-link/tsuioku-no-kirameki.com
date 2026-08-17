@@ -17,6 +17,8 @@ import {
   venueRowsFromUserLaneCandidates
 } from '../lib/venueSeats.js';
 import { userLaneCandidatesFromStorage } from '../lib/userLaneCandidatesFromStorage.js';
+// ★v0.1.1425: 「会場がいま開いている」を①POPへ伝える(鏡が古いまま固まる件の根治)。
+import { KEY_VENUE_LIVE_OPEN, buildVenueLiveOpenValue } from '../lib/venueLiveOpenFlag.js';
 import {
   KEY_LIVE_BROADCASTER_CTX,
   normalizeBroadcasterCtx,
@@ -6226,7 +6228,53 @@ export function mountVenueBarButton(options = {}) {
     aggregateBurstTimers = [];
   };
 
+  /*
+   * ★v0.1.1425: 「会場がいま開いている」を storage の【別キー】へ書く。
+   *
+   * ■ ユーザーの症状(2026-08-17)「会場モードが忠実にでてないね」
+   *   実機の会場は3人なのに、状態速報は `鏡stale(656s) … tanu332` と
+   *   11分前・別配信の332人を出し続けていた。
+   *
+   * ■ 真因: この書き込みが存在しなかった
+   *   v0.1.1394 で「①POPが隠れていても会場が開いていれば鏡は書く」と根治したが、
+   *   その判定が読む `nls_venue_open` を書く行(:6817)はコメントアウト済み。
+   *   ＝ venueOpen が常に false → publish 分岐が一度も通らず鏡が固まる。
+   *   判定はあるのに配線が無い片肺([[unwired-judgement-is-systemic-2026-08-12]])。
+   *
+   * ■ なぜ別キーにするか(「復元しない」要望を壊さないため)
+   *   旧キーの保存が止められたのは【次回起動時に開いた状態へ復元しない】ため。
+   *   鏡の供給側が知りたいのは「いま開いているか」＝目的が別。混ぜない。
+   *
+   * ■ なぜハートビートか
+   *   会場タブがクラッシュすると false を書けずに終わる。その残骸を信じ続けると
+   *   v0.1.1394→1397 で撤回した「隠れた①が毎tick書き続ける」負荷が再発する。
+   *   定期的に押し直し、読む側は90秒で失効させる(venueLiveOpenFlag.js)。
+   */
+  let venueLiveOpenTimer = 0;
+  /** @param {boolean} open */
+  const writeVenueLiveOpen = (open) => {
+    try {
+      if (!hasVenueExtensionContext()) return;
+      void chrome.storage.local
+        .set({ [KEY_VENUE_LIVE_OPEN]: buildVenueLiveOpenValue(open, Date.now()) })
+        .catch(() => { /* 会場の描画は止めない(best-effort) */ });
+    } catch {
+      /* no-op */
+    }
+  };
+  const startVenueLiveOpenHeartbeat = () => {
+    if (venueLiveOpenTimer) return;
+    writeVenueLiveOpen(true);
+    // 30秒ごとに押し直す(読む側の失効は90秒=2回落としても耐える)。
+    venueLiveOpenTimer = setInterval(() => writeVenueLiveOpen(true), 30_000);
+  };
+  const stopVenueLiveOpenHeartbeat = () => {
+    if (venueLiveOpenTimer) { clearInterval(venueLiveOpenTimer); venueLiveOpenTimer = 0; }
+    writeVenueLiveOpen(false);
+  };
+
   const stopAggregation = () => {
+    stopVenueLiveOpenHeartbeat();
     clearAggregateBurst();
     if (rosterPruneTimer) { clearInterval(rosterPruneTimer); rosterPruneTimer = 0; }
     if (rosterCommitRaf && typeof cancelAnimationFrame === 'function') {
@@ -6239,6 +6287,10 @@ export function mountVenueBarButton(options = {}) {
   };
 
   const startAggregation = () => {
+    // ★v0.1.1425: 開いたことを①POPへ伝える(この行が無いと鏡が更新されない)。
+    //   ★早期 return より前に置く: 既にタイマーが動いていても「開いている」事実は
+    //   伝え直す必要がある(再入で印だけ落ちるのを防ぐ)。
+    startVenueLiveOpenHeartbeat();
     if (aggregateTimer || rosterPruneTimer) return;
     // v0.1.1111 会場=①レーン鏡映: 開いた瞬間の catch-up を1回だけ(以降は onChanged の newValue 直採用)。
     //   読めなくても会場は止めない(fallback=従来経路で描く)。鏡が取れたら rAF 再供給で即同化。
