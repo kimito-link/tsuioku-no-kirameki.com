@@ -236,14 +236,21 @@
        *   ★ここが「まだ黒い」の正体(幕は暗色ではないが、**中身を完全に覆う**ので
        *     ダーク環境では暗く見え、いずれにせよ何も見えない)。
        *
-       * ■ 新: JS 上限(2.5秒)を過ぎたら**自力で薄れ始める**。
-       *   - 0〜50%(0〜2.5秒) = JS が正常に解除する想定の区間。不透明のまま
-       *   - 50〜100%(2.5〜5秒) = JS が来ないので**徐々に透ける**
-       *   ＝ JS が死んでいても 2.5秒以降は中身が見え始める。
+       * ■ 新: JS 上限を過ぎたら**自力で薄れ始める**。
+       *   ★v0.1.1418: JS 上限を 2.5秒 → 0.9秒へ下げたので、ここも合わせる。
+       *   停止点は【JS上限 ÷ アニメ全長】で決める(0.9s ÷ 5s = 18%)。
+       *   - 0〜18%(0〜0.9秒) = JS が正常に解除する想定の区間。不透明のまま
+       *   - 18〜100%(0.9〜5秒) = JS が来ないので**徐々に透ける**
+       *   ＝ JS が死んでいても 0.9秒以降は中身が見え始める。
        *   ★「中身が薄くても出す方が必ず良い」(v0.1.1373 の判断)を CSS 側にも適用する。
+       *
+       * ★★この値は JS 側と【必ず一緒に】動かすこと。
+       *   contentBlindTime.wiring.test.js が
+       *   「不透明のまま待つ時間 ≦ INLINE_SHADE_DATA_FALLBACK_MS」を機械照合する
+       *   (片方だけ下げると、体感時間は下がらないまま緑になる=v0.1.1414 の再演)。
        */
       @keyframes nl-init-shade-css-failsafe {
-        0%, 50% { opacity: 1; visibility: visible; pointer-events: auto; }
+        0%, 18% { opacity: 1; visibility: visible; pointer-events: auto; }
         99% { opacity: 0.04; visibility: visible; pointer-events: none; }
         100% { opacity: 0; visibility: hidden; pointer-events: none; }
       }

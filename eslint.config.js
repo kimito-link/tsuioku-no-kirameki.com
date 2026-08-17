@@ -332,7 +332,18 @@ export default [
     //     重くした v1403-1408 の再演を避けるため
     //     ([[instrument-can-kill-the-page-it-measures-2026-08-16]])。
     //   ★判定・文言の本体は純関数 src/lib/instantPushDiag.js(変異で赤を確認済)。
-    rules: { 'max-lines': ['error', { max: 22381, skipBlankLines: false, skipComments: false }] }
+    // ★2026-08-17(v0.1.1418) 22381 → 22408(+27)。ユーザー実機「まだ黒い」への対処。
+    //   サイドパネルを開いた直後の暗い時間(初回シェード)の上限を 2.5秒 → 0.9秒 へ、
+    //   データ到着ポーリングを 200ms → 60ms へ下げた。
+    //   ★増分はすべて【なぜ下げてよいか】の根拠コメント:
+    //     - この上限が効くのは「データが最後まで来なかったとき」だけで、
+    //       来た場合は5つの早期解除経路が先に外す(=早く外れる副作用は無い)
+    //     - 実測(実ブラウザ)で popup.html の色確定は72ms、about:blank の隙間は11ms。
+    //       レイアウト安定に2.5秒は要らない
+    //   ★CSS 保険(popup.html の @keyframes)も同時に 50%→18% へ動かすこと。
+    //     片方だけ下げると体感時間が変わらないまま緑になる(v0.1.1414 の再演)。
+    //     contentBlindTime.wiring.test.js が両者の関係を機械照合する(変異で赤を確認済)。
+    rules: { 'max-lines': ['error', { max: 22408, skipBlankLines: false, skipComments: false }] }
   },
   {
     files: ['src/extension/popup/**/*.js'],
