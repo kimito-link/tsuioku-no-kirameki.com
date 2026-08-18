@@ -48,13 +48,16 @@ describe('隠して→見せる の配線', () => {
     const tag = /<iframe[^>]*>/.exec(html)?.[0] ?? '';
     expect(tag).not.toContain('nl-ifr-loading');
     expect(tag).not.toMatch(/visibility:\s*hidden/);
+    expect(tag).not.toMatch(/opacity:\s*0/);
     expect(tag).not.toMatch(/display:\s*none/);
   });
 
   it('★CSS 側に隠しクラスの定義がある(JSだけ在ってCSSが無い片肺を防ぐ)', () => {
     const html = read('extension/sidepanel.html');
     expect(html).toMatch(/iframe\.nl-ifr-loading\s*\{/);
-    expect(html).toMatch(/visibility:\s*hidden/);
+    // ★隔すのは opacity(コンポジタで扱える・親のクリーム色が透ける)
+    const rule = /iframe\.nl-ifr-loading\s*\{([\s\S]*?)\}/.exec(html)?.[1] ?? '';
+    expect(rule.replace(/\/\*[\s\S]*?\*\//g, '')).toMatch(/opacity:\s*0/);
   });
 
   it('★display:none では隠さない(レイアウトが消えて中身の初期描画が狂う)', () => {
@@ -63,7 +66,7 @@ describe('隠して→見せる の配線', () => {
     // ★コメント内の「display:none ではなく」という説明を拾わない
     const block = raw.replace(/\/\*[\s\S]*?\*\//g, '');
     expect(block).not.toMatch(/display:\s*none/);
-    expect(block).toMatch(/visibility:\s*hidden/);
+    expect(block).toMatch(/opacity:\s*0/);
   });
 
   it('★色の宣言は消していない(唯一効いている守り・消すと退化)', () => {
@@ -71,5 +74,43 @@ describe('隠して→見せる の配線', () => {
     expect(html).toMatch(/color-scheme:\s*light/);
     expect(html).toContain('#fffaf2');
     expect(html).toMatch(/<meta name="color-scheme" content="light"/);
+  });
+});
+
+describe('★★JSに依存しない保険(v0.1.1437・実機で隠れっぱなしを見た)', () => {
+  /*
+   * v0.1.1436 は戻すのを JS(load / setTimeout)に任せていた。
+   * 実機のパネルで【visibility:hidden のまま戻らない】のを実際に見た。
+   * 真因: 2.3MB のバンドルを読む間イベントループが止まり、
+   *        setTimeout も load ハンドラも発火できない
+   *        [[stalled-event-loop-masquerades-as-paint-bug-2026-08-12]]
+   * ★だから【コンポジタで進む CSS アニメーション】を保険にする。
+   */
+  const html = () => read('extension/sidepanel.html');
+
+  it('★隔しクラスに CSS アニメーションの保険が付いている', () => {
+    const raw = /iframe\.nl-ifr-loading\s*\{([\s\S]*?)\}/.exec(html())?.[1] ?? '';
+    const block = raw.replace(/\/\*[\s\S]*?\*\//g, '');
+    expect(block).toMatch(/animation:\s*nl-ifr-reveal/);
+  });
+
+  it('★アニメーションの終点は visible(開く側へ倒れる)', () => {
+    const kf = /@keyframes\s+nl-ifr-reveal\s*\{([\s\S]*?)\}\s*\}/.exec(html())?.[1]
+      ?? /@keyframes\s+nl-ifr-reveal\s*\{([\s\S]*?)\}/.exec(html())?.[1] ?? '';
+    expect(kf).toMatch(/opacity:\s*1/);
+    expect(kf).not.toMatch(/opacity:\s*0/);
+  });
+
+  it('★forwards で終状態を保つ(終わった途端に隠れ戻らない)', () => {
+    const raw = /iframe\.nl-ifr-loading\s*\{([\s\S]*?)\}/.exec(html())?.[1] ?? '';
+    expect(raw.replace(/\/\*[\s\S]*?\*\//g, '')).toMatch(/forwards/);
+  });
+
+  it('★保険の長さは1.5秒以内(白いまま待たせない)', () => {
+    const raw = /iframe\.nl-ifr-loading\s*\{([\s\S]*?)\}/.exec(html())?.[1] ?? '';
+    const m = /animation:\s*nl-ifr-reveal\s+([\d.]+)s/.exec(raw.replace(/\/\*[\s\S]*?\*\//g, ''));
+    expect(m).toBeTruthy();
+    expect(Number(m[1])).toBeLessThanOrEqual(1.5);
+    expect(Number(m[1])).toBeGreaterThan(0);
   });
 });
