@@ -1070,6 +1070,53 @@ chrome.runtime.onStartup.addListener(() => {
   void resumeAutopatrolIfEnabled();
 });
 
+/* ================================================================== */
+/* ★サイドパネルの【事前用意】(v0.1.1439)                                */
+/*                                                                      */
+/* ■ ユーザーの訴え(2026-08-19)                                       */
+/*   「また会場モードがたちあがるけど サイドパネルなかなか出ない現象ですよ」 */
+/*                                                                      */
+/* ■ なぜ会場モードだけ速いか(コードで確認済)                          */
+/*   会場モード   … watchページ内のクラス付け外しだけ = SWを起こさない      */
+/*   サイドパネル … 押下 → SWの onClicked → setOptions → open              */
+/*                    = SWが寝ていれば起動待ちがそのまま体感の遅さになる   */
+/*   ★実測(2026-08-19): SWが【応答不能】に陥ることもある。               */
+/*     同じ拡張のSWが2つ生きており、片方は `() => 1` すら返せずタイムアウトした。*/
+/*     その間ツールバーを押しても onClicked が処理されない = パネルが出ない。 */
+/*                                                                      */
+/* ■ 直し方: 押される前に setOptions を済ませておく                       */
+/*   watchページを開いた/遷移した時点で path と enabled を確定させる。    */
+/*   押下時に SW がやることが減り、Chrome側に用意ができている。          */
+/*                                                                      */
+/* ■ ★やらないこと(既存の判断を壊さない)                                */
+/*   openPanelOnActionClick を true にはしない。そうすると                */
+/*   action.onClicked が発火せず、埋め込み派のツールバーが死〆。          */
+/*   (src/lib/sidePanel.wiring.test.js が禁止として機械照合している)      */
+/* ================================================================== */
+const SIDE_PANEL_PREARM_WATCH_RE = /\/watch\/(lv\d{1,15})(?:[/?#]|$)/;
+
+/** このタブに対してパネルを事前用意する(watchページのときだけ)。 */
+function prearmSidePanelForTab(tabId, url) {
+  try {
+    if (tabId == null || tabId === chrome.tabs.TAB_ID_NONE) return;
+    const m = SIDE_PANEL_PREARM_WATCH_RE.exec(String(url || ''));
+    // ★watch以外では何もしない(空のパネルを出す事故を避ける)
+    if (!m || !SIDE_PANEL_LV_RE.test(m[1])) return;
+    if (!chrome.sidePanel || typeof chrome.sidePanel.setOptions !== 'function') return;
+    void chrome.sidePanel
+      .setOptions({ tabId, path: `sidepanel.html?lv=${m[1]}`, enabled: true })
+      .catch(() => {});
+  } catch {
+    /* no-op: 事前用意に失敗しても従来の押下経路で開く */
+  }
+}
+
+/* watchページになった瞬間に用意する(押される前に済ませる)。 */
+chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
+  if (!changeInfo || (changeInfo.status !== 'complete' && !changeInfo.url)) return;
+  prearmSidePanelForTab(tabId, (tab && tab.url) || changeInfo.url);
+});
+
 chrome.alarms.onAlarm.addListener((alarm) => {
   if (alarm?.name === AUTO_BACKUP_ALARM) {
     void runAutoBackupCycle();
