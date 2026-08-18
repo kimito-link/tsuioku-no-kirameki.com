@@ -41,6 +41,9 @@
         background: #fffaf2;
         /* src 読込前の about:blank 文書へ color-scheme を継承させる(v0.1.1369)。 */
         color-scheme: light;
+        /* ★v0.1.1438: 下敷きより上に置く(中身が下敷きに隠れないように)。 */
+        position: relative;
+        z-index: 1;
       }
       /*
         ★v0.1.1436: 【出来上がるまで iframe を画面から外す】。
@@ -91,9 +94,45 @@
       @keyframes nl-ifr-reveal {
         to { opacity: 1; }
       }
+      /*
+        ★v0.1.1438: 【下敷き】。iframe の下に地の色を敷きっぱなしにする。
+
+        ■ これは【幕(cloak)ではない】——混同すると12版の失敗を繰り返す
+          [[cloakNotForSidePanel]] が禁じたのは【中身を隠す幕】。
+          解除が遅れて t+917ms まで隠れ、それが黒に見えていた。
+          これは逆向き:
+            ・中身を隠さない(iframe より【下】に敷くだけ)
+            ・★JS で解除しない(解除自体が不要) = 解除漏れ事故が原理的に起きない
+
+        ■ なぜ要るか
+          v0.1.1437 で iframe を opacity:0 にして CSS アニメで開くようにしたが、
+          ★メインスレッドが固まっている【間】はアニメも進まない(実測済)。
+          その間 iframe は透明なので、下に何も無ければ
+          UA の既定色(ダークなら黒)が見える。
+          → 下に地の色を敷いておけば【黒の代わりにクリーム色】が見える。
+
+        ■ ★JS を 1行も使わない
+          真因が「JS が動けない時間帯」なのだから、対策を JS に置いてはいけない
+          [[js-rescue-cannot-run-when-loop-stalls-2026-08-18]]。
+      */
+      #nl-underlay {
+        position: fixed;
+        inset: 0;
+        background-color: #fffaf2;
+        /* ★中身の下に潜る。重ならないので「隠す」事故が起きない。 */
+        z-index: 0;
+        pointer-events: none;
+      }
+
     </style>
   </head>
   <body>
+    <!--
+      ★下敷きは iframe より【先】に置く。
+      iframe の読み込みが始まる前に地の色が塗られるようにするため。
+      ★中身は隠さない(z-index で iframe の下に潜るだけ)。
+    -->
+    <div id="nl-underlay"></div>
     <iframe title="ニコ生ログ" src="popup.html?inline=1&amp;dock=sidepanel"></iframe>
     <!--
       自己診断だけ残す(描画には一切関与しない)。

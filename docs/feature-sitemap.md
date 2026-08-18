@@ -783,7 +783,7 @@
   - `src/lib/statusTrendKey.js`
   - `src/extension/status-entry.js`
   - `src/lib/statusActionAdvisor.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 177</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 178</summary>
 
 - `app/app.js` — スマホ閲覧用 status Web 版。
 - `app/live-view.js` — global NL_BUILD_ID
@@ -923,6 +923,7 @@
 - `src/lib/sidepanelIframeReveal.js` — iframe を【出来上がってから見せる】ための純関数。
 - `src/lib/sidepanelIframeSrc.js` — サイドパネルの iframe に渡す src を組み立てる純関数。
 - `src/lib/sidePanelLvFromTabs.js` — サイドパネルが【自力で】配信IDを見つけるための純関数。
+- `src/lib/sidepanelUnderlay.js` — サイドパネルの【下敷き】。黒の代わりに地の色を見せる。
 - `src/lib/sidePanelWatchTarget.js` — サイドパネルを「どの配信に紐づけるか」を決める純関数。
 - `src/lib/silentFailureCells.js` — 【無音で死ぬ】故障を画面に出すセル(純関数)。
 - `src/lib/singleFlightByKey.js` — key 単位の single-flight 実行器(純関数コア)。
@@ -967,7 +968,7 @@
 
 ## 🧬 修正系譜マップ(この系統のバグを過去にどう直したか)
 
-> changelog 全 767 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
+> changelog 全 768 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
 
 ### 💾 記録件数 (99版)
 - `v0.1.1429` 2026-08-18 — 広告メッセージを記録できるか調べる計器を追加
@@ -2471,7 +2472,8 @@
 - `v0.1.840` 2026-06-20 — 機能逆引き地図を全ファイル網羅に
 - `v0.1.835` 2026-06-20 — 自己検証ゲートを追加(版同期+診断文言)
 
-### その他 (97版)
+### その他 (98版)
+- `v0.1.1438` 2026-08-19 — 開くときの黒さをさらに減らしました
 - `v0.1.1437` 2026-08-18 — パネルの中身が出ない場合を直しました
 - `v0.1.1436` 2026-08-18 — パネルを開くときの黒い画面を直しました
 - `v0.1.1434` 2026-08-18 — 真っ黒(横縞)の原因を取り除きました
