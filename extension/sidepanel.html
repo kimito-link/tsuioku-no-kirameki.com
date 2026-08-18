@@ -42,6 +42,24 @@
         /* src 読込前の about:blank 文書へ color-scheme を継承させる(v0.1.1369)。 */
         color-scheme: light;
       }
+      /*
+        ★v0.1.1436: 【出来上がるまで iframe を画面から外す】。
+
+        黒が出るのは iframe が initial about:blank の間で、
+        その文書は色スキームを持たないので UA が不透明なキャンバス
+        (ダークなら黒)を敷く。★CSSWG 自身が「作者には制御できない」と
+        認定しているので、色を宣言する方向では消せない(12版・200行の実績)。
+        → その間だけ画面から外し、中身が出来たら見せる。
+
+        ★このクラスを付けるのは JS(sidepanel-entry.js)だけ。
+          HTML で初期非表示にしないのは、JS が動かないと
+          【永久に真っ白】になるから(黒より悪い退化)。
+      */
+      iframe.nl-ifr-loading {
+        /* ★display:none ではなく visibility 。display だとレイアウトが
+           消えて幅・高さが 0 になり、中身の初期描画が狂う。 */
+        visibility: hidden;
+      }
     </style>
   </head>
   <body>

@@ -19,6 +19,12 @@ import { KEY_COMMENT_WRITE_MODE_DIAG } from '../lib/commentWriteModeDiagKey.js';
 import { KEY_SIDEPANEL_SELF_DIAG } from '../lib/sidepanelSelfDiagKey.js';
 import { buildSidePanelIframeSrc, readSidePanelLv } from '../lib/sidepanelIframeSrc.js';
 import { SIDE_PANEL_WATCH_TAB_QUERY, pickLvFromTabs } from '../lib/sidePanelLvFromTabs.js';
+import {
+  HIDDEN_CLASS,
+  REVEAL_FALLBACK_MS,
+  decideReveal,
+  shouldHideUntilReady
+} from '../lib/sidepanelIframeReveal.js';
 
 /*
  * ★v0.1.1419: iframe に配信ID(lv)を渡してから読み込ませる。【描画に関与する唯一の処理】。
@@ -40,6 +46,38 @@ import { SIDE_PANEL_WATCH_TAB_QUERY, pickLvFromTabs } from '../lib/sidePanelLvFr
 try {
   const ifr = document.querySelector('iframe[src]');
   if (ifr) {
+    /*
+     * ★v0.1.1436: 【出来上がるまで iframe を画面から外す】。
+     *
+     * 黒の真因は iframe の initial about:blank。
+     * この文書は色スキームを持たないので UA が不透明なキャンバス(ダークなら黒)を敷く。
+     * ★CSSWG が「作者には制御できない」と認定しているので、
+     *   色を宣言する方向では消せない(v0.1.1279〜1423 の12版・200行が空振り)。
+     * → その間だけ画面から外し、load で見せる。
+     *
+     * ★必ず見せる: load / error / 時間切れのどれでも戻す。
+     *   戻し損ねると黒が【真っ白で何も出ない】に変わるだけ = より悪い退化。
+     */
+    try {
+      const canHide = !!(ifr.classList && typeof ifr.classList.add === 'function');
+      if (shouldHideUntilReady({ hasIframe: true, supportsHiding: canHide })) {
+        let shown = false;
+        /** @param {{loaded?:boolean, errored?:boolean, timedOut?:boolean}} ev */
+        const reveal = (ev) => {
+          if (shown) return;
+          if (!decideReveal(ev).reveal) return;
+          shown = true;
+          try { ifr.classList.remove(HIDDEN_CLASS); } catch { /* no-op */ }
+        };
+        ifr.classList.add(HIDDEN_CLASS);
+        ifr.addEventListener('load', () => reveal({ loaded: true }), { once: true });
+        ifr.addEventListener('error', () => reveal({ errored: true }), { once: true });
+        // ★最後の砟: load が来なくても必ず見せる(白紙固着の防止)
+        setTimeout(() => reveal({ timedOut: true }), REVEAL_FALLBACK_MS);
+      }
+    } catch {
+      /* no-op */
+    }
     const base = ifr.getAttribute('src') || '';
     const next = buildSidePanelIframeSrc(base, window.location.search);
     /*
