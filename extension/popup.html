@@ -1178,6 +1178,38 @@
         height: 22px;
       }
       /*
+       * ★v0.1.1426 中身LOD(枠は残す。中身だけ空にする)— laneContentLod.js が付ける class。
+       *
+       * ■ 何のためか
+       *   実測(CDP Performance.getMetrics・コメント1,200件): 拡張内DOM 13,682
+       *   ＝Web業界の推奨(1,500以下)の【9倍】。1タイル=5要素を1,108人ぶん作っていた。
+       *   後列の匿名は【枠だけ】作り、可視域に入ってから中身を詰める(5,540→1,228要素=78%減)。
+       *
+       * ■ ★寸法は「推測」ではない
+       *   すぐ上の既存LOD規則が、たぬ姉段25枚目以降の匿名を
+       *     meta: display:none / avatar: 22px / gap:0 / padding-right:0
+       *   にしている。＝この領域の見えている実体は【22pxの丸1個】だけ。
+       *   hollow はその footprint(22px + border 1px×2)を再現する＝中身が入っても
+       *   寸法が動かない=スクロール位置が飛ばない(地雷#1)。
+       *
+       * ■ 地色を塗る(★黒画面の再生産を防ぐ)
+       *   背景 transparent のまま置くと「中身は在るのに地が塗られていない」状態＝
+       *   ユーザーが報告した【横縞つきの真っ黒】と同じ見え方になる。必ず塗る。
+       */
+      .nl-story-userlane-cell--hollow {
+        gap: 0;
+        padding-right: 0;
+        /* 22px の丸 + border 1.5px×2(既存 avatar と同じ枠線幅)= 25px。
+           avatar と同じ箱を「img 無し」で作る＝中身が入った瞬間に寸法が動かない。 */
+        width: 25px;
+        height: 25px;
+        border-radius: 999px;
+        box-sizing: border-box;
+        border: 1.5px solid color-mix(in srgb, var(--nl-border) 82%, #fff 18%);
+        background: var(--nl-surface);
+      }
+
+      /*
        * ★③会場(venueBar のレーンバー)はタイルが wrapTileEl でラップされる
        *   (renderStoryUserLaneDom.js:402)ので【子孫形】が要る。①は直接子形。
        *   両方書かないと画面ごとに見た目が食い違う。

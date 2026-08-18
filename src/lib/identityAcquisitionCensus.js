@@ -30,6 +30,7 @@
  */
 
 import { isAnonymousStyleNicoUserId } from './supportGrowthTileSrc.js';
+import { resolveLaneEvidence } from '../domain/lane/evidence.js';
 
 /**
  * @typedef {{
@@ -86,7 +87,14 @@ export function hasRealNickname(nickname, userId) {
  *   namePercent: number,
  *   allPercent: number,
  *   missingThumb: number,
- *   missingName: number
+ *   missingName: number,
+ *   anonWithThumb: number,
+ *   anonWithName: number,
+ *   anonWithBoth: number,
+ *   shortNumericId: number,
+ *   overallThumbPercent: number,
+ *   overallNamePercent: number,
+ *   overallAllPercent: number
  * }}
  */
 export function countIdentityAcquisition(candidates) {
@@ -99,14 +107,44 @@ export function countIdentityAcquisition(candidates) {
   let withAll = 0;
   // ★IDから式で組んだ推測URL(実在未確認)。画面には絵が出るが「取れた」ではない。
   let guessedThumb = 0;
+  // ★v1: 匿名側の保有(前提「匿名にはサムネも名前も無い」の正否を測る)。
+  let anonWithThumb = 0;
+  let anonWithName = 0;
+  let anonWithBoth = 0;
+  // ★v1: 1〜4桁の数値ID(実在する初期ユーザーが匿名扱いされている件数)。
+  let shortNumericId = 0;
 
   for (const raw of list) {
     if (!raw || typeof raw !== 'object') continue;
     total += 1;
     const uid = raw.userId;
     if (!hasNumericUserId(uid)) {
-      // ★匿名・ID無しは「取れるはずが無い」側。失敗に数えない。
-      if (isAnonymousStyleNicoUserId(uid)) anonymous += 1;
+      /*
+       * ★v1(2026-08-17 仕様見直し会議): 分母からは従来どおり外すが、
+       *   【保有しているかは数える】ようにした。
+       *   旧実装はここで素通りしていたため「匿名にサムネ/名前があるか」を
+       *   誰も答えられなかった(=前提の誤りを検出できない計器だった)。
+       *   判定は段分けの法(v2)と同じ正本 resolveLaneEvidence を使う
+       *   ([[shared-knowledge-is-not-shared-judgment-2026-08-10]])。
+       */
+      if (isAnonymousStyleNicoUserId(uid)) {
+        anonymous += 1;
+        const ev = resolveLaneEvidence({
+          userId: uid,
+          // ★保存層の生の名前を使う。表示層(meta.nameLine)は「匿名（a:xxx）」を
+          //   合成するので、それで測ると保有率100%の嘘になる。
+          nickname: raw.rawNickname,
+          avatarObserved: raw.avatarObserved,
+          // thumbScore>=2 だけを実サムネとする(1=推測URLは404実績あり)。
+          hasNonCanonicalPersonalUrl: Math.floor(Number(raw.thumbScore) || 0) >= 2
+        });
+        if (ev.hasObservedThumb) anonWithThumb += 1;
+        if (ev.hasOwnName) anonWithName += 1;
+        if (ev.hasObservedThumb && ev.hasOwnName) anonWithBoth += 1;
+      }
+      // ★桁レンジの既知の誤差(1〜4桁の実在初期ユーザーが匿名扱い)の発生数。
+      //   直すかどうかはこの実測値を見てから決める(設計書 §5)。
+      if (/^\d{1,4}$/.test(String(uid ?? '').trim())) shortNumericId += 1;
       continue;
     }
     identifiable += 1;
@@ -128,6 +166,15 @@ export function countIdentityAcquisition(candidates) {
 
   /** @param {number} n */
   const pct = (n) => (identifiable > 0 ? Math.round((n / identifiable) * 1000) / 10 : 0);
+  /*
+   * ★v1: 「画面に出ている全員」を分母にした率も出す(二重分母)。
+   *   実機(2026-08-17)は 55人中51人が匿名で、同じ状態が
+   *   【100%(取れるはずの4人中4人)】とも【7.3%(全55人中4人)】とも表示できた。
+   *   片方だけ出すと必ずどちらかが誤解を生む＝ユーザー「正確なデータをださないといみがない」。
+   * ★overall 側の分子には匿名の保有も加える(実際に取れている人は取れている)。
+   */
+  /** @param {number} n */
+  const pctAll = (n) => (total > 0 ? Math.round((n / total) * 1000) / 10 : 0);
   return {
     total,
     anonymous,
@@ -140,7 +187,15 @@ export function countIdentityAcquisition(candidates) {
     namePercent: pct(withName),
     allPercent: pct(withAll),
     missingThumb: Math.max(0, identifiable - withThumb),
-    missingName: Math.max(0, identifiable - withName)
+    missingName: Math.max(0, identifiable - withName),
+    // ★v1 追加(既存フィールドは1つも変えていない)
+    anonWithThumb,
+    anonWithName,
+    anonWithBoth,
+    shortNumericId,
+    overallThumbPercent: pctAll(withThumb + anonWithThumb),
+    overallNamePercent: pctAll(withName + anonWithName),
+    overallAllPercent: pctAll(withAll + anonWithBoth)
   };
 }
 
@@ -172,7 +227,18 @@ export function countIdentityFromLanePicks(picks) {
       list.map((p) => ({
         userId: p?.entry?.userId,
         nickname: p?.meta?.nameLine,
-        thumbScore: p?.thumbScore
+        thumbScore: p?.thumbScore,
+        /*
+         * ★v1 追加: 匿名側の保有を測るための【保存層】の生の値。
+         *   上の `nickname` は表示層(meta.nameLine)で、匿名には
+         *   「匿名（a:xxxx）」が合成されて入る＝これで名前保有を測ると
+         *   100%の嘘になる([[check-what-the-number-counts-2026-08-09]])。
+         *   ★会場(venueLaneBuckets)の pick は entry が {userId} だけなので、
+         *     この計器を会場側へ配線すると匿名の保有が全ゼロに見える
+         *     ([[measure-the-region-you-claim-2026-08-10]])。①POP専用。
+         */
+        rawNickname: p?.entry?.nickname,
+        avatarObserved: p?.entry?.avatarObserved
       }))
     );
   } catch {
@@ -195,15 +261,36 @@ export function formatIdentityAcquisitionLine(c) {
   }
   const ident = Math.max(0, Math.floor(Number(c.identifiable) || 0));
   const anon = Math.max(0, Math.floor(Number(c.anonymous) || 0));
+  const aThumb = Math.max(0, Math.floor(Number(c.anonWithThumb) || 0));
+  const aName = Math.max(0, Math.floor(Number(c.anonWithName) || 0));
+  /*
+   * ★v1(2026-08-17): 匿名の保有を必ず併記する。
+   *   旧実装は「匿名=対象外(仕様)」としか書かず、匿名が実際にサムネや名前を
+   *   持っていても【誰にも見えなかった】。実機で匿名に個人サムネと表示名が
+   *   出ていることが確認され、前提そのものが誤りだったと判明した。
+   */
+  const anonHold =
+    anon > 0
+      ? `\n  → 匿名${anon}人のうち サムネ観測${aThumb}人 / 本人名${aName}人` +
+        (aThumb > 0 || aName > 0
+          ? '(★取れています。現行の段分けではたぬ姉段のままです)'
+          : '(いまは0人)')
+      : '';
+  const shortId = Math.max(0, Math.floor(Number(c.shortNumericId) || 0));
+  const shortNote =
+    shortId > 0
+      ? `\n  → ★1〜4桁の数値ID${shortId}人を匿名扱いしています(初期ユーザーの既知の誤差)`
+      : '';
   if (ident <= 0) {
     /*
-     * ★全員匿名でも「異常」ではない。仕様上ここに数値IDは存在しない。
-     *   赤くすると読んでも直せない計器になる。
+     * ★全員匿名でも「異常」ではない(ここは維持)。
+     *   ただし旧文言「数値IDもサムネも仕様上ありません」は【誤り】だったので消した。
+     *   匿名でもサムネ・名前は取れることがある(上の anonHold が実数で示す)。
      */
-    return `本人情報の取得 ⚪ 対象なし(${total}人すべて匿名=数値IDもサムネも仕様上ありません)`;
+    return `本人情報の取得 ⚪ 数値IDの人がいません(${total}人すべて匿名)${anonHold}${shortNote}`;
   }
   const mark = c.allPercent >= 80 ? '✅' : c.allPercent >= 50 ? '🟡' : '🔴';
-  const anonNote = anon > 0 ? ` / 匿名${anon}人は対象外(仕様)` : '';
+  const anonNote = anon > 0 ? ` / 匿名${anon}人は分母外` : '';
   const guessed = Math.max(0, Math.floor(Number(c.guessedThumb) || 0));
 
   /*
@@ -223,9 +310,17 @@ export function formatIdentityAcquisitionLine(c) {
     c.missingThumb > 0 || c.missingName > 0
       ? `\n  → 未取得: サムネ${c.missingThumb}人 / 名前${c.missingName}人` +
         '(数値IDはあるのに取れていない=取得経路を疑う)'
-      : '\n  → 3点セットが全員そろっています';
+      : `\n  → 対象${ident}人は3点セットがそろっています(★匿名を除いた数です)`;
+  /*
+   * ★v1: 実稼働の率(画面の全員が分母)を必ず併記する。
+   *   実機は 55人中51人が匿名で、同じ状態が【100%】とも【7.3%】とも書けた。
+   *   期待値だけを出すと「ほぼ完璧に取れている」と誤読される。
+   */
+  const overall =
+    `\n  → 実稼働: サムネ${c.overallThumbPercent}% / 名前${c.overallNamePercent}%` +
+    ` / 両方${c.overallAllPercent}% (画面の全${total}人が分母)`;
   return (
     `本人情報の取得 ${mark} サムネ${c.thumbPercent}% / 名前${c.namePercent}% / 両方${c.allPercent}%` +
-    ` (対象${ident}人${anonNote})${detail}${guessNote}`
+    ` (期待値: 対象${ident}人${anonNote})${detail}${overall}${anonHold}${shortNote}${guessNote}`
   );
 }

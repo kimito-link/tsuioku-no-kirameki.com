@@ -96,12 +96,33 @@ describe('たぬ姉段の段内LOD — レーンを描く全画面に入って�
   });
 
   it('★JS 側で層を判定していない(ちらつき鍵に位置を混ぜない)', () => {
-    // 位置ベースの判定が JS に漏れると diff-skip の鍵が揺れてちらつきが再発する。
-    const renderer = read('src/extension/story/renderStoryUserLaneDom.js');
-    expect(renderer).not.toMatch(/nth-child|index >= 24|i >= 24/);
+    /*
+     * 位置ベースの判定が JS に漏れると diff-skip の鍵が揺れてちらつきが再発する
+     * (story-userlane-churn-filllanetier-v1039 で7版かけた対策の核)。★この価値は維持する。
+     *
+     * ★2026-08-18 修正: この検査は【CRLF で空振りしていた】。
+     *   - 区切りに `'\n}\n'` を探していたが、このファイルは CRLF なので **0件**
+     *     (実際にあるのは `\r\n}\r\n` が17件)。indexOf は -1 を返し、
+     *     slice(keyStart, -1) が【ファイル末尾までほぼ全文】を keyBody にしていた。
+     *   - 結果、変更前のコードでも 14,160字を拾って「位置語を含む」状態＝
+     *     **どんな実装でも通る/落ちるが実装と無関係**という死んだ検査だった。
+     *   → 改行を正規化してから抽出する。[[mutation-must-verify-it-applied-2026-08-06]] と同型の地雷。
+     *
+     * ★`nth-child` の全文一致も、コメントで CSS 側の規則に言及しただけで落ちていた。
+     *   守りたいのは【実コードに位置判定が無いこと】なので、コメントを除いてから見る。
+     */
+    const renderer = read('src/extension/story/renderStoryUserLaneDom.js').replace(/\r\n/g, '\n');
+    // コメント(行/ブロック)を除いた実コードだけを対象にする。
+    const code = renderer
+      .replace(/\/\*[\s\S]*?\*\//g, '')
+      .replace(/^[ \t]*\/\/.*$/gm, '');
+    expect(code).not.toMatch(/nth-child|index >= 24|i >= 24/);
     // 鍵の定義に位置(index)が入っていないことも固定する。
-    const keyStart = renderer.indexOf('function storyLaneTierBodyKey');
-    const keyBody = renderer.slice(keyStart, renderer.indexOf('\n}\n', keyStart));
+    const keyStart = code.indexOf('function storyLaneTierBodyKey');
+    expect(keyStart).toBeGreaterThan(-1);
+    const keyEnd = code.indexOf('\n}\n', keyStart);
+    expect(keyEnd).toBeGreaterThan(keyStart); // ★区切りが見つかること自体を断言(空振り再発の防止)
+    const keyBody = code.slice(keyStart, keyEnd);
     expect(keyBody).not.toMatch(/index|nth|position/i);
   });
 });

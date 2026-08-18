@@ -31,6 +31,16 @@ import {
   createVenueYukkuriNamedCensusState,
   observeVenueYukkuriNamedTile
 } from '../../lib/venueYukkuriNamedCensus.js';
+// ★2026-08-18 中身LOD(枠は残す・中身だけ空にする): DOM要素数が業界基準の9倍(実測13,682)
+//   だったことへの対処。判定・枠ビルダー・IO管理は laneContentLod.js に集約する
+//   (ここは「どこで呼ぶか」だけ=ちらつき対策の鍵 storyLaneTierBodyKey には一切触れない)。
+import {
+  buildHollowTileEl,
+  forgetLaneContentLod,
+  isAlreadyFilled,
+  observeHollowTile,
+  shouldRenderHollow
+} from './laneContentLod.js';
 
 /**
  * @typedef {{
@@ -316,6 +326,8 @@ export function resetStoryUserLaneDom(els) {
   // ★diff-skip の整合: 直接 innerHTML を消す段は cache key も無効化する(消したのに次回 key 一致で skip され
   //   空のまま残る事故を防ぐ)。fillLaneTier 以外で DOM を消す経路がここ。
   for (const laneEl of [laneLink, laneGift, laneAd, laneKonta, laneTanu]) {
+    // ★中身LOD: DOM を消す前に観測を解く(IO がターゲット参照を握る=リーク防止)。
+    if (laneEl) forgetLaneContentLod(laneEl);
     if (laneEl) { laneEl.innerHTML = ''; _laneTierLastKey.delete(laneEl); }
   }
   laneLink.hidden = true;
@@ -363,9 +375,47 @@ function fillLaneTier(el, items, io, wrapTileEl) {
     el.hidden = false; // 温存(再描画しない)。hidden だけ念のため確実に外す(レイアウトは不変)。
     return;
   }
+  // ★中身LOD: 段を貼り替える前に前回の観測を解く(IO がターゲット参照を握る=リーク防止)。
+  //   filledKeys(一度詰めた人)は保持される=戻さない(一方通行)。
+  forgetLaneContentLod(el);
+  const laneNameForLod = laneNameOfEl(el);
   const frag = document.createDocumentFragment();
   for (let i = 0; i < items.length; i += 1) {
     const p = items[i];
+    // ★中身LOD(枠は残す・中身だけ空にする): 後列の匿名は「枠だけ」を作り、
+    //   可視域に入ってから中身を詰める。★枠は必ず frag に入る=childElementCount は不変
+    //   =幕(シェード)の解除条件 countStoryUserLaneDomTiles(els) > 0 は無傷(C2)。
+    const lodUserKey = String((p && p.entry && p.entry.userId) || '');
+    if (
+      shouldRenderHollow({
+        laneName: laneNameForLod,
+        index: i,
+        hasRealThumb: io.isHttpOrHttpsUrl(String((p && p.displaySrc) || '')),
+        hasWrap: typeof wrapTileEl === 'function',
+        alreadyFilled: isAlreadyFilled(el, lodUserKey)
+      })
+    ) {
+      const hollowEl = buildHollowTileEl(p);
+      // 既存 CSS(密度LOD)と実DOM census が読む属性は枠のうちから付ける
+      //   (中身の有無で見た目・照合が揺れないように)。
+      try {
+        hollowEl.dataset.thumb = '0'; // hollow になるのは実サムネ無しのときだけ(判定は上の hasRealThumb)
+        hollowEl.dataset.userKey = venueLaneParityKey(p);
+      } catch { /* io 未注入等でも描画は止めない */ }
+      observeHollowTile(el, hollowEl, lodUserKey, () => {
+        // ★同一位置で置換する(順序を変えない)。親が変わっていたら何もしない
+        //   (段が貼り替わった後の遅れたコールバック=捨てる)。
+        if (!hollowEl.parentNode) return;
+        const realEl = buildPersonTileEl(p, io);
+        try {
+          realEl.dataset.thumb = io.isHttpOrHttpsUrl(String((p && p.displaySrc) || '')) ? '1' : '0';
+          realEl.dataset.userKey = venueLaneParityKey(p);
+        } catch { /* 描画は止めない */ }
+        hollowEl.replaceWith(realEl);
+      });
+      frag.appendChild(hollowEl);
+      continue;
+    }
     // タイル本体の生成は人物タイル正本(buildPersonTileEl)に集約。
     // ループ・hidden 制御(=レイアウト)はここに残す。全消しでなく変化時だけ replaceChildren で一括差替。
     const tileEl = buildPersonTileEl(p, io);
@@ -607,6 +657,8 @@ export function paintStoryUserLaneDomEmptyGuides(els, faces, opts) {
   // ★diff-skip の整合: 直接 innerHTML を消す段は cache key も無効化する(消したのに次回 key 一致で skip され
   //   空のまま残る事故を防ぐ)。fillLaneTier 以外で DOM を消す経路がここ。
   for (const laneEl of [laneLink, laneGift, laneAd, laneKonta, laneTanu]) {
+    // ★中身LOD: DOM を消す前に観測を解く(IO がターゲット参照を握る=リーク防止)。
+    if (laneEl) forgetLaneContentLod(laneEl);
     if (laneEl) { laneEl.innerHTML = ''; _laneTierLastKey.delete(laneEl); }
   }
   laneLink.hidden = true;
