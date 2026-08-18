@@ -90,3 +90,61 @@ describe('実物の sidepanel.html との照合', () => {
     expect(h).toMatch(/color-scheme:\s*light/);
   });
 });
+
+describe('★リサイズ中の黒(v0.1.1440・ユーザー「引っ張る瞬間くろくなる」)', () => {
+  /*
+   * ■ 世界調査で分かった仕組み(2026-08-19)
+   *   リサイズ中、コンポジタは未描画の帯(gutter)を埋める。
+   *   Chromium はその領域を【透明で塗る】修正を入れているので、
+   *   透明の下に何も無ければ OS がダークのとき黒く見える。
+   *   ★iframe 自身が不透明だと下敷きが透けないので、iframe は透明にする。
+   *
+   * ★この検査が守っているのは【地の色の連鎖を切らないこと】。
+   *   iframe を透明にした以上、下敷きと html/body の地が
+   *   【消えたら本当に黒くなる】。だから三重とも機械で固定する。
+   */
+  const html = () => read('extension/sidepanel.html');
+
+  /*
+   * ★v0.1.1440 の判断(記録として残す)
+   *   世界調査は「iframe を透明にして下敷きを gutter に透かせよ」と推奨した。
+   *   ★しかし調査自身が「この主張は実測で裏取れていない」と明記していた。
+   *   一方このリポには v0.1.1279〜1283 で
+   *   【iframe を透明にしたことが真っ黒の原因だった】という実体験がある。
+   *   ★実測済の過去の失敗 > 未検証の推論。よって iframe は不透明のまま。
+   *   (sidepanelBlackScreen.wiring.test.js がこの禁を機械照合している)
+   */
+  it('★iframe は不透明のまま(v0.1.1283 の禁を破らない)', () => {
+    const src = html();
+    const at = src.indexOf('iframe {');
+    const rule = src.slice(at, src.indexOf('      }', at));
+    const body = rule.replace(/\/\*[\s\S]*?\*\//g, '');
+    expect(body).toMatch(/background:\s*#fffaf2/);
+    expect(body).not.toMatch(/background:\s*transparent/);
+  });
+
+  it('★下敷きは fixed ではなく absolute(別の合成レイヤにしない)', () => {
+    const rule = /#nl-underlay\s*\{([\s\S]*?)\}/.exec(html())?.[1] ?? '';
+    const body = rule.replace(/\/\*[\s\S]*?\*\//g, '');
+    expect(body).toMatch(/position:\s*absolute/);
+    expect(body).not.toMatch(/position:\s*fixed/);
+  });
+
+  it('★★地の色は【三重】で持つ(どれか1つが欠けても黒くならない)', () => {
+    const h = html();
+    // 1) 下敷き
+    // ★下敷きの【規則の中だけ】を見る(ファイル内の別の #fffaf2 を拾わない)
+    const uRule = /#nl-underlay\s*\{([\s\S]*?)\}/.exec(h)?.[1] ?? '';
+    expect(uRule.replace(/\/\*[\s\S]*?\*\//g, '')).toMatch(/background-color:\s*#fffaf2/);
+    // 2) html インライン(パース最初に効く)
+    expect(h).toMatch(/<html[^>]*background-color:\s*#fffaf2/);
+    // 3) html,body の規則
+    const cssBlock = h.slice(h.indexOf('html,'), h.indexOf('iframe {'));
+    expect(cssBlock).toMatch(/background-color:\s*#fffaf2/);
+  });
+
+  it('★中身(popup.html)の根にも地の色がある(iframeが透明でも中身側で塗る)', () => {
+    const popup = read('extension/popup.html').slice(0, 600);
+    expect(popup).toMatch(/<html[^>]*background-color:\s*#fffaf2/);
+  });
+});

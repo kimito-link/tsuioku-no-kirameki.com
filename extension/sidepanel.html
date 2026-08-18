@@ -38,6 +38,16 @@
         height: 100%;
         border: 0;
         /* iframe 自身も不透明で塗る(最後の砦)。#fffaf2 は popup.html の --nl-bg と同値。 */
+        /*
+          iframe 自身も不透明で塗る(最後の砎)。#fffaf2 は popup.html の --nl-bg と同値。
+
+          ★v0.1.1440 でここを transparent にしかけてやめた(記録として残す)。
+            世界調査は「リサイズ中の未描画帯で下敷きを透かせるため透明にせよ」と推奨したが、
+            ★その主張は【実測で裏取れていない】と調査自身が明記していた。
+            一方このリポには v0.1.1279〜1283 で【透明にしたことが真っ黒の原因だった】
+            という実体験があり、sidepanelBlackScreen.wiring.test.js が禁止として
+            機械照合している。★実測済の過去の失敗 > 未検証の推論。だから不透明のまま。
+        */
         background: #fffaf2;
         /* src 読込前の about:blank 文書へ color-scheme を継承させる(v0.1.1369)。 */
         color-scheme: light;
@@ -116,7 +126,13 @@
           [[js-rescue-cannot-run-when-loop-stalls-2026-08-18]]。
       */
       #nl-underlay {
-        position: fixed;
+        /*
+          ★v0.1.1440: fixed ではなく absolute。
+          fixed はそれ自体が別の合成レイヤになり、
+          リサイズ時に【そのレイヤも再描画待ち】になりうる。
+          absolute なら親の塗りに乗るので、新しく現れた帯に届きやすい。
+        */
+        position: absolute;
         inset: 0;
         background-color: #fffaf2;
         /* ★中身の下に潜る。重ならないので「隠す」事故が起きない。 */
