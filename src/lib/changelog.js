@@ -26,6 +26,16 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1428',
+    date: '2026-08-18',
+    summary: '応援レーンの軽量化が効いているか見えるようにしました',
+    items: Object.freeze([
+      '状態速報に「中身LOD」の行を追加しました。応援レーンの軽量化(v0.1.1426)が実際に働いているかが数字で分かります。',
+      '枠だけで置いている人数と、レーン全体の人数を並べて表示します。',
+      '★0のときも行を出します。「まだ条件を満たしていない(たぬ姉段が25人以下)」のか「効いていない」のかを区別できるようにするためです。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1427',
     date: '2026-08-18',
     summary: 'サイドパネルで応援レーンが出ないのを修正',
