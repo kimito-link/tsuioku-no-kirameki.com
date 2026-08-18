@@ -1,20 +1,44 @@
 # 引き継ぎ 2026-08-18 — 次のセッションはこの1枚から
 
-> ブランチ **`feat/lane-density-lod`** / **v0.1.1425** / **未コミット多数（下記）** / `verify:cc OK`
+> ブランチ **`feat/lane-density-lod`** / **v0.1.1426** / `verify:cc OK`
 > ★**master に切り替えないこと**（Chrome がリポの `extension/` を直接読むため版が戻る）
 
 ---
 
-## 0. ★★次にやること：実装（設計は完成済み・承認待ちで止まった）
+## 0. ★★中身LODは【実装・コミット済み】(v0.1.1426 / `4b93d7ec`)
 
 **正本**: [`lane-content-lod-DESIGN.md`](lane-content-lod-DESIGN.md)
 
-**MVP**: たぬ姉段の25枚目以降・匿名（`data-thumb=0`）のみ、①POP と④純Web で
-**枠だけのセル**にして、IntersectionObserver で**一方通行に中身を詰める**。
+設計どおり実装し、**実測で効果を確認してからコミットした**。
 
-- 触るのは **3箇所だけ**（`popup-entry.js` は **0行変更**）
-- 撤回は **1行**（`LANE_CONTENT_LOD_ENABLED = false`）＋ **1コミットなので `git revert` 1発**
-- ★**会場③は明示的に除外**（`loading="lazy"` でサムネが消えて撤回した前科がある）
+| | 実測値 |
+|---|---|
+| レーン配下の要素数 | **5,540 → 1,268（77.1%減）** ＝ 業界基準1,500以下 ✅ |
+| タイル枚数 | **1,108 → 1,108（不変）** ＝ never-drop 維持 ✅ |
+| 枠だけ(hollow)の数 | 1,068 |
+
+- 新規 **37テスト**（単体25 + 配線12）
+- ★**変異3件で赤を確認**（一方通行ガード除去／会場除外除去／forget を3→2箇所）
+- `popup-entry.js` **0行変更** / `personTileDom.js` 不触 / `venueBar.js` 不触
+
+### ★★まだ実機で確認していない（次にやること）
+
+**MCPがユーザーのChromeに繋がっていなかった**ため、司令塔は実機反映まで到達できていない。
+`list_extensions` が空・`list_pages` が `about:blank` のみ＝別インスタンスを見ている。
+
+**残っている手順（ユーザーのChromeで）**:
+1. 拡張のリロード（`chrome://extensions` の再読み込み、または MCP が繋がれば `reload_extension`）
+2. watch タブを F5
+
+**見るべきこと**:
+- ★**黒画面が出ないか**（枠は必ず作るので0枚にはならない設計。だが実機で確認するまで断定しない）
+- 「診断が重い」が軽くなったか
+- 後列の匿名がスクロールで**ちゃんと中身に変わるか**（変わらなければ IO の root 指定を疑う）
+- 明滅・白抜け・クリック不能が**無いか**
+
+★**撤回判定は先に固定してある**: 上記のどれかが出たら、原因調査より先に
+`src/extension/story/laneContentLod.js:54` の `LANE_CONTENT_LOD_ENABLED = false` を倒す。
+または `git revert 4b93d7ec`（1コミットに収めてある）。
 
 ---
 
@@ -160,6 +184,9 @@ npm run verify:deploy
 | 6 | 新規ファイル → tree-map/site-health/feature-map **再生成 → その後 git add**（★ゲートが2回捕まえた） |
 | 7 | `popup-entry.js` は max-lines **余裕0行** |
 | 8 | dist の日本語は `\uXXXX` → ASCII で grep する |
+| 9 | ★**生成マップは「build のあと」に作る** — `tree-map`/`site-health`/`feature-map` は dist を読むので、`verify:cc` の build 後に作り直さないと `drift` で落ち続ける（08-18に3回踏んだ） |
+| 10 | ★**版を上げたら LP も直す** — `tsuioku-no-kirameki/index.html` の4箇所（meta description / JSON-LD softwareVersion / twitter:description / フッター）。`verify:bump [6]` が機械照合する |
+| 11 | ★**happy-dom 環境では `import.meta.url` が file: にならない** — テストからソースを読むときは `process.cwd()` 起点にする |
 
 ---
 
