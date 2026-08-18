@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 6 / 798 件
+## ⚠️ 役割コメントが無いソース 6 / 801 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `src/lib/laneDomSelfMeasure.js`
@@ -718,7 +718,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (1743)
+- 📁 **src/** (1749)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1015,7 +1015,7 @@
         - `logo_funlink_white_RGB_maru_black.png`
       - `logo_guide_funlink_ol.pdf`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1496)
+  - 📁 **lib/** (1502)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -1041,6 +1041,8 @@
     - `adMessageCensus.js` — 「広告/ギフトの生データに【メッセージ】が入っているか」を数えるだけの計器。
     - `adMessageCensus.test.js`
     - `adMessageCensus.wiring.test.js`
+    - `adMessageLines.js` — 広告主が入れた文字を、そのままレポートに残すための整形。
+    - `adMessageLines.test.js`
     - `aiShareDiagSchema.js` — AI 共有診断バンドル（popup が組み立てる JSON / storage の nls_ai_share_fast_diag_v1）の
     - `aiShareFastDiagKey.js` — v0.1.629: AI 共有 fastDiag キャッシュの storage key を popup と status ページで共有。
     - `aiShareFastDiagKey.test.js`
@@ -1908,6 +1910,10 @@
     - `panelLiveSummary.test.js`
     - `panelMetricsExport.js` — パネル向け速報メトリクス（content メモリ → popup 直結、storage バイパス）。
     - `panelMetricsExport.test.js`
+    - `panelWakeCurtain.js` — 「黒いまま」を見せないための、いつでも出せる幕。
+    - `panelWakeCurtain.test.js`
+    - `panelWakeCurtain.wiring.test.js`
+    - `panelWakeCurtainDom.js` — 「いつでも出せる幕」の DOM 側（配線1本で使える形）。
     - `parityVerdict.js` — 3画面パリティ「①POP=②応援プレビュー=③WEBプレビュー が同一で完全か」の総合判定(純関数)。
     - `parityVerdict.test.js`
     - `parseArrivalComment.js` — ニコ生の「来場」システムメッセージ文字列をパースする純粋関数。

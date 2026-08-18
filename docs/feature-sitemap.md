@@ -570,13 +570,14 @@
 
 - **HTMLレポート生成** — マーケ/イベント順位/タイムライン等を1枚の HTML レポートに組み立てる(popup-entry 内)
   - `src/extension/popup-entry.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 39</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 40</summary>
 
 - `extension/marketing-export-guard.js` — マーケ分析タブ(marketing-export.html)の「何があっても開く」保険。
 - `scripts/build-sound-preview.mjs` — 開発用: extension/sound/ 配下の全効果音を1枚のHTMLで試聴できるページを生成する。
 - `scripts/inspect-nicolive-watch-stats.mjs` — ニコ生 watch ページの HTML から、来場・同接まわりの数値がどう埋め込まれているかを CLI で確認する。
 - `src/extension/marketing-export-entry.js` — マーケ分析レポートの別タブ化(marketing-export.html)のエントリ。
 - `src/extension/popup/report/htmlReportDocument.js` — HTMLレポート(振り返り用の保存HTML)組み立てクラスタ。
+- `src/lib/adMessageLines.js` — 広告主が入れた文字を、そのままレポートに残すための整形。
 - `src/lib/audienceEngagementGap.js` — 来場者数は多いがコメントが少ない状態を検出するローカル分析コア。
 - `src/lib/broadcastNarrativeBuilder.js` — コメント本文だけから「配信内容の流れ」を再構成する純粋関数。
 - `src/lib/broadcastReportSummary.js` — HTML レポート / マーケ分析の双方で使う「放送全体の純粋集計」。
@@ -781,7 +782,7 @@
   - `src/lib/statusTrendKey.js`
   - `src/extension/status-entry.js`
   - `src/lib/statusActionAdvisor.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 171</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 173</summary>
 
 - `app/app.js` — スマホ閲覧用 status Web 版。
 - `app/live-view.js` — global NL_BUILD_ID
@@ -885,6 +886,8 @@
 - `src/lib/openingFiveMinuteCorrelation.js` — L13: 冒頭 5 分の予兆 → ピーク CPM 相関（散布図用）。
 - `src/lib/opSoundDirector.js` — 操作音(パチンコの「玉の打ち出し」比喩・council/operation-sound-SYNTHESIS.md Phase D1)の
 - `src/lib/panelLiveSummary.js` — パネルカード用の超軽量サマリ（多タブ時の snapshot / 巨大配列 read 待ちを避ける）。
+- `src/lib/panelWakeCurtain.js` — 「黒いまま」を見せないための、いつでも出せる幕。
+- `src/lib/panelWakeCurtainDom.js` — 「いつでも出せる幕」の DOM 側（配線1本で使える形）。
 - `src/lib/parityVerdict.js` — 3画面パリティ「①POP=②応援プレビュー=③WEBプレビュー が同一で完全か」の総合判定(純関数)。
 - `src/lib/parseArrivalComment.js` — ニコ生の「来場」システムメッセージ文字列をパースする純粋関数。
 - `src/lib/parseEmbeddedDataViewerInfo.js` — v0.1.203 Patch 3: niconico watch ページの `<script id="embedded-data" data-props='{...}'>`
@@ -959,7 +962,7 @@
 
 ## 🧬 修正系譜マップ(この系統のバグを過去にどう直したか)
 
-> changelog 全 761 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
+> changelog 全 762 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
 
 ### 💾 記録件数 (99版)
 - `v0.1.1429` 2026-08-18 — 広告メッセージを記録できるか調べる計器を追加
@@ -2462,7 +2465,8 @@
 - `v0.1.840` 2026-06-20 — 機能逆引き地図を全ファイル網羅に
 - `v0.1.835` 2026-06-20 — 自己検証ゲートを追加(版同期+診断文言)
 
-### その他 (92版)
+### その他 (93版)
+- `v0.1.1432` 2026-08-18 — 広告のひとことを記録・黒画面をキャラで隠す
 - `v0.1.1424` 2026-08-17 — 前の配信の値が混ざる誤検知を修正
 - `v0.1.1423` 2026-08-17 — 中身を隠す仕組みをやめました
 - `v0.1.1421` 2026-08-17 — サイドパネルが真っ黒になるのを修正

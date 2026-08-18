@@ -7,7 +7,7 @@ import {
   buildHtmlReportDocument
 } from './popup/report/htmlReportDocument.js';
 import { makeInitialMilestoneEffectDiag, buildMilestoneEffectDiagSnapshot } from '../lib/milestoneEffectDiag.js';
-import { KEY_MILESTONE_EFFECT_DIAG } from '../lib/milestoneEffectDiagKey.js';
+import { KEY_MILESTONE_EFFECT_DIAG } from '../lib/milestoneEffectDiagKey.js'; import { installPanelWakeCurtain } from '../lib/panelWakeCurtainDom.js';
 // v0.1.1080: マイ効果音・ボイス/BGM/操作音の計器が直接 chrome.storage.local を叩くと、
 //   拡張リロード後の古い inline iframe で「Cannot read properties of undefined (reading 'local')」の
 //   同期 TypeError が uncaught のまま chrome://extensions に残る(.catch() は非同期 reject にしか
@@ -18827,10 +18827,10 @@ function dismissInitialLoadShade() {
   setTimeout(() => {
     if (shade.classList.contains('nl-init-shade--done')) return;
     shade.classList.add('nl-init-shade--done');
-    // CSS transition (220ms) 後に DOM から外す
+    // ★v0.1.1432: DOM から外さない(外すと二度と出せず、あとで黒くなっても覆えない)。畳むだけ。
     setTimeout(() => {
       try {
-        shade.remove();
+        shade.setAttribute('hidden', '');
       } catch {
         // no-op
       }
@@ -19867,7 +19867,7 @@ async function initPopup() {
     );
     if (frameThemeDetails) frameThemeDetails.open = true;
   }
-  window.addEventListener('resize', applyResponsivePopupLayout);
+  window.addEventListener('resize', applyResponsivePopupLayout); installPanelWakeCurtain({ countTiles: () => countStoryUserLaneDomTiles(getStoryUserLaneEls()) });
   // ★v0.1.1284: リサイズは【内容アドレスで検出できない唯一の経路】(中身不変のまま寸法だけ変わる)。
   //   控えを捨てて未計測へ降格させる=会場は「①DOM未計測 ⚪」で fail-closed(嘘の緑を出さない)。
   window.addEventListener('resize', () => {
