@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 6 / 806 件
+## ⚠️ 役割コメントが無いソース 6 / 807 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `src/lib/laneDomSelfMeasure.js`
@@ -721,7 +721,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (1757)
+- 📁 **src/** (1759)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1018,7 +1018,7 @@
         - `logo_funlink_white_RGB_maru_black.png`
       - `logo_guide_funlink_ol.pdf`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1510)
+  - 📁 **lib/** (1512)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -2152,6 +2152,8 @@
     - `sidepanelSelfDiagOverlay.wiring.test.js`
     - `sidepanelSelfDiagPipeline.test.js`
     - `sidepanelThemeColorParity.test.js`
+    - `sidepanelUnderlay.js` — サイドパネルの【下敷き】。黒の代わりに地の色を見せる。
+    - `sidepanelUnderlay.test.js`
     - `sidepanelVisibilityCatchup.wiring.test.js`
     - `sidepanelZeroArea.test.js`
     - `silentFailureCells.js` — 【無音で死ぬ】故障を画面に出すセル(純関数)。
