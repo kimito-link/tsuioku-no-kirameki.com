@@ -499,21 +499,42 @@ async function runRound(members, taskText, extraContextFor = null) {
 // 2026-07-03 設計: 分類器専任のllama-3.1-8b-instant。1語JSONを返すだけの仕事にfast主力の
 // TPD(1日トークン上限)を使うのは浪費（2026-07-04実測でllama-3.3-70bがTPD枯渇した一因）。
 // 正規メンバー(allMembers)には入れない＝動的ルーティングの穴埋め候補にはならない。
-const classifierOnly = G
-  ? { label: 'groq/llama-3.1-8b-instant', run: (p, s) => openaiChat(GROQ, G, 'llama-3.1-8b-instant', p, s) }
-  : null;
+//
+// 2026-08-18 撤去（llama-3.1-8b-instant の専任枠）: GroqがLlama系を一斉廃止し404になった。
+//  ★このとき「フォールバック鎖の2番目に生存モデル(gemini-2.5-flash)が居るのに、全ての問いが
+//    generalへ落ち続ける」という症状が出た。真因はモデルの死ではなく下の classify() の構造で、
+//    `classifierOnly || order...` は **GROQ_API_KEYがある限り常に左辺が真** になるため、
+//    order配列（鎖）が一度も評価されなかった。＝専任モデルが死んだ瞬間、鎖は無意味な飾りになり
+//    catch で general に固定される設計だった（会議のルーティングが丸ごと死ぬ単一障害点）。
+//  ★教訓: フォールバック鎖の「手前に無条件の固定枠」を置くと、鎖は永久に歩かれない。
+//    専任という最適化（TPD節約）のために、可用性を落としていた。
+//  対処: 専任という概念自体を捨て、下の classify() を「候補を順に試し、最初に成功した1体を使う」
+//    実挙動に変えた。TPD節約の当初目的は、鎖の先頭を軽量モデルにすることで達成できる。
 
-/** 分類器: 最速の利用可能メンバー1体にカテゴリを聞く。失敗時は general。 */
+/** 分類器: 候補を順に試し、最初に成功した1体の判定を使う。全滅時のみ general。
+ *  2026-08-18改修: 従来は先頭1体に固定で、それが死ぬと鎖を歩かず general に落ち続けた。
+ *  鎖の順序は「軽い順・別プロバイダを跨ぐ順」——1語のJSONを返すだけの仕事に重い主力の
+ *  レート枠を使わないという当初の意図を、専任枠ではなく順序で表現する。 */
 async function classify(taskText) {
-  const order = ['groq/llama-3.3-70b', 'gemini-2.5-flash', 'groq/gpt-oss-120b', 'local/qwen3.5:9b'];
-  const classifier = classifierOnly || order.map(l => allMembers.find(m => m.label === l)).find(Boolean) || allMembers[0];
-  if (!classifier) return { category: 'general', by: '(none)', raw: '' };
-  try {
-    const raw = await classifier.run(classifyPrompt(taskText), '');
-    return { category: parseCategory(raw), by: classifier.label, raw: raw.slice(0, 160) };
-  } catch (e) {
-    return { category: 'general', by: classifier.label + ' [FAILED]', raw: String(e?.message || e).slice(0, 120) };
+  const order = ['gemini-2.5-flash', 'groq/gpt-oss-20b', 'groq/gpt-oss-120b', 'local/qwen3.5:9b'];
+  const cands = order.map(l => allMembers.find(m => m.label === l)).filter(Boolean);
+  if (!cands.length && allMembers.length) cands.push(allMembers[0]);
+  if (!cands.length) return { category: 'general', by: '(none)', raw: '' };
+  let lastErr = '';
+  for (const c of cands) {
+    try {
+      const raw = await c.run(classifyPrompt(taskText), '');
+      const category = parseCategory(raw);
+      return { category, by: c.label, raw: String(raw).slice(0, 160) };
+    } catch (e) {
+      lastErr = String(e?.message || e).slice(0, 120);
+      console.error(`[分類器] ${c.label} が失敗 → 次の候補へ（${lastErr}）`);
+      noteEvent('classifier-failed', { label: c.label, error: lastErr });
+    }
   }
+  // 全滅時のみ general。従来はここに「1体でも死ねば」到達していた。
+  noteEvent('classifier-none', { tried: cands.length });
+  return { category: 'general', by: '(all failed)', raw: lastErr };
 }
 
 /** 結果配列を整形して標準出力へ。 */
