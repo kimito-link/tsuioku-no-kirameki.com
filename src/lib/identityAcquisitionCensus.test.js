@@ -112,17 +112,39 @@ describe('countIdentityAcquisition — 「取れない」と「取れなかっ�
 });
 
 describe('formatIdentityAcquisitionLine — 読んで次の一手が決まる', () => {
-  it('★全員匿名は「対象なし」と言う(赤くしない)', () => {
+  it('★全員匿名でも赤くしない(守る価値は維持)', () => {
     /*
      * 赤くすると、匿名中心の配信では永久に赤=読んでも直せない計器になる
-     * ([[instrument-value-is-measured-by-fixes-2026-08-12]])。
+     * ([[instrument-value-is-measured-by-fixes-2026-08-12]])。★この価値は維持する。
+     *
+     * ★v1(2026-08-17)で文言だけ変えた: 旧実装は「対象なし(…数値IDもサムネも
+     *   【仕様上ありません】)」と書いていたが、この【仕様上ありません】は誤りだった。
+     *   実機で匿名(a:)に個人サムネと本人設定の表示名が出ていることを確認済み。
+     *   ＝「赤くしない」は守り、「仕様上無い」という嘘だけをやめる。
      */
     const line = formatIdentityAcquisitionLine(
       countIdentityAcquisition([{ userId: 'a:1' }, { userId: 'a:2' }])
     );
-    expect(line).toContain('対象なし');
-    expect(line).toContain('仕様');
+    expect(line).toContain('数値IDの人がいません');
     expect(line).not.toContain('🔴');
+    // ★誤った前提の文言が復活したら赤にする
+    expect(line).not.toContain('仕様上ありません');
+  });
+
+  it('★全員匿名でも、匿名側の保有(サムネ/名前)を必ず数字で出す', () => {
+    /*
+     * 旧実装はここで素通りしていたため「匿名にサムネ/名前があるか」を
+     * 誰も答えられなかった＝前提の誤りを検出できない計器だった。
+     */
+    const line = formatIdentityAcquisitionLine(
+      countIdentityAcquisition([
+        { userId: 'a:1', rawNickname: 'メデタセット', thumbScore: 2, avatarObserved: true },
+        { userId: 'a:2', rawNickname: '', thumbScore: 0 }
+      ])
+    );
+    expect(line).toContain('匿名2人のうち');
+    expect(line).toContain('サムネ観測1人');
+    expect(line).toContain('本人名1人');
   });
 
   it('誰も居ないときは「未観測」(異常なしと言わない)', () => {
@@ -150,7 +172,28 @@ describe('formatIdentityAcquisitionLine — 読んで次の一手が決まる', 
       ])
     );
     expect(line).toContain('対象1人');
-    expect(line).toContain('匿名1人は対象外');
+    expect(line).toContain('匿名1人は分母外');
+  });
+
+  it('★実稼働の率(画面の全員が分母)も併記する', () => {
+    /*
+     * 実機(2026-08-17)は55人中51人が匿名で、同じ状態が【100%】とも【7.3%】とも
+     * 書けた。期待値だけ出すと「ほぼ完璧に取れている」と誤読される
+     * ＝ユーザー「正確なデータをださないといみがない」。
+     */
+    const line = formatIdentityAcquisitionLine(
+      countIdentityAcquisition([
+        { userId: 'a:1' },
+        { userId: 'a:2' },
+        { userId: 'a:3' },
+        { userId: '11111', nickname: '太郎', rawNickname: '太郎', thumbScore: 2 }
+      ])
+    );
+    expect(line).toContain('期待値');
+    expect(line).toContain('実稼働');
+    // 期待値は100%(1/1)だが、実稼働は25%(1/4)
+    expect(line).toContain('両方100%');
+    expect(line).toContain('両方25%');
   });
 
   it('全員そろっていれば ✅ と明示する', () => {

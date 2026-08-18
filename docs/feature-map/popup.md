@@ -20,6 +20,7 @@ graph LR
   n_popup --> n_src_domain_lane_columns_kontaPolicy_js["domain/lane/columns/kontaPolicy.js"]:::shared
   n_popup --> n_src_domain_lane_columns_linkPolicy_js["domain/lane/columns/linkPolicy.js"]:::shared
   n_popup --> n_src_domain_lane_columns_tanuPolicy_js["domain/lane/columns/tanuPolicy.js"]:::shared
+  n_popup --> n_src_domain_lane_evidence_js["domain/lane/evidence.js"]
   n_popup --> n_src_domain_lane_tier_js["domain/lane/tier.js"]:::shared
   n_popup --> n_src_domain_user_avatar_js["domain/user/avatar.js"]
   n_popup --> n_src_domain_user_identity_js["domain/user/identity.js"]:::shared
@@ -27,6 +28,7 @@ graph LR
   n_popup --> n_src_extension_popup_attachAiDiagButtonHandler_js["extension/popup/attachAiDiagButtonHandler.js"]
   n_popup --> n_src_extension_popup_renderAcquisitionDashboard_js["extension/popup/renderAcquisitionDashboard.js"]
   n_popup --> n_src_extension_popup_report_htmlReportDocument_js["extension/popup/report/htmlReportDocument.js"]
+  n_popup --> n_src_extension_story_laneContentLod_js["extension/story/laneContentLod.js"]:::shared
   n_popup --> n_src_extension_story_renderStoryUserLaneDom_js["extension/story/renderStoryUserLaneDom.js"]:::shared
   n_popup --> n_src_lib_acquisitionDashboardChart_js["lib/acquisitionDashboardChart.js"]
   n_popup --> n_src_lib_adLanePicksFromRooms_js["lib/adLanePicksFromRooms.js"]
@@ -51,9 +53,7 @@ graph LR
   n_popup --> n_src_lib_bgmDirector_js["lib/bgmDirector.js"]:::shared
   n_popup --> n_src_lib_bgmPhaseDiag_js["lib/bgmPhaseDiag.js"]:::shared
   n_popup --> n_src_lib_bgmPhaseDiagKey_js["lib/bgmPhaseDiagKey.js"]:::shared
-  n_popup --> n_src_lib_blobDownload_js["lib/blobDownload.js"]
-  n_popup --> n_src_lib_broadcastCrossCompare_js["lib/broadcastCrossCompare.js"]
   classDef shared fill:#eee,stroke:#999,color:#666;
 ```
 
-> ほか 391 ファイル省略（全件は storage-bus.md / metafile 参照）。
+> ほか 393 ファイル省略（全件は storage-bus.md / metafile 参照）。

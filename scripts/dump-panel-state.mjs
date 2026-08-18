@@ -37,9 +37,21 @@ const EXT_DIR = path.join(repoRoot, 'extension');
 const OUT_DIR = path.join(repoRoot, '.auth');
 const OUT_FILE = path.join(OUT_DIR, 'panel-state.json');
 
-/** 吸い出す価値のあるキーだけに絞る（全部だと数十MBになりうる）。 */
+/**
+ * 吸い出す価値のあるキーだけに絞る（全部だと数十MBになりうる）。
+ *
+ * ★2026-08-17: `nls_cchunk_` を追加。**コメント本体の正本はチャンク形式**
+ *   (`nls_cchunk_<lv>_<seq>` + `nls_cchunk_index_<lv>`・src/lib/commentChunkStore.js)。
+ *   接頭辞は `nls_comments_` と【意図的に衝突させていない】(commentChunkStore.js:16)ため、
+ *   `nls_comments_` だけを列挙していた旧実装は **本体を1件も吸い出せなかった**。
+ *   旧 `nls_comments_<lv>` は移行後もバックアップとして残るが新規行は入らない
+ *   (commentChunkStore.js:21)＝空に近い配列だけを取って「取れた」と誤認する状態だった。
+ *   ★これに気づいたきっかけ: 「匿名にサムネ/名前があるか」を実データで数えようとして、
+ *     吸い出し結果に本体が無いと判明した(仕様見直し会議 2026-08-17)。
+ */
 const KEY_PREFIXES = [
   'nls_comments_',
+  'nls_cchunk_',
   'nls_ctail_',
   'nls_summary_',
   'nls_watch_snapshot',

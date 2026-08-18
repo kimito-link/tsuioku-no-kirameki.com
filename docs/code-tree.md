@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 6 / 795 件
+## ⚠️ 役割コメントが無いソース 6 / 797 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `src/lib/laneDomSelfMeasure.js`
@@ -169,7 +169,7 @@
     - `2026-07-22.md`
     - `2026-07-23.md`
     - `2026-07-31.md`
-- 📁 **docs/** (295)
+- 📁 **docs/** (300)
   - 📁 **article-assets/** (87)
     - 📁 **venue-frames/** (12)
       - `f01.png`
@@ -279,7 +279,7 @@
     - `storage-bus.md`
     - `venue.md`
     - `web-status.md`
-  - 📁 **handoff/** (131)
+  - 📁 **handoff/** (136)
     - 📁 **bench/** (2)
       - `bench-interval.mjs` — ⚠️ 役割コメント無し
       - `bench-lane.mjs` — ⚠️ 役割コメント無し
@@ -296,6 +296,7 @@
     - `HANDOFF-2026-08-17-NEXT.md`
     - `HANDOFF-2026-08-17-comment-delay-investigation.md`
     - `HANDOFF-2026-08-17-sidepanel-black-NEXT.md`
+    - `HANDOFF-2026-08-18-NEXT.md`
     - `HANDOFF-backfill-instant-restore.md`
     - `HANDOFF-broadcast-score-panel.md`
     - `HANDOFF-comment-pickup-bsp.md`
@@ -369,8 +370,10 @@
     - `health-cells-4domains-IMPLEMENTATION-HANDOFF.md`
     - `instruments-100-WAYFINDER-2026-08-15.md`
     - `instruments-100-council-BRIEF-2026-08-15.md`
+    - `lane-content-lod-DESIGN.md`
     - `lane-shrink-guard-council-MATERIAL.md`
     - `lane-shrink-guard-council-MINUTES.md`
+    - `lane-tier-evidence-DESIGN.md`
     - `lanescene-structural-review-DESIGN.md`
     - `lanescene-structural-review-IMPLEMENTATION-HANDOFF.md`
     - `marketing-export-tab-IMPLEMENTATION-HANDOFF.md`
@@ -386,6 +389,8 @@
     - `side-panel-spike-HOWTO.md`
     - `sidepanel-black-council-MATERIAL.md`
     - `sidepanel-black-council-MINUTES.md`
+    - `sidepanel-width-DESIGN.md`
+    - `sidepanel-width-IMPLEMENTATION-HANDOFF.md`
     - `snippet-manager-clibor-parity-synthesis.md`
     - `sound-optimization-DESIGN.md`
     - `status-diag-608s-freeze-DESIGN.md`
@@ -712,7 +717,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (1733)
+- 📁 **src/** (1738)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -724,14 +729,16 @@
       - `laneStore.js` — 応援ユーザーレーンの単一 store。
       - `laneStore.test.js`
     - `laneDualPathParity.characterization.test.js`
-  - 📁 **domain/** (18)
-    - 📁 **lane/** (7)
+  - 📁 **domain/** (20)
+    - 📁 **lane/** (9)
       - 📁 **columns/** (3)
         - `kontaPolicy.js` — こん太段（konta）の配属 policy — 過渡状態 catchall。
         - `linkPolicy.js` — りんく段（link）の配属 policy。
         - `tanuPolicy.js` — たぬ姉段（tanu）の配属 policy。
       - `aggregate.js` — 応援ユーザーレーンの per-row → per-user 集約（純関数）。
       - `aggregate.test.js`
+      - `evidence.js` — 応援レーンの「確定度(evidence)」判定。
+      - `evidence.test.js`
       - `tier.js` — 応援ユーザーレーンの tier（段）決定。
       - `tier.test.js`
     - 📁 **observations/** (5)
@@ -747,7 +754,7 @@
       - `avatarResolver.test.js`
       - `identity.js` — ニコ生ユーザー ID の「匿名性」判定と関連アイデンティティ・ユーティリティ。
       - `nickname.js` — 表示名（ニックネーム）の「強弱」判定。
-  - 📁 **extension/** (43)
+  - 📁 **extension/** (45)
     - 📁 **popup/** (6)
       - 📁 **report/** (2)
         - `htmlReportDocument.js` — HTMLレポート(振り返り用の保存HTML)組み立てクラスタ。
@@ -756,7 +763,9 @@
       - `attachAiDiagButtonHandler.test.js`
       - `renderAcquisitionDashboard.js` — renderAcquisitionDashboard — 開発者モニタの「データ取得率」ダッシュボードを描く。
       - `renderAcquisitionDashboard.test.js`
-    - 📁 **story/** (3)
+    - 📁 **story/** (5)
+      - `laneContentLod.js` — 応援レーンの【中身LOD】— 枠は残す。中身だけ空にする。
+      - `laneContentLod.test.js`
       - `laneShrinkScenario.test.js`
       - `renderStoryUserLaneDom.js` — 応援ユーザーレーン DOM の同期（popup-entry から切り出し・状態は引数で受け取る）。
       - `renderStoryUserLaneDom.test.js`
@@ -1005,7 +1014,7 @@
         - `logo_funlink_white_RGB_maru_black.png`
       - `logo_guide_funlink_ol.pdf`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1490)
+  - 📁 **lib/** (1491)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -1627,6 +1636,7 @@
     - `kokenGiftHistoryApi.js` — koken 公式「ギフト履歴（個別イベント）」無認証 JSON API の URL 組立 & 正規化（純関数）。
     - `kokenGiftHistoryApi.test.js`
     - `kokenGiftHistoryFetchClient.js` — popup / content から service-worker 経由で koken ギフト履歴 API を叩く薄いクライアント。
+    - `laneContentLod.wiring.test.js`
     - `laneDensityLod.wiring.test.js`
     - `laneDetailCells.js` — 応援レーンの観測を【打ち手が変わる単位】に割る(純関数)。
     - `laneDetailCells.test.js`
@@ -2512,12 +2522,12 @@
   - 📁 **sound/** (1)
     - `yozora-small-yell.mp3`
   - `speech-recognition-globals.d.ts` — Web Speech API（Chrome は webkit 接頭辞のことがある）
-- 📁 **tests/** (79)
+- 📁 **tests/** (80)
   - 📁 **contract/** (3)
     - `layer-dependency.test.js`
     - `popupEntryFunctionBudget.test.js`
     - `wiringTestSource.test.js`
-  - 📁 **e2e/** (75)
+  - 📁 **e2e/** (76)
     - 📁 **fixtures/** (1)
       - 📁 **watch/** (1)
         - 📁 **lv888888888/** (1)
@@ -2584,6 +2594,7 @@
     - `save-ctx-invalidated-recovery.spec.js`
     - `sidepanel-first-byte-paint.spec.js`
     - `sidepanel-flash-capture.spec.js`
+    - `sidepanel-lane-stability-monkey.spec.js`
     - `smoke.spec.js`
     - `snapshot-fetch-hang-resilient.spec.js`
     - `storage-banners.spec.js`

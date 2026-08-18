@@ -300,7 +300,7 @@
   - `src/lib/giftThrowProjectile.js`
 - **吹き出し寿命管理** — 会場の吹き出しの表示上限・追い出し(eviction)ライフサイクル
   - `src/lib/venueBubbleLifecycle.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 224</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 226</summary>
 
 - `scripts/encode-marketing-html-avatars.mjs` — extension/images/marketing-html-avatars/*.png を data URI にし、
 - `scripts/split-avatar-parts.mjs` — 偽市松背景の除去 + パーツ切り出し(one-off アセットパイプライン)
@@ -310,11 +310,13 @@
 - `src/domain/lane/columns/kontaPolicy.js` — こん太段（konta）の配属 policy — 過渡状態 catchall。
 - `src/domain/lane/columns/linkPolicy.js` — りんく段（link）の配属 policy。
 - `src/domain/lane/columns/tanuPolicy.js` — たぬ姉段（tanu）の配属 policy。
+- `src/domain/lane/evidence.js` — 応援レーンの「確定度(evidence)」判定。
 - `src/domain/lane/tier.js` — 応援ユーザーレーンの tier（段）決定。
 - `src/domain/user/avatar.js` — ユーザーのアバター観測信号と表示 URL を 1 箇所で組み立てる純関数。
 - `src/domain/user/avatarResolver.js` — アバター解決の単一エントリポイント（Hoshino-Romi 流 single component）。
 - `src/domain/user/nickname.js` — 表示名（ニックネーム）の「強弱」判定。
 - `src/extension/popup/renderAcquisitionDashboard.js` — renderAcquisitionDashboard — 開発者モニタの「データ取得率」ダッシュボードを描く。
+- `src/extension/story/laneContentLod.js` — 応援レーンの【中身LOD】— 枠は残す。中身だけ空にする。
 - `src/extension/story/renderStoryUserLaneDom.js` — 応援ユーザーレーン DOM の同期（popup-entry から切り出し・状態は引数で受け取る）。
 - `src/extension/venue-entry.js` — 会場モード(standalone)のエントリ。venueBar をページに mount するだけの薄い起動点。
 - `src/extension/venueBar.js` — 会場モード UI 本体。観客の席割り・群衆・吹き出し・ギフト演出・読み上げ連動を描く。
@@ -956,7 +958,7 @@
 
 ## 🧬 修正系譜マップ(この系統のバグを過去にどう直したか)
 
-> changelog 全 755 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
+> changelog 全 756 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
 
 ### 💾 記録件数 (98版)
 - `v0.1.1407` 2026-08-16 — 診断を74→85項目に。読み上げと公式値の原因を分離
@@ -1306,7 +1308,8 @@
 - `v0.1.668` 2026-06-10 — パネルに「💬コメビュ」ボタンを追加
 - `v0.1.667` 2026-06-10 — コメビュに匿名OKのニックネーム・ラベル・メモ
 
-### 🏟 会場・席 (245版)
+### 🏟 会場・席 (246版)
+- `v0.1.1426` 2026-08-18 — 応援レーンの動作を軽くしました
 - `v0.1.1425` 2026-08-17 — 会場モードが古い内容のままになるのを修正
 - `v0.1.1422` 2026-08-17 — 会場モードがONのままになるのを修正
 - `v0.1.1413` 2026-08-16 — 診断・会場・コメビュが黒くなるのを修正
@@ -1796,7 +1799,8 @@
 - `v0.1.699` 2026-06-12 — 読み上げの名前ON/OFF切替を追加
 - `v0.1.698` 2026-06-12 — コメビュにユーザー別の声で読み上げ機能を追加
 
-### 🪟 応援レーン・タイル (180版)
+### 🪟 応援レーン・タイル (181版)
+- `v0.1.1426` 2026-08-18 — 応援レーンの動作を軽くしました
 - `v0.1.1419` 2026-08-17 — サイドパネルの応援レーンが空になるのを修正
 - `v0.1.1406` 2026-08-15 — 診断を63→74項目に増やし、レーンを3枠に分けました
 - `v0.1.1400` 2026-08-15 — 診断項目を40→54に増やし、枠も14に増やしました
@@ -1978,7 +1982,8 @@
 - `v0.1.673` 2026-06-10 — コメビュの名前をパネルと同じ情報源で補完
 - `v0.1.670` 2026-06-10 — コメビュのアイコンを本家と同じサムネに
 
-### 🩺 診断・状態速報 (289版)
+### 🩺 診断・状態速報 (290版)
+- `v0.1.1426` 2026-08-18 — 応援レーンの動作を軽くしました
 - `v0.1.1416` 2026-08-17 — コメント遅れの原因を絞り込めるように
 - `v0.1.1415` 2026-08-16 — 診断の読み取りを1本にまとめました
 - `v0.1.1414` 2026-08-16 — サイドパネルの黒さと、前版で増えた書き込みを修正

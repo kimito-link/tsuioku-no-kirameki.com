@@ -19,6 +19,7 @@ graph LR
   n_venue --> n_src_domain_lane_tier_js["domain/lane/tier.js"]:::shared
   n_venue --> n_src_domain_user_identity_js["domain/user/identity.js"]:::shared
   n_venue --> n_src_domain_user_nickname_js["domain/user/nickname.js"]:::shared
+  n_venue --> n_src_extension_story_laneContentLod_js["extension/story/laneContentLod.js"]:::shared
   n_venue --> n_src_extension_story_renderStoryUserLaneDom_js["extension/story/renderStoryUserLaneDom.js"]:::shared
   n_venue --> n_src_extension_venueBar_js["extension/venueBar.js"]:::shared
   n_venue --> n_src_lib_anomalyVerdict_js["lib/anomalyVerdict.js"]:::shared
@@ -52,8 +53,7 @@ graph LR
   n_venue --> n_src_lib_highlightLedger_js["lib/highlightLedger.js"]:::shared
   n_venue --> n_src_lib_highlightLedgerKey_js["lib/highlightLedgerKey.js"]:::shared
   n_venue --> n_src_lib_htmlEscape_js["lib/htmlEscape.js"]:::shared
-  n_venue --> n_src_lib_laneMirror_js["lib/laneMirror.js"]:::shared
   classDef shared fill:#eee,stroke:#999,color:#666;
 ```
 
-> ほか 93 ファイル省略（全件は storage-bus.md / metafile 参照）。
+> ほか 94 ファイル省略（全件は storage-bus.md / metafile 参照）。
