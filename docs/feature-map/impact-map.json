@@ -3322,16 +3322,6 @@
       ]
     },
     {
-      "file": "src/domain/ad/advertiserNameReading.js",
-      "featureCount": 1,
-      "features": [
-        "popup"
-      ],
-      "labels": [
-        "ポップアップ(応援レーン)"
-      ]
-    },
-    {
       "file": "src/domain/lane/aggregate.js",
       "featureCount": 1,
       "features": [
