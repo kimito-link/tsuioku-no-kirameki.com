@@ -393,7 +393,16 @@ import {
     //   計測のみ（挙動変更なし）。実配信で es/er/et が増えれば NDGR から取れている証拠。
     eventScore: 0,
     eventRank: 0,
-    eventTitle: 0
+    eventTitle: 0,
+    /*
+     * ★v0.1.1429 観測PR(2026-08-18 ユーザー確定「広告はメッセージが送れるのが価値」):
+     *   広告/ギフトの生データに【本文】が乗っているかを数えるだけ。挙動は変えない。
+     *   gm=本文ありの件数 / gmk=どのフィールド名で来たか / gml=最大文字数。
+     *   ★これが 0 なら生データからは記録できない=画面(広告ページ)を読む方式に切り替える。
+     */
+    giftsMsg: 0,
+    giftsMsgKey: '',
+    giftsMsgMaxLen: 0
   };
 
   /**
@@ -650,6 +659,15 @@ import {
       if (g.itemId || g.itemName) _ndgr.giftsItem++;
       if (typeof g.point === 'number') _ndgr.giftsPoint++;
       if (typeof g.contributionRank === 'number') _ndgr.giftsRank++;
+      // ★v0.1.1429 観測のみ: 本文らしきフィールドが乗っているか(候補キーを順に見る)。
+      for (const mk of ['message', 'adMessage', 'advertiserMessage', 'comment', 'body', 'text']) {
+        const mv = g[mk];
+        if (typeof mv !== 'string' || !mv.trim()) continue;
+        _ndgr.giftsMsg++;
+        if (!_ndgr.giftsMsgKey) _ndgr.giftsMsgKey = mk;
+        if (mv.trim().length > _ndgr.giftsMsgMaxLen) _ndgr.giftsMsgMaxLen = mv.trim().length;
+        break;
+      }
       if (uid) learnUser(uid, name, '');
       giftUsers.push({
         userId: uid,
@@ -729,7 +747,9 @@ import {
           ` gu=${_ndgr.giftsUid} gn=${_ndgr.giftsName} gi=${_ndgr.giftsItem}` +
           ` gp=${_ndgr.giftsPoint} gr=${_ndgr.giftsRank}` +
           // v0.1.397 観測PR: es=eventScore er=eventRank et=eventTitle の出現回数。
-          ` es=${_ndgr.eventScore} er=${_ndgr.eventRank} et=${_ndgr.eventTitle}`
+          ` es=${_ndgr.eventScore} er=${_ndgr.eventRank} et=${_ndgr.eventTitle}` +
+          // ★v0.1.1429 観測PR: gm=本文あり件数 gmk=フィールド名 gml=最大文字数
+          ` gm=${_ndgr.giftsMsg} gmk=${_ndgr.giftsMsgKey || '-'} gml=${_ndgr.giftsMsgMaxLen}`
       );
     }
     publishNdgrTagHistogram();
