@@ -1806,6 +1806,18 @@
       ]
     },
     {
+      "file": "src/lib/adMessageLines.js",
+      "featureCount": 2,
+      "features": [
+        "popup",
+        "status"
+      ],
+      "labels": [
+        "ポップアップ(応援レーン)",
+        "状態速報ページ"
+      ]
+    },
+    {
       "file": "src/lib/aiSharePopupDiagKey.js",
       "featureCount": 2,
       "features": [
@@ -6283,6 +6295,26 @@
     },
     {
       "file": "src/lib/paintTopSupportRankStyleIntoElement.js",
+      "featureCount": 1,
+      "features": [
+        "popup"
+      ],
+      "labels": [
+        "ポップアップ(応援レーン)"
+      ]
+    },
+    {
+      "file": "src/lib/panelWakeCurtain.js",
+      "featureCount": 1,
+      "features": [
+        "popup"
+      ],
+      "labels": [
+        "ポップアップ(応援レーン)"
+      ]
+    },
+    {
+      "file": "src/lib/panelWakeCurtainDom.js",
       "featureCount": 1,
       "features": [
         "popup"

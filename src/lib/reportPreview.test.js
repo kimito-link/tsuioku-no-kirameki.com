@@ -274,3 +274,23 @@ describe('buildReportPreviewLines(速報行の整形)', () => {
     expect(line).toBe('レポート内容(保存前): 本文コメント 5');
   });
 });
+
+describe('★広告でひとこと(原文をそのまま残す・2026-08-18)', () => {
+  it('adRows を渡すとレポート本文に出る(通し確認)', () => {
+    const line = buildReportPreviewLines({
+      totalComments: 10,
+      adRows: [
+        { name: 'コメリにも１６ｃｍ自慢行くの？', contribution: 22152 },
+        { name: 'いっくん応援団', contribution: 8099 }
+      ]
+    });
+    expect(line).toContain('広告でひとこと');
+    expect(line).toContain('コメリにも１６ｃｍ自慢行くの？');
+    expect(line).toContain('いっくん応援団');   // ★仕分けないので埋もれない
+  });
+
+  it('広告が無い配信では1行も増えない(ノイズにしない)', () => {
+    const line = buildReportPreviewLines({ totalComments: 10 });
+    expect(line).not.toContain('広告でひとこと');
+  });
+});
