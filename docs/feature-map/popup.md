@@ -16,7 +16,6 @@ graph LR
   n_popup --> n_src_data_acquirers_laneFromStorage_js["data/acquirers/laneFromStorage.js"]
   n_popup --> n_src_data_sources_laneFromStoredComments_js["data/sources/laneFromStoredComments.js"]
   n_popup --> n_src_data_store_laneStore_js["data/store/laneStore.js"]
-  n_popup --> n_src_domain_ad_advertiserNameReading_js["domain/ad/advertiserNameReading.js"]
   n_popup --> n_src_domain_lane_aggregate_js["domain/lane/aggregate.js"]
   n_popup --> n_src_domain_lane_columns_kontaPolicy_js["domain/lane/columns/kontaPolicy.js"]:::shared
   n_popup --> n_src_domain_lane_columns_linkPolicy_js["domain/lane/columns/linkPolicy.js"]:::shared
@@ -53,7 +52,8 @@ graph LR
   n_popup --> n_src_lib_bandScaleBoot_js["lib/bandScaleBoot.js"]
   n_popup --> n_src_lib_bgmDirector_js["lib/bgmDirector.js"]:::shared
   n_popup --> n_src_lib_bgmPhaseDiag_js["lib/bgmPhaseDiag.js"]:::shared
+  n_popup --> n_src_lib_bgmPhaseDiagKey_js["lib/bgmPhaseDiagKey.js"]:::shared
   classDef shared fill:#eee,stroke:#999,color:#666;
 ```
 
-> ほか 394 ファイル省略（全件は storage-bus.md / metafile 参照）。
+> ほか 393 ファイル省略（全件は storage-bus.md / metafile 参照）。

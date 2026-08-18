@@ -781,7 +781,7 @@
   - `src/lib/statusTrendKey.js`
   - `src/extension/status-entry.js`
   - `src/lib/statusActionAdvisor.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 172</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 171</summary>
 
 - `app/app.js` — スマホ閲覧用 status Web 版。
 - `app/live-view.js` — global NL_BUILD_ID
@@ -812,7 +812,6 @@
 - `scripts/sync-lp-twitter-icon.mjs` — LP 右端コラボ用: src/images/icon/twitter-icon.png → extension/images/lp/twitter-icon.png
 - `scripts/vendor-visual-explainer.mjs` — Vendors nicobailon/visual-explainer (MIT) into .cursor/skills/visual-explainer/
 - `scripts/write-extension-placeholder-icons.mjs` — リポジトリに 256px アイコンしか無い環境向け: manifest 用の小さめ PNG を生成する。
-- `src/domain/ad/advertiserNameReading.js` — 広告主名の欄にある文字列を「名前」「広告メッセージ」「判定不能」に読み分ける純関数。
 - `src/extension/cloak-failsafe-entry.js` — 幕(cloak)を外す【最速の保険】だけを担う極小エントリ。
 - `src/extension/offscreen-entry.js` — feat/multitab-scale-globalcap（2026-05-31）: コメント IDB の「常駐・単一書き手」を担う
 - `src/lib/adMessageCensus.js` — 「広告/ギフトの生データに【メッセージ】が入っているか」を数えるだけの計器。
@@ -960,7 +959,7 @@
 
 ## 🧬 修正系譜マップ(この系統のバグを過去にどう直したか)
 
-> changelog 全 760 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
+> changelog 全 761 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
 
 ### 💾 記録件数 (99版)
 - `v0.1.1429` 2026-08-18 — 広告メッセージを記録できるか調べる計器を追加
@@ -1063,7 +1062,8 @@
 - `v0.1.672` 2026-06-10 — コメビュの二重表示の残りを根治
 - `v0.1.665` 2026-06-10 — 長い配信が7割等で止まったままになるのを根治
 
-### 📥 コメント取得 (177版)
+### 📥 コメント取得 (178版)
+- `v0.1.1431` 2026-08-18 — 広告の文字を勝手に仕分けるのをやめました
 - `v0.1.1414` 2026-08-16 — サイドパネルの黒さと、前版で増えた書き込みを修正
 - `v0.1.1412` 2026-08-16 — ニコ生の作りが変わる前に気づく仕組みを追加
 - `v0.1.1408` 2026-08-16 — 診断項目が100個になりました（19の枠に分類）
@@ -1242,7 +1242,8 @@
 - `v0.1.664` 2026-06-10 — 複数タブ並列取得を安全に(重い時は自動で絞る)
 - `v0.1.663` 2026-06-06 — 複数タブでも過去ログを並行して一気に取れるように(2配信まで)
 
-### 🙂 匿名(184) (67版)
+### 🙂 匿名(184) (68版)
+- `v0.1.1431` 2026-08-18 — 広告の文字を勝手に仕分けるのをやめました
 - `v0.1.1408` 2026-08-16 — 診断項目が100個になりました（19の枠に分類）
 - `v0.1.1388` 2026-08-14 — 状態ページが開かない問題の修正と、症状別の判定を画面に表示
 - `v0.1.1378` 2026-08-12 — サムネ・ID・名前がどれだけ取れているか出すように

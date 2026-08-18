@@ -374,7 +374,6 @@
 | `src/data/acquirers/laneFromStorage.js` | 1 | ポップアップ(応援レーン) |
 | `src/data/sources/laneFromStoredComments.js` | 1 | ポップアップ(応援レーン) |
 | `src/data/store/laneStore.js` | 1 | ポップアップ(応援レーン) |
-| `src/domain/ad/advertiserNameReading.js` | 1 | ポップアップ(応援レーン) |
 | `src/domain/lane/aggregate.js` | 1 | ポップアップ(応援レーン) |
 | `src/domain/lane/evidence.js` | 1 | ポップアップ(応援レーン) |
 | `src/domain/observations/vocabulary.js` | 1 | 状態速報ページ |

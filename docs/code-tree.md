@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 6 / 799 件
+## ⚠️ 役割コメントが無いソース 6 / 798 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `src/lib/laneDomSelfMeasure.js`
@@ -718,7 +718,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (1746)
+- 📁 **src/** (1743)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -730,10 +730,7 @@
       - `laneStore.js` — 応援ユーザーレーンの単一 store。
       - `laneStore.test.js`
     - `laneDualPathParity.characterization.test.js`
-  - 📁 **domain/** (22)
-    - 📁 **ad/** (2)
-      - `advertiserNameReading.js` — 広告主名の欄にある文字列を「名前」「広告メッセージ」「判定不能」に読み分ける純関数。
-      - `advertiserNameReading.test.js`
+  - 📁 **domain/** (20)
     - 📁 **lane/** (9)
       - 📁 **columns/** (3)
         - `kontaPolicy.js` — こん太段（konta）の配属 policy — 過渡状態 catchall。
@@ -1018,7 +1015,7 @@
         - `logo_funlink_white_RGB_maru_black.png`
       - `logo_guide_funlink_ol.pdf`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1497)
+  - 📁 **lib/** (1496)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -1044,7 +1041,6 @@
     - `adMessageCensus.js` — 「広告/ギフトの生データに【メッセージ】が入っているか」を数えるだけの計器。
     - `adMessageCensus.test.js`
     - `adMessageCensus.wiring.test.js`
-    - `adMessageLabelShipped.probe.test.js`
     - `aiShareDiagSchema.js` — AI 共有診断バンドル（popup が組み立てる JSON / storage の nls_ai_share_fast_diag_v1）の
     - `aiShareFastDiagKey.js` — v0.1.629: AI 共有 fastDiag キャッシュの storage key を popup と status ページで共有。
     - `aiShareFastDiagKey.test.js`

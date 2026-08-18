@@ -26,6 +26,16 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1431',
+    date: '2026-08-18',
+    summary: '広告の文字を勝手に仕分けるのをやめました',
+    items: Object.freeze([
+      '前の版で入れた「広告メッセージ」ラベルを取り下げました。名前かメッセージかを機械が決めつける必要はない、というご指摘によるものです。',
+      '広告主が入れた文字は、名前でもメッセージでも、そのまま表示します。仕分けをやめたので取りこぼしも誤判定もありません。',
+      '★匿名にしたい方はニコニコ側の匿名機能を使えます。拡張が代わりに隠す必要はありませんでした。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1430',
     date: '2026-08-18',
     summary: '広告メッセージが分かるようになりました',
