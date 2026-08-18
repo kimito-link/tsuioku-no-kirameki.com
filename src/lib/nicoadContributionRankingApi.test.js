@@ -289,3 +289,35 @@ describe('nicoadContributionRankingApi', () => {
     });
   });
 });
+
+describe('★保存は原文のまま(広告メッセージの判定を焼き付けない)', () => {
+  /*
+   * ★2026-08-18: 広告主名の欄には【名前】と【広告メッセージ】が混在している。
+   *   読み分けは表示のたびに純関数で計算する(advertiserNameReading.js)。
+   *   ★保存に判定結果を足すと、判定を改善したとき過去の記録を再判定できなくなる。
+   *   この検査は「保存に分類フィールドを足す」変更を機械的に弾く。
+   */
+  const ALLOWED = ['rank', 'name', 'contribution', 'isAnonymous', 'userPageUrl', 'hasNoIcon'];
+
+  it('rows のキーは既定の集合だけ(reading/isMessage 等を足せない)', () => {
+    const rows = normalizeNicoadRankingResponse({
+      data: {
+        ranking: [
+          { rank: 1, userId: 144514252, advertiserName: 'ゲスト', totalContribution: 100 },
+          { rank: 2, advertiserName: 'コメリにも１６ｃｍ自慢行くの？', totalContribution: 50 }
+        ]
+      }
+    });
+    expect(rows).not.toBeNull();
+    for (const r of rows) {
+      for (const k of Object.keys(r)) expect(ALLOWED).toContain(k);
+    }
+  });
+
+  it('★広告メッセージらしき文字列も name に【無加工で】入る', () => {
+    const rows = normalizeNicoadRankingResponse({
+      data: { ranking: [{ rank: 1, advertiserName: 'コメリにも１６ｃｍ自慢行くの？', totalContribution: 50 }] }
+    });
+    expect(rows[0].name).toBe('コメリにも１６ｃｍ自慢行くの？');
+  });
+});
