@@ -781,7 +781,7 @@
   - `src/lib/statusTrendKey.js`
   - `src/extension/status-entry.js`
   - `src/lib/statusActionAdvisor.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 171</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 172</summary>
 
 - `app/app.js` — スマホ閲覧用 status Web 版。
 - `app/live-view.js` — global NL_BUILD_ID
@@ -812,6 +812,7 @@
 - `scripts/sync-lp-twitter-icon.mjs` — LP 右端コラボ用: src/images/icon/twitter-icon.png → extension/images/lp/twitter-icon.png
 - `scripts/vendor-visual-explainer.mjs` — Vendors nicobailon/visual-explainer (MIT) into .cursor/skills/visual-explainer/
 - `scripts/write-extension-placeholder-icons.mjs` — リポジトリに 256px アイコンしか無い環境向け: manifest 用の小さめ PNG を生成する。
+- `src/domain/ad/advertiserNameReading.js` — 広告主名の欄にある文字列を「名前」「広告メッセージ」「判定不能」に読み分ける純関数。
 - `src/extension/cloak-failsafe-entry.js` — 幕(cloak)を外す【最速の保険】だけを担う極小エントリ。
 - `src/extension/offscreen-entry.js` — feat/multitab-scale-globalcap（2026-05-31）: コメント IDB の「常駐・単一書き手」を担う
 - `src/lib/adMessageCensus.js` — 「広告/ギフトの生データに【メッセージ】が入っているか」を数えるだけの計器。
@@ -959,7 +960,7 @@
 
 ## 🧬 修正系譜マップ(この系統のバグを過去にどう直したか)
 
-> changelog 全 759 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
+> changelog 全 760 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
 
 ### 💾 記録件数 (99版)
 - `v0.1.1429` 2026-08-18 — 広告メッセージを記録できるか調べる計器を追加
@@ -1801,7 +1802,8 @@
 - `v0.1.699` 2026-06-12 — 読み上げの名前ON/OFF切替を追加
 - `v0.1.698` 2026-06-12 — コメビュにユーザー別の声で読み上げ機能を追加
 
-### 🪟 応援レーン・タイル (183版)
+### 🪟 応援レーン・タイル (184版)
+- `v0.1.1430` 2026-08-18 — 広告メッセージが分かるようになりました
 - `v0.1.1428` 2026-08-18 — 応援レーンの軽量化が効いているか見えるようにしました
 - `v0.1.1427` 2026-08-18 — サイドパネルで応援レーンが出ないのを修正
 - `v0.1.1426` 2026-08-18 — 応援レーンの動作を軽くしました

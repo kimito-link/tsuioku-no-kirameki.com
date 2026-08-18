@@ -12,6 +12,16 @@
 
 import { isNumericNicoUserId } from '../domain/user/identity.js';
 import { deriveAvatarUrlFromUid } from './deriveAvatarUrlFromUid.js';
+// ★2026-08-18 広告メッセージ: 広告主名の欄には【名前】と【広告メッセージ】が混在している
+//   (実測: ニコニ広告APIにメッセージ専用フィールドは無く、advertiserName に本文が載る)。
+//   読み分けは純関数に集約する(ここは「どう見せるか」だけを決める)。
+import { readAdvertiserName } from '../domain/ad/advertiserNameReading.js';
+
+/**
+ * ★kill スイッチ(撤回手順その1)。false にすると従来表示(「広告」/「#N」)に完全に戻る。
+ *   laneContentLod.js と同じ方式。
+ */
+export const AD_MESSAGE_TILE_LABEL_ENABLED = true;
 
 /**
  * room.userKey が公式由来の数値 uid(officialDomRankingRowsToStripRooms が記名行に採用)か判定する。
@@ -110,7 +120,20 @@ export function adLanePicksFromRooms(rooms, io) {
       typeof room.rankHint === 'number' && Number.isFinite(room.rankHint) && room.rankHint > 0
         ? Math.floor(room.rankHint)
         : null;
-    const idLine = uid ? '広告' : rankHint != null ? `#${rankHint}` : '広告';
+    /*
+     * ★2026-08-18: 広告メッセージだと読めた行は ID 行を「広告メッセージ」にする。
+     *   ★title/nameLine(本文そのもの)は【一切触らない】= 原文はそのまま画面に出る。
+     *     足すのは「これはメッセージだ」という意味づけだけ。
+     *   ★判定不能(unknown)は従来表示のまま = 人の名前をメッセージとして晒さない。
+     *   ★meta.idLine は storyLaneTierBodyKey の署名に入っている(確認済み)ので、
+     *     ラベルが変わればちゃんと描き直される(diff-skip に埋もれない)。
+     */
+    const baseIdLine = uid ? '広告' : rankHint != null ? `#${rankHint}` : '広告';
+    const reading = readAdvertiserName({ advertiserName: name, hasUserId: Boolean(uid) });
+    const idLine =
+      AD_MESSAGE_TILE_LABEL_ENABLED && reading.reading === 'message'
+        ? '広告メッセージ'
+        : baseIdLine;
     const nameLine = name || '広告主';
 
     picks.push({
