@@ -39,15 +39,41 @@ describe('サイドパネルへの lv 受け渡し', () => {
     expect(baked.length).toBe(2);
   });
 
-  it('★ツールバー経路は tab.url から lv を取り出す(取れなければ素の path に倒す)', () => {
+  it('★ツールバー経路は tab.url から lv を取り出す', () => {
     const code = stripComments(read('extension/background.js'));
     const at = code.indexOf('chrome.action.onClicked');
     expect(at).toBeGreaterThan(-1);
     const body = code.slice(at);
     // watch URL から lv を抜く正規表現が在る
     expect(body).toMatch(/\\\/watch\\\/\(lv/);
-    // 取れないときのフォールバック(素の path)も残す＝watch以外のタブで壊さない
-    expect(body).toMatch(/:\s*'sidepanel\.html'/);
+  });
+
+  /*
+   * ★v0.1.1434(実機で自分の目で見て確定した退化の防止):
+   *   v0.1.1427 で open() の【あと】に setOptions({path}) を置いてしまい、
+   *   パネルが読み込み直しになって Chrome の「読み込み中」表示
+   *   (ダークでは黒地に灰色の横縞)が居座った=ユーザー報告の真っ黒の正体。
+   *   ★path は open より【先】に確定させる。この順序を機械で固定する。
+   */
+  it('★setOptions(パス確定) は open より【先】に呼ぶ', () => {
+    const code = stripComments(read('extension/background.js'));
+    const at = code.indexOf('chrome.action.onClicked');
+    const body = code.slice(at, at + 2600);
+    const setAt = body.indexOf('setOptions');
+    const openAt = body.indexOf('sidePanel.open');
+    expect(setAt).toBeGreaterThan(-1);
+    expect(openAt).toBeGreaterThan(-1);
+    expect(setAt).toBeLessThan(openAt);
+  });
+
+  it('★lv が取れないときは setOptions を呼ばない(無駄な読み込み直しを起こさない)', () => {
+    const code = stripComments(read('extension/background.js'));
+    const at = code.indexOf('chrome.action.onClicked');
+    const body = code.slice(at, at + 2600);
+    // if (lvFromTab) { ... setOptions ... } の形で条件つきになっている
+    const ifAt = body.indexOf('if (lvFromTab)');
+    expect(ifAt).toBeGreaterThan(-1);
+    expect(ifAt).toBeLessThan(body.indexOf('setOptions'));
   });
 
   it('★lv の形式規約は1つ(SIDE_PANEL_LV_RE)を共用する — 片方だけ通る穴を作らない', () => {

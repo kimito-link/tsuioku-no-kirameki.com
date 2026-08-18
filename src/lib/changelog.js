@@ -26,6 +26,16 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1434',
+    date: '2026-08-18',
+    summary: '真っ黒(横縞)の原因を取り除きました',
+    items: Object.freeze([
+      '★サイドパネルが真っ黒に見えていた原因は、本日の更新(v0.1.1427)で私が入れた処理の順番の誤りでした。申し訳ありません。',
+      'パネルを開いたあとに表示するページを差し替えていたため、パネルが読み込み直しになり、ブラウザの「読み込み中」表示(黒地に灰色の横縞)が出続けていました。',
+      '開く前にページを決めるよう順番を直しました。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1433',
     date: '2026-08-18',
     summary: 'サイドパネルが黒くなるのを直しました',
