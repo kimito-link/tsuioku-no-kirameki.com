@@ -51,7 +51,29 @@
  *   false にすると分岐が全て旧経路へ倒れ、挙動が完全に元へ戻る。
  *   laneContentLod.wiring.test.js が「false のとき hollow を1個も作らない」を固定する。
  */
-export const LANE_CONTENT_LOD_ENABLED = true;
+/*
+ * ★★v0.1.1441: false へ倒した(ユーザー報告の退化を止める)。
+ *
+ * ■ 何が起きていたか(2026-08-19 ユーザー:「取れるべきサムネがおちてた」)
+ *   hollow(枠だけ)のタイルは【可視域に入ったときだけ】中身に差し替わる。
+ *   ところがサムネは【あとから届く】(avatarObserved で後から更新される)。
+ *   描画時点でサムネが未到着だと hasRealThumb=false で hollow になり、
+ *   そのタイルは dataset.thumb='0' のまま画面外に居続ける。
+ *   ★つまり【後から届いたサムネが永久に出ない】= 取れるはずのサムネが落ちる。
+ *
+ * ■ なぜ直しではなく【止める】のか
+ *   ユーザーの優先順位は明確: 「取れるべきサムネが落ちる退化は禁止」。
+ *   サムネはこの拡張の価値そのもの(誰が応援したかが見えること)。
+ *   対して LOD の利得は【DOM数の削減】という内部都合。
+ *   ★価値を壊してまで軽さを取らない。
+ *   直すなら「サムネが届いたら hollow を強制的に差し替える」経路が要るが、
+ *   それは新しい配線を一本増やす = 別の版で安全にやる。
+ *
+ * ■ 戻し方
+ *   true に戻すだけで v0.1.1426 の挙動に戻る(分岐は残してある)。
+ *   ただし戻す前に【後から届いたサムネを差し替える経路】を先に入れること。
+ */
+export const LANE_CONTENT_LOD_ENABLED = false;
 
 /**
  * 先頭から何枚を必ずフル(中身つき)で描くか。
@@ -90,8 +112,11 @@ const _laneLodState = new WeakMap();
  * @param {{ laneName: string, index: number, hasRealThumb: boolean, hasWrap: boolean, alreadyFilled: boolean }} ctx
  * @returns {boolean}
  */
-export function shouldRenderHollow(ctx) {
-  if (!LANE_CONTENT_LOD_ENABLED) return false;
+export function shouldRenderHollow(ctx, enabled = LANE_CONTENT_LOD_ENABLED) {
+  // ★第2引数は【検査用】。出荷経路は常に既定(=定数)を使う。
+  //   こうしておくと、定数を false に倒しても
+  //   【判定ロジック自体の検査は残せる】(将来 true に戻すときの安全網)。
+  if (!enabled) return false;
   if (!ctx || typeof ctx !== 'object') return false;
   if (ctx.hasWrap === true) return false; // ③会場は対象外(3D変形で可視判定が崩れる前科)
   if (ctx.laneName !== 'tanu') return false; // MVP はたぬ姉段だけ
@@ -171,8 +196,9 @@ export function forgetLaneContentLod(laneEl) {
  * @param {string} userKey 一方通行の記憶に使う鍵(空なら記憶しない)
  * @param {() => void} fill 中身を作って枠を置換する関数
  */
-export function observeHollowTile(laneEl, hollowEl, userKey, fill) {
-  if (!LANE_CONTENT_LOD_ENABLED) return;
+export function observeHollowTile(laneEl, hollowEl, userKey, fill, enabled = LANE_CONTENT_LOD_ENABLED) {
+  // ★第5引数は【検査用】。出荷経路は常に既定(=定数)を使う。
+  if (!enabled) return;
   if (!laneEl || !hollowEl || typeof fill !== 'function') return;
   if (typeof IntersectionObserver !== 'function') {
     // IO が無い環境(古い WebView・テスト)では【即座に中身を作る】= フェイルソフト。

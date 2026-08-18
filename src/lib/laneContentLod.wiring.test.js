@@ -110,8 +110,12 @@ describe('中身LOD: 撤回できる形になっているか', () => {
     const code = stripComments(read(LOD_SRC));
     expect(code).toMatch(/export const LANE_CONTENT_LOD_ENABLED = (true|false);/);
     const fn = code.slice(code.indexOf('export function shouldRenderHollow'));
-    const firstLine = fn.split('\n')[1];
-    expect(firstLine).toContain('LANE_CONTENT_LOD_ENABLED');
+    // ★v0.1.1441: 定数は【引数の既定値】として効く形にした
+    //   (検査からは値を注入できるが、出荷経路は常に定数を使う)。
+    const head = fn.slice(0, fn.indexOf('{'));
+    expect(head).toContain('LANE_CONTENT_LOD_ENABLED');
+    const body = fn.slice(fn.indexOf('{'));
+    expect(body).toMatch(/if \(!enabled\) return false;/);
   });
 
   it('★popup-entry.js は不触(max-lines 余裕0行のため)', () => {
