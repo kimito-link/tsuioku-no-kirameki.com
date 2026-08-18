@@ -54,7 +54,9 @@ describe('★サイドパネルが真っ黒にならない(CSSだけで担保す
 
   it('★入れ物(sidepanel.html)の3層が不透明のまま(v0.1.1283 の修正を失っていない)', () => {
     // html/body の既定背景(クリーム)。
-    expect(sidepanelHtml).toMatch(/background: linear-gradient\(160deg, #fffaf2, #eef8ff\)/);
+    expect(sidepanelHtml).toMatch(/background(-image)?: linear-gradient\(160deg, #fffaf2, #eef8ff\)/);
+    // ★v0.1.1433: 地の色(不透明)が【必ず】在ること。グラデーションだけだと黒が出る。
+    expect(sidepanelHtml).toMatch(/background-color: #fffaf2/);
     // iframe 自身も塗る(最後の砦)。
     expect(sidepanelHtml).toMatch(/iframe \{[\s\S]*?background: #fffaf2;/);
     // ★transparent に戻す変異を拒否する。
@@ -96,7 +98,7 @@ describe('★サイドパネルが真っ黒にならない(CSSだけで担保す
       /<html[^>]*\sstyle="[^"]*color-scheme:\s*light[^"]*"/
     );
     expect(sidepanelHtml).toMatch(
-      /<html[^>]*\sstyle="[^"]*background:\s*linear-gradient\(160deg, #fffaf2, #eef8ff\)[^"]*"/
+      /<html[^>]*\sstyle="[^"]*background(-image)?:\s*linear-gradient\(160deg, #fffaf2, #eef8ff\)[^"]*"/
     );
   });
 

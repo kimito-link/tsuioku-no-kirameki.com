@@ -49,13 +49,13 @@ describe('パネルの地色の一致', () => {
    *   (「3箇所とも直すこと」とコメントに書いてあったのに実際ずれた実績がある)
    */
   it('sidepanel.html の <html> インライン背景が既定色', () => {
-    const m = sidepanelHtml.match(/<html[^>]*style="[^"]*background:\s*linear-gradient\([^)]*?(#[0-9a-f]{6})/i);
+    const m = sidepanelHtml.match(/<html[^>]*style="[^"]*background(?:-image)?:\s*linear-gradient\([^)]*?(#[0-9a-f]{6})/i);
     expect(m, '<html> のインライン背景が読めること').toBeTruthy();
     expect(m[1].toLowerCase()).toBe(EXPECTED);
   });
 
   it('popup.html(中身)の <html> インライン背景とも同じ色', () => {
-    const m = popupHtml.match(/<html[^>]*style="[^"]*background:\s*linear-gradient\([^)]*?(#[0-9a-f]{6})/i);
+    const m = popupHtml.match(/<html[^>]*style="[^"]*background(?:-image)?:\s*linear-gradient\([^)]*?(#[0-9a-f]{6})/i);
     expect(m, 'popup.html の <html> インライン背景が読めること').toBeTruthy();
     expect(m[1].toLowerCase()).toBe(EXPECTED);
   });

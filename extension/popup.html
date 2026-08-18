@@ -1,4 +1,4 @@
-<!DOCTYPE html><html lang="ja" data-nl-usage-terms-ack="1" data-nl-recording="on" style="color-scheme: light; background: linear-gradient(160deg, #fffaf2, #eef8ff)">
+<!DOCTYPE html><html lang="ja" data-nl-usage-terms-ack="1" data-nl-recording="on" style="color-scheme: light; background-color: #fffaf2; background-image: linear-gradient(160deg, #fffaf2, #eef8ff)">
 <!--
   ★v0.1.1299(6度目): <html> を【1行目・DOCTYPE の直後】へ移した。
   従来はこの下に約1,233バイトのコメントがあり、ブラウザがそれを読み終わるまで
@@ -249,6 +249,19 @@
        *   「不透明のまま待つ時間 ≦ INLINE_SHADE_DATA_FALLBACK_MS」を機械照合する
        *   (片方だけ下げると、体感時間は下がらないまま緑になる=v0.1.1414 の再演)。
        */
+      /*
+       * ★v0.1.1433: 幕を【出し直す】ときは 5s の CSS 保険を打ち切る。
+       *   保険は forwards なので、一度終わると opacity:0 で固定されたままになり、
+       *   hidden を外しても【透けたまま】= 黒を隠せない(実機で確認した実害)。
+       *   出し直しの間だけ animation を none にして不透明に戻す。
+       */
+      .nl-init-shade.nl-init-shade--rearm {
+        animation: none !important;
+        opacity: 1 !important;
+        visibility: visible !important;
+        pointer-events: auto !important;
+      }
+
       @keyframes nl-init-shade-css-failsafe {
         0%, 18% { opacity: 1; visibility: visible; pointer-events: auto; }
         99% { opacity: 0.04; visibility: visible; pointer-events: none; }
@@ -371,6 +384,20 @@
 
       /* 親 iframe の高さ内に収め、はみ出しは内側スクロール（820px 級の白塔を防ぐ） */
       html.nl-inline {
+        /*
+         * ★v0.1.1433 真因対処(2026-08-18・世界の事例で仕様まで裏取り):
+         *   サイドパネルが【横縞つきの真っ黒】になる正体は「地を塗る人がいない」こと。
+         *   実測: html/body とも background-color が rgba(0,0,0,0)=透明で、
+         *   グラデーション(background-image)だけで塗っていた。
+         *   → 再描画が1フレーム間に合わないと【塗るものが何も無い】ので下の暗い層が出る。
+         *   ★CSS Color Adjust L1: iframe と親の color-scheme が食い違うと UA は
+         *     「透明キャンバス」でなく【不透明キャンバス(ダークなら黒系)】を敷く
+         *     (https://drafts.csswg.org/css-color-adjust-1/#color-scheme-effect)。
+         *     color-scheme:light は既に親子で揃えてある(v0.1.1316)が、
+         *     それでも【下地の色】が無ければリサイズ/復帰の隙間で黒が見える。
+         *   ＝不透明な background-color を必ず置く。これが唯一の確実な手。
+         */
+        background-color: #fffaf2;
         width: 100%;
         min-width: 0;
         max-width: none;
@@ -382,6 +409,8 @@
       }
 
       html.nl-inline body {
+        /* ★同上: body にも下地の色を置く(html だけだと body が透明で透ける経路が残る)。 */
+        background-color: #fffaf2;
         width: 100%;
         min-width: 0;
         max-width: none;
