@@ -3510,26 +3510,17 @@ chrome.action.onClicked.addListener((tab) => {
     __toolbarActionPolicyMem === 'always_open_popup';
   if (!wantsInline && tid !== chrome.tabs.TAB_ID_NONE) {
     try {
-      // ★同期的に開く(await を挟まない)。設定は open の後で整える。
-      chrome.sidePanel.open({ tabId: tid });
       /*
-       * ★v0.1.1427: ここでも ?lv= を焼く(実機2026-08-18で真因確定)。
-       *
-       *   状態速報: 🔴 描画関数が一度も呼ばれていません
-       *             laneTickProbe: lidMiss=4 / lidFromInline=0 /
-       *                            lidFromSnapshot=0 / lidFromLastPainted=0
-       *
-       *   v0.1.1419 は「パネル内ボタン」経路(:2066)にだけ lv を焼いており、
-       *   【ツールバーのアイコンで開く経路】であるここは素の 'sidepanel.html' の
-       *   ままだった。サイドパネルにとって lv を受け取る道は ?lv= しか無い
-       *   (popup 側の INLINE_OWN_WATCH_URL は構造上サイドパネルでは常に空)。
-       *   ＝いちばん普通の開き方をすると、必ずレーンが描かれなかった。
-       *
-       *   ★同型の再発: 「多段経路のどこか1段で値が落ちると下流は『無かった』と
-       *     しか見えない」([[venue-mirror-is-the-primary-path-2026-08-01]])。
-       *     ★入口が2つあるのに片方しか直していなかった＝配線漏れ。
-       *
-       *   lv が取れないとき(watch以外のタブ等)は素の path に倒す=従来どおり。
+       * ★v0.1.1434(実機で自分の目で確認して順序を訂正):
+       *   v0.1.1427 で「open() の【あと】に setOptions({path}) でパスを差し替える」
+       *   形にしてしまった。開いた後にパスを変えるとパネルが読み込み直しになり、
+       *   Chrome 標準の【読み込み中表示】(ダークモードでは黒地に灰色の横縞が流れる)が
+       *   居座る。ユーザーが報告した「真っ黒＋横縞」の正体はこれ。
+       *   ★正しい順序: path を先に確定 → そのあと open()。
+       *   ★open() は【ユーザー操作の文脈】でしか呼べず await を挟むと文脈が切れるので、
+       *     setOptions は await しない(Promise を捨てて即 open する)。
+       *   ★lv が取れないときは setOptions を呼ばない=既定の 'sidepanel.html' のまま
+       *     (無駄な差し替えで読み込み直しを起こさない)。
        */
       const lvFromTab = (() => {
         try {
@@ -3539,13 +3530,13 @@ chrome.action.onClicked.addListener((tab) => {
           return '';
         }
       })();
-      void chrome.sidePanel
-        .setOptions({
-          tabId: tid,
-          path: lvFromTab ? `sidepanel.html?lv=${lvFromTab}` : 'sidepanel.html',
-          enabled: true
-        })
-        .catch(() => {});
+      if (lvFromTab) {
+        void chrome.sidePanel
+          .setOptions({ tabId: tid, path: `sidepanel.html?lv=${lvFromTab}`, enabled: true })
+          .catch(() => {});
+      }
+      // ★同期的に開く(await を挟まない=ユーザー操作の文脈を保つ)。
+      chrome.sidePanel.open({ tabId: tid });
       return;
     } catch {
       // 開けなければ従来動作へ落ちる(消えたまま何も出ない、を避ける)
