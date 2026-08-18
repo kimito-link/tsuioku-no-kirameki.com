@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 6 / 805 件
+## ⚠️ 役割コメントが無いソース 6 / 806 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `src/lib/laneDomSelfMeasure.js`
@@ -721,7 +721,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (1754)
+- 📁 **src/** (1757)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1018,7 +1018,7 @@
         - `logo_funlink_white_RGB_maru_black.png`
       - `logo_guide_funlink_ol.pdf`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1507)
+  - 📁 **lib/** (1510)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -2140,6 +2140,9 @@
     - `sidepanelCloakWiring.test.js`
     - `sidepanelFlashNotOverwritten.wiring.test.js`
     - `sidepanelFlashSurvives.behavior.test.js`
+    - `sidepanelIframeReveal.js` — iframe を【出来上がってから見せる】ための純関数。
+    - `sidepanelIframeReveal.test.js`
+    - `sidepanelIframeReveal.wiring.test.js`
     - `sidepanelIframeSrc.js` — サイドパネルの iframe に渡す src を組み立てる純関数。
     - `sidepanelIframeSrc.test.js`
     - `sidepanelLvForward.wiring.test.js`
