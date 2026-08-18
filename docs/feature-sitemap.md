@@ -178,7 +178,7 @@
 
 - **応援レーン集約(誰が候補か)** — 保存コメント行を userId 単位に畳み込みレーン候補を作る唯一の集約正本(popup/venue 共通)
   - `src/lib/userLaneCandidatesFromStorage.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 97</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 98</summary>
 
 - `src/domain/lane/aggregate.js` — 応援ユーザーレーンの per-row → per-user 集約（純関数）。
 - `src/domain/observations/observationStore.js` — observationStore - StatObservation のメモリ常駐リングバッファ。
@@ -249,6 +249,7 @@
 - `src/lib/mcpBridge/buildMcpRankingSnippet.js` — MCP / L1 向けに貢献度・広告ランキングの **PII 最小スナップショット** を組み立てる。
 - `src/lib/networkErrorProbe.js` — v0.1.201: 拡張の network 層異常を診断 JSON 用に集約する純関数。
 - `src/lib/nicoadContributionRankingApi.js` — ニコニ広告(nicoad)「貢献度ランキング」無認証 JSON API の URL 組立 & 正規化（純関数）。
+- `src/lib/nicoliveRankingPick.js` — 公式ランキングから【検証に使う配信を1つ選ぶ】純関数。
 - `src/lib/nicoUserFollowingApi.js` — nvapi /v1/users/{uid}/following/users の URL 構築とレスポンス正規化。
 - `src/lib/officialContributionRankingResolver.js` — 公式貢献度ランキングの取得経路（Koken API / DOM bundle / iframe storage）から
 - `src/lib/officialDomRankingRowsToStripRooms.js` — 公式イベント DOM バンドルの貢献度／広告ランキング行を、
@@ -782,7 +783,7 @@
   - `src/lib/statusTrendKey.js`
   - `src/extension/status-entry.js`
   - `src/lib/statusActionAdvisor.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 174</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 176</summary>
 
 - `app/app.js` — スマホ閲覧用 status Web 版。
 - `app/live-view.js` — global NL_BUILD_ID
@@ -803,8 +804,10 @@
 - `scripts/delete-dead-lib.mjs` — scripts/delete-dead-lib.mjs — 死蔵lib実装ファイルとそのテストを削除
 - `scripts/fix-src-images-mojibake.mjs` — Normalizes known mojibake paths under src/images (mirrored from kimito-link).
 - `scripts/install-local-sounds.mjs` — マイ効果音「手動取込」を不要にするローカル自動同梱スクリプト。
+- `scripts/measure-flash-frames.mjs` — 「一瞬の黒」を【画面に出たピクセル】で測る。
 - `scripts/meeting-roles.mjs` — meeting.mjs の役割注入版。
 - `scripts/meeting.mjs` — 会議ハーネス: 同じ問いを「無料クラウド4系統 + ローカル ollama 数体」に投げ、
+- `scripts/pick-live-for-check.mjs` — 検証に使う実配信を【自動で1つ選ぶ】。
 - `scripts/repo-tree-map.mjs` — リポジトリのディレクトリツリー＋各ディレクトリの「役割」を自動生成する(2026-06-18 ユーザー提案)。
 - `scripts/run-e2e.mjs` — SKIP_E2E=1 のときは成功終了（CI などディスプレイなし環境用）。
 - `scripts/scan-dead-lib.mjs` — scripts/scan-dead-lib.mjs — lib/ の死蔵ファイルを entry から到達性スキャンして報告
