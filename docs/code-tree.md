@@ -718,7 +718,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (1738)
+- 📁 **src/** (1739)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1015,7 +1015,7 @@
         - `logo_funlink_white_RGB_maru_black.png`
       - `logo_guide_funlink_ol.pdf`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1491)
+  - 📁 **lib/** (1492)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -2112,6 +2112,7 @@
     - `shouldTriggerOfficialGapDeepHarvest.js` — ライブ中に「公式 statistics コメント数」と「記録件数」の差が大きいとき、
     - `shouldTriggerOfficialGapDeepHarvest.test.js`
     - `sidePanel.wiring.test.js`
+    - `sidePanelLvWiring.wiring.test.js`
     - `sidePanelWatchTarget.js` — サイドパネルを「どの配信に紐づけるか」を決める純関数。
     - `sidePanelWatchTarget.test.js`
     - `sidepanelBlackScreen.wiring.test.js`

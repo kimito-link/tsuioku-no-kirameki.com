@@ -26,6 +26,16 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1427',
+    date: '2026-08-18',
+    summary: 'サイドパネルで応援レーンが出ないのを修正',
+    items: Object.freeze([
+      'サイドパネルを開いても応援レーンに誰も並ばないことがある問題を直しました。',
+      '原因は、拡張のアイコンから開いたときに「どの配信を見ているか」がサイドパネルに伝わっていなかったことです。パネルの中のボタンから開いたときだけ伝わる作りになっていました。',
+      'どちらの開き方でも配信が伝わるようにしました。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1426',
     date: '2026-08-18',
     summary: '応援レーンの動作を軽くしました',

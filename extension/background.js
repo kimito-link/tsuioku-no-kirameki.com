@@ -3512,8 +3512,39 @@ chrome.action.onClicked.addListener((tab) => {
     try {
       // ★同期的に開く(await を挟まない)。設定は open の後で整える。
       chrome.sidePanel.open({ tabId: tid });
+      /*
+       * ★v0.1.1427: ここでも ?lv= を焼く(実機2026-08-18で真因確定)。
+       *
+       *   状態速報: 🔴 描画関数が一度も呼ばれていません
+       *             laneTickProbe: lidMiss=4 / lidFromInline=0 /
+       *                            lidFromSnapshot=0 / lidFromLastPainted=0
+       *
+       *   v0.1.1419 は「パネル内ボタン」経路(:2066)にだけ lv を焼いており、
+       *   【ツールバーのアイコンで開く経路】であるここは素の 'sidepanel.html' の
+       *   ままだった。サイドパネルにとって lv を受け取る道は ?lv= しか無い
+       *   (popup 側の INLINE_OWN_WATCH_URL は構造上サイドパネルでは常に空)。
+       *   ＝いちばん普通の開き方をすると、必ずレーンが描かれなかった。
+       *
+       *   ★同型の再発: 「多段経路のどこか1段で値が落ちると下流は『無かった』と
+       *     しか見えない」([[venue-mirror-is-the-primary-path-2026-08-01]])。
+       *     ★入口が2つあるのに片方しか直していなかった＝配線漏れ。
+       *
+       *   lv が取れないとき(watch以外のタブ等)は素の path に倒す=従来どおり。
+       */
+      const lvFromTab = (() => {
+        try {
+          const m = /\/watch\/(lv\d{1,15})/.exec(String((tab && tab.url) || ''));
+          return m && SIDE_PANEL_LV_RE.test(m[1]) ? m[1] : '';
+        } catch {
+          return '';
+        }
+      })();
       void chrome.sidePanel
-        .setOptions({ tabId: tid, path: 'sidepanel.html', enabled: true })
+        .setOptions({
+          tabId: tid,
+          path: lvFromTab ? `sidepanel.html?lv=${lvFromTab}` : 'sidepanel.html',
+          enabled: true
+        })
         .catch(() => {});
       return;
     } catch {
