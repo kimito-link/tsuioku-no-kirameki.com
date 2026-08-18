@@ -812,7 +812,10 @@ async function council(members, label, key) {
       // 候補列に「絶対に当たらない選択肢」が混ざっていること自体が次に読む人を誤らせる。
       // 2番手のcloudflare/nemotron-120bは残す: weight4でCF勢は並列FAILED実績があるものの、
       // groqがTPD枯渇した日に統合役が全滅するのを防ぐ最後の砦として機能する（順序も変えない）。
-      priority = ['groq/gpt-oss-120b', 'cloudflare/nemotron-120b', 'groq/llama-3.3-70b', 'gemini-2.5-flash'];
+      // 2026-08-18: 'groq/llama-3.3-70b' を撤去。同日GroqのLlama一斉廃止で404になった死にラベルで、
+      // 上のcloudflare/glm-5.2撤去(2026-08-13)と同じ「findが永久に外れる死に要素」。挙動は
+      // 変わらないが、統合はリトライ無しの一発工程であり、絶対に当たらない選択肢を候補列に残さない。
+      priority = ['groq/gpt-oss-120b', 'cloudflare/nemotron-120b', 'gemini-2.5-flash'];
       synth = priority.map(l => allMembers.find(m => m.label === l && !exhaustedLabels.has(l))).find(Boolean)
         || allMembers.find(m => m.kind === 'cloud' && !exhaustedLabels.has(m.label));
       if (synth) console.error(`[${label}] ②統合役(能力優先): ${synth.label}`);

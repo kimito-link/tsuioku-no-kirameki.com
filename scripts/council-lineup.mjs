@@ -44,7 +44,21 @@
  */
 export const LINEUP = [
   { label: 'groq/gpt-oss-120b', provider: 'groq', rawId: 'openai/gpt-oss-120b', apiModel: 'openai/gpt-oss-120b', opts: { reasoning_effort: 'low' }, requires: ['G'] },
-  { label: 'groq/llama-3.3-70b', provider: 'groq', rawId: 'llama-3.3-70b-versatile', apiModel: 'llama-3.3-70b-versatile', opts: {}, requires: ['G'] },
+  // 2026-08-18 撤去（groq/llama-3.3-70b）: GroqがLlama系を一斉廃止し404（同日、分類器専任の
+  //  llama-3.1-8b-instantも同時に死亡。meeting.mjs classify()の撤去コメント参照）。
+  //  fast役のweight1主力だったため、死んだままLINEUPに残るとfast役プールの先頭に座り
+  //  毎回選ばれて必ず失敗する「死に枠が席を先取りする」kimi-k2.7-code型の構造になる。
+  //  verifyLiveModels（groqはカタログ照合対象）が起動時に除外するため平常時の実害は
+  //  抑えられていたが、/modelsの取得に失敗した日はnull=素通しで死に枠が復活する
+  //  （fail-open）ため、エントリ自体を撤去する。
+  //  役割の穴: fast役の後継はlocal/qwen3.5:9b（VRAM100%格納・2回目以降2.0〜2.4秒・
+  //  レート制限なしを実測して採用）。Ollama停止時はROLE_FALLBACK fast→["generalist"]
+  //  （2026-07-04追加）が別プロバイダで代行する。
+  //  roleOfの"llama-3.3"→fast判定行は温存（mistral-large行の前例。LINEUPに該当labelが
+  //  無ければ発火しない無害な行で、Llama系が復活した際そのまま効く。同行の"groq"判定は
+  //  groq新顔のフォールスルー受け皿として現役のため、行ごと消してはならない）。
+  //  meeting.mjs ②統合のpriority配列からも同時に撤去した（cloudflare/glm-5.2撤去
+  //  (2026-08-13)と同じ「findが永久に外れる死に要素」化を防ぐため）。
 
   // 2026-06-22 追加（実機で応答確認済み・無料枠）:
   //  - qwen3-32b: thinking付き推論モデル → 批判(critic)。ローカル deepseek の重さ無しで鋭い批判が出せる。
@@ -211,7 +225,20 @@ export const LINEUP = [
   //  無料枠対象外になる」型（MiniMax-M2.7で実証済み）であり、これはcloudflare/glm-5.2の
   //  有料化と同一の、カタログ照合では原理的に検知不可能なパターンのため。
   { label: 'sambanova/deepseek-v3.1', provider: 'sambanova', rawId: 'DeepSeek-V3.1', apiModel: 'DeepSeek-V3.1', opts: {}, requires: ['SN'], liveProbe: true },
-  { label: 'sambanova/llama-3.3-70b', provider: 'sambanova', rawId: 'Meta-Llama-3.3-70B-Instruct', apiModel: 'Meta-Llama-3.3-70B-Instruct', opts: {}, requires: ['SN'], liveProbe: true },
+  //  2026-08-18 撤去（上のうち llama-3.3-70b）: 実測で使い物にならない——本日の検証6会議で
+  //  召集4回すべて429、単発プローブも3回中3回429（"Meta-Llama-3.3-70B-Instruct-8k is
+  //  currently experiencing high demand"）。さらに同日Groqが本線llama-3.3-70bを廃止（404）し、
+  //  「groq単騎の穴を塞ぐ別経路」という本採用の主目的そのものが消滅した（経路の冗長化と
+  //  頭脳の多様化は別物——死んだ本線の予備経路は冗長化ですらない）。
+  //  残置の実害: fast後継local/qwen3.5:9bと同じweight3のため、タイブレーク（JSの安定ソート
+  //  ＝allMembersのpush順で、LINEUPのクラウドはローカルより先）で本エントリが常にfast席を
+  //  先取りし、毎会議429でFAILEDさせる——kimi-k2.7-code型の実害が確定する。撤去が唯一の
+  //  「コードを足さない」解（weight格下げはweightOfに1ラベル専用分岐を足すことになる）。
+  //  429は"high demand"文言で一時混雑の可能性も残るため恒久拒否はしない: nvidia/minimax-m3の
+  //  前例に倣い、7日以上空けた再測定2回で2並列200 OKなら再検討可。ただしその時点でも
+  //  fast席はレート制限の無いローカルで充足しており採用動機は弱い（健康であることと、
+  //  会議に足りない頭脳であることは別）。deepseek-v3.1（critic予備）は無関係のため残す＝
+  //  SNキーの配線・liveProbe運用は変わらない。
 
   // 2026-08-05 追加: Mistral AI（新規プロバイダ・フランス独立系）。La Plateformeの無料枠は
   // カード登録不要で、実機で /v1/models 200(chat系39体)＋chat/completions 6モデル全て200を
