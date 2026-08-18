@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 6 / 807 件
+## ⚠️ 役割コメントが無いソース 6 / 808 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `src/lib/laneDomSelfMeasure.js`
@@ -721,7 +721,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (1759)
+- 📁 **src/** (1762)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1018,7 +1018,7 @@
         - `logo_funlink_white_RGB_maru_black.png`
       - `logo_guide_funlink_ol.pdf`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1512)
+  - 📁 **lib/** (1515)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -2131,6 +2131,9 @@
     - `sidePanelLvFromTabs.js` — サイドパネルが【自力で】配信IDを見つけるための純関数。
     - `sidePanelLvFromTabs.test.js`
     - `sidePanelLvWiring.wiring.test.js`
+    - `sidePanelPrearm.js` — サイドパネルを【押される前に】用意しておく純関数。
+    - `sidePanelPrearm.test.js`
+    - `sidePanelPrearm.wiring.test.js`
     - `sidePanelWatchTarget.js` — サイドパネルを「どの配信に紐づけるか」を決める純関数。
     - `sidePanelWatchTarget.test.js`
     - `sidepanelBlackScreen.wiring.test.js`

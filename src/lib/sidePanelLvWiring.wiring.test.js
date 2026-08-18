@@ -26,17 +26,24 @@ const stripComments = (s) =>
   s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^[ \t]*\/\/.*$/gm, '');
 
 describe('サイドパネルへの lv 受け渡し', () => {
-  it('★setOptions で path を設定する箇所は【2つ】(パネル内ボタン / ツールバーアイコン)', () => {
+  /*
+   * ★v0.1.1439: 入口が【2つ→ 3つ】になった。
+   *   ①パネル内ボタン ②ツールバーアイコン ③★事前用意(watchページを開いた時)
+   *   ③は「押される前に path を確定させておく」ためのもの。
+   *   SWが寝ている/詰まっているとパネルがなかなか出ない問題への対策。
+   *   ★数を固定し続ける意味: 入口が増えたのに lv を焼き忘れたら赤にする。
+   */
+  it('★setOptions で path を設定する箇所は【3つ】(パネル内ボタン / ツールバー / 事前用意)', () => {
     const code = stripComments(read('extension/background.js'));
     const hits = code.match(/setOptions\s*\(/g) || [];
-    expect(hits.length).toBe(2);
+    expect(hits.length).toBe(3);
   });
 
   it('★どの setOptions も、lv が取れたら ?lv= を焼く(素の sidepanel.html で終わらせない)', () => {
     const code = stripComments(read('extension/background.js'));
     // `sidepanel.html?lv=${...}` の形が2箇所に在ること＝両方の入口が lv を渡す。
     const baked = code.match(/sidepanel\.html\?lv=\$\{/g) || [];
-    expect(baked.length).toBe(2);
+    expect(baked.length).toBe(3);
   });
 
   it('★ツールバー経路は tab.url から lv を取り出す', () => {
@@ -82,7 +89,7 @@ describe('サイドパネルへの lv 受け渡し', () => {
     expect(defs.length).toBe(1);
     // 2箇所(パネル内ボタン / ツールバー)から参照される
     const uses = code.match(/SIDE_PANEL_LV_RE\.test\(/g) || [];
-    expect(uses.length).toBe(2);
+    expect(uses.length).toBe(3);
   });
 
   it('★受け取り側(sidepanel-entry)は iframe に lv を載せ替える', () => {

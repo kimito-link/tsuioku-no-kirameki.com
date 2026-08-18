@@ -783,7 +783,7 @@
   - `src/lib/statusTrendKey.js`
   - `src/extension/status-entry.js`
   - `src/lib/statusActionAdvisor.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 178</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 179</summary>
 
 - `app/app.js` — スマホ閲覧用 status Web 版。
 - `app/live-view.js` — global NL_BUILD_ID
@@ -923,6 +923,7 @@
 - `src/lib/sidepanelIframeReveal.js` — iframe を【出来上がってから見せる】ための純関数。
 - `src/lib/sidepanelIframeSrc.js` — サイドパネルの iframe に渡す src を組み立てる純関数。
 - `src/lib/sidePanelLvFromTabs.js` — サイドパネルが【自力で】配信IDを見つけるための純関数。
+- `src/lib/sidePanelPrearm.js` — サイドパネルを【押される前に】用意しておく純関数。
 - `src/lib/sidepanelUnderlay.js` — サイドパネルの【下敷き】。黒の代わりに地の色を見せる。
 - `src/lib/sidePanelWatchTarget.js` — サイドパネルを「どの配信に紐づけるか」を決める純関数。
 - `src/lib/silentFailureCells.js` — 【無音で死ぬ】故障を画面に出すセル(純関数)。
@@ -968,7 +969,7 @@
 
 ## 🧬 修正系譜マップ(この系統のバグを過去にどう直したか)
 
-> changelog 全 768 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
+> changelog 全 769 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
 
 ### 💾 記録件数 (99版)
 - `v0.1.1429` 2026-08-18 — 広告メッセージを記録できるか調べる計器を追加
@@ -1321,7 +1322,8 @@
 - `v0.1.668` 2026-06-10 — パネルに「💬コメビュ」ボタンを追加
 - `v0.1.667` 2026-06-10 — コメビュに匿名OKのニックネーム・ラベル・メモ
 
-### 🏟 会場・席 (247版)
+### 🏟 会場・席 (248版)
+- `v0.1.1439` 2026-08-19 — サイドパネルの出が遅いのを改善
 - `v0.1.1435` 2026-08-18 — サイドパネルが待たされるのを直しました
 - `v0.1.1426` 2026-08-18 — 応援レーンの動作を軽くしました
 - `v0.1.1425` 2026-08-17 — 会場モードが古い内容のままになるのを修正
