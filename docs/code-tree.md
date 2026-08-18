@@ -718,7 +718,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (1749)
+- 📁 **src/** (1750)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1015,7 +1015,7 @@
         - `logo_funlink_white_RGB_maru_black.png`
       - `logo_guide_funlink_ol.pdf`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1502)
+  - 📁 **lib/** (1503)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -1894,6 +1894,7 @@
     - `opSoundEffectDiag.js` — 操作音(opSoundDirector.js・Phase D1)の「押下→成功→発音」観測値を組み立てる純関数群。
     - `opSoundEffectDiag.test.js`
     - `opSoundEffectDiagKey.js` — 操作音(opSoundDirector.js・Phase D1)の「押下/成功/発音」観測値を
+    - `opaqueCanvasNoBlack.wiring.test.js`
     - `openingFiveMinuteCorrelation.js` — L13: 冒頭 5 分の予兆 → ピーク CPM 相関（散布図用）。
     - `openingFiveMinuteCorrelation.test.js`
     - `ownPostedUserIdSet.js` — v0.1.773: 「自分が投稿した userId」の集合を1パスで作る純関数。

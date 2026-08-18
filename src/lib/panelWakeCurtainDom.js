@@ -29,6 +29,8 @@ import {
 const SHADE_ID = 'nlInitialLoadShade';
 const SERIF_ID = 'nlInitShadeSerif';
 const DONE_CLASS = 'nl-init-shade--done';
+/** ★出し直しの間だけ CSS 保険(5s で opacity:0 固定)を打ち切るクラス。 */
+const REARM_CLASS = 'nl-init-shade--rearm';
 
 /** @type {{ hiddenSinceMs: number|null, shownAtMs: number|null, lastWidth: number, timer: any, settle: any }} */
 const _state = {
@@ -79,6 +81,13 @@ export function showWakeCurtain(reason, countTiles) {
     if (serif) serif.textContent = curtainSerif(reason);
     shade.removeAttribute('hidden');
     shade.classList.remove(DONE_CLASS);
+    /*
+     * ★v0.1.1433(実機で確認した実害): 初回の 5s CSS 保険は forwards なので、
+     *   一度終わると opacity:0 で固定される。hidden を外しただけでは【透けたまま】で
+     *   黒を隠せない。出し直しの間だけ保険を打ち切って不透明に戻す。
+     */
+    shade.classList.add(REARM_CLASS);
+
   } catch {
     return; // 出せないなら黙って諦める(描画は止めない)
   }
@@ -114,7 +123,10 @@ export function hideWakeCurtain() {
     shade.classList.add(DONE_CLASS);
     setTimeout(() => {
       try {
-        if (shade.classList.contains(DONE_CLASS)) shade.setAttribute('hidden', '');
+        if (shade.classList.contains(DONE_CLASS)) {
+          shade.setAttribute('hidden', '');
+          shade.classList.remove(REARM_CLASS);
+        }
       } catch { /* no-op */ }
     }, 260);
   } catch { /* no-op */ }

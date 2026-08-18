@@ -75,3 +75,35 @@ describe('3キャラの幕をそのまま使う', () => {
     expect(read('extension/popup.html')).toContain('nlInitShadeSerif');
   });
 });
+
+describe('★出し直しは不透明でなければ意味がない(実機で踏んだ)', () => {
+  /*
+   * 実機(2026-08-18): 幕を出し直しても opacity:0 のままで【透けていた】。
+   * 初回の 5s CSS 保険が forwards なので、一度終わると opacity:0 で固定される。
+   * hidden を外すだけでは黒を隠せない=対処が成立していなかった。
+   * ★テストが緑でも実機で見るまで分からなかった代表例。
+   */
+  it('出すときに保険を打ち切るクラスを付ける', () => {
+    const dom = strip(read('src/lib/panelWakeCurtainDom.js'));
+    expect(dom).toContain('nl-init-shade--rearm');
+    const at = dom.indexOf('removeAttribute');
+    expect(at).toBeGreaterThan(-1);
+    expect(dom.slice(at, at + 260)).toContain('REARM_CLASS');
+  });
+
+  it('★CSS がそのクラスで不透明に戻す(2画面とも)', () => {
+    for (const f of ['extension/popup.html', 'app/live-view.html']) {
+      const css = read(f);
+      const at = css.indexOf('.nl-init-shade--rearm');
+      expect(at).toBeGreaterThan(-1);
+      const block = css.slice(at, css.indexOf('}', at));
+      expect(block).toContain('animation: none');
+      expect(block).toContain('opacity: 1');
+    }
+  });
+
+  it('畳むときにクラスを外す(次の初回保険を邪魔しない)', () => {
+    const dom = strip(read('src/lib/panelWakeCurtainDom.js'));
+    expect(dom).toMatch(/classList\.remove\(REARM_CLASS\)/);
+  });
+});
