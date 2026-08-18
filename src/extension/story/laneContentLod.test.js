@@ -30,39 +30,39 @@ const baseCtx = {
 
 describe('shouldRenderHollow — どこを枠だけにするか', () => {
   it('たぬ姉段の後列の匿名は枠だけにする', () => {
-    expect(shouldRenderHollow(baseCtx)).toBe(true);
+    expect(shouldRenderHollow(baseCtx, true)).toBe(true);
   });
 
   it('★前列(24枚目まで)は必ずフルで描く — 既存LODの境界と揃える', () => {
     for (let i = 0; i < LANE_CONTENT_LOD_EAGER_HEAD; i += 1) {
-      expect(shouldRenderHollow({ ...baseCtx, index: i })).toBe(false);
+      expect(shouldRenderHollow({ ...baseCtx, index: i }, true)).toBe(false);
     }
     // 25枚目(index=24)から hollow に落ちる = popup.html の nth-child(n + 25) と同じ境界
-    expect(shouldRenderHollow({ ...baseCtx, index: LANE_CONTENT_LOD_EAGER_HEAD })).toBe(true);
+    expect(shouldRenderHollow({ ...baseCtx, index: LANE_CONTENT_LOD_EAGER_HEAD }, true)).toBe(true);
   });
 
   it('★③会場(wrapTileEl あり)は対象外 — 3D変形で可視判定が崩れた前科があるため', () => {
-    expect(shouldRenderHollow({ ...baseCtx, hasWrap: true })).toBe(false);
+    expect(shouldRenderHollow({ ...baseCtx, hasWrap: true }, true)).toBe(false);
   });
 
   it('★実サムネ持ちは対象外 — 既存LODも縮めていない領域を勝手に変えない', () => {
-    expect(shouldRenderHollow({ ...baseCtx, hasRealThumb: true })).toBe(false);
+    expect(shouldRenderHollow({ ...baseCtx, hasRealThumb: true }, true)).toBe(false);
   });
 
   it('★一度中身を詰めた人は二度と枠に戻さない(一方通行) — img 再生成の churn を作らないため', () => {
-    expect(shouldRenderHollow({ ...baseCtx, alreadyFilled: true })).toBe(false);
+    expect(shouldRenderHollow({ ...baseCtx, alreadyFilled: true }, true)).toBe(false);
   });
 
   it('たぬ姉段以外は対象外(MVP のスコープ)', () => {
     for (const laneName of ['link', 'gift', 'ad', 'konta', 'unknown']) {
-      expect(shouldRenderHollow({ ...baseCtx, laneName })).toBe(false);
+      expect(shouldRenderHollow({ ...baseCtx, laneName }, true)).toBe(false);
     }
   });
 
   it('壊れた入力でも例外を投げず false に倒れる', () => {
     expect(shouldRenderHollow(null)).toBe(false);
     expect(shouldRenderHollow(undefined)).toBe(false);
-    expect(shouldRenderHollow({})).toBe(false);
+    expect(shouldRenderHollow({}, true)).toBe(false);
   });
 });
 
@@ -131,7 +131,7 @@ describe('observeHollowTile — 可視域に入ったら1回だけ詰める', ()
     const hollow = buildHollowTileEl({ title: 'x' });
     lane.appendChild(hollow);
     const fill = vi.fn();
-    observeHollowTile(lane, hollow, 'u1', fill);
+    observeHollowTile(lane, hollow, 'u1', fill, true);
     expect(observed).toContain(hollow);
     expect(fill).not.toHaveBeenCalled();
   });
@@ -141,7 +141,7 @@ describe('observeHollowTile — 可視域に入ったら1回だけ詰める', ()
     const hollow = buildHollowTileEl({ title: 'x' });
     lane.appendChild(hollow);
     const fill = vi.fn();
-    observeHollowTile(lane, hollow, 'u1', fill);
+    observeHollowTile(lane, hollow, 'u1', fill, true);
 
     expect(isAlreadyFilled(lane, 'u1')).toBe(false);
     callbacks[0]([{ isIntersecting: true, target: hollow }], { unobserve() {} });
@@ -155,7 +155,7 @@ describe('observeHollowTile — 可視域に入ったら1回だけ詰める', ()
     const hollow = buildHollowTileEl({ title: 'x' });
     lane.appendChild(hollow);
     const fill = vi.fn();
-    observeHollowTile(lane, hollow, 'u1', fill);
+    observeHollowTile(lane, hollow, 'u1', fill, true);
     const obs = { unobserve() {} };
     callbacks[0]([{ isIntersecting: true, target: hollow }], obs);
     callbacks[0]([{ isIntersecting: true, target: hollow }], obs);
@@ -167,7 +167,7 @@ describe('observeHollowTile — 可視域に入ったら1回だけ詰める', ()
     const hollow = buildHollowTileEl({ title: 'x' });
     lane.appendChild(hollow);
     const fill = vi.fn();
-    observeHollowTile(lane, hollow, 'u1', fill);
+    observeHollowTile(lane, hollow, 'u1', fill, true);
     callbacks[0]([{ isIntersecting: false, target: hollow }], { unobserve() {} });
     expect(fill).not.toHaveBeenCalled();
   });
@@ -178,8 +178,8 @@ describe('observeHollowTile — 可視域に入ったら1回だけ詰める', ()
     const b = buildHollowTileEl({ title: 'b' });
     lane.append(a, b);
     const fillB = vi.fn();
-    observeHollowTile(lane, a, 'ua', () => { throw new Error('boom'); });
-    observeHollowTile(lane, b, 'ub', fillB);
+    observeHollowTile(lane, a, 'ua', () => { throw new Error('boom', true); });
+    observeHollowTile(lane, b, 'ub', fillB, true);
     expect(() => {
       callbacks[0]([{ isIntersecting: true, target: a }, { isIntersecting: true, target: b }], {
         unobserve() {}
@@ -193,7 +193,7 @@ describe('observeHollowTile — 可視域に入ったら1回だけ詰める', ()
     const laneB = document.createElement('div');
     const h = buildHollowTileEl({ title: 'x' });
     laneA.appendChild(h);
-    observeHollowTile(laneA, h, 'u1', () => {});
+    observeHollowTile(laneA, h, 'u1', () => {}, true);
     callbacks[0]([{ isIntersecting: true, target: h }], { unobserve() {} });
     expect(isAlreadyFilled(laneA, 'u1')).toBe(true);
     expect(isAlreadyFilled(laneB, 'u1')).toBe(false);
@@ -203,7 +203,7 @@ describe('observeHollowTile — 可視域に入ったら1回だけ詰める', ()
     const lane = document.createElement('div');
     const h = buildHollowTileEl({ title: 'x' });
     lane.appendChild(h);
-    observeHollowTile(lane, h, 'u1', () => {});
+    observeHollowTile(lane, h, 'u1', () => {}, true);
     callbacks[0]([{ isIntersecting: true, target: h }], { unobserve() {} });
     forgetLaneContentLod(lane);
     expect(isAlreadyFilled(lane, 'u1')).toBe(true);
@@ -223,7 +223,7 @@ describe('observeHollowTile — 可視域に入ったら1回だけ詰める', ()
         disconnect() { disconnected += 1; }
       }
     );
-    observeHollowTile(lane, h, 'u1', () => {});
+    observeHollowTile(lane, h, 'u1', () => {}, true);
     forgetLaneContentLod(lane);
     expect(disconnected).toBe(1);
   });
@@ -236,7 +236,7 @@ describe('★IntersectionObserver が無い環境ではフェイルソフトで�
     const h = buildHollowTileEl({ title: 'x' });
     lane.appendChild(h);
     const fill = vi.fn();
-    observeHollowTile(lane, h, 'u1', fill);
+    observeHollowTile(lane, h, 'u1', fill, true);
     expect(fill).toHaveBeenCalledTimes(1);
   });
 });
@@ -259,8 +259,15 @@ describe('countHollowTiles — 効いているかを数で読む計器', () => {
 });
 
 describe('★kill スイッチ(撤回手順)', () => {
-  it('既定では有効', () => {
-    expect(LANE_CONTENT_LOD_ENABLED).toBe(true);
+  /*
+   * ★v0.1.1441: 既定を false に倒した。
+   *   理由: hollow は【可視になったときだけ】中身を詰めるので、
+   *   【あとから届いたサムネが永久に出ない】退化を生んでいた
+   *   (ユーザー報告 2026-08-19)。サムネはこの拡張の価値そのものなので、
+   *   軽さより優先する。
+   */
+  it('★既定は【無効】(サムネが落ちる退化を止めるため)', () => {
+    expect(LANE_CONTENT_LOD_ENABLED).toBe(false);
   });
 
   it('★無効化したら shouldRenderHollow が常に false = 挙動が完全に旧へ戻る', async () => {
@@ -273,18 +280,22 @@ describe('★kill スイッチ(撤回手順)', () => {
       path.join(process.cwd(), 'src/extension/story/laneContentLod.js'),
       'utf8'
     ).replace(/\r\n/g, '\n');
-    const killed = src.replace(
-      'export const LANE_CONTENT_LOD_ENABLED = true;',
-      'export const LANE_CONTENT_LOD_ENABLED = false;'
+    // ★現在の既定は false なので、【true へ戻す】変異でスイッチの生死を見る。
+    //   将来 true に戻すとき、この検査が安全網になる。
+    const revived = src.replace(
+      'export const LANE_CONTENT_LOD_ENABLED = false;',
+      'export const LANE_CONTENT_LOD_ENABLED = true;'
     );
-    // 置換が実際に効いたことを確かめる(空振りしたまま緑になるのを防ぐ)
-    expect(killed).not.toBe(src);
+    const killed = src; // 既定(false)のままのソース
+    // ★置換が実際に効いたことを確かめる(空振りしたまま緑になるのを防ぐ)
+    expect(revived).not.toBe(src);
 
     const mod = await import(
       /* @vite-ignore */ `data:text/javascript;base64,${Buffer.from(killed).toString('base64')}`
     );
     expect(mod.LANE_CONTENT_LOD_ENABLED).toBe(false);
     // どの位置・どの段でも hollow にならない
+    // ★第2引数を渡さない = 定数がそのまま効く経路(出荷と同じ)
     expect(mod.shouldRenderHollow(baseCtx)).toBe(false);
     expect(mod.shouldRenderHollow({ ...baseCtx, index: 9999 })).toBe(false);
 
@@ -302,6 +313,7 @@ describe('★kill スイッチ(撤回手順)', () => {
     const lane = document.createElement('div');
     const h = mod.buildHollowTileEl({ title: 'x' });
     const fill = vi.fn();
+    // ★第5引数を渡さない = 定数がそのまま効く経路(出荷と同じ)
     mod.observeHollowTile(lane, h, 'u1', fill);
     expect(made).toBe(0);
     expect(fill).not.toHaveBeenCalled();
