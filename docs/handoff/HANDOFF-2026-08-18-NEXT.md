@@ -1,6 +1,6 @@
 # 引き継ぎ 2026-08-18 — 次のセッションはこの1枚から
 
-> ブランチ **`feat/lane-density-lod`** / **v0.1.1426** / `verify:cc OK`
+> ブランチ **`feat/lane-density-lod`** / **v0.1.1428** / `verify:cc OK`
 > ★**master に切り替えないこと**（Chrome がリポの `extension/` を直接読むため版が戻る）
 
 ---
@@ -187,6 +187,7 @@ npm run verify:deploy
 | 9 | ★**生成マップは「build のあと」に作る** — `tree-map`/`site-health`/`feature-map` は dist を読むので、`verify:cc` の build 後に作り直さないと `drift` で落ち続ける（08-18に3回踏んだ） |
 | 10 | ★**版を上げたら LP も直す** — `tsuioku-no-kirameki/index.html` の4箇所（meta description / JSON-LD softwareVersion / twitter:description / フッター）。`verify:bump [6]` が機械照合する |
 | 11 | ★**happy-dom 環境では `import.meta.url` が file: にならない** — テストからソースを読むときは `process.cwd()` 起点にする |
+| 12 | ★**python で書き戻すと CRLF が LF になり、既存 wiring テストが一斉に落ちる** — `popup-entry.js` を1行直しただけで差分44,852行・テスト11本が赤(2026-08-18に踏んだ)。`io.open(p,'r',encoding='utf-8',newline='')` で読み書きする。**差分の行数が異常なら真っ先にこれを疑う** |
 
 ---
 
