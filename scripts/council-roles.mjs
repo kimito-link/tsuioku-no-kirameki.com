@@ -76,6 +76,21 @@ export function roleOf(name) {
   if (n.includes("gpt-oss-120b")) return "critic";
   // gpt-oss(20b・safeguard-20b 等) はローカル/クラウドの軽量別系統発散 → diverge-alt。
   if (n.includes("gpt-oss")) return "diverge-alt";
+  // 2026-08-18 追加: local/qwen3.5:9b は速い視点(fast)。GroqのLlama一斉廃止(404)で
+  // fast役のクラウド主力が全滅した後継（VRAM100%格納=/api/psでCPUはみ出しゼロ・
+  // 2回目以降2.0〜2.4秒・fast役systemで143〜216字・レート制限が構造的に無い、を実測して採用）。
+  // 下のqwen3一括判定より必ず前に置くこと（ifは先勝ち。後ろに置くとdivergeに食われる）。
+  // 判定はコロン付き完全形"qwen3.5:9b"にする——素の"qwen3.5"だとqwen3.5-122b系
+  // （EOL済みだがweightOfに判定が残る）の将来の再採用時に巻き込むため。
+  // groq/qwen3.6-27b・local/qwen3:14bは"qwen3.5:9b"に非一致で従来どおりdivergeのまま。
+  // divergeの穴: 同役割はqwen3.6-27b(weight1)・qwen3:14b(weight5)が残り、selectMembersは
+  // diverge席を1つしか取らないため実害なし。weightOfは変更不要（local 9b以下の既定3が
+  // 自動適用。weight3<9のためselectMembersのheavy上限にもmeeting.mjsの共有スロットにも
+  // 掛からない）。初回呼び出しはモデルロード込み約14秒だが、ollamaChatの既定180秒に対し
+  // 余裕があり、並列ラウンドの律速はlead(nemotron 550b・実測52〜104秒)のため影響しない。
+  // 撤去条件: Ollama起動中の実会議でfast役として2回連続FAILEDなら、後継を立てず
+  // fast役の役割定義ごと削除する（2026-08-18裁定の予備線）。
+  if (n.includes("qwen3.5:9b")) return "fast";
   if (n.includes("qwen3") || n.includes("qwen3.5")) return "diverge";
   if (n.includes("gemma4")) return "lead";
   // 2026-07-14 追加: 超大型は統括(lead)。会議のlead枠は従来local/gemma4(8B)頼みで
@@ -259,6 +274,8 @@ export const ROLE_FALLBACK = {
   diverge: ["diverge-alt", "generalist"],
   // 2026-07-04 追加: fast主力(llama-3.3-70b/llama-4-scout)が両方 TPD 枯渇/障害で
   // 全滅した最悪日でも、別プロバイダの generalist(gemini-2.5-flash) が代行する。
+  // 2026-08-18: fast主力がlocal/qwen3.5:9bへ移設され（クラウドfastは全廃）、この代打の
+  // 発動条件は実質「Ollama停止時」になった。generalist=gemini-2.5-flash(weight1)が代行する。
   fast: ["generalist"],
 };
 
