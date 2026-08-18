@@ -215,7 +215,7 @@ graph LR
 - `briefs/`（6 件） — ⚠️ 未記入（ROLES に追記）
 
 ## `docs/` — 設計正本・マインドマップ・フロー図・feature-map(AI/人間向け)  〔設計 / レポート〕
-<sub>ファイル 300 件</sub>
+<sub>ファイル 301 件</sub>
 
 - `article-assets/`（87 件） — 記事用の画像・動画・音声アセット  〔記事 / 画像〕
 - `article-drafts/`（2 件） — ⚠️ 未記入（ROLES に追記）
