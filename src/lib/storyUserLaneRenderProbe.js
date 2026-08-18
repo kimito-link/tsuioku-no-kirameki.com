@@ -341,6 +341,7 @@ export function buildStoryUserLaneRenderDiag(probeSnap, ctx) {
     lastRunAgoMs: s.lastRunAgoMs ?? null,
     // v0.1.1040 計器: 段ごとの実 replaceChildren 回数(churn 実測)をそのまま持ち越す。
     laneRepaintCounts: s.laneRepaintCounts && typeof s.laneRepaintCounts === 'object' ? s.laneRepaintCounts : null,
+    laneHollowCounts: s.laneHollowCounts && typeof s.laneHollowCounts === 'object' ? s.laneHollowCounts : null,
     verdict,
     reason
   };
@@ -397,6 +398,22 @@ export function formatStoryUserLaneRenderDiagLines(diag, ctx) {
     lines.push(
       `  → 段別 再描画回数(累計): りんく${r.link || 0} / こん太${r.konta || 0} / たぬ姉${r.tanu || 0} / ギフト${r.gift || 0} / 広告${r.ad || 0}` +
         '（特定の段だけ突出＝その段が churn 源）'
+    );
+  }
+  /*
+   * ★v0.1.1428 計器: 中身LOD(枠は残す・中身だけ空にする)が実際に効いているか。
+   *   0 のときは「効いていない」ではなく【まだ条件を満たしていない】ことが多いので、
+   *   タイル数と併記して読み手が判断できるようにする
+   *   ([[unobserved-must-not-hide-the-cell]]: 使っていない0と動くはずの0は別物)。
+   */
+  if (d.laneHollowCounts && typeof d.laneHollowCounts === 'object') {
+    const h = d.laneHollowCounts;
+    const hollow = Math.max(0, Math.floor(Number(h.total) || 0));
+    const tiles = Math.max(0, Math.floor(Number(d.domTilesPainted) || 0));
+    lines.push(
+      hollow > 0
+        ? `  → 中身LOD ✅ 枠だけ${hollow}枚(たぬ姉${Math.max(0, Math.floor(Number(h.tanu) || 0))}枚) / 全${tiles}枚 — 画面に入ると中身が入ります(DOMを減らしています)`
+        : `  → 中身LOD ⚪ 枠だけ0枚 / 全${tiles}枚 — たぬ姉段が25枚を超え、かつ匿名のときだけ働きます(条件未達なら0が正常)`
     );
   }
   // v0.1.1033: heavy 完了が settled に到達したか。race 多発=たぬ姉レーンが暫定(直近N件)で固着の真因。

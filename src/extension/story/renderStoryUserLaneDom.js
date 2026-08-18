@@ -36,6 +36,7 @@ import {
 //   (ここは「どこで呼ぶか」だけ=ちらつき対策の鍵 storyLaneTierBodyKey には一切触れない)。
 import {
   buildHollowTileEl,
+  countHollowTiles,
   forgetLaneContentLod,
   isAlreadyFilled,
   observeHollowTile,
@@ -105,6 +106,25 @@ function laneNameOfEl(el) {
 /** 計器の現在値(状態速報が読む・スナップショット)。 */
 export function getStoryLaneRepaintCounts() {
   return { ...(_laneTierRepaintCount) };
+}
+
+/**
+ * ★2026-08-18 計器(観測のみ): いま各段に「枠だけ(hollow)」のタイルが何枚あるか。
+ *   中身LOD が実際に効いているかを状態速報の数字で判定するため。
+ *   ★DOM を読むが、既存の計器バッチ(getStoryLaneRepaintCounts と同じ場所)に
+ *     相乗りさせる=read を1本増やさない([[instrument-can-kill-the-page-it-measures]])。
+ * ★引数は document(または任意の root)。els を持ち回らずに済むよう root 起点で数える。
+ * @param {Document|HTMLElement|null} root
+ * @returns {{ tanu: number, total: number } | null}
+ */
+export function getStoryLaneHollowCounts(root) {
+  if (!root || typeof root.querySelector !== 'function') return null;
+  try {
+    const tanuEl = root.querySelector('#sceneStoryUserLaneTanu');
+    return { tanu: countHollowTiles(tanuEl), total: countHollowTiles(root) };
+  } catch {
+    return null; // 計器失敗は描画も速報も止めない
+  }
 }
 
 /**

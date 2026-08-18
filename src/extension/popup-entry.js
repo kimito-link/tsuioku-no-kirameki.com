@@ -633,7 +633,7 @@ import { userLaneHttpForTilePick } from '../lib/storyUserLaneDisplaySrc.js';
 import {
   paintStoryUserLaneDomEmptyGuides,
   paintStoryUserLaneDomFilled,
-  resetStoryUserLaneDom, getStoryLaneRepaintCounts, shouldKeepStoryUserLaneTilesOnEmpty,
+  resetStoryUserLaneDom, getStoryLaneRepaintCounts, getStoryLaneHollowCounts, shouldKeepStoryUserLaneTilesOnEmpty,
   // heavyRace再発の即効対策(HANDOFF-heavyrace-backfill-IMPL.md A): 暫定(heavy未settle)の短い候補で
   //   一度出た完全描画を上書き退化させない単調性ガード。
   shouldKeepStoryUserLaneTilesOnShrink,
@@ -19254,7 +19254,7 @@ async function collectAiShareDevMonitorPayloadBundle(watchUrl) {
       storyUserLaneRenderProbe: (() => {
         try {
           const snap = snapshotStoryUserLaneRenderProbe(_storyUserLaneRenderProbe, Date.now());
-          if (snap) snap.laneRepaintCounts = getStoryLaneRepaintCounts(); // v0.1.1040 計器: 段別 churn 実測
+          if (snap) { snap.laneRepaintCounts = getStoryLaneRepaintCounts(); snap.laneHollowCounts = getStoryLaneHollowCounts(document); } // v0.1.1040/v0.1.1428 計器: 段別churn実測 + 中身LODが効いているか
           // heavyRace根治(B)計器: fresh-read で heavy 全件再読みを省いた累計(実配信で効きと12秒ギャップの適正を判定)。
           if (snap) { /* ★v1357: 実DOM起点の縮小観測も渡す(履歴だけだと嘘をつく) */ snap.heavyFreshReadReuseCount = _heavyFreshReadReuseCount; snap.heavyReuseLastReason = _heavyReuseLastReason; snap.heavyRacePaintedFromCache = _heavyRacePaintedFromCacheCount; snap.laneTileOscillation = summarizeLaneTileOscillation(_laneTileHistory, { domShrinkCount: _laneSupplyOriginDiag?.shrinkObservedCount, domShrinkCulprit: _laneSupplyOriginDiag?.shrinkCulprit }); }
           // heavyRace根治(C-1)計器: 進行中read への合流で新規readを張らずに済んだ累計(single-flightの効き)。

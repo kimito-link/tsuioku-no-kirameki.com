@@ -718,7 +718,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (1739)
+- 📁 **src/** (1740)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1015,7 +1015,7 @@
         - `logo_funlink_white_RGB_maru_black.png`
       - `logo_guide_funlink_ol.pdf`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1492)
+  - 📁 **lib/** (1493)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -1638,6 +1638,7 @@
     - `kokenGiftHistoryApi.test.js`
     - `kokenGiftHistoryFetchClient.js` — popup / content から service-worker 経由で koken ギフト履歴 API を叩く薄いクライアント。
     - `laneContentLod.wiring.test.js`
+    - `laneContentLodDiag.wiring.test.js`
     - `laneDensityLod.wiring.test.js`
     - `laneDetailCells.js` — 応援レーンの観測を【打ち手が変わる単位】に割る(純関数)。
     - `laneDetailCells.test.js`
