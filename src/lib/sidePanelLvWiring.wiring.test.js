@@ -90,3 +90,48 @@ describe('サイドパネルへの lv 受け渡し', () => {
     expect(entry).toContain('buildSidePanelIframeSrc');
   });
 });
+
+describe('★SWを待たない自力解決(v0.1.1435)', () => {
+  /*
+   * ユーザーの訴え:「サービスワーカーが無効になる確率が多すぎて確認に時間がかかる」
+   *              「会場モードはすぐにうごくけど」
+   * ＝サイドパネルは SW の onClicked を必ず起こすので、SWが寝ていると待たされる。
+   * → ①(?lv=)が空のときだけ、パネル自身が chrome.tabs.query で watchタブを探す。
+   */
+  it('パネルが自力で lv を探す経路を持つ', () => {
+    const entry = stripComments(read('src/extension/sidepanel-entry.js'));
+    expect(entry).toContain('pickLvFromTabs');
+    expect(entry).toContain('chrome.tabs.query');
+  });
+
+  it('★①(?lv=)が在るときは自力探索を走らせない(順序の固定)', () => {
+    const entry = stripComments(read('src/extension/sidepanel-entry.js'));
+    // else if (!readSidePanelLv(...)) の形 = ①が空のときだけ②へ行く
+    expect(entry).toMatch(/else if \(!readSidePanelLv\(/);
+    const elseAt = entry.indexOf('else if (!readSidePanelLv(');
+    const queryAt = entry.indexOf('chrome.tabs.query');
+    expect(elseAt).toBeGreaterThan(-1);
+    expect(elseAt).toBeLessThan(queryAt);
+  });
+
+  it('★active を条件にしない(裏タブで別タブを掴む事故の再発防止)', () => {
+    const lib = stripComments(read('src/lib/sidePanelLvFromTabs.js'));
+    // 問い合わせ条件は url だけ
+    expect(lib).toContain('SIDE_PANEL_WATCH_TAB_QUERY');
+    expect(lib).not.toMatch(/active:\s*true/);
+  });
+
+  it('★曖昧(watchタブ複数)なら選ばない= ambiguous を返す', () => {
+    const lib = stripComments(read('src/lib/sidePanelLvFromTabs.js'));
+    expect(lib).toContain("'ambiguous'");
+    expect(lib).toMatch(/found\.size > 1/);
+  });
+
+  it('★失敗しても素の src に倒れる(描画をJSに依存させない)', () => {
+    // ★コメント内の言及ではなく【実際の呼び出し】を見る(await 付き)
+    const entry = stripComments(read('src/extension/sidepanel-entry.js'));
+    const at = entry.indexOf('await chrome.tabs.query');
+    expect(at).toBeGreaterThan(-1);
+    expect(entry.slice(at, at + 500)).toContain('catch');
+  });
+});

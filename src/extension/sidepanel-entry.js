@@ -17,7 +17,8 @@ import { summarizeEventLoopStall } from '../lib/eventLoopStallSummary.js';
 import { buildCommentWriteModeDiagLine } from '../lib/commentWriteModeDiag.js';
 import { KEY_COMMENT_WRITE_MODE_DIAG } from '../lib/commentWriteModeDiagKey.js';
 import { KEY_SIDEPANEL_SELF_DIAG } from '../lib/sidepanelSelfDiagKey.js';
-import { buildSidePanelIframeSrc } from '../lib/sidepanelIframeSrc.js';
+import { buildSidePanelIframeSrc, readSidePanelLv } from '../lib/sidepanelIframeSrc.js';
+import { SIDE_PANEL_WATCH_TAB_QUERY, pickLvFromTabs } from '../lib/sidePanelLvFromTabs.js';
 
 /*
  * ★v0.1.1419: iframe に配信ID(lv)を渡してから読み込ませる。【描画に関与する唯一の処理】。
@@ -47,7 +48,38 @@ try {
      *   ★lv が無い/このスクリプトが落ちる場合でも、HTML の src で
      *   パネルは必ず出る(v0.1.1419 の単一障害点を撤回した理由)。
      */
-    if (next && next !== base) ifr.setAttribute('src', next);
+    if (next && next !== base) {
+      ifr.setAttribute('src', next);
+    } else if (!readSidePanelLv(window.location.search)) {
+      /*
+       * ★v0.1.1435: ①(?lv=)が空のときだけ、パネルが【自力で】watchタブを探す。
+       *
+       * ■ なぜ要るか(ユーザーの訴え)
+       *   「サービスワーカーが無効になる確率が多すぎて確認に時間がかかる」
+       *   「会場モードはすぐにうごくけど」
+       *   ＝サイドパネルは SW の onClicked を必ず起こすので、SWが寝ていると
+       *     その起動待ちがそのまま体感の遅さになる(MV3のSWは30秒で止まる)。
+       *     会場モードが速いのは、ページ内で完結してSWを起こさないから。
+       *   → ここで chrome.tabs.query を【パネル自身が】呼べば SW を待たない
+       *     (公式: Tabs API は extension pages から使える。tabs 権限は manifest に在る)。
+       *
+       * ★①が在るときは呼ばない = SWが起きている通常時は従来と完全に同じ挙動。
+       * ★曖昧(watchタブ複数)なら pickLvFromTabs が '' を返す = 従来経路に倒れる。
+       *   「速いが違う配信」より「遅いが正しい」を選ぶ(ユーザー確定)。
+       * ★失敗しても素の src でパネルは出る(描画をJSに依存させない既存方針)。
+       */
+      void (async () => {
+        try {
+          const tabs = await chrome.tabs.query(SIDE_PANEL_WATCH_TAB_QUERY);
+          const picked = pickLvFromTabs(tabs);
+          if (!picked.lv) return; // none / ambiguous = 何もしない(従来どおり)
+          const withLv = buildSidePanelIframeSrc(base, `?lv=${picked.lv}`);
+          if (withLv && withLv !== ifr.getAttribute('src')) ifr.setAttribute('src', withLv);
+        } catch {
+          /* no-op: 取れなければ従来どおり素の src のまま */
+        }
+      })();
+    }
   }
 } catch {
   /* no-op: 失敗してもパネルは HTML の src で出る(描画を JS に依存させない) */
