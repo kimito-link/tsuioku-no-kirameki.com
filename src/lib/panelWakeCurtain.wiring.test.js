@@ -76,7 +76,7 @@ describe('3キャラの幕をそのまま使う', () => {
   });
 });
 
-describe('★出し直しは不透明でなければ意味がない(実機で踏んだ)', () => {
+describe('★幕は【出さない】(v0.1.1443で方針を反転)', () => {
   /*
    * 実機(2026-08-18): 幕を出し直しても opacity:0 のままで【透けていた】。
    * 初回の 5s CSS 保険が forwards なので、一度終わると opacity:0 で固定される。
@@ -97,8 +97,9 @@ describe('★出し直しは不透明でなければ意味がない(実機で踏
       const at = css.indexOf('.nl-init-shade--rearm');
       expect(at).toBeGreaterThan(-1);
       const block = css.slice(at, css.indexOf('}', at));
-      expect(block).toContain('animation: none');
-      expect(block).toContain('opacity: 1');
+      // ★v0.1.1443: 不透明に戻すのをやめた。幕そのものが黒い影だったため。
+      expect(block).toMatch(/opacity:\s*0\s*!important/);
+      expect(block).not.toMatch(/opacity:\s*1\s*!important/);
     }
   });
 
@@ -140,5 +141,26 @@ describe('★★幕は【出たら必ず数字に出る】(v0.1.1441+)', () => {
     const extras = read('src/lib/statusExtrasBatch.js');
     expect(extras).toContain('KEY_PANEL_WAKE_CURTAIN_DIAG');
     expect(extras).toMatch(/panelWakeCurtainDiag: b\[KEY_PANEL_WAKE_CURTAIN_DIAG\]/);
+  });
+});
+
+describe('★★CSS側でも幕を止める(v0.1.1443・二重の止め)', () => {
+  /*
+   * ■ なぜ CSS 側も止めるか
+   *   v0.1.1442 で JS(shouldShowOnResize)を false にしたが、
+   *   拡張をリロードするまで【古い JS がメモリに残る】。
+   *   実際ユーザーの環境では反映後も黒が出ていた。
+   *   CSS はページを開き直せば即反映されるので、
+   *   【どちらかが古くても幕が見えない】状態を作る。
+   */
+  it('★rearm 規則は幕を【見せない】側に倒れている', () => {
+    const html = read('extension/popup.html');
+    const at = html.indexOf('.nl-init-shade.nl-init-shade--rearm {');
+    expect(at).toBeGreaterThan(-1);
+    const rule = html.slice(at, html.indexOf('}', at));
+    expect(rule).toMatch(/opacity:\s*0\s*!important/);
+    // ★完全不透明に戻す変異を拒否する
+    expect(rule).not.toMatch(/opacity:\s*1\s*!important/);
+    expect(rule).not.toMatch(/visibility:\s*visible\s*!important/);
   });
 });
