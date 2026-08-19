@@ -13,5 +13,10 @@
     "types": ["chrome"]
   },
   "include": ["src/**/*.js", "src/**/*.d.ts", "extension/background.js"],
-  "exclude": ["**/node_modules", "extension/dist", "**/*.test.js"]
+  "exclude": [
+    "**/node_modules",
+    "extension/dist",
+    "**/*.test.js",
+    "src/lib/changelog-archive.js"
+  ]
 }
