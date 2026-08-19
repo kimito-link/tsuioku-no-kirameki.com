@@ -344,6 +344,12 @@ export default [
     //     片方だけ下げると体感時間が変わらないまま緑になる(v0.1.1414 の再演)。
     //     contentBlindTime.wiring.test.js が両者の関係を機械照合する(変異で赤を確認済)。
     // ★2026-08-17(v0.1.1423) 22408 → 22426(+18)。幕(cloak)を付けるのをやめた。
+    // ★2026-08-19(v0.1.1444) 22426 → 22427(+1)。
+    //   初回シェードが hidden の間【一度も畳まれない】穴を塗ぐ arm() の1行。
+    //   実測(状態速報): dismissCalls=0 / docHidden=1 /
+    //   「初回シェード t+801ms まで中身を覆っていた ★主因=初回シェード」。
+    //   ★判定本体は src/lib/initShadeDismissPolicy.js へ逃がしてあり、
+    //   ここに増やしたのは呼び出し1行だけ。
     //   増分は【なぜやめたか】の記録のみ(実装は setAttribute を1行消しただけ)。
     //   ユーザー証言「サイドパネル導入時は問題なかった」を git log で裏取りし、
     //   v0.1.1279 で幕を足した版から黒が始まったことを確認した。
@@ -351,7 +357,7 @@ export default [
     //   実機の黒は一度も消えなかった。＝足すのをやめ、始まりへ戻す判断。
     //   ★この記録を消さないこと。消すと「なぜ幕が無いのか」が分からなくなり、
     //     善意で再び足されて同じ12版を繰り返すことになる。
-    rules: { 'max-lines': ['error', { max: 22426, skipBlankLines: false, skipComments: false }] }
+    rules: { 'max-lines': ['error', { max: 22427, skipBlankLines: false, skipComments: false }] }
   },
   {
     files: ['src/extension/popup/**/*.js'],

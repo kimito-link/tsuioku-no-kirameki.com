@@ -784,7 +784,7 @@
   - `src/lib/statusTrendKey.js`
   - `src/extension/status-entry.js`
   - `src/lib/statusActionAdvisor.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 179</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 180</summary>
 
 - `app/app.js` — スマホ閲覧用 status Web 版。
 - `app/live-view.js` — global NL_BUILD_ID
@@ -859,6 +859,7 @@
 - `src/lib/heavyCachePreserve.js` — 軽い read が heavy read の証跡を消さないための純関数(v0.1.1367)。
 - `src/lib/hiddenPublishPolicy.js` — 「画面が隠れているとき、鏡の publish まで止めてよいか」の判定(純関数)。
 - `src/lib/htmlEscape.js` — 旧パス：`src/lib/htmlEscape.js`
+- `src/lib/initShadeDismissPolicy.js` — 初回ロードの幕(シェード)を【いつ畳むか】を決める純関数。
 - `src/lib/initShadeFailsafe.js` — 初回ロード幕(.nl-init-shade)の CSS フェイルセーフとクラスの乖離を断つ純関数。
 - `src/lib/isInsideRecommendedLiveSection.js` — v0.1.200: ニコ生 watch ページの「おすすめ生放送」セクション内 DOM を識別する純関数。
 - `src/lib/lengthDelimitedStream.js` — length-delimited（varint 長 + ペイロード）の連続を分割する。
@@ -970,7 +971,7 @@
 
 ## 🧬 修正系譜マップ(この系統のバグを過去にどう直したか)
 
-> changelog 全 773 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
+> changelog 全 774 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
 
 ### 💾 記録件数 (99版)
 - `v0.1.1429` 2026-08-18 — 広告メッセージを記録できるか調べる計器を追加
@@ -2003,7 +2004,8 @@
 - `v0.1.673` 2026-06-10 — コメビュの名前をパネルと同じ情報源で補完
 - `v0.1.670` 2026-06-10 — コメビュのアイコンを本家と同じサムネに
 
-### 🩺 診断・状態速報 (292版)
+### 🩺 診断・状態速報 (293版)
+- `v0.1.1444` 2026-08-19 — 開いたときの黒い時間を短くしました
 - `v0.1.1442` 2026-08-19 — 引っ張るときの黒い影を止めました
 - `v0.1.1428` 2026-08-18 — 応援レーンの軽量化が効いているか見えるようにしました
 - `v0.1.1426` 2026-08-18 — 応援レーンの動作を軽くしました
