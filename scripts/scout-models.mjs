@@ -180,6 +180,9 @@ async function listSambanova() {
 // 53体・うちchat系39体を確認）。埋め込み/OCR/音声(voxtral)等の非チャットモデルも同じ
 // 一覧に混ざるが、健康診断はLINEUPのrawIdとの突合なのでフィルタは不要（新着候補の
 // 提示時に人間が読んで判断する。同じ事情のcloudflare/nvidiaもフィルタしていない）。
+// 2026-08-19 補足: OCR系は候補選抜(EXCLUDE_RE)で除外するようにした。「フィルタは不要」は
+// カタログ取得層の話であり今も維持（健康診断・差分計算の分母は全量のまま）。候補層は
+// 元からEXCLUDE_REで非チャット(embed/whisper/tts等)を落としており、ocr追加はその抜けの補完。
 async function listMistral() {
   if (!MI) return { ok: false, models: [], error: '未設定' };
   try {
@@ -278,13 +281,75 @@ if (PROBE_ONLY) {
 }
 
 // ── ヒューリスティクス（§2-4）──────────────────────────────────────────────
-const EXCLUDE_RE = /embed|whisper|tts|audio|guard|rerank|vision|clip|image|sdxl|flux|moderation/i;
+// 2026-08-19: ocr を追加。mistral-ocr系7件(実体3グループ)が候補として溜まり、1日5枠しか
+// 無いプローブ枠を燃やした実測を受けて（OCRはchat/completions対象の頭脳ではなく会議
+// メンバーに成り得ない。INTEREST_REが"mistral"部分一致で拾ってしまうため除外側で止める）。
+// カタログ取得(listMistral)側は従来どおり無フィルタ＝健康診断・差分計算の分母は全量のまま。
+const EXCLUDE_RE = /embed|whisper|tts|audio|guard|rerank|vision|clip|image|sdxl|flux|moderation|ocr/i;
 const INTEREST_RE = /llama|qwen|deepseek|nemotron|glm|kimi|mistral|gemma|gpt-oss|command|phi/i;
 
 function estimateParamsB(modelId) {
   const m = String(modelId).match(/(\d+)b/i);
   return m ? Number(m[1]) : 0;
 }
+/**
+ * 未採用候補をaliasグループ単位で1件に折りたたむ（2026-08-19追加）。
+ * adoptedRawIdsのalias展開(2026-08-13)は「採用中モデルの別名」しか除けず、未採用モデル同士の
+ * 別名重複は全部候補に残る設計だった。実害(2026-08-19実測): mistral-mediumの別名6件が
+ * 新着候補5枠を全部埋め、同日のプローブ5回がすべて同一モデルに燃えた。pending22件の実体は
+ * 8グループしかなく、本来検討すべき未検討グループが永久に順番待ちになる構造。
+ * 代表IDは「候補内に実在するID」のうち日付入り固定ID(-2508/-2604等)を優先し、複数あれば
+ * 最新を選ぶ: -latestエイリアスは死を防がず(devstral-medium-latest自体に期限が付いていた
+ * 実測・2026-08-13)、無通知の中身差し替えで「プローブした個体」と「採用検討する個体」が
+ * 食い違う害だけが残るため(codestral採用時の固定ID推奨と同じ流儀)。固定IDが無いグループは
+ * pending最古(元の並び順先頭)を残す。グループ全体からでなく候補内から代表を選ぶのは、
+ * 濾過済みのIDを候補へ再注入しないため(fail-closed)。
+ * aliasGroupsを返すのは現状mistralのみ。返さないプロバイダの候補は素通し
+ * (adopted側のalias展開と同じfail-open)。mistralの取得に失敗した日はグループ情報が無く
+ * 折りたたみ不能だが、pendingは前回実行の書き込み時点で既に代表のみへ収縮済みのため
+ * 再膨張しない(fresh側も取得失敗日はdiffs不成立で増えない)。
+ * @param {Array<{provider:string,modelId:string}>} candidates フィルタ済み候補（pending+新着）
+ * @param {Object} fetchResults プロバイダ別の一覧取得結果
+ * @returns {Array<{provider:string,modelId:string,aliasCount:number}>} グループ代表のみの候補列
+ */
+function collapseAliasCandidates(candidates, fetchResults) {
+  // id→所属グループ(Set)。Mistralの/v1/modelsは同一モデルの各エントリがそれぞれ自分視点の
+  // aliases列を返すため、同じモデルのグループが部分集合として複数回現れる。重なったら合流する。
+  const groupOf = {}; // provider -> Map(id -> Set)
+  for (const [provider, result] of Object.entries(fetchResults)) {
+    const map = new Map();
+    for (const group of (result.aliasGroups || [])) {
+      const merged = new Set(group);
+      for (const id of group) for (const x of (map.get(id) || [])) merged.add(x);
+      for (const id of merged) map.set(id, merged);
+    }
+    groupOf[provider] = map;
+  }
+  const isFixedId = (id) => /-\d{4}$/.test(id); // 日付入り固定ID(-2508等)の緩い判定
+  const kept = [];               // グループ代表（候補の元の並び順を保つ）
+  const byGroup = new Map();     // グループSet(参照) -> keptのindex
+  for (const c of candidates) {
+    const group = groupOf[c.provider]?.get(c.modelId);
+    if (!group) { kept.push({ ...c, aliasCount: 1 }); continue; } // グループ情報なし＝素通し
+    const idx = byGroup.get(group);
+    if (idx === undefined) {
+      byGroup.set(group, kept.length);
+      kept.push({ ...c, aliasCount: 1 });
+      continue;
+    }
+    const cur = kept[idx];
+    const n = cur.aliasCount + 1;
+    // 代表の入れ替え: 固定IDが非固定IDに勝つ。固定ID同士は新しい方(文字列比較で大きい方)が勝つ。
+    if ((isFixedId(c.modelId) && !isFixedId(cur.modelId)) ||
+        (isFixedId(c.modelId) && isFixedId(cur.modelId) && c.modelId > cur.modelId)) {
+      kept[idx] = { ...c, aliasCount: n };
+    } else {
+      cur.aliasCount = n;
+    }
+  }
+  return kept;
+}
+
 function isCandidateWorthy(modelId) {
   if (EXCLUDE_RE.test(modelId)) return false;
   const params = estimateParamsB(modelId);
@@ -450,8 +515,15 @@ async function main() {
     // 「採用すべきか」として出てきた——司令塔が今日踏んだ罠(期限付きモデルの採用)を、
     // scoutが毎日勧め続ける構造になっていた。期限付きを新規に採用する理由は無い。
     .filter((c) => !((newDeprecations[c.provider] || {})[c.modelId]));
-  const toProbe = allCandidates.slice(0, 5);
-  const carryOver = allCandidates.slice(5);
+  // 2026-08-19: ヒューリスティクスをpendingの持ち越し分にも遡及適用する。EXCLUDE_REを後から
+  // 強化しても(今回のocr追加)、既にpendingへ積まれた分には効かず居座り続けるため
+  // (adoptedRawIdsのalias展開をpendingにも効かせた2026-08-13の判断と同じ構図)。
+  const worthyCandidates = allCandidates.filter((c) => isCandidateWorthy(c.modelId));
+  // 2026-08-19: 未採用候補同士のalias重複排除（詳細はcollapseAliasCandidatesのコメント参照）。
+  // 既存フィルタの後に置くこと必須——先に折りたたむと、deprecation付きの別名が代表に選ばれ得る。
+  const grouped = collapseAliasCandidates(worthyCandidates, fetchResults);
+  const toProbe = grouped.slice(0, 5);
+  const carryOver = grouped.slice(5);
 
   // 5. 候補プローブ
   const probedCandidates = [];
@@ -479,7 +551,9 @@ async function main() {
     catalogs: newCatalogs,
     deprecations: newDeprecations,
     adoptedHealth: health,
-    pendingCandidates: carryOver,
+    // aliasCountは実行のたびにaliasGroupsから再計算されるため、stateには持たせない
+    // (スキーマを増やさない。書き込むのは折りたたみ後の代表のみ＝取得失敗日の再膨張防止)。
+    pendingCandidates: carryOver.map(({ provider, modelId }) => ({ provider, modelId })),
     lastRunAt: new Date().toISOString(),
   };
 
@@ -579,7 +653,10 @@ function buildBrief({ date, isFirstRun, fetchStatus, healthAlerts, probedCandida
   } else {
     lines.push('| モデル | プロバイダ | プローブ | 所感メモ欄 |', '|---|---|---|---|');
     for (const c of probedCandidates) {
-      lines.push(`| ${c.modelId} | ${c.provider} | ${c.probe.status} / ${c.probe.ms}ms | （空欄＝人間用） |`);
+      // 2026-08-19: alias集約時は代表であることを明示する（人間が別名の存在を知らずに
+      // 同系IDを二重検討しないため。代表は日付固定ID優先＝プローブした個体そのものを検討できる）。
+      const aliasNote = (c.aliasCount || 1) > 1 ? `（別名${c.aliasCount - 1}件を集約）` : '';
+      lines.push(`| ${c.modelId}${aliasNote} | ${c.provider} | ${c.probe.status} / ${c.probe.ms}ms | （空欄＝人間用） |`);
     }
   }
   if (carryOverCount > 0) lines.push('', `未処理: ${carryOverCount}件（次回に持ち越し）`);
