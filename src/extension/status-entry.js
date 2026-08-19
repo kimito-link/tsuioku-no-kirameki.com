@@ -21,7 +21,6 @@
  * @module status-entry
  */
 
-import { KEY_AI_SHARE_POPUP_DIAG } from '../lib/aiSharePopupDiagKey.js';
 // リリース工程ガード「版混在の実行時検知」(2026-07-06): NL_BUNDLE_VERSION(このバンドルの
 //   ビルド時 package.json version)と chrome.runtime.getManifest().version(実行時本体 version)を
 //   突合し、ズレていれば画面上部にバナーを出す。詳細は src/lib/versionMismatch.js の背景コメント参照。
@@ -86,6 +85,7 @@ import { KEY_VOICE_DIAG } from '../lib/voiceDiagKey.js';
 import { computeRefreshBackoffTicks } from '../lib/statusRefreshBackoff.js';
 import { shouldReadNow } from '../lib/statusReadPolicy.js';
 import { shouldUpdateAiShareText } from '../lib/aiShareTextChanged.js';
+import { buildCoreBatchKeys, pickCoreBatchValues } from '../lib/statusCoreBatch.js';
 // 共有 URL 組み立て(状態速報/応援ライブビュー/ingest)の純関数。挙動同値で uploadStatusSnapshot から切り出し。
 import { buildStatusShareUrls } from '../lib/statusShareUrls.js';
 // 応援ライブビュー(拡張内)の「このURLをWEBでも公開する」用: status が組み立てた公開ペイロードを置くキー。
@@ -393,22 +393,30 @@ const _livesGuard = createStaleGuardedRead(() => enumerateActiveLives(), {
   emptyValue: [],
   reissueCeilingMs: CORE_READ_REISSUE_CEILING_MS
 });
-const _summariesGuard = createStaleGuardedRead((lvList) => loadAllSummaries(lvList), {
-  emptyValue: {},
-  reissueCeilingMs: CORE_READ_REISSUE_CEILING_MS
-});
-const _fastDiagGuard = createStaleGuardedRead(() => loadStatusFastDiagLiteSafe(), {
-  emptyValue: null,
-  reissueCeilingMs: CORE_READ_REISSUE_CEILING_MS
-});
-const _popupDiagGuard = createStaleGuardedRead(() => loadPopupDiagSafe(), {
-  emptyValue: null,
-  reissueCeilingMs: CORE_READ_REISSUE_CEILING_MS
-});
-const _backfillGuard = createStaleGuardedRead(() => loadBackfillProgressSafe(), {
-  emptyValue: null,
-  reissueCeilingMs: CORE_READ_REISSUE_CEILING_MS
-});
+/**
+ * ★v0.1.1449: コアの storage read を1本にまとめたガード。
+ *
+ * ■ 実測(27MB まで太らせた実ブラウザ・交互3回で順序効果を打ち消した)
+ *     単一キー get 909ms / 全件(152キー) get 1,456ms  ← キー数152倍でも1.6倍
+ *     単一キーを5回【直列】17,040ms / 同じ5キーを【1本】391ms  ← 43倍
+ *     直列6発行 27,049ms vs 一括1発行 4,649ms(5.8倍)
+ *   ＝重さの支配要因は【get の発行回数】であってキー数ではない。
+ *   ユーザー実機の「更新所要 21,449ms」はこの直列の数字とほぼ一致した。
+ *
+ * ★これに伴い _summariesGuard / _fastDiagGuard / _popupDiagGuard / _backfillGuard は
+ *   【この1本に統合して撤去】した(定義だけ残すと次の人が使ってしまい直列に戻る)。
+ *   個別の loadXxxSafe 関数は status 内の他経路(レポート生成等)がまだ使うので残す。
+ */
+const _coreBatchGuard = createStaleGuardedRead(
+  (lvList) => loadCoreBatchSafe(lvList),
+  { emptyValue: {}, reissueCeilingMs: CORE_READ_REISSUE_CEILING_MS }
+);
+/**
+ * ★popupDiag は「popup を開いた時だけ書かれる」ので間引く(v0.1.1446)。
+ *   間引いた回に出す値の置き場(袋から毎回取り直さない)。
+ * @type {unknown}
+ */
+let _lastPopupDiag = null;
 // 2026-07-15: extras(12秒間引き)の幽霊read対策。コア5readと同じ理由(runStorageOpWithTimeout直呼びは
 //   timeoutしてもopFn自体を止められず、次のextras間引きtickが同じキーへ再発行して幽霊readと多重競合する)。
 //   実測(23,944件規模の大規模配信)でstatus.htmlのフリーズが608秒修正後も残っていたため対象を広げる。
@@ -806,42 +814,48 @@ async function refresh(opts = {}) {
      */
     if (livesDue) _coreReadAt.lives = Date.now();
     _mark(livesDue ? (lvRes.stale ? 'lives(stale)' : 'lives') : 'lives(譲)');
-    step = `loadAllSummaries(${lvList.length}件)`;
-    const sumRes = await _summariesGuard.read({ timeoutMs: _slice(), arg: lvList });
-    const summaries = sumRes.value;
-    _mark(sumRes.stale ? `summaries×${lvList.length}(stale)` : `summaries×${lvList.length}`);
-    // 2026-06-23: 2秒ループは full(~40KB)でなく軽量ダイジェスト(~1KB)を read=重さの真因を断つ。
-    //   読み取りパスは full と同形なので renderAll 以下の consumer は無変更(council/status-heavy-open-SYNTHESIS.md)。
-    step = 'loadStatusFastDiagLiteSafe';
-    const fdRes = await _fastDiagGuard.read({ timeoutMs: _slice() });
-    const fastDiag = fdRes.value;
-    _mark(fdRes.stale ? 'fastDiagLite(stale)' : 'fastDiagLite');
-    step = 'loadPopupDiagSafe';
     /*
-     * ★v0.1.1446: 読む頻度を【書き手の更新間隔】から導く(src/lib/statusReadPolicy.js)。
-     *   popupDiag の書き手は popup-entry.js:19444 の1箇所で、**popup を開いたときにしか走らない**
-     *   ＝診断ページを見ている間この値は変わらない。2秒ごとに読んでも同じ値を取り直すだけで、
-     *   その間ずっと単一 LevelDB の書込(content が2秒ごとに書く)と競合していた。
-     *   ＝**譲る**のではなく【無駄を消す】。情報は1bitも失わない。
-     *   ★未登録キー(summaries/fastDiagLite/backfill/lives)は shouldReadNow が常に true を返す
-     *     ＝挙動は従来どおり(fail-open)。
+     * ★v0.1.1449: コアの storage read を【1本の get】にまとめる。
+     *
+     * ■ 実測で確定した真因(2026-08-19・27MB まで太らせた実ブラウザ・交互3回)
+     *     単一キー get                909ms
+     *     全件(152キー) get         1,456ms   ← キー数152倍でも1.6倍にしかならない
+     *     単一キーを5回【直列】    17,040ms   ← 発行回数が支配的(43倍)
+     *     同じ5キーを【1本】で        391ms
+     *     直列6発行 27,049ms vs 一括1発行 4,649ms(5.8倍)
+     *   ユーザー実機の「更新所要 21,449ms」はこの直列の数字とほぼ一致した。
+     *
+     * ★**Promise.all で並列化してはいけない**(v0.1.867 で timeout 多発→空表示の実害→撤回)。
+     *   減らすのは【直列の本数】であって並列化ではない。1本の get([...]) にまとめるのが唯一の正解。
+     * ★**読むキーを減らす方向も効かない**(上の実測どおりキー数はほぼ無関係)。
+     *
+     * 純関数は src/lib/statusCoreBatch.js(キー組み立てと取り出し)。
+     */
+    step = `loadCoreBatch(${lvList.length}件)`;
+    const coreRes = await _coreBatchGuard.read({ timeoutMs: _slice(), arg: lvList });
+    const core = pickCoreBatchValues(coreRes.value, lvList);
+    const summaries = core.summaries;
+    const fastDiag = core.fastDiag;
+    const backfillProgress = core.backfillProgress;
+    _mark(coreRes.stale ? `coreBatch×${lvList.length}(stale)` : `coreBatch×${lvList.length}`);
+    /*
+     * ★popupDiag だけは【まとめた袋の中に居ても】頻度で間引く(v0.1.1446)。
+     *   書き手は popup-entry.js:19444 の1箇所で **popup を開いたときにしか走らない**
+     *   ＝診断ページを見ている間この値は変わらない。
+     *   ★同じ袋に入っているので **read の発行回数は増えない**(=間引いても速くはならない)。
+     *     間引く意味は「popup を開いていない間、古い値で描き続けて良い」という
+     *     鮮度の宣言を1箇所に残すこと。実際の値は袋から取る。
      */
     const popupDiagDue = shouldReadNow('popupDiag', {
       lastReadAt: _coreReadAt.popupDiag,
       now: Date.now()
     });
-    const pdRes = popupDiagDue
-      ? await _popupDiagGuard.read({ timeoutMs: _slice() })
-      : _popupDiagGuard.peek();
-    const popupDiag = pdRes.value;
-    // ★実 read が成功した回だけ時計を進める(peek で進めると二度と読まなくなる)。
-    if (popupDiagDue && !pdRes.stale) _coreReadAt.popupDiag = Date.now();
-    _mark(popupDiagDue ? (pdRes.stale ? 'popupDiag(stale)' : 'popupDiag') : 'popupDiag(譲)');
-    step = 'loadBackfillProgress';
-    const bfRes = await _backfillGuard.read({ timeoutMs: _slice() });
-    const backfillProgress = bfRes.value;
-    _mark(bfRes.stale ? 'backfill(stale)' : 'backfill');
-    const coreReads = [lvRes, sumRes, fdRes, pdRes, bfRes];
+    if (popupDiagDue && !coreRes.stale) {
+      _lastPopupDiag = core.popupDiag;
+      _coreReadAt.popupDiag = Date.now();
+    }
+    const popupDiag = popupDiagDue && !coreRes.stale ? core.popupDiag : _lastPopupDiag;
+    const coreReads = [lvRes, coreRes];
     // 以下は「追加データ」=失敗しても他の表示と記録を妨げない(空で描く)。12 秒間引きでキャッシュ
     //   再利用=2 秒ごとの storage read を減らして「スムーズじゃない」を改善(コア表示は毎回更新のまま)。
     //   ★laneDiag(応援レーン人数整合セル)もここに含める=v0.1.909 で毎回の直列 read に足したら
@@ -1287,6 +1301,22 @@ async function queryWatchTabMap() {
  * サマリ読込(1 回の get() で全配信分一括)
  * ========================================================================== */
 
+/**
+ * ★v0.1.1449: コアの storage read を【1回の get】で済ませる。
+ *   キー組み立ては src/lib/statusCoreBatch.js(純関数・テスト付き)。
+ *   ★ここで Promise.all を使ってはいけない(v0.1.867 で空表示の実害)。1本の get のみ。
+ * @param {string[]} lvList
+ * @returns {Promise<Record<string, unknown>>}
+ */
+async function loadCoreBatchSafe(lvList) {
+  try {
+    const bag = await chrome.storage.local.get(buildCoreBatchKeys(lvList));
+    return bag || {};
+  } catch {
+    return {};
+  }
+}
+
 async function loadAllSummaries(lvList) {
   if (!Array.isArray(lvList) || !lvList.length) return {};
   /** @type {string[]} */
@@ -1317,16 +1347,7 @@ async function loadStatusFastDiagLiteSafe() {
   }
 }
 
-// 2026-06-18: popup の AI診断コピーにしか無い popup 固有診断(別キー)を読む。
-//   popup を開いたときだけ更新される=古いことがあるので persistedAt を併記して集約する。
-async function loadPopupDiagSafe() {
-  try {
-    const bag = await chrome.storage.local.get(KEY_AI_SHARE_POPUP_DIAG);
-    return bag?.[KEY_AI_SHARE_POPUP_DIAG] || null;
-  } catch {
-    return null;
-  }
-}
+// ★v0.1.1449: loadPopupDiagSafe は撤去(コアの1本 get に統合。statusCoreBatch.js が担う)。
 
 // v0.1.852: 会場モード(comeview・別ページ)の読み上げ診断を読む。comeview が定期的に
 //   KEY_VOICE_DIAG(nls_voice_diag_v1)へ書く(発話/間引き時)。会場モード未使用なら null=表示しない。
@@ -1625,33 +1646,8 @@ async function recordAndAnalyzeTrendSafe(lvList, summaries) {
   }
 }
 
-/**
- * v0.1.659: 過去ログ取得の診断(stopReason)を読む。「一気に取れない・50%停止」の真因を
- *   ユーザーが status を開くだけで AI に共有できるように、どの配信が何の理由で止まったかを表示。
- *   nls_backfill_progress_v1 はグローバル(直近1配信分)。
- * @returns {Promise<{lid:string, rows:number, done:number, stopReason:string, errMsg:string}|null>}
- */
-async function loadBackfillProgressSafe() {
-  try {
-    const bag = await chrome.storage.local.get('nls_backfill_progress_v1');
-    const p = bag?.['nls_backfill_progress_v1'];
-    if (!p || typeof p !== 'object') return null;
-    return {
-      lid: String(p.lid || ''),
-      rows: Number(p.rows) || 0,
-      done: Number(p.done) || 0,
-      stopReason: String(p.stopReason || ''),
-      // v0.1.692: aborted の真因(crawl 例外メッセージ)。content 側 publishBackfillProgress が保全する。
-      errMsg: String(p.errMsg || ''),
-      // v0.1.999 スループット計器: 状態速報の「⏱ 取得速度」行が使う(観測値・取り込みには影響しない)。
-      seg: Number(p.seg) || 0,
-      elapsedMs: Number(p.elapsedMs) || 0,
-      reseeds: Number(p.reseeds) || 0
-    };
-  } catch {
-    return null;
-  }
-}
+// ★v0.1.1449: loadBackfillProgressSafe は撤去(コアの1本 get に統合。
+//   整形は src/lib/statusCoreBatch.js の pickBackfillProgress が同じ形で担う)。
 
 /**
  * v0.1.1045 段1: 走行中スループット計器(KEY_BACKFILL_LIVE_METRIC)を読む(観測のみ)。

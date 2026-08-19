@@ -26,7 +26,6 @@
 - 🟠 **fn:giftSubAppHistoryStorageKey** — 書く人だけ（読む経路が無い疑い）: src/extension/content-entry.js
 - 🟠 **fn:officialGiftPointsAggregateStorageKey** — 書く人だけ（読む経路が無い疑い）: src/extension/content-entry.js
 - 🟠 **fn:perfDiagStorageKey** — 書く人だけ（読む経路が無い疑い）: src/extension/popup-entry.js
-- 🔵 **KEY_AI_SHARE_POPUP_DIAG** — 読む人だけ（書く経路が無い疑い）: src/extension/status-entry.js
 - 🔵 **KEY_ANONYMOUS_IDENTICON_ENABLED** — 読む人だけ（書く経路が無い疑い）: src/extension/marketing-export-entry.js, src/extension/popup-entry.js
 - 🔵 **KEY_AUTOPATROL_ENABLED** — 読む人だけ（書く経路が無い疑い）: src/extension/popup-entry.js
 - 🔵 **KEY_AUTOPATROL_STATE** — 読む人だけ（書く経路が無い疑い）: src/extension/popup-entry.js
@@ -68,7 +67,6 @@
 - 🔵 **fn:commentDbSummaryKey** — 読む人だけ（書く経路が無い疑い）: src/extension/popup-entry.js
 - 🔵 **fn:summaryStorageKey** — 読む人だけ（書く経路が無い疑い）: src/extension/popup-entry.js
 - 🔵 **fn:watchSnapshotStorageKey** — 読む人だけ（書く経路が無い疑い）: src/extension/popup/report/htmlReportDocument.js
-- 🔵 **nls_backfill_progress_v1** — 読む人だけ（書く経路が無い疑い）: src/extension/status-entry.js
 - 🔵 **nls_last_auto_tab_reload** — 読む人だけ（書く経路が無い疑い）: src/extension/status-entry.js
 - 🔵 **nls_mcp_live_latest_v1** — 読む人だけ（書く経路が無い疑い）: src/extension/popup-entry.js
 
@@ -77,7 +75,6 @@
 | キー | 書く人(producer) | 読む人(consumer) |
 |---|---|---|
 | `KEY_AI_SHARE_FAST_DIAG` | extension/content-entry.js | extension/popup-entry.js |
-| `KEY_AI_SHARE_POPUP_DIAG` | — | extension/status-entry.js |
 | `KEY_ANONYMOUS_IDENTICON_ENABLED` | — | extension/marketing-export-entry.js<br>extension/popup-entry.js |
 | `KEY_AUTOPATROL_ENABLED` | — | extension/popup-entry.js |
 | `KEY_AUTOPATROL_STATE` | — | extension/popup-entry.js |
@@ -178,6 +175,5 @@
 | `fn:summaryStorageKey` | — | extension/popup-entry.js |
 | `fn:tailStorageKey` | extension/content-entry.js | extension/popup-entry.js |
 | `fn:watchSnapshotStorageKey` | — | extension/popup/report/htmlReportDocument.js |
-| `nls_backfill_progress_v1` | — | extension/status-entry.js |
 | `nls_last_auto_tab_reload` | — | extension/status-entry.js |
 | `nls_mcp_live_latest_v1` | — | extension/popup-entry.js |

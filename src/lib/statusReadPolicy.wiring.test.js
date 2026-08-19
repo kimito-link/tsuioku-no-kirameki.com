@@ -7,6 +7,11 @@
  *   ＝診断ページを見ている間は値が変わらないのに、2秒ごとに単一 LevelDB の
  *   書込と競合していた(実測: 同じ read が平常1ms → 書込中217ms)。
  *
+ * ★v0.1.1449: コアread を【1本の get】へ統合したので、popupDiag は
+ *   袋から取り出す形になった(read の発行回数は増えない)。
+ *   間引きの意味は「popup を開いていない間は古い値で描いてよい」という
+ *   **鮮度の宣言を1箇所に残すこと**へ変わった。判定自体が消えたら赤。
+ *
  * ■ なぜ wiring テストが要るか
  *   純関数(statusReadPolicy.test.js)は「判定が正しいか」しか見ない。
  *   ★このリポの最大の病は【判定は在るが配線されていない】(1日に4件出た前科)。
@@ -27,6 +32,10 @@ const entrySrc = read('src/extension/status-entry.js');
 const guardSrc = read('src/lib/inFlightGuard.js');
 const policySrc = read('src/lib/statusReadPolicy.js');
 
+/** コメント行を落として「実際に動くコード」だけにする(経緯の引用で誤検知しない)。 */
+const codeOnly = (src) =>
+  src.split('\n').filter((l) => !/^\s*(\*|\/\*|\/\/)/.test(l)).join('\n');
+
 describe('読み取り頻度ポリシーの配線', () => {
   /*
    * ★extractFnBody は「header の位置から最初の `{`」を本体の開始とみなす。
@@ -39,6 +48,7 @@ describe('読み取り頻度ポリシーの配線', () => {
     entrySrc.slice(bodyStart + 'async function refresh(opts = {})'.length),
     ' {'
   );
+  const bodyCode = codeOnly(body);
 
   it('★(0) refresh 本体の切り出しに成功している(空本文で全断言が素通りするのを殺す)', () => {
     // fail-closed: 切り出せていないまま緑になるのが最悪([[wiring-test-must-assert-counts]])。
@@ -46,86 +56,58 @@ describe('読み取り頻度ポリシーの配線', () => {
     expect(body.length).toBeGreaterThan(2000);
   });
 
-  it('★(1) popupDiag の実 read は1箇所・peek も1箇所(迂回コピーが生えたら赤)', () => {
-    expect(body.match(/_popupDiagGuard\.read\(/g) || []).toHaveLength(1);
-    expect(body.match(/_popupDiagGuard\.peek\(/g) || []).toHaveLength(1);
+  it('★(1) popupDiag の間引き判定が生きている(袋の中でも鮮度の宣言は残る)', () => {
+    expect(bodyCode).toContain("shouldReadNow('popupDiag'");
+    expect(bodyCode.match(/shouldReadNow\('popupDiag'/g) || []).toHaveLength(1);
   });
 
-  it('★(2) 判定→read/peek の分岐がアンカーごと固定されている', () => {
+  it('★(2) 判定が恒真/恒偽に潰されていない', () => {
+    expect(bodyCode).not.toMatch(/const popupDiagDue = true/);
+    expect(bodyCode).not.toMatch(/const popupDiagDue = false/);
+  });
+
+  it('★(3) 間引いた回は前回値を出す(空にしない)', () => {
     /*
-     * 直前直後まで固定する。緩めると if(true) 前置や順序入れ替えが素通りする
-     * (2026-08-05 に実際に緑のまま通してしまった実績あり)。
+     * ★_lastPopupDiag を消すと、間引いた回に popupDiag が null になり
+     *   健全度セルが na へ落ちる([[unobserved-must-not-hide-the-cell-2026-08-15]])。
      */
-    expect(body).toMatch(
-      /const popupDiagDue = shouldReadNow\('popupDiag', \{\n\s*lastReadAt: _coreReadAt\.popupDiag,\n\s*now: Date\.now\(\)\n\s*\}\);\n\s*const pdRes = popupDiagDue\n\s*\? await _popupDiagGuard\.read\(\{ timeoutMs: _slice\(\) \}\)\n\s*: _popupDiagGuard\.peek\(\);/
+    expect(bodyCode).toContain('_lastPopupDiag');
+    expect(bodyCode).toMatch(
+      /const popupDiag = popupDiagDue && !coreRes\.stale \? core\.popupDiag : _lastPopupDiag;/
     );
   });
 
-  it('★(3) 判定が恒真/恒偽に潰されていない', () => {
-    expect(body).not.toMatch(/const popupDiagDue = true/);
-    expect(body).not.toMatch(/const popupDiagDue = false/);
+  it('★(4) 実 read できた回だけ時計を進める(stale で進めると鮮度を偽る)', () => {
+    expect(bodyCode).toMatch(/if \(popupDiagDue && !coreRes\.stale\) \{/);
+    expect(bodyCode.match(/_coreReadAt\.popupDiag = /g) || []).toHaveLength(1);
   });
 
-  it('★(4) 実 read が成功した回だけ時計を進める(peek で進めると二度と読まない)', () => {
-    expect(body).toMatch(
-      /if \(popupDiagDue && !pdRes\.stale\) _coreReadAt\.popupDiag = Date\.now\(\);/
-    );
-    // 代入は1箇所だけ = 条件の外にコピーが残っていない。
-    expect(body.match(/_coreReadAt\.popupDiag = /g) || []).toHaveLength(1);
+  it('★(5) 鮮度表示の材料に一括readが入っている(嘘をつかない)', () => {
+    // coreReads から外す変異 = 古い値を新品として出す静かな事故。
+    expect(bodyCode).toMatch(/const coreReads = \[lvRes, coreRes\];/);
   });
 
-  it('★(5) 譲った回も coreReads に入る=「⏳N秒前の値」が必ず出る(嘘をつかない)', () => {
-    // pdRes を coreReads から外す変異 = 古い値を新品として出す静かな事故。
-    expect(body).toMatch(/const coreReads = \[lvRes, sumRes, fdRes, pdRes, bfRes\];/);
-  });
-
-  it('★(6) 画面の土台と進捗は絶対に譲らない(peek が生えたら赤)', () => {
-    /*
-     * ★会議 2026-08-19 の結論: ユーザーは取り込み進捗を見に来ている=backfill は絶対に譲らない。
-     *   summaries/fastDiagLite は全カード・全セルの入力なので同様。
-     * ★v0.1.1447: lives は【譲る側へ移した】(tabs.query が実測1000ms=
-     *   「storage を触らないから軽い」という前提が誤りだった)。ただし4秒までに留める。
-     */
-    for (const g of ['_summariesGuard', '_fastDiagGuard', '_backfillGuard']) {
-      expect(body, `${g} の実 read が消えている`).toContain(`${g}.read(`);
-      expect(body, `${g} に peek が生えている`).not.toContain(`${g}.peek(`);
-    }
-  });
-
-  it('★(6b) 譲る対象は3本ちょうど(増やすときは必ずここを更新する)', () => {
-    // 数で固定する([[wiring-test-must-assert-counts-2026-08-04]])。
-    // 勝手に4本目が生えたら赤=「気づかないうちに鮮度を落とした」を防ぐ。
-    expect(body.match(/\.peek\(\)/g) || []).toHaveLength(3);
-    for (const g of ['_popupDiagGuard', '_livesGuard', '_watchTabMapGuard']) {
-      expect(body, `${g}.peek が無い`).toContain(`${g}.peek()`);
-    }
-  });
-
-  it('★(6c) tabs.query 系は2本とも間引きを通る(browserプロセス待ちの実測1000ms)', () => {
-    expect(body).toMatch(
-      /const livesDue = shouldReadNow\('lives', \{ lastReadAt: _coreReadAt\.lives, now: Date\.now\(\) \}\);/
-    );
-    expect(body).toMatch(/const wtDue = shouldReadNow\('watchTabMap', \{/);
+  it('★(6) tabs.query 系は2本とも間引きを通る(browserプロセス待ちの実測1000ms)', () => {
+    expect(bodyCode).toMatch(/const livesDue = shouldReadNow\('lives'/);
+    expect(bodyCode).toMatch(/const wtDue = shouldReadNow\('watchTabMap'/);
     /*
      * ★tabs.query 系は【試みた回数】で時計を進める(成功/stale を問わない)。
-     *   成功時だけ進めると、tabs.query が遅くて stale になり続ける環境で
-     *   **毎tick 1秒のクエリを叩き続ける**＝間引きが効かない
-     *   (実測1000msの当のAPIなので、ここを取り違えると修正が無意味になる)。
-     *   ★storage 系(popupDiag)は逆に「成功時だけ」が正しい=下の (3) で別に固定している。
+     *   成功時だけ進めると、遅くて stale になり続ける環境で毎tick 1秒のクエリを
+     *   叩き続ける＝間引きが効かない(実測1000msの当のAPI)。
+     *   ★storage 系(popupDiag)は逆に「成功時だけ」が正しい=上の(4)で別に固定。
      */
-    expect(body).toMatch(/if \(livesDue\) _coreReadAt\.lives = Date\.now\(\);/);
-    expect(body).toMatch(/if \(wtDue\) _coreReadAt\.watchTabMap = Date\.now\(\);/);
-    // 成功条件を混ぜる変異(=元の誤り)に戻っていないこと。
-    expect(body).not.toMatch(/livesDue && !lvRes\.stale/);
-    expect(body).not.toMatch(/wtDue && !wtRes\.stale/);
+    expect(bodyCode).toMatch(/if \(livesDue\) _coreReadAt\.lives = Date\.now\(\);/);
+    expect(bodyCode).toMatch(/if \(wtDue\) _coreReadAt\.watchTabMap = Date\.now\(\);/);
+    expect(bodyCode).not.toMatch(/livesDue && !lvRes\.stale/);
+    expect(bodyCode).not.toMatch(/wtDue && !wtRes\.stale/);
   });
 
-  it('★(7) 計器に必ず1行出る(譲った回と読んだ回を名前で見分けられる)', () => {
-    // aiShareFullText.js の重い順は 0ms 行を落とすので、譲った回は行ごと消える。
-    // その差そのものが「効いているか」の判定材料になる(6サイクル中1回だけ出れば成功)。
-    expect(body).toMatch(
-      /_mark\(popupDiagDue \? \(pdRes\.stale \? 'popupDiag\(stale\)' : 'popupDiag'\) : 'popupDiag\(譲\)'\);/
-    );
+  it('★(7) 譲る対象は2本ちょうど(lives と watchTabMap・増やすなら必ずここを更新)', () => {
+    // 数で固定する([[wiring-test-must-assert-counts-2026-08-04]])。
+    expect(bodyCode.match(/\.peek\(\)/g) || []).toHaveLength(2);
+    for (const g of ['_livesGuard', '_watchTabMapGuard']) {
+      expect(bodyCode, `${g}.peek が無い`).toContain(`${g}.peek()`);
+    }
   });
 
   it('★(8) shouldReadNow を出荷経路が import している', () => {
