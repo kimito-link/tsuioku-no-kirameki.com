@@ -721,7 +721,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (1778)
+- 📁 **src/** (1779)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1018,7 +1018,7 @@
         - `logo_funlink_white_RGB_maru_black.png`
       - `logo_guide_funlink_ol.pdf`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1531)
+  - 📁 **lib/** (1532)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -1878,6 +1878,7 @@
     - `northStarMirrorKey.js` — 北極星レーン鏡(公式値レーン)の storage キー。
     - `northStarMirrorPublishRace.js` — 北極星鏡publish取りこぼしの実害確定計器(診断先行アプローチ)。
     - `northStarMirrorPublishRace.test.js`
+    - `northStarTickThrottle.wiring.test.js`
     - `numberConsistency.js` — 状態速報の「数字の自己矛盾」を自動検知する純関数(v0.1.859)。
     - `numberConsistency.test.js`
     - `objectUrlRevokeQueue.js` — `URL.createObjectURL` で作った blob URL を、メモリ滞留を抑えながら revoke する

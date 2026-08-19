@@ -18417,6 +18417,37 @@ async function downloadMediaKitHtml() {
 const coalescedRefreshScheduler = createCoalescedRefreshScheduler({
   throttleMs: 450
 });
+/**
+ * ★v0.1.1450: 北極星 tick(独立レーン描画)専用のスロットル。
+ *
+ * ■ 何が起きていたか(2026-08-19 実ブラウザ実測・25.9MB)
+ *   `chrome.storage.onChanged` が `tickIndependentNorthStar` を**無間引きで直呼び**していた。
+ *   content は配信中ずっと `nls_comments_*` / `nls_panel_summary_*` を書くので、
+ *   **コメント1件ごとに tick 全体(storage read 9〜10本)が再実行**される。
+ *     静穏2秒の read = 10本 / **コメント1件書いた直後1.2秒の read = 60〜103本(平均77)**
+ *     10秒で計149回・**合計7,698ms**(10秒中7.7秒が storage 待ち)
+ *   ＝これがイベントループを止め、サイドパネルを黒くしていた当人
+ *   ([[sidepanel-black-is-popup-storage-read-storm-2026-08-19]])。
+ *
+ * ■ ★なぜ上の coalescedRefreshScheduler を共用しないか(重要)
+ *   あちらは**モジュール単一インスタンス**で `safeRefresh` と自コメ即時描画が既に占有し、
+ *   `lastPaintAt` を**1本しか持たない**。共用すると:
+ *     - tick が leading を消費 → 本物のコメント再描画が trailing に落ちる(v0.1.508 の再発)
+ *     - 自コメ送信が lastPaintAt を更新 → tick の leading が理由もなく消える
+ *   ＝**状態を共有しない**のが正しい。ファクトリなので新規ファイルは要らない。
+ *
+ * ■ 700ms の根拠(実測から)
+ *   1 tick ≈ 9.5本。60本 ÷ 9.5 ≈ 6.3 tick が 1.2秒に入っていた。
+ *     450ms → 1.2秒窓に3 tick(約28本・半減どまり) / **700ms → 2 tick(約19本)** /
+ *     1000ms → 2 tick(本数は同じで鮮度だけ悪化)
+ *   ★700 は NORTH_STAR_INDEPENDENT_REFRESH_MS(3000)の約1/4＝
+ *     「タイマーを信用しない」(v0.1.989)の意図を保つ。
+ *   ★**コメント本文の描画は別経路**(scheduleCoalescedStorageRefresh → safeRefresh)で
+ *     450ms のまま＝**ユーザーが一番見る部分の鮮度は1msも変わらない**。
+ */
+const northStarTickScheduler = createCoalescedRefreshScheduler({
+  throttleMs: 700
+});
 /** 初回 refresh が完了するまではコアレスをバイパスし即時反映する */
 let initialRefreshDone = false;
 
@@ -22160,6 +22191,15 @@ async function initPopup() {
    *   refreshAllNorthStarMirrorLanes は idempotent(各レーン diff-skip・内部 try/catch・並列発火)なので
    *   heavy 経路と二重に走っても同一なら no-op=競合しない。read path にキャッシュは足さない(§6 地雷回避)。
    */
+  /**
+   * ★v0.1.1450: tick 自身の初回完了フラグ(スロットルの initialDone に渡す)。
+   *
+   * ★**`initialRefreshDone` を渡してはいけない**(最も気づきにくい退化):
+   *   あれは**重い refresh() の .finally() で立つ**。重い配信では refresh が完走しない——
+   *   **それがこの独立 tick を作った動機そのもの**。渡すと initialDone=false が続き、
+   *   スケジューラの「初回はあらゆる抑制を無視」経路で**毎回即時実行＝間引きが恒久的に無効**になる。
+   */
+  let northStarTickFirstRunDone = false;
   const tickIndependentNorthStar = () => {
     // v0.1.1123 計器(観測のみ): tick の結末を理由別に数える=「started=0(描画が起動しない)」の
     //   真因(lid解決全滅/タブ非表示/スクロールdefer)を状態速報の数字で特定する(D-0)。
@@ -22234,7 +22274,11 @@ async function initPopup() {
   //   再現せず実機のみ=タイマー starvation)。タイマー任せにせず init 末尾で【同期的に1回】起動し、
   //   さらに storage.onChanged(content が contrib/ad/コメントを書くたび)でも起動して、タイマーが詰まっても
   //   描画が必ず1回は走るようにする。idempotent(diff-skip)なので多重起動は no-op=安全。
-  try { tickIndependentNorthStar(); } catch { /* no-op */ }
+  /*
+   * ★v0.1.1450: finally で立てる。tick が throw しても間引きを有効にするため
+   *   (false のまま残ると onChanged が「初回扱い」で素通しに戻り、修正が無意味になる)。
+   */
+  try { tickIndependentNorthStar(); } catch { /* no-op */ } finally { northStarTickFirstRunDone = true; }
   setTimeout(tickIndependentNorthStar, 400);
   setTimeout(tickIndependentNorthStar, 1500);
   setTimeout(tickIndependentNorthStar, 4000);
@@ -22244,7 +22288,28 @@ async function initPopup() {
       const keys = Object.keys(changes);
       // content が北極星の生データ/コメントを書いた=描けるようになった合図。タイマー非依存で起動。
       if (keys.some((k) => /^nls_(koken_api_contrib|nicoad_api_ranking|comments|cdb_summary|csummary|panel_summary)_/.test(k))) {
-        tickIndependentNorthStar();
+        /*
+         * ★v0.1.1450: ここは以前 tickIndependentNorthStar() の**直呼び**だった。
+         *   content が配信中ずっと書く nls_comments_* / nls_panel_summary_* のたびに
+         *   tick 全体(read 9〜10本)が走り、**コメント1件で60〜103本**の read になっていた。
+         *   → 同じファイルの scheduleCoalescedStorageRefresh(:19026) が既に使っている
+         *     先行+末尾スロットルへ通す(判定関数も同じものを再利用＝新しい概念を持ち込まない)。
+         *
+         * ★trailing 付きなので**必ず700ms以内に1回は走る**(debounce のように延びない)
+         *   ＝「タイマーが詰まっても描く」保険(v0.1.989)は壊さない。
+         * ★koken_api_contrib / nicoad_api_ranking は isHighFrequency… が false を返す
+         *   ＝**即時実行**(API取得時にしか書かれない低頻度キーなので間引く必要が無い)。
+         * ★stripSelfWrittenRenderArtifacts を通すのは :19044 と同じ理由
+         *   (v0.1.1248: 自己書き込みキーが混じると every が false に落ちて throttle が失効する穴)。
+         */
+        const keysForTick = stripSelfWrittenRenderArtifacts(keys);
+        const allHighFreq =
+          keysForTick.length > 0 &&
+          keysForTick.every((k) => isHighFrequencyCommentRelatedStorageKey(k));
+        northStarTickScheduler.schedule(
+          { allHighFreq, initialDone: northStarTickFirstRunDone },
+          tickIndependentNorthStar
+        );
       }
     });
   } catch { /* onChanged 不可環境: タイマーだけで動く(後退しない) */ }
