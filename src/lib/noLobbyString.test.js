@@ -10,6 +10,10 @@ const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../
 const EXCLUDE = new Set([
   'src/lib/noLobbyString.test.js',
   'src/lib/changelog.js',
+  // ★2026-08-19: changelog-archive.js も **同じ歴史記録**(changelog.js から押し出した旧版)。
+  //   除外理由は changelog.js と全く同じ = 過去の記述は書き換えない。
+  //   ★popup のバンドルには入らないので、実行コードにロビーが復活する経路にはならない。
+  'src/lib/changelog-archive.js',
   'src/lib/venueLaneParity.wiring.test.js'
 ]);
 
