@@ -787,7 +787,7 @@
   - `src/lib/statusTrendKey.js`
   - `src/extension/status-entry.js`
   - `src/lib/statusActionAdvisor.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 183</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 184</summary>
 
 - `app/app.js` — スマホ閲覧用 status Web 版。
 - `app/live-view.js` — global NL_BUILD_ID
@@ -866,6 +866,7 @@
 - `src/lib/htmlEscape.js` — 旧パス：`src/lib/htmlEscape.js`
 - `src/lib/initShadeDismissPolicy.js` — 初回ロードの幕(シェード)を【いつ畳むか】を決める純関数。
 - `src/lib/initShadeFailsafe.js` — 初回ロード幕(.nl-init-shade)の CSS フェイルセーフとクラスの乖離を断つ純関数。
+- `src/lib/instrumentSpec.js` — 【層】L0 判定層(純粋関数・I/O禁止)
 - `src/lib/isInsideRecommendedLiveSection.js` — v0.1.200: ニコ生 watch ページの「おすすめ生放送」セクション内 DOM を識別する純関数。
 - `src/lib/lengthDelimitedStream.js` — length-delimited（varint 長 + ペイロード）の連続を分割する。
 - `src/lib/liveEndedFlag.js` — 配信終了フラグ。
@@ -984,9 +985,8 @@
 - `v0.1.1448` 2026-08-19 — タブ一覧の間引きが効かない条件を塞ぎました
 - `v0.1.1447` 2026-08-19 — コピーが途中で取れなくなるのを直しました
 
-### 🏟 会場・席 (2版)
+### 🏟 会場・席 (1版)
 - `v0.1.1439` 2026-08-19 — サイドパネルの出が遅いのを改善
-- `v0.1.1435` 2026-08-18 — サイドパネルが待たされるのを直しました
 
 ### 🪟 応援レーン・タイル (1版)
 - `v0.1.1441` 2026-08-19 — 出ないアイコンがある問題を直しました
@@ -1011,7 +1011,8 @@
 - `v0.1.1445` 2026-08-19 — 診断ページの作り直しすぎを止めました
 - `v0.1.1442` 2026-08-19 — 引っ張るときの黒い影を止めました
 
-### その他 (7版)
+### その他 (8版)
+- `v0.1.1455` 2026-08-20 — 計器の意味を1枚の台帳にまとめました
 - `v0.1.1452` 2026-08-19 — 黒画面の追いかけをここで終わらせました
 - `v0.1.1451` 2026-08-19 — サイドパネルの黒を根本から軽くしました
 - `v0.1.1443` 2026-08-19 — 黒い影を画面側からも止めました
