@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 6 / 816 件
+## ⚠️ 役割コメントが無いソース 6 / 817 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `src/lib/laneDomSelfMeasure.js`
@@ -723,7 +723,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (1788)
+- 📁 **src/** (1791)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1021,7 +1021,7 @@
         - `logo_funlink_white_RGB_maru_black.png`
       - `logo_guide_funlink_ol.pdf`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1540)
+  - 📁 **lib/** (1543)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -1634,6 +1634,9 @@
     - `instantPushDiagKey.js` — コメント即時プッシュレーン(storage迂回)の「送信N/受信N/表示遅延ms」観測値を
     - `instantPushDiagSince.test.js`
     - `instrumentCoverage.test.js`
+    - `instrumentSpec.js` — 【層】L0 判定層(純粋関数・I/O禁止)
+    - `instrumentSpec.test.js`
+    - `instrumentSpecCoverage.test.js`
     - `interceptAvatarHydration.js` — profile cache の強い avatar を intercept avatar map へ補完する。
     - `interceptAvatarHydration.test.js`
     - `interceptBinaryTextExtract.js` — バイナリを UTF-8 として解釈した文字列から、近傍の commentNo とユーザー識別子の組を拾う（ヒューリスティック）。
