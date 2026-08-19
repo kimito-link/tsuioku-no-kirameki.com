@@ -26,6 +26,17 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1445',
+    date: '2026-08-19',
+    summary: '診断ページの作り直しすぎを止めました',
+    items: Object.freeze([
+      '診断ページが重い問題を改善しました。',
+      '画面下部の【状態マインドマップ】が、2秒ごとに中身を丸ごと作り直していました。',
+      '原因は、「変わっていなければ作り直さない」判定に【最終取り込み ◆秒前】という時刻が含まれていたことです。秒は常に変わるので、判定が一度も効いていませんでした。',
+      '★併せて、開いていた項目が2秒で勝手に閉じる問題も止まります。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1444',
     date: '2026-08-19',
     summary: '開いたときの黒い時間を短くしました',
