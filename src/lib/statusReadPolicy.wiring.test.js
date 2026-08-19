@@ -79,14 +79,36 @@ describe('読み取り頻度ポリシーの配線', () => {
     expect(body).toMatch(/const coreReads = \[lvRes, sumRes, fdRes, pdRes, bfRes\];/);
   });
 
-  it('★(6) 譲るのは popupDiag だけ(他のコアreadに peek が生えたら赤)', () => {
-    // ★会議 2026-08-19 の結論: ユーザーは取り込み進捗を見に来ている=backfill は絶対に譲らない。
-    for (const g of ['_summariesGuard', '_fastDiagGuard', '_backfillGuard', '_livesGuard']) {
+  it('★(6) 画面の土台と進捗は絶対に譲らない(peek が生えたら赤)', () => {
+    /*
+     * ★会議 2026-08-19 の結論: ユーザーは取り込み進捗を見に来ている=backfill は絶対に譲らない。
+     *   summaries/fastDiagLite は全カード・全セルの入力なので同様。
+     * ★v0.1.1447: lives は【譲る側へ移した】(tabs.query が実測1000ms=
+     *   「storage を触らないから軽い」という前提が誤りだった)。ただし4秒までに留める。
+     */
+    for (const g of ['_summariesGuard', '_fastDiagGuard', '_backfillGuard']) {
       expect(body, `${g} の実 read が消えている`).toContain(`${g}.read(`);
       expect(body, `${g} に peek が生えている`).not.toContain(`${g}.peek(`);
     }
-    // 全体でも peek は1回だけ。
-    expect(body.match(/\.peek\(\)/g) || []).toHaveLength(1);
+  });
+
+  it('★(6b) 譲る対象は3本ちょうど(増やすときは必ずここを更新する)', () => {
+    // 数で固定する([[wiring-test-must-assert-counts-2026-08-04]])。
+    // 勝手に4本目が生えたら赤=「気づかないうちに鮮度を落とした」を防ぐ。
+    expect(body.match(/\.peek\(\)/g) || []).toHaveLength(3);
+    for (const g of ['_popupDiagGuard', '_livesGuard', '_watchTabMapGuard']) {
+      expect(body, `${g}.peek が無い`).toContain(`${g}.peek()`);
+    }
+  });
+
+  it('★(6c) tabs.query 系は2本とも間引きを通る(browserプロセス待ちの実測1000ms)', () => {
+    expect(body).toMatch(
+      /const livesDue = shouldReadNow\('lives', \{ lastReadAt: _coreReadAt\.lives, now: Date\.now\(\) \}\);/
+    );
+    expect(body).toMatch(/const wtDue = shouldReadNow\('watchTabMap', \{/);
+    // 実read成功時だけ時計を進める(peek で進めると二度と読まない)。
+    expect(body).toMatch(/if \(livesDue && !lvRes\.stale\) _coreReadAt\.lives = Date\.now\(\);/);
+    expect(body).toMatch(/if \(wtDue && !wtRes\.stale\) _coreReadAt\.watchTabMap = Date\.now\(\);/);
   });
 
   it('★(7) 計器に必ず1行出る(譲った回と読んだ回を名前で見分けられる)', () => {
