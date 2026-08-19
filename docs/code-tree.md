@@ -723,7 +723,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (1787)
+- 📁 **src/** (1788)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -760,7 +760,7 @@
       - `avatarResolver.test.js`
       - `identity.js` — ニコ生ユーザー ID の「匿名性」判定と関連アイデンティティ・ユーティリティ。
       - `nickname.js` — 表示名（ニックネーム）の「強弱」判定。
-  - 📁 **extension/** (45)
+  - 📁 **extension/** (46)
     - 📁 **popup/** (6)
       - 📁 **report/** (2)
         - `htmlReportDocument.js` — HTMLレポート(振り返り用の保存HTML)組み立てクラスタ。
@@ -769,9 +769,10 @@
       - `attachAiDiagButtonHandler.test.js`
       - `renderAcquisitionDashboard.js` — renderAcquisitionDashboard — 開発者モニタの「データ取得率」ダッシュボードを描く。
       - `renderAcquisitionDashboard.test.js`
-    - 📁 **story/** (5)
+    - 📁 **story/** (6)
       - `laneContentLod.js` — 応援レーンの【中身LOD】— 枠は残す。中身だけ空にする。
       - `laneContentLod.test.js`
+      - `laneContentLodThumbArrival.test.js`
       - `laneShrinkScenario.test.js`
       - `renderStoryUserLaneDom.js` — 応援ユーザーレーン DOM の同期（popup-entry から切り出し・状態は引数で受け取る）。
       - `renderStoryUserLaneDom.test.js`
