@@ -215,6 +215,33 @@ export function buildBuriedCells(data) {
     ));
   }
 
+  /* ── ★メモリ/DOM の逼迫(凍結の予兆) ───────────────────────
+   * ★v0.1.1454(ユーザー指示「メモリの消費とかも計器にいれて」)。
+   *   実機で watch ページに「ページが応答しません」が出たとき、
+   *   **メモリもDOM総数も測っていなかった**ので数字で答えられなかった。
+   * ★判定は memoryPressureProbe.js(純関数)が正本。ここは表示だけ。
+   * ★測れない環境(Chrome以外)は na＝「使っていない0」と混同しない。
+   */
+  const mem = fast?.memoryPressure;
+  if (mem && typeof mem === 'object') {
+    const pct = num(mem.pct);
+    push(mem.level === 'na' || pct == null
+      ? naCell('memory-pressure', 'メモリの余裕')
+      : cell(
+        'memory-pressure', 'メモリの余裕',
+        mem.level === 'bad' ? 'bad' : mem.level === 'warn' ? 'warn' : 'ok',
+        `${mem.usedMB}MB (上限の${pct}%)`
+      ));
+    const dom = num(mem.domNodes);
+    push(dom == null
+      ? naCell('dom-nodes', '画面の部品数')
+      : cell(
+        'dom-nodes', '画面の部品数',
+        mem.domLevel === 'bad' ? 'bad' : mem.domLevel === 'warn' ? 'warn' : 'ok',
+        `${dom}個${mem.domLevel === 'ok' ? '' : '(推奨1,500)'}`
+      ));
+  }
+
   /* ── 北極星の描画がどこまで進んだか ─────────────────────── */
   const ns = p?.northStarRenderProbe;
   if (!ns || !(num(ns.refreshAllStarted) || 0)) push(naCell('northstar-render', '公式値の描画'));

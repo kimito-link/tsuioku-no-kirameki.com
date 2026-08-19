@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 6 / 815 件
+## ⚠️ 役割コメントが無いソース 6 / 816 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `src/lib/laneDomSelfMeasure.js`
@@ -722,7 +722,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (1784)
+- 📁 **src/** (1787)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1019,7 +1019,7 @@
         - `logo_funlink_white_RGB_maru_black.png`
       - `logo_guide_funlink_ol.pdf`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1537)
+  - 📁 **lib/** (1540)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -1782,6 +1782,9 @@
     - `mediaKitHtml.test.js`
     - `mediaKitStats.js` — 追憶メディアキット向けの期間集計。
     - `mediaKitStats.test.js`
+    - `memoryPressureProbe.js` — メモリ消費とDOM総数を「凍結の予兆」として判定する純関数
+    - `memoryPressureProbe.test.js`
+    - `memoryPressureWiring.test.js`
     - `mergeGiftHistoryThrows.js` — v0.1.216: 公式ギフト sub-app DOM (`ul.gift-history-list`) から scrape した
     - `mergeGiftHistoryThrows.test.js`
     - `mergeProgramStatsWatchIntoWatchMetaSnapshot.js` — 公式 DOM bundle の programStats.watchCount（累計来場）を snapshot に補完する。

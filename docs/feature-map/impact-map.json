@@ -5866,6 +5866,16 @@
       ]
     },
     {
+      "file": "src/lib/memoryPressureProbe.js",
+      "featureCount": 1,
+      "features": [
+        "content"
+      ],
+      "labels": [
+        "記録エンジン(watchページ常駐)"
+      ]
+    },
+    {
       "file": "src/lib/mergeGiftHistoryThrows.js",
       "featureCount": 1,
       "features": [
