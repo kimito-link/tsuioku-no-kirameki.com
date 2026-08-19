@@ -178,7 +178,17 @@ const STORAGE_DISCONNECT_BASELINE = new Set([
   //   取りこぼす偽陽性。経路は実在(statusExtrasBatch.test.js の pickExtrasBatchValues テストで
   //   scoreAnnounceDiag の受け渡しを確認済み・buildScoreAnnounceDiagLines が status-entry.js の
   //   概要行に描画する)。
-  'KEY_SCORE_ANNOUNCE_DIAG'
+  'KEY_SCORE_ANNOUNCE_DIAG',
+  // 幕(全画面を覆う待ち画面)の計器(2026-08-19):
+  //   producer は src/lib/panelWakeCurtainDom.js:publishCurtainDiag が
+  //   chrome.storage.local.set({[KEY]:...}) で書く(検出対象)。
+  //   consumer は status-entry.js が直接 get するのではなく、
+  //   statusExtrasBatch.js の EXTRAS_BATCH_KEYS 配列変数経由で読む
+  //   (KEY_SCORE_ANNOUNCE_DIAG 等の既存キーと同型の間接化)ため、
+  //   引数領域に識別子が現れず静的解析が consumer を取りこぼす偽陽性。
+  //   ★経路は実在し、panelWakeCurtain.wiring.test.js が
+  //   【書き手2箇所と読み手】の両方を機械照合している(変異で赤を確認済)。
+  'KEY_PANEL_WAKE_CURTAIN_DIAG'
 ]);
 
 /**

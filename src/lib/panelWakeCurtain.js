@@ -74,7 +74,43 @@ export function shouldShowOnWake(args) {
  * @param {{ prevWidth?: number, nextWidth?: number, minDeltaPx?: number }} args
  * @returns {boolean}
  */
+/**
+ * ★kill スイッチ: 幅変更で幕を出すか。
+ *   true に戻すだけで v0.1.1432 の挙動へ復帰する(1行で撤回できる形)。
+ */
+export const RESIZE_CURTAIN_ENABLED = false;
+
+/**
+ * ★★v0.1.1441+: この関数は【常に false】に倒した。
+ *
+ * ■ なぜ(2026-08-19 ユーザー:「引っ張る瞬間くろくなる」「黒い影でてる」)
+ *   幅変更で幕を出すと、.nl-init-shade に --rearm が付き
+ *   `opacity: 1 !important`(popup.html:258-263) で
+ *   【position:fixed / inset:0 / z-index:99999 の全画面の幕】が完全不透明で出る。
+ *   ★これがユーザーの言う「引っ張ると黒くなる」の正体だった。
+ *
+ * ■ 皮肉なことに、これは【黒を隠すために入れた機能】(v0.1.1432)だった。
+ *   popup.html:205-223 に v0.1.1319 の記録が残っている:
+ *     「画面全部を覆うので、ここが黒くなると
+ *       パネル全体が黒く、うっすら縞が見える」
+ *   同じ辍を、別名(rearm)で踏んでいた。
+ *
+ * ■ 失うもの(承知の上で止める)
+ *   幅変更中にレーンの描画が追いつかない瞬間が見える。
+ *   だが v0.1.1432 以前はそれが通常の姿で、ユーザーはそれを
+ *   「黒い影」とは呼んでいなかった。★幕こそが黒い影だった。
+ *
+ * ■ 戻し方
+ *   下の `return false;` を消すだ1行で v0.1.1432 の挙動に戻る。
+ *   ★ただし戻すなら、先に【幕が全画面を覆わない形】にすること。
+ *   復帰時の幕(shouldShowOnWake)はこの変更の対象外。そのまま残す。
+ *
+ * @param {{ prevWidth?: number|null, nextWidth?: number|null, minDeltaPx?: number }} args
+ * @returns {boolean} 幕を出すか(★現在は常に false)
+ */
 export function shouldShowOnResize(args) {
+  // ★幅変更では幕を出さない(上の理由)。引数の検査は以下に残す。
+  if (!RESIZE_CURTAIN_ENABLED) return false;
   const prev = Math.floor(Number(args?.prevWidth) || 0);
   const next = Math.floor(Number(args?.nextWidth) || 0);
   if (prev <= 0 || next <= 0) return false;

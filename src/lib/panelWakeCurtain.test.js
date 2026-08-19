@@ -4,6 +4,7 @@ import {
   WAKE_CURTAIN_MIN_AWAY_MS,
   curtainSerif,
   shouldHideCurtain,
+  RESIZE_CURTAIN_ENABLED,
   shouldShowOnResize,
   shouldShowOnWake
 } from './panelWakeCurtain.js';
@@ -30,21 +31,37 @@ describe('復帰(スリープ)で幕を出すか', () => {
   });
 });
 
-describe('幅変更(ひっぱる)で幕を出すか', () => {
-  it('横幅がはっきり変わったら出す', () => {
-    expect(shouldShowOnResize({ prevWidth: 380, nextWidth: 520 })).toBe(true);
+describe('★幅変更(ひっぱる)では幕を【出さない】', () => {
+  /*
+   * ★v0.1.1441+ で方針を反転させた(先人の判断を無言で覚さないため理由を残す)。
+   *
+   * 旧: 「幅が変わると黒くなるので、幕で隠そう」(v0.1.1432)
+   * 新: ★その幕自体が【黒い影の正体】だった。
+   *
+   * 根拠(コードで確定):
+   *   popup.html:258-263 `.nl-init-shade--rearm { opacity: 1 !important }`
+   *   popup.html:120-124 `.nl-init-shade { position:fixed; inset:0; z-index:99999 }`
+   *   = 幅を変えるたびに全画面の幕が完全不透明で出る。
+   *   ユーザー報告「引っ張る瞬間くろくなる」と一致。
+   */
+  it('★横幅がはっきり変わっても出さない(幕が黒い影の正体だった)', () => {
+    expect(shouldShowOnResize({ prevWidth: 380, nextWidth: 520 })).toBe(false);
   });
 
-  it('★わずかな揺れでは出さない', () => {
+  it('★縮める方向でも出さない', () => {
+    expect(shouldShowOnResize({ prevWidth: 520, nextWidth: 380 })).toBe(false);
+  });
+
+  it('わずかな揺れでも出さない(従来どおり)', () => {
     expect(shouldShowOnResize({ prevWidth: 380, nextWidth: 384 })).toBe(false);
   });
 
-  it('★縮める方向でも出す(黒くなるのは同じ)', () => {
-    expect(shouldShowOnResize({ prevWidth: 520, nextWidth: 380 })).toBe(true);
+  it('幅が取れないときも出さない(従来どおり)', () => {
+    expect(shouldShowOnResize({ prevWidth: 0, nextWidth: 500 })).toBe(false);
   });
 
-  it('幅が取れないときは出さない', () => {
-    expect(shouldShowOnResize({ prevWidth: 0, nextWidth: 500 })).toBe(false);
+  it('★kill スイッチが存在し、1行で戻せる形になっている', () => {
+    expect(RESIZE_CURTAIN_ENABLED).toBe(false);
   });
 });
 

@@ -17,6 +17,7 @@
  * @module panelWakeCurtainDom
  */
 
+import { KEY_PANEL_WAKE_CURTAIN_DIAG } from './panelWakeCurtainDiagKey.js';
 import {
   WAKE_CURTAIN_MAX_MS,
   WAKE_CURTAIN_RESIZE_SETTLE_MS,
@@ -43,6 +44,30 @@ const _state = {
 
 /** 計器(観測のみ): 何回・どの理由で出したか。状態速報が読む。 */
 const _curtainDiag = { shownWake: 0, shownResize: 0, hiddenPainted: 0, hiddenTimeout: 0 };
+
+/*
+ * ★v0.1.1441+: 計器を【実際に出力へ流す】。
+ *
+ * ■ なぜ要るか(ユーザー:「幕自体を診断に出して隠れないように」)
+ *   このファイルは shownResize を数えていたのに、
+ *   getPanelWakeCurtainDiag() の【呼び手がリポ全体でゼロ】だった。
+ *   ★幕が何回出ても数字がどこにも現れない
+ *   = 「引っ張ると幕が出ている」に誰も気づけなかった。
+ *   幕は「隠す」道具なので、出たこと自体が隠れると致命的。
+ *
+ * ■ どこで呼ぶか
+ *   【数えているその場で】書く(呼び手を別に作らない
+ *   = popup-entry.js の行数を増やさない・配線忘れを原理的に防ぐ)。
+ * ★失敗しても描画は止めない(計器が本体を壊さない)。
+ */
+function publishCurtainDiag() {
+  try {
+    if (typeof chrome === 'undefined' || !chrome?.storage?.local?.set) return;
+    void chrome.storage.local.set({
+      [KEY_PANEL_WAKE_CURTAIN_DIAG]: { ...(_curtainDiag), at: Date.now() }
+    });
+  } catch { /* no-op: 計器の失敗で幕の動作を止めない */ }
+}
 
 /** 計器の現在値(スナップショット)。 */
 export function getPanelWakeCurtainDiag() {
@@ -94,6 +119,7 @@ export function showWakeCurtain(reason, countTiles) {
   _state.shownAtMs = now;
   if (reason === 'resize') _curtainDiag.shownResize += 1;
   else _curtainDiag.shownWake += 1;
+  publishCurtainDiag();
 
   if (_state.timer) clearInterval(_state.timer);
   _state.timer = setInterval(() => {
@@ -106,6 +132,7 @@ export function showWakeCurtain(reason, countTiles) {
     if (!r.hide) return;
     if (r.reason === 'painted') _curtainDiag.hiddenPainted += 1;
     else _curtainDiag.hiddenTimeout += 1;
+    publishCurtainDiag();
     hideWakeCurtain();
   }, 120);
 }

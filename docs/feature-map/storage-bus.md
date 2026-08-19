@@ -16,6 +16,7 @@
 
 - 🟠 **KEY_COMMENT_WRITE_MODE_DIAG** — 書く人だけ（読む経路が無い疑い）: src/extension/content-entry.js
 - 🟠 **KEY_PAINT_PERF_RING_V1** — 書く人だけ（読む経路が無い疑い）: src/extension/popup-entry.js
+- 🟠 **KEY_PANEL_WAKE_CURTAIN_DIAG** — 書く人だけ（読む経路が無い疑い）: src/lib/panelWakeCurtainDom.js
 - 🟠 **KEY_SCORE_ANNOUNCE_DIAG** — 書く人だけ（読む経路が無い疑い）: src/extension/popup-entry.js
 - 🟠 **KEY_SW_PROGRESS** — 書く人だけ（読む経路が無い疑い）: src/extension/backfill-sw-entry.js
 - 🟠 **fn:backfillHeartbeatKey** — 書く人だけ（読む経路が無い疑い）: src/extension/content-entry.js
@@ -135,6 +136,7 @@
 | `KEY_OP_SOUND_EFFECT_DIAG` | extension/popup-entry.js | extension/status-entry.js |
 | `KEY_OP_SOUND_ENABLED` | — | extension/popup-entry.js |
 | `KEY_PAINT_PERF_RING_V1` | extension/popup-entry.js | — |
+| `KEY_PANEL_WAKE_CURTAIN_DIAG` | lib/panelWakeCurtainDom.js | — |
 | `KEY_POPUP_FRAME` | extension/popup-entry.js | extension/content-entry.js<br>extension/popup-entry.js |
 | `KEY_POPUP_FRAME_CUSTOM` | extension/popup-entry.js | extension/content-entry.js<br>extension/popup-entry.js |
 | `KEY_PREVIEW_RENDER_ACK` | extension/popup-entry.js | extension/popup-entry.js |

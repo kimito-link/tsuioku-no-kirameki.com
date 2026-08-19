@@ -107,3 +107,38 @@ describe('★出し直しは不透明でなければ意味がない(実機で踏
     expect(dom).toMatch(/classList\.remove\(REARM_CLASS\)/);
   });
 });
+
+describe('★★幕は【出たら必ず数字に出る】(v0.1.1441+)', () => {
+  /*
+   * ■ なぜこの検査が要るか(ユーザー要望の本体)
+   *   「幕自体を診断に入れてださないように。
+   *    もちろん構造的に出さない方が正解」
+   *
+   *   幕は position:fixed / inset:0 / z-index:99999 で【画面全部を覆う】。
+   *   覆っている間はユーザーから見て「黒い影」に見える。
+   *   ★その幕が【出たこと自体を隠していた】のが今回の真因:
+   *     panelWakeCurtainDom.js は shownResize を数えていたが、
+   *     getPanelWakeCurtainDiag() の呼び手がリポ全体でゼロだった。
+   *     [[unwired-judgement-is-systemic-2026-08-12]]
+   */
+  it('★幅変更で幕を出す経路は kill スイッチで止まっている', () => {
+    const lib = read('src/lib/panelWakeCurtain.js');
+    expect(lib).toContain('export const RESIZE_CURTAIN_ENABLED = false;');
+    expect(lib).toMatch(/if \(!RESIZE_CURTAIN_ENABLED\) return false;/);
+  });
+
+  it('★幕を出したら storage に書く(数えているその場で書く)', () => {
+    const dom = read('src/lib/panelWakeCurtainDom.js');
+    expect(dom).toContain('KEY_PANEL_WAKE_CURTAIN_DIAG');
+    expect(dom).toMatch(/function publishCurtainDiag\(\)/);
+    // ★呼び出しは【出したときと畳んだときの2箇所】
+    const calls = dom.match(/publishCurtainDiag\(\);/g) || [];
+    expect(calls.length).toBe(2);
+  });
+
+  it('★状態速報がその値を読む(読み手が居ない計器を作らない)', () => {
+    const extras = read('src/lib/statusExtrasBatch.js');
+    expect(extras).toContain('KEY_PANEL_WAKE_CURTAIN_DIAG');
+    expect(extras).toMatch(/panelWakeCurtainDiag: b\[KEY_PANEL_WAKE_CURTAIN_DIAG\]/);
+  });
+});
