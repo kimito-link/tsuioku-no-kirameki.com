@@ -99,6 +99,42 @@ export const STATUS_READ_POLICY = Object.freeze({
     writeIntervalMs: WRITE_INTERVAL_HUMAN_MS,
     writtenBy: 'popup-entry.js:19444 (AI診断コピー時のみ)',
     why: 'popup を開いたときだけ書かれる=診断ページを見ている間は不変'
+  },
+
+  /*
+   * watchTabMap: 開いている watch タブの一覧(`chrome.tabs.query`)。
+   *
+   * ★v0.1.1447: 「書き手」は storage ではなく **人のタブ操作**。
+   *   タブを開く/閉じる/切り替えるのは人の手＝popupDiag と同じ性質(分〜時間の間隔)。
+   *
+   * ★実測(2026-08-19 ユーザー実機): `tabs.query` 単独で **最悪1000ms**(watchタブは1個だけ)。
+   *   これは storage 競合ではなく **browser プロセスの応答待ち**
+   *   (`status-entry.js:1140-1145` のコメントが切り分け根拠を明記)。
+   *   ＝**キー数でもLevelDBでもないので、間引く以外に打つ手がない**。
+   *
+   * ★`windowId` で現在ウィンドウに絞る案は【却下】: このクエリは
+   *   **全ウィンドウの watch タブを探すのが目的**(別ウィンドウの配信を見失う)。
+   */
+  watchTabMap: {
+    writeIntervalMs: WRITE_INTERVAL_HUMAN_MS,
+    writtenBy: 'chrome.tabs.query (人がタブを開閉したときだけ変わる)',
+    why: 'タブ操作は人の手=分〜時間の間隔。実測で1000ms(browserプロセス待ち)'
+  },
+
+  /*
+   * lives: 視聴中の配信一覧。中身は `chrome.tabs.query`(watchTabMap と同じ実体)。
+   *
+   * ★当初これを宣言から外した(「storage を触らないから間引く意味がない」)が、
+   *   **その前提が誤りだった**。storage を触らなくても browser プロセス待ちで1秒かかる。
+   *
+   * ★ただし間隔は **短く**する(2秒→4秒)。ここは画面の土台(livesData)なので、
+   *   12秒も空けると「配信を開いたのに出てこない」になる。
+   *   ＝**呼ぶ回数を半分にしつつ、体感の鮮度は守る**。
+   */
+  lives: {
+    writeIntervalMs: 4_000,
+    writtenBy: 'chrome.tabs.query (人がタブを開閉したときだけ変わる)',
+    why: '土台なので12秒は空けられない。半減に留めて browser プロセス待ちを減らす'
   }
 });
 

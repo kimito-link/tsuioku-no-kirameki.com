@@ -25,13 +25,16 @@ const CORE_READ_KEYS = ['lives', 'summaries', 'fastDiagLite', 'popupDiag', 'back
  * ・減らす = 自由(歓迎)
  * 個別に塞ぐのではなく数で固定する([[fail-open-recurs-under-new-names-2026-08-12]])。
  *
- * ★4本の内訳と、載せない理由(会議 2026-08-19 の結論):
- *   lives        … chrome.tabs.query 経路で storage を触らない=間引く意味がない
+ * ★3本の内訳と、載せない理由(会議 2026-08-19 の結論):
  *   summaries    … livesData の土台。古いと全カード/全セルが古くなる
  *   fastDiagLite … 健全度セル・北極星・マインドマップの主入力
  *   backfill     … 取り込み進捗そのもの。ユーザーはこれを見に来ている=絶対に譲らない
+ *
+ * ★v0.1.1447 で 4→3 に減った: lives を宣言に載せた。
+ *   当初「chrome.tabs.query は storage を触らないから間引く意味がない」として外していたが、
+ *   **実測で tabs.query 単独が最悪1000ms**(browser プロセス待ち)＝前提が誤りだった。
  */
-const KNOWN_UNPOLICIED = 4;
+const KNOWN_UNPOLICIED = 3;
 
 describe('statusReadPolicy — 読む頻度を「書き手の更新間隔」から導く', () => {
   describe('★形骸化しない仕掛け(オプトイン台帳の二の舞を避ける)', () => {
@@ -114,9 +117,29 @@ describe('statusReadPolicy — 読む頻度を「書き手の更新間隔」か�
 
     it('★未登録キーは何度呼んでも必ず読む(現状の挙動と同じ)', () => {
       const t = 1_000_000;
-      for (const k of ['summaries', 'fastDiagLite', 'backfill', 'lives']) {
+      for (const k of ['summaries', 'fastDiagLite', 'backfill']) {
         expect(shouldReadNow(k, { lastReadAt: t, now: t + 1 }), k).toBe(true);
       }
+    });
+
+    it('★lives は4秒(土台なので12秒は空けない・呼ぶ回数を半分に)', () => {
+      const t = 1_000_000;
+      expect(readIntervalMsFor('lives')).toBe(4_000);
+      expect(shouldReadNow('lives', { lastReadAt: t, now: t + 3_999 })).toBe(false);
+      expect(shouldReadNow('lives', { lastReadAt: t, now: t + 4_000 })).toBe(true);
+    });
+
+    it('★watchTabMap は上限まで空ける(人のタブ操作なので)', () => {
+      const t = 1_000_000;
+      expect(readIntervalMsFor('watchTabMap')).toBe(READ_INTERVAL_CAP_MS);
+      expect(shouldReadNow('watchTabMap', { lastReadAt: t, now: t + 11_999 })).toBe(false);
+      expect(shouldReadNow('watchTabMap', { lastReadAt: t, now: t + 12_000 })).toBe(true);
+    });
+
+    it('★tabs.query 系は2つとも宣言済み(実測1000msはstorage競合では説明できない)', () => {
+      // 「storage を触らないから間引く意味がない」という誤った前提に戻る変異を殺す。
+      expect(STATUS_READ_POLICY.lives).toBeTruthy();
+      expect(STATUS_READ_POLICY.watchTabMap).toBeTruthy();
     });
 
     it('★時刻が読めないときは読む(安全側に倒す)', () => {

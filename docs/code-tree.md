@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 6 / 812 件
+## ⚠️ 役割コメントが無いソース 6 / 813 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `src/lib/laneDomSelfMeasure.js`
@@ -721,7 +721,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (1772)
+- 📁 **src/** (1775)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1018,7 +1018,7 @@
         - `logo_funlink_white_RGB_maru_black.png`
       - `logo_guide_funlink_ol.pdf`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1525)
+  - 📁 **lib/** (1528)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -1053,6 +1053,9 @@
     - `aiShareFullText.test.js`
     - `aiSharePopupDiagKey.js` — AI 共有「popup 固有診断」キャッシュの storage key を popup と status ページで共有。
     - `aiSharePopupDiagKey.test.js`
+    - `aiShareTextChanged.js` — 【層】L0 判定層(純粋関数・I/O禁止)
+    - `aiShareTextChanged.test.js`
+    - `aiShareTextChanged.wiring.test.js`
     - `anomalyVerdict.js` — 計器の値に「正常域」を持たせ、異常を【名指し】する純関数群。
     - `anomalyVerdict.test.js`
     - `anonymousIdenticon.js` — 匿名 userId 向けの決定論的アバター（SVG data URL）。

@@ -85,6 +85,7 @@ import { KEY_VOICE_DIAG } from '../lib/voiceDiagKey.js';
 // v0.1.1010: 取り込み中の更新激重(7071ms)を所要比例の間引きで緩和する純関数。
 import { computeRefreshBackoffTicks } from '../lib/statusRefreshBackoff.js';
 import { shouldReadNow } from '../lib/statusReadPolicy.js';
+import { shouldUpdateAiShareText } from '../lib/aiShareTextChanged.js';
 // 共有 URL 組み立て(状態速報/応援ライブビュー/ingest)の純関数。挙動同値で uploadStatusSnapshot から切り出し。
 import { buildStatusShareUrls } from '../lib/statusShareUrls.js';
 // 応援ライブビュー(拡張内)の「このURLをWEBでも公開する」用: status が組み立てた公開ペイロードを置くキー。
@@ -787,9 +788,17 @@ async function refresh(opts = {}) {
     // 2026-07-14 診断ページ608秒固まり根治: コア5readはガード経由(timeoutでもthrowしない)。
     //   幽霊readが多重に競合していた旧実装(runStorageOpWithTimeout直呼び)から置換。
     step = 'enumerateActiveLives';
-    const lvRes = await _livesGuard.read({ timeoutMs: _slice() });
+    /*
+     * ★v0.1.1447: lives の中身は `chrome.tabs.query`。**storage を触らないのに実測1000ms**
+     *   (browser プロセスの応答待ち・watchタブが1個でも遅い)。
+     *   ＝当初「storage を触らないから間引く意味がない」として宣言から外したのは【誤り】だった。
+     *   ★ただし画面の土台なので12秒は空けない(4秒=呼ぶ回数を半分に)。
+     */
+    const livesDue = shouldReadNow('lives', { lastReadAt: _coreReadAt.lives, now: Date.now() });
+    const lvRes = livesDue ? await _livesGuard.read({ timeoutMs: _slice() }) : _livesGuard.peek();
     const lvList = lvRes.value;
-    _mark(lvRes.stale ? 'lives(stale)' : 'lives');
+    if (livesDue && !lvRes.stale) _coreReadAt.lives = Date.now();
+    _mark(livesDue ? (lvRes.stale ? 'lives(stale)' : 'lives') : 'lives(譲)');
     step = `loadAllSummaries(${lvList.length}件)`;
     const sumRes = await _summariesGuard.read({ timeoutMs: _slice(), arg: lvList });
     const summaries = sumRes.value;
@@ -877,9 +886,21 @@ async function refresh(opts = {}) {
         sidepanelSelfDiag
       } = pickExtrasBatchValues(extrasBag, Date.now());
       step = 'queryWatchTabMap';
-      const wtRes = await _watchTabMapGuard.read({ timeoutMs: _slice() });
+      /*
+       * ★v0.1.1447: これも `chrome.tabs.query`(lives と同じ実体)。
+       *   既に extras の中(12秒間引き)に居るのに **実測2499ms**＝
+       *   **12秒に1回でも重い**。書き手は人のタブ操作なので、さらに空けてよい。
+       */
+      const wtDue = shouldReadNow('watchTabMap', {
+        lastReadAt: _coreReadAt.watchTabMap,
+        now: Date.now()
+      });
+      const wtRes = wtDue
+        ? await _watchTabMapGuard.read({ timeoutMs: _slice() })
+        : _watchTabMapGuard.peek();
       const watchTabMap = wtRes.value;
-      _mark(wtRes.stale ? 'watchTabMap(stale)' : 'watchTabMap');
+      if (wtDue && !wtRes.stale) _coreReadAt.watchTabMap = Date.now();
+      _mark(wtDue ? (wtRes.stale ? 'watchTabMap(stale)' : 'watchTabMap') : 'watchTabMap(譲)');
       step = 'recordAndAnalyzeTrend';
       const trendFindings = await runStorageOpWithTimeout(
         () => recordAndAnalyzeTrendSafe(lvList, summaries),
@@ -2262,7 +2283,18 @@ function renderAll({ extrasAgeMs, lvList, summaries, fastDiag, popupDiag, backfi
     const ta = /** @type {HTMLTextAreaElement|null} */ (
       document.getElementById('aiShareText')
     );
-    if (ta && ta.value !== fullText) ta.value = fullText;
+    /*
+     * ★v0.1.1447(ユーザー「コピーがスムーズにとれないときもありますね」):
+     *   旧 `ta.value !== fullText` は、本文1行目の【生成時刻】のせいで**常に true**。
+     *   ＝数十KBの textarea を2秒ごとに丸ごと書き換え、そのたびに
+     *   **ユーザーの選択が解除されていた**(value 代入は selection を必ず壊す)。
+     *   判定は src/lib/aiShareTextChanged.js(時刻を抜いて比較・選択中は書かない)。
+     */
+    if (ta) {
+      const selecting =
+        document.activeElement === ta && Number(ta.selectionEnd) > Number(ta.selectionStart);
+      if (shouldUpdateAiShareText(ta.value, fullText, { selecting })) ta.value = fullText;
+    }
   });
 
   // ②応援ライブビュー/③WEB に①と【全く同じフル状態速報】を出すため、status が組み立てた本文(fullText)を
