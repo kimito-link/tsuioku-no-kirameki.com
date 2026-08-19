@@ -763,6 +763,7 @@
 | `src/lib/statCardsMirrorDom.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/statusActionAdvisor.js` | 1 | 状態速報ページ |
 | `src/lib/statusCopyFreshness.js` | 1 | 状態速報ページ |
+| `src/lib/statusCoreBatch.js` | 1 | 状態速報ページ |
 | `src/lib/statusExtrasBatch.js` | 1 | 状態速報ページ |
 | `src/lib/statusMindmapModel.js` | 1 | 状態速報ページ |
 | `src/lib/statusMindmapSignature.js` | 1 | 状態速報ページ |
