@@ -129,6 +129,12 @@ export const DIAGNOSIS_REGISTRY = Object.freeze([
    *   見ていなかった**ため枠に出ていなかった(数えているのに読み手が居ない)。
    */
   reg('host-duplicate', 'パネルが2つできた', 'ingest', 1, false),
+  /*
+   * ★v0.1.1454: メモリ/DOM の逼迫(凍結の予兆)。実機で watch ページに
+   *   「ページが応答しません」が出たとき、どちらも測っていなかった。
+   */
+  reg('memory-pressure', 'メモリの余裕', 'render', 1, false),
+  reg('dom-nodes', '画面の部品数', 'render', 1, false),
   reg('northstar-render', '公式値の描画', 'northstar', 1, false),
   reg('mirror-publish', '鏡の書き出し', 'render', 1, false),
   /*

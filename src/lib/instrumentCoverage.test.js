@@ -74,6 +74,14 @@ function maximalInput() {
       //   ★重複は 0 が正常なので、0 のままだと host-duplicate セルは出ない
       //     ＝このゲート(「入力を与えれば出る」)の趣旨どおり非0を与える。
       hostMoveDiag: { moveCount: 3, duplicateSeen: 2 },
+      /*
+       * ★v0.1.1454: メモリ/DOM の逼迫。判定済みオブジェクトをそのまま入れる
+       *   (memoryPressureProbe.js が正本・ここは「入力を与えれば出る」の担保だけ)。
+       */
+      memoryPressure: {
+        level: 'bad', usedMB: 3800, limitMB: 4192, pct: 90,
+        domNodes: 13682, domLevel: 'bad', text: 'メモリ: 3800MB / 上限4192MB (90%)'
+      },
       giftDiagnostics: {
         '北極星レーン': {
         // ★v0.1.1407: foundCountLifetime = 「一度でも取れたか」(ns-ever-got の入力)

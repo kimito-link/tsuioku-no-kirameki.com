@@ -54,7 +54,9 @@ export const HEALTH_CELL_GROUPS = Object.freeze([
       // ★v0.1.1412: 取得経路が弱い方へ落ちていないか(ニコ生の構造変更の予兆)
       'source-provenance',
       // ★v0.1.1453: パネルが2つできた(重複生成)。数えていたのに枠に出ていなかった。
-      'host-duplicate'
+      'host-duplicate',
+      // ★v0.1.1454: 凍結の予兆(メモリ/DOM)。取り込みが止まる直前に赤くなる。
+      'memory-pressure', 'dom-nodes'
     ])
   }),
   Object.freeze({

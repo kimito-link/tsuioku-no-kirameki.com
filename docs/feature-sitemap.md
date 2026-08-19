@@ -787,7 +787,7 @@
   - `src/lib/statusTrendKey.js`
   - `src/extension/status-entry.js`
   - `src/lib/statusActionAdvisor.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 182</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 183</summary>
 
 - `app/app.js` — スマホ閲覧用 status Web 版。
 - `app/live-view.js` — global NL_BUILD_ID
@@ -877,6 +877,7 @@
 - `src/lib/mcpBridge/mergeLiveMcpSnapshot.js` — Canonical Snapshot のマージ（Deterministic + Monotonic Sequence）。
 - `src/lib/mcpBridge/schema.js` — L1 Canonical Snapshot の schema 定義（MCP Bridge から AI に返す正準形）。
 - `src/lib/mcpBridge/validateLiveMcpSnapshot.js` — Canonical Snapshot の構造検証。schema.js の isCanonicalLiveSnapshot より詳細な
+- `src/lib/memoryPressureProbe.js` — メモリ消費とDOM総数を「凍結の予兆」として判定する純関数
 - `src/lib/mergeProgramStatsWatchIntoWatchMetaSnapshot.js` — 公式 DOM bundle の programStats.watchCount（累計来場）を snapshot に補完する。
 - `src/lib/mirrorBundle.js` — 5種類の「鏡」を同一 tick の 1 バンドルとして扱うための合流バッファ純関数。
 - `src/lib/mirrorBundleFlushScheduler.js` — 鏡バンドルの flush スケジューラ(状態を内部に閉じた純ロジック・タイマー非依存)。
@@ -990,7 +991,8 @@
 ### 🪟 応援レーン・タイル (1版)
 - `v0.1.1441` 2026-08-19 — 出ないアイコンがある問題を直しました
 
-### 🩺 診断・状態速報 (8版)
+### 🩺 診断・状態速報 (9版)
+- `v0.1.1454` 2026-08-19 — メモリと画面の部品数を計器に入れました
 - `v0.1.1453` 2026-08-19 — 「パネルが2つできた」を画面に出しました
 - `v0.1.1449` 2026-08-19 — 診断ページの読み込みを1回にまとめました
 - `v0.1.1448` 2026-08-19 — タブ一覧の間引きが効かない条件を塞ぎました
@@ -1009,7 +1011,7 @@
 - `v0.1.1445` 2026-08-19 — 診断ページの作り直しすぎを止めました
 - `v0.1.1442` 2026-08-19 — 引っ張るときの黒い影を止めました
 
-### その他 (8版)
+### その他 (7版)
 - `v0.1.1452` 2026-08-19 — 黒画面の追いかけをここで終わらせました
 - `v0.1.1451` 2026-08-19 — サイドパネルの黒を根本から軽くしました
 - `v0.1.1443` 2026-08-19 — 黒い影を画面側からも止めました
@@ -1017,4 +1019,3 @@
 - `v0.1.1438` 2026-08-19 — 開くときの黒さをさらに減らしました
 - `v0.1.1437` 2026-08-18 — パネルの中身が出ない場合を直しました
 - `v0.1.1436` 2026-08-18 — パネルを開くときの黒い画面を直しました
-- `v0.1.1434` 2026-08-18 — 真っ黒(横縞)の原因を取り除きました

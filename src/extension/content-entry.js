@@ -336,6 +336,8 @@ import {
   shouldSkipInlineHostMoveForVenue,
   summarizeInlineHostMoveDiag
 } from '../lib/inlineHostMoveProbe.js';
+// ★v0.1.1454: メモリ/DOM の逼迫判定(凍結の予兆を数字で出す)。
+import { judgeMemoryPressure } from '../lib/memoryPressureProbe.js';
 /*
  * ★v0.1.1278: 点滅追跡の計器 import を撤去した(hostVisibilityFlipCensus /
  *   hostVisibilityWatch / hostStyleMutationTrace / hostVanishForensics /
@@ -7034,6 +7036,29 @@ function buildAiShareFastDiagnosticsPayload() {
     // v0.1.1124 D-1計器: host移設の実測(reloadCount=iframeリロード実害あり移設・byReason=犯人経路・
     //   venueOpenMoves=会場open中の移設)。ローディングちかちかの真犯人を状態速報の数字で確定する。
     hostMoveDiag: summarizeInlineHostMoveDiag(_inlineHostMoveState, Date.now()),
+    /*
+     * ★v0.1.1454 メモリ/DOM の逼迫(ユーザー指示「メモリの消費とかも計器にいれて」)。
+     *
+     *   実機で watch ページに「ページが応答しません」が出た。凍っていたのは
+     *   **拡張のパネルではなく watch ページ本体**。ところがこのリポには
+     *   **メモリもDOM総数も測る計器が1つも無かった**＝数字で答えられなかった。
+     *
+     *   ★ここは watch ページ(content script)＝**凍る当のページ**の値が取れる。
+     *   ★storage read を増やさない(この payload に相乗り)
+     *     ＝[[instrument-can-kill-the-page-it-measures-2026-08-16]]。
+     *   ★`getElementsByTagName('*').length` は live な HTMLCollection の length 参照で、
+     *     querySelectorAll のような配列生成をしない(計器自身が重くならない)。
+     */
+    memoryPressure: (() => {
+      try {
+        return judgeMemoryPressure(
+          /** @type {any} */ ((typeof performance !== 'undefined' ? performance : {}).memory),
+          { domNodes: document.getElementsByTagName('*').length }
+        );
+      } catch {
+        return null; // 計器の失敗で速報全体を壊さない
+      }
+    })(),
     /*
      * ★v0.1.1330 読み上げ到達可能性(会議4体・全員一致の一手)
      *   読み上げの計器(KEY_VOICE_DIAG)は【コメビュ/会場を開いている間だけ】書かれる。
