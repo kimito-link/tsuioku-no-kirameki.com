@@ -797,7 +797,14 @@ async function refresh(opts = {}) {
     const livesDue = shouldReadNow('lives', { lastReadAt: _coreReadAt.lives, now: Date.now() });
     const lvRes = livesDue ? await _livesGuard.read({ timeoutMs: _slice() }) : _livesGuard.peek();
     const lvList = lvRes.value;
-    if (livesDue && !lvRes.stale) _coreReadAt.lives = Date.now();
+    /*
+     * ★実read を【試みた】ら時計を進める(成功/stale を問わない)。
+     *   成功時だけ進めると、tabs.query が遅くて stale になり続ける環境で
+     *   **毎tick 1秒のクエリを叩き続ける**=間引きが効かない(実測1000msの当のAPI)。
+     *   ★popupDiag(storage)は成功時だけ進めてよいが、ここは
+     *     「呼ぶこと自体が高い」ので【呼んだ回数】で数える。
+     */
+    if (livesDue) _coreReadAt.lives = Date.now();
     _mark(livesDue ? (lvRes.stale ? 'lives(stale)' : 'lives') : 'lives(譲)');
     step = `loadAllSummaries(${lvList.length}件)`;
     const sumRes = await _summariesGuard.read({ timeoutMs: _slice(), arg: lvList });
@@ -899,7 +906,8 @@ async function refresh(opts = {}) {
         ? await _watchTabMapGuard.read({ timeoutMs: _slice() })
         : _watchTabMapGuard.peek();
       const watchTabMap = wtRes.value;
-      if (wtDue && !wtRes.stale) _coreReadAt.watchTabMap = Date.now();
+      // ★lives と同じ理由: tabs.query は「呼ぶこと自体が高い」ので試みた回数で数える。
+      if (wtDue) _coreReadAt.watchTabMap = Date.now();
       _mark(wtDue ? (wtRes.stale ? 'watchTabMap(stale)' : 'watchTabMap') : 'watchTabMap(譲)');
       step = 'recordAndAnalyzeTrend';
       const trendFindings = await runStorageOpWithTimeout(

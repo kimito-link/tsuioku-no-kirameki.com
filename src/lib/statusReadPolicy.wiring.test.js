@@ -106,9 +106,18 @@ describe('読み取り頻度ポリシーの配線', () => {
       /const livesDue = shouldReadNow\('lives', \{ lastReadAt: _coreReadAt\.lives, now: Date\.now\(\) \}\);/
     );
     expect(body).toMatch(/const wtDue = shouldReadNow\('watchTabMap', \{/);
-    // 実read成功時だけ時計を進める(peek で進めると二度と読まない)。
-    expect(body).toMatch(/if \(livesDue && !lvRes\.stale\) _coreReadAt\.lives = Date\.now\(\);/);
-    expect(body).toMatch(/if \(wtDue && !wtRes\.stale\) _coreReadAt\.watchTabMap = Date\.now\(\);/);
+    /*
+     * ★tabs.query 系は【試みた回数】で時計を進める(成功/stale を問わない)。
+     *   成功時だけ進めると、tabs.query が遅くて stale になり続ける環境で
+     *   **毎tick 1秒のクエリを叩き続ける**＝間引きが効かない
+     *   (実測1000msの当のAPIなので、ここを取り違えると修正が無意味になる)。
+     *   ★storage 系(popupDiag)は逆に「成功時だけ」が正しい=下の (3) で別に固定している。
+     */
+    expect(body).toMatch(/if \(livesDue\) _coreReadAt\.lives = Date\.now\(\);/);
+    expect(body).toMatch(/if \(wtDue\) _coreReadAt\.watchTabMap = Date\.now\(\);/);
+    // 成功条件を混ぜる変異(=元の誤り)に戻っていないこと。
+    expect(body).not.toMatch(/livesDue && !lvRes\.stale/);
+    expect(body).not.toMatch(/wtDue && !wtRes\.stale/);
   });
 
   it('★(7) 計器に必ず1行出る(譲った回と読んだ回を名前で見分けられる)', () => {
