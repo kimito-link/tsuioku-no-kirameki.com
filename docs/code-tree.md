@@ -722,7 +722,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (1782)
+- 📁 **src/** (1784)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1019,7 +1019,7 @@
         - `logo_funlink_white_RGB_maru_black.png`
       - `logo_guide_funlink_ol.pdf`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1535)
+  - 📁 **lib/** (1537)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -1591,6 +1591,7 @@
     - `inlineHostBesideSizing.test.js`
     - `inlineHostDockSizing.js` — dock_bottom モードの inline panel 高さを viewport と player rect から最適計算する純粋関数。
     - `inlineHostDockSizing.test.js`
+    - `inlineHostDuplicateCell.test.js`
     - `inlineHostHiddenAttr.wiring.test.js`
     - `inlineHostLayoutReset.js` — インラインパネルの placement（below / beside / floating / dock_bottom）を切り替える際に、
     - `inlineHostLayoutReset.test.js`
@@ -1629,6 +1630,7 @@
     - `instantPushDiag.js` — コメント即時プッシュレーン(storage迂回)の「送信N/受信N/表示遅延ms」観測値を
     - `instantPushDiag.test.js`
     - `instantPushDiagKey.js` — コメント即時プッシュレーン(storage迂回)の「送信N/受信N/表示遅延ms」観測値を
+    - `instantPushDiagSince.test.js`
     - `instrumentCoverage.test.js`
     - `interceptAvatarHydration.js` — profile cache の強い avatar を intercept avatar map へ補完する。
     - `interceptAvatarHydration.test.js`

@@ -52,7 +52,9 @@ export const HEALTH_CELL_GROUPS = Object.freeze([
     cellIds: Object.freeze([
       'ndgr', 'ingest', 'backfill', 'backfill-bottleneck', 'host-move', 'multi-tab',
       // ★v0.1.1412: 取得経路が弱い方へ落ちていないか(ニコ生の構造変更の予兆)
-      'source-provenance'
+      'source-provenance',
+      // ★v0.1.1453: パネルが2つできた(重複生成)。数えていたのに枠に出ていなかった。
+      'host-duplicate'
     ])
   }),
   Object.freeze({
