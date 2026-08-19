@@ -18992,6 +18992,7 @@ function armInlineShadeDeadlineOnFirstVisible() {
       },
       { once: true }
     );
+    arm(); // ★v0.1.1444: hidden でも締切を開始(理由=src/lib/initShadeDismissPolicy.js)
   } catch {
     // visibilityState を読めない環境では従来どおり即アーム(永久ローディングを作らない)。
     arm();

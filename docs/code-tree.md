@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 6 / 809 件
+## ⚠️ 役割コメントが無いソース 6 / 810 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `src/lib/laneDomSelfMeasure.js`
@@ -721,7 +721,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (1763)
+- 📁 **src/** (1766)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1018,7 +1018,7 @@
         - `logo_funlink_white_RGB_maru_black.png`
       - `logo_guide_funlink_ol.pdf`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1516)
+  - 📁 **lib/** (1519)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -1569,6 +1569,9 @@
     - `inFlightGuard.test.js`
     - `inferBroadcasterUserIdFromComments.js` — snapshot の broadcasterUserId が空のとき、保存済みコメント内の表示名から
     - `inferBroadcasterUserIdFromComments.test.js`
+    - `initShadeDismissPolicy.js` — 初回ロードの幕(シェード)を【いつ畳むか】を決める純関数。
+    - `initShadeDismissPolicy.test.js`
+    - `initShadeDismissWiring.wiring.test.js`
     - `initShadeFailsafe.js` — 初回ロード幕(.nl-init-shade)の CSS フェイルセーフとクラスの乖離を断つ純関数。
     - `initShadeFailsafe.test.js`
     - `inlineBelowWideRowInsert.js` — below 配置でインラインホストを「動画列の内側」から外すための挿入点解決。
