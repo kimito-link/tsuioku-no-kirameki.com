@@ -787,7 +787,7 @@
   - `src/lib/statusTrendKey.js`
   - `src/extension/status-entry.js`
   - `src/lib/statusActionAdvisor.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 181</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 182</summary>
 
 - `app/app.js` — スマホ閲覧用 status Web 版。
 - `app/live-view.js` — global NL_BUILD_ID
@@ -822,6 +822,7 @@
 - `scripts/write-extension-placeholder-icons.mjs` — リポジトリに 256px アイコンしか無い環境向け: manifest 用の小さめ PNG を生成する。
 - `src/extension/cloak-failsafe-entry.js` — 幕(cloak)を外す【最速の保険】だけを担う極小エントリ。
 - `src/extension/offscreen-entry.js` — feat/multitab-scale-globalcap（2026-05-31）: コメント IDB の「常駐・単一書き手」を担う
+- `src/lib/aboutBlankGapVerdict.js` — ★about:blank の隙間(残り32ms)に対する【確定した判定】。
 - `src/lib/adMessageCensus.js` — 「広告/ギフトの生データに【メッセージ】が入っているか」を数えるだけの計器。
 - `src/lib/aiShareTextChanged.js` — 【層】L0 判定層(純粋関数・I/O禁止)
 - `src/lib/anomalyVerdict.js` — 計器の値に「正常域」を持たせ、異常を【名指し】する純関数群。
@@ -1008,6 +1009,7 @@
 - `v0.1.1442` 2026-08-19 — 引っ張るときの黒い影を止めました
 
 ### その他 (9版)
+- `v0.1.1452` 2026-08-19 — 黒画面の追いかけをここで終わらせました
 - `v0.1.1451` 2026-08-19 — サイドパネルの黒を根本から軽くしました
 - `v0.1.1443` 2026-08-19 — 黒い影を画面側からも止めました
 - `v0.1.1440` 2026-08-19 — 引っ張るときの黒さへの一歩目
@@ -1016,4 +1018,3 @@
 - `v0.1.1436` 2026-08-18 — パネルを開くときの黒い画面を直しました
 - `v0.1.1434` 2026-08-18 — 真っ黒(横縞)の原因を取り除きました
 - `v0.1.1433` 2026-08-18 — サイドパネルが黒くなるのを直しました
-- `v0.1.1432` 2026-08-18 — 広告のひとことを記録・黒画面をキャラで隠す
