@@ -22,7 +22,9 @@ describe('makeInitialInstantPushDiag', () => {
       hiddenDeliveries: 0,
       visibleDeliveries: 0,
       avgVisibleDeliveryGapMs: -1,
-      lastEventAt: 0
+      lastEventAt: 0,
+      // ★v0.1.1453: 集計の起点(0=不明)。生涯累計を期間ごと誤読しないため。
+      since: 0
     });
   });
 });
@@ -45,6 +47,8 @@ describe('buildInstantPushDiagSnapshot', () => {
       visibleDeliveries: 0,
       avgVisibleDeliveryGapMs: -1,
       lastEventAt: 0,
+      // ★v0.1.1453: 集計の起点(0=不明)。生涯累計を期間ごと誤読しないため。
+      since: 0,
       capturedAt: 2000
     });
   });

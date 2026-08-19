@@ -197,6 +197,24 @@ export function buildBuriedCells(data) {
     }
   }
 
+  /* ── ★パネルが2つできた(重複生成) ───────────────────────
+   * ★v0.1.1453: `duplicateSeen` は v0.1.1125 から数えられ、fastDiag の JSON にも
+   *   出ていたが、**読み手が `moveCount` しか見ていなかった**ため枠に出なかった。
+   *   しかも旧実装は `moves > 0` のときだけセルを出す＝**引っ越しが0なら
+   *   重複が何回起きても画面に何も出ない**。
+   *   即時プッシュの「受信/送信」比を読むとき、重複パネルの実在が決め手になる。
+   * ★重複は **0 が正常**なので、観測ゼロなら出さない(枠を無駄にしない)。
+   *   出るのは「1回以上見た」ときだけ＝出たら必ず意味がある。
+   */
+  const dupSeen = host ? num(host.duplicateSeen) : null;
+  if (dupSeen != null && dupSeen > 0) {
+    out.push(cell(
+      'host-duplicate', 'パネルが2つできた',
+      'warn',
+      `${dupSeen}回 重複`
+    ));
+  }
+
   /* ── 北極星の描画がどこまで進んだか ─────────────────────── */
   const ns = p?.northStarRenderProbe;
   if (!ns || !(num(ns.refreshAllStarted) || 0)) push(naCell('northstar-render', '公式値の描画'));

@@ -70,7 +70,10 @@ function maximalInput() {
       // ★v0.1.1408: スクロール白化の犯人(移動 vs 描き直し)
       scrollWhiteoutDiag: { whiteoutCount: 3, culpritMove: 2, culpritRepaint: 1 },
       styleReattach: { count: 1 },
-      hostMoveDiag: { moveCount: 3 },
+      // ★v0.1.1453: duplicateSeen(パネルが2つできた)も最大入力に含める。
+      //   ★重複は 0 が正常なので、0 のままだと host-duplicate セルは出ない
+      //     ＝このゲート(「入力を与えれば出る」)の趣旨どおり非0を与える。
+      hostMoveDiag: { moveCount: 3, duplicateSeen: 2 },
       giftDiagnostics: {
         '北極星レーン': {
         // ★v0.1.1407: foundCountLifetime = 「一度でも取れたか」(ns-ever-got の入力)

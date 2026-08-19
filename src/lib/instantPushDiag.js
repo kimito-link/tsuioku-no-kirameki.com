@@ -22,8 +22,19 @@
  *   hiddenDeliveries: number,  // 受信時に document.hidden だったバッチ数(累計)
  *   visibleDeliveries: number, // 受信時に可視だったバッチ数(累計)
  *   avgVisibleDeliveryGapMs: number, // 可視中だけの配達 EMA 平均ms(-1=未計測)
- *   lastEventAt: number     // 最後にイベントが起きた時刻(epoch ms・0=未観測)
+ *   lastEventAt: number,    // 最後にイベントが起きた時刻(epoch ms・0=未観測)
+ *   since: number           // ★集計の起点(epoch ms・0=不明)。下記 v0.1.1453 参照
  * }} InstantPushDiagState
+ *
+ * ★v0.1.1453 `since` を追加した理由(2026-08-19 の誤診):
+ *   この計器は**リセット経路が存在しない生涯累計**。2026-08-19、送信/受信/破棄の
+ *   3つを比で読んで「受信+破棄=送信の1.51倍=二重注入」という**誤った真因**に到達した。
+ *   実際は導入 v0.1.1092(07-06)〜速報 v0.1.1413(08-17)の **6週間・約320版ぶん**が
+ *   混ざっており、その間に nonce 機構自体が v0.1.1094 で変わっていた
+ *   ＝**違うコードが書いた数を1つの比で語っていた**。
+ *   ★`since` が無いと「1時間の値」と「6週間の値」が同じ顔で並ぶ。
+ *   ★最初の1回だけ刻み、以後は上書きしない(縮むと分母がまた嘘になる)。
+ *   ★過去データ(since 無しの累計)には**嘘の起点を付けない**＝0(不明)のまま。
  *
  * ★v0.1.1416 (2026-08-16 実機の矛盾を解くために追加):
  *   速報に「最大タイマー遅延=753ms ✅健全」と「配達平均47,686ms」が同時に出た。
@@ -65,7 +76,16 @@ export function makeInitialInstantPushDiag() {
     hiddenDeliveries: 0,
     visibleDeliveries: 0,
     avgVisibleDeliveryGapMs: -1,
-    lastEventAt: 0
+    lastEventAt: 0,
+    /*
+     * ★v0.1.1453: 「いつから数えているか」(epoch ms・0=不明)。
+     *   この計器は**リセット経路が無い生涯累計**で、2026-08-19 に
+     *   6週間・約320版ぶんの累計を1つの比で語って**誤った真因**
+     *   (「二重注入」)に到達した。since が無いと「1時間の値」と
+     *   「6週間の値」が同じ顔で並ぶ＝**また同じ誤読が起きる**。
+     *   ★最初の1回だけ刻み、以後は絶対に上書きしない(縮むと分母が嘘になる)。
+     */
+    since: 0
   };
 }
 
@@ -110,7 +130,25 @@ export function applyInstantPushDiagDelta(prev, delta) {
       d.avgVisibleDeliveryGapMs,
       base.avgVisibleDeliveryGapMs
     ),
-    lastEventAt: replaceOrKeep(d.lastEventAt, base.lastEventAt)
+    lastEventAt: replaceOrKeep(d.lastEventAt, base.lastEventAt),
+    /*
+     * ★since は【最初の1回だけ】刻む(以後は上書きしない)。
+     *   - 既に刻まれている        → そのまま保持
+     *   - ★既存の累計があるのに since が無い(v0.1.1452 以前の保存値)
+     *     → **0(不明)のまま**。ここで今の時刻を刻むと、6週間ぶんの累計に
+     *       「たった今から」という嘘の期間が付き、分母がまた嘘になる
+     *   - まっさらから始まった   → delta の lastEventAt を起点にする
+     *     (時刻が無ければ 0=不明のまま。推測で刻まない)
+     */
+    since: (() => {
+      if (base.since > 0) return base.since;
+      const hadHistory =
+        base.sentCount > 0 || base.receivedCount > 0 || base.rejectedCount > 0 ||
+        base.sentRows > 0 || base.receivedRows > 0 || base.paintedRows > 0;
+      if (hadHistory) return 0; // ★いつからか分からない過去データ。騙らない。
+      const at = Number(d.lastEventAt);
+      return Number.isFinite(at) && at > 0 ? at : 0;
+    })()
   };
 }
 
@@ -137,7 +175,9 @@ function buildInstantPushDiagSnapshotInternal(diag) {
     hiddenDeliveries: num(d.hiddenDeliveries, base.hiddenDeliveries),
     visibleDeliveries: num(d.visibleDeliveries, base.visibleDeliveries),
     avgVisibleDeliveryGapMs: num(d.avgVisibleDeliveryGapMs, base.avgVisibleDeliveryGapMs),
-    lastEventAt: num(d.lastEventAt, base.lastEventAt)
+    lastEventAt: num(d.lastEventAt, base.lastEventAt),
+    // ★v0.1.1453: 集計の起点(0=不明)。過去データには無いので既定は 0。
+    since: num(d.since, base.since)
   };
 }
 
@@ -179,8 +219,28 @@ export function buildInstantPushDiagLines(snap, nowMs) {
     Number.isFinite(lastGapMs) && lastGapMs >= 0
       ? `表示遅延 直近${lastGapMs}ms${Number.isFinite(avgGapMs) && avgGapMs >= 0 ? `(平均${avgGapMs}ms)` : ''}`
       : '表示遅延 未計測';
+  /*
+   * ★v0.1.1453: 「いつから数えているか」を必ず併記する。
+   *
+   *   2026-08-19、この行の3つの数(送信/受信/破棄)を比で読んで
+   *   「受信+破棄=送信の1.51倍=二重注入」という**誤った真因**に到達した。
+   *   実際は**リセット経路が無い生涯累計**で、6週間・約320版ぶんが混ざっていた
+   *   (その間に nonce 機構自体が変わっている＝違うコードが書いた数を足していた)。
+   *
+   *   ★期間が見えないと、読み手は「いま起きていること」だと思い込む。
+   *   since=0(不明・過去データ)のときは**期間を騙らない**。
+   */
+  const since = Number(snap.since) || 0;
+  const spanText = (() => {
+    if (!(since > 0) || !(now > since)) return '';
+    const days = Math.floor((now - since) / 86_400_000);
+    if (days >= 1) return ` / 集計${days}日ぶん`;
+    const hours = Math.floor((now - since) / 3_600_000);
+    if (hours >= 1) return ` / 集計${hours}時間ぶん`;
+    return ' / 集計1時間未満';
+  })();
   const lines = [
-    `即時プッシュ: 送信${sentCount}件(行${sentRows}) / 受信${receivedCount}件(行${receivedRows}) / 破棄${rejectedCount} / 表示反映${paintedRows}行${agoText}`,
+    `即時プッシュ: 送信${sentCount}件(行${sentRows}) / 受信${receivedCount}件(行${receivedRows}) / 破棄${rejectedCount} / 表示反映${paintedRows}行${agoText}${spanText}`,
     `  → ${gapText}`
   ];
   // robust-arch Phase 0: 配達(送信→受信) と 描画(受信→描画完了) の内訳を1行で見せる。
