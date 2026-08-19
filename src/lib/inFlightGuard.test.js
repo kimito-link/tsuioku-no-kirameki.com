@@ -197,4 +197,73 @@ describe('createStaleGuardedRead（2026-07-14 診断ページ608秒固まり根�
     expect(r.value).toEqual([]);
     expect(r.hadData).toBe(false);
   });
+
+  /*
+   * v0.1.1446: peek(read を発行せず last-good だけ返す)。
+   * 「読む」か「読まない(=値が無い)」の2択しか無かったのを、
+   * **「読まないが前回値は出す」**という第3の選択肢で埋める。
+   */
+  it('★peek は opFn を発行せず last-good を返す(譲る=読まない、の核心)', async () => {
+    const opFn = vi.fn().mockResolvedValue('v1');
+    const guard = createStaleGuardedRead(opFn, { emptyValue: null });
+    await guard.read({ timeoutMs: 4000 });
+    expect(opFn).toHaveBeenCalledTimes(1);
+
+    const p1 = guard.peek();
+    const p2 = guard.peek();
+    // ★数で断言: 何回 peek しても read は増えない(peek が read を呼ぶ変異を殺す)。
+    expect(opFn).toHaveBeenCalledTimes(1);
+    expect(p1.value).toBe('v1');
+    expect(p2.value).toBe('v1');
+    expect(guard.getStats().peekServeCount).toBe(2);
+  });
+
+  it('★peek は必ず stale=true / reason="peek"(新鮮を装うと鮮度表示が出ず嘘になる)', async () => {
+    const guard = createStaleGuardedRead(vi.fn().mockResolvedValue('v1'), { emptyValue: null });
+    await guard.read({ timeoutMs: 4000 });
+    const p = guard.peek();
+    // stale=false に変える変異 = status のヘッダーに「⏳N秒前の値」が出なくなる
+    // = 古い値を新品として出す(嘘をつかない作法が壊れる)。
+    expect(p.stale).toBe(true);
+    expect(p.reason).toBe('peek');
+    expect(p.hadData).toBe(true);
+  });
+
+  it('★一度も成功していない peek は hadData=false / ageMs=-1(空を「0秒前」と偽らない)', () => {
+    const guard = createStaleGuardedRead(vi.fn(() => new Promise(() => {})), { emptyValue: null });
+    const p = guard.peek();
+    expect(p.hadData).toBe(false);
+    expect(p.ageMs).toBe(-1);
+    expect(p.value).toBe(null);
+  });
+
+  it('★peek の ageMs は last-good の経過を返す(注入 now で厳密に)', async () => {
+    let nowMs = 1000;
+    const guard = createStaleGuardedRead(vi.fn().mockResolvedValue('v1'), {
+      emptyValue: null,
+      now: () => nowMs
+    });
+    await guard.read({ timeoutMs: 4000 });
+    nowMs = 13000;
+    expect(guard.peek().ageMs).toBe(12000);
+  });
+
+  it('★幽霊の harvest が peek にも反映される(別キャッシュを持つとズレる箇所)', async () => {
+    /** @type {(v: string) => void} */
+    let resolveFirst = () => {};
+    const guard = createStaleGuardedRead(
+      vi.fn(() => new Promise((r) => { resolveFirst = r; })),
+      { emptyValue: null }
+    );
+    await guard.read({ timeoutMs: 10 }); // timeout → stale(まだ値が無い)
+    expect(guard.peek().hadData).toBe(false);
+
+    resolveFirst('late-value'); // 幽霊が遅れて解決
+    await new Promise((r) => setTimeout(r, 0));
+
+    // ★_coreCache のような別キャッシュ方式では絶対に取れない値。
+    //   peek を選んだ根拠そのもの(値と鮮度表示が食い違わない)。
+    expect(guard.peek().value).toBe('late-value');
+    expect(guard.peek().hadData).toBe(true);
+  });
 });

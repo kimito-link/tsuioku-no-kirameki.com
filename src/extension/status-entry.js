@@ -84,6 +84,7 @@ import { buildVoiceDiagLine } from '../lib/voiceDiag.js';
 import { KEY_VOICE_DIAG } from '../lib/voiceDiagKey.js';
 // v0.1.1010: 取り込み中の更新激重(7071ms)を所要比例の間引きで緩和する純関数。
 import { computeRefreshBackoffTicks } from '../lib/statusRefreshBackoff.js';
+import { shouldReadNow } from '../lib/statusReadPolicy.js';
 // 共有 URL 組み立て(状態速報/応援ライブビュー/ingest)の純関数。挙動同値で uploadStatusSnapshot から切り出し。
 import { buildStatusShareUrls } from '../lib/statusShareUrls.js';
 // 応援ライブビュー(拡張内)の「このURLをWEBでも公開する」用: status が組み立てた公開ペイロードを置くキー。
@@ -359,6 +360,13 @@ let _refreshTimerId = /** @type {number|null} */ (null);
 //   storage を読むと重い=12 秒間引きでキャッシュし、間は前回値を再利用(コア表示は毎回更新のまま)。
 const EXTRAS_REFETCH_MS = 12000;
 let _extrasCacheAt = 0;
+/**
+ * ★v0.1.1446: コアread を最後に【実際に読んだ】時刻(キー名→ms)。
+ *   src/lib/statusReadPolicy.js の宣言に従って read/peek を切り替えるために使う。
+ *   ★peek(読まなかった回)では**進めない**。進めると二度と実 read しなくなる。
+ * @type {Record<string, number>}
+ */
+const _coreReadAt = Object.create(null);
 /**
  * ★v0.1.1384: 拡張更新時の自動タブリロードの痕跡(background.js が書く)。
  *   これが出れば「手動F5は不要」と確定でき、ユーザーへの依頼を1手減らせる。
@@ -793,9 +801,26 @@ async function refresh(opts = {}) {
     const fastDiag = fdRes.value;
     _mark(fdRes.stale ? 'fastDiagLite(stale)' : 'fastDiagLite');
     step = 'loadPopupDiagSafe';
-    const pdRes = await _popupDiagGuard.read({ timeoutMs: _slice() });
+    /*
+     * ★v0.1.1446: 読む頻度を【書き手の更新間隔】から導く(src/lib/statusReadPolicy.js)。
+     *   popupDiag の書き手は popup-entry.js:19444 の1箇所で、**popup を開いたときにしか走らない**
+     *   ＝診断ページを見ている間この値は変わらない。2秒ごとに読んでも同じ値を取り直すだけで、
+     *   その間ずっと単一 LevelDB の書込(content が2秒ごとに書く)と競合していた。
+     *   ＝**譲る**のではなく【無駄を消す】。情報は1bitも失わない。
+     *   ★未登録キー(summaries/fastDiagLite/backfill/lives)は shouldReadNow が常に true を返す
+     *     ＝挙動は従来どおり(fail-open)。
+     */
+    const popupDiagDue = shouldReadNow('popupDiag', {
+      lastReadAt: _coreReadAt.popupDiag,
+      now: Date.now()
+    });
+    const pdRes = popupDiagDue
+      ? await _popupDiagGuard.read({ timeoutMs: _slice() })
+      : _popupDiagGuard.peek();
     const popupDiag = pdRes.value;
-    _mark(pdRes.stale ? 'popupDiag(stale)' : 'popupDiag');
+    // ★実 read が成功した回だけ時計を進める(peek で進めると二度と読まなくなる)。
+    if (popupDiagDue && !pdRes.stale) _coreReadAt.popupDiag = Date.now();
+    _mark(popupDiagDue ? (pdRes.stale ? 'popupDiag(stale)' : 'popupDiag') : 'popupDiag(譲)');
     step = 'loadBackfillProgress';
     const bfRes = await _backfillGuard.read({ timeoutMs: _slice() });
     const backfillProgress = bfRes.value;
