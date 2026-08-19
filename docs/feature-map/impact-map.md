@@ -694,6 +694,7 @@
 | `src/lib/popupContextBarModel.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/popupDiagAutoPublish.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/popupDiagUptimeNote.js` | 1 | 状態速報ページ |
+| `src/lib/popupDomCensus.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/popupEntryPendingSelfPost.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/popupErrorLine.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/popupFrameCodec.js` | 1 | ポップアップ(応援レーン) |

@@ -364,7 +364,13 @@ export default [
     //   initialRefreshDone を渡してはいけない理由・700ms の算出)。
     //   ★次に触る人が同じ地雷を踏まないためのコストとして、この増加は意図的。
     //   抽出でこの数値を下げるのは歓迎(増やすのは禁止のまま)。
-    rules: { 'max-lines': ['error', { max: 22492, skipBlankLines: false, skipComments: false }] }
+    // ★v0.1.1456(22492→22521・+29行): popup(iframe)側の DOM 量を数える採取を足した。
+    //   ★v0.1.1454 で入れた「画面の部品数」は **watch ページ本体**の数で、
+    //     実測(ユーザー実機)は 1,441個・メモリ上限の2% ＝ **watch 側は正常**だった。
+    //     それでも「ページが応答しません」が出た＝**膨らむ側(popup.html)を誰も測っていない**。
+    //   判定は `src/lib/popupDomCensus.js`(純関数)に置き、ここは採取だけ。
+    //   ★storage read は増やしていない(既存の計器バッチに相乗り)。
+    rules: { 'max-lines': ['error', { max: 22521, skipBlankLines: false, skipComments: false }] }
   },
   {
     files: ['src/extension/popup/**/*.js'],

@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 6 / 817 件
+## ⚠️ 役割コメントが無いソース 6 / 818 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `src/lib/laneDomSelfMeasure.js`
@@ -723,7 +723,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (1791)
+- 📁 **src/** (1794)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1021,7 +1021,7 @@
         - `logo_funlink_white_RGB_maru_black.png`
       - `logo_guide_funlink_ol.pdf`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1543)
+  - 📁 **lib/** (1546)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -1995,6 +1995,9 @@
     - `popupDiagUptimeNote.js` — popup 固有診断が「popup 起動から何秒後の値か」を明示する注記を作る純関数(v0.1.1211)。
     - `popupDiagUptimeNote.test.js`
     - `popupDiagUptimeNote.wiring.test.js`
+    - `popupDomCensus.js` — 【層】L0 判定層(純粋関数・I/O禁止)
+    - `popupDomCensus.test.js`
+    - `popupDomCensusWiring.test.js`
     - `popupEntryPendingSelfPost.js` — popup の表示経路で「pending self-post entry（ndgr 観測前の自コメ仮置き）」を
     - `popupEntryPendingSelfPost.test.js`
     - `popupErrorLine.js` — popupErrorProbe の速報1行を作る純関数(v0.1.1377)。
