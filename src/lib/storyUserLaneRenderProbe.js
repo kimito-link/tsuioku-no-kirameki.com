@@ -342,6 +342,8 @@ export function buildStoryUserLaneRenderDiag(probeSnap, ctx) {
     // v0.1.1040 計器: 段ごとの実 replaceChildren 回数(churn 実測)をそのまま持ち越す。
     laneRepaintCounts: s.laneRepaintCounts && typeof s.laneRepaintCounts === 'object' ? s.laneRepaintCounts : null,
     laneHollowCounts: s.laneHollowCounts && typeof s.laneHollowCounts === 'object' ? s.laneHollowCounts : null,
+    // ★v0.1.1456: popup(iframe)側の DOM 量(調査計画 Step 1)。watch 側とは別文書。
+    popupDomCensus: s.popupDomCensus && typeof s.popupDomCensus === 'object' ? s.popupDomCensus : null,
     verdict,
     reason
   };
@@ -415,6 +417,15 @@ export function formatStoryUserLaneRenderDiagLines(diag, ctx) {
         ? `  → 中身LOD ✅ 枠だけ${hollow}枚(たぬ姉${Math.max(0, Math.floor(Number(h.tanu) || 0))}枚) / 全${tiles}枚 — 画面に入ると中身が入ります(DOMを減らしています)`
         : `  → 中身LOD ⚪ 枠だけ0枚 / 全${tiles}枚 — たぬ姉段が25枚を超え、かつ匿名のときだけ働きます(条件未達なら0が正常)`
     );
+  }
+  /*
+   * ★v0.1.1456 調査計画 Step 1: popup(iframe)側の DOM 量。
+   *   ★speed枠の「画面の部品数」は **watch ページ本体**の数(v0.1.1454)。
+   *     こちらは **パネル(iframe)側**＝過去に 13,682 を記録した当の文書。
+   *   ★内訳(基準+タイル+その他)まで出すのは、中身LODで解ける量かを判定するため。
+   */
+  if (d.popupDomCensus && typeof d.popupDomCensus === 'object' && d.popupDomCensus.line) {
+    lines.push(`  → ${d.popupDomCensus.line}`);
   }
   // v0.1.1033: heavy 完了が settled に到達したか。race 多発=たぬ姉レーンが暫定(直近N件)で固着の真因。
   // ★v0.1.1241: 「一度でも settled したか」で言い分けを変える。race は自己修復の途中経過でもあり

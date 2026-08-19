@@ -630,6 +630,8 @@ import {
   NICONICO_OFFICIAL_DEFAULT_USERICON_HTTPS
 } from '../lib/supportGrowthTileSrc.js';
 import { userLaneHttpForTilePick } from '../lib/storyUserLaneDisplaySrc.js';
+// ★v0.1.1456: popup(iframe)側の DOM 量を数える(調査計画 Step 1)。watch 側とは別文書。
+import { summarizePopupDomCensus } from '../lib/popupDomCensus.js';
 import {
   paintStoryUserLaneDomEmptyGuides,
   paintStoryUserLaneDomFilled,
@@ -19286,7 +19288,34 @@ async function collectAiShareDevMonitorPayloadBundle(watchUrl) {
       storyUserLaneRenderProbe: (() => {
         try {
           const snap = snapshotStoryUserLaneRenderProbe(_storyUserLaneRenderProbe, Date.now());
-          if (snap) { snap.laneRepaintCounts = getStoryLaneRepaintCounts(); snap.laneHollowCounts = getStoryLaneHollowCounts(document); } // v0.1.1040/v0.1.1428 計器: 段別churn実測 + 中身LODが効いているか
+          if (snap) { snap.laneRepaintCounts = getStoryLaneRepaintCounts(); snap.laneHollowCounts = getStoryLaneHollowCounts(document); }
+          /*
+           * ★v0.1.1456 調査計画 Step 1: popup(iframe)側の DOM 量を数える。
+           *   ★watch 側の `dom-nodes` とは【別文書】。台帳(instrumentSpec.js)でも
+           *     `dom-nodes @ watch` / `dom-nodes @ popup` の2行に分けてある。
+           *   ★storage read を増やさない(この計器バッチに相乗り)
+           *     = [[instrument-can-kill-the-page-it-measures-2026-08-16]]。
+           *   ★`getElementsByTagName('*').length` は live コレクションの length 参照で
+           *     querySelectorAll のような配列生成をしない(計器自身が重くならない)。
+           */
+          if (snap) {
+            try {
+              const laneIds = { link: 'sceneStoryUserLaneLink', konta: 'sceneStoryUserLaneKonta',
+                tanu: 'sceneStoryUserLaneTanu', gift: 'sceneStoryUserLaneGift', ad: 'sceneStoryUserLaneAd' };
+              /** @type {Record<string, { tiles:number, nodes:number }>} */
+              const perLane = {};
+              for (const [name, id] of Object.entries(laneIds)) {
+                const el = document.getElementById(id);
+                if (el) perLane[name] = { tiles: el.childElementCount, nodes: el.getElementsByTagName('*').length };
+              }
+              snap.popupDomCensus = summarizePopupDomCensus({
+                total: document.getElementsByTagName('*').length,
+                tiles: document.getElementsByClassName('nl-story-userlane-cell').length,
+                hollow: document.getElementsByClassName('nl-story-userlane-cell--hollow').length,
+                perLane
+              });
+            } catch { /* 計器の失敗で診断全体を壊さない */ }
+          } // v0.1.1040/v0.1.1428 計器: 段別churn実測 + 中身LODが効いているか
           // heavyRace根治(B)計器: fresh-read で heavy 全件再読みを省いた累計(実配信で効きと12秒ギャップの適正を判定)。
           if (snap) { /* ★v1357: 実DOM起点の縮小観測も渡す(履歴だけだと嘘をつく) */ snap.heavyFreshReadReuseCount = _heavyFreshReadReuseCount; snap.heavyReuseLastReason = _heavyReuseLastReason; snap.heavyRacePaintedFromCache = _heavyRacePaintedFromCacheCount; snap.laneTileOscillation = summarizeLaneTileOscillation(_laneTileHistory, { domShrinkCount: _laneSupplyOriginDiag?.shrinkObservedCount, domShrinkCulprit: _laneSupplyOriginDiag?.shrinkCulprit }); }
           // heavyRace根治(C-1)計器: 進行中read への合流で新規readを張らずに済んだ累計(single-flightの効き)。
