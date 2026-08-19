@@ -721,7 +721,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (1779)
+- 📁 **src/** (1780)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1018,7 +1018,7 @@
         - `logo_funlink_white_RGB_maru_black.png`
       - `logo_guide_funlink_ol.pdf`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1532)
+  - 📁 **lib/** (1533)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -1201,9 +1201,10 @@
     - `celebrationFlyText.test.js`
     - `celebrationPika.js` — パチンコ／ボカロ MV 風 — 画面全体「ぴかっ」フラッシュ spec（純関数）。
     - `celebrationPika.test.js`
-    - `changelog-archive.js` — 追憶のきらめき 更新履歴アーカイブ（v0.1.663 以前）。
+    - `changelog-archive.js` — 追憶のきらめき 更新履歴アーカイブ（popup のバンドル外）。
     - `changelog.js` — 拡張の更新履歴データと semver 比較ヘルパ。
     - `changelog.test.js`
+    - `changelogBundleBudget.test.js`
     - `changelogConsistency.js` — 版番号の三者一致を機械照合する純関数(v0.1.835)。
     - `changelogConsistency.test.js`
     - `changelogLineage.js` — changelog 全版を「バグ系統」で枝化する純関数(v0.1.841・修正系譜マップ 第1)。

@@ -75,17 +75,27 @@ describe('buildChangelogLineage', () => {
     expect(buildChangelogLineage(null)).toEqual([]);
   });
 
-  // 実データ(177版)で動くこと=網羅と取りこぼしの実態を固定。
-  it('実 changelog(全版)で系統が複数できる・全版がどこかに入る', () => {
+  // 実データで動くこと=網羅と取りこぼしの実態を固定。
+  it('実 changelog(同梱分)で系統が複数できる・全版がどこかに入る', () => {
     const lineage = buildChangelogLineage(EXTENSION_CHANGELOG);
     expect(lineage.length).toBeGreaterThan(3);
-    // 記録件数系は実績で複数版ある(v0.1.792/804/838/839…)。
-    const rec = lineage.find((b) => b.tag === '💾 記録件数');
-    expect(rec).toBeTruthy();
-    expect(rec.versions.length).toBeGreaterThan(1);
+    /*
+     * ★2026-08-19: 以前は「💾 記録件数 の系統が複数版ある」を断言していたが、
+     *   changelog.js を **直近20版**へ戻した(旧版は changelog-archive.js)ため、
+     *   どの系統が何版含まれるかは**同梱する版によって変わる**＝
+     *   特定タグの存在を固定すると、版が進むたびに無関係に赤くなる。
+     *   ★守りたかったのは「取りこぼしゼロ」なので、そちらだけを断言する。
+     *   (バンドル削減の経緯: popup が 2,404KB→1,392KB。changelog 単独で1,042KB=43%だった)
+     */
     // 全版が「その系統 or その他」のどこかに必ず1回以上現れる(取りこぼしゼロ)。
     const seen = new Set();
     for (const b of lineage) for (const v of b.versions) seen.add(v.version);
     expect(seen.size).toBe(EXTENSION_CHANGELOG.length);
+    /*
+     * ★1版が複数の系統に入るのは【正常】(1つの修正が複数の症状に触れることがある)。
+     *   実測: 20版 → 延べ28件。合計＝版数を期待するのは誤り(私が一度書いて赤にした)。
+     */
+    const total = lineage.reduce((a, b) => a + b.versions.length, 0);
+    expect(total).toBeGreaterThanOrEqual(EXTENSION_CHANGELOG.length);
   });
 });
