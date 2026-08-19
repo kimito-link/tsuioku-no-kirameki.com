@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 6 / 811 件
+## ⚠️ 役割コメントが無いソース 6 / 812 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `src/lib/laneDomSelfMeasure.js`
@@ -721,7 +721,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (1769)
+- 📁 **src/** (1772)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1018,7 +1018,7 @@
         - `logo_funlink_white_RGB_maru_black.png`
       - `logo_guide_funlink_ol.pdf`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1522)
+  - 📁 **lib/** (1525)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -2197,6 +2197,9 @@
     - `statusMindmapSignature.js` — マインドマップの再描画を止める署名を作る純関数。
     - `statusMindmapSignature.test.js`
     - `statusMindmapSignature.wiring.test.js`
+    - `statusReadPolicy.js` — 【層】L0 判定層(純粋関数・I/O禁止)
+    - `statusReadPolicy.test.js`
+    - `statusReadPolicy.wiring.test.js`
     - `statusRefreshBackoff.js` — v0.1.1010: 状態速報(status.html)の自動更新を「直近 refresh の所要に比例して間引く」純関数。
     - `statusRefreshBackoff.test.js`
     - `statusShareUrls.js` — 状態速報の共有 URL を組み立てる純関数。

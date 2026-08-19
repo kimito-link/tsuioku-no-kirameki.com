@@ -79,9 +79,10 @@ import { startStorageOpWithTimeout, STORAGE_OP_TIMED_OUT } from './storageOpTime
  *   read: (opts?: { timeoutMs?: number, arg?: any }) => Promise<{
  *     value: T, stale: boolean, hadData: boolean, ageMs: number, reason: string
  *   }>,
+ *   peek: () => { value: T, stale: boolean, hadData: boolean, ageMs: number, reason: string },
  *   getStats: () => { freshCount: number, staleServeCount: number, timeoutCount: number,
- *     lateHarvestCount: number, reissueCount: number, inFlight: boolean, pendingMs: number,
- *     lastGoodAgeMs: number }
+ *     lateHarvestCount: number, reissueCount: number, peekServeCount: number,
+ *     inFlight: boolean, pendingMs: number, lastGoodAgeMs: number }
  * }}
  */
 export function createStaleGuardedRead(opFn, options = {}) {
@@ -100,7 +101,9 @@ export function createStaleGuardedRead(opFn, options = {}) {
     staleServeCount: 0,
     timeoutCount: 0,
     lateHarvestCount: 0,
-    reissueCount: 0
+    reissueCount: 0,
+    // v0.1.1446: peek(read を発行せず last-good だけ返す)を使った回数。
+    peekServeCount: 0
   };
 
   /** @param {string} reason */
@@ -111,6 +114,27 @@ export function createStaleGuardedRead(opFn, options = {}) {
     ageMs: lastGood.at > 0 ? now() - lastGood.at : -1,
     reason
   });
+
+  /**
+   * v0.1.1446: read を【発行せずに】last-good だけ取る。
+   *
+   * ■ なぜ要るか(2026-08-19「診断ページ重い」)
+   *   status のコアreadは「読む」か「読まない(=値が無い)」の2択しかなかった。
+   *   ＝混雑時に譲ると画面が空になるので【譲れなかった】。
+   *   peek は第3の選択肢**「読まないが前回値は出す」**を作る。
+   *
+   * ★staleResult と【同じ形】を返す(呼び出し側が read と peek を区別せず扱える
+   *   =分岐が増えない。増えた分岐は必ず片方が腐る)。
+   * ★reason:'peek' なので status-entry の staleCores 判定がそのまま拾い、
+   *   譲った回は自動で「⏳N秒前の値」がヘッダーに出る(嘘をつかない)。
+   * ★opFn を呼ばない=storage を1本も叩かない。これが「譲る」の実体。
+   *
+   * @returns {{ value: T, stale: boolean, hadData: boolean, ageMs: number, reason: string }}
+   */
+  const peek = () => {
+    stats.peekServeCount += 1;
+    return staleResult('peek');
+  };
 
   /** @param {{ timeoutMs?: number, arg?: any }} [readOpts] */
   const read = async (readOpts = {}) => {
@@ -158,5 +182,5 @@ export function createStaleGuardedRead(opFn, options = {}) {
     lastGoodAgeMs: lastGood.at > 0 ? now() - lastGood.at : -1
   });
 
-  return { read, getStats };
+  return { read, peek, getStats };
 }
