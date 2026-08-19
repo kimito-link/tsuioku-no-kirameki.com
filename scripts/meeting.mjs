@@ -879,6 +879,47 @@ async function council(members, label, key) {
     }
   }
 
+  // 2026-08-19 追加（計器のみ・挙動は変えない）: 「召集したのに有効回答が返らなかった役割」を数える。
+  //  動機: council/*.json 79件を手で掘って初めて「lead不在の会議が45件あった」と分かった。
+  //  だが分解すると実害は現行lineupで1件（2026-08-04・nvidia/nemotron-3-ultra-550bのHTTP 503
+  //  "Worker local total request limit reached (32/32)"・0ms即死・再発なし）だけで、
+  //  残りは(a)不召集39件＝CATEGORIES.codeがleadをwantしない設計/当時leadプールが薄かった歴史、
+  //  (b)召集失敗6件のうち5件はEOL撤去済みのnvidia/mistral-large-3-675b、という内訳だった。
+  //  ★重要な実測: lead不在45件は**すべて2026-08-16(SYNTH既定ON)より前**。統合はrouted
+  //    メンバーと独立に最強クラウドが担うようになったため、leadが1巡目で死んでも会議の
+  //    最終成果物は成立する。＝救済機構を今書くのは、測定された問題がゼロの過剰実装。
+  //  そこで機構は書かず、計器だけ置く。既存のnoteEvent(record.meta.events)に相乗りするので
+  //  新規配線はゼロ。
+  //  ★救済を設計してよい条件（これを満たすまで機構は書かない）:
+  //    role-gap が missing に 'lead' を含み synthCovered:false で観測されたとき、
+  //    または計器導入後に role-gap を3回観測したとき。会議は月数回しか回らないので閾値は率でなく絶対値。
+  //  ★救済を書く日の置き場所の注意: runRound(487行)の中に書いてはならない。
+  //    runRound は②統合チェーン(860/865行)からも role:'lead' で呼ばれており、
+  //    そこに差し替え再試行を入れると統合の429リトライと二重再試行になる。
+  //    置くなら council() の1巡目直後(727行の外側)で、swapToCloud(893行)を再利用する。
+  //  ★この計器が見ないもの: 「そもそも召集されなかった役割」は members に居ないので missing に出ない
+  //    （不召集は選抜段階の話で、現行LINEUPでは design/general/fact/writing に lead が入ることを実行確認済み）。
+  //  ★r.synthesis を除外する理由（外すと計器が無意味になる）: ②統合の成功行は
+  //    `role:'lead'` を付けて shown に push される(868行)。除外しないと、1巡目のleadが
+  //    死んでも統合が成功した瞬間に lead が「回答済み」に見え、2026-08-04の実例が
+  //    欠落ゼロと報告される。統合の成否は synthCovered で別に持つ。
+  const summonedRoles = new Set(members.map(m => m.role).filter(Boolean));
+  const answeredRoles = new Set(shown.filter(r => !r.error && !r.synthesis && String(r.answer || '').trim()).map(r => r.role).filter(Boolean));
+  const missingRoles = [...summonedRoles].filter(r => !answeredRoles.has(r));
+  if (missingRoles.length) {
+    const synthCovered = shown.some(r => r.synthesis && !r.error);
+    noteEvent('role-gap', {
+      round: label,
+      missing: missingRoles,
+      failed: shown.filter(r => r.error).map(r => `${r.role || '?'}:${r.label}`),
+      synthCovered,
+    });
+    const heavy = missingRoles.includes('lead') && !synthCovered;
+    console.error(`[${label}] ⚠ 役割欠落: ${missingRoles.map(r => ROLE_LABEL[r] || r).join('/')} の有効回答なし`
+      + (synthCovered ? '（統合は別頭脳で成立）' : '（統合も無し）')
+      + (heavy ? ' ★統括不在かつ統合なし＝救済機構の設計を検討すること' : ''));
+  }
+
   printResults(label, shown);
   record.rounds[key] = shown;
   const ok = shown.filter(r => !r.error).length;
