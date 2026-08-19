@@ -209,7 +209,7 @@ npm run verify:deploy
 | 件 | 状態 |
 |---|---|
 | **サイドパネルの黒（本件）** | ★最優先。ユーザー実機で継続中 |
-| 受信+破棄 = 送信の1.51倍 | 候補＝`injectIntoExistingTabs()` が二重注入を止めない。**未実証** |
+| ~~受信+破棄 = 送信の1.51倍~~ | ★**2026-08-19 決着＝二重注入ではない**（latch は実在）。1回の送信を複数iframeが各自計上していただけ。正本 `HANDOFF-2026-08-19-instant-push-1.51x.md` |
 | `status.html` が300秒以上応答しない | 実機で観測（コメント遅延とは別件・未着手） |
 | 健全度セル（残 `lane-drop`/`voice-engine`） | `docs/handoff/health-cells-4domains-DESIGN.md` |
 | 読み上げリファクタ Phase1 | **触る前に非対称4件を確認**（[[voice-refactor-plan-2026-08-11]]） |
