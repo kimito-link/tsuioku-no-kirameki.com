@@ -90,6 +90,17 @@ export function roleOf(name) {
   // 余裕があり、並列ラウンドの律速はlead(nemotron 550b・実測52〜104秒)のため影響しない。
   // 撤去条件: Ollama起動中の実会議でfast役として2回連続FAILEDなら、後継を立てず
   // fast役の役割定義ごと削除する（2026-08-18裁定の予備線）。
+  // 2026-08-19 観測（撤退線には触れていない・記録のみ）: 実会議1回目で
+  // 「Post http://127.0.0.1:11434/tokenize: EOF」でFAILEDしたが、直後の2回目は成功(7457ms)し
+  // 2回連続には至らなかった。単発の再現テストは3回とも成功(1996〜7128ms)、Ollamaは生存・
+  // qwen3.5:9bもGPU100%でロード済みだったため、モデル側の不調ではない。
+  // 真因の候補: 環境変数 OLLAMA_NUM_PARALLEL=1（＝Ollamaが同時に1リクエストしか受けない）。
+  // 会議が呼ぶローカルは常に1体（selectMembersで実測: design/code とも local 1体・general 0体）
+  // なので会議単独では競合しないが、**別セッションや他ツールが同時にOllamaを使うと衝突する**。
+  // ＝この失敗は会議ハーネスの欠陥ではなく、マシン全体でOllamaを共有していることの帰結。
+  // 対処するなら OLLAMA_NUM_PARALLEL を上げるが、ユーザーのマシン全体に影響する設定のため
+  // ここでは変更しない（VRAM 12GBでの同時ロードは別のリスクを生む）。
+  // 頻発するようなら、まず `ollama ps` と他プロセスの使用状況を確認すること。
   if (n.includes("qwen3.5:9b")) return "fast";
   if (n.includes("qwen3") || n.includes("qwen3.5")) return "diverge";
   if (n.includes("gemma4")) return "lead";
