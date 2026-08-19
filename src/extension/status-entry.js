@@ -40,6 +40,7 @@ import { buildStorageWriteLedgerLines } from '../lib/storageWriteLedger.js';
 //   重さの真因(council/status-heavy-open-SYNTHESIS.md)。status が使う4フィールドだけの軽量ダイジェスト
 //   (content が同時に書く)を read する=read 回数同じ・サイズ ~40分の1。読み取りパスは full と同形。
 import { KEY_STATUS_FAST_DIAG_LITE } from '../lib/statusFastDiagLite.js';
+import { buildStatusMindmapSignature } from '../lib/statusMindmapSignature.js';
 import {
   createPaintProbeState,
   observePaintCompletion,
@@ -2794,7 +2795,19 @@ function renderMindmap(data) {
    */
   let sig = '';
   try {
-    sig = JSON.stringify(model);
+    /*
+     * ★v0.1.1445: JSON.stringify(model) をやめた。
+     *   モデルには【時刻由来の文字列】が入っている:
+     *     statusMindmapModel.js:109  `${Math.round(ago / 1000)} 秒前`
+     *     status-entry.js:3245       Date.now() - capturedAt で毋tick再計算
+     *   で記録中の配信が1件でもあれば署名が毋tick変わり、
+     *   下の host.innerHTML = '' が【一度もスキップされない】。
+     *   = 100〜200ノードを2秒ごとに全再構築していた。
+     * ★v0.1.1409 が健全度セルで直したのと同じ型のバグ（:2425-2427）。
+     *   同じ原則で【秒の刻みだけ】を署名から外す。
+     *   label / badge / 件数 は含めるので異常の見落としは起きない。
+     */
+    sig = buildStatusMindmapSignature(model);
   } catch {
     sig = ''; // 署名を作れないときは従来どおり毎回描く(安全側)
   }
