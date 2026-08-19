@@ -97,3 +97,58 @@ v0.1.1454 で**メモリとDOM総数の計器**を入れた直後。実機では
 - `groq/compound` は **HTTP 413** で落ちた(問いが長すぎ)。★問いは6KB以内に。
 - 会議は「1タイル5要素」「1,108タイル」を**私が渡した数字のまま**使っている。
   ★**実測し直していない**(v0.1.1426 当時の値)。**実装前に現在値を採り直すこと。**
+
+---
+
+## 7. ★★実装前の裏取りで【会議の解が成立しないこと】が判明(2026-08-20)
+
+> **会議の Q2 の解「MutationObserver で img 挿入を検知して注入」は、この実装では動かない。**
+
+### 反証(コードで確定)
+
+`avatarObserved` は `resolveUserEntryAvatarSignals()`
+([content-entry.js:10697](../../src/extension/content-entry.js))が返す
+**データ上のフラグ**であって、**DOM への img 挿入イベントではない**。
+→ MutationObserver では捕まえられない。**新しい observer は解にならない。**
+
+★**批判役が刺した懸念(observer がメインスレッドを圧迫する)は、
+そもそも observer が要らないので【消える】。**
+
+### ★正しい構造(既にあるものに乗る)
+
+`displaySrc` は **既に `storyLaneTierBodyKey` に入っている**
+([renderStoryUserLaneDom.js:284](../../src/extension/story/renderStoryUserLaneDom.js))。
+＝**サムネが届いて displaySrc が変われば、その段は再描画される**。
+判定(`shouldRenderHollow`)が正しければ、後着サムネは**次の再描画で自然に入る**。
+
+### ★判定は【既に正しい】ことをテストで確認した
+
+`laneContentLodThumbArrival.test.js`(新規・8件)で固定:
+
+- ★**実サムネを持つ人は何枚目でも hollow にしない**(25/100/999枚目で確認)
+- ★**同じ人が未到着→到着に変わったら hollow をやめる**(これが v1441 退化の要点)
+- 会場(③)除外 / たぬ姉段のみ / 一方通行 / kill switch
+
+★**つまり `shouldRenderHollow` は無罪。** v0.1.1441 の退化は判定のせいではない。
+
+### ★残る唯一の容疑者(未実測・ここから先は測らないと決まらない)
+
+hollow を中身へ差し替える経路が **IntersectionObserver 1本しかない**
+([laneContentLod.js:199](../../src/extension/story/laneContentLod.js) `observeHollowTile`)。
+＝**可視域に入らないタイルは永久に枠のまま**。
+
+    描画時サムネ未到着 → hollow
+      → displaySrc 到着 → 段が再描画される「はず」
+        → ★この再描画が起きていない可能性
+
+★**次にやること: 再描画が本当に起きているかを実測する。**
+起きているなら judgement は正しいので **LOD をそのまま true に戻せる**。
+起きていないなら、再描画が止まっている理由(diff-skip の別条件等)が真因。
+
+★**推測で `true` に戻さない。** v0.1.1441 は実機の退化で止めた版であり、
+同じことを繰り返すと**ユーザーのサムネがまた落ちる**。
+
+### 補足: 会議に渡した数字は正しかった
+
+1タイル = **5要素**([personTileDom.js](../../src/lib/personTileDom.js) の
+`createElement` 6箇所のうち a/span は択一)。会議の「5,540→1,108要素」の見積りは妥当。
