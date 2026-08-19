@@ -255,11 +255,29 @@
        *   hidden を外しても【透けたまま】= 黒を隠せない(実機で確認した実害)。
        *   出し直しの間だけ animation を none にして不透明に戻す。
        */
+      /*
+       * ★★v0.1.1443: 幕の【再武装(rearm)】規則を無効化した。
+       *
+       * ■ なぜ(2026-08-19 ユーザー:「引っ張る瞬間くろくなる」「黒い影でてる」)
+       *   この規則は .nl-init-shade(position:fixed / inset:0 / z-index:99999 =
+       *   【画面全部を覆う】)を opacity:1 !important で完全不透明に戻す。
+       *   幅変更ごとにこれが発火していた = 「黒い影」の正体。
+       *
+       * ■ ★JS 側(v0.1.1442)との二重の止め
+       *   v0.1.1442 で JS 側(shouldShowOnResize)を false にしたが、
+       *   拡張をリロードするまで古い JS がメモリに残る。
+       *   CSS はページを開き直せば即反映されるので、
+       *   こちらも止めて【どちらか古くても幕が見えない】状態にする。
+       *
+       * ■ 戻し方
+       *   下の規則を復活させるだけ。★ただし戻すなら先に
+       *   【幕が全画面を覆わない形】にすること。
+       */
       .nl-init-shade.nl-init-shade--rearm {
-        animation: none !important;
-        opacity: 1 !important;
-        visibility: visible !important;
-        pointer-events: auto !important;
+        /* ★覆わない(初回ロードの幕本体はこの規則の対象外) */
+        opacity: 0 !important;
+        visibility: hidden !important;
+        pointer-events: none !important;
       }
 
       @keyframes nl-init-shade-css-failsafe {

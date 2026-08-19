@@ -197,11 +197,15 @@
         0%, 100% { transform: translateY(0); }
         50% { transform: translateY(-6px); }
       }
+      /*
+       * ★v0.1.1443: popup.html と同じ理由で【見せない】側に倒した。
+       *   幅変更ごとに全画面を覆う幕が出るのが「黒い影」の正体だった。
+       *   ★両画面で揃える(片方だけ直すと差分が残る)。
+       */
       .nl-init-shade.nl-init-shade--rearm {
-        animation: none !important;
-        opacity: 1 !important;
-        visibility: visible !important;
-        pointer-events: auto !important;
+        opacity: 0 !important;
+        visibility: hidden !important;
+        pointer-events: none !important;
       }
 
       @keyframes nl-init-shade-css-failsafe {

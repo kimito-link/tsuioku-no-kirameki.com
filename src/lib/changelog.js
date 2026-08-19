@@ -26,6 +26,17 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1443',
+    date: '2026-08-19',
+    summary: '黒い影を画面側からも止めました',
+    items: Object.freeze([
+      '引っ張るときの黒い影を、画面の仕組み側からも止めました。',
+      '前の版ではプログラム側だけを止めていましたが、拡張を読み直すまで古いプログラムが残るため、すぐには効きませんでした。',
+      '画面の見た目を決めている側でも【待ち画面を見せない】ようにしたので、ページを開き直すだけで反映されます。',
+      '応援ライブビュー(別窓)側も同じにしてあります。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1442',
     date: '2026-08-19',
     summary: '引っ張るときの黒い影を止めました',
