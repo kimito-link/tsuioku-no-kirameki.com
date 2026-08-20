@@ -787,7 +787,7 @@
   - `src/lib/statusTrendKey.js`
   - `src/extension/status-entry.js`
   - `src/lib/statusActionAdvisor.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 185</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 186</summary>
 
 - `app/app.js` — スマホ閲覧用 status Web 版。
 - `app/live-view.js` — global NL_BUILD_ID
@@ -897,6 +897,7 @@
 - `src/lib/officialStatsWindow.js` — at?: number|null,
 - `src/lib/openingFiveMinuteCorrelation.js` — L13: 冒頭 5 分の予兆 → ピーク CPM 相関（散布図用）。
 - `src/lib/opSoundDirector.js` — 操作音(パチンコの「玉の打ち出し」比喩・council/operation-sound-SYNTHESIS.md Phase D1)の
+- `src/lib/panelCoverCulprit.js` — 【層】L0 判定層(純粋関数・I/O禁止)
 - `src/lib/panelLiveSummary.js` — パネルカード用の超軽量サマリ（多タブ時の snapshot / 巨大配列 read 待ちを避ける）。
 - `src/lib/panelWakeCurtain.js` — 「黒いまま」を見せないための、いつでも出せる幕。
 - `src/lib/panelWakeCurtainDom.js` — 「いつでも出せる幕」の DOM 側（配線1本で使える形）。
@@ -1008,7 +1009,8 @@
 ### 🗺 地図・ドキュメント (1版)
 - `v0.1.1445` 2026-08-19 — 診断ページの作り直しすぎを止めました
 
-### 🧊 storage安定 (1版)
+### 🧊 storage安定 (2版)
+- `v0.1.1458` 2026-08-21 — 黒く覆っている【当人】を名指しできるようにしました
 - `v0.1.1456` 2026-08-20 — パネル側の部品数を測れるようにしました
 
 ### ⚡ 描画・性能 (4版)
@@ -1017,11 +1019,10 @@
 - `v0.1.1445` 2026-08-19 — 診断ページの作り直しすぎを止めました
 - `v0.1.1442` 2026-08-19 — 引っ張るときの黒い影を止めました
 
-### その他 (7版)
+### その他 (6版)
 - `v0.1.1457` 2026-08-20 — 引っ張った瞬間に黒くなるのを直しました
 - `v0.1.1455` 2026-08-20 — 計器の意味を1枚の台帳にまとめました
 - `v0.1.1452` 2026-08-19 — 黒画面の追いかけをここで終わらせました
 - `v0.1.1451` 2026-08-19 — サイドパネルの黒を根本から軽くしました
 - `v0.1.1443` 2026-08-19 — 黒い影を画面側からも止めました
 - `v0.1.1440` 2026-08-19 — 引っ張るときの黒さへの一歩目
-- `v0.1.1438` 2026-08-19 — 開くときの黒さをさらに減らしました

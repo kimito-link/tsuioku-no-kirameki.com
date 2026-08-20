@@ -370,7 +370,14 @@ export default [
     //     それでも「ページが応答しません」が出た＝**膨らむ側(popup.html)を誰も測っていない**。
     //   判定は `src/lib/popupDomCensus.js`(純関数)に置き、ここは採取だけ。
     //   ★storage read は増やしていない(既存の計器バッチに相乗り)。
-    rules: { 'max-lines': ['error', { max: 22521, skipBlankLines: false, skipComments: false }] }
+    // ★v0.1.1458(22521→22548・+27行): パネルを覆っている【当人】を名指しする採取を足した。
+    //   ★ユーザーは「サイドパネル全部が黒い」と何度も報告したのに、速報には
+    //     「中央の塗り主=iframe」としか出なかった。外側(sidepanel.html)の計器は
+    //     中央にある iframe しか返せず、**中で何が覆っているかが永久に分からなかった**。
+    //   → iframe の【中】で中央から祖先を辿り、暗く不透明な層を名指しする。
+    //   判定は `src/lib/panelCoverCulprit.js`(純関数)。ここは採取だけ。
+    //   ★storage read は増やしていない(既存の計器バッチに相乗り)。
+    rules: { 'max-lines': ['error', { max: 22548, skipBlankLines: false, skipComments: false }] }
   },
   {
     files: ['src/extension/popup/**/*.js'],

@@ -675,6 +675,7 @@
 | `src/lib/paintCompletionProbe.js` | 1 | 状態速報ページ |
 | `src/lib/paintPerfLog.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/paintTopSupportRankStyleIntoElement.js` | 1 | ポップアップ(応援レーン) |
+| `src/lib/panelCoverCulprit.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/panelWakeCurtain.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/panelWakeCurtainDom.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/parityVerdict.js` | 1 | 状態速報ページ |
