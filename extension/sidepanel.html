@@ -32,6 +32,42 @@
         color-scheme: light;
         background-color: #fffaf2; background-image: linear-gradient(160deg, #fffaf2, #eef8ff);
       }
+      /*
+        ★v0.1.1457: body を【位置指定の基準】にする。
+
+        ■ ユーザー報告(複数回・一次情報)
+          「くろいのがきえない」「引っ張った瞬間」
+          ★「サイドパネル導入時はなかった」
+
+        ■ 真因(コードで特定)
+          `#nl-underlay` は `position: absolute; inset: 0` だが、
+          **位置指定された祖先が1つも無かった**(html も body も static)。
+          → 基準が【初期包含ブロック】になり、
+          ★パネルを引っ張って広げた瞬間、下敷きが**新しく現れた帯に届かない**。
+          そこだけ地の色が無く、黒く見える。
+
+        ★`position: relative` を1つ足すだけで下敷きが body に追従する。
+          relative は自分自身をずらさないので**見た目は1ピクセルも変わらない**。
+        ★これは「幕」でも「隠す」でもない = 中身を覆う事故が起きない。
+      */
+      body {
+        position: relative;
+      }
+      /*
+        ★v0.1.1457: body を【位置指定の基準】にする。
+
+        ■ ユーザー報告(複数回)「引っ張った瞬間に黒くなる」「導入時は無かった」
+        ■ 真因: `#nl-underlay` は `position: absolute; inset: 0` だが、
+          **位置指定された祖先が1つも無かった**ため、基準が
+          【初期包含ブロック】になっていた。
+          ＝パネルを引っ張って広げても **下敷きは古い幅のまま**で、
+          新しく現れた帯に地の色が届かず、そこが黒く見える。
+        ★`position: relative` を1つ足すだけで、下敷きが body に追従する。
+          見た目は1ピクセルも変わらない(relative は自身をずらさない)。
+      */
+      body {
+        position: relative;
+      }
       iframe {
         display: block;
         width: 100%;
