@@ -632,6 +632,8 @@ import {
 import { userLaneHttpForTilePick } from '../lib/storyUserLaneDisplaySrc.js';
 // ★v0.1.1456: popup(iframe)側の DOM 量を数える(調査計画 Step 1)。watch 側とは別文書。
 import { summarizePopupDomCensus } from '../lib/popupDomCensus.js';
+// ★v0.1.1458: パネルを覆っている当人を名指しする(iframe の【中】で測る)。
+import { judgePanelCover } from '../lib/panelCoverCulprit.js';
 import {
   paintStoryUserLaneDomEmptyGuides,
   paintStoryUserLaneDomFilled,
@@ -19314,6 +19316,31 @@ async function collectAiShareDevMonitorPayloadBundle(watchUrl) {
                 hollow: document.getElementsByClassName('nl-story-userlane-cell--hollow').length,
                 perLane
               });
+            } catch { /* 計器の失敗で診断全体を壊さない */ }
+            /*
+             * ★v0.1.1458: 「サイドパネル全部が黒い」の【当人を名指しする】。
+             *   ★既存の probeCenterPainter(sidepanel-entry.js)は**外側**を見るので、
+             *     中央にある iframe しか返せず「中で何が覆っているか」が永久に分からなかった。
+             *   ここは iframe の【中】= popup.html なので、覆っている当人まで辿れる。
+             *   ★判定は panelCoverCulprit.js(純関数)。ここは採取だけ。
+             */
+            try {
+              const w = window.innerWidth;
+              const h = window.innerHeight;
+              if (w > 0 && h > 0 && typeof document.elementFromPoint === 'function') {
+                const el = document.elementFromPoint(Math.floor(w / 2), Math.floor(h / 2));
+                /** @type {{ tag: string, bgColor: string }[]} */
+                const layers = [];
+                for (let cur = el, n = 0; cur && n < 12; n += 1, cur = cur.parentElement) {
+                  const cs = getComputedStyle(/** @type {HTMLElement} */ (cur));
+                  const cls = cur.classList && cur.classList.length ? `.${cur.classList[0]}` : '';
+                  layers.push({
+                    tag: cur.tagName.toLowerCase() + (cur.id ? `#${cur.id}` : cls),
+                    bgColor: cs.backgroundColor
+                  });
+                }
+                snap.panelCover = judgePanelCover(layers);
+              }
             } catch { /* 計器の失敗で診断全体を壊さない */ }
           } // v0.1.1040/v0.1.1428 計器: 段別churn実測 + 中身LODが効いているか
           // heavyRace根治(B)計器: fresh-read で heavy 全件再読みを省いた累計(実配信で効きと12秒ギャップの適正を判定)。

@@ -344,6 +344,8 @@ export function buildStoryUserLaneRenderDiag(probeSnap, ctx) {
     laneHollowCounts: s.laneHollowCounts && typeof s.laneHollowCounts === 'object' ? s.laneHollowCounts : null,
     // ★v0.1.1456: popup(iframe)側の DOM 量(調査計画 Step 1)。watch 側とは別文書。
     popupDomCensus: s.popupDomCensus && typeof s.popupDomCensus === 'object' ? s.popupDomCensus : null,
+    // ★v0.1.1458: パネルを覆っている当人(黒画面の名指し)。
+    panelCover: s.panelCover && typeof s.panelCover === 'object' ? s.panelCover : null,
     verdict,
     reason
   };
@@ -426,6 +428,14 @@ export function formatStoryUserLaneRenderDiagLines(diag, ctx) {
    */
   if (d.popupDomCensus && typeof d.popupDomCensus === 'object' && d.popupDomCensus.line) {
     lines.push(`  → ${d.popupDomCensus.line}`);
+  }
+  /*
+   * ★v0.1.1458: パネルを覆っている当人。
+   *   ★「サイドパネル全部が黒い」と言われても、これまで名指しできなかった
+   *     (外側の計器は iframe しか返せない)。ここは iframe の中で測った結果。
+   */
+  if (d.panelCover && typeof d.panelCover === 'object' && d.panelCover.line) {
+    lines.push(`  → ${d.panelCover.line}`);
   }
   // v0.1.1033: heavy 完了が settled に到達したか。race 多発=たぬ姉レーンが暫定(直近N件)で固着の真因。
   // ★v0.1.1241: 「一度でも settled したか」で言い分けを変える。race は自己修復の途中経過でもあり

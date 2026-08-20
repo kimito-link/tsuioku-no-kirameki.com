@@ -6336,6 +6336,16 @@
       ]
     },
     {
+      "file": "src/lib/panelCoverCulprit.js",
+      "featureCount": 1,
+      "features": [
+        "popup"
+      ],
+      "labels": [
+        "ポップアップ(応援レーン)"
+      ]
+    },
+    {
       "file": "src/lib/panelWakeCurtain.js",
       "featureCount": 1,
       "features": [
