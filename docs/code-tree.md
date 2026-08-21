@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 6 / 819 件
+## ⚠️ 役割コメントが無いソース 6 / 820 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `src/lib/laneDomSelfMeasure.js`
@@ -724,7 +724,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (1799)
+- 📁 **src/** (1801)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1022,7 +1022,7 @@
         - `logo_funlink_white_RGB_maru_black.png`
       - `logo_guide_funlink_ol.pdf`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1551)
+  - 📁 **lib/** (1553)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -1836,6 +1836,8 @@
     - `ndgrHiddenFlushThreshold.test.js`
     - `ndgrMessageDedupe.js` — v0.1.238: NDGR Message ID dedupe
     - `ndgrMessageDedupe.test.js`
+    - `ndgrUnknownSamplesBudget.js` — 【層】L0 判定層(純粋関数・I/O禁止)
+    - `ndgrUnknownSamplesBudget.test.js`
     - `networkErrorProbe.js` — v0.1.201: 拡張の network 層異常を診断 JSON 用に集約する純関数。
     - `networkErrorProbe.test.js`
     - `nicoAnonymousDisplay.js` — ニコ生の匿名ユーザーID（a: で始まる内部ID）向けの表示補完。

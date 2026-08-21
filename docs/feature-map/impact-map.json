@@ -6026,6 +6026,16 @@
       ]
     },
     {
+      "file": "src/lib/ndgrUnknownSamplesBudget.js",
+      "featureCount": 1,
+      "features": [
+        "page-intercept"
+      ],
+      "labels": [
+        "ページ傍受"
+      ]
+    },
+    {
       "file": "src/lib/networkErrorProbe.js",
       "featureCount": 1,
       "features": [

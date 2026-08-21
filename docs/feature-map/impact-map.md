@@ -644,6 +644,7 @@
 | `src/lib/ndgrForwardCrawl.js` | 1 | 記録エンジン(watchページ常駐) |
 | `src/lib/ndgrHiddenFlushThreshold.js` | 1 | 記録エンジン(watchページ常駐) |
 | `src/lib/ndgrMessageDedupe.js` | 1 | ページ傍受 |
+| `src/lib/ndgrUnknownSamplesBudget.js` | 1 | ページ傍受 |
 | `src/lib/networkErrorProbe.js` | 1 | 記録エンジン(watchページ常駐) |
 | `src/lib/nicoadCelebrationKey.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/nicoadContributionRankingApi.js` | 1 | 記録エンジン(watchページ常駐) |

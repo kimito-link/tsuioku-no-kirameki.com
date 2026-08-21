@@ -41,7 +41,7 @@
   - `src/lib/ndgrBackfillCrawl.js`
 - **コメント重複除去(NDGR)** — 再送/再接続/relay overlap の重複を liveId+messageId の canonical key で排除
   - `src/lib/ndgrMessageDedupe.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 59</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 60</summary>
 
 - `src/domain/observations/StatObservation.js` — StatObservation - ニコ生から取得する数値の「契約付き観測値」純関数 factory。
 - `src/domain/observations/vocabulary.js` — 観測層 (StatObservation) の語彙集 - 不変な enum 定義のみ。
@@ -86,6 +86,7 @@
 - `src/lib/ndgrFlushDedupKey.js` — NDGR フラッシュ時の重複排除キーを作る純関数(v0.1.836)。
 - `src/lib/ndgrForwardCrawl.js` — v0.1.511: NDGR コメントの「前方向（forward）継続取得」巡回エンジン（純ロジック）。
 - `src/lib/ndgrHiddenFlushThreshold.js` — 裏タブで「コメントが数十秒遅れて出る」のを止める純関数。
+- `src/lib/ndgrUnknownSamplesBudget.js` — 【層】L0 判定層(純粋関数・I/O禁止)
 - `src/lib/niconicoInterceptLearn.js` — page-intercept が JSON から拾う userId / nickname / avatar / commentNo の走査（純関数）
 - `src/lib/nicoUserProfileApi.js` — ニコニコのユーザープロフィール取得用メッセージ型と uid 妥当性判定(background と文字列同期)。
 - `src/lib/nlsInterceptAuth.js` — v0.1.234: page-intercept (MAIN world) → content-entry (ISOLATED world) 経路の
@@ -991,7 +992,8 @@
 - `v0.1.1456` 2026-08-20 — パネル側の部品数を測れるようにしました
 - `v0.1.1441` 2026-08-19 — 出ないアイコンがある問題を直しました
 
-### 🩺 診断・状態速報 (10版)
+### 🩺 診断・状態速報 (11版)
+- `v0.1.1460` 2026-08-21 — 配信ページに書く診断データが無限に増えるのを止めました
 - `v0.1.1456` 2026-08-20 — パネル側の部品数を測れるようにしました
 - `v0.1.1454` 2026-08-19 — メモリと画面の部品数を計器に入れました
 - `v0.1.1453` 2026-08-19 — 「パネルが2つできた」を画面に出しました
@@ -1017,10 +1019,9 @@
 - `v0.1.1445` 2026-08-19 — 診断ページの作り直しすぎを止めました
 - `v0.1.1442` 2026-08-19 — 引っ張るときの黒い影を止めました
 
-### その他 (6版)
+### その他 (5版)
 - `v0.1.1457` 2026-08-20 — 引っ張った瞬間に黒くなるのを直しました
 - `v0.1.1455` 2026-08-20 — 計器の意味を1枚の台帳にまとめました
 - `v0.1.1452` 2026-08-19 — 黒画面の追いかけをここで終わらせました
 - `v0.1.1451` 2026-08-19 — サイドパネルの黒を根本から軽くしました
 - `v0.1.1443` 2026-08-19 — 黒い影を画面側からも止めました
-- `v0.1.1440` 2026-08-19 — 引っ張るときの黒さへの一歩目
