@@ -314,6 +314,7 @@
 | `src/lib/opSoundEffectDiagKey.js` | 2 | ポップアップ(応援レーン) / 状態速報ページ |
 | `src/lib/panelMetricsExport.js` | 2 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) |
 | `src/lib/panelWakeCurtainDiagKey.js` | 2 | ポップアップ(応援レーン) / 状態速報ページ |
+| `src/lib/parityVerdict.js` | 2 | ポップアップ(応援レーン) / 状態速報ページ |
 | `src/lib/parseArrivalComment.js` | 2 | 記録エンジン(watchページ常駐) / 会場モード(standalone) |
 | `src/lib/previewRenderAckKey.js` | 2 | ポップアップ(応援レーン) / 状態速報ページ |
 | `src/lib/reportPreview.js` | 2 | ポップアップ(応援レーン) / 状態速報ページ |
@@ -681,7 +682,6 @@
 | `src/lib/panelCoverCulprit.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/panelWakeCurtain.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/panelWakeCurtainDom.js` | 1 | ポップアップ(応援レーン) |
-| `src/lib/parityVerdict.js` | 1 | 状態速報ページ |
 | `src/lib/parseEmbeddedDataViewerInfo.js` | 1 | 記録エンジン(watchページ常駐) |
 | `src/lib/parseInterestArrivalComment.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/persistableCommentRow.js` | 1 | 記録エンジン(watchページ常駐) |

@@ -203,7 +203,7 @@ export function buildAiShareFullText({ overviewText, livesData, fastDiag, popupD
     //   withUidPercent を診断に渡す(fastDiag に既にある値・新規 read ゼロ)。
     const withUidPercent =
       fastDiag?.content?.giftDiagnostics?.commentObservability?.savedCommentsUidStats?.withUidPercent;
-    laneRenderDiag = buildStoryUserLaneRenderDiag(probeSnap, { withUidPercent });
+    laneRenderDiag = buildStoryUserLaneRenderDiag(probeSnap, { withUidPercent, bootAgeMs: popupSnapshotAgeMs(popupDiag?.popup ?? popupDiag) });
     const watching = Array.isArray(livesData)
       ? livesData.find((l) => l && l.recording && l.perfDiag) || livesData.find((l) => l && l.perfDiag)
       : null;
