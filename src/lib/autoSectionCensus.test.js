@@ -135,3 +135,52 @@ describe('★全経路を機械的に測る(囲み忘れを数字にする)', ()
       .toContain('autoSectionCensus.js');
   });
 });
+
+/**
+ * ★起動直後を「囲んでいない処理」と呼ばない。
+ *
+ * ■ ★実機(2026-08-21・v0.1.1470)が示した最後の1つ
+ *   同じ速報の中で、上と下は既に直っていた:
+ *     3画面パリティ  🟡 保留 — popup 起動直後(381ms)
+ *     応援レーン描画  ★popup 起動直後(381ms)＝まだ描き始めていなくて当然
+ *   ★ところがここだけ:
+ *     拡張の処理時間: 🟡 0%しか測れていない(測れた0ms / 経過384ms)
+ *       → ★残り384msは【囲んでいない処理】。犯人はまだ名指しできません
+ *
+ * ■ ★これは嘘だった
+ *   同じ速報の shadeAgeMs は 383 で、経過384ms とほぼ一致。
+ *   ＝ この384msは**幕が出ている待ち時間**であって、
+ *   ★**拡張は何もしていない**。「囲んでいない処理がある」は事実に反する。
+ *   囲む対象がそもそも存在しないので、読んだ人は**無い犯人を探しに行く**。
+ *
+ * ■ 退化させない条件
+ *   ・十分に経っていれば従来どおり「測れていない」と警告する(見逃さない)
+ */
+describe('★起動直後を「囲んでいない処理」と呼ばない', () => {
+  it('★★起動直後(384ms)は「まだ始まっていない」と出す', () => {
+    const c = createAutoSectionCensus();
+    const v = formatAutoSectionLines(c, { elapsedMs: 384 });
+    expect(v.line, '無い犯人を探させている').not.toContain('囲んでいない処理');
+    expect(v.line).toMatch(/起動直後|始まって/);
+  });
+
+  it('★起動直後は warn にしない(まだ判定できないだけ)', () => {
+    const v = formatAutoSectionLines(createAutoSectionCensus(), { elapsedMs: 384 });
+    expect(v.level).not.toBe('warn');
+  });
+
+  it('★★十分に経っていれば従来どおり警告する(見逃さない)', () => {
+    const c = createAutoSectionCensus();
+    noteAutoSection(c, { name: 'x', ms: 100 });
+    const v = formatAutoSectionLines(c, { elapsedMs: 60_000 });
+    expect(v.level).toBe('warn');
+    expect(v.line).toContain('囲んでいない処理');
+  });
+
+  it('★起動直後でも実際に測れていれば普通に出す(門番が判定を乗っ取らない)', () => {
+    const c = createAutoSectionCensus();
+    noteAutoSection(c, { name: 'heavy', ms: 300 });
+    const v = formatAutoSectionLines(c, { elapsedMs: 384 });
+    expect(v.line).toContain('heavy');
+  });
+});
