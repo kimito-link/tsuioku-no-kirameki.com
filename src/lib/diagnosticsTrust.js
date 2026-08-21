@@ -221,7 +221,14 @@ export function buildDiagnosticsTrust(args) {
       buildId: pd?.popup?.buildId ? String(pd.popup.buildId) : '',
       // v0.1.988: 診断の出自(passive/embed_watch/toolbar/popup)。パリティ判定が passive 由来の
       //   heavy probe=0 を「①POP未描画」と誤診しないために使う。
-      viewKind: pd?.popup?.viewKind ? String(pd.popup.viewKind) : ''
+      viewKind: pd?.popup?.viewKind ? String(pd.popup.viewKind) : '',
+      /*
+       * ★v0.1.1468: popup 起動からの経過[ms]。齢が分からなければ null。
+       *   ★起動直後(数百ms)の値で「描画が起動していない」と断定しないために使う。
+       *   実機で 288ms のスナップショットを🔴と誤診した(2026-08-21)。
+       *   判定は parityVerdict.js の PARITY_BOOT_SETTLE_MS。
+       */
+      bootAgeMs: popupBootAgeMs(pd?.popup)
     },
     mirrors,
     publish,
@@ -323,4 +330,27 @@ export function formatDiagnosticsTrustLines(trust) {
     lines.push('- 純Web公開送信: 🟡 まだ送信していない（純Webは古い/空）');
   }
   return lines;
+}
+
+/**
+ * popup スナップショットの「起動からの経過ms」。
+ *
+ * ★aiShareFullText.js の popupSnapshotAgeMs と同型だが、
+ *   **あちらを import すると循環参照になる**(aiShareFullText → diagnosticsTrust)。
+ *   そのためここに置く。判定のしきい値は持たない(parityVerdict.js が正本)。
+ * ★どちらか欠ければ null。Number(null)=0 で「起動0ms」に化けるのを防ぐため、
+ *   数値でないものは必ず null にする。
+ *
+ * @param {any} popupSnap
+ * @returns {number|null}
+ */
+function popupBootAgeMs(popupSnap) {
+  try {
+    const boot = Date.parse(String(popupSnap?.loadShadeProbe?.popupBootAtIso || ''));
+    const exported = Date.parse(String(popupSnap?.exportedAt || ''));
+    if (!Number.isFinite(boot) || !Number.isFinite(exported)) return null;
+    return Math.max(0, exported - boot);
+  } catch {
+    return null;
+  }
 }

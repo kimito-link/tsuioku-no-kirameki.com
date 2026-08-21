@@ -8,6 +8,15 @@
 //   ②応援プレビューの描画は status から直接読めないので previewAck(passive 専用 ack キー・別キー)で受ける。
 //   ③WEBの実描画は別ドメインで読めない=観測の天井は「publish済+新鮮+送った鏡が整合」。
 
+/**
+ * ★popup 起動からこの時間は「起動していない」と断定しない[ms]。
+ *
+ * ★実機で 288ms のスナップショットを🔴と誤診したことが根拠(2026-08-21)。
+ *   レーンは幕(最低800ms表示)が明けてから描き始めるので、それより短い齢では
+ *   started=0 が**正常**。3秒あれば通常は描き終わっている。
+ * ★これを長くしすぎると本物の異常を見逃すので、幕の実測(800ms)の約4倍に留める。
+ */
+export const PARITY_BOOT_SETTLE_MS = 3000;
 const DEFAULT_FRESH_MS = 180_000; // 3分。これより古い観測は鮮度不足として保留寄りに扱う。
 
 /**
@@ -184,6 +193,49 @@ export function buildParityVerdict(input) {
   }
   if (popup.fresh === false) {
     return pend('popup 診断が古い', 'popup を開き直して数秒待つ', 'popup_stale');
+  }
+
+  /*
+   * ★2-5. 起動直後(数百ms)は「起動していない」と断定しない(v0.1.1468)。
+   *
+   * ■ ★実機の速報(2026-08-21)がこの門番を要求した
+   *   popup 起動から **0.3秒後**のスナップショットに対して
+   *     🔴 不一致 — ①POPの応援レーン描画が起動していない(a)
+   *   と出た。ところが**同じ速報**にこうあった:
+   *     shadeAgeMs: 288 / shadeDone: false      ← まだ幕が出ている最中
+   *     laneTickProbe.lastReason: 'doc-hidden'  ← 隠れているので走らせなかった(正しい)
+   *     応援レーン(全段): ①POP 27 / ③WEB鏡 27 ✅一致 ← ★実際は27件出ている
+   *   ＝ レーンは動いていた。**0.3秒の瞬間を切り取っていただけ**。
+   *
+   * ■ ★同じ型を踏むのは3回目
+   *   v0.1.1211: 362ms のスナップショットを「22秒経っても鏡が空」と誤読
+   *   v0.1.1303: 鏡が読めていない時点の突合を🔴にしていた → pending へ
+   *   ★どちらも「その1件」を直しただけで、**判定の入口に齢の門番を置かなかった**。
+   *   → ここで**構造的に**塞ぐ。以後この型は生えない。
+   *
+   * ■ ★なぜ pending(保留)なのか
+   *   「異常なし(緑)」ではない。★**まだ測れていない**だけ。
+   *   45リポから収穫した3値の規約(0=合格 / 1=赤 / ★2=測れなかった)と同じ考え方
+   *   ([[unobserved-must-not-hide-the-cell-2026-08-15]])。
+   *
+   * ■ ★見逃す装置にしない
+   *   齢が分からない(null)ときは**従来どおり判定する**。
+   *   しきい値を超えたら**普通に🔴を出す**。「起動直後だから」で全部保留にすると
+   *   本物の「起動していない」を見逃す([[gate-may-be-the-only-recovery-path-2026-08-04]])。
+   */
+  /*
+   * ★Number(null) は 0 になり isFinite も通る＝「起動0ms」に化ける。
+   *   齢が分からないのに保留にすると、**本物の異常を永久に隠す**。
+   *   ★2026-08-21 に同じ穴を2回踏んでいる(popupDomCensus / aboutBlankGapVerdict)。
+   *   このテストが実際にそれを捕まえた。
+   */
+  const bootAgeMs = typeof popup.bootAgeMs === 'number' ? popup.bootAgeMs : Number.NaN;
+  if (Number.isFinite(bootAgeMs) && bootAgeMs >= 0 && bootAgeMs < PARITY_BOOT_SETTLE_MS) {
+    return pend(
+      `popup 起動直後(${Math.round(bootAgeMs)}ms)＝まだ描き始めていなくて当然`,
+      `popup を開いたまま ${Math.ceil(PARITY_BOOT_SETTLE_MS / 1000)} 秒ほど待ってから取り直す`,
+      'popup_just_booted'
+    );
   }
 
   // 3. ①POP 描画(応援レーン+北極星)が起動しているか。

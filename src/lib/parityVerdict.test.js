@@ -320,3 +320,98 @@ describe('buildParityVerdict — 世代パリティの統合(パリティ根本�
     expect(v.verdict).toBe('ok');
   });
 });
+
+/**
+ * ★起動直後(数百ms)の値で「起動していない」と断定しない。
+ *
+ * ■ ★実機の速報(2026-08-21)がこれを示した
+ *   popup 起動から **0.3秒後**のスナップショットに対して:
+ *     🔴 不一致 — ①POPの応援レーン描画が起動していない(a)
+ *   ところが**同じ速報**にこう出ていた:
+ *     shadeAgeMs: 288 / shadeDone: false     ← ★まだ幕が出ている最中
+ *     laneTickProbe.lastReason: 'doc-hidden' ← ★隠れているので走らせなかった(正しい動作)
+ *     応援レーン(全段): ①POP 27 / ③WEB鏡 27 ✅一致 ← ★実際は27件出ている
+ *   ＝ **レーンは動いている。0.3秒の瞬間を切り取っていただけ**。
+ *
+ * ■ ★同じ型は既に2回踏んでいる(これで3回目)
+ *   - v0.1.1211: 362ms のスナップショットを「22秒経っても鏡が空」と読み違えた
+ *   - v0.1.1303: 鏡がまだ読めていない時点の突合を🔴にしていた → pending へ
+ *   ★どちらも「その場の1件」を直しただけで、**判定の入口に齢の門番を置かなかった**。
+ *   → 50年後も同じ誤診が生えないよう、**起動直後は構造的に断定しない**ようにする。
+ *
+ * ■ ★なぜ pending(保留)なのか
+ *   「異常なし(緑)」でもない。★**まだ測れていない**だけ。
+ *   45リポから収穫した3値の規約(0=合格/1=赤/★2=測れなかった)と同じ考え。
+ */
+describe('★起動直後は「起動していない」と断定しない(誤診の根絶)', () => {
+  /** 起動 N ミリ秒後のスナップショットを作る。 */
+  const atBootAge = (ageMs) => ({
+    ...okInput(),
+    trust: {
+      hasWatchTab: true,
+      popup: {
+        present: true, lidMatch: true, fresh: true,
+        viewKind: 'popup',
+        // ★起動からの経過。幕の齢がそのまま「起動して何ms経ったか」
+        bootAgeMs: ageMs
+      }
+    },
+    // ★レーンは「まだ一度も走っていない」状態(実機と同じ)
+    laneRenderDiag: { started: 0, verdict: 'not_started' }
+  });
+
+  it('★★起動0.3秒では 🔴 にしない(保留にする)', () => {
+    const v = buildParityVerdict(atBootAge(288));
+    expect(v.verdict, '起動直後を不一致と断定している').not.toBe('mismatch');
+    expect(v.verdict).toBe('pending');
+  });
+
+  it('★保留の理由が「起動直後」だと分かる(読んだ人が誤解しない)', () => {
+    const v = buildParityVerdict(atBootAge(288));
+    expect(v.reason).toMatch(/起動直後|起動して/);
+    expect(v.code).toBe('popup_just_booted');
+  });
+
+  it('★★十分に時間が経っていれば従来どおり 🔴 を出す(見逃さない)', () => {
+    /*
+     * ★これが要。「起動直後だから」で全部保留にすると、
+     *   本物の「起動していない」を見逃す装置になる。
+     */
+    const v = buildParityVerdict(atBootAge(30_000));
+    expect(v.verdict, '本物の異常まで保留にしている').toBe('mismatch');
+    expect(v.code).toBe('pop_lane_not_started');
+  });
+
+  it('★齢が分からないときは従来どおり(挙動を勝手に変えない)', () => {
+    const v = buildParityVerdict(atBootAge(null));
+    expect(v.verdict).toBe('mismatch');
+  });
+});
+
+/**
+ * ★判定を作っただけで配線しない「片肺」を作らない
+ *   ([[unwired-judgement-is-systemic-2026-08-12]])。
+ *
+ * ★2026-08-21 の実機では、齢を出す仕組み(v0.1.1391)が**既にあったのに**
+ *   パリティ判定はそれを見ていなかった(grep 0件)。
+ *   ＝「注記は出るが、判定は変わらない」片肺だった。
+ */
+describe('★起動直後の門番が【配線されている】', () => {
+  it('★trust が bootAgeMs を渡している(渡さないと門番が永久に効かない)', async () => {
+    const fs = await import('node:fs');
+    const path = await import('node:path');
+    const url = await import('node:url');
+    const root = path.resolve(path.dirname(url.fileURLToPath(import.meta.url)), '../..');
+    const src = fs.readFileSync(path.join(root, 'src/lib/diagnosticsTrust.js'), 'utf8');
+    expect(src, 'trust.popup に bootAgeMs が無い').toContain('bootAgeMs:');
+    expect(src, '起動時刻(popupBootAtIso)を見ていない').toContain('popupBootAtIso');
+  });
+
+  it('★しきい値が正本に1つだけある(散らさない)', async () => {
+    const mod = await import('./parityVerdict.js');
+    expect(typeof mod.PARITY_BOOT_SETTLE_MS).toBe('number');
+    // ★幕の最低表示(800ms)より長く、見逃しを生むほど長くない
+    expect(mod.PARITY_BOOT_SETTLE_MS).toBeGreaterThan(800);
+    expect(mod.PARITY_BOOT_SETTLE_MS).toBeLessThanOrEqual(10_000);
+  });
+});
