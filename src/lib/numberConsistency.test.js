@@ -62,7 +62,7 @@ describe('detectNumberInconsistencies', () => {
   it('レポート本文が記録総数の半分未満=過小集計の疑い(v0.1.853 型)を warn', () => {
     const out = detectNumberInconsistencies({
       livesData: [{ lv: 'lv1', recordedCount: 7855 }],
-      reportPreview: { totalComments: 27 }
+      reportPreview: { liveId: 'lv1', totalComments: 27 }
     });
     const f = out.find((x) => x.id === 'report-undercount');
     expect(f).toBeTruthy();
@@ -152,5 +152,50 @@ describe('detectNumberInconsistencies', () => {
   it('officialValuesV2 が無い/壊れていても落ちない', () => {
     expect(detectNumberInconsistencies({ fastDiag: { content: {} } })).toEqual([]);
     expect(detectNumberInconsistencies({ fastDiag: 'x' })).toEqual([]);
+  });
+});
+
+describe('★比べてよいかを判定より前に確かめる(2026-08-21 実損)', () => {
+  /*
+   * ★実損: 記録3,358 と レポート409 を比べて
+   *   「表示用の一部だけを集計している」と名指ししたが、実コードで falsified だった。
+   *   ★reportPreview は単一グローバルキー(reportPreviewKey.js:12)なので、
+   *     多配信時は別配信の値が載りうる。liveId 一致を必ず確かめる。
+   */
+  it('★liveId が違えば判定しない(別配信の値かもしれない)', () => {
+    const out = detectNumberInconsistencies({
+      livesData: [{ lv: 'lv1', recordedCount: 3358 }],
+      reportPreview: { liveId: 'lv2', totalComments: 409 }
+    });
+    expect(out.find((x) => x.id === 'report-undercount')).toBeUndefined();
+  });
+
+  it('★liveId が無ければ判定しない(照合できない=まだ分からない)', () => {
+    const out = detectNumberInconsistencies({
+      livesData: [{ lv: 'lv1', recordedCount: 3358 }],
+      reportPreview: { totalComments: 409 }
+    });
+    expect(out.find((x) => x.id === 'report-undercount')).toBeUndefined();
+  });
+
+  it('★liveId が一致すれば、実機で見た型(409 vs 3,358)は鳴る', () => {
+    const out = detectNumberInconsistencies({
+      livesData: [{ lv: 'lv1', recordedCount: 3358 }],
+      reportPreview: { liveId: 'lv1', totalComments: 409 }
+    });
+    expect(out.find((x) => x.id === 'report-undercount')).toBeTruthy();
+  });
+
+  it('★falsified な名指しをしない(「表示用の一部」と断定しない)', () => {
+    const out = detectNumberInconsistencies({
+      livesData: [{ lv: 'lv1', recordedCount: 3358 }],
+      reportPreview: { liveId: 'lv1', totalComments: 409 }
+    });
+    const f = out.find((x) => x.id === 'report-undercount');
+    // ★pickCommentsForExport.js:16-24 / commentDb.js:170-192 で否定済みの犯人
+    expect(f.message).not.toContain('表示用の一部');
+    // ★原因未特定であることと、この検査の限界を必ず言う
+    expect(f.message).toContain('特定できていません');
+    expect(f.message).toContain('判定しないこと');
   });
 });

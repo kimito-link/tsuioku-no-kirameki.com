@@ -184,3 +184,42 @@ describe('★起動直後を「囲んでいない処理」と呼ばない', () =
     expect(v.line).toContain('heavy');
   });
 });
+
+describe('★起動直後の門番は「表示と同じ値」で判定する(2026-08-21 実損)', () => {
+  /*
+   * ★実機速報で起きたこと:
+   *   applyResponsivePopupLayout が 2回走り、各回 1ms 未満。
+   *   totalMs は performance.now() の小数を積むので 0.7 のような値になる。
+   *   表示は「測れた0ms」「0%」なのに `totalMs === 0` は false だったため、
+   *   ★起動直後(343ms)なのに「囲んでいない処理」という嘘を出した。
+   */
+  const buildSubMs = () => {
+    const c = createAutoSectionCensus();
+    noteAutoSection(c, { name: 'applyResponsivePopupLayout', ms: 0.4, atMs: 1 });
+    noteAutoSection(c, { name: 'applyResponsivePopupLayout', ms: 0.3, atMs: 2 });
+    return c;
+  };
+
+  it('★小数しか測れていない起動直後は「まだ始まっていません」と言う', () => {
+    const out = formatAutoSectionLines(buildSubMs(), { elapsedMs: 343 });
+    expect(out.line).toContain('起動直後');
+    expect(out.line).toContain('まだ始まっていません');
+    // ★居ない犯人を探させない
+    expect(out.line).not.toContain('囲んでいない処理');
+    expect(out.level).toBe('na');
+  });
+
+  it('★60秒たっても測れていなければ従来どおり警告する(見逃さない)', () => {
+    const out = formatAutoSectionLines(buildSubMs(), { elapsedMs: 60000 });
+    expect(out.line).toContain('囲んでいない処理');
+    expect(out.line).not.toContain('起動直後');
+    expect(out.level).toBe('warn');
+  });
+
+  it('★起動直後でも、ちゃんと測れていれば起動直後扱いにしない', () => {
+    const c = createAutoSectionCensus();
+    noteAutoSection(c, { name: 'heavy', ms: 200, atMs: 1 });
+    const out = formatAutoSectionLines(c, { elapsedMs: 343 });
+    expect(out.line).not.toContain('起動直後');
+  });
+});

@@ -120,3 +120,89 @@ describe('fail-open 台帳 — 「守るものが無いから通す」を無自�
     expect(popup).not.toContain('shouldSkipLightSupplyOverwrite(');
   });
 });
+
+/**
+ * ★v0.1.1472: 台帳の【守備範囲】を広げる。
+ *
+ * ■ なぜ広げたか(2026-08-21)
+ *   同じ型がさらに4件見つかった。★どれもこの台帳の範囲外(レーン描画の2関数しか見ていなかった)。
+ *   ＝ ★仕掛けは正しいが、守備範囲が狭すぎて再発を止められなかった。
+ *
+ *   | # | 場所                        | 「無い」と混ぜた「まだ分からない」            |
+ *   |---|-----------------------------|-----------------------------------------------|
+ *   | ① | numberConsistency.js        | 別配信の値かもしれないのに比べた               |
+ *   | ② | autoSectionCensus.js        | 0.7ms 測れているのに「まだ0」判定をすり抜けた |
+ *   | B1| popup-entry.js:8776         | IDBが0件＝まだ移行途中かもしれないのに確定した |
+ *   | B2| background.js:379-397       | read 失敗(分からない)を [] (無い)に握り潰した |
+ *
+ * ★①②は v0.1.1472 で修復済み。★B1/B2 は【記録経路】なので別リリース。
+ *   忘れて放置されないよう、下の KNOWN_UNKNOWN_DEBT に【実名で】固定する。
+ */
+describe('★「無い」と「まだ分からない」— 台帳(v0.1.1472 で範囲拡大)', () => {
+  it('★比較の前に liveId 一致を確かめている(numberConsistency)', () => {
+    const src = read('src/lib/numberConsistency.js');
+    // ★判定より前に比較可能性を問う、という構造そのものを固定する
+    expect(src).toContain('classifyComparability');
+    /*
+     * ★falsified な名指しを【出力に】復活させない。
+     *   ★コメント内の言及は許す(なぜ否定されたかの記録は残すべき)。
+     *   ＝ 名前ではなく【形】を見る: message に入る文字列だけを対象にする
+     *     ([[detect-the-shape-not-one-function-name]])。
+     */
+    const emitted = src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+    expect(emitted).not.toContain('表示用の一部');
+  });
+
+  it('★起動直後の門番は「表示と同じ値」で判定する(autoSectionCensus)', () => {
+    const src = read('src/lib/autoSectionCensus.js');
+    // ★totalMs === 0 に戻すと、小数を積んだときに門番をすり抜ける
+    expect(src).toContain('coveragePct === 0');
+    expect(src).not.toMatch(/BOOT_SETTLE_MS\s*&&\s*totalMs === 0/);
+  });
+
+  it('★仕分けの正本が存在し、迷ったら unknown に倒す(fail-closed)', () => {
+    const src = read('src/lib/unknownVsAbsent.js');
+    expect(src).toContain('export const UNKNOWN');
+    expect(src).toContain('export const ABSENT');
+    // ★measured を書かない限り「無い」と名乗れない、という強制
+    expect(src).toContain('input?.measured === true');
+  });
+
+  /*
+   * ★未修復の借金を【実名で】固定する。
+   *   ★オプトインの台帳は死ぬ([[opt-in-registry-always-ossifies]])ので、
+   *     「書かないと赤」ではなく「★数が変わると赤」にする。
+   *   ★直したらこの配列から消す＝そのとき件数が変わって赤くなり、直したことが記録に残る。
+   */
+  const KNOWN_UNKNOWN_DEBT = [
+    {
+      where: 'src/extension/popup-entry.js',
+      what: 'readAllCommentsFromCommentDb の `cnt <= 0`',
+      why: '★IDBに1行でもあれば chrome.storage の chunk を一切読まない。'
+        + '0件を「無い」と決めているが、実際は「まだ移行途中」かもしれない',
+      needle: 'if (cnt <= 0) return null;'
+    },
+    {
+      where: 'extension/background.js',
+      what: 'ensureLiveMigratedToDb の移行済みフラグ',
+      why: '★read が失敗しても catch で [] にして、移行済みフラグを無条件に立てる。'
+        + '「失敗した(分からない)」を「無い」として確定させている',
+      needle: 'await chrome.storage.local.set({ [mkey]: true });'
+    }
+  ];
+
+  it('★未修復の借金は2件(直したら数が変わって赤くなる)', () => {
+    expect(KNOWN_UNKNOWN_DEBT).toHaveLength(2);
+  });
+
+  it('★借金は実在する(直ったのに台帳に残り続けるのを防ぐ)', () => {
+    for (const debt of KNOWN_UNKNOWN_DEBT) {
+      const src = read(debt.where);
+      expect(
+        src.includes(debt.needle),
+        `${debt.where} の「${debt.what}」が見つからない。`
+        + '直したなら KNOWN_UNKNOWN_DEBT から消すこと(消し忘れ防止)'
+      ).toBe(true);
+    }
+  });
+});

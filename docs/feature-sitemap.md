@@ -791,7 +791,7 @@
   - `src/lib/statusTrendKey.js`
   - `src/extension/status-entry.js`
   - `src/lib/statusActionAdvisor.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 194</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 195</summary>
 
 - `app/app.js` — スマホ閲覧用 status Web 版。
 - `app/live-view.js` — global NL_BUILD_ID
@@ -967,6 +967,7 @@
 - `src/lib/topSupportRankAnonymousFold.js` — userKey: string,
 - `src/lib/trackedImports.js` — 「コミットし忘れた新規ファイルを import しているソース」を検出する純ロジック(2026-07-06)。
 - `src/lib/trimMap.js` — Map のサイズを max 以下に制限し、先頭（最古挿入順）から削除する。
+- `src/lib/unknownVsAbsent.js` — 【層】L0 判定層(純粋関数・I/O禁止)
 - `src/lib/versionMismatch.js` — 「本体とページで版がズレている」を検知する純関数(2026-07-06)。
 - `src/lib/videoCapture.js` — watch ページの video から PNG を取るためのユーティリティ。
 - `src/lib/viewerCountProbeMerge.js` — 【層】L0 判定層(純粋関数・I/O禁止)
@@ -1025,9 +1026,9 @@
 - `v0.1.1459` 2026-08-21 — 固まっている【当人】を名指しできるようにしました
 
 ### その他 (6版)
+- `v0.1.1472` 2026-08-21 — 誤った犯人を名指しする警告をやめました
 - `v0.1.1470` 2026-08-21 — 版ごとの「どれだけ良くなったか」を数字で残すようにしました
 - `v0.1.1467` 2026-08-21 — 検査が【自分の壊れ】に気づけるようにしました
 - `v0.1.1465` 2026-08-21 — 部品の置き場所を1枚で説明する案内を追加しました
 - `v0.1.1457` 2026-08-20 — 引っ張った瞬間に黒くなるのを直しました
 - `v0.1.1455` 2026-08-20 — 計器の意味を1枚の台帳にまとめました
-- `v0.1.1452` 2026-08-19 — 黒画面の追いかけをここで終わらせました
