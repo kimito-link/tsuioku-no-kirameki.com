@@ -59,6 +59,21 @@ export const HEALTH_CELL_GROUPS = Object.freeze([
       'memory-pressure', 'dom-nodes'
     ])
   }),
+  /*
+   * ★v0.1.1463: 【パネルが黒い・重い】の枠。
+   *   ★ユーザーが何度も報告している症状の言葉をそのまま枠名にする
+   *   ([[group-the-cells-by-symptom-words-2026-08-14]])。
+   *   「引っ張った瞬間くろくなる」「スリープでも黒い」に対して、
+   *   ★3つの計器が同時に答える枠:
+   *     覆っている当人 / 部品の量 / 拡張が使っている時間
+   */
+  Object.freeze({
+    id: 'panel-black', label: 'パネルが黒い・重い', order: 3.5,
+    hint: '引っ張った瞬間やスリープ復帰で黒くなるとき、ここを見ます',
+    cellIds: Object.freeze([
+      'panel-cover', 'dom-tree', 'auto-section'
+    ])
+  }),
   Object.freeze({
     id: 'identity', label: '人の識別（ID・サムネ・名前の紐づけ）', order: 3,
     hint: '誰が言ったかを結びつけられているか。匿名は仕様上ここに出ません',

@@ -121,7 +121,22 @@ function maximalInput() {
           // ★v0.1.1406: 振れ幅・最悪の落ち込みセルの入力
           reversals: 5, amplitude: 14, maxTiles: 20, minTiles: 6,
           worstDrop: 12, worstDropFrom: 20, worstDropTo: 8, worstDropOrigin: 'light_summary'
-        }
+        },
+        /*
+         * ★v0.1.1463: 【パネルが黒い・重い】枠の3セルの入力。
+         *   ★最大入力に非0を入れないと、そのセルは一度も生成されず
+         *     網羅ゲートが素通しする
+         *     ([[max-input-fixture-decides-what-the-gate-can-see-2026-08-19]])。
+         */
+        autoSection: {
+          level: 'warn', coveragePct: 12, uncoveredMs: 8800,
+          worstName: 'rebuildStoryGrowth', line: 'x'
+        },
+        domTreeCensus: {
+          level: 'warn', total: 2844, maxDepth: 14, topTags: [],
+          widest: { id: 'sceneStoryUserLaneTanu', tag: 'div', childCount: 86 }, line: 'x'
+        },
+        panelCover: { level: 'bad', culprit: 'div#shade', reason: 'x', line: 'x' }
       },
       // ★v0.1.1408: 識別セルの入力(匿名は分母から外す=掟2)
       identityAcquisition: {

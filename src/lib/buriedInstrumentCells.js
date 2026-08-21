@@ -280,6 +280,65 @@ export function buildBuriedCells(data) {
   }
 
   /* ── レーンが揃わない(heavy race) ───────────────────────── */
+  /* ── ★DOM系の3計器を【セルに出す】 ─────────────────────
+   * ★ユーザー指摘(2026-08-21)「みためかわってないような」
+   *   →「セルにも反映させて視覚的にもりかいしたい」
+   * ★私は v0.1.1456〜1462 で3つ作ったが、どれも**コピー文にしか出しておらず**、
+   *   コードの地図が言う【4 表示 の断線】そのものだった＝画面では何も変わらない。
+   */
+  const laneProbe = p?.storyUserLaneRenderProbe;
+
+  // ★拡張の処理時間(カバー率つき)。★測れていないうちは犯人を断言しない。
+  const auto = laneProbe?.autoSection;
+  const autoPct = auto ? num(auto.coveragePct) : null;
+  if (!auto || autoPct == null) push(naCell('auto-section', '拡張の処理時間'));
+  else {
+    const worst = String(auto.worstName || '');
+    out.push(cell(
+      'auto-section', '拡張の処理時間',
+      auto.level === 'warn' ? 'warn' : 'ok',
+      /*
+       * ★カバー率が低いときは「まだ名指しできない」と正直に出す。
+       *   囲んだ中の最大値を犯人と書くと、また誤診する。
+       */
+      auto.level === 'warn'
+        ? `${autoPct}%しか測れていません(残り${num(auto.uncoveredMs) ?? 0}msは未計測)`
+        : `${autoPct}%を計測${worst ? ` / 最も使うのは ${worst}` : ''}`
+    ));
+  }
+
+  // ★DOMの木(総数・深さ・一番太い親)。★どこを削るかが名前で分かる。
+  const tree = laneProbe?.domTreeCensus;
+  const treeTotal = tree ? num(tree.total) : null;
+  if (!tree || treeTotal == null) push(naCell('dom-tree', 'パネルの部品数'));
+  else {
+    const w = tree.widest && typeof tree.widest === 'object' ? tree.widest : null;
+    const wid = w ? String(w.id || '(id無し)') : '';
+    out.push(cell(
+      'dom-tree', 'パネルの部品数',
+      tree.level === 'warn' ? 'warn' : 'ok',
+      `${treeTotal}個(深さ${num(tree.maxDepth) ?? 0})` +
+        (w ? ` / 一番太い親: ${wid} 子${num(w.childCount) ?? 0}` : '')
+    ));
+  }
+
+  // ★パネルを覆っている当人(黒画面の名指し)。
+  const cover = laneProbe?.panelCover;
+  if (!cover || cover.level === 'na') push(naCell('panel-cover', 'パネルの覆い'));
+  else {
+    const culprit = cover.culprit ? String(cover.culprit) : '';
+    out.push(cell(
+      'panel-cover', 'パネルの覆い',
+      cover.level === 'bad' ? 'bad' : 'ok',
+      /*
+       * ★覆いが無いのも正常として出す。
+       *   実機では「黒く塗っている要素は存在しない」= 停止で描けていないだけ、
+       *   と分かったので、この✅自体が切り分けの証拠になる。
+       */
+      culprit ? `${culprit} が覆っています` : '覆っているものはありません'
+    ));
+  }
+
   const lane = p?.storyUserLaneRenderProbe;
   if (!lane || !String(lane.heavySettleState || '')) push(naCell('lane-settle', 'レーンの読み切り'));
   else {

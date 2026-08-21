@@ -111,6 +111,32 @@ export const INSTRUMENT_RESET_TRIGGERS = Object.freeze([
  * @type {ReadonlyArray<InstrumentSpecRow>}
  */
 export const INSTRUMENT_SPEC = Object.freeze([
+  /* ── ★v0.1.1463: 【パネルが黒い・重い】枠の3計器 ───────────────── */
+  Object.freeze({
+    id: 'auto-section', doc: 'popup', unit: 'ms',
+    window: 'session', resetTrigger: 'popup_reopen',
+    sourceRef: 'popup-entry.js:669(_measuredSection)',
+    normal: 'カバー率>=30%で初めて犯人を名指しできる',
+    note: '★区間そのものを実測する。markBlockerSection はラベルを置くだけで'
+      + ' finally で抜けた瞬間に戻すため、囲んでいても「(拡張の外)」と出ていた。'
+      + ' ★50ms未満も捨てない(20ms×100回=2秒が見えなくなるため)'
+  }),
+  Object.freeze({
+    id: 'dom-tree', doc: 'popup', unit: 'elements',
+    window: 'instant', resetTrigger: 'popup_reopen',
+    sourceRef: 'popup-entry.js:19420(getElementsByTagName走査)',
+    normal: '深さ<=20 / 1親の子<=60',
+    note: '★市販のDOM可視化拡張は chrome-extension:// に注入できないので'
+      + ' サイドパネルの中身には届かない＝自前で採る。走査は上限4000で1回のみ'
+  }),
+  Object.freeze({
+    id: 'panel-cover', doc: 'popup', unit: 'rows',
+    window: 'instant', resetTrigger: 'popup_reopen',
+    sourceRef: 'popup-entry.js:19410',
+    normal: '暗くて不透明な層が中央を覆っていないこと',
+    note: '★覆いが無いのも正常として出す。実機では✅正常だった＝'
+      + ' 黒く塗る要素は存在せず、停止で描けていないだけ、という切り分けの証拠になる'
+  }),
   /* ── 誤診①の当事者: 同じ名前が2つの文書に存在する ───────────────── */
   Object.freeze({
     id: 'dom-nodes', doc: 'watch', unit: 'elements',
