@@ -377,7 +377,14 @@ export default [
     //   → iframe の【中】で中央から祖先を辿り、暗く不透明な層を名指しする。
     //   判定は `src/lib/panelCoverCulprit.js`(純関数)。ここは採取だけ。
     //   ★storage read は増やしていない(既存の計器バッチに相乗り)。
-    rules: { 'max-lines': ['error', { max: 22548, skipBlankLines: false, skipComments: false }] }
+    // ★v0.1.1459(22548→22571・+23行): 重い処理3つを区間名で囲んだ。
+    //   ★これまで markBlockerSection の呼び出しが【0箇所】で、速報は必ず
+    //     「(拡張の外)」としか出なかった＝**計器が嘘をついていた**。
+    //     実機で 16.7秒中 15.9秒(95%)停止・最悪4,776ms を観測したのに犯人が分からなかった。
+    //   ★包む対象は「本体を切り出して検査する wiring テストが無い」関数から選ぶこと。
+    //     renderStoryUserLane を包んだら laneMirrorPublishNotSkipped が5件赤になった
+    //     (本体が4行の委譲関数になり中身の検査が空振りするため)＝この関数は包まない。
+    rules: { 'max-lines': ['error', { max: 22571, skipBlankLines: false, skipComments: false }] }
   },
   {
     files: ['src/extension/popup/**/*.js'],

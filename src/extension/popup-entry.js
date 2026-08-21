@@ -634,6 +634,12 @@ import { userLaneHttpForTilePick } from '../lib/storyUserLaneDisplaySrc.js';
 import { summarizePopupDomCensus } from '../lib/popupDomCensus.js';
 // ★v0.1.1458: パネルを覆っている当人を名指しする(iframe の【中】で測る)。
 import { judgePanelCover } from '../lib/panelCoverCulprit.js';
+/*
+ * ★v0.1.1459: メインスレッドを止めた【当人】を名指しするために重い処理を囲む。
+ *   ★これまで呼び出しが0箇所で、速報は必ず「(拡張の外)」と出ていた=計器が嘘をついていた。
+ *   実機で 16.7秒中 15.9秒(95%)停止・最悪4,776ms を観測したのに犯人が分からなかった。
+ */
+import { markBlockerSection } from '../lib/mainThreadBlockerBoot.js';
 import {
   paintStoryUserLaneDomEmptyGuides,
   paintStoryUserLaneDomFilled,
@@ -3520,6 +3526,10 @@ let _tickerLastUserId = '';
 
 /** @param {PopupCommentEntry[]} comments */
 function renderCommentTicker(comments) {
+  // ★v0.1.1459: 区間名を付けて呼ぶ(コメントごとに走るので停止の常連候補)。
+  return markBlockerSection('renderCommentTicker', () => renderCommentTickerImpl(comments));
+}
+function renderCommentTickerImpl(comments) {
   const segA = $('commentTickerSegA');
   const segB = $('commentTickerSegB');
   const scroll = /** @type {HTMLElement|null} */ ($('commentTickerScroll'));
@@ -8377,6 +8387,15 @@ function getStoryEntryByIndex(index) {
 }
 
 function renderStoryCommentDetailPanel() {
+  /*
+   * ★v0.1.1459: 区間名を付けて呼ぶ。
+   *   ★包む対象は「本体を切り出して検査する wiring テストが無い」関数を選ぶこと。
+   *     renderStoryUserLane を包んだら laneMirrorPublishNotSkipped が5件赤になった
+   *     (本体が4行の委譲関数になり、中身の検査が空振りするため)。
+   */
+  return markBlockerSection('renderStoryCommentDetailPanel', () => renderStoryCommentDetailPanelImpl());
+}
+function renderStoryCommentDetailPanelImpl() {
   const wrap = /** @type {HTMLElement|null} */ ($('sceneStoryDetail'));
   const img = /** @type {HTMLImageElement|null} */ ($('sceneStoryDetailImg'));
   const userEl = $('sceneStoryDetailUser');
@@ -9348,6 +9367,10 @@ function computeStoryReaction(liveId, commentCount) {
  * }} state
  */
 function renderCharacterScene(state) {
+  // ★v0.1.1459: 区間名を付けて呼ぶ(遅延が出たとき速報がこの名前を出す)。
+  return markBlockerSection('renderCharacterScene', () => renderCharacterSceneImpl(state));
+}
+function renderCharacterSceneImpl(state) {
   const { hasWatch, recording, commentCount, liveId, snapshot } = state;
   const roleCopy = '1コメントごとに、りんくが1体ずつ増えるよ。';
 
