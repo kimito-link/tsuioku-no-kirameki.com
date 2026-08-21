@@ -790,7 +790,7 @@
   - `src/lib/statusTrendKey.js`
   - `src/extension/status-entry.js`
   - `src/lib/statusActionAdvisor.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 191</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 194</summary>
 
 - `app/app.js` — スマホ閲覧用 status Web 版。
 - `app/live-view.js` — global NL_BUILD_ID
@@ -801,6 +801,7 @@
 - `scripts/build-watch.mjs` — watch では起動時刻を埋める（rebuild 毎に再 import される訳ではないので、
 - `scripts/build.mjs` — .env を読み込む(status の共有キー NL_STATUS_INGEST_KEY / NL_STATUS_VIEW_TOKEN は .env から注入)。
 - `scripts/capture-store-screenshots.mjs` — Chrome ウェブストア用スクショ自動撮影
+- `scripts/check-improvement.mjs` — ★版ごとの実測値が【退化】していないか見張る。
 - `scripts/check-layer.mjs` — ★`src/lib` が「純粋ロジックの箱」であり続けることを機械で守る。
 - `scripts/check-no-secrets-in-dist.mjs` — ビルド成果物に秘密情報が焼き込まれていないか検査する(fail-closed)。
 - `scripts/check-root-cause-claim.mjs` — コミットメッセージの「根治」語を検査する。
@@ -872,6 +873,8 @@
 - `src/lib/heavyCachePreserve.js` — 軽い read が heavy read の証跡を消さないための純関数(v0.1.1367)。
 - `src/lib/hiddenPublishPolicy.js` — 「画面が隠れているとき、鏡の publish まで止めてよいか」の判定(純関数)。
 - `src/lib/htmlEscape.js` — 旧パス：`src/lib/htmlEscape.js`
+- `src/lib/improvementHistory.js` — 【層】L0 判定層(純粋関数・I/O禁止)
+- `src/lib/improvementLedger.js` — 【層】L0 判定層(純粋関数・I/O禁止)
 - `src/lib/initShadeDismissPolicy.js` — 初回ロードの幕(シェード)を【いつ畳むか】を決める純関数。
 - `src/lib/initShadeFailsafe.js` — 初回ロード幕(.nl-init-shade)の CSS フェイルセーフとクラスの乖離を断つ純関数。
 - `src/lib/instrumentSpec.js` — 【層】L0 判定層(純粋関数・I/O禁止)
@@ -990,9 +993,6 @@
 
 > changelog 全 20 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
 
-### 📥 コメント取得 (1版)
-- `v0.1.1450` 2026-08-19 — サイドパネルが黒くなる原因を直しました
-
 ### 🪟 応援レーン・タイル (2版)
 - `v0.1.1468` 2026-08-21 — 開いた直後を「異常」と誤って赤くするのをやめました
 - `v0.1.1456` 2026-08-20 — パネル側の部品数を測れるようにしました
@@ -1021,7 +1021,8 @@
 - `v0.1.1462` 2026-08-21 — 重い処理を全部じどうで計測するようにしました
 - `v0.1.1459` 2026-08-21 — 固まっている【当人】を名指しできるようにしました
 
-### その他 (6版)
+### その他 (7版)
+- `v0.1.1470` 2026-08-21 — 版ごとの「どれだけ良くなったか」を数字で残すようにしました
 - `v0.1.1467` 2026-08-21 — 検査が【自分の壊れ】に気づけるようにしました
 - `v0.1.1465` 2026-08-21 — 部品の置き場所を1枚で説明する案内を追加しました
 - `v0.1.1457` 2026-08-20 — 引っ張った瞬間に黒くなるのを直しました
