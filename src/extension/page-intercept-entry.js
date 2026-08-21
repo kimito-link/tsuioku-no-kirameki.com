@@ -16,6 +16,15 @@ import {
   extractLearnUsersFromNicoUserIconUrlsInString
 } from '../lib/niconicoInterceptLearn.js';
 import { recordUnforwardedInterceptJsonForProbe } from '../lib/interceptVisitorProbeDebug.js';
+/*
+ * ★v0.1.1460: <html> に書く診断属性の【予算】。
+ *   キー数に上限が無く、毎回オブジェクト全体を JSON.stringify して属性へ書き直していた。
+ *   属性の書き換えはスタイル再計算・レイアウトを誘発する＝停止の候補。
+ */
+import {
+  mergeNdgrUnknownSamplesBounded,
+  serializeNdgrUnknownSamples
+} from '../lib/ndgrUnknownSamplesBudget.js';
 import {
   dedupeViewerJoinUsersByUserId,
   normalizeViewerJoin,
@@ -551,30 +560,26 @@ import {
    * 中身（hex preview + 内側 field histogram + string sample）を診断 JSON に
    * 露出して真の gift 経路を特定する。
    */
-  /** @type {Record<string, Array<any>>} */
-  const _ndgrUnknownSamples = {};
-  const NDGR_UNKNOWN_SAMPLES_MAX_PER_KEY = 3;
+  /*
+   * ★v0.1.1460: 上限つきの蓄積へ差し替え(判定は ndgrUnknownSamplesBudget.js が正本)。
+   *   旧実装は「1キー3件」の上限しか無く、★**キーの個数が無限**だった。
+   *   キーが増えるほど publish の JSON.stringify が重くなり、
+   *   属性書き換えのたびにスタイル再計算を誘発していた。
+   */
+  /** @type {{ samples: Record<string, Array<any>>, droppedKeys: number }} */
+  const _ndgrUnknownState = { samples: {}, droppedKeys: 0 };
   /** @param {Record<string, Array<any>> | undefined} u */
   function mergeNdgrUnknownSamples(u) {
-    if (!u || typeof u !== 'object') return;
-    for (const key of Object.keys(u)) {
-      if (!_ndgrUnknownSamples[key]) _ndgrUnknownSamples[key] = [];
-      const slot = _ndgrUnknownSamples[key];
-      if (slot.length >= NDGR_UNKNOWN_SAMPLES_MAX_PER_KEY) continue;
-      const incoming = Array.isArray(u[key]) ? u[key] : [];
-      for (const sample of incoming) {
-        if (slot.length >= NDGR_UNKNOWN_SAMPLES_MAX_PER_KEY) break;
-        slot.push(sample);
-      }
-    }
+    mergeNdgrUnknownSamplesBounded(_ndgrUnknownState, u);
   }
   function publishNdgrUnknownSamples() {
     const root = document.documentElement;
     if (!root) return;
     try {
+      // ★v0.1.1460: 総バイト数の上限で切って書く(切ったことは truncated で残す)。
       root.setAttribute(
         'data-nls-ndgr-unknown-samples',
-        JSON.stringify(_ndgrUnknownSamples)
+        serializeNdgrUnknownSamples(_ndgrUnknownState)
       );
     } catch { /* no-op */ }
   }
