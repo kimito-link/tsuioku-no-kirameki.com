@@ -22,6 +22,14 @@ const read = (rel) => fs.readFileSync(path.join(repoRoot, rel), 'utf8').replace(
  *   ★これは「拡張は無実」という意味ではない。**既定のラベル**でしかない。
  *   ＝ 計器が嘘をついていた([[instrument-must-name-the-cause-2026-08-01]])。
  *
+ * ■ ★v0.1.1462: さらに構造的な欠陥が見つかったので実測へ移した
+ *   `markBlockerSection` は **ラベルを置くだけで自分では測っていない**。
+ *   実測は250msごとのハートビートが行い、遅れを見つけた時点の区間名を読む。
+ *   ところが `finally` で ★**区間を抜けた瞬間にラベルを戻す**(`:60`)ので、
+ *   ハートビートが鳴る頃には抜けていて **囲んでいても「(拡張の外)」と出る**。
+ *   → `_measuredSection`(popup-entry.js)が**区間そのものを実測**するように変えた。
+ *   ★このテストはその包みを数えるように更新済み(断言の中身は変えていない)。
+ *
  * ■ このテストが固定すること
  *   popup の重い処理が **区間名で囲まれている**こと。
  *   これで次に止まったとき、速報が **当人の名前**を出せる。
@@ -46,13 +54,13 @@ describe('★メインスレッドを止めた当人を名指しできる', () =
      *   ここが0だと `_currentSection` が空のままで、
      *   計器は永久に「(拡張の外)」としか言えない。
      */
-    const calls = (src.match(/markBlockerSection\(/g) || []).length;
+    const calls = (src.match(/_measuredSection\(/g) || []).length;
     expect(calls, `囲みが ${calls} 箇所しかない`).toBeGreaterThanOrEqual(3);
   });
 
   it('★区間名が具体的(「重い処理」のような無意味な名前にしない)', () => {
     const src = read('src/extension/popup-entry.js');
-    const names = [...src.matchAll(/markBlockerSection\(\s*'([^']+)'/g)].map((m) => m[1]);
+    const names = [...src.matchAll(/_measuredSection\(\s*'([^']+)'/g)].map((m) => m[1]);
     expect(names.length, '区間名が採れない').toBeGreaterThanOrEqual(3);
     for (const n of names) {
       // ★読んだ人が「どこを直せばいいか」分かる名前であること
@@ -77,12 +85,12 @@ describe('★メインスレッドを止めた当人を名指しできる', () =
     expect(at, 'renderStoryUserLane が見つからない').toBeGreaterThan(-1);
     const body = src.slice(at, at + 400);
     expect(body, 'renderStoryUserLane を包むと本体検査が空振りする')
-      .not.toContain('markBlockerSection(');
+      .not.toContain('_measuredSection(');
   });
 
   it('★同じ名前を重複して使っていない(どれが犯人か分からなくなる)', () => {
     const src = read('src/extension/popup-entry.js');
-    const names = [...src.matchAll(/markBlockerSection\(\s*'([^']+)'/g)].map((m) => m[1]);
+    const names = [...src.matchAll(/_measuredSection\(\s*'([^']+)'/g)].map((m) => m[1]);
     expect(new Set(names).size, `重複した区間名: ${names.join(', ')}`).toBe(names.length);
   });
 });

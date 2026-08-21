@@ -642,6 +642,41 @@ import { summarizeDomTree } from '../lib/domTreeCensus.js';
  *   実機で 16.7秒中 15.9秒(95%)停止・最悪4,776ms を観測したのに犯人が分からなかった。
  */
 import { markBlockerSection } from '../lib/mainThreadBlockerBoot.js';
+/*
+ * ★v0.1.1462: 【全経路を機械的に測る】(ユーザー指示: 全部把握して計器に入れる)。
+ *   markBlockerSection はラベルを置くだけで自分では測っておらず、
+ *   finally で区間を抜けた瞬間にラベルを戻すため、250msごとのハートビートが
+ *   鳴る頃には既に抜けていて ★「(拡張の外)」としか出なかった。
+ *   → 区間【そのもの】を実測し、★測れていない時間(カバー率)も出す。
+ */
+import { createAutoSectionCensus, noteAutoSection, formatAutoSectionLines } from '../lib/autoSectionCensus.js';
+/** 拡張の処理時間の集計(状態速報が読む)。 */
+const _autoSectionCensus = createAutoSectionCensus();
+/** 計測を始めた時刻。カバー率の分母になる。 */
+const _autoSectionStartedAt = Date.now();
+/**
+ * 区間を【実測して】名前ごとに積む。
+ *
+ * ★markBlockerSection(ラベルのみ)をこれで包むことで、
+ *   既存の囲み箇所が全部そのまま実測に格上げされる。
+ *   ★戻り値も例外もそのまま通す(囲んでも挙動を変えない)。
+ *
+ * @template T
+ * @param {string} name
+ * @param {() => T} fn
+ * @returns {T}
+ */
+function _measuredSection(name, fn) {
+  const t0 = typeof performance !== 'undefined' && performance.now ? performance.now() : Date.now();
+  try {
+    return markBlockerSection(name, fn);
+  } finally {
+    try {
+      const t1 = typeof performance !== 'undefined' && performance.now ? performance.now() : Date.now();
+      noteAutoSection(_autoSectionCensus, { name, ms: t1 - t0, atMs: Date.now() });
+    } catch { /* 計器の失敗で本処理を壊さない */ }
+  }
+}
 import {
   paintStoryUserLaneDomEmptyGuides,
   paintStoryUserLaneDomFilled,
@@ -1063,6 +1098,10 @@ function updateInlineOwnWatchUrlFromLv(lv) {
 }
 
 function applyResponsivePopupLayout() {
+  // ★v0.1.1462: 幅変更のたびに走る=「引っ張った瞬間」の当事者。実測する。
+  return _measuredSection('applyResponsivePopupLayout', () => applyResponsivePopupLayoutImpl());
+}
+function applyResponsivePopupLayoutImpl() {
   const root = document.documentElement;
   const body = document.body;
   if (!root || !body) return;
@@ -3529,7 +3568,7 @@ let _tickerLastUserId = '';
 /** @param {PopupCommentEntry[]} comments */
 function renderCommentTicker(comments) {
   // ★v0.1.1459: 区間名を付けて呼ぶ(コメントごとに走るので停止の常連候補)。
-  return markBlockerSection('renderCommentTicker', () => renderCommentTickerImpl(comments));
+  return _measuredSection('renderCommentTicker', () => renderCommentTickerImpl(comments));
 }
 function renderCommentTickerImpl(comments) {
   const segA = $('commentTickerSegA');
@@ -8395,7 +8434,7 @@ function renderStoryCommentDetailPanel() {
    *     renderStoryUserLane を包んだら laneMirrorPublishNotSkipped が5件赤になった
    *     (本体が4行の委譲関数になり、中身の検査が空振りするため)。
    */
-  return markBlockerSection('renderStoryCommentDetailPanel', () => renderStoryCommentDetailPanelImpl());
+  return _measuredSection('renderStoryCommentDetailPanel', () => renderStoryCommentDetailPanelImpl());
 }
 function renderStoryCommentDetailPanelImpl() {
   const wrap = /** @type {HTMLElement|null} */ ($('sceneStoryDetail'));
@@ -9205,6 +9244,10 @@ const STORY_GROWTH_CHURN = createStoryGrowthChurnState();
 const STORY_GROWTH_CELL_SWAP = createStoryGrowthCellSwapState();
 
 function rebuildStoryGrowth(root, total) {
+  // ★v0.1.1462: 全消し再構築=DOMを最も動かす経路。実測する。
+  return _measuredSection('rebuildStoryGrowth', () => rebuildStoryGrowthImpl(root, total));
+}
+function rebuildStoryGrowthImpl(root, total) {
   const _churnT0 = typeof performance !== 'undefined' ? performance.now() : 0;
   root.innerHTML = '';
   if (total <= 0) return;
@@ -9370,7 +9413,7 @@ function computeStoryReaction(liveId, commentCount) {
  */
 function renderCharacterScene(state) {
   // ★v0.1.1459: 区間名を付けて呼ぶ(遅延が出たとき速報がこの名前を出す)。
-  return markBlockerSection('renderCharacterScene', () => renderCharacterSceneImpl(state));
+  return _measuredSection('renderCharacterScene', () => renderCharacterSceneImpl(state));
 }
 function renderCharacterSceneImpl(state) {
   const { hasWatch, recording, commentCount, liveId, snapshot } = state;
@@ -19401,6 +19444,15 @@ async function collectAiShareDevMonitorPayloadBundle(watchUrl) {
                 });
               }
               snap.domTreeCensus = summarizeDomTree(nodes);
+            } catch { /* 計器の失敗で診断全体を壊さない */ }
+            /*
+             * ★v0.1.1462: 拡張の処理時間を【全経路】実測して出す。
+             *   ★カバー率(測れた割合)も一緒に出す＝囲み忘れが数字で見える。
+             */
+            try {
+              snap.autoSection = formatAutoSectionLines(_autoSectionCensus, {
+                elapsedMs: Date.now() - _autoSectionStartedAt
+              });
             } catch { /* 計器の失敗で診断全体を壊さない */ }
           } // v0.1.1040/v0.1.1428 計器: 段別churn実測 + 中身LODが効いているか
           // heavyRace根治(B)計器: fresh-read で heavy 全件再読みを省いた累計(実配信で効きと12秒ギャップの適正を判定)。

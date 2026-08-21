@@ -3586,6 +3586,16 @@
       ]
     },
     {
+      "file": "src/lib/autoSectionCensus.js",
+      "featureCount": 1,
+      "features": [
+        "popup"
+      ],
+      "labels": [
+        "ポップアップ(応援レーン)"
+      ]
+    },
+    {
       "file": "src/lib/avatarEntryCounts.js",
       "featureCount": 1,
       "features": [

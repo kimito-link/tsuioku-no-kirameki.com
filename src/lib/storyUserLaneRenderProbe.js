@@ -348,6 +348,8 @@ export function buildStoryUserLaneRenderDiag(probeSnap, ctx) {
     panelCover: s.panelCover && typeof s.panelCover === 'object' ? s.panelCover : null,
     // ★v0.1.1461: DOMの木の形(総数・深さ・一番太い親)。
     domTreeCensus: s.domTreeCensus && typeof s.domTreeCensus === 'object' ? s.domTreeCensus : null,
+    // ★v0.1.1462: 拡張の処理時間(全経路の実測)と、★測れていない時間。
+    autoSection: s.autoSection && typeof s.autoSection === 'object' ? s.autoSection : null,
     verdict,
     reason
   };
@@ -445,6 +447,14 @@ export function formatStoryUserLaneRenderDiagLines(diag, ctx) {
    */
   if (d.domTreeCensus && typeof d.domTreeCensus === 'object' && d.domTreeCensus.line) {
     lines.push(`  → ${d.domTreeCensus.line}`);
+  }
+  /*
+   * ★v0.1.1462: 拡張の処理時間を【全経路】実測して出す。
+   *   ★カバー率が低いうちは犯人を断言せず「測れていない」と自己申告する
+   *   (囲んだ中の最大値を指すだけの誤診を防ぐ)。
+   */
+  if (d.autoSection && typeof d.autoSection === 'object' && d.autoSection.line) {
+    lines.push(`  → ${d.autoSection.line}`);
   }
   // v0.1.1033: heavy 完了が settled に到達したか。race 多発=たぬ姉レーンが暫定(直近N件)で固着の真因。
   // ★v0.1.1241: 「一度でも settled したか」で言い分けを変える。race は自己修復の途中経過でもあり

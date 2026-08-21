@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 6 / 821 件
+## ⚠️ 役割コメントが無いソース 6 / 822 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `src/lib/laneDomSelfMeasure.js`
@@ -725,7 +725,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (1804)
+- 📁 **src/** (1807)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1023,7 +1023,7 @@
         - `logo_funlink_white_RGB_maru_black.png`
       - `logo_guide_funlink_ol.pdf`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1556)
+  - 📁 **lib/** (1559)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -1078,6 +1078,9 @@
     - `autoPublishConsentWiring.test.js`
     - `autoPublishDecision.js` — ③WEB(純Web公開コピー)が古くなる前に自動で再 publish すべきかを判定する純関数(v0.1.1016)。
     - `autoPublishDecision.test.js`
+    - `autoSectionCensus.js` — 【層】L0 判定層(純粋関数・I/O禁止)
+    - `autoSectionCensus.test.js`
+    - `autoSectionCensusWiring.test.js`
     - `autoTabReloadTrace.wiring.test.js`
     - `autoshowHideExperiment.wiring.test.js`
     - `avCue.js` — 「AVCue = 音の再生結果を真実とする単一発火点」の純関数群(V1・DOM/storage/音に触れない)。
