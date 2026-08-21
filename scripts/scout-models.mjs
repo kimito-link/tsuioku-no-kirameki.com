@@ -608,10 +608,21 @@ function summarizeMeetingRecords(days = 30) {
       }
     }
   }
-  const rows = Object.entries(byLabel)
-    .map(([label, v]) => ({ label, n: v.n, ng: v.ng, rate: v.n ? v.ng / v.n : 0 }))
+  // 2026-08-21追加: 現行LINEUPに実在するメンバーだけを表に出す。
+  //  動機: 直近30日で切っても「窓の内側で撤去された」メンバーは残り続ける。実際この日の
+  //  日報は groq/compound（08-16撤去）を失敗率100%、groq/llama-3.3-70b（08-18撤去）を
+  //  0%で堂々と載せていた。どちらも既に居ないので、読んだ人間は実在しない異常を追いかける。
+  //  ＝「集計は正しいが対象が撤去済み」型の誤診。この型は今回で5回目なので、人間が毎回
+  //  突き合わせるのをやめ、ツール側で構造的に潰す。
+  //  落とすのでなく retired フラグを付けて件数だけ残す: 黙って消すと「集計に出ない＝健康」
+  //  と読める偽の安心が生まれるため（fail-closed の流儀。撤去済みだと明記して除外する）。
+  const liveLabels = new Set(LINEUP.map((m) => m.label));
+  const all = Object.entries(byLabel)
+    .map(([label, v]) => ({ label, n: v.n, ng: v.ng, rate: v.n ? v.ng / v.n : 0, retired: !liveLabels.has(label) }))
     .sort((a, b) => b.rate - a.rate || b.n - a.n);
-  return { total, rows, files };
+  const rows = all.filter((r) => !r.retired);
+  const retiredCount = all.length - rows.length;
+  return { total, rows, files, retiredCount };
 }
 
 function buildBrief({ date, isFirstRun, fetchStatus, healthAlerts, probedCandidates, referenceCounts, carryOverCount, newCatalogs, catalogCheckedCount, liveProbeCheckedCount, outOfScopeCount, deprecationAlerts, meetingStats }) {
@@ -678,7 +689,8 @@ function buildBrief({ date, isFirstRun, fetchStatus, healthAlerts, probedCandida
     for (const r of meetingStats.rows.filter((x) => x.n >= 3).slice(0, 10)) {
       lines.push(`| ${r.label} | ${r.n} | ${r.ng} | ${(r.rate * 100).toFixed(0)}% |`);
     }
-    lines.push('', '※ 発言3回未満は割愛。撤去の目安は「発言10回以上で失敗率50%以上」（下の推奨アクション参照）。', '');
+    lines.push('', '※ 発言3回未満は割愛。撤去の目安は「発言10回以上で失敗率50%以上」（下の推奨アクション参照）。'
+      + (meetingStats.retiredCount ? `\n※ 撤去済みメンバー${meetingStats.retiredCount}体分の実績は除外した（現行LINEUPに居ないため追いかけても意味がない）。` : ''), '');
   }
 
   lines.push('## 取得状況');
