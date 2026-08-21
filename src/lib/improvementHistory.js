@@ -89,5 +89,16 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
     version: '0.1.1454', metric: 'panel-block-ms', value: 106,
     source: '状態速報「サイドパネル自己診断」の最大タイマー遅延',
     note: 'バンドル分割の効果(92%減)'
+  }),
+  Object.freeze({
+    version: '0.1.1471', metric: 'bundle-kb', value: 1405,
+    source: 'extension/dist/popup.js のファイルサイズ',
+    note: '★意図した悪化。v0.1.1455〜1471 で計器・検査を17版ぶん追加した分(+45KB)。' +
+      '★親スレッド停止は 106ms のまま(panel-block-ms で見張っている)ので、体感は悪化していない。' +
+      '★1360 に戻すには計器を削るしかないため、ここは戻さない判断。'
+  }),
+  Object.freeze({
+    version: '0.1.1471', metric: 'gate-selftest', value: 2,
+    source: 'npm run audit:gates（--selftest を持つ検査の本数）'
   })
 ]);

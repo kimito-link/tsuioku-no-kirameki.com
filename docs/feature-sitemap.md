@@ -117,9 +117,10 @@
   - `src/lib/monotonicCommentCount.js`
 - **storage キー定義** — chrome.storage のキー名の正本(nls_comments_<lv> 等)
   - `src/lib/storageKeys.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 50</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 51</summary>
 
 - `scripts/dump-panel-state.mjs` — 実機の chrome.storage.local を吸い出して
+- `scripts/record-improvement.mjs` — ★実測値を台帳に書き足す【1本の口】。
 - `src/lib/autoBackupState.js` — v0.1.808(星野ロミ式コンポーネント化・第1弾): content-entry.js の巨大化を抑えるため、
 - `src/lib/avCue.js` — 「AVCue = 音の再生結果を真実とする単一発火点」の純関数群(V1・DOM/storage/音に触れない)。
 - `src/lib/blobDownload.js` — Blob を指定ファイル名で保存する。
