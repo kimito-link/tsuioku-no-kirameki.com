@@ -59,7 +59,9 @@
     "sync:lp-twitter-icon": "node scripts/sync-lp-twitter-icon.mjs",
     "lp:serve": "python -m http.server 3780 --bind 127.0.0.1",
     "prepare": "husky",
-    "verify:deploy": "node scripts/verify-deploy.mjs"
+    "verify:deploy": "node scripts/verify-deploy.mjs",
+    "improvement:record": "node scripts/record-improvement.mjs --auto",
+    "improvement:record:selftest": "node scripts/record-improvement.mjs --selftest"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.4",

@@ -26,6 +26,9 @@
  *   0 = 合格 / 1 = 測れた上での赤 / ★2 = 測れなかった(緑ではない)
  * ───────────────────────────────────────────────────────────────────────────
  */
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { dirname, join, resolve } from 'node:path';
 import { IMPROVEMENT_HISTORY } from '../src/lib/improvementHistory.js';
 import {
   IMPROVEMENT_METRICS,
@@ -102,7 +105,23 @@ if (SUBMISSION) {
   process.exit(EXIT.PASS);
 }
 
+/**
+ * ★いまの版が台帳に1件も無いか。
+ *
+ * ★fail ではなく inconclusive にする理由:
+ *   記録し忘れは【測っていない】のであって【悪化した】のではない。
+ *   ここを赤にすると、記録が面倒なときに"嘘の数字を入れる"動機を作る。
+ *   ★この土台の規約どおり「測れなかった」は 2 で答える。
+ */
+function currentVersionUnrecorded(history) {
+  const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+  const version = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')).version;
+  const found = history.some((r) => String(r?.version || '') === version);
+  return found ? null : version;
+}
+
 const undeclared = undeclaredRows(IMPROVEMENT_HISTORY);
+const unrecorded = currentVersionUnrecorded(IMPROVEMENT_HISTORY);
 const regressions = detectRegressions(IMPROVEMENT_HISTORY);
 
 if (!CHECK) {
@@ -143,6 +162,14 @@ if (IMPROVEMENT_HISTORY.length === 0) {
       '直すか、意図した変更なら improvementHistory.js に【なぜ悪化してよいか】を note に書く'
       + '(数字を消して隠さないこと。隠すと台帳の意味が無くなります)',
     limitation: '設計の良し悪しは判定しません。過去最良より悪くなったことに気づかせるだけです'
+  });
+} else if (unrecorded) {
+  results.push({
+    probe: '改善記録', verdict: 'inconclusive',
+    evidence: { 件数: IMPROVEMENT_HISTORY.length, 未記録の版: unrecorded },
+    detail: `いまの版 ${unrecorded} の実測値が台帳にありません（★悪化ではなく【測っていない】）`,
+    howToFix: 'npm run improvement:record を実行する（自動で測れる指標だけ入ります）',
+    limitation: '★記録の有無だけを見ます。数字が正しいかは見ません'
   });
 } else {
   results.push({

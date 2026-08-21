@@ -187,12 +187,20 @@ export function detectRegressions(history) {
       best.set(spec.id, { best: value, version });
       continue;
     }
+    /*
+     * ★note で【なぜ悪化してよいか】を書いた行は退化として数えない。
+     *   ★ただし過去最良は更新しない(悪い方を新しい基準にしない)＝ラチェットは緩まない。
+     *   ★このリポで生き残った仕掛けは全部この形(ベースライン＋ラチェット):
+     *     既存の借金は許容し、★新規だけ赤にする。
+     *   ★数字を消すのではなく【理由を書かせる】のが要。台帳に事実は残る。
+     */
+    const accepted = typeof row.note === 'string' && row.note.trim() !== '';
     const isBetter = spec.better === 'lower' ? value < prev.best : value > prev.best;
     if (isBetter) {
       best.set(spec.id, { best: value, version });
       continue;
     }
-    if (value !== prev.best) {
+    if (value !== prev.best && !accepted) {
       out.push({
         version, metric: spec.id, label: spec.label,
         value, best: prev.best, bestVersion: prev.version

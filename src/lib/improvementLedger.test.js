@@ -173,3 +173,38 @@ describe('★人が読む1行', () => {
     expect(l).toMatch(/🔴|退化/);
   });
 });
+
+describe('★note による許容（ベースライン＋ラチェット）', () => {
+  const base = { metric: 'bundle-kb', source: 's' };
+  it('note が無い退化は赤', () => {
+    expect(detectRegressions([
+      { ...base, version: 'a', value: 1360 },
+      { ...base, version: 'b', value: 1405 }
+    ])).toHaveLength(1);
+  });
+
+  it('note で【なぜ悪化してよいか】を書いた行は通す', () => {
+    expect(detectRegressions([
+      { ...base, version: 'a', value: 1360 },
+      { ...base, version: 'b', value: 1405, note: '意図した悪化。計器を17版ぶん追加した分' }
+    ])).toHaveLength(0);
+  });
+
+  it('★許した後にさらに悪化したら赤（ラチェットが緩まない）', () => {
+    const r = detectRegressions([
+      { ...base, version: 'a', value: 1360 },
+      { ...base, version: 'b', value: 1405, note: '理由' },
+      { ...base, version: 'c', value: 1500 }
+    ]);
+    expect(r).toHaveLength(1);
+    // ★比較対象は「許した 1405」ではなく【過去最良 1360】のまま
+    expect(r[0].best).toBe(1360);
+  });
+
+  it('★空白だけの note では黙らせられない', () => {
+    expect(detectRegressions([
+      { ...base, version: 'a', value: 1360 },
+      { ...base, version: 'b', value: 1405, note: '   ' }
+    ])).toHaveLength(1);
+  });
+});

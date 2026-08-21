@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 6 / 830 件
+## ⚠️ 役割コメントが無いソース 6 / 831 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `src/lib/laneDomSelfMeasure.js`
@@ -642,7 +642,7 @@
   - `status-guard.js` — 状態速報ページ(status.html)の「何があっても開く」保険。
   - `status.html`
   - `venue.html`
-- 📁 **scripts/** (63)
+- 📁 **scripts/** (64)
   - 📁 **__pycache__/** (1)
     - `stage-submission.cpython-311.pyc`
   - 📁 **lib/** (1)
@@ -692,6 +692,7 @@
   - `meeting-roles.mjs` — meeting.mjs の役割注入版。
   - `meeting.mjs` — 会議ハーネス: 同じ問いを「無料クラウド4系統 + ローカル ollama 数体」に投げ、
   - `pick-live-for-check.mjs` — 検証に使う実配信を【自動で1つ選ぶ】。
+  - `record-improvement.mjs` — ★実測値を台帳に書き足す【1本の口】。
   - `repo-tree-map.mjs` — リポジトリのディレクトリツリー＋各ディレクトリの「役割」を自動生成する(2026-06-18 ユーザー提案)。
   - `resize-marketing-html-avatars.ps1`
   - `run-e2e.mjs` — SKIP_E2E=1 のときは成功終了（CI などディスプレイなし環境用）。
