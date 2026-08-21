@@ -71,6 +71,8 @@ const steps = [
   ['tree-map', 'tree-map:check'],
   ['site-health', 'site-health:check'],
   ['feature-map', 'feature-map:check'],
+  // ★v0.1.1465: src/lib が「純粋ロジックの箱」であり続けるか(src/lib/AGENTS.md)
+  ['layer', 'check:layer'],
   ['verify:bump', 'verify:bump']
 ];
 
