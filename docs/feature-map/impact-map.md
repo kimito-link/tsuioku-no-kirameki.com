@@ -813,6 +813,7 @@
 | `src/lib/topSupportRankStripLines.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/topSupportRankStripStableKey.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/trimMap.js` | 1 | 記録エンジン(watchページ常駐) |
+| `src/lib/unknownVsAbsent.js` | 1 | 状態速報ページ |
 | `src/lib/userEntryAvatarResolve.js` | 1 | 記録エンジン(watchページ常駐) |
 | `src/lib/userLaneDiagSnapshot.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/userLaneMergeGiftThrowers.js` | 1 | ポップアップ(応援レーン) |

@@ -188,7 +188,17 @@ export function formatAutoSectionLines(census, opts = {}) {
    *   幕が明けるまで拡張は何もしていないので、囲む対象がそもそも無い。
    *   ★緑にもしない=「まだ判定できない」。
    */
-  if (elapsedMs < AUTO_SECTION_BOOT_SETTLE_MS && totalMs === 0) {
+  /*
+   * ★v0.1.1472: 判定を `totalMs === 0` から `coveragePct === 0` に変えた。
+   *   ★実損(2026-08-21・実機速報): totalMs は performance.now() の小数を積むので
+   *     0.7 のような値になる。表示は Math.round で「測れた0ms」・カバー率も 0% なのに
+   *     `totalMs === 0` は false で、★起動直後の門番をすり抜けて
+   *     「★残り343msは【囲んでいない処理】」という**嘘**を出した。
+   *   ★穴の本質＝**表示している値と判定している値が違う**(丸めをまたいだ厳密比較)。
+   *   ★coveragePct は画面に出しているのと同じ値なので、判定と表示が一致する。
+   *   → 一般則は src/lib/unknownVsAbsent.js（「無い」と「まだ分からない」を混ぜない）。
+   */
+  if (elapsedMs < AUTO_SECTION_BOOT_SETTLE_MS && coveragePct === 0) {
     return {
       level: 'na',
       coveragePct,

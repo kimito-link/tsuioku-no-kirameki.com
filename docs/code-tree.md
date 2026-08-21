@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 6 / 831 件
+## ⚠️ 役割コメントが無いソース 6 / 832 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `src/lib/laneDomSelfMeasure.js`
@@ -735,7 +735,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (1815)
+- 📁 **src/** (1817)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1033,7 +1033,7 @@
         - `logo_funlink_white_RGB_maru_black.png`
       - `logo_guide_funlink_ol.pdf`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1567)
+  - 📁 **lib/** (1569)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -2398,6 +2398,8 @@
     - `trimMap.js` — Map のサイズを max 以下に制限し、先頭（最古挿入順）から削除する。
     - `trimMap.test.js`
     - `uiUxRoadmapTdd.test.js`
+    - `unknownVsAbsent.js` — 【層】L0 判定層(純粋関数・I/O禁止)
+    - `unknownVsAbsent.test.js`
     - `userCommentProfileCache.js` — userId 単位で表示名・個人サムネ（弱い CDN 既定アイコン以外の http URL）を蓄積し、
     - `userCommentProfileCache.test.js`
     - `userEntryAvatarResolve.js` — 1 ユーザーエントリーのアバター状態を組み立てる純関数レイヤ。

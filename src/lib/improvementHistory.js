@@ -100,5 +100,17 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
   Object.freeze({
     version: '0.1.1471', metric: 'gate-selftest', value: 2,
     source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1472', metric: 'bundle-kb', value: 1405,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '★v0.1.1471 と同値(1405KB)＝この版では増やしていない。' +
+      '内訳は v0.1.1455〜1471 で足した計器・検査17版ぶん(+45KB)のまま。' +
+      '★親スレッド停止は 106ms のままなので体感は悪化していない。' +
+      '1360 に戻すには計器を削るしかないため、ここは戻さない判断。'
+  }),
+  Object.freeze({
+    version: '0.1.1472', metric: 'gate-selftest', value: 2,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
   })
 ]);
