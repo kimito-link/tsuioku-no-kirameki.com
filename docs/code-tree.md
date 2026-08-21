@@ -725,7 +725,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (1807)
+- 📁 **src/** (1808)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1023,7 +1023,7 @@
         - `logo_funlink_white_RGB_maru_black.png`
       - `logo_guide_funlink_ol.pdf`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1559)
+  - 📁 **lib/** (1560)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -1430,6 +1430,7 @@
     - `displayRecordedCount.test.js`
     - `domHarvestScrollDefer.js` — 「ユーザーが今まさにスクロール中か」を判定して、コメントの DOM ハーベスト
     - `domHarvestScrollDefer.test.js`
+    - `domInsightCells.test.js`
     - `domTreeCensus.js` — 【層】L0 判定層(純粋関数・I/O禁止)
     - `domTreeCensus.test.js`
     - `domTreeCensusWiring.test.js`

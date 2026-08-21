@@ -135,6 +135,10 @@ export const DIAGNOSIS_REGISTRY = Object.freeze([
    */
   reg('memory-pressure', 'メモリの余裕', 'render', 1, false),
   reg('dom-nodes', '画面の部品数', 'render', 1, false),
+  // ★v0.1.1463: DOM系の3計器をセルに出す(コピー文だけ=「4 表示」の断線を塞いだ)。
+  reg('auto-section', '拡張の処理時間', 'render', 1, false),
+  reg('dom-tree', 'パネルの部品数', 'render', 1, false),
+  reg('panel-cover', 'パネルの覆い', 'render', 1, false),
   reg('northstar-render', '公式値の描画', 'northstar', 1, false),
   reg('mirror-publish', '鏡の書き出し', 'render', 1, false),
   /*
