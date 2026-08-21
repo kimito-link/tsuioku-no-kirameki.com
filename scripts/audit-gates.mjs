@@ -61,8 +61,16 @@ for (const name of readdirSync(SCRIPTS)) {
     selftest: /--selftest|SELFTEST/.test(code),
     // ★exit 2 か EXIT.INCONCLUSIVE を出せるか
     threeState: /exit\(\s*2\s*\)|EXIT\.INCONCLUSIVE|computeExitCode/.test(code),
-    // ★直し方を出しているか(赤で終わるだけにしない)
-    howToFix: /直し方|howToFix|してください/.test(raw)
+    /*
+     * ★直し方を出しているか。**実コードだけ**を見る(raw ではない)。
+     *   ★以前は raw(コメント込み)を見ていたため、コメントに「直し方」と
+     *     書いてあるだけで ✔ がついた＝**名前だけ書いて黙らせられる**状態だった。
+     *     2026-08-21 に偽のプローブで再現(コメント3行だけで ✔ を取れた)。
+     *   ★指摘元: soushin-suggest.link/scripts/audit-sentinel-holes.ps1:156
+     *     「Detect the SHAPE, not one function name … 実際に守る代わりに
+     *      名前だけ変えて黙らせることを誘う。それは無用どころか有害」
+     */
+    howToFix: /直し方|howToFix|してください/.test(code)
   });
 }
 rows.sort((a, b) => a.name.localeCompare(b.name));
@@ -99,4 +107,7 @@ console.log('  直し方: scripts/lib/instrument-core.mjs の computeExitCode / 
 console.log('          見本は scripts/check-layer.mjs。1リリース1本ずつでよい。');
 console.log('  ★この検査が判定しないこと: 検査の中身が正しいかは見ません。');
 console.log('          「自分が壊れたら気づける形か」だけを見ます。');
+console.log('  ★★「3値exit ✔」は【持っている】だけで、正しく使えている保証ではありません。');
+console.log('     soushin-suggest.link の実測: 壊れていた3本のうち2本は exit 2 を持っていたのに');
+console.log('     「測れなかった」を製品の赤として報告していました(2026-08-21)。');
 process.exit(0);
