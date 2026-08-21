@@ -170,7 +170,7 @@
     - `2026-07-23.md`
     - `2026-07-31.md`
     - `2026-08-21.md`
-- 📁 **docs/** (304)
+- 📁 **docs/** (305)
   - 📁 **article-assets/** (87)
     - 📁 **venue-frames/** (12)
       - `f01.png`
@@ -266,10 +266,11 @@
   - 📁 **article-drafts/** (2)
     - `hasanmap-osint-20260611-copy.txt`
     - `hasanmap-osint-20260611.md`
-  - 📁 **feature-map/** (13)
+  - 📁 **feature-map/** (14)
     - `backfill-sw.md`
     - `comeview.md`
     - `content.md`
+    - `dom-attr-bus.md`
     - `impact-map.json`
     - `impact-map.md`
     - `index.md`
@@ -725,7 +726,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (1808)
+- 📁 **src/** (1809)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1023,7 +1024,7 @@
         - `logo_funlink_white_RGB_maru_black.png`
       - `logo_guide_funlink_ol.pdf`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1560)
+  - 📁 **lib/** (1561)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -1428,6 +1429,7 @@
     - `diagnosticsTrustBootGrace.test.js`
     - `displayRecordedCount.js` — 「画面に出す記録件数」の正本を1つに固定する純関数(v0.1.839・第1)。
     - `displayRecordedCount.test.js`
+    - `domAttrBus.test.js`
     - `domHarvestScrollDefer.js` — 「ユーザーが今まさにスクロール中か」を判定して、コメントの DOM ハーベスト
     - `domHarvestScrollDefer.test.js`
     - `domInsightCells.test.js`

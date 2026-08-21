@@ -79,6 +79,59 @@ const EXCLUDE = [/\.test\.js$/, /node_modules/];
  * 偽陽性が将来解消されたら(producer/consumer が両方付いたら)この一覧から消えても check は通る(緩む方向は安全)。
  * 新しいキーを足して意図的に producer/consumer 片方だけなら、ここに1行足してから再生成する。
  */
+/**
+ * ★DOM属性の「書き手↔読み手」断線ベースライン(2026-08-21 時点の全件)。
+ *
+ * ■ なぜ要るか(ユーザー方針:「まず丸ごと理解。改善はそのあと」)
+ *   既存の地図(code-tree/feature-map)は **ファイル単位**で 99.3% 網羅している。
+ *   それでも 2026-08-21 に見つかった不具合5件は **1件も検出できなかった**。
+ *   ★共通点: どれも「値の書き手と読み手の対」の破れ＝**ファイルを読んでも見えない**。
+ *   ★storage キーには既に同じ検出器(writeStorageBusMap)があり実際に効いている。
+ *     storage-bus.md 自身が「将来は verify:map で機械判定する」と次の一手を書いていた。
+ *   → **同じ形を DOM属性へ広げる**(新規発明はしない・正本を散らさない)。
+ *
+ * ■ ★静的解析だけで成立する根拠(実測・推測ではない)
+ *   setAttribute('data-nls-…') のリテラル 31種 / ★動的生成(テンプレート・連結) 0件。
+ *   ＝ このリポの DOM 属性名は全部リテラル。ランタイム計測は不要(過剰設計になる)。
+ *   ★ただし定数経由の読みが実在する(content-entry.js:310 の NLS_AUTH_TOKEN_ATTR)ので
+ *     **定数も解決する**。生文字列 grep だけだと誤って「読み手なし」と判定する
+ *     (2026-08-21 に同型で iframe.nl-ifr-loading を死んだCSSと誤判定した)。
+ *
+ * ■ 掟(storage 側と同じ)
+ *   --check は **この一覧に無い新規の断線が出たときだけ失敗**する。
+ *   ＝ 既存の借金は一度に返さなくてよい / ★新しくサボると赤くなる。
+ *   意図的に片側だけにするなら、ここに1行足してから再生成する。
+ */
+const DOM_ATTR_DISCONNECT_BASELINE = new Set([
+  /* ── 🟠 書き手だけ: 読み手が【CSS(.html)】に居る ─────────────────
+   * この解析は .js しか読まないので、CSS セレクタで使う属性は必ずここに出る。
+   * ★偽陽性であって借金ではない(実コードで1件ずつ確認済み)。
+   */
+  'data-nl-popup-content-painted', 'data-nl-state', 'data-nl-support-wired',
+  'data-nl-toolbar-only', 'data-nl-usage-terms-ack', 'data-nls-heat',
+  'data-nls-hidden-injected', 'data-nls-warmup-state',
+  // HTML 文字列側で組み立て、CSS が読む。
+  'data-nl-score-final',
+
+  /* ── 🟠 書き手だけ: 本当に読み手が居ない(★書きっぱなし＝消す候補) ──
+   * ★これは偽陽性ではなく**実際の借金**。第2版以降で消す。
+   * 消すときはこの行も一緒に消す(件数が減る方向は check を通る)。
+   */
+  'data-nls-ndgr-dedupe',            // 人間可読サマリ版。読むのは -dedupe-snapshot だけ
+  'data-nls-ndgr-view-uri-count',    // getAttribute する箇所が repo 全体に無い
+  'data-nls-intercept-visitor-probe', // sessionStorage フラグ ON 時だけの調査用
+  'data-nls-backfill',               // popup は storage 経由で読む(属性は読まれない)
+  'data-nls-backfill-diag',          // DevTools 目視専用
+  'data-nls-page-intercept-href',    // 値が変わらないのに毎回書き直している(第2版で対処)
+  'data-nls-page-intercept-referrer',// 同上
+
+  /* ── 🔵 読み手だけ: 書き手が【静的HTML】に居る ────────────────
+   * extension/popup.html に data-nl-trio-slot='rink' 等が直書きされている(6箇所)。
+   * ★.html を読まない解析の構造的な偽陽性。
+   */
+  'data-nl-trio-slot'
+]);
+
 const STORAGE_DISCONNECT_BASELINE = new Set([
   'KEY_ANONYMOUS_IDENTICON_ENABLED', 'KEY_AUTOPATROL_ENABLED', 'KEY_AUTOPATROL_STATE',
   'KEY_BACKFILL_AUTO_DISABLED', 'KEY_BACKFILL_BG_KICK_ENABLED', 'KEY_BACKFILL_SW_MODE',
@@ -294,6 +347,89 @@ function sliceBalancedArgs(text, openIdx) {
  * @param {string} text ファイル内容
  * @returns {{ producers: Set<string>, consumers: Set<string> }}
  */
+/**
+ * 1ファイルから DOM属性の書き手/読み手を抽出する。
+ *
+ * ★storage 側(extractStorageAccess)と同じ形。producers=書く / consumers=読む。
+ * ★定数経由(getAttribute(NLS_AUTH_TOKEN_ATTR))も解決する。
+ *
+ * @param {string} text
+ * @param {Map<string, string>} globalConstAttr ★全ファイル横断の定数辞書(export された定数を跨いで解決)
+ * @returns {{ producers: Set<string>, consumers: Set<string> }}
+ */
+function extractDomAttrAccess(text, globalConstAttr) {
+  const producers = new Set();
+  const consumers = new Set();
+
+  /*
+   * ★同じファイル内の `const NAME = 'data-…'` を先に集めて辞書にする。
+   *   これが無いと定数経由の読みを取りこぼし、**実際には読まれている属性を
+   *   「読み手なし」と誤判定**する(2026-08-21 に同型の誤判定をした)。
+   */
+  /** @type {Map<string, string>} */
+  const constAttr = new Map(globalConstAttr || []);
+  for (const m of text.matchAll(/\b(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*['"](data-[a-z0-9-]+)['"]/g)) {
+    constAttr.set(m[1], m[2]);
+  }
+
+  /**
+   * リテラルならそのまま、識別子なら定数辞書で解決して target へ入れる。
+   * @param {RegExp} re
+   * @param {Set<string>} target
+   */
+  const harvest = (re, target) => {
+    for (const m of text.matchAll(re)) {
+      const lit = m[1];
+      const ident = m[2];
+      const attr = lit || (ident ? constAttr.get(ident) : '');
+      if (attr && attr.startsWith('data-')) target.add(attr);
+    }
+  };
+
+  /*
+   * ★書き手は setAttribute のみ。removeAttribute は「消す」だけなので数えない
+   *   (消し手を書き手に数えると、書き手不在の断線を隠してしまう)。
+   */
+  harvest(/\.setAttribute(?:\?\.)?\(\s*(?:['"](data-[a-z0-9-]+)['"]|([A-Za-z_$][\w$]*))/g, producers);
+  // 読み手: getAttribute / hasAttribute
+  harvest(/\.(?:getAttribute|hasAttribute)(?:\?\.)?\(\s*(?:['"](data-[a-z0-9-]+)['"]|([A-Za-z_$][\w$]*))/g, consumers);
+  /*
+   * 読み手: 属性セレクタ [data-…]。querySelector / CSS 文字列の両方を拾う。
+   * ★これを入れないと「CSSでだけ使う属性」を読み手なしと誤判定する。
+   */
+  harvest(/\[\s*(data-[a-z0-9-]+)\s*[\]=~^$*|]/g, consumers);
+
+
+  /*
+   * ★dataset 表記も拾う。`el.dataset.nlRecording = v` は
+   *   `data-nl-recording` を書いているのと同じ(camelCase ⇄ kebab-case)。
+   *   ★これを拾わないと「書き手が居ない」と誤判定する
+   *   (実際 data-nl-recording は popup-entry.js:15065 が dataset で書いている)。
+   */
+  const camelToKebab = (name) => 'data-' + name.replace(/[A-Z]/g, (c) => '-' + c.toLowerCase());
+  for (const m of text.matchAll(/\.dataset\.([A-Za-z][\w$]*)\s*=/g)) {
+    const attr = camelToKebab(m[1]);
+    if (attr.startsWith('data-')) producers.add(attr);
+  }
+  for (const m of text.matchAll(/\.dataset\.([A-Za-z][\w$]*)\s*(?![=\w])/g)) {
+    const attr = camelToKebab(m[1]);
+    if (attr.startsWith('data-')) consumers.add(attr);
+  }
+
+
+  /*
+   * ★HTML文字列の中の属性も「書き手」。
+   *   `\` data-nl-uid="${uid}"\`` のようにテンプレートで組み立てる書き方が実在する
+   *   (supportTimelineHtml.js:106)。setAttribute だけを見ると
+   *   ★実際には書かれている属性を「書き手なし」と誤判定する。
+   */
+  for (const m of text.matchAll(/\sdata-(nl|nls|nlsb)-([a-z0-9-]+)\s*=\s*["'`]/g)) {
+    producers.add('data-' + m[1] + '-' + m[2]);
+  }
+
+  return { producers, consumers };
+}
+
 function extractStorageAccess(text) {
   const producers = new Set();
   const consumers = new Set();
@@ -399,6 +535,37 @@ async function main() {
     for (const k of acc.consumers) ensureKey(k).consumers.add(file);
   }
 
+  /*
+   * ★DOM属性の書き手/読み手も同じ形で集める(2026-08-21)。
+   *   ファイル単位の地図では見えない「値の対の破れ」を機械的に出す。
+   */
+  /** @type {Map<string, { producers: Set<string>, consumers: Set<string> }>} */
+  const attrMap = new Map();
+  const ensureAttr = (k) => {
+    if (!attrMap.has(k)) attrMap.set(k, { producers: new Set(), consumers: new Set() });
+    return attrMap.get(k);
+  };
+  /*
+   * ★先に【全ファイル】の `const X = 'data-…'` を集める。
+   *   定数は export されて別ファイルで使われる(例: INLINE_HOST_HIDDEN_ATTR は
+   *   inlineHostVisibilityIntent.js:103 で定義し content-entry.js:2883 が書く)。
+   *   ★ファイル内だけ見ると【実際には書かれている属性】を「書き手なし」と誤判定する。
+   */
+  /** @type {Map<string, string>} */
+  const globalConstAttr = new Map();
+  for (const file of sourceFiles) {
+    const t = readFileSync(join(ROOT, file), 'utf8');
+    for (const m of t.matchAll(/\b(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*['"](data-[a-z0-9-]+)['"]/g)) {
+      globalConstAttr.set(m[1], m[2]);
+    }
+  }
+  for (const file of sourceFiles) {
+    const acc = extractDomAttrAccess(readFileSync(join(ROOT, file), 'utf8'), globalConstAttr);
+    for (const k of acc.producers) ensureAttr(k).producers.add(file);
+    for (const k of acc.consumers) ensureAttr(k).consumers.add(file);
+  }
+
+  writeDomAttrBusMap(attrMap);
   writeStorageBusMap(keyMap);
   writeFeatureMaps(reach, access, f2f);
   writeImpactMap(f2f);
@@ -476,6 +643,98 @@ function writeImpactMap(f2f) {
     }))
   };
   emit('impact-map.json', JSON.stringify(json, null, 2) + '\n');
+}
+
+/**
+ * DOM属性のデータバス図 + 断線検出を docs/feature-map/dom-attr-bus.md に出す。
+ *
+ * ★storage-bus と同じ形・同じ掟(ベースラインに無い新規の断線だけ --check を落とす)。
+ *
+ * @param {Map<string, { producers: Set<string>, consumers: Set<string> }>} attrMap
+ */
+/**
+ * ★自分が所有する属性か(nl / nls / nlsb 接頭辞)。
+ *
+ * ★これで絞らないと **ニコ生本体の属性**(data-props / data-testid / data-user-id 等)が
+ *   「読む人だけ」として大量に並ぶ。他人のDOMを読むだけなのは**正常**であって断線ではない。
+ *   実測: 絞らないと 63件(うち38件が外部) → 絞ると 25件。
+ * ★ノイズの多い検出器は読まれなくなって死ぬ。所有権で絞るのが正しい線引き。
+ *
+ * @param {string} attr
+ * @returns {boolean}
+ */
+function isOwnDomAttr(attr) {
+  return /^data-(nl|nls|nlsb)-/.test(attr);
+}
+
+function writeDomAttrBusMap(attrMap) {
+  const lines = [];
+  lines.push('# DOM属性 データバス図（自動生成）');
+  lines.push('');
+  lines.push('> `npm run feature-map` で再生成。手で編集しない。');
+  lines.push('> `<html>` 等に書く `data-*` 属性ごとに「誰が書き(producer)・誰が読むか(consumer)」を示す。');
+  lines.push('');
+  lines.push('> ★なぜこの図が要るか: 既存の地図は**ファイル単位**で 99.3% 網羅しているのに、');
+  lines.push('> 2026-08-21 の不具合5件を**1件も検出できなかった**。どれも「書き手↔読み手の対」の');
+  lines.push('> 破れで、**1ファイルを読んでも見えない**種類だったため。storage キーには既に');
+  lines.push('> 同じ検出器があり実際に効いていたので、**同じ形を DOM属性へ広げた**。');
+  lines.push('');
+
+  /** @type {string[]} */
+  const producerOnly = [];
+  /** @type {string[]} */
+  const consumerOnly = [];
+  for (const [k, v] of [...attrMap.entries()].sort()) {
+    if (!isOwnDomAttr(k)) continue; // ★他人(ニコ生)の属性は対象外
+    const hasP = v.producers.size > 0;
+    const hasC = v.consumers.size > 0;
+    if (hasP && !hasC) producerOnly.push(k);
+    if (!hasP && hasC) consumerOnly.push(k);
+  }
+
+  /*
+   * ★--check: ベースラインに無い【新規の断線】だけを失敗にする。
+   *   既存の借金は一度に返さなくてよく、★新しくサボると赤くなる。
+   *   このリポで生き残った仕掛けは全てこの形(未記入数の固定・バンドル予算)。
+   */
+  for (const k of [...producerOnly, ...consumerOnly]) {
+    if (!DOM_ATTR_DISCONNECT_BASELINE.has(k)) {
+      checkProblems.push(`新規の DOM属性 断線: "${k}"(書き手/読み手の片方しか無い)。経路を繋ぐか、意図的なら DOM_ATTR_DISCONNECT_BASELINE に追記`);
+    }
+  }
+
+  lines.push('## ⚠️ 断線（書く人だけ / 読む人だけ）');
+  lines.push('');
+  lines.push('> 🟠 = 書いているが誰も読まない（書きっぱなし＝消す候補）');
+  lines.push('> 🔵 = 読んでいるが誰も書かない（★常に空を読む＝バグの可能性が高い）');
+  lines.push('');
+  if (producerOnly.length === 0 && consumerOnly.length === 0) {
+    lines.push('- (なし)');
+  } else {
+    for (const k of producerOnly) {
+      const mark = DOM_ATTR_DISCONNECT_BASELINE.has(k) ? '' : ' ★新規';
+      lines.push(`- 🟠 **${k}**${mark} — 書く人だけ: ${[...attrMap.get(k).producers].map(shortFile).join(', ')}`);
+    }
+    for (const k of consumerOnly) {
+      const mark = DOM_ATTR_DISCONNECT_BASELINE.has(k) ? '' : ' ★新規';
+      lines.push(`- 🔵 **${k}**${mark} — 読む人だけ: ${[...attrMap.get(k).consumers].map(shortFile).join(', ')}`);
+    }
+  }
+  lines.push('');
+
+  lines.push('## 全属性');
+  lines.push('');
+  lines.push('| 属性 | 書く人(producer) | 読む人(consumer) |');
+  lines.push('|---|---|---|');
+  for (const [k, v] of [...attrMap.entries()].sort()) {
+    if (!isOwnDomAttr(k)) continue;
+    const ps = v.producers.size ? [...v.producers].map(shortFile).join('<br>') : '—';
+    const cs = v.consumers.size ? [...v.consumers].map(shortFile).join('<br>') : '—';
+    lines.push(`| \`${k}\` | ${ps} | ${cs} |`);
+  }
+  lines.push('');
+
+  emit('dom-attr-bus.md', lines.join('\n'));
 }
 
 /**
