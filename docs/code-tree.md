@@ -161,14 +161,15 @@
   - `index.html`
   - `live-view.html`
   - `live-view.js` — global NL_BUILD_ID
-- 📁 **council-scout/** (6)
-  - 📁 **briefs/** (6)
+- 📁 **council-scout/** (7)
+  - 📁 **briefs/** (7)
     - `2026-07-16.md`
     - `2026-07-17.md`
     - `2026-07-20.md`
     - `2026-07-22.md`
     - `2026-07-23.md`
     - `2026-07-31.md`
+    - `2026-08-21.md`
 - 📁 **docs/** (303)
   - 📁 **article-assets/** (87)
     - 📁 **venue-frames/** (12)
@@ -723,7 +724,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (1798)
+- 📁 **src/** (1799)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1021,7 +1022,7 @@
         - `logo_funlink_white_RGB_maru_black.png`
       - `logo_guide_funlink_ol.pdf`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1550)
+  - 📁 **lib/** (1551)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -1139,6 +1140,7 @@
     - `blackScreenOwnerCells.test.js`
     - `blobDownload.js` — Blob を指定ファイル名で保存する。
     - `blobDownload.test.js`
+    - `blockerSectionNamed.test.js`
     - `broadcastContext.js` — v0.1.793: 「この配信の配信者(broadcaster)情報」を 1 か所で型定義し、storage キー・
     - `broadcastContext.test.js`
     - `broadcastCrossCompare.js` — 0.1.24 (Y): 横断比較系の純粋関数群。
