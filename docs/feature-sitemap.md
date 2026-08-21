@@ -788,7 +788,7 @@
   - `src/lib/statusTrendKey.js`
   - `src/extension/status-entry.js`
   - `src/lib/statusActionAdvisor.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 186</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 187</summary>
 
 - `app/app.js` — スマホ閲覧用 status Web 版。
 - `app/live-view.js` — global NL_BUILD_ID
@@ -853,6 +853,7 @@
 - `src/lib/devMonitorDebugSubset.js` — ポップアップ「開発・テスト用 監視」用: watch スナップショット _debug から
 - `src/lib/devMonitorVizHtml.js` — dev monitor セカンダリ可視化（renderDevMonitorSecondaryViz の <div class="nl-dev-monitor-viz">）の
 - `src/lib/devReloadSignal.js` — 開発用ホットリロードのシグナル判定（純関数）。
+- `src/lib/domTreeCensus.js` — 【層】L0 判定層(純粋関数・I/O禁止)
 - `src/lib/embeddedDataExtract.js` — ニコ生 watch ページの `#embedded-data[data-props]` から初期メタ情報を抽出する純関数。
 - `src/lib/eventParticipationProgramsApi.js` — ニコ生「企画イベント参加番組一覧」公式 JSON API の URL 組立 & 正規化（純関数）。
 - `src/lib/executeScriptWithTimeout.js` — v0.1.441: `chrome.scripting.executeScript` を timeout 付きで実行する純関数ラッパ。
@@ -988,11 +989,11 @@
 - `v0.1.1448` 2026-08-19 — タブ一覧の間引きが効かない条件を塞ぎました
 - `v0.1.1447` 2026-08-19 — コピーが途中で取れなくなるのを直しました
 
-### 🪟 応援レーン・タイル (2版)
+### 🪟 応援レーン・タイル (1版)
 - `v0.1.1456` 2026-08-20 — パネル側の部品数を測れるようにしました
-- `v0.1.1441` 2026-08-19 — 出ないアイコンがある問題を直しました
 
-### 🩺 診断・状態速報 (11版)
+### 🩺 診断・状態速報 (12版)
+- `v0.1.1461` 2026-08-21 — 画面の構造(DOMの木)を数字で見られるようにしました
 - `v0.1.1460` 2026-08-21 — 配信ページに書く診断データが無限に増えるのを止めました
 - `v0.1.1456` 2026-08-20 — パネル側の部品数を測れるようにしました
 - `v0.1.1454` 2026-08-19 — メモリと画面の部品数を計器に入れました

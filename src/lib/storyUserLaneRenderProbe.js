@@ -346,6 +346,8 @@ export function buildStoryUserLaneRenderDiag(probeSnap, ctx) {
     popupDomCensus: s.popupDomCensus && typeof s.popupDomCensus === 'object' ? s.popupDomCensus : null,
     // ★v0.1.1458: パネルを覆っている当人(黒画面の名指し)。
     panelCover: s.panelCover && typeof s.panelCover === 'object' ? s.panelCover : null,
+    // ★v0.1.1461: DOMの木の形(総数・深さ・一番太い親)。
+    domTreeCensus: s.domTreeCensus && typeof s.domTreeCensus === 'object' ? s.domTreeCensus : null,
     verdict,
     reason
   };
@@ -436,6 +438,13 @@ export function formatStoryUserLaneRenderDiagLines(diag, ctx) {
    */
   if (d.panelCover && typeof d.panelCover === 'object' && d.panelCover.line) {
     lines.push(`  → ${d.panelCover.line}`);
+  }
+  /*
+   * ★v0.1.1461: DOMの木の形。可視化拡張の「絵」で人が読み取るものを数字にした。
+   *   ★一番太い親を名指しするので「どこを削るか」が速報1枚で決まる。
+   */
+  if (d.domTreeCensus && typeof d.domTreeCensus === 'object' && d.domTreeCensus.line) {
+    lines.push(`  → ${d.domTreeCensus.line}`);
   }
   // v0.1.1033: heavy 完了が settled に到達したか。race 多発=たぬ姉レーンが暫定(直近N件)で固着の真因。
   // ★v0.1.1241: 「一度でも settled したか」で言い分けを変える。race は自己修復の途中経過でもあり

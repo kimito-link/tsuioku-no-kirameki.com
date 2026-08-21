@@ -634,6 +634,8 @@ import { userLaneHttpForTilePick } from '../lib/storyUserLaneDisplaySrc.js';
 import { summarizePopupDomCensus } from '../lib/popupDomCensus.js';
 // ★v0.1.1458: パネルを覆っている当人を名指しする(iframe の【中】で測る)。
 import { judgePanelCover } from '../lib/panelCoverCulprit.js';
+// ★v0.1.1461: DOMの木を数字にして計器へ(可視化拡張の代わり・自前で採る)。
+import { summarizeDomTree } from '../lib/domTreeCensus.js';
 /*
  * ★v0.1.1459: メインスレッドを止めた【当人】を名指しするために重い処理を囲む。
  *   ★これまで呼び出しが0箇所で、速報は必ず「(拡張の外)」と出ていた=計器が嘘をついていた。
@@ -19364,6 +19366,41 @@ async function collectAiShareDevMonitorPayloadBundle(watchUrl) {
                 }
                 snap.panelCover = judgePanelCover(layers);
               }
+            } catch { /* 計器の失敗で診断全体を壊さない */ }
+            /*
+             * ★v0.1.1461: DOMの【木の形】を数字にする(ユーザー指示:
+             *   「DOMを全部把握して、それを計器に入れる基本から見直すべき」)。
+             *   ★市販の可視化拡張は chrome-extension:// のページを見られないので
+             *     この文書(サイドパネルの中身)には届かない=自前で採る。
+             *   ★走査は1回・木の1階層ずつ(親を辿らない)＝計器自身を重くしない。
+             */
+            try {
+              const all = document.getElementsByTagName('*');
+              /** @type {{ tag:string, depth:number, childCount:number, id:string }[]} */
+              const nodes = [];
+              // ★上限を置く(巨大なページで計器が主犯にならないように)。
+              const cap = Math.min(all.length, 4000);
+              /** @type {WeakMap<Element, number>} 親の深さを覚えて再利用する。 */
+              const _depthOf = new WeakMap();
+              for (let i = 0; i < cap; i += 1) {
+                const el = all[i];
+                /*
+                 * ★深さは【親の深さ+1】で求める(親を毎回辿らない)。
+                 *   getElementsByTagName は文書順なので、親は必ず先に処理済み。
+                 *   ★辿る版は 2,844要素で約34,000回の参照になる=計器が重くなる。
+                 *   [[instrument-can-kill-the-page-it-measures-2026-08-16]]
+                 */
+                const parent = el.parentElement;
+                const depth = parent && _depthOf.has(parent) ? _depthOf.get(parent) + 1 : 0;
+                _depthOf.set(el, depth);
+                nodes.push({
+                  tag: el.tagName.toLowerCase(),
+                  depth,
+                  childCount: el.childElementCount,
+                  id: el.id || ''
+                });
+              }
+              snap.domTreeCensus = summarizeDomTree(nodes);
             } catch { /* 計器の失敗で診断全体を壊さない */ }
           } // v0.1.1040/v0.1.1428 計器: 段別churn実測 + 中身LODが効いているか
           // heavyRace根治(B)計器: fresh-read で heavy 全件再読みを省いた累計(実配信で効きと12秒ギャップの適正を判定)。
