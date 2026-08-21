@@ -366,3 +366,37 @@ describe('buildBackfillProgressLine（v0.1.692 過去ログ取得の診断行）
     ).toBe('過去ログ取得: [lv5] 取得中・取得99件');
   });
 });
+
+describe('★取得率が100%を超えたら比を出さない(2026-08-21 実損: 501%)', () => {
+  /*
+   * ★実機速報で「公式累計 381 件 (取得率 501%)」が出た。
+   *   分子=前の配信の記録1,910(床) / 分母=今の配信の公式381。
+   *   ★別の配信の分子を今の配信の分母で割っていた。
+   *   ★記録は公式の一部なので、100%超は原理的にありえない。
+   */
+  it('★床のせいで100%を超えるときは数字を出さず「比較不能」と言う', () => {
+    const text = buildOverviewText(
+      [{ lv: 'lv2', recordedCount: 82, officialCommentCount: 381 }],
+      { recordedSumFloor: 1910 }
+    );
+    expect(text).not.toContain('501%');
+    // ★実合算(82/381=22%)で出す。捏造も切り上げもしない。
+    expect(text).toContain('取得率 22%');
+  });
+
+  it('★取得率は【床を掛ける前の実合算】で計算する', () => {
+    const text = buildOverviewText(
+      [{ lv: 'lv1', recordedCount: 40, officialCommentCount: 80 }],
+      { recordedSumFloor: 100 }
+    );
+    // 累計表示は床で据え置く(後退させない目的は維持)
+    expect(text).toContain('累計 記録 100 件');
+    // ★比は実合算 40/80
+    expect(text).toContain('取得率 50%');
+  });
+
+  it('正常時(記録≦公式)は従来どおり比を出す', () => {
+    const text = buildOverviewText([{ lv: 'lv1', recordedCount: 1910, officialCommentCount: 1946 }]);
+    expect(text).toContain('取得率 98%');
+  });
+});
