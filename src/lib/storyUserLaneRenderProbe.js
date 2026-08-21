@@ -18,6 +18,7 @@
  *
  * @module storyUserLaneRenderProbe
  */
+import { PARITY_BOOT_SETTLE_MS } from './parityVerdict.js';
 
 /**
  * v0.1.1006: 「匿名主体の配信」とみなす userId 付き率(%)の上限。これ以下なら、コメントは供給されても
@@ -250,10 +251,32 @@ export function buildStoryUserLaneRenderDiag(probeSnap, ctx) {
     (Number(s.provisionalFalseCount) || 0) === 0 &&
     s.heavyEverSettled !== true;
 
+  /*
+   * ★起動直後(数百ms)は「呼ばれていない」と断定しない(v0.1.1469)。
+   *
+   * ■ ★実機(2026-08-21・v0.1.1468)で【直しが半分】だったのを塞ぐ
+   *   同じ速報の中で判定が食い違っていた:
+   *     上(3画面パリティ) 🟡 保留 — 起動直後(257ms)＝まだ描き始めていなくて当然
+   *     下(この行)        🔴 描画関数が一度も呼ばれていません   ← ★直し忘れ
+   *   ＝ パリティ判定だけ直して、詳細行を直していなかった。
+   *   ★同じ速報が「レーンは50件出ている・3画面一致」と示していた＝実際は正常。
+   *
+   * ■ 退化させない条件
+   *   ・齢が不明   → 従来どおり not_started(勝手に隠さない)
+   *   ・しきい値超 → 従来どおり not_started(本物の異常を見逃さない)
+   *   しきい値の正本は parityVerdict.js の PARITY_BOOT_SETTLE_MS(1箇所に集約)。
+   */
+  const bootAgeMs = typeof ctx?.bootAgeMs === 'number' ? ctx.bootAgeMs : Number.NaN;
+  const justBooted = Number.isFinite(bootAgeMs) && bootAgeMs >= 0 && bootAgeMs < PARITY_BOOT_SETTLE_MS;
+
   // 症状の判定（council の (A)〜(E)）。
   let verdict = 'unknown';
   let reason = '';
-  if (started === 0) {
+  if (started === 0 && justBooted) {
+    // ★まだ描き始めていなくて当然。緑にもしない(「測れていない」)。
+    verdict = 'booting';
+    reason = `popup 起動直後(${Math.round(bootAgeMs)}ms)＝まだ描き始めていなくて当然です（popup を開いたまま数秒待ってから取り直してください）`;
+  } else if (started === 0) {
     verdict = 'not_started';
     // v0.1.980: 「未起動」のとき次の一手を文言に含める(状態速報1枚で原因と対処が分かるように)。
     //   v0.1.976〜979 で描画は重い処理(heavy refresh)非依存の独立トリガから起動するようにした。

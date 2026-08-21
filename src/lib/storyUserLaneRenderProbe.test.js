@@ -523,3 +523,61 @@ describe('notePaintDecision — (a)/(b) の切り分け', () => {
     expect(() => notePaintDecision(null, { els: fakeEls(10), nextTileCount: 1 })).not.toThrow();
   });
 });
+
+/**
+ * ★起動直後の started=0 を「描画関数が一度も呼ばれていません」と断定しない。
+ *
+ * ■ ★実機(2026-08-21・v0.1.1468)が示した「直しが半分」
+ *   同じ速報の中で判定が食い違っていた:
+ *     上(3画面パリティ) 🟡 保留 — popup 起動直後(257ms)＝まだ描き始めていなくて当然
+ *     下(応援レーン描画) 🔴 描画関数が一度も呼ばれていません     ← ★こちらは直っていない
+ *   ＝ v0.1.1468 でパリティ判定だけ直し、**詳細行の判定を直し忘れていた**。
+ *
+ * ■ ★同じ根拠(同じ速報にある)
+ *   shadeAgeMs: 259 / shadeDone: false      ← まだ幕が出ている最中
+ *   laneTickProbe.lastReason: 'doc-hidden'  ← 隠れているので走らせなかった(正しい)
+ *   応援レーン(全段): ①POP 50 / ③WEB鏡 50 ✅一致 ← ★実際は50件出ている
+ *
+ * ■ ★退化させない条件(ユーザー指示「退化なし進化で」)
+ *   ・齢が分からない → 従来どおり not_started(勝手に隠さない)
+ *   ・しきい値超過   → 従来どおり not_started(本物の異常は見逃さない)
+ */
+describe('★起動直後の started=0 を「呼ばれていない」と断定しない', () => {
+  const snapNotStarted = { started: 0, activePath: '', domTilesPainted: -1, mirrorCells: -1 };
+
+  it('★★起動直後(259ms)は not_started と断定しない', () => {
+    const d = buildStoryUserLaneRenderDiag(snapNotStarted, { bootAgeMs: 259 });
+    expect(d.verdict, '起動直後を「呼ばれていない」と断定している').not.toBe('not_started');
+    expect(d.verdict).toBe('booting');
+  });
+
+  it('★理由が「起動直後」と分かる(読んだ人が対処を探さない)', () => {
+    const d = buildStoryUserLaneRenderDiag(snapNotStarted, { bootAgeMs: 259 });
+    expect(d.reason).toMatch(/起動直後|起動して/);
+    // ★誤った対処(リロードしろ)を出さない
+    expect(d.reason).not.toContain('リロード');
+  });
+
+  it('★★十分に経っていれば従来どおり not_started(見逃さない)', () => {
+    const d = buildStoryUserLaneRenderDiag(snapNotStarted, { bootAgeMs: 30_000 });
+    expect(d.verdict).toBe('not_started');
+    expect(d.reason).toContain('リロード');
+  });
+
+  it('★齢が不明なら従来どおり(挙動を勝手に変えない)', () => {
+    for (const bad of [undefined, null, 'x']) {
+      const d = buildStoryUserLaneRenderDiag(snapNotStarted, { bootAgeMs: bad });
+      expect(d.verdict, `bootAgeMs=${bad}`).toBe('not_started');
+    }
+    // ctx ごと無い場合も従来どおり
+    expect(buildStoryUserLaneRenderDiag(snapNotStarted).verdict).toBe('not_started');
+  });
+
+  it('★★起動直後でも started>0 なら通常判定に進む(門番が判定を乗っ取らない)', () => {
+    const d = buildStoryUserLaneRenderDiag(
+      { started: 3, activePath: 'heavy', domTilesPainted: 5, mirrorCells: 5, entriesLen: 5 },
+      { bootAgeMs: 100 }
+    );
+    expect(d.verdict).not.toBe('booting');
+  });
+});
