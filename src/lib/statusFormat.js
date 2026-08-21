@@ -43,13 +43,37 @@ export function buildOverviewText(livesData, opts = {}) {
   }
   // 累計の後退だけを床で止める(per-live は既に単調化済みなので、ここは enumerate 揺れ対策)。
   const floor = Number(opts && opts.recordedSumFloor);
-  if (Number.isFinite(floor) && floor > recordedSum) {
-    recordedSum = floor;
-  }
-  const ratePct = officialSum > 0 ? Math.round((recordedSum / officialSum) * 100) : null;
+  const flooredSum = Number.isFinite(floor) && floor > recordedSum ? floor : recordedSum;
+  /*
+   * ★v0.1.1473: 取得率は【床を掛ける前の実合算】で出す。
+   *
+   *   ★実損(2026-08-21 実機速報): 配信が切り替わった直後に
+   *     「公式累計 381 件 (取得率 ★501%)」が出た。
+   *     内訳は 分子=前の配信の記録1,910(床) / 分母=今の配信の公式381。
+   *     ＝ ★**別の配信の分子を、今の配信の分母で割っていた**。
+   *
+   *   ★床(v0.1.804)は「enumerate の一瞬の揺れで累計が後退して見える」のを
+   *     **表示だけ**据え置くための仕掛けで、これ自体は正しい。
+   *     だが床は recordedSum にしか掛からず officialSum には掛からないため、
+   *     ★「揺れ」ではなく「配信が変わって減った」ときに比が壊れる。
+   *
+   *   ★「一瞬の揺れで減った(=まだ分からない)」と「配信が変わって減った(=無い)」を
+   *     表示層では見分けられない([[unknown-vs-absent]] と同じ型)。
+   *     見分けられないなら**比を出さない**のが正しい:
+   *     ★100%を超える取得率は原理的にありえない(記録は公式の一部)ので、
+   *       超えたときは数字を捏造せず【比較不能】と言う。
+   *   ★累計の表示は従来どおり床で据え置く(後退させない目的は達成したまま)。
+   */
+  recordedSum = flooredSum;
+  const rawRatePct = officialSum > 0 ? Math.round((sumRecordedFromLives(livesData) / officialSum) * 100) : null;
   lines.push(`記録中 ${total} 配信 / 累計 記録 ${recordedSum.toLocaleString('ja-JP')} 件`);
   if (officialSum > 0) {
-    lines.push(`公式累計 ${officialSum.toLocaleString('ja-JP')} 件 (取得率 ${ratePct}%)`);
+    lines.push(
+      rawRatePct != null && rawRatePct <= 100
+        ? `公式累計 ${officialSum.toLocaleString('ja-JP')} 件 (取得率 ${rawRatePct}%)`
+        : `公式累計 ${officialSum.toLocaleString('ja-JP')} 件 (取得率は比較不能`
+          + `＝配信が切り替わった直後などで、累計と公式が別の配信を指しています)`
+    );
   }
   return lines.join('\n');
 }

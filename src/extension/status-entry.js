@@ -534,6 +534,11 @@ let _lastRenderedSourceStaleSec = 0;
  *   表示層で吸収する。床はこのページが開いている間だけ(リロードで素直に再計算)。storage には書かない。
  */
 let _recordedSumFloor = 0;
+/**
+ * ★v0.1.1473: 床が「どの配信の顔ぶれ」に対するものか。
+ *   これが変わったら床を捨てる(別配信の値を持ち越さない)。
+ */
+let _recordedSumFloorKey = '';
 
 /* ============================================================================
  * 起動
@@ -1745,6 +1750,26 @@ function renderAll({ extrasAgeMs, lvList, summaries, fastDiag, popupDiag, backfi
   // v0.1.847: 概要算出が throw しても空文字でフォールバック=後続セクションを止めない。
   let overviewText = '';
   try {
+    /*
+     * ★v0.1.1473: 配信の顔ぶれが変わったら床を捨てる。
+     *   ★実損(2026-08-21 実機): 別の配信へ移った直後に
+     *     「累計 記録 1,910 件 / 公式累計 381 件 (取得率 501%)」が出た。
+     *     1,910 は【前の配信】の記録で、381 は【今の配信】の公式。
+     *   ★床は「enumerate の一瞬の揺れ」を吸収する仕掛け(v0.1.804)であって、
+     *     「配信が変わって本当に減った」ときまで据え置くものではない。
+     *     ＝ ★「まだ分からない(揺れ)」と「無い(別配信)」を混ぜていた
+     *       ([[unknown-vs-absent]] と同じ型。今日3件目)。
+     *   ★見分ける材料は lv(配信ID)。顔ぶれが同じ間だけ床を持ち越す。
+     */
+    const liveKey = livesData
+      .map((r) => String(r?.lv || ''))
+      .filter(Boolean)
+      .sort()
+      .join(',');
+    if (liveKey !== _recordedSumFloorKey) {
+      _recordedSumFloor = 0;
+      _recordedSumFloorKey = liveKey;
+    }
     overviewText = buildOverviewText(livesData, { recordedSumFloor: _recordedSumFloor });
     const recordedSumNow = sumRecordedFromLives(livesData);
     if (recordedSumNow > _recordedSumFloor) _recordedSumFloor = recordedSumNow;

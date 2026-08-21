@@ -206,3 +206,25 @@ describe('★「無い」と「まだ分からない」— 台帳(v0.1.1472 で�
     }
   });
 });
+
+/**
+ * ★v0.1.1473: 同じ型の【3件目】。
+ *   配信が切り替わったのに「累計の床」を持ち越し、
+ *   別配信の分子(1,910)を今の配信の分母(381)で割って ★取得率501% を出した。
+ *   ★「一瞬の揺れで減った(まだ分からない)」と「配信が変わって減った(無い)」を混ぜた形。
+ */
+describe('★累計の床は配信の顔ぶれが変わったら捨てる(2026-08-21 実損: 501%)', () => {
+  it('★床のリセットが status-entry に配線されている', () => {
+    const src = read('src/extension/status-entry.js');
+    // ★床は「どの配信に対する床か」を覚えていなければ、別配信へ持ち越してしまう
+    expect(src).toContain('_recordedSumFloorKey');
+    expect(src).toMatch(/_recordedSumFloorKey\s*\)?\s*\{[\s\S]{0,120}_recordedSumFloor\s*=\s*0/);
+  });
+
+  it('★表示側にも二重の守り(100%超は比を出さない)', () => {
+    const src = read('src/lib/statusFormat.js');
+    // ★比は床を掛ける前の実合算で出す
+    expect(src).toContain('sumRecordedFromLives(livesData) / officialSum');
+    expect(src).toContain('比較不能');
+  });
+});
