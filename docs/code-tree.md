@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 6 / 823 件
+## ⚠️ 役割コメントが無いソース 6 / 824 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `src/lib/laneDomSelfMeasure.js`
@@ -170,7 +170,7 @@
     - `2026-07-23.md`
     - `2026-07-31.md`
     - `2026-08-21.md`
-- 📁 **docs/** (305)
+- 📁 **docs/** (306)
   - 📁 **article-assets/** (87)
     - 📁 **venue-frames/** (12)
       - `f01.png`
@@ -467,6 +467,7 @@
   - `kb-web-perf-diagnosis.md`
   - `koken-contrib-hidden-tab-stuck-fix-v0616.md`
   - `lane-architecture-redesign.md`
+  - `layer-map.html`
   - `llm-handoff-inline-panel-current-state.md`
   - `llm-handoff-questions.md`
   - `loading-scroll-research-checklist.md`
@@ -641,7 +642,7 @@
   - `status-guard.js` — 状態速報ページ(status.html)の「何があっても開く」保険。
   - `status.html`
   - `venue.html`
-- 📁 **scripts/** (58)
+- 📁 **scripts/** (59)
   - 📁 **__pycache__/** (1)
     - `stage-submission.cpython-311.pyc`
   - 📁 **xserver/** (2)
@@ -680,6 +681,7 @@
   - `inspect-nicolive-watch-stats.mjs` — ニコ生 watch ページの HTML から、来場・同接まわりの数値がどう埋め込まれているかを CLI で確認する。
   - `install-local-sounds.mjs` — マイ効果音「手動取込」を不要にするローカル自動同梱スクリプト。
   - `install-local-sounds.test.js`
+  - `layer-map-html.mjs` — ★`src/lib` の構成を【HTMLで見える】ようにする。
   - `measure-flash-frames.mjs` — 「一瞬の黒」を【画面に出たピクセル】で測る。
   - `measure-flash-frames.test.js`
   - `meeting-roles.mjs` — meeting.mjs の役割注入版。

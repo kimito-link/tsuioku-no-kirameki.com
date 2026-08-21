@@ -72,14 +72,18 @@ function codeOnly(text) {
 }
 
 /**
+ * ★判定の正本。HTML 版(layer-map-html.mjs)もこれを import して使う
+ *   ＝**二重実装しない**(ズレると「どちらが本当か」で必ず事故る)。
+ *
+ * @param {string} [dir] 走査するディレクトリ(既定 src/lib)
  * @returns {{ name: string, kinds: string[] }[]} 非純粋なファイル(名前順)
  */
-function scanImpure() {
+export function scanLibPurity(dir = LIB) {
   /** @type {{ name: string, kinds: string[] }[]} */
   const out = [];
-  for (const name of readdirSync(LIB)) {
+  for (const name of readdirSync(dir)) {
     if (!name.endsWith('.js') || name.endsWith('.test.js')) continue;
-    const p = join(LIB, name);
+    const p = join(dir, name);
     if (!statSync(p).isFile()) continue;
     const code = codeOnly(readFileSync(p, 'utf8'));
     /** @type {Set<string>} */
@@ -101,7 +105,7 @@ function scanImpure() {
  * ★純粋にしたらこの一覧から**消してよい**(減る方向は check を通る)。
  * ★新しくここに載せたいときは、**なぜ lib に置くのか**を1行添えること。
  */
-const IMPURE_BASELINE = new Set([
+export const IMPURE_BASELINE = new Set([
   // ── DOM を直接触る箱(名前で分かる) ──────────────────────────
   'avatarPartsComposer.js', 'chikuranHeaderDom.js', 'commentPostDom.js',
   'inlineBelowWideRowInsert.js', 'laneDomSelfMeasure.js', 'laneTickProbe.js',
@@ -127,7 +131,57 @@ const IMPURE_BASELINE = new Set([
   'nicoCommentPanelAssetLauncher.js', 'watchPopupLoadDiagnostics.js'
 ]);
 
-const impure = scanImpure();
+/**
+ * ★例外を「種類」でまとめ、**なぜ lib に置くのか**を書く。
+ *
+ * ★名前を41個並べても人は読めない。**種類と理由**があって初めて意味を持つ
+ *   ([[instrument-must-name-the-cause-2026-08-01]] と同じ考え)。
+ * ★HTML 版(docs/layer-map.html)はこの表で章立てする。
+ */
+export const IMPURE_REASONS = /** @type {Record<string,{group:string,why:string}>} */ ({});
+{
+  /** @param {string} group @param {string} why @param {string[]} files */
+  const g = (group, why, files) => {
+    for (const f of files) IMPURE_REASONS[f] = { group, why };
+  };
+  g('DOM を組み立てる', '5画面(popup/venue/comeview/status/web版)が同じ見た目を作るため。ここに無いと5箇所にコピーが増える。', [
+    'avatarPartsComposer.js', 'chikuranHeaderDom.js', 'commentPostDom.js',
+    'inlineBelowWideRowInsert.js', 'laneDomSelfMeasure.js', 'laneTickProbe.js',
+    'mirrorSanitize.js', 'paintTopSupportRankStyleIntoElement.js', 'panelWakeCurtainDom.js',
+    'personTileDom.js', 'reportCommentsTableSection.js', 'supportGrowthAvatarLoad.js',
+    'supporterRankingDom.js', 'venueDomCensus.js', 'videoCapture.js', 'watchCelebrationOverlay.js'
+  ]);
+  g('HTML を作る', '出力先が複数(レポート / プレビュー)なので、組み立てを1箇所に置く。', [
+    'marketingChartsHtml.js', 'mediaKitHtml.js'
+  ]);
+  g('保存する', '書き手が複数コンテキスト(content / offscreen / SW)にまたがる。正本を1つにするため。', [
+    'broadcastSessionSummaryDb.js', 'broadcastSessionSummaryFlush.js', 'commentDb.js',
+    'customSoundStore.js', 'diagnosticRingStore.js', 'globalBackfillQueue.js',
+    'reportPreviewPublish.js', 'thumbDb.js'
+  ]);
+  g('通信する', '外部APIの作法(認証・リトライ・形)を1箇所に閉じ込めるため。', [
+    'kokenGiftHistoryFetchClient.js', 'liveviewErrorReport.js', 'officialEventDomBundle.js',
+    'statusMindmapModel.js', 'voicevoxClient.js'
+  ]);
+  g('音・映像を鳴らす', 'ブラウザAPI(Audio / メディア)そのものが機能の本体なので切り離せない。', [
+    'bgmDirector.js', 'effectSoundPlayer.js', 'reportCompleteVoice.js', 'scoreCountUp.js',
+    'voiceComment.js', 'voiceInputDevices.js'
+  ]);
+  g('計測・診断', '測る対象がブラウザの状態そのもの(スレッド停止・エラー・ストレージ)。', [
+    'consoleErrorBuffer.js', 'devMonitorTrendSession.js', 'globalFetchRateLimiter.js',
+    'interceptVisitorProbeDebug.js', 'mainThreadBlockerBoot.js', 'nameplateToggleBoot.js',
+    'nicoCommentPanelAssetLauncher.js', 'watchPopupLoadDiagnostics.js'
+  ]);
+}
+
+/*
+ * ★ここから下は CLI として実行されたときだけ走る。
+ *   import されたとき(HTML版が判定を借りるとき)に prosess.exit しないようにする。
+ */
+const isCli = process.argv[1] && process.argv[1].endsWith('check-layer.mjs');
+if (!isCli) { /* import 用途: 何もしない */ } else {
+
+const impure = scanLibPurity();
 const names = impure.map((r) => r.name);
 const added = names.filter((n) => !IMPURE_BASELINE.has(n));
 const total = readdirSync(LIB).filter((f) => f.endsWith('.js') && !f.endsWith('.test.js')).length;
@@ -156,3 +210,5 @@ if (added.length) {
 }
 
 console.log(`[check-layer] OK(純粋 ${total - impure.length} / 非純粋 ${impure.length}・ベースライン内)`);
+
+} // ← CLI ブロックの終わり
