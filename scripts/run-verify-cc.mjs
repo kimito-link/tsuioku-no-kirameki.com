@@ -73,6 +73,8 @@ const steps = [
   ['feature-map', 'feature-map:check'],
   // ★v0.1.1465: src/lib が「純粋ロジックの箱」であり続けるか(src/lib/AGENTS.md)
   ['layer', 'check:layer'],
+  // ★HTML版(docs/layer-map.html)が最新か。手で編集させない
+  ['layer-map', 'layer-map:check'],
   ['verify:bump', 'verify:bump']
 ];
 

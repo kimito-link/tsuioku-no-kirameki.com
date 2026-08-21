@@ -112,3 +112,76 @@ describe('★src/lib/AGENTS.md が実態と一致している', () => {
     expect(fs.existsSync(path.join(repoRoot, 'src/lib/instrumentSpec.js'))).toBe(true);
   });
 });
+
+/**
+ * ★HTML版(docs/layer-map.html)— ユーザー要求「htmlでだしてほしいんですよ」。
+ *
+ * ■ ★なぜ md と検査だけでは足りなかったか
+ *   第1版で `src/lib/AGENTS.md` と `check-layer.mjs` を作ったが、
+ *   ★どちらも**画面に出ない**ので「みためがかわってない」と言われた。
+ *   このリポは既に code-tree.html / feature-sitemap.html / repo-tree-map.html を
+ *   持ち、共通ナビで行き来できる。★**同じ場所に並べる**のが正しい置き場所。
+ *
+ * ■ ★判定は二重実装しない
+ *   純粋/非純粋の判定は `check-layer.mjs` が正本。HTML版はそれを import する。
+ *   ズレると「どちらが本当か」で必ず事故る。
+ */
+describe('★部品の層のHTML(docs/layer-map.html)', () => {
+  const html = () => read('docs/layer-map.html');
+
+  it('★生成物が存在し、手編集を禁じている', () => {
+    expect(html()).toContain('自動生成');
+    expect(read('package.json')).toContain('"layer-map"');
+  });
+
+  it('★★判定を二重実装していない(check-layer.mjs を import している)', () => {
+    const src = read('scripts/layer-map-html.mjs');
+    expect(src, '判定を自前で書くとズレる').toContain("from './check-layer.mjs'");
+    expect(src).toContain('scanLibPurity');
+  });
+
+  it('★★数字が実測と一致する(古くならない)', () => {
+    const { impureCount, pure } = (() => {
+      const out = execFileSync('node', ['scripts/check-layer.mjs'], { cwd: repoRoot, encoding: 'utf8' });
+      const m = out.match(/純粋 (\d+) \/ 非純粋 (\d+)/);
+      return { pure: Number(m[1]), impureCount: Number(m[2]) };
+    })();
+    const doc = html();
+    expect(doc, `純粋 ${pure} が出ていない`).toContain(`純粋 ${pure}`);
+    expect(doc, `例外 ${impureCount} が出ていない`).toContain(`例外 ${impureCount}`);
+  });
+
+  it('★★例外を「種類と理由」で見せている(名前を41個並べない)', () => {
+    /*
+     * ★名前だけ並べても人は読めない。**なぜ lib にあるか**が要る
+     *   ([[instrument-must-name-the-cause-2026-08-01]])。
+     */
+    const doc = html();
+    for (const g of ['DOM を組み立てる', '保存する', '通信する', '計測・診断']) {
+      expect(doc, `種類「${g}」が無い`).toContain(g);
+    }
+    expect(doc, '理由が書かれていない').toContain('5画面');
+  });
+
+  it('★禁止APIを具体名で出している', () => {
+    const doc = html();
+    for (const api of ['chrome.*', 'fetch()', 'indexedDB', 'document.*', 'window.*']) {
+      expect(doc, `${api} が出ていない`).toContain(api);
+    }
+  });
+
+  it('★★他の地図から行き来できる(共通ナビに載っている)', () => {
+    /*
+     * ★どこからも辿れないページは、無いのと同じ
+     *   ([[screen-only-info-never-reaches-the-report-2026-08-11]] と同じ型)。
+     */
+    for (const f of ['docs/code-tree.html', 'docs/feature-sitemap.html', 'docs/repo-tree-map.html']) {
+      expect(read(f), `${f} から layer-map.html へ行けない`).toContain('layer-map.html');
+    }
+    expect(html(), '他の地図へ戻れない').toContain('code-tree.html');
+  });
+
+  it('★★verify:cc で鮮度を検査している(手編集・古さを止める)', () => {
+    expect(read('scripts/run-verify-cc.mjs')).toContain('layer-map:check');
+  });
+});

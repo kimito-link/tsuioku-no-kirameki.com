@@ -483,6 +483,8 @@ function navHeaderHtml(active) {
     ['feature-sitemap', '🧠 機能マップ', 'feature-sitemap.html'],
     ['code-tree', '🌳 コードの地図', 'code-tree.html'],
     ['repo-tree-map', '🧭 逆引き索引', 'repo-tree-map.html'],
+    // ★v0.1.1466: src/lib の層(純粋/例外)を絵で見る。生成は layer-map-html.mjs
+    ['layer-map', '🧱 部品の層', 'layer-map.html'],
   ];
   const items = pages.map(([key, label, href]) =>
     key === active
