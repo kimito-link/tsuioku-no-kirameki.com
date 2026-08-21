@@ -507,6 +507,7 @@
 | `src/lib/diagPaintDeferGate.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/diagWarnings.js` | 1 | 記録エンジン(watchページ常駐) |
 | `src/lib/domHarvestScrollDefer.js` | 1 | 記録エンジン(watchページ常駐) |
+| `src/lib/domTreeCensus.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/effectDetailCells.js` | 1 | 状態速報ページ |
 | `src/lib/embeddedDataExtract.js` | 1 | 記録エンジン(watchページ常駐) |
 | `src/lib/enrichmentAvatarFallback.js` | 1 | 記録エンジン(watchページ常駐) |
