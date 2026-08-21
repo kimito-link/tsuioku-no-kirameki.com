@@ -225,7 +225,9 @@ if (has('--auto')) {
     results.push({
       metric: c.metric,
       ...record(
-        { version, metric: c.metric, value, source: c.source, note: opt('--note') || '' },
+        // ★source に [auto] を前置する。括弧書きだけの違いは見分けが付かず、
+        //   このリポの往復相手が実際に「8件全部手書き」と読み違えた実績があるため。
+        { version, metric: c.metric, value, source: '[auto] ' + c.source, note: opt('--note') || '' },
         { dryRun }
       )
     });
