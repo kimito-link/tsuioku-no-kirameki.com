@@ -44,6 +44,7 @@
     "test:e2e:ci": "npx playwright test",
     "playwright:install": "playwright install chromium",
     "council:cleanup": "node scripts/council-cleanup.mjs",
+    "council:scout": "node scripts/scout-models.mjs",
     "inspect:watch-stats": "node scripts/inspect-nicolive-watch-stats.mjs",
     "vendor:visual-explainer": "node scripts/vendor-visual-explainer.mjs",
     "gen:marketing-avatars": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/resize-marketing-html-avatars.ps1 && node scripts/encode-marketing-html-avatars.mjs",

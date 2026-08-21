@@ -190,7 +190,18 @@ export const LINEUP = [
   //  timeoutMs無指定で既定150秒に委ねている）。weightOfのNIM「やや不安定枠」(weight2)の
   //  扱いは従来どおり変更しない——遅さの評価と、遅い時に殺すかどうかは別の判断。
   { label: 'nvidia/nemotron-3-ultra-550b', provider: 'nvidia', rawId: 'nvidia/nemotron-3-ultra-550b-a55b', apiModel: 'nvidia/nemotron-3-ultra-550b-a55b', opts: {}, requires: ['N'] },
-  { label: 'nvidia/deepseek-v4-pro', provider: 'nvidia', rawId: 'deepseek-ai/deepseek-v4-pro', apiModel: 'deepseek-ai/deepseek-v4-pro', opts: {}, timeoutMs: 120000, requires: ['N'] },
+  // 2026-08-21 撤去（nvidia/deepseek-v4-pro・criticの予備weight3）:
+  //   実疎通で HTTP 410 Gone。原文 "The model 'deepseek-ai/deepseek-v4-pro' has reached its
+  //   end of life on 2026-08-07T09:00:00Z and is no longer available."
+  //   ＝2026-08-07にEOL済み。NVIDIAカタログ(103件)にも不在で、残るのは deepseek-v4-flash-0731 のみ。
+  //   ★14日間気づけなかった: council-scout が 2026-08-05 を最後に実行されていなかったため
+  //     （scoutは手動起動で、HANDOFF設計にある "council:scout" npm script が未追加のまま。
+  //      毎日の日課という当初設計が実運用では成立していない）。本コミットで npm script を足す。
+  //   役割の穴: critic 5→4。予備は cloudflare/glm-4.7-flash・sambanova/deepseek-v3.1・
+  //   mistral/magistral-small の3体が別プロバイダで残るため恒久ルール5(同役割の予備に
+  //   同一プロバイダを重ね積みしない)を満たす＝後継の補充はしない。
+  //   roleOf/weightOf の "deepseek" 判定行は削除しない（mistral-large行の前例に倣う。
+  //   将来 deepseek 系を再採用したときそのまま効く無害な行のため）。
 
   // 2026-07-31 追加: NVIDIA lead正規(nemotron-3-ultra-550b)の別経路予備。OpenRouterの無料
   // モデル一覧(:freeサフィックス)に同一モデルが存在することを発見し、3並列200 OK(360/402/2140ms)
