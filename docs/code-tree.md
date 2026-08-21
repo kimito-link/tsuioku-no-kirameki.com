@@ -149,15 +149,16 @@
   - `index.html`
   - `live-view.html`
   - `live-view.js` — global NL_BUILD_ID
-- 📁 **council-scout/** (6)
-  - 📁 **briefs/** (6)
+- 📁 **council-scout/** (7)
+  - 📁 **briefs/** (7)
     - `2026-07-16.md`
     - `2026-07-17.md`
     - `2026-07-20.md`
     - `2026-07-22.md`
     - `2026-07-23.md`
     - `2026-07-31.md`
-- 📁 **docs/** (244)
+    - `2026-08-21.md`
+- 📁 **docs/** (245)
   - 📁 **article-assets/** (87)
     - 📁 **venue-frames/** (12)
       - `f01.png`
@@ -267,7 +268,7 @@
     - `storage-bus.md`
     - `venue.md`
     - `web-status.md`
-  - 📁 **handoff/** (80)
+  - 📁 **handoff/** (81)
     - `HANDOFF-backfill-instant-restore.md`
     - `HANDOFF-broadcast-score-panel.md`
     - `HANDOFF-comment-pickup-bsp.md`
@@ -340,6 +341,7 @@
     - `user-identity-unification-IMPLEMENTATION-HANDOFF.md`
     - `venue-bubble-voice-realtime-max-DESIGN.md`
     - `venue-bubble-voice-realtime-max-IMPLEMENTATION-HANDOFF.md`
+    - `venue-exact-parity-SPEC-2026-08-07.md`
     - `venue-gift-ad-mirror-mismatch-DESIGN.md`
     - `venue-gift-ad-mirror-mismatch-IMPLEMENTATION-HANDOFF.md`
     - `venue-lobby-removal-DESIGN.md`
@@ -630,7 +632,7 @@
     - `trumpet1.mp3`
     - `wallet1.mp3`
   - `SOURCES.md`
-- 📁 **src/** (1520)
+- 📁 **src/** (1521)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -911,7 +913,7 @@
         - `logo_funlink_white_RGB_maru_black.png`
       - `logo_guide_funlink_ol.pdf`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1289)
+  - 📁 **lib/** (1290)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -1471,6 +1473,7 @@
     - `laneMirrorContract.registry.test.js`
     - `laneMirrorContract.test.js`
     - `laneMirrorKey.js` — popup の応援レーン(りんく/こん太/広告/たぬ姉の段組み)を「顔=avatar 含めてそっくり」status へ
+    - `laneMirrorPublishNotSkipped.wiring.test.js`
     - `laneNeverDrop.integration.test.js`
     - `laneNeverDrop.wiring.test.js`
     - `laneRosterDelta.js` — 応援レーンの「誰が消えたか」を測る純関数(v0.1.1231・Phase 1 計器)。
