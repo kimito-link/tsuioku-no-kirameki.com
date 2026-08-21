@@ -170,7 +170,7 @@
     - `2026-07-23.md`
     - `2026-07-31.md`
     - `2026-08-21.md`
-- 📁 **docs/** (303)
+- 📁 **docs/** (304)
   - 📁 **article-assets/** (87)
     - 📁 **venue-frames/** (12)
       - `f01.png`
@@ -280,13 +280,14 @@
     - `storage-bus.md`
     - `venue.md`
     - `web-status.md`
-  - 📁 **handoff/** (138)
+  - 📁 **handoff/** (139)
     - 📁 **bench/** (2)
       - `bench-interval.mjs` — ⚠️ 役割コメント無し
       - `bench-lane.mjs` — ⚠️ 役割コメント無し
     - `CODEX-TASK-voice-v1332.md`
     - `CODEX-TASK-voice-v1334.md`
     - `CODEX-TASK-voice-v1342.md`
+    - `DOM-DUMP-HOWTO.md`
     - `HANDOFF-2026-08-14-deploy-path-and-status-hang.md`
     - `HANDOFF-2026-08-14b-venue-gift-missing.md`
     - `HANDOFF-2026-08-14c-v1388-1395.md`
