@@ -40,10 +40,14 @@
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { writeFileSync, unlinkSync } from 'node:fs';
+import { EXIT, computeExitCode, formatProbeReport, runSelfTest } from './lib/instrument-core.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const LIB = join(ROOT, 'src', 'lib');
 const CHECK = process.argv.includes('--check');
+/** ★検知器に毒を食わせて赤が出るか確かめる(45リポからの収穫)。 */
+const SELFTEST = process.argv.includes('--selftest');
 
 /**
  * ★I/O とみなす入口。ここに載っているものは「純粋ではない」。
@@ -186,29 +190,89 @@ const names = impure.map((r) => r.name);
 const added = names.filter((n) => !IMPURE_BASELINE.has(n));
 const total = readdirSync(LIB).filter((f) => f.endsWith('.js') && !f.endsWith('.test.js')).length;
 
+/*
+ * ★--selftest: 検知器に毒を食わせ、赤が出ることを確認する(45リポからの収穫)。
+ *   収穫元: soushin-suggest.link/scripts/blank-map.mjs:556
+ *   ★これまで私は【毎回手で】変異テストをしていた。手作業は忘れる。
+ *   ★仕掛けの生死は「サボると赤くなるか」で決まるので、
+ *     検知器自身が赤くなれることを機械で確かめる。
+ */
+if (SELFTEST) {
+  const probeFile = join(LIB, '__selftest_probe__.js');
+  const { ok, fails } = runSelfTest([
+    {
+      name: '純粋性の検知',
+      // ★毒: I/O を使う一時ファイルを置く。状態に依存しない毒にする
+      //   (収穫元の失敗記録: 特定項目の状態に依存した selftest は、その項目を
+      //    実装した瞬間に壊れた)。
+      poison: () => writeFileSync(probeFile, 'export const x = () => document.title;\n'),
+      restore: () => { try { unlinkSync(probeFile); } catch { /* 既に無い */ } },
+      isRed: () => scanLibPurity().some((r) => r.name === '__selftest_probe__.js')
+    },
+    {
+      name: '文字列の誤検出よけ',
+      // ★毒の逆: 文字列の中に書いても【赤にしてはいけない】。
+      //   これが壊れると誤検出だらけになり、検査が信用されず死ぬ。
+      poison: () => writeFileSync(probeFile, "export const s = 'document.title は文字列';\n"),
+      restore: () => { try { unlinkSync(probeFile); } catch { /* 既に無い */ } },
+      // ★ここだけ「赤にならないこと」が合格なので反転して渡す
+      isRed: () => !scanLibPurity().some((r) => r.name === '__selftest_probe__.js')
+    }
+  ]);
+  if (!ok) {
+    console.error('[check-layer] ★selftest 失敗(検知器が効いていません):');
+    for (const f of fails) console.error('  - ' + f);
+    process.exit(EXIT.FAIL);
+  }
+  console.log('[check-layer] selftest OK(毒を入れると赤くなる / 文字列は誤検出しない)');
+  process.exit(EXIT.PASS);
+}
+
 if (!CHECK) {
   console.log(`[check-layer] src/lib ${total} ファイル中、純粋 ${total - impure.length} / 非純粋 ${impure.length}`);
   for (const r of impure) {
     const mark = IMPURE_BASELINE.has(r.name) ? ' ' : '★新規';
     console.log(`  ${mark} ${r.name.padEnd(42)} ${r.kinds.join(' ')}`);
   }
-  process.exit(0);
+  process.exit(EXIT.PASS);
 }
 
-if (added.length) {
-  console.error('[check-layer] ★src/lib に【純粋でない】ファイルが増えました:');
-  for (const n of added) {
-    const r = impure.find((x) => x.name === n);
-    console.error(`  - ${n} (${r ? r.kinds.join(' ') : ''})`);
-  }
-  console.error('');
-  console.error('  src/lib は「純粋ロジックの箱」です(src/lib/AGENTS.md)。次のどれかにしてください:');
-  console.error('   1. I/O を呼び出し側(entry)へ move し、lib には判定だけ残す');
-  console.error('   2. どうしても lib に置くなら scripts/check-layer.mjs の');
-  console.error('      IMPURE_BASELINE に【理由を1行添えて】追記する');
-  process.exit(1);
+/*
+ * ★3値の終了コードで答える(0=合格 / 1=赤 / ★2=測れなかった)。
+ *   収穫元: soushin-suggest.link/scripts/blank-map.mjs:17
+ *   ★「測れなかった」を緑に混ぜない。走査0件は【緑ではない】。
+ */
+const results = [];
+if (total === 0) {
+  results.push({
+    probe: 'src/lib の純粋性',
+    verdict: 'inconclusive',
+    evidence: null,
+    detail: '走査対象が0件でした(src/lib が見つからない/空)',
+    howToFix: 'src/lib の場所を確認してください'
+  });
+} else if (added.length) {
+  results.push({
+    probe: 'src/lib の純粋性',
+    verdict: 'fail',
+    evidence: { 走査: total, 非純粋: impure.length, 新規: added.length },
+    detail: `純粋でないファイルが増えました: ${added.join(', ')}`,
+    howToFix:
+      'I/O を呼び出し側(entry)へ移して lib には判定だけ残す。'
+      + 'どうしても lib に置くなら IMPURE_BASELINE に【理由を1行添えて】追記する',
+    limitation:
+      '設計の良し悪しは判定しません。「純粋でないものが増えた」ことに気づかせるだけです'
+  });
+} else {
+  // ★根拠(evidence)を必ず添える。根拠なき pass は自動で inconclusive へ降格される。
+  results.push({
+    probe: 'src/lib の純粋性',
+    verdict: 'pass',
+    evidence: { 走査: total, 純粋: total - impure.length, 例外: impure.length }
+  });
 }
 
-console.log(`[check-layer] OK(純粋 ${total - impure.length} / 非純粋 ${impure.length}・ベースライン内)`);
+console.log(formatProbeReport(results, { label: 'check-layer' }));
+process.exit(computeExitCode(results));
 
 } // ← CLI ブロックの終わり

@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 6 / 824 件
+## ⚠️ 役割コメントが無いソース 6 / 827 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `src/lib/laneDomSelfMeasure.js`
@@ -642,9 +642,11 @@
   - `status-guard.js` — 状態速報ページ(status.html)の「何があっても開く」保険。
   - `status.html`
   - `venue.html`
-- 📁 **scripts/** (59)
+- 📁 **scripts/** (62)
   - 📁 **__pycache__/** (1)
     - `stage-submission.cpython-311.pyc`
+  - 📁 **lib/** (1)
+    - `instrument-core.mjs` — ★計器・検査の共通土台（45リポから収穫した知見の実装）。
   - 📁 **xserver/** (2)
     - `github-webhook-pull.php.example`
     - `webhook-git-pull-for-upload.php`
@@ -657,6 +659,7 @@
   - `_run-romi-gemma.ps1`
   - `_run-romi-local.ps1`
   - `_summarize-council.ps1`
+  - `audit-gates.mjs` — ★**計器を計器で測る**(メタ検査)。
   - `build-sound-preview.mjs` — 開発用: extension/sound/ 配下の全効果音を1枚のHTMLで試聴できるページを生成する。
   - `build-sounds.mjs` — extension/sound/ の効果音mp3を組み立てる。
   - `build-watch.mjs` — watch では起動時刻を埋める（rebuild 毎に再 import される訳ではないので、
@@ -681,6 +684,7 @@
   - `inspect-nicolive-watch-stats.mjs` — ニコ生 watch ページの HTML から、来場・同接まわりの数値がどう埋め込まれているかを CLI で確認する。
   - `install-local-sounds.mjs` — マイ効果音「手動取込」を不要にするローカル自動同梱スクリプト。
   - `install-local-sounds.test.js`
+  - `layer-config.mjs` — ★どのリポでも使えるように「設定」を読む部分だけを切り出す。
   - `layer-map-html.mjs` — ★`src/lib` の構成を【HTMLで見える】ようにする。
   - `measure-flash-frames.mjs` — 「一瞬の黒」を【画面に出たピクセル】で測る。
   - `measure-flash-frames.test.js`
@@ -729,7 +733,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (1811)
+- 📁 **src/** (1812)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1027,7 +1031,7 @@
         - `logo_funlink_white_RGB_maru_black.png`
       - `logo_guide_funlink_ol.pdf`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1563)
+  - 📁 **lib/** (1564)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -1649,6 +1653,7 @@
     - `instantPushDiag.test.js`
     - `instantPushDiagKey.js` — コメント即時プッシュレーン(storage迂回)の「送信N/受信N/表示遅延ms」観測値を
     - `instantPushDiagSince.test.js`
+    - `instrumentCore.test.js`
     - `instrumentCoverage.test.js`
     - `instrumentSpec.js` — 【層】L0 判定層(純粋関数・I/O禁止)
     - `instrumentSpec.test.js`

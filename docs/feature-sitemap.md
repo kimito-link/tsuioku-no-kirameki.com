@@ -41,8 +41,9 @@
   - `src/lib/ndgrBackfillCrawl.js`
 - **コメント重複除去(NDGR)** — 再送/再接続/relay overlap の重複を liveId+messageId の canonical key で排除
   - `src/lib/ndgrMessageDedupe.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 60</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 61</summary>
 
+- `scripts/lib/instrument-core.mjs` — ★計器・検査の共通土台（45リポから収穫した知見の実装）。
 - `src/domain/observations/StatObservation.js` — StatObservation - ニコ生から取得する数値の「契約付き観測値」純関数 factory。
 - `src/domain/observations/vocabulary.js` — 観測層 (StatObservation) の語彙集 - 不変な enum 定義のみ。
 - `src/extension/backfill-sw-entry.js` — Service Worker 側の過去ログ取得(バックフィル)エンジン。NDGR を遡って取り込む。
@@ -789,12 +790,13 @@
   - `src/lib/statusTrendKey.js`
   - `src/extension/status-entry.js`
   - `src/lib/statusActionAdvisor.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 189</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 191</summary>
 
 - `app/app.js` — スマホ閲覧用 status Web 版。
 - `app/live-view.js` — global NL_BUILD_ID
 - `extension/background.js` — MV3 Service Worker
 - `scripts/_merge-council.mjs` — 3ラウンド分の council JSON を1つの Markdown 議事録に統合する。
+- `scripts/audit-gates.mjs` — ★**計器を計器で測る**(メタ検査)。
 - `scripts/build-sounds.mjs` — extension/sound/ の効果音mp3を組み立てる。
 - `scripts/build-watch.mjs` — watch では起動時刻を埋める（rebuild 毎に再 import される訳ではないので、
 - `scripts/build.mjs` — .env を読み込む(status の共有キー NL_STATUS_INGEST_KEY / NL_STATUS_VIEW_TOKEN は .env から注入)。
@@ -811,6 +813,7 @@
 - `scripts/delete-dead-lib.mjs` — scripts/delete-dead-lib.mjs — 死蔵lib実装ファイルとそのテストを削除
 - `scripts/fix-src-images-mojibake.mjs` — Normalizes known mojibake paths under src/images (mirrored from kimito-link).
 - `scripts/install-local-sounds.mjs` — マイ効果音「手動取込」を不要にするローカル自動同梱スクリプト。
+- `scripts/layer-config.mjs` — ★どのリポでも使えるように「設定」を読む部分だけを切り出す。
 - `scripts/measure-flash-frames.mjs` — 「一瞬の黒」を【画面に出たピクセル】で測る。
 - `scripts/meeting-roles.mjs` — meeting.mjs の役割注入版。
 - `scripts/meeting.mjs` — 会議ハーネス: 同じ問いを「無料クラウド4系統 + ローカル ollama 数体」に投げ、
@@ -987,15 +990,14 @@
 
 > changelog 全 20 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
 
-### 📥 コメント取得 (3版)
+### 📥 コメント取得 (2版)
 - `v0.1.1450` 2026-08-19 — サイドパネルが黒くなる原因を直しました
 - `v0.1.1448` 2026-08-19 — タブ一覧の間引きが効かない条件を塞ぎました
-- `v0.1.1447` 2026-08-19 — コピーが途中で取れなくなるのを直しました
 
 ### 🪟 応援レーン・タイル (1版)
 - `v0.1.1456` 2026-08-20 — パネル側の部品数を測れるようにしました
 
-### 🩺 診断・状態速報 (10版)
+### 🩺 診断・状態速報 (9版)
 - `v0.1.1463` 2026-08-21 — 診断のセルに「処理時間・部品数・覆い」を出しました
 - `v0.1.1462` 2026-08-21 — 重い処理を全部じどうで計測するようにしました
 - `v0.1.1461` 2026-08-21 — 画面の構造(DOMの木)を数字で見られるようにしました
@@ -1005,7 +1007,6 @@
 - `v0.1.1453` 2026-08-19 — 「パネルが2つできた」を画面に出しました
 - `v0.1.1449` 2026-08-19 — 診断ページの読み込みを1回にまとめました
 - `v0.1.1448` 2026-08-19 — タブ一覧の間引きが効かない条件を塞ぎました
-- `v0.1.1447` 2026-08-19 — コピーが途中で取れなくなるのを直しました
 
 ### 🗺 地図・ドキュメント (2版)
 - `v0.1.1466` 2026-08-21 — 部品の構成を【絵で見られる】ページを追加しました
@@ -1020,7 +1021,8 @@
 - `v0.1.1459` 2026-08-21 — 固まっている【当人】を名指しできるようにしました
 - `v0.1.1449` 2026-08-19 — 診断ページの読み込みを1回にまとめました
 
-### その他 (5版)
+### その他 (6版)
+- `v0.1.1467` 2026-08-21 — 検査が【自分の壊れ】に気づけるようにしました
 - `v0.1.1465` 2026-08-21 — 部品の置き場所を1枚で説明する案内を追加しました
 - `v0.1.1457` 2026-08-20 — 引っ張った瞬間に黒くなるのを直しました
 - `v0.1.1455` 2026-08-20 — 計器の意味を1枚の台帳にまとめました
