@@ -9331,7 +9331,6 @@ function collectWatchPageSnapshot() {
       intercept: interceptedUsers.size,
       interceptNicknames: interceptedNicknames.size,
       interceptAvatars: interceptedAvatars.size,
-      fiberDiag: document.documentElement?.getAttribute('data-nls-fiber-diag') || '',
       harvestPipeline: {
         ...deepHarvestPipelineStats,
         harvestRunning,
