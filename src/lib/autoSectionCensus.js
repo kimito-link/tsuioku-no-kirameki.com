@@ -48,6 +48,18 @@ export const AUTO_SECTION_SLOW_MS = 50;
 /** カバー率がこれ未満なら「まだ測れていない」と自己申告する[%]。 */
 export const AUTO_SECTION_COVERAGE_WARN_PCT = 30;
 
+/**
+ * ★これより前は「起動直後＝まだ始まっていない」とする[ms]。
+ *
+ * ★実機(2026-08-21・v0.1.1470)で 経過384ms のとき
+ *   「残り384msは【囲んでいない処理】」と出した。しかし同じ速報の
+ *   shadeAgeMs は 383＝★**幕が出ている待ち時間**で、拡張は何もしていない。
+ *   ＝ 囲む対象が存在しないのに「囲んでいない処理がある」と言っていた。
+ *   読んだ人は**無い犯人を探しに行く**。
+ * ★parityVerdict.js の PARITY_BOOT_SETTLE_MS と同じ 3秒に揃える。
+ */
+export const AUTO_SECTION_BOOT_SETTLE_MS = 3000;
+
 /** 個別に残す遅いサンプルの上限。 */
 const MAX_SLOW_SAMPLES = 8;
 
@@ -171,6 +183,24 @@ export function formatAutoSectionLines(census, opts = {}) {
    *   ([[instrument-must-name-the-cause-2026-08-01]] の裏返し:
    *    名指しできる根拠が無いなら名指ししない)。
    */
+  /*
+   * ★起動直後は「囲んでいない処理」と呼ばない(嘘になる)。
+   *   幕が明けるまで拡張は何もしていないので、囲む対象がそもそも無い。
+   *   ★緑にもしない=「まだ判定できない」。
+   */
+  if (elapsedMs < AUTO_SECTION_BOOT_SETTLE_MS && totalMs === 0) {
+    return {
+      level: 'na',
+      coveragePct,
+      uncoveredMs,
+      worstName,
+      line:
+        `拡張の処理時間: ⚪ 起動直後(${Math.round(elapsedMs)}ms)＝まだ始まっていません`
+        + `
+  → 幕が明けるまで拡張は動かないので、0%は正常です(数秒待って取り直してください)`
+    };
+  }
+
   if (coveragePct < AUTO_SECTION_COVERAGE_WARN_PCT) {
     return {
       level: 'warn',
