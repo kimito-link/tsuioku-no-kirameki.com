@@ -45,7 +45,8 @@ graph LR
   d8 --> d8_1["avatar-parts/ 〔アバター/画像〕"]
   ROOT --> d9["scripts/ 〔ビルド/自動生成〕"]
   d9 --> d9_0["__pycache__/"]
-  d9 --> d9_1["xserver/ 〔デプロイ/webhook〕"]
+  d9 --> d9_1["lib/"]
+  d9 --> d9_2["xserver/ 〔デプロイ/webhook〕"]
   ROOT --> d10["sound-src/"]
   d10 --> d10_0["soundeffect-lab/"]
   ROOT --> d11["src/ 〔ソース〕"]
@@ -241,9 +242,10 @@ graph LR
 - `avatar-parts/`（29 件） — アバター素材(顔シート等)の参考画像  〔アバター / 画像〕
 
 ## `scripts/` — ビルド・検証・自動生成スクリプト(build/feature-map/repo-tree-map 等)  〔ビルド / 自動生成〕
-<sub>ファイル 59 件</sub>
+<sub>ファイル 62 件</sub>
 
 - `__pycache__/`（1 件） — ⚠️ 未記入（ROLES に追記）
+- `lib/`（1 件） — ⚠️ 未記入（ROLES に追記）
 - `xserver/`（2 件） — Xserver 向け webhook(git pull デプロイ)スクリプト  〔デプロイ / webhook〕
 
 ## `sound-src/` — ⚠️ 未記入（ROLES に追記）
@@ -252,14 +254,14 @@ graph LR
 - `soundeffect-lab/`（19 件） — ⚠️ 未記入（ROLES に追記）
 
 ## `src/` — LP 側 + 純粋関数ライブラリの源  〔ソース〕
-<sub>ファイル 1811 件</sub>
+<sub>ファイル 1812 件</sub>
 
 - `data/`（7 件） — 保存コメントからレーン候補を読む acquirer / source 層  〔コメント / 取得〕
 - `domain/`（20 件） — ドメイン正本(応援レーンの集約・列ポリシー等。識別子判定など)  〔応援 / 集約 / 識別子〕
 - `extension/`（46 件） — バンドル entry(content/popup/venue/status/offscreen/backfill-sw 等=機能境界)  〔entry / 記録 / 会場 / 応援〕
 - `fixtures/`（1 件） — テスト用フィクスチャ  〔テスト〕
 - `images/`（165 件） — LP / CWS 提出物のマスター画像  〔画像〕
-- `lib/`（1563 件） — 純粋関数ライブラリ(unit test 対象)。色・速度・コメント・レポート等の計算ロジックの大半  〔色 / 速度 / コメント / レポート / 純粋関数〕
+- `lib/`（1564 件） — 純粋関数ライブラリ(unit test 対象)。色・速度・コメント・レポート等の計算ロジックの大半  〔色 / 速度 / コメント / レポート / 純粋関数〕
 - `shared/`（7 件） — 複数機能で共有する小部品(アバター URL ガード等)  〔共有 / アバター〕
 - `sound/`（1 件） — 音声素材(src 側)  〔音声〕
 
@@ -513,7 +515,7 @@ esbuild の import 到達グラフを逆引きし「このファイルを変え�
 
 ---
 
-## ⚠️ 役割が未記入のディレクトリ（11）
+## ⚠️ 役割が未記入のディレクトリ（12）
 
 以下は `ROLES` 辞書に説明が無い。`scripts/repo-tree-map.mjs` の `ROLES` に1行足してから再生成すること。
 
@@ -525,6 +527,7 @@ esbuild の import 到達グラフを逆引きし「このファイルを変え�
 - `docs/article-drafts/`
 - `docs/patent-unique-voice-reading-filing-final/`
 - `scripts/__pycache__/`
+- `scripts/lib/`
 - `sound-src/`
 - `sound-src/soundeffect-lab/`
 - `tests/helpers/`
