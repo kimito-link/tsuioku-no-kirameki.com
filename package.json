@@ -1,6 +1,6 @@
 {
   "name": "nicolivelog",
-  "version": "0.1.1464",
+  "version": "0.1.1465",
   "private": true,
   "description": "ニコ生コメント記録プロトタイプ（拡張）",
   "type": "module",
@@ -28,6 +28,7 @@
     "build:copy": "node scripts/build.mjs && node scripts/copy-ext.mjs",
     "feature-map": "node scripts/feature-map.mjs",
     "feature-map:check": "node scripts/feature-map.mjs --check",
+    "check:layer": "node scripts/check-layer.mjs --check",
     "impact-check": "node scripts/impact-check.mjs",
     "tree-map": "node scripts/repo-tree-map.mjs",
     "tree-map:check": "node scripts/repo-tree-map.mjs --check",

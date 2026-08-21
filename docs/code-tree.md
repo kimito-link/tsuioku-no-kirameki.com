@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 6 / 822 件
+## ⚠️ 役割コメントが無いソース 6 / 823 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `src/lib/laneDomSelfMeasure.js`
@@ -641,7 +641,7 @@
   - `status-guard.js` — 状態速報ページ(status.html)の「何があっても開く」保険。
   - `status.html`
   - `venue.html`
-- 📁 **scripts/** (57)
+- 📁 **scripts/** (58)
   - 📁 **__pycache__/** (1)
     - `stage-submission.cpython-311.pyc`
   - 📁 **xserver/** (2)
@@ -661,6 +661,7 @@
   - `build-watch.mjs` — watch では起動時刻を埋める（rebuild 毎に再 import される訳ではないので、
   - `build.mjs` — .env を読み込む(status の共有キー NL_STATUS_INGEST_KEY / NL_STATUS_VIEW_TOKEN は .env から注入)。
   - `capture-store-screenshots.mjs` — Chrome ウェブストア用スクショ自動撮影
+  - `check-layer.mjs` — ★`src/lib` が「純粋ロジックの箱」であり続けることを機械で守る。
   - `check-no-secrets-in-dist.mjs` — ビルド成果物に秘密情報が焼き込まれていないか検査する(fail-closed)。
   - `check-root-cause-claim.mjs` — コミットメッセージの「根治」語を検査する。
   - `check-tracked-imports.mjs` — 「コミットし忘れた新規ファイルを import している」ことを機械的に検出するリリース工程ガード(2026-07-06)。
@@ -726,7 +727,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (1809)
+- 📁 **src/** (1811)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1024,7 +1025,7 @@
         - `logo_funlink_white_RGB_maru_black.png`
       - `logo_guide_funlink_ol.pdf`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1561)
+  - 📁 **lib/** (1563)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -1040,6 +1041,7 @@
       - `schema.test.js`
       - `validateAndMerge.test.js`
       - `validateLiveMcpSnapshot.js` — Canonical Snapshot の構造検証。schema.js の isCanonicalLiveSnapshot より詳細な
+    - `AGENTS.md`
     - `aboutBlankGapVerdict.js` — ★about:blank の隙間(残り32ms)に対する【確定した判定】。
     - `aboutBlankGapVerdict.test.js`
     - `acquisitionDashboardChart.js` — 「データ取得率」ダッシュボードのチャート計算（純関数）。
@@ -1723,6 +1725,7 @@
     - `laneTileOscillation.test.js`
     - `lengthDelimitedStream.js` — length-delimited（varint 長 + ペイロード）の連続を分割する。
     - `lengthDelimitedStream.test.js`
+    - `libAgentsDoc.test.js`
     - `lightSupplyGuard.wiring.test.js`
     - `lightSupplyOverwriteGuard.js` — 軽い供給(summary+tail)が完全描画を上書きするのを止める判定(純関数)。
     - `lightSupplyOverwriteGuard.test.js`
