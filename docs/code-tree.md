@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 6 / 827 件
+## ⚠️ 役割コメントが無いソース 6 / 830 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `src/lib/laneDomSelfMeasure.js`
@@ -642,7 +642,7 @@
   - `status-guard.js` — 状態速報ページ(status.html)の「何があっても開く」保険。
   - `status.html`
   - `venue.html`
-- 📁 **scripts/** (62)
+- 📁 **scripts/** (63)
   - 📁 **__pycache__/** (1)
     - `stage-submission.cpython-311.pyc`
   - 📁 **lib/** (1)
@@ -665,6 +665,7 @@
   - `build-watch.mjs` — watch では起動時刻を埋める（rebuild 毎に再 import される訳ではないので、
   - `build.mjs` — .env を読み込む(status の共有キー NL_STATUS_INGEST_KEY / NL_STATUS_VIEW_TOKEN は .env から注入)。
   - `capture-store-screenshots.mjs` — Chrome ウェブストア用スクショ自動撮影
+  - `check-improvement.mjs` — ★版ごとの実測値が【退化】していないか見張る。
   - `check-layer.mjs` — ★`src/lib` が「純粋ロジックの箱」であり続けることを機械で守る。
   - `check-no-secrets-in-dist.mjs` — ビルド成果物に秘密情報が焼き込まれていないか検査する(fail-closed)。
   - `check-root-cause-claim.mjs` — コミットメッセージの「根治」語を検査する。
@@ -733,7 +734,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (1812)
+- 📁 **src/** (1815)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1031,7 +1032,7 @@
         - `logo_funlink_white_RGB_maru_black.png`
       - `logo_guide_funlink_ol.pdf`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1564)
+  - 📁 **lib/** (1567)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -1594,6 +1595,9 @@
     - `identityAcquisitionCensus.test.js`
     - `iframeOfficialDomFromRelay.js` — v0.1.231: iframe relay (NLS_GIFT_HISTORY_FROM_IFRAME) 受信時の
     - `iframeOfficialDomFromRelay.test.js`
+    - `improvementHistory.js` — 【層】L0 判定層(純粋関数・I/O禁止)
+    - `improvementLedger.js` — 【層】L0 判定層(純粋関数・I/O禁止)
+    - `improvementLedger.test.js`
     - `inFlightGuard.js` — 状態速報「重さ根治 P3」: runStorageOpWithTimeout(storageOpTimeout.js)は Promise.race で
     - `inFlightGuard.test.js`
     - `inferBroadcasterUserIdFromComments.js` — snapshot の broadcasterUserId が空のとき、保存済みコメント内の表示名から

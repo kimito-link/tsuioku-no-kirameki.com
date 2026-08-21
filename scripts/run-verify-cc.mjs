@@ -73,6 +73,9 @@ const steps = [
   ['feature-map', 'feature-map:check'],
   // ★v0.1.1465: src/lib が「純粋ロジックの箱」であり続けるか(src/lib/AGENTS.md)
   // ★検知器自身が壊れていないか(毒→赤)。45リポからの収穫
+  // ★版ごとの実測値が退化していないか(申請にも使う)
+  ['improvement', 'check:improvement'],
+  ['improvement-selftest', 'check:improvement:selftest'],
   ['layer-selftest', 'check:layer:selftest'],
   ['layer', 'check:layer'],
   // ★HTML版(docs/layer-map.html)が最新か。手で編集させない

@@ -1,6 +1,6 @@
 {
   "name": "nicolivelog",
-  "version": "0.1.1469",
+  "version": "0.1.1470",
   "private": true,
   "description": "ニコ生コメント記録プロトタイプ（拡張）",
   "type": "module",
@@ -31,6 +31,10 @@
     "check:layer": "node scripts/check-layer.mjs --check",
     "check:layer:selftest": "node scripts/check-layer.mjs --selftest",
     "audit:gates": "node scripts/audit-gates.mjs",
+    "check:improvement": "node scripts/check-improvement.mjs --check",
+    "check:improvement:selftest": "node scripts/check-improvement.mjs --selftest",
+    "improvement": "node scripts/check-improvement.mjs",
+    "improvement:submission": "node scripts/check-improvement.mjs --submission",
     "layer-map": "node scripts/layer-map-html.mjs",
     "layer-map:check": "node scripts/layer-map-html.mjs --check",
     "impact-check": "node scripts/impact-check.mjs",
