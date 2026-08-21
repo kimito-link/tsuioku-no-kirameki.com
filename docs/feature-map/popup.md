@@ -40,6 +40,7 @@ graph LR
   n_popup --> n_src_lib_anonymousIdenticon_js["lib/anonymousIdenticon.js"]:::shared
   n_popup --> n_src_lib_audienceEngagementGap_js["lib/audienceEngagementGap.js"]
   n_popup --> n_src_lib_auditionEventRankingApi_js["lib/auditionEventRankingApi.js"]:::shared
+  n_popup --> n_src_lib_autoSectionCensus_js["lib/autoSectionCensus.js"]
   n_popup --> n_src_lib_avatarBroadcasterGuard_js["lib/avatarBroadcasterGuard.js"]:::shared
   n_popup --> n_src_lib_avatarEntryCounts_js["lib/avatarEntryCounts.js"]
   n_popup --> n_src_lib_avatarPartsComposer_js["lib/avatarPartsComposer.js"]:::shared
@@ -52,8 +53,7 @@ graph LR
   n_popup --> n_src_lib_bandScale_js["lib/bandScale.js"]
   n_popup --> n_src_lib_bandScaleBoot_js["lib/bandScaleBoot.js"]
   n_popup --> n_src_lib_bgmDirector_js["lib/bgmDirector.js"]:::shared
-  n_popup --> n_src_lib_bgmPhaseDiag_js["lib/bgmPhaseDiag.js"]:::shared
   classDef shared fill:#eee,stroke:#999,color:#666;
 ```
 
-> ほか 400 ファイル省略（全件は storage-bus.md / metafile 参照）。
+> ほか 401 ファイル省略（全件は storage-bus.md / metafile 参照）。

@@ -385,13 +385,16 @@ export default [
     //     renderStoryUserLane を包んだら laneMirrorPublishNotSkipped が5件赤になった
     //     (本体が4行の委譲関数になり中身の検査が空振りするため)＝この関数は包まない。
     // ★v0.1.1461(22571→22608・+37行): DOMの木を数字にする採取を足した。
+    // ★v0.1.1462(22608→22660・+52行): 全経路を機械的に実測する包み(_measuredSection)と
+    //   カバー率の採取。★markBlockerSection はラベルを置くだけで自分では測っておらず、
+    //   finally で区間を抜けた瞬間にラベルを戻すため、囲んでいても「(拡張の外)」と出ていた。
     //   ★ユーザー指示「DOMを全部把握して計器に入れる基本から見直すべき」への実装。
     //     市販の可視化拡張は chrome-extension:// のページに注入できず、
     //     黒くなっている当の文書(サイドパネル)を見られない=自前で採るしかない。
     //   ★計器自身を重くしない工夫: 深さは「親の深さ+1」で求める(文書順なので親は処理済み)。
     //     親を毎回辿る版は 2,844要素で約34,000回の参照になる。上限4,000要素。
     //   判定は `src/lib/domTreeCensus.js`(純関数)。ここは採取だけ。
-    rules: { 'max-lines': ['error', { max: 22608, skipBlankLines: false, skipComments: false }] }
+    rules: { 'max-lines': ['error', { max: 22660, skipBlankLines: false, skipComments: false }] }
   },
   {
     files: ['src/extension/popup/**/*.js'],
