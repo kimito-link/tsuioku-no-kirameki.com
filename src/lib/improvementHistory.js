@@ -155,5 +155,16 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
   Object.freeze({
     version: '0.1.1476', metric: 'gate-selftest', value: 2,
     source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1477', metric: 'bundle-kb', value: 1407,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '★+1KB は popup.html の見出し文言とコメントを足した分(機能は増やしていない)。' +
+      '「なふだ」が見つけられない=閉じた詳細設定の中で見出しに名前が無かった、への対処。' +
+      '★UIの発見性を上げる変更なので、この+1KBは受け入れる。'
+  }),
+  Object.freeze({
+    version: '0.1.1477', metric: 'gate-selftest', value: 2,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
   })
 ]);

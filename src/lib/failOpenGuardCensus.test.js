@@ -313,3 +313,31 @@ describe('★レーンの窓(v0.1.1475)— 消さない・capにしない', () =
     expect(code).not.toMatch(/\bcap\b/);
   });
 });
+
+/**
+ * ★v0.1.1477: 「実装したのに、たどり着けない」を止める。
+ *
+ * ■ 実損(2026-08-22)
+ *   なふだトグルは v0.1.1393 から実装済みだったのに、
+ *   ユーザーが「ない気がします」と言った。
+ *   ★理由＝閉じた <details> の中にあり、★見出しにその語が無かった。
+ *   ⟹ 機能を足すのではなく【名前を出す】ことで直した。
+ *
+ * ■ ★この型はキットにも記録済み
+ *   instrument-core.mjs は同梱済みだったのに入口が表の1行だけだった。
+ *   04_SELF_VERIFICATION.md は実物への導線ゼロだった。
+ *   ★「配ったのに届いていない」は繰り返し起きる。
+ */
+describe('★機能は「たどり着けて」初めて在る(2026-08-22 実損)', () => {
+  it('★折りたたみの中にある機能は、見出しにその語がある', () => {
+    const html = read('extension/popup.html');
+    // ★なふだのボタン本体は details の中にある
+    expect(html).toContain('id="nameplateOnBtn"');
+    // ★その details の見出しに「なふだ」が無いと、閉じている限り存在が分からない
+    // ★CSS規則にも同じクラス名が出るので、【要素の開始タグ】を狙う
+    const at = html.indexOf('<summary class="nl-popup-settings__summary">');
+    expect(at, '詳細設定の summary 要素が見つからない').toBeGreaterThan(0);
+    const summary = html.slice(at, at + 220);
+    expect(summary, '詳細設定の見出しに「なふだ」が無い＝閉じていると気づけない').toContain('なふだ');
+  });
+});
