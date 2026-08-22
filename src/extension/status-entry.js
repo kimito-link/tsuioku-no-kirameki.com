@@ -206,6 +206,7 @@ import {
   removeStoryAvatarTvFallbackClass
 } from '../lib/storyAvatarTvFallbackClass.js';
 import { buildReportPreviewLines } from '../lib/reportPreview.js';
+import { isCatchingUp, anyCatchingUp } from '../lib/catchingUpVerdict.js';
 import {
   KEY_REPORT_PREVIEW,
   isReportPreviewFresh
@@ -1633,8 +1634,17 @@ async function recordAndAnalyzeTrendSafe(lvList, summaries) {
       //   この時点に追いつき中があれば、全体の取得率が見かけ上下がるのは正常=trend の rate-declining を抑止。
       const endedFlag = summaries[LIVE_ENDED_PREFIX + lv];
       const ended = isLiveEndedFlag(endedFlag) ? endedFlag.endedAt : null;
-      const livePct = off > 0 ? (rec / off) * 100 : null;
-      if (!ended && rec > 0 && (livePct == null || livePct < 100)) catchingUp = true;
+      /*
+       * ★v0.1.1474: 判定は catchingUpVerdict.js(純関数)が正本。ここは呼ぶだけ。
+       *   ★実損(2026-08-22 実機): 追いつき中(30%)なのに
+       *     「取得率が下がり続けています(100%→0%)」が出た。
+       *   ★原因＝配信を開いた直後、公式件数だけ判明して記録がまだ0件の一瞬に
+       *     旧条件の `rec > 0` が false になり、その点が catchingUp=false で積まれた。
+       *     その点は取得率0%なので、後の窓で「単調低下」の材料になった。
+       *   ★つまり【まだ始まっていない】を【追いつき中ではない】と記録していた
+       *     ＝「無い」と「まだ分からない」を混ぜる型(今日4件目)。
+       */
+      if (isCatchingUp({ endedAt: ended, recordedCount: rec, officialCount: off })) catchingUp = true;
     }
     const ratePct = official > 0 ? Math.round((recorded / official) * 100) : null;
     const kpi = { recorded, official, ratePct, watch: hasWatch ? watch : null, catchingUp };
@@ -1793,8 +1803,17 @@ function renderAll({ extrasAgeMs, lvList, summaries, fastDiag, popupDiag, backfi
   let backfillLine = '';
   let laneLine = '';
   safeSection('概要併記', () => {
-    const catchingUp = livesData.some(
-      (lv) => !lv.endedAt && lv.recordedCount > 0 && (lv.officialRatePct == null || lv.officialRatePct < 100)
+    /*
+     * ★v0.1.1474: 判定を catchingUpVerdict.js(純関数)へ寄せた。
+     *   ★同じ「追いつき中か」が2箇所に【別の式】で書かれていて、
+     *     片方だけ `rec > 0` を持っていたため、片方だけ偽陽性を出していた。
+     */
+    const catchingUp = anyCatchingUp(
+      livesData.map((lv) => ({
+        endedAt: lv.endedAt,
+        recordedCount: lv.recordedCount,
+        officialCount: lv.officialCommentCount
+      }))
     );
     const bpLine = buildBackfillProgressLine(backfillProgress, { catchingUp });
     backfillLine = bpLine ? `\n${bpLine}` : '';
