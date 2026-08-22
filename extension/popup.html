@@ -1325,6 +1325,57 @@
         min-width: 0;
       }
 
+      /*
+       * ★v0.1.1478: なふだの切り替えを【コメント入力のすぐ上】に出す。
+       *   見た目は既存の案内吹き出し(.nl-story-userlane-guide__line)に揃える
+       *   ＝新しい作法を持ち込まない。
+       */
+      .nl-nameplate-inline {
+        margin: 0 0 6px;
+        display: flex;
+        flex-direction: column;
+        gap: 5px;
+      }
+      .nl-nameplate-inline__guide {
+        display: flex;
+        align-items: flex-start;
+        gap: 7px;
+        padding: 5px 8px;
+        border-radius: 10px;
+        background: linear-gradient(180deg, #fffaf0, #fff4db);
+        border: 1px solid #f5d28d;
+        color: #6b4f18;
+        font-size: 10px;
+        font-weight: 700;
+        line-height: 1.38;
+        box-shadow: 0 1px 5px rgb(148 101 14 / 9%);
+      }
+      .nl-nameplate-inline__face {
+        flex: 0 0 auto;
+        width: 24px;
+        height: 24px;
+        border-radius: 50%;
+      }
+      .nl-nameplate-inline__text {
+        flex: 1 1 auto;
+        min-width: 0;
+      }
+      .nl-nameplate-inline__row {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+      .nl-nameplate-inline__label {
+        font-size: 11px;
+        font-weight: 800;
+        color: var(--nl-text-sub);
+      }
+      .nl-nameplate-inline__note {
+        font-size: 10px;
+        color: var(--nl-text-sub);
+      }
+
       .nl-story-userlane-guide__line {
         display: flex;
         align-items: flex-start;
@@ -11977,6 +12028,41 @@
 
       <div class="nl-vdh-divider" role="presentation">
         <span>コメント・書き出し</span>
+      </div>
+
+      <!--
+        ★v0.1.1478(ユーザー指摘「コメントうつんだからこのそばにないとわからない」):
+          なふだの切り替えを【コメント入力のすぐ上】へ出す。
+
+        ★v0.1.1477 で詳細設定の見出しに「なふだ」を足したが、それでも足りなかった。
+          ★理由＝これは【コメントを打つときに決めること】なので、
+            設定の中ではなく【打つ場所の隣】に無いと気づけない。
+          ⟹ 「名前を出す」だけでは不十分で、★【使う場所へ置く】必要があった。
+
+        ★詳細設定の中のボタン(#nameplateOnBtn / #nameplateOffBtn)は残す(既存の導線を壊さない)。
+          こちらは同じ機能への2つ目の入口。
+      -->
+      <div class="nl-nameplate-inline">
+        <div class="nl-nameplate-inline__guide">
+          <img
+            class="nl-nameplate-inline__face"
+            src="images/yukkuri-charactore-english/link/link-yukkuri-half-eyes-mouth-closed.png"
+            alt=""
+            width="24"
+            height="24"
+            decoding="async"
+          />
+          <span class="nl-nameplate-inline__text">
+            りんく: コメントするとき、放送者さんにキミのアイコンと名前を見せるかどうかを決められるよ。
+            見せるのは<b>放送者さんだけ</b>で、ほかの視聴者さんには見えないから安心してね。
+          </span>
+        </div>
+        <div class="nl-nameplate-inline__row">
+          <span class="nl-nameplate-inline__label">なふだ</span>
+          <button type="button" id="nameplateOnBtnInline" class="nl-mini-btn">表示する</button>
+          <button type="button" id="nameplateOffBtnInline" class="nl-mini-btn">隠す</button>
+          <span class="nl-nameplate-inline__note" id="nameplateToggleNoteInline"></span>
+        </div>
       </div>
 
       <section

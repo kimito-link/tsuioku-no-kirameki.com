@@ -341,3 +341,45 @@ describe('★機能は「たどり着けて」初めて在る(2026-08-22 実損)
     expect(summary, '詳細設定の見出しに「なふだ」が無い＝閉じていると気づけない').toContain('なふだ');
   });
 });
+
+/**
+ * ★v0.1.1478: 「名前を出す」だけでは足りなかった。【使う場所へ置く】。
+ *
+ * ■ 経緯(2026-08-22・同じ機能で3回)
+ *   v0.1.1393 実装した              → ユーザー「ない気がします」
+ *   v0.1.1477 見出しに名前を出した  → ★それでもまだ足りない
+ *   v0.1.1478 ★コメント入力の隣に置いた
+ *
+ * ★なふだは【コメントを打つときに決めること】なので、
+ *   設定の中にあるだけでは、打っている最中に思い出せない。
+ */
+describe('★使う場所に置く(2026-08-22 なふだ・3回目)', () => {
+  it('★なふだの切り替えがコメント入力の【前】にある', () => {
+    const html = read('extension/popup.html');
+    const inline = html.indexOf('id="nameplateOnBtnInline"');
+    const textarea = html.indexOf('id="commentInput"');
+    expect(inline, 'コメント欄そばのなふだボタンが無い').toBeGreaterThan(0);
+    expect(textarea).toBeGreaterThan(0);
+    // ★入力欄より前＝打つ前に目に入る位置
+    expect(inline, 'なふだがコメント入力欄より後ろにある＝打つときに見えない').toBeLessThan(textarea);
+  });
+
+  it('★2つの入口が両方とも配線されている', () => {
+    const src = read('src/lib/nameplateToggleBoot.js');
+    expect(src).toContain('nameplateOnBtn');
+    expect(src).toContain('nameplateOnBtnInline');
+    // ★結果は押した場所に出す(押せたか分からないのを防ぐ)
+    expect(src).toContain('nameplateToggleNoteInline');
+  });
+
+  it('★キャラの吹き出しで説明している(ユーザー要望)', () => {
+    const html = read('extension/popup.html');
+    // ★CSS規則にも同じクラス名が出るので【要素の開始タグ】を狙う(v0.1.1477 と同じ罠)
+    const at = html.indexOf('<div class="nl-nameplate-inline__guide">');
+    expect(at, 'なふだの吹き出し説明が無い').toBeGreaterThan(0);
+    const block = html.slice(at, at + 700);
+    expect(block).toContain('りんく');
+    // ★「放送者だけに見える」は不安を消す核心なので必ず書く
+    expect(block).toContain('放送者');
+  });
+});

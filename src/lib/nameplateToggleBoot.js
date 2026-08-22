@@ -51,23 +51,49 @@ async function requestNameplate(on) {
   }
 }
 
+/**
+ * ★v0.1.1478: 入口は【2つ】ある。
+ *
+ *   詳細設定の中(#nameplateOnBtn / #nameplateOffBtn)
+ *   ★コメント入力のすぐ上(#nameplateOnBtnInline / #nameplateOffBtnInline)
+ *
+ * ★なぜ2つ目を足したか(ユーザー指摘)
+ *   「コメントうつんだからこのそばにないとわからない」
+ *   ＝ なふだは【コメントを打つときに決めること】。
+ *   v0.1.1477 で設定の見出しに名前を出したが、それでも足りなかった。
+ *   ★名前を出すだけでなく【使う場所へ置く】必要があった。
+ *
+ * ★どちらを押しても同じ処理。結果はそれぞれの note に出す
+ *   (押した場所に答えが出ないと、押せたのか分からない)。
+ */
+const NAMEPLATE_ENTRY_POINTS = Object.freeze([
+  { onId: 'nameplateOnBtn', offId: 'nameplateOffBtn', noteId: 'nameplateToggleNote' },
+  {
+    onId: 'nameplateOnBtnInline',
+    offId: 'nameplateOffBtnInline',
+    noteId: 'nameplateToggleNoteInline'
+  }
+]);
+
 try {
   const doc = typeof document !== 'undefined' ? document : null;
   if (doc) {
-    const note = doc.getElementById('nameplateToggleNote');
-    /** @param {string} id @param {boolean} on */
-    const bind = (id, on) => {
-      const btn = doc.getElementById(id);
-      if (!btn) return;
-      btn.addEventListener('click', () => {
-        if (note) note.textContent = '切り替え中…';
-        void requestNameplate(on).then((res) => {
-          if (note) note.textContent = describeNameplateResult(res);
+    for (const ep of NAMEPLATE_ENTRY_POINTS) {
+      const note = doc.getElementById(ep.noteId);
+      /** @param {string} id @param {boolean} on */
+      const bind = (id, on) => {
+        const btn = doc.getElementById(id);
+        if (!btn) return;
+        btn.addEventListener('click', () => {
+          if (note) note.textContent = '切り替え中…';
+          void requestNameplate(on).then((res) => {
+            if (note) note.textContent = describeNameplateResult(res);
+          });
         });
-      });
-    };
-    bind('nameplateOnBtn', true);
-    bind('nameplateOffBtn', false);
+      };
+      bind(ep.onId, true);
+      bind(ep.offId, false);
+    }
   }
 } catch {
   /* 配線に失敗しても popup は出す */
