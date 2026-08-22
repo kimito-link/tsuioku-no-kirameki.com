@@ -227,7 +227,7 @@ import {
 import { backfillLiveThroughputLine } from '../lib/backfillRinkuNarration.js';
 import { resolveVisitorCount } from '../lib/resolveVisitorCount.js';
 import { PERF_DIAG_PREFIX, isPerfDiag } from '../lib/perfDiag.js';
-import { LIVE_ENDED_PREFIX, isLiveEndedFlag } from '../lib/liveEndedFlag.js';
+import { LIVE_ENDED_PREFIX, isLiveEndedFlag, liveEndedStorageKey } from '../lib/liveEndedFlag.js';
 import { buildLiveHealth, scoreToDots } from '../lib/liveHealthScore.js';
 import { runStorageOpWithTimeout, STORAGE_OP_TIMED_OUT } from '../lib/storageOpTimeout.js';
 /*
@@ -268,6 +268,7 @@ import { pickBroadcasterNameForReputation } from '../lib/pickBroadcasterNameForR
 //   panel_summary.updatedAt が古ければ「視聴中」に出さない（純関数で test 付き）。
 import { panelSummaryStorageKey } from '../lib/panelLiveSummary.js';
 import { isLastWatchUrlFresh } from '../lib/watchUrlFreshness.js';
+import { shouldAdoptLastWatchUrl } from '../lib/lastWatchUrlAdoption.js';
 // 2026-06-23: Alt+Tab に出ない裏 watch タブ(active:false・過去 autopatrol/古い重複拡張の遺物)を
 //   検出して手動クローズ導線を出す(council/orphan-tab-survivor-SYNTHESIS.md)。自動では閉じない。
 import { isBackgroundWatchTab } from '../lib/backgroundWatchTab.js';
@@ -1246,17 +1247,29 @@ async function enumerateActiveLives() {
     const m = url.match(/lv\d{1,15}/);
     if (m) {
       const lv = m[0].toLowerCase();
-      let fresh = false;
+      let adopt = false;
       try {
+        // ★v0.1.1481: 終了の印(nls_live_ended_<lv>)も一緒に読む。
+        //   panel_summary は content が約2秒ごとに書くので、放送を閉じた【直後】は
+        //   必ず「新しい」と判定される＝★閉じた放送が最大3分「視聴中」に居座っていた
+        //   (ユーザー指摘「今放送とじて…ここにでるってへんじゃない？」)。
+        //   ★印はこのリポに既にあり status の他所は読んでいた(1636/3332)。経路3だけ配線漏れ。
+        // ★2キーを【1回の get】で読む。直列にすると有界な read でも合計が無界になる
+        //   ([[serial-bounded-reads-sum-to-unbounded]])。稀パスでも read 回数は増やさない。
         const pKey = panelSummaryStorageKey(lv);
-        const sbag = await chrome.storage.local.get(pKey);
+        const eKey = liveEndedStorageKey(lv);
+        const sbag = await chrome.storage.local.get([pKey, eKey]);
         const updatedAt = Number(sbag?.[pKey]?.updatedAt);
-        fresh = isLastWatchUrlFresh(updatedAt, Date.now());
+        const endedFlag = sbag?.[eKey];
+        adopt = shouldAdoptLastWatchUrl({
+          endedAt: isLiveEndedFlag(endedFlag) ? endedFlag.endedAt : null,
+          fresh: isLastWatchUrlFresh(updatedAt, Date.now())
+        });
       } catch {
-        // panel_summary が読めない＝記録の形跡なし＝視聴中とは言えない（採用しない）。
-        fresh = false;
+        // 読めない＝記録の形跡なし＝視聴中とは言えない（採用しない）。
+        adopt = false;
       }
-      if (fresh) lvList.push(lv);
+      if (adopt) lvList.push(lv);
     }
   } catch {
     /* fallthrough */
