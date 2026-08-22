@@ -120,7 +120,13 @@ export function buildPerfDiagLine(diag, nowMs = Date.now()) {
   if (diag.paintCount != null) {
     parts.push(`描画${diag.paintCount}回`);
     // v0.1.1248: 「多いか少ないか」を必ず添える。判定が無いと読み飛ばされる。
-    const verdict = judgePaintPerComment(diag.paintCount, diag.commentCount);
+    const verdict = judgePaintPerComment(
+      diag.paintCount,
+      diag.commentCount,
+      // ★内訳を渡すと「1コメントあたり」と言ってよいかを判定できる。
+      //   2026-08-23 実データ: 描き直しの97%はコメント以外が理由だった。
+      diag.repaintReasons
+    );
     if (verdict.level === 'bad' || verdict.level === 'warn') {
       parts.push(`⚠${verdict.label}(${verdict.detail})`);
     }

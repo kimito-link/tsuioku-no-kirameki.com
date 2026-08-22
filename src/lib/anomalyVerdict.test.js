@@ -1,10 +1,8 @@
 import { describe, it, expect } from 'vitest';
-import {
-  judgePaintPerComment,
+import {judgePaintPerComment,
   judgeValueFreshness,
   judgeVersionApplied,
-  worstVerdict
-} from './anomalyVerdict.js';
+  worstVerdict, dominantRepaintCause } from './anomalyVerdict.js';
 
 /**
  * anomalyVerdict.js — 計器に「正常域」を持たせ異常を名指しする純関数群。
@@ -133,5 +131,53 @@ describe('worstVerdict — 最も重い判定を先頭に出す', () => {
     expect(worstVerdict([]).level).toBe('ok');
     expect(worstVerdict(/** @type {any} */ (null)).level).toBe('ok');
     expect(worstVerdict(/** @type {any} */ ([null, 'x'])).level).toBe('ok');
+  });
+});
+
+describe('★描き直しの原因を名指しする(分母に置いただけの値を原因にしない)', () => {
+  // ★2026-08-23 ユーザーの速報の実データ
+  const REAL = {
+    self_write_skipped: 3310,
+    'storage_changed:nls_panel_summary_*': 219,
+    'storage_changed:nls_watch_snapshot_*': 196,
+    'storage_changed:nls_ctail_*': 8,
+    'storage_changed:nls_comment_ingest_log_v1': 25
+  };
+
+  it('★止めた回数(self_write_skipped)は分母に入れない', () => {
+    const c = dominantRepaintCause(REAL);
+    // 3310 を除いた 448 が分母
+    expect(c.topName).toBe('storage_changed:nls_panel_summary_*');
+    expect(Math.round(c.topShare * 100)).toBe(49);
+  });
+
+  it('★実データでコメント由来が少数派だと分かる', () => {
+    const c = dominantRepaintCause(REAL);
+    expect(c.commentShare).toBeLessThan(0.5);
+  });
+
+  it('★コメントが少数派なら「1コメントあたり」と言わない', () => {
+    const v = judgePaintPerComment(1106, 143, REAL);
+    expect(v.detail).toContain('原因の大半はコメント以外');
+    expect(v.detail).toContain('storage_changed:nls_panel_summary_*');
+  });
+
+  it('★コメントが主因ならこれまで通り「1コメントあたり」と言う(退化させない)', () => {
+    const v = judgePaintPerComment(100, 25, { 'storage_changed:nls_ctail_*': 90, other: 10 });
+    expect(v.detail).toContain('1コメントあたり');
+    expect(v.detail).not.toContain('原因の大半はコメント以外');
+  });
+
+  it('★内訳が無いときは今まで通り(壊さない)', () => {
+    const v = judgePaintPerComment(1106, 143);
+    expect(v.detail).toContain('1コメントあたり');
+    expect(v.level).toBe('warn');
+  });
+
+  it('★壊れた内訳を測れたことにしない', () => {
+    expect(dominantRepaintCause(null).measured).toBe(false);
+    expect(dominantRepaintCause({}).measured).toBe(false);
+    expect(dominantRepaintCause({ self_write_skipped: 99 }).measured).toBe(false);
+    expect(dominantRepaintCause({ a: 'x', b: -1 }).measured).toBe(false);
   });
 });

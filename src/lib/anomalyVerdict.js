@@ -50,6 +50,54 @@ function toNumberStrict(v) {
 }
 
 /**
+ * 描き直しの理由のうち、コメント到着とは【無関係】なものの割合を出す。
+ *
+ * ★なぜ要るか(2026-08-23・実データで判明)
+ *   ユーザーの速報: 「1コメントあたり7.7回描き直しています」
+ *   ★ところが内訳を数えると:
+ *     実際に描いた 1,106回 のうち
+ *     コメント到着が理由 … ★33回(3.0%)
+ *     それ以外(storage更新) … ★1,073回(97.0%)
+ *   ⟹ ★原因の97%はコメントではないのに「1コメントあたり」と名乗っていた。
+ *
+ *   ＝ [[instrument-can-name-the-wrong-culprit]] の再来。
+ *   ★分母に置いただけの値を、原因のように読ませてはいけない。
+ *
+ * ★コメント由来と見なす理由キー
+ *   ctail(コメント末尾) / comment_ingest / csummary。
+ *   ★ここに無いものを「コメント由来でない」と決めつけない: 判定できないものは
+ *   unknown として数え、名指しの分母から外す。
+ *
+ * @param {Record<string, number>|null|undefined} reasons 理由別の回数
+ * @returns {{ measured: boolean, topName: string, topShare: number, commentShare: number }}
+ */
+export function dominantRepaintCause(reasons) {
+  const r = reasons && typeof reasons === "object" ? reasons : null;
+  if (!r) return { measured: false, topName: "", topShare: 0, commentShare: 0 };
+
+  let painted = 0;
+  let commentish = 0;
+  /** @type {{name:string,n:number}} */
+  let top = { name: "", n: 0 };
+  for (const [name, raw] of Object.entries(r)) {
+    const n = Number(raw);
+    if (!Number.isFinite(n) || n <= 0) continue;
+    // ★止めた回数は「描いた」ではないので分母から外す(速報も分子から除外済み)。
+    if (name === "self_write_skipped") continue;
+    painted += n;
+    if (/ctail|comment_ingest|csummary/i.test(name)) commentish += n;
+    if (n > top.n) top = { name, n };
+  }
+  if (painted <= 0) return { measured: false, topName: "", topShare: 0, commentShare: 0 };
+  return {
+    measured: true,
+    topName: top.name,
+    topShare: top.n / painted,
+    commentShare: commentish / painted
+  };
+}
+
+/**
  * 描画回数がコメント件数に対して過剰でないかを判定する。
  *
  * 正常域の根拠(2026-08-04 実測):
@@ -60,9 +108,10 @@ function toNumberStrict(v) {
  *
  * @param {unknown} paintCount 累計描画回数
  * @param {unknown} commentCount 累計コメント件数
+ * @param {?Record<string, number>} repaintReasons 理由別の回数(あれば原因を名指しする)
  * @returns {AnomalyVerdict}
  */
-export function judgePaintPerComment(paintCount, commentCount) {
+export function judgePaintPerComment(paintCount, commentCount, repaintReasons) {
   const paints = toNumberStrict(paintCount);
   const comments = toNumberStrict(commentCount);
   if (!Number.isFinite(paints) || !Number.isFinite(comments) || paints < 0 || comments < 0) {
@@ -77,25 +126,37 @@ export function judgePaintPerComment(paintCount, commentCount) {
     };
   }
   const ratio = paints / comments;
+  // ★原因を名指しする(分母に置いただけの値を原因のように読ませない)。
+  //   2026-08-23 実データ: 描き直し1,106回のうちコメント由来は★3.0%だけだった。
+  const cause = dominantRepaintCause(repaintReasons);
+  //   ★コメント由来が半分に満たないなら「1コメントあたり」とは言わない。
+  const blamesComment = !cause.measured || cause.commentShare >= 0.5;
+  const per = blamesComment
+    ? '1コメントあたり'
+    : 'コメント1件につき(★原因の大半はコメント以外)';
+  const causeNote = cause.measured && !blamesComment
+    ? ` ★描き直しの${Math.round(cause.commentShare * 100)}%だけがコメント由来。`
+      + `最多の理由は ${cause.topName}(${Math.round(cause.topShare * 100)}%)`
+    : '';
   const shown = ratio >= 10 ? Math.round(ratio) : ratio.toFixed(1);
   if (ratio >= 10) {
     return {
       level: 'bad',
       label: '描き直しすぎ',
-      detail: `1コメントあたり${shown}回描き直しています(正常は3回以下)。画面のちらつきの原因です`
+      detail: `${per}${shown}回描き直しています(正常は3回以下)。画面のちらつきの原因です` + causeNote
     };
   }
   if (ratio >= 3) {
     return {
       level: 'warn',
       label: '描き直しが多い',
-      detail: `1コメントあたり${shown}回描き直しています(正常は3回以下)`
+      detail: `${per}${shown}回描き直しています(正常は3回以下)` + causeNote
     };
   }
   return {
     level: 'ok',
     label: '正常',
-    detail: `1コメントあたり${shown}回`
+    detail: `${per}${shown}回`
   };
 }
 
