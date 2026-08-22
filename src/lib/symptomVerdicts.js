@@ -197,6 +197,19 @@ export function buildSymptomVerdicts(input) {
 }
 
 /**
+ * ★症状の合言葉の見出し。共有テキストから機械が拾えるように固定文字列にする。
+ *
+ * ★なぜ要るか(2026-08-23)
+ *   症状IDは【前から出ていた】のに、速報には人が読む文だけを載せていた。
+ *   ⟹ 受け取った側が「過去に同じ症状があったか」を★言葉で引けなかった。
+ *   実測: 症状ID 7件で原因索引(ai-hub 245件)を引くと ★ヒット率 0%。
+ *
+ *   ★索引を引くには両側が【同じ言葉】を使っている必要がある。
+ *   人が読む文は毎回変わるが、症状IDは変わらない。だからIDを載せる。
+ */
+export const SYMPTOM_SIGNATURE_LABEL = '合言葉(この語で過去の原因を検索):';
+
+/**
  * 速報に貼るブロックへ整形する。
  * ★異常が無ければ**何も出さない**(正常時に1pxも足さない)。
  *
@@ -208,5 +221,14 @@ export function formatSymptomVerdictsBlock(list) {
   if (arr.length === 0) return '';
   const lines = ['### 症状別の判定(いま出ている異常だけ)'];
   for (const v of arr) lines.push(v.line);
+
+  // ★合言葉を1行にまとめて出す。
+  //   ★人が読む文とは別に置く: 文は毎回変わるが、この語は変わらないため
+  //   受け取った側が【そのまま検索に貼れる】。
+  //   ★正常時は上の early return で何も出ないので、1pxも足さない。
+  const ids = arr.map((v) => String(v?.id || '').trim()).filter(Boolean);
+  if (ids.length > 0) {
+    lines.push(SYMPTOM_SIGNATURE_LABEL + ' ' + ids.join(' '));
+  }
   return lines.join('\n');
 }
