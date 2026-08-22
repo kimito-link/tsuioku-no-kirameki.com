@@ -438,6 +438,7 @@
 | `src/lib/capCommentsForAnalytics.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/captureAuditionRichviewEventScoreDiagProbe.js` | 1 | 記録エンジン(watchページ常駐) |
 | `src/lib/cardFreshnessNote.js` | 1 | ポップアップ(応援レーン) |
+| `src/lib/catchingUpVerdict.js` | 1 | 状態速報ページ |
 | `src/lib/celebrationCommentIncrementalScan.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/celebrationCommentScanSeed.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/changelog.js` | 1 | ポップアップ(応援レーン) |

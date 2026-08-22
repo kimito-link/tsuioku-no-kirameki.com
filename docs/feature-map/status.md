@@ -37,6 +37,7 @@ graph LR
   n_status --> n_src_lib_broadcasterReputationView_js["lib/broadcasterReputationView.js"]
   n_status --> n_src_lib_buildAgeCell_js["lib/buildAgeCell.js"]
   n_status --> n_src_lib_buriedInstrumentCells_js["lib/buriedInstrumentCells.js"]
+  n_status --> n_src_lib_catchingUpVerdict_js["lib/catchingUpVerdict.js"]
   n_status --> n_src_lib_channelSwitchDiag_js["lib/channelSwitchDiag.js"]:::shared
   n_status --> n_src_lib_channelSwitchDiagKey_js["lib/channelSwitchDiagKey.js"]:::shared
   n_status --> n_src_lib_chikuranCard_js["lib/chikuranCard.js"]
@@ -52,8 +53,7 @@ graph LR
   n_status --> n_src_lib_copyTextWithFallback_js["lib/copyTextWithFallback.js"]
   n_status --> n_src_lib_currentLiveIdOrigin_js["lib/currentLiveIdOrigin.js"]
   n_status --> n_src_lib_customSoundDiag_js["lib/customSoundDiag.js"]
-  n_status --> n_src_lib_customSoundPreset_js["lib/customSoundPreset.js"]
   classDef shared fill:#eee,stroke:#999,color:#666;
 ```
 
-> ほか 126 ファイル省略（全件は storage-bus.md / metafile 参照）。
+> ほか 127 ファイル省略（全件は storage-bus.md / metafile 参照）。

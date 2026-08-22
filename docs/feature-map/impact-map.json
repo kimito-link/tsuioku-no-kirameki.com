@@ -3968,6 +3968,16 @@
       ]
     },
     {
+      "file": "src/lib/catchingUpVerdict.js",
+      "featureCount": 1,
+      "features": [
+        "status"
+      ],
+      "labels": [
+        "状態速報ページ"
+      ]
+    },
+    {
       "file": "src/lib/celebrationCommentIncrementalScan.js",
       "featureCount": 1,
       "features": [

@@ -228,3 +228,25 @@ describe('★累計の床は配信の顔ぶれが変わったら捨てる(2026-0
     expect(src).toContain('比較不能');
   });
 });
+
+/**
+ * ★v0.1.1474: 同じ型の【4件目】。
+ *   追いつき中(30%)なのに「取得率が下がり続けています(100%→0%)」の偽陽性。
+ *   ★記録0件の一瞬を【追いつき中ではない】と記録していた
+ *     ＝「まだ始まっていない」を「無い」として確定させた形。
+ */
+describe('★追いつき中の判定は1箇所で決める(2026-08-22 実損: 100%→0%)', () => {
+  it('★判定が純関数に切り出され、status-entry が呼んでいる', () => {
+    const src = read('src/extension/status-entry.js');
+    expect(src).toContain('catchingUpVerdict.js');
+    // ★2箇所とも同じ正本を通す(片方だけ条件が違うと片方だけ偽陽性になる)
+    expect(src).toContain('isCatchingUp(');
+    expect(src).toContain('anyCatchingUp(');
+  });
+
+  it('★記録0件を「追いつき中ではない」に倒さない', () => {
+    const src = read('src/lib/catchingUpVerdict.js');
+    // ★rec > 0 を条件に戻すと、開いた直後の一瞬が false になって偽陽性が復活する
+    expect(src).not.toMatch(/return\s+rec\s*>\s*0\s*&&/);
+  });
+});
