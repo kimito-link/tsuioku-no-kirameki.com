@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 6 / 834 件
+## ⚠️ 役割コメントが無いソース 6 / 835 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `src/lib/laneDomSelfMeasure.js`
@@ -47,6 +47,8 @@
 - 📁 **.codex-osint/** (2)
   - `cc_pre_request_20220927.warc.gz`
   - `test-write.txt`
+- 📁 **_docs/** (1)
+  - `FROM-web-ios-android-ledger-shipped-2026-08-22.md`
 - 📁 **api/** (1)
   - `status.js` — status 受け口 Vercel Serverless Function。
 - 📁 **app/** (97)
@@ -736,7 +738,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (1821)
+- 📁 **src/** (1823)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1034,7 +1036,7 @@
         - `logo_funlink_white_RGB_maru_black.png`
       - `logo_guide_funlink_ol.pdf`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1573)
+  - 📁 **lib/** (1575)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -1602,6 +1604,8 @@
     - `improvementHistory.js` — 【層】L0 判定層(純粋関数・I/O禁止)
     - `improvementLedger.js` — 【層】L0 判定層(純粋関数・I/O禁止)
     - `improvementLedger.test.js`
+    - `improvementStaleness.js` — 【層】L0 判定層(純粋関数・I/O禁止)
+    - `improvementStaleness.test.js`
     - `inFlightGuard.js` — 状態速報「重さ根治 P3」: runStorageOpWithTimeout(storageOpTimeout.js)は Promise.race で
     - `inFlightGuard.test.js`
     - `inferBroadcasterUserIdFromComments.js` — snapshot の broadcasterUserId が空のとき、保存済みコメント内の表示名から

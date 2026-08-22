@@ -36,6 +36,10 @@ import {
   buildSubmissionSummary,
   formatImprovementLine
 } from '../src/lib/improvementLedger.js';
+import {
+  analyzeImprovementStaleness,
+  formatImprovementStalenessLine
+} from '../src/lib/improvementStaleness.js';
 import { EXIT, computeExitCode, formatProbeReport, runSelfTest } from './lib/instrument-core.mjs';
 
 const CHECK = process.argv.includes('--check');
@@ -113,9 +117,14 @@ if (SUBMISSION) {
  *   ここを赤にすると、記録が面倒なときに"嘘の数字を入れる"動機を作る。
  *   ★この土台の規約どおり「測れなかった」は 2 で答える。
  */
-function currentVersionUnrecorded(history) {
+/** ★いまの版(package.json が正本)。鮮度判定と未記録判定の両方が使う。 */
+function currentVersion() {
   const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-  const version = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')).version;
+  return JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')).version;
+}
+
+function currentVersionUnrecorded(history) {
+  const version = currentVersion();
   const found = history.some((r) => String(r?.version || '') === version);
   return found ? null : version;
 }
@@ -132,6 +141,18 @@ if (!CHECK) {
     if (prev) console.log('  ' + formatImprovementLine({ metric: r.metric, before: prev.value, after: r.value }) + `  (${r.version})`);
     byMetric.set(r.metric, r);
   }
+  /*
+   * ★v0.1.1479: 「どの指標を測っていないか」を出す。
+   *   ★実測(2026-08-22): 10指標のうち自動の2つしか動いておらず、
+   *     診断の所要は 29,303ms→19ms と1,500倍動いたのに台帳に1件も無かった。
+   *   ★強制はしない(書かせると嘘の数字が入る・規約③)。数を見せるだけ。
+   */
+  console.log("");
+  console.log(formatImprovementStalenessLine(analyzeImprovementStaleness({
+    metrics: IMPROVEMENT_METRICS,
+    history: IMPROVEMENT_HISTORY,
+    currentVersion: currentVersion()
+  })));
   process.exit(EXIT.PASS);
 }
 

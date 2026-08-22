@@ -177,5 +177,38 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
   Object.freeze({
     version: '0.1.1478', metric: 'gate-selftest', value: 2,
     source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1478', metric: 'diag-ms', value: 19,
+    source: '実機の状態速報「更新所要(計器)」 2026-08-22 12:56',
+    note: '★v0.1.1476(状態ページにも窓)+v0.1.1478 の効果。29,303ms→638ms→19ms。★この指標は v0.1.1416 以降62版ぶん記録が空いていた(鮮度の検査で判明)'
+  }),
+  Object.freeze({
+    version: '0.1.1478', metric: 'dom-nodes', value: 2864,
+    source: '実機の状態速報 memoryPressure.domNodes 2026-08-22 12:56',
+    note: '★初回記録。推奨1500を超えている(実測2,864)。★これから下げる対象として台帳に載せる'
+  }),
+  Object.freeze({
+    version: '0.1.1478', metric: 'panel-block-ms', value: 669,
+    source: '実機の状態速報「最大タイマー遅延」 2026-08-22 12:56',
+    note: '★24版ぶりの記録。v0.1.1454の106msより大きいが、★測定条件が違う' +
+      '(当時=バンドル分割直後の計測 / 今回=来場2,605人の実配信)。' +
+      '★比べてよい数字かはまだ確かめていない。次版で同条件を揃えて測り直す。'
+  }),
+  Object.freeze({
+    version: '0.1.1478', metric: 'record-rate', value: 100,
+    source: '実機の状態速報「取得率」 2026-08-22 12:56 (記録1,864/公式1,861)',
+    note: '★初回記録。取得完了100%'
+  }),
+  Object.freeze({
+    version: '0.1.1479', metric: 'bundle-kb', value: 1407,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '★v0.1.1477 から3版連続で同値(1407KB)＝この版では増やしていない。' +
+      '追加は検査側(improvementStaleness.js)で popup.js には入らない。' +
+      '★+47KB(1360→1407)の累積は計器・検査の追加分。次に減らす対象として台帳に残す。'
+  }),
+  Object.freeze({
+    version: '0.1.1479', metric: 'gate-selftest', value: 2,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
   })
 ]);
