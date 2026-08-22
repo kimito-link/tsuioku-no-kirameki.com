@@ -237,5 +237,14 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
   Object.freeze({
     version: '0.1.1482', metric: 'gate-selftest', value: 2,
     source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1483', metric: 'bundle-kb', value: 1408,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '★1409→1408(前版より減)。合言葉の行は既存の症状IDを1行足すだけでロジック追加なし'
+  }),
+  Object.freeze({
+    version: '0.1.1483', metric: 'gate-selftest', value: 2,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
   })
 ]);

@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { buildSymptomVerdicts, formatSymptomVerdictsBlock } from './symptomVerdicts.js';
+import {
+  buildSymptomVerdicts,
+  formatSymptomVerdictsBlock,
+  SYMPTOM_SIGNATURE_LABEL
+} from './symptomVerdicts.js';
 
 /**
  * ★v0.1.1385: 症状別の特化判定(複数)。
@@ -108,5 +112,46 @@ describe('起動直後は「レーンが空」と断定しない', () => {
   it('popupAgeMs が無ければ従来どおり判定する(後方互換)', () => {
     const v = buildSymptomVerdicts({ laneRenderProbe: probeNotStarted });
     expect(v.find((x) => x.id === 'lane-never-rendered')).toBeTruthy();
+  });
+});
+
+describe('★合言葉の行(共有した相手が原因を検索できるように)', () => {
+  const two = [
+    { id: 'panel-black', symptom: '黒', level: 'bad', line: '🔴 画面が黒い' },
+    { id: 'status-slow', symptom: '遅い', level: 'warn', line: '🟡 状態が遅い' }
+  ];
+
+  it('★症状IDが【そのまま検索に貼れる形】で出る', () => {
+    const out = formatSymptomVerdictsBlock(two);
+    expect(out).toContain(SYMPTOM_SIGNATURE_LABEL);
+    expect(out).toContain('panel-black status-slow');
+  });
+
+  it('★正常時は1pxも足さない(空文字のまま)', () => {
+    expect(formatSymptomVerdictsBlock([])).toBe('');
+    expect(formatSymptomVerdictsBlock(null)).toBe('');
+  });
+
+  it('★人が読む行とは【別の行】に置く(文が変わっても語は変わらない)', () => {
+    const lines = formatSymptomVerdictsBlock(two).split(String.fromCharCode(10));
+    const sig = lines.filter((l) => l.startsWith(SYMPTOM_SIGNATURE_LABEL));
+    expect(sig).toHaveLength(1);
+    // ★人が読む行に混ぜない(混ぜると文言変更で機械が拾えなくなる)
+    expect(lines.find((l) => l.startsWith('🔴'))).not.toContain('panel-black');
+  });
+
+  it('★idが壊れていても行を壊さない', () => {
+    const out = formatSymptomVerdictsBlock([
+      { id: '', symptom: 'x', level: 'bad', line: '🔴 a' },
+      { id: 'panel-black', symptom: 'y', level: 'bad', line: '🔴 b' }
+    ]);
+    expect(out).toContain('panel-black');
+    // ★空のidで余計な空白を作らない
+    expect(out).not.toMatch(new RegExp(SYMPTOM_SIGNATURE_LABEL + '  '));
+  });
+
+  it('★実際の症状IDが索引の語彙と同じ形(小文字ハイフン)', () => {
+    // ★索引側の正規化と揃っていないと永久にヒットしない
+    for (const v of two) expect(v.id).toMatch(/^[a-z0-9][a-z0-9-]*$/);
   });
 });
