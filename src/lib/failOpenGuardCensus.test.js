@@ -266,6 +266,19 @@ describe('★追いつき中の判定は1箇所で決める(2026-08-22 実損: 1
  *   ★タイルは857枚のまま＝1枚も消えていない。
  */
 describe('★レーンの窓(v0.1.1475)— 消さない・capにしない', () => {
+  it('★窓のCSSは popup.html と status.html の【両方】にある(2026-08-22 実損)', () => {
+    /*
+     * ★v0.1.1475 で popup.html にだけ入れ、status.html を忘れた。
+     *   status は別文書なので CSS が共有されない。
+     *   実機で status の DOM が 3,984個(推奨1,500の2.7倍)まで膨れ、
+     *   ★read を1本も発行していない coreBatch×0 が 3,164ms かかった。
+     */
+    for (const f of ['extension/popup.html', 'extension/status.html']) {
+      const html = read(f);
+      expect(html, f + ' に窓のCSSが無い').toContain('nl-story-userlane--windowed');
+    }
+  });
+
   it('★窓のCSSが popup.html に存在する', () => {
     const html = read('extension/popup.html');
     expect(html).toContain('nl-story-userlane--windowed');
