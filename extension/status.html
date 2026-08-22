@@ -636,6 +636,24 @@
         max-height: none;
         overflow-y: visible;
       }
+      /*
+       * ★v0.1.1476: popup.html と【同じ窓】を status.html にも入れる。
+       *
+       * ■ ★なぜ抜けていたか
+       *   v0.1.1475 で popup.html にだけ窓を入れた。
+       *   ★status.html は別文書なので CSS が共有されない(設計時に指摘されていた)。
+       *   結果、実機で status の DOM が 3,984個(推奨1,500の2.7倍)まで膨れ、
+       *   ★read を1本も発行していない coreBatch×0 が 3,164ms かかった
+       *   ＝ storage 待ちではなく【メインスレッドが止まっていた】。
+       *
+       * ■ ★これは cap ではない(popup と同じ)
+       *   1枚も消さない。スクロールすれば全員に到達できる。
+       *   ★実測(857枚): 高さ 2,010px → 380px(81%減)・タイルは857枚のまま。
+       */
+      #sceneStoryUserLaneTanu.nl-story-userlane--windowed {
+        max-height: min(42vh, 380px);
+        overflow-y: auto;
+      }
       .nl-story-userlane-cell {
         display: inline-flex;
         flex-direction: row;
