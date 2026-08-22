@@ -11560,8 +11560,14 @@
       </p>
 
       <details id="nlPopupSettings" class="nl-popup-settings">
+        <!--
+          ★v0.1.1477: 見出しに「なふだ」を足す。
+            ★実装は v0.1.1393 からあったのに、ユーザーが「ない気がします」と言った。
+              理由＝この details が閉じていて、★見出しに その語が無いので中にあると分からない。
+            ★「入れたのに届いていない」型。中身を増やすのではなく【名前を出す】ことで直す。
+        -->
         <summary class="nl-popup-settings__summary">
-          詳細設定（記録のON/OFF・取り込み・パネル位置・動き・表示トラブル）
+          詳細設定（記録のON/OFF・なふだ・取り込み・パネル位置・動き・表示トラブル）
         </summary>
         <div class="nl-popup-settings__body">
           <div class="nl-record nl-record--in-settings">
@@ -12190,7 +12196,7 @@
           class="nl-export-toolbar__hint nl-compose-toolbar-hint"
           id="exportToolbarHint"
         >
-          HTML保存・スクショ（動画領域のみ）・再読み込みは送信の横からもできます。パネル位置・幅・動きの抑え・表示トラブル時の手順は、上の「詳細設定（取り込み・パネル位置・動き・表示トラブル）」を開いてください。定期サムネや書き出しの詳細は、さらに下の項目を開いてください。
+          HTML保存・スクショ（動画領域のみ）・再読み込みは送信の横からもできます。パネル位置・幅・動きの抑え・表示トラブル時の手順は、上の「詳細設定（なふだ・取り込み・パネル位置・動き・表示トラブル）」を開いてください。定期サムネや書き出しの詳細は、さらに下の項目を開いてください。
         </p>
         <details
           class="nl-export-toolbar__details nl-compose-primary-more"
