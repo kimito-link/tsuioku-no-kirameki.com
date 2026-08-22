@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 6 / 833 件
+## ⚠️ 役割コメントが無いソース 6 / 834 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `src/lib/laneDomSelfMeasure.js`
@@ -736,7 +736,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (1819)
+- 📁 **src/** (1821)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1034,7 +1034,7 @@
         - `logo_funlink_white_RGB_maru_black.png`
       - `logo_guide_funlink_ol.pdf`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1571)
+  - 📁 **lib/** (1573)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -1738,6 +1738,8 @@
     - `laneTileHistoryUsesDom.wiring.test.js`
     - `laneTileOscillation.js` — 【層】L0 判定層(純粋関数・I/O禁止)
     - `laneTileOscillation.test.js`
+    - `laneWindowVerdict.js` — 【層】L0 判定層(純粋関数・I/O禁止)
+    - `laneWindowVerdict.test.js`
     - `lengthDelimitedStream.js` — length-delimited（varint 長 + ペイロード）の連続を分割する。
     - `lengthDelimitedStream.test.js`
     - `libAgentsDoc.test.js`

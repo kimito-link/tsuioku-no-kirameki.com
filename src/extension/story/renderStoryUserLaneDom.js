@@ -17,6 +17,7 @@ import {
 } from '../../lib/storyUserLaneGuideHtml.js';
 import { buildStoryUserLaneStackAriaLabel } from '../../lib/supportVisualStoryCopy.js';
 import { buildPersonTileEl } from '../../lib/personTileDom.js';
+import { judgeLaneWindow } from '../../lib/laneWindowVerdict.js';
 // v0.1.1113 実DOM census(Tri-Parity): タイルへ照合キーを恒久刻印するための純関数(葉lib同士=循環なし)。
 import { venueLaneParityKey } from '../../lib/venueLaneParity.js';
 // 2026-07-20 診断先行(①POP「クリック不能な手カーソル」実害確定): タイル実体(span)なのに
@@ -291,6 +292,23 @@ function storyLaneTierBodyKey(items) {
 }
 
 /** @param {HTMLElement | null} root */
+/**
+ * ★v0.1.1475: たぬ姉段が多人数のとき【窓】にする(高さを絞ってスクロール)。
+ *
+ * ★1枚も消さない。class を付け外しするだけで、DOM の枚数は一切変えない。
+ *   判定は laneWindowVerdict.js(純関数)が正本。ここは付け外しするだけ。
+ *   ★件数だけで決める＝DOM read ゼロ([[instrument-can-kill-the-page-it-measures]])。
+ *
+ * @param {HTMLElement|null|undefined} laneEl
+ * @param {number} tileCount buckets の件数(★DOM から数えない)
+ * @param {unknown} wrapTileEl 会場モードのラッパ(あれば会場＝対象外)
+ */
+function applyStoryUserLaneWindow(laneEl, tileCount, wrapTileEl) {
+  if (!laneEl || !laneEl.classList) return;
+  const { windowed } = judgeLaneWindow({ tileCount, isVenue: !!wrapTileEl });
+  laneEl.classList.toggle('nl-story-userlane--windowed', windowed);
+}
+
 function removeStoryUserLaneEmptyNotesUnder(root) {
   if (!root) return;
   root.querySelectorAll('.nl-story-userlane__empty-note').forEach((n) => {
@@ -533,6 +551,14 @@ export function paintStoryUserLaneDomFilled(
   if (laneAd) fillLaneTier(laneAd, buckets.ad || [], io, wrapTileEl);
   fillLaneTier(laneKonta, buckets.konta, io, wrapTileEl);
   fillLaneTier(laneTanu, buckets.tanu, io, wrapTileEl);
+
+  /*
+   * ★v0.1.1475: たぬ姉段が多人数のとき【窓】にする(高さを絞ってスクロール)。
+   *   ★1枚も消さない。DOM には全員が居たままで、スクロールすれば全員に到達できる。
+   *   判定は buckets の【件数だけ】= DOM read ゼロ(計器がページを殺さないため)。
+   *   ★会場(wrapTileEl あり)は対象外。会場は元々スクロールする器を持っている。
+   */
+  applyStoryUserLaneWindow(laneTanu, buckets.tanu.length, wrapTileEl);
 
   // 空段ノートは lane el 直付け(:188-198)のため、非表示は必ずこの関数の show=false 経由で
   //   【能動的に除去】する(guide 要素の null 化では消えない=設計正本の地雷#5)。
