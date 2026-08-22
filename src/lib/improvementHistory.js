@@ -134,5 +134,16 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
   Object.freeze({
     version: '0.1.1474', metric: 'gate-selftest', value: 2,
     source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1475', metric: 'bundle-kb', value: 1406,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '★+1KB は意図した増加。応援レーンの窓(laneWindowVerdict.js)を足した分。' +
+      '実測で画面の高さ 2,010px→380px(81%減)・タイルは857枚のまま1枚も消えていない。' +
+      '★DOMを減らす効果の方が大きい(数百枚が画面を突き抜けるのを止めた)。'
+  }),
+  Object.freeze({
+    version: '0.1.1475', metric: 'gate-selftest', value: 2,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
   })
 ]);

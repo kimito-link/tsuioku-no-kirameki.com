@@ -250,3 +250,53 @@ describe('★追いつき中の判定は1箇所で決める(2026-08-22 実損: 1
     expect(src).not.toMatch(/return\s+rec\s*>\s*0\s*&&/);
   });
 });
+
+/**
+ * ★v0.1.1475: 「窓」を、また誰かが消さないように固定する。
+ *
+ * ■ ★前提が消えたのに対策が戻らなかった型(今回の真因)
+ *   v0.1.1051 上限48→200 ＋【40vh の縦スクロール枠】を追加
+ *   v0.1.1139 上限200→48 ＋ ★枠を撤去(「48なら要らない」・二重スクロール解消)
+ *   v0.1.1232 ★①の上限を撤廃
+ *   v0.1.1234 ★③鏡の cap も撤廃(238人事件)
+ *   ⟹ ★上限は消えたのに、枠は戻らなかった。実機857人で画面を突き抜けた。
+ *
+ * ■ 実測(chrome-devtools・857枚)
+ *   窓なし 2,010px / 窓あり ★380px(81%減) / scrollHeight 2,010px
+ *   ★タイルは857枚のまま＝1枚も消えていない。
+ */
+describe('★レーンの窓(v0.1.1475)— 消さない・capにしない', () => {
+  it('★窓のCSSが popup.html に存在する', () => {
+    const html = read('extension/popup.html');
+    expect(html).toContain('nl-story-userlane--windowed');
+    // ★素直な max-height + overflow-y だけを使う(実測否定済みの手口を使わない)
+    expect(html).toMatch(/nl-story-userlane--windowed[\s\S]{0,200}overflow-y:\s*auto/);
+  });
+
+  it('★実測否定済みの手口をレーンに使わない', () => {
+    const html = read('extension/popup.html');
+    // ★content-visibility は v0.1.648 で撤去(18,300件配信で白化)。2回撤去している
+    // ★contain: size は 2026-08-19 実測で高さ0・クリック判定が壊れた
+    const windowBlock = html.slice(
+      html.indexOf('nl-story-userlane--windowed'),
+      html.indexOf('nl-story-userlane--windowed') + 300
+    );
+    expect(windowBlock).not.toContain('content-visibility');
+    expect(windowBlock).not.toMatch(/contain\s*:[^;]*size/);
+  });
+
+  it('★判定は純関数が正本で、renderStoryUserLaneDom が呼んでいる', () => {
+    const src = read('src/extension/story/renderStoryUserLaneDom.js');
+    expect(src).toContain('laneWindowVerdict.js');
+    expect(src).toContain('judgeLaneWindow(');
+  });
+
+  it('★窓は「枚数を減らす」判断をしない(capにならないことの構造固定)', () => {
+    const src = read('src/lib/laneWindowVerdict.js');
+    // ★slice / limit / cap が入ったら、それはもう窓ではなく cap
+    const code = src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+    expect(code).not.toMatch(/\.slice\(/);
+    expect(code).not.toMatch(/\blimit\b/);
+    expect(code).not.toMatch(/\bcap\b/);
+  });
+});
