@@ -19,55 +19,56 @@ graph LR
   ROOT --> d0[".codex/"]
   d0 --> d0_0["agents/"]
   ROOT --> d1[".codex-osint/"]
-  ROOT --> d2["api/ 〔API〕"]
-  ROOT --> d3["app/ 〔Web版〕"]
-  d3 --> d3_0["dist/ 〔ビルド成果物〕"]
-  d3 --> d3_1["images/ 〔Web版/画像〕"]
-  ROOT --> d4["council/ 〔会議/設計〕"]
-  ROOT --> d5["council-scout/"]
-  d5 --> d5_0["briefs/"]
-  ROOT --> d6["docs/ 〔設計/レポート〕"]
-  d6 --> d6_0["article-assets/ 〔記事/画像〕"]
-  d6 --> d6_1["article-drafts/"]
-  d6 --> d6_2["feature-map/ 〔依存図/自動生成〕"]
-  d6 --> d6_3["handoff/ 〔引継ぎ/設計〕"]
-  d6 --> d6_4["patent-unique-voice-reading-filing-final/"]
-  d6 --> d6_5["policies/ 〔方針〕"]
-  d6 --> d6_6["releases/ 〔リリース〕"]
-  d6 --> d6_7["research/ 〔調査/レポート〕"]
-  d6 --> d6_8["workflows/ 〔ワークフロー〕"]
-  ROOT --> d7["extension/ 〔配布/manifest〕"]
-  d7 --> d7_0["dist/ 〔ビルド成果物〕"]
-  d7 --> d7_1["images/ 〔画像〕"]
-  d7 --> d7_2["sound/ 〔音声〕"]
-  ROOT --> d8["memory/ 〔メモリ/知見〕"]
-  d8 --> d8_0["archive/ 〔メモリ/履歴〕"]
-  d8 --> d8_1["avatar-parts/ 〔アバター/画像〕"]
-  ROOT --> d9["scripts/ 〔ビルド/自動生成〕"]
-  d9 --> d9_0["__pycache__/"]
-  d9 --> d9_1["lib/"]
-  d9 --> d9_2["xserver/ 〔デプロイ/webhook〕"]
-  ROOT --> d10["sound-src/"]
-  d10 --> d10_0["soundeffect-lab/"]
-  ROOT --> d11["src/ 〔ソース〕"]
-  d11 --> d11_0["data/ 〔コメント/取得〕"]
-  d11 --> d11_1["domain/ 〔応援/集約/識別子〕"]
-  d11 --> d11_2["extension/ 〔entry/記録/会場/応援〕"]
-  d11 --> d11_3["fixtures/ 〔テスト〕"]
-  d11 --> d11_4["images/ 〔画像〕"]
-  d11 --> d11_5["lib/ 〔色/速度/コメント/レポート/純粋関数〕"]
-  d11 --> d11_6["shared/ 〔共有/アバター〕"]
-  d11 --> d11_7["sound/ 〔音声〕"]
-  ROOT --> d12["tests/ 〔テスト〕"]
-  d12 --> d12_0["contract/ 〔テスト/契約〕"]
-  d12 --> d12_1["e2e/ 〔テスト/E2E/描画〕"]
-  d12 --> d12_2["helpers/"]
-  ROOT --> d13["tools/ 〔ツール〕"]
-  d13 --> d13_0["mcp-nicolive/ 〔MCP/診断〕"]
-  ROOT --> d14["tsuioku-no-kirameki/ 〔LP/公開〕"]
-  d14 --> d14_0["articles/ 〔記事/公開〕"]
-  d14 --> d14_1["images/ 〔画像〕"]
-  d14 --> d14_2["sound/ 〔音声/公開〕"]
+  ROOT --> d2["_docs/"]
+  ROOT --> d3["api/ 〔API〕"]
+  ROOT --> d4["app/ 〔Web版〕"]
+  d4 --> d4_0["dist/ 〔ビルド成果物〕"]
+  d4 --> d4_1["images/ 〔Web版/画像〕"]
+  ROOT --> d5["council/ 〔会議/設計〕"]
+  ROOT --> d6["council-scout/"]
+  d6 --> d6_0["briefs/"]
+  ROOT --> d7["docs/ 〔設計/レポート〕"]
+  d7 --> d7_0["article-assets/ 〔記事/画像〕"]
+  d7 --> d7_1["article-drafts/"]
+  d7 --> d7_2["feature-map/ 〔依存図/自動生成〕"]
+  d7 --> d7_3["handoff/ 〔引継ぎ/設計〕"]
+  d7 --> d7_4["patent-unique-voice-reading-filing-final/"]
+  d7 --> d7_5["policies/ 〔方針〕"]
+  d7 --> d7_6["releases/ 〔リリース〕"]
+  d7 --> d7_7["research/ 〔調査/レポート〕"]
+  d7 --> d7_8["workflows/ 〔ワークフロー〕"]
+  ROOT --> d8["extension/ 〔配布/manifest〕"]
+  d8 --> d8_0["dist/ 〔ビルド成果物〕"]
+  d8 --> d8_1["images/ 〔画像〕"]
+  d8 --> d8_2["sound/ 〔音声〕"]
+  ROOT --> d9["memory/ 〔メモリ/知見〕"]
+  d9 --> d9_0["archive/ 〔メモリ/履歴〕"]
+  d9 --> d9_1["avatar-parts/ 〔アバター/画像〕"]
+  ROOT --> d10["scripts/ 〔ビルド/自動生成〕"]
+  d10 --> d10_0["__pycache__/"]
+  d10 --> d10_1["lib/"]
+  d10 --> d10_2["xserver/ 〔デプロイ/webhook〕"]
+  ROOT --> d11["sound-src/"]
+  d11 --> d11_0["soundeffect-lab/"]
+  ROOT --> d12["src/ 〔ソース〕"]
+  d12 --> d12_0["data/ 〔コメント/取得〕"]
+  d12 --> d12_1["domain/ 〔応援/集約/識別子〕"]
+  d12 --> d12_2["extension/ 〔entry/記録/会場/応援〕"]
+  d12 --> d12_3["fixtures/ 〔テスト〕"]
+  d12 --> d12_4["images/ 〔画像〕"]
+  d12 --> d12_5["lib/ 〔色/速度/コメント/レポート/純粋関数〕"]
+  d12 --> d12_6["shared/ 〔共有/アバター〕"]
+  d12 --> d12_7["sound/ 〔音声〕"]
+  ROOT --> d13["tests/ 〔テスト〕"]
+  d13 --> d13_0["contract/ 〔テスト/契約〕"]
+  d13 --> d13_1["e2e/ 〔テスト/E2E/描画〕"]
+  d13 --> d13_2["helpers/"]
+  ROOT --> d14["tools/ 〔ツール〕"]
+  d14 --> d14_0["mcp-nicolive/ 〔MCP/診断〕"]
+  ROOT --> d15["tsuioku-no-kirameki/ 〔LP/公開〕"]
+  d15 --> d15_0["articles/ 〔記事/公開〕"]
+  d15 --> d15_1["images/ 〔画像〕"]
+  d15 --> d15_2["sound/ 〔音声/公開〕"]
 ```
 
 ### 機能逆引き（機能 → 担当ファイル）
@@ -198,6 +199,9 @@ graph LR
 ## `.codex-osint/` — ⚠️ 未記入（ROLES に追記）
 <sub>ファイル 2 件</sub>
 
+## `_docs/` — ⚠️ 未記入（ROLES に追記）
+<sub>ファイル 1 件</sub>
+
 ## `api/` — サーバレス API(status エンドポイント)  〔API〕
 <sub>ファイル 1 件</sub>
 
@@ -254,14 +258,14 @@ graph LR
 - `soundeffect-lab/`（19 件） — ⚠️ 未記入（ROLES に追記）
 
 ## `src/` — LP 側 + 純粋関数ライブラリの源  〔ソース〕
-<sub>ファイル 1821 件</sub>
+<sub>ファイル 1823 件</sub>
 
 - `data/`（7 件） — 保存コメントからレーン候補を読む acquirer / source 層  〔コメント / 取得〕
 - `domain/`（20 件） — ドメイン正本(応援レーンの集約・列ポリシー等。識別子判定など)  〔応援 / 集約 / 識別子〕
 - `extension/`（46 件） — バンドル entry(content/popup/venue/status/offscreen/backfill-sw 等=機能境界)  〔entry / 記録 / 会場 / 応援〕
 - `fixtures/`（1 件） — テスト用フィクスチャ  〔テスト〕
 - `images/`（165 件） — LP / CWS 提出物のマスター画像  〔画像〕
-- `lib/`（1573 件） — 純粋関数ライブラリ(unit test 対象)。色・速度・コメント・レポート等の計算ロジックの大半  〔色 / 速度 / コメント / レポート / 純粋関数〕
+- `lib/`（1575 件） — 純粋関数ライブラリ(unit test 対象)。色・速度・コメント・レポート等の計算ロジックの大半  〔色 / 速度 / コメント / レポート / 純粋関数〕
 - `shared/`（7 件） — 複数機能で共有する小部品(アバター URL ガード等)  〔共有 / アバター〕
 - `sound/`（1 件） — 音声素材(src 側)  〔音声〕
 
@@ -515,13 +519,14 @@ esbuild の import 到達グラフを逆引きし「このファイルを変え�
 
 ---
 
-## ⚠️ 役割が未記入のディレクトリ（12）
+## ⚠️ 役割が未記入のディレクトリ（13）
 
 以下は `ROLES` 辞書に説明が無い。`scripts/repo-tree-map.mjs` の `ROLES` に1行足してから再生成すること。
 
 - `.codex/`
 - `.codex/agents/`
 - `.codex-osint/`
+- `_docs/`
 - `council-scout/`
 - `council-scout/briefs/`
 - `docs/article-drafts/`
