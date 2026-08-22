@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 6 / 835 件
+## ⚠️ 役割コメントが無いソース 6 / 836 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `src/lib/laneDomSelfMeasure.js`
@@ -738,7 +738,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (1823)
+- 📁 **src/** (1825)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1036,7 +1036,7 @@
         - `logo_funlink_white_RGB_maru_black.png`
       - `logo_guide_funlink_ol.pdf`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1575)
+  - 📁 **lib/** (1577)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -1786,6 +1786,8 @@
     - `loadLastBroadcastSummary.test.js`
     - `longTaskTracker.js` — メインスレッドを長時間ブロックした「Long Task」を有界に記録する純関数群。
     - `longTaskTracker.test.js`
+    - `lpContentStaleness.js` — 【層】L0 判定層(純粋関数・I/O禁止)
+    - `lpContentStaleness.test.js`
     - `lpIndexAnonymousIdenticon.test.js`
     - `lpIndexBoardDarkContrast.test.js`
     - `lpIndexExtensionLiveScene.test.js`
