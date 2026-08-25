@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 6 / 840 件
+## ⚠️ 役割コメントが無いソース 6 / 841 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `src/lib/laneDomSelfMeasure.js`
@@ -738,7 +738,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (1832)
+- 📁 **src/** (1834)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1036,7 +1036,7 @@
         - `logo_funlink_white_RGB_maru_black.png`
       - `logo_guide_funlink_ol.pdf`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1584)
+  - 📁 **lib/** (1586)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -1241,6 +1241,8 @@
     - `channelSwitchDiag.js` — 配信切替(SPA遷移)の「送信N/受信N/初描画ms」観測値を組み立てる純関数群。
     - `channelSwitchDiag.test.js`
     - `channelSwitchDiagKey.js` — 配信切替(SPA遷移でパネルを作り直さず in-place 切替する経路)の「切替回数/初描画ms」観測値を
+    - `charaLiveCensus.js` — 「キャラライブが本当に画面に出ているか」を **実測** して1行にする計器。
+    - `charaLiveCensus.test.js`
     - `charaLiveController.js` — 「キャラライブ」の配線係。charaLiveState(判断) と charaLiveStage(描画) を繋ぎ、
     - `charaLiveController.test.js`
     - `charaLiveStage.js` — 「キャラライブ」の描画層。charaLiveState.js が決めた状態を DOM に落とすだけ。

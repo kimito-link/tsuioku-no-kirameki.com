@@ -267,6 +267,7 @@
 | `src/lib/broadcastUrl.js` | 2 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) |
 | `src/lib/celebrationFlyText.js` | 2 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) |
 | `src/lib/celebrationPika.js` | 2 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) |
+| `src/lib/charaLiveCensus.js` | 2 | 記録エンジン(watchページ常駐) / 会場モード(standalone) |
 | `src/lib/charaLiveController.js` | 2 | 記録エンジン(watchページ常駐) / 会場モード(standalone) |
 | `src/lib/charaLiveStage.js` | 2 | 記録エンジン(watchページ常駐) / 会場モード(standalone) |
 | `src/lib/charaLiveState.js` | 2 | 記録エンジン(watchページ常駐) / 会場モード(standalone) |

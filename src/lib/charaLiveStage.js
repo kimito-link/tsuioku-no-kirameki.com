@@ -170,6 +170,10 @@ export function charaLiveStageCss() {
 }
 .nlcl-chara__think i:nth-child(2) { animation-delay: 0.18s; }
 .nlcl-chara__think i:nth-child(3) { animation-delay: 0.36s; }
+/* ★hidden を必ず効かせる(2026-08-25 発見のバグ):
+   display:flex は hidden 属性の既定 display:none に勝ってしまうため、
+   setVisible(false) しても隠れない。明示的に打ち消す。 */
+.nlcl-stage[hidden] { display: none; }
 @keyframes nlcl-pop {
   from { opacity: 0; transform: translateX(-50%) translateY(4px) scale(0.94); }
   to   { opacity: 1; transform: translateX(-50%) translateY(0)   scale(1); }
