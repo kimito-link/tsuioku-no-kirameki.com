@@ -584,11 +584,17 @@ async function main() {
  * @param {number} days 集計対象の日数
  */
 function summarizeMeetingRecords(days = 30) {
-  const dir = join(REPO_ROOT, 'council');
-  if (!existsSync(dir)) return { total: 0, rows: [], files: 0 };
+  // 2026-08-25: 直下(人間が名付けた正式記録)に加えて council/auto/(meeting.mjsの自動記録)も見る。
+  //  それまでは直下だけを見ており、--out を付けた会議しか記録されないため最新が2026-08-04で
+  //  止まっていた。auto/ の導入で毎回の会議が残るようになったのでここも2階層見る。
+  //  再帰はしない: 深さを増やすと将来どこかのサブディレクトリを巻き込む事故が起きるため、
+  //  「直下」と「auto」の2つだけを固定で見る。
+  const dirs = [join(REPO_ROOT, 'council'), join(REPO_ROOT, 'council', 'auto')].filter((d) => existsSync(d));
+  if (!dirs.length) return { total: 0, rows: [], files: 0 };
   const since = Date.now() - days * 86400000;
   const byLabel = {};
   let total = 0, files = 0;
+  for (const dir of dirs) {
   for (const f of readdirSync(dir)) {
     if (!f.endsWith('.json')) continue;
     let j;
@@ -607,6 +613,7 @@ function summarizeMeetingRecords(days = 30) {
         if (r.error) byLabel[label].ng++;
       }
     }
+  }
   }
   // 2026-08-21追加: 現行LINEUPに実在するメンバーだけを表に出す。
   //  動機: 直近30日で切っても「窓の内側で撤去された」メンバーは残り続ける。実際この日の
@@ -683,6 +690,11 @@ function buildBrief({ date, isFirstRun, fetchStatus, healthAlerts, probedCandida
   // 「呼べるか」を見るのに対し、こちらは「会議で実際に使えているか」を見る別軸。
   // groq/compoundは9回中9回413で落ちながら現役だった——カタログ上は健全だったため、
   // この軸が無いと永久に気づけない型の異常だった。
+  // ★2026-08-25: 0件でも節を消さない。従来は files > 0 で節ごと出し分けており、
+  //  記録が途切れると「実会議の成績」という見出しが**丸ごと消える**＝読んだ人間は
+  //  異常なしと誤読する（最悪の消え方）。実際、--out 無しの会議が記録されないため
+  //  最新記録が2026-08-04で止まり、2026-09-03にこの節が消える寸前だった。
+  //  計器が死んだことは、メンバーが死んだことの次に重い。必ず見えるように出す。
   if (meetingStats && meetingStats.files > 0) {
     lines.push(`## 実会議の成績（直近30日・${meetingStats.files}会議 / ${meetingStats.total}発言）`);
     lines.push('| メンバー | 発言 | 失敗 | 失敗率 |', '|---|---|---|---|');
@@ -691,6 +703,11 @@ function buildBrief({ date, isFirstRun, fetchStatus, healthAlerts, probedCandida
     }
     lines.push('', '※ 発言3回未満は割愛。撤去の目安は「発言10回以上で失敗率50%以上」（下の推奨アクション参照）。'
       + (meetingStats.retiredCount ? `\n※ 撤去済みメンバー${meetingStats.retiredCount}体分の実績は除外した（現行LINEUPに居ないため追いかけても意味がない）。` : ''), '');
+  } else {
+    lines.push('## 実会議の成績（直近30日）');
+    lines.push('- ⚠ 会議記録が0件。**メンバーが健全という意味ではなく、測れていないという意味**。');
+    lines.push('  meeting.mjs は council/auto/ に毎回自動保存する（COUNCIL_NO_RECORD=1 で無効化される）。');
+    lines.push('  会議を実際に回していないだけなら正常。回しているのに0件なら記録側の故障を疑う。', '');
   }
 
   lines.push('## 取得状況');
