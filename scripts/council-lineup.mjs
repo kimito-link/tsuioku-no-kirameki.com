@@ -161,6 +161,22 @@ export const LINEUP = [
   //   rawId空のまま8日以上放置されていれば同じくmistral-large型の長期未検知になっていた
   //   （rawId全数埋めの効果を初回実行で即座に実証した事例として記録）。
 
+  // 2026-08-25 追加（diverge役の単騎解消）:
+  //  当時のdiverge役はクラウドではgroq/qwen3.6-27bの単騎で、groqが落ちるとローカル頼みだった
+  //  （critic4・lead3・generalist3に対しdiverge1）。本エントリはその2枚目。
+  //  実測(本番と同じ /ai/v1/chat/completions 経由・2並列): 200 OK / 1933ms・2558ms＝恒久ルール2充足。
+  //  恒久ルール5(同一プロバイダを同役の予備に積まない)も充足: diverge役は groq + cloudflare の2社構成。
+  //  ★不採用にした対抗馬 @cf/qwen/qwen3.8-27b: 内容の質は本モデルより明確に上（「前提を一度壊す」
+  //   「予算10倍/10分の1」など発散役として的確な着眼を返した）が、2並列の2本目が 76,497ms＝1分超。
+  //   会議は複数モデルを並列で回すため1体の停滞が全体を止める。質より安定を採った。
+  //   なお /ai/run/ で叩くと本モデルより3倍遅い程度に見えるが、本番経路では桁違いに悪化する——
+  //   ★エンドポイントを本番と揃えずに採否を判断してはならない（/ai/run/ と /ai/v1/ で挙動が違う）。
+  //  weightは既存の"cloudflare"判定により自動でweight4（reserve層）＝新顔を予備から入れる
+  //  恒久ルール3と一致するため個別の重み付けは足さない（weightOfに例外行を増やさない）。
+  //  つまり平常時はgroq/qwen3.6-27b(weight1)が選ばれ、本エントリはgroqが落ちた時だけ浮上する。
+  //  rawId=apiModelなのでcouncil-scoutの健康診断とliveProbeの対象に入る。
+  { label: 'cloudflare/qwen3-30b-a3b', provider: 'cloudflare', rawId: '@cf/qwen/qwen3-30b-a3b-fp8', apiModel: '@cf/qwen/qwen3-30b-a3b-fp8', opts: {}, timeoutMs: 60000, requires: ['CF', 'CF_ACC'], liveProbe: true },
+
   // 2026-07-14 追加 → 2026-07-23 EOL（nvidia/mistral-large-3-675b）:
   //   会議のlead(統括)枠が従来local/gemma4(8B)頼みで全役割中最弱だった穴を埋める本命として
   //   採用したが、NVIDIA側が2026-07-23T09:00:00Zに正式にEOL(提供終了)。実機で叩くと
