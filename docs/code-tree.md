@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 4 / 716 件
+## ⚠️ 役割コメントが無いソース 4 / 717 件
 - `src/lib/laneDomSelfMeasure.js`
 - `src/lib/reportPreviewPublish.js`
 - `src/lib/venueLaneBuckets.js`
@@ -569,7 +569,7 @@
   - `status-guard.js` — 状態速報ページ(status.html)の「何があっても開く」保険。
   - `status.html`
   - `venue.html`
-- 📁 **scripts/** (40)
+- 📁 **scripts/** (41)
   - 📁 **xserver/** (2)
     - `github-webhook-pull.php.example`
     - `webhook-git-pull-for-upload.php`
@@ -582,6 +582,7 @@
   - `check-root-cause-claim.mjs` — コミットメッセージの「根治」語を検査する。
   - `check-tracked-imports.mjs` — 「コミットし忘れた新規ファイルを import している」ことを機械的に検出するリリース工程ガード(2026-07-06)。
   - `copy-ext.mjs` — 拡張を「同期対象外フォルダ」へコピーする(Chrome の再読み込み固着の根治)。
+  - `council-env.mjs` — 会議ハーネスに必要な env の診断と流し込み（2026-08-25 新設）
   - `council-lineup.mjs` — 会議メンバー名簿（クラウドのみ。ローカルOllamaは従来通り meeting.mjs 側の
   - `council-roles.mjs` — 会議ハーネス共通の「役割・出力フォーマット・批判強制」定義。
   - `cws-publish.mjs` — Chrome Web Store Publish API で ZIP をアップロード(+任意で公開申請)する。
