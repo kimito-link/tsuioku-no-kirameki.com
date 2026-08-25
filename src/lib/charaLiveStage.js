@@ -56,10 +56,18 @@ export function listCharaLiveImagePaths() {
 export function charaLiveStageCss() {
   return `
 .nlcl-stage {
-  position: fixed;
+  /*
+   * ★会場ステージ(.nlsb-stage)の内側に入る前提の配置(2026-08-25 実機で踏んだ)。
+   *   当初 body 直下に fixed + z-index:2147483000 で置いたが、会場ルート(.nlsb-root)が
+   *   まったく同じ z-index の全画面要素で、かつ後から DOM に入るため【完全に覆われて
+   *   一度も見えなかった】。同値 z-index は DOM 順で後勝ちになる。
+   *   会場の既存階層(客席 z4 / 吹き出し z5 / 常駐 z6 / 投げ物 z7)に合わせ、
+   *   吹き出しより前・投げ物より後ろの z6 に置く。
+   */
+  position: absolute;
   right: 12px;
   bottom: 12px;
-  z-index: 2147483000;
+  z-index: 6;
   display: flex;
   align-items: flex-end;
   gap: 10px;

@@ -3056,6 +3056,10 @@ export function mountVenueBarButton(options = {}) {
   //   - reducedMotion は群衆と同じ判定を再利用(別々に計算して食い違わせない)
   const charaLive = startCharaLive({
     doc: document,
+    // ★必ず会場ステージの内側へ入れる(2026-08-25 実機で踏んだ)。
+    //   body 直下だと .nlsb-root(全画面・同じ z-index 2147483000・DOM順で後)に
+    //   完全に覆われて一度も見えなかった。ステージ内なら会場の階層(z6)に乗る。
+    mount: stage,
     resolveUrl: resolveVenueAssetUrl,
     getHeatLevel: () => crowdHeatLevel,
     reducedMotion: crowdReducedMotion

@@ -1,8 +1,15 @@
 /** @vitest-environment happy-dom */
 import { describe, it, expect, beforeEach } from 'vitest';
 import { startCharaLive, REACTION_MIN_GAP_MS } from './charaLiveController.js';
-import { listCharaLiveImagePaths, buildCharaLiveStageDom } from './charaLiveStage.js';
+import {
+  listCharaLiveImagePaths,
+  buildCharaLiveStageDom,
+  charaLiveStageCss
+} from './charaLiveStage.js';
 import { CHARA_LIVE_IDS } from './charaLiveState.js';
+import { readFileSync } from 'node:fs';
+import { join, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 /** 時間と rAF を手で回すテスト用ハーネス(実時間に依存させない)。 */
 function makeHarness() {
@@ -220,5 +227,42 @@ describe('AI シンキング', () => {
     h.advance(0);
     expect(h.live.beginThinking({})).toBe('tanunee');
     h.live.destroy();
+  });
+});
+
+/*
+ * ★2026-08-25 実機で踏んだ事故の回帰テスト。
+ *
+ * 当初キャラを document.body 直下に position:fixed + z-index:2147483000 で置いた。
+ * ところが会場ルート .nlsb-root も【まったく同じ z-index の全画面(inset:0)要素】で、
+ * かつ後から DOM に入るため、同値 z-index は DOM 順で後勝ち＝キャラは完全に覆われ
+ * 【一度も画面に出なかった】。単体テストは DOM を作れば通ってしまうので気づけない。
+ *
+ * よって「会場の実CSSと突き合わせる」形で固定する。venueBar.js の文字列を読むのは
+ * 既存の *.wiring.test.js と同じ作法(別バンドルなので import できない)。
+ */
+describe('★会場に覆われない(実機で踏んだ事故の固定)', () => {
+  const venueBarSrc = readFileSync(
+    join(dirname(fileURLToPath(import.meta.url)), '../extension/venueBar.js'),
+    'utf8'
+  );
+
+  it('会場ステージの内側にマウントしている(body 直下に置かない)', () => {
+    // startCharaLive の呼び出しが mount: stage を渡していること。
+    const call = venueBarSrc.slice(venueBarSrc.indexOf('startCharaLive({'));
+    expect(call.slice(0, 400)).toMatch(/mount:\s*stage/);
+  });
+
+  it('会場ルートと同じ z-index を使っていない(同値は DOM 順で負ける)', () => {
+    const rootZ = venueBarSrc.match(/\.nlsb-root\s*\{[^}]*z-index:\s*(\d+)/);
+    expect(rootZ, '.nlsb-root の z-index が読めない').toBeTruthy();
+    expect(charaLiveStageCss()).not.toContain(`z-index: ${rootZ[1]}`);
+  });
+
+  it('ステージ内で効く配置になっている(fixed だと親の外へ出る)', () => {
+    const css = charaLiveStageCss();
+    const block = css.slice(css.indexOf('.nlcl-stage {'), css.indexOf('}', css.indexOf('.nlcl-stage {')));
+    expect(block).toContain('position: absolute');
+    expect(block).not.toContain('position: fixed');
   });
 });
