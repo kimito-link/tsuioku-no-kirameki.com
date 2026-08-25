@@ -115,6 +115,21 @@ export const LINEUP = [
   //    消滅する穴を、クラウド版で塞ぐための予備。正規のgpt-oss-120b(weight1)は絶対に食わない。
   { label: 'groq/gpt-oss-20b', provider: 'groq', rawId: 'openai/gpt-oss-20b', apiModel: 'openai/gpt-oss-20b', opts: { reasoning_effort: 'low' }, requires: ['G'] },
 
+  // 2026-08-25 追加（diverge-alt役の単騎解消）:
+  //  diverge-alt役は上のgroq/gpt-oss-20bの単騎で、groqが落ちると役ごと消えていた。
+  //  実測(本番と同じ /ai/v1/ 経由・2並列): 200 OK / 6025ms・7070ms。恒久ルール2充足。
+  //  同役はgroq+cloudflareの2社構成となり恒久ルール5も充足。
+  //  ★同系統(gpt-oss-20b)をあえて重ねる: 2026-08-13にopenrouter版を「groqと系統が重複」
+  //   として見送った経緯があるが、今回は目的が違う——狙いは頭脳の多様化ではなく
+  //   **groq障害時に役が消えるのを防ぐ経路の冗長化**。系統が同じでもプロバイダが別なら
+  //   その目的は達成される（[[council-llm-lineup-upgrade]]の「経路の冗長化と頭脳の多様化は
+  //   別物」という気づきと同じ整理）。
+  //  ★groq/gpt-oss-safeguard-20b は不採用: 実測は速い(967ms/1828ms)が同じgroqのため、
+  //   groq全滅時に共倒れして冗長化の目的を果たさない（恒久ルール5違反）。速さより経路分散。
+  //  ラベルは 'cloudflare/gpt-oss-20b' 必須: 'oss-20b' 等に略すとroleOfがgeneralist誤判定する
+  //  （roleOfは部分一致・先勝ちのため。実行検証済み）。
+  { label: 'cloudflare/gpt-oss-20b', provider: 'cloudflare', rawId: '@cf/openai/gpt-oss-20b', apiModel: '@cf/openai/gpt-oss-20b', opts: {}, timeoutMs: 60000, requires: ['CF', 'CF_ACC'], liveProbe: true },
+
   // Cloudflare Workers AI（2026-06-27 実機で 200＋本文を裏取りして採用。X 一覧は鵜呑みにせず叩いて確認）。
   //  - 採用基準: 会議に「無い能力」を足すものだけ。gpt-oss-120b / llama-3.3-70b は Groq 等で既出なので CF では足さない。
   //  - nemotron-3-120b: どこにも無い大型の別頭脳 → 汎用(generalist)。/ai/models/search で実在確認済み。
@@ -408,6 +423,19 @@ export const LINEUP = [
   //  実会議でimplement役として2回連続FAILED／カタログ消滅streak>=2／deprecation付与を検知、
   //  のいずれかで撤去会議へ。
   { label: 'mistral/codestral', provider: 'mistral', rawId: 'codestral-2508', apiModel: 'codestral-2508', opts: {}, requires: ['MI'], liveProbe: true },
+
+  // 2026-08-25 追加（implement役の単騎解消）:
+  //  implement役はmistral/codestralの単騎で、mistralが落ちると実装役が空になっていた。
+  //  実測(本番と同じ /ai/v1/chat/completions 経由・2並列): 200 OK / 5875ms・4581ms。
+  //  恒久ルール2充足。同役はmistral+cloudflareの2社構成になり恒久ルール5も充足。
+  //  weightOfの"cloudflare"判定で自動weight4＝平常時はcodestral(weight3)が選ばれ、
+  //  本エントリはmistral全滅時にだけ浮上する（恒久ルール3と一致・例外行を足さない）。
+  //  ★不採用にした候補（いずれも実機で呼べず。カタログ在籍と実用可否は別物）:
+  //   - @cf/moonshotai/kimi-k2.7-code : 403（無料枠対象外）
+  //   - nvidia mistralai/codestral-22b-instruct-v0.1 / bigcode/starcoder2-15b /
+  //     deepseek-ai/deepseek-coder-6.7b-instruct : いずれも404。NIMはカタログに
+  //     載っていても /v1/chat/completions で呼べないモデルがある（採用前に必ず実機で叩く）。
+  { label: 'cloudflare/qwen2.5-coder-32b', provider: 'cloudflare', rawId: '@cf/qwen/qwen2.5-coder-32b-instruct', apiModel: '@cf/qwen/qwen2.5-coder-32b-instruct', opts: {}, timeoutMs: 60000, requires: ['CF', 'CF_ACC'], liveProbe: true },
 
   { label: 'gemini-2.5-flash', provider: 'gemini', rawId: 'gemini-2.5-flash', apiModel: 'gemini-2.5-flash', opts: {}, requires: ['E'] },
 
