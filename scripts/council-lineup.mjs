@@ -457,6 +457,18 @@ export const LINEUP = [
   //   nvidia/deepseek-v4-proが健在で実害なし。gpt-oss-20b:freeへの乗り換えは今回は
   //   見送り（groq/gpt-oss-20bと役割・系統が重複するため採用価値が薄い。未検証）。
 
+  // ★2026-08-25 NIMの探索記録（lead役の頭脳を3系統目に増やす試み → 採用ゼロ）:
+  //  lead役は nvidia/nemotron-3-ultra-550b と openrouter版が同一モデル(経路違い)で、
+  //  実質の頭脳は nemotron と mistral-large の2種類しかない。3種類目を探したが全滅。
+  //  ★NIMの /v1/models は「呼べるモデル一覧」ではない。カタログ102件に在籍していても
+  //   /v1/chat/completions が404を返すモデルが多数ある（実測: llama-3.1-nemotron-ultra-253b-v1,
+  //   mistralai/mistral-large-2-instruct, ai21labs/jamba-1.5-large-instruct, 01-ai/yi-large は
+  //   いずれもライブ/v1/modelsに在籍しつつ呼ぶと404）。採用中の nemotron-3-ultra-550b-a55b は
+  //   同時刻に200で健在＝キーの問題ではない。
+  //  → NIMからのlead補強は打ち止め。他プロバイダに大型が出たときに再検討する。
+  //  （council-scoutのカタログ照合はNIMについては「消滅の検知」にしか使えない。
+  //    在籍していることは呼べることを意味しないため、採用判断には必ず実機プローブを使う）
+
   // 2026-08-13 全プロバイダ探索の記録（devstral撤去→codestral採用と同日）: 採用ゼロで確定。
   //  サブエージェント報告を司令塔が全数叩き直した結果、以下4候補すべて見送り。
   //  - mistral/zai-glm-5-2 (aliases: glm-5-2): /v1/modelsに実在・deprecationなし・
