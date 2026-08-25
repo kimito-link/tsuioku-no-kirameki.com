@@ -345,6 +345,8 @@ import { buildVenueCharacterFrame } from '../lib/venueCharacterFrame.js';
 // キャラライブ(2026-08-25): 3キャラを常駐させ、ふわふわ浮遊+相槌+返事+シンキングを出す。
 //   判断は charaLiveState.js(純関数)、描画は charaLiveStage.js、配線は charaLiveController.js。
 import { startCharaLive } from '../lib/charaLiveController.js';
+// キャラライブの「本当に見えているか」実測計器(2026-08-25)。推測で3回外した反省で追加。
+import { collectCharaLiveCensus, charaLiveVerdict } from '../lib/charaLiveCensus.js';
 import { parseGiftCommentText, parseNicoadCommentText } from '../lib/parseGiftComment.js';
 import {
   resolveGiftProjectile,
@@ -3067,6 +3069,23 @@ export function mountVenueBarButton(options = {}) {
   // 会場は「必ず閉じた状態から始まる」設計(:2386)。開くのは setOpen(true) の時だけ。
   //   ここで明示的に閉じておかないと、開く前からキャラだけが放送画面に浮かぶ。
   charaLive.setVisible(false);
+
+  /*
+   * ★キャラライブ実測フック(2026-08-25)。
+   *   「出ません」に対して推測でなく【事実】で答えるための窓口。
+   *   放送ページの DevTools コンソールで次を実行すると、いま見えているかと、
+   *   見えないなら理由(覆っている要素名まで)が1行で出る:
+   *       __nls_chara_live_probe__()
+   *   DOM は読むだけで書き換えない(観測が対象を変えない)。
+   */
+  try {
+    /** @type {any} */ (globalThis).__nls_chara_live_probe__ = () => {
+      const census = collectCharaLiveCensus(document);
+      const verdict = charaLiveVerdict(census);
+      // 人が読む1行 + 生データ(貼って共有できる形)。
+      return { line: verdict.line, visible: verdict.visible, census };
+    };
+  } catch { /* 計器の失敗で会場を止めない */ }
 
   /** @type {VenueRow[]} */
   let baseRows = [];

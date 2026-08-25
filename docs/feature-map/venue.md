@@ -33,6 +33,7 @@ graph LR
   n_venue --> n_src_lib_bgmPhaseDiagKey_js["lib/bgmPhaseDiagKey.js"]:::shared
   n_venue --> n_src_lib_broadcastContext_js["lib/broadcastContext.js"]:::shared
   n_venue --> n_src_lib_celebrationCharaAssets_js["lib/celebrationCharaAssets.js"]:::shared
+  n_venue --> n_src_lib_charaLiveCensus_js["lib/charaLiveCensus.js"]:::shared
   n_venue --> n_src_lib_charaLiveController_js["lib/charaLiveController.js"]:::shared
   n_venue --> n_src_lib_charaLiveStage_js["lib/charaLiveStage.js"]:::shared
   n_venue --> n_src_lib_charaLiveState_js["lib/charaLiveState.js"]:::shared
@@ -52,8 +53,7 @@ graph LR
   n_venue --> n_src_lib_giftDisplayNickname_js["lib/giftDisplayNickname.js"]:::shared
   n_venue --> n_src_lib_giftEffectDiag_js["lib/giftEffectDiag.js"]:::shared
   n_venue --> n_src_lib_giftEffectDiagKey_js["lib/giftEffectDiagKey.js"]:::shared
-  n_venue --> n_src_lib_giftThrowProjectile_js["lib/giftThrowProjectile.js"]:::shared
   classDef shared fill:#eee,stroke:#999,color:#666;
 ```
 
-> ほか 99 ファイル省略（全件は storage-bus.md / metafile 参照）。
+> ほか 100 ファイル省略（全件は storage-bus.md / metafile 参照）。
