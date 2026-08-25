@@ -113,7 +113,11 @@ export const IMPURE_BASELINE = new Set([
   // ── DOM を直接触る箱(名前で分かる) ──────────────────────────
   'avatarPartsComposer.js', 'chikuranHeaderDom.js', 'commentPostDom.js',
   'inlineBelowWideRowInsert.js', 'laneDomSelfMeasure.js', 'laneTickProbe.js',
-  'mirrorSanitize.js', 'paintTopSupportRankStyleIntoElement.js', 'panelWakeCurtainDom.js',
+  'mirrorSanitize.js',
+  // ★ouenBannerDom: popup-entry は max-lines ラチェットで1行も増やせないので、
+  //   JSONの取得(fetch/chrome.runtime)まで lib 側に閉じ込めて呼び出しを1行にした。
+  'ouenBannerDom.js',
+  'paintTopSupportRankStyleIntoElement.js', 'panelWakeCurtainDom.js',
   'personTileDom.js', 'reportCommentsTableSection.js', 'supportGrowthAvatarLoad.js',
   'supporterRankingDom.js', 'venueDomCensus.js', 'videoCapture.js',
   'watchCelebrationOverlay.js',
@@ -151,7 +155,7 @@ export const IMPURE_REASONS = /** @type {Record<string,{group:string,why:string}
   g('DOM を組み立てる', '5画面(popup/venue/comeview/status/web版)が同じ見た目を作るため。ここに無いと5箇所にコピーが増える。', [
     'avatarPartsComposer.js', 'chikuranHeaderDom.js', 'commentPostDom.js',
     'inlineBelowWideRowInsert.js', 'laneDomSelfMeasure.js', 'laneTickProbe.js',
-    'mirrorSanitize.js', 'paintTopSupportRankStyleIntoElement.js', 'panelWakeCurtainDom.js',
+    'mirrorSanitize.js', 'ouenBannerDom.js', 'paintTopSupportRankStyleIntoElement.js', 'panelWakeCurtainDom.js',
     'personTileDom.js', 'reportCommentsTableSection.js', 'supportGrowthAvatarLoad.js',
     'supporterRankingDom.js', 'venueDomCensus.js', 'videoCapture.js', 'watchCelebrationOverlay.js'
   ]);

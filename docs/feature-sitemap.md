@@ -304,7 +304,7 @@
   - `src/lib/giftThrowProjectile.js`
 - **吹き出し寿命管理** — 会場の吹き出しの表示上限・追い出し(eviction)ライフサイクル
   - `src/lib/venueBubbleLifecycle.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 229</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 230</summary>
 
 - `scripts/encode-marketing-html-avatars.mjs` — extension/images/marketing-html-avatars/*.png を data URI にし、
 - `scripts/split-avatar-parts.mjs` — 偽市松背景の除去 + パーツ切り出し(one-off アセットパイプライン)
@@ -438,6 +438,7 @@
 - `src/lib/northStarLaneVisibility.js` — 北極星レーンの表示/非表示を `data-lane-state` から決める純関数（副作用なし）。
 - `src/lib/northStarLaneWaitingUi.js` — 北極星「公式値レーン」の取得待ち（not_yet / iframe_unrendered）用 UI 断片。
 - `src/lib/officialEventBannerDom.js` — niconico の watch ページに描画される「○○さんが参加しています！」グリーンバナーから
+- `src/lib/ouenBanner.js` — 応援動画バナーの表示判断（純粋関数）。
 - `src/lib/paintCompletionProbe.js` — paintCompletionProbe — 「JSが返った時点」でなく【画面に出るまで】を測る(v0.1.1320)。
 - `src/lib/paintPerfLog.js` — v0.1.725: 描画(paint)コストの軽量リングバッファ記録(純関数)。
 - `src/lib/paintTopSupportRankStyleIntoElement.js` — 応援帯・公式値レーン（貢献度等）で共通の `nl-top-support-rank` ブロック描画。
@@ -794,7 +795,7 @@
   - `src/lib/statusTrendKey.js`
   - `src/extension/status-entry.js`
   - `src/lib/statusActionAdvisor.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 201</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 202</summary>
 
 - `app/app.js` — スマホ閲覧用 status Web 版。
 - `app/live-view.js` — global NL_BUILD_ID
@@ -918,6 +919,7 @@
 - `src/lib/officialStatsWindow.js` — at?: number|null,
 - `src/lib/openingFiveMinuteCorrelation.js` — L13: 冒頭 5 分の予兆 → ピーク CPM 相関（散布図用）。
 - `src/lib/opSoundDirector.js` — 操作音(パチンコの「玉の打ち出し」比喩・council/operation-sound-SYNTHESIS.md Phase D1)の
+- `src/lib/ouenBannerDom.js` — 応援動画バナーを DOM に反映する。
 - `src/lib/panelCoverCulprit.js` — 【層】L0 判定層(純粋関数・I/O禁止)
 - `src/lib/panelLiveSummary.js` — パネルカード用の超軽量サマリ（多タブ時の snapshot / 巨大配列 read 待ちを避ける）。
 - `src/lib/panelWakeCurtain.js` — 「黒いまま」を見せないための、いつでも出せる幕。
@@ -1046,9 +1048,9 @@
 - `v0.1.1471` 2026-08-21 — 「無い犯人を探させる」表示をやめました
 
 ### その他 (6版)
+- `v0.1.1490` 2026-08-25 — 応援している作品を、そっとお知らせする欄をつけました
 - `v0.1.1488` 2026-08-25 — キャラが出ない原因を自分で言えるようにしました
 - `v0.1.1482` 2026-08-23 — なふだの説明を分かりやすくしました
 - `v0.1.1481` 2026-08-23 — 閉じた放送を視聴中に出しません
 - `v0.1.1477` 2026-08-22 — 「なふだ」の切り替えが見つけられるようにしました
 - `v0.1.1472` 2026-08-21 — 誤った犯人を名指しする警告をやめました
-- `v0.1.1470` 2026-08-21 — 版ごとの「どれだけ良くなったか」を数字で残すようにしました

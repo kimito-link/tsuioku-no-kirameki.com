@@ -255,5 +255,17 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
   Object.freeze({
     version: '0.1.1484', metric: 'gate-selftest', value: 2,
     source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1490', metric: 'bundle-kb', value: 1410,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '★過去最良1360(@0.1.1454)より50KB大きいが、今回の増分は【1KB】。'
+      + '実測で切り分けた: この変更を stash して同じ手順でビルドすると 1409KB、'
+      + '戻すと 1410KB。つまり49KBは v0.1.1489 までに既に積まれていたもので、'
+      + '応援動画バナー(純関数1本+DOM1本+JSON)の寄与は1KB。数字は隠さずここに残す。'
+  }),
+  Object.freeze({
+    version: '0.1.1490', metric: 'gate-selftest', value: 2,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
   })
 ]);

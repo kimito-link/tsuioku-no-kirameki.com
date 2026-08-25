@@ -3102,6 +3102,66 @@
       .nl-official-event-banner-card__thumb[hidden] {
         display: none;
       }
+
+      /* ★応援動画バナー（2026-08-25 追加）
+         このチャンネルの目的は「埋もれているクリエイターの価値が発見されること」。
+         いま応援している作品を、拡張を開いた人に静かに知らせる枠。
+         ★footer の Powered by の直上＝既に「外部誘導ゾーン」なので本体を押し下げない。
+         ★出す中身は data/ouen-banner.json 側。動画が変わっても HTML は触らない。 */
+      .nl-ouen-banner {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+        margin: 10px 0 0;
+        padding: 9px 12px;
+        border-radius: 12px;
+        background: linear-gradient(180deg, #1b2440, #141b30);
+        border: 1px solid rgb(255 206 84 / 26%);
+        text-decoration: none;
+        color: #eef2ff;
+      }
+      .nl-ouen-banner[hidden] {
+        display: none;
+      }
+      .nl-ouen-banner__tag {
+        font-size: 11px;
+        font-weight: 700;
+        color: #131a2e;
+        background: #ffce54;
+        border-radius: 5px;
+        padding: 2px 7px;
+        flex-shrink: 0;
+      }
+      .nl-ouen-banner__text {
+        flex: 1 1 auto;
+        min-width: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+      }
+      .nl-ouen-banner__title {
+        font-size: 13px;
+        font-weight: 700;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .nl-ouen-banner__note {
+        font-size: 11px;
+        color: #96a5c8;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .nl-ouen-banner__when {
+        font-size: 11px;
+        font-weight: 700;
+        color: #131a2e;
+        background: #fff;
+        border-radius: 6px;
+        padding: 3px 8px;
+        flex-shrink: 0;
+      }
       .nl-official-event-banner-card__text {
         flex: 1 1 auto;
         min-width: 0;
@@ -13108,6 +13168,27 @@
         <summary id="giftSubAppHistorySummary">ギフトサイドバー履歴（未取得）</summary>
         <div id="giftSubAppHistoryMount" class="nl-gift-quick-mount"></div>
       </details>
+
+      <!--
+        ★応援動画バナー（2026-08-25 追加）
+        中身は extension/data/ouen-banner.json から読む。
+        JSON が無い / show=false のときは表示しない（既定は非表示＝fail-closed）。
+      -->
+      <a
+        id="ouenBanner"
+        class="nl-ouen-banner"
+        hidden
+        target="_blank"
+        rel="noopener noreferrer"
+        data-nl-toolbar-only
+      >
+        <span class="nl-ouen-banner__tag">応援動画</span>
+        <span class="nl-ouen-banner__text">
+          <span class="nl-ouen-banner__title" id="ouenBannerTitle"></span>
+          <span class="nl-ouen-banner__note" id="ouenBannerNote"></span>
+        </span>
+        <span class="nl-ouen-banner__when" id="ouenBannerWhen"></span>
+      </a>
 
       <footer
         class="nl-powered-by"

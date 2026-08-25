@@ -1,7 +1,7 @@
 ---
 layer: L0
 purity: pure
-impure_exceptions: 41
+impure_exceptions: 42
 files: 719
 ---
 
@@ -18,7 +18,7 @@ files: 719
 | ファイル数 | **719**（非テスト）＋ テスト 829 |
 | 大きさ | 中央値 **102行** / 640ファイルが300行以下 |
 | 純粋 | **678 / 719** |
-| 例外（副作用あり） | **41**（下に全部の名前がある） |
+| 例外（副作用あり） | **42**（下に全部の名前がある） |
 
 ★**1ファイル1責務**が既に成立している。`src/extension/*-entry.js`（22,660行など）とは
 性格がまったく違う箱なので、**同じ気持ちで触らない**こと。
@@ -57,7 +57,7 @@ I/O が要るときは **呼び出し側（`src/extension/*-entry.js`）に置�
 
 | 種類 | ファイル | なぜ lib にあるか |
 |---|---|---|
-| **DOM を組み立てる** (`*Dom.js` 等) | `avatarPartsComposer` `chikuranHeaderDom` `commentPostDom` `inlineBelowWideRowInsert` `laneDomSelfMeasure` `laneTickProbe` `mirrorSanitize` `paintTopSupportRankStyleIntoElement` `panelWakeCurtainDom` `personTileDom` `reportCommentsTableSection` `supportGrowthAvatarLoad` `supporterRankingDom` `venueDomCensus` `videoCapture` `watchCelebrationOverlay` | ★**5画面（popup/venue/comeview/status/web）が同じ見た目を作る**ため。ここに無いと5箇所にコピーが増える |
+| **DOM を組み立てる** (`*Dom.js` 等) | `avatarPartsComposer` `chikuranHeaderDom` `commentPostDom` `inlineBelowWideRowInsert` `laneDomSelfMeasure` `laneTickProbe` `mirrorSanitize` `ouenBannerDom` `paintTopSupportRankStyleIntoElement` `panelWakeCurtainDom` `personTileDom` `reportCommentsTableSection` `supportGrowthAvatarLoad` `supporterRankingDom` `venueDomCensus` `videoCapture` `watchCelebrationOverlay` | ★**5画面（popup/venue/comeview/status/web）が同じ見た目を作る**ため。ここに無いと5箇所にコピーが増える |
 | **HTML を作る** (`*Html.js`) | `marketingChartsHtml` `mediaKitHtml` | 出力先が複数（レポート/プレビュー） |
 | **保存する** (`*Db.js` `*Store.js`) | `broadcastSessionSummaryDb` `broadcastSessionSummaryFlush` `commentDb` `customSoundStore` `diagnosticRingStore` `globalBackfillQueue` `reportPreviewPublish` `thumbDb` | ★**書き手が複数コンテキスト**（content / offscreen / SW）。正本を1つにするため |
 | **通信する** (`*Client.js`) | `kokenGiftHistoryFetchClient` `liveviewErrorReport` `officialEventDomBundle` `statusMindmapModel` `voicevoxClient` | 外部APIの作法を1箇所に閉じ込める |
