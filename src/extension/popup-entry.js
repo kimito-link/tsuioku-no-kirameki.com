@@ -7,7 +7,7 @@ import {
   buildHtmlReportDocument
 } from './popup/report/htmlReportDocument.js';
 import { makeInitialMilestoneEffectDiag, buildMilestoneEffectDiagSnapshot } from '../lib/milestoneEffectDiag.js';
-import { KEY_MILESTONE_EFFECT_DIAG } from '../lib/milestoneEffectDiagKey.js'; import { installPanelWakeCurtain } from '../lib/panelWakeCurtainDom.js';
+import { KEY_MILESTONE_EFFECT_DIAG } from '../lib/milestoneEffectDiagKey.js'; import { installPanelWakeCurtain } from '../lib/panelWakeCurtainDom.js'; import { mountOuenBanner } from '../lib/ouenBannerDom.js';
 // v0.1.1080: マイ効果音・ボイス/BGM/操作音の計器が直接 chrome.storage.local を叩くと、
 //   拡張リロード後の古い inline iframe で「Cannot read properties of undefined (reading 'local')」の
 //   同期 TypeError が uncaught のまま chrome://extensions に残る(.catch() は非同期 reject にしか
@@ -22623,7 +22623,7 @@ if (typeof window !== 'undefined') {
   } else {
     window.addEventListener('load', finalRevealFallback, { once: true });
   }
-
+  mountOuenBanner(document); // ★応援動画バナー: 設計は ../lib/ouenBannerDom.js
   /*
    * ★v0.1.1309(2026-08-10 実機で真因確定): 上の安全網は `window load` を待つが、
    *   load は【画像など全サブリソースの完了】を待つイベントで、サイドパネルでは遅い。

@@ -6434,6 +6434,26 @@
       ]
     },
     {
+      "file": "src/lib/ouenBanner.js",
+      "featureCount": 1,
+      "features": [
+        "popup"
+      ],
+      "labels": [
+        "ポップアップ(応援レーン)"
+      ]
+    },
+    {
+      "file": "src/lib/ouenBannerDom.js",
+      "featureCount": 1,
+      "features": [
+        "popup"
+      ],
+      "labels": [
+        "ポップアップ(応援レーン)"
+      ]
+    },
+    {
       "file": "src/lib/ownPostedUserIdSet.js",
       "featureCount": 1,
       "features": [

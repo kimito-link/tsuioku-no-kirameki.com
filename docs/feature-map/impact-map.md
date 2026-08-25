@@ -685,6 +685,8 @@
 | `src/lib/officialStatsWindow.js` | 1 | 記録エンジン(watchページ常駐) |
 | `src/lib/openingFiveMinuteCorrelation.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/opSoundDirector.js` | 1 | ポップアップ(応援レーン) |
+| `src/lib/ouenBanner.js` | 1 | ポップアップ(応援レーン) |
+| `src/lib/ouenBannerDom.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/ownPostedUserIdSet.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/paintCompletionProbe.js` | 1 | 状態速報ページ |
 | `src/lib/paintPerfLog.js` | 1 | ポップアップ(応援レーン) |

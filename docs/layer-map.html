@@ -47,14 +47,14 @@
 <p class="lead">この箱に何が入っていて、何が入ってはいけないか。<b>自動生成</b>（手で編集しない）。</p>
 
 <div class="bar">
-  <span class="pure" style="flex:690">純粋 690（94%）</span>
-  <span class="imp" style="flex:41">例外 41</span>
+  <span class="pure" style="flex:691">純粋 691（94%）</span>
+  <span class="imp" style="flex:42">例外 42</span>
 </div>
 
 <div class="stats">
-  <div class="stat"><b>731</b><i>ファイル（非テスト）</i></div>
-  <div class="stat"><b>104行</b><i>大きさの中央値</i></div>
-  <div class="stat"><b>648</b><i>300行以下のファイル</i></div>
+  <div class="stat"><b>733</b><i>ファイル（非テスト）</i></div>
+  <div class="stat"><b>103行</b><i>大きさの中央値</i></div>
+  <div class="stat"><b>650</b><i>300行以下のファイル</i></div>
   <div class="stat"><b>0件</b><i>lib→entry の逆流import</i></div>
 </div>
 
@@ -68,11 +68,11 @@
   <p class="note">★守っているか確認：<code>npm run check:layer</code>（出荷前 <code>verify:cc</code> でも自動で走ります）</p>
 </div>
 
-<h2>例外の 41 件 — なぜ lib にあるか</h2>
+<h2>例外の 42 件 — なぜ lib にあるか</h2>
 <section class="grp">
-  <h3>DOM を組み立てる <span class="cnt">15</span></h3>
+  <h3>DOM を組み立てる <span class="cnt">16</span></h3>
   <p class="why">5画面(popup/venue/comeview/status/web版)が同じ見た目を作るため。ここに無いと5箇所にコピーが増える。</p>
-  <ul class="files"><li><code>avatarPartsComposer.js</code><span class="kinds">document</span></li><li><code>chikuranHeaderDom.js</code><span class="kinds">document</span></li><li><code>commentPostDom.js</code><span class="kinds">window</span></li><li><code>inlineBelowWideRowInsert.js</code><span class="kinds">document</span></li><li><code>laneDomSelfMeasure.js</code><span class="kinds">window</span></li><li><code>laneTickProbe.js</code><span class="kinds">document</span></li><li><code>mirrorSanitize.js</code><span class="kinds">document</span></li><li><code>paintTopSupportRankStyleIntoElement.js</code><span class="kinds">document window</span></li><li><code>panelWakeCurtainDom.js</code><span class="kinds">chrome.storage document window</span></li><li><code>personTileDom.js</code><span class="kinds">document</span></li><li><code>supporterRankingDom.js</code><span class="kinds">document</span></li><li><code>supportGrowthAvatarLoad.js</code><span class="kinds">document</span></li><li><code>venueDomCensus.js</code><span class="kinds">window</span></li><li><code>videoCapture.js</code><span class="kinds">document</span></li><li><code>watchCelebrationOverlay.js</code><span class="kinds">document window</span></li></ul>
+  <ul class="files"><li><code>avatarPartsComposer.js</code><span class="kinds">document</span></li><li><code>chikuranHeaderDom.js</code><span class="kinds">document</span></li><li><code>commentPostDom.js</code><span class="kinds">window</span></li><li><code>inlineBelowWideRowInsert.js</code><span class="kinds">document</span></li><li><code>laneDomSelfMeasure.js</code><span class="kinds">window</span></li><li><code>laneTickProbe.js</code><span class="kinds">document</span></li><li><code>mirrorSanitize.js</code><span class="kinds">document</span></li><li><code>ouenBannerDom.js</code><span class="kinds">fetch</span></li><li><code>paintTopSupportRankStyleIntoElement.js</code><span class="kinds">document window</span></li><li><code>panelWakeCurtainDom.js</code><span class="kinds">chrome.storage document window</span></li><li><code>personTileDom.js</code><span class="kinds">document</span></li><li><code>supporterRankingDom.js</code><span class="kinds">document</span></li><li><code>supportGrowthAvatarLoad.js</code><span class="kinds">document</span></li><li><code>venueDomCensus.js</code><span class="kinds">window</span></li><li><code>videoCapture.js</code><span class="kinds">document</span></li><li><code>watchCelebrationOverlay.js</code><span class="kinds">document window</span></li></ul>
 </section>
 <section class="grp">
   <h3>保存する <span class="cnt">8</span></h3>

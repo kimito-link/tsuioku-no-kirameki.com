@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 6 / 841 件
+## ⚠️ 役割コメントが無いソース 6 / 843 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `src/lib/laneDomSelfMeasure.js`
@@ -494,7 +494,9 @@
   - `ux-tdd-hypothesis-matrix.md`
   - `venue-pop-parity-loop-flow.html`
   - `visual-explainer.md`
-- 📁 **extension/** (138)
+- 📁 **extension/** (139)
+  - 📁 **data/** (1)
+    - `ouen-banner.json`
   - 📁 **images/** (87)
     - 📁 **avatar-parts/** (22)
       - `cheek-0.png`
@@ -738,7 +740,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (1834)
+- 📁 **src/** (1838)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1036,7 +1038,7 @@
         - `logo_funlink_white_RGB_maru_black.png`
       - `logo_guide_funlink_ol.pdf`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1586)
+  - 📁 **lib/** (1590)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -1972,6 +1974,10 @@
     - `opaqueCanvasNoBlack.wiring.test.js`
     - `openingFiveMinuteCorrelation.js` — L13: 冒頭 5 分の予兆 → ピーク CPM 相関（散布図用）。
     - `openingFiveMinuteCorrelation.test.js`
+    - `ouenBanner.js` — 応援動画バナーの表示判断（純粋関数）。
+    - `ouenBanner.test.js`
+    - `ouenBannerDom.js` — 応援動画バナーを DOM に反映する。
+    - `ouenBannerDom.test.js`
     - `ownPostedUserIdSet.js` — v0.1.773: 「自分が投稿した userId」の集合を1パスで作る純関数。
     - `ownPostedUserIdSet.test.js`
     - `pageColorSchemeGate.test.js`
