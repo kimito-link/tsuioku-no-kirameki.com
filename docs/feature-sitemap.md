@@ -304,7 +304,7 @@
   - `src/lib/giftThrowProjectile.js`
 - **吹き出し寿命管理** — 会場の吹き出しの表示上限・追い出し(eviction)ライフサイクル
   - `src/lib/venueBubbleLifecycle.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 227</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 229</summary>
 
 - `scripts/encode-marketing-html-avatars.mjs` — extension/images/marketing-html-avatars/*.png を data URI にし、
 - `scripts/split-avatar-parts.mjs` — 偽市松背景の除去 + パーツ切り出し(one-off アセットパイプライン)
@@ -338,6 +338,8 @@
 - `src/lib/celebrationCommentScanSeed.js` — コメント走査系演出のシード（過去分を再発火させない）制御。
 - `src/lib/celebrationFlyText.js` — ニコニコ／ボカロ MV 風 — 文字が飛び交う演出の文言生成（純関数）。
 - `src/lib/celebrationPika.js` — パチンコ／ボカロ MV 風 — 画面全体「ぴかっ」フラッシュ spec（純関数）。
+- `src/lib/charaLiveController.js` — 「キャラライブ」の配線係。charaLiveState(判断) と charaLiveStage(描画) を繋ぎ、
+- `src/lib/charaLiveStage.js` — 「キャラライブ」の描画層。charaLiveState.js が決めた状態を DOM に落とすだけ。
 - `src/lib/cheerPalette.js` — 盛り上げワード（8888 / wwwww / 顔文字 等）のワンクリック挿入パレット。
 - `src/lib/comeviewActions.js` — v0.1.666: コメビュのコメント単位アクション(わんコメ同等+追憶独自)の純ロジック。
 - `src/lib/comeviewInstantRender.js` — コメビュ別窓で行を即時描画する純ロジック(本文の切り詰め・行の隠し判定など)。
@@ -792,7 +794,7 @@
   - `src/lib/statusTrendKey.js`
   - `src/extension/status-entry.js`
   - `src/lib/statusActionAdvisor.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 199</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 200</summary>
 
 - `app/app.js` — スマホ閲覧用 status Web 版。
 - `app/live-view.js` — global NL_BUILD_ID
@@ -848,6 +850,7 @@
 - `src/lib/bundleBuildId.js` — dist バンドル本文から NL_BUILD_ID(JST, MMDD-HHmmss)の焼き込み値を
 - `src/lib/buriedInstrumentCells.js` — 速報の文章に埋もれていた判定を【セル】として掘り起こす(純関数)。
 - `src/lib/catchingUpVerdict.js` — 【層】L0 判定層(純粋関数・I/O禁止)
+- `src/lib/charaLiveState.js` — 「キャラライブ」= 画面に常駐する 3 キャラ(りんく/こん太/たぬ姉)が、ふわふわ浮遊しながら
 - `src/lib/chikuranHeaderDom.js` — 「ちくらん風」配信者カードのヘッダー DOM ビルダー。
 - `src/lib/classifyFeatureCategory.js` — ファイルを機能カテゴリへ自動分類する純関数(v0.1.840・マップ網羅化 第1)。
 - `src/lib/cloakFailsafeMarker.js` — 外部保険(cloak-failsafe-entry.js)と本体(popup-entry.js)が
@@ -1011,11 +1014,15 @@
 - `v0.1.1474` 2026-08-22 — 「取得率が下がり続けています」の誤った注意を直しました
 - `v0.1.1473` 2026-08-22 — 取得率が501%になる表示を直しました
 
-### 🏟 会場・席 (1版)
+### 🏟 会場・席 (2版)
+- `v0.1.1485` 2026-08-25 — 3キャラが会場にずっと居るようになりました
 - `v0.1.1475` 2026-08-22 — 大人数の配信で応援レーンが画面を突き抜けるのを直しました
 
 ### 🎈 吹き出し (1版)
 - `v0.1.1478` 2026-08-22 — なふだの切り替えをコメント入力のすぐ上に置きました
+
+### 🔊 読み上げ (1版)
+- `v0.1.1485` 2026-08-25 — 3キャラが会場にずっと居るようになりました
 
 ### 🪟 応援レーン・タイル (5版)
 - `v0.1.1480` 2026-08-23 — 紹介ページに最新の機能を載せました
@@ -1040,11 +1047,10 @@
 - `v0.1.1469` 2026-08-21 — 前回の直しが半分だったので、残りも直しました
 - `v0.1.1468` 2026-08-21 — 開いた直後を「異常」と誤って赤くするのをやめました
 
-### その他 (7版)
+### その他 (6版)
 - `v0.1.1482` 2026-08-23 — なふだの説明を分かりやすくしました
 - `v0.1.1481` 2026-08-23 — 閉じた放送を視聴中に出しません
 - `v0.1.1477` 2026-08-22 — 「なふだ」の切り替えが見つけられるようにしました
 - `v0.1.1472` 2026-08-21 — 誤った犯人を名指しする警告をやめました
 - `v0.1.1470` 2026-08-21 — 版ごとの「どれだけ良くなったか」を数字で残すようにしました
 - `v0.1.1467` 2026-08-21 — 検査が【自分の壊れ】に気づけるようにしました
-- `v0.1.1465` 2026-08-21 — 部品の置き場所を1枚で説明する案内を追加しました

@@ -342,6 +342,9 @@ import {
 } from '../lib/venueBubbleLifecycle.js';
 import { resolveVoiceForUser } from '../lib/voiceAssignment.js';
 import { buildVenueCharacterFrame } from '../lib/venueCharacterFrame.js';
+// キャラライブ(2026-08-25): 3キャラを常駐させ、ふわふわ浮遊+相槌+返事+シンキングを出す。
+//   判断は charaLiveState.js(純関数)、描画は charaLiveStage.js、配線は charaLiveController.js。
+import { startCharaLive } from '../lib/charaLiveController.js';
 import { parseGiftCommentText, parseNicoadCommentText } from '../lib/parseGiftComment.js';
 import {
   resolveGiftProjectile,
@@ -3044,6 +3047,23 @@ export function mountVenueBarButton(options = {}) {
   const crowdReducedMotion =
     typeof window.matchMedia === 'function' &&
     window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  // ★キャラライブ(2026-08-25 ユーザー要望): 3キャラを会場に常駐させる。
+  //   - ふわふわ浮遊+まばたき+表情のゆらぎ = 「常に場にいる」空気
+  //   - 相槌は「コメントが届いた瞬間」でなく【読み上げが実際に鳴った瞬間】に出す
+  //     (届いた瞬間だと、読み上げキューが詰まっている時に声より先に頷いてしまう)
+  //   - heat は群衆と同じ crowdHeatLevel を共有 = 会場が沸くとキャラも一緒に沸く
+  //   - reducedMotion は群衆と同じ判定を再利用(別々に計算して食い違わせない)
+  const charaLive = startCharaLive({
+    doc: document,
+    resolveUrl: resolveVenueAssetUrl,
+    getHeatLevel: () => crowdHeatLevel,
+    reducedMotion: crowdReducedMotion
+  });
+  // 会場は「必ず閉じた状態から始まる」設計(:2386)。開くのは setOpen(true) の時だけ。
+  //   ここで明示的に閉じておかないと、開く前からキャラだけが放送画面に浮かぶ。
+  charaLive.setVisible(false);
+
   /** @type {VenueRow[]} */
   let baseRows = [];
   // v0.1.754 3時間安定化: 参加者集計のインクリメンタル状態。チャンクは append-only なので一度
@@ -6482,9 +6502,23 @@ export function mountVenueBarButton(options = {}) {
           nickname: speech.name,
           key: speech.key,
           text: speech.text,
-          onAudioStart: bubble ? () => markBubbleSpeaking(bubble) : undefined,
-          onAudioEnd: bubble ? () => markBubbleDone(bubble) : undefined,
-          onDropped: bubble ? () => markBubbleResolved(bubble) : undefined
+          // ★キャラライブの相槌はここに乗せる(2026-08-25)。
+          //   onAudioStart は「本当に audio.play() が走った」時だけ鳴る信号なので、
+          //   読み上げの声とキャラの頷きが必ず揃う。onPlayStart(再生/破棄の両方で
+          //   発火する曖昧信号)に乗せると、鳴っていないのに頷く事故になる。
+          onAudioStart: () => {
+            if (bubble) markBubbleSpeaking(bubble);
+            charaLive.onCommentSpoken({ commentKey: speech.key, text: speech.text });
+          },
+          onAudioEnd: () => {
+            if (bubble) markBubbleDone(bubble);
+            charaLive.onCommentSpokenEnd();
+          },
+          // 鳴らずに捨てられた時も相槌を畳む(声が無いのに頷いたまま残さない)。
+          onDropped: () => {
+            if (bubble) markBubbleResolved(bubble);
+            charaLive.onCommentSpokenEnd();
+          }
         }]);
       }
     }
@@ -6748,6 +6782,8 @@ export function mountVenueBarButton(options = {}) {
     try { stopAggregation(); } catch { /* no-op */ }
     try { stopSpeechPolling(); } catch { /* no-op */ }
     try { stopCrowdMotion(); } catch { /* no-op */ }
+    // キャラライブも止める(rAF を回したまま放置すると拡張更新後も裏で描き続ける)。
+    try { charaLive.destroy(); } catch { /* no-op */ }
     // v0.1.1080: Phase C の受動tick(BGMダック+フェーズ進行)も他の会場タイマーと同型で止める。
     if (bgmPhaseTickTimer) { clearInterval(bgmPhaseTickTimer); bgmPhaseTickTimer = 0; }
     try {
@@ -6836,6 +6872,8 @@ export function mountVenueBarButton(options = {}) {
     } catch { /* documentElement 不在環境でも会場は止めない */ }
     toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
     stage.setAttribute('aria-hidden', open ? 'false' : 'true');
+    // キャラライブは会場と同じ寿命。閉じている間は描画も止める(CPU を食わせない)。
+    try { charaLive.setVisible(open); } catch { /* キャラの失敗で会場を止めない */ }
     if (open) {
       try { noteVenueOpened(_openLatency, Date.now()); } catch { /* 計器失敗は会場を止めない */ }
       addEscapeListener();
