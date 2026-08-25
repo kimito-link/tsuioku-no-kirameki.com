@@ -22,6 +22,53 @@
 import { CHARA_LIVE_MEMBERS, CHARA_LIVE_IDS } from './charaLiveState.js';
 import { yukkuriCharacterImagePath } from './yukkuriBroadcastSummary.js';
 
+/**
+ * ★軽量サムネ(.thumb128)への解決。2026-08-25 の実害から。
+ *
+ * 当初フルサイズ(1500x1500)を 23 枚先読みしていた = **9.6MB を起動時に一括デコード**。
+ * 展開後は 1500*1500*4byte ≒ 9MB/枚 で、23 枚なら約 200MB。
+ * ユーザー報告「押したらすぐ起動していたのに反応が悪くなった」の主犯。
+ * 既存 venueCharacterFrame.js が「画像は軽量な .thumb128 を使う(会場を重くしない)」と
+ * 明記していたのに、それを無視していた。
+ *
+ * 実表示は 116px なので 1500px は完全な無駄。thumb128 は全 14 枚で 303KB(フルの 3%)。
+ * thumb128 に無い表情は、見た目が最も近い実在サムネへ倒す(壊れ画像を絶対に出さない)。
+ *
+ * @type {Readonly<Record<string, string>>} フルパス → thumb128 パス
+ */
+const THUMB_FALLBACK = Object.freeze({
+  // smile-mouth-closed の thumb は存在しない → 口を閉じた normal で代用。
+  'link/link-yukkuri-smile-mouth-closed': 'link/link-yukkuri-normal-mouth-closed',
+  'tanunee/tanuki-yukkuri-smile-mouth-closed': 'tanunee/tanuki-yukkuri-normal-mouth-closed',
+  'konta/kitsune-yukkuri-smile-mouth-closed': 'konta/kitsune-yukkuri-normal',
+  // blink-mouth-open / half-eyes-mouth-open の thumb は無い → 口を閉じた同表情へ。
+  'link/link-yukkuri-blink-mouth-open': 'link/link-yukkuri-blink-mouth-closed',
+  'konta/kitsune-yukkuri-blink-mouth-open': 'konta/kitsune-yukkuri-blink-mouth-closed',
+  'tanunee/tanuki-yukkuri-blink-mouth-open': 'tanunee/tanuki-yukkuri-blink-mouth-closed',
+  'link/link-yukkuri-half-eyes-mouth-open': 'link/link-yukkuri-half-eyes-mouth-closed',
+  'konta/kitsune-yukkuri-half-eyes-mouth-open': 'konta/kitsune-yukkuri-half-eyes-mouth-closed',
+  'tanunee/tanuki-yukkuri-half-eyes-mouth-open': 'tanunee/tanuki-yukkuri-half-eyes-mouth-closed',
+  // konta は normal-mouth-open の実体が無い(fullでも) → smile-mouth-open で口を開ける。
+  'konta/kitsune-yukkuri-normal-mouth-open': 'konta/kitsune-yukkuri-smile-mouth-open'
+});
+
+const IMG_BASE = 'images/yukkuri-charactore-english/';
+
+/**
+ * フルサイズのパスを、実在する軽量サムネ(.thumb128)へ解決する。
+ *
+ * @param {string} fullPath yukkuriCharacterImagePath の戻り値
+ * @returns {string} .thumb128 のパス(実在するものだけを返す)
+ */
+export function toThumbPath(fullPath) {
+  const rel = String(fullPath).startsWith(IMG_BASE)
+    ? String(fullPath).slice(IMG_BASE.length)
+    : String(fullPath);
+  const stem = rel.replace(/\.png$/, '');
+  const mapped = THUMB_FALLBACK[stem] || stem;
+  return `${IMG_BASE}${mapped}.thumb128.png`;
+}
+
 /** 立ち絵の一辺(px)。会場の邪魔をしない大きさ。 */
 export const CHARA_LIVE_SIZE_PX = 116;
 
@@ -40,7 +87,7 @@ export function listCharaLiveImagePaths() {
   for (const id of CHARA_LIVE_IDS) {
     for (const expression of /** @type {const} */ (['normal', 'smile', 'blink', 'half-eyes'])) {
       for (const mouthOpen of [false, true]) {
-        out.add(yukkuriCharacterImagePath(id, expression, mouthOpen));
+        out.add(toThumbPath(yukkuriCharacterImagePath(id, expression, mouthOpen)));
       }
     }
   }
@@ -216,7 +263,7 @@ export function buildCharaLiveStageDom(doc, resolveUrl) {
     img.className = 'nlcl-chara__img';
     img.alt = member.displayName;
     img.decoding = 'async';
-    img.src = resolveUrl(yukkuriCharacterImagePath(member.id, 'normal', false));
+    img.src = resolveUrl(toThumbPath(yukkuriCharacterImagePath(member.id, 'normal', false)));
 
     const bubble = doc.createElement('div');
     bubble.className = 'nlcl-chara__bubble';
@@ -253,7 +300,7 @@ export function applyCharaLiveFrame(nodes, model, resolveUrl) {
     if (!node) continue;
 
     // ① 立ち絵(表情+口)。src は変化時のみ差し替える。
-    const nextSrc = resolveUrl(item.imagePath);
+    const nextSrc = resolveUrl(toThumbPath(item.imagePath));
     if (node.img.getAttribute('src') !== nextSrc) {
       node.img.setAttribute('src', nextSrc);
     }
