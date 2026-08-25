@@ -51,6 +51,9 @@ export const CHARA_BACKCHANNELS = Object.freeze([
 /** 描画の目標 fps。18fps は venueBar の群衆アニメと同じ(会場を重くしない実績値)。 */
 export const CHARA_LIVE_FPS = 18;
 
+/** 描画の最小間隔(ms)。rAF が 60fps で来ても、これ未満の間隔では描き直さない。 */
+export const FRAME_MIN_GAP_MS = Math.round(1000 / CHARA_LIVE_FPS);
+
 /**
  * 相槌の間引き。全部のコメントに反応すると、コメントが速い放送で
  * 3 体が喋りっぱなしになり「ざわめき」でなく「うるさい」になる。
@@ -89,15 +92,27 @@ export function startCharaLive(deps) {
   const resolveUrl =
     typeof deps.resolveUrl === 'function' ? deps.resolveUrl : (/** @type {string} */ p) => p;
   const now = typeof deps.now === 'function' ? deps.now : () => Date.now();
+  /*
+   * ★既定は必ず requestAnimationFrame(2026-08-25 の実害):
+   *   既定を setTimeout にしていたため、venueBar から requestFrame を渡していない本番では
+   *   【タブが背面でも止まらない・ブラウザの間引きも効かない】タイマーが回り続け、
+   *   ユーザー報告「押したらすぐ起動していたのに反応が悪くなった」の一因になった。
+   *   rAF ならタブが隠れれば自動で止まり、描画と歩調も合う。
+   */
+  const view = doc.defaultView;
   const raf =
     typeof deps.requestFrame === 'function'
       ? deps.requestFrame
-      : (/** @type {FrameRequestCallback} */ cb) =>
-          /** @type {any} */ (setTimeout(() => cb(now()), Math.round(1000 / CHARA_LIVE_FPS)));
+      : typeof view?.requestAnimationFrame === 'function'
+        ? view.requestAnimationFrame.bind(view)
+        : (/** @type {FrameRequestCallback} */ cb) =>
+            /** @type {any} */ (setTimeout(() => cb(now()), Math.round(1000 / CHARA_LIVE_FPS)));
   const caf =
     typeof deps.cancelFrame === 'function'
       ? deps.cancelFrame
-      : (/** @type {number} */ id) => clearTimeout(id);
+      : typeof view?.cancelAnimationFrame === 'function'
+        ? view.cancelAnimationFrame.bind(view)
+        : (/** @type {number} */ id) => clearTimeout(id);
   const getHeat = typeof deps.getHeatLevel === 'function' ? deps.getHeatLevel : () => 0;
   const backchannels =
     Array.isArray(deps.backchannels) && deps.backchannels.length
@@ -109,6 +124,7 @@ export function startCharaLive(deps) {
       ? deps.reducedMotion
       : typeof doc.defaultView?.matchMedia === 'function' &&
         doc.defaultView.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
 
   // ---- CSS を 1 回だけ入れる ------------------------------------------------
   const STYLE_ID = 'nlcl-stage-style';
@@ -131,6 +147,10 @@ export function startCharaLive(deps) {
   let lastReactionAt = -Infinity;
   // 会場を閉じている間は描かない(rAF を回し続けると閉じても CPU を食う)。
   let visible = true;
+  // 描画の間引き用(最後に実際に描いた時刻)。
+  let lastDrawMs = -Infinity;
+  // 状態が変わった直後は間引きを1回だけ飛ばして即描く(反応の鈍さを出さない)。
+  let needsImmediateDraw = false;
   /** 読み上げ中の相槌担当。onAudioEnd で黙らせるために覚えておく。 */
   let speakingChara = /** @type {import('./charaLiveState.js').CharaId|null} */ (null);
   let frameId = 0;
@@ -145,6 +165,15 @@ export function startCharaLive(deps) {
       return;
     }
     const t = now();
+    // ★rAF は毎秒60回来る。会場を重くしないため描画は約18fpsに間引く
+    //   (群衆canvasと同じ方針)。間引いても浮遊は滑らかに見える。
+    //   ただし相槌/返事/思考が入った直後だけは即座に描く(反応が鈍く見えないように)。
+    if (!needsImmediateDraw && t - lastDrawMs < FRAME_MIN_GAP_MS) {
+      frameId = raf(tick);
+      return;
+    }
+    needsImmediateDraw = false;
+    lastDrawMs = t;
     expireCharaModes(state, t);
     const model = buildCharaLiveRenderModel(state, {
       timeMs: t,
@@ -199,6 +228,7 @@ export function startCharaLive(deps) {
       if (who) {
         lastReactionAt = t;
         speakingChara = who;
+        needsImmediateDraw = true;
       }
     },
 
@@ -212,6 +242,7 @@ export function startCharaLive(deps) {
       // 返事(answer)や思考(thinking)に化けていたら触らない=別の意図を潰さない。
       if (slot && slot.mode === 'react') {
         slot.untilMs = now();
+        needsImmediateDraw = true;
       }
       speakingChara = null;
     },
@@ -224,6 +255,7 @@ export function startCharaLive(deps) {
      * @returns {string} 答える子の id
      */
     onStreamerAddressed(input) {
+      needsImmediateDraw = true;
       return triggerCharaAnswer(state, {
         prompt: String(input?.prompt ?? ''),
         answer: String(input?.answer ?? ''),
@@ -238,6 +270,7 @@ export function startCharaLive(deps) {
      * @returns {string}
      */
     beginThinking(input = {}) {
+      needsImmediateDraw = true;
       return startCharaThinking(state, {
         nowMs: now(),
         prompt: input.prompt,
@@ -252,6 +285,7 @@ export function startCharaLive(deps) {
      * @returns {string[]}
      */
     endThinking(input = {}) {
+      needsImmediateDraw = true;
       return endCharaThinking(state, {
         nowMs: now(),
         charaId: /** @type {any} */ (input.charaId ?? null)
