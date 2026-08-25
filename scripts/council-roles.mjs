@@ -326,7 +326,15 @@ export function weightOf(label) {
     // 「カタログに残ったまま402で対象外になる」型で死に得るため予備(weight3)から入れる。
     // 昇格・降格基準はgemini-3系と同一（7日以上空けた実会議2回でFAILEDゼロなら正規化・
     // liveProbeで1回でも失敗確認なら即撤去）。
-    if (n.includes("sambanova")) return 3;
+    // 2026-08-25 格下げ(3→4): 08-19以降liveProbeが連日429("high demand"/"Rate limit
+    // exceeded")。撤去はしない——同社の他モデルが200を返しキーもカタログ在籍も生きており、
+    // 「このモデルの死」ではなく無料枠の容量枯渇だと実測済み(council-lineup.mjsのコメント)。
+    // だがweight3のままだとgroq全滅時にcritic役の先頭に座り、実際に会議で選抜されて429で
+    // 落ちた(2026-08-25・groqキーを外した実会議で再現。role-gap計器がcritic欠落を検知)。
+    // 「生きてはいるが今は繋がらない」枠が席を先取りする構図＝過去のkimi-k2.7-code型。
+    // weight4に下げ、同役の健全な予備(mistral/magistral-small w3)を先に選ばせる。
+    // 復帰条件: liveProbeが2日連続で成功したらweight3に戻す(この行を消す)。
+    if (n.includes("sambanova")) return 4;
     // 2026-08-05 追加: Mistral AI(新規プロバイダ)も同じ理由で予備(weight3)から入れる。
     // 判定は "mistral/" ではなく "mistral" の部分一致にする——将来 nvidia/mistral-large 系や
     // openrouter経由のMistral系を採用した場合も、素性が同じである以上まとめて予備扱いに
