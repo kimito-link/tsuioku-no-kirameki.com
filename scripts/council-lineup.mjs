@@ -509,3 +509,31 @@ export const LINEUP = [
   //  1件が生死逆（lead本命と推薦→実測429×2）だった。実測数値は司令塔の叩き直しを経ない
   //  限り採否の根拠にしない（「会議は素材であって結論ではない」の計測版）。
 ];
+
+/**
+ * requires の略号 → 実際の環境変数名。**この一覧が唯一の正本。**
+ *
+ * ★2026-08-25 追加（16体中4体が黙って落ちていた事故の再発防止）:
+ *  従来この対応表は3箇所に手書きコピーされていた——meeting.mjs の ENV_FLAGS、
+ *  COUNCIL-HOWTO.md のトラブルシュート節、council-fable スキルの起動手順。
+ *  プロバイダを足すたび3箇所を更新する設計だったため、SambaNova(2026-07-31)と
+ *  Mistral(2026-08-05)の追加時に**文書側2箇所とも漏れた**。
+ *  結果、スキル経由の会議は SAMBANOVA_API_KEY / MISTRAL_API_KEY が流れず
+ *  **16体中12体でしか回っていなかった**（critic 4→2・lead 3→2・implement 2→1）。
+ *  meeting.mjs は該当メンバーを無言で skip するため、誰も気づけなかった。
+ *  ＝うっかりではなく「正本が複数ある」構造の問題。
+ *
+ *  以後、**envの一覧を文書に書かない**。手順書は `node scripts/council-env.mjs --ps`
+ *  を案内するだけにし、実体はここから生成する。プロバイダを増やすときは
+ *  LINEUP に requires を書き、この表に1行足すだけでよい（文書の更新は不要）。
+ */
+export const ENV_NAMES = {
+  G: 'GROQ_API_KEY',
+  N: 'NVIDIA_API_KEY',
+  O: 'OPENROUTER_API_KEY',
+  E: 'GEMINI_API_KEY',
+  CF: 'CLOUDFLARE_API_TOKEN',
+  CF_ACC: 'CLOUDFLARE_ACCOUNT_ID',
+  SN: 'SAMBANOVA_API_KEY',
+  MI: 'MISTRAL_API_KEY',
+};

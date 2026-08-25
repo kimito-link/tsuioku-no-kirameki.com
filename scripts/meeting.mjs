@@ -29,7 +29,7 @@ import {
   buildSystem, roleOf, ROLE_LABEL,
   classifyPrompt, parseCategory, selectMembers, CATEGORIES, weightOf,
 } from './council-roles.mjs';
-import { LINEUP } from './council-lineup.mjs';
+import { LINEUP, ENV_NAMES } from './council-lineup.mjs';
 
 const args = process.argv.slice(2);
 let question = '';
@@ -316,6 +316,9 @@ const push = (label, kind, run, rawId = '', provider = '') => {
 // 2026-07-16 リファクタ（HANDOFF-council-scout-design.md Phase 0）: 個別の
 // push(...) 呼び出し列を LINEUP データ + このループに置き換えた。挙動は不変
 // （requires/provider/rawId/apiModel/opts/timeoutMs は元のpush引数と1:1対応）。
+// ENV_FLAGS は略号→「キーの値」、council-lineup.mjs の ENV_NAMES は略号→「env名」。
+// 役割が違うので両方あってよいが、**キーの集合は必ず一致していなければならない**
+// （片方に足し忘れると該当メンバーが無言で消える。下の欠落ログはそれを可視化する）。
 const ENV_FLAGS = { G, N, O, E, CF, CF_ACC, SN, MI };
 const PROVIDER_RUN = {
   groq: (entry) => (p, s) => openaiChat(GROQ, G, entry.apiModel, p, s, entry.opts, entry.timeoutMs || undefined),
@@ -342,13 +345,40 @@ function runFor(entry) {
   }
   return build(entry);
 }
+// 2026-08-25: 欠落envで落ちたメンバーを数える。以前はここが単に continue するだけで、
+//  キーが1本足りないと該当メンバーが**無言で消えていた**。実際、手順書のenv一覧が
+//  古いまま SambaNova/Mistral の2キーが流れず、スキル経由の会議が半月以上
+//  16体中12体で回っていた（critic 4→2・lead 3→2・implement 2→1）のに誰も気づけなかった。
+//  fail-closed の流儀に従い「黙って落とさず、落とした件数と影響を明記する」。
+//  なお exit(1) はしない: キーが1本も無い環境でもローカル縮退で回すのは既存の正規運用
+//  （COUNCIL-HOWTOのローカルのみ構成）であり、そこを壊さないため。
+const envMissing = {};   // env名 -> 落ちたメンバー数
+const envDroppedRoles = {};
 for (const entry of LINEUP) {
-  const enabled = entry.requires.every((k) => Boolean(ENV_FLAGS[k]));
-  if (!enabled) continue;
+  const lack = entry.requires.filter((k) => !ENV_FLAGS[k]);
+  if (lack.length) {
+    for (const k of lack) {
+      const name = ENV_NAMES[k] || k;
+      envMissing[name] = (envMissing[name] || 0) + 1;
+    }
+    const r = roleOf(entry.label) || '(none)';
+    envDroppedRoles[r] = (envDroppedRoles[r] || 0) + 1;
+    continue;
+  }
   // provider が実在チェック対象('groq'|'gemini')の場合のみ rawId/provider を渡す
   // （meeting.mjs の verifyLiveModels は provider が groq/gemini/ollama のときだけ効く）。
   const verifiable = entry.provider === 'groq' || entry.provider === 'gemini';
   push(entry.label, 'cloud', runFor(entry), verifiable ? entry.rawId : '', verifiable ? entry.provider : '');
+}
+{
+  const enabledCount = LINEUP.length - Object.values(envDroppedRoles).reduce((a, b) => a + b, 0);
+  if (Object.keys(envMissing).length) {
+    const envs = Object.entries(envMissing).map(([n, c]) => `${n}(${c}体)`).join(', ');
+    const roles = Object.entries(envDroppedRoles).map(([r, c]) => `${r} -${c}`).join(', ');
+    console.error(`[env] 有効 ${enabledCount}/${LINEUP.length}体。欠落env: ${envs} → ${roles}`);
+  } else {
+    console.error(`[env] 有効 ${enabledCount}/${LINEUP.length}体（欠落なし）`);
+  }
 }
 // 司令塔 Claude(Opus 4.8) を会議の最強メンバー(統括/批判)として自動参加させる。
 // 既定(プランB)は ANTHROPIC_API_KEY 無し＝このブロックは無効で、Claude はチャット側で手動統括する。
@@ -573,6 +603,13 @@ const record = {
 /** 会議中の特筆イベントを record に残す（stderr出力と対で呼ぶ）。 */
 function noteEvent(type, detail) {
   try { record.meta.events.push({ type, ...detail }); } catch { /* 記録失敗で会議を止めない */ }
+}
+
+// 2026-08-25: envの欠落は LINEUP ループ(上部)で検出するが、その時点では record が
+//  まだ無いので noteEvent を呼べない。検出結果を持ち越してここで1件だけ記録する
+//  （「stderrには出ていたがJSONから追えない」状態を作らないため）。
+if (Object.keys(envMissing).length) {
+  noteEvent('env-missing', { missing: envMissing, roles: envDroppedRoles });
 }
 
 if (!allMembers.length) {
