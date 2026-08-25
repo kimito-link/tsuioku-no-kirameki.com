@@ -61,13 +61,20 @@ export function charaLiveStageCss() {
    *   当初 body 直下に fixed + z-index:2147483000 で置いたが、会場ルート(.nlsb-root)が
    *   まったく同じ z-index の全画面要素で、かつ後から DOM に入るため【完全に覆われて
    *   一度も見えなかった】。同値 z-index は DOM 順で後勝ちになる。
-   *   会場の既存階層(客席 z4 / 吹き出し z5 / 常駐 z6 / 投げ物 z7)に合わせ、
-   *   吹き出しより前・投げ物より後ろの z6 に置く。
+   *   会場の既存階層(客席 z4 / 吹き出し z5 / 常駐・roster z6 / 投げ物 z7)。
+   *
+   * ★z6 も間違いだった(2回目の同じ失敗・2026-08-25):
+   *   stage.append(stageLayout, bubbleLayer, rosterPanel, ...) は startCharaLive より
+   *   先に実行されるので、【同じ z6 の rosterPanel より DOM順で前】に置かれてしまい、
+   *   また負けた(venueBar.js:2711 のコメントが「stage.appendの最後に置くことで同z-index(6)
+   *   の常駐レイヤーより手前に来る」と明言している＝先に入る側は負ける)。
+   *   実測: 会場内で使われている z-index の最大は 7(投げ物)。よって 8 で最前面を取る。
+   *   ★「最大値を名乗る」でも「既存に合わせる」でもなく【実測して1つ上】が正解。
    */
   position: absolute;
   right: 12px;
   bottom: 12px;
-  z-index: 6;
+  z-index: 8;
   display: flex;
   align-items: flex-end;
   gap: 10px;

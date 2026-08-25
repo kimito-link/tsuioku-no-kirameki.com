@@ -230,6 +230,31 @@ describe('AI シンキング', () => {
   });
 });
 
+/**
+ * CSS のブロックコメントを除いた「実際に効く宣言だけ」を返す。
+ *
+ * ★これが無いと事故る(2026-08-25 実際に踏んだ): 解説コメントに書いた
+ *   「z-index:2147483000」を正規表現が拾い、z6 に戻してもテストが通ってしまった。
+ *   テストは【実際に効く値】だけを見なければ、守っているつもりで何も守れない。
+ *
+ * @param {string} css
+ * @returns {string}
+ */
+function stripCssComments(css) {
+  return String(css).replace(/\/\*[\s\S]*?\*\//g, '');
+}
+
+/**
+ * `.nlcl-stage { … }` の中の実宣言を取り出す。
+ * @param {string} css
+ * @returns {string}
+ */
+function charaStageBlock(css) {
+  const bare = stripCssComments(css);
+  const i = bare.indexOf('.nlcl-stage {');
+  return bare.slice(i, bare.indexOf('}', i));
+}
+
 /*
  * ★2026-08-25 実機で踏んだ事故の回帰テスト。
  *
@@ -256,12 +281,35 @@ describe('★会場に覆われない(実機で踏んだ事故の固定)', () =>
   it('会場ルートと同じ z-index を使っていない(同値は DOM 順で負ける)', () => {
     const rootZ = venueBarSrc.match(/\.nlsb-root\s*\{[^}]*z-index:\s*(\d+)/);
     expect(rootZ, '.nlsb-root の z-index が読めない').toBeTruthy();
-    expect(charaLiveStageCss()).not.toContain(`z-index: ${rootZ[1]}`);
+    expect(charaStageBlock(charaLiveStageCss())).not.toContain(`z-index: ${rootZ[1]}`);
+  });
+
+  /*
+   * ★2回目の同じ失敗(2026-08-25)の固定。
+   *   1回目を直すとき z6 にしたが、stage.append(stageLayout, bubbleLayer, rosterPanel, ...)
+   *   は startCharaLive より先に走るため、【同じ z6 の rosterPanel より DOM順で前】に
+   *   置かれてまた負けた。venueBar.js:2711 のコメント自身が
+   *   「stage.appendの最後に置くことで同z-index(6)の常駐レイヤーより手前に来る」と
+   *   言っている＝先に入る側は同値だと必ず負ける。
+   *   よって「会場で使われている z-index の最大より大きい」ことを実測で要求する。
+   */
+  it('会場内のどの z-index よりも大きい(同値・以下だと DOM順で負ける)', () => {
+    const used = [...venueBarSrc.matchAll(/z-index:\s*(\d+)/g)]
+      .map((m) => Number(m[1]))
+      // 会場ルート/トグルの 2147483000 はページ全体に対する値で、stage 内の重なりとは別軸。
+      .filter((z) => z < 1000);
+    expect(used.length, '会場の z-index が読めない').toBeGreaterThan(0);
+    const maxInVenue = Math.max(...used);
+
+    const mine = Number(/z-index:\s*(\d+)/.exec(charaStageBlock(charaLiveStageCss()))[1]);
+    expect(
+      mine,
+      `会場の最大 z-index は ${maxInVenue}。キャラは ${mine} では手前に出ない`
+    ).toBeGreaterThan(maxInVenue);
   });
 
   it('ステージ内で効く配置になっている(fixed だと親の外へ出る)', () => {
-    const css = charaLiveStageCss();
-    const block = css.slice(css.indexOf('.nlcl-stage {'), css.indexOf('}', css.indexOf('.nlcl-stage {')));
+    const block = charaStageBlock(charaLiveStageCss());
     expect(block).toContain('position: absolute');
     expect(block).not.toContain('position: fixed');
   });
