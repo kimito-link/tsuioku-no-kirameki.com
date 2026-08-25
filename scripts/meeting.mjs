@@ -22,9 +22,14 @@
  *
  * 詳細・動くモデルと罠は memory/reference-free-cloud-llm-apis.md を参照。
  */
-import { readFileSync, writeFileSync, existsSync, unlinkSync, mkdirSync, readdirSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync, unlinkSync, mkdirSync, readdirSync, statSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+// 記録の保存先はスクリプト位置基準（cwd非依存）。scout-models.mjs:28 と同じ流儀にして、
+// どのディレクトリから起動しても scout が読む council/ に落ちるようにする。
+const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 import {
   buildSystem, roleOf, ROLE_LABEL,
   classifyPrompt, parseCategory, selectMembers, CATEGORIES, weightOf,
@@ -1096,4 +1101,38 @@ console.error(`\n=== 完了 ${Date.now() - t0}ms ===`);
 if (outPath) {
   writeFileSync(outPath, JSON.stringify(record, null, 2), 'utf8');
   console.error('保存: ' + outPath);
+}
+
+// 2026-08-25: --out が無くても council/auto/ に自動保存する。
+//  なぜ必要か: 会議記録は --out を付けた実行しか保存されず、COUNCIL-HOWTOの基本形にも
+//  FAST/QUALITY例にも --out が無い。結果 council/*.json は最新が2026-08-04で止まり、
+//  scoutの「実会議の成績」(直近30日窓)は2026-09-03に**節ごと消える**ところだった。
+//  さらに既存84件は meta キー自体を持たない古い形式で、noteEventの計器データは
+//  **1件も蓄積されていなかった**（rescue/dedup/synth-failed/role-gap すべて観測ゼロ）。
+//  「手順書に --out を書いて人間に打たせる」案は採らない——env一覧がまさに
+//  「文書のコピーが腐って気づけなかった」事故で、打ち忘れは観測すらできない。
+//  仕組みで担保する。
+//  置き場所: 直下(人間が名付けた正式記録84件)と混ぜないため council/auto/ に分ける。
+//  .gitignore で除外済み(council/ 自体はgit追跡下なので、除外しないと会議のたびに
+//  未コミット差分が出る)。90日超は自動削除＝scoutの30日窓に3倍の余裕。
+//  退避弁: COUNCIL_NO_RECORD=1
+if (process.env.COUNCIL_NO_RECORD !== '1') {
+  try {
+    const autoDir = join(REPO_ROOT, 'council', 'auto');
+    mkdirSync(autoDir, { recursive: true });
+    const stamp = record.at.replace(/[:.]/g, '-').replace('T', '_').slice(0, 19);
+    const cat = String(record.category || 'unknown').replace(/[^a-z0-9_-]/gi, '');
+    const p = join(autoDir, `${stamp}-${cat}.json`);
+    writeFileSync(p, JSON.stringify(record, null, 2), 'utf8');
+    console.error('自動記録: ' + p);
+    // 90日超の掃除。失敗しても会議の成否には関係ないので握りつぶす。
+    const limit = Date.now() - 90 * 86400000;
+    for (const f of readdirSync(autoDir)) {
+      if (!f.endsWith('.json')) continue;
+      const fp = join(autoDir, f);
+      try { if (statSync(fp).mtimeMs < limit) unlinkSync(fp); } catch { /* 1件の失敗で止めない */ }
+    }
+  } catch (e) {
+    console.error('[記録] 自動保存に失敗（会議結果には影響しません）: ' + String(e?.message || e).slice(0, 100));
+  }
 }

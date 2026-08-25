@@ -62,6 +62,13 @@ council-scout/LATEST.md
 /council-*.txt
 /council-*.log
 /_council-*.json
+
+# 会議の自動記録(2026-08-25新設)。meeting.mjs が --out の有無に関わらずここへ1件書く。
+# ★消さないこと: council-scout の「実会議の成績」がこのディレクトリを読んで
+#   メンバーの実稼働を評価している(掃除スクリプトの対象にしない)。
+# 追跡しない理由: council/ 自体はgit追跡下(371ファイル)なので、除外しないと
+#   会議のたびに未コミット差分が出る。90日超は meeting.mjs 側が自動削除する。
+council/auto/
 /clip-history-persistence-*.json
 /clip-history-persistence-*.txt
 /winv-clipboard-freeze-*.json
