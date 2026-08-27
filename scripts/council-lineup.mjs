@@ -104,11 +104,21 @@ export const LINEUP = [
   //     LINEUPに該当labelが無ければ発火しない無害な行）。
 
   // 2026-06-25 追加（会議ハーネス自身で採否を合議→司令塔Claudeが実機裏取り）:
-  //  - qwen3.6-27b: Groq の新世代 thinking モデル。発散(diverge)。実機で <think>…</think>＋本文を返す
-  //    （strip後「東京」を確認済み）。openaiChat 側で <think> を除去するので本文だけが会議に乗る。
+  //  - qwen3系27b: Groq の thinking 系。発散(diverge)担当。<think>…</think>付きで返すことがあるが
+  //    openaiChat 側の stripThinking で除去され本文だけが会議に乗る（2026-08-27時点の3.8は無し）。
+  // 2026-08-27 世代交代（qwen3.6-27b → qwen3.8-27b）: 同一プロバイダ・同一役割の後継が出たので
+  //  「足す」のではなく「入れ替える」。足すと diverge が groq 2体になり恒久ルール5(同役に同一
+  //  プロバイダを積まない)に反するうえ、新顔がweight1で既存主力を押しのけるだけになるため。
+  //  実測(本番と同じ /openai/v1/chat/completions・2並列を3回):
+  //    3.8 → 272〜455ms・<think>なし   3.6 → 1291〜1875ms・毎回<think>あり
+  //  ＝**4〜6倍速く、思考タグに出力予算を食われない**。発散役の実プロンプトでも
+  //  3.8は276msで即答し着眼も奇抜だった(3.6は3057msかけて<think>が出力を占有)。
+  //  <think>はstripThinkingで除去されるので害はないが、除去される文字にトークンを
+  //  払っている分だけ無駄。会議は並列なので1体の遅さが全体の律速になる。
+  //  旧: { label: 'groq/qwen3.6-27b', rawId/apiModel: 'qwen/qwen3.6-27b' }（2026-06-25採用）
   //  ※ 会議は「llama-3.3-70b-instant」を批判/速い視点に推したが【実在しない幻覚】。70Bは -versatile のみ。
   //    8B級の -instant は llama-3.1-8b-instant だけ（実機で確認）。幻覚IDは採用しない。
-  { label: 'groq/qwen3.6-27b', provider: 'groq', rawId: 'qwen/qwen3.6-27b', apiModel: 'qwen/qwen3.6-27b', opts: {}, requires: ['G'] },
+  { label: 'groq/qwen3.8-27b', provider: 'groq', rawId: 'qwen/qwen3.8-27b', apiModel: 'qwen/qwen3.8-27b', opts: {}, requires: ['G'] },
 
   // 2026-07-04 追加（実機 /models 取得で新顔確認・weightOf で予備(weight3)に格下げ）:
   //  - gpt-oss-20b: gpt-oss-120b の軽量版。Ollama停止時に diverge-alt(ローカルgpt-oss:20b専任)が
@@ -266,6 +276,9 @@ export const LINEUP = [
   //  両エントリとも liveProbe:true 必須: SambaNovaの規約は「カタログに残ったまま402で
   //  無料枠対象外になる」型（MiniMax-M2.7で実証済み）であり、これはcloudflare/glm-5.2の
   //  有料化と同一の、カタログ照合では原理的に検知不可能なパターンのため。
+  //  ★2026-08-27 再測(8日連続失敗): 全7モデル実測で 429×5・200×2(MiniMax-M2.7 / gemma-4-31B-it)。
+  //   08-25と**まったく同じパターン**＝キー有効・カタログ在籍・容量枯渇。判定不変で撤去しない。
+  //   日数が伸びること自体は新情報ではない（同居する200が消えたら初めて再評価する）。
   //  ★2026-08-25 追測: 5日連続失敗に伸びたが判定は変わらず撤去しない。同日の全7モデル実測で
   //   429が5体・200が2体（MiniMax-M2.7 / gemma-4-31B-it）＝キーは有効でカタログにも在籍。
   //   30秒あけて2回測っても同結果＝瞬間的なスパイクではないが、プロバイダ全体の容量枯渇である
