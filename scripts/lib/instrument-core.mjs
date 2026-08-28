@@ -1,45 +1,58 @@
 /**
- * instrument-core.mjs — ★計器・検査の共通土台（45リポから収穫した知見の実装）。
+ * instrument-core.mjs — ★検査・計器の共通土台（キット同梱・依存ゼロ・純Node）。
  *
- * ★【計器のやりとりの集約点】(2026-08-21 ユーザー指示で移設)
- *   github/web-ios-android/_docs/instruments/README.md
- *   ＝ リポ間の知見の往復・確定した掟・未解決は【そちらが正本】。
- *   ★このファイルの実コードの正本もキット側:
- *     web-ios-android/templates/scripts/lib/instrument-core.mjs
- *   ★コメント(このヘッダ)は各リポの事例を書いてよい。実コードだけ一致させる。
+ * ★このファイル1つをコピーすれば、web-ios-androidキットを使っていない
+ *   他のプロジェクトでもそのまま動く（外部ライブラリへの依存なし）。
+ *   取得先: https://github.com/kimito-link/web-ios-android/blob/main/templates/scripts/lib/instrument-core.mjs
  *
  * ───────────────────────────────────────────────────────────────────────────
- * ■ ★ユーザー指示(2026-08-21)
- *   「github から学べるもの全部いれて計器を最強にして」
+ * ■ ★何を解決するか
+ *   検査が「合格 / 不合格」の2値しか答えられないと、
+ *   ★**何も測っていないのに合格**と出る。これは赤より危険（機能しているように見える）。
  *
- * ■ ★45リポを実測して分かった「このリポに無かったもの」
- *   実測: このリポの scripts/ 53本のうち
- *     `--selftest` を持つもの … **0本**
- *     ゲートで `exit 2`(測れなかった)を出すもの … **0本**
- *   ＝ ★**「測れなかった」を緑に混ぜていた**。これが最大の欠落だった。
+ *   このリポでも 2026-08-17 に実際に踏んだ:
+ *     audit-native-cta.mjs を引数なしで実行 → 何も走査せず「✅ 0件」と表示
+ *     ＝ 偽の緑（commit fc3a8e3 で個別に対処）。
+ *   ★同じ穴は別の検査でも開く。だから土台側で塞ぐ。
  *
- * ■ 収穫元(すべて実ファイルで確認済み)
- *   - `soushin-suggest.link/scripts/blank-map.mjs:17`
- *       終了コードの3値規約。★「2 を 0 と同じ緑に数えないこと」と明記
- *   - `kimitolink-linktree/scripts/lib/diag-core.mjs:18`
- *       ★**pass なのに evidence が空なら inconclusive へ強制降格**
- *       ＝ fail-closed の最小実装。「根拠なき緑」を機械で潰す
- *   - `soushin-suggest.link/scripts/blank-map.mjs:556`
- *       `--selftest` = 検知器に毒を食わせ、赤が出ることを確認する
- *   - `ai-hub/bin/ci-audit.mjs:212`
- *       ★「指摘は無いが N 件を監査できなかった」を**緑と判定しない**分岐
- *   - `soushin-suggest.link/scripts/check-boundaries.ps1:132`
- *       赤のとき3行出す: 何が / 直し方 / ★**この検査の限界**
+ * ■ 終了コードの約束（3値）
+ *   0 = 合格（★根拠つき） / 1 = 測れた上での赤 / ★2 = 測れなかった
+ *   ★2 を 0 と同じ「緑」に数えないこと。
  *
- * ■ ★なぜ「限界の明記」が要るか(収穫元の実損記録)
- *   `soushin-suggest.link/_docs/PAINT-CHAIN-INSTRUMENT-DESIGN.md`:
- *     計器が「可視先頭2行×左240px」しか測っていないのに全体の数字だと解釈し、
- *     ★**会議メンバー全員が前提を誤り、立てた論の大半が無効になった**。
- *   → 計器は「自分が何を測っていないか」を出力に書かねばならない。
+ * ■ 収穫元（実運用で効いている先例・すべて実ファイルで確認）
+ *   - soushin-suggest.link/scripts/blank-map.mjs:17    3値規約の明文化
+ *   - kimitolink-linktree/scripts/lib/diag-core.mjs:18 ★根拠なき pass を降格
+ *   - soushin-suggest.link/scripts/blank-map.mjs:556   --selftest（毒→赤）
+ *   - ai-hub/bin/ci-audit.mjs:212  「N件監査できなかった」を緑と判定しない
+ *   - soushin-suggest.link/scripts/check-boundaries.ps1:132
+ *       赤のとき3行（何が / 直し方 / ★この検査の限界）
+ *
+ * ■ ★「限界の明記」がなぜ要るか（実損の記録）
+ *   soushin-suggest.link/_docs/PAINT-CHAIN-INSTRUMENT-DESIGN.md:
+ *     計器が「可視先頭2行 × 左240px」しか測っていないのに全体の数字と解釈され、
+ *     ★**会議の全メンバーが前提を誤り、立てた論の大半が無効になった**。
+ *   → 計器は「自分が何を測っていないか」を出力に書く。
+ *
+ * ■ 使い方（最小）
+ *   import { EXIT, computeExitCode, formatProbeReport, runSelfTest } from ./lib/instrument-core.mjs;
+ *   const results = [{ probe: 何を測ったか, verdict: pass, evidence: { 走査: n } }];
+ *   console.log(formatProbeReport(results));
+ *   process.exit(computeExitCode(results));
+ *   ★evidence が空だと pass は自動で inconclusive に降格する（根拠なき緑を作らない）。
  * ───────────────────────────────────────────────────────────────────────────
  */
 
-/** ★終了コードの約束(このリポ共通規約)。 */
+/** ★終了コードの約束。★このファイルをコピーすれば、web-ios-androidキットを
+ *  使っていない他のリポジトリでもそのまま同じ規約で使える(依存ゼロ・純Node)。 */
+/**
+ * ★証拠が「いつ測ったものか」を見て、古ければ印を付ける閾値（ミリ秒）。
+ *
+ * ★収穫元: surechigai-romi.link/scripts/lib/instrument-core.mjs（2026-08-27 に正本へ取り込み）。
+ *   ★合格そのものは取り消さない。「古い」は「無効」ではない。
+ *   ただし★古い緑を新しい緑と同じ見た目にはしない（経過秒を必ず出す）。
+ */
+const STALE_MS = 60 * 1000;
+
 export const EXIT = Object.freeze({
   /** 合格。★根拠(evidence)を伴うときだけ名乗れる。 */
   PASS: 0,
@@ -86,6 +99,15 @@ export function normalizeProbeResult(raw) {
   }
   if (verdict !== 'pass' && verdict !== 'fail' && verdict !== 'inconclusive') {
     verdict = 'inconclusive';
+  }
+
+  // ★証拠に verifiedAt があれば、古さを測って印を付ける（合格は取り消さない）。
+  if (evidence && typeof evidence.verifiedAt === 'string') {
+    const at = Date.parse(evidence.verifiedAt);
+    if (!Number.isNaN(at) && Date.now() - at > STALE_MS) {
+      evidence.stale = true;
+      evidence.staleSec = Math.round((Date.now() - at) / 1000);
+    }
   }
 
   return {
@@ -151,6 +173,14 @@ export function formatProbeReport(results, opts = {}) {
   if (!fails.length && !unk.length) {
     const ev = pass.length ? `(根拠あり ${pass.length}件)` : '';
     lines.push(`${label}✅ 合格 ${ev}`);
+    // ★古い証拠での合格は、経過時間を必ず出す（新しい緑と見分けが付かなくしない）。
+    for (const r of pass) {
+      if (r.evidence?.stale) {
+        lines.push(
+          `${label}⏳ ${r.probe}: ★${r.evidence.staleSec}秒前の証拠です（今の状態ではありません）`
+        );
+      }
+    }
   }
   return lines.join('\n');
 }
@@ -188,4 +218,45 @@ export function runSelfTest(cases) {
     if (!red) fails.push(`${c.name}: ★毒を入れても赤にならなかった(検知が効いていない)`);
   }
   return { ok: fails.length === 0, fails };
+}
+
+/**
+ * ★タイムアウトしうる処理を1回だけ再試行し、2回とも駄目なら「測れなかった」にする。
+ *
+ * ★収穫元: kimitolink-linktree/scripts/lib/diag-core.mjs
+ *   → surechigai-romi.link が 2026-08-27 に輸入 → ★2026-08-28 に正本へ取り込み。
+ *
+ * ■ ★なぜ fail にしないか
+ *   ネットワーク越しの検査がタイムアウトしたとき、それは
+ *   「対象が壊れている」ではなく「★こちらが測れなかった」。
+ *   fail に倒すと、回線が細い日にデプロイが止まる＝赤が日常になり、
+ *   本物の赤を誰も見なくなる（掟「測れなかったを赤にも緑にも混ぜない」）。
+ *
+ * ■ 使い方
+ *   const r = await withRetryOnTimeout(() => fetch(url), 5000);
+ *   if (r?.timedOut) → verdict: 'inconclusive' にする
+ *
+ * @param {() => Promise<any>} fn
+ * @param {number} timeoutMs
+ * @returns {Promise<any>} 成功時はその値 / 2回ともタイムアウトなら { timedOut: true }
+ */
+export async function withRetryOnTimeout(fn, timeoutMs) {
+  const attempt = () =>
+    Promise.race([
+      fn(),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), timeoutMs)),
+    ]);
+
+  try {
+    return await attempt();
+  } catch (firstErr) {
+    if (firstErr.message !== 'timeout') throw firstErr;
+    try {
+      return await attempt();
+    } catch (secondErr) {
+      if (secondErr.message !== 'timeout') throw secondErr;
+      // ★「測れなかった」を返す。呼び出し側で inconclusive にすること。
+      return { timedOut: true };
+    }
+  }
 }

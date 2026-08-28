@@ -41,9 +41,8 @@
   - `src/lib/ndgrBackfillCrawl.js`
 - **コメント重複除去(NDGR)** — 再送/再接続/relay overlap の重複を liveId+messageId の canonical key で排除
   - `src/lib/ndgrMessageDedupe.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 61</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 60</summary>
 
-- `scripts/lib/instrument-core.mjs` — ★計器・検査の共通土台（45リポから収穫した知見の実装）。
 - `src/domain/observations/StatObservation.js` — StatObservation - ニコ生から取得する数値の「契約付き観測値」純関数 factory。
 - `src/domain/observations/vocabulary.js` — 観測層 (StatObservation) の語彙集 - 不変な enum 定義のみ。
 - `src/extension/backfill-sw-entry.js` — Service Worker 側の過去ログ取得(バックフィル)エンジン。NDGR を遡って取り込む。
@@ -795,7 +794,7 @@
   - `src/lib/statusTrendKey.js`
   - `src/extension/status-entry.js`
   - `src/lib/statusActionAdvisor.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 202</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 203</summary>
 
 - `app/app.js` — スマホ閲覧用 status Web 版。
 - `app/live-view.js` — global NL_BUILD_ID
@@ -820,6 +819,7 @@
 - `scripts/fix-src-images-mojibake.mjs` — Normalizes known mojibake paths under src/images (mirrored from kimito-link).
 - `scripts/install-local-sounds.mjs` — マイ効果音「手動取込」を不要にするローカル自動同梱スクリプト。
 - `scripts/layer-config.mjs` — ★どのリポでも使えるように「設定」を読む部分だけを切り出す。
+- `scripts/lib/instrument-core.mjs` — ★検査・計器の共通土台（キット同梱・依存ゼロ・純Node）。
 - `scripts/measure-flash-frames.mjs` — 「一瞬の黒」を【画面に出たピクセル】で測る。
 - `scripts/meeting-roles.mjs` — meeting.mjs の役割注入版。
 - `scripts/meeting.mjs` — 会議ハーネス: 同じ問いを「無料クラウド4系統 + ローカル ollama 数体」に投げ、
@@ -1031,11 +1031,10 @@
 ### 🔊 読み上げ (1版)
 - `v0.1.1485` 2026-08-25 — 3キャラが会場にずっと居るようになりました
 
-### 🪟 応援レーン・タイル (4版)
+### 🪟 応援レーン・タイル (3版)
 - `v0.1.1480` 2026-08-23 — 紹介ページに最新の機能を載せました
 - `v0.1.1476` 2026-08-22 — 状態ページが29秒かかる・数字が出ないのを直しました
 - `v0.1.1475` 2026-08-22 — 大人数の配信で応援レーンが画面を突き抜けるのを直しました
-- `v0.1.1471` 2026-08-21 — 「無い犯人を探させる」表示をやめました
 
 ### 🩺 診断・状態速報 (4版)
 - `v0.1.1484` 2026-08-23 — 描き直しの本当の原因を出します
@@ -1043,11 +1042,11 @@
 - `v0.1.1479` 2026-08-22 — 「どの数字を測っていないか」が分かるようにしました
 - `v0.1.1473` 2026-08-22 — 取得率が501%になる表示を直しました
 
-### ⚡ 描画・性能 (2版)
+### ⚡ 描画・性能 (1版)
 - `v0.1.1475` 2026-08-22 — 大人数の配信で応援レーンが画面を突き抜けるのを直しました
-- `v0.1.1471` 2026-08-21 — 「無い犯人を探させる」表示をやめました
 
-### その他 (6版)
+### その他 (7版)
+- `v0.1.1491` 2026-08-29 — 検査の土台を、配布元の最新版にそろえました
 - `v0.1.1490` 2026-08-25 — 応援している作品を、そっとお知らせする欄をつけました
 - `v0.1.1488` 2026-08-25 — キャラが出ない原因を自分で言えるようにしました
 - `v0.1.1482` 2026-08-23 — なふだの説明を分かりやすくしました
