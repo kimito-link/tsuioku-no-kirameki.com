@@ -18,6 +18,7 @@
     "check:root-cause-claim": "node scripts/check-root-cause-claim.mjs --last",
     "check:no-secrets": "node scripts/check-no-secrets-in-dist.mjs",
     "check:tracked-imports": "node scripts/check-tracked-imports.mjs",
+    "check:tracked-imports:selftest": "node scripts/check-tracked-imports.mjs --selftest",
     "build:watch": "node scripts/build-watch.mjs",
     "copy:ext": "node scripts/copy-ext.mjs && node scripts/install-local-sounds.mjs",
     "sounds:install": "node scripts/install-local-sounds.mjs",
