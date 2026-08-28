@@ -134,12 +134,19 @@ async function listOpenRouter() {
     const r = await fetch('https://openrouter.ai/api/v1/models', { signal: AbortSignal.timeout(15000) });
     if (!r.ok) return { ok: false, models: [], error: `HTTP ${r.status}` };
     const j = await r.json();
-    // 無料枠のみ対象（pricingが全て"0" or idに:freeサフィックス）。
-    const free = (j.data || []).filter((m) => {
-      const p = m.pricing || {};
-      const allZero = Object.values(p).every((v) => v === '0' || v === 0 || v === undefined);
-      return allZero || /:free$/.test(m.id || '');
-    });
+    // 無料枠のみ対象。
+    // ★2026-08-29 修正: 従来は「pricingが全て"0"」も無料とみなしていたが、
+    //  **OpenRouterのpricing表示は当てにならない**。実測で `~z-ai/glm-latest` は
+    //  pricing {prompt:"0", completion:"0"} と表示されながら、実際に呼ぶと
+    //  usage.cost=0.0002906 が計上された（残高が実際に減る）。この日の日報は
+    //  それを新着候補の筆頭として推薦しており、鵜呑みにすれば無料前提の会議に
+    //  課金モデルが混入するところだった（恒久ルール1「card-free無料枠を公式で確認」違反）。
+    //  一方 `:free` サフィックス付きは実測で usage.cost=0 を確認済み
+    //  （採用中の nvidia/nemotron-3-ultra-550b-a55b:free で確認）。
+    //  よって **:free サフィックスのみを信頼**する。pricing="0" だけの根拠は捨てる。
+    //  なお `~` で始まるIDは「常に最新版を指すエイリアス」（12件存在）。11件は価格が
+    //  明示されているので従来ロジックでも除外されていた。危険なのは0表示の1件だけだった。
+    const free = (j.data || []).filter((m) => /:free$/.test(m.id || ''));
     return { ok: true, models: free.map((m) => m.id) };
   } catch (e) { return { ok: false, models: [], error: String(e.message || e) }; }
 }
