@@ -1,4 +1,11 @@
 import { describe, expect, it } from 'vitest';
+// ★2026-08-29: 「値が実際に流れるか」を見るため、ソース文字列だけでなく
+//   実物の関数も読む（要素名の一致だけを見る配線テストは毒を素通しする）。
+import {
+  buildVenueHoverCardModel,
+  createVenueHoverCardEl,
+  renderVenueHoverCard
+} from './venueHoverCard.js';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -230,5 +237,70 @@ describe('会場ホバープレビューカードの配線(配線忘れ=CI赤)',
     const end = venueBarSrc.indexOf('}', begin);
     const block = venueBarSrc.slice(begin, end);
     expect(block).toMatch(/font-size:\s*11px/);
+  });
+
+  /*
+   * ★「今どうしているか」の一言(2026-08-29)。
+   *   ★要素が在るだけでは足りない。【値が実際に流れて画面に出るか】まで固定する
+   *   （import と要素名だけを見る配線テストが毒12件を素通しした実績があるため）。
+   */
+  describe('★会場の「今どうしているか」の一言', () => {
+    it('venueBar に .nlsb-hover-card__presence のCSSがある', () => {
+      expect(venueBarSrc).toContain('.nlsb-hover-card__presence');
+    });
+
+    it('★hidden のときに消えるCSSがある(空文字で空行を作らない)', () => {
+      expect(venueBarSrc).toMatch(/\.nlsb-hover-card__presence\[hidden\]\s*\{[^}]*display:\s*none/);
+    });
+
+    it('★モデルから DOM まで値が実際に流れる(要素の存在だけで満足しない)', async () => {
+      const { Window } = await import('happy-dom');
+      const doc = new Window().document;
+      const now = 1_700_000_000_000;
+      const model = buildVenueHoverCardModel({
+        uid: '12345678',
+        displayName: 'テスト',
+        count: 12,
+        giftCount: 2,
+        venueRank: 1,
+        lastAt: now - 5_000,
+        nowMs: now
+      });
+      expect(model.presenceNote).toBeTruthy();
+
+      const card = createVenueHoverCardEl(doc);
+      renderVenueHoverCard(card, model);
+      const el = card.querySelector('.nlsb-hover-card__presence');
+      expect(el).toBeTruthy();
+      // ★モデルの文字列がそのまま画面に出ていること。
+      expect(el.textContent).toBe(model.presenceNote);
+      expect(el.hidden).toBe(false);
+    });
+
+    it('★発言1回だけの人でも行が消えない(情報が少ない人を二級市民にしない)', async () => {
+      const { Window } = await import('happy-dom');
+      const doc = new Window().document;
+      const model = buildVenueHoverCardModel({ uid: '1', displayName: 'x', count: 1 });
+      const card = createVenueHoverCardEl(doc);
+      renderVenueHoverCard(card, model);
+      const el = card.querySelector('.nlsb-hover-card__presence');
+      expect(el.hidden).toBe(false);
+      expect(el.textContent).not.toBe('');
+    });
+
+    it('★匿名と数値IDで文言を変えない(匿名を別扱いしない)', () => {
+      const a = buildVenueHoverCardModel({ uid: 'a:xxxx', displayName: '匿名', count: 3 });
+      const b = buildVenueHoverCardModel({ uid: '12345', displayName: '数値', count: 3 });
+      expect(a.presenceNote).toBe(b.presenceNote);
+    });
+
+    it('★何も無い人だけ行が消える(そこだけは出さない)', async () => {
+      const { Window } = await import('happy-dom');
+      const doc = new Window().document;
+      const model = buildVenueHoverCardModel({ uid: '1', displayName: 'x', count: 0 });
+      const card = createVenueHoverCardEl(doc);
+      renderVenueHoverCard(card, model);
+      expect(card.querySelector('.nlsb-hover-card__presence').hidden).toBe(true);
+    });
   });
 });
