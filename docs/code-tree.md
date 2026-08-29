@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 6 / 844 件
+## ⚠️ 役割コメントが無いソース 6 / 846 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `src/lib/laneDomSelfMeasure.js`
@@ -741,7 +741,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (1840)
+- 📁 **src/** (1843)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1039,7 +1039,7 @@
         - `logo_funlink_white_RGB_maru_black.png`
       - `logo_guide_funlink_ol.pdf`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1592)
+  - 📁 **lib/** (1594)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -2485,6 +2485,8 @@
     - `venueHoverCard.js` — 会場アイコンのホバープレビューカード(純ロジック+DOMビルダー)。
     - `venueHoverCard.test.js`
     - `venueHoverCard.wiring.test.js`
+    - `venueHoverCardProbe.js` — 【層】L0 判定層（純関数・chrome/DOM/fetch に触らない）
+    - `venueHoverCardProbe.test.js`
     - `venueHoverRecentTexts.integration.test.js`
     - `venueIncrementalAggregate.js` — v0.1.754 会場の3時間安定化(会議6体ほぼ全会一致の最大ボトルネック根治): 参加者集計を
     - `venueIncrementalAggregate.test.js`
@@ -2647,6 +2649,7 @@
       - `liveId.test.js`
   - 📁 **sound/** (1)
     - `yozora-small-yell.mp3`
+  - `build-globals.d.ts` — ビルド時に esbuild の `define` で注入される定数の型宣言。
   - `speech-recognition-globals.d.ts` — Web Speech API（Chrome は webkit 接頭辞のことがある）
 - 📁 **tests/** (80)
   - 📁 **contract/** (3)

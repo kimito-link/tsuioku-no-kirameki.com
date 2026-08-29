@@ -345,6 +345,7 @@ import { buildVenueCharacterFrame } from '../lib/venueCharacterFrame.js';
 // キャラライブ(2026-08-25): 3キャラを常駐させ、ふわふわ浮遊+相槌+返事+シンキングを出す。
 //   判断は charaLiveState.js(純関数)、描画は charaLiveStage.js、配線は charaLiveController.js。
 import { startCharaLive } from '../lib/charaLiveController.js';
+import { venueHoverCardPresenceVerdict } from '../lib/venueHoverCardProbe.js';
 // キャラライブの「本当に見えているか」実測計器(2026-08-25)。推測で3回外した反省で追加。
 import { collectCharaLiveCensus, charaLiveVerdict } from '../lib/charaLiveCensus.js';
 import { parseGiftCommentText, parseNicoadCommentText } from '../lib/parseGiftComment.js';
@@ -3099,6 +3100,43 @@ export function mountVenueBarButton(options = {}) {
       const verdict = charaLiveVerdict(census);
       // 人が読む1行 + 生データ(貼って共有できる形)。
       return { line: verdict.line, visible: verdict.visible, census };
+    };
+  } catch { /* 計器の失敗で会場を止めない */ }
+
+  /*
+   * ★ホバーカードの一言 実測フック(2026-08-29)。
+   *   「出ていません」に対して★推測で「リロードしてください」と答えたのを反省して作った。
+   *   ★カードを出したまま（アイコンにカーソルを乗せたまま）実行すると、
+   *     出ているか / 出ないなら理由（古いコード・配線漏れ・空・CSS）が1行で出る:
+   *       __nls_hover_note_probe__()
+   *   判定は src/lib/venueHoverCardProbe.js（純関数）。ここは採取だけ。
+   *   ★DOM は読むだけで書き換えない（観測が対象を変えない）。
+   */
+  try {
+    /** @type {any} */ (globalThis).__nls_hover_note_probe__ = () => {
+      const cardEl = document.querySelector('.nlsb-hover-card');
+      const el = /** @type {HTMLElement|null} */ (
+        cardEl ? cardEl.querySelector('.nlsb-hover-card__presence') : null
+      );
+      let displayNone = false;
+      try {
+        displayNone = el ? getComputedStyle(el).display === 'none' : false;
+      } catch { /* 取れなくても判定は続ける(fail-soft) */ }
+      const census = {
+        cardExists: Boolean(cardEl),
+        elementExists: Boolean(el),
+        text: el ? String(el.textContent || '') : '',
+        hidden: el ? el.hidden === true : false,
+        displayNone,
+        /*
+         * ★どのビルドで動いているか。新旧の取り違えを防ぐ。
+         *   ★`typeof` で囲むのは既存の作法（popup-entry / status-entry と同じ）。
+         *     esbuild の define で置換される値なので、型宣言は無い。
+         */
+        buildId: typeof NL_BUILD_ID !== 'undefined' ? String(NL_BUILD_ID) : ''
+      };
+      const verdict = venueHoverCardPresenceVerdict(census);
+      return { line: verdict.line, visible: verdict.visible, reason: verdict.reason, census };
     };
   } catch { /* 計器の失敗で会場を止めない */ }
 
