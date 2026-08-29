@@ -3142,6 +3142,18 @@
       ]
     },
     {
+      "file": "src/lib/venueHoverCardProbe.js",
+      "featureCount": 2,
+      "features": [
+        "content",
+        "venue"
+      ],
+      "labels": [
+        "記録エンジン(watchページ常駐)",
+        "会場モード(standalone)"
+      ]
+    },
+    {
       "file": "src/lib/venueIncrementalAggregate.js",
       "featureCount": 2,
       "features": [

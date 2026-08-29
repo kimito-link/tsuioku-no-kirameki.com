@@ -303,7 +303,7 @@
   - `src/lib/giftThrowProjectile.js`
 - **吹き出し寿命管理** — 会場の吹き出しの表示上限・追い出し(eviction)ライフサイクル
   - `src/lib/venueBubbleLifecycle.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 231</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 232</summary>
 
 - `scripts/encode-marketing-html-avatars.mjs` — extension/images/marketing-html-avatars/*.png を data URI にし、
 - `scripts/split-avatar-parts.mjs` — 偽市松背景の除去 + パーツ切り出し(one-off アセットパイプライン)
@@ -506,6 +506,7 @@
 - `src/lib/venueGeometryVerdict.js` — 会場と①POPのタイル寸法差が「CSS不整合」か「測定対象ズレ」かを見分ける純関数(v0.1.1212)。
 - `src/lib/venueHeat.js` — v0.1.732: 会場モードの「熱量の色温度」純関数。
 - `src/lib/venueHoverCard.js` — 会場アイコンのホバープレビューカード(純ロジック+DOMビルダー)。
+- `src/lib/venueHoverCardProbe.js` — 【層】L0 判定層（純関数・chrome/DOM/fetch に触らない）
 - `src/lib/venueLaneMirrorSupply.js` — 会場の「鏡優先+同型フォールバック」供給(純関数)。①POP が実 paint した5段 buckets の鏡
 - `src/lib/venueLaneParity.js` — 会場レーンのパリティ計器(純関数)。会場が実際に paint した段割当列を、①POP の実描画鏡
 - `src/lib/venueLiveOpenFlag.js` — 「会場モードがいま開いているか」を鏡の供給側へ伝える値。
@@ -795,7 +796,7 @@
   - `src/lib/statusTrendKey.js`
   - `src/extension/status-entry.js`
   - `src/lib/statusActionAdvisor.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 203</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 204</summary>
 
 - `app/app.js` — スマホ閲覧用 status Web 版。
 - `app/live-view.js` — global NL_BUILD_ID
@@ -833,6 +834,7 @@
 - `scripts/sync-lp-twitter-icon.mjs` — LP 右端コラボ用: src/images/icon/twitter-icon.png → extension/images/lp/twitter-icon.png
 - `scripts/vendor-visual-explainer.mjs` — Vendors nicobailon/visual-explainer (MIT) into .cursor/skills/visual-explainer/
 - `scripts/write-extension-placeholder-icons.mjs` — リポジトリに 256px アイコンしか無い環境向け: manifest 用の小さめ PNG を生成する。
+- `src/build-globals.d.ts` — ビルド時に esbuild の `define` で注入される定数の型宣言。
 - `src/extension/cloak-failsafe-entry.js` — 幕(cloak)を外す【最速の保険】だけを担う極小エントリ。
 - `src/extension/offscreen-entry.js` — feat/multitab-scale-globalcap（2026-05-31）: コメント IDB の「常駐・単一書き手」を担う
 - `src/lib/aboutBlankGapVerdict.js` — ★about:blank の隙間(残り32ms)に対する【確定した判定】。
@@ -1007,22 +1009,21 @@
 
 > changelog 全 20 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
 
-### 💾 記録件数 (3版)
+### 💾 記録件数 (2版)
 - `v0.1.1476` 2026-08-22 — 状態ページが29秒かかる・数字が出ないのを直しました
 - `v0.1.1474` 2026-08-22 — 「取得率が下がり続けています」の誤った注意を直しました
-- `v0.1.1473` 2026-08-22 — 取得率が501%になる表示を直しました
 
-### 📥 コメント取得 (5版)
+### 📥 コメント取得 (4版)
 - `v0.1.1492` 2026-08-29 — 会場で「この人が今どうしているか」が出ます
 - `v0.1.1480` 2026-08-23 — 紹介ページに最新の機能を載せました
 - `v0.1.1479` 2026-08-22 — 「どの数字を測っていないか」が分かるようにしました
 - `v0.1.1474` 2026-08-22 — 「取得率が下がり続けています」の誤った注意を直しました
-- `v0.1.1473` 2026-08-22 — 取得率が501%になる表示を直しました
 
 ### 🙂 匿名(184) (1版)
 - `v0.1.1492` 2026-08-29 — 会場で「この人が今どうしているか」が出ます
 
-### 🏟 会場・席 (6版)
+### 🏟 会場・席 (7版)
+- `v0.1.1493` 2026-08-29 — 出ないときに理由を自分で言えるようにしました
 - `v0.1.1492` 2026-08-29 — 会場で「この人が今どうしているか」が出ます
 - `v0.1.1489` 2026-08-25 — 会場の反応が悪くなったのを直しました
 - `v0.1.1487` 2026-08-25 — 3キャラが出ない件、もう一度直しました
@@ -1045,11 +1046,10 @@
 - `v0.1.1476` 2026-08-22 — 状態ページが29秒かかる・数字が出ないのを直しました
 - `v0.1.1475` 2026-08-22 — 大人数の配信で応援レーンが画面を突き抜けるのを直しました
 
-### 🩺 診断・状態速報 (4版)
+### 🩺 診断・状態速報 (3版)
 - `v0.1.1484` 2026-08-23 — 描き直しの本当の原因を出します
 - `v0.1.1483` 2026-08-23 — 不具合を伝えると原因が探せます
 - `v0.1.1479` 2026-08-22 — 「どの数字を測っていないか」が分かるようにしました
-- `v0.1.1473` 2026-08-22 — 取得率が501%になる表示を直しました
 
 ### ⚡ 描画・性能 (1版)
 - `v0.1.1475` 2026-08-22 — 大人数の配信で応援レーンが画面を突き抜けるのを直しました
