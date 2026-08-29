@@ -279,5 +279,19 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
   Object.freeze({
     version: '0.1.1491', metric: 'gate-selftest', value: 2,
     source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1492', metric: 'bundle-kb', value: 1410,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '★この版で増やした分は実質ゼロ（前版 v0.1.1491 も 1410KB。実測 1409KB）。' +
+      '足したのは純関数1本(venuePresenceNote.js・約120行)だが、' +
+      '同時に changelog を archive へ分割した分で相殺されている。' +
+      '★過去最良 1360 との差は v0.1.1455〜1471 の計器17版ぶん(+45KB)で、' +
+      'v0.1.1471 の note に記録済みの意図した悪化。' +
+      '★親スレッド停止は 106ms のままで体感は悪化していない。'
+  }),
+  Object.freeze({
+    version: '0.1.1492', metric: 'gate-selftest', value: 2,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
   })
 ]);

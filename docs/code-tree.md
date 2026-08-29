@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 6 / 843 件
+## ⚠️ 役割コメントが無いソース 6 / 844 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `src/lib/laneDomSelfMeasure.js`
@@ -172,7 +172,7 @@
     - `2026-07-23.md`
     - `2026-07-31.md`
     - `2026-08-21.md`
-- 📁 **docs/** (307)
+- 📁 **docs/** (308)
   - 📁 **article-assets/** (87)
     - 📁 **venue-frames/** (12)
       - `f01.png`
@@ -482,6 +482,7 @@
   - `plan-avatar-resolver-refactor.md`
   - `plan-empty-state-no-broadcast.md`
   - `plan-story-user-lane-tiers.md`
+  - `refactor-instructions-2026-08-29.md`
   - `refactor-instructions.md`
   - `reference_deterministic_backfill.md`
   - `reliability-backlog-phase-b.md`
@@ -740,7 +741,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (1838)
+- 📁 **src/** (1840)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1038,7 +1039,7 @@
         - `logo_funlink_white_RGB_maru_black.png`
       - `logo_guide_funlink_ol.pdf`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1590)
+  - 📁 **lib/** (1592)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -2515,6 +2516,8 @@
     - `venueOpenLatency.test.js`
     - `venuePickupBanner.js` — 会場モードの「ピックアップ枠」(BSP風・v0.1.1230)。
     - `venuePickupBanner.test.js`
+    - `venuePresenceNote.js` — 【層】L0 判定層（純関数・chrome/DOM/fetch に触らない）
+    - `venuePresenceNote.test.js`
     - `venueResidents.js` — 会場モードの常駐3キャラ(りんく・こん太・たぬ姉)の描画モデル(純関数)。
     - `venueResidents.test.js`
     - `venueRoster.js` — 2026-06-14 ユーザー要望「今会場にいるメンバーを視覚的に確認できるボタン・AIも人間も検証

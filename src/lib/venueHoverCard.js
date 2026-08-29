@@ -23,6 +23,7 @@
 
 import { isNumericNicoUserId } from '../domain/user/identity.js';
 import { RECENT_TEXT_KEEP, formatRecentTexts } from './recentTextRing.js';
+import { buildVenuePresenceNote } from './venuePresenceNote.js';
 
 /**
  * @typedef {{ src: string, kind: 'real-http'|'identicon'|'tv-fallback'|'none',
@@ -204,6 +205,20 @@ export function buildVenueHoverCardModel(input) {
     idKind,
     avatarSrc,
     statLine: statParts.join(' ・ '),
+    /*
+     * ★「この人はここでどうしていたか」の一言（2026-08-29）。
+     *   statLine が数字の羅列(発言42 ・ 🎁3 ・ 🥇1位)なのに対し、
+     *   こちらは読んだままで分かる文にする。
+     *   ★判定は venuePresenceNote.js が正本。ここは渡すだけ。
+     *   ★追加の storage 読みはゼロ（既に手元にある値だけで作る）。
+     */
+    presenceNote: buildVenuePresenceNote({
+      count,
+      giftCount,
+      venueRank,
+      lastAt: i.lastAt,
+      nowMs: i.nowMs
+    }),
     lastText,
     // v0.1.1218(ユーザー要望): ホバーだけでその人の発言を数件読めるようにする。
     //   既存データ(在席の記録)から来るので storage の追加読みはゼロ。
@@ -244,6 +259,15 @@ export function createVenueHoverCardEl(doc) {
   idEl.className = 'nlsb-hover-card__id';
   const statsEl = doc.createElement('div');
   statsEl.className = 'nlsb-hover-card__stats';
+  /*
+   * ★2026-08-29: 「この人はここでどうしていたか」の一言。
+   *   statsEl(発言42 ・ 🎁3 ・ 🥇1位)は数字の羅列で、読み解く手間が要る。
+   *   ここはそれを日本語1行にして、統計の【直後】に置く。
+   *   ★参考にした X スペースは同じことを Grok に36秒かけて推測させていたが、
+   *     この拡張は事実を手元に持っているので待たせない。
+   */
+  const presenceEl = doc.createElement('div');
+  presenceEl.className = 'nlsb-hover-card__presence';
   const thumbStatusEl = doc.createElement('div');
   thumbStatusEl.className = 'nlsb-hover-card__thumb-status';
   // 2026-07-31(ユーザー要望): 直前の発言内容。「この人が何を言ったか」が分からないと
@@ -254,7 +278,7 @@ export function createVenueHoverCardEl(doc) {
   // (補足として)ID」の情報序列を構造でも表現する。IDは文言そのまま・体裁だけ格下げ(CSS側で
   // font-size縮小)。ロジック変更ゼロ・isNumericNicoUserId判定基準は不変。
   //   発言本文は「活動」の直後=名前の次に読みたい情報なので stats の後ろに置く。
-  body.append(nameEl, statsEl, lastTextEl, idEl, thumbStatusEl);
+  body.append(nameEl, statsEl, presenceEl, lastTextEl, idEl, thumbStatusEl);
 
   card.append(avatarBox, body);
   return card;
@@ -284,6 +308,18 @@ export function renderVenueHoverCard(cardEl, model) {
 
   const statsEl = cardEl.querySelector('.nlsb-hover-card__stats');
   if (statsEl) statsEl.textContent = String(m.statLine || '');
+  /*
+   * ★「この人はここでどうしていたか」の一言。
+   *   ★空のときだけ行を隠す（＝そもそも人として成立していない場合のみ）。
+   *     判定側は「発言1回」でも必ず何か返すので、通常この行は消えない
+   *     ＝情報が少ない人を二級市民にしない（AGENTS.md §3.5）。
+   */
+  const presenceEl = cardEl.querySelector('.nlsb-hover-card__presence');
+  if (presenceEl) {
+    const note = String(m.presenceNote || '');
+    presenceEl.textContent = note;
+    presenceEl.hidden = !note;
+  }
 
   // 2026-07-31: 発言内容。無い(未発言/投擲段/データ未到達)ときは行ごと消して隙間を作らない。
   // v0.1.1218(ユーザー要望): 直近1件だけでなく数件を出す。クリックしなくても
