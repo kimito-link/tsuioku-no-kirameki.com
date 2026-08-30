@@ -24,6 +24,8 @@
 import { isNumericNicoUserId } from '../domain/user/identity.js';
 import { RECENT_TEXT_KEEP, formatRecentTexts } from './recentTextRing.js';
 import { buildVenuePresenceNote } from './venuePresenceNote.js';
+// ★匿名NNN の採番は nicoUserPage.js が正本（席タイル venueBar.js:5715 と同じ関数）。
+import { anonymousDisplayLabel } from './nicoUserPage.js';
 
 /**
  * @typedef {{ src: string, kind: 'real-http'|'identicon'|'tv-fallback'|'none',
@@ -161,7 +163,15 @@ export function buildVenueHoverCardModel(input) {
       idLine = `ID:${uid}(本登録)`;
     } else {
       idKind = 'anonymous';
-      idLine = `匿名(${uid})`;
+      /*
+       * ★席タイルと同じ「匿名NNN」で出す（2026-08-30）。
+       *   以前は生の `匿名(a:xxxx)` を出しており、同じ人なのに
+       *   席は「匿名938」・カードは「匿名(a:xxxx)」と★二通りに見えていた。
+       *   AGENTS.md §3.5「匿名は安定番号『匿名NNN』で識別できる形で出す
+       *   （一律グレー化は禁止）」の直接の実装。
+       *   ★採番は席タイル(venueBar.js:5715)と同じ関数を呼ぶ＝決して食い違わない。
+       */
+      idLine = anonymousDisplayLabel(uid);
     }
   }
 

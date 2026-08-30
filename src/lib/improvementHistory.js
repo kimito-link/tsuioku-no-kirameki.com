@@ -319,5 +319,20 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
   Object.freeze({
     version: '0.1.1494', metric: 'gate-selftest', value: 2,
     source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1495', metric: 'bundle-kb', value: 1412,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '★実測した（推測ではない）: popup.js 1444606→1445534 ＝+928B。'
+      + '内訳は更新履歴1版の入れ替えと、匿名NNN採番の統合'
+      + '（comeviewUserNotes.js が nicoUserPage.js へ委譲）の分。'
+      + '★今回の本体（発言パネルの見出し）は venue.js 側: 481839→484676 ＝+2,837B。'
+      + '★増えた分は全部、これまで行き止まりだった導線（§3.5 の未達）を埋めるためのもので、'
+      + '新規の取得・タイマー・監視は1つも増やしていない。'
+      + '★過去最良1360との差は v0.1.1455〜1471 の計嚆17版ぶん(+45KB)で v0.1.1471 の note に記録済み。'
+  }),
+  Object.freeze({
+    version: '0.1.1495', metric: 'gate-selftest', value: 2,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
   })
 ]);

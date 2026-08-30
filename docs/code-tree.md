@@ -744,7 +744,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (1846)
+- 📁 **src/** (1848)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1042,7 +1042,7 @@
         - `logo_funlink_white_RGB_maru_black.png`
       - `logo_guide_funlink_ol.pdf`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1597)
+  - 📁 **lib/** (1599)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -1085,6 +1085,7 @@
     - `aiShareTextChanged.wiring.test.js`
     - `anomalyVerdict.js` — 計器の値に「正常域」を持たせ、異常を【名指し】する純関数群。
     - `anomalyVerdict.test.js`
+    - `anonLabelSingleSource.test.js`
     - `anonymousIdenticon.js` — 匿名 userId 向けの決定論的アバター（SVG data URL）。
     - `anonymousIdenticon.test.js`
     - `arrivalEffect.js` — ニコ生「来場」システムメッセージ(parseArrivalComment.js でパース済み)を、パチンコの
@@ -2539,6 +2540,7 @@
     - `venueSeatsDiagKey.js` — 会場モードの「座席健全度」観測値を会場(venueBar.js)が書き、status が読む storage キー。
     - `venueSpeech.js` — v0.1.711: ライブ会場モードの「発言→吹き出し」純関数。
     - `venueSpeech.test.js`
+    - `venueSpeechPanelIdentity.wiring.test.js`
     - `venueSpeechStreak.js` — 「会話の連鎖」(2026-06-15 会議の最大多数決の本命・弱点A/C):
     - `venueSpeechStreak.test.js`
     - `venueStoryDiagMirrorPanel.js` — ⚠️ 役割コメント無し
