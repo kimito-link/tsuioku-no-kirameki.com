@@ -5,7 +5,7 @@
 > **波及機能数(blast radius)が多いファイルほど、変更時の影響が大きい**(共有部品)。
 > 実装前にここで「触るファイルが何に波及するか」を確認すると誤前提を潰せる。
 
-## ⚠️ 影響大（3機能以上に波及・118 ファイル）
+## ⚠️ 影響大（3機能以上に波及・120 ファイル）
 
 ここを変えると複数の実行コンテキストに影響する。変更時は各 feature の動作確認を。
 
@@ -77,6 +77,7 @@
 - `src/lib/channelSwitchDiagKey.js` → **3 機能**: 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 状態速報ページ
 - `src/lib/comeviewActions.js` → **3 機能**: コメビュ(別窓) / 記録エンジン(watchページ常駐) / 会場モード(standalone)
 - `src/lib/commentDb.js` → **3 機能**: コメビュ(別窓) / コメント IDB 書き手 / ポップアップ(応援レーン)
+- `src/lib/commentTickerNameLink.js` → **3 機能**: 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 会場モード(standalone)
 - `src/lib/commentTimelineMirror.js` → **3 機能**: 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 状態速報ページ
 - `src/lib/commentTimelineMirrorKey.js` → **3 機能**: 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 状態速報ページ
 - `src/lib/displayRecordedCount.js` → **3 機能**: 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 会場モード(standalone)
@@ -111,6 +112,7 @@
 - `src/lib/storyUserLaneSort.js` → **3 機能**: 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 会場モード(standalone)
 - `src/lib/userCommentProfileCache.js` → **3 機能**: コメビュ(別窓) / 記録エンジン(watchページ常駐) / ポップアップ(応援レーン)
 - `src/lib/userLaneCandidatesFromStorage.js` → **3 機能**: 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 会場モード(standalone)
+- `src/lib/userProfileLinkHtml.js` → **3 機能**: 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 会場モード(standalone)
 - `src/lib/venueGeometryVerdict.js` → **3 機能**: 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 会場モード(standalone)
 - `src/lib/venueLaneParity.js` → **3 機能**: 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 会場モード(standalone)
 - `src/lib/venueLiveOpenFlag.js` → **3 機能**: 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 会場モード(standalone)
@@ -200,6 +202,7 @@
 | `src/lib/channelSwitchDiagKey.js` | 3 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 状態速報ページ |
 | `src/lib/comeviewActions.js` | 3 | コメビュ(別窓) / 記録エンジン(watchページ常駐) / 会場モード(standalone) |
 | `src/lib/commentDb.js` | 3 | コメビュ(別窓) / コメント IDB 書き手 / ポップアップ(応援レーン) |
+| `src/lib/commentTickerNameLink.js` | 3 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 会場モード(standalone) |
 | `src/lib/commentTimelineMirror.js` | 3 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 状態速報ページ |
 | `src/lib/commentTimelineMirrorKey.js` | 3 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 状態速報ページ |
 | `src/lib/displayRecordedCount.js` | 3 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 会場モード(standalone) |
@@ -234,6 +237,7 @@
 | `src/lib/storyUserLaneSort.js` | 3 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 会場モード(standalone) |
 | `src/lib/userCommentProfileCache.js` | 3 | コメビュ(別窓) / 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) |
 | `src/lib/userLaneCandidatesFromStorage.js` | 3 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 会場モード(standalone) |
+| `src/lib/userProfileLinkHtml.js` | 3 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 会場モード(standalone) |
 | `src/lib/venueGeometryVerdict.js` | 3 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 会場モード(standalone) |
 | `src/lib/venueLaneParity.js` | 3 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 会場モード(standalone) |
 | `src/lib/venueLiveOpenFlag.js` | 3 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) / 会場モード(standalone) |
@@ -278,7 +282,6 @@
 | `src/lib/commentPostDiag.js` | 2 | ポップアップ(応援レーン) / 状態速報ページ |
 | `src/lib/commentPostDiagKey.js` | 2 | ポップアップ(応援レーン) / 状態速報ページ |
 | `src/lib/commentSubmitProfiling.js` | 2 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) |
-| `src/lib/commentTickerNameLink.js` | 2 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) |
 | `src/lib/concurrentCalibrationLog.js` | 2 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) |
 | `src/lib/concurrentEstimate.js` | 2 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) |
 | `src/lib/consoleErrorBuffer.js` | 2 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) |
@@ -346,7 +349,6 @@
 | `src/lib/swBackfillStaging.js` | 2 | バックフィル SW / 記録エンジン(watchページ常駐) |
 | `src/lib/thumbSettings.js` | 2 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) |
 | `src/lib/timeAuthority.js` | 2 | ポップアップ(応援レーン) / 状態速報ページ |
-| `src/lib/userProfileLinkHtml.js` | 2 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) |
 | `src/lib/venueAvatar.js` | 2 | 記録エンジン(watchページ常駐) / 会場モード(standalone) |
 | `src/lib/venueAvatarDiagLine.js` | 2 | 記録エンジン(watchページ常駐) / 会場モード(standalone) |
 | `src/lib/venueBubbleChurn.js` | 2 | 記録エンジン(watchページ常駐) / 会場モード(standalone) |

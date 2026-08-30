@@ -252,6 +252,11 @@ import { laneDomFingerprint, buildVenueSceneReceipts, compareRenderReceipts } fr
 // v0.1.1113 実DOM census(Tri-Parity): ✅の根拠をデータからDOMへ(reference_diag_truth_SYNTHESIS.md)。
 import { collectVenueLaneDomCensus, venueDomCensusToParityDom } from '../lib/venueDomCensus.js';
 import { nicoUserPageUrl, anonymousDisplayLabel } from '../lib/nicoUserPage.js';
+// ★発言パネルの見出しを §3.5（サムネ・ID・名前・リンクをセット）にするための共有部品。
+//   report系9モジュールで既に使われている正本（匿名はリンクにしない・escape済み）。
+import { buildUserProfileLinkedLabelHtml } from '../lib/userProfileLinkHtml.js';
+// ★発言パネルの一言もホバーカードと同じ純関数を使う（文言の正本は1本）。
+import { buildVenuePresenceNote } from '../lib/venuePresenceNote.js';
 import { isNumericNicoUserId } from '../domain/user/identity.js';
 // person-tile-unify 第3コミット(2026-06-22): 会場の席タイルを popup の本物ビルダーで描く。
 //   独自DOM生成をやめ、popup「アイコン列・グリッド・診断」と同じ顔ぶれ・見た目にする。
@@ -1661,6 +1666,37 @@ const VENUE_CSS = `
     align-items: flex-start;
     gap: 8px;
   }
+  /*
+   * ★発言パネルの見出し（2026-08-30）。
+   *   §3.5「サムネ・ID・ハンドルネーム・リンクをセットで出す」の実装。
+   *   ★ここは席タイルでもホバーカードでも無いので、
+   *   ①POP=②プレビュー=③会場=④WEB のパリティ検査には触れない。
+   */
+  .nlsb-roster-avatar {
+    flex: 0 0 auto;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    object-fit: cover;
+    background: rgba(255, 255, 255, 0.08);
+  }
+  /* ★名前は押せることが見て分かる形にする（押せるのに押せないように見えない）。 */
+  .nlsb-roster-title .nl-user-profile-link {
+    color: #93c5fd;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+  .nlsb-roster-title .nl-user-profile-link:hover {
+    color: #dbeafe;
+  }
+  /* 「この人がここでどうしていたか」の一言。見出しの下に小さく。 */
+  .nlsb-roster-note {
+    flex: 1 1 100%;
+    order: 9;
+    opacity: 0.75;
+    font-size: 11px;
+    line-height: 1.4;
+  }
   .nlsb-roster-badge {
     display: inline-block;
     margin-left: 4px;
@@ -2947,7 +2983,17 @@ export function mountVenueBarButton(options = {}) {
       const uid = String(data?.uid || '').trim();
       if (!uid) return; // uid が無い(広告主等)は発言記録に紐づかない=何も開かない
       closeHoverCard();
-      void openSpeechPanelFor({ uid, displayName: String(data?.displayName || '') });
+      /*
+       * ★サムネはクリック元タイルからそのまま取る＝★新規取得ゼロ。
+       *   既存の negative-cache / バックオフを迲回する野良再プローブを作らない
+       *   （venueAvatarLoadGuard の流儀を尊重）。
+       */
+      let avatarSrc = '';
+      try {
+        const imgEl = anchorEl.querySelector('.nl-story-userlane-avatar');
+        if (imgEl instanceof HTMLImageElement) avatarSrc = imgEl.currentSrc || imgEl.src || '';
+      } catch { /* サムネが取れなくてもパネルは開く */ }
+      void openSpeechPanelFor({ uid, displayName: String(data?.displayName || ''), avatarSrc });
     });
   };
   wireSpeechPanelDelegation(seatsHost);
@@ -4084,19 +4130,64 @@ export function mountVenueBarButton(options = {}) {
     stage.removeEventListener('click', onSpeechOutsideClick);
   };
   /**
+   * 発言パネルの見出しを組む（★§3.5 の「セットで出す」をここで満たす）。
+   *
+   * ★なぜここなのか（2026-08-30）:
+   *   このパネルは「アイコンを押す → その人の発言を全部読む」場所だが、
+   *   見出しが名前だけのプレーンテキストで、★その人へ行く手段が無かった。
+   *   （読む → 気に入る → でもプロフィールへは行けない＝行き止まり）
+   *   AGENTS.md §3.5「サムネ・ID・ハンドルネーム・リンクをセットで出す。
+   *   ID だけ・名前だけ…は原則違反」に当たる箇所だった。
+   *
+   *   ★リンク化は新規実装しない。report系9モジュールが使っている
+   *   buildUserProfileLinkedLabelHtml を呼ぶ。匿名(a:)は href が空になるので
+   *   自動的にリンクにならない＝★匿名を誤ってリンクにする事故が構造的に起きない。
+   *
+   * @param {string} uid
+   * @param {string} name 表示名（解決済み）
+   * @param {string} avatarSrc クリック元タイルの画像 URL（★新規取得ゼロ）
+   * @param {string} note 「この人がここでどうしていたか」の一言（空なら出さない）
+   * @param {string} countNote 件数の注释（空なら出さない）
+   * @returns {string}
+   */
+  const buildSpeechPanelHeadHtml = (uid, name, avatarSrc, note, countNote) => {
+    const linked = buildUserProfileLinkedLabelHtml(uid, name);
+    const avatar = avatarSrc
+      ? `<img class="nlsb-roster-avatar" src="${escapeHtml(avatarSrc)}" alt="">`
+      : '';
+    const noteHtml = note
+      ? `<span class="nlsb-roster-note">${escapeHtml(note)}</span>`
+      : '';
+    return (
+      `<div class="nlsb-roster-head">` +
+      avatar +
+      `<span class="nlsb-roster-title">${linked} の発言${escapeHtml(countNote || '')}</span>` +
+      noteHtml +
+      `<button type="button" class="nlsb-roster-close" aria-label="閉じる">✕</button>` +
+      `</div>`
+    );
+  };
+
+  /**
    * その人の全発言を読み込んでパネルに出す。
    * ★storage read はこの関数の中だけ=クリックした瞬間だけ(常時readを増やさない)。
-   * @param {{ uid: string, displayName: string }} who
+   * @param {{ uid: string, displayName: string, avatarSrc?: string }} who
    */
   const openSpeechPanelFor = async (who) => {
     const uid = String(who?.uid || '').trim();
-    const name = String(who?.displayName || '').trim() || uid || '(名前なし)';
+    /*
+     * ★名前のフォールバックに生の uid を使わない。
+     *   以前は匿名さんの見出しに `a:xxxx` がそのまま出ていた。
+     *   席タイル(venueBar.js の displayName 解決)と同じ anonymousDisplayLabel を使う＝
+     *   同じ人がどの画面でも「匿名938」で揃う。
+     */
+    const name =
+      String(who?.displayName || '').trim() ||
+      (uid ? anonymousDisplayLabel(uid) : '') ||
+      '(名前なし)';
     if (!uid) return; // uid が無い人(広告主等)は発言記録に紐づかない
-    const head =
-      `<div class="nlsb-roster-head">` +
-      `<span class="nlsb-roster-title">${escapeHtml(name)} の発言</span>` +
-      `<button type="button" class="nlsb-roster-close" aria-label="閉じる">✕</button>` +
-      `</div>`;
+    const avatarSrc = String(who?.avatarSrc || '').trim();
+    const head = buildSpeechPanelHeadHtml(uid, name, avatarSrc, '', '');
     speechPanel.innerHTML = `${head}<div class="nlsb-roster-list"><div class="nlsb-roster-empty">読み込み中…</div></div>`;
     speechPanel.hidden = false;
     const closeBtnEl = speechPanel.querySelector('.nlsb-roster-close');
@@ -4148,11 +4239,32 @@ export function mountVenueBarButton(options = {}) {
           .join('')
       : '';
     const note = total > rows.length ? `（新しい ${rows.length} 件を表示 / 全 ${total} 件）` : `（全 ${total} 件）`;
+    /*
+     * ★「この人がここでどうしていたか」の一言を見出しにも出す（2026-08-30）。
+     *   ホバーカードと同じ純関数(buildVenuePresenceNote)を、
+     *   ★既に手元にある値だけで呼ぶ＝storage の追加読みはゼロ。
+     *     count  … total（この配信の全発言数）
+     *     lastAt … rows の最新 capturedAt
+     *   ★過去放送は見ない（venuePresenceNote.js:35-38 の制約を守る）。
+     */
+    let presenceNote = '';
+    try {
+      let lastAt = 0;
+      for (const r of rows) {
+        const at = Number(r?.capturedAt) || 0;
+        if (at > lastAt) lastAt = at;
+      }
+      presenceNote = buildVenuePresenceNote({
+        count: total,
+        giftCount: null,
+        lastAt,
+        nowMs: Date.now()
+      });
+    } catch {
+      presenceNote = ''; // 一言の失敗で発言一覧を落とさない
+    }
     speechPanel.innerHTML =
-      `<div class="nlsb-roster-head">` +
-      `<span class="nlsb-roster-title">${escapeHtml(name)} の発言${escapeHtml(total ? note : '')}</span>` +
-      `<button type="button" class="nlsb-roster-close" aria-label="閉じる">✕</button>` +
-      `</div>` +
+      buildSpeechPanelHeadHtml(uid, name, avatarSrc, presenceNote, total ? note : '') +
       `<div class="nlsb-roster-list">${listHtml || '<div class="nlsb-roster-empty">この配信の記録にはまだ発言がありません</div>'}</div>`;
     const closeBtn2 = speechPanel.querySelector('.nlsb-roster-close');
     if (closeBtn2) closeBtn2.addEventListener('click', () => closeSpeechPanel());
