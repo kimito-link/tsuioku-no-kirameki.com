@@ -63,7 +63,10 @@ export const IMPROVEMENT_METRICS = Object.freeze([
   }),
   Object.freeze({
     id: 'dom-nodes', label: '画面の部品数', better: 'lower', unit: '個',
-    why: '業界推奨1,500。超えるとスタイル再計算が重くなる'
+    // ★2026-08-31: 「業界推奨1,500」を撤回。その基準(Lighthouse dom-size)は
+    //   13.0(2025-10)で廃止され、実測でも 7,053要素で recalc+layout 15.6ms
+    //   (新基準の閾値40msの半分以下)だった。★理由を自分の実測に置き換える。
+    why: '過去に3,984個で29.3秒固まった実測がある(桁が違うと実害が出る)'
   }),
   Object.freeze({
     id: 'repaint-per-comment', label: '1コメントあたりの描き直し', better: 'lower', unit: '回',
