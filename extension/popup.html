@@ -909,6 +909,18 @@
 
       .nl-story-body {
         --nl-story-icon-size: 14px;
+        /*
+         * ★応援レーンのアバター寸法（2026-08-30）。
+         *   以前は 32/38/20/22px を 3ファイルに直書きしていた（popup / live-view / venueBar）。
+         *   ★値を照合する検査が無く、片方だけ直しても機械は止めなかった。
+         *   ★さらに hollow の箱寸法が「22px + border 1.5px×2 = 25px」という
+         *     【手計算】で結合しており、片方だけ変えると
+         *     「中身が入った瞬間に 4px ずれてスクロールが飛ぶ」（live-view.html:1037-1038）。
+         *   ⟹ 変数にし、hollow は calc で導出させる＝★地雷を構造的に踏めなくする。
+         *   検査: src/lib/laneAvatarSize.wiring.test.js
+         */
+        --nl-lane-avatar: 32px;
+        --nl-lane-avatar-anon: 20px;
         min-width: 0;
         width: 100%;
         overflow: hidden;
@@ -1130,8 +1142,8 @@
       }
 
       .nl-story-userlane-avatar {
-        width: 32px;
-        height: 32px;
+        width: var(--nl-lane-avatar);
+        height: var(--nl-lane-avatar);
         border-radius: 999px;
         object-fit: cover;
         object-position: center;
@@ -1148,9 +1160,16 @@
         border-color: color-mix(in srgb, #8d6e63 55%, var(--nl-border) 45%);
       }
 
-      html.nl-inline body .nl-story-userlane-avatar {
-        width: 38px;
-        height: 38px;
+      /*
+       * ★inline（動画埋め込み）は変数を上書きする＝セレクタを増やさない。
+       *   ★v0.1.1496: 38px → 44px。タイル幅は meta の max-width:min(142px,34vw) が
+       *   支配的なので、44px までは【1行に入る人数が変わらない】（行数が増えない）。
+       *   ★window（ツールバーpopup）は高さ580px固定の狭い箱なので 32px のまま。
+       *     両者は ?inline=1 で決まる排他モード（popup-entry.js:1032,1109）。
+       */
+      html.nl-inline body .nl-story-body {
+        --nl-lane-avatar: 44px;
+        --nl-lane-avatar-anon: 22px;
       }
 
       /* ★v0.1.1049: サムネ持ち=大(現状維持) / 匿名(実サムネ無し)=小・ぎゅうぎゅう詰め。
@@ -1158,14 +1177,10 @@
          大きくするのでなく匿名を縮めて相対差を作る=既存レイアウトへの影響を最小化。
          セレクタは [data-thumb="0"] 側のみ=属性が付かない旧タイルは既定(大)で安全に倒れる。 */
       .nl-story-userlane-cell[data-thumb="0"] .nl-story-userlane-avatar {
-        width: 20px;
-        height: 20px;
+        width: var(--nl-lane-avatar-anon);
+        height: var(--nl-lane-avatar-anon);
         border-width: 1px;
         box-shadow: none;
-      }
-      html.nl-inline body .nl-story-userlane-cell[data-thumb="0"] .nl-story-userlane-avatar {
-        width: 22px;
-        height: 22px;
       }
       .nl-story-userlane-cell[data-thumb="0"] {
         gap: 4px;
@@ -1249,8 +1264,9 @@
       #sceneStoryUserLaneTanu
         > .nl-story-userlane-cell:nth-child(n + 25)[data-thumb='0']
         .nl-story-userlane-avatar {
-        width: 22px;
-        height: 22px;
+        /* ★後列は匿名寸法のまま（v0.1.1376 の 63%減を守る）。 */
+        width: var(--nl-lane-avatar-anon);
+        height: var(--nl-lane-avatar-anon);
       }
       /*
        * ★v0.1.1426 中身LOD(枠は残す。中身だけ空にする)— laneContentLod.js が付ける class。
@@ -1274,10 +1290,15 @@
       .nl-story-userlane-cell--hollow {
         gap: 0;
         padding-right: 0;
-        /* 22px の丸 + border 1.5px×2(既存 avatar と同じ枠線幅)= 25px。
-           avatar と同じ箱を「img 無し」で作る＝中身が入った瞬間に寸法が動かない。 */
-        width: 25px;
-        height: 25px;
+        /*
+         * 匿名アバターの丸 + border 1.5px×2(既存 avatar と同じ枠線幅)。
+         * avatar と同じ箱を「img 無し」で作る＝中身が入った瞬間に寸法が動かない。
+         * ★v0.1.1496: 25px の【手計算】をやめ、匿名寸法から calc で導出する。
+         *   手計算だと片方だけ変えたときにずれ、
+         *   「中身が入った瞬間にスクロールが飛ぶ」事故になる。
+         */
+        width: calc(var(--nl-lane-avatar-anon) + 3px);
+        height: calc(var(--nl-lane-avatar-anon) + 3px);
         border-radius: 999px;
         box-sizing: border-box;
         border: 1.5px solid color-mix(in srgb, var(--nl-border) 82%, #fff 18%);
@@ -1305,8 +1326,8 @@
         > :nth-child(n + 25)
         .nl-story-userlane-cell[data-thumb='0']
         .nl-story-userlane-avatar {
-        width: 22px;
-        height: 22px;
+        width: var(--nl-lane-avatar-anon);
+        height: var(--nl-lane-avatar-anon);
       }
 
       .nl-story-userlane-guide {

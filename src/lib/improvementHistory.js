@@ -334,5 +334,19 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
   Object.freeze({
     version: '0.1.1495', metric: 'gate-selftest', value: 2,
     source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1496', metric: 'bundle-kb', value: 1412,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '★前版と同値(1412)。実測: popup.js 1445534→1445702 ＝+168Bだけで、'
+      + 'KB 丸めでは動いていない。今回の本体は venue.js: 484676→485980 ＝+1,304B。'
+      + '内訳はアバター寸法のCSS変数化(3画面の直書き11個を変数2本へ)と、'
+      + 'hollow の手計算を calc 導出にした分のコメント。'
+      + '★新規の取得・タイマー・監視は1つも増やしていない（CSSのみ・JSは0行）。'
+      + '★過去最良1360との差は v0.1.1455〜1471 の計嚆17版ぶん(+45KB)で v0.1.1471 の note に記録済み。'
+  }),
+  Object.freeze({
+    version: '0.1.1496', metric: 'gate-selftest', value: 2,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
   })
 ]);
