@@ -348,5 +348,16 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
   Object.freeze({
     version: '0.1.1496', metric: 'gate-selftest', value: 2,
     source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1497', metric: 'bundle-kb', value: 1412,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '★実測: popup.js 1445702→1445379 ＝【-323B】(前版より減った)。'
+      + '対処案内の文言を「.env に設定して再ビルド」から「WEB共有の設定で入力」へ差し替えた分。'
+      + '★過去最良1360との差は v0.1.1455〜1471 の計器17版ぶん(+45KB)で v0.1.1471 の note に記録済み。'
+  }),
+  Object.freeze({
+    version: '0.1.1497', metric: 'gate-selftest', value: 2,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
   })
 ]);

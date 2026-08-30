@@ -337,6 +337,32 @@ describe('liveviewPublishSelfDiagToActionCards', () => {
     expect(cards.some((c) => c.id === 'liveview-publish-key-missing' && c.severity === 'bad')).toBe(true);
   });
 
+  it('★キー未設定の対処が「実際にできる操作」を案内している（.env 再ビルドは廃止済み）', () => {
+    /*
+     * ★2026-08-30 の実機速報で見つかった食い違い。
+     *   同じ1つの速報が、矛盾する案内を2つ出していた:
+     *     ・対処カード → 「.env に STATUS_INGEST_KEY を設定して再ビルド」
+     *     ・別の行     → 「「🔑 WEB共有の設定」で入力してください」
+     *   ★.env 方式は v0.1.1245 で廃止済み(公開リポに鍵が出た事故のため、
+     *     ビルドに焼き込まず storage から読む形にした・status-entry.js:609)。
+     *   ＝できない操作を案内していた＝利用者の時間を奪う。
+     *   AGENTS.md §12.7「対処を書く/変えるときは実コードで裏取りしてから書く」。
+     */
+    const d = buildLiveviewPublishSelfDiag({ jsonBlob: fullBlob(), currentLiveId: 'lv1', publishKeys: {}, nowMs: NOW });
+    const card = liveviewPublishSelfDiagToActionCards(d).find((c) => c.id === 'liveview-publish-key-missing');
+    expect(card).toBeTruthy();
+    const text = `${card.cause} ${card.action}`;
+    // ★廃止された方式を案内しないこと。
+    expect(text).not.toMatch(/\.env/);
+    expect(text).not.toMatch(/STATUS_INGEST_KEY|STATUS_VIEW_TOKEN/);
+    // ★「再ビルド」の語そのものは禁じない（「再ビルドは不要です」と書けるようにする）。
+    //   禁じるのは【再ビルドを指示すること】。
+    expect(text).not.toMatch(/再ビルド(?!は不要)/);
+    expect(text).not.toMatch(/build:copy/);
+    // ★いま実在する入口(status の設定欄)を名指しすること。
+    expect(card.action).toContain('WEB共有の設定');
+  });
+
   it('未送信で warn カード（キーは揃っている）', () => {
     const d = buildLiveviewPublishSelfDiag({
       jsonBlob: fullBlob(), currentLiveId: 'lv1',
