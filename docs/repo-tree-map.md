@@ -25,6 +25,7 @@ graph LR
   d4 --> d4_0["dist/ 〔ビルド成果物〕"]
   d4 --> d4_1["images/ 〔Web版/画像〕"]
   ROOT --> d5["council/ 〔会議/設計〕"]
+  d5 --> d5_0["auto/"]
   ROOT --> d6["council-scout/"]
   d6 --> d6_0["briefs/"]
   ROOT --> d7["docs/ 〔設計/レポート〕"]
@@ -213,12 +214,14 @@ graph LR
 - `images/`（93 件） — 純Web版 応援ライブビューの同梱画像(ゆっくり顔)  〔Web版 / 画像〕
 
 ## `council/` — 会議(COUNCIL)の問い・回答・統合(SYNTHESIS)。設計判断の根拠  〔会議 / 設計〕
-<sub>ファイル 371 件</sub>
+<sub>ファイル 376 件</sub>
+
+- `auto/`（5 件） — ⚠️ 未記入（ROLES に追記）
 
 ## `council-scout/` — ⚠️ 未記入（ROLES に追記）
-<sub>ファイル 7 件</sub>
+<sub>ファイル 10 件</sub>
 
-- `briefs/`（7 件） — ⚠️ 未記入（ROLES に追記）
+- `briefs/`（10 件） — ⚠️ 未記入（ROLES に追記）
 
 ## `docs/` — 設計正本・マインドマップ・フロー図・feature-map(AI/人間向け)  〔設計 / レポート〕
 <sub>ファイル 308 件</sub>
@@ -260,14 +263,14 @@ graph LR
 - `soundeffect-lab/`（19 件） — ⚠️ 未記入（ROLES に追記）
 
 ## `src/` — LP 側 + 純粋関数ライブラリの源  〔ソース〕
-<sub>ファイル 1843 件</sub>
+<sub>ファイル 1846 件</sub>
 
 - `data/`（7 件） — 保存コメントからレーン候補を読む acquirer / source 層  〔コメント / 取得〕
 - `domain/`（20 件） — ドメイン正本(応援レーンの集約・列ポリシー等。識別子判定など)  〔応援 / 集約 / 識別子〕
 - `extension/`（46 件） — バンドル entry(content/popup/venue/status/offscreen/backfill-sw 等=機能境界)  〔entry / 記録 / 会場 / 応援〕
 - `fixtures/`（1 件） — テスト用フィクスチャ  〔テスト〕
 - `images/`（165 件） — LP / CWS 提出物のマスター画像  〔画像〕
-- `lib/`（1594 件） — 純粋関数ライブラリ(unit test 対象)。色・速度・コメント・レポート等の計算ロジックの大半  〔色 / 速度 / コメント / レポート / 純粋関数〕
+- `lib/`（1597 件） — 純粋関数ライブラリ(unit test 対象)。色・速度・コメント・レポート等の計算ロジックの大半  〔色 / 速度 / コメント / レポート / 純粋関数〕
 - `shared/`（7 件） — 複数機能で共有する小部品(アバター URL ガード等)  〔共有 / アバター〕
 - `sound/`（1 件） — 音声素材(src 側)  〔音声〕
 
@@ -521,7 +524,7 @@ esbuild の import 到達グラフを逆引きし「このファイルを変え�
 
 ---
 
-## ⚠️ 役割が未記入のディレクトリ（14）
+## ⚠️ 役割が未記入のディレクトリ（15）
 
 以下は `ROLES` 辞書に説明が無い。`scripts/repo-tree-map.mjs` の `ROLES` に1行足してから再生成すること。
 
@@ -529,6 +532,7 @@ esbuild の import 到達グラフを逆引きし「このファイルを変え�
 - `.codex/agents/`
 - `.codex-osint/`
 - `_docs/`
+- `council/auto/`
 - `council-scout/`
 - `council-scout/briefs/`
 - `docs/article-drafts/`

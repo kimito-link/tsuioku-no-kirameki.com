@@ -69,7 +69,7 @@
     どのディレクトリが何の担当か（色・速度・コメント・レポート…）を一目で。<code>scripts/repo-tree-map.mjs</code> が git 追跡ファイルから自動生成（手編集しない）。<br>
     テキスト正本: <a href="repo-tree-map.md">repo-tree-map.md</a> ／ 機能依存図: <a href="feature-map/index.md">feature-map/index.md</a> ／ 配置ルール: <a href="../AGENTS.md">AGENTS.md</a> §4。
   </p>
-  <div class="banner warn">⚠️ 役割が未記入のディレクトリ 14 件: <code>.codex</code> <code>.codex/agents</code> <code>.codex-osint</code> <code>_docs</code> <code>council-scout</code> <code>council-scout/briefs</code> <code>docs/article-drafts</code> <code>docs/patent-unique-voice-reading-filing-final</code> <code>extension/data</code> <code>scripts/__pycache__</code> <code>scripts/lib</code> <code>sound-src</code> <code>sound-src/soundeffect-lab</code> <code>tests/helpers</code> — <code>scripts/repo-tree-map.mjs</code> の <code>ROLES</code> に追記</div>
+  <div class="banner warn">⚠️ 役割が未記入のディレクトリ 15 件: <code>.codex</code> <code>.codex/agents</code> <code>.codex-osint</code> <code>_docs</code> <code>council/auto</code> <code>council-scout</code> <code>council-scout/briefs</code> <code>docs/article-drafts</code> <code>docs/patent-unique-voice-reading-filing-final</code> <code>extension/data</code> <code>scripts/__pycache__</code> <code>scripts/lib</code> <code>sound-src</code> <code>sound-src/soundeffect-lab</code> <code>tests/helpers</code> — <code>scripts/repo-tree-map.mjs</code> の <code>ROLES</code> に追記</div>
   <section class="dir miss">
       <div class="dhead"><span class="dname">.codex/</span><span class="cnt">5 件</span></div>
       <div class="drole">⚠️ 未記入（ROLES 辞書に追記） </div>
@@ -96,14 +96,14 @@
       <div class="kids"><div class="kid"><div class="kname">dist/ <span class="cnt">2</span></div><div class="krole">Web 版アプリのビルド成果物 <span class="tag">ビルド成果物</span></div></div><div class="kid"><div class="kname">images/ <span class="cnt">93</span></div><div class="krole">純Web版 応援ライブビューの同梱画像(ゆっくり顔) <span class="tag">Web版</span><span class="tag">画像</span></div></div></div>
     </section>
 <section class="dir">
-      <div class="dhead"><span class="dname">council/</span><span class="cnt">371 件</span></div>
+      <div class="dhead"><span class="dname">council/</span><span class="cnt">376 件</span></div>
       <div class="drole">会議(COUNCIL)の問い・回答・統合(SYNTHESIS)。設計判断の根拠 <span class="tag">会議</span><span class="tag">設計</span></div>
-      
+      <div class="kids"><div class="kid miss"><div class="kname">auto/ <span class="cnt">5</span></div><div class="krole">⚠️ 未記入 </div></div></div>
     </section>
 <section class="dir miss">
-      <div class="dhead"><span class="dname">council-scout/</span><span class="cnt">7 件</span></div>
+      <div class="dhead"><span class="dname">council-scout/</span><span class="cnt">10 件</span></div>
       <div class="drole">⚠️ 未記入（ROLES 辞書に追記） </div>
-      <div class="kids"><div class="kid miss"><div class="kname">briefs/ <span class="cnt">7</span></div><div class="krole">⚠️ 未記入 </div></div></div>
+      <div class="kids"><div class="kid miss"><div class="kname">briefs/ <span class="cnt">10</span></div><div class="krole">⚠️ 未記入 </div></div></div>
     </section>
 <section class="dir">
       <div class="dhead"><span class="dname">docs/</span><span class="cnt">308 件</span></div>
@@ -131,9 +131,9 @@
       <div class="kids"><div class="kid miss"><div class="kname">soundeffect-lab/ <span class="cnt">19</span></div><div class="krole">⚠️ 未記入 </div></div></div>
     </section>
 <section class="dir">
-      <div class="dhead"><span class="dname">src/</span><span class="cnt">1843 件</span></div>
+      <div class="dhead"><span class="dname">src/</span><span class="cnt">1846 件</span></div>
       <div class="drole">LP 側 + 純粋関数ライブラリの源 <span class="tag">ソース</span></div>
-      <div class="kids"><div class="kid"><div class="kname">data/ <span class="cnt">7</span></div><div class="krole">保存コメントからレーン候補を読む acquirer / source 層 <span class="tag">コメント</span><span class="tag">取得</span></div></div><div class="kid"><div class="kname">domain/ <span class="cnt">20</span></div><div class="krole">ドメイン正本(応援レーンの集約・列ポリシー等。識別子判定など) <span class="tag">応援</span><span class="tag">集約</span><span class="tag">識別子</span></div></div><div class="kid"><div class="kname">extension/ <span class="cnt">46</span></div><div class="krole">バンドル entry(content/popup/venue/status/offscreen/backfill-sw 等=機能境界) <span class="tag">entry</span><span class="tag">記録</span><span class="tag">会場</span><span class="tag">応援</span></div></div><div class="kid"><div class="kname">fixtures/ <span class="cnt">1</span></div><div class="krole">テスト用フィクスチャ <span class="tag">テスト</span></div></div><div class="kid"><div class="kname">images/ <span class="cnt">165</span></div><div class="krole">LP / CWS 提出物のマスター画像 <span class="tag">画像</span></div></div><div class="kid"><div class="kname">lib/ <span class="cnt">1594</span></div><div class="krole">純粋関数ライブラリ(unit test 対象)。色・速度・コメント・レポート等の計算ロジックの大半 <span class="tag">色</span><span class="tag">速度</span><span class="tag">コメント</span><span class="tag">レポート</span><span class="tag">純粋関数</span></div></div><div class="kid"><div class="kname">shared/ <span class="cnt">7</span></div><div class="krole">複数機能で共有する小部品(アバター URL ガード等) <span class="tag">共有</span><span class="tag">アバター</span></div></div><div class="kid"><div class="kname">sound/ <span class="cnt">1</span></div><div class="krole">音声素材(src 側) <span class="tag">音声</span></div></div></div>
+      <div class="kids"><div class="kid"><div class="kname">data/ <span class="cnt">7</span></div><div class="krole">保存コメントからレーン候補を読む acquirer / source 層 <span class="tag">コメント</span><span class="tag">取得</span></div></div><div class="kid"><div class="kname">domain/ <span class="cnt">20</span></div><div class="krole">ドメイン正本(応援レーンの集約・列ポリシー等。識別子判定など) <span class="tag">応援</span><span class="tag">集約</span><span class="tag">識別子</span></div></div><div class="kid"><div class="kname">extension/ <span class="cnt">46</span></div><div class="krole">バンドル entry(content/popup/venue/status/offscreen/backfill-sw 等=機能境界) <span class="tag">entry</span><span class="tag">記録</span><span class="tag">会場</span><span class="tag">応援</span></div></div><div class="kid"><div class="kname">fixtures/ <span class="cnt">1</span></div><div class="krole">テスト用フィクスチャ <span class="tag">テスト</span></div></div><div class="kid"><div class="kname">images/ <span class="cnt">165</span></div><div class="krole">LP / CWS 提出物のマスター画像 <span class="tag">画像</span></div></div><div class="kid"><div class="kname">lib/ <span class="cnt">1597</span></div><div class="krole">純粋関数ライブラリ(unit test 対象)。色・速度・コメント・レポート等の計算ロジックの大半 <span class="tag">色</span><span class="tag">速度</span><span class="tag">コメント</span><span class="tag">レポート</span><span class="tag">純粋関数</span></div></div><div class="kid"><div class="kname">shared/ <span class="cnt">7</span></div><div class="krole">複数機能で共有する小部品(アバター URL ガード等) <span class="tag">共有</span><span class="tag">アバター</span></div></div><div class="kid"><div class="kname">sound/ <span class="cnt">1</span></div><div class="krole">音声素材(src 側) <span class="tag">音声</span></div></div></div>
     </section>
 <section class="dir">
       <div class="dhead"><span class="dname">tests/</span><span class="cnt">80 件</span></div>

@@ -304,5 +304,20 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
   Object.freeze({
     version: '0.1.1493', metric: 'gate-selftest', value: 2,
     source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1494', metric: 'bundle-kb', value: 1411,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '★この版で増えたのは【313バイト】。推測ではなく実測した: '
+      + 'git show HEAD:extension/dist/popup.js | wc -c = 1444293 に対し、'
+      + '当版は 1444606（差 313B）。1410→1411 は KB 丸めの境界をまたいだだけで、'
+      + '実体は版数文字列の差し替えと更新履歴1版の入れ替え（20版上限で最古版が archive へ出る）。'
+      + '★今回足した会場ホバーの判定(venueHoverFacts.js)は popup.js に入っていない'
+      + '（実測: grep -c resolveVenueHoverFacts → popup.js:0 / venue.js:2）。'
+      + '★過去最良1360との差は v0.1.1455〜1471 の計器17版ぶん(+45KB)で v0.1.1471 の note に記録済み。'
+  }),
+  Object.freeze({
+    version: '0.1.1494', metric: 'gate-selftest', value: 2,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
   })
 ]);

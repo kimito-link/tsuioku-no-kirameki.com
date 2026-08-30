@@ -56,16 +56,23 @@ export const VENUE_PRESENCE_TALKATIVE_MIN = 10;
  *   そもそも人として成立していない）。呼び出し側はその時だけ行を出さない。
  *
  * 入力の意味:
- *   count       … 発言数
- *   giftCount   … ギフト回数
+ *   count       … 発言数。★null は「知らない」（0回とは違う）
+ *   giftCount   … ギフト回数。★null は「知らない」
+ *
+ *   ★null を受ける理由（2026-08-29）:
+ *     席なし経路がゼロ埋めリテラルを渡していたため、実機で「発言 0」「発言 1」という
+ *     嘘が出た。「0回喋った」と「知らない」を同じ 0 で表すと区別が構造的に不可能になる。
+ *     ⟹ resolveVenueHoverFacts（venueHoverFacts.js）が null を返すようにし、
+ *       ここは ★null なら回数を言わない・ただし時刻が分かれば黙らない、と振る舞う。
+ *       （AGENTS.md §3.5「情報が少ない人を二級市民にしない」）
  *   venueRank   … 会場での順位（1..3 のみ意味を持つ）
  *   lastAt      … 最後の発言時刻（epoch ms）
  *   nowMs       … いまの時刻（epoch ms）。★引数で受ける（純関数のため）
  *   isAnonymous … 匿名か（★文言は変えない。差別しないことをテストで固定している）
  *
  * @param {{
- *   count?: number,
- *   giftCount?: number,
+ *   count?: number|null,
+ *   giftCount?: number|null,
  *   venueRank?: number,
  *   lastAt?: number,
  *   nowMs?: number,
@@ -75,8 +82,24 @@ export const VENUE_PRESENCE_TALKATIVE_MIN = 10;
  */
 export function buildVenuePresenceNote(input) {
   const i = input && typeof input === 'object' ? input : {};
-  const count = Math.max(0, Math.floor(Number(i.count) || 0));
-  const giftCount = Math.max(0, Math.floor(Number(i.giftCount) || 0));
+  /*
+   * ★null は「見に行ったが分からなかった」。0 に丸めない。
+   *   ここで 0 に潰すと「まだ数えていない人」が「0回の人」と同じ扱いになり、
+   *   下の `count <= 0 && giftCount <= 0 → ''` に落ちて★一言ごと消える。
+   *   （「一言が出たり出なかったりする」と言われた症状がこれ）
+   *
+   * ★null（明示的に「知らない」）と undefined（キーごと無い）を分けること。
+   *   ・null      … resolveVenueHoverFacts が「調べたが不明」と答えた
+   *                 ⟹ その人が【会場に居ることは確か】なので黙らない
+   *   ・undefined … 呼び出し側が何も渡していない＝人として成立していない
+   *                 ⟹ 既存契約どおり空を返す（buildVenuePresenceNote({}) === ''）
+   *   両者を同一視すると、壊れた入力にまで「会場に居る」と言ってしまう。
+   */
+  const explicitlyUnknown = i.count === null || i.giftCount === null;
+  const knowsCount = i.count !== null && i.count !== undefined;
+  const knowsGift = i.giftCount !== null && i.giftCount !== undefined;
+  const count = knowsCount ? Math.max(0, Math.floor(Number(i.count) || 0)) : null;
+  const giftCount = knowsGift ? Math.max(0, Math.floor(Number(i.giftCount) || 0)) : null;
   const venueRank = Math.max(0, Math.floor(Number(i.venueRank) || 0));
   const lastAt = Number(i.lastAt);
   const nowMs = Number(i.nowMs);
@@ -84,8 +107,20 @@ export function buildVenuePresenceNote(input) {
   // ★時計ズレで負値になることがある。0 に丸める（「未来から来た人」を作らない）。
   const sinceLast = hasTime ? Math.max(0, nowMs - lastAt) : -1;
 
-  // ★何も分からない＝人として成立していない。ここだけ空を返す。
-  if (count <= 0 && giftCount <= 0) return '';
+  /*
+   * ★何も分からない＝人として成立していない。ここだけ空を返す。
+   *   ★既存契約（venuePresenceNote.test.js）: count:0 かつ giftCount:0 → ''。
+   *     数えた結果ほんとうに0なら、言うことが無いので黙るのが正しい。
+   *
+   *   ★ただし「知らない(null)」は別。数は言えなくても
+   *     【時刻が分かれば「いま喋っている」とは言える】ので、ここで落とさない。
+   *     居ることまで消してしまうと二級市民になる。
+   */
+  const knowsSomething = knowsCount || knowsGift;
+  const nothingHappened = (count || 0) <= 0 && (giftCount || 0) <= 0;
+  if (knowsSomething && nothingHappened) return '';
+  // ★キーごと無い＝人として成立していない。既存契約どおりここだけ空。
+  if (!knowsSomething && !explicitlyUnknown) return '';
 
   /** @type {string[]} */
   const parts = [];
@@ -105,17 +140,24 @@ export function buildVenuePresenceNote(input) {
    * ② どれくらい喋ったか。
    *   ★1回だけの人にも必ず言う（二級市民にしない）。
    */
+  // ★count が null＝知らない。★数を言わない（「発言1」の嘘を作らない）。
   if (count === 1) parts.push('ここで1回');
-  else if (count > 0 && count < VENUE_PRESENCE_TALKATIVE_MIN) parts.push(`ここまで${count}回`);
-  else if (count >= VENUE_PRESENCE_TALKATIVE_MIN) parts.push(`ここまで${count}回`);
+  else if (count !== null && count > 0) parts.push(`ここまで${count}回`);
 
   // ③ ギフト。★数ではなく「贈った」という事実を先に言う（表彰として扱う）。
   if (giftCount === 1) parts.push('ギフトを贈った');
-  else if (giftCount > 1) parts.push(`ギフトを${giftCount}回`);
+  else if (giftCount !== null && giftCount > 1) parts.push(`ギフトを${giftCount}回`);
 
   // ④ 上位だけ。4位以下は言わない（順位で人を並べ替えて見せる場ではない）。
   if (venueRank === 1) parts.push('いちばん多い');
   else if (venueRank === 2 || venueRank === 3) parts.push(`${venueRank}番目に多い`);
+
+  /*
+   * ★ここまでで一言が空＝「知らないが、居ることは分かっている」状態。
+   *   ★存在は必ず言う（AGENTS.md §3.5「応援者は主役」）。
+   *   数を偽らずに、居ることだけを伝える。
+   */
+  if (parts.length === 0) return explicitlyUnknown ? '会場に居る' : '';
 
   return parts.join('・');
 }
