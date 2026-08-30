@@ -754,6 +754,15 @@
 
       .nl-story-body {
         --nl-story-icon-size: 14px;
+        /*
+         * ★応援レーンのアバター寸法（2026-08-30）。popup.html と同じ規約。
+         *   ★このページの後列は 26px（popup は 22px）。
+         *     前列 38px を基準に相対差を設計しているためで、
+         *     ★popup の値を写すと 4px ずれてスクロールが飛ぶ（下の hollow 参照）。
+         *     だから【3画面で同じ値にしない】のが正しい。検査も同値を強制しない。
+         */
+        --nl-lane-avatar: 32px;
+        --nl-lane-avatar-anon: 26px;
         min-width: 0;
         width: 100%;
         overflow: hidden;
@@ -980,8 +989,8 @@
       }
 
       .nl-story-userlane-avatar {
-        width: 32px;
-        height: 32px;
+        width: var(--nl-lane-avatar);
+        height: var(--nl-lane-avatar);
         border-radius: 999px;
         object-fit: cover;
         object-position: center;
@@ -998,9 +1007,9 @@
         border-color: color-mix(in srgb, #8d6e63 55%, var(--nl-border) 45%);
       }
 
-      html.nl-inline body .nl-story-userlane-avatar {
-        width: 38px;
-        height: 38px;
+      /* ★v0.1.1496: 38px → 44px。popup.html と同値（行数が増えない上限）。 */
+      html.nl-inline body .nl-story-body {
+        --nl-lane-avatar: 44px;
       }
 
       /*
@@ -1027,8 +1036,8 @@
       #sceneStoryUserLaneTanu
         > .nl-story-userlane-cell:nth-child(n + 25)[data-thumb='0']
         .nl-story-userlane-avatar {
-        width: 26px;
-        height: 26px;
+        width: var(--nl-lane-avatar-anon);
+        height: var(--nl-lane-avatar-anon);
       }
 
       /*
@@ -1042,8 +1051,12 @@
       .nl-story-userlane-cell--hollow {
         gap: 0;
         padding-right: 0;
-        width: 29px; /* 26px + border 1.5px×2 */
-        height: 29px;
+        /*
+         * ★v0.1.1496: 29px の【手計算】をやめ、後列アバター寸法から calc で導出する。
+         *   上のコメントが言う「4px ずれてスクロールが飛ぶ」を構造的に踏めなくする。
+         */
+        width: calc(var(--nl-lane-avatar-anon) + 3px);
+        height: calc(var(--nl-lane-avatar-anon) + 3px);
         border-radius: 999px;
         box-sizing: border-box;
         border: 1.5px solid color-mix(in srgb, var(--nl-border) 82%, #fff 18%);

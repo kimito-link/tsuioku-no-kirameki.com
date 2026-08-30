@@ -87,12 +87,27 @@ describe('中身LOD: 3画面の扱い', () => {
   });
 
   it('★各ページの hollow 寸法は、そのページ自身の後列 avatar 寸法と揃っている', () => {
-    // popup は後列 avatar 22px → 枠 25px(=22 + border 1.5×2)
-    const popup = read('extension/popup.html');
-    expect(popup).toMatch(/\.nl-story-userlane-cell--hollow\s*\{[^}]*width:\s*25px/);
-    // live-view は後列 avatar 26px → 枠 29px。★popup の値をコピーすると 4px ずれてスクロールが飛ぶ
-    const live = read('app/live-view.html');
-    expect(live).toMatch(/\.nl-story-userlane-cell--hollow\s*\{[^}]*width:\s*29px/);
+    /*
+     * ★v0.1.1496: 手計算(popup 25px / live-view 29px)をやめ、
+     *   後列 avatar 寸法の変数から calc で導出する形にした。
+     *   ⟹ 「そのページ自身の後列 avatar と揃っている」ことが【構造的に保証される】ので、
+     *     具体値ではなく【導出されていること】を検査する。
+     *   ★具体値を固定し続けると、寸法を調整するたびにこの検査も書き換えることになり、
+     *     テストが仕様ではなく写経になる。
+     *   ★「popup の値をコピーすると 4px ずれてスクロールが飛ぶ」という当初の恐れは、
+     *     各ページが自分の --nl-lane-avatar-anon を参照することで原理的に起きなくなった。
+     *   値そのものの見張りは src/lib/laneAvatarSize.wiring.test.js が持つ。
+     */
+    for (const f of ['extension/popup.html', 'app/live-view.html']) {
+      const css = read(f);
+      const at = css.indexOf('.nl-story-userlane-cell--hollow');
+      expect(at).toBeGreaterThan(0);
+      const decl = css.slice(at, css.indexOf('}', at));
+      expect(decl).toMatch(/width:\s*calc\(var\(--nl-lane-avatar-anon\)/);
+      expect(decl).toMatch(/height:\s*calc\(var\(--nl-lane-avatar-anon\)/);
+      // ★直書きpxに戻っていないこと(退化ガード)。
+      expect(decl).not.toMatch(/(?:^|[\s;])(?:width|height):\s*\d+px/);
+    }
   });
 
   it('★hollow は地色を塗る — transparent だと「横縞つきの黒」を再生産する', () => {

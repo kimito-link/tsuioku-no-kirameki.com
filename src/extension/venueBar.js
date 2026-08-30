@@ -1248,8 +1248,18 @@ const VENUE_CSS = `
     display: grid;
     place-items: center;
   }
-  /* LANE_CSS_SYNC_BEGIN popup.html:829-1067 */
+  /* LANE_CSS_SYNC_BEGIN popup.html:1037-1320 (★参照行は 2026-08-30 に実測して更新。旧 829-1067 は別のブロックを指していた) */
   .nlsb-venue-lane-stack.nl-story-userlane-stack {
+    /*
+     * ★レーンのアバター寸法（2026-08-30）。popup.html の値を写す。
+     *   会場は「常に inline 相当」（下の :1337-1338 の既存コメント参照）なので
+     *   popup の html.nl-inline 側の値を採る。
+     *   ★以前は 38px/22px の直書きだった。変数にして
+     *     【値が書ける場所を塞ぐ】＝どんな値の退化も検査が捕まえる。
+     *   検査: src/lib/laneAvatarSize.wiring.test.js
+     */
+    --nl-lane-avatar: 44px;
+    --nl-lane-avatar-anon: 22px;
     display: flex;
     flex-direction: column;
     gap: 8px;
@@ -1356,8 +1366,8 @@ const VENUE_CSS = `
     font-weight: 500;
   }
   .nlsb-venue-lane-stack .nl-story-userlane-avatar {
-    width: 38px;
-    height: 38px;
+    width: var(--nl-lane-avatar);
+    height: var(--nl-lane-avatar);
     border-radius: 999px;
     object-fit: cover;
     object-position: center;
@@ -1376,8 +1386,8 @@ const VENUE_CSS = `
      popup.html と同じ規約([data-thumb="0"] 側のみ・displaySrc が http か)を会場にも。
      VIP金縁/streak/順位バッジは border/box-shadow を触るだけ=サイズ非依存で競合しない。 */
   .nlsb-venue-lane-stack .nl-story-userlane-cell[data-thumb="0"] .nl-story-userlane-avatar {
-    width: 22px;
-    height: 22px;
+    width: var(--nl-lane-avatar-anon);
+    height: var(--nl-lane-avatar-anon);
     border-width: 1px;
     box-shadow: none;
   }
@@ -1402,8 +1412,9 @@ const VENUE_CSS = `
     display: none;
   }
   .nlsb-venue-lane-stack .nl-story-userlane--tanu > :nth-child(n + 25) .nl-story-userlane-cell[data-thumb="0"] .nl-story-userlane-avatar {
-    width: 22px;
-    height: 22px;
+    /* ★後列は匿名寸法のまま（v0.1.1376 の 63%減を守る）。 */
+    width: var(--nl-lane-avatar-anon);
+    height: var(--nl-lane-avatar-anon);
   }
   .nlsb-venue-lane-stack .nl-story-userlane-guide {
     display: flex;
