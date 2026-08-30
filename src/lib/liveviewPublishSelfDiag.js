@@ -587,8 +587,17 @@ export function liveviewPublishSelfDiagToActionCards(diag) {
       id: 'liveview-publish-key-missing',
       severity: 'bad',
       symptom: `純Web公開キーが未設定です（${miss}）`,
-      cause: 'ビルド時に公開キーが注入されていません。純Webへスナップショットを送れず、/live-view は何も表示できません。',
-      action: '.env に STATUS_INGEST_KEY / STATUS_VIEW_TOKEN を設定して拡張を再ビルド（npm run build:copy）してください。',
+      cause: '共有キーがまだ入力されていません。純Webへスナップショットを送れず、/live-view は何も表示できません。',
+      /*
+       * ★この案内は 2026-08-30 に直した。
+       *   以前は「.env に STATUS_INGEST_KEY / STATUS_VIEW_TOKEN を設定して再ビルド」と案内していたが、
+       *   ★その方式は v0.1.1245 で廃止済み(公開リポに鍵が出た事故のため、ビルドに焼き込まず
+       *   storage から読む形にした・status-entry.js:609「共有キーを storage から読む(ビルドに焼き込まない)」)。
+       *   ★同じ速報の別行は正しく「「🔑 WEB共有の設定」で入力」と言っており、
+       *   【1つの速報が矛盾した案内を2つ出していた】。
+       *   AGENTS.md §12.7: 対処を書くときは実コードで裏取りすること。
+       */
+      action: '状態速報の「🔑 WEB共有の設定」を開き、書き込みキーと閲覧トークンを入力して保存してください（再ビルドは不要です）。',
       fixableHere: 'no'
     });
   }
