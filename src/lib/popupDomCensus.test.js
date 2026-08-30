@@ -67,10 +67,34 @@ describe('★popup側のDOM census(Step 1 の実測を製品に載せる)', () =
     expect(v.unexplained).toBe(6592 - 1092 - 1100 * 5);
   });
 
-  it('★基準内なら ok / 超えたら warn / 大幅超過は bad', () => {
+  it('★要素数では判定しない(どれだけ多くても warn/bad にしない)', () => {
+    /*
+     * ★2026-08-31: 要素数での判定をやめた。
+     *   ・判定の根拠だった Lighthouse の `dom-size` 監査は 13.0(2025-10)で【廃止】
+     *     → `dom-size-insight` は静的な要素数ではなく
+     *       「recalc/layout が 40ms 超か」で判定する
+     *   ・★実測: 7,053要素でも recalc+layout は 15.6ms(閾値40msの半分以下)
+     *   ・新基準で判定するには recalc を測る計器が要るが、この製品には無い
+     *     (longtask は iframe に配送されない= mainThreadBlockerBoot.js:12)
+     *   ⟹ 測れない基準で判定しない。数字は出すが色は付けない。
+     *   ★これを warn/bad に戻すなら、先に recalc を測る計器を作ること。
+     */
     expect(summarizePopupDomCensus({ total: 1400, tiles: 0, hollow: 0, perLane: {} }).level).toBe('ok');
-    expect(summarizePopupDomCensus({ total: 3000, tiles: 300, hollow: 0, perLane: {} }).level).toBe('warn');
-    expect(summarizePopupDomCensus({ total: 13682, tiles: 1108, hollow: 0, perLane: {} }).level).toBe('bad');
+    expect(summarizePopupDomCensus({ total: 3000, tiles: 300, hollow: 0, perLane: {} }).level).toBe('ok');
+    expect(summarizePopupDomCensus({ total: 13682, tiles: 1108, hollow: 0, perLane: {} }).level).toBe('ok');
+  });
+
+  it('★「多すぎる」と断じる文言を出さない(誤警告の再発防止)', () => {
+    // ★健全(実測15.6ms)なのに「⚠推奨1,500を超過」と出していたのが直した当のもの。
+    for (const total of [1400, 3000, 13682]) {
+      const line = summarizePopupDomCensus({ total, tiles: 0, hollow: 0, perLane: {} }).line;
+      expect(line).not.toContain('超過');
+      expect(line).not.toContain('推奨');
+      expect(line).not.toContain('⚠');
+      expect(line).not.toContain('🔴');
+      // ★数字そのものは残す(桁違いの異常を人が見つける材料)。
+      expect(line).toContain(String(total));
+    }
   });
 
   it('★測れないときは na(0と言い張らない)', () => {

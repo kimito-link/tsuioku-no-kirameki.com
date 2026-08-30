@@ -62,6 +62,26 @@ describe('★メモリ逼迫の判定(純関数)', () => {
     expect(v.domLevel).toBe('bad');
   });
 
+  it('★健全な水準(実測15.6ms)で警告を出さない — 誤警告の再発防止', () => {
+    /*
+     * ★2026-08-31: 旧基準 1,500 は Lighthouse 13.0 で廃止された監査の値で、
+     *   実測(Chrome)では 7,053要素でも recalc+layout 15.6ms(閾値40msの半分以下)。
+     *   ＝ 健全な状態で「⚠DOMが推奨(1,500)を超えています」と出していた。
+     *   ★これを 1,500 に戻すと、また嘘の警告が出る。
+     */
+    for (const n of [1_600, 2_500, 3_000]) {
+      const v = judgeMemoryPressure(mk(200, 4192), { domNodes: n });
+      expect(v.domLevel, `domNodes=${n}`).toBe('ok');
+      expect(v.text).not.toContain('推奨');
+    }
+  });
+
+  it('★過去に実際に凍った水準(3,984要素/29.3秒)は今も検知できる', () => {
+    // ★信号を消したのではなく、根拠を「業界推奨」から「自分の実測」へ移した。
+    expect(judgeMemoryPressure(mk(200, 4192), { domNodes: 3_984 }).domLevel).toBe('warn');
+    expect(judgeMemoryPressure(mk(200, 4192), { domNodes: 13_682 }).domLevel).toBe('bad');
+  });
+
   it('★DOMが基準内なら ok / 測っていなければ na', () => {
     expect(judgeMemoryPressure(mk(200, 4192), { domNodes: 900 }).domLevel).toBe('ok');
     expect(judgeMemoryPressure(mk(200, 4192)).domLevel).toBe('na');

@@ -155,7 +155,10 @@ export const INSTRUMENT_SPEC = Object.freeze([
     id: 'dom-nodes', doc: 'popup', unit: 'elements',
     window: 'instant', resetTrigger: 'popup_reopen',
     sourceRef: 'renderStoryUserLaneDom.js:120',
-    normal: '<=1500(業界推奨) / 実測: タイル0枚で1092・1108枚で13682',
+    // ★2026-08-31: '<=1500(業界推奨)' を撤回。Lighthouse の dom-size 監査は
+    //   13.0(2025-10)で廃止され、新 dom-size-insight は要素数ではなく
+    //   「recalc/layout が 40ms 超か」で判定する。実測では 7,053要素でも 15.6ms。
+    normal: '要素数では判定しない(参考値) / 実測: タイル0枚で1092・1108枚で13682・3984個で29.3秒固まった実績あり',
     note: '★DOMが膨らむのはこちら。1タイル=5要素(personTileDom.js)。'
       + ' ★製品コードでの常時採取は未実装＝Step1 は evaluate_script で測る'
   }),

@@ -359,5 +359,19 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
   Object.freeze({
     version: '0.1.1497', metric: 'gate-selftest', value: 2,
     source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1498', metric: 'bundle-kb', value: 1412,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '★前版と同値(1412)。実測 popup.js 1445379→1445615 ＝ +236B のみ(コメント追加分)。'
+      + '★この版は【判定をやめた】版: 要素数での警告(⚠推奨1,500を超過)を撤去した。'
+      + '根拠だった Lighthouse の dom-size 監査は 13.0(2025-10)で廃止され、'
+      + '新 dom-size-insight は「recalc/layout が 40ms 超か」で判定する。'
+      + '★実測(Chrome): 7,053要素でも 15.6ms＝閾値の半分以下。健全な状態で警告が出ていた。'
+      + '★dom-nodes 指標そのものは残す(桁違いの異常は今も検知価値がある)。'
+  }),
+  Object.freeze({
+    version: '0.1.1498', metric: 'gate-selftest', value: 2,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
   })
 ]);
