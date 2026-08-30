@@ -346,6 +346,8 @@ import { buildVenueCharacterFrame } from '../lib/venueCharacterFrame.js';
 //   判断は charaLiveState.js(純関数)、描画は charaLiveStage.js、配線は charaLiveController.js。
 import { startCharaLive } from '../lib/charaLiveController.js';
 import { venueHoverCardPresenceVerdict } from '../lib/venueHoverCardProbe.js';
+// ★会場ホバーに出す数字の出所はここが正本（3経路すべてがこの判定を通る）。
+import { resolveVenueHoverFacts } from '../lib/venueHoverFacts.js';
 // キャラライブの「本当に見えているか」実測計器(2026-08-25)。推測で3回外した反省で追加。
 import { collectCharaLiveCensus, charaLiveVerdict } from '../lib/charaLiveCensus.js';
 import { parseGiftCommentText, parseNicoadCommentText } from '../lib/parseGiftComment.js';
@@ -2766,7 +2768,9 @@ export function mountVenueBarButton(options = {}) {
    * ★paint 時に全タイルを走査する実装は hot path 汚染で実機が重くなったため、
    *   「ホバーされた1枚だけ・その場で」に変更した。走査対象は同じ段の中だけ。
    * @param {HTMLElement} el
-   * @returns {{ uid: string, displayName: string, count: number, hasGift: boolean, giftCount: number, venueRank: number, lastAt: number, tier?: string, lastText?: string, recentTexts?: string[] }|null}
+   * ★count/giftCount は number|null。null は「在席名簿に居らず、数が分からない」。
+   *   ここで 0 と言うと画面に「発言 0」という嘘が出る（2026-08-29 に実機で確認した症状）。
+   * @returns {{ uid: string, displayName: string, count: number|null, hasGift: boolean, giftCount: number|null, venueRank: number, lastAt: number, tier?: string, lastText?: string, recentTexts?: string[], factsSource?: string }|null}
    */
   const resolveSeatlessHoverData = (el) => {
     try {
@@ -2787,18 +2791,32 @@ export function mountVenueBarButton(options = {}) {
       const seatIdx = Number(it?._venueSeatIndex);
       if (Number.isInteger(seatIdx) && seatIdx >= 0) return null; // 席ありは対象外
       const u = String(it?.entry?.userId || '').trim();
+      /*
+       * ★2026-08-29: ここは以前 count:0 / lastAt:0 のゼロ埋めリテラルを返していた。
+       *   その結果、同じ人が経路によって「発言 70」と「発言 0(→下駄で発言 1)」で
+       *   ★揺れて見えた（実機で確認）。
+       *
+       *   ⟹ ★uid があるなら在席名簿(liveRoster)から O(1) で1回だけ引く。
+       *     ・全走査はしない（hot path を汚さない・paint 時に触らない方針は維持）
+       *     ・新しい hydrate を足さない（venueBar.js:6452 で既に hydrate 済み）
+       *     ・名簿に居なければ★null を返させる（「知らない」を 0 と言わない）
+       *   数字の出所の決定そのものは venueHoverFacts.js が正本。ここは引いて渡すだけ。
+       */
+      const rosterEntry = u ? liveRoster.get(u) || null : null;
+      const facts = resolveVenueHoverFacts({ registered: null, rosterEntry });
       return {
         uid: u,
         displayName: String(it?.title || '').trim(),
-        count: 0,
-        hasGift: tier === 'gift',
-        giftCount: 0,
-        venueRank: 0,
-        lastAt: 0,
+        count: facts.count,
+        hasGift: tier === 'gift' || (facts.giftCount || 0) > 0,
+        giftCount: facts.giftCount,
+        venueRank: facts.venueRank,
+        lastAt: facts.lastAt,
         tier,
-        lastText: '',
-        // 席なしタイル(広告主等)は発言記録に紐づかないので空。
-        recentTexts: []
+        lastText: facts.lastText,
+        recentTexts: facts.recentTexts,
+        // ★どこから採った値かを残す（後から「どちらを見たか」を言えるようにする）。
+        factsSource: facts.source
       };
     } catch {
       return null;
@@ -2813,7 +2831,15 @@ export function mountVenueBarButton(options = {}) {
       const seatless = resolveSeatlessHoverData(anchorEl);
       if (seatless) {
         data = seatless;
-        _hoverCardDataByEl.set(anchorEl, seatless); // 同じ要素の2回目以降は走査しない
+        /*
+         * ★キャッシュは uid が無いときだけ（2026-08-29）。
+         *   uid のある人の値は在席名簿由来で、喋るほど伸びる。ここでキャッシュすると
+         *   ★「一度3回で見えたら、その要素では永遠に3回」になり、
+         *   いま直している「数字が実態と合わない」症状の別バージョンを作ってしまう。
+         *   uid 無しのタイル(広告主等)は静的なので従来どおり保存する
+         *   ＝段内走査を繰り返さない保護目的は維持する。
+         */
+        if (!seatless.uid) _hoverCardDataByEl.set(anchorEl, seatless);
       }
     }
     if (!data) return; // データ無し=fail-closed(ネイティブtitleがそのまま生きる)。

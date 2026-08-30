@@ -130,9 +130,18 @@ export function buildVenueHoverCardModel(input) {
   const i = input && typeof input === 'object' ? input : {};
   const uid = String(i.uid || '').trim();
   const displayName = String(i.displayName || '').trim();
-  const count = Math.max(0, Math.floor(Number(i.count) || 0));
+  /*
+   * ★count/giftCount は number|null（2026-08-29）。
+   *   null は「在席名簿に居らず、数が分からない」。★ここで 0 に丸めないこと。
+   *   丸めると下の statLine が「発言 0」と断言し、さらに上流の下駄
+   *   (venueLaneMirrorSupply.js の Math.max(1,...)) と合わさって「発言 1」の嘘になる。
+   *   ＝実機で「同じ人が発言1と発言70で揺れる」と言われた症状そのもの。
+   */
+  const knowsCount = i.count !== null && i.count !== undefined;
+  const count = knowsCount ? Math.max(0, Math.floor(Number(i.count) || 0)) : null;
   const hasGift = i.hasGift === true;
-  const giftCount = Math.max(0, Math.floor(Number(i.giftCount) || 0));
+  const knowsGift = i.giftCount !== null && i.giftCount !== undefined;
+  const giftCount = knowsGift ? Math.max(0, Math.floor(Number(i.giftCount) || 0)) : null;
   const venueRank = Math.max(0, Math.floor(Number(i.venueRank) || 0));
   const thumb = i.thumb && typeof i.thumb === 'object' ? i.thumb : {};
   const thumbSrc = String(thumb.src || '');
@@ -178,10 +187,21 @@ export function buildVenueHoverCardModel(input) {
     statParts.push(relTime ? `広告(${relTime})` : '広告');
   } else if (tier === 'gift') {
     statParts.push(relTime ? `ギフト(${relTime})` : 'ギフト');
+  } else if (count === null) {
+    /*
+     * ★数が分からないとき（2026-08-29）。
+     *   ★数を言わない。ただし★居ることは必ず言う（AGENTS.md §3.5「応援者は主役」・
+     *   情報が少ない人を二級市民にしない）。
+     *   これは既にこのリポにある流儀の適用範囲を広げたもので、新しい機構ではない
+     *   ＝上の tier==='ad'/'gift' が「件数ごと出さず時刻だけ出す」のと同じ形。
+     */
+    statParts.push(relTime ? `会場に居る(${relTime})` : '会場に居る');
   } else {
     statParts.push(relTime ? `発言 ${count}(${relTime})` : `発言 ${count}`);
   }
-  if (hasGift) statParts.push(`🎁${giftCount}`);
+  // ★giftCount が null(=知らない)のときは🎁の数を出さない。0件と断言しないため。
+  if (hasGift && giftCount !== null && giftCount > 0) statParts.push(`🎁${giftCount}`);
+  else if (hasGift && giftCount === null) statParts.push('🎁');
   if (venueRank === 1) statParts.push('🥇1位');
   else if (venueRank === 2) statParts.push('🥈2位');
   else if (venueRank === 3) statParts.push('🥉3位');

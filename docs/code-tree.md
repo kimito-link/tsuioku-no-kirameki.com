@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 6 / 846 件
+## ⚠️ 役割コメントが無いソース 6 / 847 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `src/lib/laneDomSelfMeasure.js`
@@ -163,8 +163,8 @@
   - `index.html`
   - `live-view.html`
   - `live-view.js` — global NL_BUILD_ID
-- 📁 **council-scout/** (7)
-  - 📁 **briefs/** (7)
+- 📁 **council-scout/** (10)
+  - 📁 **briefs/** (10)
     - `2026-07-16.md`
     - `2026-07-17.md`
     - `2026-07-20.md`
@@ -172,6 +172,9 @@
     - `2026-07-23.md`
     - `2026-07-31.md`
     - `2026-08-21.md`
+    - `2026-08-25.md`
+    - `2026-08-27.md`
+    - `2026-08-29.md`
 - 📁 **docs/** (308)
   - 📁 **article-assets/** (87)
     - 📁 **venue-frames/** (12)
@@ -741,7 +744,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (1843)
+- 📁 **src/** (1846)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1039,7 +1042,7 @@
         - `logo_funlink_white_RGB_maru_black.png`
       - `logo_guide_funlink_ol.pdf`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1594)
+  - 📁 **lib/** (1597)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -2487,6 +2490,9 @@
     - `venueHoverCard.wiring.test.js`
     - `venueHoverCardProbe.js` — 【層】L0 判定層（純関数・chrome/DOM/fetch に触らない）
     - `venueHoverCardProbe.test.js`
+    - `venueHoverFacts.js` — 【層】L0 判定層（純関数・chrome/DOM/fetch に触らない）
+    - `venueHoverFacts.test.js`
+    - `venueHoverParity.test.js`
     - `venueHoverRecentTexts.integration.test.js`
     - `venueIncrementalAggregate.js` — v0.1.754 会場の3時間安定化(会議6体ほぼ全会一致の最大ボトルネック根治): 参加者集計を
     - `venueIncrementalAggregate.test.js`

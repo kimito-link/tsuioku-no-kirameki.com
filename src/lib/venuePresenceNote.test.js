@@ -145,3 +145,37 @@ describe('文言の組み立て', () => {
     expect(s).not.toMatch(/熱心|常連|ファン|マニア|ヘビー|すごい|えらい/);
   });
 });
+
+/*
+ * ★2026-08-29 追加: 「知らない(null)」を受けたときの振る舞い。
+ *   実機症状「一言が出たり出なかったりする」の直接再現。
+ *   席なし経路が count:0 を渡していたため、発言している人でも一言が消えていた。
+ */
+describe('★count が null（＝まだ数えていない）のとき', () => {
+  it('T4: 時刻さえ分かれば一言が空にならない（症状の直接再現）', () => {
+    const s = buildVenuePresenceNote({ count: null, giftCount: null, lastAt: NOW - 30_000, nowMs: NOW });
+    expect(s).not.toBe('');
+    expect(s).toContain('いま喋っている');
+  });
+
+  it('★回数を言わない（「発言1」の嘘を作らない）', () => {
+    const s = buildVenuePresenceNote({ count: null, giftCount: null, lastAt: NOW - 30_000, nowMs: NOW });
+    expect(s).not.toContain('1回');
+    expect(s).not.toContain('0回');
+    expect(s).not.toMatch(/\d/);
+  });
+
+  it('★時刻も無ければ、存在だけは言う（二級市民にしない）', () => {
+    expect(buildVenuePresenceNote({ count: null, giftCount: null })).toBe('会場に居る');
+  });
+
+  it('★数えた結果ほんとうに0なら黙る（既存契約を壊していないこと）', () => {
+    expect(buildVenuePresenceNote({ count: 0, giftCount: 0 })).toBe('');
+    expect(buildVenuePresenceNote({ count: 0, giftCount: 0, lastAt: NOW - 1000, nowMs: NOW })).toBe('');
+  });
+
+  it('片方だけ分かっている場合も落とさない', () => {
+    expect(buildVenuePresenceNote({ count: null, giftCount: 2 })).toContain('ギフトを2回');
+    expect(buildVenuePresenceNote({ count: 3, giftCount: null })).toContain('ここまで3回');
+  });
+});

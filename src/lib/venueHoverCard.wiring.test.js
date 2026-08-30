@@ -132,7 +132,16 @@ describe('会場ホバープレビューカードの配線(配線忘れ=CI赤)',
     expect(venueBarSrc).toMatch(/const resolveSeatlessHoverData\s*=/);
     expect(venueBarSrc).toMatch(/_laneItemsByTier/);
     const fnAt = venueBarSrc.indexOf('const resolveSeatlessHoverData');
-    const fnBlock = venueBarSrc.slice(fnAt, fnAt + 1600);
+    /*
+     * ★固定長スライス(旧: fnAt + 1600)をやめた（2026-08-29）。
+     *   関数にコメントを足しただけで検査対象の窓から本体がはみ出し、
+     *   ★中身は正しいのにテストが赤くなった。窓が狭いことが原因の赤は
+     *   「直すべきものが無いのに直させる」ので、次の人の時間を奪う。
+     *   ⟹ 次の関数宣言の手前までを本体とみなす（長さに依存しない）。
+     */
+    const afterFn = venueBarSrc.slice(fnAt + 1);
+    const nextDeclAt = afterFn.search(/\n {2}(?:const|let|function) /);
+    const fnBlock = venueBarSrc.slice(fnAt, nextDeclAt > 0 ? fnAt + 1 + nextDeclAt : fnAt + 4000);
     // 段が乗ること(広告/ギフト段のラベル出し分けに必要)。
     expect(fnBlock).toMatch(/tier,?\s*$|tier[,:]/m);
     // 席あり(seatIdx>=0)は対象外にして seat 側の実数を上書きしないこと。
