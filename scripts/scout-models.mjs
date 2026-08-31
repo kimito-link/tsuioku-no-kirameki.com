@@ -268,8 +268,17 @@ async function probeModel(provider, modelId) {
     });
     const ms = Date.now() - started;
     const j = await r.json().catch(() => ({}));
-    const text = j?.choices?.[0]?.message?.content || j?.choices?.[0]?.message?.reasoning_content || '';
-    return { status: r.status, ms, snippet: String(text).slice(0, 80) };
+    // ★2026-08-31 修正: 失敗時は**エラー本文**をsnippetに載せる。
+    //  従来は choices[0].message.content だけを見ており、非200のときは choices が無いので
+    //  **snippetが常に空**だった。その結果「有料化疑い」の判定(paid plan等の文字列マッチ)は
+    //  導入以来一度も発火し得なかった＝死んだ判定だった。実際 2026-08-31 に
+    //  mistral-large-latest が 403 tier_not_allowed になった日、日報は何も警告しなかった。
+    //  プロバイダごとにエラー形が違うので順に拾う（Mistral/OpenAI系は error.message か
+    //  トップレベル message、Cloudflare は errors[].message）。
+    const text = r.ok
+      ? (j?.choices?.[0]?.message?.content || j?.choices?.[0]?.message?.reasoning_content || '')
+      : (j?.error?.message || j?.message || j?.errors?.[0]?.message || JSON.stringify(j).slice(0, 200));
+    return { status: r.status, ms, snippet: String(text).slice(0, 200) };
   } catch (e) {
     return { status: 'error', ms: Date.now() - started, snippet: String(e.message || e).slice(0, 80) };
   }
@@ -459,9 +468,19 @@ async function main() {
     }
     const streak = (health[key]?.probeFailStreak || 0) + 1;
     health[key] = { probeFailStreak: streak, lastSeen: health[key]?.lastSeen || date };
-    if (streak >= 2) {
-      const snippet = String(probe.snippet || '');
-      const kind = /paid plan|workers free plan/i.test(snippet) ? '有料化疑い' : '疎通不能';
+    const snippet = String(probe.snippet || '');
+    // ★2026-08-31: 課金要求(=無料枠から外れた)は **初回で即警告**する。
+    //  従来は streak>=2 一律で、2026-08-31 に mistral-large-latest が
+    //  403 "This model is not available in your subscription tier" (tier_not_allowed)
+    //  になった日、streak=1 のため**日報に一切出なかった**（司令塔が手で叩いて発見）。
+    //  429(容量枯渇)は待てば戻るので2日連続を待つ意味があるが、402/403の課金要求は
+    //  **待っても戻らない**うえ、放置すると会議のたびに必ず落ちる死に枠が席を占める。
+    //  区別して即出しする。tier_not_allowed / subscription tier も判定語に追加
+    //  （従来の paid plan / workers free plan だけでは Mistral の文言を拾えなかった）。
+    const paywalled = /paid plan|workers free plan|tier_not_allowed|subscription tier/i.test(snippet)
+      || probe.status === 402;
+    if (paywalled || streak >= 2) {
+      const kind = paywalled ? '有料化(無料枠から外れた)' : '疎通不能';
       healthAlerts.push({ label: entry.label, streak, probeStatus: probe.status, kind: 'live', liveKind: kind, snippet: snippet.slice(0, 80) });
     }
   }

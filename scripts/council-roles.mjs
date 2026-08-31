@@ -35,6 +35,16 @@ export function roleOf(name) {
   // 散らないよう、critic群のここにまとめる意図）。critic予備はnvidia/deepseek-v4-pro・
   // sambanova/deepseek-v3.1と合わせて3体になるが全て別プロバイダ（恒久ルール5適合）で、
   // かつ前2体がDeepSeek系＝同一系譜のため、非DeepSeek系が入ることで批判の視点が分散する。
+  // ★2026-08-31 追加: magistral-medium だけ lead に分ける。**この行は下の
+  //  "magistral"→critic より前**でなければならない（ifは先勝ち。後ろに置くと
+  //  critic が先に発火して永久に効かない——実際そう書いて実行検証で気づいた）。
+  //  理由: 同日 mistral-large が 403(tier_not_allowed=無料枠から外れた)で死に、
+  //  lead が nvidia/nemotron-3-ultra の2経路だけ＝**実質の頭脳が1種類**に落ちた。
+  //  統括役が単一モデル依存だと、同じ誤り方をしても誰も気づけない。別系譜を確保する。
+  //  実測(統括プロンプト): 200/1924ms、統合と異論を指示どおり出した。2並列も200 OK。
+  //  "magistral" ではなく **"magistral-medium"** で判定するのは、magistral-small を
+  //  critic のまま残すため（小さい方まで lead に持っていくと critic が1体減る）。
+  if (n.includes("magistral-medium")) return "lead";
   if (n.includes("magistral")) return "critic";
   // qwen3-32b は thinking 付き推論モデル → 批判(critic)。汎用 qwen3(発散)より先に判定する。
   if (n.includes("qwen3-32b") || n.includes("qwq")) return "critic";
