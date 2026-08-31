@@ -276,6 +276,17 @@ export const LINEUP = [
   //  両エントリとも liveProbe:true 必須: SambaNovaの規約は「カタログに残ったまま402で
   //  無料枠対象外になる」型（MiniMax-M2.7で実証済み）であり、これはcloudflare/glm-5.2の
   //  有料化と同一の、カタログ照合では原理的に検知不可能なパターンのため。
+  //  ★2026-08-31 再測(11日連続失敗): 200が2体→**1体に減った**(gemma-4-31B-itのみ。
+  //   MiniMax-M2.7が429に転落)。採用中V3.1は12秒間隔で5回叩いて**5回とも429**＝
+  //   会議に呼べば必ず落ちる状態が11日続いている。
+  //   **それでも撤去しない。** 2026-08-25にweight4へ格下げ済みで、critic役は健全な3体
+  //   (groq w1 / mistral w3 / cloudflare w4)が先に並ぶため**実害は既に封じ込め済み**。
+  //   いま撤去しても得るものが無く、容量が戻ったとき自動で復帰する余地を失うだけ。
+  //   ★撤去する条件を明確にする(毎日「日数が伸びた」で迷わないため):
+  //     (a) SambaNovaの**全モデルが429**になる = プロバイダ全体の死。または
+  //     (b) カタログからDeepSeek-V3.1が消える。または
+  //     (c) 402など**課金要求**に変わる(=無料枠から外れた。cloudflare/glm-5.2型)
+  //   429が何日続こうと、200を返すモデルが1体でも同居する限りは容量枯渇であって死ではない。
   //  ★2026-08-27 再測(8日連続失敗): 全7モデル実測で 429×5・200×2(MiniMax-M2.7 / gemma-4-31B-it)。
   //   08-25と**まったく同じパターン**＝キー有効・カタログ在籍・容量枯渇。判定不変で撤去しない。
   //   日数が伸びること自体は新情報ではない（同居する200が消えたら初めて再評価する）。
@@ -347,7 +358,21 @@ export const LINEUP = [
   //  「カタログに残ったまま呼べなくなる」型に該当し得るため、SambaNova・CFと同じ扱いにする。
   //  labelに"large"を含むが weightOf に "large" 判定は無いため誤爆しない（"nvidia"を含めない
   //  のはopenrouter/nemotron採用時と同じ注意点。ここでは"mistral/"プレフィクスなので問題なし）。
-  { label: 'mistral/mistral-large', provider: 'mistral', rawId: 'mistral-large-latest', apiModel: 'mistral-large-latest', opts: {}, requires: ['MI'], liveProbe: true },
+  // ★2026-08-31 撤去→差し替え（mistral/mistral-large → mistral/magistral-medium）:
+  //  mistral-large-latest が **HTTP 403 "This model is not available in your subscription
+  //  tier" (type: tier_not_allowed, code 1910)** を返すようになった。カタログ(/v1/models)には
+  //  在籍したままで、同キーの magistral-small / codestral は 200＝キーの問題ではない。
+  //  ＝「カタログに残ったまま**課金要求で死ぬ**」型（cloudflare/glm-5.2の有料化と同一）。
+  //  mistral-large-2512 も同じ403で、large系は無料枠から丸ごと外れたと判断する。
+  //  **これは撤去する**（SambaNovaの429=容量枯渇とは別物。402/403の課金要求は死）。
+  //  ★放置すると危険だった理由: lead役は nvidia/nemotron-3-ultra-550b と openrouter版が
+  //   **同一モデルの2経路**なので、mistral-largeが死ぬと lead の実質的な頭脳が**1種類**に落ちる。
+  //   統括役が単一モデル依存だと、同じ誤り方をしても誰も気づけない。
+  //  後継に magistral-medium-latest を採用（roleOfに"magistral-medium"→lead判定を追加）:
+  //   実測2並列 200 OK / 2338ms・2638ms、統括プロンプトでも 1924ms で統合＋異論を
+  //   指示どおり出した。別系譜(Mistral)なので lead の頭脳が2種類に戻る。
+  //  不採用: mistral-medium-latest は 200 だが roleOf 上 generalist で lead の穴を埋めない。
+  { label: 'mistral/magistral-medium', provider: 'mistral', rawId: 'magistral-medium-latest', apiModel: 'magistral-medium-latest', opts: {}, requires: ['MI'], liveProbe: true },
   { label: 'mistral/magistral-small', provider: 'mistral', rawId: 'magistral-small-latest', apiModel: 'magistral-small-latest', opts: {}, requires: ['MI'], liveProbe: true },
 
   // 2026-08-11 追加 → 2026-08-13 撤去（mistral/devstral-medium）: devstral-medium-latest → implementの予備。
