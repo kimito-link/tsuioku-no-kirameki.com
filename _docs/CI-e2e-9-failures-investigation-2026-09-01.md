@@ -86,7 +86,7 @@ CIワークフロー(`.github/workflows/ci.yml`)は`xvfb-run`でheaded実行用�
 | 6 | `tests/e2e/timeline-fill-standalone-window.spec.js:28` | 応援タイムラインが下部常設+既定オープンで空白を埋める | dock処理(`docked==='window-bottom'`)は成立するが、`open`制御が非同期`refresh`サイクル依存で`waitForTimeout(2000)`固定待ちが完了前に切れる | `waitForTimeout(2000)`を`expect.poll(() => details.evaluate(el=>el.open), {timeout:15000})`に置換して再実行 |
 | 7 | `tests/e2e/extension-interaction.spec.js:57`（flaky） | モックwatchの埋め込みiframe内で記録チェックがトグルできる | `content-entry.js`のresizeリスナーが150ms後に`renderInlineHostAnchoredToVideo`でiframeごとDOM移動（`insertAdjacentElement`）。テストのiframe内操作とレースし`Frame was detached`が発生 | resize発火後に`waitForTimeout(300)`（150ms debounce超え）を挟むか、`reloadCount`変化が止まるまでpollしてから操作開始 |
 | 8 | `tests/e2e/popup-comment-compose.spec.js:41,95` | watch接続中はコメント送信できて成功文言を返す／強い言い方では言い換えを促す | モックは送信後1.8秒でtextareaをクリアし`input`イベント発火。拡張側`confirmSubmittedCommentAsync`は最大4秒までポーリングするはずだが、実際には「送信確認できませんでした」で失敗。`findVisibleEnabledSubmitForEditor`がモックの送信ボタンを正しく検出できているか要確認（`src/lib/commentPostDom.js`の`findCommentSubmitButton`のスコアリング） | ボタン検出のスコアを実測（`scoreCommentSubmitButton`の戻り値をログ）、confirmProbesの実際の発火タイミングを確認 |
-| 9 | `tests/e2e/popup-double-scroll.spec.js:21` | standalone popupでbody/htmlはスクロールせず.nl-main 1本のみがスクロールする | **6件の根本原因（原因A〜F）をすべて特定・修正済み。popup-window-empty-history-real.spec.js／popup-multitab-empty-dash-rescue.spec.jsを含む3ファイルでローカル緑を確認（下記セクション参照）。** | 実CIでの最終確認が必要 |
+| 9 | `tests/e2e/popup-double-scroll.spec.js:21` | standalone popupでbody/htmlはスクロールせず.nl-main 1本のみがスクロールする | **7件の根本原因（原因A〜G）をすべて特定・修正済み。popup-window-empty-history-real.spec.js／popup-multitab-empty-dash-rescue.spec.js／popup-empty-state-window-height.spec.jsを含む4ファイルでローカル緑を確認（下記セクション参照）。** | 実CIでの最終確認が必要 |
 
 ## popup-double-scroll: 追加調査で判明したこと（2026-09-01 22時台、Claudeセッション継続分）
 
@@ -189,10 +189,42 @@ primary自身の高さのみで、`nl-compose-quick-toolbar`等primaryより前�
 **ローカルで`src/`や`extension/`を編集して`playwright test`を回すときは、必ず先に
 `npm run build`すること**。
 
+### 原因G（確定・修正済み）: `hoistQuickToolbarToTop()`がempty stateでも操作ツールバーを非表示から外していた
+
+原因D〜Fをpush・実CI確認したところ、**目標の3ファイルは緑になったが**、それまで
+このセッションが見ていなかった別の既存テスト`popup-empty-state-window-height.spec.js`
+（履歴ゼロのempty stateでpopup windowが600px前後に縮むことを検証、過去の実ユーザー
+影響バグ「0501-1117ビルドでpopupが逆に拡大した」の回帰ガード）が**新たに失敗**した
+（`outer:903`、期待`695`、差208px）。原因D（primaryBottom計算修正）の副作用だった。
+
+実測（`primaryRectBottom:863.015625`と`bottomOfPoweredBy:863.015625`が一致、
+`primaryScrollHeight:655`との差208px）から、`.nl-comment-compose`（CSS側で
+`html.nl-empty-state body .nl-comment-compose { display:none !important }`により
+非表示になる設計、9865行目付近）の子であるはずの`.nl-compose-quick-toolbar`が、
+**実際には非表示になっていなかった**ことが判明した。
+
+真因は`hoistQuickToolbarToTop()`（v0.1.896「操作ボタン群をパネル上部へ昇格」機能）。
+この関数は`.nl-compose-quick-toolbar`を`.nl-comment-compose`の外、`.nl-main`直下
+（常に表示される場所）へDOM移動させる。`initPopup()`から`emptyState`のガード無しで
+無条件に呼ばれており、empty stateでも操作ツールバーが常時表示の場所に居座り続けていた。
+
+**修正**:
+1. `hoistQuickToolbarToTop()`自体がempty stateでは昇格をスキップする（新規昇格を防ぐ）。
+2. CSS側に`html.nl-empty-state body .nl-compose-quick-toolbar[data-nl-hoisted='top']`
+   の`display:none`ルールを追加（active watch→empty state切り替え時、既に昇格済みの
+   DOMをdata属性で確実に非表示にする、DOM位置に依存しない保険）。
+
 `popup-double-scroll.spec.js`・`popup-window-empty-history-real.spec.js`・
-`popup-multitab-empty-dash-rescue.spec.js`の3ファイルをまとめてローカルで
-`CI=true npx playwright test`実行し、全て`passed`になることを確認済み。
-フルユニットテスト（8972件）も全通過。実CIでの最終確認はこのコミット後に必要。
+`popup-multitab-empty-dash-rescue.spec.js`・`popup-empty-state-window-height.spec.js`
+の4ファイルをまとめてローカルで`CI=true npx playwright test`実行し、全て`passed`に
+なることを確認済み。フルユニットテスト（8972件）も全通過。実CIでの最終確認はこの
+コミット後に必要。
+
+**教訓**: `primaryScrollHeight`から`primaryBottom`（`getBoundingClientRect().bottom`）
+への計算式変更は、それまで「兄弟要素を含まない過小評価」で偶然マスクされていた
+別の不具合（ツールバー非表示漏れ）を顕在化させた。計算式を「より正確」にする修正は、
+既存の不正確な値に依存していた別のロジック・テストに波及することがある——修正後は
+関連しそうな既存specを幅広く実行して確認する必要がある。
 
 ## 共通パターンの気づき
 
