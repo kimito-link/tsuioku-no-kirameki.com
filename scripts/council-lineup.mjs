@@ -482,7 +482,23 @@ export const LINEUP = [
   // 留める。昇格基準: 7日以上空けた実会議2回でFAILEDゼロなら正規化。降格基準: 1回でも429/503が
   // 出たら即撤去。3-pro/3-flash-previewは今回も429継続 or 完全重複のため不採用（詳細は
   // memory/council-llm-lineup-upgrade-2026-07-03.md 参照）。
-  { label: 'gemini-3.5-flash', provider: 'gemini', rawId: 'gemini-3.5-flash', apiModel: 'gemini-3.5-flash', opts: {}, requires: ['E'] },
+  // ★2026-09-01 世代交代（gemini-3.5-flash → gemini-3.6-flash）:
+  //  同一プロバイダ・同一役割(generalist)・同一weight(3)の後継が出たので入れ替える
+  //  （足すとgeminiが3体になり同役の重複が増えるだけで、冗長化にならない）。
+  //  実測(本番と同じ generateContent・2並列を3回):
+  //    3.6 → 3955〜4968ms   3.5(採用中) → 11877〜21149ms
+  //  ＝**3〜4倍速い**。3.5は最大21秒で会議の律速になっていた（会議は並列なので
+  //  1体の遅さが全体を止める。08-27にgroq/qwen3.6→3.8で入れ替えたのと同じ理由）。
+  //  ★不採用にした対抗馬:
+  //   - gemini-3.7-flash: 最新だが2並列で30754ms/14316ms＝3.6より明確に遅い。
+  //     新しい＝速いとは限らない。世代番号でなく実測で選ぶこと。
+  //   - gemini-3.1-pro-preview: **429（無料枠にquotaが割り当てられていない）**。
+  //     proは上位モデルでleadの穴埋め候補になり得たが、無料枠では呼べない＝恒久ルール1違反。
+  //   - gemini-2.5-pro: 404 "no longer available"（提供終了済み）。
+  //  昇格基準は前任から引き継ぐ: 7日以上空けた実会議2回でFAILEDゼロなら正規化。
+  //  降格基準: 1回でも429/503が出たら即撤去（Google無料枠は時期変動が大きい実績あり）。
+  //  旧: { label: 'gemini-3.5-flash', rawId/apiModel: 'gemini-3.5-flash' }（2026-07-04採用）
+  { label: 'gemini-3.6-flash', provider: 'gemini', rawId: 'gemini-3.6-flash', apiModel: 'gemini-3.6-flash', opts: {}, requires: ['E'] },
 
   // 2026-06-?? 追加 → 2026-07-31 撤去（openrouter/gpt-oss-120b）:
   //   本改修でrawIdを空('')から'openai/gpt-oss-120b:free'に埋めた直後の初回実行で
