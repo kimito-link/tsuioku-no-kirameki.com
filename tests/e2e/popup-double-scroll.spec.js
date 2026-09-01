@@ -66,6 +66,18 @@ test('standalone popup: body はスクロールせず .nl-main 1本のみがス�
   if (!page) throw new Error('standalone popup page was not created');
 
   await page.waitForSelector('#nlPopupPrimary', { timeout: 20_000 });
+  // ★nl-popup-windowクラスはchrome.windows.getCurrent()の非同期解決を待って
+  //   付与される（popup-entry.js:15243-15267）。固定スリープだけに頼ると、
+  //   クラス付与前に計測してCSSの580pxキャップが外れていない状態を拾う
+  //   （実測・2026-09-01）。クラス自体の付与を明示的に待つ。
+  await page.waitForFunction(
+    () => document.documentElement.classList.contains('nl-popup-window'),
+    { timeout: 20_000 }
+  );
+  // 描画完了マーカー（popup-window-empty-history-real.spec.jsと同じ確認軸）
+  await expect(
+    page.locator('html[data-nl-popup-content-painted="1"]')
+  ).toBeAttached({ timeout: 15_000 });
   // cloak auto-reveal の完全終了（750ms 以上）を待つ
   await page.waitForTimeout(1200);
 
