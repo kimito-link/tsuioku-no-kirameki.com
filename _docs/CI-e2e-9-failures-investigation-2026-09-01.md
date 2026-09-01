@@ -2,9 +2,17 @@
 
 調査=web-ios-android担当のClaudeセッション（越境作業） / 2026-09-01
 実装（この記録の続き）=Codex に依頼（ユーザー判断：「codexがこういうの得意だから」）だったが、
-Codexが使用制限に達したため、同じClaudeセッションが追加調査を継続（2026-09-01 22時台）。
-popup-double-scroll.spec.jsについて根本原因を3件すべて特定・修正し、**ローカルで緑になることを
-確認済み**（実CIでの最終確認は引き続き必要）。残り8件は未着手のまま引き継ぐ。
+Codexが使用制限に達したため、同じClaudeセッションが追加調査を継続（2026-09-01 22時台〜9-2未明）。
+
+**popup-double-scroll.spec.js・popup-window-empty-history-real.spec.js・
+popup-multitab-empty-dash-rescue.spec.jsの3件は根本原因を特定・修正し、
+ローカルで実行して緑になることを確認済み**（実CIでの最終確認はこの後のpush分で実施予定）。
+8回の推測修正の空振りを経て、最終的に実測ベースで真因（primaryBottom過小評価・
+POPUP_WINDOW_MAX_HEIGHTクランプ誤検知・100vh依存とhtml.clientHeightのDOM仕様）に
+到達した。詳細は下記「popup-double-scroll: 追加調査で判明したこと」節を参照。
+残り6件（multitab-storage-contention・popup-comment-compose×2・popup-layout・
+snapshot-fetch-hang-resilient・support-activity-timeline・timeline-fill-standalone-window）
+は未着手のまま引き継ぐ。
 
 ## 発端
 
@@ -78,7 +86,7 @@ CIワークフロー(`.github/workflows/ci.yml`)は`xvfb-run`でheaded実行用�
 | 6 | `tests/e2e/timeline-fill-standalone-window.spec.js:28` | 応援タイムラインが下部常設+既定オープンで空白を埋める | dock処理(`docked==='window-bottom'`)は成立するが、`open`制御が非同期`refresh`サイクル依存で`waitForTimeout(2000)`固定待ちが完了前に切れる | `waitForTimeout(2000)`を`expect.poll(() => details.evaluate(el=>el.open), {timeout:15000})`に置換して再実行 |
 | 7 | `tests/e2e/extension-interaction.spec.js:57`（flaky） | モックwatchの埋め込みiframe内で記録チェックがトグルできる | `content-entry.js`のresizeリスナーが150ms後に`renderInlineHostAnchoredToVideo`でiframeごとDOM移動（`insertAdjacentElement`）。テストのiframe内操作とレースし`Frame was detached`が発生 | resize発火後に`waitForTimeout(300)`（150ms debounce超え）を挟むか、`reloadCount`変化が止まるまでpollしてから操作開始 |
 | 8 | `tests/e2e/popup-comment-compose.spec.js:41,95` | watch接続中はコメント送信できて成功文言を返す／強い言い方では言い換えを促す | モックは送信後1.8秒でtextareaをクリアし`input`イベント発火。拡張側`confirmSubmittedCommentAsync`は最大4秒までポーリングするはずだが、実際には「送信確認できませんでした」で失敗。`findVisibleEnabledSubmitForEditor`がモックの送信ボタンを正しく検出できているか要確認（`src/lib/commentPostDom.js`の`findCommentSubmitButton`のスコアリング） | ボタン検出のスコアを実測（`scoreCommentSubmitButton`の戻り値をログ）、confirmProbesの実際の発火タイミングを確認 |
-| 9 | `tests/e2e/popup-double-scroll.spec.js:21` | standalone popupでbody/htmlはスクロールせず.nl-main 1本のみがスクロールする | **3件の根本原因すべてを特定・修正済み。ローカルで緑を確認（下記セクション参照）。** | 実CIでの最終確認が必要 |
+| 9 | `tests/e2e/popup-double-scroll.spec.js:21` | standalone popupでbody/htmlはスクロールせず.nl-main 1本のみがスクロールする | **6件の根本原因（原因A〜F）をすべて特定・修正済み。popup-window-empty-history-real.spec.js／popup-multitab-empty-dash-rescue.spec.jsを含む3ファイルでローカル緑を確認（下記セクション参照）。** | 実CIでの最終確認が必要 |
 
 ## popup-double-scroll: 追加調査で判明したこと（2026-09-01 22時台、Claudeセッション継続分）
 
@@ -115,54 +123,76 @@ CIワークフロー(`.github/workflows/ci.yml`)は`xvfb-run`でheaded実行用�
 修正: 他のactive watch系spec（`popup-layout.spec.js`等）と同じパターンで、popupを開く前に
 `context.newPage()`でwatchタブ（`MOCK_WATCH`）を開くようにした。
 
-### 原因C（確定・修正済み）: lastFocused由来の解決が誤って`dataBacked`扱いになりtreatAsNoActiveWatchに巻き込まれていた
+### 原因C（試行→revert済み）: `treatAsNoActiveWatch`修正は別の回帰を生んだため取り下げた
 
-原因A・Bを修正した状態でも、`htmlClass`に依然`nl-empty-state`が残り、`.nl-main`が`display:block`の
-まま（`mainFlex: "0 0 auto"`）で、`scrollH=1163 clientH=720`という新しい超過値で失敗し続けていた。
+一度、`pickWatchUrlFromMultipleSources()`で`lastFocusedUrl`由来の`dataBacked`判定を
+`lastFocusedNormal`に変える修正を入れたが、実CIで**別の既存テスト
+`popup-multitab-empty-dash-rescue.spec.js`（実機の「別タブの記録を誤ってアクティブ表示
+しない」安全設計の回帰ガード）を退行させた**。standalone popup windowでは
+`chrome.tabs.query({active:true, currentWindow:true})`が popup 自身を返す以上、
+「ユーザーが今見ている配信」と「別タブの古い記録」を原理的に区別できず、拡張は
+安全側（empty state）に倒す設計になっている。この修正はその安全設計と矛盾したため
+`git revert`で取り下げた（コミット`a48b09cc`）。
 
-**当初「`lastFocusedNormalActiveTab`が正しく解決されない」という仮説を立てたが、これは誤りだった。**
-SW側から`chrome.windows.getLastFocused({windowTypes:['normal']})`を直接呼ぶタイミング比較テスト
-（popup作成前後の複数タイミング・popup内部/外部の両方）を実施したところ、**全てのタイミング・
-呼び出し元で一貫して正しくwatchタブを返していた**（実測・`zz-debug-lastfocused.spec.js`）。
+代わりに、`popup-double-scroll.spec.js`のテストセットアップ自体を、
+`popup-window-empty-history-real.spec.js`と同じ「IndexedDB (`nls_broadcast_summary_v1`)
+に前回配信サンプルを直接シードし、empty state＝前回配信レビューとして実データを描画させる」
+パターンに書き換えた。これにより「配信中かどうか」ではなく「実データがある状態で二重
+スクロールしないか」という本来の検証目的を、安全設計と衝突せずに検証できるようにした。
 
-真因は`src/lib/popupWatchUrlResolveMultiTab.js`の`pickWatchUrlFromMultipleSources()`の
-優先順位1.5（`liveIdsWithData`によるstandalone混信救済）にあった。このロジックは
-`lastFocusedUrl → storage → candidateUrls`の順で「データのあるlvか」をチェックし、
-**マッチした候補が`lastFocusedUrl`自身であっても、一律で`source: 'dataBacked'`として返していた**
-（`popupWatchUrlResolveMultiTab.test.js`の既存テストも、この挙動を仕様として明記していた）。
+### 原因D・E・F（確定・修正済み・実測で確認）: empty stateの高さ計算が3重に壊れていた
 
-一方`popup-entry.js`の`treatAsNoActiveWatch`は`'storage'`/`'dataBacked'`ソースを意図的に
-「実質アクティブでない」扱いにする設計（別タブの記録を誤ってアクティブ表示しないため）。
-この2つが組み合わさることで、**「ユーザーが今まさに見ている通常ウィンドウの前面タブ
-（`lastFocusedUrl`）に、正当な理由でデータがある」という最も確度の高いケースまで、
-単に「データチェックを先に通っただけ」で低信頼度の`'dataBacked'`経路に格下げされ、
-`treatAsNoActiveWatch`に巻き込まれてempty state扱いになっていた**。
+テストセットアップを書き換えた後も、`popup-double-scroll.spec.js`だけでなく
+**既存の`popup-window-empty-history-real.spec.js`まで同じ「下空白が異常」症状
+（`outerHeight - primaryBottom = -168`）で落ちる**ことが判明し、これが
+`popup-double-scroll.spec.js`固有の問題ではなく共通の根本原因であると分かった。
+以降、実測ベースで8回の修正試行を経て、独立した3つの原因すべてを特定した。
 
-このモックwatchページ（`lv888888888`）は`nls_recording_enabled:true`で記録を開始すると
-実際にコメント25件を`nls_ctail_lv888888888`（テールキー）と`nls_watch_snapshot_lv888888888`
-（スナップショット）に書き込む。`collectDataBackedWatchLvs()`の`hasSnap`判定
-（`watchSnapshotStorageKey`ベース）がこれを正しく拾い、`liveIdsWithData`に`lv888888888`を
-含めていた——つまり「データがある」判定自体は正しく、そのデータが`lastFocusedUrl`由来だった
-ときの`source`の付け方だけが誤っていた。
+**原因D: `viewportHint`計算の過小評価**（`resizePopupWindowForState()`）
+`nlPopupPrimary.scrollHeight`だけを見てウィンドウ目標高を計算していたが、これは
+primary自身の高さのみで、`nl-compose-quick-toolbar`等primaryより前にある兄弟要素の
+高さを含まない（実測: `primaryBottom`が`primary.scrollHeight`より208px大きかった）。
+修正: `primary.getBoundingClientRect().bottom`（ビューポート絶対位置、兄弟要素込み）
+を使うよう変更。
 
-**修正**: `pickWatchUrlFromMultipleSources()`で、優先順位1.5の候補が`lastFocusedUrl`自身に
-マッチした場合は`source`を`'lastFocusedNormal'`のまま返すようにした（`storage`/`candidateUrls`
-由来のときは従来どおり`'dataBacked'`）。既存テスト`popupWatchUrlResolveMultiTab.test.js`の
-該当ケースも新しい正しい仕様に更新（期待値を`'dataBacked'`→`'lastFocusedNormal'`に修正）。
-関連ユニットテスト41件・フルスイート8972件とも全通過。
+**原因E: `POPUP_WINDOW_MAX_HEIGHT`のクランプ誤検知**（`popupWindowEmptyHeight.js`）
+原因D修正で正しい目標高（~1150px級）が計算されるようになった結果、旧上限1100pxに
+張り付き、`popup-window-empty-history-real.spec.js`の「レーン空枠バグ（コンテンツ
+~2245px→outer=1100だった旧バグ）の回帰ガード」が誤検知するようになった。修正:
+上限を1250に緩和し、対応するテスト閾値（`toBeLessThan(1080)`→`toBeLessThan(1200)`）
+も更新。
 
-**ローカル検証で踏んだ別の罠（重要）**: この修正を`src/`に加えた直後、何度再実行しても
-`nl-empty-state`が解消せず数時間ハマった。原因は**`npm run build`し忘れ**——このリポジトリの
-E2Eテストは`extension/dist/popup.js`（ビルド成果物）を読み込む構成で、`src/`への編集は
-`npm run build`しない限りローカルのPlaywright実行には一切反映されない。`grep -c "自分の
-デバッグマーカー" extension/dist/popup.js`で0件だったことで発覚した。実CI（GitHub Actions）は
-ワークフロー内で毎回buildするため影響を受けないが、**ローカルで`src/`を編集して
-`playwright test`を回すときは、必ず先に`npm run build`すること**。
+**原因F: 100vh依存と`html.clientHeight`のDOM仕様**（`extension/popup.html` /
+`popup-double-scroll.spec.js`）
+`html.nl-popup-window`のCSSが`height/max-height: min(var(--nl-pop-height), 100vh)`
+としていたが、`chrome.windows.update()`後、**Playwright headless/CI環境で
+`window.innerHeight`（=`100vh`の基準）が新ウィンドウ高に追従しないことがあり**、
+`100vh`側の古い値（リサイズ前の`720px`）に永続的にクランプされ続けていた
+（`--nl-pop-height`をどれだけ大きくしても`min()`が`100vh`側を選び続ける）。
+修正: `--nl-pop-height`のみを信頼する形（`100vh`を使わない）に変更。
 
-`tests/e2e/popup-double-scroll.spec.js`をローカルで`CI=true npx playwright test`実行し、
-2件とも`passed`になることを確認済み（`scrollH`は依然大きい値だが、`.nl-main`が正しく
-flex化され1本のスクロールに収まっているため、テストの意図する「縦スクロール要素は1つだけ」
-という条件は満たされる）。実CIでの最終確認はこのコミット後に必要。
+さらに、この修正後も`popup-double-scroll.spec.js`だけが`clientH=720`で失敗し続けた。
+実測したところ`html.offsetHeight`（1123px、正しい）と`getComputedStyle(html).height`
+（1122.84px、正しい）は正常なのに、**`html.clientHeight`（`document.documentElement
+.clientHeight`）だけが`window.innerHeight`と同じ値（720px）に固定されたまま**だった。
+これは拡張のバグではなく、**CSSOM View仕様上`document.documentElement.clientHeight`が
+実レイアウト結果ではなくビューポートサイズを返す既知の挙動**（`html`要素固有、`body`
+要素等では発生しない）。修正: テスト側の`html`溢れ判定を`html.clientHeight`から
+`html.offsetHeight`に変更。
+
+**ローカル検証で踏んだ別の罠（重要）**: 原因C〜Fの調査中、修正を`src/`に加えた直後、
+何度再実行しても症状が変わらず数時間ハマった。原因は**`npm run build`し忘れ**——
+このリポジトリのE2Eテストは`extension/dist/popup.js`（ビルド成果物）を読み込む構成で、
+`src/`への編集は`npm run build`しない限りローカルのPlaywright実行には一切反映されない。
+`grep -c "自分のデバッグマーカー" extension/dist/popup.js`で0件だったことで発覚した。
+実CI（GitHub Actions）はワークフロー内で毎回buildするため影響を受けないが、
+**ローカルで`src/`や`extension/`を編集して`playwright test`を回すときは、必ず先に
+`npm run build`すること**。
+
+`popup-double-scroll.spec.js`・`popup-window-empty-history-real.spec.js`・
+`popup-multitab-empty-dash-rescue.spec.js`の3ファイルをまとめてローカルで
+`CI=true npx playwright test`実行し、全て`passed`になることを確認済み。
+フルユニットテスト（8972件）も全通過。実CIでの最終確認はこのコミット後に必要。
 
 ## 共通パターンの気づき
 
@@ -172,18 +202,24 @@ flex化され1本のスクロールに収まっているため、テストの意
 ロジックの優先順位・クロックスキュー・DOM再アンカリングのタイミング・ボタン検出ロジック）
 であり、**一括修正できる単一原因ではない**。9件を1つの原因のせいにしないこと。
 
-## 推奨する進め方（このセッションからの提案）
+## 推奨する進め方（残り6件への引き継ぎ）
 
-1. **診断ログを先に仕込み、1回のCI実行で複数件の実測データをまとめて取得する**アプローチを
-   推奨する。12分×N回のCI待ちを繰り返さないため。具体的には、失敗しやすい9件それぞれに
-   `test.info().annotations.push()`で診断情報（実際の値・タイミング）を追加してから
-   一度にpush・CI実行し、実測結果を見てから本当に効く修正を1件ずつ確定させる。
-2. 1件直すごとに実CIで確認する場合も、**修正は1件ずつ**入れること（今回のセッションのように
-   複数の仮説を積み重ねてから確認すると、どれが効いてどれが効いていないか切り分けられなくなる）。
-3. PR #247には既にheadless修正とpopup-double-scrollの2回の試行が積まれている。
-   popup-double-scrollの2回の試行は効果が確認できていないため、**新しい仮説（#9の
-   「実際のレイアウト不具合」説）で書き直すか、いったんrevertしてから再着手する**ことも検討する。
-4. 9件全て緑になったら、PR #247をマージする（マージの実行はユーザーに確認してから）。
+popup-double-scroll / popup-window-empty-history-real / popup-multitab-empty-dash-rescue
+の3件は解決した。残る6件（`multitab-storage-contention` / `popup-comment-compose`×2 /
+`popup-layout` / `snapshot-fetch-hang-resilient` / `support-activity-timeline` /
+`timeline-fill-standalone-window`）はこのセッションでは未着手。
+
+1. **ローカルでの検証は必ず`npm run build`してから行う**（このセッションが数時間ハマった罠。
+   `extension/dist/popup.js`にデバッグマーカーが実際に入っているかを`grep`で確認する癖をつける）。
+2. **診断ログを先に仕込み、1回のCI実行で複数件の実測データをまとめて取得する**アプローチを
+   推奨する。12分×N回のCI待ちを繰り返さないため。
+3. 1件直すごとに実CIで確認する場合も、**修正は1件ずつ**入れること。複数の仮説を積み重ねてから
+   確認すると、どれが効いてどれが効いていないか切り分けられなくなる（このセッションは
+   popup-double-scroll系で8回の試行を要した）。
+4. **既存の他テストへの影響を必ず確認する**（このセッションはtreatAsNoActiveWatchの修正で
+   一度popup-multitab-empty-dash-rescue.spec.jsを退行させ、revertした）。修正前後で
+   関連しそうな既存specもまとめて実行し、意図しない回帰がないか確認する。
+5. 9件全て緑になったら、PR #247をマージする（マージの実行はユーザーに確認してから）。
 
 ## 既知の環境固有の注意点（このセッションで踏んだ地雷）
 
