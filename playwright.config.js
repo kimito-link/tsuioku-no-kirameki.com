@@ -33,7 +33,13 @@ export default defineConfig({
   timeout: 120_000,
   expect: { timeout: 15_000 },
   use: {
-    headless: process.env.CI === 'true' || process.env.PW_HEADLESS === '1',
+    // ★拡張機能テストはheaded実行が前提（16行目コメント参照）。CIも xvfb-run で
+    //   仮想ディスプレイを用意しheaded実行させているため、CI=trueでheadlessを
+    //   強制してはならない（2026-08-18〜9-1の20連続CI失敗の根本原因だった。
+    //   headless: true だと Chromium の拡張機能ロード・service worker起動・
+    //   iframe描画のタイミングがheaded実行と系統的にずれ、9件のE2Eが軒並み
+    //   タイムアウトしていた）。headlessにしたい場合のみ明示的にPW_HEADLESS=1を渡す。
+    headless: process.env.PW_HEADLESS === '1',
     reducedMotion: 'reduce',
     trace: 'on-first-retry'
   },
