@@ -13059,6 +13059,9 @@ function relocateSupportTimelineForStandaloneWindow() {
  *   - 冪等(既に目的位置の直前にあれば no-op)。元の compose にはコメント送信ボタンが残る(自然)。
  */
 function hoistQuickToolbarToTop() {
+  // ★empty stateでは.nl-comment-compose(親)がCSS非表示になる設計だが、この関数はツールバーを
+  //   .nl-main直下へDOM移動させ非表示から外してしまう（実測で発覚）。empty stateでは昇格しない。
+  if (document.documentElement.classList.contains('nl-empty-state')) return;
   const toolbar = /** @type {HTMLElement|null} */ (document.querySelector('.nl-compose-quick-toolbar'));
   const main = /** @type {HTMLElement|null} */ (document.querySelector('.nl-main'));
   if (!(toolbar instanceof HTMLElement) || !(main instanceof HTMLElement)) return;
@@ -15199,13 +15202,10 @@ async function resizePopupWindowForState(input) {
 
     // 0.1.73 (BC): empty state は CSS で body cap を解除し、content の高さに
     //   合わせて body を伸ばすようにした。よって `nlPopupPrimary.scrollHeight`
-    //   が「実際に見せるべき content の高さ」になる。これに OS chrome 余裕 40px
-    //   を足して outer height とする。
-    //   primary を使う理由: body.scrollHeight は body cap 580 で止まるが（後方互換
-    //   のため CSS cap は default 残す）、primary は cap がかかっていないので
-    //   生の content 高さが取れる。
-    //
-    //   active watch (emptyState=false) は preset 780 のまま。
+    //   が「実際に見せるべき content の高さ」になる。これに OS chrome 余裕 40px を足して
+    //   outer height とする。primaryを使う理由: body.scrollHeightはbody cap 580で止まるが
+    //   （後方互換のためCSS capはdefault残す）、primaryはcapがかかっていないので生のcontent
+    //   高さが取れる。active watch (emptyState=false) は preset 780 のまま。
     /** @type {{ contentHeightPx: number, chromeOverheadPx: number }|undefined} */
     let viewportHint = undefined;
     if (emptyState) {

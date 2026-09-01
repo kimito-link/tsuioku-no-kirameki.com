@@ -9868,7 +9868,13 @@
       html.nl-empty-state body .nl-gift-quick-panel,
       html.nl-empty-state body .nl-score-panel-details,
       html.nl-empty-state body .nl-record-nav-hint,
-      html.nl-empty-state body .nl-dev-monitor-details {
+      html.nl-empty-state body .nl-dev-monitor-details,
+      /* ★2026-09-01: hoistQuickToolbarToTop() が .nl-compose-quick-toolbar を
+         .nl-comment-compose の外（.nl-main 直下）へ DOM 移動させるため、上の
+         .nl-comment-compose 非表示ルールが効かなくなる。active watch から
+         empty state へ切り替わった直後、まだ昇格済み DOM のままの場合に備え、
+         data-nl-hoisted マーカーを直接見て非表示にする（DOM 位置に依存しない）。 */
+      html.nl-empty-state body .nl-compose-quick-toolbar[data-nl-hoisted='top'] {
         display: none !important;
       }
 
