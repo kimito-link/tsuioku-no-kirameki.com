@@ -288,10 +288,18 @@
        * win.type==='popup' のときだけ付与）ため、従来の 580px cap を維持する。
        * nl-popup-window は :not(.nl-inline) と両立（inline 埋め込みには付かない）。
        */
+      /* ★2026-09-01: 100vh は resizePopupWindowForState() の chrome.windows.update() 後、
+         Playwright headless/CI 環境で window.innerHeight（= 1vh の基準）が実ウィンドウの
+         新しい高さに追従しないことがあり、その場合 100vh が古いビューポート高に固定され
+         min() が常にそちらを選んで html/body が実ウィンドウ高まで広がらず二重スクロール
+         になる（実測: outerHeight 1153px でも 100vh=720px のままで clientHeight が
+         720px に頭打ち）。standalone window では --nl-pop-height を実測値で明示的に
+         同期させている（applyResponsivePopupLayoutImpl / waitForWindowResizeThenSyncPopHeight）
+         ため、100vh でのクランプは不要。--nl-pop-height だけを信頼する。 */
       html.nl-popup-window,
       html.nl-popup-window body {
-        height: min(var(--nl-pop-height), 100vh);
-        max-height: 100vh;
+        height: var(--nl-pop-height);
+        max-height: var(--nl-pop-height);
       }
 
       /* 親 iframe の高さ内に収め、はみ出しは内側スクロール（820px 級の白塔を防ぐ） */

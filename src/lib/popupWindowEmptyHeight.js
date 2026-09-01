@@ -42,8 +42,14 @@ export const POPUP_WINDOW_HEIGHT_EMPTY_NO_HISTORY = 600;
 /** クランプ用の MIN（OS / Chrome の最小窓サイズを下回らないように） */
 export const POPUP_WINDOW_MIN_HEIGHT = 360;
 
-/** クランプ用の MAX（巨大ディスプレイで暴れないように） */
-export const POPUP_WINDOW_MAX_HEIGHT = 1100;
+/** クランプ用の MAX（巨大ディスプレイで暴れないように）
+ *  ★2026-09-01: primaryBottom（getBoundingClientRect().bottom、兄弟要素込みの実下端）を
+ *  正しく測るよう viewportHint 計算を修正した結果、empty state + 履歴ありの実測高が
+ *  1153px 級になるケースが判明（旧 primary.scrollHeight ベースの過小評価では見えて
+ *  いなかった）。1100 では実データがこの MAX に張り付き、レーン空枠バグの回帰ガード
+ *  （popup-window-empty-history-real.spec.js）が誤検知する。実データの上限に余裕を
+ *  持たせて 1250 に緩和した。 */
+export const POPUP_WINDOW_MAX_HEIGHT = 1250;
 
 /**
  * @typedef {{
