@@ -1,4 +1,5 @@
 import { test, expect } from './fixtures.js';
+import { E2E_MOCK_WATCH_URL as MOCK_WATCH } from './constants.js';
 
 /*
  * ユーザー報告「Chromeのアイコンを押したポップアップでスクロールバーが2つも出る」の再現と検証。
@@ -23,18 +24,53 @@ test('standalone popup: body はスクロールせず .nl-main 1本のみがス�
 }) => {
   const base = await extensionBasePath(context);
   const popupUrl = `${base}/popup.html`;
-  // データ入り状態: 応援ランキング・記録件数など content が埋まった状態で double-scroll が出るか
   const sw = context
     .serviceWorkers()
     .find((w) => w.url().startsWith('chrome-extension://'));
   if (sw) {
-    await sw.evaluate(async () => {
-      await chrome.storage.local.set({
-        nls_recording_enabled: true,
-        nls_usage_terms_ack_ver: 1
-      });
-    });
+    await sw.evaluate(
+      async (watchUrl) => {
+        await chrome.storage.local.set({
+          nls_recording_enabled: true,
+          nls_usage_terms_ack_ver: 1,
+          // ★nls_last_watch_url は popup-layout.spec.js に倣って投入しているが、
+          //   単体では active watch 状態を保証しない（下のコメント参照）。
+          nls_last_watch_url: watchUrl
+        });
+      },
+      MOCK_WATCH
+    );
   }
+  // ★データ入り状態（応援ランキング・記録件数など content が埋まった状態）で
+  //   double-scroll を再現するには、popup を開く前に active な watch タブが
+  //   必要。無いと popup 側は「配信中のタブが見つからない」と判定して
+  //   empty state（nl-empty-state / nl-empty-no-history）に倒れ、
+  //   html.nl-popup-window:not(.nl-empty-state) 系の CSS（.nl-main を
+  //   flex 化して残余高を割り当てる規則）が丸ごと無効化されたまま
+  //   実データを描画することになり、意図しない高さで溢れる
+  //   （実測・2026-09-01: .nl-main が display:block のまま 855px の
+  //   コンテンツを描画し、3回の popup 側修正では直らなかった。真因は
+  //   このテストの watch タブ不足だった）。他の active watch 系 spec
+  //   （popup-layout.spec.js 等）と同じく、先に watch タブを開いてから
+  //   popup を開く。
+  //
+  //   ★2026-09-01 追加調査（未解決）: watch タブを開いても、standalone popup
+  //   window 内部の chrome.tabs.query({active:true, currentWindow:true}) は
+  //   popup 自身を currentWindow とみなすため必ず popup 自身の URL を返し、
+  //   pickWatchUrlFromMultipleSources の優先順位 1（activeTab）はヒットしない。
+  //   優先順位 3（storage の nls_last_watch_url）でも解決できるが、
+  //   popup-entry.js の treatAsNoActiveWatch 判定はソースが 'storage' /
+  //   'dataBacked' の場合を意図的に「実質アクティブでない」扱いにする設計
+  //   （他タブの記録を誤ってアクティブ表示しないため）。つまりこのテストが
+  //   意図する「standalone popup window で active watch の実データ」は、
+  //   実際の OS レベルのウィンドウフォーカス（優先順位 2、
+  //   lastFocusedNormalActiveTab）が正しく解決される場合にしか成立せず、
+  //   Playwright 環境でそれを確実に再現できるかは未検証。詳細は
+  //   _docs/CI-e2e-9-failures-investigation-2026-09-01.md の
+  //   「popup-double-scroll: 追加調査で判明したこと」節（原因C）を参照。
+  const watch = await context.newPage();
+  await watch.goto(MOCK_WATCH, { waitUntil: 'load', timeout: 60_000 });
+
   // ★page.goto()で直接開くだけだと、chrome.windows.getCurrent()のtypeが'popup'に
   //   ならず、popup-entry.jsのnl-popup-windowクラス付与ロジック(win.type!=='popup'で
   //   early return)が発火しない。すると html:not(.nl-inline) の580pxキャップが

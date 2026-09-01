@@ -1098,9 +1098,22 @@ function applyResponsivePopupLayout() {
    * アクションポップアップの実効表示は多くの環境で ~600px 未満。それより高い html/body を
    * 固定するとウィンドウ外枠のスクロールと .nl-main のスクロールが二重になる。
    * main.scrollHeight を外枠に足すのはスクロール領域の全文高になり得るため使わない。
+   *
+   * ★standalone popup window（chrome.windows.create({type:'popup'})、resizePopupWindowForState()
+   *   が nl-popup-window クラスを付与し --nl-pop-height を実ウィンドウ高に設定する）では
+   *   この 580px cap を適用してはならない。適用すると、この関数は refresh() 完了のたびに
+   *   （safeRefresh() の finally から）再実行されるため、resizePopupWindowForState() が
+   *   一度だけ設定した実ウィンドウ高を毎回 580px に巻き戻してしまい、standalone window の
+   *   下に大きな空白＋.nl-main の二重スクロールが再発する（popup-double-scroll.spec.js が
+   *   3 回の修正試行後も一貫して scrollH=873 clientH=720 で落ち続けていた根本原因。
+   *   実測・2026-09-01）。action popup（ツールバーのドロップダウン）には nl-popup-window が
+   *   付かないため、cap は従来どおり適用される。
    */
+  const isStandaloneWindow = document.documentElement.classList.contains('nl-popup-window');
   const CHROME_ACTION_POPUP_MAX_HEIGHT_PX = 580;
-  const height = Math.min(CHROME_ACTION_POPUP_MAX_HEIGHT_PX, baseHeight);
+  const height = isStandaloneWindow
+    ? baseHeight
+    : Math.min(CHROME_ACTION_POPUP_MAX_HEIGHT_PX, baseHeight);
   const baseFont =
     width >= 500
       ? 16.25
