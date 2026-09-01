@@ -3,8 +3,8 @@
 調査=web-ios-android担当のClaudeセッション（越境作業） / 2026-09-01
 実装（この記録の続き）=Codex に依頼（ユーザー判断：「codexがこういうの得意だから」）だったが、
 Codexが使用制限に達したため、同じClaudeセッションが追加調査を継続（2026-09-01 22時台）。
-popup-double-scroll.spec.jsについて根本原因を2件確定・修正し、3件目（下記「新たに判明した
-問題」）を発見したが未解決のまま引き継ぐ。
+popup-double-scroll.spec.jsについて根本原因を3件すべて特定・修正し、**ローカルで緑になることを
+確認済み**（実CIでの最終確認は引き続き必要）。残り8件は未着手のまま引き継ぐ。
 
 ## 発端
 
@@ -78,7 +78,7 @@ CIワークフロー(`.github/workflows/ci.yml`)は`xvfb-run`でheaded実行用�
 | 6 | `tests/e2e/timeline-fill-standalone-window.spec.js:28` | 応援タイムラインが下部常設+既定オープンで空白を埋める | dock処理(`docked==='window-bottom'`)は成立するが、`open`制御が非同期`refresh`サイクル依存で`waitForTimeout(2000)`固定待ちが完了前に切れる | `waitForTimeout(2000)`を`expect.poll(() => details.evaluate(el=>el.open), {timeout:15000})`に置換して再実行 |
 | 7 | `tests/e2e/extension-interaction.spec.js:57`（flaky） | モックwatchの埋め込みiframe内で記録チェックがトグルできる | `content-entry.js`のresizeリスナーが150ms後に`renderInlineHostAnchoredToVideo`でiframeごとDOM移動（`insertAdjacentElement`）。テストのiframe内操作とレースし`Frame was detached`が発生 | resize発火後に`waitForTimeout(300)`（150ms debounce超え）を挟むか、`reloadCount`変化が止まるまでpollしてから操作開始 |
 | 8 | `tests/e2e/popup-comment-compose.spec.js:41,95` | watch接続中はコメント送信できて成功文言を返す／強い言い方では言い換えを促す | モックは送信後1.8秒でtextareaをクリアし`input`イベント発火。拡張側`confirmSubmittedCommentAsync`は最大4秒までポーリングするはずだが、実際には「送信確認できませんでした」で失敗。`findVisibleEnabledSubmitForEditor`がモックの送信ボタンを正しく検出できているか要確認（`src/lib/commentPostDom.js`の`findCommentSubmitButton`のスコアリング） | ボタン検出のスコアを実測（`scoreCommentSubmitButton`の戻り値をログ）、confirmProbesの実際の発火タイミングを確認 |
-| 9 | `tests/e2e/popup-double-scroll.spec.js:21` | standalone popupでbody/htmlはスクロールせず.nl-main 1本のみがスクロールする | **2件は根本原因を特定・修正済み（下記セクション参照）。3件目が未解決で残る。** | 下記「popup-double-scroll: 追加調査で判明したこと」参照 |
+| 9 | `tests/e2e/popup-double-scroll.spec.js:21` | standalone popupでbody/htmlはスクロールせず.nl-main 1本のみがスクロールする | **3件の根本原因すべてを特定・修正済み。ローカルで緑を確認（下記セクション参照）。** | 実CIでの最終確認が必要 |
 
 ## popup-double-scroll: 追加調査で判明したこと（2026-09-01 22時台、Claudeセッション継続分）
 
@@ -115,45 +115,54 @@ CIワークフロー(`.github/workflows/ci.yml`)は`xvfb-run`でheaded実行用�
 修正: 他のactive watch系spec（`popup-layout.spec.js`等）と同じパターンで、popupを開く前に
 `context.newPage()`でwatchタブ（`MOCK_WATCH`）を開くようにした。
 
-### 原因C（未解決・引き継ぎ）: standalone popup windowは`nls_last_watch_url`経由でも意図的にempty state扱いになる
+### 原因C（確定・修正済み）: lastFocused由来の解決が誤って`dataBacked`扱いになりtreatAsNoActiveWatchに巻き込まれていた
 
 原因A・Bを修正した状態でも、`htmlClass`に依然`nl-empty-state`が残り、`.nl-main`が`display:block`の
-まま（`mainFlex: "0 0 auto"`）で、`scrollH=1163 clientH=720`という新しい超過値で失敗し続けている
-（実測・`tests/e2e/popup-double-scroll.spec.js`を`--retries=0`で単体実行して確認）。
+まま（`mainFlex: "0 0 auto"`）で、`scrollH=1163 clientH=720`という新しい超過値で失敗し続けていた。
 
-原因を`src/lib/popupWatchUrlResolveMultiTab.js`の`pickWatchUrlFromMultipleSources()`と
-`popup-entry.js`の`treatAsNoActiveWatch`判定（15795行目付近）まで遡って特定した:
+**当初「`lastFocusedNormalActiveTab`が正しく解決されない」という仮説を立てたが、これは誤りだった。**
+SW側から`chrome.windows.getLastFocused({windowTypes:['normal']})`を直接呼ぶタイミング比較テスト
+（popup作成前後の複数タイミング・popup内部/外部の両方）を実施したところ、**全てのタイミング・
+呼び出し元で一貫して正しくwatchタブを返していた**（実測・`zz-debug-lastfocused.spec.js`）。
 
-1. popup内部の`chrome.tabs.query({active:true, currentWindow:true})`は、standalone popup window
-   自身を`currentWindow`とみなすため、**必ずpopup自身のURLを返す**（`chrome-extension://...`）。
-   これはコード内コメント（15464行目）にも明記された既知の制約。よって優先順位1
-   （`activeTab`直接マッチ）は原理上ヒットしない。
-2. 優先順位2（`lastFocusedNormalActiveTab`、`chrome.windows.getLastFocused({windowTypes:['normal']})`
-   から取得）は、SW側から直接呼ぶと正しくwatchタブを返す（実測で確認済み）が、popup内部の
-   `refresh()`から呼ばれるタイミングでは効かない場合がある。
-3. `nls_last_watch_url`をstorageに投入すると優先順位3（`storage`ソース）でURLは解決されるが、
-   **`treatAsNoActiveWatch`はソースが`'storage'`または`'dataBacked'`の場合を意図的に
-   「実質アクティブでない」扱いにする**設計になっている（15795〜15801行目付近のコメント:
-   「別の watch タブの記録を、フルのアクティブ表示として誤表示させないため」）。
+真因は`src/lib/popupWatchUrlResolveMultiTab.js`の`pickWatchUrlFromMultipleSources()`の
+優先順位1.5（`liveIdsWithData`によるstandalone混信救済）にあった。このロジックは
+`lastFocusedUrl → storage → candidateUrls`の順で「データのあるlvか」をチェックし、
+**マッチした候補が`lastFocusedUrl`自身であっても、一律で`source: 'dataBacked'`として返していた**
+（`popupWatchUrlResolveMultiTab.test.js`の既存テストも、この挙動を仕様として明記していた）。
 
-つまり、このテストが再現しようとしている「standalone popup windowでactive watchの実データを
-表示する」という状態は、**この拡張の設計では実際のOSレベルのウィンドウフォーカス
-（`lastFocusedNormalActiveTab`が正しく解決される状態）でしか成立しない**。Playwrightの
-自動化環境（`launchPersistentContext`、`focused:false`でpopup windowを作成）でこれを
-確実に再現できるかは未検証。
+一方`popup-entry.js`の`treatAsNoActiveWatch`は`'storage'`/`'dataBacked'`ソースを意図的に
+「実質アクティブでない」扱いにする設計（別タブの記録を誤ってアクティブ表示しないため）。
+この2つが組み合わさることで、**「ユーザーが今まさに見ている通常ウィンドウの前面タブ
+（`lastFocusedUrl`）に、正当な理由でデータがある」という最も確度の高いケースまで、
+単に「データチェックを先に通っただけ」で低信頼度の`'dataBacked'`経路に格下げされ、
+`treatAsNoActiveWatch`に巻き込まれてempty state扱いになっていた**。
 
-**次に試すべきこと（未検証の仮説）**:
-- `chrome.windows.create`の`focused:false`を`focused:true`に変えてpopup windowを開いた場合に、
-  `getLastFocused`が通常windowを正しく返すようになるか（現状`focused:false`で開いているため、
-  popup自身がフォーカスされないぶん通常windowのフォーカスは保たれるはずだが、実際に
-  `lastFocusedNormalActiveTab`がどう解決されているか未確認）
-- `popup-entry.js`の`refresh()`内で`lastFocusedNormalActiveTab`の実際の値をログ出力し、
-  なぜ優先順位2でヒットしないのかを直接確認する（SW側から呼んだ`getLastFocused`とpopup内部の
-  `refresh()`が呼ぶものとで結果が違う可能性がある）
-- そもそも`treatAsNoActiveWatch`が`'storage'`/`'dataBacked'`ソースを弾く設計は意図的なので、
-  テスト側で「本物のOSフォーカス状態」を再現する方向ではなく、テスト用に
-  `lastFocusedNormalActiveTab`相当のモックを注入できる経路を拡張側に用意する方が
-  筋が良い可能性がある（ただし本番コードにテスト専用分岐を増やすことになるので要検討）
+このモックwatchページ（`lv888888888`）は`nls_recording_enabled:true`で記録を開始すると
+実際にコメント25件を`nls_ctail_lv888888888`（テールキー）と`nls_watch_snapshot_lv888888888`
+（スナップショット）に書き込む。`collectDataBackedWatchLvs()`の`hasSnap`判定
+（`watchSnapshotStorageKey`ベース）がこれを正しく拾い、`liveIdsWithData`に`lv888888888`を
+含めていた——つまり「データがある」判定自体は正しく、そのデータが`lastFocusedUrl`由来だった
+ときの`source`の付け方だけが誤っていた。
+
+**修正**: `pickWatchUrlFromMultipleSources()`で、優先順位1.5の候補が`lastFocusedUrl`自身に
+マッチした場合は`source`を`'lastFocusedNormal'`のまま返すようにした（`storage`/`candidateUrls`
+由来のときは従来どおり`'dataBacked'`）。既存テスト`popupWatchUrlResolveMultiTab.test.js`の
+該当ケースも新しい正しい仕様に更新（期待値を`'dataBacked'`→`'lastFocusedNormal'`に修正）。
+関連ユニットテスト41件・フルスイート8972件とも全通過。
+
+**ローカル検証で踏んだ別の罠（重要）**: この修正を`src/`に加えた直後、何度再実行しても
+`nl-empty-state`が解消せず数時間ハマった。原因は**`npm run build`し忘れ**——このリポジトリの
+E2Eテストは`extension/dist/popup.js`（ビルド成果物）を読み込む構成で、`src/`への編集は
+`npm run build`しない限りローカルのPlaywright実行には一切反映されない。`grep -c "自分の
+デバッグマーカー" extension/dist/popup.js`で0件だったことで発覚した。実CI（GitHub Actions）は
+ワークフロー内で毎回buildするため影響を受けないが、**ローカルで`src/`を編集して
+`playwright test`を回すときは、必ず先に`npm run build`すること**。
+
+`tests/e2e/popup-double-scroll.spec.js`をローカルで`CI=true npx playwright test`実行し、
+2件とも`passed`になることを確認済み（`scrollH`は依然大きい値だが、`.nl-main`が正しく
+flex化され1本のスクロールに収まっているため、テストの意図する「縦スクロール要素は1つだけ」
+という条件は満たされる）。実CIでの最終確認はこのコミット後に必要。
 
 ## 共通パターンの気づき
 
