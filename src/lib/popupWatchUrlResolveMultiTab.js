@@ -44,7 +44,14 @@
  *   1. activeTab.url が niconico watch URL
  *      （INLINE_MODE で popup が前面 watch タブ内 iframe の場合の従来経路）
  *   1.5 （standalone のみ）candidateUrls / lastFocused / storage のうち
- *       「liveIdsWithData に含まれる lv」を持つ最初の watch URL（混信時にデータのある配信へ）
+ *       「liveIdsWithData に含まれる lv」を持つ最初の watch URL（混信時にデータのある配信へ）。
+ *       ★2026-09-01 修正: このとき候補が lastFocusedNormalActiveTab.url そのものであれば
+ *       source は 'lastFocusedNormal' のまま返す（'dataBacked' に格下げしない）。
+ *       lastFocusedUrl は self-tab 相当の信頼度を持つ情報源であり、単に「データがあるか」
+ *       を先にチェックしただけで低信頼度の 'dataBacked' 経路に混ぜると、呼び出し側
+ *       （popup-entry.js の treatAsNoActiveWatch）が 'storage'/'dataBacked' を意図的に
+ *       empty state 扱いにする設計と衝突し、正当にデータのある watch タブまで
+ *       empty state に落ちる（実測・popup-double-scroll.spec.js）。
  *   2. lastFocusedNormalActiveTab.url が niconico watch URL
  *      （standalone popup → 通常 window のアクティブタブ）
  *   3. lastWatchUrlRaw（storage `nls_last_watch_url`、複数タブで last-write-wins）
@@ -137,12 +144,28 @@ export function pickWatchUrlFromMultipleSources(input) {
       : [];
     // 評価順: lastFocused → storage → その他の開いている watch タブ。
     // 同じく watch URL かつ liveIdsWithData に含まれる lv を持つ最初の候補を採用。
-    const ordered = [lastFocusedUrl, stashed, ...extraCandidates];
-    for (const cand of ordered) {
+    //
+    // ★lastFocusedUrl 自身がここでマッチした場合は source を 'lastFocusedNormal' の
+    //   ままにする（'dataBacked' にしない）。lastFocusedUrl は「ユーザーが今まさに
+    //   見ている通常ウィンドウの前面タブ」という self-tab 相当の信頼度を持つ情報源
+    //   であり、優先順位 2 で単独評価しても同じ URL・同じ結果に到達する。単に
+    //   「データがあるかどうか」を先にチェックしただけで信頼度の低い 'dataBacked'
+    //   （他タブの記録を誤って拾う経路）に格下げしてしまうと、standalone popup
+    //   window で「ユーザーが今見ている配信に正当にデータがある」という最も確度の
+    //   高いケースまで treatAsNoActiveWatch に巻き込まれる（実測・2026-09-01:
+    //   popup-double-scroll.spec.js で lastFocusedUrl が watch タブを正しく指して
+    //   いるにも関わらず、liveIdsWithData に一致したため 'dataBacked' 扱いになり
+    //   empty state に落ちていた）。
+    const ordered = [
+      { url: lastFocusedUrl, source: /** @type {WatchUrlSource} */ ('lastFocusedNormal') },
+      { url: stashed, source: /** @type {WatchUrlSource} */ ('dataBacked') },
+      ...extraCandidates.map((url) => ({ url, source: /** @type {WatchUrlSource} */ ('dataBacked') }))
+    ];
+    for (const { url: cand, source } of ordered) {
       if (!isNicoLiveWatchUrl(cand)) continue;
       const lv = String(extractLiveIdFromUrl(cand) || '').trim().toLowerCase();
       if (lv && liveIdsWithData.has(lv)) {
-        return { url: cand, source: 'dataBacked' };
+        return { url: cand, source };
       }
     }
   }

@@ -180,7 +180,13 @@ describe('pickWatchUrlFromMultipleSources', () => {
       expect(r.source).toBe('dataBacked');
     });
 
-    it('lastFocused 自体がデータのある lv → lastFocused を dataBacked として採用（storage の空 lv に負けない）', () => {
+    it('lastFocused 自体がデータのある lv → lastFocused を lastFocusedNormal として採用（storage の空 lv に負けず、treatAsNoActiveWatch にも巻き込まれない）', () => {
+      // ★2026-09-01 修正: 以前は source を 'dataBacked' としていたが、lastFocusedUrl は
+      //   「ユーザーが今まさに見ている通常ウィンドウの前面タブ」という self-tab 相当の
+      //   信頼度を持つ情報源であり、'storage'/'dataBacked' を意図的に
+      //   treatAsNoActiveWatch 扱いにする popup-entry.js の設計と組み合わさると、
+      //   正当に データのある watch タブまで empty state に落ちてしまっていた
+      //   （popup-double-scroll.spec.js で実際に再現）。
       const r = pickWatchUrlFromMultipleSources({
         activeTab: { url: 'chrome-extension://aaaaa/popup.html' },
         lastFocusedNormalActiveTab: { url: 'https://live.nicovideo.jp/watch/lv200' },
@@ -192,7 +198,7 @@ describe('pickWatchUrlFromMultipleSources', () => {
         liveIdsWithData: ['lv200']
       });
       expect(r.url).toBe('https://live.nicovideo.jp/watch/lv200');
-      expect(r.source).toBe('dataBacked');
+      expect(r.source).toBe('lastFocusedNormal');
     });
 
     it('liveIdsWithData が空（情報なし）→ 従来順（lastFocusedNormal）で解決', () => {
