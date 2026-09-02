@@ -202,7 +202,7 @@ graph LR
 <sub>ファイル 2 件</sub>
 
 ## `_docs/` — ⚠️ 未記入（ROLES に追記）
-<sub>ファイル 1 件</sub>
+<sub>ファイル 3 件</sub>
 
 ## `api/` — サーバレス API(status エンドポイント)  〔API〕
 <sub>ファイル 1 件</sub>
@@ -214,14 +214,14 @@ graph LR
 - `images/`（93 件） — 純Web版 応援ライブビューの同梱画像(ゆっくり顔)  〔Web版 / 画像〕
 
 ## `council/` — 会議(COUNCIL)の問い・回答・統合(SYNTHESIS)。設計判断の根拠  〔会議 / 設計〕
-<sub>ファイル 376 件</sub>
+<sub>ファイル 379 件</sub>
 
-- `auto/`（5 件） — ⚠️ 未記入（ROLES に追記）
+- `auto/`（8 件） — ⚠️ 未記入（ROLES に追記）
 
 ## `council-scout/` — ⚠️ 未記入（ROLES に追記）
-<sub>ファイル 10 件</sub>
+<sub>ファイル 12 件</sub>
 
-- `briefs/`（10 件） — ⚠️ 未記入（ROLES に追記）
+- `briefs/`（12 件） — ⚠️ 未記入（ROLES に追記）
 
 ## `docs/` — 設計正本・マインドマップ・フロー図・feature-map(AI/人間向け)  〔設計 / レポート〕
 <sub>ファイル 308 件</sub>
@@ -263,14 +263,14 @@ graph LR
 - `soundeffect-lab/`（19 件） — ⚠️ 未記入（ROLES に追記）
 
 ## `src/` — LP 側 + 純粋関数ライブラリの源  〔ソース〕
-<sub>ファイル 1849 件</sub>
+<sub>ファイル 1819 件</sub>
 
 - `data/`（7 件） — 保存コメントからレーン候補を読む acquirer / source 層  〔コメント / 取得〕
 - `domain/`（20 件） — ドメイン正本(応援レーンの集約・列ポリシー等。識別子判定など)  〔応援 / 集約 / 識別子〕
 - `extension/`（46 件） — バンドル entry(content/popup/venue/status/offscreen/backfill-sw 等=機能境界)  〔entry / 記録 / 会場 / 応援〕
 - `fixtures/`（1 件） — テスト用フィクスチャ  〔テスト〕
-- `images/`（165 件） — LP / CWS 提出物のマスター画像  〔画像〕
-- `lib/`（1600 件） — 純粋関数ライブラリ(unit test 対象)。色・速度・コメント・レポート等の計算ロジックの大半  〔色 / 速度 / コメント / レポート / 純粋関数〕
+- `images/`（134 件） — LP / CWS 提出物のマスター画像  〔画像〕
+- `lib/`（1601 件） — 純粋関数ライブラリ(unit test 対象)。色・速度・コメント・レポート等の計算ロジックの大半  〔色 / 速度 / コメント / レポート / 純粋関数〕
 - `shared/`（7 件） — 複数機能で共有する小部品(アバター URL ガード等)  〔共有 / アバター〕
 - `sound/`（1 件） — 音声素材(src 側)  〔音声〕
 

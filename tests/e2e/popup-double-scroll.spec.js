@@ -22,7 +22,7 @@ test('standalone popup: body はスクロールせず .nl-main 1本のみがス�
   context
 }) => {
   const base = await extensionBasePath(context);
-  const page = await context.newPage();
+  const popupUrl = `${base}/popup.html`;
   // データ入り状態: 応援ランキング・記録件数など content が埋まった状態で double-scroll が出るか
   const sw = context
     .serviceWorkers()
@@ -35,11 +35,49 @@ test('standalone popup: body はスクロールせず .nl-main 1本のみがス�
       });
     });
   }
-  await page.goto(`${base}/popup.html`, {
-    waitUntil: 'load',
-    timeout: 30_000
-  });
+  // ★page.goto()で直接開くだけだと、chrome.windows.getCurrent()のtypeが'popup'に
+  //   ならず、popup-entry.jsのnl-popup-windowクラス付与ロジック(win.type!=='popup'で
+  //   early return)が発火しない。すると html:not(.nl-inline) の580pxキャップが
+  //   外れないまま実データを描画し、コンテンツが580pxを超えて二重スクロールになる
+  //   （実測・CI/ローカル両方で再現・2026-09-01）。実際のstandalone windowの起動
+  //   経路(chrome.windows.create({type:'popup'}))を通す（popup-window-empty-history-real.spec.js
+  //   と同じパターン）。
+  if (!sw) throw new Error('service worker not found');
+  await sw.evaluate(
+    async (url) => {
+      await chrome.windows.create({
+        url,
+        type: 'popup',
+        width: 420,
+        height: 780,
+        focused: false
+      });
+    },
+    popupUrl
+  );
+
+  let page;
+  const deadline = Date.now() + 30_000;
+  while (Date.now() < deadline) {
+    page = context.pages().find((p) => p.url() === popupUrl);
+    if (page) break;
+    await new Promise((r) => setTimeout(r, 200));
+  }
+  if (!page) throw new Error('standalone popup page was not created');
+
   await page.waitForSelector('#nlPopupPrimary', { timeout: 20_000 });
+  // ★nl-popup-windowクラスはchrome.windows.getCurrent()の非同期解決を待って
+  //   付与される（popup-entry.js:15243-15267）。固定スリープだけに頼ると、
+  //   クラス付与前に計測してCSSの580pxキャップが外れていない状態を拾う
+  //   （実測・2026-09-01）。クラス自体の付与を明示的に待つ。
+  await page.waitForFunction(
+    () => document.documentElement.classList.contains('nl-popup-window'),
+    { timeout: 20_000 }
+  );
+  // 描画完了マーカー（popup-window-empty-history-real.spec.jsと同じ確認軸）
+  await expect(
+    page.locator('html[data-nl-popup-content-painted="1"]')
+  ).toBeAttached({ timeout: 15_000 });
   // cloak auto-reveal の完全終了（750ms 以上）を待つ
   await page.waitForTimeout(1200);
 
