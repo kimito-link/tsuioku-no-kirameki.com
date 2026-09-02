@@ -386,5 +386,17 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
   Object.freeze({
     version: '0.1.1499', metric: 'gate-selftest', value: 2,
     source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1500', metric: 'bundle-kb', value: 1411,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '★1412→1411 で【減った】。実測 popup.js 1445626→1445139 ＝ -487B'
+      + '（更新履歴20版の入れ替えで押し出された分。会場埋め込みは popup.js に入らない）。'
+      + '★増えたのは status.js の +1,488B のみ＝iframe を1つ足す関数と kill switch。'
+      + '★会場UIは iframe の中(venue.js)が作るので、status 側の DOM も storage 読みも増えない。'
+  }),
+  Object.freeze({
+    version: '0.1.1500', metric: 'gate-selftest', value: 2,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
   })
 ]);

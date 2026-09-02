@@ -81,3 +81,57 @@ describe('★kill switch は残っている（戻せること）', () => {
     expect(head).toMatch(/autopatrol/);
   });
 });
+
+describe('★会場モードの埋め込み（v0.1.1500）', () => {
+  it('venue.html?lv= を iframe で出す配線がある', () => {
+    expect(statusSrc).toMatch(/function ensureStatusVenueIframe/);
+    const at = statusSrc.indexOf('function ensureStatusVenueIframe');
+    const block = statusSrc.slice(at, at + 2500);
+    expect(block).toMatch(/getURL\('venue\.html'\)/);
+    expect(block).toMatch(/searchParams\.set\('lv', lv\)/);
+    // ★描画ループから呼ばれていること（関数を作っただけで配線漏れ、を防ぐ）。
+    expect(statusSrc).toMatch(/safeSection\('会場埋め込み'/);
+  });
+
+  it('★kill switch と戻し方がある', () => {
+    expect(statusSrc).toMatch(/const STATUS_VENUE_EMBED_ENABLED = (true|false);/);
+    const at = statusSrc.indexOf('if (!STATUS_VENUE_EMBED_ENABLED)');
+    expect(at).toBeGreaterThan(0);
+    const block = statusSrc.slice(at, at + 500);
+    expect(block).toMatch(/section\.hidden = true/);
+    expect(block).toMatch(/remove\(\)/);
+  });
+
+  it('★lv が無いときは出さない（死に画面を作らない）', () => {
+    const at = statusSrc.indexOf('function ensureStatusVenueIframe');
+    const block = statusSrc.slice(at, at + 2500);
+    expect(block).toMatch(/if \(!lv\)/);
+  });
+
+  it('★署名ガードがある（同じ配信で作り直さない＝チラつき/重さ防止）', () => {
+    expect(statusSrc).toMatch(/_lastStatusVenueEmbedSrc/);
+    const at = statusSrc.indexOf('function ensureStatusVenueIframe');
+    const block = statusSrc.slice(at, at + 2500);
+    expect(block).toMatch(/if \(src === _lastStatusVenueEmbedSrc\)/);
+  });
+
+  it('★載せてよい根拠: 会場から 3D 変形が消えている', () => {
+    /*
+     * ★過去に「会場は 3D変形で可視判定が崩れるので載せられない」と判断していたが、
+     *   その 3D は v0.1.1047 で撤去済みだった（前提だけが残っていた）。
+     *   ★もし 3D が戻ったら、この判断は成り立たなくなるので赤くする。
+     *   （この型の記録: _docs/KB-stale-premise.md）
+     */
+    const venueSrc = read('src/extension/venueBar.js');
+    expect(venueSrc).not.toMatch(/perspective\s*:/);
+    expect(venueSrc).not.toMatch(/translateZ\(/);
+    expect(venueSrc).not.toMatch(/transform-style\s*:/);
+  });
+
+  it('★status 側の DOM を増やさない（会場UIは iframe の中が作る）', () => {
+    // status.html に会場用の受け皿は「箱1つ」だけ。席やタイルの DOM を持ち込まない。
+    const html = read('extension/status.html');
+    expect(html).toMatch(/id="statusVenueEmbedHost"/);
+    expect(html).not.toMatch(/nlsb-seat/);
+  });
+});
