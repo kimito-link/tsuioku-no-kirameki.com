@@ -2206,6 +2206,9 @@ function renderAll({ extrasAgeMs, lvList, summaries, fastDiag, popupDiag, backfi
   //   丸ごと出し「見た目も操作も popup そっくり」を本物のまま映す。下の鏡(間引き)より上に置き、出たら
   //   鏡は安全網として共存。独立 try/catch=iframe が壊れても status コア・鏡を巻き込まない。
   safeSection('popup埋め込み', () => ensureStatusPopupIframe(lvList, laneMirror));
+  // ★v0.1.1500: 会場モードも同じ画面で見られるように(ユーザー要望「会場モードも同時に埋め込んだ方が
+  //   理解が深い」)。★iframe を1つ足すだけ＝status 側の DOM も storage 読みも増えない。
+  safeSection('会場埋め込み', () => ensureStatusVenueIframe(lvList, laneMirror));
 
   // 2026-06-26: 応援レーン鏡は status 画面から【撤去】(ユーザー実機「ちくらん画面に応援レーンがあると遅い」)。
   //   status は2秒ループ再描画で、顔つきレーンの毎回 paint が重さ/「—」固まりの一因。応援レーンは各配信カードの
@@ -2793,6 +2796,106 @@ function ensureStatusPopupIframe(lvList, laneMirror) {
     iframe.style.height = '100%';
     iframe.style.border = '0';
     iframe.style.backgroundColor = 'transparent';
+    host.appendChild(iframe);
+  }
+  if (iframe.getAttribute('src') !== src) {
+    iframe.setAttribute('src', src);
+  }
+}
+
+/**
+ * 会場モードの埋め込みを出すか。★kill switch(false で消える)。
+ *
+ * ───────────────────────────────────────────────────────────────────────────
+ * ■ ★なぜ「会場は載せられない」が覆ったか(2026-09-02・実コードで確認)
+ *   過去の判断は「会場は CSS 3D変形(perspective/translateZ)で可視判定が崩れるので
+ *   lazy も IntersectionObserver も使えない＝最も重い描画を最も頻繁な画面に入れることになる」だった。
+ *   ★だがその 3D は v0.1.1047「会場をひな壇3Dから応援レーン段組みに統一」で**撤去済み**。
+ *   実測: `venueBar.js` に `perspective` / `translateZ` / `transform-style` は **0件**、
+ *        `buildVenueTiers` の呼び出しも **0件**（残る scale はフキダシのアニメだけ）。
+ *   ⟹ ★前提が消えていたのに、その前提で作った判断だけが残っていた。
+ *     （この型は `_docs/KB-stale-premise.md` に記録済み）
+ *
+ * ■ ★なぜ status に載せても重くならないか
+ *   1. 会場UIは `venueBar.js` が **iframe の中で自分で全部作る**。
+ *      status 側の DOM は増えない（`venue.html` は全23行）。
+ *   2. 会場は **storage 経由**でデータを取る（standalone は `onLiveComments` が来ない設計・
+ *      `venueBar.js:76`）。★status が新しく storage を読む必要はない＝このページの負荷は増えない。
+ *   3. iframe は **別文書＝別のメインスレッド予算**。status の2秒ループとは独立して動く。
+ *
+ * ■ ★戻し方
+ *   ここを false にするだけ。下の分岐が iframe を除去して section を隠す。
+ * ───────────────────────────────────────────────────────────────────────────
+ */
+const STATUS_VENUE_EMBED_ENABLED = true;
+
+/** 直近に焼いた会場 iframe の src(=lv 変化時だけ作り直すための署名)。 */
+let _lastStatusVenueEmbedSrc = '';
+
+/**
+ * 会場モード(venue.html?lv=)を status に埋め込む。
+ * ★popup 埋め込み(ensureStatusPopupIframe)と同じ流儀。新しい機構を作らない。
+ * @param {string[]} lvList 開いている watch タブの lv
+ * @param {{ liveId?: string }|null|undefined} laneMirror 鏡 snapshot(フォールバックの lv 源)
+ */
+function ensureStatusVenueIframe(lvList, laneMirror) {
+  const section = document.getElementById('statusVenueEmbed');
+  const host = document.getElementById('statusVenueEmbedHost');
+  if (!section || !host) return;
+
+  // kill switch: iframe を出さない=section を隠し、既存 iframe は src を外して除去(中の会場を停止)。
+  if (!STATUS_VENUE_EMBED_ENABLED) {
+    const existing = host.querySelector('iframe');
+    if (existing) {
+      try { existing.setAttribute('src', 'about:blank'); } catch { /* no-op */ }
+      try { existing.remove(); } catch { /* no-op */ }
+    }
+    section.hidden = true;
+    _lastStatusVenueEmbedSrc = '';
+    return;
+  }
+
+  // lv 解決: popup 埋め込みと同じ順(開いている watch タブ優先 → 鏡の liveId)。
+  const fromList = (Array.isArray(lvList) ? lvList : [])
+    .map((s) => String(s || '').trim().toLowerCase())
+    .find((s) => /^lv\d{1,15}$/.test(s));
+  const fromMirror = String(laneMirror?.liveId || '').trim().toLowerCase();
+  const lv = fromList || (/^lv\d{1,15}$/.test(fromMirror) ? fromMirror : '');
+
+  if (!lv) {
+    // どの放送も特定できない=出さない(死に画面にしない)。
+    section.hidden = true;
+    _lastStatusVenueEmbedSrc = '';
+    return;
+  }
+
+  let src = '';
+  try {
+    const u = new URL(chrome.runtime.getURL('venue.html'));
+    u.searchParams.set('lv', lv);
+    src = u.href;
+  } catch {
+    section.hidden = true;
+    return;
+  }
+
+  section.hidden = false;
+
+  // ★署名ガード: lv が同じなら作り直さない(再ロードのチラつき/重さ防止)。
+  if (src === _lastStatusVenueEmbedSrc) {
+    if (host.querySelector('iframe')) return;
+  }
+  _lastStatusVenueEmbedSrc = src;
+
+  let iframe = /** @type {HTMLIFrameElement|null} */ (host.querySelector('iframe'));
+  if (!iframe) {
+    iframe = document.createElement('iframe');
+    iframe.setAttribute('title', 'nicolivelog venue embed');
+    iframe.style.width = '100%';
+    iframe.style.height = '100%';
+    iframe.style.border = '0';
+    // 会場は自前で暗い地色を敷く(venue.html の body background)。透過にしない。
+    iframe.style.backgroundColor = '#0a0b0c';
     host.appendChild(iframe);
   }
   if (iframe.getAttribute('src') !== src) {

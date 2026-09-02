@@ -1067,6 +1067,26 @@
     </section>
 
     <!--
+      ★v0.1.1500: 会場モードの埋め込み。popup 埋め込み(上)と【同じ流儀】。
+        venue.html?lv=<lv> を iframe で出すだけ＝会場UIは venueBar.js が自分で全部作るので
+        この HTML 側に会場の DOM は1つも要らない(venue.html は全23行)。
+      ★会場は storage 経由でデータを取る(standalone は onLiveComments が来ない設計)。
+        status が新しく storage を読む必要はない＝このページの負荷は増えない。
+      ★出ない時はセクションごと hidden。JS は status-entry.js の ensureStatusVenueIframe。
+      ★kill switch: STATUS_VENUE_EMBED_ENABLED を false にすれば消える。
+    -->
+    <section class="lane" id="statusVenueEmbed" hidden>
+      <h2>🏟️ 会場モードそっくり（本物を埋め込み）</h2>
+      <div class="status-meta" style="margin-bottom: 8px">
+        いま開いている配信の会場モードを、そのまま埋め込んで表示します。誰が来ているか・誰が喋ったかを、診断と同じ画面で見比べられます（本物を映しています）。
+      </div>
+      <div
+        id="statusVenueEmbedHost"
+        style="width: 100%; height: 70vh; min-height: 420px; border: 1px solid var(--nl-border, #d5e3f5); border-radius: 12px; overflow: hidden; background: #0a0b0c"
+      ></div>
+    </section>
+
+    <!--
       応援レーン鏡: popup の応援レーン(りんく/こん太/広告/たぬ姉の段組み)を【顔=avatar 含めて
       そっくり】映す。データは popup→storage(nls_lane_mirror_v1)、status が読んで本物の
       paintStoryUserLaneDomFilled + buildPersonTileEl で描く。会場(venue)とは無関係=popup と status だけ。
