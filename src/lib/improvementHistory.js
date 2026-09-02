@@ -373,5 +373,18 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
   Object.freeze({
     version: '0.1.1498', metric: 'gate-selftest', value: 2,
     source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1499', metric: 'bundle-kb', value: 1412,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '★前版と同値(1412)。実測 popup.js 1445615→1445626 ＝ +11B のみ。'
+      + '★status.js は 483161→483161 で【1バイトも増えていない】'
+      + '（変更はフラグ1つ true とコメント。iframe の機構は元から在った）。'
+      + '★この版は「疑いで止めたまま忘れられていた機能を、真因が別と確定していたので戻した」もの。'
+      + '真因(background.js の autopatrol)の封じは今も有効で、検査で見張っている。'
+  }),
+  Object.freeze({
+    version: '0.1.1499', metric: 'gate-selftest', value: 2,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
   })
 ]);

@@ -2697,12 +2697,39 @@ let _lastStatusPopupEmbedSrc = '';
  * @param {{ liveId?: string }|null|undefined} laneMirror 鏡 snapshot(フォールバック lv 源)
  */
 /**
- * ★緊急停止フラグ(v0.1.917): false の間は popup 埋め込み iframe を【出さない】。
- * 理由=埋め込んだ iframe 内 popup が「閉じても勝手に別配信タブを開く」実機症状の疑い(過去に backfill
- * 環境を壊した『勝手なタブ操作』と同種)。被害を即止めるため一旦無効化し、原因特定後に true へ戻す。
- * 無効中は下の「鏡」がフォールバックで表示を担保するので status は無事。
+ * popup 埋め込み iframe を出すか。★kill switch は残す(false で即座に元へ戻せる)。
+ *
+ * ───────────────────────────────────────────────────────────────────────────
+ * ■ 経緯: v0.1.917 で false にした。当時の理由(原文):
+ *     「埋め込んだ iframe 内 popup が【閉じても勝手に別配信タブを開く】実機症状の【疑い】」
+ *
+ * ■ ★2026-08-31: その疑いは【晴れている】。真因は別だった(git 履歴で確認)。
+ *     v0.1.917 popup埋め込みを緊急停止（★疑いの段階で止めた）
+ *     v0.1.918 ギフトサイドバー自動オープンを緊急停止（★これも無関係と判明し 919 で復帰）
+ *     v0.1.919 ★**真因確定**: `background.js` の autopatrol(自動巡回)だった。
+ *              原文「拡張起動の瞬間に毎回違う配信が裏タブで複数開く症状の正体は
+ *              background.js の autopatrol。…openAutopatrolTab=chrome.tabs.create({active:false})
+ *              で裏タブに開いていた。既定 ON(v0.1.528)のためユーザーは意図せず動作」
+ *   ⟹ ★**popup 埋め込みは無実だった。** 巻き添えで止まったまま残っていた。
+ *   ★真因側の封じは今も生きている: `background.js:1231` `AUTOPATROL_KILL_SWITCH = true`
+ *     （`getAutopatrolEnabled()` が常に false を返す＝巡回は起動しない）
+ *
+ * ■ ★なぜ再開してよいと言えるか(実コードで確認した3点)
+ *   1. 埋め込みは `dock=status` で開く＝**受動ビュー(INLINE_PASSIVE)**。
+ *      `inlineModeFlags.js:14` の定義「**書かない・注入しない・fetch しない**」。
+ *   2. popup 内で `chrome.tabs.create` を呼ぶ経路は**すべてクリックハンドラの中**
+ *      (`popup-entry.js:21907` 前回配信を開く / `:20551` マーケ分析)。
+ *      ★**ユーザーが押さない限り発火しない**＝「勝手に開く」経路が無い。
+ *   3. ★同じ受動ビューを `app/live-view` が**本番で使い続けている**
+ *      (`inlineModeFlags.js:52` passive は status と liveview で共有)。
+ *      ＝この経路自体は実績がある。
+ *
+ * ■ ★戻し方
+ *   ここを false に戻すだけ。下の分岐が iframe を除去し section を隠す(鏡がフォールバック)。
+ *   ★「また勝手にタブが開く」ようなら、まず `background.js:1231` を疑う(そちらが真因だった)。
+ * ───────────────────────────────────────────────────────────────────────────
  */
-const STATUS_POPUP_EMBED_ENABLED = false;
+const STATUS_POPUP_EMBED_ENABLED = true;
 
 function ensureStatusPopupIframe(lvList, laneMirror) {
   const section = document.getElementById('statusPopupEmbed');

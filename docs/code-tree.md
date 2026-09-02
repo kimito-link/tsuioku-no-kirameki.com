@@ -47,8 +47,10 @@
 - 📁 **.codex-osint/** (2)
   - `cc_pre_request_20220927.warc.gz`
   - `test-write.txt`
-- 📁 **_docs/** (1)
+- 📁 **_docs/** (3)
   - `FROM-web-ios-android-ledger-shipped-2026-08-22.md`
+  - `KB-stale-premise.md`
+  - `TO-web-ios-android-ai-maze-pattern-2026-08-31.md`
 - 📁 **api/** (1)
   - `status.js` — status 受け口 Vercel Serverless Function。
 - 📁 **app/** (97)
@@ -163,8 +165,8 @@
   - `index.html`
   - `live-view.html`
   - `live-view.js` — global NL_BUILD_ID
-- 📁 **council-scout/** (10)
-  - 📁 **briefs/** (10)
+- 📁 **council-scout/** (12)
+  - 📁 **briefs/** (12)
     - `2026-07-16.md`
     - `2026-07-17.md`
     - `2026-07-20.md`
@@ -175,6 +177,8 @@
     - `2026-08-25.md`
     - `2026-08-27.md`
     - `2026-08-29.md`
+    - `2026-08-31.md`
+    - `2026-09-01.md`
 - 📁 **docs/** (308)
   - 📁 **article-assets/** (87)
     - 📁 **venue-frames/** (12)
@@ -744,7 +748,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (1849)
+- 📁 **src/** (1819)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -833,35 +837,25 @@
     - `venueSpeechPanelUserKey.wiring.test.js`
   - 📁 **fixtures/** (1)
     - `nicolive-comment-list.html`
-  - 📁 **images/** (165)
-    - 📁 **brand/** (39)
+  - 📁 **images/** (134)
+    - 📁 **brand/** (29)
       - 📁 **backgrounds/** (1)
         - `galaxy-background.PNG`
-      - 📁 **logo/** (37)
+      - 📁 **logo/** (27)
         - 📁 **black/** (3)
           - `logo_kimito-link_black_RGB_black.png`
           - `logo_kimito-link_black_RGB_link_black.png`
           - `logo_kimito-link_black_RGB_maru_black.png`
-        - 📁 **color/** (31)
-          - `logo_funlink_CMYK_color.jpg`
-          - `logo_funlink_CMYK_ginga_color.jpg`
-          - `logo_funlink_CMYK_maru_blue.jpg`
-          - `logo_funlink_CMYK_maru_orange.jpg`
-          - `logo_funlink_RGB_black.jpg`
+        - 📁 **color/** (21)
           - `logo_funlink_RGB_black.png`
           - `logo_funlink_RGB_color.jpg`
           - `logo_funlink_RGB_color.png`
-          - `logo_funlink_RGB_favi_blue.jpg`
           - `logo_funlink_RGB_favi_blue.png`
-          - `logo_funlink_RGB_favi_orange.jpg`
           - `logo_funlink_RGB_favi_orange.png`
           - `logo_funlink_RGB_ginga_color.jpg`
           - `logo_funlink_RGB_ginga_color.png`
-          - `logo_funlink_RGB_maru_black.jpg`
           - `logo_funlink_RGB_maru_black.png`
-          - `logo_funlink_RGB_maru_blue.jpg`
           - `logo_funlink_RGB_maru_blue.png`
-          - `logo_funlink_RGB_maru_orange.jpg`
           - `logo_funlink_RGB_maru_orange.png`
           - `logo_funlink_RGB_white.png`
           - `logo_kimito-link_RGB_color.png`
@@ -886,15 +880,11 @@
       - `character.png`
       - `kimito-link-main-image.png`
       - `sample-creator.png`
-    - 📁 **downloads/** (18)
-      - 📁 **company/** (9)
-        - 📁 **black/** (2)
-          - `logo_funlink_black_CMYK_black.jpg`
+    - 📁 **downloads/** (14)
+      - 📁 **company/** (5)
+        - 📁 **black/** (1)
           - `logo_funlink_black_RGB_black.png`
-        - 📁 **color/** (6)
-          - `logo_funlink_CMYK_color.jpg`
-          - `logo_funlink_CMYK_maru_blue.jpg`
-          - `logo_funlink_CMYK_maru_orange.jpg`
+        - 📁 **color/** (3)
           - `logo_funlink_RGB_color.png`
           - `logo_funlink_RGB_maru_blue.png`
           - `logo_funlink_RGB_maru_orange.png`
@@ -1002,31 +992,14 @@
         - `tanuki-yukkuri-normal-mouth-open.png`
         - `tanuki-yukkuri-smile-mouth-closed.png`
         - `tanuki-yukkuri-smile-mouth-open.png`
-    - 📁 **データ出力/** (31)
-      - 📁 **black/** (8)
-        - 📁 **JPEG/** (4)
-          - `logo_funlink_black_CMYK.ai`
-          - `logo_funlink_black_CMYK_black.jpg`
-          - `logo_funlink_black_CMYK_link_black.jpg`
-          - `logo_funlink_black_CMYK_maru_black.jpg`
-        - 📁 **PNG/** (4)
-          - `logo_funlink_black_RGB.ai`
+    - 📁 **データ出力/** (14)
+      - 📁 **black/** (3)
+        - 📁 **PNG/** (3)
           - `logo_funlink_black_RGB_black.png`
           - `logo_funlink_black_RGB_link_black.png`
           - `logo_funlink_black_RGB_maru_black.png`
-      - 📁 **color/** (18)
-        - 📁 **CMYK_データ用/** (9)
-          - `logo_funlink_CMYK.ai`
-          - `logo_funlink_CMYK_color.jpg`
-          - `logo_funlink_CMYK_ginga_color.jpg`
-          - `logo_funlink_CMYK_hoshi.jpg`
-          - `logo_funlink_CMYK_link_hoshi.jpg`
-          - `logo_funlink_CMYK_link_orange.jpg`
-          - `logo_funlink_CMYK_maru_blue.jpg`
-          - `logo_funlink_CMYK_maru_ginga.jpg`
-          - `logo_funlink_CMYK_maru_orange.jpg`
-        - 📁 **RGB_データ用/** (9)
-          - `logo_funlink_RGB.ai`
+      - 📁 **color/** (8)
+        - 📁 **RGB_データ用/** (8)
           - `logo_funlink_RGB_color.png`
           - `logo_funlink_RGB_ginga_color.png`
           - `logo_funlink_RGB_hoshi.png`
@@ -1035,14 +1008,12 @@
           - `logo_funlink_RGB_maru_blue.png`
           - `logo_funlink_RGB_maru_ginga.png`
           - `logo_funlink_RGB_maru_orange.png`
-      - 📁 **white/** (4)
-        - `logo_funlink_white_RGB.ai`
+      - 📁 **white/** (3)
         - `logo_funlink_white_RGB_black.png`
         - `logo_funlink_white_RGB_link_black.png`
         - `logo_funlink_white_RGB_maru_black.png`
-      - `logo_guide_funlink_ol.pdf`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1600)
+  - 📁 **lib/** (1601)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -2286,6 +2257,7 @@
     - `statusMindmapSignature.js` — マインドマップの再描画を止める署名を作る純関数。
     - `statusMindmapSignature.test.js`
     - `statusMindmapSignature.wiring.test.js`
+    - `statusPopupEmbed.wiring.test.js`
     - `statusReadPolicy.js` — 【層】L0 判定層(純粋関数・I/O禁止)
     - `statusReadPolicy.test.js`
     - `statusReadPolicy.wiring.test.js`
