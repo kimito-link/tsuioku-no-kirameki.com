@@ -314,6 +314,18 @@ export function weightOf(label) {
     // 本線(weight1)とnvidia既存枠(weight2)より下。deepseekは実測5〜15秒と遅いが
     // 並列会議では律速にならないため遅さでの格下げはしない。
     if (n.includes("deepseek-v4")) return 3;
+    // ★2026-09-02 昇格(3→1): magistral-medium を lead 主力にする。
+    //  実測(統括プロンプト・3回): magistral-medium 1745/2176/2496ms に対し、
+    //  従来主力の nvidia/nemotron-3-ultra-550b は 23754/56588/25015ms＝**10〜25倍遅い**。
+    //  "hi" の一言でも 9〜61秒かかる日があり、日報の実会議成績でも失敗率29%(7回中2回)と
+    //  lead役だけ突出して悪かった。会議は並列なので1体の遅さが全体を止める。
+    //  ★この行は下の "nvidia"→2 より前に置くこと（ifは先勝ち）。また "mistral"→3 より
+    //   前でもある必要がある（同ファイル下部）。magistral-small は "magistral-medium" に
+    //   非一致なので critic 予備(weight3)のまま影響を受けない。
+    //  nemotron側は撤去しない: 200自体は返る(5/5成功)ので死んではおらず、
+    //  mistral障害時の lead 冗長化として weight2 の位置で残す価値がある。
+    //  差し戻す条件: magistral-medium が実会議で2回連続FAILED、または 402/403 の課金要求。
+    if (n.includes("magistral-medium")) return 1;
     // 実測で詰まりやすい不安定クラウドは後回し（同役割なら安定クラウドを先に選ぶ）。
     // nvidia/qwen3.5-122b は150秒タイムアウトが頻発(2026-06-17実測) → 重み2。
     // nemotron-3-ultra-550bも意図的にこの2を踏襲(2026-07-31・lead正規化に伴い予備weight3
