@@ -202,7 +202,7 @@ graph LR
 <sub>ファイル 2 件</sub>
 
 ## `_docs/` — ⚠️ 未記入（ROLES に追記）
-<sub>ファイル 3 件</sub>
+<sub>ファイル 4 件</sub>
 
 ## `api/` — サーバレス API(status エンドポイント)  〔API〕
 <sub>ファイル 1 件</sub>
