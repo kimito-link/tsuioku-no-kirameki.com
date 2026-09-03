@@ -432,11 +432,43 @@ def verify_no_secrets(zf: zipfile.ZipFile, names: set) -> None:
         )
 
 
+def _validate_version_arg(version: str) -> None:
+    """★v0.1.1505: 引数の形と package.json の version を検証する(fail-closed)。
+
+    実測(2026-09-03): `python scripts/stage-submission.py --help` を実行したところ、
+    ヘルプではなく `--help` という文字列がそのまま version として扱われ、
+    `build/submission---help/` と `build/tsuioku-no-kirameki---help.zip` が
+    実際に生成されてしまった(len(sys.argv)==2 しか見ていなかったため)。
+    版数の typo でも同じことが起き、中身は正しいのにファイル名だけ違う ZIP が
+    黙って作られる恐れがある(lp_version_drift_needs_a_gate_2026-08-01 と同じ型)。
+    """
+    if not re.fullmatch(r'\d+\.\d+\.\d+', version):
+        print(
+            f'error: version は "0.1.1234" の形式で指定してください(受け取った値: {version!r})',
+            file=sys.stderr
+        )
+        sys.exit(2)
+    pkg_path = REPO_ROOT / 'package.json'
+    try:
+        pkg_version = json.loads(pkg_path.read_text(encoding='utf-8'))['version']
+    except (OSError, KeyError, json.JSONDecodeError) as exc:
+        print(f'error: package.json の version を読めませんでした: {exc}', file=sys.stderr)
+        sys.exit(2)
+    if version != pkg_version:
+        print(
+            f'error: 指定された version({version}) が package.json の version({pkg_version}) と'
+            ' 一致しません。version bump 忘れ、または typo の可能性があります。',
+            file=sys.stderr
+        )
+        sys.exit(2)
+
+
 def main() -> None:
     if len(sys.argv) != 2:
         print('usage: python build/stage_submission.py <version>', file=sys.stderr)
         sys.exit(2)
     version = sys.argv[1]
+    _validate_version_arg(version)
     stage_dir = stage(version)
     zip_path = make_zip(version, stage_dir)
     verify_zip(zip_path)
