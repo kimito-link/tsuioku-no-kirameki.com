@@ -411,5 +411,17 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
   Object.freeze({
     version: '0.1.1501', metric: 'gate-selftest', value: 2,
     source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1502', metric: 'bundle-kb', value: 1413,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '★+2KB は comeviewWindowGeometry.js(窓の大きさを覚える純関数・約100行)の分。'
+      + 'OBS のウィンドウキャプチャ運用で「開き直すたびに配信レイアウトの合わせ直し」が'
+      + '発生していた実運用の負担を消すための追加で、意図した増加。'
+      + '★過去最良 1360KB は v0.1.1454。バンドル削減は別の版で扱う(数字は消さない)。'
+  }),
+  Object.freeze({
+    version: '0.1.1502', metric: 'gate-selftest', value: 2,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
   })
 ]);

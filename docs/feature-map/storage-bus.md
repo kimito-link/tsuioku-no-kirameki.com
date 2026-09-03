@@ -93,6 +93,7 @@
 | `KEY_CALM_PANEL_MOTION` | — | extension/popup-entry.js |
 | `KEY_CDB_OFFSCREEN_ENABLED` | — | extension/content-entry.js |
 | `KEY_CHEER_RECENT_V1` | extension/popup-entry.js | extension/popup-entry.js |
+| `KEY_COMEVIEW_WINDOW_GEOMETRY` | extension/comeview-entry.js | extension/comeview-entry.js |
 | `KEY_COMMENTER_FOLLOWING_LIST_CACHE` | — | extension/content-entry.js |
 | `KEY_COMMENTER_FOLLOW_CACHE` | extension/popup/report/htmlReportDocument.js<br>extension/popup-entry.js | extension/content-entry.js<br>extension/popup-entry.js |
 | `KEY_COMMENT_IDB_ENABLED` | — | extension/content-entry.js |

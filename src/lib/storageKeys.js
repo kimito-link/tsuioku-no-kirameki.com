@@ -633,6 +633,13 @@ export const KEY_BGM_VOLUME_FEVER = 'nls_bgm_volume_fever_v1';
  */
 export const KEY_OP_SOUND_ENABLED = 'nls_op_sound_enabled_v1';
 
+/**
+ * コメビュ別窓／OBS窓の大きさと位置(v0.1.1502)。
+ * ★決め打ち 400x640 で開き直すたびに、OBS の配信レイアウト合わせがやり直しになるため覚える。
+ * ★正規化と保存可否の判定は src/lib/comeviewWindowGeometry.js が正本(壊れた窓を作らない)。
+ */
+export const KEY_COMEVIEW_WINDOW_GEOMETRY = 'nls_comeview_window_geometry_v1';
+
 /** @param {unknown} raw */
 export function isOpSoundEnabled(raw) {
   return raw !== false; // 既定ON

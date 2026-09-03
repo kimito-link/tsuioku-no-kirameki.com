@@ -19,8 +19,13 @@
 
 import {
   commentsStorageKey,
+  KEY_COMEVIEW_WINDOW_GEOMETRY,
   KEY_USER_COMMENT_PROFILE_CACHE
 } from '../lib/storageKeys.js';
+import {
+  buildComeviewWindowOptions,
+  pickComeviewGeometryToSave
+} from '../lib/comeviewWindowGeometry.js';
 import { tailStorageKey } from '../lib/commentTailBuffer.js';
 import { readChunkedComments } from '../lib/commentChunkStore.js';
 import {
@@ -2033,30 +2038,42 @@ function wireButtons() {
       }
     });
   }
+  /*
+   * ★別窓/OBS窓は「前回の大きさと位置」で開く(v0.1.1502)。
+   *   従来は必ず 400x640 の決め打ちだったため、OBS のウィンドウキャプチャで
+   *   配信画面に重ねる運用だと【開き直すたびに合わせ込みがやり直し】になっていた。
+   *   ★保存が無い/壊れている場合は従来と同じ 400x640 に倒れる
+   *     (判定は src/lib/comeviewWindowGeometry.js が正本)。
+   */
+  const openComeviewWindow = async (url) => {
+    let saved = null;
+    try {
+      const bag = await chrome.storage.local.get(KEY_COMEVIEW_WINDOW_GEOMETRY);
+      saved = bag?.[KEY_COMEVIEW_WINDOW_GEOMETRY] ?? null;
+    } catch {
+      // 読めなくても開く(既定サイズに倒れるだけ)。
+    }
+    const opts = buildComeviewWindowOptions(url, saved);
+    try {
+      chrome.windows.create(opts);
+    } catch {
+      window.open(url, '_blank', `width=${opts.width},height=${opts.height}`);
+    }
+  };
   const btnWin = document.getElementById('cvBtnWindow');
   if (btnWin) {
     btnWin.addEventListener('click', () => {
-      const url = chrome.runtime.getURL(
-        `comeview.html?lv=${encodeURIComponent(_liveId)}`
+      void openComeviewWindow(
+        chrome.runtime.getURL(`comeview.html?lv=${encodeURIComponent(_liveId)}`)
       );
-      try {
-        chrome.windows.create({ url, type: 'popup', width: 400, height: 640 });
-      } catch {
-        window.open(url, '_blank', 'width=400,height=640');
-      }
     });
   }
   const btnObs = document.getElementById('cvBtnObs');
   if (btnObs) {
     btnObs.addEventListener('click', () => {
-      const url = chrome.runtime.getURL(
-        `comeview.html?lv=${encodeURIComponent(_liveId)}&obs=1`
+      void openComeviewWindow(
+        chrome.runtime.getURL(`comeview.html?lv=${encodeURIComponent(_liveId)}&obs=1`)
       );
-      try {
-        chrome.windows.create({ url, type: 'popup', width: 400, height: 640 });
-      } catch {
-        window.open(url, '_blank', 'width=400,height=640');
-      }
     });
   }
   const btnPause = document.getElementById('cvBtnPause');
@@ -2120,6 +2137,37 @@ function wireButtons() {
   }
   createHoverBar();
   window.addEventListener('resize', () => hideHoverBar(), { passive: true });
+  /*
+   * ★窓の形を覚える(v0.1.1502)。次に開くときこの大きさ/位置で開く。
+   *   ★保存の可否は pickComeviewGeometryToSave が決める:
+   *     最小化(0x0)や極端な値は【保存しない】= 次に潰れた窓が出る事故を防ぐ。
+   *   ★resize は連続で飛ぶので 500ms 落ち着いてから1回だけ書く(storage を叩き続けない)。
+   */
+  let _geometrySaveTimer = 0;
+  const saveWindowGeometry = () => {
+    const next = pickComeviewGeometryToSave({
+      width: window.outerWidth,
+      height: window.outerHeight,
+      left: window.screenX,
+      top: window.screenY
+    });
+    if (!next) return; // ★最小化中などは覚えない
+    try {
+      void chrome.storage.local.set({ [KEY_COMEVIEW_WINDOW_GEOMETRY]: next });
+    } catch {
+      // 保存できなくても表示には影響しない。
+    }
+  };
+  window.addEventListener(
+    'resize',
+    () => {
+      if (_geometrySaveTimer) window.clearTimeout(_geometrySaveTimer);
+      _geometrySaveTimer = window.setTimeout(saveWindowGeometry, 500);
+    },
+    { passive: true }
+  );
+  // ★閉じる直前にも1回(サイズを変えてすぐ閉じたときに取りこぼさない)。
+  window.addEventListener('pagehide', saveWindowGeometry);
 }
 
 async function main() {

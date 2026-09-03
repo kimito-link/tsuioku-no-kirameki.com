@@ -303,7 +303,7 @@
   - `src/lib/giftThrowProjectile.js`
 - **吹き出し寿命管理** — 会場の吹き出しの表示上限・追い出し(eviction)ライフサイクル
   - `src/lib/venueBubbleLifecycle.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 234</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 235</summary>
 
 - `scripts/encode-marketing-html-avatars.mjs` — extension/images/marketing-html-avatars/*.png を data URI にし、
 - `scripts/split-avatar-parts.mjs` — 偽市松背景の除去 + パーツ切り出し(one-off アセットパイプライン)
@@ -345,6 +345,7 @@
 - `src/lib/comeviewRows.js` — v0.1.652: 独自コメビュ「KIRAMEKI Comment View」の表示行ロジック(純関数)。
 - `src/lib/comeviewTimelineDiff.js` — コメビュの「整合(reconcile)」を差分で描くための純関数。
 - `src/lib/comeviewUserNotes.js` — v0.1.667: コメビュのユーザー詳細(わんコメ式 ニックネーム/ラベル/メモ)の純ロジック。
+- `src/lib/comeviewWindowGeometry.js` — コメビュ別窓／OBS窓の「大きさと位置を覚える」純関数。
 - `src/lib/commentKindnessDisplayModel.js` — やさしさナッジ（コメント送信前の言い換え促し）の「表示モデル」を導出する純関数。
 - `src/lib/commentPostWatchTarget.js` — コメント送信コンテキストだけを、表示用の「実質アクティブ watch」判定から分離して解決する。
 - `src/lib/commentSummary.js` — v0.1.508: コメント記録の「軽量サマリ（0 秒表示）」純関数群。
@@ -1060,7 +1061,7 @@
 - `v0.1.1498` 2026-08-31 — 間違った警告を出していたのをやめました
 
 ### その他 (4版)
+- `v0.1.1502` 2026-09-03 — コメビュの窓の大きさを覚えます
 - `v0.1.1491` 2026-08-29 — 検査の土台を、配布元の最新版にそろえました
 - `v0.1.1490` 2026-08-25 — 応援している作品を、そっとお知らせする欄をつけました
 - `v0.1.1488` 2026-08-25 — キャラが出ない原因を自分で言えるようにしました
-- `v0.1.1482` 2026-08-23 — なふだの説明を分かりやすくしました
