@@ -47,10 +47,11 @@
 - 📁 **.codex-osint/** (2)
   - `cc_pre_request_20220927.warc.gz`
   - `test-write.txt`
-- 📁 **_docs/** (3)
+- 📁 **_docs/** (4)
   - `FROM-web-ios-android-ledger-shipped-2026-08-22.md`
   - `KB-stale-premise.md`
   - `TO-web-ios-android-ai-maze-pattern-2026-08-31.md`
+  - `TO-web-ios-android-unnamed-bucket-2026-09-03.md`
 - 📁 **api/** (1)
   - `status.js` — status 受け口 Vercel Serverless Function。
 - 📁 **app/** (97)
