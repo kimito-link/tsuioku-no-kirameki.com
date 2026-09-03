@@ -93,6 +93,7 @@ import {
 } from '../lib/avatarPartsComposer.js';
 import { isVoiceItemStale } from '../lib/voiceAgeGate.js';
 import { runStorageOpWithTimeout } from '../lib/storageOpTimeout.js';
+import { diffComeviewTimeline } from '../lib/comeviewTimelineDiff.js';
 import {
   shouldRenderLoading,
   resolveVoiceLoadingView,
@@ -1339,9 +1340,92 @@ function forgetTimelineElement(element) {
   if (_hoverRow === element) hideHoverBar();
 }
 
+/*
+ * ★整合(reconcile)を差分で描く。60秒ごとの全再構築が「ちらつき」の正体だった。
+ *   (2026-09-03 ユーザー報告「りりーすしたものはちらちらしていました」)
+ *
+ *   旧: listEl.innerHTML = timeline.map(...) で 120行を毎回作り直す
+ *       ⟹ 全 <img>(アバター)が破棄→再取得され、一瞬空白になる。
+ *   新: 変化が無ければ【DOMを1バイトも触らない】= img が生き残る = ちらつかない。
+ *
+ * ★「全再構築を無くす」のではなく「変化が無いときは触らない」が目的。
+ *   差分で表現できない形(順序入れ替え・間への挿入・上流の重複)は、判定関数が
+ *   reorderNeeded=true を返すので、正直に従来の全再構築へ倒す(rebuildFullTimeline)。
+ *
+ * ★二重表示(v0.1.671/672)への防波堤: remove する要素は必ず forgetTimelineElement を
+ *   通し、_renderedKeys と DOM を【同時に】動かす。_renderedKeys は :1639 の
+ *   pickNewComeviewTimelineItems で「もう出したか」の唯一の判定に使われるため、
+ *   DOM とズレると同じコメントが2行出る。
+ */
 function renderFullTimeline(timeline, forceBottom = false) {
   const listEl = document.getElementById('cvList');
   if (!listEl) return;
+  const rows = Array.from(listEl.children).filter((element) =>
+    element instanceof HTMLElement && element.matches('.nl-tl-row, .nl-tl-gift')
+  );
+  const domKeys = rows.map((element) => element.dataset.cvKey || '');
+  const items = Array.isArray(timeline) ? timeline : [];
+  const diff = domKeys.every((k) => k) ? diffComeviewTimeline(domKeys, items) : null;
+
+  // ★何も変わっていない = 触らない(ここが効くとちらつきが消える)。
+  if (diff && !diff.reorderNeeded && diff.unchanged) return;
+
+  // ★空になる場合は差分で描かない。空状態の <p>(「まだコメントもギフトもありません」)を
+  //   出す責務は rebuildFullTimeline 側にあるので、そこへ倒す(空の白紙を作らない)。
+  if (diff && !diff.reorderNeeded && items.length > 0) {
+    const wasNearBottomD =
+      forceBottom ||
+      isComeviewNearBottom({
+        scrollTop: listEl.scrollTop,
+        clientHeight: listEl.clientHeight,
+        scrollHeight: listEl.scrollHeight
+      });
+    const bottomGapD = Math.max(
+      0,
+      listEl.scrollHeight - listEl.clientHeight - listEl.scrollTop
+    );
+    if (diff.removeKeys.length) {
+      const drop = new Set(diff.removeKeys);
+      for (const element of rows) {
+        if (!drop.has(element.dataset.cvKey || '')) continue;
+        forgetTimelineElement(element); // ★keys と DOM を同時に動かす
+        element.remove();
+      }
+    }
+    if (diff.appendItems.length) {
+      // ★空状態の <p> を先に外す(appendTimelineItems:1471 と同じ扱い)。
+      //   これが残ると「まだありません」の下に行が積まれる。
+      const empty = listEl.querySelector('.nl-support-timeline__empty, #cvEmpty');
+      if (empty) empty.remove();
+      // ★追加は appendTimelineItems と同一手順(新しい描画パスを作らない)。
+      const fragment = document.createDocumentFragment();
+      for (const item of diff.appendItems) {
+        const template = document.createElement('template');
+        template.innerHTML = timelineRowHtml(item).trim();
+        const element = template.content.firstElementChild;
+        if (!element) continue;
+        rememberTimelineElement(element, item, false);
+        fragment.appendChild(element);
+      }
+      listEl.appendChild(fragment);
+      upgradeAnonymousAvatarImages(listEl);
+    }
+    if (wasNearBottomD) {
+      listEl.scrollTop = listEl.scrollHeight;
+    } else {
+      listEl.scrollTop = Math.max(
+        0,
+        listEl.scrollHeight - listEl.clientHeight - bottomGapD
+      );
+    }
+    return;
+  }
+
+  rebuildFullTimeline(listEl, items, forceBottom);
+}
+
+/** ★従来の全再構築(差分で表現できないときのフォールバック)。挙動は据え置き。 */
+function rebuildFullTimeline(listEl, timeline, forceBottom) {
   const wasNearBottom =
     forceBottom ||
     isComeviewNearBottom({

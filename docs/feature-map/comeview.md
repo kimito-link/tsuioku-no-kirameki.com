@@ -20,6 +20,7 @@ graph LR
   n_comeview --> n_src_lib_comeviewActions_js["lib/comeviewActions.js"]:::shared
   n_comeview --> n_src_lib_comeviewInstantRender_js["lib/comeviewInstantRender.js"]
   n_comeview --> n_src_lib_comeviewRows_js["lib/comeviewRows.js"]:::shared
+  n_comeview --> n_src_lib_comeviewTimelineDiff_js["lib/comeviewTimelineDiff.js"]
   n_comeview --> n_src_lib_comeviewUserNotes_js["lib/comeviewUserNotes.js"]:::shared
   n_comeview --> n_src_lib_commentChunkStore_js["lib/commentChunkStore.js"]:::shared
   n_comeview --> n_src_lib_commentDb_js["lib/commentDb.js"]:::shared

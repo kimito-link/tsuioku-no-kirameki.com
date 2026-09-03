@@ -398,5 +398,18 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
   Object.freeze({
     version: '0.1.1500', metric: 'gate-selftest', value: 2,
     source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1501', metric: 'bundle-kb', value: 1411,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '★この版の変更(コメビュのちらつき根治)による増加ではない。v0.1.1500 と同値(1411KB)で、'
+      + '追加した comeviewTimelineDiff.js は popup.js に入らない(コメビュ側のバンドル)。'
+      + '過去最良 1360KB は v0.1.1454。以後 1411〜1412 で推移しており、この版で悪化させたのではなく'
+      + '★既に存在していた差を、この版で初めて台帳に記録したもの。'
+      + '(★数字は消さない。バンドル削減は別の版で扱う)'
+  }),
+  Object.freeze({
+    version: '0.1.1501', metric: 'gate-selftest', value: 2,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
   })
 ]);
