@@ -462,6 +462,7 @@
 | `src/lib/cleanNdgrChatRows.js` | 1 | 記録エンジン(watchページ常駐) |
 | `src/lib/cloakFailsafeMarker.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/comeviewInstantRender.js` | 1 | コメビュ(別窓) |
+| `src/lib/comeviewTimelineDiff.js` | 1 | コメビュ(別窓) |
 | `src/lib/commentComposeShortcuts.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/commentCountProvenance.js` | 1 | 状態速報ページ |
 | `src/lib/commentEchoDetector.js` | 1 | ポップアップ(応援レーン) |

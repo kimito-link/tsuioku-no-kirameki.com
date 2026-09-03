@@ -4194,6 +4194,16 @@
       ]
     },
     {
+      "file": "src/lib/comeviewTimelineDiff.js",
+      "featureCount": 1,
+      "features": [
+        "comeview"
+      ],
+      "labels": [
+        "コメビュ(別窓)"
+      ]
+    },
+    {
       "file": "src/lib/commentComposeShortcuts.js",
       "featureCount": 1,
       "features": [
