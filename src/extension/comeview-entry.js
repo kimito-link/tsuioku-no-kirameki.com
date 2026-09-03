@@ -20,8 +20,14 @@
 import {
   commentsStorageKey,
   KEY_COMEVIEW_WINDOW_GEOMETRY,
+  KEY_LAST_WATCH_URL,
   KEY_USER_COMMENT_PROFILE_CACHE
 } from '../lib/storageKeys.js';
+import {
+  KEY_VOICE_ASSIGNMENTS,
+  KEY_VOICE_READ_NAME_ENABLED,
+  KEY_VOICE_READING_ENABLED
+} from '../lib/voiceKeys.js';
 import {
   buildComeviewWindowOptions,
   pickComeviewGeometryToSave
@@ -132,11 +138,16 @@ const FULL_REFRESH_STORAGE_TIMEOUT_MS = 8000;
 const COMEVIEW_BOOT_READ_TIMEOUT_MS = 1500;
 /** ★v0.1.1321: onChanged の二重登録防止(キーを動的に引くので1回張れば足りる)。 */
 let _storageChangesWired = false;
-const KEY_LAST_WATCH_URL = 'nls_last_watch_url';
-const VOICE_READING_ENABLED_KEY = 'nls_voice_reading_enabled_v1';
-const VOICE_ASSIGNMENTS_KEY = 'nls_voice_assignments_v1';
+/*
+ * ★v0.1.1506: キー文字列の再定義をやめ、正本から import する。
+ *   ここには storageKeys.js:14 の KEY_LAST_WATCH_URL と、voicePlayer.js:168-170 の
+ *   読み上げ3キーが【二重定義】されていた＝片方だけ直す事故を生む形だった。
+ *   正本1つ・コピーを散らさない(github/CLAUDE.md の原則)。
+ */
+const VOICE_READING_ENABLED_KEY = KEY_VOICE_READING_ENABLED;
+const VOICE_ASSIGNMENTS_KEY = KEY_VOICE_ASSIGNMENTS;
 /** v0.1.699: 名前(ハンドルネーム)も読むか。既定OFF=本文だけ読む(ユーザー要望)。 */
-const VOICE_READ_NAME_KEY = 'nls_voice_read_name_enabled_v1';
+const VOICE_READ_NAME_KEY = KEY_VOICE_READ_NAME_ENABLED;
 
 let _liveId = '';
 let _paused = false;

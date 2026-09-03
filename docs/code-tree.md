@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 6 / 849 件
+## ⚠️ 役割コメントが無いソース 6 / 850 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `src/lib/laneDomSelfMeasure.js`
@@ -749,7 +749,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (1824)
+- 📁 **src/** (1826)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1014,7 +1014,7 @@
         - `logo_funlink_white_RGB_link_black.png`
         - `logo_funlink_white_RGB_maru_black.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1606)
+  - 📁 **lib/** (1608)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -2277,6 +2277,7 @@
     - `storageErrorState.js` — ストレージ書き込みエラーをポップアップ向けにシリアライズする純関数
     - `storageErrorState.test.js`
     - `storageFullReadCensus.test.js`
+    - `storageKeyLiteralSingleSource.test.js`
     - `storageKeys.js` — chrome.storage.local キー（プレフィックスで衝突回避）
     - `storageKeys.test.js`
     - `storageOpTimeout.js` — v0.1.502: 単発の非同期処理（主に chrome.storage.local の get/set/remove）を
@@ -2563,6 +2564,7 @@
     - `voiceFailureTaxonomy.js` — 【層】L0 判定層（純粋関数・I/O禁止）
     - `voiceInputDevices.js` — マイク確認でサンプルする時間（ms）
     - `voiceInputDevices.test.js`
+    - `voiceKeys.js` — 読み上げ設定の storage キーの【正本】。
     - `voiceLagBudget.js` — 会場読み上げの件数ゲート実効上限を、処理時間EMA(実測)から動的に
     - `voiceLagBudget.test.js`
     - `voiceLoadingState.js` — VOICEVOX 起動待ちのローディング表示を決める純関数群。

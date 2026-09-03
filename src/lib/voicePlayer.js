@@ -3,6 +3,11 @@
 import { buildVoiceReadingText, buildMergedVoiceText } from './voicevoxClient.js';
 import { isVoiceItemStale } from './voiceAgeGate.js';
 import { classifyVoiceSynthNull } from './voiceSynthFailure.js';
+import {
+  KEY_VOICE_ASSIGNMENTS,
+  KEY_VOICE_READ_NAME_ENABLED,
+  KEY_VOICE_READING_ENABLED
+} from './voiceKeys.js';
 import { classifyVoiceSynthFailureReason } from './voiceSynthFailureReason.js';
 import {
   computeVoiceCongestion,
@@ -165,9 +170,11 @@ export class VoicePlayer {
     try { this.onDiag(this.diag); } catch { /* 計器は本体の再生を妨げない */ }
   }
 
-  get VOICE_READING_ENABLED_KEY() { return 'nls_voice_reading_enabled_v1'; }
-  get VOICE_ASSIGNMENTS_KEY() { return 'nls_voice_assignments_v1'; }
-  get VOICE_READ_NAME_KEY() { return 'nls_voice_read_name_enabled_v1'; }
+  // ★v0.1.1506: キー文字列の正本は voiceKeys.js。getter の【形は残し】戻り値だけ委譲する
+  //   (comeview-entry.js と二重定義になっていた。片方だけ直す事故を構造的に無くす)。
+  get VOICE_READING_ENABLED_KEY() { return KEY_VOICE_READING_ENABLED; }
+  get VOICE_ASSIGNMENTS_KEY() { return KEY_VOICE_ASSIGNMENTS; }
+  get VOICE_READ_NAME_KEY() { return KEY_VOICE_READ_NAME_ENABLED; }
 
   /**
    * @param {{ forceOn?: boolean }} [opts]

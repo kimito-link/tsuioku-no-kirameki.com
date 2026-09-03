@@ -434,5 +434,17 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
   Object.freeze({
     version: '0.1.1505', metric: 'gate-selftest', value: 2,
     source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1506', metric: 'bundle-kb', value: 1409,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '★v0.1.1505(1408KB)から+1KB。キーの二重定義を正本(voiceKeys.js)へ寄せた分の'
+      + 'import が増えたため。★過去最良1360KB(v0.1.1454)には未達だが、この版の主眼は'
+      + '「同じ文字列が2箇所以上に書かれない構造にする」ことで、バンドル削減は別の版で扱う。'
+      + '(数字は消さない)'
+  }),
+  Object.freeze({
+    version: '0.1.1506', metric: 'gate-selftest', value: 3,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
   })
 ]);
