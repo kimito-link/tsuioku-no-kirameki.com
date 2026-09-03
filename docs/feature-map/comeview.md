@@ -44,6 +44,7 @@ graph LR
   n_comeview --> n_src_lib_voiceDiag_js["lib/voiceDiag.js"]:::shared
   n_comeview --> n_src_lib_voiceDiagKey_js["lib/voiceDiagKey.js"]:::shared
   n_comeview --> n_src_lib_voiceFailureTaxonomy_js["lib/voiceFailureTaxonomy.js"]:::shared
+  n_comeview --> n_src_lib_voiceKeys_js["lib/voiceKeys.js"]:::shared
   n_comeview --> n_src_lib_voiceLagBudget_js["lib/voiceLagBudget.js"]:::shared
   n_comeview --> n_src_lib_voiceLoadingState_js["lib/voiceLoadingState.js"]:::shared
   n_comeview --> n_src_lib_voicePlayer_js["lib/voicePlayer.js"]:::shared
@@ -52,6 +53,7 @@ graph LR
   n_comeview --> n_src_lib_voiceSynthFailureReason_js["lib/voiceSynthFailureReason.js"]:::shared
   n_comeview --> n_src_lib_voicevoxClient_js["lib/voicevoxClient.js"]:::shared
   n_comeview --> n_src_shared_avatar_avatarUrlGuard_js["shared/avatar/avatarUrlGuard.js"]:::shared
-  n_comeview --> n_src_shared_avatar_clampAvatarUrl_js["shared/avatar/clampAvatarUrl.js"]:::shared
   classDef shared fill:#eee,stroke:#999,color:#666;
 ```
+
+> ほか 1 ファイル省略（全件は storage-bus.md / metafile 参照）。

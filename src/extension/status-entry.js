@@ -96,7 +96,8 @@ import {
   KEY_BGM_ENABLED,
   KEY_BGM_VOLUME_REACH,
   KEY_BGM_VOLUME_FEVER,
-  isBgmEnabled
+  isBgmEnabled,
+  KEY_LAST_WATCH_URL
 } from '../lib/storageKeys.js';
 // レポートプレビュー信頼度注釈の文脈(fastDiag→ctx)の純関数。挙動同値で status-entry から切り出し。
 import { reportPreviewCtxFromFastDiag } from '../lib/reportPreviewCtx.js';
@@ -294,8 +295,8 @@ const PANEL_SUMMARY_PREFIX = 'nls_panel_summary_';
  */
 const WATCH_SNAPSHOT_PREFIX = 'nls_watch_snapshot_';
 
-/** 最後に視聴した URL の storage key。 */
-const KEY_LAST_WATCH_URL = 'nls_last_watch_url';
+/* ★v0.1.1506: KEY_LAST_WATCH_URL の再定義を削除し storageKeys.js から import する
+   (comeview-entry.js と合わせて【3箇所】で同じ文字列を定義していた)。 */
 
 /**
  * ★v0.1.1242(CWS提出ブロッカー BLOCKING-1): WEB公開の明示同意フラグ(既定OFF)。

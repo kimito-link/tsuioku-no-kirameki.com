@@ -22,9 +22,12 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
+import { runSelfTest } from './lib/instrument-core.mjs';
 
 /** 検査対象。git 追跡下＝push される＝公開されうる場所。 */
 const DEFAULT_DIRS = ['extension/dist', 'app/dist'];
+/** ★検知器に毒を食わせて赤が出るか確かめる(check-layer.mjs と同じ流儀)。 */
+const SELFTEST = process.argv.includes('--selftest');
 
 /**
  * 「キー名: "値"」の形で、値が空でないものを秘密の焼き込みとみなす。
@@ -64,25 +67,91 @@ function listJsFiles(dir) {
   return out;
 }
 
-const dirs = process.argv.length > 2 ? process.argv.slice(2) : DEFAULT_DIRS;
-/** @type {string[]} */
-const findings = [];
-
-for (const dir of dirs) {
-  for (const file of listJsFiles(dir)) {
-    const text = fs.readFileSync(file, 'utf8');
-    SECRET_FIELD_RE.lastIndex = 0;
-    let m;
-    while ((m = SECRET_FIELD_RE.exec(text)) !== null) {
-      const [, field, value] = m;
-      if (isBenign(value)) continue;
-      findings.push(`${file}: ${field} に値が焼き込まれています（${value.length}文字）`);
-    }
-    for (const { name, re } of SECRET_VALUE_RES) {
-      if (re.test(text)) findings.push(`${file}: ${name} らしき文字列が含まれています`);
+/**
+ * 指定ディレクトリを走査して、秘密らしき記述を全部返す。
+ * ★selftest から同じ関数を呼ぶために切り出した(検査本体と自己検査で
+ *   別のロジックを持つと、計器が本番とズレる = 実例を surechigai-lite の
+ *   debug エンドポイントで確認済み)。
+ * @param {string[]} targetDirs
+ * @returns {string[]}
+ */
+function scanForSecrets(targetDirs) {
+  /** @type {string[]} */
+  const out = [];
+  for (const dir of targetDirs) {
+    for (const file of listJsFiles(dir)) {
+      const text = fs.readFileSync(file, 'utf8');
+      SECRET_FIELD_RE.lastIndex = 0;
+      let m;
+      while ((m = SECRET_FIELD_RE.exec(text)) !== null) {
+        const [, field, value] = m;
+        if (isBenign(value)) continue;
+        out.push(`${file}: ${field} に値が焼き込まれています（${value.length}文字）`);
+      }
+      for (const { name, re } of SECRET_VALUE_RES) {
+        if (re.test(text)) out.push(`${file}: ${name} らしき文字列が含まれています`);
+      }
     }
   }
+  return out;
 }
+
+/*
+ * ★--selftest: 毒を入れて赤が出るか自分で確かめる(v0.1.1506)。
+ *
+ * ■ なぜこの検査を1本目に選んだか
+ *   「重要だから」ではなく【取り返しがつかないから】。他のゲートは壊れても
+ *   気づくのが遅れるだけだが、これが壊れると鍵が公開リポジトリへ push され、
+ *   ★ローテーションしても取り消せない(v0.1.1245 の実事故)。
+ *
+ * ■ 毒は2ケース(★誤検出よけも必ず入れる)
+ *   1. 秘密を含むファイルを置く → 赤くなるか
+ *      ★毒の値は「実際に漏れた鍵と同じ形」(32文字の URL-safe 乱数)にする。
+ *      ★短い英数字だと isBenign() の変数名よけ(24文字未満)に当たって
+ *        赤くならない= 毒が空振りする(この selftest を書いて初めて分かった)。
+ *   2. ingestKey:"" (空) を置く → ★赤くならないか
+ *      (空は「鍵を外した正常な状態」。ここで赤くなると出荷が常に止まる)
+ */
+if (SELFTEST) {
+  const tmpDir = path.join('extension', 'dist');
+  const poisonFile = path.join(tmpDir, '__selftest_secret_poison.js');
+  const benignFile = path.join(tmpDir, '__selftest_benign_poison.js');
+  const writeFile = (f, body) => {
+    fs.mkdirSync(path.dirname(f), { recursive: true });
+    fs.writeFileSync(f, body, 'utf8');
+  };
+  const removeFile = (f) => { try { fs.unlinkSync(f); } catch { /* 無ければよい */ } };
+
+  const { ok, fails } = runSelfTest([
+    {
+      name: '秘密が焼き込まれていたら赤',
+      poison: () => writeFile(poisonFile, 'export const c = { ingestKey: "xK9_mQ2p-vR7wL4nT8bZ3cF6dH1jS5yE" };\n'),
+      restore: () => removeFile(poisonFile),
+      isRed: () => scanForSecrets([tmpDir]).length > 0
+    },
+    {
+      name: '★空の ingestKey では赤にしない(誤検出よけ)',
+      poison: () => writeFile(benignFile, 'export const c = { ingestKey: "" };\n'),
+      restore: () => removeFile(benignFile),
+      // ★この毒では「赤にならない」ことが正しい。isRed の意味が反転するので
+      //   「赤くならなかったら合格」を true として返す。
+      isRed: () => scanForSecrets([tmpDir]).length === 0
+    }
+  ]);
+
+  if (!ok) {
+    console.error('[check-no-secrets-in-dist] ★selftest 失敗（この検査は守れていません）:');
+    for (const f of fails) console.error(`  ✗ ${f}`);
+    process.exit(1);
+  }
+  console.log('[check-no-secrets-in-dist] selftest OK（毒2件で赤/緑を確認）');
+  process.exit(0);
+}
+
+const dirs = process.argv.length > 2
+  ? process.argv.slice(2).filter((a) => !a.startsWith('--'))
+  : DEFAULT_DIRS;
+const findings = scanForSecrets(dirs.length ? dirs : DEFAULT_DIRS);
 
 if (findings.length) {
   console.error('[check-no-secrets-in-dist] ビルド成果物に秘密情報が含まれています:\n');
