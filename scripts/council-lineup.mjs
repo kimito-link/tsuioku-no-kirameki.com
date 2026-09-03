@@ -140,6 +140,25 @@ export const LINEUP = [
   //  （roleOfは部分一致・先勝ちのため。実行検証済み）。
   { label: 'cloudflare/gpt-oss-20b', provider: 'cloudflare', rawId: '@cf/openai/gpt-oss-20b', apiModel: '@cf/openai/gpt-oss-20b', opts: {}, timeoutMs: 60000, requires: ['CF', 'CF_ACC'], liveProbe: true },
 
+  // ★2026-09-03 追加（fast役のクラウド不在を解消＋Llama系0体の是正）:
+  //  それまで **fast役はクラウドに1体も居らず**、ローカル local/qwen3.5:9b の単騎だった。
+  //  Ollamaが止まっている環境では ROLE_FALLBACK(fast→generalist) で代替されるため会議は
+  //  成立するが、「速い視点」という役割そのものは消えていた＝PC依存の穴。
+  //  同時に系譜の偏りも是正する: 採用16体の内訳は OpenAI-oss/Qwen/NVIDIA/Mistral 各3・
+  //  Google2・Zhipu1・DeepSeek1 で **Llama系が0体**だった。会議は同じ間違い方をする
+  //  モデルを増やしても意味がないので、系譜の多様性は冗長化と同じくらい重要。
+  //  実測(本番と同じ /ai/v1/ 経由・2並列): 200 OK / 1670ms・3511ms。
+  //  fast役の実プロンプト(要約)でも 1391〜2218ms で的確に3行要約した。
+  //  恒久ルール2(2並列200 OK)充足。weightは"cloudflare"判定で自動4(reserve層)＝
+  //  ローカルqwen3.5:9bが健在な平常時は選ばれず、Ollama停止時にだけ浮上する。
+  //  ★同日に測った他のCF候補は見送り（いずれも2並列200だが本エントリより遅い）:
+  //   @cf/openai/gpt-oss-120b 7472/8444ms（criticは既に4体で足りている）、
+  //   @cf/mistralai/mistral-small-3.1-24b 11352/8103ms、@cf/google/gemma-4-26b 9046/7610ms。
+  //  ラベルは 'cloudflare/llama-3.3-70b' 必須: roleOfの"llama-3.3"→fast判定に一致させる
+  //  （2026-08-18のgroq/llama-3.3-70b撤去時に「復活したらそのまま効く」として温存した行が、
+  //   ここで実際に効く。コメントで残した判定行が後日に効いた実例）。
+  { label: 'cloudflare/llama-3.3-70b', provider: 'cloudflare', rawId: '@cf/meta/llama-3.3-70b-instruct-fp8-fast', apiModel: '@cf/meta/llama-3.3-70b-instruct-fp8-fast', opts: {}, timeoutMs: 60000, requires: ['CF', 'CF_ACC'], liveProbe: true },
+
   // Cloudflare Workers AI（2026-06-27 実機で 200＋本文を裏取りして採用。X 一覧は鵜呑みにせず叩いて確認）。
   //  - 採用基準: 会議に「無い能力」を足すものだけ。gpt-oss-120b / llama-3.3-70b は Groq 等で既出なので CF では足さない。
   //  - nemotron-3-120b: どこにも無い大型の別頭脳 → 汎用(generalist)。/ai/models/search で実在確認済み。
