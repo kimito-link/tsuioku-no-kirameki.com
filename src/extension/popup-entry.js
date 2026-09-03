@@ -1094,13 +1094,14 @@ function applyResponsivePopupLayout() {
   const heightMax = sh >= 900 ? 960 : sh >= 800 ? 900 : 860;
   const heightMin = sh >= 760 ? 700 : sh >= 660 ? 640 : 560;
   const baseHeight = Math.max(heightMin, Math.min(heightMax, Math.round(sh * 0.88)));
-  /**
-   * アクションポップアップの実効表示は多くの環境で ~600px 未満。それより高い html/body を
-   * 固定するとウィンドウ外枠のスクロールと .nl-main のスクロールが二重になる。
-   * main.scrollHeight を外枠に足すのはスクロール領域の全文高になり得るため使わない。
-   */
+  // アクションポップアップの実効表示は多くの環境で ~600px 未満。高い html/body は二重スクロール化する。
+  // ★standalone popup（nl-popup-window）かつ active watch（nl-empty-state無し）だけ580pxキャップを外す。
+  const isStandaloneWindow = document.documentElement.classList.contains('nl-popup-window');
+  const isEmptyStateForHeightCap = document.documentElement.classList.contains('nl-empty-state');
   const CHROME_ACTION_POPUP_MAX_HEIGHT_PX = 580;
-  const height = Math.min(CHROME_ACTION_POPUP_MAX_HEIGHT_PX, baseHeight);
+  const height = isStandaloneWindow && !isEmptyStateForHeightCap
+    ? baseHeight
+    : Math.min(CHROME_ACTION_POPUP_MAX_HEIGHT_PX, baseHeight);
   const baseFont =
     width >= 500
       ? 16.25
@@ -13058,6 +13059,9 @@ function relocateSupportTimelineForStandaloneWindow() {
  *   - 冪等(既に目的位置の直前にあれば no-op)。元の compose にはコメント送信ボタンが残る(自然)。
  */
 function hoistQuickToolbarToTop() {
+  // ★empty stateでは.nl-comment-compose(親)がCSS非表示になる設計だが、この関数はツールバーを
+  //   .nl-main直下へDOM移動させ非表示から外してしまう（実測で発覚）。empty stateでは昇格しない。
+  if (document.documentElement.classList.contains('nl-empty-state')) return;
   const toolbar = /** @type {HTMLElement|null} */ (document.querySelector('.nl-compose-quick-toolbar'));
   const main = /** @type {HTMLElement|null} */ (document.querySelector('.nl-main'));
   if (!(toolbar instanceof HTMLElement) || !(main instanceof HTMLElement)) return;
@@ -15131,6 +15135,18 @@ async function closeStandalonePopupAfterNavigate(openedStreamTab) {
   }
 }
 
+/** update()後、innerHeight安定を最大1.5sポーリングし--nl-pop-heightに同期（resize待ちのみだと反映遅延・実測）。*/
+async function waitForWindowResizeThenSyncPopHeight() {
+  let last = -1, stable = 0;
+  for (let i = 0; i < 15 && stable < 2; i++) {
+    await new Promise((r) => setTimeout(r, 100));
+    const h = Math.round(window.innerHeight || 0);
+    stable = h === last ? stable + 1 : 0;
+    last = h;
+  }
+  if (last > 0) document.documentElement.style.setProperty('--nl-pop-height', `${last}px`);
+}
+
 async function resizePopupWindowForState(input) {
   if (INLINE_MODE) return;
   // v0.1.406: 拡張リロード後に古い popup が残っていると chrome.windows.update が
@@ -15186,24 +15202,20 @@ async function resizePopupWindowForState(input) {
 
     // 0.1.73 (BC): empty state は CSS で body cap を解除し、content の高さに
     //   合わせて body を伸ばすようにした。よって `nlPopupPrimary.scrollHeight`
-    //   が「実際に見せるべき content の高さ」になる。これに OS chrome 余裕 40px
-    //   を足して outer height とする。
-    //   primary を使う理由: body.scrollHeight は body cap 580 で止まるが（後方互換
-    //   のため CSS cap は default 残す）、primary は cap がかかっていないので
-    //   生の content 高さが取れる。
-    //
-    //   active watch (emptyState=false) は preset 780 のまま。
+    //   が「実際に見せるべき content の高さ」になる。これに OS chrome 余裕 40px を足して
+    //   outer height とする。primaryを使う理由: body.scrollHeightはbody cap 580で止まるが
+    //   （後方互換のためCSS capはdefault残す）、primaryはcapがかかっていないので生のcontent
+    //   高さが取れる。active watch (emptyState=false) は preset 780 のまま。
     /** @type {{ contentHeightPx: number, chromeOverheadPx: number }|undefined} */
     let viewportHint = undefined;
     if (emptyState) {
       try {
-        // 1 frame 待って CSS の hide / cap 解除が反映されたあとに測る
+        // 1 frame 待つ（CSS反映後）。scrollHeightは兄弟要素高を含まず過小評価のため
+        // getBoundingClientRect().bottom（ビューポート絶対位置）を使う（実測）。
         await new Promise((r) => requestAnimationFrame(() => r(undefined)));
         const primary = document.getElementById('nlPopupPrimary');
-        const measured =
-          (primary && Number.isFinite(primary.scrollHeight)
-            ? primary.scrollHeight
-            : 0) || 0;
+        const primaryBottom = primary ? primary.getBoundingClientRect().bottom : 0;
+        const measured = Number.isFinite(primaryBottom) ? Math.max(0, Math.round(primaryBottom)) : 0;
         if (measured > 0) {
           viewportHint = {
             contentHeightPx: measured,
@@ -15225,6 +15237,7 @@ async function resizePopupWindowForState(input) {
       height,
       width: POPUP_WINDOW_WIDTH
     });
+    await waitForWindowResizeThenSyncPopHeight(); // update()後の--nl-pop-height非追従を補正
   } catch (err) {
     // 「Extension context invalidated」はリロード後の古い popup で起こる無害な失敗。
     // 騒がしくしない（chrome://extensions のエラー欄に出さない）。それ以外だけ warn。

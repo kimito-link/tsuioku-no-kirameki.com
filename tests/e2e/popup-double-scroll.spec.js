@@ -1,10 +1,27 @@
-import { test, expect } from './fixtures.js';
+import { test, expect, dismissExtensionUsageTermsGate } from './fixtures.js';
 
 /*
  * ユーザー報告「Chromeのアイコンを押したポップアップでスクロールバーが2つも出る」の再現と検証。
  * 二重スクロールは body / .nl-main / .nl-popup-primary のいずれかが同時に overflow:auto|scroll に
- * なると起きる。ここでは実ユーザー条件（standalone popup, dark skin, データあり）で
+ * なると起きる。ここでは実ユーザー条件（standalone popup, データあり）で
  * 「縦方向に scroll 可能な要素が .nl-main 1 つだけ」を保証する。
+ *
+ * ★2026-09-01: 当初「active watch タブ（配信中）」の状態を再現しようとしたが、これは
+ *   popup-multitab-empty-dash-rescue.spec.js が守る安全設計（standalone popup window
+ *   では chrome.tabs.query({active:true, currentWindow:true}) が popup 自身を返すため、
+ *   「ユーザーが今見ている配信」と「別タブの古い記録」を原理的に区別できず、拡張は
+ *   安全側＝empty state（前回配信レビュー）に倒す設計）と真っ向から矛盾する。
+ *   watch タブを開いて bringToFront() してから standalone popup を開く、という
+ *   セットアップ自体が「別タブの記録を誤ってアクティブ表示させようとする」構図になり、
+ *   一度は popupWatchUrlResolveMultiTab.js 側を変更して通そうとしたが、
+ *   popup-multitab-empty-dash-rescue.spec.js を退行させたため revert した。
+ *
+ *   正しい検証対象は「配信中かどうか」ではなく「実データが多いレイアウトで二重スクロール
+ *   しないか」なので、popup-window-empty-history-real.spec.js と同じパターン
+ *   （IndexedDB の nls_broadcast_summary_v1 に前回配信サンプルを直接シードし、
+ *   empty state＝前回配信レビューとして実データを描画させる）に変更した。これなら
+ *   popup-multitab-empty-dash-rescue.spec.js の安全設計と衝突せず、かつ「実データが
+ *   ある状態で二重スクロールしないこと」という本来の検証目的も満たせる。
  */
 async function extensionBasePath(context) {
   const deadline = Date.now() + 60_000;
@@ -22,24 +39,107 @@ test('standalone popup: body はスクロールせず .nl-main 1本のみがス�
   context
 }) => {
   const base = await extensionBasePath(context);
-  const page = await context.newPage();
-  // データ入り状態: 応援ランキング・記録件数など content が埋まった状態で double-scroll が出るか
+  const popupUrl = `${base}/popup.html`;
   const sw = context
     .serviceWorkers()
     .find((w) => w.url().startsWith('chrome-extension://'));
-  if (sw) {
-    await sw.evaluate(async () => {
-      await chrome.storage.local.set({
-        nls_recording_enabled: true,
-        nls_usage_terms_ack_ver: 1
-      });
+  if (!sw) throw new Error('service worker not found');
+
+  // 1) popup ページを通常タブで開いて、その origin の IDB に「前回配信」履歴を1件入れる
+  //    （popup-window-empty-history-real.spec.js と同じパターン）。
+  const seed = await context.newPage();
+  await seed.goto(popupUrl, { waitUntil: 'domcontentloaded', timeout: 60_000 });
+  await seed.evaluate(async () => {
+    const DB_NAME = 'nls_broadcast_summary_v1';
+    const STORE = 'samples';
+    const db = await new Promise((resolve, reject) => {
+      const req = indexedDB.open(DB_NAME, 1);
+      req.onupgradeneeded = () => {
+        const d = req.result;
+        if (!d.objectStoreNames.contains(STORE)) {
+          const s = d.createObjectStore(STORE, { keyPath: 'id', autoIncrement: true });
+          s.createIndex('byLiveCaptured', ['liveId', 'capturedAt'], { unique: false });
+          s.createIndex('byCapturedAt', 'capturedAt', { unique: false });
+        }
+      };
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => reject(req.error);
     });
-  }
-  await page.goto(`${base}/popup.html`, {
-    waitUntil: 'load',
-    timeout: 30_000
+    await new Promise((resolve, reject) => {
+      const tx = db.transaction(STORE, 'readwrite');
+      tx.objectStore(STORE).add({
+        liveId: 'lv888888888',
+        capturedAt: Date.now() - 60_000,
+        watchUrl: 'https://live.nicovideo.jp/watch/lv888888888',
+        recording: true,
+        commentStorageCount: 123,
+        uniqueKnownCommenters: 20,
+        giftUserCount: 3,
+        peakConcurrentEstimate: 456,
+        officialCommentCount: 789,
+        officialViewerCount: 456,
+        officialCaptureRatio: 0.8,
+        broadcastTitle: 'テスト配信タイトル（データ入り）',
+        broadcasterName: 'テスト配信者',
+        viewerCountFromDom: 456
+      });
+      tx.oncomplete = () => resolve(undefined);
+      tx.onerror = () => reject(tx.error);
+    });
+    db.close();
   });
+  await seed.close();
+  await sw.evaluate(async () => {
+    await chrome.storage.local.set({
+      nls_recording_enabled: true,
+      nls_usage_terms_ack_ver: 1
+    });
+  });
+
+  // 2) 実 popup ウィンドウを開く（active watch タブが無い→empty state＝前回配信レビュー
+  //    として上でシードしたデータが描画される）。
+  //    ★page.goto()で直接開くだけだと、chrome.windows.getCurrent()のtypeが'popup'に
+  //    ならず、popup-entry.jsのnl-popup-windowクラス付与ロジック(win.type!=='popup'で
+  //    early return)が発火しない。すると html:not(.nl-inline) の580pxキャップが
+  //    外れないまま実データを描画し、コンテンツが580pxを超えて二重スクロールになる
+  //    （実測・CI/ローカル両方で再現・2026-09-01）。実際のstandalone windowの起動
+  //    経路(chrome.windows.create({type:'popup'}))を通す。
+  await sw.evaluate(
+    async (url) => {
+      await chrome.windows.create({
+        url,
+        type: 'popup',
+        width: 420,
+        height: 780,
+        focused: false
+      });
+    },
+    popupUrl
+  );
+
+  let page;
+  const deadline = Date.now() + 30_000;
+  while (Date.now() < deadline) {
+    page = context.pages().find((p) => p.url() === popupUrl);
+    if (page) break;
+    await new Promise((r) => setTimeout(r, 200));
+  }
+  if (!page) throw new Error('standalone popup page was not created');
+
+  await dismissExtensionUsageTermsGate(page);
   await page.waitForSelector('#nlPopupPrimary', { timeout: 20_000 });
+  // ★nl-popup-windowクラスはchrome.windows.getCurrent()の非同期解決を待って
+  //   付与される（popup-entry.js:15243-15267）。固定スリープだけに頼ると、
+  //   クラス付与前に計測してCSSの580pxキャップが外れていない状態を拾う
+  //   （実測・2026-09-01）。クラス自体の付与を明示的に待つ。
+  await page.waitForFunction(
+    () => document.documentElement.classList.contains('nl-popup-window'),
+    { timeout: 20_000 }
+  );
+  // 描画完了マーカー（popup-window-empty-history-real.spec.jsと同じ確認軸）
+  await expect(
+    page.locator('html[data-nl-popup-content-painted="1"]')
+  ).toBeAttached({ timeout: 15_000 });
   // cloak auto-reveal の完全終了（750ms 以上）を待つ
   await page.waitForTimeout(1200);
 
@@ -86,10 +186,19 @@ test('standalone popup: body はスクロールせず .nl-main 1本のみがス�
       scrollable,
       htmlOverflowY: globalThis.getComputedStyle(html).overflowY,
       bodyOverflowY: globalThis.getComputedStyle(body).overflowY,
-      htmlScrollExceed: html.scrollHeight > html.clientHeight + 1,
+      // ★2026-09-01: document.documentElement.clientHeight（html.clientHeight）は
+      //   CSSOM View 仕様上、実レイアウト結果ではなく window.innerHeight（ビューポート
+      //   サイズ）に固定される特別な挙動を持つ（html/body 双方の CSSでの実際の高さ計算
+      //   結果は html.offsetHeight / getComputedStyle().height / body.clientHeight に
+      //   正しく反映される）。standalone popup window で chrome.windows.update() 後に
+      //   window.innerHeight が Playwright headless/CI 環境で新ウィンドウ高へ追従しない
+      //   ケースがあり、html.clientHeight だけがそれに引きずられて古い値のまま固定される
+      //   （実測: html.offsetHeight=1123 で正しいのに html.clientHeight=720 のまま）。
+      //   html 側の溢れ判定は html.offsetHeight を使う（html.clientHeight は使わない）。
+      htmlScrollExceed: html.scrollHeight > html.offsetHeight + 1,
       bodyScrollExceed: body.scrollHeight > body.clientHeight + 1,
       innerHeight: globalThis.innerHeight,
-      htmlClientH: html.clientHeight,
+      htmlClientH: html.offsetHeight,
       bodyClientH: body.clientHeight,
       htmlScrollH: html.scrollHeight,
       bodyScrollH: body.scrollHeight
