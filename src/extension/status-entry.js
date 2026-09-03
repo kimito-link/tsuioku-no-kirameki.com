@@ -2821,7 +2821,15 @@ function ensureStatusPopupIframe(lvList, laneMirror) {
  *      status 側の DOM は増えない（`venue.html` は全23行）。
  *   2. 会場は **storage 経由**でデータを取る（standalone は `onLiveComments` が来ない設計・
  *      `venueBar.js:76`）。★status が新しく storage を読む必要はない＝このページの負荷は増えない。
- *   3. iframe は **別文書＝別のメインスレッド予算**。status の2秒ループとは独立して動く。
+ *   3. ★訂正(2026-09-03): 「iframe は別文書＝別のメインスレッド予算」は誤り。
+ *      same-origin の iframe は親と【同一メインスレッド】を共有する
+ *      (`aboutBlankGapVerdict.js` の実測が前提にしている事実)。
+ *      ★ただし実害は無い: この埋め込みは lv 不変の間はロードし直さない
+ *      (下の署名ガード `_lastStatusVenueEmbedSrc` )ので、ロード負荷は開いた瞬間の一度きり。
+ *      `venue.js` は `changelog-archive.js`(黒画面の主因だった1MB)を含まない分割後のバンドルで、
+ *      同種のバンドルは `aboutBlankGapVerdict.js` に記録された実測で
+ *      1,373ms→106ms(92%減)まで縮んでいる側にある(2026-08-19の分割の恩恵をこちらも受ける)。
+ *      ★それでも重いと分かれば、下の kill switch を false に戻すだけで消える。
  *
  * ■ ★戻し方
  *   ここを false にするだけ。下の分岐が iframe を除去して section を隠す。

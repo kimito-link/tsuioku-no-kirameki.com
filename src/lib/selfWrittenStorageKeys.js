@@ -99,7 +99,37 @@ const SELF_WRITTEN_PATTERNS = Object.freeze([
    *   正本: laneMirrorKey.js の laneMirrorKeyFor / laneReceiptKeyFor。
    */
   /^nls_lane_mirror_v\d+_lv\d{1,15}$/i,
-  /^nls_lane_receipt_v\d+_lv\d{1,15}$/i
+  /^nls_lane_receipt_v\d+_lv\d{1,15}$/i,
+
+  /*
+   * ★v0.1.1503: 鏡バンドル以外の自己書き込み3種を追加。
+   *
+   * ■ 実測(2026-08-23状態速報・v0.1.1484の内訳計器で確定)
+   *     描き直し1,106回のうちコメント由来は3.0%だけ。残り97%は storage 更新。
+   *     最多3つ: nls_panel_summary_*(219) / nls_watch_snapshot_*(196) /
+   *              ai_share+status_lite(173)
+   *   このうち後者2種(196+173=369回・33.3%)は isHighFrequencyCommentRelatedStorageKey が
+   *   false のため、popupStorageRefreshCoalesce.js の allHighFreq 判定に混ざると
+   *   450msスロットルを丸ごと素通りする(このファイル冒頭の stripSelfWrittenRenderArtifacts
+   *   と同型の穴が、鏡以外のキーには塞がれていなかった)。
+   *
+   * ■ nls_watch_snapshot_<lv> … popup 自身が書く(popup-entry.js の cached-first render
+   *   write-through)。popup 自身の onChanged が即座に受けて再描画する自己フィードバック。
+   *   正本: storageKeys.js#watchSnapshotStorageKey。実キーで確認済み(定数名だけで
+   *   正規表現を書かない・v0.1.1345の教訓)。
+   *
+   * ■ ai_share_fast_diag / status_fast_diag_lite … 純粋な診断キー。中身が同じでも
+   *   書き込み時刻の記録が毎回更新されるため必ず onChanged が発火する。status.html は
+   *   自前の2秒ループで読んでおり popup の onChanged には依存しないため、
+   *   popup 側の再描画トリガーから外しても失うものが無い。
+   *
+   * ★panel_summary(219回・最多)は【あえて含めない】。watchUrlFreshness.js が
+   *   その updatedAt を「配信がまだ生きているか」の生存確認に使っており、
+   *   自己書き込み扱いで無変化スキップすると誤診の恐れがあるため触らない。
+   */
+  /^nls_watch_snapshot_lv\d{1,15}$/i,
+  /^nls_ai_share_fast_diag_v\d+$/i,
+  /^nls_status_fast_diag_lite_v\d+$/i
 ]);
 
 /**

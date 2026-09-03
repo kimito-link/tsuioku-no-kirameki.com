@@ -423,5 +423,16 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
   Object.freeze({
     version: '0.1.1502', metric: 'gate-selftest', value: 2,
     source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1505', metric: 'bundle-kb', value: 1408,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '★v0.1.1502の1413KBより減った(引き金3種を自己書き込み登録し、無関係な'
+      + 'onChangedを削った副次効果)。ただし過去最良1360KB(v0.1.1454)にはまだ届いていない。'
+      + 'バンドル削減そのものは別の版で扱う(数字は消さない)。'
+  }),
+  Object.freeze({
+    version: '0.1.1505', metric: 'gate-selftest', value: 2,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
   })
 ]);
