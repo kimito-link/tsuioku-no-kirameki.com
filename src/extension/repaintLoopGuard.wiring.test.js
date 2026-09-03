@@ -75,4 +75,18 @@ describe('repaint loop guard wiring (popup-entry.js)', () => {
     // 素の 'storage_changed' リテラルへ後退していないこと(格上げの取り消し防止)。
     expect(popupSrc).not.toContain("tagRefreshReason('storage_changed')");
   });
+
+  /*
+   * ★v0.1.1502: 読んだタグを【消す】。
+   *   _refreshReasonTag はモジュールグローバルなので、タグを置かずに safeRefresh() を
+   *   呼ぶ経路(クリック由来が15箇所ある)では【直前の別経路のタグが再利用】され、
+   *   速報の「描き直しの内訳」が実際とずれていた。
+   *   ★計器が嘘をつく側の穴なので、消す行が外れたら赤くする。
+   */
+  it('★読んだ引き金タグを消している(前の値の使い回しで内訳が汚れない)', () => {
+    const at = popupSrc.indexOf("noteRepaintReason(_refreshReasonTag || 'unknown');");
+    expect(at).toBeGreaterThan(0); // ★走査0件を緑にしない
+    // 同じ行(または直後)で空へ戻していること。
+    expect(popupSrc.slice(at, at + 160)).toMatch(/_refreshReasonTag = '';/);
+  });
 });

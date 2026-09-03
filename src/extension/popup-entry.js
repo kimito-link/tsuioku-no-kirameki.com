@@ -16750,7 +16750,7 @@ async function refresh() {
     //   初回/配信切替/未描画(空)のときは見送らず必ず描画する。
     // 白フラッシュ見える化: ここから renderWatchMetaCard までの重い paint 区間を計測する。
     _perfPaintCount += 1;
-    noteRepaintReason(_refreshReasonTag || 'unknown'); // v0.1.1248: 引き金別に積む
+    noteRepaintReason(_refreshReasonTag || 'unknown'); _refreshReasonTag = ''; // v0.1.1248:引き金別/★1502:読んだら消す(前の値の使い回し=内訳の嘘を防ぐ)
     const _perfPaintT0 = typeof performance !== 'undefined' ? performance.now() : Date.now();
     const userRoomsUl = /** @type {HTMLElement|null} */ ($('userRoomList'));
     const userRoomsAlreadyPainted =

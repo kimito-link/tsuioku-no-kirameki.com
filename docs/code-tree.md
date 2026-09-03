@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 6 / 848 件
+## ⚠️ 役割コメントが無いソース 6 / 849 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `src/lib/laneDomSelfMeasure.js`
@@ -748,7 +748,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (1821)
+- 📁 **src/** (1823)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1013,7 +1013,7 @@
         - `logo_funlink_white_RGB_link_black.png`
         - `logo_funlink_white_RGB_maru_black.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1603)
+  - 📁 **lib/** (1605)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -1256,6 +1256,8 @@
     - `comeviewUserNotes.js` — v0.1.667: コメビュのユーザー詳細(わんコメ式 ニックネーム/ラベル/メモ)の純ロジック。
     - `comeviewUserNotes.test.js`
     - `comeviewVoiceParity.wiring.test.js`
+    - `comeviewWindowGeometry.js` — コメビュ別窓／OBS窓の「大きさと位置を覚える」純関数。
+    - `comeviewWindowGeometry.test.js`
     - `commentChunkModeFailOpen.wiring.test.js`
     - `commentChunkStore.js` — v0.1.509: コメント本体の「追記専用チャンク分割」純関数群＋ストレージ orchestration。
     - `commentChunkStore.test.js`

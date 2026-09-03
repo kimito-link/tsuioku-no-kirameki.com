@@ -5,8 +5,8 @@
 
 ## storage の出入り
 
-- 書くキー: `KEY_VOICE_DIAG`, `fn:comeviewPinStorageKey`
-- 読むキー: `KEY_LAST_WATCH_URL`, `KEY_USER_COMMENT_PROFILE_CACHE`
+- 書くキー: `KEY_COMEVIEW_WINDOW_GEOMETRY`, `KEY_VOICE_DIAG`, `fn:comeviewPinStorageKey`
+- 読むキー: `KEY_COMEVIEW_WINDOW_GEOMETRY`, `KEY_LAST_WATCH_URL`, `KEY_USER_COMMENT_PROFILE_CACHE`
 
 ## 構成ファイル（import 到達・最大40件表示）
 
@@ -22,6 +22,7 @@ graph LR
   n_comeview --> n_src_lib_comeviewRows_js["lib/comeviewRows.js"]:::shared
   n_comeview --> n_src_lib_comeviewTimelineDiff_js["lib/comeviewTimelineDiff.js"]
   n_comeview --> n_src_lib_comeviewUserNotes_js["lib/comeviewUserNotes.js"]:::shared
+  n_comeview --> n_src_lib_comeviewWindowGeometry_js["lib/comeviewWindowGeometry.js"]
   n_comeview --> n_src_lib_commentChunkStore_js["lib/commentChunkStore.js"]:::shared
   n_comeview --> n_src_lib_commentDb_js["lib/commentDb.js"]:::shared
   n_comeview --> n_src_lib_commentRecord_js["lib/commentRecord.js"]:::shared
