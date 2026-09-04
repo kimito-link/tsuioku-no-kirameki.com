@@ -1,6 +1,7 @@
 // @ts-nocheck — popup UI; DOM/Chrome API が広く any 相当
 // popup-entry.js — ポップアップ UI 本体。応援レーン描画・HTMLレポート生成・各種診断/共有のまとめ役。
 import { extractLiveIdFromUrl, isNicoLiveWatchUrl, watchPageUrlsMatchForSnapshot } from '../lib/broadcastUrl.js';
+import { shouldSkipMirrorForLiveId } from '../lib/passiveMirrorLiveIdGuard.js';
 // v0.1.1057: HTMLレポート組み立てクラスタを popup/report/ へ切り出し(max-linesラチェット対応・挙動不変)。
 import {
   buildYukkuriImageDataUrlMap,
@@ -7211,18 +7212,14 @@ function renderStoryUserLane() {
    *   publish が運ぶ buckets / picked / rosteredCandidates は【この行より前】で確定済み。
    *   描画のスキップは正しい最適化だが、publish は描画ではなく【運搬】なので巻き添えにしない。
    *
-   * ■ 読者は誰か
-   *   ★src/lib/laneMirrorContract.js の LANE_MIRROR_CONSUMERS が正本。
-   *     【会場モード(venueBar.js)もこの鏡を読む】=v0.1.1111 で「会場の正本」に昇格している。
-   *     書き手が読者を知らないまま片側を変えると会場が無言で壊れる(8回再発した構造的真因)。
-   *     登録簿はCIが実importと照合するので、読者が増えたら必ず気づける。
+   * ■ 読者は誰か: ★src/lib/laneMirrorContract.js の LANE_MIRROR_CONSUMERS が正本。
+   *   【会場モード(venueBar.js)もこの鏡を読む】=v0.1.1111 で「会場の正本」に昇格。書き手が読者を知らずに
+   *   片側を変えると会場が無言で壊れる(8回再発した構造的真因)。登録簿はCIが実importと照合＝読者増に気づける。
    *
-   * ■ domSelf(①の実DOM計測)の扱い ★「古くなる」わけではない
-   *   domSelf は会場の parity 判定(venueLaneParity.js)が読む【タイル寸法の突合】用で、
-   *   顔ぶれ(誰が並ぶか)の判定には使われていない。
-   *   ★measureLaneDomSelf は「そのとき存在するDOMの寸法」を読むだけなので、
-   *     描画をスキップした = DOM が変わっていない = 寸法も変わっていない。
-   *     よって直近に描けたときの値を持ち回しても、それは【古い値ではなく正しい値】。
+   * ■ domSelf(①の実DOM計測) ★「古くなる」わけではない
+   *   domSelf は会場の parity 判定(venueLaneParity.js)が読む【タイル寸法の突合】用で、顔ぶれ判定には使わない。
+   *   ★measureLaneDomSelf は「そのとき存在するDOMの寸法」を読むだけ＝描画をスキップした=DOMが変わっていない
+   *     =寸法も変わっていない。直近に描けたときの値を持ち回しても【古い値ではなく正しい値】。
    *   描いた直後は下の paint 経路が _laneDomSelfLast を更新する。
    */
   // 計器: publish に到達した時刻(見送りカウンタと対で読む)。
@@ -7364,6 +7361,15 @@ const PREVIEW_ACK_GEN_REFRESH_MS = 10000;
 let _commentTimelineMirrorPassiveSig = '';
 
 /**
+ * 受動ビューが「今どの配信を映すべきか」。passive は dock!=='sidepanel' ＝ INLINE_EMBED_WATCH に含まれるので
+ *   `&lv=` 由来の INLINE_OWN_WATCH_URL を持つ(SPA 遷移は updateInlineOwnWatchUrlFromLv が in-place 更新)。
+ *   取れなければ空＝shouldSkipMirrorForLiveId が fail-open で素通しする(空画面より古い表示を選ぶ)。
+ * @returns {string}
+ */
+function currentPassiveSurfaceLiveId() {
+  return extractLiveIdFromUrl(INLINE_OWN_WATCH_URL) || String(watchPopupLastPaintedLiveId || '');
+}
+/**
  * ★2026-06-26: 受動ビュー(応援プレビュー dock=liveview)で応援レーン(りんく/こん太/広告/たぬ姉)を
  *   【鏡】から描く。passive は heavy comments を完走できず STORY_SOURCE_STATE.entries が空=
  *   renderStoryUserLane が即 return して応援レーンが出ない真因(council/liveview-all-lanes-SYNTHESIS.md)。
@@ -7384,6 +7390,8 @@ async function applyLaneMirrorForPassive() {
     return;
   }
   if (!snap || typeof snap !== 'object') return;
+  // ★別配信の古い鏡は貼らない(①POP の applyLaneMirrorForMainPopupFallback と同じ判定・passive は素通しだった)。
+  if (shouldSkipMirrorForLiveId(snap.liveId, currentPassiveSurfaceLiveId())) return;
   const buckets = restoreLaneMirrorBuckets(snap);
   const totalCells =
     buckets.link.length + buckets.gift.length + buckets.ad.length + buckets.konta.length + buckets.tanu.length;
@@ -7626,6 +7634,7 @@ async function applyCommentTimelineMirrorForPassive() {
   } catch {
     return;
   }
+  if (shouldSkipMirrorForLiveId(snap && snap.liveId, currentPassiveSurfaceLiveId())) return; // ★別配信の鏡を貼らない
   const rows = restoreCommentTimelineRows(snap);
   if (!rows.length) return; // データ無し=popup の空状態(placeholder)のまま(死に画面にしない)
   // v0.1.1226: ①と同一の純関数で選ぶ。バケット丸めが決定的=同じ7秒窓なら①と同じ1件になる。
@@ -7661,14 +7670,11 @@ let _northStarMirrorPassiveSig = '';
 // v0.1.1019: passive 数字カード鏡のペインター(sig ガード込み・状態は lib 内)。
 const _statCardsMirrorPassivePaint = createStatCardsMirrorPassivePainter(typeof document !== 'undefined' ? document : { getElementById: () => null });
 /**
- * ★v0.1.965(council/single-source-of-truth-SYNTHESIS.md 第1段): 受動ビュー(応援プレビュー dock=liveview)で
- *   北極星レーン(貢献度ランキング/広告ランキング)を【鏡】(KEY_NORTH_STAR_MIRROR=本物 popup が watch タブで
- *   publishNorthStarMirror した行)から描く。応援レーン(applyLaneMirrorForPassive)・コメント
- *   (applyCommentTimelineMirrorForPassive)は鏡経路があったのに、北極星だけ apply 関数が無く=
- *   passive で北極星の描画関数が一度も呼ばれず(diag activePath="" / refreshAllStarted=0)=
- *   「見せる側は同じ鏡を読むだけ」の星野ロミ型から漏れていた(ユーザー指摘の核心)。
- *   → 純Web app/live-view.js:paintNorthStarMirror と同型・本物 paintTopSupportRankStyleIntoElement を再利用(似せて自作しない)。
- *   storage read のみ=passive 原則を守る(書かない/注入しない/fetch しない)。重い refreshAll に依存しない=軽い。
+ * ★v0.1.965(council/single-source-of-truth-SYNTHESIS.md 第1段): 受動ビューで北極星レーン(貢献度/広告ランキング)を
+ *   【鏡】KEY_NORTH_STAR_MIRROR(①が publishNorthStarMirror した行)から描く。レーン/コメントには鏡経路があったのに
+ *   北極星だけ apply 関数が無く passive で一度も描画関数が呼ばれず(diag activePath="" / refreshAllStarted=0)、
+ *   「見せる側は同じ鏡を読むだけ」から漏れていた(ユーザー指摘の核心)。→ 純Web app/live-view.js:paintNorthStarMirror と
+ *   同型・本物 paintTopSupportRankStyleIntoElement を再利用(似せて自作しない)。storage read のみ=passive 原則を守る。
  */
 async function applyNorthStarMirrorForPassive() {
   if (!INLINE_PASSIVE || !hasExtensionContext()) return;
@@ -7683,6 +7689,7 @@ async function applyNorthStarMirrorForPassive() {
     return;
   }
   if (!snap || typeof snap !== 'object') return;
+  if (shouldSkipMirrorForLiveId(snap.liveId, currentPassiveSurfaceLiveId())) return; // ★別配信の鏡を貼らない
   const contribRows = restoreNorthStarMirrorRows(snap, 'contributionRanking');
   const adRows = restoreNorthStarMirrorRows(snap, 'adRanking');
   // v0.1.1022(明滅根治): sig から capturedAt を外す(先頭行の名前も入れ順位入れ替わりを検知・時刻では再描画しない)。
@@ -7729,7 +7736,9 @@ async function applyStatCardsMirrorForPassive() {
   if (!INLINE_PASSIVE || !hasExtensionContext()) return;
   try {
     const bag = await chrome.storage.local.get(KEY_STAT_CARDS_MIRROR);
-    _statCardsMirrorPassivePaint(bag && bag[KEY_STAT_CARDS_MIRROR]);
+    const snap = bag && bag[KEY_STAT_CARDS_MIRROR];
+    if (shouldSkipMirrorForLiveId(snap && snap.liveId, currentPassiveSurfaceLiveId())) return; // ★別配信の鏡を貼らない
+    _statCardsMirrorPassivePaint(snap);
   } catch { /* no-op */ }
 }
 
@@ -7748,6 +7757,7 @@ async function applyTopSupportersMirrorForPassive() {
     const bag = await chrome.storage.local.get(KEY_TOP_SUPPORTERS_MIRROR);
     snap = bag && bag[KEY_TOP_SUPPORTERS_MIRROR];
   } catch { return; }
+  if (shouldSkipMirrorForLiveId(snap && snap.liveId, currentPassiveSurfaceLiveId())) return; // ★別配信の鏡を貼らない
   const rooms = snap && Array.isArray(snap.rooms) ? snap.rooms : [];
   if (!rooms.length) return;
   const sig = topSupportersMirrorSig(snap);
@@ -12292,23 +12302,6 @@ async function computeGiftHistoryNorthStarRoomsContext(liveId, opts = {}) {
   return null;
 }
 
-/**
- * 応援帯・公式値レーン（貢献度等）で共通の `nl-top-support-rank` ブロック描画。
- * @param {HTMLElement} el
- * @param {{ userKey: string; nickname: string; count: number; avatarUrl?: string }[]} rooms
- * @param {{
- *   noteText: string;
- *   unitSuffix: string;
- *   ariaLabel: string;
- *   prependHtml?: string;
- *   beforeNoteHtml?: string;
- *   isNorthStarBody?: boolean;
- *   freshnessNote?: string;
- *   pointsSumAll?: number;
- *   pointsSumDisplayed?: number;
- *   officialProgramGiftPts?: number|null;
- * }} opts
- */
 /**
  * 応援帯・公式値レーン（貢献度等）で共通の `nl-top-support-rank` ブロック描画。
  *

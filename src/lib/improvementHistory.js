@@ -446,5 +446,17 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
   Object.freeze({
     version: '0.1.1506', metric: 'gate-selftest', value: 3,
     source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1507', metric: 'bundle-kb', value: 1408,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '★過去最良1360からの差の大半は v0.1.1455〜1471 の計器追加(既に別entryで説明済み)。' +
+      '★この版が足したのは実測 544バイト(1,441,250→1,441,794)＝埋め込みが別配信の鏡を貼らないための' +
+      'liveId照合(passiveMirrorLiveIdGuard)5経路ぶん。★誤表示を止めるための増加なので戻さない。' +
+      '★親スレッド停止は 106ms 側のまま(panel-block-ms で見張っている)。'
+  }),
+  Object.freeze({
+    version: '0.1.1507', metric: 'gate-selftest', value: 3,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
   })
 ]);
