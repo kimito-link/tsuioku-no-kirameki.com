@@ -107,3 +107,145 @@ const el = document.elementFromPoint(Math.floor(w / 2), Math.floor(h / 2));
 　（サイドパネル＝ブラウザ右端の常設領域 / 埋め込み＝ニコ生のページ内）
 
 作成: 2026-09-05 / ユーザー就寝中の調査記録
+
+---
+
+# ★追記（2026-09-05 朝・ユーザー証言で再現条件が確定）
+
+## 0. ★確定した再現条件（一次情報）
+
+> **「Chromeのサイドパネル　押した瞬間なる　毎回そう」**
+
+★これで面が確定した: **Chrome のサイドパネル**（status 埋め込みでも別窓でもない）。
+★タイミングも確定: **開いた瞬間・毎回**（引っ張った瞬間ではない・確率的でもない）。
+
+⟹ ★**JS が動く前の窓**の話。バンドル(1.4MB)の実行前に起きている。
+
+---
+
+## 1. ★同じ症状が過去に特定されている（popup.html:406 実物）
+
+v0.1.1433 の記述が**ユーザーと同じ言葉**を使っている:
+> サイドパネルが【**横縞つきの真っ黒**】になる正体は「**地を塗る人がいない**」こと。
+> 実測: html/body とも background-color が rgba(0,0,0,0)=透明で、
+> **グラデーション(background-image)だけで塗っていた**。
+> → 再描画が1フレーム間に合わないと【塗るものが何も無い】ので下の暗い層が出る。
+
+★つまり「縞」は**この製品で既知の症状名**であり、原因も一度特定されている。
+
+---
+
+## 2. ★対策は入っているが、body に穴が残っている
+
+| 要素 | パース時点で塗られるか |
+|---|---|
+| `sidepanel.html` の html | ✅ inline style（`:1`） |
+| `sidepanel.html` の `#nl-underlay` | ✅ `<style>`（iframe より先に配置） |
+| `sidepanel.html` の iframe | ✅ `background:#fffaf2`（不透明） |
+| `popup.html` の **html** | ✅ **inline style**（`:1`・v0.1.1289 で対処済） |
+| ★`popup.html` の **body** | ★**inline style が無い**（`<body>` タグは素） |
+
+★`popup.html:10-22` が**自分で測って書いている**:
+> ロード後 **9〜21ms に【html も body も何も塗らないフレーム】が実在した**。
+> `<style>` 内の `html{background}` も間に合わない。
+> ★インライン style 属性なら HTML パース時点で効く。
+
+★html はこの理由で inline 化された。★**body は inline 化されていない。**
+
+## 3. ★body が塗れない窓に「縞」が出る筋道（仮説・未実測）
+
+`popup.html:333-343`（`.nl-inline` が付く前の body）:
+```
+width: var(--nl-pop-width);
+max-width: 540px;                                   ← ★横幅が 540px で頭打ち
+background: linear-gradient(--nl-bg, --nl-bg-soft); ← ★background-image のみ
+```
+★`html.nl-inline body { max-width: none; background-color: #fffaf2 }`(`:429`)が外すが、
+★これは **JS が `nl-inline` を付けた後**（`popup-entry.js:1110`）。
+
+⟹ ★JS 前は body が **540px 幅・color 無しのグラデのみ**。
+　サイドパネルがそれより広いと、**body の外側の帯**は body が塗らない。
+
+---
+
+## 4. ★除外できたもの（推測を残さない）
+
+| 候補 | 判定 |
+|---|---|
+| cloak／幕 | ★**無い**（sidepanel.html の cloak 3件は全部コメント） |
+| popup の透明化 | ★**していない**（iframe も html も不透明を明示） |
+| ★`--nl-bg: #0a0e14`(暗色) | ★**該当しない**。`html.nl-skin-panel-dark` 配下だが、`popup-entry.js:1126` が**常に remove**（light 強制・dark は一切付けない） |
+
+---
+
+## 5. ★次の一手（★実装ではなく、まず1回測る）
+
+★`<body>` に inline style を足す案は**筋が通る**（html と同じ対処の水平展開）。
+★**ただし先に測る**。理由: このリポは「色を宣言する方向」で12版・200行を失った実績がある。
+　★`popup.html:10-22` の実測（rAF ごとに塗り状態を記録）を**もう一度走らせて、
+　 body が塗っていないフレームが実在するか**を確認してから足す。
+
+★既存の計測資産: `tests/e2e/sidepanel-flash-capture.spec.js`（rAF ごとの塗り記録）
+★今回足した `judgeSidepanelBandStripes` は**帯ごとの塗り**を判定できる（中央1点の穴を埋めた）。
+
+★★**推測で inline style を足して「直った」と言わない。**
+
+---
+
+# ★実測した（2026-09-05 朝・Playwright）★仮説は【外れ】
+
+## 1. 既存の計測を走らせた（width:500）
+`tests/e2e/sidepanel-flash-capture.spec.js`:
+```
+[result] 全 444 フレーム
+[result] 誰も塗らないフレーム = 0
+[result] color-scheme が 'light dark' のフレーム = 0
+```
+★**塗り手が居ないフレームは0**。ただし ★この spec は **width:500** で開く。
+　body の `max-width:540px` に収まるので**帯が原理的にできない**＝この症状は測れない。
+
+## 2. ★広く開いて測り直した（width:900・調査用specは削除済み）
+```
+[wide] 全 193 / 実文書 192
+[wide] ★body が覆えていないフレーム = 2
+[wide] 最初: t=369ms body=420px iframe=900px 帯=480px nl-inline=false htmlPaints=true
+[wide] 最後: t=459ms 帯=480px
+```
+⟹ ★**帯そのものは実在した**（約90ms・480px）。`nl-inline` が付く前は body が 420px しかない。
+
+## 3. ★しかし黒くならなかった（仮説の否定）
+```
+t=369ms  htmlBg = rgb(255, 250, 242)   ← ★クリーム
+t=459ms  htmlBg = rgb(255, 250, 242)
+```
+★スクショ(.artifacts/sidepanel-wide/wide-1.png)も**全面クリーム**。縞も黒も出ていない。
+
+⟹ ★**「body が覆わない帯＝黒」は成立しない。** html の inline style(`popup.html:1`)が
+　その帯を塗っているので、帯があってもクリームに見える。★v0.1.1289 の対処が効いている。
+
+★**私の仮説（§3 の筋道）は外れ。** 帯は実在するが、それは黒の原因ではない。
+
+---
+
+## 4. ★残った可能性（実測で絞り込んだ結果）
+
+| 可能性 | 根拠 |
+|---|---|
+| ★**Playwright の Chromium では再現しない環境差** | 444+193 フレーム測って一度も黒が出ない。実機は「毎回」出る＝**環境差が症状を決めている** |
+| ★実機は **Chrome の本物のサイドパネル API**（`chrome.sidePanel`） | Playwright は `chrome-extension://.../sidepanel.html` を**普通のタブとして**開いている＝**別物**。サイドパネル固有の合成/背景処理を通っていない |
+| ★OS/Chrome のダークテーマ | `emulateMedia({colorScheme:'dark'})` はメディアクエリを騙すだけで、**UA が敷くキャンバスの実色までは再現しない可能性** |
+
+★★**次に測るべきは「本物のサイドパネルとして開いたとき」**。
+　これは Playwright では出せない（`chrome.sidePanel.open()` はユーザー操作が要る）。
+　⟹ ★実機の chrome-devtools MCP で、サイドパネルを開いた状態の文書に接続して測るしかない。
+
+★今回足した `judgeSidepanelBandStripes` は帯ごとの塗りを判定できるので、
+　実機で拾えれば「どの帯が塗られていないか」を機械で言える。
+
+---
+
+## 5. ★やらないと決めたこと（実測に基づく）
+
+- ★`<body>` に inline style を足す案 → ★**保留**。帯は黒くなかったので、足す根拠が無い。
+  「効くかもしれない」で足すと、また「効いたと言えないものを効いたと言う」になる。
+- ★色/透明/幕を触る → ★ユーザー禁止 + 84版の実績。
