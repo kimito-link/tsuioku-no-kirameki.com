@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 6 / 850 件
+## ⚠️ 役割コメントが無いソース 6 / 851 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `src/lib/laneDomSelfMeasure.js`
@@ -749,7 +749,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (1826)
+- 📁 **src/** (1828)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1014,7 +1014,7 @@
         - `logo_funlink_white_RGB_link_black.png`
         - `logo_funlink_white_RGB_maru_black.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1608)
+  - 📁 **lib/** (1610)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -1992,6 +1992,8 @@
     - `parseGiftComment.test.js`
     - `parseInterestArrivalComment.js` — ニコ生の興味タグ来場システムコメントをパースする純関数。
     - `parseInterestArrivalComment.test.js`
+    - `passiveMirrorLiveIdGuard.js` — 受動ビュー(status 埋め込み / live-view)が「別配信の古い鏡」を貼らないための判定。
+    - `passiveMirrorLiveIdGuard.test.js`
     - `perfDiag.js` — 複数タブ paint 負荷の診断スナップショット。
     - `perfDiag.test.js`
     - `persistThrottle.js` — v0.1.431: 連続フラッシュの合間にイベントループへ制御を返す既定の yield。

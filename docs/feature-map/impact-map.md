@@ -705,6 +705,7 @@
 | `src/lib/panelWakeCurtainDom.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/parseEmbeddedDataViewerInfo.js` | 1 | 記録エンジン(watchページ常駐) |
 | `src/lib/parseInterestArrivalComment.js` | 1 | ポップアップ(応援レーン) |
+| `src/lib/passiveMirrorLiveIdGuard.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/persistableCommentRow.js` | 1 | 記録エンジン(watchページ常駐) |
 | `src/lib/persistThrottle.js` | 1 | 記録エンジン(watchページ常駐) |
 | `src/lib/pickBroadcasterNameForReputation.js` | 1 | 状態速報ページ |
