@@ -749,7 +749,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (1828)
+- 📁 **src/** (1829)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1014,7 +1014,7 @@
         - `logo_funlink_white_RGB_link_black.png`
         - `logo_funlink_white_RGB_maru_black.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1610)
+  - 📁 **lib/** (1611)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -2373,6 +2373,7 @@
     - `swBackfillStaging.test.js`
     - `swBackfillTrigger.js` — SW backfill モード(実験)の起動判定純関数。
     - `swBackfillTrigger.test.js`
+    - `swCommentChunkKeyMirror.test.js`
     - `swCrawlSlots.js` — SW backfill の per-lid 並列スロット判定。
     - `swCrawlSlots.test.js`
     - `symptomVerdicts.js` — 「症状名でそのまま引ける」特化判定を**複数**出す純関数。
