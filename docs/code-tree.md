@@ -180,7 +180,7 @@
     - `2026-08-29.md`
     - `2026-08-31.md`
     - `2026-09-01.md`
-- 📁 **docs/** (308)
+- 📁 **docs/** (309)
   - 📁 **article-assets/** (87)
     - 📁 **venue-frames/** (12)
       - `f01.png`
@@ -291,7 +291,7 @@
     - `storage-bus.md`
     - `venue.md`
     - `web-status.md`
-  - 📁 **handoff/** (139)
+  - 📁 **handoff/** (140)
     - 📁 **bench/** (2)
       - `bench-interval.mjs` — ⚠️ 役割コメント無し
       - `bench-lane.mjs` — ⚠️ 役割コメント無し
@@ -312,6 +312,7 @@
     - `HANDOFF-2026-08-18-NEXT.md`
     - `HANDOFF-2026-08-19-dom-reduction-COUNCIL.md`
     - `HANDOFF-2026-08-19-instant-push-1.51x.md`
+    - `HANDOFF-2026-09-05-sidepanel-stripes.md`
     - `HANDOFF-backfill-instant-restore.md`
     - `HANDOFF-broadcast-score-panel.md`
     - `HANDOFF-comment-pickup-bsp.md`
@@ -749,7 +750,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (1829)
+- 📁 **src/** (1830)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1014,7 +1015,7 @@
         - `logo_funlink_white_RGB_link_black.png`
         - `logo_funlink_white_RGB_maru_black.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1611)
+  - 📁 **lib/** (1612)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -2204,6 +2205,7 @@
     - `sidePanelPrearm.wiring.test.js`
     - `sidePanelWatchTarget.js` — サイドパネルを「どの配信に紐づけるか」を決める純関数。
     - `sidePanelWatchTarget.test.js`
+    - `sidepanelBandStripes.test.js`
     - `sidepanelBlackScreen.wiring.test.js`
     - `sidepanelBlackV8.wiring.test.js`
     - `sidepanelCloakDuration.js` — 幕(cloak)が「いつ外れたか / まだ残っているか」を要約する純関数。

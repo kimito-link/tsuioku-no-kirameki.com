@@ -237,3 +237,63 @@ export function judgeSidepanelBlack(s) {
 
   return { ok, line, cause };
 }
+
+/**
+ * ★2026-09-05: 縦に並べた複数点のサンプルから「縞(帯ごとに塗られたり塗られなかったり)」を判定する。
+ *
+ * ■ なぜ要るか（ユーザー報告 2026-09-05 1:55・スクショ一次情報）
+ *   右ペインが【縞状】に黒い。★真っ黒ではない。
+ *   ところが既存の計器は `probeCenterPainter` が **画面中央の1点しか見ていない**
+ *   (sidepanel-entry.js:139 `elementFromPoint(w/2, h/2)`)。
+ *   ⟹ ★中心がたまたま明るい帯に当たれば「黒くない」と緑を出す＝
+ *      ユーザーが「まっくろ」と言っているのに計器が嘘をつく。
+ *      [[gate-watches-only-what-it-measures-2026-08-23]] と同型。
+ *
+ * ■ ★これは「直す」変更ではなく「測れるようにする」変更
+ *   縞の再現条件(幅変更の瞬間か・常時か)が未特定なので、まず機械で捕まえる。
+ *   ★体感の改善は主張しない。84版の轍(効いたと言えないものを効いたと言う)を踏まない。
+ *
+ * ■ ★縞は「模様」ではない
+ *   repeating-linear-gradient 等の縞を描くCSSは全ソースに0件(2026-09-05 grep 実測)。
+ *   ⟹ 縞＝帯ごとに【塗りが届いている/いない】が割れている状態。だから
+ *      「各帯に塗り手が居るか」を層ではなく点ごとに見る。
+ *
+ * ■ 判定
+ *   - 塗り手が居る帯と居ない帯が混在 → 'STRIPED'(縞を捕まえた)
+ *   - 全部の帯に塗り手が居ない       → 'ALL_BLANK'(面で黒い＝従来の症状)
+ *   - 全部の帯に塗り手が居る         → 'OK'
+ *   - 測れる帯が2つ未満             → 'INCONCLUSIVE'(★緑にしない＝測れなかった)
+ *
+ * @param {ReadonlyArray<{ y?: unknown, painter?: unknown }>|null|undefined} bands
+ *   上から順の帯サンプル。painter は findCenterPainter の戻り(塗り手が居なければ null)。
+ * @returns {{ verdict: 'OK'|'STRIPED'|'ALL_BLANK'|'INCONCLUSIVE', painted: number, blank: number, line: string }}
+ */
+export function judgeSidepanelBandStripes(bands) {
+  const list = Array.isArray(bands) ? bands : [];
+  let painted = 0;
+  let blank = 0;
+  for (const raw of list) {
+    const b = raw && typeof raw === 'object' ? raw : {};
+    // painter は「その点を塗る人」。null/空文字は塗り手不在＝地が出ない＝黒く見える。
+    const has = typeof b.painter === 'string' && b.painter.trim() !== '';
+    if (has) painted += 1;
+    else blank += 1;
+  }
+  const total = painted + blank;
+  // ★測れなかったことを OK と混ぜない(3値の掟)。
+  if (total < 2) {
+    return { verdict: 'INCONCLUSIVE', painted, blank, line: 'サイドパネル縞検査: 🟡測れませんでした(帯が2つ未満)' };
+  }
+  if (blank === 0) {
+    return { verdict: 'OK', painted, blank, line: `サイドパネル縞検査: ✅全${total}帯に地の色あり` };
+  }
+  if (painted === 0) {
+    return { verdict: 'ALL_BLANK', painted, blank, line: `サイドパネル縞検査: 🔴全${total}帯で地の色が無い(面で黒い)` };
+  }
+  return {
+    verdict: 'STRIPED',
+    painted,
+    blank,
+    line: `サイドパネル縞検査: 🔴縞を検出(${total}帯中 ${blank}帯に地の色が無い)`
+  };
+}
