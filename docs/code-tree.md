@@ -180,7 +180,7 @@
     - `2026-08-29.md`
     - `2026-08-31.md`
     - `2026-09-01.md`
-- 📁 **docs/** (309)
+- 📁 **docs/** (310)
   - 📁 **article-assets/** (87)
     - 📁 **venue-frames/** (12)
       - `f01.png`
@@ -291,7 +291,7 @@
     - `storage-bus.md`
     - `venue.md`
     - `web-status.md`
-  - 📁 **handoff/** (140)
+  - 📁 **handoff/** (141)
     - 📁 **bench/** (2)
       - `bench-interval.mjs` — ⚠️ 役割コメント無し
       - `bench-lane.mjs` — ⚠️ 役割コメント無し
@@ -366,6 +366,7 @@
     - `HANDOFF-web-same-as-ext.md`
     - `MEASURED-2026-08-16-diag-heavy-ROOTCAUSE.md`
     - `NOTEPC-CHECK-PROMPT.md`
+    - `PLAN-live-ranking-2026-09-05.md`
     - `ROOT-CAUSE-CLAIM-RULE.md`
     - `VOICE-BASELINE-2026-08-11.md`
     - `clip-history-persistence-synthesis.md`
