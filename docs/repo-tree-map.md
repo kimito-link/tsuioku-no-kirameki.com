@@ -70,7 +70,8 @@ graph LR
   ROOT --> d15["tsuioku-no-kirameki/ 〔LP/公開〕"]
   d15 --> d15_0["articles/ 〔記事/公開〕"]
   d15 --> d15_1["images/ 〔画像〕"]
-  d15 --> d15_2["sound/ 〔音声/公開〕"]
+  d15 --> d15_2["live/"]
+  d15 --> d15_3["sound/ 〔音声/公開〕"]
 ```
 
 ### 機能逆引き（機能 → 担当ファイル）
@@ -205,7 +206,7 @@ graph LR
 <sub>ファイル 4 件</sub>
 
 ## `api/` — サーバレス API(status エンドポイント)  〔API〕
-<sub>ファイル 1 件</sub>
+<sub>ファイル 2 件</sub>
 
 ## `app/` — Web 版状態ページのアプリ(app.js + dist)  〔Web版〕
 <sub>ファイル 99 件</sub>
@@ -287,10 +288,11 @@ graph LR
 - `mcp-nicolive/`（3 件） — ニコ生状態を読む MCP サーバ(司令塔の状態取得用)  〔MCP / 診断〕
 
 ## `tsuioku-no-kirameki/` — 本番 LP の配信ディレクトリ(Cloudflare Pages へ deploy)  〔LP / 公開〕
-<sub>ファイル 40 件</sub>
+<sub>ファイル 41 件</sub>
 
 - `articles/`（14 件） — 技術記事(防御的公開)。手法を再利用可能な形で解説  〔記事 / 公開〕
 - `images/`（17 件） — LP 用の favicon・OG 画像等  〔画像〕
+- `live/`（1 件） — ⚠️ 未記入（ROLES に追記）
 - `sound/`（1 件） — LP 公開用の音声素材(エール音等)  〔音声 / 公開〕
 
 ---
@@ -524,7 +526,7 @@ esbuild の import 到達グラフを逆引きし「このファイルを変え�
 
 ---
 
-## ⚠️ 役割が未記入のディレクトリ（15）
+## ⚠️ 役割が未記入のディレクトリ（16）
 
 以下は `ROLES` 辞書に説明が無い。`scripts/repo-tree-map.mjs` の `ROLES` に1行足してから再生成すること。
 
@@ -543,3 +545,4 @@ esbuild の import 到達グラフを逆引きし「このファイルを変え�
 - `sound-src/`
 - `sound-src/soundeffect-lab/`
 - `tests/helpers/`
+- `tsuioku-no-kirameki/live/`
