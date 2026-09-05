@@ -185,7 +185,7 @@
     - `2026-09-02.md`
     - `2026-09-03.md`
     - `2026-09-06.md`
-- 📁 **docs/** (310)
+- 📁 **docs/** (311)
   - 📁 **article-assets/** (87)
     - 📁 **venue-frames/** (12)
       - `f01.png`
@@ -296,7 +296,7 @@
     - `storage-bus.md`
     - `venue.md`
     - `web-status.md`
-  - 📁 **handoff/** (141)
+  - 📁 **handoff/** (142)
     - 📁 **bench/** (2)
       - `bench-interval.mjs` — ⚠️ 役割コメント無し
       - `bench-lane.mjs` — ⚠️ 役割コメント無し
@@ -318,6 +318,7 @@
     - `HANDOFF-2026-08-19-dom-reduction-COUNCIL.md`
     - `HANDOFF-2026-08-19-instant-push-1.51x.md`
     - `HANDOFF-2026-09-05-sidepanel-stripes.md`
+    - `HANDOFF-2026-09-06-init-shade-measured.md`
     - `HANDOFF-backfill-instant-restore.md`
     - `HANDOFF-broadcast-score-panel.md`
     - `HANDOFF-comment-pickup-bsp.md`

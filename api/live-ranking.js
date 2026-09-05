@@ -78,10 +78,22 @@ async function upstash(command) {
   return json?.result;
 }
 
+/**
+ * ★1本あたりの上限時間。
+ *   Promise.all は【一番遅い1本】に引きずられる。相手が半開きのまま返さないと
+ *   収集全体が Vercel の実行時間まで待たされ、500 で終わる。
+ *   ★実測(2026-09-05)は watch 83件を並列で 1,210ms。8秒はその6倍以上＝
+ *   正常な遅さでは当たらず、異常な1本だけを切れる値。★npm 不要(Node 18+)。
+ */
+const FETCH_TIMEOUT_MS = 8000;
+
 /** 失敗しても全体を止めない fetch(JSON)。★1配信の失敗で他を巻き添えにしない。 */
 async function fetchJsonSafe(url) {
   try {
-    const res = await fetch(url, { headers: { Accept: 'application/json' } });
+    const res = await fetch(url, {
+      headers: { Accept: 'application/json' },
+      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS)
+    });
     if (!res.ok) return null;
     return await res.json();
   } catch {
@@ -91,13 +103,38 @@ async function fetchJsonSafe(url) {
 
 async function fetchTextSafe(url) {
   try {
-    const res = await fetch(url);
+    const res = await fetch(url, { signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) });
     if (!res.ok) return '';
     return await res.text();
   } catch {
     return '';
   }
 }
+
+/**
+ * ★同時実行数に上限を付けて map する。
+ *   Promise.all で83本を一斉に開くと、相手にも自分のテールにも優しくない。
+ *   ★上限12の根拠(★実測で決めた。最初の見積もりは外れた):
+ *     72件を実際に測ると 無制限=700ms / 8並列=1,780ms / 12並列=1,278ms。
+ *     ★「8でも実測と同じ速さ」という当初の見積もりは【誤り】で、2.5倍遅かった。
+ *     12なら無制限との差は約0.6秒に収まり、同時接続の山も1/6に削れる。
+ *   ★見積もりではなく計測値を採用している。
+ */
+async function mapPool(items, limit, fn) {
+  const out = new Array(items.length);
+  let cursor = 0;
+  const worker = async () => {
+    while (cursor < items.length) {
+      const i = cursor++;
+      out[i] = await fn(items[i], i);
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
+  return out;
+}
+
+/** ★同時に開く本数の上限(上記の根拠による)。 */
+const FETCH_CONCURRENCY = 12;
 
 /** ランキングページから lv を拾う(重複除去・順序維持)。 */
 function pickLiveIdsFromRankingHtml(html) {
@@ -119,7 +156,8 @@ function pickLiveIdsFromRankingHtml(html) {
  */
 async function probeWatchPage(lv) {
   const html = await fetchTextSafe(`https://live.nicovideo.jp/watch/${lv}`);
-  if (!html) return { onAir: false, title: '' };
+  // ★fetched=false は「そもそも取れなかった」。★HTMLは取れたが読めない(仕様変更)と区別するため。
+  if (!html) return { onAir: false, fetched: false, title: '' };
   const m = html.match(OG_TITLE_RE);
   // ★og:title は HTML エンティティを含みうる。表示側で二重エスケープしないよう素の形に戻す。
   const title = m
@@ -134,6 +172,7 @@ async function probeWatchPage(lv) {
   };
   const st = html.match(SUPPLIER_TYPE_RE);
   return {
+    fetched: true,
     onAir: ON_AIR_RE.test(html),
     // ★'user' 以外(channel 等)は TV番組・公式番組なので落とす。取れなければ落とす(fail-closed)。
     isUserBroadcast: !!st && st[1] === 'user',
@@ -180,19 +219,22 @@ async function collect() {
 
   // ★候補は【全件】見る。上位だけ見るとチャンネルで埋まって個人配信が入らない(実測: 上位20の19件)。
   //   watch の取得は並列なので、83件でも約1.2秒(実測)。
-  const probes = await Promise.all(all.map((lv) => probeWatchPage(lv)));
+  const probes = await mapPool(all, FETCH_CONCURRENCY, (lv) => probeWatchPage(lv));
   const onAir = all
     .map((lv, i) => ({ lv, meta: probes[i] }))
     .filter((x) => x.meta.onAir && x.meta.isUserBroadcast)
     // ★中身(ギフト/広告)を取るのはここで絞ってから。API 呼び出し数を実測範囲に保つ。
     .slice(0, MAX_LIVES);
 
-  const collected = await Promise.all(onAir.map((x) => collectOne(x.lv, x.meta)));
+  const collected = await mapPool(onAir, FETCH_CONCURRENCY, (x) => collectOne(x.lv, x.meta));
   const lives = collected.filter(Boolean);
+  // ★watch を1枚でも読めたか。★「通信が全部こけた」と「仕様が変わって読めない」を分ける材料。
+  const probeOk = probes.filter((p) => p && p.fetched).length;
   return {
     ok: true,
     capturedAt: Date.now(),
     scanned: all.length,
+    probeOk,
     onAir: onAir.length,
     lives
   };
@@ -217,6 +259,25 @@ export default async function handler(req, res) {
       const payload = await collect();
       if (!payload.ok) {
         res.status(502).json(payload);
+        return;
+      }
+      // ★★空を保存しない。ここが無いと【良いデータを空で上書き】して静かに壊れる。
+      //   起きる筋道(実際に再現した): ニコ生がHTMLの埋め込み形式を変える
+      //   → ON_AIR_RE / SUPPLIER_TYPE_RE が全滅 → 全件 onAir:false
+      //   → lives:[] のまま ok:true で返り、SET されて TTL 1時間 空になる。
+      //   ★しかも HTTP 200 + stored:true なので workflow は緑のまま＝誰も気づかない。
+      if (!payload.lives.length) {
+        res.status(502).json({
+          ok: false,
+          error: 'zero lives — not stored',
+          // ★どこで途切れたかを数字で残す(次に読む人が推測しなくて済むように)
+          scanned: payload.scanned,
+          probeOk: payload.probeOk,
+          onAir: payload.onAir,
+          hint: payload.probeOk === 0
+            ? 'watch を1枚も取得できていない(通信/遮断の疑い)'
+            : 'watch は取得できているのに放送中の個人配信が0件(HTML仕様変更の疑い)'
+        });
         return;
       }
       await upstash(['SET', STORE_KEY, JSON.stringify(payload), 'EX', String(TTL_SECONDS)]);
