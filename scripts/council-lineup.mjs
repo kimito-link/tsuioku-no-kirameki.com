@@ -118,7 +118,16 @@ export const LINEUP = [
   //  旧: { label: 'groq/qwen3.6-27b', rawId/apiModel: 'qwen/qwen3.6-27b' }（2026-06-25採用）
   //  ※ 会議は「llama-3.3-70b-instant」を批判/速い視点に推したが【実在しない幻覚】。70Bは -versatile のみ。
   //    8B級の -instant は llama-3.1-8b-instant だけ（実機で確認）。幻覚IDは採用しない。
-  { label: 'groq/qwen3.8-27b', provider: 'groq', rawId: 'qwen/qwen3.8-27b', apiModel: 'qwen/qwen3.8-27b', opts: {}, requires: ['G'] },
+  // ★2026-09-06 opts に max_tokens:800 を追加（既定1600では構造的に落ちる）:
+  //  実会議で diverge 役として 429 で失敗し、原文が
+  //  "Request too large ... on output tokens per minute" だった。
+  //  ★この429は「枠の使い切り」ではなく**1リクエストが上限を超えている**型で、
+  //   待っても直らない。実測: max_tokens=1600 → 429 / 800 → 200 / 400 → 429(枠切れ)。
+  //   ＝同じ429でも "Request too large"(構造) と "Rate limit reached"(一時) は別物。
+  //   前者はエントリ側で絞れば直り、後者は待てば戻る。混同して撤去してはならない。
+  //  発散役の出力は「2行×2案」程度なので800で足りる（実プロンプト3回すべて200・len102〜131）。
+  //  openaiChat は body に ...extra(=opts) を後置き展開するので、ここの指定が既定1600を上書きする。
+  { label: 'groq/qwen3.8-27b', provider: 'groq', rawId: 'qwen/qwen3.8-27b', apiModel: 'qwen/qwen3.8-27b', opts: { max_tokens: 800 }, requires: ['G'] },
 
   // 2026-07-04 追加（実機 /models 取得で新顔確認・weightOf で予備(weight3)に格下げ）:
   //  - gpt-oss-20b: gpt-oss-120b の軽量版。Ollama停止時に diverge-alt(ローカルgpt-oss:20b専任)が
