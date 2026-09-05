@@ -75,6 +75,30 @@
       .pt { flex: 0 0 auto; font-variant-numeric: tabular-nums; font-size: .85rem; color: var(--ink-sub); }
       .empty { color: var(--ink-sub); font-size: .85rem; margin: 0; }
 
+      /*
+        ★「動いている感じ」を出す。
+        ★POP(extension/popup.html の nl-story-pop)と同じ流儀にする:
+          scale は 1.045 程度までの【控えめ】な値。派手にしない。
+        ★光らせるのは【実際に数字が変わった行だけ】。全体を光らせると
+          「変わっていないのに動いて見える」＝嘘になるうえ、目が疲れる。
+      */
+      @keyframes nl-live-pop {
+        0% { transform: scale(1); background-color: transparent; }
+        40% { transform: scale(1.045); background-color: rgba(201, 142, 43, .16); }
+        100% { transform: scale(1); background-color: transparent; }
+      }
+      ol.rank li.is-bumped { animation: nl-live-pop 900ms ease-out; transform-origin: left center; }
+      /* ★新しく入ってきた人は、やわらかく現れる。 */
+      @keyframes nl-live-enter {
+        0% { opacity: 0; transform: translateY(-4px); }
+        100% { opacity: 1; transform: translateY(0); }
+      }
+      ol.rank li.is-new { animation: nl-live-enter 420ms ease-out; }
+      /* ★動きを減らす設定の人には出さない(既存ページと同じ配慮)。 */
+      @media (prefers-reduced-motion: reduce) {
+        ol.rank li.is-bumped, ol.rank li.is-new { animation: none; }
+      }
+
       .note { margin-top: 28px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 10px; background: var(--bg-soft); font-size: .82rem; color: var(--ink-sub); }
       .note p { margin: 0 0 6px; }
       .note p:last-child { margin-bottom: 0; }
@@ -130,10 +154,11 @@
         });
       }
 
-      function renderRows(rows, unit) {
+      function renderRows(rows, unit, liveId, kind) {
         if (!rows.length) return '<p class="empty">まだいません</p>';
         var html = rows.map(function (r) {
           var n = Number(r.rank) || 0;
+          var cls = rowChange(rowKey(liveId, kind, r), Number(r.point) || 0);
           var nameHtml = r.url
             ? '<a href="' + esc(r.url) + '" target="_blank" rel="noopener noreferrer">' + esc(r.name) + '</a>'
             : esc(r.name);
@@ -146,7 +171,7 @@
           var ava = (r.avatar && !isBlank)
             ? '<img class="ava" src="' + esc(r.avatar) + '" alt="" loading="lazy" referrerpolicy="no-referrer">'
             : '<span class="ava"></span>';
-          return '<li><span class="no' + (n > 0 && n <= 3 ? ' top' : '') + '">' + (n || '-') + '</span>'
+          return '<li' + (cls ? ' class="' + cls + '"' : '') + '><span class="no' + (n > 0 && n <= 3 ? ' top' : '') + '">' + (n || '-') + '</span>'
             + ava + '<span class="nm">' + nameHtml + '</span>'
             + '<span class="pt">' + num(r.point) + unit + '</span></li>';
         }).join('');
@@ -208,6 +233,24 @@
         return Math.round(visitors * retentionRate(ageMin));
       }
 
+      // ★前回の値を覚えて「何が変わったか」を出す。
+      //   ★変わっていない行は光らせない。全部光らせると「動いて見える」だけの嘘になる。
+      var _prevPoints = {};   // "lv|種別|名前" -> ポイント
+      var _seenKeys = {};     // 初回描画で全部を「新規」にしないための記録
+      var _firstPaint = true;
+
+      function rowKey(liveId, kind, r) {
+        return liveId + '|' + kind + '|' + String(r.name || '');
+      }
+      /** その行が今回どう変わったか。'' / 'is-new' / 'is-bumped' */
+      function rowChange(key, point) {
+        var prev = _prevPoints[key];
+        _prevPoints[key] = point;
+        if (_firstPaint) { _seenKeys[key] = true; return ''; }
+        if (!_seenKeys[key]) { _seenKeys[key] = true; return 'is-new'; }
+        return (prev !== undefined && point > prev) ? 'is-bumped' : '';
+      }
+
       function render(data) {
         var lives = (data && Array.isArray(data.lives)) ? data.lives : [];
         if (!lives.length) {
@@ -237,12 +280,14 @@
             + esc(l.title || l.liveId) + '</a>' + head + '</h2>'
             + '<div class="cols">'
             + '<div class="col"><h3>ギフトで支えた人 <span class="sum">' + num(l.giftTotal) + 'pt</span></h3>'
-            + renderRows(gift, 'pt') + '</div>'
+            + renderRows(gift, 'pt', l.liveId, 'gift') + '</div>'
             + '<div class="col"><h3>広告で支えた人 <span class="sum">' + num(l.adTotal) + 'pt</span></h3>'
-            + renderRows(ad, 'pt') + '</div>'
+            + renderRows(ad, 'pt', l.liveId, 'ad') + '</div>'
             + '</div></section>';
         }).join('');
         bindAvatarFallback(elList);
+        // ★初回は全行が「新規」になってしまうので、ここで初めて通常運転にする。
+        _firstPaint = false;
       }
 
       function load() {
