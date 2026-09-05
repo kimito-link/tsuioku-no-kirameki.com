@@ -164,6 +164,21 @@
         }
       }
 
+      // ★収集が古くなったことを画面で言う。
+      //   しきい値30分の根拠(★数字を発明しない): 収集は GitHub Actions の cron で
+      //   5分間隔に設定しているが、GitHub は負荷分散で実行を遅らせる仕様。
+      //   ★実測(2026-09-05)では 8〜13分間隔で動いていた。その2倍以上を「異常」とする。
+      var STALE_MIN = 30;
+      function freshnessText(capturedAt) {
+        var t = Number(capturedAt) || 0;
+        if (!t) return '';
+        var min = Math.floor((Date.now() - t) / 60000);
+        if (min < 0) return '';                 // ★時計ずれ。嘘を書くより何も言わない
+        if (min >= STALE_MIN) return '・⚠ ' + min + '分前の情報です（更新が止まっている可能性があります）';
+        if (min < 1) return '・たった今';
+        return '・' + min + '分前';
+      }
+
       function render(data) {
         var lives = (data && Array.isArray(data.lives)) ? data.lives : [];
         if (!lives.length) {
@@ -171,9 +186,11 @@
           elList.innerHTML = '';
           return;
         }
-        var when = data.capturedAt ? new Date(data.capturedAt) : null;
-        elMeta.innerHTML = '放送中 <b>' + lives.length + '</b> 件'
-          + (when ? '・' + esc(when.toLocaleTimeString('ja-JP')) + ' 時点' : '');
+        // ★「何分前か」を出す。時刻だけだと見る人が暗算しないと鮮度が分からない。
+        // ★さらに重要なのは【古くなったことに気づける】こと。収集が止まったとき、
+        //   時刻だけ出す作りだと古い値が黙って表示され続け、誰も気づかない。
+        //   ⟹ しきい値を超えたら画面上で明示する(機械が見ている所だけが動く)。
+        elMeta.innerHTML = '放送中 <b>' + lives.length + '</b> 件' + esc(freshnessText(data.capturedAt));
 
         elList.innerHTML = lives.map(function (l) {
           var gift = rowsFromGift(l.gift);
@@ -204,6 +221,11 @@
       load();
       // ★見ていないときは止める(無駄に叩かない)。
       setInterval(function () { if (!document.hidden) load(); }, 60000);
+      // ★裏タブの間は上の更新が止まるので、戻ってきた瞬間に取り直す。
+      //   これが無いと「何分前」が裏に居た時間ぶん古いまま最初に目に入る。
+      document.addEventListener('visibilitychange', function () {
+        if (!document.hidden) load();
+      });
     </script>
   </body>
 </html>
