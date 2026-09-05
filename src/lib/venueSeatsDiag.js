@@ -23,6 +23,7 @@
  *                               dupIntra: number, dupCross: number, strays: number,
  *                               charFrame: number, crowdOn: boolean, crowdCount: number } }|null,
  *   anonExcluded: number,
+ *   unseated: number,
  *   storyDiagMirror: { present: boolean, ageSec: number|null },
  *   openLatency: { opens: number, mirrorMs: number, aggregateMs: number, firstPaintMs: number,
  *                  firstSeatMs: number, mirrorTimedOut: boolean, mirrorAbsent: boolean, line: string },
@@ -32,7 +33,12 @@
  *     lastSample: null | { kind: string, seatIndex: number, mirrorUid: string, rosterUid: string,
  *       tileTag: string, seatLinkOn: boolean, mode: string, atWall: number } }|null,
  *   yukkuriNamedCensus: { line: string, checked: number, yukkuriNamed: number, outOfRangeDigits: number,
- *     lastSample: null | { uid: string, name: string, digits: number } }|null
+ *     lastSample: null | { uid: string, name: string, digits: number } }|null,
+ *   mirrorIntakeLine: string,
+ *   mirrorIntake: { changedEvents:number, keyMatched:number, keyMissed:number, accepted:number,
+ *     rejectedByGate:number, lastMissedKeys:string[], lastExpectedKey:string,
+ *     lastAcceptedAt:number, lastRejectReason:string }|null,
+ *   avatarProbe: {usericonSucceeded:number,usericonFailed:number,failedTimeout:number,failedError:number,retriedTotal:number,lastFailAgoMs:number}|null
  * }} VenueSeatsDiagState
  *
  * laneParity は v0.1.1111 の「会場=①レーンのメンバー一致トークン」(venueLaneParity.js)。null=未観測。
@@ -63,6 +69,7 @@ export function makeInitialVenueSeatsDiag() {
     laneParity: /** @type {VenueSeatsDiagState['laneParity']} */ (null),
     sceneReceipt: /** @type {VenueSeatsDiagState['sceneReceipt']} */ (null),
     anonExcluded: 0,
+    unseated: 0,
     storyDiagMirror: { present: false, ageSec: /** @type {number|null} */ (null) },
     // v0.1.1207: 会場の立ち上がり分解(開く→鏡→集計→初描画→初席)。未観測は -1。
     openLatency: {
@@ -70,7 +77,18 @@ export function makeInitialVenueSeatsDiag() {
       mirrorTimedOut: false, mirrorAbsent: false, line: '会場立ち上がり ⚪ 未観測'
     },
     seatLinkParity: /** @type {VenueSeatsDiagState['seatLinkParity']} */ (null),
-    yukkuriNamedCensus: /** @type {VenueSeatsDiagState['yukkuriNamedCensus']} */ (null)
+    yukkuriNamedCensus: /** @type {VenueSeatsDiagState['yukkuriNamedCensus']} */ (null),
+    // ★v0.1.1317: 会場が鏡を受け取れているかの1行(未観測は空文字=状態速報に出ない)。
+    mirrorIntakeLine: '',
+    /*
+     * ★v0.1.1405: 判定の【材料】(行だけでは画面のセルが作れない)。
+     *   ★この関数は「フィールドを個別列挙して作り直す」型なので、
+     *     ここに足さないと venueBar が載せても **黙って落ちる**
+     *     ([[venue-mirror-is-the-primary-path-2026-08-01]] を5回踏んだ箇所)。
+     */
+    mirrorIntake: /** @type {VenueSeatsDiagState['mirrorIntake']} */ (null),
+    // ★v0.1.1348: 会場のアイコン実績(初期は未計測=null)。
+    avatarProbe: /** @type {VenueSeatsDiagState['avatarProbe']} */ (null)
   };
 }
 
@@ -253,10 +271,57 @@ export function buildVenueSeatsDiagSnapshot(diag, nowMs) {
     laneParity,
     sceneReceipt,
     anonExcluded: Math.max(0, Math.floor(num(d.anonExcluded, 0))),
+    // venue-exact-parity-SPEC-2026-08-07 §5-3: 席なし(uid で席に結びつかなかった段タイル)件数。
+    unseated: Math.max(0, Math.floor(num(d.unseated, 0))),
     storyDiagMirror,
     openLatency,
     seatLinkParity,
     yukkuriNamedCensus,
+    /*
+     * ★v0.1.1317: 会場が鏡を受け取れているかの1行(会場が完全一致しない件の切り分け)。
+     *   文字列1本だけ通す(未知の巨大オブジェクトを写さない=このファイルの既存方針)。
+     *   空文字なら状態速報側で行ごと出さない=普段の速報を汚さない。
+     */
+    mirrorIntakeLine: String(d.mirrorIntakeLine || ''),
+    // ★v0.1.1405: 判定の材料を素通しする(数値/文字列のみ・構造は固定)。
+    mirrorIntake: (() => {
+      const mi = /** @type {any} */ (d.mirrorIntake);
+      if (!mi || typeof mi !== 'object') return null;
+      const num = (/** @type {unknown} */ x) => (Number.isFinite(Number(x)) ? Number(x) : 0);
+      return {
+        changedEvents: num(mi.changedEvents),
+        keyMatched: num(mi.keyMatched),
+        keyMissed: num(mi.keyMissed),
+        accepted: num(mi.accepted),
+        rejectedByGate: num(mi.rejectedByGate),
+        lastMissedKeys: Array.isArray(mi.lastMissedKeys) ? mi.lastMissedKeys.slice(0, 3).map(String) : [],
+        lastExpectedKey: String(mi.lastExpectedKey || ''),
+        lastAcceptedAt: num(mi.lastAcceptedAt),
+        lastRejectReason: String(mi.lastRejectReason || '')
+      };
+    })(),
+    /*
+     * ★v0.1.1348: 会場のアイコン実績(6値だけ)を通す。
+     *
+     * ■ なぜ必要か: v0.1.1347 で読み手に `venueSeatsDiag.avatarProbe` を読む行を足したが、
+     *   ここを通していなかったため【永久に出ない行】だった(書き手の実出力で通し確認せず出荷)。
+     *   ★このファイルは「個別列挙して作り直す」方式なので、
+     *     載せ忘れた値は静かに消える([[venue-mirror-is-the-primary-path]]・6回目)。
+     *
+     * ★未知フィールドは通さない既存方針を守り、数値6つだけを検証して写す。
+     */
+    avatarProbe: (() => {
+      const p = d.avatarProbe;
+      if (!p || typeof p !== 'object') return null;
+      return {
+        usericonSucceeded: Math.max(0, Math.floor(num(p.usericonSucceeded, 0))),
+        usericonFailed: Math.max(0, Math.floor(num(p.usericonFailed, 0))),
+        failedTimeout: Math.max(0, Math.floor(num(p.failedTimeout, 0))),
+        failedError: Math.max(0, Math.floor(num(p.failedError, 0))),
+        retriedTotal: Math.max(0, Math.floor(num(p.retriedTotal, 0))),
+        lastFailAgoMs: Math.max(-1, Math.floor(num(p.lastFailAgoMs, -1)))
+      };
+    })(),
     capturedAt: now
   };
 }

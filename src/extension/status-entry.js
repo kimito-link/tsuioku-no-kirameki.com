@@ -21,7 +21,6 @@
  * @module status-entry
  */
 
-import { KEY_AI_SHARE_POPUP_DIAG } from '../lib/aiSharePopupDiagKey.js';
 // リリース工程ガード「版混在の実行時検知」(2026-07-06): NL_BUNDLE_VERSION(このバンドルの
 //   ビルド時 package.json version)と chrome.runtime.getManifest().version(実行時本体 version)を
 //   突合し、ズレていれば画面上部にバナーを出す。詳細は src/lib/versionMismatch.js の背景コメント参照。
@@ -40,6 +39,13 @@ import { buildStorageWriteLedgerLines } from '../lib/storageWriteLedger.js';
 //   重さの真因(council/status-heavy-open-SYNTHESIS.md)。status が使う4フィールドだけの軽量ダイジェスト
 //   (content が同時に書く)を read する=read 回数同じ・サイズ ~40分の1。読み取りパスは full と同形。
 import { KEY_STATUS_FAST_DIAG_LITE } from '../lib/statusFastDiagLite.js';
+import { buildStatusMindmapSignature } from '../lib/statusMindmapSignature.js';
+import {
+  createPaintProbeState,
+  observePaintCompletion,
+  formatPaintCompletionLine
+} from '../lib/paintCompletionProbe.js';
+import { buildLivesCardSignature } from '../lib/livesCardSignature.js';
 import { buildStatusMindmapModel } from '../lib/statusMindmapModel.js';
 import { copyTextWithFallback } from '../lib/copyTextWithFallback.js';
 import {
@@ -52,6 +58,9 @@ import { buildStatusActions } from '../lib/statusActionAdvisor.js';
 //   =新規 storage read ゼロ。致命は症状カードにも昇格する。
 // AI共有(状態速報)本文ビルダーを lib に切り出し(②応援ライブビュー/③WEB で再利用)。挙動同値。
 import { buildAiShareFullText } from '../lib/aiShareFullText.js';
+// ★v0.1.1424: 「いま視聴中の lv」を鏡とは別の起点(watch タブ)から決める。
+//   鏡から取ると別配信ガードが恒真になり、前の配信の鏡と突合して誤検知する。
+import { resolveCurrentLiveId, canCompareMirrorCounts } from '../lib/currentLiveIdOrigin.js';
 // v0.1.1016: ③WEB が古くなる前に自動で再 publish すべきかの判定(手動ボタンの往復を無くす)。
 import { shouldAutoPublish } from '../lib/autoPublishDecision.js';
 // 直近の公開送信(POST)結果を globalThis に集計(read を増やさない)→送信時の記録に使う。
@@ -68,10 +77,15 @@ import {
 } from '../lib/liveviewPublishOutcomeKey.js';
 // KEY_PREVIEW_RENDER_ACK は statusExtrasBatch.js の1バッチ get 内で読む(重さ根治 P2・2026-07-06)。
 import { buildHealthCells, summarizeHealthVerdict } from '../lib/healthCells.js';
+// ★v0.1.1412: 取得経路の履歴(降格＝ニコ生の構造変更の予兆 を検出する)。
+import { fromStorable, toStorable, noteSource } from '../lib/sourceProvenance.js';
 import { buildVoiceDiagLine } from '../lib/voiceDiag.js';
 import { KEY_VOICE_DIAG } from '../lib/voiceDiagKey.js';
 // v0.1.1010: 取り込み中の更新激重(7071ms)を所要比例の間引きで緩和する純関数。
 import { computeRefreshBackoffTicks } from '../lib/statusRefreshBackoff.js';
+import { shouldReadNow } from '../lib/statusReadPolicy.js';
+import { shouldUpdateAiShareText } from '../lib/aiShareTextChanged.js';
+import { buildCoreBatchKeys, pickCoreBatchValues } from '../lib/statusCoreBatch.js';
 // 共有 URL 組み立て(状態速報/応援ライブビュー/ingest)の純関数。挙動同値で uploadStatusSnapshot から切り出し。
 import { buildStatusShareUrls } from '../lib/statusShareUrls.js';
 // 応援ライブビュー(拡張内)の「このURLをWEBでも公開する」用: status が組み立てた公開ペイロードを置くキー。
@@ -82,7 +96,8 @@ import {
   KEY_BGM_ENABLED,
   KEY_BGM_VOLUME_REACH,
   KEY_BGM_VOLUME_FEVER,
-  isBgmEnabled
+  isBgmEnabled,
+  KEY_LAST_WATCH_URL
 } from '../lib/storageKeys.js';
 // レポートプレビュー信頼度注釈の文脈(fastDiag→ctx)の純関数。挙動同値で status-entry から切り出し。
 import { reportPreviewCtxFromFastDiag } from '../lib/reportPreviewCtx.js';
@@ -192,6 +207,7 @@ import {
   removeStoryAvatarTvFallbackClass
 } from '../lib/storyAvatarTvFallbackClass.js';
 import { buildReportPreviewLines } from '../lib/reportPreview.js';
+import { isCatchingUp, anyCatchingUp } from '../lib/catchingUpVerdict.js';
 import {
   KEY_REPORT_PREVIEW,
   isReportPreviewFresh
@@ -212,9 +228,17 @@ import {
 import { backfillLiveThroughputLine } from '../lib/backfillRinkuNarration.js';
 import { resolveVisitorCount } from '../lib/resolveVisitorCount.js';
 import { PERF_DIAG_PREFIX, isPerfDiag } from '../lib/perfDiag.js';
-import { LIVE_ENDED_PREFIX, isLiveEndedFlag } from '../lib/liveEndedFlag.js';
+import { LIVE_ENDED_PREFIX, isLiveEndedFlag, liveEndedStorageKey } from '../lib/liveEndedFlag.js';
 import { buildLiveHealth, scoreToDots } from '../lib/liveHealthScore.js';
 import { runStorageOpWithTimeout, STORAGE_OP_TIMED_OUT } from '../lib/storageOpTimeout.js';
+/*
+ * ★v0.1.1371: boot(init)で await する storage read の上限[ms]。
+ *   ここが無界だと storage stall のとき init が止まり、refresh にも到達せず【画面が白紙】になる
+ *   (2026-08-12 実機の真因: init 冒頭の2つの await が timeout 無しだった)。
+ *   短く倒す=読めなくても既定値で先へ進む方が必ず良い。
+ *   ★既定値は fail-closed(送らない/未設定扱い)なので、timeout しても安全側に倒れる。
+ */
+const BOOT_STORAGE_TIMEOUT_MS = 1_500;
 // 重さ根治 P3(2026-07-06): runStorageOpWithTimeout はタイムアウトしても opFn 自体は裏で生き続ける
 //   (Promise.race の性質)。次 tick が同じ opFn を再発行すると幽霊 read と多重競合するため、
 //   loadCustomSoundDiagSafe(IndexedDB open+count+fetch を伴う唯一の重い extras 処理)に
@@ -245,9 +269,19 @@ import { pickBroadcasterNameForReputation } from '../lib/pickBroadcasterNameForR
 //   panel_summary.updatedAt が古ければ「視聴中」に出さない（純関数で test 付き）。
 import { panelSummaryStorageKey } from '../lib/panelLiveSummary.js';
 import { isLastWatchUrlFresh } from '../lib/watchUrlFreshness.js';
+import { shouldAdoptLastWatchUrl } from '../lib/lastWatchUrlAdoption.js';
 // 2026-06-23: Alt+Tab に出ない裏 watch タブ(active:false・過去 autopatrol/古い重複拡張の遺物)を
 //   検出して手動クローズ導線を出す(council/orphan-tab-survivor-SYNTHESIS.md)。自動では閉じない。
 import { isBackgroundWatchTab } from '../lib/backgroundWatchTab.js';
+// ★v0.1.1388: 1サイクル全体の締切。個別 timeout(10本×8秒=80秒)の合計に天井を付ける。
+import {
+  createRefreshDeadline, REFRESH_CYCLE_BUDGET_MS, REFRESH_FIRST_CYCLE_BUDGET_MS
+} from '../lib/refreshCycleDeadline.js';
+// ★v0.1.1388: 症状別判定を【画面に】出す(v0.1.1385 はコピー本文にしか配線されていなかった)。
+import { buildSymptomVerdicts } from '../lib/symptomVerdicts.js';
+import { popupSnapshotAgeMs } from '../lib/aiShareFullText.js';
+// ★v0.1.1389: 33セルを症状の言葉(コメント記録/人の識別/レーン/公式値/演出/健全性)で枠に分ける。
+import { groupHealthCells, summarizeGroup } from '../lib/healthCellGroups.js';
 
 /** 自動更新間隔(ms)。 */
 const REFRESH_INTERVAL_MS = 2000;
@@ -261,8 +295,8 @@ const PANEL_SUMMARY_PREFIX = 'nls_panel_summary_';
  */
 const WATCH_SNAPSHOT_PREFIX = 'nls_watch_snapshot_';
 
-/** 最後に視聴した URL の storage key。 */
-const KEY_LAST_WATCH_URL = 'nls_last_watch_url';
+/* ★v0.1.1506: KEY_LAST_WATCH_URL の再定義を削除し storageKeys.js から import する
+   (comeview-entry.js と合わせて【3箇所】で同じ文字列を定義していた)。 */
 
 /**
  * ★v0.1.1242(CWS提出ブロッカー BLOCKING-1): WEB公開の明示同意フラグ(既定OFF)。
@@ -281,10 +315,29 @@ let _webPublishOptIn = false;
 /** 同意フラグを storage から読み直してキャッシュする(失敗時は false=送らない側に倒す)。 */
 async function refreshWebPublishOptInCache() {
   try {
-    const bag = await chrome.storage.local.get(KEY_WEB_PUBLISH_OPT_IN);
+    /*
+     * ★v0.1.1371: 【必ず timeout で有界化する】。
+     *
+     * ■ 何が起きていたか(2026-08-12 実機・status.html が真っ白のまま返らない)
+     *   この関数は boot の最初(init)で `await` されており、しかも生の
+     *   `chrome.storage.local.get` を timeout 無しで待っていた。
+     *   chrome.storage.local は単一 LevelDB で、他タブの巨大 read-merge-write が
+     *   走ると **settle せず永久 pending** になりうる(storageOpTimeout.js の背景)。
+     *   ＝storage が詰まると **init がここで止まり、下の refresh()/startRefreshLoop に
+     *   一生到達しない**。画面は白紙のまま、速報も書かれない(=コピーする物が無い)。
+     *   ★このページの他の read は全て有界化済みで、ここだけが非対称に無防備だった
+     *     ([[shared-helper-hides-canonical-bugs-2026-08-07]] と同じ「1箇所だけ素通し」)。
+     *
+     * ■ fail-closed は維持: 読めないなら false(送らない)。
+     *   ★同意フラグを「読めなかった」ことを「同意した」に倒してはいけない。
+     */
+    const bag = await runStorageOpWithTimeout(
+      () => chrome.storage.local.get(KEY_WEB_PUBLISH_OPT_IN),
+      BOOT_STORAGE_TIMEOUT_MS
+    );
     _webPublishOptIn = bag?.[KEY_WEB_PUBLISH_OPT_IN] === true;
   } catch {
-    _webPublishOptIn = false; // fail-closed: 読めないなら送らない
+    _webPublishOptIn = false; // fail-closed: 読めない/timeout なら送らない
   }
   return _webPublishOptIn;
 }
@@ -311,6 +364,26 @@ let _refreshTimerId = /** @type {number|null} */ (null);
 //   storage を読むと重い=12 秒間引きでキャッシュし、間は前回値を再利用(コア表示は毎回更新のまま)。
 const EXTRAS_REFETCH_MS = 12000;
 let _extrasCacheAt = 0;
+/**
+ * ★v0.1.1446: コアread を最後に【実際に読んだ】時刻(キー名→ms)。
+ *   src/lib/statusReadPolicy.js の宣言に従って read/peek を切り替えるために使う。
+ *   ★peek(読まなかった回)では**進めない**。進めると二度と実 read しなくなる。
+ * @type {Record<string, number>}
+ */
+const _coreReadAt = Object.create(null);
+/**
+ * ★v0.1.1384: 拡張更新時の自動タブリロードの痕跡(background.js が書く)。
+ *   これが出れば「手動F5は不要」と確定でき、ユーザーへの依頼を1手減らせる。
+ * @type {{ at?: number, reason?: string, tabCount?: number, reloaded?: number }|null}
+ */
+let _autoTabReloadRec = null;
+/**
+ * ★v0.1.1412: 取得経路の履歴(storage 由来)。
+ *   「先週は embedded-data で取れていた」を覚えていないと降格を判定できない。
+ */
+const KEY_SOURCE_PROVENANCE = 'nls_source_provenance_v1';
+/** @type {Record<string, any>|null} */
+let _sourceProvenanceStored = null;
 // 重さ根治 P3(2026-07-06): loadCustomSoundDiagSafe(IndexedDB open+count+fetch)の幽霊 read 対策。
 //   前回発行分が未解決の間は新規発行せず、直近スナップショット(fallback)を呼び出し側で渡す。
 const _customSoundDiagGuard = createInFlightGuard(() => loadCustomSoundDiagSafe(), { ceilingMs: 15000 });
@@ -323,22 +396,30 @@ const _livesGuard = createStaleGuardedRead(() => enumerateActiveLives(), {
   emptyValue: [],
   reissueCeilingMs: CORE_READ_REISSUE_CEILING_MS
 });
-const _summariesGuard = createStaleGuardedRead((lvList) => loadAllSummaries(lvList), {
-  emptyValue: {},
-  reissueCeilingMs: CORE_READ_REISSUE_CEILING_MS
-});
-const _fastDiagGuard = createStaleGuardedRead(() => loadStatusFastDiagLiteSafe(), {
-  emptyValue: null,
-  reissueCeilingMs: CORE_READ_REISSUE_CEILING_MS
-});
-const _popupDiagGuard = createStaleGuardedRead(() => loadPopupDiagSafe(), {
-  emptyValue: null,
-  reissueCeilingMs: CORE_READ_REISSUE_CEILING_MS
-});
-const _backfillGuard = createStaleGuardedRead(() => loadBackfillProgressSafe(), {
-  emptyValue: null,
-  reissueCeilingMs: CORE_READ_REISSUE_CEILING_MS
-});
+/**
+ * ★v0.1.1449: コアの storage read を1本にまとめたガード。
+ *
+ * ■ 実測(27MB まで太らせた実ブラウザ・交互3回で順序効果を打ち消した)
+ *     単一キー get 909ms / 全件(152キー) get 1,456ms  ← キー数152倍でも1.6倍
+ *     単一キーを5回【直列】17,040ms / 同じ5キーを【1本】391ms  ← 43倍
+ *     直列6発行 27,049ms vs 一括1発行 4,649ms(5.8倍)
+ *   ＝重さの支配要因は【get の発行回数】であってキー数ではない。
+ *   ユーザー実機の「更新所要 21,449ms」はこの直列の数字とほぼ一致した。
+ *
+ * ★これに伴い _summariesGuard / _fastDiagGuard / _popupDiagGuard / _backfillGuard は
+ *   【この1本に統合して撤去】した(定義だけ残すと次の人が使ってしまい直列に戻る)。
+ *   個別の loadXxxSafe 関数は status 内の他経路(レポート生成等)がまだ使うので残す。
+ */
+const _coreBatchGuard = createStaleGuardedRead(
+  (lvList) => loadCoreBatchSafe(lvList),
+  { emptyValue: {}, reissueCeilingMs: CORE_READ_REISSUE_CEILING_MS }
+);
+/**
+ * ★popupDiag は「popup を開いた時だけ書かれる」ので間引く(v0.1.1446)。
+ *   間引いた回に出す値の置き場(袋から毎回取り直さない)。
+ * @type {unknown}
+ */
+let _lastPopupDiag = null;
 // 2026-07-15: extras(12秒間引き)の幽霊read対策。コア5readと同じ理由(runStorageOpWithTimeout直呼びは
 //   timeoutしてもopFn自体を止められず、次のextras間引きtickが同じキーへ再発行して幽霊readと多重競合する)。
 //   実測(23,944件規模の大規模配信)でstatus.htmlのフリーズが608秒修正後も残っていたため対象を広げる。
@@ -354,7 +435,7 @@ const _watchTabMapGuard = createStaleGuardedRead(() => queryWatchTabMap(), {
 });
 /** v0.1.1005: 直近 refresh の所要計器(totalMs と重いステップ)。コピー本文(AI共有)にも出すため保持。
  *   renderAll は当該 refresh の render 計測【前】に走るので、前サイクルの値を本文に載せる(代表値として十分)。 */
-let _lastRefreshPerf = /** @type {{ totalMs: number|null, stepMs: Array<[string, number]> }} */ ({ totalMs: null, stepMs: [] });
+let _lastRefreshPerf = /** @type {{ totalMs: number|null, stepMs: Array<[string, number]>, tabsQuerySlow?: { count: number, worstMs: number, lastMs: number, lastTabCount: number } }} */ ({ totalMs: null, stepMs: [] });
 /** 2026-07-14: renderAll 内の各セクション(配信カード/マインドマップ/AI共有テキスト等)の所要 ms
  *   (降順)。診断ページ軽量化(lazy details 化)の対象を実測で決めるための自己計測(観測のみ)。 */
 let _lastRenderSectionMs = /** @type {Array<[string, number]>} */ ([]);
@@ -394,7 +475,8 @@ let _extrasCache = /** @type {{reportPreview:any, watchTabMap:any, trendFindings
   // SC2(council/broadcast-scoring-SYNTHESIS.md §2.2): ハイライト台帳(実際に発火した演出の記録)。補助情報=extras(12秒間引き)のみ。
   highlightLedger: null,
   // SC3(council/broadcast-scoring-SYNTHESIS.md §2.1): 結果発表シーケンスの起動/完走/中断観測値。補助情報=extras(12秒間引き)のみ。
-  scoreAnnounceDiag: null
+  scoreAnnounceDiag: null,
+  sidepanelSelfDiag: null
 });
 /** v0.1.868: 配信カードの再構築 skip 判定用 signature(変化なしなら innerHTML を作り直さない)。 */
 let _lastLivesSig = '';
@@ -455,6 +537,11 @@ let _lastRenderedSourceStaleSec = 0;
  *   表示層で吸収する。床はこのページが開いている間だけ(リロードで素直に再計算)。storage には書かない。
  */
 let _recordedSumFloor = 0;
+/**
+ * ★v0.1.1473: 床が「どの配信の顔ぶれ」に対するものか。
+ *   これが変わったら床を捨てる(別配信の値を持ち越さない)。
+ */
+let _recordedSumFloorKey = '';
 
 /* ============================================================================
  * 起動
@@ -568,38 +655,96 @@ function updateAutoRefreshMeta() {
   meta.textContent = `自動更新: 混雑中→約${waitSec}秒に自動調整`;
 }
 
+/**
+ * ★v0.1.1371: 初回描画までの「読み込み中」表示を消す(初回 render 成功時に1回だけ)。
+ *
+ * ★status.html に【静的に】置いてある(JSが1行も動かなくても出る)ので、
+ *   消すのはここだけ。失敗しても描画は壊さない。
+ */
+function dismissStatusBootNotice() {
+  try {
+    const el = document.getElementById('nlStatusBootNotice');
+    if (el && !el.classList.contains('nl-status-boot-notice--done')) {
+      el.classList.add('nl-status-boot-notice--done');
+    }
+  } catch {
+    /* no-op: 表示の後始末が失敗しても本体を止めない */
+  }
+}
+
+/**
+ * ★v0.1.1371: 「開いた瞬間の1回」と「2秒ごとの1回」を同じ処理にする。
+ *
+ * ■ 何が起きていたか(2026-08-12 実機・ユーザーのスクショは【真っ白のまま】)
+ *   描画経路は setInterval で回る refresh() 【だけ】だった。
+ *   ＝ページを開いてから最初の描画まで **最低 REFRESH_INTERVAL_MS(2秒)** 何も出ない。
+ *   さらに初回は _lastRefreshPerf が空なので下の congested 判定が必ず false になり、
+ *   ★**初回だけ「一番遅い条件(記録中のstorage競合)」を「一番長いtimeout」で走る**。
+ *   実測はコード内に残っていた: backfill 1918ms / fastDiagLite 1749ms / summaries 1724ms。
+ *   2秒の空白 + 混雑した初回read = ユーザーが見た「白いまま返ってこない」。
+ *
+ * ■ なぜ速報で捕まえられなかったか(ユーザー指摘「状態速報なくても分かるようにして」)
+ *   速報は refresh() が**成功して初めて**書かれる。初回が終わらない間は速報が存在しない。
+ *   ＝**一番知りたい時間帯に計器が黙る**([[instrument-must-not-overwrite-its-own-evidence]] と同型)。
+ *
+ * @param {{ first?: boolean }} [opts] first=true なら初回(混雑を仮定して短いtimeoutで走る)
+ */
+function runRefreshTick(opts) {
+  const first = opts?.first === true;
+  if (_refreshPausedByUser) return;
+  // ★初回は hidden でも描く。開いた直後は hidden 判定が true になりうるうえ、
+  //   ここで降りると「開いたのに永久に白い」を作る(降りた後に誰も再挑戦しない)。
+  if (!first && document.hidden) return;
+  if (_refreshInFlight) return;
+  if (!first && _refreshBackoffTicks > 0) { _refreshBackoffTicks -= 1; return; }
+  _refreshInFlight = true;
+  const prevTotalMs = Number(_lastRefreshPerf?.totalMs);
+  /*
+   * ★初回は「未知」であって「軽い」ではない。
+   *   従来は prevTotalMs が無い=congested false=通常の長いtimeout(8000ms)だった。
+   *   未知を軽い側に倒すと、一番混んでいる初回が一番長く待つ。短い側に倒して素早くdegradeする
+   *   (degradeしても画面は出る=白いままより必ず良い)。
+   */
+  const congested = first
+    ? true
+    : Number.isFinite(prevTotalMs) && prevTotalMs > REFRESH_CONGESTED_MS;
+  /*
+   * ★v0.1.1410: 初回は【開くまでの時間】が体感そのものなので予算を強く締める。
+   *   実測 6004ms の refresh が 12秒予算に収まっていた=何にも止められず、
+   *   その間ページが出なかった。1.5秒で切り上げ、残りは次のtick(2秒後)が埋める。
+   */
+  refresh(
+    first
+      ? { timeoutMs: CONGESTED_TIMEOUT_MS, budgetMs: REFRESH_FIRST_CYCLE_BUDGET_MS }
+      : congested
+        ? { timeoutMs: CONGESTED_TIMEOUT_MS }
+        : {}
+  )
+    .catch((err) => console.debug('[status] refresh err', err))
+    .finally(() => {
+      _refreshInFlight = false;
+      _refreshBackoffTicks = computeRefreshBackoffTicks(Number(_lastRefreshPerf?.totalMs));
+      updateAutoRefreshMeta();
+    });
+}
+
 function startRefreshLoop() {
   if (_refreshTimerId != null) return;
+  // ★v0.1.1371: interval の登録と同時に【1回すぐ描く】。2秒の空白を消す。
+  runRefreshTick({ first: true });
+  /*
+   * ★v0.1.1009/1010「過去ログ取り込み中に状態速報が重い(1819→7071ms)」の緩和: backfill SW/content が
+   *   単一 LevelDB に大きな staged 書込(最大2000行/2.5秒)を、2配信同時記録中はさらに倍で出すため、
+   *   status の read がそれと競合して 1 refresh が数百ms〜7秒に膨れる(実機 backfill 1918ms/
+   *   fastDiagLite 1749ms/summaries 1724ms=小さな read すら競合で待たされる)。
+   *   そこで (a)前回の refresh が終わるまで次を走らせない(再入防止=積み上がりを断つ)、
+   *   (b)前回の所要に【比例して】次の tick を間引く(v0.1.1010・computeRefreshBackoffTicks)=
+   *      重いほど控えめにして書込が drain する余地を作る。通常時(軽い)は2秒のまま=鮮度不変。
+   *   記録/取り込みには触らない(status の更新頻度だけ)。
+   * ★v0.1.1371: 上記のガードは runRefreshTick に集約(初回と同じ経路を通す=判断が2箇所に割れない)。
+   */
   _refreshTimerId = window.setInterval(() => {
-    if (_refreshPausedByUser) return;
-    if (document.hidden) return;
-    // ★v0.1.1009/1010「過去ログ取り込み中に状態速報が重い(1819→7071ms)」の緩和: backfill SW/content が
-    //   単一 LevelDB に大きな staged 書込(最大2000行/2.5秒)を、2配信同時記録中はさらに倍で出すため、
-    //   status の read がそれと競合して 1 refresh が数百ms〜7秒に膨れる(実機 backfill 1918ms/
-    //   fastDiagLite 1749ms/summaries 1724ms=小さな read すら競合で待たされる)。
-    //   そこで (a)前回の refresh が終わるまで次を走らせない(再入防止=積み上がりを断つ)、
-    //   (b)前回の所要に【比例して】次の tick を間引く(v0.1.1010・computeRefreshBackoffTicks)=
-    //      重いほど控えめにして書込が drain する余地を作る。通常時(軽い)は2秒のまま=鮮度不変。
-    //   記録/取り込みには触らない(status の更新頻度だけ)。
-    if (_refreshInFlight) return;
-    if (_refreshBackoffTicks > 0) { _refreshBackoffTicks -= 1; return; }
-    _refreshInFlight = true;
-    // v0.1.785: storage stall(storage_op_timeout)は status の自己診断 UI に画面表示済みで
-    //   グレースフルに degrade する想定内の事象。console.warn は chrome://extensions のエラー欄に
-    //   収集され「これ見てどうすればいいの?」を生むため console.debug に下げる(v0.1.776 と同方針=
-    //   行動につながらない警告を目立つ場所に出さない)。実エラーは画面の概要欄/AI共有欄で確認できる。
-    // v0.1.1062: 前回が混雑(10秒超)なら、次回は各readを3秒で有界化して素早くdegradeする
-    //   (62秒級のマラソン更新がstorageを占有し続け、Chrome全体を固める実機事象への対応)。
-    const prevTotalMs = Number(_lastRefreshPerf?.totalMs);
-    const congested = Number.isFinite(prevTotalMs) && prevTotalMs > REFRESH_CONGESTED_MS;
-    refresh(congested ? { timeoutMs: CONGESTED_TIMEOUT_MS } : {})
-      .catch((err) => console.debug('[status] refresh err', err))
-      .finally(() => {
-        _refreshInFlight = false;
-        // 直近 refresh の所要に比例して次の数 tick を間引く(重いほど大きく控える)。
-        _refreshBackoffTicks = computeRefreshBackoffTicks(Number(_lastRefreshPerf?.totalMs));
-        updateAutoRefreshMeta();
-      });
+    runRefreshTick();
   }, REFRESH_INTERVAL_MS);
 }
 
@@ -614,9 +759,29 @@ function startRefreshLoop() {
  *   storage stall でも「重くて開かない」を作らず即 degrade 表示する。通常更新は 8000ms のまま。
  */
 async function refresh(opts = {}) {
-  const tmo = Number.isFinite(Number(opts.timeoutMs)) && Number(opts.timeoutMs) > 0
+  const tmoBase = Number.isFinite(Number(opts.timeoutMs)) && Number(opts.timeoutMs) > 0
     ? Number(opts.timeoutMs)
     : 8000;
+  /*
+   * ★v0.1.1388(ユーザー実機「診断おもくてひらかない」の根治):
+   *   ここから下は timeout 付きの read を **10本、直列に await** する。
+   *   1本ずつは有界(既定8000ms)でも **合計に上限が無かった**=最悪 10×8000=80秒/サイクル。
+   *   refresh は2秒ごとに回るので数サイクルで180秒を超える(ユーザー実機と一致)。
+   *
+   *   ★並列化(Promise.all)では解かない。v0.1.867 で並列化して **退行**させた実績があり
+   *     (単一LevelDBの並行readがstall→fastDiag={}・記録0)、v0.1.868 で直列へ戻している
+   *     (上のコメントが正本)。＝**直列のまま、合計に天井を付ける**。
+   *
+   *   `_slice(既定値)` が「残り予算と既定値の小さい方」を返す。残りが尽きたら 0 =
+   *   read を発行せず、ガードの直近値(stale)で描く。画面が出ないより古い値の方が良い。
+   */
+  const _deadline = createRefreshDeadline({
+    totalMs: Number.isFinite(Number(opts.budgetMs)) && Number(opts.budgetMs) > 0
+      ? Number(opts.budgetMs)
+      : REFRESH_CYCLE_BUDGET_MS
+  });
+  /** @param {number} [want] @returns {number} この read に許す timeout[ms](0=読まない) */
+  const _slice = (want) => _deadline.next(Number(want) || tmoBase);
   let step = 'init';
   // v0.1.890: 「状態速報が重い」の真因可視化。refresh 全体と各ステップの所要 ms を測り、最終更新メタに
   //   出す(self-verifying: 推測で重さ対策をする前に、どのステップが重いかを実データで見る)。
@@ -639,28 +804,66 @@ async function refresh(opts = {}) {
     // 2026-07-14 診断ページ608秒固まり根治: コア5readはガード経由(timeoutでもthrowしない)。
     //   幽霊readが多重に競合していた旧実装(runStorageOpWithTimeout直呼び)から置換。
     step = 'enumerateActiveLives';
-    const lvRes = await _livesGuard.read({ timeoutMs: tmo });
+    /*
+     * ★v0.1.1447: lives の中身は `chrome.tabs.query`。**storage を触らないのに実測1000ms**
+     *   (browser プロセスの応答待ち・watchタブが1個でも遅い)。
+     *   ＝当初「storage を触らないから間引く意味がない」として宣言から外したのは【誤り】だった。
+     *   ★ただし画面の土台なので12秒は空けない(4秒=呼ぶ回数を半分に)。
+     */
+    const livesDue = shouldReadNow('lives', { lastReadAt: _coreReadAt.lives, now: Date.now() });
+    const lvRes = livesDue ? await _livesGuard.read({ timeoutMs: _slice() }) : _livesGuard.peek();
     const lvList = lvRes.value;
-    _mark(lvRes.stale ? 'lives(stale)' : 'lives');
-    step = `loadAllSummaries(${lvList.length}件)`;
-    const sumRes = await _summariesGuard.read({ timeoutMs: tmo, arg: lvList });
-    const summaries = sumRes.value;
-    _mark(sumRes.stale ? `summaries×${lvList.length}(stale)` : `summaries×${lvList.length}`);
-    // 2026-06-23: 2秒ループは full(~40KB)でなく軽量ダイジェスト(~1KB)を read=重さの真因を断つ。
-    //   読み取りパスは full と同形なので renderAll 以下の consumer は無変更(council/status-heavy-open-SYNTHESIS.md)。
-    step = 'loadStatusFastDiagLiteSafe';
-    const fdRes = await _fastDiagGuard.read({ timeoutMs: tmo });
-    const fastDiag = fdRes.value;
-    _mark(fdRes.stale ? 'fastDiagLite(stale)' : 'fastDiagLite');
-    step = 'loadPopupDiagSafe';
-    const pdRes = await _popupDiagGuard.read({ timeoutMs: tmo });
-    const popupDiag = pdRes.value;
-    _mark(pdRes.stale ? 'popupDiag(stale)' : 'popupDiag');
-    step = 'loadBackfillProgress';
-    const bfRes = await _backfillGuard.read({ timeoutMs: tmo });
-    const backfillProgress = bfRes.value;
-    _mark(bfRes.stale ? 'backfill(stale)' : 'backfill');
-    const coreReads = [lvRes, sumRes, fdRes, pdRes, bfRes];
+    /*
+     * ★実read を【試みた】ら時計を進める(成功/stale を問わない)。
+     *   成功時だけ進めると、tabs.query が遅くて stale になり続ける環境で
+     *   **毎tick 1秒のクエリを叩き続ける**=間引きが効かない(実測1000msの当のAPI)。
+     *   ★popupDiag(storage)は成功時だけ進めてよいが、ここは
+     *     「呼ぶこと自体が高い」ので【呼んだ回数】で数える。
+     */
+    if (livesDue) _coreReadAt.lives = Date.now();
+    _mark(livesDue ? (lvRes.stale ? 'lives(stale)' : 'lives') : 'lives(譲)');
+    /*
+     * ★v0.1.1449: コアの storage read を【1本の get】にまとめる。
+     *
+     * ■ 実測で確定した真因(2026-08-19・27MB まで太らせた実ブラウザ・交互3回)
+     *     単一キー get                909ms
+     *     全件(152キー) get         1,456ms   ← キー数152倍でも1.6倍にしかならない
+     *     単一キーを5回【直列】    17,040ms   ← 発行回数が支配的(43倍)
+     *     同じ5キーを【1本】で        391ms
+     *     直列6発行 27,049ms vs 一括1発行 4,649ms(5.8倍)
+     *   ユーザー実機の「更新所要 21,449ms」はこの直列の数字とほぼ一致した。
+     *
+     * ★**Promise.all で並列化してはいけない**(v0.1.867 で timeout 多発→空表示の実害→撤回)。
+     *   減らすのは【直列の本数】であって並列化ではない。1本の get([...]) にまとめるのが唯一の正解。
+     * ★**読むキーを減らす方向も効かない**(上の実測どおりキー数はほぼ無関係)。
+     *
+     * 純関数は src/lib/statusCoreBatch.js(キー組み立てと取り出し)。
+     */
+    step = `loadCoreBatch(${lvList.length}件)`;
+    const coreRes = await _coreBatchGuard.read({ timeoutMs: _slice(), arg: lvList });
+    const core = pickCoreBatchValues(coreRes.value, lvList);
+    const summaries = core.summaries;
+    const fastDiag = core.fastDiag;
+    const backfillProgress = core.backfillProgress;
+    _mark(coreRes.stale ? `coreBatch×${lvList.length}(stale)` : `coreBatch×${lvList.length}`);
+    /*
+     * ★popupDiag だけは【まとめた袋の中に居ても】頻度で間引く(v0.1.1446)。
+     *   書き手は popup-entry.js:19444 の1箇所で **popup を開いたときにしか走らない**
+     *   ＝診断ページを見ている間この値は変わらない。
+     *   ★同じ袋に入っているので **read の発行回数は増えない**(=間引いても速くはならない)。
+     *     間引く意味は「popup を開いていない間、古い値で描き続けて良い」という
+     *     鮮度の宣言を1箇所に残すこと。実際の値は袋から取る。
+     */
+    const popupDiagDue = shouldReadNow('popupDiag', {
+      lastReadAt: _coreReadAt.popupDiag,
+      now: Date.now()
+    });
+    if (popupDiagDue && !coreRes.stale) {
+      _lastPopupDiag = core.popupDiag;
+      _coreReadAt.popupDiag = Date.now();
+    }
+    const popupDiag = popupDiagDue && !coreRes.stale ? core.popupDiag : _lastPopupDiag;
+    const coreReads = [lvRes, coreRes];
     // 以下は「追加データ」=失敗しても他の表示と記録を妨げない(空で描く)。12 秒間引きでキャッシュ
     //   再利用=2 秒ごとの storage read を減らして「スムーズじゃない」を改善(コア表示は毎回更新のまま)。
     //   ★laneDiag(応援レーン人数整合セル)もここに含める=v0.1.909 で毎回の直列 read に足したら
@@ -681,7 +884,7 @@ async function refresh(opts = {}) {
       // 2026-07-15: コア5readと同じstale-while-revalidateガード経由に変更(旧runStorageOpWithTimeout
       //   直呼びは幽霊readの多重競合を止められなかった)。
       step = 'loadExtrasBatch';
-      const extrasRes = await _extrasBatchGuard.read({ timeoutMs: tmo });
+      const extrasRes = await _extrasBatchGuard.read({ timeoutMs: _slice() });
       const extrasBag = extrasRes.value;
       _mark(extrasRes.stale ? 'extrasBatch(stale)' : 'extrasBatch');
       const {
@@ -708,16 +911,30 @@ async function refresh(opts = {}) {
         instantPushDiag,
         channelSwitchDiag,
         highlightLedger,
-        scoreAnnounceDiag
+        scoreAnnounceDiag,
+        sidepanelSelfDiag
       } = pickExtrasBatchValues(extrasBag, Date.now());
       step = 'queryWatchTabMap';
-      const wtRes = await _watchTabMapGuard.read({ timeoutMs: tmo });
+      /*
+       * ★v0.1.1447: これも `chrome.tabs.query`(lives と同じ実体)。
+       *   既に extras の中(12秒間引き)に居るのに **実測2499ms**＝
+       *   **12秒に1回でも重い**。書き手は人のタブ操作なので、さらに空けてよい。
+       */
+      const wtDue = shouldReadNow('watchTabMap', {
+        lastReadAt: _coreReadAt.watchTabMap,
+        now: Date.now()
+      });
+      const wtRes = wtDue
+        ? await _watchTabMapGuard.read({ timeoutMs: _slice() })
+        : _watchTabMapGuard.peek();
       const watchTabMap = wtRes.value;
-      _mark(wtRes.stale ? 'watchTabMap(stale)' : 'watchTabMap');
+      // ★lives と同じ理由: tabs.query は「呼ぶこと自体が高い」ので試みた回数で数える。
+      if (wtDue) _coreReadAt.watchTabMap = Date.now();
+      _mark(wtDue ? (wtRes.stale ? 'watchTabMap(stale)' : 'watchTabMap') : 'watchTabMap(譲)');
       step = 'recordAndAnalyzeTrend';
       const trendFindings = await runStorageOpWithTimeout(
         () => recordAndAnalyzeTrendSafe(lvList, summaries),
-        tmo
+        _slice()
       ).catch(() => []);
       // v0.1.1072: マイ効果音(取込件数/割当キー数/rev)も extras(12秒間引き)へ。IDB read のため
       //   コアには絶対足さない(既知の地雷=v1045/v1046と同型)。失敗時は「-」表示スナップショットへ。
@@ -729,13 +946,43 @@ async function refresh(opts = {}) {
         _extrasCache.customSoundDiag || buildCustomSoundDiagSnapshot({ dbAvailable: false });
       const customSoundDiag = await runStorageOpWithTimeout(
         () => _customSoundDiagGuard.run(customSoundDiagFallback),
-        tmo
+        _slice()
       ).catch(() => customSoundDiagFallback);
-      _extrasCache = { reportPreview, watchTabMap, trendFindings, laneDiag, laneMirror, statCardsMirror, northStarMirror, voiceDiag, venueSeatsDiag, publishOutcomeRec, commentTimelineMirror, giftHistoryMirror, roomHeatMirror, sessionSummaryMirror, previewRenderAck, backfillLiveMetric, giftEffectDiag, milestoneEffectDiag, customSoundDiag, voiceEffectDiag, bgmPhaseDiag, opSoundEffectDiag, commentPostDiag, instantPushDiag, channelSwitchDiag, highlightLedger, scoreAnnounceDiag };
+      /*
+       * ★v0.1.1384: 自動タブリロードの痕跡(1キーだけ・extras 側=12秒間引き)。
+       *   コアには足さない([[status-extras-read-not-core-read]])。
+       *   失敗しても null のまま=行が出ないだけで、速報全体は止めない。
+       */
+      /*
+       * ★v0.1.1415: 小さな1キー read を【1本にまとめる】。
+       *
+       * ■ なぜ
+       *   実測で分かった重さの正体は「読む量」ではなく **read の本数 ×
+       *   書き込みとの競合**(同じreadが 平常1ms → backfill中217ms)。
+       *   ＝ **直列に並べた本数がそのまま体感になる**。
+       *   `chrome.storage.local.get` は複数キーを1回で取れるので、
+       *   情報量を1bitも減らさずに本数だけ減らせる。
+       *
+       *   ★v0.1.1412 で私が sourceProvenance を**独立した1本**として足したのは誤り。
+       *     計器を足すたびに read が1本増えるなら、計器が診断を殺す
+       *     (observer effect)。**足すときは既存のバッチに相乗りさせる**。
+       */
+      step = 'smallKeysBatch';
+      {
+        const _small = await runStorageOpWithTimeout(
+          () => chrome.storage.local.get(['nls_last_auto_tab_reload', KEY_SOURCE_PROVENANCE]),
+          _slice()
+        ).catch(() => null);
+        if (_small) {
+          _autoTabReloadRec = _small.nls_last_auto_tab_reload || null;
+          _sourceProvenanceStored = _small[KEY_SOURCE_PROVENANCE] || null;
+        }
+      }
+      _extrasCache = { reportPreview, watchTabMap, trendFindings, laneDiag, laneMirror, statCardsMirror, northStarMirror, voiceDiag, venueSeatsDiag, publishOutcomeRec, commentTimelineMirror, giftHistoryMirror, roomHeatMirror, sessionSummaryMirror, previewRenderAck, backfillLiveMetric, giftEffectDiag, milestoneEffectDiag, customSoundDiag, voiceEffectDiag, bgmPhaseDiag, opSoundEffectDiag, commentPostDiag, instantPushDiag, channelSwitchDiag, highlightLedger, scoreAnnounceDiag, sidepanelSelfDiag };
       _extrasCacheAt = Date.now();
       _mark('extras');
     }
-    const { reportPreview, watchTabMap, trendFindings, laneDiag, laneMirror, statCardsMirror, northStarMirror, voiceDiag, venueSeatsDiag, publishOutcomeRec, commentTimelineMirror, giftHistoryMirror, roomHeatMirror, sessionSummaryMirror, previewRenderAck, backfillLiveMetric, giftEffectDiag, milestoneEffectDiag, customSoundDiag, voiceEffectDiag, bgmPhaseDiag, opSoundEffectDiag, commentPostDiag, instantPushDiag, channelSwitchDiag, highlightLedger, scoreAnnounceDiag } = _extrasCache;
+    const { reportPreview, watchTabMap, trendFindings, laneDiag, laneMirror, statCardsMirror, northStarMirror, voiceDiag, venueSeatsDiag, publishOutcomeRec, commentTimelineMirror, giftHistoryMirror, roomHeatMirror, sessionSummaryMirror, previewRenderAck, backfillLiveMetric, giftEffectDiag, milestoneEffectDiag, customSoundDiag, voiceEffectDiag, bgmPhaseDiag, opSoundEffectDiag, commentPostDiag, instantPushDiag, channelSwitchDiag, highlightLedger, scoreAnnounceDiag, sidepanelSelfDiag } = _extrasCache;
     // 2026-07-14 診断ページ608秒固まり根治: コアreadがstale供給(timeoutでも直近成功値)された場合、
     //   嘘の新鮮さを装わずヘッダーに鮮度を明記する(parity診断群と同じ「嘘をつかない」原則)。
     const staleCores = coreReads.filter((r) => r.stale);
@@ -759,14 +1006,56 @@ async function refresh(opts = {}) {
         `  数秒ごとに自動で再読み込みします。このまま少しお待ちください。`;
     }
     step = 'renderAll';
+    /*
+     * ★v0.1.1371: ここまで来れば「画面に何かが出る」ことが確定=読み込み表示を下ろす。
+     *   ★degrade(stale値/空)でも下ろす。中身が薄くても【画面が出ている】方が、
+     *     「読み込み中」が居座り続けるより正しい(永久ローディングを作らない)。
+     */
+    dismissStatusBootNotice();
     // v0.1.1005: 前サイクルの所要計器をコピー本文へ渡す(画面ヘッダーだけでなく AI共有テキストにも出す)。
     // 2026-07-14: renderAll 内のセクション別内訳(前サイクル計測)も同様に渡す(診断ページ軽量化の実測材料)。
-    renderAll({ lvList, summaries, fastDiag, popupDiag, backfillProgress, backfillLiveMetric, voiceDiag, venueSeatsDiag, laneDiag, laneMirror, statCardsMirror, northStarMirror, reportPreview, trendFindings, watchTabMap, publishOutcomeRec, commentTimelineMirror, giftHistoryMirror, roomHeatMirror, sessionSummaryMirror, previewRenderAck, refreshPerf: _lastRefreshPerf, renderSectionMs: _lastRenderSectionMs, giftEffectDiag, milestoneEffectDiag, customSoundDiag, voiceEffectDiag, bgmPhaseDiag, opSoundEffectDiag, commentPostDiag, instantPushDiag, channelSwitchDiag, highlightLedger, scoreAnnounceDiag });
+    renderAll({ lvList, summaries, fastDiag, popupDiag, backfillProgress, backfillLiveMetric, voiceDiag, venueSeatsDiag, laneDiag, laneMirror, statCardsMirror, northStarMirror, reportPreview, trendFindings, watchTabMap, publishOutcomeRec, commentTimelineMirror, giftHistoryMirror, roomHeatMirror, sessionSummaryMirror, previewRenderAck, refreshPerf: _lastRefreshPerf, renderSectionMs: _lastRenderSectionMs, giftEffectDiag, milestoneEffectDiag, customSoundDiag, voiceEffectDiag, bgmPhaseDiag, opSoundEffectDiag, commentPostDiag, instantPushDiag, channelSwitchDiag, highlightLedger, scoreAnnounceDiag, sidepanelSelfDiag, extrasAgeMs: _extrasCacheAt ? Math.max(0, Date.now() - _extrasCacheAt) : null });
     _mark('render');
+    /*
+     * ★v0.1.1320: 「JSが返るまで」でなく【画面に出るまで】を測る。
+     *
+     * ■ なぜ必要か(2026-08-10 に判明した計器の欠陥)
+     *   ここより下の _totalMs は renderAll から【JSが返った時点】で確定する。
+     *   style/layout/paint は**その後**にブラウザが走らせるので計器の【外】。
+     *   ＝速報の「更新所要 6ms」は「JSが6msで返った」であって「画面が軽い」ではない。
+     *   ★このファイル自身に反証が残っていた:
+     *     「1回目 12,610ms(extras 12,607 / render 3) → 2回目 5ms」
+     *     ＝render 3ms でも実所要は12秒。render の小ささは軽さを意味しない。
+     *
+     * ■ 測り方: rAF は「次の描画の直前」、その中の setTimeout(0) は「描画の直後」に戻る。
+     *   この2点で JS 復帰→実描画 を挟み込む。計測だけで描画には触らない。
+     */
+    try {
+      if (typeof requestAnimationFrame === 'function') {
+        const _paintT0 = typeof performance !== 'undefined' ? performance.now() : Date.now();
+        requestAnimationFrame(() => {
+          setTimeout(() => {
+            try {
+              const now = typeof performance !== 'undefined' ? performance.now() : Date.now();
+              observePaintCompletion(_paintProbe, now - _paintT0);
+            } catch { /* 計器の失敗は描画を壊さない */ }
+          }, 0);
+        });
+      }
+    } catch { /* no-op */ }
     const _totalMs = Math.round((typeof performance !== 'undefined' ? performance.now() : Date.now()) - _t0);
     updateLastUpdateMeta({ totalMs: _totalMs, stepMs: _stepMs, staleNote });
     // 次サイクルのコピー本文に出すため、この refresh の計器を保持(render 込みの最新 totalMs/stepMs)。
-    _lastRefreshPerf = { totalMs: _totalMs, stepMs: _stepMs.slice() };
+    // ★v0.1.1314: tabs.query の遅延計器を同梱する(「lives が遅い」の内訳を名指しするため)。
+    //   遅延を1度も観測していなければ count=0 で、速報には1行も出ない。
+    _lastRefreshPerf = {
+      totalMs: _totalMs,
+      stepMs: _stepMs.slice(),
+      tabsQuerySlow: { ..._tabsQuerySlowDiag },
+      // ★v0.1.1320: JSが返った後の style/layout/paint まで含めた実所要。
+      //   これが大きければ「重いのはDOMの作り直し」＝拡張の中で直せる、と名指しできる。
+      paintCompletionLine: formatPaintCompletionLine(_paintProbe, { jsMs: _totalMs })
+    };
     if (staleCores.length === 0) _statusLastErrorText = '';
   } catch (err) {
     // v0.1.797: timeout は「ストレージ混雑(記録は別途継続)」の想定内 degrade=不安にさせない文言に。
@@ -782,6 +1071,13 @@ async function refresh(opts = {}) {
         `⚠ 状態の読み込みでつまずきました\n  つまずいた処理: ${step}\n  原因: ${String(err?.message || err)}\n` +
         `  (記録自体は watch タブ側で継続中です。storage が大きいと status の表示だけ遅れることがあります)`;
     }
+    /*
+     * ★v0.1.1371: 失敗経路でも読み込み表示を下ろす。
+     *   ここは renderAll に到達しないので、下ろさないと「読み込み中」が【永久に居座る】。
+     *   下の _statusLastErrorText が理由を画面に出すので、消しても情報は失われない
+     *   (むしろ「読み込み中」が理由を覆い隠す方が悪い)。
+     */
+    dismissStatusBootNotice();
     try {
       const ovEl = document.getElementById('overviewBody');
       if (ovEl && /読み込み中/.test(ovEl.textContent || '')) {
@@ -870,14 +1166,53 @@ function updateLastUpdateMeta(perf) {
  *   タブの last_watch_url が「視聴中」に居座る誤表示を防ぐ([[watchUrlFreshness]])。
  * ========================================================================== */
 
+/**
+ * ★v0.1.1314: `chrome.tabs.query` が遅かった回数と最悪値(診断ページ 9.8 秒の切り分け用)。
+ *   storage を触らない API なので、ここが遅いなら真因は storage 競合ではない。
+ * @type {{ count: number, worstMs: number, lastMs: number, lastTabCount: number }}
+ */
+const _tabsQuerySlowDiag = { count: 0, worstMs: 0, lastMs: 0, lastTabCount: -1 };
+
+/**
+ * ★v0.1.1320: 「JSが返ってから画面に出るまで」の実測(既存計器の盲点を埋める)。
+ *   既存の totalMs は renderAll から JS が返った時点で止まるので、
+ *   style/layout/paint(=DOMを作り直しすぎたときの重さ)が一切写らなかった。
+ */
+const _paintProbe = createPaintProbeState();
+
 async function enumerateActiveLives() {
   /** @type {string[]} */
   const lvList = [];
   // 経路1: 実際に開いているニコ生 watch タブから lv 抽出
   try {
+    /*
+     * ★v0.1.1314: `chrome.tabs.query` だけの所要を単独で測る。
+     *
+     * ■ なぜ要るか(2026-08-06 に測って未解明のまま残っている数字)
+     *   診断ページ 9,812ms の内訳で `lives` が 5,493ms を占めていた。
+     *   しかし `lives` は【tabs.query + fastDiag フォールバック】の合計なので、
+     *   どちらが遅いのか名指しできない＝計器が症状しか出していない。
+     *   ★tabs.query は storage を触らない(browser プロセスが応える)ので、
+     *     もし tabs.query 単独が遅いなら【storage競合説では説明できない】=
+     *     真因は拡張の外(browser プロセスの混雑)側にある、と切り分けられる。
+     *   逆に tabs.query が速ければ、遅いのは fastDiag 経路＝storage 側と確定する。
+     *
+     * ★この計器は「遅いときだけ」記録する(常時書くと storage を汚す)。
+     */
+    const _tq0 = typeof performance !== 'undefined' ? performance.now() : Date.now();
     const tabs = await chrome.tabs.query({
       url: ['https://live.nicovideo.jp/watch/*', 'https://sp.live.nicovideo.jp/watch/*']
     });
+    const _tqMs = Math.round(
+      (typeof performance !== 'undefined' ? performance.now() : Date.now()) - _tq0
+    );
+    // 1秒以上かかったら記録する(通常は数ms。閾値を超えた回数と最悪値だけ持つ)。
+    if (_tqMs >= 1000) {
+      _tabsQuerySlowDiag.count += 1;
+      if (_tqMs > _tabsQuerySlowDiag.worstMs) _tabsQuerySlowDiag.worstMs = _tqMs;
+      _tabsQuerySlowDiag.lastMs = _tqMs;
+      _tabsQuerySlowDiag.lastTabCount = Array.isArray(tabs) ? tabs.length : -1;
+    }
     for (const tab of tabs || []) {
       const url = String(tab?.url || '');
       const m = url.match(/\/watch\/(lv\d{1,15})/);
@@ -913,17 +1248,29 @@ async function enumerateActiveLives() {
     const m = url.match(/lv\d{1,15}/);
     if (m) {
       const lv = m[0].toLowerCase();
-      let fresh = false;
+      let adopt = false;
       try {
+        // ★v0.1.1481: 終了の印(nls_live_ended_<lv>)も一緒に読む。
+        //   panel_summary は content が約2秒ごとに書くので、放送を閉じた【直後】は
+        //   必ず「新しい」と判定される＝★閉じた放送が最大3分「視聴中」に居座っていた
+        //   (ユーザー指摘「今放送とじて…ここにでるってへんじゃない？」)。
+        //   ★印はこのリポに既にあり status の他所は読んでいた(1636/3332)。経路3だけ配線漏れ。
+        // ★2キーを【1回の get】で読む。直列にすると有界な read でも合計が無界になる
+        //   ([[serial-bounded-reads-sum-to-unbounded]])。稀パスでも read 回数は増やさない。
         const pKey = panelSummaryStorageKey(lv);
-        const sbag = await chrome.storage.local.get(pKey);
+        const eKey = liveEndedStorageKey(lv);
+        const sbag = await chrome.storage.local.get([pKey, eKey]);
         const updatedAt = Number(sbag?.[pKey]?.updatedAt);
-        fresh = isLastWatchUrlFresh(updatedAt, Date.now());
+        const endedFlag = sbag?.[eKey];
+        adopt = shouldAdoptLastWatchUrl({
+          endedAt: isLiveEndedFlag(endedFlag) ? endedFlag.endedAt : null,
+          fresh: isLastWatchUrlFresh(updatedAt, Date.now())
+        });
       } catch {
-        // panel_summary が読めない＝記録の形跡なし＝視聴中とは言えない（採用しない）。
-        fresh = false;
+        // 読めない＝記録の形跡なし＝視聴中とは言えない（採用しない）。
+        adopt = false;
       }
-      if (fresh) lvList.push(lv);
+      if (adopt) lvList.push(lv);
     }
   } catch {
     /* fallthrough */
@@ -974,6 +1321,22 @@ async function queryWatchTabMap() {
  * サマリ読込(1 回の get() で全配信分一括)
  * ========================================================================== */
 
+/**
+ * ★v0.1.1449: コアの storage read を【1回の get】で済ませる。
+ *   キー組み立ては src/lib/statusCoreBatch.js(純関数・テスト付き)。
+ *   ★ここで Promise.all を使ってはいけない(v0.1.867 で空表示の実害)。1本の get のみ。
+ * @param {string[]} lvList
+ * @returns {Promise<Record<string, unknown>>}
+ */
+async function loadCoreBatchSafe(lvList) {
+  try {
+    const bag = await chrome.storage.local.get(buildCoreBatchKeys(lvList));
+    return bag || {};
+  } catch {
+    return {};
+  }
+}
+
 async function loadAllSummaries(lvList) {
   if (!Array.isArray(lvList) || !lvList.length) return {};
   /** @type {string[]} */
@@ -1004,16 +1367,7 @@ async function loadStatusFastDiagLiteSafe() {
   }
 }
 
-// 2026-06-18: popup の AI診断コピーにしか無い popup 固有診断(別キー)を読む。
-//   popup を開いたときだけ更新される=古いことがあるので persistedAt を併記して集約する。
-async function loadPopupDiagSafe() {
-  try {
-    const bag = await chrome.storage.local.get(KEY_AI_SHARE_POPUP_DIAG);
-    return bag?.[KEY_AI_SHARE_POPUP_DIAG] || null;
-  } catch {
-    return null;
-  }
-}
+// ★v0.1.1449: loadPopupDiagSafe は撤去(コアの1本 get に統合。statusCoreBatch.js が担う)。
 
 // v0.1.852: 会場モード(comeview・別ページ)の読み上げ診断を読む。comeview が定期的に
 //   KEY_VOICE_DIAG(nls_voice_diag_v1)へ書く(発話/間引き時)。会場モード未使用なら null=表示しない。
@@ -1294,8 +1648,17 @@ async function recordAndAnalyzeTrendSafe(lvList, summaries) {
       //   この時点に追いつき中があれば、全体の取得率が見かけ上下がるのは正常=trend の rate-declining を抑止。
       const endedFlag = summaries[LIVE_ENDED_PREFIX + lv];
       const ended = isLiveEndedFlag(endedFlag) ? endedFlag.endedAt : null;
-      const livePct = off > 0 ? (rec / off) * 100 : null;
-      if (!ended && rec > 0 && (livePct == null || livePct < 100)) catchingUp = true;
+      /*
+       * ★v0.1.1474: 判定は catchingUpVerdict.js(純関数)が正本。ここは呼ぶだけ。
+       *   ★実損(2026-08-22 実機): 追いつき中(30%)なのに
+       *     「取得率が下がり続けています(100%→0%)」が出た。
+       *   ★原因＝配信を開いた直後、公式件数だけ判明して記録がまだ0件の一瞬に
+       *     旧条件の `rec > 0` が false になり、その点が catchingUp=false で積まれた。
+       *     その点は取得率0%なので、後の窓で「単調低下」の材料になった。
+       *   ★つまり【まだ始まっていない】を【追いつき中ではない】と記録していた
+       *     ＝「無い」と「まだ分からない」を混ぜる型(今日4件目)。
+       */
+      if (isCatchingUp({ endedAt: ended, recordedCount: rec, officialCount: off })) catchingUp = true;
     }
     const ratePct = official > 0 ? Math.round((recorded / official) * 100) : null;
     const kpi = { recorded, official, ratePct, watch: hasWatch ? watch : null, catchingUp };
@@ -1312,33 +1675,8 @@ async function recordAndAnalyzeTrendSafe(lvList, summaries) {
   }
 }
 
-/**
- * v0.1.659: 過去ログ取得の診断(stopReason)を読む。「一気に取れない・50%停止」の真因を
- *   ユーザーが status を開くだけで AI に共有できるように、どの配信が何の理由で止まったかを表示。
- *   nls_backfill_progress_v1 はグローバル(直近1配信分)。
- * @returns {Promise<{lid:string, rows:number, done:number, stopReason:string, errMsg:string}|null>}
- */
-async function loadBackfillProgressSafe() {
-  try {
-    const bag = await chrome.storage.local.get('nls_backfill_progress_v1');
-    const p = bag?.['nls_backfill_progress_v1'];
-    if (!p || typeof p !== 'object') return null;
-    return {
-      lid: String(p.lid || ''),
-      rows: Number(p.rows) || 0,
-      done: Number(p.done) || 0,
-      stopReason: String(p.stopReason || ''),
-      // v0.1.692: aborted の真因(crawl 例外メッセージ)。content 側 publishBackfillProgress が保全する。
-      errMsg: String(p.errMsg || ''),
-      // v0.1.999 スループット計器: 状態速報の「⏱ 取得速度」行が使う(観測値・取り込みには影響しない)。
-      seg: Number(p.seg) || 0,
-      elapsedMs: Number(p.elapsedMs) || 0,
-      reseeds: Number(p.reseeds) || 0
-    };
-  } catch {
-    return null;
-  }
-}
+// ★v0.1.1449: loadBackfillProgressSafe は撤去(コアの1本 get に統合。
+//   整形は src/lib/statusCoreBatch.js の pickBackfillProgress が同じ形で担う)。
 
 /**
  * v0.1.1045 段1: 走行中スループット計器(KEY_BACKFILL_LIVE_METRIC)を読む(観測のみ)。
@@ -1379,7 +1717,7 @@ async function loadBackfillLiveMetricSafe() {
 // v0.1.861: レポートプレビューの信頼度注釈の文脈は純関数 reportPreviewCtxFromFastDiag(src/lib)に抽出済み
 //   (NDGR 接続/userId 付き率/backfill 進行 → 注釈ctx・挙動同値・テストで固定)。import は冒頭。
 
-function renderAll({ lvList, summaries, fastDiag, popupDiag, backfillProgress, backfillLiveMetric, voiceDiag, venueSeatsDiag, laneDiag, laneMirror, statCardsMirror, northStarMirror, reportPreview, trendFindings, watchTabMap, publishOutcomeRec, commentTimelineMirror, giftHistoryMirror, roomHeatMirror, sessionSummaryMirror, previewRenderAck, refreshPerf, renderSectionMs, giftEffectDiag, milestoneEffectDiag, customSoundDiag, voiceEffectDiag, bgmPhaseDiag, opSoundEffectDiag, commentPostDiag, instantPushDiag, channelSwitchDiag, highlightLedger, scoreAnnounceDiag }) {
+function renderAll({ extrasAgeMs, lvList, summaries, fastDiag, popupDiag, backfillProgress, backfillLiveMetric, voiceDiag, venueSeatsDiag, laneDiag, laneMirror, statCardsMirror, northStarMirror, reportPreview, trendFindings, watchTabMap, publishOutcomeRec, commentTimelineMirror, giftHistoryMirror, roomHeatMirror, sessionSummaryMirror, previewRenderAck, refreshPerf, renderSectionMs, giftEffectDiag, milestoneEffectDiag, customSoundDiag, voiceEffectDiag, bgmPhaseDiag, opSoundEffectDiag, commentPostDiag, instantPushDiag, channelSwitchDiag, highlightLedger, scoreAnnounceDiag, sidepanelSelfDiag }) {
   // v0.1.847: 各描画セクションを独立 try/catch で隔離するヘルパ。1つが throw しても他のセクションと
   //   最終更新メタを巻き込まない=「セルが全部消える/最終更新—のまま固まる」を根治。落ちた場所は
   //   console と AI 共有欄に出して真因を追えるようにする(star-romi 失敗体験の除去)。
@@ -1436,6 +1774,26 @@ function renderAll({ lvList, summaries, fastDiag, popupDiag, backfillProgress, b
   // v0.1.847: 概要算出が throw しても空文字でフォールバック=後続セクションを止めない。
   let overviewText = '';
   try {
+    /*
+     * ★v0.1.1473: 配信の顔ぶれが変わったら床を捨てる。
+     *   ★実損(2026-08-21 実機): 別の配信へ移った直後に
+     *     「累計 記録 1,910 件 / 公式累計 381 件 (取得率 501%)」が出た。
+     *     1,910 は【前の配信】の記録で、381 は【今の配信】の公式。
+     *   ★床は「enumerate の一瞬の揺れ」を吸収する仕掛け(v0.1.804)であって、
+     *     「配信が変わって本当に減った」ときまで据え置くものではない。
+     *     ＝ ★「まだ分からない(揺れ)」と「無い(別配信)」を混ぜていた
+     *       ([[unknown-vs-absent]] と同じ型。今日3件目)。
+     *   ★見分ける材料は lv(配信ID)。顔ぶれが同じ間だけ床を持ち越す。
+     */
+    const liveKey = livesData
+      .map((r) => String(r?.lv || ''))
+      .filter(Boolean)
+      .sort()
+      .join(',');
+    if (liveKey !== _recordedSumFloorKey) {
+      _recordedSumFloor = 0;
+      _recordedSumFloorKey = liveKey;
+    }
     overviewText = buildOverviewText(livesData, { recordedSumFloor: _recordedSumFloor });
     const recordedSumNow = sumRecordedFromLives(livesData);
     if (recordedSumNow > _recordedSumFloor) _recordedSumFloor = recordedSumNow;
@@ -1459,8 +1817,17 @@ function renderAll({ lvList, summaries, fastDiag, popupDiag, backfillProgress, b
   let backfillLine = '';
   let laneLine = '';
   safeSection('概要併記', () => {
-    const catchingUp = livesData.some(
-      (lv) => !lv.endedAt && lv.recordedCount > 0 && (lv.officialRatePct == null || lv.officialRatePct < 100)
+    /*
+     * ★v0.1.1474: 判定を catchingUpVerdict.js(純関数)へ寄せた。
+     *   ★同じ「追いつき中か」が2箇所に【別の式】で書かれていて、
+     *     片方だけ `rec > 0` を持っていたため、片方だけ偽陽性を出していた。
+     */
+    const catchingUp = anyCatchingUp(
+      livesData.map((lv) => ({
+        endedAt: lv.endedAt,
+        recordedCount: lv.recordedCount,
+        officialCount: lv.officialCommentCount
+      }))
     );
     const bpLine = buildBackfillProgressLine(backfillProgress, { catchingUp });
     backfillLine = bpLine ? `\n${bpLine}` : '';
@@ -1580,6 +1947,28 @@ function renderAll({ lvList, summaries, fastDiag, popupDiag, backfillProgress, b
     const sLines = buildChannelSwitchDiagLines(channelSwitchDiag, Date.now());
     channelSwitchLine = sLines.length ? `\n${sLines.join('\n')}` : '';
   });
+  /*
+   * ★v0.1.1384: 拡張更新時に watch タブが【自動リロードされたか】を出す。
+   *
+   * ■ なぜ(2026-08-13 ユーザーの困りごと)
+   *   ユーザーは更新のたび「🔄 → watch タブ F5」を手作業でやっていた(1日11版=11回)。
+   *   しかし background.js の reloadExistingWatchTabs() が効いているなら **F5 は不要**。
+   *   ★「効いているか」を誰も測っていなかったため、私(司令塔)は毎回 F5 を依頼し続けた。
+   *   この行が出れば、次からその依頼を**やめられる**。
+   */
+  let autoTabReloadLine = '';
+  safeSection('自動タブリロード計器', () => {
+    const rec = _autoTabReloadRec;
+    if (!rec || typeof rec !== 'object') return;
+    const at = Number(rec.at) || 0;
+    if (at <= 0) return;
+    const agoSec = Math.max(0, Math.round((Date.now() - at) / 1000));
+    const reloaded = Math.max(0, Number(rec.reloaded) || 0);
+    autoTabReloadLine =
+      `\n拡張更新時の自動タブリロード: ${reloaded > 0 ? '✅' : '⚠'}${reloaded}枚を再読込` +
+      `(${agoSec}秒前・経路=${String(rec.reason || '?')})` +
+      (reloaded > 0 ? ' ★手動F5は不要です' : ' ★対象タブが無かった(watchを開く前の更新)');
+  });
   // SC2(council/broadcast-scoring-SYNTHESIS.md §2.2): ハイライト台帳(実際に発火した演出の
   //   件数/最終記録ago/上位ラベル)を概要に併記(台帳が空の配信なら空=ノイズにしない)。
   let highlightLedgerLine = '';
@@ -1598,7 +1987,7 @@ function renderAll({ lvList, summaries, fastDiag, popupDiag, backfillProgress, b
   if (overviewEl) {
     overviewEl.textContent =
       (overviewText || '視聴中の配信はありません。') +
-      backfillLine + laneLine + voiceLine + reportPreviewLine + giftEffectLine + milestoneEffectLine + customSoundLine + voiceEffectLine + bgmPhaseLine + opSoundEffectLine + commentPostLine + instantPushLine + writeLedgerLine + prunePublishLine + channelSwitchLine + highlightLedgerLine + scoreAnnounceLine;
+      backfillLine + laneLine + voiceLine + reportPreviewLine + giftEffectLine + milestoneEffectLine + customSoundLine + voiceEffectLine + bgmPhaseLine + opSoundEffectLine + commentPostLine + instantPushLine + writeLedgerLine + prunePublishLine + channelSwitchLine + autoTabReloadLine + highlightLedgerLine + scoreAnnounceLine;
     overviewEl.classList.toggle('empty-note', !overviewText);
   }
 
@@ -1629,12 +2018,28 @@ function renderAll({ lvList, summaries, fastDiag, popupDiag, backfillProgress, b
       // v0.1.868: 「スムーズじゃない」対策。配信カードは 2 秒ごとに innerHTML 全再構築+<img>再生成で
       //   サムネが毎回チラつき重い。表示に効く値だけの軽い signature を作り、変化が無ければ再構築を
       //   丸ごと skip(描画/画像再取得を止める)。値が動いた時だけ作り直す。
-      const sig = livesData
-        .map((l) => `${l.lv}|${l.recordedCount}|${l.officialCommentCount}|${l.watchCount}|${l.giftPoints}|${l.elapsedSec}|${l.endedAt ? 1 : 0}|${l.thumbnailUrl ? 1 : 0}`)
-        .join('~')
-        // v0.1.869: 応援者データの配信(reportPreview.liveId)と件数も signature に含める=popup の応援者が
-        //   届いたら該当カードを作り直して展開に反映(届くまでは案内のまま)。
-        + `#rp:${String(reportPreview?.liveId || '')}:${Array.isArray(reportPreview?.topSupporters) ? reportPreview.topSupporters.length : 0}`;
+      /*
+       * ★v0.1.1320: signature から `elapsedSec`(経過【秒】)を外し、【分】に丸めて入れる。
+       *
+       * ■ 何が起きていたか(2026-08-10 実測)
+       *   上のコメントが「2秒ごとの innerHTML 全再構築+<img>再生成を止める」と書いている
+       *   その guard の signature に、配信中ずっと増え続ける `elapsedSec` が入っていた。
+       *   ＝**guard が一度も効かない**。止めたかった再構築がそのまま起き続けていた
+       *   (カード1枚30〜60要素・サムネ <img> 再生成つき)。自分で自分の対策を無効化していた。
+       *
+       * ■ 分に丸めてよい根拠
+       *   カードの表示は「経過 2:01:00」＝**分単位**(buildChikuranHeaderEl)。
+       *   秒精度は画面に出ないので、signature に秒を持つ理由が無い。
+       *   分に丸めれば「表示が変わるとき」だけ再構築＝コメントの意図どおりになる。
+       *   ★`null`(未取得)は 'x' に落として 0分 と区別する(未取得→0分の誤判定を防ぐ)。
+       */
+      // v0.1.869: 応援者データ(reportPreview)の変化も署名に含める＝届いたらカードを作り直す。
+      const sig = buildLivesCardSignature(livesData, {
+        liveId: reportPreview?.liveId,
+        topSupportersLength: Array.isArray(reportPreview?.topSupporters)
+          ? reportPreview.topSupporters.length
+          : 0
+      });
       if (sig === _lastLivesSig) return; // 変化なし=再描画しない(チラつき/重さの主因を除去)。
       _lastLivesSig = sig;
       // 画面が広いとき方眼紙のように横へ並べるグリッド(狭いと1列)。
@@ -1713,12 +2118,98 @@ function renderAll({ lvList, summaries, fastDiag, popupDiag, backfillProgress, b
 
   // 健全度パネル(ファーストビュー・正常100/異常だけ色・対象外は—)
   //   v0.1.894: 会場モード読み上げセル(タイミング・抜け漏れ)を出すため voiceDiag も渡す。
-  safeSection('健全度パネル', () => renderHealthCells({ livesData, fastDiag, popupDiag, voiceDiag, venueSeatsDiag, laneDiag, giftEffectDiag, milestoneEffectDiag, previewRenderAck, laneMirror }));
+  //   ★v0.1.1362: backfillLiveMetric を渡す=「取り込み律速」セルの入力。
+  //     渡し忘れると判定はあるのにセルが na のまま=配線されていない片肺になる。
+  /*
+   * ★v0.1.1395: v1390 で足した特化セル5種の入力を【実際に渡す】。
+   *   渡していなかったので、registry にもテストにも居るのに
+   *   実機では4つが出ていなかった(作っただけ=同じ穴を自分でまた作った)。
+   *   → [[unwired-judgement-is-systemic-2026-08-12]]
+   */
+  const _popupSnapForCells = popupDiag?.popup ?? popupDiag;
+  const _liveElapsedMs = (() => {
+    // 「取得中」が詰まりかどうかは配信の経過時間で決まる(giftAdPipelineCensus)。
+    const openedAt = Number(livesData?.[0]?.openTime || livesData?.[0]?.startedAt || 0);
+    return openedAt > 0 ? Math.max(0, Date.now() - openedAt) : 0;
+  })();
+  const _mirrorAgeMs = (() => {
+    const cap = Number(laneMirror?.capturedAt || 0);
+    return cap > 0 ? Math.max(0, Date.now() - cap) : 0;
+  })();
+  /*
+   * ★v0.1.1412: 取得経路の履歴を更新して保存する。
+   *
+   *   ★これが無いと「先週は embedded-data だった」を誰も覚えず、
+   *     降格(=ニコ生が構造を変えた)を**永久に検出できない**。
+   *   ★書き込みは値が変わったときだけ(毎回書くと storage 競合を自分で増やす。
+   *     今セッションで「診断が重い」の真因が**書き込み競合**だと実測済み)。
+   */
+  safeSection('取得経路の記録', () => {
+    const st = fromStorable(_sourceProvenanceStored);
+    for (const lv of livesData) {
+      if (!lv) continue;
+      noteSource(st, { field: 'viewerCount', source: lv.viewerCountSource, at: Date.now() });
+    }
+    const next = toStorable(st);
+    const prevJson = JSON.stringify(_sourceProvenanceStored || {});
+    const nextJson = JSON.stringify(next);
+    if (nextJson === prevJson) return; // 変化なし=書かない
+    _sourceProvenanceStored = next;
+    chrome.storage.local.set({ [KEY_SOURCE_PROVENANCE]: next }).catch(() => { /* 保存失敗は無害 */ });
+  });
+
+  safeSection('健全度パネル', () => renderHealthCells({
+    livesData, fastDiag, popupDiag, voiceDiag, venueSeatsDiag, laneDiag,
+    giftEffectDiag, milestoneEffectDiag, previewRenderAck, laneMirror, backfillLiveMetric,
+    // ★v0.1.1395 追加分(特化セル5種の入力)
+    commentPostDiag: _extrasCache?.commentPostDiag ?? null,
+    instantPushDiag: _extrasCache?.instantPushDiag ?? null,
+    /*
+     * ★v0.1.1403「無音で死ぬ」セルの入力(silentFailureCells.js)。
+     *   ★どれも extras(12秒間引き)で **既に読んでいる** 値なので storage 読み取りは増えない。
+     *   ★ここへ足し忘れると registry・純関数・test を作っても **画面に出ない**
+     *     (v0.1.1390 で実際に4セルが出なかった穴。ゲートが赤くなるので気づける)。
+     */
+    customSoundDiag,
+    /*
+     * ★v0.1.1404: ビルドの古さセル(buildAgeCell.js)の入力。
+     *   NL_BUILD_ID はビルド時に埋め込まれる定数(識別子は残らない)。
+     *   ★ここで渡さないとセルが永久に na になる=「登録したのに出ない」の再演。
+     */
+    /*
+     * ★v0.1.1408: 操作音/BGM セル(finalDetailCells.js)の入力。
+     *   どちらも extras(12秒間引き)で既に読んでいる=storage 読み取りは増えない。
+     */
+    opSoundEffectDiag,
+    bgmPhaseDiag,
+    // ★v0.1.1412: 取得経路の履歴(降格＝ニコ生の構造変更の予兆 を判定する材料)
+    sourceProvenanceStored: _sourceProvenanceStored,
+    buildId: typeof NL_BUILD_ID !== 'undefined' ? NL_BUILD_ID : '',
+    appVersion: (() => {
+      try { return String(chrome.runtime.getManifest()?.version || ''); } catch { return ''; }
+    })(),
+    mainThreadBlocker: _popupSnapForCells?.mainThreadBlocker ?? null,
+    liveElapsedMs: _liveElapsedMs,
+    // ★v0.1.1396: 会場が「いま」開いているかは、古い venueSeatsDiag ではなく
+    //   【鏡の新しさ】で判断する(鏡は会場が開いている間だけ更新され続ける)。
+    //   古い snap の enabled を使うと、11日前の化石値で「開いている」と誤判定する。
+    venueOpen: _mirrorAgeMs > 0 && _mirrorAgeMs < 180_000,
+    venueMirrorAgeMs: _mirrorAgeMs,
+    venueTiers: {
+      link: laneMirror?.link?.length || 0, gift: laneMirror?.gift?.length || 0,
+      ad: laneMirror?.ad?.length || 0, konta: laneMirror?.konta?.length || 0,
+      tanu: laneMirror?.tanu?.length || 0
+    },
+    venueHasGiftData: Number(fastDiag?.content?.giftDiagnostics?.['北極星レーン']?.['1_貢献度ランキング']?.apiRows || 0) > 0
+  }));
 
   // popup 埋め込み(本物 iframe・v0.1.916 試作): popup.html?inline=1&dock=status&lv=<lv> を iframe で
   //   丸ごと出し「見た目も操作も popup そっくり」を本物のまま映す。下の鏡(間引き)より上に置き、出たら
   //   鏡は安全網として共存。独立 try/catch=iframe が壊れても status コア・鏡を巻き込まない。
   safeSection('popup埋め込み', () => ensureStatusPopupIframe(lvList, laneMirror));
+  // ★v0.1.1500: 会場モードも同じ画面で見られるように(ユーザー要望「会場モードも同時に埋め込んだ方が
+  //   理解が深い」)。★iframe を1つ足すだけ＝status 側の DOM も storage 読みも増えない。
+  safeSection('会場埋め込み', () => ensureStatusVenueIframe(lvList, laneMirror));
 
   // 2026-06-26: 応援レーン鏡は status 画面から【撤去】(ユーザー実機「ちくらん画面に応援レーンがあると遅い」)。
   //   status は2秒ループ再描画で、顔つきレーンの毎回 paint が重さ/「—」固まりの一因。応援レーンは各配信カードの
@@ -1789,10 +2280,44 @@ function renderAll({ lvList, summaries, fastDiag, popupDiag, backfillProgress, b
     //   R-1: HTML は載せない=数値行を運ぶ(③で escapeHtml 済み lib が HTML 化)。24行≈5KB でコンパクト。
     sessionSummaryMirror: sessionSummaryMirror || null
   };
-  // 自己診断の「いま視聴中の lv」= 鏡(北極星/lane/数字)の liveId を優先採用(read を増やさない)。
-  const currentLiveId = String(
-    northStarMirror?.liveId || laneMirror?.liveId || statCardsMirror?.liveId || ''
-  );
+  /*
+   * ★v0.1.1424: 「いま視聴中の lv」を【鏡とは別の起点】から決める。
+   *
+   * ■ 何が壊れていたか(2026-08-17 実機・ユーザー速報で確定)
+   *   旧: const currentLiveId = northStarMirror?.liveId || laneMirror?.liveId || ...
+   *   ＝**いま視聴中の配信を鏡自身から取っていた**。
+   *   すると別配信を弾くガード(liveviewPublishSelfDiag.js の lidMatch)は
+   *     鏡.liveId === currentLiveId(=鏡.liveId)
+   *   で【常に一致】＝恒真。一度も発動しなかった。
+   *   実機: watch は lv351196729 なのに 対象配信 lv351196674(前の配信の鏡)で
+   *   「北極星 広告: 拡張1 / 鏡5 🔴不一致」と誤検知していた。
+   *   ★[[comparison-needs-two-origins-2026-08-07]]: 一致判定は両辺の起点が
+   *     別でなければ恒真。まさにその型を踏んでいた。
+   *
+   * ■ 直し方
+   *   実際に開いている watch タブ(livesData)を第一の起点にする。
+   *   鏡が古ければ「鏡≠現在」と正しく出る。watch が無いときだけ鏡へ落とすが、
+   *   その場合は origin='mirror' を返して件数突合を保留させる(恒真を避ける)。
+   */
+  const _currentLive = resolveCurrentLiveId({
+    lives: livesData,
+    northStarMirror,
+    laneMirror,
+    statCardsMirror
+  });
+  const currentLiveId = _currentLive.liveId;
+  /*
+   * ★突合してよいのは watch 起点のときだけ(canCompareMirrorCounts)。
+   *   watch タブが無く鏡へフォールバックした場合、currentLiveId と鏡の liveId は
+   *   同じ値になるので「一致」しか出ない=判定に意味が無い。
+   *   その状態で件数を比べると、前の配信の鏡を現配信のものとして扱ってしまう。
+   *   → 鏡由来のときは currentLiveId を渡さない(空にする)ことで、
+   *     下流(liveviewPublishSelfDiag)の lidMatch が「判定不能=null」となり
+   *     件数突合そのものが保留される(既存の設計に乗る)。
+   */
+  const currentLiveIdForDiag = canCompareMirrorCounts(_currentLive.origin)
+    ? currentLiveId
+    : '';
 
   // ③WEB配信採点丸写し(第3号・reference_full_mirror_SYNTHESIS.md M2・路線2): status 既読の5値から①と同じ
   //   純lib(buildBroadcastScorePanelViewModel)で view-model を組み、jsonBlob に載せる。③は
@@ -1819,11 +2344,22 @@ function renderAll({ lvList, summaries, fastDiag, popupDiag, backfillProgress, b
   // AI 共有用テキスト
   let fullText = '';
   safeSection('AI共有テキスト', () => {
-    fullText = buildAiShareFullText({ overviewText, livesData, fastDiag, popupDiag, voiceDiag, venueSeatsDiag, laneDiag, laneMirror, reportPreview, trendFindings, jsonBlob, currentLiveId, publishKeys, publishOutcomeRec, previewRenderAck, refreshPerf, renderSectionMs, giftEffectDiag, milestoneEffectDiag, customSoundDiag, voiceEffectDiag, bgmPhaseDiag, opSoundEffectDiag, commentPostDiag, instantPushDiag, channelSwitchDiag, highlightLedger, scoreAnnounceDiag });
+    fullText = buildAiShareFullText({ overviewText, livesData, fastDiag, popupDiag, voiceDiag, venueSeatsDiag, laneDiag, laneMirror, reportPreview, trendFindings, jsonBlob, currentLiveId: currentLiveIdForDiag, publishKeys, publishOutcomeRec, previewRenderAck, refreshPerf, renderSectionMs, giftEffectDiag, milestoneEffectDiag, customSoundDiag, voiceEffectDiag, bgmPhaseDiag, opSoundEffectDiag, commentPostDiag, instantPushDiag, channelSwitchDiag, highlightLedger, scoreAnnounceDiag, sidepanelSelfDiag, extrasAgeMs });
     const ta = /** @type {HTMLTextAreaElement|null} */ (
       document.getElementById('aiShareText')
     );
-    if (ta && ta.value !== fullText) ta.value = fullText;
+    /*
+     * ★v0.1.1447(ユーザー「コピーがスムーズにとれないときもありますね」):
+     *   旧 `ta.value !== fullText` は、本文1行目の【生成時刻】のせいで**常に true**。
+     *   ＝数十KBの textarea を2秒ごとに丸ごと書き換え、そのたびに
+     *   **ユーザーの選択が解除されていた**(value 代入は selection を必ず壊す)。
+     *   判定は src/lib/aiShareTextChanged.js(時刻を抜いて比較・選択中は書かない)。
+     */
+    if (ta) {
+      const selecting =
+        document.activeElement === ta && Number(ta.selectionEnd) > Number(ta.selectionStart);
+      if (shouldUpdateAiShareText(ta.value, fullText, { selecting })) ta.value = fullText;
+    }
   });
 
   // ②応援ライブビュー/③WEB に①と【全く同じフル状態速報】を出すため、status が組み立てた本文(fullText)を
@@ -1974,9 +2510,48 @@ function renderHealthCells(data) {
   //   表示に効く値(label/level/value/text)だけで署名し、変化が無ければ DOM を触らない=
   //   健全度パネル(基本6+北極星6+その他=~18セル)の毎回 replaceChildren+createElement ループを skip。
   //   値が変われば再構築されるので表示は常に最新。「状態速報が重い」の render 側ボトルネックを軽くする。
+  /*
+   * ★v0.1.1388: 症状別判定も署名に入れる。
+   *   入れないと「セルは同じだが症状別が変わった」paint が diff-skip で捨てられ、
+   *   **足した判定が画面に永久に出ない**([[verify-output-appears-before-shipping-2026-08-09]])。
+   *   ここは計器を足す版で必ず踏む穴なので、判定の生成を署名の前に置く。
+   */
+  const _popupSnapForSig = data?.popupDiag?.popup ?? data?.popupDiag;
+  let _symptomSig = '';
+  try {
+    _symptomSig = buildSymptomVerdicts({
+      identityAcquisition: _popupSnapForSig?.identityAcquisition || null,
+      laneRenderProbe: _popupSnapForSig?.storyUserLaneRenderProbe || null,
+      avatarLoadDiag: _popupSnapForSig?.avatarLoadDiag || null,
+      updateMs: _lastRefreshPerf?.totalMs,
+      popupAgeMs: popupSnapshotAgeMs(_popupSnapForSig)
+    }).map((s) => `${s.id}:${s.level}`).join('~');
+  } catch {
+    _symptomSig = '';
+  }
+  /*
+   * ★v0.1.1409(退化の修理): 署名から【毎秒変わる値】を外す。
+   *
+   * ■ 何が起きたか
+   *   v0.1.1403〜1408 で 53→100 セルに増やした際、
+   *   「◯秒前」「◯分経過」のような **時刻由来の文字列** を text に持つセルを
+   *   多数足した。署名は text をそのまま含んでいたので、
+   *   **中身が何も変わっていなくても毎tick 署名が変わる**。
+   *   ＝ diff-skip が一度も効かず、19枠×100セル(約500 DOMノード)を
+   *   **2秒ごとに全再構築**していた。ユーザー実機「診断タブが重すぎて開かない」。
+   *
+   * ★[[status-slow-correlates-with-record-count-2026-08-06]] の教訓どおり、
+   *   重さの原因は件数ではなく **再構築の頻度**。
+   *   ★[[timestamp-in-dedupe-key-double-counts-2026-08-10]] と同じ型＝
+   *     「鍵に時刻を混ぜると毎回別物になる」。
+   *
+   * ■ 直し方: 署名は **level と数値** だけで作る(表示は従来どおり text を出す)。
+   *   level が変われば必ず再描画されるので、**異常の見落としは起きない**。
+   *   秒数の刻みだけが画面に反映されなくなるが、それは次の tick で追いつく。
+   */
   const sig =
-    `${v.level}|${v.text}|` +
-    cells.map((c) => `${c.label}:${c.level}:${c.kind === 'pct' ? c.value : c.text || ''}`).join('~');
+    `${v.level}|${v.text}|${_symptomSig}|` +
+    cells.map((c) => `${c.id}:${c.level}:${c.kind === 'pct' ? c.value : ''}`).join('~');
   if (sig === _lastHealthSig) return; // 変化なし=再描画しない。
   _lastHealthSig = sig;
   // v0.1.846: 先頭に総合判定バッジ。満点=「全部緑」でなく「異常ゼロ」(進行中/対象外は正常)。
@@ -1988,23 +2563,126 @@ function renderHealthCells(data) {
     const span = document.createElement('span');
     span.textContent = `${mark} 総合判定: ${v.text}`;
     verdictHost.appendChild(span);
+    /*
+     * ★v0.1.1388(ユーザー実機「診断の箇所が1つしかない」の根治):
+     *   症状別判定(v0.1.1385 で新設)は **コピー本文(aiShareFullText.js)にしか配線されて
+     *   おらず、この画面から一度も呼ばれていなかった**＝ユーザーの指摘は完全に正しい。
+     *   私は「症状別判定を新設した」と報告したが、**画面上は存在していなかった**。
+     *   → [[unwired-judgement-is-systemic-2026-08-12]] を書いた本人が同じ穴を作った。
+     *
+     *   ★掟(symptomVerdicts.js の JSDoc が正本):
+     *     - 異常だけ出す(正常なら1行も出さない=ノイズを作らない)
+     *     - 1行目に次の一手(読んで直せない判定は価値が低い)
+     *     - 仕様上取れないもの(匿名のサムネ)を異常と呼ばない
+     *   ＝**総合判定が緑でも、症状別が赤ならここに出る**のが本来の姿。
+     */
+    try {
+      // 署名計算で既に解いた同じスナップショットを使う(二重に解かない・スコープも揃える)。
+      const popupSnap = _popupSnapForSig;
+      const verdicts = buildSymptomVerdicts({
+        identityAcquisition: popupSnap?.identityAcquisition || null,
+        laneRenderProbe: popupSnap?.storyUserLaneRenderProbe || null,
+        avatarLoadDiag: popupSnap?.avatarLoadDiag || null,
+        updateMs: _lastRefreshPerf?.totalMs,
+        popupAgeMs: popupSnapshotAgeMs(popupSnap)
+      });
+      for (const sv of verdicts) {
+        const row = document.createElement('div');
+        row.className = `health-symptom hs-${sv.level}`;
+        row.textContent = `${sv.level === 'bad' ? '🔴' : '🟡'} ${sv.symptom}: ${sv.line}`;
+        row.title = sv.line;
+        verdictHost.appendChild(row);
+      }
+    } catch {
+      /* 症状別判定の失敗で総合判定まで消さない(画面を白くしない) */
+    }
+    /*
+     * ★v0.1.1388(ユーザー実機「サムネイルとんでる」への回答を画面に出す):
+     *   会場参加者が全員 匿名(a:) の配信では、**数値IDも個人サムネも仕様上存在しない**
+     *   (identityAcquisitionCensus.js:19)＝ゆっくり顔で出るのが正しい挙動。
+     *   ところがその理由は `identityAcquisition.line` に書いてあるのに
+     *   **コピー本文にしか出ておらず、画面には一度も出ていなかった**
+     *   ＝ユーザーには「サムネが飛んでいる不具合」にしか見えない。
+     *   → [[symptom-owner-must-be-told-2026-08-12]](症状が出ている当の画面に出す)
+     *
+     *   ★ここは「直すのは表示ではなく説明」。挙動(ゆっくり顔)は正しいので変えない。
+     *     赤くもしない(仕様上取れないものを異常と呼ばない)。
+     */
+    try {
+      const idLine = String(_popupSnapForSig?.identityAcquisition?.line || '').trim();
+      if (idLine) {
+        const note = document.createElement('div');
+        note.className = 'health-idnote';
+        note.textContent = idLine;
+        note.title = idLine;
+        verdictHost.appendChild(note);
+      }
+    } catch {
+      /* 説明行の失敗で画面を壊さない */
+    }
   }
   host.replaceChildren();
-  for (const c of cells) {
-    const div = document.createElement('div');
-    div.className = `hc hc-${c.level}`;
-    const label = document.createElement('div');
-    label.className = 'hc-label';
-    label.textContent = c.label;
-    const val = document.createElement('div');
-    val.className = 'hc-val';
-    val.textContent = c.kind === 'pct'
-      ? (c.value == null ? '—' : `${c.value}%`)
-      : (c.text || '—');
-    div.title = `${c.label}: ${val.textContent}`;
-    div.appendChild(label);
-    div.appendChild(val);
-    host.appendChild(div);
+  /*
+   * ★v0.1.1389: 33セルを【症状の言葉】で枠に分ける。
+   *
+   * ■ ユーザーに何度も言わせた要望(これが本来の姿)
+   *   「この枠をコメント関連・ID・サムネ・アカウント名・紐づけ関連などで
+   *     区分して枠を増やしてほしい」
+   *   従来は33セルが1枚の平坦なグリッドで、探している項目に辿り着けなかった。
+   *   ★特に「ID・サムネ・名前」は uid-rate(record) / avatar(northstar) /
+   *     venue-yukkuri-face(venue) と**3カテゴリに散っていた**=並べても集まらない。
+   *
+   * ■ ここでやらないこと(壊さないための境界)
+   *   - セルの中身・判定・色は変えない(buildHealthCells の出力をそのまま描く)
+   *   - diagnosisRegistry の category は変えない(完全性スコアの集計を壊さない)
+   *   ＝**並べ替えと見出しだけ**の層。分類表は src/lib/healthCellGroups.js が正本。
+   *
+   * ★未知のセルは「その他」に落ちる(登録漏れでも画面から消えない)。
+   */
+  const groups = groupHealthCells(cells);
+  for (const g of groups) {
+    const sec = document.createElement('div');
+    sec.className = 'hc-group';
+    const head = document.createElement('div');
+    head.className = 'hc-group-head';
+    const title = document.createElement('span');
+    title.className = 'hc-group-title';
+    title.textContent = g.label;
+    head.appendChild(title);
+    // 異常件数を見出しに出す(枠が増えても異常を見落とさないため)。
+    const sum = summarizeGroup(g.cells);
+    if (sum.bad > 0 || sum.warn > 0) {
+      const badge = document.createElement('span');
+      badge.className = `hc-group-badge hcg-${sum.level}`;
+      badge.textContent = sum.bad > 0 ? `要確認 ${sum.bad}` : `注意 ${sum.warn}`;
+      head.appendChild(badge);
+    }
+    const hint = document.createElement('span');
+    hint.className = 'hc-group-hint';
+    hint.textContent = g.hint;
+    head.appendChild(hint);
+    sec.appendChild(head);
+
+    const grid = document.createElement('div');
+    grid.className = 'health-cells';
+    for (const c of g.cells) {
+      const div = document.createElement('div');
+      div.className = `hc hc-${c.level}`;
+      const label = document.createElement('div');
+      label.className = 'hc-label';
+      label.textContent = c.label;
+      const val = document.createElement('div');
+      val.className = 'hc-val';
+      val.textContent = c.kind === 'pct'
+        ? (c.value == null ? '—' : `${c.value}%`)
+        : (c.text || '—');
+      div.title = `${c.label}: ${val.textContent}`;
+      div.appendChild(label);
+      div.appendChild(val);
+      grid.appendChild(div);
+    }
+    sec.appendChild(grid);
+    host.appendChild(sec);
   }
 }
 
@@ -2023,12 +2701,39 @@ let _lastStatusPopupEmbedSrc = '';
  * @param {{ liveId?: string }|null|undefined} laneMirror 鏡 snapshot(フォールバック lv 源)
  */
 /**
- * ★緊急停止フラグ(v0.1.917): false の間は popup 埋め込み iframe を【出さない】。
- * 理由=埋め込んだ iframe 内 popup が「閉じても勝手に別配信タブを開く」実機症状の疑い(過去に backfill
- * 環境を壊した『勝手なタブ操作』と同種)。被害を即止めるため一旦無効化し、原因特定後に true へ戻す。
- * 無効中は下の「鏡」がフォールバックで表示を担保するので status は無事。
+ * popup 埋め込み iframe を出すか。★kill switch は残す(false で即座に元へ戻せる)。
+ *
+ * ───────────────────────────────────────────────────────────────────────────
+ * ■ 経緯: v0.1.917 で false にした。当時の理由(原文):
+ *     「埋め込んだ iframe 内 popup が【閉じても勝手に別配信タブを開く】実機症状の【疑い】」
+ *
+ * ■ ★2026-08-31: その疑いは【晴れている】。真因は別だった(git 履歴で確認)。
+ *     v0.1.917 popup埋め込みを緊急停止（★疑いの段階で止めた）
+ *     v0.1.918 ギフトサイドバー自動オープンを緊急停止（★これも無関係と判明し 919 で復帰）
+ *     v0.1.919 ★**真因確定**: `background.js` の autopatrol(自動巡回)だった。
+ *              原文「拡張起動の瞬間に毎回違う配信が裏タブで複数開く症状の正体は
+ *              background.js の autopatrol。…openAutopatrolTab=chrome.tabs.create({active:false})
+ *              で裏タブに開いていた。既定 ON(v0.1.528)のためユーザーは意図せず動作」
+ *   ⟹ ★**popup 埋め込みは無実だった。** 巻き添えで止まったまま残っていた。
+ *   ★真因側の封じは今も生きている: `background.js:1231` `AUTOPATROL_KILL_SWITCH = true`
+ *     （`getAutopatrolEnabled()` が常に false を返す＝巡回は起動しない）
+ *
+ * ■ ★なぜ再開してよいと言えるか(実コードで確認した3点)
+ *   1. 埋め込みは `dock=status` で開く＝**受動ビュー(INLINE_PASSIVE)**。
+ *      `inlineModeFlags.js:14` の定義「**書かない・注入しない・fetch しない**」。
+ *   2. popup 内で `chrome.tabs.create` を呼ぶ経路は**すべてクリックハンドラの中**
+ *      (`popup-entry.js:21907` 前回配信を開く / `:20551` マーケ分析)。
+ *      ★**ユーザーが押さない限り発火しない**＝「勝手に開く」経路が無い。
+ *   3. ★同じ受動ビューを `app/live-view` が**本番で使い続けている**
+ *      (`inlineModeFlags.js:52` passive は status と liveview で共有)。
+ *      ＝この経路自体は実績がある。
+ *
+ * ■ ★戻し方
+ *   ここを false に戻すだけ。下の分岐が iframe を除去し section を隠す(鏡がフォールバック)。
+ *   ★「また勝手にタブが開く」ようなら、まず `background.js:1231` を疑う(そちらが真因だった)。
+ * ───────────────────────────────────────────────────────────────────────────
  */
-const STATUS_POPUP_EMBED_ENABLED = false;
+const STATUS_POPUP_EMBED_ENABLED = true;
 
 function ensureStatusPopupIframe(lvList, laneMirror) {
   const section = document.getElementById('statusPopupEmbed');
@@ -2092,6 +2797,114 @@ function ensureStatusPopupIframe(lvList, laneMirror) {
     iframe.style.height = '100%';
     iframe.style.border = '0';
     iframe.style.backgroundColor = 'transparent';
+    host.appendChild(iframe);
+  }
+  if (iframe.getAttribute('src') !== src) {
+    iframe.setAttribute('src', src);
+  }
+}
+
+/**
+ * 会場モードの埋め込みを出すか。★kill switch(false で消える)。
+ *
+ * ───────────────────────────────────────────────────────────────────────────
+ * ■ ★なぜ「会場は載せられない」が覆ったか(2026-09-02・実コードで確認)
+ *   過去の判断は「会場は CSS 3D変形(perspective/translateZ)で可視判定が崩れるので
+ *   lazy も IntersectionObserver も使えない＝最も重い描画を最も頻繁な画面に入れることになる」だった。
+ *   ★だがその 3D は v0.1.1047「会場をひな壇3Dから応援レーン段組みに統一」で**撤去済み**。
+ *   実測: `venueBar.js` に `perspective` / `translateZ` / `transform-style` は **0件**、
+ *        `buildVenueTiers` の呼び出しも **0件**（残る scale はフキダシのアニメだけ）。
+ *   ⟹ ★前提が消えていたのに、その前提で作った判断だけが残っていた。
+ *     （この型は `_docs/KB-stale-premise.md` に記録済み）
+ *
+ * ■ ★なぜ status に載せても重くならないか
+ *   1. 会場UIは `venueBar.js` が **iframe の中で自分で全部作る**。
+ *      status 側の DOM は増えない（`venue.html` は全23行）。
+ *   2. 会場は **storage 経由**でデータを取る（standalone は `onLiveComments` が来ない設計・
+ *      `venueBar.js:76`）。★status が新しく storage を読む必要はない＝このページの負荷は増えない。
+ *   3. ★訂正(2026-09-03): 「iframe は別文書＝別のメインスレッド予算」は誤り。
+ *      same-origin の iframe は親と【同一メインスレッド】を共有する
+ *      (`aboutBlankGapVerdict.js` の実測が前提にしている事実)。
+ *      ★ただし実害は無い: この埋め込みは lv 不変の間はロードし直さない
+ *      (下の署名ガード `_lastStatusVenueEmbedSrc` )ので、ロード負荷は開いた瞬間の一度きり。
+ *      `venue.js` は `changelog-archive.js`(黒画面の主因だった1MB)を含まない分割後のバンドルで、
+ *      同種のバンドルは `aboutBlankGapVerdict.js` に記録された実測で
+ *      1,373ms→106ms(92%減)まで縮んでいる側にある(2026-08-19の分割の恩恵をこちらも受ける)。
+ *      ★それでも重いと分かれば、下の kill switch を false に戻すだけで消える。
+ *
+ * ■ ★戻し方
+ *   ここを false にするだけ。下の分岐が iframe を除去して section を隠す。
+ * ───────────────────────────────────────────────────────────────────────────
+ */
+const STATUS_VENUE_EMBED_ENABLED = true;
+
+/** 直近に焼いた会場 iframe の src(=lv 変化時だけ作り直すための署名)。 */
+let _lastStatusVenueEmbedSrc = '';
+
+/**
+ * 会場モード(venue.html?lv=)を status に埋め込む。
+ * ★popup 埋め込み(ensureStatusPopupIframe)と同じ流儀。新しい機構を作らない。
+ * @param {string[]} lvList 開いている watch タブの lv
+ * @param {{ liveId?: string }|null|undefined} laneMirror 鏡 snapshot(フォールバックの lv 源)
+ */
+function ensureStatusVenueIframe(lvList, laneMirror) {
+  const section = document.getElementById('statusVenueEmbed');
+  const host = document.getElementById('statusVenueEmbedHost');
+  if (!section || !host) return;
+
+  // kill switch: iframe を出さない=section を隠し、既存 iframe は src を外して除去(中の会場を停止)。
+  if (!STATUS_VENUE_EMBED_ENABLED) {
+    const existing = host.querySelector('iframe');
+    if (existing) {
+      try { existing.setAttribute('src', 'about:blank'); } catch { /* no-op */ }
+      try { existing.remove(); } catch { /* no-op */ }
+    }
+    section.hidden = true;
+    _lastStatusVenueEmbedSrc = '';
+    return;
+  }
+
+  // lv 解決: popup 埋め込みと同じ順(開いている watch タブ優先 → 鏡の liveId)。
+  const fromList = (Array.isArray(lvList) ? lvList : [])
+    .map((s) => String(s || '').trim().toLowerCase())
+    .find((s) => /^lv\d{1,15}$/.test(s));
+  const fromMirror = String(laneMirror?.liveId || '').trim().toLowerCase();
+  const lv = fromList || (/^lv\d{1,15}$/.test(fromMirror) ? fromMirror : '');
+
+  if (!lv) {
+    // どの放送も特定できない=出さない(死に画面にしない)。
+    section.hidden = true;
+    _lastStatusVenueEmbedSrc = '';
+    return;
+  }
+
+  let src = '';
+  try {
+    const u = new URL(chrome.runtime.getURL('venue.html'));
+    u.searchParams.set('lv', lv);
+    src = u.href;
+  } catch {
+    section.hidden = true;
+    return;
+  }
+
+  section.hidden = false;
+
+  // ★署名ガード: lv が同じなら作り直さない(再ロードのチラつき/重さ防止)。
+  if (src === _lastStatusVenueEmbedSrc) {
+    if (host.querySelector('iframe')) return;
+  }
+  _lastStatusVenueEmbedSrc = src;
+
+  let iframe = /** @type {HTMLIFrameElement|null} */ (host.querySelector('iframe'));
+  if (!iframe) {
+    iframe = document.createElement('iframe');
+    iframe.setAttribute('title', 'nicolivelog venue embed');
+    iframe.style.width = '100%';
+    iframe.style.height = '100%';
+    iframe.style.border = '0';
+    // 会場は自前で暗い地色を敷く(venue.html の body background)。透過にしない。
+    iframe.style.backgroundColor = '#0a0b0c';
     host.appendChild(iframe);
   }
   if (iframe.getAttribute('src') !== src) {
@@ -2206,6 +3019,9 @@ function buildMindNodeEl(node) {
 /**
  * @param {{ overviewText?: string, livesData?: any[], fastDiag?: any, popupDiag?: any }} data
  */
+/** ★v0.1.1320: マインドマップの diff-skip 用。変化が無ければDOMを触らず開いた枝を残す。 */
+let _lastMindmapSig = '';
+
 function renderMindmap(data) {
   const host = document.getElementById('mindmapBody');
   if (!host) return;
@@ -2220,6 +3036,40 @@ function renderMindmap(data) {
       '下の「🤖 AI に貼る用テキスト」をコピーして AI に貼ると原因を調べられます。';
     return;
   }
+  /*
+   * ★v0.1.1320: 中身が同じなら作り直さない(diff-skip)。
+   *
+   * ■ 何が起きていたか(2026-08-10 実測)
+   *   ここには guard が【一つも無く】、2秒ごとに `host.innerHTML=''` で
+   *   100〜200ノードの DOM を全消し→全再生成していた(SVG/canvasではなく純DOM)。
+   *   ★さらに <details> ごと作り直すので、**ユーザーが開いた枝が2秒で閉じる**。
+   *     「全部ひらく」を押しても2秒で元に戻る＝ms以前に「画面が言うことを聞かない」。
+   *
+   * ■ 直し方
+   *   モデルを文字列化した署名で差分を取り、変化が無ければ**DOMに触らない**。
+   *   ＝開いた枝はそのまま残る(ユーザー操作を壊さない)。
+   *   署名はモデル(表示に出る値)そのものなので、表示が変わるときは必ず作り直される。
+   */
+  let sig = '';
+  try {
+    /*
+     * ★v0.1.1445: JSON.stringify(model) をやめた。
+     *   モデルには【時刻由来の文字列】が入っている:
+     *     statusMindmapModel.js:109  `${Math.round(ago / 1000)} 秒前`
+     *     status-entry.js:3245       Date.now() - capturedAt で毋tick再計算
+     *   で記録中の配信が1件でもあれば署名が毋tick変わり、
+     *   下の host.innerHTML = '' が【一度もスキップされない】。
+     *   = 100〜200ノードを2秒ごとに全再構築していた。
+     * ★v0.1.1409 が健全度セルで直したのと同じ型のバグ（:2425-2427）。
+     *   同じ原則で【秒の刻みだけ】を署名から外す。
+     *   label / badge / 件数 は含めるので異常の見落としは起きない。
+     */
+    sig = buildStatusMindmapSignature(model);
+  } catch {
+    sig = ''; // 署名を作れないときは従来どおり毎回描く(安全側)
+  }
+  if (sig && sig === _lastMindmapSig && host.firstChild) return;
+  _lastMindmapSig = sig;
   host.className = 'mind';
   host.innerHTML = '';
   // 根の子(主要枝)を並べる。根自身は見出しに既に出ているので展開済みで描く。
@@ -2687,6 +3537,13 @@ function summarizeOneLive(lv, summary, snapshot, perfDiag, endedFlag) {
     broadcasterName,
     title,
     thumbnailUrl,
+    /*
+     * ★v0.1.1412: 視聴者数を「どの経路で取れたか」。
+     *   content-entry が既に付けている値('ws'|'embedded'|'dom'|'none')をそのまま運ぶ。
+     *   embedded(JSON) → dom(画面文字) へ落ちたら**ニコ生が構造を変えた予兆**として鳴らす
+     *   (判定は sourceProvenance.js)。ここで落とすと計器が永久に鳴らない。
+     */
+    viewerCountSource: snap?.viewerCountSource,
     recordedCount,
     officialCommentCount,
     officialRatePct,
@@ -2754,7 +3611,12 @@ function getUploadConfig() {
 /** storage から共有キーを読み直してキャッシュする(失敗時は未設定=公開機能を出さない側に倒す)。 */
 async function refreshUploadConfigCache() {
   try {
-    const bag = await chrome.storage.local.get(KEY_STATUS_UPLOAD_CONFIG);
+    // ★v0.1.1371: boot で await されるので必ず有界化する(理由は
+    //   refreshWebPublishOptInCache のコメント参照=storage stall で init が止まり白紙になる)。
+    const bag = await runStorageOpWithTimeout(
+      () => chrome.storage.local.get(KEY_STATUS_UPLOAD_CONFIG),
+      BOOT_STORAGE_TIMEOUT_MS
+    );
     const raw = bag?.[KEY_STATUS_UPLOAD_CONFIG];
     const src = raw && typeof raw === 'object' ? raw : {};
     _uploadConfigCache = {
@@ -3648,7 +4510,29 @@ function setupStorageChangeListener() {
           k.startsWith(PANEL_SUMMARY_PREFIX) ||
           k.startsWith(WATCH_SNAPSHOT_PREFIX)
         ) {
-          refresh().catch(() => {});
+          /*
+           * ★v0.1.1320: interval と同じガードを通す(この経路が全部迂回していた)。
+           *
+           * ■ 何が起きていたか(2026-08-10 実測)
+           *   interval 側(startRefreshLoop)は4つのガードを持つ:
+           *     _refreshPausedByUser / document.hidden / **_refreshInFlight(再入防止)** / backoff
+           *   ★この listener は1つ目しか無く、`refresh()` を【直接】呼んでいた。
+           *   content-entry は `nls_panel_summary_<lv>` を 2秒ごと/配信ごとに書くので、
+           *   記録中は interval の2秒に【加えて】書き込みのたびに refresh が走り、
+           *   しかも**再入を許す**。startRefreshLoop のコメントが
+           *   「再入防止＝積み上がりを断つ」と書いた当のものを、この経路が無効化していた。
+           *
+           * ■ 直し方: 画面が見えていないなら描かない・前回が走っていれば重ねない。
+           *   ★鮮度は落ちない(2秒 interval は従来どおり動く)。減るのは【重複した実行】だけ。
+           */
+          if (document.hidden) return;
+          if (_refreshInFlight) return;
+          _refreshInFlight = true;
+          refresh()
+            .catch(() => {})
+            .finally(() => {
+              _refreshInFlight = false;
+            });
           return;
         }
       }

@@ -82,3 +82,31 @@ describe('pickPrunableStorageKeys', () => {
     }
   });
 });
+
+/**
+ * ★v0.1.1301(Codex レビュー指摘・重大度中)の回帰。
+ *
+ * v0.1.1300 で応援レーン鏡を配信ごとキーへ分離した結果、
+ * 視聴した配信の数だけキーが増えるようになった(旧実装は単一キー1本=lifecycle 不要だった)。
+ * 削除する人が居ないと無界蓄積する(実機で nls_event_dom_* が 513件まで膨れた前例あり)。
+ */
+describe('配信ごと応援レーン鏡の lifecycle(v0.1.1301)', () => {
+  it('★配信ごと鏡と受領証は prune 対象に入る(無界蓄積を防ぐ)', () => {
+    const picked = pickPrunableStorageKeys([
+      'nls_lane_mirror_v2_lv351133862',
+      'nls_lane_receipt_v1_lv351133862'
+    ]);
+    expect(picked).toContain('nls_lane_mirror_v2_lv351133862');
+    expect(picked).toContain('nls_lane_receipt_v1_lv351133862');
+  });
+
+  it('★旧グローバルキー(単一・配信をまたぐ)は prune 対象にしない', () => {
+    // nls_lane_mirror_v1 は per-live ではないので TTL/LRU の対象にすると
+    // 「今使っている鏡」を消しかねない。prefix が末尾 '_' なので一致しないことを固定する。
+    expect(pickPrunableStorageKeys(['nls_lane_mirror_v1'])).toEqual([]);
+  });
+
+  it('★巨大なコメント配列は引き続き対象外(prune のために読まない)', () => {
+    expect(pickPrunableStorageKeys(['nls_comments_lv351133862'])).toEqual([]);
+  });
+});

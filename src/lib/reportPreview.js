@@ -19,18 +19,20 @@
  *   commenters: number,          // コメントした人(audienceGap.uniqueCommenters)
  *   silentEstimate: number,      // 沈黙視聴者の推定(audienceGap.silentVisitorEstimate)
  *   topSupporters?: import('./supporterRanking.js').SupporterRow[] // 応援者ランキング上位(ちくらん風・v0.1.865)
+ *   adRows?: ReadonlyArray<{ name?: unknown, contribution?: unknown }> // ★v0.1.1432 広告でひとこと(原文のまま・仕分けない)
  * }} ReportPreview
  */
 
 import { withConfidence } from './metricConfidence.js';
 import { buildSupporterRanking, buildSupporterRankingLines } from './supporterRanking.js';
+import { buildAdMessageLines } from './adMessageLines.js';
 
 /**
  * @param {(...args: any[]) => any} aggregateMarketingReport DI: marketingAggregate.aggregateMarketingReport
  * @param {(...args: any[]) => any} analyzeAudienceEngagementGap DI: audienceEngagementGap.analyzeAudienceEngagementGap
  * @param {any[]} comments 当該配信の全保存コメント(レポートと同じ入力)
  * @param {string} liveId
- * @param {{ broadcasterUserId?: string, totalVisitors?: number, officialCommentCount?: number }} [opts]
+ * @param {{ broadcasterUserId?: string, totalVisitors?: number, officialCommentCount?: number, adRows?: ReadonlyArray<any> }} [opts]
  * @returns {ReportPreview}
  */
 export function buildReportPreview(
@@ -93,7 +95,9 @@ export function buildReportPreview(
     visitors: num(gap?.totalVisitors),
     commenters: num(gap?.uniqueCommenters),
     silentEstimate: num(gap?.silentVisitorEstimate),
-    topSupporters
+    topSupporters,
+    // ★v0.1.1432: 広告主が入れた文字を素通しする(仕分けない・加工しない)。
+    ...(Array.isArray(opts?.adRows) ? { adRows: opts.adRows } : {})
   };
 }
 
@@ -156,5 +160,12 @@ export function buildReportPreviewLines(p, ctx = {}) {
   // v0.1.865: 応援者ランキング(ちくらん風)。上位があれば続けて出す(空ならノイズにしない)。
   const rankLines = buildSupporterRankingLines(p.topSupporters, { max: 5 });
   if (rankLines) lines.push(rankLines);
+  /*
+   * ★v0.1.1432: 広告主が入れた文字を【そのまま】残す(ユーザー要望「メッセージも記録したい」)。
+   *   ニコ生は広告メッセージを advertiserName の欄に載せて配信している(実測)ため、
+   *   名前かメッセージかを機械が仕分けず、全部そのまま出す。
+   */
+  const adLines = buildAdMessageLines(p.adRows, { max: 10 });
+  if (adLines) lines.push(adLines);
   return lines.join('\n');
 }

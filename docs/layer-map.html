@@ -1,0 +1,112 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>部品の層 — src/lib</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+  :root{ --bg:#0b1020; --card:#141b30; --line:#26304a; --text:#e8edf4; --sub:#9fb6da;
+         --ok:#34d399; --warn:#fbbf24; --accent:#ec4899; }
+  *{ box-sizing:border-box; }
+  body{ margin:0; padding:20px; background:var(--bg); color:var(--text);
+        font:14px/1.7 system-ui,-apple-system,"Segoe UI","Hiragino Kaku Gothic ProN",sans-serif; }
+  h1{ font-size:20px; margin:0 0 6px; }
+  h2{ font-size:16px; margin:28px 0 10px; padding-bottom:6px; border-bottom:1px solid var(--line); }
+  h3{ font-size:14px; margin:0 0 6px; }
+  .lead{ color:var(--sub); margin:0 0 18px; }
+  .map-nav{ display:flex; flex-wrap:wrap; align-items:center; gap:6px 8px; margin:0 0 16px; }
+  .map-nav .nav-item{ font-size:12.5px; text-decoration:none; color:#9fb6da;
+    background:#111a2e; border:1px solid #223052; border-radius:999px; padding:4px 10px; cursor:pointer; }
+  .map-nav a.nav-item:hover{ border-color:var(--line); color:#cfe0ff; }
+  .map-nav .nav-here{ color:#fff; font-weight:700; border-color:var(--accent); }
+  .map-nav .nav-back{ font-family:inherit; }
+  /* ★一番上に「割合」を大きく出す。数字を探させない */
+  .bar{ display:flex; height:34px; border-radius:8px; overflow:hidden; border:1px solid var(--line); }
+  .bar .pure{ background:linear-gradient(180deg,#34d399,#10b981); }
+  .bar .imp{ background:linear-gradient(180deg,#fbbf24,#f59e0b); }
+  .bar span{ display:flex; align-items:center; justify-content:center; font-size:12px;
+             font-weight:700; color:#06210f; white-space:nowrap; }
+  .stats{ display:flex; flex-wrap:wrap; gap:10px; margin:12px 0 0; }
+  .stat{ background:var(--card); border:1px solid var(--line); border-radius:10px;
+         padding:10px 14px; min-width:130px; }
+  .stat b{ display:block; font-size:22px; line-height:1.2; }
+  .stat i{ font-style:normal; color:var(--sub); font-size:12px; }
+  .grp{ background:var(--card); border:1px solid var(--line); border-radius:10px;
+        padding:12px 14px; margin:0 0 10px; }
+  .grp .cnt{ color:var(--warn); font-weight:700; }
+  .why{ color:var(--sub); margin:0 0 8px; font-size:12.5px; }
+  .files{ list-style:none; margin:0; padding:0; display:flex; flex-wrap:wrap; gap:6px; }
+  .files li{ background:#101828; border:1px solid var(--line); border-radius:6px; padding:3px 8px; font-size:12px; }
+  .files code{ color:#cfe0ff; }
+  .kinds{ color:var(--warn); margin-left:6px; font-size:11px; }
+  .rule{ background:var(--card); border:1px solid var(--line); border-radius:10px; padding:12px 14px; }
+  .rule code{ background:#0d1526; padding:2px 6px; border-radius:4px; color:#ffd6e7; }
+  .note{ color:var(--sub); font-size:12.5px; }
+  a{ color:#8ab4f8; }
+</style>
+<nav class="map-nav" aria-label="地図ナビ"><button type="button" class="nav-item nav-back" onclick="if(history.length>1){history.back()}else{location.href='MAP.md'}" title="1つ前のページに戻る(無ければ入口へ)">← 戻る</button><a class="nav-item" href="feature-sitemap.html">🧠 機能マップ</a><a class="nav-item" href="code-tree.html">🌳 コードの地図</a><a class="nav-item" href="repo-tree-map.html">🧭 逆引き索引</a><span class="nav-item nav-here" aria-current="page">🧱 部品の層</span><a class="nav-item nav-ext" href="MAP.md">🗺️ 入口(MAP)</a></nav>
+<h1>🧱 部品の層 — <code>src/lib</code></h1>
+<p class="lead">この箱に何が入っていて、何が入ってはいけないか。<b>自動生成</b>（手で編集しない）。</p>
+
+<div class="bar">
+  <span class="pure" style="flex:698">純粋 698（94%）</span>
+  <span class="imp" style="flex:42">例外 42</span>
+</div>
+
+<div class="stats">
+  <div class="stat"><b>740</b><i>ファイル（非テスト）</i></div>
+  <div class="stat"><b>104行</b><i>大きさの中央値</i></div>
+  <div class="stat"><b>656</b><i>300行以下のファイル</i></div>
+  <div class="stat"><b>0件</b><i>lib→entry の逆流import</i></div>
+</div>
+
+<h2>この箱の掟</h2>
+<div class="rule">
+  <p><b>入るもの</b>：判定（〜してよいか）・変換（データ→表示の形）・集計・宣言テーブル。</p>
+  <p><b>入らないもの</b>：<code>chrome.*</code> <code>fetch()</code> <code>localStorage</code>
+     <code>sessionStorage</code> <code>indexedDB</code> <code>document.*</code> <code>window.*</code></p>
+  <p class="note">★コメントや文字列の中に書くのは OK（検査は文字列を潰してから見ます）。<br>
+     I/O が要るときは呼び出し側（<code>src/extension/*-entry.js</code>）へ置き、lib には判定だけ残します。</p>
+  <p class="note">★守っているか確認：<code>npm run check:layer</code>（出荷前 <code>verify:cc</code> でも自動で走ります）</p>
+</div>
+
+<h2>例外の 42 件 — なぜ lib にあるか</h2>
+<section class="grp">
+  <h3>DOM を組み立てる <span class="cnt">16</span></h3>
+  <p class="why">5画面(popup/venue/comeview/status/web版)が同じ見た目を作るため。ここに無いと5箇所にコピーが増える。</p>
+  <ul class="files"><li><code>avatarPartsComposer.js</code><span class="kinds">document</span></li><li><code>chikuranHeaderDom.js</code><span class="kinds">document</span></li><li><code>commentPostDom.js</code><span class="kinds">window</span></li><li><code>inlineBelowWideRowInsert.js</code><span class="kinds">document</span></li><li><code>laneDomSelfMeasure.js</code><span class="kinds">window</span></li><li><code>laneTickProbe.js</code><span class="kinds">document</span></li><li><code>mirrorSanitize.js</code><span class="kinds">document</span></li><li><code>ouenBannerDom.js</code><span class="kinds">fetch</span></li><li><code>paintTopSupportRankStyleIntoElement.js</code><span class="kinds">document window</span></li><li><code>panelWakeCurtainDom.js</code><span class="kinds">chrome.storage document window</span></li><li><code>personTileDom.js</code><span class="kinds">document</span></li><li><code>supporterRankingDom.js</code><span class="kinds">document</span></li><li><code>supportGrowthAvatarLoad.js</code><span class="kinds">document</span></li><li><code>venueDomCensus.js</code><span class="kinds">window</span></li><li><code>videoCapture.js</code><span class="kinds">document</span></li><li><code>watchCelebrationOverlay.js</code><span class="kinds">document window</span></li></ul>
+</section>
+<section class="grp">
+  <h3>保存する <span class="cnt">8</span></h3>
+  <p class="why">書き手が複数コンテキスト(content / offscreen / SW)にまたがる。正本を1つにするため。</p>
+  <ul class="files"><li><code>broadcastSessionSummaryDb.js</code><span class="kinds">indexedDB</span></li><li><code>broadcastSessionSummaryFlush.js</code><span class="kinds">chrome.storage</span></li><li><code>commentDb.js</code><span class="kinds">indexedDB</span></li><li><code>customSoundStore.js</code><span class="kinds">chrome.runtime indexedDB</span></li><li><code>diagnosticRingStore.js</code><span class="kinds">chrome.storage</span></li><li><code>globalBackfillQueue.js</code><span class="kinds">chrome.storage</span></li><li><code>reportPreviewPublish.js</code><span class="kinds">chrome.storage</span></li><li><code>thumbDb.js</code><span class="kinds">indexedDB</span></li></ul>
+</section>
+<section class="grp">
+  <h3>計測・診断 <span class="cnt">7</span></h3>
+  <p class="why">測る対象がブラウザの状態そのもの(スレッド停止・エラー・ストレージ)。</p>
+  <ul class="files"><li><code>devMonitorTrendSession.js</code><span class="kinds">chrome.runtime chrome.storage</span></li><li><code>globalFetchRateLimiter.js</code><span class="kinds">chrome.storage</span></li><li><code>interceptVisitorProbeDebug.js</code><span class="kinds">sessionStorage</span></li><li><code>mainThreadBlockerBoot.js</code><span class="kinds">document</span></li><li><code>nameplateToggleBoot.js</code><span class="kinds">chrome.tabs</span></li><li><code>nicoCommentPanelAssetLauncher.js</code><span class="kinds">window</span></li><li><code>watchPopupLoadDiagnostics.js</code><span class="kinds">localStorage</span></li></ul>
+</section>
+<section class="grp">
+  <h3>音・映像を鳴らす <span class="cnt">6</span></h3>
+  <p class="why">ブラウザAPI(Audio / メディア)そのものが機能の本体なので切り離せない。</p>
+  <ul class="files"><li><code>bgmDirector.js</code><span class="kinds">window</span></li><li><code>effectSoundPlayer.js</code><span class="kinds">chrome.runtime</span></li><li><code>reportCompleteVoice.js</code><span class="kinds">chrome.runtime</span></li><li><code>scoreCountUp.js</code><span class="kinds">window</span></li><li><code>voiceComment.js</code><span class="kinds">window</span></li><li><code>voiceInputDevices.js</code><span class="kinds">window</span></li></ul>
+</section>
+<section class="grp">
+  <h3>通信する <span class="cnt">4</span></h3>
+  <p class="why">外部APIの作法(認証・リトライ・形)を1箇所に閉じ込めるため。</p>
+  <ul class="files"><li><code>kokenGiftHistoryFetchClient.js</code><span class="kinds">chrome.runtime</span></li><li><code>liveviewErrorReport.js</code><span class="kinds">fetch</span></li><li><code>officialEventDomBundle.js</code><span class="kinds">fetch</span></li><li><code>voicevoxClient.js</code><span class="kinds">chrome.runtime</span></li></ul>
+</section>
+<section class="grp">
+  <h3>HTML を作る <span class="cnt">1</span></h3>
+  <p class="why">出力先が複数(レポート / プレビュー)なので、組み立てを1箇所に置く。</p>
+  <ul class="files"><li><code>mediaKitHtml.js</code><span class="kinds">window</span></li></ul>
+</section>
+
+<h2>もっと詳しく</h2>
+<div class="rule">
+  <p class="note">
+    文章版：<a href="../src/lib/AGENTS.md">src/lib/AGENTS.md</a>（AIはこれを自動で読みます）<br>
+    全ファイルの役割：<a href="code-tree.html">🌳 コードの地図</a>／
+    影響範囲：<a href="feature-map/impact-map.md">impact-map.md</a>／
+    storageの書き手読み手：<a href="feature-map/storage-bus.md">storage-bus.md</a>／
+    data属性の書き手読み手：<a href="feature-map/dom-attr-bus.md">dom-attr-bus.md</a>
+  </p>
+</div>

@@ -385,6 +385,7 @@
           <a href="#s11">11. 未成年の利用</a>
           <a href="#s12">12. 改定</a>
           <a href="#s13">13. お問い合わせ</a>
+          <a href="#s14">14. 本ウェブサイトの「いま支えている人」について</a>
           <a href="./" class="cta">← トップへ戻る</a>
         </nav>
       <p class="topbar__drawer-intro">
@@ -697,6 +698,33 @@
             <li><strong>ウェブサイト：</strong><a href="https://tsuioku-no-kirameki.com/">https://tsuioku-no-kirameki.com/</a></li>
           </ul>
           <p style="margin-top:var(--space-sm);font-size:.88rem;color:var(--muted)">※ 公式 LINE 等の追加連絡手段は、準備が整い次第このページに追記する予定です。</p>
+        </section>
+
+        <section class="box" id="s14">
+          <h2><span class="num">14.</span>本ウェブサイトの「いま支えている人」について</h2>
+          <div class="guide guide--tanu">
+            <div class="guide__face">
+              <img src="../extension/images/yukkuri-charactore-english/tanunee/tanuki-yukkuri-normal-mouth-open.png" width="64" height="64" alt="">
+            </div>
+            <div class="guide__body">
+              このサイトの <b>「いま支えている人」</b>（<code>/live/</code>）だけは、拡張機能とは別のしくみよ。<b>ニコニコ生放送が公開しているランキング</b>を、うちのサーバーが取ってきて並べているの。見ている人のことは<b>何も記録していない</b>から安心してね。
+            </div>
+          </div>
+          <p>本ウェブサイトの「いま支えている人」（<code>https://tsuioku-no-kirameki.com/live/</code>）は、本拡張とは独立した機能です。<strong>利用者の端末や本拡張とは一切関係なく</strong>、当プロジェクトのサーバーがニコニコ生放送の公開情報を取得して表示します。本章はこのページについてのみ説明するものです。</p>
+          <h3>14-1. 取得する情報と取得元</h3>
+          <p>放送中の番組について、ニコニコ生放送が<strong>一般に公開している</strong>以下の情報を取得します。いずれもログインや権限を必要とせず、誰でも同じ内容を閲覧できるものです。</p>
+          <ul>
+            <li>番組の ID・番組名・放送中かどうか（<code>live.nicovideo.jp</code>）</li>
+            <li>ギフトの貢献ランキング（<code>api.koken.nicovideo.jp</code>）</li>
+            <li>広告の貢献ランキング（<code>api.nicoad.nicovideo.jp</code>）</li>
+          </ul>
+          <p>ランキングに含まれる<strong>表示名・アイコン画像・ポイント数・順位</strong>は、ニコニコ生放送が各番組のページで公開しているものをそのまま表示しています。<strong>当プロジェクトが独自に集計・推定・スコア化した値ではありません。</strong></p>
+          <h3>14-2. 誰の情報か</h3>
+          <p>表示されるのは<strong>配信者および、その番組をギフト・広告で支援した方</strong>の公開情報です。これらの方は当サイトの利用者ではありません。<strong>本ページを閲覧している方の情報は、一切取得・記録していません。</strong>アクセス解析・行動追跡・Cookie による識別は行っていません（第 7 章と同じ方針です）。</p>
+          <h3>14-3. 保存期間</h3>
+          <p>取得した内容は表示のために一時保存し、<strong>最新の 1 件のみ</strong>を保持します。新しく取得するたびに上書きされ、更新が止まった場合も<strong>1 時間で自動的に消えます</strong>。過去の履歴を蓄積することはありません。</p>
+          <h3>14-4. 掲載の停止をご希望の場合</h3>
+          <p>ご自身の表示名・アイコンの掲載停止をご希望の場合は、第 13 章の連絡先までご連絡ください。確認のうえ、以後の掲載対象から除外します。なお当サイトの表示はニコニコ生放送の公開情報を参照しているだけであり、<strong>ニコニコ生放送側の表示は当プロジェクトでは変更できません</strong>。</p>
         </section>
 
       </div>

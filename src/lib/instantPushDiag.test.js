@@ -19,7 +19,12 @@ describe('makeInitialInstantPushDiag', () => {
       avgGapMs: -1,
       lastDeliveryGapMs: -1,
       avgDeliveryGapMs: -1,
-      lastEventAt: 0
+      hiddenDeliveries: 0,
+      visibleDeliveries: 0,
+      avgVisibleDeliveryGapMs: -1,
+      lastEventAt: 0,
+      // ★v0.1.1453: 集計の起点(0=不明)。生涯累計を期間ごと誤読しないため。
+      since: 0
     });
   });
 });
@@ -38,7 +43,12 @@ describe('buildInstantPushDiagSnapshot', () => {
       avgGapMs: -1,
       lastDeliveryGapMs: -1,
       avgDeliveryGapMs: -1,
+      hiddenDeliveries: 0,
+      visibleDeliveries: 0,
+      avgVisibleDeliveryGapMs: -1,
       lastEventAt: 0,
+      // ★v0.1.1453: 集計の起点(0=不明)。生涯累計を期間ごと誤読しないため。
+      since: 0,
       capturedAt: 2000
     });
   });
@@ -99,7 +109,7 @@ describe('buildInstantPushDiagLines', () => {
     expect(lines[1]).toContain('平均60ms');
   });
 
-  it('配達内訳(avgDeliveryGapMs)があれば内訳行を足す=描画分は差で出す', () => {
+  it('配達内訳(avgDeliveryGapMs)があれば内訳行を足す=2値をそのまま並べる', () => {
     const snap = {
       sentCount: 5,
       sentRows: 12,
@@ -116,7 +126,100 @@ describe('buildInstantPushDiagLines', () => {
     const lines = buildInstantPushDiagLines(snap, 10000);
     expect(lines).toHaveLength(3);
     expect(lines[2]).toContain('配達平均30ms');
-    expect(lines[2]).toContain('描画平均50ms'); // 80 - 30
+    expect(lines[2]).toContain('送信→描画平均80ms');
+  });
+
+  /**
+   * ★v0.1.1416: 実機(2026-08-16)が出した「描画平均0ms」を再現し、
+   *   それが **描画の無罪証明ではなかった** ことを固定する。
+   *
+   *   旧実装は 描画平均 = avgGapMs - avgDeliveryGapMs で出していたが、
+   *   この2つは母集団が違う EMA(片方は毎バッチ更新・もう片方は描画時の最後の1行だけ)。
+   *   両方が同程度に大きいと差が0付近に落ち、「描画は0ms=無罪」と読めてしまう。
+   */
+  it('★引き算をやめた: 配達47秒でも「描画平均0ms」という誤読を生まない', () => {
+    const snap = {
+      sentCount: 370041,
+      sentRows: 370041,
+      receivedCount: 310750,
+      receivedRows: 310750,
+      rejectedCount: 247763,
+      paintedRows: 300000,
+      lastGapMs: 47783,
+      avgGapMs: 47409,
+      lastDeliveryGapMs: 47783,
+      avgDeliveryGapMs: 47686,
+      lastEventAt: 9000
+    };
+    const lines = buildInstantPushDiagLines(snap, 10000);
+    // 旧実装は max(0, 47409-47686)=0 で「描画平均0ms」と出していた。
+    expect(lines.join('\n')).not.toContain('描画平均0ms');
+    expect(lines[2]).toContain('配達平均47686ms');
+    expect(lines[2]).toContain('送信→描画平均47409ms');
+  });
+
+  it('★可視/裏タブを分けて出す: 可視中が健全なら「裏タブ滞留で説明が付く」と言う', () => {
+    const snap = {
+      sentCount: 100,
+      sentRows: 100,
+      receivedCount: 100,
+      receivedRows: 100,
+      rejectedCount: 0,
+      paintedRows: 100,
+      lastGapMs: 47000,
+      avgGapMs: 47000,
+      lastDeliveryGapMs: 47000,
+      avgDeliveryGapMs: 47686, // 全体は47秒
+      hiddenDeliveries: 95,
+      visibleDeliveries: 5,
+      avgVisibleDeliveryGapMs: 12, // ただし可視中は12ms
+      lastEventAt: 9000
+    };
+    const text = buildInstantPushDiagLines(snap, 10000).join('\n');
+    expect(text).toContain('可視中の配達平均12ms');
+    expect(text).toContain('可視5件 / 裏タブ95件');
+    expect(text).toContain('✅');
+    expect(text).toContain('裏タブ滞留で説明が付く');
+  });
+
+  it('★可視中でも1秒超なら🔴で「描画側を直しても消えない」と言う', () => {
+    const snap = {
+      sentCount: 100,
+      sentRows: 100,
+      receivedCount: 100,
+      receivedRows: 100,
+      rejectedCount: 0,
+      paintedRows: 100,
+      lastGapMs: 47000,
+      avgGapMs: 47000,
+      lastDeliveryGapMs: 47000,
+      avgDeliveryGapMs: 47686,
+      hiddenDeliveries: 5,
+      visibleDeliveries: 95,
+      avgVisibleDeliveryGapMs: 43210, // 可視中でも詰まっている
+      lastEventAt: 9000
+    };
+    const text = buildInstantPushDiagLines(snap, 10000).join('\n');
+    expect(text).toContain('🔴');
+    expect(text).toContain('イベントループが詰まっている');
+    expect(text).not.toContain('✅');
+  });
+
+  it('可視/裏タブの観測がゼロなら分離行を出さない(ノイズにしない)', () => {
+    const snap = {
+      sentCount: 5,
+      sentRows: 12,
+      receivedCount: 5,
+      receivedRows: 12,
+      rejectedCount: 0,
+      paintedRows: 10,
+      lastGapMs: 100,
+      avgGapMs: 80,
+      lastDeliveryGapMs: 30,
+      avgDeliveryGapMs: 30,
+      lastEventAt: 9000
+    };
+    expect(buildInstantPushDiagLines(snap, 10000)).toHaveLength(3);
   });
 
   it('配達内訳が未計測なら内訳行を出さない(2行のまま=ノイズにしない)', () => {

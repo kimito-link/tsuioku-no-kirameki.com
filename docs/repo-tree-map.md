@@ -5,7 +5,7 @@
 > 下にマインドマップ（GitHub で図として表示）→ ディレクトリ一覧 → 機能逆引き索引 の順。
 > **全部の地図への入口: [MAP.md](MAP.md)** ／ 視覚ビュー: [repo-tree-map.html](repo-tree-map.html) ／ 機能依存図: [feature-map/index.md](feature-map/index.md) ／ 配置ルール正本: [AGENTS.md](../AGENTS.md) §4。
 
-ルート直下の設定ファイル: 46 件（package.json / *.config.js / AGENTS.md 等）
+ルート直下の設定ファイル: 50 件（package.json / *.config.js / AGENTS.md 等）
 
 ## マインドマップ（自動生成・GitHub で図として表示）
 
@@ -16,52 +16,62 @@
 ```mermaid
 graph LR
   ROOT["リポジトリ"]
-  ROOT --> d0["api/ 〔API〕"]
-  ROOT --> d1["app/ 〔Web版〕"]
-  d1 --> d1_0["dist/ 〔ビルド成果物〕"]
-  d1 --> d1_1["images/ 〔Web版/画像〕"]
-  ROOT --> d2["council/ 〔会議/設計〕"]
-  ROOT --> d3["council-scout/"]
-  d3 --> d3_0["briefs/"]
-  ROOT --> d4["docs/ 〔設計/レポート〕"]
-  d4 --> d4_0["article-assets/ 〔記事/画像〕"]
-  d4 --> d4_1["article-drafts/"]
-  d4 --> d4_2["feature-map/ 〔依存図/自動生成〕"]
-  d4 --> d4_3["handoff/ 〔引継ぎ/設計〕"]
-  d4 --> d4_4["patent-unique-voice-reading-filing-final/"]
-  d4 --> d4_5["policies/ 〔方針〕"]
-  d4 --> d4_6["releases/ 〔リリース〕"]
-  d4 --> d4_7["research/ 〔調査/レポート〕"]
-  d4 --> d4_8["workflows/ 〔ワークフロー〕"]
-  ROOT --> d5["extension/ 〔配布/manifest〕"]
-  d5 --> d5_0["dist/ 〔ビルド成果物〕"]
-  d5 --> d5_1["images/ 〔画像〕"]
-  d5 --> d5_2["sound/ 〔音声〕"]
-  ROOT --> d6["memory/ 〔メモリ/知見〕"]
-  d6 --> d6_0["archive/ 〔メモリ/履歴〕"]
-  d6 --> d6_1["avatar-parts/ 〔アバター/画像〕"]
-  ROOT --> d7["scripts/ 〔ビルド/自動生成〕"]
-  d7 --> d7_0["xserver/ 〔デプロイ/webhook〕"]
-  ROOT --> d8["sound-src/"]
-  d8 --> d8_0["soundeffect-lab/"]
-  ROOT --> d9["src/ 〔ソース〕"]
-  d9 --> d9_0["data/ 〔コメント/取得〕"]
-  d9 --> d9_1["domain/ 〔応援/集約/識別子〕"]
-  d9 --> d9_2["extension/ 〔entry/記録/会場/応援〕"]
-  d9 --> d9_3["fixtures/ 〔テスト〕"]
-  d9 --> d9_4["images/ 〔画像〕"]
-  d9 --> d9_5["lib/ 〔色/速度/コメント/レポート/純粋関数〕"]
-  d9 --> d9_6["shared/ 〔共有/アバター〕"]
-  d9 --> d9_7["sound/ 〔音声〕"]
-  ROOT --> d10["tests/ 〔テスト〕"]
-  d10 --> d10_0["contract/ 〔テスト/契約〕"]
-  d10 --> d10_1["e2e/ 〔テスト/E2E/描画〕"]
-  ROOT --> d11["tools/ 〔ツール〕"]
-  d11 --> d11_0["mcp-nicolive/ 〔MCP/診断〕"]
-  ROOT --> d12["tsuioku-no-kirameki/ 〔LP/公開〕"]
-  d12 --> d12_0["articles/ 〔記事/公開〕"]
-  d12 --> d12_1["images/ 〔画像〕"]
-  d12 --> d12_2["sound/ 〔音声/公開〕"]
+  ROOT --> d0[".codex/"]
+  d0 --> d0_0["agents/"]
+  ROOT --> d1[".codex-osint/"]
+  ROOT --> d2["_docs/"]
+  ROOT --> d3["api/ 〔API〕"]
+  ROOT --> d4["app/ 〔Web版〕"]
+  d4 --> d4_0["dist/ 〔ビルド成果物〕"]
+  d4 --> d4_1["images/ 〔Web版/画像〕"]
+  ROOT --> d5["council/ 〔会議/設計〕"]
+  d5 --> d5_0["auto/"]
+  ROOT --> d6["council-scout/"]
+  d6 --> d6_0["briefs/"]
+  ROOT --> d7["docs/ 〔設計/レポート〕"]
+  d7 --> d7_0["article-assets/ 〔記事/画像〕"]
+  d7 --> d7_1["article-drafts/"]
+  d7 --> d7_2["feature-map/ 〔依存図/自動生成〕"]
+  d7 --> d7_3["handoff/ 〔引継ぎ/設計〕"]
+  d7 --> d7_4["patent-unique-voice-reading-filing-final/"]
+  d7 --> d7_5["policies/ 〔方針〕"]
+  d7 --> d7_6["releases/ 〔リリース〕"]
+  d7 --> d7_7["research/ 〔調査/レポート〕"]
+  d7 --> d7_8["workflows/ 〔ワークフロー〕"]
+  ROOT --> d8["extension/ 〔配布/manifest〕"]
+  d8 --> d8_0["data/"]
+  d8 --> d8_1["dist/ 〔ビルド成果物〕"]
+  d8 --> d8_2["images/ 〔画像〕"]
+  d8 --> d8_3["sound/ 〔音声〕"]
+  ROOT --> d9["memory/ 〔メモリ/知見〕"]
+  d9 --> d9_0["archive/ 〔メモリ/履歴〕"]
+  d9 --> d9_1["avatar-parts/ 〔アバター/画像〕"]
+  ROOT --> d10["scripts/ 〔ビルド/自動生成〕"]
+  d10 --> d10_0["__pycache__/"]
+  d10 --> d10_1["lib/"]
+  d10 --> d10_2["xserver/ 〔デプロイ/webhook〕"]
+  ROOT --> d11["sound-src/"]
+  d11 --> d11_0["soundeffect-lab/"]
+  ROOT --> d12["src/ 〔ソース〕"]
+  d12 --> d12_0["data/ 〔コメント/取得〕"]
+  d12 --> d12_1["domain/ 〔応援/集約/識別子〕"]
+  d12 --> d12_2["extension/ 〔entry/記録/会場/応援〕"]
+  d12 --> d12_3["fixtures/ 〔テスト〕"]
+  d12 --> d12_4["images/ 〔画像〕"]
+  d12 --> d12_5["lib/ 〔色/速度/コメント/レポート/純粋関数〕"]
+  d12 --> d12_6["shared/ 〔共有/アバター〕"]
+  d12 --> d12_7["sound/ 〔音声〕"]
+  ROOT --> d13["tests/ 〔テスト〕"]
+  d13 --> d13_0["contract/ 〔テスト/契約〕"]
+  d13 --> d13_1["e2e/ 〔テスト/E2E/描画〕"]
+  d13 --> d13_2["helpers/"]
+  ROOT --> d14["tools/ 〔ツール〕"]
+  d14 --> d14_0["mcp-nicolive/ 〔MCP/診断〕"]
+  ROOT --> d15["tsuioku-no-kirameki/ 〔LP/公開〕"]
+  d15 --> d15_0["articles/ 〔記事/公開〕"]
+  d15 --> d15_1["images/ 〔画像〕"]
+  d15 --> d15_2["live/"]
+  d15 --> d15_3["sound/ 〔音声/公開〕"]
 ```
 
 ### 機能逆引き（機能 → 担当ファイル）
@@ -184,8 +194,19 @@ graph LR
 
 ---
 
+## `.codex/` — ⚠️ 未記入（ROLES に追記）
+<sub>ファイル 5 件</sub>
+
+- `agents/`（4 件） — ⚠️ 未記入（ROLES に追記）
+
+## `.codex-osint/` — ⚠️ 未記入（ROLES に追記）
+<sub>ファイル 2 件</sub>
+
+## `_docs/` — ⚠️ 未記入（ROLES に追記）
+<sub>ファイル 5 件</sub>
+
 ## `api/` — サーバレス API(status エンドポイント)  〔API〕
-<sub>ファイル 1 件</sub>
+<sub>ファイル 2 件</sub>
 
 ## `app/` — Web 版状態ページのアプリ(app.js + dist)  〔Web版〕
 <sub>ファイル 99 件</sub>
@@ -194,7 +215,9 @@ graph LR
 - `images/`（93 件） — 純Web版 応援ライブビューの同梱画像(ゆっくり顔)  〔Web版 / 画像〕
 
 ## `council/` — 会議(COUNCIL)の問い・回答・統合(SYNTHESIS)。設計判断の根拠  〔会議 / 設計〕
-<sub>ファイル 371 件</sub>
+<sub>ファイル 381 件</sub>
+
+- `auto/`（8 件） — ⚠️ 未記入（ROLES に追記）
 
 ## `council-scout/` — ⚠️ 未記入（ROLES に追記）
 <sub>ファイル 14 件</sub>
@@ -202,58 +225,62 @@ graph LR
 - `briefs/`（14 件） — ⚠️ 未記入（ROLES に追記）
 
 ## `docs/` — 設計正本・マインドマップ・フロー図・feature-map(AI/人間向け)  〔設計 / レポート〕
-<sub>ファイル 245 件</sub>
+<sub>ファイル 310 件</sub>
 
 - `article-assets/`（87 件） — 記事用の画像・動画・音声アセット  〔記事 / 画像〕
 - `article-drafts/`（2 件） — ⚠️ 未記入（ROLES に追記）
-- `feature-map/`（13 件） — 機能ごと依存図(自動生成)。誰が storage を書き/読むか  〔依存図 / 自動生成〕
-- `handoff/`（81 件） — セッション引継ぎ・調査設計の記録(HANDOFF-*/MAP/SPEC/DESIGN)。ルート直下に散らかっていたものを 2026-07-31 に集約  〔引継ぎ / 設計〕
+- `feature-map/`（14 件） — 機能ごと依存図(自動生成)。誰が storage を書き/読むか  〔依存図 / 自動生成〕
+- `handoff/`（141 件） — セッション引継ぎ・調査設計の記録(HANDOFF-*/MAP/SPEC/DESIGN)。ルート直下に散らかっていたものを 2026-07-31 に集約  〔引継ぎ / 設計〕
 - `patent-unique-voice-reading-filing-final/`（1 件） — ⚠️ 未記入（ROLES に追記）
 - `policies/`（1 件） — 運用方針メモ(統計の失敗モード等)  〔方針〕
-- `releases/`（4 件） — リリース関連メモ(CWS 公開 API 設定・版ごとの記事下書き)  〔リリース〕
+- `releases/`（5 件） — リリース関連メモ(CWS 公開 API 設定・版ごとの記事下書き)  〔リリース〕
 - `research/`（2 件） — ディープリサーチ成果(ギフトランキング等の調査)  〔調査 / レポート〕
 - `workflows/`（1 件） — 開発ワークフロー設計(TDD/UI-UX ロードマップ等)  〔ワークフロー〕
 
 ## `extension/` — 拡張本体の配布版ソース(ここを編集)。manifest/background/各 html  〔配布 / manifest〕
-<sub>ファイル 149 件</sub>
+<sub>ファイル 152 件</sub>
 
-- `dist/`（11 件） — ビルド成果物(content/popup/status 等の bundle)。build が生成  〔ビルド成果物〕
+- `data/`（1 件） — ⚠️ 未記入（ROLES に追記）
+- `dist/`（13 件） — ビルド成果物(content/popup/status 等の bundle)。build が生成  〔ビルド成果物〕
 - `images/`（87 件） — アイコン・ロゴのマスター画像  〔画像〕
 - `sound/`（39 件） — 読み上げ・完了音などの音声素材  〔音声〕
 
 ## `memory/` — セッション横断の知見・引き継ぎ(AI のメモリ)。コミット対象外も混在  〔メモリ / 知見〕
-<sub>ファイル 84 件</sub>
+<sub>ファイル 131 件</sub>
 
 - `archive/`（12 件） — 過去セッションの引き継ぎ(HANDOFF)アーカイブ  〔メモリ / 履歴〕
-- `avatar-parts/`（26 件） — アバター素材(顔シート等)の参考画像  〔アバター / 画像〕
+- `avatar-parts/`（29 件） — アバター素材(顔シート等)の参考画像  〔アバター / 画像〕
 
 ## `scripts/` — ビルド・検証・自動生成スクリプト(build/feature-map/repo-tree-map 等)  〔ビルド / 自動生成〕
-<sub>ファイル 41 件</sub>
+<sub>ファイル 65 件</sub>
 
+- `__pycache__/`（1 件） — ⚠️ 未記入（ROLES に追記）
+- `lib/`（1 件） — ⚠️ 未記入（ROLES に追記）
 - `xserver/`（2 件） — Xserver 向け webhook(git pull デプロイ)スクリプト  〔デプロイ / webhook〕
 
 ## `sound-src/` — ⚠️ 未記入（ROLES に追記）
-<sub>ファイル 20 件</sub>
+<sub>ファイル 23 件</sub>
 
 - `soundeffect-lab/`（19 件） — ⚠️ 未記入（ROLES に追記）
 
 ## `src/` — LP 側 + 純粋関数ライブラリの源  〔ソース〕
-<sub>ファイル 1521 件</sub>
+<sub>ファイル 1830 件</sub>
 
 - `data/`（7 件） — 保存コメントからレーン候補を読む acquirer / source 層  〔コメント / 取得〕
-- `domain/`（18 件） — ドメイン正本(応援レーンの集約・列ポリシー等。識別子判定など)  〔応援 / 集約 / 識別子〕
-- `extension/`（31 件） — バンドル entry(content/popup/venue/status/offscreen/backfill-sw 等=機能境界)  〔entry / 記録 / 会場 / 応援〕
+- `domain/`（20 件） — ドメイン正本(応援レーンの集約・列ポリシー等。識別子判定など)  〔応援 / 集約 / 識別子〕
+- `extension/`（46 件） — バンドル entry(content/popup/venue/status/offscreen/backfill-sw 等=機能境界)  〔entry / 記録 / 会場 / 応援〕
 - `fixtures/`（1 件） — テスト用フィクスチャ  〔テスト〕
-- `images/`（165 件） — LP / CWS 提出物のマスター画像  〔画像〕
-- `lib/`（1290 件） — 純粋関数ライブラリ(unit test 対象)。色・速度・コメント・レポート等の計算ロジックの大半  〔色 / 速度 / コメント / レポート / 純粋関数〕
+- `images/`（134 件） — LP / CWS 提出物のマスター画像  〔画像〕
+- `lib/`（1612 件） — 純粋関数ライブラリ(unit test 対象)。色・速度・コメント・レポート等の計算ロジックの大半  〔色 / 速度 / コメント / レポート / 純粋関数〕
 - `shared/`（7 件） — 複数機能で共有する小部品(アバター URL ガード等)  〔共有 / アバター〕
 - `sound/`（1 件） — 音声素材(src 側)  〔音声〕
 
 ## `tests/` — E2E / contract テスト(layer 依存・描画 spec 等)  〔テスト〕
-<sub>ファイル 73 件</sub>
+<sub>ファイル 80 件</sub>
 
-- `contract/`（1 件） — レイヤ依存などアーキテクチャ契約のテスト  〔テスト / 契約〕
-- `e2e/`（72 件） — Playwright の E2E(描画 spec・クリップ崩れ検出等)  〔テスト / E2E / 描画〕
+- `contract/`（3 件） — レイヤ依存などアーキテクチャ契約のテスト  〔テスト / 契約〕
+- `e2e/`（76 件） — Playwright の E2E(描画 spec・クリップ崩れ検出等)  〔テスト / E2E / 描画〕
+- `helpers/`（1 件） — ⚠️ 未記入（ROLES に追記）
 
 ## `tools/` — 補助ツール(LP overflow 監査・MCP サーバ等)  〔ツール〕
 <sub>ファイル 5 件</sub>
@@ -261,10 +288,11 @@ graph LR
 - `mcp-nicolive/`（3 件） — ニコ生状態を読む MCP サーバ(司令塔の状態取得用)  〔MCP / 診断〕
 
 ## `tsuioku-no-kirameki/` — 本番 LP の配信ディレクトリ(Cloudflare Pages へ deploy)  〔LP / 公開〕
-<sub>ファイル 40 件</sub>
+<sub>ファイル 41 件</sub>
 
 - `articles/`（14 件） — 技術記事(防御的公開)。手法を再利用可能な形で解説  〔記事 / 公開〕
 - `images/`（17 件） — LP 用の favicon・OG 画像等  〔画像〕
+- `live/`（1 件） — ⚠️ 未記入（ROLES に追記）
 - `sound/`（1 件） — LP 公開用の音声素材(エール音等)  〔音声 / 公開〕
 
 ---
@@ -498,13 +526,23 @@ esbuild の import 到達グラフを逆引きし「このファイルを変え�
 
 ---
 
-## ⚠️ 役割が未記入のディレクトリ（6）
+## ⚠️ 役割が未記入のディレクトリ（16）
 
 以下は `ROLES` 辞書に説明が無い。`scripts/repo-tree-map.mjs` の `ROLES` に1行足してから再生成すること。
 
+- `.codex/`
+- `.codex/agents/`
+- `.codex-osint/`
+- `_docs/`
+- `council/auto/`
 - `council-scout/`
 - `council-scout/briefs/`
 - `docs/article-drafts/`
 - `docs/patent-unique-voice-reading-filing-final/`
+- `extension/data/`
+- `scripts/__pycache__/`
+- `scripts/lib/`
 - `sound-src/`
 - `sound-src/soundeffect-lab/`
+- `tests/helpers/`
+- `tsuioku-no-kirameki/live/`

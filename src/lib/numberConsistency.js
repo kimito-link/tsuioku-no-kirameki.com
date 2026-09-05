@@ -20,6 +20,8 @@
  * }} ConsistencyFinding
  */
 
+import { classifyComparability } from './unknownVsAbsent.js';
+
 /** @param {unknown} v @returns {number|null} */
 function num(v) {
   const n = Number(v);
@@ -91,19 +93,43 @@ export function detectNumberInconsistencies(data) {
       });
     }
 
-    // 3) レポート本文と配信の記録総数が桁違い(v0.1.853 型の断線=表示用キャップへの短絡の早期検知)。
-    //    同一配信が1つに特定できる時だけ照合(複数配信ならどれと比べるか曖昧なのでスキップ)。
+    /*
+     * 3) レポート本文と配信の記録総数が桁違い(v0.1.853 型の断線の早期検知)。
+     *    同一配信が1つに特定できる時だけ照合(複数配信ならどれと比べるか曖昧なのでスキップ)。
+     *
+     * ★v0.1.1472: 判定の【前】に「そもそも比べてよいか」を確かめる。
+     *   ★実損(2026-08-21): 記録3,358 と レポート409 を比べて
+     *     「表示用の一部だけを集計している」と名指ししたが、実コードで **falsified**:
+     *       - pickCommentsForExport.js:16-24 は storage が空でない限り【全件パススルー】
+     *       - commentDb.js:170-192 の全件読みは【上限なしカーソル】
+     *       - 表示用キャップは60件で、409 とも一致しない
+     *   ★真因は別にあった(記録経路側・別リリースで直す):
+     *       - popup-entry.js:8776 `cnt <= 0` = IDBに1行でもあれば chunk を一切読まない
+     *       - background.js:379-397 = 移行の read 失敗を [] に握り潰して「移行済み」にする
+     *   ★さらに reportPreview は【単一グローバルキー】(reportPreviewKey.js:12)なので、
+     *     多配信時は **別配信の値** が載りうる。だから liveId の一致を必ず確かめる。
+     *   ⟹ ★誤った名指しは、調査を最も高くつく方向へ引っ張る。断定をやめ、事実だけ言う。
+     */
     if (total != null && total > 0 && livesData.length === 1) {
       const recorded = num(livesData[0]?.recordedCount);
+      // ★比較可能性の判定は unknownVsAbsent.js が正本(「無い」と「まだ分からない」を混ぜない)。
+      const cmp = classifyComparability({
+        leftId: String(rp.liveId ?? ''),
+        rightId: String(livesData[0]?.lv ?? livesData[0]?.liveId ?? ''),
+        what: 'レポートと記録の件数'
+      });
       // レポート本文は「本文ありのみ・配信者除外・興味到着除外」で記録総数より少なめが正常。
-      //   だが記録の半分未満まで落ちるのは、全件 storage でなく表示用キャップ済みを集計している断線のサイン。
-      if (recorded != null && recorded >= 50 && total < recorded * 0.5) {
+      //   だが記録の半分未満まで落ちるのは、集計対象がごっそり欠けているサイン。
+      if (cmp.comparable && recorded != null && recorded >= 50 && total < recorded * 0.5) {
         findings.push({
           id: 'report-undercount',
           severity: 'warn',
           message:
             `レポートの本文コメント(${ja(total)})が記録総数(${ja(recorded)})の半分未満です。` +
-            `レポートが全件でなく表示用の一部だけを集計している断線(過小集計)の疑いがあります。`
+            `集計対象がごっそり欠けている疑いがあります。★原因はまだ特定できていません` +
+            `(記録の読み落としか、母集団の違いか、どちらもありえます)。` +
+            `★この検査が判定しないこと: どちらの数字が正しいかは判定しません` +
+            `(2つは母集団が違い、記録側は下がらない高水位です)。`
         });
       }
     }

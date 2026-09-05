@@ -14,7 +14,9 @@
 > それでも **今回の broadcaster バグのような「経路がそもそも無い」断線はここに出る**。
 > 1件ずつ実コードで確認すること(将来は `verify:map` で機械判定する=会議 Q4)。
 
+- 🟠 **KEY_COMMENT_WRITE_MODE_DIAG** — 書く人だけ（読む経路が無い疑い）: src/extension/content-entry.js
 - 🟠 **KEY_PAINT_PERF_RING_V1** — 書く人だけ（読む経路が無い疑い）: src/extension/popup-entry.js
+- 🟠 **KEY_PANEL_WAKE_CURTAIN_DIAG** — 書く人だけ（読む経路が無い疑い）: src/lib/panelWakeCurtainDom.js
 - 🟠 **KEY_SCORE_ANNOUNCE_DIAG** — 書く人だけ（読む経路が無い疑い）: src/extension/popup-entry.js
 - 🟠 **KEY_SW_PROGRESS** — 書く人だけ（読む経路が無い疑い）: src/extension/backfill-sw-entry.js
 - 🟠 **fn:backfillHeartbeatKey** — 書く人だけ（読む経路が無い疑い）: src/extension/content-entry.js
@@ -24,7 +26,6 @@
 - 🟠 **fn:giftSubAppHistoryStorageKey** — 書く人だけ（読む経路が無い疑い）: src/extension/content-entry.js
 - 🟠 **fn:officialGiftPointsAggregateStorageKey** — 書く人だけ（読む経路が無い疑い）: src/extension/content-entry.js
 - 🟠 **fn:perfDiagStorageKey** — 書く人だけ（読む経路が無い疑い）: src/extension/popup-entry.js
-- 🔵 **KEY_AI_SHARE_POPUP_DIAG** — 読む人だけ（書く経路が無い疑い）: src/extension/status-entry.js
 - 🔵 **KEY_ANONYMOUS_IDENTICON_ENABLED** — 読む人だけ（書く経路が無い疑い）: src/extension/marketing-export-entry.js, src/extension/popup-entry.js
 - 🔵 **KEY_AUTOPATROL_ENABLED** — 読む人だけ（書く経路が無い疑い）: src/extension/popup-entry.js
 - 🔵 **KEY_AUTOPATROL_STATE** — 読む人だけ（書く経路が無い疑い）: src/extension/popup-entry.js
@@ -46,7 +47,7 @@
 - 🔵 **KEY_INLINE_PANEL_PLACEMENT_USER_EXPLICIT** — 読む人だけ（書く経路が無い疑い）: src/extension/content-entry.js, src/extension/popup-entry.js
 - 🔵 **KEY_INLINE_PANEL_VIEWPORT_WIDE_POLICY** — 読む人だけ（書く経路が無い疑い）: src/extension/content-entry.js, src/extension/popup-entry.js
 - 🔵 **KEY_INLINE_PANEL_WIDTH_MODE** — 読む人だけ（書く経路が無い疑い）: src/extension/content-entry.js, src/extension/popup-entry.js
-- 🔵 **KEY_LANE_MIRROR** — 読む人だけ（書く経路が無い疑い）: src/extension/popup-entry.js, src/extension/status-entry.js, src/extension/venueBar.js, src/lib/venueOpenLatency.js
+- 🔵 **KEY_LANE_MIRROR** — 読む人だけ（書く経路が無い疑い）: src/extension/popup-entry.js, src/extension/status-entry.js, src/lib/venueOpenLatency.js
 - 🔵 **KEY_LAST_WATCH_URL** — 読む人だけ（書く経路が無い疑い）: src/extension/comeview-entry.js, src/extension/popup-entry.js, src/extension/status-entry.js
 - 🔵 **KEY_LIVEVIEW_PUBLISH_OUTCOME** — 読む人だけ（書く経路が無い疑い）: src/extension/status-entry.js
 - 🔵 **KEY_MARKETING_EXPORT_MASK_LABELS** — 読む人だけ（書く経路が無い疑い）: src/extension/popup-entry.js
@@ -57,7 +58,6 @@
 - 🔵 **KEY_PROFILE_RESOLVE_STATE** — 読む人だけ（書く経路が無い疑い）: src/extension/content-entry.js
 - 🔵 **KEY_RECORDING** — 読む人だけ（書く経路が無い疑い）: src/extension/content-entry.js, src/extension/popup-entry.js
 - 🔵 **KEY_STAT_CARDS_MIRROR** — 読む人だけ（書く経路が無い疑い）: src/extension/popup-entry.js, src/extension/status-entry.js
-- 🔵 **KEY_STORY_DIAG_MIRROR** — 読む人だけ（書く経路が無い疑い）: src/extension/venueBar.js
 - 🔵 **KEY_STORY_GROWTH_COLLAPSED** — 読む人だけ（書く経路が無い疑い）: src/extension/popup-entry.js
 - 🔵 **KEY_SUPPORT_CELEBRATION_STATE** — 読む人だけ（書く経路が無い疑い）: src/extension/popup-entry.js
 - 🔵 **KEY_THUMB_AUTO** — 読む人だけ（書く経路が無い疑い）: src/extension/content-entry.js, src/extension/popup-entry.js
@@ -67,7 +67,7 @@
 - 🔵 **fn:commentDbSummaryKey** — 読む人だけ（書く経路が無い疑い）: src/extension/popup-entry.js
 - 🔵 **fn:summaryStorageKey** — 読む人だけ（書く経路が無い疑い）: src/extension/popup-entry.js
 - 🔵 **fn:watchSnapshotStorageKey** — 読む人だけ（書く経路が無い疑い）: src/extension/popup/report/htmlReportDocument.js
-- 🔵 **nls_backfill_progress_v1** — 読む人だけ（書く経路が無い疑い）: src/extension/status-entry.js
+- 🔵 **nls_last_auto_tab_reload** — 読む人だけ（書く経路が無い疑い）: src/extension/status-entry.js
 - 🔵 **nls_mcp_live_latest_v1** — 読む人だけ（書く経路が無い疑い）: src/extension/popup-entry.js
 
 ## 全 storage キー
@@ -75,7 +75,6 @@
 | キー | 書く人(producer) | 読む人(consumer) |
 |---|---|---|
 | `KEY_AI_SHARE_FAST_DIAG` | extension/content-entry.js | extension/popup-entry.js |
-| `KEY_AI_SHARE_POPUP_DIAG` | — | extension/status-entry.js |
 | `KEY_ANONYMOUS_IDENTICON_ENABLED` | — | extension/marketing-export-entry.js<br>extension/popup-entry.js |
 | `KEY_AUTOPATROL_ENABLED` | — | extension/popup-entry.js |
 | `KEY_AUTOPATROL_STATE` | — | extension/popup-entry.js |
@@ -94,6 +93,7 @@
 | `KEY_CALM_PANEL_MOTION` | — | extension/popup-entry.js |
 | `KEY_CDB_OFFSCREEN_ENABLED` | — | extension/content-entry.js |
 | `KEY_CHEER_RECENT_V1` | extension/popup-entry.js | extension/popup-entry.js |
+| `KEY_COMEVIEW_WINDOW_GEOMETRY` | extension/comeview-entry.js | extension/comeview-entry.js |
 | `KEY_COMMENTER_FOLLOWING_LIST_CACHE` | — | extension/content-entry.js |
 | `KEY_COMMENTER_FOLLOW_CACHE` | extension/popup/report/htmlReportDocument.js<br>extension/popup-entry.js | extension/content-entry.js<br>extension/popup-entry.js |
 | `KEY_COMMENT_IDB_ENABLED` | — | extension/content-entry.js |
@@ -102,6 +102,7 @@
 | `KEY_COMMENT_PANEL_STATUS` | extension/content-entry.js | extension/popup-entry.js |
 | `KEY_COMMENT_POST_DIAG` | extension/popup-entry.js | extension/status-entry.js |
 | `KEY_COMMENT_TIMELINE_MIRROR` | extension/content-entry.js | extension/popup-entry.js<br>extension/status-entry.js |
+| `KEY_COMMENT_WRITE_MODE_DIAG` | extension/content-entry.js | — |
 | `KEY_CONCURRENT_CALIBRATION_RING_V1` | extension/content-entry.js<br>extension/popup-entry.js | extension/content-entry.js<br>extension/popup-entry.js |
 | `KEY_CUSTOM_SOUND_REV` | — | extension/status-entry.js |
 | `KEY_DEEP_HARVEST_QUIET_UI` | — | extension/content-entry.js<br>extension/popup-entry.js |
@@ -120,7 +121,7 @@
 | `KEY_INLINE_PANEL_VIEWPORT_WIDE_POLICY` | — | extension/content-entry.js<br>extension/popup-entry.js |
 | `KEY_INLINE_PANEL_WIDTH_MODE` | — | extension/content-entry.js<br>extension/popup-entry.js |
 | `KEY_LANE_DIAG` | extension/popup-entry.js | extension/status-entry.js |
-| `KEY_LANE_MIRROR` | — | extension/popup-entry.js<br>extension/status-entry.js<br>extension/venueBar.js<br>lib/venueOpenLatency.js |
+| `KEY_LANE_MIRROR` | — | extension/popup-entry.js<br>extension/status-entry.js<br>lib/venueOpenLatency.js |
 | `KEY_LAST_WATCH_URL` | — | extension/comeview-entry.js<br>extension/popup-entry.js<br>extension/status-entry.js |
 | `KEY_LIVEVIEW_PUBLISH_OUTCOME` | — | extension/status-entry.js |
 | `KEY_LIVEVIEW_PUBLISH_PAYLOAD` | extension/status-entry.js | extension/live-view-entry.js |
@@ -133,6 +134,7 @@
 | `KEY_OP_SOUND_EFFECT_DIAG` | extension/popup-entry.js | extension/status-entry.js |
 | `KEY_OP_SOUND_ENABLED` | — | extension/popup-entry.js |
 | `KEY_PAINT_PERF_RING_V1` | extension/popup-entry.js | — |
+| `KEY_PANEL_WAKE_CURTAIN_DIAG` | lib/panelWakeCurtainDom.js | — |
 | `KEY_POPUP_FRAME` | extension/popup-entry.js | extension/content-entry.js<br>extension/popup-entry.js |
 | `KEY_POPUP_FRAME_CUSTOM` | extension/popup-entry.js | extension/content-entry.js<br>extension/popup-entry.js |
 | `KEY_PREVIEW_RENDER_ACK` | extension/popup-entry.js | extension/popup-entry.js |
@@ -142,12 +144,12 @@
 | `KEY_REPORT_PREVIEW` | lib/reportPreviewPublish.js | extension/popup-entry.js<br>extension/status-entry.js |
 | `KEY_SCORE_ANNOUNCE_DIAG` | extension/popup-entry.js | — |
 | `KEY_SELF_POSTED_RECENTS` | extension/content-entry.js | extension/content-entry.js<br>extension/popup-entry.js |
+| `KEY_SOURCE_PROVENANCE` | extension/status-entry.js | extension/status-entry.js |
 | `KEY_STATUS_FAST_DIAG_LITE` | extension/content-entry.js | extension/status-entry.js |
 | `KEY_STATUS_TREND` | extension/status-entry.js | extension/status-entry.js |
 | `KEY_STATUS_UPLOAD_CONFIG` | extension/status-entry.js | extension/status-entry.js |
 | `KEY_STAT_CARDS_MIRROR` | — | extension/popup-entry.js<br>extension/status-entry.js |
 | `KEY_STORAGE_WRITE_ERROR` | extension/content-entry.js<br>extension/popup-entry.js | extension/popup-entry.js |
-| `KEY_STORY_DIAG_MIRROR` | — | extension/venueBar.js |
 | `KEY_STORY_GROWTH_COLLAPSED` | — | extension/popup-entry.js |
 | `KEY_SUPPORT_CELEBRATION_STATE` | — | extension/popup-entry.js |
 | `KEY_SW_PROGRESS` | extension/backfill-sw-entry.js | — |
@@ -174,5 +176,5 @@
 | `fn:summaryStorageKey` | — | extension/popup-entry.js |
 | `fn:tailStorageKey` | extension/content-entry.js | extension/popup-entry.js |
 | `fn:watchSnapshotStorageKey` | — | extension/popup/report/htmlReportDocument.js |
-| `nls_backfill_progress_v1` | — | extension/status-entry.js |
+| `nls_last_auto_tab_reload` | — | extension/status-entry.js |
 | `nls_mcp_live_latest_v1` | — | extension/popup-entry.js |

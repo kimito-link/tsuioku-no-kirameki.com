@@ -46,6 +46,10 @@ export const DIAGNOSIS_REGISTRY = Object.freeze([
   reg('ndgr', 'NDGR接続', 'ingest', 2, true),
   reg('ingest', 'リアルタイム取込', 'ingest', 1, false),
   reg('backfill', '過去ログ取得', 'ingest', 1, false),
+  // ★v0.1.1362: 取り込みの【律速】を名指しするセル(裏タブ/譲りすぎ/空区画/計器沈黙)。
+  //   weight=1・mandatory=false: 取り込みが走っていない時間帯は na なので、
+  //   達成率の分母に固定で入れると「取り込みしていない=未達」に見えてしまう。
+  reg('backfill-bottleneck', '取り込み律速', 'ingest', 1, false),
   reg('storage', 'storage安定', 'ingest', 2, true),
   // ③ 描画・UI健全性。
   reg('paint', '描画', 'render', 1, false),
@@ -87,7 +91,148 @@ export const DIAGNOSIS_REGISTRY = Object.freeze([
   //   venue-parity セルと同時に登録する(v0.1.1054 のレジストリ・ドリフトを繰り返さない)。
   reg('venue-parity', '会場一致', 'venue', 2, false),
   // 2026-07-15 診断先行(venue-yukkuri-named-diagnose): 「名前ありゆっくり顔」実害計器。
-  reg('venue-yukkuri-face', '名前ありゆっくり顔', 'venue', 1, false)
+  reg('venue-yukkuri-face', '名前ありゆっくり顔', 'venue', 1, false),
+  // ★v0.1.1390(ユーザー要望): 読み上げ特化。「よみあげと吹き出しはリアルタイム一致がいい」
+  //   個別の速さでなく【2つが揃っているか】を1セルで見る(voiceBubbleRealtimeParity.js)。
+  reg('voice-bubble-parity', '読み上げ⇄吹き出し', 'venue', 1, false),
+  // ★v0.1.1390(ユーザー要望): コメント送信特化。従来は「操作音」等と混ざって埋もれていた。
+  reg('comment-post', 'コメント送信', 'render', 1, false),
+  // ★v0.1.1390: メインスレッドを止めた【当人】。速報は「探すこと」で終わっており
+  //   誰が止めたかを名指ししていなかった(mainThreadBlockerCensus.js)。
+  reg('main-thread', 'メインスレッド', 'render', 1, false),
+  // ★v0.1.1390(ユーザー要望): 会場モード専用。会場は鏡ごしにしか見えないので
+  //   「鏡が古い」を会場の言葉で出す(venueModeCensus.js)。
+  reg('venue-mode', '会場モードの鮮度', 'venue', 1, false),
+  // ★v0.1.1390(ユーザー要望): ギフト/広告の通り道(取得→反映→演出)。
+  //   「取得中」のまま数分続くのは詰まり、を名指しする(giftAdPipelineCensus.js)。
+  reg('gift-ad-pipeline', 'ギフト/広告の通り道', 'northstar', 1, false),
+  /*
+   * ★v0.1.1400: 速報の本文に埋もれていた判定を掘り起こしてセル化(在庫の棚卸し)。
+   *   判定は buriedInstrumentCells.js が正本。weight=1・mandatory=false
+   *   (どれも「観測できたときだけ出る」補助情報なので、達成率の分母を歪めない)。
+   */
+  reg('lane-tick', 'レーン描画の起動', 'render', 1, false),
+  reg('lane-dropped', 'レーンから消えた人', 'northstar', 1, false),
+  reg('lane-supply-guard', 'レーン保護', 'render', 1, false),
+  reg('lane-settle', 'レーンの読み切り', 'northstar', 1, false),
+  reg('lane-oscillation', 'レーンの増減', 'render', 1, false),
+  reg('boot-shade', '起動時のシェード', 'render', 1, false),
+  reg('grid-rebuild', 'アイコングリッド', 'render', 1, false),
+  reg('pickup-write', 'PICK UPの更新', 'render', 1, false),
+  reg('click-affordance', 'クリックの見た目', 'render', 1, false),
+  reg('avatar-cache', 'サムネの記憶', 'northstar', 1, false),
+  reg('dedupe-seed', '重複の見分け', 'record', 1, false),
+  reg('host-move', '記録役の引っ越し', 'ingest', 1, false),
+  /*
+   * ★v0.1.1453: パネルの重複生成。v0.1.1125 から `duplicateSeen` として
+   *   数えられ fastDiag の JSON にも出ていたが、**読み手が moveCount しか
+   *   見ていなかった**ため枠に出ていなかった(数えているのに読み手が居ない)。
+   */
+  reg('host-duplicate', 'パネルが2つできた', 'ingest', 1, false),
+  /*
+   * ★v0.1.1454: メモリ/DOM の逼迫(凍結の予兆)。実機で watch ページに
+   *   「ページが応答しません」が出たとき、どちらも測っていなかった。
+   */
+  reg('memory-pressure', 'メモリの余裕', 'render', 1, false),
+  reg('dom-nodes', '画面の部品数', 'render', 1, false),
+  // ★v0.1.1463: DOM系の3計器をセルに出す(コピー文だけ=「4 表示」の断線を塞いだ)。
+  reg('auto-section', '拡張の処理時間', 'render', 1, false),
+  reg('dom-tree', 'パネルの部品数', 'render', 1, false),
+  reg('panel-cover', 'パネルの覆い', 'render', 1, false),
+  reg('northstar-render', '公式値の描画', 'northstar', 1, false),
+  reg('mirror-publish', '鏡の書き出し', 'render', 1, false),
+  /*
+   * ★v0.1.1403 第1弾「無音で死ぬ」故障(silentFailureCells.js が判定の正本)。
+   *   会議3席が独立に一致した最優先群=**既に測れているのに画面が無言**だったもの。
+   *   例: customSoundDiag.dbAvailable=false は '-' としか出ておらず、
+   *   カスタム音源が全滅しても誰も気づけなかった。
+   *   weight=1・mandatory=false: 使っていない機能で達成率を下げないため。
+   */
+  reg('custom-sound-db', 'マイ効果音の保管庫', 'render', 1, false),
+  reg('voice-start-fail', '読み上げのON失敗', 'venue', 1, false),
+  reg('voice-audio-blocked', '音の再生ブロック', 'venue', 1, false),
+  reg('gift-sound-fail', 'ギフト音の失敗', 'northstar', 1, false),
+  reg('comment-revert', '送信の取り消し', 'render', 1, false),
+  /*
+   * ★v0.1.1404 第2弾: 黒画面の【当人】と、ビルドの古さ。
+   *   どちらも「過去に往復を何度も生んだ症状」を1行で終わらせるための計器
+   *   (blackScreenOwnerCells.js / buildAgeCell.js が判定の正本)。
+   */
+  reg('mt-owner', '止めている当人', 'render', 1, false),
+  reg('mt-total', '止まった合計時間', 'render', 1, false),
+  reg('mt-resume', 'スリープ明けの詰まり', 'render', 1, false),
+  reg('build-age', 'このビルドの新しさ', 'render', 1, false),
+  /*
+   * ★v0.1.1405: 会場が鏡を受け取れているか。
+   *   (a)通知が来ない /(b)別配信の鏡を見ている /(c)関所で全却下 を名指しする。
+   *   未解決の「会場一致が鏡stale(656s)で固定」を肯定/否定できる唯一の計器。
+   */
+  reg('venue-intake', '会場の鏡うけとり', 'venue', 1, false),
+  /*
+   * ★v0.1.1406 第4弾: 既存プローブを【打ち手が変わる単位】に割る。
+   *   laneDetailCells.js / effectDetailCells.js が判定の正本。
+   *   ★単独では打ち手の無い内訳(docHidden 等)はセルにしない(会議の判定)。
+   */
+  reg('lane-last-run', 'レーンの最終描画', 'render', 1, false),
+  reg('lane-capped', '上限で表示できなかった人', 'northstar', 1, false),
+  reg('lane-drop-burst', '一度に消えた最大人数', 'northstar', 1, false),
+  reg('lane-amplitude', 'レーンの振れ幅', 'render', 1, false),
+  reg('lane-worst-drop', '一番大きく減った瞬間', 'render', 1, false),
+  reg('lane-publish-skip', 'レーンの書き出し見送り', 'render', 1, false),
+  reg('arrival-effect', '到着の演出', 'northstar', 1, false),
+  reg('effect-throttle', '演出の間引き', 'northstar', 1, false),
+  reg('comment-echo', '送信から表示まで', 'render', 1, false),
+  reg('comment-retry', '送信の再試行', 'render', 1, false),
+  reg('instant-reject', '即時表示の取りこぼし', 'render', 1, false),
+  /*
+   * ★v0.1.1407 第5弾: 公式値の実績 / 読み上げの内訳 / 外部APIの生死。
+   *   northStarDetailCells.js / voiceDetailCells.js / externalFetchCells.js が正本。
+   */
+  reg('ns-ever-got', '公式値の取得実績', 'northstar', 1, false),
+  reg('ns-pending', '取得中のまま', 'northstar', 1, false),
+  reg('voice-synth-fail', '声の合成の失敗', 'venue', 1, false),
+  reg('voice-synth-null', '声が空で返った', 'venue', 1, false),
+  reg('voice-catchup', '追いつくための調整', 'venue', 1, false),
+  reg('voice-drop-reason', '読み飛ばしの理由', 'venue', 1, false),
+  reg('voice-queue', '読み上げの待ち', 'venue', 1, false),
+  reg('voice-playback-timeout', '再生の打ち切り', 'venue', 1, false),
+  reg('fetch-koken', 'ギフト貢献度の取得', 'northstar', 1, false),
+  reg('fetch-nicoad', '広告ランキングの取得', 'northstar', 1, false),
+  reg('fetch-leader', '取得役の選出', 'ingest', 1, false),
+  /*
+   * ★v0.1.1408 最終弾: 識別・操作音・BGM・記録の質・多タブ。
+   *   finalDetailCells.js が判定の正本。
+   *   ★匿名にサムネ/名前が無いのは【仕様】なので異常にしない(掟2)。
+   *     識別可能な人だけを分母にする。
+   */
+  reg('identity-anon', '匿名の割合', 'record', 1, false),
+  reg('identity-name', '名前の取得', 'northstar', 1, false),
+  reg('identity-thumb', 'サムネの取得', 'northstar', 1, false),
+  reg('identity-complete', '名前とサムネが揃った人', 'northstar', 1, false),
+  reg('op-sound', '操作音', 'render', 1, false),
+  reg('bgm-phase', 'BGMの盛り上がり', 'render', 1, false),
+  reg('ndgr-persist', '受信から保存まで', 'record', 1, false),
+  reg('uid-detail', 'あとから人を辿れる記録', 'record', 1, false),
+  reg('multi-tab', '複数タブの混線', 'ingest', 1, false),
+  /*
+   * ★v0.1.1408: 黒画面の追い込み(ユーザー実機で継続中のため厚くする)。
+   *   ★幕/シェードの【消し方】は触らない(下流・7版空振り済)。
+   *     出直した回数・どの段階で止まったか=上流の情報だけを出す。
+   */
+  reg('boot-phase', '起動の進み具合', 'render', 1, false),
+  reg('boot-remount', '画面の作り直し', 'render', 1, false),
+  reg('whiteout-culprit', 'スクロール時の犯人', 'render', 1, false),
+  reg('mt-owner2', '2番目に止めている処理', 'render', 1, false),
+  reg('mt-spread', '止めている処理の数', 'render', 1, false),
+  reg('mt-average', '1回あたりの停止', 'render', 1, false),
+  /*
+   * ★v0.1.1412: 取得経路の劣化。**他の100セルと役割が違う唯一のセル**。
+   *   他は「いま壊れているか」を見るが、これは **「これから壊れそうか」** を見る。
+   *   ニコ生が構造を変えると、症状が出る前にまず取得経路が
+   *   embedded-data(JSON) → dom-text(画面文字) へ落ちる。そこで鳴らす。
+   *   判定の正本は sourceProvenance.js。
+   */
+  reg('source-provenance', 'データの取り方', 'ingest', 1, false)
 ]);
 
 /** id → 観点 の索引(集計で O(1) 参照)。 */

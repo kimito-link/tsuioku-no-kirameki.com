@@ -49,10 +49,33 @@ describe('自動WEB公開の同意ゲート配線(status-entry)', () => {
 
   it('storage 読み取りに失敗したら false に倒す(fail-closed)', () => {
     const src = readSource();
-    const fn = src.match(/async function refreshWebPublishOptInCache\(\)[\s\S]{0,500}?\n\}/);
+    /*
+     * ★v0.1.1371: 上限を 500→2000 に広げた。
+     *   関数に説明コメント(白紙の真因)を足したら 500 文字を超えて【関数が見つからない】で
+     *   落ちた。★これは「コメントを書くと検査が壊れる」＝検査が中身でなく長さに依存していた
+     *   ということ。判定したいのは catch で false に倒すことなので、窓を実態に合わせる
+     *   ([[mutation-test-needs-anchored-regex-2026-08-05]] の逆側の失敗)。
+     */
+    const fn = src.match(/async function refreshWebPublishOptInCache\(\)[\s\S]{0,2000}?\n\}/);
     expect(fn, 'refreshWebPublishOptInCache が見つからない').toBeTruthy();
     // catch 節で false を代入していること
-    expect(fn[0]).toMatch(/catch\s*\{[\s\S]{0,160}_webPublishOptIn\s*=\s*false/);
+    expect(fn[0]).toMatch(/catch\s*\{[\s\S]{0,200}_webPublishOptIn\s*=\s*false/);
+  });
+
+  it('★同意フラグの読み取りは timeout で有界化する(白紙の再発防止)', () => {
+    /*
+     * ★v0.1.1371: この read は bootstrap で await されるので、無界だと storage stall のとき
+     *   init がここで止まり、状態速報ページが【真っ白のまま返らない】(2026-08-12 実機の真因)。
+     *   実ブラウザで証明済み: 無界=6秒後も「読み込み中...」/ 有界=9秒で degrade 表示。
+     *   ★fail-closed(catch で false)は上のテストが担保しているので、
+     *     timeout しても「同意した」に倒れることはない。
+     */
+    const src = readSource();
+    const fn = src.match(/async function refreshWebPublishOptInCache\(\)[\s\S]{0,2000}?\n\}/);
+    expect(fn, 'refreshWebPublishOptInCache が見つからない').toBeTruthy();
+    expect(fn[0]).toContain('runStorageOpWithTimeout');
+    // 生の await が残っていたら白紙に戻る。
+    expect(fn[0]).not.toMatch(/await chrome\.storage\.local\.get\(/);
   });
 
   it('bootstrap が同意キャッシュの読み込みを無条件に await している', () => {

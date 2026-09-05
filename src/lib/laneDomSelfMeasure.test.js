@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { afterEach, describe, expect, it } from 'vitest';
-import { measureLaneDomSelf } from './laneDomSelfMeasure.js';
+import { measureLaneDomSelf, perTierKeysOf } from './laneDomSelfMeasure.js';
 
 function tile(width, height, hidden = false, userKey = '') {
   const el = document.createElement('div');
@@ -39,12 +39,14 @@ describe('measureLaneDomSelf', () => {
   it('全段の要素が無ければ measured:false・全段0件', () => {
     const result = measureLaneDomSelf(null);
     expect(result.measured).toBe(false);
+    // v0.1.1284: keys(可視タイルの userKey 列)を追加。★形は厳密に固定したまま維持する
+    //   (toEqual を toMatchObject に緩めると、フィールドが黙って消える退行を通してしまう)。
     expect(result.perTier).toEqual({
-      link: { visible: 0, tileW: 0, tileH: 0, tileKey: '' },
-      gift: { visible: 0, tileW: 0, tileH: 0, tileKey: '' },
-      ad: { visible: 0, tileW: 0, tileH: 0, tileKey: '' },
-      konta: { visible: 0, tileW: 0, tileH: 0, tileKey: '' },
-      tanu: { visible: 0, tileW: 0, tileH: 0, tileKey: '' }
+      link: { visible: 0, tileW: 0, tileH: 0, tileKey: '', keys: [] },
+      gift: { visible: 0, tileW: 0, tileH: 0, tileKey: '', keys: [] },
+      ad: { visible: 0, tileW: 0, tileH: 0, tileKey: '', keys: [] },
+      konta: { visible: 0, tileW: 0, tileH: 0, tileKey: '', keys: [] },
+      tanu: { visible: 0, tileW: 0, tileH: 0, tileKey: '', keys: [] }
     });
   });
 
@@ -57,9 +59,10 @@ describe('measureLaneDomSelf', () => {
       laneTanu: lane(tile(72, 90))
     });
     expect(result.measured).toBe(true);
-    expect(result.perTier.link).toEqual({ visible: 2, tileW: 64, tileH: 84, tileKey: '' });
-    expect(result.perTier.gift).toEqual({ visible: 0, tileW: 0, tileH: 0, tileKey: '' });
-    expect(result.perTier.tanu).toEqual({ visible: 1, tileW: 72, tileH: 90, tileKey: '' });
+    // keys は「鍵を持つ可視タイル」だけ(この段のタイルは userKey 未設定なので空配列)。
+    expect(result.perTier.link).toEqual({ visible: 2, tileW: 64, tileH: 84, tileKey: '', keys: [] });
+    expect(result.perTier.gift).toEqual({ visible: 0, tileW: 0, tileH: 0, tileKey: '', keys: [] });
+    expect(result.perTier.tanu).toEqual({ visible: 1, tileW: 72, tileH: 90, tileKey: '', keys: [] });
   });
 
   it('非表示の段は子があっても0件・0pxとして扱う', () => {
@@ -69,7 +72,60 @@ describe('measureLaneDomSelf', () => {
       visible: 0,
       tileW: 0,
       tileH: 0,
-      tileKey: ''
+      tileKey: '',
+      keys: []
+    });
+  });
+
+  /*
+   * ★v0.1.1284(venue-exact-parity-SPEC-2026-08-07 §3-2/M2): キー列の採取。
+   *   会場側の census(venueDomCensus.countSection)と【同じ走査規則・同じ除外規則】で
+   *   並び順まで揃っていることが、指紋(laneDomFingerprint)が3起点で一致する前提。
+   *   ★両者が同じ実DOMから同じ列を出すことの貫通テストは laneSceneEnvelope.fingerprint.test.js。
+   */
+  describe('keys(可視タイルの userKey 列)', () => {
+    it('可視タイルの鍵を【並び順のまま】集める', () => {
+      const result = measureLaneDomSelf({
+        laneLink: lane(tile(64, 84, false, 'u:1'), tile(64, 84, false, 'u:2'))
+      });
+      expect(result.perTier.link.keys).toEqual(['u:1', 'u:2']);
+    });
+
+    it('hidden なタイルは除く(visible と同じ規則)', () => {
+      const result = measureLaneDomSelf({
+        laneLink: lane(tile(64, 84, false, 'u:1'), tile(64, 84, true, 'u:hidden'))
+      });
+      expect(result.perTier.link.visible).toBe(1);
+      expect(result.perTier.link.keys).toEqual(['u:1']);
+    });
+
+    it('無鍵タイルは keys に入れない(嘘の鍵を作らない・census の unkeyed の縄張り)', () => {
+      const result = measureLaneDomSelf({
+        laneLink: lane(tile(64, 84, false, 'u:1'), tile(64, 84))
+      });
+      expect(result.perTier.link.visible).toBe(2);
+      expect(result.perTier.link.keys).toEqual(['u:1']);
+    });
+
+    it('空席(.nlsb-is-empty)の中身の鍵は拾わない(会場側と同じ除外)', () => {
+      const result = measureLaneDomSelf({
+        laneLink: lane(seat(tile(999, 999, false, 'u:ghost'), true), seat(tile(118, 40, false, 'u:real')))
+      });
+      expect(result.perTier.link.keys).toEqual(['u:real']);
+    });
+  });
+
+  describe('perTierKeysOf', () => {
+    it('5段そろえて取り出す(欠けた段は空配列=呼び出し側が手書きしないための小関数)', () => {
+      const result = measureLaneDomSelf({ laneLink: lane(tile(64, 84, false, 'u:1')) });
+      expect(perTierKeysOf(result)).toEqual({
+        link: ['u:1'], gift: [], ad: [], konta: [], tanu: []
+      });
+    });
+
+    it('null/壊れた入力でも落ちない(全段空配列)', () => {
+      expect(perTierKeysOf(null)).toEqual({ link: [], gift: [], ad: [], konta: [], tanu: [] });
+      expect(perTierKeysOf({ perTier: 'x' })).toEqual({ link: [], gift: [], ad: [], konta: [], tanu: [] });
     });
   });
 

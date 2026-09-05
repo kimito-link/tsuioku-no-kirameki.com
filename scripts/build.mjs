@@ -162,6 +162,23 @@ const targets = [
     target: 'chrome100'
   },
   {
+    // 2026-08-08: サイドパネルの自己診断だけを担う極小エントリ(描画には関与しない)。
+    //   黒画面が開発環境で再現せず実機だけで起きるため、パネル自身に状態を書かせて
+    //   いつもの「状態速報コピー」で原因が分かるようにする。
+    entryPoints: ['src/extension/sidepanel-entry.js'],
+    outfile: 'extension/dist/sidepanel.js',
+    target: 'chrome100'
+  },
+  {
+    // ★v0.1.1354: 幕(cloak)を外す最速の保険だけを担う極小エントリ。
+    //   popup.js(2.3MB)より前に読ませて、保険タイマーの起点を t≈0 にするのが目的
+    //   (バンドル末尾の保険は「読み終えてから400ms」になり実測922msだった)。
+    //   ★インラインで書くと拡張CSP(script-src 'self')違反でブロックされるので必ず別ファイル。
+    entryPoints: ['src/extension/cloak-failsafe-entry.js'],
+    outfile: 'extension/dist/cloak-failsafe.js',
+    target: 'chrome100'
+  },
+  {
     // feat/status-web-mobile-share: スマホ閲覧用 status Web 版(app.tsuioku-no-kirameki.com)。
     //   拡張に依存しない純 Web。api/status から GET した概要 jsonBlob を、拡張の status と
     //   同じ整形(src/lib/statusFormat.js を共用)で描画する。Vercel 静的配信。

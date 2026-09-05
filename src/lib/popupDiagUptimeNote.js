@@ -1,3 +1,5 @@
+import { durationMsOf, WRITER_BOOT_GRACE_MS } from './timeAuthority.js';
+
 /**
  * popup 固有診断が「popup 起動から何秒後の値か」を明示する注記を作る純関数(v0.1.1211)。
  *
@@ -14,19 +16,28 @@
  *
  * @param {number|null|undefined} shadeAgeMs popup 起動からの経過ミリ秒
  *   (popupDiag.popup.loadShadeProbe.shadeAgeMs)
+ *   ★これは performance.now() 基準の【経過時間】であり、capturedAt(epoch の時点)とは
+ *     別の量。混ぜてはいけない([[venue-seats-lastupdate-clock-mismatch-v1044]])。
  * @returns {string} 注記(判定不能なら空文字)
  */
 export function buildPopupDiagUptimeNote(shadeAgeMs) {
-  // ★null/undefined を先に弾く。Number(null)===0 なので、これが無いと
-  //   「値が取れなかった」を「起動0.0秒」と偽って報告してしまう。
-  if (shadeAgeMs == null) return '';
-  const ms = Number(shadeAgeMs);
-  if (!Number.isFinite(ms) || ms < 0) return '';
+  /*
+   * ★v0.1.1304: null/空文字ガードは timeAuthority.durationMsOf が正本。
+   *   Number(null)===0 / Number('')===0 なので、これが無いと
+   *   「値が取れなかった」を「起動0.0秒」と偽って報告してしまう。
+   */
+  const ms = durationMsOf(shadeAgeMs);
+  if (ms == null) return '';
   const sec = ms / 1000;
   const shown = sec < 10 ? sec.toFixed(1) : String(Math.round(sec));
   const base = `popup 起動から ${shown} 秒後の値`;
-  // 起動直後(3秒未満)は、ゼロの計器を「不具合」と読まないよう明示的に警告する。
-  if (ms < 3000) {
+  /*
+   * 起動直後は、ゼロの計器を「不具合」と読まないよう明示的に警告する。
+   * ★v0.1.1304: 閾値は timeAuthority.WRITER_BOOT_GRACE_MS が正本。
+   *   ここにリテラル 3000 を書くと、diagnosticsTrust 側の定数と【同じ値が2箇所】になり、
+   *   片方だけ変えたときに判定がずれる(7版事件の構造そのもの)。
+   */
+  if (ms < WRITER_BOOT_GRACE_MS) {
     return (
       `${base} ⚠ 起動直後のため、鏡・グリッド等がゼロや「未観測」でも正常です` +
       `（鏡の書き出しは publish の 400ms 後・幕は 800ms 最低表示）。` +

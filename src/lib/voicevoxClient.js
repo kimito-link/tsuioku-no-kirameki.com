@@ -173,12 +173,55 @@ export function defaultVoicevoxAliveTimeoutMs(viaProxy) {
 }
 
 /**
- * @param {{ fetchFn?: FetchFn, timeoutMs?: number, baseUrl?: string }} [opts]
- * @returns {Promise<boolean>}
+ * 生存確認が失敗した理由を分類する純関数。
+ *
+ * ★2026-08-11(v0.1.1326) なぜ要るか(ユーザー実機):
+ *   VOICEVOX 0.25.2 が【起動しているのに】読み上げボタンが ON にならず、画面には
+ *   「VOICEVOXが見つかりません」と出ていた。ユーザーの言葉は「たちあがってるけどね」。
+ *   = 失敗理由を区別せず一律「見つかりません」と言っていたため、
+ *     ユーザーにも司令塔にも**次の一手が分からなかった**。
+ *   起動しているのに応答が無い(timeout)のと、そもそも居ない(refused)のは
+ *   打つ手がまるで違う。理由を名指しする(memory: instrument-must-name-the-cause)。
+ *
+ * ■ 判定材料(実装の実際の挙動に基づく・推測ではない)
+ *   - timeout    : fetchWithTimeout が `Error('voicevox_timeout')` を throw する(:116)
+ *   - http-error : fetch は成功したが response.ok === false(起動しているがエラー応答)
+ *   - refused    : それ以外の throw(TypeError: Failed to fetch 等=接続できない)
+ *   - no-fetch   : fetchFn が無い(プロキシ未配線・拡張コンテキスト消失)
+ *
+ * @param {{ error?: unknown, response?: { ok?: unknown }|null, hasFetch?: boolean }} input
+ * @returns {'timeout'|'refused'|'http-error'|'no-fetch'|''} ''=失敗していない
  */
-export async function isVoicevoxAlive(opts = {}) {
+export function classifyVoicevoxAliveFailure(input) {
+  if (input?.hasFetch === false) return 'no-fetch';
+  const err = input?.error;
+  if (err) {
+    const msg = String(/** @type {any} */ (err)?.message || err || '');
+    if (msg.includes('voicevox_timeout')) return 'timeout';
+    // AbortError も「待ちきれず打ち切った」= timeout と同じ意味に寄せる。
+    if (/abort/i.test(msg) || /** @type {any} */ (err)?.name === 'AbortError') return 'timeout';
+    return 'refused';
+  }
+  const res = input?.response;
+  if (res && res.ok === false) return 'http-error';
+  return '';
+}
+
+/**
+ * VOICEVOX の生存確認。理由付きで返す。
+ *
+ * ★後方互換: 戻り値は `{ ok, reason }` だが、既存の `if (alive)` 判定を壊さないよう
+ *   呼び出し側は `.ok` を見ること。boolean を期待する古い呼び出しが残っていないか
+ *   配線テストで固定する。
+ *
+ * @param {{ fetchFn?: FetchFn, timeoutMs?: number, baseUrl?: string }} [opts]
+ * @returns {Promise<{ ok: boolean, reason: 'timeout'|'refused'|'http-error'|'no-fetch'|'' }>}
+ */
+export async function probeVoicevoxAlive(opts = {}) {
   const fetchFn = opts.fetchFn || proxyFetchFn;
-  if (typeof fetchFn !== 'function') return false;
+  if (typeof fetchFn !== 'function') {
+    return { ok: false, reason: classifyVoicevoxAliveFailure({ hasFetch: false }) };
+  }
   const baseUrl = String(opts.baseUrl || VOICEVOX_BASE_URL).replace(/\/+$/, '');
   // 明示 timeoutMs が無ければ、プロキシ経由(content script)は長め・直接 fetch は短め。
   const viaProxy = !opts.fetchFn && !isExtensionPage();
@@ -190,10 +233,20 @@ export async function isVoicevoxAlive(opts = {}) {
       { method: 'GET' },
       positiveTimeout(opts.timeoutMs, fallbackTimeout)
     );
-    return response?.ok !== false;
-  } catch {
-    return false;
+    if (response?.ok !== false) return { ok: true, reason: '' };
+    return { ok: false, reason: classifyVoicevoxAliveFailure({ response }) };
+  } catch (err) {
+    return { ok: false, reason: classifyVoicevoxAliveFailure({ error: err }) };
   }
+}
+
+/**
+ * @param {{ fetchFn?: FetchFn, timeoutMs?: number, baseUrl?: string }} [opts]
+ * @returns {Promise<boolean>}
+ */
+export async function isVoicevoxAlive(opts = {}) {
+  const probe = await probeVoicevoxAlive(opts);
+  return probe.ok;
 }
 
 /**

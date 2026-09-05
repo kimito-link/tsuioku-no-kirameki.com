@@ -25,6 +25,8 @@ import {
 } from './commentCountProvenance.js';
 // 応援コメント(最新N件・本文)を状態速報にも載せる(jsonBlob 同梱の鏡を貼るだけ=新規 read なし)。
 import { formatCommentTimelineReportLines } from './commentTimelineReport.js';
+// v0.1.1385: 症状名で引ける特化判定を【複数】出す(総合1個では埋もれるため)。
+import { buildSymptomVerdicts, formatSymptomVerdictsBlock } from './symptomVerdicts.js';
 // スクロール白化(重い・一瞬白くなる)を状態速報の読める所に出す(fastDiag に既にある値を貼るだけ)。
 import {
   formatScrollWhiteoutReportLines,
@@ -35,6 +37,9 @@ import { buildHealthCells, summarizeHealthVerdict } from './healthCells.js';
 //   diagnosisRegistry の category/weight/mandatory で集計し「カテゴリ別スコア+完璧判定」を出す。
 import { buildCompletenessScore, formatCompletenessScoreLines } from './completenessScore.js';
 import { buildVoiceDiagLine } from './voiceDiag.js';
+// v0.1.1330: 読み上げの到達可能性(面が開いているか・計器はいつのものか)を先に断定する。
+import { formatVenueAvatarLine, formatVenueDiagReachLine } from './venueAvatarReport.js';
+import { judgeVoiceReachability } from './voiceReachabilityProbe.js';
 import { buildGiftEffectDiagLines, giftEffectDiagToActionCards } from './giftEffectDiag.js';
 import { buildMilestoneEffectDiagLines, milestoneEffectDiagToActionCards } from './milestoneEffectDiag.js';
 // v0.1.1072: マイ効果音(customSoundStore.js)の取込状況(extras 12秒間引き)をAI共有本文にも併記。
@@ -82,6 +87,34 @@ export function formatRefreshPerfLine(refreshPerf) {
 }
 
 /**
+ * ★v0.1.1314: `chrome.tabs.query` が遅かったことを1行で名指しする純関数。
+ *
+ * ■ なぜ要るか(2026-08-06 から未解明で残っている数字)
+ *   診断ページ 9,812ms の内訳で `lives` が 5,493ms を占めていたが、`lives` は
+ *   【tabs.query + fastDiag フォールバック】の合計なのでどちらが遅いか名指しできなかった。
+ *   ★tabs.query は storage を触らない(browser プロセスが応える)ので、
+ *     ここが遅い＝真因は【拡張の外・browser プロセスの混雑】と切り分けられる。
+ *     逆にここが速いのに lives が遅いなら、遅いのは storage 側と確定する。
+ *   ＝計器は症状(遅い)でなく【原因のありか】を出す([[instrument-must-name-the-cause-2026-08-01]])。
+ *
+ * @param {{ count?: number, worstMs?: number, lastMs?: number, lastTabCount?: number }|null|undefined} diag
+ * @returns {string} 遅延を観測していなければ ''(常時出さない)
+ */
+export function formatTabsQuerySlowLine(diag) {
+  const d = diag && typeof diag === 'object' ? diag : null;
+  const count = d ? Number(d.count) || 0 : 0;
+  if (count <= 0) return '';
+  const worst = Number(d.worstMs) || 0;
+  const last = Number(d.lastMs) || 0;
+  const tabCount = Number.isFinite(Number(d.lastTabCount)) ? Number(d.lastTabCount) : -1;
+  const tabPart = tabCount >= 0 ? ` / 直近のwatchタブ数 ${tabCount}` : '';
+  return (
+    `★タブ一覧の取得が遅い: ${count}回(最悪 ${worst}ms / 直近 ${last}ms${tabPart})` +
+    ' — これは storage でなくブラウザ側の応答待ちです(拡張の中を直しても速くなりません)'
+  );
+}
+
+/**
  * 2026-07-14: renderAll 内のセクション別所要(計器)を1行に整形する純関数。
  *   診断ページ軽量化(lazy details 化)の対象を推測でなく実測で決めるための材料。材料が無ければ ''。
  * @param {Array<[string, number]>|null|undefined} renderSectionMs
@@ -104,7 +137,7 @@ export function formatRenderSectionMsLine(renderSectionMs) {
  * @param {any} args
  * @returns {string}
  */
-export function buildAiShareFullText({ overviewText, livesData, fastDiag, popupDiag, voiceDiag, venueSeatsDiag, laneDiag, laneMirror, reportPreview, trendFindings, jsonBlob, currentLiveId, publishKeys, publishOutcomeRec, previewRenderAck, refreshPerf, renderSectionMs, giftEffectDiag, milestoneEffectDiag, customSoundDiag, voiceEffectDiag, bgmPhaseDiag, opSoundEffectDiag, commentPostDiag, instantPushDiag, channelSwitchDiag, highlightLedger }) {
+export function buildAiShareFullText({ overviewText, livesData, fastDiag, popupDiag, voiceDiag, venueSeatsDiag, laneDiag, laneMirror, reportPreview, trendFindings, jsonBlob, currentLiveId, publishKeys, publishOutcomeRec, previewRenderAck, refreshPerf, renderSectionMs, giftEffectDiag, milestoneEffectDiag, customSoundDiag, voiceEffectDiag, bgmPhaseDiag, opSoundEffectDiag, commentPostDiag, instantPushDiag, channelSwitchDiag, highlightLedger, sidepanelSelfDiag, extrasAgeMs }) {
   const lines = [];
   lines.push('## 君斗りんくの追憶のきらめき 状態速報');
   lines.push(`生成: ${new Date().toISOString()}`);
@@ -113,9 +146,21 @@ export function buildAiShareFullText({ overviewText, livesData, fastDiag, popupD
   //   体感の重さは初期ロード/スクロール側、という切り分けが状態速報1枚で分かる。
   const perfLine = formatRefreshPerfLine(refreshPerf);
   if (perfLine) lines.push(perfLine);
+  /*
+   * ★v0.1.1320: 上の「更新所要」は【JSが返るまで】しか測っていない。
+   *   style/layout/paint を含む実所要をこの行で出す(status-entry が計測して同梱)。
+   *   ★これが無いと「6ms＝軽い」と誤読する(2026-08-10 に私が実際に誤読した)。
+   *   観測ゼロなら空文字＝行ごと出ない。
+   */
+  const paintLine = String(refreshPerf?.paintCompletionLine || '');
+  if (paintLine) lines.push(paintLine);
   // 2026-07-14: 「更新所要(計器)」のrenderステップだけをさらに分解した内訳(診断ページ軽量化の実測材料)。
   const sectionMsLine = formatRenderSectionMsLine(renderSectionMs);
   if (sectionMsLine) lines.push(sectionMsLine);
+  // ★v0.1.1314: 「lives が遅い」の内訳を名指しする(storage 側か browser 側かの切り分け)。
+  //   遅延を観測していないときは1行も出さない=普段の速報を汚さない。
+  const tabsQueryLine = formatTabsQuerySlowLine(refreshPerf?.tabsQuerySlow);
+  if (tabsQueryLine) lines.push(tabsQueryLine);
   // v0.1.1020: 更新所要が重い×②応援プレビューが開いている(ack 新鮮)を突合し「②が重さの原因」を名指しする。
   //   ユーザー実機「応援プレビュー出すとめちゃ重い」への対応=体感でなく状態速報1枚で原因が分かる。
   try {
@@ -158,7 +203,7 @@ export function buildAiShareFullText({ overviewText, livesData, fastDiag, popupD
     //   withUidPercent を診断に渡す(fastDiag に既にある値・新規 read ゼロ)。
     const withUidPercent =
       fastDiag?.content?.giftDiagnostics?.commentObservability?.savedCommentsUidStats?.withUidPercent;
-    laneRenderDiag = buildStoryUserLaneRenderDiag(probeSnap, { withUidPercent });
+    laneRenderDiag = buildStoryUserLaneRenderDiag(probeSnap, { withUidPercent, bootAgeMs: popupSnapshotAgeMs(popupDiag?.popup ?? popupDiag) });
     const watching = Array.isArray(livesData)
       ? livesData.find((l) => l && l.recording && l.perfDiag) || livesData.find((l) => l && l.perfDiag)
       : null;
@@ -176,6 +221,8 @@ export function buildAiShareFullText({ overviewText, livesData, fastDiag, popupD
       popupDiag: popupDiag || null,
       jsonBlob: jsonBlob || null,
       publishOutcome,
+      // ★v0.1.1302: 鏡を含む補助データの齢(12秒キャッシュ)。表示専用。
+      extrasAgeMs: extrasAgeMs == null ? null : extrasAgeMs,
       nowMs: Date.now()
     });
     // v0.1.985(council/parity-diagnose-SYNTHESIS.md): 状態速報の最先頭に「3画面パリティ」総合判定1行。
@@ -214,6 +261,34 @@ export function buildAiShareFullText({ overviewText, livesData, fastDiag, popupD
     } catch {
       /* no-op: パリティ判定の失敗は状態速報を壊さない */
     }
+    /*
+     * ★v0.1.1385: 症状別の特化判定を【複数】出す(ユーザー指摘への回答)。
+     *
+     *   ユーザーの言葉:「特化したものを複数つくれといっているのに、総合1個しかない」
+     *   従来は33セルを `総合判定: 🟢 取り込み中 ✓` の1行に畳んでおり、
+     *   **サムネが全部白くてもレーンが空でも総合は緑になりうる**構造だった
+     *   (2026-08-13 の実機がまさにそれ: 総合=取り込み中✓ / サムネ0% / レーン未描画)。
+     *
+     *   ここでは「サムネが白い」「レーンが空」「診断が重い」など
+     *   **ユーザーが困ったときに使う言葉**で引ける判定を、異常な分だけ列挙する。
+     *   ★正常なものは1行も出さない(ノイズを作らない)。
+     */
+    try {
+      const popupSnap = popupDiag?.popup ?? popupDiag;
+      const symptomBlock = formatSymptomVerdictsBlock(
+        buildSymptomVerdicts({
+          identityAcquisition: popupSnap?.identityAcquisition || null,
+          laneRenderProbe: popupSnap?.storyUserLaneRenderProbe || null,
+          avatarLoadDiag: popupSnap?.avatarLoadDiag || null,
+          updateMs: refreshPerf?.totalMs,
+          // ★v0.1.1391: popup 起動からの経過。起動直後の値でレーンを 🔴 と断定しない。
+          popupAgeMs: popupSnapshotAgeMs(popupSnap)
+        })
+      );
+      if (symptomBlock) { lines.push(symptomBlock); lines.push(''); }
+    } catch {
+      /* no-op: 症状別判定の失敗は状態速報を壊さない */
+    }
     const trustLines = formatDiagnosticsTrustLines(trust);
     if (trustLines.length) { for (const l of trustLines) lines.push(l); lines.push(''); }
     // 網羅的完全性診断(PageSpeed 型): 全観点をレジストリで網羅し、カテゴリ別スコア+✅完璧判定+
@@ -228,6 +303,23 @@ export function buildAiShareFullText({ overviewText, livesData, fastDiag, popupD
     }
   } catch {
     /* no-op: 信頼性ブロックの失敗は状態速報を壊さない */
+  }
+  /*
+   * ★v0.1.1317: 会場の鏡うけとりは【概要ブロックの外】で出す。
+   *
+   * ■ なぜ外に出すか(通し検査が教えてくれた)
+   *   会場系の診断行は全部 `if (overviewText)` の中にあり、overviewText は
+   *   「視聴中の配信が無い」と空になる(status-entry.js:1477-1479)。
+   *   ＝**会場が同期していないときほど、その診断が消える**という逆立ちした構造だった。
+   *   この行は「会場が鏡を受け取れているか」を測るものなので、
+   *   配信の有無に関係なく出せなければ意味がない。
+   *   ★観測ゼロなら空文字=行ごと出ないので、普段の速報は汚さない。
+   */
+  try {
+    const miLine = String(/** @type {any} */ (venueSeatsDiag)?.mirrorIntakeLine || '');
+    if (miLine) lines.push(miLine);
+  } catch {
+    /* no-op */
   }
   if (overviewText) {
     lines.push('### 概要');
@@ -252,6 +344,26 @@ export function buildAiShareFullText({ overviewText, livesData, fastDiag, popupD
     } catch {
       /* no-op */
     }
+    /*
+     * ★v0.1.1330: 読み上げは【到達可能性 → 中身】の順に出す。
+     *   従来は中身(voiceDiag)だけを出しており、面を開いていないと化石値になり、
+     *   「開いていないだけ」なのか「壊れている」のかが区別できなかった
+     *   (これで3版ぶん空振りした)。常駐側の観測を先に出して、まずそこを断定する。
+     */
+    try {
+      // 時点→経過の変換はここで行う(判定側に時点フィールドを増やさない=timeAuthorityRegistry の方針)。
+      const _vCapturedAt = Number(/** @type {any} */ (voiceDiag)?.capturedAt) || 0;
+      const reach = judgeVoiceReachability({
+        // 常駐(content script)の観測は fastDiag.content 配下に届く(他の content 計器と同じ経路)。
+        venueOpen: fastDiag?.content?.voiceReachRaw?.venueOpen === true,
+        diagAgeMs: _vCapturedAt > 0 ? Math.max(0, Date.now() - _vCapturedAt) : -1,
+        diagSource: /** @type {any} */ (voiceDiag)?.source,
+        diagEnabled: /** @type {any} */ (voiceDiag)?.enabled
+      });
+      if (reach.line) lines.push(reach.line);
+    } catch {
+      /* no-op */
+    }
     // v0.1.852: 会場モードの読み上げ診断(使用時のみ)。「たまに遅れる」の切り分け材料を AI 共有に載せる。
     try {
       const vStr = buildVoiceDiagLine(voiceDiag, Date.now());
@@ -264,6 +376,28 @@ export function buildAiShareFullText({ overviewText, livesData, fastDiag, popupD
     try {
       const vpLine = String(/** @type {any} */ (venueSeatsDiag)?.laneParity?.line || '');
       if (vpLine) lines.push(vpLine);
+    } catch {
+      /* no-op */
+    }
+    /*
+     * ★v0.1.1347: 会場のアイコン実績と、診断そのものの到達を出す。
+     *   ユーザー報告「サムネイルが会場モードで出てない。これも計器に入ってないの?」
+     *   → 入っていなかった。速報の avatarLoadDiag は popup の数字だけで、
+     *     会場(別バンドル)の成否は venueSeatsDiag.avatarProbe にしか無く、
+     *     しかも実測では venueSeatsDiag:null で1文字も出ていなかった。
+     *   ★上の行は `if (line)` なので【届いていないときほど消える】。
+     *     だから「届いていない」こと自体を名指しする行を別に出す。
+     */
+    try {
+      const vsd = /** @type {any} */ (venueSeatsDiag);
+      const avLine = formatVenueAvatarLine(vsd?.avatarProbe);
+      if (avLine) lines.push(avLine);
+      const reachLine = formatVenueDiagReachLine({
+        venueOpen: fastDiag?.content?.voiceReachRaw?.venueOpen === true,
+        venueSeatsDiag: vsd,
+        diagAgeMs: vsd?.lastUpdateAt > 0 ? Date.now() - Number(vsd.lastUpdateAt) : -1
+      });
+      if (reachLine) lines.push(reachLine);
     } catch {
       /* no-op */
     }
@@ -487,6 +621,25 @@ export function buildAiShareFullText({ overviewText, livesData, fastDiag, popupD
     if (lightLine) { lines.push(lightLine); lines.push(''); }
   } catch { /* no-op: 計器の失敗は状態速報を壊さない */ }
   /*
+   * ★v0.1.1377: popup で起きた例外(バグ検出の本命)。
+   *   旧実装は popup の error/unhandledrejection を握り潰すだけで記録しておらず、
+   *   ★一番見る画面の例外が【どこにも残らなかった】。ここに出して初めて気づける。
+   *   0件でも「観測中」と出す=沈黙と正常を区別する([[zero-count-may-mean-unmeasured-2026-08-04]])。
+   */
+  try {
+    const errLine = String((popupDiag?.popup ?? popupDiag)?.popupErrorProbe?.line || '');
+    if (errLine) { lines.push(errLine); lines.push(''); }
+  } catch { /* no-op: 計器の失敗は状態速報を壊さない */ }
+  /*
+   * ★v0.1.1378: サムネ/ID/アカウント名の取得率(ユーザー確定「これが価値高い」)。
+   *   ★分母は【取れるはずの人=数値ID保持者】。匿名は仕様上ありえないので対象外にする
+   *   =匿名中心の配信で永久に赤くなる(読んでも直せない)計器にしない。
+   */
+  try {
+    const idLine = String((popupDiag?.popup ?? popupDiag)?.identityAcquisition?.line || '');
+    if (idLine) { lines.push(idLine); lines.push(''); }
+  } catch { /* no-op: 計器の失敗は状態速報を壊さない */ }
+  /*
    * ★v0.1.1278: 点滅追跡の計器7行(vanishForensics / hostAncestryTrace /
    *   hostStyleTrace / hostHideReason / hostRecoveryDiag / hostVisWatch /
    *   hostFlipCensus)を速報から外した。点滅は Side Panel 移行(v0.1.1275)で
@@ -517,6 +670,14 @@ export function buildAiShareFullText({ overviewText, livesData, fastDiag, popupD
   try {
     const nsRaceLine = String((popupDiag?.popup ?? popupDiag)?.northStarMirrorPublishRace?.line || '');
     if (nsRaceLine) lines.push(nsRaceLine);
+  } catch {
+    /* no-op: 自己診断の失敗は状態速報を壊さない */
+  }
+  // 2026-08-08: サイドパネルの自己診断(黒画面の切り分け)。パネル自身が3層の塗り状態を
+  //   storage に書く=ユーザーが DevTools を開かずに原因が分かる。開いていなければ出ない。
+  try {
+    const spLine = String(sidepanelSelfDiag?.line || '');
+    if (spLine) lines.push(spLine);
   } catch {
     /* no-op: 自己診断の失敗は状態速報を壊さない */
   }
@@ -572,4 +733,23 @@ export function buildAiShareFullText({ overviewText, livesData, fastDiag, popupD
     lines.push('未取得。ニコ生 watch を開いた状態で拡張ポップアップの「AI診断コピー」を一度押すと、ここに集約されます。');
   }
   return lines.join('\n');
+}
+
+
+/**
+ * ★v0.1.1391: popup スナップショットの「起動からの経過ms」。
+ *   exportedAt(採取時刻) - popupBootAtIso(起動時刻)。どちらか欠ければ null。
+ *   ＝起動直後(数百ms)の値で「描画されていない」と断定しないための材料。
+ * @param {any} popupSnap
+ * @returns {number|null}
+ */
+export function popupSnapshotAgeMs(popupSnap) {
+  try {
+    const boot = Date.parse(String(popupSnap?.loadShadeProbe?.popupBootAtIso || ''));
+    const exported = Date.parse(String(popupSnap?.exportedAt || ''));
+    if (!Number.isFinite(boot) || !Number.isFinite(exported)) return null;
+    return Math.max(0, exported - boot);
+  } catch {
+    return null;
+  }
 }

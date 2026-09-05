@@ -49,6 +49,39 @@ describe('adLanePicksFromRooms', () => {
     expect(out[0].displaySrc).toBe('https://cdn.test/real.png');
   });
 
+  /*
+   * ★v0.1.1307(2026-08-10 実機 lv351140568): 公式が「アイコン未設定」と言っている行では
+   *   ③の CDN 導出をしない。導出すると必ず404になり、壊れ画像=白丸が並ぶ(10件中7件が該当)。
+   *   実測: uid=138442683(未設定)の導出URL=404 / uid=38947059(設定済)=200。
+   */
+  it('hasNoIcon の行は CDN 導出をせずゆっくり顔に落とす(404の白丸を作らない)', () => {
+    const out = adLanePicksFromRooms(
+      [{ userKey: '138442683', nickname: 'アンワル・ビン・イブラヒム', count: 67039, rankHint: 1, hasNoIcon: true }],
+      io
+    );
+    expect(out[0].displaySrc).toBe('yukkuri:138442683');
+    expect(out[0].displaySrc).not.toContain('usericon'); // 404 になる導出URLを出していない
+    expect(out[0].entry.userId).toBe('138442683'); // リンクは維持(本人ページへは飛べる)
+  });
+
+  it('hasNoIcon でも観測済みの実サムネ(②)があればそちらを使う', () => {
+    const out = adLanePicksFromRooms(
+      [{ userKey: '138442683', nickname: 'アンワル', count: 1, hasNoIcon: true }],
+      { ...io, resolveAvatarForUid: () => 'https://cdn.test/observed.png' }
+    );
+    expect(out[0].displaySrc).toBe('https://cdn.test/observed.png');
+  });
+
+  it('hasNoIcon が無い行は従来どおり CDN 導出する(退化防止)', () => {
+    const out = adLanePicksFromRooms(
+      [{ userKey: '38947059', nickname: '足利尊氏', count: 24431 }],
+      io
+    );
+    expect(out[0].displaySrc).toBe(
+      'https://secure-dcdn.cdn.nimg.jp/nicoaccount/usericon/s/3894/38947059.jpg'
+    );
+  });
+
   it('名前も uid も無い行は飛ばす', () => {
     const out = adLanePicksFromRooms([{ userKey: '__anon_ad_3', nickname: '' }], io);
     expect(out).toHaveLength(0);

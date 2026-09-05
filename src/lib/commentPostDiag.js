@@ -34,24 +34,43 @@
  * }} CommentPostDiagState
  */
 
-/** 初期 コメント送信診断 state。 */
+import { makeInitialFromSchema, copyDiagBySchema } from './diagSchemaCopy.js';
+import { CANONICAL_TIME_FIELD } from './timeAuthority.js';
+
+/**
+ * ★フィールド表(唯一の正本)。HANDOFF-instrument-channels-2026-08-12.md §2 の必須5点セット①。
+ *   makeInitialCommentPostDiag はこの表から機械生成する(v1349 で導入・値は移行前と同一)。
+ *
+ * ★kind の使い分け: 'ms' は既定 -1(未計測)。「0=観測して0ms」と区別するため。
+ *   ただし lastTotalMs だけは移行前から既定 0 だったので default:0 を明示して**挙動同値**を保つ
+ *   (ここを -1 に変えると行の文言が変わる=v1349 の「挙動変更ゼロ」を破る。
+ *    意味の是正が要るなら別版で、ゴールデン出力の差分とセットで行うこと)。
+ *   lastEventAt も「時点(epoch)」であり所要msではないので既定 0。
+ *
+ * @type {import('./diagSchemaCopy.js').DiagSchema}
+ */
+export const COMMENT_POST_DIAG_SCHEMA = [
+  { name: 'attempts', kind: 'count' },
+  { name: 'okCount', kind: 'count' },
+  { name: 'failCount', kind: 'count' },
+  { name: 'timeoutCount', kind: 'count' },
+  { name: 'revertCount', kind: 'count' },
+  { name: 'totalRetryAttempts', kind: 'count' },
+  { name: 'lastTotalMs', kind: 'ms', default: 0 },
+  { name: 'lastOutcome', kind: 'text' },
+  { name: 'lastEventAt', kind: 'count', default: 0 },
+  { name: 'lastEchoMs', kind: 'ms' },
+  { name: 'avgEchoMs', kind: 'ms' },
+  { name: 'lastOptimisticPaintMs', kind: 'ms' },
+  { name: 'avgOptimisticPaintMs', kind: 'ms' },
+  { name: 'instantPaintRuns', kind: 'count' }
+];
+
+/** 初期 コメント送信診断 state(schema から機械生成)。 */
 export function makeInitialCommentPostDiag() {
-  return {
-    attempts: 0,
-    okCount: 0,
-    failCount: 0,
-    timeoutCount: 0,
-    revertCount: 0,
-    totalRetryAttempts: 0,
-    lastTotalMs: 0,
-    lastOutcome: '',
-    lastEventAt: 0,
-    lastEchoMs: -1,
-    avgEchoMs: -1,
-    lastOptimisticPaintMs: -1,
-    avgOptimisticPaintMs: -1,
-    instantPaintRuns: 0
-  };
+  return /** @type {CommentPostDiagState} */ (
+    /** @type {unknown} */ (makeInitialFromSchema(COMMENT_POST_DIAG_SCHEMA))
+  );
 }
 
 /**
@@ -130,31 +149,15 @@ export function commentPostOutcomeKindForResult(result) {
  * @returns {CommentPostDiagState & { capturedAt: number }}
  */
 export function buildCommentPostDiagSnapshot(diag, nowMs) {
-  const base = makeInitialCommentPostDiag();
-  const d = /** @type {any} */ (diag && typeof diag === 'object' ? diag : {});
-  /** @param {unknown} x @param {number} fallback @returns {number} */
-  const num = (x, fallback) => {
-    const n = Number(x);
-    return Number.isFinite(n) ? n : fallback;
-  };
+  // ★v0.1.1350: 個別列挙(14行の手書き)を廃止し schema の反復に置き換えた。
+  //   これで「schema にフィールドを足したのに snapshot に足し忘れる」事故が構造的に起きない
+  //   (失敗#3・2026-08-12 時点で6回踏んだ型)。挙動は移行前と同値(ゴールデン検査で担保)。
   const now = Number.isFinite(Number(nowMs)) ? Number(nowMs) : 0;
-  return {
-    attempts: num(d.attempts, base.attempts),
-    okCount: num(d.okCount, base.okCount),
-    failCount: num(d.failCount, base.failCount),
-    timeoutCount: num(d.timeoutCount, base.timeoutCount),
-    revertCount: num(d.revertCount, base.revertCount),
-    totalRetryAttempts: num(d.totalRetryAttempts, base.totalRetryAttempts),
-    lastTotalMs: num(d.lastTotalMs, base.lastTotalMs),
-    lastOutcome: String(d.lastOutcome || ''),
-    lastEventAt: num(d.lastEventAt, base.lastEventAt),
-    lastEchoMs: num(d.lastEchoMs, base.lastEchoMs),
-    avgEchoMs: num(d.avgEchoMs, base.avgEchoMs),
-    lastOptimisticPaintMs: num(d.lastOptimisticPaintMs, base.lastOptimisticPaintMs),
-    avgOptimisticPaintMs: num(d.avgOptimisticPaintMs, base.avgOptimisticPaintMs),
-    instantPaintRuns: num(d.instantPaintRuns, base.instantPaintRuns),
-    capturedAt: now
-  };
+  return /** @type {CommentPostDiagState & { capturedAt: number }} */ (
+    /** @type {unknown} */ (
+      copyDiagBySchema(COMMENT_POST_DIAG_SCHEMA, diag, { [CANONICAL_TIME_FIELD]: now })
+    )
+  );
 }
 
 /**

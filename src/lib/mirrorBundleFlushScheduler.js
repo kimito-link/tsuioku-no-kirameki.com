@@ -31,8 +31,10 @@ import { KEY_STORY_DIAG_MIRROR } from './storyDiagMirrorKey.js';
 
 const DEFAULT_MIN_GAP_MS = 3000;
 
-/** section → 旧 storage キー(同梱書き込み用)。読み手(②③)を無変更のまま同一 tick 一貫にするため。 */
-const SECTION_TO_LEGACY_KEY = /** @type {const} */ ({
+/** section → 旧 storage キー(同梱書き込み用)。読み手(②③)を無変更のまま同一 tick 一貫にするため。
+ *  ★v0.1.1344: export する。selfWrittenStorageKeys.js の登録漏れを機械照合するため
+ *  (鏡が4→9種に増えた際に登録が漏れ、自己フィードバックループが再発した)。 */
+export const SECTION_TO_LEGACY_KEY = /** @type {const} */ ({
   lane: KEY_LANE_MIRROR,
   statCards: KEY_STAT_CARDS_MIRROR,
   topSupporters: KEY_TOP_SUPPORTERS_MIRROR,

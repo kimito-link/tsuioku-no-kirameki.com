@@ -3,6 +3,11 @@
 import { buildVoiceReadingText, buildMergedVoiceText } from './voicevoxClient.js';
 import { isVoiceItemStale } from './voiceAgeGate.js';
 import { classifyVoiceSynthNull } from './voiceSynthFailure.js';
+import {
+  KEY_VOICE_ASSIGNMENTS,
+  KEY_VOICE_READ_NAME_ENABLED,
+  KEY_VOICE_READING_ENABLED
+} from './voiceKeys.js';
 import { classifyVoiceSynthFailureReason } from './voiceSynthFailureReason.js';
 import {
   computeVoiceCongestion,
@@ -24,6 +29,25 @@ import {
   computeSustainedPressureBoost, mergeVoiceSpeedBoost
 } from './voiceLagBudget.js';
 
+/**
+ * ★v0.1.1326: 生存確認の再試行バックオフ(ms)。初回失敗後にこの間隔で最大3回試す。
+ *
+ * なぜ増やしたか: 会場モードは content script → MV3 SW プロキシ経由で、SW のコールド
+ *   起床が既定タイムアウト(5000ms)に間に合わないことがある。従来は再試行1回だけで
+ *   諦めて「VOICEVOXが見つかりません」を出し、ボタンが OFF に戻っていた。
+ *   VOICEVOX が本当に未起動なら3回とも即座に refused で返るので、待ち時間は増えない
+ *   (待つのは「応答が遅いだけ」のときだけ=直したい状況とコストが一致する)。
+ */
+export const VOICE_ALIVE_RETRY_BACKOFF_MS = Object.freeze([0, 500, 1500]);
+
+/**
+ * ★v0.1.1327: 音声解錠(audio unlock)用の無音 WAV。
+ *   44バイトのヘッダのみ(データ0サンプル)= 実質無音・即座に終わる。
+ *   data: URI なので外部取得なし(CWS 審査の外部リソース規約に抵触しない)。
+ */
+export const SILENT_WAV_DATA_URI =
+  'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAgD4AAAB9AAACABAAZGF0YQAAAAA=';
+
 export class VoicePlayer {
   constructor(deps = {}) {
     this.storage = deps.storage;
@@ -36,9 +60,31 @@ export class VoicePlayer {
     this.onSkip = deps.onSkip || (() => {});
     this.isObsMode = deps.isObsMode || (() => false);
     this.audioConstructor = deps.audioConstructor;
+    /*
+     * ★v0.1.1327: 音声解錠(無音1回再生)専用のコンストラクタ。
+     *   既定は実ブラウザの Audio。audioConstructor と分けるのは、呼び出し側/テストが
+     *   audioConstructor の生成回数を「読み上げの再生回数」として数えているため
+     *   (ここを共用すると計測が1つズレる=実際に既存テストが赤くなった)。
+     */
+    this.unlockAudioConstructor =
+      deps.unlockAudioConstructor ||
+      (typeof globalThis !== 'undefined' && typeof globalThis.Audio === 'function'
+        ? globalThis.Audio
+        : null);
     this.createObjectURL = deps.createObjectURL;
     this.revokeObjectURL = deps.revokeObjectURL;
     this.fetchVoicevoxAlive = deps.fetchVoicevoxAlive;
+    /*
+     * ★v0.1.1326: 理由付きの生存確認。未配線(既存の呼び出し側・テスト)なら
+     *   従来の fetchVoicevoxAlive を包んで {ok, reason:'refused'} に均す=後方互換。
+     *   reason が要るのは表示だけなので、未配線でも挙動は壊れない。
+     */
+    this.probeVoicevoxAlive =
+      deps.probeVoicevoxAlive ||
+      (async () => {
+        const ok = await this.fetchVoicevoxAlive();
+        return { ok: !!ok, reason: ok ? '' : 'refused' };
+      });
     this.fetchVoiceStyleIds = deps.fetchVoiceStyleIds;
     this.fetchSynthesizeVoice = deps.fetchSynthesizeVoice;
     this.resolveVoice = deps.resolveVoice;
@@ -124,9 +170,11 @@ export class VoicePlayer {
     try { this.onDiag(this.diag); } catch { /* 計器は本体の再生を妨げない */ }
   }
 
-  get VOICE_READING_ENABLED_KEY() { return 'nls_voice_reading_enabled_v1'; }
-  get VOICE_ASSIGNMENTS_KEY() { return 'nls_voice_assignments_v1'; }
-  get VOICE_READ_NAME_KEY() { return 'nls_voice_read_name_enabled_v1'; }
+  // ★v0.1.1506: キー文字列の正本は voiceKeys.js。getter の【形は残し】戻り値だけ委譲する
+  //   (comeview-entry.js と二重定義になっていた。片方だけ直す事故を構造的に無くす)。
+  get VOICE_READING_ENABLED_KEY() { return KEY_VOICE_READING_ENABLED; }
+  get VOICE_ASSIGNMENTS_KEY() { return KEY_VOICE_ASSIGNMENTS; }
+  get VOICE_READ_NAME_KEY() { return KEY_VOICE_READ_NAME_ENABLED; }
 
   /**
    * @param {{ forceOn?: boolean }} [opts]
@@ -224,31 +272,109 @@ export class VoicePlayer {
     }
   }
 
+  /**
+   * ★v0.1.1327: クリックの「ユーザー操作」を【その場で】使って音声を解錠する。
+   *
+   * ■ なぜ要るか(ユーザー実機「一瞬ONになって戻ってしまう」)
+   *   Chrome は自動再生をブロックし、`audio.play()` は【ユーザー操作の延長】でしか
+   *   通らない。ところが enable() は
+   *     クリック → (生存確認 最大3回+バックオフ) → スタイル取得 → …数百ms〜数秒…
+   *     → 最初のコメント到着 → 合成 → ようやく audio.play()
+   *   という流れで、実際に鳴らす時点では**クリックから遠く離れている**。
+   *   すると NotAllowedError になり、再生パス(:612-617)が disable() を呼ぶため
+   *   「ONになった直後にOFFへ戻る」ように見えていた。
+   *   ★comeview(拡張ページ)は制約が緩く、会場(content script)だけで出る非対称の正体。
+   *
+   * ■ 何をするか
+   *   クリック直後の同期タイミングで、無音の短い音を1回 play() しておく。
+   *   これが通れば以後の play() は解錠済みとして扱われる(標準的な audio unlock 手法)。
+   *   失敗しても握りつぶす=従来どおり進む(悪化させない)。
+   *
+   * @returns {Promise<boolean>} 解錠できたか(できなくても enable は続行する)
+   */
+  async primeAudioUnlock() {
+    /*
+     * ★解錠用の Audio は【注入された audioConstructor を使わない】。
+     *   理由: 呼び出し側/テストは audioConstructor を「読み上げの再生」として数えており、
+     *   ここで1個増やすと再生パスの計測(fakeAudios[0] 等)がズレる=既存の
+     *   lagDecomposition テストが実際に赤くなった。解錠は再生とは別物なので分離する。
+     *   unlockAudioConstructor が無い環境(テスト等)では解錠をスキップする(害を出さない)。
+     */
+    const Ctor = this.unlockAudioConstructor;
+    if (typeof Ctor !== 'function') return false;
+    try {
+      const a = new Ctor();
+      // 無音(1サンプルの WAV)。外部リソースを取りに行かない=CWS 審査上も安全。
+      a.src = SILENT_WAV_DATA_URI;
+      a.volume = 0;
+      const p = a.play();
+      if (p && typeof p.then === 'function') await p;
+      try { a.pause(); } catch { /* no-op */ }
+      this._audioUnlocked = true;
+      return true;
+    } catch {
+      // ブロックされた=解錠できなかった。enable は続行し、鳴らす時に改めて判断する。
+      return false;
+    }
+  }
+
   async enable({ persist = true } = {}) {
     if (this.isObsMode() || this.toggleBusy) return;
     this.toggleBusy = true;
     this._emitToggle();
+    // ★v0.1.1327: 非同期処理に入る【前】に解錠する。ここが唯一「クリックの延長」に
+    //   居られる瞬間で、await を挟んだ後では手遅れになる。
+    await this.primeAudioUnlock();
     // v0.1.770: 起動待ちの表示は onLoadingState(状態)が所有する(遅延ガードで一瞬成功はチラつかせない)。
     //   onStatus(テキスト)は audio ブロック警告など臨時メッセージ専用に残す。
     this.onLoadingState('checking');
 
     // 2026-06-14: 会場モード(content script・SW プロキシ経由)では MV3 SW のコールド起床で
-    //   初回の生存確認がタイムアウトしやすい。初回失敗時に1回だけ再試行する(SW が起きた後の
-    //   2回目はほぼ通る)。VOICEVOX が本当に未起動なら2回とも失敗して従来どおり案内を出す。
-    let alive = await this.fetchVoicevoxAlive();
-    if (!alive) {
+    //   初回の生存確認がタイムアウトしやすい。初回失敗時に再試行する(SW が起きた後の
+    //   2回目はほぼ通る)。VOICEVOX が本当に未起動なら全部失敗して従来どおり案内を出す。
+    //
+    // ★v0.1.1326(ユーザー実機「押してもONにならない」の根治):
+    //   ① 再試行を 1回 → 3回(バックオフ 0/500/1500ms)。MV3 SW の起床が 5000ms でも
+    //      間に合わないことがあり、1回の再試行では取りこぼしていた。
+    //   ② 失敗しても【OFF を永続保存しない】(persist:false)。従来は disable({persist:true})
+    //      でユーザーの「ONにしたい」意思を storage に消しに行っており、これが
+    //      「押しても勝手にOFFに戻る」の直接原因だった。
+    //   ③ 失敗理由(timeout/refused/http-error)を画面に渡す。VOICEVOX が起動しているのに
+    //      「見つかりません」と言っていた誤案内の是正(ユーザー指摘「たちあがってるけどね」)。
+    let probe = await this.probeVoicevoxAlive();
+    if (!probe.ok) {
       this.onLoadingState('connecting');
-      alive = await this.fetchVoicevoxAlive();
+      for (const waitMs of VOICE_ALIVE_RETRY_BACKOFF_MS) {
+        if (waitMs > 0) await new Promise((r) => setTimeout(r, waitMs));
+        probe = await this.probeVoicevoxAlive();
+        if (probe.ok) break;
+      }
     }
-    if (!alive) {
-      this.disable({ persist: true });
-      this.onLoadingState('notfound');
+    if (!probe.ok) {
+      /*
+       * ★v0.1.1331: 失敗理由を【計器にも】残す。
+       *   従来は onLoadingState(画面表示)にしか渡しておらず、ユーザーが
+       *   「押しても一瞬で戻る」と報告しても、状態速報には理由が1文字も出なかった
+       *   =受け取った側(私)が原因を特定できず、推測で版を重ねることになった。
+       *   ★画面に出すだけの情報は、報告に乗らない=無いのと同じ。
+       */
+      this.diag.lastEnableFailReason = String(probe.reason || 'unknown');
+      this.diag.enableFailTotal = (Number(this.diag.enableFailTotal) || 0) + 1;
+      this._emitDiag();
+      // ★persist:false = ユーザーの意思を消さない。次に押せばまた試せる。
+      this.disable({ persist: false });
+      this.onLoadingState('notfound', probe.reason);
+      this.toggleBusy = false;
+      this._emitToggle();
       return;
     }
 
     this.styleIds = await this.fetchVoiceStyleIds();
     this.generation += 1;
     this.enabled = true;
+    // ★v0.1.1331: 成功したら理由を消す(古い失敗が残り続けて誤診させない)。
+    this.diag.lastEnableFailReason = '';
+    this._emitDiag();
     this.toggleBusy = false;
     this.onLoadingState('ready');
     this._emitToggle();
@@ -574,8 +700,18 @@ export class VoicePlayer {
               if (playResult && typeof playResult.catch === 'function') {
                 playResult.catch((err) => {
                   if (err && err.name === 'NotAllowedError') {
-                    this.onStatus('⚠️ブラウザにより音声がブロックされました。ボタンを押し直してください');
-                    this.disable({ persist: false });
+                    /*
+                     * ★v0.1.1327: ここで disable() しない。
+                     *   従来はブロックされるたびに読み上げを OFF に落としており、
+                     *   ユーザーには「ONにした直後に勝手に戻る」as見えていた(実機報告
+                     *   「一瞬ONになって戻ってしまう」)。
+                     *   ブロックは【この1件が鳴らせなかった】だけで、読み上げ機能が
+                     *   壊れたわけではない。次のコメントでは解錠済みかもしれない。
+                     *   ONのまま案内だけ出し、ユーザーがページを一度クリックすれば
+                     *   自然に復帰する(解錠は primeAudioUnlock でも試みている)。
+                     */
+                    this.diag.audioBlockedTotal = (Number(this.diag.audioBlockedTotal) || 0) + 1;
+                    this.onStatus('⚠️ブラウザが音声をブロックしています。ページのどこかを一度クリックすると鳴ります');
                   }
                   finish();
                 });

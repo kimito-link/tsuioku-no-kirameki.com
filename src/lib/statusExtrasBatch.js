@@ -39,9 +39,11 @@ import { KEY_BGM_PHASE_DIAG } from './bgmPhaseDiagKey.js';
 import { KEY_OP_SOUND_EFFECT_DIAG } from './opSoundEffectDiagKey.js';
 import { KEY_COMMENT_POST_DIAG } from './commentPostDiagKey.js';
 import { KEY_INSTANT_PUSH_DIAG } from './instantPushDiagKey.js';
+import { KEY_PANEL_WAKE_CURTAIN_DIAG } from './panelWakeCurtainDiagKey.js';
 import { KEY_CHANNEL_SWITCH_DIAG } from './channelSwitchDiagKey.js';
 import { KEY_HIGHLIGHT_LEDGER } from './highlightLedgerKey.js';
 import { KEY_SCORE_ANNOUNCE_DIAG } from './scoreAnnounceDiagKey.js';
+import { KEY_SIDEPANEL_SELF_DIAG } from './sidepanelSelfDiagKey.js';
 
 /**
  * 1回の chrome.storage.local.get で統合して読む21キー(いずれも単一キー get のみの項目)。
@@ -76,9 +78,11 @@ export const EXTRAS_BATCH_KEYS = [
   KEY_OP_SOUND_EFFECT_DIAG,
   KEY_COMMENT_POST_DIAG,
   KEY_INSTANT_PUSH_DIAG,
+  KEY_PANEL_WAKE_CURTAIN_DIAG,
   KEY_CHANNEL_SWITCH_DIAG,
   KEY_HIGHLIGHT_LEDGER,
-  KEY_SCORE_ANNOUNCE_DIAG
+  KEY_SCORE_ANNOUNCE_DIAG,
+  KEY_SIDEPANEL_SELF_DIAG
 ];
 
 /**
@@ -95,7 +99,8 @@ export const EXTRAS_BATCH_KEYS = [
  *   giftHistoryMirror: any, roomHeatMirror: any, sessionSummaryMirror: any,
  *   previewRenderAck: any, backfillLiveMetric: any, giftEffectDiag: any, milestoneEffectDiag: any,
  *   voiceEffectDiag: any, bgmPhaseDiag: any, opSoundEffectDiag: any, commentPostDiag: any,
- *   instantPushDiag: any, channelSwitchDiag: any, highlightLedger: any, scoreAnnounceDiag: any
+ *   instantPushDiag: any, channelSwitchDiag: any, highlightLedger: any, scoreAnnounceDiag: any, sidepanelSelfDiag: any
+ *   panelWakeCurtainDiag: any,
  * }}
  */
 export function pickExtrasBatchValues(bag, nowMs) {
@@ -123,8 +128,11 @@ export function pickExtrasBatchValues(bag, nowMs) {
     opSoundEffectDiag: b[KEY_OP_SOUND_EFFECT_DIAG] || null,
     commentPostDiag: b[KEY_COMMENT_POST_DIAG] || null,
     instantPushDiag: b[KEY_INSTANT_PUSH_DIAG] || null,
+    panelWakeCurtainDiag: b[KEY_PANEL_WAKE_CURTAIN_DIAG] || null,
     channelSwitchDiag: b[KEY_CHANNEL_SWITCH_DIAG] || null,
     highlightLedger: b[KEY_HIGHLIGHT_LEDGER] || null,
-    scoreAnnounceDiag: b[KEY_SCORE_ANNOUNCE_DIAG] || null
+    scoreAnnounceDiag: b[KEY_SCORE_ANNOUNCE_DIAG] || null,
+    // 2026-08-08: サイドパネルの自己診断(黒画面の切り分け用・sidepanel-entry.js が書く)。
+    sidepanelSelfDiag: b[KEY_SIDEPANEL_SELF_DIAG] || null
   };
 }

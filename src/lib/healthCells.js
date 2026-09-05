@@ -1,6 +1,33 @@
 // v0.1.1056: パリティ根本修正 Phase4(この修正自体が動いているかを診断シートで検証可能にする)。
 //   parityVerdict.js の世代パリティ判定を再利用(一方向 import・循環なし)。
 import { judgePreviewGenerationParity } from './parityVerdict.js';
+// ★v0.1.1362: 取り込みの律速判定は backfillBottleneck.js が正本(ここでは再判定しない)。
+import { judgeBackfillBottleneck } from './backfillBottleneck.js';
+// ★v0.1.1390(ユーザー要望の特化計器5種)。判定は各 lib が正本=ここは束ねるだけ。
+import { buildVoiceBubbleParity } from './voiceBubbleRealtimeParity.js';
+import { buildGiftAdPipeline } from './giftAdPipelineCensus.js';
+import { buildVenueModeCensus } from './venueModeCensus.js';
+// ★v0.1.1400: 速報に埋もれていた判定のセル化(在庫の棚卸し・14セル)。
+import { buildBuriedCells } from './buriedInstrumentCells.js';
+// ★v0.1.1403: 無音で死ぬ故障(カスタム音源全滅・読み上げON失敗など)を画面へ。
+import { buildSilentFailureCells } from './silentFailureCells.js';
+// ★v0.1.1404: 黒画面の当人(累計/合計/スリープ明け)とビルドの古さ。
+import { buildBlackScreenOwnerCells } from './blackScreenOwnerCells.js';
+import { buildBuildAgeCell } from './buildAgeCell.js';
+// ★v0.1.1406: 既存プローブを打ち手が変わる単位に割る(レーン/演出・送信)。
+import { buildLaneDetailCells } from './laneDetailCells.js';
+import { buildEffectDetailCells } from './effectDetailCells.js';
+// ★v0.1.1407: 公式値の取得実績 / 読み上げの内訳 / 外部APIの生死。
+import { buildNorthStarDetailCells } from './northStarDetailCells.js';
+import { buildVoiceDetailCells } from './voiceDetailCells.js';
+import { buildExternalFetchCells } from './externalFetchCells.js';
+// ★v0.1.1408: 最終弾(識別・操作音・BGM・記録の質・多タブ)。
+import { buildFinalDetailCells } from './finalDetailCells.js';
+/*
+ * ★v0.1.1412: 取得経路の劣化検出（「これから壊れそうか」を見る唯一のセル）。
+ *   他のセルは「いま壊れているか」を見るが、これは**壊れる前に鳴る**。
+ */
+import { buildSourceProvenanceCell, fromStorable, noteSource } from './sourceProvenance.js';
 
 /**
  * healthCells.js — status ファーストビューの「健全度セル」を作る純関数(v0.1.843)。
@@ -31,12 +58,35 @@ function num(x) {
 }
 
 /**
- * v0.1.1004: voiceDiag(会場読み上げ観測値)が「今の状態」と見なせる鮮度上限(ms)。
+ * v0.1.1004: voiceDiag(会場読み上げ観測値)を使って「live 固着判定をする」適用窓(ms)。
  *   会場が稼働中は comeview が頻繁に publishVoiceDiag するので capturedAt は新しい。これより古ければ
  *   会場非稼働(watch タブ無し/会場閉じた)=過去セッションの待機/沈黙が残存しているだけ=live 固着判定を
  *   しない(stale な「待機8・最終発話5.5日前」で🔴を誤発火しないため)。90秒=数十秒間隔の publish に余裕。
+ *
+ * ★v0.1.1367 改名(旧名 VOICE_DIAG_FRESH_MS): voiceDiag.js の同名定数と【役割が違う】。
+ *   ここ         = 判定を適用するか否かの境界。超えたら na('会場休止中') に落とす(実効90秒)。
+ *   voiceDiag.js = judgeValueFreshness に渡す【基準値】。化石値と出るのは実効10分。
+ *   ★同名ゆえ設計書(health-cells-4domains-DESIGN.md §9)は「一本化せよ」としていたが、
+ *   統合すると此処の境界が 90秒→60秒 に縮み v0.1.1004 の誤発火が戻る=退化。統合しないこと。
  */
-const VOICE_DIAG_FRESH_MS = 90 * 1000;
+const VOICE_LIVE_JUDGE_WINDOW_MS = 90 * 1000;
+
+/**
+ * ★v0.1.1360: 会場座席の観測がこれより古ければ【会場を開いていない】と見なす(na)。
+ *   実機で 737,644秒前(8.5日)の化石値が🟡warn のまま出続け、総合判定を「注意」に
+ *   引きずっていた。会場モードを開いていないのは異常ではないので色もスコアも付けない。
+ *   ★5分: 会場が開いていれば数秒ごとに publish されるので、5分空くのは「閉じた」で確定。
+ *     60秒〜5分は「開いているのに遅れている」=本物の warn として残す。
+ */
+const VENUE_SEATS_CLOSED_MS = 5 * 60 * 1000;
+
+/**
+ * ★v0.1.1360: ギフト/広告演出の観測がこれより古ければ【前回の配信の記録】と見なす(na)。
+ *   実機で 753,314秒前(8.7日)の「音漏れ1件」が🟡のまま出続け、総合判定を
+ *   「注意: ギフト演出/効果音」に引きずっていた。今日の配信の話ではないものを
+ *   今日の異常として出さない。★2時間: 同一配信中なら十分短い間隔で更新される。
+ */
+const GIFT_EFFECT_FOSSIL_MS = 2 * 60 * 60 * 1000;
 
 /**
  * % セル: value(0-100) と 80/40 閾値で level。value=null は na('—')。
@@ -148,9 +198,9 @@ function buildVoiceHealthCells(voiceDiag, nowMs) {
   // ★v0.1.1004 stale 誤検知の根治: voiceDiag が古い(comeview が長く書いていない=会場非稼働/
   //   watch タブ無し)ときは、queueNow/lastSpokenBase が過去セッションの値のまま残り「待機8・
   //   最終発話5.5日前」で🔴を誤発火する(番犬は発火していない=今まさに固着ではない)。
-  //   capturedAt が VOICE_DIAG_FRESH_MS より古ければ「今の状態は不明」として live 固着判定をしない。
+  //   capturedAt が VOICE_LIVE_JUDGE_WINDOW_MS より古ければ「今の状態は不明」として live 固着判定をしない。
   const capturedAt = num(snap.capturedAt) || 0;
-  const diagFresh = capturedAt > 0 && now > 0 ? now - capturedAt <= VOICE_DIAG_FRESH_MS : true;
+  const diagFresh = capturedAt > 0 && now > 0 ? now - capturedAt <= VOICE_LIVE_JUDGE_WINDOW_MS : true;
 
   // ① 読み上げ追従(タイミング)。判定は【今の状態】を最優先にする(v0.1.895)。
   //   重要: playbackTimeoutTotal は【累計】=一度でも再生TO/固着回復が起きると永久に増えたまま。
@@ -210,9 +260,10 @@ function buildVoiceHealthCells(voiceDiag, nowMs) {
  *
  * @param {(import('./venueSeatsDiag.js').VenueSeatsDiagState & { capturedAt?: number })|null|undefined} venueSeatsDiag
  * @param {number} nowMs 更新 ago の算出用(現在時刻)
+ * @param {boolean} [freshVenueOpen] v1396: いま会場が開いているか(古い snap 以外の情報源から)
  * @returns {HealthCell[]}
  */
-function buildVenueSeatsHealthCells(venueSeatsDiag, nowMs) {
+function buildVenueSeatsHealthCells(venueSeatsDiag, nowMs, freshVenueOpen) {
   const snap = venueSeatsDiag && typeof venueSeatsDiag === 'object' ? venueSeatsDiag : null;
   if (!snap) return [];
   const enabled = !!snap.enabled;
@@ -245,9 +296,55 @@ function buildVenueSeatsHealthCells(venueSeatsDiag, nowMs) {
     out.push(stateCell('venue-broadcaster', '配信者混入', 'ok', 'なし'));
   }
 
-  // ② 会場座席(固着検出+稼働状況)。更新が古い=会場が止まっている兆候。
+  /*
+   * ② 会場座席(固着検出+稼働状況)。更新が古い=会場が止まっている兆候。
+   *
+   * ★v0.1.1360: 「会場を閉じている」と「会場が固まっている」を分ける。
+   *   実機(2026-08-12)は `会場座席 更新737644秒前`(=8.5日前)を🟡warn として出し続け、
+   *   総合判定まで「注意: 会場座席」に引きずっていた。会場モードを開いていないのだから
+   *   これは異常ではなく【対象外】。上限を設けずに warn にしていたため、化石値が
+   *   永久に黄色を出し続けていた([[status-report-fossil-value-guard]] と同じ型)。
+   *   ★60秒〜VENUE_SEATS_CLOSED_MS は「開いているのに遅れている」=本物の warn。
+   *     それより古い=会場が閉じている=na('—')にして色もスコアも付けない。
+   */
   const otherSuffix = otherCount > 0 ? `+他${otherCount}` : '';
-  if (sinceUpdateMs != null && sinceUpdateMs >= 60000) {
+  /*
+   * ★v0.1.1391(ユーザー実機):「会場ひらいてるけど『ひらいてません』ってでてます」
+   *
+   * ■ 何が嘘だったか
+   *   この判定は【計器の古さ】だけで「閉じている」と断定していた。
+   *   ところが会場が開いていても、この計器が書かれない/届かない状況はある
+   *   (実機の fastDiag は venueSeatsDiag:null のまま、画面には「会場参加者 15人」)。
+   *   ＝**計器が無い**ことを**会場が無い**と読み替えていた
+   *     ([[zero-count-may-mean-unmeasured-2026-08-04]] と同型)。
+   *
+   * ■ 直し方: 開いている【別の証拠】があるなら「閉じている」と言わない。
+   *   同じパネルの `venue-seats-visible`(会場席の網羅)は実DOM由来で、
+   *   実機では 356/356 描画=緑だった。**同じ画面の中で矛盾していた**。
+   *   証拠があるのに計器が古い場合は「閉じている」ではなく
+   *   【計器が届いていない】と正直に言う(直せる情報を出す)。
+   */
+  /*
+   * ★v0.1.1396(前版の直しが不十分だった): 「開いている証拠」を
+   *   **同じ古いスナップショット**から取ってはいけない。
+   *   v1395 は participants>0 を根拠にしたが、その participants 自体が
+   *   11日前の化石値だった → 実機で「計器が届いていません(944648秒前)」と
+   *   出続けた(＝閉じているのに開いている扱い)。
+   *   ★**古い値は自分の新しさを証明できない**。証拠は【別の新しい情報源】から取る。
+   *
+   *   ここでは freshVenueOpen(呼び出し側が今の状態を渡す)だけを信じる。
+   *   渡されていない(undefined)なら判定材料が無いので、従来どおり
+   *   「開いていません」に倒す(古い値で warn を居座らせない)。
+   */
+  const venueLooksOpen = freshVenueOpen === true;
+  if (sinceUpdateMs != null && sinceUpdateMs >= VENUE_SEATS_CLOSED_MS && venueLooksOpen) {
+    out.push(stateCell(
+      'venue-seats', '会場座席', 'warn',
+      `計器が届いていません(会場は開いています)`
+    ));
+  } else if (sinceUpdateMs != null && sinceUpdateMs >= VENUE_SEATS_CLOSED_MS) {
+    out.push(stateCell('venue-seats', '会場座席', 'na', '会場を開いていません'));
+  } else if (sinceUpdateMs != null && sinceUpdateMs >= 60000) {
     out.push(stateCell('venue-seats', '会場座席', 'warn', `更新${Math.round(sinceUpdateMs / 1000)}秒前`));
   } else {
     out.push(stateCell('venue-seats', '会場座席', 'ok', `${seatsShown}席/${participants}人${otherSuffix}`));
@@ -301,15 +398,33 @@ function buildVenueSeatsHealthCells(venueSeatsDiag, nowMs) {
 
   // ⑤ 2026-07-15 診断先行(venue-yukkuri-named-diagnose): 「名前ありゆっくり顔」実害計器。
   //   真因(桁レンジ境界)は意図的仕様のため修正しない。実害の有無だけを可視化する(赤にしない=warn止め)。
+  /*
+   * ★v0.1.1361: v1358 で計器に足した「ID無し(広告主・ゲスト)」をセルにも通す。
+   *
+   * ■ v1358 の片肺(=このセルが v1358 の修正を殺していた)
+   *   計器側は checkedNoUid / yukkuriNamedNoUid を数えるようにしたのに、
+   *   ここのゲートは `checked > 0` のままだった。広告列だけで症状が出ている配信では
+   *   checked=0 / checkedNoUid>0 になるため【セルごと出ない】。
+   *   件数も yukkuriNamed だけを見ており、ID無しの実害が 0件 と表示されていた。
+   *   ★[[unwired-judgement-is-systemic-2026-08-12]]: 判定はあるが配線されていない、の再発。
+   *   ★分母(検査した数)を text に必ず出す=「0件」が「異常なし」か「測っていない」か読み分けられる。
+   */
   const yn = /** @type {any} */ (snap).yukkuriNamedCensus;
-  if (yn && typeof yn === 'object' && num(yn.checked) > 0) {
-    const yukkuriNamed = Math.max(0, Math.floor(num(yn.yukkuriNamed) || 0));
+  const ynChecked =
+    Math.max(0, Math.floor(num(yn?.checked) || 0)) +
+    Math.max(0, Math.floor(num(yn?.checkedAnonymousStyle) || 0)) +
+    Math.max(0, Math.floor(num(yn?.checkedNoUid) || 0));
+  if (yn && typeof yn === 'object' && ynChecked > 0) {
+    const yukkuriNamed =
+      Math.max(0, Math.floor(num(yn.yukkuriNamed) || 0)) +
+      Math.max(0, Math.floor(num(yn.yukkuriNamedAnonymousStyle) || 0)) +
+      Math.max(0, Math.floor(num(yn.yukkuriNamedNoUid) || 0));
     out.push(
       stateCell(
         'venue-yukkuri-face',
         '名前ありゆっくり顔',
         yukkuriNamed > 0 ? 'warn' : 'ok',
-        yukkuriNamed > 0 ? `${yukkuriNamed}件` : 'なし'
+        yukkuriNamed > 0 ? `${yukkuriNamed}件/検${ynChecked}` : `なし(検${ynChecked})`
       )
     );
   }
@@ -365,11 +480,23 @@ function buildLaneHealthCells(laneDiag) {
 
 /**
  * 健全度セル配列を作る。
- * @param {{ livesData?: any[], fastDiag?: any, popupDiag?: any, voiceDiag?: any, venueSeatsDiag?: any, laneDiag?: any, giftEffectDiag?: any, milestoneEffectDiag?: any, previewRenderAck?: any, laneMirror?: any, nowMs?: number }} data
+ * @param {{ livesData?: any[], fastDiag?: any, popupDiag?: any, voiceDiag?: any, venueSeatsDiag?: any, laneDiag?: any, giftEffectDiag?: any, milestoneEffectDiag?: any, previewRenderAck?: any, laneMirror?: any, backfillLiveMetric?: any, nowMs?: number,
+ *   instantPushDiag?: any, commentPostDiag?: any, mainThreadBlocker?: any, liveElapsedMs?: number,
+ *   venueOpen?: boolean, venueMirrorAgeMs?: number, venueTiers?: any, venueHasGiftData?: boolean,
+ *   customSoundDiag?: any, buildId?: unknown, appVersion?: unknown,
+ *   opSoundEffectDiag?: any, bgmPhaseDiag?: any, sourceProvenanceStored?: any }} data
+ *   ★v0.1.1390 で追加した後半7つは、ユーザー要望の特化セル5種の入力
+ *   (読み上げ⇄吹き出し / コメント送信 / 会場モードの鮮度 / ギフト広告の通り道 / メインスレッド)。
  * @returns {HealthCell[]}
  */
 export function buildHealthCells(data) {
   const livesData = Array.isArray(data?.livesData) ? data.livesData : [];
+  // ★v0.1.1362: 取り込み律速セルの入力(KEY_BACKFILL_LIVE_METRIC の値そのまま)。
+  const backfillLiveMetric = data?.backfillLiveMetric ?? null;
+  //   nowMs は ago 算出用(テスト固定可能なように引数で受ける・未指定は実行時刻)。
+  //   ★関数の先頭で確定させる: 途中で宣言すると、それより前で使う判定が
+  //     「初期化前アクセス」で落ちる(v0.1.1362 の実装時に実際に踏んだ)。
+  const nowMs = Number.isFinite(Number(data?.nowMs)) ? Number(data.nowMs) : safeNow();
   const fast = data?.fastDiag?.content && typeof data.fastDiag.content === 'object' ? data.fastDiag.content : null;
   const gift = fast?.giftDiagnostics && typeof fast.giftDiagnostics === 'object' ? fast.giftDiagnostics : null;
   const obs = gift?.commentObservability || {};
@@ -462,6 +589,21 @@ export function buildHealthCells(data) {
     cells.push(stateCell('backfill', '過去ログ取得', 'na', '—'));
   }
 
+  /*
+   * 5-b. ★v0.1.1362: 取り込みの【律速】を1つ名指しする(設計 §C-1・MVP)。
+   *
+   * ■ なぜ「過去ログ取得: 取得中」だけでは足りないか(2026-08-12 ユーザー実機)
+   *   3000件が0.5件/秒で33%停滞したとき、律速3候補(裏タブ/譲りすぎ/空区画)の
+   *   数字は速報に出ていたが【どれが律速かは人間が毎回暗算していた】。
+   *   ★「計器をみれば解決しないなら測定値がひくい」(ユーザー確定の判定基準)。
+   *
+   * ★判定は backfillBottleneck.js が正本。ここは色と文言に載せ替えるだけ
+   *   (同じ観測値を2箇所で別々に判定しない=報告内矛盾の構造的封じ)。
+   * ★異常時必出: running=0 でも na セルを出す。if(値>0) で行ごと消さない。
+   */
+  const bfVerdict = judgeBackfillBottleneck(backfillLiveMetric, nowMs);
+  cells.push(stateCell('backfill-bottleneck', '取り込み律速', bfVerdict.level, bfVerdict.text));
+
   // 6. アバター解決率。観測0(intercept0)は na。
   //   v0.1.845: アバターは観測ユーザーの後を追って非同期取得=構造的に遅れて埋まる「追いつき」で、
   //   ハード失敗しない(時間で埋まる・status の対処候補も ⚪ 扱い)。よって ok 未満は warn でなく
@@ -553,12 +695,10 @@ export function buildHealthCells(data) {
   cells.push(pctCell('match', '記録↔公式一致', rates.length ? Math.min(...rates) : null, { okAt: 90, warnAt: 60, processing: ratesInProgress }));
 
   // 19-20. 会場モード読み上げ(タイミング・抜け漏れ)。voiceDiag 未使用なら空=セルを足さない。
-  //   nowMs は ago 算出用(テスト固定可能なように引数で受ける・未指定は実行時刻)。
-  const nowMs = Number.isFinite(Number(data?.nowMs)) ? Number(data.nowMs) : safeNow();
   for (const c of buildVoiceHealthCells(data?.voiceDiag, nowMs)) cells.push(c);
 
   // 21-22. 会場モード座席(配信者混入・固着)。venueSeatsDiag 未使用なら空=セルを足さない。
-  for (const c of buildVenueSeatsHealthCells(data?.venueSeatsDiag, nowMs)) cells.push(c);
+  for (const c of buildVenueSeatsHealthCells(data?.venueSeatsDiag, nowMs, data?.venueOpen)) cells.push(c);
 
   // 23. 応援レーン人数整合(素性 N / 表示 M)。laneDiag 未観測なら空=セルを足さない。
   for (const c of buildLaneHealthCells(data?.laneDiag)) cells.push(c);
@@ -571,6 +711,179 @@ export function buildHealthCells(data) {
 
   // 27. v0.1.1058: コメント数マイルストーンの「検知→演出→効果音」整合(milestoneEffectDiag 未観測なら空)。
   for (const c of buildMilestoneEffectHealthCells(data?.milestoneEffectDiag)) cells.push(c);
+
+  /* ────────────────────────────────────────────────────────────────
+   * ★v0.1.1390: ユーザー要望の特化セル(読み上げ/送信/会場/ギフト広告/メインスレッド)。
+   *   ★registry 登録と【同じ版】でここに足す。片方だけだと
+   *     「登録したのに画面に出ない」になる([[unwired-judgement-is-systemic-2026-08-12]])。
+   *   ★判定ロジックは各 lib(純関数・test 付き)が正本。ここは呼ぶだけ。
+   *   ★未観測なら push しない=「使っていないのに赤い」を作らない。
+   * ──────────────────────────────────────────────────────────────── */
+  // ① 読み上げ⇄吹き出しのリアルタイム一致(ユーザー:「よみあげと吹き出しはリアルタイム一致がいい」)
+  try {
+    const vb = buildVoiceBubbleParity({
+      voiceDiag: data?.voiceDiag ?? null,
+      instantPush: fast?.instantPushDiag ?? data?.instantPushDiag ?? null
+    });
+    if (vb.state !== 'unused') {
+      cells.push(stateCell(
+        'voice-bubble-parity', '読み上げ⇄吹き出し',
+        vb.state === 'bad' ? 'bad' : vb.state === 'warn' ? 'warn' : 'ok',
+        vb.gapMs == null ? '—' : `差${Math.abs(vb.gapMs)}ms`
+      ));
+    }
+  } catch { /* 計器の失敗でパネルを壊さない */ }
+
+  // ② コメント送信(従来は「操作音」等と混ざって埋もれていた)
+  try {
+    const cp = data?.commentPostDiag ?? null;
+    const attempts = Math.max(0, Math.floor(num(cp?.attempts) || 0));
+    if (attempts > 0) {
+      const okN = Math.max(0, Math.floor(num(cp?.okCount) || 0));
+      const failN = Math.max(0, Math.floor(num(cp?.failCount) || 0));
+      const toN = Math.max(0, Math.floor(num(cp?.timeoutCount) || 0));
+      cells.push(stateCell(
+        'comment-post', 'コメント送信',
+        failN + toN > 0 ? 'warn' : 'ok',
+        failN + toN > 0 ? `${okN}/${attempts}成功(失敗${failN}/締切${toN})` : `${okN}/${attempts}成功`
+      ));
+    }
+  } catch { /* no-op */ }
+
+  // ③ 会場モードの鮮度(会場は鏡ごしにしか見えない=古い鏡を会場の言葉で名指し)
+  try {
+    const vm = buildVenueModeCensus({
+      venueOpen: data?.venueOpen === true,
+      mirrorAgeMs: num(data?.venueMirrorAgeMs) || 0,
+      tiers: data?.venueTiers ?? null,
+      hasGiftData: data?.venueHasGiftData === true
+    });
+    if (vm.level !== 'na') {
+      cells.push(stateCell(
+        'venue-mode', '会場モードの鮮度', vm.level,
+        vm.mirrorState === 'fresh' ? '最新' : `${Math.round(vm.mirrorAgeMs / 1000)}秒前`
+      ));
+    }
+  } catch { /* no-op */ }
+
+  // ④ ギフト/広告の通り道(「取得中」のまま数分続くのは詰まり)
+  try {
+    const gp = buildGiftAdPipeline({
+      northStar: fast?.giftDiagnostics?.['北極星レーン'] ?? null,
+      giftEffect: data?.giftEffectDiag ?? null,
+      liveElapsedMs: num(data?.liveElapsedMs) || 0
+    });
+    const warnN = gp.stages.filter((x) => x.level === 'warn' || x.level === 'bad').length;
+    const okN2 = gp.stages.filter((x) => x.level === 'ok').length;
+    if (warnN + okN2 > 0) {
+      cells.push(stateCell(
+        'gift-ad-pipeline', 'ギフト/広告の通り道',
+        warnN > 0 ? 'warn' : 'ok',
+        warnN > 0 ? `${warnN}段で詰まり` : '通っています'
+      ));
+    }
+  } catch { /* no-op */ }
+
+  // ⑤ メインスレッド(黒くなる件の【当人】。速報は「探すこと」で終わっていた)
+  try {
+    const mt = data?.mainThreadBlocker ?? null;
+    if (mt && (num(mt.count) || 0) > 0) {
+      const worst = Math.round(num(mt.worstMs) || 0);
+      cells.push(stateCell(
+        'main-thread', 'メインスレッド',
+        worst >= 500 ? 'bad' : worst >= 200 ? 'warn' : 'ok',
+        `${String(mt.worstName || '?')} ${worst}ms`
+      ));
+    }
+  } catch { /* no-op */ }
+
+  // ★v0.1.1400: 埋もれていた判定を掘り起こす(未観測は返らない)。
+  try {
+    for (const c of buildBuriedCells(data)) cells.push(c);
+  } catch { /* 掘り起こしの失敗でパネル全体を壊さない */ }
+
+  /*
+   * ★v0.1.1403: 【無音で死ぬ】故障(判定は silentFailureCells.js が正本)。
+   *   既に測れているのに画面が無言だったものだけを扱う。
+   *   ここは観測が無くても ⚪「—」で必ず出す(掟5: 異常時ほど消えるのを防ぐ)。
+   */
+  try {
+    for (const c of buildSilentFailureCells(data)) cells.push(c);
+  } catch { /* 同上: 1系統の失敗でパネル全体を壊さない */ }
+
+  /*
+   * ★v0.1.1404: 黒画面の【当人】(blackScreenOwnerCells.js が正本)。
+   *   既存 main-thread は「最悪の1件」しか出さないので、
+   *   累計・合計・スリープ明けを別セルにして打ち手を分ける。
+   */
+  try {
+    for (const c of buildBlackScreenOwnerCells(data)) cells.push(c);
+  } catch { /* 同上 */ }
+
+  /*
+   * ★v0.1.1404: いま動いているビルドの古さ。
+   *   2026-08-14 に「7版届いていなかった」を8日間見逃した反省
+   *   (速報が自分の古さを言えば1往復で終わっていた)。
+   */
+  try {
+    cells.push(buildBuildAgeCell({
+      buildId: data?.buildId, version: data?.appVersion, nowMs: data?.nowMs || Date.now()
+    }));
+  } catch { /* 同上 */ }
+
+  /*
+   * ★v0.1.1406: 既存プローブの分解(laneDetailCells / effectDetailCells が正本)。
+   *   在庫の棚卸し=新しい観測は作らず、2〜3割しか読んでいなかった観測を
+   *   「打ち手が変わる単位」に割る。
+   */
+  try {
+    for (const c of buildLaneDetailCells(data)) cells.push(c);
+  } catch { /* 同上 */ }
+  try {
+    for (const c of buildEffectDetailCells(data)) cells.push(c);
+  } catch { /* 同上 */ }
+
+  /*
+   * ★v0.1.1407: 公式値の実績 / 読み上げの内訳 / 外部APIの生死。
+   *   ★読み上げは「使っていなければ出さない」(voiceDetailCells が空配列を返す)。
+   */
+  try {
+    for (const c of buildNorthStarDetailCells(data)) cells.push(c);
+  } catch { /* 同上 */ }
+  try {
+    for (const c of buildVoiceDetailCells(data)) cells.push(c);
+  } catch { /* 同上 */ }
+  try {
+    for (const c of buildExternalFetchCells(data)) cells.push(c);
+  } catch { /* 同上 */ }
+
+  // ★v0.1.1408: 最終弾(識別・操作音・BGM・記録の質・多タブ)。
+  try {
+    for (const c of buildFinalDetailCells(data)) cells.push(c);
+  } catch { /* 同上 */ }
+
+  /*
+   * ★v0.1.1412: 取得経路の劣化（ニコ生が構造を変えた予兆）。
+   *
+   *   ★入力は **既に publish 済みの値**だけを使う（新しい read を増やさない）。
+   *     - `sourceProvenanceStored`: 前回までの経路の履歴（storage 由来）
+   *     - 各配信の `viewerCountSource`: content が既に付けている 'ws'|'embedded'|'dom'
+   *   ＝ 診断が本体より重くならないようにする（observer effect の回避）。
+   */
+  try {
+    const provState = fromStorable(data?.sourceProvenanceStored);
+    const lives = Array.isArray(data?.livesData) ? data.livesData : [];
+    for (const lv of lives) {
+      if (!lv) continue;
+      // ★配信ごとに別フィールドにはしない（同じ「視聴者数の取り方」を見たい）
+      noteSource(provState, {
+        field: 'viewerCount',
+        source: lv.viewerCountSource,
+        at: num(lv.watchSnapshotAt) || num(data?.nowMs) || Date.now()
+      });
+    }
+    cells.push(buildSourceProvenanceCell(provState));
+  } catch { /* 同上 */ }
 
   return cells;
 }
@@ -647,6 +960,18 @@ function buildGiftEffectHealthCells(giftEffectDiag) {
     : 0; // 効果音OFFは鳴らないのが正常=不合格にしない(誤診断防止)
 
   const missing = throwMissing + soundMissing;
+  /*
+   * ★v0.1.1360: 化石値で🟡を出し続けない。
+   *   実機(2026-08-12)は `最終753314秒前`(=8.7日前)の観測なのに「音漏れ1件」で
+   *   🟡を出し、総合判定まで「注意: ギフト演出/効果音」に引きずっていた。
+   *   ★今日の配信の話ではないものを今日の異常として出さない。
+   *   古い観測は na('—') にして色もスコアも付けない(数字自体は速報の本文に残る)。
+   */
+  const lastEventAt = num(snap.lastEventAt) || 0;
+  const ageMs = lastEventAt > 0 ? Date.now() - lastEventAt : null;
+  if (ageMs != null && ageMs >= GIFT_EFFECT_FOSSIL_MS) {
+    return [stateCell('gift-effect', 'ギフト演出/効果音', 'na', `前回の配信の記録(${Math.round(ageMs / 86400000)}日前)`)];
+  }
   const detail =
     missing > 0
       ? `演出漏れ${throwMissing}件・音漏れ${soundMissing}件`

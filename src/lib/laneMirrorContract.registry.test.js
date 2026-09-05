@@ -66,9 +66,17 @@ describe('KEY_LANE_MIRROR 消費者登録簿の同期', () => {
   });
 
   it('★書き手は popup-entry.js と mirrorBundleFlushScheduler.js だけ(passive は書かない)', () => {
+    /*
+     * ★v0.1.1300: 配信ごとキー(v2)+受領証の書き出し口を lib へ抽出したので writer が1つ増えた。
+     *   ★書き手の【主体】は増えていない: laneMirrorPerLivePublish.js は popup-entry.js の
+     *     publishLaneMirror から1回だけ呼ばれる storage I/O グルーで、
+     *     独自に鏡を生成したり別 tick で書いたりしない
+     *     (呼び出しが1箇所であることは laneMirrorPerLiveWiring.wiring.test.js が数で固定する)。
+     */
     const writers = LANE_MIRROR_CONSUMERS.filter((c) => c.role === 'writer').map((c) => c.file).sort();
     expect(writers).toEqual([
       'src/extension/popup-entry.js',
+      'src/lib/laneMirrorPerLivePublish.js',
       'src/lib/mirrorBundleFlushScheduler.js'
     ]);
   });

@@ -103,6 +103,15 @@ export function buildStatusFastDiagLite(payload) {
   //   どちらも samples がリング cap 済み(hostMove=8件/whiteout同型)で小さい=lite の軽さは保つ。
   const hostMoveDiag =
     content.hostMoveDiag && typeof content.hostMoveDiag === 'object' ? content.hostMoveDiag : null;
+  /*
+   * ★v0.1.1454 メモリ/DOM の逼迫。ここに通さないとユーザーのコピペに永久に出ない
+   *   ([[fastdiag-lite-is-the-printer-subset]]・v0.1.1124 hostMoveDiag と同じ穴)。
+   *   判定済みの小さなオブジェクト(数値6個+文字列1つ)なので lite の軽さは保つ。
+   */
+  const memoryPressure =
+    content.memoryPressure && typeof content.memoryPressure === 'object'
+      ? content.memoryPressure
+      : null;
   const scrollWhiteoutDiag =
     content.scrollWhiteoutDiag && typeof content.scrollWhiteoutDiag === 'object'
       ? content.scrollWhiteoutDiag
@@ -152,6 +161,7 @@ export function buildStatusFastDiagLite(payload) {
         ndgrConnectStatus: String(net.ndgrConnectStatus || '')
       },
       hostMoveDiag,
+      memoryPressure,
       scrollWhiteoutDiag,
       styleReattach,
       venueSeatsDiag: venueSeatsDiagLite

@@ -12,12 +12,18 @@
  *   3. dist の各 .js が manifest.json より新しい (build 忘れ検出)
  *   4. popup.js が popup-entry.js のシンボル（`applyStoryGrowthIconAttributes` 等）を含む
  *   5. flamboyant worktree が同じ commit にいる（本体 pull 漏れ検出）
+ *   6. 紹介LP の掲載【版数】が package と一致（版数表記は常に追従）
+ *   7. ★紹介LP の掲載【内容】が何版ぶん止まっているか（警告のみ・載せることは強制しない）
  *
  * 失敗したら exit 1。CI でも手元でも回せる。
  */
 
 import fs from 'node:fs';
 import path from 'node:path';
+import {
+  judgeLpContentStaleness,
+  formatLpStalenessLine
+} from '../src/lib/lpContentStaleness.js';
 import { execSync } from 'node:child_process';
 import { EXTENSION_CHANGELOG } from '../src/lib/changelog.js';
 import { checkChangelogConsistency } from '../src/lib/changelogConsistency.js';
@@ -224,9 +230,37 @@ console.log(`\n[6] 紹介LP の掲載版数が package と一致`);
   }
 }
 
+// [7] ★紹介LP の「掲載内容」が何版ぶん止まっているか
+//    2026-08-23: [6](版数)は完全に一致していたのに、★本文は242版ぶん止まっていた。
+//    LPを触った直近40コミットが【すべて4行だけ】＝[6]が見ている4箇所だけが動き、
+//    ★機械が見ていない本文は一度も動かなかった。
+//    ★ここは fail にしない。「載せないと赤」にすると LP が計器の羅列になり、
+//      ユーザーに関係のない版まで載せる動機を作ってしまう（＝LPの価値が下がる）。
+//      判定は src/lib/lpContentStaleness.js（純関数・19テスト・毒で赤を確認済み）。
+console.log(`
+[7] 紹介LP の掲載内容の鮮度（★警告のみ）`);
+{
+  const lpPath = path.join(ROOT, 'tsuioku-no-kirameki/index.html');
+  if (!fs.existsSync(lpPath)) {
+    log.warn('紹介LP が見つからない（tsuioku-no-kirameki/index.html）');
+  } else {
+    const verdict = judgeLpContentStaleness({
+      html: fs.readFileSync(lpPath, 'utf8'),
+      currentVersion: pkg.version
+    });
+    const line = formatLpStalenessLine(verdict);
+    if (verdict.state === 'fresh') {
+      log.ok(line);
+    } else {
+      // ★stale も unknown も warn。unknown を緑にはしない。
+      for (const row of line.split('\n')) log.warn(row);
+    }
+  }
+}
+
 console.log();
 if (failed > 0) {
   console.log(`\x1b[31m✗ ${failed} 件失敗。ship 前に解消してください。\x1b[0m`);
   process.exit(1);
 }
-console.log('\x1b[32m✓ 全 6 ステップ OK。Chrome をリロードすれば反映されるはず。\x1b[0m');
+console.log('\x1b[32m✓ 全 7 ステップ OK。Chrome をリロードすれば反映されるはず。\x1b[0m');

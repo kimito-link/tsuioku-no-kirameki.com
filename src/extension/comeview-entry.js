@@ -19,8 +19,19 @@
 
 import {
   commentsStorageKey,
+  KEY_COMEVIEW_WINDOW_GEOMETRY,
+  KEY_LAST_WATCH_URL,
   KEY_USER_COMMENT_PROFILE_CACHE
 } from '../lib/storageKeys.js';
+import {
+  KEY_VOICE_ASSIGNMENTS,
+  KEY_VOICE_READ_NAME_ENABLED,
+  KEY_VOICE_READING_ENABLED
+} from '../lib/voiceKeys.js';
+import {
+  buildComeviewWindowOptions,
+  pickComeviewGeometryToSave
+} from '../lib/comeviewWindowGeometry.js';
 import { tailStorageKey } from '../lib/commentTailBuffer.js';
 import { readChunkedComments } from '../lib/commentChunkStore.js';
 import {
@@ -72,10 +83,12 @@ import { resolveVoiceForUser } from '../lib/voiceAssignment.js';
 import {
   buildMergedVoiceText,
   buildVoiceReadingText,
-  isVoicevoxAlive,
   listVoicevoxStyleIds,
+  probeVoicevoxAlive,
   synthesizeVoice
 } from '../lib/voicevoxClient.js';
+// ★v0.1.1329: 会場と同じ「再試行バックオフ」「無音WAV」をコメビュでも使う(二重定義しない)。
+import { VOICE_ALIVE_RETRY_BACKOFF_MS, SILENT_WAV_DATA_URI } from '../lib/voicePlayer.js';
 import {
   computeVoiceCongestion,
   mergeRepeatedVoiceItem,
@@ -84,12 +97,14 @@ import {
 } from '../lib/voiceReadQueue.js';
 import { makeInitialVoiceDiag, buildVoiceDiagSnapshot } from '../lib/voiceDiag.js';
 import { KEY_VOICE_DIAG } from '../lib/voiceDiagKey.js';
+import { classifyVoiceSynthFailureReason } from '../lib/voiceSynthFailureReason.js';
 import {
   upgradeAnonymousAvatarImage,
   upgradeAnonymousAvatarImages
 } from '../lib/avatarPartsComposer.js';
 import { isVoiceItemStale } from '../lib/voiceAgeGate.js';
 import { runStorageOpWithTimeout } from '../lib/storageOpTimeout.js';
+import { diffComeviewTimeline } from '../lib/comeviewTimelineDiff.js';
 import {
   shouldRenderLoading,
   resolveVoiceLoadingView,
@@ -109,11 +124,30 @@ const RECONCILE_INTERVAL_MS = 60_000;
  *   を防ぐ。RECONCILE_INTERVAL_MS(60s)より十分短くし、次の tick で自然に再試行される範囲にする。
  */
 const FULL_REFRESH_STORAGE_TIMEOUT_MS = 8000;
-const KEY_LAST_WATCH_URL = 'nls_last_watch_url';
-const VOICE_READING_ENABLED_KEY = 'nls_voice_reading_enabled_v1';
-const VOICE_ASSIGNMENTS_KEY = 'nls_voice_assignments_v1';
+/**
+ * ★v0.1.1321: 起動経路(main)の storage read を有界化する上限。
+ *
+ * ■ なぜ 1.5 秒か
+ *   ここで読むのは【小さな単一キー】(最終watch URL / 読み上げ設定 / NGリスト)で、
+ *   空いていれば数ms〜数十msで返る。1.5秒待って返らない＝storage が混んでいる状態なので、
+ *   待ち続けるより【まず画面を出す】ほうが良い(取れなかった値は onChanged や
+ *   後続の再読み込みで自動的に追いつく)。
+ *   ★full refresh(8秒)より短くする: あちらは本体データで「取れないと意味が無い」が、
+ *     こちらは設定値で「取れなくても画面は出せる」＝止めてよい理由が無い。
+ */
+const COMEVIEW_BOOT_READ_TIMEOUT_MS = 1500;
+/** ★v0.1.1321: onChanged の二重登録防止(キーを動的に引くので1回張れば足りる)。 */
+let _storageChangesWired = false;
+/*
+ * ★v0.1.1506: キー文字列の再定義をやめ、正本から import する。
+ *   ここには storageKeys.js:14 の KEY_LAST_WATCH_URL と、voicePlayer.js:168-170 の
+ *   読み上げ3キーが【二重定義】されていた＝片方だけ直す事故を生む形だった。
+ *   正本1つ・コピーを散らさない(github/CLAUDE.md の原則)。
+ */
+const VOICE_READING_ENABLED_KEY = KEY_VOICE_READING_ENABLED;
+const VOICE_ASSIGNMENTS_KEY = KEY_VOICE_ASSIGNMENTS;
 /** v0.1.699: 名前(ハンドルネーム)も読むか。既定OFF=本文だけ読む(ユーザー要望)。 */
-const VOICE_READ_NAME_KEY = 'nls_voice_read_name_enabled_v1';
+const VOICE_READ_NAME_KEY = KEY_VOICE_READ_NAME_ENABLED;
 
 let _liveId = '';
 let _paused = false;
@@ -234,13 +268,24 @@ function publishVoiceDiag() {
     const now = Date.now();
     if (now - _voiceDiagLastWriteAt < 3000) return; // 3秒 min-gap=書き過ぎない。
     _voiceDiagLastWriteAt = now;
-    const snap = buildVoiceDiagSnapshot(_voiceDiag, now);
+    // ★v0.1.1328: どの面が書いたかを残す(会場は 'venue' を書いている)。
+    //   化石値を見たとき「どちらの実装のものか」が分からないと調査が始められない。
+    const snap = { ...buildVoiceDiagSnapshot(_voiceDiag, now), source: 'comeview' };
     chrome.storage.local.set({ [KEY_VOICE_DIAG]: snap }).catch(() => {
       /* best-effort: storage 不可・context 消失 */
     });
   } catch {
     /* no-op */
   }
+}
+
+/** 会場と同じ分類で、合成失敗の理由を1件記録する。 */
+function recordVoiceSynthFailureReason(info) {
+  try {
+    const reason = classifyVoiceSynthFailureReason(info);
+    const bag = _voiceDiag.synthFailReasons || (_voiceDiag.synthFailReasons = {});
+    bag[reason] = (Number(bag[reason]) || 0) + 1;
+  } catch { /* 計器の失敗は読み上げを止めない */ }
 }
 
 /** @type {Array<{key:string,name:string,at:number}>} ユーザーNG リスト(storage 永続)。 */
@@ -286,12 +331,30 @@ function resolveLiveIdFromUrl() {
 
 async function resolveLiveIdFromStorage() {
   try {
-    const bag = await chrome.storage.local.get(KEY_LAST_WATCH_URL);
-    const url = String(bag[KEY_LAST_WATCH_URL] || '');
+    /*
+     * ★v0.1.1321: 有界化する(コメビュが立ち上がらない実害の根治)。
+     *
+     * ■ 何が起きていたか(2026-08-11 実機)
+     *   過去ログ取り込み(backfill)中は storage が混み、この生の get が返らず
+     *   **main() がここで止まる**。画面は cvLiveMeta が静的既定の「—」のまま、
+     *   本文は「コメントを待っています…」で固まる＝「立ち上がらない」に見えていた。
+     *   (実際 storage が空くと自力で立ち上がった＝壊れてはいなかった)
+     *   ★同型の事故は v0.1.784「storage stall でコメビュが凍結する不具合を根治」で
+     *     一度手当てされているが、**起動経路は素通しのまま残っていた**。
+     *
+     * ■ 直し方: 待ち切らない。取れなければ空を返し、後続の onChanged
+     *   (nls_last_watch_url の変化→switchToLiveId)が拾って自動で追いつく。
+     *   ＝**まず画面を出して、データは後から**。
+     */
+    const bag = await runStorageOpWithTimeout(
+      () => chrome.storage.local.get(KEY_LAST_WATCH_URL),
+      COMEVIEW_BOOT_READ_TIMEOUT_MS
+    );
+    const url = String(bag?.[KEY_LAST_WATCH_URL] || '');
     const m = url.toLowerCase().match(/lv\d{1,15}/);
     if (m) return m[0];
   } catch {
-    /* no-op */
+    /* timeout/失敗は空で続行(起動を止めない) */
   }
   return '';
 }
@@ -361,15 +424,16 @@ function setVoiceStatus(message) {
 // v0.1.770 起動待ちの「楽しいローディング」(会議 2026-06-16・遅延ガードで一瞬成功はチラつかせない)。
 //   会場(venueBar)と同じ純関数(voiceLoadingState)を共用。文言だけ comeview 用。
 let _cvVoiceLoadingTimer = null;
-function renderCvVoiceLoading(state) {
+function renderCvVoiceLoading(state, reason) {
   const status = document.getElementById('cvVoiceStatus');
   if (!status) return;
-  const view = resolveVoiceLoadingView(state, 'comeview');
+  // ★v0.1.1329: 失敗理由で文言を出し分ける(timeout を「見つかりません」と言わない)。
+  const view = resolveVoiceLoadingView(state, 'comeview', reason);
   status.classList.toggle('is-loading', view.kind === 'loading');
   status.classList.toggle('is-error', view.kind === 'error');
   status.textContent = view.text;
 }
-function driveCvVoiceLoading(state) {
+function driveCvVoiceLoading(state, reason) {
   if (_cvVoiceLoadingTimer != null) {
     clearTimeout(_cvVoiceLoadingTimer);
     _cvVoiceLoadingTimer = null;
@@ -387,7 +451,7 @@ function driveCvVoiceLoading(state) {
     }, VOICE_LOADING_FLICKER_GUARD_MS);
     return;
   }
-  renderCvVoiceLoading(state);
+  renderCvVoiceLoading(state, reason);
 }
 
 function showVoiceSkipped(count) {
@@ -430,22 +494,63 @@ function disableVoiceReading({ persist = true } = {}) {
   if (persist) persistVoiceReadingEnabled(false);
 }
 
+/**
+ * ★v0.1.1329: 音声解錠(会場の primeAudioUnlock と同じ手法をコメビュにも)。
+ *   クリック直後に無音を1回鳴らして、以後の play() を解錠しておく。
+ *   失敗しても握って続行する(悪化させない)。
+ * @returns {Promise<boolean>}
+ */
+async function primeCvAudioUnlock() {
+  try {
+    if (typeof Audio !== 'function') return false;
+    const a = new Audio();
+    a.src = SILENT_WAV_DATA_URI;
+    a.volume = 0;
+    const p = a.play();
+    if (p && typeof p.then === 'function') await p;
+    try { a.pause(); } catch { /* no-op */ }
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 async function enableVoiceReading({ persist = true } = {}) {
   if (isObsMode() || _voiceToggleBusy) return;
   _voiceToggleBusy = true;
   updateVoiceToggle();
   // v0.1.770: 起動待ちは状態駆動の楽しいローディング(遅延ガードで一瞬成功はチラつかせない)。
   driveCvVoiceLoading('checking');
-  // v0.1.770: 会場(VoicePlayer)と非対称だったのを解消。初回が空振りしても1回だけ再試行する
-  //   (MV3 SW コールド起床で初回 alive-check がタイムアウトしやすい)。本当に未起動なら2回とも失敗。
-  let alive = await isVoicevoxAlive();
-  if (!alive) {
+  /*
+   * ★v0.1.1329: 会場(VoicePlayer)に入れた3つの修正を【コメビュにも】移す。
+   *   v1326/v1327 は VoicePlayer だけを直しており、独自実装のこちらは素通しだった
+   *   =ユーザーがコメビュのボタンを押している限り「何も変わらない」状態だった。
+   *   (読み上げは2実装に分岐している。同じ症状は両方に出る前提で直す)
+   *
+   *   ① 解錠を最初にやる: クリックの延長でいられる唯一の瞬間。await を挟んだ後では
+   *      Chrome の自動再生ブロックに掛かる。
+   *   ② 再試行 1回 → 3回(バックオフ)。MV3 SW のコールド起床が既定タイムアウトに
+   *      間に合わないことがある。未起動なら即 refused で返るので待ちは増えない。
+   *   ③ 失敗しても OFF を永続保存しない。ユーザーの「ONにしたい」意思を消さない。
+   */
+  await primeCvAudioUnlock();
+  let probe = await probeVoicevoxAlive();
+  if (!probe.ok) {
     driveCvVoiceLoading('connecting');
-    alive = await isVoicevoxAlive();
+    for (const waitMs of VOICE_ALIVE_RETRY_BACKOFF_MS) {
+      if (waitMs > 0) await new Promise((r) => setTimeout(r, waitMs));
+      probe = await probeVoicevoxAlive();
+      if (probe.ok) break;
+    }
   }
-  if (!alive) {
-    disableVoiceReading({ persist: true });
-    driveCvVoiceLoading('notfound');
+  if (!probe.ok) {
+    // ★v0.1.1333: 会場と同じ失敗理由を既存計器へ残す(新しいstorage書き手は増やさない)。
+    _voiceDiag.lastEnableFailReason = String(probe.reason || 'unknown');
+    _voiceDiag.enableFailTotal = (Number(_voiceDiag.enableFailTotal) || 0) + 1;
+    publishVoiceDiag();
+    // ★persist:false = 次に押せばまた試せる(OFFで固定しない)。
+    disableVoiceReading({ persist: false });
+    driveCvVoiceLoading('notfound', probe.reason);
     return;
   }
 
@@ -453,6 +558,9 @@ async function enableVoiceReading({ persist = true } = {}) {
   _voiceGeneration += 1;
   _voiceReadingEnabled = true;
   _voiceToggleBusy = false;
+  // ★v0.1.1333: 成功時は古い失敗理由を消し、次の状態速報で誤診させない。
+  _voiceDiag.lastEnableFailReason = '';
+  publishVoiceDiag();
   driveCvVoiceLoading('ready');
   updateVoiceToggle();
   if (persist) persistVoiceReadingEnabled(true);
@@ -487,7 +595,8 @@ function ensureVoicePrefetch(item, generation) {
     {
       ...assigned,
       speedOffset: assigned.speedOffset + congestion.speedBoost
-    }
+    },
+    { onFailure: (info) => recordVoiceSynthFailureReason(info) }
   ).catch(() => null);
   _voicePrefetches.set(item, { generation, promise });
   return promise;
@@ -606,10 +715,15 @@ async function drainVoiceQueue() {
             {
               ...assigned,
               speedOffset: assigned.speedOffset + congestion.speedBoost
-            }
+            },
+            { onFailure: (info) => recordVoiceSynthFailureReason(info) }
           );
       _voiceDiag.lastSynthMs = Math.max(0, Date.now() - _synthStart);
       markVoicePhase('synth_done'); // v0.1.895: 合成は通過した(ここで止まれば下の continue/再生で詰まり)。
+      if (!wav) {
+        _voiceDiag.synthNullTotal = (Number(_voiceDiag.synthNullTotal) || 0) + 1;
+        publishVoiceDiag();
+      }
       if (
         !wav ||
         !_voiceReadingEnabled ||
@@ -678,10 +792,16 @@ async function drainVoiceQueue() {
             if (playResult && typeof playResult.catch === 'function') {
               playResult.catch((err) => {
                 if (err && err.name === 'NotAllowedError') {
-                  // リネーム漏れ修正: setVoiceStatus / updateVoiceToggle が正しい関数名。
-                  setVoiceStatus('⚠️ブラウザによりブロックされました。押し直してください');
-                  _voiceReadingEnabled = false;
-                  updateVoiceToggle();
+                  /*
+                   * ★v0.1.1329: ここで読み上げを OFF にしない(会場と同じ修正)。
+                   *   ブロックは【この1件が鳴らせなかった】だけで、機能が壊れたわけではない。
+                   *   従来は _voiceReadingEnabled=false にしていたため、ユーザーには
+                   *   「ONにした直後に戻る」と見えていた(実機報告)。
+                   *   ONのまま案内を出し、ページを一度クリックすれば自然に復帰する。
+                   */
+                  _voiceDiag.audioBlockedTotal = (Number(_voiceDiag.audioBlockedTotal) || 0) + 1;
+                  publishVoiceDiag();
+                  setVoiceStatus('⚠️ブラウザが音声をブロックしています。ページのどこかを一度クリックすると鳴ります');
                 }
                 finish();
               });
@@ -768,14 +888,21 @@ async function initializeVoiceReading() {
   if (isObsMode()) return;
   let bag = {};
   try {
-    bag = await chrome.storage.local.get([
-      VOICE_READING_ENABLED_KEY,
-      VOICE_ASSIGNMENTS_KEY,
-      VOICE_READ_NAME_KEY
-    ]);
+    // ★v0.1.1321: 有界化(起動経路)。読み上げ設定が取れなくても画面は出す。
+    //   既定(読み上げOFF・割当なし)で始まり、後で設定変更を onChanged が拾う。
+    bag = await runStorageOpWithTimeout(
+      () =>
+        chrome.storage.local.get([
+          VOICE_READING_ENABLED_KEY,
+          VOICE_ASSIGNMENTS_KEY,
+          VOICE_READ_NAME_KEY
+        ]),
+      COMEVIEW_BOOT_READ_TIMEOUT_MS
+    );
   } catch {
     bag = {};
   }
+  if (!bag || typeof bag !== 'object') bag = {};
   _voiceAssignments = normalizeVoiceAssignments(bag[VOICE_ASSIGNMENTS_KEY]);
   _voiceReadNameEnabled = bag[VOICE_READ_NAME_KEY] === true;
   updateVoiceToggle();
@@ -876,8 +1003,15 @@ function updateNgButton() {
 
 async function loadNgList() {
   try {
-    const bag = await chrome.storage.local.get(COMEVIEW_NG_STORAGE_KEY);
-    _ngList = normalizeComeviewNgList(bag[COMEVIEW_NG_STORAGE_KEY]);
+    // ★v0.1.1321: 有界化(起動経路)。NGリストが取れなくても画面は出す。
+    //   ★NGは「出さない」ための設定なので、取れないときに全部出るのは望ましくない。
+    //     ただしここで止めると【何も出ない】=より悪い。空で開始し、
+    //     下の onChanged / 再読み込みで取れ次第すぐ適用される。
+    const bag = await runStorageOpWithTimeout(
+      () => chrome.storage.local.get(COMEVIEW_NG_STORAGE_KEY),
+      COMEVIEW_BOOT_READ_TIMEOUT_MS
+    );
+    _ngList = normalizeComeviewNgList(bag?.[COMEVIEW_NG_STORAGE_KEY]);
     _ngKeys = new Set(_ngList.map((e) => e.key));
   } catch {
     _ngList = [];
@@ -1222,9 +1356,92 @@ function forgetTimelineElement(element) {
   if (_hoverRow === element) hideHoverBar();
 }
 
+/*
+ * ★整合(reconcile)を差分で描く。60秒ごとの全再構築が「ちらつき」の正体だった。
+ *   (2026-09-03 ユーザー報告「りりーすしたものはちらちらしていました」)
+ *
+ *   旧: listEl.innerHTML = timeline.map(...) で 120行を毎回作り直す
+ *       ⟹ 全 <img>(アバター)が破棄→再取得され、一瞬空白になる。
+ *   新: 変化が無ければ【DOMを1バイトも触らない】= img が生き残る = ちらつかない。
+ *
+ * ★「全再構築を無くす」のではなく「変化が無いときは触らない」が目的。
+ *   差分で表現できない形(順序入れ替え・間への挿入・上流の重複)は、判定関数が
+ *   reorderNeeded=true を返すので、正直に従来の全再構築へ倒す(rebuildFullTimeline)。
+ *
+ * ★二重表示(v0.1.671/672)への防波堤: remove する要素は必ず forgetTimelineElement を
+ *   通し、_renderedKeys と DOM を【同時に】動かす。_renderedKeys は :1639 の
+ *   pickNewComeviewTimelineItems で「もう出したか」の唯一の判定に使われるため、
+ *   DOM とズレると同じコメントが2行出る。
+ */
 function renderFullTimeline(timeline, forceBottom = false) {
   const listEl = document.getElementById('cvList');
   if (!listEl) return;
+  const rows = Array.from(listEl.children).filter((element) =>
+    element instanceof HTMLElement && element.matches('.nl-tl-row, .nl-tl-gift')
+  );
+  const domKeys = rows.map((element) => element.dataset.cvKey || '');
+  const items = Array.isArray(timeline) ? timeline : [];
+  const diff = domKeys.every((k) => k) ? diffComeviewTimeline(domKeys, items) : null;
+
+  // ★何も変わっていない = 触らない(ここが効くとちらつきが消える)。
+  if (diff && !diff.reorderNeeded && diff.unchanged) return;
+
+  // ★空になる場合は差分で描かない。空状態の <p>(「まだコメントもギフトもありません」)を
+  //   出す責務は rebuildFullTimeline 側にあるので、そこへ倒す(空の白紙を作らない)。
+  if (diff && !diff.reorderNeeded && items.length > 0) {
+    const wasNearBottomD =
+      forceBottom ||
+      isComeviewNearBottom({
+        scrollTop: listEl.scrollTop,
+        clientHeight: listEl.clientHeight,
+        scrollHeight: listEl.scrollHeight
+      });
+    const bottomGapD = Math.max(
+      0,
+      listEl.scrollHeight - listEl.clientHeight - listEl.scrollTop
+    );
+    if (diff.removeKeys.length) {
+      const drop = new Set(diff.removeKeys);
+      for (const element of rows) {
+        if (!drop.has(element.dataset.cvKey || '')) continue;
+        forgetTimelineElement(element); // ★keys と DOM を同時に動かす
+        element.remove();
+      }
+    }
+    if (diff.appendItems.length) {
+      // ★空状態の <p> を先に外す(appendTimelineItems:1471 と同じ扱い)。
+      //   これが残ると「まだありません」の下に行が積まれる。
+      const empty = listEl.querySelector('.nl-support-timeline__empty, #cvEmpty');
+      if (empty) empty.remove();
+      // ★追加は appendTimelineItems と同一手順(新しい描画パスを作らない)。
+      const fragment = document.createDocumentFragment();
+      for (const item of diff.appendItems) {
+        const template = document.createElement('template');
+        template.innerHTML = timelineRowHtml(item).trim();
+        const element = template.content.firstElementChild;
+        if (!element) continue;
+        rememberTimelineElement(element, item, false);
+        fragment.appendChild(element);
+      }
+      listEl.appendChild(fragment);
+      upgradeAnonymousAvatarImages(listEl);
+    }
+    if (wasNearBottomD) {
+      listEl.scrollTop = listEl.scrollHeight;
+    } else {
+      listEl.scrollTop = Math.max(
+        0,
+        listEl.scrollHeight - listEl.clientHeight - bottomGapD
+      );
+    }
+    return;
+  }
+
+  rebuildFullTimeline(listEl, items, forceBottom);
+}
+
+/** ★従来の全再構築(差分で表現できないときのフォールバック)。挙動は据え置き。 */
+function rebuildFullTimeline(listEl, timeline, forceBottom) {
   const wasNearBottom =
     forceBottom ||
     isComeviewNearBottom({
@@ -1719,19 +1936,37 @@ function createHoverBar() {
 }
 
 function wireStorageChanges() {
-  if (!_liveId) return;
-  const tKey = tailStorageKey(_liveId);
-  const giftKey = `nls_gift_events_${_liveId}`;
-  const pinKey = comeviewPinStorageKey(_liveId);
+  /*
+   * ★v0.1.1321: `if (!_liveId) return;` を撤去し、キーを【毎回 _liveId から引き直す】。
+   *
+   * ■ なぜ必要か(コメビュが立ち上がらない件の第2の穴)
+   *   旧実装は起動時の `_liveId` からキーを closure で固定し、`_liveId` が
+   *   空なら【何も配線せずに return】していた。
+   *   ＝storage が混んで起動時に liveId を取れないと、**復帰役である
+   *     onChanged 自体が張られず、永久に追いつけない**。
+   *   ★この関数は「配信が変わったら追従する」ための復帰経路そのものなので、
+   *     liveId が未確定のときこそ張っておく必要がある(順序を逆にしていた)。
+   *
+   * ■ 直し方: キーは listener の中で **その時点の _liveId** から作る。
+   *   これで「起動時は空 → 後で switchToLiveId で決まる」でも正しく追従する。
+   *   ★二重登録しないよう _storageChangesWired で1回に固定する
+   *     (switchToLiveId は _liveId を書き換えるだけでよくなる)。
+   */
+  if (_storageChangesWired) return;
+  _storageChangesWired = true;
   chrome.storage.onChanged.addListener((changes, areaName) => {
     if (areaName !== 'local') return;
+    // ★キーは固定しない(配信が変わっても同じ listener で追従できる)。
+    const tKey = _liveId ? tailStorageKey(_liveId) : '';
+    const giftKey = _liveId ? `nls_gift_events_${_liveId}` : '';
+    const pinKey = _liveId ? comeviewPinStorageKey(_liveId) : '';
     // 配信切替に追従(?lv= 明示窓は固定)。watch タブが別配信へ移ったら自動で新配信を読む。
     if (!_explicitLiveId && changes[KEY_LAST_WATCH_URL]) {
       const url = String(changes[KEY_LAST_WATCH_URL].newValue || '');
       const m = url.toLowerCase().match(/lv\d{1,15}/);
       if (m && m[0] !== _liveId) void switchToLiveId(m[0]);
     }
-    if (changes[pinKey]) renderPin(changes[pinKey].newValue);
+    if (pinKey && changes[pinKey]) renderPin(changes[pinKey].newValue);
     if (changes[COMEVIEW_USER_NOTES_KEY]) {
       _userNotes = normalizeComeviewUserNotes(
         changes[COMEVIEW_USER_NOTES_KEY].newValue
@@ -1771,7 +2006,8 @@ function wireStorageChanges() {
         void enableVoiceReading({ persist: false });
       }
     }
-    if (changes[tKey] || changes[giftKey]) {
+    // ★キーが未確定(liveId未取得)のうちは本文の更新はしない(空キーで誤爆させない)。
+    if ((tKey && changes[tKey]) || (giftKey && changes[giftKey])) {
       processHotSnapshots(
         changes[tKey]
           ? Array.isArray(changes[tKey].newValue)
@@ -1813,30 +2049,42 @@ function wireButtons() {
       }
     });
   }
+  /*
+   * ★別窓/OBS窓は「前回の大きさと位置」で開く(v0.1.1502)。
+   *   従来は必ず 400x640 の決め打ちだったため、OBS のウィンドウキャプチャで
+   *   配信画面に重ねる運用だと【開き直すたびに合わせ込みがやり直し】になっていた。
+   *   ★保存が無い/壊れている場合は従来と同じ 400x640 に倒れる
+   *     (判定は src/lib/comeviewWindowGeometry.js が正本)。
+   */
+  const openComeviewWindow = async (url) => {
+    let saved = null;
+    try {
+      const bag = await chrome.storage.local.get(KEY_COMEVIEW_WINDOW_GEOMETRY);
+      saved = bag?.[KEY_COMEVIEW_WINDOW_GEOMETRY] ?? null;
+    } catch {
+      // 読めなくても開く(既定サイズに倒れるだけ)。
+    }
+    const opts = buildComeviewWindowOptions(url, saved);
+    try {
+      chrome.windows.create(opts);
+    } catch {
+      window.open(url, '_blank', `width=${opts.width},height=${opts.height}`);
+    }
+  };
   const btnWin = document.getElementById('cvBtnWindow');
   if (btnWin) {
     btnWin.addEventListener('click', () => {
-      const url = chrome.runtime.getURL(
-        `comeview.html?lv=${encodeURIComponent(_liveId)}`
+      void openComeviewWindow(
+        chrome.runtime.getURL(`comeview.html?lv=${encodeURIComponent(_liveId)}`)
       );
-      try {
-        chrome.windows.create({ url, type: 'popup', width: 400, height: 640 });
-      } catch {
-        window.open(url, '_blank', 'width=400,height=640');
-      }
     });
   }
   const btnObs = document.getElementById('cvBtnObs');
   if (btnObs) {
     btnObs.addEventListener('click', () => {
-      const url = chrome.runtime.getURL(
-        `comeview.html?lv=${encodeURIComponent(_liveId)}&obs=1`
+      void openComeviewWindow(
+        chrome.runtime.getURL(`comeview.html?lv=${encodeURIComponent(_liveId)}&obs=1`)
       );
-      try {
-        chrome.windows.create({ url, type: 'popup', width: 400, height: 640 });
-      } catch {
-        window.open(url, '_blank', 'width=400,height=640');
-      }
     });
   }
   const btnPause = document.getElementById('cvBtnPause');
@@ -1900,19 +2148,73 @@ function wireButtons() {
   }
   createHoverBar();
   window.addEventListener('resize', () => hideHoverBar(), { passive: true });
+  /*
+   * ★窓の形を覚える(v0.1.1502)。次に開くときこの大きさ/位置で開く。
+   *   ★保存の可否は pickComeviewGeometryToSave が決める:
+   *     最小化(0x0)や極端な値は【保存しない】= 次に潰れた窓が出る事故を防ぐ。
+   *   ★resize は連続で飛ぶので 500ms 落ち着いてから1回だけ書く(storage を叩き続けない)。
+   */
+  let _geometrySaveTimer = 0;
+  const saveWindowGeometry = () => {
+    const next = pickComeviewGeometryToSave({
+      width: window.outerWidth,
+      height: window.outerHeight,
+      left: window.screenX,
+      top: window.screenY
+    });
+    if (!next) return; // ★最小化中などは覚えない
+    try {
+      void chrome.storage.local.set({ [KEY_COMEVIEW_WINDOW_GEOMETRY]: next });
+    } catch {
+      // 保存できなくても表示には影響しない。
+    }
+  };
+  window.addEventListener(
+    'resize',
+    () => {
+      if (_geometrySaveTimer) window.clearTimeout(_geometrySaveTimer);
+      _geometrySaveTimer = window.setTimeout(saveWindowGeometry, 500);
+    },
+    { passive: true }
+  );
+  // ★閉じる直前にも1回(サイズを変えてすぐ閉じたときに取りこぼさない)。
+  window.addEventListener('pagehide', saveWindowGeometry);
 }
 
 async function main() {
   if (isObsMode()) document.body.classList.add('is-obs');
   const urlLiveId = resolveLiveIdFromUrl();
   _explicitLiveId = !!urlLiveId; // ?lv= 明示窓は配信切替に追従しない(固定窓)
+  /*
+   * ★v0.1.1321: 起動の順序を「まず操作できる画面を出す」に組み替えた。
+   *
+   * ■ 何が起きていたか(2026-08-11 実機・ユーザー報告「コメビュが立ち上がらない」)
+   *   旧: liveId取得 → wireButtons → 読み上げ設定 → NG → **wireStorageChanges** → 全件読み
+   *   起動経路の storage read は無制限に待つ実装だったため、backfill 中は最初の await で
+   *   止まり、画面は cvLiveMeta が静的既定の「—」・本文「コメントを待っています…」で固着。
+   *   ★さらに悪いことに、**復帰役の wireStorageChanges が3つの await の後ろ**にあった。
+   *     ＝止まると「後から自動で追いつく」経路すら張られない=永久に立ち上がらない。
+   *     (実際は storage が空くと自力で回復した＝壊れてはいなかったが、待たされていた)
+   *
+   * ■ 直し方(順序と有界化の両方)
+   *   1) ボタン配線と **wireStorageChanges を最優先**で張る
+   *      ＝storage が詰まっていても操作でき、liveId は後から onChanged で自動追従できる。
+   *   2) 各 read は有界化(COMEVIEW_BOOT_READ_TIMEOUT_MS)＝待ち切らない。
+   *   3) 設定系(読み上げ/NG)は **await しない**＝画面表示を人質にしない。
+   *      取れ次第それぞれが自分で反映する(いずれも冪等)。
+   */
+  wireButtons();
+  wireStorageChanges();
   _liveId = urlLiveId || (await resolveLiveIdFromStorage());
   const meta = document.getElementById('cvLiveMeta');
-  if (meta) meta.textContent = _liveId ? _liveId : '配信が見つかりません';
-  wireButtons();
-  await initializeVoiceReading();
-  await loadNgList();
-  wireStorageChanges();
+  if (meta) {
+    // ★liveId が取れないのは「無い」ではなく「まだ来ていない」ことがある(storage混雑)。
+    //   断定せず、待てば来ると伝える(onChanged が拾ったら switchToLiveId が上書きする)。
+    meta.textContent = _liveId ? _liveId : '配信を探しています…';
+  }
+  // 設定系は画面表示をブロックしない(失敗しても既定で動く)。
+  void initializeVoiceReading();
+  void loadNgList();
   await requestFullRefresh(true);
   // パネルのタイムライン行クリックから ?user= 付きで開かれたら、詳細を自動で開く。
   const detailReq = resolveDetailRequestFromUrl();

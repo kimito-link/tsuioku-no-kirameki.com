@@ -164,6 +164,7 @@ import {
   planAppendRowsAsChunks,
   readChunkedComments
 } from '../lib/commentChunkStore.js';
+import { KEY_COMMENT_WRITE_MODE_DIAG } from '../lib/commentWriteModeDiagKey.js';
 import { anonymousNicknameFallback } from '../lib/nicoAnonymousDisplay.js';
 import {
   applyUserCommentProfileMapToEntries,
@@ -226,6 +227,10 @@ import {
   validateEventScoreRankingRelayPayload
 } from '../lib/eventScoreRankingRelay.js';
 import { pickPrunableStorageKeys } from '../lib/prunableStorageKeys.js';
+// ★v0.1.1393: 公式「なふだを表示」トグルをPOPから操作する(探し方は lib 側=テスト可能)。
+import {
+  findNameplateToggle, readToggleState, decideNameplateClick
+} from '../lib/nameplateToggleFinder.js';
 import { decideHiddenOfficialIframeInject } from '../lib/hiddenOfficialIframeReinjectGate.js';
 import { classifyGiftSubAppFrameSource } from '../lib/giftSubAppFrameSource.js';
 import { captureSameOriginContributionRankingDomShape } from '../lib/sameOriginContribRankingDomShape.js';
@@ -331,6 +336,8 @@ import {
   shouldSkipInlineHostMoveForVenue,
   summarizeInlineHostMoveDiag
 } from '../lib/inlineHostMoveProbe.js';
+// ★v0.1.1454: メモリ/DOM の逼迫判定(凍結の予兆を数字で出す)。
+import { judgeMemoryPressure } from '../lib/memoryPressureProbe.js';
 /*
  * ★v0.1.1278: 点滅追跡の計器 import を撤去した(hostVisibilityFlipCensus /
  *   hostVisibilityWatch / hostStyleMutationTrace / hostVanishForensics /
@@ -530,6 +537,8 @@ import { migrateBelowInlinePanelToDockOnce } from '../lib/migrateInlinePanelBelo
 import { migrateSuggestInitialInlinePanelPlacementOnce } from '../lib/migrateSuggestInitialInlinePanelPlacement.js';
 import { createPersistCoalescer } from '../lib/persistThrottle.js';
 import { computeLivePersistIntervalMs } from '../lib/livePersistInterval.js';
+// v0.1.1417: 裏タブの setTimeout クランプ(1/分)でコメントが数十秒遅れるのを止める。
+import { resolveNdgrPendingThreshold } from '../lib/ndgrHiddenFlushThreshold.js';
 import { isInsideRecommendedLiveSection } from '../lib/isInsideRecommendedLiveSection.js';
 import { resolveUserEntryAvatarSignals } from '../lib/userEntryAvatarResolve.js';
 import { recordDiagnosticException } from '../lib/diagnosticRingStore.js';
@@ -1934,7 +1943,26 @@ function schedulePersistNdgrChatRows(rows) {
     stamped,
     NDGR_PENDING_MAX
   );
-  if (ndgrChatRowsPending.length >= NDGR_PENDING_FLUSH_THRESHOLD) {
+  /*
+   * ★v0.1.1417「コメントが裏タブで数十秒遅れて出る」根治:
+   *   下の flush は setTimeout(150ms) に載っているが、Chrome は hidden タブの
+   *   setTimeout を【約1分に1回】までクランプする。
+   *   ＝可視中150msの吐き出しが裏タブでは最大60秒に1回になり、
+   *   逃げ道のこのしきい値(240行)にも届かないまま数十秒溜まる。
+   *   実機(2026-08-16)の「即時プッシュ 配達平均47,686ms」がこれ。
+   *   ★受信側は健全だった(実測 配達5ms)＝遅いのは【送る側が起きられないこと】。
+   *   ★このリポは同じクランプを v0.1.795 で踏んで backfill を chrome.alarms へ
+   *     逃がしている。コメント側だけ横展開されていなかった(配線漏れ)。
+   *   対処: 裏タブのときだけ「溜まったら吐く」しきい値を下げる。
+   *     タイマー側を常時駆動へ変えると裏タブで電池/CPUを食い続けるが、
+   *     しきい値ならコメントが来ないときは何も動かない(イベント駆動のまま)。
+   *   判定は純関数 ndgrHiddenFlushThreshold.js(単体7テスト)に隔離。
+   */
+  const pendingFlushThreshold = resolveNdgrPendingThreshold({
+    hidden: typeof document !== 'undefined' && document.hidden === true,
+    visibleThreshold: NDGR_PENDING_FLUSH_THRESHOLD
+  });
+  if (ndgrChatRowsPending.length >= pendingFlushThreshold) {
     if (ndgrChatRowsFlushTimer != null) {
       clearTimeout(ndgrChatRowsFlushTimer);
       ndgrChatRowsFlushTimer = null;
@@ -7008,6 +7036,47 @@ function buildAiShareFastDiagnosticsPayload() {
     // v0.1.1124 D-1計器: host移設の実測(reloadCount=iframeリロード実害あり移設・byReason=犯人経路・
     //   venueOpenMoves=会場open中の移設)。ローディングちかちかの真犯人を状態速報の数字で確定する。
     hostMoveDiag: summarizeInlineHostMoveDiag(_inlineHostMoveState, Date.now()),
+    /*
+     * ★v0.1.1454 メモリ/DOM の逼迫(ユーザー指示「メモリの消費とかも計器にいれて」)。
+     *
+     *   実機で watch ページに「ページが応答しません」が出た。凍っていたのは
+     *   **拡張のパネルではなく watch ページ本体**。ところがこのリポには
+     *   **メモリもDOM総数も測る計器が1つも無かった**＝数字で答えられなかった。
+     *
+     *   ★ここは watch ページ(content script)＝**凍る当のページ**の値が取れる。
+     *   ★storage read を増やさない(この payload に相乗り)
+     *     ＝[[instrument-can-kill-the-page-it-measures-2026-08-16]]。
+     *   ★`getElementsByTagName('*').length` は live な HTMLCollection の length 参照で、
+     *     querySelectorAll のような配列生成をしない(計器自身が重くならない)。
+     */
+    memoryPressure: (() => {
+      try {
+        return judgeMemoryPressure(
+          /** @type {any} */ ((typeof performance !== 'undefined' ? performance : {}).memory),
+          { domNodes: document.getElementsByTagName('*').length }
+        );
+      } catch {
+        return null; // 計器の失敗で速報全体を壊さない
+      }
+    })(),
+    /*
+     * ★v0.1.1330 読み上げ到達可能性(会議4体・全員一致の一手)
+     *   読み上げの計器(KEY_VOICE_DIAG)は【コメビュ/会場を開いている間だけ】書かれる。
+     *   ユーザーは普段どちらも開いていないため、v0.1.1326/1327/1329 と3版修正を出しても
+     *   状態速報は毎回「化石値」しか出さず【効いたかを1度も確認できなかった】。
+     *   そこで【常駐している content script】から「読み上げが動きうる状態か」を毎回書く。
+     *   これで「面を開いていないだけ」か「開いているのに壊れている」かが1回で確定する。
+     *   ★content は読み上げのキュー自体は持てない(別の面に居る)。持てるのは到達可能性だけ。
+     */
+    voiceReachRaw: {
+      venueOpen: (() => {
+        try {
+          return document.documentElement.classList.contains('nlsb-venue-open');
+        } catch {
+          return false;
+        }
+      })()
+    },
       /*
        * ★v0.1.1278: 点滅追跡の計器(hostFlipCensus / hostVisWatch / vanishForensics /
        *   hostAncestryTrace / hostStyleTrace / hostHideReason / hostRecoveryDiag)を
@@ -9262,7 +9331,6 @@ function collectWatchPageSnapshot() {
       intercept: interceptedUsers.size,
       interceptNicknames: interceptedNicknames.size,
       interceptAvatars: interceptedAvatars.size,
-      fiberDiag: document.documentElement?.getAttribute('data-nls-fiber-diag') || '',
       harvestPipeline: {
         ...deepHarvestPipelineStats,
         harvestRunning,
@@ -9688,6 +9756,24 @@ function buildAiSharePageDiagnostics() {
     // v0.1.1124 D-1計器: host移設の実測(reloadCount=iframeリロード実害あり移設・byReason=犯人経路・
     //   venueOpenMoves=会場open中の移設)。ローディングちかちかの真犯人を状態速報の数字で確定する。
     hostMoveDiag: summarizeInlineHostMoveDiag(_inlineHostMoveState, Date.now()),
+    /*
+     * ★v0.1.1330 読み上げ到達可能性(会議4体・全員一致の一手)
+     *   読み上げの計器(KEY_VOICE_DIAG)は【コメビュ/会場を開いている間だけ】書かれる。
+     *   ユーザーは普段どちらも開いていないため、v0.1.1326/1327/1329 と3版修正を出しても
+     *   状態速報は毎回「化石値」しか出さず【効いたかを1度も確認できなかった】。
+     *   そこで【常駐している content script】から「読み上げが動きうる状態か」を毎回書く。
+     *   これで「面を開いていないだけ」か「開いているのに壊れている」かが1回で確定する。
+     *   ★content は読み上げのキュー自体は持てない(別の面に居る)。持てるのは到達可能性だけ。
+     */
+    voiceReachRaw: {
+      venueOpen: (() => {
+        try {
+          return document.documentElement.classList.contains('nlsb-venue-open');
+        } catch {
+          return false;
+        }
+      })()
+    },
       /*
        * ★v0.1.1278: 点滅追跡の計器(hostFlipCensus / hostVisWatch / vanishForensics /
        *   hostAncestryTrace / hostStyleTrace / hostHideReason / hostRecoveryDiag)を
@@ -10122,6 +10208,47 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
       (hasPanel ? 4_000_000 : 0) +
       (/\/watch\/lv\d+/i.test(href) ? 50_000 : 0);
     sendResponse({ ok: true, score, href, hasEditor, hasPanel });
+    return true;
+  }
+
+  /*
+   * ★v0.1.1393(ユーザー要望「公式のこれも POPで操作できるようにしたい」):
+   *   公式の「なふだを表示」トグルを①POPから ON/OFF する。
+   *
+   *   ★状態が読めないときは【押さない】。OFFだと思って押したら実はONで
+   *     逆に消す、という事故の方が高くつく(判定は decideNameplateClick が正本)。
+   *   ★見つからない場合は「公式UIを開いてください」と理由を返す
+   *     (公式の設定パネルが閉じていると DOM に存在しないため)。
+   */
+  if (msg.type === 'NLS_NAMEPLATE_TOGGLE') {
+    try {
+      const want = Boolean(/** @type {{ on?: unknown }} */ (msg).on);
+      const el = findNameplateToggle(document);
+      if (!el) {
+        sendResponse({
+          ok: false,
+          error: '公式の「なふだを表示」が見つかりません。コメント欄の設定を一度開いてください。'
+        });
+        return true;
+      }
+      const current = readToggleState(el);
+      const decision = decideNameplateClick(current, want);
+      if (!decision.shouldClick) {
+        sendResponse({
+          ok: decision.reason === 'already',
+          current,
+          reason: decision.reason,
+          error: decision.reason === 'unknown-state'
+            ? '「なふだ」のON/OFFが読み取れませんでした(誤操作を避けるため押していません)。'
+            : ''
+        });
+        return true;
+      }
+      el.click();
+      sendResponse({ ok: true, current, changedTo: want, reason: decision.reason });
+    } catch (err) {
+      sendResponse({ ok: false, error: String(err && err.message || err) });
+    }
     return true;
   }
 
@@ -10759,6 +10886,28 @@ let liveChunkIndex = null;
 let liveChunkMigrated = false;
 
 /**
+ * ★v0.1.1382: コメント書き込みモードの観測値。
+ *
+ * 「巨大配列を丸ごと書き戻しているか / チャンクに追記しているか」を数える。
+ * 会議(2026-08-12)で【真犯人が計器の死角にいる】と確定したため追加した:
+ * chunkMode が false になると畳み込みのたびに O(N) の構造化クローンが走り
+ * (実測: 停止410ms vs チャンク63ms=6.8倍)、同一スレッドのパネル/診断を巻き込んで固める。
+ * それなのに chunkMode の状態は速報に1文字も出ていなかった。
+ *
+ * @type {{ wholeWrites: number, chunkWrites: number, fallbackReason: string }}
+ */
+const _commentWriteModeCensus = { wholeWrites: 0, chunkWrites: 0, fallbackReason: '' };
+
+/**
+ * ★チャンク運用に乗れなかった理由を記録する(空振りの理由を捨てない)。
+ * [[discarded-pass-reason-makes-greens-unreadable-2026-08-12]]
+ * @param {string} reason
+ */
+function noteCommentChunkModeFallback(reason) {
+  _commentWriteModeCensus.fallbackReason = String(reason || '').slice(0, 40);
+}
+
+/**
  * v0.1.513: チャンクモードの dedupe をインメモリ・インクリメンタル化するフラグ。
  * 全チャンク read + O(N) merge を初回 seed 後の O(追加分)照合へ置き換え、頭打ちを防ぐ。
  * 明示的に false が保存された環境だけ従来経路へ戻す。
@@ -10942,9 +11091,35 @@ async function seedTailFromMain(lid) {
       liveChunkIndex = /** @type {any} */ (idx);
       liveChunkMigrated = true;
     } else if (metaBag[chunkMigratedKey(lid)] === true) {
-      // フラグだけ立つがインデックス破損＝安全側で従来 main 運用に戻す（チャンク無効）。
+      /*
+       * フラグだけ立つがインデックス破損。
+       *
+       * ★v0.1.1382(fail-open 6件目の根治・2026-08-12 実測で確定):
+       *   旧実装は「安全側で従来 main 運用に戻す」として liveChunkMigrated を false のままにしていた。
+       *   しかし false は chunkMode=false を意味し(12151行)、以後この配信は
+       *   **畳み込みのたびに巨大配列を丸ごと書き戻す**(12476行の `{ [key]: next }` 経路)。
+       *
+       * ■ 実測(chrome-devtools・24,000件の配列・出荷ビルド)
+       *     丸ごと書き戻し ×5 = 2,522ms / イベントループ停止 410ms
+       *     末尾チャンクだけ×5 =   371ms / イベントループ停止  63ms   ＝6.8倍
+       *   ＝この分岐に落ちた配信は、記録が伸びるほど重くなり、
+       *     同一スレッドを共有するパネル/診断ページを巻き込んで固める。
+       *
+       * ★これは v0.1.769 が「storage stall spiral の根治」として塞いだのと【同じ穴】。
+       *   当時は timeout 経路(下の catch)だけを塞ぎ、この破損経路は残っていた
+       *   ＝[[fail-open-recurs-under-new-names-2026-08-12]] が別名で再発していた形。
+       *   「守るものが壊れているから通す」も fail-open である。
+       *
+       * ■ 直し方: timeout 経路(下の catch)と【同じ扱い】に揃える。
+       *   空の in-memory チャンク状態を立てて bounded(追記専用)で書き続ける。
+       *   既存 main は削除せず温存され、読めなかった dedup キーは
+       *   mergeNewComments / incrementalMode が前方向に再構築して取りこぼしを担保する。
+       */
       const bag = await chunkGetMany([mainKey]);
       main = Array.isArray(bag[mainKey]) ? bag[mainKey] : [];
+      liveChunkIndex = /** @type {any} */ (planMigrateMainToChunks(lid, []).index);
+      liveChunkMigrated = true;
+      noteCommentChunkModeFallback('index_broken');
     } else {
       // 未移行: 従来 main を読んで、読めたら冪等にチャンクへ移行する。
       const bag = await chunkGetMany([mainKey]);
@@ -12433,6 +12608,18 @@ async function persistCommentRowsImpl(rows, opts = {}) {
       }
     }
     if (storageTouched || pendingTouched) {
+      /*
+       * ★v0.1.1382: どちらの経路で書いたかを数える(真犯人が計器の死角にいた)。
+       *   `chunkMode=false` の書きは巨大配列の丸ごと書き戻し＝O(N)の構造化クローン。
+       *   実測で停止410ms(チャンクは63ms)＝同一スレッドのパネル/診断を巻き込んで固める。
+       *   ★数えるのは【実際に本体を書く分岐に入ったとき】だけ(storageTouched の中)。
+       *     外で数えると「書いていないのに whole」と嘘をつく。
+       */
+      if (chunkMode) {
+        if (chunkCommentWrite) _commentWriteModeCensus.chunkWrites += 1;
+      } else {
+        _commentWriteModeCensus.wholeWrites += 1;
+      }
       try {
         await runStorageOpWithTimeout(
           () =>
@@ -12442,6 +12629,15 @@ async function persistCommentRowsImpl(rows, opts = {}) {
                   ? chunkCommentWrite.writes
                   : {}
                 : { [key]: next }),
+              [KEY_COMMENT_WRITE_MODE_DIAG]: {
+                mode: chunkMode ? 'chunk' : 'whole',
+                liveId: String(liveId || ''),
+                rows: Array.isArray(next) ? next.length : 0,
+                wholeWrites: _commentWriteModeCensus.wholeWrites,
+                chunkWrites: _commentWriteModeCensus.chunkWrites,
+                fallbackReason: _commentWriteModeCensus.fallbackReason,
+                at: Date.now()
+              },
               [KEY_AUTO_BACKUP_STATE]: autoBackupState,
               ...(ingestLogPayload ? { [KEY_COMMENT_INGEST_LOG]: ingestLogPayload } : {}),
               ...(pendingTouched
@@ -14946,7 +15142,10 @@ function maybeFetchKokenContribRankingMirrorOnce() {
         _externalFetchProbe.kokenLastRows = Array.isArray(rows) ? rows.length : 0;
         // v0.1.621: 診断 state 用に rows 配列もキャッシュ(残課題3根治)。
         _externalFetchProbe.kokenLastRowsArr = Array.isArray(rows) && rows.length > 0 ? rows : null;
-        if (!Array.isArray(rows) || rows.length === 0) return;
+        // ★v0.1.1343: 【成功して0件】でも保存する(nicoad 側と同じ真因・詳細はそちらのコメント)。
+        //   旧実装は早期 return で書き込みごと飛ばしており、popup からは
+        //   「取得失敗」と区別がつかず fetch_error(赤) と誤称していた。
+        const rowsSafe = Array.isArray(rows) ? rows : [];
         // 応答到着までに別 liveId へ遷移していたら stale 書込しない
         const curLid = String(liveId || '')
           .trim()
@@ -14956,9 +15155,11 @@ function maybeFetchKokenContribRankingMirrorOnce() {
           chrome.storage.local
             .set({
               [kokenContribStorageKey(lid)]: {
-                rows,
+                rows: rowsSafe,
                 capturedAt: Date.now(),
-                liveId: lid
+                liveId: lid,
+                lastOk: _externalFetchProbe.kokenLastOk === true,
+                lastStatus: Number(_externalFetchProbe.kokenLastStatus) || null
               }
             })
             .catch((err) => {
@@ -15042,7 +15243,20 @@ function maybeFetchNicoadContribRankingMirrorOnce() {
         _externalFetchProbe.nicoadLastRows = Array.isArray(rows) ? rows.length : 0;
         // v0.1.621: 診断 state 用に rows 配列もキャッシュ(残課題3根治)。
         _externalFetchProbe.nicoadLastRowsArr = Array.isArray(rows) && rows.length > 0 ? rows : null;
-        if (!Array.isArray(rows) || rows.length === 0) return;
+        /*
+         * ★v0.1.1343: 【成功して0件】のときも記録する(popup が「取得失敗」と誤称する真因)。
+         *
+         * ■ 旧: `if (!Array.isArray(rows) || rows.length === 0) return;`
+         *   ＝成功0件だと storage に何も書かれず、popup からは「取得できなかった」と
+         *   区別がつかなかった。結果 popup の判定は fetch_error(赤) へ落ちる。
+         *   ★v0.1.851 が content 側で根治した「成功0件=該当無し(灰)」が、
+         *     popup 側にだけ残っていた真因はこれ(引数の配線ではなくデータの不在)。
+         *
+         * ■ 読み手は rows.length > 0 を要求しているので、空配列を保存しても
+         *   既存の描画挙動は一切変わらない(popup-entry.js:12172-12178 で確認済み)。
+         *   足すのは「成功したという事実」だけ。
+         */
+        const rowsSafe = Array.isArray(rows) ? rows : [];
         const curLid = String(liveId || '')
           .trim()
           .toLowerCase();
@@ -15051,9 +15265,12 @@ function maybeFetchNicoadContribRankingMirrorOnce() {
           chrome.storage.local
             .set({
               [nicoadContribStorageKey(lid)]: {
-                rows,
+                rows: rowsSafe,
                 capturedAt: Date.now(),
-                liveId: lid
+                liveId: lid,
+                // ★取得の成否(popup が「成功0件」と「取得失敗」を分けるために要る)。
+                lastOk: _externalFetchProbe.nicoadLastOk === true,
+                lastStatus: Number(_externalFetchProbe.nicoadLastStatus) || null
               }
             })
             .catch((err) => {
@@ -16527,6 +16744,17 @@ function publishBackfillProgress() {
 let _lastLiveMetricWroteAt = 0;
 
 /**
+ * ★v0.1.1356: 走行中スループット計器の心拍間隔[ms]。
+ *   status 側は ts が15秒以内のときだけ「⏱ 取得速度(走行中)」を出すので、
+ *   それより十分短くする(5秒)。★詰まっている最中こそ更新が要る=
+ *   generator が返ってこない間も ts を進め続けるのがこの心拍の目的。
+ */
+const BACKFILL_LIVE_METRIC_HEARTBEAT_MS = 5000;
+
+/** ★v0.1.1356: 心拍タイマーのID(finally で必ず止める。止め忘れると嘘の走行中が残る)。 */
+let _backfillLiveMetricHeartbeatTid = /** @type {ReturnType<typeof setInterval>|null} */ (null);
+
+/**
  * v0.1.1045 段1: 走行中スループット計器を KEY_BACKFILL_LIVE_METRIC へ書く(観測のみ・1Hz間引き)。
  *
  * ⚠️ KEY_BACKFILL_PROGRESS には【一切触れない】。popup 実況(v0.1.657 で完走時だけに絞った)を
@@ -16911,6 +17139,49 @@ async function runNdgrBackfillOnce(ctx = {}) {
     _backfillRoundDiag.genSteps = 0;
     _backfillRoundDiag.roundStartedAt = Date.now();
 
+    /*
+     * ★v0.1.1356: 走行中スループット計器の【心拍】。
+     *
+     * ■ 実機で確定したこと(2026-08-12 の状態速報)
+     *   「⏳ 取り込み中 33%・過去のコメントを取得中」= backfill は走っているのに、
+     *   状態速報に「⏱ 取得速度(走行中)」の行が【1行も出ていなかった】。
+     *   status 側は running===1 かつ ts が15秒以内のときだけ出す(嘘の走行中を残さないため)。
+     *
+     * ■ 真因: 計器の更新が `await gen.next()` の【後】にしか無い。
+     *   generator の中で待ち(ネットワーク・リトライ・バックオフ)が起きると
+     *   ループが戻ってこない=計器が更新されない=15秒で ts が古くなり行が消える。
+     *   ★つまり【詰まっているときに限って計器が黙る】(異常時ほど診断が消える型)。
+     *   ユーザーが一番知りたい「なぜ止まったか」の瞬間に、計器が自分を消していた。
+     *
+     * ■ 直し: 生成器の歩みとは独立した心拍で ts を更新し続ける。
+     *   値(seg/rows/dataSegs...)は最後に観測したものをそのまま再送する=嘘を足さない。
+     *   ★running:1 のまま止まっている、が速報から読めるようになるのが目的。
+     *   ★rAF は使わない(タブ非表示で止まる)。setInterval + 実時刻。
+     */
+    const liveMetricHeartbeat = setInterval(() => {
+      try {
+        publishBackfillLiveMetric({
+          lid: String(liveId || ''),
+          running: 1,
+          seg: _backfillProgress.seg,
+          rows: _backfillProgress.rows,
+          genSteps: _backfillRoundDiag.genSteps,
+          dataSegs: _liveDataSegs,
+          bridgingSteps: _liveBridgingSteps,
+          yields: _liveYields,
+          yieldWaitMsTotal: _liveYieldWaitMsTotal,
+          elapsedMs: _backfillRoundDiag.roundStartedAt
+            ? Date.now() - _backfillRoundDiag.roundStartedAt
+            : 0,
+          fg: isForegroundWatchTab ? 1 : 0,
+          force: true
+        });
+      } catch {
+        /* best-effort: 計器は取り込みに影響させない */
+      }
+    }, BACKFILL_LIVE_METRIC_HEARTBEAT_MS);
+    _backfillLiveMetricHeartbeatTid = liveMetricHeartbeat;
+
     for (;;) {
       const step = await gen.next();
       _backfillRoundDiag.genSteps += 1; // v0.1.892: gen.next() を回した回数(初回 pending 切り分け用)。
@@ -17085,6 +17356,16 @@ async function runNdgrBackfillOnce(ctx = {}) {
     try { _backfillProgress.errMsg = String(e?.message || e || '').slice(0, 120); } catch { /* no-op */ }
   } finally {
     clearTimeout(rotationTid);
+    // ★v0.1.1356: 計器の心拍を必ず止める(例外・中断・完走のどの経路でも)。
+    //   止め忘れると走行終了後も running:1 を書き続け、速報が「まだ走っている」と嘘をつく。
+    try {
+      if (_backfillLiveMetricHeartbeatTid != null) {
+        clearInterval(_backfillLiveMetricHeartbeatTid);
+        _backfillLiveMetricHeartbeatTid = null;
+      }
+    } catch {
+      /* no-op */
+    }
     // v0.1.1045 段1: 走行終了を計器で締める(running:0・force で min-gap 無視)。status の
     //   「⏱ 取得速度(走行中)」は running:0 or ts 古で自動的に消える=固着時に嘘の走行中を残さない。
     try {

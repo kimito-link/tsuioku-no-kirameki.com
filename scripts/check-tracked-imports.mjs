@@ -54,6 +54,61 @@ function loadFiles(targets) {
   return files;
 }
 
+/*
+ * ── --selftest: ★毒を食わせ、赤が出ることを確認する ──────────────────────
+ *
+ * ■ ★なぜ要るか（2026-08-29）
+ *   判定ロジック(src/lib/trackedImports.js)には手厚いテストがあるが、
+ *   ★この【ゲート本体】が実際に赤(exit 1)を返すかは誰も確かめていなかった。
+ *   ＝「純関数は正しいが、ゲートが常に緑を返す」状態を検出できない。
+ *   実際このリポでは、別のゲートが★1行も走らないまま exit 0 を返していた
+ *   前科がある（isMain 判定が Windows + 日本語パスで必ず false になっていた）。
+ *
+ * ■ ★ここで確かめること
+ *   ① 未追跡ファイルへの import を入れたら【違反として拾う】か（見逃さない）
+ *   ② 追跡済みなら拾わない（誤検知しない）
+ *   ③ 検査対象が0件のとき、それを「違反0件＝合格」と読ませていないか
+ *      ★これが一番危険（何も測っていないのに緑）
+ */
+if (process.argv.includes('--selftest')) {
+  const fails = [];
+
+  // 毒1: 未追跡ファイルへの import → 違反として拾うべき
+  {
+    const files = [{ path: 'src/a.js', text: "import { x } from './nope.js';\n" }];
+    const v = findUntrackedImports(files, new Set(['src/a.js']));
+    if (v.length !== 1) fails.push(`★未追跡 import を拾えなかった(得た: ${v.length}件)`);
+  }
+  // 毒2: 追跡済みなら拾わない（誤検知しない）
+  {
+    const files = [{ path: 'src/a.js', text: "import { x } from './b.js';\n" }];
+    const v = findUntrackedImports(files, new Set(['src/a.js', 'src/b.js']));
+    if (v.length !== 0) fails.push(`★追跡済みなのに違反と誤検知した(得た: ${v.length}件)`);
+  }
+  // 毒3: ★検査対象0件を「違反0件」と同じに扱っていないか
+  {
+    const v = findUntrackedImports([], new Set());
+    if (v.length !== 0) fails.push('★空入力で違反を捏造した');
+    // ここでは「0件でも exit 0 になる」ことを問題として明示する。
+    // ★実運用では下の本体が files.length を出力するので、0 件なら人が気づける。
+    if (bundleTargets([]).length !== 0) fails.push('★空の追跡一覧から対象を捏造した');
+  }
+  // 毒4: 実リポで対象が1件も無いのはおかしい（検査が空振りしていないか）
+  {
+    const n = bundleTargets(trackedFiles()).length;
+    if (n === 0) fails.push('★実リポで検査対象が0件（検査が空振りしています）');
+  }
+
+  if (fails.length > 0) {
+    console.error('[check-tracked-imports] ★selftest 失敗（検知が効いていません）:');
+    for (const f of fails) console.error(`  - ${f}`);
+    process.exit(1);
+  }
+  console.log('[check-tracked-imports] selftest OK'
+    + '（未追跡を拾う / 追跡済みを誤検知しない / 空入力で捏造しない / 実リポで空振りしない）');
+  process.exit(0);
+}
+
 const all = trackedFiles();
 const trackedSet = new Set(all);
 const targets = bundleTargets(all);

@@ -59,7 +59,77 @@ const SELF_WRITTEN_PATTERNS = Object.freeze([
   /^nls_lane_mirror_v\d+$/i,
   /^nls_stat_cards_mirror_v\d+$/i,
   /^nls_north_star_mirror_v\d+$/i,
-  /^nls_comment_timeline_mirror_v\d+$/i
+  /^nls_comment_timeline_mirror_v\d+$/i,
+  /*
+   * ★v0.1.1344: 鏡バンドルの【残り5種】を追加(2026-08-04 の根治後に鏡が増え、
+   *   このリストの更新が漏れていた)。
+   *
+   * ■ 実測(2026-08-12 状態速報)
+   *     描き直しの内訳(計2285回): storage_changed1891 / self_write_skipped352
+   *     1コメントあたり30回(正常は3回以下)・表示遅延5秒
+   *   ＝2026-08-04 に一度根治したはずの自己フィードバックループが再発していた。
+   *
+   * ■ 真因(コードだけで確定・実データ不要だった)
+   *   mirrorBundleFlushScheduler.js:36-44 は【9種】の鏡を同じバンドルで書くが、
+   *   ここには4種しか無かった。isAllSelfWrittenRenderArtifacts は every() なので
+   *   **未登録の鏡が1つ混ざるだけでスキップ判定が丸ごと false** になり、
+   *   さらに popupStorageRefreshCoalesce の allHighFreq も false になって
+   *   450ms スロットルまで素通りする(穴1と穴2が再び噛み合った)。
+   *
+   * ★検査 selfWrittenCoversMirrorBundle.test.js が「バンドルの全キーがここに載ること」を
+   *   機械照合する。鏡を足したらこのリストも足す、を人間の記憶に頼らない。
+   */
+  /^nls_top_supporters_mirror_v\d+$/i,
+  /^nls_gift_history_mirror_v\d+$/i,
+  /^nls_room_heat_mirror_v\d+$/i,
+  /^nls_session_summary_mirror_v\d+$/i,
+  /^nls_story_diag_mirror_v\d+$/i,
+  /*
+   * ★v0.1.1345: per-live 版の鏡(配信IDが末尾に付く)を追加。
+   *
+   * ■ v0.1.1344 の修正は【不完全だった】。実機の計器が名指しした:
+   *     storage_changed:nls_lane_mirror_v2_*+nls_lane_receipt_v1_* が 3,456回(69%)
+   *   上の `/^nls_lane_mirror_v\d+$/` は **`$` で終わる**ため、実際に書かれている
+   *   `nls_lane_mirror_v2_lv351156267` に**一致しない**(旧 v1 の配信ID無しキー専用だった)。
+   *   `nls_lane_receipt_v1_<lv>` に至っては登録すら無かった。
+   *   → 1コメントあたり31回の描き直しが残っていた(v1344 出荷後の実測)。
+   *
+   * ★教訓: パターンを足すときは【実際に書かれているキー文字列】で照合すること。
+   *   定数名(KEY_LANE_MIRROR)だけ見て正規表現を書くと、per-live 版の存在を見落とす。
+   *   正本: laneMirrorKey.js の laneMirrorKeyFor / laneReceiptKeyFor。
+   */
+  /^nls_lane_mirror_v\d+_lv\d{1,15}$/i,
+  /^nls_lane_receipt_v\d+_lv\d{1,15}$/i,
+
+  /*
+   * ★v0.1.1503: 鏡バンドル以外の自己書き込み3種を追加。
+   *
+   * ■ 実測(2026-08-23状態速報・v0.1.1484の内訳計器で確定)
+   *     描き直し1,106回のうちコメント由来は3.0%だけ。残り97%は storage 更新。
+   *     最多3つ: nls_panel_summary_*(219) / nls_watch_snapshot_*(196) /
+   *              ai_share+status_lite(173)
+   *   このうち後者2種(196+173=369回・33.3%)は isHighFrequencyCommentRelatedStorageKey が
+   *   false のため、popupStorageRefreshCoalesce.js の allHighFreq 判定に混ざると
+   *   450msスロットルを丸ごと素通りする(このファイル冒頭の stripSelfWrittenRenderArtifacts
+   *   と同型の穴が、鏡以外のキーには塞がれていなかった)。
+   *
+   * ■ nls_watch_snapshot_<lv> … popup 自身が書く(popup-entry.js の cached-first render
+   *   write-through)。popup 自身の onChanged が即座に受けて再描画する自己フィードバック。
+   *   正本: storageKeys.js#watchSnapshotStorageKey。実キーで確認済み(定数名だけで
+   *   正規表現を書かない・v0.1.1345の教訓)。
+   *
+   * ■ ai_share_fast_diag / status_fast_diag_lite … 純粋な診断キー。中身が同じでも
+   *   書き込み時刻の記録が毎回更新されるため必ず onChanged が発火する。status.html は
+   *   自前の2秒ループで読んでおり popup の onChanged には依存しないため、
+   *   popup 側の再描画トリガーから外しても失うものが無い。
+   *
+   * ★panel_summary(219回・最多)は【あえて含めない】。watchUrlFreshness.js が
+   *   その updatedAt を「配信がまだ生きているか」の生存確認に使っており、
+   *   自己書き込み扱いで無変化スキップすると誤診の恐れがあるため触らない。
+   */
+  /^nls_watch_snapshot_lv\d{1,15}$/i,
+  /^nls_ai_share_fast_diag_v\d+$/i,
+  /^nls_status_fast_diag_lite_v\d+$/i
 ]);
 
 /**

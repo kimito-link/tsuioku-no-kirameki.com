@@ -1,13 +1,14 @@
 // @ts-nocheck — popup UI; DOM/Chrome API が広く any 相当
 // popup-entry.js — ポップアップ UI 本体。応援レーン描画・HTMLレポート生成・各種診断/共有のまとめ役。
 import { extractLiveIdFromUrl, isNicoLiveWatchUrl, watchPageUrlsMatchForSnapshot } from '../lib/broadcastUrl.js';
+import { shouldSkipMirrorForLiveId } from '../lib/passiveMirrorLiveIdGuard.js';
 // v0.1.1057: HTMLレポート組み立てクラスタを popup/report/ へ切り出し(max-linesラチェット対応・挙動不変)。
 import {
   buildYukkuriImageDataUrlMap,
   buildHtmlReportDocument
 } from './popup/report/htmlReportDocument.js';
 import { makeInitialMilestoneEffectDiag, buildMilestoneEffectDiagSnapshot } from '../lib/milestoneEffectDiag.js';
-import { KEY_MILESTONE_EFFECT_DIAG } from '../lib/milestoneEffectDiagKey.js';
+import { KEY_MILESTONE_EFFECT_DIAG } from '../lib/milestoneEffectDiagKey.js'; import { installPanelWakeCurtain } from '../lib/panelWakeCurtainDom.js'; import { mountOuenBanner } from '../lib/ouenBannerDom.js';
 // v0.1.1080: マイ効果音・ボイス/BGM/操作音の計器が直接 chrome.storage.local を叩くと、
 //   拡張リロード後の古い inline iframe で「Cannot read properties of undefined (reading 'local')」の
 //   同期 TypeError が uncaught のまま chrome://extensions に残る(.catch() は非同期 reject にしか
@@ -22,16 +23,14 @@ import {
   mergeInstantPushBuffer,
   composeDisplayEntriesWithInstantPush,
   computeInstantPushGapAverage,
-  NLS_LIVE_COMMENT_PUSH_NONCE_PARAM
-} from '../lib/instantCommentPush.js';
+  NLS_LIVE_COMMENT_PUSH_NONCE_PARAM } from '../lib/instantCommentPush.js';
 import { applyInstantPushDiagDelta } from '../lib/instantPushDiag.js';
 import { KEY_INSTANT_PUSH_DIAG } from '../lib/instantPushDiagKey.js';
 // 2026-07-06: 「別の配信へ移動(SPA遷移)するとパネルが壊れる」修正。iframe を作り直さず
 //   postMessage で新 lv を通知する経路(content-entry.js の notifyInlineIframeOfChannelSwitch)。
 import {
   isLiveChannelSwitchMessageValid,
-  extractSwitchedLiveIdFromMessage
-} from '../lib/liveChannelSwitch.js';
+  extractSwitchedLiveIdFromMessage } from '../lib/liveChannelSwitch.js';
 import { applyChannelSwitchDiagDelta, computeChannelSwitchPaintGapAverage } from '../lib/channelSwitchDiag.js';
 import { KEY_CHANNEL_SWITCH_DIAG } from '../lib/channelSwitchDiagKey.js';
 import { createThrottledDiagFlusher } from '../lib/diagFlushThrottle.js';
@@ -42,6 +41,9 @@ import { detectVersionMismatch } from '../lib/versionMismatch.js';
 import { directHit, makeInitialComboState } from '../lib/effectDirector.js';
 import { readInlineModeFlags } from '../lib/inlineModeFlags.js';
 import { pickWatchUrlFromMultipleSources } from '../lib/popupWatchUrlResolveMultiTab.js';
+import { buildWatchSnapshotKey, heavyResultStillTargetsThisWatch } from '../lib/watchSnapshotKey.js';
+import { decideNoActiveWatch } from '../lib/noActiveWatchDecision.js';
+import { shouldRevealCloakAfterFirstPaint } from '../lib/popupCloakRevealTiming.js';
 import { resolveCommentPostWatchTarget } from '../lib/commentPostWatchTarget.js';
 import { shouldCloseStandalonePopupAfterNavigate } from '../lib/standalonePopupClose.js';
 import { shouldRescueEmptyResolvedWatch } from '../lib/popupContextBarModel.js';
@@ -53,8 +55,7 @@ import { executeScriptWithTimeout } from '../lib/executeScriptWithTimeout.js';
 import { backfillRemoveGiftSystemMessages } from '../lib/backfillRemoveGiftSystemMessages.js';
 import {
   backfillRemoveRecommendedLivePollution,
-  backfillRemoveRecommendedUserChipPollution
-} from '../lib/backfillRemoveRecommendedLivePollution.js';
+  backfillRemoveRecommendedUserChipPollution } from '../lib/backfillRemoveRecommendedLivePollution.js';
 import { summarizeDevMonitorGiftRanking } from '../lib/summarizeDevMonitorGiftRanking.js';
 import { AI_SHARE_DIAG_SCHEMA_VERSION } from '../lib/aiShareDiagSchema.js';
 import { buildStorageWriteErrorPayload } from '../lib/storageErrorState.js';
@@ -65,12 +66,10 @@ import { addRepaintReason } from '../lib/repaintReasonCensus.js';
 import { deriveCommentPostUiState } from '../lib/commentPostUi.js';
 import {
   resolveCommentPostStatus,
-  commentComposeAriaDescribedBy
-} from '../lib/commentPostStatusPresentation.js';
+  commentComposeAriaDescribedBy } from '../lib/commentPostStatusPresentation.js';
 import {
   createCommentSubmitProfiler,
-  recordCommentSubmitTotal
-} from '../lib/commentSubmitProfiling.js';
+  recordCommentSubmitTotal } from '../lib/commentSubmitProfiling.js';
 import { commentPostErrorWarrantsFrameDiscovery } from '../lib/commentPostRetriable.js';
 import { capCommentsForAnalytics } from '../lib/capCommentsForAnalytics.js';
 import { pickCommentsForExport } from '../lib/pickCommentsForExport.js';
@@ -78,16 +77,14 @@ import { selectLaneFeedCommentRows } from '../lib/provisionalLaneCommentRows.js'
 import {
   markWatchPopupLoadPhase,
   resetWatchPopupLoadDiagnostics,
-  snapshotWatchPopupLoadPhase
-} from '../lib/watchPopupLoadDiagnostics.js';
+  snapshotWatchPopupLoadPhase } from '../lib/watchPopupLoadDiagnostics.js';
 // v0.1.1123 計器(D-0): 独立描画トリガ(tick)の結末を理由別に数える(started=0 の真因実測)。
 import {
   createLaneTickProbe,
   recordLaneTick,
   snapshotLaneTickProbe,
   LANE_TICK_REASONS,
-  LANE_TICK_LID_SOURCES
-} from '../lib/laneTickProbe.js';
+  LANE_TICK_LID_SOURCES } from '../lib/laneTickProbe.js';
 import { sanitizeRoomAvatarsForBroadcaster } from '../lib/sanitizeRoomAvatarsForBroadcaster.js';
 import { excludeBroadcasterFromRankedRooms } from '../lib/excludeBroadcasterFromRankedRooms.js';
 import { excludeBroadcasterFromCommentEntries } from '../lib/excludeBroadcasterFromCommentEntries.js';
@@ -101,12 +98,10 @@ import { aggregateGiftSenderTotals } from '../lib/giftEventStore.js';
 import { kokenContribStorageKey } from '../lib/kokenContributionRankingApi.js';
 import {
   giftHistoryThrowsStorageKey,
-  buildKokenGiftPersistPayload
-} from '../lib/kokenGiftHistoryApi.js';
+  buildKokenGiftPersistPayload } from '../lib/kokenGiftHistoryApi.js';
 import {
   shouldDeferCelebrationsUntilHeavySettled,
-  shouldReprimeCommentMilestones
-} from '../lib/watchPopupCelebrationGuard.js';
+  shouldReprimeCommentMilestones } from '../lib/watchPopupCelebrationGuard.js';
 import { createPopupCelebrationGate } from '../lib/popupCelebrationGate.js';
 import { nicoadCommentCelebrationKey } from '../lib/nicoadCelebrationKey.js';
 import { buildGiftHistoryNorthStarViewModel } from '../lib/giftHistoryViewModel.js';
@@ -116,6 +111,7 @@ import { buildGiftHistoryMirrorSnapshot } from '../lib/giftHistoryMirror.js';
 // heavyRace再発の根治(HANDOFF-heavyrace-backfill-IMPL.md B): backfill中の全件re-readループを断つ
 //   canReuse fresh-read 判定(現total 80%coverage に加え「前回読了時完全 かつ 直近12秒以内」なら再利用)。
 import { decideHeavyChunkReadReuse, HEAVY_FULL_REREAD_MIN_GAP_MS } from '../lib/heavyChunkReadReuse.js';
+import { decideLightWriteKeepsHeavyTrace } from '../lib/heavyCachePreserve.js';
 import { createSingleFlightByKey } from '../lib/singleFlightByKey.js';
 // ③WEB室温丸写し(第4号・reference_full_mirror_SYNTHESIS.md M3): 室温パネル(直近5分の応援増加=件数/人数/
 //   熱度%/文言)を純Web③にも丸写しするための鏡スナップショット純関数。renderRoomHeatSummary で計算済みの
@@ -475,9 +471,13 @@ import {
   storagePatchInlineFloatingAnchor,
   storagePatchInlinePanelPlacementWithExplicit,
   storagePatchInlinePanelViewportWidePolicy,
-  storagePatchInlinePanelWidthMode
-} from '../lib/inlinePanelPlacementStorage.js';
+  storagePatchInlinePanelWidthMode } from '../lib/inlinePanelPlacementStorage.js';
 import { isGiftRankingLaneEnabledFromStorage } from '../lib/giftRankingLaneOptIn.js';
+import { decideHiddenWork } from '../lib/hiddenPublishPolicy.js'; // ★v1394 隠れていても会場へ供給
+import { isVenueOpenCached } from '../lib/venueOpenCache.js';
+import { mainThreadBlocker } from '../lib/mainThreadBlockerBoot.js';
+import '../lib/bandScaleBoot.js'; // ★v1392帯拡大/v1393なふだ/v1394会場購読(本体はlib側)
+import '../lib/nameplateToggleBoot.js';
 // v0.1.450 (PR4): isBackfillEnabledFromStorage は refreshBackfillFetchPrompt（B 用）で使われ
 //   ていたが、B 廃止により未使用。自動取り込みトグル hydrate は isBackfillAutoStartEnabled のみ
 //   で完結する。
@@ -543,6 +543,7 @@ import {
 import { mergeProgramStatsWatchIntoWatchMetaSnapshot } from '../lib/mergeProgramStatsWatchIntoWatchMetaSnapshot.js';
 import { buildWatchMetaCardAudienceViewModel } from '../lib/buildWatchMetaCardAudienceViewModel.js';
 import { mergeStoredCommentDedupeVariants } from '../lib/storedCommentDedupeMerge.js';
+import { storedCommentDedupeKey } from '../lib/storedCommentDedupeKey.js';
 import {
   resolveWatchMetaCardState,
   isLiveStatValueAwaitingData
@@ -583,7 +584,15 @@ import {
   matchesAnySelfPostedRecent,
   prepareSelfPostedMatchRecents
 } from '../lib/selfPostedMatcher.js';
-import { parseViewerCountFromLooseText } from '../lib/liveAudienceDom.js';
+import {
+  mergeViewerProbeIntoSnapshot,
+  probeViewerCountFromFrameTexts
+} from '../lib/viewerCountProbeMerge.js';
+import { yieldToBrowserPaint } from '../lib/yieldToBrowserPaint.js';
+import { buildStorageRefreshTriggerTag } from '../lib/storageRefreshTriggerKey.js';
+import { prefersReducedMotion } from '../lib/prefersReducedMotion.js';
+import { pushLaneTileSample, summarizeLaneTileOscillation } from '../lib/laneTileOscillation.js';
+import { makeLaneResult } from '../lib/northStarLaneResult.js';
 import {
   buildTickerTextAndTip,
   decorateTickerLine,
@@ -622,10 +631,57 @@ import {
   NICONICO_OFFICIAL_DEFAULT_USERICON_HTTPS
 } from '../lib/supportGrowthTileSrc.js';
 import { userLaneHttpForTilePick } from '../lib/storyUserLaneDisplaySrc.js';
+// ★v0.1.1456: popup(iframe)側の DOM 量を数える(調査計画 Step 1)。watch 側とは別文書。
+import { summarizePopupDomCensus } from '../lib/popupDomCensus.js';
+// ★v0.1.1458: パネルを覆っている当人を名指しする(iframe の【中】で測る)。
+import { judgePanelCover } from '../lib/panelCoverCulprit.js';
+// ★v0.1.1461: DOMの木を数字にして計器へ(可視化拡張の代わり・自前で採る)。
+import { summarizeDomTree } from '../lib/domTreeCensus.js';
+/*
+ * ★v0.1.1459: メインスレッドを止めた【当人】を名指しするために重い処理を囲む。
+ *   ★これまで呼び出しが0箇所で、速報は必ず「(拡張の外)」と出ていた=計器が嘘をついていた。
+ *   実機で 16.7秒中 15.9秒(95%)停止・最悪4,776ms を観測したのに犯人が分からなかった。
+ */
+import { markBlockerSection } from '../lib/mainThreadBlockerBoot.js';
+/*
+ * ★v0.1.1462: 【全経路を機械的に測る】(ユーザー指示: 全部把握して計器に入れる)。
+ *   markBlockerSection はラベルを置くだけで自分では測っておらず、
+ *   finally で区間を抜けた瞬間にラベルを戻すため、250msごとのハートビートが
+ *   鳴る頃には既に抜けていて ★「(拡張の外)」としか出なかった。
+ *   → 区間【そのもの】を実測し、★測れていない時間(カバー率)も出す。
+ */
+import { createAutoSectionCensus, noteAutoSection, formatAutoSectionLines } from '../lib/autoSectionCensus.js';
+/** 拡張の処理時間の集計(状態速報が読む)。 */
+const _autoSectionCensus = createAutoSectionCensus();
+/** 計測を始めた時刻。カバー率の分母になる。 */
+const _autoSectionStartedAt = Date.now();
+/**
+ * 区間を【実測して】名前ごとに積む。
+ *
+ * ★markBlockerSection(ラベルのみ)をこれで包むことで、
+ *   既存の囲み箇所が全部そのまま実測に格上げされる。
+ *   ★戻り値も例外もそのまま通す(囲んでも挙動を変えない)。
+ *
+ * @template T
+ * @param {string} name
+ * @param {() => T} fn
+ * @returns {T}
+ */
+function _measuredSection(name, fn) {
+  const t0 = typeof performance !== 'undefined' && performance.now ? performance.now() : Date.now();
+  try {
+    return markBlockerSection(name, fn);
+  } finally {
+    try {
+      const t1 = typeof performance !== 'undefined' && performance.now ? performance.now() : Date.now();
+      noteAutoSection(_autoSectionCensus, { name, ms: t1 - t0, atMs: Date.now() });
+    } catch { /* 計器の失敗で本処理を壊さない */ }
+  }
+}
 import {
   paintStoryUserLaneDomEmptyGuides,
   paintStoryUserLaneDomFilled,
-  resetStoryUserLaneDom, getStoryLaneRepaintCounts, shouldKeepStoryUserLaneTilesOnEmpty,
+  resetStoryUserLaneDom, getStoryLaneRepaintCounts, getStoryLaneHollowCounts, shouldKeepStoryUserLaneTilesOnEmpty,
   // heavyRace再発の即効対策(HANDOFF-heavyrace-backfill-IMPL.md A): 暫定(heavy未settle)の短い候補で
   //   一度出た完全描画を上書き退化させない単調性ガード。
   shouldKeepStoryUserLaneTilesOnShrink,
@@ -665,9 +721,10 @@ import {
 } from '../lib/storyUserLaneRenderProbe.js';
 // v0.1.1231 Phase1: レーンの人物集合の増減(誰が消えたか)を測る計器。観測のみ。
 import { makeLaneRosterDeltaState, noteLaneRoster, snapshotLaneRosterDelta } from '../lib/laneRosterDelta.js';
-import { shouldSkipLightSupplyOverwrite, formatLightSupplyGuardLine } from '../lib/lightSupplyOverwriteGuard.js';
+import { judgeAndRecordLightSupply, shouldSkipLightSupplyAfterAwait, formatLightSupplyGuardLine } from '../lib/lightSupplyOverwriteGuard.js';
 // v0.1.1249: 「誰が供給を書いたか」を名指しする計器(provisional 申告漏れの検出込み)。
 import { LANE_SUPPLY_ORIGIN, createLaneSupplyOriginDiag, noteLaneSupplyShrink, noteLaneSupplyWrite, snapshotLaneSupplyOriginDiag } from '../lib/laneSupplyOriginDiag.js';
+import { snapshotLanePublishSkipDiag } from '../lib/lanePublishSkipDiag.js';
 // v0.1.1232 lane-never-drop: 「一度出た人」を覚える名簿(Phase2 蓄積器)。計器とは別モジュール。
 import { applyLaneRosterKeeper, makeLaneRosterKeeperState } from '../lib/laneRosterKeeper.js';
 // 人物タイルの ID 行・名前行の正本(person-tile-unify 第3コミット)。popup と会場で共有。
@@ -686,6 +743,7 @@ import {
 } from '../lib/exportWaitNarration.js';
 import { playReportCompleteVoiceSequence } from '../lib/reportCompleteVoice.js';
 import { createSupportAvatarLoadGuard } from '../lib/supportGrowthAvatarLoad.js';
+import { shouldSweepAvatarRetry } from '../lib/avatarRetrySweepThrottle.js';
 // avatar load guard のコールバック(TV-fallback クラス付け外し)の正本。popup と会場で共有。
 import {
   applyStoryAvatarTvFallbackClass,
@@ -724,9 +782,13 @@ import { buildStoryUserLaneCandidateRow } from '../lib/storyUserLaneRowModel.js'
 import { KEY_LANE_DIAG } from '../lib/laneDiagKey.js';
 import { buildLaneDiagSnapshot } from '../lib/laneDiag.js';
 import { KEY_LANE_MIRROR } from '../lib/laneMirrorKey.js';
+// ★v0.1.1300: 配信ごと鏡(v2)+受領証の書き出し(storage I/O グルーは lib へ抽出=max-lines ラチェット遵守)。
+import { publishLaneMirrorPerLive } from '../lib/laneMirrorPerLivePublish.js';
 import { KEY_PREVIEW_RENDER_ACK, buildPreviewRenderAck } from '../lib/previewRenderAckKey.js';
 import { buildLaneMirrorSnapshot, laneMirrorCapFromBuckets, restoreLaneMirrorBuckets } from '../lib/laneMirror.js';
-import { measureLaneDomSelf } from '../lib/laneDomSelfMeasure.js';
+import { measureLaneDomSelf, perTierKeysOf } from '../lib/laneDomSelfMeasure.js';
+// v0.1.1284: ①実DOMのキー列指紋(会場が別ドキュメント起点で顔ぶれ一致を判定するために同梱)。
+import { laneDomFingerprint } from '../lib/laneSceneEnvelope.js';
 import { createMirrorBundleFlushScheduler } from '../lib/mirrorBundleFlushScheduler.js';
 import { KEY_STAT_CARDS_MIRROR } from '../lib/statCardsMirrorKey.js';
 import { buildStatCardsMirrorSnapshot } from '../lib/statCardsMirror.js';
@@ -758,21 +820,11 @@ import { explainSupportGridDisplayTier } from '../lib/supportGridDisplayTier.js'
 import { parseCommentIngestLog } from '../lib/commentIngestLog.js';
 import { pickDevMonitorDebugSubset } from '../lib/devMonitorDebugSubset.js';
 import {
-  computeAcquisitionPercents,
-  computeRadarPolygonPoints,
-  computeAcquisitionPieGradient,
-  ACQUISITION_RADAR_GEOMETRY
-} from '../lib/acquisitionDashboardChart.js';
-import {
   summarizeStoredCommentAvatarStats,
   summarizeStoredCommentProfileGaps
 } from '../lib/devMonitorAvatarStats.js';
-import {
-  appendTrendPoint,
-  persistTrendPointChrome,
-  readMergedTrendSeries,
-  readTrendSeries
-} from '../lib/devMonitorTrendSession.js';
+import { readMergedTrendSeries, readTrendSeries } from '../lib/devMonitorTrendSession.js';
+import { renderAcquisitionDashboard } from './popup/renderAcquisitionDashboard.js';
 import { publishReportPreviewThrottled } from '../lib/reportPreviewPublish.js';
 import {
   summarizeCommentRecordBreakdown,
@@ -828,6 +880,10 @@ import {
 } from '../lib/commentVelocityWindow.js';
 import { maybeFlushBroadcastSessionSummarySample } from '../lib/broadcastSessionSummaryFlush.js';
 import { isContextInvalidatedError as isExtensionContextInvalidatedError } from '../lib/reportSilentError.js';
+import { createConsoleErrorBuffer } from '../lib/consoleErrorBuffer.js';
+import { buildPopupErrorProbe } from '../lib/popupErrorLine.js';
+import { countIdentityFromLanePicks, buildIdentityAcquisitionProbe } from '../lib/identityAcquisitionCensus.js';
+import { hasCloakFailsafeFired } from '../lib/cloakFailsafeMarker.js';
 import {
   listBroadcastSessionSummaryForLive,
   openBroadcastSessionSummaryDb
@@ -876,13 +932,10 @@ import { avatarCompareKey, isSameAvatarUrl } from '../lib/avatarUrlCompare.js';
 // 一意アバター数の集計(純関数・挙動同値で popup-entry から切り出し)。
 import { countUniqueAvatarEntries } from '../lib/avatarEntryCounts.js';
 import { resolveStoryLaneAvatarSrc } from '../lib/storyLaneAvatarSrc.js';
-import { pickAvatarUrlForUid } from '../lib/deriveAvatarUrlFromUid.js';
-import { runPopupAiDiagnosis } from '../lib/popupAiDiagOrchestrator.js';
-import {
-  probeBuiltinAiAvailability,
-  runBuiltinAiPrompt
-} from '../lib/geminiNanoBridge.js';
-import { buildErrorDiagnosisPrompt } from '../lib/errorAutoDiagnosis.js';
+import { pickAvatarUrlForUid, extractUidFromAvatarUrl } from '../lib/deriveAvatarUrlFromUid.js';
+// v0.1.1386: 実在が確認できたサムネ(uid)を覚えて、次から本物として数える。
+import { addVerifiedAvatarUids, verifiedAvatarUidSet, KEY_VERIFIED_AVATAR_UIDS } from '../lib/verifiedAvatarRegistry.js';
+import { attachAiDiagButtonHandler } from './popup/attachAiDiagButtonHandler.js';
 import { mergeWatchSnapshotPreservingBroadcaster } from '../lib/watchSnapshotPartialMerge.js';
 import { persistFreshlyFetchedSnapshot } from '../lib/popupWatchSnapshotPersist.js';
 import {
@@ -1046,6 +1099,10 @@ function updateInlineOwnWatchUrlFromLv(lv) {
 }
 
 function applyResponsivePopupLayout() {
+  // ★v0.1.1462: 幅変更のたびに走る=「引っ張った瞬間」の当事者。実測する。
+  return _measuredSection('applyResponsivePopupLayout', () => applyResponsivePopupLayoutImpl());
+}
+function applyResponsivePopupLayoutImpl() {
   const root = document.documentElement;
   const body = document.body;
   if (!root || !body) return;
@@ -2113,7 +2170,7 @@ async function loadSupportCelebrationState() {
 /** 節目・自分操作の shower／豪雨／飛び文字。OS の reduced-motion のみ尊重（nl-calm-motion では止めない）。 */
 function supportCelebrationMotionEnabled() {
   try {
-    if (window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches) return false;
+    if (prefersReducedMotion()) return false;
   } catch {
     /* no-op */
   }
@@ -3511,6 +3568,10 @@ let _tickerLastUserId = '';
 
 /** @param {PopupCommentEntry[]} comments */
 function renderCommentTicker(comments) {
+  // ★v0.1.1459: 区間名を付けて呼ぶ(コメントごとに走るので停止の常連候補)。
+  return _measuredSection('renderCommentTicker', () => renderCommentTickerImpl(comments));
+}
+function renderCommentTickerImpl(comments) {
   const segA = $('commentTickerSegA');
   const segB = $('commentTickerSegB');
   const scroll = /** @type {HTMLElement|null} */ ($('commentTickerScroll'));
@@ -3797,18 +3858,18 @@ function hasExtensionContext() {
   }
 }
 
+// ★v0.1.1377: popup の例外を記録する(経緯と掟は src/lib/popupErrorLine.js のヘッダ)。
+const _popupErrorBuffer = createConsoleErrorBuffer({ capacity: 20 });
+/** ★v0.1.1378: サムネ/ID/名前の取得率。@type {ReturnType<typeof countIdentityFromLanePicks>} */
+let _identityAcquisition = null;
+
 let extensionContextErrorGuardInstalled = false;
 function installExtensionContextErrorGuard() {
   if (extensionContextErrorGuardInstalled) return;
   extensionContextErrorGuardInstalled = true;
-  globalThis.addEventListener('unhandledrejection', (ev) => {
-    if (!isExtensionContextInvalidatedError(ev.reason)) return;
-    ev.preventDefault();
-  });
-  globalThis.addEventListener('error', (ev) => {
-    if (!isExtensionContextInvalidatedError(ev.error || ev.message)) return;
-    ev.preventDefault();
-  });
+  try {
+    _popupErrorBuffer.install(globalThis);
+  } catch { /* 観測の失敗で popup を止めない */ }
 }
 
 /**
@@ -4035,8 +4096,37 @@ function clearPopupPrimaryRevealFallback() {
 
 function ensurePopupPrimaryCloakedBeforeFirstReveal() {
   if (popupPrimaryRevealDone) return;
+  /*
+   * ★v0.1.1381: 外部保険(cloak-failsafe-entry.js)が既に幕を外していたら【付け直さない】。
+   *   保険は別スクリプトなので popupPrimaryRevealDone を立てられず、従来はここが
+   *   「まだ誰も見せていない」と誤認して幕を再付与していた(一度見えたのにまた隠れる)。
+   *   印を見て同じ結論(=もう見せてよい)へ倒すことで初めて止まる。
+   *   [[shared-knowledge-is-not-shared-judgment-2026-08-10]]
+   */
+  if (hasCloakFailsafeFired(typeof window !== 'undefined' ? window : null)) {
+    revealPopupPrimaryOnce();
+    return;
+  }
+  /*
+   * ★v0.1.1423: 幕(cloak)を【付けない】。
+   *
+   * ■ ユーザーの証言(これが根拠・2026-08-17)
+   *   「サイドパネル導入時は問題なかった」「前に進んでる気がしない」
+   *   git log で裏付け: 導入時(795c41b3)の sidepanel.html は【25行】で
+   *   幕は存在せず、黒くなかった。v0.1.1279 で
+   *   `data-nl-popup-primary-cloak="1"` を静的に足した版から黒が始まり、
+   *   以後 **12版** 黒を消す工夫を足し続けて sidepanel.html は 200行に膨れたが、
+   *   実機の黒は一度も消えなかった。
+   *   ＝足すのをやめ、**始まりの状態へ戻す**。
+   *
+   * ■ 幕の目的は「白フラッシュ防止」だったが
+   *   サイドパネルの白0.2秒は Chromium issue 40190899 で拡張からは直せないと
+   *   結論済み([[sidepanel-white-flash-is-unfixable-2026-08-10]])。
+   *   ＝防げない白のために、中身を隠す仕組みを全画面に入れていた。
+   *
+   * ★aria-busy だけは残す(支援技術向けの正しい表明で、見た目を隠さない)。
+   */
   try {
-    document.documentElement.setAttribute('data-nl-popup-primary-cloak', '1');
     const el = /** @type {HTMLElement|null} */ ($('nlPopupPrimary'));
     if (el) el.setAttribute('aria-busy', 'true');
   } catch {
@@ -4982,11 +5072,128 @@ const STORY_REMOTE_FAILED_PLACEHOLDER_IMG = NICONICO_OFFICIAL_DEFAULT_USERICON_H
 //   person-tile-unify 第3コミット(2026-06-22)で src/lib/storyAvatarTvFallbackClass.js に抽出し、
 //   popup と会場(venueBar.js)で同じ本物を avatar load guard のコールバックに渡す(上部で import)。
 
+// ★v0.1.1338: retryPolicy を popup でも opt-in(会場は v0.1.1318 で先行導入済み)。
+//   理由と実測は avatarRetrySweepThrottle.js のヘッダが正本。値は会場と同じ既定。
+/*
+ * ★v0.1.1386: 実在が確認できたサムネ(uid)を貯めて storage に間引き保存する。
+ *
+ * ■ なぜ(2026-08-13 ユーザー「会場モードのサムネがしろい 一体なんのため」)
+ *   uid から式で組んだサムネURLは【実在を確認していない】ため score=1 のままで、
+ *   速報は「実サムネ0%」と言い続けていた。しかし実測では推測URLの多くが実在した
+ *   (curl で5件中3件が HTTP 200・4KBの画像が返る)。
+ *   ＝白いのはURLが悪いのではなく【実在を確認する経路が無かった】。
+ *
+ * ■ 掟
+ *   - 追加の通信をしない(既に描いた <img> の onload 結果だけを使う)
+ *   - 書き込みは間引く(成功のたびに set すると storage を圧迫する=過去に固まった原因)
+ *   - 失敗しても描画を止めない(全て try/catch)
+ */
+/**
+ * ★v0.1.1387: 実在確認済み uid の集合(描画の thumbScore 判定に使う)。
+ *   ここが空だと「記録はしたが誰も読んでいない」＝v0.1.1378 と同じ失敗になる
+ *   ([[unwired-judgement-is-systemic-2026-08-12]])。
+ * @type {Set<string>}
+ */
+let _verifiedAvatarUidSet = new Set();
+
+/** 起動時に一度だけ storage から読み込む(1キーのみ・失敗しても描画を止めない)。 */
+function loadVerifiedAvatarUidsOnce() {
+  try {
+    const local = globalThis.chrome?.storage?.local;
+    if (!local?.get) return;
+    void local.get(KEY_VERIFIED_AVATAR_UIDS).then((bag) => {
+      _verifiedAvatarUidSet = verifiedAvatarUidSet(bag?.[KEY_VERIFIED_AVATAR_UIDS]);
+    }).catch(() => { /* no-op */ });
+  } catch {
+    // no-op
+  }
+}
+loadVerifiedAvatarUidsOnce();
+
+/** @type {Set<string>} この起動で新たに実在確認できた uid(未保存分)。 */
+const _verifiedAvatarPending = new Set();
+/** 直近の保存時刻(ms)。間引きの基準。 */
+let _verifiedAvatarSavedAt = 0;
+/** 保存の最小間隔[ms]。 */
+const VERIFIED_AVATAR_SAVE_GAP_MS = 10_000;
+
+/**
+ * 実際に表示できた <img> から uid を拾って控える。
+ * @param {any} img
+ */
+function noteVerifiedAvatarFromImg(img) {
+  const src = String(img?.currentSrc || img?.src || '').trim();
+  if (!src) return;
+  const uid = extractUidFromAvatarUrl(src);
+  if (!uid) return;
+  _verifiedAvatarPending.add(String(uid));
+  /*
+   * ★v0.1.1387: 覚えた瞬間に判定用の集合へも入れる。
+   *   storage 保存は10秒間引きなので、これが無いと「表示できたのに次の描画でも
+   *   まだ推測URL扱い」になり、最大10秒ぶん判定が遅れる。
+   */
+  try { _verifiedAvatarUidSet.add(String(uid)); } catch { /* no-op */ }
+  maybeFlushVerifiedAvatars();
+}
+
+/** 間引きつきで storage へ流す(失敗は無視)。 */
+function maybeFlushVerifiedAvatars() {
+  if (_verifiedAvatarPending.size === 0) return;
+  const now = Date.now();
+  if (now - _verifiedAvatarSavedAt < VERIFIED_AVATAR_SAVE_GAP_MS) return;
+  _verifiedAvatarSavedAt = now;
+  const batch = Array.from(_verifiedAvatarPending);
+  _verifiedAvatarPending.clear();
+  try {
+    const local = globalThis.chrome?.storage?.local;
+    if (!local?.get) return;
+    void local.get(KEY_VERIFIED_AVATAR_UIDS).then((bag) => {
+      const merged = addVerifiedAvatarUids(bag?.[KEY_VERIFIED_AVATAR_UIDS], batch);
+      if (!merged.changed) return;
+      void local.set({ [KEY_VERIFIED_AVATAR_UIDS]: merged.uids });
+    }).catch(() => { /* no-op */ });
+  } catch {
+    // no-op
+  }
+}
+
 const storyAvatarLoadGuard = createSupportAvatarLoadGuard({
   fallbackSrc: STORY_REMOTE_FAILED_PLACEHOLDER_IMG,
   onFallbackApplied: applyStoryAvatarTvFallbackClass,
-  onRemoteSuccess: removeStoryAvatarTvFallbackClass
+  onRemoteSuccess: (img) => {
+    removeStoryAvatarTvFallbackClass(img);
+    /*
+     * ★v0.1.1386: onload が成功した瞬間＝そのURLが実在する生きた証拠。
+     *   追加の fetch は一切しない(既に描いた <img> の結果を拾うだけ)。
+     */
+    try {
+      noteVerifiedAvatarFromImg(img);
+    } catch {
+      // no-op: 記録の失敗は描画を止めない
+    }
+  },
+  retryPolicy: {}
 });
+
+/** アイコン再プローブ掃引の最終実行時刻(ms)。間引き判定は lib が正本。 */
+let _storyAvatarRetrySweepAt = 0;
+
+/**
+ * 失敗アイコンの再プローブ掃引(間引きつき)。★描画経路2つの【両方】から呼ぶ。
+ * @param {{ stack?: unknown, root?: unknown }|null|undefined} els
+ * @returns {void}
+ */
+function sweepStoryAvatarRetryThrottled(els) {
+  const now = Date.now();
+  if (!shouldSweepAvatarRetry(_storyAvatarRetrySweepAt, now)) return;
+  _storyAvatarRetrySweepAt = now;
+  try {
+    const root = /** @type {any} */ (els)?.stack || /** @type {any} */ (els)?.root || null;
+    if (root) storyAvatarLoadGuard.retrySweep(root, now);
+  } catch {
+    // 再試行の失敗は描画を止めない(観測は retriedTotal に残る)
+  }
+}
 
 /** @type {boolean} */
 let anonymousIdenticonRuntimeEnabled = true;
@@ -5930,10 +6137,7 @@ const STORY_REACTION_STATE = {
   liveId: '',
   lastCount: null,
   clearTimer: null,
-  reducedMotion:
-    typeof window.matchMedia === 'function'
-      ? window.matchMedia('(prefers-reduced-motion: reduce)').matches
-      : false
+  reducedMotion: prefersReducedMotion()
 };
 
 /**
@@ -6158,11 +6362,28 @@ let _instantPushAvgGapMsLocal = -1;
 
 /**
  * robust-arch Phase 0 (2026-07-07・計器のみ・挙動不変): 「配達のみ」(送信→ハンドラ受信)の
- * EMA 平均をメモリ上だけで追跡する。_instantPushAvgGapMsLocal(送信→描画完了=全経路)から
- * これを引けば「描画分」が出る。どちらが支配的かで MVP 後の次の一手が数値で決まる。
+ * EMA 平均をメモリ上だけで追跡する。
+ *
+ * ★v0.1.1416 訂正: 旧コメントは「_instantPushAvgGapMsLocal から これを引けば描画分が出る」と
+ *   書いていたが、**引いてはいけない2数**だった。母集団が違う:
+ *     - この値              … 受信ハンドラで【毎バッチ】更新
+ *     - _instantPushAvgGapMsLocal … 描画時に、バッファ内で commentNo を持つ
+ *                            【最後の1行だけ】が sample になる(下のループが毎回上書きする)
+ *   実機(2026-08-16)で両者が同程度に大きくなり、差が0付近に落ちて
+ *   「描画平均0ms=描画は無罪」と読めてしまった。引き算は instantPushDiag.js 側で廃止済。
  * @type {number} -1=未計測
  */
 let _instantPushAvgDeliveryGapMsLocal = -1;
+
+/**
+ * ★v0.1.1416: 【可視中だけ】の配達 EMA 平均。
+ * 裏タブでは Chrome がタイマーを間引くので配達 gap は正常でも伸びる(postMessage 自体は
+ * 間引かれないので、この経路の gap には裏タブ滞留がそのまま乗る)。
+ * 全体平均だけでは「裏タブで溜まっただけ(正常)」と「可視なのに詰まっている(異常)」が
+ * 混ざり、次の一手が決まらない。可視中だけを別に持って分離する。
+ * @type {number} -1=未計測
+ */
+let _instantPushAvgVisibleDeliveryGapMsLocal = -1;
 
 /**
  * v0.1.1092: 即時プッシュバッファの内容を STORY_SOURCE_STATE へ合流し、レーンだけを軽量に再描画する。
@@ -6277,9 +6498,30 @@ function handleInstantCommentPushMessage(event) {
       _instantPushAvgDeliveryGapMsLocal,
       deliveryGapMs
     );
+    /*
+     * ★v0.1.1416: 可視/裏タブを分けて数える(新しい storage read は足さない=
+     *   既存 delta に相乗りさせるだけ)。
+     *   裏タブでは Chrome がタイマーを間引くので配達 gap は正常でも伸びる。
+     *   一方 postMessage 自体は間引かれないため、この経路の gap だけが
+     *   「裏タブ滞留」と「本当に詰まっている」を混ぜて持ってしまう。
+     *   ＝可視中だけの平均を別に持たないと、47秒が異常なのか正常なのか判定できない。
+     */
+    const hiddenNow = typeof document !== 'undefined' && document.hidden === true;
+    if (!hiddenNow) {
+      _instantPushAvgVisibleDeliveryGapMsLocal = computeInstantPushGapAverage(
+        _instantPushAvgVisibleDeliveryGapMsLocal,
+        deliveryGapMs
+      );
+    }
     deliveryGapDelta = {
       lastDeliveryGapMs: deliveryGapMs,
-      avgDeliveryGapMs: _instantPushAvgDeliveryGapMsLocal
+      avgDeliveryGapMs: _instantPushAvgDeliveryGapMsLocal,
+      ...(hiddenNow
+        ? { hiddenDeliveries: 1 }
+        : {
+            visibleDeliveries: 1,
+            avgVisibleDeliveryGapMs: _instantPushAvgVisibleDeliveryGapMsLocal
+          })
     };
   }
   noteInstantPushDiagReceived({
@@ -6431,14 +6673,24 @@ let storyUserLaneLastRenderSig = '';
  *   会場の parity 判定(venueLaneParity.js)が読む。未描画のうちは null。
  */
 let _laneDomSelfLast = null;
+/** ★v0.1.1284: 直近に publish した鏡の contentHash(=次の paint の指紋の内容アドレス)。 */
+let _lastPublishedLaneMirrorHash = '';
+/** ★2026-08-08 計器: 鏡 publish の到達/見送りを数える。設計と読み方は lanePublishSkipDiag.js。 */
+const _lanePublishSkipDiag = {
+  noEls: 0,
+  entriesEmpty: 0,
+  lastPublishAt: 0,
+  lastSkipAt: 0,
+  lastSkipReason: ''
+};
 /** v0.1.1041: 最後に実タイルを描いた liveId。同一配信 backfill 谷間の一瞬空でタイルを畳まない判定の基準(shouldKeepStoryUserLaneTilesOnEmpty)。 */
 let _storyUserLaneLastTiledLid = '';
 /** v0.1.1231 Phase1: 人物集合の増減を測る計器の状態(観測のみ)。 */
 const _laneRosterDeltaState = makeLaneRosterDeltaState();
 // v0.1.1251: 軽い供給(summary+tail)の上書きを見送った回数を数える計器。
-//   ★件数0の意味を区別するため observedCount(暫定供給を何回判定したか)も持つ
-//   ([[zero-count-may-mean-unmeasured-2026-08-04]])。
-const _lightSupplyGuardDiag = { skipCount: 0, observedCount: 0, worst: null };
+//   ★件数0の意味を区別するため observedCount も持つ([[zero-count-may-mean-unmeasured-2026-08-04]])。
+// ★v0.1.1370: passReasons=通した理由の内訳(素通りの原因を速報に残す)。
+const _lightSupplyGuardDiag = { skipCount: 0, observedCount: 0, worst: null, paintedDuringAwaitCount: 0, passReasons: {} };
 const _laneSupplyOriginDiag = createLaneSupplyOriginDiag();
 /** v0.1.1232 Phase2: 「一度出た人」を覚える名簿(描画に使う・計器とは別物)。 */
 const _laneRosterKeeperState = makeLaneRosterKeeperState();
@@ -6705,7 +6957,13 @@ function renderStoryUserLane() {
   //   candidates 全件走査+sort+bucket+paint の合計。全員表示(limit撤廃)で重くなるかの実機ベースライン。
   const _laneRenderT0 = typeof performance !== 'undefined' ? performance.now() : Date.now();
   const els = getStoryUserLaneEls();
-  if (!els) return;
+  if (!els) {
+    // 計器: publish 未到達=①のレーンDOM無し(lanePublishSkipDiag.js 参照)。
+    _lanePublishSkipDiag.noEls += 1;
+    _lanePublishSkipDiag.lastSkipAt = Date.now();
+    _lanePublishSkipDiag.lastSkipReason = 'noEls';
+    return;
+  }
   // 本体で直接触るガード要素だけ分割代入(stack/4段は els 経由で paintStoryUserLaneDomFilled へ渡る)。
   const { guideTop, guideLinesTop, guideBottom, guideLinesBottom } = els;
 
@@ -6723,7 +6981,9 @@ function renderStoryUserLane() {
     yukkuriSrc: STORY_GRID_DEFAULT_TILE_IMG,
     tvSrc: STORY_REMOTE_FAILED_PLACEHOLDER_IMG,
     anonymousIdenticonEnabled: anonymousIdenticonRuntimeEnabled,
-    anonymousIdenticonDataUrl: ''
+    anonymousIdenticonDataUrl: '',
+    // ★v0.1.1387: 実在確認済みの uid 集合を渡す(推測URLでも実績があれば本物として数える)。
+    verifiedAvatarUids: _verifiedAvatarUidSet
   };
 
   const entries = Array.isArray(STORY_SOURCE_STATE.entries)
@@ -6742,6 +7002,10 @@ function renderStoryUserLane() {
     ? STORY_SOURCE_STATE.storageRowsForCurrentLive
     : entries;
   if (!entries.length) {
+    // 計器: publish 未到達=供給が空。block 内の return 2本を入口で1回だけ数える。
+    _lanePublishSkipDiag.entriesEmpty += 1;
+    _lanePublishSkipDiag.lastSkipAt = Date.now();
+    _lanePublishSkipDiag.lastSkipReason = 'entriesEmpty';
     // ★v1041: 同一配信 backfill 谷間の一瞬空では既存タイルを畳まない(タイル出入り根治・判定は lib 集約)。
     if (shouldKeepStoryUserLaneTilesOnEmpty(els, STORY_SOURCE_STATE.liveId, _storyUserLaneLastTiledLid)) { recordStoryUserLaneStep(_storyUserLaneRenderProbe, STORY_USER_LANE_STEPS.DONE, { domTilesPainted: countStoryUserLaneDomTiles(els) }); return; }
     recordStoryUserLaneStep(_storyUserLaneRenderProbe, STORY_USER_LANE_STEPS.ENTRIES_EMPTY_RETURN, {
@@ -6914,6 +7178,8 @@ function renderStoryUserLane() {
   const picked = flattenStoryUserLaneBuckets(buckets);
   // v0.1.1231 Phase1 計器: 誰が消えたかを測る(挙動不変・個数だけでは入れ替わりが見えないため)。
   noteLaneRoster(_laneRosterDeltaState, { liveId: STORY_SOURCE_STATE.liveId, picks: picked, candidateTotal: rosteredCandidates.length });
+  // ★v0.1.1378: サムネ/ID/名前の取得率。picked=【いま画面に出ている人】が母数。
+  _identityAcquisition = countIdentityFromLanePicks(picked);
   const giftPicks = Array.isArray(STORY_SOURCE_STATE.giftThrowerPicks)
     ? STORY_SOURCE_STATE.giftThrowerPicks
     : [];
@@ -6946,20 +7212,18 @@ function renderStoryUserLane() {
    *   publish が運ぶ buckets / picked / rosteredCandidates は【この行より前】で確定済み。
    *   描画のスキップは正しい最適化だが、publish は描画ではなく【運搬】なので巻き添えにしない。
    *
-   * ■ 読者は誰か
-   *   ★src/lib/laneMirrorContract.js の LANE_MIRROR_CONSUMERS が正本。
-   *     【会場モード(venueBar.js)もこの鏡を読む】=v0.1.1111 で「会場の正本」に昇格している。
-   *     書き手が読者を知らないまま片側を変えると会場が無言で壊れる(8回再発した構造的真因)。
-   *     登録簿はCIが実importと照合するので、読者が増えたら必ず気づける。
+   * ■ 読者は誰か: ★src/lib/laneMirrorContract.js の LANE_MIRROR_CONSUMERS が正本。
+   *   【会場モード(venueBar.js)もこの鏡を読む】=v0.1.1111 で「会場の正本」に昇格。書き手が読者を知らずに
+   *   片側を変えると会場が無言で壊れる(8回再発した構造的真因)。登録簿はCIが実importと照合＝読者増に気づける。
    *
-   * ■ domSelf(①の実DOM計測)の扱い ★「古くなる」わけではない
-   *   domSelf は会場の parity 判定(venueLaneParity.js)が読む【タイル寸法の突合】用で、
-   *   顔ぶれ(誰が並ぶか)の判定には使われていない。
-   *   ★measureLaneDomSelf は「そのとき存在するDOMの寸法」を読むだけなので、
-   *     描画をスキップした = DOM が変わっていない = 寸法も変わっていない。
-   *     よって直近に描けたときの値を持ち回しても、それは【古い値ではなく正しい値】。
+   * ■ domSelf(①の実DOM計測) ★「古くなる」わけではない
+   *   domSelf は会場の parity 判定(venueLaneParity.js)が読む【タイル寸法の突合】用で、顔ぶれ判定には使わない。
+   *   ★measureLaneDomSelf は「そのとき存在するDOMの寸法」を読むだけ＝描画をスキップした=DOMが変わっていない
+   *     =寸法も変わっていない。直近に描けたときの値を持ち回しても【古い値ではなく正しい値】。
    *   描いた直後は下の paint 経路が _laneDomSelfLast を更新する。
    */
+  // 計器: publish に到達した時刻(見送りカウンタと対で読む)。
+  _lanePublishSkipDiag.lastPublishAt = Date.now();
   publishLaneMirror({
     liveId,
     buckets,
@@ -6992,6 +7256,9 @@ function renderStoryUserLane() {
   const _shrinkGuardHit = _rawKeep && !_keepExpired;
   notePaintDecision(_storyUserLaneRenderProbe,
     { els, nextTileCount, provisional: _prov, guardHit: _shrinkGuardHit });
+  // ★v0.1.1346: タイル数の【往復】を記録。★v1357訂正: 候補数だとガード時(描かずreturn)に実機で嘘をつくため実DOM枚数。
+  _laneTileHistory = pushLaneTileSample(_laneTileHistory,
+    { tiles: _shrinkGuardHit ? countStoryUserLaneDomTiles(els) : nextTileCount, origin: _laneSupplyOriginDiag?.lastOrigin || '' });
   // ★v0.1.1249 現行犯記録: 実際に減る瞬間、直前に供給を書いた者を名指しで残す(判定は計器側)。
   noteLaneSupplyShrink(_laneSupplyOriginDiag,
     { prevTiles: countStoryUserLaneDomTiles(els), nextTiles: nextTileCount, guardHit: _shrinkGuardHit });
@@ -7035,6 +7302,7 @@ function renderStoryUserLane() {
   // comment-post-speed-DESIGN.md §F(Phase 0計器): この paint で pending-self が実際に
   //   表示されたか mark と突合する(観測のみ・描画は変えない)。
   try { consumeCommentPostOptimisticPaintSamples(); } catch { /* no-op: 計器の失敗で描画を止めない */ }
+  sweepStoryAvatarRetryThrottled(els);
   // v0.1.987(状態速報「描画済みなのにローディング継続」の根治): レーンが実際にタイルを描けた瞬間=
   //   「中身が画面に出た」確定シグナル。従来の幕撤去は inlineWatchPanelHasRealDataForShade/失敗時タイマー
   //   依存で、heavy 経路が詰まり気味だと幕が残ることがあった(実機 perfDiag.shadeActive=true・painted)。
@@ -7063,8 +7331,18 @@ function renderStoryUserLane() {
    *   巻き添えで止めており、鏡が 656秒 凍結していた(2026-08-06 実機で確定)。
    *   ★ここでは「今回描けた実DOM計測」を控えるだけにする。次回の publish がこれを同梱する。
    *   描画は触らない(計測値の保存のみ)。
+   *
+   * ★v0.1.1284: 寸法に加えて【キー列の指紋】を控える。fingerprintFor=直前に publish した
+   *   鏡の contentHash=「どの内容を測ったか」の内容アドレス。契約の正本と理由は
+   *   src/lib/laneMirrorContract.js の「domSelf の指紋契約」を読むこと。
    */
-  _laneDomSelfLast = laneDomSelf;
+  _laneDomSelfLast = {
+    ...laneDomSelf,
+    // 診断表示専用(会場の line に「①DOM齢Ns」)。verdict には影響させない(§6-2)。
+    measuredAt: Date.now(),
+    fingerprint: laneDomFingerprint(perTierKeysOf(laneDomSelf)),
+    fingerprintFor: _lastPublishedLaneMirrorHash
+  };
   setTimeout(() => {
     if (typeof window !== 'undefined' && window.__NLS_LANE_DIAG__) {
       window.__NLS_LANE_DIAG__();
@@ -7082,6 +7360,15 @@ const PREVIEW_ACK_GEN_REFRESH_MS = 10000;
 /** passive コメントティッカー鏡描画の再描画 skip 用 signature。 */
 let _commentTimelineMirrorPassiveSig = '';
 
+/**
+ * 受動ビューが「今どの配信を映すべきか」。passive は dock!=='sidepanel' ＝ INLINE_EMBED_WATCH に含まれるので
+ *   `&lv=` 由来の INLINE_OWN_WATCH_URL を持つ(SPA 遷移は updateInlineOwnWatchUrlFromLv が in-place 更新)。
+ *   取れなければ空＝shouldSkipMirrorForLiveId が fail-open で素通しする(空画面より古い表示を選ぶ)。
+ * @returns {string}
+ */
+function currentPassiveSurfaceLiveId() {
+  return extractLiveIdFromUrl(INLINE_OWN_WATCH_URL) || String(watchPopupLastPaintedLiveId || '');
+}
 /**
  * ★2026-06-26: 受動ビュー(応援プレビュー dock=liveview)で応援レーン(りんく/こん太/広告/たぬ姉)を
  *   【鏡】から描く。passive は heavy comments を完走できず STORY_SOURCE_STATE.entries が空=
@@ -7103,6 +7390,8 @@ async function applyLaneMirrorForPassive() {
     return;
   }
   if (!snap || typeof snap !== 'object') return;
+  // ★別配信の古い鏡は貼らない(①POP の applyLaneMirrorForMainPopupFallback と同じ判定・passive は素通しだった)。
+  if (shouldSkipMirrorForLiveId(snap.liveId, currentPassiveSurfaceLiveId())) return;
   const buckets = restoreLaneMirrorBuckets(snap);
   const totalCells =
     buckets.link.length + buckets.gift.length + buckets.ad.length + buckets.konta.length + buckets.tanu.length;
@@ -7175,6 +7464,7 @@ async function applyLaneMirrorForPassive() {
     domTilesPainted: countStoryUserLaneDomTiles(els)
   });
   recordStoryUserLaneStep(_storyUserLaneRenderProbe, STORY_USER_LANE_STEPS.DONE);
+  sweepStoryAvatarRetryThrottled(els); // ★v1338: 失敗アイコンの再プローブ(正本=lib)
   // v0.1.985(council/parity-diagnose): ②応援プレビューが「描画できた」を status へ伝える ack を
   //   【専用キー】(本物の鏡とは別・passive だけが書く片方向)に best-effort で書く。3画面パリティ判定の
   //   ②描画OK 観測に使う。本物の鏡(KEY_LANE_MIRROR)は上書きしない=passive の不可侵原則を守る。
@@ -7252,6 +7542,7 @@ async function applyLaneMirrorForMainPopupFallback(resolvedLid = '') {
     domTilesPainted: countStoryUserLaneDomTiles(els)
   });
   recordStoryUserLaneStep(_storyUserLaneRenderProbe, STORY_USER_LANE_STEPS.DONE);
+  // ★v0.1.1338: 鏡由来の描画経路にも【同じ】掃引を配線する(片肺を作らない)。
   // v0.1.987: 鏡フォールバックで描けたら幕も畳む(描けたのにローディングを構造的に消す)。冪等。
   if (countStoryUserLaneDomTiles(els) > 0) {
     try { dismissInitialLoadShade(); } catch { /* no-op */ }
@@ -7304,23 +7595,20 @@ async function renderStoryUserLaneFromLightCommentsForCurrentLive(lid) {
   //   → 守りの基準を DOM でなく【名簿(この配信で一度でも見た人数・単調増加)】に移す。
   {
     const _roster = snapshotLaneRosterDelta(_laneRosterDeltaState);
-    const _verdict = shouldSkipLightSupplyOverwrite({
+    // ★v0.1.1370: 判定と計器更新を1呼び出しに統合(通した理由の記録漏れを構造で防ぐ)。
+    const _verdict = judgeAndRecordLightSupply(_lightSupplyGuardDiag, {
       provisional: true, // この経路の供給は定義上つねに暫定
       nextSupplyCount: entries.length,
       rosterEverSeen: Number(_roster?.everSeenMax) || 0,
       currentLiveId: live,
-      rosterLiveId: String(_roster?.lastLid || '')
+      rosterLiveId: String(_roster?.lastLid || ''),
+      // ★v0.1.1380: 名簿は描画の【後】に育つ(6960行)ので、配信の最初の light 供給では空。
+      //   その窓で41枚の縮小が通り抜けた実機報告があるため、実表示枚数を補助材料に渡す。
+      paintedTiles: countStoryUserLaneDomTiles(els)
     });
-    _lightSupplyGuardDiag.observedCount += 1;
-    if (_verdict.skip) {
-      _lightSupplyGuardDiag.skipCount += 1;
-      const _r = Number(_roster?.everSeenMax) || 0;
-      if (!_lightSupplyGuardDiag.worst || _r - entries.length > _lightSupplyGuardDiag.worst.roster - _lightSupplyGuardDiag.worst.next) {
-        _lightSupplyGuardDiag.worst = { next: entries.length, roster: _r };
-      }
-      return; // 不完全な軽い供給で完全描画を潰さない(heavy/onChanged の次回に委ねる)
-    }
+    if (_verdict.skip) return; // 不完全な軽い供給で完全描画を潰さない(heavy/onChanged の次回に委ねる)
   }
+  if (shouldSkipLightSupplyAfterAwait(_lightSupplyGuardDiag, { domTiles: countStoryUserLaneDomTiles(els), stateLiveId: STORY_SOURCE_STATE.liveId, liveId: live })) return; // ★v1359: awaitをまたいだので再判定(39→3の根治)
   // 既存の描画トリガに軽い entries を渡す=renderStoryUserLane が走り、末尾で現配信 lane mirror も publish。
   //   ★provisional: true = summary+tail 由来の軽い候補=定義上暫定(HANDOFF-heavyrace A-2)。
   //   heavy が settle するまでは、この短い候補で完全描画を上書きしない(単調性ガード)。
@@ -7346,6 +7634,7 @@ async function applyCommentTimelineMirrorForPassive() {
   } catch {
     return;
   }
+  if (shouldSkipMirrorForLiveId(snap && snap.liveId, currentPassiveSurfaceLiveId())) return; // ★別配信の鏡を貼らない
   const rows = restoreCommentTimelineRows(snap);
   if (!rows.length) return; // データ無し=popup の空状態(placeholder)のまま(死に画面にしない)
   // v0.1.1226: ①と同一の純関数で選ぶ。バケット丸めが決定的=同じ7秒窓なら①と同じ1件になる。
@@ -7381,14 +7670,11 @@ let _northStarMirrorPassiveSig = '';
 // v0.1.1019: passive 数字カード鏡のペインター(sig ガード込み・状態は lib 内)。
 const _statCardsMirrorPassivePaint = createStatCardsMirrorPassivePainter(typeof document !== 'undefined' ? document : { getElementById: () => null });
 /**
- * ★v0.1.965(council/single-source-of-truth-SYNTHESIS.md 第1段): 受動ビュー(応援プレビュー dock=liveview)で
- *   北極星レーン(貢献度ランキング/広告ランキング)を【鏡】(KEY_NORTH_STAR_MIRROR=本物 popup が watch タブで
- *   publishNorthStarMirror した行)から描く。応援レーン(applyLaneMirrorForPassive)・コメント
- *   (applyCommentTimelineMirrorForPassive)は鏡経路があったのに、北極星だけ apply 関数が無く=
- *   passive で北極星の描画関数が一度も呼ばれず(diag activePath="" / refreshAllStarted=0)=
- *   「見せる側は同じ鏡を読むだけ」の星野ロミ型から漏れていた(ユーザー指摘の核心)。
- *   → 純Web app/live-view.js:paintNorthStarMirror と同型・本物 paintTopSupportRankStyleIntoElement を再利用(似せて自作しない)。
- *   storage read のみ=passive 原則を守る(書かない/注入しない/fetch しない)。重い refreshAll に依存しない=軽い。
+ * ★v0.1.965(council/single-source-of-truth-SYNTHESIS.md 第1段): 受動ビューで北極星レーン(貢献度/広告ランキング)を
+ *   【鏡】KEY_NORTH_STAR_MIRROR(①が publishNorthStarMirror した行)から描く。レーン/コメントには鏡経路があったのに
+ *   北極星だけ apply 関数が無く passive で一度も描画関数が呼ばれず(diag activePath="" / refreshAllStarted=0)、
+ *   「見せる側は同じ鏡を読むだけ」から漏れていた(ユーザー指摘の核心)。→ 純Web app/live-view.js:paintNorthStarMirror と
+ *   同型・本物 paintTopSupportRankStyleIntoElement を再利用(似せて自作しない)。storage read のみ=passive 原則を守る。
  */
 async function applyNorthStarMirrorForPassive() {
   if (!INLINE_PASSIVE || !hasExtensionContext()) return;
@@ -7403,6 +7689,7 @@ async function applyNorthStarMirrorForPassive() {
     return;
   }
   if (!snap || typeof snap !== 'object') return;
+  if (shouldSkipMirrorForLiveId(snap.liveId, currentPassiveSurfaceLiveId())) return; // ★別配信の鏡を貼らない
   const contribRows = restoreNorthStarMirrorRows(snap, 'contributionRanking');
   const adRows = restoreNorthStarMirrorRows(snap, 'adRanking');
   // v0.1.1022(明滅根治): sig から capturedAt を外す(先頭行の名前も入れ順位入れ替わりを検知・時刻では再描画しない)。
@@ -7449,7 +7736,9 @@ async function applyStatCardsMirrorForPassive() {
   if (!INLINE_PASSIVE || !hasExtensionContext()) return;
   try {
     const bag = await chrome.storage.local.get(KEY_STAT_CARDS_MIRROR);
-    _statCardsMirrorPassivePaint(bag && bag[KEY_STAT_CARDS_MIRROR]);
+    const snap = bag && bag[KEY_STAT_CARDS_MIRROR];
+    if (shouldSkipMirrorForLiveId(snap && snap.liveId, currentPassiveSurfaceLiveId())) return; // ★別配信の鏡を貼らない
+    _statCardsMirrorPassivePaint(snap);
   } catch { /* no-op */ }
 }
 
@@ -7468,6 +7757,7 @@ async function applyTopSupportersMirrorForPassive() {
     const bag = await chrome.storage.local.get(KEY_TOP_SUPPORTERS_MIRROR);
     snap = bag && bag[KEY_TOP_SUPPORTERS_MIRROR];
   } catch { return; }
+  if (shouldSkipMirrorForLiveId(snap && snap.liveId, currentPassiveSurfaceLiveId())) return; // ★別配信の鏡を貼らない
   const rooms = snap && Array.isArray(snap.rooms) ? snap.rooms : [];
   if (!rooms.length) return;
   const sig = topSupportersMirrorSig(snap);
@@ -7549,7 +7839,14 @@ function publishLaneMirror(input) {
       cap: laneMirrorCapFromBuckets(input?.buckets),
       nowMs: now
     });
+    // ★v0.1.1284: publish は paint より前なので、この直後の paint が測る DOM = この hash の中身。
+    _lastPublishedLaneMirrorHash = String(snap?.contentHash || '');
     mergeAndScheduleFlush('lane', snap, snap && snap.liveId, now);
+    // ★v0.1.1300: 配信ごとキー(v2)と受領証も書く(理由と不変条件は lib 側の JSDoc が正本)。
+    //   旧キーへの合流は上の行で継続=既存 reader は無変更のまま(rollback の保険)。
+    publishLaneMirrorPerLive(snap, now, {
+      set: (obj) => void chrome.storage.local.set(obj).catch(() => { /* best-effort */ })
+    });
   } catch {
     /* no-op */
   }
@@ -7858,7 +8155,9 @@ function buildStoryGiftThrowerLanePicks(giftUsers, liveId, storageCtx, limit) {
     yukkuriSrc: STORY_GRID_DEFAULT_TILE_IMG,
     tvSrc: STORY_REMOTE_FAILED_PLACEHOLDER_IMG,
     anonymousIdenticonEnabled: anonymousIdenticonRuntimeEnabled,
-    anonymousIdenticonDataUrl: ''
+    anonymousIdenticonDataUrl: '',
+    // ★v0.1.1387: 実在確認済みの uid 集合を渡す(推測URLでも実績があれば本物として数える)。
+    verifiedAvatarUids: _verifiedAvatarUidSet
   };
   const seen = new Set();
   /** @type {ReturnType<typeof buildStoryGiftThrowerLanePicks>} */
@@ -8007,6 +8306,17 @@ async function paintStoryUserLaneCoalesced(liveId, displayEntries, storageRows) 
       yukkuriFaceFor: (key) => anonymousIdenticonDataUrl(String(key || ''), 64),
       // 2026-06-22(council/lane-show-all-active): 数値ID付き広告主の個人サムネ導出は adLanePicksFromRooms
       //   が内蔵(広告API が thumbnailUrl を返さなくても「ぱき」等サムネ持ちがゆっくり顔に化けない)。
+      /*
+       * ★v0.1.1286: 広告段を【他レーンと同じ正本の解決器】に配線する。
+       *   広告段だけが resolveStoryLaneAvatarSrc を通らない唯一のレーンで、そのため
+       *   同じ人が「りんく段では実サムネ / 広告段では白丸」になっていた(2026-08-07 実機)。
+       *   ここで注入するのは他レーンが使うのと【同じ関数】(storyGrowthAvatarSrcCandidate)。
+       *   ★entry 形は {userId, avatarUrl} で足りる(resolveStoryLaneAvatarSrc が読むのはこの2つ)。
+       *     広告 room は avatarUrl を持たない場合があるので uid だけ渡し、
+       *     観測済みサムネ/記憶アバター/本人画像の解決を正本に委ねる。
+       */
+      resolveAvatarForUid: (uid) =>
+        storyGrowthAvatarSrcCandidate({ userId: uid, avatarUrl: '' }, lid, storageRows),
       limit: giftLimit
     }
   );
@@ -8128,6 +8438,15 @@ function getStoryEntryByIndex(index) {
 }
 
 function renderStoryCommentDetailPanel() {
+  /*
+   * ★v0.1.1459: 区間名を付けて呼ぶ。
+   *   ★包む対象は「本体を切り出して検査する wiring テストが無い」関数を選ぶこと。
+   *     renderStoryUserLane を包んだら laneMirrorPublishNotSkipped が5件赤になった
+   *     (本体が4行の委譲関数になり、中身の検査が空振りするため)。
+   */
+  return _measuredSection('renderStoryCommentDetailPanel', () => renderStoryCommentDetailPanelImpl());
+}
+function renderStoryCommentDetailPanelImpl() {
   const wrap = /** @type {HTMLElement|null} */ ($('sceneStoryDetail'));
   const img = /** @type {HTMLImageElement|null} */ ($('sceneStoryDetailImg'));
   const userEl = $('sceneStoryDetailUser');
@@ -8559,11 +8878,10 @@ function normalizeStoredCommentEntries(entries) {
 
   for (const raw of list) {
     const entry = /** @type {PopupCommentEntry} */ (raw);
-    const no = String(entry?.commentNo || '').trim();
-    const key =
-      /^\d+$/.test(no)
-        ? `no:${no}`
-        : `${String(entry?.liveId || '').trim().toLowerCase()}|${normalizeCommentText(entry?.text || '')}|${Number(entry?.capturedAt || 0)}`;
+    // ★v0.1.1313: キー生成は純関数 storedCommentDedupeKey が正本(経緯はそちらの冒頭)。
+    //   旧キーは capturedAt をそのまま含み、読み直しで時刻が振り直されると
+    //   同じコメントが別行として数えられていた(＝「記録101%」の残り火)。
+    const key = storedCommentDedupeKey(entry);
     const existingIndex = indexByKey.get(key);
     if (existingIndex == null) {
       indexByKey.set(key, out.length);
@@ -8936,6 +9254,10 @@ const STORY_GROWTH_CHURN = createStoryGrowthChurnState();
 const STORY_GROWTH_CELL_SWAP = createStoryGrowthCellSwapState();
 
 function rebuildStoryGrowth(root, total) {
+  // ★v0.1.1462: 全消し再構築=DOMを最も動かす経路。実測する。
+  return _measuredSection('rebuildStoryGrowth', () => rebuildStoryGrowthImpl(root, total));
+}
+function rebuildStoryGrowthImpl(root, total) {
   const _churnT0 = typeof performance !== 'undefined' ? performance.now() : 0;
   root.innerHTML = '';
   if (total <= 0) return;
@@ -9100,6 +9422,10 @@ function computeStoryReaction(liveId, commentCount) {
  * }} state
  */
 function renderCharacterScene(state) {
+  // ★v0.1.1459: 区間名を付けて呼ぶ(遅延が出たとき速報がこの名前を出す)。
+  return _measuredSection('renderCharacterScene', () => renderCharacterSceneImpl(state));
+}
+function renderCharacterSceneImpl(state) {
   const { hasWatch, recording, commentCount, liveId, snapshot } = state;
   const roleCopy = '1コメントごとに、りんくが1体ずつ増えるよ。';
 
@@ -10757,6 +11083,10 @@ let _lastGiftEventsForMirror = { liveId: '', events: [] };
 /** heavyRace再発の根治(HANDOFF-heavyrace-backfill-IMPL.md B): fresh-read で heavy 全件再読みを省いた累計回数。
  *   getHeavyFreshReadReuseCount で状態速報が読む(実配信で「fresh-read が効いているか/12秒ギャップが適正か」を判定)。 */
 let _heavyFreshReadReuseCount = 0;
+/** ★v1341: 再利用の最後の判定理由 / ★v1363: 世代が進んでも手元の全件で描いた回数(根治の証拠)。 */
+let _heavyReuseLastReason = ''; let _heavyRacePaintedFromCacheCount = 0;
+let _laneTileHistory = [];
+let _kokenLaneResult = null;
 /** heavyRace再発の根治(HANDOFF-heavyrace-backfill-IMPL.md C-1): 同一 lv の heavy 全件 read を
  *   多重に張らない single-flight 実行器(src/lib/singleFlightByKey.js)。onChanged coalesced 経由の
  *   頻繁な refresh で read が多重発生し追い越しレースを起こしていた主因への対処。
@@ -11566,6 +11896,8 @@ async function resolveOfficialContributionRankingRows(liveId) {
       const bag = await chrome.storage.local.get([kKey, iKey]);
       kokenStorage = bag[kKey] ?? null;
       iframeStorage = bag[iKey] ?? null;
+      const kv = /** @type {any} */ (kokenStorage);
+      _kokenLaneResult = kv && typeof kv === 'object' ? makeLaneResult({ ok: kv.lastOk, status: kv.lastStatus, rows: kv.rows }) : null;
     } catch {
       /* no-op */
     }
@@ -11972,23 +12304,6 @@ async function computeGiftHistoryNorthStarRoomsContext(liveId, opts = {}) {
 
 /**
  * 応援帯・公式値レーン（貢献度等）で共通の `nl-top-support-rank` ブロック描画。
- * @param {HTMLElement} el
- * @param {{ userKey: string; nickname: string; count: number; avatarUrl?: string }[]} rooms
- * @param {{
- *   noteText: string;
- *   unitSuffix: string;
- *   ariaLabel: string;
- *   prependHtml?: string;
- *   beforeNoteHtml?: string;
- *   isNorthStarBody?: boolean;
- *   freshnessNote?: string;
- *   pointsSumAll?: number;
- *   pointsSumDisplayed?: number;
- *   officialProgramGiftPts?: number|null;
- * }} opts
- */
-/**
- * 応援帯・公式値レーン（貢献度等）で共通の `nl-top-support-rank` ブロック描画。
  *
  * v0.1.881: 描画本体は共有 lib(renderTopSupportRankStripInto)へ抽出済(live-view と完全コピー共有)。
  *   ここは popup 固有の本物のローカル依存(guard/identicon/北極星DOM同期/待機UI teardown)を opts で
@@ -12078,11 +12393,6 @@ async function refreshNorthStarAdRankingLane(liveId) {
     publishNorthStarMirror({ liveId: lid, adRanking: adRows, deferWrite: true });
     return;
   }
-  const mirrorHtml = typeof bundle?.adRankingMirrorHtml === 'string' ? bundle.adRankingMirrorHtml : null;
-  if (mirrorHtml) {
-    renderNorthStarLane('adRanking', mirrorHtml);
-    return;
-  }
   // v0.1.617: bundle に広告行が無くても、nicoad API 直叩きが storage に rows を書いていれば
   //   それを使って描画する。bundle 経由(readOfficialEventDomBundleFromStorage のマージ)は
   //   stale bundle / 取得タイミングのずれで null になることがあり(実機 staleDomBundleSuspected)、
@@ -12091,11 +12401,15 @@ async function refreshNorthStarAdRankingLane(liveId) {
   const lidForApi = String(lid || '').trim().toLowerCase();
   let nicoadApiRows = null;
   let nicoadApiCapturedAt = null;
+  let nicoadApiResult = null; // ★v1343: 取得の成否(成功0件と失敗を分ける)
   if (/^lv\d{1,15}$/.test(lidForApi) && body instanceof HTMLElement) {
     try {
       const apiKey = `nls_nicoad_api_ranking_${lidForApi}`;
       const apiBag = await chrome.storage.local.get([apiKey]);
       const apiVal = apiBag?.[apiKey];
+      if (apiVal && typeof apiVal === 'object' && String(apiVal.liveId || '').trim().toLowerCase() === lidForApi) {
+        nicoadApiResult = makeLaneResult({ ok: apiVal.lastOk, status: apiVal.lastStatus, rows: apiVal.rows });
+      }
       if (
         apiVal &&
         typeof apiVal === 'object' &&
@@ -12146,12 +12460,25 @@ async function refreshNorthStarAdRankingLane(liveId) {
     publishNorthStarMirror({ liveId: lid, adRanking: nicoadApiRows, deferWrite: true });
     return;
   }
+  // ★v0.1.1297(鏡publish取りこぼしの根治): 鏡HTML経路は【行を持たない】(mirrorHtml は
+  //   scrape した DOM の HTML 文字列で、northStarMirror が要求する row 配列ではない)。
+  //   この経路は以前ここより【前】にあり、当たると publishNorthStarMirror を呼ばずに return して
+  //   いた=①には広告が描けているのに③WEB鏡は空(0)=状態速報の「拡張3≠鏡0」。
+  //   → 行が取れる2経路(bundle / nicoad API 直読み)を【先に】試し、どちらも行が無いときだけ
+  //     この装飾的な鏡HTMLで描く。行があるのに鏡へ積まない経路を無くす=publish漏れの根を断つ。
+  //   ★行が無い以上ここでは鏡に積めない(積むと空配列で上書きし、直近の正しい鏡を消す)。
+  //     未指定レーンは mergeNorthStarMirrorLanes が温存する=触らないのが正しい。
+  const mirrorHtml = typeof bundle?.adRankingMirrorHtml === 'string' ? bundle.adRankingMirrorHtml : null;
+  if (mirrorHtml) {
+    renderNorthStarLane('adRanking', mirrorHtml);
+    return;
+  }
   // v0.1.1026(広告列の出たり消えたりチカチカ根治): ポーリングで storage read が一瞬空になるたび広告列を畳む→再表示を
   //   繰り返し、高さ振動で下のアイコングリッドが揺れていた。一度実データ(rank行)を描いていれば一瞬の空では畳まない
   //   (配信切替は refresh が新lidの実データで上書き)。
   const adBody = body instanceof HTMLElement ? body : document.getElementById('northStarLaneBody-adRanking');
   if (adBody instanceof HTMLElement && adBody.querySelector('[role="listitem"]')) return;
-  const state = determineNorthStarLaneState('adRanking', { bundle, snap, nicoadApiRows });
+  const state = determineNorthStarLaneState('adRanking', { bundle, snap, nicoadApiRows, adResult: nicoadApiResult });
   renderNorthStarLane('adRanking', null, state);
 }
 
@@ -12201,7 +12528,9 @@ async function refreshNorthStarContributionRankingLaneAsync(liveId) {
   }
   // ranking 取れない時は既存 host class を付け直して reason 経由 placeholder へ。
   body.classList.remove('nl-contrib-ranking-list-host');
-  const state = determineNorthStarLaneState('contributionRanking', { bundle, snap });
+  // ★v0.1.1339: kokenApiRows を渡す(giftHistory と同じ片肺がここにもあった)。
+  const kokenApiRows = Array.isArray(ranking) && ranking.length > 0 ? ranking : null;
+  const state = determineNorthStarLaneState('contributionRanking', { bundle, snap, kokenApiRows, contribResult: _kokenLaneResult });
   renderNorthStarLane('contributionRanking', null, state);
 }
 
@@ -12684,7 +13013,11 @@ async function refreshNorthStarGiftHistoryLaneAsync(liveId) {
   _giftHistoryThrowsPanelHtmlKey = '';
   _giftHistoryNorthStarCapturedAtMs = 0;
   clearNorthStarGiftThrowsPanel();
-  const state = determineNorthStarLaneState('giftHistory', { bundle, snap });
+  // ★v1339: API経路の実データを判定へ渡す(理由は northStarLaneReason.js が正本)。
+  const giftHistoryApiRows = Array.isArray(ctxRaw?.ledgerRows) && ctxRaw.ledgerRows.length > 0
+    ? ctxRaw.ledgerRows
+    : (Array.isArray(ctxRaw?.rooms) ? ctxRaw.rooms : null);
+  const state = determineNorthStarLaneState('giftHistory', { bundle, snap, giftHistoryApiRows });
   renderNorthStarLane('giftHistory', null, state);
 }
 
@@ -14365,127 +14698,6 @@ async function refreshVoiceInputDeviceList() {
  *   avatarStats?: import('../lib/devMonitorAvatarStats.js').StoredCommentAvatarStats|null,
  * }} p
  */
-function renderAcquisitionDashboard(p) {
-  const host = $('devMonitorAcquisition');
-  if (!host) return;
-
-  const liveId = String(p.liveId || '').trim();
-  if (!liveId) {
-    host.innerHTML =
-      '<section class="nl-acquisition nl-acquisition--empty" aria-label="データ取得率">' +
-      '<p class="nl-acquisition__empty">ニコ生 watch を開いた状態でポップアップを開くと、取得率チャートが表示されます（記録0件でも表示）。</p>' +
-      '</section>';
-    return;
-  }
-
-  // DOM 非依存の数値計算は純関数 acquisitionDashboardChart.js に委譲（pure refactor）。
-  const avs = p.avatarStats;
-  const { thumb, idPct, nick, commentPct, total: t } = computeAcquisitionPercents({
-    avatarStats: avs,
-    snapshot: p.snapshot,
-    displayCount: p.displayCount
-  });
-  const radarComment = commentPct != null ? commentPct : 0;
-
-  const { polyPts, ringPts, midPts, axisLines } = computeRadarPolygonPoints(
-    [thumb, idPct, nick, radarComment],
-    ACQUISITION_RADAR_GEOMETRY
-  );
-
-  const fmt = (n) => `${n.toFixed(1)}%`;
-  const commentBar = commentPct != null ? fmt(commentPct) : '—';
-
-  const pieDiskBackground = computeAcquisitionPieGradient({ thumb, idPct, nick, commentPct });
-
-  const footExtra =
-    t <= 0
-      ? '記録0件のためサムネ・ID・名前は0%。ログイン不要で表示します。'
-      : '';
-  const footMain =
-    commentPct != null
-      ? 'コメント＝記録の表示件数÷公式コメント数（上限100%）。'
-      : 'コメント率は公式件数が無いとき「—」（レーダー・円のコメント分は0扱い）。';
-  const footThumb =
-    t > 0
-      ? ' サムネ＝応援レーンと同じく「表示に使える http(s) アイコン」まで解決できた割合（数字IDの既定CDN合成を含む。匿名形式はページ側の追加情報が無いと上がりにくい）。'
-      : '';
-  const foot = escapeHtml(
-    footExtra ? `${footMain}${footThumb} ${footExtra}` : `${footMain}${footThumb}`
-  );
-
-  host.innerHTML =
-    '<section class="nl-acquisition" aria-label="データ取得率">' +
-    '<h3 class="nl-acquisition__title">現在のデータ取得率</h3>' +
-    '<div class="nl-acquisition__charts">' +
-    '<div class="nl-acquisition__radar">' +
-    '<svg viewBox="0 0 120 120" aria-hidden="true">' +
-    axisLines +
-    `<polygon fill="none" stroke="#94a3b8" stroke-width="0.55" opacity="0.45" points="${ringPts}" />` +
-    `<polygon fill="none" stroke="#94a3b8" stroke-width="0.45" opacity="0.32" points="${midPts}" />` +
-    `<polygon fill="rgb(15 143 216 / 22%)" stroke="#0f8fd8" stroke-width="1.2" points="${polyPts}" />` +
-    '</svg>' +
-    '<span class="nl-acquisition__cap">4項目バランス（レーダー）</span>' +
-    '</div>' +
-    '<div class="nl-acquisition__bars">' +
-    `<div class="nl-acquisition__bar-row"><p class="nl-acquisition__bar-label">サムネ</p><div class="nl-acquisition__bar-track"><div class="nl-acquisition__bar-fill nl-acquisition__bar-fill--thumb" style="width:${Math.min(
-      100,
-      thumb
-    )}%"></div></div><p class="nl-acquisition__bar-pct">${escapeHtml(
-      fmt(thumb)
-    )}</p></div>` +
-    `<div class="nl-acquisition__bar-row"><p class="nl-acquisition__bar-label">ID</p><div class="nl-acquisition__bar-track"><div class="nl-acquisition__bar-fill nl-acquisition__bar-fill--id" style="width:${Math.min(
-      100,
-      idPct
-    )}%"></div></div><p class="nl-acquisition__bar-pct">${escapeHtml(
-      fmt(idPct)
-    )}</p></div>` +
-    `<div class="nl-acquisition__bar-row"><p class="nl-acquisition__bar-label">名前</p><div class="nl-acquisition__bar-track"><div class="nl-acquisition__bar-fill nl-acquisition__bar-fill--nick" style="width:${Math.min(
-      100,
-      nick
-    )}%"></div></div><p class="nl-acquisition__bar-pct">${escapeHtml(
-      fmt(nick)
-    )}</p></div>` +
-    `<div class="nl-acquisition__bar-row"><p class="nl-acquisition__bar-label">コメ</p><div class="nl-acquisition__bar-track"><div class="nl-acquisition__bar-fill nl-acquisition__bar-fill--comment" style="width:${commentPct != null ? Math.min(100, commentPct) : 0}%"></div></div><p class="nl-acquisition__bar-pct">${escapeHtml(
-      commentBar
-    )}</p></div>` +
-    '</div>' +
-    '<div class="nl-acquisition__pie">' +
-    '<div class="nl-acquisition__pie-disk"></div>' +
-    '<span class="nl-acquisition__cap">構成比（円）</span>' +
-    '</div>' +
-    '</div>' +
-    '<ul class="nl-acquisition__legend">' +
-    `<li><span class="nl-acquisition__dot nl-acquisition__dot--thumb" aria-hidden="true"></span>アイコン（表示解決・応援レーンと同じ基準）</li>` +
-    `<li><span class="nl-acquisition__dot nl-acquisition__dot--id" aria-hidden="true"></span>ユーザーID（取れている割合）</li>` +
-    `<li><span class="nl-acquisition__dot nl-acquisition__dot--nick" aria-hidden="true"></span>表示名・ニックネーム（付いている割合）</li>` +
-    `<li><span class="nl-acquisition__dot nl-acquisition__dot--comment" aria-hidden="true"></span>コメント（記録÷公式）</li>` +
-    '</ul>' +
-    `<p class="nl-acquisition__footnote">${foot}</p>` +
-    '</section>';
-
-  const disk = host.querySelector('.nl-acquisition__pie-disk');
-  if (disk instanceof HTMLElement) {
-    disk.style.background = pieDiskBackground;
-  }
-
-  const win = typeof globalThis !== 'undefined' ? globalThis : window;
-  appendTrendPoint(win, liveId, {
-    thumb,
-    idPct,
-    nick,
-    commentPct,
-    displayCount: p.displayCount,
-    storageCount: p.storageCount
-  });
-  void persistTrendPointChrome(liveId, {
-    thumb,
-    idPct,
-    nick,
-    commentPct,
-    displayCount: p.displayCount,
-    storageCount: p.storageCount
-  });
-}
 
 /**
  * @param {{
@@ -14547,7 +14759,7 @@ function renderDevMonitorPanel(p) {
   const statsEl = $('devMonitorStats');
   const jsonEl = $('devMonitorJson');
   const dlChartsEl = $('devMonitorDlCharts');
-  renderAcquisitionDashboard(p);
+  renderAcquisitionDashboard(p, { getEl: $ });
   renderDevMonitorSecondaryViz(p);
   if (dlChartsEl) {
     dlChartsEl.innerHTML = buildDevMonitorDlChartsHtml(p);
@@ -14800,16 +15012,11 @@ async function renderDevMonitorGiftRankingExtras() {
     //   ハンドラ（attachAiDiagButtonHandler）は呼び出して delegated listener を維持するが、
     //   対応するボタンを描画しないため発火しない（関数は将来の再利用・lint 用に残置）。
     extrasEl.innerHTML = buildDevMonitorGiftRankingExtrasHtml(rows);
-    attachAiDiagButtonHandler(fastCache);
+    attachAiDiagButtonHandler(fastCache, { getEl: $ });
   } catch {
     extrasEl.innerHTML = '';
   }
 }
-
-/** @type {any} 直近の fastCache を click 時に参照するため保持 */
-let _latestAiDiagFastCache = null;
-/** @type {boolean} extrasEl への delegated click listener が attach 済みか */
-let _aiDiagDelegatedAttached = false;
 
 /**
  * popup「AI 診断（Gemini Nano）」ボタンの handler。
@@ -14829,134 +15036,6 @@ let _aiDiagDelegatedAttached = false;
  *
  * @param {any} fastCache  KEY_AI_SHARE_FAST_DIAG の中身
  */
-function attachAiDiagButtonHandler(fastCache) {
-  _latestAiDiagFastCache = fastCache;
-  if (_aiDiagDelegatedAttached) return;
-  const extrasEl = $('devMonitorGiftRankingExtras');
-  if (!extrasEl) return;
-  _aiDiagDelegatedAttached = true;
-  try {
-    console.log(
-      '[nls AI診断] delegated listener attached to #devMonitorGiftRankingExtras'
-    );
-  } catch { /* no-op */ }
-  extrasEl.addEventListener('click', async (e) => {
-    const target = /** @type {HTMLElement|null} */ (e.target);
-    const btn = /** @type {HTMLButtonElement|null} */ (
-      target?.closest?.('#aiDiagBtn') || null
-    );
-    if (!btn) return;
-    const result = /** @type {HTMLElement|null} */ (
-      extrasEl.querySelector('#aiDiagResult')
-    );
-    if (!result) return;
-    if (btn.hasAttribute('disabled')) return;
-    try {
-      console.log('[nls AI診断] click 検知（delegated）');
-    } catch { /* no-op */ }
-    result.textContent = '⏳ ステップ 1/4: クリック検知、Built-in AI 検出中…';
-    btn.setAttribute('disabled', 'disabled');
-    const fastCache = _latestAiDiagFastCache;
-    try {
-      const av = await probeBuiltinAiAvailability();
-      result.textContent = `⏳ ステップ 2/4: 検出結果 state=${av.state}${av.reason ? ` (${av.reason})` : ''}`;
-      try {
-        console.log('[nls AI診断] availability', av);
-      } catch { /* no-op */ }
-      if (av.state === 'unavailable') {
-        result.textContent =
-          `❌ Built-in AI 利用不可\n` +
-          `state: ${av.state}\n` +
-          `reason: ${av.reason || '(なし)'}\n\n` +
-          `Chrome 138+ + WebGPU 対応 + Built-in AI 機能の有効化が必要です。\n` +
-          `chrome://flags/#optimization-guide-on-device-model を有効化、\n` +
-          `chrome://components で「Optimization Guide On Device Model」を最新化してください。`;
-        btn.removeAttribute('disabled');
-        return;
-      }
-
-      // step 3: prompt 構築
-      const cache = fastCache && typeof fastCache === 'object' ? fastCache : {};
-      const content = cache?.content || {};
-      const consoleErrors = Array.isArray(
-        content?.consoleErrorProbe?.recentErrors
-      )
-        ? content.consoleErrorProbe.recentErrors
-        : [];
-      const networkErrorMessages = Array.isArray(
-        content?.networkErrorProbe?.nicoadFetchErrorMessages
-      )
-        ? content.networkErrorProbe.nicoadFetchErrorMessages
-        : [];
-      const networkErrors = networkErrorMessages.map((msg, i) => ({
-        url: '(nicoad fetch)',
-        ts: i,
-        reason: String(msg || '')
-      }));
-      const giftDiag = content?.giftDiagnostics || {};
-      const diagWarnings = [];
-      if (giftDiag?.multiTabDiag?.staleDomBundleSuspected) {
-        diagWarnings.push({
-          severity: 'medium',
-          code: 'STALE_DOM_BUNDLE',
-          message:
-            'multi-tab race の疑い（過去配信の DOM 残骸が混入している可能性）'
-        });
-      }
-      if (giftDiag?.rankingDiag?.autoOpen?.lastFailureReason) {
-        diagWarnings.push({
-          severity: 'medium',
-          code: 'AUTO_OPEN_FAILED',
-          message: `応援ランキング自動オープン失敗: ${giftDiag.rankingDiag.autoOpen.lastFailureReason}`
-        });
-      }
-      const giftSummary = giftDiag?.['ギフトサマリ'] || {};
-      const ndgrGifts = giftSummary?.['NDGRギフトevent数'] ?? 0;
-      const giftPoints = giftSummary?.['ギフトポイント観測'] ?? 0;
-      const contextNote = `現在の配信状況: ギフト event 観測 ${ndgrGifts} 件, ギフトポイント ${giftPoints}, 視聴者 ${content?.romiDebug?.interceptMapSize ?? 0} 名`;
-
-      result.textContent = '⏳ ステップ 3/4: prompt 構築中…';
-      const prompt = buildErrorDiagnosisPrompt({
-        consoleErrors,
-        networkErrors,
-        diagWarnings,
-        contextNote
-      });
-
-      const needsDownload =
-        av.state === 'downloadable' || av.state === 'downloading';
-      result.textContent = needsDownload
-        ? '⏳ ステップ 4/4: Built-in AI モデル DL 中…\n' +
-          '（初回のみ、約 2GB の DL が走ります。Wi-Fi 推奨、数分〜数十分）'
-        : '⏳ ステップ 4/4: Built-in AI に問い合わせ中… (5〜10 秒かかります)';
-      try {
-        console.log('[nls AI診断] runBuiltinAiPrompt 開始', { needsDownload });
-      } catch { /* no-op */ }
-      const text = await runBuiltinAiPrompt(prompt, {
-        onDownloadProgress: (loaded) => {
-          const pct = Math.max(0, Math.min(100, Number(loaded) * 100));
-          result.textContent =
-            `⬇️ Built-in AI モデル DL 中: ${pct.toFixed(1)}%\n` +
-            `（初回のみ、約 2GB。完了後そのまま AI 診断を実行します）`;
-        }
-      });
-      try {
-        console.log('[nls AI診断] runBuiltinAiPrompt 応答', text?.length, '文字');
-      } catch { /* no-op */ }
-      result.textContent = text || '(AI 応答が空でした)';
-    } catch (e) {
-      try {
-        console.error('[nls AI診断] エラー', e);
-      } catch { /* no-op */ }
-      result.textContent =
-        '❌ エラー: ' + String(/** @type {any} */ (e)?.message || e);
-    } finally {
-      btn.removeAttribute('disabled');
-    }
-  });
-  // 参照されない警告抑制（runPopupAiDiagnosis は v0.1.212 互換のため残置）
-  void runPopupAiDiagnosis;
-}
 
 /** 収録・スクショ向け: `html.nl-calm-motion` でループアニメ等を止める */
 function applyCalmPanelMotionClass(enabled) {
@@ -15773,23 +15852,25 @@ async function refresh() {
    *   activeTab / lastFocused で watch が取れたときは非表示（0.1.106）。
    */
   // v0.1.424（再適用・v0.1.421 を単独で・パネル描画と無関係な popup 限定変更）:
-  //   dataBacked（v0.1.414 の「記録のある配信タブを優先」ソース）も storage と同じく
-  //   「実質アクティブ watch ではない」扱いにする。さもないと、ニコ生以外のページ（X 等）で
-  //   standalone POP を開いたとき、別の watch タブの記録（応援○件＋アイコングリッド）が
-  //   フルのアクティブ表示として出る誤情報になる（実機 2026-05-27）。dataBacked は foreground の
-  //   watch ではなく「データのある直近の配信」なので前回配信レビュー(empty-state)として軽く出す。
-  //   ※この変更は standalone popup の refresh() 限定で、watch ページ内の inline パネル描画
+  //   ※この判定は standalone popup の refresh() 限定で、watch ページ内の inline パネル描画
   //     （content-entry.js ensurePageFrameOverlay）には一切触れない。
-  const treatAsNoActiveWatch =
-    !isNicoLiveWatchUrl(url) ||
-    watchUrlPick.source === 'storage' ||
-    watchUrlPick.source === 'dataBacked' ||
-    watchUrlPick.source === 'none';
+  /*
+   * ★v0.1.1313: 判定は純関数 decideNoActiveWatch が正本(v0.1.424 の経緯もそちらの冒頭に集約)。
+   *   要点だけ: サイドパネルは【タブを切り替えても開いたまま】の面なので、
+   *   `activeTab` が watch でないことは「見ていない」を意味しない。
+   *   旧判定はこれを空扱いにし、記録中でもサイドパネルだけが空になっていた。
+   */
+  const noActiveWatchDecision = decideNoActiveWatch({
+    isWatchUrl: isNicoLiveWatchUrl(url),
+    source: watchUrlPick.source,
+    embedWatch: INLINE_EMBED_WATCH,
+    sidePanel: INLINE_SIDE_PANEL
+  });
+  const treatAsNoActiveWatch = noActiveWatchDecision.treatAsNoActiveWatch;
 
   const noWatchHint = $('noWatchRankingHint');
   if (noWatchHint instanceof HTMLElement) {
-    const showNoWatchRankingHint =
-      !INLINE_EMBED_WATCH && treatAsNoActiveWatch;
+    const showNoWatchRankingHint = noActiveWatchDecision.showNoWatchHint;
     if (showNoWatchRankingHint) {
       noWatchHint.removeAttribute('hidden');
       noWatchHint.style.display = 'block';
@@ -15993,7 +16074,8 @@ async function refresh() {
   // 以降のコードは通常の paintWatchPopupUi 経路で cards に live data を流す。
   clearLastBroadcastReviewArtifacts();
 
-  const snapshotKey = `${lv}|${url}|s17`;
+  // ★v0.1.1324 正本=src/lib/watchSnapshotKey.js(旧鍵は url 差で heavy 全件を捨てていた)
+  const snapshotKey = buildWatchSnapshotKey({ liveId: lv, url });
   const key = commentsStorageKey(lv);
   // v0.1.527: 保存系ボタン（HTMLレポート💾／スクショ📷／マーケ📊）を lv 判明のこの時点で
   //   即有効化する。従来は重い snapshot fetch + 巨大コメント配列の storage 読みが終わって
@@ -16111,19 +16193,11 @@ async function refresh() {
     ? Math.max(0, Number(/** @type {any} */ (lightChunkIndexRaw).total) || 0)
     : null;
   const cachedHeavy = watchMetaCache.lastCommentsArr;
-  // v0.1.625: cached arr が currentChunkTotal を「ほぼ全部カバーしている」場合のみ再利用する
-  //   厳密化を追加。従来は chunkTotal が一致するだけで再利用していたが、cached arr が
-  //   初期 paint の短い summary or empty で固まっていて、再 paint も heavy 取得 catch→null
-  //   の経路でスキップされると「5枠だけ表示」が永続化していた(実機 lv350676215・
-  //   記録カードは 716 表示・応援帯は 5名固まり)。80% 以上カバーしていなければ
-  //   cached を捨てて heavy 再読みする(冷スタート扱い)=確実に 716 件で塗り直す。
-  // v0.1.1034(council/tanu-lane-heavy-stall・実機 heavySettleState:race 6回で確認): 旧 chunkTotal【完全一致】は
-  //   総数が増え続ける重い配信で毎回不一致=heavy 全件再読み→完了(5秒)前に次 refresh に追い越され settled が永遠に
-  //   立たず、応援レーンが途中件数で固着(たぬ姉少ない/数字増えない/全員出ない)。→ 完全一致をやめ「現 total の80%以上を
-  //   カバー」なら再利用(coverage)。
-  // ★heavyRace再発の根治(HANDOFF-heavyrace-backfill-IMPL.md B): 過去ログ遡り中(backfill)は total が秒単位で
-  //   増え続け coverage(80%) が永久に割れ→毎poll全件re-read→race固着。coverage に加え「前回読了時点では完全 かつ
-  //   読了が直近12秒以内」なら再利用する fresh-read 条件を decideHeavyChunkReadReuse で足す(全件re-readループを断つ)。
+  // 再利用判定の歴史(正本=lib/heavyChunkReadReuse.js に全文): v0.1.625 chunkTotal 一致のみ→短い cached で
+  //   「5枠だけ表示」が永続(実機 lv350676215)→80%カバー必須に厳格化。v0.1.1034 完全一致は total 増加配信で
+  //   毎回不一致=全件re-read→次 refresh に追い越され settled が永久に立たない→「現 total の80%以上」(coverage)へ。
+  //   ★heavyRace再発の根治(HANDOFF-heavyrace-backfill-IMPL.md B): backfill 中は total が秒単位で増え coverage が
+  //   永久に割れる→「読了時点で完全 かつ 12秒以内」なら再利用する fresh-read を追加(全件re-readループを断つ)。
   const heavyReuseDecision = decideHeavyChunkReadReuse({
     lv,
     cached: cachedHeavy
@@ -16134,14 +16208,10 @@ async function refresh() {
     minGapMs: HEAVY_FULL_REREAD_MIN_GAP_MS
   });
   if (heavyReuseDecision.reason === 'fresh-read') _heavyFreshReadReuseCount += 1; // 計器(実配信で fresh-read の効きを見る)
-  const canReuseHeavyChunkRead =
-    (idbMode || commentsChunked) &&
-    currentChunkTotal != null &&
-    cachedHeavy &&
-    cachedHeavy.lv === lv &&
-    Array.isArray(cachedHeavy.arr) &&
-    cachedHeavy.arr.length > 0 &&
-    heavyReuseDecision.reuse;
+  _heavyReuseLastReason = heavyReuseDecision.reason || ''; // ★v1341: 0回のとき「なぜ0か」を言うため
+  // ★v0.1.1344: 判定は純関数に一本化(旧条件は idbMode||commentsChunked の二重掛けで
+  //   非チャンク配信を締め出し、自己修復が構造的に働かなかった。正本=heavyChunkReadReuse.js)。
+  const canReuseHeavyChunkRead = Boolean(cachedHeavy) && heavyReuseDecision.reuse;
   /** heavy 全件読み完了前はマイルストーン／ギフト Bahamut の誤爆を抑止 */
   let watchPopupHeavyCommentsSettled = canReuseHeavyChunkRead;
   // v0.1.509: 本体は追記専用チャンク（無ければ従来 main にフォールバック）から読む。
@@ -16295,8 +16365,11 @@ async function refresh() {
   let arr = readCommentsOk ? /** @type {unknown[]} */ (data[key]) : [];
   let commentReadState = readCommentsOk ? 'storage_ok' : 'missing';
   if (readCommentsOk) {
-    // 従来 main 経路（非チャンク）。chunkTotal は持たない（チャンク再利用判定の対象外）。
-    watchMetaCache.lastCommentsArr = { lv, arr, chunkTotal: null };
+    // ★v0.1.1367: 軽い read が heavy の読了証跡(readAtMs/chunkTotal)を消すと、v1363 の race 救済が
+    //   【構造的に一度も発動できない】(実機 v1366: fromCache 0回 / no-cache / 78件中19件)。正本=lib/heavyCachePreserve.js
+    const keep = decideLightWriteKeepsHeavyTrace({ lv, lightArr: /** @type {unknown[]} */ (arr), cached: watchMetaCache.lastCommentsArr });
+    if (keep.preserved) arr = keep.arr; // heavy の全件を表示にも使う(軽い部分供給での縮小を防ぐ)
+    watchMetaCache.lastCommentsArr = { lv, arr: keep.arr, chunkTotal: keep.chunkTotal, readAtMs: keep.readAtMs };
   } else if (
     watchMetaCache.lastCommentsArr &&
     watchMetaCache.lastCommentsArr.lv === lv &&
@@ -16670,7 +16743,7 @@ async function refresh() {
     //   初回/配信切替/未描画(空)のときは見送らず必ず描画する。
     // 白フラッシュ見える化: ここから renderWatchMetaCard までの重い paint 区間を計測する。
     _perfPaintCount += 1;
-    noteRepaintReason(_refreshReasonTag || 'unknown'); // v0.1.1248: 引き金別に積む
+    noteRepaintReason(_refreshReasonTag || 'unknown'); _refreshReasonTag = ''; // v0.1.1248:引き金別/★1502:読んだら消す(前の値の使い回し=内訳の嘘を防ぐ)
     const _perfPaintT0 = typeof performance !== 'undefined' ? performance.now() : Date.now();
     const userRoomsUl = /** @type {HTMLElement|null} */ ($('userRoomList'));
     const userRoomsAlreadyPainted =
@@ -16764,16 +16837,16 @@ async function refresh() {
   //   同一 liveId のときだけ再描画。v0.1.509: heavyDataPromise は配列 or null を resolve する。
   void heavyDataPromise.then(async (nextArr) => {
     const bailHeavy = (state) => { recordStoryUserLaneHeavySettle(_storyUserLaneRenderProbe, state); }; // v0.1.1033 計器
-    if (watchMetaCache.key !== snapshotKey) return bailHeavy(STORY_USER_LANE_HEAVY_SETTLE.STALE_SNAPSHOT);
+    if (!heavyResultStillTargetsThisWatch({ cacheKey: watchMetaCache.key, snapshotKey })) return bailHeavy(STORY_USER_LANE_HEAVY_SETTLE.STALE_SNAPSHOT); // v1325: key='' は再取得の合図(正本=lib/watchSnapshotKey.js)
     if (!Array.isArray(nextArr)) return bailHeavy(STORY_USER_LANE_HEAVY_SETTLE.NULL_RESP);
     if (refreshGen !== watchPopupRefreshGeneration) {
-      // v0.1.1035(レビュー指摘=初回レース残存): 追い越された古い callback でも snapshotKey は一致(上)=nextArr は現配信の
-      //   有効な全件。stale 描画はせず、キャッシュだけ最新化→次 refresh が v0.1.1034 の80%再利用で settled で始まれる
-      //   (初回が何度追い越されても「一度読めた全件」が次に活きる=自己修復の起点)。
-      //   ★heavyRace根治(B): readAtMs を打つ=次 refresh(450ms後)が fresh-read で reuse=即 settled で始まれる。
-      //   これが「race で bail しても A+B だけで全件re-readループが切れる」自己修復の起点。
+      // v0.1.1035: 追い越された古い callback でも snapshotKey は一致(上)=nextArr は現配信の有効な全件。
+      //   キャッシュだけ最新化→次 refresh が80%再利用で settled で始まれる(自己修復の起点)。
+      //   ★heavyRace根治(B): readAtMs を打つ=次 refresh が fresh-read で reuse=即 settled で始まれる(v1363 で下の分岐も追加)。
       if (nextArr.length > 0) watchMetaCache.lastCommentsArr = { lv, arr: nextArr, chunkTotal: idbMode || commentsChunked ? currentChunkTotal : null, readAtMs: Date.now() };
-      return bailHeavy(STORY_USER_LANE_HEAVY_SETTLE.RACE);
+      // ★v1363 race固着の根治(実機 race46回/settled0回・158件中18件): 再利用時も .then() が1マイクロタスク遅れ、その間に refresh で世代が進み必ず bail していた。手元に全件があれば描く。
+      if (!(canReuseHeavyChunkRead && nextArr.length > 0)) return bailHeavy(STORY_USER_LANE_HEAVY_SETTLE.RACE);
+      _heavyRacePaintedFromCacheCount += 1; // 発動証拠を速報に出す
     }
     // v0.1.625: nextArr が空でも、現 arr が currentChunkTotal を満たしていない
     //   (cached が短い arr で固まっている)なら skip しない(=空応援帯固まり防止)。
@@ -16819,6 +16892,17 @@ async function refresh() {
   resetWatchPopupLoadDiagnostics(lv);
   resetPerBroadcastPopupCachesIfLiveIdChanged(lv);
 
+  /*
+   * ★v0.1.1315: キャッシュヒット経路で【すぐ】幕を外す(黒画面の真因・判定は純関数が正本)。
+   *   実機 v0.1.1314 の計器: t+60ms で面積あり・全層✅・地はクリームなのに
+   *   幕だけ t+1238ms まで残る=約1.2秒「中身が見えない」。冪等なので後続は no-op。
+   */
+  if (shouldRevealCloakAfterFirstPaint({ snapshotCacheHit, freshRefresh: isFreshRefresh() }).revealNow) {
+    paintWatchPopupUi();
+    markPopupRefreshContentPainted();
+    revealPopupPrimaryOnce();
+  }
+
   if (!snapshotCacheHit) {
     // 0.1.19 (T): 取得中フラグを立ててから最初の paint を出す。
     // clearWatchMetaCard が `watchMetaCache.fetchInflight` を読んで「（接続中…）」
@@ -16833,6 +16917,10 @@ async function refresh() {
     watchMetaCache.fetchError = '';
     if (isFreshRefresh()) {
       paintWatchPopupUi();
+      // ★v0.1.1315: 描けた直後に外す(従来は1500msの保険任せ=中身が描けているのに隠れていた)。
+      //   保険は最終防衛として残す。冪等なので二重実行しない。
+      markPopupRefreshContentPainted();
+      revealPopupPrimaryOnce();
       schedulePopupPrimaryRevealFallback(1500);
     }
     // 視聴タブのリロード直後は content script が readiness 揃わず、単発の
@@ -16952,6 +17040,7 @@ async function refresh() {
   paintWatchPopupUi();
   markPopupRefreshContentPainted();
   revealPopupPrimaryOnce();
+  // ★v0.1.1315: ここは heavy read の【後】=実機で t+1238ms。上流で先に外すので通常 no-op。
 
   /*
    * v0.1.414 ウォッチドッグ（standalone popup multitab「中身が空」救済の最終防衛）:
@@ -17588,30 +17677,6 @@ async function listWatchFramesWithInnerText(tabId, opts = {}) {
 }
 
 /**
- * innerText 断片から視聴者数を拾う（content より先にポップアップ側で試す）
- * @param {{ frameId: number, score: number, text: string }[]} frames
- * @returns {number|null}
- */
-function probeViewerCountFromFrameTexts(frames) {
-  for (const f of frames) {
-    const n = parseViewerCountFromLooseText(f.text);
-    if (n != null) return n;
-  }
-  return null;
-}
-
-/**
- * @param {WatchPageSnapshot} snap
- * @param {number|null} probe
- */
-function mergeViewerProbeIntoSnapshot(snap, probe) {
-  if (!snap || probe == null) return snap;
-  const cur = snap.viewerCountFromDom;
-  if (typeof cur === 'number' && Number.isFinite(cur) && cur >= 0) return snap;
-  return { ...snap, viewerCountFromDom: probe };
-}
-
-/**
  * content script 注入直後はReceiving end does not existになりやすいので再試行
  * @param {number} tabId
  * @param {object} message
@@ -18081,21 +18146,6 @@ async function forceRefetchAllCommenterFollowProfiles(liveId, onStatus) {
 
 
 /**
- * disable / status 文言を先にペイントしてから重い処理に入る（体感ラグ軽減）。
- * @returns {Promise<void>}
- */
-function yieldToBrowserPaint() {
-  // ★v0.1.1277: rAF だけだとサイドパネルが裏に回った瞬間に凍り
-  //   html_report_build_timeout になる。setTimeout と競走させて必ず進める。
-  return new Promise((resolve) => {
-    let done = false;
-    const finish = () => { if (done) return; done = true; resolve(undefined); };
-    try { requestAnimationFrame(() => { requestAnimationFrame(finish); }); } catch { /* rAF無し */ }
-    setTimeout(finish, 32);
-  });
-}
-
-/**
  * HTML レポート用: popup が既に持つ snapshot が watch と整合していれば
  * タブへの NLS_EXPORT を省略（ダウンロード開始までの待ちを短縮）。
  * @param {string} watchUrl
@@ -18432,6 +18482,37 @@ async function downloadMediaKitHtml() {
 const coalescedRefreshScheduler = createCoalescedRefreshScheduler({
   throttleMs: 450
 });
+/**
+ * ★v0.1.1450: 北極星 tick(独立レーン描画)専用のスロットル。
+ *
+ * ■ 何が起きていたか(2026-08-19 実ブラウザ実測・25.9MB)
+ *   `chrome.storage.onChanged` が `tickIndependentNorthStar` を**無間引きで直呼び**していた。
+ *   content は配信中ずっと `nls_comments_*` / `nls_panel_summary_*` を書くので、
+ *   **コメント1件ごとに tick 全体(storage read 9〜10本)が再実行**される。
+ *     静穏2秒の read = 10本 / **コメント1件書いた直後1.2秒の read = 60〜103本(平均77)**
+ *     10秒で計149回・**合計7,698ms**(10秒中7.7秒が storage 待ち)
+ *   ＝これがイベントループを止め、サイドパネルを黒くしていた当人
+ *   ([[sidepanel-black-is-popup-storage-read-storm-2026-08-19]])。
+ *
+ * ■ ★なぜ上の coalescedRefreshScheduler を共用しないか(重要)
+ *   あちらは**モジュール単一インスタンス**で `safeRefresh` と自コメ即時描画が既に占有し、
+ *   `lastPaintAt` を**1本しか持たない**。共用すると:
+ *     - tick が leading を消費 → 本物のコメント再描画が trailing に落ちる(v0.1.508 の再発)
+ *     - 自コメ送信が lastPaintAt を更新 → tick の leading が理由もなく消える
+ *   ＝**状態を共有しない**のが正しい。ファクトリなので新規ファイルは要らない。
+ *
+ * ■ 700ms の根拠(実測から)
+ *   1 tick ≈ 9.5本。60本 ÷ 9.5 ≈ 6.3 tick が 1.2秒に入っていた。
+ *     450ms → 1.2秒窓に3 tick(約28本・半減どまり) / **700ms → 2 tick(約19本)** /
+ *     1000ms → 2 tick(本数は同じで鮮度だけ悪化)
+ *   ★700 は NORTH_STAR_INDEPENDENT_REFRESH_MS(3000)の約1/4＝
+ *     「タイマーを信用しない」(v0.1.989)の意図を保つ。
+ *   ★**コメント本文の描画は別経路**(scheduleCoalescedStorageRefresh → safeRefresh)で
+ *     450ms のまま＝**ユーザーが一番見る部分の鮮度は1msも変わらない**。
+ */
+const northStarTickScheduler = createCoalescedRefreshScheduler({
+  throttleMs: 700
+});
 /** 初回 refresh が完了するまではコアレスをバイパスし即時反映する */
 let initialRefreshDone = false;
 
@@ -18500,16 +18581,6 @@ function initShadeFrameSrc(who, frame) {
   return set[frame] || set.idle || '';
 }
 
-function initShadePrefersReducedMotion() {
-  try {
-    return (
-      typeof matchMedia === 'function' &&
-      matchMedia('(prefers-reduced-motion: reduce)').matches
-    );
-  } catch {
-    return false;
-  }
-}
 
 let initShadeCharCycleTimer = null;
 let initShadeLipTimer = null;
@@ -18582,7 +18653,7 @@ function startInitShadeCharCycle() {
     if (who && el instanceof HTMLElement) initShadeCharEls[who] = el;
   }
   if (!serif || Object.keys(initShadeCharEls).length === 0) return;
-  const reduceMotion = initShadePrefersReducedMotion();
+  const reduceMotion = prefersReducedMotion();
   let idx = 0;
   const applyLine = (i) => {
     const line = INIT_SHADE_LINES[i % INIT_SHADE_LINES.length];
@@ -18655,7 +18726,7 @@ function exportWaitStopLipSync() {
 
 function exportWaitStartLipSync(who) {
   exportWaitStopLipSync();
-  if (initShadePrefersReducedMotion()) return;
+  if (prefersReducedMotion()) return;
   exportWaitLipTimer = setInterval(() => {
     const open = Math.random() < 0.45;
     exportWaitSetFrame(who, open ? 'talk' : 'idle');
@@ -18702,7 +18773,7 @@ function exportWaitApplyLine(line) {
     }
     if (who !== line.who) exportWaitSetFrame(who, 'idle');
   }
-  if (initShadePrefersReducedMotion()) {
+  if (prefersReducedMotion()) {
     exportWaitSetFrame(line.who, 'talk');
   } else {
     exportWaitStartLipSync(line.who);
@@ -18730,7 +18801,7 @@ function startExportWaitCharCycle(lines) {
   if (!exportWaitActiveLines.length || Object.keys(exportWaitCharEls).length === 0) return;
   let idx = 0;
   exportWaitApplyLine(exportWaitActiveLines[0]);
-  if (!initShadePrefersReducedMotion()) {
+  if (!prefersReducedMotion()) {
     for (const who of Object.keys(exportWaitCharEls)) exportWaitScheduleBlink(who);
   }
   exportWaitCharCycleTimer = setInterval(() => {
@@ -18852,10 +18923,10 @@ function dismissInitialLoadShade() {
   setTimeout(() => {
     if (shade.classList.contains('nl-init-shade--done')) return;
     shade.classList.add('nl-init-shade--done');
-    // CSS transition (220ms) 後に DOM から外す
+    // ★v0.1.1432: DOM から外さない(外すと二度と出せず、あとで黒くなっても覆えない)。畳むだけ。
     setTimeout(() => {
       try {
-        shade.remove();
+        shade.setAttribute('hidden', '');
       } catch {
         // no-op
       }
@@ -18874,11 +18945,34 @@ function dismissInitialLoadShade() {
  */
 let inlineShadeDataPollTimer = null;
 let inlineShadeDataFallbackTimer = null;
-// INLINE 幕の安全上限。データが来なくてもこの時間で必ず外す（永久ローディング防止）。
-//   記録済みコメント／レーン候補が乗れば inlineWatchPanelHasRealDataForShade() が即 true を
-//   返して早期解除されるため、この上限は「初回かつ完全に空」の最悪ケースだけに効く。
-//   20 秒は体感が長すぎたので 10 秒に短縮（prewarm 表示でも十分キャラ幕が見える）。
-const INLINE_SHADE_DATA_FALLBACK_MS = 10_000;
+/*
+ * INLINE 幕の安全上限。データが来なくてもこの時間で必ず外す（永久ローディング防止）。
+ * ★v0.1.1373: 10秒 → 2.5秒。実機(2026-08-12)の「黒いパネル」の正体がこれだった:
+ *   ★中身が見えなかった合計=12773ms(幕660ms / シェード12773ms) 主因=初回シェード
+ *   更新所要48820ms / 記録中2配信 ＝storage 飽和でシェードが待つデータが来ない。
+ *   旧コメントは10秒を「最悪ケースだけ」としていたが、★飽和時はこれが通常ケース＝
+ *   上限そのものが体感の黒時間を決めていた。幕の目的(初期レイアウトのガタつき隠し)は
+ *   2.5秒で足り、それ以上は待つほど黒く見えるだけ。中身が薄くても出す方が必ず良い。
+ *
+ * ★v0.1.1418: 2.5秒 → 0.9秒。ユーザー実機で「まだ黒い」が続いていたため。
+ *
+ * 【なぜ下げてよいと言えるか】この上限が効くのは【データが最後まで来なかった】ときだけ。
+ *   データが来た場合はポーリング(下の 200ms→60ms)と、実際に中身を描いた5経路
+ *   (countStoryUserLaneDomTiles>0 等・7172/7202/7241/7404/7467行)が先に外す。
+ *   ＝上限を下げても「データが来ているのに早く外れる」ことは起きない。
+ *   下げて変わるのは【来なかったとき何秒黒いままか】だけ。
+ *
+ * 【なぜ0.9秒か】幕の本来の目的は「初期レイアウトのガタつきを隠す」こと。
+ *   実測(2026-08-17・実ブラウザ)では popup.html の文書生成〜色確定が 72ms、
+ *   about:blank の隙間は 11ms。★レイアウトが落ち着くのに2.5秒は要らない。
+ *   一方で 0 にはしない: prewarm 直後や低速環境で「空の枠が一瞬見える」のを
+ *   避ける最小限の余裕として 0.9秒を残す(体感1秒未満に収める)。
+ *
+ * ★トレードオフ(正直に): データが遅い環境では、以前より
+ *   「中身が薄い状態」が見える時間が長くなる。ただし黒いまま待たせるより良い
+ *   というのは v0.1.1373 で既に確定した方針で、その延長。
+ */
+const INLINE_SHADE_DATA_FALLBACK_MS = 900;
 
 function inlineWatchPanelHasRealDataForShade() {
   try {
@@ -18921,17 +19015,84 @@ function dismissInlineShadeWhenDataReady(fallbackMs) {
     dismissInitialLoadShade();
     return;
   }
+  /*
+   * ★v0.1.1381: 再入時に既存タイマーを掃除する。
+   *   従来は2つの呼び出し元(初回 refresh の finally / 5秒の安全網)が両方走ると
+   *   setInterval/setTimeout が**上書きされて前のハンドルが迷子**になり、
+   *   古い interval が 200ms ごとに回り続けた(誰も clear できない)。
+   *   締切そのものも後勝ちで伸びる=上限が上限として働いていなかった。
+   */
+  clearInlineShadeDataWaiters();
   const cap = Math.max(0, Number(fallbackMs) || 0);
+  /*
+   * ★v0.1.1418: 200ms → 60ms。
+   *   データが揃っていても、次のポーリングまで最大200ms シェードが覆ったままだった。
+   *   ＝「データは来ているのに黒い」時間が毎回上乗せされていた。
+   *   inlineWatchPanelHasRealDataForShade() は DOM 参照とキャッシュ読みだけで
+   *   storage を触らないため、間隔を詰めても輻輳源にならない
+   *   ([[instrument-can-kill-the-page-it-measures-2026-08-16]] を踏まないこと)。
+   *   上限(下の cap)に達すれば必ず止まるので、回り続けることもない。
+   */
   inlineShadeDataPollTimer = setInterval(() => {
     if (inlineWatchPanelHasRealDataForShade()) {
       clearInlineShadeDataWaiters();
       dismissInitialLoadShade();
     }
-  }, 200);
+  }, 60);
   inlineShadeDataFallbackTimer = setTimeout(() => {
     clearInlineShadeDataWaiters();
     dismissInitialLoadShade();
   }, cap);
+}
+
+/*
+ * ★v0.1.1381: シェードの締切を【初回可視】起点にする(会議 Q3)。
+ *
+ * ■ 何が壊れていたか
+ *   安全網は `setTimeout(..., 5000)` の中で `dismissInlineShadeWhenDataReady(2500)` を
+ *   呼んでいた。＝上限は「呼ばれた時刻からの相対」なので、実データが来ない最悪系では
+ *   **5000 + 2500 = 最短7.5秒**シェードが中身を覆う。ユーザーにはその間ずっと
+ *   「パネルは開いているのに中身が出ない」＝黒に見える。
+ *   ★[[timer-delay-is-not-timer-origin-2026-08-12]] を私が同じ日にまた踏んでいた。
+ *
+ * ■ なぜ boot 起点ではなく可視起点か
+ *   5秒待っていたのは prewarm(画面外先読み)対策で、これ自体は正しい:
+ *   画面外で幕を外すと「表示された時には空白」になる。
+ *   ★しかし守りたいのは「**見えている**あいだに空白を見せない」ことなので、
+ *   起点を boot ではなく【初回可視】に置けば prewarm 対策と短い締切は両立する。
+ *   見えていない間は1秒も消費されず、見えた瞬間から 2.5秒の締切が始まる。
+ *
+ * ■ これは「黒が消える」対策ではない(過大申告しない)
+ *   凍結レジーム(イベントループ停止)では、この setTimeout 自体が遅れて発火する。
+ *   効くのは JS が生きている場合の最短7.5秒→2.5秒だけ。
+ */
+let inlineShadeVisibleDeadlineArmed = false;
+
+function armInlineShadeDeadlineOnFirstVisible() {
+  if (!INLINE_MODE || inlineShadeVisibleDeadlineArmed) return;
+  const arm = () => {
+    if (inlineShadeVisibleDeadlineArmed) return;
+    inlineShadeVisibleDeadlineArmed = true;
+    dismissInlineShadeWhenDataReady(INLINE_SHADE_DATA_FALLBACK_MS);
+  };
+  try {
+    if (document.visibilityState === 'visible') {
+      arm();
+      return;
+    }
+    // まだ画面外(prewarm)。見えた瞬間に締切を開始する。
+    document.addEventListener(
+      'visibilitychange',
+      () => {
+        if (document.visibilityState === 'visible') arm();
+      },
+      { once: true }
+    );
+    arm(); // ★v0.1.1444: hidden でも締切を開始(理由=src/lib/initShadeDismissPolicy.js)
+  } catch {
+    // visibilityState を読めない環境では従来どおり即アーム(永久ローディングを作らない)。
+    arm();
+  }
 }
 
 /** @param {string} key */
@@ -19149,6 +19310,11 @@ async function collectAiShareDevMonitorPayloadBundle(watchUrl) {
           return null;
         }
       })(),
+      // ★v0.1.1377: popup の例外。ここに載せないと速報に出ない=起きたことすら分からない
+      //   ([[fastdiag-lite-is-the-printer-subset]] / [[unwired-judgement-is-systemic-2026-08-12]])。
+      popupErrorProbe: buildPopupErrorProbe(_popupErrorBuffer),
+      // ★v0.1.1378: サムネ/ID/名前の取得率(ユーザー確定の価値指標)。
+      identityAcquisition: buildIdentityAcquisitionProbe(_identityAcquisition),
       // v0.1.1226: ティッカーのピックアップ計器(gift+scored=0 なら未発火と断言できる)。
       tickerPick: { ..._tickerPickDiag },
       // v0.1.1231 Phase1: 人物集合の増減。「消えた人数」が本丸/everSeenMax は上限判断の実測。
@@ -19156,10 +19322,15 @@ async function collectAiShareDevMonitorPayloadBundle(watchUrl) {
       lightSupplyGuard: {
         skipCount: _lightSupplyGuardDiag.skipCount,
         observedCount: _lightSupplyGuardDiag.observedCount,
-        worst: _lightSupplyGuardDiag.worst,
+        worst: _lightSupplyGuardDiag.worst, paintedDuringAwaitCount: _lightSupplyGuardDiag.paintedDuringAwaitCount,
+        // ★v0.1.1370: 通した理由の内訳。これが無いと「✅見送り0回」が正常か穴かを区別できない。
+        passReasons: { ..._lightSupplyGuardDiag.passReasons },
         line: formatLightSupplyGuardLine(_lightSupplyGuardDiag)
       },
       laneSupplyOrigin: snapshotLaneSupplyOriginDiag(_laneSupplyOriginDiag),
+      // ★2026-08-08 計器: 鏡 publish の到達/見送り。読み方は lanePublishSkipDiag.js の冒頭。
+      lanePublishSkip: snapshotLanePublishSkipDiag(_lanePublishSkipDiag, Date.now()),
+      mainThreadBlocker, // ★v1394: 黒くなる件の【当人】(longtask 実測・boot 側で観測)
       // v0.1.1215: 「積み上げ式にならずアイコンがちらちら変わる」の観測。上の churn は
       //   全消し再構築だけを数えるため、DOM枚数を変えない「中身のすり替え」を取りこぼす。
       storyGrowthCellSwap: (() => {
@@ -19180,9 +19351,105 @@ async function collectAiShareDevMonitorPayloadBundle(watchUrl) {
       storyUserLaneRenderProbe: (() => {
         try {
           const snap = snapshotStoryUserLaneRenderProbe(_storyUserLaneRenderProbe, Date.now());
-          if (snap) snap.laneRepaintCounts = getStoryLaneRepaintCounts(); // v0.1.1040 計器: 段別 churn 実測
+          if (snap) { snap.laneRepaintCounts = getStoryLaneRepaintCounts(); snap.laneHollowCounts = getStoryLaneHollowCounts(document); }
+          /*
+           * ★v0.1.1456 調査計画 Step 1: popup(iframe)側の DOM 量を数える。
+           *   ★watch 側の `dom-nodes` とは【別文書】。台帳(instrumentSpec.js)でも
+           *     `dom-nodes @ watch` / `dom-nodes @ popup` の2行に分けてある。
+           *   ★storage read を増やさない(この計器バッチに相乗り)
+           *     = [[instrument-can-kill-the-page-it-measures-2026-08-16]]。
+           *   ★`getElementsByTagName('*').length` は live コレクションの length 参照で
+           *     querySelectorAll のような配列生成をしない(計器自身が重くならない)。
+           */
+          if (snap) {
+            try {
+              const laneIds = { link: 'sceneStoryUserLaneLink', konta: 'sceneStoryUserLaneKonta',
+                tanu: 'sceneStoryUserLaneTanu', gift: 'sceneStoryUserLaneGift', ad: 'sceneStoryUserLaneAd' };
+              /** @type {Record<string, { tiles:number, nodes:number }>} */
+              const perLane = {};
+              for (const [name, id] of Object.entries(laneIds)) {
+                const el = document.getElementById(id);
+                if (el) perLane[name] = { tiles: el.childElementCount, nodes: el.getElementsByTagName('*').length };
+              }
+              snap.popupDomCensus = summarizePopupDomCensus({
+                total: document.getElementsByTagName('*').length,
+                tiles: document.getElementsByClassName('nl-story-userlane-cell').length,
+                hollow: document.getElementsByClassName('nl-story-userlane-cell--hollow').length,
+                perLane
+              });
+            } catch { /* 計器の失敗で診断全体を壊さない */ }
+            /*
+             * ★v0.1.1458: 「サイドパネル全部が黒い」の【当人を名指しする】。
+             *   ★既存の probeCenterPainter(sidepanel-entry.js)は**外側**を見るので、
+             *     中央にある iframe しか返せず「中で何が覆っているか」が永久に分からなかった。
+             *   ここは iframe の【中】= popup.html なので、覆っている当人まで辿れる。
+             *   ★判定は panelCoverCulprit.js(純関数)。ここは採取だけ。
+             */
+            try {
+              const w = window.innerWidth;
+              const h = window.innerHeight;
+              if (w > 0 && h > 0 && typeof document.elementFromPoint === 'function') {
+                const el = document.elementFromPoint(Math.floor(w / 2), Math.floor(h / 2));
+                /** @type {{ tag: string, bgColor: string }[]} */
+                const layers = [];
+                for (let cur = el, n = 0; cur && n < 12; n += 1, cur = cur.parentElement) {
+                  const cs = getComputedStyle(/** @type {HTMLElement} */ (cur));
+                  const cls = cur.classList && cur.classList.length ? `.${cur.classList[0]}` : '';
+                  layers.push({
+                    tag: cur.tagName.toLowerCase() + (cur.id ? `#${cur.id}` : cls),
+                    bgColor: cs.backgroundColor
+                  });
+                }
+                snap.panelCover = judgePanelCover(layers);
+              }
+            } catch { /* 計器の失敗で診断全体を壊さない */ }
+            /*
+             * ★v0.1.1461: DOMの【木の形】を数字にする(ユーザー指示:
+             *   「DOMを全部把握して、それを計器に入れる基本から見直すべき」)。
+             *   ★市販の可視化拡張は chrome-extension:// のページを見られないので
+             *     この文書(サイドパネルの中身)には届かない=自前で採る。
+             *   ★走査は1回・木の1階層ずつ(親を辿らない)＝計器自身を重くしない。
+             */
+            try {
+              const all = document.getElementsByTagName('*');
+              /** @type {{ tag:string, depth:number, childCount:number, id:string }[]} */
+              const nodes = [];
+              // ★上限を置く(巨大なページで計器が主犯にならないように)。
+              const cap = Math.min(all.length, 4000);
+              /** @type {WeakMap<Element, number>} 親の深さを覚えて再利用する。 */
+              const _depthOf = new WeakMap();
+              for (let i = 0; i < cap; i += 1) {
+                const el = all[i];
+                /*
+                 * ★深さは【親の深さ+1】で求める(親を毎回辿らない)。
+                 *   getElementsByTagName は文書順なので、親は必ず先に処理済み。
+                 *   ★辿る版は 2,844要素で約34,000回の参照になる=計器が重くなる。
+                 *   [[instrument-can-kill-the-page-it-measures-2026-08-16]]
+                 */
+                const parent = el.parentElement;
+                const depth = parent && _depthOf.has(parent) ? _depthOf.get(parent) + 1 : 0;
+                _depthOf.set(el, depth);
+                nodes.push({
+                  tag: el.tagName.toLowerCase(),
+                  depth,
+                  childCount: el.childElementCount,
+                  id: el.id || ''
+                });
+              }
+              snap.domTreeCensus = summarizeDomTree(nodes);
+            } catch { /* 計器の失敗で診断全体を壊さない */ }
+            /*
+             * ★v0.1.1462: 拡張の処理時間を【全経路】実測して出す。
+             *   ★カバー率(測れた割合)も一緒に出す＝囲み忘れが数字で見える。
+             */
+            try {
+              snap.autoSection = formatAutoSectionLines(_autoSectionCensus, {
+                elapsedMs: Date.now() - _autoSectionStartedAt
+              });
+            } catch { /* 計器の失敗で診断全体を壊さない */ }
+          } // v0.1.1040/v0.1.1428 計器: 段別churn実測 + 中身LODが効いているか
           // heavyRace根治(B)計器: fresh-read で heavy 全件再読みを省いた累計(実配信で効きと12秒ギャップの適正を判定)。
-          if (snap) snap.heavyFreshReadReuseCount = _heavyFreshReadReuseCount;
+          if (snap) { /* ★v1357: 実DOM起点の縮小観測も渡す(履歴だけだと嘘をつく) */ snap.heavyFreshReadReuseCount = _heavyFreshReadReuseCount; snap.heavyReuseLastReason = _heavyReuseLastReason; snap.heavyRacePaintedFromCache = _heavyRacePaintedFromCacheCount; snap.laneTileOscillation = summarizeLaneTileOscillation(_laneTileHistory, { domShrinkCount: _laneSupplyOriginDiag?.shrinkObservedCount, domShrinkCulprit: _laneSupplyOriginDiag?.shrinkCulprit }); }
           // heavyRace根治(C-1)計器: 進行中read への合流で新規readを張らずに済んだ累計(single-flightの効き)。
           if (snap) snap.heavyReadInflightJoinCount = _heavyReadSingleFlight.joinCount();
           return snap;
@@ -19393,6 +19660,49 @@ const schedulePopupDiagAutoPublish = createPopupDiagAutoPublisher(
  * - 失敗してもユーザー操作を妨げない（try/catch で握り潰し）
  * - chrome.storage.local 権限がない環境（テスト等）では noop
  */
+/**
+ * ★v0.1.1382: migration が読むのは `nls_comments_lv*` だけなので、
+ *   **全 storage を読まずにそのキーだけ**を取る。
+ *
+ * ■ なぜ(2026-08-12 実測・chrome-devtools で出荷ビルドを計測)
+ *     get(null) 全件読み(20.7MB) = 1,157ms   ← これを4本が別々に叩いていた
+ *     getKeys() キー名だけ       =    81ms   ← 14倍軽い
+ *   拡張の全ページは同一メインスレッドを共有するので、パネルの初期化で撃つ全件読みは
+ *   そのまま黒画面・診断ページの固まりとして出る
+ *   ([[stalled-event-loop-masquerades-as-paint-bug-2026-08-12]])。
+ *
+ * ■ これは新しい発明ではない
+ *   `content-entry.js` の `readPrunableStorageBagCheap()`(v0.1.419)が同じ手順を
+ *   既に実装しており、記録エンジン側では解決済みだった。popup 側だけ取り残されていた
+ *   ＝既存資産の横展開(作り直さず薄く束ねる)。
+ *
+ * ★getKeys() は Chrome 130+。無い/失敗した環境では従来どおり全件読みに倒す
+ *   (挙動は不変・重いだけ)。fallback は content 側と同じ形に揃える。
+ *
+ * @param {{ get: (k: any) => Promise<Record<string, any>>, getKeys?: () => Promise<string[]> }} local
+ * @returns {Promise<Record<string, any>>} `nls_comments_lv*` だけを含む bag
+ */
+async function readCommentBagForMigrationCheap(local) {
+  /** @type {string[]} */
+  let allKeys = [];
+  if (typeof (/** @type {any} */ (local).getKeys) === 'function') {
+    try {
+      allKeys = await (/** @type {any} */ (local).getKeys());
+    } catch {
+      allKeys = [];
+    }
+  }
+  if (!allKeys || allKeys.length === 0) {
+    // fallback(旧 Chrome / getKeys 失敗): 従来どおり全部読む。
+    const all = await local.get(null);
+    return all && typeof all === 'object' ? all : {};
+  }
+  const wanted = allKeys.filter((k) => String(k).startsWith('nls_comments_lv'));
+  if (wanted.length === 0) return {};
+  const bag = await local.get(wanted);
+  return bag && typeof bag === 'object' ? bag : {};
+}
+
 const KEY_BACKFILL_REMOVE_GIFT_SYSTEM_MSGS_DONE = 'nls_backfill_remove_gift_system_msgs_v1';
 async function runOneTimeBackfillRemoveGiftSystemMessages() {
   const local = globalThis.chrome?.storage?.local;
@@ -19401,7 +19711,7 @@ async function runOneTimeBackfillRemoveGiftSystemMessages() {
     const flagBag = await local.get(KEY_BACKFILL_REMOVE_GIFT_SYSTEM_MSGS_DONE);
     if (flagBag?.[KEY_BACKFILL_REMOVE_GIFT_SYSTEM_MSGS_DONE]) return;
 
-    const all = await local.get(null);
+    const all = await readCommentBagForMigrationCheap(local);
     let totalRemoved = 0;
     /** @type {Record<string, unknown>} */
     const updates = {};
@@ -19456,7 +19766,7 @@ async function runOneTimeBackfillRemoveRecommendedLivePollution() {
     const flagBag = await local.get(KEY_BACKFILL_REMOVE_RECOMMENDED_LIVE_POLLUTION_DONE);
     if (flagBag?.[KEY_BACKFILL_REMOVE_RECOMMENDED_LIVE_POLLUTION_DONE]) return;
 
-    const all = await local.get(null);
+    const all = await readCommentBagForMigrationCheap(local);
     let totalRemoved = 0;
     /** @type {Record<string, unknown>} */
     const updates = {};
@@ -19502,7 +19812,7 @@ async function runOneTimeBackfillRemoveRecommendedLivePollutionV2() {
     const flagBag = await local.get(KEY_BACKFILL_REMOVE_RECOMMENDED_LIVE_POLLUTION_V2_DONE);
     if (flagBag?.[KEY_BACKFILL_REMOVE_RECOMMENDED_LIVE_POLLUTION_V2_DONE]) return;
 
-    const all = await local.get(null);
+    const all = await readCommentBagForMigrationCheap(local);
     let totalRemoved = 0;
     /** @type {Record<string, unknown>} */
     const updates = {};
@@ -19549,7 +19859,7 @@ async function runOneTimeBackfillRemoveRecommendedUserChipPollution() {
     );
     if (flagBag?.[KEY_BACKFILL_REMOVE_RECOMMENDED_USER_CHIP_POLLUTION_V1_DONE]) return;
 
-    const all = await local.get(null);
+    const all = await readCommentBagForMigrationCheap(local);
     let totalRemoved = 0;
     /** @type {Record<string, unknown>} */
     const updates = {};
@@ -19750,7 +20060,12 @@ async function initPopup() {
     );
     if (frameThemeDetails) frameThemeDetails.open = true;
   }
-  window.addEventListener('resize', applyResponsivePopupLayout);
+  window.addEventListener('resize', applyResponsivePopupLayout); installPanelWakeCurtain({ countTiles: () => countStoryUserLaneDomTiles(getStoryUserLaneEls()) });
+  // ★v0.1.1284: リサイズは【内容アドレスで検出できない唯一の経路】(中身不変のまま寸法だけ変わる)。
+  //   控えを捨てて未計測へ降格させる=会場は「①DOM未計測 ⚪」で fail-closed(嘘の緑を出さない)。
+  window.addEventListener('resize', () => {
+    _laneDomSelfLast = null;
+  });
 
   const toggle = /** @type {HTMLInputElement} */ ($('recordToggle'));
   const exportBtn = /** @type {HTMLButtonElement} */ ($('exportJson'));
@@ -21899,8 +22214,10 @@ async function initPopup() {
         const onlyVisualExpanded =
           changedKeys.length === 1 && changedKeys[0] === KEY_SUPPORT_VISUAL_EXPANDED;
         if (!skipVisualExternalSync || !onlyVisualExpanded) {
+          // ★v0.1.1340: どのキーが引き金かまで名指しする(内訳が読めないと原因が特定できない)。
+          const trigTag = buildStorageRefreshTriggerTag(changedKeys);
           scheduleCoalescedStorageRefresh(changes, () => {
-            tagRefreshReason('storage_changed'); safeRefresh();
+            tagRefreshReason(trigTag); safeRefresh();
           });
         }
       };
@@ -22035,6 +22352,15 @@ async function initPopup() {
    *   refreshAllNorthStarMirrorLanes は idempotent(各レーン diff-skip・内部 try/catch・並列発火)なので
    *   heavy 経路と二重に走っても同一なら no-op=競合しない。read path にキャッシュは足さない(§6 地雷回避)。
    */
+  /**
+   * ★v0.1.1450: tick 自身の初回完了フラグ(スロットルの initialDone に渡す)。
+   *
+   * ★**`initialRefreshDone` を渡してはいけない**(最も気づきにくい退化):
+   *   あれは**重い refresh() の .finally() で立つ**。重い配信では refresh が完走しない——
+   *   **それがこの独立 tick を作った動機そのもの**。渡すと initialDone=false が続き、
+   *   スケジューラの「初回はあらゆる抑制を無視」経路で**毎回即時実行＝間引きが恒久的に無効**になる。
+   */
+  let northStarTickFirstRunDone = false;
   const tickIndependentNorthStar = () => {
     // v0.1.1123 計器(観測のみ): tick の結末を理由別に数える=「started=0(描画が起動しない)」の
     //   真因(lid解決全滅/タブ非表示/スクロールdefer)を状態速報の数字で特定する(D-0)。
@@ -22044,6 +22370,10 @@ async function initPopup() {
     }
     if (typeof document !== 'undefined' && document.hidden) {
       recordLaneTick(_laneTickProbe, LANE_TICK_REASONS.DOC_HIDDEN);
+      // ★v1394: 隠れていても会場が開いていれば鏡は書く(正本 hiddenPublishPolicy.js)。
+      try {
+        if (decideHiddenWork({ docHidden: true, venueOpen: isVenueOpenCached() }).publish) renderStoryUserLane();
+      } catch { /* 供給に失敗しても tick は落とさない */ }
       return;
     }
     // v0.1.981(回帰修正): スクロール中は重い再描画を見送る。独立 tick(v0.1.977/979)が
@@ -22105,7 +22435,11 @@ async function initPopup() {
   //   再現せず実機のみ=タイマー starvation)。タイマー任せにせず init 末尾で【同期的に1回】起動し、
   //   さらに storage.onChanged(content が contrib/ad/コメントを書くたび)でも起動して、タイマーが詰まっても
   //   描画が必ず1回は走るようにする。idempotent(diff-skip)なので多重起動は no-op=安全。
-  try { tickIndependentNorthStar(); } catch { /* no-op */ }
+  /*
+   * ★v0.1.1450: finally で立てる。tick が throw しても間引きを有効にするため
+   *   (false のまま残ると onChanged が「初回扱い」で素通しに戻り、修正が無意味になる)。
+   */
+  try { tickIndependentNorthStar(); } catch { /* no-op */ } finally { northStarTickFirstRunDone = true; }
   setTimeout(tickIndependentNorthStar, 400);
   setTimeout(tickIndependentNorthStar, 1500);
   setTimeout(tickIndependentNorthStar, 4000);
@@ -22115,7 +22449,28 @@ async function initPopup() {
       const keys = Object.keys(changes);
       // content が北極星の生データ/コメントを書いた=描けるようになった合図。タイマー非依存で起動。
       if (keys.some((k) => /^nls_(koken_api_contrib|nicoad_api_ranking|comments|cdb_summary|csummary|panel_summary)_/.test(k))) {
-        tickIndependentNorthStar();
+        /*
+         * ★v0.1.1450: ここは以前 tickIndependentNorthStar() の**直呼び**だった。
+         *   content が配信中ずっと書く nls_comments_* / nls_panel_summary_* のたびに
+         *   tick 全体(read 9〜10本)が走り、**コメント1件で60〜103本**の read になっていた。
+         *   → 同じファイルの scheduleCoalescedStorageRefresh(:19026) が既に使っている
+         *     先行+末尾スロットルへ通す(判定関数も同じものを再利用＝新しい概念を持ち込まない)。
+         *
+         * ★trailing 付きなので**必ず700ms以内に1回は走る**(debounce のように延びない)
+         *   ＝「タイマーが詰まっても描く」保険(v0.1.989)は壊さない。
+         * ★koken_api_contrib / nicoad_api_ranking は isHighFrequency… が false を返す
+         *   ＝**即時実行**(API取得時にしか書かれない低頻度キーなので間引く必要が無い)。
+         * ★stripSelfWrittenRenderArtifacts を通すのは :19044 と同じ理由
+         *   (v0.1.1248: 自己書き込みキーが混じると every が false に落ちて throttle が失効する穴)。
+         */
+        const keysForTick = stripSelfWrittenRenderArtifacts(keys);
+        const allHighFreq =
+          keysForTick.length > 0 &&
+          keysForTick.every((k) => isHighFrequencyCommentRelatedStorageKey(k));
+        northStarTickScheduler.schedule(
+          { allHighFreq, initialDone: northStarTickFirstRunDone },
+          tickIndependentNorthStar
+        );
       }
     });
   } catch { /* onChanged 不可環境: タイマーだけで動く(後退しない) */ }
@@ -22146,7 +22501,7 @@ async function initPopup() {
       const now = Date.now();
       // 多タブで background 化中は storage.onChanged を抑止しているため、可視復帰は
       // 即 catch-up（埋め込みは 400ms、サイドパネルは従来どおり poll 周期）。
-      const visGapMs = INLINE_EMBED_WATCH ? 400 : POLL_INTERVAL_MS;
+      const visGapMs = INLINE_EMBED_WATCH || INLINE_SIDE_PANEL ? 400 : POLL_INTERVAL_MS; // ★v1365: sidepanel も 400ms 側へ(復帰が3秒スロットルで捨てられ暗いままだった)
       if (now - lastVisibilityRefresh < visGapMs) return;
       lastVisibilityRefresh = now;
       // 0.1.94: 0.1.92 polling 側で snapshot=null を撤去したのに合わせて
@@ -22229,17 +22584,19 @@ if (!INLINE_PASSIVE) {
 }
 
 // 安全網：万が一 initPopup が throw して initialRefreshDone が立たなくても、
-// 最大 5 秒でロードシェードを撤去する（ユーザーが永遠に「読み込み中…」を見続けるのを防ぐ）。
-//   ただし INLINE_MODE は prewarm（画面外先読み）でこの 5 秒が表示前に経過し得る。
-//   その場合は実データが乗るまでキャラ幕を維持し、長めの上限でだけ外す
-//   （短い 5 秒固定だと「表示時には空白」になるため）。
-setTimeout(() => {
-  if (INLINE_MODE) {
-    dismissInlineShadeWhenDataReady(INLINE_SHADE_DATA_FALLBACK_MS);
-  } else {
+// ロードシェードを撤去する（ユーザーが永遠に「読み込み中…」を見続けるのを防ぐ）。
+//   ★v0.1.1381: INLINE_MODE の締切を【初回可視】起点へ付け替えた(会議 Q3)。
+//   旧実装は 5秒待ってから 2.5秒の上限を開始＝最短7.5秒シェードが中身を覆っていた。
+//   prewarm(画面外先読み)対策は「見えた瞬間から数える」ことで両立する
+//   ＝画面外では1秒も消費せず、見えたら 2.5秒で必ず外れる。
+//   standalone popup は prewarm が無いので従来どおり 5秒固定でよい。
+if (INLINE_MODE) {
+  armInlineShadeDeadlineOnFirstVisible();
+} else {
+  setTimeout(() => {
     dismissInitialLoadShade();
-  }
-}, 5000);
+  }, 5000);
+}
 
 // 最終安全網: initPopup や refresh が throw / 中断しても、window load 後に
 // 800ms（CSS の auto-reveal 後）で必ず cloak を外す。JS state に依らない
@@ -22259,4 +22616,38 @@ if (typeof window !== 'undefined') {
   } else {
     window.addEventListener('load', finalRevealFallback, { once: true });
   }
+  mountOuenBanner(document); // ★応援動画バナー: 設計は ../lib/ouenBannerDom.js
+  /*
+   * ★v0.1.1309(2026-08-10 実機で真因確定): 上の安全網は `window load` を待つが、
+   *   load は【画像など全サブリソースの完了】を待つイベントで、サイドパネルでは遅い。
+   *
+   * ■ 実測(状態速報 v0.1.1308・計器を30秒窓に延ばして初めて見えた)
+   *     幕(cloak) ✅ t+5887ms で解除 ★CSS自動解除(1500ms)より後
+   *   サイドパネルは滑り出るあいだブラウザから hidden 扱いになり(laneTickProbe.docHidden=7)、
+   *   サブリソースの読み込みが進まないので load 自体が t≈5.1秒までずれ込む。
+   *
+   * ★訂正(2026-08-10・v0.1.1312): この保険を入れた当時は「cloak が残る＝ユーザー証言の
+   *   【黒】の正体」と考えていたが、それは【誤り】だった。画面録画の219フレーム解析で、
+   *   黒の正体は拡張の外側(パネルが開く前に見えているニコ生の暗いページ)と確定した。
+   *   ＝この保険は黒画面の対策では【ない】。
+   *   それでも残す理由は別にある: `window load` は hidden なサイドパネルで実測 t≈5.1秒まで
+   *   ずれ込み、その間 cloak(＝中身が見えない状態)が続くのは事実で、それ自体が遅い。
+   *   時間だけの保険は load に依らず必ず外れるので、最終安全網として素直に強い。
+   *   冪等＝通常経路が先に外していれば no-op なので害も無い。
+   *   ★CSS の 1500ms 保険は `.nl-popup-primary` の opacity しか戻さず、cloak 属性は残る
+   *     (面積0でもCSSアニメは時間どおり進むことは実ブラウザで実測確認済み=面積は無関係)。
+   *
+   * ■ 直し方: load に依存しない【時間だけの保険】を足す。
+   *   DOM が使える時点から数えるので、hidden でも滑走中でも必ず時間内に外れる。
+   *   この値は CSS の auto-reveal と同じ値＝「CSSが中身を見せる瞬間には幕も外す」で揃える。
+   *   ★v0.1.1352: 1500→400ms に短縮(実機は0〜1500msのあいだ誰も中身を見せず真っ黒
+   *   だった)。片方だけ変えると幕が残るので wiring test が CSS との一致を断言する。
+   */
+  setTimeout(() => {
+    try {
+      revealPopupPrimaryOnce();
+    } catch {
+      // no-op
+    }
+  }, 400);
 }
