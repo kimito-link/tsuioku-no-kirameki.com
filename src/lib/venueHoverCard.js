@@ -23,6 +23,9 @@
 
 import { isNumericNicoUserId } from '../domain/user/identity.js';
 import { RECENT_TEXT_KEEP, formatRecentTexts } from './recentTextRing.js';
+import { buildVenuePresenceNote } from './venuePresenceNote.js';
+// ★匿名NNN の採番は nicoUserPage.js が正本（席タイル venueBar.js:5715 と同じ関数）。
+import { anonymousDisplayLabel } from './nicoUserPage.js';
 
 /**
  * @typedef {{ src: string, kind: 'real-http'|'identicon'|'tv-fallback'|'none',
@@ -129,9 +132,18 @@ export function buildVenueHoverCardModel(input) {
   const i = input && typeof input === 'object' ? input : {};
   const uid = String(i.uid || '').trim();
   const displayName = String(i.displayName || '').trim();
-  const count = Math.max(0, Math.floor(Number(i.count) || 0));
+  /*
+   * ★count/giftCount は number|null（2026-08-29）。
+   *   null は「在席名簿に居らず、数が分からない」。★ここで 0 に丸めないこと。
+   *   丸めると下の statLine が「発言 0」と断言し、さらに上流の下駄
+   *   (venueLaneMirrorSupply.js の Math.max(1,...)) と合わさって「発言 1」の嘘になる。
+   *   ＝実機で「同じ人が発言1と発言70で揺れる」と言われた症状そのもの。
+   */
+  const knowsCount = i.count !== null && i.count !== undefined;
+  const count = knowsCount ? Math.max(0, Math.floor(Number(i.count) || 0)) : null;
   const hasGift = i.hasGift === true;
-  const giftCount = Math.max(0, Math.floor(Number(i.giftCount) || 0));
+  const knowsGift = i.giftCount !== null && i.giftCount !== undefined;
+  const giftCount = knowsGift ? Math.max(0, Math.floor(Number(i.giftCount) || 0)) : null;
   const venueRank = Math.max(0, Math.floor(Number(i.venueRank) || 0));
   const thumb = i.thumb && typeof i.thumb === 'object' ? i.thumb : {};
   const thumbSrc = String(thumb.src || '');
@@ -151,7 +163,15 @@ export function buildVenueHoverCardModel(input) {
       idLine = `ID:${uid}(本登録)`;
     } else {
       idKind = 'anonymous';
-      idLine = `匿名(${uid})`;
+      /*
+       * ★席タイルと同じ「匿名NNN」で出す（2026-08-30）。
+       *   以前は生の `匿名(a:xxxx)` を出しており、同じ人なのに
+       *   席は「匿名938」・カードは「匿名(a:xxxx)」と★二通りに見えていた。
+       *   AGENTS.md §3.5「匿名は安定番号『匿名NNN』で識別できる形で出す
+       *   （一律グレー化は禁止）」の直接の実装。
+       *   ★採番は席タイル(venueBar.js:5715)と同じ関数を呼ぶ＝決して食い違わない。
+       */
+      idLine = anonymousDisplayLabel(uid);
     }
   }
 
@@ -177,10 +197,21 @@ export function buildVenueHoverCardModel(input) {
     statParts.push(relTime ? `広告(${relTime})` : '広告');
   } else if (tier === 'gift') {
     statParts.push(relTime ? `ギフト(${relTime})` : 'ギフト');
+  } else if (count === null) {
+    /*
+     * ★数が分からないとき（2026-08-29）。
+     *   ★数を言わない。ただし★居ることは必ず言う（AGENTS.md §3.5「応援者は主役」・
+     *   情報が少ない人を二級市民にしない）。
+     *   これは既にこのリポにある流儀の適用範囲を広げたもので、新しい機構ではない
+     *   ＝上の tier==='ad'/'gift' が「件数ごと出さず時刻だけ出す」のと同じ形。
+     */
+    statParts.push(relTime ? `会場に居る(${relTime})` : '会場に居る');
   } else {
     statParts.push(relTime ? `発言 ${count}(${relTime})` : `発言 ${count}`);
   }
-  if (hasGift) statParts.push(`🎁${giftCount}`);
+  // ★giftCount が null(=知らない)のときは🎁の数を出さない。0件と断言しないため。
+  if (hasGift && giftCount !== null && giftCount > 0) statParts.push(`🎁${giftCount}`);
+  else if (hasGift && giftCount === null) statParts.push('🎁');
   if (venueRank === 1) statParts.push('🥇1位');
   else if (venueRank === 2) statParts.push('🥈2位');
   else if (venueRank === 3) statParts.push('🥉3位');
@@ -204,6 +235,20 @@ export function buildVenueHoverCardModel(input) {
     idKind,
     avatarSrc,
     statLine: statParts.join(' ・ '),
+    /*
+     * ★「この人はここでどうしていたか」の一言（2026-08-29）。
+     *   statLine が数字の羅列(発言42 ・ 🎁3 ・ 🥇1位)なのに対し、
+     *   こちらは読んだままで分かる文にする。
+     *   ★判定は venuePresenceNote.js が正本。ここは渡すだけ。
+     *   ★追加の storage 読みはゼロ（既に手元にある値だけで作る）。
+     */
+    presenceNote: buildVenuePresenceNote({
+      count,
+      giftCount,
+      venueRank,
+      lastAt: i.lastAt,
+      nowMs: i.nowMs
+    }),
     lastText,
     // v0.1.1218(ユーザー要望): ホバーだけでその人の発言を数件読めるようにする。
     //   既存データ(在席の記録)から来るので storage の追加読みはゼロ。
@@ -244,6 +289,15 @@ export function createVenueHoverCardEl(doc) {
   idEl.className = 'nlsb-hover-card__id';
   const statsEl = doc.createElement('div');
   statsEl.className = 'nlsb-hover-card__stats';
+  /*
+   * ★2026-08-29: 「この人はここでどうしていたか」の一言。
+   *   statsEl(発言42 ・ 🎁3 ・ 🥇1位)は数字の羅列で、読み解く手間が要る。
+   *   ここはそれを日本語1行にして、統計の【直後】に置く。
+   *   ★参考にした X スペースは同じことを Grok に36秒かけて推測させていたが、
+   *     この拡張は事実を手元に持っているので待たせない。
+   */
+  const presenceEl = doc.createElement('div');
+  presenceEl.className = 'nlsb-hover-card__presence';
   const thumbStatusEl = doc.createElement('div');
   thumbStatusEl.className = 'nlsb-hover-card__thumb-status';
   // 2026-07-31(ユーザー要望): 直前の発言内容。「この人が何を言ったか」が分からないと
@@ -254,7 +308,7 @@ export function createVenueHoverCardEl(doc) {
   // (補足として)ID」の情報序列を構造でも表現する。IDは文言そのまま・体裁だけ格下げ(CSS側で
   // font-size縮小)。ロジック変更ゼロ・isNumericNicoUserId判定基準は不変。
   //   発言本文は「活動」の直後=名前の次に読みたい情報なので stats の後ろに置く。
-  body.append(nameEl, statsEl, lastTextEl, idEl, thumbStatusEl);
+  body.append(nameEl, statsEl, presenceEl, lastTextEl, idEl, thumbStatusEl);
 
   card.append(avatarBox, body);
   return card;
@@ -284,6 +338,18 @@ export function renderVenueHoverCard(cardEl, model) {
 
   const statsEl = cardEl.querySelector('.nlsb-hover-card__stats');
   if (statsEl) statsEl.textContent = String(m.statLine || '');
+  /*
+   * ★「この人はここでどうしていたか」の一言。
+   *   ★空のときだけ行を隠す（＝そもそも人として成立していない場合のみ）。
+   *     判定側は「発言1回」でも必ず何か返すので、通常この行は消えない
+   *     ＝情報が少ない人を二級市民にしない（AGENTS.md §3.5）。
+   */
+  const presenceEl = cardEl.querySelector('.nlsb-hover-card__presence');
+  if (presenceEl) {
+    const note = String(m.presenceNote || '');
+    presenceEl.textContent = note;
+    presenceEl.hidden = !note;
+  }
 
   // 2026-07-31: 発言内容。無い(未発言/投擲段/データ未到達)ときは行ごと消して隙間を作らない。
   // v0.1.1218(ユーザー要望): 直近1件だけでなく数件を出す。クリックしなくても

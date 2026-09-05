@@ -40,12 +40,27 @@ export function publishReportPreviewThrottled(liveId, deps) {
   void (async () => {
     try {
       const comments = await deps.resolveComments(lv);
+      /*
+       * ★v0.1.1432: 広告主が入れた文字(名前でもメッセージでも)をレポートに残す。
+       *   ユーザー要望「広告はメッセージがおくれるという価値があるので記録したい」。
+       *   保存済みの公式ランキング(nls_nicoad_api_ranking_<lv>)から【原文のまま】読む
+       *   =新しい取得も新しい保存キーも作らない。読めなければ静かに省く(レポートは止めない)。
+       */
+      let adRows;
+      try {
+        const adKey = `nls_nicoad_api_ranking_${lv}`;
+        const bag = await globalThis.chrome?.storage?.local?.get?.([adKey]);
+        const v = /** @type {any} */ (bag?.[adKey]);
+        if (v && typeof v === 'object' && Array.isArray(v.rows)) adRows = v.rows;
+      } catch {
+        /* 読めなくてもレポートは出す */
+      }
       const preview = buildReportPreview(
         aggregateMarketingReport,
         analyzeAudienceEngagementGap,
         comments,
         lv,
-        extractReportPreviewInputs(deps.getSnapshot())
+        { ...extractReportPreviewInputs(deps.getSnapshot()), adRows }
       );
       const rec = buildReportPreviewRecord(preview, deps.now());
       // feature-map の storage 断線ゲートが producer を検出できるよう、素の chrome.storage.local.set を使う

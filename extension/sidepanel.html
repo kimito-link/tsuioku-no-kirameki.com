@@ -1,54 +1,202 @@
-<!DOCTYPE html>
-<html lang="ja">
+<!DOCTYPE html><html lang="ja" style="color-scheme: light; background-color: #fffaf2; background-image: linear-gradient(160deg, #fffaf2, #eef8ff)">
+<!--
+  ★v0.1.1423: 導入時(795c41b3・25行)の姿へ戻した。
+
+  ■ なぜ戻すか(ユーザーの証言・2026-08-17)
+    「サイドパネル導入時は問題なかった」「前に進んでる気がしない」
+    git log で裏付け: 導入時の sidepanel.html は 25行・幕なしで、黒くなかった。
+    v0.1.1279 で幕(cloak)を足した版から黒が始まり、以後12版・200行まで
+    「黒を消す工夫」を積み上げたが、実機の黒は一度も消えなかった。
+    ＝足すのをやめ、始まりへ戻す。
+
+  ■ ただし【色の宣言だけは残す】(消してはいけないもの)
+    `color-scheme: light` と地の色は、OSがダークのときChromeが
+    キャンバスを暗色で塗るのを止める唯一の手段(v0.1.1289/1294/1316/1369)。
+    これは「中身を隠す」幕とは別物で、隠さずに色だけ決める。
+    ★検査 pageColorSchemeGate / colorSchemeMetaPresent /
+      sidepanelBlackScreen が機械照合する(消すと赤くなる=実際に赤で気づいた)。
+    ★値は popup.html の1行目と同値。変えるときは両方。
+-->
   <head>
     <meta charset="utf-8" />
+    <!-- パース初期にブラウザへ伝える層(インライン style は CSS 適用後に効くため二段構え)。 -->
+    <meta name="color-scheme" content="light" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>君斗りんくの追憶のきらめき — サイドパネル</title>
     <style>
-      /*
-       * ★v0.1.1283: サイドパネルが真っ黒になるのを直す(v0.1.1279 の修正は効いていなかった)。
-       *
-       * 真犯人は popup.html の cloak ルール:
-       *   popup.html:2 の <html> に data-nl-popup-primary-cloak="1" が【静的に】書かれており、
-       *   popup.html:1561-1563 が html/body を `background: transparent !important` にする。
-       *   = JS が走る前から背景がゼロ。解除は revealPopupPrimaryOnce()(JS)のみで、
-       *   CSS フェイルセーフ(popup.html:1543)は opacity しか戻さず transparent は解除しない。
-       *   ★あのルールのコメント自身が「親ホストの暗い背景を透かして」と書いているとおり、
-       *     あれは【埋め込み】向けの規則で、サイドパネルには合わない。
-       * そこへ v0.1.1279 が iframe にも transparent を足し、html・body・iframe の
-       * 3層すべてが透明 = 何も塗らない → Chrome のキャンバス地(暗色)が出て【黒】になった。
-       *
-       * ★フェイルセーフの向きを反転させるのが本質:
-       *   旧「既定=透明 / JSが解除」→ JSが遅れると【黒】
-       *   新「既定=不透明 / 必要なときだけ透明」→ JSが失敗しても【クリーム色】
-       */
       html,
       body {
         margin: 0;
         height: 100%;
         overflow: hidden;
-        /* ★light 固定。このアプリに実質ダークモードは無い(popup-entry.js:1069-1070 が
-           nl-skin-panel-dark を無条件 remove する=v0.1.51「完全に light 強制」)。
-           `light dark` だと Chrome のキャンバス既定色が暗色になり、最後の砦が黒くなる。 */
         color-scheme: light;
-        /* popup.html の :root と同値(ライト既定)。 */
-        background: linear-gradient(160deg, #fffaf2, #eef8ff);
+        background-color: #fffaf2; background-image: linear-gradient(160deg, #fffaf2, #eef8ff);
       }
-      /* ★ダーク時の上書きは置かない(v0.1.1279 の濃紺 #0b1220 が事実上の黒だった)。
-         アプリは常時ライトなので、OS がダークでもここはクリーム色のままが正しい。 */
+      /*
+        ★v0.1.1457: body を【位置指定の基準】にする。
+
+        ■ ユーザー報告(複数回・一次情報)
+          「くろいのがきえない」「引っ張った瞬間」
+          ★「サイドパネル導入時はなかった」
+
+        ■ 真因(コードで特定)
+          `#nl-underlay` は `position: absolute; inset: 0` だが、
+          **位置指定された祖先が1つも無かった**(html も body も static)。
+          → 基準が【初期包含ブロック】になり、
+          ★パネルを引っ張って広げた瞬間、下敷きが**新しく現れた帯に届かない**。
+          そこだけ地の色が無く、黒く見える。
+
+        ★`position: relative` を1つ足すだけで下敷きが body に追従する。
+          relative は自分自身をずらさないので**見た目は1ピクセルも変わらない**。
+        ★これは「幕」でも「隠す」でもない = 中身を覆う事故が起きない。
+      */
+      body {
+        position: relative;
+      }
+      /*
+        ★v0.1.1457: body を【位置指定の基準】にする。
+
+        ■ これは正しい修正だが【引っ張った瞬間の黒の真因ではなかった】
+          ★2026-08-21 訂正: 私は「下敷きが幅変更に追従しないのが真因」と断定して
+          この版を出したが、ユーザー実機では**黒は消えなかった**。
+          その後スクショで判明した実際の正体は
+          **液晶保護アプリ(DISPLAY-002)の焼き付き防止オーバーレイ**で、
+          拡張と無関係の X(Twitter)のタブまで同じ縞模様に覆われていた。
+          ＝**拡張のせいではない**。[[measure-the-region-you-claim-2026-08-10]]
+
+        ■ ではなぜこの1行を残すのか(害が無く、筋は通っているため)
+          `#nl-underlay` は `position: absolute; inset: 0` なのに、
+          **位置指定された祖先が1つも無かった**(html も body も static)。
+          基準が初期包含ブロックになるのは事実で、body を基準にするのが正しい。
+        ★relative は自身をずらさないので**見た目は1ピクセルも変わらない**。
+        ★ただし「これで黒が直る」とは書かない(実機で直っていない)。
+      */
+      body {
+        position: relative;
+      }
       iframe {
         display: block;
         width: 100%;
         height: 100%;
         border: 0;
-        /* ★不透明で塗る(v0.1.1279 の transparent を撤回)。iframe 自身が最後の砦になる。
-           #fffaf2 は popup.html:18 の --nl-bg と同値。★別文書なので CSS 変数を共有できない
-           = 変更するときは popup.html:18 と【両方】直すこと。 */
+        /* iframe 自身も不透明で塗る(最後の砦)。#fffaf2 は popup.html の --nl-bg と同値。 */
+        /*
+          iframe 自身も不透明で塗る(最後の砎)。#fffaf2 は popup.html の --nl-bg と同値。
+
+          ★v0.1.1440 でここを transparent にしかけてやめた(記録として残す)。
+            世界調査は「リサイズ中の未描画帯で下敷きを透かせるため透明にせよ」と推奨したが、
+            ★その主張は【実測で裏取れていない】と調査自身が明記していた。
+            一方このリポには v0.1.1279〜1283 で【透明にしたことが真っ黒の原因だった】
+            という実体験があり、sidepanelBlackScreen.wiring.test.js が禁止として
+            機械照合している。★実測済の過去の失敗 > 未検証の推論。だから不透明のまま。
+        */
         background: #fffaf2;
+        /* src 読込前の about:blank 文書へ color-scheme を継承させる(v0.1.1369)。 */
+        color-scheme: light;
+        /* ★v0.1.1438: 下敷きより上に置く(中身が下敷きに隠れないように)。 */
+        position: relative;
+        z-index: 1;
       }
+      /*
+        ★v0.1.1436: 【出来上がるまで iframe を画面から外す】。
+
+        黒が出るのは iframe が initial about:blank の間で、
+        その文書は色スキームを持たないので UA が不透明なキャンバス
+        (ダークなら黒)を敷く。★CSSWG 自身が「作者には制御できない」と
+        認定しているので、色を宣言する方向では消せない(12版・200行の実績)。
+        → その間だけ画面から外し、中身が出来たら見せる。
+
+        ★このクラスを付けるのは JS(sidepanel-entry.js)だけ。
+          HTML で初期非表示にしないのは、JS が動かないと
+          【永久に真っ白】になるから(黒より悪い退化)。
+      */
+      iframe.nl-ifr-loading {
+        /*
+          ★v0.1.1437: 中身が出来るまで iframe を【透明】にする。
+
+          ■ なぜこれで黒が消えるか(実測で確認済・2026-08-18)
+            iframe が透明の間は、背後の親(この sidepanel.html の地 #fffaf2)が
+            そのまま見える。実測: 透明にした状態で親の色を読むと
+            rgb(255,250,242) が返った。
+            ★つまり【黒の代わりにクリーム色が見える】。穴にはならない。
+
+          ■ 真因(世界調査でCSS仕様レベルまで確定)
+            iframe は src が commit されるまで initial about:blank で存在し、
+            この文書は色スキームを持たないので UA が不透明なキャンバス
+            (OSがダークなら黒)を敷く。
+            ★W3C CSSWG は2024-02に「常に透明にする」と決議し、理由を
+              【作者には制御できない】と明記 = 色を宣言する方向では消せない。
+              このリポはその方向で12版・200行を費やして失敗している。
+
+          ■ ★必ず自分で開ける(JS に頼らない)
+            v0.1.1436 は戻すのを JS(load / setTimeout)に任せたところ、
+            実機のパネルで【隠れたまま戻らない】のを見た。
+            パネルは 2.3MB のバンドルを読む間イベントループが止まるので
+            ハンドラもタイマーも発火できない
+            [[stalled-event-loop-masquerades-as-paint-bug-2026-08-12]]。
+            → CSS アニメーションを保険にする。
+            ★実測で分かった限界(正直に書く):
+              メインスレッドが固まっているあいだはこのアニメーションも進まない。
+              ただし【手が空いた瞬間に必ず開く】ので、永久に隠れっぱなしにはならない。
+              (実測: 1.2秒ブロック後、解除100msで開いた)
+        */
+        opacity: 0;
+        animation: nl-ifr-reveal 1.2s step-end forwards;
+      }
+      @keyframes nl-ifr-reveal {
+        to { opacity: 1; }
+      }
+      /*
+        ★v0.1.1438: 【下敷き】。iframe の下に地の色を敷きっぱなしにする。
+
+        ■ これは【幕(cloak)ではない】——混同すると12版の失敗を繰り返す
+          [[cloakNotForSidePanel]] が禁じたのは【中身を隠す幕】。
+          解除が遅れて t+917ms まで隠れ、それが黒に見えていた。
+          これは逆向き:
+            ・中身を隠さない(iframe より【下】に敷くだけ)
+            ・★JS で解除しない(解除自体が不要) = 解除漏れ事故が原理的に起きない
+
+        ■ なぜ要るか
+          v0.1.1437 で iframe を opacity:0 にして CSS アニメで開くようにしたが、
+          ★メインスレッドが固まっている【間】はアニメも進まない(実測済)。
+          その間 iframe は透明なので、下に何も無ければ
+          UA の既定色(ダークなら黒)が見える。
+          → 下に地の色を敷いておけば【黒の代わりにクリーム色】が見える。
+
+        ■ ★JS を 1行も使わない
+          真因が「JS が動けない時間帯」なのだから、対策を JS に置いてはいけない
+          [[js-rescue-cannot-run-when-loop-stalls-2026-08-18]]。
+      */
+      #nl-underlay {
+        /*
+          ★v0.1.1440: fixed ではなく absolute。
+          fixed はそれ自体が別の合成レイヤになり、
+          リサイズ時に【そのレイヤも再描画待ち】になりうる。
+          absolute なら親の塗りに乗るので、新しく現れた帯に届きやすい。
+        */
+        position: absolute;
+        inset: 0;
+        background-color: #fffaf2;
+        /* ★中身の下に潜る。重ならないので「隠す」事故が起きない。 */
+        z-index: 0;
+        pointer-events: none;
+      }
+
     </style>
   </head>
   <body>
+    <!--
+      ★下敷きは iframe より【先】に置く。
+      iframe の読み込みが始まる前に地の色が塗られるようにするため。
+      ★中身は隠さない(z-index で iframe の下に潜るだけ)。
+    -->
+    <div id="nl-underlay"></div>
     <iframe title="ニコ生ログ" src="popup.html?inline=1&amp;dock=sidepanel"></iframe>
+    <!--
+      自己診断だけ残す(描画には一切関与しない)。
+      これが無いと「いま黒いか」を測る手段が消え、また推測に戻ってしまう。
+      CSP は script-src 'self' なので外部ファイルであること(インライン不可)。
+    -->
+    <script src="dist/sidepanel.js"></script>
   </body>
 </html>

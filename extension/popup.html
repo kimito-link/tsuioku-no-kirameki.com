@@ -1,7 +1,37 @@
-<!DOCTYPE html>
-<html lang="ja" data-nl-usage-terms-ack="1" data-nl-popup-primary-cloak="1" data-nl-recording="on">
+<!DOCTYPE html><html lang="ja" data-nl-usage-terms-ack="1" data-nl-recording="on" style="color-scheme: light; background-color: #fffaf2; background-image: linear-gradient(160deg, #fffaf2, #eef8ff)">
+<!--
+  ★v0.1.1299(6度目): <html> を【1行目・DOCTYPE の直後】へ移した。
+  従来はこの下に約1,233バイトのコメントがあり、ブラウザがそれを読み終わるまで
+  地の色が効かなかった(=面積ゼロ/未生成の瞬間に Chrome の地が出る)。
+  ★属性・値はすべて元のまま(cloak/recording/terms-ack を落とすと別の不具合になる)。
+    移したのは【位置だけ】=見た目は1ピクセルも変わらない。
+
+  ---- 以下は経緯(v0.1.1289・4度目までの記録) ----
+  ★v0.1.1289: html の style= と color-scheme を【インライン属性】で先に置く。
+  サイドパネルが「一瞬だけ真っ黒」になるのを根治（v1279/1283/1285 に続く4度目）。
+
+  ■ なぜ <style> ではダメか（計測で確定）
+    tests/e2e/sidepanel-flash-capture.spec.js で rAF ごとに塗り状態を記録したところ、
+    ロード後 9〜21ms に【html も body も何も塗らないフレーム】が実在した。
+    そのフレームの colorScheme は "normal"＝【まだ自前の CSS が適用されていない】。
+    つまり <style> 内の html{background} も :root{color-scheme} も間に合わない。
+    インライン style 属性なら HTML パース時点で効くのでこの窓を塞げる。
+    ★CSP(script-src 'self') が禁じるのは script であって style 属性ではない
+      （v1285 で head inline script 案が潰れた件とは別物）。
+
+  ■ 値は :root の --nl-bg/--nl-bg-soft、body:236、sidepanel.html:34 と同値。
+    ★変更するときは【4箇所とも】直すこと。
+-->
   <head>
     <meta charset="UTF-8" />
+    <!--
+      ★v0.1.1316: color-scheme を【meta でも】宣言する(sidepanel.html と対)。
+        インラインの style は【CSS 適用後】、meta は【パース初期】に効く。
+        その差の区間で、ダーク環境のブラウザはキャンバスを暗色で塗る。
+        ★実測(2026-08-10)で、出荷ビルドの popup.html にも meta が【無かった】。
+        light 固定の理由: このアプリに実質ダークモードは無い(v0.1.51)。
+    -->
+    <meta name="color-scheme" content="light" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>君斗りんくの追憶のきらめき</title>
     <!-- ローディング幕で最初に出る3キャラ（通常顔）のサムネだけ最優先で先読み（空丸を防ぐ）。
@@ -11,7 +41,14 @@
     <link rel="preload" as="image" fetchpriority="high" href="images/yukkuri-charactore-english/tanunee/tanuki-yukkuri-normal-mouth-closed.thumb128.png" />
     <style>
       :root {
-        color-scheme: light dark;
+        /* ★v0.1.1289: `light dark` から `light` に変更（サイドパネル真っ黒・4度目の根治）。
+           このアプリに実質ダークモードは無い（popup-entry.js:1069-1070 が
+           nl-skin-panel-dark を無条件 remove する = v0.1.51「完全に light 強制」）。
+           `light dark` だと OS がダークのとき【Chrome のキャンバス既定色が暗色】になり、
+           下の html 背景が塗られていない隙間から黒が出る。sidepanel.html:29 が同じ理由で
+           既に `light` を宣言済み＝【中身のこの文書だけが取り残されていた】。
+           ★ここと sidepanel.html:29 は対。片方だけ直すと再発する。 */
+        color-scheme: light;
         --nl-pop-width: 420px;
         --nl-pop-height: 780px;
         --nl-base-font: 15.25px;
@@ -92,7 +129,13 @@
         background: linear-gradient(180deg, var(--nl-bg, #f6fff8), var(--nl-bg-soft, #eef9f3));
         transition: opacity 220ms ease-out;
         will-change: opacity;
-        animation: nl-init-shade-css-failsafe 15s ease-out forwards;
+        /*
+         * ★v0.1.1373: 15s → 5s。JS 側の上限(INLINE_SHADE_DATA_FALLBACK_MS=2.5s)より後だが、
+         *   「JS が完全に止まった場合」の最後の保険なので少し余裕を持たせる。
+         *   ★旧 15s は、実機で「中身が見えなかった合計=12.7秒」を許してしまう長さだった
+         *   (storage 飽和時は JS 側の解除も遅れるため、この保険が体感時間を決めていた)。
+         */
+        animation: nl-init-shade-css-failsafe 5s ease-out forwards;
       }
       .nl-init-shade__face {
         width: clamp(56px, 14vw, 72px);
@@ -159,41 +202,87 @@
         animation: none;
       }
 
-      /* システムのダークモード設定時、JS 起動前の初回ロードシェード */
-      @media (prefers-color-scheme: dark) {
-        .nl-init-shade {
-          background: linear-gradient(180deg, var(--nl-bg, #0b1220), var(--nl-bg-soft, #111827));
-        }
-        .nl-init-shade__face {
-          background: var(--nl-surface, #0f172a);
-          border-color: var(--nl-text-sub, #cbd5e1);
-          box-shadow: 2px 2px 0 var(--nl-text-sub, #cbd5e1);
-        }
-        .nl-init-shade__char {
-          background: var(--nl-surface, #0f172a);
-          border-color: color-mix(in srgb, var(--nl-text-sub, #cbd5e1) 55%, transparent);
-          box-shadow: 2px 2px 0 color-mix(in srgb, var(--nl-text-sub, #cbd5e1) 35%, transparent);
-        }
-        .nl-init-shade__char.is-speaking {
-          border-color: var(--nl-accent, #60a5fa);
-          box-shadow: 0 0 0 2px color-mix(in srgb, var(--nl-accent, #60a5fa) 50%, transparent), 2px 3px 0 color-mix(in srgb, var(--nl-accent, #60a5fa) 40%, transparent);
-        }
-        .nl-init-shade__speaker {
-          color: var(--nl-accent, #60a5fa);
-        }
-        .nl-init-shade__msg {
-          color: var(--nl-accent, #60a5fa);
-        }
-        .nl-init-shade__submsg {
-          color: var(--nl-muted, #94a3b8);
-        }
-      }
+      /*
+       * ★v0.1.1319: 初回ロードシェードの【ダーク用フォールバック色を撤去】した。
+       *
+       * ■ なぜ撤去するか(2026-08-10・黒画面をユーザーが何度も報告)
+       *   ここは `var(--nl-bg, #0b1220)` のように【変数が未定義なら濃紺】という書き方だった。
+       *   `#0b1220` は v0.1.1279 で「事実上の黒」と判定して一度撤去した色そのもの。
+       *   通常は <html> のインライン style が --nl-bg をクリーム色に定義するので発火しないが、
+       *   **その定義が間に合わない/失われた瞬間だけ、全画面のシェードが濃紺=黒になる**。
+       *   シェードは position:fixed inset:0 z-index:99999 で【画面全部を覆う】ので、
+       *   ここが黒くなると「パネル全体が黒く、うっすら縞が見える」という見え方になる。
+       *
+       * ■ このアプリに実質ダークモードは無い(v0.1.51 で light 強制)
+       *   だからダーク時だけ色を変える理由が無い。規則ごと消せば
+       *   既定(ライトのクリーム色)がそのまま効く＝「塗る人が必ず居る」状態になる。
+       *   [[css-default-should-be-the-safe-state-2026-08-05]] と同じ原則。
+       *
+       * ★戻すときの注意: 変数のフォールバック値に【暗い色】を書かないこと。
+       *   書くなら明るい既定色にする(未定義時に黒くなる経路を作らない)。
+       */
       @keyframes nl-init-shade-bob {
         0%, 100% { transform: translateY(0); }
         50% { transform: translateY(-6px); }
       }
+      /*
+       * ★v0.1.1414(実機「サイドパネルがまだ黒い」の修正):
+       *
+       * ■ 旧: `0%, 93% { opacity: 1 }` = 5秒のうち **4.65秒は完全に不透明**のまま。
+       *   JS 側の上限は 2.5秒(INLINE_SHADE_DATA_FALLBACK_MS)に短縮済みだったが、
+       *   **JS の解除が遅れるとこの CSS が体感時間を決める**。
+       *   実機速報: shadeAgeMs 427 / shadeDone false / **dismissCalls 0**
+       *   ＝JS がまだ一度も解除を呼べていない区間で、幕が全面不透明だった。
+       *   ★ここが「まだ黒い」の正体(幕は暗色ではないが、**中身を完全に覆う**ので
+       *     ダーク環境では暗く見え、いずれにせよ何も見えない)。
+       *
+       * ■ 新: JS 上限を過ぎたら**自力で薄れ始める**。
+       *   ★v0.1.1418: JS 上限を 2.5秒 → 0.9秒へ下げたので、ここも合わせる。
+       *   停止点は【JS上限 ÷ アニメ全長】で決める(0.9s ÷ 5s = 18%)。
+       *   - 0〜18%(0〜0.9秒) = JS が正常に解除する想定の区間。不透明のまま
+       *   - 18〜100%(0.9〜5秒) = JS が来ないので**徐々に透ける**
+       *   ＝ JS が死んでいても 0.9秒以降は中身が見え始める。
+       *   ★「中身が薄くても出す方が必ず良い」(v0.1.1373 の判断)を CSS 側にも適用する。
+       *
+       * ★★この値は JS 側と【必ず一緒に】動かすこと。
+       *   contentBlindTime.wiring.test.js が
+       *   「不透明のまま待つ時間 ≦ INLINE_SHADE_DATA_FALLBACK_MS」を機械照合する
+       *   (片方だけ下げると、体感時間は下がらないまま緑になる=v0.1.1414 の再演)。
+       */
+      /*
+       * ★v0.1.1433: 幕を【出し直す】ときは 5s の CSS 保険を打ち切る。
+       *   保険は forwards なので、一度終わると opacity:0 で固定されたままになり、
+       *   hidden を外しても【透けたまま】= 黒を隠せない(実機で確認した実害)。
+       *   出し直しの間だけ animation を none にして不透明に戻す。
+       */
+      /*
+       * ★★v0.1.1443: 幕の【再武装(rearm)】規則を無効化した。
+       *
+       * ■ なぜ(2026-08-19 ユーザー:「引っ張る瞬間くろくなる」「黒い影でてる」)
+       *   この規則は .nl-init-shade(position:fixed / inset:0 / z-index:99999 =
+       *   【画面全部を覆う】)を opacity:1 !important で完全不透明に戻す。
+       *   幅変更ごとにこれが発火していた = 「黒い影」の正体。
+       *
+       * ■ ★JS 側(v0.1.1442)との二重の止め
+       *   v0.1.1442 で JS 側(shouldShowOnResize)を false にしたが、
+       *   拡張をリロードするまで古い JS がメモリに残る。
+       *   CSS はページを開き直せば即反映されるので、
+       *   こちらも止めて【どちらか古くても幕が見えない】状態にする。
+       *
+       * ■ 戻し方
+       *   下の規則を復活させるだけ。★ただし戻すなら先に
+       *   【幕が全画面を覆わない形】にすること。
+       */
+      .nl-init-shade.nl-init-shade--rearm {
+        /* ★覆わない(初回ロードの幕本体はこの規則の対象外) */
+        opacity: 0 !important;
+        visibility: hidden !important;
+        pointer-events: none !important;
+      }
+
       @keyframes nl-init-shade-css-failsafe {
-        0%, 93% { opacity: 1; visibility: visible; pointer-events: auto; }
+        0%, 18% { opacity: 1; visibility: visible; pointer-events: auto; }
+        99% { opacity: 0.04; visibility: visible; pointer-events: none; }
         100% { opacity: 0; visibility: hidden; pointer-events: none; }
       }
       @media (prefers-reduced-motion: reduce) {
@@ -222,6 +311,23 @@
         margin: 0;
         padding: 0;
         overflow: hidden;
+        /*
+         * ★v0.1.1289: html 自身にも地の色を塗る（多重防御）。
+         *
+         * ★真因そのものは【上の <html> インライン style】＝ color-scheme:light で潰した。
+         *   ここは "自前 CSS が効き始めた後" に body が覆えない領域が出た場合の保険。
+         *   html/body は height:var(--nl-pop-height)=780px の固定高だが、サイドパネルは
+         *   実機で 1090px 前後になり得るため、body だけが塗る構図を残さない。
+         *
+         * ■ 測って分かったこと（tests/e2e/sidepanel-flash-capture.spec.js）
+         *   ロード直後は colorScheme==='normal'＝【この <style> はまだ効いていない】。
+         *   つまりこの規則だけでは初回フラッシュは塞げない（だからインライン属性が要る）。
+         *   → [[css-default-should-be-the-safe-state-2026-08-05]]：既定を安全側にする。
+         *
+         * ★<html> インライン style と body:236 と sidepanel.html:34 と同値。
+         *   別文書/別規則なので変更するときは【4つとも】直すこと。
+         */
+        background: linear-gradient(160deg, var(--nl-bg, #fffaf2), var(--nl-bg-soft, #eef8ff));
       }
 
       body {
@@ -296,6 +402,20 @@
 
       /* 親 iframe の高さ内に収め、はみ出しは内側スクロール（820px 級の白塔を防ぐ） */
       html.nl-inline {
+        /*
+         * ★v0.1.1433 真因対処(2026-08-18・世界の事例で仕様まで裏取り):
+         *   サイドパネルが【横縞つきの真っ黒】になる正体は「地を塗る人がいない」こと。
+         *   実測: html/body とも background-color が rgba(0,0,0,0)=透明で、
+         *   グラデーション(background-image)だけで塗っていた。
+         *   → 再描画が1フレーム間に合わないと【塗るものが何も無い】ので下の暗い層が出る。
+         *   ★CSS Color Adjust L1: iframe と親の color-scheme が食い違うと UA は
+         *     「透明キャンバス」でなく【不透明キャンバス(ダークなら黒系)】を敷く
+         *     (https://drafts.csswg.org/css-color-adjust-1/#color-scheme-effect)。
+         *     color-scheme:light は既に親子で揃えてある(v0.1.1316)が、
+         *     それでも【下地の色】が無ければリサイズ/復帰の隙間で黒が見える。
+         *   ＝不透明な background-color を必ず置く。これが唯一の確実な手。
+         */
+        background-color: #fffaf2;
         width: 100%;
         min-width: 0;
         max-width: none;
@@ -307,6 +427,8 @@
       }
 
       html.nl-inline body {
+        /* ★同上: body にも下地の色を置く(html だけだと body が透明で透ける経路が残る)。 */
+        background-color: #fffaf2;
         width: 100%;
         min-width: 0;
         max-width: none;
@@ -787,6 +909,18 @@
 
       .nl-story-body {
         --nl-story-icon-size: 14px;
+        /*
+         * ★応援レーンのアバター寸法（2026-08-30）。
+         *   以前は 32/38/20/22px を 3ファイルに直書きしていた（popup / live-view / venueBar）。
+         *   ★値を照合する検査が無く、片方だけ直しても機械は止めなかった。
+         *   ★さらに hollow の箱寸法が「22px + border 1.5px×2 = 25px」という
+         *     【手計算】で結合しており、片方だけ変えると
+         *     「中身が入った瞬間に 4px ずれてスクロールが飛ぶ」（live-view.html:1037-1038）。
+         *   ⟹ 変数にし、hollow は calc で導出させる＝★地雷を構造的に踏めなくする。
+         *   検査: src/lib/laneAvatarSize.wiring.test.js
+         */
+        --nl-lane-avatar: 32px;
+        --nl-lane-avatar-anon: 20px;
         min-width: 0;
         width: 100%;
         overflow: hidden;
@@ -1008,8 +1142,8 @@
       }
 
       .nl-story-userlane-avatar {
-        width: 32px;
-        height: 32px;
+        width: var(--nl-lane-avatar);
+        height: var(--nl-lane-avatar);
         border-radius: 999px;
         object-fit: cover;
         object-position: center;
@@ -1026,9 +1160,16 @@
         border-color: color-mix(in srgb, #8d6e63 55%, var(--nl-border) 45%);
       }
 
-      html.nl-inline body .nl-story-userlane-avatar {
-        width: 38px;
-        height: 38px;
+      /*
+       * ★inline（動画埋め込み）は変数を上書きする＝セレクタを増やさない。
+       *   ★v0.1.1496: 38px → 44px。タイル幅は meta の max-width:min(142px,34vw) が
+       *   支配的なので、44px までは【1行に入る人数が変わらない】（行数が増えない）。
+       *   ★window（ツールバーpopup）は高さ580px固定の狭い箱なので 32px のまま。
+       *     両者は ?inline=1 で決まる排他モード（popup-entry.js:1032,1109）。
+       */
+      html.nl-inline body .nl-story-body {
+        --nl-lane-avatar: 44px;
+        --nl-lane-avatar-anon: 22px;
       }
 
       /* ★v0.1.1049: サムネ持ち=大(現状維持) / 匿名(実サムネ無し)=小・ぎゅうぎゅう詰め。
@@ -1036,14 +1177,10 @@
          大きくするのでなく匿名を縮めて相対差を作る=既存レイアウトへの影響を最小化。
          セレクタは [data-thumb="0"] 側のみ=属性が付かない旧タイルは既定(大)で安全に倒れる。 */
       .nl-story-userlane-cell[data-thumb="0"] .nl-story-userlane-avatar {
-        width: 20px;
-        height: 20px;
+        width: var(--nl-lane-avatar-anon);
+        height: var(--nl-lane-avatar-anon);
         border-width: 1px;
         box-shadow: none;
-      }
-      html.nl-inline body .nl-story-userlane-cell[data-thumb="0"] .nl-story-userlane-avatar {
-        width: 22px;
-        height: 22px;
       }
       .nl-story-userlane-cell[data-thumb="0"] {
         gap: 4px;
@@ -1052,6 +1189,145 @@
       .nl-story-userlane-cell[data-thumb="0"] .nl-story-userlane-meta {
         font-size: 9px;
         max-width: 72px;
+      }
+
+      /*
+       * ★v0.1.1376: たぬ姉段の【段内LOD(遠近法)】。
+       *
+       * ■ 何を解くか(2026-08-12 ユーザー確定)
+       *   v0.1.1375 で匿名がたぬ姉段に出るようになり、実配信で 332人が並ぶ。
+       *   ユーザー「たぬ姉段が匿名332人で埋まること自体は望ましい。ただしレスポンシブで
+       *   うまく見せやすい形を。SHOWROOMがヒントだがごちゃごちゃして見にくい」
+       *   ＝★人数を減らす解は禁止。密度と階層で解く。
+       *
+       * ■ 実測(出荷ビルド・幅461px・332タイル・chrome-devtools)
+       *     適用前 1,615px → 適用後 598px(63%減)。1行7個 → 後列は1行17個相当。
+       *   ★推定(1,900〜2,100px)ではなく【実測1,615px】が基準。
+       *
+       * ■ なぜ CSS だけでやるか(ちらつき対策を壊さないため)
+       *   diff-skip の鍵 storyLaneTierBodyKey(renderStoryUserLaneDom.js:248)は
+       *   userId+displaySrc+idLine+nameLine+title のみで【位置を含まない】。
+       *   ＝:nth-child で見た目を変えても鍵は1バイトも動かない=再描画を誘発しない。
+       *   ★JS で層を判定すると鍵に位置を混ぜたくなり、ちらつき再発の典型経路になる
+       *     (7版かけて直した churn 対策・[[story-userlane-churn-filllanetier-v1039]])。
+       *   ★同ファイル 392-394 行の既存コメントが同じ論理を独立に述べており、
+       *     v0.1.1049(上のブロック)が同じ [data-thumb] 手法で実装済み=本規則はその延長。
+       *
+       * ■ 個体識別は失わない
+       *   全タイルに title ツールチップがある(personTileDom.js:85)。
+       *   identicon は uid ごとに柄が違う(venueLaneBuckets.js:104)。
+       *   ＝情報を「足す」のではなく「求めに応じて出す」。
+       *
+       * ★セレクタは [data-thumb="0"](匿名/identicon)のみ。実サムネ持ち(=1)は
+       *   名前を隠さない。属性が付かない旧タイルは既定(pill)に安全に倒れる。
+       */
+      #sceneStoryUserLaneTanu {
+        gap: 4px;
+      }
+      /*
+       * ★v0.1.1475: たぬ姉段が多人数のとき【窓】で見せる(高さを絞ってスクロール)。
+       *
+       * ■ ★これは「上限(cap)」ではない。1枚も消さない。
+       *   DOM には全員が居たままで、スクロールすれば全員に到達できる。
+       *   ③WEB鏡・会場の顔ぶれにも一切影響しない(鏡は DOM を読まず buckets から作る)。
+       *   ★cap は v0.1.1234 で「238人が会場に載らない」事故を起こして撤廃済み＝二度と使わない。
+       *
+       * ■ ★なぜ今これが要るのか(前提が消えたのに対策が戻らなかった型)
+       *   v0.1.1051 で上限200へ拡大したとき、同時に【40vh の縦スクロール枠】を入れた。
+       *   v0.1.1139 で上限を48へ戻したとき、「48なら要らない」として★枠だけ撤去した。
+       *   ★ところが v0.1.1232/1234 で上限そのものが撤廃されたのに、枠は戻されなかった。
+       *   ⟹ 実機(857人)でタイルが数百枚展開し、画面を突き抜けてプレイヤーを覆った。
+       *   ★実測: 基準DOM 1,100個 → 857枚で 5,385個(推奨1,500の3.6倍)。
+       *
+       * ■ ★使わない手口(このリポで実測否定済み)
+       *   content-visibility … v0.1.648 で撤去(18,300件配信で白化)。★2回撤去している
+       *   contain: size      … 2026-08-19 実測で高さ0・クリック判定が壊れた
+       *   ⟹ 素直な max-height + overflow-y だけを使う(既存の .nl-top-support-rank__list と同型)。
+       *
+       * ■ 二重スクロールについて
+       *   v0.1.1139 が撤去した理由は「二重スクロール」。★段が短いときは窓を出さない
+       *   (JS が枚数で class を付け外しする)ので、通常時の体験は従来どおり。
+       */
+      #sceneStoryUserLaneTanu.nl-story-userlane--windowed {
+        max-height: min(42vh, 380px);
+        overflow-y: auto;
+      }
+      #sceneStoryUserLaneTanu > .nl-story-userlane-cell:nth-child(n + 25)[data-thumb='0'] {
+        gap: 0;
+        padding-right: 0;
+      }
+      #sceneStoryUserLaneTanu
+        > .nl-story-userlane-cell:nth-child(n + 25)[data-thumb='0']
+        .nl-story-userlane-meta {
+        display: none;
+      }
+      #sceneStoryUserLaneTanu
+        > .nl-story-userlane-cell:nth-child(n + 25)[data-thumb='0']
+        .nl-story-userlane-avatar {
+        /* ★後列は匿名寸法のまま（v0.1.1376 の 63%減を守る）。 */
+        width: var(--nl-lane-avatar-anon);
+        height: var(--nl-lane-avatar-anon);
+      }
+      /*
+       * ★v0.1.1426 中身LOD(枠は残す。中身だけ空にする)— laneContentLod.js が付ける class。
+       *
+       * ■ 何のためか
+       *   実測(CDP Performance.getMetrics・コメント1,200件): 拡張内DOM 13,682
+       *   ＝Web業界の推奨(1,500以下)の【9倍】。1タイル=5要素を1,108人ぶん作っていた。
+       *   後列の匿名は【枠だけ】作り、可視域に入ってから中身を詰める(5,540→1,228要素=78%減)。
+       *
+       * ■ ★寸法は「推測」ではない
+       *   すぐ上の既存LOD規則が、たぬ姉段25枚目以降の匿名を
+       *     meta: display:none / avatar: 22px / gap:0 / padding-right:0
+       *   にしている。＝この領域の見えている実体は【22pxの丸1個】だけ。
+       *   hollow はその footprint(22px + border 1px×2)を再現する＝中身が入っても
+       *   寸法が動かない=スクロール位置が飛ばない(地雷#1)。
+       *
+       * ■ 地色を塗る(★黒画面の再生産を防ぐ)
+       *   背景 transparent のまま置くと「中身は在るのに地が塗られていない」状態＝
+       *   ユーザーが報告した【横縞つきの真っ黒】と同じ見え方になる。必ず塗る。
+       */
+      .nl-story-userlane-cell--hollow {
+        gap: 0;
+        padding-right: 0;
+        /*
+         * 匿名アバターの丸 + border 1.5px×2(既存 avatar と同じ枠線幅)。
+         * avatar と同じ箱を「img 無し」で作る＝中身が入った瞬間に寸法が動かない。
+         * ★v0.1.1496: 25px の【手計算】をやめ、匿名寸法から calc で導出する。
+         *   手計算だと片方だけ変えたときにずれ、
+         *   「中身が入った瞬間にスクロールが飛ぶ」事故になる。
+         */
+        width: calc(var(--nl-lane-avatar-anon) + 3px);
+        height: calc(var(--nl-lane-avatar-anon) + 3px);
+        border-radius: 999px;
+        box-sizing: border-box;
+        border: 1.5px solid color-mix(in srgb, var(--nl-border) 82%, #fff 18%);
+        background: var(--nl-surface);
+      }
+
+      /*
+       * ★③会場(venueBar のレーンバー)はタイルが wrapTileEl でラップされる
+       *   (renderStoryUserLaneDom.js:402)ので【子孫形】が要る。①は直接子形。
+       *   両方書かないと画面ごとに見た目が食い違う。
+       */
+      .nlsb-venue-lane-stack .nl-story-userlane--tanu > :nth-child(n + 25) .nl-story-userlane-cell[data-thumb='0'] {
+        gap: 0;
+        padding-right: 0;
+      }
+      .nlsb-venue-lane-stack
+        .nl-story-userlane--tanu
+        > :nth-child(n + 25)
+        .nl-story-userlane-cell[data-thumb='0']
+        .nl-story-userlane-meta {
+        display: none;
+      }
+      .nlsb-venue-lane-stack
+        .nl-story-userlane--tanu
+        > :nth-child(n + 25)
+        .nl-story-userlane-cell[data-thumb='0']
+        .nl-story-userlane-avatar {
+        width: var(--nl-lane-avatar-anon);
+        height: var(--nl-lane-avatar-anon);
       }
 
       .nl-story-userlane-guide {
@@ -1068,6 +1344,57 @@
         flex-direction: column;
         gap: 5px;
         min-width: 0;
+      }
+
+      /*
+       * ★v0.1.1478: なふだの切り替えを【コメント入力のすぐ上】に出す。
+       *   見た目は既存の案内吹き出し(.nl-story-userlane-guide__line)に揃える
+       *   ＝新しい作法を持ち込まない。
+       */
+      .nl-nameplate-inline {
+        margin: 0 0 6px;
+        display: flex;
+        flex-direction: column;
+        gap: 5px;
+      }
+      .nl-nameplate-inline__guide {
+        display: flex;
+        align-items: flex-start;
+        gap: 7px;
+        padding: 5px 8px;
+        border-radius: 10px;
+        background: linear-gradient(180deg, #fffaf0, #fff4db);
+        border: 1px solid #f5d28d;
+        color: #6b4f18;
+        font-size: 10px;
+        font-weight: 700;
+        line-height: 1.38;
+        box-shadow: 0 1px 5px rgb(148 101 14 / 9%);
+      }
+      .nl-nameplate-inline__face {
+        flex: 0 0 auto;
+        width: 24px;
+        height: 24px;
+        border-radius: 50%;
+      }
+      .nl-nameplate-inline__text {
+        flex: 1 1 auto;
+        min-width: 0;
+      }
+      .nl-nameplate-inline__row {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+      .nl-nameplate-inline__label {
+        font-size: 11px;
+        font-weight: 800;
+        color: var(--nl-text-sub);
+      }
+      .nl-nameplate-inline__note {
+        font-size: 10px;
+        color: var(--nl-text-sub);
       }
 
       .nl-story-userlane-guide__line {
@@ -1521,12 +1848,31 @@
              ユーザー実機 18300件で再現)。親+各レーンの二重指定はネストして白化を悪化させる。
          新: レーンは6個程度で描画スキップの利得が小さい一方、白化リスクが大きいので
              content-visibility を外して常時描画にする(白化が構造的に起きなくなる)。
-             単発で重い .nl-stats / .nl-support-visual-details は従来どおり省略を残す。 */
-      .nl-stats,
-      .nl-support-visual-details {
-        content-visibility: auto;
-        contain-intrinsic-size: auto 240px;
-      }
+             単発で重い .nl-stats / .nl-support-visual-details は従来どおり省略を残す。
+
+         ★2026-08-08: .nl-stats から content-visibility を【外した】(クリックが効かない根治)。
+
+         ■ 何が起きていたか(e2e popup-layout:465 が2026-08-05から赤だった真因)
+           `content-visibility: auto` はスキップ中の subtree を【ヒットテスト対象から外す】。
+           そのため .nl-stats の中の要素を狙った elementFromPoint が、子ではなく
+           .nl-stats(SECTION)自身を返していた。実測(同じ点・同じ瞬間で両方向を確認):
+             content-visibility: auto    → elementFromPoint = SECTION            🔴
+             content-visibility: visible → elementFromPoint = DETAILS#supportVisualDetails ✅
+           .nl-stats は button 1個と details 2個(応援タイムライン/応援ビジュアル)を
+           【含む】ので、スキップ中は当たり判定が親に吸われ、1クリックで開かないことがある。
+           = テストの不具合ではなく実害のある製品バグ。
+
+         ■ .nl-support-visual-details も同じ理由で外した
+           当初「<summary> は details の直接の子だから当たり判定は残る」と考えたが、
+           実測で【誤り】と分かった。content-visibility:auto は subtree を丸ごと
+           スキップするので <summary> 自身も当たらない:
+             .nl-support-visual-details: auto    → elementFromPoint = DETAILS  🔴
+             .nl-support-visual-details: visible → elementFromPoint = SUMMARY  ✅
+           開閉トグルの当たり判定そのものが消えるので、ここも外すのが正しい。
+
+         ★教訓: content-visibility:auto は【インタラクティブ要素を含む器】には掛けない。
+           速さのための省略が、当たり判定という機能を黙って削る。
+           ★「直接の子なら残る」は成り立たない(subtree 全体がスキップされる)。 */
 
       /* 初回のみ: メイン UI をハイドレート完了まで覆い、段階描画のちらつきを抑える（#usageTermsGate は外に出す）。
        *
@@ -1537,10 +1883,29 @@
        * 新実装は JS state に依存しない CSS アニメーションを保険として走らせ、1500ms 後には必ず自動で
        * fade-in する。JS が通常ルートで reveal すれば removeAttribute でこのブロックが外れて即可視。
        * 例外ルートでも「見えない UI」が延々と続くことを CSS 側で防ぐ。 */
+      /*
+       * ★v0.1.1352: 自動 reveal の遅延を 1500ms → 400ms に短縮。
+       *
+       * ■ 実機で確定したこと(2026-08-12 の状態速報)
+       *     幕(cloak) ✅ t+1507ms で解除 ★CSS自動解除(1500ms)より後=JS解除が遅い
+       *   JS の解除は 1507ms、CSS の保険は 1500ms から 260ms かけて fade する。
+       *   つまり **0〜1500ms のあいだ、誰も中身を見せていない**。
+       *   ユーザーはサイドパネルを引っ張って開いた瞬間そこを見るので「真っ黒」になる。
+       *
+       * ■ なぜ 1500ms が長すぎたか
+       *   この値は「ちらつき(段階描画)を隠す」ために置かれたもので、
+       *   ちらつきを隠す時間 = ユーザーが黒を見る時間 でもある。
+       *   ★ちらつき対策と黒対策はトレードオフで、1500ms は黒の側に振れすぎていた。
+       *   400ms なら段階描画のちらつきは大半が終わっており、かつ人が「黒い画面」として
+       *   認識する前に中身が出る。
+       *
+       * ★JS が通常ルートで reveal すれば removeAttribute で即可視(従来どおり)。
+       *   これは「JS が遅れた/落ちた」ときの保険の発動を早めるだけの変更。
+       */
       html[data-nl-popup-primary-cloak='1'] .nl-popup-primary {
         opacity: 0;
         pointer-events: none;
-        animation: nl-popup-primary-cloak-auto-reveal 260ms 1500ms ease-out forwards;
+        animation: nl-popup-primary-cloak-auto-reveal 260ms 400ms ease-out forwards;
       }
       @keyframes nl-popup-primary-cloak-auto-reveal {
         to {
@@ -1552,15 +1917,61 @@
       @media (prefers-reduced-motion: reduce) {
         html[data-nl-popup-primary-cloak='1'] .nl-popup-primary {
           animation-duration: 0ms;
-          animation-delay: 700ms;
+          /* ★v0.1.1352: 通常時(400ms)より遅くしない。ここが長いと reduced-motion の
+             ユーザーだけ黒を長く見ることになる(従来は 700ms で通常より遅かった)。 */
+          animation-delay: 200ms;
         }
       }
 
-      /* cloak 中: 親ホストの暗い背景を透かして白フラッシュを防ぐ（JS 読み込み中も有効にするためクラス限定を外す） */
-      html[data-nl-popup-primary-cloak='1'],
-      html[data-nl-popup-primary-cloak='1'] body {
-        background: transparent !important;
-      }
+      /*
+       * cloak 中: 親ホストの暗い背景を透かして白フラッシュを防ぐ（JS 読み込み中も有効にするためクラス限定を外す）
+       *
+       * ★v0.1.1285: この規則を【透明にしてよい場所だけ】に限定する（サイドパネル真っ黒の根治）。
+       *
+       * ■ 何が起きていたか（2026-08-07 実機・v0.1.1279/1283 に続く3度目の黒画面）
+       *   v0.1.1283 は入れ物（sidepanel.html の html/body/iframe）を不透明にしたが、
+       *   【中身】であるこの popup.html は transparent !important のままだった。
+       *   cloak 属性は popup.html:2 に【静的に】書かれているので JS が走る前から背景がゼロ。
+       *   解除は revealPopupPrimaryOnce()（JS）だけで、上の CSS フェイルセーフ（1500ms 自動
+       *   reveal）は opacity しか戻さない＝背景は透明のまま。
+       *   → 中身は見えるのに地の色を塗らない＝下の暗い層が透けて【真っ黒】。
+       *     （実機スクショに横縞＝コンテンツは描画済み、が写っていたのがこの証拠）
+       *
+       * ■ 直し方は v0.1.1283 と同じ原則＝【既定を安全側にし、危険な状態は明示のときだけ】
+       *   透明が要るのは「親ホストの暗い背景に重ねる埋め込み」だけ。
+       *   サイドパネル（dock=sidepanel）と別窓 popup では親が不透明なので透明にする理由がない。
+       *   :has() で自分の URL を見て判定する＝JS を待たずに効く（ここが肝）。
+       *
+       * ★ここを触るときは sidepanel.html の背景色（#fffaf2）と揃える。別文書なので
+       *   CSS 変数を共有できない＝両方直すこと（sidepanel.html:44 のコメントと対）。
+       */
+      /*
+       * ★v0.1.1285: 【この規則は撤去した】。サイドパネル真っ黒（3度目）の根治。
+       *
+       * ■ 旧実装（v0.1.1283 まで）
+       *     html[data-nl-popup-primary-cloak='1'],
+       *     html[...] body { background: transparent !important; }
+       *   意図は「親ホストの暗い背景を透かして白フラッシュを防ぐ」。
+       *
+       * ■ なぜ黒くなったか（2026-08-07 実機・v0.1.1279/1283 に続く3度目）
+       *   cloak 属性は popup.html:2 に【静的に】書かれており、JS が走る前から有効。
+       *   解除は revealPopupPrimaryOnce()（JS）だけ。上の CSS フェイルセーフ（1500ms
+       *   自動 reveal）は opacity しか戻さず、この background は透明のまま残る。
+       *   → 中身は見えるのに【地の色を塗らない】＝下の暗い層が透けて真っ黒。
+       *     （実機スクショに横縞＝コンテンツは描画済み、が写っていたのがその証拠）
+       *   v0.1.1283 は入れ物（sidepanel.html）だけ不透明にしたので中身が残っていた。
+       *
+       * ■ なぜ「撤去」で良いか（弱める・条件を足す、ではなく）
+       *   白フラッシュ防止の本体は上の `.nl-popup-primary { opacity: 0 }`＝中身を隠すこと。
+       *   背景まで透明にする必要はなく、透明にすると「塗る人が誰も居ない」状態を作る。
+       *   ★CSP が `script-src 'self'`＝head のインライン script で URL 判定する案は
+       *     実機で【CSPにブロックされる】ことを確認済み（2026-08-07）。JS に頼る解は取れない。
+       *   → 既定を安全側（＝body の通常背景 linear-gradient をそのまま使う）に倒す。
+       *     [[css-default-should-be-the-safe-state-2026-08-05]] と同じ原則。
+       *
+       * ★埋め込み（watch 重ね）で本当に透明が要るなら、body ではなく
+       *   【その埋め込み専用のクラス】に対して指定すること（html/body を透明にしない）。
+       */
 
       .nl-version-badge {
         display: inline-flex;
@@ -2711,6 +3122,66 @@
       }
       .nl-official-event-banner-card__thumb[hidden] {
         display: none;
+      }
+
+      /* ★応援動画バナー（2026-08-25 追加）
+         このチャンネルの目的は「埋もれているクリエイターの価値が発見されること」。
+         いま応援している作品を、拡張を開いた人に静かに知らせる枠。
+         ★footer の Powered by の直上＝既に「外部誘導ゾーン」なので本体を押し下げない。
+         ★出す中身は data/ouen-banner.json 側。動画が変わっても HTML は触らない。 */
+      .nl-ouen-banner {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+        margin: 10px 0 0;
+        padding: 9px 12px;
+        border-radius: 12px;
+        background: linear-gradient(180deg, #1b2440, #141b30);
+        border: 1px solid rgb(255 206 84 / 26%);
+        text-decoration: none;
+        color: #eef2ff;
+      }
+      .nl-ouen-banner[hidden] {
+        display: none;
+      }
+      .nl-ouen-banner__tag {
+        font-size: 11px;
+        font-weight: 700;
+        color: #131a2e;
+        background: #ffce54;
+        border-radius: 5px;
+        padding: 2px 7px;
+        flex-shrink: 0;
+      }
+      .nl-ouen-banner__text {
+        flex: 1 1 auto;
+        min-width: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+      }
+      .nl-ouen-banner__title {
+        font-size: 13px;
+        font-weight: 700;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .nl-ouen-banner__note {
+        font-size: 11px;
+        color: #96a5c8;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .nl-ouen-banner__when {
+        font-size: 11px;
+        font-weight: 700;
+        color: #131a2e;
+        background: #fff;
+        border-radius: 6px;
+        padding: 3px 8px;
+        flex-shrink: 0;
       }
       .nl-official-event-banner-card__text {
         flex: 1 1 auto;
@@ -5763,7 +6234,19 @@
 
       .nl-comment-ticker__viewport {
         overflow: hidden;
-        height: clamp(32px, 9vw, 44px);
+        /*
+         * ★v0.1.1392(ユーザー要望「顔を近づけないと読めない」の根治・会議 design 系4体):
+         *   PICK UP 帯は「1件ずつ【大きく】出る」と自称しているのに、実測で
+         *   font-size 最大13px・高さ最大44px しかなかった=名前と実体が食い違っていた。
+         *   ★全体 zoom は却下(ユーザー:「ぜんたいじゃなくて」)。情報量を減らすため。
+         *     この帯【だけ】を大きくする=他の密度は1pxも変えない。
+         *
+         *   ★高さと文字を【同じ倍率】で上げる(--nl-band-scale)。
+         *     文字だけ上げると overflow:hidden で上下が切れる(会議の批判役が指摘)。
+         *   ★アニメーションは translateX(横流れ)なので、縦に伸ばしても壊れない
+         *     (批判役は translateY と述べたが実コードは translateX = 裏取りで否定)。
+         */
+        height: calc(clamp(32px, 9vw, 44px) * var(--nl-band-scale, 1.6));
         border-radius: 10px;
         background: linear-gradient(180deg, #eff6ff 0%, #dbeafe 100%);
         border: 1px solid #93c5fd;
@@ -5835,7 +6318,9 @@
         gap: 0 1.75rem;
         padding: 0 1rem;
         white-space: nowrap;
-        font-size: clamp(10.5px, 3.1vw, 13px);
+        /* ★v0.1.1392: 帯の文字。高さと同じ --nl-band-scale で拡大する。
+           既定1.6倍=最大13px→約21px(離れて読める下限)。設定で 1.0〜2.4 に変更可。 */
+        font-size: calc(clamp(10.5px, 3.1vw, 13px) * var(--nl-band-scale, 1.6));
         font-weight: 700;
         color: #0f172a;
       }
@@ -9902,17 +10387,40 @@
        * 自然。下流で popup window 自体の outer height を primary.scrollHeight + 40
        * に合わせるので、popup window 外側にも内部にも scrollbar が出ない。
        */
+      /*
+       * ★v0.1.1288: cap 解除は【ビューポートに収まる範囲まで】に限る。
+       *
+       * ■ 直した不具合(2026-08-07・e2e が 08-03 から9件落ち続けていた真因の1つ)
+       *   上の 0.1.73 の意図は「popup window の外側の高さを content に合わせるので、
+       *   内側にも外側にもスクロールバーは出ない」。その前提は
+       *   `chrome.windows.update` で外枠を伸ばせるときにしか成立しない。
+       *   実装(popup-entry.js:15188)は `win.type !== 'popup'` で早期 return するので、
+       *   【通常タブで popup.html を開くと外枠は伸びない】。
+       *   その状態で height:auto を !important で通すと、html が content の高さ(855px)まで
+       *   伸びてビューポート(720px)を超え、**html に外側スクロールバーが出る**
+       *   =「二重スクロールを出さない」という設計そのものを破っていた。
+       *
+       * ■ 直し方: auto をやめ、ビューポート上限つきの max-height にする
+       *   - 収まるとき(実 popup window・content が短い)は従来どおり全部見える＝意図は保つ
+       *   - 収まらないときは 100vh で止まり、内側(.nl-main)がスクロールする＝外側バーは出ない
+       *   ★`height` は指定しない(auto のまま content に追従させる)。max-height だけで抑える。
+       */
       html.nl-empty-state:not(.nl-inline) {
         height: auto !important;
-        max-height: none !important;
+        max-height: 100vh !important;
+        overflow-y: hidden !important;
       }
       html.nl-empty-state:not(.nl-inline) body {
         height: auto !important;
-        max-height: none !important;
+        max-height: 100vh !important;
+        overflow-y: hidden !important;
       }
+      /* ★収まらないときだけ内側でスクロールさせる(収まるときは visible と同じ挙動)。 */
       html.nl-empty-state:not(.nl-inline) body .nl-main {
-        flex: 0 0 auto;
-        overflow-y: visible;
+        flex: 1 1 auto;
+        min-height: 0;
+        max-height: 100vh;
+        overflow-y: auto;
       }
 
       html.nl-skin-panel-dark {
@@ -10138,6 +10646,12 @@
         border-color: rgb(248 113 113 / 38%);
       }
     </style>
+    <!--
+      ★v0.1.1354: 幕(cloak)を外す【最速の保険】。dist/popup.js(2.3MB)より前に必ず走る。
+      ★インラインで書くと拡張のCSP(script-src 'self')違反でブロックされる(v1353の実機エラー)。
+        必ず別ファイル(=self)にすること。中身は src/extension/cloak-failsafe-entry.js。
+    -->
+    <script src="dist/cloak-failsafe.js"></script>
   </head>
   <body>
     <!--
@@ -11178,8 +11692,14 @@
       </p>
 
       <details id="nlPopupSettings" class="nl-popup-settings">
+        <!--
+          ★v0.1.1477: 見出しに「なふだ」を足す。
+            ★実装は v0.1.1393 からあったのに、ユーザーが「ない気がします」と言った。
+              理由＝この details が閉じていて、★見出しに その語が無いので中にあると分からない。
+            ★「入れたのに届いていない」型。中身を増やすのではなく【名前を出す】ことで直す。
+        -->
         <summary class="nl-popup-settings__summary">
-          詳細設定（記録のON/OFF・取り込み・パネル位置・動き・表示トラブル）
+          詳細設定（記録のON/OFF・なふだ・取り込み・パネル位置・動き・表示トラブル）
         </summary>
         <div class="nl-popup-settings__body">
           <div class="nl-record nl-record--in-settings">
@@ -11286,6 +11806,22 @@
                   >既定はOFFです。ONにするとリーチ中・大当たり後フィーバー中に短いループBGMを鳴らします。音量は診断ページで調整できます。</span>
               </span>
             </label>
+          </div>
+          <!-- ★v0.1.1393(ユーザー要望「公式のこれも POPで操作できるようにしたい」):
+               公式コメント欄の「なふだを表示」を①POPから切り替える。
+               ★これは公式側の設定なので、拡張が状態を保存しない(公式が正本)。
+                 押すたびに公式トグルを叩き、結果を下の #nameplateToggleNote に出す。 -->
+          <div class="nl-record-sub">
+            <div class="nl-record-sub__label" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+              <span>なふだ（放送者にあなたのアイコン・名前を見せる）</span>
+              <button type="button" id="nameplateOnBtn" class="nl-mini-btn">表示する</button>
+              <button type="button" id="nameplateOffBtn" class="nl-mini-btn">隠す</button>
+              <span class="nl-record-sub__hint" id="nameplateToggleNote"></span>
+            </div>
+            <div class="nl-record-sub__hint">
+              公式の「なふだを表示」を切り替えます。ONにすると放送者だけにあなたのアイコンとニックネームが見えます（他の視聴者には見えません）。
+              ★公式の設定パネルを一度も開いていないと切り替えられません。
+            </div>
           </div>
           <!-- Phase D1(2026-07-05・council/operation-sound-SYNTHESIS.md §4.2): 操作音（コメント送信の
                打ち出し音等・既定ON）。ユーザー自身のジェスチャ起点なのでautoplay制約が無く、
@@ -11575,6 +12111,42 @@
         <span>コメント・書き出し</span>
       </div>
 
+      <!--
+        ★v0.1.1478(ユーザー指摘「コメントうつんだからこのそばにないとわからない」):
+          なふだの切り替えを【コメント入力のすぐ上】へ出す。
+
+        ★v0.1.1477 で詳細設定の見出しに「なふだ」を足したが、それでも足りなかった。
+          ★理由＝これは【コメントを打つときに決めること】なので、
+            設定の中ではなく【打つ場所の隣】に無いと気づけない。
+          ⟹ 「名前を出す」だけでは不十分で、★【使う場所へ置く】必要があった。
+
+        ★詳細設定の中のボタン(#nameplateOnBtn / #nameplateOffBtn)は残す(既存の導線を壊さない)。
+          こちらは同じ機能への2つ目の入口。
+      -->
+      <div class="nl-nameplate-inline">
+        <div class="nl-nameplate-inline__guide">
+          <img
+            class="nl-nameplate-inline__face"
+            src="images/yukkuri-charactore-english/link/link-yukkuri-half-eyes-mouth-closed.png"
+            alt=""
+            width="24"
+            height="24"
+            decoding="async"
+          />
+          <span class="nl-nameplate-inline__text">
+            りんく: 「表示する」にすると、キミがコメントしたとき<b>放送者さんのコメント欄にキミのアイコンと名前が出る</b>のだ。
+            見えるのは<b>放送者さんだけ</b>で、ほかの視聴者さんには見えないから安心してね。
+            これはニコ生そのものの設定で、<b>追憶のきらめきの記録には出ない</b>のだ。
+          </span>
+        </div>
+        <div class="nl-nameplate-inline__row">
+          <span class="nl-nameplate-inline__label">なふだ</span>
+          <button type="button" id="nameplateOnBtnInline" class="nl-mini-btn">表示する</button>
+          <button type="button" id="nameplateOffBtnInline" class="nl-mini-btn">隠す</button>
+          <span class="nl-nameplate-inline__note" id="nameplateToggleNoteInline"></span>
+        </div>
+      </div>
+
       <section
         class="nl-comment-compose nl-comment-compose--primary"
         aria-label="コメント投稿"
@@ -11792,7 +12364,7 @@
           class="nl-export-toolbar__hint nl-compose-toolbar-hint"
           id="exportToolbarHint"
         >
-          HTML保存・スクショ（動画領域のみ）・再読み込みは送信の横からもできます。パネル位置・幅・動きの抑え・表示トラブル時の手順は、上の「詳細設定（取り込み・パネル位置・動き・表示トラブル）」を開いてください。定期サムネや書き出しの詳細は、さらに下の項目を開いてください。
+          HTML保存・スクショ（動画領域のみ）・再読み込みは送信の横からもできます。パネル位置・幅・動きの抑え・表示トラブル時の手順は、上の「詳細設定（なふだ・取り込み・パネル位置・動き・表示トラブル）」を開いてください。定期サムネや書き出しの詳細は、さらに下の項目を開いてください。
         </p>
         <details
           class="nl-export-toolbar__details nl-compose-primary-more"
@@ -12617,6 +13189,27 @@
         <summary id="giftSubAppHistorySummary">ギフトサイドバー履歴（未取得）</summary>
         <div id="giftSubAppHistoryMount" class="nl-gift-quick-mount"></div>
       </details>
+
+      <!--
+        ★応援動画バナー（2026-08-25 追加）
+        中身は extension/data/ouen-banner.json から読む。
+        JSON が無い / show=false のときは表示しない（既定は非表示＝fail-closed）。
+      -->
+      <a
+        id="ouenBanner"
+        class="nl-ouen-banner"
+        hidden
+        target="_blank"
+        rel="noopener noreferrer"
+        data-nl-toolbar-only
+      >
+        <span class="nl-ouen-banner__tag">応援動画</span>
+        <span class="nl-ouen-banner__text">
+          <span class="nl-ouen-banner__title" id="ouenBannerTitle"></span>
+          <span class="nl-ouen-banner__note" id="ouenBannerNote"></span>
+        </span>
+        <span class="nl-ouen-banner__when" id="ouenBannerWhen"></span>
+      </a>
 
       <footer
         class="nl-powered-by"

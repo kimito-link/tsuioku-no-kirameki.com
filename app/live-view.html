@@ -197,6 +197,17 @@
         0%, 100% { transform: translateY(0); }
         50% { transform: translateY(-6px); }
       }
+      /*
+       * ★v0.1.1443: popup.html と同じ理由で【見せない】側に倒した。
+       *   幅変更ごとに全画面を覆う幕が出るのが「黒い影」の正体だった。
+       *   ★両画面で揃える(片方だけ直すと差分が残る)。
+       */
+      .nl-init-shade.nl-init-shade--rearm {
+        opacity: 0 !important;
+        visibility: hidden !important;
+        pointer-events: none !important;
+      }
+
       @keyframes nl-init-shade-css-failsafe {
         0%, 93% { opacity: 1; visibility: visible; pointer-events: auto; }
         100% { opacity: 0; visibility: hidden; pointer-events: none; }
@@ -743,6 +754,15 @@
 
       .nl-story-body {
         --nl-story-icon-size: 14px;
+        /*
+         * ★応援レーンのアバター寸法（2026-08-30）。popup.html と同じ規約。
+         *   ★このページの後列は 26px（popup は 22px）。
+         *     前列 38px を基準に相対差を設計しているためで、
+         *     ★popup の値を写すと 4px ずれてスクロールが飛ぶ（下の hollow 参照）。
+         *     だから【3画面で同じ値にしない】のが正しい。検査も同値を強制しない。
+         */
+        --nl-lane-avatar: 32px;
+        --nl-lane-avatar-anon: 26px;
         min-width: 0;
         width: 100%;
         overflow: hidden;
@@ -969,8 +989,8 @@
       }
 
       .nl-story-userlane-avatar {
-        width: 32px;
-        height: 32px;
+        width: var(--nl-lane-avatar);
+        height: var(--nl-lane-avatar);
         border-radius: 999px;
         object-fit: cover;
         object-position: center;
@@ -987,9 +1007,60 @@
         border-color: color-mix(in srgb, #8d6e63 55%, var(--nl-border) 45%);
       }
 
-      html.nl-inline body .nl-story-userlane-avatar {
-        width: 38px;
-        height: 38px;
+      /* ★v0.1.1496: 38px → 44px。popup.html と同値（行数が増えない上限）。 */
+      html.nl-inline body .nl-story-body {
+        --nl-lane-avatar: 44px;
+      }
+
+      /*
+       * ★v0.1.1376: たぬ姉段の段内LOD(遠近法)。popup.html と同じ規約を純Webにも。
+       *   先頭24人は読めるpill / 25人目以降の匿名はアイコンのみ=群れとして見せる。
+       *   ★live-view.js は renderStoryUserLaneDom を wrapTileEl 無しで呼ぶので
+       *   ①popup と同じ【直接子形】でよい(会場だけが子孫形)。
+       *   根拠と実測(332人 1,615px→598px)は popup.html の同名ブロック参照。
+       *   ★このページの avatar 既定は 38px(上)なので、後列は 26px にして
+       *   相対差を保つ(popup は 20px→22px)。
+       */
+      #sceneStoryUserLaneTanu {
+        gap: 4px;
+      }
+      #sceneStoryUserLaneTanu > .nl-story-userlane-cell:nth-child(n + 25)[data-thumb='0'] {
+        gap: 0;
+        padding-right: 0;
+      }
+      #sceneStoryUserLaneTanu
+        > .nl-story-userlane-cell:nth-child(n + 25)[data-thumb='0']
+        .nl-story-userlane-meta {
+        display: none;
+      }
+      #sceneStoryUserLaneTanu
+        > .nl-story-userlane-cell:nth-child(n + 25)[data-thumb='0']
+        .nl-story-userlane-avatar {
+        width: var(--nl-lane-avatar-anon);
+        height: var(--nl-lane-avatar-anon);
+      }
+
+      /*
+       * ★v0.1.1426 中身LOD(枠は残す。中身だけ空にする)— laneContentLod.js が付ける class。
+       *   根拠と実測(拡張内DOM 13,682 = 業界基準の9倍)は popup.html の同名ブロック参照。
+       *   ★このページの後列 avatar は 26px なので枠も 26px にする(popup は 22px)。
+       *     寸法を popup からコピーすると中身が入った瞬間に 4px ずれてスクロールが飛ぶ。
+       *   ★地色を必ず塗る: transparent のままだと「中身は在るのに地が無い」＝
+       *     報告された【横縞つきの真っ黒】と同じ見え方になる。
+       */
+      .nl-story-userlane-cell--hollow {
+        gap: 0;
+        padding-right: 0;
+        /*
+         * ★v0.1.1496: 29px の【手計算】をやめ、後列アバター寸法から calc で導出する。
+         *   上のコメントが言う「4px ずれてスクロールが飛ぶ」を構造的に踏めなくする。
+         */
+        width: calc(var(--nl-lane-avatar-anon) + 3px);
+        height: calc(var(--nl-lane-avatar-anon) + 3px);
+        border-radius: 999px;
+        box-sizing: border-box;
+        border: 1.5px solid color-mix(in srgb, var(--nl-border) 82%, #fff 18%);
+        background: var(--nl-surface);
       }
 
       .nl-story-userlane-guide {

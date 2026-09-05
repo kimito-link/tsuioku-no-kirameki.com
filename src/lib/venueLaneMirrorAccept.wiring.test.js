@@ -20,16 +20,21 @@ const renderSrc = fs
  *   ([[wiring-test-must-assert-counts-2026-08-04]])。
  */
 describe('会場の鏡受け入れは関所を通る', () => {
-  it('★acceptLaneMirrorSnapshot の出現は3回(定義1 + 受け入れ点2)', () => {
+  it('★acceptLaneMirrorSnapshot の出現は4回(定義1 + 受け入れ点3)', () => {
+    /*
+     * ★v0.1.1300: catch-up が【配信ごとキー(v2) → 旧キー】の2段になったので受け入れ点が
+     *   1つ増えた(2→3)。数で断言する意味は変わらない=どの経路も関所を通ることの担保。
+     */
     const hits = venueSrc.match(/acceptLaneMirrorSnapshot\(/g) || [];
-    expect(hits.length).toBe(3);
+    expect(hits.length).toBe(4);
   });
 
-  it('★catch-up 経路(bag?.[KEY_LANE_MIRROR])が関所を通る', () => {
+  it('★catch-up 経路が関所を通る(v2 優先・旧キー fallback の両方)', () => {
     // アンカーを前後まで固定する。緩めると別の代入に化けても素通りする
     // ([[mutation-test-needs-anchored-regex-2026-08-05]])。
+    // ★v2 を先に試し、無ければ旧キー。順序まで固定する(逆にすると他配信の鏡を掴む)。
     expect(venueSrc).toMatch(
-      /const snap = acceptLaneMirrorSnapshot\(bag\?\.\[KEY_LANE_MIRROR\]\);/
+      /const snap =\s*\n\s*\(_mirrorKey \? acceptLaneMirrorSnapshot\(bag\?\.\[_mirrorKey\]\) : null\) \|\|\s*\n\s*acceptLaneMirrorSnapshot\(bag\?\.\[KEY_LANE_MIRROR\]\);/
     );
   });
 

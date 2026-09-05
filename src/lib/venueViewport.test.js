@@ -4,6 +4,7 @@ import {
   resolveVisibleArenaCount,
   resolveDynamicArenaCap,
   resolveVenueMaxHeightVh,
+  VENUE_MAX_HEIGHT_VH,
   resolveVisibleAudienceCount,
   selectStableVisibleMembers,
   partitionThumbnailFirst
@@ -61,15 +62,37 @@ describe('resolveDynamicArenaCap', () => {
 });
 
 describe('resolveVenueMaxHeightVh', () => {
-  it('人数が増えるほど会場が高くなる(満席感・映像セーフエリアは控えめ)', () => {
+  /*
+   * ★2026-08-11: 旧テストは「人数が増えるほど高くなる」(48→56→64→72vh)を固定していた。
+   *   これはユーザー実機(2,769人)で「配信の映像はちゃんとみたい」という不満の直接原因
+   *   だったため、会議(4体・3対1)で人数連動を撤回。この describe は
+   *   【人数連動へ戻したら赤になる】ことを役目とする。
+   *   経緯は venueViewport.js の resolveVenueMaxHeightVh JSDoc に正本がある。
+   */
+  it('人数によらず 48vh 固定(映像セーフエリアを 52vh 残す)', () => {
     expect(resolveVenueMaxHeightVh(5)).toBe(48);
     expect(resolveVenueMaxHeightVh(16)).toBe(48);
-    expect(resolveVenueMaxHeightVh(64)).toBe(56);
-    expect(resolveVenueMaxHeightVh(150)).toBe(64);
-    expect(resolveVenueMaxHeightVh(405)).toBe(72);
+    expect(resolveVenueMaxHeightVh(64)).toBe(48);
+    expect(resolveVenueMaxHeightVh(150)).toBe(48);
+    expect(resolveVenueMaxHeightVh(405)).toBe(48);
   });
-  it('上限 72vh を超えない(映像を覆いすぎない)', () => {
-    expect(resolveVenueMaxHeightVh(99999)).toBe(72);
+
+  it('★ユーザー実機の人数(2,769人)でも 48vh を超えない', () => {
+    // 旧実装はここで 72 を返し、画面の72%を会場が占めていた(不満の実測値)。
+    expect(resolveVenueMaxHeightVh(2769)).toBe(48);
+  });
+
+  it('極端な人数・異常値でも 48vh 固定', () => {
+    expect(resolveVenueMaxHeightVh(99999)).toBe(48);
+    expect(resolveVenueMaxHeightVh(0)).toBe(48);
+    expect(resolveVenueMaxHeightVh(undefined)).toBe(48);
+    expect(resolveVenueMaxHeightVh(NaN)).toBe(48);
+    expect(resolveVenueMaxHeightVh(-5)).toBe(48);
+  });
+
+  it('公開定数と一致する(呼び出し側が定数を直接使っても同じ値)', () => {
+    expect(VENUE_MAX_HEIGHT_VH).toBe(48);
+    expect(resolveVenueMaxHeightVh(2769)).toBe(VENUE_MAX_HEIGHT_VH);
   });
 });
 

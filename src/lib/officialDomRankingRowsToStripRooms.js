@@ -10,7 +10,8 @@
  *   count: number,
  *   avatarUrl?: string,
  *   rankHint?: number|null,
- *   hideIdLine?: boolean
+ *   hideIdLine?: boolean,
+ *   hasNoIcon?: boolean
  * }} OfficialStripRoom
  */
 
@@ -77,7 +78,10 @@ export function officialDomRankingRowsToStripRooms(ranking, opts = {}) {
       count: contribution,
       avatarUrl: thumb,
       ...(rankHint != null ? { rankHint } : {}),
-      ...(officialUid && displayName ? { hideIdLine: true } : {})
+      ...(officialUid && displayName ? { hideIdLine: true } : {}),
+      // ★v0.1.1307: 「公式がアイコン未設定と言っている」事実を下流へ素通しする。
+      //   これが無いと広告段が uid から CDN URL を導出し、実体が無く 404=白丸になる。
+      ...(row.hasNoIcon === true ? { hasNoIcon: true } : {})
     };
   });
 }

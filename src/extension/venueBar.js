@@ -1,5 +1,7 @@
 // venueBar.js — 会場モード UI 本体。観客の席割り・群衆・吹き出し・ギフト演出・読み上げ連動を描く。
-import { isGenericComeviewName } from '../lib/comeviewRows.js';
+// v0.1.1287: combineCanonicalComeviewRows = チャンクとテールを commentNo で重複排除して合流する
+//   純関数(comeview と同じ正本)。会場の発言パネルがテールを読むために使う。
+import { isGenericComeviewName, combineCanonicalComeviewRows } from '../lib/comeviewRows.js';
 import {
   applyVenuePickupView,
   buildVenuePickupView,
@@ -15,6 +17,8 @@ import {
   venueRowsFromUserLaneCandidates
 } from '../lib/venueSeats.js';
 import { userLaneCandidatesFromStorage } from '../lib/userLaneCandidatesFromStorage.js';
+// ★v0.1.1425: 「会場がいま開いている」を①POPへ伝える(鏡が古いまま固まる件の根治)。
+import { KEY_VENUE_LIVE_OPEN, buildVenueLiveOpenValue } from '../lib/venueLiveOpenFlag.js';
 import {
   KEY_LIVE_BROADCASTER_CTX,
   normalizeBroadcasterCtx,
@@ -84,6 +88,7 @@ const VENUE_ROSTER_ENABLED = false;
  */
 const VENUE_SPEECH_PANEL_MAX = 200;
 import { resolveDisplayRows } from '../lib/venueDisplayRows.js';
+import { createVenueEntryQueue, VENUE_ENTRY_FLIGHT_MS } from '../lib/venueEntryQueue.js';
 import { runStorageOpWithTimeout, STORAGE_OP_TIMED_OUT } from '../lib/storageOpTimeout.js';
 import { buildVenueResidents } from '../lib/venueResidents.js';
 import {
@@ -202,16 +207,28 @@ import { buildVenueMirrorAvatarMap, enrichVenueRowsWithMirrorAvatars } from '../
 // ★KEY_LANE_MIRROR の契約(消費者登録簿・段別の不変条件)は src/lib/laneMirrorContract.js が正本。
 //   会場は reader として登録済み。読み口は必ず acceptLaneMirrorSnapshot を通す(受け入れ点は2箇所)。
 import { sanitizeLaneMirrorForRead } from '../lib/laneMirrorContract.js';
+// ★v0.1.1318: アイコン未設定(404)の人を白丸でなく「その人ごとのゆっくり顔」にするため。
+import { anonymousIdenticonDataUrl } from '../lib/anonymousIdenticon.js';
+import {
+  createVenueMirrorIntakeState,
+  observeVenueMirrorChange,
+  observeVenueMirrorAccept,
+  formatVenueMirrorIntakeLine
+} from '../lib/venueMirrorIntakeDiag.js';
 // fallback 経路で「ギフト段が作れない」ことを正直に伝える文言(①③と同じ正本ファイル)。
 import { buildVenueFallbackGiftEmptyNoteHtml } from '../lib/storyUserLaneGuideHtml.js';
 // v0.1.1111 会場=①レーン鏡映(メンバー完全一致): ①の実paint鏡(KEY_LANE_MIRROR)を会場の正本に昇格。
 //   設計正本=memory/reference_pop_venue_parity_SYNTHESIS.md(P層=鏡そのまま/T層=cap溢れの尾/X層=直近発言者)。
-import { KEY_LANE_MIRROR } from '../lib/laneMirrorKey.js';
+// ★v0.1.1300: 配信ごとキー(v2)を優先し、無ければ旧グローバルキーへ落ちる。
+//   旧キーは「最後に書いた配信」が他配信を上書きするため、多配信タブでは
+//   正しい配信の鏡が liveId 照合で弾かれ「鏡なし」に見えていた(=fallback降格)。
+import { KEY_LANE_MIRROR, laneMirrorKeyFor, laneReceiptKeyFor } from '../lib/laneMirrorKey.js';
 import { KEY_STORY_DIAG_MIRROR } from '../lib/storyDiagMirrorKey.js';
 // 記録件数の正本購読(story-diag-realtime-sync-DESIGN.md): ①popup非依存で content-entry.js が
 //   書く nls_panel_summary_<lv> を購読し、①が閉じていても件数だけはリアルタイムで動かす。
 import { panelSummaryStorageKey } from '../lib/panelLiveSummary.js';
-import { restoreLaneMirrorBuckets } from '../lib/laneMirror.js';
+// ★v0.1.1300: isReceiptComparable = 受領証と鏡が同じ内容を指すときだけ比較を許す関所。
+import { isReceiptComparable, restoreLaneMirrorBuckets } from '../lib/laneMirror.js';
 import {
   composeVenueLaneBuckets,
   isLaneMirrorUsableForVenue,
@@ -227,10 +244,19 @@ import {
 } from '../lib/venueLaneParity.js';
 // v0.1.1137(lanescene-structural-review MVP): venueLaneParityの厳密突合(P/T/X層・DOM census)とは
 //   独立に、①と会場が同じ鏡世代(revision)を見ているかを1行で確認する軽量な代理指標。
-import { buildSceneEnvelope, buildRenderReceipt, compareRenderReceipts } from '../lib/laneSceneEnvelope.js';
+// ★venue-exact-parity-SPEC-2026-08-07 §3-3: 受領証の組み立ては純関数へ移した。
+//   旧インライン組み立て(venueBar.js:5300-5324)は venueReceipt.revision に pop 側の値を
+//   自己代入していた=revision比較が恒真(C1)。両辺を別の入力から作る関数に閉じ込めることで、
+//   自己代入は【関数の外から作れない】(檻=laneSceneEnvelope.receipts.test.js が変異で赤にする)。
+import { laneDomFingerprint, buildVenueSceneReceipts, compareRenderReceipts } from '../lib/laneSceneEnvelope.js';
 // v0.1.1113 実DOM census(Tri-Parity): ✅の根拠をデータからDOMへ(reference_diag_truth_SYNTHESIS.md)。
 import { collectVenueLaneDomCensus, venueDomCensusToParityDom } from '../lib/venueDomCensus.js';
 import { nicoUserPageUrl, anonymousDisplayLabel } from '../lib/nicoUserPage.js';
+// ★発言パネルの見出しを §3.5（サムネ・ID・名前・リンクをセット）にするための共有部品。
+//   report系9モジュールで既に使われている正本（匿名はリンクにしない・escape済み）。
+import { buildUserProfileLinkedLabelHtml } from '../lib/userProfileLinkHtml.js';
+// ★発言パネルの一言もホバーカードと同じ純関数を使う（文言の正本は1本）。
+import { buildVenuePresenceNote } from '../lib/venuePresenceNote.js';
 import { isNumericNicoUserId } from '../domain/user/identity.js';
 // person-tile-unify 第3コミット(2026-06-22): 会場の席タイルを popup の本物ビルダーで描く。
 //   独自DOM生成をやめ、popup「アイコン列・グリッド・診断」と同じ顔ぶれ・見た目にする。
@@ -321,6 +347,14 @@ import {
 } from '../lib/venueBubbleLifecycle.js';
 import { resolveVoiceForUser } from '../lib/voiceAssignment.js';
 import { buildVenueCharacterFrame } from '../lib/venueCharacterFrame.js';
+// キャラライブ(2026-08-25): 3キャラを常駐させ、ふわふわ浮遊+相槌+返事+シンキングを出す。
+//   判断は charaLiveState.js(純関数)、描画は charaLiveStage.js、配線は charaLiveController.js。
+import { startCharaLive } from '../lib/charaLiveController.js';
+import { venueHoverCardPresenceVerdict } from '../lib/venueHoverCardProbe.js';
+// ★会場ホバーに出す数字の出所はここが正本（3経路すべてがこの判定を通る）。
+import { resolveVenueHoverFacts } from '../lib/venueHoverFacts.js';
+// キャラライブの「本当に見えているか」実測計器(2026-08-25)。推測で3回外した反省で追加。
+import { collectCharaLiveCensus, charaLiveVerdict } from '../lib/charaLiveCensus.js';
 import { parseGiftCommentText, parseNicoadCommentText } from '../lib/parseGiftComment.js';
 import {
   resolveGiftProjectile,
@@ -353,6 +387,7 @@ import {
 } from '../lib/giftDeltaFallback.js';
 import {
   isVoicevoxAlive,
+  probeVoicevoxAlive,
   listVoicevoxStyleIds,
   synthesizeVoice
 } from '../lib/voicevoxClient.js';
@@ -401,8 +436,36 @@ const VENUE_FALLBACK_GIFT_EMPTY_HTML = buildVenueFallbackGiftEmptyNoteHtml();
 //   ことがあり、一度の一時的プローブ失敗(timeout/error)が永久固着して白丸のまま=真因確定済み。
 //   retryPolicy を opt-in(会場のみ・既定値のまま)で有効化し、TTL+指数バックオフで再プローブ
 //   の機会を与える。popup側は§Eの段階3判断まで既定null(従来の恒久負キャッシュ)のまま。
+/*
+ * ★v0.1.1318: アイコン未設定の人を「全員同じ白丸」にしない(実機報告「サムネがおちてる」)。
+ *
+ * ■ 実測(2026-08-10・curl で確認)
+ *     未設定ユーザー(135315894/138512750/138339168) → 404
+ *     設定済ユーザー(128121142/4046119)             → 200
+ *   ＝URL の作り方は正しく、404 は【本当にアイコンを設定していない人】。
+ *   guard は失敗時に全員へ同じ blank.jpg(公式の未設定アイコン)を出すので、
+ *   未設定の人が多い配信では会場が【白丸だらけ】になる。
+ *
+ * ■ 直し方は v0.1.1307(広告段)と同じ結論
+ *   「404 の白丸でなく【ゆっくり顔】にする」。今回は会場にも同じ扱いを与える。
+ *   失敗した URL には uid が含まれる(usericon/s/<uid/10000>/<uid>.jpg)ので、
+ *   そこから uid を復元して【その人ごとの identicon】を生成する
+ *   ＝全員違う顔になり、誰が誰か見分けられる(白丸だらけにならない)。
+ */
+/** @param {string} requestedSrc @returns {string} 解決できなければ ''(共通fallbackへ倒れる) */
+const venueAvatarFallbackFor = (requestedSrc) => {
+  try {
+    const m = /\/usericon\/(?:[sm]\/)?\d+\/(\d{1,14})\.jpg/i.exec(String(requestedSrc || ''));
+    const uid = m ? m[1] : '';
+    if (!uid) return '';
+    return anonymousIdenticonDataUrl(uid, 64) || '';
+  } catch {
+    return ''; // 失敗時は共通 fallback(blank.jpg)へ倒れる
+  }
+};
 const venueAvatarLoadGuard = createSupportAvatarLoadGuard({
   fallbackSrc: NICONICO_OFFICIAL_DEFAULT_USERICON_HTTPS,
+  fallbackSrcFor: venueAvatarFallbackFor,
   onFallbackApplied: applyStoryAvatarTvFallbackClass,
   onRemoteSuccess: removeStoryAvatarTvFallbackClass,
   retryPolicy: {}
@@ -530,27 +593,56 @@ const VENUE_CSS = `
   .nlsb-root.nlsb-is-open {
     pointer-events: auto;
   }
+  /* ★2026-08-11 v0.1.1323 ユーザー報告「会場モードにするボタンがないかも？どこ？」:
+     見つけられなかったのは position:absolute + 暗色 + 13px の三重苦だった。
+       ① absolute = .nlsb-root(ページ内)の右下 = スクロールすると流れて画面外へ出る
+       ② 背景 rgba(20,24,30,.82) はニコ生の暗いページに溶ける(同系色)
+       ③ 13px・パディング7px = 視線が拾う前に他のUIに埋もれる
+     → fixed で画面右下に常駐させ、桜ピンク(DESIGN.md の主アクセント)で必ず目に入るようにする。
+     ★会場を開いている間は隠す(html.nlsb-venue-open で制御)。閉じるのはヘッダーの「✕ 閉じる」。 */
   .nlsb-toggle {
-    position: absolute;
-    right: 16px;
-    bottom: 16px;
-    z-index: 3;
-    min-height: 34px;
-    padding: 7px 12px;
-    border: 1px solid rgba(255, 255, 255, 0.22);
+    position: fixed;
+    right: 20px;
+    bottom: 20px;
+    z-index: 2147483000;
+    min-height: 44px;
+    padding: 12px 20px;
+    border: 2px solid rgba(255, 255, 255, 0.9);
     border-radius: 999px;
-    background: rgba(20, 24, 30, 0.82);
+    background: linear-gradient(135deg, #ff8fb1, #ff6f9c);
     color: #fff;
-    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.24);
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    box-shadow: 0 6px 20px rgba(214, 51, 108, 0.45), 0 2px 6px rgba(0, 0, 0, 0.25);
     cursor: pointer;
     pointer-events: auto;
     font: inherit;
-    font-size: 13px;
+    font-size: 15px;
+    font-weight: 700;
     line-height: 1;
-    transition: background-color 180ms ease;
+    transition: transform 180ms ease, box-shadow 180ms ease, background-color 180ms ease;
   }
   .nlsb-toggle:hover {
-    background: rgba(36, 43, 53, 0.94);
+    background: linear-gradient(135deg, #ff7ea6, #ff5e91);
+    transform: translateY(-2px);
+    box-shadow: 0 10px 26px rgba(214, 51, 108, 0.55), 0 2px 6px rgba(0, 0, 0, 0.25);
+  }
+  /* 会場を開いている間はボタンを隠す(ヘッダーの「✕ 閉じる」が閉じる手段)。
+     fixed 化で最前面に来たため、開いている間も出したままだと会場の上に浮いて邪魔になる。
+     ★セレクタは html.nlsb-venue-open(既存の文字列契約・content-entry.js:2923 が
+       「venueBar.js が open 中に立てる documentElement クラス」として wiring テストで固定)。
+       会場側の独自クラスを新設しない=契約を1本に保つ。 */
+  html.nlsb-venue-open .nlsb-toggle {
+    display: none;
+  }
+  /* 動きを減らす設定の人には拡大アニメを出さない(a11y)。 */
+  @media (prefers-reduced-motion: reduce) {
+    .nlsb-toggle {
+      transition: none;
+    }
+    .nlsb-toggle:hover {
+      transform: none;
+    }
   }
   .nlsb-toggle:focus-visible {
     outline: 2px solid #8dc8ff;
@@ -567,12 +659,24 @@ const VENUE_CSS = `
     padding: 6px 10px;
     border-radius: 8px;
     border: 1px solid rgba(255, 190, 90, 0.55);
-    background: linear-gradient(90deg, rgba(255, 176, 62, 0.22), rgba(255, 176, 62, 0.06));
+    /*
+     * ★v0.1.1337: 地の色を【不透明で】敷く(実機で読めなくなっていた)。
+     *   旧: linear-gradient のみ = 透明度 0.22〜0.06 の帯だけ。
+     *   会場の暗い背景の上なら成立するが、後ろにニコ生のページ(カテゴリタグ等)が
+     *   透けると文字と背景が重なって【判読不能】になる。実機スクリーンショットで確認。
+     *   さらに data-empty の opacity:0.55 が乗ると実質 0.03〜0.12 まで薄くなっていた。
+     *   → 不透明の下地(#2a2118 相当)を先に置き、その上に既存のグラデを重ねる。
+     *     色は会場の暗色系に馴染ませる(白背景でも黒背景でも読める濃さ)。
+     */
+    background-color: rgba(38, 30, 20, 0.92);
+    background-image: linear-gradient(90deg, rgba(255, 176, 62, 0.28), rgba(255, 176, 62, 0.1));
+    color: #fff5e8;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.18);
     font-size: 13px;
     line-height: 1.35;
   }
-  .nlsb-pickup[data-empty='1'] { opacity: 0.55; }
+  /* ★空のときも【薄くしすぎない】(0.55 だと下地ごと透けて読めなくなる)。 */
+  .nlsb-pickup[data-empty='1'] { opacity: 0.85; }
   .nlsb-pickup__badge {
     flex: 0 0 auto;
     font-size: 10px;
@@ -771,9 +875,16 @@ const VENUE_CSS = `
     align-self: end;
     display: grid;
     width: 100%;
-    /* 2026-06-14 会議(表示領域拡大): 高さを人数連動で可変。少人数は低く映像を広く見せ、
-       満員は高くして客席を奥まで見せる。JS が --nlsb-venue-max-h を人数で注入(既定55vh)。 */
-    max-height: var(--nlsb-venue-max-h, 55vh);
+    /* ★2026-08-11: 人数連動(旧 48→72vh)を撤回し 48vh 固定にした(会議4体・3対1)。
+       ユーザー実機2,769人で「配信の映像はちゃんとみたい」＝映像が実質ゼロだったため。
+       正本の経緯は src/lib/venueViewport.js の resolveVenueMaxHeightVh JSDoc。
+
+       ★fallback を 55vh → 48vh に変更した理由(css_default_should_be_the_safe_state):
+       JS の注入(renderSeats 内)が走る前や、何らかの理由で注入が失敗した場合、
+       この fallback がそのまま効く。55vh のままだと「注入が失敗したときだけ
+       映像が余計に潰れる」= 直したはずの症状が経路によって復活する。
+       CSS 既定は常に【安全な側】に置く。 */
+    max-height: var(--nlsb-venue-max-h, 48vh);
     min-height: 0;
     box-sizing: border-box;
     grid-template-areas:
@@ -1137,8 +1248,18 @@ const VENUE_CSS = `
     display: grid;
     place-items: center;
   }
-  /* LANE_CSS_SYNC_BEGIN popup.html:829-1067 */
+  /* LANE_CSS_SYNC_BEGIN popup.html:1037-1320 (★参照行は 2026-08-30 に実測して更新。旧 829-1067 は別のブロックを指していた) */
   .nlsb-venue-lane-stack.nl-story-userlane-stack {
+    /*
+     * ★レーンのアバター寸法（2026-08-30）。popup.html の値を写す。
+     *   会場は「常に inline 相当」（下の :1337-1338 の既存コメント参照）なので
+     *   popup の html.nl-inline 側の値を採る。
+     *   ★以前は 38px/22px の直書きだった。変数にして
+     *     【値が書ける場所を塞ぐ】＝どんな値の退化も検査が捕まえる。
+     *   検査: src/lib/laneAvatarSize.wiring.test.js
+     */
+    --nl-lane-avatar: 44px;
+    --nl-lane-avatar-anon: 22px;
     display: flex;
     flex-direction: column;
     gap: 8px;
@@ -1245,8 +1366,8 @@ const VENUE_CSS = `
     font-weight: 500;
   }
   .nlsb-venue-lane-stack .nl-story-userlane-avatar {
-    width: 38px;
-    height: 38px;
+    width: var(--nl-lane-avatar);
+    height: var(--nl-lane-avatar);
     border-radius: 999px;
     object-fit: cover;
     object-position: center;
@@ -1265,8 +1386,8 @@ const VENUE_CSS = `
      popup.html と同じ規約([data-thumb="0"] 側のみ・displaySrc が http か)を会場にも。
      VIP金縁/streak/順位バッジは border/box-shadow を触るだけ=サイズ非依存で競合しない。 */
   .nlsb-venue-lane-stack .nl-story-userlane-cell[data-thumb="0"] .nl-story-userlane-avatar {
-    width: 22px;
-    height: 22px;
+    width: var(--nl-lane-avatar-anon);
+    height: var(--nl-lane-avatar-anon);
     border-width: 1px;
     box-shadow: none;
   }
@@ -1277,6 +1398,23 @@ const VENUE_CSS = `
   .nlsb-venue-lane-stack .nl-story-userlane-cell[data-thumb="0"] .nl-story-userlane-meta {
     font-size: 9px;
     max-width: 72px;
+  }
+  /* ★v0.1.1376: たぬ姉段の段内LOD(遠近法)。popup.html と同じ規約を会場にも。
+     先頭24人は読めるpill / 25人目以降の匿名はアイコンのみ=群れとして見せる。
+     ★会場はタイルが wrapTileEl でラップされる(renderStoryUserLaneDom.js:402)ので
+     【子孫形】で書く(①popup は直接子形)。ここを直接子形にすると会場だけ効かない。
+     根拠と実測(1,615px→598px)は popup.html の同名ブロックのコメント参照。 */
+  .nlsb-venue-lane-stack .nl-story-userlane--tanu > :nth-child(n + 25) .nl-story-userlane-cell[data-thumb="0"] {
+    gap: 0;
+    padding-right: 0;
+  }
+  .nlsb-venue-lane-stack .nl-story-userlane--tanu > :nth-child(n + 25) .nl-story-userlane-cell[data-thumb="0"] .nl-story-userlane-meta {
+    display: none;
+  }
+  .nlsb-venue-lane-stack .nl-story-userlane--tanu > :nth-child(n + 25) .nl-story-userlane-cell[data-thumb="0"] .nl-story-userlane-avatar {
+    /* ★後列は匿名寸法のまま（v0.1.1376 の 63%減を守る）。 */
+    width: var(--nl-lane-avatar-anon);
+    height: var(--nl-lane-avatar-anon);
   }
   .nlsb-venue-lane-stack .nl-story-userlane-guide {
     display: flex;
@@ -1539,6 +1677,37 @@ const VENUE_CSS = `
     align-items: flex-start;
     gap: 8px;
   }
+  /*
+   * ★発言パネルの見出し（2026-08-30）。
+   *   §3.5「サムネ・ID・ハンドルネーム・リンクをセットで出す」の実装。
+   *   ★ここは席タイルでもホバーカードでも無いので、
+   *   ①POP=②プレビュー=③会場=④WEB のパリティ検査には触れない。
+   */
+  .nlsb-roster-avatar {
+    flex: 0 0 auto;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    object-fit: cover;
+    background: rgba(255, 255, 255, 0.08);
+  }
+  /* ★名前は押せることが見て分かる形にする（押せるのに押せないように見えない）。 */
+  .nlsb-roster-title .nl-user-profile-link {
+    color: #93c5fd;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+  .nlsb-roster-title .nl-user-profile-link:hover {
+    color: #dbeafe;
+  }
+  /* 「この人がここでどうしていたか」の一言。見出しの下に小さく。 */
+  .nlsb-roster-note {
+    flex: 1 1 100%;
+    order: 9;
+    opacity: 0.75;
+    font-size: 11px;
+    line-height: 1.4;
+  }
   .nlsb-roster-badge {
     display: inline-block;
     margin-left: 4px;
@@ -1630,6 +1799,70 @@ const VENUE_CSS = `
     .nlsb-seat.nlsb-seat-speaking .nl-story-userlane-avatar {
       animation: none;
     }
+  }
+  /*
+   * 2026-08-08 入場演出(サイドパネル→会場へ「運ぶ」): 新しく来た人のアイコンが
+   * 画面端から自分の席へ弧を描いて飛び、着弾で席が一度ふくらむ。
+   *
+   * ★これは飾りであると同時に【計器】でもある。会場は「気づいたら居る」ので
+   *   載っていないのか目立たないのか区別できない。入場をイベントにすると
+   *   「飛んでこない＝載っていない」が目視で分かる。
+   *   だから reduced-motion でも【消さずに】ゆっくり出す(検証価値を残す)。
+   *
+   * 正本SPEC: docs/handoff/venue-transport-effect-SPEC-2026-08-08.md
+   */
+  .nlsb-entry-proj {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    overflow: hidden;
+    pointer-events: none;
+    opacity: 0;
+    z-index: 6;
+    box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.85), 0 6px 18px rgba(0, 0, 0, 0.5);
+    filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.5));
+  }
+  .nlsb-entry-proj img,
+  .nlsb-entry-proj .nl-story-userlane-avatar {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+    border-radius: 50%;
+  }
+  .nlsb-entry-proj.is-flying {
+    animation: nlsb-entry-fly var(--nlsb-entry-dur, 900ms) cubic-bezier(0.22, 0.61, 0.36, 1) forwards;
+  }
+  @keyframes nlsb-entry-fly {
+    0%   { transform: translate(-50%, -50%) scale(0.7); opacity: 0; }
+    12%  { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+    60%  { transform: translate(calc(-50% + var(--nlsb-entry-mx)), calc(-50% + var(--nlsb-entry-my))) scale(1.06); opacity: 1; }
+    100% { transform: translate(calc(-50% + var(--nlsb-entry-dx)), calc(-50% + var(--nlsb-entry-dy))) scale(0.92); opacity: 0; }
+  }
+  /* 着弾: 席が一度だけふくらんで「確定」を示す。 */
+  .nlsb-seat.nlsb-seat-entered .nl-story-userlane-avatar {
+    animation: nlsb-seat-enter 0.5s ease-out;
+  }
+  @keyframes nlsb-seat-enter {
+    0%   { transform: scale(0.72); filter: brightness(1.3); }
+    55%  { transform: scale(1.14); filter: brightness(1.12); }
+    100% { transform: scale(1); filter: brightness(1); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    /* ★飛ばさない。ただし【消さない】=着弾点でふわっと出して消える(入場が分かる)。 */
+    .nlsb-entry-proj.is-flying {
+      animation: nlsb-entry-fade var(--nlsb-entry-dur, 900ms) ease-out forwards;
+    }
+    @keyframes nlsb-entry-fade {
+      0%   { transform: translate(calc(-50% + var(--nlsb-entry-dx)), calc(-50% + var(--nlsb-entry-dy))) scale(1); opacity: 0; }
+      25%  { transform: translate(calc(-50% + var(--nlsb-entry-dx)), calc(-50% + var(--nlsb-entry-dy))) scale(1); opacity: 0.95; }
+      75%  { transform: translate(calc(-50% + var(--nlsb-entry-dx)), calc(-50% + var(--nlsb-entry-dy))) scale(1); opacity: 0.95; }
+      100% { transform: translate(calc(-50% + var(--nlsb-entry-dx)), calc(-50% + var(--nlsb-entry-dy))) scale(1); opacity: 0; }
+    }
+    .nlsb-seat.nlsb-seat-entered .nl-story-userlane-avatar { animation: none; }
   }
   /* v0.1.743 「会話の連鎖」(会議の最大多数決の本命・弱点A/C): 同じ人が短い間隔で続けて喋ると、
      その席が段階的に暖色(コーラル)で輝き、連続するほど強く速く脈動する=「溜まっていく感」。
@@ -1763,6 +1996,21 @@ const VENUE_CSS = `
   }
   .nlsb-hover-card__stats {
     font-weight: 600;
+  }
+  /*
+   * ★2026-08-29: 「この人はここでどうしていたか」の一言。
+   *   直上の __stats(発言42 ・ 🎁3 ・ 🥇1位)を日本語に言い換えた行なので、
+   *   ★統計より控えめにして「読み解きの補助」だと分かる見た目にする
+   *   （主役は本人と発言であって、この行ではない）。
+   */
+  .nlsb-hover-card__presence {
+    margin-top: 2px;
+    font-size: 0.92em;
+    opacity: 0.85;
+    line-height: 1.35;
+  }
+  .nlsb-hover-card__presence[hidden] {
+    display: none;
   }
   /*
    * 2026-07-31(ユーザー要望): 直前の発言内容。「多忙なあやりん」が何を言ったか分からない、
@@ -1909,8 +2157,13 @@ const VENUE_CSS = `
     opacity: 1;
   }
   @media (max-width: 900px) {
+    /* ★2026-08-11: fixed 化に伴い、狭い窓では少し内側+上に寄せる。
+       ニコ生の右下UI(コメント入力欄まわり)と重なって押せなくなるのを避ける。 */
     .nlsb-toggle {
-      right: 10px;
+      right: 12px;
+      bottom: 76px;
+      font-size: 14px;
+      padding: 10px 16px;
     }
     .nlsb-stage {
       padding-right: 10px;
@@ -2178,6 +2431,37 @@ export function mountVenueBarButton(options = {}) {
   if (document.getElementById(ROOT_ID)) return NOOP_API;
   const parent = isStandalone ? document.body : document.documentElement;
   if (!parent) return NOOP_API;
+
+  /*
+   * ★v0.1.1422: 前回の残骸 `html.nlsb-venue-open` を必ず落としてから始める。
+   *
+   * ■ ユーザー実機の症状(2026-08-17・「ずっと前から」)
+   *   「常に会場モードがONになっている」
+   *   「拡張のこん太ボタンを押しても動かない」
+   *   「何度もリロードしてやっとサイドボタンを押して引っ張れる」
+   *
+   * ■ 真因: このクラスを【消す経路が setOpen(false) の1本しか無かった】
+   *   :2144 の CSS が効いている間、①POPホストは
+   *     visibility: hidden !important; pointer-events: none !important;
+   *   ＝**見えない上にクリックも通らない**。
+   *   会場バーが作り直される / SPA遷移 / 途中でエラー終了 のいずれでも
+   *   setOpen(false) は呼ばれず、クラスが <html> に残り続ける。
+   *   一度残ると、次にページを開いてもこの CSS が最初から効いた状態で始まる
+   *   ＝「常にON」「押しても動かない」「真っ黒」が全部説明できる。
+   *
+   * ■ なぜ mount 時に落とすのが正しいか
+   *   会場は必ず「閉じた状態から始まる」設計(:6839 の setOpen(false,false))。
+   *   ＝mount 時点で open な状態は【定義上あり得ない】ので、残っていれば残骸。
+   *   ★消す方向にしか倒さない(付ける処理は setOpen が握ったまま)ので、
+   *     会場の挙動は一切変わらない。
+   *   [[css-default-should-be-the-safe-state-2026-08-05]]:
+   *     既定(=クラス無し)が安全側。危険な状態は明示のときだけ。
+   */
+  try {
+    document.documentElement.classList.remove('nlsb-venue-open');
+  } catch {
+    /* documentElement 不在環境でも会場は止めない */
+  }
 
   ensureVenueStyle();
 
@@ -2531,7 +2815,9 @@ export function mountVenueBarButton(options = {}) {
    * ★paint 時に全タイルを走査する実装は hot path 汚染で実機が重くなったため、
    *   「ホバーされた1枚だけ・その場で」に変更した。走査対象は同じ段の中だけ。
    * @param {HTMLElement} el
-   * @returns {{ uid: string, displayName: string, count: number, hasGift: boolean, giftCount: number, venueRank: number, lastAt: number, tier?: string, lastText?: string, recentTexts?: string[] }|null}
+   * ★count/giftCount は number|null。null は「在席名簿に居らず、数が分からない」。
+   *   ここで 0 と言うと画面に「発言 0」という嘘が出る（2026-08-29 に実機で確認した症状）。
+   * @returns {{ uid: string, displayName: string, count: number|null, hasGift: boolean, giftCount: number|null, venueRank: number, lastAt: number, tier?: string, lastText?: string, recentTexts?: string[], factsSource?: string }|null}
    */
   const resolveSeatlessHoverData = (el) => {
     try {
@@ -2552,18 +2838,32 @@ export function mountVenueBarButton(options = {}) {
       const seatIdx = Number(it?._venueSeatIndex);
       if (Number.isInteger(seatIdx) && seatIdx >= 0) return null; // 席ありは対象外
       const u = String(it?.entry?.userId || '').trim();
+      /*
+       * ★2026-08-29: ここは以前 count:0 / lastAt:0 のゼロ埋めリテラルを返していた。
+       *   その結果、同じ人が経路によって「発言 70」と「発言 0(→下駄で発言 1)」で
+       *   ★揺れて見えた（実機で確認）。
+       *
+       *   ⟹ ★uid があるなら在席名簿(liveRoster)から O(1) で1回だけ引く。
+       *     ・全走査はしない（hot path を汚さない・paint 時に触らない方針は維持）
+       *     ・新しい hydrate を足さない（venueBar.js:6452 で既に hydrate 済み）
+       *     ・名簿に居なければ★null を返させる（「知らない」を 0 と言わない）
+       *   数字の出所の決定そのものは venueHoverFacts.js が正本。ここは引いて渡すだけ。
+       */
+      const rosterEntry = u ? liveRoster.get(u) || null : null;
+      const facts = resolveVenueHoverFacts({ registered: null, rosterEntry });
       return {
         uid: u,
         displayName: String(it?.title || '').trim(),
-        count: 0,
-        hasGift: tier === 'gift',
-        giftCount: 0,
-        venueRank: 0,
-        lastAt: 0,
+        count: facts.count,
+        hasGift: tier === 'gift' || (facts.giftCount || 0) > 0,
+        giftCount: facts.giftCount,
+        venueRank: facts.venueRank,
+        lastAt: facts.lastAt,
         tier,
-        lastText: '',
-        // 席なしタイル(広告主等)は発言記録に紐づかないので空。
-        recentTexts: []
+        lastText: facts.lastText,
+        recentTexts: facts.recentTexts,
+        // ★どこから採った値かを残す（後から「どちらを見たか」を言えるようにする）。
+        factsSource: facts.source
       };
     } catch {
       return null;
@@ -2578,7 +2878,15 @@ export function mountVenueBarButton(options = {}) {
       const seatless = resolveSeatlessHoverData(anchorEl);
       if (seatless) {
         data = seatless;
-        _hoverCardDataByEl.set(anchorEl, seatless); // 同じ要素の2回目以降は走査しない
+        /*
+         * ★キャッシュは uid が無いときだけ（2026-08-29）。
+         *   uid のある人の値は在席名簿由来で、喋るほど伸びる。ここでキャッシュすると
+         *   ★「一度3回で見えたら、その要素では永遠に3回」になり、
+         *   いま直している「数字が実態と合わない」症状の別バージョンを作ってしまう。
+         *   uid 無しのタイル(広告主等)は静的なので従来どおり保存する
+         *   ＝段内走査を繰り返さない保護目的は維持する。
+         */
+        if (!seatless.uid) _hoverCardDataByEl.set(anchorEl, seatless);
       }
     }
     if (!data) return; // データ無し=fail-closed(ネイティブtitleがそのまま生きる)。
@@ -2686,7 +2994,17 @@ export function mountVenueBarButton(options = {}) {
       const uid = String(data?.uid || '').trim();
       if (!uid) return; // uid が無い(広告主等)は発言記録に紐づかない=何も開かない
       closeHoverCard();
-      void openSpeechPanelFor({ uid, displayName: String(data?.displayName || '') });
+      /*
+       * ★サムネはクリック元タイルからそのまま取る＝★新規取得ゼロ。
+       *   既存の negative-cache / バックオフを迲回する野良再プローブを作らない
+       *   （venueAvatarLoadGuard の流儀を尊重）。
+       */
+      let avatarSrc = '';
+      try {
+        const imgEl = anchorEl.querySelector('.nl-story-userlane-avatar');
+        if (imgEl instanceof HTMLImageElement) avatarSrc = imgEl.currentSrc || imgEl.src || '';
+      } catch { /* サムネが取れなくてもパネルは開く */ }
+      void openSpeechPanelFor({ uid, displayName: String(data?.displayName || ''), avatarSrc });
     });
   };
   wireSpeechPanelDelegation(seatsHost);
@@ -2707,13 +3025,20 @@ export function mountVenueBarButton(options = {}) {
   //   状態を受け、checking は 180ms 経ってもまだ ready で無ければ初めて演出を描く。connecting(再試行中)は
   //   即描く。ready/idle で空にし、notfound で起動案内に切替。voiceStatus の内容/見た目はこの driver が所有。
   let voiceLoadingTimer = 0;
-  const renderVoiceLoading = (/** @type {string} */ state) => {
-    const view = resolveVoiceLoadingView(state, 'venue');
+  // ★v0.1.1326: 第2引数 reason(timeout/refused/http-error)で文言を出し分ける。
+  const renderVoiceLoading = (
+    /** @type {string} */ state,
+    /** @type {'timeout'|'refused'|'http-error'|'no-fetch'|''} */ reason
+  ) => {
+    const view = resolveVoiceLoadingView(state, 'venue', reason);
     voiceStatus.classList.toggle('is-loading', view.kind === 'loading');
     voiceStatus.classList.toggle('is-error', view.kind === 'error');
     voiceStatus.textContent = view.text;
   };
-  const driveVoiceLoading = (/** @type {string} */ state) => {
+  const driveVoiceLoading = (
+    /** @type {string} */ state,
+    /** @type {'timeout'|'refused'|'http-error'|'no-fetch'|''} */ reason = ''
+  ) => {
     if (voiceLoadingTimer) {
       window.clearTimeout(voiceLoadingTimer);
       voiceLoadingTimer = 0;
@@ -2724,11 +3049,11 @@ export function mountVenueBarButton(options = {}) {
       voiceStatus.textContent = '';
       voiceLoadingTimer = window.setTimeout(() => {
         voiceLoadingTimer = 0;
-        if (shouldRenderLoading('checking', VOICE_LOADING_FLICKER_GUARD_MS)) renderVoiceLoading('checking');
+        if (shouldRenderLoading('checking', VOICE_LOADING_FLICKER_GUARD_MS)) renderVoiceLoading('checking', '');
       }, VOICE_LOADING_FLICKER_GUARD_MS);
       return;
     }
-    renderVoiceLoading(state);
+    renderVoiceLoading(state, reason);
   };
 
   // v0.1.1065: 会場読み上げの計器を KEY_VOICE_DIAG へ書く(3秒min-gap・他診断と同型)。
@@ -2759,7 +3084,10 @@ export function mountVenueBarButton(options = {}) {
       voiceStatus.classList.toggle('is-error', /見つかりません|ブロック/.test(msg));
       voiceStatus.textContent = msg;
     },
-    onLoadingState: (/** @type {string} */ state) => driveVoiceLoading(state),
+    onLoadingState: (
+      /** @type {string} */ state,
+      /** @type {'timeout'|'refused'|'http-error'|'no-fetch'|''} */ reason = ''
+    ) => driveVoiceLoading(state, reason),
     onSkip: () => {},
     isObsMode: () => {
       return (window.name || '').includes('OBS') || window.location.search.includes('obs=');
@@ -2768,6 +3096,9 @@ export function mountVenueBarButton(options = {}) {
     createObjectURL: typeof URL !== 'undefined' ? URL.createObjectURL.bind(URL) : null,
     revokeObjectURL: typeof URL !== 'undefined' ? URL.revokeObjectURL.bind(URL) : null,
     fetchVoicevoxAlive: isVoicevoxAlive,
+    // ★v0.1.1326: 理由付きの生存確認を配線(未配線だと reason が常に 'refused' になり、
+    //   起動しているのに「見つかりません」と言い続ける従来の誤案内が残る)。
+    probeVoicevoxAlive,
     fetchVoiceStyleIds: listVoicevoxStyleIds,
     fetchSynthesizeVoice: synthesizeVoice,
     resolveVoice: resolveVoiceForUser
@@ -2817,6 +3148,81 @@ export function mountVenueBarButton(options = {}) {
   const crowdReducedMotion =
     typeof window.matchMedia === 'function' &&
     window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  // ★キャラライブ(2026-08-25 ユーザー要望): 3キャラを会場に常駐させる。
+  //   - ふわふわ浮遊+まばたき+表情のゆらぎ = 「常に場にいる」空気
+  //   - 相槌は「コメントが届いた瞬間」でなく【読み上げが実際に鳴った瞬間】に出す
+  //     (届いた瞬間だと、読み上げキューが詰まっている時に声より先に頷いてしまう)
+  //   - heat は群衆と同じ crowdHeatLevel を共有 = 会場が沸くとキャラも一緒に沸く
+  //   - reducedMotion は群衆と同じ判定を再利用(別々に計算して食い違わせない)
+  const charaLive = startCharaLive({
+    doc: document,
+    // ★必ず会場ステージの内側へ入れる(2026-08-25 実機で踏んだ)。
+    //   body 直下だと .nlsb-root(全画面・同じ z-index 2147483000・DOM順で後)に
+    //   完全に覆われて一度も見えなかった。ステージ内なら会場の階層(z6)に乗る。
+    mount: stage,
+    resolveUrl: resolveVenueAssetUrl,
+    getHeatLevel: () => crowdHeatLevel,
+    reducedMotion: crowdReducedMotion
+  });
+  // 会場は「必ず閉じた状態から始まる」設計(:2386)。開くのは setOpen(true) の時だけ。
+  //   ここで明示的に閉じておかないと、開く前からキャラだけが放送画面に浮かぶ。
+  charaLive.setVisible(false);
+
+  /*
+   * ★キャラライブ実測フック(2026-08-25)。
+   *   「出ません」に対して推測でなく【事実】で答えるための窓口。
+   *   放送ページの DevTools コンソールで次を実行すると、いま見えているかと、
+   *   見えないなら理由(覆っている要素名まで)が1行で出る:
+   *       __nls_chara_live_probe__()
+   *   DOM は読むだけで書き換えない(観測が対象を変えない)。
+   */
+  try {
+    /** @type {any} */ (globalThis).__nls_chara_live_probe__ = () => {
+      const census = collectCharaLiveCensus(document);
+      const verdict = charaLiveVerdict(census);
+      // 人が読む1行 + 生データ(貼って共有できる形)。
+      return { line: verdict.line, visible: verdict.visible, census };
+    };
+  } catch { /* 計器の失敗で会場を止めない */ }
+
+  /*
+   * ★ホバーカードの一言 実測フック(2026-08-29)。
+   *   「出ていません」に対して★推測で「リロードしてください」と答えたのを反省して作った。
+   *   ★カードを出したまま（アイコンにカーソルを乗せたまま）実行すると、
+   *     出ているか / 出ないなら理由（古いコード・配線漏れ・空・CSS）が1行で出る:
+   *       __nls_hover_note_probe__()
+   *   判定は src/lib/venueHoverCardProbe.js（純関数）。ここは採取だけ。
+   *   ★DOM は読むだけで書き換えない（観測が対象を変えない）。
+   */
+  try {
+    /** @type {any} */ (globalThis).__nls_hover_note_probe__ = () => {
+      const cardEl = document.querySelector('.nlsb-hover-card');
+      const el = /** @type {HTMLElement|null} */ (
+        cardEl ? cardEl.querySelector('.nlsb-hover-card__presence') : null
+      );
+      let displayNone = false;
+      try {
+        displayNone = el ? getComputedStyle(el).display === 'none' : false;
+      } catch { /* 取れなくても判定は続ける(fail-soft) */ }
+      const census = {
+        cardExists: Boolean(cardEl),
+        elementExists: Boolean(el),
+        text: el ? String(el.textContent || '') : '',
+        hidden: el ? el.hidden === true : false,
+        displayNone,
+        /*
+         * ★どのビルドで動いているか。新旧の取り違えを防ぐ。
+         *   ★`typeof` で囲むのは既存の作法（popup-entry / status-entry と同じ）。
+         *     esbuild の define で置換される値なので、型宣言は無い。
+         */
+        buildId: typeof NL_BUILD_ID !== 'undefined' ? String(NL_BUILD_ID) : ''
+      };
+      const verdict = venueHoverCardPresenceVerdict(census);
+      return { line: verdict.line, visible: verdict.visible, reason: verdict.reason, census };
+    };
+  } catch { /* 計器の失敗で会場を止めない */ }
+
   /** @type {VenueRow[]} */
   let baseRows = [];
   // v0.1.754 3時間安定化: 参加者集計のインクリメンタル状態。チャンクは append-only なので一度
@@ -2861,6 +3267,26 @@ export function mountVenueBarButton(options = {}) {
    * 新しい観測系統は作らない。通常は 0。0 でなければ①側が契約違反の鏡を書いている。
    */
   let _laneMirrorSanitizeDropped = 0;
+  /**
+   * ★v0.1.1300: ①(popup/サイドパネル)が書いた実DOM受領証。
+   *   会場は【別ドキュメントの DOM】を持つので、受領証はデータ本体と分けて運ぶ。
+   *   比較してよいのは isReceiptComparable(snap, receipt) が true のときだけ
+   *   (= receipt.fingerprintFor === snap.contentHash)。時計では判定しない。
+   * @type {any}
+   */
+  let _laneReceiptFromPopup = null;
+  /**
+   * ★venue-exact-parity-SPEC-2026-08-07 §3-3: 会場【実DOM】のキー列指紋(diagDue のときだけ更新)。
+   *   census が既に集めている keys 列(venueDomCensus.js:97-98)から作る=追加のDOM走査ゼロ。
+   *   ①の実DOM指紋(鏡の domSelf.fingerprint)と突き合わせる相手。'' は未計測(=⚪)。
+   */
+  let _venueDomFingerprintLast = '';
+  /**
+   * ★席なし(unseated)件数。鏡セルが席を得る条件は【uid一致のみ】(venueSeatIndexByUid)で、
+   *   名前でしか同定できない人は席に結びつかず生タイルとして段に出る=これは正常。
+   *   「段img 19 − 席16 = 3」を説明済みの差分にするための数値(新しい観測系統は作らない)。
+   */
+  let _venueUnseatedCount = 0;
   /** 見出しの人数だけの基準文(鏡の鮮度は後段で併記する)。 */
   let _venueTitleBaseText = '';
   /** 直近に書いた見出し文(値が変わったときだけ DOM に書くため)。 */
@@ -2876,9 +3302,20 @@ export function mountVenueBarButton(options = {}) {
    * @param {unknown} rawSnap
    * @returns {Partial<import('../lib/laneMirror.js').LaneMirrorSnapshot>|null} null=使えない(fallbackへ)
    */
+  /*
+   * ★v0.1.1317: 会場の鏡うけとり計器(なぜ更新が止まったかを名指しするため)。
+   *   書き手は動いているのに会場の鏡が古い、という実測から「読み手が真因」まで
+   *   絞れているが、その先(通知が来ない/キー不一致/関所却下)は測らないと決まらない。
+   */
+  const _venueMirrorIntake = createVenueMirrorIntakeState();
+  /** 関所が捨てた理由(sanitize の issues を1行に。計器が原因を名乗るために持つ)。 */
+  let _laneMirrorSanitizeIssues = '';
+  /** @param {unknown} rawSnap */
   function acceptLaneMirrorSnapshot(rawSnap) {
     const r = sanitizeLaneMirrorForRead(rawSnap);
     _laneMirrorSanitizeDropped = r.droppedLinkAnon + r.droppedKontaAnon + r.droppedUnkeyed;
+    // ★関所が null を返した理由を保存する(「捨てられた」だけでは次の一手が決まらない)。
+    _laneMirrorSanitizeIssues = Array.isArray(r.issues) ? r.issues.join('/') : '';
     return /** @type {any} */ (r.snap);
   }
   // venue-avatar-stale-mirror-DESIGN.md §C-1d: 鏡capturedAtの前進(popup復帰等)を検知する
@@ -3652,15 +4089,44 @@ export function mountVenueBarButton(options = {}) {
   const readVenueCommentRowsForSpeech = async (liveId) => {
     const lid = String(liveId || '').trim();
     if (!lid) return [];
+    /** @type {unknown[]} */
+    let rows = [];
     try {
       const result = await runStorageOpWithTimeout(
         () => readChunkedComments(lid, commentsStorageKey(lid), (keys) => chrome.storage.local.get(keys)),
         8000
       );
-      return Array.isArray(result?.rows) ? result.rows : [];
+      rows = Array.isArray(result?.rows) ? result.rows : [];
     } catch {
-      return [];
+      rows = [];
     }
+    /*
+     * ★v0.1.1287: テール(nls_ctail_<lv>)も読む。会場の発言パネルだけが読んでいなかった。
+     *
+     * ■ なぜ「発言がありません」が出続けたか(2026-08-07 実機・ユーザー証言「出たところを見たことがない」)
+     *   コメントはまずテールに溜まり、compaction されて初めてチャンクへ畳まれる。
+     *   しきい値は通常 200件 or 10秒、【巨大メイン(5,000件超)では 1,500件】
+     *   (commentTailBuffer.js:30,33,67)。つまり大配信では
+     *   【直近1,500件がチャンクに存在しない窓】ができる。
+     *   発言数の少ない人がその窓に入ると、チャンクだけ読む会場では total=0 になる。
+     *
+     * ■ 正しい読み方の正本は comeview(comeview-entry.js:1172-1177)
+     *   あちらは「チャンク → テールを合流」の2段で読む。会場だけがこの2段目を欠いていた。
+     *   合流は既存の純関数 combineCanonicalComeviewRows(commentNo で重複排除)をそのまま使う
+     *   =独自実装を作らない。
+     *
+     * ■ テールは任意(失敗しても握る)
+     *   テールが読めなくても、チャンク分だけで従来どおり動く=fail-soft。
+     *   read は【クリックした瞬間だけ】という既存設計を維持する(常時経路には足さない)。
+     */
+    try {
+      const tKey = tailStorageKey(lid);
+      const bag = await chrome.storage.local.get(tKey);
+      rows = combineCanonicalComeviewRows(rows, Array.isArray(bag[tKey]) ? bag[tKey] : []);
+    } catch {
+      /* テールは任意=読めなくてもチャンク分で動く */
+    }
+    return rows;
   };
 
   /** @param {MouseEvent} event */
@@ -3675,19 +4141,64 @@ export function mountVenueBarButton(options = {}) {
     stage.removeEventListener('click', onSpeechOutsideClick);
   };
   /**
+   * 発言パネルの見出しを組む（★§3.5 の「セットで出す」をここで満たす）。
+   *
+   * ★なぜここなのか（2026-08-30）:
+   *   このパネルは「アイコンを押す → その人の発言を全部読む」場所だが、
+   *   見出しが名前だけのプレーンテキストで、★その人へ行く手段が無かった。
+   *   （読む → 気に入る → でもプロフィールへは行けない＝行き止まり）
+   *   AGENTS.md §3.5「サムネ・ID・ハンドルネーム・リンクをセットで出す。
+   *   ID だけ・名前だけ…は原則違反」に当たる箇所だった。
+   *
+   *   ★リンク化は新規実装しない。report系9モジュールが使っている
+   *   buildUserProfileLinkedLabelHtml を呼ぶ。匿名(a:)は href が空になるので
+   *   自動的にリンクにならない＝★匿名を誤ってリンクにする事故が構造的に起きない。
+   *
+   * @param {string} uid
+   * @param {string} name 表示名（解決済み）
+   * @param {string} avatarSrc クリック元タイルの画像 URL（★新規取得ゼロ）
+   * @param {string} note 「この人がここでどうしていたか」の一言（空なら出さない）
+   * @param {string} countNote 件数の注释（空なら出さない）
+   * @returns {string}
+   */
+  const buildSpeechPanelHeadHtml = (uid, name, avatarSrc, note, countNote) => {
+    const linked = buildUserProfileLinkedLabelHtml(uid, name);
+    const avatar = avatarSrc
+      ? `<img class="nlsb-roster-avatar" src="${escapeHtml(avatarSrc)}" alt="">`
+      : '';
+    const noteHtml = note
+      ? `<span class="nlsb-roster-note">${escapeHtml(note)}</span>`
+      : '';
+    return (
+      `<div class="nlsb-roster-head">` +
+      avatar +
+      `<span class="nlsb-roster-title">${linked} の発言${escapeHtml(countNote || '')}</span>` +
+      noteHtml +
+      `<button type="button" class="nlsb-roster-close" aria-label="閉じる">✕</button>` +
+      `</div>`
+    );
+  };
+
+  /**
    * その人の全発言を読み込んでパネルに出す。
    * ★storage read はこの関数の中だけ=クリックした瞬間だけ(常時readを増やさない)。
-   * @param {{ uid: string, displayName: string }} who
+   * @param {{ uid: string, displayName: string, avatarSrc?: string }} who
    */
   const openSpeechPanelFor = async (who) => {
     const uid = String(who?.uid || '').trim();
-    const name = String(who?.displayName || '').trim() || uid || '(名前なし)';
+    /*
+     * ★名前のフォールバックに生の uid を使わない。
+     *   以前は匿名さんの見出しに `a:xxxx` がそのまま出ていた。
+     *   席タイル(venueBar.js の displayName 解決)と同じ anonymousDisplayLabel を使う＝
+     *   同じ人がどの画面でも「匿名938」で揃う。
+     */
+    const name =
+      String(who?.displayName || '').trim() ||
+      (uid ? anonymousDisplayLabel(uid) : '') ||
+      '(名前なし)';
     if (!uid) return; // uid が無い人(広告主等)は発言記録に紐づかない
-    const head =
-      `<div class="nlsb-roster-head">` +
-      `<span class="nlsb-roster-title">${escapeHtml(name)} の発言</span>` +
-      `<button type="button" class="nlsb-roster-close" aria-label="閉じる">✕</button>` +
-      `</div>`;
+    const avatarSrc = String(who?.avatarSrc || '').trim();
+    const head = buildSpeechPanelHeadHtml(uid, name, avatarSrc, '', '');
     speechPanel.innerHTML = `${head}<div class="nlsb-roster-list"><div class="nlsb-roster-empty">読み込み中…</div></div>`;
     speechPanel.hidden = false;
     const closeBtnEl = speechPanel.querySelector('.nlsb-roster-close');
@@ -3739,11 +4250,32 @@ export function mountVenueBarButton(options = {}) {
           .join('')
       : '';
     const note = total > rows.length ? `（新しい ${rows.length} 件を表示 / 全 ${total} 件）` : `（全 ${total} 件）`;
+    /*
+     * ★「この人がここでどうしていたか」の一言を見出しにも出す（2026-08-30）。
+     *   ホバーカードと同じ純関数(buildVenuePresenceNote)を、
+     *   ★既に手元にある値だけで呼ぶ＝storage の追加読みはゼロ。
+     *     count  … total（この配信の全発言数）
+     *     lastAt … rows の最新 capturedAt
+     *   ★過去放送は見ない（venuePresenceNote.js:35-38 の制約を守る）。
+     */
+    let presenceNote = '';
+    try {
+      let lastAt = 0;
+      for (const r of rows) {
+        const at = Number(r?.capturedAt) || 0;
+        if (at > lastAt) lastAt = at;
+      }
+      presenceNote = buildVenuePresenceNote({
+        count: total,
+        giftCount: null,
+        lastAt,
+        nowMs: Date.now()
+      });
+    } catch {
+      presenceNote = ''; // 一言の失敗で発言一覧を落とさない
+    }
     speechPanel.innerHTML =
-      `<div class="nlsb-roster-head">` +
-      `<span class="nlsb-roster-title">${escapeHtml(name)} の発言${escapeHtml(total ? note : '')}</span>` +
-      `<button type="button" class="nlsb-roster-close" aria-label="閉じる">✕</button>` +
-      `</div>` +
+      buildSpeechPanelHeadHtml(uid, name, avatarSrc, presenceNote, total ? note : '') +
       `<div class="nlsb-roster-list">${listHtml || '<div class="nlsb-roster-empty">この配信の記録にはまだ発言がありません</div>'}</div>`;
     const closeBtn2 = speechPanel.querySelector('.nlsb-roster-close');
     if (closeBtn2) closeBtn2.addEventListener('click', () => closeSpeechPanel());
@@ -4255,6 +4787,151 @@ export function mountVenueBarButton(options = {}) {
     el.classList.add('is-flying');
     return true;
   };
+  /* ------------------------------------------------------------------ */
+  /* 入場演出(サイドパネル→会場へ「運ぶ」) 2026-08-08                    */
+  /* 正本SPEC: docs/handoff/venue-transport-effect-SPEC-2026-08-08.md    */
+  /* ------------------------------------------------------------------ */
+  /** 差分検出と間引きの正本(純ロジック・DOM無し)。 */
+  const entryQueue = createVenueEntryQueue();
+  /** 入場投射体のプール(gift と同じ作法)。 @type {HTMLElement[]} */
+  const entryProjPool = [];
+  const ENTRY_PROJ_POOL_SIZE = 8;
+  /** 計器: 入場演出の実績(状態速報に出す)。 */
+  const _entryEffectDiag = { flown: 0, seatedDirect: 0, suppressedFirst: 0, suppressedLiveChange: 0, noSeat: 0 };
+
+  /**
+   * 画面端(サイドパネル側)の座標を bubbleLayer ローカルで返す。
+   * ★サイドパネルと会場は別ウィンドウ/別ドキュメントなので DOM をまたいで実際に飛ばすことは
+   *   できない。「その方向から飛んでくる」見立てで十分伝わる(SPEC §5)。
+   *   Chrome のサイドパネルは既定で【右】なので右端から。
+   * @param {number} seatY 着地点のY(高さを合わせると自然に見える)
+   */
+  const entryOriginPoint = (seatY) => {
+    try {
+      const lr = bubbleLayer.getBoundingClientRect();
+      return { x: lr.width + 40, y: Number.isFinite(seatY) ? seatY : lr.height * 0.5 };
+    } catch {
+      return { x: 900, y: 300 };
+    }
+  };
+
+  /**
+   * 席の中心を bubbleLayer ローカル座標で返す(giftThrowOriginForSpeaker の着地版)。
+   * @param {string} key 席 key
+   * @returns {{ x: number, y: number, node: any } | null}
+   */
+  const entrySeatPoint = (key) => {
+    const seatIndex = seatByKey.get(key);
+    const node = typeof seatIndex === 'number' ? seatNodes[seatIndex] : null;
+    const anchorEl = node ? seatAnchorEl(node) : null;
+    if (!anchorEl || !anchorEl.isConnected) return null;
+    try {
+      const layerRect = bubbleLayer.getBoundingClientRect();
+      const r = anchorEl.getBoundingClientRect();
+      if (r.width <= 0) return null;
+      return {
+        x: r.left - layerRect.left + r.width / 2,
+        y: r.top - layerRect.top + r.height / 2,
+        node
+      };
+    } catch {
+      return null;
+    }
+  };
+
+  /**
+   * 1人ぶんの入場を飛ばす。
+   * ★アイコンは【席タイルの実アバターを複製】する。席タイルは正本の解決器を通って
+   *   作られているので、これで白丸事故(v1286)を構造的に避けられる=自前で解決し直さない。
+   * @param {string} key 席 key
+   * @returns {boolean} true=飛ばした / false=席が無い等で飛ばせなかった(着席はしている)
+   */
+  const launchEntryFlight = (key) => {
+    if (!open) return false;
+    const seat = entrySeatPoint(key);
+    if (!seat) {
+      _entryEffectDiag.noSeat += 1;
+      return false; // 席が見つからない=演出だけ諦める(その人は席に居る)
+    }
+    const el = entryProjPool.pop() || (() => {
+      const d = document.createElement('div');
+      d.className = 'nlsb-entry-proj';
+      bubbleLayer.appendChild(d);
+      return d;
+    })();
+    el.innerHTML = '';
+    // 席の実アバターを複製(解決済みの img をそのまま使う)。
+    const srcEl = seatAnchorEl(seat.node);
+    const srcImg = srcEl ? srcEl.querySelector('img') : null;
+    if (srcImg instanceof HTMLImageElement && srcImg.src) {
+      const img = document.createElement('img');
+      img.alt = '';
+      img.decoding = 'async';
+      img.src = srcImg.src;
+      el.append(img);
+    } else if (srcEl instanceof HTMLElement) {
+      // 画像でない(ゆっくり顔の合成DOM等)ならクローンで見た目を保つ。
+      const clone = /** @type {HTMLElement} */ (srcEl.cloneNode(true));
+      clone.removeAttribute('id');
+      el.append(clone);
+    }
+    const origin = entryOriginPoint(seat.y);
+    const dx = seat.x - origin.x;
+    const dy = seat.y - origin.y;
+    el.style.left = `${origin.x}px`;
+    el.style.top = `${origin.y}px`;
+    el.style.setProperty('--nlsb-entry-dx', `${dx}px`);
+    el.style.setProperty('--nlsb-entry-dy', `${dy}px`);
+    // 中間点を少し上に持ち上げて弧を描く(gift と同じ考え方)。
+    el.style.setProperty('--nlsb-entry-mx', `${dx * 0.55}px`);
+    el.style.setProperty('--nlsb-entry-my', `${dy * 0.55 - 46}px`);
+    el.style.setProperty('--nlsb-entry-dur', `${VENUE_ENTRY_FLIGHT_MS}ms`);
+
+    const recycle = () => {
+      el.removeEventListener('animationend', recycle);
+      el.classList.remove('is-flying');
+      el.style.cssText = '';
+      el.textContent = '';
+      entryQueue.onFlightDone(key);
+      if (entryProjPool.length < ENTRY_PROJ_POOL_SIZE) entryProjPool.push(el);
+      else el.remove();
+      // 着弾: 席を一度ふくらませて「確定」を示す。
+      const landed = entrySeatPoint(key);
+      if (landed && landed.node && landed.node.seat) {
+        const seatEl = landed.node.seat;
+        seatEl.classList.remove('nlsb-seat-entered');
+        void seatEl.offsetWidth; // reflow でアニメ再起動を確実に
+        seatEl.classList.add('nlsb-seat-entered');
+        window.setTimeout(() => seatEl.classList.remove('nlsb-seat-entered'), 700);
+      }
+    };
+    el.addEventListener('animationend', recycle, { once: true });
+    // 保険タイマー(animationend 取りこぼしでもキューを詰まらせない)。
+    window.setTimeout(recycle, VENUE_ENTRY_FLIGHT_MS + 400);
+    void el.offsetWidth;
+    el.classList.add('is-flying');
+    _entryEffectDiag.flown += 1;
+    return true;
+  };
+
+  /**
+   * renderSeats の直後に呼ぶ: 新規入場者を検出して演出を起こす。
+   * ★人は絶対に消さない。演出を間引くだけ(SPEC §4)。
+   * @param {string} liveId
+   */
+  const runEntryEffects = (liveId) => {
+    try {
+      const keys = Array.from(seatByKey.keys()).map((k) => String(k));
+      const r = entryQueue.tick({ keys, liveId: String(liveId || '') });
+      if (r.suppressedReason === 'first_paint') _entryEffectDiag.suppressedFirst += r.seat.length;
+      else if (r.suppressedReason === 'live_changed') _entryEffectDiag.suppressedLiveChange += r.seat.length;
+      else _entryEffectDiag.seatedDirect += r.seat.length;
+      for (const key of r.fly) {
+        if (!launchEntryFlight(key)) entryQueue.onFlightDone(key); // 飛ばせなくても枠は返す
+      }
+    } catch { /* 演出の失敗は会場の描画を止めない */ }
+  };
+
   /** speech.text からギフト/広告を検出して投げる。 @param {{ text?: unknown, speakerKey?: string }} speech */
   const maybeThrowGiftFromSpeech = (speech) => {
     const text = String(speech?.text || '');
@@ -4860,8 +5537,12 @@ export function mountVenueBarButton(options = {}) {
     renderTopBar(seating.topSupporters);
     seatsHost.classList.remove(...VENUE_LAYOUT_CLASSES);
     seatsHost.classList.add(`nlsb-mode-${seating.layoutMode}`);
-    // 2026-06-14 会議(表示領域拡大): 会場の最大高さを人数連動で注入。少人数は低く映像を広く、
-    //   満員は高く客席を奥まで。.nlsb-seating(=seatsHost の親)の var(--nlsb-venue-max-h) を更新。
+    // ★2026-08-11: 人数連動を撤回し 48vh 固定を注入する(関数側で固定)。
+    //   旧: 少人数は低く映像を広く、満員は高く客席を奥まで(人数↑→会場↑)。
+    //   撤回理由: 2,769人の実機で 72vh となり配信映像が実質ゼロ=ユーザー不満の直接原因。
+    //   満席感は面積でなく「全員の顔(overflow-y)+入場演出」で表現する方針に変更。
+    //   経緯の正本は src/lib/venueViewport.js の resolveVenueMaxHeightVh JSDoc。
+    //   ここは呼び出し署名を変えずに残す(参加者数は将来の密度表現で使う余地がある)。
     const seatingHostEl = seatsHost.parentElement;
     if (seatingHostEl) {
       seatingHostEl.style.setProperty(
@@ -5130,10 +5811,14 @@ export function mountVenueBarButton(options = {}) {
     //   publishは既存publishVenueSeatsDiagの3秒min-gapサイクルに相乗り(新規タイマー/read/writeなし)。
     beginVenueSeatLinkPaint(_seatLinkParity);
     const seatLinkWallNow = Date.now();
+    // ★venue-exact-parity-SPEC §5-3: 席なし(=uid で席に結びつかなかった)件数を既存ループの
+    //   分岐で数える(新規ループを作らない=§7 の予算表)。「段img 19 − 席16 = 3」を
+    //   説明済みの差分にするための数値であり、異常ではない(席は装飾・段が正本)。
+    let unseatedThisPaint = 0;
     for (const item of visibleLaneItems) {
       // v0.1.1111: 席なしアイテム(-1)は席装飾の対象外(wrapTileEl と同じ規則で席0を誤装飾しない)。
       const seatIndexRaw = Number(item?._venueSeatIndex);
-      if (!Number.isInteger(seatIndexRaw) || seatIndexRaw < 0) continue;
+      if (!Number.isInteger(seatIndexRaw) || seatIndexRaw < 0) { unseatedThisPaint += 1; continue; }
       const seatIndex = seatIndexRaw;
       const node = seatNodes[seatIndex];
       const entry = entryBySeatIndex.get(seatIndex);
@@ -5214,6 +5899,7 @@ export function mountVenueBarButton(options = {}) {
         delete node.seat.dataset.streak;
       }
     }
+    _venueUnseatedCount = unseatedThisPaint;
 
     // v0.1.1113 一致計器 v3(Tri-Parity): 鏡データ=段割当データ=【段実DOM】の3点一致で初めて✅。
     //   census は席装飾ループの【後】=この paint の最終DOM(装飾で is-empty が外れた後)を数える。
@@ -5247,28 +5933,39 @@ export function mountVenueBarButton(options = {}) {
         /** @type {ReturnType<typeof venueDomCensusToParityDom>} */
         let domSummary = null;
         try {
-          domSummary = venueDomCensusToParityDom(
-            collectVenueLaneDomCensus({
-              laneEls: {
-                link: venueLaneEls.laneLink,
-                gift: venueLaneEls.laneGift,
-                ad: venueLaneEls.laneAd,
-                konta: venueLaneEls.laneKonta,
-                tanu: venueLaneEls.laneTanu
-              },
-              stackEl: venueLaneEls.stack,
-              extras: {
-                charFrameLayer,
-                crowdOn: totalAnonymous > 0,
-                crowdCount: totalAnonymous,
-                // v0.1.1116 白円計器: 会場の顔プローブ実績(成功/404)を census 経由で状態速報へ。
-                //   getDiagnostics は Set サイズ集計のみ=3秒期日内の1回呼びで hot path 無汚染。
-                avatarProbe: venueAvatarLoadGuard.getDiagnostics()
-              }
-            })
-          );
+          // ★venue-exact-parity-SPEC §3-3: summarize(venueDomCensusToParityDom)は keys 列を
+          //   落とす(PII/容量)。指紋は【落とす前の生値】から作るので、ここで1変数受けする。
+          //   census は既にキー列を集めているので追加のDOM走査はゼロ(§7 予算表)。
+          const rawCensus = collectVenueLaneDomCensus({
+            laneEls: {
+              link: venueLaneEls.laneLink,
+              gift: venueLaneEls.laneGift,
+              ad: venueLaneEls.laneAd,
+              konta: venueLaneEls.laneKonta,
+              tanu: venueLaneEls.laneTanu
+            },
+            stackEl: venueLaneEls.stack,
+            extras: {
+              charFrameLayer,
+              crowdOn: totalAnonymous > 0,
+              crowdCount: totalAnonymous,
+              // v0.1.1116 白円計器: 会場の顔プローブ実績(成功/404)を census 経由で状態速報へ。
+              //   getDiagnostics は Set サイズ集計のみ=3秒期日内の1回呼びで hot path 無汚染。
+              avatarProbe: venueAvatarLoadGuard.getDiagnostics()
+            }
+          });
+          _venueDomFingerprintLast = laneDomFingerprint({
+            link: rawCensus.perSection?.link?.keys,
+            gift: rawCensus.perSection?.gift?.keys,
+            ad: rawCensus.perSection?.ad?.keys,
+            konta: rawCensus.perSection?.konta?.keys,
+            tanu: rawCensus.perSection?.tanu?.keys
+          });
+          domSummary = venueDomCensusToParityDom(rawCensus);
         } catch {
           domSummary = null;
+          // census 自体に失敗した=会場DOMを写せていない。指紋も捨てる(古い指紋で✅を名乗らない)。
+          _venueDomFingerprintLast = '';
         }
         laneParityDiag = toVenueLaneParityDiag(
           buildVenueLaneParity({
@@ -5294,34 +5991,74 @@ export function mountVenueBarButton(options = {}) {
             line: `${laneParityDiag.line} / 鏡除外${_laneMirrorSanitizeDropped}`
           };
         }
-        // v0.1.1137(lanescene-structural-review MVP): mirror mode のときだけ、①が発行した鏡世代
-        //   (revision/contentHash)と会場が実際にpaintした段(laneBuckets)を突合する。venueLaneParity
-        //   の厳密突合(上)とは独立した軽量な代理指標なので、判定に失敗しても laneParityDiag には影響しない。
-        if (lanePaintSnap) {
-          // 会場一致gift/ad根治(2026-07-14 Patch 2a): ①Receiptのhashは「会場が実際に受け取り
-          //   描く中身=復元正準形」で取る。displaySrc空+uid有りのスリムセル(laneMirror.js
-          //   toMirrorCellのPatch1でcapされなくなった)はrestoreLaneMirrorBuckets(B-1)で
-          //   identiconに復元されるため、snapshot生値のまま署名すると会場が正しく描いても
-          //   ①=会場のhashが恒常的に不一致(偽🔴)になる。
-          const popEnvelope = buildSceneEnvelope({
-            capturedAt: lanePaintSnap.capturedAt,
-            ...restoreLaneMirrorBuckets(lanePaintSnap)
-          });
-          const popReceipt = buildRenderReceipt({
-            surface: 'pop',
-            revision: popEnvelope.revision,
-            contentHash: popEnvelope.contentHash
-          });
-          const venueEnvelope = buildSceneEnvelope(/** @type {any} */ (laneBuckets));
-          const venueReceipt = buildRenderReceipt({
-            surface: 'venue',
-            revision: popEnvelope.revision,
-            contentHash: venueEnvelope.contentHash
-          });
-          sceneReceiptDiag = compareRenderReceipts(popReceipt, venueReceipt);
-        } else {
-          sceneReceiptDiag = null;
+        /*
+         * ★venue-exact-parity-SPEC §5-3: 席なし件数も既存の1行に併記する(同上・新設しない)。
+         *   席は uid でしか結びつかない(venueSeatIndexByUid=uid-only join)ので、
+         *   名前でしか同定できない人は席なしの生タイルとして段に出る=これは【正常】。
+         *   0 でなければ「段の枚数と席の枚数がなぜ違うか」がこの数値で説明済みになる。
+         */
+        if (laneParityDiag && _venueUnseatedCount > 0) {
+          laneParityDiag = {
+            ...laneParityDiag,
+            line: `${laneParityDiag.line} / 席なし${_venueUnseatedCount}`
+          };
         }
+        /*
+         * ★venue-exact-parity-SPEC-2026-08-07 §3-3(MVPの中核): 受領証を【3つの独立起点】から組む。
+         *
+         *   旧実装(v0.1.1137〜1283)はここでインラインに組み立てており、
+         *     - venueReceipt.revision に popEnvelope.revision を【自己代入】(C1: revision比較が恒真)
+         *     - pop/venue 両 hash が同じ lanePaintSnap 起点(C2: X と copy(X) の比較)
+         *     - ①が snapshot に焼いた contentHash を誰も読まない(C3)
+         *   の3点で恒真=「①が0件描画でも鏡さえ残れば ✅」という嘘の緑を出していた。
+         *
+         *   新実装の起点:
+         *     ① 側 = laneMirrorSnap(最新の受理済み鏡)の capturedAt / contentHash / domSelf.fingerprint
+         *     会場側 = lanePaintSnap(実際に描いた鏡)の capturedAt + laneBuckets からの再計算 hash
+         *              + _venueDomFingerprintLast(会場【実DOM】census 由来の指紋)
+         *   → revision差=「古い/先の世代を描いた」、hash差=「同世代で中身が違う」、
+         *     指紋差=「データは同じなのに画面の顔ぶれが違う」を別々に名指しできる。
+         */
+        /*
+         * ★v0.1.1300(受領証の分離): ①の実DOM指紋は、鏡データ本体(domSelf)ではなく
+         *   【別キーの受領証】から取れる場合がある。受領証は表示面固有なので、
+         *   共通データ(鏡)から切り離してある。
+         *   ★使ってよいのは isReceiptComparable が true のときだけ
+         *     = receipt.fingerprintFor === snap.contentHash(内容アドレス一致)。
+         *     時計では判定しない: sig一致で描画スキップ中の DOM は不変=指紋は
+         *     「古くて正しい」ので、時計で切ると正しい値を捨てる。
+         *   鏡本体に domSelf があるならそちらを優先する(既存挙動を変えない)。
+         */
+        let _acceptedForScene = laneMirrorSnap;
+        try {
+          const hasOwnFp = String(laneMirrorSnap?.domSelf?.fingerprint || '').trim() !== '';
+          if (!hasOwnFp && _laneReceiptFromPopup) {
+            const cmp = isReceiptComparable(laneMirrorSnap, _laneReceiptFromPopup);
+            if (cmp.comparable) {
+              const base = laneMirrorSnap?.domSelf;
+              _acceptedForScene = {
+                ...laneMirrorSnap,
+                domSelf: /** @type {import('../lib/laneMirror.js').LaneMirrorDomSelf} */ ({
+                  measured: base?.measured === true || _laneReceiptFromPopup.measured === true,
+                  perTier: base?.perTier ?? _laneReceiptFromPopup.perTier,
+                  dpr: base?.dpr ?? _laneReceiptFromPopup.dpr ?? 1,
+                  measuredAt: base?.measuredAt ?? _laneReceiptFromPopup.measuredAt ?? 0,
+                  fingerprint: String(_laneReceiptFromPopup.fingerprint || ''),
+                  fingerprintFor: String(_laneReceiptFromPopup.fingerprintFor || '')
+                })
+              };
+            }
+          }
+        } catch { /* 受領証の合成失敗は既存経路(鏡のdomSelf)に任せる */ }
+        const sceneReceipts = buildVenueSceneReceipts({
+          acceptedSnap: _acceptedForScene,
+          paintedSnap: lanePaintSnap,
+          paintedBuckets: laneBuckets,
+          venueDomFingerprint: _venueDomFingerprintLast
+        });
+        sceneReceiptDiag = sceneReceipts
+          ? compareRenderReceipts(sceneReceipts.popReceipt, sceneReceipts.venueReceipt)
+          : null;
       } catch {
         /* 計器失敗は描画を止めない(前回値を保持) */
       }
@@ -5379,6 +6116,9 @@ export function mountVenueBarButton(options = {}) {
       sceneReceipt: sceneReceiptDiag,
       // v0.1.1138(「消す側」の計器): fallback時に段から除外された匿名の人数。
       anonExcluded: _anonExcludedCount,
+      // ★venue-exact-parity-SPEC §5-3: 席に結びつかなかった段タイル数(uid-only join の説明済み差分)。
+      //   ★状態速報へは laneParity.line への併記で出る(この構造フィールドは診断パネル/回帰テスト用)。
+      unseated: _venueUnseatedCount,
       // 2026-07-14 席リンク一致計器: タイル実体(鏡uid)⇄席クラス(roster uid)の二重ソース突合(累積)。
       seatLinkParity: toVenueSeatLinkParityDiag(_seatLinkParity, Date.now()),
       // 2026-07-15 診断先行(venue-yukkuri-named-diagnose): 「名前ありゆっくり顔」の実害を数えるだけの1行。
@@ -5389,7 +6129,49 @@ export function mountVenueBarButton(options = {}) {
       // v0.1.1207: 会場の立ち上がり分解(開く→鏡→集計→初描画→初席)。ユーザー報告
       //   「立ち上がりが遅い/出ないときがある」を体感でなく数字で切り分けるため。
       //   ★ここに載せないと状態速報に出ない([[fastdiag-lite-is-the-printer-subset]]の同型)。
-      openLatency: summarizeVenueOpenLatency(_openLatency)
+      openLatency: summarizeVenueOpenLatency(_openLatency),
+      // ★v0.1.1317: 会場が鏡を受け取れているか(通知/キー一致/関所)を1行で出す。
+      //   ★ここに載せないと状態速報に出ない([[fastdiag-lite-is-the-printer-subset]]の同型)。
+      //   観測ゼロなら空文字=行ごと出ない(普段の速報を汚さない)。
+      mirrorIntakeLine: formatVenueMirrorIntakeLine(_venueMirrorIntake, Date.now()),
+      /*
+       * ★v0.1.1405: 判定の【材料】も載せる(行だけでは画面のセルが作れない)。
+       *
+       * ■ なぜ必要か
+       *   会場が publish していたのは整形済みの1行だけで、(a)通知が来ない /
+       *   (b)別配信の鏡 / (c)関所で却下 を区別するカウンタは会場の外に出ていなかった。
+       *   ＝ 状態速報の本文を人が読む以外に使い道がなく、未解決の
+       *   「会場一致が鏡stale(656s)で固定」を **画面が名指しできなかった**。
+       *   ★[[screen-only-info-never-reaches-the-report-2026-08-11]] の逆向きの穴
+       *     (報告にしか出さない情報は画面に届かない)。
+       *
+       * ★構造のまま渡す=読み手(healthCells)が judgeVenueMirrorIntake で判定する。
+       *   ここで判定結果を文字列化して渡すと、また同じ穴を作る。
+       */
+      mirrorIntake: {
+        changedEvents: _venueMirrorIntake.changedEvents,
+        keyMatched: _venueMirrorIntake.keyMatched,
+        keyMissed: _venueMirrorIntake.keyMissed,
+        accepted: _venueMirrorIntake.accepted,
+        rejectedByGate: _venueMirrorIntake.rejectedByGate,
+        lastMissedKeys: (_venueMirrorIntake.lastMissedKeys || []).slice(0, 3),
+        lastExpectedKey: _venueMirrorIntake.lastExpectedKey,
+        lastAcceptedAt: _venueMirrorIntake.lastAcceptedAt,
+        lastRejectReason: _venueMirrorIntake.lastRejectReason
+      },
+      /*
+       * ★v0.1.1348: 会場のアイコン実績を【トップレベル】にも載せる(v0.1.1347 の断線修理)。
+       *
+       * ■ v0.1.1347 で読み手(aiShareFullText)に `venueSeatsDiag.avatarProbe` を読む行を足したが、
+       *   書き手はここに載せておらず【永久に出ない行】だった(通し確認を怠った)。
+       *   avatarProbe は census の extras 経由で laneParity.dom へ平坦化されるだけで、
+       *   しかも whitelist は probeFail 1個しか通していない。
+       *   ＝[[venue-mirror-is-the-primary-path]]「個別列挙して作り直す関数が値を落とす」の再演。
+       *
+       * ★census 側(extras.avatarProbe)は現状維持で、ここに【追加で】貫通させる
+       *   (既存契約を壊さない)。同じ 3秒 min-gap 内の1回呼びなので hot path は汚さない。
+       */
+      avatarProbe: venueAvatarLoadGuard.getDiagnostics()
     };
     publishVenueSeatsDiag(seatsDiagObs);
     // 2026-07-01 会議(venue-diag): 「🩺 会場の状態」パネル用に最新の観測値を保持。
@@ -5398,6 +6180,9 @@ export function mountVenueBarButton(options = {}) {
     if (!diagPanel.hidden) renderDiagPanel();
     // v0.1.1053: 会場が生きている間だけプレゼンスを書く(popup側の効果音二重再生防止・3秒min-gap内蔵)。
     if (open) writeVenueEffectSoundPresence();
+    // 2026-08-08 入場演出: 席が DOM に載った【後】に呼ぶ(座標が取れるのはこの時点以降)。
+    //   新規が居なければ何もしない=通常 paint を汚さない。
+    runEntryEffects(String(activeLiveId || liveIdFromPathname() || ''));
   };
 
   /**
@@ -5688,7 +6473,53 @@ export function mountVenueBarButton(options = {}) {
     aggregateBurstTimers = [];
   };
 
+  /*
+   * ★v0.1.1425: 「会場がいま開いている」を storage の【別キー】へ書く。
+   *
+   * ■ ユーザーの症状(2026-08-17)「会場モードが忠実にでてないね」
+   *   実機の会場は3人なのに、状態速報は `鏡stale(656s) … tanu332` と
+   *   11分前・別配信の332人を出し続けていた。
+   *
+   * ■ 真因: この書き込みが存在しなかった
+   *   v0.1.1394 で「①POPが隠れていても会場が開いていれば鏡は書く」と根治したが、
+   *   その判定が読む `nls_venue_open` を書く行(:6817)はコメントアウト済み。
+   *   ＝ venueOpen が常に false → publish 分岐が一度も通らず鏡が固まる。
+   *   判定はあるのに配線が無い片肺([[unwired-judgement-is-systemic-2026-08-12]])。
+   *
+   * ■ なぜ別キーにするか(「復元しない」要望を壊さないため)
+   *   旧キーの保存が止められたのは【次回起動時に開いた状態へ復元しない】ため。
+   *   鏡の供給側が知りたいのは「いま開いているか」＝目的が別。混ぜない。
+   *
+   * ■ なぜハートビートか
+   *   会場タブがクラッシュすると false を書けずに終わる。その残骸を信じ続けると
+   *   v0.1.1394→1397 で撤回した「隠れた①が毎tick書き続ける」負荷が再発する。
+   *   定期的に押し直し、読む側は90秒で失効させる(venueLiveOpenFlag.js)。
+   */
+  let venueLiveOpenTimer = 0;
+  /** @param {boolean} open */
+  const writeVenueLiveOpen = (open) => {
+    try {
+      if (!hasVenueExtensionContext()) return;
+      void chrome.storage.local
+        .set({ [KEY_VENUE_LIVE_OPEN]: buildVenueLiveOpenValue(open, Date.now()) })
+        .catch(() => { /* 会場の描画は止めない(best-effort) */ });
+    } catch {
+      /* no-op */
+    }
+  };
+  const startVenueLiveOpenHeartbeat = () => {
+    if (venueLiveOpenTimer) return;
+    writeVenueLiveOpen(true);
+    // 30秒ごとに押し直す(読む側の失効は90秒=2回落としても耐える)。
+    venueLiveOpenTimer = setInterval(() => writeVenueLiveOpen(true), 30_000);
+  };
+  const stopVenueLiveOpenHeartbeat = () => {
+    if (venueLiveOpenTimer) { clearInterval(venueLiveOpenTimer); venueLiveOpenTimer = 0; }
+    writeVenueLiveOpen(false);
+  };
+
   const stopAggregation = () => {
+    stopVenueLiveOpenHeartbeat();
     clearAggregateBurst();
     if (rosterPruneTimer) { clearInterval(rosterPruneTimer); rosterPruneTimer = 0; }
     if (rosterCommitRaf && typeof cancelAnimationFrame === 'function') {
@@ -5701,6 +6532,10 @@ export function mountVenueBarButton(options = {}) {
   };
 
   const startAggregation = () => {
+    // ★v0.1.1425: 開いたことを①POPへ伝える(この行が無いと鏡が更新されない)。
+    //   ★早期 return より前に置く: 既にタイマーが動いていても「開いている」事実は
+    //   伝え直す必要がある(再入で印だけ落ちるのを防ぐ)。
+    startVenueLiveOpenHeartbeat();
     if (aggregateTimer || rosterPruneTimer) return;
     // v0.1.1111 会場=①レーン鏡映: 開いた瞬間の catch-up を1回だけ(以降は onChanged の newValue 直採用)。
     //   読めなくても会場は止めない(fallback=従来経路で描く)。鏡が取れたら rAF 再供給で即同化。
@@ -5709,17 +6544,24 @@ export function mountVenueBarButton(options = {}) {
         if (!hasVenueExtensionContext()) return;
         const _catchUpLiveId = String(activeLiveId || liveIdFromPathname() || '').trim().toLowerCase();
         const _panelKey = _catchUpLiveId ? panelSummaryStorageKey(_catchUpLiveId) : '';
-        const bag = await runStorageOpWithTimeout(
-          () =>
-            chrome.storage.local.get(
-              _panelKey
-                ? [KEY_LANE_MIRROR, KEY_STORY_DIAG_MIRROR, _panelKey]
-                : [KEY_LANE_MIRROR, KEY_STORY_DIAG_MIRROR]
-            ),
-          3000
-        );
+        // ★v0.1.1300: この配信専用の鏡(v2)と受領証も一緒に読む。
+        const _mirrorKey = laneMirrorKeyFor(_catchUpLiveId);
+        const _receiptKey = laneReceiptKeyFor(_catchUpLiveId);
+        const _keys = [KEY_LANE_MIRROR, KEY_STORY_DIAG_MIRROR];
+        if (_panelKey) _keys.push(_panelKey);
+        if (_mirrorKey) _keys.push(_mirrorKey, _receiptKey);
+        const bag = await runStorageOpWithTimeout(() => chrome.storage.local.get(_keys), 3000);
         // ★受け入れ点1/2(開時 catch-up): 関所を必ず通す(laneMirrorContract.js の契約)。
-        const snap = acceptLaneMirrorSnapshot(bag?.[KEY_LANE_MIRROR]);
+        //   ★v0.1.1300: 配信ごとキー(v2)を【優先】する。無ければ旧グローバルキー。
+        //     旧キーは他配信の①が最後に書くと上書きされ、liveId 照合で弾かれて
+        //     「鏡なし」に見える(会場が fallback へ降格し gift/ad 段が消える真因)。
+        const snap =
+          (_mirrorKey ? acceptLaneMirrorSnapshot(bag?.[_mirrorKey]) : null) ||
+          acceptLaneMirrorSnapshot(bag?.[KEY_LANE_MIRROR]);
+        // 受領証(①が実際に描いた DOM の要約)。比較は isReceiptComparable が許すときだけ。
+        if (open && _receiptKey && bag?.[_receiptKey]) {
+          _laneReceiptFromPopup = /** @type {any} */ (bag[_receiptKey]);
+        }
         if (open && snap) {
           laneMirrorSnap = snap;
           scheduleLaneMirrorRecommit();
@@ -5885,9 +6727,23 @@ export function mountVenueBarButton(options = {}) {
           nickname: speech.name,
           key: speech.key,
           text: speech.text,
-          onAudioStart: bubble ? () => markBubbleSpeaking(bubble) : undefined,
-          onAudioEnd: bubble ? () => markBubbleDone(bubble) : undefined,
-          onDropped: bubble ? () => markBubbleResolved(bubble) : undefined
+          // ★キャラライブの相槌はここに乗せる(2026-08-25)。
+          //   onAudioStart は「本当に audio.play() が走った」時だけ鳴る信号なので、
+          //   読み上げの声とキャラの頷きが必ず揃う。onPlayStart(再生/破棄の両方で
+          //   発火する曖昧信号)に乗せると、鳴っていないのに頷く事故になる。
+          onAudioStart: () => {
+            if (bubble) markBubbleSpeaking(bubble);
+            charaLive.onCommentSpoken({ commentKey: speech.key, text: speech.text });
+          },
+          onAudioEnd: () => {
+            if (bubble) markBubbleDone(bubble);
+            charaLive.onCommentSpokenEnd();
+          },
+          // 鳴らずに捨てられた時も相槌を畳む(声が無いのに頷いたまま残さない)。
+          onDropped: () => {
+            if (bubble) markBubbleResolved(bubble);
+            charaLive.onCommentSpokenEnd();
+          }
         }]);
       }
     }
@@ -6046,14 +6902,50 @@ export function mountVenueBarButton(options = {}) {
     }
     // v0.1.1111 会場=①レーン鏡映: ①が publish した実paint鏡の新着を newValue 直採用(追加readゼロ)。
     //   rAF集約で再供給→再描画(①のpaint後 数百msで会場が同じ5段に同化する)。
-    const mirrorChange = changes[KEY_LANE_MIRROR];
+    // ★v0.1.1300: この配信専用キー(v2)を優先。旧グローバルキーは互換のため後段で見る。
+    //   ★v2 が来たら旧キーの変化は【無視】する: 旧キーは他配信の①も書くので、
+    //     ここで採用すると別配信の鏡で上書きしてしまう(単一グローバルキーの害)。
+    const _perLiveKey = laneMirrorKeyFor(liveId);
+    const perLiveChange = _perLiveKey ? changes[_perLiveKey] : null;
+    const mirrorChange = perLiveChange || changes[KEY_LANE_MIRROR];
+    /*
+     * ★v0.1.1317: 会場が鏡を「受け取れているか」を経路ごとに数える(会場が完全一致しない件)。
+     *
+     * ■ なぜ要るか
+     *   書き手は毎秒 publish していて見送り0なのに、会場の鏡は実測 656秒古かった。
+     *   ＝読み手が真因と確定済み(lanePublishSkipDiag.js の判断表)。しかし既存の計器は
+     *   「鏡が何秒古いか」しか言わず、【なぜ更新が止まったか】を名指しできない。
+     *   候補は (a)通知が来ない (b)キー不一致(liveId食い違い) (c)関所で却下 で、
+     *   打ち手が正反対なので推測で直すと必ず外す。だから測る。
+     *   ★特に (b): 会場の liveId は location.pathname 由来、書き手は popup が解決した値。
+     */
+    try {
+      observeVenueMirrorChange(_venueMirrorIntake, {
+        changedKeys: Object.keys(changes || {}),
+        expectedKey: _perLiveKey || KEY_LANE_MIRROR,
+        matched: Boolean(mirrorChange && mirrorChange.newValue)
+      });
+    } catch { /* 計器失敗は受け取りを止めない */ }
     if (mirrorChange && mirrorChange.newValue) {
       // ★受け入れ点2/2(onChanged): 関所を必ず通す(laneMirrorContract.js の契約)。
       const accepted = acceptLaneMirrorSnapshot(mirrorChange.newValue);
+      try {
+        observeVenueMirrorAccept(_venueMirrorIntake, {
+          accepted: Boolean(accepted),
+          nowMs: Date.now(),
+          reason: accepted ? '' : (_laneMirrorSanitizeIssues || '関所が捨てた')
+        });
+      } catch { /* 計器失敗は受け取りを止めない */ }
       if (accepted) {
         laneMirrorSnap = accepted;
         scheduleLaneMirrorRecommit();
       }
+    }
+    // ①の実DOM受領証の新着(データ本体とは別キー=表示面固有だから分けている)。
+    const _receiptChangeKey = laneReceiptKeyFor(liveId);
+    const receiptChange = _receiptChangeKey ? changes[_receiptChangeKey] : null;
+    if (receiptChange && receiptChange.newValue && typeof receiptChange.newValue === 'object') {
+      _laneReceiptFromPopup = /** @type {any} */ (receiptChange.newValue);
     }
     const storyDiagChange = changes[KEY_STORY_DIAG_MIRROR];
     if (storyDiagChange && storyDiagChange.newValue && typeof storyDiagChange.newValue === 'object') {
@@ -6115,6 +7007,8 @@ export function mountVenueBarButton(options = {}) {
     try { stopAggregation(); } catch { /* no-op */ }
     try { stopSpeechPolling(); } catch { /* no-op */ }
     try { stopCrowdMotion(); } catch { /* no-op */ }
+    // キャラライブも止める(rAF を回したまま放置すると拡張更新後も裏で描き続ける)。
+    try { charaLive.destroy(); } catch { /* no-op */ }
     // v0.1.1080: Phase C の受動tick(BGMダック+フェーズ進行)も他の会場タイマーと同型で止める。
     if (bgmPhaseTickTimer) { clearInterval(bgmPhaseTickTimer); bgmPhaseTickTimer = 0; }
     try {
@@ -6203,6 +7097,8 @@ export function mountVenueBarButton(options = {}) {
     } catch { /* documentElement 不在環境でも会場は止めない */ }
     toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
     stage.setAttribute('aria-hidden', open ? 'false' : 'true');
+    // キャラライブは会場と同じ寿命。閉じている間は描画も止める(CPU を食わせない)。
+    try { charaLive.setVisible(open); } catch { /* キャラの失敗で会場を止めない */ }
     if (open) {
       try { noteVenueOpened(_openLatency, Date.now()); } catch { /* 計器失敗は会場を止めない */ }
       addEscapeListener();
@@ -6269,6 +7165,16 @@ export function mountVenueBarButton(options = {}) {
       stopCrowdMotion();
       resetSpeechTracking();
       removeEscapeListener();
+      /*
+       * ★v0.1.1422: 離脱時に `nlsb-venue-open` を必ず落とす。
+       *   ここが無いと、会場を開いたままページを離れた場合にクラスが残り、
+       *   次に開いたとき①POPが visibility:hidden + pointer-events:none で
+       *   始まる=「常に会場モードON・押しても動かない・真っ黒」になる。
+       *   ★bfcache から復帰する場合も mount 時の掃除で二重に守られる。
+       */
+      try {
+        document.documentElement.classList.remove('nlsb-venue-open');
+      } catch { /* no-op */ }
     },
     { once: true }
   );

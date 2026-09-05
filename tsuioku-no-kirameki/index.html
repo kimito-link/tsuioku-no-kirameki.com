@@ -11,7 +11,7 @@
     <link rel="apple-touch-icon" sizes="180x180" href="images/apple-touch-icon.png">
     <link rel="icon" type="image/png" sizes="192x192" href="images/favicon-192.png">
 
-    <meta name="description" content="ニコ生の応援コメントを取りこぼしにくく、あとから育つコメント記録へ。過去ログの一気取り・配信を「ライブ会場」にする会場モード・OBS 透過のコメビュ・人ごとに違う声の読み上げ（VOICEVOX 連携）まで備えた Chrome 拡張（v0.1.1283）。">
+    <meta name="description" content="ニコ生の応援コメントを取りこぼしにくく、あとから育つコメント記録へ。過去ログの一気取り・配信を「ライブ会場」にする会場モード・OBS 透過のコメビュ・人ごとに違う声の読み上げ（VOICEVOX 連携）まで備えた Chrome 拡張（v0.1.1507）。">
     <meta name="theme-color" content="#0a1228">
     <link rel="manifest" href="site.webmanifest">
     <meta name="mobile-web-app-capable" content="yes">
@@ -25,7 +25,7 @@
       {"@context":"https://schema.org","@type":"WebSite","name":"君斗りんくの追憶のきらめき","url":"https://tsuioku-no-kirameki.com/","description":"ニコ生の応援コメントを取りこぼしにくく、あとから育つコメント記録へ。過去ログ一気取り・会場モード（ライブ会場化）・コメビュ（OBS 透過）・人ごとに違う声の読み上げ（VOICEVOX 連携）まで備えた Chrome 拡張。","inLanguage":"ja-JP","publisher":{"@type":"Organization","name":"Kimito-Link Project","url":"https://kimito-link.com/"}}
     </script>
     <script type="application/ld+json">
-      {"@context":"https://schema.org","@type":"SoftwareApplication","name":"君斗りんくの追憶のきらめき","alternateName":"追憶のきらめき","operatingSystem":"Google Chrome","applicationCategory":"BrowserApplication","softwareVersion":"0.1.1283","url":"https://tsuioku-no-kirameki.com/","inLanguage":"ja-JP","description":"ニコ生の応援コメントと公式値（イベント累計 / 現在順位 / 番組累計 / 広告ランキング）を取りこぼしにくく記録する Chrome 拡張。過去ログ一気取り・会場モード（ライブ会場化）・コメビュ（OBS 透過）・人ごとに違う声の読み上げ（VOICEVOX 連携）まで備え、長時間配信でもコメント記録を貯めて育てやすい運用を目指す。","publisher":{"@type":"Organization","name":"Kimito-Link Project","url":"https://kimito-link.com/"},"offers":{"@type":"Offer","price":"0","priceCurrency":"JPY"},"license":"https://opensource.org/licenses/MIT"}
+      {"@context":"https://schema.org","@type":"SoftwareApplication","name":"君斗りんくの追憶のきらめき","alternateName":"追憶のきらめき","operatingSystem":"Google Chrome","applicationCategory":"BrowserApplication","softwareVersion":"0.1.1507","url":"https://tsuioku-no-kirameki.com/","inLanguage":"ja-JP","description":"ニコ生の応援コメントと公式値（イベント累計 / 現在順位 / 番組累計 / 広告ランキング）を取りこぼしにくく記録する Chrome 拡張。過去ログ一気取り・会場モード（ライブ会場化）・コメビュ（OBS 透過）・人ごとに違う声の読み上げ（VOICEVOX 連携）まで備え、長時間配信でもコメント記録を貯めて育てやすい運用を目指す。","publisher":{"@type":"Organization","name":"Kimito-Link Project","url":"https://kimito-link.com/"},"offers":{"@type":"Offer","price":"0","priceCurrency":"JPY"},"license":"https://opensource.org/licenses/MIT"}
     </script>
 
     <meta property="og:type" content="website">
@@ -42,7 +42,7 @@
 
     <meta name="twitter:card" content="summary_large_image">
     <meta name="twitter:title" content="君斗りんくの追憶のきらめき ― 取りこぼしにくく、あとから育つコメント記録へ">
-    <meta name="twitter:description" content="ニコ生の応援コメントを取りこぼしにくく、あとから育つ記録へ。過去ログ一気取り + ライブ会場モード + OBS 透過コメビュ + 人ごとに違う声の読み上げ（VOICEVOX）で、配信をもっと楽しく（v0.1.1283）。">
+    <meta name="twitter:description" content="ニコ生の応援コメントを取りこぼしにくく、あとから育つ記録へ。過去ログ一気取り + ライブ会場モード + OBS 透過コメビュ + 人ごとに違う声の読み上げ（VOICEVOX）で、配信をもっと楽しく（v0.1.1507）。">
     <meta name="twitter:image" content="https://tsuioku-no-kirameki.com/images/og-image.png">
     <meta name="twitter:image:alt" content="追憶のきらめき ― 流れ星みたいに消えていくコメントを、星座みたいに、つながりが残る世界へ。">
     <style>
@@ -5914,6 +5914,7 @@
           <a href="#algorithm">同接推定</a>
           <a href="#solution">解決の方向</a>
           <a href="#product-policy">提供の考え方</a>
+          <a href="live/">いま支えている人</a>
           <a href="articles/">技術記事</a>
           <a href="#record-cta" class="cta">導入・試用</a>
         </nav>
@@ -8010,6 +8011,17 @@
             </p>
           </div>
           <div class="board fade d1">
+            <h3 id="lp-nameplate-block">なふだ: 放送者さんに「自分」を見せるかどうかを選ぶ（v0.1.1477〜1478）</h3>
+            <p>
+              「表示する」にすると、コメントしたとき<strong>放送者さんのコメント欄にあなたのアイコンと名前が出ます</strong>。
+              見えるのは<strong>放送者さんだけ</strong>で、ほかの視聴者さんには見えません。
+              これはニコ生そのものの設定で、<strong>この拡張の記録には出ません</strong>（切り替えを手元から押せるようにしただけです）。
+            </p>
+            <p class="lp-feature-note">
+              切り替えは<strong>コメント入力欄のすぐ隣</strong>にあります（v0.1.1478）。
+              以前は詳細設定の中にあり、<strong>コメントを打つ場所から離れていて見つけられませんでした</strong>。
+              「表示する / 隠す」のボタンと、りんくの吹き出しでの説明がその場に出ます。
+            </p>
             <h3>基本の流れ</h3>
             <ol class="lp-compose-steps">
               <li><strong>watch ページ</strong>を開いたタブを用意し、コメント欄が読み込まれるまで待つ。</li>
@@ -8631,6 +8643,7 @@
             <p><strong>例（観測層全体）</strong> — <code>FRONTEND_HOOK_BROKEN</code>（拡張のフック失敗）・<code>OFFICIAL_NOT_PROVIDED</code>（公式値が未提供）・<code>TAB_NOT_OPEN</code>（観測タブが閉じている）など。</p>
             <p><strong>v0.1.244 で実装した北極星レーン側</strong> — popup の公式値レーンに <strong>6 種類の理由</strong>（イベント不参加・ギフト 0 件・サイドバー未描画・取得エラー・取得中・未取得）を細分化して表示する仕組みを入れました（<code>:empty::after</code> による reason 別 placeholder text）。診断 JSON の state も 7 値に細分化。</p>
             <p><strong>今いまできていること（観測層全体）</strong> — source / capturedAt の記録は v0.1.190 系で導入済み、北極星レーンは v0.1.244 で reason 細分化済み。</p>
+            <p id="lp-fix-1473"><strong>取得率が 501% や 0% にならない（v0.1.1473〜1474）</strong> — 配信を切り替えたときに、<strong>前の配信の件数が残ったまま新しい配信の件数と比べられて</strong>、取得率が 501% と表示されることがありました。配信が変わったら前の値を捨てるようにしています。あわせて、<strong>まだ過去ログを取り込んでいる途中</strong>なだけなのに「取得率が下がり続けています」と警告していた誤報も直しました（取り込み中かどうかの判定が 2 箇所でくい違っていたのが原因です）。
             <p><strong>これから</strong> — 北極星以外の全観測点でも reason code を統一する形を計画中です。</p>
           </div>
         </div>
@@ -8728,6 +8741,7 @@
             <p><strong>本物のサムネ＋ゆっくり顔</strong> — アイコンが設定されている人は実サムネ、匿名さんには人ごとに違う優しい顔を自動で割り当て。後方の観客席にも顔つきで並びます。</p>
             <p><strong>会場モードでも読み上げ（v0.1.726〜727）</strong> — 会場を開くと読み上げが<strong>自動で ON</strong>。VOICEVOX 連携で、しゃべった人のコメントを人ごとに違う声で読み上げます。会場バーのボタンで OFF にもできます。</p>
             <p><strong>一度応援してくれた人は、ずっと並び続ける（v0.1.1232〜1237）</strong> — これまでは表示できる人数に上限があり、新しい人が来ると<strong>古い人から静かに消えていました</strong>。上限をなくし、<strong>その配信に来てくれた全員がずっと残る</strong>ようにしました。実際の配信で <strong>500人を超えても全員が並び、一人も消えないこと</strong>を確認しています。</p>
+            <p id="lp-fix-1475"><strong>大人数でも応援レーンが画面を突き抜けない（v0.1.1475〜1476）</strong> — 上の「ずっと並び続ける」おかげで人数が増えると、応援レーンが縦に伸び続けて<strong>画面からはみ出し、下にある表示が押し出されてしまう</strong>ことがありました。<strong>49 人を超えたときだけ</strong>レーンに高さの上限をつけ、その中でスクロールできるようにしています。<strong>並んでいる人を減らしてはいません</strong>（全員そのままです）。実測では 857 人のとき、レーンの高さが 2,010px から 380px になり、<strong>並んでいる人数は 857 のまま変わりません</strong>でした。
             <p><strong>会場を長く開いても重くならない（v0.1.1237〜1239）</strong> — 会場モードを閉じても解放されずに溜まっていたメモリを解放し、匿名の方のアイコンの持ち方も見直して、<strong>あわせて約32MB</strong>を削減しました。診断ページの最初の表示も<strong>12.6秒から4.3秒</strong>になりました。</p>
             <p><strong>アイコンに乗せると、その人のことが分かる（v0.1.1191〜1192）</strong> — 観客のアイコンに<strong>マウスを乗せるだけ</strong>で、表示名・発言数・応援者ランキングの順位・<strong>最後にコメントした時刻</strong>がカードで出ます。クリックも待ち時間もなし。「さっきから応援してくれているこの人、誰だっけ」がその場で分かります。</p>
             <p><strong>混雑しても「今」のコメントが読まれる（v0.1.1181）</strong> — コメントが多い配信で読み上げが追いつかなくなったとき、<strong>待ち行列を自動で減らして</strong>ラグを抑えます。全部は読まれませんが、何分も前のコメントを延々読み続けることがなくなり、<strong>いつも「今」に近い声</strong>が返ってきます。</p>
@@ -10522,8 +10536,8 @@
 
     <footer class="footer-note">
       <div class="shell">
-        <div>追憶のきらめき v0.1.1283 ― Kimito-Link Project</div>
-        <div class="footer-note__links"><a href="articles/">技術記事</a> ／ <a href="privacy.html">プライバシーポリシー</a></div>
+        <div>追憶のきらめき v0.1.1507 ― Kimito-Link Project</div>
+        <div class="footer-note__links"><a href="live/">いま支えている人</a> ／ <a href="articles/">技術記事</a> ／ <a href="privacy.html">プライバシーポリシー</a></div>
       </div>
     </footer>
 

@@ -1,3 +1,17 @@
+import { judgeValueFreshness } from './anomalyVerdict.js';
+import { canonicalLabel, fromAliveFailure } from './voiceFailureTaxonomy.js';
+
+/**
+ * ★v0.1.1328: この診断を「新鮮」とみなす上限。これを大きく超えたら化石値として数値を伏せる。
+ *   judgeValueFreshness は 10分以上で level='bad'(化石値)を返す。
+ *   読み上げ診断は3秒 min-gap で書かれるので、60秒あれば通常運用では十分に新しい。
+ *
+ * ★v0.1.1367: healthCells.js の VOICE_LIVE_JUDGE_WINDOW_MS(90秒・旧同名)と統合しないこと。
+ *   こちらは judgeValueFreshness に渡す【基準値】で、化石値と出る実効境界は10分。
+ *   向こうは live 固着判定を適用するか否かの【境界そのもの】(実効90秒)。名前が同じだっただけで別物。
+ */
+export const VOICE_DIAG_FRESH_MS = 60_000;
+
 /**
  * 会場モード(comeview)の読み上げ発話キュー診断。リアルタイム性(「たまに遅れて出る」)の
  * 真因切り分け用の純観測値を組み立てる純関数群。記録/発話には一切触れない。
@@ -41,6 +55,9 @@
  *   dropSweepStaleTotal: number, // 2026-07-28計器: 全stale時の先頭群破棄の累計
  *   synthNullTotal: number,      // 2026-08-01計器: 合成がnullで返り読まれずに消えた累計
  *   synthNullNearTimeout: number,// 同上のうち時間切れ(8000ms上限付近)由来の件数
+ *   audioBlockedTotal: number,   // v0.1.1327計器: ブラウザの自動再生ブロック(NotAllowedError)で鳴らせなかった累計
+ *   lastEnableFailReason: string,// v0.1.1331計器: 読み上げONに失敗した理由(timeout/refused/http-error/no-fetch)
+ *   enableFailTotal: number,     // v0.1.1331計器: 読み上げONに失敗した累計回数
  *   lagVerdict: string,          // 2026-07-28計器: 体感遅延の真因判定トークン(印字専用・挙動に不使用)
  *   diagBornAt: number           // 2026-07-28計器: この診断stateが生まれた時刻(epoch ms・世代識別用)
  * }} VoiceDiagState
@@ -89,6 +106,13 @@ export function makeInitialVoiceDiag() {
     // v0.1.1213: 合成が null で返って消えた件(時間切れ内訳つき)。
     synthNullTotal: 0,
     synthNullNearTimeout: 0,
+    // v0.1.1327: 自動再生ブロックで鳴らせなかった件。「読み上げONなのに無音」の切り分け用
+    //   (合成は成功しているのに音が出ない=ブラウザ側の制約、という状態を名指しする)。
+    audioBlockedTotal: 0,
+    // v0.1.1331: 「押しても一瞬で戻る」の理由。画面にしか出していなかったため
+    //   ユーザー報告に理由が乗らず、原因特定ができなかった反省から計器へ載せる。
+    lastEnableFailReason: '',
+    enableFailTotal: 0,
     lagVerdict: '',
     diagBornAt: 0
   };
@@ -98,7 +122,7 @@ export function makeInitialVoiceDiag() {
  * storage 書き込み用の軽量スナップショット(ago は読み手側で算出するため base を渡す)。
  * @param {Partial<VoiceDiagState>|null|undefined} diag
  * @param {number} [nowMs]
- * @returns {VoiceDiagState & { capturedAt: number }}
+ * @returns {VoiceDiagState & { capturedAt: number, source: string }}
  */
 export function buildVoiceDiagSnapshot(diag, nowMs) {
   const base = makeInitialVoiceDiag();
@@ -143,12 +167,24 @@ export function buildVoiceDiagSnapshot(diag, nowMs) {
     voicedRecentRatio: num(d.voicedRecentRatio, base.voicedRecentRatio),
     synthNullTotal: num(d.synthNullTotal, base.synthNullTotal),
     synthNullNearTimeout: num(d.synthNullNearTimeout, base.synthNullNearTimeout),
+    audioBlockedTotal: num(d.audioBlockedTotal, base.audioBlockedTotal),
+    lastEnableFailReason: String(d.lastEnableFailReason || base.lastEnableFailReason),
+    enableFailTotal: num(d.enableFailTotal, base.enableFailTotal),
     dropCountGateTotal: num(d.dropCountGateTotal, base.dropCountGateTotal),
     dropHeadStaleTotal: num(d.dropHeadStaleTotal, base.dropHeadStaleTotal),
     dropSweepStaleTotal: num(d.dropSweepStaleTotal, base.dropSweepStaleTotal),
     lagVerdict: String(d.lagVerdict || base.lagVerdict),
     diagBornAt: num(d.diagBornAt, base.diagBornAt),
-    capturedAt: now
+    capturedAt: now,
+    /*
+     * ★v0.1.1328: どちらの面が書いたスナップショットかを必ず残す。
+     *   読み上げは【会場(VoicePlayer)】と【コメビュ(独自実装)】の2実装が同じ
+     *   storage キーを奪い合っており(last-writer-wins)、化石値を見たときに
+     *   「どちらが書いたか」が分からないと調査の出発点が決まらない。
+     *   venueBar は従来から 'venue' を後付けしていたが、comeview は無印だった=非対称。
+     *   ここで既定を持たせ、呼び出し側が上書きする形に揃える。
+     */
+    source: String(d.source || '')
   };
 }
 
@@ -156,12 +192,46 @@ export function buildVoiceDiagSnapshot(diag, nowMs) {
  * 状態速報の概要に出す1行を作る純関数。voice が一度も動いていない(未取得)なら ''。
  * 「たまに遅れる」を一目で掴めるよう、待機ピーク・間引き・最終発話からの経過を出す。
  *
- * @param {(VoiceDiagState & { capturedAt?: number })|null|undefined} snap
+ * @param {(VoiceDiagState & { capturedAt?: number, source?: string })|null|undefined} snap
  * @param {number} nowMs 現在時刻(最終発話 ago の算出用)
  * @returns {string}
  */
 export function buildVoiceDiagLine(snap, nowMs) {
   if (!snap || typeof snap !== 'object') return '';
+  /*
+   * ★v0.1.1328 化石値ガード(2026-08-11・実際に2回誤診してから入れた)
+   *
+   * ■ 何が起きたか
+   *   KEY_VOICE_DIAG は chrome.storage.local に永続化され、リポジトリ内に
+   *   リセット経路が1つも無い。コメビュ/会場を閉じるとスナップショットはそのまま凍り、
+   *   読み手(状態速報)は【8日前の数字】を今の値として表示し続けていた。
+   *   実際に出ていた「実効上限2 / 判定=coldsynth / 需要28.3 vs 供給13.6」は
+   *   すべて 2026-08-03 頃の値。★床は 2026-08-04 に 5 へ上げてあり、
+   *   現行コードでは実効上限2も coldsynth(cap<=3が条件)も【到達不能】=化石の証明。
+   *
+   * ■ 同じ誤読が既に2回起きている
+   *   1回目 2026-08-04: 「まだ実効上限2だ、変更が効いていない」と誤読して版を重ねた
+   *     (対策として judgeValueFreshness が書かれたが【どこからも呼ばれていなかった】)
+   *   2回目 2026-08-11: 司令塔が同じ数字を根拠に「読み上げが重い」とユーザーに説明した
+   *
+   * ■ なぜ数値を隠すのか(警告を添えるだけにしない)
+   *   数字が見えれば人は読む。1回目の対策(文書化)は2回目を止められなかった。
+   *   止まるのは判定を共有したときだけなので、古い値は【出さない】。
+   */
+  const capturedAt = Number(snap.capturedAt) || 0;
+  const nowForAge = Number.isFinite(Number(nowMs)) ? Number(nowMs) : 0;
+  if (capturedAt > 0 && nowForAge > 0) {
+    const verdict = judgeValueFreshness(nowForAge - capturedAt, VOICE_DIAG_FRESH_MS);
+    if (verdict.level === 'bad') {
+      const min = Math.max(0, Math.round((nowForAge - capturedAt) / 60000));
+      const src = String(snap.source || '').trim();
+      const who = src ? `・${src}` : '';
+      return (
+        `会場読み上げ: ⚠化石値(${min}分前${who}) この数字で判断してはいけません` +
+        `(会場モードかコメビュを開き直すと今の値になります)`
+      );
+    }
+  }
   const enabled = !!snap.enabled;
   const spoken = Number(snap.spokenTotal) || 0;
   const queueNow = Number(snap.queueNow) || 0;
@@ -172,7 +242,14 @@ export function buildVoiceDiagLine(snap, nowMs) {
   //   spokenTotal が 0 のままなので、この早期returnは「読み上げが最も壊れているときほど
   //   診断行が丸ごと消える」向きに効いてしまう(実配信で約34件が行方不明だった件と同根)。
   const synthNull = Number(snap.synthNullTotal) || 0;
-  if (!enabled && spoken === 0 && queueMax === 0 && synthNull === 0) return '';
+  /*
+   * ★v0.1.1331: ON失敗も早期returnの例外に加える。
+   *   ユーザーが「押しても一瞬で戻る」状態は enabled=false・spoken=0・queueMax=0 に
+   *   なるため、この早期returnが【まさに壊れているときだけ診断行を丸ごと消す】。
+   *   上の v0.1.1213 コメントが警告していた同じ罠を、別のフィールドで踏んでいた。
+   */
+  const enableFail = Number(snap.enableFailTotal) || 0;
+  if (!enabled && spoken === 0 && queueMax === 0 && synthNull === 0 && enableFail === 0) return '';
   const parts = [];
   parts.push(enabled ? '読み上げ:ON' : '読み上げ:OFF');
   parts.push(`待機${queueNow}(最大${queueMax})`);
@@ -216,6 +293,30 @@ export function buildVoiceDiagLine(snap, nowMs) {
     //   v0.1.1180(段階0=shadow)当時の名残で、実適用後もこの文言が残っていたのは表示上の
     //   不整合(実害は無いが誤解を招く)。
     if (Number.isFinite(effectiveMax)) parts.push(`実効上限${effectiveMax}`);
+  }
+  /*
+   * ★v0.1.1331: 読み上げONに失敗した理由。ユーザー報告「押しても一瞬で戻る」に対して
+   *   状態速報が理由を1文字も持っておらず、原因特定ができなかったので載せる。
+   *   ★enabled が false のときほど重要なので、他の行より前に出す。
+   */
+  const failReason = String(snap.lastEnableFailReason || '').trim();
+  const failTotal = Number(snap.enableFailTotal) || 0;
+  if (failReason) {
+    /*
+     * ★v0.1.1335: 日本語ラベルは taxonomy(voiceFailureTaxonomy.js)が正本。
+     *   ここで三項演算子を並べると、同じ cause が別の場所で別の日本語になる
+     *   (実際に voiceLoadingState.js と文言が食い違っていた)。
+     * ★生の値(refused 等)は消さずに併記する。次のセッションが grep で原因を追う材料であり、
+     *   日本語だけにすると storage に書かれた値と突き合わせられなくなる。
+     */
+    const why = canonicalLabel(fromAliveFailure(failReason));
+    parts.push(why ? `★ON失敗${failTotal}回: ${failReason}(${why})` : `★ON失敗${failTotal}回: ${failReason}`);
+  }
+  // v0.1.1327: 自動再生ブロック。合成は通っているのに音が出ない状態を名指しする
+  //   (ユーザー実機「一瞬ONになって戻る」の正体。0なら何も言わない)。
+  const audioBlocked = Number(snap.audioBlockedTotal) || 0;
+  if (audioBlocked > 0) {
+    parts.push(`再生ブロック${audioBlocked}件(ページを一度クリックすると鳴ります)`);
   }
   const rateClamp = Number(snap.rateClampTotal) || 0;
   if (rateClamp > 0) parts.push(`速度飽和${rateClamp}件`); // playbackRateが上限で追いつけていない兆候。

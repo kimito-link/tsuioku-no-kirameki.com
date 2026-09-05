@@ -1,3 +1,5 @@
+import { canonicalLabel, fromSynthFailure } from './voiceFailureTaxonomy.js';
+
 /**
  * 読み上げ合成が失敗した「どこで・なぜ」を名前で返す純関数(v0.1.1224)。
  *
@@ -38,17 +40,6 @@ export const VOICE_SYNTH_FAIL_REASONS = Object.freeze([
   'synth_body',
   'unknown'
 ]);
-
-/** 人間が読むラベル(状態速報は日本語で出す)。 @type {Record<string, string>} */
-const REASON_LABEL = Object.freeze({
-  timeout: '時間切れ',
-  unreachable: '接続不能(VOICEVOX未起動/落ちた)',
-  query_http: '解析拒否(過負荷の疑い)',
-  query_body: '解析応答が不正',
-  synth_http: '合成拒否(過負荷の疑い)',
-  synth_body: '音声の受信失敗',
-  unknown: '不明'
-});
 
 /**
  * 例外/応答から失敗理由を1つに決める。
@@ -110,7 +101,7 @@ export function formatVoiceSynthFailureReasonLine(counts) {
     const n = Math.max(0, Math.floor(Number(/** @type {any} */ (c)[key]) || 0));
     if (n <= 0) continue;
     total += n;
-    parts.push(`${REASON_LABEL[key]}${n}`);
+    parts.push(`${canonicalLabel(fromSynthFailure(key))}${n}`);
   }
   if (total <= 0) return '';
   return `合成失敗の内訳(${total}件): ${parts.join(' / ')}`;

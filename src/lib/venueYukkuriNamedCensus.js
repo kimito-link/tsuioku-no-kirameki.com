@@ -23,6 +23,13 @@
  * @module venueYukkuriNamedCensus
  */
 
+// ★v0.1.1366: 「ゲスト」「user XXXX」はニコ既定の placeholder=本人の名前ではない。
+//   判定はこのファイルで再実装せず正本を使う(文字列比較を散らさない)。
+import {
+  isNiconicoGuestPlaceholderNickname,
+  isNiconicoAutoUserPlaceholderNickname
+} from './nicoAnonymousDisplay.js';
+
 /** identicon(anonymousIdenticon.js の出力)の data URI 先頭。 */
 const IDENTICON_SRC_PREFIX = 'data:image/svg+xml';
 /** 本登録の数値ID(このレンジ内だけ displaySrc が実写/CDN合成URLになりうる)。 */
@@ -32,8 +39,10 @@ const IN_RANGE_NUMERIC_UID_RE = /^\d{5,14}$/;
 /**
  * @returns {{ checked: number, yukkuriNamed: number, outOfRangeDigits: number,
  *   checkedAnonymousStyle: number, yukkuriNamedAnonymousStyle: number,
+ *   checkedNoUid: number, yukkuriNamedNoUid: number,
  *   lastSample: null | { uid: string, name: string, digits: number },
- *   lastSampleAnonymousStyle: null | { uid: string, name: string } }}
+ *   lastSampleAnonymousStyle: null | { uid: string, name: string },
+ *   lastSampleNoUid: null | { name: string } }}
  */
 export function createVenueYukkuriNamedCensusState() {
   return {
@@ -43,7 +52,22 @@ export function createVenueYukkuriNamedCensusState() {
     checkedAnonymousStyle: 0,
     yukkuriNamedAnonymousStyle: 0,
     lastSample: null,
-    lastSampleAnonymousStyle: null
+    lastSampleAnonymousStyle: null,
+    /*
+     * ★v0.1.1358: uid を持たない「名前ありゆっくり顔」(広告主・ゲスト等)。
+     *
+     * ■ なぜ足すか(2026-08-12 ユーザー実機・指摘「計器が機能してない証拠」)
+     *   スクショには広告列に「無職にまっしぐら」「そろおじさん」「ノエル」等、
+     *   **名前があるのにゆっくり顔**のタイルが並んでいた。
+     *   ところが速報は `名前ありゆっくり顔 ✅ 検18(匿名系検0)` = 実害0 と報告していた。
+     *   真因: 数値ID系でも a:系でもない(uid が空の)タイルは `if (!uid) return` で
+     *   **checked にすら入らず**、完全に計器の外だった。
+     *   ★「0件」は「異常なし」ではなく「測っていない」だった
+     *     ([[zero-count-may-mean-unmeasured]] の典型)。
+     */
+    checkedNoUid: 0,
+    yukkuriNamedNoUid: 0,
+    lastSampleNoUid: /** @type {null | { name: string }} */ (null)
   };
 }
 
@@ -66,11 +90,39 @@ export function observeVenueYukkuriNamedTile(state, obs) {
   //   ではなく displayUserLabel/anonymousDisplayLabel が合成したフォールバックラベル
   //   (「匿名123」「匿名（a:xxx）」)。これは↑と同じ「仕様どおりで実害ではない」ケースの亜種なので対象外。
   if (rawName.startsWith('匿名')) return;
+  /*
+   * ★v0.1.1366: ニコ既定の placeholder を「名前あり」と数えない(v1358 の偽陽性)。
+   *
+   * ■ 実機(2026-08-12・v0.1.1365 の速報)
+   *     名前ありゆっくり顔 🔴 ID無1件 / 直近ID無{ゲスト}
+   *   「ゲスト」はハンドル未設定のときニコ側が出す既定表示で、本人が付けた名前ではない。
+   *   ＝ゆっくり顔で正しいのに🔴を出していた=誤誘導(価値が負)。
+   *   ★判定は nicoAnonymousDisplay.js の正本を使う(ここで文字列比較を再実装しない)。
+   *     「ゲスト123」「ゲストさん」等の派生は本人設定なので対象に残る(完全一致のみ除外)。
+   */
+  if (
+    isNiconicoGuestPlaceholderNickname(rawName) ||
+    isNiconicoAutoUserPlaceholderNickname(rawName)
+  ) {
+    return;
+  }
 
   if (!NUMERIC_UID_RE.test(uid)) {
     // a:系・ハッシュ系(カスタム表示名を持つ匿名スタイルユーザー)。従来は完全対象外だったが、
     //   「名前はあるのにゆっくり顔」は数値ID系と同じ症状なので別カウンタで観測する(桁境界とは別集計)。
-    if (!uid) return; // uid空(素性不明)は対象外(観測しても原因特定に繋がらない)
+    if (!uid) {
+      /*
+       * ★v0.1.1358: 旧実装はここで return し、**checked にすら入れていなかった**。
+       *   その結果、広告列(広告主名はあるが uid が無い)の「名前ありゆっくり顔」が
+       *   ユーザーの画面に並んでいるのに、速報は「✅ 実害0」と報告し続けた。
+       *   ★観測しないものは「異常なし」ではない。数えて名指しする。
+       */
+      state.checkedNoUid += 1;
+      if (!displaySrc.startsWith(IDENTICON_SRC_PREFIX)) return; // 実写/CDN URL=正常
+      state.yukkuriNamedNoUid += 1;
+      state.lastSampleNoUid = { name: rawName };
+      return;
+    }
     state.checkedAnonymousStyle += 1;
     if (!displaySrc.startsWith(IDENTICON_SRC_PREFIX)) return; // 実写/CDN URL=正常
     state.yukkuriNamedAnonymousStyle += 1;
@@ -91,25 +143,38 @@ export function observeVenueYukkuriNamedTile(state, obs) {
  * @param {ReturnType<typeof createVenueYukkuriNamedCensusState>|null|undefined} state
  * @returns {{ line: string, checked: number, yukkuriNamed: number, outOfRangeDigits: number,
  *   checkedAnonymousStyle: number, yukkuriNamedAnonymousStyle: number,
+ *   checkedNoUid: number, yukkuriNamedNoUid: number,
  *   lastSample: null | { uid: string, name: string, digits: number },
- *   lastSampleAnonymousStyle: null | { uid: string, name: string } } | null}
+ *   lastSampleAnonymousStyle: null | { uid: string, name: string },
+ *   lastSampleNoUid: null | { name: string } } | null}
  */
 export function toVenueYukkuriNamedCensusDiag(state) {
   if (!state || typeof state !== 'object') return null;
-  const checkedAny = state.checked > 0 || state.checkedAnonymousStyle > 0;
+  // ★v0.1.1358: uid無し(広告主・ゲスト)も観測対象に含める。含めないと
+  //   「画面には名前ありゆっくり顔が並んでいるのに ✅ 実害0」が再発する。
+  const checkedNoUid = Number(state.checkedNoUid) || 0;
+  const yukkuriNamedNoUid = Number(state.yukkuriNamedNoUid) || 0;
+  const checkedAny = state.checked > 0 || state.checkedAnonymousStyle > 0 || checkedNoUid > 0;
+  const harmAny =
+    state.yukkuriNamed > 0 || state.yukkuriNamedAnonymousStyle > 0 || yukkuriNamedNoUid > 0;
   let line;
   if (!checkedAny) {
     line = '名前ありゆっくり顔 ⚪ 未観測';
-  } else if (state.yukkuriNamed === 0 && state.yukkuriNamedAnonymousStyle === 0) {
-    line = `名前ありゆっくり顔 ✅ 検${state.checked}(匿名系検${state.checkedAnonymousStyle})`;
+  } else if (!harmAny) {
+    line = `名前ありゆっくり顔 ✅ 検${state.checked}(匿名系検${state.checkedAnonymousStyle}/ID無検${checkedNoUid})`;
   } else {
     const s = state.lastSample;
     const sa = state.lastSampleAnonymousStyle;
+    const sn = state.lastSampleNoUid;
     line =
       `名前ありゆっくり顔 🔴 ${state.yukkuriNamed}件(桁境界${state.outOfRangeDigits})` +
-      ` 匿名系${state.yukkuriNamedAnonymousStyle}件 / 検${state.checked}(匿名系検${state.checkedAnonymousStyle})` +
+      ` 匿名系${state.yukkuriNamedAnonymousStyle}件` +
+      // ★ID無し(広告主等)は原因が別(公式ランキング由来でuidが取れない)なので分けて出す。
+      ` ID無${yukkuriNamedNoUid}件` +
+      ` / 検${state.checked}(匿名系検${state.checkedAnonymousStyle}/ID無検${checkedNoUid})` +
       (s ? ` / 直近{${s.name} uid${s.digits}桁}` : '') +
-      (sa ? ` / 直近匿名系{${sa.name} uid=${sa.uid}}` : '');
+      (sa ? ` / 直近匿名系{${sa.name} uid=${sa.uid}}` : '') +
+      (sn ? ` / 直近ID無{${sn.name}}` : '');
   }
   return {
     line,
@@ -118,7 +183,10 @@ export function toVenueYukkuriNamedCensusDiag(state) {
     outOfRangeDigits: state.outOfRangeDigits,
     checkedAnonymousStyle: state.checkedAnonymousStyle,
     yukkuriNamedAnonymousStyle: state.yukkuriNamedAnonymousStyle,
+    checkedNoUid,
+    yukkuriNamedNoUid,
     lastSample: state.lastSample ? { ...state.lastSample } : null,
-    lastSampleAnonymousStyle: state.lastSampleAnonymousStyle ? { ...state.lastSampleAnonymousStyle } : null
+    lastSampleAnonymousStyle: state.lastSampleAnonymousStyle ? { ...state.lastSampleAnonymousStyle } : null,
+    lastSampleNoUid: state.lastSampleNoUid ? { ...state.lastSampleNoUid } : null
   };
 }

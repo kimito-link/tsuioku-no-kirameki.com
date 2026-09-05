@@ -185,4 +185,89 @@ describe('toVenueYukkuriNamedCensusDiag', () => {
     expect(toVenueYukkuriNamedCensusDiag(null)).toBeNull();
     expect(toVenueYukkuriNamedCensusDiag(undefined)).toBeNull();
   });
+
+  /*
+   * ★v0.1.1358(ユーザー実機 2026-08-12・指摘「名前があるのがゆっくりがお 計器が機能してない証拠」)
+   *
+   *   スクショの広告列: 「無職にまっしぐら」「そろおじさん」「ノエル」が
+   *   **名前ありなのにゆっくり顔**。ところが速報は
+   *     名前ありゆっくり顔 ✅ 検18(匿名系検0)
+   *   = 実害0 と報告していた。
+   *
+   *   真因: uid が空のタイル(広告主・ゲスト)は `if (!uid) return` で
+   *   **checked にすら入らず**完全に計器の外だった。
+   *   ★「0件」は「異常なし」ではなく「測っていない」だった。
+   */
+  describe('★uid が無いタイル(広告主・ゲスト)も数える', () => {
+    it('名前ありゆっくり顔なら🔴として数える(実機スクショの再現)', () => {
+      const state = createVenueYukkuriNamedCensusState();
+      // 広告列: 広告主名はあるが uid が取れない(公式ランキング由来)。
+      observeVenueYukkuriNamedTile(state, { uid: '', rawName: 'そろおじさん', displaySrc: IDENTICON });
+      observeVenueYukkuriNamedTile(state, { uid: '', rawName: 'ノエル', displaySrc: IDENTICON });
+      const diag = toVenueYukkuriNamedCensusDiag(state);
+      expect(diag.yukkuriNamedNoUid).toBe(2);
+      expect(diag.checkedNoUid).toBe(2);
+      expect(diag.line).toContain('🔴');
+      expect(diag.line).toContain('ID無2件');
+      expect(diag.line).toContain('ノエル');
+    });
+
+    it('★uid無しでも実写サムネなら正常(誤検知しない)', () => {
+      const state = createVenueYukkuriNamedCensusState();
+      observeVenueYukkuriNamedTile(state, {
+        uid: '',
+        rawName: 'ノエル',
+        displaySrc: 'https://secure-dcdn.cdn.nimg.jp/nicoaccount/usericon/s/1/1.jpg'
+      });
+      const diag = toVenueYukkuriNamedCensusDiag(state);
+      expect(diag.checkedNoUid).toBe(1);
+      expect(diag.yukkuriNamedNoUid).toBe(0);
+      expect(diag.line).toContain('✅');
+    });
+
+    it('uid無しの観測だけでも「未観測」にならない(測っている事実が出る)', () => {
+      const state = createVenueYukkuriNamedCensusState();
+      observeVenueYukkuriNamedTile(state, { uid: '', rawName: 'ゲスト太郎', displaySrc: 'https://x/y.jpg' });
+      const diag = toVenueYukkuriNamedCensusDiag(state);
+      expect(diag.line).not.toContain('未観測');
+      expect(diag.line).toContain('ID無検1');
+    });
+
+    /*
+     * ★v0.1.1366(ユーザー実機 2026-08-12・v1365 の速報)
+     *   `名前ありゆっくり顔 🔴 ID無1件 / 直近ID無{ゲスト}` が出ていたが、
+     *   「ゲスト」はハンドル未設定時にニコ側が出す既定表示で本人の名前ではない。
+     *   ＝ゆっくり顔で正しいのに🔴＝誤誘導(価値が負)。v1358 の偽陽性。
+     */
+    it('★「ゲスト」はニコ既定の placeholder=名前ありに数えない', () => {
+      const state = createVenueYukkuriNamedCensusState();
+      observeVenueYukkuriNamedTile(state, { uid: '', rawName: 'ゲスト', displaySrc: IDENTICON });
+      const diag = toVenueYukkuriNamedCensusDiag(state);
+      expect(diag.checkedNoUid).toBe(0);
+      expect(diag.yukkuriNamedNoUid).toBe(0);
+    });
+
+    it('★「user XXXX」も placeholder として除外する', () => {
+      const state = createVenueYukkuriNamedCensusState();
+      observeVenueYukkuriNamedTile(state, { uid: '12345678', rawName: 'user 0539Z74OJ13', displaySrc: IDENTICON });
+      const diag = toVenueYukkuriNamedCensusDiag(state);
+      expect(diag.yukkuriNamed).toBe(0);
+    });
+
+    it('★「ゲスト123」等の派生は本人が付けた名前として数える(完全一致のみ除外)', () => {
+      const state = createVenueYukkuriNamedCensusState();
+      observeVenueYukkuriNamedTile(state, { uid: '', rawName: 'ゲスト123', displaySrc: IDENTICON });
+      const diag = toVenueYukkuriNamedCensusDiag(state);
+      expect(diag.yukkuriNamedNoUid).toBe(1);
+    });
+
+    it('名前が無ければ従来どおり対象外(匿名は仕様どおり=ノイズにしない)', () => {
+      const state = createVenueYukkuriNamedCensusState();
+      observeVenueYukkuriNamedTile(state, { uid: '', rawName: '', displaySrc: IDENTICON });
+      observeVenueYukkuriNamedTile(state, { uid: '', rawName: '匿名123', displaySrc: IDENTICON });
+      const diag = toVenueYukkuriNamedCensusDiag(state);
+      expect(diag.checkedNoUid).toBe(0);
+      expect(diag.yukkuriNamedNoUid).toBe(0);
+    });
+  });
 });

@@ -24,6 +24,8 @@ import { KEY_INSTANT_PUSH_DIAG } from './instantPushDiagKey.js';
 import { KEY_CHANNEL_SWITCH_DIAG } from './channelSwitchDiagKey.js';
 import { KEY_HIGHLIGHT_LEDGER } from './highlightLedgerKey.js';
 import { KEY_SCORE_ANNOUNCE_DIAG } from './scoreAnnounceDiagKey.js';
+import { KEY_SIDEPANEL_SELF_DIAG } from './sidepanelSelfDiagKey.js';
+import { KEY_PANEL_WAKE_CURTAIN_DIAG } from './panelWakeCurtainDiagKey.js';
 
 describe('EXTRAS_BATCH_KEYS', () => {
   // 会議設計時点の列挙(16キー)+ v0.1.1083 の commentPostDiag + v0.1.1092 の instantPushDiag +
@@ -31,7 +33,7 @@ describe('EXTRAS_BATCH_KEYS', () => {
   //   第2号(③WEB投げ一覧丸写し)の giftHistoryMirror + 第4号(③WEB室温丸写し)の roomHeatMirror +
   //   第5号(③WEB記録サマリ推移丸写し)の sessionSummaryMirror で実際は24キー。
   //   「漏れなく統合したか」を人力の数え間違いに頼らず固定するため、実装済みの全キーを列挙して突合する。
-  it('24キーすべてを含む(commentPostDiag / instantPushDiag / channelSwitchDiag / highlightLedger / scoreAnnounceDiag / 第2号 giftHistoryMirror / 第4号 roomHeatMirror / 第5号 sessionSummaryMirror も含む)', () => {
+  it('26キーすべてを含む(commentPostDiag / instantPushDiag / channelSwitchDiag / highlightLedger / scoreAnnounceDiag / 第2号 giftHistoryMirror / 第4号 roomHeatMirror / 第5号 sessionSummaryMirror も含む)', () => {
     const expectedKeys = [
       KEY_VOICE_DIAG,
       KEY_VENUE_SEATS_DIAG,
@@ -56,10 +58,20 @@ describe('EXTRAS_BATCH_KEYS', () => {
       KEY_INSTANT_PUSH_DIAG,
       KEY_CHANNEL_SWITCH_DIAG,
       KEY_HIGHLIGHT_LEDGER,
-      KEY_SCORE_ANNOUNCE_DIAG
+      KEY_SCORE_ANNOUNCE_DIAG,
+      // 2026-08-08: サイドパネル自己診断(黒画面の切り分け・sidepanel-entry.js が書く)
+      KEY_SIDEPANEL_SELF_DIAG,
+      /*
+       * ★2026-08-19: 幕(全画面を覆う待ち画面)が出た回数。
+       *   幕は「隠す」道具なので、出たこと自体が隠れると気づけない。
+       *   実際 panelWakeCurtainDom.js は数えていたのに読み手がゼロで、
+       *   「引っ張ると幕が出ている」に誰も気づけなかった(ユーザー報告で判明)。
+       *   [[unwired-judgement-is-systemic-2026-08-12]]
+       */
+      KEY_PANEL_WAKE_CURTAIN_DIAG
     ];
-    expect(expectedKeys).toHaveLength(24);
-    expect(EXTRAS_BATCH_KEYS).toHaveLength(24);
+    expect(expectedKeys).toHaveLength(26);
+    expect(EXTRAS_BATCH_KEYS).toHaveLength(26);
     expect(EXTRAS_BATCH_KEYS).toEqual(expect.arrayContaining(expectedKeys));
   });
 

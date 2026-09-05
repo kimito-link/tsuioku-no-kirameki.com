@@ -1,0 +1,209 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <title>いま支えている人 ― 君斗りんくの追憶のきらめき</title>
+
+    <link rel="icon" href="../images/favicon.ico" sizes="any">
+    <link rel="icon" type="image/png" sizes="32x32" href="../images/favicon-32.png">
+    <link rel="apple-touch-icon" sizes="180x180" href="../images/apple-touch-icon.png">
+
+    <meta name="description" content="ニコニコ生放送で、いまこの瞬間に配信を支えている人（ギフト・広告）のランキング。配信者ではなく『応援した人』を主役にして表示します。">
+    <meta name="theme-color" content="#f7f1e7">
+    <meta name="robots" content="index,follow">
+    <link rel="canonical" href="https://tsuioku-no-kirameki.com/live/">
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://tsuioku-no-kirameki.com/live/">
+    <meta property="og:title" content="いま支えている人 ― 追憶のきらめき">
+    <meta property="og:description" content="いまこの瞬間、誰が配信を支えているか。">
+
+    <!--
+      ★このリポの静的ページは CSS を全部 inline で持つ(共通CSSファイルは0件)。
+        新規ページもそれに揃える(勝手に共通CSSを新設して散らかさない)。
+      ★配色は articles/ と同じものを使う。
+    -->
+    <style>
+      :root {
+        --bg: #f7f1e7;
+        --bg-soft: #f1e7da;
+        --line: #e8dac4;
+        --ink: #1a1208;
+        --ink-sub: #4f4338;
+        --accent: #c98e2b;
+      }
+      * { box-sizing: border-box; }
+      html, body { margin: 0; padding: 0; }
+      body {
+        background: var(--bg);
+        color: var(--ink);
+        font-family: system-ui, -apple-system, 'Segoe UI', 'Hiragino Kaku Gothic ProN', Meiryo, sans-serif;
+        line-height: 1.7;
+        -webkit-font-smoothing: antialiased;
+      }
+      .wrap { max-width: 960px; margin: 0 auto; padding: 24px 16px 64px; }
+      header.page { border-bottom: 2px solid var(--line); padding-bottom: 16px; margin-bottom: 20px; }
+      .home { display: inline-block; font-size: .85rem; color: var(--ink-sub); text-decoration: none; margin-bottom: 8px; }
+      .home:hover { text-decoration: underline; }
+      h1 { font-size: clamp(1.4rem, 4vw, 2rem); margin: 0 0 6px; letter-spacing: .02em; }
+      .lede { margin: 0; color: var(--ink-sub); font-size: .95rem; }
+      .meta { margin-top: 10px; font-size: .82rem; color: var(--ink-sub); }
+      .meta b { color: var(--ink); font-weight: 600; }
+
+      .live { border: 1px solid var(--line); border-radius: 10px; background: #fff; margin: 16px 0; overflow: hidden; }
+      .live > h2 { margin: 0; padding: 12px 14px; font-size: .95rem; background: var(--bg-soft); border-bottom: 1px solid var(--line); }
+      .live > h2 a { color: var(--ink); text-decoration: none; }
+      .live > h2 a:hover { text-decoration: underline; }
+      .cols { display: grid; grid-template-columns: 1fr; gap: 0; }
+      @media (min-width: 720px) { .cols { grid-template-columns: 1fr 1fr; } }
+      .col { padding: 12px 14px; }
+      .col + .col { border-top: 1px solid var(--line); }
+      @media (min-width: 720px) { .col + .col { border-top: 0; border-left: 1px solid var(--line); } }
+      .col h3 { margin: 0 0 8px; font-size: .82rem; color: var(--ink-sub); font-weight: 600; }
+      .col h3 .sum { color: var(--accent); }
+
+      ol.rank { list-style: none; margin: 0; padding: 0; }
+      ol.rank li { display: flex; align-items: center; gap: 8px; padding: 5px 0; border-bottom: 1px dotted var(--line); }
+      ol.rank li:last-child { border-bottom: 0; }
+      .no { flex: 0 0 1.6em; text-align: right; font-variant-numeric: tabular-nums; color: var(--ink-sub); font-size: .85rem; }
+      .no.top { color: var(--accent); font-weight: 700; }
+      .ava { flex: 0 0 auto; width: 26px; height: 26px; border-radius: 50%; object-fit: cover; background: var(--bg-soft); display: inline-block; }
+      .nm { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: .9rem; }
+      .nm a { color: var(--ink); text-decoration: none; }
+      .nm a:hover { text-decoration: underline; }
+      .pt { flex: 0 0 auto; font-variant-numeric: tabular-nums; font-size: .85rem; color: var(--ink-sub); }
+      .empty { color: var(--ink-sub); font-size: .85rem; margin: 0; }
+
+      .note { margin-top: 28px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 10px; background: var(--bg-soft); font-size: .82rem; color: var(--ink-sub); }
+      .note p { margin: 0 0 6px; }
+      .note p:last-child { margin-bottom: 0; }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <header class="page">
+        <a class="home" href="/">← 追憶のきらめき</a>
+        <h1>いま支えている人</h1>
+        <p class="lede">ニコニコ生放送で、いまこの瞬間に配信を支えている人。</p>
+        <p class="meta" id="meta">読み込み中…</p>
+      </header>
+
+      <main id="list"></main>
+
+      <div class="note">
+        <p>★このページは<b>配信者ではなく「応援した人」</b>を並べます。</p>
+        <p>数字はニコニコ生放送が公開しているギフト・広告のランキングをそのまま出しています。当サイトが独自に集計・推定した値ではありません。</p>
+        <p>放送中の番組のみを対象にしています。表示は定期的に更新されます。</p>
+      </div>
+    </div>
+
+    <script>
+      // ★外部依存を増やさないため素の JS で書く(このディレクトリはビルド対象外＝置くだけ)。
+      var elList = document.getElementById('list');
+      var elMeta = document.getElementById('meta');
+
+      var ESC_MAP = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
+      function esc(s) {
+        return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return ESC_MAP[c]; });
+      }
+      function num(n) { return (Number(n) || 0).toLocaleString('ja-JP'); }
+
+      // ★行の形は koken(rankers) と nicoad(ranking) で違う。ここで1つに揃える。
+      function rowsFromGift(g) {
+        var a = (g && Array.isArray(g.rankers)) ? g.rankers : [];
+        return a.map(function (r) {
+          return {
+            rank: r.rank, name: r.supporterName, point: r.contribution,
+            avatar: r.supporterThumbnailUrl, url: r.userPageUrl
+          };
+        });
+      }
+      function rowsFromAd(d) {
+        var a = (d && Array.isArray(d.ranking)) ? d.ranking : [];
+        return a.map(function (r) {
+          return {
+            rank: r.rank, name: r.advertiserName, point: r.totalContribution,
+            avatar: r.thumbnailUrl, url: r.userPageUrl
+          };
+        });
+      }
+
+      function renderRows(rows, unit) {
+        if (!rows.length) return '<p class="empty">まだいません</p>';
+        var html = rows.map(function (r) {
+          var n = Number(r.rank) || 0;
+          var nameHtml = r.url
+            ? '<a href="' + esc(r.url) + '" target="_blank" rel="noopener noreferrer">' + esc(r.name) + '</a>'
+            : esc(r.name);
+          // ★ニコ生は「アイコン未設定」に defaults/blank.jpg を返すが、これは実際には
+          //   読めない(実測: 63枚中4枚が失敗し、全部これだった)。★そのまま <img> にすると
+          //   壊れた画像アイコンが出るので、最初から素の丸(span)にする。
+          // ★inline onerror は使わない: このリポの既存ページに1件も無く(実測0件)、
+          //   CSP を足したときに黙って壊れる。読み込み失敗の面倒は下の bindAvatarFallback が見る。
+          var isBlank = /\/defaults\/blank\.jpg(\?|$)/.test(String(r.avatar || ''));
+          var ava = (r.avatar && !isBlank)
+            ? '<img class="ava" src="' + esc(r.avatar) + '" alt="" loading="lazy" referrerpolicy="no-referrer">'
+            : '<span class="ava"></span>';
+          return '<li><span class="no' + (n > 0 && n <= 3 ? ' top' : '') + '">' + (n || '-') + '</span>'
+            + ava + '<span class="nm">' + nameHtml + '</span>'
+            + '<span class="pt">' + num(r.point) + unit + '</span></li>';
+        }).join('');
+        return '<ol class="rank">' + html + '</ol>';
+      }
+
+      // ★読み込みに失敗したアイコンを素の丸へ落とす(壊れた画像アイコンを出さない)。
+      //   inline onerror を書かずに済ませるため、描画後に一度だけ張る。
+      function bindAvatarFallback(root) {
+        var imgs = root.querySelectorAll('img.ava');
+        for (var i = 0; i < imgs.length; i++) {
+          imgs[i].addEventListener('error', function () {
+            var span = document.createElement('span');
+            span.className = 'ava';
+            if (this.parentNode) this.parentNode.replaceChild(span, this);
+          }, { once: true });
+        }
+      }
+
+      function render(data) {
+        var lives = (data && Array.isArray(data.lives)) ? data.lives : [];
+        if (!lives.length) {
+          elMeta.textContent = 'いま表示できる配信がありません。';
+          elList.innerHTML = '';
+          return;
+        }
+        var when = data.capturedAt ? new Date(data.capturedAt) : null;
+        elMeta.innerHTML = '放送中 <b>' + lives.length + '</b> 件'
+          + (when ? '・' + esc(when.toLocaleTimeString('ja-JP')) + ' 時点' : '');
+
+        elList.innerHTML = lives.map(function (l) {
+          var gift = rowsFromGift(l.gift);
+          var ad = rowsFromAd(l.ad);
+          return '<section class="live">'
+            + '<h2><a href="https://live.nicovideo.jp/watch/' + esc(l.liveId) + '" target="_blank" rel="noopener noreferrer">'
+            + esc(l.title || l.liveId) + '</a></h2>'
+            + '<div class="cols">'
+            + '<div class="col"><h3>ギフトで支えた人 <span class="sum">' + num(l.giftTotal) + 'pt</span></h3>'
+            + renderRows(gift, 'pt') + '</div>'
+            + '<div class="col"><h3>広告で支えた人 <span class="sum">' + num(l.adTotal) + 'pt</span></h3>'
+            + renderRows(ad, 'pt') + '</div>'
+            + '</div></section>';
+        }).join('');
+        bindAvatarFallback(elList);
+      }
+
+      function load() {
+        fetch('/api/live-ranking', { cache: 'no-store' })
+          .then(function (r) {
+            if (r.status === 404) throw new Error('まだ集計されていません。しばらくお待ちください。');
+            if (!r.ok) throw new Error('読み込みに失敗しました (' + r.status + ')');
+            return r.json();
+          })
+          .then(render)
+          .catch(function (e) { elMeta.textContent = String(e && e.message ? e.message : e); });
+      }
+      load();
+      // ★見ていないときは止める(無駄に叩かない)。
+      setInterval(function () { if (!document.hidden) load(); }, 60000);
+    </script>
+  </body>
+</html>

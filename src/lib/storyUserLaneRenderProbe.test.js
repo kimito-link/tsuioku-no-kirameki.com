@@ -163,6 +163,87 @@ describe('buildStoryUserLaneRenderDiag', () => {
     expect(text).not.toContain('暫定縮小の上書き');
     expect(text).not.toContain('fresh-read再利用');
   });
+
+  /*
+   * ★v0.1.1341: 「効いていないときこそ出す」。
+   *   旧実装は heavyFreshReadReuseCount > 0 のときだけ行を出していたため、
+   *   再利用が一度も成立していない=まさに異常な状態のときに限って
+   *   速報から診断が消えていた(異常時ほど診断が消える型)。
+   *   実測(2026-08-12): freshRead=0 / race=26 で、その事実が1文字も出なかった。
+   */
+  it('★race が起きているのに再利用0回なら【理由つきで】警告を出す', () => {
+    const d = buildStoryUserLaneRenderDiag({
+      activePath: 'heavy', started: 5, completed: 5, entriesLen: 100, domTilesPainted: 30,
+      lastReachedStep: 'done',
+      heavyFreshReadReuseCount: 0, heavyRaceReturns: 26, heavyReuseLastReason: 'coverage'
+    });
+    const text = formatStoryUserLaneRenderDiagLines(d).join('\n');
+    expect(text).toContain('省略が0回');
+    expect(text).toContain('race 26回');
+    expect(text).toContain('coverage');
+  });
+
+  it('★判定理由が空なら「一度も判定されていない」と名指しする', () => {
+    const d = buildStoryUserLaneRenderDiag({
+      activePath: 'heavy', started: 5, completed: 5, entriesLen: 100, domTilesPainted: 30,
+      lastReachedStep: 'done',
+      heavyFreshReadReuseCount: 0, heavyRaceReturns: 12, heavyReuseLastReason: ''
+    });
+    const text = formatStoryUserLaneRenderDiagLines(d).join('\n');
+    expect(text).toContain('一度も判定されていない');
+  });
+
+  /*
+   * ★v0.1.1352: 3択のまま出さない。
+   *   旧実装は理由が空のとき「cachedが無い/lv不一致/件数0のいずれか」と出しており、
+   *   ユーザーが聞き返さないと次の一手が決まらなかった(2026-08-12 指摘
+   *   「全部質問しなくても分かるようにならないと困る」)。
+   *   decideHeavyChunkReadReuse が理由を名指しするようになったので、人語まで翻訳する。
+   */
+  describe('★不成立の理由を人語で名指しする', () => {
+    /** @param {string} reason */
+    const lineFor = (reason) => {
+      const d = buildStoryUserLaneRenderDiag({
+        activePath: 'heavy', started: 5, completed: 5, entriesLen: 100, domTilesPainted: 30,
+        lastReachedStep: 'done',
+        heavyFreshReadReuseCount: 0, heavyRaceReturns: 8, heavyReuseLastReason: reason
+      });
+      return formatStoryUserLaneRenderDiagLines(d).join('\n');
+    };
+
+    it('no-cache: 全件読みが残っていないと言う', () => {
+      const t = lineFor('no-cache');
+      expect(t).toContain('前回の全件読みが1度も残っていない');
+      expect(t).not.toContain('いずれか'); // ★3択のまま出さない
+    });
+
+    it('lv-mismatch: 別配信のキャッシュだと言う', () => {
+      const t = lineFor('lv-mismatch');
+      expect(t).toContain('別配信のもの');
+      expect(t).not.toContain('いずれか');
+    });
+
+    it('empty-cache: 0件で終わっていると言う', () => {
+      const t = lineFor('empty-cache');
+      expect(t).toContain('0件で終わっている');
+      expect(t).not.toContain('いずれか');
+    });
+
+    it('★3つの理由がそれぞれ違う文言になる(同じ説明に潰れていない)', () => {
+      const texts = ['no-cache', 'lv-mismatch', 'empty-cache'].map(lineFor);
+      expect(new Set(texts).size).toBe(3);
+    });
+  });
+
+  it('race が無ければ0でも警告を出さない(正常時のノイズにしない)', () => {
+    const d = buildStoryUserLaneRenderDiag({
+      activePath: 'heavy', started: 1, completed: 1, entriesLen: 5, domTilesPainted: 5,
+      lastReachedStep: 'done',
+      heavyFreshReadReuseCount: 0, heavyRaceReturns: 0
+    });
+    const text = formatStoryUserLaneRenderDiagLines(d).join('\n');
+    expect(text).not.toContain('省略が0回');
+  });
 });
 
 describe('formatStoryUserLaneRenderDiagLines', () => {
@@ -440,5 +521,63 @@ describe('notePaintDecision — (a)/(b) の切り分け', () => {
 
   it('計器の失敗は描画を止めない(壊れた probe でも例外なし)', () => {
     expect(() => notePaintDecision(null, { els: fakeEls(10), nextTileCount: 1 })).not.toThrow();
+  });
+});
+
+/**
+ * ★起動直後の started=0 を「描画関数が一度も呼ばれていません」と断定しない。
+ *
+ * ■ ★実機(2026-08-21・v0.1.1468)が示した「直しが半分」
+ *   同じ速報の中で判定が食い違っていた:
+ *     上(3画面パリティ) 🟡 保留 — popup 起動直後(257ms)＝まだ描き始めていなくて当然
+ *     下(応援レーン描画) 🔴 描画関数が一度も呼ばれていません     ← ★こちらは直っていない
+ *   ＝ v0.1.1468 でパリティ判定だけ直し、**詳細行の判定を直し忘れていた**。
+ *
+ * ■ ★同じ根拠(同じ速報にある)
+ *   shadeAgeMs: 259 / shadeDone: false      ← まだ幕が出ている最中
+ *   laneTickProbe.lastReason: 'doc-hidden'  ← 隠れているので走らせなかった(正しい)
+ *   応援レーン(全段): ①POP 50 / ③WEB鏡 50 ✅一致 ← ★実際は50件出ている
+ *
+ * ■ ★退化させない条件(ユーザー指示「退化なし進化で」)
+ *   ・齢が分からない → 従来どおり not_started(勝手に隠さない)
+ *   ・しきい値超過   → 従来どおり not_started(本物の異常は見逃さない)
+ */
+describe('★起動直後の started=0 を「呼ばれていない」と断定しない', () => {
+  const snapNotStarted = { started: 0, activePath: '', domTilesPainted: -1, mirrorCells: -1 };
+
+  it('★★起動直後(259ms)は not_started と断定しない', () => {
+    const d = buildStoryUserLaneRenderDiag(snapNotStarted, { bootAgeMs: 259 });
+    expect(d.verdict, '起動直後を「呼ばれていない」と断定している').not.toBe('not_started');
+    expect(d.verdict).toBe('booting');
+  });
+
+  it('★理由が「起動直後」と分かる(読んだ人が対処を探さない)', () => {
+    const d = buildStoryUserLaneRenderDiag(snapNotStarted, { bootAgeMs: 259 });
+    expect(d.reason).toMatch(/起動直後|起動して/);
+    // ★誤った対処(リロードしろ)を出さない
+    expect(d.reason).not.toContain('リロード');
+  });
+
+  it('★★十分に経っていれば従来どおり not_started(見逃さない)', () => {
+    const d = buildStoryUserLaneRenderDiag(snapNotStarted, { bootAgeMs: 30_000 });
+    expect(d.verdict).toBe('not_started');
+    expect(d.reason).toContain('リロード');
+  });
+
+  it('★齢が不明なら従来どおり(挙動を勝手に変えない)', () => {
+    for (const bad of [undefined, null, 'x']) {
+      const d = buildStoryUserLaneRenderDiag(snapNotStarted, { bootAgeMs: bad });
+      expect(d.verdict, `bootAgeMs=${bad}`).toBe('not_started');
+    }
+    // ctx ごと無い場合も従来どおり
+    expect(buildStoryUserLaneRenderDiag(snapNotStarted).verdict).toBe('not_started');
+  });
+
+  it('★★起動直後でも started>0 なら通常判定に進む(門番が判定を乗っ取らない)', () => {
+    const d = buildStoryUserLaneRenderDiag(
+      { started: 3, activePath: 'heavy', domTilesPainted: 5, mirrorCells: 5, entriesLen: 5 },
+      { bootAgeMs: 100 }
+    );
+    expect(d.verdict).not.toBe('booting');
   });
 });

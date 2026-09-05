@@ -1,7 +1,27 @@
-<!DOCTYPE html>
-<html lang="ja">
+<!DOCTYPE html><html lang="ja" style="color-scheme: light; background: #fffaf2">
   <head>
     <meta charset="UTF-8" />
+    <!--
+      ★v0.1.1413: 黒画面対策を status.html にも入れる(sidepanel.html と同じ対策)。
+
+      ■ 何が起きていたか(2026-08-16 実機・ユーザーのスクショは【全面が真っ黒】)
+        status.html は `color-scheme: light` を **<style> の中(13行目付近)にしか**
+        持っていなかった。CSS が適用されるまでの区間、ユーザー環境がダークだと
+        ブラウザはキャンバス(=まだ何も描かれていない地)を**暗色で塗る**。
+        ＝ 読み込みが遅いほど黒い時間が長い。診断ページは storage read が重いので
+        その区間が長く、実機で全面が黒くなった。
+
+      ■ なぜ <html> のインライン style と meta の【両方】が要るか
+        <html style="color-scheme: light"> は【CSS が適用された後】に効く。
+        `<meta name="color-scheme">` は【パースの初期段階】でブラウザに伝わる。
+        その差の区間を埋めるために両方置く。
+
+      ★sidepanel.html は v0.1.1299〜1316 の7版でこれを確立済み。
+        status.html には**一度も入っていなかった**(実測: meta 0件)。
+      ★light 固定にする理由: このアプリに実質ダークモードは無い。
+        `light dark` と書くとダーク環境でキャンバス既定が暗色になり同じ穴に戻る。
+    -->
+    <meta name="color-scheme" content="light" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>君斗りんく 状態 (AI共有用)</title>
     <style>
@@ -452,6 +472,32 @@
       .nl-extension-context-banner:not([hidden]) {
         display: block;
       }
+      /*
+       * ★v0.1.1371: 初回描画までの読み込み表示。
+       *   ★JS が1行も動かなくても出ること が唯一の役目なので、既定は【表示】。
+       *   初回 render が成功したときだけ JS が --done を付けて消す。
+       *   (既定を hidden にすると「JSが死んだら何も出ない」= 直そうとしている症状に戻る)
+       */
+      .nl-status-boot-notice {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        margin: 0 0 12px;
+        padding: 12px 14px;
+        font-size: 13px;
+        line-height: 1.6;
+        color: #1e3a5f;
+        background: #eef7ff;
+        border: 1px solid #93c5fd;
+        border-radius: 8px;
+      }
+      .nl-status-boot-notice__hint {
+        color: #475569;
+        font-size: 12px;
+      }
+      .nl-status-boot-notice--done {
+        display: none;
+      }
       /* 健全度パネル: 正常は淡い緑、異常(黄/赤)だけ目を引く。対象外は灰の「—」。 */
       section.health-panel { margin: 0 0 14px; }
       /* ★v0.1.1230: 健全度カードは件数が更新のたびに変わり、グリッドの行数が増減して
@@ -462,6 +508,26 @@
         grid-template-columns: repeat(auto-fill, minmax(108px, 1fr));
         gap: 6px;
       }
+      /* ★v0.1.1389 症状ごとの枠。#healthCells は枠(hc-group)を縦に積む器へ変わるので、
+         この要素自身の grid は解除する(中の .health-cells が実際のセル格子)。 */
+      #healthCells {
+        display: block;
+        min-height: 0;
+      }
+      .hc-group { margin: 0 0 12px; }
+      .hc-group:last-child { margin-bottom: 0; }
+      .hc-group-head {
+        display: flex; align-items: baseline; flex-wrap: wrap; gap: 8px;
+        margin: 0 0 5px; padding: 0 2px;
+      }
+      .hc-group-title { font-size: 13px; font-weight: 700; color: var(--nl-fg, #33506e); }
+      .hc-group-hint { font-size: 11px; font-weight: 400; color: #7a8aa0; }
+      .hc-group-badge {
+        font-size: 11px; font-weight: 700; padding: 1px 7px; border-radius: 999px;
+      }
+      /* 色はベタ書き(テーマ変数が無くても必ず読める)。 */
+      .hc-group-badge.hcg-bad { background: #fdecea; color: #8a1c12; border: 1px solid #f2b8b1; }
+      .hc-group-badge.hcg-warn { background: #fff6e0; color: #7a5200; border: 1px solid #f0d79a; }
       .hc {
         /* 健全度カードは数が多く地に溶けやすい=境界を borderStrong ではっきり見せる(DESIGN.md)。 */
         border: 1px solid #d8b89f;
@@ -499,6 +565,16 @@
       /* v0.1.846 総合判定バッジ: 満点=「異常ゼロ」。進行中/対象外は正常扱い=緑。 */
       .health-verdict { font-size: 14px; font-weight: 700; padding: 7px 12px; border-radius: 8px; margin-bottom: 8px; border: 1px solid var(--nl-border); }
       .health-verdict:empty { display: none; }
+      /* ★v0.1.1388 症状別判定(異常時のみ出る・総合判定の下に積む)。
+         色はベタ書き(テーマ変数が無くても必ず読める=判定が読めないのは判定が無いのと同じ)。 */
+      .health-symptom { display: block; font-size: 13px; font-weight: 600; line-height: 1.5;
+        margin-top: 6px; padding: 6px 10px; border-radius: 6px; white-space: pre-wrap; }
+      .health-symptom.hs-bad { background: #fdecea; color: #8a1c12; border: 1px solid #f2b8b1; }
+      .health-symptom.hs-warn { background: #fff6e0; color: #7a5200; border: 1px solid #f0d79a; }
+      /* ★v0.1.1388 本人情報の取得(匿名は仕様上サムネが無い、の説明)。異常ではないので淡色。 */
+      .health-idnote { display: block; font-size: 12px; font-weight: 500; line-height: 1.5;
+        margin-top: 6px; padding: 6px 10px; border-radius: 6px; white-space: pre-wrap;
+        background: #eef4fb; color: #33506e; border: 1px solid #cfe0f2; }
       .hv-ok { color: #2f9e57; border-color: rgba(47, 125, 74, 0.35); background: rgba(47, 125, 74, 0.06); }
       .hv-warn { color: #c8861f; border-color: #e0a93f; background: rgba(224, 169, 63, 0.08); }
       .hv-bad { color: #d4495f; border-color: #d4495f; background: rgba(212, 73, 95, 0.10); }
@@ -559,6 +635,24 @@
       .nl-story-userlane-stack .nl-story-userlane-tier-wrap .nl-story-userlane {
         max-height: none;
         overflow-y: visible;
+      }
+      /*
+       * ★v0.1.1476: popup.html と【同じ窓】を status.html にも入れる。
+       *
+       * ■ ★なぜ抜けていたか
+       *   v0.1.1475 で popup.html にだけ窓を入れた。
+       *   ★status.html は別文書なので CSS が共有されない(設計時に指摘されていた)。
+       *   結果、実機で status の DOM が 3,984個(推奨1,500の2.7倍)まで膨れ、
+       *   ★read を1本も発行していない coreBatch×0 が 3,164ms かかった
+       *   ＝ storage 待ちではなく【メインスレッドが止まっていた】。
+       *
+       * ■ ★これは cap ではない(popup と同じ)
+       *   1枚も消さない。スクロールすれば全員に到達できる。
+       *   ★実測(857枚): 高さ 2,010px → 380px(81%減)・タイルは857枚のまま。
+       */
+      #sceneStoryUserLaneTanu.nl-story-userlane--windowed {
+        max-height: min(42vh, 380px);
+        overflow-y: auto;
       }
       .nl-story-userlane-cell {
         display: inline-flex;
@@ -896,6 +990,30 @@
     </header>
 
     <!--
+      ★v0.1.1371: 初回描画までの「読み込み中」表示(静的・JS不要)。
+
+      ■ なぜ要るか(2026-08-12 ユーザー実機・スクショは【真っ白】)
+        描画経路は setInterval の refresh() だけで、開いてから最初の描画まで
+        最低2秒(+storage混雑分)何も出なかった。その間ユーザーには真っ白で、
+        ★状態速報は refresh() が成功して初めて書かれるので【コピーする物も無い】。
+        ユーザー指摘「どうやってこれで伝えるの・状態速報なくても分かるようにして」。
+
+      ■ 掟: この要素は【HTMLに静的に書く】。JS が1行も動かなくても必ず出る。
+        (拡張の CSP は script-src 'self'=インライン script は不可。
+         [[static-attribute-makes-instrument-lie-2026-08-12]] の逆で、
+         ここは「JSが動かなくても出る」ことが目的なので静的が正しい)
+      ★消すのは初回 render の成功時だけ(status-entry.js の dismissStatusBootNotice)。
+    -->
+    <div id="nlStatusBootNotice" class="nl-status-boot-notice">
+      <strong>読み込み中です…</strong>
+      <span>記録は各 watch タブで続いています（止まっていません）。</span>
+      <span class="nl-status-boot-notice__hint">
+        10秒たっても変わらないときは、ストレージが混雑しています。
+        watch タブを1つ閉じるか、少し待ってから再読み込みしてください。
+      </span>
+    </div>
+
+    <!--
       版混在検知バナー(2026-07-06): 未パック拡張は「本体(manifest/SW)=リロード時のまま、
       このページ=ディスクの新ファイルを都度読む」ため、配信中に copy:ext でディスクを
       差し替えると新旧混在ランタイムになる。DOM は一度作ったら remove せず hidden 切替
@@ -945,6 +1063,26 @@
       <div
         id="statusPopupEmbedHost"
         style="width: 100%; height: 80vh; min-height: 480px; border: 1px solid var(--nl-border, #d5e3f5); border-radius: 12px; overflow: auto; background: transparent"
+      ></div>
+    </section>
+
+    <!--
+      ★v0.1.1500: 会場モードの埋め込み。popup 埋め込み(上)と【同じ流儀】。
+        venue.html?lv=<lv> を iframe で出すだけ＝会場UIは venueBar.js が自分で全部作るので
+        この HTML 側に会場の DOM は1つも要らない(venue.html は全23行)。
+      ★会場は storage 経由でデータを取る(standalone は onLiveComments が来ない設計)。
+        status が新しく storage を読む必要はない＝このページの負荷は増えない。
+      ★出ない時はセクションごと hidden。JS は status-entry.js の ensureStatusVenueIframe。
+      ★kill switch: STATUS_VENUE_EMBED_ENABLED を false にすれば消える。
+    -->
+    <section class="lane" id="statusVenueEmbed" hidden>
+      <h2>🏟️ 会場モードそっくり（本物を埋め込み）</h2>
+      <div class="status-meta" style="margin-bottom: 8px">
+        いま開いている配信の会場モードを、そのまま埋め込んで表示します。誰が来ているか・誰が喋ったかを、診断と同じ画面で見比べられます（本物を映しています）。
+      </div>
+      <div
+        id="statusVenueEmbedHost"
+        style="width: 100%; height: 70vh; min-height: 420px; border: 1px solid var(--nl-border, #d5e3f5); border-radius: 12px; overflow: hidden; background: #0a0b0c"
       ></div>
     </section>
 

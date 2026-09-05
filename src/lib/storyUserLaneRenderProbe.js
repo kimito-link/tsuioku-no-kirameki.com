@@ -18,6 +18,7 @@
  *
  * @module storyUserLaneRenderProbe
  */
+import { PARITY_BOOT_SETTLE_MS } from './parityVerdict.js';
 
 /**
  * v0.1.1006: 「匿名主体の配信」とみなす userId 付き率(%)の上限。これ以下なら、コメントは供給されても
@@ -242,10 +243,40 @@ export function buildStoryUserLaneRenderDiag(probeSnap, ctx) {
   // 「期待件数」= 経路に応じた供給件数（mirror なら鏡、heavy なら entries）。
   const expected = path === 'mirror' ? mirror : path === 'heavy' ? entries : Math.max(mirror, entries, -1);
 
+  // ★2026-08-08: 「まだ落ち着いていない」判定。暫定paintだけで確定paintが0回なら
+  //   読み込み途中＝0件でも異常ではない。heavyEverSettled も併せて見る
+  //   (どちらかでも「確定した」と言えるなら settling ではない)。
+  const provisionalOnly =
+    (Number(s.provisionalTrueCount) || 0) > 0 &&
+    (Number(s.provisionalFalseCount) || 0) === 0 &&
+    s.heavyEverSettled !== true;
+
+  /*
+   * ★起動直後(数百ms)は「呼ばれていない」と断定しない(v0.1.1469)。
+   *
+   * ■ ★実機(2026-08-21・v0.1.1468)で【直しが半分】だったのを塞ぐ
+   *   同じ速報の中で判定が食い違っていた:
+   *     上(3画面パリティ) 🟡 保留 — 起動直後(257ms)＝まだ描き始めていなくて当然
+   *     下(この行)        🔴 描画関数が一度も呼ばれていません   ← ★直し忘れ
+   *   ＝ パリティ判定だけ直して、詳細行を直していなかった。
+   *   ★同じ速報が「レーンは50件出ている・3画面一致」と示していた＝実際は正常。
+   *
+   * ■ 退化させない条件
+   *   ・齢が不明   → 従来どおり not_started(勝手に隠さない)
+   *   ・しきい値超 → 従来どおり not_started(本物の異常を見逃さない)
+   *   しきい値の正本は parityVerdict.js の PARITY_BOOT_SETTLE_MS(1箇所に集約)。
+   */
+  const bootAgeMs = typeof ctx?.bootAgeMs === 'number' ? ctx.bootAgeMs : Number.NaN;
+  const justBooted = Number.isFinite(bootAgeMs) && bootAgeMs >= 0 && bootAgeMs < PARITY_BOOT_SETTLE_MS;
+
   // 症状の判定（council の (A)〜(E)）。
   let verdict = 'unknown';
   let reason = '';
-  if (started === 0) {
+  if (started === 0 && justBooted) {
+    // ★まだ描き始めていなくて当然。緑にもしない(「測れていない」)。
+    verdict = 'booting';
+    reason = `popup 起動直後(${Math.round(bootAgeMs)}ms)＝まだ描き始めていなくて当然です（popup を開いたまま数秒待ってから取り直してください）`;
+  } else if (started === 0) {
     verdict = 'not_started';
     // v0.1.980: 「未起動」のとき次の一手を文言に含める(状態速報1枚で原因と対処が分かるように)。
     //   v0.1.976〜979 で描画は重い処理(heavy refresh)非依存の独立トリガから起動するようにした。
@@ -265,6 +296,25 @@ export function buildStoryUserLaneRenderDiag(probeSnap, ctx) {
     //   いない=0タイルが正常。🔴(描画停止)でなく正常扱いにして誤報を消す。
     verdict = 'empty_source_anonymous';
     reason = `供給${expected}件は匿名主体(userId付き率${Math.round(withUidPercent * 10) / 10}%)で顔タイルに乗れる人がいない＝0件で正常（匿名は識別子が無く応援レーンに出ないのは仕様）`;
+  } else if (expected > 0 && dom === 0 && path === 'heavy' && provisionalOnly) {
+    // ★2026-08-08: 「まだ落ち着いていない」を🔴(描画停止)と言わない。
+    //
+    // ■ 実機で踏んだ誤報(状態速報 2026-08-07T15:59)
+    //   heavy が entries26 で走り domTiles0 の瞬間を切り取って
+    //   「供給26件あるのに画面0件＝描画が止まっています」と🔴を出し、
+    //   「開発者に共有してください」まで案内していた。しかし同じ報告の中で
+    //   鏡149件・会場152席は正常に出ており、描画経路は生きていた。
+    //   実態は popup 起動283ms・幕(shade)が出たまま・heavyEverSettled=false
+    //   =【まだ一度も読み切っていない】だけ。
+    //
+    // ■ 見分け方: 全ての paint が provisional(暫定)で、確定 paint が0回。
+    //   確定が一度でもあって0件なら本物の異常なので従来どおり🔴のまま。
+    //   ★これは [[instrument-name-can-mislead]] と同型(計器が正常を犯人と名指しする)。
+    verdict = 'settling';
+    reason =
+      `供給${expected}件・画面0件ですが、まだ暫定描画のみ(確定paint 0回)＝` +
+      '読み込み途中です。popup を数十秒開いたままにして取り直してください' +
+      '（それでも0件なら本物の異常です）';
   } else if (expected > 0 && dom === 0) {
     verdict = 'source_but_no_dom';
     reason = `供給${expected}件あるのに画面0件＝描画が止まっています（最後の到達=${step || '不明'}）`;
@@ -300,9 +350,29 @@ export function buildStoryUserLaneRenderDiag(probeSnap, ctx) {
     paintSkipReasons: s.paintSkipReasons && typeof s.paintSkipReasons === 'object' ? s.paintSkipReasons : {},
     // heavyRace根治(B)計器: fresh-read で heavy 全件再読みを省いた累計(popup-entry が snap に直接載せる)。
     heavyFreshReadReuseCount: Number(s.heavyFreshReadReuseCount) || 0,
+    // ★v0.1.1341: 再利用が0回のとき【なぜ0なのか】を言うための最後の判定理由
+    //   ('coverage' | 'fresh-read' | '')。0のときこそ出す(異常時に診断が消えるのを防ぐ)。
+    heavyReuseLastReason: String(s.heavyReuseLastReason || ''),
+    // ★v0.1.1363: 世代が進んでも手元の全件で描いた回数(race固着の回避が効いた証拠)。
+    //   ★ここに足し忘れると、popup が snap に載せても行に出ない=個別列挙が値を落とす型。
+    heavyRacePaintedFromCache: Number(s.heavyRacePaintedFromCache) || 0,
+    // ★v0.1.1346: タイル数の往復(点滅)の要約。popup が summarize 済みの物を載せる。
+    laneTileOscillation:
+      s.laneTileOscillation && typeof s.laneTileOscillation === 'object'
+        ? s.laneTileOscillation
+        : null,
     lastRunAgoMs: s.lastRunAgoMs ?? null,
     // v0.1.1040 計器: 段ごとの実 replaceChildren 回数(churn 実測)をそのまま持ち越す。
     laneRepaintCounts: s.laneRepaintCounts && typeof s.laneRepaintCounts === 'object' ? s.laneRepaintCounts : null,
+    laneHollowCounts: s.laneHollowCounts && typeof s.laneHollowCounts === 'object' ? s.laneHollowCounts : null,
+    // ★v0.1.1456: popup(iframe)側の DOM 量(調査計画 Step 1)。watch 側とは別文書。
+    popupDomCensus: s.popupDomCensus && typeof s.popupDomCensus === 'object' ? s.popupDomCensus : null,
+    // ★v0.1.1458: パネルを覆っている当人(黒画面の名指し)。
+    panelCover: s.panelCover && typeof s.panelCover === 'object' ? s.panelCover : null,
+    // ★v0.1.1461: DOMの木の形(総数・深さ・一番太い親)。
+    domTreeCensus: s.domTreeCensus && typeof s.domTreeCensus === 'object' ? s.domTreeCensus : null,
+    // ★v0.1.1462: 拡張の処理時間(全経路の実測)と、★測れていない時間。
+    autoSection: s.autoSection && typeof s.autoSection === 'object' ? s.autoSection : null,
     verdict,
     reason
   };
@@ -338,7 +408,11 @@ export function formatStoryUserLaneRenderDiagLines(diag, ctx) {
       ? '✅'
       : d.verdict === 'unknown'
         ? ''
-        : '🔴';
+        : // ★2026-08-08: 読み込み途中は🔴(異常)ではなく⏳(待ち)。
+          //   🔴のままだと「開発者に共有してください」まで案内して実機で誤報になった。
+          d.verdict === 'settling'
+          ? '⏳'
+          : '🔴';
   lines.push(
     `応援レーン描画: 経路=${pathLabel(d.path)} / ${supply} → 画面${dom} ${mark}` +
       (d.lastReachedStep ? ` / 最後の到達=${d.lastReachedStep}` : '') +
@@ -356,6 +430,54 @@ export function formatStoryUserLaneRenderDiagLines(diag, ctx) {
       `  → 段別 再描画回数(累計): りんく${r.link || 0} / こん太${r.konta || 0} / たぬ姉${r.tanu || 0} / ギフト${r.gift || 0} / 広告${r.ad || 0}` +
         '（特定の段だけ突出＝その段が churn 源）'
     );
+  }
+  /*
+   * ★v0.1.1428 計器: 中身LOD(枠は残す・中身だけ空にする)が実際に効いているか。
+   *   0 のときは「効いていない」ではなく【まだ条件を満たしていない】ことが多いので、
+   *   タイル数と併記して読み手が判断できるようにする
+   *   ([[unobserved-must-not-hide-the-cell]]: 使っていない0と動くはずの0は別物)。
+   */
+  if (d.laneHollowCounts && typeof d.laneHollowCounts === 'object') {
+    const h = d.laneHollowCounts;
+    const hollow = Math.max(0, Math.floor(Number(h.total) || 0));
+    const tiles = Math.max(0, Math.floor(Number(d.domTilesPainted) || 0));
+    lines.push(
+      hollow > 0
+        ? `  → 中身LOD ✅ 枠だけ${hollow}枚(たぬ姉${Math.max(0, Math.floor(Number(h.tanu) || 0))}枚) / 全${tiles}枚 — 画面に入ると中身が入ります(DOMを減らしています)`
+        : `  → 中身LOD ⚪ 枠だけ0枚 / 全${tiles}枚 — たぬ姉段が25枚を超え、かつ匿名のときだけ働きます(条件未達なら0が正常)`
+    );
+  }
+  /*
+   * ★v0.1.1456 調査計画 Step 1: popup(iframe)側の DOM 量。
+   *   ★speed枠の「画面の部品数」は **watch ページ本体**の数(v0.1.1454)。
+   *     こちらは **パネル(iframe)側**＝過去に 13,682 を記録した当の文書。
+   *   ★内訳(基準+タイル+その他)まで出すのは、中身LODで解ける量かを判定するため。
+   */
+  if (d.popupDomCensus && typeof d.popupDomCensus === 'object' && d.popupDomCensus.line) {
+    lines.push(`  → ${d.popupDomCensus.line}`);
+  }
+  /*
+   * ★v0.1.1458: パネルを覆っている当人。
+   *   ★「サイドパネル全部が黒い」と言われても、これまで名指しできなかった
+   *     (外側の計器は iframe しか返せない)。ここは iframe の中で測った結果。
+   */
+  if (d.panelCover && typeof d.panelCover === 'object' && d.panelCover.line) {
+    lines.push(`  → ${d.panelCover.line}`);
+  }
+  /*
+   * ★v0.1.1461: DOMの木の形。可視化拡張の「絵」で人が読み取るものを数字にした。
+   *   ★一番太い親を名指しするので「どこを削るか」が速報1枚で決まる。
+   */
+  if (d.domTreeCensus && typeof d.domTreeCensus === 'object' && d.domTreeCensus.line) {
+    lines.push(`  → ${d.domTreeCensus.line}`);
+  }
+  /*
+   * ★v0.1.1462: 拡張の処理時間を【全経路】実測して出す。
+   *   ★カバー率が低いうちは犯人を断言せず「測れていない」と自己申告する
+   *   (囲んだ中の最大値を指すだけの誤診を防ぐ)。
+   */
+  if (d.autoSection && typeof d.autoSection === 'object' && d.autoSection.line) {
+    lines.push(`  → ${d.autoSection.line}`);
   }
   // v0.1.1033: heavy 完了が settled に到達したか。race 多発=たぬ姉レーンが暫定(直近N件)で固着の真因。
   // ★v0.1.1241: 「一度でも settled したか」で言い分けを変える。race は自己修復の途中経過でもあり
@@ -398,9 +520,68 @@ export function formatStoryUserLaneRenderDiagLines(diag, ctx) {
       );
     }
   }
-  // heavyRace根治(B): fresh-read で heavy 全件再読みを省いた回数(>0=backfill中の re-read ループが切れている証拠)。
-  if (Number(d.heavyFreshReadReuseCount) > 0) {
-    lines.push(`  → heavy 全件再読み省略(fresh-read再利用): ${d.heavyFreshReadReuseCount} 回(backfill中の re-read ループ抑止が効いている)`);
+  /*
+   * heavyRace根治(B): fresh-read で heavy 全件再読みを省いた回数。
+   *
+   * ★v0.1.1341: 【0のときこそ理由を出す】。
+   *   旧実装は `> 0` のときだけ行を出していたため、**効いていないときに限って
+   *   速報から消える**という逆立ちだった(異常時ほど診断が消える型)。
+   *   実測(2026-08-12): heavyFreshReadReuseCount=0 / heavyRaceReturns=26 で
+   *   「再利用が一度も成立していない」のに、その事実が速報に1文字も出なかった。
+   *   ★再利用が成立しない原因は入力側にあるので、最後の判定理由を併記する。
+   */
+  /*
+   * ★v0.1.1346: タイル数の【往復】= 点滅。
+   *   既存の縮小ガードは「前回より減ったか」しか見ないので、
+   *   2⇄30 の往復も 2→2 の停滞も同じ「縮小0回」に見えていた。
+   *   往復が観測されたときだけ出す(正常時のノイズにしない)。
+   */
+  /*
+   * ★v0.1.1355: 「減った」ときも必ず出す(ユーザー実機「途中で増えたり減ったりしてる」)。
+   *   旧実装は reversals>0(往復した)ときだけ出していたため、
+   *   **17→2 に減ったまま戻らない**経過が「✅往復なし」として黙殺されていた
+   *   (異常時ほど診断が消える型)。減少は往復に数えられないので条件に足す。
+   */
+  const osc = d.laneTileOscillation;
+  if (osc && osc.line && (Number(osc.reversals) > 0 || Number(osc.drops) > 0)) {
+    lines.push(`  → ${osc.line}`);
+  }
+  /*
+   * ★v0.1.1363: 世代が進んでいても【手元の全件】で描いた回数。
+   *   実機(2026-08-12)は race 46回・settled 0回で、158件あるのに18件しか描けていなかった
+   *   (会場は①の鏡なので会場も18件=「会場モードがりんくしかない」)。
+   *   再利用が成立していても .then() のマイクロタスク1回で世代が進み、必ず bail していた。
+   *   この行が出る=その固着を抜けた証拠。
+   */
+  const fromCache = Number(d.heavyRacePaintedFromCache) || 0;
+  if (fromCache > 0) {
+    lines.push(`  → 🛡 世代が進んでも手元の全件で描いた: ${fromCache}回(race固着の回避が効いている)`);
+  }
+  const freshReuse = Number(d.heavyFreshReadReuseCount) || 0;
+  const raceN = Number(d.heavyRaceReturns) || 0;
+  if (freshReuse > 0) {
+    lines.push(`  → heavy 全件再読み省略(fresh-read再利用): ${freshReuse} 回(backfill中の re-read ループ抑止が効いている)`);
+  } else if (raceN > 0) {
+    const why = String(d.heavyReuseLastReason || '').trim();
+    /*
+     * ★v0.1.1352: 理由を【原因語+次の一手】まで翻訳する。
+     *   旧実装は「cachedが無い/lv不一致/件数0のいずれか」と3択のまま出しており、
+     *   ユーザーが「どれ?」と聞き返さないと次に進めなかった
+     *   (2026-08-12 指摘「全部質問しなくても分かるようにならないと困る」)。
+     *   decideHeavyChunkReadReuse が理由を名指しするようになったので、ここで人語にする。
+     */
+    const whyLabel = why === 'coverage'
+      ? 'coverage(80%カバー)で再利用済み=fresh-readの出番が無い'
+      : why === 'no-cache'
+        ? '★原因=前回の全件読みが1度も残っていない(popupを開き直した直後/heavy readが毎回失敗)'
+        : why === 'lv-mismatch'
+          ? '★原因=キャッシュが別配信のもの(配信を移った直後なら次の全件読みで解消)'
+          : why === 'empty-cache'
+            ? '★原因=前回の全件読みが0件で終わっている(読めていないのにキャッシュだけ残った)'
+            : why
+              ? `最後の判定理由=${why}`
+              : '★再利用が一度も判定されていない(判定関数まで到達していない)';
+    lines.push(`  → ⚠ heavy 全件再読みの省略が0回(race ${raceN}回) ${whyLabel}`);
   }
   return lines;
 }

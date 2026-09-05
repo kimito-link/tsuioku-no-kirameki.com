@@ -162,6 +162,26 @@
       ]
     },
     {
+      "file": "src/lib/anomalyVerdict.js",
+      "featureCount": 6,
+      "features": [
+        "comeview",
+        "content",
+        "popup",
+        "status",
+        "venue",
+        "web-status"
+      ],
+      "labels": [
+        "コメビュ(別窓)",
+        "記録エンジン(watchページ常駐)",
+        "ポップアップ(応援レーン)",
+        "状態速報ページ",
+        "会場モード(standalone)",
+        "Web版 状態(スマホ)"
+      ]
+    },
+    {
       "file": "src/lib/anonymousIdenticon.js",
       "featureCount": 5,
       "features": [
@@ -798,6 +818,22 @@
       ]
     },
     {
+      "file": "src/lib/voiceFailureTaxonomy.js",
+      "featureCount": 4,
+      "features": [
+        "comeview",
+        "content",
+        "status",
+        "venue"
+      ],
+      "labels": [
+        "コメビュ(別窓)",
+        "記録エンジン(watchページ常駐)",
+        "状態速報ページ",
+        "会場モード(standalone)"
+      ]
+    },
+    {
       "file": "src/lib/voiceSynthFailure.js",
       "featureCount": 4,
       "features": [
@@ -932,7 +968,7 @@
       ]
     },
     {
-      "file": "src/extension/story/renderStoryUserLaneDom.js",
+      "file": "src/extension/story/laneContentLod.js",
       "featureCount": 3,
       "features": [
         "content",
@@ -946,17 +982,17 @@
       ]
     },
     {
-      "file": "src/lib/anomalyVerdict.js",
+      "file": "src/extension/story/renderStoryUserLaneDom.js",
       "featureCount": 3,
       "features": [
+        "content",
         "popup",
-        "status",
-        "web-status"
+        "venue"
       ],
       "labels": [
+        "記録エンジン(watchページ常駐)",
         "ポップアップ(応援レーン)",
-        "状態速報ページ",
-        "Web版 状態(スマホ)"
+        "会場モード(standalone)"
       ]
     },
     {
@@ -1086,6 +1122,20 @@
       ]
     },
     {
+      "file": "src/lib/commentTickerNameLink.js",
+      "featureCount": 3,
+      "features": [
+        "content",
+        "popup",
+        "venue"
+      ],
+      "labels": [
+        "記録エンジン(watchページ常駐)",
+        "ポップアップ(応援レーン)",
+        "会場モード(standalone)"
+      ]
+    },
+    {
       "file": "src/lib/commentTimelineMirror.js",
       "featureCount": 3,
       "features": [
@@ -1199,6 +1249,20 @@
     },
     {
       "file": "src/lib/laneSceneEnvelope.js",
+      "featureCount": 3,
+      "features": [
+        "content",
+        "popup",
+        "venue"
+      ],
+      "labels": [
+        "記録エンジン(watchページ常駐)",
+        "ポップアップ(応援レーン)",
+        "会場モード(standalone)"
+      ]
+    },
+    {
+      "file": "src/lib/laneWindowVerdict.js",
       "featureCount": 3,
       "features": [
         "content",
@@ -1548,6 +1612,20 @@
       ]
     },
     {
+      "file": "src/lib/userProfileLinkHtml.js",
+      "featureCount": 3,
+      "features": [
+        "content",
+        "popup",
+        "venue"
+      ],
+      "labels": [
+        "記録エンジン(watchページ常駐)",
+        "ポップアップ(応援レーン)",
+        "会場モード(standalone)"
+      ]
+    },
+    {
       "file": "src/lib/venueGeometryVerdict.js",
       "featureCount": 3,
       "features": [
@@ -1572,6 +1650,34 @@
       "labels": [
         "記録エンジン(watchページ常駐)",
         "ポップアップ(応援レーン)",
+        "会場モード(standalone)"
+      ]
+    },
+    {
+      "file": "src/lib/venueLiveOpenFlag.js",
+      "featureCount": 3,
+      "features": [
+        "content",
+        "popup",
+        "venue"
+      ],
+      "labels": [
+        "記録エンジン(watchページ常駐)",
+        "ポップアップ(応援レーン)",
+        "会場モード(standalone)"
+      ]
+    },
+    {
+      "file": "src/lib/venueMirrorIntakeDiag.js",
+      "featureCount": 3,
+      "features": [
+        "content",
+        "status",
+        "venue"
+      ],
+      "labels": [
+        "記録エンジン(watchページ常駐)",
+        "状態速報ページ",
         "会場モード(standalone)"
       ]
     },
@@ -1646,7 +1752,49 @@
       ]
     },
     {
+      "file": "src/lib/voiceKeys.js",
+      "featureCount": 3,
+      "features": [
+        "comeview",
+        "content",
+        "venue"
+      ],
+      "labels": [
+        "コメビュ(別窓)",
+        "記録エンジン(watchページ常駐)",
+        "会場モード(standalone)"
+      ]
+    },
+    {
+      "file": "src/lib/voiceLagBudget.js",
+      "featureCount": 3,
+      "features": [
+        "comeview",
+        "content",
+        "venue"
+      ],
+      "labels": [
+        "コメビュ(別窓)",
+        "記録エンジン(watchページ常駐)",
+        "会場モード(standalone)"
+      ]
+    },
+    {
       "file": "src/lib/voiceLoadingState.js",
+      "featureCount": 3,
+      "features": [
+        "comeview",
+        "content",
+        "venue"
+      ],
+      "labels": [
+        "コメビュ(別窓)",
+        "記録エンジン(watchページ常駐)",
+        "会場モード(standalone)"
+      ]
+    },
+    {
+      "file": "src/lib/voicePlayer.js",
       "featureCount": 3,
       "features": [
         "comeview",
@@ -1688,6 +1836,20 @@
       ]
     },
     {
+      "file": "src/lib/yukkuriBroadcastSummary.js",
+      "featureCount": 3,
+      "features": [
+        "content",
+        "popup",
+        "venue"
+      ],
+      "labels": [
+        "記録エンジン(watchページ常駐)",
+        "ポップアップ(応援レーン)",
+        "会場モード(standalone)"
+      ]
+    },
+    {
       "file": "src/shared/niconico/liveId.js",
       "featureCount": 3,
       "features": [
@@ -1711,6 +1873,18 @@
       "labels": [
         "記録エンジン(watchページ常駐)",
         "会場モード(standalone)"
+      ]
+    },
+    {
+      "file": "src/lib/adMessageLines.js",
+      "featureCount": 2,
+      "features": [
+        "popup",
+        "status"
+      ],
+      "labels": [
+        "ポップアップ(応援レーン)",
+        "状態速報ページ"
       ]
     },
     {
@@ -1894,6 +2068,54 @@
       ]
     },
     {
+      "file": "src/lib/charaLiveCensus.js",
+      "featureCount": 2,
+      "features": [
+        "content",
+        "venue"
+      ],
+      "labels": [
+        "記録エンジン(watchページ常駐)",
+        "会場モード(standalone)"
+      ]
+    },
+    {
+      "file": "src/lib/charaLiveController.js",
+      "featureCount": 2,
+      "features": [
+        "content",
+        "venue"
+      ],
+      "labels": [
+        "記録エンジン(watchページ常駐)",
+        "会場モード(standalone)"
+      ]
+    },
+    {
+      "file": "src/lib/charaLiveStage.js",
+      "featureCount": 2,
+      "features": [
+        "content",
+        "venue"
+      ],
+      "labels": [
+        "記録エンジン(watchページ常駐)",
+        "会場モード(standalone)"
+      ]
+    },
+    {
+      "file": "src/lib/charaLiveState.js",
+      "featureCount": 2,
+      "features": [
+        "content",
+        "venue"
+      ],
+      "labels": [
+        "記録エンジン(watchページ常駐)",
+        "会場モード(standalone)"
+      ]
+    },
+    {
       "file": "src/lib/comeviewUserNotes.js",
       "featureCount": 2,
       "features": [
@@ -1978,18 +2200,6 @@
       ]
     },
     {
-      "file": "src/lib/commentTickerNameLink.js",
-      "featureCount": 2,
-      "features": [
-        "content",
-        "popup"
-      ],
-      "labels": [
-        "記録エンジン(watchページ常駐)",
-        "ポップアップ(応援レーン)"
-      ]
-    },
-    {
       "file": "src/lib/concurrentCalibrationLog.js",
       "featureCount": 2,
       "features": [
@@ -2003,6 +2213,18 @@
     },
     {
       "file": "src/lib/concurrentEstimate.js",
+      "featureCount": 2,
+      "features": [
+        "content",
+        "popup"
+      ],
+      "labels": [
+        "記録エンジン(watchページ常駐)",
+        "ポップアップ(応援レーン)"
+      ]
+    },
+    {
+      "file": "src/lib/consoleErrorBuffer.js",
       "featureCount": 2,
       "features": [
         "content",
@@ -2035,6 +2257,18 @@
       "labels": [
         "記録エンジン(watchページ常駐)",
         "ポップアップ(応援レーン)"
+      ]
+    },
+    {
+      "file": "src/lib/diagSchemaCopy.js",
+      "featureCount": 2,
+      "features": [
+        "popup",
+        "status"
+      ],
+      "labels": [
+        "ポップアップ(応援レーン)",
+        "状態速報ページ"
       ]
     },
     {
@@ -2470,6 +2704,30 @@
       ]
     },
     {
+      "file": "src/lib/panelWakeCurtainDiagKey.js",
+      "featureCount": 2,
+      "features": [
+        "popup",
+        "status"
+      ],
+      "labels": [
+        "ポップアップ(応援レーン)",
+        "状態速報ページ"
+      ]
+    },
+    {
+      "file": "src/lib/parityVerdict.js",
+      "featureCount": 2,
+      "features": [
+        "popup",
+        "status"
+      ],
+      "labels": [
+        "ポップアップ(応援レーン)",
+        "状態速報ページ"
+      ]
+    },
+    {
       "file": "src/lib/parseArrivalComment.js",
       "featureCount": 2,
       "features": [
@@ -2734,15 +2992,15 @@
       ]
     },
     {
-      "file": "src/lib/userProfileLinkHtml.js",
+      "file": "src/lib/timeAuthority.js",
       "featureCount": 2,
       "features": [
-        "content",
-        "popup"
+        "popup",
+        "status"
       ],
       "labels": [
-        "記録エンジン(watchページ常駐)",
-        "ポップアップ(応援レーン)"
+        "ポップアップ(応援レーン)",
+        "状態速報ページ"
       ]
     },
     {
@@ -2866,6 +3124,18 @@
       ]
     },
     {
+      "file": "src/lib/venueEntryQueue.js",
+      "featureCount": 2,
+      "features": [
+        "content",
+        "venue"
+      ],
+      "labels": [
+        "記録エンジン(watchページ常駐)",
+        "会場モード(standalone)"
+      ]
+    },
+    {
       "file": "src/lib/venueHeat.js",
       "featureCount": 2,
       "features": [
@@ -2879,6 +3149,30 @@
     },
     {
       "file": "src/lib/venueHoverCard.js",
+      "featureCount": 2,
+      "features": [
+        "content",
+        "venue"
+      ],
+      "labels": [
+        "記録エンジン(watchページ常駐)",
+        "会場モード(standalone)"
+      ]
+    },
+    {
+      "file": "src/lib/venueHoverCardProbe.js",
+      "featureCount": 2,
+      "features": [
+        "content",
+        "venue"
+      ],
+      "labels": [
+        "記録エンジン(watchページ常駐)",
+        "会場モード(standalone)"
+      ]
+    },
+    {
+      "file": "src/lib/venueHoverFacts.js",
       "featureCount": 2,
       "features": [
         "content",
@@ -2963,6 +3257,18 @@
     },
     {
       "file": "src/lib/venuePickupBanner.js",
+      "featureCount": 2,
+      "features": [
+        "content",
+        "venue"
+      ],
+      "labels": [
+        "記録エンジン(watchページ常駐)",
+        "会場モード(standalone)"
+      ]
+    },
+    {
+      "file": "src/lib/venuePresenceNote.js",
       "featureCount": 2,
       "features": [
         "content",
@@ -3130,30 +3436,6 @@
       ]
     },
     {
-      "file": "src/lib/voiceLagBudget.js",
-      "featureCount": 2,
-      "features": [
-        "content",
-        "venue"
-      ],
-      "labels": [
-        "記録エンジン(watchページ常駐)",
-        "会場モード(standalone)"
-      ]
-    },
-    {
-      "file": "src/lib/voicePlayer.js",
-      "featureCount": 2,
-      "features": [
-        "content",
-        "venue"
-      ],
-      "labels": [
-        "記録エンジン(watchページ常駐)",
-        "会場モード(standalone)"
-      ]
-    },
-    {
       "file": "src/lib/watchCelebrationOverlay.js",
       "featureCount": 2,
       "features": [
@@ -3213,6 +3495,26 @@
       ],
       "labels": [
         "ポップアップ(応援レーン)"
+      ]
+    },
+    {
+      "file": "src/domain/lane/evidence.js",
+      "featureCount": 1,
+      "features": [
+        "popup"
+      ],
+      "labels": [
+        "ポップアップ(応援レーン)"
+      ]
+    },
+    {
+      "file": "src/domain/observations/vocabulary.js",
+      "featureCount": 1,
+      "features": [
+        "status"
+      ],
+      "labels": [
+        "状態速報ページ"
       ]
     },
     {
@@ -3277,6 +3579,26 @@
     },
     {
       "file": "src/extension/popup-entry.js",
+      "featureCount": 1,
+      "features": [
+        "popup"
+      ],
+      "labels": [
+        "ポップアップ(応援レーン)"
+      ]
+    },
+    {
+      "file": "src/extension/popup/attachAiDiagButtonHandler.js",
+      "featureCount": 1,
+      "features": [
+        "popup"
+      ],
+      "labels": [
+        "ポップアップ(応援レーン)"
+      ]
+    },
+    {
+      "file": "src/extension/popup/renderAcquisitionDashboard.js",
       "featureCount": 1,
       "features": [
         "popup"
@@ -3366,6 +3688,16 @@
       ]
     },
     {
+      "file": "src/lib/aiShareTextChanged.js",
+      "featureCount": 1,
+      "features": [
+        "status"
+      ],
+      "labels": [
+        "状態速報ページ"
+      ]
+    },
+    {
       "file": "src/lib/audienceEngagementGap.js",
       "featureCount": 1,
       "features": [
@@ -3396,6 +3728,16 @@
       ]
     },
     {
+      "file": "src/lib/autoSectionCensus.js",
+      "featureCount": 1,
+      "features": [
+        "popup"
+      ],
+      "labels": [
+        "ポップアップ(応援レーン)"
+      ]
+    },
+    {
       "file": "src/lib/avatarEntryCounts.js",
       "featureCount": 1,
       "features": [
@@ -3407,6 +3749,26 @@
     },
     {
       "file": "src/lib/avatarLoadReport.js",
+      "featureCount": 1,
+      "features": [
+        "status"
+      ],
+      "labels": [
+        "状態速報ページ"
+      ]
+    },
+    {
+      "file": "src/lib/avatarRetrySweepThrottle.js",
+      "featureCount": 1,
+      "features": [
+        "popup"
+      ],
+      "labels": [
+        "ポップアップ(応援レーン)"
+      ]
+    },
+    {
+      "file": "src/lib/backfillBottleneck.js",
       "featureCount": 1,
       "features": [
         "status"
@@ -3477,6 +3839,36 @@
     },
     {
       "file": "src/lib/backgroundWatchTab.js",
+      "featureCount": 1,
+      "features": [
+        "status"
+      ],
+      "labels": [
+        "状態速報ページ"
+      ]
+    },
+    {
+      "file": "src/lib/bandScale.js",
+      "featureCount": 1,
+      "features": [
+        "popup"
+      ],
+      "labels": [
+        "ポップアップ(応援レーン)"
+      ]
+    },
+    {
+      "file": "src/lib/bandScaleBoot.js",
+      "featureCount": 1,
+      "features": [
+        "popup"
+      ],
+      "labels": [
+        "ポップアップ(応援レーン)"
+      ]
+    },
+    {
+      "file": "src/lib/blackScreenOwnerCells.js",
       "featureCount": 1,
       "features": [
         "status"
@@ -3636,6 +4028,16 @@
       ]
     },
     {
+      "file": "src/lib/buildAgeCell.js",
+      "featureCount": 1,
+      "features": [
+        "status"
+      ],
+      "labels": [
+        "状態速報ページ"
+      ]
+    },
+    {
       "file": "src/lib/buildNorthStarAdRankingStatsHtml.js",
       "featureCount": 1,
       "features": [
@@ -3653,6 +4055,16 @@
       ],
       "labels": [
         "ポップアップ(応援レーン)"
+      ]
+    },
+    {
+      "file": "src/lib/buriedInstrumentCells.js",
+      "featureCount": 1,
+      "features": [
+        "status"
+      ],
+      "labels": [
+        "状態速報ページ"
       ]
     },
     {
@@ -3683,6 +4095,16 @@
       ],
       "labels": [
         "ポップアップ(応援レーン)"
+      ]
+    },
+    {
+      "file": "src/lib/catchingUpVerdict.js",
+      "featureCount": 1,
+      "features": [
+        "status"
+      ],
+      "labels": [
+        "状態速報ページ"
       ]
     },
     {
@@ -3766,7 +4188,37 @@
       ]
     },
     {
+      "file": "src/lib/cloakFailsafeMarker.js",
+      "featureCount": 1,
+      "features": [
+        "popup"
+      ],
+      "labels": [
+        "ポップアップ(応援レーン)"
+      ]
+    },
+    {
       "file": "src/lib/comeviewInstantRender.js",
+      "featureCount": 1,
+      "features": [
+        "comeview"
+      ],
+      "labels": [
+        "コメビュ(別窓)"
+      ]
+    },
+    {
+      "file": "src/lib/comeviewTimelineDiff.js",
+      "featureCount": 1,
+      "features": [
+        "comeview"
+      ],
+      "labels": [
+        "コメビュ(別窓)"
+      ]
+    },
+    {
+      "file": "src/lib/comeviewWindowGeometry.js",
       "featureCount": 1,
       "features": [
         "comeview"
@@ -4096,6 +4548,16 @@
       ]
     },
     {
+      "file": "src/lib/commentWriteModeDiagKey.js",
+      "featureCount": 1,
+      "features": [
+        "content"
+      ],
+      "labels": [
+        "記録エンジン(watchページ常駐)"
+      ]
+    },
+    {
       "file": "src/lib/completenessScore.js",
       "featureCount": 1,
       "features": [
@@ -4146,16 +4608,6 @@
       ]
     },
     {
-      "file": "src/lib/consoleErrorBuffer.js",
-      "featureCount": 1,
-      "features": [
-        "content"
-      ],
-      "labels": [
-        "記録エンジン(watchページ常駐)"
-      ]
-    },
-    {
       "file": "src/lib/contentViewerNicoadCelebration.js",
       "featureCount": 1,
       "features": [
@@ -4167,6 +4619,16 @@
     },
     {
       "file": "src/lib/copyTextWithFallback.js",
+      "featureCount": 1,
+      "features": [
+        "status"
+      ],
+      "labels": [
+        "状態速報ページ"
+      ]
+    },
+    {
+      "file": "src/lib/currentLiveIdOrigin.js",
       "featureCount": 1,
       "features": [
         "status"
@@ -4376,6 +4838,26 @@
       ]
     },
     {
+      "file": "src/lib/domTreeCensus.js",
+      "featureCount": 1,
+      "features": [
+        "popup"
+      ],
+      "labels": [
+        "ポップアップ(応援レーン)"
+      ]
+    },
+    {
+      "file": "src/lib/effectDetailCells.js",
+      "featureCount": 1,
+      "features": [
+        "status"
+      ],
+      "labels": [
+        "状態速報ページ"
+      ]
+    },
+    {
       "file": "src/lib/embeddedDataExtract.js",
       "featureCount": 1,
       "features": [
@@ -4506,6 +4988,16 @@
       ]
     },
     {
+      "file": "src/lib/externalFetchCells.js",
+      "featureCount": 1,
+      "features": [
+        "status"
+      ],
+      "labels": [
+        "状態速報ページ"
+      ]
+    },
+    {
       "file": "src/lib/externalLinksSectionHtml.js",
       "featureCount": 1,
       "features": [
@@ -4513,6 +5005,16 @@
       ],
       "labels": [
         "ポップアップ(応援レーン)"
+      ]
+    },
+    {
+      "file": "src/lib/finalDetailCells.js",
+      "featureCount": 1,
+      "features": [
+        "status"
+      ],
+      "labels": [
+        "状態速報ページ"
       ]
     },
     {
@@ -4563,6 +5065,16 @@
       ],
       "labels": [
         "ポップアップ(応援レーン)"
+      ]
+    },
+    {
+      "file": "src/lib/giftAdPipelineCensus.js",
+      "featureCount": 1,
+      "features": [
+        "status"
+      ],
+      "labels": [
+        "状態速報ページ"
       ]
     },
     {
@@ -4756,6 +5268,16 @@
       ]
     },
     {
+      "file": "src/lib/healthCellGroups.js",
+      "featureCount": 1,
+      "features": [
+        "status"
+      ],
+      "labels": [
+        "状態速報ページ"
+      ]
+    },
+    {
       "file": "src/lib/healthCells.js",
       "featureCount": 1,
       "features": [
@@ -4763,6 +5285,16 @@
       ],
       "labels": [
         "状態速報ページ"
+      ]
+    },
+    {
+      "file": "src/lib/heavyCachePreserve.js",
+      "featureCount": 1,
+      "features": [
+        "popup"
+      ],
+      "labels": [
+        "ポップアップ(応援レーン)"
       ]
     },
     {
@@ -4783,6 +5315,16 @@
       ],
       "labels": [
         "記録エンジン(watchページ常駐)"
+      ]
+    },
+    {
+      "file": "src/lib/hiddenPublishPolicy.js",
+      "featureCount": 1,
+      "features": [
+        "popup"
+      ],
+      "labels": [
+        "ポップアップ(応援レーン)"
       ]
     },
     {
@@ -4807,6 +5349,16 @@
     },
     {
       "file": "src/lib/htmlReportConceptGuide.js",
+      "featureCount": 1,
+      "features": [
+        "popup"
+      ],
+      "labels": [
+        "ポップアップ(応援レーン)"
+      ]
+    },
+    {
+      "file": "src/lib/identityAcquisitionCensus.js",
       "featureCount": 1,
       "features": [
         "popup"
@@ -5126,6 +5678,16 @@
       ]
     },
     {
+      "file": "src/lib/laneDetailCells.js",
+      "featureCount": 1,
+      "features": [
+        "status"
+      ],
+      "labels": [
+        "状態速報ページ"
+      ]
+    },
+    {
       "file": "src/lib/laneDiag.js",
       "featureCount": 1,
       "features": [
@@ -5137,6 +5699,26 @@
     },
     {
       "file": "src/lib/laneDomSelfMeasure.js",
+      "featureCount": 1,
+      "features": [
+        "popup"
+      ],
+      "labels": [
+        "ポップアップ(応援レーン)"
+      ]
+    },
+    {
+      "file": "src/lib/laneMirrorPerLivePublish.js",
+      "featureCount": 1,
+      "features": [
+        "popup"
+      ],
+      "labels": [
+        "ポップアップ(応援レーン)"
+      ]
+    },
+    {
+      "file": "src/lib/lanePublishSkipDiag.js",
       "featureCount": 1,
       "features": [
         "popup"
@@ -5173,6 +5755,26 @@
       ],
       "labels": [
         "ポップアップ(応援レーン)"
+      ]
+    },
+    {
+      "file": "src/lib/laneTileOscillation.js",
+      "featureCount": 1,
+      "features": [
+        "popup"
+      ],
+      "labels": [
+        "ポップアップ(応援レーン)"
+      ]
+    },
+    {
+      "file": "src/lib/lastWatchUrlAdoption.js",
+      "featureCount": 1,
+      "features": [
+        "status"
+      ],
+      "labels": [
+        "状態速報ページ"
       ]
     },
     {
@@ -5213,6 +5815,16 @@
       ],
       "labels": [
         "記録エンジン(watchページ常駐)"
+      ]
+    },
+    {
+      "file": "src/lib/livesCardSignature.js",
+      "featureCount": 1,
+      "features": [
+        "status"
+      ],
+      "labels": [
+        "状態速報ページ"
       ]
     },
     {
@@ -5283,6 +5895,26 @@
       ],
       "labels": [
         "記録エンジン(watchページ常駐)"
+      ]
+    },
+    {
+      "file": "src/lib/mainThreadBlockerBoot.js",
+      "featureCount": 1,
+      "features": [
+        "popup"
+      ],
+      "labels": [
+        "ポップアップ(応援レーン)"
+      ]
+    },
+    {
+      "file": "src/lib/mainThreadBlockerCensus.js",
+      "featureCount": 1,
+      "features": [
+        "popup"
+      ],
+      "labels": [
+        "ポップアップ(応援レーン)"
       ]
     },
     {
@@ -5436,6 +6068,16 @@
       ]
     },
     {
+      "file": "src/lib/memoryPressureProbe.js",
+      "featureCount": 1,
+      "features": [
+        "content"
+      ],
+      "labels": [
+        "記録エンジン(watchページ常駐)"
+      ]
+    },
+    {
       "file": "src/lib/mergeGiftHistoryThrows.js",
       "featureCount": 1,
       "features": [
@@ -5516,6 +6158,26 @@
       ]
     },
     {
+      "file": "src/lib/nameplateToggleBoot.js",
+      "featureCount": 1,
+      "features": [
+        "popup"
+      ],
+      "labels": [
+        "ポップアップ(応援レーン)"
+      ]
+    },
+    {
+      "file": "src/lib/nameplateToggleFinder.js",
+      "featureCount": 1,
+      "features": [
+        "content"
+      ],
+      "labels": [
+        "記録エンジン(watchページ常駐)"
+      ]
+    },
+    {
       "file": "src/lib/ndgrBacklog.js",
       "featureCount": 1,
       "features": [
@@ -5546,7 +6208,27 @@
       ]
     },
     {
+      "file": "src/lib/ndgrHiddenFlushThreshold.js",
+      "featureCount": 1,
+      "features": [
+        "content"
+      ],
+      "labels": [
+        "記録エンジン(watchページ常駐)"
+      ]
+    },
+    {
       "file": "src/lib/ndgrMessageDedupe.js",
+      "featureCount": 1,
+      "features": [
+        "page-intercept"
+      ],
+      "labels": [
+        "ページ傍受"
+      ]
+    },
+    {
+      "file": "src/lib/ndgrUnknownSamplesBudget.js",
       "featureCount": 1,
       "features": [
         "page-intercept"
@@ -5626,6 +6308,16 @@
       ]
     },
     {
+      "file": "src/lib/noActiveWatchDecision.js",
+      "featureCount": 1,
+      "features": [
+        "popup"
+      ],
+      "labels": [
+        "ポップアップ(応援レーン)"
+      ]
+    },
+    {
       "file": "src/lib/northStarAcquisitionGauge.js",
       "featureCount": 1,
       "features": [
@@ -5643,6 +6335,16 @@
       ],
       "labels": [
         "ポップアップ(応援レーン)"
+      ]
+    },
+    {
+      "file": "src/lib/northStarDetailCells.js",
+      "featureCount": 1,
+      "features": [
+        "status"
+      ],
+      "labels": [
+        "状態速報ページ"
       ]
     },
     {
@@ -5806,6 +6508,26 @@
       ]
     },
     {
+      "file": "src/lib/ouenBanner.js",
+      "featureCount": 1,
+      "features": [
+        "popup"
+      ],
+      "labels": [
+        "ポップアップ(応援レーン)"
+      ]
+    },
+    {
+      "file": "src/lib/ouenBannerDom.js",
+      "featureCount": 1,
+      "features": [
+        "popup"
+      ],
+      "labels": [
+        "ポップアップ(応援レーン)"
+      ]
+    },
+    {
       "file": "src/lib/ownPostedUserIdSet.js",
       "featureCount": 1,
       "features": [
@@ -5813,6 +6535,16 @@
       ],
       "labels": [
         "ポップアップ(応援レーン)"
+      ]
+    },
+    {
+      "file": "src/lib/paintCompletionProbe.js",
+      "featureCount": 1,
+      "features": [
+        "status"
+      ],
+      "labels": [
+        "状態速報ページ"
       ]
     },
     {
@@ -5836,13 +6568,33 @@
       ]
     },
     {
-      "file": "src/lib/parityVerdict.js",
+      "file": "src/lib/panelCoverCulprit.js",
       "featureCount": 1,
       "features": [
-        "status"
+        "popup"
       ],
       "labels": [
-        "状態速報ページ"
+        "ポップアップ(応援レーン)"
+      ]
+    },
+    {
+      "file": "src/lib/panelWakeCurtain.js",
+      "featureCount": 1,
+      "features": [
+        "popup"
+      ],
+      "labels": [
+        "ポップアップ(応援レーン)"
+      ]
+    },
+    {
+      "file": "src/lib/panelWakeCurtainDom.js",
+      "featureCount": 1,
+      "features": [
+        "popup"
+      ],
+      "labels": [
+        "ポップアップ(応援レーン)"
       ]
     },
     {
@@ -5857,6 +6609,16 @@
     },
     {
       "file": "src/lib/parseInterestArrivalComment.js",
+      "featureCount": 1,
+      "features": [
+        "popup"
+      ],
+      "labels": [
+        "ポップアップ(応援レーン)"
+      ]
+    },
+    {
+      "file": "src/lib/passiveMirrorLiveIdGuard.js",
       "featureCount": 1,
       "features": [
         "popup"
@@ -5956,6 +6718,16 @@
       ]
     },
     {
+      "file": "src/lib/popupCloakRevealTiming.js",
+      "featureCount": 1,
+      "features": [
+        "popup"
+      ],
+      "labels": [
+        "ポップアップ(応援レーン)"
+      ]
+    },
+    {
       "file": "src/lib/popupConcurrentEstimateGate.js",
       "featureCount": 1,
       "features": [
@@ -5996,7 +6768,27 @@
       ]
     },
     {
+      "file": "src/lib/popupDomCensus.js",
+      "featureCount": 1,
+      "features": [
+        "popup"
+      ],
+      "labels": [
+        "ポップアップ(応援レーン)"
+      ]
+    },
+    {
       "file": "src/lib/popupEntryPendingSelfPost.js",
+      "featureCount": 1,
+      "features": [
+        "popup"
+      ],
+      "labels": [
+        "ポップアップ(応援レーン)"
+      ]
+    },
+    {
+      "file": "src/lib/popupErrorLine.js",
       "featureCount": 1,
       "features": [
         "popup"
@@ -6097,6 +6889,16 @@
     },
     {
       "file": "src/lib/popupWindowEmptyHeight.js",
+      "featureCount": 1,
+      "features": [
+        "popup"
+      ],
+      "labels": [
+        "ポップアップ(応援レーン)"
+      ]
+    },
+    {
+      "file": "src/lib/prefersReducedMotion.js",
       "featureCount": 1,
       "features": [
         "popup"
@@ -6253,6 +7055,16 @@
       ],
       "labels": [
         "ポップアップ(応援レーン)"
+      ]
+    },
+    {
+      "file": "src/lib/refreshCycleDeadline.js",
+      "featureCount": 1,
+      "features": [
+        "status"
+      ],
+      "labels": [
+        "状態速報ページ"
       ]
     },
     {
@@ -6576,6 +7388,26 @@
       ]
     },
     {
+      "file": "src/lib/sidepanelSelfDiagKey.js",
+      "featureCount": 1,
+      "features": [
+        "status"
+      ],
+      "labels": [
+        "状態速報ページ"
+      ]
+    },
+    {
+      "file": "src/lib/silentFailureCells.js",
+      "featureCount": 1,
+      "features": [
+        "status"
+      ],
+      "labels": [
+        "状態速報ページ"
+      ]
+    },
+    {
       "file": "src/lib/singleFlightByKey.js",
       "featureCount": 1,
       "features": [
@@ -6583,6 +7415,16 @@
       ],
       "labels": [
         "ポップアップ(応援レーン)"
+      ]
+    },
+    {
+      "file": "src/lib/sourceProvenance.js",
+      "featureCount": 1,
+      "features": [
+        "status"
+      ],
+      "labels": [
+        "状態速報ページ"
       ]
     },
     {
@@ -6636,6 +7478,16 @@
       ]
     },
     {
+      "file": "src/lib/statusCoreBatch.js",
+      "featureCount": 1,
+      "features": [
+        "status"
+      ],
+      "labels": [
+        "状態速報ページ"
+      ]
+    },
+    {
       "file": "src/lib/statusExtrasBatch.js",
       "featureCount": 1,
       "features": [
@@ -6647,6 +7499,26 @@
     },
     {
       "file": "src/lib/statusMindmapModel.js",
+      "featureCount": 1,
+      "features": [
+        "status"
+      ],
+      "labels": [
+        "状態速報ページ"
+      ]
+    },
+    {
+      "file": "src/lib/statusMindmapSignature.js",
+      "featureCount": 1,
+      "features": [
+        "status"
+      ],
+      "labels": [
+        "状態速報ページ"
+      ]
+    },
+    {
+      "file": "src/lib/statusReadPolicy.js",
       "featureCount": 1,
       "features": [
         "status"
@@ -6693,6 +7565,26 @@
       ],
       "labels": [
         "状態速報ページ"
+      ]
+    },
+    {
+      "file": "src/lib/storageRefreshTriggerKey.js",
+      "featureCount": 1,
+      "features": [
+        "popup"
+      ],
+      "labels": [
+        "ポップアップ(応援レーン)"
+      ]
+    },
+    {
+      "file": "src/lib/storedCommentDedupeKey.js",
+      "featureCount": 1,
+      "features": [
+        "popup"
+      ],
+      "labels": [
+        "ポップアップ(応援レーン)"
       ]
     },
     {
@@ -6906,6 +7798,16 @@
       ]
     },
     {
+      "file": "src/lib/symptomVerdicts.js",
+      "featureCount": 1,
+      "features": [
+        "status"
+      ],
+      "labels": [
+        "状態速報ページ"
+      ]
+    },
+    {
       "file": "src/lib/tabLeaderLock.js",
       "featureCount": 1,
       "features": [
@@ -7016,6 +7918,16 @@
       ]
     },
     {
+      "file": "src/lib/unknownVsAbsent.js",
+      "featureCount": 1,
+      "features": [
+        "status"
+      ],
+      "labels": [
+        "状態速報ページ"
+      ]
+    },
+    {
       "file": "src/lib/userEntryAvatarResolve.js",
       "featureCount": 1,
       "features": [
@@ -7066,6 +7978,56 @@
       ]
     },
     {
+      "file": "src/lib/venueAvatarReport.js",
+      "featureCount": 1,
+      "features": [
+        "status"
+      ],
+      "labels": [
+        "状態速報ページ"
+      ]
+    },
+    {
+      "file": "src/lib/venueModeCensus.js",
+      "featureCount": 1,
+      "features": [
+        "status"
+      ],
+      "labels": [
+        "状態速報ページ"
+      ]
+    },
+    {
+      "file": "src/lib/venueOpenCache.js",
+      "featureCount": 1,
+      "features": [
+        "popup"
+      ],
+      "labels": [
+        "ポップアップ(応援レーン)"
+      ]
+    },
+    {
+      "file": "src/lib/verifiedAvatarRegistry.js",
+      "featureCount": 1,
+      "features": [
+        "popup"
+      ],
+      "labels": [
+        "ポップアップ(応援レーン)"
+      ]
+    },
+    {
+      "file": "src/lib/viewerCountProbeMerge.js",
+      "featureCount": 1,
+      "features": [
+        "popup"
+      ],
+      "labels": [
+        "ポップアップ(応援レーン)"
+      ]
+    },
+    {
       "file": "src/lib/viewerSelfLaneAggregate.js",
       "featureCount": 1,
       "features": [
@@ -7076,6 +8038,16 @@
       ]
     },
     {
+      "file": "src/lib/voiceBubbleRealtimeParity.js",
+      "featureCount": 1,
+      "features": [
+        "status"
+      ],
+      "labels": [
+        "状態速報ページ"
+      ]
+    },
+    {
       "file": "src/lib/voiceComment.js",
       "featureCount": 1,
       "features": [
@@ -7083,6 +8055,26 @@
       ],
       "labels": [
         "記録エンジン(watchページ常駐)"
+      ]
+    },
+    {
+      "file": "src/lib/voiceDetailCells.js",
+      "featureCount": 1,
+      "features": [
+        "status"
+      ],
+      "labels": [
+        "状態速報ページ"
+      ]
+    },
+    {
+      "file": "src/lib/voiceReachabilityProbe.js",
+      "featureCount": 1,
+      "features": [
+        "status"
+      ],
+      "labels": [
+        "状態速報ページ"
       ]
     },
     {
@@ -7206,6 +8198,16 @@
       ]
     },
     {
+      "file": "src/lib/watchSnapshotKey.js",
+      "featureCount": 1,
+      "features": [
+        "popup"
+      ],
+      "labels": [
+        "ポップアップ(応援レーン)"
+      ]
+    },
+    {
       "file": "src/lib/watchSnapshotOfficialFields.js",
       "featureCount": 1,
       "features": [
@@ -7246,7 +8248,7 @@
       ]
     },
     {
-      "file": "src/lib/yukkuriBroadcastSummary.js",
+      "file": "src/lib/yieldToBrowserPaint.js",
       "featureCount": 1,
       "features": [
         "popup"

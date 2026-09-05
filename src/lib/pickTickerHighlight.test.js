@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   TICKER_BUCKET_MS,
+  TICKER_MIN_TEXT_LEN,
   pickTickerHighlightEntry,
   tickerHighlightKey
 } from './pickTickerHighlight.js';
@@ -109,6 +110,28 @@ describe('pickTickerHighlightEntry — フォールバック(最悪ケースが�
     expect(r.why).toBe('fallback');
     expect(r.entry).not.toBeNull();
     expect(r.stats.filteredTooShort).toBeGreaterThan(0);
+  });
+
+  /*
+   * ★v0.1.1337: 極短判定の【境界】を固定する。
+   *   従来のテストは「w」(1文字)でしか検査しておらず、閾値を 4→3 に変えても
+   *   1つも赤にならなかった＝閾値を守っていなかった([[wiring-test-mutation-check]] の型)。
+   *   境界の両側(通る最短 / 落ちる最長)を実データ相当の日本語で固定する。
+   */
+  it('★極短判定の境界を固定する(閾値そのものを守る)', () => {
+    expect(TICKER_MIN_TEXT_LEN).toBe(3);
+
+    // 閾値ちょうど(3文字)は【通る】。実データ「うゆゆ」「まじ卍」相当。
+    const pass = [entry(BASE - 100, 'うゆゆ')];
+    const rPass = pickTickerHighlightEntry(pass, BASE + 100);
+    expect(rPass.stats.filteredTooShort).toBe(0);
+    expect(rPass.why).toBe('scored');
+
+    // 閾値未満(2文字)は【落ちる】。「草」「88」を枠に出さないための下限。
+    const drop = [entry(BASE - 100, '88')];
+    const rDrop = pickTickerHighlightEntry(drop, BASE + 100);
+    expect(rDrop.stats.filteredTooShort).toBe(1);
+    expect(rDrop.why).toBe('fallback');
   });
 
   it('空リストは none(判定不能を明示する)', () => {

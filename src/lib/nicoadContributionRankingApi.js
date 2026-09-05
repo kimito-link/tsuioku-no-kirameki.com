@@ -156,8 +156,15 @@ function resolveNicoUserPageUrl(rawUrl, userId) {
  *   - サーバ提供順を信頼し再ソートしない（同点同 rank をそのまま保持）。
  *   - userPageUrl は正規化してから付与（officialDomRankingRowsToStripRooms は厳格）。
  *
+ * ★v0.1.1307（2026-08-10 実機 lv351140568 で確定）: `thumbnailUrl` が
+ *   `usericon/defaults/blank.jpg`（＝アカウントにアイコン未設定）の行は `hasNoIcon:true` を付ける。
+ *   従来はこの情報を捨てていたため、下流（adLanePicksFromRooms）が「サムネ情報なし」と解釈して
+ *   uid から CDN URL を導出し、実体が無いので 404 →ブラウザの壊れ画像＝白丸が並んでいた
+ *   （実測: uid=138442683 の導出URL=404 / uid=38947059=200。10件中7件が blank.jpg）。
+ *   URL 自体は載せない（誤って「実サムネ」として採用されるのを防ぐ）＝「無い」という事実だけ運ぶ。
+ *
  * @param {unknown} json nicoad API レスポンスの生 JSON（SW が res.json() したもの）
- * @returns {Array<{rank:number, name:string, contribution:number, isAnonymous:boolean, userPageUrl?:string}>|null}
+ * @returns {Array<{rank:number, name:string, contribution:number, isAnonymous:boolean, userPageUrl?:string, hasNoIcon?:boolean}>|null}
  */
 export function normalizeNicoadRankingResponse(json) {
   if (!isLikelyNicoadRankingShape(json)) return null;
@@ -165,7 +172,7 @@ export function normalizeNicoadRankingResponse(json) {
     /** @type {Record<string, any>} */ (json).data.ranking
   );
 
-  /** @type {Array<{rank:number, name:string, contribution:number, isAnonymous:boolean, userPageUrl?:string}>} */
+  /** @type {Array<{rank:number, name:string, contribution:number, isAnonymous:boolean, userPageUrl?:string, hasNoIcon?:boolean}>} */
   const rows = [];
   for (let i = 0; i < ranking.length; i++) {
     const r = ranking[i];
@@ -195,12 +202,18 @@ export function normalizeNicoadRankingResponse(json) {
       userPageUrl = resolveNicoUserPageUrl(r.userPageUrl, r.userId);
     }
 
+    // ★v0.1.1307: 公式が「アイコン未設定」と教えている事実だけを運ぶ（URL は載せない）。
+    //   defaults/ 配下は公式のプレースホルダ置き場（blank.jpg / blank_s.jpg 等）。
+    const thumbnailUrl = String(r.thumbnailUrl == null ? '' : r.thumbnailUrl).trim();
+    const hasNoIcon = /\/usericon\/defaults\//i.test(thumbnailUrl);
+
     rows.push({
       rank,
       name,
       contribution,
       isAnonymous,
-      ...(userPageUrl ? { userPageUrl } : {})
+      ...(userPageUrl ? { userPageUrl } : {}),
+      ...(hasNoIcon ? { hasNoIcon: true } : {})
     });
   }
 

@@ -88,7 +88,27 @@ describe('venueSeatEntryToLaneItem', () => {
 });
 
 describe('bucketVenueLaneSeats', () => {
-  it('popup と同じ比較器順で link/konta に分ける(2026-07-14: 匿名は常に除外)', () => {
+  /*
+   * ★v0.1.1375(ユーザー確定 2026-08-12): 匿名は【たぬ姉段に出す】。
+   *
+   * ■ 何が起きていたか(実機)
+   *   「会場モードが りんくのみで こん太 たぬ姉が反映されてない」
+   *   速報の会場行も `link7 gift0 ad4 konta0 tanu332`。
+   *
+   * ■ なぜ旧契約(2026-07-14 の匿名除外)を取り下げたか
+   *   会場の設計正本(venueSeats.js 冒頭・2026-06-17 ユーザー確定)はこう書いている:
+   *     「匿名(a:xxx・184)か数値IDかは無関係＝アクションした人は全員、会場の主役」
+   *     「userId があれば匿名でも座る」「匿名も同じ土俵」
+   *   さらに段の正本 src/domain/lane/tier.js は【匿名を必ず たぬ姉段(tier1)】に置く契約
+   *   (matchesTanuPolicy が最優先＝たぬ姉段の存在理由そのもの)。
+   *   ①POP(popup-entry.js:6957)も匿名を除外していない。
+   *   ★つまり 2026-07-14 の除外こそが【会場だけの独自ルール】で、
+   *     同じコメントが掲げた「①と完全に同じ顔ぶれ」を自分で破っていた
+   *     ([[decisions-accumulate-into-regressions-2026-08-11]])。
+   *
+   * ★uid 無しの除外は【維持】(正本 resolveLaneTier でも tier=0=候補除外)。
+   */
+  it('★匿名(a:)は たぬ姉段に出す(2026-08-12 ユーザー確定・除外を撤回)', () => {
     const buckets = bucketVenueLaneSeats([
       seat(0, 'a:1', '', ''),
       seat(1, '22222', '', ''),
@@ -97,7 +117,8 @@ describe('bucketVenueLaneSeats', () => {
 
     expect(buckets.link.map((x) => x.entry.userId)).toEqual(['11111']);
     expect(buckets.konta.map((x) => x.entry.userId)).toEqual(['22222']);
-    expect(buckets.tanu.map((x) => x.entry.userId)).toEqual([]);
+    // ★ここが撤回点: 旧実装は [] だった(匿名を段の手前で全除外していた)。
+    expect(buckets.tanu.map((x) => x.entry.userId)).toEqual(['a:1']);
   });
 
   it('maxTotal は5段合計の上限として効く', () => {
@@ -114,18 +135,45 @@ describe('bucketVenueLaneSeats', () => {
     expect(flattenVenueLaneBuckets(buckets).map((x) => x.entry.userId)).toEqual(['11111', '22222']);
   });
 
-  // --- 2026-07-14(会場独自受け皿の撤去): 匿名・無uidは会場のどこにも表示しない ---
-  it('匿名系(a:)と無uidは会場のどこにも表示されない(段にもそれ以外にも出ない)', () => {
+  // --- ★v0.1.1375: 無uid【だけ】を除外する(匿名は たぬ姉段に出す) ---
+  it('★無uidは段に出ない / 匿名は たぬ姉段に出る', () => {
     const b = bucketVenueLaneSeats([
       seat(0, '11111', '太郎', 'https://cdn.example/11111.jpg'),
-      seat(1, 'a:anon-1', '匿名でも名前あり', ''), // 表示名があってもID種別で除外(churn防止)
+      seat(1, 'a:anon-1', '匿名でも名前あり', ''),
       seat(2, 'a:anon-2', '', ''),
-      seat(3, '22222', '', '')
+      seat(3, '22222', '', ''),
+      seat(4, '', '無uid', '') // uid 無しは正本でも tier=0=候補除外
     ]);
-    expect(flattenVenueLaneBuckets(b).map((x) => x.entry.userId)).toEqual(['11111', '22222']);
+    const ids = flattenVenueLaneBuckets(b).map((x) => x.entry.userId);
+    // 無uid は出ない(除外は維持)。
+    expect(ids).not.toContain('');
+    // ★匿名は出る(旧実装では消えていた=会場が「りんくのみ」になった真因)。
+    expect(b.tanu.map((x) => x.entry.userId)).toEqual(['a:anon-1', 'a:anon-2']);
+    // 名前あり/数値IDは従来どおり上の段に残る(匿名に埋もれない)。
+    expect(b.link.map((x) => x.entry.userId)).toEqual(['11111']);
+    expect(b.konta.map((x) => x.entry.userId)).toEqual(['22222']);
   });
 
-  it('maxTotal は段側のみに効く(匿名は元々段に出ないので影響しない)', () => {
+  /*
+   * ★匿名が増えても【名前ありの人が押し出されない】ことを断言する。
+   *   これが崩れると「匿名を出す」判断が、名前ありの応援を埋もれさせる退化になる。
+   *   tanuPolicy の存在理由(非匿名が匿名の群れに埋もれないため)を検査で固定する。
+   */
+  it('★匿名が大量でも link/konta の顔ぶれは変わらない(埋もれない)', () => {
+    const many = Array.from({ length: 50 }, (_, i) => seat(i + 2, `a:anon-${i}`, '', ''));
+    const b = bucketVenueLaneSeats([
+      seat(0, '11111', '太郎', 'https://cdn.example/11111.jpg'),
+      seat(1, '22222', '', ''),
+      ...many
+    ]);
+    expect(b.link.map((x) => x.entry.userId)).toEqual(['11111']);
+    expect(b.konta.map((x) => x.entry.userId)).toEqual(['22222']);
+    expect(b.tanu.length).toBe(50);
+  });
+
+  // ★v0.1.1375: 旧題は「匿名は元々段に出ないので影響しない」だったが、
+  //   匿名も段に出るようになったので【maxTotal は匿名込みの合計に効く】が正しい説明。
+  it('maxTotal は5段合計の上限として効く(匿名も合計に含まれる)', () => {
     const b = bucketVenueLaneSeats(
       [
         seat(0, '11111', 'A', 'https://cdn.example/1.jpg'),
@@ -155,5 +203,33 @@ describe('bucketVenueLaneSeats', () => {
       'konta',
       'tanu'
     ]);
+  });
+
+  /*
+   * ★2026-08-14(ユーザー実機「自分でギフト投げてPOPには出るが会場に出ない」)
+   *
+   *   この test ファイルは長らく **flatten(並べる側)に gift を手渡しして**検査するだけで、
+   *   `bucketVenueLaneSeats`(作る側)が gift を**空で返すこと自体**は誰も断言していなかった
+   *   → [[wiring-test-must-assert-counts-2026-08-04]] と同型の穴。
+   *
+   *   ★事実の記録: フォールバック経路には**ギフト段を作る能力が無い**。
+   *     供給元 `bucketStoryUserLanePicks` の返り値は {link, konta, tanu} だけで
+   *     `gift`/`ad` は存在しない(= 値を落としているのではなく、経路が無い)。
+   *     ギフト段は主経路である **鏡(laneMirror)** から供給される。
+   *
+   *   ここでは「いまそうなっている」を固定して、将来この前提が変わったら気づけるようにする。
+   *   ★会場にギフトを出す実装をするときは、この test が赤くなるのが正しい(仕様変更の合図)。
+   */
+  it('★フォールバック経路は gift/ad 段を作らない(鏡が主経路・仕様の固定)', () => {
+    const seats = [
+      { seatIndex: 0, participant: { userId: '12345678', nickname: 'ギフト投げた人' } },
+      { seatIndex: 1, participant: { userId: 'a:anon1', nickname: '匿名' } }
+    ];
+    const b = bucketVenueLaneSeats(seats, { maxTotal: 10 });
+    // 作る側は gift/ad を常に空で返す(=会場のギフト段はフォールバックでは出ない)。
+    expect(b.gift).toEqual([]);
+    expect(b.ad).toEqual([]);
+    // 一方で uid のある人は link/konta/tanu のどこかには載る(段ごと消えてはいない)。
+    expect(b.link.length + b.konta.length + b.tanu.length).toBeGreaterThan(0);
   });
 });

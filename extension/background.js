@@ -792,15 +792,53 @@ async function injectIntoExistingTabs() {
   }
 }
 
-async function reloadExistingWatchTabs() {
+/**
+ * ★v0.1.1384: 拡張更新時に watch タブを自動リロードする(既存機能)。
+ *   ここに【実行痕跡】を残す。
+ *
+ * ■ なぜ計器が要るか(2026-08-13 ユーザーの困りごとから)
+ *   ユーザーは拡張を更新するたび「chrome://extensions で🔄 → watch タブで F5」を
+ *   手作業でやっていた(1日11版=11回)。「戻す作業が大変」。
+ *   ★しかしこの関数が効いているなら **F5 は元々不要**。
+ *   ところが「効いているか」を誰も測っておらず、私(司令塔)は毎回 F5 を依頼し続けていた。
+ *   ＝**余計な1手を私が生み出していた疑い**がある。
+ *
+ * ■ 判定の仕方
+ *   拡張更新の直後に状態速報を見て、`nls_last_auto_tab_reload` が
+ *   「更新時刻とほぼ同時 / tabCount≧1 / reason:'update'」なら**自動で効いている**
+ *   → 反映手順から F5 を消してよい。
+ *   逆に痕跡が無ければ、この経路に到達していない(SW停止 or reason 不一致)と分かる。
+ *   ★どちらに転んでも次の一手が決まる([[instrument-value-is-measured-by-fixes-2026-08-12]])。
+ *
+ * @param {string} reason onInstalled の details.reason(痕跡に残して経路を特定する)
+ */
+async function reloadExistingWatchTabs(reason = '') {
   const tabs = await queryTargetTabs();
+  let reloaded = 0;
   for (const tab of tabs) {
     if (!tab.id || tab.id === chrome.tabs.TAB_ID_NONE) continue;
     try {
       await chrome.tabs.reload(tab.id);
+      reloaded += 1;
     } catch {
       // no-op
     }
+  }
+  /*
+   * ★痕跡は【リロードの後】に書く(先に書くと、失敗したのに「やった」と嘘をつく)。
+   *   1キーだけの小さな書き込み=storage を圧迫しない。
+   */
+  try {
+    await chrome.storage.local.set({
+      nls_last_auto_tab_reload: {
+        at: Date.now(),
+        reason: String(reason || ''),
+        tabCount: tabs.length,
+        reloaded
+      }
+    });
+  } catch {
+    // no-op: 痕跡が残せなくてもリロード自体は済んでいる
   }
 }
 
@@ -1006,7 +1044,7 @@ chrome.runtime.onInstalled.addListener((details) => {
     //   reload より前に消すことで「孤児を reload して延命」を避ける。前面/手動視聴タブは触らない。
     await sweepOrphanAutopatrolTabsOnce();
     if (details?.reason === 'update') {
-      await reloadExistingWatchTabs();
+      await reloadExistingWatchTabs(String(details?.reason || ''));
     } else {
       await injectIntoExistingTabs();
     }
@@ -1030,6 +1068,53 @@ chrome.runtime.onStartup.addListener(() => {
   } catch { /* no-op */ }
   void injectIntoExistingTabs();
   void resumeAutopatrolIfEnabled();
+});
+
+/* ================================================================== */
+/* ★サイドパネルの【事前用意】(v0.1.1439)                                */
+/*                                                                      */
+/* ■ ユーザーの訴え(2026-08-19)                                       */
+/*   「また会場モードがたちあがるけど サイドパネルなかなか出ない現象ですよ」 */
+/*                                                                      */
+/* ■ なぜ会場モードだけ速いか(コードで確認済)                          */
+/*   会場モード   … watchページ内のクラス付け外しだけ = SWを起こさない      */
+/*   サイドパネル … 押下 → SWの onClicked → setOptions → open              */
+/*                    = SWが寝ていれば起動待ちがそのまま体感の遅さになる   */
+/*   ★実測(2026-08-19): SWが【応答不能】に陥ることもある。               */
+/*     同じ拡張のSWが2つ生きており、片方は `() => 1` すら返せずタイムアウトした。*/
+/*     その間ツールバーを押しても onClicked が処理されない = パネルが出ない。 */
+/*                                                                      */
+/* ■ 直し方: 押される前に setOptions を済ませておく                       */
+/*   watchページを開いた/遷移した時点で path と enabled を確定させる。    */
+/*   押下時に SW がやることが減り、Chrome側に用意ができている。          */
+/*                                                                      */
+/* ■ ★やらないこと(既存の判断を壊さない)                                */
+/*   openPanelOnActionClick を true にはしない。そうすると                */
+/*   action.onClicked が発火せず、埋め込み派のツールバーが死〆。          */
+/*   (src/lib/sidePanel.wiring.test.js が禁止として機械照合している)      */
+/* ================================================================== */
+const SIDE_PANEL_PREARM_WATCH_RE = /\/watch\/(lv\d{1,15})(?:[/?#]|$)/;
+
+/** このタブに対してパネルを事前用意する(watchページのときだけ)。 */
+function prearmSidePanelForTab(tabId, url) {
+  try {
+    if (tabId == null || tabId === chrome.tabs.TAB_ID_NONE) return;
+    const m = SIDE_PANEL_PREARM_WATCH_RE.exec(String(url || ''));
+    // ★watch以外では何もしない(空のパネルを出す事故を避ける)
+    if (!m || !SIDE_PANEL_LV_RE.test(m[1])) return;
+    if (!chrome.sidePanel || typeof chrome.sidePanel.setOptions !== 'function') return;
+    void chrome.sidePanel
+      .setOptions({ tabId, path: `sidepanel.html?lv=${m[1]}`, enabled: true })
+      .catch(() => {});
+  } catch {
+    /* no-op: 事前用意に失敗しても従来の押下経路で開く */
+  }
+}
+
+/* watchページになった瞬間に用意する(押される前に済ませる)。 */
+chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
+  if (!changeInfo || (changeInfo.status !== 'complete' && !changeInfo.url)) return;
+  prearmSidePanelForTab(tabId, (tab && tab.url) || changeInfo.url);
 });
 
 chrome.alarms.onAlarm.addListener((alarm) => {
@@ -3472,11 +3557,33 @@ chrome.action.onClicked.addListener((tab) => {
     __toolbarActionPolicyMem === 'always_open_popup';
   if (!wantsInline && tid !== chrome.tabs.TAB_ID_NONE) {
     try {
-      // ★同期的に開く(await を挟まない)。設定は open の後で整える。
+      /*
+       * ★v0.1.1434(実機で自分の目で確認して順序を訂正):
+       *   v0.1.1427 で「open() の【あと】に setOptions({path}) でパスを差し替える」
+       *   形にしてしまった。開いた後にパスを変えるとパネルが読み込み直しになり、
+       *   Chrome 標準の【読み込み中表示】(ダークモードでは黒地に灰色の横縞が流れる)が
+       *   居座る。ユーザーが報告した「真っ黒＋横縞」の正体はこれ。
+       *   ★正しい順序: path を先に確定 → そのあと open()。
+       *   ★open() は【ユーザー操作の文脈】でしか呼べず await を挟むと文脈が切れるので、
+       *     setOptions は await しない(Promise を捨てて即 open する)。
+       *   ★lv が取れないときは setOptions を呼ばない=既定の 'sidepanel.html' のまま
+       *     (無駄な差し替えで読み込み直しを起こさない)。
+       */
+      const lvFromTab = (() => {
+        try {
+          const m = /\/watch\/(lv\d{1,15})/.exec(String((tab && tab.url) || ''));
+          return m && SIDE_PANEL_LV_RE.test(m[1]) ? m[1] : '';
+        } catch {
+          return '';
+        }
+      })();
+      if (lvFromTab) {
+        void chrome.sidePanel
+          .setOptions({ tabId: tid, path: `sidepanel.html?lv=${lvFromTab}`, enabled: true })
+          .catch(() => {});
+      }
+      // ★同期的に開く(await を挟まない=ユーザー操作の文脈を保つ)。
       chrome.sidePanel.open({ tabId: tid });
-      void chrome.sidePanel
-        .setOptions({ tabId: tid, path: 'sidepanel.html', enabled: true })
-        .catch(() => {});
       return;
     } catch {
       // 開けなければ従来動作へ落ちる(消えたまま何も出ない、を避ける)

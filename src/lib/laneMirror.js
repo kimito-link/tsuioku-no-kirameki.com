@@ -11,7 +11,10 @@
  * @typedef {{ visible: number, tileW: number, tileH: number }} LaneMirrorDomTier
  * @typedef {{ measured: boolean,
  *   perTier: { link: LaneMirrorDomTier, gift: LaneMirrorDomTier, ad: LaneMirrorDomTier, konta: LaneMirrorDomTier, tanu: LaneMirrorDomTier },
- *   dpr: number }} LaneMirrorDomSelf
+ *   dpr: number,
+ *   measuredAt: number,
+ *   fingerprint: string,
+ *   fingerprintFor: string }} LaneMirrorDomSelf
  * @typedef {{
  *   liveId: string,
  *   capturedAt: number,
@@ -23,7 +26,8 @@
  *   domSelf: LaneMirrorDomSelf,
  *   pickedLength: number,
  *   totalCandidates: number,
- *   contentHash: string
+ *   contentHash: string,
+ *   writer: string
  * }} LaneMirrorSnapshot
  *
  * ★pickedLength = popup が paint に渡す laneDisplayedTotal(全5段=りんく+ギフト+広告+こん太+たぬ姉の
@@ -51,7 +55,16 @@ function nonNegativeMetric(value, integer = false) {
   return integer ? Math.floor(n) : Math.round(n * 100) / 100;
 }
 
-/** @param {unknown} input @returns {LaneMirrorDomSelf} */
+/**
+ * ★venue-exact-parity-SPEC-2026-08-07 §3-2/M4: この関数は【個別列挙で作り直す】型なので、
+ *   新しいフィールドを足しても明示的に引き継がない限り黙って落ちる
+ *   ([[venue-mirror-is-the-primary-path-2026-08-01]]の再発類型・v0.1.1280 と同じ穴)。
+ *   measuredAt / fingerprint / fingerprintFor は会場の一致判定が読む=必ず保存する。
+ *   ★perTier の `keys` は【保存しない】。指紋(hash)だけを運ぶ設計
+ *   (500人分のキー列 ~12KB を publish 毎に載せると 512KB フェイルセーフの守備範囲外で
+ *    容量が膨らむ・census の「keys は storage へ出さない」既定=venueDomCensus.js:20 にも逆行)。
+ * @param {unknown} input @returns {LaneMirrorDomSelf}
+ */
 function normalizeDomSelf(input) {
   const source = /** @type {any} */ (input && typeof input === 'object' ? input : {});
   const sourceTiers = source.perTier && typeof source.perTier === 'object' ? source.perTier : {};
@@ -69,7 +82,14 @@ function normalizeDomSelf(input) {
   return {
     measured: source.measured === true,
     perTier: /** @type {LaneMirrorDomSelf['perTier']} */ (perTier),
-    dpr: Number.isFinite(rawDpr) && rawDpr > 0 ? Math.round(rawDpr * 1000) / 1000 : 1
+    dpr: Number.isFinite(rawDpr) && rawDpr > 0 ? Math.round(rawDpr * 1000) / 1000 : 1,
+    // 診断表示専用(会場の line に「①DOM齢Ns」として出す)。verdict には影響させない。
+    measuredAt: nonNegativeMetric(source.measuredAt, true),
+    // ①実DOMのキー列指紋。会場実DOMの指紋と突き合わせる(比較の両辺が別ドキュメント起点)。
+    fingerprint: String(source.fingerprint || ''),
+    // ★この指紋が「どの内容」を測ったかの内容アドレス。会場は
+    //   fingerprintFor === snap.contentHash のときだけ指紋を硬く比較する(§6・時計を使わない)。
+    fingerprintFor: String(source.fingerprintFor || '')
   };
 }
 
@@ -159,7 +179,9 @@ export function laneMirrorCapFromBuckets(buckets) {
  * storage 書き込み用の鏡スナップショット。容量超過時は cap を半減して作り直す(status を重くしない)。
  * @param {{ liveId?: unknown, buckets?: Record<string, unknown[]>, pickedLength?: unknown,
  *   totalCandidates?: unknown, domSelf?: unknown }} input
- * @param {{ cap?: number, nowMs?: number }} [opts]
+ * @param {{ cap?: number, nowMs?: number, writer?: string }} [opts]
+ *   writer: この鏡を焼いた主体('popup' 既定)。★2026-08-08 追加。将来 content 側の
+ *   書き手を足したとき「最後に書いたのは誰か」を読み手が見分けられるようにするための印。
  * @returns {LaneMirrorSnapshot}
  */
 export function buildLaneMirrorSnapshot(input, opts = {}) {
@@ -181,6 +203,12 @@ export function buildLaneMirrorSnapshot(input, opts = {}) {
       domSelf,
       pickedLength,
       totalCandidates,
+      // ★2026-08-08: 誰がこの鏡を焼いたか。既定は 'popup'(=①の描画経路)。
+      //   背景: 会場/③WEBが古い鏡を見る症状の切り分けで「最後に書いたのは誰か」が
+      //   読めないと、書き手を増やしたとき静かな上書き劣化に気づけない。
+      //   ★laneMirrorContract.js:80 の「唯一の書き手」不変条件は現時点では維持している。
+      //     将来 content 側の書き手を足すなら、この値で見分けられるようにしておく。
+      writer: String(opts?.writer || 'popup'),
       // v0.1.1137(lanescene-structural-review MVP): revisionはcapturedAt(壁時計)をそのまま使う
       //   (新規カウンタを作らない)。
       // 会場一致gift/ad根治(2026-07-14 Patch 2b): contentHashは復元正準形(読み手B-1適用後)で
@@ -231,4 +259,83 @@ export function restoreLaneMirrorBuckets(snap) {
     konta: restore(s.konta),
     tanu: restore(s.tanu)
   };
+}
+
+/**
+ * ★v0.1.1300: 実DOM受領証(Receipt)を鏡データ本体から分離して組む純関数。
+ *
+ * ■ なぜ分離するか
+ *   domSelf は「①(サイドパネル)が実際に描いた DOM の要約」= 表示面固有の受領証。
+ *   配信の共通データではない。会場は別ドキュメントの DOM を持つので、
+ *   受領証をデータ本体に同梱したままだと「同じデータなのに hash が違う」を
+ *   構造的に作る(=完全一致を永久に名乗れない)。
+ *   → データ(共通・全 reader が等値で持つ)と受領証(表示面ごと)を分け、
+ *     contentHash で安全に関連付ける。
+ *
+ * ■ 比較のしかた(laneMirrorContract.js の domSelf 指紋契約と同じ規律)
+ *   `receipt.fingerprintFor === snap.contentHash` のときだけ指紋を硬く比較する。
+ *   一致しなければ「⚪指紋未計測」へ逃がす=時計(measuredAt)では判定しない。
+ *   ★時計で切ると、sig一致で描画をスキップしている間の「古くて正しい指紋」を
+ *     捨ててしまう。内容アドレスならその誤りが起きない。
+ *
+ * ★fingerprintFor は domSelf(測った本人)の申告をそのまま運ぶ。
+ *   呼び手が現在の contentHash を渡して上書きする設計にしてはいけない(v0.1.1301 で是正)。
+ *
+ * @param {{ liveId?: unknown, domSelf?: unknown }} input
+ * @param {{ nowMs?: number, surface?: string }} [opts] surface=どの表示面の受領証か
+ * @returns {{ liveId: string, surface: string, capturedAt: number,
+ *   fingerprint: string, fingerprintFor: string, measured: boolean,
+ *   perTier: object, dpr: number, measuredAt: number }}
+ */
+export function buildLaneReceipt(input, opts = {}) {
+  const dom = normalizeDomSelf(input?.domSelf);
+  const nowMs = Number.isFinite(Number(opts?.nowMs)) ? Number(opts.nowMs) : 0;
+  return {
+    liveId: String(input?.liveId || '').trim().toLowerCase(),
+    // 表示面の名前。①=popup(サイドパネル内) / 会場=venue。
+    // ★受領証は表示面ごとに別物=どの面のものか名乗れないと比較できない。
+    surface: String(opts?.surface || 'popup'),
+    capturedAt: nowMs,
+    fingerprint: dom.fingerprint,
+    /*
+     * ★この受領証が「どの内容を測ったか」の内容アドレス。
+     *   受け手はこれが snapshot.contentHash と一致するときだけ硬く比較する。
+     *
+     * ★★v0.1.1301(Codex レビュー指摘・重大度高): ここに現在の snapshot.contentHash を
+     *   入れてはいけない。指紋は【前回 paint 時に測った DOM】の要約で、
+     *   popup-entry.js:7098-7103 が「その指紋が測った内容」を domSelf.fingerprintFor に
+     *   既に刻んでいる。現在の hash で上書きすると:
+     *     H1 を描いた指紋 F1 を持ったまま H2 の snapshot を publish
+     *       → 受領証は「F1 は H2 を測った」と【嘘を名乗る】
+     *       → isReceiptComparable が comparable=true を返す
+     *       → 別内容の指紋で「一致」を判定する = 恒真化と同じ穴
+     *   このリポが何度も踏んだ「比較の両辺が実は別物なのに緑」の類型そのもの。
+     *   → 測った本人(domSelf)の申告を【そのまま】運ぶ。上書きしない。
+     */
+    fingerprintFor: String(dom.fingerprintFor || ''),
+    measured: dom.measured,
+    perTier: dom.perTier,
+    dpr: dom.dpr,
+    measuredAt: dom.measuredAt
+  };
+}
+
+/**
+ * ★v0.1.1300: 受領証と鏡が「同じ内容を指しているか」を判定する純関数。
+ *
+ * @param {{ contentHash?: unknown }|null|undefined} snap 鏡 snapshot
+ * @param {{ fingerprintFor?: unknown, fingerprint?: unknown }|null|undefined} receipt
+ * @returns {{ comparable: boolean, reason: string }}
+ *   comparable=true のときだけ指紋を硬く比較してよい。
+ */
+export function isReceiptComparable(snap, receipt) {
+  const hash = String(snap?.contentHash || '').trim();
+  const forHash = String(receipt?.fingerprintFor || '').trim();
+  const fp = String(receipt?.fingerprint || '').trim();
+  if (!hash) return { comparable: false, reason: '鏡にcontentHashが無い' };
+  if (!receipt) return { comparable: false, reason: '受領証が無い(未描画)' };
+  if (!fp) return { comparable: false, reason: '指紋未計測' };
+  if (!forHash) return { comparable: false, reason: '受領証が対象内容を名乗っていない' };
+  if (forHash !== hash) return { comparable: false, reason: '受領証は別の内容を測っている(世代差)' };
+  return { comparable: true, reason: '' };
 }

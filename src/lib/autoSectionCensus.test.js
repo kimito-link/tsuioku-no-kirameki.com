@@ -1,0 +1,225 @@
+import { describe, it, expect } from 'vitest';
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import {
+  createAutoSectionCensus,
+  noteAutoSection,
+  formatAutoSectionLines,
+  AUTO_SECTION_SLOW_MS,
+  AUTO_SECTION_COVERAGE_WARN_PCT
+} from './autoSectionCensus.js';
+
+const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
+const read = (rel) => fs.readFileSync(path.join(repoRoot, rel), 'utf8').replace(/\r\n/g, '\n');
+
+/**
+ * ★「囲んだ3箇所しか犯人にできない」を構造で終わらせる。
+ *
+ * ■ ★ユーザー指示(2026-08-21)がこのモジュールの出発点
+ *   「表面的なものを考えるんじゃなくて、まず DOM を全部把握して
+ *     それを計器に入れる基本から見直すべき」
+ *   → DOM Tree Visualizer を見て「これでできたものを計器にいれればいいかも」
+ *   ★あのツールの本質は「絵」ではない。**全要素を機械的に測ること**。
+ *     人が「ここが怪しい」と当たりをつける余地が無い＝**見落としが起きない**。
+ *
+ * ■ ★いまの計器の構造的欠陥(コードで確認・推測ではない)
+ *   `mainThreadBlockerBoot.js` の `markBlockerSection` は
+ *   **区間名のラベルを置くだけで、自分では何も測っていない**。
+ *   実測しているのは 250ms ごとのハートビートで、遅れを見つけた時点の
+ *   `_currentSection` を読む。ところが `markBlockerSection` は `finally` で
+ *   ★**区間を抜けた瞬間にラベルを戻す**(`:60`)。
+ *   ＝ ハートビートが鳴るのは区間が終わった後のことが多く、
+ *     ★**実際には拡張が止めていても「(拡張の外)」と出る**。
+ *
+ *   さらに囲みは実測で **3箇所しかない**
+ *   (renderCommentTicker / renderStoryCommentDetailPanel / renderCharacterScene)。
+ *   ★私が事前に怪しいと思った所だけ＝**推測が計器に混入している**。
+ *
+ * ■ このモジュールの契約
+ *   1. ★**区間そのものを実測する**(ラベルではなく所要時間を持つ)。
+ *      ハートビートの取りこぼしに依存しない。
+ *   2. ★**測っていない時間を数える**(カバー率)。
+ *      「囲み忘れ」が数字で見える＝黙って見落とさない
+ *      ([[zero-count-may-mean-unmeasured-2026-08-04]])。
+ *   3. 純関数・DOM/chrome 非依存。時刻は呼び出し側が渡す。
+ */
+describe('★全経路を機械的に測る(囲み忘れを数字にする)', () => {
+  it('★測れないときは na(「異常なし」と言わない)', () => {
+    const c = createAutoSectionCensus();
+    expect(formatAutoSectionLines(c, { elapsedMs: 0 }).level).toBe('na');
+  });
+
+  it('★区間の所要を実測して名前ごとに積む', () => {
+    const c = createAutoSectionCensus();
+    noteAutoSection(c, { name: 'renderCharacterScene', ms: 120 });
+    noteAutoSection(c, { name: 'renderCharacterScene', ms: 80 });
+    noteAutoSection(c, { name: 'laneRepaint', ms: 300 });
+    expect(c.byName.renderCharacterScene.ms).toBe(200);
+    expect(c.byName.renderCharacterScene.count).toBe(2);
+    expect(c.byName.laneRepaint.worstMs).toBe(300);
+  });
+
+  it('★★遅い区間だけでなく【全区間】を積む(50ms未満も落とさない)', () => {
+    /*
+     * ★既存の noteBlocker は LONG_TASK_MS(50ms)未満を捨てる。
+     *   それだと「20msの処理が100回」= 2秒 が**完全に見えない**。
+     *   ★実機は 16.7秒中15.9秒停止。細かい積み上げを捨てたら真因に届かない。
+     */
+    const c = createAutoSectionCensus();
+    for (let i = 0; i < 100; i += 1) noteAutoSection(c, { name: 'tinyButOften', ms: 20 });
+    expect(c.byName.tinyButOften.ms).toBe(2000);
+    expect(c.totalMs).toBe(2000);
+  });
+
+  it('★★測っていない時間を出す(囲み忘れが数字で見える)', () => {
+    const c = createAutoSectionCensus();
+    noteAutoSection(c, { name: 'a', ms: 1000 });
+    // 10秒のうち1秒しか測れていない = カバー率10%
+    const v = formatAutoSectionLines(c, { elapsedMs: 10_000 });
+    expect(v.coveragePct).toBe(10);
+    expect(v.uncoveredMs).toBe(9000);
+  });
+
+  it('★★カバー率が低いときは「計器が足りない」と自分で言う', () => {
+    const c = createAutoSectionCensus();
+    noteAutoSection(c, { name: 'a', ms: 100 });
+    const v = formatAutoSectionLines(c, { elapsedMs: 10_000 });
+    expect(v.coveragePct).toBeLessThan(AUTO_SECTION_COVERAGE_WARN_PCT);
+    /*
+     * ★ここが要。カバー率が低いのに「犯人は○○」と断言すると誤診する。
+     *   計器自身が「まだ測れていない」と言えなければならない。
+     */
+    expect(v.line).toContain('測れていない');
+  });
+
+  it('★カバー率が十分なら犯人を名指しする', () => {
+    const c = createAutoSectionCensus();
+    noteAutoSection(c, { name: 'laneRepaint', ms: 8000 });
+    noteAutoSection(c, { name: 'small', ms: 500 });
+    const v = formatAutoSectionLines(c, { elapsedMs: 10_000 });
+    expect(v.coveragePct).toBeGreaterThanOrEqual(AUTO_SECTION_COVERAGE_WARN_PCT);
+    expect(v.line).toContain('laneRepaint');
+    expect(v.worstName).toBe('laneRepaint');
+  });
+
+  it('★遅い1回は別に残す(平均に埋もれさせない)', () => {
+    const c = createAutoSectionCensus();
+    noteAutoSection(c, { name: 'x', ms: AUTO_SECTION_SLOW_MS + 10 });
+    expect(c.slowSamples.length).toBe(1);
+    expect(c.slowSamples[0].name).toBe('x');
+  });
+
+  it('★壊れた入力でも落ちない(計器が本体を壊さない)', () => {
+    const c = createAutoSectionCensus();
+    for (const bad of [null, undefined, {}, { name: 'x' }, { ms: 'abc' }]) {
+      expect(() => noteAutoSection(c, bad)).not.toThrow();
+    }
+    expect(c.totalMs).toBe(0);
+  });
+
+  it('★Number(null)=0 の穴を塞ぐ(過去に2回踏んだ)', () => {
+    const c = createAutoSectionCensus();
+    noteAutoSection(c, { name: 'x', ms: null });
+    expect(c.totalMs).toBe(0);
+    expect(formatAutoSectionLines(c, { elapsedMs: null }).level).toBe('na');
+  });
+
+  it('★★実装(popup-entry.js)がこの計器を使っている', () => {
+    /*
+     * ★純関数を作っただけで使われないと意味がない
+     *   ([[unwired-judgement-is-systemic-2026-08-12]])。
+     */
+    const src = read('src/extension/popup-entry.js');
+    expect(src, '自動計測モジュールを import していない')
+      .toContain('autoSectionCensus.js');
+  });
+});
+
+/**
+ * ★起動直後を「囲んでいない処理」と呼ばない。
+ *
+ * ■ ★実機(2026-08-21・v0.1.1470)が示した最後の1つ
+ *   同じ速報の中で、上と下は既に直っていた:
+ *     3画面パリティ  🟡 保留 — popup 起動直後(381ms)
+ *     応援レーン描画  ★popup 起動直後(381ms)＝まだ描き始めていなくて当然
+ *   ★ところがここだけ:
+ *     拡張の処理時間: 🟡 0%しか測れていない(測れた0ms / 経過384ms)
+ *       → ★残り384msは【囲んでいない処理】。犯人はまだ名指しできません
+ *
+ * ■ ★これは嘘だった
+ *   同じ速報の shadeAgeMs は 383 で、経過384ms とほぼ一致。
+ *   ＝ この384msは**幕が出ている待ち時間**であって、
+ *   ★**拡張は何もしていない**。「囲んでいない処理がある」は事実に反する。
+ *   囲む対象がそもそも存在しないので、読んだ人は**無い犯人を探しに行く**。
+ *
+ * ■ 退化させない条件
+ *   ・十分に経っていれば従来どおり「測れていない」と警告する(見逃さない)
+ */
+describe('★起動直後を「囲んでいない処理」と呼ばない', () => {
+  it('★★起動直後(384ms)は「まだ始まっていない」と出す', () => {
+    const c = createAutoSectionCensus();
+    const v = formatAutoSectionLines(c, { elapsedMs: 384 });
+    expect(v.line, '無い犯人を探させている').not.toContain('囲んでいない処理');
+    expect(v.line).toMatch(/起動直後|始まって/);
+  });
+
+  it('★起動直後は warn にしない(まだ判定できないだけ)', () => {
+    const v = formatAutoSectionLines(createAutoSectionCensus(), { elapsedMs: 384 });
+    expect(v.level).not.toBe('warn');
+  });
+
+  it('★★十分に経っていれば従来どおり警告する(見逃さない)', () => {
+    const c = createAutoSectionCensus();
+    noteAutoSection(c, { name: 'x', ms: 100 });
+    const v = formatAutoSectionLines(c, { elapsedMs: 60_000 });
+    expect(v.level).toBe('warn');
+    expect(v.line).toContain('囲んでいない処理');
+  });
+
+  it('★起動直後でも実際に測れていれば普通に出す(門番が判定を乗っ取らない)', () => {
+    const c = createAutoSectionCensus();
+    noteAutoSection(c, { name: 'heavy', ms: 300 });
+    const v = formatAutoSectionLines(c, { elapsedMs: 384 });
+    expect(v.line).toContain('heavy');
+  });
+});
+
+describe('★起動直後の門番は「表示と同じ値」で判定する(2026-08-21 実損)', () => {
+  /*
+   * ★実機速報で起きたこと:
+   *   applyResponsivePopupLayout が 2回走り、各回 1ms 未満。
+   *   totalMs は performance.now() の小数を積むので 0.7 のような値になる。
+   *   表示は「測れた0ms」「0%」なのに `totalMs === 0` は false だったため、
+   *   ★起動直後(343ms)なのに「囲んでいない処理」という嘘を出した。
+   */
+  const buildSubMs = () => {
+    const c = createAutoSectionCensus();
+    noteAutoSection(c, { name: 'applyResponsivePopupLayout', ms: 0.4, atMs: 1 });
+    noteAutoSection(c, { name: 'applyResponsivePopupLayout', ms: 0.3, atMs: 2 });
+    return c;
+  };
+
+  it('★小数しか測れていない起動直後は「まだ始まっていません」と言う', () => {
+    const out = formatAutoSectionLines(buildSubMs(), { elapsedMs: 343 });
+    expect(out.line).toContain('起動直後');
+    expect(out.line).toContain('まだ始まっていません');
+    // ★居ない犯人を探させない
+    expect(out.line).not.toContain('囲んでいない処理');
+    expect(out.level).toBe('na');
+  });
+
+  it('★60秒たっても測れていなければ従来どおり警告する(見逃さない)', () => {
+    const out = formatAutoSectionLines(buildSubMs(), { elapsedMs: 60000 });
+    expect(out.line).toContain('囲んでいない処理');
+    expect(out.line).not.toContain('起動直後');
+    expect(out.level).toBe('warn');
+  });
+
+  it('★起動直後でも、ちゃんと測れていれば起動直後扱いにしない', () => {
+    const c = createAutoSectionCensus();
+    noteAutoSection(c, { name: 'heavy', ms: 200, atMs: 1 });
+    const out = formatAutoSectionLines(c, { elapsedMs: 343 });
+    expect(out.line).not.toContain('起動直後');
+  });
+});

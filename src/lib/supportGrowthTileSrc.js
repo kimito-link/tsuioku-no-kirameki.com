@@ -221,14 +221,28 @@ export function userLaneDedupeKey(p) {
  *
  * @param {unknown} userId
  * @param {unknown} httpCandidate storyGrowthAvatarSrcCandidate 相当（https または空）
+ * @param {Set<string>} [verifiedUids] 実在確認済み uid(onload成功の実績)。省略時は従来動作
  * @returns {0|1|2}
  */
-export function userLaneResolvedThumbScore(userId, httpCandidate) {
+export function userLaneResolvedThumbScore(userId, httpCandidate, verifiedUids) {
   const c = String(httpCandidate || '').trim();
   if (!isHttpOrHttpsUrl(c)) return 0;
   if (isWeakNiconicoUserIconHttpUrl(c)) return 0;
   const u = String(userId || '').trim();
-  if (/^\d{5,14}$/.test(u) && isNiconicoSyntheticDefaultUserIconUrl(c, u)) return 1;
+  if (/^[0-9]{5,14}$/.test(u) && isNiconicoSyntheticDefaultUserIconUrl(c, u)) {
+    /*
+     * ★v0.1.1387: 式で組んだURLでも【実際に画像が表示できた実績がある】なら 2(本物)に上げる。
+     *
+     *   2026-08-13 実測: 実機に出ていた uid を curl したら 5件中3件が HTTP 200(4KBの画像)。
+     *   ＝推測URLの多くは実在するのに、ここで一律 1 に落としていたため
+     *   速報は「実サムネ0%」と言い続け、ユーザーには「サムネが白い」まま見えていた。
+     *
+     *   verifiedUids = onload 成功を記録した集合(verifiedAvatarRegistry)。
+     *   ★渡されなければ従来どおり 1(呼び出し側を壊さない=段階的に配線できる)。
+     */
+    if (verifiedUids && typeof verifiedUids.has === 'function' && verifiedUids.has(u)) return 2;
+    return 1;
+  }
   return 2;
 }
 

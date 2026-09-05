@@ -41,13 +41,14 @@
   - `src/lib/ndgrBackfillCrawl.js`
 - **コメント重複除去(NDGR)** — 再送/再接続/relay overlap の重複を liveId+messageId の canonical key で排除
   - `src/lib/ndgrMessageDedupe.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 54</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 60</summary>
 
 - `src/domain/observations/StatObservation.js` — StatObservation - ニコ生から取得する数値の「契約付き観測値」純関数 factory。
 - `src/domain/observations/vocabulary.js` — 観測層 (StatObservation) の語彙集 - 不変な enum 定義のみ。
 - `src/extension/backfill-sw-entry.js` — Service Worker 側の過去ログ取得(バックフィル)エンジン。NDGR を遡って取り込む。
 - `src/extension/page-intercept-entry.js` — MAIN world エントリ（esbuild で単一 IIFE にバンドルされる）
 - `src/lib/acquisitionDashboardChart.js` — 「データ取得率」ダッシュボードのチャート計算（純関数）。
+- `src/lib/backfillBottleneck.js` — 【層】L0 判定層(純粋関数・I/O禁止)
 - `src/lib/backfillCapturedAt.js` — v0.1.405: バックフィルした過去コメントの「実時刻 capturedAt」を推定する純関数。
 - `src/lib/backfillFlushThreshold.js` — バックフィル（過去ログ一括取り込み）の persist フラッシュ閾値を、
 - `src/lib/backfillHeartbeat.js` — v0.1.795: 裏(背面)タブでも過去ログ backfill を取り切るための「ハートビート」純ロジック。
@@ -66,6 +67,8 @@
 - `src/lib/commentObservabilityDiag.js` — v0.1.225: コメント記録の uid 解決経路を AI 共有診断 JSON に自動で乗せる純関数。
 - `src/lib/commentPipelineLog.js` — コメント取り込みパイプラインの構造化デバッグログ（純関数フォーマッタ）。
 - `src/lib/deepHarvestReason.js` — 深掘り収穫(deep harvest)の発動理由(起動/記録ON/配信切替/タブ可視)の定義と判定。
+- `src/lib/eventLoopStallSummary.js` — 観測列の「予定時刻 vs 実発火時刻」から
+- `src/lib/externalFetchCells.js` — 外部API(貢献度/ニコニ広告)の取得をセルにする(純関数)。
 - `src/lib/giftRelayStorageLiveId.js` — ギフト sub-app iframe からの postMessage を storage に書くときの liveId 解決。
 - `src/lib/giftSubAppRelayDiag.js` — v0.1.226: ギフトサイドバー cross-origin iframe relay 経路の生存確認用 純関数。
 - `src/lib/giftSubAppRelayTrust.js` — Cross-frame gift relay messages are accepted only from NicoNico/local-dev
@@ -82,6 +85,8 @@
 - `src/lib/ndgrDecode.js` — NDGR (のどぐろ) Protobuf 軽量デコーダー
 - `src/lib/ndgrFlushDedupKey.js` — NDGR フラッシュ時の重複排除キーを作る純関数(v0.1.836)。
 - `src/lib/ndgrForwardCrawl.js` — v0.1.511: NDGR コメントの「前方向（forward）継続取得」巡回エンジン（純ロジック）。
+- `src/lib/ndgrHiddenFlushThreshold.js` — 裏タブで「コメントが数十秒遅れて出る」のを止める純関数。
+- `src/lib/ndgrUnknownSamplesBudget.js` — 【層】L0 判定層(純粋関数・I/O禁止)
 - `src/lib/niconicoInterceptLearn.js` — page-intercept が JSON から拾う userId / nickname / avatar / commentNo の走査（純関数）
 - `src/lib/nicoUserProfileApi.js` — ニコニコのユーザープロフィール取得用メッセージ型と uid 妥当性判定(background と文字列同期)。
 - `src/lib/nlsInterceptAuth.js` — v0.1.234: page-intercept (MAIN world) → content-entry (ISOLATED world) 経路の
@@ -97,6 +102,7 @@
 - `src/lib/swBackfillStaging.js` — Service Worker backfill の取り置きペイロードを扱う純関数群。
 - `src/lib/swBackfillTrigger.js` — SW backfill モード(実験)の起動判定純関数。
 - `src/lib/userIdPreference.js` — コメント記録まわり: userId の「観測強度」（数字 ID を匿名系より優先する等）
+- `tests/helpers/wiringTestSource.js` — wiringTestSource — wiring テストが「関数の本体」を、置き場所に依らず取得するための正本。
 
 </details>
 
@@ -110,8 +116,10 @@
   - `src/lib/monotonicCommentCount.js`
 - **storage キー定義** — chrome.storage のキー名の正本(nls_comments_<lv> 等)
   - `src/lib/storageKeys.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 44</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 51</summary>
 
+- `scripts/dump-panel-state.mjs` — 実機の chrome.storage.local を吸い出して
+- `scripts/record-improvement.mjs` — ★実測値を台帳に書き足す【1本の口】。
 - `src/lib/autoBackupState.js` — v0.1.808(星野ロミ式コンポーネント化・第1弾): content-entry.js の巨大化を抑えるため、
 - `src/lib/avCue.js` — 「AVCue = 音の再生結果を真実とする単一発火点」の純関数群(V1・DOM/storage/音に触れない)。
 - `src/lib/blobDownload.js` — Blob を指定ファイル名で保存する。
@@ -126,6 +134,8 @@
 - `src/lib/commentTimelineMirrorKey.js` — コメントタイムライン鏡の storage キー正本（council/liveview-wholesale-root-SYNTHESIS.md 第2段）。
 - `src/lib/devMonitorTrendSession.js` — 開発監視トレンド: sessionStorage（セッション）+ chrome.storage.local（永続・最大7日）
 - `src/lib/displayRecordedCount.js` — 「画面に出す記録件数」の正本を1つに固定する純関数(v0.1.839・第1)。
+- `src/lib/effectDetailCells.js` — 演出・効果音・コメント送信の観測を割る(純関数)。
+- `src/lib/finalDetailCells.js` — 100個化の最終弾(識別・効果音・BGM・記録の質)。
 - `src/lib/giftRecord.js` — ギフト/広告ユーザーの永続化（純関数）
 - `src/lib/heavyChunkReadReuse.js` — heavy 全件コメント read の再利用判定純関数
 - `src/lib/inFlightGuard.js` — 状態速報「重さ根治 P3」: runStorageOpWithTimeout(storageOpTimeout.js)は Promise.race で
@@ -134,6 +144,7 @@
 - `src/lib/liveviewPublishOutcome.js` — 純Web公開（応援ライブビューの /api/status への POST）の直近結果を記録・要約する。
 - `src/lib/longTaskTracker.js` — メインスレッドを長時間ブロックした「Long Task」を有界に記録する純関数群。
 - `src/lib/mirrorBundleKey.js` — 鏡バンドルの storage キー。
+- `src/lib/northStarDetailCells.js` — 公式値レーン(ギフト/広告/イベント)の【実績】をセルにする(純関数)。
 - `src/lib/northStarMirrorKey.js` — 北極星レーン鏡(公式値レーン)の storage キー。
 - `src/lib/persistableCommentRow.js` — v0.1.362: DOM ハーベスト経路で拾ったコメント行を `nls_comments_<lv>` に保存して
 - `src/lib/persistThrottle.js` — v0.1.431: 連続フラッシュの合間にイベントループへ制御を返す既定の yield。
@@ -147,10 +158,12 @@
 - `src/lib/sessionSummaryCompareTableHtml.js` — セッションサマリ推移テーブル（renderSessionSummaryComparePanel の <table>）の HTML を組む純関数。
 - `src/lib/sessionSummaryMirror.js` — セッション比較(記録サマリの推移)の「鏡」スナップショット純関数
 - `src/lib/sessionSummaryMirrorKey.js` — セッション比較(記録サマリの推移)鏡の storage キー正本
+- `src/lib/sourceProvenance.js` — 値を「**どの経路で取れたか**」で記録し、経路の劣化を検出する(純関数)。
 - `src/lib/statCardsMirror.js` — 数字カード鏡のスナップショット純関数。popup 上部の数字カード(記録N件・推定同時接続・来場者数)と
 - `src/lib/statCardsMirrorDom.js` — 数字カード鏡(記録/推定同時接続/来場者数+公式統計チップ)の【値セット部分】を、
 - `src/lib/statCardsMirrorKey.js` — popup 上部の数字カード群(記録N件・推定同時接続・来場者数・公式統計チップ)を status.html に
 - `src/lib/storageOpTimeout.js` — v0.1.502: 単発の非同期処理（主に chrome.storage.local の get/set/remove）を
+- `src/lib/storedCommentDedupeKey.js` — 保存済みコメントの重複判定キーを作る純関数(v0.1.1313)。
 - `src/lib/storyDetailRelatedEntries.js` — ストーリー詳細／プレビュー脇の「同一ユーザーの直近」リスト用。
 - `src/lib/storyDiagMonotonic.js` — 診断カウンタchurn(内訳・用語の顔一覧が増減して見える)の根治。
 - `src/lib/supportVisualExpanded.js` — 応援ビジュアル（アイコン列・グリッド・診断）の開閉を storage に保存するときの正規化。
@@ -167,8 +180,9 @@
 
 - **応援レーン集約(誰が候補か)** — 保存コメント行を userId 単位に畳み込みレーン候補を作る唯一の集約正本(popup/venue 共通)
   - `src/lib/userLaneCandidatesFromStorage.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 95</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 99</summary>
 
+- `api/live-ranking.js` — /live/ 用「支えた人ランキング」の収集・配信 Vercel Serverless Function。
 - `src/domain/lane/aggregate.js` — 応援ユーザーレーンの per-row → per-user 集約（純関数）。
 - `src/domain/observations/observationStore.js` — observationStore - StatObservation のメモリ常駐リングバッファ。
 - `src/domain/user/identity.js` — ニコ生ユーザー ID の「匿名性」判定と関連アイデンティティ・ユーティリティ。
@@ -213,6 +227,7 @@
 - `src/lib/concurrentResolvedFromSnapshot.js` — watch スナップショット（content-entry の collectWatchPageSnapshot 戻り、popup へ送るのと
 - `src/lib/concurrentTimelineSeries.js` — 同接推移カーブ（視聴維持率の核）の時系列データを純粋関数で構築する。
 - `src/lib/devMonitorGiftRankingExtrasHtml.js` — dev monitor「取得状況サマリ」(#devMonitorGiftRankingExtras)の HTML を組む純関数。
+- `src/lib/diagChannelRegistry.js` — 計器チャンネルの台帳。HANDOFF-instrument-channels-2026-08-12.md §3。
 - `src/lib/effectSoundPlayer.js` — ギフト/広告/応援者ランキング順位変動に鳴らす短い効果音の再生ロジック(純関数+再生本体)。
 - `src/lib/eventRankingReportModel.js` — イベントランキングの「レポート用 正規化モデル」純関数（Phase A・2026-05-26 会議）。
 - `src/lib/eventRankingSectionHtml.js` — v0.1.810(星野ロミ式コンポーネント化・第3弾): popup-entry.js の巨大 HTML ビルダー
@@ -222,6 +237,7 @@
 - `src/lib/giftMomentumAnalytics.js` — HTML マーケ分析向けのギフト深掘り集計。
 - `src/lib/giftRankingLaneOptIn.js` — v0.1.228: ギフトランキングレーンの opt-in 判定 純関数群。
 - `src/lib/hiddenTabExternalFetchGate.js` — v0.1.616: 非可視タブでも外部 API fetch（koken 貢献度 / nicoad 広告 / ギフト履歴 /
+- `src/lib/identityAcquisitionCensus.js` — サムネ / 数値ID / アカウント名 の【取得率】を数える純関数。
 - `src/lib/inferBroadcasterUserIdFromComments.js` — snapshot の broadcasterUserId が空のとき、保存済みコメント内の表示名から
 - `src/lib/isInsideRecommendedUserSection.js` — ニコニコ視聴ページ周辺に出る「おすすめユーザー／フォロー候補」系 UI の子孫かを粗く判定する。
 - `src/lib/kiramekiAwards.js` — 「きらめきの賞」判定ロジック（純関数）。
@@ -236,6 +252,7 @@
 - `src/lib/mcpBridge/buildMcpRankingSnippet.js` — MCP / L1 向けに貢献度・広告ランキングの **PII 最小スナップショット** を組み立てる。
 - `src/lib/networkErrorProbe.js` — v0.1.201: 拡張の network 層異常を診断 JSON 用に集約する純関数。
 - `src/lib/nicoadContributionRankingApi.js` — ニコニ広告(nicoad)「貢献度ランキング」無認証 JSON API の URL 組立 & 正規化（純関数）。
+- `src/lib/nicoliveRankingPick.js` — 公式ランキングから【検証に使う配信を1つ選ぶ】純関数。
 - `src/lib/nicoUserFollowingApi.js` — nvapi /v1/users/{uid}/following/users の URL 構築とレスポンス正規化。
 - `src/lib/officialContributionRankingResolver.js` — 公式貢献度ランキングの取得経路（Koken API / DOM bundle / iframe storage）から
 - `src/lib/officialDomRankingRowsToStripRooms.js` — 公式イベント DOM バンドルの貢献度／広告ランキング行を、
@@ -287,7 +304,7 @@
   - `src/lib/giftThrowProjectile.js`
 - **吹き出し寿命管理** — 会場の吹き出しの表示上限・追い出し(eviction)ライフサイクル
   - `src/lib/venueBubbleLifecycle.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 207</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 235</summary>
 
 - `scripts/encode-marketing-html-avatars.mjs` — extension/images/marketing-html-avatars/*.png を data URI にし、
 - `scripts/split-avatar-parts.mjs` — 偽市松背景の除去 + パーツ切り出し(one-off アセットパイプライン)
@@ -297,10 +314,13 @@
 - `src/domain/lane/columns/kontaPolicy.js` — こん太段（konta）の配属 policy — 過渡状態 catchall。
 - `src/domain/lane/columns/linkPolicy.js` — りんく段（link）の配属 policy。
 - `src/domain/lane/columns/tanuPolicy.js` — たぬ姉段（tanu）の配属 policy。
+- `src/domain/lane/evidence.js` — 応援レーンの「確定度(evidence)」判定。
 - `src/domain/lane/tier.js` — 応援ユーザーレーンの tier（段）決定。
 - `src/domain/user/avatar.js` — ユーザーのアバター観測信号と表示 URL を 1 箇所で組み立てる純関数。
 - `src/domain/user/avatarResolver.js` — アバター解決の単一エントリポイント（Hoshino-Romi 流 single component）。
 - `src/domain/user/nickname.js` — 表示名（ニックネーム）の「強弱」判定。
+- `src/extension/popup/renderAcquisitionDashboard.js` — renderAcquisitionDashboard — 開発者モニタの「データ取得率」ダッシュボードを描く。
+- `src/extension/story/laneContentLod.js` — 応援レーンの【中身LOD】— 枠は残す。中身だけ空にする。
 - `src/extension/story/renderStoryUserLaneDom.js` — 応援ユーザーレーン DOM の同期（popup-entry から切り出し・状態は引数で受け取る）。
 - `src/extension/venue-entry.js` — 会場モード(standalone)のエントリ。venueBar をページに mount するだけの薄い起動点。
 - `src/extension/venueBar.js` — 会場モード UI 本体。観客の席割り・群衆・吹き出し・ギフト演出・読み上げ連動を描く。
@@ -310,6 +330,7 @@
 - `src/lib/avatarEntryCounts.js` — コメントエントリ配列から avatar の数を数える純関数。
 - `src/lib/avatarLoadReport.js` — アイコン画像(usericon)の【実際のロード失敗】を状態速報の対処候補カードに出す純関数(v0.1.1026)。
 - `src/lib/avatarPartsComposer.js` — 匿名ユーザー用アバターのパーツ(髪/目/口など)定義と組み合わせ合成。
+- `src/lib/avatarRetrySweepThrottle.js` — 【層】L0 判定層(純粋関数・I/O禁止)
 - `src/lib/avatarUrlCompare.js` — アバター URL の比較用ヘルパ（純粋関数）。
 - `src/lib/cardFreshnessNote.js` — カードの「鮮度」表示（最終更新からの経過）を作る純関数。
 - `src/lib/celebrationCharaAssets.js` — お祝い演出で使う3キャラ(りんく/こんた/混在)の画像パス定義。
@@ -317,11 +338,15 @@
 - `src/lib/celebrationCommentScanSeed.js` — コメント走査系演出のシード（過去分を再発火させない）制御。
 - `src/lib/celebrationFlyText.js` — ニコニコ／ボカロ MV 風 — 文字が飛び交う演出の文言生成（純関数）。
 - `src/lib/celebrationPika.js` — パチンコ／ボカロ MV 風 — 画面全体「ぴかっ」フラッシュ spec（純関数）。
+- `src/lib/charaLiveController.js` — 「キャラライブ」の配線係。charaLiveState(判断) と charaLiveStage(描画) を繋ぎ、
+- `src/lib/charaLiveStage.js` — 「キャラライブ」の描画層。charaLiveState.js が決めた状態を DOM に落とすだけ。
 - `src/lib/cheerPalette.js` — 盛り上げワード（8888 / wwwww / 顔文字 等）のワンクリック挿入パレット。
 - `src/lib/comeviewActions.js` — v0.1.666: コメビュのコメント単位アクション(わんコメ同等+追憶独自)の純ロジック。
 - `src/lib/comeviewInstantRender.js` — コメビュ別窓で行を即時描画する純ロジック(本文の切り詰め・行の隠し判定など)。
 - `src/lib/comeviewRows.js` — v0.1.652: 独自コメビュ「KIRAMEKI Comment View」の表示行ロジック(純関数)。
+- `src/lib/comeviewTimelineDiff.js` — コメビュの「整合(reconcile)」を差分で描くための純関数。
 - `src/lib/comeviewUserNotes.js` — v0.1.667: コメビュのユーザー詳細(わんコメ式 ニックネーム/ラベル/メモ)の純ロジック。
+- `src/lib/comeviewWindowGeometry.js` — コメビュ別窓／OBS窓の「大きさと位置を覚える」純関数。
 - `src/lib/commentKindnessDisplayModel.js` — やさしさナッジ（コメント送信前の言い換え促し）の「表示モデル」を導出する純関数。
 - `src/lib/commentPostWatchTarget.js` — コメント送信コンテキストだけを、表示用の「実質アクティブ watch」判定から分離して解決する。
 - `src/lib/commentSummary.js` — v0.1.508: コメント記録の「軽量サマリ（0 秒表示）」純関数群。
@@ -336,6 +361,7 @@
 - `src/lib/effectDirector.js` — 「演出ディレクター」層(パチンコ的ゲーム性 Phase 1・Fable設計 2026-07-04)。
 - `src/lib/enrichmentAvatarFallback.js` — enrichRowsWithInterceptedUserIds 内で、全ソースにアバターURLがない場合に
 - `src/lib/formatGiftSubAppHistory.js` — v0.1.198: gift sub-app DOM 由来の history / totalCounts を popup 表示用に
+- `src/lib/giftAdPipelineCensus.js` — ギフト/広告が「取れて→出て→鳴る」まで通っているかを
 - `src/lib/giftBahamutCelebration.js` — ギフト到着時の「画面ズームイン」演出 spec（純関数）。
 - `src/lib/giftDeltaFallback.js` — 「ギフト個別イベント欠落配信」のフォールバック検知(2026-07-06)。
 - `src/lib/giftDisplayNickname.js` — NDGR ギフト protobuf から拾いがちな「内部用ラベル」を表示名から除外する。
@@ -378,16 +404,21 @@
 - `src/lib/interceptAvatarHydration.js` — profile cache の強い avatar を intercept avatar map へ補完する。
 - `src/lib/kokenGiftHistoryApi.js` — koken 公式「ギフト履歴（個別イベント）」無認証 JSON API の URL 組立 & 正規化（純関数）。
 - `src/lib/kokenGiftHistoryFetchClient.js` — popup / content から service-worker 経由で koken ギフト履歴 API を叩く薄いクライアント。
+- `src/lib/laneDetailCells.js` — 応援レーンの観測を【打ち手が変わる単位】に割る(純関数)。
 - `src/lib/laneDiag.js` — 応援アイコン列(popup レーン)の「人数整合」診断。popup が描いたレーンの純観測値を組み立てる純関数群。
 - `src/lib/laneDiagKey.js` — 応援アイコン列(popup レーン)の「人数整合」観測値を popup が書き、status が読む storage キー。
 - `src/lib/laneMirror.js` — 応援レーンの「鏡」スナップショット純関数。popup がレーンを描いた buckets を、status が本物の
 - `src/lib/laneMirrorContract.js` — `KEY_LANE_MIRROR`(応援レーンの鏡)の【契約の正本】。
 - `src/lib/laneMirrorKey.js` — popup の応援レーン(りんく/こん太/広告/たぬ姉の段組み)を「顔=avatar 含めてそっくり」status へ
+- `src/lib/laneMirrorPerLivePublish.js` — laneMirrorPerLivePublish — 配信ごとの鏡(v2)と実DOM受領証を storage へ書く薄いグルー。
+- `src/lib/lanePublishSkipDiag.js` — lanePublishSkipDiag — 応援レーン鏡の publish が「到達したか/何で見送られたか」を1行にする純関数。
 - `src/lib/laneRosterDelta.js` — 応援レーンの「誰が消えたか」を測る純関数(v0.1.1231・Phase 1 計器)。
 - `src/lib/laneRosterKeeper.js` — 応援レーンの「名簿キーパー」(v0.1.1232・Phase 2 蓄積器)。
 - `src/lib/laneSceneEnvelope.js` — LaneScene一致証明の封筒(純関数)。lanescene-structural-review-DESIGN.md のMVP実装。
 - `src/lib/laneSupplyOriginDiag.js` — 応援レーンの供給元(誰が entriesProvisional を書いたか)を名指しする計器。
 - `src/lib/laneTickProbe.js` — ①popup の独立描画トリガ(tickIndependentNorthStar)の自己診断(v0.1.1123)。
+- `src/lib/laneTileOscillation.js` — 【層】L0 判定層(純粋関数・I/O禁止)
+- `src/lib/laneWindowVerdict.js` — 【層】L0 判定層(純粋関数・I/O禁止)
 - `src/lib/lightSupplyOverwriteGuard.js` — 軽い供給(summary+tail)が完全描画を上書きするのを止める判定(純関数)。
 - `src/lib/liveAudienceDom.js` — watch ページ DOM から「同時接続（ページ表示）」に近い視聴者数を読む（純関数・ベストエフォート）
 - `src/lib/liveStatValuePlaceholder.js` — `.nl-live-stat-value` 向け: 数字表示かプレースホルダー文言かを判定（0.1.68 の極太フォント切替と共通）。
@@ -397,6 +428,7 @@
 - `src/lib/migrateInlinePanelBelowToDock.js` — `below` → `dock_bottom` のワンショット移行（0.1.63 AS）。
 - `src/lib/migrateInlinePanelFloatToDock.js` — 旧「ポップアップ風（floating）」利用者を画面下ドックへ一度だけ移す（公式右パネルとの衝突緩和）。
 - `src/lib/migrateSuggestInitialInlinePanelPlacement.js` — 新規インストール時のみ、インライン配置キーが未保存なら画面幅で既定を一度書き込む。
+- `src/lib/nameplateToggleFinder.js` — ニコ生公式の「なふだを表示」トグルを見つける(純関数)。
 - `src/lib/nicoadCelebrationKey.js` — ニコ広/ギフトのシステムコメント演出を「同じコメントで二度光らせない」ための
 - `src/lib/nicoAnonymousDisplay.js` — ニコ生の匿名ユーザーID（a: で始まる内部ID）向けの表示補完。
 - `src/lib/nicoUserPage.js` — 汎用: ニコ生ユーザーの公開ページ URL / 表示名 を作る純関数。
@@ -408,6 +440,8 @@
 - `src/lib/northStarLaneVisibility.js` — 北極星レーンの表示/非表示を `data-lane-state` から決める純関数（副作用なし）。
 - `src/lib/northStarLaneWaitingUi.js` — 北極星「公式値レーン」の取得待ち（not_yet / iframe_unrendered）用 UI 断片。
 - `src/lib/officialEventBannerDom.js` — niconico の watch ページに描画される「○○さんが参加しています！」グリーンバナーから
+- `src/lib/ouenBanner.js` — 応援動画バナーの表示判断（純粋関数）。
+- `src/lib/paintCompletionProbe.js` — paintCompletionProbe — 「JSが返った時点」でなく【画面に出るまで】を測る(v0.1.1320)。
 - `src/lib/paintPerfLog.js` — v0.1.725: 描画(paint)コストの軽量リングバッファ記録(純関数)。
 - `src/lib/paintTopSupportRankStyleIntoElement.js` — 応援帯・公式値レーン（貢献度等）で共通の `nl-top-support-rank` ブロック描画。
 - `src/lib/parseGiftComment.js` — ニコ生のギフトコメント文字列をパースする純粋関数。
@@ -464,21 +498,30 @@
 - `src/lib/userSupportGridAccent.js` — Paul Tol Bright に近い 8 色を OKLCH で表現（カテゴリ識別用）。
 - `src/lib/venueAvatar.js` — v0.1.712: 会場モードのアバター解決(サムネ補強)純関数。
 - `src/lib/venueAvatarDiagLine.js` — 会場モード(venueBar.js)の「🩺 会場の状態」診断ブロックを組み立てる純関数群。
+- `src/lib/venueAvatarReport.js` — 【層】L0 判定層(純粋関数・I/O禁止)
 - `src/lib/venueBubbleChurn.js` — 会場「応援TOP」吹き出しchurnの実測計器(診断先行アプローチ)。
 - `src/lib/venueBubbleLayout.js` — v0.1.717: 会場モードの吹き出し(セリフ)を「席の外の最上位レイヤー」に置くための配置純関数。
 - `src/lib/venueCharacterFrame.js` — 会場モードの「額縁(フレーム)」: ゆっくり3キャラ(りんく/こん太/たぬ姉)の全表情サムネを、
 - `src/lib/venueCrowdMotion.js` — 会場の観客シルエット群を「生きている会場」にするための動きパラメータ(純関数)。
 - `src/lib/venueDisplayRows.js` — 会場モードの「空っぽ・途中で消える・ちらつき」根治の正本(2026-06-15・会議+根本原因調査)。
 - `src/lib/venueDomCensus.js` — 会場5段の【実DOM国勢調査(census)】。
+- `src/lib/venueEntryQueue.js` — venueEntryQueue — 会場「入場演出」の差分検出と間引き（純ロジック・DOM を触らない）。
 - `src/lib/venueGeometryVerdict.js` — 会場と①POPのタイル寸法差が「CSS不整合」か「測定対象ズレ」かを見分ける純関数(v0.1.1212)。
 - `src/lib/venueHeat.js` — v0.1.732: 会場モードの「熱量の色温度」純関数。
 - `src/lib/venueHoverCard.js` — 会場アイコンのホバープレビューカード(純ロジック+DOMビルダー)。
+- `src/lib/venueHoverCardProbe.js` — 【層】L0 判定層（純関数・chrome/DOM/fetch に触らない）
+- `src/lib/venueHoverFacts.js` — 【層】L0 判定層（純関数・chrome/DOM/fetch に触らない）
 - `src/lib/venueLaneMirrorSupply.js` — 会場の「鏡優先+同型フォールバック」供給(純関数)。①POP が実 paint した5段 buckets の鏡
 - `src/lib/venueLaneParity.js` — 会場レーンのパリティ計器(純関数)。会場が実際に paint した段割当列を、①POP の実描画鏡
+- `src/lib/venueLiveOpenFlag.js` — 「会場モードがいま開いているか」を鏡の供給側へ伝える値。
 - `src/lib/venueLiveRoster.js` — v0.1.754 会場の3時間安定化(星野ロミ・メソッド会議の本質解・6体ほぼ全会一致):
 - `src/lib/venueMirrorAvatarEnrich.js` — 会場行の avatar を「①の実描画鏡(laneMirror)が解決済みの顔URL」で
+- `src/lib/venueMirrorIntakeDiag.js` — venueMirrorIntakeDiag — 会場が鏡を「受け取れているか」を経路ごとに数える純関数(v0.1.1317)。
+- `src/lib/venueModeCensus.js` — 会場モード専用の計器(純関数)。
+- `src/lib/venueOpenCache.js` — 「会場モードが開いているか」を安く保持する。
 - `src/lib/venueOpenLatency.js` — 会場モードの「開いてから見えるまで」を分解して観測する純関数(v0.1.1207)。
 - `src/lib/venuePickupBanner.js` — 会場モードの「ピックアップ枠」(BSP風・v0.1.1230)。
+- `src/lib/venuePresenceNote.js` — 【層】L0 判定層（純関数・chrome/DOM/fetch に触らない）
 - `src/lib/venueResidents.js` — 会場モードの常駐3キャラ(りんく・こん太・たぬ姉)の描画モデル(純関数)。
 - `src/lib/venueRoster.js` — 2026-06-14 ユーザー要望「今会場にいるメンバーを視覚的に確認できるボタン・AIも人間も検証
 - `src/lib/venueSeatLinkParity.js` — 会場タイルの「リンク欠落」実害確定計器(診断先行アプローチ)。
@@ -488,11 +531,13 @@
 - `src/lib/venueSpeechStreak.js` — 「会話の連鎖」(2026-06-15 会議の最大多数決の本命・弱点A/C):
 - `src/lib/venueViewport.js` — v0.1.715: 会場モードの「映像セーフエリア」と「同時表示人数」を決める純関数。
 - `src/lib/venueYukkuriNamedCensus.js` — 「名前ありゆっくり顔」実害確定計器(診断先行アプローチ)。
+- `src/lib/verifiedAvatarRegistry.js` — 「推測URLだが**実際に画像が出た**」を覚えて、次から本物として扱う純関数群。
 - `src/lib/viewerCelebrationMatch.js` — 視聴者本人のギフト／広告システムコメント判定（ニコ生の表記揺れに耐える）。
 - `src/lib/watchCelebrationOverlay.js` — popup iframe から content script 経由で呼ぶ。
 - `src/lib/watchMetaCardStateGate.js` — watch メタカードの「来場者数 / 推定同時接続」表示状態を、
 - `src/lib/watchPageViewerProfile.js` — watch ページのサイトヘッダー付近からログイン中ユーザーのアイコン・表示名を推定。
 - `src/lib/watchPopupCelebrationGuard.js` — popup 再描画時の応援演出ガード（純関数）。
+- `src/lib/yieldToBrowserPaint.js` — 【層】L0 判定層(依存ゼロ・chrome.* 非依存)
 - `src/shared/avatar/avatarUrlGuard.js` — avatar URL 比較・抽出・整合性判定の純粋関数群（shared レイヤ）。
 - `src/shared/avatar/clampAvatarUrl.js` — avatar URL の長さ上限を一元適用する純関数（H2 / D-5 / S-13 の根治）。
 - `tools/render-og.js` — 追憶の煌めき LP 用 OG 画像（1200×630）を生成する。
@@ -509,17 +554,22 @@
   - `src/lib/voicePlayer.js`
   - `src/lib/voiceReadQueue.js`
   - `src/lib/voiceAgeGate.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 12</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 17</summary>
 
 - `src/lib/reportCompleteVoice.js` — v0.1.806: レポート(HTML/マーケ/メディアキット)の保存が【成功した直後】に、完了の合図として
 - `src/lib/voiceAssignment.js` — コメント者ごとに読み上げ声(styleId/ピッチ/速度オフセット)を決定論的に割り当てる純ロジック。
+- `src/lib/voiceBubbleRealtimeParity.js` — 「読み上げ」と「吹き出し(画面表示)」が
 - `src/lib/voiceComment.js` — ニコ生コメント欄の最大文字数（textarea maxlength と一致）
+- `src/lib/voiceDetailCells.js` — 読み上げの観測を【打ち手が変わる単位】に割る(純関数)。
 - `src/lib/voiceDirector.js` — council/pachinko-ultimate-SYNTHESIS.md §4(ボイスの歯止め)+§6 Phase B の実装。
 - `src/lib/voiceEffectDiag.js` — パチンコボイス演出(voiceDirector.js・Phase B)の発火/スキップ観測値を組み立てる純関数群。
 - `src/lib/voiceEffectDiagKey.js` — パチンコボイス演出(voiceDirector.js・Phase B)の「発火/スキップ内訳」観測値を
+- `src/lib/voiceFailureTaxonomy.js` — 【層】L0 判定層（純粋関数・I/O禁止）
 - `src/lib/voiceInputDevices.js` — マイク確認でサンプルする時間（ms）
+- `src/lib/voiceKeys.js` — 読み上げ設定の storage キーの【正本】。
 - `src/lib/voiceLagBudget.js` — 会場読み上げの件数ゲート実効上限を、処理時間EMA(実測)から動的に
 - `src/lib/voiceLoadingState.js` — VOICEVOX 起動待ちのローディング表示を決める純関数群。
+- `src/lib/voiceReachabilityProbe.js` — 「読み上げは今どういう状態か」を1行で断定する純関数。
 - `src/lib/voiceSynthFailure.js` — 読み上げの合成失敗を分類する純関数(v0.1.1213)。
 - `src/lib/voiceSynthFailureReason.js` — 読み上げ合成が失敗した「どこで・なぜ」を名前で返す純関数(v0.1.1224)。
 - `src/lib/voicevoxClient.js` — ローカル VOICEVOX エンジン(127.0.0.1:50021)へ音声合成をリクエストするクライアント。
@@ -534,13 +584,15 @@
 
 - **HTMLレポート生成** — マーケ/イベント順位/タイムライン等を1枚の HTML レポートに組み立てる(popup-entry 内)
   - `src/extension/popup-entry.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 39</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 41</summary>
 
 - `extension/marketing-export-guard.js` — マーケ分析タブ(marketing-export.html)の「何があっても開く」保険。
 - `scripts/build-sound-preview.mjs` — 開発用: extension/sound/ 配下の全効果音を1枚のHTMLで試聴できるページを生成する。
 - `scripts/inspect-nicolive-watch-stats.mjs` — ニコ生 watch ページの HTML から、来場・同接まわりの数値がどう埋め込まれているかを CLI で確認する。
+- `scripts/layer-map-html.mjs` — ★`src/lib` の構成を【HTMLで見える】ようにする。
 - `src/extension/marketing-export-entry.js` — マーケ分析レポートの別タブ化(marketing-export.html)のエントリ。
 - `src/extension/popup/report/htmlReportDocument.js` — HTMLレポート(振り返り用の保存HTML)組み立てクラスタ。
+- `src/lib/adMessageLines.js` — 広告主が入れた文字を、そのままレポートに残すための整形。
 - `src/lib/audienceEngagementGap.js` — 来場者数は多いがコメントが少ない状態を検出するローカル分析コア。
 - `src/lib/broadcastNarrativeBuilder.js` — コメント本文だけから「配信内容の流れ」を再構成する純粋関数。
 - `src/lib/broadcastReportSummary.js` — HTML レポート / マーケ分析の双方で使う「放送全体の純粋集計」。
@@ -606,7 +658,7 @@
 - **影響範囲ゲート(規律を自動化)** — 星野ロミ式「規律を自動ゲートに」。diff から影響大(複数機能波及)の変更ファイルを検出し波及先機能を列挙。警告のみ(摩擦ゼロ)・--strict で exit1。AGENTS.md §10 のルールを diff 発火に
   - `scripts/impact-check.mjs`
   - `docs/feature-map/impact-map.json`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 66</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 80</summary>
 
 - `api/status.js` — status 受け口 Vercel Serverless Function。
 - `extension/status-guard.js` — 状態速報ページ(status.html)の「何があっても開く」保険。
@@ -615,6 +667,9 @@
 - `scripts/split-changelog.mjs` — scripts/split-changelog.mjs — changelog.js を直近20版(本体)と旧版(archive)に分割
 - `scripts/status-live.mjs` — 状態速報(status.html の「AI共有」全文)を、コピー&貼り付けせずにターミナルへ取得する CLI。
 - `scripts/verify-bump.mjs` — extension bump 後の整合性チェッカー
+- `scripts/verify-deploy.mjs` — 「Chrome に配ったビルドが本当に今の版か」を照合する。
+- `src/extension/popup/attachAiDiagButtonHandler.js` — attachAiDiagButtonHandler — 「AIで診断」ボタンの delegated listener を張る。
+- `src/extension/sidepanel-entry.js` — サイドパネルの自己診断だけを担う極小エントリ。
 - `src/lib/aiShareDiagSchema.js` — AI 共有診断バンドル（popup が組み立てる JSON / storage の nls_ai_share_fast_diag_v1）の
 - `src/lib/aiShareFastDiagKey.js` — v0.1.629: AI 共有 fastDiag キャッシュの storage key を popup と status ページで共有。
 - `src/lib/aiShareFullText.js` — 状態速報(AI共有)本文ビルダー。②応援ライブビュー/③WEB が同一の status-report builder を
@@ -622,7 +677,7 @@
 - `src/lib/bgmPhaseDiag.js` — BGMディレクター(bgmDirector.js)+フェーズディレクター(phaseDirector.js)の観測値を組み立てる
 - `src/lib/bgmPhaseDiagKey.js` — BGMディレクター(bgmDirector.js)+フェーズディレクター(phaseDirector.js・Phase C)の
 - `src/lib/captureAuditionRichviewEventScoreDiagProbe.js` — audition.nicovideo.jp `/embedded/richview/live` 向けの診断ペイロード（PR1）。
-- `src/lib/changelog-archive.js` — 追憶のきらめき 更新履歴アーカイブ（v0.1.663 以前）。
+- `src/lib/changelog-archive.js` — 追憶のきらめき 更新履歴アーカイブ（popup のバンドル外）。
 - `src/lib/changelog.js` — 拡張の更新履歴データと semver 比較ヘルパ。
 - `src/lib/changelogConsistency.js` — 版番号の三者一致を機械照合する純関数(v0.1.835)。
 - `src/lib/changelogLineage.js` — changelog 全版を「バグ系統」で枝化する純関数(v0.1.841・修正系譜マップ 第1)。
@@ -632,6 +687,8 @@
 - `src/lib/commentPostDiag.js` — コメント送信(requestPostCommentToOpenTab)の「所要ms/結果/リトライ回数」観測値を
 - `src/lib/commentPostDiagKey.js` — コメント送信(requestPostCommentToOpenTab)の「所要ms/結果/リトライ回数」観測値を
 - `src/lib/commentPostStatusPresentation.js` — コメント送信 UI の「最終ステータス表示」と aria-describedby を決める純関数群。
+- `src/lib/commentWriteModeDiag.js` — コメント記録の「書き込みモード」を1行に要約する純関数。
+- `src/lib/commentWriteModeDiagKey.js` — コメント記録の【書き込みモード】(チャンク追記 or 巨大配列の丸ごと書き戻し)を
 - `src/lib/customSoundDiag.js` — 「マイ効果音」(customSoundStore.js・Phase A)の取込状況を状態速報 extras(12秒間引き)に
 - `src/lib/diagFlushThrottle.js` — 2026-07-06: 即時プッシュ計器(instantPushDiag)が「コメント送信バッチ毎に
 - `src/lib/diagnosisRegistry.js` — 状態速報「網羅的完全性診断」の【真実の源泉(Source of Truth)】。
@@ -639,12 +696,15 @@
 - `src/lib/diagnosticRedact.js` — AI共有・診断バンドル向けの URL / 文字列のサニタイズ（純粋関数）。
 - `src/lib/diagnosticRingStore.js` — 診断エラーリングを chrome.storage.local に追記（拡張コンテキスト専用）。
 - `src/lib/diagnosticsTrust.js` — 「この診断の信頼性」メタ診断（council/diagnostics-completeness-root-SYNTHESIS.md 第1段）。
+- `src/lib/diagPublisher.js` — 計器の「書き手」を一本化する共有ヘルパー。HANDOFF-instrument-channels-2026-08-12.md §3 のゲートG4。
+- `src/lib/diagSchemaCopy.js` — 計器スナップショットを「フィールド表(schema)だけ」から機械的に組み立てる共有ヘルパー。
 - `src/lib/diagWarnings.js` — v0.1.201: 診断 JSON の現在値から「なぜ取れていないか」を導出する純関数群。
 - `src/lib/diagWordingGuard.js` — ユーザー向け診断カードの「実害を示唆する語」を検出する純関数(v0.1.835)。
 - `src/lib/errorAutoDiagnosis.js` — v0.1.205 Phase D: 既存の診断データ（consoleErrors / networkErrors / diagWarnings）から
 - `src/lib/eventSelfStatusHeaderHtml.js` — v0.1.809(星野ロミ式コンポーネント化・第2弾): popup-entry.js の純粋寄り HTML ビルダー
 - `src/lib/giftEffectDiag.js` — ギフト/広告の「検知→演出(投擲)→効果音」が揃っているかの純観測値を組み立てる純関数群。
 - `src/lib/giftEffectDiagKey.js` — ギフト/広告の「検知→演出(投擲)→効果音」が揃っているかの観測値を venueBar.js が書き、
+- `src/lib/healthCellGroups.js` — 健全度セルを【症状の言葉】で枠に分ける(純関数)。
 - `src/lib/healthCells.js` — v0.1.1056: パリティ根本修正 Phase4(この修正自体が動いているかを診断シートで検証可能にする)。
 - `src/lib/instantPushDiag.js` — コメント即時プッシュレーン(storage迂回)の「送信N/受信N/表示遅延ms」観測値を
 - `src/lib/instantPushDiagKey.js` — コメント即時プッシュレーン(storage迂回)の「送信N/受信N/表示遅延ms」観測値を
@@ -657,15 +717,21 @@
 - `src/lib/northStarMirrorPublishRace.js` — 北極星鏡publish取りこぼしの実害確定計器(診断先行アプローチ)。
 - `src/lib/opSoundEffectDiag.js` — 操作音(opSoundDirector.js・Phase D1)の「押下→成功→発音」観測値を組み立てる純関数群。
 - `src/lib/opSoundEffectDiagKey.js` — 操作音(opSoundDirector.js・Phase D1)の「押下/成功/発音」観測値を
+- `src/lib/panelWakeCurtainDiagKey.js` — 「幕(シェード)が全画面を覆った回数」の観測値を popup-entry.js が書き、status が読む storage キー。
 - `src/lib/popupAiDiagOrchestrator.js` — v0.1.211: popup「AI 診断」ボタンのオーケストレータ純関数。
 - `src/lib/popupDiagAutoPublish.js` — popup を開いたとき popup 固有診断を status へ自動集約するスケジューラ(純ロジック)。
 - `src/lib/popupDiagUptimeNote.js` — popup 固有診断が「popup 起動から何秒後の値か」を明示する注記を作る純関数(v0.1.1211)。
 - `src/lib/previewHeavyHint.js` — 「応援プレビュー(②)を開いている間は診断更新が重い」を状態速報で名指しする純関数(v0.1.1020)。
 - `src/lib/scoreAnnounceDiag.js` — 結果発表シーケンス(scoreAnnounce.js・SC3・council/broadcast-scoring-SYNTHESIS.md §2.1)の
 - `src/lib/scoreAnnounceDiagKey.js` — 結果発表シーケンス(scoreAnnounce.js・SC3・council/broadcast-scoring-SYNTHESIS.md §2.1)の
+- `src/lib/sidepanelSelfDiag.js` — sidepanelSelfDiag — サイドパネルが「自分がいま黒くないか」を自己申告するための純ロジック。
+- `src/lib/sidepanelSelfDiagKey.js` — サイドパネル自己診断の storage キー。
 - `src/lib/statusCopyFreshness.js` — 状態速報の「コピーした本文がどれくらい古いか」を、コピーする側に伝える純関数(v0.1.1222)。
+- `src/lib/statusCoreBatch.js` — 【層】L0 判定層(純粋関数・I/O禁止)
 - `src/lib/statusExtrasBatch.js` — 状態速報「重さ根治 P2」: status-entry.js の extras ブロック(12秒間引き)が単一キー get だけの
 - `src/lib/statusFastDiagLite.js` — status.html 用「軽量 fastDiag ダイジェスト」。
+- `src/lib/statusMindmapSignature.js` — マインドマップの再描画を止める署名を作る純関数。
+- `src/lib/statusReadPolicy.js` — 【層】L0 判定層(純粋関数・I/O禁止)
 - `src/lib/statusRefreshBackoff.js` — v0.1.1010: 状態速報(status.html)の自動更新を「直近 refresh の所要に比例して間引く」純関数。
 - `src/lib/statusShareUrls.js` — 状態速報の共有 URL を組み立てる純関数。
 - `src/lib/storyDiagMirrorKey.js` — ①「詳しい状況」診断を会場へ鏡映する legacy storage key。
@@ -736,26 +802,36 @@
   - `src/lib/statusTrendKey.js`
   - `src/extension/status-entry.js`
   - `src/lib/statusActionAdvisor.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 137</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 205</summary>
 
 - `app/app.js` — スマホ閲覧用 status Web 版。
 - `app/live-view.js` — global NL_BUILD_ID
 - `extension/background.js` — MV3 Service Worker
+- `scripts/_merge-council.mjs` — 3ラウンド分の council JSON を1つの Markdown 議事録に統合する。
+- `scripts/audit-gates.mjs` — ★**計器を計器で測る**(メタ検査)。
 - `scripts/build-sounds.mjs` — extension/sound/ の効果音mp3を組み立てる。
 - `scripts/build-watch.mjs` — watch では起動時刻を埋める（rebuild 毎に再 import される訳ではないので、
 - `scripts/build.mjs` — .env を読み込む(status の共有キー NL_STATUS_INGEST_KEY / NL_STATUS_VIEW_TOKEN は .env から注入)。
 - `scripts/capture-store-screenshots.mjs` — Chrome ウェブストア用スクショ自動撮影
+- `scripts/check-improvement.mjs` — ★版ごとの実測値が【退化】していないか見張る。
+- `scripts/check-layer.mjs` — ★`src/lib` が「純粋ロジックの箱」であり続けることを機械で守る。
 - `scripts/check-no-secrets-in-dist.mjs` — ビルド成果物に秘密情報が焼き込まれていないか検査する(fail-closed)。
 - `scripts/check-root-cause-claim.mjs` — コミットメッセージの「根治」語を検査する。
 - `scripts/check-tracked-imports.mjs` — 「コミットし忘れた新規ファイルを import している」ことを機械的に検出するリリース工程ガード(2026-07-06)。
 - `scripts/copy-ext.mjs` — 拡張を「同期対象外フォルダ」へコピーする(Chrome の再読み込み固着の根治)。
+- `scripts/council-cleanup.mjs` — 会議ハーネス(meeting.mjs)の後始末。
 - `scripts/council-lineup.mjs` — 会議メンバー名簿（クラウドのみ。ローカルOllamaは従来通り meeting.mjs 側の
 - `scripts/council-roles.mjs` — 会議ハーネス共通の「役割・出力フォーマット・批判強制」定義。
 - `scripts/cws-publish.mjs` — Chrome Web Store Publish API で ZIP をアップロード(+任意で公開申請)する。
 - `scripts/delete-dead-lib.mjs` — scripts/delete-dead-lib.mjs — 死蔵lib実装ファイルとそのテストを削除
 - `scripts/fix-src-images-mojibake.mjs` — Normalizes known mojibake paths under src/images (mirrored from kimito-link).
 - `scripts/install-local-sounds.mjs` — マイ効果音「手動取込」を不要にするローカル自動同梱スクリプト。
+- `scripts/layer-config.mjs` — ★どのリポでも使えるように「設定」を読む部分だけを切り出す。
+- `scripts/lib/instrument-core.mjs` — ★検査・計器の共通土台（キット同梱・依存ゼロ・純Node）。
+- `scripts/measure-flash-frames.mjs` — 「一瞬の黒」を【画面に出たピクセル】で測る。
+- `scripts/meeting-roles.mjs` — meeting.mjs の役割注入版。
 - `scripts/meeting.mjs` — 会議ハーネス: 同じ問いを「無料クラウド4系統 + ローカル ollama 数体」に投げ、
+- `scripts/pick-live-for-check.mjs` — 検証に使う実配信を【自動で1つ選ぶ】。
 - `scripts/repo-tree-map.mjs` — リポジトリのディレクトリツリー＋各ディレクトリの「役割」を自動生成する(2026-06-18 ユーザー提案)。
 - `scripts/run-e2e.mjs` — SKIP_E2E=1 のときは成功終了（CI などディスプレイなし環境用）。
 - `scripts/scan-dead-lib.mjs` — scripts/scan-dead-lib.mjs — lib/ の死蔵ファイルを entry から到達性スキャンして報告
@@ -764,25 +840,44 @@
 - `scripts/sync-lp-twitter-icon.mjs` — LP 右端コラボ用: src/images/icon/twitter-icon.png → extension/images/lp/twitter-icon.png
 - `scripts/vendor-visual-explainer.mjs` — Vendors nicobailon/visual-explainer (MIT) into .cursor/skills/visual-explainer/
 - `scripts/write-extension-placeholder-icons.mjs` — リポジトリに 256px アイコンしか無い環境向け: manifest 用の小さめ PNG を生成する。
+- `src/build-globals.d.ts` — ビルド時に esbuild の `define` で注入される定数の型宣言。
+- `src/extension/cloak-failsafe-entry.js` — 幕(cloak)を外す【最速の保険】だけを担う極小エントリ。
 - `src/extension/offscreen-entry.js` — feat/multitab-scale-globalcap（2026-05-31）: コメント IDB の「常駐・単一書き手」を担う
+- `src/lib/aboutBlankGapVerdict.js` — ★about:blank の隙間(残り32ms)に対する【確定した判定】。
+- `src/lib/adMessageCensus.js` — 「広告/ギフトの生データに【メッセージ】が入っているか」を数えるだけの計器。
+- `src/lib/aiShareTextChanged.js` — 【層】L0 判定層(純粋関数・I/O禁止)
 - `src/lib/anomalyVerdict.js` — 計器の値に「正常域」を持たせ、異常を【名指し】する純関数群。
 - `src/lib/arrivalEffect.js` — ニコ生「来場」システムメッセージ(parseArrivalComment.js でパース済み)を、パチンコの
 - `src/lib/autoPublishDecision.js` — ③WEB(純Web公開コピー)が古くなる前に自動で再 publish すべきかを判定する純関数(v0.1.1016)。
+- `src/lib/autoSectionCensus.js` — 【層】L0 判定層(純粋関数・I/O禁止)
 - `src/lib/backgroundWatchTab.js` — 「Alt+Tab に出てこない裏 watch タブ(active:false)」の判定。
+- `src/lib/bandScale.js` — 「大きく見せる枠(PICK UP 帯)」の倍率(純関数)。
+- `src/lib/bandScaleBoot.js` — PICK UP 帯の倍率を起動時に適用する(副作用モジュール)。
 - `src/lib/bgmDirector.js` — council/pachinko-ultimate-SYNTHESIS.md §5(BGM設計)+§6 Phase C の実装。
+- `src/lib/blackScreenOwnerCells.js` — 黒画面の【止めている当人】をセルにする(純関数)。
+- `src/lib/buildAgeCell.js` — いま動いているビルドが【いつのものか】を出す(純関数)。
 - `src/lib/buildWatchMetaCardAudienceViewModel.js` — Watch メタカード「観客」ブロック用 ViewModel（DOM 非依存）。
 - `src/lib/bundleBuildId.js` — dist バンドル本文から NL_BUILD_ID(JST, MMDD-HHmmss)の焼き込み値を
+- `src/lib/buriedInstrumentCells.js` — 速報の文章に埋もれていた判定を【セル】として掘り起こす(純関数)。
+- `src/lib/catchingUpVerdict.js` — 【層】L0 判定層(純粋関数・I/O禁止)
+- `src/lib/charaLiveCensus.js` — 「キャラライブが本当に画面に出ているか」を **実測** して1行にする計器。
+- `src/lib/charaLiveState.js` — 「キャラライブ」= 画面に常駐する 3 キャラ(りんく/こん太/たぬ姉)が、ふわふわ浮遊しながら
 - `src/lib/chikuranHeaderDom.js` — 「ちくらん風」配信者カードのヘッダー DOM ビルダー。
 - `src/lib/classifyFeatureCategory.js` — ファイルを機能カテゴリへ自動分類する純関数(v0.1.840・マップ網羅化 第1)。
+- `src/lib/cloakFailsafeMarker.js` — 外部保険(cloak-failsafe-entry.js)と本体(popup-entry.js)が
+- `src/lib/cloakNotForSidePanel.js` — 「この画面で幕(cloak)を使うべきか」を言う純関数。
 - `src/lib/commentMirrorPublishGate.js` — コメント鏡 publish の provisional ガード(純関数 + 状態ファクトリ・v0.1.1018)。
 - `src/lib/commentTimelineMirror.js` — コメントタイムラインの「鏡」スナップショット純関数（council/liveview-wholesale-root-SYNTHESIS.md 第2段）。
 - `src/lib/consoleErrorBuffer.js` — v0.1.201: window.error / unhandledrejection を捕捉する ring buffer。
 - `src/lib/copyTextWithFallback.js` — テキストを「確実に」クリップボードへ入れるためのフォールバック付きコピー。
+- `src/lib/currentLiveIdOrigin.js` — 「いま視聴中の配信」を【鏡とは別の起点】から決める純関数。
 - `src/lib/customSoundPreset.js` — council/pachinko-ultimate-SYNTHESIS.md §2 の「85素材の完全割り当て表」をそのままJSON化した
 - `src/lib/customSoundStore.js` — council/pachinko-ultimate-SYNTHESIS.md §1.2/§1.4/§1.5(Phase A)の実装。
+- `src/lib/devAutoReloadDecision.js` — devAutoReloadDecision — 開発用オートリロードの判定(v0.1.1318)。
 - `src/lib/devMonitorDebugSubset.js` — ポップアップ「開発・テスト用 監視」用: watch スナップショット _debug から
 - `src/lib/devMonitorVizHtml.js` — dev monitor セカンダリ可視化（renderDevMonitorSecondaryViz の <div class="nl-dev-monitor-viz">）の
 - `src/lib/devReloadSignal.js` — 開発用ホットリロードのシグナル判定（純関数）。
+- `src/lib/domTreeCensus.js` — 【層】L0 判定層(純粋関数・I/O禁止)
 - `src/lib/embeddedDataExtract.js` — ニコ生 watch ページの `#embedded-data[data-props]` から初期メタ情報を抽出する純関数。
 - `src/lib/eventParticipationProgramsApi.js` — ニコ生「企画イベント参加番組一覧」公式 JSON API の URL 組立 & 正規化（純関数）。
 - `src/lib/executeScriptWithTimeout.js` — v0.1.441: `chrome.scripting.executeScript` を timeout 付きで実行する純関数ラッパ。
@@ -792,21 +887,36 @@
 - `src/lib/forwardReactivation.js` — v0.1.765「最終系(a): 入口が死んだ時だけ forward crawl を起動して再接続」の判定(純ロジック)。
 - `src/lib/geminiNanoBridge.js` — v0.1.205 Phase C: Built-in AI (Gemini Nano, Chrome 138+) の薄いラッパー。
 - `src/lib/globalFetchRateLimiter.js` — v0.1.664 PR4: tokenBucket.js を用いた全タブ横断の fetch レートリミッター(土台)。
+- `src/lib/heavyCachePreserve.js` — 軽い read が heavy read の証跡を消さないための純関数(v0.1.1367)。
+- `src/lib/hiddenPublishPolicy.js` — 「画面が隠れているとき、鏡の publish まで止めてよいか」の判定(純関数)。
 - `src/lib/htmlEscape.js` — 旧パス：`src/lib/htmlEscape.js`
+- `src/lib/improvementHistory.js` — 【層】L0 判定層(純粋関数・I/O禁止)
+- `src/lib/improvementLedger.js` — 【層】L0 判定層(純粋関数・I/O禁止)
+- `src/lib/improvementStaleness.js` — 【層】L0 判定層(純粋関数・I/O禁止)
+- `src/lib/initShadeDismissPolicy.js` — 初回ロードの幕(シェード)を【いつ畳むか】を決める純関数。
 - `src/lib/initShadeFailsafe.js` — 初回ロード幕(.nl-init-shade)の CSS フェイルセーフとクラスの乖離を断つ純関数。
+- `src/lib/instrumentSpec.js` — 【層】L0 判定層(純粋関数・I/O禁止)
 - `src/lib/isInsideRecommendedLiveSection.js` — v0.1.200: ニコ生 watch ページの「おすすめ生放送」セクション内 DOM を識別する純関数。
+- `src/lib/lastWatchUrlAdoption.js` — 【層】L0 判定層(純粋関数・I/O禁止)
 - `src/lib/lengthDelimitedStream.js` — length-delimited（varint 長 + ペイロード）の連続を分割する。
 - `src/lib/liveEndedFlag.js` — 配信終了フラグ。
+- `src/lib/livesCardSignature.js` — livesCardSignature — 配信カードを作り直すべきかの署名(v0.1.1320)。
 - `src/lib/liveviewSnapshotFreshness.js` — 純Web応援ライブビューの「スナップショット丸ごと1枚の鮮度」判定（council/liveview-wholesale-root-SYNTHESIS.md 第1段）。
+- `src/lib/lpContentStaleness.js` — 【層】L0 判定層(純粋関数・I/O禁止)
+- `src/lib/mainThreadBlockerBoot.js` — メインスレッドを止めた区間を【実測】する(副作用モジュール)。
+- `src/lib/mainThreadBlockerCensus.js` — メインスレッドを止めた【当人】を名指しする計器(純関数)。
 - `src/lib/mcpBridge/buildMcpMismatchReasons.js` — MCP L1 snapshot の `diag.mismatchReasons` を組み立てる純関数。
 - `src/lib/mcpBridge/mergeLiveMcpSnapshot.js` — Canonical Snapshot のマージ（Deterministic + Monotonic Sequence）。
 - `src/lib/mcpBridge/schema.js` — L1 Canonical Snapshot の schema 定義（MCP Bridge から AI に返す正準形）。
 - `src/lib/mcpBridge/validateLiveMcpSnapshot.js` — Canonical Snapshot の構造検証。schema.js の isCanonicalLiveSnapshot より詳細な
+- `src/lib/memoryPressureProbe.js` — メモリ消費とDOM総数を「凍結の予兆」として判定する純関数
 - `src/lib/mergeProgramStatsWatchIntoWatchMetaSnapshot.js` — 公式 DOM bundle の programStats.watchCount（累計来場）を snapshot に補完する。
 - `src/lib/mirrorBundle.js` — 5種類の「鏡」を同一 tick の 1 バンドルとして扱うための合流バッファ純関数。
 - `src/lib/mirrorBundleFlushScheduler.js` — 鏡バンドルの flush スケジューラ(状態を内部に閉じた純ロジック・タイマー非依存)。
 - `src/lib/mirrorSanitize.js` — v0.1.237: 北極星「鏡のように貼り付け」用の自前最小サニタイザ。
+- `src/lib/nameplateToggleBoot.js` — ①POP の「なふだ」ボタンを配線する(副作用モジュール)。
 - `src/lib/nicoCommentPanelAssetLauncher.js` — ニコ生 watch のコメント欄付近から「ギフト / アイテム / スタンプ」等の起動ボタンを推定する。
+- `src/lib/noActiveWatchDecision.js` — 「実質アクティブな watch が無い」＝画面を空にするか、を決める純関数(v0.1.1313)。
 - `src/lib/northStarCharaTrioConfig.js` — 北極星 3 キャラ trio（りんく / こん太 / たぬ姉）の slot 構成と tier 連動 src 解決。
 - `src/lib/northStarMirror.js` — 北極星レーン鏡(公式値レーン)のスナップショット純関数。
 - `src/lib/objectUrlRevokeQueue.js` — `URL.createObjectURL` で作った blob URL を、メモリ滞留を抑えながら revoke する
@@ -818,51 +928,75 @@
 - `src/lib/officialStatsWindow.js` — at?: number|null,
 - `src/lib/openingFiveMinuteCorrelation.js` — L13: 冒頭 5 分の予兆 → ピーク CPM 相関（散布図用）。
 - `src/lib/opSoundDirector.js` — 操作音(パチンコの「玉の打ち出し」比喩・council/operation-sound-SYNTHESIS.md Phase D1)の
+- `src/lib/ouenBannerDom.js` — 応援動画バナーを DOM に反映する。
+- `src/lib/panelCoverCulprit.js` — 【層】L0 判定層(純粋関数・I/O禁止)
 - `src/lib/panelLiveSummary.js` — パネルカード用の超軽量サマリ（多タブ時の snapshot / 巨大配列 read 待ちを避ける）。
+- `src/lib/panelWakeCurtain.js` — 「黒いまま」を見せないための、いつでも出せる幕。
+- `src/lib/panelWakeCurtainDom.js` — 「いつでも出せる幕」の DOM 側（配線1本で使える形）。
 - `src/lib/parityVerdict.js` — 3画面パリティ「①POP=②応援プレビュー=③WEBプレビュー が同一で完全か」の総合判定(純関数)。
 - `src/lib/parseArrivalComment.js` — ニコ生の「来場」システムメッセージ文字列をパースする純粋関数。
 - `src/lib/parseEmbeddedDataViewerInfo.js` — v0.1.203 Patch 3: niconico watch ページの `<script id="embedded-data" data-props='{...}'>`
 - `src/lib/parseInterestArrivalComment.js` — ニコ生の興味タグ来場システムコメントをパースする純関数。
+- `src/lib/passiveMirrorLiveIdGuard.js` — 受動ビュー(status 埋め込み / live-view)が「別配信の古い鏡」を貼らないための判定。
 - `src/lib/phaseDirector.js` — council/pachinko-ultimate-SYNTHESIS.md §3(物語弧=決定論ステートマシン)+§6 Phase C の実装。
 - `src/lib/pickLatestComment.js` — ストレージ上のコメント配列の並びは一定でないため、
 - `src/lib/pollUntil.js` — 再読み込み直後など DOM が遅れて現れるまで待つ（純粋な間隔ポーリング）
 - `src/lib/popupBooleanSettingController.js` — popup のブール設定 1 件を管理する純粋コントローラ。
 - `src/lib/popupBooleanSettingsRegistry.js` — popup のブール設定コントローラをまとめて扱うレジストリ。
+- `src/lib/popupCloakRevealTiming.js` — 幕(cloak)をいつ外してよいかを決める純関数(v0.1.1315)。
+- `src/lib/popupDomCensus.js` — 【層】L0 判定層(純粋関数・I/O禁止)
+- `src/lib/popupErrorLine.js` — popupErrorProbe の速報1行を作る純関数(v0.1.1377)。
 - `src/lib/popupFramePresets.js` — popup の配色プリセット（フレーム）管理。
 - `src/lib/popupWatchSnapshotRetry.js` — 視聴タブのリロード直後は content script の readiness が揃わず、
 - `src/lib/popupWindowEmptyHeight.js` — 0.1.71 (BA): popup window の高さを「state（active watch / empty+history /
+- `src/lib/prefersReducedMotion.js` — 【層】L0 判定層(依存ゼロ・chrome.* 非依存)
 - `src/lib/prewarmCoordinator.js` — 複数 watch タブで popup.html の prewarm が同時に走るのを防ぐ
 - `src/lib/profileResolveState.js` — v0.1.720 PR-T2: プロフィール解決の状態管理（純関数）。
 - `src/lib/protobufVarint.js` — Protobuf の非負 varint を読み取る（length-delimited の長さ用）。
 - `src/lib/pruneLiveViewPublishBlob.js` — 純Web公開ペイロード(jsonBlob)の容量 prune はしご純関数
 - `src/lib/pruneStaleEventDomLvs.js` — v0.1.203 Patch 4: 古い event-dom snapshot 残骸を cleanup 対象として識別する純関数。
 - `src/lib/recentTextRing.js` — 「その人の直近N件の発言」を保持する固定長リングの純関数(v0.1.1218)。
+- `src/lib/refreshCycleDeadline.js` — 1サイクル全体の締切を持ち、各 read の timeout を残り時間に切り詰める。
 - `src/lib/refreshTaskGuard.js` — v0.1.437: popup の `refresh()` で chrome API が永久 pending になっても全カード「—」固定にしない
 - `src/lib/resolveKiramekiReturningAndFirstTimeUserKeys.js` — 「きらめきの賞」のかよい / はじまり判定用 userKey 分類（純関数）。
 - `src/lib/roomHeatMirror.js` — 室温(ルーム熱度・5分増減)の「鏡」スナップショット純関数
 - `src/lib/safeStorageLocal.js` — v0.1.1080: 拡張リロード後の古いタブ(stale content script / iframe)が
 - `src/lib/scoreAnnounce.js` — 配信採点「結果発表シーケンス」の純関数プランナー(council/broadcast-scoring-SYNTHESIS.md
 - `src/lib/scoreRadar.js` — 配信採点の「講評レーダー」5軸(council/broadcast-scoring-SYNTHESIS.md §2.3)を組む純関数群。
+- `src/lib/sidepanelCloakDuration.js` — 幕(cloak)が「いつ外れたか / まだ残っているか」を要約する純関数。
+- `src/lib/sidepanelIframeReveal.js` — iframe を【出来上がってから見せる】ための純関数。
+- `src/lib/sidepanelIframeSrc.js` — サイドパネルの iframe に渡す src を組み立てる純関数。
+- `src/lib/sidePanelLvFromTabs.js` — サイドパネルが【自力で】配信IDを見つけるための純関数。
+- `src/lib/sidePanelPrearm.js` — サイドパネルを【押される前に】用意しておく純関数。
+- `src/lib/sidepanelUnderlay.js` — サイドパネルの【下敷き】。黒の代わりに地の色を見せる。
 - `src/lib/sidePanelWatchTarget.js` — サイドパネルを「どの配信に紐づけるか」を決める純関数。
+- `src/lib/silentFailureCells.js` — 【無音で死ぬ】故障を画面に出すセル(純関数)。
 - `src/lib/singleFlightByKey.js` — key 単位の single-flight 実行器(純関数コア)。
 - `src/lib/standalonePopupClose.js` — v0.1.433: 別ウィンドウ POP（standalone popup window）を「配信に飛ばしたら閉じる」判定（純ロジック）。
 - `src/lib/storageErrorState.js` — ストレージ書き込みエラーをポップアップ向けにシリアライズする純関数
+- `src/lib/storageRefreshTriggerKey.js` — 【層】L0 判定層(純粋関数・I/O禁止)
 - `src/lib/storageWriteLedger.js` — 2026-07-07 (robust-arch Phase 0 / 計器のみ・挙動不変):
 - `src/lib/storedCommentDedupeMerge.js` — popup normalizeStoredCommentEntries 用: 同一キー重複行のマージ（PII を増やさずフラグのみ統合）
 - `src/lib/supportActivityTimeline.js` — 応援タイムライン: コメントとギフト着弾を時刻順に統合する純関数（v0.1.340）。
 - `src/lib/supportTimelineGuard.js` — 応援タイムラインの重い全件読み込みを実行してよいか判定する。
 - `src/lib/swCrawlSlots.js` — SW backfill の per-lid 並列スロット判定。
+- `src/lib/symptomVerdicts.js` — 「症状名でそのまま引ける」特化判定を**複数**出す純関数。
 - `src/lib/tabLeaderLock.js` — PR1-b/PR2（feat/multitab-scale-ultraC）: 同一 origin の複数タブのうち「1タブだけ」が
+- `src/lib/timeAuthority.js` — timeAuthority — 「その値がいつ真だったか」と「その値は判定に使えるか」の【唯一の正本】。
+- `src/lib/timeAuthorityRegistry.js` — timeAuthorityRegistry — 「独自に時点フィールドを持つファイル」の凍結リスト(祖父条項)。
 - `src/lib/tokenBucket.js` — PR5（feat/multitab-scale-ultraC）: トークンバケットによるグローバル流量制御の純ロジック。
 - `src/lib/topSupportRankAnonymousFold.js` — userKey: string,
 - `src/lib/trackedImports.js` — 「コミットし忘れた新規ファイルを import しているソース」を検出する純ロジック(2026-07-06)。
 - `src/lib/trimMap.js` — Map のサイズを max 以下に制限し、先頭（最古挿入順）から削除する。
+- `src/lib/unknownVsAbsent.js` — 【層】L0 判定層(純粋関数・I/O禁止)
 - `src/lib/versionMismatch.js` — 「本体とページで版がズレている」を検知する純関数(2026-07-06)。
 - `src/lib/videoCapture.js` — watch ページの video から PNG を取るためのユーティリティ。
+- `src/lib/viewerCountProbeMerge.js` — 【層】L0 判定層(純粋関数・I/O禁止)
 - `src/lib/watchAudienceCopy.js` — watch パネル「観客メモ」用の短文・ツールチップ文言（DOM 非依存）。
 - `src/lib/watchContext.js` — watch ページ URL と直前の lv から、コンテンツスクリプト用の文脈を純関数で求める
 - `src/lib/watchFrameCommentPostGate.js` — watch 上の各フレームが `NLS_POST_COMMENT` / コメント欄系操作を受けてよいかの判定。
 - `src/lib/watchProgramEndState.js` — 視聴ページ文言から「番組終了状態」を推定する。
+- `src/lib/watchSnapshotKey.js` — heavy read の「まだ現配信のものか」を判定する snapshotKey を作る純関数。
 - `src/lib/watchSnapshotOfficialFields.js` — collectWatchPageSnapshot が返すオブジェクトのうち、公式統計・キャプチャ率まわり（DOM 非依存）。
 - `src/lib/watchSnapshotPartialMerge.js` — watchMetaCache.snapshot を更新する際の partial-merge 純粋関数。
 - `src/lib/watchUrlFreshness.js` — 「最後に視聴した URL（nls_last_watch_url）」フォールバックの鮮度判定。
@@ -880,1347 +1014,54 @@
 
 ## 🧬 修正系譜マップ(この系統のバグを過去にどう直したか)
 
-> changelog 全 613 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
+> changelog 全 20 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
 
-### 💾 記録件数 (89版)
-- `v0.1.1247` 2026-08-04 — 読み上げが遅くなる悪循環を断ち切りました
-- `v0.1.1246` 2026-08-04 — 読み上げが「たまにしか読まれない」問題を改善しました
-- `v0.1.1240` 2026-08-03 — 診断の「タイルが消える」警告が誤って出ていたのを修正
-- `v0.1.1234` 2026-08-03 — 会場にも全員が並ぶようになりました
-- `v0.1.1222` 2026-08-01 — 古い状態速報を黙って渡さない+混雑時の読み上げ速度
-- `v0.1.1217` 2026-08-01 — アイコングリッドがちらちら変わる問題を根治
-- `v0.1.1213` 2026-08-01 — 読み上げが「読まれずに消えた件数」を数えるようにしました
-- `v0.1.1209` 2026-08-01 — グリッドの「同ユーザー計N件」が実際より少なく見えていた表記を修正
-- `v0.1.1205` 2026-07-31 — 会場のアイコンをクリックすると、その方の発言を全部読めるように
-- `v0.1.1202` 2026-07-31 — 「あの人が何を言ったか・どこに居るか」を追えるように3点改善
-- `v0.1.1199` 2026-07-31 — 記録件数が実際より多くなる不具合を修正/会場の説明文をすっきり
-- `v0.1.1197` 2026-07-31 — 記録件数が多すぎる原因の切り分け計器を追加
-- `v0.1.1187` 2026-07-25 — ポップアップの記録件数表示を安定化
-- `v0.1.1186` 2026-07-25 — 状態速報の診断計器を強化(表示のみ)
-- `v0.1.1181` 2026-07-24 — 会場読み上げが混雑時に詰まりにくく
-- `v0.1.1171` 2026-07-18 — 会場モードの記録件数がリアルタイムで動くように
-- `v0.1.1153` 2026-07-15 — 応援コメントの内訳表示が増減して見える不具合を修正
-- `v0.1.1139` 2026-07-14 — 応援レーンの表示上限を差し戻し、二重スクロールを解消
-- `v0.1.1134` 2026-07-14 — 会場一致判定に①実DOMの寸法指紋を追加
-- `v0.1.1133` 2026-07-13 — fix(venue): 会場の案内文言・診断パネルを①と完全一致に
-- `v0.1.1127` 2026-07-11 — feat(venue): 会場ガイド帯を①一致で復活
-- `v0.1.1116` 2026-07-10 — feat(diag): 会場の白円サムネを数える計器
-- `v0.1.1111` 2026-07-08 — feat(venue): 会場の顔ぶれを応援レーンと完全一致
-- `v0.1.1107` 2026-07-07 — feat(web): ③応援ライブビューに室温丸写し
-- `v0.1.1102` 2026-07-07 — perf(liveview): 公開書込12秒間隔+容量上限で削減
-- `v0.1.1084` 2026-07-06 — perf(status): マイ効果音計器のBlob全件走査を廃止
-- `v0.1.1077` 2026-07-05 — ボイス空振り消費とpayout張り付き修正
-- `v0.1.1072` 2026-07-05 — マイ効果音計器をextrasに追加
-- `v0.1.1050` 2026-07-03 — 状態速報のパリティ判定に会場(④)を追加=POPと会場の人数ズレを検知
-- `v0.1.1048` 2026-07-03 — 応援レーン描画の所要時間を状態速報に計測(全員表示の準備・観測のみ)
-- `v0.1.1038` 2026-07-02 — 応援者/広告ランキングの中身ちらつきを根治
-- `v0.1.1036` 2026-07-02 — 応援プレビュー/WEBの数字ズレを同一tick化で根治
-- `v0.1.1034` 2026-07-01 — 重い配信で応援レーンに全員が出ない不具合を根治
-- `v0.1.1033` 2026-07-01 — 応援レーンが少なすぎる原因を状態速報で分かるようにした(計器)
-- `v0.1.1025` 2026-07-01 — 応援プレビューが空でも「同一」と誤表示する嘘を根治
-- `v0.1.1022` 2026-07-01 — 応援プレビューが3秒ごとにチカチカ明滅する不具合を根治
-- `v0.1.1017` 2026-07-01 — 応援レーン・コメントの①POP=③WEB一致を自動チェック
-- `v0.1.1013` 2026-06-30 — 複数配信同時の重さと二重記録の再発を緩和・根治
-- `v0.1.1003` 2026-06-30 — 記録>本家コメの「要確認」誤発火を根治
-- `v0.1.1001` 2026-06-30 — 記録>本家コメの内訳(欠落行割合)を表示
-- `v0.1.1000` 2026-06-29 — 貢献度ランキングの「不一致」誤検知を解消
-- `v0.1.999` 2026-06-29 — 過去ログ取得の速度を状態速報に表示
-- `v0.1.998` 2026-06-29 — 記録>本家コメの一時的な水増しを是正
-- `v0.1.995` 2026-06-29 — 状態速報に応援コメントの本文を表示
-- `v0.1.969` 2026-06-28 — 内部整理: 応援ランク行の生成をlib抽出
-- `v0.1.966` 2026-06-27 — ランキング件数の「拡張≠鏡」1件差の誤警告を解消
-- `v0.1.957` 2026-06-26 — 状態速報に「数字の出どころ」を追加
-- `v0.1.954` 2026-06-26 — 純Web公開コピーの自己診断の「コピー漏れ」誤検知を修正
-- `v0.1.953` 2026-06-26 — 状態速報に純Web公開コピーの自己診断を追加
-- `v0.1.947` 2026-06-25 — WEB公開版に応援者ランキングとギフト貢献度を顔つきで表示
-- `v0.1.946` 2026-06-25 — 過去ログ取得の「ローディングが出ない/固まる」を改善
-- `v0.1.937` 2026-06-25 — 応援者ランキングを顔つき(サムネ・ID・名前・リンク)で表示
-- `v0.1.916` 2026-06-23 — status に popup をiframeで丸ごと埋め込み(試作)
-- `v0.1.914` 2026-06-23 — 応援レーン鏡のフッター件数をpopupと一致
-- `v0.1.908` 2026-06-22 — レーンの件数を正直に表示+広告列のサムネ化け修正
-- `v0.1.895` 2026-06-22 — 読み上げが止まったまま戻らない固着を自動回復+停止位置の計器
-- `v0.1.894` 2026-06-22 — 健全度パネルに会場モード読み上げのセルを追加
-- `v0.1.877` 2026-06-21 — 応援ライブビューを popup の本物のHTML/CSSで完全コピー
-- `v0.1.874` 2026-06-21 — 応援ライブビューの配色を popup と完全一致(別物感を解消)
-- `v0.1.872` 2026-06-21 — 応援ライブビューの応援者をpopup風タイル(アイコン+件数)に
-- `v0.1.868` 2026-06-21 — 状態ページの並行化を撤回+追加読込を間引いて軽くする
-- `v0.1.865` 2026-06-21 — 診断画面に応援者ランキング(ちくらん風)を追加
-- `v0.1.862` 2026-06-21 — 時系列トレンドで記録停止/取得率低下を時間変化で検知
-- `v0.1.858` 2026-06-21 — レポートの中身を保存前に状態速報で確認(プレビュー)
-- `v0.1.853` 2026-06-21 — HTMLレポートに記録が全部反映されない不具合を修正
-- `v0.1.852` 2026-06-21 — 会場モードの読み上げ状況を状態速報に表示(遅延の切り分け用)
-- `v0.1.849` 2026-06-20 — イベント順位/スコアの黄と「レーンが空」誤報を解消
-- `v0.1.844` 2026-06-20 — 状態速報のレーン件数を正確に
-- `v0.1.842` 2026-06-20 — 記録件数を公式とほぼ一致させる(配信者引き算を廃止)
-- `v0.1.841` 2026-06-20 — 修正系譜マップ(再発防止)を地図に追加
-- `v0.1.839` 2026-06-20 — 記録件数の表示の正本を1本に固定(第1)
-- `v0.1.838` 2026-06-20 — 記録数が0に潰れる不具合を根治
-- `v0.1.834` 2026-06-20 — 「他配信DOM混入」の誤警告と誤解文言を是正
-- `v0.1.816` 2026-06-17 — 人物情報のまとめ役を内部に新設(挙動は変わりません・土台整備)
-- `v0.1.814` 2026-06-17 — 過去ログ取得が途中で止まる(失速)のを軽減
-- `v0.1.806` 2026-06-17 — HTML保存の失敗を根治+完了音声を追加
-- `v0.1.804` 2026-06-17 — 記録件数がまた減るのを根治
-- `v0.1.792` 2026-06-17 — 記録件数が増えてから減る表示を止めた
-- `v0.1.791` 2026-06-17 — 記録が追いつく途中を「追いつき中」と明示
-- `v0.1.790` 2026-06-17 — 会場の人が時間で減らないように(満席維持)
-- `v0.1.782` 2026-06-16 — 読み上げの破棄判定を件数ベースに作り直し(無音回避)
-- `v0.1.774` 2026-06-16 — 送信・画面が重い性能問題を改善＋記録数を配信者コメ除外に
-- `v0.1.761` 2026-06-16 — 見ている配信の過去ログ取得を高速化(待ち時間を短縮)
-- `v0.1.759` 2026-06-16 — 過去ログ取得を先読みで高速化(一気取得に近づける)
-- `v0.1.686` 2026-06-11 — 長時間配信の「届いていません」を黙って取るように
-- `v0.1.685` 2026-06-11 — 内訳に配信者コメント数を追加
-- `v0.1.680` 2026-06-10 — メディアキットに応援者の表彰セクション
-- `v0.1.672` 2026-06-10 — コメビュの二重表示の残りを根治
-- `v0.1.665` 2026-06-10 — 長い配信が7割等で止まったままになるのを根治
+### 📥 コメント取得 (3版)
+- `v0.1.1501` 2026-09-03 — コメビュのちらつきを直しました
+- `v0.1.1499` 2026-08-31 — 診断ページでポップアップを見られます
+- `v0.1.1492` 2026-08-29 — 会場で「この人が今どうしているか」が出ます
 
-### 📥 コメント取得 (161版)
-- `v0.1.1247` 2026-08-04 — 読み上げが遅くなる悪循環を断ち切りました
-- `v0.1.1233` 2026-08-02 — サムネが減っていた3つの原因を塞ぎました
-- `v0.1.1221` 2026-08-01 — ホバーの発言が出ない真因を修正+VIPの光りも回復
-- `v0.1.1203` 2026-07-31 — ポップアップの段説明からもキャラアイコンと枠を削除
-- `v0.1.1192` 2026-07-30 — 会場ホバープレビューの表示内容を調整
-- `v0.1.1191` 2026-07-30 — 会場アイコンにホバープレビューを追加
-- `v0.1.1188` 2026-07-25 — 会場のサムネ白丸を根治
-- `v0.1.1174` 2026-07-18 — 大配信でのサムネ取りこぼしを軽減
-- `v0.1.1172` 2026-07-18 — サムネ表示の安定化に向けた計器を追加
-- `v0.1.1132` 2026-07-11 — fix(gift): 公式ギフト履歴の鮮度優先を修正
-- `v0.1.1117` 2026-07-10 — fix(venue): 会場の白円サムネを根治=①と同じ顔規則
-- `v0.1.1110` 2026-07-08 — fix(venue): 会場の記名サムネ白円を根治
-- `v0.1.1109` 2026-07-08 — fix(lane): 大配信backfillのアバター暫定固着を根治
-- `v0.1.1094` 2026-07-06 — fix(inline): 配信切替に即追従(再ロード・一括取得なし)
-- `v0.1.1091` 2026-07-06 — ギフト音が静かに消える取りこぼしを根治
-- `v0.1.1058` 2026-07-04 — ギフト取りこぼし修正+コメント数マイルストーン診断を新設
-- `v0.1.1057` 2026-07-04 — ギフト診断の対処候補への統合漏れを修正+内部構造の整理
-- `v0.1.1046` 2026-07-03 — 大きめ配信で状態速報が固まる不具合を修正(計器readを間引き側へ)
-- `v0.1.1045` 2026-07-03 — 過去ログ取得が遅い真因を切り分ける走行中計器を追加(観測のみ)
-- `v0.1.1023` 2026-07-01 — 応援プレビューを開くと診断が激重・真っ白になる根治
-- `v0.1.1020` 2026-07-01 — 応援プレビューが原因で診断が重いことを自動で表示
-- `v0.1.1018` 2026-07-01 — 多タブでコメントが30件に痩せてWEBに出る不具合を根治
-- `v0.1.1013` 2026-06-30 — 複数配信同時の重さと二重記録の再発を緩和・根治
-- `v0.1.1012` 2026-06-30 — 取り込み中にコメントが二重記録される不具合を根治
-- `v0.1.1010` 2026-06-30 — 取り込み中の状態速報の更新を所要比例で間引き
-- `v0.1.1009` 2026-06-30 — 過去ログ取り込み中の状態速報の重さを緩和
-- `v0.1.1008` 2026-06-30 — 記録>本家の「要確認」を時系列で正常判定
-- `v0.1.1007` 2026-06-30 — 記録>本家の「焼き付きvs遅延」を時系列で表示
-- `v0.1.1001` 2026-06-30 — 記録>本家コメの内訳(欠落行割合)を表示
-- `v0.1.1000` 2026-06-29 — 貢献度ランキングの「不一致」誤検知を解消
-- `v0.1.999` 2026-06-29 — 過去ログ取得の速度を状態速報に表示
-- `v0.1.997` 2026-06-29 — 状態速報に完全性スコア(網羅診断)を追加
-- `v0.1.992` 2026-06-29 — 記録・同接・来場の数字カードを確実に表示
-- `v0.1.990` 2026-06-29 — 貢献度・広告が鏡に出ない真因を根治
-- `v0.1.986` 2026-06-29 — レーンが出ない真因を根治(配信IDの解決)
-- `v0.1.980` 2026-06-28 — 状態速報に「描画が出ない時の対処」を明記
-- `v0.1.977` 2026-06-28 — 貢献度・広告ランキングを重い処理待ちせず表示
-- `v0.1.972` 2026-06-28 — 内部整理: 取得状況サマリの生成をlib抽出
-- `v0.1.966` 2026-06-27 — ランキング件数の「拡張≠鏡」1件差の誤警告を解消
-- `v0.1.963` 2026-06-27 — 貢献度ランキングが公開版・プレビューで欠ける不具合を修正
-- `v0.1.954` 2026-06-26 — 純Web公開コピーの自己診断の「コピー漏れ」誤検知を修正
-- `v0.1.946` 2026-06-25 — 過去ログ取得の「ローディングが出ない/固まる」を改善
-- `v0.1.922` 2026-06-23 — ギフト参加者ランキングの自動取得を再開
-- `v0.1.920` 2026-06-23 — ギフト自動取得を再び緊急停止(切り分け第2弾)
-- `v0.1.919` 2026-06-23 — 自動巡回(裏で配信を勝手に開く)を停止+ギフト自動取得を再開
-- `v0.1.918` 2026-06-23 — ギフトサイドバーの自動オープンを緊急停止(別配信が勝手に開く疑い)
-- `v0.1.916` 2026-06-23 — status に popup をiframeで丸ごと埋め込み(試作)
-- `v0.1.915` 2026-06-23 — status埋め込み土台=受動popupモード追加
-- `v0.1.893` 2026-06-22 — 終了した配信が0%になる原因の切り分け計器を追加
-- `v0.1.892` 2026-06-22 — 過去ログ取得が進まない箇所の細分計器を追加
-- `v0.1.891` 2026-06-22 — 過去ログ取得が始まらない原因の計器を追加(真因特定用)
-- `v0.1.890` 2026-06-22 — 状態ページを軽量化(無駄な再生成を止める)+更新時間を表示
-- `v0.1.889` 2026-06-22 — 「貢献度ランキング」を「ギフト貢献度」に改称(広告ptと別物)
-- `v0.1.887` 2026-06-22 — 「取得率が下がり続けています」の誤った黄色を抑止(追いつき中は正常)
-- `v0.1.886` 2026-06-22 — 取り込み中を「あと約◯件」の進捗で表示
-- `v0.1.885` 2026-06-22 — 取得中の配信に「取得率が低い」の黄色を出さないように
-- `v0.1.882` 2026-06-21 — 公式値レーン(貢献度/広告)を開いた瞬間に出るよう高速化
-- `v0.1.881` 2026-06-21 — 応援ライブビューを本物の描画関数で完全コピーに
-- `v0.1.880` 2026-06-21 — 応援ライブビューにギフト履歴レーンを追加(完全コピー)
-- `v0.1.879` 2026-06-21 — 応援ライブビューに公式値レーンを追加(完全コピー)
-- `v0.1.878` 2026-06-21 — 匿名アイコンを本物identiconに+統計カードを追加(完全コピー)
-- `v0.1.877` 2026-06-21 — 応援ライブビューを popup の本物のHTML/CSSで完全コピー
-- `v0.1.876` 2026-06-21 — 応援者を popup 非依存で自前集計=popup無しでも応援者が出る
-- `v0.1.875` 2026-06-21 — 応援ライブビューにりんく列・ギフト列(popup の全レーン)を再現
-- `v0.1.874` 2026-06-21 — 応援ライブビューの配色を popup と完全一致(別物感を解消)
-- `v0.1.873` 2026-06-21 — 応援ライブビュー先頭に配信者タイル(popup と同じ見た目)
-- `v0.1.872` 2026-06-21 — 応援ライブビューの応援者をpopup風タイル(アイコン+件数)に
-- `v0.1.871` 2026-06-21 — クリックで応援ライブビューを新規タブにリアルタイム表示
-- `v0.1.869` 2026-06-21 — 診断ページにちくらんタブ+カードクリックで応援者ランキング
-- `v0.1.868` 2026-06-21 — 状態ページの並行化を撤回+追加読込を間引いて軽くする
-- `v0.1.867` 2026-06-21 — 状態ページが重い/開かないを並行読込で改善
-- `v0.1.865` 2026-06-21 — 診断画面に応援者ランキング(ちくらん風)を追加
-- `v0.1.863` 2026-06-21 — 公式値のDOM↔NDGR食い違いも自己矛盾検知に追加
-- `v0.1.862` 2026-06-21 — 時系列トレンドで記録停止/取得率低下を時間変化で検知
-- `v0.1.861` 2026-06-21 — 数字に信頼度の注釈を付けて意味の取り違えを防ぐ
-- `v0.1.860` 2026-06-21 — 匿名主体の偽の赤と「既知0を空」表示を解消(診断の正直化)
-- `v0.1.859` 2026-06-21 — レポートの「コメントした人」を正本に統一+数字の食い違いを自動検知
-- `v0.1.858` 2026-06-21 — レポートの中身を保存前に状態速報で確認(プレビュー)
-- `v0.1.857` 2026-06-21 — 配布版では開発用の診断エクスポートを隠す(プライバシー)
-- `v0.1.856` 2026-06-21 — 「これを共有すれば原因が全部わかる」大ボタンを最上部に
-- `v0.1.855` 2026-06-21 — 「記録中の配信0件」誤報と読み込み中固着の理由表示を修正
-- `v0.1.854` 2026-06-21 — パネルが白/ローディング固着を状態速報で分かるように
-- `v0.1.852` 2026-06-21 — 会場モードの読み上げ状況を状態速報に表示(遅延の切り分け用)
-- `v0.1.851` 2026-06-21 — 「取得エラー」の誤表示を根治(成功0件と本物の失敗を分離)
-- `v0.1.850` 2026-06-20 — 追いつき中の配信を赤にしない判定をさらに堅牢に
-- `v0.1.849` 2026-06-20 — イベント順位/スコアの黄と「レーンが空」誤報を解消
-- `v0.1.848` 2026-06-20 — 裏タブで追いつき中の配信を青に(赤誤判定の解消)
-- `v0.1.847` 2026-06-20 — 状態ページが一部の不具合で全部消えないように
-- `v0.1.846` 2026-06-20 — 健全度パネルに総合判定「異常なし✓」
-- `v0.1.845` 2026-06-20 — 健全度パネル: 取得中は青で「順調」に
-- `v0.1.844` 2026-06-20 — 状態速報のレーン件数を正確に
-- `v0.1.843` 2026-06-20 — 状態ページ先頭に健全度パネルを追加
-- `v0.1.841` 2026-06-20 — 修正系譜マップ(再発防止)を地図に追加
-- `v0.1.840` 2026-06-20 — 機能逆引き地図を全ファイル網羅に
-- `v0.1.838` 2026-06-20 — 記録数が0に潰れる不具合を根治
-- `v0.1.837` 2026-06-20 — ギフト送信者の文字化け表示を抑止
-- `v0.1.836` 2026-06-20 — 匿名コメントの記録を救済(第1歩)
-- `v0.1.835` 2026-06-20 — 自己検証ゲートを追加(版同期+診断文言)
-- `v0.1.834` 2026-06-20 — 「他配信DOM混入」の誤警告と誤解文言を是正
-- `v0.1.833` 2026-06-20 — 全地図とstatusに共通ナビを追加
-- `v0.1.832` 2026-06-20 — 「はじめての方へ」をLPと同じキャラ吹き出し会話に
-- `v0.1.831` 2026-06-20 — 「はじめての方へ」に3キャラの笑顔を添えて応援感を強化
-- `v0.1.830` 2026-06-20 — 状態ページ先頭に「はじめての方へ」みちしるべを追加
-- `v0.1.829` 2026-06-20 — AI共有テキストに「まるごとコピー」ボタンを追加
-- `v0.1.828` 2026-06-20 — ポップアップを開くだけで状態ページに診断が集約
-- `v0.1.827` 2026-06-20 — 状態ページに「コードの地図を開く」ボタンを追加
-- `v0.1.826` 2026-06-19 — 多タブで重い時に「タブを絞ると軽い」と案内
-- `v0.1.825` 2026-06-19 — 記録された内部エラーを状態速報の対処カードに集約
-- `v0.1.824` 2026-06-18 — 状態速報に「症状→原因→次の一手」対処カードを追加
-- `v0.1.823` 2026-06-18 — 状態速報に全体マインドマップを追加(1枚で俯瞰)
-- `v0.1.822` 2026-06-18 — 状態速報に popup 固有診断を集約(ここで全部わかる)
-- `v0.1.821` 2026-06-18 — AI診断の popup 固有情報を状態速報へ集約(土台)
-- `v0.1.820` 2026-06-18 — コメント行の受理判定を共通部品に整理(挙動不変)
-- `v0.1.814` 2026-06-17 — 過去ログ取得が途中で止まる(失速)のを軽減
-- `v0.1.807` 2026-06-17 — 応援アイコン列・マーケ分析の人物情報を回復
-- `v0.1.803` 2026-06-17 — 匿名コメントを会場・レーンへ戻す
-- `v0.1.798` 2026-06-17 — 状態を司令塔がローカル確認できる仕組みを追加
-- `v0.1.797` 2026-06-17 — 状態ページが重くて開かない問題を解消
-- `v0.1.796` 2026-06-17 — 記録が止まる不具合を防ぐため裏取得を一旦OFFに
-- `v0.1.795` 2026-06-17 — 裏タブでも過去ログを取り切るよう改善
-- `v0.1.794` 2026-06-17 — 状態速報に過去ログ取り込み中の表示を追加
-- `v0.1.793` 2026-06-17 — 配信者本人が会場に匿名で映る不具合を修正
-- `v0.1.791` 2026-06-17 — 記録が追いつく途中を「追いつき中」と明示
-- `v0.1.775` 2026-06-16 — 自分のコメントを応援アイコン列にも表示
-- `v0.1.767` 2026-06-16 — コメント基盤に自分で常時つなぎ、取得の遅れを解消
-- `v0.1.766` 2026-06-16 — 状態速報の概要に「公式値レーンの状況」を追加
-- `v0.1.765` 2026-06-16 — 入口が切れて止まったら自力でコメント取得を再開
-- `v0.1.764` 2026-06-16 — 記録カードの「約N%」を完全に廃止(状態名だけに)
-- `v0.1.763` 2026-06-16 — 中途半端な％をやめ「取り込み中/再接続待ち」を正直に表示
-- `v0.1.762` 2026-06-16 — 過去ログが途中(数%)で止まる真因を根治(入口の鮮度)
-- `v0.1.761` 2026-06-16 — 見ている配信の過去ログ取得を高速化(待ち時間を短縮)
-- `v0.1.760` 2026-06-16 — 長い配信の過去ログが途中で止まる(再開が遅い)を根治
-- `v0.1.759` 2026-06-16 — 過去ログ取得を先読みで高速化(一気取得に近づける)
-- `v0.1.758` 2026-06-16 — 視聴中タブの過去ログ取得が2%で止まる回帰を根治
-- `v0.1.751` 2026-06-15 — 今見ている配信の過去ログ取得を優先するように
-- `v0.1.750` 2026-06-15 — 過去ログ取得が途中で固まり続ける不具合を根治
-- `v0.1.749` 2026-06-15 — 若い配信の過去ログが途中で諦めて止まる不具合を改善
-- `v0.1.748` 2026-06-15 — 3キャラを配信画面のまわりに移動＋コメント反映を速く
-- `v0.1.741` 2026-06-15 — 会場を開いた瞬間ちゃんと人が出るように安定化
-- `v0.1.719` 2026-06-13 — サムネと名前を一体リンクに・読み上げボタン追加
-- `v0.1.712` 2026-06-13 — 会場モードに本物のアイコンと観客を表示
-- `v0.1.706` 2026-06-13 — 過去ログ取得を配信ごとに2本並列化
-- `v0.1.703` 2026-06-12 — 読み上げの待ち時間とコメント取りこぼしを改善
-- `v0.1.697` 2026-06-12 — 取得開始の高速化と過去ログの実時刻保存
-- `v0.1.696` 2026-06-12 — 過去ログ大量取得時の保存欠落を根治
-- `v0.1.695` 2026-06-12 — 取得リトライのリクエスト集中を緩和
-- `v0.1.694` 2026-06-11 — SW取得の自動再試行と中断耐性を強化
-- `v0.1.692` 2026-06-11 — 取得が中断したまま止まる問題の自動回復を追加
-- `v0.1.691` 2026-06-11 — 配信序盤の過去ログが0件で止まる問題を修正
-- `v0.1.690` 2026-06-11 — SWでの過去ログ取得を試せる切替を追加
-- `v0.1.689` 2026-06-11 — タブを閉じてもSWが過去ログを取り置きするように
-- `v0.1.688` 2026-06-11 — 過去ログ取得をSWでも実行できる土台を追加
-- `v0.1.686` 2026-06-11 — 長時間配信の「届いていません」を黙って取るように
-- `v0.1.684` 2026-06-11 — ローディング表示の改善と公式比較の修正
-- `v0.1.683` 2026-06-11 — 別タブを開いても過去ログ取得が止まらないように
-- `v0.1.678` 2026-06-10 — 配信実績を共有できるメディアキットを追加
-- `v0.1.670` 2026-06-10 — コメビュのアイコンを本家と同じサムネに
-- `v0.1.666` 2026-06-10 — コメビュにコメント単位の操作ボタンを追加
-- `v0.1.665` 2026-06-10 — 長い配信が7割等で止まったままになるのを根治
-- `v0.1.664` 2026-06-10 — 複数タブ並列取得を安全に(重い時は自動で絞る)
-- `v0.1.663` 2026-06-06 — 複数タブでも過去ログを並行して一気に取れるように(2配信まで)
+### 🙂 匿名(184) (3版)
+- `v0.1.1496` 2026-08-30 — 応援レーンのお顔を少し大きくしました
+- `v0.1.1495` 2026-08-30 — 発言を読んだあと、その人へ行けます
+- `v0.1.1492` 2026-08-29 — 会場で「この人が今どうしているか」が出ます
 
-### 🙂 匿名(184) (61版)
-- `v0.1.1282` 2026-08-07 — ★会場モードでギフト・広告の段が消えていたのを直しました
-- `v0.1.1280` 2026-08-06 — 会場モードが①パネルとずれる原因に手を入れました
-- `v0.1.1239` 2026-08-03 — 会場の背景描画のメモリも閉じたときに解放するようにしました
-- `v0.1.1238` 2026-08-03 — 会場を大幅に軽くしました(匿名の方の顔の作り方を変更)
-- `v0.1.1235` 2026-08-03 — 会場に全員が並ばなかった原因を根治しました
-- `v0.1.1226` 2026-08-02 — 流れて埋もれるコメントを1件ずつ留めて見せる
-- `v0.1.1185` 2026-07-24 — 状態速報の診断計器を強化(表示のみ)
-- `v0.1.1178` 2026-07-20 — 診断の誤検知を修正
-- `v0.1.1138` 2026-07-14 — ロビーを廃止し会場を①と同じ顔ぶれだけに
-- `v0.1.1133` 2026-07-13 — fix(venue): 会場の案内文言・診断パネルを①と完全一致に
-- `v0.1.1122` 2026-07-10 — fix(venue): 匿名の大群がたぬ姉段の壁になるのを解消
-- `v0.1.1117` 2026-07-10 — fix(venue): 会場の白円サムネを根治=①と同じ顔規則
-- `v0.1.1116` 2026-07-10 — feat(diag): 会場の白円サムネを数える計器
-- `v0.1.1112` 2026-07-08 — feat(venue): 会場の5段を①と厳密一致+ロビー新設
-- `v0.1.1049` 2026-07-03 — サムネ持ちは大きく・匿名は小さく詰めて表示(応援レーン/会場)
-- `v0.1.1034` 2026-07-01 — 重い配信で応援レーンに全員が出ない不具合を根治
-- `v0.1.1033` 2026-07-01 — 応援レーンが少なすぎる原因を状態速報で分かるようにした(計器)
-- `v0.1.1031` 2026-07-01 — 会場のひな壇の上に「応援者トップ」バーを追加した
-- `v0.1.1028` 2026-07-01 — 応援プレビューの応援者ランキングで匿名の顔が崩れる不具合を根治
-- `v0.1.1006` 2026-06-30 — 匿名主体の配信で応援レーンを赤誤報しない
-- `v0.1.1002` 2026-06-30 — 記録>本家の内訳(欠落割合)を実際に表示
-- `v0.1.1001` 2026-06-30 — 記録>本家コメの内訳(欠落行割合)を表示
-- `v0.1.941` 2026-06-25 — 共有URLのWeb版に「応援者ランキング」を顔つきで追加
-- `v0.1.937` 2026-06-25 — 応援者ランキングを顔つき(サムネ・ID・名前・リンク)で表示
-- `v0.1.903` 2026-06-22 — ポップアップに「広告列」を新設=広告を投げた人も並ぶように
-- `v0.1.885` 2026-06-22 — 取得中の配信に「取得率が低い」の黄色を出さないように
-- `v0.1.878` 2026-06-21 — 匿名アイコンを本物identiconに+統計カードを追加(完全コピー)
-- `v0.1.872` 2026-06-21 — 応援ライブビューの応援者をpopup風タイル(アイコン+件数)に
-- `v0.1.869` 2026-06-21 — 診断ページにちくらんタブ+カードクリックで応援者ランキング
-- `v0.1.865` 2026-06-21 — 診断画面に応援者ランキング(ちくらん風)を追加
-- `v0.1.861` 2026-06-21 — 数字に信頼度の注釈を付けて意味の取り違えを防ぐ
-- `v0.1.860` 2026-06-21 — 匿名主体の偽の赤と「既知0を空」表示を解消(診断の正直化)
-- `v0.1.859` 2026-06-21 — レポートの「コメントした人」を正本に統一+数字の食い違いを自動検知
-- `v0.1.849` 2026-06-20 — イベント順位/スコアの黄と「レーンが空」誤報を解消
-- `v0.1.846` 2026-06-20 — 健全度パネルに総合判定「異常なし✓」
-- `v0.1.845` 2026-06-20 — 健全度パネル: 取得中は青で「順調」に
-- `v0.1.838` 2026-06-20 — 記録数が0に潰れる不具合を根治
-- `v0.1.836` 2026-06-20 — 匿名コメントの記録を救済(第1歩)
-- `v0.1.824` 2026-06-18 — 状態速報に「症状→原因→次の一手」対処カードを追加
-- `v0.1.819` 2026-06-17 — 会場の「ほか観客」表記を「ほか」に整理(誤読防止)
-- `v0.1.815` 2026-06-17 — 会場の席まわりの設計を整理(挙動は変わりません・土台整備)
-- `v0.1.807` 2026-06-17 — 応援アイコン列・マーケ分析の人物情報を回復
-- `v0.1.803` 2026-06-17 — 匿名コメントを会場・レーンへ戻す
-- `v0.1.793` 2026-06-17 — 配信者本人が会場に匿名で映る不具合を修正
-- `v0.1.775` 2026-06-16 — 自分のコメントを応援アイコン列にも表示
-- `v0.1.740` 2026-06-15 — コメントしていない配信者本人が会場に出る不具合を修正
-- `v0.1.725` 2026-06-14 — 会場モードでサムネ付きの人を前列に・匿名は後列へ
-- `v0.1.715` 2026-06-13 — 会場モードで配信映像を見せ名前にリンク
-- `v0.1.713` 2026-06-13 — 会場モードを明るくして発言を吹き出し表示
-- `v0.1.712` 2026-06-13 — 会場モードに本物のアイコンと観客を表示
-- `v0.1.707` 2026-06-13 — ニコ生に会場モードを追加
-- `v0.1.704` 2026-06-13 — 匿名の顔アバターをパーツ合成へ更新
-- `v0.1.702` 2026-06-12 — 匿名の顔アイコンを本家タッチへさらに接近
-- `v0.1.701` 2026-06-12 — 匿名の顔アイコンを本家ゆっくりのタッチに
-- `v0.1.700` 2026-06-12 — 匿名アイコンを幾何学模様から優しい顔に変更
-- `v0.1.680` 2026-06-10 — メディアキットに応援者の表彰セクション
-- `v0.1.674` 2026-06-10 — タイムラインから人を開ける+匿名の見分け復活
-- `v0.1.671` 2026-06-10 — コメビュの二重表示と「匿名」表記の混在を修正
-- `v0.1.670` 2026-06-10 — コメビュのアイコンを本家と同じサムネに
-- `v0.1.668` 2026-06-10 — パネルに「💬コメビュ」ボタンを追加
-- `v0.1.667` 2026-06-10 — コメビュに匿名OKのニックネーム・ラベル・メモ
+### 🏟 会場・席 (7版)
+- `v0.1.1500` 2026-09-02 — 診断ページで会場も見られます
+- `v0.1.1496` 2026-08-30 — 応援レーンのお顔を少し大きくしました
+- `v0.1.1495` 2026-08-30 — 発言を読んだあと、その人へ行けます
+- `v0.1.1494` 2026-08-30 — 会場の発言数が揺れるのを直しました
+- `v0.1.1493` 2026-08-29 — 出ないときに理由を自分で言えるようにしました
+- `v0.1.1492` 2026-08-29 — 会場で「この人が今どうしているか」が出ます
+- `v0.1.1489` 2026-08-25 — 会場の反応が悪くなったのを直しました
 
-### 🏟 会場・席 (209版)
-- `v0.1.1282` 2026-08-07 — ★会場モードでギフト・広告の段が消えていたのを直しました
-- `v0.1.1281` 2026-08-07 — ★会場モードに①パネルと違う顔ぶれが並ぶのを直しました
-- `v0.1.1280` 2026-08-06 — 会場モードが①パネルとずれる原因に手を入れました
-- `v0.1.1271` 2026-08-06 — 「会場モード」ボタンを消せるようにしました
-- `v0.1.1245` 2026-08-03 — WEB共有のキーを、拡張の中に埋め込まない方式に変えました（重要）
-- `v0.1.1243` 2026-08-03 — ストア提出物に会場モード等のページが入っていなかったのを修正
-- `v0.1.1241` 2026-08-03 — 診断の「会場と①が違う」「タイルが固まっている」の誤警告を2つとも修正
-- `v0.1.1239` 2026-08-03 — 会場の背景描画のメモリも閉じたときに解放するようにしました
-- `v0.1.1238` 2026-08-03 — 会場を大幅に軽くしました(匿名の方の顔の作り方を変更)
-- `v0.1.1237` 2026-08-03 — 会場を閉じてもメモリが戻らない問題と、診断ページの初回待ちを改善
-- `v0.1.1236` 2026-08-03 — 診断が「会場に届いていない」と誤って知らせていたのを修正
-- `v0.1.1235` 2026-08-03 — 会場に全員が並ばなかった原因を根治しました
-- `v0.1.1234` 2026-08-03 — 会場にも全員が並ぶようになりました
-- `v0.1.1232` 2026-08-02 — 一度出た人は、もう消えません(表示上限を撤廃)
-- `v0.1.1230` 2026-08-02 — 会場にピックアップ枠+診断ページの上下ブレを修正
-- `v0.1.1221` 2026-08-01 — ホバーの発言が出ない真因を修正+VIPの光りも回復
-- `v0.1.1220` 2026-08-01 — 段の説明のキャラを復活+ホバーの発言をようやく表示
-- `v0.1.1219` 2026-08-01 — ホバーの発言が実際には出ていなかったのを修正
-- `v0.1.1218` 2026-08-01 — 会場でアイコンにマウスを乗せると、その人の発言が数件読めるように
-- `v0.1.1216` 2026-08-01 — 会場でアイコンにマウスを乗せたとき、直前の発言が出るように
-- `v0.1.1214` 2026-08-01 — 会場モードで映像に重なっていた3キャラを非表示に
-- `v0.1.1212` 2026-08-01 — 会場と①の「幾何差」が本物か測り方の問題かを見分ける計器を追加
-- `v0.1.1207` 2026-08-01 — 会場モードの立ち上がりの遅さを切り分ける計器を追加
-- `v0.1.1206` 2026-07-31 — 広告主のアイコンにホバー・クリックが効かなかった問題を修正
-- `v0.1.1205` 2026-07-31 — 会場のアイコンをクリックすると、その方の発言を全部読めるように
-- `v0.1.1204` 2026-07-31 — 拡張が重くなる原因を解消(v0.1.1201の不具合)
-- `v0.1.1203` 2026-07-31 — ポップアップの段説明からもキャラアイコンと枠を削除
-- `v0.1.1202` 2026-07-31 — 「あの人が何を言ったか・どこに居るか」を追えるように3点改善
-- `v0.1.1201` 2026-07-31 — 広告主のアイコンにもホバーカードが出るように
-- `v0.1.1200` 2026-07-31 — 広告・ギフトの方のホバー表示を「投げたタイミング」に
-- `v0.1.1199` 2026-07-31 — 記録件数が実際より多くなる不具合を修正/会場の説明文をすっきり
-- `v0.1.1198` 2026-07-31 — 会場を開いたときの誤った「白化」警告を解消
-- `v0.1.1195` 2026-07-31 — 長時間ポップアップを開いていないときも会場に新しい人が出るように
-- `v0.1.1193` 2026-07-31 — 紹介サイトの掲載内容を最新版に更新
-- `v0.1.1192` 2026-07-30 — 会場ホバープレビューの表示内容を調整
-- `v0.1.1191` 2026-07-30 — 会場アイコンにホバープレビューを追加
-- `v0.1.1190` 2026-07-30 — 会場の応援者ランキングのチラつきを軽減
-- `v0.1.1189` 2026-07-28 — 会場読み上げの遅延の内訳を診断できるように
-- `v0.1.1188` 2026-07-25 — 会場のサムネ白丸を根治
-- `v0.1.1183` 2026-07-24 — 状態速報の表示文言を修正
-- `v0.1.1182` 2026-07-24 — 会場の順位バッジのちらつきを修正
-- `v0.1.1181` 2026-07-24 — 会場読み上げが混雑時に詰まりにくく
-- `v0.1.1180` 2026-07-24 — 会場読み上げの診断を強化
-- `v0.1.1179` 2026-07-21 — 公開データ同期と会場表示の診断を強化
-- `v0.1.1175` 2026-07-20 — 会場の顔アイコン診断を強化
-- `v0.1.1171` 2026-07-18 — 会場モードの記録件数がリアルタイムで動くように
-- `v0.1.1167` 2026-07-17 — 会場モードのサムネが白丸になる不具合を修正
-- `v0.1.1164` 2026-07-16 — 会場を開いた瞬間の意図しない効果音を停止
-- `v0.1.1163` 2026-07-16 — 会場の応援アイコン列を①ポップアップと同じ大きさに統一
-- `v0.1.1154` 2026-07-15 — 会場の「名前ありゆっくり顔」の原因を見つけやすくする診断を追加
-- `v0.1.1152` 2026-07-15 — 会場のリンク不具合を見つけやすくする診断を追加
-- `v0.1.1144` 2026-07-14 — コメントが多いときの読み上げのテンポを改善
-- `v0.1.1141` 2026-07-14 — 会場のギフト・広告レーンの表示欠けを修正
-- `v0.1.1138` 2026-07-14 — ロビーを廃止し会場を①と同じ顔ぶれだけに
-- `v0.1.1137` 2026-07-14 — 会場一致判定に鏡世代の突合を追加(診断強化のみ)
-- `v0.1.1136` 2026-07-14 — 会場のりんく段が数分おきに出たり消えたりする不具合を修正
-- `v0.1.1134` 2026-07-14 — 会場一致判定に①実DOMの寸法指紋を追加
-- `v0.1.1133` 2026-07-13 — fix(venue): 会場の案内文言・診断パネルを①と完全一致に
-- `v0.1.1129` 2026-07-11 — fix(venue): スクロールバー非表示+ロビー巨大タイル根治
-- `v0.1.1128` 2026-07-11 — fix(venue): 会場中の点滅を根治(引っ越し凍結)
-- `v0.1.1127` 2026-07-11 — feat(venue): 会場ガイド帯を①一致で復活
-- `v0.1.1126` 2026-07-10 — feat(venue): 会場に①の詳しい状況を転写
-- `v0.1.1125` 2026-07-10 — feat(diag): ちかちか計器を状態速報で読める化+盲点2経路
-- `v0.1.1124` 2026-07-10 — feat(diag): パネル引っ越し(=リロード)の実測計器
-- `v0.1.1122` 2026-07-10 — fix(venue): 匿名の大群がたぬ姉段の壁になるのを解消
-- `v0.1.1121` 2026-07-10 — fix(venue): 白い大パネルを解消=カード背景を行単位に
-- `v0.1.1120` 2026-07-10 — feat(venue): 会場から案内バナー等の文章を除去
-- `v0.1.1119` 2026-07-10 — feat(venue): 会場の段を①と同じ見た目に
-- `v0.1.1118` 2026-07-10 — feat(venue): ①が解決済みの顔を会場にも共有
-- `v0.1.1117` 2026-07-10 — fix(venue): 会場の白円サムネを根治=①と同じ顔規則
-- `v0.1.1116` 2026-07-10 — feat(diag): 会場の白円サムネを数える計器
-- `v0.1.1115` 2026-07-10 — feat(venue): 会場を開くと①パネルを自動で畳む
-- `v0.1.1114` 2026-07-10 — feat(venue): 額縁フレーム(四辺のキャラ顔)を廃止
-- `v0.1.1113` 2026-07-10 — feat(diag): 会場一致を実DOMで判定(3点一致)
-- `v0.1.1112` 2026-07-08 — feat(venue): 会場の5段を①と厳密一致+ロビー新設
-- `v0.1.1111` 2026-07-08 — feat(venue): 会場の顔ぶれを応援レーンと完全一致
-- `v0.1.1110` 2026-07-08 — fix(venue): 会場の記名サムネ白円を根治
-- `v0.1.1097` 2026-07-06 — feat(venue): 来場が控えめな入賞演出になります
-- `v0.1.1088` 2026-07-06 — feat(diag): 読み上げ/ギフトの体感遅延を実測計器化
-- `v0.1.1077` 2026-07-05 — ボイス空振り消費とpayout張り付き修正
-- `v0.1.1065` 2026-07-04 — 会場読み上げに計器と固着回復を追加
-- `v0.1.1055` 2026-07-04 — 診断シートの網羅漏れ2件を修正+ギフト診断を数値化
-- `v0.1.1053` 2026-07-04 — ギフト・広告・イベント順位の変動に効果音を追加(会場/埋め込み対応)
-- `v0.1.1051` 2026-07-04 — 応援レーン(埋め込み)の表示上限を48人→200人に拡大
-- `v0.1.1050` 2026-07-03 — 状態速報のパリティ判定に会場(④)を追加=POPと会場の人数ズレを検知
-- `v0.1.1049` 2026-07-03 — サムネ持ちは大きく・匿名は小さく詰めて表示(応援レーン/会場)
-- `v0.1.1047` 2026-07-03 — 会場を応援レーン段組みに統一(第1段=りんく/こん太/たぬ姉)
-- `v0.1.1044` 2026-07-02 — 会場座席「更新◯秒前」が約56年前と誤表示される不具合を修正
-- `v0.1.1043` 2026-07-02 — 会場席の網羅状況を状態速報に計器追加
-- `v0.1.1031` 2026-07-01 — 会場のひな壇の上に「応援者トップ」バーを追加した
-- `v0.1.1030` 2026-07-01 — 会場モードに「🩺 会場の状態」診断パネルを追加した
-- `v0.1.1029` 2026-07-01 — 会場の席に応援者ランキング上位3位の順位バッジを付けた
-- `v0.1.1019` 2026-07-01 — 応援プレビューの数字を①ポップアップと同じ鏡に揃えた
-- `v0.1.1004` 2026-06-30 — 読み上げが止まる固着とその誤検知を根治
-- `v0.1.997` 2026-06-29 — 状態速報に完全性スコア(網羅診断)を追加
-- `v0.1.992` 2026-06-29 — 記録・同接・来場の数字カードを確実に表示
-- `v0.1.953` 2026-06-26 — 状態速報に純Web公開コピーの自己診断を追加
-- `v0.1.950` 2026-06-26 — 応援プレビューの上段3カードを即表示しローディング解消
-- `v0.1.940` 2026-06-25 — 共有URLのWeb版に「配信者カード」をポップアップそっくり追加
-- `v0.1.939` 2026-06-25 — 共有URLのWeb版に「数字カード」をポップアップそっくり追加
-- `v0.1.924` 2026-06-23 — 状態速報ページが重い問題を改善(毎回の読み込みを削減)
-- `v0.1.922` 2026-06-23 — ギフト参加者ランキングの自動取得を再開
-- `v0.1.919` 2026-06-23 — 自動巡回(裏で配信を勝手に開く)を停止+ギフト自動取得を再開
-- `v0.1.918` 2026-06-23 — ギフトサイドバーの自動オープンを緊急停止(別配信が勝手に開く疑い)
-- `v0.1.917` 2026-06-23 — status の popup埋め込みを緊急停止(タブ自動オープン疑い)
-- `v0.1.915` 2026-06-23 — status埋め込み土台=受動popupモード追加
-- `v0.1.914` 2026-06-23 — 応援レーン鏡のフッター件数をpopupと一致
-- `v0.1.913` 2026-06-23 — 応援ライブビューに応援レーン・数字カードの鏡を追加
-- `v0.1.912` 2026-06-23 — 状態速報に数字カード(記録・同接・来場・公式)の鏡を追加
-- `v0.1.911` 2026-06-23 — 状態速報に応援レーンを顔つきでそっくり映す鏡を追加
-- `v0.1.910` 2026-06-22 — 状態速報が重くなったのを修正(応援レーンセルの読込を間引きに)
-- `v0.1.909` 2026-06-22 — 健全度パネルに応援レーンの人数整合セルを追加
-- `v0.1.908` 2026-06-22 — レーンの件数を正直に表示+広告列のサムネ化け修正
-- `v0.1.907` 2026-06-22 — 会場でサムネ(顔写真)が出ない不具合を修正+席上限表示を実態に合わせた
-- `v0.1.906` 2026-06-22 — 会場・ポップアップの顔アイコンを遅延読み込みにして軽くした
-- `v0.1.905` 2026-06-22 — 会場モードに参加者全員を顔付きで並べる(最大500席・縦スクロール)
-- `v0.1.904` 2026-06-22 — 状態速報ページが「何があっても開く」保険を追加(重くて開かない対策)
-- `v0.1.902` 2026-06-22 — 健全度パネルに会場座席セル(配信者混入・会場の固まり検知)を追加
-- `v0.1.901` 2026-06-22 — 配信者本人を応援者一覧・会場の席から除外する
-- `v0.1.900` 2026-06-22 — 会場の席をポップアップの「アイコン列」と同じ本物の描画で表示する
-- `v0.1.899` 2026-06-22 — 会場モードの席を画面いっぱいに広げる(中央寄せの余白を撤廃)
-- `v0.1.898` 2026-06-22 — 会場モードの「壁で覆う」を撤回=映像とコメント欄を隠さない
-- `v0.1.896` 2026-06-22 — 操作ボタン群(HTML/コメビュ/読み上げ等)をパネル上部へ移動
-- `v0.1.895` 2026-06-22 — 読み上げが止まったまま戻らない固着を自動回復+停止位置の計器
-- `v0.1.894` 2026-06-22 — 健全度パネルに会場モード読み上げのセルを追加
-- `v0.1.883` 2026-06-21 — 会場モードの読み上げが止まったまま戻らない不具合を修正
-- `v0.1.878` 2026-06-21 — 匿名アイコンを本物identiconに+統計カードを追加(完全コピー)
-- `v0.1.871` 2026-06-21 — クリックで応援ライブビューを新規タブにリアルタイム表示
-- `v0.1.866` 2026-06-21 — 診断の配信カードをちくらん風(サムネ+来場+コメント+ギフト)に
-- `v0.1.862` 2026-06-21 — 時系列トレンドで記録停止/取得率低下を時間変化で検知
-- `v0.1.861` 2026-06-21 — 数字に信頼度の注釈を付けて意味の取り違えを防ぐ
-- `v0.1.859` 2026-06-21 — レポートの「コメントした人」を正本に統一+数字の食い違いを自動検知
-- `v0.1.858` 2026-06-21 — レポートの中身を保存前に状態速報で確認(プレビュー)
-- `v0.1.853` 2026-06-21 — HTMLレポートに記録が全部反映されない不具合を修正
-- `v0.1.852` 2026-06-21 — 会場モードの読み上げ状況を状態速報に表示(遅延の切り分け用)
-- `v0.1.841` 2026-06-20 — 修正系譜マップ(再発防止)を地図に追加
-- `v0.1.840` 2026-06-20 — 機能逆引き地図を全ファイル網羅に
-- `v0.1.837` 2026-06-20 — ギフト送信者の文字化け表示を抑止
-- `v0.1.836` 2026-06-20 — 匿名コメントの記録を救済(第1歩)
-- `v0.1.824` 2026-06-18 — 状態速報に「症状→原因→次の一手」対処カードを追加
-- `v0.1.820` 2026-06-18 — コメント行の受理判定を共通部品に整理(挙動不変)
-- `v0.1.819` 2026-06-17 — 会場の「ほか観客」表記を「ほか」に整理(誤読防止)
-- `v0.1.818` 2026-06-17 — 会場の席と応援アイコンのリンク基準を統一(顔ぶれ一致の土台)
-- `v0.1.817` 2026-06-17 — 応援アイコンのタイル描画を共通部品に整理(見た目不変・土台整備)
-- `v0.1.816` 2026-06-17 — 人物情報のまとめ役を内部に新設(挙動は変わりません・土台整備)
-- `v0.1.815` 2026-06-17 — 会場の席まわりの設計を整理(挙動は変わりません・土台整備)
-- `v0.1.806` 2026-06-17 — HTML保存の失敗を根治+完了音声を追加
-- `v0.1.803` 2026-06-17 — 匿名コメントを会場・レーンへ戻す
-- `v0.1.800` 2026-06-17 — 読み上げと吹き出しを同時に立ち上げる
-- `v0.1.799` 2026-06-17 — 読み上げとコメントの吹き出しのずれを解消
-- `v0.1.793` 2026-06-17 — 配信者本人が会場に匿名で映る不具合を修正
-- `v0.1.790` 2026-06-17 — 会場の人が時間で減らないように(満席維持)
-- `v0.1.789` 2026-06-17 — 会場の参加者をレーンと一致(レーンを鏡のように映す)
-- `v0.1.786` 2026-06-16 — ギフトの保存処理が記録/会場/状態を巻き込んで止める不具合を根治
-- `v0.1.783` 2026-06-16 — ギフト投げ演出を実画像化+一瞬で消えないよう調整
-- `v0.1.780` 2026-06-16 — ギフト投げ演出の発火経路をDOM検出からも確保
-- `v0.1.779` 2026-06-16 — ギフト投げ演出の発火を確実に(構造化イベントから)
-- `v0.1.778` 2026-06-16 — ギフト・広告が投げ主の席から配信画面へ飛ぶ演出を追加
-- `v0.1.777` 2026-06-16 — 会場モードを3キャラの額縁フレームで囲む装飾を追加
-- `v0.1.773` 2026-06-16 — 読み上げの遅れ(定常ラグ)を詰めて長時間でも吹き出しとほぼ同時に
-- `v0.1.772` 2026-06-16 — 会場モードの「閉じる」ボタンをヘッダー(見出しバー)へ移動
-- `v0.1.771` 2026-06-16 — 会場の吹き出しを「読み上げが終わるまで」消さないように
-- `v0.1.770` 2026-06-16 — 読み上げ起動待ちのローディングを楽しく＋会場タブに閉じるボタン
-- `v0.1.757` 2026-06-16 — 会場の吹き出し読み飛ばし・音声だけ出る不具合を根治
-- `v0.1.756` 2026-06-16 — 会場の反映をコメビュ並みに速い経路へ統一
-- `v0.1.755` 2026-06-16 — 会場の吹き出し・読み上げのリアルタイム性を強化
-- `v0.1.754` 2026-06-15 — 会場を作り直し3時間配信でも軽さ・速さを維持
-- `v0.1.753` 2026-06-15 — 拡張更新後に会場が固まる時、再読込を案内
-- `v0.1.752` 2026-06-15 — 会場の吹き出し・読み上げをリアルタイムに
-- `v0.1.748` 2026-06-15 — 3キャラを配信画面のまわりに移動＋コメント反映を速く
-- `v0.1.747` 2026-06-15 — 会場にりんく・こん太・たぬ姉が常駐するように
-- `v0.1.746` 2026-06-15 — 会場がたまに空っぽ/ローディングになる不具合を根治
-- `v0.1.745` 2026-06-15 — 会場で吹き出しが出ないことがある不具合を修正
-- `v0.1.744` 2026-06-15 — サムネ(顔写真)持ちの人が会場で一目で特別に見えるように
-- `v0.1.743` 2026-06-15 — 観客が呼吸し盛り上がると一斉に揺れる＋連続で喋る席が輝く
-- `v0.1.742` 2026-06-15 — 誰かがコメントすると会場の席がふわっと反応するように
-- `v0.1.741` 2026-06-15 — 会場を開いた瞬間ちゃんと人が出るように安定化
-- `v0.1.740` 2026-06-15 — コメントしていない配信者本人が会場に出る不具合を修正
-- `v0.1.739` 2026-06-14 — 常連・応援者の金色オーラが実際に点くように改善
-- `v0.1.738` 2026-06-14 — 診断パネルを閉じやすく＋掴めるカーソルの誤解を解消
-- `v0.1.737` 2026-06-14 — 会場の後列が画面外で見切れる不具合を修正
-- `v0.1.736` 2026-06-14 — 会場が埋まらない問題を改善（表示席数を増やした）
-- `v0.1.735` 2026-06-14 — 診断の「サムネ持ち」数が実際の席表示と一致するように修正
-- `v0.1.734` 2026-06-14 — 常連・応援者の金色オーラが正しく点くように修正
-- `v0.1.733` 2026-06-14 — 大人数の会場でも軽く動くように描画を最適化
-- `v0.1.732` 2026-06-14 — 会場の照明がコメントの勢いで色温度を変える
-- `v0.1.731` 2026-06-14 — 会場モードで常連・応援者の席を金色に光らせる
-- `v0.1.730` 2026-06-14 — 会場モードに「メンバー一覧」ボタン＋窮屈表示を修正
-- `v0.1.729` 2026-06-14 — 会場モード: サムネ優遇・領域拡大・ドラッグ移動
-- `v0.1.728` 2026-06-14 — 会場モードを人数に応じて満席感アップ
-- `v0.1.727` 2026-06-14 — 会場モードを開いたら読み上げが自動でONに
-- `v0.1.726` 2026-06-14 — 会場モードの読み上げが始まらない問題を修正
-- `v0.1.725` 2026-06-14 — 会場モードでサムネ付きの人を前列に・匿名は後列へ
-- `v0.1.723` 2026-06-14 — VOICEVOX読み上げの接続修正・会場の空席表示修正
-- `v0.1.721` 2026-06-13 — 別窓の会場モードに映像を表示・読み上げボタンが確実に出るよう修正
-- `v0.1.720` 2026-06-13 — 会場モードのバグ修正と音声読み上げ機能の統合
-- `v0.1.719` 2026-06-13 — サムネと名前を一体リンクに・読み上げボタン追加
-- `v0.1.718` 2026-06-13 — 会場を本物のライブ会場っぽく(後方を暗く)
-- `v0.1.717` 2026-06-13 — 会場のセリフを大きく・隠れないように
-- `v0.1.716` 2026-06-13 — 会場の名前リンクを押せるように・スモーク撤去
-- `v0.1.715` 2026-06-13 — 会場モードで配信映像を見せ名前にリンク
-- `v0.1.713` 2026-06-13 — 会場モードを明るくして発言を吹き出し表示
-- `v0.1.712` 2026-06-13 — 会場モードに本物のアイコンと観客を表示
-- `v0.1.711` 2026-06-13 — 会場モードで発言を吹き出し表示
-- `v0.1.710` 2026-06-13 — 会場モードを立体的なひな壇表示に
-- `v0.1.709` 2026-06-13 — 会場モードに参加者全員を表示
-- `v0.1.708` 2026-06-13 — 会場モードを全画面表示に変更
-- `v0.1.707` 2026-06-13 — ニコ生に会場モードを追加
-- `v0.1.678` 2026-06-10 — 配信実績を共有できるメディアキットを追加
+### 🎁 ギフト (1版)
+- `v0.1.1492` 2026-08-29 — 会場で「この人が今どうしているか」が出ます
 
-### 🎈 吹き出し (26版)
-- `v0.1.1047` 2026-07-03 — 会場を応援レーン段組みに統一(第1段=りんく/こん太/たぬ姉)
-- `v0.1.840` 2026-06-20 — 機能逆引き地図を全ファイル網羅に
-- `v0.1.832` 2026-06-20 — 「はじめての方へ」をLPと同じキャラ吹き出し会話に
-- `v0.1.819` 2026-06-17 — 会場の「ほか観客」表記を「ほか」に整理(誤読防止)
-- `v0.1.818` 2026-06-17 — 会場の席と応援アイコンのリンク基準を統一(顔ぶれ一致の土台)
-- `v0.1.817` 2026-06-17 — 応援アイコンのタイル描画を共通部品に整理(見た目不変・土台整備)
-- `v0.1.816` 2026-06-17 — 人物情報のまとめ役を内部に新設(挙動は変わりません・土台整備)
-- `v0.1.815` 2026-06-17 — 会場の席まわりの設計を整理(挙動は変わりません・土台整備)
-- `v0.1.800` 2026-06-17 — 読み上げと吹き出しを同時に立ち上げる
-- `v0.1.799` 2026-06-17 — 読み上げとコメントの吹き出しのずれを解消
-- `v0.1.781` 2026-06-16 — 吹き出しは出るのに読み上げ音声が全く出ない不具合を修正
-- `v0.1.773` 2026-06-16 — 読み上げの遅れ(定常ラグ)を詰めて長時間でも吹き出しとほぼ同時に
-- `v0.1.771` 2026-06-16 — 会場の吹き出しを「読み上げが終わるまで」消さないように
-- `v0.1.757` 2026-06-16 — 会場の吹き出し読み飛ばし・音声だけ出る不具合を根治
-- `v0.1.756` 2026-06-16 — 会場の反映をコメビュ並みに速い経路へ統一
-- `v0.1.755` 2026-06-16 — 会場の吹き出し・読み上げのリアルタイム性を強化
-- `v0.1.754` 2026-06-15 — 会場を作り直し3時間配信でも軽さ・速さを維持
-- `v0.1.753` 2026-06-15 — 拡張更新後に会場が固まる時、再読込を案内
-- `v0.1.752` 2026-06-15 — 会場の吹き出し・読み上げをリアルタイムに
-- `v0.1.748` 2026-06-15 — 3キャラを配信画面のまわりに移動＋コメント反映を速く
-- `v0.1.745` 2026-06-15 — 会場で吹き出しが出ないことがある不具合を修正
-- `v0.1.742` 2026-06-15 — 誰かがコメントすると会場の席がふわっと反応するように
-- `v0.1.720` 2026-06-13 — 会場モードのバグ修正と音声読み上げ機能の統合
-- `v0.1.717` 2026-06-13 — 会場のセリフを大きく・隠れないように
-- `v0.1.713` 2026-06-13 — 会場モードを明るくして発言を吹き出し表示
-- `v0.1.711` 2026-06-13 — 会場モードで発言を吹き出し表示
+### 🔊 読み上げ (1版)
+- `v0.1.1506` 2026-09-04 — 設定の保存先の名前を1箇所にまとめました
 
-### 🎁 ギフト (112版)
-- `v0.1.1282` 2026-08-07 — ★会場モードでギフト・広告の段が消えていたのを直しました
-- `v0.1.1280` 2026-08-06 — 会場モードが①パネルとずれる原因に手を入れました
-- `v0.1.1272` 2026-08-06 — 計器が動かない原因を突き止めて直しました
-- `v0.1.1230` 2026-08-02 — 会場にピックアップ枠+診断ページの上下ブレを修正
-- `v0.1.1226` 2026-08-02 — 流れて埋もれるコメントを1件ずつ留めて見せる
-- `v0.1.1221` 2026-08-01 — ホバーの発言が出ない真因を修正+VIPの光りも回復
-- `v0.1.1218` 2026-08-01 — 会場でアイコンにマウスを乗せると、その人の発言が数件読めるように
-- `v0.1.1216` 2026-08-01 — 会場でアイコンにマウスを乗せたとき、直前の発言が出るように
-- `v0.1.1202` 2026-07-31 — 「あの人が何を言ったか・どこに居るか」を追えるように3点改善
-- `v0.1.1200` 2026-07-31 — 広告・ギフトの方のホバー表示を「投げたタイミング」に
-- `v0.1.1194` 2026-07-31 — ギフト演出の診断精度を改善
-- `v0.1.1162` 2026-07-16 — 状態速報の異常な数値表示・誤った警告表示を修正
-- `v0.1.1161` 2026-07-16 — ギフトの効果音をより自然な音に更新
-- `v0.1.1158` 2026-07-16 — ギフト音の原素材の出典記録を撤回し全て自作音源へ統一
-- `v0.1.1157` 2026-07-16 — ギフト効果音の状態表示が古いまま固まることがある不具合を修正
-- `v0.1.1156` 2026-07-15 — ギフト演出は出るのに効果音が鳴らないことがある不具合を修正
-- `v0.1.1142` 2026-07-14 — ギフト列で自分のサムネが表示されない不具合を修正
-- `v0.1.1141` 2026-07-14 — 会場のギフト・広告レーンの表示欠けを修正
-- `v0.1.1132` 2026-07-11 — fix(gift): 公式ギフト履歴の鮮度優先を修正
-- `v0.1.1119` 2026-07-10 — feat(venue): 会場の段を①と同じ見た目に
-- `v0.1.1112` 2026-07-08 — feat(venue): 会場の5段を①と厳密一致+ロビー新設
-- `v0.1.1111` 2026-07-08 — feat(venue): 会場の顔ぶれを応援レーンと完全一致
-- `v0.1.1108` 2026-07-07 — feat(web): ③応援ライブビューに記録サマリ推移丸写し
-- `v0.1.1105` 2026-07-07 — feat(web): ③応援ライブビューに配信採点丸写し
-- `v0.1.1104` 2026-07-07 — feat(web): ③応援ライブビューに投げ一覧丸写し
-- `v0.1.1103` 2026-07-07 — feat(web): ③応援ライブビューに応援タイムライン丸写し
-- `v0.1.1099` 2026-07-06 — feat(score): popupに採点パネル+ハイライト台帳
-- `v0.1.1097` 2026-07-06 — feat(venue): 来場が控えめな入賞演出になります
-- `v0.1.1095` 2026-07-06 — fix(gift): デルタ補完ギフトにも効果音を配線
-- `v0.1.1092` 2026-07-06 — feat(lane): コメント即時プッシュで重負荷でも表示即時
-- `v0.1.1091` 2026-07-06 — ギフト音が静かに消える取りこぼしを根治
-- `v0.1.1090` 2026-07-06 — feat(gift): 個別イベント欠落配信のデルタ補完検知
-- `v0.1.1088` 2026-07-06 — feat(diag): 読み上げ/ギフトの体感遅延を実測計器化
-- `v0.1.1077` 2026-07-05 — ボイス空振り消費とpayout張り付き修正
-- `v0.1.1073` 2026-07-05 — パチンコボイス演出+頻度ゲート追加
-- `v0.1.1071` 2026-07-05 — マイ効果音差し替え(IndexedDB取込+割当)
-- `v0.1.1069` 2026-07-04 — パチンコ文法準拠へ効果音を全面刷新
-- `v0.1.1068` 2026-07-04 — ギフト音をパチンコ電子音(きゅいん)に一新+即発音
-- `v0.1.1066` 2026-07-04 — ギフト音の出だし遅れを解消(最大0.2秒)
-- `v0.1.1064` 2026-07-04 — ギフト音を短く歯切れよく調整
-- `v0.1.1061` 2026-07-04 — ギフト音を根治(音量・着弾同期・連続は1本に置換)
-- `v0.1.1060` 2026-07-04 — パチンコ的な盛り上がり演出の土台を新設
-- `v0.1.1059` 2026-07-04 — ギフト効果音を刷新+毎回違う音のバリエーションを追加
-- `v0.1.1058` 2026-07-04 — ギフト取りこぼし修正+コメント数マイルストーン診断を新設
-- `v0.1.1057` 2026-07-04 — ギフト診断の対処候補への統合漏れを修正+内部構造の整理
-- `v0.1.1055` 2026-07-04 — 診断シートの網羅漏れ2件を修正+ギフト診断を数値化
-- `v0.1.1054` 2026-07-04 — コメント数の節目に効果音を追加+診断シート強化
-- `v0.1.1053` 2026-07-04 — ギフト・広告・イベント順位の変動に効果音を追加(会場/埋め込み対応)
-- `v0.1.1047` 2026-07-03 — 会場を応援レーン段組みに統一(第1段=りんく/こん太/たぬ姉)
-- `v0.1.1042` 2026-07-02 — ギフト/広告列のタイル出入りちらつきを根治
-- `v0.1.1040` 2026-07-02 — 応援レーンの段別再描画回数を状態速報に追加
-- `v0.1.1039` 2026-07-02 — 応援レーン(アイコン列)のちらつきを根治
-- `v0.1.1038` 2026-07-02 — 応援者/広告ランキングの中身ちらつきを根治
-- `v0.1.1031` 2026-07-01 — 会場のひな壇の上に「応援者トップ」バーを追加した
-- `v0.1.1029` 2026-07-01 — 会場の席に応援者ランキング上位3位の順位バッジを付けた
-- `v0.1.1017` 2026-07-01 — 応援レーン・コメントの①POP=③WEB一致を自動チェック
-- `v0.1.1014` 2026-06-30 — 貢献度・広告ランキングが純Web側に出ない不具合を根治
-- `v0.1.976` 2026-06-28 — 応援レーンを重い読み込みの前に描画
-- `v0.1.973` 2026-06-28 — 内部整理: ギフトユーザー一覧の生成をlib抽出
-- `v0.1.971` 2026-06-28 — 内部整理: ギフト履歴表示の生成をlib抽出
-- `v0.1.955` 2026-06-26 — 状態速報に「応援レーン描画の自己診断」を追加
-- `v0.1.951` 2026-06-26 — 応援プレビューに応援レーンと貢献度/広告ランキングを表示
-- `v0.1.947` 2026-06-25 — WEB公開版に応援者ランキングとギフト貢献度を顔つきで表示
-- `v0.1.940` 2026-06-25 — 共有URLのWeb版に「配信者カード」をポップアップそっくり追加
-- `v0.1.939` 2026-06-25 — 共有URLのWeb版に「数字カード」をポップアップそっくり追加
-- `v0.1.928` 2026-06-23 — 応援ライブビューのりんく列・ギフト列をポップアップと同じ顔タイルに統一
-- `v0.1.922` 2026-06-23 — ギフト参加者ランキングの自動取得を再開
-- `v0.1.920` 2026-06-23 — ギフト自動取得を再び緊急停止(切り分け第2弾)
-- `v0.1.919` 2026-06-23 — 自動巡回(裏で配信を勝手に開く)を停止+ギフト自動取得を再開
-- `v0.1.918` 2026-06-23 — ギフトサイドバーの自動オープンを緊急停止(別配信が勝手に開く疑い)
-- `v0.1.914` 2026-06-23 — 応援レーン鏡のフッター件数をpopupと一致
-- `v0.1.912` 2026-06-23 — 状態速報に数字カード(記録・同接・来場・公式)の鏡を追加
-- `v0.1.903` 2026-06-22 — ポップアップに「広告列」を新設=広告を投げた人も並ぶように
-- `v0.1.889` 2026-06-22 — 「貢献度ランキング」を「ギフト貢献度」に改称(広告ptと別物)
-- `v0.1.888` 2026-06-22 — 公式値レーン(貢献度/広告/ギフト履歴等)が出ない・遅い問題を根治
-- `v0.1.880` 2026-06-21 — 応援ライブビューにギフト履歴レーンを追加(完全コピー)
-- `v0.1.878` 2026-06-21 — 匿名アイコンを本物identiconに+統計カードを追加(完全コピー)
-- `v0.1.875` 2026-06-21 — 応援ライブビューにりんく列・ギフト列(popup の全レーン)を再現
-- `v0.1.866` 2026-06-21 — 診断の配信カードをちくらん風(サムネ+来場+コメント+ギフト)に
-- `v0.1.863` 2026-06-21 — 公式値のDOM↔NDGR食い違いも自己矛盾検知に追加
-- `v0.1.860` 2026-06-21 — 匿名主体の偽の赤と「既知0を空」表示を解消(診断の正直化)
-- `v0.1.845` 2026-06-20 — 健全度パネル: 取得中は青で「順調」に
-- `v0.1.843` 2026-06-20 — 状態ページ先頭に健全度パネルを追加
-- `v0.1.840` 2026-06-20 — 機能逆引き地図を全ファイル網羅に
-- `v0.1.837` 2026-06-20 — ギフト送信者の文字化け表示を抑止
-- `v0.1.836` 2026-06-20 — 匿名コメントの記録を救済(第1歩)
-- `v0.1.819` 2026-06-17 — 会場の「ほか観客」表記を「ほか」に整理(誤読防止)
-- `v0.1.818` 2026-06-17 — 会場の席と応援アイコンのリンク基準を統一(顔ぶれ一致の土台)
-- `v0.1.817` 2026-06-17 — 応援アイコンのタイル描画を共通部品に整理(見た目不変・土台整備)
-- `v0.1.816` 2026-06-17 — 人物情報のまとめ役を内部に新設(挙動は変わりません・土台整備)
-- `v0.1.815` 2026-06-17 — 会場の席まわりの設計を整理(挙動は変わりません・土台整備)
-- `v0.1.801` 2026-06-17 — 過去配信キャッシュの溜め込みを抑え軽量化
-- `v0.1.786` 2026-06-16 — ギフトの保存処理が記録/会場/状態を巻き込んで止める不具合を根治
-- `v0.1.783` 2026-06-16 — ギフト投げ演出を実画像化+一瞬で消えないよう調整
-- `v0.1.780` 2026-06-16 — ギフト投げ演出の発火経路をDOM検出からも確保
-- `v0.1.779` 2026-06-16 — ギフト投げ演出の発火を確実に(構造化イベントから)
-- `v0.1.778` 2026-06-16 — ギフト・広告が投げ主の席から配信画面へ飛ぶ演出を追加
-- `v0.1.774` 2026-06-16 — 送信・画面が重い性能問題を改善＋記録数を配信者コメ除外に
-- `v0.1.766` 2026-06-16 — 状態速報の概要に「公式値レーンの状況」を追加
-- `v0.1.763` 2026-06-16 — 中途半端な％をやめ「取り込み中/再接続待ち」を正直に表示
-- `v0.1.755` 2026-06-16 — 会場の吹き出し・読み上げのリアルタイム性を強化
-- `v0.1.754` 2026-06-15 — 会場を作り直し3時間配信でも軽さ・速さを維持
-- `v0.1.740` 2026-06-15 — コメントしていない配信者本人が会場に出る不具合を修正
-- `v0.1.739` 2026-06-14 — 常連・応援者の金色オーラが実際に点くように改善
-- `v0.1.734` 2026-06-14 — 常連・応援者の金色オーラが正しく点くように修正
-- `v0.1.731` 2026-06-14 — 会場モードで常連・応援者の席を金色に光らせる
-- `v0.1.680` 2026-06-10 — メディアキットに応援者の表彰セクション
-- `v0.1.679` 2026-06-10 — コメビュ即時表示の二重表示バグを修正
-- `v0.1.678` 2026-06-10 — 配信実績を共有できるメディアキットを追加
-- `v0.1.677` 2026-06-10 — コメビュを新着即時表示とコメピタ対応に
-- `v0.1.676` 2026-06-10 — コメビュをパネルのタイムラインと完全同一に
-- `v0.1.674` 2026-06-10 — タイムラインから人を開ける+匿名の見分け復活
+### 🪟 応援レーン・タイル (4版)
+- `v0.1.1507` 2026-09-04 — 埋め込みに別の配信が映る問題を直しました
+- `v0.1.1499` 2026-08-31 — 診断ページでポップアップを見られます
+- `v0.1.1496` 2026-08-30 — 応援レーンのお顔を少し大きくしました
+- `v0.1.1495` 2026-08-30 — 発言を読んだあと、その人へ行けます
 
-### 🔊 読み上げ (69版)
-- `v0.1.1247` 2026-08-04 — 読み上げが遅くなる悪循環を断ち切りました
-- `v0.1.1246` 2026-08-04 — 読み上げが「たまにしか読まれない」問題を改善しました
-- `v0.1.1244` 2026-08-03 — ストア提出物に画像3点が入っていなかったのを修正
-- `v0.1.1243` 2026-08-03 — ストア提出物に会場モード等のページが入っていなかったのを修正
-- `v0.1.1242` 2026-08-03 — WEB公開を「自分でONにしたときだけ」に変更しました(重要)
-- `v0.1.1225` 2026-08-01 — 読み上げの速度調整が効き始める条件をゆるめた
-- `v0.1.1224` 2026-08-01 — 読み上げが失敗する理由を名前で出すようにした
-- `v0.1.1222` 2026-08-01 — 古い状態速報を黙って渡さない+混雑時の読み上げ速度
-- `v0.1.1213` 2026-08-01 — 読み上げが「読まれずに消えた件数」を数えるようにしました
-- `v0.1.1193` 2026-07-31 — 紹介サイトの掲載内容を最新版に更新
-- `v0.1.1189` 2026-07-28 — 会場読み上げの遅延の内訳を診断できるように
-- `v0.1.1183` 2026-07-24 — 状態速報の表示文言を修正
-- `v0.1.1181` 2026-07-24 — 会場読み上げが混雑時に詰まりにくく
-- `v0.1.1180` 2026-07-24 — 会場読み上げの診断を強化
-- `v0.1.1144` 2026-07-14 — コメントが多いときの読み上げのテンポを改善
-- `v0.1.1088` 2026-07-06 — feat(diag): 読み上げ/ギフトの体感遅延を実測計器化
-- `v0.1.1084` 2026-07-06 — perf(status): マイ効果音計器のBlob全件走査を廃止
-- `v0.1.1080` 2026-07-05 — 拡張リロード後の旧タブ黙過ガード追加
-- `v0.1.1077` 2026-07-05 — ボイス空振り消費とpayout張り付き修正
-- `v0.1.1073` 2026-07-05 — パチンコボイス演出+頻度ゲート追加
-- `v0.1.1071` 2026-07-05 — マイ効果音差し替え(IndexedDB取込+割当)
-- `v0.1.1065` 2026-07-04 — 会場読み上げに計器と固着回復を追加
-- `v0.1.1063` 2026-07-04 — 読み上げの音声合成を約30%高速化(テンポ改善)
-- `v0.1.1047` 2026-07-03 — 会場を応援レーン段組みに統一(第1段=りんく/こん太/たぬ姉)
-- `v0.1.1004` 2026-06-30 — 読み上げが止まる固着とその誤検知を根治
-- `v0.1.997` 2026-06-29 — 状態速報に完全性スコア(網羅診断)を追加
-- `v0.1.953` 2026-06-26 — 状態速報に純Web公開コピーの自己診断を追加
-- `v0.1.924` 2026-06-23 — 状態速報ページが重い問題を改善(毎回の読み込みを削減)
-- `v0.1.896` 2026-06-22 — 操作ボタン群(HTML/コメビュ/読み上げ等)をパネル上部へ移動
-- `v0.1.895` 2026-06-22 — 読み上げが止まったまま戻らない固着を自動回復+停止位置の計器
-- `v0.1.894` 2026-06-22 — 健全度パネルに会場モード読み上げのセルを追加
-- `v0.1.883` 2026-06-21 — 会場モードの読み上げが止まったまま戻らない不具合を修正
-- `v0.1.852` 2026-06-21 — 会場モードの読み上げ状況を状態速報に表示(遅延の切り分け用)
-- `v0.1.840` 2026-06-20 — 機能逆引き地図を全ファイル網羅に
-- `v0.1.819` 2026-06-17 — 会場の「ほか観客」表記を「ほか」に整理(誤読防止)
-- `v0.1.818` 2026-06-17 — 会場の席と応援アイコンのリンク基準を統一(顔ぶれ一致の土台)
-- `v0.1.817` 2026-06-17 — 応援アイコンのタイル描画を共通部品に整理(見た目不変・土台整備)
-- `v0.1.816` 2026-06-17 — 人物情報のまとめ役を内部に新設(挙動は変わりません・土台整備)
-- `v0.1.815` 2026-06-17 — 会場の席まわりの設計を整理(挙動は変わりません・土台整備)
-- `v0.1.806` 2026-06-17 — HTML保存の失敗を根治+完了音声を追加
-- `v0.1.800` 2026-06-17 — 読み上げと吹き出しを同時に立ち上げる
-- `v0.1.799` 2026-06-17 — 読み上げとコメントの吹き出しのずれを解消
-- `v0.1.782` 2026-06-16 — 読み上げの破棄判定を件数ベースに作り直し(無音回避)
-- `v0.1.781` 2026-06-16 — 吹き出しは出るのに読み上げ音声が全く出ない不具合を修正
-- `v0.1.773` 2026-06-16 — 読み上げの遅れ(定常ラグ)を詰めて長時間でも吹き出しとほぼ同時に
-- `v0.1.772` 2026-06-16 — 会場モードの「閉じる」ボタンをヘッダー(見出しバー)へ移動
-- `v0.1.771` 2026-06-16 — 会場の吹き出しを「読み上げが終わるまで」消さないように
-- `v0.1.770` 2026-06-16 — 読み上げ起動待ちのローディングを楽しく＋会場タブに閉じるボタン
-- `v0.1.768` 2026-06-16 — コメント読み上げのリアルタイム性を強化(先読み合成を深く)
-- `v0.1.757` 2026-06-16 — 会場の吹き出し読み飛ばし・音声だけ出る不具合を根治
-- `v0.1.756` 2026-06-16 — 会場の反映をコメビュ並みに速い経路へ統一
-- `v0.1.755` 2026-06-16 — 会場の吹き出し・読み上げのリアルタイム性を強化
-- `v0.1.754` 2026-06-15 — 会場を作り直し3時間配信でも軽さ・速さを維持
-- `v0.1.753` 2026-06-15 — 拡張更新後に会場が固まる時、再読込を案内
-- `v0.1.752` 2026-06-15 — 会場の吹き出し・読み上げをリアルタイムに
-- `v0.1.748` 2026-06-15 — 3キャラを配信画面のまわりに移動＋コメント反映を速く
-- `v0.1.745` 2026-06-15 — 会場で吹き出しが出ないことがある不具合を修正
-- `v0.1.727` 2026-06-14 — 会場モードを開いたら読み上げが自動でONに
-- `v0.1.726` 2026-06-14 — 会場モードの読み上げが始まらない問題を修正
-- `v0.1.724` 2026-06-14 — コメビュが配信切替に追従・読み上げの無音を解消
-- `v0.1.723` 2026-06-14 — VOICEVOX読み上げの接続修正・会場の空席表示修正
-- `v0.1.721` 2026-06-13 — 別窓の会場モードに映像を表示・読み上げボタンが確実に出るよう修正
-- `v0.1.720` 2026-06-13 — 会場モードのバグ修正と音声読み上げ機能の統合
-- `v0.1.719` 2026-06-13 — サムネと名前を一体リンクに・読み上げボタン追加
-- `v0.1.716` 2026-06-13 — 会場の名前リンクを押せるように・スモーク撤去
-- `v0.1.714` 2026-06-13 — 読み上げのささやき声を使わないように
-- `v0.1.703` 2026-06-12 — 読み上げの待ち時間とコメント取りこぼしを改善
-- `v0.1.699` 2026-06-12 — 読み上げの名前ON/OFF切替を追加
-- `v0.1.698` 2026-06-12 — コメビュにユーザー別の声で読み上げ機能を追加
+### 🩺 診断・状態速報 (6版)
+- `v0.1.1504` 2026-09-03 — 診断ページの説明文の誤りを訂正
+- `v0.1.1503` 2026-09-03 — 無関係な更新で描き直す回数を減らしました
+- `v0.1.1500` 2026-09-02 — 診断ページで会場も見られます
+- `v0.1.1499` 2026-08-31 — 診断ページでポップアップを見られます
+- `v0.1.1498` 2026-08-31 — 間違った警告を出していたのをやめました
+- `v0.1.1497` 2026-08-30 — できない手順を案内していたのを直しました
 
-### 🪟 応援レーン・タイル (155版)
-- `v0.1.1251` 2026-08-04 — 応援タイルが一瞬で3枚まで減る症状を止めました
-- `v0.1.1241` 2026-08-03 — 診断の「会場と①が違う」「タイルが固まっている」の誤警告を2つとも修正
-- `v0.1.1240` 2026-08-03 — 診断の「タイルが消える」警告が誤って出ていたのを修正
-- `v0.1.1234` 2026-08-03 — 会場にも全員が並ぶようになりました
-- `v0.1.1233` 2026-08-02 — サムネが減っていた3つの原因を塞ぎました
-- `v0.1.1232` 2026-08-02 — 一度出た人は、もう消えません(表示上限を撤廃)
-- `v0.1.1231` 2026-08-02 — レーンから人が消えていないかを測る計器
-- `v0.1.1229` 2026-08-02 — レーンが出たり消えたりする原因を特定する計器
-- `v0.1.1227` 2026-08-02 — コメントのピックアップが動いていなかったのを修正
-- `v0.1.1221` 2026-08-01 — ホバーの発言が出ない真因を修正+VIPの光りも回復
-- `v0.1.1217` 2026-08-01 — アイコングリッドがちらちら変わる問題を根治
-- `v0.1.1212` 2026-08-01 — 会場と①の「幾何差」が本物か測り方の問題かを見分ける計器を追加
-- `v0.1.1184` 2026-07-24 — 純Web公開データの同期を安定化
-- `v0.1.1177` 2026-07-20 — 応援アイコンの表示診断を強化
-- `v0.1.1176` 2026-07-20 — 自分のコメントが速く画面に反映されるように
-- `v0.1.1174` 2026-07-18 — 大配信でのサムネ取りこぼしを軽減
-- `v0.1.1170` 2026-07-17 — 応援レーンの応援者が出没する不具合を修正
-- `v0.1.1163` 2026-07-16 — 会場の応援アイコン列を①ポップアップと同じ大きさに統一
-- `v0.1.1162` 2026-07-16 — 状態速報の異常な数値表示・誤った警告表示を修正
-- `v0.1.1154` 2026-07-15 — 会場の「名前ありゆっくり顔」の原因を見つけやすくする診断を追加
-- `v0.1.1142` 2026-07-14 — ギフト列で自分のサムネが表示されない不具合を修正
-- `v0.1.1141` 2026-07-14 — 会場のギフト・広告レーンの表示欠けを修正
-- `v0.1.1139` 2026-07-14 — 応援レーンの表示上限を差し戻し、二重スクロールを解消
-- `v0.1.1138` 2026-07-14 — ロビーを廃止し会場を①と同じ顔ぶれだけに
-- `v0.1.1136` 2026-07-14 — 会場のりんく段が数分おきに出たり消えたりする不具合を修正
-- `v0.1.1134` 2026-07-14 — 会場一致判定に①実DOMの寸法指紋を追加
-- `v0.1.1133` 2026-07-13 — fix(venue): 会場の案内文言・診断パネルを①と完全一致に
-- `v0.1.1129` 2026-07-11 — fix(venue): スクロールバー非表示+ロビー巨大タイル根治
-- `v0.1.1126` 2026-07-10 — feat(venue): 会場に①の詳しい状況を転写
-- `v0.1.1123` 2026-07-10 — feat(diag): ローディング/描画未起動の実測計器
-- `v0.1.1122` 2026-07-10 — fix(venue): 匿名の大群がたぬ姉段の壁になるのを解消
-- `v0.1.1121` 2026-07-10 — fix(venue): 白い大パネルを解消=カード背景を行単位に
-- `v0.1.1120` 2026-07-10 — feat(venue): 会場から案内バナー等の文章を除去
-- `v0.1.1119` 2026-07-10 — feat(venue): 会場の段を①と同じ見た目に
-- `v0.1.1118` 2026-07-10 — feat(venue): ①が解決済みの顔を会場にも共有
-- `v0.1.1117` 2026-07-10 — fix(venue): 会場の白円サムネを根治=①と同じ顔規則
-- `v0.1.1116` 2026-07-10 — feat(diag): 会場の白円サムネを数える計器
-- `v0.1.1113` 2026-07-10 — feat(diag): 会場一致を実DOMで判定(3点一致)
-- `v0.1.1112` 2026-07-08 — feat(venue): 会場の5段を①と厳密一致+ロビー新設
-- `v0.1.1111` 2026-07-08 — feat(venue): 会場の顔ぶれを応援レーンと完全一致
-- `v0.1.1110` 2026-07-08 — fix(venue): 会場の記名サムネ白円を根治
-- `v0.1.1109` 2026-07-08 — fix(lane): 大配信backfillのアバター暫定固着を根治
-- `v0.1.1099` 2026-07-06 — feat(score): popupに採点パネル+ハイライト台帳
-- `v0.1.1092` 2026-07-06 — feat(lane): コメント即時プッシュで重負荷でも表示即時
-- `v0.1.1083` 2026-07-06 — fix(post): 送信5秒締切+自コメ取り消しの厳格化
-- `v0.1.1077` 2026-07-05 — ボイス空振り消費とpayout張り付き修正
-- `v0.1.1055` 2026-07-04 — 診断シートの網羅漏れ2件を修正+ギフト診断を数値化
-- `v0.1.1052` 2026-07-04 — 応援レーンの人数表示ズレ(埋め込み211人≠公開ページ99人)を修正
-- `v0.1.1051` 2026-07-04 — 応援レーン(埋め込み)の表示上限を48人→200人に拡大
-- `v0.1.1050` 2026-07-03 — 状態速報のパリティ判定に会場(④)を追加=POPと会場の人数ズレを検知
-- `v0.1.1049` 2026-07-03 — サムネ持ちは大きく・匿名は小さく詰めて表示(応援レーン/会場)
-- `v0.1.1048` 2026-07-03 — 応援レーン描画の所要時間を状態速報に計測(全員表示の準備・観測のみ)
-- `v0.1.1047` 2026-07-03 — 会場を応援レーン段組みに統一(第1段=りんく/こん太/たぬ姉)
-- `v0.1.1042` 2026-07-02 — ギフト/広告列のタイル出入りちらつきを根治
-- `v0.1.1041` 2026-07-02 — 取込中に応援レーンのタイルが出入りするのを根治
-- `v0.1.1040` 2026-07-02 — 応援レーンの段別再描画回数を状態速報に追加
-- `v0.1.1039` 2026-07-02 — 応援レーン(アイコン列)のちらつきを根治
-- `v0.1.1037` 2026-07-02 — 重い配信で応援レーンがちかちかするのを根治
-- `v0.1.1036` 2026-07-02 — 応援プレビュー/WEBの数字ズレを同一tick化で根治
-- `v0.1.1035` 2026-07-01 — 応援レーンの全員表示を「開いた初回」から効くようにした
-- `v0.1.1034` 2026-07-01 — 重い配信で応援レーンに全員が出ない不具合を根治
-- `v0.1.1033` 2026-07-01 — 応援レーンが少なすぎる原因を状態速報で分かるようにした(計器)
-- `v0.1.1027` 2026-07-01 — 「同一でない」の誤検知(嘘の🔴)を保留に格下げして根治
-- `v0.1.1024` 2026-07-01 — 応援プレビューで応援者ランキングが空になる不具合を根治
-- `v0.1.1022` 2026-07-01 — 応援プレビューが3秒ごとにチカチカ明滅する不具合を根治
-- `v0.1.1021` 2026-07-01 — 応援レーンが描画済みでもローディングが終わらないバグを根治
-- `v0.1.1019` 2026-07-01 — 応援プレビューの数字を①ポップアップと同じ鏡に揃えた
-- `v0.1.1017` 2026-07-01 — 応援レーン・コメントの①POP=③WEB一致を自動チェック
-- `v0.1.1014` 2026-06-30 — 貢献度・広告ランキングが純Web側に出ない不具合を根治
-- `v0.1.1006` 2026-06-30 — 匿名主体の配信で応援レーンを赤誤報しない
-- `v0.1.997` 2026-06-29 — 状態速報に完全性スコア(網羅診断)を追加
-- `v0.1.992` 2026-06-29 — 記録・同接・来場の数字カードを確実に表示
-- `v0.1.991` 2026-06-29 — 応援レーン(アイコン列)を重い処理待ちせず表示
-- `v0.1.990` 2026-06-29 — 貢献度・広告が鏡に出ない真因を根治
-- `v0.1.989` 2026-06-29 — レーン描画を確実に起動(タイマー詰まり対策)
-- `v0.1.988` 2026-06-29 — 複数配信視聴時のレーン未描画と誤診断を修正
-- `v0.1.987` 2026-06-29 — 描けたのにローディングが終わらない不具合を修正
-- `v0.1.986` 2026-06-29 — レーンが出ない真因を根治(配信IDの解決)
-- `v0.1.982` 2026-06-28 — 白くなる状態を状態速報で一発表示
-- `v0.1.980` 2026-06-28 — 状態速報に「描画が出ない時の対処」を明記
-- `v0.1.979` 2026-06-28 — 応援レーンも重い処理待ちせず鏡から表示
-- `v0.1.978` 2026-06-28 — 貢献度・広告ランキングを開いた直後に表示
-- `v0.1.977` 2026-06-28 — 貢献度・広告ランキングを重い処理待ちせず表示
-- `v0.1.976` 2026-06-28 — 応援レーンを重い読み込みの前に描画
-- `v0.1.974` 2026-06-28 — 内部整理: 応援レーン再描画判定をlib抽出
-- `v0.1.965` 2026-06-27 — 応援プレビューでも貢献度・広告ランキングを鏡から表示
-- `v0.1.964` 2026-06-27 — 「描画済みなのにローディング継続」の誤検知を解消
-- `v0.1.962` 2026-06-27 — 応援プレビューを開いた瞬間の重さを解消(コメントは鏡から描く)
-- `v0.1.958` 2026-06-26 — 状態速報の冒頭に「この診断の信頼性」を追加
-- `v0.1.956` 2026-06-26 — 純Web応援ライブビューの全レーンを揃えて表示
-- `v0.1.955` 2026-06-26 — 状態速報に「応援レーン描画の自己診断」を追加
-- `v0.1.951` 2026-06-26 — 応援プレビューに応援レーンと貢献度/広告ランキングを表示
-- `v0.1.948` 2026-06-26 — 状態速報を軽量化(鏡を撤去・配信ごとに表示)
-- `v0.1.942` 2026-06-25 — 共有URLのWeb版を、拡張のポップアップ「まるごとコピー」に作り直し
-- `v0.1.939` 2026-06-25 — 共有URLのWeb版に「数字カード」をポップアップそっくり追加
-- `v0.1.937` 2026-06-25 — 応援者ランキングを顔つき(サムネ・ID・名前・リンク)で表示
-- `v0.1.933` 2026-06-25 — WEBサイトURL案内を押せるリンク化+応援ライブビュー導線
-- `v0.1.932` 2026-06-23 — スマホ送信後に応援レーンWeb版のURLも案内
-- `v0.1.931` 2026-06-23 — 応援レーンを拡張なしのWebでも見られるように(スマホ送信に相乗り)
-- `v0.1.930` 2026-06-23 — 状態速報ページが重い問題を改善(巨大な診断データを毎回読まない)
-- `v0.1.928` 2026-06-23 — 応援ライブビューのりんく列・ギフト列をポップアップと同じ顔タイルに統一
-- `v0.1.927` 2026-06-23 — 配信していないのに状態速報に古い応援レーン・数字カードが残る問題を修正
-- `v0.1.924` 2026-06-23 — 状態速報ページが重い問題を改善(毎回の読み込みを削減)
-- `v0.1.914` 2026-06-23 — 応援レーン鏡のフッター件数をpopupと一致
-- `v0.1.913` 2026-06-23 — 応援ライブビューに応援レーン・数字カードの鏡を追加
-- `v0.1.912` 2026-06-23 — 状態速報に数字カード(記録・同接・来場・公式)の鏡を追加
-- `v0.1.911` 2026-06-23 — 状態速報に応援レーンを顔つきでそっくり映す鏡を追加
-- `v0.1.910` 2026-06-22 — 状態速報が重くなったのを修正(応援レーンセルの読込を間引きに)
-- `v0.1.909` 2026-06-22 — 健全度パネルに応援レーンの人数整合セルを追加
-- `v0.1.908` 2026-06-22 — レーンの件数を正直に表示+広告列のサムネ化け修正
-- `v0.1.900` 2026-06-22 — 会場の席をポップアップの「アイコン列」と同じ本物の描画で表示する
-- `v0.1.888` 2026-06-22 — 公式値レーン(貢献度/広告/ギフト履歴等)が出ない・遅い問題を根治
-- `v0.1.884` 2026-06-21 — 応援ライブビューの応援者ランキングを本物の描画に統一
-- `v0.1.882` 2026-06-21 — 公式値レーン(貢献度/広告)を開いた瞬間に出るよう高速化
-- `v0.1.880` 2026-06-21 — 応援ライブビューにギフト履歴レーンを追加(完全コピー)
-- `v0.1.879` 2026-06-21 — 応援ライブビューに公式値レーンを追加(完全コピー)
-- `v0.1.877` 2026-06-21 — 応援ライブビューを popup の本物のHTML/CSSで完全コピー
-- `v0.1.876` 2026-06-21 — 応援者を popup 非依存で自前集計=popup無しでも応援者が出る
-- `v0.1.875` 2026-06-21 — 応援ライブビューにりんく列・ギフト列(popup の全レーン)を再現
-- `v0.1.873` 2026-06-21 — 応援ライブビュー先頭に配信者タイル(popup と同じ見た目)
-- `v0.1.872` 2026-06-21 — 応援ライブビューの応援者をpopup風タイル(アイコン+件数)に
-- `v0.1.860` 2026-06-21 — 匿名主体の偽の赤と「既知0を空」表示を解消(診断の正直化)
-- `v0.1.856` 2026-06-21 — 「これを共有すれば原因が全部わかる」大ボタンを最上部に
-- `v0.1.849` 2026-06-20 — イベント順位/スコアの黄と「レーンが空」誤報を解消
-- `v0.1.845` 2026-06-20 — 健全度パネル: 取得中は青で「順調」に
-- `v0.1.844` 2026-06-20 — 状態速報のレーン件数を正確に
-- `v0.1.843` 2026-06-20 — 状態ページ先頭に健全度パネルを追加
-- `v0.1.836` 2026-06-20 — 匿名コメントの記録を救済(第1歩)
-- `v0.1.835` 2026-06-20 — 自己検証ゲートを追加(版同期+診断文言)
-- `v0.1.834` 2026-06-20 — 「他配信DOM混入」の誤警告と誤解文言を是正
-- `v0.1.832` 2026-06-20 — 「はじめての方へ」をLPと同じキャラ吹き出し会話に
-- `v0.1.828` 2026-06-20 — ポップアップを開くだけで状態ページに診断が集約
-- `v0.1.824` 2026-06-18 — 状態速報に「症状→原因→次の一手」対処カードを追加
-- `v0.1.823` 2026-06-18 — 状態速報に全体マインドマップを追加(1枚で俯瞰)
-- `v0.1.822` 2026-06-18 — 状態速報に popup 固有診断を集約(ここで全部わかる)
-- `v0.1.821` 2026-06-18 — AI診断の popup 固有情報を状態速報へ集約(土台)
-- `v0.1.820` 2026-06-18 — コメント行の受理判定を共通部品に整理(挙動不変)
-- `v0.1.818` 2026-06-17 — 会場の席と応援アイコンのリンク基準を統一(顔ぶれ一致の土台)
-- `v0.1.817` 2026-06-17 — 応援アイコンのタイル描画を共通部品に整理(見た目不変・土台整備)
-- `v0.1.816` 2026-06-17 — 人物情報のまとめ役を内部に新設(挙動は変わりません・土台整備)
-- `v0.1.813` 2026-06-17 — コメント多い配信での重さ(スクロール/描画)を軽減
-- `v0.1.807` 2026-06-17 — 応援アイコン列・マーケ分析の人物情報を回復
-- `v0.1.803` 2026-06-17 — 匿名コメントを会場・レーンへ戻す
-- `v0.1.789` 2026-06-17 — 会場の参加者をレーンと一致(レーンを鏡のように映す)
-- `v0.1.775` 2026-06-16 — 自分のコメントを応援アイコン列にも表示
-- `v0.1.774` 2026-06-16 — 送信・画面が重い性能問題を改善＋記録数を配信者コメ除外に
-- `v0.1.769` 2026-06-16 — コメントがほとんど記録されない/レーンが空になる詰まりを根治
-- `v0.1.766` 2026-06-16 — 状態速報の概要に「公式値レーンの状況」を追加
-- `v0.1.717` 2026-06-13 — 会場のセリフを大きく・隠れないように
-- `v0.1.709` 2026-06-13 — 会場モードに参加者全員を表示
-- `v0.1.707` 2026-06-13 — ニコ生に会場モードを追加
-- `v0.1.704` 2026-06-13 — 匿名の顔アバターをパーツ合成へ更新
-- `v0.1.687` 2026-06-11 — ランキング等のレーンを即時非表示→データで即表示に
-- `v0.1.673` 2026-06-10 — コメビュの名前をパネルと同じ情報源で補完
-- `v0.1.670` 2026-06-10 — コメビュのアイコンを本家と同じサムネに
+### ⚡ 描画・性能 (2版)
+- `v0.1.1500` 2026-09-02 — 診断ページで会場も見られます
+- `v0.1.1498` 2026-08-31 — 間違った警告を出していたのをやめました
 
-### 🩺 診断・状態速報 (219版)
-- `v0.1.1276` 2026-08-06 — コメント送信が遅い原因を取り除きました
-- `v0.1.1256` 2026-08-05 — パネルを消している犯人を名指しする計器を入れました
-- `v0.1.1254` 2026-08-04 — パネルが消えたまま戻らなくなる不具合を直しました
-- `v0.1.1251` 2026-08-04 — 応援タイルが一瞬で3枚まで減る症状を止めました
-- `v0.1.1250` 2026-08-04 — パネルが4秒ごとに一瞬消えるちらつきを止めました
-- `v0.1.1249` 2026-08-04 — アイコンが消える不具合の、消えない側への作り替え
-- `v0.1.1248` 2026-08-04 — 画面のちらつきと「発言がありません」を直しました
-- `v0.1.1245` 2026-08-03 — WEB共有のキーを、拡張の中に埋め込まない方式に変えました（重要）
-- `v0.1.1243` 2026-08-03 — ストア提出物に会場モード等のページが入っていなかったのを修正
-- `v0.1.1242` 2026-08-03 — WEB公開を「自分でONにしたときだけ」に変更しました(重要)
-- `v0.1.1241` 2026-08-03 — 診断の「会場と①が違う」「タイルが固まっている」の誤警告を2つとも修正
-- `v0.1.1240` 2026-08-03 — 診断の「タイルが消える」警告が誤って出ていたのを修正
-- `v0.1.1238` 2026-08-03 — 会場を大幅に軽くしました(匿名の方の顔の作り方を変更)
-- `v0.1.1237` 2026-08-03 — 会場を閉じてもメモリが戻らない問題と、診断ページの初回待ちを改善
-- `v0.1.1236` 2026-08-03 — 診断が「会場に届いていない」と誤って知らせていたのを修正
-- `v0.1.1230` 2026-08-02 — 会場にピックアップ枠+診断ページの上下ブレを修正
-- `v0.1.1229` 2026-08-02 — レーンが出たり消えたりする原因を特定する計器
-- `v0.1.1225` 2026-08-01 — 読み上げの速度調整が効き始める条件をゆるめた
-- `v0.1.1222` 2026-08-01 — 古い状態速報を黙って渡さない+混雑時の読み上げ速度
-- `v0.1.1213` 2026-08-01 — 読み上げが「読まれずに消えた件数」を数えるようにしました
-- `v0.1.1212` 2026-08-01 — 会場と①の「幾何差」が本物か測り方の問題かを見分ける計器を追加
-- `v0.1.1211` 2026-08-01 — 状態速報に「popup起動から何秒後の値か」を明記
-- `v0.1.1208` 2026-08-01 — アイコングリッドの動きを実測する計器を追加
-- `v0.1.1207` 2026-08-01 — 会場モードの立ち上がりの遅さを切り分ける計器を追加
-- `v0.1.1204` 2026-07-31 — 拡張が重くなる原因を解消(v0.1.1201の不具合)
-- `v0.1.1198` 2026-07-31 — 会場を開いたときの誤った「白化」警告を解消
-- `v0.1.1197` 2026-07-31 — 記録件数が多すぎる原因の切り分け計器を追加
-- `v0.1.1196` 2026-07-31 — スクロール白化の原因が状態速報から読めるように
-- `v0.1.1194` 2026-07-31 — ギフト演出の診断精度を改善
-- `v0.1.1189` 2026-07-28 — 会場読み上げの遅延の内訳を診断できるように
-- `v0.1.1186` 2026-07-25 — 状態速報の診断計器を強化(表示のみ)
-- `v0.1.1185` 2026-07-24 — 状態速報の診断計器を強化(表示のみ)
-- `v0.1.1183` 2026-07-24 — 状態速報の表示文言を修正
-- `v0.1.1180` 2026-07-24 — 会場読み上げの診断を強化
-- `v0.1.1179` 2026-07-21 — 公開データ同期と会場表示の診断を強化
-- `v0.1.1178` 2026-07-20 — 診断の誤検知を修正
-- `v0.1.1177` 2026-07-20 — 応援アイコンの表示診断を強化
-- `v0.1.1175` 2026-07-20 — 会場の顔アイコン診断を強化
-- `v0.1.1172` 2026-07-18 — サムネ表示の安定化に向けた計器を追加
-- `v0.1.1162` 2026-07-16 — 状態速報の異常な数値表示・誤った警告表示を修正
-- `v0.1.1154` 2026-07-15 — 会場の「名前ありゆっくり顔」の原因を見つけやすくする診断を追加
-- `v0.1.1152` 2026-07-15 — 会場のリンク不具合を見つけやすくする診断を追加
-- `v0.1.1150` 2026-07-15 — 大規模配信で状態速報ページが固まりやすい不具合を軽減
-- `v0.1.1143` 2026-07-14 — 状態速報が大規模配信時に固まる不具合を修正
-- `v0.1.1140` 2026-07-14 — 状態速報の自己診断を強化(内部計器)
-- `v0.1.1137` 2026-07-14 — 会場一致判定に鏡世代の突合を追加(診断強化のみ)
-- `v0.1.1135` 2026-07-14 — スクロール白化の真犯人を特定する診断を追加
-- `v0.1.1133` 2026-07-13 — fix(venue): 会場の案内文言・診断パネルを①と完全一致に
-- `v0.1.1128` 2026-07-11 — fix(venue): 会場中の点滅を根治(引っ越し凍結)
-- `v0.1.1126` 2026-07-10 — feat(venue): 会場に①の詳しい状況を転写
-- `v0.1.1125` 2026-07-10 — feat(diag): ちかちか計器を状態速報で読める化+盲点2経路
-- `v0.1.1124` 2026-07-10 — feat(diag): パネル引っ越し(=リロード)の実測計器
-- `v0.1.1123` 2026-07-10 — feat(diag): ローディング/描画未起動の実測計器
-- `v0.1.1122` 2026-07-10 — fix(venue): 匿名の大群がたぬ姉段の壁になるのを解消
-- `v0.1.1117` 2026-07-10 — fix(venue): 会場の白円サムネを根治=①と同じ顔規則
-- `v0.1.1116` 2026-07-10 — feat(diag): 会場の白円サムネを数える計器
-- `v0.1.1114` 2026-07-10 — feat(venue): 額縁フレーム(四辺のキャラ顔)を廃止
-- `v0.1.1113` 2026-07-10 — feat(diag): 会場一致を実DOMで判定(3点一致)
-- `v0.1.1112` 2026-07-08 — feat(venue): 会場の5段を①と厳密一致+ロビー新設
-- `v0.1.1111` 2026-07-08 — feat(venue): 会場の顔ぶれを応援レーンと完全一致
-- `v0.1.1102` 2026-07-07 — perf(liveview): 公開書込12秒間隔+容量上限で削減
-- `v0.1.1091` 2026-07-06 — ギフト音が静かに消える取りこぼしを根治
-- `v0.1.1089` 2026-07-06 — feat(diag): 自コメの実着までの感度を計測
-- `v0.1.1088` 2026-07-06 — feat(diag): 読み上げ/ギフトの体感遅延を実測計器化
-- `v0.1.1087` 2026-07-06 — perf(status): 変化なしpublishのset省略
-- `v0.1.1086` 2026-07-06 — perf(status): 幽霊read抑止のin-flightガード
-- `v0.1.1085` 2026-07-06 — perf(status): extras読取を1バッチget化
-- `v0.1.1084` 2026-07-06 — perf(status): マイ効果音計器のBlob全件走査を廃止
-- `v0.1.1078` 2026-07-05 — 実物音源のローカル自動同梱+自動割当
-- `v0.1.1077` 2026-07-05 — ボイス空振り消費とpayout張り付き修正
-- `v0.1.1075` 2026-07-05 — パチンコBGMを既定ONに変更
-- `v0.1.1074` 2026-07-05 — BGMディレクター+盛り上がり相対閾値
-- `v0.1.1072` 2026-07-05 — マイ効果音計器をextrasに追加
-- `v0.1.1071` 2026-07-05 — マイ効果音差し替え(IndexedDB取込+割当)
-- `v0.1.1069` 2026-07-04 — パチンコ文法準拠へ効果音を全面刷新
-- `v0.1.1068` 2026-07-04 — ギフト音をパチンコ電子音(きゅいん)に一新+即発音
-- `v0.1.1067` 2026-07-04 — 診断ページに効果音の試聴パネルを追加(開発用)
-- `v0.1.1065` 2026-07-04 — 会場読み上げに計器と固着回復を追加
-- `v0.1.1060` 2026-07-04 — パチンコ的な盛り上がり演出の土台を新設
-- `v0.1.1058` 2026-07-04 — ギフト取りこぼし修正+コメント数マイルストーン診断を新設
-- `v0.1.1057` 2026-07-04 — ギフト診断の対処候補への統合漏れを修正+内部構造の整理
-- `v0.1.1056` 2026-07-04 — ①POPと②応援プレビューの数値ズレを世代番号で検知
-- `v0.1.1055` 2026-07-04 — 診断シートの網羅漏れ2件を修正+ギフト診断を数値化
-- `v0.1.1054` 2026-07-04 — コメント数の節目に効果音を追加+診断シート強化
-- `v0.1.1052` 2026-07-04 — 応援レーンの人数表示ズレ(埋め込み211人≠公開ページ99人)を修正
-- `v0.1.1050` 2026-07-03 — 状態速報のパリティ判定に会場(④)を追加=POPと会場の人数ズレを検知
-- `v0.1.1048` 2026-07-03 — 応援レーン描画の所要時間を状態速報に計測(全員表示の準備・観測のみ)
-- `v0.1.1046` 2026-07-03 — 大きめ配信で状態速報が固まる不具合を修正(計器readを間引き側へ)
-- `v0.1.1045` 2026-07-03 — 過去ログ取得が遅い真因を切り分ける走行中計器を追加(観測のみ)
-- `v0.1.1044` 2026-07-02 — 会場座席「更新◯秒前」が約56年前と誤表示される不具合を修正
-- `v0.1.1043` 2026-07-02 — 会場席の網羅状況を状態速報に計器追加
-- `v0.1.1040` 2026-07-02 — 応援レーンの段別再描画回数を状態速報に追加
-- `v0.1.1037` 2026-07-02 — 重い配信で応援レーンがちかちかするのを根治
-- `v0.1.1033` 2026-07-01 — 応援レーンが少なすぎる原因を状態速報で分かるようにした(計器)
-- `v0.1.1030` 2026-07-01 — 会場モードに「🩺 会場の状態」診断パネルを追加した
-- `v0.1.1027` 2026-07-01 — 「同一でない」の誤検知(嘘の🔴)を保留に格下げして根治
-- `v0.1.1026` 2026-07-01 — 広告列の出たり消えたりでグリッドが揺れる不具合を根治
-- `v0.1.1025` 2026-07-01 — 応援プレビューが空でも「同一」と誤表示する嘘を根治
-- `v0.1.1023` 2026-07-01 — 応援プレビューを開くと診断が激重・真っ白になる根治
-- `v0.1.1020` 2026-07-01 — 応援プレビューが原因で診断が重いことを自動で表示
-- `v0.1.1017` 2026-07-01 — 応援レーン・コメントの①POP=③WEB一致を自動チェック
-- `v0.1.1016` 2026-07-01 — ③WEB公開を配信中に自動更新(手押し不要)
-- `v0.1.1015` 2026-07-01 — 応援プレビューに3画面パリティのバッジを表示
-- `v0.1.1013` 2026-06-30 — 複数配信同時の重さと二重記録の再発を緩和・根治
-- `v0.1.1011` 2026-06-30 — 大きい配信で集計が0件になる不具合を修正
-- `v0.1.1010` 2026-06-30 — 取り込み中の状態速報の更新を所要比例で間引き
-- `v0.1.1009` 2026-06-30 — 過去ログ取り込み中の状態速報の重さを緩和
-- `v0.1.1005` 2026-06-30 — 更新の所要時間(計器)を状態速報の本文に追加
-- `v0.1.1002` 2026-06-30 — 記録>本家の内訳(欠落割合)を実際に表示
-- `v0.1.1001` 2026-06-30 — 記録>本家コメの内訳(欠落行割合)を表示
-- `v0.1.1000` 2026-06-29 — 貢献度ランキングの「不一致」誤検知を解消
-- `v0.1.999` 2026-06-29 — 過去ログ取得の速度を状態速報に表示
-- `v0.1.997` 2026-06-29 — 状態速報に完全性スコア(網羅診断)を追加
-- `v0.1.996` 2026-06-29 — 状態速報にスクロール白化の診断を表示
-- `v0.1.995` 2026-06-29 — 状態速報に応援コメントの本文を表示
-- `v0.1.994` 2026-06-29 — 応援ライブビュー・WEBにも状態速報
-- `v0.1.993` 2026-06-29 — 内部整理: 状態速報の生成を共有部品に
-- `v0.1.988` 2026-06-29 — 複数配信視聴時のレーン未描画と誤診断を修正
-- `v0.1.985` 2026-06-29 — 状態速報の先頭に「3画面パリティ」総合判定
-- `v0.1.984` 2026-06-29 — 状態速報に拡張バージョンを表示
-- `v0.1.982` 2026-06-28 — 白くなる状態を状態速報で一発表示
-- `v0.1.980` 2026-06-28 — 状態速報に「描画が出ない時の対処」を明記
-- `v0.1.975` 2026-06-28 — コピーが効かない問題を根治
-- `v0.1.972` 2026-06-28 — 内部整理: 取得状況サマリの生成をlib抽出
-- `v0.1.970` 2026-06-28 — 内部整理: 診断グラフの組立をlib抽出
-- `v0.1.966` 2026-06-27 — ランキング件数の「拡張≠鏡」1件差の誤警告を解消
-- `v0.1.964` 2026-06-27 — 「描画済みなのにローディング継続」の誤検知を解消
-- `v0.1.959` 2026-06-26 — 「数字の出どころ」に正常/要確認の判定を追加
-- `v0.1.958` 2026-06-26 — 状態速報の冒頭に「この診断の信頼性」を追加
-- `v0.1.957` 2026-06-26 — 状態速報に「数字の出どころ」を追加
-- `v0.1.955` 2026-06-26 — 状態速報に「応援レーン描画の自己診断」を追加
-- `v0.1.954` 2026-06-26 — 純Web公開コピーの自己診断の「コピー漏れ」誤検知を修正
-- `v0.1.953` 2026-06-26 — 状態速報に純Web公開コピーの自己診断を追加
-- `v0.1.949` 2026-06-26 — 応援プレビューを裏タブで一時停止して診断を軽く
-- `v0.1.948` 2026-06-26 — 状態速報を軽量化(鏡を撤去・配信ごとに表示)
-- `v0.1.945` 2026-06-25 — 応援ライブビュー上に「WEBでも公開する」ボタン
-- `v0.1.943` 2026-06-25 — WEBサイトURL共有でポップアップそっくりを開く
-- `v0.1.937` 2026-06-25 — 応援者ランキングを顔つき(サムネ・ID・名前・リンク)で表示
-- `v0.1.936` 2026-06-25 — WEBサイトURLで見るを配信カード内に移動(UIUX)
-- `v0.1.935` 2026-06-25 — 暖色パステルをWeb版にも展開+カードの枠を見やすく
-- `v0.1.934` 2026-06-25 — 診断ページを明るい暖色パステルに刷新(DESIGN.md 導入)
-- `v0.1.933` 2026-06-25 — WEBサイトURL案内を押せるリンク化+応援ライブビュー導線
-- `v0.1.932` 2026-06-23 — スマホ送信後に応援レーンWeb版のURLも案内
-- `v0.1.931` 2026-06-23 — 応援レーンを拡張なしのWebでも見られるように(スマホ送信に相乗り)
-- `v0.1.930` 2026-06-23 — 状態速報ページが重い問題を改善(巨大な診断データを毎回読まない)
-- `v0.1.927` 2026-06-23 — 配信していないのに状態速報に古い応援レーン・数字カードが残る問題を修正
-- `v0.1.926` 2026-06-23 — Alt+Tabに出ない「裏タブ」を状態速報で検知して閉じられるように
-- `v0.1.925` 2026-06-23 — 「視聴中の配信」の誤表示を修正+コメント送信の感度を診断に追加
-- `v0.1.924` 2026-06-23 — 状態速報ページが重い問題を改善(毎回の読み込みを削減)
-- `v0.1.923` 2026-06-23 — スクロール時の白化を診断で観測できるように
-- `v0.1.917` 2026-06-23 — status の popup埋め込みを緊急停止(タブ自動オープン疑い)
-- `v0.1.916` 2026-06-23 — status に popup をiframeで丸ごと埋め込み(試作)
-- `v0.1.915` 2026-06-23 — status埋め込み土台=受動popupモード追加
-- `v0.1.914` 2026-06-23 — 応援レーン鏡のフッター件数をpopupと一致
-- `v0.1.913` 2026-06-23 — 応援ライブビューに応援レーン・数字カードの鏡を追加
-- `v0.1.912` 2026-06-23 — 状態速報に数字カード(記録・同接・来場・公式)の鏡を追加
-- `v0.1.911` 2026-06-23 — 状態速報に応援レーンを顔つきでそっくり映す鏡を追加
-- `v0.1.910` 2026-06-22 — 状態速報が重くなったのを修正(応援レーンセルの読込を間引きに)
-- `v0.1.909` 2026-06-22 — 健全度パネルに応援レーンの人数整合セルを追加
-- `v0.1.904` 2026-06-22 — 状態速報ページが「何があっても開く」保険を追加(重くて開かない対策)
-- `v0.1.902` 2026-06-22 — 健全度パネルに会場座席セル(配信者混入・会場の固まり検知)を追加
-- `v0.1.900` 2026-06-22 — 会場の席をポップアップの「アイコン列」と同じ本物の描画で表示する
-- `v0.1.895` 2026-06-22 — 読み上げが止まったまま戻らない固着を自動回復+停止位置の計器
-- `v0.1.894` 2026-06-22 — 健全度パネルに会場モード読み上げのセルを追加
-- `v0.1.893` 2026-06-22 — 終了した配信が0%になる原因の切り分け計器を追加
-- `v0.1.892` 2026-06-22 — 過去ログ取得が進まない箇所の細分計器を追加
-- `v0.1.891` 2026-06-22 — 過去ログ取得が始まらない原因の計器を追加(真因特定用)
-- `v0.1.890` 2026-06-22 — 状態ページを軽量化(無駄な再生成を止める)+更新時間を表示
-- `v0.1.889` 2026-06-22 — 「貢献度ランキング」を「ギフト貢献度」に改称(広告ptと別物)
-- `v0.1.887` 2026-06-22 — 「取得率が下がり続けています」の誤った黄色を抑止(追いつき中は正常)
-- `v0.1.885` 2026-06-22 — 取得中の配信に「取得率が低い」の黄色を出さないように
-- `v0.1.870` 2026-06-21 — ちくらん/診断タブを上部ナビに移動(地図リンクと同列)
-- `v0.1.869` 2026-06-21 — 診断ページにちくらんタブ+カードクリックで応援者ランキング
-- `v0.1.867` 2026-06-21 — 状態ページが重い/開かないを並行読込で改善
-- `v0.1.866` 2026-06-21 — 診断の配信カードをちくらん風(サムネ+来場+コメント+ギフト)に
-- `v0.1.865` 2026-06-21 — 診断画面に応援者ランキング(ちくらん風)を追加
-- `v0.1.864` 2026-06-21 — 診断ページの各配信から放送へ行けるボタンを追加
-- `v0.1.860` 2026-06-21 — 匿名主体の偽の赤と「既知0を空」表示を解消(診断の正直化)
-- `v0.1.859` 2026-06-21 — レポートの「コメントした人」を正本に統一+数字の食い違いを自動検知
-- `v0.1.858` 2026-06-21 — レポートの中身を保存前に状態速報で確認(プレビュー)
-- `v0.1.857` 2026-06-21 — 配布版では開発用の診断エクスポートを隠す(プライバシー)
-- `v0.1.856` 2026-06-21 — 「これを共有すれば原因が全部わかる」大ボタンを最上部に
-- `v0.1.855` 2026-06-21 — 「記録中の配信0件」誤報と読み込み中固着の理由表示を修正
-- `v0.1.854` 2026-06-21 — パネルが白/ローディング固着を状態速報で分かるように
-- `v0.1.852` 2026-06-21 — 会場モードの読み上げ状況を状態速報に表示(遅延の切り分け用)
-- `v0.1.847` 2026-06-20 — 状態ページが一部の不具合で全部消えないように
-- `v0.1.846` 2026-06-20 — 健全度パネルに総合判定「異常なし✓」
-- `v0.1.844` 2026-06-20 — 状態速報のレーン件数を正確に
-- `v0.1.840` 2026-06-20 — 機能逆引き地図を全ファイル網羅に
-- `v0.1.839` 2026-06-20 — 記録件数の表示の正本を1本に固定(第1)
-- `v0.1.837` 2026-06-20 — ギフト送信者の文字化け表示を抑止
-- `v0.1.835` 2026-06-20 — 自己検証ゲートを追加(版同期+診断文言)
-- `v0.1.834` 2026-06-20 — 「他配信DOM混入」の誤警告と誤解文言を是正
-- `v0.1.833` 2026-06-20 — 全地図とstatusに共通ナビを追加
-- `v0.1.830` 2026-06-20 — 状態ページ先頭に「はじめての方へ」みちしるべを追加
-- `v0.1.829` 2026-06-20 — AI共有テキストに「まるごとコピー」ボタンを追加
-- `v0.1.828` 2026-06-20 — ポップアップを開くだけで状態ページに診断が集約
-- `v0.1.827` 2026-06-20 — 状態ページに「コードの地図を開く」ボタンを追加
-- `v0.1.826` 2026-06-19 — 多タブで重い時に「タブを絞ると軽い」と案内
-- `v0.1.825` 2026-06-19 — 記録された内部エラーを状態速報の対処カードに集約
-- `v0.1.824` 2026-06-18 — 状態速報に「症状→原因→次の一手」対処カードを追加
-- `v0.1.823` 2026-06-18 — 状態速報に全体マインドマップを追加(1枚で俯瞰)
-- `v0.1.822` 2026-06-18 — 状態速報に popup 固有診断を集約(ここで全部わかる)
-- `v0.1.821` 2026-06-18 — AI診断の popup 固有情報を状態速報へ集約(土台)
-- `v0.1.805` 2026-06-17 — 状態のローカル保存ダイアログ連発を停止
-- `v0.1.804` 2026-06-17 — 記録件数がまた減るのを根治
-- `v0.1.802` 2026-06-17 — 状態のローカル保存がSWで書けない不具合を修正
-- `v0.1.801` 2026-06-17 — 過去配信キャッシュの溜め込みを抑え軽量化
-- `v0.1.798` 2026-06-17 — 状態を司令塔がローカル確認できる仕組みを追加
-- `v0.1.797` 2026-06-17 — 状態ページが重くて開かない問題を解消
-- `v0.1.794` 2026-06-17 — 状態速報に過去ログ取り込み中の表示を追加
-- `v0.1.792` 2026-06-17 — 記録件数が増えてから減る表示を止めた
-- `v0.1.791` 2026-06-17 — 記録が追いつく途中を「追いつき中」と明示
-- `v0.1.787` 2026-06-17 — 画面が固まる原因の計測を追加+重い診断ビルドを空き時間へ
-- `v0.1.766` 2026-06-16 — 状態速報の概要に「公式値レーンの状況」を追加
-- `v0.1.762` 2026-06-16 — 過去ログが途中(数%)で止まる真因を根治(入口の鮮度)
-- `v0.1.738` 2026-06-14 — 診断パネルを閉じやすく＋掴めるカーソルの誤解を解消
-- `v0.1.735` 2026-06-14 — 診断の「サムネ持ち」数が実際の席表示と一致するように修正
-- `v0.1.693` 2026-06-11 — 左下の記録監視オーバーレイを既定で非表示に
-
-### 🗺 地図・ドキュメント (13版)
-- `v0.1.983` 2026-06-28 — 地図ページに「← 戻る」を共通設置
-- `v0.1.870` 2026-06-21 — ちくらん/診断タブを上部ナビに移動(地図リンクと同列)
-- `v0.1.856` 2026-06-21 — 「これを共有すれば原因が全部わかる」大ボタンを最上部に
-- `v0.1.855` 2026-06-21 — 「記録中の配信0件」誤報と読み込み中固着の理由表示を修正
-- `v0.1.847` 2026-06-20 — 状態ページが一部の不具合で全部消えないように
-- `v0.1.841` 2026-06-20 — 修正系譜マップ(再発防止)を地図に追加
-- `v0.1.840` 2026-06-20 — 機能逆引き地図を全ファイル網羅に
-- `v0.1.833` 2026-06-20 — 全地図とstatusに共通ナビを追加
-- `v0.1.832` 2026-06-20 — 「はじめての方へ」をLPと同じキャラ吹き出し会話に
-- `v0.1.830` 2026-06-20 — 状態ページ先頭に「はじめての方へ」みちしるべを追加
-- `v0.1.827` 2026-06-20 — 状態ページに「コードの地図を開く」ボタンを追加
-- `v0.1.825` 2026-06-19 — 記録された内部エラーを状態速報の対処カードに集約
-- `v0.1.823` 2026-06-18 — 状態速報に全体マインドマップを追加(1枚で俯瞰)
-
-### 🧊 storage安定 (6版)
-- `v0.1.1083` 2026-07-06 — fix(post): 送信5秒締切+自コメ取り消しの厳格化
-- `v0.1.1020` 2026-07-01 — 応援プレビューが原因で診断が重いことを自動で表示
-- `v0.1.955` 2026-06-26 — 状態速報に「応援レーン描画の自己診断」を追加
-- `v0.1.953` 2026-06-26 — 状態速報に純Web公開コピーの自己診断を追加
-- `v0.1.806` 2026-06-17 — HTML保存の失敗を根治+完了音声を追加
-- `v0.1.785` 2026-06-16 — 状態ページのタイムアウト警告を拡張エラー欄に出さない
-
-### ⚡ 描画・性能 (130版)
-- `v0.1.1273` 2026-08-06 — パネルのちらつきを止めました（原因は私の修正でした）
-- `v0.1.1239` 2026-08-03 — 会場の背景描画のメモリも閉じたときに解放するようにしました
-- `v0.1.1230` 2026-08-02 — 会場にピックアップ枠+診断ページの上下ブレを修正
-- `v0.1.1229` 2026-08-02 — レーンが出たり消えたりする原因を特定する計器
-- `v0.1.1227` 2026-08-02 — コメントのピックアップが動いていなかったのを修正
-- `v0.1.1207` 2026-08-01 — 会場モードの立ち上がりの遅さを切り分ける計器を追加
-- `v0.1.1204` 2026-07-31 — 拡張が重くなる原因を解消(v0.1.1201の不具合)
-- `v0.1.1198` 2026-07-31 — 会場を開いたときの誤った「白化」警告を解消
-- `v0.1.1196` 2026-07-31 — スクロール白化の原因が状態速報から読めるように
-- `v0.1.1189` 2026-07-28 — 会場読み上げの遅延の内訳を診断できるように
-- `v0.1.1165` 2026-07-17 — タイムシフト視聴時の重さ・画面の白化を修正
-- `v0.1.1162` 2026-07-16 — 状態速報の異常な数値表示・誤った警告表示を修正
-- `v0.1.1140` 2026-07-14 — 状態速報の自己診断を強化(内部計器)
-- `v0.1.1139` 2026-07-14 — 応援レーンの表示上限を差し戻し、二重スクロールを解消
-- `v0.1.1135` 2026-07-14 — スクロール白化の真犯人を特定する診断を追加
-- `v0.1.1129` 2026-07-11 — fix(venue): スクロールバー非表示+ロビー巨大タイル根治
-- `v0.1.1125` 2026-07-10 — feat(diag): ちかちか計器を状態速報で読める化+盲点2経路
-- `v0.1.1123` 2026-07-10 — feat(diag): ローディング/描画未起動の実測計器
-- `v0.1.1115` 2026-07-10 — feat(venue): 会場を開くと①パネルを自動で畳む
-- `v0.1.1110` 2026-07-08 — fix(venue): 会場の記名サムネ白円を根治
-- `v0.1.1104` 2026-07-07 — feat(web): ③応援ライブビューに投げ一覧丸写し
-- `v0.1.1102` 2026-07-07 — perf(liveview): 公開書込12秒間隔+容量上限で削減
-- `v0.1.1101` 2026-07-07 — perf(diag): 書込台帳+配達/描画ギャップ計器
-- `v0.1.1096` 2026-07-06 — perf(diag): 即時プッシュ計器の書込を10秒集約
-- `v0.1.1092` 2026-07-06 — feat(lane): コメント即時プッシュで重負荷でも表示即時
-- `v0.1.1088` 2026-07-06 — feat(diag): 読み上げ/ギフトの体感遅延を実測計器化
-- `v0.1.1087` 2026-07-06 — perf(status): 変化なしpublishのset省略
-- `v0.1.1086` 2026-07-06 — perf(status): 幽霊read抑止のin-flightガード
-- `v0.1.1085` 2026-07-06 — perf(status): extras読取を1バッチget化
-- `v0.1.1084` 2026-07-06 — perf(status): マイ効果音計器のBlob全件走査を廃止
-- `v0.1.1068` 2026-07-04 — ギフト音をパチンコ電子音(きゅいん)に一新+即発音
-- `v0.1.1062` 2026-07-04 — 大配信で状態ページがPC全体を重くする問題を緩和
-- `v0.1.1055` 2026-07-04 — 診断シートの網羅漏れ2件を修正+ギフト診断を数値化
-- `v0.1.1051` 2026-07-04 — 応援レーン(埋め込み)の表示上限を48人→200人に拡大
-- `v0.1.1050` 2026-07-03 — 状態速報のパリティ判定に会場(④)を追加=POPと会場の人数ズレを検知
-- `v0.1.1048` 2026-07-03 — 応援レーン描画の所要時間を状態速報に計測(全員表示の準備・観測のみ)
-- `v0.1.1043` 2026-07-02 — 会場席の網羅状況を状態速報に計器追加
-- `v0.1.1040` 2026-07-02 — 応援レーンの段別再描画回数を状態速報に追加
-- `v0.1.1038` 2026-07-02 — 応援者/広告ランキングの中身ちらつきを根治
-- `v0.1.1037` 2026-07-02 — 重い配信で応援レーンがちかちかするのを根治
-- `v0.1.1035` 2026-07-01 — 応援レーンの全員表示を「開いた初回」から効くようにした
-- `v0.1.1034` 2026-07-01 — 重い配信で応援レーンに全員が出ない不具合を根治
-- `v0.1.1033` 2026-07-01 — 応援レーンが少なすぎる原因を状態速報で分かるようにした(計器)
-- `v0.1.1027` 2026-07-01 — 「同一でない」の誤検知(嘘の🔴)を保留に格下げして根治
-- `v0.1.1026` 2026-07-01 — 広告列の出たり消えたりでグリッドが揺れる不具合を根治
-- `v0.1.1024` 2026-07-01 — 応援プレビューで応援者ランキングが空になる不具合を根治
-- `v0.1.1023` 2026-07-01 — 応援プレビューを開くと診断が激重・真っ白になる根治
-- `v0.1.1021` 2026-07-01 — 応援レーンが描画済みでもローディングが終わらないバグを根治
-- `v0.1.1020` 2026-07-01 — 応援プレビューが原因で診断が重いことを自動で表示
-- `v0.1.1017` 2026-07-01 — 応援レーン・コメントの①POP=③WEB一致を自動チェック
-- `v0.1.1014` 2026-06-30 — 貢献度・広告ランキングが純Web側に出ない不具合を根治
-- `v0.1.1010` 2026-06-30 — 取り込み中の状態速報の更新を所要比例で間引き
-- `v0.1.1007` 2026-06-30 — 記録>本家の「焼き付きvs遅延」を時系列で表示
-- `v0.1.1006` 2026-06-30 — 匿名主体の配信で応援レーンを赤誤報しない
-- `v0.1.1005` 2026-06-30 — 更新の所要時間(計器)を状態速報の本文に追加
-- `v0.1.1003` 2026-06-30 — 記録>本家コメの「要確認」誤発火を根治
-- `v0.1.997` 2026-06-29 — 状態速報に完全性スコア(網羅診断)を追加
-- `v0.1.996` 2026-06-29 — 状態速報にスクロール白化の診断を表示
-- `v0.1.992` 2026-06-29 — 記録・同接・来場の数字カードを確実に表示
-- `v0.1.991` 2026-06-29 — 応援レーン(アイコン列)を重い処理待ちせず表示
-- `v0.1.990` 2026-06-29 — 貢献度・広告が鏡に出ない真因を根治
-- `v0.1.989` 2026-06-29 — レーン描画を確実に起動(タイマー詰まり対策)
-- `v0.1.988` 2026-06-29 — 複数配信視聴時のレーン未描画と誤診断を修正
-- `v0.1.987` 2026-06-29 — 描けたのにローディングが終わらない不具合を修正
-- `v0.1.986` 2026-06-29 — レーンが出ない真因を根治(配信IDの解決)
-- `v0.1.985` 2026-06-29 — 状態速報の先頭に「3画面パリティ」総合判定
-- `v0.1.984` 2026-06-29 — 状態速報に拡張バージョンを表示
-- `v0.1.982` 2026-06-28 — 白くなる状態を状態速報で一発表示
-- `v0.1.981` 2026-06-28 — スクロールで白くなる不具合を修正
-- `v0.1.980` 2026-06-28 — 状態速報に「描画が出ない時の対処」を明記
-- `v0.1.979` 2026-06-28 — 応援レーンも重い処理待ちせず鏡から表示
-- `v0.1.978` 2026-06-28 — 貢献度・広告ランキングを開いた直後に表示
-- `v0.1.977` 2026-06-28 — 貢献度・広告ランキングを重い処理待ちせず表示
-- `v0.1.976` 2026-06-28 — 応援レーンを重い読み込みの前に描画
-- `v0.1.974` 2026-06-28 — 内部整理: 応援レーン再描画判定をlib抽出
-- `v0.1.967` 2026-06-28 — 内部整理: 応援カード描画をlib抽出
-- `v0.1.966` 2026-06-27 — ランキング件数の「拡張≠鏡」1件差の誤警告を解消
-- `v0.1.965` 2026-06-27 — 応援プレビューでも貢献度・広告ランキングを鏡から表示
-- `v0.1.964` 2026-06-27 — 「描画済みなのにローディング継続」の誤検知を解消
-- `v0.1.963` 2026-06-27 — 貢献度ランキングが公開版・プレビューで欠ける不具合を修正
-- `v0.1.962` 2026-06-27 — 応援プレビューを開いた瞬間の重さを解消(コメントは鏡から描く)
-- `v0.1.961` 2026-06-26 — ポップアップを開かなくてもコメントが進むように
-- `v0.1.960` 2026-06-26 — 純Web応援ライブビューでコメントが進むように
-- `v0.1.958` 2026-06-26 — 状態速報の冒頭に「この診断の信頼性」を追加
-- `v0.1.955` 2026-06-26 — 状態速報に「応援レーン描画の自己診断」を追加
-- `v0.1.952` 2026-06-26 — 純Web公開の応援ライブビューに広告ランキングも表示
-- `v0.1.951` 2026-06-26 — 応援プレビューに応援レーンと貢献度/広告ランキングを表示
-- `v0.1.948` 2026-06-26 — 状態速報を軽量化(鏡を撤去・配信ごとに表示)
-- `v0.1.947` 2026-06-25 — WEB公開版に応援者ランキングとギフト貢献度を顔つきで表示
-- `v0.1.941` 2026-06-25 — 共有URLのWeb版に「応援者ランキング」を顔つきで追加
-- `v0.1.940` 2026-06-25 — 共有URLのWeb版に「配信者カード」をポップアップそっくり追加
-- `v0.1.939` 2026-06-25 — 共有URLのWeb版に「数字カード」をポップアップそっくり追加
-- `v0.1.931` 2026-06-23 — 応援レーンを拡張なしのWebでも見られるように(スマホ送信に相乗り)
-- `v0.1.930` 2026-06-23 — 状態速報ページが重い問題を改善(巨大な診断データを毎回読まない)
-- `v0.1.924` 2026-06-23 — 状態速報ページが重い問題を改善(毎回の読み込みを削減)
-- `v0.1.923` 2026-06-23 — スクロール時の白化を診断で観測できるように
-- `v0.1.907` 2026-06-22 — 会場でサムネ(顔写真)が出ない不具合を修正+席上限表示を実態に合わせた
-- `v0.1.906` 2026-06-22 — 会場・ポップアップの顔アイコンを遅延読み込みにして軽くした
-- `v0.1.905` 2026-06-22 — 会場モードに参加者全員を顔付きで並べる(最大500席・縦スクロール)
-- `v0.1.900` 2026-06-22 — 会場の席をポップアップの「アイコン列」と同じ本物の描画で表示する
-- `v0.1.896` 2026-06-22 — 操作ボタン群(HTML/コメビュ/読み上げ等)をパネル上部へ移動
-- `v0.1.890` 2026-06-22 — 状態ページを軽量化(無駄な再生成を止める)+更新時間を表示
-- `v0.1.888` 2026-06-22 — 公式値レーン(貢献度/広告/ギフト履歴等)が出ない・遅い問題を根治
-- `v0.1.884` 2026-06-21 — 応援ライブビューの応援者ランキングを本物の描画に統一
-- `v0.1.881` 2026-06-21 — 応援ライブビューを本物の描画関数で完全コピーに
-- `v0.1.877` 2026-06-21 — 応援ライブビューを popup の本物のHTML/CSSで完全コピー
-- `v0.1.867` 2026-06-21 — 状態ページが重い/開かないを並行読込で改善
-- `v0.1.856` 2026-06-21 — 「これを共有すれば原因が全部わかる」大ボタンを最上部に
-- `v0.1.854` 2026-06-21 — パネルが白/ローディング固着を状態速報で分かるように
-- `v0.1.852` 2026-06-21 — 会場モードの読み上げ状況を状態速報に表示(遅延の切り分け用)
-- `v0.1.843` 2026-06-20 — 状態ページ先頭に健全度パネルを追加
-- `v0.1.828` 2026-06-20 — ポップアップを開くだけで状態ページに診断が集約
-- `v0.1.826` 2026-06-19 — 多タブで重い時に「タブを絞ると軽い」と案内
-- `v0.1.822` 2026-06-18 — 状態速報に popup 固有診断を集約(ここで全部わかる)
-- `v0.1.821` 2026-06-18 — AI診断の popup 固有情報を状態速報へ集約(土台)
-- `v0.1.817` 2026-06-17 — 応援アイコンのタイル描画を共通部品に整理(見た目不変・土台整備)
-- `v0.1.813` 2026-06-17 — コメント多い配信での重さ(スクロール/描画)を軽減
-- `v0.1.806` 2026-06-17 — HTML保存の失敗を根治+完了音声を追加
-- `v0.1.787` 2026-06-17 — 画面が固まる原因の計測を追加+重い診断ビルドを空き時間へ
-- `v0.1.784` 2026-06-16 — コメビュが固まって新着が止まる不具合を根治
-- `v0.1.774` 2026-06-16 — 送信・画面が重い性能問題を改善＋記録数を配信者コメ除外に
-- `v0.1.770` 2026-06-16 — 読み上げ起動待ちのローディングを楽しく＋会場タブに閉じるボタン
-- `v0.1.769` 2026-06-16 — コメントがほとんど記録されない/レーンが空になる詰まりを根治
-- `v0.1.754` 2026-06-15 — 会場を作り直し3時間配信でも軽さ・速さを維持
-- `v0.1.748` 2026-06-15 — 3キャラを配信画面のまわりに移動＋コメント反映を速く
-- `v0.1.733` 2026-06-14 — 大人数の会場でも軽く動くように描画を最適化
-- `v0.1.729` 2026-06-14 — 会場モード: サムネ優遇・領域拡大・ドラッグ移動
-- `v0.1.715` 2026-06-13 — 会場モードで配信映像を見せ名前にリンク
-- `v0.1.705` 2026-06-13 — 閉じた応援タイムラインの全件読込を停止
-- `v0.1.664` 2026-06-10 — 複数タブ並列取得を安全に(重い時は自動で絞る)
-
-### 🔁 自己検証・規律 (3版)
-- `v0.1.1073` 2026-07-05 — パチンコボイス演出+頻度ゲート追加
-- `v0.1.840` 2026-06-20 — 機能逆引き地図を全ファイル網羅に
-- `v0.1.835` 2026-06-20 — 自己検証ゲートを追加(版同期+診断文言)
-
-### その他 (62版)
-- `v0.1.1283` 2026-08-07 — ★サイドパネルが真っ黒になるのを直しました
-- `v0.1.1279` 2026-08-06 — サイドパネルを開いたとき真っ黒になるのを直しました
-- `v0.1.1278` 2026-08-06 — 点滅調査で使った仕掛けのうち、役目を終えたものを片付けました
-- `v0.1.1277` 2026-08-06 — レポート保存が途中で止まる問題を直しました
-- `v0.1.1275` 2026-08-06 — パネルをブラウザの右側（サイドパネル）に移しました
-- `v0.1.1274` 2026-08-06 — ちらつきの直接の原因を止めました
-- `v0.1.1270` 2026-08-06 — 計器が動かない原因を切り分けます
-- `v0.1.1269` 2026-08-06 — 前回の計器が動いていなかったので直しました
-- `v0.1.1268` 2026-08-05 — パネルを消している相手を名指しします
-- `v0.1.1267` 2026-08-05 — 消えた原因を1回で見分けられるようにしました
-- `v0.1.1266` 2026-08-05 — パネルが「消えない構造」になりました
-- `v0.1.1265` 2026-08-05 — 消える直前に何が起きたかを記録します
-- `v0.1.1264` 2026-08-05 — パネルが3個作られていたのを直しました
-- `v0.1.1263` 2026-08-05 — 【実験】ちらつきの原因を1回で判定します
-- `v0.1.1262` 2026-08-05 — 一度出したパネルを消さないようにしました
-- `v0.1.1261` 2026-08-05 — パネルを消している場所を直接つきとめる計器を入れました
-- `v0.1.1260` 2026-08-05 — 消えた回数の数え漏れを直しました(半分しか数えていませんでした)
-- `v0.1.1259` 2026-08-05 — サイドパネルで開けるようにする準備をしました(内部)
-- `v0.1.1258` 2026-08-05 — 点滅を止めました(消す側と戻す側が競り合っていました)
-- `v0.1.1257` 2026-08-05 — 消えた回数の数え漏れを塞ぎました
-- `v0.1.1255` 2026-08-04 — パネルの表示切替を1つの操作にまとめました(内部整理)
-- `v0.1.1253` 2026-08-04 — パネルが消える瞬間を確実に捕まえる見張りを入れました
-- `v0.1.1252` 2026-08-04 — パネルが消えても記録されない穴を塞ぎました
-- `v0.1.1228` 2026-08-02 — ピックアップが常に最新1件に戻っていたのを修正
-- `v0.1.1223` 2026-08-01 — コピーが効かない/中身が古いのを修正
-- `v0.1.1215` 2026-08-01 — アイコンが「ちらちら変わる」現象を実測する計器を追加
-- `v0.1.1210` 2026-08-01 — 紹介サイトが古いファイル名を見せていた問題を修正
-- `v0.1.1173` 2026-07-18 — アイコン表示の内部処理を整理
-- `v0.1.1169` 2026-07-17 — マーケ分析の目次リンクで空白に見える不具合を修正
-- `v0.1.1168` 2026-07-17 — マーケ分析に音付き発表演出を追加
-- `v0.1.1166` 2026-07-17 — マーケ分析を別タブでダウンロードするように変更
-- `v0.1.1160` 2026-07-16 — ニコニコ動画ページで拡張のエラー表示が出ることがある不具合を修正
-- `v0.1.1159` 2026-07-16 — 広告・順位変動・コメント数節目の効果音をより自然な音に更新
-- `v0.1.1155` 2026-07-15 — コメント数マイルストーン効果音の第三者ライセンス依存を解消
-- `v0.1.1151` 2026-07-15 — 広告・順位変動の効果音をより自然な音に更新
-- `v0.1.1131` 2026-07-11 — feat(web): ③WEBのエラー報告を有効化(DSN設定)
-- `v0.1.1130` 2026-07-11 — feat(web): ③WEBにエラーレポータ(Sentry)
-- `v0.1.1106` 2026-07-07 — chore(web): 丸写しセクションレジストリでdrift検知
-- `v0.1.1100` 2026-07-06 — feat(score): 結果発表シーケンス+採点音割当
-- `v0.1.1098` 2026-07-06 — feat(score): 配信採点モデルv2+フェーズ実績計器
-- `v0.1.1093` 2026-07-06 — fix(post): watchタブが開いていれば送信可能に
-- `v0.1.1082` 2026-07-06 — 拡張の版混在を検知してリロード案内
-- `v0.1.1081` 2026-07-06 — コミット漏れimport検査を追加
-- `v0.1.1079` 2026-07-05 — 操作音4種の音源配線漏れを修正
-- `v0.1.1076` 2026-07-05 — コメント投稿の打ち出し操作音を追加
-- `v0.1.1070` 2026-07-04 — 拡張リロード後の古いタブのエラー表示を抑止
-- `v0.1.968` 2026-06-28 — 内部整理: サマリ推移表の生成をlib抽出
-- `v0.1.944` 2026-06-25 — 共有を押すと「そっくりの画面URL」を大きく表示
-- `v0.1.938` 2026-06-25 — 「応援ライブビュー」と「共有URL」のボタンを役割分け
-- `v0.1.929` 2026-06-23 — 応援ライブビューを拡張ポップアップそっくりそのままに(丸ごと埋め込み)
-- `v0.1.921` 2026-06-23 — 勝手に復活する配信タブの掃除(セッション復元の孤児タブ)
-- `v0.1.812` 2026-06-17 — 内部構造の整理(HTMLレポートの外部リンク欄を部品化)
-- `v0.1.811` 2026-06-17 — 内部構造の整理(HTMLレポートの次枠メモを部品化)
-- `v0.1.810` 2026-06-17 — 内部構造の整理(HTMLレポートの順位表を部品化)
-- `v0.1.809` 2026-06-17 — 内部構造の整理(イベント順位ヘッダを部品化)
-- `v0.1.808` 2026-06-17 — 内部構造の整理(自動バックアップ状態を部品化)
-- `v0.1.788` 2026-06-17 — ページ固まりの計測範囲を広げ原因特定をより確実に
-- `v0.1.776` 2026-06-16 — コメント送信の計測警告を拡張エラー欄に出さないように
-- `v0.1.682` 2026-06-10 — メディアキット生成時のエラーを解消
-- `v0.1.681` 2026-06-10 — コメビュをわんコメ式の大きく読みやすい表示に
-- `v0.1.675` 2026-06-10 — コメビュをタイムラインと同じデータ源に統一
-- `v0.1.669` 2026-06-10 — コメビュの操作ボタンをすっきりした見た目に
+### その他 (5版)
+- `v0.1.1505` 2026-09-03 — 提出物づくりで版数を間違えられなくした
+- `v0.1.1502` 2026-09-03 — コメビュの窓の大きさを覚えます
+- `v0.1.1491` 2026-08-29 — 検査の土台を、配布元の最新版にそろえました
+- `v0.1.1490` 2026-08-25 — 応援している作品を、そっとお知らせする欄をつけました
+- `v0.1.1488` 2026-08-25 — キャラが出ない原因を自分で言えるようにしました

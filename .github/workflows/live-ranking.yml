@@ -1,0 +1,71 @@
+name: live ranking refresh
+
+# ★なぜ GitHub Actions なのか（Vercel Cron ではない理由・2026-09-05 調査）
+#   Vercel の Hobby プランは cron が【1日1回】に制限されており、
+#   `*/5 * * * *` のような指定は【デプロイ自体が失敗】する（公式ドキュメントに明記）。
+#   ⟹ 「いま支えている人」は【今この瞬間】が売りなので1日1回では成立しない。
+#   GitHub Actions は最短5分間隔で、public リポジトリなら無料・無制限。
+#   ★このリポは PUBLIC（gh repo view で実測確認）。
+#
+# ★これが無いと何が起きるか（この workflow の存在理由）
+#   api/live-ranking.js は ?refresh=1 で叩かれて初めて収集する。
+#   誰も叩かなければ Redis は空のままで、/live/ は
+#   「まだ集計されていません」を永久に出し続ける。
+#   ★実測: 番組は数時間で ENDED になる。定期実行しないと
+#     「終了した番組のランキング」を出し続けることにもなる。
+#
+# ★既知の制約（記録として残す）
+#   public リポジトリの scheduled workflow は【60日間リポに活動が無いと自動停止】する。
+#   このリポは日々コミットしているため実害は無い見込みだが、
+#   長期休止したときは Actions 画面から手動で再有効化が要る。
+
+on:
+  schedule:
+    # ★5分間隔（GitHub の最短）。実行時刻は GitHub 側の負荷で前後する（仕様）。
+    - cron: "*/5 * * * *"
+  # ★手動実行も残す: 初回投入と、cron が止まったときの復旧に要る。
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  # ★前回が終わる前に次が走らないようにする（収集は約5秒だが、遅延時の二重取得を防ぐ）。
+  group: live-ranking-refresh
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: 収集を叩く
+        env:
+          INGEST_KEY: ${{ secrets.STATUS_INGEST_KEY }}
+        run: |
+          # ★鍵が未登録なら「黙って成功」させない。何もせず緑になるのが一番たちが悪い。
+          if [ -z "$INGEST_KEY" ]; then
+            echo "::error::secrets.STATUS_INGEST_KEY が未登録です。リポジトリの Settings > Secrets で登録してください。"
+            exit 1
+          fi
+
+          # ★-f を付けない: 本文(JSON)を読んで理由を出したいため、HTTP コードは自前で見る。
+          code=$(curl -sS -o /tmp/out.json -w '%{http_code}' \
+            --max-time 60 \
+            -H "x-share-key: $INGEST_KEY" \
+            "https://app.tsuioku-no-kirameki.com/api/live-ranking?refresh=1")
+
+          echo "HTTP $code"
+          cat /tmp/out.json || true
+          echo ""
+
+          if [ "$code" != "200" ]; then
+            echo "::error::収集に失敗しました (HTTP $code)"
+            exit 1
+          fi
+
+          # ★200 でも中身が空なら失敗扱いにする（「機械が見ている所だけが動く」）。
+          if ! grep -q '"stored":true' /tmp/out.json; then
+            echo "::error::200 が返りましたが保存されていません（応答本文を確認してください）"
+            exit 1
+          fi

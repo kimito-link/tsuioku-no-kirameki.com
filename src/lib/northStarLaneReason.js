@@ -69,6 +69,7 @@ export function hasEventParticipationSignal(bundle, snap) {
  *   snap?: any,
  *   kokenApiRows?: any[]|null,
  *   nicoadApiRows?: any[]|null,
+ *   giftHistoryApiRows?: any[]|null,
  *   contribResult?: { ok: boolean|null, status: number|null, rows: any[]|null }|null,
  *   adResult?: { ok: boolean|null, status: number|null, rows: any[]|null }|null
  * }} ctx
@@ -79,6 +80,16 @@ export function hasEventParticipationSignal(bundle, snap) {
  *   v0.1.851: contribResult / adResult(makeLaneResult の戻り)が渡されたら、0件フォールバックを
  *   「成功0件=no_ranking_data(該当無し)」「失敗=fetch_error」「未取得=not_yet」に正しく分ける。
  *   省略時は従来の rows のみ経路(等価)＝後方互換。
+ *
+ *   ★★未解決(2026-08-12 調査で判明・v0.1.1340 時点):
+ *     contribResult / adResult を渡しているのは content-entry.js:6782-6789 だけ。
+ *     **popup 経路(popup-entry.js の3レーン)は渡していない＝この分岐が発火しない**。
+ *     結果、popup では「API が200で成功したが0件」を fetch_error / iframe_unrendered と
+ *     誤称する(v0.1.851 が根治したはずの症状が popup にだけ残っている)。
+ *     ★ただし単純な配線漏れ【ではない】: 成否(ok/status)の出所である `_externalFetchProbe`
+ *       は content script 側の状態で、**popup にはその情報が存在しない**(grep 0件)。
+ *       渡すには「取得の成否を popup まで運ぶ経路」を先に作る必要がある＝別版の仕事。
+ *     ★暫定で嘘の値を渡さないこと(成功と誤判定すると本物の失敗を隠す)。
  * @returns {NorthStarLaneState}
  */
 export function determineNorthStarLaneState(laneId, ctx) {
@@ -86,6 +97,17 @@ export function determineNorthStarLaneState(laneId, ctx) {
   const snap = ctx?.snap || null;
   const kokenApiRows = Array.isArray(ctx?.kokenApiRows) ? ctx.kokenApiRows : null;
   const nicoadApiRows = Array.isArray(ctx?.nicoadApiRows) ? ctx.nicoadApiRows : null;
+  /*
+   * ★v0.1.1339: giftHistory の API 直読み経路(kokenApiRows/nicoadApiRows と同じ流儀)。
+   *
+   * ★このとき呼び出し側にも【2件の片肺】が見つかったので併記する(popup-entry.js):
+   *   - giftHistory: この引数自体が無く、判定は公式DOMしか見られなかった
+   *   - contributionRanking: v0.1.617 で kokenApiRows の分岐を足したのに、
+   *     呼び出し側が { bundle, snap } しか渡しておらず【一度も発火していなかった】
+   *   ＝3レーン中2つで「判定コードはあるが配線が無い」状態だった。
+   *   検査: src/extension/giftHistoryLaneStateWiring.test.js が3レーン全部を断言する。
+   */
+  const giftHistoryApiRows = Array.isArray(ctx?.giftHistoryApiRows) ? ctx.giftHistoryApiRows : null;
   const contribResult = ctx?.contribResult || null;
   const adResult = ctx?.adResult || null;
 
@@ -111,6 +133,25 @@ export function determineNorthStarLaneState(laneId, ctx) {
       return 'iframe_unrendered';
     }
     case 'giftHistory': {
+      /*
+       * ★v0.1.1339: koken API / sub-app 経由で履歴が取れていれば ok(片肺の解消)。
+       *
+       * ■ 症状(2026-08-12 実機・状態速報)
+       *     公式値レーン: ... / ギフト履歴:⏳取得中 / ...
+       *   ギフトが実際に投げられ、レーンも投げ一覧も【正しく描けている】のに
+       *   速報だけが永久に「取得中」と言い続けていた。
+       *
+       * ■ 真因: この case が `bundle.giftHistory`(公式サイドバーの DOM scrape)しか
+       *   見ておらず、koken API 経路(nls_gift_subapp_history_<lv> 由来)を無視していた。
+       *   ★同じ v0.1.617 で contributionRanking には kokenApiRows、adRanking には
+       *     nicoadApiRows という API 直読みの分岐が【追加済み】だったのに、
+       *     giftHistory だけ取り残されていた＝典型的な片肺。
+       *   ＝サイドバーのギフトタブを開いていない配信では、取れていても「取得中」。
+       *
+       * ★画面は正しい(描画に成功した経路はこの判定に到達しない)。
+       *   壊れていたのは【報告】だけ。だが速報が嘘をつくのは誤診の直接の原因になる。
+       */
+      if (giftHistoryApiRows && giftHistoryApiRows.length > 0) return 'ok';
       const count = Array.isArray(bundle?.giftHistory)
         ? bundle.giftHistory.length
         : 0;

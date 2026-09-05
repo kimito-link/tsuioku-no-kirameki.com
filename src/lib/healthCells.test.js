@@ -547,6 +547,48 @@ describe('summarizeHealthVerdict v0.1.846 満点=「異常ゼロ」(進行中/�
       expect(cellById(cells, 'venue-seats').text).toContain('他70');
     });
 
+    /*
+     * ★v0.1.1360(ユーザー実機 2026-08-12・診断ページのスクショ)
+     *   会場座席セルが「更新737644秒前(=8.5日前)」を🟡warn として出し続け、
+     *   総合判定まで「注意: 会場座席」に引きずっていた。
+     *   会場モードを開いていないだけなので、これは異常ではなく【対象外】。
+     *   ★上限を設けずに warn にしていたため、化石値が永久に黄色を出していた。
+     */
+    it('★8.5日前の化石値は warn でなく na(会場を開いていないだけ)', () => {
+      const now = 1000000000;
+      const cells = buildHealthCells({
+        venueSeatsDiag: {
+          enabled: true,
+          seatsShown: 0,
+          participantCount: 0,
+          broadcasterInSeats: false,
+          broadcasterKnown: true,
+          lastUpdateAt: now - 737644 * 1000 // 実機の値そのまま
+        },
+        nowMs: now
+      });
+      const c = cellById(cells, 'venue-seats');
+      expect(c.level).toBe('na');
+      expect(c.text).toContain('会場を開いていません');
+    });
+
+    it('★60秒〜5分の遅れは本物の warn として残す(開いているのに遅い)', () => {
+      const now = 1000000000;
+      const cells = buildHealthCells({
+        venueSeatsDiag: {
+          enabled: true,
+          seatsShown: 10,
+          participantCount: 12,
+          broadcasterInSeats: false,
+          broadcasterKnown: true,
+          lastUpdateAt: now - 90 * 1000
+        },
+        nowMs: now
+      });
+      expect(cellById(cells, 'venue-seats').level).toBe('warn');
+      expect(cellById(cells, 'venue-seats').text).toContain('更新90秒前');
+    });
+
     it('配信者 uid 未取得=混入判定不能で na(赤にしない)', () => {
       const now = 1000000;
       const cells = buildHealthCells({
@@ -582,6 +624,65 @@ describe('summarizeHealthVerdict v0.1.846 満点=「異常ゼロ」(進行中/�
   });
 
   // 2026-06-22(council/lane-show-all-active): 応援レーンの人数整合セル。
+  describe('★名前ありゆっくり顔セル(ID無し=広告主・ゲストも数える)', () => {
+    /*
+     * ★v0.1.1361: v1358 で計器に checkedNoUid/yukkuriNamedNoUid を足したのに、
+     *   このセルのゲートが  のままで【広告列だけの症状では出なかった】。
+     *   実機スクショ(2026-08-12)は広告列に「名前ありゆっくり顔」が並んでいたのに
+     *   速報は「✅ 実害0」。判定はあるが配線されていない、の再発。
+     */
+    it('★ID無し(広告主)だけでもセルが出て warn になる', () => {
+      const cells = buildHealthCells({
+        venueSeatsDiag: {
+          enabled: true,
+          participantCount: 5,
+          yukkuriNamedCensus: { checked: 0, yukkuriNamed: 0, checkedNoUid: 2, yukkuriNamedNoUid: 2 }
+        }
+      });
+      const c = cellById(cells, 'venue-yukkuri-face');
+      expect(c).toBeDefined();
+      expect(c.level).toBe('warn');
+      expect(c.text).toContain('2件');
+    });
+
+    it('★分母(検査した数)を必ず出す=「0件」が未計測かどうか読み分けられる', () => {
+      const cells = buildHealthCells({
+        venueSeatsDiag: {
+          enabled: true,
+          participantCount: 5,
+          yukkuriNamedCensus: { checked: 12, yukkuriNamed: 0, checkedNoUid: 3, yukkuriNamedNoUid: 0 }
+        }
+      });
+      const c = cellById(cells, 'venue-yukkuri-face');
+      expect(c.level).toBe('ok');
+      expect(c.text).toContain('検15'); // 12 + 3 = 全部の分母
+    });
+
+    it('匿名スタイル(a:系)の実害も件数に入る', () => {
+      const cells = buildHealthCells({
+        venueSeatsDiag: {
+          enabled: true,
+          participantCount: 5,
+          yukkuriNamedCensus: { checked: 0, checkedAnonymousStyle: 4, yukkuriNamedAnonymousStyle: 1 }
+        }
+      });
+      const c = cellById(cells, 'venue-yukkuri-face');
+      expect(c.level).toBe('warn');
+      expect(c.text).toContain('1件');
+    });
+
+    it('一度も検査していなければセルを出さない(死にセルにしない)', () => {
+      const cells = buildHealthCells({
+        venueSeatsDiag: {
+          enabled: true,
+          participantCount: 5,
+          yukkuriNamedCensus: { checked: 0, checkedNoUid: 0, checkedAnonymousStyle: 0 }
+        }
+      });
+      expect(cellById(cells, 'venue-yukkuri-face')).toBeUndefined();
+    });
+  });
+
   describe('応援レーン人数整合セル(laneDiag)', () => {
     it('laneDiag 未指定/liveId 空=セルを足さない(死にセルにしない)', () => {
       expect(cellById(buildHealthCells({ livesData: [] }), 'lane-count')).toBeUndefined();
@@ -679,6 +780,38 @@ describe('summarizeHealthVerdict v0.1.846 満点=「異常ゼロ」(進行中/�
       const c = cellById(cells, 'gift-effect');
       expect(c.level).toBe('warn');
       expect(c.text).toContain('演出漏れ2件');
+    });
+
+    /*
+     * ★v0.1.1360(ユーザー実機 2026-08-12・診断ページのスクショ)
+     *    が🟡のまま出続け、総合判定を
+     *   「注意: ギフト演出/効果音」に引きずっていた。しかし観測は 753,314秒前(8.7日前)で、
+     *   今日の配信の話ではない。★過去の記録を今日の異常として出さない。
+     */
+    it('★8.7日前の化石値は warn でなく na(前回の配信の記録)', () => {
+      const cells = buildHealthCells({
+        livesData: [],
+        giftEffectDiag: {
+          giftDetected: 8, giftThrown: 8, giftSoundPlayed: 7, soundEnabled: true,
+          lastEventAt: Date.now() - 753314 * 1000 // 実機の値そのまま
+        }
+      });
+      const c = cellById(cells, 'gift-effect');
+      expect(c.level).toBe('na');
+      expect(c.text).toContain('前回の配信の記録');
+    });
+
+    it('★直近(2時間以内)の取りこぼしは従来どおり warn(見逃さない)', () => {
+      const cells = buildHealthCells({
+        livesData: [],
+        giftEffectDiag: {
+          giftDetected: 8, giftThrown: 8, giftSoundPlayed: 7, soundEnabled: true,
+          lastEventAt: Date.now() - 60 * 1000
+        }
+      });
+      const c = cellById(cells, 'gift-effect');
+      expect(c.level).toBe('warn');
+      expect(c.text).toContain('音漏れ1件');
     });
 
     it('効果音OFFなら音0件でも warn にしない(誤診断防止)', () => {

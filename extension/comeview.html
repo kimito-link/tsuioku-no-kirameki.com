@@ -1,6 +1,15 @@
-<!DOCTYPE html>
-<html lang="ja">
+<!DOCTYPE html><html lang="ja" style="color-scheme: light">
   <head>
+    <!--
+      ★v0.1.1413: 黒画面対策(color-scheme のみ・背景は塗らない)。
+
+      ★comeview は **OBS 透過用**なので背景を不透明にしてはいけない
+        (このファイルに transparent 指定が10箇所ある=配信の合成が壊れる)。
+        color-scheme だけを light 固定して、ダーク環境で
+        ブラウザがキャンバス既定を暗色にするのを防ぐ。
+      ★sidepanel.html / status.html と違い background は**意図的に置かない**。
+    -->
+    <meta name="color-scheme" content="light" />
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>追憶のきらめき コメビュ</title>

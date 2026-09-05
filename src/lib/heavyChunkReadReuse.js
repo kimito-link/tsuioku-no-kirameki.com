@@ -15,6 +15,19 @@
  *
  * ★純データ判定: 配列本体は渡さず arrLength/chunkTotal/readAtMs の縮約だけ受ける(軽い・テスト容易)。
  *
+ * ★★呼び出し側で条件を重ねないこと(2026-08-12・v0.1.1344 で判明した真因)
+ *   popup-entry.js は長らくこう書いていた:
+ *     canReuse = (idbMode || commentsChunked) && currentChunkTotal != null && … && decision.reuse
+ *   currentChunkTotal は `idbMode ? … : commentsChunked ? … : null` で作られるため、
+ *   `currentChunkTotal != null` は **`idbMode || commentsChunked` と等価**＝同じ条件の二重掛け。
+ *   実効は「非チャンク配信を締め出す」ことだけだった。
+ *   ところが本関数は currentChunkTotal == null のとき **常に reuse:true(coverage)** を返す。
+ *   ＝非チャンク配信では【判定が「再利用してよい」と言っているのに呼び出し側が必ず無視】し、
+ *   毎 refresh で heavy 全件を読み直す → 次 refresh に追い越されて race →
+ *   heavyEverSettled が永久に false(実測 race 26回 / freshReadReuse 0回)。
+ *   ★lv 一致・件数>0 も本関数が見ている(下の early return)。呼び出し側で重複させない。
+ *   検査: src/extension/heavyReuseNotDoubleGated.wiring.test.js が二重ゲートの復活を禁じる。
+ *
  * @module heavyChunkReadReuse
  */
 
@@ -42,10 +55,21 @@ export function decideHeavyChunkReadReuse(args) {
     ? Number(a.minGapMs)
     : HEAVY_FULL_REREAD_MIN_GAP_MS;
 
-  if (!cached) return { reuse: false, reason: '' };
+  /*
+   * ★v0.1.1352: 不成立の理由を【3択のまま返さず名指しする】。
+   *
+   * ■ なぜ(2026-08-12 ユーザー指摘「全部質問しなくても分かるようにならないと困る」)
+   *   従来は不成立をすべて reason:'' で返していたため、速報は
+   *   「cachedが無い/lv不一致/件数0のいずれか」としか言えなかった。
+   *   ★3つのうちどれかが分からないと次の一手が決まらない=原因を名指ししていない
+   *   ([[instrument-must-name-the-cause-2026-08-01]])。
+   *   reuse:false は不変なので、挙動は変えずに理由だけ細かくする。
+   */
+  if (!cached) return { reuse: false, reason: 'no-cache' };
   const cachedLv = String(cached.lv || '').trim().toLowerCase();
   const arrLength = Math.max(0, Math.floor(Number(cached.arrLength) || 0));
-  if (!cachedLv || cachedLv !== lv || arrLength <= 0) return { reuse: false, reason: '' };
+  if (!cachedLv || cachedLv !== lv) return { reuse: false, reason: 'lv-mismatch' };
+  if (arrLength <= 0) return { reuse: false, reason: 'empty-cache' };
 
   // 条件1(現行そのまま=coverage): 現 total の80%以上を持つ。非チャンク(null/0)は常に成立。
   const curTotal = currentChunkTotal;
