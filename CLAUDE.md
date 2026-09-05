@@ -1,6 +1,38 @@
+@AGENTS.md
+
 # CLAUDE.md — Claude Code 向けブートストラップ
 
-> ⚠️ **このファイルは短い案内です。本物のプロジェクトルール・設計判断・運用ルールは [AGENTS.md](AGENTS.md) にあります。必ず AGENTS.md を最初に読んでください。**
+> ⚠️ **本物のプロジェクトルール・設計判断・運用ルールは [AGENTS.md](AGENTS.md) です。**
+> ★上の `@AGENTS.md` で**起動時に自動で読み込まれる**ので、リンクを踏む必要はありません。
+
+<!--
+  ★なぜ 1行目が `@AGENTS.md` なのか(2026-09-06・ユーザー指摘「自動適用されるべきなのに出来ていない」)
+
+  ■ 何が起きていたか
+    ここには「必ず AGENTS.md を読んでください」と★4回書いてあった。
+    しかし Claude Code が自動で読むのは CLAUDE.md だけで、
+    ★AGENTS.md(505行)は【一度も context に入っていなかった】。
+    リンクを踏むかどうかは読み手次第＝案内は守られない。
+
+  ■ 実害(2026-09-06)
+    AGENTS.md:364「既存部品を検索して再利用(重複実装しない)」を破って
+    esc / num / safeHttpUrl / retentionRate / freshnessText の★5個を重複実装した。
+    ★lint も test も緑のままだった。
+
+  ■ 直し方(公式ドキュメントに従う)
+    https://code.claude.com/docs/en/memory
+      「Claude Code reads CLAUDE.md, not AGENTS.md.
+        …create a CLAUDE.md that imports it」
+      「On Windows, creating a symlink requires Administrator privileges
+        …so use the @AGENTS.md import instead.」
+    ★`@path` は【起動時に展開されて context に入る】。★symlink は Windows で管理者権限が要るので使わない。
+
+  ■ ★これだけでは足りないことも公式が明記している
+      「Claude treats them as context, not enforced configuration.
+        To block an action regardless of what Claude decides, use a PreToolUse hook instead.」
+    ⟹ ★import は「読ませる」までしか保証しない。【守らせる】のは検査(verify:cc)と hook の仕事。
+    ⟹ この import を消しても何も壊れないが、★scripts/check-agent-bootstrap.mjs が赤くする。
+-->
 
 ## なぜ二重に置いているか
 

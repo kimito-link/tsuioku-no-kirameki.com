@@ -134,6 +134,15 @@
       }
       function num(n) { return (Number(n) || 0).toLocaleString('ja-JP'); }
 
+      // ★http(s) 以外を弾く。
+      //   esc() は < > " ' を実体参照にするだけなので、javascript: で始まる文字列は
+      //   エスケープしても href として【そのまま有効】になる。
+      //   ★値の出どころはニコ生のAPIだが、外から来た値を無検証で href/src に入れない。
+      function safeHttpUrl(u) {
+        var v = String(u == null ? '' : u).trim();
+        return /^https?:\/\//i.test(v) ? v : '';
+      }
+
       // ★行の形は koken(rankers) と nicoad(ranking) で違う。ここで1つに揃える。
       function rowsFromGift(g) {
         var a = (g && Array.isArray(g.rankers)) ? g.rankers : [];
@@ -159,17 +168,19 @@
         var html = rows.map(function (r) {
           var n = Number(r.rank) || 0;
           var cls = rowChange(rowKey(liveId, kind, r), Number(r.point) || 0);
-          var nameHtml = r.url
-            ? '<a href="' + esc(r.url) + '" target="_blank" rel="noopener noreferrer">' + esc(r.name) + '</a>'
+          var href = safeHttpUrl(r.url);
+          var nameHtml = href
+            ? '<a href="' + esc(href) + '" target="_blank" rel="noopener noreferrer">' + esc(r.name) + '</a>'
             : esc(r.name);
           // ★ニコ生は「アイコン未設定」に defaults/blank.jpg を返すが、これは実際には
           //   読めない(実測: 63枚中4枚が失敗し、全部これだった)。★そのまま <img> にすると
           //   壊れた画像アイコンが出るので、最初から素の丸(span)にする。
           // ★inline onerror は使わない: このリポの既存ページに1件も無く(実測0件)、
           //   CSP を足したときに黙って壊れる。読み込み失敗の面倒は下の bindAvatarFallback が見る。
-          var isBlank = /\/defaults\/blank\.jpg(\?|$)/.test(String(r.avatar || ''));
-          var ava = (r.avatar && !isBlank)
-            ? '<img class="ava" src="' + esc(r.avatar) + '" alt="" loading="lazy" referrerpolicy="no-referrer">'
+          var avatarSrc = safeHttpUrl(r.avatar);
+          var isBlank = /\/defaults\/blank\.jpg(\?|$)/.test(avatarSrc);
+          var ava = (avatarSrc && !isBlank)
+            ? '<img class="ava" src="' + esc(avatarSrc) + '" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer">'
             : '<span class="ava"></span>';
           return '<li' + (cls ? ' class="' + cls + '"' : '') + '><span class="no' + (n > 0 && n <= 3 ? ' top' : '') + '">' + (n || '-') + '</span>'
             + ava + '<span class="nm">' + nameHtml + '</span>'
@@ -238,6 +249,10 @@
       var _prevPoints = {};   // "lv|種別|名前" -> ポイント
       var _seenKeys = {};     // 初回描画で全部を「新規」にしないための記録
       var _firstPaint = true;
+      // ★今回の描画で使ったキーだけを集める。描画の最後に古い記録を捨てる。
+      //   ★これが無いと配信が入れ替わるたびにキーが増え続け、開きっぱなしのタブで
+      //   数日〜数週間かけて数万件まで膨らむ(サーバ側には影響しないが端末が重くなる)。
+      var _touched = null;
 
       function rowKey(liveId, kind, r) {
         return liveId + '|' + kind + '|' + String(r.name || '');
@@ -246,12 +261,14 @@
       function rowChange(key, point) {
         var prev = _prevPoints[key];
         _prevPoints[key] = point;
+        if (_touched) _touched[key] = point;
         if (_firstPaint) { _seenKeys[key] = true; return ''; }
         if (!_seenKeys[key]) { _seenKeys[key] = true; return 'is-new'; }
         return (prev !== undefined && point > prev) ? 'is-bumped' : '';
       }
 
       function render(data) {
+        _touched = Object.create(null);   // ★この描画で実際に出た行だけを集める
         var lives = (data && Array.isArray(data.lives)) ? data.lives : [];
         if (!lives.length) {
           elMeta.textContent = 'いま表示できる配信がありません。';
@@ -286,6 +303,12 @@
             + '</div></section>';
         }).join('');
         bindAvatarFallback(elList);
+        // ★今回出なかった行の記録を捨てる(青天井を防ぐ)。
+        //   ★_seenKeys も同じ集合に揃える。片方だけ残すと「新規」の判定がズレる。
+        _prevPoints = _touched;
+        _seenKeys = Object.create(null);
+        for (var k in _touched) _seenKeys[k] = true;
+        _touched = null;
         // ★初回は全行が「新規」になってしまうので、ここで初めて通常運転にする。
         _firstPaint = false;
       }
