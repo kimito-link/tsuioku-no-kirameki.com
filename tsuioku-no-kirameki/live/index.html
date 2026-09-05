@@ -54,6 +54,7 @@
       .live > h2 { margin: 0; padding: 12px 14px; font-size: .95rem; background: var(--bg-soft); border-bottom: 1px solid var(--line); }
       .live > h2 a { color: var(--ink); text-decoration: none; }
       .live > h2 a:hover { text-decoration: underline; }
+      .live > h2 .now { margin-left: .6em; font-size: .82rem; font-weight: 400; color: var(--ink-sub); white-space: nowrap; }
       .cols { display: grid; grid-template-columns: 1fr; gap: 0; }
       @media (min-width: 720px) { .cols { grid-template-columns: 1fr 1fr; } }
       .col { padding: 12px 14px; }
@@ -92,7 +93,8 @@
 
       <div class="note">
         <p>★このページは<b>配信者ではなく「応援した人」</b>を並べます。</p>
-        <p>数字はニコニコ生放送が公開しているギフト・広告のランキングをそのまま出しています。当サイトが独自に集計・推定した値ではありません。</p>
+        <p><b>ギフト・広告のランキング</b>（名前・順位・ポイント）は、ニコニコ生放送が公開しているものを<b>そのまま</b>出しています。当サイトが独自に集計・改変した値ではありません。</p>
+        <p>★<b>「約○人（推定）」と並び順だけは当サイトの推定値です。</b>ニコニコ生放送に同時視聴数を知る手段が無いため、公開されている<b>累計の来場者数</b>と<b>放送の経過時間</b>から見積もっています（時間が経つほど視聴者が入れ替わる前提の減衰モデル）。実際の人数とは差があります。</p>
         <p>放送中の番組のみを対象にしています。表示は定期的に更新されます。</p>
       </div>
     </div>
@@ -179,6 +181,33 @@
         return '・' + min + '分前';
       }
 
+      // ★並び順: 推定同時視聴が多い順。
+      //
+      //   ★ニコ生には【同時視聴数の API が無い】。これは推測ではなく、
+      //     この製品の src/lib/concurrentEstimate.js が実測の末に明記していること:
+      //     「ニコ生には同時接続 API がないため、複数の統計指標から推定する」
+      //   ⟹ 取れるのは【累計の来場者数】。そのまま並べると長時間配信が上に居座る。
+      //
+      //   ★式は発明しない。concurrentEstimate.js の Signal B(滞留率法)と同じものを使う:
+      //     rate = max(0.08, 0.48 × exp(-0.005 × 経過分))
+      //     推定同時視聴 = 累計来場者 × rate
+      //   ★値も同ファイルの retention 定義(peak .48 / decay .005 / floor .08 / fallback .4)と同一。
+      //   ★同ファイルの Signal A(アクティブコメンター法)は配信を実際に見ないと取れないので、
+      //     サーバから集めるこのページでは使えない。だから B だけを使う。
+      var RETENTION = { peak: 0.48, decay: 0.005, floor: 0.08, fallback: 0.4 };
+      function retentionRate(ageMin) {
+        if (typeof ageMin !== 'number' || !isFinite(ageMin) || ageMin < 0) return RETENTION.fallback;
+        return Math.max(RETENTION.floor, RETENTION.peak * Math.exp(-RETENTION.decay * ageMin));
+      }
+      function estimateConcurrent(l) {
+        var visitors = Number(l && l.watchCount) || 0;
+        if (!visitors) return 0;
+        var begin = Number(l && l.beginTime) || 0;
+        // ★beginTime が無ければ経過不明 ⟹ fallback が効く(retentionRate の仕様どおり)。
+        var ageMin = begin ? (Date.now() / 1000 - begin) / 60 : NaN;
+        return Math.round(visitors * retentionRate(ageMin));
+      }
+
       function render(data) {
         var lives = (data && Array.isArray(data.lives)) ? data.lives : [];
         if (!lives.length) {
@@ -192,12 +221,20 @@
         //   ⟹ しきい値を超えたら画面上で明示する(機械が見ている所だけが動く)。
         elMeta.innerHTML = '放送中 <b>' + lives.length + '</b> 件' + esc(freshnessText(data.capturedAt));
 
-        elList.innerHTML = lives.map(function (l) {
+        // ★賑わっている順に並べ替える(元の配列は壊さない)。
+        var sorted = lives.slice().sort(function (a, b) { return estimateConcurrent(b) - estimateConcurrent(a); });
+
+        elList.innerHTML = sorted.map(function (l) {
           var gift = rowsFromGift(l.gift);
           var ad = rowsFromAd(l.ad);
+          var now = estimateConcurrent(l);
+          // ★「推定」と明記する。ニコ生が出している数字だと誤解させない。
+          var head = now
+            ? '<span class="now">👥 約' + num(now) + '人（推定）</span>'
+            : '';
           return '<section class="live">'
             + '<h2><a href="https://live.nicovideo.jp/watch/' + esc(l.liveId) + '" target="_blank" rel="noopener noreferrer">'
-            + esc(l.title || l.liveId) + '</a></h2>'
+            + esc(l.title || l.liveId) + '</a>' + head + '</h2>'
             + '<div class="cols">'
             + '<div class="col"><h3>ギフトで支えた人 <span class="sum">' + num(l.giftTotal) + 'pt</span></h3>'
             + renderRows(gift, 'pt') + '</div>'

@@ -37,6 +37,15 @@ const LV_RE = /lv\d{6,15}/g;
 const ON_AIR_RE = /status&quot;:&quot;ON_AIR&quot;/;
 /** 番組名。★watch ページは放送中判定で既に取っているので【追加リクエストは増えない】。 */
 const OG_TITLE_RE = /<meta property="og:title" content="([^"]*)"/;
+/**
+ * ★並び順の材料（同上・追加リクエストなし）。
+ *   ニコ生には【同時視聴数の API が無い】(src/lib/concurrentEstimate.js:4 が明記)。
+ *   取れるのは累計来場者数(watchCount)とコメント数と開始時刻。
+ *   ★ここでは推定値を計算せず【材料だけ】返す。推定の式の正本は concurrentEstimate.js に置く。
+ */
+const WATCH_COUNT_RE = /watchCount&quot;:(\d+)/;
+const COMMENT_COUNT_RE = /commentCount&quot;:(\d+)/;
+const BEGIN_TIME_RE = /beginTime&quot;:(\d+)/;
 
 async function upstash(command) {
   const base = process.env.KV_REST_API_URL;
@@ -102,11 +111,21 @@ async function probeWatchPage(lv) {
         .replace(/&quot;/g, '"').replace(/&#39;/g, "'")
         .trim().slice(0, 120)
     : '';
-  return { onAir: ON_AIR_RE.test(html), title };
+  const numAt = (re) => {
+    const mm = html.match(re);
+    return mm ? Number(mm[1]) || 0 : 0;
+  };
+  return {
+    onAir: ON_AIR_RE.test(html),
+    title,
+    watchCount: numAt(WATCH_COUNT_RE),
+    commentCount: numAt(COMMENT_COUNT_RE),
+    beginTime: numAt(BEGIN_TIME_RE)
+  };
 }
 
 /** 1配信ぶんの「支えた人」を集める。★rank はニコ生側が持っているので自前で計算しない。 */
-async function collectOne(lv, title) {
+async function collectOne(lv, meta) {
   const [gift, ad] = await Promise.all([
     fetchJsonSafe(`https://api.koken.nicovideo.jp/v1/userperspective/contents/gift/live/${lv}/ranking?rank=10`),
     fetchJsonSafe(`https://api.nicoad.nicovideo.jp/v1/contents/live/${lv}/ranking/contribution?limit=10`)
@@ -120,7 +139,11 @@ async function collectOne(lv, title) {
   const giftTotal = giftRankers.reduce((sum, r) => sum + (Number(r?.contribution) || 0), 0);
   return {
     liveId: lv,
-    title: String(title || ''),
+    title: String(meta.title || ''),
+    // ★並び順の材料。画面側が推定に使う（ここでは推定しない）。
+    watchCount: Number(meta.watchCount) || 0,
+    commentCount: Number(meta.commentCount) || 0,
+    beginTime: Number(meta.beginTime) || 0,
     giftTotal,
     adTotal: Number(ad?.data?.contentTotalContribution) || 0,
     // ★生の形のまま載せる。画面側が既存の正規化関数
@@ -139,10 +162,10 @@ async function collect() {
   const candidates = all.slice(0, MAX_LIVES);
   const probes = await Promise.all(candidates.map((lv) => probeWatchPage(lv)));
   const onAir = candidates
-    .map((lv, i) => ({ lv, title: probes[i].title, onAir: probes[i].onAir }))
-    .filter((x) => x.onAir);
+    .map((lv, i) => ({ lv, meta: probes[i] }))
+    .filter((x) => x.meta.onAir);
 
-  const collected = await Promise.all(onAir.map((x) => collectOne(x.lv, x.title)));
+  const collected = await Promise.all(onAir.map((x) => collectOne(x.lv, x.meta)));
   const lives = collected.filter(Boolean);
   return {
     ok: true,
