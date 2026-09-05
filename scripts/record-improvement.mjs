@@ -90,6 +90,46 @@ const AUTO_COLLECTORS = Object.freeze([
         return null;
       }
     }
+  },
+  {
+    metric: 'cross-checked-claims',
+    source: '直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    /**
+     * ★なぜこれを測るのか(2026-09-06・1日分を数えた実測):
+     *   訂正9件のうち3件が「道具の出力を1つだけ見て断定」だった。
+     *     git merge-tree だけ見て「衝突0件」→ 実際は7ファイル衝突
+     *     文字列カウントだけで「抽出しやすい関数4個」→ 構文解析すると0個
+     *     サブエージェントの報告だけで「重複5個」→ 自分で grep したら2個
+     *   ★どれも【別の手段で1回確かめれば1分で分かった】。
+     *
+     * ★なぜ「間違えた回数」を数えないのか:
+     *   ★正直に訂正を書くほど数字が悪化する＝正直さを罰する指標になる。
+     *   実測すると訂正の記述も機械的に数えられてしまう(直近5日で4件)。だからこそ危ない。
+     *   ⟹ ★【確かめた回数】を数える。増やす行動がそのまま正解になる。
+     *
+     * ★0件は「測れなかった」ではなく「本当に0件」なので null にしない。
+     *   ただし★コミットが1件も無ければ測っていないので null を返す。
+     */
+    measure() {
+      try {
+        const bodies = execFileSync(
+          'git',
+          ['log', '--since=30 days ago', '--format=%b'],
+          { cwd: ROOT, encoding: 'utf8', timeout: 30000 }
+        );
+        // ★コミットが無い＝測れていない(0件と区別する)
+        const commits = execFileSync(
+          'git',
+          ['log', '--since=30 days ago', '--oneline'],
+          { cwd: ROOT, encoding: 'utf8', timeout: 30000 }
+        ).trim();
+        if (!commits) return null;
+        const re = /毒テスト|毒で赤|毒で確認|実測で確認|測り直|再現し|目視確認|別の手段|裏を取|裏どり|実際に走らせ/gi;
+        return (bodies.match(re) || []).length;
+      } catch {
+        return null;
+      }
+    }
   }
 ]);
 
