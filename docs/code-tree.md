@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 6 / 851 件
+## ⚠️ 役割コメントが無いソース 6 / 852 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `src/lib/laneDomSelfMeasure.js`
@@ -52,7 +52,8 @@
   - `KB-stale-premise.md`
   - `TO-web-ios-android-ai-maze-pattern-2026-08-31.md`
   - `TO-web-ios-android-unnamed-bucket-2026-09-03.md`
-- 📁 **api/** (1)
+- 📁 **api/** (2)
+  - `live-ranking.js` — /live/ 用「支えた人ランキング」の収集・配信 Vercel Serverless Function。
   - `status.js` — status 受け口 Vercel Serverless Function。
 - 📁 **app/** (97)
   - 📁 **images/** (93)
@@ -2740,7 +2741,7 @@
     - `store.mjs` — NicoLive Local MCP Bridge - Snapshot Store.
   - `audit-lp-overflow.mjs` — One-off LP overflow audit (run: node tools/audit-lp-overflow.mjs)
   - `render-og.js` — 追憶の煌めき LP 用 OG 画像（1200×630）を生成する。
-- 📁 **tsuioku-no-kirameki/** (40)
+- 📁 **tsuioku-no-kirameki/** (41)
   - 📁 **articles/** (14)
     - 📁 **role-separation-design/** (2)
       - 📁 **img/** (1)
@@ -2777,6 +2778,8 @@
     - `og-image.jpg`
     - `og-image.png`
     - `twitter-icon.png`
+  - 📁 **live/** (1)
+    - `index.html`
   - 📁 **sound/** (1)
     - `yozora-small-yell.mp3`
   - `.htaccess`
