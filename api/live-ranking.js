@@ -29,8 +29,25 @@
 
 const STORE_KEY = 'live:ranking:latest';
 const TTL_SECONDS = 60 * 60; // 1 時間(収集が止まっても古い値が残り続けないように)
-/** ★1回の収集で見る配信数。実測で 30本連続 200 を確認済みの範囲に収める。 */
+/**
+ * ★1回の収集で【中身まで取る】配信数。
+ *   放送中/個人配信かの判定(watch ページ)は候補全件に対して並列で行う。
+ *   ★実測(2026-09-05): 83件の watch を並列取得して 1,210ms。逐次より速い。
+ */
 const MAX_LIVES = 20;
+/**
+ * ★チャンネル/公式番組(TV番組)を除外し、個人配信だけを対象にする。
+ *
+ *   ユーザーの言葉:「これTV番組」「配信者にしてほしい」
+ *   ★実測(2026-09-05): /ranking の【上位20件は 19件がチャンネル】だった。
+ *     一方、全83件まで見ると【放送中×個人配信が 49件】ある。
+ *   ⟹ 上位を切るのではなく、全件を判定してから個人配信だけ残す。
+ *
+ *   判定は watch ページの埋め込み JSON:
+ *     個人配信   providerType:"community" / supplierType:"user"
+ *     TV番組など providerType:"official"|"channel" / supplierType:"channel"
+ */
+const SUPPLIER_TYPE_RE = /supplierType&quot;:&quot;([a-z]+)/;
 /** ランキングHTMLから拾う lv の形。 */
 const LV_RE = /lv\d{6,15}/g;
 /** watch ページの埋め込み JSON は HTML エスケープされている(&quot;)。素の "status" では見つからない。 */
@@ -115,8 +132,11 @@ async function probeWatchPage(lv) {
     const mm = html.match(re);
     return mm ? Number(mm[1]) || 0 : 0;
   };
+  const st = html.match(SUPPLIER_TYPE_RE);
   return {
     onAir: ON_AIR_RE.test(html),
+    // ★'user' 以外(channel 等)は TV番組・公式番組なので落とす。取れなければ落とす(fail-closed)。
+    isUserBroadcast: !!st && st[1] === 'user',
     title,
     watchCount: numAt(WATCH_COUNT_RE),
     commentCount: numAt(COMMENT_COUNT_RE),
@@ -158,19 +178,21 @@ async function collect() {
   const all = pickLiveIdsFromRankingHtml(html);
   if (!all.length) return { ok: false, error: 'no live ids' };
 
-  // ★放送中の確認を先に済ませてから中身を取る(終了番組に3本ずつ叩かない)。
-  const candidates = all.slice(0, MAX_LIVES);
-  const probes = await Promise.all(candidates.map((lv) => probeWatchPage(lv)));
-  const onAir = candidates
+  // ★候補は【全件】見る。上位だけ見るとチャンネルで埋まって個人配信が入らない(実測: 上位20の19件)。
+  //   watch の取得は並列なので、83件でも約1.2秒(実測)。
+  const probes = await Promise.all(all.map((lv) => probeWatchPage(lv)));
+  const onAir = all
     .map((lv, i) => ({ lv, meta: probes[i] }))
-    .filter((x) => x.meta.onAir);
+    .filter((x) => x.meta.onAir && x.meta.isUserBroadcast)
+    // ★中身(ギフト/広告)を取るのはここで絞ってから。API 呼び出し数を実測範囲に保つ。
+    .slice(0, MAX_LIVES);
 
   const collected = await Promise.all(onAir.map((x) => collectOne(x.lv, x.meta)));
   const lives = collected.filter(Boolean);
   return {
     ok: true,
     capturedAt: Date.now(),
-    scanned: candidates.length,
+    scanned: all.length,
     onAir: onAir.length,
     lives
   };
