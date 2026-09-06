@@ -1,5 +1,6 @@
 import js from '@eslint/js';
 import globals from 'globals';
+import html from 'eslint-plugin-html';
 
 const browserChrome = {
   ...globals.browser,
@@ -517,6 +518,64 @@ export default [
       eqeqeq: ['error', 'smart'],
       'no-var': 'error',
       'prefer-const': ['error', { ignoreReadBeforeAssign: true }]
+    }
+  },
+  // ───────────────────────────────────────────────────────────────────────
+  // ★HTMLの中に直接書いたJavaScript（2026-09-06 追加）
+  //
+  // ★なぜ要るか（実測）: ここは【検査を1バイトも通っていなかった】。
+  //     $ npx eslint tsuioku-no-kirameki/live/index.html
+  //       0:0 warning File ignored because no matching configuration was supplied
+  //       EXIT=0   ← ★エラーが無いのではなく【見ていない】のに緑を返していた
+  //   files: に .html を指す指定が1つも無かったのが原因。対象は実測1,276行。
+  //
+  // ★no-var / prefer-const を切ってある理由（★スタイルを触らない）
+  //   実測すると no-var だけで101件出るが、これは【意図的な方針】であって
+  //   バグではない。live/index.html の冒頭に理由が明記されている:
+  //     「★外部依存を増やさないため素の JS で書く(このディレクトリはビルド対象外)」
+  //   101件を機械的に書き換えるとレビュー不能な差分になり、
+  //   「一度に全部直せと迫る仕掛けは全部死んだ」の轍を踏む。
+  //   ⟹ ★捕まえるのは【本物のバグ】だけにする。no-undef(タイポ)が本命。
+  //
+  // ★no-unused-vars / no-empty も切ってある理由
+  //   実測134件の内訳は no-var 101 / no-unused-vars 17 / no-empty 16 で、
+  //   ★17件と16件は【全て同一の定型】だった: `try { ... } catch (e) {}`。
+  //   ★本物のバグは0件。定型を潰すために既存コードを触る価値はない。
+  //
+  // ★このプラグイン(eslint-plugin-html)はメンテナが1人（実測）。
+  //   将来使えなくなる可能性がある。★そのときは このブロックごと消せばよい。
+  //   ★構文エラーだけは web-ios-android の check-inline-script-syntax.mjs
+  //     （依存ゼロ・node:vm）が別途守るので、消しても丸裸にはならない。
+  // ───────────────────────────────────────────────────────────────────────
+  {
+    files: ['tsuioku-no-kirameki/**/*.html'],
+    plugins: { html },
+    languageOptions: {
+      ecmaVersion: 2022,
+      // ★実測: 対象3ファイルとも type="module" が無い classic script。
+      sourceType: 'script',
+      globals: globals.browser
+    },
+    rules: {
+      // ★上位ブロック(js.configs.recommended 等)から error として継承されるので、
+      //   ここで【明示的に切る】。実測134件のうち33件がこれで、
+      //   中身は全て `try { ... } catch (e) {}` の定型＝★本物のバグは0件だった。
+      //   （--print-config で [2]=error を継承していることを確認済み）
+      'no-unused-vars': 'off',
+      'no-empty': 'off',
+      // ★本命。タイポ（documnt.getElementById 等）を捕まえる。
+      //   ★依存ゼロの構文検査では【素通りする】ので、ここでしか捕まえられない。
+      'no-undef': 'error',
+      // ★同じキーを2回書くと後勝ちで静かに壊れる。
+      'no-dupe-keys': 'error',
+      'no-dupe-args': 'error',
+      'no-func-assign': 'error',
+      'no-unreachable': 'error',
+      // ★到達不能・自明な誤りだけ。スタイルは入れない（上の理由）。
+      'no-cond-assign': 'error',
+      'no-compare-neg-zero': 'error',
+      'use-isnan': 'error',
+      'valid-typeof': 'error'
     }
   }
 ];
