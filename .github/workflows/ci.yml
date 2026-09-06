@@ -12,6 +12,10 @@ permissions:
 jobs:
   test-and-build:
     runs-on: ubuntu-latest
+    # ★timeout を書かない job は、ハングすると【6時間のデフォルト】まで走り続ける。
+    #   2026-08-06 にそれで Actions の予算を使い切り、★全リポの CI が止まった実績がある。
+    #   verify(test+lint+typecheck+build) の実測は数分なので 20分あれば足りる。
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
 

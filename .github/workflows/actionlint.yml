@@ -1,0 +1,54 @@
+name: Actionlint
+
+# ★なぜ要るか（2026-09-06 実測）
+#   このリポの workflow（ci.yml / live-ranking.yml）は【どの検査も受けていなかった】。
+#   ESLint は .js しか見ず、yml を見る仕組みが1つも無かった（grep で確認）。
+#
+#   ★workflow は「壊れていても push できてしまう」種類のファイル。
+#     構文ミス・存在しない action 名・打ち間違えた式は、
+#     ★実際に実行されるまで誰も気づかない。
+#
+# ★実害の記録（横展開元 kimitolink-linktree のコメントより）
+#   「timeout-minutes を書かない job は、ハングすると 6時間のデフォルトまで走り続ける。
+#     2026-08-06 にそれで Actions の予算を使い切り、全リポの CI が止まった」
+#   ★このリポにも同じ穴が空いていた（ci.yml の test-and-build に timeout が無かった）。
+#   同時に修正済み。
+#
+# ★非ブロッキングで入れてある理由
+#   actionlint をローカルで実行できず（未インストール・docker 無し）、
+#   ★既存の2本が何件指摘されるかを【実測できていない】。
+#   いきなり必須ゲートにすると、既存の指摘で CI が赤のまま止まる恐れがある。
+#   ⟹ まず「見えるようにする」ところまで。指摘が0件だと分かったら
+#      continue-on-error を外して必須ゲートに格上げする。
+#
+# ★横展開元: kimitolink-linktree/.github/workflows/actionlint.yml
+#   （★全リポでそこだけが導入済みだった。新規に発明していない）
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/**"
+  push:
+    branches: [main, master, develop]
+    paths:
+      - ".github/workflows/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  actionlint:
+    runs-on: ubuntu-latest
+    # ★この job 自身にも timeout を書く（上のコメントの実害を繰り返さない）
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install and run actionlint
+        # ★まずは非ブロッキング。指摘件数を実測してから必須に格上げする。
+        continue-on-error: true
+        run: |
+          set -euo pipefail
+          bash <(curl -fsSL https://raw.githubusercontent.com/rhysd/actionlint/main/scripts/download-actionlint.bash)
+          ./actionlint -color
