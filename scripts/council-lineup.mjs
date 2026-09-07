@@ -526,7 +526,17 @@ export const LINEUP = [
   //  昇格基準は前任から引き継ぐ: 7日以上空けた実会議2回でFAILEDゼロなら正規化。
   //  降格基準: 1回でも429/503が出たら即撤去（Google無料枠は時期変動が大きい実績あり）。
   //  旧: { label: 'gemini-3.5-flash', rawId/apiModel: 'gemini-3.5-flash' }（2026-07-04採用）
-  { label: 'gemini-3.6-flash', provider: 'gemini', rawId: 'gemini-3.6-flash', apiModel: 'gemini-3.6-flash', opts: {}, requires: ['E'] },
+  // ★2026-09-07 入れ替え（gemini-3.6-flash → gemini-3.7-flash）: 09-01の判断が逆転した。
+  //  09-01時点: 3.6 → 3955〜4968ms / 3.7 → 30754ms・14316ms ＝ 3.7を「遅い」として不採用にした。
+  //  09-07実測(3回): 3.7 → 3108/7255/3054ms / 3.6 → 28615/10268/13777ms(うち1回503)。
+  //  ＝**完全に逆転**。無料枠の割当は日単位で入れ替わるので、一度の実測を恒久的な性能差と
+  //  みなしてはならない（同日 magistral 系も2日連続429で沈み、09-02に主力へ上げた
+  //  magistral-medium を09-06に差し戻したのと同じ現象）。
+  //  ★教訓: 採用時の実測値は必ず日付とセットで残す。後日ひっくり返るのが常態。
+  //  旧: { label: 'gemini-3.6-flash', ... }（2026-09-01採用・当時は3〜4倍速かった）
+  //  基準は相対比較に切り替える: 「他の候補より明確に遅くなったら入れ替える」。
+  //  Google無料枠は変動が常態と実証されたため「1回でも429/503で即撤去」は適用しない。
+  { label: 'gemini-3.7-flash', provider: 'gemini', rawId: 'gemini-3.7-flash', apiModel: 'gemini-3.7-flash', opts: {}, requires: ['E'] },
 
   // 2026-06-?? 追加 → 2026-07-31 撤去（openrouter/gpt-oss-120b）:
   //   本改修でrawIdを空('')から'openai/gpt-oss-120b:free'に埋めた直後の初回実行で
