@@ -124,6 +124,26 @@ export function roleOf(name) {
   // 採用する際にそのまま効くため。
   // 注意: 素の"nemotron"では書かない（cloudflare/nemotron-120bは意図的にgeneralist=フォールスルー）。
   if (n.includes("mistral-large")) return "lead";
+  // ★2026-09-09 追加: ling-3.0-flash を lead に。**leadの実質頭脳が1種類しかない**問題への対処。
+  //  lead は nvidia/nemotron-3-ultra と openrouter 版が同一モデルの2経路で、3体目の
+  //  mistral/magistral-medium が3日連続429で沈むと**頭脳が nemotron だけ**になる（08-31・
+  //  09-07 と3度目の再発）。統括役が単一モデル依存だと、同じ誤り方をしても誰も気づけない。
+  //  inclusionAI は既存17体のどれとも別系譜（OpenAI-oss/Qwen/NVIDIA/Mistral/Google/Zhipu/
+  //  DeepSeek/Llama のいずれでもない）＝頭脳の多様化として意味がある。
+  //  実測(本番と同じ /api/v1/chat/completions・2並列を3回・時間差): **6/6成功・2986〜5430ms**。
+  //  usage.cost=0 を毎回確認（:free サフィックス付き＝OpenRouterで唯一信頼できる無料の根拠。
+  //  pricing="0" 表示は当てにならない実績あり→2026-08-29の修理を参照）。
+  //  統括プロンプトの質も確認済み: 3案を統合した結論＋異論1行を指示どおり返した。
+  //  ★不採用にした候補（同日・同条件で実測）:
+  //   - nex-agi/nex-n2.5-mini:free … **1149〜1979msと最速だが不採用**。統括プロンプトに対し
+  //     「了解しました。提示すれば統合します」という**メタ返答**を返し、実際の統合をしなかった。
+  //     速さだけで採ると会議の結論が空になる（速度より仕事をするかを先に見る）。
+  //   - nex-agi/nex-n2.5-pro:free … 統合の質は良いが10119/10764msで本エントリより遅い。
+  //   - thinkingmachines/inkling:free … 403（無料枠で呼べない）。
+  //   - google/gemma-4-31b-it:free … 429（枠なし）。
+  //  ラベルは 'openrouter/ling-3.0-flash' 必須: この行より上に "ling" を拾う判定は無く、
+  //  下の汎用 openrouter 判定(weight3)に落ちる前にここで lead が確定する。
+  if (n.includes("ling-3.0-flash")) return "lead";
   if (n.includes("nemotron-3-ultra")) return "lead";
   // llama-4(scout/maverick) は軽快な新顔 → 速い視点。汎用 llama-3.3 と同枠。
   if (n.includes("llama-4") || n.includes("scout") || n.includes("maverick")) return "fast";

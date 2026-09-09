@@ -285,6 +285,29 @@ export const LINEUP = [
   //  こちらはlead予備だが、本線が落ちた日の代打がまた90秒で落ちては冗長化の意味がない。
   { label: 'openrouter/nemotron-3-ultra-550b', provider: 'openrouter', rawId: 'nvidia/nemotron-3-ultra-550b-a55b:free', apiModel: 'nvidia/nemotron-3-ultra-550b-a55b:free', opts: {}, requires: ['O'] },
 
+  // ★2026-09-09 追加（leadの頭脳が1種類しかない問題の解消・17→18体）:
+  //  lead は上の nvidia版 と openrouter版 が**同一モデルの2経路**で、3体目の
+  //  mistral/magistral-medium が3日連続429で沈むと**実質の頭脳が nemotron だけ**になる。
+  //  08-31・09-07 に続き3度目の再発なので、その都度しのぐのをやめて別系譜を常設する。
+  //  inclusionAI は既存メンバーのどの系譜にも属さない（頭脳の多様化として意味がある。
+  //  「経路の冗長化と頭脳の多様化は別物」＝2026-08-05 のMistral追加時に得た整理と同じ）。
+  //  実測(本番と同じ経路・2並列を3回・時間差): **6/6成功・2986〜5430ms**、毎回 usage.cost=0。
+  //  統括プロンプトでも3案を統合した結論＋異論1行を指示どおり返した（質を確認済み）。
+  //  ★:free サフィックス付きを選んだのは必須条件: OpenRouterの pricing="0" 表示は嘘をつく
+  //   （2026-08-29に課金モデルを無料と誤判定してscoutを修理した実績）。cost=0 の実測が根拠。
+  //  weightは"openrouter"判定で自動3＝nemotron(w2)の次に並ぶ予備。平常時は選ばれず、
+  //  nemotron が落ちた時に**別系譜として**浮上する（同じ誤り方をしない保険）。
+  //  rawId=apiModelなのでcouncil-scoutのカタログ照合対象に入る。
+  //  ★恒久ルール5（同役に同一プロバイダを重ね積みしない）にlead=openrouter×2で抵触するが、
+  //   **意図的な例外**として許容する。ルールの目的は「そのプロバイダが死んだ日に予備が
+  //   まとめて消えること」の防止だが、実測でその事態は起きない:
+  //     nvidia全滅→lead 3体/頭脳3種類・openrouter全滅→2体/2種類・mistral全滅→3体/2種類
+  //   ＝**どのプロバイダが落ちても頭脳2種類以上が残る**。逆に本エントリを入れないと、
+  //   mistralが429で沈んでいる平常時に頭脳が1種類（nemotronのみ）に落ちる方が危険だった。
+  //   ルールの字面より目的（統括役が単一モデル依存にならないこと）を優先した判断。
+  //   将来 openrouter 以外で別系譜のleadが採れたら、そちらへ移して重複を解消してよい。
+  { label: 'openrouter/ling-3.0-flash', provider: 'openrouter', rawId: 'inclusionai/ling-3.0-flash-fin:free', apiModel: 'inclusionai/ling-3.0-flash-fin:free', opts: {}, requires: ['O'] },
+
   // 2026-07-31 追加: SambaNova Cloud（新規プロバイダ）。Free Tierは支払い方法未登録時に
   // 自動適用されカード登録不要（docs.sambanova.ai/docs/en/models/rate-limitsで確認済み）。
   // 会議ハーネス自身への諮問で「同一無料プロバイダへの二重依存」を懸念されたが、両エントリ

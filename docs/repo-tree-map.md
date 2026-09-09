@@ -220,9 +220,9 @@ graph LR
 - `auto/`（8 件） — ⚠️ 未記入（ROLES に追記）
 
 ## `council-scout/` — ⚠️ 未記入（ROLES に追記）
-<sub>ファイル 16 件</sub>
+<sub>ファイル 17 件</sub>
 
-- `briefs/`（16 件） — ⚠️ 未記入（ROLES に追記）
+- `briefs/`（17 件） — ⚠️ 未記入（ROLES に追記）
 
 ## `docs/` — 設計正本・マインドマップ・フロー図・feature-map(AI/人間向け)  〔設計 / レポート〕
 <sub>ファイル 312 件</sub>
