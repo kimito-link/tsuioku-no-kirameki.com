@@ -518,5 +518,19 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
     version: '0.1.1511', metric: 'cross-checked-claims', value: 47,
     source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
     note: '★悪化してよい理由: 30 日の移動窓(1508〜1510 の note と同じ)で 1510 と同値。この版は実配信 3 本への --dry-run(reached_start 1 本・cap_elapsed 1 本)で裏取りしているが、コミット前なので窓に載るのは次版から'
+  }),
+  Object.freeze({
+    version: '0.1.1512', metric: 'bundle-kb', value: 1407,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '★悪化してよい理由: 1409→1407KB(−2KB・前版より改善だが過去最良 1360 @1454 には届かない)。この版の変更は /live/ の CSS 1 行(3 列の minmax)と更新履歴 1 件だけで popup バンドルには入らない。減ったのは【更新履歴の入れ替え】(1512 の短いエントリが入り、押し出された最古の 1 件の方が長かった)。1454 以来の増分は未計測のまま(1508 の note 参照)'
+  }),
+  Object.freeze({
+    version: '0.1.1512', metric: 'gate-selftest', value: 4,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1512', metric: 'cross-checked-claims', value: 47,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: '★悪化してよい理由: 30 日の移動窓(1508〜1511 の note と同じ)で 1511 と同値。この版は本番 /live/ を 800px 幅で実測(3 列が 302/346/176px に割れて 3 列目がはみ出す)して直し、直後にローカルの同条件で再測して確かめるが、コミット前なので窓に載るのは次版から'
   })
 ]);

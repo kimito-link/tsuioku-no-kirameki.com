@@ -232,7 +232,9 @@
       .tpt { font-size: .66rem; color: var(--orange); font-variant-numeric: tabular-nums; white-space: nowrap; }
 
       .cols { display: grid; grid-template-columns: 1fr; gap: 0; }
-      @media (min-width: 720px) { .cols { grid-template-columns: 1fr 1fr 1fr; } }
+      /* ★minmax(0,1fr): 素の 1fr は中身の最小幅(長い名前・件数)で列が押し広がり、800px 幅で 3 列目がはみ出た(実測 302/346/176px)。
+         0 を下限にすると 3 等分に収まり、長い名前は .nm の ellipsis が受ける。 */
+      @media (min-width: 720px) { .cols { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
       .col { padding: 10px 14px 12px; }
       .col + .col { border-top: 1px solid var(--line); }
       @media (min-width: 720px) { .col + .col { border-top: 0; border-left: 1px solid var(--line); } }
