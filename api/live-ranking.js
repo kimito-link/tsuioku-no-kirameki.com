@@ -28,6 +28,15 @@
  */
 
 const STORE_KEY = 'live:ranking:latest';
+/**
+ * ★2026-09-14 「リアルタイム取得を売りにする」: 見る人が ?refresh=1 を叩いたら【鍵なしでも】収集する。
+ *   ただし乱打でニコ生を叩かないよう、前回の収集から PUBLIC_REFRESH_MIN_MS 未満なら保存済みを返す(throttled)。
+ *   同時に複数の閲覧者が叩いても収集は 1 本だけ(Redis の SET NX ロック。TTL は収集所要 1.2〜5 秒の余裕で 30 秒)。
+ *   cron(x-share-key つき)は従来どおり無条件に収集する。
+ */
+const PUBLIC_REFRESH_MIN_MS = 60 * 1000;
+const REFRESH_LOCK_KEY = 'live:ranking:refresh-lock';
+const REFRESH_LOCK_TTL_SECONDS = 30;
 const TTL_SECONDS = 60 * 60; // 1 時間(収集が止まっても古い値が残り続けないように)
 /**
  * ★1回の収集で【中身まで取る】配信数。
@@ -303,13 +312,28 @@ export default async function handler(req, res) {
       return;
     }
 
-    // ★収集は書き込みなので、status と同じ x-share-key で守る(誰でも走らせられないように)。
+    // ★収集は書き込み。cron は x-share-key で無条件に、閲覧者は鍵なしで【1 分に 1 回まで】(上の定数)。
     if (String(req.query?.refresh || '') === '1') {
       const key = String(req.headers['x-share-key'] || '');
       const want = process.env.STATUS_INGEST_KEY;
-      if (!want || key !== want) {
-        res.status(401).json({ ok: false, error: 'unauthorized' });
-        return;
+      const trusted = !!want && key === want;
+      if (!trusted) {
+        // 閲覧者からの更新要求: 新鮮なら保存済みをそのまま返す(ニコ生を叩かない)。
+        const rawNow = await upstash(['GET', STORE_KEY]);
+        let stored = null;
+        try { stored = rawNow ? JSON.parse(rawNow) : null; } catch { stored = null; }
+        const ageMs = stored && Number(stored.capturedAt) > 0 ? Date.now() - Number(stored.capturedAt) : Infinity;
+        if (stored && ageMs < PUBLIC_REFRESH_MIN_MS) {
+          res.status(200).json({ ...stored, refreshed: false, throttled: true, nextAllowedInMs: PUBLIC_REFRESH_MIN_MS - ageMs });
+          return;
+        }
+        // 同時に来た他の閲覧者は保存済みを返す(収集は 1 本だけ)。
+        const locked = await upstash(['SET', REFRESH_LOCK_KEY, String(Date.now()), 'NX', 'EX', String(REFRESH_LOCK_TTL_SECONDS)]);
+        if (locked !== 'OK') {
+          if (stored) { res.status(200).json({ ...stored, refreshed: false, inFlight: true }); return; }
+          res.status(404).json({ ok: false, error: 'not collected yet', inFlight: true });
+          return;
+        }
       }
       const payload = await collect();
       if (!payload.ok) {
@@ -336,6 +360,12 @@ export default async function handler(req, res) {
         return;
       }
       await upstash(['SET', STORE_KEY, JSON.stringify(payload), 'EX', String(TTL_SECONDS)]);
+      if (!trusted) {
+        // ★閲覧者には集めたての本体をそのまま返す(もう一往復させない=リアルタイム性)。
+        try { await upstash(['DEL', REFRESH_LOCK_KEY]); } catch { /* TTL で消える */ }
+        res.status(200).json({ ...payload, refreshed: true });
+        return;
+      }
       res.status(200).json({ ok: true, stored: true, onAir: payload.onAir, lives: payload.lives.length });
       return;
     }

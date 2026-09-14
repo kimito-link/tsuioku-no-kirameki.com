@@ -34,9 +34,17 @@
       ★画像は extension/images/ が正本。/live/ からは ../../extension/ で Web でも disk でも同じ実体に解決する
         (Web: /live/../../extension → /extension は vercel.json の rewrite 対象外で直接配信される)。
     -->
+    <!-- ★ヘッダー(ロゴ＋ハンバーガー)・ドロワー・フッターは LP と共通の部品(assets/css/site-chrome-lp.css + assets/js/site-chrome-lp.js)。 -->
+    <link rel="stylesheet" href="../assets/css/site-chrome-lp.css">
     <link rel="stylesheet" href="../assets/css/yukkuri-thread.css">
     <style>
       :root {
+        /* ★共有ヘッダー/フッター(site-chrome-lp.css)が参照する変数。LP と同じ名前・値。 */
+        --gold: #c98e2b;
+        --shell-pad: 16px;
+        --maxw: 1160px;
+        --lp-yoz-petal-mid: rgba(220,150,185,.32);
+        --lp-yoz-mist: rgba(140,95,150,.1);
         --bg: #fffaf4;
         --bg-soft: #fff3e6;
         --line: #eadbc7;
@@ -52,6 +60,10 @@
       }
       * { box-sizing: border-box; }
       html, body { margin: 0; padding: 0; }
+      /* ★共有ヘッダー/フッターが使う LP の骨組みクラス(LP と同じ式)。 */
+      .shell { width: min(calc(100% - 2 * var(--shell-pad)), var(--maxw)); margin: 0 auto; }
+      @media (min-width: 480px) { :root { --shell-pad: clamp(16px, 3.2vw, 28px); } }
+      .visually-hidden { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
       body {
         background:
           radial-gradient(ellipse 60% 30% at 50% -6%, rgba(255, 228, 196, .55), transparent 70%),
@@ -115,6 +127,24 @@
       .ext-link { margin-left: auto; display: inline-flex; align-items: center; gap: 4px; font-size: .78rem; color: var(--navy); text-decoration: none; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--line); background: #fff; }
       .ext-link:hover { border-color: var(--orange); color: var(--orange); }
       .cta-foot { margin-top: 26px; text-align: center; }
+
+      /* ── リアルタイム更新(自動 60 秒＋手動ボタン) ── */
+      .refresh-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 10px; }
+      .btn--refresh { background: var(--navy-deep); color: #fff; border-color: var(--navy-deep); }
+      .btn--refresh:hover { background: var(--navy); }
+      .btn--refresh:disabled, .btn--refresh.is-busy { opacity: .7; cursor: progress; }
+      .btn--refresh.is-busy::before { content: ""; width: 12px; height: 12px; border: 2px solid rgba(255,255,255,.5); border-top-color: #fff; border-radius: 50%; animation: nl-spin .8s linear infinite; }
+      @keyframes nl-spin { to { transform: rotate(360deg); } }
+      .countdown { font-size: .8rem; color: var(--ink-sub); font-variant-numeric: tabular-nums; }
+      .realtime-badge { font-size: .74rem; font-weight: 800; letter-spacing: .04em; color: #b3400f; background: #fff1e6; border: 1px solid rgba(200,114,28,.35); border-radius: 999px; padding: 3px 9px; }
+      .fab-refresh {
+        position: fixed; right: 14px; bottom: 16px; z-index: 30; width: 52px; height: 52px; border-radius: 50%;
+        border: 1px solid rgba(20,55,92,.25); background: var(--navy-deep); color: #fff; font-size: 1.3rem; line-height: 1;
+        box-shadow: 0 8px 22px rgba(20,55,92,.35); cursor: pointer;
+      }
+      .fab-refresh:disabled, .fab-refresh.is-busy { opacity: .7; cursor: progress; animation: nl-spin 1s linear infinite; }
+      @media (min-width: 760px) { .fab-refresh { display: none; } }
+      @media (prefers-reduced-motion: reduce) { .btn--refresh.is-busy::before, .fab-refresh.is-busy { animation: none; } }
 
       /* ── 3キャラの説明: 見た目は共有 CSS。ここはこのページ固有の間隔・色・揺れだけ ── */
       .yukkuri-thread { margin: 16px 0 6px; gap: 12px; }
@@ -253,8 +283,10 @@
     </style>
   </head>
   <body>
+    <!-- ★LP と同じヘッダー・ハンバーガーメニュー(同期的にここへ差し込まれる)。data-base="../" でナビは LP のセクションへ飛ぶ。 -->
+    <script src="../assets/js/site-chrome-lp.js" data-part="header" data-base="../" data-current="live"></script>
     <div class="wrap">
-      <a class="home" href="/">← 追憶のきらめき（トップへ）</a>
+      <a class="home" href="../">← 追憶のきらめき（トップへ）</a>
 
       <header class="brand">
         <a class="brand__logo" href="https://kimito-link.com/" target="_blank" rel="noopener noreferrer" aria-label="Kimito-Link Project（キミトリンクプロジェクト）公式サイト（新しいタブ）">
@@ -265,12 +297,22 @@
           <h1>追憶のきらめき ランキング<small>いま支えている人 ― ニコニコ生放送</small></h1>
           <p class="lede">いまこの瞬間、配信を支えている人（ギフト・広告）を配信ごとに。配信サムネ・配信者・経過時間つき。</p>
           <p class="meta" id="meta"><img class="face" src="../../extension/images/yukkuri-charactore-english/link/link-yukkuri-blink-mouth-closed.thumb128.png" alt="">読み込み中…</p>
+          <div class="refresh-row">
+            <button type="button" class="btn btn--refresh" data-refresh aria-label="ランキングをいま更新する">🔄 いま更新</button>
+            <span class="countdown" id="refreshCountdown" aria-live="polite">自動更新: 60 秒ごと</span>
+            <span class="realtime-badge">⚡ リアルタイム取得</span>
+          </div>
           <div class="cta-row">
             <a class="btn btn--primary" href="https://chromewebstore.google.com/detail/cjbabignmmodaickpeckiojjabnlogdb" target="_blank" rel="noopener noreferrer"><img src="../../extension/images/logo/konta-yukkuri-icon-48.png" alt="" width="22" height="22" decoding="async">Chrome 拡張を入れる（無料）</a>
             <a class="btn btn--ghost" href="../#record-cta">本体アプリの使い方</a>
           </div>
         </div>
       </header>
+
+      <!-- ★ランキングは【すぐ見える位置】に(ユーザー要望 2026-09-14「すぐに ranking が見れるようにして」)。説明と導線はその下。 -->
+      <main id="list" class="list" aria-live="polite"></main>
+
+      <button type="button" class="fab-refresh" data-refresh aria-label="ランキングをいま更新する" title="いま更新">🔄</button>
 
       <div class="yukkuri-thread" aria-label="このページの説明">
         <div class="y-row">
@@ -292,22 +334,20 @@
             <img src="../../extension/images/yukkuri-charactore-english/tanunee/tanuki-yukkuri-half-eyes-mouth-open.png" alt="たぬ姉" width="92" height="92" decoding="async">
             <span>たぬ姉</span>
           </div>
-          <div class="bubble">順位とポイントは<strong>ニコ生が公開している値そのまま</strong>。当サイトが足したのは「約○人（推定）」と並び順だけよ。数分おきの更新だから、「たった今」を名乗るのは鮮度表示が緑のときだけ、と覚えておいて。</div>
+          <div class="bubble">順位とポイントは<strong>ニコ生が公開している値そのまま</strong>。当サイトが足したのは「約○人（推定）」と並び順だけよ。更新は<strong>60 秒ごとの自動＋「いま更新」ボタン</strong>。データの収集時刻は上に出しているから、古いときは正直に「⚠」が出るわ。</div>
         </div>
       </div>
 
       <div class="cta-band">
         <img class="face" src="../../extension/images/yukkuri-charactore-english/konta/kitsune-yukkuri-smile-mouth-open.png" alt="" width="64" height="64" decoding="async">
         <div>
-          <p>このページは<b>数分おき</b>の更新なのだ。配信中の応援を<b>その場で</b>見たいなら、本体の Chrome 拡張「君斗りんくの追憶のきらめき」！ 応援レーン・会場モード・読み上げまで、配信ページの横に全部出るのだ。</p>
+          <p>このページは<b>最短 60 秒</b>で取り直すのだ。配信中の応援を<b>1 秒単位</b>で、しかも自分の配信の記録として残したいなら、本体の Chrome 拡張「君斗りんくの追憶のきらめき」！ 応援レーン・会場モード・読み上げまで、配信ページの横に全部出るのだ。</p>
           <div class="cta-row">
             <a class="btn btn--primary" href="https://chromewebstore.google.com/detail/cjbabignmmodaickpeckiojjabnlogdb" target="_blank" rel="noopener noreferrer">🧩 Chrome ウェブストアで入手</a>
             <a class="btn btn--ghost" href="../#extension-guide">画面の見方を読む</a>
           </div>
         </div>
       </div>
-
-      <main id="list" class="list" aria-live="polite"></main>
 
       <div class="note">
         <p>★このページは<b>配信者ではなく「応援した人」</b>を並べます（追憶のきらめき ランキング）。</p>
@@ -327,11 +367,9 @@
         </div>
       </div>
 
-      <footer class="foot">
-        <a href="https://kimito-link.com/" target="_blank" rel="noopener noreferrer"><img src="../../extension/images/logo/kimito-link-color.png" width="120" height="90" alt="Kimito-Link" loading="lazy" decoding="async"></a>
-        <a href="../">君斗りんくの追憶のきらめき</a> ／ <a href="../articles/">技術記事</a> ／ <a href="../privacy.html">プライバシーポリシー</a>
-      </footer>
     </div>
+    <!-- ★LP と同じフッター(共有コンポーネント)。 -->
+    <script src="../assets/js/site-chrome-lp.js" data-part="footer" data-base="../"></script>
 
     <!-- ★描画は共有部品を束ねたバンドル(src/extension/live-ranking-entry.js → app/dist/live-ranking.js)。このページに JS は書かない。 -->
     <script src="../../app/dist/live-ranking.js" defer></script>

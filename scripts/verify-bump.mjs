@@ -215,7 +215,9 @@ console.log(`\n[6] 紹介LP の掲載版数が package と一致`);
         name: 'twitter:description',
         re: /<meta\s+name="twitter:description"[^>]*?（v(\d+\.\d+\.\d+)）[^>]*>/
       },
-      { name: 'フッター', re: /追憶のきらめき v(\d+\.\d+\.\d+)/ }
+      // 2026-09-14: フッターは共有コンポーネント(assets/js/site-chrome-lp.js)が生成する。LP 側に残る正本は
+      //   <script … data-part="footer" data-version="X"> の属性。文言(追憶のきらめき vX)は JS が組み立てる。
+      { name: 'フッター', re: /data-part="footer"[^>]*?data-version="(\d+\.\d+\.\d+)"/ }
     ];
     for (const spot of spots) {
       const m = lp.match(spot.re);
