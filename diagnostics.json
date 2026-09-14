@@ -5,7 +5,7 @@
   "index": "../ai-hub/index.json",
   "_sharedDir_why": "src/lib は純粋ロジックの箱(src/lib/AGENTS.md)。ここにある関数と同名の自前実装が src/extension 等に増えていないかを check-shared-parts-used が数える(ラチェット値は .shared-parts-baseline.json)。",
   "sharedDir": ["src/lib"],
-  "_srcDir_why": "利用者に見える操作(popup/venue/content の handleXxx 等)は src/ 配下。時間を測る計器の有無を check-timing-instrumented が数える(ラチェット値は .timing-instrumented-baseline.json)。",
+  "_srcDir_why": "利用者に見える操作は src/ 配下。★ただし 2026-09-14 時点では check-timing-instrumented は src/ でも『測れませんでした』(exit 2)のまま。この検査は関数名(handleSubmit / onUpload 等の動詞)で操作を当てるが、このリポのハンドラ名は onStage / onProgress / onPlayStart 等で動詞表に無い。★測ったことにするために名前を変えたり対象を広げたりしない(キット自身の diagnostics.json と同じ判断)。実測の計器は src/lib の diagnosisRegistry と状態速報(npm run status:live)側にある。",
   "srcDir": "src",
   "_nearDupBaseline_why": "★2026-09-14 初回実測値。tsuioku-no-kirameki/articles/*.html(記事テンプレ)・lpIndexSnapshot*.test.js(同型テスト)・app/live-view.html≒extension/popup.html≒status.html(3画面パリティで意図的に同型)が大半。増えた分だけ見るラチェットなので、この値をそのまま初期値とする。",
   "nearDupBaseline": 365
