@@ -28,6 +28,7 @@ graph LR
   n_popup --> n_src_extension_popup_attachAiDiagButtonHandler_js["extension/popup/attachAiDiagButtonHandler.js"]
   n_popup --> n_src_extension_popup_renderAcquisitionDashboard_js["extension/popup/renderAcquisitionDashboard.js"]
   n_popup --> n_src_extension_popup_report_htmlReportDocument_js["extension/popup/report/htmlReportDocument.js"]
+  n_popup --> n_src_extension_popup_wireLaneUserDetailOpen_js["extension/popup/wireLaneUserDetailOpen.js"]
   n_popup --> n_src_extension_story_laneContentLod_js["extension/story/laneContentLod.js"]:::shared
   n_popup --> n_src_extension_story_renderStoryUserLaneDom_js["extension/story/renderStoryUserLaneDom.js"]:::shared
   n_popup --> n_src_lib_acquisitionDashboardChart_js["lib/acquisitionDashboardChart.js"]
@@ -52,8 +53,7 @@ graph LR
   n_popup --> n_src_lib_backfillRinkuNarration_js["lib/backfillRinkuNarration.js"]:::shared
   n_popup --> n_src_lib_bandScale_js["lib/bandScale.js"]
   n_popup --> n_src_lib_bandScaleBoot_js["lib/bandScaleBoot.js"]
-  n_popup --> n_src_lib_bgmDirector_js["lib/bgmDirector.js"]:::shared
   classDef shared fill:#eee,stroke:#999,color:#666;
 ```
 
-> ほか 408 ファイル省略（全件は storage-bus.md / metafile 参照）。
+> ほか 410 ファイル省略（全件は storage-bus.md / metafile 参照）。

@@ -44,6 +44,7 @@
 | `data-nl-detail-hover-bound` | extension/popup-entry.js | extension/popup-entry.js |
 | `data-nl-gift-rank-metric` | lib/paintTopSupportRankStyleIntoElement.js | extension/popup-entry.js<br>lib/paintTopSupportRankStyleIntoElement.js |
 | `data-nl-hoisted` | extension/popup-entry.js | extension/popup-entry.js |
+| `data-nl-lane-user-detail-wired` | extension/popup/wireLaneUserDetailOpen.js | extension/popup/wireLaneUserDetailOpen.js |
 | `data-nl-on-error-bound` | extension/popup-entry.js | extension/popup-entry.js |
 | `data-nl-pickup-key` | lib/venuePickupBanner.js | lib/venuePickupBanner.js |
 | `data-nl-popup-content-painted` | extension/popup-entry.js | — |

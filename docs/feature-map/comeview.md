@@ -21,6 +21,7 @@ graph LR
   n_comeview --> n_src_lib_comeviewInstantRender_js["lib/comeviewInstantRender.js"]
   n_comeview --> n_src_lib_comeviewRows_js["lib/comeviewRows.js"]:::shared
   n_comeview --> n_src_lib_comeviewTimelineDiff_js["lib/comeviewTimelineDiff.js"]
+  n_comeview --> n_src_lib_comeviewUserDetailLink_js["lib/comeviewUserDetailLink.js"]:::shared
   n_comeview --> n_src_lib_comeviewUserNotes_js["lib/comeviewUserNotes.js"]:::shared
   n_comeview --> n_src_lib_comeviewWindowGeometry_js["lib/comeviewWindowGeometry.js"]
   n_comeview --> n_src_lib_commentChunkStore_js["lib/commentChunkStore.js"]:::shared
@@ -52,8 +53,7 @@ graph LR
   n_comeview --> n_src_lib_voiceReadQueue_js["lib/voiceReadQueue.js"]:::shared
   n_comeview --> n_src_lib_voiceSynthFailure_js["lib/voiceSynthFailure.js"]:::shared
   n_comeview --> n_src_lib_voiceSynthFailureReason_js["lib/voiceSynthFailureReason.js"]:::shared
-  n_comeview --> n_src_lib_voicevoxClient_js["lib/voicevoxClient.js"]:::shared
   classDef shared fill:#eee,stroke:#999,color:#666;
 ```
 
-> ほか 2 ファイル省略（全件は storage-bus.md / metafile 参照）。
+> ほか 3 ファイル省略（全件は storage-bus.md / metafile 参照）。

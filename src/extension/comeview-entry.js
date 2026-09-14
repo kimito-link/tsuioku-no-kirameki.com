@@ -60,6 +60,7 @@ import {
   extractUserCommentRows,
   COMEVIEW_NG_STORAGE_KEY
 } from '../lib/comeviewActions.js';
+import { USER_SPEECH_ROWS_MAX } from '../lib/comeviewUserDetailLink.js';
 import {
   normalizeComeviewUserNotes,
   upsertComeviewUserNote,
@@ -1183,7 +1184,7 @@ async function showUserDetail(row) {
     rawRows = [];
   }
 
-  const { rows, total } = extractUserCommentRows(rawRows, ukey, 200);
+  const { rows, total } = extractUserCommentRows(rawRows, ukey, USER_SPEECH_ROWS_MAX);
   loading.remove();
   const countNote = document.createElement('div');
   countNote.className = 'cv-panel-note';

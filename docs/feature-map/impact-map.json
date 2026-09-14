@@ -2182,6 +2182,18 @@
       ]
     },
     {
+      "file": "src/lib/comeviewUserDetailLink.js",
+      "featureCount": 2,
+      "features": [
+        "comeview",
+        "popup"
+      ],
+      "labels": [
+        "コメビュ(別窓)",
+        "ポップアップ(応援レーン)"
+      ]
+    },
+    {
       "file": "src/lib/comeviewUserNotes.js",
       "featureCount": 2,
       "features": [
@@ -3661,6 +3673,16 @@
     },
     {
       "file": "src/extension/popup/report/htmlReportDocument.js",
+      "featureCount": 1,
+      "features": [
+        "popup"
+      ],
+      "labels": [
+        "ポップアップ(応援レーン)"
+      ]
+    },
+    {
+      "file": "src/extension/popup/wireLaneUserDetailOpen.js",
       "featureCount": 1,
       "features": [
         "popup"

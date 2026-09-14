@@ -110,6 +110,7 @@ const FEATURES = [
   { feature: 'コメント重複除去(NDGR)', desc: '再送/再接続/relay overlap の重複を liveId+messageId の canonical key で排除', paths: ['src/lib/ndgrMessageDedupe.js'], tags: ['コメント', '重複除去'] },
   { feature: '応援レーン集約(誰が候補か)', desc: '保存コメント行を userId 単位に畳み込みレーン候補を作る唯一の集約正本(popup/venue 共通)', paths: ['src/lib/userLaneCandidatesFromStorage.js'], tags: ['応援', '集約'] },
   { feature: '人物タイル描画(丸サムネ)', desc: 'popup 応援アイコン列の「1人ぶんのタイル(丸サムネ+ID+名前)」生成の正本 DOM ビルダー', paths: ['src/lib/personTileDom.js'], tags: ['応援', '描画'] },
+  { feature: '応援レーンタイル→発言一覧(comeview 詳細)', desc: 'popup の応援レーンのタイルを素クリックすると、その人のこの配信での全発言(記録済み)を comeview のユーザー詳細で時系列表示(既存経路に乗せるだけ・新パネル無し)。Ctrl/中クリックは従来のユーザーページ。純関数=comeviewUserDetailLink・委譲配線=wireLaneUserDetailOpen・受け口=comeview-entry(v0.1.1515)', paths: ['src/lib/comeviewUserDetailLink.js', 'src/extension/popup/wireLaneUserDetailOpen.js', 'src/extension/comeview-entry.js'], tags: ['応援', 'コメント', '表示'] },
   { feature: '会場の席割り', desc: '150席上限+入れ替えで席を割り当てる。席資格(venueParticipantKey)もここ', paths: ['src/lib/venueSeats.js'], tags: ['会場', '席'] },
   { feature: '背景群衆(来場者数の表現)', desc: '席に出せない来場者数(PV)を背景群衆 Canvas の密度で描く', paths: ['src/lib/crowdRasterizer.js'], tags: ['会場', '色', '描画'] },
   { feature: '読み上げ(再生/キュー/年齢ゲート)', desc: 'コメント読み上げの再生・キュー上限・年齢ゲート・ロード状態', paths: ['src/lib/voicePlayer.js', 'src/lib/voiceReadQueue.js', 'src/lib/voiceAgeGate.js'], tags: ['読み上げ', '音声'] },
