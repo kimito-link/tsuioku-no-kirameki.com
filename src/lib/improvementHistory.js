@@ -462,5 +462,19 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
   Object.freeze({
     version: '0.1.1507', metric: 'cross-checked-claims', value: 54,
     source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数'
+  }),
+  Object.freeze({
+    version: '0.1.1508', metric: 'bundle-kb', value: 1408,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '★悪化してよい理由: 1454(1360KB)以降この指標は54版分記録されておらず、1507時点で既に 1,441,794B(=1408KB)。今回(診断キット接続)の増分は実測 -141B で拡張ソースは触っていない。1454→1507 の増分の内訳は未計測(記録が無い)。数字を隠さず、次に減らす版で内訳を測る'
+  }),
+  Object.freeze({
+    version: '0.1.1508', metric: 'gate-selftest', value: 4,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1508', metric: 'cross-checked-claims', value: 47,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: '★悪化してよい理由: 30日の移動窓。09-04(1507)→09-14 で 8/5〜8/15 のコミット(該当語 23 件・git log --since/--until で実測)が窓から外れた分。コミット文言で数字を稼がない'
   })
 ]);

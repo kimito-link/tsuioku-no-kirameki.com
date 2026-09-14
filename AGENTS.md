@@ -503,3 +503,27 @@ per-live 単調化済み)の1本だけ**。取り出しは `src/lib/displayRecor
   (venueLiveRoster.js)の実装を読んで確認し仕様に追記した。
 - **設計時レビューと実装後検証はセット**: 仕様書の3視点批判(実装者/テスター/利用者)だけで
   満足せず、実装後は必ずreality-checkerに検証を委任する。どちらか一方では品質を担保できない。
+
+---
+
+## 13. 横断キット(web-ios-android)との接続(2026-09-14 導入・v0.1.1508)
+
+> 正本は `../web-ios-android/CLAUDE.md`(全プロジェクトが従う設計の心臓部)。**本文をここへコピーしない。**
+> ここに書くのは「このリポではどのコマンド・どのファイルで接続しているか」だけ。
+
+| 何 | このリポでの入口 | 正本 |
+|---|---|---|
+| **出荷前の汎用診断**(lockfile不一致・秘密の追跡・巨大ファイル・似た実装の増殖・検査の配線漏れ・指示書の腐り 等) | `npm run diagnostics`(隣の `../web-ios-android/templates/diagnostics/run.mjs .` を**コピーせず直接呼ぶ**)。案内板は [`diagnostics.json`](diagnostics.json)。ラチェット値は `.shared-parts-baseline.json` / `.timing-instrumented-baseline.json` | `web-ios-android/templates/diagnostics/README.md` |
+| 診断の verify:cc への組み込み | `npm run verify:cc` の**末尾で「報」として走る**(赤でも出荷を止めない。別リポの検査が変わるだけでこのリポが止まらないため)。結果は `.artifacts/verify-cc.log` の `REPORT diagnostics` 行。★キットが隣に無い環境は skip と出る(合格ではない) | `scripts/run-verify-cc.mjs` |
+| **全文脈スナップショット・確定アクション台帳** | `npm run context`(`.instrument-context.md` を生成。gitignore 済み)/ `npm run context:check` / `npm run context:record -- ...` | `web-ios-android/_docs/instruments/CONTEXT-EVOLUTION.md`・`_docs/DESIGN-approved-action-ledger-2026-09-08.md` |
+| **並列セッション協調(Main-Write Pause)** | `.agent/coord.md`(gitignore 済み・無ければ `web-ios-android/templates/.agent/coord.md.example` から作る)。**commit / push の前に必ず読む**。`write_lock.state` と `updated` の両方を見る | `web-ios-android/CLAUDE.md`「並列セッション協調プロトコル」節 |
+| **症状名→原因の索引** | `src/lib/symptomVerdicts.js` の症状ID(`thumb-white` / `avatar-all-failed` / `lane-never-rendered` / `lane-painted-zero` / `lane-heavy-race` / `panel-black` / `status-slow`)は `../ai-hub/index.json` の `triggers` に登録済み。**新しい症状IDを足したら ai-hub にも足す**(`check-symptom-index` が赤くする) | `ai-hub/CLAUDE.md`「harvest の掟」 |
+| CLAUDE.md の入口の保全 | `scripts/check-agent-bootstrap.mjs`(verify:cc の門)。CLAUDE.md 1行目 `@AGENTS.md` と AGENTS.md の実在を機械で守る。★2026-09-14 まで「この検査が赤くする」と書いてあるだけで実体が無かった | `CLAUDE.md` 冒頭コメント |
+| 実装着手前の10項目(既存検索→`ai-hub find`→CANONICAL CHECK→…) | `node ../ai-hub/bin/hub.mjs find --tag <t>` / `--sig "<実文言>"` を**実装の直前に**叩く | `web-ios-android/CLAUDE.md`「実装着手前の非交渉ルール」節 |
+
+**既知の赤(2026-09-14 時点・意図的に残す)**: `check-large-tracked-files` が 5MB 超の追跡ファイル 4 件
+(`app/` と `extension/` の `kimito-rinku-app-icon-2048.png` 7.8MB(同一)・`src/sound/` と
+`tsuioku-no-kirameki/sound/` の `yozora-small-yell.mp3` 5.2MB(同一))を指す。2048px アイコンは
+ロスレス再圧縮でも 6.3MB(閾値超)、mp3 は LP の BGM で音質を落とす判断は人が決める。
+削除・圧縮はユーザー判断待ち。キット側に「意図的な大ファイルの宣言」が無いことは
+web-ios-android セッションへ伝達済み。

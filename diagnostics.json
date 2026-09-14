@@ -1,0 +1,12 @@
+{
+  "_why": "web-ios-android/templates/diagnostics/run.mjs(横断の汎用診断キット)がこのリポを測るときの案内板。キットをコピーせず `npm run diagnostics` で正本を直接呼ぶ(正本1つ・コピー散らさない)。宣言が無いと check-timing-instrumented / check-shared-parts-used が『測れませんでした』のまま終わる(2026-09-14 実測)。",
+  "_note": "★実在するものだけを書く。無いものを宣言すると案内板そのものが嘘になる。",
+  "symptoms": "src/lib/symptomVerdicts.js",
+  "index": "../ai-hub/index.json",
+  "_sharedDir_why": "src/lib は純粋ロジックの箱(src/lib/AGENTS.md)。ここにある関数と同名の自前実装が src/extension 等に増えていないかを check-shared-parts-used が数える(ラチェット値は .shared-parts-baseline.json)。",
+  "sharedDir": ["src/lib"],
+  "_srcDir_why": "利用者に見える操作(popup/venue/content の handleXxx 等)は src/ 配下。時間を測る計器の有無を check-timing-instrumented が数える(ラチェット値は .timing-instrumented-baseline.json)。",
+  "srcDir": "src",
+  "_nearDupBaseline_why": "★2026-09-14 初回実測値。tsuioku-no-kirameki/articles/*.html(記事テンプレ)・lpIndexSnapshot*.test.js(同型テスト)・app/live-view.html≒extension/popup.html≒status.html(3画面パリティで意図的に同型)が大半。増えた分だけ見るラチェットなので、この値をそのまま初期値とする。",
+  "nearDupBaseline": 365
+}
