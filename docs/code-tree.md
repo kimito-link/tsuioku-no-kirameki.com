@@ -187,7 +187,7 @@
     - `2026-09-06.md`
     - `2026-09-07.md`
     - `2026-09-09.md`
-- 📁 **docs/** (315)
+- 📁 **docs/** (316)
   - 📁 **article-assets/** (87)
     - 📁 **venue-frames/** (12)
       - `f01.png`
@@ -446,6 +446,8 @@
     - `venue-transport-effect-SPEC-2026-08-08.md`
     - `voicevox-any-pc-DESIGN.md`
     - `winv-clipboard-freeze-synthesis.md`
+  - 📁 **marketing/** (1)
+    - `x-article-live-ranking-2026-09-14.md`
   - 📁 **patent-unique-voice-reading-filing-final/** (1)
     - `MOVED.md`
   - 📁 **policies/** (1)
