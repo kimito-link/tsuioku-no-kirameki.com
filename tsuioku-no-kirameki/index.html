@@ -3574,7 +3574,9 @@
         background:linear-gradient(135deg,rgba(79,172,254,.2),rgba(221,101,0,.14));
         border:1px solid rgba(0,66,123,.15)
       }
-      .lp-worldview__ranking-link{margin:14px auto 0;max-width:640px}
+      /* ★ロゴ帯は display:flex(横並び)。カードは【折り返して全幅】にしないとスマホで縦一列に潰れる(2026-09-14 実機スクショ) */
+      .lp-worldview__logo-band--top{flex-wrap:wrap}
+      .lp-worldview__ranking-link{flex:1 1 100%;width:100%;max-width:640px;margin:14px auto 0}
       .lp-worldview__ranking-link a{
         display:flex;align-items:center;gap:12px;padding:12px 16px;border-radius:16px;text-decoration:none;
         background:linear-gradient(135deg,rgba(255,250,244,.98),rgba(255,243,230,.96));
