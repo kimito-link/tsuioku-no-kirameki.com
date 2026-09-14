@@ -180,13 +180,12 @@
 
 - **応援レーン集約(誰が候補か)** — 保存コメント行を userId 単位に畳み込みレーン候補を作る唯一の集約正本(popup/venue 共通)
   - `src/lib/userLaneCandidatesFromStorage.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 101</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 99</summary>
 
 - `api/live-ranking.js` — /live/ 用「支えた人ランキング」の収集・配信 Vercel Serverless Function。
 - `src/domain/lane/aggregate.js` — 応援ユーザーレーンの per-row → per-user 集約（純関数）。
 - `src/domain/observations/observationStore.js` — observationStore - StatObservation のメモリ常駐リングバッファ。
 - `src/domain/user/identity.js` — ニコ生ユーザー ID の「匿名性」判定と関連アイデンティティ・ユーティリティ。
-- `src/extension/live-ranking-entry.js` — `/live/`「追憶のきらめき ランキング」(tsuioku-no-kirameki/live/index.html)の描画。
 - `src/lib/auditionEventRankingApi.js` — audition 公式「イベント💎ランキング」無認証 JSON API の URL 組立 & 正規化（純関数）。
 - `src/lib/broadcastContext.js` — v0.1.793: 「この配信の配信者(broadcaster)情報」を 1 か所で型定義し、storage キー・
 - `src/lib/broadcastCrossCompare.js` — 0.1.24 (Y): 横断比較系の純粋関数群。
@@ -246,7 +245,6 @@
 - `src/lib/kokenContributionRankingApi.js` — koken 公式「ギフト貢献度ランキング」無認証 JSON API の URL 組立 & 正規化（純関数）。
 - `src/lib/liveChannelSwitch.js` — 「別の配信へ移動(SPA遷移)するとパネルが壊れる」問題の修正(2026-07-06)。
 - `src/lib/liveCommenterStats.js` — 記録済みコメントから「ユニーク投稿者（推定）」用の集計（純関数）
-- `src/lib/liveRankingView.js` — `/live/`「追憶のきらめき ランキング」の純ロジック(DOM を触らない)。
 - `src/lib/liveviewMirrorSections.js` — ③WEB丸写しの「セクション・レジストリ」= ①POP の各パネルが③に出るための配線を1箇所に集約した一覧表
 - `src/lib/loadLastBroadcastSummary.js` — 0.1.69 (AY): empty state（配信なし）popup で「前回の配信」cards を復元するために、
 - `src/lib/mangaBroadcastSummary.js` — 放送終了後の HTML レポート / マーケ分析の頭にくる「漫画読み体験」要約。
@@ -806,6 +804,12 @@
   - `src/lib/statusTrendKey.js`
   - `src/extension/status-entry.js`
   - `src/lib/statusActionAdvisor.js`
+- **ランキング(/live/)の X シェア** — 各配信の stats 行に <a class="share-x">(X Web Intent・JS ゼロ)。?lv= で該当配信を先頭固定(pinLiveFirst)。本文は liveShareText(中立・数値なし・60字以内)、URL は buildXIntentUrl(safeHttpUrl 検疫)。OG 画像は tools/gen-og-live-ranking.py。計器なし(privacy §14-2)(v0.1.1510)
+  - `src/lib/xIntentUrl.js`
+  - `src/lib/liveRankingView.js`
+  - `src/extension/live-ranking-entry.js`
+  - `tsuioku-no-kirameki/live/index.html`
+  - `tools/gen-og-live-ranking.py`
 <details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 207</summary>
 
 - `app/app.js` — スマホ閲覧用 status Web 版。
@@ -1069,7 +1073,7 @@
 - `v0.1.1498` 2026-08-31 — 間違った警告を出していたのをやめました
 
 ### その他 (4版)
+- `v0.1.1510` 2026-09-14 — ランキングを X でシェアできるようにしました
 - `v0.1.1505` 2026-09-03 — 提出物づくりで版数を間違えられなくした
 - `v0.1.1502` 2026-09-03 — コメビュの窓の大きさを覚えます
 - `v0.1.1491` 2026-08-29 — 検査の土台を、配布元の最新版にそろえました
-- `v0.1.1490` 2026-08-25 — 応援している作品を、そっとお知らせする欄をつけました

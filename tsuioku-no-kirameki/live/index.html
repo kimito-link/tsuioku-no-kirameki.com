@@ -17,10 +17,13 @@
     <link rel="canonical" href="https://tsuioku-no-kirameki.com/live/">
     <meta property="og:type" content="website">
     <meta property="og:url" content="https://tsuioku-no-kirameki.com/live/">
-    <meta property="og:title" content="追憶のきらめき ランキング ― いま支えている人">
-    <meta property="og:description" content="いまこの瞬間、誰が配信を支えているか。配信サムネ・配信者・経過時間つき。">
-    <meta property="og:image" content="https://tsuioku-no-kirameki.com/images/og-image.png">
+    <meta property="og:title" content="いま配信を支えている人 ― ニコニコ生放送（追憶のきらめき ランキング）">
+    <meta property="og:description" content="いまこの瞬間、誰が配信を支えているか。ギフト・広告で応援した人を配信ごとに、配信サムネ・配信者・経過時間つきで。主役は配信者ではなく「応援した人」。">
+    <meta property="og:image" content="https://tsuioku-no-kirameki.com/images/og-live-ranking.png">
     <meta name="twitter:card" content="summary_large_image">
+    <meta property="og:site_name" content="追憶のきらめき ランキング">
+    <meta name="twitter:image" content="https://tsuioku-no-kirameki.com/images/og-live-ranking.png">
+    <meta name="twitter:image:alt" content="追憶のきらめき ランキング ― ニコニコ生放送で、いま配信を支えている人（ギフト・広告）をリアルタイムに表彰するページ">
 
     <!--
       ★コンポーネント化(2026-09-14・web-ios-android/CLAUDE.md 基準⑤⑥⑦):
@@ -106,6 +109,7 @@
       .meta b { color: var(--navy-deep); font-weight: 700; }
       .meta .face { width: 28px; height: 28px; object-fit: contain; }
       .meta .stale { color: #a13d0a; font-weight: 600; }
+      .meta .pin-missing { color: #a13d0a; font-weight: 600; }
 
       /* ── 本体(Chrome 拡張)への導線。★このページは「入口」。本体は拡張(リアルタイム記録)。 ── */
       .cta-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
@@ -124,8 +128,9 @@
       .cta-band p { margin: 0 0 8px; font-size: .9rem; color: var(--ink); }
       .cta-band p b { color: var(--navy-deep); }
       .cta-band .cta-row { margin-top: 0; }
-      .ext-link { margin-left: auto; display: inline-flex; align-items: center; gap: 4px; font-size: .78rem; color: var(--navy); text-decoration: none; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--line); background: #fff; }
-      .ext-link:hover { border-color: var(--orange); color: var(--orange); }
+      .stats-actions { margin-left: auto; display: inline-flex; align-items: center; gap: 6px; }
+      .ext-link, .share-x { display: inline-flex; align-items: center; gap: 4px; font-size: .78rem; color: var(--navy); text-decoration: none; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--line); background: #fff; }
+      .ext-link:hover, .share-x:hover { border-color: var(--orange); color: var(--orange); }
       .cta-foot { margin-top: 26px; text-align: center; }
 
       /* ── リアルタイム更新(自動 60 秒＋手動ボタン) ── */
@@ -354,6 +359,7 @@
         <p><b>ギフト・広告のランキング</b>（名前・順位・ポイント）は、ニコニコ生放送が公開しているものを<b>そのまま</b>出しています。当サイトが独自に集計・改変した値ではありません。配信サムネ・配信者名・アイコンも、ニコニコ生放送の番組ページに掲載されているものです。</p>
         <p>★<b>「約○人（推定）」と並び順だけは当サイトの推定値です。</b>ニコニコ生放送に同時視聴数を知る手段が無いため、公開されている<b>累計の来場者数</b>と<b>放送の経過時間</b>から見積もっています（時間が経つほど視聴者が入れ替わる前提の減衰モデル）。実際の人数とは差があります。</p>
         <p>放送中の個人配信のみを対象にしています。表示は定期的に更新されます（更新が止まったときは上に警告が出ます）。</p>
+        <p>掲載されているご本人で、表示の停止をご希望の方は <a href="../privacy.html#s14">プライバシーポリシー 14-4</a> をご覧ください。</p>
       </div>
 
       <div class="cta-band cta-foot" style="grid-template-columns: auto 1fr;">

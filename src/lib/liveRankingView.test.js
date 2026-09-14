@@ -3,7 +3,8 @@ import { retentionRate } from './concurrentEstimate.js';
 import {
   watchUrlOf, jstClock, elapsedText, freshness, estimateConcurrentForLive, sortByEstimatedConcurrent,
   cacheBust, supporterRows, identifiedSupporters, isBlankIcon, uidFromUserPageUrl,
-  createRowChangeTracker, rowKey, STALE_MIN
+  createRowChangeTracker, rowKey, STALE_MIN,
+  pinLiveFirst, liveShareText, SHARE_NAME_MAX, SHARE_TITLE_MAX, SHARE_TEXT_MAX
 } from './liveRankingView.js';
 
 describe('liveRankingView', () => {
@@ -138,6 +139,106 @@ describe('liveRankingView', () => {
     expect(t.classFor(k('a'), 150)).toBe('');             // 変わらない
     expect(t.classFor(k('b'), 50)).toBe('is-new');        // ★捨てられたので再登場は新規扱い
     t.end();
+  });
+
+  // ── ?lv= の先頭固定と X シェア本文(v0.1.1510) ──────────────────────────────
+  // ★lv は LIVE_ID_RE(/^lv\d{6,15}$/i)に合格する 6 桁以上で書く(lv3 は恒等パスに落ちて検証にならない)。
+  const a = { liveId: 'lv100001' };
+  const b = { liveId: 'lv100002' };
+  const c = { liveId: 'lv100003' };
+
+  it('pinLiveFirst: 該当を先頭へ・他の順序は保つ', () => {
+    expect(pinLiveFirst([a, b, c], 'lv100003')).toEqual({ lives: [c, a, b], found: true });
+  });
+
+  it('pinLiveFirst: 既に先頭ならそのまま', () => {
+    expect(pinLiveFirst([a, b], 'lv100001')).toEqual({ lives: [a, b], found: true });
+  });
+
+  it('pinLiveFirst: 大文字・前後空白を許す', () => {
+    expect(pinLiveFirst([a, b, c], ' LV100003 ')).toEqual({ lives: [c, a, b], found: true });
+  });
+
+  it('pinLiveFirst: 不在なら found=false・並び不変', () => {
+    expect(pinLiveFirst([a, b, c], 'lv999999999')).toEqual({ lives: [a, b, c], found: false });
+  });
+
+  it('pinLiveFirst: 不正な lv は恒等(エラーにしない)', () => {
+    for (const bad of ['', null, undefined, 'lv1', 'javascript:', 'lv12345']) {
+      expect(pinLiveFirst([a, b, c], bad)).toEqual({ lives: [a, b, c], found: false });
+    }
+  });
+
+  it('pinLiveFirst: 元配列を壊さない', () => {
+    const input = [a, b, c];
+    const before = JSON.stringify(input);
+    const out = pinLiveFirst(input, 'lv100003');
+    expect(JSON.stringify(input)).toBe(before);
+    expect(out.lives).not.toBe(input);
+  });
+
+  it('pinLiveFirst: 非配列は空', () => {
+    expect(pinLiveFirst(null, 'lv100003')).toEqual({ lives: [], found: false });
+  });
+
+  it('pinLiveFirst: 状態を持たない(2 回目に対象が消えれば false)', () => {
+    expect(pinLiveFirst([a, b, c], 'lv100003').found).toBe(true);
+    expect(pinLiveFirst([a, b], 'lv100003')).toEqual({ lives: [a, b], found: false });
+  });
+
+  it('liveShareText: 通常(配信者名＋番組名)', () => {
+    expect(liveShareText({ streamer: { name: 'りんく' }, title: '雑談' })).toBe('りんくの配信「雑談」を、いま支えている人');
+  });
+
+  it('liveShareText: name 空', () => {
+    expect(liveShareText({ streamer: { name: '' }, title: '雑談' })).toBe('この配信「雑談」を、いま支えている人');
+  });
+
+  it('liveShareText: title 空', () => {
+    expect(liveShareText({ streamer: { name: 'りんく' }, title: '' })).toBe('りんくの配信を、いま支えている人');
+  });
+
+  it('liveShareText: 両方空・null', () => {
+    expect(liveShareText({})).toBe('この配信を、いま支えている人');
+    expect(liveShareText(null)).toBe('この配信を、いま支えている人');
+  });
+
+  it('liveShareText: name が上限超なら 17 字+…', () => {
+    const name = 'あ'.repeat(30);
+    const out = liveShareText({ streamer: { name }, title: '雑談' });
+    expect(out).toBe(`${'あ'.repeat(SHARE_NAME_MAX - 1)}…の配信「雑談」を、いま支えている人`);
+  });
+
+  it('liveShareText: title が上限超なら 23 字+…', () => {
+    const title = 'い'.repeat(40);
+    const out = liveShareText({ streamer: { name: 'りんく' }, title });
+    expect(out).toBe(`りんくの配信「${'い'.repeat(SHARE_TITLE_MAX - 1)}…」を、いま支えている人`);
+  });
+
+  it('liveShareText: 4 分岐の最大長を固定(構造的に 60 字に収まる)', () => {
+    const name = 'あ'.repeat(80);
+    const title = 'い'.repeat(200);
+    expect(Array.from(liveShareText({ streamer: { name }, title })).length).toBe(57);
+    expect(Array.from(liveShareText({ streamer: { name: '' }, title })).length).toBe(40);
+    expect(Array.from(liveShareText({ streamer: { name }, title: '' })).length).toBe(31);
+    expect(Array.from(liveShareText({})).length).toBe(14);
+    expect(SHARE_NAME_MAX + 15 + SHARE_TITLE_MAX).toBeLessThanOrEqual(SHARE_TEXT_MAX);
+  });
+
+  it('liveShareText: 絵文字は割れない(コードポイント単位で切る)', () => {
+    const title = '\u{1F389}'.repeat(30);
+    const out = liveShareText({ streamer: { name: 'りんく' }, title });
+    expect(out).not.toContain('\uFFFD');
+    expect(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?:^|[^\uD800-\uDBFF])[\uDC00-\uDFFF]/.test(out)).toBe(false);
+  });
+
+  it('liveShareText: 空白・改行を 1 つに正規化', () => {
+    expect(liveShareText({ streamer: { name: 'a\n\n b' }, title: 'c  d' })).toBe('a bの配信「c d」を、いま支えている人');
+  });
+
+  it('★ネガコン: 数値・時間を本文に混ぜない(投稿した瞬間に古くならない)', () => {
+    const live = { streamer: { name: 'りんく' }, title: '雑談', watchCount: 12345, beginTime: 1789355007, giftTotal: 999 };
+    expect(liveShareText(live)).toBe('りんくの配信「雑談」を、いま支えている人');
   });
 
   it('★毒: 同じ順位のデータを2回渡しても is-bumped が出ない(嘘の演出をしない)', () => {

@@ -876,4 +876,5 @@
 | `src/lib/watchSnapshotPartialMerge.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/watchTabPrioritize.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/watchUrlFreshness.js` | 1 | 状態速報ページ |
+| `src/lib/xIntentUrl.js` | 1 | Web版 追憶のきらめき ランキング(/live/) |
 | `src/lib/yieldToBrowserPaint.js` | 1 | ポップアップ(応援レーン) |
