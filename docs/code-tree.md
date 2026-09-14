@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 6 / 859 件
+## ⚠️ 役割コメントが無いソース 6 / 860 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `src/lib/laneDomSelfMeasure.js`
@@ -187,7 +187,7 @@
     - `2026-09-06.md`
     - `2026-09-07.md`
     - `2026-09-09.md`
-- 📁 **docs/** (316)
+- 📁 **docs/** (317)
   - 📁 **article-assets/** (87)
     - 📁 **venue-frames/** (12)
       - `f01.png`
@@ -299,7 +299,7 @@
     - `storage-bus.md`
     - `venue.md`
     - `web-status.md`
-  - 📁 **handoff/** (145)
+  - 📁 **handoff/** (146)
     - 📁 **bench/** (2)
       - `bench-interval.mjs` — ⚠️ 役割コメント無し
       - `bench-lane.mjs` — ⚠️ 役割コメント無し
@@ -405,6 +405,7 @@
     - `lane-tier-evidence-DESIGN.md`
     - `lanescene-structural-review-DESIGN.md`
     - `lanescene-structural-review-IMPLEMENTATION-HANDOFF.md`
+    - `live-ranking-share-DESIGN.md`
     - `marketing-export-tab-IMPLEMENTATION-HANDOFF.md`
     - `mirror-writer-decoupling-PLAN-2026-08-08.md`
     - `panel-flicker-council-brief-2026-08-05.md`
@@ -767,7 +768,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (1837)
+- 📁 **src/** (1839)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1033,7 +1034,7 @@
         - `logo_funlink_white_RGB_link_black.png`
         - `logo_funlink_white_RGB_maru_black.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1618)
+  - 📁 **lib/** (1620)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -2651,6 +2652,8 @@
     - `watchTabPrioritize.test.js`
     - `watchUrlFreshness.js` — 「最後に視聴した URL（nls_last_watch_url）」フォールバックの鮮度判定。
     - `watchUrlFreshness.test.js`
+    - `xIntentUrl.js` — X（旧 Twitter）の Web Intent（投稿画面）URL を組み立てる純関数。
+    - `xIntentUrl.test.js`
     - `yieldToBrowserPaint.js` — 【層】L0 判定層(依存ゼロ・chrome.* 非依存)
     - `yukkuriBroadcastSummary.js` — 放送終了後の HTML レポート / マーケ分析の頭にくる「ゆっくり解説風」要約セクション。
     - `yukkuriBroadcastSummary.test.js`
@@ -2756,14 +2759,15 @@
     - `watch-messaging.spec.js`
   - 📁 **helpers/** (1)
     - `wiringTestSource.js` — wiringTestSource — wiring テストが「関数の本体」を、置き場所に依らず取得するための正本。
-- 📁 **tools/** (5)
+- 📁 **tools/** (6)
   - 📁 **mcp-nicolive/** (3)
     - `README.md`
     - `server.mjs` — NicoLive Local MCP Bridge Phase1a (PoC) — stdio JSON-RPC server.
     - `store.mjs` — NicoLive Local MCP Bridge - Snapshot Store.
   - `audit-lp-overflow.mjs` — One-off LP overflow audit (run: node tools/audit-lp-overflow.mjs)
+  - `gen-og-live-ranking.py`
   - `render-og.js` — 追憶の煌めき LP 用 OG 画像（1200×630）を生成する。
-- 📁 **tsuioku-no-kirameki/** (44)
+- 📁 **tsuioku-no-kirameki/** (45)
   - 📁 **articles/** (14)
     - 📁 **role-separation-design/** (2)
       - 📁 **img/** (1)
@@ -2787,7 +2791,7 @@
       - `yukkuri-thread.css`
     - 📁 **js/** (1)
       - `site-chrome-lp.js` — 追憶のきらめき サイト共通の「ヘッダー(ロゴ＋ハンバーガー)・ドロワーメニュー・フッター」。
-  - 📁 **images/** (17)
+  - 📁 **images/** (18)
     - 📁 **venue/** (6)
       - `venue-living-overview.jpg`
       - `venue-living-overview.mp4`
@@ -2805,6 +2809,7 @@
     - `favicon.ico`
     - `og-image.jpg`
     - `og-image.png`
+    - `og-live-ranking.png`
     - `twitter-icon.png`
   - 📁 **live/** (1)
     - `index.html`

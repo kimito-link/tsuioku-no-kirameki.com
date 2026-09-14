@@ -192,6 +192,12 @@ graph LR
   HUB --> f36["影響範囲ゲート(規律を自動化)"]
   f36 --> f36_0["impact-check.mjs"]
   f36 --> f36_1["feature-map/impact-map.json"]
+  HUB --> f37["ランキング(/live/)の X シェア"]
+  f37 --> f37_0["lib/xIntentUrl.js"]
+  f37 --> f37_1["lib/liveRankingView.js"]
+  f37 --> f37_2["extension/live-ranking-entry.js"]
+  f37 --> f37_3["live/index.html"]
+  f37 --> f37_4["gen-og-live-ranking.py"]
 ```
 
 ---
@@ -217,7 +223,7 @@ graph LR
 - `images/`（93 件） — 純Web版 応援ライブビューの同梱画像(ゆっくり顔)  〔Web版 / 画像〕
 
 ## `council/` — 会議(COUNCIL)の問い・回答・統合(SYNTHESIS)。設計判断の根拠  〔会議 / 設計〕
-<sub>ファイル 381 件</sub>
+<sub>ファイル 385 件</sub>
 
 - `auto/`（8 件） — ⚠️ 未記入（ROLES に追記）
 
@@ -227,12 +233,12 @@ graph LR
 - `briefs/`（17 件） — ⚠️ 未記入（ROLES に追記）
 
 ## `docs/` — 設計正本・マインドマップ・フロー図・feature-map(AI/人間向け)  〔設計 / レポート〕
-<sub>ファイル 316 件</sub>
+<sub>ファイル 317 件</sub>
 
 - `article-assets/`（87 件） — 記事用の画像・動画・音声アセット  〔記事 / 画像〕
 - `article-drafts/`（2 件） — ⚠️ 未記入（ROLES に追記）
 - `feature-map/`（15 件） — 機能ごと依存図(自動生成)。誰が storage を書き/読むか  〔依存図 / 自動生成〕
-- `handoff/`（145 件） — セッション引継ぎ・調査設計の記録(HANDOFF-*/MAP/SPEC/DESIGN)。ルート直下に散らかっていたものを 2026-07-31 に集約  〔引継ぎ / 設計〕
+- `handoff/`（146 件） — セッション引継ぎ・調査設計の記録(HANDOFF-*/MAP/SPEC/DESIGN)。ルート直下に散らかっていたものを 2026-07-31 に集約  〔引継ぎ / 設計〕
 - `marketing/`（1 件） — 発信用の原稿(X 記事・告知文)。★数字は出典なしで書かない  〔マーケ / 原稿〕
 - `patent-unique-voice-reading-filing-final/`（1 件） — ⚠️ 未記入（ROLES に追記）
 - `policies/`（1 件） — 運用方針メモ(統計の失敗モード等)  〔方針〕
@@ -267,14 +273,14 @@ graph LR
 - `soundeffect-lab/`（19 件） — ⚠️ 未記入（ROLES に追記）
 
 ## `src/` — LP 側 + 純粋関数ライブラリの源  〔ソース〕
-<sub>ファイル 1837 件</sub>
+<sub>ファイル 1839 件</sub>
 
 - `data/`（7 件） — 保存コメントからレーン候補を読む acquirer / source 層  〔コメント / 取得〕
 - `domain/`（20 件） — ドメイン正本(応援レーンの集約・列ポリシー等。識別子判定など)  〔応援 / 集約 / 識別子〕
 - `extension/`（47 件） — バンドル entry(content/popup/venue/status/offscreen/backfill-sw 等=機能境界)  〔entry / 記録 / 会場 / 応援〕
 - `fixtures/`（1 件） — テスト用フィクスチャ  〔テスト〕
 - `images/`（134 件） — LP / CWS 提出物のマスター画像  〔画像〕
-- `lib/`（1618 件） — 純粋関数ライブラリ(unit test 対象)。色・速度・コメント・レポート等の計算ロジックの大半  〔色 / 速度 / コメント / レポート / 純粋関数〕
+- `lib/`（1620 件） — 純粋関数ライブラリ(unit test 対象)。色・速度・コメント・レポート等の計算ロジックの大半  〔色 / 速度 / コメント / レポート / 純粋関数〕
 - `shared/`（7 件） — 複数機能で共有する小部品(アバター URL ガード等)  〔共有 / アバター〕
 - `sound/`（1 件） — 音声素材(src 側)  〔音声〕
 
@@ -286,16 +292,16 @@ graph LR
 - `helpers/`（1 件） — ⚠️ 未記入（ROLES に追記）
 
 ## `tools/` — 補助ツール(LP overflow 監査・MCP サーバ等)  〔ツール〕
-<sub>ファイル 5 件</sub>
+<sub>ファイル 6 件</sub>
 
 - `mcp-nicolive/`（3 件） — ニコ生状態を読む MCP サーバ(司令塔の状態取得用)  〔MCP / 診断〕
 
 ## `tsuioku-no-kirameki/` — 本番 LP の配信ディレクトリ(Cloudflare Pages へ deploy)  〔LP / 公開〕
-<sub>ファイル 44 件</sub>
+<sub>ファイル 45 件</sub>
 
 - `articles/`（14 件） — 技術記事(防御的公開)。手法を再利用可能な形で解説  〔記事 / 公開〕
 - `assets/`（3 件） — 公開ページ群が共有する静的資産の置き場(2026-09-14)  〔LP / 共有〕
-- `images/`（17 件） — LP 用の favicon・OG 画像等  〔画像〕
+- `images/`（18 件） — LP 用の favicon・OG 画像等  〔画像〕
 - `live/`（1 件） — /live/ 追憶のきらめき ランキング(描画は app/dist/live-ranking.js・収集は api/live-ranking.js)  〔LP / 公開 / ランキング〕
 - `sound/`（1 件） — LP 公開用の音声素材(エール音等)  〔音声 / 公開〕
 
@@ -527,6 +533,15 @@ esbuild の import 到達グラフを逆引きし「このファイルを変え�
 
 - [`scripts/impact-check.mjs`](../scripts/impact-check.mjs)
 - [`docs/feature-map/impact-map.json`](../docs/feature-map/impact-map.json)
+
+### ランキング(/live/)の X シェア  〔LP / 公開 / ランキング〕
+各配信の stats 行に <a class="share-x">(X Web Intent・JS ゼロ)。?lv= で該当配信を先頭固定(pinLiveFirst)。本文は liveShareText(中立・数値なし・60字以内)、URL は buildXIntentUrl(safeHttpUrl 検疫)。OG 画像は tools/gen-og-live-ranking.py。計器なし(privacy §14-2)(v0.1.1510)
+
+- [`src/lib/xIntentUrl.js`](../src/lib/xIntentUrl.js)
+- [`src/lib/liveRankingView.js`](../src/lib/liveRankingView.js)
+- [`src/extension/live-ranking-entry.js`](../src/extension/live-ranking-entry.js)
+- [`tsuioku-no-kirameki/live/index.html`](../tsuioku-no-kirameki/live/index.html)
+- [`tools/gen-og-live-ranking.py`](../tools/gen-og-live-ranking.py)
 
 ---
 

@@ -490,5 +490,19 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
     version: '0.1.1509', metric: 'cross-checked-claims', value: 47,
     source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
     note: '★悪化してよい理由: 30 日の移動窓(1508 の note と同じ)。この版のコミット本文は CPU プロファイル・Node ベンチ・自己診断の 3 手段で裏取りしているが、コミット前の記録なので窓に載るのは次版から'
+  }),
+  Object.freeze({
+    version: '0.1.1510', metric: 'bundle-kb', value: 1408,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '★悪化してよい理由: 1508・1509 と同値(1408KB)。この版の差分は /live/ の LP 側(popup.js に入らない)と lib 2 本で、popup バンドルは ±0。1454 以来の増分は未計測のまま(1508 の note 参照)'
+  }),
+  Object.freeze({
+    version: '0.1.1510', metric: 'gate-selftest', value: 4,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1510', metric: 'cross-checked-claims', value: 47,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: '★悪化してよい理由: 30 日の移動窓(1508・1509 の note と同じ)で 1509 と同値。この版はまだコミット前なので、本文の裏取りが窓に載るのは次版から'
   })
 ]);

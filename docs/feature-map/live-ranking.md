@@ -20,5 +20,6 @@ graph LR
   n_live_ranking --> n_src_lib_liveRankingView_js["lib/liveRankingView.js"]
   n_live_ranking --> n_src_lib_nicoadContributionRankingApi_js["lib/nicoadContributionRankingApi.js"]:::shared
   n_live_ranking --> n_src_lib_timeAuthority_js["lib/timeAuthority.js"]:::shared
+  n_live_ranking --> n_src_lib_xIntentUrl_js["lib/xIntentUrl.js"]
   classDef shared fill:#eee,stroke:#999,color:#666;
 ```

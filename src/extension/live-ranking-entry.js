@@ -12,8 +12,10 @@
 import { escapeHtml as esc, safeHttpUrl, formatNumberJa as num } from '../lib/htmlText.js';
 import {
   watchUrlOf, jstClock, elapsedText, freshness, estimateConcurrentForLive, sortByEstimatedConcurrent,
-  cacheBust, supporterRows, identifiedSupporters, isBlankIcon, createRowChangeTracker, rowKey
+  cacheBust, supporterRows, identifiedSupporters, isBlankIcon, createRowChangeTracker, rowKey,
+  LIVE_ID_RE, pinLiveFirst, liveShareText
 } from '../lib/liveRankingView.js';
+import { buildXIntentUrl } from '../lib/xIntentUrl.js';
 
 const elList = /** @type {HTMLElement} */ (document.getElementById('list'));
 const elMeta = /** @type {HTMLElement} */ (document.getElementById('meta'));
@@ -34,6 +36,35 @@ const tracker = createRowChangeTracker();
 
 /** 本体(Chrome 拡張)のストア URL。★LP index.html と同じ ID(AGENTS.md §2 の拡張 ID)。 */
 const STORE_URL = 'https://chromewebstore.google.com/detail/cjbabignmmodaickpeckiojjabnlogdb';
+
+/**
+ * ★シェアされる URL は本番 canonical に固定する(プレビューや app. から押しても本番 URL が投稿される)。
+ *   本文・URL の組み立ては純関数(liveShareText / buildXIntentUrl)。ここには DOM と location だけ残す。
+ */
+const SHARE_PAGE_URL = 'https://tsuioku-no-kirameki.com/live/';
+const SHARE_HASHTAGS = ['ニコ生'];
+
+/** 起動時に 1 回だけ ?lv= を読む。形が違えば ''(エラーを出さずに通常表示へ倒す)。 */
+function liveIdFromQuery() {
+  try {
+    const lv = String(new URLSearchParams(location.search).get('lv') || '').trim().toLowerCase();
+    return LIVE_ID_RE.test(lv) ? lv : '';
+  } catch {
+    return '';
+  }
+}
+const PINNED_LV = liveIdFromQuery();
+
+/**
+ * 1 配信ぶんの「X でシェア」リンクの href。空なら呼び出し側はリンクを描かない。
+ * @param {any} l
+ * @returns {string}
+ */
+function shareHref(l) {
+  const id = String((l && l.liveId) || '').trim().toLowerCase();
+  const url = LIVE_ID_RE.test(id) ? `${SHARE_PAGE_URL}?lv=${id}` : SHARE_PAGE_URL;
+  return buildXIntentUrl({ text: liveShareText(l), url, hashtags: SHARE_HASHTAGS });
+}
 
 /**
  * ★「サムネ付きで応援した人」の枠(2026-09-14 ユーザー要望・全配信に出す)。
@@ -169,13 +200,18 @@ function render(data) {
   }
   const nowMs = Date.now();
   const f = freshness(data.capturedAt, nowMs);
-  elMeta.innerHTML = `<img class="face" src="${esc(f.stale ? FACE.tanuNormal : FACE.kontaSmile)}" alt="">`
+  // ★合成順序は「賑わい順を作ってから 1 件を先頭へ」(逆だと sort が pin を壊す)。
+  const { lives: ordered, found } = pinLiveFirst(sortByEstimatedConcurrent(lives, nowMs), PINNED_LV);
+  const missing = !!PINNED_LV && !found;
+  elMeta.innerHTML = `<img class="face" src="${esc(f.stale ? FACE.tanuNormal : (missing ? FACE.tanuHalf : FACE.kontaSmile))}" alt="">`
     + `放送中 <b>${lives.length}</b> 配信`
-    + (f.text ? `・<span${f.stale ? ' class="stale"' : ''}>${esc(f.text)}</span>` : '');
+    + (f.text ? `・<span${f.stale ? ' class="stale"' : ''}>${esc(f.text)}</span>` : '')
+    + (missing ? '・<span class="pin-missing">その配信はもう放送が終わったみたい。いま支えている人の一覧は、そのまま見られるわ</span>' : '');
 
   tracker.begin();
-  elList.innerHTML = sortByEstimatedConcurrent(lives, nowMs).map((l, i) => {
+  elList.innerHTML = ordered.map((l, i) => {
     const rows = supporterRows(l);
+    const sx = shareHref(l);
     return '<section class="live">'
       + renderHead(l, i + 1, data.capturedAt, nowMs)
       + '<div class="stats">'
@@ -184,7 +220,11 @@ function render(data) {
       + `<span>🎁 ギフト <b>${num(l.giftTotal)}pt</b></span>`
       + `<span>📣 広告 <b>${num(l.adTotal)}pt</b></span>`
       // ★本体(Chrome 拡張)への導線。配信ごとに「この配信を拡張で記録する」を置く。
+      // ★🧩(本体への導線)と X でシェアは一塊で右端へ(.stats が折り返しても離ればなれにならない)。
+      + '<span class="stats-actions">'
       + `<a class="ext-link" href="${esc(STORE_URL)}" target="_blank" rel="noopener noreferrer" title="Chrome 拡張を入れると、この配信の応援コメント・ギフトを配信中にそのまま記録できます">🧩 この配信を拡張で記録する</a>`
+      + (sx ? `<a class="share-x" href="${esc(sx)}" target="_blank" rel="noopener noreferrer" title="X（旧 Twitter）の投稿画面が新しいタブで開くだけよ。押したことも含めて、当サイトは何も記録しないわ">X でシェア</a>` : '')
+      + '</span>'
       + '</div>'
       + renderKnown(identifiedSupporters(l))
       + '<div class="cols">'

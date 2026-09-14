@@ -268,3 +268,58 @@ export function createRowChangeTracker() {
 export function rowKey(liveId, kind, r) {
   return `${liveId}|${kind}|${String(r && r.name ? r.name : '')}`;
 }
+
+/**
+ * ★シェア本文の長さの上限(コードポイント単位)。
+ *   固定部の最大 16 字と合わせても SHARE_TEXT_MAX に構造的に収まる値を選んである
+ *   (18+15+24=57 / 16+24=40 / 18+13=31 / 14。テストが 4 分岐の最大長を固定している)。
+ */
+export const SHARE_NAME_MAX = 18;
+export const SHARE_TITLE_MAX = 24;
+export const SHARE_TEXT_MAX = 60;
+
+/**
+ * シェアされた `?lv=` の配信を一覧の先頭に固定する。★状態を持たない(呼ぶたびに判定)。
+ * 並びは「賑わい順を作ってから 1 件を先頭へ」の順で合成する(逆だと sort が pin を壊す)。
+ * @template {{ liveId?: unknown }} T
+ * @param {T[]} lives
+ * @param {unknown} lv
+ * @returns {{ lives: T[], found: boolean }} 不正な lv・不在なら恒等(コピー)で found:false
+ */
+export function pinLiveFirst(lives, lv) {
+  const arr = Array.isArray(lives) ? lives.slice() : [];
+  const id = String(lv ?? '').trim().toLowerCase();
+  if (!LIVE_ID_RE.test(id)) return { lives: arr, found: false };
+  const at = arr.findIndex((l) => String((l && l.liveId) ?? '').trim().toLowerCase() === id);
+  if (at < 0) return { lives: arr, found: false };
+  const [hit] = arr.splice(at, 1);
+  arr.unshift(hit);
+  return { lives: arr, found: true };
+}
+
+/**
+ * 文字列を 1 行に正規化して、コードポイント単位で切り詰める(サロゲートペアを割らない)。
+ * @param {unknown} v
+ * @param {number} max
+ * @returns {string}
+ */
+function trimTo(v, max) {
+  const s = String(v ?? '').replace(/\s+/g, ' ').trim();
+  const cp = Array.from(s);
+  return cp.length > max ? `${cp.slice(0, max - 1).join('')}…` : s;
+}
+
+/**
+ * シェアの下書き本文。★中立(誰が押しても成立する見出し体)・数値と時刻を入れない
+ *   (投稿した瞬間に古くなる値は載せない)。材料は配信者名と番組名だけ。
+ * @param {{ streamer?: { name?: unknown }|null, title?: unknown }|null|undefined} live
+ * @returns {string}
+ */
+export function liveShareText(live) {
+  const name = trimTo(live && live.streamer ? live.streamer.name : '', SHARE_NAME_MAX);
+  const title = trimTo(live ? live.title : '', SHARE_TITLE_MAX);
+  if (name && title) return `${name}の配信「${title}」を、いま支えている人`;
+  if (title) return `この配信「${title}」を、いま支えている人`;
+  if (name) return `${name}の配信を、いま支えている人`;
+  return 'この配信を、いま支えている人';
+}
