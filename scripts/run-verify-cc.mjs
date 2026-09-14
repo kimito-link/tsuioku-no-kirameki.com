@@ -68,6 +68,9 @@ const steps = [
   //   /api/status の書き込み認証キーが GitHub 上に出ていた事故があった。
   ['no-secrets', 'check:no-secrets'],
   ['tracked-imports', 'check:tracked-imports'],
+  // ★v0.1.1508: CLAUDE.md 1行目の `@AGENTS.md` import が生きているか(AGENTS.md が context に入る入口)。
+  //   CLAUDE.md が「この検査が赤くする」と書きながら検査が存在しなかった(check-doc-rot が検出)。
+  ['agent-bootstrap', 'check:agent-bootstrap'],
   ['tree-map', 'tree-map:check'],
   ['site-health', 'site-health:check'],
   ['feature-map', 'feature-map:check'],
@@ -120,6 +123,40 @@ for (const [name, script] of steps) {
   if (!runNpmScript(name, script)) {
     ok = false;
     break;
+  }
+}
+
+/*
+ * ★「報」ステップ(止めない): 横断キットの診断(v0.1.1508・2026-09-14)。
+ *
+ * ■ なぜ「門」に混ぜないか
+ *   `npm run diagnostics` は隣のリポ web-ios-android/templates/diagnostics/run.mjs(正本)を
+ *   コピーせず直接呼ぶ。別リポの検査が増えたり厳しくなったりしただけで、このリポの出荷が
+ *   止まるのは筋が違う。門(この上の steps=止める)と報(見せるが止めない)を分ける
+ *   ([[bundle-gates-into-one-entry-gate-vs-report]])。
+ *   ただし黙らせない: 結果は必ずログとコンソールに出す(見ない報は無いのと同じ)。
+ *   キットが隣に無い環境(CI の clone 等)では skip と明記する(合格ではない)。
+ */
+if (ok) {
+  const kitRunner = path.join(ROOT, '..', 'web-ios-android', 'templates', 'diagnostics', 'run.mjs');
+  if (fs.existsSync(kitRunner)) {
+    log('REPORT diagnostics start (npm run diagnostics / 止めない)');
+    const r = spawnSync('npm', ['run', 'diagnostics'], {
+      cwd: ROOT,
+      encoding: 'utf8',
+      shell: true,
+      maxBuffer: 32 * 1024 * 1024,
+      env: { ...process.env, FORCE_COLOR: '0', CI: '1', NODE_NO_WARNINGS: '1' }
+    });
+    if (r.stdout) fs.appendFileSync(logFile, r.stdout);
+    if (r.stderr) fs.appendFileSync(logFile, r.stderr);
+    const summary = String(r.stdout || '').split(/\r?\n/).filter((l) => /^[✓✗?] /.test(l));
+    for (const l of summary) log(`REPORT diagnostics ${l}`);
+    log(r.status === 0
+      ? 'REPORT diagnostics OK'
+      : `REPORT diagnostics に指摘あり(exit=${r.status ?? 'null'})。出荷は止めない。詳細は .artifacts/verify-cc.log`);
+  } else {
+    log('REPORT diagnostics skip(隣に web-ios-android キットが無い。★対象外であって合格ではない)');
   }
 }
 

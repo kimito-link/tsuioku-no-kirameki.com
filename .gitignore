@@ -87,3 +87,10 @@ council/auto/
 
 # 実機再現の使い捨て計測スクリプト置き場(2026-08-10)
 tests-tmp/
+
+# 並列セッション協調ファイル(web-ios-android/CLAUDE.md「Main-Write Pause」)。
+# write_lock/sessions が頻繁に変わるためコミットしない。テンプレは templates/.agent/coord.md.example。
+.agent/coord.md
+
+# 横断キットの context-engine が生成する全文脈スナップショット(npm run context)。生成物。
+.instrument-context.md

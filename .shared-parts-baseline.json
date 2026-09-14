@@ -1,0 +1,4 @@
+{
+  "_why": "web-ios-android/templates/diagnostics/check-shared-parts-used のラチェット上限。src/lib(共有)と本体まで一致する同名の自前実装の件数(identical)。2026-09-14 初回実測 identical=9 / different=101。増えたら赤。減らしたら下げる。",
+  "duplicates": 9
+}
