@@ -1,3 +1,4 @@
+import { safeHttpUrl as sanitizeHttpUrl } from './htmlText.js';
 /**
  * koken 公式「ギフト貢献度ランキング」無認証 JSON API の URL 組立 & 正規化（純関数）。
  *
@@ -117,16 +118,6 @@ export function isLikelyKokenRankingShape(json) {
     if (Number(j.meta.status) !== 200) return false;
   }
   return !!(j.data && typeof j.data === 'object' && Array.isArray(j.data.rankers));
-}
-
-/**
- * http(s) URL だけ通す（thumbnail）。それ以外は空に倒す。
- * @param {unknown} value
- * @returns {string}
- */
-function sanitizeHttpUrl(value) {
-  const s = String(value == null ? '' : value).trim();
-  return /^https?:\/\//i.test(s) ? s : '';
 }
 
 /**

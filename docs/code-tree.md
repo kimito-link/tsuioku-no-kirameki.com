@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 6 / 854 件
+## ⚠️ 役割コメントが無いソース 6 / 857 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `src/lib/laneDomSelfMeasure.js`
@@ -187,7 +187,7 @@
     - `2026-09-06.md`
     - `2026-09-07.md`
     - `2026-09-09.md`
-- 📁 **docs/** (312)
+- 📁 **docs/** (314)
   - 📁 **article-assets/** (87)
     - 📁 **venue-frames/** (12)
       - `f01.png`
@@ -283,7 +283,7 @@
   - 📁 **article-drafts/** (2)
     - `hasanmap-osint-20260611-copy.txt`
     - `hasanmap-osint-20260611.md`
-  - 📁 **feature-map/** (14)
+  - 📁 **feature-map/** (15)
     - `backfill-sw.md`
     - `comeview.md`
     - `content.md`
@@ -291,6 +291,7 @@
     - `impact-map.json`
     - `impact-map.md`
     - `index.md`
+    - `live-ranking.md`
     - `offscreen.md`
     - `page-intercept.md`
     - `popup.md`
@@ -298,7 +299,7 @@
     - `storage-bus.md`
     - `venue.md`
     - `web-status.md`
-  - 📁 **handoff/** (143)
+  - 📁 **handoff/** (144)
     - 📁 **bench/** (2)
       - `bench-interval.mjs` — ⚠️ 役割コメント無し
       - `bench-lane.mjs` — ⚠️ 役割コメント無し
@@ -376,6 +377,7 @@
     - `MEASURED-2026-08-16-diag-heavy-ROOTCAUSE.md`
     - `NOTEPC-CHECK-PROMPT.md`
     - `PLAN-live-ranking-2026-09-05.md`
+    - `PLAN-live-ranking-components-2026-09-14.md`
     - `ROOT-CAUSE-CLAIM-RULE.md`
     - `VOICE-BASELINE-2026-08-11.md`
     - `clip-history-persistence-synthesis.md`
@@ -762,7 +764,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (1830)
+- 📁 **src/** (1835)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -799,7 +801,7 @@
       - `avatarResolver.test.js`
       - `identity.js` — ニコ生ユーザー ID の「匿名性」判定と関連アイデンティティ・ユーティリティ。
       - `nickname.js` — 表示名（ニックネーム）の「強弱」判定。
-  - 📁 **extension/** (46)
+  - 📁 **extension/** (47)
     - 📁 **popup/** (6)
       - 📁 **report/** (2)
         - `htmlReportDocument.js` — HTMLレポート(振り返り用の保存HTML)組み立てクラスタ。
@@ -824,6 +826,7 @@
     - `giftHistoryLaneStateWiring.test.js`
     - `heavyReuseNotDoubleGated.wiring.test.js`
     - `inlineHostMoveProbe.wiring.test.js`
+    - `live-ranking-entry.js` — `/live/`「追憶のきらめき ランキング」(tsuioku-no-kirameki/live/index.html)の描画。
     - `live-view-entry.js` — 応援ライブビュー(live-view.html)のエントリ。
     - `marketing-export-entry.js` — マーケ分析レポートの別タブ化(marketing-export.html)のエントリ。
     - `ndgrHiddenFlush.wiring.test.js`
@@ -1027,7 +1030,7 @@
         - `logo_funlink_white_RGB_link_black.png`
         - `logo_funlink_white_RGB_maru_black.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1612)
+  - 📁 **lib/** (1616)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -1600,6 +1603,8 @@
     - `htmlReportCommenterFollowSection.test.js`
     - `htmlReportConceptGuide.js` — HTML レポート用キャラガイド（この拡張の説明／保存ページの使い方）
     - `htmlReportConceptGuide.test.js`
+    - `htmlText.js` — HTML に文字列を流し込むときの最小の共有部品(純粋関数)。
+    - `htmlText.test.js`
     - `identityAcquisitionCensus.js` — サムネ / 数値ID / アカウント名 の【取得率】を数える純関数。
     - `identityAcquisitionCensus.test.js`
     - `iframeOfficialDomFromRelay.js` — v0.1.231: iframe relay (NLS_GIFT_HISTORY_FROM_IFRAME) 受信時の
@@ -1769,6 +1774,8 @@
     - `liveHealthScore.test.js`
     - `livePersistInterval.js` — v0.1.498〜501: ライブ記録の保存（コアレッサ）最小間隔を決める純粋関数。フリーズ対策 A。
     - `livePersistInterval.test.js`
+    - `liveRankingView.js` — `/live/`「追憶のきらめき ランキング」の純ロジック(DOM を触らない)。
+    - `liveRankingView.test.js`
     - `liveStatValuePlaceholder.js` — `.nl-live-stat-value` 向け: 数字表示かプレースホルダー文言かを判定（0.1.68 の極太フォント切替と共通）。
     - `liveStatValuePlaceholder.test.js`
     - `liveViewPublishSignature.js` — 状態速報「重さ根治 P4」: publishLiveViewPublishPayload(status-entry.js)は 3秒 min-gap を
@@ -2751,7 +2758,7 @@
     - `store.mjs` — NicoLive Local MCP Bridge - Snapshot Store.
   - `audit-lp-overflow.mjs` — One-off LP overflow audit (run: node tools/audit-lp-overflow.mjs)
   - `render-og.js` — 追憶の煌めき LP 用 OG 画像（1200×630）を生成する。
-- 📁 **tsuioku-no-kirameki/** (41)
+- 📁 **tsuioku-no-kirameki/** (42)
   - 📁 **articles/** (14)
     - 📁 **role-separation-design/** (2)
       - 📁 **img/** (1)
@@ -2769,6 +2776,9 @@
     - `phase-gate-flow-canon.html`
     - `prewarm-coordinator-lease.html`
     - `reaction-template-classifier.html`
+  - 📁 **assets/** (1)
+    - 📁 **css/** (1)
+      - `yukkuri-thread.css`
   - 📁 **images/** (17)
     - 📁 **venue/** (6)
       - `venue-living-overview.jpg`

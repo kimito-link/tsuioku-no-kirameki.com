@@ -55,6 +55,7 @@ import {
   resolveVenueHoverCardPlacement,
   formatVenueHoverRelativeTime
 } from '../lib/venueHoverCard.js';
+import { escapeHtml } from '../lib/htmlText.js';
 
 /**
  * 会場の参加者ソース切替。
@@ -563,20 +564,6 @@ function buildVenuePersonTile(participant, fallbackLabel = '会場') {
     },
     venuePersonTileIo
   );
-}
-
-/**
- * 診断パネル等で表示名を innerHTML に差し込む前に HTML エスケープする。
- * @param {string} s
- * @returns {string}
- */
-function escapeHtml(s) {
-  return String(s == null ? '' : s)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
 }
 
 /** @typedef {ReturnType<typeof venueRowsFromUserLaneCandidates>[number]} VenueRow */

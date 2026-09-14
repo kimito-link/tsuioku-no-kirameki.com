@@ -59,6 +59,9 @@ const ROLES = {
   'tsuioku-no-kirameki': { role: '本番 LP の配信ディレクトリ(Cloudflare Pages へ deploy)', tags: ['LP', '公開'] },
   'tsuioku-no-kirameki/articles': { role: '技術記事(防御的公開)。手法を再利用可能な形で解説', tags: ['記事', '公開'] },
   'tsuioku-no-kirameki/images': { role: 'LP 用の favicon・OG 画像等', tags: ['画像'] },
+  'tsuioku-no-kirameki/assets': { role: '公開ページ群が共有する静的資産の置き場(2026-09-14)', tags: ['LP', '共有'] },
+  'tsuioku-no-kirameki/assets/css': { role: '共有 CSS コンポーネント(ゆっくり吹き出し等)。LP と /live/ が同じ1本を読む=2箇所目を書かない', tags: ['CSS', '共有'] },
+  'tsuioku-no-kirameki/live': { role: '/live/ 追憶のきらめき ランキング(描画は app/dist/live-ranking.js・収集は api/live-ranking.js)', tags: ['LP', '公開', 'ランキング'] },
   'tsuioku-no-kirameki/sound': { role: 'LP 公開用の音声素材(エール音等)', tags: ['音声', '公開'] },
 
   'docs': { role: '設計正本・マインドマップ・フロー図・feature-map(AI/人間向け)', tags: ['設計', 'レポート'] },

@@ -66,7 +66,8 @@ const FEATURES = [
   { entry: 'src/extension/offscreen-entry.js', feature: 'offscreen', label: 'コメント IDB 書き手' },
   { entry: 'src/extension/backfill-sw-entry.js', feature: 'backfill-sw', label: 'バックフィル SW' },
   { entry: 'src/extension/page-intercept-entry.js', feature: 'page-intercept', label: 'ページ傍受' },
-  { entry: 'app/app.js', feature: 'web-status', label: 'Web版 状態(スマホ)' }
+  { entry: 'app/app.js', feature: 'web-status', label: 'Web版 状態(スマホ)' },
+  { entry: 'src/extension/live-ranking-entry.js', feature: 'live-ranking', label: 'Web版 追憶のきらめき ランキング(/live/)' }
 ];
 
 /** 解析から除外するパス断片。 */

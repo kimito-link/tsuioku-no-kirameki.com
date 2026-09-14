@@ -11,6 +11,67 @@
         "scripts/check-agent-bootstrap.mjs"
       ],
       "note": "CLAUDE.md 1行目の @AGENTS.md import と AGENTS.md の実在を守る門。キットの check-doc-rot(文書→実体の向き)とは責務が違う(こちらは『入口の位置』)ので LOCAL。ai-hub find --tag diagnostics で同等品が無いことを確認済み"
+    },
+    {
+      "at": "2026-09-14T06:40:00.000Z",
+      "responsibility": "html-text-escape-and-url-sanitize",
+      "decision": "ESTABLISH_REHOME",
+      "canonicalSource": "src/lib/htmlText.js",
+      "scopePaths": [
+        "src/lib/htmlText.js",
+        "src/lib/supportTimelineHtml.js",
+        "src/extension/venueBar.js",
+        "src/lib/eventRankingReportModel.js",
+        "src/lib/auditionEventRankingApi.js",
+        "src/lib/eventParticipationProgramsApi.js",
+        "src/lib/giftThrowLedgerTableHtml.js",
+        "src/lib/kokenContributionRankingApi.js"
+      ],
+      "note": "同じ本体の escapeHtml×2 / safeHttpUrl×1 / sanitizeHttpUrl×4 を htmlText.js に集約し、7ファイルは import へ"
+    },
+    {
+      "at": "2026-09-14T06:40:00.000Z",
+      "responsibility": "live-ranking-page-pure-logic",
+      "decision": "LOCAL",
+      "canonicalSource": null,
+      "scopePaths": [
+        "src/lib/liveRankingView.js"
+      ],
+      "note": "式(retentionRate)・正規化(koken/nicoad)・アイコン導出(deriveAvatarUrlFromUid)は既存正本を呼ぶ。残るのは /live/ 固有の判定だけ"
+    },
+    {
+      "at": "2026-09-14T06:40:00.000Z",
+      "responsibility": "live-ranking-page-dom",
+      "decision": "LOCAL",
+      "canonicalSource": null,
+      "scopePaths": [
+        "src/extension/live-ranking-entry.js"
+      ],
+      "note": "DOM 描画のみ。app/dist/live-ranking.js へビルド"
+    },
+    {
+      "at": "2026-09-14T06:40:00.000Z",
+      "responsibility": "yukkuri-thread-css-component",
+      "decision": "ESTABLISH_REHOME",
+      "canonicalSource": "tsuioku-no-kirameki/assets/css/yukkuri-thread.css",
+      "scopePaths": [
+        "tsuioku-no-kirameki/assets/css/yukkuri-thread.css",
+        "tsuioku-no-kirameki/index.html",
+        "tsuioku-no-kirameki/live/index.html"
+      ],
+      "note": "LP inline から順序を保って切り出し、LP と /live/ の両方が読む"
+    },
+    {
+      "at": "2026-09-14T06:45:00.000Z",
+      "responsibility": "live-ranking-tests-and-bundle",
+      "decision": "LOCAL",
+      "canonicalSource": null,
+      "scopePaths": [
+        "src/lib/htmlText.test.js",
+        "src/lib/liveRankingView.test.js",
+        "app/dist/live-ranking.js"
+      ],
+      "note": "新モジュールの単体テストと、esbuild が出す配布物(git 追跡=Vercel が配る)。判断は元モジュールの receipt に従う"
     }
   ]
 }

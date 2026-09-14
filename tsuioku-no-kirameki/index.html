@@ -455,58 +455,12 @@
         line-height:var(--lh-body);
         font-size:clamp(.9rem,2.5vw,.96rem)
       }
-      .yukkuri-thread{display:grid;gap:18px;margin-top:20px}
-      .y-row{display:grid;grid-template-columns:minmax(50px,76px) minmax(0,1fr);gap:10px;align-items:start}
-      .y-row.reverse{grid-template-columns:minmax(0,1fr) minmax(50px,76px)}
-      .y-row .bubble{min-width:0}
-      .y-row .speaker img{width:64px;height:64px}
-      .y-row .speaker span{font-size:.74rem}
-      .y-row .bubble{
-        padding:14px 16px;
-        border-radius:22px;
-        font-size:clamp(.88rem,2.9vw,.98rem)
-      }
-      .y-row .bubble::after{
-        left:-7px;top:18px;width:14px;height:14px;
-        transform:rotate(45deg)
-      }
-      .y-row.reverse .bubble::after{
-        left:auto;right:-7px;top:18px;
-        transform:rotate(45deg)
-      }
-      @media (min-width:761px){
-        .y-row{grid-template-columns:112px minmax(0,1fr);gap:16px}
-        .y-row.reverse{grid-template-columns:minmax(0,1fr) 112px}
-        .y-row .speaker img{width:92px;height:92px}
-        .y-row .speaker span{font-size:.8rem}
-        .y-row .bubble{
-          padding:18px 20px;
-          border-radius:26px;
-          font-size:1rem;
-        }
-        .y-row .bubble::after{
-          left:-10px;top:50%;width:18px;height:18px;
-          transform:translateY(-50%) rotate(45deg)
-        }
-        .y-row.reverse .bubble::after{
-          left:auto;right:-10px;top:50%;
-          transform:translateY(-50%) rotate(45deg)
-        }
-      }
-      .speaker{display:flex;flex-direction:column;align-items:center;gap:8px}
-      .speaker img{width:92px;height:92px;object-fit:contain;filter:drop-shadow(0 10px 16px rgba(79,56,23,.14))}
-      .speaker span{color:var(--text-secondary);font-size:.8rem}
-      .bubble{
-        position:relative;padding:18px 20px;border-radius:26px;background:rgba(255,253,248,.97);
-        border:1px solid rgba(88,62,28,.1);line-height:var(--lh-body)
-      }
-      .bubble::after{
-        content:"";position:absolute;left:-10px;top:50%;width:18px;height:18px;transform:translateY(-50%) rotate(45deg);
-        background:rgba(255,253,248,.97);border-left:1px solid rgba(88,62,28,.1);border-bottom:1px solid rgba(88,62,28,.1)
-      }
-      .y-row.reverse .bubble::after{
-        left:auto;right:-10px;border-left:none;border-bottom:none;border-right:1px solid rgba(88,62,28,.1);border-top:1px solid rgba(88,62,28,.1)
-      }
+    </style>
+    <!-- ★ゆっくり吹き出しは共有コンポーネント(assets/css/yukkuri-thread.css)。/live/ と共用。
+         ★元の inline 定義と【同じ位置】で読む: 前後の同じ詳細度のセレクタ(.hero-thread 等)との勝ち負けを変えないため。
+         (先頭で読むと .hero-thread .speaker img 等が勝ってヒーローのキャラが 92→84px に縮む＝2026-09-14 実測) -->
+    <link rel="stylesheet" href="assets/css/yukkuri-thread.css">
+    <style>
       .bubble strong,.mini-note strong{color:#8a5a0a}
       .two-col{grid-template-columns:repeat(2,minmax(0,1fr));margin-top:20px}
       .lane{padding:18px;border-radius:22px;border:1px solid rgba(88,62,28,.1);background:rgba(255,252,247,.78)}
@@ -976,14 +930,6 @@
         }
       }
       @keyframes floaty{0%,100%{transform:translateY(0)}50%{transform:translateY(-10px)}}
-      @keyframes yukkuriFloat{
-        0%,100%{transform:translateY(0) rotate(0deg)}
-        50%{transform:translateY(-8px) rotate(-1.4deg)}
-      }
-      @keyframes yukkuriBubbleFloat{
-        0%,100%{transform:translateY(0)}
-        50%{transform:translateY(-4px)}
-      }
       @media (max-width:1020px){
         .two-col,.stats,.solution-grid,.avatar-line,.mini-notes,.footer-card,.comment-flow,.impact-chain,.impact-dual{grid-template-columns:1fr}
         .live-ui-layout{grid-template-columns:1fr;min-height:0}
@@ -1008,11 +954,6 @@
       @media (min-width:761px){
         .hero-thread .y-row{grid-template-columns:minmax(82px,104px) minmax(0,1fr);gap:14px}
         .hero-thread .y-row.reverse{grid-template-columns:minmax(0,1fr) minmax(82px,104px)}
-      }
-      @media (max-width:360px){
-        .y-row{grid-template-columns:minmax(46px,64px) minmax(0,1fr);gap:8px}
-        .y-row.reverse{grid-template-columns:minmax(0,1fr) minmax(46px,64px)}
-        .y-row .speaker img{width:56px;height:56px}
       }
 
       /* 七夕プレビュー（織姫・彦星の距離と、応援が残る世界） */
