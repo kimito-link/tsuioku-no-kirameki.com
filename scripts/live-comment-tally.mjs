@@ -42,6 +42,7 @@ import { crawlNdgrBackward } from '../src/lib/ndgrBackfillCrawl.js';
 import { ndgrChatsToMergeRows } from '../src/lib/ndgrChatRows.js';
 import { extractEmbeddedData } from '../src/lib/nicoliveRankingPick.js';
 import { pickWsUrlFromEmbeddedData } from '../src/lib/embeddedDataExtract.js';
+import { fetchViewUri, fetchWatchHtml } from '../src/server/nicoliveGuest.js';
 import {
   createCommentTally,
   rowsBeyondWater,
@@ -120,83 +121,11 @@ async function fetchBinary(url, o) {
   return { ok: res.ok, status: res.status, bytes: new Uint8Array(await res.arrayBuffer()) };
 }
 
-/**
- * watch ページの HTML を取る。取れなければ ''。
- * @param {string} lv
- * @returns {Promise<string>}
+/*
+ * ★watch HTML 取得と WS 握手(viewUri 取得)は src/server/nicoliveGuest.js へ移した。
+ *   api/live-recent-comments.js と共用する(2 箇所目を書かない)。ここでは import して
+ *   run の締め切り signal と本ファイルの timeout 定数を渡すだけ。
  */
-async function fetchWatchHtml(lv) {
-  try {
-    const res = await fetch(`https://live.nicovideo.jp/watch/${lv}`, {
-      signal: AbortSignal.any([runAbort.signal, AbortSignal.timeout(HTTP_TIMEOUT_MS)]),
-      headers: { 'user-agent': UA },
-      redirect: 'follow'
-    });
-    if (!res.ok) return '';
-    return await res.text();
-  } catch {
-    return '';
-  }
-}
-
-/**
- * 視聴セッション WS にゲストで繋ぎ、コメントサーバの場所(view の URL)だけを受け取って切る。
- *
- * ★送るのは startWatching 1 通だけ。`ping` に pong は返さない・`keepSeat` も送らない
- *   (欲しいのは最初の messageServer だけで、席を持ち続ける必要が無い)。
- * ★`stream`(映像)の中身は読まない。
- *
- * @param {string} wsUrl
- * @returns {Promise<{ viewUri: string, error: string }>} viewUri は呼び出し元の外へ出さない
- */
-function fetchViewUri(wsUrl) {
-  return new Promise((resolve) => {
-    let settled = false;
-    /** @type {WebSocket|null} */
-    let ws = null;
-    const finish = (viewUri, error) => {
-      if (settled) return;
-      settled = true;
-      clearTimeout(timer);
-      try { ws?.close(1000); } catch { /* 閉じられないなら放置(プロセスは終わる) */ }
-      resolve({ viewUri, error });
-    };
-    const timer = setTimeout(() => finish('', 'ws_timeout'), WS_TIMEOUT_MS);
-    try {
-      ws = new WebSocket(wsUrl);
-    } catch {
-      finish('', 'ws_open_failed');
-      return;
-    }
-    ws.addEventListener('open', () => {
-      try {
-        ws?.send(JSON.stringify({
-          type: 'startWatching',
-          data: {
-            stream: { quality: 'abr', protocol: 'hls', latency: 'low', chasePlay: false },
-            room: { protocol: 'webSocket', commentable: true },
-            reconnect: false
-          }
-        }));
-      } catch {
-        finish('', 'ws_send_failed');
-      }
-    });
-    ws.addEventListener('message', (ev) => {
-      let msg = null;
-      try { msg = JSON.parse(String(ev.data || '')); } catch { return; }
-      if (!msg || typeof msg !== 'object') return;
-      if (msg.type === 'messageServer') {
-        const uri = String(msg?.data?.viewUri || '').trim();
-        finish(uri && /^https:\/\//i.test(uri) ? uri : '', uri ? '' : 'no_view_uri');
-      } else if (msg.type === 'disconnect') {
-        finish('', 'ws_disconnect');
-      }
-    });
-    ws.addEventListener('error', () => finish('', 'ws_error'));
-    ws.addEventListener('close', () => finish('', 'ws_closed'));
-  });
-}
 
 /**
  * 巡回 generator を回し、前回水位より外側の行だけを tally へ足す(増分の心臓部)。
@@ -271,7 +200,7 @@ async function tallyOne(live, prev) {
   const lv = String(live.liveId || '').trim().toLowerCase();
   if (!/^lv\d{6,15}$/.test(lv)) return { ok: false, reason: 'bad_live_id', entry: null, state: null };
 
-  const html = await fetchWatchHtml(lv);
+  const html = await fetchWatchHtml(lv, { timeoutMs: HTTP_TIMEOUT_MS, signal: runAbort.signal, ua: UA });
   if (!html) return { ok: false, reason: 'watch_fetch_failed', entry: null, state: null };
   const props = extractEmbeddedData(html);
   if (!props) return { ok: false, reason: 'no_embedded_data', entry: null, state: null };
@@ -279,7 +208,7 @@ async function tallyOne(live, prev) {
   // ★終了した番組は空文字になる(実測)。「取れない」と「終わっている」を混ぜない。
   if (!wsUrl) return { ok: false, reason: 'no_ws_url', entry: null, state: null };
 
-  const { viewUri, error } = await fetchViewUri(wsUrl);
+  const { viewUri, error } = await fetchViewUri(wsUrl, { timeoutMs: WS_TIMEOUT_MS });
   if (!viewUri) return { ok: false, reason: error || 'no_view_uri', entry: null, state: null };
 
   const p = prev && typeof prev === 'object' ? prev : null;

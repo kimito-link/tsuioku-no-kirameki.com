@@ -252,10 +252,22 @@
       .nm a { color: var(--ink); text-decoration: none; }
       .nm a:hover { text-decoration: underline; }
       .pt { flex: 0 0 auto; font-variant-numeric: tabular-nums; font-size: .85rem; color: var(--ink-sub); }
+      /* ★行全体を 1 つのリンクに(サムネ+名前+件数)。色は継承し、下線は hover のときだけ。 */
+      .rank-link { display: flex; align-items: center; gap: 8px; flex: 1 1 auto; min-width: 0; color: inherit; text-decoration: none; }
+      .rank-link:hover { background: var(--bg-soft); border-radius: 8px; }
+      .rank-link:hover .nm { text-decoration: underline; }
       .empty { display: flex; align-items: center; gap: 8px; color: var(--ink-sub); font-size: .85rem; margin: 0; }
       .empty img { width: 40px; height: 40px; object-fit: contain; opacity: .85; }
       /* ★上限に当たった配信の注記(「全部を数えた」と誤解させないための小さな但し書き)。 */
       .col-note { margin: 6px 0 0; font-size: .72rem; color: var(--ink-sub); }
+      /* ★ホバーで出す「その人の直近の発言」カード(body 直下・1 個を使い回す・position:fixed)。 */
+      .recent-card { position: fixed; z-index: 50; max-width: 320px; background: var(--card); border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 8px 24px rgba(20, 55, 92, .14); padding: 8px 10px; font-size: .82rem; color: var(--ink); }
+      .recent-card ul { margin: 4px 0 0; padding-left: 1.1em; }
+      .recent-card li { margin: 2px 0; }
+      .recent-card .st { margin: 2px 0 0; color: var(--ink-sub); }
+      /* ★コメント列の行は「マウスを乗せると発言が出る」ことを help カーソルで示す(匿名行にも uid はある)。 */
+      ol.rank li[data-uid] { cursor: help; }
+      ol.rank li[data-uid] .rank-link { cursor: pointer; }
 
       /*
         ★「動いている感じ」を出す。
@@ -343,7 +355,7 @@
             <img src="../../extension/images/yukkuri-charactore-english/tanunee/tanuki-yukkuri-half-eyes-mouth-open.png" alt="たぬ姉" width="92" height="92" decoding="async">
             <span>たぬ姉</span>
           </div>
-          <div class="bubble">ギフトと広告の順位とポイントは<strong>ニコ生が公開している値そのまま</strong>。<strong>コメントの件数だけはうちが数えた値</strong>よ（誰が何件かだけ。本文は保存していないわ）。ほかに当サイトが足したのは「約○人（推定）」と並び順だけ。更新は<strong>60 秒ごとの自動＋「いま更新」ボタン</strong>（コメントの集計はもう少しゆっくりで、約 10 分ごと）。データの収集時刻は上に出しているから、古いときは正直に「⚠」が出るわ。</div>
+          <div class="bubble">ギフトと広告の順位とポイントは<strong>ニコ生が公開している値そのまま</strong>。<strong>コメントの件数だけはうちが数えた値</strong>よ（誰が何件かだけ。本文は保存していないわ）。ほかに当サイトが足したのは「約○人（推定）」と並び順だけ。更新は<strong>60 秒ごとの自動＋「いま更新」ボタン</strong>（コメントの集計はもう少しゆっくりで、約 10 分ごと）。データの収集時刻は上に出しているから、古いときは正直に「⚠」が出るわ。<strong>名前にマウスを乗せる</strong>と、その人の直近の発言をその場で取ってくるわ（<strong>本文は保存しないわ</strong>）。</div>
         </div>
       </div>
 

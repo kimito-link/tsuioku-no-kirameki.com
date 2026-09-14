@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 6 / 862 件
+## ⚠️ 役割コメントが無いソース 6 / 865 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `src/lib/laneDomSelfMeasure.js`
@@ -53,8 +53,9 @@
   - `KB-stale-premise.md`
   - `TO-web-ios-android-ai-maze-pattern-2026-08-31.md`
   - `TO-web-ios-android-unnamed-bucket-2026-09-03.md`
-- 📁 **api/** (2)
+- 📁 **api/** (3)
   - `live-ranking.js` — /live/ 用「支えた人ランキング」の収集・配信 Vercel Serverless Function。
+  - `live-recent-comments.js` — /api/live-recent-comments — `/live/` の「コメントで応援した人」にホバーしたとき、
   - `status.js` — status 受け口 Vercel Serverless Function。
 - 📁 **app/** (97)
   - 📁 **images/** (93)
@@ -771,7 +772,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (1841)
+- 📁 **src/** (1845)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1037,7 +1038,7 @@
         - `logo_funlink_white_RGB_link_black.png`
         - `logo_funlink_white_RGB_maru_black.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1622)
+  - 📁 **lib/** (1624)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -1785,6 +1786,8 @@
     - `livePersistInterval.test.js`
     - `liveRankingView.js` — `/live/`「追憶のきらめき ランキング」の純ロジック(DOM を触らない)。
     - `liveRankingView.test.js`
+    - `liveRecentHoverCard.js` — `/live/` の「コメントで応援した人」にホバーしたとき出す
+    - `liveRecentHoverCard.test.js`
     - `liveStatValuePlaceholder.js` — `.nl-live-stat-value` 向け: 数字表示かプレースホルダー文言かを判定（0.1.68 の極太フォント切替と共通）。
     - `liveStatValuePlaceholder.test.js`
     - `liveViewPublishSignature.js` — 状態速報「重さ根治 P4」: publishLiveViewPublishPayload(status-entry.js)は 3秒 min-gap を
@@ -2662,6 +2665,9 @@
     - `yieldToBrowserPaint.js` — 【層】L0 判定層(依存ゼロ・chrome.* 非依存)
     - `yukkuriBroadcastSummary.js` — 放送終了後の HTML レポート / マーケ分析の頭にくる「ゆっくり解説風」要約セクション。
     - `yukkuriBroadcastSummary.test.js`
+  - 📁 **server/** (2)
+    - `nicoliveGuest.js` — ニコ生の「ゲスト視聴」で必要な素の I/O だけを持つ Node 側の共有部品。
+    - `nicoliveGuest.test.js`
   - 📁 **shared/** (7)
     - 📁 **avatar/** (3)
       - `avatarUrlGuard.js` — avatar URL 比較・抽出・整合性判定の純粋関数群（shared レイヤ）。

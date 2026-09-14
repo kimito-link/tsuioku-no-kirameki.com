@@ -60,8 +60,9 @@ graph LR
   d12 --> d12_3["fixtures/ 〔テスト〕"]
   d12 --> d12_4["images/ 〔画像〕"]
   d12 --> d12_5["lib/ 〔色/速度/コメント/レポート/純粋関数〕"]
-  d12 --> d12_6["shared/ 〔共有/アバター〕"]
-  d12 --> d12_7["sound/ 〔音声〕"]
+  d12 --> d12_6["server/ 〔API/公開/ランキング〕"]
+  d12 --> d12_7["shared/ 〔共有/アバター〕"]
+  d12 --> d12_8["sound/ 〔音声〕"]
   ROOT --> d13["tests/ 〔テスト〕"]
   d13 --> d13_0["contract/ 〔テスト/契約〕"]
   d13 --> d13_1["e2e/ 〔テスト/E2E/描画〕"]
@@ -205,6 +206,12 @@ graph LR
   f38 --> f38_3["lib/liveRankingView.js"]
   f38 --> f38_4["extension/live-ranking-entry.js"]
   f38 --> f38_5["workflows/live-ranking.yml"]
+  HUB --> f39["ランキング(/live/)ホバーで直近の発言"]
+  f39 --> f39_0["live-recent-comments.js"]
+  f39 --> f39_1["server/nicoliveGuest.js"]
+  f39 --> f39_2["lib/liveRecentHoverCard.js"]
+  f39 --> f39_3["extension/live-ranking-entry.js"]
+  f39 --> f39_4["live/index.html"]
 ```
 
 ---
@@ -221,7 +228,7 @@ graph LR
 <sub>ファイル 5 件</sub>
 
 ## `api/` — サーバレス API(status エンドポイント)  〔API〕
-<sub>ファイル 2 件</sub>
+<sub>ファイル 3 件</sub>
 
 ## `app/` — Web 版状態ページのアプリ(app.js + dist)  〔Web版〕
 <sub>ファイル 100 件</sub>
@@ -280,14 +287,15 @@ graph LR
 - `soundeffect-lab/`（19 件） — ⚠️ 未記入（ROLES に追記）
 
 ## `src/` — LP 側 + 純粋関数ライブラリの源  〔ソース〕
-<sub>ファイル 1841 件</sub>
+<sub>ファイル 1845 件</sub>
 
 - `data/`（7 件） — 保存コメントからレーン候補を読む acquirer / source 層  〔コメント / 取得〕
 - `domain/`（20 件） — ドメイン正本(応援レーンの集約・列ポリシー等。識別子判定など)  〔応援 / 集約 / 識別子〕
 - `extension/`（47 件） — バンドル entry(content/popup/venue/status/offscreen/backfill-sw 等=機能境界)  〔entry / 記録 / 会場 / 応援〕
 - `fixtures/`（1 件） — テスト用フィクスチャ  〔テスト〕
 - `images/`（134 件） — LP / CWS 提出物のマスター画像  〔画像〕
-- `lib/`（1622 件） — 純粋関数ライブラリ(unit test 対象)。色・速度・コメント・レポート等の計算ロジックの大半  〔色 / 速度 / コメント / レポート / 純粋関数〕
+- `lib/`（1624 件） — 純粋関数ライブラリ(unit test 対象)。色・速度・コメント・レポート等の計算ロジックの大半  〔色 / 速度 / コメント / レポート / 純粋関数〕
+- `server/`（2 件） — Node 側 I/O 部品(fetch/WebSocket を実際に叩く。api と scripts が共用。lib には置けない)  〔API / 公開 / ランキング〕
 - `shared/`（7 件） — 複数機能で共有する小部品(アバター URL ガード等)  〔共有 / アバター〕
 - `sound/`（1 件） — 音声素材(src 側)  〔音声〕
 
@@ -559,6 +567,15 @@ esbuild の import 到達グラフを逆引きし「このファイルを変え�
 - [`src/lib/liveRankingView.js`](../src/lib/liveRankingView.js)
 - [`src/extension/live-ranking-entry.js`](../src/extension/live-ranking-entry.js)
 - [`.github/workflows/live-ranking.yml`](../.github/workflows/live-ranking.yml)
+
+### ランキング(/live/)ホバーで直近の発言  〔LP / 公開 / ランキング / コメント〕
+「コメントで応援した人」の名前にマウスを乗せると、その人の直近発言(最大5件)をその場で NDGR から浅く取って小さなカードで出す。POST /api/live-recent-comments が watch HTML→握手(nicoliveGuest)→crawlNdgrBackward を浅く回して byUid を返す。本文は Redis に保存せずサーバのメモリに最長60秒だけ。カード HTML は純関数 buildRecentCardHtml。行全体を1つの <a class="rank-link"> にまとめる変更も同段(v0.1.1514)
+
+- [`api/live-recent-comments.js`](../api/live-recent-comments.js)
+- [`src/server/nicoliveGuest.js`](../src/server/nicoliveGuest.js)
+- [`src/lib/liveRecentHoverCard.js`](../src/lib/liveRecentHoverCard.js)
+- [`src/extension/live-ranking-entry.js`](../src/extension/live-ranking-entry.js)
+- [`tsuioku-no-kirameki/live/index.html`](../tsuioku-no-kirameki/live/index.html)
 
 ---
 

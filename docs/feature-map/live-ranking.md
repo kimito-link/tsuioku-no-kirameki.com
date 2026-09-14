@@ -19,6 +19,7 @@ graph LR
   n_live_ranking --> n_src_lib_htmlText_js["lib/htmlText.js"]:::shared
   n_live_ranking --> n_src_lib_kokenContributionRankingApi_js["lib/kokenContributionRankingApi.js"]:::shared
   n_live_ranking --> n_src_lib_liveRankingView_js["lib/liveRankingView.js"]
+  n_live_ranking --> n_src_lib_liveRecentHoverCard_js["lib/liveRecentHoverCard.js"]
   n_live_ranking --> n_src_lib_nicoUserPage_js["lib/nicoUserPage.js"]:::shared
   n_live_ranking --> n_src_lib_nicoadContributionRankingApi_js["lib/nicoadContributionRankingApi.js"]:::shared
   n_live_ranking --> n_src_lib_timeAuthority_js["lib/timeAuthority.js"]:::shared
