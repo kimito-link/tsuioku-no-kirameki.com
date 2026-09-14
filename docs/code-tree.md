@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 6 / 857 件
+## ⚠️ 役割コメントが無いソース 6 / 858 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `src/lib/laneDomSelfMeasure.js`
@@ -187,7 +187,7 @@
     - `2026-09-06.md`
     - `2026-09-07.md`
     - `2026-09-09.md`
-- 📁 **docs/** (314)
+- 📁 **docs/** (315)
   - 📁 **article-assets/** (87)
     - 📁 **venue-frames/** (12)
       - `f01.png`
@@ -299,7 +299,7 @@
     - `storage-bus.md`
     - `venue.md`
     - `web-status.md`
-  - 📁 **handoff/** (144)
+  - 📁 **handoff/** (145)
     - 📁 **bench/** (2)
       - `bench-interval.mjs` — ⚠️ 役割コメント無し
       - `bench-lane.mjs` — ⚠️ 役割コメント無し
@@ -323,6 +323,7 @@
     - `HANDOFF-2026-09-05-sidepanel-stripes.md`
     - `HANDOFF-2026-09-06-council-verdict.md`
     - `HANDOFF-2026-09-06-init-shade-measured.md`
+    - `HANDOFF-2026-09-14-sidepanel-stall-root-cause.md`
     - `HANDOFF-backfill-instant-restore.md`
     - `HANDOFF-broadcast-score-panel.md`
     - `HANDOFF-comment-pickup-bsp.md`
@@ -764,7 +765,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (1835)
+- 📁 **src/** (1837)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1030,7 +1031,7 @@
         - `logo_funlink_white_RGB_link_black.png`
         - `logo_funlink_white_RGB_maru_black.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1616)
+  - 📁 **lib/** (1618)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -2127,6 +2128,8 @@
     - `refreshCycleDeadline.test.js`
     - `refreshTaskGuard.js` — v0.1.437: popup の `refresh()` で chrome API が永久 pending になっても全カード「—」固定にしない
     - `refreshTaskGuard.test.js`
+    - `rememberedAvatarIndex.js` — 「同じ userId で過去に取れた avatarUrl」を O(1) で引く索引(純粋関数)。
+    - `rememberedAvatarIndex.test.js`
     - `repaintReasonCensus.js` — 「描き直しが何回・どの理由で起きたか」を数える純関数群。
     - `repaintReasonCensus.test.js`
     - `reportCommentsCsv.js` — 保存コメント配列を「Excel / LibreOffice / Google Sheets で安全に開ける CSV」に変換する純関数。

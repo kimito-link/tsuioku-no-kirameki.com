@@ -933,6 +933,7 @@ import { avatarCompareKey, isSameAvatarUrl } from '../lib/avatarUrlCompare.js';
 import { countUniqueAvatarEntries } from '../lib/avatarEntryCounts.js';
 import { resolveStoryLaneAvatarSrc } from '../lib/storyLaneAvatarSrc.js';
 import { pickAvatarUrlForUid, extractUidFromAvatarUrl } from '../lib/deriveAvatarUrlFromUid.js';
+import { createRememberedAvatarLookup } from '../lib/rememberedAvatarIndex.js';
 // v0.1.1386: 実在が確認できたサムネ(uid)を覚えて、次から本物として数える。
 import { addVerifiedAvatarUids, verifiedAvatarUidSet, KEY_VERIFIED_AVATAR_UIDS } from '../lib/verifiedAvatarRegistry.js';
 import { attachAiDiagButtonHandler } from './popup/attachAiDiagButtonHandler.js';
@@ -5703,6 +5704,8 @@ function scheduleDeferredUserCommentProfileHydrate(ctx) {
 //   entries逆順走査(第2分岐)相当が無い(§A裁定=意図的に埋めない)。hitEntriesScan が
 //   実配信で無視できない比率なら、この裁定を再検討する(状態速報 avatarRememberedDiag で確認)。
 const _avatarRememberedDiag = { hitProfileCache: 0, hitEntriesScan: 0, hitSynth: 0 };
+// v0.1.1509: entries 配列ごとに1回だけ作る uid→avatarUrl 索引(O(1) 引き)。正本 src/lib/rememberedAvatarIndex.js。
+const _rememberedAvatarLookup = createRememberedAvatarLookup();
 
 /**
  * 同一 userId で過去に取れた avatarUrl を再利用する（仮想スクロールの欠落補完）
@@ -5729,18 +5732,15 @@ function rememberedAvatarUrlForUserId(userId) {
     _avatarRememberedDiag.hitSynth += 1;
     return pickAvatarUrlForUid(uid, null);
   }
-  for (let i = list.length - 1; i >= 0; i -= 1) {
-    const e = list[i];
-    if (String(e?.userId || '').trim() !== uid) continue;
-    const av = String(e?.avatarUrl || '').trim();
-    if (
-      av &&
-      isHttpOrHttpsUrl(av) &&
-      !isWeakNiconicoUserIconHttpUrl(av)
-    ) {
-      _avatarRememberedDiag.hitEntriesScan += 1;
-      return av;
-    }
+  // v0.1.1509: 旧実装は list を毎回【逆順に全走査】(O(N)/呼び出し)していた。呼び手の
+  //   countResolvedAvatarEntries が全コメント分呼ぶため O(N²)=21,680²≒4.7億比較/refresh となり、
+  //   ★実測(2026-09-14 CPU プロファイル)で拡張プロセスの非 idle 時間の過半・サイドパネル自己診断の
+  //   最大タイマー遅延 49,988ms→178,299ms(=黒い読み込み中表示・スクロール不能)の真因だった。
+  //   索引(後勝ち)は逆順走査と同じ答え(rememberedAvatarIndex.test.js が同値性を固定)。
+  const av = _rememberedAvatarLookup.get(list, uid);
+  if (av) {
+    _avatarRememberedDiag.hitEntriesScan += 1;
+    return av;
   }
   // v0.1.208 Phase B: STORY_SOURCE 走査でも見つからなければ uid から生成。
   _avatarRememberedDiag.hitSynth += 1;
