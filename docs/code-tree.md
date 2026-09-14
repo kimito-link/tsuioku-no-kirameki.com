@@ -187,7 +187,7 @@
     - `2026-09-06.md`
     - `2026-09-07.md`
     - `2026-09-09.md`
-- 📁 **docs/** (317)
+- 📁 **docs/** (319)
   - 📁 **article-assets/** (87)
     - 📁 **venue-frames/** (12)
       - `f01.png`
@@ -299,7 +299,7 @@
     - `storage-bus.md`
     - `venue.md`
     - `web-status.md`
-  - 📁 **handoff/** (146)
+  - 📁 **handoff/** (148)
     - 📁 **bench/** (2)
       - `bench-interval.mjs` — ⚠️ 役割コメント無し
       - `bench-lane.mjs` — ⚠️ 役割コメント無し
@@ -405,6 +405,8 @@
     - `lane-tier-evidence-DESIGN.md`
     - `lanescene-structural-review-DESIGN.md`
     - `lanescene-structural-review-IMPLEMENTATION-HANDOFF.md`
+    - `live-comment-body-DESIGN.md`
+    - `live-comment-incremental-DESIGN.md`
     - `live-ranking-share-DESIGN.md`
     - `marketing-export-tab-IMPLEMENTATION-HANDOFF.md`
     - `mirror-writer-decoupling-PLAN-2026-08-08.md`

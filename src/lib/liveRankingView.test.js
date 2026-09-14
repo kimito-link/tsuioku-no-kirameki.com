@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { retentionRate } from './concurrentEstimate.js';
+import { anonymousDisplayLabel } from './nicoUserPage.js';
 import {
   watchUrlOf, jstClock, elapsedText, freshness, estimateConcurrentForLive, sortByEstimatedConcurrent,
   cacheBust, supporterRows, identifiedSupporters, commentRows, isBlankIcon, uidFromUserPageUrl,
@@ -308,6 +309,69 @@ describe('liveRankingView', () => {
       expect(r.url).toBe('');
       expect(r.anon).toBe(true);
       expect(r.name).toMatch(/^匿名\d+$/);
+    });
+
+    // ★anonymousDisplayLabel は「キー中の数字の末尾3桁」で番号を作る(nicoUserPage.js:38-44)。
+    //   末尾 3 桁を揃えれば同じ「匿名NNN」を決定的に作れる。ここでは 001 で「匿名1」に揃える。
+    const COLL_A = 'a:d8KyTJ001'; // 匿名1・断片 d8Ky
+    const COLL_B = 'a:Qw9xVb001'; // 匿名1・断片 Qw9x
+    // 先頭 4 文字(a: を除く)まで同じで 8 文字目以降が違う衝突ペア(4→8 桁伸長の検証用)。
+    const PFX_A = 'a:d8Ky0A001'; // 匿名1・先頭4 d8Ky・8文字 d8Ky0A00
+    const PFX_B = 'a:d8KyZZ001'; // 匿名1・先頭4 d8Ky・8文字 d8KyZZ00
+
+    it('同じ「匿名NNN」の匿名 2 人 → 両方に uid 先頭 4 文字のサフィックス', () => {
+      const rows = commentRows(live([
+        { rank: 1, uid: COLL_A, name: '', count: 9, anon: true },
+        { rank: 2, uid: COLL_B, name: '', count: 8, anon: true }
+      ]));
+      expect(rows[0].name).toMatch(/^匿名\d{1,3} ·[A-Za-z0-9_-]{4}$/);
+      expect(rows[1].name).toMatch(/^匿名\d{1,3} ·[A-Za-z0-9_-]{4}$/);
+      expect(rows[0].name).not.toBe(rows[1].name);
+      // 断片は「a:」を除いた uid の先頭 4 文字。
+      expect(rows[0].name.split(' ·')[1]).toBe('d8Ky');
+      expect(rows[1].name.split(' ·')[1]).toBe('Qw9x');
+    });
+
+    it('匿名 1 人 → サフィックス無し(既存契約と同じ)', () => {
+      const [r] = commentRows(live([{ rank: 1, uid: COLL_A, name: '', count: 30, anon: true }]));
+      expect(r.name).toMatch(/^匿名\d+$/);
+    });
+
+    it('匿名 2 人で番号が違う → サフィックス無し', () => {
+      const rows = commentRows(live([
+        { rank: 1, uid: 'a:AbCd012', name: '', count: 9, anon: true }, // 匿名12
+        { rank: 2, uid: 'a:ZzYy099', name: '', count: 8, anon: true } // 匿名99
+      ]));
+      expect(rows[0].name).toMatch(/^匿名\d+$/);
+      expect(rows[1].name).toMatch(/^匿名\d+$/);
+      expect(rows[0].name).not.toMatch(/ ·/);
+    });
+
+    it('数値 uid の本名が「匿名1」・匿名の「匿名1」→ 匿名側だけサフィックス・本名側不変', () => {
+      const numName = anonymousDisplayLabel(COLL_A); // 「匿名1」
+      const rows = commentRows(live([
+        { rank: 1, uid: '143172392', name: numName, count: 10, anon: false },
+        { rank: 2, uid: COLL_A, name: '', count: 9, anon: true },
+        { rank: 3, uid: COLL_B, name: '', count: 8, anon: true }
+      ]));
+      // 数値 uid の本名(=たまたま「匿名1」)はそのまま(リンク・サムネで区別できる)。
+      expect(rows[0].name).toBe(numName);
+      expect(rows[0].anon).toBe(false);
+      // 匿名 2 人はサフィックス付きで区別される。
+      expect(rows[1].name).toMatch(/^匿名\d{1,3} ·[A-Za-z0-9_-]{4}$/);
+      expect(rows[2].name).toMatch(/^匿名\d{1,3} ·[A-Za-z0-9_-]{4}$/);
+      expect(rows[1].name).not.toBe(rows[2].name);
+    });
+
+    it('先頭 4 文字まで同じ uid 2 つ → 8 文字に伸びる', () => {
+      const rows = commentRows(live([
+        { rank: 1, uid: PFX_A, name: '', count: 9, anon: true },
+        { rank: 2, uid: PFX_B, name: '', count: 8, anon: true }
+      ]));
+      expect(rows[0].name).toMatch(/^匿名\d{1,3} ·[A-Za-z0-9_-]{8}$/);
+      expect(rows[1].name).toMatch(/^匿名\d{1,3} ·[A-Za-z0-9_-]{8}$/);
+      expect(rows[0].name).not.toBe(rows[1].name);
+      expect(rows[0].name.split(' ·')[1]).toBe('d8Ky0A00');
     });
 
     it('★既存の supporterRows / identifiedSupporters は comment を足しても変わらない', () => {
