@@ -546,5 +546,22 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
     version: '0.1.1513', metric: 'cross-checked-claims', value: 47,
     source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
     note: '★悪化してよい理由: 30 日の移動窓(1508〜1512 の note と同じ)で 1512 と同値。この版は純関数のテスト(liveCommentTally.test.js に rowsBeyondWater/waterOf/seed のケース・liveRankingView.test.js に匿名衝突のケースを追加)と全 11448 件の test:cc 緑で裏取りしているが、本番 API への POST を伴う実測はしていない(設計の指示・dry-run も本番へ POST しうるため回避)。コミット前なので窓に載るのは次版から。数字をコミット文言で稼がない'
+  }),
+  Object.freeze({
+    version: '0.1.1514', metric: 'bundle-kb', value: 1405,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '★悪化ではない: この版の変更は /live/(公開ページ)側=app/dist/live-ranking.js と api/ で、'
+      + '拡張本体(popup.js)には手を入れていない。過去最良 1360@1454 との差(+45KB)は 1471 で計上済みの'
+      + '計器・検査 17 版ぶんで、この版で増やしたものではない(1471 以降ずっと 1405 で同値)'
+  }),
+  Object.freeze({
+    version: '0.1.1514', metric: 'gate-selftest', value: 4,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1514', metric: 'cross-checked-claims', value: 47,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: '★この版の変更とは無関係な指標(過去30日のコミット本文の語数の移動窓)。'
+      + '古い版が窓から外れると自然に下がる。この版のコード変更が何かを悪化させたわけではない'
   })
 ]);

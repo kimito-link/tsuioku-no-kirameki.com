@@ -5880,6 +5880,16 @@
       ]
     },
     {
+      "file": "src/lib/liveRecentHoverCard.js",
+      "featureCount": 1,
+      "features": [
+        "live-ranking"
+      ],
+      "labels": [
+        "Web版 追憶のきらめき ランキング(/live/)"
+      ]
+    },
+    {
       "file": "src/lib/livesCardSignature.js",
       "featureCount": 1,
       "features": [

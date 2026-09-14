@@ -16,6 +16,7 @@ import {
   LIVE_ID_RE, pinLiveFirst, liveShareText
 } from '../lib/liveRankingView.js';
 import { buildXIntentUrl } from '../lib/xIntentUrl.js';
+import { buildRecentCardHtml } from '../lib/liveRecentHoverCard.js';
 
 const elList = /** @type {HTMLElement} */ (document.getElementById('list'));
 const elMeta = /** @type {HTMLElement} */ (document.getElementById('meta'));
@@ -91,6 +92,12 @@ function renderKnown(people) {
 const EMPTY_FACE = { gift: FACE.kontaHalf, ad: FACE.tanuHalf, comment: FACE.linkBlink };
 
 /**
+ * ★1 行を「1 つのリンク」にまとめる(2026-09-15 ユーザー要望「アンカーはサムネ+テキストで1つに」)。
+ *   数値 uid の行は 行全体を `<a class="rank-link">`(順位・サムネ・名前・件数を内包)にして
+ *   ニコ生ユーザーページへ。url が無い行(匿名・comment の匿名)は `<a>` にせず素の中身のまま
+ *   (匿名にはリンク先が無い=pointer カーソルも付けない。第3段のホバー対象)。
+ *   ★`tracker.classFor`(is-bumped/is-new)は従来どおり `<li>` に付ける(演出の対象を壊さない)。
+ *   ★comment 列は `<li>` に data-uid/data-lv を付け、ホバーで直近発言を出す(第3段)。
  * @param {import('../lib/liveRankingView.js').SupporterRow[]} rows
  * @param {string} liveId
  * @param {'gift'|'ad'|'comment'} kind
@@ -102,16 +109,21 @@ function renderRows(rows, liveId, kind) {
   const html = rows.map((r) => {
     const n = Number(r.rank) || 0;
     const cls = tracker.classFor(rowKey(liveId, kind, r), Number(r.point) || 0);
-    const nameHtml = r.url
-      ? `<a href="${esc(r.url)}" target="_blank" rel="noopener noreferrer">${esc(r.name)}</a>`
-      : esc(r.name);
     // ★inline onerror は使わない(このリポの既存ページに1件も無く、CSP を足したときに黙って壊れる)。
     //   読み込み失敗の面倒は bindImgFallback が見る。
     const ava = (r.avatar && !isBlankIcon(r.avatar))
       ? `<img class="ava" src="${esc(r.avatar)}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer">`
       : '<span class="ava"></span>';
-    return `<li${cls ? ` class="${cls}"` : ''}><span class="no${n > 0 && n <= 3 ? ' top' : ''}">${n || '-'}</span>`
-      + `${ava}<span class="nm">${nameHtml}</span><span class="pt">${num(r.point)}${kind === 'comment' ? '件' : 'pt'}</span></li>`;
+    const inner = `<span class="no${n > 0 && n <= 3 ? ' top' : ''}">${n || '-'}</span>`
+      + `${ava}<span class="nm">${esc(r.name)}</span>`
+      + `<span class="pt">${num(r.point)}${kind === 'comment' ? '件' : 'pt'}</span>`;
+    // ★comment 列だけ data-uid/data-lv を付ける(数値 uid・匿名 uid とも=ホバー対象)。
+    const hoverAttr = (kind === 'comment' && r.uid) ? ` data-uid="${esc(r.uid)}" data-lv="${esc(liveId)}"` : '';
+    // 行全体を 1 つのリンクに(url があるときだけ)。無い行は素の中身のまま。
+    const rowHtml = r.url
+      ? `<a class="rank-link" href="${esc(r.url)}" target="_blank" rel="noopener noreferrer">${inner}</a>`
+      : inner;
+    return `<li${cls ? ` class="${cls}"` : ''}${hoverAttr}>${rowHtml}</li>`;
   }).join('');
   return `<ol class="rank">${html}</ol>`;
 }
@@ -323,3 +335,140 @@ load({ refresh: true });
 setInterval(() => { if (!document.hidden && Date.now() >= _nextAutoAt) load({ refresh: true }); }, 1000);
 setInterval(tickCountdown, 1000);
 document.addEventListener('visibilitychange', () => { if (!document.hidden) load({ refresh: true }); });
+
+/*
+ * ★ホバーで「その時点の発言」(2026-09-15 ユーザー要望「live はホバーしたときだけその時の発言を出す」)
+ *   - comment 列の行(li[data-uid])にマウスを乗せると、250ms 後に POST /api/live-recent-comments へ問い合わせ、
+ *     その人の直近発言(最大 5 件)を小さなカードで出す。本文はサーバに保存しない(privacy §14)。
+ *   - ★委譲は render() の外で 1 回だけ張る(render は 60 秒ごとに innerHTML を全置換するので、
+ *     行ごとにリスナーを張ると消える)。elList に mouseover/mouseout を委譲する。
+ *   - カードは body 直下に 1 個だけ(position:fixed・使い回し)。
+ *   - 連打・戻りホバーはページ内キャッシュ(60 秒)で POST を抑える(サーバ側も 60 秒キャッシュ)。
+ */
+const HOVER_DELAY_MS = 250;
+const HOVER_CACHE_TTL_MS = 60000;
+/** @type {Map<string, { at: number, byUid: Record<string, string[]>, partial: boolean }>} lv 単位の短命キャッシュ。 */
+const _recentCache = new Map();
+/** @type {HTMLElement|null} 使い回すカード要素。 */
+let _card = null;
+/** @type {ReturnType<typeof setTimeout>|null} */
+let _hoverTimer = null;
+/** @type {AbortController|null} */
+let _hoverAbort = null;
+/** @type {HTMLElement|null} いま表示対象にしている行(mouseout の判定用)。 */
+let _hoverLi = null;
+
+function ensureCard() {
+  if (_card) return _card;
+  const el = document.createElement('div');
+  el.className = 'recent-card';
+  el.hidden = true;
+  document.body.appendChild(el);
+  _card = el;
+  return el;
+}
+
+/**
+ * カードを行(li)の下に置いて表示する。画面右端/下端では左/上へ折り返す。
+ * @param {HTMLElement} li
+ * @param {string} html
+ */
+function showCardFor(li, html) {
+  const el = ensureCard();
+  el.innerHTML = html;
+  el.hidden = false;
+  const r = li.getBoundingClientRect();
+  // まず左下に仮置きしてから寸法を測り、はみ出す側を折り返す。
+  el.style.left = '0px';
+  el.style.top = '0px';
+  const cw = el.offsetWidth;
+  const ch = el.offsetHeight;
+  let left = r.left;
+  let top = r.bottom + 6;
+  if (left + cw > window.innerWidth - 8) left = Math.max(8, window.innerWidth - 8 - cw);
+  if (top + ch > window.innerHeight - 8) top = Math.max(8, r.top - 6 - ch);
+  el.style.left = `${Math.round(left)}px`;
+  el.style.top = `${Math.round(top)}px`;
+}
+
+function hideCard() {
+  if (_card) _card.hidden = true;
+  _hoverLi = null;
+  if (_hoverTimer) { clearTimeout(_hoverTimer); _hoverTimer = null; }
+  if (_hoverAbort) { try { _hoverAbort.abort(); } catch { /* 中断済みは無視 */ } _hoverAbort = null; }
+}
+
+/**
+ * その人の直近発言を取得してカードに出す。
+ * @param {HTMLElement} li @param {string} lv @param {string} uid
+ */
+async function requestRecent(li, lv, uid) {
+  const cached = _recentCache.get(lv);
+  if (cached && Date.now() - cached.at < HOVER_CACHE_TTL_MS) {
+    renderRecentCard(li, cached, uid);
+    return;
+  }
+  showCardFor(li, buildRecentCardHtml({ phase: 'loading' }));
+  const ac = new AbortController();
+  _hoverAbort = ac;
+  let resp;
+  try {
+    resp = await fetch('/api/live-recent-comments', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ lv, uid }),
+      cache: 'no-store',
+      signal: ac.signal
+    });
+  } catch {
+    if (_hoverLi === li) showCardFor(li, buildRecentCardHtml({ phase: 'error' }));
+    return;
+  }
+  if (_hoverLi !== li) return; // ホバーが別の行へ移った/離れた。
+  if (resp.status === 501) { showCardFor(li, buildRecentCardHtml({ phase: 'unsupported' })); return; }
+  if (resp.status === 410) { showCardFor(li, buildRecentCardHtml({ phase: 'empty' })); return; }
+  if (resp.status === 202) { showCardFor(li, buildRecentCardHtml({ phase: 'loading' })); return; }
+  if (!resp.ok) { showCardFor(li, buildRecentCardHtml({ phase: 'error' })); return; }
+  let data = null;
+  try { data = await resp.json(); } catch { data = null; }
+  if (!data || !data.ok || !data.byUid || typeof data.byUid !== 'object') {
+    if (_hoverLi === li) showCardFor(li, buildRecentCardHtml({ phase: 'error' }));
+    return;
+  }
+  const rec = { at: Date.now(), byUid: data.byUid, partial: !!data.partial };
+  _recentCache.set(lv, rec);
+  if (_hoverLi === li) renderRecentCard(li, rec, uid);
+}
+
+/**
+ * キャッシュ/応答から、その uid のカードを描く。
+ * @param {HTMLElement} li
+ * @param {{ at: number, byUid: Record<string, string[]>, partial: boolean }} rec
+ * @param {string} uid
+ */
+function renderRecentCard(li, rec, uid) {
+  const texts = rec.byUid && Array.isArray(rec.byUid[uid]) ? rec.byUid[uid] : [];
+  const html = texts.length
+    ? buildRecentCardHtml({ phase: 'ok', texts, partial: rec.partial })
+    : buildRecentCardHtml({ phase: 'empty' });
+  showCardFor(li, html);
+}
+
+elList.addEventListener('mouseover', (ev) => {
+  const t = /** @type {HTMLElement} */ (ev.target);
+  const li = /** @type {HTMLElement|null} */ (t && t.closest ? t.closest('li[data-uid]') : null);
+  if (!li) return;
+  if (li === _hoverLi) return;
+  hideCard();
+  _hoverLi = li;
+  const lv = String(li.getAttribute('data-lv') || '').trim();
+  const uid = String(li.getAttribute('data-uid') || '').trim();
+  if (!lv || !uid) { _hoverLi = null; return; }
+  _hoverTimer = setTimeout(() => { if (_hoverLi === li) requestRecent(li, lv, uid); }, HOVER_DELAY_MS);
+});
+elList.addEventListener('mouseout', (ev) => {
+  const rel = /** @type {HTMLElement|null} */ (ev.relatedTarget);
+  // 行の内側(サムネ↔名前)を移動しただけなら消さない。カードへ移ったときも消さない。
+  if (rel && ((_hoverLi && _hoverLi.contains(rel)) || (_card && _card.contains(rel)))) return;
+  hideCard();
+});

@@ -125,7 +125,7 @@ function httpUrlOrEmpty(u) {
   return /^https?:\/\//i.test(v) ? v : '';
 }
 
-async function upstash(command) {
+export async function upstash(command) {
   const base = process.env.KV_REST_API_URL;
   const token = process.env.KV_REST_API_TOKEN;
   if (!base || !token) throw new Error('KV env missing');
