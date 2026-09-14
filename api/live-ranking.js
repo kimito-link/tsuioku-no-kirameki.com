@@ -36,6 +36,15 @@ const STORE_KEY = 'live:ranking:latest';
  *   ★片方が落ちてももう片方は出る(合流は GET のときだけ・attachComments)。
  */
 const COMMENTS_KEY = 'live:comments:latest';
+/**
+ * ★2026-09-15 追加: 増分集計の「高水位・全員名簿」を run 跨ぎで持ち越す作業用の状態。
+ *   ★表示には使わない(閲覧者へは返さない)。tally スクリプトだけが x-share-key で読み書きする。
+ *   性質で分けた別キー(COMMENTS_KEY は「表示する集計結果」・こちらは「次 run の続きの起点」)。
+ *   viewUri / token / HLS は入れない(数えた結果の水位と名簿だけ)。
+ */
+const STATE_KEY = 'live:comments:state';
+/** 状態の生存時間。配信が数時間続くので COMMENTS_KEY の 1h より長く保つ(6h)。 */
+const STATE_TTL_SECONDS = 6 * 60 * 60;
 /** 1 配信ぶんの順位表の長さ(送られてきた値が長くてもここで切る)。 */
 const COMMENT_RANKERS_MAX = 10;
 /** 表示名の最大長(送られてきた値が長くてもここで切る)。 */
@@ -376,6 +385,49 @@ function sanitizeCommentEntry(v) {
   };
 }
 
+/** 0 以上の整数 or null(高水位は「無い(初回)」と 0 を区別する)。 */
+function nonNegIntOrNull(v) {
+  if (v == null) return null;
+  return nonNegInt(v);
+}
+
+/**
+ * ★増分集計の state 1 配信ぶんを【許可したキーだけ】に絞って作り直す(設計 §5.4)。
+ *   知らないキーは捨てる。uids が object でなければ entry ごと捨てる(null)。
+ * @param {unknown} v
+ * @returns {object|null} 形が違えば null
+ */
+function sanitizeStateEntry(v) {
+  if (!v || typeof v !== 'object') return null;
+  const src = /** @type {any} */ (v);
+  if (!src.uids || typeof src.uids !== 'object') return null;
+  /** @type {Record<string, object>} */
+  const uids = {};
+  let n = 0;
+  for (const [k, u] of Object.entries(src.uids)) {
+    if (n >= 5000) break;
+    const uid = str(k, 64);
+    if (!uid) continue;
+    if (!u || typeof u !== 'object') continue;
+    uids[uid] = {
+      name: str(/** @type {any} */ (u).name, COMMENT_NAME_MAX),
+      count: nonNegInt(/** @type {any} */ (u).count),
+      anon: /** @type {any} */ (u).anon === true
+    };
+    n += 1;
+  }
+  return {
+    maxNo: nonNegIntOrNull(src.maxNo),
+    maxVpos: nonNegIntOrNull(src.maxVpos),
+    minNo: nonNegIntOrNull(src.minNo),
+    minVpos: nonNegIntOrNull(src.minVpos),
+    complete: src.complete === true,
+    comments: nonNegInt(src.comments),
+    runs: nonNegInt(src.runs),
+    uids
+  };
+}
+
 /**
  * 保存済みのコメント集計を lives に合流させる。★読み手に返す直前だけで呼ぶ。
  *   ★`lives[]` に無い liveId は捨てる(集計だけが残って幽霊の行が出ないように)。
@@ -463,12 +515,52 @@ export default async function handler(req, res) {
         byLive
       };
       await upstash(['SET', COMMENTS_KEY, JSON.stringify(stored), 'EX', String(TTL_SECONDS)]);
-      res.status(200).json({ ok: true, stored: true, lives: Object.keys(byLive).length });
+
+      // ★増分集計の作業用状態(高水位・全員名簿)。次 run が「続き」を読むためだけに保存する。
+      //   state が無い/空なら STATE_KEY を触らない(前回の続きを空で潰さない)。
+      let stateLives = 0;
+      const stateIn = body.state && typeof body.state === 'object' ? body.state : null;
+      const stateByLiveIn = stateIn && stateIn.byLive && typeof stateIn.byLive === 'object' ? stateIn.byLive : null;
+      if (stateByLiveIn) {
+        /** @type {Record<string, object>} */
+        const stateByLive = {};
+        for (const [id, v] of Object.entries(stateByLiveIn)) {
+          if (!/^lv\d{6,15}$/i.test(String(id))) continue;
+          const entry = sanitizeStateEntry(v);
+          if (entry) stateByLive[String(id).toLowerCase()] = entry;
+        }
+        stateLives = Object.keys(stateByLive).length;
+        if (stateLives >= 1) {
+          const state = { at: Date.now(), byLive: stateByLive };
+          await upstash(['SET', STATE_KEY, JSON.stringify(state), 'EX', String(STATE_TTL_SECONDS)]);
+        }
+      }
+      res.status(200).json({ ok: true, stored: true, lives: Object.keys(byLive).length, stateLives });
       return;
     }
 
     if (req.method !== 'GET') {
       res.status(405).json({ ok: false, error: 'method not allowed' });
+      return;
+    }
+
+    // ★増分集計の状態を返す(tally スクリプトだけが x-share-key で読む・閲覧者には出さない)。
+    //   ★これは「次 run の続きの起点」であって表示用ではない。閲覧者向け GET(下)とは別。
+    if (String(req.query?.state || '') === 'comments') {
+      const want = process.env.STATUS_INGEST_KEY;
+      const sent = String(req.headers['x-share-key'] || '');
+      if (!want || sent !== want) {
+        res.status(401).json({ ok: false, error: 'unauthorized' });
+        return;
+      }
+      let parsed = null;
+      try {
+        const raw = await upstash(['GET', STATE_KEY]);
+        parsed = raw ? JSON.parse(raw) : null;
+      } catch {
+        parsed = null;
+      }
+      res.status(200).json({ ok: true, state: parsed });
       return;
     }
 

@@ -237,7 +237,44 @@ export function commentRows(live) {
       uid
     });
   }
+  // ★同名の匿名衝突解消(設計 §5.6)。同じ「匿名NNN」が 1 つの順位表に 2 人出るのを、
+  //   衝突した匿名行にだけ uid 断片を添えて「匿名8 ·d8Ky」の形で区別する。番号自体
+  //   (正本 anonymousDisplayLabel)は変えない=その順位表の中だけの「呼び名」。
+  //   数値 uid の同名はリンク・サムネで区別できるので触らない(AGENTS §3.5)。
+  //   ★毎パス「元のラベル(base)」から作り直す(前パスの断片へ二重付与しない)。
+  const baseName = out.map((r) => r.name);
+  for (const len of [4, 8, Infinity]) {
+    /** @type {Map<string, number>} */
+    const nameCount = new Map();
+    for (const r of out) nameCount.set(r.name, (nameCount.get(r.name) || 0) + 1);
+    // 衝突している「元ラベル」を集める(匿名行の現在名が 2 回以上出るもの)。
+    /** @type {Set<string>} */
+    const collidingBase = new Set();
+    for (let i = 0; i < out.length; i += 1) {
+      if (out[i].anon && (nameCount.get(out[i].name) || 0) >= 2) collidingBase.add(baseName[i]);
+    }
+    if (!collidingBase.size) break;
+    for (let i = 0; i < out.length; i += 1) {
+      if (!out[i].anon || !collidingBase.has(baseName[i])) continue;
+      const frag = anonUidFragment(out[i].uid, len);
+      out[i].name = frag ? `${baseName[i]} ·${frag}` : baseName[i];
+    }
+  }
   return out;
+}
+
+/**
+ * 匿名 uid から短い識別断片を作る(設計 §5.6)。`a:` を除いた先頭 `len` 文字
+ * (`[A-Za-z0-9_-]` 以外は捨てる)。空になったら uid 全体の先頭 `len` 文字で代替。
+ * @param {string} uid
+ * @param {number} len
+ * @returns {string}
+ */
+function anonUidFragment(uid, len) {
+  const s = String(uid == null ? '' : uid);
+  const stripped = s.replace(/^a:/i, '').replace(/[^A-Za-z0-9_-]/g, '');
+  const base = stripped || s.replace(/[^A-Za-z0-9_-]/g, '');
+  return Number.isFinite(len) ? base.slice(0, len) : base;
 }
 
 /** @typedef {{ uid: string, name: string, avatar: string, url: string, giftPt: number, adPt: number, total: number }} IdentifiedSupporter */

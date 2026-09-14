@@ -240,12 +240,12 @@ graph LR
 - `briefs/`（17 件） — ⚠️ 未記入（ROLES に追記）
 
 ## `docs/` — 設計正本・マインドマップ・フロー図・feature-map(AI/人間向け)  〔設計 / レポート〕
-<sub>ファイル 317 件</sub>
+<sub>ファイル 319 件</sub>
 
 - `article-assets/`（87 件） — 記事用の画像・動画・音声アセット  〔記事 / 画像〕
 - `article-drafts/`（2 件） — ⚠️ 未記入（ROLES に追記）
 - `feature-map/`（15 件） — 機能ごと依存図(自動生成)。誰が storage を書き/読むか  〔依存図 / 自動生成〕
-- `handoff/`（146 件） — セッション引継ぎ・調査設計の記録(HANDOFF-*/MAP/SPEC/DESIGN)。ルート直下に散らかっていたものを 2026-07-31 に集約  〔引継ぎ / 設計〕
+- `handoff/`（148 件） — セッション引継ぎ・調査設計の記録(HANDOFF-*/MAP/SPEC/DESIGN)。ルート直下に散らかっていたものを 2026-07-31 に集約  〔引継ぎ / 設計〕
 - `marketing/`（1 件） — 発信用の原稿(X 記事・告知文)。★数字は出典なしで書かない  〔マーケ / 原稿〕
 - `patent-unique-voice-reading-filing-final/`（1 件） — ⚠️ 未記入（ROLES に追記）
 - `policies/`（1 件） — 運用方針メモ(統計の失敗モード等)  〔方針〕

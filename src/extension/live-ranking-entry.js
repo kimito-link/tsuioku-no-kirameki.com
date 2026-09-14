@@ -160,7 +160,7 @@ function renderCommentCol(l) {
   if (!c) {
     return `<div class="col">${head}<p class="empty"><img src="${esc(FACE.linkBlink)}" alt="" loading="lazy" decoding="async">コメント集計待ち（約 10 分ごとに更新）</p></div>`;
   }
-  const note = c.partial ? '<p class="col-note">直近ぶんの集計です</p>' : '';
+  const note = c.partial ? '<p class="col-note">直近ぶんの集計です（古い側は順次さかのぼり中）</p>' : '';
   return `<div class="col">${head}${renderRows(commentRows(l), l.liveId, 'comment')}${note}</div>`;
 }
 

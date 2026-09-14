@@ -35,7 +35,18 @@ export const TALLY_NAME_MAX = 80;
 export const TALLY_DEFAULT_LIMIT = 10;
 
 /**
+ * state(run 跨ぎの高水位・全員名簿)に載せる uids の上限人数。
+ * これを超える配信は state を書かない=毎 run フル(cap で守られる)。
+ * 50B×5000=250KB/配信の上限見積(設計 §5.5)。
+ */
+export const TALLY_STATE_UIDS_MAX = 5000;
+
+/**
  * @typedef {{ rank: number, uid: string, name: string, count: number, anon: boolean }} CommentRanker
+ */
+
+/**
+ * @typedef {{ name: string, count: number, anon: boolean }} TallyUidEntry
  */
 
 /**
@@ -43,7 +54,8 @@ export const TALLY_DEFAULT_LIMIT = 10;
  *   rankers: CommentRanker[],
  *   commenters: number,
  *   comments: number,
- *   anonCommenters: number
+ *   anonCommenters: number,
+ *   uids: Record<string, TallyUidEntry>
  * }} CommentTallyResult
  */
 
@@ -68,8 +80,14 @@ function trimName(v, max) {
  *   ★コメント番号が空の行(匿名 184 で `no` が来ないことがある)は毎回数える。
  *   ここで text+時刻の合成キーを作ると本文を持つことになるので作らない。
  *
- * @param {{ broadcasterUid?: unknown, limit?: number }} [opts]
+ * @param {{ broadcasterUid?: unknown, limit?: number, seed?: { uids?: Record<string, { name?: unknown, count?: unknown, anon?: unknown }>, comments?: unknown } }} [opts]
  *   `broadcasterUid` 配信者本人の数値 ID(この人は「応援した人」ではないので数えない)。
+ *   `seed` 前回 run の結果(`result().uids`・`comments`)。run 跨ぎで先着順と累計を保つために
+ *     渡す。`byUid` を seed の挿入順で事前充填し、`comments` を seed 値から始める。
+ *     ★`seenNo` は空のまま=前回分の重複除去は呼び出し側の水位フィルタ
+ *     (rowsBeyondWater)が担う。ここで seed の no を seenNo に入れると本文/番号を
+ *     持ち回ることになり、また水位フィルタとの二重防御で「前回領域を数え直さない」
+ *     契約が曖昧になる(ネガコンでこの分離を固定)。
  * @returns {{ add: (rows: unknown) => void, result: () => CommentTallyResult }}
  */
 export function createCommentTally(opts) {
@@ -82,6 +100,28 @@ export function createCommentTally(opts) {
   /** @type {Set<string>} 既に数えたコメント番号(重複 add の防波堤)。 */
   const seenNo = new Set();
   let comments = 0;
+
+  // ★seed(前回 run の結果)を挿入順で事前充填する=先着順を run 跨ぎで保つ。
+  //   seenNo は空のまま(前回分は呼び出し側の水位フィルタが弾く・上の jsdoc 参照)。
+  const seed = opts && opts.seed && typeof opts.seed === 'object' ? opts.seed : null;
+  if (seed) {
+    const seedUids = seed.uids && typeof seed.uids === 'object' ? seed.uids : null;
+    if (seedUids) {
+      for (const [uid, v] of Object.entries(seedUids)) {
+        const key = String(uid ?? '').trim();
+        if (!key) continue;
+        if (broadcaster && key === broadcaster) continue;
+        const rawCount = Math.floor(Number(v && v.count));
+        byUid.set(key, {
+          name: trimName(v ? v.name : '', TALLY_NAME_MAX),
+          count: Number.isFinite(rawCount) && rawCount > 0 ? rawCount : 0,
+          anon: (v && v.anon) === true
+        });
+      }
+    }
+    const seedComments = Math.floor(Number(seed.comments));
+    if (Number.isFinite(seedComments) && seedComments > 0) comments = seedComments;
+  }
 
   return {
     add(rows) {
@@ -128,7 +168,126 @@ export function createCommentTally(opts) {
       }));
       let anonCommenters = 0;
       for (const e of entries) if (e.anon) anonCommenters += 1;
-      return { rankers, commenters: entries.length, comments, anonCommenters };
+      // ★全員(上位 10 ではない)を挿入順=先着順で返す。state に載せて次 run の seed にする。
+      //   ★既存 4 キー(rankers/commenters/comments/anonCommenters)は不変。
+      /** @type {Record<string, { name: string, count: number, anon: boolean }>} */
+      const uids = {};
+      for (const [uid, v] of byUid) uids[uid] = { name: v.name, count: v.count, anon: v.anon };
+      return { rankers, commenters: entries.length, comments, anonCommenters, uids };
     }
   };
+}
+
+/**
+ * @typedef {{ maxNo: number|null, maxVpos: number|null, minNo: number|null, minVpos: number|null }} CommentWater
+ */
+
+/**
+ * 有限数だけ返す。null / undefined / 非有限は null(★`Number(null)===0` の罠を避ける)。
+ * @param {unknown} v
+ * @returns {number|null}
+ */
+function finiteOrNull(v) {
+  if (v == null) return null;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
+}
+
+/**
+ * 行から数値 `no`(commentNo)を取り出す。有限数だけ・それ以外は null。
+ * @param {any} row
+ * @returns {number|null}
+ */
+function rowNo(row) {
+  const raw = row && row.commentNo != null ? row.commentNo : null;
+  if (raw == null || String(raw).trim() === '') return null;
+  const n = Number(raw);
+  return Number.isFinite(n) ? n : null;
+}
+
+/**
+ * 行から数値 `vpos`(センチ秒)を取り出す。有限かつ 0 以上だけ・それ以外は null。
+ * ★minVposOf / minNoOf(ndgrBackfillCrawl.js:327-355)と同じ判定に揃える。
+ * @param {any} row
+ * @returns {number|null}
+ */
+function rowVpos(row) {
+  const raw = row && row.vpos != null ? row.vpos : null;
+  if (raw == null) return null;
+  const v = Number(raw);
+  return Number.isFinite(v) && v >= 0 ? v : null;
+}
+
+/**
+ * 前回の高水位より「外側」(新しい/古い)にある行だけ返す(設計 §5.2)。
+ *
+ * ★二重計上を防ぐ要。増分集計では区画が前回領域と重なるため、前回数えた行を弾く。
+ *   `no > maxNo`(新しい側)/ `no < minNo`(古い側)/ `no` 無しは `vpos` で同じ判定。
+ *   `no` も `vpos` も無い行は捨てる(位置が決められない=二重計上の恐れ)。
+ *   ★water が全部 null(初回)なら全行を返す(このとき no も vpos も無い行も採用する)。
+ *
+ * @param {unknown} rows `NdgrMergeRow[]`
+ * @param {CommentWater} [water]
+ * @returns {any[]}
+ */
+export function rowsBeyondWater(rows, water) {
+  if (!Array.isArray(rows) || !rows.length) return [];
+  const w = water && typeof water === 'object' ? water : null;
+  const maxNo = w ? finiteOrNull(w.maxNo) : null;
+  const minNo = w ? finiteOrNull(w.minNo) : null;
+  const maxVpos = w ? finiteOrNull(w.maxVpos) : null;
+  const minVpos = w ? finiteOrNull(w.minVpos) : null;
+  const noWater = maxNo == null && minNo == null && maxVpos == null && minVpos == null;
+  if (noWater) return rows.filter((r) => r && typeof r === 'object');
+  /** @type {any[]} */
+  const out = [];
+  for (const row of rows) {
+    if (!row || typeof row !== 'object') continue;
+    const no = rowNo(row);
+    if (no != null) {
+      if ((maxNo != null && no > maxNo) || (minNo != null && no < minNo)) out.push(row);
+      continue;
+    }
+    const vp = rowVpos(row);
+    if (vp != null) {
+      if ((maxVpos != null && vp > maxVpos) || (minVpos != null && vp < minVpos)) out.push(row);
+      continue;
+    }
+    // ★no も vpos も無い行は位置が決められない=捨てる(water あり時)。
+  }
+  return out;
+}
+
+/**
+ * 前回水位 `prev` と今回の行 `rows` から新しい高水位を畳む(設計 §5.3)。
+ *
+ * ★`no` は Number() 有限のみ・`vpos` は 0 以上の有限のみ(minNoOf/minVposOf と同じ)。
+ *   `prev` の各値は「無い(null)」として畳み込みに参加しない。
+ *
+ * @param {unknown} rows `NdgrMergeRow[]`
+ * @param {CommentWater} [prev]
+ * @returns {CommentWater}
+ */
+export function waterOf(rows, prev) {
+  const p = prev && typeof prev === 'object' ? prev : null;
+  let maxNo = p ? finiteOrNull(p.maxNo) : null;
+  let minNo = p ? finiteOrNull(p.minNo) : null;
+  let maxVpos = p ? finiteOrNull(p.maxVpos) : null;
+  let minVpos = p ? finiteOrNull(p.minVpos) : null;
+  if (Array.isArray(rows)) {
+    for (const row of rows) {
+      if (!row || typeof row !== 'object') continue;
+      const no = rowNo(row);
+      if (no != null) {
+        if (maxNo == null || no > maxNo) maxNo = no;
+        if (minNo == null || no < minNo) minNo = no;
+      }
+      const vp = rowVpos(row);
+      if (vp != null) {
+        if (maxVpos == null || vp > maxVpos) maxVpos = vp;
+        if (minVpos == null || vp < minVpos) minVpos = vp;
+      }
+    }
+  }
+  return { maxNo, maxVpos, minNo, minVpos };
 }

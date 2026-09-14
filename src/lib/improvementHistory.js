@@ -532,5 +532,19 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
     version: '0.1.1512', metric: 'cross-checked-claims', value: 47,
     source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
     note: '★悪化してよい理由: 30 日の移動窓(1508〜1511 の note と同じ)で 1511 と同値。この版は本番 /live/ を 800px 幅で実測(3 列が 302/346/176px に割れて 3 列目がはみ出す)して直し、直後にローカルの同条件で再測して確かめるが、コミット前なので窓に載るのは次版から'
+  }),
+  Object.freeze({
+    version: '0.1.1513', metric: 'bundle-kb', value: 1406,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '★悪化してよい理由: 1407→1406KB(−1KB・前版より改善だが過去最良 1360 @1454 には届かない)。この版の実装(コメント集計の増分化・匿名重複名の解消)は src/lib(liveCommentTally/liveRankingView)・api/・scripts/ 側で、popup バンドルに入る差分は【更新履歴 1 件の入れ替え】と live-ranking-entry.js の注記文言 1 行だけ。減ったのは changelog.js の入れ替え(1513 のエントリが入り押し出された最古の 1 件の方が長かった)。実測で確かめた: grep -c 0.1.1513 extension/dist/popup.js = 2 でこの版の本文が同梱。1454 以来の増分は未計測のまま(1508 の note 参照)'
+  }),
+  Object.freeze({
+    version: '0.1.1513', metric: 'gate-selftest', value: 4,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1513', metric: 'cross-checked-claims', value: 47,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: '★悪化してよい理由: 30 日の移動窓(1508〜1512 の note と同じ)で 1512 と同値。この版は純関数のテスト(liveCommentTally.test.js に rowsBeyondWater/waterOf/seed のケース・liveRankingView.test.js に匿名衝突のケースを追加)と全 11448 件の test:cc 緑で裏取りしているが、本番 API への POST を伴う実測はしていない(設計の指示・dry-run も本番へ POST しうるため回避)。コミット前なので窓に載るのは次版から。数字をコミット文言で稼がない'
   })
 ]);
