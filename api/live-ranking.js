@@ -63,6 +63,37 @@ const OG_TITLE_RE = /<meta property="og:title" content="([^"]*)"/;
 const WATCH_COUNT_RE = /watchCount&quot;:(\d+)/;
 const COMMENT_COUNT_RE = /commentCount&quot;:(\d+)/;
 const BEGIN_TIME_RE = /beginTime&quot;:(\d+)/;
+/**
+ * ★2026-09-14 追加: ちくわちゃん風に「配信サムネ・配信者・時間」を出すための材料。
+ *   ★どれも watch ページ(放送中判定で既に取っている)の埋め込み JSON から拾う＝追加リクエストなし。
+ *   ★実物(lv351386196 で実測)の形:
+ *     supplier":{"supplierType":"user","name":"ミュントゥ","pageUrl":"http://www.nicovideo.jp/user/142919600",...}
+ *     programProviderId":"142919600","icons":{"uri50x50":"https://secure-dcdn.cdn.nimg.jp/nicoaccount/usericon/s/14291/142919600.jpg?…","uri150x150":"…"}
+ *     screenshot":{"urlSet":{"large":"…thumbnail-854x480/screenshot.jpg","middle":"…640x360…","small":"…352x198…","micro":"…160x90…"}}
+ *     "endTime":1789367607   (放送中は予定終了時刻。★`scheduledEndTime` も同じ値で並ぶので、キーの引用符ごと当てて取り違えない)
+ *   ★取れなければ空('' / 0)。表示側が代替(キャラの顔・「—」)を出す(AGENTS.md §3.6 fail-soft)。
+ */
+const SUPPLIER_BLOCK_RE = /supplier&quot;:\{(.*?)\}/;
+const SUPPLIER_NAME_RE = /&quot;name&quot;:&quot;(.*?)&quot;,/;
+const SUPPLIER_PAGE_URL_RE = /&quot;pageUrl&quot;:&quot;(.*?)&quot;/;
+const PROVIDER_ID_RE = /programProviderId&quot;:&quot;(\d+)&quot;/;
+const ICON_50_RE = /uri50x50&quot;:&quot;([^&]*)&quot;/;
+const ICON_150_RE = /uri150x150&quot;:&quot;([^&]*)&quot;/;
+const SCREENSHOT_SET_RE = /screenshot&quot;:\{&quot;urlSet&quot;:\{(.*?)\}/;
+const END_TIME_RE = /&quot;endTime&quot;:(\d+)/;
+
+/** ★watch ページの埋め込み JSON は HTML エンティティで包まれている。素の文字列に戻す(og:title と supplier.name で共用)。 */
+function unescapeHtml(s) {
+  return String(s == null ? '' : s)
+    .replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"').replace(/&#39;/g, "'");
+}
+
+/** ★外から来た URL は http(s) だけ通す(それ以外は '' = 無い扱い)。 */
+function httpUrlOrEmpty(u) {
+  const v = unescapeHtml(u).trim();
+  return /^https?:\/\//i.test(v) ? v : '';
+}
 
 async function upstash(command) {
   const base = process.env.KV_REST_API_URL;
@@ -160,12 +191,21 @@ async function probeWatchPage(lv) {
   if (!html) return { onAir: false, fetched: false, title: '' };
   const m = html.match(OG_TITLE_RE);
   // ★og:title は HTML エンティティを含みうる。表示側で二重エスケープしないよう素の形に戻す。
-  const title = m
-    ? String(m[1])
-        .replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>')
-        .replace(/&quot;/g, '"').replace(/&#39;/g, "'")
-        .trim().slice(0, 120)
-    : '';
+  const title = m ? unescapeHtml(m[1]).trim().slice(0, 120) : '';
+  // ★配信者(supplier)。★ブロックを先に切り出してから中を読む(キーの並び順に依存しない)。
+  const sb = html.match(SUPPLIER_BLOCK_RE);
+  const sname = sb ? sb[1].match(SUPPLIER_NAME_RE) : null;
+  const spage = sb ? sb[1].match(SUPPLIER_PAGE_URL_RE) : null;
+  const pid = html.match(PROVIDER_ID_RE);
+  const i50 = html.match(ICON_50_RE);
+  const i150 = html.match(ICON_150_RE);
+  // ★配信画面のスクショ(ニコ生が定期更新する画像)。4サイズとも URL だけを持つ。
+  const ss = html.match(SCREENSHOT_SET_RE);
+  const shot = (key) => {
+    if (!ss) return '';
+    const mm = ss[1].match(new RegExp(`&quot;${key}&quot;:&quot;([^&]*)&quot;`));
+    return mm ? httpUrlOrEmpty(mm[1]) : '';
+  };
   const numAt = (re) => {
     const mm = html.match(re);
     return mm ? Number(mm[1]) || 0 : 0;
@@ -179,7 +219,16 @@ async function probeWatchPage(lv) {
     title,
     watchCount: numAt(WATCH_COUNT_RE),
     commentCount: numAt(COMMENT_COUNT_RE),
-    beginTime: numAt(BEGIN_TIME_RE)
+    beginTime: numAt(BEGIN_TIME_RE),
+    endTime: numAt(END_TIME_RE),
+    streamer: {
+      id: pid ? String(pid[1]) : '',
+      name: sname ? unescapeHtml(sname[1]).trim().slice(0, 80) : '',
+      pageUrl: spage ? httpUrlOrEmpty(spage[1]) : '',
+      icon50: i50 ? httpUrlOrEmpty(i50[1]) : '',
+      icon150: i150 ? httpUrlOrEmpty(i150[1]) : ''
+    },
+    thumbnail: { large: shot('large'), middle: shot('middle'), small: shot('small'), micro: shot('micro') }
   };
 }
 
@@ -203,6 +252,11 @@ async function collectOne(lv, meta) {
     watchCount: Number(meta.watchCount) || 0,
     commentCount: Number(meta.commentCount) || 0,
     beginTime: Number(meta.beginTime) || 0,
+    endTime: Number(meta.endTime) || 0,
+    watchUrl: `https://live.nicovideo.jp/watch/${lv}`,
+    // ★配信者・配信サムネ(2026-09-14)。無ければ空のまま載せる(表示側が代替を出す)。
+    streamer: meta.streamer || { id: '', name: '', pageUrl: '', icon50: '', icon150: '' },
+    thumbnail: meta.thumbnail || { large: '', middle: '', small: '', micro: '' },
     giftTotal,
     adTotal: Number(ad?.data?.contentTotalContribution) || 0,
     // ★生の形のまま載せる。画面側が既存の正規化関数
@@ -212,7 +266,8 @@ async function collectOne(lv, meta) {
   };
 }
 
-async function collect() {
+/** ★export はローカル検証用(node から実データを1回集めて画面に流す)。Vercel は default export しか見ない。 */
+export async function collect() {
   const html = await fetchTextSafe('https://live.nicovideo.jp/ranking');
   const all = pickLiveIdsFromRankingHtml(html);
   if (!all.length) return { ok: false, error: 'no live ids' };
