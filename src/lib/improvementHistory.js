@@ -504,5 +504,19 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
     version: '0.1.1510', metric: 'cross-checked-claims', value: 47,
     source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
     note: '★悪化してよい理由: 30 日の移動窓(1508・1509 の note と同じ)で 1509 と同値。この版はまだコミット前なので、本文の裏取りが窓に載るのは次版から'
+  }),
+  Object.freeze({
+    version: '0.1.1511', metric: 'bundle-kb', value: 1409,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '★悪化してよい理由: 1408→1409KB(+1KB)。この版の実装(コメント集計)は /live/ と api/ と scripts/ 側で、popup バンドルには入らない。+1KB は【更新履歴の 1 件ぶん】(popup が同梱する changelog.js に 879 バイトの新エントリが入り、押し出された最古の 1 件はそれより短かった)。実測で確かめた: grep -c 0.1.1511 extension/dist/popup.js = 2 でこの版の本文が同梱されている。1454 以来の増分は未計測のまま(1508 の note 参照)'
+  }),
+  Object.freeze({
+    version: '0.1.1511', metric: 'gate-selftest', value: 4,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1511', metric: 'cross-checked-claims', value: 47,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: '★悪化してよい理由: 30 日の移動窓(1508〜1510 の note と同じ)で 1510 と同値。この版は実配信 3 本への --dry-run(reached_start 1 本・cap_elapsed 1 本)で裏取りしているが、コミット前なので窓に載るのは次版から'
   })
 ]);

@@ -198,6 +198,13 @@ graph LR
   f37 --> f37_2["extension/live-ranking-entry.js"]
   f37 --> f37_3["live/index.html"]
   f37 --> f37_4["gen-og-live-ranking.py"]
+  HUB --> f38["ランキング(/live/)のコメント件数集計"]
+  f38 --> f38_0["lib/liveCommentTally.js"]
+  f38 --> f38_1["live-comment-tally.mjs"]
+  f38 --> f38_2["live-ranking.js"]
+  f38 --> f38_3["lib/liveRankingView.js"]
+  f38 --> f38_4["extension/live-ranking-entry.js"]
+  f38 --> f38_5["workflows/live-ranking.yml"]
 ```
 
 ---
@@ -261,7 +268,7 @@ graph LR
 - `avatar-parts/`（29 件） — アバター素材(顔シート等)の参考画像  〔アバター / 画像〕
 
 ## `scripts/` — ビルド・検証・自動生成スクリプト(build/feature-map/repo-tree-map 等)  〔ビルド / 自動生成〕
-<sub>ファイル 66 件</sub>
+<sub>ファイル 67 件</sub>
 
 - `__pycache__/`（1 件） — ⚠️ 未記入（ROLES に追記）
 - `lib/`（1 件） — ⚠️ 未記入（ROLES に追記）
@@ -273,14 +280,14 @@ graph LR
 - `soundeffect-lab/`（19 件） — ⚠️ 未記入（ROLES に追記）
 
 ## `src/` — LP 側 + 純粋関数ライブラリの源  〔ソース〕
-<sub>ファイル 1839 件</sub>
+<sub>ファイル 1841 件</sub>
 
 - `data/`（7 件） — 保存コメントからレーン候補を読む acquirer / source 層  〔コメント / 取得〕
 - `domain/`（20 件） — ドメイン正本(応援レーンの集約・列ポリシー等。識別子判定など)  〔応援 / 集約 / 識別子〕
 - `extension/`（47 件） — バンドル entry(content/popup/venue/status/offscreen/backfill-sw 等=機能境界)  〔entry / 記録 / 会場 / 応援〕
 - `fixtures/`（1 件） — テスト用フィクスチャ  〔テスト〕
 - `images/`（134 件） — LP / CWS 提出物のマスター画像  〔画像〕
-- `lib/`（1620 件） — 純粋関数ライブラリ(unit test 対象)。色・速度・コメント・レポート等の計算ロジックの大半  〔色 / 速度 / コメント / レポート / 純粋関数〕
+- `lib/`（1622 件） — 純粋関数ライブラリ(unit test 対象)。色・速度・コメント・レポート等の計算ロジックの大半  〔色 / 速度 / コメント / レポート / 純粋関数〕
 - `shared/`（7 件） — 複数機能で共有する小部品(アバター URL ガード等)  〔共有 / アバター〕
 - `sound/`（1 件） — 音声素材(src 側)  〔音声〕
 
@@ -542,6 +549,16 @@ esbuild の import 到達グラフを逆引きし「このファイルを変え�
 - [`src/extension/live-ranking-entry.js`](../src/extension/live-ranking-entry.js)
 - [`tsuioku-no-kirameki/live/index.html`](../tsuioku-no-kirameki/live/index.html)
 - [`tools/gen-og-live-ranking.py`](../tools/gen-og-live-ranking.py)
+
+### ランキング(/live/)のコメント件数集計  〔LP / 公開 / ランキング / コメント / 集計〕
+3枠目「コメントで応援した人」。GitHub Actions(live-ranking.yml の tally ジョブ)が watch HTML→視聴セッション握手→NDGR を crawlNdgrBackward で遡り、ndgrChatsToMergeRows→createCommentTally で【件数だけ】数えて POST(?ingest=comments)。本文・時刻は保存しない。匿名(184)も件数順にそのまま(匿名NNN＋identicon)。GET 側は attachComments が lives[i].comment に合流(v0.1.1511)
+
+- [`src/lib/liveCommentTally.js`](../src/lib/liveCommentTally.js)
+- [`scripts/live-comment-tally.mjs`](../scripts/live-comment-tally.mjs)
+- [`api/live-ranking.js`](../api/live-ranking.js)
+- [`src/lib/liveRankingView.js`](../src/lib/liveRankingView.js)
+- [`src/extension/live-ranking-entry.js`](../src/extension/live-ranking-entry.js)
+- [`.github/workflows/live-ranking.yml`](../.github/workflows/live-ranking.yml)
 
 ---
 

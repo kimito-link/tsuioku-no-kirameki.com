@@ -11,7 +11,10 @@
  * ■ 入力の形(api/live-ranking.js が保存する 1 配信)
  *   { liveId, title, watchCount, commentCount, beginTime, endTime, watchUrl,
  *     streamer:{ id, name, pageUrl, icon50, icon150 }, thumbnail:{ large, middle, small, micro },
- *     giftTotal, adTotal, gift:{ rankers:[...] }|null, ad:{ ranking:[...] }|null }
+ *     giftTotal, adTotal, gift:{ rankers:[...] }|null, ad:{ ranking:[...] }|null,
+ *     comment:{ rankers:[{rank,uid,name,count,anon}], commenters, comments, anonCommenters, partial }|null }
+ *   ★`comment` だけは【当サイトが数えた件数】(api/live-ranking.js が別キーから合流させる)。
+ *     ギフト/広告は「ニコ生が公開している値そのまま」なので、性質が違う。画面の文言もそう書く。
  */
 
 import { retentionRate } from './concurrentEstimate.js';
@@ -19,6 +22,9 @@ import { normalizeKokenRankingResponse } from './kokenContributionRankingApi.js'
 import { normalizeNicoadRankingResponse } from './nicoadContributionRankingApi.js';
 import { deriveAvatarUrlFromUid } from './deriveAvatarUrlFromUid.js';
 import { safeHttpUrl } from './htmlText.js';
+// ★匿名(184)の見せ方も既存の正本を呼ぶ(「匿名NNN」と似顔絵をここで作り直さない)。
+import { nicoUserPageUrl, anonymousDisplayLabel } from './nicoUserPage.js';
+import { anonymousIdenticonDataUrl } from './anonymousIdenticon.js';
 // ★時点(capturedAt)の解釈は timeAuthority.js に委ねる(独自に Number(x.capturedAt) しない。
 //   timeAuthorityRegistry の祖父条項=「時点フィールドを独自に持つファイルを増やさない」)。
 import { toEpochMs, ageMsOf } from './timeAuthority.js';
@@ -150,7 +156,7 @@ export function uidFromUserPageUrl(url) {
   return m ? m[1] : '';
 }
 
-/** @typedef {{ rank: number, name: string, point: number, avatar: string, url: string, uid: string }} SupporterRow */
+/** @typedef {{ rank: number, name: string, point: number, avatar: string, url: string, uid: string, anon?: boolean }} SupporterRow */
 
 /**
  * 収集ペイロードの gift/ad を、既存の正規化関数を通して画面用の行にする。
@@ -192,6 +198,46 @@ export function supporterRows(live) {
     };
   });
   return { gift, ad };
+}
+
+/**
+ * 「コメントで応援した人」の行(3 枠目)。★数えたのは当サイト(api の `comment`)。
+ *
+ *   数値 uid … 公開ユーザーページへのリンクと、確定パターンのアイコン(AGENTS.md §3.5 で
+ *              「サムネ・ID・名前・リンクをセットで出す」と決めてある)。
+ *   匿名(184) … 「匿名NNN」＋その番組の中だけで一定の似顔絵。公開ページは無いので url は ''。
+ *              ★後ろへ送らない(件数順にそのまま並べる・ユーザー決定 2026-09-14)。
+ *
+ * ★`point` は件数。単位(件/pt)は描画側が `kind` で決める。
+ * @param {{ comment?: any }|null|undefined} live
+ * @returns {SupporterRow[]} `comment` が無い/形が違うなら空
+ */
+export function commentRows(live) {
+  const c = live && live.comment && typeof live.comment === 'object' ? live.comment : null;
+  const rankers = c && Array.isArray(c.rankers) ? c.rankers : [];
+  /** @type {SupporterRow[]} */
+  const out = [];
+  for (const r of rankers) {
+    if (!r || typeof r !== 'object') continue;
+    const uid = String(r.uid == null ? '' : r.uid).trim();
+    if (!uid) continue;
+    const count = Number(r.count) || 0;
+    // ★0 件の人は「応援した人」ではない。出さない。
+    if (count <= 0) continue;
+    const url = nicoUserPageUrl(uid);
+    // ★匿名かどうかは送り主の申告(anon)だけに頼らない。リンクを作れない ID は匿名として扱う。
+    const anon = r.anon === true || !url;
+    out.push({
+      rank: Number(r.rank) || out.length + 1,
+      name: anon ? anonymousDisplayLabel(uid) : String(r.name == null ? '' : r.name),
+      point: count,
+      avatar: anon ? anonymousIdenticonDataUrl(uid, 64) : deriveAvatarUrlFromUid(uid),
+      url: anon ? '' : url,
+      anon,
+      uid
+    });
+  }
+  return out;
 }
 
 /** @typedef {{ uid: string, name: string, avatar: string, url: string, giftPt: number, adPt: number, total: number }} IdentifiedSupporter */
@@ -262,7 +308,7 @@ export function createRowChangeTracker() {
 /**
  * 行のキー("lv|種別|名前")。名前が同じなら同じ人として追跡する(ID は匿名で欠けるため名前を使う)。
  * @param {string} liveId
- * @param {'gift'|'ad'} kind
+ * @param {'gift'|'ad'|'comment'} kind
  * @param {{ name?: unknown }} r
  */
 export function rowKey(liveId, kind, r) {

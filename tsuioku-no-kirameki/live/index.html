@@ -11,19 +11,19 @@
     <!-- ★ロゴは主役(web-ios-android/docs/brand/LOGO-RULES.md)。最優先で読み込む。 -->
     <link rel="preload" as="image" href="../../extension/images/logo/kimito-link-ginga-color.png" fetchpriority="high">
 
-    <meta name="description" content="追憶のきらめき ランキング。ニコニコ生放送で、いまこの瞬間に配信を支えている人（ギフト・広告）を配信ごとに並べます。配信サムネ・配信者・経過時間つき。主役は配信者ではなく『応援した人』。">
+    <meta name="description" content="追憶のきらめき ランキング。ニコニコ生放送で、いまこの瞬間に配信を支えている人（ギフト・広告・コメント）を配信ごとに並べます。配信サムネ・配信者・経過時間つき。主役は配信者ではなく『応援した人』。">
     <meta name="theme-color" content="#fffaf4">
     <meta name="robots" content="index,follow">
     <link rel="canonical" href="https://tsuioku-no-kirameki.com/live/">
     <meta property="og:type" content="website">
     <meta property="og:url" content="https://tsuioku-no-kirameki.com/live/">
     <meta property="og:title" content="いま配信を支えている人 ― ニコニコ生放送（追憶のきらめき ランキング）">
-    <meta property="og:description" content="いまこの瞬間、誰が配信を支えているか。ギフト・広告で応援した人を配信ごとに、配信サムネ・配信者・経過時間つきで。主役は配信者ではなく「応援した人」。">
+    <meta property="og:description" content="いまこの瞬間、誰が配信を支えているか。ギフト・広告・コメントで応援した人を配信ごとに、配信サムネ・配信者・経過時間つきで。主役は配信者ではなく「応援した人」。">
     <meta property="og:image" content="https://tsuioku-no-kirameki.com/images/og-live-ranking.png">
     <meta name="twitter:card" content="summary_large_image">
     <meta property="og:site_name" content="追憶のきらめき ランキング">
     <meta name="twitter:image" content="https://tsuioku-no-kirameki.com/images/og-live-ranking.png">
-    <meta name="twitter:image:alt" content="追憶のきらめき ランキング ― ニコニコ生放送で、いま配信を支えている人（ギフト・広告）をリアルタイムに表彰するページ">
+    <meta name="twitter:image:alt" content="追憶のきらめき ランキング ― ニコニコ生放送で、いま配信を支えている人（ギフト・広告・コメント）をリアルタイムに表彰するページ">
 
     <!--
       ★コンポーネント化(2026-09-14・web-ios-android/CLAUDE.md 基準⑤⑥⑦):
@@ -232,7 +232,7 @@
       .tpt { font-size: .66rem; color: var(--orange); font-variant-numeric: tabular-nums; white-space: nowrap; }
 
       .cols { display: grid; grid-template-columns: 1fr; gap: 0; }
-      @media (min-width: 720px) { .cols { grid-template-columns: 1fr 1fr; } }
+      @media (min-width: 720px) { .cols { grid-template-columns: 1fr 1fr 1fr; } }
       .col { padding: 10px 14px 12px; }
       .col + .col { border-top: 1px solid var(--line); }
       @media (min-width: 720px) { .col + .col { border-top: 0; border-left: 1px solid var(--line); } }
@@ -252,6 +252,8 @@
       .pt { flex: 0 0 auto; font-variant-numeric: tabular-nums; font-size: .85rem; color: var(--ink-sub); }
       .empty { display: flex; align-items: center; gap: 8px; color: var(--ink-sub); font-size: .85rem; margin: 0; }
       .empty img { width: 40px; height: 40px; object-fit: contain; opacity: .85; }
+      /* ★上限に当たった配信の注記(「全部を数えた」と誤解させないための小さな但し書き)。 */
+      .col-note { margin: 6px 0 0; font-size: .72rem; color: var(--ink-sub); }
 
       /*
         ★「動いている感じ」を出す。
@@ -300,7 +302,7 @@
         <div>
           <p class="brand__eyebrow">Kimito-Link Project</p>
           <h1>追憶のきらめき ランキング<small>いま支えている人 ― ニコニコ生放送</small></h1>
-          <p class="lede">いまこの瞬間、配信を支えている人（ギフト・広告）を配信ごとに。配信サムネ・配信者・経過時間つき。</p>
+          <p class="lede">いまこの瞬間、配信を支えている人（ギフト・広告・コメント）を配信ごとに。配信サムネ・配信者・経過時間つき。</p>
           <p class="meta" id="meta"><img class="face" src="../../extension/images/yukkuri-charactore-english/link/link-yukkuri-blink-mouth-closed.thumb128.png" alt="">読み込み中…</p>
           <div class="refresh-row">
             <button type="button" class="btn btn--refresh" data-refresh aria-label="ランキングをいま更新する">🔄 いま更新</button>
@@ -328,7 +330,7 @@
           <div class="bubble">配信している人へ。<strong>いま誰が支えてくれているか</strong>が、配信ごとに一目でわかります。サムネと経過時間も並べたので、放送中のようすがそのまま見えます。</div>
         </div>
         <div class="y-row reverse">
-          <div class="bubble">主役は配信者じゃなくて<strong>応援した人</strong>なのだ。ギフトと広告で支えた人が、名前つきでちゃんと並ぶ。応援は隠すものじゃなくて、表彰するものなのだ！</div>
+          <div class="bubble">主役は配信者じゃなくて<strong>応援した人</strong>なのだ。ギフト・広告・コメントで支えた人が、名前つきでちゃんと並ぶ。応援は隠すものじゃなくて、表彰するものなのだ！</div>
           <div class="speaker">
             <img src="../../extension/images/yukkuri-charactore-english/konta/kitsune-yukkuri-smile-mouth-open.png" alt="こん太" width="92" height="92" decoding="async">
             <span>こん太</span>
@@ -339,7 +341,7 @@
             <img src="../../extension/images/yukkuri-charactore-english/tanunee/tanuki-yukkuri-half-eyes-mouth-open.png" alt="たぬ姉" width="92" height="92" decoding="async">
             <span>たぬ姉</span>
           </div>
-          <div class="bubble">順位とポイントは<strong>ニコ生が公開している値そのまま</strong>。当サイトが足したのは「約○人（推定）」と並び順だけよ。更新は<strong>60 秒ごとの自動＋「いま更新」ボタン</strong>。データの収集時刻は上に出しているから、古いときは正直に「⚠」が出るわ。</div>
+          <div class="bubble">ギフトと広告の順位とポイントは<strong>ニコ生が公開している値そのまま</strong>。<strong>コメントの件数だけはうちが数えた値</strong>よ（誰が何件かだけ。本文は保存していないわ）。ほかに当サイトが足したのは「約○人（推定）」と並び順だけ。更新は<strong>60 秒ごとの自動＋「いま更新」ボタン</strong>（コメントの集計はもう少しゆっくりで、約 10 分ごと）。データの収集時刻は上に出しているから、古いときは正直に「⚠」が出るわ。</div>
         </div>
       </div>
 
@@ -357,6 +359,7 @@
       <div class="note">
         <p>★このページは<b>配信者ではなく「応援した人」</b>を並べます（追憶のきらめき ランキング）。</p>
         <p><b>ギフト・広告のランキング</b>（名前・順位・ポイント）は、ニコニコ生放送が公開しているものを<b>そのまま</b>出しています。当サイトが独自に集計・改変した値ではありません。配信サムネ・配信者名・アイコンも、ニコニコ生放送の番組ページに掲載されているものです。</p>
+        <p>★<b>「コメントで応援した人」の件数だけは当サイトが数えた値です。</b>ニコニコ生放送が公開している番組のコメントを読み、<b>誰が何件コメントしたか</b>だけを数えています（<b>本文・時刻は保存していません</b>）。匿名（184）の方は、その番組の中だけで通じる識別子から「匿名＋番号」と似顔絵を作っています（アカウントや個人を特定するものではありません）。集計は約 10 分ごとで、長い放送では「直近ぶんの集計」と添えます。</p>
         <p>★<b>「約○人（推定）」と並び順だけは当サイトの推定値です。</b>ニコニコ生放送に同時視聴数を知る手段が無いため、公開されている<b>累計の来場者数</b>と<b>放送の経過時間</b>から見積もっています（時間が経つほど視聴者が入れ替わる前提の減衰モデル）。実際の人数とは差があります。</p>
         <p>放送中の個人配信のみを対象にしています。表示は定期的に更新されます（更新が止まったときは上に警告が出ます）。</p>
         <p>掲載されているご本人で、表示の停止をご希望の方は <a href="../privacy.html#s14">プライバシーポリシー 14-4</a> をご覧ください。</p>

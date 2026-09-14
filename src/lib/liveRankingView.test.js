@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { retentionRate } from './concurrentEstimate.js';
 import {
   watchUrlOf, jstClock, elapsedText, freshness, estimateConcurrentForLive, sortByEstimatedConcurrent,
-  cacheBust, supporterRows, identifiedSupporters, isBlankIcon, uidFromUserPageUrl,
+  cacheBust, supporterRows, identifiedSupporters, commentRows, isBlankIcon, uidFromUserPageUrl,
   createRowChangeTracker, rowKey, STALE_MIN,
   pinLiveFirst, liveShareText, SHARE_NAME_MAX, SHARE_TITLE_MAX, SHARE_TEXT_MAX
 } from './liveRankingView.js';
@@ -246,5 +246,78 @@ describe('liveRankingView', () => {
     const paint = () => { t.begin(); const c = t.classFor(rowKey('lv', 'ad', { name: 'x' }), 7); t.end(); return c; };
     paint(); paint();
     expect(paint()).toBe('');
+  });
+
+  describe('commentRows(3 枠目「コメントで応援した人」)', () => {
+    const live = (rankers) => ({ comment: { rankers, commenters: rankers.length, comments: 0, anonCommenters: 0 } });
+
+    it('数値 uid: 公開ページ URL と確定パターンのアイコンを導出する(AGENTS.md §3.5)', () => {
+      const [r] = commentRows(live([{ rank: 1, uid: '143172392', name: 'みち', count: 42, anon: false }]));
+      expect(r.rank).toBe(1);
+      expect(r.name).toBe('みち');
+      expect(r.point).toBe(42);
+      expect(r.url).toBe('https://www.nicovideo.jp/user/143172392');
+      expect(r.avatar).toBe('https://secure-dcdn.cdn.nimg.jp/nicoaccount/usericon/s/14317/143172392.jpg');
+      expect(r.anon).toBe(false);
+      expect(r.uid).toBe('143172392');
+    });
+
+    it('匿名: 「匿名NNN」＋似顔絵(data:image/svg+xml)・url は空', () => {
+      const [r] = commentRows(live([{ rank: 1, uid: 'a:AbCdEfGh01', name: '', count: 30, anon: true }]));
+      expect(r.name).toMatch(/^匿名\d+$/);
+      expect(r.avatar.startsWith('data:image/svg+xml')).toBe(true);
+      expect(r.url).toBe('');
+      expect(r.anon).toBe(true);
+    });
+
+    it('★匿名は後ろへ送らない(送られてきた順のまま出す)', () => {
+      const rows = commentRows(live([
+        { rank: 1, uid: 'a:AbCdEfGh01', name: '', count: 99, anon: true },
+        { rank: 2, uid: '143172392', name: 'みち', count: 5, anon: false }
+      ]));
+      expect(rows.map((r) => r.uid)).toEqual(['a:AbCdEfGh01', '143172392']);
+    });
+
+    it('comment が null / 形が違う → []', () => {
+      expect(commentRows(null)).toEqual([]);
+      expect(commentRows({})).toEqual([]);
+      expect(commentRows({ comment: null })).toEqual([]);
+      expect(commentRows({ comment: { rankers: 'x' } })).toEqual([]);
+      expect(commentRows({ comment: { rankers: [null, {}, { uid: '' }] } })).toEqual([]);
+    });
+
+    it('count<=0 は落とす(「応援した人」ではない)', () => {
+      const rows = commentRows(live([
+        { rank: 1, uid: '143172392', name: 'a', count: 0, anon: false },
+        { rank: 2, uid: '2913665', name: 'b', count: -3, anon: false },
+        { rank: 3, uid: '99', name: 'c', count: 1, anon: false }
+      ]));
+      expect(rows.map((r) => r.uid)).toEqual(['99']);
+    });
+
+    it('rank 欠落は index+1 で埋める', () => {
+      const rows = commentRows(live([
+        { uid: '143172392', name: 'a', count: 5 },
+        { uid: '2913665', name: 'b', count: 4 }
+      ]));
+      expect(rows.map((r) => r.rank)).toEqual([1, 2]);
+    });
+
+    it('★ネガコン: anon:false でもリンクを作れない ID は匿名として扱う(嘘のリンクを出さない)', () => {
+      const [r] = commentRows(live([{ rank: 1, uid: 'a:Zzz', name: 'なりすまし', count: 3, anon: false }]));
+      expect(r.url).toBe('');
+      expect(r.anon).toBe(true);
+      expect(r.name).toMatch(/^匿名\d+$/);
+    });
+
+    it('★既存の supporterRows / identifiedSupporters は comment を足しても変わらない', () => {
+      const base = {
+        gift: { rankers: [{ rank: 1, advertiserName: 'g', contribution: 10, userId: 143172392 }] },
+        ad: { ranking: [] }
+      };
+      const withComment = { ...base, comment: { rankers: [{ rank: 1, uid: '99', name: 'c', count: 9 }] } };
+      expect(supporterRows(withComment)).toEqual(supporterRows(base));
+      expect(identifiedSupporters(withComment)).toEqual(identifiedSupporters(base));
+    });
   });
 });

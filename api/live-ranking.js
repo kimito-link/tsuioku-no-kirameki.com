@@ -29,6 +29,18 @@
 
 const STORE_KEY = 'live:ranking:latest';
 /**
+ * ★2026-09-14 追加: 3 枠目「コメントで応援した人」の集計。
+ *   ★収集元が違うので【別キー】にする。ギフト/広告はニコ生が公開しているランキングを
+ *   そのまま出すのに対し、こちらは **当サイトが数えた件数**(GitHub Actions の
+ *   scripts/live-comment-tally.mjs が POST してくる)。性質が違うものを 1 つの値に混ぜない。
+ *   ★片方が落ちてももう片方は出る(合流は GET のときだけ・attachComments)。
+ */
+const COMMENTS_KEY = 'live:comments:latest';
+/** 1 配信ぶんの順位表の長さ(送られてきた値が長くてもここで切る)。 */
+const COMMENT_RANKERS_MAX = 10;
+/** 表示名の最大長(送られてきた値が長くてもここで切る)。 */
+const COMMENT_NAME_MAX = 80;
+/**
  * ★2026-09-14 「リアルタイム取得を売りにする」: 見る人が ?refresh=1 を叩いたら【鍵なしでも】収集する。
  *   ただし乱打でニコ生を叩かないよう、前回の収集から PUBLIC_REFRESH_MIN_MS 未満なら保存済みを返す(throttled)。
  *   同時に複数の閲覧者が叩いても収集は 1 本だけ(Redis の SET NX ロック。TTL は収集所要 1.2〜5 秒の余裕で 30 秒)。
@@ -304,9 +316,157 @@ export async function collect() {
   };
 }
 
+/** ★api/status.js の readBody と同じ(Vercel は req.body を自動 parse することがある)。 */
+function readBody(req) {
+  if (req.body && typeof req.body === 'object') return req.body;
+  if (typeof req.body === 'string' && req.body) {
+    try {
+      return JSON.parse(req.body);
+    } catch {
+      return null;
+    }
+  }
+  return null;
+}
+
+/** 文字列を長さで切る(外から来た値をそのまま保存しない)。 */
+function str(v, max) {
+  return String(v == null ? '' : v).replace(/\s+/g, ' ').trim().slice(0, max);
+}
+
+/** 0 以上の整数(でっち上げない・読めなければ 0)。 */
+function nonNegInt(v) {
+  const n = Math.floor(Number(v));
+  return Number.isFinite(n) && n > 0 ? n : 0;
+}
+
+/**
+ * ★送られてきた 1 配信ぶんを【許可したキーだけ】に絞って作り直す。
+ *   知らないキーは捨てる(保存形が送り主の都合で膨らまないように)。
+ * @param {unknown} v
+ * @returns {object|null} 形が違えば null
+ */
+function sanitizeCommentEntry(v) {
+  if (!v || typeof v !== 'object') return null;
+  const src = /** @type {any} */ (v);
+  const rankersIn = Array.isArray(src.rankers) ? src.rankers.slice(0, COMMENT_RANKERS_MAX) : [];
+  const rankers = [];
+  for (const r of rankersIn) {
+    if (!r || typeof r !== 'object') continue;
+    const uid = str(r.uid, 64);
+    if (!uid) continue;
+    rankers.push({
+      rank: nonNegInt(r.rank) || rankers.length + 1,
+      uid,
+      name: str(r.name, COMMENT_NAME_MAX),
+      count: nonNegInt(r.count),
+      anon: r.anon === true
+    });
+  }
+  return {
+    rankers,
+    commenters: nonNegInt(src.commenters),
+    comments: nonNegInt(src.comments),
+    anonCommenters: nonNegInt(src.anonCommenters),
+    stopReason: str(src.stopReason, 64),
+    segments: nonNegInt(src.segments),
+    bytes: nonNegInt(src.bytes),
+    ms: nonNegInt(src.ms),
+    partial: src.partial === true
+  };
+}
+
+/**
+ * 保存済みのコメント集計を lives に合流させる。★読み手に返す直前だけで呼ぶ。
+ *   ★`lives[]` に無い liveId は捨てる(集計だけが残って幽霊の行が出ないように)。
+ *   ★集計が無い/壊れているときは `comment: null` のまま返す＝画面が「集計待ち」を出す
+ *     (空の順位表を出して「誰も居ない」と嘘をつかない)。
+ * @param {any} payload
+ * @returns {Promise<any>}
+ */
+async function attachComments(payload) {
+  if (!payload || !Array.isArray(payload.lives)) return payload;
+  let stored = null;
+  try {
+    const raw = await upstash(['GET', COMMENTS_KEY]);
+    stored = raw ? JSON.parse(raw) : null;
+  } catch {
+    stored = null;
+  }
+  const byLive = stored && stored.byLive && typeof stored.byLive === 'object' ? stored.byLive : null;
+  const lives = payload.lives.map((l) => {
+    const id = String((l && l.liveId) || '');
+    const hit = byLive && Object.prototype.hasOwnProperty.call(byLive, id) ? sanitizeCommentEntry(byLive[id]) : null;
+    return { ...l, comment: hit };
+  });
+  const out = { ...payload, lives };
+  if (stored && Number(stored.at) > 0) {
+    out.commentsCapturedAt = Number(stored.at);
+    out.commentsMeta = {
+      at: Number(stored.at) || 0,
+      runMs: nonNegInt(stored.runMs),
+      bytes: nonNegInt(stored.bytes),
+      segments: nonNegInt(stored.segments),
+      ok: nonNegInt(stored.ok_n),
+      ng: nonNegInt(stored.ng),
+      skipped: nonNegInt(stored.skipped),
+      reasons: stored.reasons && typeof stored.reasons === 'object' ? stored.reasons : {}
+    };
+  }
+  return out;
+}
+
 export default async function handler(req, res) {
   res.setHeader('Cache-Control', 'no-store');
   try {
+    // ★コメント集計の投入(GitHub Actions の scripts/live-comment-tally.mjs だけが叩く)。
+    //   ★これ以外の POST は従来どおり 405。
+    if (req.method === 'POST' && String(req.query?.ingest || '') === 'comments') {
+      const want = process.env.STATUS_INGEST_KEY;
+      const sent = String(req.headers['x-share-key'] || '');
+      if (!want || sent !== want) {
+        res.status(401).json({ ok: false, error: 'unauthorized' });
+        return;
+      }
+      const body = readBody(req);
+      if (!body || typeof body !== 'object' || !body.byLive || typeof body.byLive !== 'object') {
+        res.status(400).json({ ok: false, error: 'bad body' });
+        return;
+      }
+      const lives = nonNegInt(body.lives);
+      const okN = nonNegInt(body.ok_n);
+      /** @type {Record<string, object>} */
+      const byLive = {};
+      for (const [id, v] of Object.entries(body.byLive)) {
+        if (!/^lv\d{6,15}$/i.test(String(id))) continue;
+        const entry = sanitizeCommentEntry(v);
+        if (entry) byLive[String(id).toLowerCase()] = entry;
+      }
+      // ★★空で上書きしない(STORE_KEY 側と同じ掟)。
+      //   1 配信も集計できていないのに保存すると、良い値を空で潰して TTL 1 時間ぶん
+      //   「コメント集計待ち」が続く。★「配信が 0 件だった」は正常なので保存する。
+      if (lives >= 1 && (okN === 0 || Object.keys(byLive).length === 0)) {
+        res.status(502).json({ ok: false, error: 'zero tallies — not stored', lives, ok_n: okN });
+        return;
+      }
+      const stored = {
+        ok: true,
+        at: Date.now(),
+        runMs: nonNegInt(body.runMs),
+        lives,
+        ok_n: okN,
+        ng: nonNegInt(body.ng),
+        skipped: nonNegInt(body.skipped),
+        segments: Object.values(byLive).reduce((s, v) => s + (Number(/** @type {any} */ (v).segments) || 0), 0),
+        bytes: Object.values(byLive).reduce((s, v) => s + (Number(/** @type {any} */ (v).bytes) || 0), 0),
+        reasons: body.reasons && typeof body.reasons === 'object' ? body.reasons : {},
+        byLive
+      };
+      await upstash(['SET', COMMENTS_KEY, JSON.stringify(stored), 'EX', String(TTL_SECONDS)]);
+      res.status(200).json({ ok: true, stored: true, lives: Object.keys(byLive).length });
+      return;
+    }
+
     if (req.method !== 'GET') {
       res.status(405).json({ ok: false, error: 'method not allowed' });
       return;
@@ -324,13 +484,13 @@ export default async function handler(req, res) {
         try { stored = rawNow ? JSON.parse(rawNow) : null; } catch { stored = null; }
         const ageMs = stored && Number(stored.capturedAt) > 0 ? Date.now() - Number(stored.capturedAt) : Infinity;
         if (stored && ageMs < PUBLIC_REFRESH_MIN_MS) {
-          res.status(200).json({ ...stored, refreshed: false, throttled: true, nextAllowedInMs: PUBLIC_REFRESH_MIN_MS - ageMs });
+          res.status(200).json({ ...(await attachComments(stored)), refreshed: false, throttled: true, nextAllowedInMs: PUBLIC_REFRESH_MIN_MS - ageMs });
           return;
         }
         // 同時に来た他の閲覧者は保存済みを返す(収集は 1 本だけ)。
         const locked = await upstash(['SET', REFRESH_LOCK_KEY, String(Date.now()), 'NX', 'EX', String(REFRESH_LOCK_TTL_SECONDS)]);
         if (locked !== 'OK') {
-          if (stored) { res.status(200).json({ ...stored, refreshed: false, inFlight: true }); return; }
+          if (stored) { res.status(200).json({ ...(await attachComments(stored)), refreshed: false, inFlight: true }); return; }
           res.status(404).json({ ok: false, error: 'not collected yet', inFlight: true });
           return;
         }
@@ -363,7 +523,7 @@ export default async function handler(req, res) {
       if (!trusted) {
         // ★閲覧者には集めたての本体をそのまま返す(もう一往復させない=リアルタイム性)。
         try { await upstash(['DEL', REFRESH_LOCK_KEY]); } catch { /* TTL で消える */ }
-        res.status(200).json({ ...payload, refreshed: true });
+        res.status(200).json({ ...(await attachComments(payload)), refreshed: true });
         return;
       }
       res.status(200).json({ ok: true, stored: true, onAir: payload.onAir, lives: payload.lives.length });
@@ -383,7 +543,7 @@ export default async function handler(req, res) {
       res.status(500).json({ ok: false, error: 'broken payload' });
       return;
     }
-    res.status(200).json(data);
+    res.status(200).json(await attachComments(data));
   } catch (e) {
     res.status(500).json({ ok: false, error: String(e && e.message ? e.message : e) });
   }

@@ -12,7 +12,7 @@
 import { escapeHtml as esc, safeHttpUrl, formatNumberJa as num } from '../lib/htmlText.js';
 import {
   watchUrlOf, jstClock, elapsedText, freshness, estimateConcurrentForLive, sortByEstimatedConcurrent,
-  cacheBust, supporterRows, identifiedSupporters, isBlankIcon, createRowChangeTracker, rowKey,
+  cacheBust, supporterRows, identifiedSupporters, commentRows, isBlankIcon, createRowChangeTracker, rowKey,
   LIVE_ID_RE, pinLiveFirst, liveShareText
 } from '../lib/liveRankingView.js';
 import { buildXIntentUrl } from '../lib/xIntentUrl.js';
@@ -87,14 +87,17 @@ function renderKnown(people) {
   return `<div class="known">${head}<ul class="tiles">${tiles}</ul></div>`;
 }
 
+/** 空のときに出す顔。★3 枠目(コメント)はりんく。 */
+const EMPTY_FACE = { gift: FACE.kontaHalf, ad: FACE.tanuHalf, comment: FACE.linkBlink };
+
 /**
  * @param {import('../lib/liveRankingView.js').SupporterRow[]} rows
  * @param {string} liveId
- * @param {'gift'|'ad'} kind
+ * @param {'gift'|'ad'|'comment'} kind
  */
 function renderRows(rows, liveId, kind) {
   if (!rows.length) {
-    return `<p class="empty"><img src="${esc(kind === 'gift' ? FACE.kontaHalf : FACE.tanuHalf)}" alt="" loading="lazy" decoding="async">まだいません</p>`;
+    return `<p class="empty"><img src="${esc(EMPTY_FACE[kind] || FACE.tanuHalf)}" alt="" loading="lazy" decoding="async">まだいません</p>`;
   }
   const html = rows.map((r) => {
     const n = Number(r.rank) || 0;
@@ -108,7 +111,7 @@ function renderRows(rows, liveId, kind) {
       ? `<img class="ava" src="${esc(r.avatar)}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer">`
       : '<span class="ava"></span>';
     return `<li${cls ? ` class="${cls}"` : ''}><span class="no${n > 0 && n <= 3 ? ' top' : ''}">${n || '-'}</span>`
-      + `${ava}<span class="nm">${nameHtml}</span><span class="pt">${num(r.point)}pt</span></li>`;
+      + `${ava}<span class="nm">${nameHtml}</span><span class="pt">${num(r.point)}${kind === 'comment' ? '件' : 'pt'}</span></li>`;
   }).join('');
   return `<ol class="rank">${html}</ol>`;
 }
@@ -140,6 +143,25 @@ function bindImgFallback(root) {
       }
     }, { once: true });
   }
+}
+
+/**
+ * 3 枠目「💬 コメントで応援した人」。
+ *
+ * ★ギフト・広告は「ニコ生が公開している値そのまま」だが、ここは【当サイトが数えた件数】。
+ *   集計は約 10 分ごとの別ジョブなので、まだ来ていない配信がある(そのときは黙らず「待ち」と出す)。
+ * ★上限に当たった配信は「直近ぶんの集計」と正直に添える(全部を数えたふりをしない)。
+ * @param {any} l
+ */
+function renderCommentCol(l) {
+  const c = (l && l.comment && typeof l.comment === 'object') ? l.comment : null;
+  const sum = c ? `<span class="sum">${num(c.commenters)}人</span>` : '';
+  const head = `<h3><img src="${esc(FACE.linkSmile)}" alt="" loading="lazy" decoding="async">💬 コメントで応援した人 ${sum}</h3>`;
+  if (!c) {
+    return `<div class="col">${head}<p class="empty"><img src="${esc(FACE.linkBlink)}" alt="" loading="lazy" decoding="async">コメント集計待ち（約 10 分ごとに更新）</p></div>`;
+  }
+  const note = c.partial ? '<p class="col-note">直近ぶんの集計です</p>' : '';
+  return `<div class="col">${head}${renderRows(commentRows(l), l.liveId, 'comment')}${note}</div>`;
 }
 
 /**
@@ -203,9 +225,13 @@ function render(data) {
   // ★合成順序は「賑わい順を作ってから 1 件を先頭へ」(逆だと sort が pin を壊す)。
   const { lives: ordered, found } = pinLiveFirst(sortByEstimatedConcurrent(lives, nowMs), PINNED_LV);
   const missing = !!PINNED_LV && !found;
+  // ★コメントの集計は別ジョブ(約 10 分ごと)。ギフト/広告の鮮度とは別に、いつ数えた値かを添える。
+  const cf = freshness(data.commentsCapturedAt, nowMs);
+  const cMin = cf.text ? cf.text.replace(/^⚠ /, '').replace(/ 更新$/, '').replace(/の情報です.*$/, '') : '';
   elMeta.innerHTML = `<img class="face" src="${esc(f.stale ? FACE.tanuNormal : (missing ? FACE.tanuHalf : FACE.kontaSmile))}" alt="">`
     + `放送中 <b>${lives.length}</b> 配信`
     + (f.text ? `・<span${f.stale ? ' class="stale"' : ''}>${esc(f.text)}</span>` : '')
+    + (cMin ? `・<span${cf.stale ? ' class="stale"' : ''}>コメント集計 ${esc(cMin)}</span>` : '')
     + (missing ? '・<span class="pin-missing">その配信はもう放送が終わったみたい。いま支えている人の一覧は、そのまま見られるわ</span>' : '');
 
   tracker.begin();
@@ -230,6 +256,7 @@ function render(data) {
       + '<div class="cols">'
       + `<div class="col"><h3><img src="${esc(FACE.kontaSmile)}" alt="" loading="lazy" decoding="async">ギフトで支えた人 <span class="sum">${num(l.giftTotal)}pt</span></h3>${renderRows(rows.gift, l.liveId, 'gift')}</div>`
       + `<div class="col"><h3><img src="${esc(FACE.tanuNormal)}" alt="" loading="lazy" decoding="async">広告で支えた人 <span class="sum">${num(l.adTotal)}pt</span></h3>${renderRows(rows.ad, l.liveId, 'ad')}</div>`
+      + renderCommentCol(l)
       + '</div></section>';
   }).join('');
   tracker.end();
