@@ -289,10 +289,10 @@ graph LR
 - `mcp-nicolive/`（3 件） — ニコ生状態を読む MCP サーバ(司令塔の状態取得用)  〔MCP / 診断〕
 
 ## `tsuioku-no-kirameki/` — 本番 LP の配信ディレクトリ(Cloudflare Pages へ deploy)  〔LP / 公開〕
-<sub>ファイル 42 件</sub>
+<sub>ファイル 44 件</sub>
 
 - `articles/`（14 件） — 技術記事(防御的公開)。手法を再利用可能な形で解説  〔記事 / 公開〕
-- `assets/`（1 件） — 公開ページ群が共有する静的資産の置き場(2026-09-14)  〔LP / 共有〕
+- `assets/`（3 件） — 公開ページ群が共有する静的資産の置き場(2026-09-14)  〔LP / 共有〕
 - `images/`（17 件） — LP 用の favicon・OG 画像等  〔画像〕
 - `live/`（1 件） — /live/ 追憶のきらめき ランキング(描画は app/dist/live-ranking.js・収集は api/live-ranking.js)  〔LP / 公開 / ランキング〕
 - `sound/`（1 件） — LP 公開用の音声素材(エール音等)  〔音声 / 公開〕

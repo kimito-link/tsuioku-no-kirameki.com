@@ -806,7 +806,7 @@
   - `src/lib/statusTrendKey.js`
   - `src/extension/status-entry.js`
   - `src/lib/statusActionAdvisor.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 206</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 207</summary>
 
 - `app/app.js` — スマホ閲覧用 status Web 版。
 - `app/live-view.js` — global NL_BUILD_ID
@@ -1014,6 +1014,7 @@
 - `tools/audit-lp-overflow.mjs` — One-off LP overflow audit (run: node tools/audit-lp-overflow.mjs)
 - `tools/mcp-nicolive/server.mjs` — NicoLive Local MCP Bridge Phase1a (PoC) — stdio JSON-RPC server.
 - `tools/mcp-nicolive/store.mjs` — NicoLive Local MCP Bridge - Snapshot Store.
+- `tsuioku-no-kirameki/assets/js/site-chrome-lp.js` — 追憶のきらめき サイト共通の「ヘッダー(ロゴ＋ハンバーガー)・ドロワーメニュー・フッター」。
 
 </details>
 

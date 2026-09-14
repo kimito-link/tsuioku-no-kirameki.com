@@ -114,173 +114,11 @@
         box-shadow:0 8px 28px rgba(45,36,28,.18);
         outline:2px solid var(--gold);outline-offset:2px
       }
-      .topbar{
-        position:sticky;top:0;z-index:50;
-        padding-top:max(0px, env(safe-area-inset-top,0px));
-        padding-left:max(0px, env(safe-area-inset-left,0px));
-        padding-right:max(0px, env(safe-area-inset-right,0px));
-        background:rgba(250,244,235,.82);
-        backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);
-        border-bottom:1px solid rgba(88,62,28,.07);
-        box-shadow:0 1px 0 rgba(255,255,255,.6) inset
-      }
-      .topbar-inner{
-        display:flex;justify-content:space-between;align-items:center;gap:12px;
-        min-height:44px;padding:6px 0
-      }
-      .topbar__logo{
-        display:flex;align-items:center;gap:8px;text-decoration:none;color:inherit;
-        flex-shrink:1;min-width:0;line-height:0;
-        position:relative;z-index:0;isolation:isolate;
-        padding:6px 12px;
-        border-radius:14px;
-        border:1px solid rgba(88,62,28,.14);
-        box-shadow:0 2px 14px rgba(45,36,28,.08),inset 0 1px 0 rgba(255,255,255,.98),
-          0 0 28px rgba(120,170,255,.12),0 0 48px rgba(180,210,255,.06),
-          0 0 36px rgba(200,130,165,.07);
-        background:
-          radial-gradient(circle at 8% 18%, rgba(255,255,255,.95) 0.55px, transparent 1.1px),
-          radial-gradient(circle at 22% 6%, rgba(220,235,255,.9) 0.45px, transparent 1px),
-          radial-gradient(circle at 94% 12%, rgba(255,230,240,.88) 0.5px, transparent 1px),
-          radial-gradient(circle at 78% 4%, rgba(200,220,255,.75) 0.4px, transparent 0.85px),
-          radial-gradient(circle at 3% 72%, rgba(255,248,245,.9) 0.5px, transparent 1px),
-          radial-gradient(circle at 15% 88%, rgba(235,215,235,.75) 0.45px, transparent 0.95px),
-          radial-gradient(circle at 88% 78%, rgba(255,255,255,.9) 0.5px, transparent 1.05px),
-          radial-gradient(circle at 96% 55%, rgba(245,210,230,.55) 0.4px, transparent 0.9px),
-          radial-gradient(circle at 42% -2%, rgba(255,255,255,.7) 0.35px, transparent 0.75px),
-          radial-gradient(circle at 58% 102%, rgba(255,248,255,.75) 0.45px, transparent 0.9px),
-          radial-gradient(circle at 68% 38%, rgba(255,200,220,.35) 0.3px, transparent 0.65px),
-          linear-gradient(180deg,rgba(255,255,255,.97),rgba(255,250,252,.94));
-        background-repeat:no-repeat;
-        background-size:100% 100%,100% 100%,100% 100%,100% 100%,100% 100%,100% 100%,100% 100%,100% 100%,100% 100%,100% 100%,100% 100%,100% 100%
-      }
-      .topbar__logo::before{
-        content:"";position:absolute;inset:-18px;z-index:-1;pointer-events:none;border-radius:22px;opacity:.88;
-        background:
-          radial-gradient(ellipse 55% 42% at 50% 118%, var(--lp-yoz-mist), transparent 72%),
-          radial-gradient(ellipse 40% 30% at 18% -8%, var(--lp-yoz-petal-mid), transparent 78%),
-          radial-gradient(circle at 108% 20%, rgba(140,185,255,.5) 0%, rgba(90,130,210,.15) 6px, transparent 22px),
-          radial-gradient(circle at -6% 85%, rgba(255,195,175,.42) 0%, rgba(230,140,150,.1) 5px, transparent 20px),
-          radial-gradient(circle at 12% -8%, rgba(190,255,230,.38) 0%, rgba(120,210,180,.1) 4px, transparent 18px),
-          radial-gradient(circle at 95% 95%, rgba(210,170,220,.34) 0%, rgba(140,100,180,.1) 5px, transparent 19px),
-          linear-gradient(118deg,transparent 32%,rgba(235,210,230,.14) 44%,rgba(220,235,255,.18) 52%,transparent 68%)
-      }
-      .topbar__logo img{
-        display:block;position:relative;z-index:1;
-        height:clamp(34px,8.5vw,44px);width:auto;max-width:min(240px,62vw);
-        object-fit:contain;object-position:left center
-      }
-      .topbar__menu-btn{
-        display:inline-flex;align-items:center;justify-content:center;gap:8px;flex-shrink:0;
-        margin:0;padding:10px 12px;border:1px solid rgba(88,62,28,.16);
-        border-radius:12px;background:rgba(255,252,247,.94);cursor:pointer;
-        font-size:.8rem;font-weight:500;color:var(--text-secondary);
-        box-shadow:0 1px 0 rgba(255,255,255,.9) inset;
-        min-width:44px;min-height:44px;
-        transition:background .2s ease,border-color .2s ease,box-shadow .2s ease
-      }
-      .topbar__menu-btn:hover{background:#fff;border-color:rgba(88,62,28,.22)}
-      .topbar__menu-btn:focus-visible{
-        outline:2px solid rgba(79,172,254,.8);outline-offset:2px
-      }
-      .topbar__menu-btn[aria-expanded="true"]{
-        background:rgba(79,172,254,.12);border-color:rgba(79,172,254,.28);
-        box-shadow:0 0 0 1px rgba(79,172,254,.15) inset
-      }
-      .topbar__menu-icon{
-        display:flex;flex-direction:column;justify-content:center;gap:5px;
-        width:22px;height:16px;flex-shrink:0
-      }
-      .topbar__menu-icon span{
-        display:block;height:2.5px;width:100%;border-radius:2px;background:var(--text-secondary);
-        transition:transform .24s ease,opacity .24s ease,background .2s ease
-      }
-      .topbar__menu-btn[aria-expanded="true"] .topbar__menu-icon span{background:#2c2117}
-      .topbar__menu-btn[aria-expanded="true"] .topbar__menu-icon span:nth-child(1){
-        transform:translateY(7.25px) rotate(45deg)
-      }
-      .topbar__menu-btn[aria-expanded="true"] .topbar__menu-icon span:nth-child(2){opacity:0}
-      .topbar__menu-btn[aria-expanded="true"] .topbar__menu-icon span:nth-child(3){
-        transform:translateY(-7.25px) rotate(-45deg)
-      }
-      .topbar__menu-text{
-        max-width:min(4.5em,20vw);overflow:hidden;text-overflow:ellipsis;white-space:nowrap
-      }
-      @media (max-width:380px){
-        .topbar__menu-btn{padding:10px 11px;gap:0}
-        .topbar__menu-text{
-          position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;
-          clip:rect(0,0,0,0);white-space:nowrap;border:0
-        }
-      }
-      .topbar__backdrop{
-        position:fixed;inset:0;z-index:60;
-        background:rgba(6,10,22,.55);
-        backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
-        opacity:0;visibility:hidden;pointer-events:none;
-        transition:opacity .28s ease,visibility .28s ease
-      }
-      .topbar__backdrop.is-open{opacity:1;visibility:visible;pointer-events:auto}
-      .topbar__drawer{
-        position:fixed;top:0;right:0;bottom:0;z-index:65;
-        width:min(100vw,380px);
-        max-width:100%;
-        padding:
-          calc(12px + env(safe-area-inset-top,0px))
-          clamp(14px,4vw,22px)
-          calc(20px + env(safe-area-inset-bottom,0px));
-        background:linear-gradient(175deg,rgba(16,22,40,.97) 0%,rgba(10,14,28,.98) 100%);
-        border-left:1px solid rgba(255,255,255,.1);
-        box-shadow:-16px 0 48px rgba(0,0,0,.45);
-        overflow-y:auto;-webkit-overflow-scrolling:touch;
-        overscroll-behavior:contain;
-        transform:translate3d(100%,0,0);
-        visibility:hidden;pointer-events:none;opacity:0;
-        transition:transform .32s cubic-bezier(.22,1,.36,1),opacity .22s ease,visibility 0s linear .35s
-      }
-      .topbar__drawer.is-open{
-        transform:translate3d(0,0,0);visibility:visible;pointer-events:auto;opacity:1;
-        transition:transform .32s cubic-bezier(.22,1,.36,1),opacity .2s ease,visibility 0s linear 0s
-      }
-      @media (max-width:420px){
-        .topbar__drawer{
-          width:100vw;max-width:100vw;border-left:none;
-          box-shadow:none
-        }
-      }
-      .topbar__drawer-hint{
-        margin:0 0 14px;padding:0 2px 12px;
-        border-bottom:1px solid rgba(255,255,255,.1);
-        font-size:.72rem;letter-spacing:.06em;color:rgba(200,210,230,.55);
-        text-transform:uppercase
-      }
-      .topbar__nav{display:flex;flex-direction:column;gap:5px;font-size:clamp(.88rem,2.4vw,.95rem)}
-      .topbar__nav a{
-        display:block;padding:13px 14px;border-radius:12px;text-decoration:none;
-        color:rgba(235,238,248,.9);border:1px solid transparent;
-        line-height:1.35
-      }
-      .topbar__nav a:hover,.topbar__nav a:focus-visible{
-        background:rgba(79,172,254,.14);border-color:rgba(79,172,254,.22);color:#fff
-      }
-      .topbar__nav a.cta{
-        margin-top:8px;text-align:center;font-weight:700;
-        background:linear-gradient(135deg,var(--gold),#ddb25d);color:#2e1606;border-color:rgba(142,90,10,.2)
-      }
-      .topbar__nav a.cta:hover,.topbar__nav a.cta:focus-visible{
-        filter:brightness(1.05);color:#1a1006
-      }
-      .topbar__drawer-intro{
-        margin:1.2rem 0 0;padding-top:1rem;border-top:1px solid rgba(255,255,255,.1);
-        font-size:clamp(.74rem,2.1vw,.8rem);line-height:1.68;color:rgba(200,205,220,.72)
-      }
-      .topbar__drawer-intro strong{color:rgba(245,240,230,.9)}
-      .topbar__drawer-intro a{color:#8ec8ff;text-decoration:underline;text-underline-offset:.14em}
-      .topbar__drawer-intro a:hover,.topbar__drawer-intro a:focus-visible{color:#c5e2ff}
-      body.topbar-menu-open{overflow:hidden;touch-action:none}
-      @media (prefers-reduced-motion:reduce){
-        .topbar__drawer,.topbar__backdrop{transition:none}
-      }
+    </style>
+    <!-- ★ヘッダー/ドロワー/フッターの見た目は共有コンポーネント(assets/css/site-chrome-lp.css)。/live/ と共用。
+         ★元の inline 定義と同じ位置で読む(前後の同じ詳細度のセレクタとの勝ち負けを変えないため)。 -->
+    <link rel="stylesheet" href="assets/css/site-chrome-lp.css">
+    <style>
       .nav{display:flex;gap:10px 16px;flex-wrap:wrap;font-size:.93rem;row-gap:10px}
       .nav a{text-decoration:none;color:var(--text-secondary)}
       .nav .cta{padding:10px 16px;border-radius:999px;background:linear-gradient(135deg,var(--gold),#ddb25d);color:#2e1606}
@@ -831,28 +669,6 @@
       .footer-card h2{margin:0 0 10px;font-size:clamp(1.9rem,3vw,2.7rem);line-height:var(--lh-heading)}
       .footer-card p{margin:0;color:var(--text-secondary);line-height:var(--lh-body)}
       .footer-actions{display:flex;gap:12px;flex-wrap:wrap;justify-content:flex-end}
-      .footer-note{
-        padding:16px max(var(--shell-pad), env(safe-area-inset-left,0px)) calc(30px + env(safe-area-inset-bottom,0px)) max(var(--shell-pad), env(safe-area-inset-right,0px));
-        text-align:center;
-        color:rgba(200,192,180,.72);font-size:clamp(.78rem,2.4vw,.85rem);line-height:1.55;
-        background:#080f22
-      }
-      .footer-note__credit{
-        margin-top:6px;
-        color:rgba(212,228,240,.72);
-        font-size:clamp(.72rem,2.2vw,.8rem)
-      }
-      .footer-note__ip{
-        margin-top:10px;font-size:.92em;opacity:.82;line-height:1.7;
-      }
-      .footer-note__links{
-        margin-top:10px;
-        display:flex;gap:18px;justify-content:center;flex-wrap:wrap;
-      }
-      .footer-note__links a{
-        color:rgba(212,228,240,.88);text-decoration:underline;text-underline-offset:3px;
-      }
-      .footer-note__links a:hover{color:#fff}
       .lp-policy-board{
         border:1px solid rgba(88,62,28,.12);
         border-radius:var(--r2);
@@ -5832,54 +5648,10 @@
     <div id="page-top" aria-hidden="true"></div>
     <audio id="lp-bgm" loop preload="none" playsinline style="display:none"
            src="sound/yozora-small-yell.mp3"></audio>
-    <header class="topbar" id="site-header">
-      <div class="shell topbar-inner">
-        <a class="topbar__logo" href="#worldview" aria-label="君斗りんくの追憶のきらめき（はじめにへ）">
-          <img src="../extension/images/logo/kimito-link-color.png" width="160" height="40" alt="Kimito-Link Project（キミトリンク）" loading="eager" decoding="async">
-        </a>
-        <button type="button" class="topbar__menu-btn" id="topbar-menu-btn" aria-expanded="false" aria-controls="topbar-drawer" aria-haspopup="dialog" aria-label="メニューを開く">
-          <span class="topbar__menu-icon" aria-hidden="true"><span></span><span></span><span></span></span>
-          <span class="topbar__menu-text" aria-hidden="true">メニュー</span>
-        </button>
-      </div>
-    </header>
+    <!-- ★ヘッダー・ドロワー・フッターは共有コンポーネント(assets/js/site-chrome-lp.js)がここに同期的に差し込む。/live/ と共用。 -->
+    <script src="assets/js/site-chrome-lp.js" data-part="header" data-base=""></script>
     <p class="lp-inapp-hint" id="lp-inapp-hint" role="note">X（旧Twitter）アプリ内では、BGM やコンテンツの表示・操作に制限があることがあります。<strong>画面を一度タップ（クリック）する</strong>か、<a id="lp-inapp-open" href="https://tsuioku-no-kirameki.com/" target="_blank" rel="noopener noreferrer">ブラウザで開く</a>とよいです。</p>
 
-    <div class="topbar__backdrop" id="topbar-backdrop" aria-hidden="true"></div>
-    <div class="topbar__drawer" id="topbar-drawer" role="dialog" aria-modal="true" aria-labelledby="topbar-drawer-title" aria-hidden="true">
-      <h2 id="topbar-drawer-title" class="visually-hidden">サイトメニュー</h2>
-      <p class="topbar__drawer-hint" aria-hidden="true">ページ内リンク</p>
-      <nav class="topbar__nav" aria-label="主要リンク">
-          <a href="#worldview">はじめに</a>
-          <a href="#record-foundation">記録安定</a>
-          <a href="#record-results">改善実績</a>
-          <a href="#record-transparency">透明性</a>
-          <a href="#tanabata-preview">七夕プレビュー</a>
-          <a href="#voices">タイムライン</a>
-          <a href="#context-scale">背景の数字</a>
-          <a href="#multi-live">同時視聴</a>
-          <a href="#extension-visual">拡張の見え方</a>
-          <a href="#lp-comment-compose-guide">コメント送信</a>
-          <a href="#lp-voice-comment">音声コメント</a>
-          <a href="#lp-anonymous-identicon">匿名 Identicon</a>
-          <a href="#html-save">HTML保存</a>
-          <a href="#marketing-features">マーケ分析</a>
-          <a href="#marketing-what-you-can-do">分析の読み方</a>
-          <a href="#problem">問題</a>
-          <a href="#impact">反応の階段</a>
-          <a href="#comments">配信コメント</a>
-          <a href="#extension-guide">画面の見方</a>
-          <a href="#algorithm">同接推定</a>
-          <a href="#solution">解決の方向</a>
-          <a href="#product-policy">提供の考え方</a>
-          <a href="live/">追憶のきらめき ランキング</a>
-          <a href="articles/">技術記事</a>
-          <a href="#record-cta" class="cta">導入・試用</a>
-        </nav>
-      <p class="topbar__drawer-intro">
-        <strong>君斗りんくの追憶のきらめき</strong> — 応援が流れてしまう現実と、「なかったことにしたくない」気持ちに寄り添うページです。Web・iOS・Android と Chrome 拡張を前提に整理しています。見え方や仕組みは、上のリンクから章ごとにたどれます。今後、<strong>YouTube</strong> をはじめとした<strong>他の配信プラットフォーム</strong>への対応も視野に入れています。
-      </p>
-    </div>
 
     <main id="main-content">
       <div class="lp-dawn-arc">
@@ -10499,54 +10271,10 @@
       </section>
     </main>
 
-    <footer class="footer-note">
-      <div class="shell">
-        <div>追憶のきらめき v0.1.1509 ― Kimito-Link Project</div>
-        <div class="footer-note__links"><a href="live/">追憶のきらめき ランキング</a> ／ <a href="articles/">技術記事</a> ／ <a href="https://kimitotalk.link/talent/" target="_blank" rel="noopener">キミトトーク</a> ／ <a href="privacy.html">プライバシーポリシー</a></div>
-        <div class="footer-note__ip">
-          コメントを投稿者ごとの声で読み上げる仕組みは<strong>特許出願中</strong>です（特願2026-159890）。<br>
-          「キミトリンク」は商標登録第7069215号。
-        </div>
-      </div>
-    </footer>
+    <script src="assets/js/site-chrome-lp.js" data-part="footer" data-base="" data-version="0.1.1509"></script>
 
     <button type="button" id="lp-bgm-toggle" aria-label="音を再生">&#9835;</button>
 
-    <script>
-      (function () {
-        var btn = document.getElementById('topbar-menu-btn');
-        var backdrop = document.getElementById('topbar-backdrop');
-        var drawer = document.getElementById('topbar-drawer');
-        var label = btn && btn.querySelector('.topbar__menu-text');
-        if (!btn || !backdrop || !drawer) return;
-
-        function setOpen(open) {
-          btn.setAttribute('aria-expanded', open ? 'true' : 'false');
-          btn.setAttribute('aria-label', open ? 'メニューを閉じる' : 'メニューを開く');
-          backdrop.classList.toggle('is-open', open);
-          drawer.classList.toggle('is-open', open);
-          backdrop.setAttribute('aria-hidden', open ? 'false' : 'true');
-          drawer.setAttribute('aria-hidden', open ? 'false' : 'true');
-          document.body.classList.toggle('topbar-menu-open', open);
-          if (label) label.textContent = open ? '閉じる' : 'メニュー';
-        }
-
-        btn.addEventListener('click', function () {
-          setOpen(btn.getAttribute('aria-expanded') !== 'true');
-        });
-        backdrop.addEventListener('click', function () {
-          setOpen(false);
-        });
-        drawer.querySelectorAll('a[href^="#"]').forEach(function (a) {
-          a.addEventListener('click', function () {
-            setOpen(false);
-          });
-        });
-        document.addEventListener('keydown', function (e) {
-          if (e.key === 'Escape') setOpen(false);
-        });
-      })();
-    </script>
 
     <script>
       (function () {

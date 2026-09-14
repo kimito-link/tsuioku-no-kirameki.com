@@ -83,6 +83,19 @@
         "src/lib/rememberedAvatarIndex.test.js"
       ],
       "note": "popup の逆順走査(O(N)/呼び出し)を entries 参照ごとに1回の索引へ。同型の先例 buildOwnPostedUserIdSet(v0.1.773)と同じ判断。ai-hub find --tag avatar で同等品なしを確認"
+    },
+    {
+      "at": "2026-09-14T08:37:00.000Z",
+      "responsibility": "site-chrome-header-drawer-footer",
+      "decision": "ESTABLISH_REHOME",
+      "canonicalSource": "tsuioku-no-kirameki/assets/js/site-chrome-lp.js",
+      "scopePaths": [
+        "tsuioku-no-kirameki/assets/js/site-chrome-lp.js",
+        "tsuioku-no-kirameki/assets/css/site-chrome-lp.css",
+        "tsuioku-no-kirameki/index.html",
+        "tsuioku-no-kirameki/live/index.html"
+      ],
+      "note": "LP inline のヘッダー/ドロワー/フッター(HTML+CSS+JS)を切り出して LP と /live/ が共用。キットの templates/web/site-chrome は別デザインの汎用品のため KEEP_SEPARATE(採用せず)。LP は計算済みスタイル 48 要素で前後差分 0"
     }
   ]
 }

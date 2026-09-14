@@ -204,18 +204,55 @@ function showState(msg) {
   }
 }
 
-function load() {
-  fetch('/api/live-ranking', { cache: 'no-store' })
+/*
+ * ★リアルタイム取得(2026-09-14 ユーザー要望「リアルタイム取得を売りにしたい」「リロード機能もつけて」)
+ *   - 自動: 60 秒ごとに ?refresh=1 で【サーバに集め直させる】(サーバ側は前回から 60 秒未満なら保存済みを返す=ニコ生を乱打しない)
+ *   - 手動: 「いま更新」ボタン。押した瞬間に ?refresh=1(同じ throttle)
+ *   - 画面には「最終更新 N 秒前」と「次の自動更新まで N 秒」を出す(止まっているときに黙らない)
+ */
+const AUTO_REFRESH_MS = 60000;
+const elRefreshBtns = /** @type {NodeListOf<HTMLButtonElement>} */ (document.querySelectorAll('[data-refresh]'));
+const elCountdown = /** @type {HTMLElement|null} */ (document.getElementById('refreshCountdown'));
+let _loading = false;
+let _nextAutoAt = Date.now() + AUTO_REFRESH_MS;
+let _lastCapturedAt = 0;
+
+/** @param {boolean} busy */
+function setBusy(busy) {
+  _loading = busy;
+  for (const b of elRefreshBtns) {
+    b.disabled = busy;
+    b.classList.toggle('is-busy', busy);
+    b.setAttribute('aria-busy', busy ? 'true' : 'false');
+  }
+}
+
+/** @param {{ refresh?: boolean }} [opts] */
+function load(opts) {
+  if (_loading) return;
+  const refresh = !!(opts && opts.refresh);
+  setBusy(true);
+  fetch(refresh ? '/api/live-ranking?refresh=1' : '/api/live-ranking', { cache: 'no-store' })
     .then((r) => {
       if (r.status === 404) throw new Error('まだ集計されていません。しばらくお待ちください。');
       if (!r.ok) throw new Error(`読み込みに失敗しました (${r.status})`);
       return r.json();
     })
-    .then(render)
-    .catch((e) => showState(String(e && e.message ? e.message : e)));
+    .then((data) => { _lastCapturedAt = Number(data && data.capturedAt) || _lastCapturedAt; render(data); })
+    .catch((e) => showState(String(e && e.message ? e.message : e)))
+    .finally(() => { setBusy(false); _nextAutoAt = Date.now() + AUTO_REFRESH_MS; });
 }
 
-load();
+function tickCountdown() {
+  if (!elCountdown) return;
+  const left = Math.max(0, Math.ceil((_nextAutoAt - Date.now()) / 1000));
+  const ago = _lastCapturedAt ? Math.max(0, Math.round((Date.now() - _lastCapturedAt) / 1000)) : null;
+  elCountdown.textContent = (_loading ? '更新中…' : `次の自動更新まで ${left} 秒`) + (ago != null ? `・データは ${ago < 60 ? `${ago} 秒前` : `${Math.floor(ago / 60)} 分前`}の収集` : '');
+}
+
+for (const b of elRefreshBtns) b.addEventListener('click', () => load({ refresh: true }));
+load({ refresh: true });
 // ★見ていないときは止める(無駄に叩かない)。裏タブから戻った瞬間に取り直す。
-setInterval(() => { if (!document.hidden) load(); }, 60000);
-document.addEventListener('visibilitychange', () => { if (!document.hidden) load(); });
+setInterval(() => { if (!document.hidden && Date.now() >= _nextAutoAt) load({ refresh: true }); }, 1000);
+setInterval(tickCountdown, 1000);
+document.addEventListener('visibilitychange', () => { if (!document.hidden) load({ refresh: true }); });

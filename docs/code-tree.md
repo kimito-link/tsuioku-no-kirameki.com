@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 6 / 858 件
+## ⚠️ 役割コメントが無いソース 6 / 859 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `src/lib/laneDomSelfMeasure.js`
@@ -2761,7 +2761,7 @@
     - `store.mjs` — NicoLive Local MCP Bridge - Snapshot Store.
   - `audit-lp-overflow.mjs` — One-off LP overflow audit (run: node tools/audit-lp-overflow.mjs)
   - `render-og.js` — 追憶の煌めき LP 用 OG 画像（1200×630）を生成する。
-- 📁 **tsuioku-no-kirameki/** (42)
+- 📁 **tsuioku-no-kirameki/** (44)
   - 📁 **articles/** (14)
     - 📁 **role-separation-design/** (2)
       - 📁 **img/** (1)
@@ -2779,9 +2779,12 @@
     - `phase-gate-flow-canon.html`
     - `prewarm-coordinator-lease.html`
     - `reaction-template-classifier.html`
-  - 📁 **assets/** (1)
-    - 📁 **css/** (1)
+  - 📁 **assets/** (3)
+    - 📁 **css/** (2)
+      - `site-chrome-lp.css`
       - `yukkuri-thread.css`
+    - 📁 **js/** (1)
+      - `site-chrome-lp.js` — 追憶のきらめき サイト共通の「ヘッダー(ロゴ＋ハンバーガー)・ドロワーメニュー・フッター」。
   - 📁 **images/** (17)
     - 📁 **venue/** (6)
       - `venue-living-overview.jpg`
