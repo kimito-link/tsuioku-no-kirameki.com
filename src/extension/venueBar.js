@@ -87,7 +87,7 @@ const VENUE_ROSTER_ENABLED = false;
  * 上限を設けるのは、1配信で数百件しゃべる人がいてもパネルが実用的な長さに収まるようにするため。
  * 全件数は見出しに併記するので「切られた」ことは読み手に伝わる(黙って切らない)。
  */
-const VENUE_SPEECH_PANEL_MAX = 200;
+const VENUE_SPEECH_PANEL_MAX = 1000;
 import { resolveDisplayRows } from '../lib/venueDisplayRows.js';
 import { createVenueEntryQueue, VENUE_ENTRY_FLIGHT_MS } from '../lib/venueEntryQueue.js';
 import { runStorageOpWithTimeout, STORAGE_OP_TIMED_OUT } from '../lib/storageOpTimeout.js';

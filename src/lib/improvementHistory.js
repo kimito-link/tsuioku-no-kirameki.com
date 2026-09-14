@@ -563,5 +563,19 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
     source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
     note: '★この版の変更とは無関係な指標(過去30日のコミット本文の語数の移動窓)。'
       + '古い版が窓から外れると自然に下がる。この版のコード変更が何かを悪化させたわけではない'
+  }),
+  Object.freeze({
+    version: '0.1.1515', metric: 'bundle-kb', value: 1404,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '★悪化してよい理由: 1405→1404KB(−1KB・前版より改善だが過去最良 1360 @1454 には届かない)。この版の実装(応援レーンのタイル→comeview 発言一覧)で popup バンドルに入る差分は、新モジュール comeviewUserDetailLink.js(純関数・約50行)+ wireLaneUserDetailOpen.js(委譲・約40行)+ popup-entry.js 純増2行 + 更新履歴 1 件の入れ替え。減ったのは changelog.js の入れ替え(押し出された最古 1 件の方が長かった)ぶんが新モジュールぶんを上回った結果。1454 以来の増分は未計測のまま(1508 の note 参照)'
+  }),
+  Object.freeze({
+    version: '0.1.1515', metric: 'gate-selftest', value: 4,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1515', metric: 'cross-checked-claims', value: 47,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: '★この版の変更とは無関係な指標(過去30日のコミット本文の語数の移動窓)。54@1507 からの目減りはコミット本文の書き方に依存し、この実装差分とは因果が無い。この版は純関数テスト(comeviewUserDetailLink.test.js)+DOM 単体テスト(wireLaneUserDetailOpen.test.js・happy-dom)+配線テスト(venueSpeechPanelRowsMax.wiring.test.js)と全 test:cc 緑で裏取りしたが、実機(chrome)確認は司令塔が行うため、この差分の cross-check がコミット窓に載るのは次版から'
   })
 ]);

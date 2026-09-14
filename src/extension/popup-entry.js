@@ -937,6 +937,8 @@ import { createRememberedAvatarLookup } from '../lib/rememberedAvatarIndex.js';
 // v0.1.1386: 実在が確認できたサムネ(uid)を覚えて、次から本物として数える。
 import { addVerifiedAvatarUids, verifiedAvatarUidSet, KEY_VERIFIED_AVATAR_UIDS } from '../lib/verifiedAvatarRegistry.js';
 import { attachAiDiagButtonHandler } from './popup/attachAiDiagButtonHandler.js';
+import { wireLaneUserDetailOpen } from './popup/wireLaneUserDetailOpen.js';
+import { buildComeviewUserDetailPath } from '../lib/comeviewUserDetailLink.js';
 import { mergeWatchSnapshotPreservingBroadcaster } from '../lib/watchSnapshotPartialMerge.js';
 import { persistFreshlyFetchedSnapshot } from '../lib/popupWatchSnapshotPersist.js';
 import {
@@ -13199,9 +13201,7 @@ async function refreshSupportActivityTimeline(liveId) {
       if (!uid) return;
       ev.preventDefault();
       const uname = t.getAttribute('data-nl-uname') || '';
-      const url = chrome.runtime.getURL(
-        `comeview.html?user=${encodeURIComponent(uid)}&uname=${encodeURIComponent(uname)}`
-      );
+      const url = chrome.runtime.getURL(buildComeviewUserDetailPath(uid, uname));
       try {
         void chrome.windows.create({ url, type: 'popup', width: 420, height: 640 });
       } catch {
@@ -20009,6 +20009,8 @@ async function initPopup() {
   }
   applyResponsivePopupLayout();
   bindNlMainScrollPerfHook();
+  // v0.1.1515: 応援レーンのタイル click → その人の全発言(comeview 詳細)を開く委譲を1回張る。
+  try { wireLaneUserDetailOpen(document); } catch { /* 配線失敗でも通常初期化は続ける */ }
   // v0.1.896: 操作ボタン群をパネル上部へ昇格(ユーザー要望「上の方に」+ 会議確定)。冪等・id ハンドラ無傷。
   try {
     hoistQuickToolbarToTop();
