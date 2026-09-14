@@ -72,6 +72,17 @@
         "app/dist/live-ranking.js"
       ],
       "note": "新モジュールの単体テストと、esbuild が出す配布物(git 追跡=Vercel が配る)。判断は元モジュールの receipt に従う"
+    },
+    {
+      "at": "2026-09-14T08:05:00.000Z",
+      "responsibility": "remembered-avatar-uid-index",
+      "decision": "LOCAL",
+      "canonicalSource": null,
+      "scopePaths": [
+        "src/lib/rememberedAvatarIndex.js",
+        "src/lib/rememberedAvatarIndex.test.js"
+      ],
+      "note": "popup の逆順走査(O(N)/呼び出し)を entries 参照ごとに1回の索引へ。同型の先例 buildOwnPostedUserIdSet(v0.1.773)と同じ判断。ai-hub find --tag avatar で同等品なしを確認"
     }
   ]
 }
