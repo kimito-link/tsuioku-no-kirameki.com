@@ -3,11 +3,12 @@
   "files": [
     {
       "file": "src/lib/deriveAvatarUrlFromUid.js",
-      "featureCount": 8,
+      "featureCount": 9,
       "features": [
         "backfill-sw",
         "comeview",
         "content",
+        "live-ranking",
         "offscreen",
         "page-intercept",
         "popup",
@@ -18,6 +19,7 @@
         "バックフィル SW",
         "コメビュ(別窓)",
         "記録エンジン(watchページ常駐)",
+        "Web版 追憶のきらめき ランキング(/live/)",
         "コメント IDB 書き手",
         "ページ傍受",
         "ポップアップ(応援レーン)",
@@ -214,6 +216,24 @@
         "記録エンジン(watchページ常駐)",
         "ポップアップ(応援レーン)",
         "状態速報ページ",
+        "会場モード(standalone)"
+      ]
+    },
+    {
+      "file": "src/lib/htmlText.js",
+      "featureCount": 5,
+      "features": [
+        "comeview",
+        "content",
+        "live-ranking",
+        "popup",
+        "venue"
+      ],
+      "labels": [
+        "コメビュ(別窓)",
+        "記録エンジン(watchページ常駐)",
+        "Web版 追憶のきらめき ランキング(/live/)",
+        "ポップアップ(応援レーン)",
         "会場モード(standalone)"
       ]
     },
@@ -1164,6 +1184,20 @@
       ]
     },
     {
+      "file": "src/lib/concurrentEstimate.js",
+      "featureCount": 3,
+      "features": [
+        "content",
+        "live-ranking",
+        "popup"
+      ],
+      "labels": [
+        "記録エンジン(watchページ常駐)",
+        "Web版 追憶のきらめき ランキング(/live/)",
+        "ポップアップ(応援レーン)"
+      ]
+    },
+    {
       "file": "src/lib/displayRecordedCount.js",
       "featureCount": 3,
       "features": [
@@ -1231,6 +1265,20 @@
         "記録エンジン(watchページ常駐)",
         "ポップアップ(応援レーン)",
         "状態速報ページ"
+      ]
+    },
+    {
+      "file": "src/lib/kokenContributionRankingApi.js",
+      "featureCount": 3,
+      "features": [
+        "content",
+        "live-ranking",
+        "popup"
+      ],
+      "labels": [
+        "記録エンジン(watchページ常駐)",
+        "Web版 追憶のきらめき ランキング(/live/)",
+        "ポップアップ(応援レーン)"
       ]
     },
     {
@@ -1581,6 +1629,20 @@
         "記録エンジン(watchページ常駐)",
         "ポップアップ(応援レーン)",
         "会場モード(standalone)"
+      ]
+    },
+    {
+      "file": "src/lib/timeAuthority.js",
+      "featureCount": 3,
+      "features": [
+        "live-ranking",
+        "popup",
+        "status"
+      ],
+      "labels": [
+        "Web版 追憶のきらめき ランキング(/live/)",
+        "ポップアップ(応援レーン)",
+        "状態速報ページ"
       ]
     },
     {
@@ -2212,18 +2274,6 @@
       ]
     },
     {
-      "file": "src/lib/concurrentEstimate.js",
-      "featureCount": 2,
-      "features": [
-        "content",
-        "popup"
-      ],
-      "labels": [
-        "記録エンジン(watchページ常駐)",
-        "ポップアップ(応援レーン)"
-      ]
-    },
-    {
       "file": "src/lib/consoleErrorBuffer.js",
       "featureCount": 2,
       "features": [
@@ -2404,18 +2454,6 @@
       ]
     },
     {
-      "file": "src/lib/kokenContributionRankingApi.js",
-      "featureCount": 2,
-      "features": [
-        "content",
-        "popup"
-      ],
-      "labels": [
-        "記録エンジン(watchページ常駐)",
-        "ポップアップ(応援レーン)"
-      ]
-    },
-    {
       "file": "src/lib/kokenGiftHistoryApi.js",
       "featureCount": 2,
       "features": [
@@ -2557,6 +2595,18 @@
       "labels": [
         "バックフィル SW",
         "記録エンジン(watchページ常駐)"
+      ]
+    },
+    {
+      "file": "src/lib/nicoadContributionRankingApi.js",
+      "featureCount": 2,
+      "features": [
+        "content",
+        "live-ranking"
+      ],
+      "labels": [
+        "記録エンジン(watchページ常駐)",
+        "Web版 追憶のきらめき ランキング(/live/)"
       ]
     },
     {
@@ -2989,18 +3039,6 @@
       "labels": [
         "記録エンジン(watchページ常駐)",
         "ポップアップ(応援レーン)"
-      ]
-    },
-    {
-      "file": "src/lib/timeAuthority.js",
-      "featureCount": 2,
-      "features": [
-        "popup",
-        "status"
-      ],
-      "labels": [
-        "ポップアップ(応援レーン)",
-        "状態速報ページ"
       ]
     },
     {
@@ -3555,6 +3593,16 @@
       ],
       "labels": [
         "記録エンジン(watchページ常駐)"
+      ]
+    },
+    {
+      "file": "src/extension/live-ranking-entry.js",
+      "featureCount": 1,
+      "features": [
+        "live-ranking"
+      ],
+      "labels": [
+        "Web版 追憶のきらめき ランキング(/live/)"
       ]
     },
     {
@@ -5818,6 +5866,16 @@
       ]
     },
     {
+      "file": "src/lib/liveRankingView.js",
+      "featureCount": 1,
+      "features": [
+        "live-ranking"
+      ],
+      "labels": [
+        "Web版 追憶のきらめき ランキング(/live/)"
+      ]
+    },
+    {
       "file": "src/lib/livesCardSignature.js",
       "featureCount": 1,
       "features": [
@@ -6255,16 +6313,6 @@
       ],
       "labels": [
         "ポップアップ(応援レーン)"
-      ]
-    },
-    {
-      "file": "src/lib/nicoadContributionRankingApi.js",
-      "featureCount": 1,
-      "features": [
-        "content"
-      ],
-      "labels": [
-        "記録エンジン(watchページ常駐)"
       ]
     },
     {

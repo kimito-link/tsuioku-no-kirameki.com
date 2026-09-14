@@ -1,3 +1,4 @@
+import { safeHttpUrl as sanitizeHttpUrl } from './htmlText.js';
 /**
  * ニコ生「企画イベント参加番組一覧」公式 JSON API の URL 組立 & 正規化（純関数）。
  *
@@ -124,16 +125,6 @@ export function isLikelyEventParticipationShape(json) {
   }
   // koken/nicoad と違い、配列は data 直下（data:[...]）。
   return Array.isArray(j.data);
-}
-
-/**
- * http(s) URL だけ通す（サムネ/アバター）。それ以外は空に倒す。
- * @param {unknown} value
- * @returns {string}
- */
-function sanitizeHttpUrl(value) {
-  const s = String(value == null ? '' : value).trim();
-  return /^https?:\/\//i.test(s) ? s : '';
 }
 
 /**

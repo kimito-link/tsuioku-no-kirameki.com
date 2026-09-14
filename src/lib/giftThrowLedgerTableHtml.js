@@ -8,6 +8,7 @@ import { buildUserProfileLinkedLabelHtml } from './userProfileLinkHtml.js';
 import { displayUserLabel } from './userRooms.js';
 import { resolveReportUserThumbSrc } from './reportUserThumb.js';
 import { NICONICO_OFFICIAL_DEFAULT_USERICON_HTTPS } from './supportGrowthTileSrc.js';
+import { safeHttpUrl as sanitizeHttpUrl } from './htmlText.js';
 
 const DEFAULT_USERICON_ONERROR_ATTR = `onerror="this.onerror=null;this.src='${escapeHtml(NICONICO_OFFICIAL_DEFAULT_USERICON_HTTPS)}'"`;
 
@@ -15,12 +16,6 @@ const DEFAULT_USERICON_ONERROR_ATTR = `onerror="this.onerror=null;this.src='${es
 function formatLedgerNumber(v) {
   const n = typeof v === 'number' && Number.isFinite(v) ? Math.trunc(v) : NaN;
   return Number.isFinite(n) ? n.toLocaleString('ja-JP') : '—';
-}
-
-/** @param {unknown} value */
-function sanitizeHttpUrl(value) {
-  const s = String(value || '').trim();
-  return /^https?:\/\//i.test(s) ? s : '';
 }
 
 /**

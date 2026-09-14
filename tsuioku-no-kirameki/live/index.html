@@ -23,14 +23,18 @@
     <meta name="twitter:card" content="summary_large_image">
 
     <!--
-      ★このリポの静的ページは CSS を全部 inline で持つ(共通CSSファイルは0件)。
-        新規ページもそれに揃える(勝手に共通CSSを新設して散らかさない)。
-      ★配色はロゴから取る(LOGO-RULES.md): 紺 #1c4b7d / 濃紺 #14375c / オレンジ #c8721c。
-        地は生成りの明るい色(ロゴが濃紺なので暗い地に置かない)。
-      ★キャラ画像・ロゴは extension/images/ が正本(LP index.html と同じ場所を参照する)。
-        /live/ からは ../../extension/ で Web でも disk でも同じ実体に解決する
+      ★コンポーネント化(2026-09-14・web-ios-android/CLAUDE.md 基準⑤⑥⑦):
+        - ゆっくり吹き出し(.yukkuri-thread/.y-row/.speaker/.bubble)は共有 CSS
+          ../assets/css/yukkuri-thread.css を LP と共用(2箇所目を書かない)。inline <style> より前に読む。
+        - 描画ロジックは src/extension/live-ranking-entry.js → app/dist/live-ranking.js(esbuild)。
+          純ロジックは src/lib/liveRankingView.js(テストつき)、HTML/URL の検疫は src/lib/htmlText.js。
+          このファイルに JS は書かない。
+        - このページ固有の見た目(カード・順位バッジ・ロゴ帯)だけを下の <style> に持つ。
+      ★配色はロゴから取る(LOGO-RULES.md): 紺 #1c4b7d / 濃紺 #14375c / オレンジ #c8721c。地は生成りの明るい色。
+      ★画像は extension/images/ が正本。/live/ からは ../../extension/ で Web でも disk でも同じ実体に解決する
         (Web: /live/../../extension → /extension は vercel.json の rewrite 対象外で直接配信される)。
     -->
+    <link rel="stylesheet" href="../assets/css/yukkuri-thread.css">
     <style>
       :root {
         --bg: #fffaf4;
@@ -41,8 +45,10 @@
         --navy: #1c4b7d;
         --navy-deep: #14375c;
         --orange: #c8721c;
-        --gold: #c98e2b;
         --card: #ffffff;
+        /* ★共有コンポーネント(yukkuri-thread.css)が参照する変数。LP と同じ名前で用意する。 */
+        --lh-body: 1.7;
+        --text-secondary: var(--ink-sub);
       }
       * { box-sizing: border-box; }
       html, body { margin: 0; padding: 0; }
@@ -89,33 +95,30 @@
       .meta .face { width: 28px; height: 28px; object-fit: contain; }
       .meta .stale { color: #a13d0a; font-weight: 600; }
 
-      /* ── 3キャラの説明(LP の yukkuri-thread と同じ見た目) ───── */
-      .yukkuri-thread { display: grid; gap: 12px; margin: 16px 0 6px; }
-      .y-row { display: grid; grid-template-columns: minmax(56px, 76px) minmax(0, 1fr); gap: 10px; align-items: start; }
-      .y-row.reverse { grid-template-columns: minmax(0, 1fr) minmax(56px, 76px); }
-      .speaker { display: flex; flex-direction: column; align-items: center; gap: 4px; }
-      .speaker img { width: 64px; height: 64px; object-fit: contain; filter: drop-shadow(0 8px 14px rgba(79,56,23,.14)); }
-      .speaker span { color: var(--ink-sub); font-size: .74rem; }
-      .bubble {
-        position: relative; min-width: 0; padding: 12px 16px; border-radius: 20px;
-        background: rgba(255,253,248,.97); border: 1px solid rgba(88,62,28,.1);
-        font-size: clamp(.86rem, 2.6vw, .95rem);
+      /* ── 本体(Chrome 拡張)への導線。★このページは「入口」。本体は拡張(リアルタイム記録)。 ── */
+      .cta-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+      .btn { display: inline-flex; align-items: center; gap: 6px; padding: 9px 14px; border-radius: 999px; font-size: .88rem; font-weight: 700; text-decoration: none; line-height: 1.2; border: 1px solid transparent; }
+      .btn--primary { background: linear-gradient(135deg, #f0a24a, var(--orange)); color: #fff; box-shadow: 0 6px 16px rgba(200,114,28,.28); }
+      .btn--primary:hover { filter: brightness(1.05); }
+      .btn--ghost { background: #fff; color: var(--navy-deep); border-color: var(--line); }
+      .btn--ghost:hover { border-color: var(--navy); }
+      .btn img { width: 22px; height: 22px; object-fit: contain; }
+      .cta-band {
+        display: grid; grid-template-columns: auto 1fr; gap: 12px; align-items: center; margin: 14px 0 0;
+        padding: 12px 14px; border-radius: 16px; background: linear-gradient(135deg, #fff7ec, #ffefdc);
+        border: 1px solid rgba(200,114,28,.35); box-shadow: 0 8px 20px rgba(20,55,92,.08);
       }
-      .bubble::after {
-        content: ""; position: absolute; left: -8px; top: 22px; width: 14px; height: 14px; transform: rotate(45deg);
-        background: rgba(255,253,248,.97); border-left: 1px solid rgba(88,62,28,.1); border-bottom: 1px solid rgba(88,62,28,.1);
-      }
-      .y-row.reverse .bubble::after {
-        left: auto; right: -8px; border-left: none; border-bottom: none;
-        border-right: 1px solid rgba(88,62,28,.1); border-top: 1px solid rgba(88,62,28,.1);
-      }
+      .cta-band img.face { width: 64px; height: 64px; object-fit: contain; }
+      .cta-band p { margin: 0 0 8px; font-size: .9rem; color: var(--ink); }
+      .cta-band p b { color: var(--navy-deep); }
+      .cta-band .cta-row { margin-top: 0; }
+      .ext-link { margin-left: auto; display: inline-flex; align-items: center; gap: 4px; font-size: .78rem; color: var(--navy); text-decoration: none; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--line); background: #fff; }
+      .ext-link:hover { border-color: var(--orange); color: var(--orange); }
+      .cta-foot { margin-top: 26px; text-align: center; }
+
+      /* ── 3キャラの説明: 見た目は共有 CSS。ここはこのページ固有の間隔・色・揺れだけ ── */
+      .yukkuri-thread { margin: 16px 0 6px; gap: 12px; }
       .bubble strong { color: var(--orange); }
-      @media (min-width: 760px) {
-        .speaker img { width: 84px; height: 84px; }
-        .y-row { grid-template-columns: minmax(70px, 96px) minmax(0, 1fr); }
-        .y-row.reverse { grid-template-columns: minmax(0, 1fr) minmax(70px, 96px); }
-      }
-      @keyframes yukkuriFloat { 0%,100% { transform: translateY(0) rotate(0deg); } 50% { transform: translateY(-6px) rotate(-1.4deg); } }
       .speaker img { animation: yukkuriFloat 4.4s ease-in-out infinite; }
       .y-row:nth-child(2) .speaker img { animation-delay: .6s; }
       .y-row:nth-child(3) .speaker img { animation-delay: 1.2s; }
@@ -179,6 +182,20 @@
       .stats { display: flex; flex-wrap: wrap; gap: 6px 16px; padding: 8px 14px; font-size: .82rem; color: var(--ink-sub); border-bottom: 1px solid var(--line); background: #fff; font-variant-numeric: tabular-nums; }
       .stats b { color: var(--ink); font-weight: 600; }
 
+      /* ── サムネ付きで応援した人(数値ID＋個人サムネが揃った人だけ。サイドパネルの「アイコン列」と同じ枠) ── */
+      .known { padding: 10px 14px 12px; border-bottom: 1px solid var(--line); background: linear-gradient(180deg, #fffdf9, #fff7ec); }
+      .known h3 { margin: 0 0 8px; font-size: .84rem; color: var(--navy-deep); font-weight: 700; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+      .known h3 img { width: 30px; height: 30px; object-fit: contain; }
+      .known h3 .cnt { color: var(--orange); font-variant-numeric: tabular-nums; }
+      .known h3 .hint { font-size: .72rem; font-weight: 500; color: var(--ink-sub); }
+      .tiles { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 8px; }
+      .tile { display: flex; flex-direction: column; align-items: center; width: 84px; padding: 8px 4px 6px; border-radius: 12px; background: #fff; border: 1px solid var(--line); text-decoration: none; color: var(--ink); }
+      .tile:hover { border-color: var(--orange); box-shadow: 0 4px 12px rgba(200,114,28,.16); }
+      .tava { width: 48px; height: 48px; border-radius: 50%; object-fit: cover; background: var(--bg-soft); border: 2px solid #fff; box-shadow: 0 0 0 1px var(--line); }
+      .tname { margin-top: 5px; max-width: 76px; font-size: .74rem; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      .tid { font-size: .64rem; color: var(--ink-sub); font-variant-numeric: tabular-nums; }
+      .tpt { font-size: .66rem; color: var(--orange); font-variant-numeric: tabular-nums; white-space: nowrap; }
+
       .cols { display: grid; grid-template-columns: 1fr; gap: 0; }
       @media (min-width: 720px) { .cols { grid-template-columns: 1fr 1fr; } }
       .col { padding: 10px 14px 12px; }
@@ -205,8 +222,7 @@
         ★「動いている感じ」を出す。
         ★POP(extension/popup.html の nl-story-pop)と同じ流儀にする:
           scale は 1.045 程度までの【控えめ】な値。派手にしない。
-        ★光らせるのは【実際に数字が変わった行だけ】。全体を光らせると
-          「変わっていないのに動いて見える」＝嘘になるうえ、目が疲れる。
+        ★光らせるのは【実際に数字が変わった行だけ】(判定は src/lib/liveRankingView.js の追跡器)。
       */
       @keyframes nl-live-pop {
         0% { transform: scale(1); background-color: transparent; }
@@ -214,13 +230,11 @@
         100% { transform: scale(1); background-color: transparent; }
       }
       ol.rank li.is-bumped { animation: nl-live-pop 900ms ease-out; transform-origin: left center; }
-      /* ★新しく入ってきた人は、やわらかく現れる。 */
       @keyframes nl-live-enter {
         0% { opacity: 0; transform: translateY(-4px); }
         100% { opacity: 1; transform: translateY(0); }
       }
       ol.rank li.is-new { animation: nl-live-enter 420ms ease-out; }
-      /* ★動きを減らす設定の人には出さない(既存ページと同じ配慮)。 */
       @media (prefers-reduced-motion: reduce) {
         ol.rank li.is-bumped, ol.rank li.is-new, .speaker img { animation: none; }
       }
@@ -251,13 +265,17 @@
           <h1>追憶のきらめき ランキング<small>いま支えている人 ― ニコニコ生放送</small></h1>
           <p class="lede">いまこの瞬間、配信を支えている人（ギフト・広告）を配信ごとに。配信サムネ・配信者・経過時間つき。</p>
           <p class="meta" id="meta"><img class="face" src="../../extension/images/yukkuri-charactore-english/link/link-yukkuri-blink-mouth-closed.thumb128.png" alt="">読み込み中…</p>
+          <div class="cta-row">
+            <a class="btn btn--primary" href="https://chromewebstore.google.com/detail/cjbabignmmodaickpeckiojjabnlogdb" target="_blank" rel="noopener noreferrer"><img src="../../extension/images/logo/konta-yukkuri-icon-48.png" alt="" width="22" height="22" decoding="async">Chrome 拡張を入れる（無料）</a>
+            <a class="btn btn--ghost" href="../#record-cta">本体アプリの使い方</a>
+          </div>
         </div>
       </header>
 
       <div class="yukkuri-thread" aria-label="このページの説明">
         <div class="y-row">
           <div class="speaker">
-            <img src="../../extension/images/yukkuri-charactore-english/link/link-yukkuri-smile-mouth-open.png" alt="りんく" width="84" height="84" decoding="async">
+            <img src="../../extension/images/yukkuri-charactore-english/link/link-yukkuri-smile-mouth-open.png" alt="りんく" width="92" height="92" decoding="async">
             <span>りんく</span>
           </div>
           <div class="bubble">配信している人へ。<strong>いま誰が支えてくれているか</strong>が、配信ごとに一目でわかります。サムネと経過時間も並べたので、放送中のようすがそのまま見えます。</div>
@@ -265,16 +283,27 @@
         <div class="y-row reverse">
           <div class="bubble">主役は配信者じゃなくて<strong>応援した人</strong>なのだ。ギフトと広告で支えた人が、名前つきでちゃんと並ぶ。応援は隠すものじゃなくて、表彰するものなのだ！</div>
           <div class="speaker">
-            <img src="../../extension/images/yukkuri-charactore-english/konta/kitsune-yukkuri-smile-mouth-open.png" alt="こん太" width="84" height="84" decoding="async">
+            <img src="../../extension/images/yukkuri-charactore-english/konta/kitsune-yukkuri-smile-mouth-open.png" alt="こん太" width="92" height="92" decoding="async">
             <span>こん太</span>
           </div>
         </div>
         <div class="y-row">
           <div class="speaker">
-            <img src="../../extension/images/yukkuri-charactore-english/tanunee/tanuki-yukkuri-half-eyes-mouth-open.png" alt="たぬ姉" width="84" height="84" decoding="async">
+            <img src="../../extension/images/yukkuri-charactore-english/tanunee/tanuki-yukkuri-half-eyes-mouth-open.png" alt="たぬ姉" width="92" height="92" decoding="async">
             <span>たぬ姉</span>
           </div>
           <div class="bubble">順位とポイントは<strong>ニコ生が公開している値そのまま</strong>。当サイトが足したのは「約○人（推定）」と並び順だけよ。数分おきの更新だから、「たった今」を名乗るのは鮮度表示が緑のときだけ、と覚えておいて。</div>
+        </div>
+      </div>
+
+      <div class="cta-band">
+        <img class="face" src="../../extension/images/yukkuri-charactore-english/konta/kitsune-yukkuri-smile-mouth-open.png" alt="" width="64" height="64" decoding="async">
+        <div>
+          <p>このページは<b>数分おき</b>の更新なのだ。配信中の応援を<b>その場で</b>見たいなら、本体の Chrome 拡張「君斗りんくの追憶のきらめき」！ 応援レーン・会場モード・読み上げまで、配信ページの横に全部出るのだ。</p>
+          <div class="cta-row">
+            <a class="btn btn--primary" href="https://chromewebstore.google.com/detail/cjbabignmmodaickpeckiojjabnlogdb" target="_blank" rel="noopener noreferrer">🧩 Chrome ウェブストアで入手</a>
+            <a class="btn btn--ghost" href="../#extension-guide">画面の見方を読む</a>
+          </div>
         </div>
       </div>
 
@@ -287,292 +316,24 @@
         <p>放送中の個人配信のみを対象にしています。表示は定期的に更新されます（更新が止まったときは上に警告が出ます）。</p>
       </div>
 
+      <div class="cta-band cta-foot" style="grid-template-columns: auto 1fr;">
+        <img class="face" src="../../extension/images/yukkuri-charactore-english/link/link-yukkuri-smile-mouth-open.png" alt="" width="64" height="64" decoding="async">
+        <div>
+          <p><b>配信する人へ。</b>自分の配信の「支えてくれた人」を、取りこぼしにくく手元に残すのが本体アプリです。このランキングに載る前の応援も、拡張なら配信中にそのまま記録できます。</p>
+          <div class="cta-row">
+            <a class="btn btn--primary" href="https://chromewebstore.google.com/detail/cjbabignmmodaickpeckiojjabnlogdb" target="_blank" rel="noopener noreferrer">🧩 Chrome 拡張を入れる（無料）</a>
+            <a class="btn btn--ghost" href="../">追憶のきらめきとは</a>
+          </div>
+        </div>
+      </div>
+
       <footer class="foot">
         <a href="https://kimito-link.com/" target="_blank" rel="noopener noreferrer"><img src="../../extension/images/logo/kimito-link-color.png" width="120" height="90" alt="Kimito-Link" loading="lazy" decoding="async"></a>
         <a href="../">君斗りんくの追憶のきらめき</a> ／ <a href="../articles/">技術記事</a> ／ <a href="../privacy.html">プライバシーポリシー</a>
       </footer>
     </div>
 
-    <script>
-      // ★外部依存を増やさないため素の JS で書く(このディレクトリはビルド対象外＝置くだけ)。
-      var elList = document.getElementById('list');
-      var elMeta = document.getElementById('meta');
-      var IMG_BASE = '../../extension/images/yukkuri-charactore-english/';
-      var FACE = {
-        linkBlink: IMG_BASE + 'link/link-yukkuri-blink-mouth-closed.thumb128.png',
-        linkSmile: IMG_BASE + 'link/link-yukkuri-smile-mouth-open.thumb128.png',
-        linkNormal: IMG_BASE + 'link/link-yukkuri-normal-mouth-closed.thumb128.png',
-        kontaSmile: IMG_BASE + 'konta/kitsune-yukkuri-smile-mouth-open.thumb128.png',
-        kontaHalf: IMG_BASE + 'konta/kitsune-yukkuri-half-eyes-mouth-closed.thumb128.png',
-        tanuNormal: IMG_BASE + 'tanunee/tanuki-yukkuri-normal-mouth-open.thumb128.png',
-        tanuHalf: IMG_BASE + 'tanunee/tanuki-yukkuri-half-eyes-mouth-closed.thumb128.png'
-      };
-
-      var ESC_MAP = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
-      function esc(s) {
-        return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return ESC_MAP[c]; });
-      }
-      function num(n) { return (Number(n) || 0).toLocaleString('ja-JP'); }
-
-      // ★http(s) 以外を弾く。
-      //   esc() は < > " ' を実体参照にするだけなので、javascript: で始まる文字列は
-      //   エスケープしても href として【そのまま有効】になる。
-      //   ★値の出どころはニコ生のAPIだが、外から来た値を無検証で href/src に入れない。
-      function safeHttpUrl(u) {
-        var v = String(u == null ? '' : u).trim();
-        return /^https?:\/\//i.test(v) ? v : '';
-      }
-      // ★watch URL は liveId から【こちらで組み立てる】(外から来た URL をそのまま使わない)。
-      function watchUrlOf(liveId) {
-        var id = String(liveId || '').toLowerCase();
-        return /^lv\d{6,15}$/.test(id) ? 'https://live.nicovideo.jp/watch/' + id : '';
-      }
-
-      // ── 時刻(JST 固定。見る人がどこに居ても配信の時計で揃える) ──
-      function jstClock(sec) {
-        var t = Number(sec) || 0;
-        if (!t) return '';
-        try {
-          return new Date(t * 1000).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Tokyo' });
-        } catch (e) { return ''; }
-      }
-      function elapsedText(beginSec, nowMs) {
-        var b = Number(beginSec) || 0;
-        if (!b) return '';
-        var m = Math.floor((nowMs / 1000 - b) / 60);
-        if (m < 0) return '';
-        var h = Math.floor(m / 60);
-        return h > 0 ? h + '時間' + (m % 60) + '分' : m + '分';
-      }
-
-      // ★行の形は koken(rankers) と nicoad(ranking) で違う。ここで1つに揃える。
-      function rowsFromGift(g) {
-        var a = (g && Array.isArray(g.rankers)) ? g.rankers : [];
-        return a.map(function (r) {
-          return { rank: r.rank, name: r.supporterName, point: r.contribution, avatar: r.supporterThumbnailUrl, url: r.userPageUrl };
-        });
-      }
-      function rowsFromAd(d) {
-        var a = (d && Array.isArray(d.ranking)) ? d.ranking : [];
-        return a.map(function (r) {
-          return { rank: r.rank, name: r.advertiserName, point: r.totalContribution, avatar: r.thumbnailUrl, url: r.userPageUrl };
-        });
-      }
-
-      // ★ニコ生は「アイコン未設定」に defaults/blank.jpg を返すが、これは実際には読めない
-      //   (実測: 63枚中4枚が失敗し、全部これだった)。最初から素の丸(span)にする。
-      function isBlankIcon(src) { return /\/defaults\/blank\.jpg(\?|$)/.test(src); }
-
-      function renderRows(rows, unit, liveId, kind) {
-        if (!rows.length) {
-          return '<p class="empty"><img src="' + esc(kind === 'gift' ? FACE.kontaHalf : FACE.tanuHalf) + '" alt="" loading="lazy" decoding="async">まだいません</p>';
-        }
-        var html = rows.map(function (r) {
-          var n = Number(r.rank) || 0;
-          var cls = rowChange(rowKey(liveId, kind, r), Number(r.point) || 0);
-          var href = safeHttpUrl(r.url);
-          var nameHtml = href
-            ? '<a href="' + esc(href) + '" target="_blank" rel="noopener noreferrer">' + esc(r.name) + '</a>'
-            : esc(r.name);
-          // ★inline onerror は使わない: このリポの既存ページに1件も無く(実測0件)、
-          //   CSP を足したときに黙って壊れる。読み込み失敗の面倒は下の bindImgFallback が見る。
-          var avatarSrc = safeHttpUrl(r.avatar);
-          var ava = (avatarSrc && !isBlankIcon(avatarSrc))
-            ? '<img class="ava" src="' + esc(avatarSrc) + '" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer">'
-            : '<span class="ava"></span>';
-          return '<li' + (cls ? ' class="' + cls + '"' : '') + '><span class="no' + (n > 0 && n <= 3 ? ' top' : '') + '">' + (n || '-') + '</span>'
-            + ava + '<span class="nm">' + nameHtml + '</span>'
-            + '<span class="pt">' + num(r.point) + unit + '</span></li>';
-        }).join('');
-        return '<ol class="rank">' + html + '</ol>';
-      }
-
-      // ★読み込みに失敗した画像を代替へ落とす(壊れた画像アイコンを出さない)。
-      //   応援者アイコン → 素の丸 / 配信者アイコン → りんくの顔 / 配信サムネ → キャラの幕。
-      function bindImgFallback(root) {
-        var imgs = root.querySelectorAll('img.ava, img.sicon, .shot img.shotimg');
-        for (var i = 0; i < imgs.length; i++) {
-          imgs[i].addEventListener('error', function () {
-            var el = this;
-            if (!el.parentNode) return;
-            if (el.classList.contains('ava')) {
-              var span = document.createElement('span'); span.className = 'ava';
-              el.parentNode.replaceChild(span, el);
-            } else if (el.classList.contains('sicon')) {
-              el.src = FACE.linkNormal;
-            } else {
-              var box = document.createElement('span'); box.className = 'noimg';
-              box.innerHTML = '<img src="' + esc(FACE.linkBlink) + '" alt="">';
-              el.parentNode.replaceChild(box, el);
-            }
-          }, { once: true });
-        }
-      }
-
-      // ★収集が古くなったことを画面で言う。
-      //   しきい値30分の根拠(★数字を発明しない): 収集は GitHub Actions の cron で
-      //   5分間隔に設定しているが、GitHub は負荷分散で実行を遅らせる仕様。
-      //   ★実測(2026-09-05)では 8〜13分間隔で動いていた。その2倍以上を「異常」とする。
-      var STALE_MIN = 30;
-      function freshness(capturedAt) {
-        var t = Number(capturedAt) || 0;
-        if (!t) return { text: '', stale: false };
-        var min = Math.floor((Date.now() - t) / 60000);
-        if (min < 0) return { text: '', stale: false };            // ★時計ずれ。嘘を書くより何も言わない
-        if (min >= STALE_MIN) return { text: '⚠ ' + min + '分前の情報です（更新が止まっている可能性があります）', stale: true };
-        if (min < 1) return { text: 'たった今 更新', stale: false };
-        return { text: min + '分前 更新', stale: false };
-      }
-
-      // ★並び順: 推定同時視聴が多い順。
-      //   ★ニコ生には【同時視聴数の API が無い】(src/lib/concurrentEstimate.js が実測の末に明記)。
-      //   ★式は発明しない。concurrentEstimate.js の Signal B(滞留率法)と同じものを使う:
-      //     rate = max(0.08, 0.48 × exp(-0.005 × 経過分)) / 推定同時視聴 = 累計来場者 × rate
-      //   ★値も同ファイルの retention 定義(peak .48 / decay .005 / floor .08 / fallback .4)と同一。
-      var RETENTION = { peak: 0.48, decay: 0.005, floor: 0.08, fallback: 0.4 };
-      function retentionRate(ageMin) {
-        if (typeof ageMin !== 'number' || !isFinite(ageMin) || ageMin < 0) return RETENTION.fallback;
-        return Math.max(RETENTION.floor, RETENTION.peak * Math.exp(-RETENTION.decay * ageMin));
-      }
-      function estimateConcurrent(l) {
-        var visitors = Number(l && l.watchCount) || 0;
-        if (!visitors) return 0;
-        var begin = Number(l && l.beginTime) || 0;
-        var ageMin = begin ? (Date.now() / 1000 - begin) / 60 : NaN;
-        return Math.round(visitors * retentionRate(ageMin));
-      }
-
-      // ★前回の値を覚えて「何が変わったか」を出す。
-      //   ★変わっていない行は光らせない。全部光らせると「動いて見える」だけの嘘になる。
-      var _prevPoints = {};
-      var _seenKeys = {};
-      var _firstPaint = true;
-      var _touched = null;   // ★今回の描画で使ったキーだけ。描画の最後に古い記録を捨てる(青天井を防ぐ)。
-
-      function rowKey(liveId, kind, r) { return liveId + '|' + kind + '|' + String(r.name || ''); }
-      /** その行が今回どう変わったか。'' / 'is-new' / 'is-bumped' */
-      function rowChange(key, point) {
-        var prev = _prevPoints[key];
-        _prevPoints[key] = point;
-        if (_touched) _touched[key] = point;
-        if (_firstPaint) { _seenKeys[key] = true; return ''; }
-        if (!_seenKeys[key]) { _seenKeys[key] = true; return 'is-new'; }
-        return (prev !== undefined && point > prev) ? 'is-bumped' : '';
-      }
-
-      // ── 配信カードの頭(順位・サムネ・配信者・時間・URL) ──
-      function renderHead(l, rankNo, capturedAt, nowMs) {
-        var wurl = watchUrlOf(l.liveId);
-        var th = (l.thumbnail && typeof l.thumbnail === 'object') ? l.thumbnail : {};
-        // ★サムネはニコ生が定期的に差し替える画像。収集時刻を付けてキャッシュを割る
-        //   (同じ URL のままだとブラウザが古い絵を出し続ける)。
-        var shotSrc = safeHttpUrl(th.small || th.middle || th.large || th.micro);
-        var shotImg = shotSrc
-          ? '<img class="shotimg" src="' + esc(shotSrc + (shotSrc.indexOf('?') >= 0 ? '&' : '?') + 't=' + (Number(capturedAt) || 0)) + '" width="352" height="198" alt="配信画面のサムネイル" loading="lazy" decoding="async" referrerpolicy="no-referrer">'
-          : '<span class="noimg"><img src="' + esc(FACE.linkBlink) + '" alt=""></span>';
-        var rankCls = rankNo <= 3 ? ' r' + rankNo : '';
-        var shot = '<a class="shot" href="' + esc(wurl) + '" target="_blank" rel="noopener noreferrer" aria-label="配信ページを開く（新しいタブ）">'
-          + shotImg + '<span class="rankno' + rankCls + '">' + rankNo + '</span><span class="onair">LIVE</span></a>';
-
-        var s = (l.streamer && typeof l.streamer === 'object') ? l.streamer : {};
-        var sIcon = safeHttpUrl(s.icon50 || s.icon150);
-        var sPage = safeHttpUrl(s.pageUrl);
-        var sName = String(s.name || '').trim() || '配信者';
-        var iconHtml = (sIcon && !isBlankIcon(sIcon))
-          ? '<img class="sicon" src="' + esc(sIcon) + '" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer">'
-          : '<img class="sicon" src="' + esc(FACE.linkNormal) + '" alt="">';
-        var nameHtml = sPage
-          ? '<a class="sname" href="' + esc(sPage) + '" target="_blank" rel="noopener noreferrer">' + esc(sName) + '</a>'
-          : '<span class="sname">' + esc(sName) + '</span>';
-
-        var begin = jstClock(l.beginTime);
-        var end = jstClock(l.endTime);
-        var elapsed = elapsedText(l.beginTime, nowMs);
-        var times = '<div class="times">'
-          + (begin ? '<span>▶ ' + esc(begin) + ' 開始</span>' : '')
-          + (elapsed ? '<span>経過 <b>' + esc(elapsed) + '</b></span>' : '')
-          + (end ? '<span>〜' + esc(end) + ' 予定</span>' : '')
-          + '</div>';
-        var urlHtml = wurl ? '<a class="url" href="' + esc(wurl) + '" target="_blank" rel="noopener noreferrer">' + esc(wurl.replace(/^https?:\/\//, '')) + '</a>' : '';
-
-        var now = estimateConcurrent(l);
-        var nowHtml = '<div class="now"><b>' + (now ? '約' + num(now) + '人' : '—') + '</b><span>推定同時視聴</span></div>';
-
-        return '<div class="live__head">' + shot
-          + '<div class="live__info"><div class="streamer">' + iconHtml + nameHtml + '</div>'
-          + '<h2><a href="' + esc(wurl) + '" target="_blank" rel="noopener noreferrer">' + esc(l.title || l.liveId) + '</a></h2>'
-          + times + urlHtml + '</div>' + nowHtml + '</div>';
-      }
-
-      function render(data) {
-        _touched = Object.create(null);
-        var lives = (data && Array.isArray(data.lives)) ? data.lives : [];
-        if (!lives.length) {
-          elMeta.innerHTML = '<img class="face" src="' + esc(FACE.tanuHalf) + '" alt="">いま表示できる配信がありません。';
-          elList.innerHTML = '';
-          return;
-        }
-        var nowMs = Date.now();
-        var f = freshness(data.capturedAt);
-        // ★「何分前か」を出す。収集が止まったとき古い値が黙って表示され続けないように、しきい値超えは明示する。
-        elMeta.innerHTML = '<img class="face" src="' + esc(f.stale ? FACE.tanuNormal : FACE.kontaSmile) + '" alt="">'
-          + '放送中 <b>' + lives.length + '</b> 配信'
-          + (f.text ? '・<span' + (f.stale ? ' class="stale"' : '') + '>' + esc(f.text) + '</span>' : '');
-
-        // ★賑わっている順に並べ替える(元の配列は壊さない)。
-        var sorted = lives.slice().sort(function (a, b) { return estimateConcurrent(b) - estimateConcurrent(a); });
-
-        elList.innerHTML = sorted.map(function (l, i) {
-          var gift = rowsFromGift(l.gift);
-          var ad = rowsFromAd(l.ad);
-          return '<section class="live">'
-            + renderHead(l, i + 1, data.capturedAt, nowMs)
-            + '<div class="stats">'
-            + '<span>👥 来場 <b>' + num(l.watchCount) + '</b></span>'
-            + '<span>💬 コメント <b>' + num(l.commentCount) + '</b></span>'
-            + '<span>🎁 ギフト <b>' + num(l.giftTotal) + 'pt</b></span>'
-            + '<span>📣 広告 <b>' + num(l.adTotal) + 'pt</b></span>'
-            + '</div>'
-            + '<div class="cols">'
-            + '<div class="col"><h3><img src="' + esc(FACE.kontaSmile) + '" alt="" loading="lazy" decoding="async">ギフトで支えた人 <span class="sum">' + num(l.giftTotal) + 'pt</span></h3>'
-            + renderRows(gift, 'pt', l.liveId, 'gift') + '</div>'
-            + '<div class="col"><h3><img src="' + esc(FACE.tanuNormal) + '" alt="" loading="lazy" decoding="async">広告で支えた人 <span class="sum">' + num(l.adTotal) + 'pt</span></h3>'
-            + renderRows(ad, 'pt', l.liveId, 'ad') + '</div>'
-            + '</div></section>';
-        }).join('');
-        bindImgFallback(elList);
-        // ★今回出なかった行の記録を捨てる(青天井を防ぐ)。_seenKeys も同じ集合に揃える。
-        _prevPoints = _touched;
-        _seenKeys = Object.create(null);
-        for (var k in _touched) _seenKeys[k] = true;
-        _touched = null;
-        _firstPaint = false;
-      }
-
-      function showState(msg) {
-        elMeta.innerHTML = '<img class="face" src="' + esc(FACE.tanuHalf) + '" alt="">' + esc(msg);
-        if (!elList.children.length) {
-          elList.innerHTML = '<div class="state"><img src="' + esc(FACE.linkBlink) + '" alt="">' + esc(msg) + '</div>';
-        }
-      }
-
-      function load() {
-        fetch('/api/live-ranking', { cache: 'no-store' })
-          .then(function (r) {
-            if (r.status === 404) throw new Error('まだ集計されていません。しばらくお待ちください。');
-            if (!r.ok) throw new Error('読み込みに失敗しました (' + r.status + ')');
-            return r.json();
-          })
-          .then(render)
-          .catch(function (e) { showState(String(e && e.message ? e.message : e)); });
-      }
-      load();
-      // ★見ていないときは止める(無駄に叩かない)。
-      setInterval(function () { if (!document.hidden) load(); }, 60000);
-      // ★裏タブの間は上の更新が止まるので、戻ってきた瞬間に取り直す。
-      document.addEventListener('visibilitychange', function () {
-        if (!document.hidden) load();
-      });
-    </script>
+    <!-- ★描画は共有部品を束ねたバンドル(src/extension/live-ranking-entry.js → app/dist/live-ranking.js)。このページに JS は書かない。 -->
+    <script src="../../app/dist/live-ranking.js" defer></script>
   </body>
 </html>

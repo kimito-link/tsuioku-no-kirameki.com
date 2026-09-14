@@ -29,6 +29,7 @@ graph LR
   n_comeview --> n_src_lib_commentTailBuffer_js["lib/commentTailBuffer.js"]:::shared
   n_comeview --> n_src_lib_deriveAvatarUrlFromUid_js["lib/deriveAvatarUrlFromUid.js"]:::shared
   n_comeview --> n_src_lib_giftDisplayNickname_js["lib/giftDisplayNickname.js"]:::shared
+  n_comeview --> n_src_lib_htmlText_js["lib/htmlText.js"]:::shared
   n_comeview --> n_src_lib_nicoAnonymousDisplay_js["lib/nicoAnonymousDisplay.js"]:::shared
   n_comeview --> n_src_lib_nicoUserPage_js["lib/nicoUserPage.js"]:::shared
   n_comeview --> n_src_lib_storageKeys_js["lib/storageKeys.js"]:::shared
@@ -52,8 +53,7 @@ graph LR
   n_comeview --> n_src_lib_voiceSynthFailure_js["lib/voiceSynthFailure.js"]:::shared
   n_comeview --> n_src_lib_voiceSynthFailureReason_js["lib/voiceSynthFailureReason.js"]:::shared
   n_comeview --> n_src_lib_voicevoxClient_js["lib/voicevoxClient.js"]:::shared
-  n_comeview --> n_src_shared_avatar_avatarUrlGuard_js["shared/avatar/avatarUrlGuard.js"]:::shared
   classDef shared fill:#eee,stroke:#999,color:#666;
 ```
 
-> ほか 1 ファイル省略（全件は storage-bus.md / metafile 参照）。
+> ほか 2 ファイル省略（全件は storage-bus.md / metafile 参照）。

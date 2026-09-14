@@ -198,6 +198,15 @@ const targets = [
     target: 'es2020',
     format: 'esm',
     define: popupDefine
+  },
+  {
+    // 2026-09-14 /live/「追憶のきらめき ランキング」(tsuioku-no-kirameki/live/index.html)。
+    //   純Web(拡張非依存)。ページ内 inline JS をやめ、src/lib の共有部品(htmlText / liveRankingView /
+    //   koken・nicoad の正規化 / concurrentEstimate)を import する形にした(コンポーネント化)。
+    //   app/ は vercel.json の rewrite 対象外なので主ドメインからも /app/dist/live-ranking.js で読める。
+    entryPoints: ['src/extension/live-ranking-entry.js'],
+    outfile: 'app/dist/live-ranking.js',
+    target: 'es2020'
   }
 ];
 

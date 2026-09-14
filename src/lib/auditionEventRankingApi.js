@@ -1,3 +1,4 @@
+import { safeHttpUrl as sanitizeHttpUrl } from './htmlText.js';
 /**
  * audition 公式「イベント💎ランキング」無認証 JSON API の URL 組立 & 正規化（純関数）。
  *
@@ -119,16 +120,6 @@ export function buildAuditionRankingsUrl(auditionKey, options = {}) {
 function numOrNull(v) {
   const n = Number(v);
   return Number.isFinite(n) && n >= 0 ? n : null;
-}
-
-/**
- * http(s) URL だけ通す。それ以外は空に倒す。
- * @param {unknown} value
- * @returns {string}
- */
-function sanitizeHttpUrl(value) {
-  const s = String(value == null ? '' : value).trim();
-  return /^https?:\/\//i.test(s) ? s : '';
 }
 
 /**

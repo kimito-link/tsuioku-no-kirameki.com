@@ -1,3 +1,4 @@
+import { safeHttpUrl } from './htmlText.js';
 /**
  * イベントランキングの「レポート用 正規化モデル」純関数（Phase A・2026-05-26 会議）。
  *
@@ -39,16 +40,6 @@ export const EVENT_RANKING_REPORT_MAX_ROWS = 10;
 
 /** これより古い取得はレポートで「古い」と注記する目安（10 分）。 */
 export const EVENT_RANKING_REPORT_STALE_MS = 10 * 60 * 1000;
-
-/**
- * http/https の URL だけ通す（それ以外＝data:/javascript: 等は空に倒す）。
- * @param {unknown} v
- * @returns {string}
- */
-function safeHttpUrl(v) {
-  const s = String(v == null ? '' : v).trim();
-  return /^https?:\/\//i.test(s) ? s : '';
-}
 
 /**
  * @param {unknown} v

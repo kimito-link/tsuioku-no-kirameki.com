@@ -12,6 +12,7 @@ import { formatRelativeTimeJa } from './supportActivityTimeline.js';
 import { anonymousIdenticonDataUrl } from './anonymousIdenticon.js';
 import { isGenericComeviewName } from './comeviewRows.js';
 import { comeviewAnonLabel } from './comeviewUserNotes.js';
+import { escapeHtml } from './htmlText.js';
 
 /**
  * v0.1.671: タイムラインの表示名。コメビュと同じルールに統一する
@@ -48,16 +49,6 @@ function resolveTimelineAvatar(item, defaultAvatar) {
     if (identicon) return { src: identicon, upgradeUserKey: id };
   }
   return { src: defaultAvatar, upgradeUserKey: '' };
-}
-
-/** @param {unknown} s */
-function escapeHtml(s) {
-  return String(s == null ? '' : s)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
 }
 
 /** @param {unknown} s */

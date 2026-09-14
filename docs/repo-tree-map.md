@@ -69,9 +69,10 @@ graph LR
   d14 --> d14_0["mcp-nicolive/ 〔MCP/診断〕"]
   ROOT --> d15["tsuioku-no-kirameki/ 〔LP/公開〕"]
   d15 --> d15_0["articles/ 〔記事/公開〕"]
-  d15 --> d15_1["images/ 〔画像〕"]
-  d15 --> d15_2["live/"]
-  d15 --> d15_3["sound/ 〔音声/公開〕"]
+  d15 --> d15_1["assets/ 〔LP/共有〕"]
+  d15 --> d15_2["images/ 〔画像〕"]
+  d15 --> d15_3["live/ 〔LP/公開/ランキング〕"]
+  d15 --> d15_4["sound/ 〔音声/公開〕"]
 ```
 
 ### 機能逆引き（機能 → 担当ファイル）
@@ -209,9 +210,9 @@ graph LR
 <sub>ファイル 2 件</sub>
 
 ## `app/` — Web 版状態ページのアプリ(app.js + dist)  〔Web版〕
-<sub>ファイル 99 件</sub>
+<sub>ファイル 100 件</sub>
 
-- `dist/`（2 件） — Web 版アプリのビルド成果物  〔ビルド成果物〕
+- `dist/`（3 件） — Web 版アプリのビルド成果物  〔ビルド成果物〕
 - `images/`（93 件） — 純Web版 応援ライブビューの同梱画像(ゆっくり顔)  〔Web版 / 画像〕
 
 ## `council/` — 会議(COUNCIL)の問い・回答・統合(SYNTHESIS)。設計判断の根拠  〔会議 / 設計〕
@@ -225,12 +226,12 @@ graph LR
 - `briefs/`（17 件） — ⚠️ 未記入（ROLES に追記）
 
 ## `docs/` — 設計正本・マインドマップ・フロー図・feature-map(AI/人間向け)  〔設計 / レポート〕
-<sub>ファイル 312 件</sub>
+<sub>ファイル 314 件</sub>
 
 - `article-assets/`（87 件） — 記事用の画像・動画・音声アセット  〔記事 / 画像〕
 - `article-drafts/`（2 件） — ⚠️ 未記入（ROLES に追記）
-- `feature-map/`（14 件） — 機能ごと依存図(自動生成)。誰が storage を書き/読むか  〔依存図 / 自動生成〕
-- `handoff/`（143 件） — セッション引継ぎ・調査設計の記録(HANDOFF-*/MAP/SPEC/DESIGN)。ルート直下に散らかっていたものを 2026-07-31 に集約  〔引継ぎ / 設計〕
+- `feature-map/`（15 件） — 機能ごと依存図(自動生成)。誰が storage を書き/読むか  〔依存図 / 自動生成〕
+- `handoff/`（144 件） — セッション引継ぎ・調査設計の記録(HANDOFF-*/MAP/SPEC/DESIGN)。ルート直下に散らかっていたものを 2026-07-31 に集約  〔引継ぎ / 設計〕
 - `patent-unique-voice-reading-filing-final/`（1 件） — ⚠️ 未記入（ROLES に追記）
 - `policies/`（1 件） — 運用方針メモ(統計の失敗モード等)  〔方針〕
 - `releases/`（5 件） — リリース関連メモ(CWS 公開 API 設定・版ごとの記事下書き)  〔リリース〕
@@ -264,14 +265,14 @@ graph LR
 - `soundeffect-lab/`（19 件） — ⚠️ 未記入（ROLES に追記）
 
 ## `src/` — LP 側 + 純粋関数ライブラリの源  〔ソース〕
-<sub>ファイル 1830 件</sub>
+<sub>ファイル 1835 件</sub>
 
 - `data/`（7 件） — 保存コメントからレーン候補を読む acquirer / source 層  〔コメント / 取得〕
 - `domain/`（20 件） — ドメイン正本(応援レーンの集約・列ポリシー等。識別子判定など)  〔応援 / 集約 / 識別子〕
-- `extension/`（46 件） — バンドル entry(content/popup/venue/status/offscreen/backfill-sw 等=機能境界)  〔entry / 記録 / 会場 / 応援〕
+- `extension/`（47 件） — バンドル entry(content/popup/venue/status/offscreen/backfill-sw 等=機能境界)  〔entry / 記録 / 会場 / 応援〕
 - `fixtures/`（1 件） — テスト用フィクスチャ  〔テスト〕
 - `images/`（134 件） — LP / CWS 提出物のマスター画像  〔画像〕
-- `lib/`（1612 件） — 純粋関数ライブラリ(unit test 対象)。色・速度・コメント・レポート等の計算ロジックの大半  〔色 / 速度 / コメント / レポート / 純粋関数〕
+- `lib/`（1616 件） — 純粋関数ライブラリ(unit test 対象)。色・速度・コメント・レポート等の計算ロジックの大半  〔色 / 速度 / コメント / レポート / 純粋関数〕
 - `shared/`（7 件） — 複数機能で共有する小部品(アバター URL ガード等)  〔共有 / アバター〕
 - `sound/`（1 件） — 音声素材(src 側)  〔音声〕
 
@@ -288,11 +289,12 @@ graph LR
 - `mcp-nicolive/`（3 件） — ニコ生状態を読む MCP サーバ(司令塔の状態取得用)  〔MCP / 診断〕
 
 ## `tsuioku-no-kirameki/` — 本番 LP の配信ディレクトリ(Cloudflare Pages へ deploy)  〔LP / 公開〕
-<sub>ファイル 41 件</sub>
+<sub>ファイル 42 件</sub>
 
 - `articles/`（14 件） — 技術記事(防御的公開)。手法を再利用可能な形で解説  〔記事 / 公開〕
+- `assets/`（1 件） — 公開ページ群が共有する静的資産の置き場(2026-09-14)  〔LP / 共有〕
 - `images/`（17 件） — LP 用の favicon・OG 画像等  〔画像〕
-- `live/`（1 件） — ⚠️ 未記入（ROLES に追記）
+- `live/`（1 件） — /live/ 追憶のきらめき ランキング(描画は app/dist/live-ranking.js・収集は api/live-ranking.js)  〔LP / 公開 / ランキング〕
 - `sound/`（1 件） — LP 公開用の音声素材(エール音等)  〔音声 / 公開〕
 
 ---
@@ -526,7 +528,7 @@ esbuild の import 到達グラフを逆引きし「このファイルを変え�
 
 ---
 
-## ⚠️ 役割が未記入のディレクトリ（16）
+## ⚠️ 役割が未記入のディレクトリ（15）
 
 以下は `ROLES` 辞書に説明が無い。`scripts/repo-tree-map.mjs` の `ROLES` に1行足してから再生成すること。
 
@@ -545,4 +547,3 @@ esbuild の import 到達グラフを逆引きし「このファイルを変え�
 - `sound-src/`
 - `sound-src/soundeffect-lab/`
 - `tests/helpers/`
-- `tsuioku-no-kirameki/live/`

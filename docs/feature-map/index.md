@@ -14,6 +14,7 @@
 - [バックフィル SW](backfill-sw.md) — `src/extension/backfill-sw-entry.js`
 - [ページ傍受](page-intercept.md) — `src/extension/page-intercept-entry.js`
 - [Web版 状態(スマホ)](web-status.md) — `app/app.js`
+- [Web版 追憶のきらめき ランキング(/live/)](live-ranking.md) — `src/extension/live-ranking-entry.js`
 
 ## データの流れ・影響範囲
 
