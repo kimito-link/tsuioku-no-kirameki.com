@@ -33,11 +33,12 @@ graph LR
   d7 --> d7_1["article-drafts/"]
   d7 --> d7_2["feature-map/ 〔依存図/自動生成〕"]
   d7 --> d7_3["handoff/ 〔引継ぎ/設計〕"]
-  d7 --> d7_4["patent-unique-voice-reading-filing-final/"]
-  d7 --> d7_5["policies/ 〔方針〕"]
-  d7 --> d7_6["releases/ 〔リリース〕"]
-  d7 --> d7_7["research/ 〔調査/レポート〕"]
-  d7 --> d7_8["workflows/ 〔ワークフロー〕"]
+  d7 --> d7_4["marketing/ 〔マーケ/原稿〕"]
+  d7 --> d7_5["patent-unique-voice-reading-filing-final/"]
+  d7 --> d7_6["policies/ 〔方針〕"]
+  d7 --> d7_7["releases/ 〔リリース〕"]
+  d7 --> d7_8["research/ 〔調査/レポート〕"]
+  d7 --> d7_9["workflows/ 〔ワークフロー〕"]
   ROOT --> d8["extension/ 〔配布/manifest〕"]
   d8 --> d8_0["data/"]
   d8 --> d8_1["dist/ 〔ビルド成果物〕"]
@@ -226,12 +227,13 @@ graph LR
 - `briefs/`（17 件） — ⚠️ 未記入（ROLES に追記）
 
 ## `docs/` — 設計正本・マインドマップ・フロー図・feature-map(AI/人間向け)  〔設計 / レポート〕
-<sub>ファイル 315 件</sub>
+<sub>ファイル 316 件</sub>
 
 - `article-assets/`（87 件） — 記事用の画像・動画・音声アセット  〔記事 / 画像〕
 - `article-drafts/`（2 件） — ⚠️ 未記入（ROLES に追記）
 - `feature-map/`（15 件） — 機能ごと依存図(自動生成)。誰が storage を書き/読むか  〔依存図 / 自動生成〕
 - `handoff/`（145 件） — セッション引継ぎ・調査設計の記録(HANDOFF-*/MAP/SPEC/DESIGN)。ルート直下に散らかっていたものを 2026-07-31 に集約  〔引継ぎ / 設計〕
+- `marketing/`（1 件） — 発信用の原稿(X 記事・告知文)。★数字は出典なしで書かない  〔マーケ / 原稿〕
 - `patent-unique-voice-reading-filing-final/`（1 件） — ⚠️ 未記入（ROLES に追記）
 - `policies/`（1 件） — 運用方針メモ(統計の失敗モード等)  〔方針〕
 - `releases/`（5 件） — リリース関連メモ(CWS 公開 API 設定・版ごとの記事下書き)  〔リリース〕
