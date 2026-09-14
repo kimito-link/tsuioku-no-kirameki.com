@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 6 / 860 件
+## ⚠️ 役割コメントが無いソース 6 / 862 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `src/lib/laneDomSelfMeasure.js`
@@ -673,7 +673,7 @@
   - `status-guard.js` — 状態速報ページ(status.html)の「何があっても開く」保険。
   - `status.html`
   - `venue.html`
-- 📁 **scripts/** (66)
+- 📁 **scripts/** (67)
   - 📁 **__pycache__/** (1)
     - `stage-submission.cpython-311.pyc`
   - 📁 **lib/** (1)
@@ -720,6 +720,7 @@
   - `install-local-sounds.test.js`
   - `layer-config.mjs` — ★どのリポでも使えるように「設定」を読む部分だけを切り出す。
   - `layer-map-html.mjs` — ★`src/lib` の構成を【HTMLで見える】ようにする。
+  - `live-comment-tally.mjs` — `/live/` の 3 枠目「💬 コメントで応援した人」を集める I/O 係。
   - `measure-flash-frames.mjs` — 「一瞬の黒」を【画面に出たピクセル】で測る。
   - `measure-flash-frames.test.js`
   - `meeting-roles.mjs` — meeting.mjs の役割注入版。
@@ -768,7 +769,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (1839)
+- 📁 **src/** (1841)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1034,7 +1035,7 @@
         - `logo_funlink_white_RGB_link_black.png`
         - `logo_funlink_white_RGB_maru_black.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1620)
+  - 📁 **lib/** (1622)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -1770,6 +1771,8 @@
     - `liveAudienceDom.test.js`
     - `liveChannelSwitch.js` — 「別の配信へ移動(SPA遷移)するとパネルが壊れる」問題の修正(2026-07-06)。
     - `liveChannelSwitch.test.js`
+    - `liveCommentTally.js` — 「コメントで応援した人」の件数だけを数える純関数(2026-09-14)。
+    - `liveCommentTally.test.js`
     - `liveCommenterStats.js` — 記録済みコメントから「ユニーク投稿者（推定）」用の集計（純関数）
     - `liveCommenterStats.test.js`
     - `liveEndedFlag.js` — 配信終了フラグ。

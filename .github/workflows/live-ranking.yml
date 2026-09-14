@@ -69,3 +69,31 @@ jobs:
             echo "::error::200 が返りましたが保存されていません（応答本文を確認してください）"
             exit 1
           fi
+
+  # ★3枠目「コメントで応援した人」の集計（2026-09-14 追加）。
+  #   refresh が保存した一覧を読んでから走るので needs: refresh。
+  #   ★ギフト/広告と違い、これは【当サイトが数える】ので実際にコメントを遡って読む。
+  #     1 run 150 秒の締め切りを script 側が持っており、当たってもその時点の結果を保存する。
+  #   ★node-version: "22" は必須。視聴セッションの握手に global WebSocket を使う（Node 22 から）。
+  #   ★npm ci は不要（このスクリプトの import 木は npm 依存ゼロ＝Node 標準だけで動く）。
+  tally:
+    needs: refresh
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: コメント件数を集計して投入
+        env:
+          STATUS_INGEST_KEY: ${{ secrets.STATUS_INGEST_KEY }}
+        run: |
+          # ★鍵が未登録なら「黙って成功」させない（refresh と同じ掟）。
+          if [ -z "$STATUS_INGEST_KEY" ]; then
+            echo "::error::secrets.STATUS_INGEST_KEY が未登録です。リポジトリの Settings > Secrets で登録してください。"
+            exit 1
+          fi
+          node scripts/live-comment-tally.mjs

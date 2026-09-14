@@ -180,9 +180,8 @@
 
 - **応援レーン集約(誰が候補か)** — 保存コメント行を userId 単位に畳み込みレーン候補を作る唯一の集約正本(popup/venue 共通)
   - `src/lib/userLaneCandidatesFromStorage.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 99</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 98</summary>
 
-- `api/live-ranking.js` — /live/ 用「支えた人ランキング」の収集・配信 Vercel Serverless Function。
 - `src/domain/lane/aggregate.js` — 応援ユーザーレーンの per-row → per-user 集約（純関数）。
 - `src/domain/observations/observationStore.js` — observationStore - StatObservation のメモリ常駐リングバッファ。
 - `src/domain/user/identity.js` — ニコ生ユーザー ID の「匿名性」判定と関連アイデンティティ・ユーティリティ。
@@ -810,6 +809,13 @@
   - `src/extension/live-ranking-entry.js`
   - `tsuioku-no-kirameki/live/index.html`
   - `tools/gen-og-live-ranking.py`
+- **ランキング(/live/)のコメント件数集計** — 3枠目「コメントで応援した人」。GitHub Actions(live-ranking.yml の tally ジョブ)が watch HTML→視聴セッション握手→NDGR を crawlNdgrBackward で遡り、ndgrChatsToMergeRows→createCommentTally で【件数だけ】数えて POST(?ingest=comments)。本文・時刻は保存しない。匿名(184)も件数順にそのまま(匿名NNN＋identicon)。GET 側は attachComments が lives[i].comment に合流(v0.1.1511)
+  - `src/lib/liveCommentTally.js`
+  - `scripts/live-comment-tally.mjs`
+  - `api/live-ranking.js`
+  - `src/lib/liveRankingView.js`
+  - `src/extension/live-ranking-entry.js`
+  - `.github/workflows/live-ranking.yml`
 <details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 207</summary>
 
 - `app/app.js` — スマホ閲覧用 status Web 版。
@@ -1026,12 +1032,16 @@
 
 > changelog 全 20 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
 
+### 💾 記録件数 (1版)
+- `v0.1.1511` 2026-09-14 — コメントで応援した人の枠を足しました
+
 ### 📥 コメント取得 (3版)
 - `v0.1.1501` 2026-09-03 — コメビュのちらつきを直しました
 - `v0.1.1499` 2026-08-31 — 診断ページでポップアップを見られます
 - `v0.1.1492` 2026-08-29 — 会場で「この人が今どうしているか」が出ます
 
-### 🙂 匿名(184) (3版)
+### 🙂 匿名(184) (4版)
+- `v0.1.1511` 2026-09-14 — コメントで応援した人の枠を足しました
 - `v0.1.1496` 2026-08-30 — 応援レーンのお顔を少し大きくしました
 - `v0.1.1495` 2026-08-30 — 発言を読んだあと、その人へ行けます
 - `v0.1.1492` 2026-08-29 — 会場で「この人が今どうしているか」が出ます
@@ -1044,7 +1054,8 @@
 - `v0.1.1493` 2026-08-29 — 出ないときに理由を自分で言えるようにしました
 - `v0.1.1492` 2026-08-29 — 会場で「この人が今どうしているか」が出ます
 
-### 🎁 ギフト (1版)
+### 🎁 ギフト (2版)
+- `v0.1.1511` 2026-09-14 — コメントで応援した人の枠を足しました
 - `v0.1.1492` 2026-08-29 — 会場で「この人が今どうしているか」が出ます
 
 ### 🔊 読み上げ (1版)
@@ -1072,8 +1083,7 @@
 - `v0.1.1500` 2026-09-02 — 診断ページで会場も見られます
 - `v0.1.1498` 2026-08-31 — 間違った警告を出していたのをやめました
 
-### その他 (4版)
+### その他 (3版)
 - `v0.1.1510` 2026-09-14 — ランキングを X でシェアできるようにしました
 - `v0.1.1505` 2026-09-03 — 提出物づくりで版数を間違えられなくした
 - `v0.1.1502` 2026-09-03 — コメビュの窓の大きさを覚えます
-- `v0.1.1491` 2026-08-29 — 検査の土台を、配布元の最新版にそろえました
