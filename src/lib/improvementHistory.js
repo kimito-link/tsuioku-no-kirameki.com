@@ -591,5 +591,19 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
     version: '0.1.1516', metric: 'cross-checked-claims', value: 47,
     source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
     note: '★悪化してよい理由: 30日の移動窓(1508〜の note と同じ)で前版と同値。この版はホバー待ち3.5秒の内訳を実測(watch370ms+握手190ms+NDGR遡り3秒=主犯は遡り)で裏取りし会議の「握手が致命的」を訂正して設計したが、コミット前なので窓に載るのは次版から'
+  }),
+  Object.freeze({
+    version: '0.1.1517', metric: 'bundle-kb', value: 1403,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '★悪化ではない: 前版 1516 と同値 1403KB(過去最良 1360@1454 には未達)。この版の実装(配信ごと動的 OGP)は api/live-og.js・src/lib/liveOgHtml.js・vercel.json・privacy.html 側で、いずれも popup バンドルには入らない。popup が同梱する差分は更新履歴 1 件の入れ替えだけで、押し出された最古の 1 件とほぼ同長のため増減が出なかった。1454 以来の増分は計器・検査ぶんで未計測(1508 の note 参照)'
+  }),
+  Object.freeze({
+    version: '0.1.1517', metric: 'gate-selftest', value: 4,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1517', metric: 'cross-checked-claims', value: 46,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: '★この版の変更とは無関係な指標(過去30日のコミット本文の語数の移動窓)。54@1507 からの目減りはコミット本文の書き方と窓の経過に依存し、この実装差分とは因果が無い。この版は純関数テスト(liveOgHtml.test.js・liveRankingView.test.js の liveOgTitle ケース)+リダイレクト不在の静的検査+全 test:cc 緑で裏取りした。本番の has 付き rewrite は vercel dev で動かないため実測は司令塔のデプロイ後(設計 §16)。コミット前なので窓に載るのは次版から'
   })
 ]);

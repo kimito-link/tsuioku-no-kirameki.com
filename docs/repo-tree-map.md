@@ -216,6 +216,11 @@ graph LR
   f40 --> f40_2["lib/liveRecentHoverCard.js"]
   f40 --> f40_3["extension/live-ranking-entry.js"]
   f40 --> f40_4["live/index.html"]
+  HUB --> f41["ランキング(/live/)の配信ごと OGP"]
+  f41 --> f41_0["live-og.js"]
+  f41 --> f41_1["lib/liveOgHtml.js"]
+  f41 --> f41_2["lib/liveRankingView.js"]
+  f41 --> f41_3[""]
 ```
 
 ---
@@ -231,8 +236,8 @@ graph LR
 ## `_docs/` — ⚠️ 未記入（ROLES に追記）
 <sub>ファイル 5 件</sub>
 
-## `api/` — サーバレス API(status エンドポイント)  〔API〕
-<sub>ファイル 3 件</sub>
+## `api/` — サーバレス API(status / live-ranking / live-recent-comments / live-og)  〔API〕
+<sub>ファイル 4 件</sub>
 
 ## `app/` — Web 版状態ページのアプリ(app.js + dist)  〔Web版〕
 <sub>ファイル 100 件</sub>
@@ -251,12 +256,12 @@ graph LR
 - `briefs/`（17 件） — ⚠️ 未記入（ROLES に追記）
 
 ## `docs/` — 設計正本・マインドマップ・フロー図・feature-map(AI/人間向け)  〔設計 / レポート〕
-<sub>ファイル 319 件</sub>
+<sub>ファイル 320 件</sub>
 
 - `article-assets/`（87 件） — 記事用の画像・動画・音声アセット  〔記事 / 画像〕
 - `article-drafts/`（2 件） — ⚠️ 未記入（ROLES に追記）
 - `feature-map/`（15 件） — 機能ごと依存図(自動生成)。誰が storage を書き/読むか  〔依存図 / 自動生成〕
-- `handoff/`（148 件） — セッション引継ぎ・調査設計の記録(HANDOFF-*/MAP/SPEC/DESIGN)。ルート直下に散らかっていたものを 2026-07-31 に集約  〔引継ぎ / 設計〕
+- `handoff/`（149 件） — セッション引継ぎ・調査設計の記録(HANDOFF-*/MAP/SPEC/DESIGN)。ルート直下に散らかっていたものを 2026-07-31 に集約  〔引継ぎ / 設計〕
 - `marketing/`（1 件） — 発信用の原稿(X 記事・告知文)。★数字は出典なしで書かない  〔マーケ / 原稿〕
 - `patent-unique-voice-reading-filing-final/`（1 件） — ⚠️ 未記入（ROLES に追記）
 - `policies/`（1 件） — 運用方針メモ(統計の失敗モード等)  〔方針〕
@@ -291,14 +296,14 @@ graph LR
 - `soundeffect-lab/`（19 件） — ⚠️ 未記入（ROLES に追記）
 
 ## `src/` — LP 側 + 純粋関数ライブラリの源  〔ソース〕
-<sub>ファイル 1850 件</sub>
+<sub>ファイル 1852 件</sub>
 
 - `data/`（7 件） — 保存コメントからレーン候補を読む acquirer / source 層  〔コメント / 取得〕
 - `domain/`（20 件） — ドメイン正本(応援レーンの集約・列ポリシー等。識別子判定など)  〔応援 / 集約 / 識別子〕
 - `extension/`（50 件） — バンドル entry(content/popup/venue/status/offscreen/backfill-sw 等=機能境界)  〔entry / 記録 / 会場 / 応援〕
 - `fixtures/`（1 件） — テスト用フィクスチャ  〔テスト〕
 - `images/`（134 件） — LP / CWS 提出物のマスター画像  〔画像〕
-- `lib/`（1626 件） — 純粋関数ライブラリ(unit test 対象)。色・速度・コメント・レポート等の計算ロジックの大半  〔色 / 速度 / コメント / レポート / 純粋関数〕
+- `lib/`（1628 件） — 純粋関数ライブラリ(unit test 対象)。色・速度・コメント・レポート等の計算ロジックの大半  〔色 / 速度 / コメント / レポート / 純粋関数〕
 - `server/`（2 件） — Node 側 I/O 部品(fetch/WebSocket を実際に叩く。api と scripts が共用。lib には置けない)  〔API / 公開 / ランキング〕
 - `shared/`（7 件） — 複数機能で共有する小部品(アバター URL ガード等)  〔共有 / アバター〕
 - `sound/`（1 件） — 音声素材(src 側)  〔音声〕
@@ -587,6 +592,14 @@ esbuild の import 到達グラフを逆引きし「このファイルを変え�
 - [`src/lib/liveRecentHoverCard.js`](../src/lib/liveRecentHoverCard.js)
 - [`src/extension/live-ranking-entry.js`](../src/extension/live-ranking-entry.js)
 - [`tsuioku-no-kirameki/live/index.html`](../tsuioku-no-kirameki/live/index.html)
+
+### ランキング(/live/)の配信ごと OGP  〔LP / 公開 / ランキング〕
+vercel.json が「?lv= あり∧カード用クローラー UA」だけ /api/live-og へ rewrite。api は live:ranking:latest から該当配信を引き、og:image=配信サムネ(thumbnail.large)・og:title=liveOgTitle の最小 HTML を返す(リダイレクト無し・no-store)。人間は従来どおり静的 /live/。不在 lv は汎用カード。支援者名・本文・数値は出さない(v0.1.1517)
+
+- [`api/live-og.js`](../api/live-og.js)
+- [`src/lib/liveOgHtml.js`](../src/lib/liveOgHtml.js)
+- [`src/lib/liveRankingView.js`](../src/lib/liveRankingView.js)
+- [`vercel.json`](../vercel.json)
 
 ---
 

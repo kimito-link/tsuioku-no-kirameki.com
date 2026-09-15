@@ -86,7 +86,7 @@ const ROLES = {
   'app': { role: 'Web 版状態ページのアプリ(app.js + dist)', tags: ['Web版'] },
   'app/dist': { role: 'Web 版アプリのビルド成果物', tags: ['ビルド成果物'] },
   'app/images': { role: '純Web版 応援ライブビューの同梱画像(ゆっくり顔)', tags: ['Web版', '画像'] },
-  'api': { role: 'サーバレス API(status エンドポイント)', tags: ['API'] },
+  'api': { role: 'サーバレス API(status / live-ranking / live-recent-comments / live-og)', tags: ['API'] },
   'memory': { role: 'セッション横断の知見・引き継ぎ(AI のメモリ)。コミット対象外も混在', tags: ['メモリ', '知見'] },
   'memory/archive': { role: '過去セッションの引き継ぎ(HANDOFF)アーカイブ', tags: ['メモリ', '履歴'] },
   'memory/avatar-parts': { role: 'アバター素材(顔シート等)の参考画像', tags: ['アバター', '画像'] }
@@ -142,7 +142,8 @@ const FEATURES = [
   { feature: '影響範囲ゲート(規律を自動化)', desc: '星野ロミ式「規律を自動ゲートに」。diff から影響大(複数機能波及)の変更ファイルを検出し波及先機能を列挙。警告のみ(摩擦ゼロ)・--strict で exit1。AGENTS.md §10 のルールを diff 発火に', paths: ['scripts/impact-check.mjs', 'docs/feature-map/impact-map.json'], tags: ['影響範囲', '自動ゲート', '再発防止'] },
   { feature: 'ランキング(/live/)の X シェア', desc: '各配信の stats 行に <a class="share-x">(X Web Intent・JS ゼロ)。?lv= で該当配信を先頭固定(pinLiveFirst)。本文は liveShareText(中立・数値なし・60字以内)、URL は buildXIntentUrl(safeHttpUrl 検疫)。OG 画像は tools/gen-og-live-ranking.py。計器なし(privacy §14-2)(v0.1.1510)', paths: ['src/lib/xIntentUrl.js', 'src/lib/liveRankingView.js', 'src/extension/live-ranking-entry.js', 'tsuioku-no-kirameki/live/index.html', 'tools/gen-og-live-ranking.py'], tags: ['LP', '公開', 'ランキング'] },
   { feature: 'ランキング(/live/)のコメント件数集計', desc: '3枠目「コメントで応援した人」。GitHub Actions(live-ranking.yml の tally ジョブ)が watch HTML→視聴セッション握手→NDGR を crawlNdgrBackward で遡り、ndgrChatsToMergeRows→createCommentTally で【件数だけ】数えて POST(?ingest=comments)。本文・時刻は保存しない。匿名(184)も件数順にそのまま(匿名NNN＋identicon)。GET 側は attachComments が lives[i].comment に合流(v0.1.1511)', paths: ['src/lib/liveCommentTally.js', 'scripts/live-comment-tally.mjs', 'api/live-ranking.js', 'src/lib/liveRankingView.js', 'src/extension/live-ranking-entry.js', '.github/workflows/live-ranking.yml'], tags: ['LP', '公開', 'ランキング', 'コメント', '集計'] },
-  { feature: 'ランキング(/live/)ホバーで直近の発言', desc: '「コメントで応援した人」の名前にマウスを乗せると、その人の直近発言(最大5件)をその場で NDGR から浅く取って小さなカードで出す。POST /api/live-recent-comments が watch HTML→握手(nicoliveGuest)→crawlNdgrBackward を浅く回して byUid を返す。本文は Redis に保存せずサーバのメモリに最長60秒だけ。カード HTML は純関数 buildRecentCardHtml。行全体を1つの <a class="rank-link"> にまとめる変更も同段(v0.1.1514)', paths: ['api/live-recent-comments.js', 'src/server/nicoliveGuest.js', 'src/lib/liveRecentHoverCard.js', 'src/extension/live-ranking-entry.js', 'tsuioku-no-kirameki/live/index.html'], tags: ['LP', '公開', 'ランキング', 'コメント'] }
+  { feature: 'ランキング(/live/)ホバーで直近の発言', desc: '「コメントで応援した人」の名前にマウスを乗せると、その人の直近発言(最大5件)をその場で NDGR から浅く取って小さなカードで出す。POST /api/live-recent-comments が watch HTML→握手(nicoliveGuest)→crawlNdgrBackward を浅く回して byUid を返す。本文は Redis に保存せずサーバのメモリに最長60秒だけ。カード HTML は純関数 buildRecentCardHtml。行全体を1つの <a class="rank-link"> にまとめる変更も同段(v0.1.1514)', paths: ['api/live-recent-comments.js', 'src/server/nicoliveGuest.js', 'src/lib/liveRecentHoverCard.js', 'src/extension/live-ranking-entry.js', 'tsuioku-no-kirameki/live/index.html'], tags: ['LP', '公開', 'ランキング', 'コメント'] },
+  { feature: 'ランキング(/live/)の配信ごと OGP', desc: 'vercel.json が「?lv= あり∧カード用クローラー UA」だけ /api/live-og へ rewrite。api は live:ranking:latest から該当配信を引き、og:image=配信サムネ(thumbnail.large)・og:title=liveOgTitle の最小 HTML を返す(リダイレクト無し・no-store)。人間は従来どおり静的 /live/。不在 lv は汎用カード。支援者名・本文・数値は出さない(v0.1.1517)', paths: ['api/live-og.js', 'src/lib/liveOgHtml.js', 'src/lib/liveRankingView.js', 'vercel.json'], tags: ['LP', '公開', 'ランキング'] }
 ];
 
 /**

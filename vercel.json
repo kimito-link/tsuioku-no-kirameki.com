@@ -20,6 +20,16 @@
       "destination": "/tsuioku-no-kirameki/index.html"
     },
     {
+      "source": "/live/",
+      "has": [
+        { "type": "query", "key": "lv" },
+        { "type": "header", "key": "user-agent",
+          "value": ".*(Twitterbot|facebookexternalhit|Discordbot|Slackbot|LinkedInBot|TelegramBot|Mastodon|Bluesky|Misskey|SummalyBot).*" }
+      ],
+      "missing": [{ "type": "host", "value": "app.tsuioku-no-kirameki.com" }],
+      "destination": "/api/live-og"
+    },
+    {
       "source": "/:path((?!tsuioku-no-kirameki/|app/|extension/|api/|_next/).*)",
       "missing": [{ "type": "host", "value": "app.tsuioku-no-kirameki.com" }],
       "destination": "/tsuioku-no-kirameki/:path"

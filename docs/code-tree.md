@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 6 / 867 件
+## ⚠️ 役割コメントが無いソース 6 / 869 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `src/lib/laneDomSelfMeasure.js`
@@ -53,7 +53,8 @@
   - `KB-stale-premise.md`
   - `TO-web-ios-android-ai-maze-pattern-2026-08-31.md`
   - `TO-web-ios-android-unnamed-bucket-2026-09-03.md`
-- 📁 **api/** (3)
+- 📁 **api/** (4)
+  - `live-og.js` — /api/live-og — 配信ごとの OGP カード用 HTML を返す薄い I/O 係(v0.1.1517)。
   - `live-ranking.js` — /live/ 用「支えた人ランキング」の収集・配信 Vercel Serverless Function。
   - `live-recent-comments.js` — /api/live-recent-comments — `/live/` の「コメントで応援した人」にホバーしたとき、
   - `status.js` — status 受け口 Vercel Serverless Function。
@@ -188,7 +189,7 @@
     - `2026-09-06.md`
     - `2026-09-07.md`
     - `2026-09-09.md`
-- 📁 **docs/** (319)
+- 📁 **docs/** (320)
   - 📁 **article-assets/** (87)
     - 📁 **venue-frames/** (12)
       - `f01.png`
@@ -300,7 +301,7 @@
     - `storage-bus.md`
     - `venue.md`
     - `web-status.md`
-  - 📁 **handoff/** (148)
+  - 📁 **handoff/** (149)
     - 📁 **bench/** (2)
       - `bench-interval.mjs` — ⚠️ 役割コメント無し
       - `bench-lane.mjs` — ⚠️ 役割コメント無し
@@ -408,6 +409,7 @@
     - `lanescene-structural-review-IMPLEMENTATION-HANDOFF.md`
     - `live-comment-body-DESIGN.md`
     - `live-comment-incremental-DESIGN.md`
+    - `live-ranking-dynamic-og-DESIGN.md`
     - `live-ranking-share-DESIGN.md`
     - `marketing-export-tab-IMPLEMENTATION-HANDOFF.md`
     - `mirror-writer-decoupling-PLAN-2026-08-08.md`
@@ -772,7 +774,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (1850)
+- 📁 **src/** (1852)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1041,7 +1043,7 @@
         - `logo_funlink_white_RGB_link_black.png`
         - `logo_funlink_white_RGB_maru_black.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1626)
+  - 📁 **lib/** (1628)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -1787,6 +1789,8 @@
     - `liveEndedFlag.test.js`
     - `liveHealthScore.js` — 配信ごとの「健康チェック」5段階評価(純関数)。
     - `liveHealthScore.test.js`
+    - `liveOgHtml.js` — 配信ごとの OGP カード用の最小 HTML を組み立てる純関数(v0.1.1517)。
+    - `liveOgHtml.test.js`
     - `livePersistInterval.js` — v0.1.498〜501: ライブ記録の保存（コアレッサ）最小間隔を決める純粋関数。フリーズ対策 A。
     - `livePersistInterval.test.js`
     - `liveRankingView.js` — `/live/`「追憶のきらめき ランキング」の純ロジック(DOM を触らない)。
