@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 6 / 869 件
+## ⚠️ 役割コメントが無いソース 6 / 870 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `src/lib/laneDomSelfMeasure.js`
@@ -189,7 +189,7 @@
     - `2026-09-06.md`
     - `2026-09-07.md`
     - `2026-09-09.md`
-- 📁 **docs/** (320)
+- 📁 **docs/** (321)
   - 📁 **article-assets/** (87)
     - 📁 **venue-frames/** (12)
       - `f01.png`
@@ -301,7 +301,7 @@
     - `storage-bus.md`
     - `venue.md`
     - `web-status.md`
-  - 📁 **handoff/** (149)
+  - 📁 **handoff/** (150)
     - 📁 **bench/** (2)
       - `bench-interval.mjs` — ⚠️ 役割コメント無し
       - `bench-lane.mjs` — ⚠️ 役割コメント無し
@@ -410,6 +410,7 @@
     - `live-comment-body-DESIGN.md`
     - `live-comment-incremental-DESIGN.md`
     - `live-ranking-dynamic-og-DESIGN.md`
+    - `live-ranking-og-stats-DESIGN.md`
     - `live-ranking-share-DESIGN.md`
     - `marketing-export-tab-IMPLEMENTATION-HANDOFF.md`
     - `mirror-writer-decoupling-PLAN-2026-08-08.md`
@@ -774,7 +775,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (1852)
+- 📁 **src/** (1854)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1043,7 +1044,7 @@
         - `logo_funlink_white_RGB_link_black.png`
         - `logo_funlink_white_RGB_maru_black.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1628)
+  - 📁 **lib/** (1630)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -1791,6 +1792,8 @@
     - `liveHealthScore.test.js`
     - `liveOgHtml.js` — 配信ごとの OGP カード用の最小 HTML を組み立てる純関数(v0.1.1517)。
     - `liveOgHtml.test.js`
+    - `liveOgStats.js` — 配信ごと OGP カードの og:description に載せる「応援の数字」を組み立てる純関数(v0.1.1518)。
+    - `liveOgStats.test.js`
     - `livePersistInterval.js` — v0.1.498〜501: ライブ記録の保存（コアレッサ）最小間隔を決める純粋関数。フリーズ対策 A。
     - `livePersistInterval.test.js`
     - `liveRankingView.js` — `/live/`「追憶のきらめき ランキング」の純ロジック(DOM を触らない)。
