@@ -77,8 +77,10 @@ describe('buildLiveOgHtml', () => {
     expect(html).not.toContain('http-equiv');
   });
 
-  it('★支援者・本文・数値不在: gift/comment/watchCount を持つ live でもその文字列が出ない', () => {
+  it('★数字は description に出るが、名前・本文・個別ポイント・uid・件数は出ない(v0.1.1518 反転)', () => {
     // ★数値は lv(lv1234567)やサムネ寸法(854/480)と重ならない値を選ぶ(テスト側の偶然一致を避ける)。
+    //   来場(70001)・ギフト合計(80002)は description に出る。個別 contribution(90003)・uid(60004)・
+    //   件数(60005)・支援者名・本文は出さない(段1 の反転ケース・設計 §13-3)。
     const live = onAirLive({
       watchCount: 70001,
       giftTotal: 80002,
@@ -87,14 +89,35 @@ describe('buildLiveOgHtml', () => {
       comment: { rankers: [{ rank: 1, uid: '60004', name: 'コメント次郎', count: 60005 }] }
     });
     const html = buildLiveOgHtml({ lv: 'lv1234567', live });
+    // 出る: 来場・ギフト合計(桁区切り済み)が description に。
+    expect(html).toContain('来場70,001');
+    expect(html).toContain('ギフト80,002pt');
+    // 出ない: 支援者名・本文・個別ポイント・uid・件数。
     expect(html).not.toContain('ギフト太郎');
     expect(html).not.toContain('広告花子');
     expect(html).not.toContain('コメント次郎');
-    expect(html).not.toContain('70001');
-    expect(html).not.toContain('80002');
     expect(html).not.toContain('90003');
     expect(html).not.toContain('60004');
     expect(html).not.toContain('60005');
+  });
+
+  it('★0 省略: ギフト 0・広告欠落なら来場とコメントだけが description に出る', () => {
+    const live = onAirLive({ watchCount: 70001, commentCount: 50002, giftTotal: 0 });
+    const html = buildLiveOgHtml({ lv: 'lv1234567', live });
+    expect(html).toContain('来場70,001');
+    expect(html).toContain('コメント50,002');
+    expect(html).not.toContain('ギフト');
+    expect(html).not.toContain('広告');
+  });
+
+  it('★全部 0/欠落: 数字文を出さず、liveShareText + 補いの一言になる', () => {
+    const live = onAirLive({ watchCount: 0, commentCount: 0, giftTotal: 0, adTotal: 0 });
+    const html = buildLiveOgHtml({ lv: 'lv1234567', live });
+    // liveShareText の前半は出る(配信者名・番組名は og:title/description に出てよい情報)。
+    expect(html).toContain('いま支えている人');
+    // 数字文の語(来場/pt)は出ない。
+    expect(html).not.toContain('来場');
+    expect(html).not.toContain('pt。');
   });
 
   it('ネガコン: lv が違えば og:url が違う / title が違えば og:title が違う', () => {

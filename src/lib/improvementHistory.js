@@ -605,5 +605,19 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
     version: '0.1.1517', metric: 'cross-checked-claims', value: 46,
     source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
     note: '★この版の変更とは無関係な指標(過去30日のコミット本文の語数の移動窓)。54@1507 からの目減りはコミット本文の書き方と窓の経過に依存し、この実装差分とは因果が無い。この版は純関数テスト(liveOgHtml.test.js・liveRankingView.test.js の liveOgTitle ケース)+リダイレクト不在の静的検査+全 test:cc 緑で裏取りした。本番の has 付き rewrite は vercel dev で動かないため実測は司令塔のデプロイ後(設計 §16)。コミット前なので窓に載るのは次版から'
+  }),
+  Object.freeze({
+    version: '0.1.1518', metric: 'bundle-kb', value: 1402,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '★悪化ではない: 前版 1403→1402KB(前版より改善・過去最良 1360@1454 には未達)。この版の実装(第1段: og:description に数字)は src/lib/liveOgStats.js・liveOgHtml.js・api/live-og.js・privacy.html 側で、liveOgStats.js は popup バンドルに入らない(api/live-og の HTML 生成でのみ使う)。popup が同梱する差分は更新履歴 1 件の入れ替えだけ。1454 以来の増分は計器・検査ぶんで未計測(1508 の note 参照)'
+  }),
+  Object.freeze({
+    version: '0.1.1518', metric: 'gate-selftest', value: 4,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1518', metric: 'cross-checked-claims', value: 46,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: '★この版の変更とは無関係な指標(過去30日のコミット本文の語数の移動窓)。54@1507 からの目減りはコミット本文の書き方と窓の経過に依存し、この実装差分とは因果が無い。この版(第1段)は純関数テスト(liveOgStats.test.js 全ケース+liveOgHtml.test.js の数字反転/0省略/全0ケース)+全 test:cc 緑(11514)で裏取りした。本番の has 付き rewrite と数字入り description は vercel dev で動かないため実測は司令塔のデプロイ後(設計 §15)。コミット前なので窓に載るのは次版から'
   })
 ]);

@@ -21,13 +21,18 @@
 
 import { escapeHtml, safeHttpUrl } from './htmlText.js';
 import { liveOgTitle, LIVE_ID_RE } from './liveRankingView.js';
+import { liveOgDescription } from './liveOgStats.js';
 
 /** カードの絶対 URL を組み立てる基点。 */
 export const LIVE_OG_ORIGIN = 'https://tsuioku-no-kirameki.com';
 /** サムネが取れないときの汎用カード画像(第1段の生成物・実在)。 */
 export const LIVE_OG_FALLBACK_IMAGE = 'https://tsuioku-no-kirameki.com/images/og-live-ranking.png';
-/** description(配信で変えない・支援者名/数値なし)。 */
-const LIVE_OG_DESCRIPTION =
+/**
+ * description(live なしのとき用・配信で変えない・支援者名/数値なし)。
+ * ★live ありのときは liveOgDescription(live) が数字入りの文を作る(v0.1.1518)。
+ *   この定数は liveOgStats.liveOgDescription が live なしで返す文と同文(向こうが正本)。
+ */
+export const LIVE_OG_DESCRIPTION =
   'いまこの瞬間、この配信をギフト・広告・コメントで支えている人を、配信サムネ・配信者つきでリアルタイムに。主役は配信者ではなく「応援した人」。';
 /** site_name(/live/index.html:24 と同文)。 */
 const LIVE_OG_SITE_NAME = '追憶のきらめき ランキング';
@@ -91,7 +96,8 @@ export function buildLiveOgHtml(input) {
     : (name ? `${name}の配信画面` : '追憶のきらめき ランキングの配信サムネ');
 
   const t = escapeHtml(title);
-  const desc = escapeHtml(LIVE_OG_DESCRIPTION);
+  // live ありなら数字入りの description、なしなら現行の汎用文(liveOgStats が正本)。
+  const desc = escapeHtml(liveOgDescription(live));
   const img = escapeHtml(image);
   const ogUrl = escapeHtml(url);
   const alt = escapeHtml(altText);
