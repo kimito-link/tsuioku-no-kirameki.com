@@ -66,25 +66,35 @@ function thumbnailSize(imageUrl) {
 /**
  * 配信ごとの OGP カード用 HTML を返す。
  * ★live が null/不在/不正でも汎用カードを 200 で返せる形にする(呼び出し側は例外を live=null に倒す)。
- * @param {{ lv?: unknown, live?: any }} [input]
+ * @param {{ lv?: unknown, live?: any, bakedImage?: boolean }} [input]
+ *   bakedImage:true(かつ live あり)なら og:image を焼いた JPEG(/api/live-og-image?lv=)にする。
+ *   焼き画像の有無は呼び出し側(api/live-og.js)が Redis の HEXISTS で判定して渡す。
  * @returns {string} 完全な HTML 文字列
  */
 export function buildLiveOgHtml(input) {
   const lv = normalizeLv(input && input.lv);
   const live = input && input.live && typeof input.live === 'object' ? input.live : null;
+  // 焼いた JPEG があるか(api/live-og.js が HEXISTS で判定して渡す)。live が無ければ意味を持たない。
+  const bakedImage = !!(input && input.bakedImage) && !!live && !!lv;
 
   const title = liveOgTitle(live);
   // twitter:image:alt 用の素材(取れなければ空)。
   const name = live && live.streamer ? String(live.streamer.name == null ? '' : live.streamer.name).trim() : '';
   const programTitle = live ? String(live.title == null ? '' : live.title).trim() : '';
 
-  // og:image = 配信サムネ(large)。safeHttpUrl を通らなければフォールバック PNG(設計 §7)。
+  // og:image の優先順位(設計 §7・3 段):
+  //   ① 焼いた JPEG(bakedImage・配信サムネ＋数字帯)= /api/live-og-image?lv=<lv>(1200x630 固定)
+  //   ② 配信サムネ(large・safeHttpUrl を通ったとき)
+  //   ③ フォールバック PNG(第1段の生成物)
+  // ★①の URL は当サイト固定なので safeHttpUrl 不要(発行元がこの関数)。寸法は投入検証が
+  //   1200x630 以外を拒否するので不変式として定数で出す(数字を発明していない)。
+  const bakedUrl = bakedImage ? `${LIVE_OG_ORIGIN}/api/live-og-image?lv=${lv}` : '';
   const thumbLarge = live && live.thumbnail ? safeHttpUrl(live.thumbnail.large) : '';
-  const image = thumbLarge || LIVE_OG_FALLBACK_IMAGE;
+  const image = bakedUrl || thumbLarge || LIVE_OG_FALLBACK_IMAGE;
   const isFallback = image === LIVE_OG_FALLBACK_IMAGE;
-  // 寸法はサムネ URL のパスから読めたときだけ(数字を発明しない)。フォールバック PNG では出さない。
-  const size = isFallback ? null : thumbnailSize(image);
-  // image:type はサムネ=jpeg / フォールバック=png(1 パターンに絞る)。
+  // 寸法: 焼き画像は 1200x630 固定 / サムネは URL パスから読めたときだけ / フォールバックは出さない。
+  const size = bakedUrl ? { width: 1200, height: 630 } : (isFallback ? null : thumbnailSize(image));
+  // image:type は 焼き画像/サムネ=jpeg・フォールバック=png(1 パターンに絞る)。
   const imageType = isFallback ? 'image/png' : 'image/jpeg';
 
   // og:url は取得された URL と同じにする(FB 系は og:url が違うと再取得する・設計 §5.3)。

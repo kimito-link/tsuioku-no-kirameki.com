@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 6 / 870 件
+## ⚠️ 役割コメントが無いソース 6 / 872 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `src/lib/laneDomSelfMeasure.js`
@@ -53,7 +53,8 @@
   - `KB-stale-premise.md`
   - `TO-web-ios-android-ai-maze-pattern-2026-08-31.md`
   - `TO-web-ios-android-unnamed-bucket-2026-09-03.md`
-- 📁 **api/** (4)
+- 📁 **api/** (5)
+  - `live-og-image.js` — /api/live-og-image — 焼いた OGP カード画像(配信サムネ＋数字帯)を返す薄い I/O 係(v0.1.1519)。
   - `live-og.js` — /api/live-og — 配信ごとの OGP カード用 HTML を返す薄い I/O 係(v0.1.1517)。
   - `live-ranking.js` — /live/ 用「支えた人ランキング」の収集・配信 Vercel Serverless Function。
   - `live-recent-comments.js` — /api/live-recent-comments — `/live/` の「コメントで応援した人」にホバーしたとき、
@@ -679,7 +680,7 @@
   - `status-guard.js` — 状態速報ページ(status.html)の「何があっても開く」保険。
   - `status.html`
   - `venue.html`
-- 📁 **scripts/** (67)
+- 📁 **scripts/** (68)
   - 📁 **__pycache__/** (1)
     - `stage-submission.cpython-311.pyc`
   - 📁 **lib/** (1)
@@ -727,6 +728,7 @@
   - `layer-config.mjs` — ★どのリポでも使えるように「設定」を読む部分だけを切り出す。
   - `layer-map-html.mjs` — ★`src/lib` の構成を【HTMLで見える】ようにする。
   - `live-comment-tally.mjs` — `/live/` の 3 枠目「💬 コメントで応援した人」を集める I/O 係。
+  - `live-og-bake.mjs` — 配信ごとの OGP カード画像(配信サムネ＋数字帯)を焼いて投入する I/O 係(v0.1.1519)。
   - `measure-flash-frames.mjs` — 「一瞬の黒」を【画面に出たピクセル】で測る。
   - `measure-flash-frames.test.js`
   - `meeting-roles.mjs` — meeting.mjs の役割注入版。
@@ -2782,13 +2784,14 @@
     - `watch-messaging.spec.js`
   - 📁 **helpers/** (1)
     - `wiringTestSource.js` — wiringTestSource — wiring テストが「関数の本体」を、置き場所に依らず取得するための正本。
-- 📁 **tools/** (6)
+- 📁 **tools/** (7)
   - 📁 **mcp-nicolive/** (3)
     - `README.md`
     - `server.mjs` — NicoLive Local MCP Bridge Phase1a (PoC) — stdio JSON-RPC server.
     - `store.mjs` — NicoLive Local MCP Bridge - Snapshot Store.
   - `audit-lp-overflow.mjs` — One-off LP overflow audit (run: node tools/audit-lp-overflow.mjs)
   - `gen-og-live-ranking.py`
+  - `og-live-compose.py`
   - `render-og.js` — 追憶の煌めき LP 用 OG 画像（1200×630）を生成する。
 - 📁 **tsuioku-no-kirameki/** (45)
   - 📁 **articles/** (14)

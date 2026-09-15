@@ -21,9 +21,24 @@
  * @module api/live-og
  */
 
-import { upstash, STORE_KEY } from './live-ranking.js';
+import { upstash, STORE_KEY, OG_IMAGE_KEY } from './live-ranking.js';
 import { buildLiveOgHtml } from '../src/lib/liveOgHtml.js';
 import { LIVE_ID_RE } from '../src/lib/liveRankingView.js';
+
+/**
+ * 焼いた OGP 画像がこの lv にあるか(設計 §7)。★ニコ生へは fetch しない=Redis の HEXISTS だけ。
+ *   Redis 障害・例外はすべて false(サムネ直へ fail-soft)。
+ * @param {string} lv 正規化済み(小文字)。
+ * @returns {Promise<boolean>}
+ */
+async function hasBakedImage(lv) {
+  try {
+    const r = await upstash(['HEXISTS', OG_IMAGE_KEY, lv]);
+    return Number(r) === 1;
+  } catch {
+    return false;
+  }
+}
 
 /**
  * 保存済み一覧から lv 一致の 1 配信を返す(見つからない・壊れている・障害はすべて null)。
@@ -59,7 +74,9 @@ export default async function handler(req, res) {
     const lv = String((req.query && req.query.lv) || '').trim().toLowerCase();
     if (LIVE_ID_RE.test(lv)) {
       const found = await findLive(lv);
-      const html = buildLiveOgHtml({ lv, live: found });
+      // 焼いた画像があるときだけ og:image を /api/live-og-image?lv= に切り替える(無ければサムネ直)。
+      const bakedImage = found ? await hasBakedImage(lv) : false;
+      const html = buildLiveOgHtml({ lv, live: found, bakedImage });
       res.setHeader('Content-Type', 'text/html; charset=utf-8');
       res.status(200).end(html);
       return;

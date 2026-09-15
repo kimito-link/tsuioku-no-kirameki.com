@@ -120,6 +120,36 @@ describe('buildLiveOgHtml', () => {
     expect(html).not.toContain('pt。');
   });
 
+  it('★bakedImage:true(live あり): og:image=/api/live-og-image?lv=・1200x630・jpeg', () => {
+    const html = buildLiveOgHtml({ lv: 'lv1234567', live: onAirLive(), bakedImage: true });
+    expect(html).toContain('<meta property="og:image" content="https://tsuioku-no-kirameki.com/api/live-og-image?lv=lv1234567">');
+    expect(html).toContain('<meta property="og:image:type" content="image/jpeg">');
+    expect(html).toContain('<meta property="og:image:width" content="1200">');
+    expect(html).toContain('<meta property="og:image:height" content="630">');
+    // 焼き画像に切り替わったのでサムネ直 URL は og:image に出ない。
+    expect(html).not.toContain(`<meta property="og:image" content="${LARGE_URL}">`);
+  });
+
+  it('★bakedImage:false: 従来どおりサムネ large(焼き画像 URL は出ない)', () => {
+    const html = buildLiveOgHtml({ lv: 'lv1234567', live: onAirLive(), bakedImage: false });
+    expect(html).toContain(`<meta property="og:image" content="${LARGE_URL}">`);
+    expect(html).not.toContain('/api/live-og-image');
+    expect(html).toContain('<meta property="og:image:width" content="854">');
+  });
+
+  it('★live なしなら bakedImage:true でも焼き画像に切り替えず PNG', () => {
+    const html = buildLiveOgHtml({ lv: 'lv1234567', live: null, bakedImage: true });
+    expect(html).toContain(`<meta property="og:image" content="${LIVE_OG_FALLBACK_IMAGE}">`);
+    expect(html).not.toContain('/api/live-og-image');
+  });
+
+  it('★lv 不正なら bakedImage:true でも焼き画像に切り替えない(URL を組めない)', () => {
+    const html = buildLiveOgHtml({ lv: 'abc', live: onAirLive(), bakedImage: true });
+    expect(html).not.toContain('/api/live-og-image');
+    // live あり・lv 不正はサムネ直に倒れる(og:url は /live/ に収束)。
+    expect(html).toContain('<meta property="og:url" content="https://tsuioku-no-kirameki.com/live/">');
+  });
+
   it('ネガコン: lv が違えば og:url が違う / title が違えば og:title が違う', () => {
     const a = buildLiveOgHtml({ lv: 'lv1234567', live: onAirLive() });
     const b = buildLiveOgHtml({ lv: 'lv7654321', live: onAirLive({ liveId: 'lv7654321' }) });

@@ -218,10 +218,14 @@ graph LR
   f40 --> f40_4["live/index.html"]
   HUB --> f41["ランキング(/live/)の配信ごと OGP"]
   f41 --> f41_0["live-og.js"]
-  f41 --> f41_1["lib/liveOgHtml.js"]
-  f41 --> f41_2["lib/liveOgStats.js"]
-  f41 --> f41_3["lib/liveRankingView.js"]
-  f41 --> f41_4[""]
+  f41 --> f41_1["live-og-image.js"]
+  f41 --> f41_2["lib/liveOgHtml.js"]
+  f41 --> f41_3["lib/liveOgStats.js"]
+  f41 --> f41_4["lib/liveRankingView.js"]
+  f41 --> f41_5["live-og-bake.mjs"]
+  f41 --> f41_6["og-live-compose.py"]
+  f41 --> f41_7["workflows/live-ranking.yml"]
+  f41 --> f41_8[""]
 ```
 
 ---
@@ -238,7 +242,7 @@ graph LR
 <sub>ファイル 5 件</sub>
 
 ## `api/` — サーバレス API(status / live-ranking / live-recent-comments / live-og)  〔API〕
-<sub>ファイル 4 件</sub>
+<sub>ファイル 5 件</sub>
 
 ## `app/` — Web 版状態ページのアプリ(app.js + dist)  〔Web版〕
 <sub>ファイル 100 件</sub>
@@ -285,7 +289,7 @@ graph LR
 - `avatar-parts/`（29 件） — アバター素材(顔シート等)の参考画像  〔アバター / 画像〕
 
 ## `scripts/` — ビルド・検証・自動生成スクリプト(build/feature-map/repo-tree-map 等)  〔ビルド / 自動生成〕
-<sub>ファイル 67 件</sub>
+<sub>ファイル 68 件</sub>
 
 - `__pycache__/`（1 件） — ⚠️ 未記入（ROLES に追記）
 - `lib/`（1 件） — ⚠️ 未記入（ROLES に追記）
@@ -316,8 +320,8 @@ graph LR
 - `e2e/`（76 件） — Playwright の E2E(描画 spec・クリップ崩れ検出等)  〔テスト / E2E / 描画〕
 - `helpers/`（1 件） — ⚠️ 未記入（ROLES に追記）
 
-## `tools/` — 補助ツール(LP overflow 監査・MCP サーバ等)  〔ツール〕
-<sub>ファイル 6 件</sub>
+## `tools/` — 補助ツール(LP overflow 監査・MCP サーバ・OG カード画像合成 等)  〔ツール〕
+<sub>ファイル 7 件</sub>
 
 - `mcp-nicolive/`（3 件） — ニコ生状態を読む MCP サーバ(司令塔の状態取得用)  〔MCP / 診断〕
 
@@ -595,12 +599,16 @@ esbuild の import 到達グラフを逆引きし「このファイルを変え�
 - [`tsuioku-no-kirameki/live/index.html`](../tsuioku-no-kirameki/live/index.html)
 
 ### ランキング(/live/)の配信ごと OGP  〔LP / 公開 / ランキング〕
-vercel.json が「?lv= あり∧カード用クローラー UA」だけ /api/live-og へ rewrite。api は live:ranking:latest から該当配信を引き、og:image=配信サムネ(thumbnail.large)・og:title=liveOgTitle・og:description=liveOgDescription(来場・コメント・ギフト・広告の数字を liveOgStats が整形。0/欠落は省く)の最小 HTML を返す(リダイレクト無し・no-store)。人間は従来どおり静的 /live/。不在 lv は汎用カード。支援者名・コメント本文・個別ポイントは出さない(v0.1.1518)
+vercel.json が「?lv= あり∧カード用クローラー UA」だけ /api/live-og へ rewrite。api は live:ranking:latest から該当配信を引き、数字(来場・コメント・ギフト・広告)を description と焼いた JPEG に出す(0/欠落は省く)。焼き画像がある lv(HEXISTS)は og:image=/api/live-og-image?lv=(1200x630・配信サムネ＋数字帯)、無ければサムネ直。画像は GitHub Actions(og ジョブ)が live-og-bake.mjs→og-live-compose.py(Pillow)で焼き、base64 を Upstash(live:og:img・TTL 1h)へ POST(?ingest=og-image)。api はニコ生へ fetch しない・リダイレクト無し・no-store。人間は静的 /live/。支援者名・コメント本文・個別ポイントは出さない(v0.1.1519)
 
 - [`api/live-og.js`](../api/live-og.js)
+- [`api/live-og-image.js`](../api/live-og-image.js)
 - [`src/lib/liveOgHtml.js`](../src/lib/liveOgHtml.js)
 - [`src/lib/liveOgStats.js`](../src/lib/liveOgStats.js)
 - [`src/lib/liveRankingView.js`](../src/lib/liveRankingView.js)
+- [`scripts/live-og-bake.mjs`](../scripts/live-og-bake.mjs)
+- [`tools/og-live-compose.py`](../tools/og-live-compose.py)
+- [`.github/workflows/live-ranking.yml`](../.github/workflows/live-ranking.yml)
 - [`vercel.json`](../vercel.json)
 
 ---
