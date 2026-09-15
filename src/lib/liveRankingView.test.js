@@ -5,7 +5,7 @@ import {
   watchUrlOf, jstClock, elapsedText, freshness, estimateConcurrentForLive, sortByEstimatedConcurrent,
   cacheBust, supporterRows, identifiedSupporters, commentRows, isBlankIcon, uidFromUserPageUrl,
   createRowChangeTracker, rowKey, STALE_MIN,
-  pinLiveFirst, liveShareText, SHARE_NAME_MAX, SHARE_TITLE_MAX, SHARE_TEXT_MAX
+  pinLiveFirst, liveShareText, liveOgTitle, SHARE_NAME_MAX, SHARE_TITLE_MAX, SHARE_TEXT_MAX
 } from './liveRankingView.js';
 
 describe('liveRankingView', () => {
@@ -247,6 +247,40 @@ describe('liveRankingView', () => {
     const paint = () => { t.begin(); const c = t.classFor(rowKey('lv', 'ad', { name: 'x' }), 7); t.end(); return c; };
     paint(); paint();
     expect(paint()).toBe('');
+  });
+
+  describe('liveOgTitle(SNS カードの見出し)', () => {
+    it('name・title あり', () => {
+      expect(liveOgTitle({ streamer: { name: 'りんく' }, title: '雑談' })).toBe('りんくの配信「雑談」 ― いま支えている人');
+    });
+    it('title のみ', () => {
+      expect(liveOgTitle({ streamer: { name: '' }, title: '雑談' })).toBe('「雑談」 ― いま支えている人');
+    });
+    it('name のみ', () => {
+      expect(liveOgTitle({ streamer: { name: 'りんく' }, title: '' })).toBe('りんくの配信 ― いま支えている人');
+    });
+    it('両方空・null は汎用見出し(/live/index.html:20 と同文)', () => {
+      const generic = 'いま配信を支えている人 ― ニコニコ生放送（追憶のきらめき ランキング）';
+      expect(liveOgTitle({})).toBe(generic);
+      expect(liveOgTitle(null)).toBe(generic);
+    });
+    it('4 分岐の最大長を固定', () => {
+      const name = 'あ'.repeat(SHARE_NAME_MAX + 10);
+      const title = 'い'.repeat(SHARE_TITLE_MAX + 10);
+      expect(Array.from(liveOgTitle({ streamer: { name }, title })).length).toBe(58);
+      expect(Array.from(liveOgTitle({ streamer: { name: '' }, title })).length).toBe(37);
+      expect(Array.from(liveOgTitle({ streamer: { name }, title: '' })).length).toBe(32);
+      expect(Array.from(liveOgTitle({})).length).toBe(36);
+    });
+    it('絵文字は割れない(コードポイント単位で切る)', () => {
+      const title = '🎉'.repeat(SHARE_TITLE_MAX + 5);
+      const out = liveOgTitle({ streamer: { name: 'りんく' }, title });
+      expect([...out].every((ch) => ch !== '�')).toBe(true);
+    });
+    it('★ネガコン: 数値・時刻を持つ live でも見出しは変わらない', () => {
+      const live = { streamer: { name: 'りんく' }, title: '雑談', watchCount: 12345, beginTime: 1789355007, giftTotal: 999 };
+      expect(liveOgTitle(live)).toBe('りんくの配信「雑談」 ― いま支えている人');
+    });
   });
 
   describe('commentRows(3 枠目「コメントで応援した人」)', () => {

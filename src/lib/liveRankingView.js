@@ -406,3 +406,20 @@ export function liveShareText(live) {
   if (name) return `${name}の配信を、いま支えている人`;
   return 'この配信を、いま支えている人';
 }
+
+/**
+ * SNS カード(og:title)の見出し。★材料は配信者名と番組名だけ(数値・時刻は入れない=
+ *   カードは初回取得を保持するので投稿後に必ず古くなる)。liveShareText と同じ正規化・
+ *   同じ上限を使い、語尾だけ「見出し体( ― いま支えている人)」にする(設計 §6)。
+ *   live 不在・両方空なら /live/index.html:20 と同じ汎用見出しへ収束する。
+ * @param {{ streamer?: { name?: unknown }|null, title?: unknown }|null|undefined} live
+ * @returns {string}
+ */
+export function liveOgTitle(live) {
+  const name = trimTo(live && live.streamer ? live.streamer.name : '', SHARE_NAME_MAX);
+  const title = trimTo(live ? live.title : '', SHARE_TITLE_MAX);
+  if (name && title) return `${name}の配信「${title}」 ― いま支えている人`;
+  if (title) return `「${title}」 ― いま支えている人`;
+  if (name) return `${name}の配信 ― いま支えている人`;
+  return 'いま配信を支えている人 ― ニコニコ生放送（追憶のきらめき ランキング）';
+}

@@ -27,7 +27,7 @@
  *   MAX_LIVES は実測(30本OK)の範囲内に収める。★実測していない数字へ広げない。
  */
 
-const STORE_KEY = 'live:ranking:latest';
+export const STORE_KEY = 'live:ranking:latest';
 /**
  * ★2026-09-14 追加: 3 枠目「コメントで応援した人」の集計。
  *   ★収集元が違うので【別キー】にする。ギフト/広告はニコ生が公開しているランキングを
