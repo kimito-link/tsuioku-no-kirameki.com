@@ -265,6 +265,15 @@
       .recent-card ul { margin: 4px 0 0; padding-left: 1.1em; }
       .recent-card li { margin: 2px 0; }
       .recent-card .st { margin: 2px 0 0; color: var(--ink-sub); }
+      /* ★スケルトン(取得中の骨格)。届いたら発言の <ul> に差し替わる。 */
+      .recent-card ul.recent-skeleton { list-style: none; margin: 2px 0 0; padding: 0; min-width: 180px; }
+      .recent-card ul.recent-skeleton li.sk { height: .78em; margin: 6px 0; border-radius: 4px;
+        background: linear-gradient(90deg, var(--bg-soft) 25%, var(--line) 37%, var(--bg-soft) 63%);
+        background-size: 400% 100%; animation: nl-shimmer 1.2s ease-in-out infinite; }
+      .recent-card ul.recent-skeleton li.sk2 { width: 82%; }
+      .recent-card ul.recent-skeleton li.sk3 { width: 64%; }
+      @keyframes nl-shimmer { 0% { background-position: 100% 0; } 100% { background-position: 0 0; } }
+      @media (prefers-reduced-motion: reduce) { .recent-card ul.recent-skeleton li.sk { animation: none; } }
       /* ★コメント列の行は「マウスを乗せると発言が出る」ことを help カーソルで示す(匿名行にも uid はある)。 */
       ol.rank li[data-uid] { cursor: help; }
       ol.rank li[data-uid] .rank-link { cursor: pointer; }
