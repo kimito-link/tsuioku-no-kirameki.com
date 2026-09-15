@@ -241,7 +241,7 @@ graph LR
 - `images/`（93 件） — 純Web版 応援ライブビューの同梱画像(ゆっくり顔)  〔Web版 / 画像〕
 
 ## `council/` — 会議(COUNCIL)の問い・回答・統合(SYNTHESIS)。設計判断の根拠  〔会議 / 設計〕
-<sub>ファイル 385 件</sub>
+<sub>ファイル 389 件</sub>
 
 - `auto/`（8 件） — ⚠️ 未記入（ROLES に追記）
 

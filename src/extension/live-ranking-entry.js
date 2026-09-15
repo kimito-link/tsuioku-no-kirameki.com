@@ -317,9 +317,47 @@ function load(opts) {
       if (!r.ok) throw new Error(`読み込みに失敗しました (${r.status})`);
       return r.json();
     })
-    .then((data) => { _lastCapturedAt = Number(data && data.capturedAt) || _lastCapturedAt; render(data); })
+    .then((data) => { _lastCapturedAt = Number(data && data.capturedAt) || _lastCapturedAt; render(data); prewarmRecent(data); })
     .catch((e) => showState(String(e && e.message ? e.message : e)))
     .finally(() => { setBusy(false); _nextAutoAt = Date.now() + AUTO_REFRESH_MS; });
+}
+
+/**
+ * ★ホバーの初回待ち(実測 3.5 秒・主犯は NDGR の遡り)を消すための先読み。
+ *   ページを開いた【最初の 1 回だけ】、いま見えている上位数配信の代表 uid で
+ *   /api/live-recent-comments を投げ、サーバのメモリキャッシュ(60 秒)を温める。
+ *   ★60 秒ごとの再読み込みでは温め直さない=視聴WS 握手(来場者+1)を増やさない。
+ *   ★本文は保存しない(現行と同じエンドポイントを叩くだけ・privacy §14)。応答は捨てる。
+ *   会議の裁定=council/hover-latency-SYNTHESIS.md(先読み上位3・逐次・スケルトン併用)。
+ * @param {any} data 収集ペイロード
+ */
+let _didPrewarm = false;
+async function prewarmRecent(/** @type {any} */ data) {
+  if (_didPrewarm) return;
+  _didPrewarm = true;
+  try {
+    const lives = data && Array.isArray(data.lives) ? data.lives : [];
+    // 画面と同じ並び(賑わい順・pin 先頭)の上位 3 配信だけ温める。
+    const nowMs = Date.now();
+    const { lives: ordered } = pinLiveFirst(sortByEstimatedConcurrent(lives, nowMs), PINNED_LV);
+    const targets = ordered.slice(0, 3);
+    for (const l of targets) {
+      const lv = String((l && l.liveId) || '').trim();
+      const uid = l && l.comment && Array.isArray(l.comment.rankers) && l.comment.rankers[0]
+        ? String(l.comment.rankers[0].uid || '').trim()
+        : '';
+      if (!lv || !uid) continue;
+      try {
+        // 逐次(並列にしない=Vercel Hobby の同時実行を圧迫しない)。応答は捨てる=キャッシュが温まるのが目的。
+        await fetch('/api/live-recent-comments', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ lv, uid }),
+          cache: 'no-store'
+        });
+      } catch { /* 温めの失敗は無視(ホバー時に通常取得へフォールバック) */ }
+    }
+  } catch { /* 先読み全体の失敗は無視 */ }
 }
 
 function tickCountdown() {

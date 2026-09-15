@@ -53,6 +53,12 @@ export function buildRecentCardHtml(state) {
     const note = state.partial ? '<p class="st">（直近ぶんだけ）</p>' : '';
     return `<ul>${items}</ul>${note}`;
   }
+  if (phase === 'loading') {
+    // ★スケルトン(骨格)。取得中の「待たされ感」を消すため、文言だけでなく発言行の骨格を出す。
+    //   届いたら ok の <ul> に差し替わる。会議の裁定=council/hover-latency-SYNTHESIS.md。
+    const bars = '<li class="sk"></li><li class="sk sk2"></li><li class="sk sk3"></li>';
+    return `<ul class="recent-skeleton" aria-label="${escapeHtml(MESSAGES.loading)}">${bars}</ul>`;
+  }
   const msg = /** @type {Record<string, string>} */ (MESSAGES)[String(phase)] ?? '';
   if (!msg) return '';
   return `<p class="st">${escapeHtml(msg)}</p>`;

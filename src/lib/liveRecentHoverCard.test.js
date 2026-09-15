@@ -6,10 +6,11 @@ import { buildRecentCardHtml } from './liveRecentHoverCard.js';
  * DOM/fetch を持たない純関数なので、状態→HTML 文字列の対応だけを検査する。
  */
 describe('buildRecentCardHtml', () => {
-  it('loading は「取得中」を出す', () => {
+  it('loading はスケルトン(骨格)を出す（待たされ感を消す・取得中は aria-label に残す）', () => {
     const html = buildRecentCardHtml({ phase: 'loading' });
-    expect(html).toContain('取得中');
-    expect(html).toContain('class="st"');
+    expect(html).toContain('recent-skeleton');
+    expect(html).toContain('取得中'); // スクリーンリーダー向けに aria-label で残す
+    expect(html).toContain('class="sk"'); // 骨格の帯
   });
 
   it('ok は各発言を <li> で並べる', () => {

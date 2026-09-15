@@ -577,5 +577,19 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
     version: '0.1.1515', metric: 'cross-checked-claims', value: 47,
     source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
     note: '★この版の変更とは無関係な指標(過去30日のコミット本文の語数の移動窓)。54@1507 からの目減りはコミット本文の書き方に依存し、この実装差分とは因果が無い。この版は純関数テスト(comeviewUserDetailLink.test.js)+DOM 単体テスト(wireLaneUserDetailOpen.test.js・happy-dom)+配線テスト(venueSpeechPanelRowsMax.wiring.test.js)と全 test:cc 緑で裏取りしたが、実機(chrome)確認は司令塔が行うため、この差分の cross-check がコミット窓に載るのは次版から'
+  }),
+  Object.freeze({
+    version: '0.1.1516', metric: 'bundle-kb', value: 1403,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '★悪化してよい理由: 1404→1403KB(前版より改善・過去最良 1360@1454 には未達)。この版の変更は /live/ のホバー先読み(live-ranking-entry.js)とスケルトンCSS・更新履歴1件で popup バンドルには入らない。1454 以来の増分は計器・検査ぶんで未計測(1508 の note 参照)'
+  }),
+  Object.freeze({
+    version: '0.1.1516', metric: 'gate-selftest', value: 4,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1516', metric: 'cross-checked-claims', value: 47,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: '★悪化してよい理由: 30日の移動窓(1508〜の note と同じ)で前版と同値。この版はホバー待ち3.5秒の内訳を実測(watch370ms+握手190ms+NDGR遡り3秒=主犯は遡り)で裏取りし会議の「握手が致命的」を訂正して設計したが、コミット前なので窓に載るのは次版から'
   })
 ]);
