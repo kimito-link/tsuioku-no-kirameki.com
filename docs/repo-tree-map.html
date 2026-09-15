@@ -86,7 +86,7 @@
       
     </section>
 <section class="dir">
-      <div class="dhead"><span class="dname">api/</span><span class="cnt">4 件</span></div>
+      <div class="dhead"><span class="dname">api/</span><span class="cnt">5 件</span></div>
       <div class="drole">サーバレス API(status / live-ranking / live-recent-comments / live-og) <span class="tag">API</span></div>
       
     </section>
@@ -121,7 +121,7 @@
       <div class="kids"><div class="kid"><div class="kname">archive/ <span class="cnt">12</span></div><div class="krole">過去セッションの引き継ぎ(HANDOFF)アーカイブ <span class="tag">メモリ</span><span class="tag">履歴</span></div></div><div class="kid"><div class="kname">avatar-parts/ <span class="cnt">29</span></div><div class="krole">アバター素材(顔シート等)の参考画像 <span class="tag">アバター</span><span class="tag">画像</span></div></div></div>
     </section>
 <section class="dir">
-      <div class="dhead"><span class="dname">scripts/</span><span class="cnt">67 件</span></div>
+      <div class="dhead"><span class="dname">scripts/</span><span class="cnt">68 件</span></div>
       <div class="drole">ビルド・検証・自動生成スクリプト(build/feature-map/repo-tree-map 等) <span class="tag">ビルド</span><span class="tag">自動生成</span></div>
       <div class="kids"><div class="kid miss"><div class="kname">__pycache__/ <span class="cnt">1</span></div><div class="krole">⚠️ 未記入 </div></div><div class="kid miss"><div class="kname">lib/ <span class="cnt">1</span></div><div class="krole">⚠️ 未記入 </div></div><div class="kid"><div class="kname">xserver/ <span class="cnt">2</span></div><div class="krole">Xserver 向け webhook(git pull デプロイ)スクリプト <span class="tag">デプロイ</span><span class="tag">webhook</span></div></div></div>
     </section>
@@ -141,8 +141,8 @@
       <div class="kids"><div class="kid"><div class="kname">contract/ <span class="cnt">3</span></div><div class="krole">レイヤ依存などアーキテクチャ契約のテスト <span class="tag">テスト</span><span class="tag">契約</span></div></div><div class="kid"><div class="kname">e2e/ <span class="cnt">76</span></div><div class="krole">Playwright の E2E(描画 spec・クリップ崩れ検出等) <span class="tag">テスト</span><span class="tag">E2E</span><span class="tag">描画</span></div></div><div class="kid miss"><div class="kname">helpers/ <span class="cnt">1</span></div><div class="krole">⚠️ 未記入 </div></div></div>
     </section>
 <section class="dir">
-      <div class="dhead"><span class="dname">tools/</span><span class="cnt">6 件</span></div>
-      <div class="drole">補助ツール(LP overflow 監査・MCP サーバ等) <span class="tag">ツール</span></div>
+      <div class="dhead"><span class="dname">tools/</span><span class="cnt">7 件</span></div>
+      <div class="drole">補助ツール(LP overflow 監査・MCP サーバ・OG カード画像合成 等) <span class="tag">ツール</span></div>
       <div class="kids"><div class="kid"><div class="kname">mcp-nicolive/ <span class="cnt">3</span></div><div class="krole">ニコ生状態を読む MCP サーバ(司令塔の状態取得用) <span class="tag">MCP</span><span class="tag">診断</span></div></div></div>
     </section>
 <section class="dir">
@@ -360,8 +360,8 @@
     </section>
 <section class="feat">
       <div class="fhead"><span class="fname">ランキング(/live/)の配信ごと OGP</span> <span class="tag">LP</span><span class="tag">公開</span><span class="tag">ランキング</span></div>
-      <div class="fdesc">vercel.json が「?lv= あり∧カード用クローラー UA」だけ /api/live-og へ rewrite。api は live:ranking:latest から該当配信を引き、og:image=配信サムネ(thumbnail.large)・og:title=liveOgTitle・og:description=liveOgDescription(来場・コメント・ギフト・広告の数字を liveOgStats が整形。0/欠落は省く)の最小 HTML を返す(リダイレクト無し・no-store)。人間は従来どおり静的 /live/。不在 lv は汎用カード。支援者名・コメント本文・個別ポイントは出さない(v0.1.1518)</div>
-      <div class="fpaths"><code class="path">api/live-og.js</code><code class="path">src/lib/liveOgHtml.js</code><code class="path">src/lib/liveOgStats.js</code><code class="path">src/lib/liveRankingView.js</code><code class="path">vercel.json</code></div>
+      <div class="fdesc">vercel.json が「?lv= あり∧カード用クローラー UA」だけ /api/live-og へ rewrite。api は live:ranking:latest から該当配信を引き、数字(来場・コメント・ギフト・広告)を description と焼いた JPEG に出す(0/欠落は省く)。焼き画像がある lv(HEXISTS)は og:image=/api/live-og-image?lv=(1200x630・配信サムネ＋数字帯)、無ければサムネ直。画像は GitHub Actions(og ジョブ)が live-og-bake.mjs→og-live-compose.py(Pillow)で焼き、base64 を Upstash(live:og:img・TTL 1h)へ POST(?ingest=og-image)。api はニコ生へ fetch しない・リダイレクト無し・no-store。人間は静的 /live/。支援者名・コメント本文・個別ポイントは出さない(v0.1.1519)</div>
+      <div class="fpaths"><code class="path">api/live-og.js</code><code class="path">api/live-og-image.js</code><code class="path">src/lib/liveOgHtml.js</code><code class="path">src/lib/liveOgStats.js</code><code class="path">src/lib/liveRankingView.js</code><code class="path">scripts/live-og-bake.mjs</code><code class="path">tools/og-live-compose.py</code><code class="path">.github/workflows/live-ranking.yml</code><code class="path">vercel.json</code></div>
     </section>
 
   <div class="legend">

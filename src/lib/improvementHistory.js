@@ -619,5 +619,19 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
     version: '0.1.1518', metric: 'cross-checked-claims', value: 46,
     source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
     note: '★この版の変更とは無関係な指標(過去30日のコミット本文の語数の移動窓)。54@1507 からの目減りはコミット本文の書き方と窓の経過に依存し、この実装差分とは因果が無い。この版(第1段)は純関数テスト(liveOgStats.test.js 全ケース+liveOgHtml.test.js の数字反転/0省略/全0ケース)+全 test:cc 緑(11514)で裏取りした。本番の has 付き rewrite と数字入り description は vercel dev で動かないため実測は司令塔のデプロイ後(設計 §15)。コミット前なので窓に載るのは次版から'
+  }),
+  Object.freeze({
+    version: '0.1.1519', metric: 'bundle-kb', value: 1400,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '★悪化ではない: 前版 1402→1400KB(前版より改善・過去最良 1360@1454 には未達)。この版の実装(第2段: カード画像に数字を合成)は api/live-og-image.js・api/live-ranking.js の POST 分岐・src/lib/liveOgHtml.js の bakedImage 段・scripts/live-og-bake.mjs・tools/og-live-compose.py・workflow の og ジョブ側で、いずれも popup バンドルには入らない(画像合成は GitHub Actions の Python・api/lib は og HTML 生成でのみ使う)。popup が同梱する差分は更新履歴 1 件の入れ替えだけ。1454 以来の増分は計器・検査ぶんで未計測(1508 の note 参照)'
+  }),
+  Object.freeze({
+    version: '0.1.1519', metric: 'gate-selftest', value: 4,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1519', metric: 'cross-checked-claims', value: 46,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: '★この版の変更とは無関係な指標(過去30日のコミット本文の語数の移動窓)。54@1507 からの目減りはコミット本文の書き方と窓の経過に依存し、この実装差分とは因果が無い。この版(第2段)は純関数テスト(liveOgHtml.test.js の bakedImage 4 ケース追加)+全 test:cc 緑(11518)+tools/og-live-compose.py の単体焼き(1200x630・JPEG ffd8ff・38,512B<300KB を実測)で裏取りした。本番の Actions 焼き時間・Redis 消費・og:image 切り替え・X が画像内数字を読めるかは実測未了で、司令塔のデプロイ後(設計 §15-3/§16)。コミット前なので窓に載るのは次版から'
   })
 ]);

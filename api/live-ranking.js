@@ -58,7 +58,15 @@ const COMMENT_NAME_MAX = 80;
 const PUBLIC_REFRESH_MIN_MS = 60 * 1000;
 const REFRESH_LOCK_KEY = 'live:ranking:refresh-lock';
 const REFRESH_LOCK_TTL_SECONDS = 30;
-const TTL_SECONDS = 60 * 60; // 1 時間(収集が止まっても古い値が残り続けないように)
+export const TTL_SECONDS = 60 * 60; // 1 時間(収集が止まっても古い値が残り続けないように)
+/**
+ * ★2026-09-15 追加(第2段・v0.1.1519): 焼いた OGP カード画像(配信サムネ＋数字帯)の置き場。
+ *   ハッシュ 1 本(field=`lvNNN`・value=JSON 文字列 `{type,w,h,b64}`)。
+ *   ★性質で分けた別キー(ここは「当方が焼いた画像バイト」で、COMMENTS_KEY/STORE_KEY とは別)。
+ *   投入は §7 の HSET(tmp)→EXPIRE→RENAME で丸ごと原子的に差し替える(半端な状態を読ませない)。
+ *   ★文字列を 2 箇所に書かないよう export し、api/live-og.js・api/live-og-image.js から import する。
+ */
+export const OG_IMAGE_KEY = 'live:og:img';
 /**
  * ★1回の収集で【中身まで取る】配信数。
  *   放送中/個人配信かの判定(watch ページ)は候補全件に対して並列で行う。
@@ -325,8 +333,37 @@ export async function collect() {
   };
 }
 
+/**
+ * ★2026-09-15(第2段): 焼いた OGP 画像 1 枚ぶんを【許可した形だけ】に検疫する(設計 §7)。
+ *   通らなければ null(その配信は hash に入らない=クローラーはサムネ直へ fail-soft)。
+ *   ・type は image/jpeg のみ(X は png/jpeg のみ・本設計は jpeg で焼く)
+ *   ・w=1200, h=630 固定(liveOgHtml が og:image:width/height を定数で出す不変式の担保)
+ *   ・b64 は base64 文字だけ・≤ 400,000 字(1 枚 300KB 相当の base64 上限・§6)
+ *   ・デコード先頭 3 バイトが FF D8 FF(JPEG のマジックナンバー・中身が本当に JPEG か)
+ * @param {unknown} v
+ * @returns {{ type: string, w: number, h: number, b64: string }|null}
+ */
+function sanitizeOgImageEntry(v) {
+  if (!v || typeof v !== 'object') return null;
+  const src = /** @type {any} */ (v);
+  if (String(src.type) !== 'image/jpeg') return null;
+  if (Number(src.w) !== 1200 || Number(src.h) !== 630) return null;
+  const b64 = String(src.b64 == null ? '' : src.b64);
+  if (!b64 || b64.length > 400000) return null;
+  if (!/^[A-Za-z0-9+/=]+$/.test(b64)) return null;
+  // ★先頭 3 バイトだけデコードして JPEG のマジックナンバーを確かめる(全体をデコードしない)。
+  let head;
+  try {
+    head = Buffer.from(b64.slice(0, 8), 'base64');
+  } catch {
+    return null;
+  }
+  if (head.length < 3 || head[0] !== 0xff || head[1] !== 0xd8 || head[2] !== 0xff) return null;
+  return { type: 'image/jpeg', w: 1200, h: 630, b64 };
+}
+
 /** ★api/status.js の readBody と同じ(Vercel は req.body を自動 parse することがある)。 */
-function readBody(req) {
+export function readBody(req) {
   if (req.body && typeof req.body === 'object') return req.body;
   if (typeof req.body === 'string' && req.body) {
     try {
@@ -536,6 +573,47 @@ export default async function handler(req, res) {
         }
       }
       res.status(200).json({ ok: true, stored: true, lives: Object.keys(byLive).length, stateLives });
+      return;
+    }
+
+    // ★焼いた OGP カード画像の投入(GitHub Actions の scripts/live-og-bake.mjs だけが叩く・第2段)。
+    //   ★body の各 lv を検疫し、通ったものだけを OG_IMAGE_KEY へ【丸ごと原子的に】差し替える
+    //     (HSET tmp → EXPIRE → RENAME・設計 §6/§7)。前回の配信も半端な状態も残さない。
+    if (req.method === 'POST' && String(req.query?.ingest || '') === 'og-image') {
+      const want = process.env.STATUS_INGEST_KEY;
+      const sent = String(req.headers['x-share-key'] || '');
+      if (!want || sent !== want) {
+        res.status(401).json({ ok: false, error: 'unauthorized' });
+        return;
+      }
+      const body = readBody(req);
+      if (!body || typeof body !== 'object' || !body.images || typeof body.images !== 'object') {
+        res.status(400).json({ ok: false, error: 'bad body' });
+        return;
+      }
+      /** @type {Record<string, string>} field=lvNNN(小文字) → JSON 文字列 {type,w,h,b64} */
+      const fields = {};
+      for (const [id, v] of Object.entries(body.images)) {
+        if (!/^lv\d{6,15}$/i.test(String(id))) continue;
+        const entry = sanitizeOgImageEntry(v);
+        if (entry) fields[String(id).toLowerCase()] = JSON.stringify(entry);
+      }
+      const stored = Object.keys(fields).length;
+      // ★★通った画像が 0 なら保存しない(空で上書きしない・COMMENTS_KEY 側と同じ掟)。
+      //   保存すると良い画像を空で潰し、TTL ぶんクローラーがサムネ直に落ちる。
+      if (stored === 0) {
+        res.status(502).json({ ok: false, error: 'zero images — not stored' });
+        return;
+      }
+      const tmp = `${OG_IMAGE_KEY}:tmp`;
+      // ★HSET の引数は [key, f1, v1, f2, v2, ...]。tmp に全 field を 1 コマンドで書く。
+      const hsetArgs = ['HSET', tmp];
+      for (const [f, val] of Object.entries(fields)) hsetArgs.push(f, val);
+      await upstash(hsetArgs);
+      await upstash(['EXPIRE', tmp, String(TTL_SECONDS)]);
+      // ★RENAME で本番キーへ丸ごと差し替え(TTL を引き継ぐ・前回の配信は消える)。
+      await upstash(['RENAME', tmp, OG_IMAGE_KEY]);
+      res.status(200).json({ ok: true, stored: true, images: stored });
       return;
     }
 

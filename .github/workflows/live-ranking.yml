@@ -97,3 +97,58 @@ jobs:
             exit 1
           fi
           node scripts/live-comment-tally.mjs
+
+  # ★配信ごとの OGP カード画像（配信サムネ＋数字帯）を焼いて投入（2026-09-15 追加・第2段）。
+  #   refresh が保存した一覧を読んでから走るので needs: refresh（tally と並列）。
+  #   ★焼いた JPEG バイトを既存の Upstash Redis に置く（リポにもコミットしない）。掃除は TTL 1h。
+  #   ★フォント（BIZ UDGothic Bold）は actions/cache で raw.githubusercontent から取る＝コミットしない
+  #     （5MB 門・AGENTS §13）。取れなければ og-live-compose.py が exit 1 で焼かない。
+  #   ★python3 tools/og-live-compose.py は plan の文字列を描くだけ（数字は Node が決める）。
+  og:
+    needs: refresh
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Pillow を入れる
+        run: pip install pillow
+      - name: フォント（BIZ UDGothic Bold）を取得（キャッシュ）
+        id: font
+        uses: actions/cache@v4
+        with:
+          path: .cache/fonts/BIZUDGothic-Bold.ttf
+          # ★key に URL を入れて、URL が変われば取り直す。
+          key: biz-udgothic-bold-raw-githubusercontent-morisawa-main
+      - name: キャッシュに無ければフォントを取得
+        if: steps.font.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p .cache/fonts
+          curl -sSL --max-time 60 \
+            -o .cache/fonts/BIZUDGothic-Bold.ttf \
+            "https://raw.githubusercontent.com/googlefonts/morisawa-biz-ud-gothic/main/fonts/ttf/BIZUDGothic-Bold.ttf"
+          # ★取れていなければ焼く前に止める（黙って豆腐の画像を作らない）。
+          if [ ! -s .cache/fonts/BIZUDGothic-Bold.ttf ]; then
+            echo "::error::フォントを取得できませんでした（raw.githubusercontent のパス/ブランチを確認）"
+            exit 1
+          fi
+      - name: OGP カード画像を焼いて投入
+        env:
+          STATUS_INGEST_KEY: ${{ secrets.STATUS_INGEST_KEY }}
+          OG_FONT_PATH: .cache/fonts/BIZUDGothic-Bold.ttf
+          OG_PYTHON: python3
+        run: |
+          # ★鍵が未登録なら「黙って成功」させない（refresh と同じ掟）。
+          if [ -z "$STATUS_INGEST_KEY" ]; then
+            echo "::error::secrets.STATUS_INGEST_KEY が未登録です。リポジトリの Settings > Secrets で登録してください。"
+            exit 1
+          fi
+          node scripts/live-og-bake.mjs
