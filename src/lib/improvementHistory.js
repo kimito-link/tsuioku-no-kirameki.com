@@ -633,5 +633,19 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
     version: '0.1.1519', metric: 'cross-checked-claims', value: 46,
     source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
     note: '★この版の変更とは無関係な指標(過去30日のコミット本文の語数の移動窓)。54@1507 からの目減りはコミット本文の書き方と窓の経過に依存し、この実装差分とは因果が無い。この版(第2段)は純関数テスト(liveOgHtml.test.js の bakedImage 4 ケース追加)+全 test:cc 緑(11518)+tools/og-live-compose.py の単体焼き(1200x630・JPEG ffd8ff・38,512B<300KB を実測)で裏取りした。本番の Actions 焼き時間・Redis 消費・og:image 切り替え・X が画像内数字を読めるかは実測未了で、司令塔のデプロイ後(設計 §15-3/§16)。コミット前なので窓に載るのは次版から'
+  }),
+  Object.freeze({
+    version: '0.1.1520', metric: 'bundle-kb', value: 1399,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '★悪化ではない: 前版 1400→1399KB(前版より改善・過去最良 1360@1454 には未達)。この版の変更は scripts/live-og-bake.mjs の trimName に括弧欠け修正(dropDanglingOpenParen)を足しただけで、popup バンドルには入らない(bake は GitHub Actions の CI 専用)。popup が同梱する差分は更新履歴 1 件の入れ替えだけ。1454 以来の増分は計器・検査ぶんで未計測(1508 の note 参照)'
+  }),
+  Object.freeze({
+    version: '0.1.1520', metric: 'gate-selftest', value: 4,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1520', metric: 'cross-checked-claims', value: 46,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: '★この版の変更とは無関係な指標(過去30日のコミット本文の語数の移動窓)。54@1507 からの目減りはコミット本文の書き方と窓の経過に依存し、この実装差分とは因果が無い。この版(括弧欠け修正)は trimName を node 単体で6ケース検証(閉じ括弧つきはそのまま/未閉じの開き括弧は落として…/括弧なし長名は従来通り/ネスト括弧は最後の未閉じだけ落とす)。★第2段(v0.1.1519)の本番実測もこの版で完了: GitHub Actions の og ジョブ成功(18枚焼き12秒・ジョブ全体25秒)・POST 200 stored:18・本番の live-og-image がランキング内 lv で 200(JPEG 1200x630)/圏外 lv で 302 フォールバック・焼き画像を目視し数字帯(来場/コメント/広告)と配信者名・時刻・ロゴのみで個人名の漏れ無しを確認。X の実カード表示だけ未確認(ユーザーが投稿画面に貼って目視)'
   })
 ]);
