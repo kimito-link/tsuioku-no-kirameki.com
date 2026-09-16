@@ -70,7 +70,8 @@
     "verify:deploy": "node scripts/verify-deploy.mjs",
     "improvement:record": "node scripts/record-improvement.mjs --auto",
     "improvement:record:selftest": "node scripts/record-improvement.mjs --selftest",
-    "council:scout": "node scripts/scout-models.mjs"
+    "council:scout": "node scripts/scout-models.mjs",
+    "council:daily": "node scripts/council-daily.mjs"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.4",
