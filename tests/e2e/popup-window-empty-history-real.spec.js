@@ -139,12 +139,15 @@ test('実別ウィンドウ empty-history: ウィンドウ高とコンテンツ�
   // 根治確認1: live レーンは empty-state では畳まれている（白い空白の正体）。
   expect(content.lanesDisplay, '#northStarLanes は empty-state で非表示').toBe('none');
 
-  // 根治確認2: ウィンドウが MAX(1100)に張り付いていない＝空き枠が消えた。
-  // バグ時はレーンの空枠でコンテンツ ~2245px → outer=1100 だった。
+  // 根治確認2: ウィンドウが MAX(1250)に張り付いていない＝空き枠が消えた。
+  // バグ時はレーンの空枠でコンテンツ ~2245px → outer=MAX だった。
+  // ★2026-09-01: primaryBottom（兄弟要素込みの実下端）を正しく測るよう viewportHint
+  //   計算を修正した結果、正常時でも outer が ~1150px 級になった（旧計算は過小評価
+  //   していた）ため、閾値を旧レーンバグ実測値(~2245px)から十分離れた1200に更新。
   expect(
     dims.outerHeight,
-    `ウィンドウ高 ${dims.outerHeight} が MAX(1100)未満＝空のレーン枠が消えた`
-  ).toBeLessThan(1080);
+    `ウィンドウ高 ${dims.outerHeight} が MAX(1250)未満＝空のレーン枠が消えた`
+  ).toBeLessThan(1200);
 
   // 根治確認3: ウィンドウ高とコンテンツ実高の差(下空白)が小さい。
   // chrome 余裕 40px + OS 誤差を見て 120px 以内なら「大きな白い空白」は無い。

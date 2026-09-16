@@ -395,7 +395,10 @@ export default [
     //   ★計器自身を重くしない工夫: 深さは「親の深さ+1」で求める(文書順なので親は処理済み)。
     //     親を毎回辿る版は 2,844要素で約34,000回の参照になる。上限4,000要素。
     //   判定は `src/lib/domTreeCensus.js`(純関数)。ここは採取だけ。
-    rules: { 'max-lines': ['error', { max: 22660, skipBlankLines: false, skipComments: false }] }
+    // ★fix/e2e-ci-headless マージ(22660→22666・+6行): PR #247 が持つ standalone popup の
+    //   empty state 高さ計算の根本修正(hoistQuickToolbarToTop の empty state 対応)を
+    //   master(v0.1.1462 時点)へ取り込んだ分。新規の計器・機能ではなく修正の行数。
+    rules: { 'max-lines': ['error', { max: 22666, skipBlankLines: false, skipComments: false }] }
   },
   {
     files: ['src/extension/popup/**/*.js'],
