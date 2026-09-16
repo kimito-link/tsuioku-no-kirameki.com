@@ -647,7 +647,12 @@ export const ENV_NAMES = {
   N: 'NVIDIA_API_KEY',
   O: 'OPENROUTER_API_KEY',
   E: 'GEMINI_API_KEY',
-  CF: 'CLOUDFLARE_API_TOKEN',
+  // ★2026-09-16 変更: Workers AI 用は CF_WORKERS_AI_TOKEN が正。
+  //  CLOUDFLARE_API_TOKEN（ゾーンDNS用に発行）ではアカウント系権限が無く Workers AI が
+  //  401 になる。CF勢6体が毎回401で落ちていた真因。meeting.mjs / scout-models.mjs 側は
+  //  `CF_WORKERS_AI_TOKEN || CLOUDFLARE_API_TOKEN` のフォールバックで両対応にしてある。
+  //  正本: web-ios-android/docs/ai-workflows/MULTI-BRAIN-HOWTO.md（権限はWorkers AIだけ）。
+  CF: 'CF_WORKERS_AI_TOKEN',
   CF_ACC: 'CLOUDFLARE_ACCOUNT_ID',
   SN: 'SAMBANOVA_API_KEY',
   MI: 'MISTRAL_API_KEY',
