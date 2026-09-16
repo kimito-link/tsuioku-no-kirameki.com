@@ -836,7 +836,7 @@
   - `tools/og-live-compose.py`
   - `.github/workflows/live-ranking.yml`
   - `vercel.json`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 207</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 208</summary>
 
 - `app/app.js` — スマホ閲覧用 status Web 版。
 - `app/live-view.js` — global NL_BUILD_ID
@@ -855,6 +855,7 @@
 - `scripts/check-tracked-imports.mjs` — 「コミットし忘れた新規ファイルを import している」ことを機械的に検出するリリース工程ガード(2026-07-06)。
 - `scripts/copy-ext.mjs` — 拡張を「同期対象外フォルダ」へコピーする(Chrome の再読み込み固着の根治)。
 - `scripts/council-cleanup.mjs` — 会議ハーネス(meeting.mjs)の後始末。
+- `scripts/council-daily.mjs` — 会議ハーネスの日課を1本にまとめる（2026-09-16 新設）
 - `scripts/council-lineup.mjs` — 会議メンバー名簿（クラウドのみ。ローカルOllamaは従来通り meeting.mjs 側の
 - `scripts/council-roles.mjs` — 会議ハーネス共通の「役割・出力フォーマット・批判強制」定義。
 - `scripts/cws-publish.mjs` — Chrome Web Store Publish API で ZIP をアップロード(+任意で公開申請)する。

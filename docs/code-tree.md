@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 6 / 872 件
+## ⚠️ 役割コメントが無いソース 6 / 873 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `src/lib/laneDomSelfMeasure.js`
@@ -681,7 +681,7 @@
   - `status-guard.js` — 状態速報ページ(status.html)の「何があっても開く」保険。
   - `status.html`
   - `venue.html`
-- 📁 **scripts/** (68)
+- 📁 **scripts/** (69)
   - 📁 **__pycache__/** (1)
     - `stage-submission.cpython-311.pyc`
   - 📁 **lib/** (1)
@@ -712,6 +712,7 @@
   - `check-tracked-imports.mjs` — 「コミットし忘れた新規ファイルを import している」ことを機械的に検出するリリース工程ガード(2026-07-06)。
   - `copy-ext.mjs` — 拡張を「同期対象外フォルダ」へコピーする(Chrome の再読み込み固着の根治)。
   - `council-cleanup.mjs` — 会議ハーネス(meeting.mjs)の後始末。
+  - `council-daily.mjs` — 会議ハーネスの日課を1本にまとめる（2026-09-16 新設）
   - `council-env.mjs` — 会議ハーネスに必要な env の診断と流し込み（2026-08-25 新設）
   - `council-lineup.mjs` — 会議メンバー名簿（クラウドのみ。ローカルOllamaは従来通り meeting.mjs 側の
   - `council-roles.mjs` — 会議ハーネス共通の「役割・出力フォーマット・批判強制」定義。
