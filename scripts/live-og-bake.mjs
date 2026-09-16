@@ -70,11 +70,32 @@ const DRY_RUN = hasFlag('dry-run');
 const ONLY_LV = String(argOf('lv') || '').trim().toLowerCase();
 const LIMIT = Number(argOf('limit')) || 0;
 
-/** 名前を SHARE_NAME_MAX で切る(liveRankingView の trimTo と同じ流儀・…で締める)。 */
+/** 開き括弧が閉じないまま末尾に残っていたら、その括弧以降を落とす(全角（）・半角()両対応)。
+ *  例「掲示板（七原君録画＆ミラー再放送」→「掲示板」。切り詰めで括弧の対応が崩れた時だけ効く。 */
+function dropDanglingOpenParen(s) {
+  const opens = { '（': '）', '(': ')' };
+  let depth = 0;
+  let lastOpenAt = -1;
+  for (let i = 0; i < s.length; i++) {
+    const ch = s[i];
+    if (opens[ch]) {
+      if (depth === 0) lastOpenAt = i;
+      depth++;
+    } else if (ch === '）' || ch === ')') {
+      if (depth > 0) depth--;
+    }
+  }
+  return depth > 0 && lastOpenAt >= 0 ? s.slice(0, lastOpenAt).trimEnd() : s;
+}
+
+/** 名前を SHARE_NAME_MAX で切る(liveRankingView の trimTo と同じ流儀・…で締める)。
+ *  切り詰めで開き括弧だけ残ると見栄えが悪いので、その括弧以降を落としてから…を付ける。 */
 function trimName(v) {
   const s = String(v == null ? '' : v).replace(/\s+/g, ' ').trim();
   const cp = Array.from(s);
-  return cp.length > SHARE_NAME_MAX ? `${cp.slice(0, SHARE_NAME_MAX - 1).join('')}…` : s;
+  if (cp.length <= SHARE_NAME_MAX) return s;
+  const cut = dropDanglingOpenParen(cp.slice(0, SHARE_NAME_MAX - 1).join(''));
+  return `${cut}…`;
 }
 
 /** JST の HH:MM 時点 ラベル(★時刻ラベルは scripts 側で作る・設計 §9)。 */
