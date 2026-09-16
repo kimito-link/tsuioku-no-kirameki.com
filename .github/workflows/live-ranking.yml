@@ -118,7 +118,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-          cache: pip
+          # ★cache: pip は使わない。requirements.txt / pyproject.toml が無いと
+          #   setup-python 自体がエラーで止まる(2026-09-16 実測)。Pillow は下で毎回入れる。
       - name: Pillow を入れる
         run: pip install pillow
       - name: フォント（BIZ UDGothic Bold）を取得（キャッシュ）
