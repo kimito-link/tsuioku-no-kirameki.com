@@ -155,7 +155,17 @@ const SN = process.env.SAMBANOVA_API_KEY;
 const MI = process.env.MISTRAL_API_KEY;
 // Cloudflare Workers AI（OpenAI互換）。トークン1つ＋アカウントID(公開情報)で叩ける無料枠。
 // 2026-06-27 実機確認: glm-5.2 / nemotron-3-120b / kimi-k2.7-code が 200＋本文で返ることを裏取り済み。
-const CF = process.env.CLOUDFLARE_API_TOKEN, CF_ACC = process.env.CLOUDFLARE_ACCOUNT_ID;
+// ★2026-09-16: Workers AI は **CF_WORKERS_AI_TOKEN を優先**する。
+//  CLOUDFLARE_API_TOKEN（ゾーンDNS用途で発行されたトークン）はアカウント系の権限が無く、
+//  Workers AI を叩くと 401 Authentication error になる。この日、CF勢6体全員が毎回401で
+//  落ちていた真因がこれだった（トークン自体は verify で active・ゾーン一覧も200なので
+//  「生きている」と誤認しやすい。**見えている≠その機能が使える**）。
+//  正しいトークンは最初から環境変数 CF_WORKERS_AI_TOKEN にあり、
+//  web-ios-android/docs/ai-workflows/MULTI-BRAIN-HOWTO.md が「権限はWorkers AIだけ」と
+//  規約化していた。会議側が古い変数名を読み続けていただけ＝人の作業もダッシュボードも不要だった。
+//  旧名もフォールバックに残す（旧名しか持たない環境を壊さないため）。
+const CF = process.env.CF_WORKERS_AI_TOKEN || process.env.CLOUDFLARE_API_TOKEN;
+const CF_ACC = process.env.CLOUDFLARE_ACCOUNT_ID;
 // OLLAMA_HOST は "0.0.0.0:11434" のようにスキームなしのことがある → 補う。127.0.0.1 で叩く。
 let OLLAMA = process.env.OLLAMA_HOST || 'http://127.0.0.1:11434';
 if (!/^https?:\/\//.test(OLLAMA)) OLLAMA = 'http://' + OLLAMA;

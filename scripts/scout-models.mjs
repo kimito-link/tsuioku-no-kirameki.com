@@ -42,7 +42,9 @@ const G = process.env.GROQ_API_KEY;
 const E = process.env.GEMINI_API_KEY;
 const N = process.env.NVIDIA_API_KEY;
 const O = process.env.OPENROUTER_API_KEY;
-const CF = process.env.CLOUDFLARE_API_TOKEN;
+// ★2026-09-16: Workers AI は CF_WORKERS_AI_TOKEN を優先（meeting.mjs と同じ理由）。
+//  CLOUDFLARE_API_TOKEN はゾーン系専用で Workers AI が401になる。旧名はフォールバック。
+const CF = process.env.CF_WORKERS_AI_TOKEN || process.env.CLOUDFLARE_API_TOKEN;
 const CF_ACC = process.env.CLOUDFLARE_ACCOUNT_ID;
 const SN = process.env.SAMBANOVA_API_KEY;
 const MI = process.env.MISTRAL_API_KEY;
@@ -479,8 +481,19 @@ async function main() {
     //  （従来の paid plan / workers free plan だけでは Mistral の文言を拾えなかった）。
     const paywalled = /paid plan|workers free plan|tier_not_allowed|subscription tier/i.test(snippet)
       || probe.status === 402;
-    if (paywalled || streak >= 2) {
-      const kind = paywalled ? '有料化(無料枠から外れた)' : '疎通不能';
+    // ★2026-09-16: 認証エラー(401/403)も **初回で即警告**する。上の課金要求と同じ理屈で
+    //  **待っても直らない**種類だが、従来は streak>=2 側に落ちていたため初日は無警告だった。
+    //  実害: この日 Cloudflare の API トークンがアカウント系権限を失い、**CF勢6体全員が
+    //  401 で毎回失敗**していたのに日報は1体も警告しなかった（司令塔が会議記録の
+    //  失敗文言を読んで発見）。トークン失効・権限剥奪・キー削除は人が直すまで回復しないので、
+    //  1日でも早く気づける方がよい。402/403 は paywalled 側が拾うため 401 を明示的に足す。
+    //  ★「疎通不能(429)」と混同しないこと: 429は待てば戻るので2日連続を待つ意味がある。
+    const authFailed = probe.status === 401
+      || /authentication error|unauthorized|invalid api key|invalid token/i.test(snippet);
+    if (paywalled || authFailed || streak >= 2) {
+      const kind = paywalled ? '有料化(無料枠から外れた)'
+        : authFailed ? '認証エラー(キー/権限の問題・人が直すまで回復しない)'
+        : '疎通不能';
       healthAlerts.push({ label: entry.label, streak, probeStatus: probe.status, kind: 'live', liveKind: kind, snippet: snippet.slice(0, 80) });
     }
   }
