@@ -661,5 +661,19 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
     version: '0.1.1521', metric: 'cross-checked-claims', value: 45,
     source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
     note: '★この版の変更とは無関係な指標(過去30日のコミット本文の語数の移動窓)。54@1507 からの目減りは窓の経過に依存し実装差分と因果が無い。この版(リファクタ Phase 2)は司令塔が別の手段で裏取り済み: (1)新テスト contentEntryFunctionBudget.test.js の 7 関数を extractFnBodyAfterParams で実測し slack が全て+30 であることを確認(2)content-entry.js に 2 行足すと max-lines が赤(19348>19346)・復元で緑、の変異確認を実施(directive で死んでいたゲートが実効することを証明)(3)新旧 wiring テスト計 20 ケース緑(既存 9 も不変)(4)verify:cc 全ゲート緑。★成果は Grok(dispatch --brain grok)が生成し司令塔が git diff で全数検収した'
+  }),
+  Object.freeze({
+    version: '0.1.1522', metric: 'bundle-kb', value: 1397,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '★悪化ではない: 前版 1398→1397KB(前版より改善・過去最良 1360@1454 には未達)。この版はリファクタ Phase 3(安全な棚卸し)で、popup-entry.js から重複していた paintVersionBadge() の二重呼び出し 1 行を削除しただけ(挙動不変)。popup バンドルの増分は更新履歴 1 件の入れ替えぶんで、実コードはむしろ 1 行減っている。1454 以来の増分は計器・検査ぶんで未計測(1508 の note 参照)'
+  }),
+  Object.freeze({
+    version: '0.1.1522', metric: 'gate-selftest', value: 4,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1522', metric: 'cross-checked-claims', value: 45,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: '★この版の変更とは無関係な指標(過去30日のコミット本文の語数の移動窓)。54@1507 からの目減りは窓の経過に依存し実装差分と因果が無い。この版(リファクタ Phase 3)は司令塔が実コードで裏取り済み: paintVersionBadge の第1呼び出し(popup-entry.js:19980)が initPopup 冒頭で無条件・try/catch 付き、第2呼び出し(旧:20029)との間に early return が無い直線フローであることを Read で確認。paintVersionBadge は冪等(ローカル manifest + build id を塗るだけ)なので後段の削除は挙動不変。verify:cc 全ゲート緑'
   })
 ]);
