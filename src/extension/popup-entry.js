@@ -20026,7 +20026,10 @@ async function initPopup() {
   void runOneTimeBackfillRemoveRecommendedUserChipPollution();
   installExtensionContextErrorGuard();
   initOfflineBannerOnce();
-  paintVersionBadge();
+  // v0.1.1522 (refactor Phase 3): ここの paintVersionBadge() 二重呼び出しを削除。
+  //   initPopup 冒頭(:19980)で無条件・try/catch 付きで既に塗っており、間に early return は
+  //   無い(直線フロー)。paintVersionBadge は冪等(ローカル manifest + build id を塗るだけ)なので
+  //   挙動不変。先に確実に呼ばれる冒頭側を残す。
   bindGiftRankingFetchPromptButtonOnce();
   // v0.1.450 (PR4): bindBackfillFetchPromptButtonOnce（B 用ボタン bind）は削除。
   //   A 内の「↻ もう一度ためす」ボタンは applyBackfillRecordCardHint 内で visible 時に
