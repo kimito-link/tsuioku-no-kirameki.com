@@ -647,5 +647,19 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
     version: '0.1.1520', metric: 'cross-checked-claims', value: 46,
     source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
     note: '★この版の変更とは無関係な指標(過去30日のコミット本文の語数の移動窓)。54@1507 からの目減りはコミット本文の書き方と窓の経過に依存し、この実装差分とは因果が無い。この版(括弧欠け修正)は trimName を node 単体で6ケース検証(閉じ括弧つきはそのまま/未閉じの開き括弧は落として…/括弧なし長名は従来通り/ネスト括弧は最後の未閉じだけ落とす)。★第2段(v0.1.1519)の本番実測もこの版で完了: GitHub Actions の og ジョブ成功(18枚焼き12秒・ジョブ全体25秒)・POST 200 stored:18・本番の live-og-image がランキング内 lv で 200(JPEG 1200x630)/圏外 lv で 302 フォールバック・焼き画像を目視し数字帯(来場/コメント/広告)と配信者名・時刻・ロゴのみで個人名の漏れ無しを確認。X の実カード表示だけ未確認(ユーザーが投稿画面に貼って目視)'
+  }),
+  Object.freeze({
+    version: '0.1.1521', metric: 'bundle-kb', value: 1398,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '★悪化ではない: 前版 1399→1398KB(前版より改善・過去最良 1360@1454 には未達)。この版はリファクタ Phase 2(安全網)で、変更は tests/(新テスト)・eslint.config.js のラチェット追加・content-entry.js の eslint-disable directive 削除のみ。popup.js の実コードは変えていない(popup バンドルに入るのは更新履歴 1 件の入れ替えだけ)。1454 以来の増分は計器・検査ぶんで未計測(1508 の note 参照)'
+  }),
+  Object.freeze({
+    version: '0.1.1521', metric: 'gate-selftest', value: 4,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1521', metric: 'cross-checked-claims', value: 45,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: '★この版の変更とは無関係な指標(過去30日のコミット本文の語数の移動窓)。54@1507 からの目減りは窓の経過に依存し実装差分と因果が無い。この版(リファクタ Phase 2)は司令塔が別の手段で裏取り済み: (1)新テスト contentEntryFunctionBudget.test.js の 7 関数を extractFnBodyAfterParams で実測し slack が全て+30 であることを確認(2)content-entry.js に 2 行足すと max-lines が赤(19348>19346)・復元で緑、の変異確認を実施(directive で死んでいたゲートが実効することを証明)(3)新旧 wiring テスト計 20 ケース緑(既存 9 も不変)(4)verify:cc 全ゲート緑。★成果は Grok(dispatch --brain grok)が生成し司令塔が git diff で全数検収した'
   })
 ]);

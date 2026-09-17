@@ -403,7 +403,19 @@ export default [
   },
   {
     files: ['src/extension/content-entry.js'],
-    rules: { 'max-lines': ['error', { max: 17267, skipBlankLines: false, skipComments: false }] }
+    // 17,267 は directive で抑止され実効していなかった（2026-08-06 確定・2026-09-17 実施）。
+    // 実測ちょうどへ復活。+ε は取らない。
+    rules: { 'max-lines': ['error', { max: 19346, skipBlankLines: false, skipComments: false }] }
+  },
+  {
+    // 安全網のみ。分割は別地図。
+    files: ['src/extension/venueBar.js'],
+    rules: { 'max-lines': ['error', { max: 7196, skipBlankLines: false, skipComments: false }] }
+  },
+  {
+    // 安全網のみ。分割は別地図。
+    files: ['src/extension/status-entry.js'],
+    rules: { 'max-lines': ['error', { max: 4544, skipBlankLines: false, skipComments: false }] }
   },
   {
     // extension/ 直下の素のスクリプト(esbuild を通さず同梱する .js)。background.js と

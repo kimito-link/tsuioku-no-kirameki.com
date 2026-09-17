@@ -53,13 +53,9 @@ export function extractFnBody(src, header) {
 }
 
 /** 探索対象(先に見つかった方を採用)。Phase 2 で popup/ 配下が増えても追加不要。 */
-function candidateFiles() {
+function candidateFiles(entry) {
   /** @type {string[]} */
   const files = [];
-  const entry = path.join(extensionDir, 'popup-entry.js');
-  if (fs.existsSync(entry)) files.push(entry);
-  // src/extension/popup/**(Phase 2 の受け皿・eslint に max-lines 2000 で予約済み)
-  const popupDir = path.join(extensionDir, 'popup');
   /** @param {string} dir */
   const walk = (dir) => {
     if (!fs.existsSync(dir)) return;
@@ -69,7 +65,18 @@ function candidateFiles() {
       else if (name.endsWith('.js') && !name.includes('.test.')) files.push(full);
     }
   };
-  walk(popupDir);
+  const includePopup = entry == null || entry === 'popup';
+  const includeContent = entry == null || entry === 'content';
+  if (includePopup) {
+    const popupEntry = path.join(extensionDir, 'popup-entry.js');
+    if (fs.existsSync(popupEntry)) files.push(popupEntry);
+    walk(path.join(extensionDir, 'popup'));
+  }
+  if (includeContent) {
+    const contentEntry = path.join(extensionDir, 'content-entry.js');
+    if (fs.existsSync(contentEntry)) files.push(contentEntry);
+    walk(path.join(extensionDir, 'content'));
+  }
   return files;
 }
 
@@ -77,13 +84,16 @@ function candidateFiles() {
  * 関数名から本体を取る。popup-entry.js → src/extension/popup/** の順に探す。
  *
  * @param {string} fnName 例 "publishLaneMirror"
- * @param {{ async?: boolean, export?: boolean }} [opts] 宣言の形(既定は両方を試す)
+ * @param {{ async?: boolean, export?: boolean, entry?: 'popup' | 'content' }} [opts] 宣言の形(既定は両方を試す)
  * @returns {string} 関数本体(必ず非空)
  * @throws {Error} どこにも無い / 本体が空のとき(★黙って緑にしない)
  */
 export function resolveEntryFnSource(fnName, opts = {}) {
   const name = String(fnName || '').trim();
   if (!name) throw new Error('resolveEntryFnSource: 関数名が空です');
+  if (opts.entry != null && opts.entry !== 'popup' && opts.entry !== 'content') {
+    throw new Error(`resolveEntryFnSource: unknown entry '${opts.entry}'`);
+  }
   // 宣言の書き方は複数あるので、実在しうる形を順に試す。
   const headers = [
     `export async function ${name}(`,
@@ -92,7 +102,7 @@ export function resolveEntryFnSource(fnName, opts = {}) {
     `function ${name}(`
   ];
   if (opts.async === true) headers.unshift(`async function ${name}(`);
-  for (const file of candidateFiles()) {
+  for (const file of candidateFiles(opts.entry)) {
     const src = fs.readFileSync(file, 'utf8').replace(/\r\n/g, '\n');
     for (const header of headers) {
       const body = extractFnBody(src, header);
@@ -101,7 +111,7 @@ export function resolveEntryFnSource(fnName, opts = {}) {
   }
   throw new Error(
     `resolveEntryFnSource: 関数 ${name} が見つかりません` +
-      `(popup-entry.js と src/extension/popup/** を探索済み)。` +
+      `(popup-entry.js / src/extension/popup/** / content-entry.js / src/extension/content/** を探索済み)。` +
       '関数名の変更・削除か、探索対象の追加漏れを疑ってください。'
   );
 }

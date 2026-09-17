@@ -314,9 +314,9 @@ graph LR
 - `sound/`（1 件） — 音声素材(src 側)  〔音声〕
 
 ## `tests/` — E2E / contract テスト(layer 依存・描画 spec 等)  〔テスト〕
-<sub>ファイル 80 件</sub>
+<sub>ファイル 81 件</sub>
 
-- `contract/`（3 件） — レイヤ依存などアーキテクチャ契約のテスト  〔テスト / 契約〕
+- `contract/`（4 件） — レイヤ依存などアーキテクチャ契約のテスト  〔テスト / 契約〕
 - `e2e/`（76 件） — Playwright の E2E(描画 spec・クリップ崩れ検出等)  〔テスト / E2E / 描画〕
 - `helpers/`（1 件） — ⚠️ 未記入（ROLES に追記）
 
