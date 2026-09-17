@@ -61,6 +61,18 @@ describe('resolveEntryFnSource(置き場所に依らず解決する)', () => {
   it('関数名が空でも throw する', () => {
     expect(() => resolveEntryFnSource('')).toThrow();
   });
+
+  it('★content-entry.js の実在関数を解決できる', () => {
+    const body = resolveEntryFnSource('start');
+    expect(body).toContain('async function start(');
+    expect(body.length).toBeGreaterThan(200);
+  });
+
+  it("★entry:'content' 指定で popup 側の同名関数を拾わない", () => {
+    const body = resolveEntryFnSource('hasExtensionContext', { entry: 'content' });
+    expect(body).toContain('isExtensionContextAlive');
+    expect(body).not.toContain('chrome?.runtime?.id');
+  });
 });
 
 describe('locateEntryFn(移設の進捗が読める)', () => {

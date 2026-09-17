@@ -188,6 +188,8 @@ NDGR（ニコ生コメント配信）／nicoad API／koken（貢献度）API／u
 | 生成物 | `npm run tree-map` / `npm run feature-map` | 新規ファイル・import 変更の後に必ず |
 | bump 整合 | `npm run verify:bump` | bump する時だけ（Q2） |
 
+**Phase 1 再測（実装担当・2026-09-17 HEAD `d7cd26af`）**: write_lock FREE。git status は分析時と同じ `M extension/dist/{content,popup,status,venue}.js` + `M app/dist/live-view.js` + `?? surechigai-user-needs-question.txt`（既存未コミット。未混入）。`test:cc` 921 files / 11,518 tests / 1 skipped / 6 todo / 82.79s / exit 0。`lint` exit 0。`typecheck` exit 0。`build` exit 0（`NL_BUILD_ID=0917-210759`）。関数ラチェット initPopup 2,595 / refresh 1,774。`verify:cc` OK（107s）。diagnostics は止めない報で `check-large-tracked-files` / `check-docs-match-code` が fail（既存・本作業起因ではない）。popup-entry 実測 22,656 行（指示書の 22,655 は 1 行差。上限 22,660）。棚卸し docs の initPopup 2,553 / refresh 1,764 は古い（docs 本体の数値表は未編集）。
+
 **e2e（`npm run test:e2e*`）は baseline に含めない**: memory に「e2e CI が 2026-08-05 から全 failure」とあり、本作業の合否判定に使えない（触らない・直さない）。
 
 ---
