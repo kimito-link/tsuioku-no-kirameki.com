@@ -675,5 +675,19 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
     version: '0.1.1522', metric: 'cross-checked-claims', value: 45,
     source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
     note: '★この版の変更とは無関係な指標(過去30日のコミット本文の語数の移動窓)。54@1507 からの目減りは窓の経過に依存し実装差分と因果が無い。この版(リファクタ Phase 3)は司令塔が実コードで裏取り済み: paintVersionBadge の第1呼び出し(popup-entry.js:19980)が initPopup 冒頭で無条件・try/catch 付き、第2呼び出し(旧:20029)との間に early return が無い直線フローであることを Read で確認。paintVersionBadge は冪等(ローカル manifest + build id を塗るだけ)なので後段の削除は挙動不変。verify:cc 全ゲート緑'
+  }),
+  Object.freeze({
+    version: '0.1.1523', metric: 'bundle-kb', value: 1396,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '★改善方向: 前版 1397→1396KB(この版で純関数 mergeCommentsWithInterceptCache / mergeInterceptCacheItems / normalizeInterceptCacheItems を popup-entry.js から src/lib/interceptCacheMerge.js へ移設した Track A)。過去最良 1360@1454 には未達だが、これは 1454 以来足した計器・検査ぶんで、抽出そのものは popup バンドルを減らす方向に効いている(1454 以来の増分は 1508 の note 参照)'
+  }),
+  Object.freeze({
+    version: '0.1.1523', metric: 'gate-selftest', value: 4,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1523', metric: 'cross-checked-claims', value: 46,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: '★この版の変更とは無関係な指標(過去30日のコミット本文の語数の移動窓)。54@1507 からの目減りは窓の経過に依存し実装差分と因果が無い。この版(Track A・純関数抽出)は司令塔が別の手段で裏取り済み: (1)移設 3 関数の characterization テスト計 20 ケースを新設し、切り出し前の入出力を固定(1 件は当初の私の思い込みが誤りで、pickStrongerUserId が強い uid を常に採るためしきい値と無関係に置換が起きる実挙動をテストで発見・修正) (2)lint が「移設で未使用になった 2 import」を検出→削除 (3)check:layer 緑(新 lib が純粋) (4)verify:cc 全ゲート緑'
   })
 ]);

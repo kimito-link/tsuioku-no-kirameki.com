@@ -18,6 +18,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1523',
+    date: '2026-09-18',
+    summary: '内部整理(表示や動作は変わりません)',
+    items: Object.freeze([
+      '内部の純粋な処理を共通の場所へ移して見通しをよくしました(表示や動作は変わりません)。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1522',
     date: '2026-09-18',
     summary: '内部整理(表示や動作は変わりません)',
@@ -185,16 +193,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     summary: '診断ページの説明文の誤りを訂正',
     items: Object.freeze([
       '★診断ページのソースコード内の説明文に、事実と異なる記載がありました。実際の動きは変わりません。'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.1503',
-    date: '2026-09-03',
-    summary: '無関係な更新で描き直す回数を減らしました',
-    items: Object.freeze([
-      '★画面と関係ない裏側の更新のせいで、無駄に描き直っていた回数を減らしました。体感の重さが少し軽くなるはずです。',
-      '★診断用のデータの更新や、前に見た配信情報の保存が、余計な描き直しを引き起こしていました。',
-      'これらは表示の正しさには関わらない裏方の処理だったため、描き直しの引き金から外しました。'
     ])
   })
 ]);
