@@ -1,511 +1,484 @@
-# refactor-instructions.md — 点滅追跡計器の撤去と安全な負債整理（実装担当モデル向け指示書）
+# リファクタリング指示書 — 拡張本体（popup-entry / content-entry / src/lib）
 
-> **作成**: 2026-08-06 / 司令塔(Claude Code)が実コードを読んで証拠ベースで作成
-> **改訂**: 2026-08-06 追補 — §6 の質問A〜Dはユーザー確定済み（回答を §6 に記載）。
-> ユーザー指摘「診断ページが重い。干渉しない仕組みを作るべきかもしれない」を受け
-> **Track B（診断ページの重さ・真因調査）** を追加。Track A（計器撤去）とは**独立して実施・コミットできる**。
-> ⚠️ Track B は当初「コア3read のバッチ化」で起案されたが、**実測（2026-08-06T07:18Z・v0.1.1277）で効果が否定された**
-> ため「まず真因を特定する調査」へ書き直した（§8 D-8）。実測より前の仮説をこの文書に書き戻さないこと。
-> **対象リポ**: `C:\Users\info\OneDrive\デスクトップ\Resilio\github\tsuioku-no-kirameki.com`
-> **想定実装者**: Codex / Opus / Cursor 等（`/goal docs/refactor-instructions.md` で渡される前提）
-> **着手前に必読**: [AGENTS.md](../AGENTS.md)（特に §3 設計判断・§12 実装前ゲート・§12.5 version bump）、
-> [CLAUDE.md](../CLAUDE.md)、[docs/handoff/HANDOFF-resume-0806-sidepanel.md](handoff/HANDOFF-resume-0806-sidepanel.md)
+> 作成: 2026-09-17 / 対象コミット: `9350c410`（master・v0.1.1520）
+> 作成者: 分析担当（Fable）。**コードは1行も変更していない。** 行番号は上記コミット時点の実測。
+> 実装担当への渡し方: `/goal docs/refactor-instructions.md に書かれたことを完遂しろ`
+> **末尾の「実装前に確認すべき質問」6 件は 2026-09-17 にユーザー回答済み（確定）。再質問せず、その決定に従うこと。**
 >
-> ⚠️ **ルート直下に別の `refactor-instructions.md`（entry 分割・component-factoring 計画）が既に存在する。**
-> あれは「popup-entry / content-entry を薄くする」長期計画（Phase 0 完了・Phase 1 未着手）で、**本書とは別タスク**。
-> 本書は「点滅追跡で入れた計器の撤去＋確実に安全な整理」に**限定**する。entry 分割はここではやらない。
+> 先行資料（本書はこれらの続き。矛盾したら本書の実測値が新しい）:
+> - 地図 `docs/handoff/giant-entry-split-MAP-2026-08-10.md`
+> - 仕様 `docs/handoff/giant-entry-split-SPEC-2026-08-10.md`（Phase 2 の設計 = 本書の Phase 4〜6）
+> - 棚卸し `docs/handoff/giant-entry-split-PHASE2-INVENTORY-2026-08-10.md`
+>
+> 過去の指示書とその状態（本書は**置き換え**ではなく続き。Non-Negotiables は累積で有効）:
+> | 指示書 | 内容 | 状態（2026-09-17 実コードで確認） |
+> |---|---|---|
+> | ルート `refactor-instructions.md`（2026-06-25） | I/O を含まない純関数を `src/lib` へ抽出（Phase A）・Danger Map | 一部実施（`5feeb50a` `161117f3` `eaab67ad` `dbc31875`）。§1 の 8 挙動と §3 Danger Map は**今も有効** |
+> | `docs/refactor-instructions.md` 旧版（2026-08-06） | 点滅追跡計器の撤去 | **完遂**（v0.1.1278）。本書で上書きした。旧文は `git show 31c0646c:docs/refactor-instructions.md` |
+> | `docs/refactor-instructions-2026-08-29.md` | content ラチェット復活（D-1）・popup の I/O 無し関数を lib へ（D-2） | **D-1 未実施**（directive が残っている）。**D-2 の候補 3 件も未抽出**（本書 Phase 4 Track A に引き継ぐ。ただし同書の行数は古い: `mergeInterceptCacheItems` は 187 行ではなく実測 26 行） |
 
 ---
 
-## 1. Objective（目的）
+## Objective
 
-2026-08-01〜06 の「パネル点滅」調査で `src/extension/content-entry.js` に投入された
-**点滅追跡専用の診断計器（8系統）と、その残骸（死んだ送信口・終了済み実験フラグ）を、挙動を変えずに撤去する。**
+**目的**: 拡張本体（`src/extension/` + `src/lib/` + `extension/`）を、**既存挙動を1つも変えずに**「今後の変更が入れやすく・エラーが出にくい」状態へ近づける。
 
-- 背景: 点滅は Side Panel 移行（v0.1.1275）で解決済み。5日間で28版、うち14版が計器だった
-  （[docs/handoff/HANDOFF-resume-0806-sidepanel.md](handoff/HANDOFF-resume-0806-sidepanel.md) §未解決(4)）。
-- ユーザーの明言した方針: **「用が済んだ計器は外す。ただし診断強化そのものは残す」**。
-  → 撤去するのは点滅追跡専用の計器**だけ**。診断の仕組み（状態速報・fastDiag・診断レジストリ・
-  進行中バグ用の計器）は**残す**。
-- 副次目的（安全なもののみ）: content-entry.js の死んでいる max-lines ラチェットの復活、
-  計器スナップショット重複の解消。
+**目的ではないこと**: 見た目を綺麗にすること／古いコードを一掃すること／行数を減らすこと自体。
 
-**追加目的（Track B・独立実施可）**: 診断ページ（status-entry.js）の更新が実測 9.8秒かかる問題の
-**真因特定**。実測で重いのは `lives`(5.5秒) と `summaries`(4.3秒) の2つだけと判明済み（§8 D-8）。
-原因が確定するまで修正はしない（調査→提案→承認→実装の順）。
+**なぜ今か（実測）**:
 
-**目的ではないもの**: 見た目の綺麗さ・entry ファイルの分割・新機能・未解決バグ（101%二重計上／
-「watchページが見つかりません」）の修正。
+| 計器 | 現在値 | 上限 | 余裕 |
+|---|---:|---:|---:|
+| `src/extension/popup-entry.js` 行数 | 22,655 | 22,660（`eslint.config.js:398`） | **5行** |
+| `initPopup()` 行数 | 2,595 | 2,600（`tests/contract/popupEntryFunctionBudget.test.js:32`） | **5行** |
+| `refresh()` 行数 | 1,774 | 1,800（同 :33） | 26行 |
+| `src/extension/content-entry.js` 行数 | 19,347 | 17,267（`eslint.config.js:406`） | **-2,080行（ゲートが死んでいる。Debt D2）** |
 
----
+popup-entry は**次の1つの修正で必ずゲートに当たる**。「修正のたびに抽出で行数を作る」状態は、修正のコストを上げ、抽出を雑にする誘因になる。先に安全網を張り、小さく・戻せる単位で責務を外へ出す。
 
-## 2. Project Understanding（プロジェクト理解・証拠ベース）
-
-### 2.1 何をするものか
-
-**「君斗りんくの追憶のきらめき」** — ニコニコ生放送（`*.nicovideo.jp`）の応援コメントを
-利用者本人のローカル（`chrome.storage.local`）に記録し、3キャラ（りんく／こん太／たぬ姉）の
-レーンで振り返れる Chrome 拡張（MV3）。CWS 公開中（拡張ID `cjbabignmmodaickpeckiojjabnlogdb`）。
-LP + プライバシーポリシーは `tsuioku-no-kirameki/`（Cloudflare Pages 自動デプロイ）。
-
-### 2.2 主要エントリーポイント（esbuild bundle: `scripts/build.mjs` → `extension/dist/` ほか）
-
-| ファイル | 行数 | 責務 |
-|---|---|---|
-| `src/extension/content-entry.js` | 19,464 | **watch ページ常駐の記録エンジン**。NDGR受信・DOM収集・記録・backfill・インラインパネル host 管理。**本書の主戦場** |
-| `src/extension/popup-entry.js` | 22,225 | ポップアップ/サイドパネル UI 本体（応援レーン・HTMLレポート・診断共有）。**本書では触らない** |
-| `src/extension/page-intercept-entry.js` | 1,531 | MAIN world スクリプト（fetch フック・コメント送信 `NLS_INTERCEPT_COMMENT_POST` 経路）。v0.1.1276 で点滅調査トラップは**撤去済み** |
-| `src/extension/status-entry.js` | 3,656 | 状態速報（診断）ページ |
-| `extension/background.js` | — | SW。**Side Panel を開くクリックリスナー（v0.1.1275・触るな）**。`chrome.sidePanel.open()` は同期呼び出し必須 |
-| `src/lib/*.js` | 約640モジュール + 約650テスト | 純関数ライブラリ（vitest 対象） |
-
-### 2.3 データフロー（本書に関わる範囲）
-
-- コメント: NDGR(fetch intercept, MAIN world) + DOM 走査 → content-entry が `chrome.storage.local` へ記録。
-- 診断: content-entry が `buildAiShareFastDiagnosticsPayload()`（行7236）と
-  `buildAiSharePageDiagnostics()`（行9883）で診断 JSON を構築 → `src/lib/statusFastDiagLite.js` が
-  「印字用サブセット(lite)」を作る → 状態速報のコピペ・`npm run status:live` に出る。
-  **lite に通っていない計器はユーザーのコピペに永久に出ない**（memory [[fastdiag-lite-is-the-printer-subset]]）。
-  → 計器を消すときは **full(2箇所) + lite + 整形(aiShareFullText.js)** を揃って消す必要がある。
-
-### 2.4 検証コマンド（実在を package.json で確認済み）
-
-| コマンド | 内容 |
-|---|---|
-| `npm run verify:cc` | **出荷ゲート一本**。test:cc → lint → typecheck → build → no-secrets → tracked-imports → tree-map:check → site-health:check → feature-map:check → verify:bump の10段（`scripts/run-verify-cc.mjs`）。失敗時は `.artifacts/verify-cc.log` を読む |
-| `npm run test:cc` | vitest（dot reporter）。`npx vitest run` をパイプ付きで打つのは禁止（Windows でハング） |
-| `npm run lint` / `npm run typecheck` | eslint / tsc --noEmit |
-| `npm run verify:bump` | manifest / package.json / changelog の版数同期チェック |
-| `npm run tree-map` / `npm run feature-map` | lib ファイルを消したら**再生成してコミットに含める**（check が verify:cc 内にあり、古いままだと落ちる） |
-| 個別テスト | `npx vitest run src/lib/<file>.test.js --reporter=dot` |
-
-### 2.5 このリポ固有の地雷（実績あり・必ず守る）
-
-- **Windows**: 日本語パスは引用符。PowerShell に日本語文字列を渡さない。Unix パイプ（`tail`/`head`/`grep`）を PowerShell で使わない。
-- **dist は git 追跡**。pre-push フックがビルドを走らせるため **push 直後は dist の buildId が1つずれる**。追いかけない（既知の揺れ）。
-- **wiring テストは変異で赤を確認するまでが1セット**（memory [[wiring-test-mutation-check-2026-08-01]]）。
-  ゲート・計器を撤去したときは、**テストの「向き」を反転**させて「消えていること」を固定する
-  （HANDOFF-resume-0806 踏んだ地雷#4）。regex は前後アンカーまで固定（[[mutation-test-needs-anchored-regex-2026-08-05]]）。
-- **python の一括置換は CRLF/LF で壊れる**（`newline=''` 必須）。原則 Edit ツール等の exact-match 置換を使う。
-- **バンドラは日本語を `\uXXXX` にする**ので dist の grep では日本語文言は見つからない。
-- **paint 毎の DOM 走査は禁止**（v0.1.1201 で拡張全体を重くした前科）。
+**成功の測り方**（行数ではなく性質で測る・仕様 Q8 踏襲）:
+1. 抽出した各塊が **単体テスト（happy-dom/引数注入）で動く**
+2. `initPopup`/`refresh` の関数ラチェットが**下がる**（同一ファイル内で移しただけでは下がらない）
+3. 既存 wiring テストが**移動後も緑**（`resolveEntryFnSource` 経由）
+4. content-entry の max-lines ゲートが**生き返る**
 
 ---
 
-## 3. Behaviors To Preserve（絶対に壊してはいけない既存挙動）
+## Project Understanding
 
-以下は**計器と同じ名前空間・同じ関数に混在している「実挙動」**。1行も変えない。
+### 何を作っているか
 
-1. **`INLINE_HOST_HIDDEN_ATTR`（`data-nls-hidden`）= 「消えている」状態の唯一の正本**
-   - 定義: `src/lib/inlineHostVisibilityIntent.js:103`
-   - CSS ルール `#nls-inline-popup-host[data-nls-hidden="1"] { display:none !important; ... }`
-     （content-entry.js 行3605付近・v0.1.1266 で「CSS既定を安全側に反転」した着地）
-   - host 生成直後の属性付与（content-entry.js 行4299。「こん太を押すまで出さない」を守る窓ゼロの実装）
-   - 固定テスト: `src/lib/inlineHostHiddenAttr.wiring.test.js`（**残す**）
-2. **`setInlineHostDisplay()`（行3096）= host の display を書き換える唯一の入口**
-   - 9箇所に散っていた直接代入の集約。属性の付け外しと必ずセット。関数自体・集約構造は残す
-     （内部の計器呼び出し `noteHostHidden`/`noteHostShown`/`noteInlineHostHideReason`/`trail` だけが撤去対象）。
-3. **`setInlineHostVisible()`（行3194）= 見せる/消すの唯一の入口**（display/opacity/pointerEvents/aria-hidden をセットで書く）
-4. **`_inlineHostEverShown` ガード（行3192・v0.1.1274）**: 一度表示したパネルを `autoshow_off` で消さない。
-   固定テスト: `src/lib/autoshowHideExperiment.wiring.test.js` の該当 it（このガードの断言は**残す**か、テスト再編時も断言を維持）。
-5. **`shouldHideInlineHostOnMissingPanel()`（inlineHostRecoveryGate.js・使用箇所 行13167）**:
-   ニコ生 SPA 再描画でコメントパネルが一時未検出でも「watch URL に居る限り消さない」ガード。
-   `verdict.hide` の判定と `hidePageFrameOverlay('left_watch_page')` への流れは不変。
-   （撤去してよいのは診断カウンタ `_inlineHostRecoveryDiag` への加算だけ）
-6. **`ensurePageFrameStyleAlive()`（行3022）**: 拡張の `<style>` が外部に消されたとき貼り直す自己修復。
-   4秒経路から無条件で呼ばれる（行13145）。**復帰経路なので残す**（[[gate-may-be-the-only-recovery-path-2026-08-04]]）。
-   （撤去してよいのは回数カウンタ `_pageFrameStyleReattachCount` だけ）
-7. **Side Panel まわり（extension/background.js）**: クリックリスナーの同期 `chrome.sidePanel.open()`、
-   `nls_toolbar_action_policy`（`prefer_focus_inline` で埋め込みへ戻す道）。**一切触らない**。
-8. **記録エンジン全体**: NDGR受信・DOM走査・persist・backfill・4秒 poll（`syncLiveIdFromLocation` 等）の
-   タイマー構造。`stopContentIntervalsIfContextInvalidated` の解除順も不変。
-9. **進行中バグ調査用の計器（撤去禁止）**: `dedupeSeedDiag`（記録101%二重計上の調査中・HANDOFF §未解決(2)）、
-   `commentSubmitDiag`（送信の感度計測）、`scrollWhiteoutDiag`・`hostMoveDiag`（§6 質問A=残すで確定）。
-10. **プライバシー/ストア関連**: manifest の権限・description・privacy 文書には触れない。
-11. **【Track B】status-entry.js のコア read は直列のまま**。`Promise.all` 並行化は
-    **v0.1.867 で実施→実機退行（timeout 多発・fastDiag={}・記録0）→v0.1.868 で撤回済み**
-    （status-entry.js 行631-633 のコメントで確認済み）。**並行化は提案すら禁止**。
-    正しい方向は「read の回数・量そのものを減らす」。
-12. **【Track B】extras 17項目のバッチ read（`_extrasBatchGuard`・v0.1.1084・12秒間引き
-    `EXTRAS_REFETCH_MS`）は手当て済みの現役構造**（status-entry.js 行669-681・
-    `src/lib/statusExtrasBatch.js`）。触らない。
-13. **【Track B】stale-guarded-read の意味論**（timeout しても throw せず stale 値で描く・
-    2026-07-14 の608秒固まり根治）を変えない。
-14. **IndexedDB へのコメント保存移行は永久却下済み**（2026-06-01 実機失敗・
-    `FORCE_DISABLE_COMMENT_IDB_PATH` が content-entry.js に現存）。候補に挙げない。
+Chrome 拡張（MV3）「君斗りんくの追憶のきらめき」（`extension/manifest.json`・v0.1.1520）。
+ニコニコ生放送（`https://*.nicovideo.jp/*`）の応援コメントを**利用者のPC内**（`chrome.storage.local` + IndexedDB）に記録し、3レーン（りんく／こん太／たぬ姉）等で可視化する。Chrome Web Store 公開中（ID `cjbabignmmodaickpeckiojjabnlogdb`）。
 
----
+### エントリーポイント（`scripts/build.mjs` の targets が正本）
 
-## 4. Non-Negotiables（作業規律・違反したら差し戻し）
+| ソース | 出力 | 実行文脈 | 行数 |
+|---|---|---|---:|
+| `src/extension/page-intercept-entry.js` | `extension/dist/page-intercept.js` | watch ページ **MAIN world**・`document_start`・全フレーム。fetch/NDGR を傍受し `window.postMessage` で content へ | 1,556 |
+| `src/extension/content-entry.js` | `extension/dist/content.js` | watch ページ content script・`document_idle`・全フレーム。**記録エンジン本体**（NDGR+DOM 取込・storage/IDB 書込・バックフィル・インラインパネル iframe の設置） | 19,347 |
+| `src/extension/popup-entry.js` | `extension/dist/popup.js` | `popup.html`。ツールバーpopup／watch ページ内 iframe（`?inline=1`）／サイドパネル（`sidepanel.html` が iframe で載せる）／受動ビュー（`INLINE_PASSIVE`）の**全て** | 22,655 |
+| `src/extension/status-entry.js` | `extension/dist/status.js` | `status.html` 状態速報（診断ページ・読み取り専用） | 4,544 |
+| `src/extension/venueBar.js` | `extension/dist/venue.js`（`venue-entry.js` 経由）+ content からも import | 会場モード（鏡の reader） | 7,196 |
+| `src/extension/offscreen-entry.js` | `extension/dist/offscreen.js` | Offscreen Document = コメント IDB の常駐書き手 | 322 |
+| `src/extension/backfill-sw-entry.js` | `extension/dist/backfill-sw.js` | `background.js` が `importScripts` で読む | 464 |
+| `extension/background.js` | （esbuild を通さない手書き SW） | MV3 Service Worker。IDB 書込集約・自動バックアップ・タブ注入・popup 窓管理。`src/lib` を **import できないので定数を手でミラー**（`:28-55`, `:100-109`） | 3,718 |
+| その他 | comeview / live-view / marketing-export / sidepanel / cloak-failsafe | 独立ページ（popup 非依存） | 86〜2,249 |
 
-1. **最初に `git status` を確認**。既存の未コミット変更（`app/dist/live-view.js` / `extension/dist/popup.js` /
-   `extension/dist/status.js` の dist 揺れ、未追跡の council ログ類）と**自分の変更を混ぜない**。
-   未追跡ファイルの削除・gitignore 追加は**しない**（ユーザーのローカル資産）。
-2. **編集前に baseline を記録**: `npm run verify:cc` を1回流し、結果（10段の OK/NG）を控える。
-   baseline で既に赤いものは自分の責任範囲外として記録だけする（黙って直さない）。
-3. **変更は小さく戻しやすい単位**（計器1系統 = 1コミット目安）。各フェーズ末に検証。
-4. **無関係な整形・ついでリファクタ禁止**（AGENTS.md §12.2「外科的に変更」）。
-5. **既存挙動を勝手に変えない**。§3 のリストに触れる必要が生じたら**停止して質問**。
-6. **version bump は §12.5 に従う**: 意味ある変更1つ = patch 1つ。3点セット
-   （`extension/manifest.json` / `package.json` / `src/lib/changelog.js` 先頭・summary 35字以内）を同期し
-   `npm run verify:bump` を通す。本タスクは「計器撤去」で1バンプ、「ラチェット復活」で1バンプが目安。
-7. **push しただけでは Chrome に届かない**: 報告には反映3手順（pull → 拡張リロード → watch タブ F5）を1行添える。
-8. **lib ファイルを削除したら** `npm run tree-map` と `npm run feature-map` を再生成しコミットに含める。
-9. **`git add` は新規/削除ファイルを明示列挙**（フィルタ add による取りこぼし事故の実績あり・AGENTS.md §12.5）。
-10. commit メッセージ規約は AGENTS.md §7（`refactor(content): ...` 等・日本語可）。
+★**`app/live-view.js:821` が `popup-entry.js` を dynamic import する**（`:166-171` で `globalThis.chrome` のシムを先に置き、`hasExtensionContext()` が `runtime.id && storage.local` を見る前提）。出力は `app/dist/live-view.js`（esm）。＝ popup-entry が import する新モジュールは**純 Web 版にも同梱される**。モジュール評価時（top-level）に本物の `chrome.*` を要求する副作用を新モジュールに置かないこと（既存 popup-entry と同じ前提に留める）。
 
----
+`src/lib/`（752 ファイル・非テスト）は**純粋関数の箱**（`src/lib/AGENTS.md`）。`chrome.*`/`fetch`/`document`/`window` を実コードで呼ぶと `npm run check:layer` が赤（ベースライン 42 件は許容）。実測で **lib → entry の逆流 import は 0 件**。
 
-## 5. Stop And Ask Conditions（実装を止めて質問する条件)
+### データの流れ（抽出時に壊してはいけない配線）
 
-- §3 の「Behaviors To Preserve」のいずれかを変更・削除しないと先へ進めないとき。
-- 撤去対象リスト（§7 Phase 2-4 の名指し分）**以外**の計器・診断・ゲートを消したくなったとき
-  （特に `scrollWhiteoutDiag` / `hostMoveDiag` / `dedupeSeedDiag` / `commentSubmitDiag` / 診断レジストリ系）。
-- テストが「計器の存在」を固定していて、撤去の向きに反転してよいか判断がつかないとき
-  （例: そのテストが実挙動の断言を**同居**させている場合 — `autoshowHideExperiment.wiring.test.js` が該当。
-  実挙動の断言だけ残して計器の断言を落とす、が原則だが、切り分けに迷ったら質問）。
-- `statusFastDiagLite.js` から削るフィールドが撤去対象リスト外に及ぶとき。
-- `extension/background.js`・`manifest.json`・storage キーのスキーマ・保存済みデータに影響が及ぶとき。
-- baseline の `verify:cc` が赤で、原因が自分の変更か既存かを切り分けられないとき。
-- eslint ラチェット復活（Phase 5）で lint が予想外の別ルールで赤くなったとき。
-- 【Track B】真因調査の結果、修正案が §3 の 11〜14（直列維持・extras 不可侵・stale-guard 意味論・
-  IndexedDB 却下）のいずれかに抵触するとき、または表示の鮮度・更新間隔などユーザー体感が
-  変わりうる案しか無いとき（例: トレンド記録 `recordAndAnalyzeTrendSafe` 内の `set`
-  （status-entry.js 行1305）を読み取りサイクル外へ出す・混雑中スキップする等は挙動が変わりうるので
-  実装前に必ず質問）。
-- 【Track B】調査で計器（タイミング計測）を仕込む必要があり、それが出荷版に乗るとき
-  （計器スパイラルの再発防止: [[instrument-spiral-25-versions-2026-08-06]]。計器を2版続けて
-  入れる前に必ず立ち止まる）。
-
----
-
-## 6. 実装前の質問と回答（2026-08-06 ユーザー確定済み・実装者は再質問不要）
-
-- **質問A → 確定: 残す**。`scrollWhiteoutDiag`（v0.1.923）と `hostMoveDiag`（v0.1.1124）は
-  点滅追跡以前からの計器で HANDOFF の撤去リスト8系統に入っていない。**撤去対象に含めない**。
-- **質問B → 確定: ファイルごと削除**。撤去する計器の lib モジュール（`hostVisibilityWatch.js` 等 +
-  単体テスト）は削除する（参照ゼロで残すと死コードになるため）。
-- **質問C → 確定: やる**。content-entry.js 行1 の `/* eslint-disable max-lines */` を外し、
-  ラチェットを実測+50 に張り直す（Phase 5）。
-- **質問D → 確定: 今回はやらない**。ルート直下の設計文書の `docs/handoff/` への移動は提案のみ（Phase 6）。
-
-Track B で新たに質問が生じた場合（§5 の Stop And Ask 条件）は、その都度停止して質問すること。
-
----
-
-## 7. Baseline Commands（Phase 0 で必ず実行・記録）
-
-```bash
-git status                  # 既存差分の確認（dist 3ファイルの揺れは既知）
-git log --oneline -5        # 現在地の確認（v0.1.1277 相当のはず）
-npm run verify:cc           # 10段の結果を控える（.artifacts/verify-cc.log）
+```
+page-intercept (MAIN world)  --window.postMessage-->  content-entry
+content-entry  --chrome.storage.local (nls_* / chunk / tail)-->  popup / status / venue / comeview
+content-entry  --NLS_CDB_APPEND (runtime.sendMessage)-->  background.js  --> IndexedDB (or Offscreen 経由)
+popup-entry    --鏡 publish (KEY_LANE_MIRROR / KEY_NORTH_STAR_MIRROR / KEY_STAT_CARDS_MIRROR …)-->  受動ビュー・会場・status・Web版
+popup-entry    <--tabs.sendMessage (NLS_EXPORT_WATCH_SNAPSHOT / NLS_POST_COMMENT …)-->  content-entry
+content-entry  --window.postMessage (即時プッシュ・NLS_LIVE_CHANNEL_SWITCH)-->  popup iframe
 ```
 
----
+- storage.onChanged 購読: popup 10 箇所 / content 1 / venue 1 / background 2
+- `runtime.onMessage` 受け口: background 17 / content 2 / popup 0（popup は `window` message 3 箇所）
+- メッセージ種別は `'NLS_*'` 文字列リテラル **46 種**が entry と background に散在（中央の登録簿なし）
 
-## 8. Debt Map(負債地図・証拠つき)
+### 外部依存（`AGENTS.md §3.6`「いつか落ちる・形が変わる」前提）
 
-### D-1. 点滅追跡計器8系統が content-entry.js に残留【本タスクの本体・実装してよい】
+NDGR（ニコ生コメント配信）／nicoad API／koken（貢献度）API／usericon CDN／VOICEVOX（`127.0.0.1:50021`）／`app.tsuioku-no-kirameki.com`（status 共有）／`suggestqueries.google.com`。通信の作法は `src/lib/*Client.js` に閉じ込めるのが方針（`src/lib/AGENTS.md`）。
 
-- **根拠**: `src/extension/content-entry.js` 行2827-3087（状態と rAF ループ）、行7313-7360 と
-  行10046-10090（診断 JSON への出力・**ほぼ同一ブロックが2箇所に重複**）、行14974（`startHostVisibilityWatch()` を無条件起動）。
-  HANDOFF-resume-0806 §未解決(4) が撤去対象を名指し:
-  `vanishForensics` / `hostStyleTrace` / `hostAncestryTrace` / `hostVisWatch` / `hostFlipCensus` /
-  `hostHideReason` / `styleReattach` / `hostRecoveryDiag`。
-- **なぜ負債か**: 点滅は Side Panel 移行で解決済み＝用済み。`startHostVisibilityWatch` は
-  **rAF 毎フレームループ**で、Side Panel 既定でも回り続ける（host 不在時はほぼ no-op だが wakeup は毎フレーム）。
-  `ensureHostAncestryMutationTrace` は host+親+祖父に MutationObserver を張る。
-  状態速報 JSON が長く読みにくい（ユーザーも「削ると読みやすくなる」と明言）。
-  **実測証拠（2026-08-06T07:18Z・v0.1.1277・ユーザー実機の速報）**: Side Panel 移行後にも
-  `hostVisWatch: frames 12660` / `hostAncestryTrace: 属性変化1830件` / `hostStyleTrace: 946回` と
-  **全計器が回り続けている**ことが確認された＝撤去の妥当性の裏づけ。
-- **影響範囲**: content-entry.js、`src/lib/statusFastDiagLite.js`（passthrough）、`src/lib/aiShareFullText.js`（整形）、
-  lib 8ファイル（`hostVisibilityWatch.js` / `hostVisibilityFlipCensus.js` / `hostStyleMutationTrace.js` /
-  `hostVanishForensics.js` / `inlineHostVanishClassifier.js` / `inlineHostHideReasonCensus.js` の各実装+単体テスト。
-  ※`inlineHostVisibilityIntent.js` と `inlineHostRecoveryGate.js` は**実挙動を含むので削除禁止**）、
-  wiring テスト5+本（`hostVisWatch` / `hostFlipCensus` / `hostStyleTrace` / `inlineHostHideReason` /
-  `vanishForensics1267` の各 .wiring.test.js）。
-- **変更リスク**: 中。計器と実挙動が同じ関数に混在（§3 参照）。lint(no-unused-vars) と
-  wiring テスト反転で機械検出できる。
-- **改善案**: Phase 2-4 の手順どおり1系統ずつ撤去。
-- **検証**: 各コミットで `npm run test:cc` + `npm run lint`、フェーズ末に `verify:cc`。
-  撤去後に「消えていること」を固定するテストを1本追加（§9 Phase 3 参照）。
+### 検証の仕組み（既存・全部生きている）
 
-### D-2. MAIN world 書き込みトラップの死んだ送信口【確実な死コード・実装してよい】
+- `npm run verify:cc`（`scripts/run-verify-cc.mjs`）= test:cc → lint → typecheck → build → no-secrets → tracked-imports → agent-bootstrap → tree-map:check → site-health:check → feature-map:check → improvement → layer → layer-map:check → verify:bump → 各 selftest。**末尾の `diagnostics` は「報」（赤でも止めない）**。
+- 契約テスト: `tests/contract/popupEntryFunctionBudget.test.js`（関数ラチェット）／`tests/contract/wiringTestSource.test.js`（移設耐性ヘルパ）／`tests/contract/layer-dependency.test.js`（src/shared・domain・data・ui の依存方向）
+- `src/lib/storageFullReadCensus.test.js`: `get(null)` 全件読みを **2 箇所・関数名・ファイル名で固定**（`:103-106`, `:134-135`）
+- `scripts/verify-bump.mjs:136-141`: `dist/popup.js` に `applyStoryGrowthIconAttributes` / `syncStorySourceEntries` / `renderCharacterScene` / `paintWatchPopupUi` が**含まれる**ことを要求（esbuild は `minifyIdentifiers:false` なので別モジュールへ移しても名前は残る＝**リネームだけ禁止**）
+- `src/lib/laneMirrorContract.js:73` `LANE_MIRROR_CONSUMERS`: 鏡の書き手は `popup-entry.js` の `publishLaneMirror` 1 箇所と registry テストが照合
+- `.husky/pre-commit`: `impact-check`（警告のみ）＋ tree-map 同梱ゲート（新規/削除ファイルを含むコミットでブロック）＋ `.artifacts/agent-git.lock`
+- `.husky/pre-push`: `npm run verify`（★Claude ターミナルでハングする素の verify。**push は本書の範囲外**）
 
-- **根拠**: v0.1.1276（commit ee29dba9）で page-intercept-entry.js 側のトラップ本体・受信側を撤去済み
-  （`grep hwt src/extension/page-intercept-entry.js` は0件）。しかし content-entry.js に
-  `armHostWriteTrap()`（行2871・呼び出し 行3050, 4307）、`helloHostWriteTrap()`（行2886・呼び出し 行14366）、
-  `_hwtArmedHost`（行2863）が残り、**誰も聴いていない CustomEvent（`nls:hwt-arm`/`nls:hwt-hello`）を dispatch し続けている**。
-- **なぜ負債か**: 受信者ゼロの送信＝純粋な死コード。読み手を「MAIN world に何かある」と誤誘導する。
-- **影響/リスク**: 低。dispatch は no-op。削除で挙動不変。
-- **検証**: `grep -rn "hwt" src/` が0件になること + test:cc 緑。
+### 型検査の実効範囲（誤解しやすい）
 
-### D-3. 終了済み二分実験フラグ【確実な死コード・実装してよい（テストの扱いに注意）】
-
-- **根拠**: `INLINE_AUTOSHOW_HIDE_EXPERIMENT = false`（content-entry.js 行3190。コメントに
-  「実験は終了(2026-08-05)・無罪と確定」と明記）。`src/lib/autoshowHideExperiment.wiring.test.js` が
-  「フラグが定義されている」ことを固定している。
-- **なぜ負債か**: 実験終了・恒久 false。フラグ分岐が読み手の認知コストになる。
-- **実測で確認された実害（2026-08-06 速報）**: `パネルを消した理由 ⚠ 1774回 —
-  autoshow_off_experiment_skipped 887 / autoshow_off 887` と、**実験由来のタグが本番の診断に
-  50% を占めて出続けている**。実コードで裏取り済みの構造:
-  - `noteInlineHostHideReason('autoshow_off_experiment_skipped')`（content-entry.js 行7939）は
-    autoshow の hide 判定が立つたび**無条件に**打たれる census 記録（＝計器。名前が実験当時のまま）。
-  - 実際に消す実行は行7960 `if (!INLINE_AUTOSHOW_HIDE_EXPERIMENT && !_inlineHostEverShown)` に
-    ゲートされており、フラグは恒久 false なので**実効条件は `!_inlineHostEverShown` だけ**
-    （= v0.1.1274 の everShown ガード。これは意図された実挙動）。
-  - つまり**挙動は正しく、汚れているのは計器のタグ名と実験フラグの残骸**。887回の
-    `_skipped` は「everShown により消さなかった」回数が実験名で記録されているだけ。
-- **畳み方（挙動不変を厳守）**: 行7960 の条件を `if (!_inlineHostEverShown)` に畳む。
-  verdict.hide かつ everShown=true のときの**素通り（通常描画へ進む）は意図された挙動なので維持**。
-  `autoshow_off_experiment_skipped` の note はタグごと撤去（hostHideReason census 自体が
-  Phase 3 #6 の撤去対象）。`autoshowHideExperiment.wiring.test.js` は行43/50 でこの note の
-  存在を固定しているため、**反転**が必要。
-- **注意**: 同テスト内の **「一度でも表示したら autoshow_off では消さない」（v0.1.1274 ガード）の断言は実挙動**。
-  フラグ撤去時、この断言は独立テストとして**必ず残す**（テスト名を実態に合わせて改名可）。
-- **検証**: 変異（ガード条件を `if(false)` 前置）でテストが赤くなることを確認してから戻す。
-  撤去後の実機速報で `autoshow_off_experiment_skipped` が診断から消えていること。
-
-### D-4. content-entry.js の max-lines ラチェットが死んでいる【実装してよい（§6 質問C=やるで確定）】
-
-- **根拠**: `eslint.config.js` 行251-253 は `max-lines: 17267` を課しているが、
-  content-entry.js **行1に `/* eslint-disable max-lines */`**（v0.1.723 で追加・commit 904efc4c）があり
-  **ルールは一度も効いていない**（実測: 19,464行でも `npx eslint --no-cache` が exit 0。本調査で確認済み）。
-  popup-entry.js のラチェットは生きていて版ごとに保守されているのと対照的。
-- **なぜ負債か**: 「ラチェットで成長を止めている」という config コメントと実態が乖離。
-  ガードがあると信じられているのに無い＝サイレントな成長を許す。
-- **改善案**: 撤去フェーズ完了**後**に行1の disable を外し、eslint.config.js の max を
-  「その時点の実測+50」へ更新（popup-entry と同じ流儀でコメントに実測値と理由を記す）。
-- **検証**: `npm run lint` 緑。変異（適当な行を51行追加）で赤くなることを手元確認して戻す。
-
-### D-5. 診断スナップショット構築の重複【実装してよい（Phase 4 で自然解消・残りは任意）】
-
-- **根拠**: `buildAiShareFastDiagnosticsPayload()`（行7236〜）と `buildAiSharePageDiagnostics()`（行9883〜）に
-  計器スナップショット群（hostFlipCensus〜hostRecoveryDiag、各 line 整形込み）の**ほぼ同一ブロックが2箇所**。
-- **なぜ負債か**: 片方だけ直す事故の温床（このリポで実績のある「配線漏れ」型）。
-- **改善案**: 撤去でブロック自体が消えるのが第一。撤去後も両者に残る共通部が3項目以上あれば
-  1ヘルパー関数へ寄せる（**任意・小さく**。大きな組み替えはしない）。
-
-### D-6. ルート直下の設計文書散乱【提案のみ・実装しない】
-
-- **根拠**: git 追跡のルート直下に `lane-never-drop-*.md` / `venue-*-SPEC.md` / `*-DESIGN.md` 等 20+ ファイル。
-  2026-07-31 に「設計文書は `docs/handoff/` へ」の方針が確立済み（memory 索引・tree-map drift の実績）。
-  ほかに未追跡の council ログ・`UsersinfoAppData...json` 等の作業残骸もあるが**ユーザーのローカル資産なので触らない**。
-- **リスク**: 移動はリンク・`site-health`・tree-map に波及。**本タスクでは提案に留める**（質問D）。
-
-### D-7. 全 entry の `@ts-nocheck`【提案のみ・実装しない】
-
-- **根拠**: `src/extension/*.js` 全6 entry + 一部 lib（aiShareFullText.js 等）の行1に `@ts-nocheck`。
-  typecheck が entry 本体を素通りしている。
-- **判断**: 19k/22k 行の entry から外すのは大工事で、entry 分割計画（ルートの refactor-instructions.md）の
-  領分。**ここではやらない**。
-
-### D-8. 診断ページの更新が9.8秒（真因未確定・調査から始める）【Track B・調査は実装してよい、修正は承認後】
-
-- **実測（2026-08-06T07:18Z・v0.1.1277・ユーザー実機）**:
-  ```
-  更新所要(計器): 9812ms(重い順: lives 5493ms / summaries×1 4314ms / render 5ms)
-  ```
-  条件: 記録中は**1配信のみ**・取得率100%（3,726/3,720）・最終取り込み5秒前・backfill 停止中。
-- **この実測が否定したこと（重要・逆戻り禁止）**:
-  1. **「コア3read（fastDiagLite/popupDiag/backfill）のバッチ化」は的外れ**。3つとも重い順に
-     一度も出てこない。9.8秒のほぼ全部が `lives` と `summaries`。→ 当初案のバッチ化フェーズは
-     **効果が実測で否定済みとして本書から削除**（やらない）。
-  2. **「診断は記録側書き込みの被害者」という従来説明（[[status-diag-is-victim-not-cause-2026-08-02]]）
-     だけでは説明できない**。上の実測はほぼ空いている状態で lives 5.5秒・summaries 4.3秒。
-     従来説明を前提にした対策を立てないこと。
-- **実コードで確認済みの事実（調査の出発点）**:
-  - `enumerateActiveLives()`（status-entry.js 行870-929）の経路1は **`chrome.tabs.query`**
-    （storage read ではない）。watch タブが開いていれば経路1で early return するので、
-    5.5秒は tabs.query 自体（またはガード層）で費やされている可能性がある。**LevelDB とは限らない**。
-  - `loadAllSummaries()`（行974-989）は**既に1回の `chrome.storage.local.get(keys)`**（配信ごとに
-    `nls_panel_summary_` / `nls_watch_snapshot_` / `nls_perf_diag_` / `nls_live_ended_` の4キー）。
-    1配信=4キーの単発 get に4.3秒。**呼び出し回数の問題ではなく、値の大きさか storage 層の詰まり**。
-    `nls_watch_snapshot_<lv>` は cached-first render 用スナップショット（`src/lib/storageKeys.js`
-    行650-656）で、**サイズがコメント件数に比例するかは未確認**＝要調査。
-- **なぜ負債か**: 診断ページの体感が壊れている（9.8秒/更新）のに、原因の所在（tabs.query か・
-  値の肥大か・storage 層か）が特定されていない。
-- **変更リスク**: 調査自体は低（読むだけ+ローカル計測）。修正は真因次第＝**原因確定前に修正しない**。
-- **改善案**: §9 Track B の手順（調査→報告→承認→実装）。
-- **検証**: 修正が入る場合は同じ計器行（更新所要の重い順）で before/after を実測比較。
+`npm run typecheck` は緑だが、**全 entry と `src/extension/popup/**`・`story/**`・`background.js` は `// @ts-nocheck`**（実測 12 ファイル）。型検査が実際に見ているのは `src/lib` のみ。抽出先モジュールも現状は `@ts-nocheck` を継承している（`popup/report/htmlReportDocument.js:1` 等）。
 
 ---
 
-## 9. Implementation Phases（実装フェーズ・この順で・各フェーズ末に検証）
+## Behaviors To Preserve
 
-**Track A（Phase 0〜6・計器撤去）と Track B（Phase B0〜B2・診断ページの重さ調査）は独立**。
-どちらか片方だけ実施しても意味が通る。コミット・version bump も混ぜない。
+**次は「変えない」。変える必要が出たら止まって質問する（Stop And Ask）。**
 
-### Phase 0: 現状確認（編集なし）
-
-1. `git status` / `git log --oneline -5` を記録。
-2. `npm run verify:cc` を実行し baseline を記録（§7）。
-3. 本書 §3（Behaviors To Preserve）の各箇所を実際に Read して現物を確認する
-   （行番号は v0.1.1277 時点。ズレていたら現物優先で読み直す）。
-
-### Phase 1: 安全網の確認（テスト追加のみ可・実装変更なし）
-
-1. 実挙動を固定している既存テストが緑であることを個別確認:
-   - `src/lib/inlineHostHiddenAttr.wiring.test.js`（hidden 属性の正本）
-   - `src/lib/inlineHostVisible.wiring.test.js`（見せる/消すの唯一入口）
-   - `src/lib/inlineHostRecoveryGate.test.js`（SPA 再描画ガード）
-   - `src/lib/inlinePanelShowGate` 系テスト
-   - `src/lib/autoshowHideExperiment.wiring.test.js`（everShown ガードの断言を含む）
-2. これらが撤去対象の計器に依存していないか読む。依存があれば Stop And Ask。
-
-### Phase 2: 確実な死コードの撤去（1コミット）
-
-1. **hwt 送信口**（D-2）: `armHostWriteTrap` / `helloHostWriteTrap` / `_hwtArmedHost` と呼び出し3箇所
-   （行3048-3051, 4307, 14366）を削除。
-2. **実験フラグ**（D-3）: `INLINE_AUTOSHOW_HIDE_EXPERIMENT` を撤去し分岐を畳む。
-   `autoshowHideExperiment.wiring.test.js` は「フラグ存在」断言を削り、
-   **everShown ガードの断言は独立して残す**（改名可）。撤去を固定する断言
-   （`INLINE_AUTOSHOW_HIDE_EXPERIMENT` が content-entry に**現れない**こと）を追加。
-3. 検証: `npm run test:cc` + `npm run lint`。変異確認（ガードに `if(false)` 前置→赤→戻す）。
-
-### Phase 3: 点滅計器の撤去（1系統=1コミット・依存の浅い順)
-
-対象8系統（HANDOFF 名指し分のみ。**これ以外は消さない**）:
-
-| # | 計器 | content-entry の主な撤去点 | lib（§6 質問B=削除で確定） | 反転すべき wiring テスト |
-|---|---|---|---|---|
-| 1 | `hostAncestryTrace` | `_hostAncestryTrace`(2857) / `ensureHostAncestryMutationTrace`(2898) / 呼び出し(3044, 4306) / snapshot 2箇所 | （content 内実装のみ） | — |
-| 2 | `hostStyleTrace` | `_hostStyleTrace`(2836) / `_hostStyleObserver` / `_hostMutPrevVisible` | `hostStyleMutationTrace.js` + test | `hostStyleTrace.wiring.test.js` |
-| 3 | `vanishForensics` | `_vanishForensics`(2837) / `trail()`(2839) / `captureVanishSnapshot`(2979) / rAF 内の遷移検出(3057-3072) / `_hostRafPrevVisible` / `_lastLivePollTickAt`(2861, 12958) | `hostVanishForensics.js` / `inlineHostVanishClassifier.js` + tests | `vanishForensics1267.wiring.test.js` |
-| 4 | `hostVisWatch` | `_hostVisWatch`(2830) / `noteHostFrame`(3073) | `hostVisibilityWatch.js` + test | `hostVisWatch.wiring.test.js` |
-| 5 | `hostFlipCensus` | `_hostFlipCensus`(2827) / `noteHostHidden`/`noteHostShown`(3141-3142) | `hostVisibilityFlipCensus.js` + test | `hostFlipCensus.wiring.test.js` |
-| 6 | `hostHideReason` | `_hostHideReasonCensus`(3166) / `noteInlineHostHideReason`(3169, 3123) | `inlineHostHideReasonCensus.js` + test | `inlineHostHideReason.wiring.test.js` |
-| 7 | `styleReattach` | `_pageFrameStyleReattachCount`(2859, 3025) **のみ**（`ensurePageFrameStyleAlive` 本体は残す） | — | — |
-| 8 | `hostRecoveryDiag` | `_inlineHostRecoveryDiag`(6121) と加算(13173 等) **のみ**（gate 本体・`shouldHideInlineHostOnMissingPanel` は残す。`formatInlineHostRecoveryLine` import は未使用化したら import から外す） | （`inlineHostRecoveryGate.js` は**削除禁止**） | `inlineHostRecoveryGate.test.js` は挙動断言を残す |
-
-各系統で必ずセットで行うこと:
-1. content-entry の状態・呼び出し・**診断 JSON 2箇所**（行7313-7360 / 10046-10090 相当）から除去。
-2. `src/lib/statusFastDiagLite.js` の passthrough（行104-176 相当）から該当フィールドを除去。
-3. `src/lib/aiShareFullText.js` の該当整形を除去。
-4. lib 実装+単体テストを削除（§6 質問B=削除で確定）。wiring テストは**反転**（「import されていない/識別子が現れない」を
-   アンカー付き regex で断言する形へ）。反転テストは新設1本 `src/lib/flickerInstrumentsRemoved.wiring.test.js` に
-   集約してよい（既存 wiring テストは削除）。
-5. `npm run test:cc` + `npm run lint`（no-unused-vars が取り残し import を検出する）。
-6. 変異確認: 撤去断言テストに対し、ダミーで `createHostVisibilityWatch` 等の文字列を content-entry に足す→赤→戻す。
-
-### Phase 4: rAF ループ本体の撤去（1コミット）
-
-Phase 3 完了後、`startHostVisibilityWatch()`（行3030-3087）の中身は計器のみになる（本調査で確認済み:
-tick 内は trace 再attach / hwt 再arm / vanish 採取 / noteHostFrame の4つで全て計器）。
-1. `startHostVisibilityWatch` / `_hostVisWatchRaf` / 起動呼び出し（行14974）を削除。
-2. 診断 JSON の重複ブロック（D-5）で残った共通部があれば、3項目以上のときだけ小ヘルパーへ寄せる（任意）。
-3. `npm run verify:cc` フル実行。lib 削除に伴い `npm run tree-map` / `npm run feature-map` を再生成しコミットへ含める。
-4. **version bump**（§12.5 の3点セット・summary 例「点滅追跡の計器を撤去」）。
-
-### Phase 5: max-lines ラチェット復活（§6 質問C=やるで確定・1コミット）
-
-1. content-entry.js 行1 の `/* eslint-disable max-lines */` を削除。
-2. 撤去後の実測行数を測り、`eslint.config.js` の content-entry ブロックを「実測+50」へ更新
-   （popup-entry と同じ流儀で、実測値・日付・理由をコメントに記す）。
-3. `npm run lint` 緑を確認。ダミー51行追加→赤→戻す、の変異確認。
-4. 必要なら bump（挙動不変の開発ガードのみなので、Phase 4 のバンプに同梱可否は §12.5 の粒度判断に従い、
-   迷ったら別 patch にする）。
-
-### Phase 6: 提案書き出し（実装しない）
-
-D-6（ルート文書移動）・D-7（@ts-nocheck）・entry 分割（ルートの refactor-instructions.md との統合方針）を
-最終報告に「提案」として列挙する。**承認なしに着手しない。**
+| # | 挙動 | 根拠（ファイル:行） |
+|---|---|---|
+| B1 | 拡張の全画面（popup／inline iframe／サイドパネル／受動ビュー）が **同じ `popup.html` + `popup-entry.js`** で動き、`INLINE_MODE` / `INLINE_EMBED_WATCH` / `INLINE_SIDE_PANEL` / `INLINE_PASSIVE` の分岐で振る舞いを変える | `popup-entry.js:1036-1040`（`readInlineModeFlags`） |
+| B2 | `initPopup()` の**先頭順序**: `paintVersionBadge` → `checkVersionMismatchBanner` → `initCustomSoundRuntimeOnce` → シェード最終安全網 → … ワンタイム migration 4 本（`runOneTimeBackfill*`）を起動時に `void` で走らせる | `popup-entry.js:19974-20026` |
+| B3 | `refresh()` は `INLINE_PASSIVE` で即 return。世代番号 `watchPopupRefreshGeneration` を先頭で取り、以降の paint は `isFreshRefresh()` で守る（本文内 12 箇所）。`refreshTaskGuarded` 10 箇所 | `popup-entry.js:15494-15517` |
+| B4 | `get(null)` 全件読みは **content の `readPrunableStorageBagCheap` と popup の `readCommentBagForMigrationCheap` の 2 箇所だけ**（Chrome<130 fallback）。migration 4 本は `await readCommentBagForMigrationCheap(local)` を **ちょうど 4 回** | `storageFullReadCensus.test.js:90-136`, `popup-entry.js:19685-19853` |
+| B5 | 鏡（KEY_LANE_MIRROR 等）の**書き手は popup の非 passive 1 箇所のみ**。passive は読むだけ | `laneMirrorContract.js:73-83`, `popup-entry.js:7829` |
+| B6 | ローディング幕／cloak の解除タイミング（400ms / 5000ms / `INLINE_SHADE_DATA_FALLBACK_MS+2000`）と CSS 側の値の一致は wiring テストが機械照合 | `popup-entry.js:22595-22655`, `contentBlindTime.wiring.test.js`（eslint.config.js:344-346 の記述） |
+| B7 | storage キー名・保存形式・メッセージ種別文字列（`nls_*` / `NLS_*`）は**1 文字も変えない**。既存ユーザーの保存データと他文脈（background / offscreen / Web版）が読むため | `docs/feature-map/storage-bus.md`, `background.js:28-55` |
+| B8 | content の二重起動防止 `__NLS_CONTENT_ENTRY_STARTED__` と `start()` の順序（venue ボタン → 記録フラグ → migration → page frame → native self-post recorder → progress monitor → MutationObserver） | `content-entry.js:19325-19345`, `:14159-14236` |
+| B9 | `dist/popup.js` に verify-bump が要求する 4 シンボル名が残る（B7 と同じく**リネーム禁止**） | `scripts/verify-bump.mjs:136-141` |
+| B10 | `dist/` に秘密が焼き込まれない（`check:no-secrets`）。新しい `define` を build.mjs に足さない | `scripts/build.mjs:76-92` |
+| B11 | 例外の握り潰し方（`try { … } catch { /* no-op */ }`・popup 330 箇所／content 415 箇所）は**この作業では変えない**。挙動同値の物理移動に徹する（改善は Debt D14 で提案のみ） | 実測 |
+| B12 | プライバシー方針: 新しい送信先・新しい通信・新しい権限を**足さない**（CWS 審査文書 3 点同期の対象） | `AGENTS.md §3.3, §10` |
+| B13 | 純 Web 版 `app/live-view.js` が popup-entry を dynamic import して動く（chrome シム前提）。新モジュールの top-level で本物の `chrome.*` を要求しない | `app/live-view.js:166-171, 821` |
+| B14 | **凍結フラグは生きた分岐（削除・有効化禁止）**: `AUTOPATROL_KILL_SWITCH = true`（`background.js:1231`）／`STATUS_POPUP_EMBED_ENABLED`（status-entry）／`KEY_BACKFILL_AUTO_DISABLED` 分岐。wiring テストが文字列で固定 | `src/lib/statusPopupEmbed.wiring.test.js:37, 66`、ルート `refactor-instructions.md §3` |
+| B15 | ルート `refactor-instructions.md §1` の 8 挙動（backfill の継続・件数の単調増加・開いた瞬間の全件表示・読み上げの配信追従・会場モード・公式値レーン即表示・来場/同接の区別・本家 DOM 非破壊）も維持 | ルート `refactor-instructions.md:40-54` |
 
 ---
 
-### Track B: 診断ページの重さ・真因調査（Phase B0〜B2・Track A と独立）
+## Non-Negotiables
 
-> 前提: §8 D-8 を熟読。**当初案「コア3read のバッチ化」は実測で効果が否定済み＝やらない。**
-> `Promise.all` 並行化は提案も禁止（§3-11）。IndexedDB 移行は永久却下（§3-14）。
-> extras バッチ（§3-12）と stale-guard 意味論（§3-13）は触らない。
-> **原因が確定するまで修正コードを書かない。**
-
-#### Phase B0: 実測の再確認（編集なし）
-
-1. status-entry.js の計測機構（`_mark` / `_stepMs`・行625-629 付近）を読み、
-   「更新所要(計器)」の重い順表示がどの step 名をどう束ねているか把握する。
-2. D-8 の実測値（lives 5493ms / summaries×1 4314ms / render 5ms）を出発点として記録する。
-   追加の実測が必要ならユーザーに状態速報のコピペを依頼する
-   （[[feedback-trust-status-report-over-browser-check]]: 実機目視でなく速報コピペで切り分ける）。
-
-#### Phase B1: 真因の切り分け（読解+ローカル検証のみ・出荷版への計器追加は Stop And Ask）
-
-以下の仮説を**この順で**実コードとローカル計測で潰す。各仮説に「支持する証拠/否定する証拠」を記録する:
-
-1. **`lives` 5.5秒 = `chrome.tabs.query` 側か、ガード層か**
-   - `enumerateActiveLives`（行870-929）は watch タブがあれば経路1（tabs.query）だけで返る。
-   - `_livesGuard`（`createStaleGuardedRead`・行319）のラッパが遅延を足していないか読む。
-   - 同ファイルの `queryWatchTabMap()`（行941-968）も同じ tabs.query を打つ。同一サイクル内で
-     tabs.query が何回飛ぶか数える（回数が多ければそれ自体が手がかり）。
-   - tabs.query が遅い場合、それは storage ではなく**ブラウザプロセス/レンダラの混雑**。
-     「診断は被害者」説とは別のボトルネック像になるため、証拠を添えて報告する。
-2. **`summaries` 4.3秒 = 値の肥大か、storage 層か**
-   - 4キーのうちどれが大きいかを特定する。`chrome.storage.local.getBytesInUse([key])` を
-     DevTools コンソール（またはユーザー依頼のワンライナー）で採るのが最短。
-   - 特に `nls_watch_snapshot_<lv>` の中身を書き込み側（content-entry / popup）から追い、
-     **サイズがコメント件数(3,726件)に比例する構造かどうか**を確定する。
-     比例するなら「診断側の read は O(1)」という従来認識（memory）の訂正として報告する。
-   - `nls_panel_summary_` / `nls_perf_diag_` / `nls_live_ended_` も同様にサイズ確認。
-3. **残る可能性: 単発 get 自体が詰まる**（記録側の書き込みキューとの競合）
-   - 1・2 で説明がつかない場合のみ。取り込みが続いている実測条件（最終取り込み5秒前）と
-     矛盾しないかを付記する。
-4. 途中で出荷版に計時計器を足したくなったら **Stop And Ask**（§5。計器スパイラル再発防止）。
-
-#### Phase B2: 修正提案（実装は承認後）
-
-1. B1 の結論を「真因・証拠・反証済み仮説」の形で報告し、真因に対応する**最小の修正案**を
-   1〜3案提示する（例は真因次第。値の肥大なら「スナップショットの分割/軽量化（表示に必要な
-   フィールドだけの lite 化＝fastDiagLite と同じ既存の勝ちパターン）」、tabs.query 重複なら
-   「同一サイクル内の結果共有」など）。
-2. ユーザーの言う「干渉しない仕組み」に相当する構造案も、**真因の証拠と整合するものだけ**
-   候補として添える（例: 記録側が混雑を宣言する軽量フラグ→診断側が更新間隔を動的に落とす／
-   混雑中は stale 表示を明示して read を見送る等）。**IndexedDB 移行・並行化は候補に入れない。**
-3. 各案に「変わりうる体感（鮮度・更新間隔）」を明記する。体感が変わる案は承認必須。
-4. 承認された案のみ実装。実装時は lib に純関数+テストを切り、同じ計器行で before/after を実測。
-   version bump は Track A と別 patch。
+1. **最初に `git status` を確認し記録する。** 現時点で `extension/dist/*.js` と `app/dist/live-view.js` に**既存の未コミット差分**（build による buildId ずれ）、未追跡の `surechigai-user-needs-question.txt` がある。**これらに触らない・自分の変更と混ぜない・消さない。**
+2. **編集前に baseline の検証結果を記録する**（Baseline Commands の表を埋める）。
+3. **`extension/dist/` と `app/dist/` は生成物。手で編集しない。** ソースを直したら `npm run build`。dist の buildId が毎回ずれるのは既知（追わない）。dist の日本語は `\uXXXX` エスケープ形なので grep は escape 形で。
+4. **max-lines ラチェット（`eslint.config.js:398/402/406`）と関数ラチェット（`popupEntryFunctionBudget.test.js:31-34`）は「増やす方向」に触らない。** 抽出したら**同じ変更の中で実測値まで下げる**（関数ラチェットは実測との差が 200 を超えると `:59-68` の slack テストが赤くなる＝下げ忘れは機械が止める）。
+5. **抽出は「追加行 < 削除行」を同一の変更単位で満たす**（仕様 Q6）。満たせない抽出は**やらない**（ラチェット緩和を交渉しない）。
+6. **1 変更 = 1 塊。** 複数の塊を1つの diff に混ぜない。無関係な整形・「ついで」の修正・命名変更をしない。
+7. **新規ファイルは `git add <path>` を明示列挙で**（`git status | grep -v '^??'` 型のフィルタ add で新規ファイルを取りこぼし Vercel 全デプロイ失敗の実事故 = `AGENTS.md §12.5`）。`check:tracked-imports` が機械検出するが頼らない。
+8. **生成物の再生成順序**: 新規ファイルを `git add` → `npm run tree-map` → `npm run feature-map` → 生成物も `git add` → `npm run verify:cc`。tree-map は **git 追跡ファイル**から生成するので add 前に走らせても反映されない（memory「`npm run tree-map` は `git add` の【後】」）。新ディレクトリを作ったら `scripts/repo-tree-map.mjs` の `ROLES` に 1 行、移した機能の担当ファイルが変わったら `FEATURES` の `paths` を直す（推測で書かない・grep で確かめてから）。
+9. **`src/lib` に `window` / `document` / `fetch` / `chrome.*` を持ち込まない**（`npm run check:layer`）。I/O は `src/extension/**` 側に置き、判定・変換だけ lib へ。
+10. **version bump はしない**（Stop And Ask Q2 の回答待ち）。bump する場合は 3 点同期（`extension/manifest.json` / `package.json` / `src/lib/changelog.js` 先頭）・summary 35 字以内・`npm run verify:bump`。**changelog は現在ちょうど 20 版**なので bump 前に `node scripts/split-changelog.mjs` が必要（実行後に版数を検算）。`src/lib/changelog.js` だけ **CRLF**（置換が空振りする既往）。
+11. **commit / push / `copy:ext` / Chrome リロードは明示依頼後**（`AGENTS.md §12.4`）。commit する前に `.agent/coord.md` の `write_lock.state`（現在 FREE）と `updated` を読む。配信視聴中の `copy:ext` は禁止（新旧混在ランタイム）。**push は本書の範囲外**（pre-push が素の `verify` を走らせてハングする）。
+12. **検証コマンドは `verify:cc` / `test:cc` / `typecheck`。** `npm run verify` と パイプ付き `npx vitest run` は使わない（ハング）。失敗時は `.artifacts/verify-cc.log` を Read。
+13. **wiring テストの断言（無条件呼び出し・アンカー付き regex・件数）は弱めない。** 変えてよいのは「本文をどこから取るか」だけ（`resolveEntryFnSource` 経由に寄せる）。
+14. **`@ts-nocheck` は物理移動では移設元と同じ方針で維持する**（新規モジュールの先頭に付け、理由コメントを 1 行）。型付けは別作業（Debt D3）。
+15. 新しい症状 ID（`src/lib/symptomVerdicts.js`）を足さない（足すなら `../ai-hub/index.json` にも要登録。本作業では不要）。
+16. **正しさが分からないことは実装せず質問に落とす**（下の Stop And Ask）。
+17. `.artifacts/agent-git.lock` が存在する間は commit 不可（他エージェント作業中）。
+18. commit する場合、メッセージに「根治／真因を特定／完全に直／解決しました／直りました」を**書かない**（`.husky/commit-msg` → `scripts/check-root-cause-claim.mjs` が証拠語なしの宣言をブロック）。リファクタは「挙動不変・未実機」と正直に書く。
+19. 診断セル・計器・症状 ID を**足さない**（`instrumentSpecCoverage.test.js` の `MAX_UNDECLARED` が 2026-08-29 時点で上限ちょうどと記録されている。本作業は計器を増やさない）。
 
 ---
 
-## 10. Verification Requirements（検証要件）
+## Stop And Ask Conditions
 
-- 各コミット: `npm run test:cc` + `npm run lint` 緑。
-- 各フェーズ末: `npm run verify:cc` 10段オール緑（baseline で既に赤かった段はその旨併記）。
-- 撤去断言テストは**変異で赤を確認してから**コミット（確認手順をコミットメッセージか報告に1行残す）。
-- 撤去完了後の外形確認（できれば）: `npm run status:live` またはユーザーの状態速報コピペで、
-  診断 JSON から撤去8系統のキーが消え、`dedupeSeedDiag` 等の現役計器が**残っている**こと。
-- 実機（拡張リロード後の watch ページ）での動作確認はユーザー手動が必要（[[claude-cannot-drive-own-extension-pages]]）。
-  依頼文には反映3手順を1行で添える。確認観点: ①インラインモード（`prefer_focus_inline`）でパネルが
-  従来どおり出る/消える ②Side Panel が従来どおり開く ③コメント記録が続く。
-- 【Track B】調査フェーズは「証拠つきの結論報告」が成果物（コード変更ゼロでも完了扱い）。
-  修正を実装した場合のみ、状態速報の「更新所要(計器)」行の before/after 実測を必須とする
-  （before: lives 5493ms / summaries×1 4314ms / 計9812ms）。
+次のどれかに当たったら**その場で止めて人間に質問**する（推測で進めない）:
 
-## 11. Reporting Format（最終報告の形式）
+- **S1** 抽出しようとした関数が module-level の `let`（popup 162 個 / content 202 個）を**書き換えて**いる、または `initPopup` と `refresh` の**両方**から参照される共有状態（実測 12 個: `INLINE_*` 4 定数 / `INLINE_OWN_WATCH_URL` / `_opSoundEnabledCache` / `_commentPostDiagCounters` / `_bgmEnabledCachePopup` / `watchMetaCache` / `watchPopupLastPaintedLiveId` / `popupBooleanSettingsRegistry` / `_effectSoundEnabledCache`）を**書き換える**とき → ctx で参照を渡せるか、所有者を移すべきか、判断を仰ぐ。
+- **S2** 抽出で **storage キー・保存形式・メッセージ種別・DOM id・`data-*` 属性名**のいずれかを変えないと成立しないとき。
+- **S3** 既存 wiring テストの**断言そのもの**を変えないと緑にならないとき（本文の取得元を変えるだけで済まないとき）。
+- **S4** テストと実装が矛盾している（テストが意図と逆を固定している）と気づいたとき。
+- **S5** 削除候補（重複関数・二重呼び出し等）が本当に不要か**コードから確定できない**とき。例: `initPopup` 内の `paintVersionBadge()` 二重呼び出し（`:19980` と `:20029`。関数自体は冪等（`:19156-19168`）だが、2 回目が意図的な「setup 後の再塗り」かは不明）。
+- **S6** `get(null)` の個数（B4）・鏡の書き手（B5）・verify-bump の 4 シンボル（B9）に影響しうるとき。
+- **S7** `background.js` / `offscreen` / `page-intercept`（別文脈）に触る必要が出たとき。
+- **S8** 追加行 < 削除行 を満たせない抽出になったとき（→ その抽出は中止して報告）。
+- **S9** `npm run verify:cc` のどのステップでも赤が出て、**自分の変更に起因すると確定できない**とき（baseline と比べて判断。baseline は下表のとおり全緑）。
+- **S10** 複数の設計案（例: 抽出先ディレクトリ／メッセージ登録簿の形／refresh のステージ分割）があり、プロダクト判断が要るとき（下の「実装前に確認すべき質問」）。
+- **S11** `.agent/coord.md` の `write_lock.state` が FREE でない、または `updated` が古い（他セッションの作業中の疑い）。
 
-1. 実行した全フェーズと各コミット（hash・1行要約・対象計器）。Track A / Track B を分けて書く。
-2. baseline と最終の `verify:cc` 結果（10段の OK/NG 対比）。
-3. 削除したファイル一覧・削減行数・診断 JSON から消えたキー一覧。
-4. 変異確認の実施記録（どのテストに何を仕込んで赤を確認したか）。
-5. Stop And Ask に該当して**やらなかったこと**（あれば理由つき）。
-6. Phase 6 の提案リスト。
-7. 【Track B】真因調査の結論: 支持された仮説・反証された仮説・各証拠（実測値/該当コード行）・
-   修正案リスト（B2 を実装まで進めた場合は before/after 実測）。
-8. 最後に実行したコマンドとその結果。
-9. ユーザー向け1行: 「反映は git pull → 拡張リロード → watch タブ F5 で行えます」。
+---
 
-## 12. Out-of-scope Items（本タスクでやらないこと）
+## Baseline Commands
 
-- `popup-entry.js` の変更全般（ラチェット・分割含む）。
-- entry 分割・component-factoring（ルートの `refactor-instructions.md` の領分）。
-- 未解決バグの修正: 「watchページが見つかりません」／記録101%二重計上／サイドパネル切替の設定UI。
-- `scrollWhiteoutDiag` / `hostMoveDiag` / `dedupeSeedDiag` / `commentSubmitDiag` の撤去（質問A=残すで確定）。
-- `extension/background.js`・`manifest.json`・storage スキーマ・CWS 提出物・privacy 文書。
-- ルート直下ファイルの移動・削除・.gitignore 変更（質問D=今回はやらないで確定・提案のみ）。
-- `@ts-nocheck` の除去。
-- 未追跡ファイル（council ログ等）への一切の操作。
-- 【Track B】コア3read（fastDiagLite/popupDiag/backfill）のバッチ化（**実測で効果否定済み**・§8 D-8）。
-- 【Track B】`Promise.all` によるコア read の並行化（v0.1.867→868 で実機退行・撤回済み・提案も禁止）。
-- 【Track B】IndexedDB へのコメント保存移行（2026-06-01 実機失敗・`FORCE_DISABLE_COMMENT_IDB_PATH` で永久却下）。
-- 【Track B】extras 17項目バッチ（`statusExtrasBatch.js`・12秒間引き）の変更。
-- 【Track B】真因が確定する前のいかなる「重さ修正」実装。
+**すべて `package.json` の `scripts` に実在するもの**（2026-09-17 確認）。素の `npm run verify` は使わない。
+
+| 目的 | コマンド | 2026-09-17 の実測（分析担当が実行） |
+|---|---|---|
+| 状態確認 | `git status --short` / `git log -1 --oneline` | `M extension/dist/{content,popup,status,venue}.js`, `M app/dist/live-view.js`, `?? surechigai-user-needs-question.txt` / HEAD `9350c410` |
+| 単体テスト | `npm run test:cc` | **921 files passed / 11,518 tests passed / 1 skipped / 6 todo / 87s / exit 0** |
+| lint | `npm run lint` | 4 大ファイル単体で exit 0（`npx eslint --no-cache src/extension/{content-entry,popup-entry,venueBar,status-entry}.js`）。★content-entry は `/* eslint-disable max-lines */` で max-lines が抑止されている（Debt D2） |
+| 型検査 | `npm run typecheck` | exit 0（ただし entry は `@ts-nocheck`＝実効は lib のみ） |
+| ビルド | `npm run build` | 未実行（dist を汚さないため）。実装担当が Phase 1 で実行し記録すること |
+| 全ゲート | `npm run verify:cc` | 未実行。実装担当が Phase 1 で実行し記録すること（ログ `.artifacts/verify-cc.log`） |
+| 関数ラチェット単体 | `npx vitest run tests/contract/popupEntryFunctionBudget.test.js --reporter=dot` | initPopup 2,595 / refresh 1,774（slack 5 / 26） |
+| 層の純粋性 | `npm run check:layer` | verify:cc 内。42 件の許容ベースライン |
+| 波及確認 | `npm run impact-check` | 共有 lib を触ったら。警告のみ |
+| 生成物 | `npm run tree-map` / `npm run feature-map` | 新規ファイル・import 変更の後に必ず |
+| bump 整合 | `npm run verify:bump` | bump する時だけ（Q2） |
+
+**e2e（`npm run test:e2e*`）は baseline に含めない**: memory に「e2e CI が 2026-08-05 から全 failure」とあり、本作業の合否判定に使えない（触らない・直さない）。
+
+---
+
+## Debt Map
+
+凡例 — **実装可**: 本指示書の範囲で今実装してよい ／ **提案**: 設計案を書いて承認を待つ（実装しない）。
+
+### D1. popup-entry.js の 2 大関数と行数ラチェットが同時に限界（最優先）
+
+- **根拠**: `popup-entry.js` 22,655 行 vs 上限 22,660（`eslint.config.js:398`）。`initPopup()` `:19974-22568` = 2,595 行（上限 2,600）。`refresh()` `:15494-17267` = 1,774 行（上限 1,800）。トップレベル関数 438 個のうち 370 個は 50 行以下＝分割は既に進んでおり、残っているのは**巨大 2 関数**。
+- **内訳（実測）**: `initPopup` 内 `addEventListener` 90 箇所、`$('id')` 97 種、名前付き内部関数は `submitComment`（`:21332`・約 166 行）1 つだけ。module-level 変数 291 個のうち initPopup が読むのは 30 個、refresh は 37 個、両方が読むのは 12 個（S1 参照）。**トップレベル関数 72 個は initPopup からしか呼ばれない**（= 一緒に外へ出せる塊。下の Phase 4 候補表）。
+- **なぜ負債か**: 次の修正が必ずゲートに当たる。修正者が「抽出で行数を作る」作業を強いられ、雑な抽出＝回帰の温床になる。
+- **影響範囲**: popup の全画面（B1）。
+- **変更リスク**: 中（クロージャ依存・wiring テスト 63 ファイルがファイルパスで本文を読む＝D4）。
+- **改善案**: Phase 4（機能クラスタ単位で `src/extension/popup/init/<feature>.js` へ 1 塊ずつ）。
+- **検証**: 関数ラチェット低下＋抽出先の単体テスト＋`verify:cc`。
+- **判断**: **実装可**（Phase 4）。ただし `refresh()` の分割は **提案**（D7）。
+
+### D2. content-entry.js の max-lines ゲートが死んでいる
+
+- **根拠**: `content-entry.js:1` `/* eslint-disable max-lines */`。`eslint.config.js:404-407` は上限 17,267 と書くが実測 19,347 行。`npx eslint --format json` の `suppressedMessages` に `max-lines:directive` が出る＝**ルールは発火しているが抑止されている**。差分 2,080 行が無監視で積まれた。
+- **なぜ負債か**: memory「機械が見ている所だけが動く」の実例。設定コメント（`eslint.config.js:77-79`「増やすのは禁止」）が事実と乖離し、次に読む人を誤らせる。
+- **影響範囲**: content-entry の成長抑止のみ（実行時挙動は無関係）。
+- **変更リスク**: 低（設定と 1 行のコメント削除）。
+- **改善案**: `content-entry.js:1` の directive を消し、`eslint.config.js:406` の `max` を**実測ちょうど**（19,347）に置き直し、コメントに「17,267 は directive で抑止されており実効していなかった（2026-09-17 実測）」と記録。
+- **検証**: `npx eslint --no-cache src/extension/content-entry.js` が緑、`max` を 19,346 に一時変更して赤を目視 → 復元（変異確認）。
+- **判断**: **実装可（ユーザー確定済み）**。2026-08-06 の指示書 §6 質問C で「やる」と確定し、2026-08-29 の指示書 D-1 でも「未実施」と記録されたまま今日に至る。数値は**実測ちょうど**（popup 側の最新運用 `eslint.config.js:266`「+εを取らない」に合わせる。08-29 版は +50 を提案していたが、どちらでも可＝人間が指定すればそれに従う）。
+
+### D3. 型検査の空白（entry 全部が `@ts-nocheck`）
+
+- **根拠**: `@ts-nocheck` 12 ファイル（全 entry + `popup/**` 4 + `story/**` 2 + `background.js`）。`tsconfig.json` は `checkJs:true` `noImplicitAny:true` だが実効は lib のみ。
+- **なぜ負債か**: `npm run typecheck` 緑が「entry も型で守られている」と誤読される。抽出先も `@ts-nocheck` を継承（`htmlReportDocument.js:1`）。
+- **改善案**: 物理移動中は継承（Non-Negotiable 14）。**別作業**として「抽出先モジュール単位で `@ts-nocheck` を外し、JSDoc 型を付ける」を提案。
+- **判断**: **提案**（本作業では触らない。数を報告するだけ）。
+
+### D4. wiring テストがファイルパスで本文を読む（移設で壊れる／黙って緑になる）
+
+- **根拠**: `readFileSync`/`new URL`/`resolve` の引数で **`popup-entry.js` を直接読むテスト 34 ファイル**、`content-entry.js` **15**、`venueBar.js` **17**、`status-entry.js` **10**（2026-09-17 機械集計。08-29 指示書の「2〜3 本」は過小）。内訳: `src/extension/*.test.js` 8 本・`src/lib/*.test.js` 24 本・`tests/contract` / `src/data` の契約・特性テスト 2 本。移設耐性ヘルパ `tests/helpers/wiringTestSource.js`（`resolveEntryFnSource`・2026-08-10 作成）を使うテストは **1 つだけ**（ヘルパ自身の契約テスト）。例: `src/extension/popupAvatarRetry.wiring.test.js:19-25` は `SRC.indexOf('const storyAvatarLoadGuard = …')` 〜 `SRC.indexOf('let _storyAvatarRetrySweepAt')` の**スライス**で本文を取る。
+- **なぜ負債か**: 関数を移すと軒並み赤（地図 §6 で「今日 3 件経験」）。さらに `indexOf` が -1 を返すと `slice(-1, n)` が**末尾の断片を返し、断言が偶然通る**（fail-open）可能性がある。ヘルパは「無ければ throw」で fail-closed。
+- **影響範囲**: 抽出のたびに移設対象の関数名で grep して該当テストを直す必要がある。
+- **改善案**: **移す関数に限って**、当該テストの「本文取得」を `resolveEntryFnSource('<fn>')` に置き換える（断言は不変）。アンカー方式（変数宣言のスライス）は、その塊が移った先のファイルを読む形に直す。ヘルパの探索対象は `popup-entry.js` と `src/extension/popup/**` のみ（`wiringTestSource.js:56-74`）。content を移すなら探索対象を足す（契約テスト `wiringTestSource.test.js` に「content の実在関数を解決できる」を追加）。
+- **判断**: **実装可**（Phase 2 でヘルパ拡張、Phase 4 で対象テストのみ移行）。63 件を一括で書き換えない。
+
+### D5. 責務の混在: initPopup は「配線」ではなく「ハンドラの中身」
+
+- **根拠**: 棚卸し §2-3「addEventListener のコールバック本体が 1,268 行（50%）」。DOM id 97 種のうち `devMonitor*`（開発モニタ・エクスポート）系と `frame*`（枠テーマ）系と `voice*`（音声）系と `commentInput/postCommentBtn`（送信）系がそれぞれ独立の機能塊。
+- **改善案**: 機能ごとに `attach<Feature>(ctx)` へ出す（横断的関心で割らない＝仕様 Q4）。
+- **判断**: **実装可**（Phase 4）。
+
+### D6. 抽出時の ctx の作り方が未定義（`PopupInitContext` typedef が未作成）
+
+- **根拠**: 棚卸し §5「`PopupInitContext` の typedef を置く」は未実施（grep で docs にしか出ない）。既存の抽出は 2 方式: (a) `buildHtmlReportDeps()`（`popup-entry.js:18229-18240`）で**関数参照と現在値**を deps オブジェクトにして渡す、(b) `attachAiDiagButtonHandler(fastCache, { getEl })`（`popup/attachAiDiagButtonHandler.js:31`）で要素取得器を注入し、専用状態は移設先の module-level に持つ。
+- **なぜ負債か**: 方式が決まっていないと抽出ごとに ctx の形が増える。memory「フィールドを個別列挙で詰め替える関数は値を落とす（5 回踏んだ）」。
+- **改善案**: `src/extension/popup/initContext.js` に JSDoc typedef を置き、規約「参照を渡す・詰め替えない／定数は import／専用状態は移設先へ同伴」を明文化。
+- **判断**: **実装可**（Phase 5）。
+
+### D7. `refresh()` の分割は世代ガードに依存する（高リスク）
+
+- **根拠**: `:15513-15517` で世代番号を取り、本文中 `isFreshRefresh()` 12 箇所・`await` 24 箇所・`refreshTaskGuarded` 10 箇所。refresh からしか呼ばれない関数 35 個。
+- **なぜ負債か**: 1,774 行の直列手続きで、await の前後で世代ガードを入れ忘れると**古い放送の描画が新しい放送を上書き**する（コメントに実害の記録）。
+- **改善案（仕様 §4 Phase 2 踏襲）**: ステージ関数は `gen` を受け取り**自分の先頭でガード**する規約。着手前に「await ごとの世代チェック有無」を機械集計する。
+- **判断**: **提案**（設計案と集計結果を書いて承認待ち。実装しない）。
+
+### D8. storage キーの契約が一部リテラル
+
+- **根拠**: `'nls_…'` リテラルが popup-entry に 8 種（lib に無いもの 8）、content-entry に 6 種（lib に無いもの 3）。lib 側は `*Key.js` 40 ファイル＋ `storageKeys.js`。`docs/feature-map/storage-bus.md` は「書く人だけ」12 キー・「読む人だけ」多数を**疑い**として列挙（偽陽性を含むと明記）。
+- **なぜ負債か**: 誰が書き誰が読むかが静的に追えない箇所が残る。
+- **改善案**: 移す塊の中にリテラルキーがあれば**移設先でもリテラルのまま**（変えない）。別作業として lib へ集約を提案（各リテラルが動的キーでないことを 1 件ずつ確認してから）。
+- **判断**: **提案**（本作業ではキーを 1 文字も動かさない＝B7）。
+
+### D9. メッセージ種別 `'NLS_*'` 46 種に登録簿がない
+
+- **根拠**: `src/extension/**` + `background.js` に散在。lib に `messageTypes` 相当なし（`ls src/lib | grep -i message` は無関係ファイルのみ）。`background.js` の `runtime.onMessage` 17 箇所。
+- **改善案**: `src/lib/messageTypes.js`（凍結オブジェクト）＋「entry のリテラルは登録簿の部分集合」テスト（このリポで生き残っている registry 型）。**文字列の値は変えない**。
+- **判断**: **提案**（別文脈 background に触るため S7）。
+
+### D10. background.js が lib の定数を手でミラー
+
+- **根拠**: `background.js:33-55`（chunk/tail キー・`readAllCommentsForLiveLocal`）、`:95-109`（commentDb スキーマ）。drift テストは `src/lib/commentDb.test.js:36` と `src/lib/swCommentChunkKeyMirror.test.js` に存在。
+- **なぜ負債か**: 二重定義。ただし drift はテストで検知済み（機械が見ている）。
+- **改善案**: esbuild で background をバンドルする案（`backfill-sw-entry.js` と同型）。
+- **判断**: **提案**（S7）。
+
+### D11. content-entry.js の巨大関数に関数ラチェットがない
+
+- **根拠**: `buildGiftDiagnosticsBundle` `:6047` 915 行／`start` `:14159` 802／`runNdgrBackfillOnce` `:16914` 574／`collectWatchPageSnapshot` `:9031` 517／`persistCommentRowsImpl` `:12247` 470／`bindContentScriptMessageListener` `:10022` 440／`buildAiSharePageDiagnostics` `:9597` 407。150 行以上が 17 個。`popupEntryFunctionBudget` に相当する契約テストなし。
+- **改善案**: `tests/contract/contentEntryFunctionBudget.test.js`（上位 7 関数を実測+30 で固定・slack ≤ 200）。抽出候補は診断バンドル 3 関数（`buildGiftDiagnosticsBundle` / `buildAiSharePageDiagnostics` `:9597` / `buildAiShareFastDiagnosticsPayload` `:6963` 328 行）＝**データ組み立て**で DOM 書込が少ない可能性が高いが**未確認**。
+- **判断**: ラチェット追加は**実装可**（Phase 2）。抽出は Phase 6 で**依存を実測してから**。
+
+### D12. venueBar.js / status-entry.js は無監視
+
+- **根拠**: `venueBar.js` `mountVenueBarButton` `:2413` = **4,778 行の単一関数**（ファイル 7,196 行）。`status-entry.js` `renderAll` `:1720` 672 行。どちらも eslint の max-lines 対象外。
+- **改善案**: `eslint.config.js` に実測ちょうどの max-lines ブロックを足す（安全網のみ）。分割は別地図（仕様 §6 でも対象外）。
+- **判断**: ラチェット追加は**実装可**（Phase 2）。分割は**対象外**。
+
+### D13. 生成物ドキュメントとの結合
+
+- **根拠**: `scripts/repo-tree-map.mjs` の `FEATURES` が `popup-entry.js` を 5 箇所で担当ファイルに挙げる（`:118,121,122,123` 等）。`feature-map:check` は esbuild 到達ファイルの drift で赤（`scripts/feature-map.mjs:28-48`）。
+- **改善案**: 抽出のたびに Non-Negotiable 8 の順序で再生成し、`FEATURES.paths` を実態に合わせる。
+- **判断**: **実装可**（各 Phase の手順に含める）。
+
+### D14. 例外の握り潰しとログの不統一
+
+- **根拠**: `try` ブロック popup 330 / content 415、`catch { /* no-op */ }` 多数。popup の例外バッファ（`consoleErrorBuffer` / `popupErrorLine`）は v0.1.1377 で追加済みだが、握り潰し箇所は経由しない。
+- **判断**: **提案**（挙動を変えるため。移動時はそのまま）。
+
+### D15. 重複ヘルパ（entry ごとの自前実装）
+
+- **根拠**: `hasExtensionContext` が `popup-entry.js:3854` と `content-entry.js:8250` に別実装。`isContextInvalidatedError` は `content-entry.js:8257` に自前があり、lib の `reportSilentError.js:11` を popup は import している。`withTimeout` は `popup-entry.js:4880` のみ（lib に無い）。
+- **なぜ負債か**: 同じ判定が面ごとに違う挙動になりうる（memory「面ごとに挙動を変えない」）。
+- **改善案**: **等価性を 1 件ずつ確認**した上で lib へ寄せる。等価でなければ寄せない。
+- **判断**: **提案**（S5。等価性未確認）。
+
+### D16. 契約テストが特定関数の**所在**を固定している
+
+- **根拠**: `storageFullReadCensus.test.js:103-106` は `readCommentBagForMigrationCheap` が `popup-entry.js` に在ること・`await readCommentBagForMigrationCheap(local)` が 4 回あることを固定。`wiringTestSource.test.js:69` は `initPopup` が `popup-entry.js` に在ることを固定。`laneMirrorContract.js:73` は `publishLaneMirror` の所在。
+- **改善案**: これらの関数（migration 4 本・`initPopup` 本体・`publishLaneMirror`）は**動かさない**（動かすなら契約テストごと＝S6）。
+- **判断**: 制約として Phase 4 の除外リストに載せる。
+
+---
+
+## Implementation Phases
+
+各 Phase は独立に検証・報告できる単位。**Phase の途中で Plan に無いファイル変更が必要になったら止まって報告**（`AGENTS.md §12.1`）。
+
+### Phase 1 — 現状確認と baseline 記録（変更なし）
+
+1. `git status --short` / `git log -1 --oneline` を記録（Non-Negotiable 1）。
+2. `.agent/coord.md` を読み `write_lock.state` を記録（S11）。
+3. `npm run test:cc` → `npm run lint` → `npm run typecheck` → `npm run build` → `npm run verify:cc` を順に実行し、結果（件数・exit・所要）を Baseline Commands の表に**追記**。build で dist が変わるのは想定内（既存の未コミット差分と同種）。
+4. `npx vitest run tests/contract/popupEntryFunctionBudget.test.js --reporter=dot` で initPopup/refresh の現在行数を記録。
+5. `docs/handoff/giant-entry-split-PHASE2-INVENTORY-2026-08-10.md` の数値（initPopup 2,553 → 2,595 等）が古いことを**報告に書く**（docs は編集しない）。
+
+**完了条件**: すべて緑、または赤の原因が「自分の変更ではない」と確定して報告済み。
+
+### Phase 2 — 安全網（挙動不変・テスト/設定のみ）
+
+1. **content-entry の関数ラチェット**: `tests/contract/contentEntryFunctionBudget.test.js` を新設。`popupEntryFunctionBudget.test.js` を雛形に、D11 の上位 7 関数を実測+30 で固定し、slack ≤ 200 の督促テストも付ける。**変異確認**: ダミー 60 行を一時追加 → 赤 → 復元。
+2. **ヘルパの探索対象拡張**: `tests/helpers/wiringTestSource.js` の `candidateFiles()` に `content-entry.js` と `src/extension/content/**`（将来の受け皿）を追加。ただし**探索順序は popup-entry → popup/** → content-entry → content/** とし、同名関数がある場合は先勝ち**（`hasExtensionContext` が両 entry にある＝D15）。`resolveEntryFnSource(fnName, { entry: 'popup' | 'content' })` の絞り込みオプションを足し、既定は従来どおり。`tests/contract/wiringTestSource.test.js` に「content の実在関数（例 `start`）を解決できる」「`entry:'content'` 指定で popup 側の同名関数を拾わない」を追加。既存 9 ケース（extractFnBody 3 / resolveEntryFnSource 4 / locateEntryFn 2）は触らない。
+3. **無監視ファイルのラチェット**: `eslint.config.js` に `src/extension/venueBar.js`（max 7,196）と `src/extension/status-entry.js`（max 4,544）の max-lines ブロックを追加（実測ちょうど・`+ε` を取らない＝popup の運用と同じ）。各ブロックに「安全網のみ。分割は別地図」と 1 行。
+4. **D2（content max-lines の復活）を実施**（ユーザー確定済み・Debt D2 参照）: `content-entry.js:1` の directive を削除 → `eslint.config.js:406` の `max` を実測ちょうど（19,347）に → コメントに「17,267 は directive で抑止され実効していなかった（2026-08-06 確定・2026-09-17 実施）」→ 変異確認（`max` を 1 減らして赤 → 復元）。
+5. `npm run verify:cc` 緑。新規ファイルは `git add` 明示列挙 → `npm run tree-map` → 生成物 add。
+
+**完了条件**: 新規テスト 2 本が緑かつ変異で赤を確認済み。既存テスト件数が減っていない。
+
+### Phase 3 — 明らかに安全な整理（挙動不変・小さく）
+
+**この Phase で削除・書換をしてよいのは次の 2 種だけ**:
+
+1. **コメント・JSDoc の事実修正**: 移設済みの関数を「popup-entry にある」と書いているコメント等。**根拠コメント（なぜそうしたか）は削らない**（`eslint.config.js:294-296, 359-360` の方針）。
+2. **`initPopup` の import 整理**: 未使用 import があれば eslint `no-unused-vars` が既に赤にするはずなので、現時点で 0 のはず。確認だけ。
+
+**やらない**: `paintVersionBadge()` 二重呼び出しの削除（S5 → Q5）、重複ヘルパの統合（D15）、`catch {}` の変更（B11）。
+
+**完了条件**: diff が説明できる行だけで構成され、`verify:cc` 緑。
+
+### Phase 4 — 小さな責務分離（2 トラック・Track A → Track B の順）
+
+popup-entry は**ファイル上限（5 行）と initPopup 上限（5 行）の両方**が尽きている。Track A はファイル上限を、Track B は initPopup 上限を下げる。両方やる。
+
+#### Track A（低リスク・先にやる）— I/O を含まない関数を `src/lib` へ
+
+ルート指示書 Phase A と 08-29 指示書 D-2 の続き。実績コミット `5feeb50a`（`nicoadCommentCelebrationKey`）/ `161117f3`（`avatarEntryCounts`）が手本。**2026-09-17 に本体を機械走査して確認した候補**（I/O トークン無し・module-level 参照無し）:
+
+| 順 | 関数 | 位置 | 行数 | 呼び出し元 | 備考 |
+|---|---|---|---:|---:|---|
+| A-1 | `mergeCommentsWithInterceptCache` | `:14206` | 104 | 1 | 最大の純関数。`src/lib/interceptCacheMerge.js` 等へ |
+| A-2 | `mergeInterceptCacheItems` + `normalizeInterceptCacheItems` | `:14019` / `:13995` | 26 + 18 | 各 1 | 同じ lib ファイルに同居させる |
+| A-3 | `stripViewerAvatarContamination` | `:14318` | 49 | 2 | |
+| A-4 | `normalizeStoredCommentEntries` | `:8858` | 46 | 1 | |
+| A-5 | `formatAiShareDiagnosticsMarkdown` + `romiDebugDataChecklist` | `:5016` / `:4993` | 23 + 13 | 2 / 1 | initPopup からしか呼ばれない＝Track B 4-2 の負担も減る |
+
+**避ける**: `sweepStoryAvatarRetryThrottled`（`popupAvatarRetry.wiring.test.js` が文字列範囲＋件数 2 で固定）、`maybePlaySupportCelebrationImmediate`（module-level 4 変数を参照＝純粋ではない。08-29 版の「安全」判定は誤り）、`clearWatchMetaCard`（`watchMetaCache` 参照）。
+
+**Track A の定型**: (1) 関数名で `src/**/*.test.js` `tests/**` を grep し、文字列で固定しているテストが無いことを確認（あれば S3）→ (2) `src/lib/<name>.js` に `src/lib/AGENTS.md` の定型ヘッダ付きで移し **characterization テスト**（元の入出力を固定）を同時に作る → (3) popup-entry は import して呼ぶだけ → (4) `eslint.config.js:398` を実測へ下げる → (5) `npm run check:layer`（新ファイルが純粋なら赤にならない）→ (6) `npm run feature-map`（新 lib は `app/dist/live-view.js` にも到達する＝B13）→ (7) `verify:cc`。**1 関数（群）= 1 変更単位。A-1〜A-3 で一度止めて報告。**
+
+#### Track B（中リスク）— initPopup の機能クラスタを `src/extension/popup/` へ
+
+**受け皿**: `src/extension/popup/init/<feature>.js`（`eslint.config.js:400-403` で `popup/**` に max-lines 2,000 が予約済み。既存 4 モジュールはフラットに `popup/` 直下＝Q3 で確認）。新ディレクトリを作ったら `ROLES` に 1 行。
+
+**抽出の定型（1 塊ごとに全部やる）**:
+
+1. **棚卸し**: 移す関数群を決め、次を grep で機械集計して報告に載せる: (a) 参照する module-level 変数と、その**書換の有無**（書換があれば S1）、(b) `initPopup` 内クロージャ（`$('…')` で取った要素・`safeRefresh` 等）への依存、(c) 関数名で `src/**/*.test.js` と `tests/**` を grep した該当テスト一覧。
+2. **テスト先行**: 該当 wiring テストの本文取得を `resolveEntryFnSource` に置換（断言不変）。移設先の**単体テスト**を新設（happy-dom＋ `{ getEl, … }` 注入。`popup/attachAiDiagButtonHandler.test.js` / `popup/wireLaneUserDetailOpen.test.js` が雛形）。
+3. **移動**: 関数本体を**そのまま**新モジュールへ（`@ts-nocheck` と「なぜ切り出したか・依存はどう注入するか」の頭コメント。`attachAiDiagButtonHandler.js:1-14` の形）。popup-entry 側は `import` + 呼び出し最小フック。**専用の module-level 状態は同伴**（`_aiDiagDelegatedAttached` 方式）、共有状態は ctx で**参照**を渡す（詰め替えない）。
+4. **ラチェット更新**: `popupEntryFunctionBudget.test.js` の `BUDGET.initPopup` と `eslint.config.js:398` の `max` を実測へ下げる。**追加行 < 削除行** を確認。
+5. **生成物**: `git add <new files>` → `npm run tree-map` → `npm run feature-map` → `FEATURES.paths` 修正 → 生成物 add。
+6. **検証**: `npm run verify:cc` 緑・`npm run impact-check`（警告を読む）・変異確認（移設先の単体テストの断言を 1 つ反転 → 赤 → 復元）。
+7. **報告**（Reporting Format）してから次の塊へ。
+
+**候補（結合の弱い順の仮説。★実施前に定型 1 で必ず再測定する）**:
+
+| 順 | 塊 | 根拠（initPopup からしか呼ばれない関数・実測） | 想定行数 |
+|---|---|---|---:|
+| 4-1 | **枠テーマ（frame theme）** | `loadPopupFrameSettings` `:4778` / `savePopupFrameSettings` `:4795` / `setFrameShareStatus` `:4803` / `copyTextToClipboard` `:4842` / `openManualCopyOverlay` `:4898` / `syncFrameShareInput` `:5040` ＋ `frameCustomEditor / saveCustomFrame / resetCustomFrame / copyFrameCode / toggleFrameCodeInput / frameShareBox / frameShareCode` のリスナ。`renderFrameSelection` `:4724` / `renderCustomFrameEditor` `:4737` / `applyPopupFrame` `:4748` は他からも呼ばれるか要確認 | 約 300〜400 |
+| 4-2 | **開発モニタのエクスポート/DL** | `downloadMcpSnapshotJson` `:4608` / `downloadSessionSummaryJson` `:4637` / `downloadCalibrationData` `:4673` / `clearCalibrationData` `:4702`（純粋部分 `romiDebugDataChecklist` / `formatAiShareDiagnosticsMarkdown` は Track A-5 で先に lib へ）＋ `devMonitorCopyAiBundleBtn`（104 行ハンドラ・棚卸し）/ `devMonitorDownloadAiBundleBtn` / `devMonitorExportMarketingBtn` / `exportMediaKitBtn` のリスナ | 約 400 |
+| 4-3 | **コメント送信 `submitComment`** | `:21332`・唯一の名前付き内部関数・棚卸しの第一候補。`_commentPostDiagCounters`（initPopup で 14 回参照・**書換あり**の疑い → S1 で判断）・`withCommentPostDeadline`・`commentInput`/`exportBtn` クロージャ依存 | 約 170 |
+| 4-4 | **受動ビュー(passive)の鏡描画** | `applyLaneMirrorForPassive` `:7383` / `applyLaneMirrorForMainPopupFallback` `:7501` / `applyCommentTimelineMirrorForPassive` `:7628` / `applyNorthStarMirrorForPassive` `:7681` / `applyStatCardsMirrorForPassive` `:7737` / `applyTopSupportersMirrorForPassive` `:7753` / `renderStoryUserLaneFromLightCommentsForCurrentLive` `:7566` ＋ initPopup の初回/onChanged 配線。**wiring テストの結合が最も濃い**ので 4-1〜4-3 で定型が固まってから | 約 400 |
+
+**除外（動かさない）**: `initPopup` 自体・`refresh` 自体・`runOneTimeBackfill*` 4 本と `readCommentBagForMigrationCheap`（D16）・`publishLaneMirror`（B5）・verify-bump の 4 シンボル関数（B9）・幕/cloak 関連（B6）。
+
+**完了条件（Phase 4 全体）**: Track A の A-1〜A-3 と Track B の 4-1・4-2 が完了し、`eslint.config.js:398` が 22,400 未満・`BUDGET.initPopup` が 2,000 未満。4-3/4-4 は S1 の結果次第で提案に戻してよい。
+
+### Phase 5 — 境界とインターフェースの明確化
+
+1. `src/extension/popup/initContext.js` に `PopupInitContext` の JSDoc typedef（フィールドは Phase 4 で実際に渡したものだけ。推測で増やさない）。
+2. 抽出先モジュールの頭コメント形式を 1 つに固定（`attachAiDiagButtonHandler.js:1-14` を規範）し、Phase 4 の成果物を揃える。
+3. `src/extension/popup/README.md` は**作らない**（docs 増殖禁止。規約は typedef ファイルの JSDoc に書く）。
+
+### Phase 6 — テストしやすい構造（content-entry の診断バンドル）
+
+1. `buildGiftDiagnosticsBundle` `:6047`（915 行）/ `buildAiSharePageDiagnostics` `:9597`（407）/ `buildAiShareFastDiagnosticsPayload` `:6963`（328）について、Phase 4 の定型 1 と同じ棚卸しを行い、**DOM 読み取り・module-level 変数への依存を実測**して報告。
+2. 依存が「読み取りのみ・引数化できる」と確定した関数だけ、`src/extension/content/diag/<name>.js` へ移して単体テストを付ける（新ディレクトリ → eslint ブロック `src/extension/content/**` max 2,000 と `ROLES` 追加）。確定できなければ**提案に留める**。
+3. `contentEntryFunctionBudget` を下げる。
+
+### Phase 7 — 大きな設計変更（提案のみ・実装しない）
+
+次は**設計案と根拠（実測値）を報告に書くだけ**。承認なしに実装しない:
+
+- D7 `refresh()` のステージ分割（await ごとの世代ガード集計を添付）
+- D9 メッセージ種別の登録簿
+- D8 storage リテラルキーの lib 集約
+- D10 `background.js` のバンドル化
+- D3 `@ts-nocheck` の段階的撤去
+- D14 例外握り潰しの `consoleErrorBuffer` 経由化
+- D15 重複ヘルパの統合（等価性表つき）
+- D12 `mountVenueBarButton`（4,778 行）の分割
+
+---
+
+## Verification Requirements
+
+- **各 Phase の終わりに** `npm run verify:cc` を実行し、`.artifacts/verify-cc.log` の `verify:cc OK` 行と `REPORT diagnostics` 行を報告に貼る。
+- **抽出 1 塊ごとに**: (1) 移設先の単体テスト緑 (2) 移設対象名で grep した既存テストが全部緑 (3) 関数ラチェット・max-lines を下げた後も緑 (4) 変異確認 1 件（断言反転 → 赤 → 復元。**変異が本当に適用されたか**を先に確認: CRLF/空振りの前例）(5) `npm run build` 後の `dist/popup.js` に verify-bump の 4 シンボルが残る（`verify:cc` の verify:bump が見る）。
+- **件数の単調性**: `npm run test:cc` の passed 件数が baseline（11,518）を下回らない（減ったら理由を書く）。
+- **e2e は走らせない**（baseline に無い。CI 失敗中）。
+- **実機確認は本書の範囲外**（拡張の反映は 司令塔が build+commit+push+pull+リロード+F5 を 1 セットで行う）。報告に「⏳実機待ち: <確認項目>」を 1 行で書く。
+
+---
+
+## Reporting Format
+
+各 Phase 完了時と最終報告で、次の順に書く（Markdown・簡潔に）:
+
+```
+## Phase N 報告
+- 変更ファイル: <追加/変更/削除 を明示・新規は git add 済みか>
+- 追加行/削除行: +A / -D（抽出は A < D を明記）
+- ラチェット: initPopup 2,595→X / refresh 1,774→Y / popup max-lines 22,660→Z / content max-lines <状態>
+- 実行したコマンドと結果: test:cc(件数/exit) / lint / typecheck / build / verify:cc(OK|FAILED・ログ行)
+- 変異確認: <何を反転し・赤を確認し・復元したか>
+- 棚卸し結果（抽出時）: module-level 依存 N 個（書換 M 個）/ クロージャ依存 / 該当テスト K 件とその扱い
+- 生成物: tree-map / feature-map 再生成の有無・FEATURES/ROLES の変更
+- 止まった点（Stop And Ask）: 該当番号と質問文
+- 提案（実装していないもの）: 箇条書き
+- ⏳実機待ち: <1 行>
+```
+
+最終報告には加えて: baseline との差分表（テスト件数・各ラチェットの前後）／未着手の Phase と理由／`docs/handoff/giant-entry-split-PHASE2-INVENTORY` の数値が古い旨。
+
+---
+
+## Out-of-scope Items
+
+**触らない（読むのは可）**:
+
+- `tsuioku-no-kirameki/`（紹介 LP・privacy・`/live/`）、`api/`（Vercel Functions）、`app/`（Web版 status / live-view。`app/dist/*` は build が更新するが**自分の変更として扱わない**）
+- `docs/`（`docs/refactor-instructions.md` の進捗追記と、`npm run tree-map` / `npm run feature-map` が生成するファイルを除く）、`council/`、`memory/`、`.claude/`
+- `scripts/`（`eslint.config.js` と `tests/` 配下は対象。`scripts/repo-tree-map.mjs` の `ROLES` / `FEATURES` 辞書の**1 行追加・paths 修正のみ**可）
+- `extension/dist/`・`app/dist/`（生成物）
+- `extension/background.js`・`offscreen-entry.js`・`page-intercept-entry.js`（別実行文脈。D9/D10 は提案のみ）
+- `venueBar.js` / `status-entry.js` の**分割**（Phase 2 のラチェット追加のみ）
+- `refresh()` の分割（提案のみ）
+- storage キー・保存形式・メッセージ種別・DOM id・`data-*` の変更（B7）
+- 例外処理の変更・ログ統一（D14）
+- 型付け（`@ts-nocheck` 撤去）（D3）
+- version bump・changelog・commit・push・`copy:ext`・Chrome リロード・CWS 提出（Non-Negotiable 10-11。依頼があった場合のみ）
+- e2e テストの修正・実行
+- LP/プライバシー文言・CWS 提出文書（`docs/releases/cws-submission-texts.md`）
+- 既存の未コミット差分（dist 4 本・`app/dist/live-view.js`・`surechigai-user-needs-question.txt`）
+
+---
+
+## 実装前に確認すべき質問 — 【回答済み・2026-09-17 ユーザー確定】
+
+以下はすべてユーザー回答で確定済み。**再質問しない**。この決定に従って実装する。
+
+- **Q1（D2）→ 確定: 実測ちょうど 19,347** で content-entry の max-lines を復活させる（`+ε` を取らない＝popup の運用に揃える）。
+- **Q2（bump 粒度）→ 確定: Phase ごとに patch bump 1 つ**。挙動不変でも「Phase 単位＝説明できる単位」で 1 版上げる。bump は 3 点セット同期（manifest / package / changelog）＋ `npm run verify:bump`。changelog が 20 版ちょうどなので、bump 前に必ず `node scripts/split-changelog.mjs`（実行後に版数を検算）。summary は 35 字以内。★ただし bump・commit・push そのものは司令塔（メインの Claude）が行う（Non-Negotiable 10-11）。実装担当は「この Phase は 1 bump 相当」と報告に明記し、changelog エントリ案（summary＋items）を報告に添える。
+- **Q3（Phase 4 受け皿）→ 確定: `src/extension/popup/init/<feature>.js`（新ディレクトリ）**。既存 4 モジュール（`popup/` 直下フラット）とは混ぜない。新ディレクトリを作ったら `scripts/repo-tree-map.mjs` の `ROLES` に 1 行追加（`eslint.config.js:400-403` の `popup/**` max 2,000 は `popup/init/**` にも及ぶことを確認。及ばなければ `src/extension/popup/init/**` のブロックを追加）。
+- **Q4（優先順）→ 確定: 指示書どおり**。Phase 4 は Track A（純関数 → lib・低リスク）→ Track B（initPopup クラスタ → popup/init/・中リスク）。content-entry は Phase 2 で安全網（ラチェット）だけ張り、抽出は Phase 6。
+- **Q5（paintVersionBadge 二重呼び出し）→ 確定: 削除してよい**。冪等で実害なしだが、`popup-entry.js:19980` と `:20029` のうち**後から呼ばれる側 1 行を Phase 3 で削除**する（どちらを残すかは、初期化順で先に確実に呼ばれる方を残す＝棚卸しで確認してから）。削除は 1 行・挙動不変。迷ったら残す（本作業に影響なし）。
+- **Q6（submitComment の計器）→ 確定: ctx で参照渡し**。`_commentPostDiagCounters`（module-level・書換あり）は**所有者を移動せず、参照を ctx で渡す**（詰め替えない）。挙動不変を最優先する。計器の flush も現在の所有者（popup-entry）に残す。
