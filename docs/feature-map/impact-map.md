@@ -613,6 +613,7 @@
 | `src/lib/inlinePopupIframeVisibilityPolicy.js` | 1 | 記録エンジン(watchページ常駐) |
 | `src/lib/interceptAvatarHydration.js` | 1 | 記録エンジン(watchページ常駐) |
 | `src/lib/interceptBinaryTextExtract.js` | 1 | ページ傍受 |
+| `src/lib/interceptCacheMerge.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/interceptViewerJoinSignals.js` | 1 | ページ傍受 |
 | `src/lib/interceptVisitorProbeDebug.js` | 1 | ページ傍受 |
 | `src/lib/isInsideRecommendedLiveSection.js` | 1 | 記録エンジン(watchページ常駐) |

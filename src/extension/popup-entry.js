@@ -621,7 +621,6 @@ import {
   upsertUserCommentProfileFromIntercept
 } from '../lib/userCommentProfileCache.js';
 import {
-  commentEnrichmentAvatarScore,
   isHttpOrHttpsUrl,
   isAnonymousStyleNicoUserId,
   isWeakNiconicoUserIconHttpUrl,
@@ -873,7 +872,11 @@ import {
   buildStoryAvatarDiagHtml,
   buildStoryAvatarDiagVerboseHtml
 } from '../lib/storyAvatarDiagLine.js';
-import { pickStrongerUserId } from '../lib/userIdPreference.js';
+import {
+  mergeCommentsWithInterceptCache,
+  mergeInterceptCacheItems,
+  normalizeInterceptCacheItems
+} from '../lib/interceptCacheMerge.js';
 import {
   countCommentsInWindowMs,
   commentsPerMinuteFromWindow
@@ -13988,60 +13991,8 @@ async function sendMessageToWatchTabs(watchUrl, message) {
   return null;
 }
 
-/**
- * @param {unknown} raw
- * @returns {{ no: string, uid: string, name: string, av: string }[]}
- */
-function normalizeInterceptCacheItems(raw) {
-  if (!Array.isArray(raw)) return [];
-  const out = [];
-  for (const v of raw) {
-    if (!v || typeof v !== 'object') continue;
-    const item = /** @type {{ no?: unknown, uid?: unknown, name?: unknown, av?: unknown }} */ (
-      v
-    );
-    const no = String(item.no || '').trim();
-    const uid = String(item.uid || '').trim();
-    if (!no) continue;
-    const name = String(item.name || '').trim();
-    const av = isHttpOrHttpsUrl(item.av) ? String(item.av || '').trim() : '';
-    if (!uid && !name && !av) continue;
-    out.push({ no, uid, name, av });
-  }
-  return out;
-}
-
-/**
- * 同一 commentNo の intercept 情報をマージする。
- * @param {{ no: string, uid: string, name: string, av: string }[]} items
- * @returns {{ no: string, uid: string, name: string, av: string }[]}
- */
-function mergeInterceptCacheItems(items) {
-  if (!Array.isArray(items) || items.length === 0) return [];
-  /** @type {Map<string, { no: string, uid: string, name: string, av: string }>} */
-  const byNo = new Map();
-  for (const it of items) {
-    const no = String(it?.no || '').trim();
-    if (!no) continue;
-    const prev = byNo.get(no);
-    if (!prev) {
-      byNo.set(no, {
-        no,
-        uid: String(it?.uid || '').trim(),
-        name: String(it?.name || '').trim(),
-        av: isHttpOrHttpsUrl(it?.av) ? String(it.av || '').trim() : ''
-      });
-      continue;
-    }
-    byNo.set(no, {
-      no,
-      uid: String(it?.uid || '').trim() || prev.uid,
-      name: String(it?.name || '').trim() || prev.name,
-      av: (isHttpOrHttpsUrl(it?.av) ? String(it.av || '').trim() : '') || prev.av
-    });
-  }
-  return [...byNo.values()];
-}
+// normalizeInterceptCacheItems / mergeInterceptCacheItems は Track A(refactor Phase 4)で
+//   src/lib/interceptCacheMerge.js へ移設(挙動不変)。上部で import。
 
 /**
  * @param {string} watchUrl
@@ -14197,116 +14148,8 @@ async function requestInterceptCacheFromOpenTab(watchUrl, opts = {}) {
   return { items, diag };
 }
 
-/**
- * @param {PopupCommentEntry[]} entries
- * @param {{ no: string, uid: string, name: string, av: string }[]} items
- * @param {{ preferInterceptUidSet?: Set<string> }} [opts]
- * @returns {{ next: PopupCommentEntry[], patched: number, uidReplaced: number }}
- */
-function mergeCommentsWithInterceptCache(entries, items, opts = {}) {
-  if (!Array.isArray(entries) || entries.length === 0 || items.length === 0) {
-    return {
-      next: Array.isArray(entries) ? entries : [],
-      patched: 0,
-      uidReplaced: 0
-    };
-  }
-
-  /** @type {Map<string, { no: string, uid: string, name: string, av: string }>} */
-  const byNo = new Map();
-  for (const it of items) {
-    const prev = byNo.get(it.no);
-    if (!prev) {
-      byNo.set(it.no, it);
-      continue;
-    }
-    byNo.set(it.no, {
-      no: it.no,
-      uid: it.uid || prev.uid,
-      name: it.name || prev.name,
-      av: it.av || prev.av
-    });
-  }
-
-  /** @type {Map<string, { total: number, mismatch: number, hitUids: Set<string> }>} */
-  const mismatchByCurrentUid = new Map();
-  for (const e of entries) {
-    const no = String(e?.commentNo || '').trim();
-    if (!no) continue;
-    const hit = byNo.get(no);
-    if (!hit?.uid) continue;
-    const curUid = String(e?.userId || '').trim();
-    if (!curUid) continue;
-    const st =
-      mismatchByCurrentUid.get(curUid) || {
-        total: 0,
-        mismatch: 0,
-        hitUids: new Set()
-      };
-    st.total += 1;
-    if (curUid !== hit.uid) {
-      st.mismatch += 1;
-      st.hitUids.add(hit.uid);
-    }
-    mismatchByCurrentUid.set(curUid, st);
-  }
-  const preferInterceptUidSet =
-    opts.preferInterceptUidSet instanceof Set ? opts.preferInterceptUidSet : new Set();
-  /** @param {string} curUid */
-  const shouldReplaceUid = (curUid) => {
-    if (!curUid) return false;
-    if (preferInterceptUidSet.has(curUid)) return true;
-    const st = mismatchByCurrentUid.get(curUid);
-    if (!st || st.total < 4) return false;
-    if (st.hitUids.size < 3) return false;
-    return st.mismatch >= Math.ceil(st.total * 0.6);
-  };
-
-  let patched = 0;
-  let uidReplaced = 0;
-  const next = entries.map((e) => {
-    const no = String(e?.commentNo || '').trim();
-    if (!no) return e;
-    const hit = byNo.get(no);
-    if (!hit) return e;
-
-    const curUid = String(e?.userId || '').trim();
-    const curName = String(e?.nickname || '').trim();
-    const curAv = String(e?.avatarUrl || '').trim();
-    let changed = false;
-    /** @type {PopupCommentEntry} */
-    let out = e;
-
-    if (hit.uid) {
-      const tie = shouldReplaceUid(curUid) ? 'incoming' : 'existing';
-      const chosen = pickStrongerUserId(curUid, hit.uid, tie);
-      if (chosen && chosen !== curUid) {
-        if (curUid) uidReplaced += 1;
-        out = { ...out, userId: chosen };
-        changed = true;
-      }
-    }
-    if (hit.name && !curName) {
-      out = { ...out, nickname: hit.name };
-      changed = true;
-    }
-    const uidForAv = String(out.userId || '').trim();
-    const hitAv = String(hit.av || '').trim();
-    if (hitAv && isHttpOrHttpsUrl(hitAv)) {
-      const curSc = commentEnrichmentAvatarScore(uidForAv, curAv);
-      const hitSc = commentEnrichmentAvatarScore(uidForAv, hitAv);
-      if (hitSc > curSc) {
-        out = { ...out, avatarUrl: hitAv };
-        changed = true;
-      }
-    }
-
-    if (changed) patched += 1;
-    return out;
-  });
-
-  return { next, patched, uidReplaced };
-}
+// mergeCommentsWithInterceptCache は Track A(refactor Phase 4)で
+//   src/lib/interceptCacheMerge.js へ移設(挙動不変)。上部で import。
 
 /**
  * 誤って「自分のサムネ」を他者コメントに付けた履歴を除去する。

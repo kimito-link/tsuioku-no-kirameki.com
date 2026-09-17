@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 6 / 873 件
+## ⚠️ 役割コメントが無いソース 6 / 874 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `src/lib/laneDomSelfMeasure.js`
@@ -779,7 +779,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (1854)
+- 📁 **src/** (1856)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1048,7 +1048,7 @@
         - `logo_funlink_white_RGB_link_black.png`
         - `logo_funlink_white_RGB_maru_black.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1630)
+  - 📁 **lib/** (1632)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -1702,6 +1702,8 @@
     - `interceptAvatarHydration.test.js`
     - `interceptBinaryTextExtract.js` — バイナリを UTF-8 として解釈した文字列から、近傍の commentNo とユーザー識別子の組を拾う（ヒューリスティック）。
     - `interceptBinaryTextExtract.test.js`
+    - `interceptCacheMerge.js` — コメント記録 × NDGR インターセプトキャッシュのマージ（純粋関数）。
+    - `interceptCacheMerge.test.js`
     - `interceptReconcileHotPathGuard.test.js`
     - `interceptViewerJoinSignals.js` — page-intercept 用: JSON から「視聴者入室・オーディエンス更新」らしいユーザ配列を抽出（純関数・PII は userId/表示名/アイコン URL のみ）
     - `interceptViewerJoinSignals.test.js`

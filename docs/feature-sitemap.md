@@ -41,7 +41,7 @@
   - `src/lib/ndgrBackfillCrawl.js`
 - **コメント重複除去(NDGR)** — 再送/再接続/relay overlap の重複を liveId+messageId の canonical key で排除
   - `src/lib/ndgrMessageDedupe.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 60</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 61</summary>
 
 - `src/domain/observations/StatObservation.js` — StatObservation - ニコ生から取得する数値の「契約付き観測値」純関数 factory。
 - `src/domain/observations/vocabulary.js` — 観測層 (StatObservation) の語彙集 - 不変な enum 定義のみ。
@@ -77,6 +77,7 @@
 - `src/lib/hiddenOfficialIframeReinjectGate.js` — hidden audition iframe を「再 inject してよいか」を判定する純関数（v0.1.394）。
 - `src/lib/iframeOfficialDomFromRelay.js` — v0.1.231: iframe relay (NLS_GIFT_HISTORY_FROM_IFRAME) 受信時の
 - `src/lib/interceptBinaryTextExtract.js` — バイナリを UTF-8 として解釈した文字列から、近傍の commentNo とユーザー識別子の組を拾う（ヒューリスティック）。
+- `src/lib/interceptCacheMerge.js` — コメント記録 × NDGR インターセプトキャッシュのマージ（純粋関数）。
 - `src/lib/interceptViewerJoinSignals.js` — page-intercept 用: JSON から「視聴者入室・オーディエンス更新」らしいユーザ配列を抽出（純関数・PII は userId/表示名/アイコン URL のみ）
 - `src/lib/interceptVisitorProbeDebug.js` — TAKT B フォールバック: 来場・入室信号の観測用。既定 OFF。
 - `src/lib/mcpBridge/buildLiveMcpSnapshot.js` — L0 Evidence（拡張の観測データ）→ L1 Canonical Snapshot 変換。
@@ -1084,16 +1085,16 @@
 - `v0.1.1508` 2026-09-14 — 出荷前の自己点検を横断キットと共通化
 - `v0.1.1507` 2026-09-04 — 埋め込みに別の配信が映る問題を直しました
 
-### 🩺 診断・状態速報 (4版)
+### 🩺 診断・状態速報 (3版)
 - `v0.1.1509` 2026-09-14 — サイドパネルが固まる・黒いままの真因を直しました
 - `v0.1.1508` 2026-09-14 — 出荷前の自己点検を横断キットと共通化
 - `v0.1.1504` 2026-09-03 — 診断ページの説明文の誤りを訂正
-- `v0.1.1503` 2026-09-03 — 無関係な更新で描き直す回数を減らしました
 
 ### ⚡ 描画・性能 (1版)
 - `v0.1.1509` 2026-09-14 — サイドパネルが固まる・黒いままの真因を直しました
 
-### その他 (7版)
+### その他 (8版)
+- `v0.1.1523` 2026-09-18 — 内部整理(表示や動作は変わりません)
 - `v0.1.1522` 2026-09-18 — 内部整理(表示や動作は変わりません)
 - `v0.1.1521` 2026-09-17 — 内部整理の安全網(挙動は変わりません)
 - `v0.1.1520` 2026-09-16 — カード画像の配信者名の括弧欠けを修正

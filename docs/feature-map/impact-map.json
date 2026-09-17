@@ -5682,6 +5682,16 @@
       ]
     },
     {
+      "file": "src/lib/interceptCacheMerge.js",
+      "featureCount": 1,
+      "features": [
+        "popup"
+      ],
+      "labels": [
+        "ポップアップ(応援レーン)"
+      ]
+    },
+    {
       "file": "src/lib/interceptViewerJoinSignals.js",
       "featureCount": 1,
       "features": [
