@@ -542,8 +542,11 @@ import {
 } from '../lib/commentDb.js';
 import { mergeProgramStatsWatchIntoWatchMetaSnapshot } from '../lib/mergeProgramStatsWatchIntoWatchMetaSnapshot.js';
 import { buildWatchMetaCardAudienceViewModel } from '../lib/buildWatchMetaCardAudienceViewModel.js';
-import { mergeStoredCommentDedupeVariants } from '../lib/storedCommentDedupeMerge.js';
-import { storedCommentDedupeKey } from '../lib/storedCommentDedupeKey.js';
+import { normalizeStoredCommentEntries } from '../lib/storedCommentEntriesNormalize.js';
+import {
+  formatAiShareDiagnosticsMarkdown,
+  romiDebugDataChecklist
+} from '../lib/aiShareDiagnosticsMarkdown.js';
 import {
   resolveWatchMetaCardState,
   isLiveStatValueAwaitingData
@@ -4989,56 +4992,8 @@ function openManualCopyOverlay(text) {
 // isContextInvalidatedError（import 経由 isExtensionContextInvalidatedError）に
 // 統一済み。同関数は string でも Error オブジェクトでも受けられる。
 
-/**
- * 改善切り分けに必要な観測データ（ロミ式: 入口/経路/出口を最短で絞る）
- * @returns {string[]}
- */
-function romiDebugDataChecklist() {
-  return [
-    '`diagSchemaVersion`（診断 JSON ルート）',
-    '`content.romiDebug`（取り込み入口/保存ゲート）',
-    '`content.giftDiagnostics.rankingDiag`（自動オープン失敗の段）',
-    '`content.commentObservability`（NDGR/DOM 経路比率）',
-    'watch URL（lv番号）',
-    'popup exportedAt / content exportedAt',
-    'intercept map size',
-    'ndgr pending / ndgrLastReceivedAgo',
-    'lastPersistBatch / persistGateFailures'
-  ];
-}
-
-/**
- * @param {{
- *   extensionName: string;
- *   extensionVersion: string;
- *   watchUrlNote: string;
- *   lastSendMessageError: string;
- *   payload: Record<string, unknown>;
- * }} parts
- */
-function formatAiShareDiagnosticsMarkdown(parts) {
-  const lines = [];
-  lines.push('## nicolivelog 診断バンドル（AI 共有用）');
-  lines.push('');
-  lines.push(
-    '次の JSON ブロックをそのまま AI に貼ってください。拡張を再読み込みした直後は watch ページを **F5** してください。'
-  );
-  lines.push('');
-  lines.push(`- 拡張: ${parts.extensionName} v${parts.extensionVersion}`);
-  lines.push(`- 診断スキーマ: \`${String(parts.payload?.diagSchemaVersion || '') || '（未付与）'}\`（LLM への再現用バージョン）`);
-  lines.push(`- タブ選択: ${parts.watchUrlNote}`);
-  if (parts.lastSendMessageError) {
-    lines.push(`- content への送信: \`${parts.lastSendMessageError}\``);
-  }
-  lines.push(
-    '- 重点確認: `content.romiDebug`（取り込み入口/補完/保存ゲートの全体像。ここを見ると不具合の段が特定しやすいです）'
-  );
-  lines.push('');
-  lines.push('```json');
-  lines.push(JSON.stringify(parts.payload, null, 2));
-  lines.push('```');
-  return lines.join('\n');
-}
+// romiDebugDataChecklist / formatAiShareDiagnosticsMarkdown は Track A(refactor Phase 4)で
+//   src/lib/aiShareDiagnosticsMarkdown.js へ移設(挙動不変)。上部で import。
 
 function syncFrameShareInput() {
   const input = /** @type {HTMLTextAreaElement|null} */ ($('frameShareCode'));
@@ -8852,58 +8807,8 @@ async function readAllCommentsForLive(lv) {
   return rows;
 }
 
-/**
- * 旧バグで混ざった「複数コメント連結行」を UI 表示前に潰す。
- *
- * @param {PopupCommentEntry[]} entries
- * @returns {{ next: PopupCommentEntry[], changed: boolean }}
- */
-function normalizeStoredCommentEntries(entries) {
-  const list = Array.isArray(entries) ? entries : [];
-  if (list.length <= 1) return { next: list, changed: false };
-
-  /** @type {PopupCommentEntry[]} */
-  const out = [];
-  /** @type {Map<string, number>} */
-  const indexByKey = new Map();
-  let changed = false;
-
-  /**
-   * @param {PopupCommentEntry} prev
-   * @param {PopupCommentEntry} next
-   * @returns {PopupCommentEntry}
-   */
-  const mergeVariant = (prev, next) =>
-    /** @type {PopupCommentEntry} */ (
-      mergeStoredCommentDedupeVariants(
-        /** @type {Record<string, unknown>} */ (prev),
-        /** @type {Record<string, unknown>} */ (next)
-      )
-    );
-
-  for (const raw of list) {
-    const entry = /** @type {PopupCommentEntry} */ (raw);
-    // ★v0.1.1313: キー生成は純関数 storedCommentDedupeKey が正本(経緯はそちらの冒頭)。
-    //   旧キーは capturedAt をそのまま含み、読み直しで時刻が振り直されると
-    //   同じコメントが別行として数えられていた(＝「記録101%」の残り火)。
-    const key = storedCommentDedupeKey(entry);
-    const existingIndex = indexByKey.get(key);
-    if (existingIndex == null) {
-      indexByKey.set(key, out.length);
-      out.push(entry);
-      continue;
-    }
-    const merged = mergeVariant(out[existingIndex], entry);
-    if (merged !== out[existingIndex]) {
-      changed = true;
-      out[existingIndex] = merged;
-    } else {
-      changed = true;
-    }
-  }
-
-  return { next: out, changed: changed || out.length !== list.length };
-}
+// normalizeStoredCommentEntries は Track A(refactor Phase 4)で
+//   src/lib/storedCommentEntriesNormalize.js へ移設(挙動不変)。上部で import。
 
 /** @returns {string} */
 function storySourceSignature() {
