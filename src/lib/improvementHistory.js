@@ -731,5 +731,19 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
     version: '0.1.1526', metric: 'cross-checked-claims', value: 49,
     source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
     note: '★この版の変更とは無関係な指標(過去30日のコミット本文の語数の移動窓)。54@1507 からの目減りは窓の経過に依存し実装差分と因果が無い。この版(Track B 4-2・開発モニタ DL 抽出)は司令塔が別の手段で裏取り済み: (1)devMonitorExport.js の単体テスト7ケースを happy-dom + chrome/downloads スタブで新設(snapshot 無しは DL しない/消去で storage.set/busy 中は session summary を DL しない 等) (2)initPopup ラチェットを 2510→2480 へ下げて効くことを確認 (3)KEY_CONCURRENT_CALIBRATION_RING_V1 はハードコードせず storageKeys.js から import(重複リテラルを作らない) (4)lint が移設で未使用になった 2 import(serializeCalibrationCsv/Json)を検出→削除 (5)verify:cc 全ゲート緑。★initPopup は 2477 でまだ 2000 超=指示書の完了条件(initPopup<2000)には未到達。残りは別クラスタの抽出が要る'
+  }),
+  Object.freeze({
+    version: '0.1.1527', metric: 'bundle-kb', value: 1396,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '★前版 1396 と同値(この版は /live/ 作法の逆輸入 Step1/2=既存 mirror 高速描画を initPopup 冒頭へ引き上げる並べ替え数十行のみ・新機構ゼロ・fetch なし)。バンドルはほぼ不変。過去最良 1360@1454 未達は 1454 以来の計器・検査ぶん(1508 の note 参照)。★体感速度の指標(初期ロードの blind ms)は実機測定が必要で、この台帳の bundle-kb では捉えられない=次の実機で status 速報の blind/panel-block を測る'
+  }),
+  Object.freeze({
+    version: '0.1.1527', metric: 'gate-selftest', value: 4,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1527', metric: 'cross-checked-claims', value: 50,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: '★この版の変更とは無関係な指標(過去30日のコミット本文の語数の移動窓)。54@1507 からの目減りは窓の経過に依存し実装差分と因果が無い。この版(逆輸入 Step1/2)は司令塔が別の手段で裏取り済み: (1)会議 Explore×3+Plan×1 で /live/ が軽い真因(非対称設計)と拡張が重い真因(refresh の Promise.all が mirror 高速描画の前でクリティカルパスを占有)を実コードで確定 (2)mirror/3カードの先行起動先関数が module-level・自前 lid フォールバック・heavy 譲りガード(countStoryUserLaneDomTiles>0)を持つことを Read で確認=stale 配信を貼らない (3)initPopup ラチェット 2480→2500・file max-lines 22075→22092 を実測で更新 (4)typecheck/lint 緑・verify:bump 全7 OK。★体感の実測は次の実機(status 速報 blind ms)で reality-checker に委任'
   })
 ]);
