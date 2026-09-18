@@ -759,5 +759,10 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
     version: '0.1.1528', metric: 'cross-checked-claims', value: 51,
     source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
     note: '★この版の変更とは無関係な指標(過去30日のコミット本文の語数の移動窓)。54@1507 からの目減りは窓の経過に依存し実装差分と因果が無い。この版は reality-checker の判定(PLAUSIBLE)を受けた安全側の絞り込み: 1527 の Step2(上段3カード先行)は setCountDisplay が num>_prevSupportCount で triggerCharaReaction(お祝い)を発火するため、鏡値→heavy値の差で偽お祝いが出る恐れを reality-checker が指摘(未検証点#1)。お祝い演出を持たない Step1(応援レーン鏡)だけ先行に残し、3カードは従来の tick(400ms後)に戻した。stale配信を貼らない(snap.liveId!==lid で return)は 1527 で CONFIRMED 済み。★体感の実測は次の実機(status 速報 blind ms)で確認'
+  }),
+  Object.freeze({
+    version: '0.1.1528', metric: 'panel-block-ms', value: 405,
+    source: '実機の状態速報「サイドパネル自己診断・最大タイマー遅延」 2026-09-18 05:19 (lv351411586・来場1,838・記録78件)',
+    note: '★逆輸入 Step1(mirror先行起動)の実機実測。同じ速報で「更新所要(計器) 5,167ms→98ms(-98%)」「描画完了まで 2,095ms→23ms(-99%)」「中身が見えなかった合計=801ms(主因=初回シェード)」を観測=cold boot で mirror が重い await の後ろに並んでいた構造(会議で特定)を先行起動で解消できた。★過去最良 106ms@1454 とは【測定対象が違う】: 当時=バンドル分割直後の同条件計測 / 今回=逆輸入後の実配信で「中身が見えなかった合計801ms」の内の最大タイマー遅延405ms。数字を単純比較しない(archive の panel-block-ms 群と同じ注意)。★残る801msの主因は初回シェード=Step3(重いrefreshをidle後回し)で更に短縮の余地あり(未着手)'
   })
 ]);
