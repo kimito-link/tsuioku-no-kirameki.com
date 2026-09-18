@@ -19518,6 +19518,24 @@ async function initPopup() {
   } catch {
     /* no-op */
   }
+  // v0.1.1527(refactor Phase 4 の後・/live/ 作法の逆輸入 Step1/2): 既存の鏡(mirror)高速描画を
+  //   【重い await 群(refresh の Promise.all=tabs.query×2/windows/storage・:15081)より前】へ引き上げる。
+  //   /live/ が軽い本質(集約済みの小さいデータ→即描画)は拡張内に既に実装済み。cold boot で mirror が
+  //   tabs.query/SW 起床の後ろに並んでいたのが体感5秒の構造だった(会議で実コード裏取り)。
+  //   ★storage read 1本のみ・fire-and-forget・heavy が既に描いていたら譲る既存ガード(:7257)付き=
+  //     get 回数も並列化も増やさない。DOM 未準備なら getStoryUserLaneEls()=null で安全に no-op。
+  //   ★lid は module-level の INLINE_OWN_WATCH_URL(自タブの &lv=)から同期抽出(initPopup クロージャ非依存)。
+  //     取れなければ applyLaneMirrorForMainPopupFallback 側が watchPopupLastPaintedLiveId に落ちる。
+  try {
+    const bootM = String(INLINE_OWN_WATCH_URL || '').match(/lv\d{1,15}/);
+    const bootLid = bootM ? bootM[0].toLowerCase() : '';
+    // Step1: 応援レーン(アイコン列)を鏡から即描画。
+    void applyLaneMirrorForMainPopupFallback(bootLid);
+    // Step2: 上段3カード(記録/推定同接/来場)も鏡由来の panel_summary から即埋める。
+    void applyLightweightPanelSummaryCards(bootLid);
+  } catch {
+    /* no-op: 先行描画に失敗しても以降の通常初期化(heavy refresh)がそのまま描く */
+  }
   try {
     checkVersionMismatchBanner();
   } catch {
