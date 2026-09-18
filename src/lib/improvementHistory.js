@@ -703,5 +703,19 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
     version: '0.1.1524', metric: 'cross-checked-claims', value: 47,
     source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
     note: '★この版の変更とは無関係な指標(過去30日のコミット本文の語数の移動窓)。54@1507 からの目減りは窓の経過に依存し実装差分と因果が無い。この版(Track A A-4/A-5・純関数抽出)は司令塔が別の手段で裏取り済み: (1)移設 3 関数(normalizeStoredCommentEntries / formatAiShareDiagnosticsMarkdown / romiDebugDataChecklist)の characterization テスト計 13 ケースを新設し切り出し前の入出力を固定 (2)lint が移設で未使用になった 2 import を検出→削除 (3)check:layer 緑・layer-map 純粋 710 へ更新 (4)verify:cc 全ゲート緑。A-3 は module-level 状態依存で純関数でないため見送り済み'
+  }),
+  Object.freeze({
+    version: '0.1.1525', metric: 'bundle-kb', value: 1397,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '★+1KB(1396→1397)は Track B 4-1(枠テーマを popup/init/frameTheme.js へ移設)で、DOM取得・generic utility を注入する ctx ラッパのぶん。popup-entry の行数は 199 行減(22406→22207)・initPopup 本体も縮んだ(BUDGET 2600→2510)ので、構造上の負債は下がっている。過去最良 1360@1454 未達は 1454 以来の計器・検査ぶん(1508 の note 参照)'
+  }),
+  Object.freeze({
+    version: '0.1.1525', metric: 'gate-selftest', value: 4,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1525', metric: 'cross-checked-claims', value: 48,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: '★この版の変更とは無関係な指標(過去30日のコミット本文の語数の移動窓)。54@1507 からの目減りは窓の経過に依存し実装差分と因果が無い。この版(Track B 4-1・枠テーマ抽出)は司令塔が別の手段で裏取り済み: (1)frameTheme.js の単体テスト7ケースを happy-dom + ctx 注入で新設(保存で storage.set が呼ばれる/コピーで triggerOpSound(op_copy)が呼ばれる/トグルで hidden 反転 等) (2)popupEntryFunctionBudget の initPopup ラチェットが実際に効くことを確認(2600→2510) (3)lint が移設で未使用になった 10 の frame-lib import と popupFrameState を検出→削除 (4)実施前に定型1で結合を再測定し、generic utility(withTimeout=24/copyTextToClipboard=6箇所)は移さず注入する設計に修正(司令塔がユーザーに範囲を確認) (5)verify:cc 全ゲート緑'
   })
 ]);

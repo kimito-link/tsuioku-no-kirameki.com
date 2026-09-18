@@ -29,7 +29,7 @@ const popupEntry = fs
 
 /** 抽出のたびに下げる上限(実測+余裕)。★増やす方向の編集は禁止。 */
 const BUDGET = Object.freeze({
-  initPopup: 2600,
+  initPopup: 2510,
   refresh: 1800
 });
 

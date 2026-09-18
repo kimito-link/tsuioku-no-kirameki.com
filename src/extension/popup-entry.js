@@ -565,21 +565,8 @@ import { KEY_COMMENT_TIMELINE_MIRROR } from '../lib/commentTimelineMirrorKey.js'
 import { createCommentMirrorPublishGate } from '../lib/commentMirrorPublishGate.js';
 import { createBooleanSettingController } from '../lib/popupBooleanSettingController.js';
 import { createBooleanSettingsRegistry } from '../lib/popupBooleanSettingsRegistry.js';
-import {
-  DEFAULT_CUSTOM_FRAME,
-  DEFAULT_FRAME_ID,
-  frameLabel,
-  hasFramePreset,
-  KNOWN_FRAME_VARS,
-  normalizeFrameId,
-  resolveFrameVars,
-  sanitizeCustomFrame
-} from '../lib/popupFramePresets.js';
+// popupFramePresets / popupFrameCodec は Track B(4-1)で frameTheme.js だけが使うようになった。
 import { isPendingSelfPostEntry } from '../lib/popupEntryPendingSelfPost.js';
-import {
-  createFrameShareCode,
-  parseFrameShareCode
-} from '../lib/popupFrameCodec.js';
 import {
   SELF_POST_RECENT_TTL_MS,
   filterValidSelfPostedRecents,
@@ -944,6 +931,11 @@ import { createRememberedAvatarLookup } from '../lib/rememberedAvatarIndex.js';
 import { addVerifiedAvatarUids, verifiedAvatarUidSet, KEY_VERIFIED_AVATAR_UIDS } from '../lib/verifiedAvatarRegistry.js';
 import { attachAiDiagButtonHandler } from './popup/attachAiDiagButtonHandler.js';
 import { wireLaneUserDetailOpen } from './popup/wireLaneUserDetailOpen.js';
+import {
+  applyPopupFrameFallback,
+  loadPopupFrameSettings,
+  wireFrameTheme
+} from './popup/init/frameTheme.js';
 import { buildComeviewUserDetailPath } from '../lib/comeviewUserDetailLink.js';
 import { mergeWatchSnapshotPreservingBroadcaster } from '../lib/watchSnapshotPartialMerge.js';
 import { persistFreshlyFetchedSnapshot } from '../lib/popupWatchSnapshotPersist.js';
@@ -4720,100 +4712,10 @@ const INTERCEPT_BACKFILL_STATE = {
   deepTried: false
 };
 
-/** @type {{ id: string, custom: { headerStart: string, headerEnd: string, accent: string } }} */
-const popupFrameState = {
-  id: DEFAULT_FRAME_ID,
-  custom: { ...DEFAULT_CUSTOM_FRAME }
-};
-
-/** @param {string} frameId */
-function renderFrameSelection(frameId) {
-  const labelEl = $('frameCurrentLabel');
-  if (labelEl) labelEl.textContent = frameLabel(frameId);
-  const chips = Array.from(document.querySelectorAll('.nl-frame-chip'));
-  for (const chip of chips) {
-    const id = String(chip.getAttribute('data-frame-id') || '');
-    const active = id === frameId;
-    chip.classList.toggle('is-active', active);
-    chip.setAttribute('aria-selected', active ? 'true' : 'false');
-  }
-}
-
-/** @param {{ headerStart: string, headerEnd: string, accent: string }} custom */
-function renderCustomFrameEditor(custom) {
-  const safe = sanitizeCustomFrame(custom);
-  const start = /** @type {HTMLInputElement|null} */ ($('frameHeaderStart'));
-  const end = /** @type {HTMLInputElement|null} */ ($('frameHeaderEnd'));
-  const accent = /** @type {HTMLInputElement|null} */ ($('frameAccent'));
-  if (start) start.value = safe.headerStart;
-  if (end) end.value = safe.headerEnd;
-  if (accent) accent.value = safe.accent;
-}
-
-/** @param {string} frameId @param {{ headerStart: string, headerEnd: string, accent: string }} custom */
-function applyPopupFrame(frameId, custom) {
-  const root = document.documentElement;
-  const normalized = normalizeFrameId(frameId);
-  const selectedFrame =
-    normalized === 'custom' || hasFramePreset(normalized)
-      ? normalized
-      : DEFAULT_FRAME_ID;
-  const vars = resolveFrameVars(selectedFrame, custom);
-  // 0.1.11 (A1 親バグ根治): プリセット切替で前プリセットの inline 値が残留すると、
-  // 例えば dark→light 切替時に `--nl-text-sub: #cbd5e1` が残って light 背景上で
-  // 読めなくなる。新プリセットを書く前に既知キーを一括 removeProperty して、
-  // CSS rule の値（`html.nl-skin-panel-dark` の dark 値 など）に一旦戻してから
-  // 新プリセットの inline で上書きする。これで切替の度に綺麗にリセットされる。
-  for (const key of KNOWN_FRAME_VARS) {
-    root.style.removeProperty(key);
-  }
-  for (const [key, value] of Object.entries(vars)) {
-    root.style.setProperty(key, value);
-  }
-  renderFrameSelection(selectedFrame);
-  renderCustomFrameEditor(custom);
-  syncFrameShareInput();
-}
-
-/** 配色プリセットが外側の details 内にあるため、カスタム編集時は開いておく */
-function openFrameThemeSectionIfPresent() {
-  const theme = /** @type {HTMLDetailsElement|null} */ ($('frameThemeDetails'));
-  if (theme) theme.open = true;
-}
-
-async function loadPopupFrameSettings() {
-  const bag = await chrome.storage.local.get([
-    KEY_POPUP_FRAME,
-    KEY_POPUP_FRAME_CUSTOM
-  ]);
-  const rawFrameId = normalizeFrameId(bag[KEY_POPUP_FRAME]);
-  const frameId =
-    rawFrameId === 'custom' || hasFramePreset(rawFrameId)
-      ? rawFrameId
-      : DEFAULT_FRAME_ID;
-  const custom = sanitizeCustomFrame(bag[KEY_POPUP_FRAME_CUSTOM]);
-  popupFrameState.id = frameId;
-  popupFrameState.custom = custom;
-  applyPopupFrame(frameId, custom);
-  if (frameId === 'custom') openFrameThemeSectionIfPresent();
-}
-
-async function savePopupFrameSettings() {
-  await chrome.storage.local.set({
-    [KEY_POPUP_FRAME]: popupFrameState.id,
-    [KEY_POPUP_FRAME_CUSTOM]: popupFrameState.custom
-  });
-}
-
-/** @param {string} message @param {'idle'|'error'|'success'} kind */
-function setFrameShareStatus(message, kind = 'idle') {
-  const status = $('frameShareStatus');
-  if (!status) return;
-  status.textContent = message;
-  status.classList.remove('error', 'success');
-  if (kind === 'error') status.classList.add('error');
-  if (kind === 'success') status.classList.add('success');
-}
+// 枠テーマ(配色プリセット)一式は Track B(refactor Phase 4 4-1)で
+//   src/extension/popup/init/frameTheme.js へ移設(挙動不変)。popupFrameState もそちらが正本。
+//   generic な copyTextToClipboard / openManualCopyOverlay / withTimeout は全体で使うので
+//   ここに残し、frameTheme へは ctx で注入する。
 
 /**
  * クリップボード書き込みのフォールバック（document.execCommand）。
@@ -4994,12 +4896,7 @@ function openManualCopyOverlay(text) {
 
 // romiDebugDataChecklist / formatAiShareDiagnosticsMarkdown は Track A(refactor Phase 4)で
 //   src/lib/aiShareDiagnosticsMarkdown.js へ移設(挙動不変)。上部で import。
-
-function syncFrameShareInput() {
-  const input = /** @type {HTMLTextAreaElement|null} */ ($('frameShareCode'));
-  if (!input) return;
-  input.value = createFrameShareCode(popupFrameState.id, popupFrameState.custom);
-}
+// syncFrameShareInput は Track B(4-1)で frameTheme.js へ移設(挙動不変)。
 
 /** ストーリー枠は りんく上半身（応援カウンター） */
 const STORY_RINK_FACE_IMG = 'images/toumeilink.png';
@@ -19844,15 +19741,7 @@ async function initPopup() {
   const voiceLevelTrack = /** @type {HTMLDivElement|null} */ ($('voiceLevelTrack'));
   const commentInput = /** @type {HTMLTextAreaElement} */ ($('commentInput'));
   const dismissErr = $('dismissStorageError');
-  const frameChips = Array.from(document.querySelectorAll('.nl-frame-chip'));
-  const frameEditor = /** @type {HTMLDetailsElement|null} */ ($('frameCustomEditor'));
-  const saveCustomFrameBtn = $('saveCustomFrame');
-  const resetCustomFrameBtn = $('resetCustomFrame');
-  const copyFrameCodeBtn = $('copyFrameCode');
-  const toggleFrameCodeInputBtn = $('toggleFrameCodeInput');
-  const frameShareBox = $('frameShareBox');
-  const frameShareCode = /** @type {HTMLTextAreaElement|null} */ ($('frameShareCode'));
-  const applyFrameCodeBtn = $('applyFrameCode');
+  // 枠テーマの DOM 取得・listener は frameTheme.wireFrameTheme(下で 1 回呼ぶ)へ移設。
 
   const safeRefresh = () => {
     if (!hasExtensionContext()) return Promise.resolve();
@@ -20298,28 +20187,7 @@ async function initPopup() {
     if (stEl) stEl.textContent = '別タブで分析中…（このポップアップは閉じても大丈夫です）';
   });
 
-  const readCustomFrameInputs = () =>
-    sanitizeCustomFrame({
-      headerStart: /** @type {HTMLInputElement|null} */ ($('frameHeaderStart'))
-        ?.value,
-      headerEnd: /** @type {HTMLInputElement|null} */ ($('frameHeaderEnd'))
-        ?.value,
-      accent: /** @type {HTMLInputElement|null} */ ($('frameAccent'))?.value
-    });
-
-  const applyAndSaveFrame = async (frameId) => {
-    const normalized =
-      frameId === 'custom' || hasFramePreset(frameId) ? frameId : DEFAULT_FRAME_ID;
-    popupFrameState.id = normalized;
-    if (normalized === 'custom') {
-      popupFrameState.custom = readCustomFrameInputs();
-      openFrameThemeSectionIfPresent();
-      if (frameEditor) frameEditor.open = true;
-    }
-    applyPopupFrame(popupFrameState.id, popupFrameState.custom);
-    setFrameShareStatus('', 'idle');
-    await savePopupFrameSettings();
-  };
+  // 枠テーマの readCustomFrameInputs / applyAndSaveFrame は frameTheme.js へ移設。
 
   dismissErr?.addEventListener('click', async () => {
     try {
@@ -20832,80 +20700,13 @@ async function initPopup() {
     }
   });
 
-  for (const chip of frameChips) {
-    chip.addEventListener('click', () => {
-      const frameId = String(chip.getAttribute('data-frame-id') || '');
-      applyAndSaveFrame(frameId).catch(() => {});
-    });
-  }
-
-  saveCustomFrameBtn?.addEventListener('click', () => {
-    popupFrameState.custom = readCustomFrameInputs();
-    popupFrameState.id = 'custom';
-    applyPopupFrame(popupFrameState.id, popupFrameState.custom);
-    setFrameShareStatus('カスタム色を更新しました。', 'success');
-    savePopupFrameSettings().catch(() => {});
-  });
-
-  resetCustomFrameBtn?.addEventListener('click', () => {
-    popupFrameState.custom = { ...DEFAULT_CUSTOM_FRAME };
-    renderCustomFrameEditor(popupFrameState.custom);
-    if (popupFrameState.id === 'custom') {
-      applyPopupFrame(popupFrameState.id, popupFrameState.custom);
-    }
-    setFrameShareStatus('カスタム色を初期化しました。', 'success');
-    savePopupFrameSettings().catch(() => {});
-  });
-
-  toggleFrameCodeInputBtn?.addEventListener('click', () => {
-    if (!frameShareBox) return;
-    const nextHidden = !frameShareBox.hidden;
-    frameShareBox.hidden = nextHidden;
-    setFrameShareStatus('', 'idle');
-    if (!nextHidden) {
-      syncFrameShareInput();
-      frameShareCode?.focus();
-      frameShareCode?.select();
-    }
-  });
-
-  copyFrameCodeBtn?.addEventListener('click', () => {
-    const code = createFrameShareCode(popupFrameState.id, popupFrameState.custom);
-    copyTextToClipboard(code)
-      .then((ok) => {
-        if (ok) {
-          setFrameShareStatus('共有コードをコピーしました。', 'success');
-          // Phase D1(操作音・§1.2): コピー成功=コイン1枚獲得の比喩。失敗時は無音(嘘をつかない)。
-          triggerOpSound('op_copy');
-          return;
-        }
-        setFrameShareStatus('コピーに失敗しました。', 'error');
-      })
-      .catch(() => {
-        setFrameShareStatus('コピーに失敗しました。', 'error');
-      });
-  });
-
-  applyFrameCodeBtn?.addEventListener('click', () => {
-    const raw = String(frameShareCode?.value || '');
-    try {
-      const parsed = parseFrameShareCode(raw);
-      popupFrameState.id = parsed.frameId;
-      popupFrameState.custom = parsed.custom;
-      applyPopupFrame(popupFrameState.id, popupFrameState.custom);
-      if (popupFrameState.id === 'custom') {
-        openFrameThemeSectionIfPresent();
-        if (frameEditor) frameEditor.open = true;
-      }
-      savePopupFrameSettings().catch(() => {});
-      setFrameShareStatus('共有コードを適用しました。', 'success');
-    } catch {
-      setFrameShareStatus('共有コードの形式が正しくありません。', 'error');
-    }
-  });
-
-  frameShareCode?.addEventListener('input', () => {
-    setFrameShareStatus('', 'idle');
+  // 枠テーマの listener 一式は frameTheme.wireFrameTheme へ移設(挙動不変)。
+  //   generic な copyTextToClipboard と triggerOpSound は ctx で注入する。
+  wireFrameTheme({
+    getEl: (id) => $(id),
+    doc: document,
+    copyTextToClipboard,
+    triggerOpSound
   });
 
   captureBtn?.addEventListener('click', async () => {
@@ -21907,9 +21708,9 @@ async function initPopup() {
     changelogLatestLabelEl.textContent = `v${EXTENSION_CHANGELOG[0].version}`;
   }
 
-  loadPopupFrameSettings()
+  loadPopupFrameSettings((id) => $(id), document)
     .catch(() => {
-      applyPopupFrame(popupFrameState.id, popupFrameState.custom);
+      applyPopupFrameFallback((id) => $(id), document);
     })
     .finally(() => {
       void (async () => {
@@ -21946,7 +21747,7 @@ async function initPopup() {
         // レジストリ経由のブール設定を一括反映（未登録 key は何もしない）
         popupBooleanSettingsRegistry.dispatchStorageChanges(changes);
         if (changes[KEY_POPUP_FRAME] || changes[KEY_POPUP_FRAME_CUSTOM]) {
-          loadPopupFrameSettings().catch(() => {});
+          loadPopupFrameSettings((id) => $(id), document).catch(() => {});
         }
         if (changes[KEY_THUMB_AUTO] || changes[KEY_THUMB_INTERVAL_MS]) {
           applyThumbSelectFromStorage().catch(() => {});
