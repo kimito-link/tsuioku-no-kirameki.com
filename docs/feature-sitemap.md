@@ -586,13 +586,14 @@
 
 - **HTMLレポート生成** — マーケ/イベント順位/タイムライン等を1枚の HTML レポートに組み立てる(popup-entry 内)
   - `src/extension/popup-entry.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 42</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 43</summary>
 
 - `extension/marketing-export-guard.js` — マーケ分析タブ(marketing-export.html)の「何があっても開く」保険。
 - `scripts/build-sound-preview.mjs` — 開発用: extension/sound/ 配下の全効果音を1枚のHTMLで試聴できるページを生成する。
 - `scripts/inspect-nicolive-watch-stats.mjs` — ニコ生 watch ページの HTML から、来場・同接まわりの数値がどう埋め込まれているかを CLI で確認する。
 - `scripts/layer-map-html.mjs` — ★`src/lib` の構成を【HTMLで見える】ようにする。
 - `src/extension/marketing-export-entry.js` — マーケ分析レポートの別タブ化(marketing-export.html)のエントリ。
+- `src/extension/popup/init/devMonitorExport.js` — devMonitorExport — 開発モニタの「エクスポート/ダウンロード/較正データ消去」一式。
 - `src/extension/popup/report/htmlReportDocument.js` — HTMLレポート(振り返り用の保存HTML)組み立てクラスタ。
 - `src/lib/adMessageLines.js` — 広告主が入れた文字を、そのままレポートに残すための整形。
 - `src/lib/audienceEngagementGap.js` — 来場者数は多いがコメントが少ない状態を検出するローカル分析コア。
@@ -1080,9 +1081,6 @@
 - `v0.1.1518` 2026-09-15 — シェアカードの説明文に応援の数字
 - `v0.1.1511` 2026-09-14 — コメントで応援した人の枠を足しました
 
-### 🔊 読み上げ (1版)
-- `v0.1.1506` 2026-09-04 — 設定の保存先の名前を1箇所にまとめました
-
 ### 🪟 応援レーン・タイル (3版)
 - `v0.1.1515` 2026-09-15 — 応援レーンのタイルから発言一覧を開けるように
 - `v0.1.1508` 2026-09-14 — 出荷前の自己点検を横断キットと共通化
@@ -1095,7 +1093,8 @@
 ### ⚡ 描画・性能 (1版)
 - `v0.1.1509` 2026-09-14 — サイドパネルが固まる・黒いままの真因を直しました
 
-### その他 (9版)
+### その他 (10版)
+- `v0.1.1526` 2026-09-18 — 内部整理(表示や動作は変わりません)
 - `v0.1.1525` 2026-09-18 — 内部整理(表示や動作は変わりません)
 - `v0.1.1524` 2026-09-18 — 内部整理(表示や動作は変わりません)
 - `v0.1.1523` 2026-09-18 — 内部整理(表示や動作は変わりません)

@@ -717,5 +717,19 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
     version: '0.1.1525', metric: 'cross-checked-claims', value: 48,
     source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
     note: '★この版の変更とは無関係な指標(過去30日のコミット本文の語数の移動窓)。54@1507 からの目減りは窓の経過に依存し実装差分と因果が無い。この版(Track B 4-1・枠テーマ抽出)は司令塔が別の手段で裏取り済み: (1)frameTheme.js の単体テスト7ケースを happy-dom + ctx 注入で新設(保存で storage.set が呼ばれる/コピーで triggerOpSound(op_copy)が呼ばれる/トグルで hidden 反転 等) (2)popupEntryFunctionBudget の initPopup ラチェットが実際に効くことを確認(2600→2510) (3)lint が移設で未使用になった 10 の frame-lib import と popupFrameState を検出→削除 (4)実施前に定型1で結合を再測定し、generic utility(withTimeout=24/copyTextToClipboard=6箇所)は移さず注入する設計に修正(司令塔がユーザーに範囲を確認) (5)verify:cc 全ゲート緑'
+  }),
+  Object.freeze({
+    version: '0.1.1526', metric: 'bundle-kb', value: 1396,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '★改善方向: 前版 1397→1396KB(Track B 4-2 で開発モニタの DL 系 4 関数と listener を popup/init/devMonitorExport.js へ移設)。popup-entry は 133 行減(22207→22074)。過去最良 1360@1454 未達は 1454 以来の計器・検査ぶん(1508 の note 参照)'
+  }),
+  Object.freeze({
+    version: '0.1.1526', metric: 'gate-selftest', value: 4,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1526', metric: 'cross-checked-claims', value: 49,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: '★この版の変更とは無関係な指標(過去30日のコミット本文の語数の移動窓)。54@1507 からの目減りは窓の経過に依存し実装差分と因果が無い。この版(Track B 4-2・開発モニタ DL 抽出)は司令塔が別の手段で裏取り済み: (1)devMonitorExport.js の単体テスト7ケースを happy-dom + chrome/downloads スタブで新設(snapshot 無しは DL しない/消去で storage.set/busy 中は session summary を DL しない 等) (2)initPopup ラチェットを 2510→2480 へ下げて効くことを確認 (3)KEY_CONCURRENT_CALIBRATION_RING_V1 はハードコードせず storageKeys.js から import(重複リテラルを作らない) (4)lint が移設で未使用になった 2 import(serializeCalibrationCsv/Json)を検出→削除 (5)verify:cc 全ゲート緑。★initPopup は 2477 でまだ 2000 超=指示書の完了条件(initPopup<2000)には未到達。残りは別クラスタの抽出が要る'
   })
 ]);

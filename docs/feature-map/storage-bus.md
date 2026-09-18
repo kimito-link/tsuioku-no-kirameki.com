@@ -68,7 +68,7 @@
 - 🔵 **fn:summaryStorageKey** — 読む人だけ（書く経路が無い疑い）: src/extension/popup-entry.js
 - 🔵 **fn:watchSnapshotStorageKey** — 読む人だけ（書く経路が無い疑い）: src/extension/popup/report/htmlReportDocument.js
 - 🔵 **nls_last_auto_tab_reload** — 読む人だけ（書く経路が無い疑い）: src/extension/status-entry.js
-- 🔵 **nls_mcp_live_latest_v1** — 読む人だけ（書く経路が無い疑い）: src/extension/popup-entry.js
+- 🔵 **nls_mcp_live_latest_v1** — 読む人だけ（書く経路が無い疑い）: src/extension/popup/init/devMonitorExport.js
 
 ## 全 storage キー
 
@@ -103,7 +103,7 @@
 | `KEY_COMMENT_POST_DIAG` | extension/popup-entry.js | extension/status-entry.js |
 | `KEY_COMMENT_TIMELINE_MIRROR` | extension/content-entry.js | extension/popup-entry.js<br>extension/status-entry.js |
 | `KEY_COMMENT_WRITE_MODE_DIAG` | extension/content-entry.js | — |
-| `KEY_CONCURRENT_CALIBRATION_RING_V1` | extension/content-entry.js<br>extension/popup-entry.js | extension/content-entry.js<br>extension/popup-entry.js |
+| `KEY_CONCURRENT_CALIBRATION_RING_V1` | extension/content-entry.js<br>extension/popup/init/devMonitorExport.js | extension/content-entry.js<br>extension/popup/init/devMonitorExport.js<br>extension/popup-entry.js |
 | `KEY_CUSTOM_SOUND_REV` | — | extension/status-entry.js |
 | `KEY_DEEP_HARVEST_QUIET_UI` | — | extension/content-entry.js<br>extension/popup-entry.js |
 | `KEY_DIAGNOSTICS_ERROR_RING_V1` | lib/diagnosticRingStore.js | lib/diagnosticRingStore.js |
@@ -177,4 +177,4 @@
 | `fn:tailStorageKey` | extension/content-entry.js | extension/popup-entry.js |
 | `fn:watchSnapshotStorageKey` | — | extension/popup/report/htmlReportDocument.js |
 | `nls_last_auto_tab_reload` | — | extension/status-entry.js |
-| `nls_mcp_live_latest_v1` | — | extension/popup-entry.js |
+| `nls_mcp_live_latest_v1` | — | extension/popup/init/devMonitorExport.js |

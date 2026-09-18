@@ -3662,6 +3662,16 @@
       ]
     },
     {
+      "file": "src/extension/popup/init/devMonitorExport.js",
+      "featureCount": 1,
+      "features": [
+        "popup"
+      ],
+      "labels": [
+        "ポップアップ(応援レーン)"
+      ]
+    },
+    {
       "file": "src/extension/popup/init/frameTheme.js",
       "featureCount": 1,
       "features": [
