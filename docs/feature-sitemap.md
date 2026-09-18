@@ -839,7 +839,7 @@
   - `tools/og-live-compose.py`
   - `.github/workflows/live-ranking.yml`
   - `vercel.json`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 208</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 209</summary>
 
 - `app/app.js` — スマホ閲覧用 status Web 版。
 - `app/live-view.js` — global NL_BUILD_ID
@@ -882,6 +882,7 @@
 - `src/build-globals.d.ts` — ビルド時に esbuild の `define` で注入される定数の型宣言。
 - `src/extension/cloak-failsafe-entry.js` — 幕(cloak)を外す【最速の保険】だけを担う極小エントリ。
 - `src/extension/offscreen-entry.js` — feat/multitab-scale-globalcap（2026-05-31）: コメント IDB の「常駐・単一書き手」を担う
+- `src/extension/popup/init/frameTheme.js` — frameTheme — popup の「配色プリセット/枠テーマ」一式。
 - `src/lib/aboutBlankGapVerdict.js` — ★about:blank の隙間(残り32ms)に対する【確定した判定】。
 - `src/lib/adMessageCensus.js` — 「広告/ギフトの生データに【メッセージ】が入っているか」を数えるだけの計器。
 - `src/lib/aiShareTextChanged.js` — 【層】L0 判定層(純粋関数・I/O禁止)
@@ -1095,6 +1096,7 @@
 - `v0.1.1509` 2026-09-14 — サイドパネルが固まる・黒いままの真因を直しました
 
 ### その他 (9版)
+- `v0.1.1525` 2026-09-18 — 内部整理(表示や動作は変わりません)
 - `v0.1.1524` 2026-09-18 — 内部整理(表示や動作は変わりません)
 - `v0.1.1523` 2026-09-18 — 内部整理(表示や動作は変わりません)
 - `v0.1.1522` 2026-09-18 — 内部整理(表示や動作は変わりません)
@@ -1103,4 +1105,3 @@
 - `v0.1.1517` 2026-09-15 — シェアしたリンクのカードが配信ごとに
 - `v0.1.1512` 2026-09-14 — ランキングの3列目が狭い画面ではみ出す不具合を修正
 - `v0.1.1510` 2026-09-14 — ランキングを X でシェアできるようにしました
-- `v0.1.1505` 2026-09-03 — 提出物づくりで版数を間違えられなくした

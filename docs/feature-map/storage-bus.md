@@ -135,8 +135,8 @@
 | `KEY_OP_SOUND_ENABLED` | — | extension/popup-entry.js |
 | `KEY_PAINT_PERF_RING_V1` | extension/popup-entry.js | — |
 | `KEY_PANEL_WAKE_CURTAIN_DIAG` | lib/panelWakeCurtainDom.js | — |
-| `KEY_POPUP_FRAME` | extension/popup-entry.js | extension/content-entry.js<br>extension/popup-entry.js |
-| `KEY_POPUP_FRAME_CUSTOM` | extension/popup-entry.js | extension/content-entry.js<br>extension/popup-entry.js |
+| `KEY_POPUP_FRAME` | extension/popup/init/frameTheme.js | extension/content-entry.js<br>extension/popup/init/frameTheme.js |
+| `KEY_POPUP_FRAME_CUSTOM` | extension/popup/init/frameTheme.js | extension/content-entry.js<br>extension/popup/init/frameTheme.js |
 | `KEY_PREVIEW_RENDER_ACK` | extension/popup-entry.js | extension/popup-entry.js |
 | `KEY_PROFILE_RESOLVE_STATE` | — | extension/content-entry.js |
 | `KEY_RECORDING` | — | extension/content-entry.js<br>extension/popup-entry.js |

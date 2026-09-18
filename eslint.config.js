@@ -395,7 +395,7 @@ export default [
     //   ★計器自身を重くしない工夫: 深さは「親の深さ+1」で求める(文書順なので親は処理済み)。
     //     親を毎回辿る版は 2,844要素で約34,000回の参照になる。上限4,000要素。
     //   判定は `src/lib/domTreeCensus.js`(純関数)。ここは採取だけ。
-    rules: { 'max-lines': ['error', { max: 22407, skipBlankLines: false, skipComments: false }] }
+    rules: { 'max-lines': ['error', { max: 22208, skipBlankLines: false, skipComments: false }] }
   },
   {
     files: ['src/extension/popup/**/*.js'],
