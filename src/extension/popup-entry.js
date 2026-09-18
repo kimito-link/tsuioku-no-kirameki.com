@@ -440,11 +440,9 @@ import {
   NICO_USER_PROFILE_FETCH_MESSAGE_TYPE,
   normalizeNicoUserProfileResponse
 } from '../lib/nicoUserProfileApi.js';
-import {
-  parseCalibrationLog,
-  serializeCalibrationJson,
-  serializeCalibrationCsv
-} from '../lib/concurrentCalibrationLog.js';
+// serializeCalibrationJson/Csv は Track B(4-2)で devMonitorExport.js へ移設(挙動不変)。
+//   parseCalibrationLog は他所(状態行のサンプル数計算)でも使うのでここに残す。
+import { parseCalibrationLog } from '../lib/concurrentCalibrationLog.js';
 import {
   computeCalibrationFit,
   buildCalibratedPlatformProfile
@@ -936,6 +934,7 @@ import {
   loadPopupFrameSettings,
   wireFrameTheme
 } from './popup/init/frameTheme.js';
+import { wireDevMonitorExport } from './popup/init/devMonitorExport.js';
 import { buildComeviewUserDetailPath } from '../lib/comeviewUserDetailLink.js';
 import { mergeWatchSnapshotPreservingBroadcaster } from '../lib/watchSnapshotPartialMerge.js';
 import { persistFreshlyFetchedSnapshot } from '../lib/popupWatchSnapshotPersist.js';
@@ -4595,117 +4594,10 @@ async function renderGiftSubAppHistoryPanel(liveId) {
   });
 }
 
-/**
- * 0.1.191: MCP Bridge Phase1a (PoC) の手動エクスポート。
- * chrome.storage.local の `nls_mcp_live_latest_v1` を JSON として
- * Downloads/nicolivelog-mcp/<liveId>.json に保存する。
- *
- * Node MCP server がこのフォルダを polling して MCP ツールの返却値に使う想定。
- * 権限は既存の `downloads` で間に合うため新規追加なし。
- */
-async function downloadMcpSnapshotJson() {
-  /** @type {{ liveId?: string, snapshot?: unknown, updatedAt?: number }|null} */
-  let bag = null;
-  try {
-    const got = await chrome.storage.local.get('nls_mcp_live_latest_v1');
-    bag = /** @type {any} */ (got?.nls_mcp_live_latest_v1) || null;
-  } catch {
-    return;
-  }
-  if (!bag || !bag.snapshot) return;
-  const lid = String(bag.liveId || 'unknown').toLowerCase().replace(/[^a-z0-9_-]/gi, '');
-  const json = JSON.stringify(bag.snapshot, null, 2);
-  const blob = new Blob([json], { type: 'application/json;charset=utf-8' });
-  const url = URL.createObjectURL(blob);
-  try {
-    await chrome.downloads.download({
-      url,
-      filename: `nicolivelog-mcp/${lid || 'unknown'}.json`,
-      saveAs: false,
-      conflictAction: 'overwrite'
-    });
-  } finally {
-    objectUrlRevokeQueue.enqueue(url);
-  }
-}
-
-/**
- * @param {string} liveId
- */
-async function downloadSessionSummaryJson(liveId) {
-  const lid = String(liveId || '').trim().toLowerCase();
-  if (!lid || typeof indexedDB === 'undefined') return;
-  /** @type {IDBDatabase|undefined} */
-  let db;
-  try {
-    db = await openBroadcastSessionSummaryDb();
-    const rows = await listBroadcastSessionSummaryForLive(db, lid, 500);
-    const json = JSON.stringify(rows, null, 2);
-    const blob = new Blob([json], { type: 'application/json;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    try {
-      await chrome.downloads.download({
-        url,
-        filename: `nicolivelog-session-summary-${lid}-${Date.now()}.json`,
-        saveAs: true,
-        conflictAction: 'uniquify'
-      });
-    } finally {
-      objectUrlRevokeQueue.enqueue(url);
-    }
-  } catch {
-    // no-op
-  } finally {
-    try {
-      db?.close();
-    } catch {
-      // no-op
-    }
-  }
-}
-
-/**
- * 同接推定 較正データ（KEY_CONCURRENT_CALIBRATION_RING_V1）を JSON/CSV でダウンロードする。
- * @param {'json'|'csv'} format
- */
-async function downloadCalibrationData(format) {
-  try {
-    const bag = await chrome.storage.local.get(KEY_CONCURRENT_CALIBRATION_RING_V1);
-    const parsed = parseCalibrationLog(bag[KEY_CONCURRENT_CALIBRATION_RING_V1]);
-    if (!parsed.items.length) return;
-    const isCsv = format === 'csv';
-    const text = isCsv
-      ? serializeCalibrationCsv(parsed)
-      : serializeCalibrationJson(parsed);
-    const blob = new Blob([text], {
-      type: isCsv ? 'text/csv;charset=utf-8' : 'application/json;charset=utf-8'
-    });
-    const url = URL.createObjectURL(blob);
-    try {
-      await chrome.downloads.download({
-        url,
-        filename: `nicolivelog-concurrent-calibration-${Date.now()}.${isCsv ? 'csv' : 'json'}`,
-        saveAs: true,
-        conflictAction: 'uniquify'
-      });
-    } finally {
-      objectUrlRevokeQueue.enqueue(url);
-    }
-  } catch {
-    // no-op
-  }
-}
-
-/** 較正データを全消去する（リングバッファを空にする）。 */
-async function clearCalibrationData() {
-  try {
-    await chrome.storage.local.set({
-      [KEY_CONCURRENT_CALIBRATION_RING_V1]: { v: 1, items: [] }
-    });
-  } catch {
-    // no-op
-  }
-}
+// 開発モニタの DL 系 4 関数(downloadMcpSnapshotJson / downloadSessionSummaryJson /
+//   downloadCalibrationData / clearCalibrationData)と listener は Track B(4-2)で
+//   src/extension/popup/init/devMonitorExport.js へ移設(挙動不変)。
+//   objectUrlRevokeQueue / refreshAutopatrolStatusLine / exportBtn.dataset は ctx で注入する。
 
 const INTERCEPT_BACKFILL_STATE = {
   liveId: '',
@@ -20336,24 +20228,15 @@ async function initPopup() {
     e.stopPropagation();
   });
 
-  // 較正データのエクスポート/クリア。
-  $('calibrationExportJsonBtn')?.addEventListener('click', (e) => {
-    e.stopPropagation();
-    void downloadCalibrationData('json');
-  });
-  $('calibrationExportCsvBtn')?.addEventListener('click', (e) => {
-    e.stopPropagation();
-    void downloadCalibrationData('csv');
-  });
-  $('calibrationClearBtn')?.addEventListener('click', async (e) => {
-    e.stopPropagation();
-    const ok =
-      typeof window !== 'undefined' && typeof window.confirm === 'function'
-        ? window.confirm('貯めた較正データ（数値のみ）を全消去します。よろしいですか？')
-        : true;
-    if (!ok) return;
-    await clearCalibrationData();
-    refreshAutopatrolStatusLine();
+  // 開発モニタのエクスポート/DL/較正消去の listener 一式は devMonitorExport.wireDevMonitorExport
+  //   へ移設(挙動不変)。objectUrlRevokeQueue / refreshAutopatrolStatusLine / exportBtn.dataset は
+  //   ctx で注入する(いずれも popup-entry で生成・全体で使う共有物)。
+  wireDevMonitorExport({
+    getEl: (id) => $(id),
+    objectUrlRevokeQueue,
+    refreshAutopatrolStatusLine,
+    getExportLiveId: () => exportBtn.dataset.liveId,
+    isExportBusy: () => exportBtn.disabled
   });
 
   // 開いている間は状態（訪問数・現在の配信・記録サンプル数）を数秒ごとに更新する。
@@ -20862,24 +20745,8 @@ async function initPopup() {
     }
   });
 
-  $('exportSessionSummaryJsonBtn')?.addEventListener('click', async () => {
-    const lv = exportBtn.dataset.liveId;
-    if (!lv || exportBtn.disabled) return;
-    try {
-      await downloadSessionSummaryJson(lv);
-    } catch {
-      // no-op
-    }
-  });
-
-  // 0.1.191: MCP Phase1a 手動 export
-  $('exportMcpSnapshotJsonBtn')?.addEventListener('click', async () => {
-    try {
-      await downloadMcpSnapshotJson();
-    } catch {
-      // no-op
-    }
-  });
+  // exportSessionSummaryJsonBtn / exportMcpSnapshotJsonBtn の listener は
+  //   devMonitorExport.wireDevMonitorExport(上で 1 回呼ぶ)へ移設(挙動不変)。
 
   async function submitComment() {
     const text = String(commentInput?.value || '').trim();

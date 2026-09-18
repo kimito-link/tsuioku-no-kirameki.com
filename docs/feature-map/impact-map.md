@@ -411,6 +411,7 @@
 | `src/extension/page-intercept-entry.js` | 1 | ページ傍受 |
 | `src/extension/popup-entry.js` | 1 | ポップアップ(応援レーン) |
 | `src/extension/popup/attachAiDiagButtonHandler.js` | 1 | ポップアップ(応援レーン) |
+| `src/extension/popup/init/devMonitorExport.js` | 1 | ポップアップ(応援レーン) |
 | `src/extension/popup/init/frameTheme.js` | 1 | ポップアップ(応援レーン) |
 | `src/extension/popup/renderAcquisitionDashboard.js` | 1 | ポップアップ(応援レーン) |
 | `src/extension/popup/report/htmlReportDocument.js` | 1 | ポップアップ(応援レーン) |

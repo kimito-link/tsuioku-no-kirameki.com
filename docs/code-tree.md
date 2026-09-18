@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 6 / 877 件
+## ⚠️ 役割コメントが無いソース 6 / 878 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `src/lib/laneDomSelfMeasure.js`
@@ -779,7 +779,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (1862)
+- 📁 **src/** (1864)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -816,9 +816,11 @@
       - `avatarResolver.test.js`
       - `identity.js` — ニコ生ユーザー ID の「匿名性」判定と関連アイデンティティ・ユーティリティ。
       - `nickname.js` — 表示名（ニックネーム）の「強弱」判定。
-  - 📁 **extension/** (52)
-    - 📁 **popup/** (10)
-      - 📁 **init/** (2)
+  - 📁 **extension/** (54)
+    - 📁 **popup/** (12)
+      - 📁 **init/** (4)
+        - `devMonitorExport.js` — devMonitorExport — 開発モニタの「エクスポート/ダウンロード/較正データ消去」一式。
+        - `devMonitorExport.test.js`
         - `frameTheme.js` — frameTheme — popup の「配色プリセット/枠テーマ」一式。
         - `frameTheme.test.js`
       - 📁 **report/** (2)
