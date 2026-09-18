@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 6 / 874 件
+## ⚠️ 役割コメントが無いソース 6 / 876 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `src/lib/laneDomSelfMeasure.js`
@@ -779,7 +779,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (1856)
+- 📁 **src/** (1860)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1048,7 +1048,7 @@
         - `logo_funlink_white_RGB_link_black.png`
         - `logo_funlink_white_RGB_maru_black.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1632)
+  - 📁 **lib/** (1636)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -1080,6 +1080,8 @@
     - `adMessageLines.js` — 広告主が入れた文字を、そのままレポートに残すための整形。
     - `adMessageLines.test.js`
     - `aiShareDiagSchema.js` — AI 共有診断バンドル（popup が組み立てる JSON / storage の nls_ai_share_fast_diag_v1）の
+    - `aiShareDiagnosticsMarkdown.js` — AI 共有用「診断バンドル」Markdown の整形（純粋関数）。
+    - `aiShareDiagnosticsMarkdown.test.js`
     - `aiShareFastDiagKey.js` — v0.1.629: AI 共有 fastDiag キャッシュの storage key を popup と status ページで共有。
     - `aiShareFastDiagKey.test.js`
     - `aiShareFullText.js` — 状態速報(AI共有)本文ビルダー。②応援ライブビュー/③WEB が同一の status-report builder を
@@ -2344,6 +2346,8 @@
     - `storedCommentDedupeKey.js` — 保存済みコメントの重複判定キーを作る純関数(v0.1.1313)。
     - `storedCommentDedupeKey.test.js`
     - `storedCommentDedupeMerge.js` — popup normalizeStoredCommentEntries 用: 同一キー重複行のマージ（PII を増やさずフラグのみ統合）
+    - `storedCommentEntriesNormalize.js` — 保存済みコメント配列の重複潰し（純粋関数）。
+    - `storedCommentEntriesNormalize.test.js`
     - `storyAvatarDiagLine.js` — 応援グリッド用・診断表示（PII なし・件数のみ）。
     - `storyAvatarDiagLine.test.js`
     - `storyAvatarTvFallbackClass.js` — 人物タイル/アイコンの「リモートサムネ取得失敗→ゆっくりTVスタイルへ落とす」class 付け外しの正本。

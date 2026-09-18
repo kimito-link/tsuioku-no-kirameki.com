@@ -18,6 +18,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1524',
+    date: '2026-09-18',
+    summary: '内部整理(表示や動作は変わりません)',
+    items: Object.freeze([
+      '内部の純粋な処理をさらに共通の場所へ移して見通しをよくしました(表示や動作は変わりません)。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1523',
     date: '2026-09-18',
     summary: '内部整理(表示や動作は変わりません)',
@@ -185,14 +193,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     items: Object.freeze([
       '★ストア提出物を作るスクリプトが、版数の入力ミスをそのまま素通しして作業を進めてしまう不具合を直しました。',
       '正しい形の版数、かつ現在の版数と一致しているときだけ提出物を作るようにしました。'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.1504',
-    date: '2026-09-03',
-    summary: '診断ページの説明文の誤りを訂正',
-    items: Object.freeze([
-      '★診断ページのソースコード内の説明文に、事実と異なる記載がありました。実際の動きは変わりません。'
     ])
   })
 ]);

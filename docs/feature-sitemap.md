@@ -117,7 +117,7 @@
   - `src/lib/monotonicCommentCount.js`
 - **storage キー定義** — chrome.storage のキー名の正本(nls_comments_<lv> 等)
   - `src/lib/storageKeys.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 51</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 52</summary>
 
 - `scripts/dump-panel-state.mjs` — 実機の chrome.storage.local を吸い出して
 - `scripts/record-improvement.mjs` — ★実測値を台帳に書き足す【1本の口】。
@@ -165,6 +165,7 @@
 - `src/lib/statCardsMirrorKey.js` — popup 上部の数字カード群(記録N件・推定同時接続・来場者数・公式統計チップ)を status.html に
 - `src/lib/storageOpTimeout.js` — v0.1.502: 単発の非同期処理（主に chrome.storage.local の get/set/remove）を
 - `src/lib/storedCommentDedupeKey.js` — 保存済みコメントの重複判定キーを作る純関数(v0.1.1313)。
+- `src/lib/storedCommentEntriesNormalize.js` — 保存済みコメント配列の重複潰し（純粋関数）。
 - `src/lib/storyDetailRelatedEntries.js` — ストーリー詳細／プレビュー脇の「同一ユーザーの直近」リスト用。
 - `src/lib/storyDiagMonotonic.js` — 診断カウンタchurn(内訳・用語の顔一覧が増減して見える)の根治。
 - `src/lib/supportVisualExpanded.js` — 応援ビジュアル（アイコン列・グリッド・診断）の開閉を storage に保存するときの正規化。
@@ -660,7 +661,7 @@
 - **影響範囲ゲート(規律を自動化)** — 星野ロミ式「規律を自動ゲートに」。diff から影響大(複数機能波及)の変更ファイルを検出し波及先機能を列挙。警告のみ(摩擦ゼロ)・--strict で exit1。AGENTS.md §10 のルールを diff 発火に
   - `scripts/impact-check.mjs`
   - `docs/feature-map/impact-map.json`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 80</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 81</summary>
 
 - `api/status.js` — status 受け口 Vercel Serverless Function。
 - `extension/status-guard.js` — 状態速報ページ(status.html)の「何があっても開く」保険。
@@ -672,6 +673,7 @@
 - `scripts/verify-deploy.mjs` — 「Chrome に配ったビルドが本当に今の版か」を照合する。
 - `src/extension/popup/attachAiDiagButtonHandler.js` — attachAiDiagButtonHandler — 「AIで診断」ボタンの delegated listener を張る。
 - `src/extension/sidepanel-entry.js` — サイドパネルの自己診断だけを担う極小エントリ。
+- `src/lib/aiShareDiagnosticsMarkdown.js` — AI 共有用「診断バンドル」Markdown の整形（純粋関数）。
 - `src/lib/aiShareDiagSchema.js` — AI 共有診断バンドル（popup が組み立てる JSON / storage の nls_ai_share_fast_diag_v1）の
 - `src/lib/aiShareFastDiagKey.js` — v0.1.629: AI 共有 fastDiag キャッシュの storage key を popup と status ページで共有。
 - `src/lib/aiShareFullText.js` — 状態速報(AI共有)本文ビルダー。②応援ライブビュー/③WEB が同一の status-report builder を
@@ -1085,15 +1087,15 @@
 - `v0.1.1508` 2026-09-14 — 出荷前の自己点検を横断キットと共通化
 - `v0.1.1507` 2026-09-04 — 埋め込みに別の配信が映る問題を直しました
 
-### 🩺 診断・状態速報 (3版)
+### 🩺 診断・状態速報 (2版)
 - `v0.1.1509` 2026-09-14 — サイドパネルが固まる・黒いままの真因を直しました
 - `v0.1.1508` 2026-09-14 — 出荷前の自己点検を横断キットと共通化
-- `v0.1.1504` 2026-09-03 — 診断ページの説明文の誤りを訂正
 
 ### ⚡ 描画・性能 (1版)
 - `v0.1.1509` 2026-09-14 — サイドパネルが固まる・黒いままの真因を直しました
 
-### その他 (8版)
+### その他 (9版)
+- `v0.1.1524` 2026-09-18 — 内部整理(表示や動作は変わりません)
 - `v0.1.1523` 2026-09-18 — 内部整理(表示や動作は変わりません)
 - `v0.1.1522` 2026-09-18 — 内部整理(表示や動作は変わりません)
 - `v0.1.1521` 2026-09-17 — 内部整理の安全網(挙動は変わりません)

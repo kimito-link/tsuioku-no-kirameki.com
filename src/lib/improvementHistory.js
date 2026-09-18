@@ -689,5 +689,19 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
     version: '0.1.1523', metric: 'cross-checked-claims', value: 46,
     source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
     note: '★この版の変更とは無関係な指標(過去30日のコミット本文の語数の移動窓)。54@1507 からの目減りは窓の経過に依存し実装差分と因果が無い。この版(Track A・純関数抽出)は司令塔が別の手段で裏取り済み: (1)移設 3 関数の characterization テスト計 20 ケースを新設し、切り出し前の入出力を固定(1 件は当初の私の思い込みが誤りで、pickStrongerUserId が強い uid を常に採るためしきい値と無関係に置換が起きる実挙動をテストで発見・修正) (2)lint が「移設で未使用になった 2 import」を検出→削除 (3)check:layer 緑(新 lib が純粋) (4)verify:cc 全ゲート緑'
+  }),
+  Object.freeze({
+    version: '0.1.1524', metric: 'bundle-kb', value: 1396,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '★前版 1396 と同値(Track A 続き: 純関数 normalizeStoredCommentEntries=A-4 / formatAiShareDiagnosticsMarkdown+romiDebugDataChecklist=A-5 を popup-entry.js から lib へ移設)。移設ぶんはバンドル総量には現れない(同じコードが別ファイルへ移るだけ)。過去最良 1360@1454 未達は 1454 以来の計器・検査ぶん(1508 の note 参照)'
+  }),
+  Object.freeze({
+    version: '0.1.1524', metric: 'gate-selftest', value: 4,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1524', metric: 'cross-checked-claims', value: 47,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: '★この版の変更とは無関係な指標(過去30日のコミット本文の語数の移動窓)。54@1507 からの目減りは窓の経過に依存し実装差分と因果が無い。この版(Track A A-4/A-5・純関数抽出)は司令塔が別の手段で裏取り済み: (1)移設 3 関数(normalizeStoredCommentEntries / formatAiShareDiagnosticsMarkdown / romiDebugDataChecklist)の characterization テスト計 13 ケースを新設し切り出し前の入出力を固定 (2)lint が移設で未使用になった 2 import を検出→削除 (3)check:layer 緑・layer-map 純粋 710 へ更新 (4)verify:cc 全ゲート緑。A-3 は module-level 状態依存で純関数でないため見送り済み'
   })
 ]);

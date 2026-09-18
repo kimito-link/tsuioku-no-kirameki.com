@@ -418,6 +418,7 @@
 | `src/extension/venue-entry.js` | 1 | 会場モード(standalone) |
 | `src/lib/acquisitionDashboardChart.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/adLanePicksFromRooms.js` | 1 | ポップアップ(応援レーン) |
+| `src/lib/aiShareDiagnosticsMarkdown.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/aiShareDiagSchema.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/aiShareFastDiagKey.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/aiShareFullText.js` | 1 | 状態速報ページ |
@@ -815,6 +816,7 @@
 | `src/lib/storageRefreshTriggerKey.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/storedCommentDedupeKey.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/storedCommentDedupeMerge.js` | 1 | ポップアップ(応援レーン) |
+| `src/lib/storedCommentEntriesNormalize.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/storyDetailRelatedEntries.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/storyDiagMonotonic.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/storyGrowthCellSwap.js` | 1 | ポップアップ(応援レーン) |

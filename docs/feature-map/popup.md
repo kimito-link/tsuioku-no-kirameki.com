@@ -35,6 +35,7 @@ graph LR
   n_popup --> n_src_lib_adLanePicksFromRooms_js["lib/adLanePicksFromRooms.js"]
   n_popup --> n_src_lib_adMessageLines_js["lib/adMessageLines.js"]:::shared
   n_popup --> n_src_lib_aiShareDiagSchema_js["lib/aiShareDiagSchema.js"]
+  n_popup --> n_src_lib_aiShareDiagnosticsMarkdown_js["lib/aiShareDiagnosticsMarkdown.js"]
   n_popup --> n_src_lib_aiShareFastDiagKey_js["lib/aiShareFastDiagKey.js"]
   n_popup --> n_src_lib_aiSharePopupDiagKey_js["lib/aiSharePopupDiagKey.js"]:::shared
   n_popup --> n_src_lib_anomalyVerdict_js["lib/anomalyVerdict.js"]:::shared
@@ -52,8 +53,7 @@ graph LR
   n_popup --> n_src_lib_backfillRemoveRecommendedLivePollution_js["lib/backfillRemoveRecommendedLivePollution.js"]:::shared
   n_popup --> n_src_lib_backfillRinkuNarration_js["lib/backfillRinkuNarration.js"]:::shared
   n_popup --> n_src_lib_bandScale_js["lib/bandScale.js"]
-  n_popup --> n_src_lib_bandScaleBoot_js["lib/bandScaleBoot.js"]
   classDef shared fill:#eee,stroke:#999,color:#666;
 ```
 
-> ほか 411 ファイル省略（全件は storage-bus.md / metafile 参照）。
+> ほか 413 ファイル省略（全件は storage-bus.md / metafile 参照）。
