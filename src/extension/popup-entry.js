@@ -19530,9 +19530,13 @@ async function initPopup() {
     const bootM = String(INLINE_OWN_WATCH_URL || '').match(/lv\d{1,15}/);
     const bootLid = bootM ? bootM[0].toLowerCase() : '';
     // Step1: 応援レーン(アイコン列)を鏡から即描画。
+    //   ★お祝い演出(triggerCharaReaction)を持たない=先行描画で偽お祝いが出ない安全な経路。
+    //   stale配信は snap.liveId!==lid で貼らない・heavy が描いていたら譲る既存ガード付き(:7257)。
     void applyLaneMirrorForMainPopupFallback(bootLid);
-    // Step2: 上段3カード(記録/推定同接/来場)も鏡由来の panel_summary から即埋める。
-    void applyLightweightPanelSummaryCards(bootLid);
+    // ★Step2(上段3カードの先行=applyLightweightPanelSummaryCards)は保留:
+    //   setCountDisplay が num>_prevSupportCount で triggerCharaReaction(お祝い)を発火するため、
+    //   鏡値→heavy値の差で【偽のお祝い】が出る恐れがある(reality-checker 指摘・v0.1.1527)。
+    //   3カードは従来どおり tick(400ms後)が埋める。実機で偽お祝いが出ないと確認できたら先行に戻す。
   } catch {
     /* no-op: 先行描画に失敗しても以降の通常初期化(heavy refresh)がそのまま描く */
   }

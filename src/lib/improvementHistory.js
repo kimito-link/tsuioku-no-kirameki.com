@@ -745,5 +745,19 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
     version: '0.1.1527', metric: 'cross-checked-claims', value: 50,
     source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
     note: '★この版の変更とは無関係な指標(過去30日のコミット本文の語数の移動窓)。54@1507 からの目減りは窓の経過に依存し実装差分と因果が無い。この版(逆輸入 Step1/2)は司令塔が別の手段で裏取り済み: (1)会議 Explore×3+Plan×1 で /live/ が軽い真因(非対称設計)と拡張が重い真因(refresh の Promise.all が mirror 高速描画の前でクリティカルパスを占有)を実コードで確定 (2)mirror/3カードの先行起動先関数が module-level・自前 lid フォールバック・heavy 譲りガード(countStoryUserLaneDomTiles>0)を持つことを Read で確認=stale 配信を貼らない (3)initPopup ラチェット 2480→2500・file max-lines 22075→22092 を実測で更新 (4)typecheck/lint 緑・verify:bump 全7 OK。★体感の実測は次の実機(status 速報 blind ms)で reality-checker に委任'
+  }),
+  Object.freeze({
+    version: '0.1.1528', metric: 'bundle-kb', value: 1395,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '★改善方向: 前版 1396→1395KB。この版は前版(1527)の逆輸入 Step2 を先行起動から外す修正(コメント数行の差)。過去最良 1360@1454 未達は 1454 以来の計器・検査ぶん(1508 の note 参照)'
+  }),
+  Object.freeze({
+    version: '0.1.1528', metric: 'gate-selftest', value: 4,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1528', metric: 'cross-checked-claims', value: 51,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: '★この版の変更とは無関係な指標(過去30日のコミット本文の語数の移動窓)。54@1507 からの目減りは窓の経過に依存し実装差分と因果が無い。この版は reality-checker の判定(PLAUSIBLE)を受けた安全側の絞り込み: 1527 の Step2(上段3カード先行)は setCountDisplay が num>_prevSupportCount で triggerCharaReaction(お祝い)を発火するため、鏡値→heavy値の差で偽お祝いが出る恐れを reality-checker が指摘(未検証点#1)。お祝い演出を持たない Step1(応援レーン鏡)だけ先行に残し、3カードは従来の tick(400ms後)に戻した。stale配信を貼らない(snap.liveId!==lid で return)は 1527 で CONFIRMED 済み。★体感の実測は次の実機(status 速報 blind ms)で確認'
   })
 ]);
