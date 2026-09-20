@@ -6,7 +6,6 @@
  *     - ギフト/広告の効果音(`playEffectSound` 系が戻り値 `'played'` を返した瞬間。
  *       tier が gift_large 以上(gift_large/gift_mega)・milestone_hard 以上
  *       (milestone_hard/milestone_jackpot)のみ)
- *     - フェーズ遷移(リーチ/突破/大当たり到達。bgmPhaseDiag と同じ判定=`result.changed && !result.silent`)
  *   「実際に画面/音に出た演出だけを記録する」= 見てない演出が結果に出る構造を防止(HANDOFF既決)。
  *
  * 1行 = `{ at: number, kind: string, label: string }`。label は決定論テンプレ固定文字列のみ
@@ -27,15 +26,11 @@ export const HIGHLIGHT_KIND_LABEL = Object.freeze({
   gift_large: 'ギフト大波(large)',
   gift_mega: 'ギフト大波(mega)',
   milestone_hard: 'コメント節目(500件)',
-  milestone_jackpot: 'コメント節目 大当たり(1000件以上)',
-  phase_reach: 'リーチ到達',
-  phase_breakthrough: '突破到達',
-  phase_jackpot: '大当たり到達'
+  milestone_jackpot: 'コメント節目 大当たり(1000件以上)'
 });
 
 /**
- * 台帳に記録してよい kind か(§2.2: gift_large以上/breakthrough/jackpot/milestone_hard以上+
- *   フェーズ遷移のみ)。
+ * 台帳に記録してよい kind か(§2.2: gift_large以上/milestone_hard以上)。
  * @param {string} kind
  * @returns {boolean}
  */
@@ -104,13 +99,10 @@ export function appendHighlight(prevRaw, entry) {
 
 /** kind → 選抜時の重み(降順ソート用・大きいほど優先)。 @type {Readonly<Record<string, number>>} */
 const HIGHLIGHT_TIER_WEIGHT = Object.freeze({
-  phase_jackpot: 100,
   gift_mega: 90,
   milestone_jackpot: 85,
-  phase_breakthrough: 70,
   gift_large: 60,
-  milestone_hard: 50,
-  phase_reach: 30
+  milestone_hard: 50
 });
 
 /**
@@ -140,7 +132,7 @@ export function pickTopHighlights(rows) {
 }
 
 /**
- * 状態速報に出す行群を作る純関数(extras相乗り・bgmPhaseDiag.jsのbuildBgmPhaseDiagLinesと同型)。
+ * 状態速報に出す行群を作る純関数(extras相乗り)。
  *   台帳が空(このセッションでハイライトが一度も記録されていない)なら空配列(ノイズにしない)。
  * @param {unknown} snap 台帳(storage由来のraw値でよい・内部でnormalizeする)
  * @param {number} nowMs 現在時刻(最終記録 ago の算出用)

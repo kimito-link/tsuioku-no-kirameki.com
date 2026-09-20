@@ -248,9 +248,8 @@ function maximalInput() {
     //   mainThreadBlocker は上でも与えているが、byName/afterResume まで持たせる。
     buildId: '0101-000000',
     appVersion: '0.1.1404',
-    // ★v0.1.1408: 操作音 / BGM セルの入力
-    opSoundEffectDiag: { handlePressed: 10, handleFired: 7, noPathCount: 2, soundEnabled: true },
-    bgmPhaseDiag: { bgmEnabled: true, phase: 'fever', reachCount: 3, jackpotCount: 1 }
+    // ★v0.1.1408: 操作音セルの入力
+    opSoundEffectDiag: { handlePressed: 10, handleFired: 7, noPathCount: 2, soundEnabled: true }
   };
 }
 

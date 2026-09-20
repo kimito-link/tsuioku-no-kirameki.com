@@ -25,9 +25,7 @@
 //   ビルド時 package.json version)と chrome.runtime.getManifest().version(実行時本体 version)を
 //   突合し、ズレていれば画面上部にバナーを出す。詳細は src/lib/versionMismatch.js の背景コメント参照。
 import { detectVersionMismatch } from '../lib/versionMismatch.js';
-// v0.1.1080: BGM設定パネル(Phase C)が直接 chrome.storage.local を叩くと、status.html を
-//   タブに残したまま拡張をリロードした場合に同期 TypeError が uncaught で残る。
-//   唯一の安全な入口に集約する(popup-entry.js/venueBar.js と同じ helper を共有)。
+// 拡張リロード後も残る status.html からの storage 操作を安全な helper に集約する。
 import {
   safeStorageLocalGet,
   safeStorageLocalSet,
@@ -93,10 +91,6 @@ import {
   KEY_BACKFILL_LIVE_METRIC,
   KEY_LIVEVIEW_PUBLISH_PAYLOAD,
   KEY_CUSTOM_SOUND_REV,
-  KEY_BGM_ENABLED,
-  KEY_BGM_VOLUME_REACH,
-  KEY_BGM_VOLUME_FEVER,
-  isBgmEnabled,
   KEY_LAST_WATCH_URL
 } from '../lib/storageKeys.js';
 // レポートプレビュー信頼度注釈の文脈(fastDiag→ctx)の純関数。挙動同値で status-entry から切り出し。
@@ -136,14 +130,6 @@ import {
   loadLocalBundledSoundManifest
 } from '../lib/customSoundStore.js';
 import { buildMilestoneEffectDiagLines, milestoneEffectDiagToActionCards } from '../lib/milestoneEffectDiag.js';
-// Phase B(2026-07-05): パチンコボイス演出(voiceDirector.js)の発火/スキップ内訳を extras(12秒間引き)で
-//   読む。venueBar/popup が書く純観測値=歯止め(個別CD/上限/45秒CD/読み上げ中スキップ)の動作証明。
-import { buildVoiceEffectDiagLines } from '../lib/voiceEffectDiag.js';
-import { KEY_VOICE_EFFECT_DIAG } from '../lib/voiceEffectDiagKey.js';
-// Phase C(2026-07-05): BGMディレクター(bgmDirector.js)+フェーズディレクター(phaseDirector.js)の
-//   in/out回数・現在フェーズ・R値・B値を extras(12秒間引き)で読む。venueBar/popup が書く純観測値。
-import { buildBgmPhaseDiagLines } from '../lib/bgmPhaseDiag.js';
-import { KEY_BGM_PHASE_DIAG } from '../lib/bgmPhaseDiagKey.js';
 // SC2(council/broadcast-scoring-SYNTHESIS.md §2.2): ハイライト台帳(実際に発火した演出だけ記録)を
 //   extras(12秒間引き)で読む。venueBar/popup が書く純観測値。キー定数自体は
 //   statusExtrasBatch.js が EXTRAS_BATCH_KEYS へ統合済み(直接importは不要)。
@@ -153,7 +139,7 @@ import { buildHighlightLedgerDiagLines } from '../lib/highlightLedger.js';
 //   statusExtrasBatch.js が EXTRAS_BATCH_KEYS へ統合済み(直接importは不要)。
 import { buildScoreAnnounceDiagLines } from '../lib/scoreAnnounceDiag.js';
 // ③WEB配信採点丸写し(第3号・reference_full_mirror_SYNTHESIS.md M2/A-3・路線2): status が既に extras で
-//   読んでいる5値(reportPreview/bgmPhaseDiag/giftEffectDiag/voiceDiag/highlightLedger)から①と同じ純lib
+//   読んでいる4値(reportPreview/giftEffectDiag/voiceDiag/highlightLedger)から①と同じ純lib
 //   で view-model を組み、jsonBlob.broadcastScoreVm に載せる(新規 storage read ゼロ・publish ゼロ)。
 //   R-1: VM 戻りは score/radar/highlights 等の構造化データのみ=HTML文字列を含まない(③で buildBroadcastScorePanelHtml が HTML 化)。
 import { buildBroadcastScorePanelViewModel } from '../lib/broadcastScorePanelViewModel.js';
@@ -460,10 +446,6 @@ let _extrasCache = /** @type {{reportPreview:any, watchTabMap:any, trendFindings
   giftEffectDiag: null,
   // v0.1.1072: マイ効果音(customSoundStore.js)の取込状況。IDB readのため12秒間引き必須。
   customSoundDiag: null,
-  // Phase B(v0.1.1073): パチンコボイス演出の発火/スキップ内訳。補助情報=extras(12秒間引き)のみ。
-  voiceEffectDiag: null,
-  // Phase C(v0.1.1074): BGM in/out・現在フェーズ・R値・B値。補助情報=extras(12秒間引き)のみ。
-  bgmPhaseDiag: null,
   // Phase D1(2026-07-05): 操作音の押下→成功→発音観測値。補助情報=extras(12秒間引き)のみ。
   opSoundEffectDiag: null,
   // 感度パッチ(2026-07-06): コメント送信の所要ms/結果/フレーム試行回数観測値。補助情報=extras(12秒間引き)のみ。
@@ -622,7 +604,6 @@ async function bootstrap() {
   setupStorageChangeListener();
   setupSoundPreviewPanel();
   setupMyCustomSoundPanel();
-  setupBgmSettingsPanel();
 
   // v0.1.797「status が重くて開かない」根治: 初回は短い timeout(1500ms)で走らせ、storage が
   //   混雑していても最大 ~1.5秒で degrade 表示に切り替える(=「開かない」を作らない)。await せず
@@ -904,8 +885,6 @@ async function refresh(opts = {}) {
         backfillLiveMetric,
         giftEffectDiag,
         milestoneEffectDiag,
-        voiceEffectDiag,
-        bgmPhaseDiag,
         opSoundEffectDiag,
         commentPostDiag,
         instantPushDiag,
@@ -978,11 +957,11 @@ async function refresh(opts = {}) {
           _sourceProvenanceStored = _small[KEY_SOURCE_PROVENANCE] || null;
         }
       }
-      _extrasCache = { reportPreview, watchTabMap, trendFindings, laneDiag, laneMirror, statCardsMirror, northStarMirror, voiceDiag, venueSeatsDiag, publishOutcomeRec, commentTimelineMirror, giftHistoryMirror, roomHeatMirror, sessionSummaryMirror, previewRenderAck, backfillLiveMetric, giftEffectDiag, milestoneEffectDiag, customSoundDiag, voiceEffectDiag, bgmPhaseDiag, opSoundEffectDiag, commentPostDiag, instantPushDiag, channelSwitchDiag, highlightLedger, scoreAnnounceDiag, sidepanelSelfDiag };
+      _extrasCache = { reportPreview, watchTabMap, trendFindings, laneDiag, laneMirror, statCardsMirror, northStarMirror, voiceDiag, venueSeatsDiag, publishOutcomeRec, commentTimelineMirror, giftHistoryMirror, roomHeatMirror, sessionSummaryMirror, previewRenderAck, backfillLiveMetric, giftEffectDiag, milestoneEffectDiag, customSoundDiag, opSoundEffectDiag, commentPostDiag, instantPushDiag, channelSwitchDiag, highlightLedger, scoreAnnounceDiag, sidepanelSelfDiag };
       _extrasCacheAt = Date.now();
       _mark('extras');
     }
-    const { reportPreview, watchTabMap, trendFindings, laneDiag, laneMirror, statCardsMirror, northStarMirror, voiceDiag, venueSeatsDiag, publishOutcomeRec, commentTimelineMirror, giftHistoryMirror, roomHeatMirror, sessionSummaryMirror, previewRenderAck, backfillLiveMetric, giftEffectDiag, milestoneEffectDiag, customSoundDiag, voiceEffectDiag, bgmPhaseDiag, opSoundEffectDiag, commentPostDiag, instantPushDiag, channelSwitchDiag, highlightLedger, scoreAnnounceDiag, sidepanelSelfDiag } = _extrasCache;
+    const { reportPreview, watchTabMap, trendFindings, laneDiag, laneMirror, statCardsMirror, northStarMirror, voiceDiag, venueSeatsDiag, publishOutcomeRec, commentTimelineMirror, giftHistoryMirror, roomHeatMirror, sessionSummaryMirror, previewRenderAck, backfillLiveMetric, giftEffectDiag, milestoneEffectDiag, customSoundDiag, opSoundEffectDiag, commentPostDiag, instantPushDiag, channelSwitchDiag, highlightLedger, scoreAnnounceDiag, sidepanelSelfDiag } = _extrasCache;
     // 2026-07-14 診断ページ608秒固まり根治: コアreadがstale供給(timeoutでも直近成功値)された場合、
     //   嘘の新鮮さを装わずヘッダーに鮮度を明記する(parity診断群と同じ「嘘をつかない」原則)。
     const staleCores = coreReads.filter((r) => r.stale);
@@ -1014,7 +993,7 @@ async function refresh(opts = {}) {
     dismissStatusBootNotice();
     // v0.1.1005: 前サイクルの所要計器をコピー本文へ渡す(画面ヘッダーだけでなく AI共有テキストにも出す)。
     // 2026-07-14: renderAll 内のセクション別内訳(前サイクル計測)も同様に渡す(診断ページ軽量化の実測材料)。
-    renderAll({ lvList, summaries, fastDiag, popupDiag, backfillProgress, backfillLiveMetric, voiceDiag, venueSeatsDiag, laneDiag, laneMirror, statCardsMirror, northStarMirror, reportPreview, trendFindings, watchTabMap, publishOutcomeRec, commentTimelineMirror, giftHistoryMirror, roomHeatMirror, sessionSummaryMirror, previewRenderAck, refreshPerf: _lastRefreshPerf, renderSectionMs: _lastRenderSectionMs, giftEffectDiag, milestoneEffectDiag, customSoundDiag, voiceEffectDiag, bgmPhaseDiag, opSoundEffectDiag, commentPostDiag, instantPushDiag, channelSwitchDiag, highlightLedger, scoreAnnounceDiag, sidepanelSelfDiag, extrasAgeMs: _extrasCacheAt ? Math.max(0, Date.now() - _extrasCacheAt) : null });
+    renderAll({ lvList, summaries, fastDiag, popupDiag, backfillProgress, backfillLiveMetric, voiceDiag, venueSeatsDiag, laneDiag, laneMirror, statCardsMirror, northStarMirror, reportPreview, trendFindings, watchTabMap, publishOutcomeRec, commentTimelineMirror, giftHistoryMirror, roomHeatMirror, sessionSummaryMirror, previewRenderAck, refreshPerf: _lastRefreshPerf, renderSectionMs: _lastRenderSectionMs, giftEffectDiag, milestoneEffectDiag, customSoundDiag, opSoundEffectDiag, commentPostDiag, instantPushDiag, channelSwitchDiag, highlightLedger, scoreAnnounceDiag, sidepanelSelfDiag, extrasAgeMs: _extrasCacheAt ? Math.max(0, Date.now() - _extrasCacheAt) : null });
     _mark('render');
     /*
      * ★v0.1.1320: 「JSが返るまで」でなく【画面に出るまで】を測る。
@@ -1434,34 +1413,8 @@ async function loadMilestoneEffectDiagSafe() {
   }
 }
 
-// Phase B(v0.1.1073): venueBar/popup が書く「パチンコボイスの発火/スキップ内訳」を読む。
-//   ボイストリガが一度も無い配信なら null=行を出さない(giftEffectDiag と同方針)。
-// 重さ根治 P2(2026-07-06): 呼び出し元は statusExtrasBatch.js の1バッチ get へ統合済み(残置)。
-// eslint-disable-next-line no-unused-vars
-async function loadVoiceEffectDiagSafe() {
-  try {
-    const bag = await chrome.storage.local.get(KEY_VOICE_EFFECT_DIAG);
-    return bag?.[KEY_VOICE_EFFECT_DIAG] || null;
-  } catch {
-    return null;
-  }
-}
-
-// Phase C(v0.1.1074): venueBar/popup が書く「BGM in/out・現在フェーズ・R値・B値」を読む。
-//   フェーズ判定が一度も走っていない配信なら null=行を出さない(voiceEffectDiagと同方針)。
-// 重さ根治 P2(2026-07-06): 呼び出し元は statusExtrasBatch.js の1バッチ get へ統合済み(残置)。
-// eslint-disable-next-line no-unused-vars
-async function loadBgmPhaseDiagSafe() {
-  try {
-    const bag = await chrome.storage.local.get(KEY_BGM_PHASE_DIAG);
-    return bag?.[KEY_BGM_PHASE_DIAG] || null;
-  } catch {
-    return null;
-  }
-}
-
 // Phase D1(2026-07-05): popup が書く「操作音(押下→成功→発音)」観測値を読む。
-//   投稿操作が一度も無い配信なら null=行を出さない(voiceEffectDiag と同方針)。
+//   投稿操作が一度も無い配信なら null=行を出さない(他の効果音診断と同方針)。
 // 重さ根治 P2(2026-07-06): 呼び出し元は statusExtrasBatch.js の1バッチ get へ統合済み(残置)。
 // eslint-disable-next-line no-unused-vars
 async function loadOpSoundEffectDiagSafe() {
@@ -1717,7 +1670,7 @@ async function loadBackfillLiveMetricSafe() {
 // v0.1.861: レポートプレビューの信頼度注釈の文脈は純関数 reportPreviewCtxFromFastDiag(src/lib)に抽出済み
 //   (NDGR 接続/userId 付き率/backfill 進行 → 注釈ctx・挙動同値・テストで固定)。import は冒頭。
 
-function renderAll({ extrasAgeMs, lvList, summaries, fastDiag, popupDiag, backfillProgress, backfillLiveMetric, voiceDiag, venueSeatsDiag, laneDiag, laneMirror, statCardsMirror, northStarMirror, reportPreview, trendFindings, watchTabMap, publishOutcomeRec, commentTimelineMirror, giftHistoryMirror, roomHeatMirror, sessionSummaryMirror, previewRenderAck, refreshPerf, renderSectionMs, giftEffectDiag, milestoneEffectDiag, customSoundDiag, voiceEffectDiag, bgmPhaseDiag, opSoundEffectDiag, commentPostDiag, instantPushDiag, channelSwitchDiag, highlightLedger, scoreAnnounceDiag, sidepanelSelfDiag }) {
+function renderAll({ extrasAgeMs, lvList, summaries, fastDiag, popupDiag, backfillProgress, backfillLiveMetric, voiceDiag, venueSeatsDiag, laneDiag, laneMirror, statCardsMirror, northStarMirror, reportPreview, trendFindings, watchTabMap, publishOutcomeRec, commentTimelineMirror, giftHistoryMirror, roomHeatMirror, sessionSummaryMirror, previewRenderAck, refreshPerf, renderSectionMs, giftEffectDiag, milestoneEffectDiag, customSoundDiag, opSoundEffectDiag, commentPostDiag, instantPushDiag, channelSwitchDiag, highlightLedger, scoreAnnounceDiag, sidepanelSelfDiag }) {
   // v0.1.847: 各描画セクションを独立 try/catch で隔離するヘルパ。1つが throw しても他のセクションと
   //   最終更新メタを巻き込まない=「セルが全部消える/最終更新—のまま固まる」を根治。落ちた場所は
   //   console と AI 共有欄に出して真因を追えるようにする(star-romi 失敗体験の除去)。
@@ -1884,20 +1837,6 @@ function renderAll({ extrasAgeMs, lvList, summaries, fastDiag, popupDiag, backfi
     const cStr = buildCustomSoundDiagLine(customSoundDiag);
     customSoundLine = cStr ? `\n${cStr}` : '';
   });
-  // Phase B(v0.1.1073): パチンコボイスの発火/スキップ内訳を概要に併記(ボイストリガが一度も
-  //   無い配信なら空=ノイズにしない)。歯止め(§4)の動作証明を状態速報1枚で確認できる。
-  let voiceEffectLine = '';
-  safeSection('パチンコボイス計器', () => {
-    const vLines = buildVoiceEffectDiagLines(voiceEffectDiag, Date.now());
-    voiceEffectLine = vLines.length ? `\n${vLines.join('\n')}` : '';
-  });
-  // Phase C(v0.1.1074): BGM/フェーズ計器(in/out回数・現在フェーズ・R値・B値)を概要に併記
-  //   (フェーズ判定が一度も走っていない配信なら空=ノイズにしない)。
-  let bgmPhaseLine = '';
-  safeSection('パチンコBGM/フェーズ計器', () => {
-    const bLines = buildBgmPhaseDiagLines(bgmPhaseDiag, Date.now());
-    bgmPhaseLine = bLines.length ? `\n${bLines.join('\n')}` : '';
-  });
   // Phase D1(2026-07-05): 操作音(押下→成功→発音)計器を概要に併記(投稿操作が一度も
   //   無い配信なら空=ノイズにしない)。「押下は鳴るのに成功が無い/成功しても未割当」を1枚で確認。
   let opSoundEffectLine = '';
@@ -1987,7 +1926,7 @@ function renderAll({ extrasAgeMs, lvList, summaries, fastDiag, popupDiag, backfi
   if (overviewEl) {
     overviewEl.textContent =
       (overviewText || '視聴中の配信はありません。') +
-      backfillLine + laneLine + voiceLine + reportPreviewLine + giftEffectLine + milestoneEffectLine + customSoundLine + voiceEffectLine + bgmPhaseLine + opSoundEffectLine + commentPostLine + instantPushLine + writeLedgerLine + prunePublishLine + channelSwitchLine + autoTabReloadLine + highlightLedgerLine + scoreAnnounceLine;
+      backfillLine + laneLine + voiceLine + reportPreviewLine + giftEffectLine + milestoneEffectLine + customSoundLine + opSoundEffectLine + commentPostLine + instantPushLine + writeLedgerLine + prunePublishLine + channelSwitchLine + autoTabReloadLine + highlightLedgerLine + scoreAnnounceLine;
     overviewEl.classList.toggle('empty-note', !overviewText);
   }
 
@@ -2177,11 +2116,10 @@ function renderAll({ extrasAgeMs, lvList, summaries, fastDiag, popupDiag, backfi
      *   ★ここで渡さないとセルが永久に na になる=「登録したのに出ない」の再演。
      */
     /*
-     * ★v0.1.1408: 操作音/BGM セル(finalDetailCells.js)の入力。
-     *   どちらも extras(12秒間引き)で既に読んでいる=storage 読み取りは増えない。
+     * ★v0.1.1408: 操作音セル(finalDetailCells.js)の入力。
+     *   extras(12秒間引き)で既に読んでいる=storage 読み取りは増えない。
      */
     opSoundEffectDiag,
-    bgmPhaseDiag,
     // ★v0.1.1412: 取得経路の履歴(降格＝ニコ生の構造変更の予兆 を判定する材料)
     sourceProvenanceStored: _sourceProvenanceStored,
     buildId: typeof NL_BUILD_ID !== 'undefined' ? NL_BUILD_ID : '',
@@ -2331,7 +2269,7 @@ function renderAll({ extrasAgeMs, lvList, summaries, fastDiag, popupDiag, backfi
         liveId: scoreLiveId,
         nowMs: Date.now(),
         previewRec: reportPreview,
-        phaseStats: bgmPhaseDiag,
+        phaseStats: null,
         giftDiag: giftEffectDiag,
         voiceDiag,
         ledger: highlightLedger && typeof highlightLedger === 'object' ? highlightLedger : null
@@ -2344,7 +2282,7 @@ function renderAll({ extrasAgeMs, lvList, summaries, fastDiag, popupDiag, backfi
   // AI 共有用テキスト
   let fullText = '';
   safeSection('AI共有テキスト', () => {
-    fullText = buildAiShareFullText({ overviewText, livesData, fastDiag, popupDiag, voiceDiag, venueSeatsDiag, laneDiag, laneMirror, reportPreview, trendFindings, jsonBlob, currentLiveId: currentLiveIdForDiag, publishKeys, publishOutcomeRec, previewRenderAck, refreshPerf, renderSectionMs, giftEffectDiag, milestoneEffectDiag, customSoundDiag, voiceEffectDiag, bgmPhaseDiag, opSoundEffectDiag, commentPostDiag, instantPushDiag, channelSwitchDiag, highlightLedger, scoreAnnounceDiag, sidepanelSelfDiag, extrasAgeMs });
+    fullText = buildAiShareFullText({ overviewText, livesData, fastDiag, popupDiag, voiceDiag, venueSeatsDiag, laneDiag, laneMirror, reportPreview, trendFindings, jsonBlob, currentLiveId: currentLiveIdForDiag, publishKeys, publishOutcomeRec, previewRenderAck, refreshPerf, renderSectionMs, giftEffectDiag, milestoneEffectDiag, customSoundDiag, opSoundEffectDiag, commentPostDiag, instantPushDiag, channelSwitchDiag, highlightLedger, scoreAnnounceDiag, sidepanelSelfDiag, extrasAgeMs });
     const ta = /** @type {HTMLTextAreaElement|null} */ (
       document.getElementById('aiShareText')
     );
@@ -4142,52 +4080,6 @@ function setupButtons() {
 //   これらは自分の viewerUserId・配信URL を含む開発用エクスポートなので本番ユーザーには出さない
 //   (ユーザー方針「そもそも開発用なので release時は出さない」)。健全度パネル・総合判定・対処カードは
 //   ID を漏らさずユーザーに有用なので残す。NL_RELEASE は esbuild define(NL_DEV_HOTRELOAD と同方式)。
-/**
- * Phase C(2026-07-05・council/pachinko-ultimate-SYNTHESIS.md §5.1/§6): BGM設定パネル。
- *   トグル(既定OFF)+リーチ/フィーバー音量スライダー(上限0.30クランプ)。開発用パネルではないので
- *   hideDevDiagnosticsIfReleaseの対象外(常時表示)。
- */
-function setupBgmSettingsPanel() {
-  const toggle = /** @type {HTMLInputElement|null} */ (document.getElementById('bgmEnabledToggle'));
-  const reachSlider = /** @type {HTMLInputElement|null} */ (document.getElementById('bgmVolumeReachSlider'));
-  const feverSlider = /** @type {HTMLInputElement|null} */ (document.getElementById('bgmVolumeFeverSlider'));
-  const reachValueEl = document.getElementById('bgmVolumeReachValue');
-  const feverValueEl = document.getElementById('bgmVolumeFeverValue');
-  if (!toggle || !reachSlider || !feverSlider) return;
-
-  const BGM_VOLUME_MAX = 0.30;
-  const BGM_REACH_DEFAULT = 0.12;
-  const BGM_FEVER_DEFAULT = 0.15;
-  const clamp = (v, fallback) => {
-    const n = Number(v);
-    return Number.isFinite(n) ? Math.max(0, Math.min(BGM_VOLUME_MAX, n)) : fallback;
-  };
-
-  void safeStorageLocalGet([KEY_BGM_ENABLED, KEY_BGM_VOLUME_REACH, KEY_BGM_VOLUME_FEVER]).then((bag) => {
-    toggle.checked = isBgmEnabled(bag?.[KEY_BGM_ENABLED]);
-    const reachV = clamp(bag?.[KEY_BGM_VOLUME_REACH], BGM_REACH_DEFAULT);
-    const feverV = clamp(bag?.[KEY_BGM_VOLUME_FEVER], BGM_FEVER_DEFAULT);
-    reachSlider.value = String(reachV);
-    feverSlider.value = String(feverV);
-    if (reachValueEl) reachValueEl.textContent = reachV.toFixed(2);
-    if (feverValueEl) feverValueEl.textContent = feverV.toFixed(2);
-  });
-
-  toggle.addEventListener('change', () => {
-    void safeStorageLocalSet({ [KEY_BGM_ENABLED]: toggle.checked });
-  });
-  reachSlider.addEventListener('input', () => {
-    const v = clamp(reachSlider.value, BGM_REACH_DEFAULT);
-    if (reachValueEl) reachValueEl.textContent = v.toFixed(2);
-    void safeStorageLocalSet({ [KEY_BGM_VOLUME_REACH]: v });
-  });
-  feverSlider.addEventListener('input', () => {
-    const v = clamp(feverSlider.value, BGM_FEVER_DEFAULT);
-    if (feverValueEl) feverValueEl.textContent = v.toFixed(2);
-    void safeStorageLocalSet({ [KEY_BGM_VOLUME_FEVER]: v });
-  });
-}
-
 /**
  * v0.1.1067 開発用: 効果音試聴パネル。EFFECT_SOUND_VARIANT_PATHS/EFFECT_SOUND_PATHS(正本)を
  *   そのまま列挙し、実再生と同じ音量(defaultVolumeForEffectSoundKind)で鳴らす。release では

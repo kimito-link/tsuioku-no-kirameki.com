@@ -19,6 +19,7 @@
 - 🟠 **KEY_PANEL_WAKE_CURTAIN_DIAG** — 書く人だけ（読む経路が無い疑い）: src/lib/panelWakeCurtainDom.js
 - 🟠 **KEY_SCORE_ANNOUNCE_DIAG** — 書く人だけ（読む経路が無い疑い）: src/extension/popup-entry.js
 - 🟠 **KEY_SW_PROGRESS** — 書く人だけ（読む経路が無い疑い）: src/extension/backfill-sw-entry.js
+- 🟠 **KEY_VENUE_EFFECT_SOUND_PRESENCE** — 書く人だけ（読む経路が無い疑い）: src/extension/venueBar.js
 - 🟠 **fn:backfillHeartbeatKey** — 書く人だけ（読む経路が無い疑い）: src/extension/content-entry.js
 - 🟠 **fn:chunkMigratedKey** — 書く人だけ（読む経路が無い疑い）: src/extension/content-entry.js
 - 🟠 **fn:comeviewPinStorageKey** — 書く人だけ（読む経路が無い疑い）: src/extension/comeview-entry.js
@@ -86,10 +87,6 @@
 | `KEY_BACKFILL_LIVE_METRIC` | extension/content-entry.js | extension/status-entry.js |
 | `KEY_BACKFILL_PROGRESS` | extension/backfill-sw-entry.js<br>extension/content-entry.js<br>extension/popup-entry.js | extension/popup-entry.js |
 | `KEY_BACKFILL_SW_MODE` | — | extension/content-entry.js |
-| `KEY_BGM_ENABLED` | extension/status-entry.js | extension/popup-entry.js<br>extension/status-entry.js<br>extension/venueBar.js |
-| `KEY_BGM_PHASE_DIAG` | extension/popup-entry.js<br>extension/venueBar.js | extension/status-entry.js |
-| `KEY_BGM_VOLUME_FEVER` | extension/status-entry.js | extension/popup-entry.js<br>extension/status-entry.js<br>extension/venueBar.js |
-| `KEY_BGM_VOLUME_REACH` | extension/status-entry.js | extension/popup-entry.js<br>extension/status-entry.js<br>extension/venueBar.js |
 | `KEY_CALM_PANEL_MOTION` | — | extension/popup-entry.js |
 | `KEY_CDB_OFFSCREEN_ENABLED` | — | extension/content-entry.js |
 | `KEY_CHEER_RECENT_V1` | extension/popup-entry.js | extension/popup-entry.js |
@@ -158,10 +155,9 @@
 | `KEY_TOP_SUPPORTERS_MIRROR` | — | extension/popup-entry.js |
 | `KEY_USER_COMMENT_PROFILE_CACHE` | extension/content-entry.js | extension/comeview-entry.js<br>extension/content-entry.js<br>extension/popup-entry.js<br>extension/venueBar.js |
 | `KEY_VENUE_BUTTON_VISIBLE` | — | extension/content-entry.js<br>extension/popup-entry.js |
-| `KEY_VENUE_EFFECT_SOUND_PRESENCE` | extension/venueBar.js | extension/popup-entry.js |
+| `KEY_VENUE_EFFECT_SOUND_PRESENCE` | extension/venueBar.js | — |
 | `KEY_VENUE_SEATS_DIAG` | extension/venueBar.js | extension/status-entry.js |
 | `KEY_VOICE_DIAG` | extension/comeview-entry.js<br>extension/venueBar.js | extension/popup-entry.js<br>extension/status-entry.js |
-| `KEY_VOICE_EFFECT_DIAG` | extension/popup-entry.js<br>extension/venueBar.js | extension/status-entry.js |
 | `KEY_VOICE_INPUT_DEVICE` | extension/popup-entry.js | extension/popup-entry.js |
 | `KEY_WEB_PUBLISH_OPT_IN` | extension/status-entry.js | extension/status-entry.js |
 | `fn:backfillHeartbeatKey` | extension/content-entry.js | — |

@@ -256,12 +256,7 @@ import {
   KEY_VENUE_BUTTON_VISIBLE,
   isVenueButtonVisible,
   KEY_CUSTOM_SOUND_REV,
-  KEY_VENUE_EFFECT_SOUND_PRESENCE,
   isEffectSoundEnabled,
-  KEY_BGM_ENABLED,
-  KEY_BGM_VOLUME_REACH,
-  KEY_BGM_VOLUME_FEVER,
-  isBgmEnabled,
   KEY_OP_SOUND_ENABLED,
   isOpSoundEnabled
 } from '../lib/storageKeys.js';
@@ -269,55 +264,10 @@ import {
   playEffectSound,
   EFFECT_SOUND_VARIANT_PATHS,
   EFFECT_SOUND_PATHS,
-  defaultVolumeForEffectSoundKind,
-  shouldSkipEffectSoundForVenuePresence
+  defaultVolumeForEffectSoundKind
 } from '../lib/effectSoundPlayer.js';
-// Phase B(2026-07-05): パチンコボイス演出+歯止め(council/pachinko-ultimate-SYNTHESIS.md §4/§6)。
-//   voiceGate=事象履歴の純関数(個別CD/上限+グローバル45秒CD+1配信20回)。popup側はVOICEVOX
-//   読み上げが走らないコンテキストのため isNarrating は常に false。会場優先プレゼンスで譲る。
-import {
-  makeInitialVoiceGateState,
-  voiceGate,
-  planBreakthroughChain,
-  planJackpotChain,
-  MILESTONE_HARD_TO_BREAKTHROUGH_MS,
-  isUnassignedVoiceKey,
-  resetVoiceGateStateForLiveIfChanged
-} from '../lib/voiceDirector.js';
-import { makeInitialVoiceEffectDiag, buildVoiceEffectDiagSnapshot, voiceSkipFieldForGateReason } from '../lib/voiceEffectDiag.js';
-import { KEY_VOICE_EFFECT_DIAG } from '../lib/voiceEffectDiagKey.js';
-// Phase C(2026-07-05): 物語弧の完成(council/pachinko-ultimate-SYNTHESIS.md §3/§5/§6)。
-//   meterStateFor(既存M)→baselineFor(B)→R→phaseForの決定論ステートマシンでフェーズを進め、
-//   遷移の瞬間だけR条件ボイス/BGMを発火する。venueBar.jsと同型の配線(会場優先で二重発音しない)。
-import { meterStateFor, makeInitialExcitementMeter } from '../lib/effectDirector.js';
-import {
-  baselineFor,
-  rWithWarmup,
-  phaseFor,
-  makeInitialBaselineState,
-  makeInitialPhaseState,
-  PHASE
-} from '../lib/phaseDirector.js';
-import {
-  createBgmRuntime,
-  reachBgmDecision,
-  makeInitialReachBgmState,
-  feverBgmStart,
-  feverBgmExtend,
-  feverBgmShouldEnd,
-  feverBgmStop,
-  makeInitialFeverBgmState,
-  reachLoopVariantIndex,
-  feverLoopVariantIndex,
-  clampBgmVolume,
-  BGM_REACH_DEFAULT_VOLUME,
-  BGM_FEVER_DEFAULT_VOLUME,
-  FADE_MS
-} from '../lib/bgmDirector.js';
-import { makeInitialBgmPhaseDiag, buildBgmPhaseDiagSnapshot } from '../lib/bgmPhaseDiag.js';
-import { KEY_BGM_PHASE_DIAG } from '../lib/bgmPhaseDiagKey.js';
 // SC2(council/broadcast-scoring-SYNTHESIS.md §5): popup採点パネル配線。既存publish済み値
-//   (reportPreview/bgmPhaseDiag自身)だけを読む=新規の重い集計・新規コアreadゼロ。
+//   (reportPreview自身)だけを読む=新規の重い集計・新規コアreadゼロ。
 //   liveId突合・スコア計算・レーダー計算・ハイライト選抜の合成はbroadcastScorePanelViewModel.js
 //   (純関数・テスト済み)に集約し、ここではstorage readとinnerHTML代入だけを行う。
 import { buildBroadcastScorePanelHtml } from '../lib/broadcastScoreHtml.js';
@@ -1264,21 +1214,6 @@ function publishMilestoneEffectDiag() {
   void safeStorageLocalSet({ [KEY_MILESTONE_EFFECT_DIAG]: snap });
 }
 
-// Phase B(2026-07-05): パチンコボイス演出+歯止め(council/pachinko-ultimate-SYNTHESIS.md §4/§6)。
-//   popup側のトリガはコメント数マイルストーン(節目500=突破チェーン・節目1000+=大当たりチェーン・
-//   コンボ昇格=上乗せボイス)。本Phaseはイベント直結のみ(メーターR条件はPhase C)。
-let _voiceGateState = makeInitialVoiceGateState();
-const _voiceEffectDiagCounters = makeInitialVoiceEffectDiag();
-let _voiceEffectDiagLastWriteAt = 0;
-function publishVoiceEffectDiag() {
-  const now = Date.now();
-  if (now - _voiceEffectDiagLastWriteAt < 3000) return; // 3秒 min-gap(他の診断と同型)。
-  _voiceEffectDiagLastWriteAt = now;
-  _voiceEffectDiagCounters.soundEnabled = _effectSoundEnabledCache;
-  const snap = { ...buildVoiceEffectDiagSnapshot(_voiceEffectDiagCounters, now), source: 'popup' };
-  void safeStorageLocalSet({ [KEY_VOICE_EFFECT_DIAG]: snap });
-}
-
 // Phase D1(2026-07-05): 操作音(council/operation-sound-SYNTHESIS.md)。
 //   「コメント送信=玉の打ち出し」の核。押下=op_handle・成功=op_shot(投稿成功数nで4段に育つ)。
 //   マスタートグルは既存の効果音設定(_effectSoundEnabledCache)と独立(§4.2・既定ON)。
@@ -1423,327 +1358,6 @@ function triggerOpSoundShotSuccess(liveId) {
   triggerOpSound(kind);
 }
 
-/**
- * 会場window(venueBar)が開いていれば popup 側のボイスは譲る(二重再生防止・会場優先。
- *   officialEventRankSoundEffect.js の shouldPopupSkipEffectSoundForVenue と同じ判定)。
- * @returns {Promise<boolean>} true=popup側はスキップすべき(会場側の演出に任せる)
- */
-async function popupShouldSkipVoiceForVenue() {
-  try {
-    const bag = await chrome.storage.local.get(KEY_VENUE_EFFECT_SOUND_PRESENCE);
-    return shouldSkipEffectSoundForVenuePresence(Number(bag?.[KEY_VENUE_EFFECT_SOUND_PRESENCE]) || 0, Date.now());
-  } catch {
-    return false; // 判定不能なら鳴らす側に倒す(無音になり続けるより安全)
-  }
-}
-/**
- * ボイス1本をゲート(個別CD/上限・グローバル45秒CD・1配信20回)経由で鳴らす(popup側)。
- *   popupではVOICEVOX読み上げが走らないため isNarrating は常に false。
- * @param {string} key voice_* のいずれか
- * @returns {'played'|'off'|string} 'played'=実際に鳴らした。それ以外はスキップ理由等。
- */
-function tryPlayVoicePopup(key) {
-  if (!_effectSoundEnabledCache) return 'off';
-  // 修正1: カスタム未割当キーはゲートより先に諦める(ゲートstateを一切消費しない・§本体)。
-  if (isUnassignedVoiceKey(key, _customSoundState.customVariantPaths)) {
-    _voiceEffectDiagCounters.skippedUnassigned += 1;
-    _voiceEffectDiagCounters.lastEventAt = Date.now();
-    publishVoiceEffectDiag();
-    return 'unassigned';
-  }
-  const stateBeforeGate = _voiceGateState;
-  const gate = voiceGate(stateBeforeGate, key, Date.now(), {
-    liveId: watchPopupLastPaintedLiveId,
-    isNarrating: false
-  });
-  _voiceGateState = gate.nextState;
-  _voiceEffectDiagCounters.lastEventAt = Date.now();
-  if (!gate.allowed) {
-    const field = voiceSkipFieldForGateReason(gate.reason);
-    if (field) _voiceEffectDiagCounters[field] += 1;
-    publishVoiceEffectDiag();
-    return gate.reason;
-  }
-  // 「鳴らした」時だけ数える(戻り値を見ずに数えると診断が嘘をつく・v0.1.1057と同じ教訓)。
-  const result = playEffectSound(key, buildEffectSoundDeps(key));
-  if (result === 'played') {
-    _voiceEffectDiagCounters.fired += 1;
-    _voiceEffectDiagCounters.lastKey = key;
-  } else if (result === 'no-path') {
-    // 保険(修正1): 事前チェックはcustomVariantPathsのキー存在だけを見るため、blob URL失効等の
-    //   すり抜けがあっても消費済みのCD/カウンタを巻き戻す(嘘の状態を作らない・決定論を保つ)。
-    _voiceGateState = resetVoiceGateStateForLiveIfChanged(stateBeforeGate, watchPopupLastPaintedLiveId);
-    _voiceEffectDiagCounters.skippedUnassigned += 1;
-  }
-  publishVoiceEffectDiag();
-  return result;
-}
-/**
- * 突破チェーン(§3.3「リーチ→突破」・節目500到達): breakthrough SE → (300ms) → voice_breakthrough。
- *   イベント側SE(milestone_hard)と重ねないよう、チェーン全体をMILESTONE_HARD_TO_BREAKTHROUGH_MSだけ
- *   後ろへずらして直列にする。会場windowが開いていれば譲る(二重再生防止)。
- */
-async function scheduleBreakthroughVoiceChainPopup() {
-  if (!_effectSoundEnabledCache) return;
-  if (await popupShouldSkipVoiceForVenue()) {
-    _voiceEffectDiagCounters.skippedVenue += 1;
-    _voiceEffectDiagCounters.lastEventAt = Date.now();
-    publishVoiceEffectDiag();
-    return;
-  }
-  // 修正1: voice_breakthroughが未割当ならゲートを消費せず諦める(§本体)。SE(breakthrough)は
-  //   ボイスゲートの対象外なので、この判定に関わらず1本だけ鳴らす(§3.3=SEが主役・ボイスは添え物)。
-  const voiceUnassigned = isUnassignedVoiceKey('voice_breakthrough', _customSoundState.customVariantPaths);
-  const gate = voiceUnassigned
-    ? null
-    : voiceGate(_voiceGateState, 'voice_breakthrough', Date.now(), {
-        liveId: watchPopupLastPaintedLiveId,
-        isNarrating: false
-      });
-  if (gate) _voiceGateState = gate.nextState;
-  _voiceEffectDiagCounters.lastEventAt = Date.now();
-  // ボイスのゲートを先に判定(§4)。SE(breakthrough)はボイスゲートの対象外だが、ボイスが
-  //   通らないときもSEは1本だけ鳴らす(§3.3のリーチ→突破はSEが主役・ボイスは添え物)。
-  const voiceAllowed = !voiceUnassigned && gate.allowed;
-  // planBreakthroughChain の delayMs は「直前ステップからの遅延」= 累積して直列にスケジュールする。
-  let atMs = MILESTONE_HARD_TO_BREAKTHROUGH_MS;
-  for (const step of planBreakthroughChain()) {
-    atMs += step.delayMs;
-    if (step.kind === 'voice_breakthrough' && !voiceAllowed) continue; // 声だけ諦める(遅延再生禁止)
-    window.setTimeout(() => {
-      const result = playEffectSound(step.kind, buildEffectSoundDeps(step.kind));
-      if (step.kind === 'voice_breakthrough' && result === 'played') {
-        _voiceEffectDiagCounters.fired += 1;
-        _voiceEffectDiagCounters.lastKey = 'voice_breakthrough';
-      }
-      publishVoiceEffectDiag();
-    }, atMs);
-  }
-  if (voiceUnassigned) {
-    _voiceEffectDiagCounters.skippedUnassigned += 1;
-  } else if (!gate.allowed) {
-    const field = voiceSkipFieldForGateReason(gate.reason);
-    if (field) _voiceEffectDiagCounters[field] += 1;
-  }
-  publishVoiceEffectDiag();
-}
-/**
- * 大当たりチェーン(§3.3「突破→大当たり」「大当たり→払い出し」・節目1000+/コンボ昇格jackpot):
- *   (イベント側 milestone_jackpot SE) → voice_jackpot → payout SE 1本 の直列。
- *   チェーン全体を voice_jackpot のゲート(300秒CD/1配信3回)に従属させる=payoutだけ連発する
- *   積み増しを構造的に防ぐ(§7)。会場windowが開いていれば譲る(二重再生防止)。
- */
-async function scheduleJackpotVoiceChainPopup() {
-  if (!_effectSoundEnabledCache) return;
-  if (await popupShouldSkipVoiceForVenue()) {
-    _voiceEffectDiagCounters.skippedVenue += 1;
-    _voiceEffectDiagCounters.lastEventAt = Date.now();
-    publishVoiceEffectDiag();
-    return;
-  }
-  // 修正1: voice_jackpotが未割当ならゲートを消費せず諦める(§本体)。イベント側SEは既に鳴っている
-  //   ので、このチェーン(voice_jackpot→payout)を諦めても演出は欠落しない(payoutはadvancePhaseDirector
-  //   側のPAYOUT遷移でも1本鳴らす=既存の重複許容と同じ考え方)。
-  if (isUnassignedVoiceKey('voice_jackpot', _customSoundState.customVariantPaths)) {
-    _voiceEffectDiagCounters.skippedUnassigned += 1;
-    _voiceEffectDiagCounters.lastEventAt = Date.now();
-    publishVoiceEffectDiag();
-    return;
-  }
-  const gate = voiceGate(_voiceGateState, 'voice_jackpot', Date.now(), {
-    liveId: watchPopupLastPaintedLiveId,
-    isNarrating: false
-  });
-  _voiceGateState = gate.nextState;
-  _voiceEffectDiagCounters.lastEventAt = Date.now();
-  if (!gate.allowed) {
-    const field = voiceSkipFieldForGateReason(gate.reason);
-    if (field) _voiceEffectDiagCounters[field] += 1;
-    publishVoiceEffectDiag();
-    return;
-  }
-  let atMs = 0;
-  for (const step of planJackpotChain()) {
-    atMs += step.delayMs;
-    window.setTimeout(() => {
-      const result = playEffectSound(step.kind, buildEffectSoundDeps(step.kind));
-      if (step.kind === 'voice_jackpot' && result === 'played') {
-        _voiceEffectDiagCounters.fired += 1;
-        _voiceEffectDiagCounters.lastKey = 'voice_jackpot';
-      }
-      publishVoiceEffectDiag();
-    }, atMs);
-  }
-  publishVoiceEffectDiag();
-}
-
-/* ============================================================================
- * Phase C(2026-07-05): 物語弧の完成(council/pachinko-ultimate-SYNTHESIS.md §3/§5/§6)。
- *   meterStateFor(既存M)→baselineFor(B)→R→phaseFor の決定論ステートマシンでフェーズを進め、
- *   遷移の瞬間だけR条件ボイス/BGMを発火する。popup側は会場windowが開いていれば譲る(二重再生防止)。
- * ========================================================================== */
-
-/** メーター重み(§3.2表・popup側で観測できる範囲): コメント+1・節目到達+10。 */
-const METER_WEIGHT_COMMENT_POPUP = 1;
-const METER_WEIGHT_MILESTONE_POPUP = 10;
-
-let _meterStatePopup = makeInitialExcitementMeter();
-let _baselineStatePopup = makeInitialBaselineState();
-let _phaseStatePopup = makeInitialPhaseState(Date.now());
-/** 配信検知時刻(ウォームアップ3分の起点・liveId切替でリセット)。0=未検知。 */
-let _streamDetectedAtMsPopup = 0;
-let _phaseLiveIdPopup = '';
-let _reachBgmStatePopup = makeInitialReachBgmState();
-let _feverBgmStatePopup = makeInitialFeverBgmState();
-let _bgmEnabledCachePopup = true; // v0.1.1075: 既定ON(ユーザー明示指示・isBgmEnabledと同じ向き)
-let _bgmVolumeReachCache = BGM_REACH_DEFAULT_VOLUME;
-let _bgmVolumeFeverCache = BGM_FEVER_DEFAULT_VOLUME;
-const _bgmRuntimePopup = createBgmRuntime();
-void safeStorageLocalGet([KEY_BGM_ENABLED, KEY_BGM_VOLUME_REACH, KEY_BGM_VOLUME_FEVER]).then((bag) => {
-  _bgmEnabledCachePopup = isBgmEnabled(bag?.[KEY_BGM_ENABLED]);
-  if (Number.isFinite(Number(bag?.[KEY_BGM_VOLUME_REACH]))) _bgmVolumeReachCache = clampBgmVolume(Number(bag[KEY_BGM_VOLUME_REACH]));
-  if (Number.isFinite(Number(bag?.[KEY_BGM_VOLUME_FEVER]))) _bgmVolumeFeverCache = clampBgmVolume(Number(bag[KEY_BGM_VOLUME_FEVER]));
-});
-
-const _bgmPhaseDiagCountersPopup = makeInitialBgmPhaseDiag();
-let _bgmPhaseDiagLastWriteAtPopup = 0;
-function publishBgmPhaseDiagPopup() {
-  const now = Date.now();
-  if (now - _bgmPhaseDiagLastWriteAtPopup < 3000) return; // 3秒 min-gap(他の診断と同型)。
-  _bgmPhaseDiagLastWriteAtPopup = now;
-  _bgmPhaseDiagCountersPopup.bgmEnabled = _bgmEnabledCachePopup;
-  const snap = buildBgmPhaseDiagSnapshot(_bgmPhaseDiagCountersPopup, now);
-  void safeStorageLocalSet({ [KEY_BGM_PHASE_DIAG]: snap });
-}
-
-/**
- * カスタム割当済みBGM URLを1本選ぶ(§5.3決定論ローテーション)。未割当キーは空文字(no-path扱い=
- *   bgmDirector.createBgmRuntime().start()が「urlが無ければ何もしない」で安全側に倒す)。
- * @param {string} key
- * @param {number} [variantIndex]
- * @returns {string}
- */
-function resolveBgmUrlPopup(key, variantIndex) {
-  const variants = _customSoundState.customVariantPaths[key];
-  if (!Array.isArray(variants) || variants.length === 0) return '';
-  const idx = Number.isFinite(Number(variantIndex)) ? Math.max(0, Number(variantIndex)) % variants.length : 0;
-  return getUrlForCustomSound(variants[idx], (q) => chrome.runtime.getURL(q));
-}
-
-/** フィーバー終了(§5.2「アウト3.0秒→bgm_jingle_win」)。 */
-function endFeverBgmPopup() {
-  _bgmRuntimePopup.stop(FADE_MS.feverOut, () => {
-    const winUrl = resolveBgmUrlPopup('bgm_jingle_win', 0);
-    if (winUrl) playEffectSound('bgm_jingle_win', { ...buildEffectSoundDeps('bgm_jingle_win'), getUrl: () => winUrl });
-  });
-  _feverBgmStatePopup = feverBgmStop(_feverBgmStatePopup);
-  _bgmPhaseDiagCountersPopup.feverOutCount += 1;
-  _bgmPhaseDiagCountersPopup.lastEventAt = Date.now();
-  publishBgmPhaseDiagPopup();
-}
-
-/**
- * フィーバー開始(payoutチェーン完了合図)。bgm_jingle_stage(直列)→ループイン(§3.3/§5.2)。
- * @returns {Promise<boolean>} true=実際にフィーバーが始まった(BGM ONかつ開始成立・会場優先で
- *   譲っていない)。falseなら呼び出し側がpayout張り付き対策のフォールバックを仕掛ける必要がある。
- */
-async function startFeverBgmPopup() {
-  if (await popupShouldSkipVoiceForVenue()) return false; // 会場優先(二重再生防止)。
-  const startDecision = feverBgmStart(_feverBgmStatePopup, Date.now(), { bgmEnabled: _bgmEnabledCachePopup });
-  if (startDecision.action !== 'start') return false;
-  _feverBgmStatePopup = startDecision.nextState;
-  const stageUrl = resolveBgmUrlPopup('bgm_jingle_stage', (_feverBgmStatePopup.loopIndex - 1) % 2);
-  if (stageUrl) playEffectSound('bgm_jingle_stage', { ...buildEffectSoundDeps('bgm_jingle_stage'), getUrl: () => stageUrl });
-  const loopUrl = resolveBgmUrlPopup('bgm_fever_loop', feverLoopVariantIndex(_feverBgmStatePopup.loopIndex));
-  _bgmRuntimePopup.start(loopUrl, _bgmVolumeFeverCache, FADE_MS.feverIn);
-  _bgmPhaseDiagCountersPopup.feverInCount += 1;
-  _bgmPhaseDiagCountersPopup.lastEventAt = Date.now();
-  publishBgmPhaseDiagPopup();
-  tryPlayVoicePopup('voice_stage');
-  return true;
-}
-
-/**
- * 払い出し張り付き対策(修正2・popup側)。venueBar.jsのschedulePayoutFallbackと同じ形。
- *   BGM無効時/フィーバー未開始時/会場優先で譲った時、payoutChainDone合図が永遠に来ない
- *   (fever終了判定のみに依存していたため)。payout SEの再生予定時刻+2秒で決定論的に合図する。
- */
-const PAYOUT_FALLBACK_SE_TO_DONE_MS_POPUP = 2_000;
-let _payoutFallbackAtMsPopup = 0;
-function schedulePayoutFallbackPopup(nowMs) {
-  if (_payoutFallbackAtMsPopup > 0) return; // 二重予約防止。
-  _payoutFallbackAtMsPopup = nowMs + PAYOUT_FALLBACK_SE_TO_DONE_MS_POPUP;
-}
-function clearPayoutFallbackPopup() {
-  _payoutFallbackAtMsPopup = 0;
-}
-
-/** リーチBGMのin/out判定を1歩進める(§5.2)。 */
-function tickReachBgmPopup(phase, R, nowMs) {
-  const decision = reachBgmDecision(_reachBgmStatePopup, phase, R, nowMs, { bgmEnabled: _bgmEnabledCachePopup });
-  _reachBgmStatePopup = decision.nextState;
-  if (decision.action === 'start') {
-    const url = resolveBgmUrlPopup('bgm_reach_loop', reachLoopVariantIndex(_reachBgmStatePopup.loopIndex));
-    _bgmRuntimePopup.start(url, _bgmVolumeReachCache, decision.fadeMs);
-    _bgmPhaseDiagCountersPopup.reachInCount += 1;
-    _bgmPhaseDiagCountersPopup.lastEventAt = Date.now();
-    publishBgmPhaseDiagPopup();
-  } else if (decision.action === 'stop') {
-    _bgmRuntimePopup.stop(decision.fadeMs);
-    _bgmPhaseDiagCountersPopup.reachOutCount += 1;
-    _bgmPhaseDiagCountersPopup.lastEventAt = Date.now();
-    publishBgmPhaseDiagPopup();
-  }
-}
-
-/**
- * 修正4(council/pachinko-ultimate-SYNTHESIS.md §6 Phase C手順書準拠・「音だけで視覚的な
- *   アクションが出ない」への回答): venueBar.js の #nlsbPhaseMeter / PHASE_METER_LABEL と
- *   同等のフェーズチップ(応援レーン=popup側ヘッダー)。
- * @type {Readonly<Record<string, string>>}
- */
-const PHASE_METER_LABEL_POPUP = Object.freeze({
-  normal: '通常', atsui: '煽り', reach: 'リーチ', breakthrough: '突破', jackpot: '大当たり', payout: '払い出し'
-});
-let _lastPaintedPhaseMeterSigPopup = '';
-/**
- * popupヘッダーのフェーズチップ(#nlPhaseMeter)へフェーズ色+ラベルを反映する。
- *   一度作ったDOMはremoveしない(churn地雷対策・venueBar.jsのpaintPhaseMeterDomと同じ規律)。
- *   要素が無ければ何もしない(HTML側未対応でも安全)。フェーズ判定が一度も走っていない環境では
- *   hidden属性を保ったまま(ノイズにしない)。リーチ中は点滅系クラスを付ける(§本体)。
- * @param {string} phase
- * @param {number} r
- */
-function paintPhaseMeterPopup(phase, r) {
-  const el = document.getElementById('nlPhaseMeter');
-  if (!el) return;
-  if (el.hidden) el.hidden = false; // 最初のフェーズ判定が来たら表示する(初期状態はノイズにしないhidden)。
-  const label = PHASE_METER_LABEL_POPUP[phase] || phase;
-  const sig = `${phase}|${label}`;
-  if (sig !== _lastPaintedPhaseMeterSigPopup) {
-    _lastPaintedPhaseMeterSigPopup = sig;
-    const blinkClass = phase === PHASE.REACH ? ' nl-phase-meter--blink' : '';
-    el.className = `nl-phase-meter nl-phase-meter--${phase}${blinkClass}`;
-    el.textContent = label;
-    el.setAttribute('aria-label', `盛り上がりフェーズ: ${label}`);
-  }
-  el.dataset.r = r.toFixed(2);
-}
-
-/**
- * 突破/大当たりチェーン発火時の強調アニメ(修正4・§本体)。既存クラスに
- *   nl-phase-meter--pulse を付け、animationendで自動的に外す(DOM追加削除なし)。
- *   要素が無ければ何もしない。
- */
-function triggerPhaseMeterPulsePopup() {
-  const el = document.getElementById('nlPhaseMeter');
-  if (!el) return;
-  el.classList.remove('nl-phase-meter--pulse');
-  void el.offsetWidth; // reflowを挟んで再起動(同フレーム再付与でanimationendが飛ぶ事故を防ぐ)。
-  el.classList.add('nl-phase-meter--pulse');
-  el.addEventListener('animationend', () => el.classList.remove('nl-phase-meter--pulse'), { once: true });
-}
-
 // SC2(council/broadcast-scoring-SYNTHESIS.md §2.2): ハイライト台帳(KEY_HIGHLIGHT_LEDGER)への
 //   追記ヘルパ。書き手はvenueBar.jsと同じ「実際に発火が確定した演出だけ」相乗りする
 //   (新規writerを作らず既存の確定分岐に載せる・§6却下事項)。read-modify-writeだが、追記頻度は
@@ -1756,152 +1370,6 @@ function appendHighlightAndPublishPopup(liveId, kind, atMs) {
     void safeStorageLocalSet({ [KEY_HIGHLIGHT_LEDGER]: next });
   });
 }
-
-/**
- * フェーズディレクターを1歩進める(§6 Phase C の核)。popup側の呼び出し元は
- *   noteCommentMilestoneHighWater(コメント数delta)+maybeCelebrateFromCommentCount(節目到達)。
- *   会場windowが開いていればボイス/BGMは譲る(二重再生防止・メーター計算自体は各コンテキストで独立)。
- * @param {{ addWeight?: number, milestoneApproach?: boolean, milestoneHit500?: boolean,
- *   milestoneHit1000Plus?: boolean, giftLargeOrAbove?: boolean, giftMega?: boolean, comboStreak?: number }} [events]
- */
-async function advancePhaseDirectorPopup(events = {}) {
-  const now = Date.now();
-  const lid = String(watchPopupLastPaintedLiveId || '');
-  if (_phaseLiveIdPopup !== lid) {
-    // liveId切替: フェーズ関連stateを全リセット(ウォームアップも仕切り直し・§3.2)。
-    //   採点用フェーズ実績カウンタ(§SC1)も同じliveId切替でリセットする
-    //   (resetVoiceGateStateForLiveIfChangedと同型・古い配信の実績を新しい配信へ持ち越さない)。
-    _phaseLiveIdPopup = lid;
-    _meterStatePopup = makeInitialExcitementMeter();
-    _baselineStatePopup = makeInitialBaselineState();
-    _phaseStatePopup = makeInitialPhaseState(now);
-    _streamDetectedAtMsPopup = now;
-    _reachBgmStatePopup = makeInitialReachBgmState();
-    clearPayoutFallbackPopup();
-    _bgmPhaseDiagCountersPopup.reachCount = 0;
-    _bgmPhaseDiagCountersPopup.breakthroughCount = 0;
-    _bgmPhaseDiagCountersPopup.jackpotCount = 0;
-    _bgmPhaseDiagCountersPopup.rMax = 0;
-    _bgmPhaseDiagCountersPopup.hotDwellMs = 0;
-    _bgmPhaseDiagCountersPopup.elapsedMs = 0;
-  }
-  if (_streamDetectedAtMsPopup === 0) _streamDetectedAtMsPopup = now;
-  const dtMs = _meterStatePopup.updatedAt > 0 ? now - _meterStatePopup.updatedAt : 0;
-  _meterStatePopup = meterStateFor(_meterStatePopup, now, Math.max(0, Number(events.addWeight) || 0));
-  _baselineStatePopup = baselineFor(_baselineStatePopup, _meterStatePopup.value, dtMs);
-  const r = rWithWarmup(_meterStatePopup.value, _baselineStatePopup.value, now - _streamDetectedAtMsPopup);
-  const prevPhase = _phaseStatePopup.phase;
-  const prevHighestR = Number(_phaseStatePopup.highestR) || 0;
-  const result = phaseFor(_phaseStatePopup, r, events, now);
-  _phaseStatePopup = result.nextState;
-  _bgmPhaseDiagCountersPopup.phase = result.phase;
-  _bgmPhaseDiagCountersPopup.r = r;
-  _bgmPhaseDiagCountersPopup.b = _baselineStatePopup.value;
-  _bgmPhaseDiagCountersPopup.lastEventAt = now;
-
-  // 採点用フェーズ実績(§SC1・BGMトグルと無関係に数える・skipForVenueより前=会場優先で
-  //   譲っている間もこのpopup自身の観測は止めない。liveIdはlidを直接使う=liveIdFromPathname
-  //   相当の値が既にwatchPopupLastPaintedLiveId経由で確定済み)。
-  _bgmPhaseDiagCountersPopup.liveId = lid;
-  _bgmPhaseDiagCountersPopup.rMax = Math.max(Number(_bgmPhaseDiagCountersPopup.rMax) || 0, r);
-  _bgmPhaseDiagCountersPopup.elapsedMs = (Number(_bgmPhaseDiagCountersPopup.elapsedMs) || 0) + dtMs;
-  if (r >= 1.5) _bgmPhaseDiagCountersPopup.hotDwellMs = (Number(_bgmPhaseDiagCountersPopup.hotDwellMs) || 0) + dtMs;
-  if (result.changed && !result.silent) {
-    if (result.phase === PHASE.REACH) _bgmPhaseDiagCountersPopup.reachCount += 1;
-    else if (result.phase === PHASE.BREAKTHROUGH) _bgmPhaseDiagCountersPopup.breakthroughCount += 1;
-    else if (result.phase === PHASE.JACKPOT) _bgmPhaseDiagCountersPopup.jackpotCount += 1;
-    // SC2(§2.2): フェーズ遷移(実際にフェーズが変わった=画面のフェーズチップにも出ている確定事象)を
-    //   ハイライト台帳へ追記する。「見てない演出が結果に出る」を防ぐため、この changed&&!silent の
-    //   確定分岐に相乗りする(新規writerを作らない・§6却下事項)。
-    const highlightPhaseKind =
-      result.phase === PHASE.REACH ? 'phase_reach'
-      : result.phase === PHASE.BREAKTHROUGH ? 'phase_breakthrough'
-      : result.phase === PHASE.JACKPOT ? 'phase_jackpot'
-      : '';
-    if (highlightPhaseKind) appendHighlightAndPublishPopup(lid, highlightPhaseKind, now);
-  }
-
-  const skipForVenue = await popupShouldSkipVoiceForVenue();
-
-  if (result.holdLampFired && _effectSoundEnabledCache && !skipForVenue) {
-    playEffectSound('hold_lamp', buildEffectSoundDeps('hold_lamp'));
-  }
-
-  // 修正4: 突破/大当たりチェーン発火時はフェーズチップへ強調アニメ(§本体)。表示のみの反映なので
-  //   会場優先(skipForVenue=音/BGMを譲る判定)とは独立に常に反映する(視覚的なアクションが
-  //   欠けているという症状への直接の回答)。
-  if (result.changed && !result.silent && (result.phase === PHASE.BREAKTHROUGH || result.phase === PHASE.JACKPOT)) {
-    triggerPhaseMeterPulsePopup();
-  }
-
-  if (result.changed && !result.silent && !skipForVenue) {
-    if (prevPhase === PHASE.NORMAL && result.phase === PHASE.ATSUI) {
-      tryPlayVoicePopup('voice_chance');
-    } else if (result.phase === PHASE.REACH) {
-      if (_effectSoundEnabledCache) playEffectSound('reach', buildEffectSoundDeps('reach'));
-      tryPlayVoicePopup('voice_atsui');
-    } else if (result.phase === PHASE.PAYOUT && prevPhase === PHASE.JACKPOT) {
-      if (_effectSoundEnabledCache) playEffectSound('payout', buildEffectSoundDeps('payout'));
-      const feverStarted = await startFeverBgmPopup();
-      // 修正2: BGM OFF/フィーバー未開始/会場優先で譲った場合はfeverBgmShouldEndが一生来ない。
-      //   payout SE予定時刻+2秒でpayoutChainDoneを決定論的に予約する(フォールバック)。
-      if (!feverStarted) schedulePayoutFallbackPopup(now);
-    } else if (result.phase === PHASE.NORMAL && prevPhase === PHASE.PAYOUT) {
-      clearPayoutFallbackPopup();
-    }
-  }
-
-  if (!skipForVenue && r >= 6.0 && r > prevHighestR) {
-    tryPlayVoicePopup('voice_max');
-  }
-
-  if (!skipForVenue) {
-    tickReachBgmPopup(result.phase, r, now);
-    if (_feverBgmStatePopup.playing) {
-      if (events.giftMega || events.milestoneHit1000Plus) _feverBgmStatePopup = feverBgmExtend(_feverBgmStatePopup);
-      if (feverBgmShouldEnd(_feverBgmStatePopup, now)) {
-        endFeverBgmPopup();
-        _phaseStatePopup = phaseFor(_phaseStatePopup, r, { payoutChainDone: true }, now).nextState;
-        clearPayoutFallbackPopup();
-      }
-    }
-  }
-  // 修正2: BGM OFF/フィーバー未開始/会場優先で予約されたフォールバックの予定時刻に達したら
-  //   payoutChainDoneを合図する。PAYOUTを既に抜けていれば予約は無意味なのでクリアする。
-  if (_payoutFallbackAtMsPopup > 0) {
-    if (_phaseStatePopup.phase !== PHASE.PAYOUT) {
-      clearPayoutFallbackPopup();
-    } else if (now >= _payoutFallbackAtMsPopup) {
-      clearPayoutFallbackPopup();
-      _phaseStatePopup = phaseFor(_phaseStatePopup, r, { payoutChainDone: true }, now).nextState;
-      _bgmPhaseDiagCountersPopup.phase = _phaseStatePopup.phase;
-    }
-  }
-  publishBgmPhaseDiagPopup();
-  paintPhaseMeterPopup(_phaseStatePopup.phase, r);
-}
-
-// Phase C: フィーバー中の音量ダック(VOICEVOX読み上げはpopup文脈に無いため常時unduck扱い)+
-//   受動tick(イベントが無い間も減衰/降格/リーチ120秒上限/フィーバー終了判定を進める)。
-//   新規のstorage/直列readは増やさない(純粋な時間計算のみ)。
-// v0.1.1080: 拡張リロード後は id を保持して clearInterval する(20530行付近の
-//   popupPollIntervalId と同型)。これが無いと、advancePhaseDirectorPopup 経由の
-//   publishBgmPhaseDiagPopup が無効化された chrome.storage へ触り続け、
-//   タブを閉じない限り「空 tick」が永続的に走り続ける。
-let _phaseDirectorPopupTickId = /** @type {number|null} */ (
-  /** @type {unknown} */ (
-    window.setInterval(() => {
-      if (!hasExtensionContext()) {
-        if (_phaseDirectorPopupTickId != null) {
-          clearInterval(_phaseDirectorPopupTickId);
-          _phaseDirectorPopupTickId = null;
-        }
-        return;
-      }
-      if (_streamDetectedAtMsPopup > 0) void advancePhaseDirectorPopup({});
-    }, 1000)
-  )
-);
 
 /** @type {number|null} */
 let _prevEventBannerRank = null;
@@ -2668,8 +2136,6 @@ function noteCommentMilestoneHighWater(liveId, appRecordCount) {
   const next = Math.floor(appRecordCount);
   const prev = _prevMilestoneCommentHighWater;
   if (prev != null && next > prev) {
-    // Phase C(§3.2): コメント+1をメーターへ加算(delta分まとめて1回のtickで進める)。
-    void advancePhaseDirectorPopup({ addWeight: METER_WEIGHT_COMMENT_POPUP * (next - prev) });
     void maybeCelebrateFromCommentCount(lid, prev, next);
   }
   _prevMilestoneCommentHighWater = next;
@@ -2685,40 +2151,10 @@ async function maybeCelebrateFromCommentCount(liveId, prev, next) {
   if (spec) {
     _milestoneEffectDiagCounters.milestoneDetected += 1;
     _milestoneEffectDiagCounters.lastEventAt = Date.now();
-    // v0.1.1060(パチンコPhase1): 検知を演出ディレクターに通す(コンボ判定+ティア昇格の決定)。
-    //   判定は計上のみで、実際に鳴らす音の差し替えはPhase3(畳み掛け)で行う。
     try {
       const baseKind = effectSoundKindForPikaTier(pikaTierForSupportCelebration(spec));
       _milestoneComboState = directHit(_milestoneComboState, baseKind || '', Date.now());
       _milestoneEffectDiagCounters.milestoneDirected = (Number(_milestoneEffectDiagCounters.milestoneDirected) || 0) + 1;
-      // Phase B(2026-07-05): パチンコボイス(イベント直結・§3.3)。トリガはここ1箇所に集約する
-      //   (SE再生側 maybePlayMilestoneEffectSound にも置くと、コンボ昇格jackpotで突破チェーンと
-      //   大当たりチェーンが同一イベントから二重起動するため)。優先度は§4.3:
-      //   P1大当たりチェーン(節目1000+/昇格jackpot) > P3突破チェーン(節目500) > P2上乗せボイス。
-      const comboKind = String(_milestoneComboState.kind || '');
-      const isJackpotMilestone = baseKind === 'milestone_jackpot' || comboKind === 'milestone_jackpot';
-      if (isJackpotMilestone) {
-        void scheduleJackpotVoiceChainPopup();
-      } else if (baseKind === 'milestone_hard') {
-        void scheduleBreakthroughVoiceChainPopup();
-      } else if (_milestoneComboState.promotedSteps >= 1) {
-        void popupShouldSkipVoiceForVenue().then((skip) => {
-          if (skip) {
-            _voiceEffectDiagCounters.skippedVenue += 1;
-            _voiceEffectDiagCounters.lastEventAt = Date.now();
-            publishVoiceEffectDiag();
-            return;
-          }
-          tryPlayVoicePopup('voice_kamitsumi');
-        });
-      }
-      // Phase C(§3.2/§3.3): 節目到達+10をメーターへ加算し、節目500/1000+をフェーズ層へ伝える。
-      void advancePhaseDirectorPopup({
-        addWeight: METER_WEIGHT_MILESTONE_POPUP,
-        milestoneHit500: baseKind === 'milestone_hard',
-        milestoneHit1000Plus: isJackpotMilestone,
-        comboStreak: _milestoneComboState.comboCount
-      });
     } catch { /* director段の失敗は計上されない=diffで検知できる */ }
     publishMilestoneEffectDiag();
     await maybePlaySupportCelebration(liveId, spec);
@@ -4265,7 +3701,7 @@ const _scoreDiagCounters = { renderCount: 0, lastRenderedLiveId: '', ledgerRows:
  * SC2: popupスコアパネル(`<details id="broadcastScoreDetails">` open時のみ描画)。
  *   既存 renderGiftQuickStatsPanel と同型: 単キーget→liveId突合(嘘の数字を出さない)→
  *   純関数で組み立て→innerHTML代入。新規の重い集計・新規コアreadは行わない
- *   (nls_report_preview_v1・bgmPhaseDiag自身・giftEffectDiag・voiceDiagは全て既存publish値)。
+ *   (nls_report_preview_v1・giftEffectDiag・voiceDiagは全て既存publish値)。
  * @param {string} liveId
  */
 async function renderBroadcastScorePanel(liveId) {
@@ -4284,14 +3720,11 @@ async function renderBroadcastScorePanel(liveId) {
   try {
     const bag = await safeStorageLocalGet([KEY_REPORT_PREVIEW, KEY_GIFT_EFFECT_DIAG, KEY_VOICE_DIAG, KEY_HIGHLIGHT_LEDGER]);
     const ledgerRaw = bag?.[KEY_HIGHLIGHT_LEDGER];
-    // phaseStats: このpopup自身が書いているカウンタをそのまま読む(新規readゼロ)。
-    //   liveId不一致(古い配信の残骸)は buildBroadcastScorePanelViewModel 側で弾く
-    //   (v1と同傾向に縮退・computeBroadcastScoreV2の設計どおり)。
     const vm = buildBroadcastScorePanelViewModel({
       liveId: lid,
       nowMs: Date.now(),
       previewRec: bag?.[KEY_REPORT_PREVIEW],
-      phaseStats: _bgmPhaseDiagCountersPopup,
+      phaseStats: null,
       giftDiag: bag?.[KEY_GIFT_EFFECT_DIAG],
       voiceDiag: bag?.[KEY_VOICE_DIAG],
       ledger: ledgerRaw && typeof ledgerRaw === 'object' ? ledgerRaw : null
@@ -4370,7 +3803,7 @@ async function buildScoreAnnounceInputs(liveId) {
     liveId: lid,
     nowMs: Date.now(),
     previewRec: bag?.[KEY_REPORT_PREVIEW],
-    phaseStats: _bgmPhaseDiagCountersPopup,
+    phaseStats: null,
     giftDiag: bag?.[KEY_GIFT_EFFECT_DIAG],
     voiceDiag: bag?.[KEY_VOICE_DIAG],
     ledger: ledgerRaw && typeof ledgerRaw === 'object' ? ledgerRaw : null
@@ -9306,25 +8739,6 @@ function initCustomSoundRuntimeOnce() {
   }
 }
 
-// Phase C(2026-07-05): BGM設定(トグル/音量)を別ページ(status.html)で変えても、開きっぱなしの
-//   popupに反映されるようにする(effectSoundEnabledには同種の即時反映が無いが、BGMは常時鳴る
-//   ループのため反映漏れが体感に直結しやすい・opt-in設計の安全側)。
-if (typeof chrome !== 'undefined' && chrome.storage?.onChanged?.addListener) {
-  chrome.storage.onChanged.addListener((changes, area) => {
-    if (area !== 'local') return;
-    if (changes[KEY_BGM_ENABLED]) {
-      _bgmEnabledCachePopup = isBgmEnabled(changes[KEY_BGM_ENABLED].newValue);
-      const el = /** @type {HTMLInputElement|null} */ ($('bgmEnabledToggle'));
-      if (el) el.checked = _bgmEnabledCachePopup;
-    }
-    if (changes[KEY_BGM_VOLUME_REACH] && Number.isFinite(Number(changes[KEY_BGM_VOLUME_REACH].newValue))) {
-      _bgmVolumeReachCache = clampBgmVolume(Number(changes[KEY_BGM_VOLUME_REACH].newValue));
-    }
-    if (changes[KEY_BGM_VOLUME_FEVER] && Number.isFinite(Number(changes[KEY_BGM_VOLUME_FEVER].newValue))) {
-      _bgmVolumeFeverCache = clampBgmVolume(Number(changes[KEY_BGM_VOLUME_FEVER].newValue));
-    }
-  });
-}
 /**
  * playEffectSound呼び出し共通のdeps組み立て(カスタム優先マージ+決定論順繰りrng+gain反映)。
  *   venueBar.js の buildEffectSoundDeps と同じ形(挙動を揃える)。
@@ -15266,20 +14680,6 @@ async function refresh() {
     opSoundEnabledEl.disabled = false;
   }
 
-  // Phase C(2026-07-05): パチンコBGM ON/OFF(既定OFF)。
-  _bgmEnabledCachePopup = isBgmEnabled(openBag[KEY_BGM_ENABLED]);
-  const bgmEnabledEl = /** @type {HTMLInputElement|null} */ ($('bgmEnabledToggle'));
-  if (bgmEnabledEl) {
-    bgmEnabledEl.checked = _bgmEnabledCachePopup;
-    bgmEnabledEl.disabled = false;
-  }
-  if (Number.isFinite(Number(openBag[KEY_BGM_VOLUME_REACH]))) {
-    _bgmVolumeReachCache = clampBgmVolume(Number(openBag[KEY_BGM_VOLUME_REACH]));
-  }
-  if (Number.isFinite(Number(openBag[KEY_BGM_VOLUME_FEVER]))) {
-    _bgmVolumeFeverCache = clampBgmVolume(Number(openBag[KEY_BGM_VOLUME_FEVER]));
-  }
-
   // 視聴ページでインラインパネルを自動表示するかどうか。
   // 既定 true（従来動作）。OFF にするとツールバーアイコンを押すまで出てこない。
   const inlinePanelAutoshowEl = /** @type {HTMLInputElement|null} */ (
@@ -20190,19 +19590,6 @@ async function initPopup() {
       const ok = await storageSetSafe({ [KEY_OP_SOUND_ENABLED]: opSoundEnabledToggle.checked });
       if (!ok) return;
       _opSoundEnabledCache = opSoundEnabledToggle.checked;
-    } catch {
-      //
-    }
-  });
-
-  // Phase C(2026-07-05・council/pachinko-ultimate-SYNTHESIS.md §5.1): パチンコBGM(既定OFF)。
-  const bgmEnabledToggle = /** @type {HTMLInputElement|null} */ ($('bgmEnabledToggle'));
-  if (bgmEnabledToggle) bgmEnabledToggle.checked = _bgmEnabledCachePopup;
-  bgmEnabledToggle?.addEventListener('change', async () => {
-    try {
-      const ok = await storageSetSafe({ [KEY_BGM_ENABLED]: bgmEnabledToggle.checked });
-      if (!ok) return;
-      _bgmEnabledCachePopup = bgmEnabledToggle.checked;
     } catch {
       //
     }

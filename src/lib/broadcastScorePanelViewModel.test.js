@@ -69,7 +69,7 @@ describe('buildBroadcastScorePanelViewModel', () => {
     const ledger = {
       liveId: 'lv1',
       rows: [
-        { at: 1, kind: 'phase_jackpot', label: '大当たり到達' },
+        { at: 1, kind: 'milestone_jackpot', label: '節目到達' },
         { at: 2, kind: 'gift_large', label: 'ギフト大波(large)' }
       ]
     };
@@ -78,7 +78,7 @@ describe('buildBroadcastScorePanelViewModel', () => {
   });
 
   it('ledgerがliveId不一致なら空配列(古い配信のハイライトを持ち越さない)', () => {
-    const ledger = { liveId: 'other', rows: [{ at: 1, kind: 'phase_jackpot', label: 'x' }] };
+    const ledger = { liveId: 'other', rows: [{ at: 1, kind: 'milestone_jackpot', label: 'x' }] };
     const vm = buildBroadcastScorePanelViewModel({ liveId: 'lv1', nowMs: NOW, previewRec: freshPreview, ledger });
     expect(vm.highlights).toEqual([]);
   });

@@ -811,5 +811,19 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
     version: '0.1.1531', metric: 'cross-checked-claims', value: 51,
     source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
     note: '直近30日窓のスライドによる自然増減'
+  }),
+  Object.freeze({
+    version: '0.1.1532', metric: 'bundle-kb', value: 1361,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: 'パチンコ演出削除で減少（1392→1361・約31KB減）。死んだコード除去の効果'
+  }),
+  Object.freeze({
+    version: '0.1.1532', metric: 'gate-selftest', value: 4,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1532', metric: 'cross-checked-claims', value: 51,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: '直近30日窓のスライドによる自然増減'
   })
 ]);

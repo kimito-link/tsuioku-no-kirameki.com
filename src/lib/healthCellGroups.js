@@ -193,7 +193,7 @@ export const HEALTH_CELL_GROUPS = Object.freeze([
     cellIds: Object.freeze([
       'gift-effect', 'milestone-effect', 'arrival-effect',
       'custom-sound-db', 'gift-sound-fail', 'effect-throttle',
-      'op-sound', 'bgm-phase'
+      'op-sound'
     ])
   }),
   Object.freeze({

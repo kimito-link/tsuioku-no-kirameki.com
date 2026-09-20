@@ -16,8 +16,6 @@ import { KEY_PREVIEW_RENDER_ACK } from './previewRenderAckKey.js';
 import { KEY_BACKFILL_LIVE_METRIC } from './storageKeys.js';
 import { KEY_GIFT_EFFECT_DIAG } from './giftEffectDiagKey.js';
 import { KEY_MILESTONE_EFFECT_DIAG } from './milestoneEffectDiagKey.js';
-import { KEY_VOICE_EFFECT_DIAG } from './voiceEffectDiagKey.js';
-import { KEY_BGM_PHASE_DIAG } from './bgmPhaseDiagKey.js';
 import { KEY_OP_SOUND_EFFECT_DIAG } from './opSoundEffectDiagKey.js';
 import { KEY_COMMENT_POST_DIAG } from './commentPostDiagKey.js';
 import { KEY_INSTANT_PUSH_DIAG } from './instantPushDiagKey.js';
@@ -33,7 +31,7 @@ describe('EXTRAS_BATCH_KEYS', () => {
   //   第2号(③WEB投げ一覧丸写し)の giftHistoryMirror + 第4号(③WEB室温丸写し)の roomHeatMirror +
   //   第5号(③WEB記録サマリ推移丸写し)の sessionSummaryMirror で実際は24キー。
   //   「漏れなく統合したか」を人力の数え間違いに頼らず固定するため、実装済みの全キーを列挙して突合する。
-  it('26キーすべてを含む(commentPostDiag / instantPushDiag / channelSwitchDiag / highlightLedger / scoreAnnounceDiag / 第2号 giftHistoryMirror / 第4号 roomHeatMirror / 第5号 sessionSummaryMirror も含む)', () => {
+  it('24キーすべてを含む(commentPostDiag / instantPushDiag / channelSwitchDiag / highlightLedger / scoreAnnounceDiag / 第2号 giftHistoryMirror / 第4号 roomHeatMirror / 第5号 sessionSummaryMirror も含む)', () => {
     const expectedKeys = [
       KEY_VOICE_DIAG,
       KEY_VENUE_SEATS_DIAG,
@@ -51,8 +49,6 @@ describe('EXTRAS_BATCH_KEYS', () => {
       KEY_BACKFILL_LIVE_METRIC,
       KEY_GIFT_EFFECT_DIAG,
       KEY_MILESTONE_EFFECT_DIAG,
-      KEY_VOICE_EFFECT_DIAG,
-      KEY_BGM_PHASE_DIAG,
       KEY_OP_SOUND_EFFECT_DIAG,
       KEY_COMMENT_POST_DIAG,
       KEY_INSTANT_PUSH_DIAG,
@@ -70,8 +66,8 @@ describe('EXTRAS_BATCH_KEYS', () => {
        */
       KEY_PANEL_WAKE_CURTAIN_DIAG
     ];
-    expect(expectedKeys).toHaveLength(26);
-    expect(EXTRAS_BATCH_KEYS).toHaveLength(26);
+    expect(expectedKeys).toHaveLength(24);
+    expect(EXTRAS_BATCH_KEYS).toHaveLength(24);
     expect(EXTRAS_BATCH_KEYS).toEqual(expect.arrayContaining(expectedKeys));
   });
 
@@ -101,8 +97,6 @@ describe('pickExtrasBatchValues', () => {
       [KEY_BACKFILL_LIVE_METRIC]: { j: 11 },
       [KEY_GIFT_EFFECT_DIAG]: { k: 12 },
       [KEY_MILESTONE_EFFECT_DIAG]: { l: 13 },
-      [KEY_VOICE_EFFECT_DIAG]: { m: 14 },
-      [KEY_BGM_PHASE_DIAG]: { n: 15 },
       [KEY_OP_SOUND_EFFECT_DIAG]: { o: 16 },
       [KEY_COMMENT_POST_DIAG]: { p: 17 },
       [KEY_INSTANT_PUSH_DIAG]: { q: 18 },
@@ -127,8 +121,6 @@ describe('pickExtrasBatchValues', () => {
     expect(picked.backfillLiveMetric).toEqual({ j: 11 });
     expect(picked.giftEffectDiag).toEqual({ k: 12 });
     expect(picked.milestoneEffectDiag).toEqual({ l: 13 });
-    expect(picked.voiceEffectDiag).toEqual({ m: 14 });
-    expect(picked.bgmPhaseDiag).toEqual({ n: 15 });
     expect(picked.opSoundEffectDiag).toEqual({ o: 16 });
     expect(picked.commentPostDiag).toEqual({ p: 17 });
     expect(picked.instantPushDiag).toEqual({ q: 18 });
@@ -155,8 +147,6 @@ describe('pickExtrasBatchValues', () => {
     expect(picked.backfillLiveMetric).toBeNull();
     expect(picked.giftEffectDiag).toBeNull();
     expect(picked.milestoneEffectDiag).toBeNull();
-    expect(picked.voiceEffectDiag).toBeNull();
-    expect(picked.bgmPhaseDiag).toBeNull();
     expect(picked.opSoundEffectDiag).toBeNull();
     expect(picked.commentPostDiag).toBeNull();
     expect(picked.instantPushDiag).toBeNull();
