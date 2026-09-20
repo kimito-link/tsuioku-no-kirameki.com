@@ -67,6 +67,9 @@ const steps = [
   //   dist は git 追跡下=push すると公開リポジトリで誰でも読める。実際に
   //   /api/status の書き込み認証キーが GitHub 上に出ていた事故があった。
   ['no-secrets', 'check:no-secrets'],
+  // ★v0.1.1529: Chrome がこの拡張を同期フォルダ配下から読み込んでいたら赤(リロード固着の再発防止)。
+  //   実機(Chromeプロファイルが在る環境)では【門】=止める。CI 等プロファイルが無い環境は skip(合格ではない)。
+  ['chrome-load-path', 'check:chrome-load-path'],
   ['tracked-imports', 'check:tracked-imports'],
   // ★v0.1.1508: CLAUDE.md 1行目の `@AGENTS.md` import が生きているか(AGENTS.md が context に入る入口)。
   //   CLAUDE.md が「この検査が赤くする」と書きながら検査が存在しなかった(check-doc-rot が検出)。
