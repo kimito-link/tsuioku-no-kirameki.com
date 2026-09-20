@@ -3323,6 +3323,7 @@ function ensurePageFrameStyle() {
          popup.html のダークローディング幕(.nl-init-shade)と同じグラデを host に敷き、
          読み込み中は黒ではなく「ローディング中のパネル」に見せる。中身が描画されると
          popup の不透明な背景が前面に来るので、この下地は隠れる（継ぎ目なし）。 */
+      background-color: #fffaf2; /* ★v0.1.1531: 透明iframe越しにニコ生の黒が透ける対策(watch開いた瞬間の黒) */
       background: linear-gradient(180deg, #fffaf2, #eef9f3);
       border-radius: 12px;
     }
