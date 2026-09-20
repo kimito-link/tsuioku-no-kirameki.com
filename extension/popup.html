@@ -126,6 +126,7 @@
         justify-content: center;
         flex-direction: column;
         gap: 12px;
+        background-color: var(--nl-bg, #fffaf2);
         background: linear-gradient(180deg, var(--nl-bg, #f6fff8), var(--nl-bg-soft, #eef9f3));
         transition: opacity 220ms ease-out;
         will-change: opacity;
@@ -339,6 +340,8 @@
         height: var(--nl-pop-height);
         min-height: 0;
         max-height: 960px;
+        /* v0.1.1530: 不透明の地色を必ず敷く(gradientだけだと描画前/シェード撤去直後に下地の黒が透ける=panelCover bad)。見た目は不変。 */
+        background-color: var(--nl-bg, #fffaf2);
         background: linear-gradient(160deg, var(--nl-bg), var(--nl-bg-soft));
         color: var(--nl-text);
         font-size: var(--nl-base-font);
