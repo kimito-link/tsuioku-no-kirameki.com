@@ -43,6 +43,10 @@ def build_submission_manifest(dev_manifest: dict, version: str) -> dict:
     """extension/manifest.json から提出用 manifest を派生させる。"""
     m = json.loads(json.dumps(dev_manifest))
     m['version'] = version
+    # key: 開発版 manifest には拡張ID固定用の公開鍵(key)を入れているが、
+    #   提出版に残すと CWS 側の署名IDと食い違う。ストアが署名でIDを決めるので提出物に key は不要。
+    #   (v0.1.1529: 開発版のリロード固着根治で key を導入した際の対策・下の verify_no_secrets が二重に検査)
+    m.pop('key', None)
     # description: 開発識別子サフィックスを落とす（CWS 掲載名は短い方で統一）
     m['description'] = 'ニコニコ生放送の応援コメントをこのPCに記録し、応援の可視化につなげます。'
     # hosts: dev サーバ(localhost/127.0.0.1:3456)は外す。
@@ -430,6 +434,16 @@ def verify_no_secrets(zf: zipfile.ZipFile, names: set) -> None:
             '公開キーが提出物に焼き込まれています。NL_STORE_BUILD=1 でビルドし直してください: '
             + '; '.join(leaked)
         )
+    # ★v0.1.1529: manifest の "key"(開発版ID固定用の公開鍵)が提出物に残っていないか確認する。
+    #   ストアが署名でIDを決めるので提出物に key は不要。build_submission_manifest が
+    #   m.pop('key') で落とすが、そのミスを提出前に必ず止める二重ゲート(fail-closed)。
+    if 'manifest.json' in names:
+        submitted_manifest = json.loads(zf.read('manifest.json').decode('utf-8'))
+        if 'key' in submitted_manifest:
+            raise RuntimeError(
+                '提出用 manifest.json に "key"(開発版ID固定用の公開鍵)が残っています。'
+                'build_submission_manifest の m.pop("key") を確認してください。'
+            )
 
 
 def _validate_version_arg(version: str) -> None:

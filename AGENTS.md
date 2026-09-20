@@ -20,7 +20,9 @@ Cursor / Claude Code / その他エージェントが共通で参照する前提
 
 ## 2. Chrome Web Store ステータス
 
-- **拡張 ID**: `cjbabignmmodaickpeckiojjabnlogdb`
+- **拡張 ID（公開版/CWS）**: `cjbabignmmodaickpeckiojjabnlogdb`
+- **拡張 ID（開発版/unpacked・恒久固定）**: `ohifblceplfkfajfecaoaclmkiahfflm`
+  （v0.1.1529 で manifest に `key` を追加して固定。以前はフォルダパス由来で不安定（旧 `edpellgokebgpjboflekdmmlnjgajnfn`）＝リロード固着の一因だった。`key` の公開鍵は秘密でないので git 管理。CRX秘密鍵 `dev-extension.pem` は gitignore 済＝コミットしない。提出版には `stage-submission.py` が `key` を落とす。`scripts/check-chrome-load-path.mjs` がこの恒久IDを参照する）
 - **公開中**: **0.1.7**（2026-04-23 提出 / 2026-04-29 公開）
 - **直近提出**: **0.1.102**（2026-05-01 23 時台 / 自動公開 ON / 審査結果は要確認）
 - **次回提出準備済**: **0.1.663**（2026-06-08 ZIP 生成済: `build/tsuioku-no-kirameki-0.1.663.zip` / localhost・開発識別子 除去済 / 説明文・権限理由 反映済 / ダッシュボード貼り付け＋提出はユーザー手動）

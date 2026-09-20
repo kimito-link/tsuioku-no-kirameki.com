@@ -117,9 +117,10 @@
   - `src/lib/monotonicCommentCount.js`
 - **storage キー定義** — chrome.storage のキー名の正本(nls_comments_<lv> 等)
   - `src/lib/storageKeys.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 52</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 53</summary>
 
 - `scripts/dump-panel-state.mjs` — 実機の chrome.storage.local を吸い出して
+- `scripts/migrate-ext-storage.mjs` — 拡張の記録データを「旧ID配下フォルダ」→「新ID配下フォルダ」へコピーする(一度だけ・v0.1.1529)。
 - `scripts/record-improvement.mjs` — ★実測値を台帳に書き足す【1本の口】。
 - `src/lib/autoBackupState.js` — v0.1.808(星野ロミ式コンポーネント化・第1弾): content-entry.js の巨大化を抑えるため、
 - `src/lib/avCue.js` — 「AVCue = 音の再生結果を真実とする単一発火点」の純関数群(V1・DOM/storage/音に触れない)。
@@ -840,7 +841,7 @@
   - `tools/og-live-compose.py`
   - `.github/workflows/live-ranking.yml`
   - `vercel.json`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 209</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 210</summary>
 
 - `app/app.js` — スマホ閲覧用 status Web 版。
 - `app/live-view.js` — global NL_BUILD_ID
@@ -852,6 +853,7 @@
 - `scripts/build.mjs` — .env を読み込む(status の共有キー NL_STATUS_INGEST_KEY / NL_STATUS_VIEW_TOKEN は .env から注入)。
 - `scripts/capture-store-screenshots.mjs` — Chrome ウェブストア用スクショ自動撮影
 - `scripts/check-agent-bootstrap.mjs` — CLAUDE.md の1行目が `@AGENTS.md` の import であることを機械で守る。
+- `scripts/check-chrome-load-path.mjs` — Chrome が拡張を「同期フォルダ配下から」読み込んでいないか検査する(リロード固着の再発防止・v0.1.1529)。
 - `scripts/check-improvement.mjs` — ★版ごとの実測値が【退化】していないか見張る。
 - `scripts/check-layer.mjs` — ★`src/lib` が「純粋ロジックの箱」であり続けることを機械で守る。
 - `scripts/check-no-secrets-in-dist.mjs` — ビルド成果物に秘密情報が焼き込まれていないか検査する(fail-closed)。
@@ -1087,14 +1089,11 @@
 - `v0.1.1527` 2026-09-18 — パネルを開いた直後の表示を速く
 - `v0.1.1515` 2026-09-15 — 応援レーンのタイルから発言一覧を開けるように
 
-### 🩺 診断・状態速報 (1版)
-- `v0.1.1509` 2026-09-14 — サイドパネルが固まる・黒いままの真因を直しました
-
-### ⚡ 描画・性能 (2版)
+### ⚡ 描画・性能 (1版)
 - `v0.1.1527` 2026-09-18 — パネルを開いた直後の表示を速く
-- `v0.1.1509` 2026-09-14 — サイドパネルが固まる・黒いままの真因を直しました
 
-### その他 (10版)
+### その他 (11版)
+- `v0.1.1529` 2026-09-20 — 拡張の識別子を固定し反映を安定化
 - `v0.1.1526` 2026-09-18 — 内部整理(表示や動作は変わりません)
 - `v0.1.1525` 2026-09-18 — 内部整理(表示や動作は変わりません)
 - `v0.1.1524` 2026-09-18 — 内部整理(表示や動作は変わりません)

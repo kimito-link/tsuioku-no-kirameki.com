@@ -1,6 +1,6 @@
 {
   "name": "nicolivelog",
-  "version": "0.1.1528",
+  "version": "0.1.1529",
   "private": true,
   "description": "ニコ生コメント記録プロトタイプ（拡張）",
   "type": "module",
@@ -18,6 +18,8 @@
     "check:root-cause-claim": "node scripts/check-root-cause-claim.mjs --last",
     "check:no-secrets": "node scripts/check-no-secrets-in-dist.mjs",
     "check:no-secrets:selftest": "node scripts/check-no-secrets-in-dist.mjs --selftest",
+    "check:chrome-load-path": "node scripts/check-chrome-load-path.mjs",
+    "check:chrome-load-path:selftest": "node scripts/check-chrome-load-path.mjs --selftest",
     "check:tracked-imports": "node scripts/check-tracked-imports.mjs",
     "check:tracked-imports:selftest": "node scripts/check-tracked-imports.mjs --selftest",
     "check:agent-bootstrap": "node scripts/check-agent-bootstrap.mjs",

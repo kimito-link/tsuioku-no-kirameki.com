@@ -13,6 +13,11 @@
  *   【そのコピー先】をロードさせる。コピー先は同期されないのでリロードが固着しない。
  *   更新したいときは `npm run copy:ext` → Chrome で更新ボタン、の2手順。
  *
+ * ★v0.1.1529(atomic swap 化): 以前は robocopy /MIR で「宛先を完全ミラー」していたが、/MIR は
+ *   宛先の余分ファイルを削除するため【Chrome が読んでいる最中に一瞬ファイルが消える】瞬間があり、
+ *   それ自体が固着を誘発し得た。今は「staging(<dest>.staging)へ全コピー → 本名を .old へ退避 →
+ *   staging を本名へ rename」の atomic swap にする。Chrome が読む本名フォルダは常に完全な状態を保つ。
+ *
  * 使い方:
  *   npm run copy:ext               # 既定 C:\nicolive-ext へコピー
  *   NL_EXT_DEST=D:\myext npm run copy:ext   # コピー先を変えたいとき
@@ -73,29 +78,48 @@ async function main() {
   }
   warnIfSynced(destDir);
 
-  // コピー(robocopy /MIR)で上書きされる前に、コピー先(旧)の BUILD_ID を読んでおく。
+  // コピーで置き換えられる前に、コピー先(旧)の BUILD_ID を読んでおく。
   const oldBuildId = readBuildIdFromDir(destDir);
 
-  // Windows は robocopy で丸ごとミラー(/MIR=コピー先を完全同期・消し残し無し)。
-  //   Node の fs.cpSync は Windows で大きめツリーをコピーすると native crash(0xC0000409)する個体が
-  //   あるため(2026-06-22 実機で確認)、堅牢な robocopy を使う。robocopy の終了コードは 0-7 が成功。
+  // ★atomic swap: Chrome が読む本名フォルダ(destDir)を一瞬も壊さないために、
+  //   1) staging(destDir.staging)へ全コピー → 2) 本名を .old へ退避 → 3) staging を本名へ rename。
+  //   rename は同一ボリューム内なら原子的。Chrome から見て destDir は「古い完全版」か「新しい完全版」の
+  //   どちらかであり、「中身が消えかけた不完全版」を読む瞬間が無い。
+  const stagingDir = `${destDir}.staging`;
+  const oldDir = `${destDir}.old`;
   if (process.platform === 'win32') {
+    const { rmSync, existsSync: exists, renameSync } = await import('node:fs');
+    // 前回の中断残骸を掃除。
+    if (exists(stagingDir)) rmSync(stagingDir, { recursive: true, force: true });
+    if (exists(oldDir)) rmSync(oldDir, { recursive: true, force: true });
+    // 1) srcDir → stagingDir を robocopy /MIR でミラー(staging は Chrome が読んでいないので /MIR 安全)。
+    //   Node の fs.cpSync は Windows で大きめツリーをコピーすると native crash(0xC0000409)する個体が
+    //   あるため(2026-06-22 実機で確認)、堅牢な robocopy を使う。終了コードは 0-7 が成功。
     const r = spawnSync(
       'robocopy',
-      [srcDir, destDir, '/MIR', '/NFL', '/NDL', '/NJH', '/NJS', '/NP', '/R:1', '/W:1'],
+      [srcDir, stagingDir, '/MIR', '/NFL', '/NDL', '/NJH', '/NJS', '/NP', '/R:1', '/W:1'],
       { stdio: 'ignore', windowsHide: true }
     );
     const code = typeof r.status === 'number' ? r.status : 16;
     if (code >= 8) {
-      console.error(`robocopy が失敗しました(exit=${code})。コピー先の権限/パスを確認してください: ${destDir}`);
+      console.error(`robocopy が失敗しました(exit=${code})。コピー先の権限/パスを確認してください: ${stagingDir}`);
       process.exit(1);
     }
+    // 2)+3) 本名を .old へ退避 → staging を本名へ(rename は原子的)。初回は本名が無いので退避を飛ばす。
+    if (exists(destDir)) renameSync(destDir, oldDir);
+    renameSync(stagingDir, destDir);
+    // 退避した旧版を後片付け(Chrome はもう新本名を読むので旧は不要)。
+    if (exists(oldDir)) rmSync(oldDir, { recursive: true, force: true });
   } else {
-    // 非 Windows(将来用): Node の cpSync を使う。
-    const { cpSync, rmSync, mkdirSync } = await import('node:fs');
-    if (existsSync(destDir)) rmSync(destDir, { recursive: true, force: true });
-    mkdirSync(destDir, { recursive: true });
-    cpSync(srcDir, destDir, { recursive: true });
+    // 非 Windows(将来用): Node の cpSync で staging を作ってから rename。
+    const { cpSync, rmSync, mkdirSync, existsSync: exists, renameSync } = await import('node:fs');
+    if (exists(stagingDir)) rmSync(stagingDir, { recursive: true, force: true });
+    if (exists(oldDir)) rmSync(oldDir, { recursive: true, force: true });
+    mkdirSync(stagingDir, { recursive: true });
+    cpSync(srcDir, stagingDir, { recursive: true });
+    if (exists(destDir)) renameSync(destDir, oldDir);
+    renameSync(stagingDir, destDir);
+    if (exists(oldDir)) rmSync(oldDir, { recursive: true, force: true });
   }
 
   let version = '?';

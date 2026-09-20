@@ -764,5 +764,24 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
     version: '0.1.1528', metric: 'panel-block-ms', value: 405,
     source: '実機の状態速報「サイドパネル自己診断・最大タイマー遅延」 2026-09-18 05:19 (lv351411586・来場1,838・記録78件)',
     note: '★逆輸入 Step1(mirror先行起動)の実機実測。同じ速報で「更新所要(計器) 5,167ms→98ms(-98%)」「描画完了まで 2,095ms→23ms(-99%)」「中身が見えなかった合計=801ms(主因=初回シェード)」を観測=cold boot で mirror が重い await の後ろに並んでいた構造(会議で特定)を先行起動で解消できた。★過去最良 106ms@1454 とは【測定対象が違う】: 当時=バンドル分割直後の同条件計測 / 今回=逆輸入後の実配信で「中身が見えなかった合計801ms」の内の最大タイマー遅延405ms。数字を単純比較しない(archive の panel-block-ms 群と同じ注意)。★残る801msの主因は初回シェード=Step3(重いrefreshをidle後回し)で更に短縮の余地あり(未着手)'
+  }),
+  Object.freeze({
+    version: '0.1.1529', metric: 'bundle-kb', value: 1394,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    // 過去最良 1360(@0.1.1454)より 34KB 大きいが、これは 1454→1529 の75版ぶんの機能追加が積もった
+    // 結果で、本版(リロード固着の恒久根治)の変更が増やしたものではない。本版が触ったのは
+    // manifest の key(バンドルに入らない)・ビルド配置・検査スクリプトのみで popup.js のコードは不変。
+    note: 'key追加はmanifest側でバンドル非関与。34KB超過は前版までの累積(本版の変更由来ではない)'
+  }),
+  Object.freeze({
+    version: '0.1.1529', metric: 'gate-selftest', value: 4,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1529', metric: 'cross-checked-claims', value: 51,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    // 過去最良 54(@0.1.1507)より 3 少ないが、これは「直近30日のコミット本文」を数える窓が
+    // スライドしただけ(古いコミットが窓から外れた)で、検証の質が落ちたわけではない。悪化ではない。
+    note: '直近30日窓のスライドによる自然な増減。検証の質の低下ではない'
   })
 ]);
