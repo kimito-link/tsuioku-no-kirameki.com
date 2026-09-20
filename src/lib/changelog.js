@@ -18,6 +18,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1532',
+    date: '2026-09-21',
+    summary: 'パチンコ風の点滅演出を削除しました',
+    items: Object.freeze([
+      'リーチ/フィーバーのパチンコ風の点滅・BGM・ボイス演出を削除しました。画面がすっきりし、動作も軽くなります。ギフト・広告の効果音や読み上げは従来どおりです(内部整理を含む)。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1531',
     date: '2026-09-21',
     summary: 'パネルを開く瞬間の黒帯を修正',
@@ -172,14 +180,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     items: Object.freeze([
       '追憶のきらめき ランキング(/live/)のコメント集計が、前回数えた続きだけを読むようになりました。長い配信でも「直近ぶん」で止まりにくくなり、古い側も順次さかのぼります。',
       '同じ順位表に同じ『匿名NNN』が 2 人出たときだけ、区別のための短い記号を添えます。'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.1512',
-    date: '2026-09-14',
-    summary: 'ランキングの3列目が狭い画面ではみ出す不具合を修正',
-    items: Object.freeze([
-      '追憶のきらめき ランキング(/live/)で、画面幅が 720〜900px のとき「コメントで応援した人」の列が右にはみ出していたのを直しました。3 列が同じ幅で収まり、長い名前は「…」で省略されます。'
     ])
   })
 ]);

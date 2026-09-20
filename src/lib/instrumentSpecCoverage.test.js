@@ -32,7 +32,8 @@ import { DIAGNOSIS_REGISTRY } from './diagnosisRegistry.js';
  * ★実測値: registry 104件 − 宣言済み7件 = **97**(2026-08-20)。
  * ★v0.1.1463: セルを3つ足し(auto-section/dom-tree/panel-cover)、
  *   ★3つとも instrumentSpec.js に宣言したので **未記入は97のまま**。
- *   registry 総数だけ 104→107 に増える。
+ *   registry 総数だけ 104→107 に増えた。その後、削除した診断セルを反映して
+ *   現在の registry 総数は 106。
  *   ★推測で 96 と書いて赤にした＝**数は必ず実測から書く**。
  * ★減らしたらこの定数も下げること(ラチェット)。
  */
@@ -88,6 +89,6 @@ describe('★計器台帳のカバレッジ(未記入の数を固定する)', ()
     expect(
       registryIds.length,
       'registry のセル数が変わりました。instrumentSpec.js に宣言を足し、この数を更新してください。'
-    ).toBe(107);
+    ).toBe(106);
   });
 });

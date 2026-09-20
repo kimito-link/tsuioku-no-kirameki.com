@@ -8,23 +8,23 @@ import {
   buildPresetNoIndex
 } from './customSoundPreset.js';
 
-// council/operation-sound-SYNTHESIS.md §5.1: op_* キー(Phase D1操作音)は既存85本の同一No.を
+// council/operation-sound-SYNTHESIS.md §5.1: op_* キー(Phase D1操作音)は既存素材の同一No.を
 //   複数キーから「意図的に」参照する(重複購入ゼロにするための設計)。よって id/No. の重複禁止は
-//   op_* を除いた元の85本表の中でのみ検証する(op_*での再参照は仕様どおりで異常ではない)。
-// SC3(council/broadcast-scoring-SYNTHESIS.md §4)の score_* キーは元の85本表とは別枠の
-//   追加DL分(D2)なので、op_* と同様に「元の85本表」からは除外して検証する
+//   op_* を除いた元の表の中でのみ検証する(op_*での再参照は仕様どおりで異常ではない)。
+// SC3(council/broadcast-scoring-SYNTHESIS.md §4)の score_* キーは元の表とは別枠の
+//   追加DL分(D2)なので、op_* と同様に「元の表」からは除外して検証する
 //   (v0.1.1079の d1DownloadedNos 方式を踏襲・別枠として許容リストで裏取りする)。
-const ORIGINAL_85_KEYS = Object.keys(CUSTOM_SOUND_PRESET).filter(
+const ORIGINAL_BASE_KEYS = Object.keys(CUSTOM_SOUND_PRESET).filter(
   (k) => !k.startsWith('op_') && !k.startsWith('score_')
 );
 
-describe('CUSTOM_SOUND_PRESET(85素材の完全割り当て表)', () => {
-  it('元の85素材が割り当て済み(SE52+ボイス22+BGM11の検算・op_*を除く)', () => {
-    const original85Count = ORIGINAL_85_KEYS.reduce(
+describe('CUSTOM_SOUND_PRESET(基本音種の割り当て表)', () => {
+  it('基本35素材が割り当て済み(op_*を除く)', () => {
+    const originalBaseCount = ORIGINAL_BASE_KEYS.reduce(
       (sum, key) => sum + CUSTOM_SOUND_PRESET[key].length,
       0
     );
-    expect(original85Count).toBe(85);
+    expect(originalBaseCount).toBe(35);
   });
 
   it('op_*・score_* を含む全キーの延べアセット数はcountPresetAssetsと一致する(op_*は既存Noの再参照ぶん、score_*はSC3追加DL6本ぶんを加算)', () => {
@@ -32,37 +32,37 @@ describe('CUSTOM_SOUND_PRESET(85素材の完全割り当て表)', () => {
     const opCount = opKeys.reduce((sum, key) => sum + CUSTOM_SOUND_PRESET[key].length, 0);
     const scoreKeys = Object.keys(CUSTOM_SOUND_PRESET).filter((k) => k.startsWith('score_'));
     const scoreCount = scoreKeys.reduce((sum, key) => sum + CUSTOM_SOUND_PRESET[key].length, 0);
-    const original85Count = ORIGINAL_85_KEYS.reduce(
+    const originalBaseCount = ORIGINAL_BASE_KEYS.reduce(
       (sum, key) => sum + CUSTOM_SOUND_PRESET[key].length,
       0
     );
-    expect(countPresetAssets()).toBe(original85Count + opCount + scoreCount);
+    expect(countPresetAssets()).toBe(originalBaseCount + opCount + scoreCount);
   });
 
-  it('id が重複しない(op_*を除く元の85本表の中で)', () => {
+  it('id が重複しない(op_*を除く基本音種の中で)', () => {
     const ids = [];
-    for (const key of ORIGINAL_85_KEYS) {
+    for (const key of ORIGINAL_BASE_KEYS) {
       for (const asset of CUSTOM_SOUND_PRESET[key]) ids.push(asset.id);
     }
     expect(new Set(ids).size).toBe(ids.length);
   });
 
-  it('No. も重複しない(op_*を除く元の85本表の中で)', () => {
+  it('No. も重複しない(op_*を除く基本音種の中で)', () => {
     const nos = [];
-    for (const key of ORIGINAL_85_KEYS) {
+    for (const key of ORIGINAL_BASE_KEYS) {
       for (const asset of CUSTOM_SOUND_PRESET[key]) nos.push(asset.no);
     }
     expect(new Set(nos).size).toBe(nos.length);
   });
 
-  it('op_* キーのNo.は元の85本表への流用か、D1追加DL済み5本のどちらかに限られる(裏取り)', () => {
+  it('op_* キーのNo.は基本音種への流用か、操作音用の追加素材に限られる(裏取り)', () => {
     const originalNos = new Set();
-    for (const key of ORIGINAL_85_KEYS) {
+    for (const key of ORIGINAL_BASE_KEYS) {
       for (const asset of CUSTOM_SOUND_PRESET[key]) originalNos.add(asset.no);
     }
-    // v0.1.1079: D1実装時に Audiostock 定額で追加DLされた操作音5本(計90本)。
+    // v0.1.1079: D1実装時に Audiostock 定額で追加DLされた操作音5本。
     //   D1でプリセット配線が漏れて無音だったのを修正した際にここへ登録。
-    const d1DownloadedNos = new Set([861221, 1652750, 1260384, 258054, 108443]);
+    const d1DownloadedNos = new Set([861221, 1652750, 1260384, 258054, 108443, 141839, 224302, 371385, 476302, 970774]);
     const opKeys = Object.keys(CUSTOM_SOUND_PRESET).filter((k) => k.startsWith('op_'));
     for (const key of opKeys) {
       for (const asset of CUSTOM_SOUND_PRESET[key]) {
@@ -87,26 +87,6 @@ describe('CUSTOM_SOUND_PRESET(85素材の完全割り当て表)', () => {
     ]) {
       expect(CUSTOM_SOUND_PRESET_KEYS).toContain(key);
     }
-  });
-
-  it('新設SEキー(breakthrough/payout/hold_lamp)が含まれる', () => {
-    expect(CUSTOM_SOUND_PRESET_KEYS).toContain('breakthrough');
-    expect(CUSTOM_SOUND_PRESET_KEYS).toContain('payout');
-    expect(CUSTOM_SOUND_PRESET_KEYS).toContain('hold_lamp');
-  });
-
-  it('新設ボイスキー(voice_*)が7種含まれる', () => {
-    const voiceKeys = CUSTOM_SOUND_PRESET_KEYS.filter((k) => k.startsWith('voice_'));
-    expect(voiceKeys).toHaveLength(7);
-  });
-
-  it('新設BGMキー(bgm_*)が4種含まれる', () => {
-    const bgmKeys = CUSTOM_SOUND_PRESET_KEYS.filter((k) => k.startsWith('bgm_'));
-    expect(bgmKeys).toHaveLength(4);
-  });
-
-  it('bgm_jingle_win は固定1本', () => {
-    expect(CUSTOM_SOUND_PRESET.bgm_jingle_win).toHaveLength(1);
   });
 
   it('Phase D1新設op_*キー(操作音)が視聴イベントキーと不共有の13種で含まれる', () => {
@@ -175,7 +155,7 @@ describe('CUSTOM_SOUND_PRESET(85素材の完全割り当て表)', () => {
     }
   });
 
-  it('score_* キーのNo.は元の85本表・op_*とも重複しない(重複購入ゼロの裏取り)', () => {
+  it('score_* キーのNo.は基本音種・op_*とも重複しない(重複購入ゼロの裏取り)', () => {
     const otherNos = new Set();
     for (const key of Object.keys(CUSTOM_SOUND_PRESET)) {
       if (key.startsWith('score_')) continue;
@@ -216,9 +196,9 @@ describe('presetIdForNo', () => {
 });
 
 describe('buildPresetNoIndex', () => {
-  it('全100件のユニークNo.が逆引きできる(Mapキーのため重複Noは1件に畳まれる・85本+D1追加DL5本+SC3 score_*追加DL6本のうち重複分を除いた実数)', () => {
+  it('全55件のユニークNo.が逆引きできる(Mapキーのため重複Noは1件に畳まれる・基本35本+操作音用素材+SC3追加DL10本のうち重複分を除いた実数)', () => {
     const idx = buildPresetNoIndex();
-    expect(idx.size).toBe(100);
+    expect(idx.size).toBe(55);
     expect(idx.get(204361)).toMatchObject({ key: 'gift_large', title: '【キュイーン】パチンコの演出に', id: 'as_204361' });
     expect(idx.get(1260384)).toMatchObject({ key: 'op_shot_2', id: 'as_1260384' });
     expect(idx.get(811438)).toMatchObject({ key: 'score_drumroll', id: 'as_811438' });

@@ -131,7 +131,7 @@ export const IMPURE_BASELINE = new Set([
   'kokenGiftHistoryFetchClient.js', 'liveviewErrorReport.js', 'officialEventDomBundle.js',
   'statusMindmapModel.js', 'voicevoxClient.js',
   // ── 音・映像の再生(ブラウザAPIが本体) ────────────────────────
-  'bgmDirector.js', 'effectSoundPlayer.js', 'reportCompleteVoice.js', 'scoreCountUp.js',
+  'effectSoundPlayer.js', 'reportCompleteVoice.js', 'scoreCountUp.js',
   'voiceComment.js', 'voiceInputDevices.js',
   // ── 計測・診断で window/document/storage を読む箱 ──────────────
   'consoleErrorBuffer.js', 'devMonitorTrendSession.js', 'globalFetchRateLimiter.js',
@@ -172,7 +172,7 @@ export const IMPURE_REASONS = /** @type {Record<string,{group:string,why:string}
     'statusMindmapModel.js', 'voicevoxClient.js'
   ]);
   g('音・映像を鳴らす', 'ブラウザAPI(Audio / メディア)そのものが機能の本体なので切り離せない。', [
-    'bgmDirector.js', 'effectSoundPlayer.js', 'reportCompleteVoice.js', 'scoreCountUp.js',
+    'effectSoundPlayer.js', 'reportCompleteVoice.js', 'scoreCountUp.js',
     'voiceComment.js', 'voiceInputDevices.js'
   ]);
   g('計測・診断', '測る対象がブラウザの状態そのもの(スレッド停止・エラー・ストレージ)。', [

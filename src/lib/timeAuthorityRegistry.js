@@ -43,7 +43,6 @@ export const TIME_JUDGE_GRANDFATHERED = Object.freeze([
   "src/lib/aiSharePopupDiagKey.js",
   "src/lib/audienceEngagementGap.js",
   "src/lib/backfillCapturedAt.js",
-  "src/lib/bgmPhaseDiag.js",
   "src/lib/broadcastCrossCompare.js",
   "src/lib/broadcastNarrativeBuilder.js",
   "src/lib/broadcastReportSummary.js",
@@ -156,6 +155,5 @@ export const TIME_JUDGE_GRANDFATHERED = Object.freeze([
   "src/lib/venueSpeech.js",
   "src/lib/venueStoryDiagMirrorPanel.js",
   "src/lib/voiceDiag.js",
-  "src/lib/voiceEffectDiag.js",
   "src/lib/watchUrlFreshness.js"
 ]);

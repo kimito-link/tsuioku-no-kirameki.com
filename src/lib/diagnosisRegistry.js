@@ -210,7 +210,6 @@ export const DIAGNOSIS_REGISTRY = Object.freeze([
   reg('identity-thumb', 'サムネの取得', 'northstar', 1, false),
   reg('identity-complete', '名前とサムネが揃った人', 'northstar', 1, false),
   reg('op-sound', '操作音', 'render', 1, false),
-  reg('bgm-phase', 'BGMの盛り上がり', 'render', 1, false),
   reg('ndgr-persist', '受信から保存まで', 'record', 1, false),
   reg('uid-detail', 'あとから人を辿れる記録', 'record', 1, false),
   reg('multi-tab', '複数タブの混線', 'ingest', 1, false),
