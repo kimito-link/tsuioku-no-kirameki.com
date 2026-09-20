@@ -19518,28 +19518,7 @@ async function initPopup() {
   } catch {
     /* no-op */
   }
-  // v0.1.1527(refactor Phase 4 の後・/live/ 作法の逆輸入 Step1/2): 既存の鏡(mirror)高速描画を
-  //   【重い await 群(refresh の Promise.all=tabs.query×2/windows/storage・:15081)より前】へ引き上げる。
-  //   /live/ が軽い本質(集約済みの小さいデータ→即描画)は拡張内に既に実装済み。cold boot で mirror が
-  //   tabs.query/SW 起床の後ろに並んでいたのが体感5秒の構造だった(会議で実コード裏取り)。
-  //   ★storage read 1本のみ・fire-and-forget・heavy が既に描いていたら譲る既存ガード(:7257)付き=
-  //     get 回数も並列化も増やさない。DOM 未準備なら getStoryUserLaneEls()=null で安全に no-op。
-  //   ★lid は module-level の INLINE_OWN_WATCH_URL(自タブの &lv=)から同期抽出(initPopup クロージャ非依存)。
-  //     取れなければ applyLaneMirrorForMainPopupFallback 側が watchPopupLastPaintedLiveId に落ちる。
-  try {
-    const bootM = String(INLINE_OWN_WATCH_URL || '').match(/lv\d{1,15}/);
-    const bootLid = bootM ? bootM[0].toLowerCase() : '';
-    // Step1: 応援レーン(アイコン列)を鏡から即描画。
-    //   ★お祝い演出(triggerCharaReaction)を持たない=先行描画で偽お祝いが出ない安全な経路。
-    //   stale配信は snap.liveId!==lid で貼らない・heavy が描いていたら譲る既存ガード付き(:7257)。
-    void applyLaneMirrorForMainPopupFallback(bootLid);
-    // ★Step2(上段3カードの先行=applyLightweightPanelSummaryCards)は保留:
-    //   setCountDisplay が num>_prevSupportCount で triggerCharaReaction(お祝い)を発火するため、
-    //   鏡値→heavy値の差で【偽のお祝い】が出る恐れがある(reality-checker 指摘・v0.1.1527)。
-    //   3カードは従来どおり tick(400ms後)が埋める。実機で偽お祝いが出ないと確認できたら先行に戻す。
-  } catch {
-    /* no-op: 先行描画に失敗しても以降の通常初期化(heavy refresh)がそのまま描く */
-  }
+  // v0.1.1530: mirror先行描画の前倒し(v0.1.1527)を撤去。18→1タイル競合と一瞬黒の退化源だった。応援レーンは heavy が単一供給源で描く(供給源一本化)。
   try {
     checkVersionMismatchBanner();
   } catch {

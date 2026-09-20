@@ -783,5 +783,19 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
     // 過去最良 54(@0.1.1507)より 3 少ないが、これは「直近30日のコミット本文」を数える窓が
     // スライドしただけ(古いコミットが窓から外れた)で、検証の質が落ちたわけではない。悪化ではない。
     note: '直近30日窓のスライドによる自然な増減。検証の質の低下ではない'
+  }),
+  Object.freeze({
+    version: '0.1.1530', metric: 'bundle-kb', value: 1393,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '1454(過去最良)以降の機能追加の累積。本版は mirror先行描画の撤去+CSS地色追加でむしろ微減(1394→1393)'
+  }),
+  Object.freeze({
+    version: '0.1.1530', metric: 'gate-selftest', value: 4,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1530', metric: 'cross-checked-claims', value: 51,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: '直近30日窓のスライドによる自然増減。検証の質の低下ではない'
   })
 ]);
