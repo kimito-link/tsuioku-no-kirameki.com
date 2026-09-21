@@ -132,6 +132,18 @@
         "src/extension/laneMirrorRecordsLastTiled.wiring.test.js"
       ],
       "note": "鏡経路(fallback/passive)に heavy:6478 と同じ _storyUserLaneLastTiledLid 記録を1行足す小改修。新しいガードは作らず既存の縮小/空ガード(唯一の正本 renderStoryUserLaneDom.js)を正しく効かせるだけ=REUSE。18→1 の非対称の根を解消。大改修(mirror を entries に積む)は最事故多発域のため却下。v0.1.1536。"
+    },
+    {
+      "at": "2026-09-21T10:52:00.000Z",
+      "responsibility": "coalesced-repaint-scheduler",
+      "decision": "LOCAL",
+      "canonicalSource": null,
+      "scopePaths": [
+        "src/lib/coalescedRepaintScheduler.js",
+        "src/lib/coalescedRepaintScheduler.test.js",
+        "src/extension/popup-entry.js"
+      ],
+      "note": "即時プッシュ受信ごとの同期直呼びrepaintをrAF束ねする新規責務。既存調査(Explore agent)で src/lib 配下に同等の『pendingフラグで複数呼び出しを1回に束ねるスケジューラ』は無いことを確認済み(yieldToBrowserPaint.jsは待ち方のみでpendingフラグ無し、createThrottledDiagFlusherはstorage書き込み専用でrepaintに不適合)。待ち方はyieldToBrowserPaintに委譲(再実装しない)、束ね(pendingフラグ)のみ新規=LOCAL。段A(黒白重い根治)。"
     }
   ]
 }

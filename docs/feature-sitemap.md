@@ -303,7 +303,7 @@
   - `src/lib/giftThrowProjectile.js`
 - **吹き出し寿命管理** — 会場の吹き出しの表示上限・追い出し(eviction)ライフサイクル
   - `src/lib/venueBubbleLifecycle.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 236</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 237</summary>
 
 - `scripts/encode-marketing-html-avatars.mjs` — extension/images/marketing-html-avatars/*.png を data URI にし、
 - `scripts/split-avatar-parts.mjs` — 偽市松背景の除去 + パーツ切り出し(one-off アセットパイプライン)
@@ -340,6 +340,7 @@
 - `src/lib/charaLiveController.js` — 「キャラライブ」の配線係。charaLiveState(判断) と charaLiveStage(描画) を繋ぎ、
 - `src/lib/charaLiveStage.js` — 「キャラライブ」の描画層。charaLiveState.js が決めた状態を DOM に落とすだけ。
 - `src/lib/cheerPalette.js` — 盛り上げワード（8888 / wwwww / 顔文字 等）のワンクリック挿入パレット。
+- `src/lib/coalescedRepaintScheduler.js` — 【層】L0 判定層(依存ゼロ・chrome.* 非依存。yieldToBrowserPaint のみ依存)
 - `src/lib/comeviewActions.js` — v0.1.666: コメビュのコメント単位アクション(わんコメ同等+追憶独自)の純ロジック。
 - `src/lib/comeviewInstantRender.js` — コメビュ別窓で行を即時描画する純ロジック(本文の切り詰め・行の隠し判定など)。
 - `src/lib/comeviewRows.js` — v0.1.652: 独自コメビュ「KIRAMEKI Comment View」の表示行ロジック(純関数)。
@@ -1067,7 +1068,8 @@
 ### 🔊 読み上げ (1版)
 - `v0.1.1532` 2026-09-21 — パチンコ風の点滅演出を削除しました
 
-### 🪟 応援レーン・タイル (5版)
+### 🪟 応援レーン・タイル (6版)
+- `v0.1.1537` 2026-09-21 — 即時コメント表示の重さ・停止を軽減
 - `v0.1.1536` 2026-09-21 — 応援レーンのタイル競合(18→1)の残る原因を解消
 - `v0.1.1534` 2026-09-21 — 会場の席のちらつきを修正
 - `v0.1.1530` 2026-09-20 — パネルの一瞬黒とレーンのちらつきを修正
@@ -1078,7 +1080,7 @@
 - `v0.1.1530` 2026-09-20 — パネルの一瞬黒とレーンのちらつきを修正
 - `v0.1.1527` 2026-09-18 — パネルを開いた直後の表示を速く
 
-### その他 (12版)
+### その他 (11版)
 - `v0.1.1535` 2026-09-21 — 終了配信の経過時間が伸び続ける不具合を修正
 - `v0.1.1533` 2026-09-21 — 使っていない内部コードを整理
 - `v0.1.1531` 2026-09-21 — パネルを開く瞬間の黒帯を修正
@@ -1090,4 +1092,3 @@
 - `v0.1.1522` 2026-09-18 — 内部整理(表示や動作は変わりません)
 - `v0.1.1521` 2026-09-17 — 内部整理の安全網(挙動は変わりません)
 - `v0.1.1520` 2026-09-16 — カード画像の配信者名の括弧欠けを修正
-- `v0.1.1517` 2026-09-15 — シェアしたリンクのカードが配信ごとに

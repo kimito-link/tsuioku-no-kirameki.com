@@ -527,6 +527,7 @@ import {
   probeViewerCountFromFrameTexts
 } from '../lib/viewerCountProbeMerge.js';
 import { yieldToBrowserPaint } from '../lib/yieldToBrowserPaint.js';
+import { createCoalescedRepaintScheduler } from '../lib/coalescedRepaintScheduler.js';
 import { buildStorageRefreshTriggerTag } from '../lib/storageRefreshTriggerKey.js';
 import { prefersReducedMotion } from '../lib/prefersReducedMotion.js';
 import { pushLaneTileSample, summarizeLaneTileOscillation } from '../lib/laneTileOscillation.js';
@@ -5457,6 +5458,13 @@ function resolveBroadcasterUidSticky(liveId, entries, snapshot) {
 }
 
 /**
+ * 2026-09-21(段A): 1回の即時プッシュ postMessage あたりの受理行数上限(異常系の安全弁)。
+ * 送信側 timingConstants.js の ndgrPendingThreshold(240)の半分、mergeInstantPushBuffer 側
+ * maxBuffered(300)の半分以下に収める値。通常運用(数件〜数十件/メッセージ)では一切効かない。
+ */
+const INSTANT_PUSH_ROWS_PER_MESSAGE_CAP = 120;
+
+/**
  * v0.1.1092: コメント即時プッシュレーン(storage迂回)の「先出し」バッファ。content-entry.js から
  * postMessage で届いた新着行(nonce 照合済み)を、storage 由来の正規行(STORY_SOURCE_STATE.entries)が
  * 追いつくまで一時的に保持する。記録・鏡・集計・演出/音のトリガには使わない=表示専用(instantCommentPush.js
@@ -5466,6 +5474,16 @@ function resolveBroadcasterUidSticky(liveId, entries, snapshot) {
 let _instantPushBuffer = [];
 /** 即時プッシュで受け取った行の push→表示合流 ms を計測するための sentAt 記録(commentNo キー)。 */
 const _instantPushSentAtByCommentNo = new Map();
+/**
+ * 2026-09-21(段A): 即時プッシュ受信ごとの同期直呼び repaint を rAF 束ねするスケジューラ。
+ * `repaintStoryUserLaneWithInstantPushBuffer` は呼ばれた時点の `_instantPushBuffer`(グローバル状態)を
+ * 都度読み直す関数であるため、束ねても・配信切替で buffer がクリアされていても安全(空なら早期return)。
+ * この安全性は「コールバックが引数を取らず実行時に最新状態を読む」契約に依存する
+ * (coalescedRepaintScheduler.js の JSDoc 参照。契約を破る変更をしない)。
+ */
+const _instantPushRepaintScheduler = createCoalescedRepaintScheduler(
+  () => repaintStoryUserLaneWithInstantPushBuffer()
+);
 /** INLINE_EMBED_WATCH の自 iframe に content-entry.js が焼き込んだ照合用 nonce(`pn=`)。 */
 const _instantPushExpectedNonce = (() => {
   try {
@@ -5659,10 +5677,17 @@ function handleInstantCommentPushMessage(event) {
     noteInstantPushDiagReceived({ rejectedCount: 1, lastEventAt: Date.now() });
     return;
   }
+  // 2026-09-21(段A): 1メッセージあたりの行数防御(異常系の安全弁・通常運用では効かない)。
+  //   sanitizeInstantPushRows の既存reject閾値(1000件超で全件破棄)とは性質が違い、
+  //   ここは「reject未満だが実用上多すぎる域」を truncate する。末尾(新しい方)を残すのは
+  //   mergeInstantPushBuffer 側の maxBuffered(300) と同じ「新しい方を残す」ポリシーに揃えるため。
+  const cappedRows = rows.length > INSTANT_PUSH_ROWS_PER_MESSAGE_CAP
+    ? rows.slice(rows.length - INSTANT_PUSH_ROWS_PER_MESSAGE_CAP)
+    : rows;
   const liveId = String(STORY_SOURCE_STATE.liveId || watchPopupLastPaintedLiveId || '');
   const sentAt = Number(event.data.sentAt);
   const capturedAt = Number.isFinite(sentAt) ? sentAt : Date.now();
-  const displayEntries = rows.map((r) => toInstantPushDisplayEntry(r, liveId, capturedAt));
+  const displayEntries = cappedRows.map((r) => toInstantPushDisplayEntry(r, liveId, capturedAt));
   for (const e of displayEntries) {
     const no = String(e?.commentNo || '').trim();
     if (no) _instantPushSentAtByCommentNo.set(no, capturedAt);
@@ -5708,11 +5733,14 @@ function handleInstantCommentPushMessage(event) {
   }
   noteInstantPushDiagReceived({
     receivedCount: 1,
-    receivedRows: rows.length,
+    receivedRows: cappedRows.length,
     lastEventAt: Date.now(),
     ...deliveryGapDelta
   });
-  repaintStoryUserLaneWithInstantPushBuffer();
+  // 2026-09-21(段A): 同期直呼びをやめ rAF 束ねに委譲(coalescedRepaintScheduler.js)。
+  //   同一tick~同一フレーム内に複数回このハンドラが呼ばれても、実際の repaint(重いDOM再構築)は
+  //   1フレームに1回で済む。nonce検証・merge・計器記録(上記まで)は従来通り完全に同期。
+  _instantPushRepaintScheduler.schedule();
 }
 
 /**
@@ -7547,6 +7575,9 @@ function syncStorySourceEntries(liveId, displayList, storageRowsForLane, opts = 
     STORY_SOURCE_STATE.giftThrowerPicks = Object.freeze([]); STORY_SOURCE_STATE.adThrowerPicks = Object.freeze([]);
     // v0.1.1092: 配信切替では前の配信の先出しプッシュ行を持ち越さない(別配信のコメントが
     //   新しい配信のレーンに混入するのを防ぐ)。同一配信内の poll では消さない(先出しの意味が無くなる)。
+    // ★2026-09-21(段A): _instantPushRepaintScheduler に pending 中の repaint 予約があっても安全。
+    //   コールバック(repaintStoryUserLaneWithInstantPushBuffer)は実行時にこの _instantPushBuffer を
+    //   都度読み直すため、ここで空にした後に実行されても早期return で無害に終わる(古いbufferで描かない)。
     _instantPushBuffer = [];
     _instantPushSentAtByCommentNo.clear();
   }
