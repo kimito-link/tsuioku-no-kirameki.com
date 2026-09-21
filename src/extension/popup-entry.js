@@ -6646,6 +6646,8 @@ async function applyLaneMirrorForPassive() {
     domTilesPainted: countStoryUserLaneDomTiles(els)
   });
   recordStoryUserLaneStep(_storyUserLaneRenderProbe, STORY_USER_LANE_STEPS.DONE);
+  // ★v0.1.1536: 鏡経路(②passive)でも実タイルを描いた lid を記録(heavy:6478 と対称・18→1 の非対称解消)。
+  if (countStoryUserLaneDomTiles(els) > 0) _storyUserLaneLastTiledLid = String(snap.liveId || '').trim().toLowerCase();
   sweepStoryAvatarRetryThrottled(els); // ★v1338: 失敗アイコンの再プローブ(正本=lib)
   // v0.1.985(council/parity-diagnose): ②応援プレビューが「描画できた」を status へ伝える ack を
   //   【専用キー】(本物の鏡とは別・passive だけが書く片方向)に best-effort で書く。3画面パリティ判定の
@@ -6724,6 +6726,10 @@ async function applyLaneMirrorForMainPopupFallback(resolvedLid = '') {
     domTilesPainted: countStoryUserLaneDomTiles(els)
   });
   recordStoryUserLaneStep(_storyUserLaneRenderProbe, STORY_USER_LANE_STEPS.DONE);
+  // ★v0.1.1536: 鏡経路でも実タイルを描いた lid を記録(heavy 経路:6478 と対称)。これが無いと
+  //   縮小ガードが「守る前回描画が無い」と誤認し、直後の heavy 暫定1枚が鏡18枚を上書き(18→1)する。
+  //   settled な heavy は shouldKeepStoryUserLaneTilesOnShrink:253 で必ず通るので固着はしない。
+  if (countStoryUserLaneDomTiles(els) > 0) _storyUserLaneLastTiledLid = lid;
   // ★v0.1.1338: 鏡由来の描画経路にも【同じ】掃引を配線する(片肺を作らない)。
   // v0.1.987: 鏡フォールバックで描けたら幕も畳む(描けたのにローディングを構造的に消す)。冪等。
   if (countStoryUserLaneDomTiles(els) > 0) {
