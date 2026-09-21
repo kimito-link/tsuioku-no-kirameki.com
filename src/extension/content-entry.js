@@ -1614,12 +1614,16 @@ function maybeRunEndedBulkHarvest() {
   if (endedDetected) {
     const endedLv = String(liveId || '').trim().toLowerCase();
     if (/^lv\d{1,15}$/.test(endedLv)) {
+      // ★v0.1.1535: 終了時の経過秒を凍結(begin 既知時のみ)。伸び続ける「配信時間46時間」を止める。
+      const bms = programBeginAtMs;
+      const elapsedSecAtEnd = (typeof bms === 'number' && Number.isFinite(bms) && bms > 0) ? Math.max(0, Math.floor((now - bms) / 1000)) : null;
       try {
         chrome.storage.local
           .set({
             [liveEndedStorageKey(endedLv)]: buildLiveEndedFlag({
               liveId: endedLv,
-              endedAt: now
+              endedAt: now,
+              elapsedSecAtEnd
             })
           })
           .catch(() => {});

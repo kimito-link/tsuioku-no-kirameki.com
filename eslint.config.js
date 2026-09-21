@@ -404,8 +404,8 @@ export default [
   {
     files: ['src/extension/content-entry.js'],
     // 17,267 は directive で抑止され実効していなかった（2026-08-06 確定・2026-09-17 実施）。
-    // 実測ちょうどへ復活。+ε は取らない。
-    rules: { 'max-lines': ['error', { max: 19346, skipBlankLines: false, skipComments: false }] }
+    // 実測ちょうどへ復活。+ε は取らない。v0.1.1535: 終了経過秒の凍結(46時間修正)で実測ちょうどへ更新。
+    rules: { 'max-lines': ['error', { max: 19350, skipBlankLines: false, skipComments: false }] }
   },
   {
     // 安全網のみ。分割は別地図。

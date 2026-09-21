@@ -215,6 +215,7 @@ import { backfillLiveThroughputLine } from '../lib/backfillRinkuNarration.js';
 import { resolveVisitorCount } from '../lib/resolveVisitorCount.js';
 import { PERF_DIAG_PREFIX, isPerfDiag } from '../lib/perfDiag.js';
 import { LIVE_ENDED_PREFIX, isLiveEndedFlag, liveEndedStorageKey } from '../lib/liveEndedFlag.js';
+import { resolveDisplayElapsedSec } from '../lib/frozenElapsedOnEnd.js';
 import { buildLiveHealth, scoreToDots } from '../lib/liveHealthScore.js';
 import { runStorageOpWithTimeout, STORAGE_OP_TIMED_OUT } from '../lib/storageOpTimeout.js';
 /*
@@ -3442,10 +3443,13 @@ function summarizeOneLive(lv, summary, snapshot, perfDiag, endedFlag) {
   const adPoints = numOrNull(snap?.officialAdPointsNdgr) ?? numOrNull(s?.adPoints);
   const giftPoints = numOrNull(snap?.officialGiftPointsNdgr) ?? numOrNull(s?.giftPoints);
   // 経過時間は snapshot.streamAgeMin(分)→秒に変換、無ければ panel_summary.elapsedSec。
-  const elapsedSec =
+  const elapsedSecLive =
     snap && typeof snap.streamAgeMin === 'number' && Number.isFinite(snap.streamAgeMin)
       ? Math.max(0, Math.floor(snap.streamAgeMin * 60))
       : numOrNull(s?.elapsedSec);
+  // ★v0.1.1535: 終了枠は begin からの Date.now() 差で経過が伸び続ける(「配信時間46時間」の直因)。
+  //   凍結値(elapsedSecAtEnd)があればそれで止める。判定は純関数 resolveDisplayElapsedSec に集約。
+  const elapsedSec = resolveDisplayElapsedSec(endedFlag, elapsedSecLive);
   const capturedAt =
     numOrNull(s?.lastIngestAt) ??
     numOrNull(s?.capturedAt) ??

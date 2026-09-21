@@ -107,6 +107,20 @@
         "src/extension/venueLaneEmptyKeep.wiring.test.js"
       ],
       "note": "会場の空クリアに①popup と同じ shouldKeepStoryUserLaneTilesOnEmpty(既存の唯一の正本)を配線。新しいガードは作らず REUSE。会場用 lastTiled 状態変数のみ新設。v0.1.1534。"
+    },
+    {
+      "at": "2026-09-21T00:46:33.789Z",
+      "responsibility": "ended-live-elapsed-freeze",
+      "decision": "LOCAL",
+      "canonicalSource": null,
+      "scopePaths": [
+        "src/lib/frozenElapsedOnEnd.js",
+        "src/lib/frozenElapsedOnEnd.test.js",
+        "src/lib/liveEndedFlag.js",
+        "src/extension/content-entry.js",
+        "src/extension/status-entry.js"
+      ],
+      "note": "終了枠の経過秒を「凍結値優先」で決める新責務(既存 lib に同等判定なし=grep 確認済み)。ローカルで正本を持つので LOCAL。凍結値の生成=content-entry、格納=liveEndedFlag、表示判定=frozenElapsedOnEnd と責務分離。46時間問題の表示直因を止める。v0.1.1535。"
     }
   ]
 }
