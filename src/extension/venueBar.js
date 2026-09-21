@@ -247,7 +247,8 @@ import {
 } from '../lib/venueYukkuriNamedCensus.js';
 import {
   paintStoryUserLaneDomFilled,
-  resetStoryUserLaneDom
+  resetStoryUserLaneDom,
+  shouldKeepStoryUserLaneTilesOnEmpty
 } from './story/renderStoryUserLaneDom.js';
 // v0.1.902: 会場座席の健全度を健全度パネルに載せる(配信者混入・固着を AI/人間が一目で発見)。
 import { KEY_VENUE_SEATS_DIAG } from '../lib/venueSeatsDiagKey.js';
@@ -3188,6 +3189,12 @@ export function mountVenueBarButton(options = {}) {
   /** 直近に書いた見出し文(値が変わったときだけ DOM に書くため)。 */
   let _venueTitleLastText = '';
   /**
+   * ★v0.1.1534: 会場が最後に【実タイルを描いた】liveId(小文字trim)。①popup の
+   *   _storyUserLaneLastTiledLid と同役。空keepガードの判定入力に使う(会場にだけ無かった)。
+   *   配信切替時にクリアして前配信のタイルを持ち越さない。
+   */
+  let _venueStoryUserLaneLastTiledLid = '';
+  /**
    * ★鏡snapshotの受け入れ関所。読み口はこの1関数に集約する(受け入れ点は catch-up と
    *   onChanged の2箇所。wiringテストが呼び出し数で固定する)。
    *
@@ -5197,7 +5204,20 @@ export function mountVenueBarButton(options = {}) {
     } catch { /* 表示の失敗は描画を止めない */ }
     emptyMessage.hidden = visibleLaneItems.length > 0;
     if (visibleLaneItems.length === 0) {
-      resetStoryUserLaneDom(venueLaneEls);
+      // ★v0.1.1534: 同一配信の一瞬空(backfill 谷間・鏡の陳腐化)では既存タイルを畳まない。
+      //   ①popup と同じ shouldKeepStoryUserLaneTilesOnEmpty を会場にも配線(会場にだけ無かった
+      //   =「席が出たり消えたり」の根治)。配信切替(cur!==last)や一度も描いていない時は畳む。
+      const keepOnEmpty = shouldKeepStoryUserLaneTilesOnEmpty(
+        venueLaneEls,
+        String(activeLiveId || ''),
+        _venueStoryUserLaneLastTiledLid
+      );
+      if (keepOnEmpty) {
+        // 前回タイルを残す=空ガイド文は出さない(タイルが見えているのにガイドが出る不整合を防ぐ)。
+        emptyMessage.hidden = true;
+      } else {
+        resetStoryUserLaneDom(venueLaneEls);
+      }
     } else {
       paintStoryUserLaneDomFilled(
         venueLaneEls,
@@ -5240,6 +5260,9 @@ export function mountVenueBarButton(options = {}) {
           }
         }
       );
+      // ★v0.1.1534: 実タイルを描いた liveId を記録(①popup:6478 と対称)。次サイクルの空ガードが
+      //   「同一配信の一瞬空なら残す」を判定できるようにする。paint 分岐=必ず実タイルあり。
+      _venueStoryUserLaneLastTiledLid = String(activeLiveId || '').trim().toLowerCase();
     }
 
     // 2026-07-31(ユーザー指摘): 広告段の #1/#5 等にホバーしても何も出ない件の解消。
@@ -5787,6 +5810,8 @@ export function mountVenueBarButton(options = {}) {
         liveRoster.clear(); // v0.1.754: 別配信の在席を持ち越さない
         // v0.1.1111: 別配信の鏡/暫定(X層)を持ち越さない(鏡はliveId不一致でも弾かれるが明示クリア)。
         laneMirrorPaintSnap = null;
+        // ★v0.1.1534: 空keepガードの基準 lid もクリア(前配信のタイルを新配信で残さない)。
+        _venueStoryUserLaneLastTiledLid = '';
         venueTransientFirstSeen.clear();
         // 配信切替は意図的な空表示(前配信を持ち越さない)。clearDisplay で lastGood も破棄。
         clearDisplay();
