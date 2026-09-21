@@ -89,7 +89,21 @@ const ROLES = {
   'api': { role: 'サーバレス API(status / live-ranking / live-recent-comments / live-og)', tags: ['API'] },
   'memory': { role: 'セッション横断の知見・引き継ぎ(AI のメモリ)。コミット対象外も混在', tags: ['メモリ', '知見'] },
   'memory/archive': { role: '過去セッションの引き継ぎ(HANDOFF)アーカイブ', tags: ['メモリ', '履歴'] },
-  'memory/avatar-parts': { role: 'アバター素材(顔シート等)の参考画像', tags: ['アバター', '画像'] }
+  'memory/avatar-parts': { role: 'アバター素材(顔シート等)の参考画像', tags: ['アバター', '画像'] },
+  '.codex': { role: 'Codex CLI 用のエージェント定義(司令塔から呼ぶ実装役)', tags: ['Codex', 'エージェント'] },
+  '.codex/agents': { role: 'Codex エージェント設定(.toml)', tags: ['Codex', 'エージェント'] },
+  '.codex-osint': { role: 'OSINT 調査の作業データ(warc 等)。コミット対象外も混在', tags: ['OSINT', '調査'] },
+  '_docs': { role: '横断キット(web-ios-android)との手紙・KB・コンセプトメモ', tags: ['横断', 'KB'] },
+  'council/auto': { role: '会議の自動実行ログ(code/design の JSON)', tags: ['会議', '自動生成'] },
+  'council-scout': { role: '外部モデルの日次スカウト(会議の下ごしらえ)', tags: ['会議', '調査'] },
+  'council-scout/briefs': { role: 'スカウトの日次ブリーフ(md)', tags: ['会議', '原稿'] },
+  'docs/article-drafts': { role: '公開前の記事下書き(防御的公開の草稿)', tags: ['記事', '下書き'] },
+  'docs/patent-unique-voice-reading-filing-final': { role: '読み上げ手法の出願関連(現在は MOVED=移設済みの残置)', tags: ['特許', '履歴'] },
+  'extension/data': { role: '拡張同梱の静的データ(応援バナー定義 json)', tags: ['データ', '応援'] },
+  'scripts/lib': { role: 'スクリプト共有の小部品(計器コア等)', tags: ['ビルド', '共有'] },
+  'sound-src': { role: '効果音の元素材(HQ wav 等)。ここから build して配布用 mp3 を作る', tags: ['音声', '素材'] },
+  'sound-src/soundeffect-lab': { role: '効果音ラボ由来の素材候補(採否検討用)', tags: ['音声', '素材'] },
+  'tests/helpers': { role: 'テスト共有ヘルパ(配線テストのソース走査等)', tags: ['テスト', '共有'] }
 };
 
 /**

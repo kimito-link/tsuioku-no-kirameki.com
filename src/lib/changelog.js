@@ -18,6 +18,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1533',
+    date: '2026-09-21',
+    summary: '使っていない内部コードを整理',
+    items: Object.freeze([
+      'どこからも使われていない内部モジュール5件を削除しました。動作は変わらず、配布物が少し軽くなります。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1532',
     date: '2026-09-21',
     summary: 'パチンコ風の点滅演出を削除しました',
@@ -171,15 +179,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     items: Object.freeze([
       '追憶のきらめき ランキング(/live/)で「コメントで応援した人」の名前にマウスを乗せると、その人の直近の発言を最大 5 件その場で取得して表示します。本文はサーバーに保存しません。',
       '各行をサムネ・名前・件数まとめて 1 つのリンクにしました(数値 ID の人はユーザーページへ)。'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.1513',
-    date: '2026-09-15',
-    summary: 'コメント集計を増分にし匿名の重複名を解消',
-    items: Object.freeze([
-      '追憶のきらめき ランキング(/live/)のコメント集計が、前回数えた続きだけを読むようになりました。長い配信でも「直近ぶん」で止まりにくくなり、古い側も順次さかのぼります。',
-      '同じ順位表に同じ『匿名NNN』が 2 人出たときだけ、区別のための短い記号を添えます。'
     ])
   })
 ]);
