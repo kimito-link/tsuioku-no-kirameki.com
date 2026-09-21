@@ -18,6 +18,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1534',
+    date: '2026-09-21',
+    summary: '会場の席のちらつきを修正',
+    items: Object.freeze([
+      '会場モードで、同じ配信の一瞬だけ空になる瞬間に席(応援タイル)が消えてすぐ戻る「ちらつき」を修正しました。配信を切り替えたときは従来どおり前の配信の席は残しません。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1533',
     date: '2026-09-21',
     summary: '使っていない内部コードを整理',
@@ -170,15 +178,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     summary: '応援レーンのタイルから発言一覧を開けるように',
     items: Object.freeze([
       '応援レーンのアイコンを押すと、その人がこの配信でした発言を新しい順に読めます(Ctrl+クリックで従来どおりプロフィール)。会場モードの発言パネルも 1,000 件まで表示します。'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.1514',
-    date: '2026-09-15',
-    summary: 'ランキングの名前ホバーで直近の発言を表示',
-    items: Object.freeze([
-      '追憶のきらめき ランキング(/live/)で「コメントで応援した人」の名前にマウスを乗せると、その人の直近の発言を最大 5 件その場で取得して表示します。本文はサーバーに保存しません。',
-      '各行をサムネ・名前・件数まとめて 1 つのリンクにしました(数値 ID の人はユーザーページへ)。'
     ])
   })
 ]);
