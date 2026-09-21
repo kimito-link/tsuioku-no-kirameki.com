@@ -18,6 +18,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1535',
+    date: '2026-09-21',
+    summary: '終了配信の経過時間が伸び続ける不具合を修正',
+    items: Object.freeze([
+      '配信が終わっても「配信時間」が伸び続けて何十時間にもなる不具合を修正しました。終了を検知した時点の経過時間で止まります。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1534',
     date: '2026-09-21',
     summary: '会場の席のちらつきを修正',
@@ -170,14 +178,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     items: Object.freeze([
       '追憶のきらめき ランキング(/live/)で、コメント順位表の行にマウスを乗せたとき出る「その人の発言」を、ページを開いた時点で上位の配信ぶん先読みするようにしました。初回の待ち時間が減ります。',
       '取得中は骨格(スケルトン)を表示して、待っている間の見た目をなめらかにしました。'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.1515',
-    date: '2026-09-15',
-    summary: '応援レーンのタイルから発言一覧を開けるように',
-    items: Object.freeze([
-      '応援レーンのアイコンを押すと、その人がこの配信でした発言を新しい順に読めます(Ctrl+クリックで従来どおりプロフィール)。会場モードの発言パネルも 1,000 件まで表示します。'
     ])
   })
 ]);

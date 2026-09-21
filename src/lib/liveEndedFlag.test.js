@@ -12,15 +12,24 @@ describe('liveEndedStorageKey', () => {
 });
 
 describe('buildLiveEndedFlag', () => {
-  it('liveId 小文字化 + endedAt 整数化', () => {
-    expect(buildLiveEndedFlag({ liveId: 'LV1', endedAt: 1700.9 })).toEqual({
+  it('liveId 小文字化 + endedAt 整数化 + elapsedSecAtEnd 整数化', () => {
+    expect(buildLiveEndedFlag({ liveId: 'LV1', endedAt: 1700.9, elapsedSecAtEnd: 42.9 })).toEqual({
       liveId: 'lv1',
-      endedAt: 1700
+      endedAt: 1700,
+      elapsedSecAtEnd: 42
     });
   });
   it('不正な endedAt は 0', () => {
     expect(buildLiveEndedFlag({ liveId: 'lv1', endedAt: NaN }).endedAt).toBe(0);
     expect(buildLiveEndedFlag({ liveId: 'lv1' }).endedAt).toBe(0);
+  });
+  it('elapsedSecAtEnd 未指定/不正は null(従来通り=表示は begin 差にフォールバック)', () => {
+    expect(buildLiveEndedFlag({ liveId: 'lv1', endedAt: 100 }).elapsedSecAtEnd).toBe(null);
+    expect(buildLiveEndedFlag({ liveId: 'lv1', endedAt: 100, elapsedSecAtEnd: NaN }).elapsedSecAtEnd).toBe(null);
+    expect(buildLiveEndedFlag({ liveId: 'lv1', endedAt: 100, elapsedSecAtEnd: -5 }).elapsedSecAtEnd).toBe(null);
+  });
+  it('0 秒終了(開始直後終了)は 0 を保持する', () => {
+    expect(buildLiveEndedFlag({ liveId: 'lv1', endedAt: 100, elapsedSecAtEnd: 0 }).elapsedSecAtEnd).toBe(0);
   });
 });
 

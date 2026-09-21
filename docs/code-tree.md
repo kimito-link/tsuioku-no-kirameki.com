@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 6 / 866 件
+## ⚠️ 役割コメントが無いソース 6 / 867 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `src/lib/laneDomSelfMeasure.js`
@@ -779,7 +779,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (1841)
+- 📁 **src/** (1843)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1054,7 +1054,7 @@
         - `logo_funlink_white_RGB_link_black.png`
         - `logo_funlink_white_RGB_maru_black.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1612)
+  - 📁 **lib/** (1614)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -1526,6 +1526,8 @@
     - `formatOfficialStreamAgeMinutes.test.js`
     - `forwardReactivation.js` — v0.1.765「最終系(a): 入口が死んだ時だけ forward crawl を起動して再接続」の判定(純ロジック)。
     - `forwardReactivation.test.js`
+    - `frozenElapsedOnEnd.js` — frozenElapsedOnEnd — 終了枠の経過秒を「凍結値があればそれ、無ければライブ値」に決める純関数。
+    - `frozenElapsedOnEnd.test.js`
     - `geminiNanoBridge.js` — v0.1.205 Phase C: Built-in AI (Gemini Nano, Chrome 138+) の薄いラッパー。
     - `geminiNanoBridge.test.js`
     - `giftAdPipelineCensus.js` — ギフト/広告が「取れて→出て→鳴る」まで通っているかを
