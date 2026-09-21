@@ -1,0 +1,3 @@
+# husky フックが CRLF になると sh が壊れる(Windows のエディタ/同期で起きうる)ため LF 固定。
+# 2026-09-21: dist-fingerprint-gate 導入時に追加(docs/dist-fingerprint-gate-DESIGN.md E-1)。
+.husky/* text eol=lf

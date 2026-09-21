@@ -833,7 +833,13 @@
   - `tools/og-live-compose.py`
   - `.github/workflows/live-ranking.yml`
   - `vercel.json`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 206</summary>
+- **dist 鮮度ゲート(buildId無限差分ループ根治)** — pre-pushのbuild再実行でbuildIdタイムスタンプが毎回変わりdist差分が無限に再発していた問題を根治。esbuildのmetafileから実際のバンドル入力のgit blob shaを集めた指紋(.dist-fingerprint.json・buildIdを含まない)をbuild.mjsが書き、pre-commit(--index)/pre-push(--pushed)/CI(--ref HEAD)がこの指紋だけを照合してbuildを再実行しない。NL_BUILD_ID(buildAgeCell.jsが依存する時刻計器)は無変更。council-fable設計(docs/dist-fingerprint-gate-DESIGN.md・v0.1.1538)
+  - `src/lib/distFingerprint.js`
+  - `scripts/check-dist-fresh.mjs`
+  - `scripts/build.mjs`
+  - `.husky/pre-push`
+  - `.husky/pre-commit`
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 205</summary>
 
 - `app/app.js` — スマホ閲覧用 status Web 版。
 - `app/live-view.js` — global NL_BUILD_ID
@@ -842,7 +848,6 @@
 - `scripts/audit-gates.mjs` — ★**計器を計器で測る**(メタ検査)。
 - `scripts/build-sounds.mjs` — extension/sound/ の効果音mp3を組み立てる。
 - `scripts/build-watch.mjs` — watch では起動時刻を埋める（rebuild 毎に再 import される訳ではないので、
-- `scripts/build.mjs` — .env を読み込む(status の共有キー NL_STATUS_INGEST_KEY / NL_STATUS_VIEW_TOKEN は .env から注入)。
 - `scripts/capture-store-screenshots.mjs` — Chrome ウェブストア用スクショ自動撮影
 - `scripts/check-agent-bootstrap.mjs` — CLAUDE.md の1行目が `@AGENTS.md` の import であることを機械で守る。
 - `scripts/check-chrome-load-path.mjs` — Chrome が拡張を「同期フォルダ配下から」読み込んでいないか検査する(リロード固着の再発防止・v0.1.1529)。
@@ -1051,19 +1056,14 @@
 ### 💾 記録件数 (1版)
 - `v0.1.1528` 2026-09-18 — 先読み表示を応援レーンだけに絞りました
 
-### 📥 コメント取得 (1版)
-- `v0.1.1518` 2026-09-15 — シェアカードの説明文に応援の数字
-
-### 🏟 会場・席 (4版)
+### 🏟 会場・席 (3版)
 - `v0.1.1536` 2026-09-21 — 応援レーンのタイル競合(18→1)の残る原因を解消
 - `v0.1.1534` 2026-09-21 — 会場の席のちらつきを修正
 - `v0.1.1519` 2026-09-15 — シェアカードの画像に応援の数字を合成
-- `v0.1.1518` 2026-09-15 — シェアカードの説明文に応援の数字
 
-### 🎁 ギフト (3版)
+### 🎁 ギフト (2版)
 - `v0.1.1532` 2026-09-21 — パチンコ風の点滅演出を削除しました
 - `v0.1.1519` 2026-09-15 — シェアカードの画像に応援の数字を合成
-- `v0.1.1518` 2026-09-15 — シェアカードの説明文に応援の数字
 
 ### 🔊 読み上げ (1版)
 - `v0.1.1532` 2026-09-21 — パチンコ風の点滅演出を削除しました
@@ -1080,7 +1080,8 @@
 - `v0.1.1530` 2026-09-20 — パネルの一瞬黒とレーンのちらつきを修正
 - `v0.1.1527` 2026-09-18 — パネルを開いた直後の表示を速く
 
-### その他 (11版)
+### その他 (12版)
+- `v0.1.1538` 2026-09-21 — 内部整理(表示や動作は変わりません)
 - `v0.1.1535` 2026-09-21 — 終了配信の経過時間が伸び続ける不具合を修正
 - `v0.1.1533` 2026-09-21 — 使っていない内部コードを整理
 - `v0.1.1531` 2026-09-21 — パネルを開く瞬間の黒帯を修正

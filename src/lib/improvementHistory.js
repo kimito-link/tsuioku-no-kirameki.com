@@ -896,5 +896,20 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
   Object.freeze({
     version: '0.1.1537', metric: 'cross-checked-claims', value: 55,
     source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数'
+  }),
+  Object.freeze({
+    version: '0.1.1538', metric: 'bundle-kb', value: 1360,
+    source: '[auto] extension/dist/popup.js のファイルサイズ'
+  }),
+  Object.freeze({
+    version: '0.1.1538', metric: 'gate-selftest', value: 4,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1538', metric: 'cross-checked-claims', value: 54,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: '★直近30日窓のスライドによる自然減(55→54・古いコミットが窓外に出た分)。' +
+      '今回の実装自体はcouncil-fable(会議5体+Fable設計)+毒テスト4件(build忘れ/ツールチェーン変更/' +
+      'add漏れ/pre-commitブロック)を実機で確認済み・別の手段での確認は今回も行っている。'
   })
 ]);

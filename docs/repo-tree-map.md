@@ -5,7 +5,7 @@
 > 下にマインドマップ（GitHub で図として表示）→ ディレクトリ一覧 → 機能逆引き索引 の順。
 > **全部の地図への入口: [MAP.md](MAP.md)** ／ 視覚ビュー: [repo-tree-map.html](repo-tree-map.html) ／ 機能依存図: [feature-map/index.md](feature-map/index.md) ／ 配置ルール正本: [AGENTS.md](../AGENTS.md) §4。
 
-ルート直下の設定ファイル: 54 件（package.json / *.config.js / AGENTS.md 等）
+ルート直下の設定ファイル: 56 件（package.json / *.config.js / AGENTS.md 等）
 
 ## マインドマップ（自動生成・GitHub で図として表示）
 
@@ -225,6 +225,12 @@ graph LR
   f41 --> f41_6["og-live-compose.py"]
   f41 --> f41_7["workflows/live-ranking.yml"]
   f41 --> f41_8[""]
+  HUB --> f42["dist 鮮度ゲート(buildId無限差分ループ根治)"]
+  f42 --> f42_0["lib/distFingerprint.js"]
+  f42 --> f42_1["check-dist-fresh.mjs"]
+  f42 --> f42_2["build.mjs"]
+  f42 --> f42_3["pre-push"]
+  f42 --> f42_4["pre-commit"]
 ```
 
 ---
@@ -288,7 +294,7 @@ graph LR
 - `avatar-parts/`（29 件） — アバター素材(顔シート等)の参考画像  〔アバター / 画像〕
 
 ## `scripts/` — ビルド・検証・自動生成スクリプト(build/feature-map/repo-tree-map 等)  〔ビルド / 自動生成〕
-<sub>ファイル 70 件</sub>
+<sub>ファイル 71 件</sub>
 
 - `lib/`（1 件） — スクリプト共有の小部品(計器コア等)  〔ビルド / 共有〕
 - `xserver/`（2 件） — Xserver 向け webhook(git pull デプロイ)スクリプト  〔デプロイ / webhook〕
@@ -299,14 +305,14 @@ graph LR
 - `soundeffect-lab/`（19 件） — 効果音ラボ由来の素材候補(採否検討用)  〔音声 / 素材〕
 
 ## `src/` — LP 側 + 純粋関数ライブラリの源  〔ソース〕
-<sub>ファイル 1846 件</sub>
+<sub>ファイル 1848 件</sub>
 
 - `data/`（7 件） — 保存コメントからレーン候補を読む acquirer / source 層  〔コメント / 取得〕
 - `domain/`（20 件） — ドメイン正本(応援レーンの集約・列ポリシー等。識別子判定など)  〔応援 / 集約 / 識別子〕
 - `extension/`（56 件） — バンドル entry(content/popup/venue/status/offscreen/backfill-sw 等=機能境界)  〔entry / 記録 / 会場 / 応援〕
 - `fixtures/`（1 件） — テスト用フィクスチャ  〔テスト〕
 - `images/`（134 件） — LP / CWS 提出物のマスター画像  〔画像〕
-- `lib/`（1616 件） — 純粋関数ライブラリ(unit test 対象)。色・速度・コメント・レポート等の計算ロジックの大半  〔色 / 速度 / コメント / レポート / 純粋関数〕
+- `lib/`（1618 件） — 純粋関数ライブラリ(unit test 対象)。色・速度・コメント・レポート等の計算ロジックの大半  〔色 / 速度 / コメント / レポート / 純粋関数〕
 - `server/`（2 件） — Node 側 I/O 部品(fetch/WebSocket を実際に叩く。api と scripts が共用。lib には置けない)  〔API / 公開 / ランキング〕
 - `shared/`（7 件） — 複数機能で共有する小部品(アバター URL ガード等)  〔共有 / アバター〕
 - `sound/`（1 件） — 音声素材(src 側)  〔音声〕
@@ -608,6 +614,15 @@ vercel.json が「?lv= あり∧カード用クローラー UA」だけ /api/liv
 - [`tools/og-live-compose.py`](../tools/og-live-compose.py)
 - [`.github/workflows/live-ranking.yml`](../.github/workflows/live-ranking.yml)
 - [`vercel.json`](../vercel.json)
+
+### dist 鮮度ゲート(buildId無限差分ループ根治)  〔出荷 / ゲート / dist / ビルド〕
+pre-pushのbuild再実行でbuildIdタイムスタンプが毎回変わりdist差分が無限に再発していた問題を根治。esbuildのmetafileから実際のバンドル入力のgit blob shaを集めた指紋(.dist-fingerprint.json・buildIdを含まない)をbuild.mjsが書き、pre-commit(--index)/pre-push(--pushed)/CI(--ref HEAD)がこの指紋だけを照合してbuildを再実行しない。NL_BUILD_ID(buildAgeCell.jsが依存する時刻計器)は無変更。council-fable設計(docs/dist-fingerprint-gate-DESIGN.md・v0.1.1538)
+
+- [`src/lib/distFingerprint.js`](../src/lib/distFingerprint.js)
+- [`scripts/check-dist-fresh.mjs`](../scripts/check-dist-fresh.mjs)
+- [`scripts/build.mjs`](../scripts/build.mjs)
+- [`.husky/pre-push`](../.husky/pre-push)
+- [`.husky/pre-commit`](../.husky/pre-commit)
 
 ---
 
