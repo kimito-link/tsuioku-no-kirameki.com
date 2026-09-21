@@ -18,6 +18,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1538',
+    date: '2026-09-21',
+    summary: '内部整理(表示や動作は変わりません)',
+    items: Object.freeze([
+      '開発時の出荷手順を見直しました(配布物には影響ありません)。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1537',
     date: '2026-09-21',
     summary: '即時コメント表示の重さ・停止を軽減',
@@ -167,15 +175,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     summary: 'シェアカードの画像に応援の数字を合成',
     items: Object.freeze([
       'カード画像が、配信サムネに来場・コメント・ギフト・広告の数字と時刻を重ねたものになりました(放送中の配信のみ・数字は貼った時点の目安)。'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.1518',
-    date: '2026-09-15',
-    summary: 'シェアカードの説明文に応援の数字',
-    items: Object.freeze([
-      '配信リンクのカード説明文に、来場・コメント・ギフト・広告の数字(取得時点)が入るようになりました。',
-      '応援した人の名前・コメント本文は引き続き載せません。'
     ])
   })
 ]);

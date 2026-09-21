@@ -1,7 +1,10 @@
 import * as esbuild from 'esbuild';
-import { readFileSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { createHash } from 'node:crypto';
+import { execFileSync } from 'node:child_process';
+import { normalizeInputs, fingerprintText, maskBuildId, FINGERPRINT_SCHEMA } from '../src/lib/distFingerprint.js';
 
 // .env を読み込む(status の共有キー NL_STATUS_INGEST_KEY / NL_STATUS_VIEW_TOKEN は .env から注入)。
 //   ★これが無いと `npm run build` が空キービルドになり、status の「WEBサイトURLで共有」ボタンが
@@ -210,5 +213,49 @@ const targets = [
   }
 ];
 
-await Promise.all(targets.map((t) => esbuild.build({ ...common, ...t })));
-console.log(`nicolivelog: build done (NL_BUILD_ID=${BUILD_ID})`);
+const results = await Promise.all(targets.map((t) => esbuild.build({ ...common, ...t, metafile: true })));
+
+/*
+ * ---- 指紋(2026-09-21: pre-push の buildId 無限差分ループ根治) ----
+ * ★NL_BUILD_ID(時刻)は上と一切変えていない。「実際にバンドルされた入力」の git blob sha
+ *   を集めた指紋を .dist-fingerprint.json(git 追跡・buildId を含まない)へ書く。
+ *   pre-push/pre-commit/CI はこの指紋だけを照合し、build を再実行しない(=ループ源が消える)。
+ *   設計: docs/dist-fingerprint-gate-DESIGN.md
+ */
+const ROOT = resolve(__dirname, '..');
+const MODE = IS_RELEASE ? 'release' : 'default';
+const rawInputs = results.flatMap((r) => Object.keys(r.metafile?.inputs || {}));
+const fpInputs = normalizeInputs(rawInputs);
+// ★git が `add` 時に付けるのと同じ blob sha(1プロセス・stdin にパスを流す)。
+const blobsOut = execFileSync('git', ['hash-object', '--stdin-paths'], {
+  cwd: ROOT,
+  input: fpInputs.join('\n') + '\n',
+  encoding: 'utf8'
+}).trim();
+const blobs = blobsOut ? blobsOut.split('\n') : [];
+if (blobs.length !== fpInputs.length) {
+  throw new Error(`[build] hash-object の件数不一致: inputs=${fpInputs.length} blobs=${blobs.length}`);
+}
+const fpEntries = fpInputs.map((path, i) => ({ path, blob: blobs[i] }));
+const fingerprint = createHash('sha256').update(fingerprintText({ mode: MODE, entries: fpEntries })).digest('hex');
+
+const fpOutputs = {};
+for (const t of targets) {
+  const text = readFileSync(resolve(ROOT, t.outfile), 'utf8');
+  fpOutputs[t.outfile] = createHash('sha256').update(maskBuildId(text)).digest('hex');
+}
+const sidecarPath = resolve(ROOT, '.dist-fingerprint.json');
+const sidecarNext =
+  JSON.stringify(
+    { schema: FINGERPRINT_SCHEMA, mode: MODE, fingerprint, inputs: fpInputs, outputs: fpOutputs },
+    null,
+    2
+  ) + '\n';
+// ★「変わらなければ書かない」(生成物の掟)。buildId は入れていないので同じ入力なら同じ文字列になる。
+if (!existsSync(sidecarPath) || readFileSync(sidecarPath, 'utf8') !== sidecarNext) {
+  writeFileSync(sidecarPath, sidecarNext);
+}
+
+console.log(
+  `nicolivelog: build done (NL_BUILD_ID=${BUILD_ID} fingerprint=${fingerprint.slice(0, 12)} inputs=${fpInputs.length})`
+);

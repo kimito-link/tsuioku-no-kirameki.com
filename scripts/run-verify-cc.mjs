@@ -63,6 +63,10 @@ const steps = [
   ['lint', 'lint'],
   ['typecheck', 'typecheck'],
   ['build', 'build'],
+  // ★2026-09-21: build 直後に「.dist-fingerprint.json と dist がこの作業ツリーのソースに
+  //   対応しているか」。pre-commit(--index)/pre-push(--pushed)/CI(--ref HEAD)と同じ判定を、
+  //   司令塔の手元でも先に見る(docs/dist-fingerprint-gate-DESIGN.md)。
+  ['dist-fresh', 'check:dist-fresh'],
   // ★v0.1.1245: ビルド直後に「秘密が焼き込まれていないか」を検査する。
   //   dist は git 追跡下=push すると公開リポジトリで誰でも読める。実際に
   //   /api/status の書き込み認証キーが GitHub 上に出ていた事故があった。

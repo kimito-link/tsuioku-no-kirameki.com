@@ -144,6 +144,22 @@
         "src/extension/popup-entry.js"
       ],
       "note": "即時プッシュ受信ごとの同期直呼びrepaintをrAF束ねする新規責務。既存調査(Explore agent)で src/lib 配下に同等の『pendingフラグで複数呼び出しを1回に束ねるスケジューラ』は無いことを確認済み(yieldToBrowserPaint.jsは待ち方のみでpendingフラグ無し、createThrottledDiagFlusherはstorage書き込み専用でrepaintに不適合)。待ち方はyieldToBrowserPaintに委譲(再実装しない)、束ね(pendingフラグ)のみ新規=LOCAL。段A(黒白重い根治)。"
+    },
+    {
+      "at": "2026-09-21T23:20:00.000Z",
+      "responsibility": "dist-fingerprint-gate",
+      "decision": "LOCAL",
+      "canonicalSource": null,
+      "scopePaths": [
+        "src/lib/distFingerprint.js",
+        "src/lib/distFingerprint.test.js",
+        "scripts/check-dist-fresh.mjs",
+        "scripts/build.mjs",
+        ".husky/pre-push",
+        ".husky/pre-commit",
+        ".gitattributes"
+      ],
+      "note": "pre-pushのbuild再実行によるbuildId無限差分ループを根治する新規責務。council-fable(会議5体+Fable設計)で恒久対処を設計(docs/dist-fingerprint-gate-DESIGN.md)。既存のyieldToBrowserPaint/createThrottledDiagFlusherと同様、src/lib配下に同等の『ビルド入力のgit blob shaから指紋を作り照合する』機構は無いことを会議・Fable双方で調査済み=LOCAL。NL_BUILD_ID(buildAgeCell.jsが依存する時刻計器)は一切変更せず、指紋(.dist-fingerprint.json)を別途新設して照合だけを担わせる設計。"
     }
   ]
 }
