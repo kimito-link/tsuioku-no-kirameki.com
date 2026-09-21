@@ -191,7 +191,7 @@
     - `2026-09-07.md`
     - `2026-09-09.md`
     - `2026-09-16.md`
-- 📁 **docs/** (321)
+- 📁 **docs/** (323)
   - 📁 **article-assets/** (87)
     - 📁 **venue-frames/** (12)
       - `f01.png`
@@ -495,6 +495,8 @@
   - `cursor-handoff-direct-concurrent-viewers.md`
   - `dev-sound-preview.html`
   - `diagnostics-strengthening-log.md`
+  - `dist-fingerprint-gate-DESIGN.md`
+  - `dist-fingerprint-gate-IMPLEMENTATION-HANDOFF.md`
   - `extension-bump-checklist.md`
   - `feature-sitemap.html`
   - `feature-sitemap.md`
