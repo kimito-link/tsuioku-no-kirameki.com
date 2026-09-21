@@ -121,6 +121,17 @@
         "src/extension/status-entry.js"
       ],
       "note": "終了枠の経過秒を「凍結値優先」で決める新責務(既存 lib に同等判定なし=grep 確認済み)。ローカルで正本を持つので LOCAL。凍結値の生成=content-entry、格納=liveEndedFlag、表示判定=frozenElapsedOnEnd と責務分離。46時間問題の表示直因を止める。v0.1.1535。"
+    },
+    {
+      "at": "2026-09-21T00:57:03.361Z",
+      "responsibility": "lane-mirror-records-last-tiled",
+      "decision": "REUSE",
+      "canonicalSource": "src/extension/story/renderStoryUserLaneDom.js",
+      "scopePaths": [
+        "src/extension/popup-entry.js",
+        "src/extension/laneMirrorRecordsLastTiled.wiring.test.js"
+      ],
+      "note": "鏡経路(fallback/passive)に heavy:6478 と同じ _storyUserLaneLastTiledLid 記録を1行足す小改修。新しいガードは作らず既存の縮小/空ガード(唯一の正本 renderStoryUserLaneDom.js)を正しく効かせるだけ=REUSE。18→1 の非対称の根を解消。大改修(mirror を entries に積む)は最事故多発域のため却下。v0.1.1536。"
     }
   ]
 }
