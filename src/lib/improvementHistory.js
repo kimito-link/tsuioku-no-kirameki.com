@@ -881,5 +881,20 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
     version: '0.1.1536', metric: 'cross-checked-claims', value: 54,
     source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
     note: '段5の前提(18→1)が既に1530で解決済みと git で裏取り→大改修を回避'
+  }),
+  Object.freeze({
+    version: '0.1.1537', metric: 'bundle-kb', value: 1361,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '★+1KBは意図した増加。即時プッシュrepaintのrAF束ねスケジューラ(coalescedRepaintScheduler.js)を' +
+      '新規追加した分。過去最良1360(@0.1.1454)との差は v0.1.1455〜1471 の計器17版ぶん(+45KB)で既に' +
+      'v0.1.1471のnoteに記録済み・そこからの純増は今回の+1KBのみ。実測1360(@0.1.1536)→1361。'
+  }),
+  Object.freeze({
+    version: '0.1.1537', metric: 'gate-selftest', value: 4,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1537', metric: 'cross-checked-claims', value: 55,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数'
   })
 ]);

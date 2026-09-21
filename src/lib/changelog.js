@@ -18,6 +18,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1537',
+    date: '2026-09-21',
+    summary: '即時コメント表示の重さ・停止を軽減',
+    items: Object.freeze([
+      'コメントが届くたびに応援レーンを即座に描き直していた処理を、短時間に複数届いても1回にまとめて描くよう変更しました。表示が固まる・重くなる場面を減らしています。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1536',
     date: '2026-09-21',
     summary: '応援レーンのタイル競合(18→1)の残る原因を解消',
@@ -168,15 +176,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     items: Object.freeze([
       '配信リンクのカード説明文に、来場・コメント・ギフト・広告の数字(取得時点)が入るようになりました。',
       '応援した人の名前・コメント本文は引き続き載せません。'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.1517',
-    date: '2026-09-15',
-    summary: 'シェアしたリンクのカードが配信ごとに',
-    items: Object.freeze([
-      '追憶のきらめき ランキング(/live/)の配信リンク(?lv=付き)を X などに貼ると、その配信の画面サムネ・配信者名・番組名がカードに出るようになりました。',
-      'カードに出るのはニコ生が公開している番組名・配信者名・サムネだけです。応援した人の名前・コメント・数値は載せません。放送が終わった配信のリンクは、これまでどおりランキング共通のカードになります。'
     ])
   })
 ]);
