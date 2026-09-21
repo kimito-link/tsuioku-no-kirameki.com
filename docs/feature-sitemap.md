@@ -117,7 +117,7 @@
   - `src/lib/monotonicCommentCount.js`
 - **storage キー定義** — chrome.storage のキー名の正本(nls_comments_<lv> 等)
   - `src/lib/storageKeys.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 52</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 51</summary>
 
 - `scripts/dump-panel-state.mjs` — 実機の chrome.storage.local を吸い出して
 - `scripts/migrate-ext-storage.mjs` — 拡張の記録データを「旧ID配下フォルダ」→「新ID配下フォルダ」へコピーする(一度だけ・v0.1.1529)。
@@ -144,7 +144,6 @@
 - `src/lib/livePersistInterval.js` — v0.1.498〜501: ライブ記録の保存（コアレッサ）最小間隔を決める純粋関数。フリーズ対策 A。
 - `src/lib/liveviewPublishOutcome.js` — 純Web公開（応援ライブビューの /api/status への POST）の直近結果を記録・要約する。
 - `src/lib/longTaskTracker.js` — メインスレッドを長時間ブロックした「Long Task」を有界に記録する純関数群。
-- `src/lib/mirrorBundleKey.js` — 鏡バンドルの storage キー。
 - `src/lib/northStarDetailCells.js` — 公式値レーン(ギフト/広告/イベント)の【実績】をセルにする(純関数)。
 - `src/lib/northStarMirrorKey.js` — 北極星レーン鏡(公式値レーン)の storage キー。
 - `src/lib/persistableCommentRow.js` — v0.1.362: DOM ハーベスト経路で拾ったコメント行を `nls_comments_<lv>` に保存して
@@ -182,7 +181,7 @@
 
 - **応援レーン集約(誰が候補か)** — 保存コメント行を userId 単位に畳み込みレーン候補を作る唯一の集約正本(popup/venue 共通)
   - `src/lib/userLaneCandidatesFromStorage.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 98</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 97</summary>
 
 - `src/domain/lane/aggregate.js` — 応援ユーザーレーンの per-row → per-user 集約（純関数）。
 - `src/domain/observations/observationStore.js` — observationStore - StatObservation のメモリ常駐リングバッファ。
@@ -192,7 +191,6 @@
 - `src/lib/broadcastCrossCompare.js` — 0.1.24 (Y): 横断比較系の純粋関数群。
 - `src/lib/broadcastDurationLabel.js` — HTML レポートの「配信時間」表示ラベルを純粋に整形する。
 - `src/lib/broadcasterCommentCount.js` — 「配信者本人のコメント数」を正しく算出する純関数(v0.1.838)。
-- `src/lib/broadcasterExcludedCount.js` — v0.1.774: 記録カードの見出し数値から「配信者本人のコメント」を差し引いて、公式(本家コメ)と
 - `src/lib/broadcasterFollowTarget.js` — 配信者タイル / casterBanner で出す「配信者の page URL とアイコン」を、
 - `src/lib/broadcasterProfileCard.js` — 配信者プロフィールの「レポート用 正規化モデル」と HTML 断片ビルダー（純関数）。
 - `src/lib/broadcasterReputationKeywords.js` — 配信者の評判チェック - ネガティブキーワード判定エンジン
@@ -834,7 +832,7 @@
   - `tools/og-live-compose.py`
   - `.github/workflows/live-ranking.yml`
   - `vercel.json`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 208</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 205</summary>
 
 - `app/app.js` — スマホ閲覧用 status Web 版。
 - `app/live-view.js` — global NL_BUILD_ID
@@ -908,7 +906,6 @@
 - `src/lib/currentLiveIdOrigin.js` — 「いま視聴中の配信」を【鏡とは別の起点】から決める純関数。
 - `src/lib/customSoundPreset.js` — 対応する効果音・操作音・結果発表音の No.→音種キー割り当てを JSON 化した
 - `src/lib/customSoundStore.js` — council/pachinko-ultimate-SYNTHESIS.md §1.2/§1.4/§1.5(Phase A)の実装。
-- `src/lib/devAutoReloadDecision.js` — devAutoReloadDecision — 開発用オートリロードの判定(v0.1.1318)。
 - `src/lib/devMonitorDebugSubset.js` — ポップアップ「開発・テスト用 監視」用: watch スナップショット _debug から
 - `src/lib/devMonitorVizHtml.js` — dev monitor セカンダリ可視化（renderDevMonitorSecondaryViz の <div class="nl-dev-monitor-viz">）の
 - `src/lib/devReloadSignal.js` — 開発用ホットリロードのシグナル判定（純関数）。
@@ -1002,8 +999,6 @@
 - `src/lib/sidepanelIframeSrc.js` — サイドパネルの iframe に渡す src を組み立てる純関数。
 - `src/lib/sidePanelLvFromTabs.js` — サイドパネルが【自力で】配信IDを見つけるための純関数。
 - `src/lib/sidePanelPrearm.js` — サイドパネルを【押される前に】用意しておく純関数。
-- `src/lib/sidepanelUnderlay.js` — サイドパネルの【下敷き】。黒の代わりに地の色を見せる。
-- `src/lib/sidePanelWatchTarget.js` — サイドパネルを「どの配信に紐づけるか」を決める純関数。
 - `src/lib/silentFailureCells.js` — 【無音で死ぬ】故障を画面に出すセル(純関数)。
 - `src/lib/singleFlightByKey.js` — key 単位の single-flight 実行器(純関数コア)。
 - `src/lib/standalonePopupClose.js` — v0.1.433: 別ウィンドウ POP（standalone popup window）を「配信に飛ばしたら閉じる」判定（純ロジック）。
@@ -1060,9 +1055,6 @@
 - `v0.1.1516` 2026-09-15 — ランキングのホバー発言を先読みで速く
 - `v0.1.1514` 2026-09-15 — ランキングの名前ホバーで直近の発言を表示
 
-### 🙂 匿名(184) (1版)
-- `v0.1.1513` 2026-09-15 — コメント集計を増分にし匿名の重複名を解消
-
 ### 🏟 会場・席 (3版)
 - `v0.1.1519` 2026-09-15 — シェアカードの画像に応援の数字を合成
 - `v0.1.1518` 2026-09-15 — シェアカードの説明文に応援の数字
@@ -1086,7 +1078,8 @@
 - `v0.1.1530` 2026-09-20 — パネルの一瞬黒とレーンのちらつきを修正
 - `v0.1.1527` 2026-09-18 — パネルを開いた直後の表示を速く
 
-### その他 (10版)
+### その他 (11版)
+- `v0.1.1533` 2026-09-21 — 使っていない内部コードを整理
 - `v0.1.1531` 2026-09-21 — パネルを開く瞬間の黒帯を修正
 - `v0.1.1529` 2026-09-20 — 拡張の識別子を固定し反映を安定化
 - `v0.1.1526` 2026-09-18 — 内部整理(表示や動作は変わりません)

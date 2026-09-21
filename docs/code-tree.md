@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 6 / 871 件
+## ⚠️ 役割コメントが無いソース 6 / 866 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `src/lib/laneDomSelfMeasure.js`
@@ -681,9 +681,7 @@
   - `status-guard.js` — 状態速報ページ(status.html)の「何があっても開く」保険。
   - `status.html`
   - `venue.html`
-- 📁 **scripts/** (71)
-  - 📁 **__pycache__/** (1)
-    - `stage-submission.cpython-311.pyc`
+- 📁 **scripts/** (70)
   - 📁 **lib/** (1)
     - `instrument-core.mjs` — ★検査・計器の共通土台（キット同梱・依存ゼロ・純Node）。
   - 📁 **xserver/** (2)
@@ -781,7 +779,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (1849)
+- 📁 **src/** (1840)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1055,7 +1053,7 @@
         - `logo_funlink_white_RGB_link_black.png`
         - `logo_funlink_white_RGB_maru_black.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1621)
+  - 📁 **lib/** (1612)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -1200,8 +1198,6 @@
     - `broadcastWaveformFingerprint.test.js`
     - `broadcasterCommentCount.js` — 「配信者本人のコメント数」を正しく算出する純関数(v0.1.838)。
     - `broadcasterCommentCount.test.js`
-    - `broadcasterExcludedCount.js` — v0.1.774: 記録カードの見出し数値から「配信者本人のコメント」を差し引いて、公式(本家コメ)と
-    - `broadcasterExcludedCount.test.js`
     - `broadcasterFollowTarget.js` — 配信者タイル / casterBanner で出す「配信者の page URL とアイコン」を、
     - `broadcasterFollowTarget.test.js`
     - `broadcasterProfileCard.js` — 配信者プロフィールの「レポート用 正規化モデル」と HTML 断片ビルダー（純関数）。
@@ -1428,8 +1424,6 @@
     - `deriveAvatarUrlFromUid.equivalence.test.js`
     - `deriveAvatarUrlFromUid.js` — v0.1.203 Patch 1: niconico ユーザー UID から avatar URL を確定パターンで生成する純関数。
     - `deriveAvatarUrlFromUid.test.js`
-    - `devAutoReloadDecision.js` — devAutoReloadDecision — 開発用オートリロードの判定(v0.1.1318)。
-    - `devAutoReloadDecision.test.js`
     - `devMonitorAvatarStats.js` — 開発者向け監視: storage コメント配列からアバター／userId の集計（PII なし・件数のみ）
     - `devMonitorAvatarStats.test.js`
     - `devMonitorDebugSubset.js` — ポップアップ「開発・テスト用 監視」用: watch スナップショット _debug から
@@ -1891,7 +1885,6 @@
     - `mirrorBundle.test.js`
     - `mirrorBundleFlushScheduler.js` — 鏡バンドルの flush スケジューラ(状態を内部に閉じた純ロジック・タイマー非依存)。
     - `mirrorBundleFlushScheduler.test.js`
-    - `mirrorBundleKey.js` — 鏡バンドルの storage キー。
     - `mirrorSanitize.js` — v0.1.237: 北極星「鏡のように貼り付け」用の自前最小サニタイザ。
     - `mirrorSanitize.test.js`
     - `monotonicCommentCount.js` — v0.1.645: コメント記録件数の「数値ズレ」根治。
@@ -2253,8 +2246,6 @@
     - `sidePanelPrearm.js` — サイドパネルを【押される前に】用意しておく純関数。
     - `sidePanelPrearm.test.js`
     - `sidePanelPrearm.wiring.test.js`
-    - `sidePanelWatchTarget.js` — サイドパネルを「どの配信に紐づけるか」を決める純関数。
-    - `sidePanelWatchTarget.test.js`
     - `sidepanelBandStripes.test.js`
     - `sidepanelBlackScreen.wiring.test.js`
     - `sidepanelBlackV8.wiring.test.js`
@@ -2276,8 +2267,6 @@
     - `sidepanelSelfDiagOverlay.wiring.test.js`
     - `sidepanelSelfDiagPipeline.test.js`
     - `sidepanelThemeColorParity.test.js`
-    - `sidepanelUnderlay.js` — サイドパネルの【下敷き】。黒の代わりに地の色を見せる。
-    - `sidepanelUnderlay.test.js`
     - `sidepanelVisibilityCatchup.wiring.test.js`
     - `sidepanelZeroArea.test.js`
     - `silentFailureCells.js` — 【無音で死ぬ】故障を画面に出すセル(純関数)。

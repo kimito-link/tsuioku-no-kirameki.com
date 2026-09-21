@@ -2817,7 +2817,7 @@ function setCountDisplay(value, watchSnapshot = null, breakdown = undefined) {
   //   かつ公式 commentCount は配信者コメントを含むため、引くと逆に記録が公式より小さくズレていた
   //   (実機 記録3,630 < 公式3,653)。引かず素直に「記録した全件」を出すと記録 ≒ 公式に一致する。
   //   配信者ぶんは見出しから引かず、内訳 sub 行に「うち配信者 M」と並記する(下記 breakdown 経路)。
-  //   _broadcasterCount は内訳表示にのみ使う。引き算(resolveBroadcasterExcludedCount)は廃止。
+  //   _broadcasterCount は内訳表示にのみ使う。見出しからの引き算は廃止(残骸 lib も削除済み)。
 
   // v0.1.645: 数値表示は同一 lv 内で単調増加に固定(数値ズレ根治)。4経路の別ソース別タイミングの
   //   生値を「これまで表示した最大」に収束。文言は gate=null で素通し・lv 切替は gate 内でリセット。
@@ -6980,7 +6980,7 @@ function publishLaneDiag(obs) {
 }
 
 // ★v0.1.1036(鏡バンドル統合): 5鏡を合流バッファ→trailing-edge で旧5キーを1回の atomic set に統合(②③が別 get で読んでも
-//   相互一貫=「①150 vs ②129」根治)。min-gap は scheduler 一元(gap 中の更新も次 flush で載る=F-1 根治)。KEY_MIRROR_BUNDLE は後続。
+//   相互一貫=「①150 vs ②129」根治)。min-gap は scheduler 一元(gap 中の更新も次 flush で載る=F-1 根治)。mirror bundle 単一キー化は後続(未実装)。
 const _mirrorFlushScheduler = createMirrorBundleFlushScheduler();
 let _mirrorFlushTimer = null;
 // 2026-07-21 診断先行(北極星鏡publish取りこぼし実害確定計器): 全9鏡共通のflushスケジューラが

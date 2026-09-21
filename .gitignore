@@ -98,3 +98,7 @@ tests-tmp/
 # 一時ファイル(会話由来・追跡しない)
 surechigai-user-needs-question.txt
 *.bak-*
+
+# Python bytecode cache (stage-submission.py 等)
+__pycache__/
+*.pyc
