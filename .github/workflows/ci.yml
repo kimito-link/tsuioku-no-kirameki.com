@@ -27,6 +27,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: dist freshness (build 忘れ / --no-verify の押し通し / マージ commit の不整合)
+        run: node scripts/check-dist-fresh.mjs --ref HEAD
+
       - name: Verify (tests, lint, typecheck, build)
         run: npm run verify
 

@@ -896,5 +896,52 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
   Object.freeze({
     version: '0.1.1537', metric: 'cross-checked-claims', value: 55,
     source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数'
+  }),
+  Object.freeze({
+    version: '0.1.1538', metric: 'bundle-kb', value: 1360,
+    source: '[auto] extension/dist/popup.js のファイルサイズ'
+  }),
+  Object.freeze({
+    version: '0.1.1538', metric: 'gate-selftest', value: 4,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1538', metric: 'cross-checked-claims', value: 54,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: '★直近30日窓のスライドによる自然減(55→54・古いコミットが窓外に出た分)。' +
+      '今回の実装自体はcouncil-fable(会議5体+Fable設計)+毒テスト4件(build忘れ/ツールチェーン変更/' +
+      'add漏れ/pre-commitブロック)を実機で確認済み・別の手段での確認は今回も行っている。'
+  }),
+  Object.freeze({
+    version: '0.1.1539', metric: 'bundle-kb', value: 1360,
+    source: '[auto] extension/dist/popup.js のファイルサイズ'
+  }),
+  Object.freeze({
+    version: '0.1.1539', metric: 'gate-selftest', value: 4,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1539', metric: 'cross-checked-claims', value: 52,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: '★直近30日窓のスライドによる自然減(55→52・古いコミットが窓外に出た分)。' +
+      '今回はLP本文の鮮度警告(61版滞留)をLP本文更新で解消・dist-fingerprint-gateの' +
+      'コンポーネント化(責務コメント追加)を実施し、いずれも実測(テスト緑・build指紋不変)で確認済み。'
+  }),
+  Object.freeze({
+    version: '0.1.1540', metric: 'bundle-kb', value: 1360,
+    source: '[auto] extension/dist/popup.js のファイルサイズ'
+  }),
+  Object.freeze({
+    version: '0.1.1540', metric: 'gate-selftest', value: 4,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1540', metric: 'cross-checked-claims', value: 52,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: '★直近30日窓のスライドによる自然減(55→52で横ばい)。今回はesbuildのmetafile仕様変更で' +
+      '指紋が静かに空になる穴をExplore2本+Plan1本で調査し、毒テスト(実際にrawInputsを空にして' +
+      'throwを実機確認)で別の手段の確認を行っている。またe2e失敗8件が今回PR由来でないことも' +
+      'popup.js等のバイト単位比較(buildId/version/changelog差分を正規化除去して完全一致確認)で' +
+      '別の手段による裏取りを実施済み。'
   })
 ]);

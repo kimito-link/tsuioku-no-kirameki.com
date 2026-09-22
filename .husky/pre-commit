@@ -41,3 +41,11 @@ if [ -z "$SKIP_TREE_MAP_GATE" ] && git diff --cached --name-only --diff-filter=A
     exit 1
   fi
 fi
+
+# ★dist 鮮度ゲート(2026-09-21): ステージ内容(=コミットされる中身)でビルド入力と dist の対応を照合。
+#   ここで止まれば「ソースだけ commit → 後で chore(dist)」の2段 commit が生まれない。
+#   pre-push(--pushed)は第2、CI(--ref HEAD)は第3防衛線。緊急時は SKIP_DIST_GATE=1。
+#   設計: docs/dist-fingerprint-gate-DESIGN.md
+if [ -z "$SKIP_DIST_GATE" ]; then
+  node scripts/check-dist-fresh.mjs --index || exit 1
+fi
