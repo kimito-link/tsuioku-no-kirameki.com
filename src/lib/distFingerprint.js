@@ -65,6 +65,43 @@ export function normalizeInputs(paths) {
 }
 
 /**
+ * esbuild の metafile から拾った「正規化前」の入力本数が、健全な build 実行として
+ * 妥当かを判定する。
+ *
+ * ★なぜ要るか(2026-09-22 実測で確定した穴): `results.flatMap((r) => Object.keys(
+ *   r.metafile?.inputs || {}))` は、将来 esbuild の metafile 仕様が変わって空になっても
+ *   【エラーを出さない】。その場合 `normalizeInputs([])` は ALWAYS_INPUTS の4件だけを
+ *   静かに返し、指紋はソースを一切見ずに計算される。結果「build し忘れても常に緑になる」
+ *   という、このゲートの存在意義を消す壊れ方をする。ここで早期に throw させて気づけるようにする。
+ *
+ * ★閾値は当てずっぽうの絶対数(現状761件等)ではなく、呼び出し側が持つ「entryPoint 数
+ *   (=targets.length)」という相対値にする。esbuild の性質上、各 entryPoint は最低でも
+ *   自分自身のファイル1つを metafile.inputs に含むはずなので、
+ *   「入力本数が entryPoint 数を下回ることはあり得ない」が原理的な下限になる。
+ *   targets が将来増減しても閾値を書き直す必要がない。
+ *
+ * @param {{ rawInputCount: number, targetCount: number }} args
+ * @returns {{ ok: boolean, reason: string | null }}
+ */
+export function judgeBuildInputsHealthy({ rawInputCount, targetCount }) {
+  if (rawInputCount <= 0) {
+    return {
+      ok: false,
+      reason: 'esbuild の metafile.inputs が空(rawInputCount=0)。esbuild のバージョン変更等で形式が変わった疑い'
+    };
+  }
+  if (rawInputCount < targetCount) {
+    return {
+      ok: false,
+      reason:
+        `metafile.inputs の件数(${rawInputCount})が entryPoint 数(${targetCount})を下回る。` +
+        '各 entryPoint は最低1 input を持つはずなので異常'
+    };
+  }
+  return { ok: true, reason: null };
+}
+
+/**
  * 指紋の元テキスト。呼び出し側が sha256 する。
  * @param {{ mode: string, entries: Array<{ path: string, blob: string }> }} input
  * @returns {string}
