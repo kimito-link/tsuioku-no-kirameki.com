@@ -911,5 +911,20 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
     note: '★直近30日窓のスライドによる自然減(55→54・古いコミットが窓外に出た分)。' +
       '今回の実装自体はcouncil-fable(会議5体+Fable設計)+毒テスト4件(build忘れ/ツールチェーン変更/' +
       'add漏れ/pre-commitブロック)を実機で確認済み・別の手段での確認は今回も行っている。'
+  }),
+  Object.freeze({
+    version: '0.1.1539', metric: 'bundle-kb', value: 1360,
+    source: '[auto] extension/dist/popup.js のファイルサイズ'
+  }),
+  Object.freeze({
+    version: '0.1.1539', metric: 'gate-selftest', value: 4,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1539', metric: 'cross-checked-claims', value: 52,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: '★直近30日窓のスライドによる自然減(55→52・古いコミットが窓外に出た分)。' +
+      '今回はLP本文の鮮度警告(61版滞留)をLP本文更新で解消・dist-fingerprint-gateの' +
+      'コンポーネント化(責務コメント追加)を実施し、いずれも実測(テスト緑・build指紋不変)で確認済み。'
   })
 ]);
