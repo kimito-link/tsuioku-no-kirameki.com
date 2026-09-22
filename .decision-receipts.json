@@ -160,6 +160,21 @@
         ".gitattributes"
       ],
       "note": "pre-pushのbuild再実行によるbuildId無限差分ループを根治する新規責務。council-fable(会議5体+Fable設計)で恒久対処を設計(docs/dist-fingerprint-gate-DESIGN.md)。既存のyieldToBrowserPaint/createThrottledDiagFlusherと同様、src/lib配下に同等の『ビルド入力のgit blob shaから指紋を作り照合する』機構は無いことを会議・Fable双方で調査済み=LOCAL。NL_BUILD_ID(buildAgeCell.jsが依存する時刻計器)は一切変更せず、指紋(.dist-fingerprint.json)を別途新設して照合だけを担わせる設計。"
+    },
+    {
+      "at": "2026-09-22T23:56:00.000Z",
+      "responsibility": "cross-supporter-ranking",
+      "decision": "REUSE",
+      "canonicalSource": "src/lib/supporterRanking.js",
+      "scopePaths": [
+        "src/lib/crossSupporterRanking.js",
+        "src/lib/crossSupporterRanking.test.js",
+        "src/lib/commenterHistoricalAnalytics.js",
+        "src/lib/supporterRanking.js",
+        "src/lib/marketingChartsHtml.js",
+        "src/lib/marketingChartsHtml.test.js"
+      ],
+      "note": "上位計画(elegant-crunching-quokka.md 段B)のデバイス内・横断応援者ランキング。既存のindexPastUsers(commenterHistoricalAnalytics.js)とbuildSupporterRanking(supporterRanking.js、既に単一配信専用として自律tick経由で実運用中)を無改変のまま組み合わせるだけの薄い合成層=REUSE。broadcastCountは既存のSupporterRow型を拡張せず外側で合成する設計にし、実運用中の自律tick経路(popup-entry.js:15762→status-entry.js#buildSupporterExpander)への波及をゼロにした。UIはmarketing-export.html側(応援レーン描画経路と実行コンテキストが完全分離)に新規セクションとして追加。Explore2本+Plan1本で既存関数のexport化/型非改変/UI配置を裏取り・設計した。"
     }
   ]
 }

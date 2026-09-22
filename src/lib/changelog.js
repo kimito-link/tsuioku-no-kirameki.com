@@ -18,6 +18,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1541',
+    date: '2026-09-23',
+    summary: 'マーケ分析に横断応援者ランキングを追加',
+    items: Object.freeze([
+      'マーケ分析(HTMLレポート)に、過去の配信もまたいで応援してくれている人が分かる「横断応援者ランキング」を追加しました。公開や他PCとの集約はせず、このPC内の記録だけで完結します。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1540',
     date: '2026-09-22',
     summary: '内部整理(表示や動作は変わりません)',
@@ -167,14 +175,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     summary: '内部整理(表示や動作は変わりません)',
     items: Object.freeze([
       '内部の重複していた初期化処理を1つ整理しました(バージョン表示や動作は変わりません)。'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.1521',
-    date: '2026-09-17',
-    summary: '内部整理の安全網(挙動は変わりません)',
-    items: Object.freeze([
-      '今後の内部整理でうっかり大きくなりすぎないよう、開発用の見張りを追加しました(表示や動作は変わりません)。'
     ])
   })
 ]);

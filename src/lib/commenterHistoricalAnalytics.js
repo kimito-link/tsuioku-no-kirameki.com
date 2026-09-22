@@ -36,11 +36,14 @@ function cleanUid(v) {
  * 同じ userId で nickname が複数あった場合は「最も長い」候補を採用（ハンドル名は
  * 詳しいほどよい想定）。
  *
+ * ★段B(2026-09-22): `src/lib/crossSupporterRanking.js` が横断応援者ランキングの
+ *   集計元としてこの関数を再利用するため export した(挙動は無変更)。
+ *
  * @param {BroadcastBundle[]} pastBroadcasts
  * @param {string} currentLiveId
  * @returns {Map<string, { userId: string, totalComments: number, broadcastIds: Set<string>, nickname: string }>}
  */
-function indexPastUsers(pastBroadcasts, currentLiveId) {
+export function indexPastUsers(pastBroadcasts, currentLiveId) {
   /** @type {Map<string, { userId: string, totalComments: number, broadcastIds: Set<string>, nickname: string }>} */
   const map = new Map();
   const currentLid = cleanUid(currentLiveId).toLowerCase();
