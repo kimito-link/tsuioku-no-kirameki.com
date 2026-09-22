@@ -231,6 +231,11 @@ graph LR
   f42 --> f42_2["build.mjs"]
   f42 --> f42_3["pre-push"]
   f42 --> f42_4["pre-commit"]
+  HUB --> f43["横断応援者ランキング(デバイス内・段B)"]
+  f43 --> f43_0["lib/crossSupporterRanking.js"]
+  f43 --> f43_1["lib/commenterHistoricalAnalytics.js"]
+  f43 --> f43_2["lib/supporterRanking.js"]
+  f43 --> f43_3["lib/marketingChartsHtml.js"]
 ```
 
 ---
@@ -305,14 +310,14 @@ graph LR
 - `soundeffect-lab/`（19 件） — 効果音ラボ由来の素材候補(採否検討用)  〔音声 / 素材〕
 
 ## `src/` — LP 側 + 純粋関数ライブラリの源  〔ソース〕
-<sub>ファイル 1848 件</sub>
+<sub>ファイル 1850 件</sub>
 
 - `data/`（7 件） — 保存コメントからレーン候補を読む acquirer / source 層  〔コメント / 取得〕
 - `domain/`（20 件） — ドメイン正本(応援レーンの集約・列ポリシー等。識別子判定など)  〔応援 / 集約 / 識別子〕
 - `extension/`（56 件） — バンドル entry(content/popup/venue/status/offscreen/backfill-sw 等=機能境界)  〔entry / 記録 / 会場 / 応援〕
 - `fixtures/`（1 件） — テスト用フィクスチャ  〔テスト〕
 - `images/`（134 件） — LP / CWS 提出物のマスター画像  〔画像〕
-- `lib/`（1618 件） — 純粋関数ライブラリ(unit test 対象)。色・速度・コメント・レポート等の計算ロジックの大半  〔色 / 速度 / コメント / レポート / 純粋関数〕
+- `lib/`（1620 件） — 純粋関数ライブラリ(unit test 対象)。色・速度・コメント・レポート等の計算ロジックの大半  〔色 / 速度 / コメント / レポート / 純粋関数〕
 - `server/`（2 件） — Node 側 I/O 部品(fetch/WebSocket を実際に叩く。api と scripts が共用。lib には置けない)  〔API / 公開 / ランキング〕
 - `shared/`（7 件） — 複数機能で共有する小部品(アバター URL ガード等)  〔共有 / アバター〕
 - `sound/`（1 件） — 音声素材(src 側)  〔音声〕
@@ -623,6 +628,14 @@ pre-pushのbuild再実行でbuildIdタイムスタンプが毎回変わりdist�
 - [`scripts/build.mjs`](../scripts/build.mjs)
 - [`.husky/pre-push`](../.husky/pre-push)
 - [`.husky/pre-commit`](../.husky/pre-commit)
+
+### 横断応援者ランキング(デバイス内・段B)  〔応援 / ランキング / マーケ〕
+過去N配信+今回を横断して「少数固定・複数配信を横断して応援してくれている人」をコメント数順に可視化。indexPastUsers(横断集計)→buildSupporterRanking(既存の単一配信専用ランキング関数・無改変)を呼び、broadcastCount(横断配信数)を外側で合成。marketing-export.html側(heavyMktガード配下・明示トリガー時のみ)に新規セクションとして描画し、応援レーン描画経路(renderStoryUserLane等)や自律tick(popup-entry.js:15762)は一切通さない。公開・集約はせずこのPC内で完結(上位計画 elegant-crunching-quokka.md 段B・2026-09-22)
+
+- [`src/lib/crossSupporterRanking.js`](../src/lib/crossSupporterRanking.js)
+- [`src/lib/commenterHistoricalAnalytics.js`](../src/lib/commenterHistoricalAnalytics.js)
+- [`src/lib/supporterRanking.js`](../src/lib/supporterRanking.js)
+- [`src/lib/marketingChartsHtml.js`](../src/lib/marketingChartsHtml.js)
 
 ---
 
