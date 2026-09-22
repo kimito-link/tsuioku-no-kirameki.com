@@ -18,6 +18,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1540',
+    date: '2026-09-22',
+    summary: '内部整理(表示や動作は変わりません)',
+    items: Object.freeze([
+      '出荷手順の異常検知を強化しました(配布物には影響ありません)。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1539',
     date: '2026-09-22',
     summary: '内部整理(表示や動作は変わりません)',
@@ -167,14 +175,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     summary: '内部整理の安全網(挙動は変わりません)',
     items: Object.freeze([
       '今後の内部整理でうっかり大きくなりすぎないよう、開発用の見張りを追加しました(表示や動作は変わりません)。'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.1520',
-    date: '2026-09-16',
-    summary: 'カード画像の配信者名の括弧欠けを修正',
-    items: Object.freeze([
-      'シェアカード画像で、配信者名が途中で切れて開き括弧だけが残ることがあったのを直しました。'
     ])
   })
 ]);

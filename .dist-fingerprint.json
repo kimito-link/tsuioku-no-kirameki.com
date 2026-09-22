@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "mode": "default",
-  "fingerprint": "9ea5ee3e4275f38d8a53e62c4c3a1963fdee7ec40d480b4e7f51087a3da1dabb",
+  "fingerprint": "ad6756cce90d73bc23eee3c52aee99c332c333936bd15dddf8021eaf215a815a",
   "inputs": [
     "app/app.js",
     "app/live-view.js",
@@ -769,9 +769,9 @@
     "extension/dist/page-intercept.js": "15fab9147ade13dc6853b9f407bea98b3eafa0b30b7afb7404d2d3d6bad69e1e",
     "extension/dist/backfill-sw.js": "f7b284e0efc83deca607da48bc71a29ab70aef249d2bb11bce9ed6fe0d1e2d15",
     "extension/dist/content.js": "e749142123aa378ab4849ed06644a35647394bdeb83ec7316aee34f14f0031c8",
-    "extension/dist/popup.js": "8ce1f34a6872ba649cdcd28c75048d65f7955ffa5a97b1c80f90cc1320a636d3",
+    "extension/dist/popup.js": "c4d003ab5d05e3b0f2ac77ce952128144bcc1b297fe7a30c172eb6b50eeb2c11",
     "extension/dist/offscreen.js": "3bd8f15c2ce9e880b6dd150256d899377e2e2647bd0d71ec08803bc0233c48dc",
-    "extension/dist/status.js": "8d8af309989d0ffd9e8934daafd9805c4c39224759da4f30a72ac1550133606f",
+    "extension/dist/status.js": "3ff8492f60e44e44562424ac866251d8b4f70026619801bd9cfd5326f7ca4482",
     "extension/dist/live-view.js": "c4f54a96606bcb01af056fbfd2ada7e45b1864f72ef2cc697e965fe4f32a51f6",
     "extension/dist/marketing-export.js": "c23e6d1a5516b73ebf4ce42eb5561310a3fc7316a8b8a4ad0bb4a3a574e9627f",
     "extension/dist/comeview.js": "450f096bb45d8bab7f3a3646e116040972ef9db3b719c9c205e933dfef0aabeb",
@@ -779,7 +779,7 @@
     "extension/dist/sidepanel.js": "93b11868e25961b598089c5102dc8662c8f05d5ae99ea7542b37b478681d1352",
     "extension/dist/cloak-failsafe.js": "8baabc8a7ee4ab9f0e6fd66c6b917c4832bade10efa9917cf50bf40ca2588207",
     "app/dist/app.js": "9af7800bc0527fbcc239eba0a06d8c02324f0c4d3b7ff0c740bacd9a307a016e",
-    "app/dist/live-view.js": "1241034269531796c6e610b04889323130a6e28b8d391eb957cc9fccf3646052",
+    "app/dist/live-view.js": "28e5de2795b0b5da826a4c2cb0556f6e0edebcf03cf13e1964eaa3da8c1b388b",
     "app/dist/live-ranking.js": "3be7cd22712ce6353fcc304866b3f3956cd331a9875a3c14672e3f1a48bed0ff"
   }
 }

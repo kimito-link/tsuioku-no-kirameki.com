@@ -4,7 +4,13 @@ import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
-import { normalizeInputs, fingerprintText, maskBuildId, FINGERPRINT_SCHEMA } from '../src/lib/distFingerprint.js';
+import {
+  normalizeInputs,
+  fingerprintText,
+  maskBuildId,
+  FINGERPRINT_SCHEMA,
+  judgeBuildInputsHealthy
+} from '../src/lib/distFingerprint.js';
 
 // .env を読み込む(status の共有キー NL_STATUS_INGEST_KEY / NL_STATUS_VIEW_TOKEN は .env から注入)。
 //   ★これが無いと `npm run build` が空キービルドになり、status の「WEBサイトURLで共有」ボタンが
@@ -225,6 +231,12 @@ const results = await Promise.all(targets.map((t) => esbuild.build({ ...common, 
 const ROOT = resolve(__dirname, '..');
 const MODE = IS_RELEASE ? 'release' : 'default';
 const rawInputs = results.flatMap((r) => Object.keys(r.metafile?.inputs || {}));
+// ★2026-09-22: metafile.inputs が(esbuildの仕様変更等で)静かに空/縮退すると、指紋がソースを
+//   一切見ずに計算され「build し忘れても常に緑になる」壊れ方をする。ここで早期に throw する。
+const inputsCheck = judgeBuildInputsHealthy({ rawInputCount: rawInputs.length, targetCount: targets.length });
+if (!inputsCheck.ok) {
+  throw new Error(`[build] 入力ファイル検出の異常: ${inputsCheck.reason}`);
+}
 const fpInputs = normalizeInputs(rawInputs);
 // ★git が `add` 時に付けるのと同じ blob sha(1プロセス・stdin にパスを流す)。
 const blobsOut = execFileSync('git', ['hash-object', '--stdin-paths'], {

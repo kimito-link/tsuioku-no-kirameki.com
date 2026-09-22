@@ -5,7 +5,8 @@ import {
   maskBuildId,
   normalizeInputs,
   fingerprintText,
-  judgeDistFreshness
+  judgeDistFreshness,
+  judgeBuildInputsHealthy
 } from './distFingerprint.js';
 
 describe('maskBuildId', () => {
@@ -196,5 +197,30 @@ describe('judgeDistFreshness', () => {
     });
     expect(result.ok).toBe(false);
     expect(result.problems.length).toBeGreaterThanOrEqual(3);
+  });
+});
+
+describe('judgeBuildInputsHealthy', () => {
+  it('★rawInputCount が 0 なら NG(esbuildのmetafile仕様変更等で静かに空になる穴の検知)', () => {
+    const r = judgeBuildInputsHealthy({ rawInputCount: 0, targetCount: 15 });
+    expect(r.ok).toBe(false);
+    expect(r.reason).toMatch(/空/);
+  });
+
+  it('rawInputCount が targetCount 未満なら NG', () => {
+    const r = judgeBuildInputsHealthy({ rawInputCount: 10, targetCount: 15 });
+    expect(r.ok).toBe(false);
+    expect(r.reason).toMatch(/entryPoint/);
+  });
+
+  it('rawInputCount が targetCount 以上なら OK(実測相当: 761件/15targets)', () => {
+    const r = judgeBuildInputsHealthy({ rawInputCount: 761, targetCount: 15 });
+    expect(r.ok).toBe(true);
+    expect(r.reason).toBeNull();
+  });
+
+  it('境界: ちょうど targetCount と同数なら OK', () => {
+    const r = judgeBuildInputsHealthy({ rawInputCount: 15, targetCount: 15 });
+    expect(r.ok).toBe(true);
   });
 });
