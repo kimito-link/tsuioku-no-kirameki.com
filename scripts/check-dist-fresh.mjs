@@ -39,6 +39,14 @@ function git(args, opt = {}) {
   return execFileSync('git', args, { cwd: ROOT, maxBuffer: 64 * 1024 * 1024, encoding: 'utf8', ...opt });
 }
 
+/* ================================================================
+ * 【ブロック】TreeSource 生成(git/fs へのI/O層)
+ *   「どの tree を見るか」(commit / index / 作業ツリー)の違いを吸収し、
+ *   どれも同じ形(blobsOf/read)で check() に渡せるようにするアダプタ群。
+ *   git を叩くのはここだけ。以降の check()/selftest() は TreeSource の
+ *   インターフェースだけを見て動く(3種類の呼び分けを意識しない)。
+ * ================================================================ */
+
 /**
  * @typedef {{
  *   label: string,
@@ -119,6 +127,14 @@ function worktreeSource() {
   };
 }
 
+/* ================================================================
+ * 【ブロック】check 本体(判定のオーケストレーション)
+ *   sidecar(.dist-fingerprint.json)を読み、渡された TreeSource から
+ *   実際の blob sha / 出力hash を引き直し、distFingerprint.js の純関数
+ *   (fingerprintText/maskBuildId/judgeDistFreshness)に判定を委ねるだけ。
+ *   判定ロジック自体はここに書かない(src/lib/distFingerprint.js が正本)。
+ * ================================================================ */
+
 /**
  * @param {TreeSource} src
  * @returns {boolean}
@@ -167,6 +183,13 @@ function check(src) {
   }
   return v.ok;
 }
+
+/* ================================================================
+ * 【ブロック】selftest(この検査自体が壊れていないかの自己診断)
+ *   judgeDistFreshness を直接呼ぶだけで git/fs には一切触れない
+ *   (実環境に依存せず「毒→赤・正常→緑」の判定ロジックだけを検査する)。
+ *   npm run check:dist-fresh:selftest → verify:cc が自動収集して実行する。
+ * ================================================================ */
 
 /** 毒→赤 / 正常→緑 の自己診断(judgeDistFreshness を直接呼ぶ・git/fs には触れない)。 */
 function selftest() {
@@ -231,6 +254,12 @@ function selftest() {
   return ok;
 }
 
+/* ================================================================
+ * 【ブロック】CLI エントリ(引数→どの TreeSource を使うかの振り分けだけ)
+ *   呼び出し元(pre-commit/pre-push/CI/verify:cc/手動)ごとに見るべき
+ *   tree が違うので、フラグとTreeSource生成関数の対応をここに集約する。
+ *   判定ロジックはここに書かない(check()/judgeDistFreshnessに委譲)。
+ * ================================================================ */
 const argv = process.argv.slice(2);
 let ok = true;
 

@@ -18,6 +18,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1539',
+    date: '2026-09-22',
+    summary: '内部整理(表示や動作は変わりません)',
+    items: Object.freeze([
+      '開発時の出荷手順のコード説明を強化しました(配布物には影響ありません)。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1538',
     date: '2026-09-21',
     summary: '内部整理(表示や動作は変わりません)',
@@ -167,14 +175,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     summary: 'カード画像の配信者名の括弧欠けを修正',
     items: Object.freeze([
       'シェアカード画像で、配信者名が途中で切れて開き括弧だけが残ることがあったのを直しました。'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.1519',
-    date: '2026-09-15',
-    summary: 'シェアカードの画像に応援の数字を合成',
-    items: Object.freeze([
-      'カード画像が、配信サムネに来場・コメント・ギフト・広告の数字と時刻を重ねたものになりました(放送中の配信のみ・数字は貼った時点の目安)。'
     ])
   })
 ]);

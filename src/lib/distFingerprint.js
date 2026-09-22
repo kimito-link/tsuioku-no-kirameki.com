@@ -12,6 +12,17 @@
  *
  * fs / child_process に触らない(src/lib の掟)。I/O は scripts/check-dist-fresh.mjs / build.mjs 側。
  *
+ * ★前提(2026-09-22 実測で裏取り済み): blob sha は「作業ツリー→git checkout時のフィルタ後」の
+ *   バイト列から決まる(`git hash-object` = `git rev-parse HEAD:<path>` を実測で確認)。
+ *   このリポは `core.autocrlf=false`(改行変換なし)であり、CI(Ubuntu, actions/checkout@v4)も
+ *   既定でフィルタを入れない。**両者の設定が一致している前提が崩れる(例: 誰かが自分の
+ *   グローバル設定で `autocrlf=true` の clone を作り、その環境で `npm run build` を実行する)と、
+ *   同じ commit でも blob sha がずれて指紋が不一致になりうる。** これは実害としては
+ *   「本来正しいのに check-dist-fresh が赤くなる」偽陽性であり、`npm run build` すれば
+ *   その環境の autocrlf で再計算されるため直る(危険側には倒れない)。
+ *   `.gitattributes` の `.husky/* text eol=lf` はフックのCRLF化だけを防ぐもので、
+ *   この autocrlf 依存そのものは解消しない(2026-09-22 時点で未解決の既知の前提)。
+ *
  * @module distFingerprint
  */
 
