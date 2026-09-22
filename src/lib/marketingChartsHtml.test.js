@@ -1152,3 +1152,61 @@ describe('buildMarketingDashboardHtml', () => {
     });
   });
 });
+
+describe('段B: 横断応援者ランキング(buildMarketingDashboardHtml統合)', () => {
+  it('pastBroadcastsがあれば横断応援者ランキングセクションが描画される', () => {
+    const base = Date.now() - 600_000;
+    const comments = [
+      { id: 'c1', liveId: 'lv123', commentNo: '1', text: 'hi', userId: '100', nickname: 'A', capturedAt: base, vpos: 0, is184: false, selfPosted: false }
+    ];
+    const html = buildMarketingDashboardHtml(aggregateMarketingReport(comments, 'lv123'), {
+      commentsForAnalytics: comments,
+      pastBroadcasts: [
+        { liveId: 'lv121', comments: [{ userId: '100', nickname: 'A' }, { userId: '200', nickname: 'B' }] },
+        { liveId: 'lv122', comments: [{ userId: '100', nickname: 'A' }] }
+      ]
+    });
+    const section = html.match(/<section class="mkt-section mkt-section--cross-supporter-ranking"[\s\S]*?<\/section>/)?.[0] || '';
+    expect(section).toContain('id="mkt-cross-supporter-ranking"');
+    expect(section).toContain('横断応援者ランキング');
+    expect(section).toContain('>A<');
+    // userId 100 は lv121+lv122 の2配信に出現
+    expect(section).toContain('data-label="横断配信数" class="mkt-num">2<');
+  });
+
+  it('pastBroadcasts未指定なら横断応援者ランキングセクションは描画されない(空で非表示)', () => {
+    const html = buildMarketingDashboardHtml(minimal());
+    expect(html).not.toContain('id="mkt-cross-supporter-ranking"');
+    expect(html).not.toContain('横断応援者ランキング');
+  });
+
+  it('TOCには実際に描画されたときだけ「横断応援者ランキングβ」項目が載る', () => {
+    const base = Date.now() - 600_000;
+    const comments = [
+      { id: 'c1', liveId: 'lv123', commentNo: '1', text: 'hi', userId: '100', nickname: 'A', capturedAt: base, vpos: 0, is184: false, selfPosted: false }
+    ];
+    const withPast = buildMarketingDashboardHtml(aggregateMarketingReport(comments, 'lv123'), {
+      commentsForAnalytics: comments,
+      pastBroadcasts: [{ liveId: 'lv121', comments: [{ userId: '100', nickname: 'A' }] }]
+    });
+    expect(withPast).toContain('横断応援者ランキングβ');
+    const withoutPast = buildMarketingDashboardHtml(minimal());
+    expect(withoutPast).not.toContain('横断応援者ランキングβ');
+  });
+
+  it('匿名userIdは「匿名」として表示される(集約キーには使うが表示名として漏らさない)', () => {
+    const base = Date.now() - 600_000;
+    const comments = [
+      { id: 'c1', liveId: 'lv123', commentNo: '1', text: 'hi', userId: '100', nickname: 'A', capturedAt: base, vpos: 0, is184: false, selfPosted: false }
+    ];
+    const html = buildMarketingDashboardHtml(aggregateMarketingReport(comments, 'lv123'), {
+      commentsForAnalytics: comments,
+      pastBroadcasts: [
+        { liveId: 'lv121', comments: [{ userId: 'a:anonhash', nickname: '' }] }
+      ]
+    });
+    const section = html.match(/<section class="mkt-section mkt-section--cross-supporter-ranking"[\s\S]*?<\/section>/)?.[0] || '';
+    expect(section).toContain('>匿名<');
+    expect(section).not.toContain('anonhash');
+  });
+});

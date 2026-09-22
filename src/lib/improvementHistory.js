@@ -943,5 +943,22 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
       'throwを実機確認)で別の手段の確認を行っている。またe2e失敗8件が今回PR由来でないことも' +
       'popup.js等のバイト単位比較(buildId/version/changelog差分を正規化除去して完全一致確認)で' +
       '別の手段による裏取りを実施済み。'
+  }),
+  Object.freeze({
+    version: '0.1.1541', metric: 'bundle-kb', value: 1360,
+    source: '[auto] extension/dist/popup.js のファイルサイズ'
+  }),
+  Object.freeze({
+    version: '0.1.1541', metric: 'gate-selftest', value: 4,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1541', metric: 'cross-checked-claims', value: 53,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: '★直近30日窓のスライドによる自然減(55→53で横ばい圏)。今回は段B(横断応援者ランキング)の' +
+      '実装前にExplore2本+Plan1本で既存関数(indexPastUsers/buildSupporterRanking)の型・実運用経路を' +
+      '実コードで裏取りし、buildSupporterRankingが自律tick経由で単一配信専用として実運用中であることを' +
+      '確認した上でSupporterRow型を無改変にする設計を選んだ。統合テスト4件で実際にHTML内に' +
+      'セクションが出る/出ないを別の手段(marketingChartsHtml.test.js)で確認済み。'
   })
 ]);
