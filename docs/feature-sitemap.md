@@ -181,7 +181,7 @@
 
 - **応援レーン集約(誰が候補か)** — 保存コメント行を userId 単位に畳み込みレーン候補を作る唯一の集約正本(popup/venue 共通)
   - `src/lib/userLaneCandidatesFromStorage.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 97</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 96</summary>
 
 - `src/domain/lane/aggregate.js` — 応援ユーザーレーンの per-row → per-user 集約（純関数）。
 - `src/domain/observations/observationStore.js` — observationStore - StatObservation のメモリ常駐リングバッファ。
@@ -212,7 +212,6 @@
 - `src/lib/commenterFollowAnalytics.js` — 数値IDコメンターのフォロー情報を、マーケ分析HTMLで扱いやすい形へ整える純関数群。
 - `src/lib/commenterFollowCache.js` — コメンター（数値 userId）のフォロー/フォロワー数・プレミアム・LV を userId 単位でためる
 - `src/lib/commenterFollowingListCache.js` — コメンター（数値 userId）のフォロー先 userId リスト横断キャッシュ。
-- `src/lib/commenterHistoricalAnalytics.js` — 過去 N 配信 × 現在配信のコメンターを横断分析する純粋関数群。
 - `src/lib/commenterSurvivalCurve.js` — コメンター生存曲線（B6）。
 - `src/lib/commentFatigue.js` — コメント疲労（「短い時間でコメントを打つと疲れて失速する」）をデータ化する純関数。
 - `src/lib/commentSilenceZones.js` — コメントの沈黙ゾーン検出（連続 X 秒以上のコメ無し区間）+ L2 沈黙の質判定。
@@ -582,7 +581,7 @@
 
 - **HTMLレポート生成** — マーケ/イベント順位/タイムライン等を1枚の HTML レポートに組み立てる(popup-entry 内)
   - `src/extension/popup-entry.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 43</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 42</summary>
 
 - `extension/marketing-export-guard.js` — マーケ分析タブ(marketing-export.html)の「何があっても開く」保険。
 - `scripts/build-sound-preview.mjs` — 開発用: extension/sound/ 配下の全効果音を1枚のHTMLで試聴できるページを生成する。
@@ -605,7 +604,6 @@
 - `src/lib/htmlReportConceptGuide.js` — HTML レポート用キャラガイド（この拡張の説明／保存ページの使い方）
 - `src/lib/htmlText.js` — HTML に文字列を流し込むときの最小の共有部品(純粋関数)。
 - `src/lib/liveviewErrorReport.js` — 純Web③(app.tsuioku-no-kirameki.com)専用の最小エラーレポータ(v0.1.1130)。
-- `src/lib/marketingChartsHtml.js` — マーケ集計(MarketingReport)から HTMLレポート用のグラフ/チャート HTML を組み立てる。
 - `src/lib/marketingDynamicAdvice.js` — 0.1.33 (AH): マーケ分析の各セクションに「内容に応じて変わる」キャラ解説を出す
 - `src/lib/marketingReportEmbed.js` — マーケ分析 HTML に埋め込む JSON（表計算・ツール連携用）。
 - `src/lib/marketingSupportParticipationCounts.js` — マーケ分析・HTMLレポート先頭 KPI: ギフト投げ主・広告した人の人数。
@@ -839,6 +837,11 @@
   - `scripts/build.mjs`
   - `.husky/pre-push`
   - `.husky/pre-commit`
+- **横断応援者ランキング(デバイス内・段B)** — 過去N配信+今回を横断して「少数固定・複数配信を横断して応援してくれている人」をコメント数順に可視化。indexPastUsers(横断集計)→buildSupporterRanking(既存の単一配信専用ランキング関数・無改変)を呼び、broadcastCount(横断配信数)を外側で合成。marketing-export.html側(heavyMktガード配下・明示トリガー時のみ)に新規セクションとして描画し、応援レーン描画経路(renderStoryUserLane等)や自律tick(popup-entry.js:15762)は一切通さない。公開・集約はせずこのPC内で完結(上位計画 elegant-crunching-quokka.md 段B・2026-09-22)
+  - `src/lib/crossSupporterRanking.js`
+  - `src/lib/commenterHistoricalAnalytics.js`
+  - `src/lib/supporterRanking.js`
+  - `src/lib/marketingChartsHtml.js`
 <details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 205</summary>
 
 - `app/app.js` — スマホ閲覧用 status Web 版。
@@ -1079,6 +1082,7 @@
 - `v0.1.1527` 2026-09-18 — パネルを開いた直後の表示を速く
 
 ### その他 (13版)
+- `v0.1.1541` 2026-09-23 — マーケ分析に横断応援者ランキングを追加
 - `v0.1.1540` 2026-09-22 — 内部整理(表示や動作は変わりません)
 - `v0.1.1539` 2026-09-22 — 内部整理(表示や動作は変わりません)
 - `v0.1.1538` 2026-09-21 — 内部整理(表示や動作は変わりません)
@@ -1091,4 +1095,3 @@
 - `v0.1.1524` 2026-09-18 — 内部整理(表示や動作は変わりません)
 - `v0.1.1523` 2026-09-18 — 内部整理(表示や動作は変わりません)
 - `v0.1.1522` 2026-09-18 — 内部整理(表示や動作は変わりません)
-- `v0.1.1521` 2026-09-17 — 内部整理の安全網(挙動は変わりません)

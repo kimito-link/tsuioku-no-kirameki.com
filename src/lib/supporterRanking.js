@@ -28,8 +28,13 @@ function num(v) {
   return Number.isFinite(n) ? n : 0;
 }
 
-/** userId が匿名(a:hash / anon: prefix / 空)か。giftMomentumAnalytics と同じ匿名判定に揃える。 @param {unknown} userId */
-function isAnonymousUserId(userId) {
+/**
+ * userId が匿名(a:hash / anon: prefix / 空)か。giftMomentumAnalytics と同じ匿名判定に揃える。
+ * ★段B(2026-09-22): `src/lib/crossSupporterRanking.js` が同じ匿名判定を再利用するため
+ *   export した(挙動は無変更)。
+ * @param {unknown} userId
+ */
+export function isAnonymousUserId(userId) {
   const id = String(userId || '').trim();
   if (!id) return true;
   return /^(__anon_|anon:|a:)/i.test(id);

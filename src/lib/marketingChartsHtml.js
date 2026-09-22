@@ -39,6 +39,7 @@ import {
   buildCommenterAttendanceMatrix
 } from './commenterHistoricalAnalytics.js';
 import { buildCommenterSurvivalCurve } from './commenterSurvivalCurve.js';
+import { buildCrossSupporterRanking } from './crossSupporterRanking.js';
 import { diagnoseKeyboardTypes } from './keyboardTypeDiagnostic.js';
 import {
   buildRecentBroadcastComparison,
@@ -3926,6 +3927,36 @@ function sectionSupporterChikuranBeta(analysis, maskShare, identiconResolver) {
 }
 
 /**
+ * 段B(2026-09-22): デバイス内・横断応援者ランキング。今回だけでなく過去配信も含めて
+ * 「少数固定・複数配信を横断して応援してくれている人」を可視化する。公開・集約はしない
+ * (このPC内の記録だけで完結・サーバ送信なし)。
+ *
+ * @param {ReturnType<typeof buildCrossSupporterRanking>} rows
+ * @param {number} pastBroadcastCount 横断対象にした過去配信の枠数(0件表示の分岐用)
+ */
+function sectionCrossSupporterRanking(rows, pastBroadcastCount) {
+  if (!Array.isArray(rows) || rows.length === 0) return '';
+  const rowHtml = rows
+    .map(
+      (row) => `<tr>
+<td data-label="#">${row.rank}</td>
+<td data-label="応援者">${escapeHtml(row.name)}</td>
+<td data-label="コメ(横断合計)" class="mkt-num">${row.count}</td>
+<td data-label="横断配信数" class="mkt-num">${row.broadcastCount}</td>
+</tr>`
+    )
+    .join('');
+  return `<section class="mkt-section mkt-section--cross-supporter-ranking" id="mkt-cross-supporter-ranking">
+<h2>横断応援者ランキング（このPC内・β）</h2>
+<p class="mkt-note">過去${pastBroadcastCount}配信 + 今回を横断して、コメント数が多い順に並べています。<strong>このPCに記録が残っている配信だけ</strong>が対象で、公開や他PCとの集約はしていません。匿名の方は「匿名」とまとめて表示します。</p>
+<div class="mkt-table-scroll"><table class="mkt-rank mkt-cross-supporter-table">
+<thead><tr><th>#</th><th>応援者</th><th>コメ(横断合計)</th><th>横断配信数</th></tr></thead>
+<tbody>${rowHtml}</tbody>
+</table></div>
+</section>`;
+}
+
+/**
  * セクション順次発表の CSS を初回描画前から効かせるための早期フラグ。
  * 本体 script が動かない環境では class が付かないため、レポートは通常表示のまま残る。
  * @returns {string}
@@ -4267,6 +4298,13 @@ export function buildMarketingDashboardHtml(r, opts = {}) {
     liveId: String(b?.liveId || ''),
     comments: filterBroadcaster(b?.comments)
   }));
+  // 段B(2026-09-22): デバイス内・横断応援者ランキング。配信者除外済みの pastBroadcastsForLayer に
+  // 相乗り(自律tick/描画から絶対呼ばない・応援レーン経路は通さない・新規storage getは増やさない)。
+  // heavyMkt時はmarketing-export-entry.js側で pastBroadcasts 自体が空配列で渡ってくるため、
+  // ここでは追加ガード不要(空なら buildCrossSupporterRanking も自然に空配列を返す)。
+  const crossSupporterRanking = buildCrossSupporterRanking(pastBroadcastsForLayer, r.liveId, {
+    limit: 10
+  });
   const newVsRepeat = classifyCommentersAgainstHistory({
     currentLiveId: r.liveId,
     currentComments: currentCommentsForLayer,
@@ -4577,6 +4615,7 @@ export function buildMarketingDashboardHtml(r, opts = {}) {
     { id: 'mkt-segment-action', label: '層別マーケ診断' },
     { id: 'mkt-audience-gap', label: '来場→コメント変換率' },
     { id: 'mkt-supporter-chikuran', label: '応援者ちくらんβ' },
+    { id: 'mkt-cross-supporter-ranking', label: '横断応援者ランキングβ' },
     { id: 'mkt-support-chance', label: '応援が増えそうな時間' },
     { id: 'mkt-gift-flow', label: 'ギフトの流れ' },
     { id: 'mkt-gift-deep', label: 'ギフト深掘り' },
@@ -4659,6 +4698,7 @@ ${sectionMarketingFunnelBoard(marketingFunnelBoard)}
 ${sectionMarketingSegmentActionBoard(marketingSegmentActionBoard)}
 ${sectionAudienceEngagementGap(audienceGap, r)}
 ${sectionSupporterChikuranBeta(supporterChikuran, maskShare, identiconResolver)}
+${sectionCrossSupporterRanking(crossSupporterRanking, pastBroadcastsForLayer.length)}
 ${sectionGiftMomentum(giftMomentum, maskShare, identiconResolver)}
 ${sectionGiftThrowLedger(giftThrowLedger, maskShare, identiconResolver)}
 ${idWrap('mkt-event-ranking', sectionEventRanking(opts.eventRanking, maskShare, opts.broadcasterProfile ?? null))}
