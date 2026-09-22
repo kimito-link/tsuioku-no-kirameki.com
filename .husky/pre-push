@@ -1,2 +1,12 @@
 #!/usr/bin/env sh
-npm run verify
+# pre-push は push 内容を変えられない(送る sha は確定済み)。ここで build しても
+# 出力を捨てるか作業ツリーを汚すかしかない=buildId 無限差分ループの正体(2026-09-21)。
+# 代わりに「push される commit の dist がその commit のソースから build されたものか」を指紋で照合する。
+# 設計: docs/dist-fingerprint-gate-DESIGN.md
+# ★stdin(refs)は最初に読み切る。後続の npm 子プロセスが stdin を食うと refs が消える。
+PRE_PUSH_REFS="$(cat)"
+export PRE_PUSH_REFS
+if [ -z "$SKIP_DIST_GATE" ]; then
+  node scripts/check-dist-fresh.mjs --pushed || exit 1
+fi
+npm test && npm run lint && npm run typecheck

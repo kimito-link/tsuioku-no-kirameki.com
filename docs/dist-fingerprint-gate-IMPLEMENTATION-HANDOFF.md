@@ -3,6 +3,11 @@
 > 設計書: [dist-fingerprint-gate-DESIGN.md](dist-fingerprint-gate-DESIGN.md)(必ず先に全文読む)
 > このファイル1枚で着手できる粒度。実装は別モデル/次チャットで行う(3段構えの手順3)。
 > 作成日: 2026-09-21
+>
+> ★状態(2026-09-22更新): **実装・実機検証完了**(PR #250, commit 79e2dc5f)。
+> pushを複数回連続実行し作業ツリーが空のままであることを実機確認済み。
+> さらに長期運用の補強(設計書G章参照)を追加済み。このファイルは実装完了時点の記録であり、
+> 実装がその後変わっても更新しない。現在の正本は実コード。
 
 ## スコープ
 
@@ -100,3 +105,14 @@ git status --porcelain   # ★これが空でなければ設計が機能して�
    1つずれる(追わない)」の記述を更新(前提が変わったため。他ツールに渡さず司令塔が直接編集する)
 3. AGENTS.md §2の`NL_STORE_BUILD=1`の記述が古い(build.mjsではもう読んでいない)ことを別途報告
    (本タスクのスコープ外だが、設計書調査で判明した事実として記録)
+
+## ★将来この仕組みを変更する人へ(2026-09-22追記)
+
+- `src/lib/distFingerprint.js`の`ALWAYS_INPUTS`(package.json/package-lock.json/scripts/build.mjs/
+  tsconfig.json)は、esbuildの`metafile`に現れないがビルド出力に影響する設定ファイルの手作業一覧。
+  **新しい設定ファイル(esbuild.config.mjs分離・babel.config.js追加等)を足すときは、この配列にも
+  追記が必要か検討すること**(機械的な強制は無い。追記漏れても即座に壊れるわけではないが、
+  そのファイルの変更が指紋に反映されず「build忘れ」を検知できなくなる)。
+- `src/lib/distFingerprint.js`の`judgeBuildInputsHealthy`は、esbuildの`metafile.inputs`が
+  将来のバージョンアップで空/縮退した場合に`build.mjs`がthrowして気づけるようにするガード。
+  閾値は`targets.length`(entryPoint数)という相対値なので、targetsを増減しても書き直し不要。

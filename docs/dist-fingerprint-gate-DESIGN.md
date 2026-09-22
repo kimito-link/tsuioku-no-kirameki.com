@@ -496,3 +496,53 @@ fi
 12. **無傷の確認**: `copy:ext`のBUILD_ID表示、`verify:deploy`、status画面の「このビルドの新しさ」セルが従来通り。
 13. **`verify-bump` [3]**: bump→build→`verify:bump`で[3]が緑のまま。
 14. **ロールバック**: `.husky/pre-push`を`npm run verify`の1行に戻し、pre-commitの追記とci.ymlの1ステップを外せば旧挙動。`.dist-fingerprint.json`と2スクリプトは残しても無害。
+
+## G. 追加補強: 長期運用での「静かな壊れ方」対策(2026-09-22)
+
+> 経緯: 実装・PR作成後、ユーザーから「100年後も安心できる形にしたい」との要望を受け、
+> dist-fingerprint-gate自体の長期リスクを2本のExploreエージェント + 1本のPlanエージェントで
+> 再調査した。以下は実コード裏取り・毒テストで確認済みの内容。
+
+### 確認したリスクと対応
+
+1. **【対応済み】esbuildのmetafile仕様変更で静かに壊れる経路**:
+   `scripts/build.mjs`の`results.flatMap((r) => Object.keys(r.metafile?.inputs || {}))`は、
+   将来esbuildの`metafile`仕様が変わって空になっても**エラーを出さない**。`normalizeInputs([])`は
+   `ALWAYS_INPUTS`の4件だけを静かに返し、指紋はソースを一切見ずに計算され続ける。結果
+   「build し忘れても常に緑になる」というこのゲートの存在意義を消す壊れ方をする。
+   → `src/lib/distFingerprint.js`に純関数`judgeBuildInputsHealthy({ rawInputCount, targetCount })`
+   を追加し、`scripts/build.mjs`で`rawInputs`計算直後に呼んで異常なら`throw`するようにした。
+   閾値は当てずっぽうの絶対数(現状761件)ではなく、`targets.length`(entryPoint数、現状15件)
+   という**コード上に既に存在する相対値**にした(「entryPoint 1つにつき最低1 inputは出るはず」
+   というesbuildの性質が根拠。targetsが将来増減しても閾値を書き直す必要がない)。
+   実機の毒テストで、`rawInputs`を空にすると実際に`throw`されbuildが失敗することを確認済み。
+
+2. **【見送り・記録のみ】`ALWAYS_INPUTS`の網羅性の経年劣化**: 将来新しい設定ファイル
+   (esbuild.config.mjs分離等)が増えたときにこの配列への追記を機械的に強制する仕組みは
+   無い(確認済み)。将来のファイル種別を予測できないため機械的強制は過剰設計と判断し見送り。
+   実装ハンドオフに一文の注意書きを追加するに留める。
+
+3. **【見送り・記録のみ】この設計書自体が`check-doc-rot`の対象外**: `check-doc-rot.mjs`の
+   `DEFAULT_TARGETS`は`CLAUDE.md`のみで、`diagnostics.json`にもこの2ファイルを対象に加える
+   宣言は無い(確認済み)。この文書は「実装完了時点のスナップショット」という性質上、
+   将来実装が変わっても自動検知はされない。**このファイルおよび
+   `dist-fingerprint-gate-IMPLEMENTATION-HANDOFF.md`は実装完了時点の記録であり、実装が
+   その後変わっても更新しない。現在の正本は実コード(`src/lib/distFingerprint.js`・
+   `scripts/build.mjs`・`scripts/check-dist-fresh.mjs`)である。**
+
+4. **【対応不要と確認済み】selftestの境界ケース(壊れたJSON)**: `check-dist-fresh.mjs`の`check()`
+   は`JSON.parse`を`try/catch`で握っており、壊れたJSONは`sidecar=null`経由で正しくNG判定される
+   設計に既になっている(実装済み・追加対応不要)。
+
+5. **【低リスクと確認済み】`--pushed`のPOSIX準拠性・`verify-bump`[3]との整合性**:
+   `$(cat)`はPOSIX基本機能でシェル実装差の懸念は薄い。`verify-bump`[3](mtimeチェック)は
+   CI/pre-commit/pre-pushのどの自動フックにも配線されておらず(`run-verify-cc.mjs`でのみ
+   呼ばれる人間向けログ)、dist-fingerprint-gateと自動フック内で衝突することはない。
+
+### e2e失敗との切り分け(参考記録)
+
+PR #250のCIで`e2e`が8件失敗したが、実コード比較(base/headの`extension/dist/popup.js`等を
+buildId・version・changelog差分を正規化除去した上でバイト単位比較)により**完全一致**を確認し、
+このPRのソース変更に起因しないことを確定した。MEMORY記録「e2e CIが08-05から全failure」・
+`docs/handoff/HANDOFF-resume-0808-e2e-content-visibility.md`の「masterも08-05から落ちている」・
+`playwright.config.js`記載の「2026-08-18〜9-1の20連続CI失敗」という既存の慢性flaky問題に該当する。
