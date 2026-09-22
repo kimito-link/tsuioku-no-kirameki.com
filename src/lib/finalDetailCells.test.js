@@ -72,21 +72,6 @@ describe('最終弾のセル', () => {
     });
   });
 
-  describe('BGM(bgm-phase)', () => {
-    it('★使っていなければ na(死にセルで埋めない)', () => {
-      const c = cellOf({ bgmPhaseDiag: { bgmEnabled: false } }, 'bgm-phase');
-      expect(c?.level).toBe('na');
-    });
-
-    it('★状態の記録は異常にしない', () => {
-      const c = cellOf({
-        bgmPhaseDiag: { bgmEnabled: true, phase: 'fever', reachCount: 3, jackpotCount: 1 }
-      }, 'bgm-phase');
-      expect(c?.level).toBe('ok');
-      expect(c?.text).toContain('フィーバー');
-    });
-  });
-
   describe('受信から保存まで(ndgr-persist)', () => {
     it('★取れているのに保存されていなければ bad', () => {
       const c = cellOf({
@@ -145,7 +130,7 @@ describe('最終弾のセル', () => {
   it('★全セルが常に出る(消えない=掟5)', () => {
     const ids = buildFinalDetailCells({}).map((c) => c.id).sort();
     expect(ids).toEqual([
-      'bgm-phase', 'identity-anon', 'identity-complete', 'identity-name', 'identity-thumb',
+      'identity-anon', 'identity-complete', 'identity-name', 'identity-thumb',
       'multi-tab', 'ndgr-persist', 'op-sound', 'uid-detail'
     ]);
   });

@@ -117,12 +117,12 @@
   - `src/lib/monotonicCommentCount.js`
 - **storage キー定義** — chrome.storage のキー名の正本(nls_comments_<lv> 等)
   - `src/lib/storageKeys.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 52</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 51</summary>
 
 - `scripts/dump-panel-state.mjs` — 実機の chrome.storage.local を吸い出して
+- `scripts/migrate-ext-storage.mjs` — 拡張の記録データを「旧ID配下フォルダ」→「新ID配下フォルダ」へコピーする(一度だけ・v0.1.1529)。
 - `scripts/record-improvement.mjs` — ★実測値を台帳に書き足す【1本の口】。
 - `src/lib/autoBackupState.js` — v0.1.808(星野ロミ式コンポーネント化・第1弾): content-entry.js の巨大化を抑えるため、
-- `src/lib/avCue.js` — 「AVCue = 音の再生結果を真実とする単一発火点」の純関数群(V1・DOM/storage/音に触れない)。
 - `src/lib/blobDownload.js` — Blob を指定ファイル名で保存する。
 - `src/lib/broadcastSessionSummaryDb.js` — 配信セッション単位の軽量サマリ（ポップアップの IndexedDB）
 - `src/lib/broadcastSessionSummaryFlush.js` — サマリ IndexedDB への間欠フラッシュ（ポップアップから呼ぶ）
@@ -144,7 +144,6 @@
 - `src/lib/livePersistInterval.js` — v0.1.498〜501: ライブ記録の保存（コアレッサ）最小間隔を決める純粋関数。フリーズ対策 A。
 - `src/lib/liveviewPublishOutcome.js` — 純Web公開（応援ライブビューの /api/status への POST）の直近結果を記録・要約する。
 - `src/lib/longTaskTracker.js` — メインスレッドを長時間ブロックした「Long Task」を有界に記録する純関数群。
-- `src/lib/mirrorBundleKey.js` — 鏡バンドルの storage キー。
 - `src/lib/northStarDetailCells.js` — 公式値レーン(ギフト/広告/イベント)の【実績】をセルにする(純関数)。
 - `src/lib/northStarMirrorKey.js` — 北極星レーン鏡(公式値レーン)の storage キー。
 - `src/lib/persistableCommentRow.js` — v0.1.362: DOM ハーベスト経路で拾ったコメント行を `nls_comments_<lv>` に保存して
@@ -182,7 +181,7 @@
 
 - **応援レーン集約(誰が候補か)** — 保存コメント行を userId 単位に畳み込みレーン候補を作る唯一の集約正本(popup/venue 共通)
   - `src/lib/userLaneCandidatesFromStorage.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 98</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 97</summary>
 
 - `src/domain/lane/aggregate.js` — 応援ユーザーレーンの per-row → per-user 集約（純関数）。
 - `src/domain/observations/observationStore.js` — observationStore - StatObservation のメモリ常駐リングバッファ。
@@ -192,7 +191,6 @@
 - `src/lib/broadcastCrossCompare.js` — 0.1.24 (Y): 横断比較系の純粋関数群。
 - `src/lib/broadcastDurationLabel.js` — HTML レポートの「配信時間」表示ラベルを純粋に整形する。
 - `src/lib/broadcasterCommentCount.js` — 「配信者本人のコメント数」を正しく算出する純関数(v0.1.838)。
-- `src/lib/broadcasterExcludedCount.js` — v0.1.774: 記録カードの見出し数値から「配信者本人のコメント」を差し引いて、公式(本家コメ)と
 - `src/lib/broadcasterFollowTarget.js` — 配信者タイル / casterBanner で出す「配信者の page URL とアイコン」を、
 - `src/lib/broadcasterProfileCard.js` — 配信者プロフィールの「レポート用 正規化モデル」と HTML 断片ビルダー（純関数）。
 - `src/lib/broadcasterReputationKeywords.js` — 配信者の評判チェック - ネガティブキーワード判定エンジン
@@ -305,7 +303,7 @@
   - `src/lib/giftThrowProjectile.js`
 - **吹き出し寿命管理** — 会場の吹き出しの表示上限・追い出し(eviction)ライフサイクル
   - `src/lib/venueBubbleLifecycle.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 236</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 237</summary>
 
 - `scripts/encode-marketing-html-avatars.mjs` — extension/images/marketing-html-avatars/*.png を data URI にし、
 - `scripts/split-avatar-parts.mjs` — 偽市松背景の除去 + パーツ切り出し(one-off アセットパイプライン)
@@ -342,6 +340,7 @@
 - `src/lib/charaLiveController.js` — 「キャラライブ」の配線係。charaLiveState(判断) と charaLiveStage(描画) を繋ぎ、
 - `src/lib/charaLiveStage.js` — 「キャラライブ」の描画層。charaLiveState.js が決めた状態を DOM に落とすだけ。
 - `src/lib/cheerPalette.js` — 盛り上げワード（8888 / wwwww / 顔文字 等）のワンクリック挿入パレット。
+- `src/lib/coalescedRepaintScheduler.js` — 【層】L0 判定層(依存ゼロ・chrome.* 非依存。yieldToBrowserPaint のみ依存)
 - `src/lib/comeviewActions.js` — v0.1.666: コメビュのコメント単位アクション(わんコメ同等+追憶独自)の純ロジック。
 - `src/lib/comeviewInstantRender.js` — コメビュ別窓で行を即時描画する純ロジック(本文の切り詰め・行の隠し判定など)。
 - `src/lib/comeviewRows.js` — v0.1.652: 独自コメビュ「KIRAMEKI Comment View」の表示行ロジック(純関数)。
@@ -556,16 +555,13 @@
   - `src/lib/voicePlayer.js`
   - `src/lib/voiceReadQueue.js`
   - `src/lib/voiceAgeGate.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 17</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 14</summary>
 
 - `src/lib/reportCompleteVoice.js` — v0.1.806: レポート(HTML/マーケ/メディアキット)の保存が【成功した直後】に、完了の合図として
 - `src/lib/voiceAssignment.js` — コメント者ごとに読み上げ声(styleId/ピッチ/速度オフセット)を決定論的に割り当てる純ロジック。
 - `src/lib/voiceBubbleRealtimeParity.js` — 「読み上げ」と「吹き出し(画面表示)」が
 - `src/lib/voiceComment.js` — ニコ生コメント欄の最大文字数（textarea maxlength と一致）
 - `src/lib/voiceDetailCells.js` — 読み上げの観測を【打ち手が変わる単位】に割る(純関数)。
-- `src/lib/voiceDirector.js` — council/pachinko-ultimate-SYNTHESIS.md §4(ボイスの歯止め)+§6 Phase B の実装。
-- `src/lib/voiceEffectDiag.js` — パチンコボイス演出(voiceDirector.js・Phase B)の発火/スキップ観測値を組み立てる純関数群。
-- `src/lib/voiceEffectDiagKey.js` — パチンコボイス演出(voiceDirector.js・Phase B)の「発火/スキップ内訳」観測値を
 - `src/lib/voiceFailureTaxonomy.js` — 【層】L0 判定層（純粋関数・I/O禁止）
 - `src/lib/voiceInputDevices.js` — マイク確認でサンプルする時間（ms）
 - `src/lib/voiceKeys.js` — 読み上げ設定の storage キーの【正本】。
@@ -662,7 +658,7 @@
 - **影響範囲ゲート(規律を自動化)** — 星野ロミ式「規律を自動ゲートに」。diff から影響大(複数機能波及)の変更ファイルを検出し波及先機能を列挙。警告のみ(摩擦ゼロ)・--strict で exit1。AGENTS.md §10 のルールを diff 発火に
   - `scripts/impact-check.mjs`
   - `docs/feature-map/impact-map.json`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 81</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 78</summary>
 
 - `api/status.js` — status 受け口 Vercel Serverless Function。
 - `extension/status-guard.js` — 状態速報ページ(status.html)の「何があっても開く」保険。
@@ -678,9 +674,6 @@
 - `src/lib/aiShareDiagSchema.js` — AI 共有診断バンドル（popup が組み立てる JSON / storage の nls_ai_share_fast_diag_v1）の
 - `src/lib/aiShareFastDiagKey.js` — v0.1.629: AI 共有 fastDiag キャッシュの storage key を popup と status ページで共有。
 - `src/lib/aiShareFullText.js` — 状態速報(AI共有)本文ビルダー。②応援ライブビュー/③WEB が同一の status-report builder を
-- `src/lib/avCueDiagKey.js` — AVCue(音+視覚の単一発火点・council/pachinko-av-max-SYNTHESIS.md V1)の観測値を
-- `src/lib/bgmPhaseDiag.js` — BGMディレクター(bgmDirector.js)+フェーズディレクター(phaseDirector.js)の観測値を組み立てる
-- `src/lib/bgmPhaseDiagKey.js` — BGMディレクター(bgmDirector.js)+フェーズディレクター(phaseDirector.js・Phase C)の
 - `src/lib/captureAuditionRichviewEventScoreDiagProbe.js` — audition.nicovideo.jp `/embedded/richview/live` 向けの診断ペイロード（PR1）。
 - `src/lib/changelog-archive.js` — 追憶のきらめき 更新履歴アーカイブ（popup のバンドル外）。
 - `src/lib/changelog.js` — 拡張の更新履歴データと semver 比較ヘルパ。
@@ -840,7 +833,13 @@
   - `tools/og-live-compose.py`
   - `.github/workflows/live-ranking.yml`
   - `vercel.json`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 209</summary>
+- **dist 鮮度ゲート(buildId無限差分ループ根治)** — pre-pushのbuild再実行でbuildIdタイムスタンプが毎回変わりdist差分が無限に再発していた問題を根治。esbuildのmetafileから実際のバンドル入力のgit blob shaを集めた指紋(.dist-fingerprint.json・buildIdを含まない)をbuild.mjsが書き、pre-commit(--index)/pre-push(--pushed)/CI(--ref HEAD)がこの指紋だけを照合してbuildを再実行しない。NL_BUILD_ID(buildAgeCell.jsが依存する時刻計器)は無変更。council-fable設計(docs/dist-fingerprint-gate-DESIGN.md・v0.1.1538)
+  - `src/lib/distFingerprint.js`
+  - `scripts/check-dist-fresh.mjs`
+  - `scripts/build.mjs`
+  - `.husky/pre-push`
+  - `.husky/pre-commit`
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 205</summary>
 
 - `app/app.js` — スマホ閲覧用 status Web 版。
 - `app/live-view.js` — global NL_BUILD_ID
@@ -849,9 +848,9 @@
 - `scripts/audit-gates.mjs` — ★**計器を計器で測る**(メタ検査)。
 - `scripts/build-sounds.mjs` — extension/sound/ の効果音mp3を組み立てる。
 - `scripts/build-watch.mjs` — watch では起動時刻を埋める（rebuild 毎に再 import される訳ではないので、
-- `scripts/build.mjs` — .env を読み込む(status の共有キー NL_STATUS_INGEST_KEY / NL_STATUS_VIEW_TOKEN は .env から注入)。
 - `scripts/capture-store-screenshots.mjs` — Chrome ウェブストア用スクショ自動撮影
 - `scripts/check-agent-bootstrap.mjs` — CLAUDE.md の1行目が `@AGENTS.md` の import であることを機械で守る。
+- `scripts/check-chrome-load-path.mjs` — Chrome が拡張を「同期フォルダ配下から」読み込んでいないか検査する(リロード固着の再発防止・v0.1.1529)。
 - `scripts/check-improvement.mjs` — ★版ごとの実測値が【退化】していないか見張る。
 - `scripts/check-layer.mjs` — ★`src/lib` が「純粋ロジックの箱」であり続けることを機械で守る。
 - `scripts/check-no-secrets-in-dist.mjs` — ビルド成果物に秘密情報が焼き込まれていないか検査する(fail-closed)。
@@ -894,7 +893,6 @@
 - `src/lib/backgroundWatchTab.js` — 「Alt+Tab に出てこない裏 watch タブ(active:false)」の判定。
 - `src/lib/bandScale.js` — 「大きく見せる枠(PICK UP 帯)」の倍率(純関数)。
 - `src/lib/bandScaleBoot.js` — PICK UP 帯の倍率を起動時に適用する(副作用モジュール)。
-- `src/lib/bgmDirector.js` — council/pachinko-ultimate-SYNTHESIS.md §5(BGM設計)+§6 Phase C の実装。
 - `src/lib/blackScreenOwnerCells.js` — 黒画面の【止めている当人】をセルにする(純関数)。
 - `src/lib/buildAgeCell.js` — いま動いているビルドが【いつのものか】を出す(純関数)。
 - `src/lib/buildWatchMetaCardAudienceViewModel.js` — Watch メタカード「観客」ブロック用 ViewModel（DOM 非依存）。
@@ -912,9 +910,8 @@
 - `src/lib/consoleErrorBuffer.js` — v0.1.201: window.error / unhandledrejection を捕捉する ring buffer。
 - `src/lib/copyTextWithFallback.js` — テキストを「確実に」クリップボードへ入れるためのフォールバック付きコピー。
 - `src/lib/currentLiveIdOrigin.js` — 「いま視聴中の配信」を【鏡とは別の起点】から決める純関数。
-- `src/lib/customSoundPreset.js` — council/pachinko-ultimate-SYNTHESIS.md §2 の「85素材の完全割り当て表」をそのままJSON化した
+- `src/lib/customSoundPreset.js` — 対応する効果音・操作音・結果発表音の No.→音種キー割り当てを JSON 化した
 - `src/lib/customSoundStore.js` — council/pachinko-ultimate-SYNTHESIS.md §1.2/§1.4/§1.5(Phase A)の実装。
-- `src/lib/devAutoReloadDecision.js` — devAutoReloadDecision — 開発用オートリロードの判定(v0.1.1318)。
 - `src/lib/devMonitorDebugSubset.js` — ポップアップ「開発・テスト用 監視」用: watch スナップショット _debug から
 - `src/lib/devMonitorVizHtml.js` — dev monitor セカンダリ可視化（renderDevMonitorSecondaryViz の <div class="nl-dev-monitor-viz">）の
 - `src/lib/devReloadSignal.js` — 開発用ホットリロードのシグナル判定（純関数）。
@@ -926,6 +923,7 @@
 - `src/lib/formatDateTime.js` — 日時の数値（epoch ms）を日本語ロケールで `YYYY/MM/DD HH:MM:SS` 形式に整形する
 - `src/lib/formatOfficialStreamAgeMinutes.js` — 視聴ページ由来の「放送開始からの経過（分）」を短い日本語にする。
 - `src/lib/forwardReactivation.js` — v0.1.765「最終系(a): 入口が死んだ時だけ forward crawl を起動して再接続」の判定(純ロジック)。
+- `src/lib/frozenElapsedOnEnd.js` — frozenElapsedOnEnd — 終了枠の経過秒を「凍結値があればそれ、無ければライブ値」に決める純関数。
 - `src/lib/geminiNanoBridge.js` — v0.1.205 Phase C: Built-in AI (Gemini Nano, Chrome 138+) の薄いラッパー。
 - `src/lib/globalFetchRateLimiter.js` — v0.1.664 PR4: tokenBucket.js を用いた全タブ横断の fetch レートリミッター(土台)。
 - `src/lib/heavyCachePreserve.js` — 軽い read が heavy read の証跡を消さないための純関数(v0.1.1367)。
@@ -979,7 +977,6 @@
 - `src/lib/parseEmbeddedDataViewerInfo.js` — v0.1.203 Patch 3: niconico watch ページの `<script id="embedded-data" data-props='{...}'>`
 - `src/lib/parseInterestArrivalComment.js` — ニコ生の興味タグ来場システムコメントをパースする純関数。
 - `src/lib/passiveMirrorLiveIdGuard.js` — 受動ビュー(status 埋め込み / live-view)が「別配信の古い鏡」を貼らないための判定。
-- `src/lib/phaseDirector.js` — council/pachinko-ultimate-SYNTHESIS.md §3(物語弧=決定論ステートマシン)+§6 Phase C の実装。
 - `src/lib/pickLatestComment.js` — ストレージ上のコメント配列の並びは一定でないため、
 - `src/lib/pollUntil.js` — 再読み込み直後など DOM が遅れて現れるまで待つ（純粋な間隔ポーリング）
 - `src/lib/popupBooleanSettingController.js` — popup のブール設定 1 件を管理する純粋コントローラ。
@@ -1009,8 +1006,6 @@
 - `src/lib/sidepanelIframeSrc.js` — サイドパネルの iframe に渡す src を組み立てる純関数。
 - `src/lib/sidePanelLvFromTabs.js` — サイドパネルが【自力で】配信IDを見つけるための純関数。
 - `src/lib/sidePanelPrearm.js` — サイドパネルを【押される前に】用意しておく純関数。
-- `src/lib/sidepanelUnderlay.js` — サイドパネルの【下敷き】。黒の代わりに地の色を見せる。
-- `src/lib/sidePanelWatchTarget.js` — サイドパネルを「どの配信に紐づけるか」を決める純関数。
 - `src/lib/silentFailureCells.js` — 【無音で死ぬ】故障を画面に出すセル(純関数)。
 - `src/lib/singleFlightByKey.js` — key 単位の single-flight 実行器(純関数コア)。
 - `src/lib/standalonePopupClose.js` — v0.1.433: 別ウィンドウ POP（standalone popup window）を「配信に飛ばしたら閉じる」判定（純ロジック）。
@@ -1058,50 +1053,42 @@
 
 > changelog 全 20 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
 
-### 💾 記録件数 (3版)
+### 💾 記録件数 (1版)
 - `v0.1.1528` 2026-09-18 — 先読み表示を応援レーンだけに絞りました
-- `v0.1.1514` 2026-09-15 — ランキングの名前ホバーで直近の発言を表示
-- `v0.1.1511` 2026-09-14 — コメントで応援した人の枠を足しました
 
-### 📥 コメント取得 (3版)
-- `v0.1.1518` 2026-09-15 — シェアカードの説明文に応援の数字
-- `v0.1.1516` 2026-09-15 — ランキングのホバー発言を先読みで速く
-- `v0.1.1514` 2026-09-15 — ランキングの名前ホバーで直近の発言を表示
+### 🏟 会場・席 (2版)
+- `v0.1.1536` 2026-09-21 — 応援レーンのタイル競合(18→1)の残る原因を解消
+- `v0.1.1534` 2026-09-21 — 会場の席のちらつきを修正
 
-### 🙂 匿名(184) (2版)
-- `v0.1.1513` 2026-09-15 — コメント集計を増分にし匿名の重複名を解消
-- `v0.1.1511` 2026-09-14 — コメントで応援した人の枠を足しました
+### 🎁 ギフト (1版)
+- `v0.1.1532` 2026-09-21 — パチンコ風の点滅演出を削除しました
 
-### 🏟 会場・席 (3版)
-- `v0.1.1519` 2026-09-15 — シェアカードの画像に応援の数字を合成
-- `v0.1.1518` 2026-09-15 — シェアカードの説明文に応援の数字
-- `v0.1.1515` 2026-09-15 — 応援レーンのタイルから発言一覧を開けるように
+### 🔊 読み上げ (1版)
+- `v0.1.1532` 2026-09-21 — パチンコ風の点滅演出を削除しました
 
-### 🎁 ギフト (3版)
-- `v0.1.1519` 2026-09-15 — シェアカードの画像に応援の数字を合成
-- `v0.1.1518` 2026-09-15 — シェアカードの説明文に応援の数字
-- `v0.1.1511` 2026-09-14 — コメントで応援した人の枠を足しました
-
-### 🪟 応援レーン・タイル (3版)
+### 🪟 応援レーン・タイル (6版)
+- `v0.1.1537` 2026-09-21 — 即時コメント表示の重さ・停止を軽減
+- `v0.1.1536` 2026-09-21 — 応援レーンのタイル競合(18→1)の残る原因を解消
+- `v0.1.1534` 2026-09-21 — 会場の席のちらつきを修正
+- `v0.1.1530` 2026-09-20 — パネルの一瞬黒とレーンのちらつきを修正
 - `v0.1.1528` 2026-09-18 — 先読み表示を応援レーンだけに絞りました
 - `v0.1.1527` 2026-09-18 — パネルを開いた直後の表示を速く
-- `v0.1.1515` 2026-09-15 — 応援レーンのタイルから発言一覧を開けるように
-
-### 🩺 診断・状態速報 (1版)
-- `v0.1.1509` 2026-09-14 — サイドパネルが固まる・黒いままの真因を直しました
 
 ### ⚡ 描画・性能 (2版)
+- `v0.1.1530` 2026-09-20 — パネルの一瞬黒とレーンのちらつきを修正
 - `v0.1.1527` 2026-09-18 — パネルを開いた直後の表示を速く
-- `v0.1.1509` 2026-09-14 — サイドパネルが固まる・黒いままの真因を直しました
 
-### その他 (10版)
+### その他 (13版)
+- `v0.1.1540` 2026-09-22 — 内部整理(表示や動作は変わりません)
+- `v0.1.1539` 2026-09-22 — 内部整理(表示や動作は変わりません)
+- `v0.1.1538` 2026-09-21 — 内部整理(表示や動作は変わりません)
+- `v0.1.1535` 2026-09-21 — 終了配信の経過時間が伸び続ける不具合を修正
+- `v0.1.1533` 2026-09-21 — 使っていない内部コードを整理
+- `v0.1.1531` 2026-09-21 — パネルを開く瞬間の黒帯を修正
+- `v0.1.1529` 2026-09-20 — 拡張の識別子を固定し反映を安定化
 - `v0.1.1526` 2026-09-18 — 内部整理(表示や動作は変わりません)
 - `v0.1.1525` 2026-09-18 — 内部整理(表示や動作は変わりません)
 - `v0.1.1524` 2026-09-18 — 内部整理(表示や動作は変わりません)
 - `v0.1.1523` 2026-09-18 — 内部整理(表示や動作は変わりません)
 - `v0.1.1522` 2026-09-18 — 内部整理(表示や動作は変わりません)
 - `v0.1.1521` 2026-09-17 — 内部整理の安全網(挙動は変わりません)
-- `v0.1.1520` 2026-09-16 — カード画像の配信者名の括弧欠けを修正
-- `v0.1.1517` 2026-09-15 — シェアしたリンクのカードが配信ごとに
-- `v0.1.1512` 2026-09-14 — ランキングの3列目が狭い画面ではみ出す不具合を修正
-- `v0.1.1510` 2026-09-14 — ランキングを X でシェアできるようにしました

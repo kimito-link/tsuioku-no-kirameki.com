@@ -24,14 +24,18 @@ export function liveEndedStorageKey(liveId) {
 }
 
 /**
- * @param {{ liveId?: string, endedAt?: number }} [opts]
- * @returns {{ liveId: string, endedAt: number }}
+ * @param {{ liveId?: string, endedAt?: number, elapsedSecAtEnd?: number }} [opts]
+ * @returns {{ liveId: string, endedAt: number, elapsedSecAtEnd: number|null }}
  */
 export function buildLiveEndedFlag(opts = {}) {
   const endedAt = Number(opts.endedAt);
+  // ★v0.1.1535: 終了した瞬間の経過秒を凍結して持つ。status/Web版はこれを読み、
+  //   Date.now()-begin で伸び続ける経過(46時間問題)を止める。begin 不明なら null=従来通り。
+  const frozen = Number(opts.elapsedSecAtEnd);
   return {
     liveId: String(opts.liveId || '').trim().toLowerCase(),
-    endedAt: Number.isFinite(endedAt) && endedAt > 0 ? Math.floor(endedAt) : 0
+    endedAt: Number.isFinite(endedAt) && endedAt > 0 ? Math.floor(endedAt) : 0,
+    elapsedSecAtEnd: Number.isFinite(frozen) && frozen >= 0 ? Math.floor(frozen) : null
   };
 }
 

@@ -1614,12 +1614,16 @@ function maybeRunEndedBulkHarvest() {
   if (endedDetected) {
     const endedLv = String(liveId || '').trim().toLowerCase();
     if (/^lv\d{1,15}$/.test(endedLv)) {
+      // ★v0.1.1535: 終了時の経過秒を凍結(begin 既知時のみ)。伸び続ける「配信時間46時間」を止める。
+      const bms = programBeginAtMs;
+      const elapsedSecAtEnd = (typeof bms === 'number' && Number.isFinite(bms) && bms > 0) ? Math.max(0, Math.floor((now - bms) / 1000)) : null;
       try {
         chrome.storage.local
           .set({
             [liveEndedStorageKey(endedLv)]: buildLiveEndedFlag({
               liveId: endedLv,
-              endedAt: now
+              endedAt: now,
+              elapsedSecAtEnd
             })
           })
           .catch(() => {});
@@ -3323,6 +3327,7 @@ function ensurePageFrameStyle() {
          popup.html のダークローディング幕(.nl-init-shade)と同じグラデを host に敷き、
          読み込み中は黒ではなく「ローディング中のパネル」に見せる。中身が描画されると
          popup の不透明な背景が前面に来るので、この下地は隠れる（継ぎ目なし）。 */
+      background-color: #fffaf2; /* ★v0.1.1531: 透明iframe越しにニコ生の黒が透ける対策(watch開いた瞬間の黒) */
       background: linear-gradient(180deg, #fffaf2, #eef9f3);
       border-radius: 12px;
     }

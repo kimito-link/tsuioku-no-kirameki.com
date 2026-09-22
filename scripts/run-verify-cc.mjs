@@ -63,10 +63,17 @@ const steps = [
   ['lint', 'lint'],
   ['typecheck', 'typecheck'],
   ['build', 'build'],
+  // ★2026-09-21: build 直後に「.dist-fingerprint.json と dist がこの作業ツリーのソースに
+  //   対応しているか」。pre-commit(--index)/pre-push(--pushed)/CI(--ref HEAD)と同じ判定を、
+  //   司令塔の手元でも先に見る(docs/dist-fingerprint-gate-DESIGN.md)。
+  ['dist-fresh', 'check:dist-fresh'],
   // ★v0.1.1245: ビルド直後に「秘密が焼き込まれていないか」を検査する。
   //   dist は git 追跡下=push すると公開リポジトリで誰でも読める。実際に
   //   /api/status の書き込み認証キーが GitHub 上に出ていた事故があった。
   ['no-secrets', 'check:no-secrets'],
+  // ★v0.1.1529: Chrome がこの拡張を同期フォルダ配下から読み込んでいたら赤(リロード固着の再発防止)。
+  //   実機(Chromeプロファイルが在る環境)では【門】=止める。CI 等プロファイルが無い環境は skip(合格ではない)。
+  ['chrome-load-path', 'check:chrome-load-path'],
   ['tracked-imports', 'check:tracked-imports'],
   // ★v0.1.1508: CLAUDE.md 1行目の `@AGENTS.md` import が生きているか(AGENTS.md が context に入る入口)。
   //   CLAUDE.md が「この検査が赤くする」と書きながら検査が存在しなかった(check-doc-rot が検出)。

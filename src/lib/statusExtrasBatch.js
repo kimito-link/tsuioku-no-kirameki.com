@@ -34,8 +34,6 @@ import { KEY_PREVIEW_RENDER_ACK } from './previewRenderAckKey.js';
 import { KEY_BACKFILL_LIVE_METRIC } from './storageKeys.js';
 import { KEY_GIFT_EFFECT_DIAG } from './giftEffectDiagKey.js';
 import { KEY_MILESTONE_EFFECT_DIAG } from './milestoneEffectDiagKey.js';
-import { KEY_VOICE_EFFECT_DIAG } from './voiceEffectDiagKey.js';
-import { KEY_BGM_PHASE_DIAG } from './bgmPhaseDiagKey.js';
 import { KEY_OP_SOUND_EFFECT_DIAG } from './opSoundEffectDiagKey.js';
 import { KEY_COMMENT_POST_DIAG } from './commentPostDiagKey.js';
 import { KEY_INSTANT_PUSH_DIAG } from './instantPushDiagKey.js';
@@ -73,8 +71,6 @@ export const EXTRAS_BATCH_KEYS = [
   KEY_BACKFILL_LIVE_METRIC,
   KEY_GIFT_EFFECT_DIAG,
   KEY_MILESTONE_EFFECT_DIAG,
-  KEY_VOICE_EFFECT_DIAG,
-  KEY_BGM_PHASE_DIAG,
   KEY_OP_SOUND_EFFECT_DIAG,
   KEY_COMMENT_POST_DIAG,
   KEY_INSTANT_PUSH_DIAG,
@@ -98,7 +94,7 @@ export const EXTRAS_BATCH_KEYS = [
  *   statCardsMirror: any, northStarMirror: any, publishOutcomeRec: any, commentTimelineMirror: any,
  *   giftHistoryMirror: any, roomHeatMirror: any, sessionSummaryMirror: any,
  *   previewRenderAck: any, backfillLiveMetric: any, giftEffectDiag: any, milestoneEffectDiag: any,
- *   voiceEffectDiag: any, bgmPhaseDiag: any, opSoundEffectDiag: any, commentPostDiag: any,
+ *   opSoundEffectDiag: any, commentPostDiag: any,
  *   instantPushDiag: any, channelSwitchDiag: any, highlightLedger: any, scoreAnnounceDiag: any, sidepanelSelfDiag: any
  *   panelWakeCurtainDiag: any,
  * }}
@@ -123,8 +119,6 @@ export function pickExtrasBatchValues(bag, nowMs) {
     backfillLiveMetric: b[KEY_BACKFILL_LIVE_METRIC] || null,
     giftEffectDiag: b[KEY_GIFT_EFFECT_DIAG] || null,
     milestoneEffectDiag: b[KEY_MILESTONE_EFFECT_DIAG] || null,
-    voiceEffectDiag: b[KEY_VOICE_EFFECT_DIAG] || null,
-    bgmPhaseDiag: b[KEY_BGM_PHASE_DIAG] || null,
     opSoundEffectDiag: b[KEY_OP_SOUND_EFFECT_DIAG] || null,
     commentPostDiag: b[KEY_COMMENT_POST_DIAG] || null,
     instantPushDiag: b[KEY_INSTANT_PUSH_DIAG] || null,

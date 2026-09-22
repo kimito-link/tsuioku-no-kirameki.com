@@ -484,7 +484,7 @@ function buildLaneHealthCells(laneDiag) {
  *   instantPushDiag?: any, commentPostDiag?: any, mainThreadBlocker?: any, liveElapsedMs?: number,
  *   venueOpen?: boolean, venueMirrorAgeMs?: number, venueTiers?: any, venueHasGiftData?: boolean,
  *   customSoundDiag?: any, buildId?: unknown, appVersion?: unknown,
- *   opSoundEffectDiag?: any, bgmPhaseDiag?: any, sourceProvenanceStored?: any }} data
+ *   opSoundEffectDiag?: any, sourceProvenanceStored?: any }} data
  *   ★v0.1.1390 で追加した後半7つは、ユーザー要望の特化セル5種の入力
  *   (読み上げ⇄吹き出し / コメント送信 / 会場モードの鮮度 / ギフト広告の通り道 / メインスレッド)。
  * @returns {HealthCell[]}

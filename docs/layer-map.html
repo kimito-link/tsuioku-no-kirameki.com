@@ -47,14 +47,14 @@
 <p class="lead">この箱に何が入っていて、何が入ってはいけないか。<b>自動生成</b>（手で編集しない）。</p>
 
 <div class="bar">
-  <span class="pure" style="flex:710">純粋 710（94%）</span>
-  <span class="imp" style="flex:42">例外 42</span>
+  <span class="pure" style="flex:700">純粋 700（94%）</span>
+  <span class="imp" style="flex:41">例外 41</span>
 </div>
 
 <div class="stats">
-  <div class="stat"><b>752</b><i>ファイル（非テスト）</i></div>
+  <div class="stat"><b>741</b><i>ファイル（非テスト）</i></div>
   <div class="stat"><b>103行</b><i>大きさの中央値</i></div>
-  <div class="stat"><b>668</b><i>300行以下のファイル</i></div>
+  <div class="stat"><b>659</b><i>300行以下のファイル</i></div>
   <div class="stat"><b>0件</b><i>lib→entry の逆流import</i></div>
 </div>
 
@@ -68,7 +68,7 @@
   <p class="note">★守っているか確認：<code>npm run check:layer</code>（出荷前 <code>verify:cc</code> でも自動で走ります）</p>
 </div>
 
-<h2>例外の 42 件 — なぜ lib にあるか</h2>
+<h2>例外の 41 件 — なぜ lib にあるか</h2>
 <section class="grp">
   <h3>DOM を組み立てる <span class="cnt">16</span></h3>
   <p class="why">5画面(popup/venue/comeview/status/web版)が同じ見た目を作るため。ここに無いと5箇所にコピーが増える。</p>
@@ -85,9 +85,9 @@
   <ul class="files"><li><code>devMonitorTrendSession.js</code><span class="kinds">chrome.runtime chrome.storage</span></li><li><code>globalFetchRateLimiter.js</code><span class="kinds">chrome.storage</span></li><li><code>interceptVisitorProbeDebug.js</code><span class="kinds">sessionStorage</span></li><li><code>mainThreadBlockerBoot.js</code><span class="kinds">document</span></li><li><code>nameplateToggleBoot.js</code><span class="kinds">chrome.tabs</span></li><li><code>nicoCommentPanelAssetLauncher.js</code><span class="kinds">window</span></li><li><code>watchPopupLoadDiagnostics.js</code><span class="kinds">localStorage</span></li></ul>
 </section>
 <section class="grp">
-  <h3>音・映像を鳴らす <span class="cnt">6</span></h3>
+  <h3>音・映像を鳴らす <span class="cnt">5</span></h3>
   <p class="why">ブラウザAPI(Audio / メディア)そのものが機能の本体なので切り離せない。</p>
-  <ul class="files"><li><code>bgmDirector.js</code><span class="kinds">window</span></li><li><code>effectSoundPlayer.js</code><span class="kinds">chrome.runtime</span></li><li><code>reportCompleteVoice.js</code><span class="kinds">chrome.runtime</span></li><li><code>scoreCountUp.js</code><span class="kinds">window</span></li><li><code>voiceComment.js</code><span class="kinds">window</span></li><li><code>voiceInputDevices.js</code><span class="kinds">window</span></li></ul>
+  <ul class="files"><li><code>effectSoundPlayer.js</code><span class="kinds">chrome.runtime</span></li><li><code>reportCompleteVoice.js</code><span class="kinds">chrome.runtime</span></li><li><code>scoreCountUp.js</code><span class="kinds">window</span></li><li><code>voiceComment.js</code><span class="kinds">window</span></li><li><code>voiceInputDevices.js</code><span class="kinds">window</span></li></ul>
 </section>
 <section class="grp">
   <h3>通信する <span class="cnt">4</span></h3>

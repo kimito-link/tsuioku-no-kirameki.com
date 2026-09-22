@@ -5,8 +5,8 @@
 
 ## storage の出入り
 
-- 書くキー: `KEY_BGM_PHASE_DIAG`, `KEY_GIFT_EFFECT_DIAG`, `KEY_HIGHLIGHT_LEDGER`, `KEY_VENUE_EFFECT_SOUND_PRESENCE`, `KEY_VENUE_SEATS_DIAG`, `KEY_VOICE_DIAG`, `KEY_VOICE_EFFECT_DIAG`
-- 読むキー: `KEY_BGM_ENABLED`, `KEY_BGM_VOLUME_FEVER`, `KEY_BGM_VOLUME_REACH`, `KEY_EFFECT_SOUND_ENABLED`, `KEY_HIGHLIGHT_LEDGER`, `KEY_LANE_MIRROR`, `KEY_LIVE_BROADCASTER_CTX`, `KEY_USER_COMMENT_PROFILE_CACHE`
+- 書くキー: `KEY_GIFT_EFFECT_DIAG`, `KEY_HIGHLIGHT_LEDGER`, `KEY_VENUE_EFFECT_SOUND_PRESENCE`, `KEY_VENUE_SEATS_DIAG`, `KEY_VOICE_DIAG`
+- 読むキー: `KEY_EFFECT_SOUND_ENABLED`, `KEY_HIGHLIGHT_LEDGER`, `KEY_LANE_MIRROR`, `KEY_LIVE_BROADCASTER_CTX`, `KEY_USER_COMMENT_PROFILE_CACHE`
 
 ## 構成ファイル（import 到達・最大40件表示）
 
@@ -28,9 +28,6 @@ graph LR
   n_venue --> n_src_lib_avatarBroadcasterGuard_js["lib/avatarBroadcasterGuard.js"]:::shared
   n_venue --> n_src_lib_avatarUrlCompare_js["lib/avatarUrlCompare.js"]:::shared
   n_venue --> n_src_lib_backfillRemoveRecommendedLivePollution_js["lib/backfillRemoveRecommendedLivePollution.js"]:::shared
-  n_venue --> n_src_lib_bgmDirector_js["lib/bgmDirector.js"]:::shared
-  n_venue --> n_src_lib_bgmPhaseDiag_js["lib/bgmPhaseDiag.js"]:::shared
-  n_venue --> n_src_lib_bgmPhaseDiagKey_js["lib/bgmPhaseDiagKey.js"]:::shared
   n_venue --> n_src_lib_broadcastContext_js["lib/broadcastContext.js"]:::shared
   n_venue --> n_src_lib_celebrationCharaAssets_js["lib/celebrationCharaAssets.js"]:::shared
   n_venue --> n_src_lib_charaLiveCensus_js["lib/charaLiveCensus.js"]:::shared
@@ -53,7 +50,10 @@ graph LR
   n_venue --> n_src_lib_giftDeltaFallback_js["lib/giftDeltaFallback.js"]:::shared
   n_venue --> n_src_lib_giftDisplayNickname_js["lib/giftDisplayNickname.js"]:::shared
   n_venue --> n_src_lib_giftEffectDiag_js["lib/giftEffectDiag.js"]:::shared
+  n_venue --> n_src_lib_giftEffectDiagKey_js["lib/giftEffectDiagKey.js"]:::shared
+  n_venue --> n_src_lib_giftThrowProjectile_js["lib/giftThrowProjectile.js"]:::shared
+  n_venue --> n_src_lib_highlightLedger_js["lib/highlightLedger.js"]:::shared
   classDef shared fill:#eee,stroke:#999,color:#666;
 ```
 
-> ほか 107 ファイル省略（全件は storage-bus.md / metafile 参照）。
+> ほか 100 ファイル省略（全件は storage-bus.md / metafile 参照）。

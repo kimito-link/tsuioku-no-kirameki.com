@@ -1,13 +1,13 @@
 ---
 layer: L0
 purity: pure
-impure_exceptions: 42
-files: 719
+impure_exceptions: 41
+files: 743
 ---
 
 # `src/lib` — 純粋ロジックの箱
 
-> **この1枚で `src/lib` の 719ファイルが分かる。** ここを触る前に読む。
+> **この1枚で `src/lib` の 743ファイルが分かる。** ここを触る前に読む。
 > AGENTS.md は入れ子で読まれる（ツリー上で**最も近いもの**が優先）。
 > リポ全体の話はルートの [AGENTS.md](../../AGENTS.md) にある。ここでは **lib だけ**を書く。
 
@@ -15,10 +15,10 @@ files: 719
 
 | | |
 |---|---|
-| ファイル数 | **719**（非テスト）＋ テスト 829 |
+| ファイル数 | **743**（非テスト）＋ テスト 864 |
 | 大きさ | 中央値 **102行** / 640ファイルが300行以下 |
-| 純粋 | **678 / 719** |
-| 例外（副作用あり） | **42**（下に全部の名前がある） |
+| 純粋 | **702 / 743** |
+| 例外（副作用あり） | **41**（下に全部の名前がある） |
 
 ★**1ファイル1責務**が既に成立している。`src/extension/*-entry.js`（22,660行など）とは
 性格がまったく違う箱なので、**同じ気持ちで触らない**こと。
@@ -45,7 +45,7 @@ I/O が要るときは **呼び出し側（`src/extension/*-entry.js`）に置�
 
 ## ★なぜ「純粋」にこだわるのか
 
-1. **テストが書ける** — 829個のテストはブラウザ無しで走る（`npm run test:cc`）
+1. **テストが書ける** — 864個のテストはブラウザ無しで走る（`npm run test:cc`）
 2. **AIが読める** — 入力と出力だけ見れば分かる。外の状態を追わなくてよい
 3. **再利用できる** — popup / content / venue / status / web版が同じ関数を共有できる
 4. ★**逆流が起きない** — 実測で **lib → entry の import は 0件**。
@@ -61,7 +61,7 @@ I/O が要るときは **呼び出し側（`src/extension/*-entry.js`）に置�
 | **HTML を作る** (`*Html.js`) | `marketingChartsHtml` `mediaKitHtml` | 出力先が複数（レポート/プレビュー） |
 | **保存する** (`*Db.js` `*Store.js`) | `broadcastSessionSummaryDb` `broadcastSessionSummaryFlush` `commentDb` `customSoundStore` `diagnosticRingStore` `globalBackfillQueue` `reportPreviewPublish` `thumbDb` | ★**書き手が複数コンテキスト**（content / offscreen / SW）。正本を1つにするため |
 | **通信する** (`*Client.js`) | `kokenGiftHistoryFetchClient` `liveviewErrorReport` `officialEventDomBundle` `statusMindmapModel` `voicevoxClient` | 外部APIの作法を1箇所に閉じ込める |
-| **音・映像を鳴らす** | `bgmDirector` `effectSoundPlayer` `reportCompleteVoice` `scoreCountUp` `voiceComment` `voiceInputDevices` | ブラウザAPIそのものが機能の本体 |
+| **音・映像を鳴らす** | `effectSoundPlayer` `reportCompleteVoice` `scoreCountUp` `voiceComment` `voiceInputDevices` | ブラウザAPIそのものが機能の本体 |
 | **計測・診断** | `consoleErrorBuffer` `devMonitorTrendSession` `globalFetchRateLimiter` `interceptVisitorProbeDebug` `mainThreadBlockerBoot` `nameplateToggleBoot` `nicoCommentPanelAssetLauncher` `watchPopupLoadDiagnostics` | 測る対象がブラウザの状態そのもの |
 
 ★純粋にできたら `scripts/check-layer.mjs` の `IMPURE_BASELINE` から**消してよい**（減る方向は緑）。

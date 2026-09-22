@@ -16,9 +16,6 @@ describe('isHighlightWorthyKind', () => {
     expect(isHighlightWorthyKind('gift_mega')).toBe(true);
     expect(isHighlightWorthyKind('milestone_hard')).toBe(true);
     expect(isHighlightWorthyKind('milestone_jackpot')).toBe(true);
-    expect(isHighlightWorthyKind('phase_reach')).toBe(true);
-    expect(isHighlightWorthyKind('phase_breakthrough')).toBe(true);
-    expect(isHighlightWorthyKind('phase_jackpot')).toBe(true);
   });
 
   it('対象外のkindはfalse(gift_small等・存在しないkind)', () => {
@@ -47,17 +44,17 @@ describe('appendHighlight', () => {
 
   it('同一liveIdなら既存行に追記する(蓄積)', () => {
     const first = appendHighlight(null, { liveId: 'lv1', kind: 'gift_large', atMs: 1000 });
-    const second = appendHighlight(first, { liveId: 'lv1', kind: 'phase_reach', atMs: 2000 });
+    const second = appendHighlight(first, { liveId: 'lv1', kind: 'milestone_hard', atMs: 2000 });
     expect(second.rows).toHaveLength(2);
     expect(second.rows[0].kind).toBe('gift_large');
-    expect(second.rows[1].kind).toBe('phase_reach');
+    expect(second.rows[1].kind).toBe('milestone_hard');
   });
 
   it('liveId切替は台帳を置換する(古い配信のハイライトを持ち越さない)', () => {
     const first = appendHighlight(null, { liveId: 'lv1', kind: 'gift_large', atMs: 1000 });
-    const switched = appendHighlight(first, { liveId: 'lv2', kind: 'phase_jackpot', atMs: 5000 });
+    const switched = appendHighlight(first, { liveId: 'lv2', kind: 'milestone_jackpot', atMs: 5000 });
     expect(switched.liveId).toBe('lv2');
-    expect(switched.rows).toEqual([{ at: 5000, kind: 'phase_jackpot', label: HIGHLIGHT_KIND_LABEL.phase_jackpot }]);
+    expect(switched.rows).toEqual([{ at: 5000, kind: 'milestone_jackpot', label: HIGHLIGHT_KIND_LABEL.milestone_jackpot }]);
   });
 
   it('liveIdは大小文字・前後空白を正規化する', () => {
@@ -68,7 +65,7 @@ describe('appendHighlight', () => {
   it('上限件数(cap)を超えたら古い順に切り詰める', () => {
     let ledger = null;
     for (let i = 1; i <= HIGHLIGHT_LEDGER_CAP + 10; i += 1) {
-      ledger = appendHighlight(ledger, { liveId: 'lv1', kind: 'phase_reach', atMs: i });
+      ledger = appendHighlight(ledger, { liveId: 'lv1', kind: 'milestone_hard', atMs: i });
     }
     expect(ledger.rows).toHaveLength(HIGHLIGHT_LEDGER_CAP);
     // 古い順(先頭10件)が切り詰められ、最後の値まで残っている。
@@ -97,18 +94,18 @@ describe('appendHighlight', () => {
 describe('pickTopHighlights', () => {
   it('tier重み降順で並べる', () => {
     const rows = [
-      { at: 1000, kind: 'phase_reach', label: 'x' },
-      { at: 2000, kind: 'phase_jackpot', label: 'x' },
+      { at: 1000, kind: 'milestone_hard', label: 'x' },
+      { at: 2000, kind: 'milestone_jackpot', label: 'x' },
       { at: 3000, kind: 'gift_large', label: 'x' }
     ];
     const picked = pickTopHighlights(rows);
-    expect(picked.map((r) => r.kind)).toEqual(['phase_jackpot', 'gift_large', 'phase_reach']);
+    expect(picked.map((r) => r.kind)).toEqual(['milestone_jackpot', 'gift_large', 'milestone_hard']);
   });
 
   it('同点は早い順(at昇順)', () => {
     const rows = [
-      { at: 5000, kind: 'phase_reach', label: 'x' },
-      { at: 1000, kind: 'phase_reach', label: 'y' }
+      { at: 5000, kind: 'milestone_hard', label: 'x' },
+      { at: 1000, kind: 'milestone_hard', label: 'y' }
     ];
     // kind重複は1件までなので、この2件のうち早い方(at=1000)だけが残る。
     const picked = pickTopHighlights(rows);
@@ -128,21 +125,21 @@ describe('pickTopHighlights', () => {
 
   it(`最大${HIGHLIGHT_PICK_COUNT}件まで`, () => {
     const rows = [
-      { at: 1, kind: 'phase_jackpot', label: 'x' },
+      { at: 1, kind: 'milestone_jackpot', label: 'x' },
       { at: 2, kind: 'gift_mega', label: 'x' },
       { at: 3, kind: 'milestone_jackpot', label: 'x' },
-      { at: 4, kind: 'phase_breakthrough', label: 'x' },
+      { at: 4, kind: 'milestone_hard', label: 'x' },
       { at: 5, kind: 'gift_large', label: 'x' }
     ];
     const picked = pickTopHighlights(rows);
     expect(picked).toHaveLength(HIGHLIGHT_PICK_COUNT);
-    expect(picked.map((r) => r.kind)).toEqual(['phase_jackpot', 'gift_mega', 'milestone_jackpot']);
+    expect(picked.map((r) => r.kind)).toEqual(['gift_mega', 'milestone_jackpot', 'gift_large']);
   });
 
   it('決定論: 同じ入力には常に同じ結果', () => {
     const rows = [
       { at: 10, kind: 'gift_large', label: 'x' },
-      { at: 5, kind: 'phase_breakthrough', label: 'x' },
+      { at: 5, kind: 'milestone_jackpot', label: 'x' },
       { at: 20, kind: 'milestone_hard', label: 'x' }
     ];
     const a = pickTopHighlights(rows);
@@ -175,12 +172,12 @@ describe('buildHighlightLedgerDiagLines', () => {
 
   it('件数・最終記録ago・上位ラベルを1行にまとめる', () => {
     let ledger = appendHighlight(null, { liveId: 'lv1', kind: 'gift_large', atMs: 1000 });
-    ledger = appendHighlight(ledger, { liveId: 'lv1', kind: 'phase_jackpot', atMs: 5000 });
+    ledger = appendHighlight(ledger, { liveId: 'lv1', kind: 'milestone_jackpot', atMs: 5000 });
     const lines = buildHighlightLedgerDiagLines(ledger, 10000);
     expect(lines).toHaveLength(1);
     expect(lines[0]).toContain('2件');
     expect(lines[0]).toContain('5秒前'); // (10000-5000)/1000
-    expect(lines[0]).toContain(HIGHLIGHT_KIND_LABEL.phase_jackpot);
+    expect(lines[0]).toContain(HIGHLIGHT_KIND_LABEL.milestone_jackpot);
   });
 
   it('nowMs省略/0以下は「最終N秒前」を出さない', () => {

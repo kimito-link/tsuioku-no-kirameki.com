@@ -96,6 +96,70 @@
         "tsuioku-no-kirameki/live/index.html"
       ],
       "note": "LP inline のヘッダー/ドロワー/フッター(HTML+CSS+JS)を切り出して LP と /live/ が共用。キットの templates/web/site-chrome は別デザインの汎用品のため KEEP_SEPARATE(採用せず)。LP は計算済みスタイル 48 要素で前後差分 0"
+    },
+    {
+      "at": "2026-09-21T00:38:20.023Z",
+      "responsibility": "venue-lane-empty-keep-wiring",
+      "decision": "REUSE",
+      "canonicalSource": "src/extension/story/renderStoryUserLaneDom.js",
+      "scopePaths": [
+        "src/extension/venueBar.js",
+        "src/extension/venueLaneEmptyKeep.wiring.test.js"
+      ],
+      "note": "会場の空クリアに①popup と同じ shouldKeepStoryUserLaneTilesOnEmpty(既存の唯一の正本)を配線。新しいガードは作らず REUSE。会場用 lastTiled 状態変数のみ新設。v0.1.1534。"
+    },
+    {
+      "at": "2026-09-21T00:46:33.789Z",
+      "responsibility": "ended-live-elapsed-freeze",
+      "decision": "LOCAL",
+      "canonicalSource": null,
+      "scopePaths": [
+        "src/lib/frozenElapsedOnEnd.js",
+        "src/lib/frozenElapsedOnEnd.test.js",
+        "src/lib/liveEndedFlag.js",
+        "src/extension/content-entry.js",
+        "src/extension/status-entry.js"
+      ],
+      "note": "終了枠の経過秒を「凍結値優先」で決める新責務(既存 lib に同等判定なし=grep 確認済み)。ローカルで正本を持つので LOCAL。凍結値の生成=content-entry、格納=liveEndedFlag、表示判定=frozenElapsedOnEnd と責務分離。46時間問題の表示直因を止める。v0.1.1535。"
+    },
+    {
+      "at": "2026-09-21T00:57:03.361Z",
+      "responsibility": "lane-mirror-records-last-tiled",
+      "decision": "REUSE",
+      "canonicalSource": "src/extension/story/renderStoryUserLaneDom.js",
+      "scopePaths": [
+        "src/extension/popup-entry.js",
+        "src/extension/laneMirrorRecordsLastTiled.wiring.test.js"
+      ],
+      "note": "鏡経路(fallback/passive)に heavy:6478 と同じ _storyUserLaneLastTiledLid 記録を1行足す小改修。新しいガードは作らず既存の縮小/空ガード(唯一の正本 renderStoryUserLaneDom.js)を正しく効かせるだけ=REUSE。18→1 の非対称の根を解消。大改修(mirror を entries に積む)は最事故多発域のため却下。v0.1.1536。"
+    },
+    {
+      "at": "2026-09-21T10:52:00.000Z",
+      "responsibility": "coalesced-repaint-scheduler",
+      "decision": "LOCAL",
+      "canonicalSource": null,
+      "scopePaths": [
+        "src/lib/coalescedRepaintScheduler.js",
+        "src/lib/coalescedRepaintScheduler.test.js",
+        "src/extension/popup-entry.js"
+      ],
+      "note": "即時プッシュ受信ごとの同期直呼びrepaintをrAF束ねする新規責務。既存調査(Explore agent)で src/lib 配下に同等の『pendingフラグで複数呼び出しを1回に束ねるスケジューラ』は無いことを確認済み(yieldToBrowserPaint.jsは待ち方のみでpendingフラグ無し、createThrottledDiagFlusherはstorage書き込み専用でrepaintに不適合)。待ち方はyieldToBrowserPaintに委譲(再実装しない)、束ね(pendingフラグ)のみ新規=LOCAL。段A(黒白重い根治)。"
+    },
+    {
+      "at": "2026-09-21T23:20:00.000Z",
+      "responsibility": "dist-fingerprint-gate",
+      "decision": "LOCAL",
+      "canonicalSource": null,
+      "scopePaths": [
+        "src/lib/distFingerprint.js",
+        "src/lib/distFingerprint.test.js",
+        "scripts/check-dist-fresh.mjs",
+        "scripts/build.mjs",
+        ".husky/pre-push",
+        ".husky/pre-commit",
+        ".gitattributes"
+      ],
+      "note": "pre-pushのbuild再実行によるbuildId無限差分ループを根治する新規責務。council-fable(会議5体+Fable設計)で恒久対処を設計(docs/dist-fingerprint-gate-DESIGN.md)。既存のyieldToBrowserPaint/createThrottledDiagFlusherと同様、src/lib配下に同等の『ビルド入力のgit blob shaから指紋を作り照合する』機構は無いことを会議・Fable双方で調査済み=LOCAL。NL_BUILD_ID(buildAgeCell.jsが依存する時刻計器)は一切変更せず、指紋(.dist-fingerprint.json)を別途新設して照合だけを担わせる設計。"
     }
   ]
 }

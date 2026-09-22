@@ -1,10 +1,9 @@
 {
   "mcpServers": {
     "chrome-devtools": {
-      "command": "npx",
+      "command": "C:\\Program Files\\nodejs\\node.exe",
       "args": [
-        "-y",
-        "chrome-devtools-mcp@latest",
+        "C:\\Users\\info\\AppData\\Roaming\\npm\\node_modules\\chrome-devtools-mcp\\build\\src\\bin\\chrome-devtools-mcp.js",
         "--categoryExtensions",
         "--isolated",
         "--headless"

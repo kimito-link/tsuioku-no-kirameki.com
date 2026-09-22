@@ -84,6 +84,16 @@ node scripts/cws-publish.mjs build/tsuioku-no-kirameki-<version>.zip --publish
 　`reloadExistingWatchTabs()`(background.js:1008 の update 分岐)に**乗らない**
 　＝タブが自動リロードされず「効かない」ように見える(2026-08-13 に司令塔が自分で踏んだ)。
 
+★**Chrome の実ロード先は必ず「同期外フォルダ(C:\nicolive-ext)」でなければならない**(v0.1.1529・
+　リロード固着の恒久根治)。過去、Chrome が同期フォルダ配下の `extension/` を直読みしていて、
+　build が 1MB級ファイルを同期フォルダ内へ書くたびに OneDrive/Resilio の再ハッシュと Chrome の
+　再読込が競合し、更新ボタンで固着・トグルOFF固着していた(Secure Preferences を直接読んで実証)。
+　`copy:ext` は atomic swap で同期外へ配置する(robocopy /MIR は宛先を一瞬消すので不可)。
+　**この不変条件は文書ではなくコードが守る**: `npm run verify:cc` の `check:chrome-load-path` が
+　Chrome の Secure Preferences を全プロファイル走査し、恒久ID `ohifblceplfkfajfecaoaclmkiahfflm` が
+　同期フォルダを読んでいたら赤で止める(MEMORY「判定はコードに置く」)。IDは `key` で固定済み＝
+　どのフォルダから読んでも不変なので、記録は紐づき続ける。
+
 ★**メイン世界で `chrome.runtime.id` を読んで生死を判定しない**。
 　`externally_connectable` が無いので**健全でも常に null**＝正常と異常を区別できない。
 　判定するなら content script の隔離世界か、状態速報の値を見ること。
