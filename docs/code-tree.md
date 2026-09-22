@@ -27,9 +27,10 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 6 / 878 件
+## ⚠️ 役割コメントが無いソース 7 / 870 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
+- `scripts/build.mjs`
 - `src/lib/laneDomSelfMeasure.js`
 - `src/lib/reportPreviewPublish.js`
 - `src/lib/venueLaneBuckets.js`
@@ -191,7 +192,7 @@
     - `2026-09-07.md`
     - `2026-09-09.md`
     - `2026-09-16.md`
-- 📁 **docs/** (321)
+- 📁 **docs/** (323)
   - 📁 **article-assets/** (87)
     - 📁 **venue-frames/** (12)
       - `f01.png`
@@ -495,6 +496,8 @@
   - `cursor-handoff-direct-concurrent-viewers.md`
   - `dev-sound-preview.html`
   - `diagnostics-strengthening-log.md`
+  - `dist-fingerprint-gate-DESIGN.md`
+  - `dist-fingerprint-gate-IMPLEMENTATION-HANDOFF.md`
   - `extension-bump-checklist.md`
   - `feature-sitemap.html`
   - `feature-sitemap.md`
@@ -681,9 +684,7 @@
   - `status-guard.js` — 状態速報ページ(status.html)の「何があっても開く」保険。
   - `status.html`
   - `venue.html`
-- 📁 **scripts/** (69)
-  - 📁 **__pycache__/** (1)
-    - `stage-submission.cpython-311.pyc`
+- 📁 **scripts/** (71)
   - 📁 **lib/** (1)
     - `instrument-core.mjs` — ★検査・計器の共通土台（キット同梱・依存ゼロ・純Node）。
   - 📁 **xserver/** (2)
@@ -702,9 +703,11 @@
   - `build-sound-preview.mjs` — 開発用: extension/sound/ 配下の全効果音を1枚のHTMLで試聴できるページを生成する。
   - `build-sounds.mjs` — extension/sound/ の効果音mp3を組み立てる。
   - `build-watch.mjs` — watch では起動時刻を埋める（rebuild 毎に再 import される訳ではないので、
-  - `build.mjs` — .env を読み込む(status の共有キー NL_STATUS_INGEST_KEY / NL_STATUS_VIEW_TOKEN は .env から注入)。
+  - `build.mjs` — ⚠️ 役割コメント無し
   - `capture-store-screenshots.mjs` — Chrome ウェブストア用スクショ自動撮影
   - `check-agent-bootstrap.mjs` — CLAUDE.md の1行目が `@AGENTS.md` の import であることを機械で守る。
+  - `check-chrome-load-path.mjs` — Chrome が拡張を「同期フォルダ配下から」読み込んでいないか検査する(リロード固着の再発防止・v0.1.1529)。
+  - `check-dist-fresh.mjs` — 「その tree の dist は、その tree のソースから build されたものか」。
   - `check-improvement.mjs` — ★版ごとの実測値が【退化】していないか見張る。
   - `check-layer.mjs` — ★`src/lib` が「純粋ロジックの箱」であり続けることを機械で守る。
   - `check-no-secrets-in-dist.mjs` — ビルド成果物に秘密情報が焼き込まれていないか検査する(fail-closed)。
@@ -735,6 +738,7 @@
   - `measure-flash-frames.test.js`
   - `meeting-roles.mjs` — meeting.mjs の役割注入版。
   - `meeting.mjs` — 会議ハーネス: 同じ問いを「無料クラウド4系統 + ローカル ollama 数体」に投げ、
+  - `migrate-ext-storage.mjs` — 拡張の記録データを「旧ID配下フォルダ」→「新ID配下フォルダ」へコピーする(一度だけ・v0.1.1529)。
   - `pick-live-for-check.mjs` — 検証に使う実配信を【自動で1つ選ぶ】。
   - `record-improvement.mjs` — ★実測値を台帳に書き足す【1本の口】。
   - `repo-tree-map.mjs` — リポジトリのディレクトリツリー＋各ディレクトリの「役割」を自動生成する(2026-06-18 ユーザー提案)。
@@ -779,7 +783,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (1864)
+- 📁 **src/** (1848)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -816,7 +820,7 @@
       - `avatarResolver.test.js`
       - `identity.js` — ニコ生ユーザー ID の「匿名性」判定と関連アイデンティティ・ユーティリティ。
       - `nickname.js` — 表示名（ニックネーム）の「強弱」判定。
-  - 📁 **extension/** (54)
+  - 📁 **extension/** (56)
     - 📁 **popup/** (12)
       - 📁 **init/** (4)
         - `devMonitorExport.js` — devMonitorExport — 開発モニタの「エクスポート/ダウンロード/較正データ消去」一式。
@@ -848,6 +852,7 @@
     - `giftHistoryLaneStateWiring.test.js`
     - `heavyReuseNotDoubleGated.wiring.test.js`
     - `inlineHostMoveProbe.wiring.test.js`
+    - `laneMirrorRecordsLastTiled.wiring.test.js`
     - `live-ranking-entry.js` — `/live/`「追憶のきらめき ランキング」(tsuioku-no-kirameki/live/index.html)の描画。
     - `live-view-entry.js` — 応援ライブビュー(live-view.html)のエントリ。
     - `marketing-export-entry.js` — マーケ分析レポートの別タブ化(marketing-export.html)のエントリ。
@@ -872,6 +877,7 @@
     - `venueBar.js` — 会場モード UI 本体。観客の席割り・群衆・吹き出し・ギフト演出・読み上げ連動を描く。
     - `venueBarGiftDeltaSoundWiring.test.js`
     - `venueBarPopupOcclusion.wiring.test.js`
+    - `venueLaneEmptyKeep.wiring.test.js`
     - `venueSpeechPanelRowsMax.wiring.test.js`
     - `venueSpeechPanelTailRead.test.js`
     - `venueSpeechPanelUserKey.wiring.test.js`
@@ -1053,7 +1059,7 @@
         - `logo_funlink_white_RGB_link_black.png`
         - `logo_funlink_white_RGB_maru_black.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1636)
+  - 📁 **lib/** (1618)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -1117,9 +1123,6 @@
     - `autoSectionCensusWiring.test.js`
     - `autoTabReloadTrace.wiring.test.js`
     - `autoshowHideExperiment.wiring.test.js`
-    - `avCue.js` — 「AVCue = 音の再生結果を真実とする単一発火点」の純関数群(V1・DOM/storage/音に触れない)。
-    - `avCue.test.js`
-    - `avCueDiagKey.js` — AVCue(音+視覚の単一発火点・council/pachinko-av-max-SYNTHESIS.md V1)の観測値を
     - `avatarBroadcasterGuard.js` — 配信者アイコン取り違え防止ガード（純粋関数）。
     - `avatarBroadcasterGuard.test.js`
     - `avatarEntryCounts.js` — コメントエントリ配列から avatar の数を数える純関数。
@@ -1169,11 +1172,6 @@
     - `bandScale.test.js`
     - `bandScale.wiring.test.js`
     - `bandScaleBoot.js` — PICK UP 帯の倍率を起動時に適用する(副作用モジュール)。
-    - `bgmDirector.js` — council/pachinko-ultimate-SYNTHESIS.md §5(BGM設計)+§6 Phase C の実装。
-    - `bgmDirector.test.js`
-    - `bgmPhaseDiag.js` — BGMディレクター(bgmDirector.js)+フェーズディレクター(phaseDirector.js)の観測値を組み立てる
-    - `bgmPhaseDiag.test.js`
-    - `bgmPhaseDiagKey.js` — BGMディレクター(bgmDirector.js)+フェーズディレクター(phaseDirector.js・Phase C)の
     - `blackScreenOwnerCells.js` — 黒画面の【止めている当人】をセルにする(純関数)。
     - `blackScreenOwnerCells.test.js`
     - `blobDownload.js` — Blob を指定ファイル名で保存する。
@@ -1206,8 +1204,6 @@
     - `broadcastWaveformFingerprint.test.js`
     - `broadcasterCommentCount.js` — 「配信者本人のコメント数」を正しく算出する純関数(v0.1.838)。
     - `broadcasterCommentCount.test.js`
-    - `broadcasterExcludedCount.js` — v0.1.774: 記録カードの見出し数値から「配信者本人のコメント」を差し引いて、公式(本家コメ)と
-    - `broadcasterExcludedCount.test.js`
     - `broadcasterFollowTarget.js` — 配信者タイル / casterBanner で出す「配信者の page URL とアイコン」を、
     - `broadcasterFollowTarget.test.js`
     - `broadcasterProfileCard.js` — 配信者プロフィールの「レポート用 正規化モデル」と HTML 断片ビルダー（純関数）。
@@ -1285,6 +1281,8 @@
     - `cloakNotForSidePanel.test.js`
     - `cloakRevealNotBehindLoad.wiring.test.js`
     - `cloakSkippedOnSidePanel.wiring.test.js`
+    - `coalescedRepaintScheduler.js` — 【層】L0 判定層(依存ゼロ・chrome.* 非依存。yieldToBrowserPaint のみ依存)
+    - `coalescedRepaintScheduler.test.js`
     - `colorSchemeMetaPresent.test.js`
     - `comeviewActions.js` — v0.1.666: コメビュのコメント単位アクション(わんコメ同等+追憶独自)の純ロジック。
     - `comeviewActions.test.js`
@@ -1423,7 +1421,7 @@
     - `currentLiveIdOrigin.test.js`
     - `customSoundDiag.js` — 「マイ効果音」(customSoundStore.js・Phase A)の取込状況を状態速報 extras(12秒間引き)に
     - `customSoundDiag.test.js`
-    - `customSoundPreset.js` — council/pachinko-ultimate-SYNTHESIS.md §2 の「85素材の完全割り当て表」をそのままJSON化した
+    - `customSoundPreset.js` — 対応する効果音・操作音・結果発表音の No.→音種キー割り当てを JSON 化した
     - `customSoundPreset.test.js`
     - `customSoundStore.js` — council/pachinko-ultimate-SYNTHESIS.md §1.2/§1.4/§1.5(Phase A)の実装。
     - `customSoundStore.test.js`
@@ -1434,8 +1432,6 @@
     - `deriveAvatarUrlFromUid.equivalence.test.js`
     - `deriveAvatarUrlFromUid.js` — v0.1.203 Patch 1: niconico ユーザー UID から avatar URL を確定パターンで生成する純関数。
     - `deriveAvatarUrlFromUid.test.js`
-    - `devAutoReloadDecision.js` — devAutoReloadDecision — 開発用オートリロードの判定(v0.1.1318)。
-    - `devAutoReloadDecision.test.js`
     - `devMonitorAvatarStats.js` — 開発者向け監視: storage コメント配列からアバター／userId の集計（PII なし・件数のみ）
     - `devMonitorAvatarStats.test.js`
     - `devMonitorDebugSubset.js` — ポップアップ「開発・テスト用 監視」用: watch スナップショット _debug から
@@ -1477,6 +1473,8 @@
     - `diagnosticsTrustBootGrace.test.js`
     - `displayRecordedCount.js` — 「画面に出す記録件数」の正本を1つに固定する純関数(v0.1.839・第1)。
     - `displayRecordedCount.test.js`
+    - `distFingerprint.js` — 「この dist はこのソースから build されたものか」を判定する純関数。
+    - `distFingerprint.test.js`
     - `domAttrBus.test.js`
     - `domHarvestScrollDefer.js` — 「ユーザーが今まさにスクロール中か」を判定して、コメントの DOM ハーベスト
     - `domHarvestScrollDefer.test.js`
@@ -1537,6 +1535,8 @@
     - `formatOfficialStreamAgeMinutes.test.js`
     - `forwardReactivation.js` — v0.1.765「最終系(a): 入口が死んだ時だけ forward crawl を起動して再接続」の判定(純ロジック)。
     - `forwardReactivation.test.js`
+    - `frozenElapsedOnEnd.js` — frozenElapsedOnEnd — 終了枠の経過秒を「凍結値があればそれ、無ければライブ値」に決める純関数。
+    - `frozenElapsedOnEnd.test.js`
     - `geminiNanoBridge.js` — v0.1.205 Phase C: Built-in AI (Gemini Nano, Chrome 138+) の薄いラッパー。
     - `geminiNanoBridge.test.js`
     - `giftAdPipelineCensus.js` — ギフト/広告が「取れて→出て→鳴る」まで通っているかを
@@ -1897,7 +1897,6 @@
     - `mirrorBundle.test.js`
     - `mirrorBundleFlushScheduler.js` — 鏡バンドルの flush スケジューラ(状態を内部に閉じた純ロジック・タイマー非依存)。
     - `mirrorBundleFlushScheduler.test.js`
-    - `mirrorBundleKey.js` — 鏡バンドルの storage キー。
     - `mirrorSanitize.js` — v0.1.237: 北極星「鏡のように貼り付け」用の自前最小サニタイザ。
     - `mirrorSanitize.test.js`
     - `monotonicCommentCount.js` — v0.1.645: コメント記録件数の「数値ズレ」根治。
@@ -2061,8 +2060,6 @@
     - `personProfiles.test.js`
     - `personTileDom.js` — 人物タイル(丸サムネ＋ID＋ニックネーム)の DOM ビルダー（person-tile-unify 第2コミット・2026-06-17）。
     - `personTileDom.test.js`
-    - `phaseDirector.js` — council/pachinko-ultimate-SYNTHESIS.md §3(物語弧=決定論ステートマシン)+§6 Phase C の実装。
-    - `phaseDirector.test.js`
     - `pickBroadcasterNameForReputation.js` — 評判チェック用に「配信者名」を解決する純関数 (PR R4)
     - `pickBroadcasterNameForReputation.test.js`
     - `pickCommentsForExport.js` — HTML/メディアキットレポート用のコメント集合を選ぶ純関数。
@@ -2261,8 +2258,6 @@
     - `sidePanelPrearm.js` — サイドパネルを【押される前に】用意しておく純関数。
     - `sidePanelPrearm.test.js`
     - `sidePanelPrearm.wiring.test.js`
-    - `sidePanelWatchTarget.js` — サイドパネルを「どの配信に紐づけるか」を決める純関数。
-    - `sidePanelWatchTarget.test.js`
     - `sidepanelBandStripes.test.js`
     - `sidepanelBlackScreen.wiring.test.js`
     - `sidepanelBlackV8.wiring.test.js`
@@ -2284,8 +2279,6 @@
     - `sidepanelSelfDiagOverlay.wiring.test.js`
     - `sidepanelSelfDiagPipeline.test.js`
     - `sidepanelThemeColorParity.test.js`
-    - `sidepanelUnderlay.js` — サイドパネルの【下敷き】。黒の代わりに地の色を見せる。
-    - `sidepanelUnderlay.test.js`
     - `sidepanelVisibilityCatchup.wiring.test.js`
     - `sidepanelZeroArea.test.js`
     - `silentFailureCells.js` — 【無音で死ぬ】故障を画面に出すセル(純関数)。
@@ -2620,11 +2613,6 @@
     - `voiceDiag.js` — ★v0.1.1328: この診断を「新鮮」とみなす上限。これを大きく超えたら化石値として数値を伏せる。
     - `voiceDiag.test.js`
     - `voiceDiagKey.js` — 会場モード(comeview)の読み上げ診断 storage キーの正本(producer=comeview / consumer=status で共有)。
-    - `voiceDirector.js` — council/pachinko-ultimate-SYNTHESIS.md §4(ボイスの歯止め)+§6 Phase B の実装。
-    - `voiceDirector.test.js`
-    - `voiceEffectDiag.js` — パチンコボイス演出(voiceDirector.js・Phase B)の発火/スキップ観測値を組み立てる純関数群。
-    - `voiceEffectDiag.test.js`
-    - `voiceEffectDiagKey.js` — パチンコボイス演出(voiceDirector.js・Phase B)の「発火/スキップ内訳」観測値を
     - `voiceFailureTaxonomy.contract.test.js`
     - `voiceFailureTaxonomy.js` — 【層】L0 判定層（純粋関数・I/O禁止）
     - `voiceInputDevices.js` — マイク確認でサンプルする時間（ms）

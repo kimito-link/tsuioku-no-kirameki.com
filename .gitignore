@@ -94,3 +94,11 @@ tests-tmp/
 
 # 横断キットの context-engine が生成する全文脈スナップショット(npm run context)。生成物。
 .instrument-context.md
+
+# 一時ファイル(会話由来・追跡しない)
+surechigai-user-needs-question.txt
+*.bak-*
+
+# Python bytecode cache (stage-submission.py 等)
+__pycache__/
+*.pyc

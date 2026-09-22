@@ -1,15 +1,13 @@
 /**
  * customSoundPreset.js
- * council/pachinko-ultimate-SYNTHESIS.md §2 の「85素材の完全割り当て表」をそのままJSON化した
- *   No.→音種キーのプリセットメタデータ。**音声データ(mp3/wav等)は一切含まない**
+ * 対応する効果音・操作音・結果発表音の No.→音種キー割り当てを JSON 化した
+ *   プリセットメタデータ。**音声データ(mp3/wav等)は一切含まない**
  *   (タイトル/No.は事実メタデータでライセンス対象外だが、音声本体はユーザーのIndexedDBにのみ存在する)。
  *
  * id は `as_<No.>`(audiostock_<No.> のファイル名から機械導出)。
  * キーごとの配列順=設計書の「変奏順」をそのまま踏襲(customSoundStore.js の rotationRng が
  *   この順で1→2→3→…と巡回する)。
  *
- * §2.4 の bgm_* キーは再生器(専用ループプレイヤー)自体は Phase C だが、割り当て表としては
- *   ここに含める(設計書の指示どおり・「載っているが鳴らす配線はまだ無い」状態)。
  */
 
 /**
@@ -80,92 +78,8 @@ export const CUSTOM_SOUND_PRESET = Object.freeze({
     Object.freeze({ id: 'as_62247', no: 62247, title: 'トゥルルルー 失敗 残念' })
   ]),
 
-  // ---- §2.2 新設SEキー(物語弧の欠けを埋める3キー) ----
-  breakthrough: Object.freeze([
-    Object.freeze({ id: 'as_328880', no: 328880, title: 'ドドドドドキュイーン!!!' }),
-    Object.freeze({ id: 'as_809695', no: 809695, title: 'ドゥーン、ドドドドドドドドゥーン!!!!' }),
-    Object.freeze({ id: 'as_256953', no: 256953, title: 'ドドドドドドドドパキーン' }),
-    Object.freeze({ id: 'as_134542', no: 134542, title: 'シャキーン!(勢いのあるインパクト)' }),
-    Object.freeze({ id: 'as_219045', no: 219045, title: 'シャキーン!(派手なインパクト)' }),
-    Object.freeze({ id: 'as_970774', no: 970774, title: 'カキーン(スロット確定音)' }),
-    Object.freeze({ id: 'as_817343', no: 817343, title: '遊技機の和声 確定・激熱音' })
-  ]),
-  payout: Object.freeze([
-    Object.freeze({ id: 'as_396693', no: 396693, title: 'ジャラジャラ(コイン・払い出し)' }),
-    Object.freeze({ id: 'as_968474', no: 968474, title: '大量のお金がジャラジャラ降ってくる' }),
-    Object.freeze({ id: 'as_233126', no: 233126, title: '【録音】コインがジャラジャラ混ざる' }),
-    Object.freeze({ id: 'as_968518', no: 968518, title: 'お金がもうかるイメージ音、ジャラジャラ' }),
-    Object.freeze({ id: 'as_543444', no: 543444, title: '流れるジャックポットコイン' }),
-    Object.freeze({ id: 'as_672200', no: 672200, title: '大型スロットマシンジャックポット' }),
-    Object.freeze({ id: 'as_371385', no: 371385, title: '特殊シンボル払い出し音' })
-  ]),
-  hold_lamp: Object.freeze([
-    Object.freeze({ id: 'as_141839', no: 141839, title: 'タッチ,クリック音(ピコン)' }),
-    Object.freeze({ id: 'as_224302', no: 224302, title: 'ピコン(タップ・通知音)' }),
-    Object.freeze({ id: 'as_476302', no: 476302, title: 'ピコーン(診断・ボタン音)' })
-  ]),
-
-  // ---- §2.3 新設ボイスキー(voice_*・22本) ----
-  voice_chance: Object.freeze([
-    Object.freeze({ id: 'as_192487', no: 192487, title: 'チャンス' }),
-    Object.freeze({ id: 'as_192488', no: 192488, title: 'チャ〜ンス!' }),
-    Object.freeze({ id: 'as_1268907', no: 1268907, title: 'チャンスっ' }),
-    Object.freeze({ id: 'as_1269358', no: 1269358, title: 'チャンスアップ' })
-  ]),
-  voice_atsui: Object.freeze([
-    Object.freeze({ id: 'as_1268912', no: 1268912, title: '激熱' }),
-    Object.freeze({ id: 'as_1269409', no: 1269409, title: '激熱_EFF' }),
-    Object.freeze({ id: 'as_13652', no: 13652, title: '激アツ' }),
-    Object.freeze({ id: 'as_192489', no: 192489, title: '激アツ〜!' }),
-    Object.freeze({ id: 'as_192490', no: 192490, title: '超〜激アツ〜!' })
-  ]),
-  voice_breakthrough: Object.freeze([
-    Object.freeze({ id: 'as_1269331', no: 1269331, title: '突破ぁっ' }),
-    Object.freeze({ id: 'as_1269353', no: 1269353, title: 'とりゃああああああああ' }),
-    Object.freeze({ id: 'as_1269390', no: 1269390, title: '一撃' })
-  ]),
-  voice_jackpot: Object.freeze([
-    Object.freeze({ id: 'as_192197', no: 192197, title: 'ボーナス確定' }),
-    Object.freeze({ id: 'as_1269429', no: 1269429, title: 'キターーーー_EFF' }),
-    Object.freeze({ id: 'as_1269387', no: 1269387, title: '大爆発っ_01' }),
-    Object.freeze({ id: 'as_1269433', no: 1269433, title: '大爆発っ_01_EFF' })
-  ]),
-  voice_kamitsumi: Object.freeze([
-    Object.freeze({ id: 'as_1268996', no: 1268996, title: '上乗せだぁー' }),
-    Object.freeze({ id: 'as_1268997', no: 1268997, title: '超上乗せだぁーー' })
-  ]),
-  voice_max: Object.freeze([
-    Object.freeze({ id: 'as_1269386', no: 1269386, title: 'マァーーーックス' }),
-    Object.freeze({ id: 'as_1269432', no: 1269432, title: 'マァーーーックス_EFF' })
-  ]),
-  voice_stage: Object.freeze([
-    Object.freeze({ id: 'as_1269355', no: 1269355, title: 'ステージチェンジ' }),
-    Object.freeze({ id: 'as_1269357', no: 1269357, title: 'モードアップ' })
-  ]),
-
-  // ---- §2.4 新設BGMキー(bgm_*・11本・再生器はPhase C) ----
-  bgm_reach_loop: Object.freeze([
-    Object.freeze({ id: 'as_1201154', no: 1201154, title: 'ループ_パチンコ スロット煽りBGM(1)' }),
-    Object.freeze({ id: 'as_1201186', no: 1201186, title: 'ループ_パチンコ スロット煽りBGM(2)' })
-  ]),
-  bgm_fever_loop: Object.freeze([
-    Object.freeze({ id: 'as_1225178', no: 1225178, title: 'ループ ハイテンポBGMパチスロ' }),
-    Object.freeze({ id: 'as_1024818', no: 1024818, title: 'ボーナスタイム!疾走感ギラギラ' }),
-    Object.freeze({ id: 'as_1651262', no: 1651262, title: 'わちゃわちゃブチ上げボーナスタイム!' }),
-    Object.freeze({ id: 'as_326636', no: 326636, title: 'BigBonus 懐かしいヒーロー戦隊' }),
-    Object.freeze({ id: 'as_862729', no: 862729, title: 'ルーレット風シンセポップ' }),
-    Object.freeze({ id: 'as_1196296', no: 1196296, title: 'オーケストラヒットのアニメロック' })
-  ]),
-  bgm_jingle_stage: Object.freeze([
-    Object.freeze({ id: 'as_1146181', no: 1146181, title: 'エレクトロなアイキャッチ' }),
-    Object.freeze({ id: 'as_23737', no: 23737, title: 'シンセジングル' })
-  ]),
-  bgm_jingle_win: Object.freeze([
-    Object.freeze({ id: 'as_1576401', no: 1576401, title: 'エレキギター勝利ジングル' })
-  ]),
-
   // ---- §5.1 新設操作音キー(op_*・Phase D1・視聴イベントキーと不共有) ----
-  // council/operation-sound-SYNTHESIS.md §5.1: 既存85本の同一No.を複数キーから参照する
+  // council/operation-sound-SYNTHESIS.md §5.1: 基本音種の同一No.を複数キーから参照する
   //   (IndexedDB assignments は同じ blob id を別キーに割り当て可能=重複購入ゼロ)。
   // v0.1.1079: op_handle/op_shot_1〜3 は D1 実装時に Audiostock 定額で5本追加DL済み
   //   (計90本)だったのにプリセット配線が漏れて「永遠に未割当=無音」だった修正。
@@ -244,7 +158,7 @@ export const CUSTOM_SOUND_PRESET = Object.freeze({
 export const CUSTOM_SOUND_PRESET_KEYS = Object.freeze(Object.keys(CUSTOM_SOUND_PRESET));
 
 /**
- * プリセットの全アセット数(検算用)。設計書の検算=SE52+ボイス22+BGM11=85本。
+ * プリセットの全アセット数(検算用)。
  * @returns {number}
  */
 export function countPresetAssets() {

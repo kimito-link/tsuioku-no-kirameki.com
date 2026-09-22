@@ -135,25 +135,6 @@ export function buildFinalDetailCells(data) {
     }
   }
 
-  /* ══ BGM ══════════════════════════════════════════════
-   * ★盛り上がり(リーチ/フィーバー)の出入りが記録されているか。
-   *   ★掟5: BGMを使っていなければ出さない。
-   */
-  const bgm = data?.bgmPhaseDiag ?? null;
-  if (!bgm || typeof bgm !== 'object' || bgm.bgmEnabled !== true) {
-    out.push(cell('bgm-phase', 'BGMの盛り上がり', 'na', '—'));
-  } else {
-    const phase = String(bgm.phase || 'normal');
-    const reach = n0(bgm.reachCount);
-    const jackpot = n0(bgm.jackpotCount);
-    const phaseJa = phase === 'fever' ? 'フィーバー' : phase === 'reach' ? 'リーチ' : '通常';
-    out.push(cell(
-      'bgm-phase', 'BGMの盛り上がり',
-      'ok', // ★状態の記録=異常ではない
-      `いま${phaseJa}(リーチ${reach}回・大当たり${jackpot}回)`
-    ));
-  }
-
   /* ══ 記録の質 ══════════════════════════════════════════
    * ★NDGR(公式の配信経路)から取れたコメントが、実際に保存されたか。
    *   取れているのに保存されていないなら、保存側が詰まっている。

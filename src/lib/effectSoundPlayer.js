@@ -64,7 +64,6 @@ export const EFFECT_SOUND_VARIANT_PATHS = Object.freeze({
   gift_medium: Object.freeze(['sound/tiers/gift-medium-1.mp3', 'sound/tiers/gift-medium-2.mp3', 'sound/tiers/gift-medium-3.mp3']),
   gift_large: Object.freeze(['sound/tiers/gift-large-1.mp3', 'sound/tiers/gift-large-2.mp3', 'sound/tiers/gift-large-3.mp3']),
   gift_mega: Object.freeze(['sound/tiers/gift-mega-1.mp3', 'sound/tiers/gift-mega-2.mp3', 'sound/tiers/gift-mega-3.mp3']),
-  reach: Object.freeze(['sound/tiers/reach-1.mp3', 'sound/tiers/reach-2.mp3']),
   // 2026-07-16: ad/rank_upは効果音ラボ(soundeffect-lab.info・商用利用無料/クレジット表記不要/
   //   「アプリの操作音として組み込む」用途を明示許可)の専用素材へ差し替え(sound-src/SOURCES.md
   //   参照)。ad=可愛く輝く(控えめな通知)・rank_up=シャキーン(短い上昇感)。

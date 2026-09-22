@@ -89,7 +89,21 @@ const ROLES = {
   'api': { role: 'サーバレス API(status / live-ranking / live-recent-comments / live-og)', tags: ['API'] },
   'memory': { role: 'セッション横断の知見・引き継ぎ(AI のメモリ)。コミット対象外も混在', tags: ['メモリ', '知見'] },
   'memory/archive': { role: '過去セッションの引き継ぎ(HANDOFF)アーカイブ', tags: ['メモリ', '履歴'] },
-  'memory/avatar-parts': { role: 'アバター素材(顔シート等)の参考画像', tags: ['アバター', '画像'] }
+  'memory/avatar-parts': { role: 'アバター素材(顔シート等)の参考画像', tags: ['アバター', '画像'] },
+  '.codex': { role: 'Codex CLI 用のエージェント定義(司令塔から呼ぶ実装役)', tags: ['Codex', 'エージェント'] },
+  '.codex/agents': { role: 'Codex エージェント設定(.toml)', tags: ['Codex', 'エージェント'] },
+  '.codex-osint': { role: 'OSINT 調査の作業データ(warc 等)。コミット対象外も混在', tags: ['OSINT', '調査'] },
+  '_docs': { role: '横断キット(web-ios-android)との手紙・KB・コンセプトメモ', tags: ['横断', 'KB'] },
+  'council/auto': { role: '会議の自動実行ログ(code/design の JSON)', tags: ['会議', '自動生成'] },
+  'council-scout': { role: '外部モデルの日次スカウト(会議の下ごしらえ)', tags: ['会議', '調査'] },
+  'council-scout/briefs': { role: 'スカウトの日次ブリーフ(md)', tags: ['会議', '原稿'] },
+  'docs/article-drafts': { role: '公開前の記事下書き(防御的公開の草稿)', tags: ['記事', '下書き'] },
+  'docs/patent-unique-voice-reading-filing-final': { role: '読み上げ手法の出願関連(現在は MOVED=移設済みの残置)', tags: ['特許', '履歴'] },
+  'extension/data': { role: '拡張同梱の静的データ(応援バナー定義 json)', tags: ['データ', '応援'] },
+  'scripts/lib': { role: 'スクリプト共有の小部品(計器コア等)', tags: ['ビルド', '共有'] },
+  'sound-src': { role: '効果音の元素材(HQ wav 等)。ここから build して配布用 mp3 を作る', tags: ['音声', '素材'] },
+  'sound-src/soundeffect-lab': { role: '効果音ラボ由来の素材候補(採否検討用)', tags: ['音声', '素材'] },
+  'tests/helpers': { role: 'テスト共有ヘルパ(配線テストのソース走査等)', tags: ['テスト', '共有'] }
 };
 
 /**
@@ -143,7 +157,8 @@ const FEATURES = [
   { feature: 'ランキング(/live/)の X シェア', desc: '各配信の stats 行に <a class="share-x">(X Web Intent・JS ゼロ)。?lv= で該当配信を先頭固定(pinLiveFirst)。本文は liveShareText(中立・数値なし・60字以内)、URL は buildXIntentUrl(safeHttpUrl 検疫)。OG 画像は tools/gen-og-live-ranking.py。計器なし(privacy §14-2)(v0.1.1510)', paths: ['src/lib/xIntentUrl.js', 'src/lib/liveRankingView.js', 'src/extension/live-ranking-entry.js', 'tsuioku-no-kirameki/live/index.html', 'tools/gen-og-live-ranking.py'], tags: ['LP', '公開', 'ランキング'] },
   { feature: 'ランキング(/live/)のコメント件数集計', desc: '3枠目「コメントで応援した人」。GitHub Actions(live-ranking.yml の tally ジョブ)が watch HTML→視聴セッション握手→NDGR を crawlNdgrBackward で遡り、ndgrChatsToMergeRows→createCommentTally で【件数だけ】数えて POST(?ingest=comments)。本文・時刻は保存しない。匿名(184)も件数順にそのまま(匿名NNN＋identicon)。GET 側は attachComments が lives[i].comment に合流(v0.1.1511)', paths: ['src/lib/liveCommentTally.js', 'scripts/live-comment-tally.mjs', 'api/live-ranking.js', 'src/lib/liveRankingView.js', 'src/extension/live-ranking-entry.js', '.github/workflows/live-ranking.yml'], tags: ['LP', '公開', 'ランキング', 'コメント', '集計'] },
   { feature: 'ランキング(/live/)ホバーで直近の発言', desc: '「コメントで応援した人」の名前にマウスを乗せると、その人の直近発言(最大5件)をその場で NDGR から浅く取って小さなカードで出す。POST /api/live-recent-comments が watch HTML→握手(nicoliveGuest)→crawlNdgrBackward を浅く回して byUid を返す。本文は Redis に保存せずサーバのメモリに最長60秒だけ。カード HTML は純関数 buildRecentCardHtml。行全体を1つの <a class="rank-link"> にまとめる変更も同段(v0.1.1514)', paths: ['api/live-recent-comments.js', 'src/server/nicoliveGuest.js', 'src/lib/liveRecentHoverCard.js', 'src/extension/live-ranking-entry.js', 'tsuioku-no-kirameki/live/index.html'], tags: ['LP', '公開', 'ランキング', 'コメント'] },
-  { feature: 'ランキング(/live/)の配信ごと OGP', desc: 'vercel.json が「?lv= あり∧カード用クローラー UA」だけ /api/live-og へ rewrite。api は live:ranking:latest から該当配信を引き、数字(来場・コメント・ギフト・広告)を description と焼いた JPEG に出す(0/欠落は省く)。焼き画像がある lv(HEXISTS)は og:image=/api/live-og-image?lv=(1200x630・配信サムネ＋数字帯)、無ければサムネ直。画像は GitHub Actions(og ジョブ)が live-og-bake.mjs→og-live-compose.py(Pillow)で焼き、base64 を Upstash(live:og:img・TTL 1h)へ POST(?ingest=og-image)。api はニコ生へ fetch しない・リダイレクト無し・no-store。人間は静的 /live/。支援者名・コメント本文・個別ポイントは出さない(v0.1.1519)', paths: ['api/live-og.js', 'api/live-og-image.js', 'src/lib/liveOgHtml.js', 'src/lib/liveOgStats.js', 'src/lib/liveRankingView.js', 'scripts/live-og-bake.mjs', 'tools/og-live-compose.py', '.github/workflows/live-ranking.yml', 'vercel.json'], tags: ['LP', '公開', 'ランキング'] }
+  { feature: 'ランキング(/live/)の配信ごと OGP', desc: 'vercel.json が「?lv= あり∧カード用クローラー UA」だけ /api/live-og へ rewrite。api は live:ranking:latest から該当配信を引き、数字(来場・コメント・ギフト・広告)を description と焼いた JPEG に出す(0/欠落は省く)。焼き画像がある lv(HEXISTS)は og:image=/api/live-og-image?lv=(1200x630・配信サムネ＋数字帯)、無ければサムネ直。画像は GitHub Actions(og ジョブ)が live-og-bake.mjs→og-live-compose.py(Pillow)で焼き、base64 を Upstash(live:og:img・TTL 1h)へ POST(?ingest=og-image)。api はニコ生へ fetch しない・リダイレクト無し・no-store。人間は静的 /live/。支援者名・コメント本文・個別ポイントは出さない(v0.1.1519)', paths: ['api/live-og.js', 'api/live-og-image.js', 'src/lib/liveOgHtml.js', 'src/lib/liveOgStats.js', 'src/lib/liveRankingView.js', 'scripts/live-og-bake.mjs', 'tools/og-live-compose.py', '.github/workflows/live-ranking.yml', 'vercel.json'], tags: ['LP', '公開', 'ランキング'] },
+  { feature: 'dist 鮮度ゲート(buildId無限差分ループ根治)', desc: 'pre-pushのbuild再実行でbuildIdタイムスタンプが毎回変わりdist差分が無限に再発していた問題を根治。esbuildのmetafileから実際のバンドル入力のgit blob shaを集めた指紋(.dist-fingerprint.json・buildIdを含まない)をbuild.mjsが書き、pre-commit(--index)/pre-push(--pushed)/CI(--ref HEAD)がこの指紋だけを照合してbuildを再実行しない。NL_BUILD_ID(buildAgeCell.jsが依存する時刻計器)は無変更。council-fable設計(docs/dist-fingerprint-gate-DESIGN.md・v0.1.1538)', paths: ['src/lib/distFingerprint.js', 'scripts/check-dist-fresh.mjs', 'scripts/build.mjs', '.husky/pre-push', '.husky/pre-commit'], tags: ['出荷', 'ゲート', 'dist', 'ビルド'] }
 ];
 
 /**

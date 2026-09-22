@@ -99,9 +99,6 @@ describe('resolveEffectSoundPath', () => {
     }
   });
 
-  it('reachのバリエーションが2件定義されている', () => {
-    expect(EFFECT_SOUND_VARIANT_PATHS.reach).toHaveLength(2);
-  });
 });
 
 describe('effectSoundKindForGiftTier', () => {
