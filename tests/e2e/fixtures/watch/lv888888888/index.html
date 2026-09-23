@@ -109,9 +109,13 @@
       })();
     </script>
 
-    <!-- NLS_POST_COMMENT E2E: 送信後 100ms で欄が空く（本番のニコ生入力欄クリア実測 ~50-150ms に合わせる。
-         commentSubmitConfirm.js の COMMENT_SUBMIT_CONFIRM_PROBE_FAST_MS(最大450ms)を旧1800msでは
-         必ず超過し確認不能だった） -->
+    <!-- NLS_POST_COMMENT E2E: 送信後 commentClearDelayMs(既定100ms)で欄が空く。
+         既定値は本番のニコ生入力欄クリア実測 ~50-150ms に合わせる(fastSubmit確認用)。
+         ?commentClearDelayMs=1800 のように明示指定すると、遅いクリアへの耐性
+         (comment-post.spec.js の通常プローブ COMMENT_SUBMIT_CONFIRM_PROBE_MS
+         最大4000ms)を検証できる。単一の固定値(旧1800ms)だと
+         COMMENT_SUBMIT_CONFIRM_PROBE_FAST_MS(最大450ms)を必ず超過し
+         fastSubmit確認が不能だったため、テストごとに選べるようにした。 -->
     <!-- comment-panel クラスはこのブロックのみ（.comment-panel セレクタの strict 一意） -->
     <div class="ga-ns-comment-panel comment-panel" id="e2e-comment-compose"></div>
     <script>
@@ -120,6 +124,10 @@
         if (!wrap) return;
         var params = new URLSearchParams(location.search);
         var variant = params.get('commentVariant') || 'submit';
+        var clearDelayMsRaw = Number(params.get('commentClearDelayMs'));
+        var clearDelayMs = Number.isFinite(clearDelayMsRaw) && clearDelayMsRaw >= 0
+          ? clearDelayMsRaw
+          : 100;
         if (variant === 'text-button') {
           wrap.innerHTML =
             '<div class="comment-box">' +
@@ -141,7 +149,7 @@
               } catch (err) {
                 /* ignore */
               }
-            }, 100);
+            }, clearDelayMs);
           });
           return;
         }
@@ -176,7 +184,7 @@
             } catch (err) {
               /* ignore */
             }
-          }, 100);
+          }, clearDelayMs);
         });
       })();
     </script>
