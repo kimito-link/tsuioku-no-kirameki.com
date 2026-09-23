@@ -564,6 +564,13 @@ async function classify(taskText) {
   const order = ['gemini-2.5-flash', 'groq/gpt-oss-20b', 'groq/gpt-oss-120b', 'local/qwen3.5:9b'];
   const cands = order.map(l => allMembers.find(m => m.label === l)).filter(Boolean);
   if (!cands.length && allMembers.length) cands.push(allMembers[0]);
+  // ★この行は現行経路では到達しない（上の行が allMembers から必ず1体入れるため、
+  //  ここへ来るのは allMembers 自体が空＝メンバー0体の構成のときだけ）。
+  //  **防御として意図的に残す**（2026-09-23 に「消すか」を検討して残す判断をした）:
+  //  classify() を「呼び出し元の前提に依存しない全域関数」に保つための番人で、
+  //  消すと下の for が空回りして cands[0] 前提の経路に undefined が流れ得る＝fail-closed に逆行。
+  //  ★次の人へ: 「到達しないから消せる」と判断しないこと。上の :1066 で消したのは
+  //   「2段目と同じ集合＝拾えるものが無い飾り」であって、こちらは役割が違う。
   if (!cands.length) return { category: 'general', by: '(none)', raw: '' };
   let lastErr = '';
   for (const c of cands) {
@@ -828,6 +835,11 @@ async function council(members, label, key) {
   //  4体召集した後も gemini-2.5-flash が候補として残る。
   //  今後の発動は record.meta.events の type:'rescue' で数えられる（2026-08-16に計器を追加）。
   //  もし発動したのに救えていない、という事象が出たらそのとき初めて機構を疑うこと。
+  //  ★2026-09-23: その「救えていない」の判定方法を実際に用意した。
+  //   'rescue' は**試行前**に出るので、これ単体では成否が分からない（＝上の判断基準を
+  //   満たせなかった）。'rescue-result' の ok:false を数えること。
+  //   判定式: events に rescue があるのに rescue-result.ok===true が無ければ「救えていない」。
+  //   ★'rescue' の方を消さないこと（例外で抜けた場合でも「試みた」事実が残る）。
   const okCount = shown.filter(r => !r.error).length;
   if (okCount < 3) {
     const usedLabels = new Set(members.map(m => m.label));
@@ -840,6 +852,11 @@ async function council(members, label, key) {
       const rescued = await runRound([rescueCand], question);
       if (rescued[0] && !rescued[0].error) {
         shown = [...shown, rescued[0]];
+        noteEvent('rescue-result', { round: label, cand: rescueCand.label, ok: true });
+      } else {
+        const why = String(rescued[0]?.error || '(no result)').slice(0, 120);
+        console.error(`[${label}] 敗者復活が失敗: ${rescueCand.label} → ${why}`);
+        noteEvent('rescue-result', { round: label, cand: rescueCand.label, ok: false, error: why });
       }
     }
   }
@@ -994,7 +1011,14 @@ function swapToCloud(member, routedMembers, allMembers, reason) {
   const sameRole = allMembers.filter((m) => m.kind === 'cloud' && m.role === member.role && !usedLabels.has(m.label)).sort(byWeight);
   const anyCloud = allMembers.filter((m) => m.kind === 'cloud' && !usedLabels.has(m.label)).sort(byWeight);
   const spare = sameRole[0] || anyCloud[0];
-  if (!spare) { console.error(`[振替] ${member.label} の代替クラウドが無く、そのまま残す（${reason}）`); return; }
+  // ★2026-09-23: 失敗側にも計器を置いた。従来は成功時(下の'swap')だけ記録され、
+  //  「振替を諦めた」は画面に出るだけでrecordに残らなかった＝非対称で、後から
+  //  「重いローカルがGPUを掴んだまま残った」既知の地雷を数えられなかった。
+  if (!spare) {
+    console.error(`[振替] ${member.label} の代替クラウドが無く、そのまま残す（${reason}）`);
+    noteEvent('swap-none', { from: member.label, role: member.role, reason });
+    return;
+  }
   routedMembers.splice(idx, 1, { ...spare, role: member.role });
   console.error(`[振替] ${member.label} → ${spare.label}（${ROLE_LABEL[member.role]}・理由:${reason}）`);
   noteEvent('swap', { from: member.label, to: spare.label, role: member.role, reason });
@@ -1042,6 +1066,9 @@ if (FULL && !AB) {
       routedMembers.push({ ...spare, role: 'critic' });
       console.error(`[補完] 批判役が不在のため ${spare.label} を批判役として追加`);
     } else {
+      // ★計器を置かない判断（2026-09-23）: ここに到達するのはほぼローカル単独構成のときだけ。
+      //  発生したかどうかは 'env-missing' と record.meta.members（critic が0体）から
+      //  再構成できるので、noteEvent を足しても新しい情報が増えない。
       console.error('[警告] 批判役を立てられませんでした（褒め合い防止が働きません）');
     }
   }
@@ -1061,9 +1088,17 @@ if (FULL && !AB) {
     // プロバイダ未使用のクラウドを最優先し、無ければ従来どおり label 重複回避のみで選ぶ
     // （fail-open。候補が尽きて2体目を諦めるより、同一プロバイダでも試す方がまし）。
     const usedProviders = new Set(routedMembers.map(m => m.provider).filter(Boolean));
+    // ★2026-09-23 3段目を削除した: 旧 `m.kind !== 'local'` は**2段目と完全に同じ集合**だった。
+    //  kind を代入するのは push(:327) の1箇所だけで、呼び出し3箇所がいずれも 'cloud'(:386,:403)
+    //  か 'local'(:421) しか渡さない（実測で全数確認）。よって !== 'local' ≡ === 'cloud' で、
+    //  2段目が外した候補を3段目が拾うことは原理的に起きない。防御ではなく誤解を生む飾り。
+    //  「絶対に当たらない選択肢を候補列に残さない」流儀（cloudflare/glm-5.2・
+    //  groq/llama-3.3-70b の撤去で確立）と同型。
     const cand = allMembers.find(m => m.kind === 'cloud' && !usedLabels.has(m.label) && !usedProviders.has(m.provider))
-              || allMembers.find(m => m.kind === 'cloud' && !usedLabels.has(m.label))
-              || allMembers.find(m => m.kind !== 'local' && !usedLabels.has(m.label)); // ローカルは増やさない
+              || allMembers.find(m => m.kind === 'cloud' && !usedLabels.has(m.label));
+    // ★計器を置かない判断（2026-09-23・次の人が同じ調査を繰り返さないための記録）:
+    //  この見送りは record.meta.members を数えれば critic が何体居るか分かるので再構成可能。
+    //  noteEvent を足しても新しい情報が増えない。
     if (!cand) { console.error('[③多視点] 別頭脳の空きクラウドが無いため2体目の批判役は見送り'); break; }
     if (routedMembers.length >= MAX_MEMBERS) {
       const drop = routedMembers.findIndex(m => m.role !== 'critic' && m.role !== 'lead');
