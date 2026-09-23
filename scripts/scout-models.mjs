@@ -245,13 +245,26 @@ const PROBE_URL = {
 };
 const PROBE_KEY = { groq: G, nvidia: N, openrouter: O, cloudflare: CF, sambanova: SN, mistral: MI };
 
+// ★2026-09-23 追加: 遅いが健全なモデルを「疎通不能」と誤診しないための個別timeout。
+//  実損: 採用当日の nvidia/deepseek-v4.1-flash が「2日連続 The operation was aborted due to
+//  timeout」＝疎通不能と日報に出た。だが実会議では成功しており(0失敗/1発言)、実測すると
+//  **20秒ではABORT・90秒なら200で41376ms**＝モデルは健全で、probe側が短すぎただけだった。
+//  ★全体を延ばすと本当に死んでいるモデルの検出が遅くなるので、遅いと実証済みのものだけ延ばす
+//  （liveProbe導入時と同じ「実証されたものにだけ付ける」流儀）。
+//  ここに足す条件: 本番経路の実測で20秒を超え、かつ実会議で成功実績があること。
+const PROBE_TIMEOUT_MS = {
+  'deepseek-ai/deepseek-v4.1-flash': 90000, // 実測41376ms(2026-09-23)。既定20秒では必ずabort
+};
+const DEFAULT_PROBE_TIMEOUT_MS = 20000;
+
 /** 1モデルに軽量プロンプトを1発投げ、呼べるかだけ検証する。@returns {{status:number|string, ms:number, snippet:string}} */
 async function probeModel(provider, modelId) {
   const started = Date.now();
+  const timeoutMs = PROBE_TIMEOUT_MS[modelId] || DEFAULT_PROBE_TIMEOUT_MS;
   try {
     if (provider === 'gemini') {
       const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent?key=${E}`, {
-        method: 'POST', signal: AbortSignal.timeout(20000),
+        method: 'POST', signal: AbortSignal.timeout(timeoutMs),
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ contents: [{ parts: [{ text: 'hi' }] }], generationConfig: { maxOutputTokens: 8 } }),
       });
@@ -264,7 +277,7 @@ async function probeModel(provider, modelId) {
     const key = PROBE_KEY[provider];
     if (!url || !key) return { status: 'skip(no-key)', ms: 0, snippet: '' };
     const r = await fetch(url, {
-      method: 'POST', signal: AbortSignal.timeout(20000),
+      method: 'POST', signal: AbortSignal.timeout(timeoutMs),
       headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + key },
       body: JSON.stringify({ model: modelId, messages: [{ role: 'user', content: 'hi' }], max_tokens: 8 }),
     });
