@@ -50,10 +50,15 @@ test('snapshot fetch が永久ハングしても snapshotFetchActive は永久 t
         [recordingKey]: true,
         [lastWatchKey]: watchUrl,
         [commentsKey]: [],
+        // recordedCount: content-entry.js の recordedCountForDisplay は起動直後に
+        //   observedRecordedCommentCount(モックページの実DOM行数=25件、index.html の
+        //   for(i=1..25) で生成)で単調化ゲートを再構築するため、事前投入した任意値は
+        //   拡張の初回 harvest で上書きされる(拡張内部の Map は storage の既存値を
+        //   シードしない・仕様として正しい)。期待値もモックページの実測に合わせる。
         [panelSummaryKey]: {
           v: 1,
           liveId: 'lv888888888',
-          recordedCount: 42,
+          recordedCount: 25,
           officialCount: 100,
           viewerCountFromDom: 55,
           concurrentEstimated: 9,
@@ -144,7 +149,7 @@ test('snapshot fetch が永久ハングしても snapshotFetchActive は永久 t
         message: 'snapshot fetch ハング中でも panel サマリで記録件数が表示されるまで'
       }
     )
-    .toBe('42');
+    .toBe('25');
 
   // 2) ★ 核心: fetch は永久ハングしているのに、snapshotFetchActive が false へ戻る瞬間が来る。
   //    = withTimeout が 15s で打ち切り finally が走り、フラグがリセットされた証拠。

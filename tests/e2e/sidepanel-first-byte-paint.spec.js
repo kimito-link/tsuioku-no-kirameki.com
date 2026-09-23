@@ -65,13 +65,13 @@ test.describe('サイドパネル: 最初のバイトで地を塗る', () => {
     });
   }
 
-  test('popup.html は移設後も cloak/recording/terms-ack 属性を保っている', () => {
+  test('popup.html は移設後も recording/terms-ack 属性を保っている', () => {
     const s = fs.readFileSync(path.join(repoRoot, 'extension/popup.html'), 'utf8');
     // ★1行目まるごとを見る。`>` で切ると gradient の `)` より手前の `>` に当たらず、
     //   逆に style 値の途中で切れて属性を見落とす(実際にこれで一度誤検知した)。
     const firstTag = s.slice(0, s.indexOf('\n'));
-    // ★属性を落とすと別の不具合になる(cloak が無いと段階描画のちらつきが戻る)。
-    expect(firstTag).toContain('data-nl-popup-primary-cloak="1"');
+    // data-nl-popup-primary-cloak は v0.1.1423(514396b1)で意図的に廃止済み
+    // (12版調査の末、幕自体が黒画面の原因だったため撤去)。このテストでは検証しない。
     expect(firstTag).toContain('data-nl-recording="on"');
     expect(firstTag).toContain('data-nl-usage-terms-ack="1"');
     expect(firstTag).toMatch(/color-scheme:\s*light/);

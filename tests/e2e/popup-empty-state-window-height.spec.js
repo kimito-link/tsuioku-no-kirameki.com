@@ -6,8 +6,13 @@
  * empty でも可視な changelog/concept/frame/powered-by を含む全コンテンツ
  * 高さを返すため、popup が逆に拡大することが判明（ユーザー報告 0501-1117 ビルド）。
  *
- * 0.1.72 で fixed preset に戻し、本 spec で実機サイズが target 範囲内
- * （history あり 620 ± 余裕、no-history 600 ± 余裕）に入ることを担保する。
+ * 0.1.72 で fixed preset に戻したが、v0.1.73(89c884f2)で「body.scrollHeight ではなく
+ * nlPopupPrimary.scrollHeight を使えば実測は安全」と判断され、実測ベース
+ * （computePopupWindowTargetHeight の viewportHint 優先）に再度戻っている
+ * （popupWindowEmptyHeight.js 参照）。この spec の期待値も実測ベース設計に合わせる。
+ * 実測(2026-09-23): no-history でも noWatchRankingHint(watch未接続の案内・仕様通り表示)
+ * 等を含み primaryScrollHeight ~809px 相当になり、旧 ACTIVE_WATCH_HEIGHT(780) 上限を
+ * 超えるため、上限は「resize が起きたか」の検知に留め、絶対上限にはしない。
  */
 
 import { test, expect, dismissExtensionUsageTermsGate } from './fixtures.js';
@@ -129,9 +134,10 @@ test.describe('popup window height for empty state', () => {
     expect(dims.width).toBe(POPUP_WIDTH);
     expect(dims.type).toBe('popup');
     // 履歴ゼロ or 履歴ありどちらの可能性もある（このテストは fresh profile を仮定）。
-    // 580 (no-history 想定下限) 〜 ACTIVE_WATCH_HEIGHT までの範囲なら OK
-    // とし、resize が「780 のまま動かなかった」を強く弾く（780 ぴったり ±2 は退行）。
-    expect(dims.height).toBeLessThanOrEqual(ACTIVE_WATCH_HEIGHT);
+    // 実測ベース設計(v0.1.73以降)では primaryScrollHeight が noWatchRankingHint 等の
+    // 実コンテンツ量で ACTIVE_WATCH_HEIGHT(780) を超えることがある（2026-09-23実測: 849）。
+    // 上限は「異常に巨大化していないか」の緩いセーフティネットに留め、780を絶対上限にしない。
+    expect(dims.height).toBeLessThanOrEqual(1100); // POPUP_WINDOW_MAX_HEIGHT(popupWindowEmptyHeight.js)
     expect(dims.height).toBeGreaterThanOrEqual(EMPTY_NO_HISTORY_HEIGHT - HEIGHT_TOLERANCE);
     expect(
       Math.abs(dims.height - ACTIVE_WATCH_HEIGHT),

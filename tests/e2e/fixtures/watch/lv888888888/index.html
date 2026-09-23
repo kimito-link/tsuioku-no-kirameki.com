@@ -109,7 +109,9 @@
       })();
     </script>
 
-    <!-- NLS_POST_COMMENT E2E: 送信後 1.8s で欄が空く（React 遅延クリアの模倣） -->
+    <!-- NLS_POST_COMMENT E2E: 送信後 100ms で欄が空く（本番のニコ生入力欄クリア実測 ~50-150ms に合わせる。
+         commentSubmitConfirm.js の COMMENT_SUBMIT_CONFIRM_PROBE_FAST_MS(最大450ms)を旧1800msでは
+         必ず超過し確認不能だった） -->
     <!-- comment-panel クラスはこのブロックのみ（.comment-panel セレクタの strict 一意） -->
     <div class="ga-ns-comment-panel comment-panel" id="e2e-comment-compose"></div>
     <script>
@@ -139,7 +141,7 @@
               } catch (err) {
                 /* ignore */
               }
-            }, 1800);
+            }, 100);
           });
           return;
         }
@@ -174,7 +176,7 @@
             } catch (err) {
               /* ignore */
             }
-          }, 1800);
+          }, 100);
         });
       })();
     </script>

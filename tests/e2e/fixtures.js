@@ -81,6 +81,41 @@ export async function focusMockWatchThenReloadPopup(watch, popup) {
 }
 
 /**
+ * standalone window(別ウィンドウ)文脈を e2e で再現するため、popup.html の
+ * `<html>` に `nl-popup-window` クラスを goto/reload の**都度**自動付与する。
+ *
+ * ★ popup.evaluate() での後付けは使えない: popup-entry.js は
+ *   `initPopup()` をモジュールトップレベルで同期的に即時実行するため
+ *   （`document.readyState !== 'loading'` なら即呼び出し）、
+ *   `reload({ waitUntil: 'domcontentloaded' })` の Promise が resolve した時点で
+ *   既に `wireSupportTimelineOpenPersistence()` の `isStandaloneWindow` 判定
+ *   （class の有無を見る）が完了しており、後から evaluate で class を足しても
+ *   間に合わない（実測で `details.open` が false に固定される事故を確認済み）。
+ * ★ `page.addInitScript()` 単体も不可: このコールバックは `document.documentElement`
+ *   （`<html>`）が生成される**前**（`document-start` 相当）に走るため、
+ *   `document.documentElement` は null で `classList.add` が失敗する（実測確認済み）。
+ *   `<html>` の出現を `MutationObserver` で待ってから付与することで、
+ *   goto 直後・reload 直後のどちらでも安定して効く。
+ * @param {import('@playwright/test').Page} popup
+ */
+export async function applyStandaloneWindowClass(popup) {
+  await popup.addInitScript(() => {
+    function tryAdd() {
+      if (document.documentElement) {
+        document.documentElement.classList.add('nl-popup-window');
+        return true;
+      }
+      return false;
+    }
+    if (!tryAdd()) {
+      new MutationObserver((_, obs) => {
+        if (tryAdd()) obs.disconnect();
+      }).observe(document, { childList: true, subtree: true });
+    }
+  });
+}
+
+/**
  * 記録 ON/OFF などが `#nlPopupSettings` 内にある場合に、折りたたみを開く。
  * @param {import('@playwright/test').Page | import('@playwright/test').FrameLocator} pageOrFrame
  */
