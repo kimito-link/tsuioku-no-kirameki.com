@@ -2,7 +2,8 @@ import {
   test,
   expect,
   dismissExtensionUsageTermsGate,
-  focusMockWatchThenReloadPopup
+  focusMockWatchThenReloadPopup,
+  applyStandaloneWindowClass
 } from './fixtures.js';
 import { E2E_MOCK_WATCH_URL as MOCK_WATCH } from './constants.js';
 
@@ -55,16 +56,14 @@ test('別ウィンドウ配信中: 応援タイムラインが下部常設+既�
   await watch.goto(MOCK_WATCH, { waitUntil: 'domcontentloaded', timeout: 60_000 });
   const popup = await context.newPage();
   await popup.setViewportSize({ width: 420, height: 820 }); // 別ウィンドウ相当（縦長）
+  // standalone window 文脈を再現（本番は resizePopupWindowForState が付与）。
+  await applyStandaloneWindowClass(popup);
   await popup.goto(`chrome-extension://${extensionId}/popup.html`, {
     waitUntil: 'domcontentloaded',
     timeout: 60_000
   });
-  // standalone window 文脈を再現（本番は resizePopupWindowForState が付与）。
-  await popup.evaluate(() => document.documentElement.classList.add('nl-popup-window'));
   await dismissExtensionUsageTermsGate(popup);
   await focusMockWatchThenReloadPopup(watch, popup);
-  // reload で class が落ちるので付け直す。
-  await popup.evaluate(() => document.documentElement.classList.add('nl-popup-window'));
   await expect(popup.locator('html[data-nl-support-wired]')).toBeAttached({
     timeout: 20_000
   });

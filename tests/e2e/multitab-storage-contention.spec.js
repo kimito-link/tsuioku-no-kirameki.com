@@ -60,7 +60,14 @@ test.describe('多タブ storage 競合の基準線（PR0 観測基盤）', () =
 
   test(`${TAB_COUNT} 枚の watch タブ + inline パネルが、stall 下でも全部「—」で固まらず描画完了する`, async ({
     context
-  }) => {
+  }, testInfo) => {
+    // 4 タブの storage キュー head-of-line blocking 回復にかかる時間はローカルで
+    // 最大 81s だったが、CI(headed+virtual display・共有CPU)では 120s でも
+    // tab#1 が paint 完了せず timeout することを実測確認した(2026-09-23、PR #253)。
+    // CI 環境は負荷変動が大きいため、e2e job 全体の timeout(ci.yml で 30分)に対して
+    // 十分な余裕を残しつつ、下の paint 待機(300s)+ 後続ポーリング(最大120s)を
+    // 収められるよう 480s を確保する。
+    testInfo.setTimeout(480_000);
     let sw = context.serviceWorkers()[0];
     if (!sw) sw = await context.waitForEvent('serviceworker', { timeout: 60_000 });
 
@@ -119,13 +126,18 @@ test.describe('多タブ storage 競合の基準線（PR0 観測基盤）', () =
     }
 
     // ★核心: 全タブの inline パネルが描画完了マーカーを立てる（＝stall 下でも paint が走った）。
-    //   1 タブでも「—」のまま固まれば、ここで timeout して RED になる。
+    //   1 タブでも「永久に」固まれば、ここで timeout して RED になる。
+    //   実測(2026-09-23): stall window は 6s だが、4 タブの storage キュー head-of-line
+    //   blocking(コメント冒頭の真因)が解けるまで全タブ paint 完了に、ローカルで ~38s〜81s、
+    //   CI(headed+virtual display・共有CPU)では 120s でも tab#1 が未完了(PR #253 実測)と、
+    //   環境で大きく変動することを確認済み。「永久固まり」ではなく「有限だが遅い」という
+    //   北極星は不変なため、CI の負荷変動を吸収できるよう 300s まで確保する。
     for (let i = 0; i < pages.length; i += 1) {
       const frame = pages[i].frameLocator(`#${INLINE_HOST_ID} iframe`);
       await expect(
         frame.locator('html[data-nl-popup-content-painted]'),
         `tab#${i + 1} の inline パネルが描画完了マーカーを立てる`
-      ).toBeAttached({ timeout: 30_000 });
+      ).toBeAttached({ timeout: 300_000 });
     }
 
     // stall 回復後、全タブで記録カードが「—」から数値（>=200）になる（自然復活）。
