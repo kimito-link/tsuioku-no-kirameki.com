@@ -272,6 +272,28 @@ export const LINEUP = [
   //   roleOf/weightOf の "deepseek" 判定行は削除しない（mistral-large行の前例に倣う。
   //   将来 deepseek 系を再採用したときそのまま効く無害な行のため）。
 
+  // ★2026-09-23 追加（criticが生存2体まで痩せた問題の解消・18→19体）:
+  //  上の 08-21 撤去メモは「予備が3体(cloudflare/glm-4.7-flash・sambanova/deepseek-v3.1・
+  //  mistral/magistral-small)別プロバイダで残るので補充しない」と判断していたが、
+  //  **その3体のうち2体が死んだ**。実測(2026-09-23):
+  //    sambanova/deepseek-v3.1  … 30日連続 疎通失敗（"high demand"）
+  //    mistral/magistral-small  … 14日連続 429（クールダウン6秒後の単発でも429）
+  //  結果 critic は **生存2体**（groq/gpt-oss-120b・cloudflare/glm-4.7-flash）まで痩せた。
+  //  critic は会議で最も要る役割なので、ここを2体で回すのは薄すぎる＝補充する。
+  //  ★08-21に「deepseek判定行を消さない」と決めておいたので、roleOf/weightOfは**無変更**で
+  //   この行を足すだけで critic/weight3 に載る（当時の判断がそのまま効いた実例）。
+  //  実測(本番と同じ /v1/chat/completions・2並列・統括プロンプト):
+  //   **2/2成功 52800ms / 29217ms**、本文は3意見を実際に統合した結論を返した
+  //   （速いだけでメタ返答しかしない類ではないことを本文で確認済み＝2026-09-09の教訓）。
+  //   比較: 同時測定した現役 nvidia/nemotron-3-ultra-550b は 69372ms / 2935ms で、
+  //   **新顔の方が遅い側の実測値は速い**。ただし単発11065ms→2並列52800msと振れるので
+  //   「速い枠」とは扱わない＝weight3(予備)のまま据える（恒久ルール3: 新顔は予備から）。
+  //  恒久ルール5(同役割の予備に同一プロバイダを重ね積みしない)の確認: critic の生存は
+  //   groq・cloudflare の2種で、nvidia は critic に**居ない**ので抵触しない。
+  //  ★nvidia枠のlead(nemotron)と同じプロバイダになるが、役割が違うので重ね積みではない。
+  //   NVIDIA障害時に critic が groq/cloudflare の2体で残ることは実測の生存表で確認済み。
+  { label: 'nvidia/deepseek-v4.1-flash', provider: 'nvidia', rawId: 'deepseek-ai/deepseek-v4.1-flash', apiModel: 'deepseek-ai/deepseek-v4.1-flash', opts: {}, requires: ['N'], liveProbe: true },
+
   // 2026-07-31 追加: NVIDIA lead正規(nemotron-3-ultra-550b)の別経路予備。OpenRouterの無料
   // モデル一覧(:freeサフィックス)に同一モデルが存在することを発見し、3並列200 OK(360/402/2140ms)
   // で裏取り済み。roleOfはlabelに"nemotron-3-ultra"を含むため自動でlead判定される。
@@ -423,6 +445,21 @@ export const LINEUP = [
   //   実測2並列 200 OK / 2338ms・2638ms、統括プロンプトでも 1924ms で統合＋異論を
   //   指示どおり出した。別系譜(Mistral)なので lead の頭脳が2種類に戻る。
   //  不採用: mistral-medium-latest は 200 だが roleOf 上 generalist で lead の穴を埋めない。
+  // ★2026-09-23 現況（この2体は**据え置く**。撤去しない）:
+  //  実測: 両方とも14日連続429 "Rate limit exceeded"。クールダウン6秒後の
+  //  単発（max_tokens:20の軽い問い）でも429で、**構造的な429ではなく容量枯渇型**。
+  //  据え置く理由: 既存の判断基準どおり「429は死ではない。402/403の課金要求が死」
+  //  （上の mistral-large 撤去メモと対）。カタログには在籍、同キーの codestral は
+  //  200/1437ms で応答＝**キーの問題でもプロバイダ全体の死でもない**。
+  //  ★日数の伸び（7→14→…）は新しい情報ではない。次に判断が変わるのは
+  //   (a) codestral も同時に429になる（=Mistralキー全体の枯渇）
+  //   (b) カタログから magistral 系が消える
+  //   (c) 402/403の課金要求に変わる  のいずれかが起きたときだけ。
+  //  ★magistral-medium の lead 復帰条件（2026-09-06に降格して以来据え置き）は未達のまま:
+  //   「2会議連続成功 ＋ 単発429ゼロを別々の2日で確認」。実会議でも 4発言/2失敗=50%。
+  //   lead は nvidia + openrouter×2 の生存3体で回っているので穴は空いていない。
+  //  ★magistral-small が死んでいる影響は critic に出ていたので、そちらは
+  //   上の nvidia/deepseek-v4.1-flash 追加で埋めた（この2体の据え置きとは別の話）。
   { label: 'mistral/magistral-medium', provider: 'mistral', rawId: 'magistral-medium-latest', apiModel: 'magistral-medium-latest', opts: {}, requires: ['MI'], liveProbe: true },
   { label: 'mistral/magistral-small', provider: 'mistral', rawId: 'magistral-small-latest', apiModel: 'magistral-small-latest', opts: {}, requires: ['MI'], liveProbe: true },
 
