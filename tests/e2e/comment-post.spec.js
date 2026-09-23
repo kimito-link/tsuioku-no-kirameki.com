@@ -5,8 +5,11 @@ import {
 } from './constants.js';
 
 /**
- * フィクスチャ HTML は送信後 1.8s で textarea を空にする。
- * 旧プローブ（最大 1.4s）だと確認失敗するため、延長後の回帰防止用。
+ * フィクスチャ HTML は ?commentClearDelayMs=1800 指定で送信後 1.8s に textarea を
+ * 空ける(既定は fastSubmit 確認用の100ms・fixtures/watch/lv888888888/index.html 参照)。
+ * NLS_POST_COMMENT を SW 経由で直接送信するこのテストは fastSubmit を渡さないため
+ * 常に通常プローブ COMMENT_SUBMIT_CONFIRM_PROBE_MS(最大4000ms)を使う経路であり、
+ * 1.8s の遅いクリアでも確認できることの回帰防止用。
  */
 test.describe('NLS_POST_COMMENT（mock watch・遅延クリア）', () => {
   test('遅延クリアでも ok: true', async ({ context }) => {
@@ -16,7 +19,10 @@ test.describe('NLS_POST_COMMENT（mock watch・遅延クリア）', () => {
     }
 
     const page = await context.newPage();
-    await page.goto(MOCK_WATCH, { waitUntil: 'load', timeout: 60_000 });
+    await page.goto(`${MOCK_WATCH}?commentClearDelayMs=1800`, {
+      waitUntil: 'load',
+      timeout: 60_000
+    });
     await page.waitForTimeout(800);
 
     const result = await sw.evaluate(async (tabUrlPattern) => {
@@ -48,7 +54,7 @@ test.describe('NLS_POST_COMMENT（mock watch・遅延クリア）', () => {
     }
 
     const page = await context.newPage();
-    await page.goto(`${MOCK_WATCH}?commentVariant=text-button`, {
+    await page.goto(`${MOCK_WATCH}?commentVariant=text-button&commentClearDelayMs=1800`, {
       waitUntil: 'load',
       timeout: 60_000
     });
