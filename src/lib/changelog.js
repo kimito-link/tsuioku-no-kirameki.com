@@ -18,6 +18,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1542',
+    date: '2026-09-24',
+    summary: 'イベント未参加時の誤表示・文字化けタイトルを根治',
+    items: Object.freeze([
+      'イベントに参加していない配信で、順位やスコアが誤って表示されたり、文字化けしたイベント名が出ることがある不具合を修正しました。公式のイベント参加が確認できる時だけ表示するようにしています。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1541',
     date: '2026-09-23',
     summary: 'マーケ分析に横断応援者ランキングを追加',
@@ -167,14 +175,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     summary: '内部整理(表示や動作は変わりません)',
     items: Object.freeze([
       '内部の純粋な処理を共通の場所へ移して見通しをよくしました(表示や動作は変わりません)。'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.1522',
-    date: '2026-09-18',
-    summary: '内部整理(表示や動作は変わりません)',
-    items: Object.freeze([
-      '内部の重複していた初期化処理を1つ整理しました(バージョン表示や動作は変わりません)。'
     ])
   })
 ]);
