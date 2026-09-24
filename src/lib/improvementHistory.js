@@ -960,5 +960,22 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
       '実コードで裏取りし、buildSupporterRankingが自律tick経由で単一配信専用として実運用中であることを' +
       '確認した上でSupporterRow型を無改変にする設計を選んだ。統合テスト4件で実際にHTML内に' +
       'セクションが出る/出ないを別の手段(marketingChartsHtml.test.js)で確認済み。'
+  }),
+  Object.freeze({
+    version: '0.1.1542', metric: 'bundle-kb', value: 1360,
+    source: '[auto] extension/dist/popup.js のファイルサイズ'
+  }),
+  Object.freeze({
+    version: '0.1.1542', metric: 'gate-selftest', value: 4,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1542', metric: 'cross-checked-claims', value: 53,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: '★直近30日窓のスライドによる自然減(過去最良55→53)。今回はPR #141(イベント誤表示' +
+      '根治)をmaster起点で再実装するにあたり、Exploreエージェントでbefore側diffと現行master' +
+      'をバイト単位で突き合わせ該当2ケース(eventScore/eventRank)がv0.1.359以降無変更であることを' +
+      '実コードで裏取りした上で、northStarLaneReason.test.js/ndgrDecode.test.jsの単体テスト' +
+      '(69+88件)で実際に緑になることを別の手段(npx vitest run単体実行)で確認済み。'
   })
 ]);
