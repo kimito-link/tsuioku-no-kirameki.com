@@ -43,7 +43,7 @@ jobs:
     # ★この job 自身にも timeout を書く（上のコメントの実害を繰り返さない）
     timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Install and run actionlint
         # ★まずは非ブロッキング。指摘件数を実測してから必須に格上げする。
