@@ -32,7 +32,7 @@ describe('liveRankingView', () => {
     expect(elapsedText(0, now)).toBe('');
   });
 
-  it('freshness: しきい値(30分)以上で stale、負の差(時計ずれ)は何も言わない', () => {
+  it('freshness: しきい値(STALE_MIN)以上で stale、負の差(時計ずれ)は何も言わない', () => {
     const now = 1_000_000_000_000;
     expect(freshness(now - 10_000, now)).toEqual({ text: 'たった今 更新', stale: false });
     expect(freshness(now - 5 * 60_000, now)).toEqual({ text: '5分前 更新', stale: false });
@@ -40,6 +40,17 @@ describe('liveRankingView', () => {
     expect(freshness(now - 120 * 60_000, now).text).toContain('120分前');
     expect(freshness(now + 60_000, now)).toEqual({ text: '', stale: false });
     expect(freshness(0, now)).toEqual({ text: '', stale: false });
+  });
+
+  it('freshness: STALE_MIN の境界(59分は正常、60分で stale・2026-09-25実測を根拠に60分へ引き上げ済み)', () => {
+    const now = 1_000_000_000_000;
+    expect(freshness(now - 59 * 60_000, now).stale).toBe(false);
+    expect(freshness(now - 60 * 60_000, now).stale).toBe(true);
+  });
+
+  it('freshness: 実測最大55.3分(2026-09-25・GitHub Actions cron遅延)相当はまだ stale にしない', () => {
+    const now = 1_000_000_000_000;
+    expect(freshness(now - 55 * 60_000, now).stale).toBe(false);
   });
 
   it('★推定同時視聴は concurrentEstimate.js の retentionRate と同じ式(コピーではなく呼び出し)', () => {
@@ -421,12 +432,58 @@ describe('liveRankingView', () => {
 
   describe('identifiedSupportersByName(サムネ無し・ハンドルネームのみの第2段)', () => {
     const live = (rankers) => ({ comment: { rankers, commenters: rankers.length, comments: 0, anonCommenters: 0 } });
+    // ★avatar は uid だけから決定論的に作られる identicon(anonymousIdenticonDataUrl)なので、
+    //   厳密一致ではなく「data:image/svg+xml で始まる」ことだけを見る(実装詳細に結合しない)。
+    const svgAvatar = expect.stringMatching(/^data:image\/svg\+xml/);
 
-    it('コメントのみ・強い表示名の人が第2段に入る', () => {
+    it('コメントのみ・強い表示名の人が第2段に入る(avatarはidenticon・thumbnailConfirmedはfalse)', () => {
       const out = identifiedSupportersByName(live([
         { rank: 1, uid: '143172392', name: 'みち', count: 42, anon: false }
       ]));
-      expect(out).toEqual([{ uid: '143172392', name: 'みち', url: 'https://www.nicovideo.jp/user/143172392', count: 42 }]);
+      expect(out).toEqual([{
+        uid: '143172392', name: 'みち', url: 'https://www.nicovideo.jp/user/143172392',
+        count: 42, avatar: svgAvatar, thumbnailConfirmed: false,
+        giftPt: 0, adPt: 0, commentCount: 42
+      }]);
+    });
+
+    it('ギフトで uid はあるが avatar が blank(未設定)の人は第2段に入る(2026-09-25 実測の穴を塞ぐ)', () => {
+      const liveData = {
+        gift: { rankers: [
+          { rank: 1, supporterId: 555, supporterName: 'とろろ', supporterThumbnailUrl: 'https://img/usericon/defaults/blank.jpg', contribution: 200, userPageUrl: 'https://www.nicovideo.jp/user/555' }
+        ] }
+      };
+      const out = identifiedSupportersByName(liveData);
+      expect(out).toEqual([{
+        uid: '555', name: 'とろろ', url: 'https://www.nicovideo.jp/user/555',
+        count: 200, avatar: svgAvatar, thumbnailConfirmed: false,
+        giftPt: 200, adPt: 0, commentCount: 0
+      }]);
+    });
+
+    it('広告で hasNoIcon(avatar=="") の人は第2段に入る。弱い名前でも isStrongNickname を課さない', () => {
+      const liveData = {
+        ad: { ranking: [
+          { userId: 777, advertiserName: '短', totalContribution: 100, rank: 1, userPageUrl: 'https://www.nicovideo.jp/user/777', thumbnailUrl: 'https://img/usericon/defaults/blank.jpg' }
+        ] }
+      };
+      const out = identifiedSupportersByName(liveData);
+      expect(out.map((s) => s.uid)).toEqual(['777']); // 弱い名前('短'相当)でも除外されない
+      expect(out[0].adPt).toBe(100);
+    });
+
+    it('同一uidがgift(blankアイコン)とcommentの両方に出た場合、合算されて1行になる', () => {
+      const liveData = {
+        gift: { rankers: [
+          { rank: 1, supporterId: 42, supporterName: 'あいうえ', supporterThumbnailUrl: 'https://img/usericon/defaults/blank.jpg', contribution: 300, userPageUrl: 'https://www.nicovideo.jp/user/42' }
+        ] },
+        comment: { rankers: [
+          { rank: 1, uid: '42', name: 'あいうえ', count: 7, anon: false }
+        ], commenters: 1, comments: 0, anonCommenters: 0 }
+      };
+      const out = identifiedSupportersByName(liveData);
+      expect(out.length).toBe(1);
+      expect(out[0]).toMatchObject({ uid: '42', giftPt: 300, commentCount: 7, count: 307 });
     });
 
     it('ギフト/広告で既に第1段(identifiedSupporters)に載っている uid は重複しない', () => {
@@ -443,6 +500,21 @@ describe('liveRankingView', () => {
       expect(out.map((s) => s.uid)).toEqual(['999']); // 111 は第1段に既出なので除外
     });
 
+    it('第1段に既出のuidは、gift/adのblank経由でも第2段に出ない', () => {
+      const liveData = {
+        gift: { rankers: [
+          // 実サムネ(blankでない)→ 第1段(identifiedSupporters)に載る
+          { rank: 1, supporterId: 111, supporterName: 'みち', supporterThumbnailUrl: 'https://img/michi.jpg', contribution: 100, userPageUrl: 'https://www.nicovideo.jp/user/111' }
+        ] },
+        ad: { ranking: [
+          // 同じ uid が広告側では blank(未設定)扱い → 第1段優先で第2段には出ない
+          { userId: 111, advertiserName: 'みち', totalContribution: 50, rank: 1, userPageUrl: 'https://www.nicovideo.jp/user/111', thumbnailUrl: 'https://img/usericon/defaults/blank.jpg' }
+        ] }
+      };
+      expect(identifiedSupporters(liveData).map((s) => s.uid)).toEqual(['111']);
+      expect(identifiedSupportersByName(liveData)).toEqual([]);
+    });
+
     it('匿名(anon:true)は除外される', () => {
       const out = identifiedSupportersByName(live([
         { rank: 1, uid: 'a:AbCdEfGh01', name: 'なまえあり', count: 30, anon: true }
@@ -450,7 +522,7 @@ describe('liveRankingView', () => {
       expect(out).toEqual([]);
     });
 
-    it('弱い表示名(未取得/ゲスト/user形式)は除外される', () => {
+    it('コメント経由の弱い表示名(未取得/ゲスト/user形式)は除外される', () => {
       const out = identifiedSupportersByName(live([
         { rank: 1, uid: '1', name: '（未取得）', count: 5, anon: false },
         { rank: 2, uid: '2', name: 'ゲスト', count: 5, anon: false },
@@ -460,7 +532,7 @@ describe('liveRankingView', () => {
       expect(out).toEqual([]);
     });
 
-    it('件数の降順に並ぶ', () => {
+    it('件数(合算)の降順に並ぶ', () => {
       const out = identifiedSupportersByName(live([
         { rank: 1, uid: '1', name: 'すくない', count: 3, anon: false },
         { rank: 2, uid: '2', name: 'おおい', count: 99, anon: false }
@@ -472,6 +544,18 @@ describe('liveRankingView', () => {
       expect(identifiedSupportersByName(null)).toEqual([]);
       expect(identifiedSupportersByName({})).toEqual([]);
       expect(identifiedSupportersByName({ comment: null })).toEqual([]);
+    });
+  });
+
+  describe('★回帰確認: identifiedSupporters(第1段)自体は無変更', () => {
+    it('数値ID と個人サムネの両方が揃った人だけを返す既存契約は変わらない', () => {
+      const liveData = {
+        gift: { rankers: [
+          { rank: 1, supporterId: 1, supporterName: 'A', supporterThumbnailUrl: 'https://img/a.jpg', contribution: 10, userPageUrl: 'https://www.nicovideo.jp/user/1' },
+          { rank: 2, supporterId: 2, supporterName: 'B', supporterThumbnailUrl: 'https://img/usericon/defaults/blank.jpg', contribution: 20, userPageUrl: 'https://www.nicovideo.jp/user/2' }
+        ] }
+      };
+      expect(identifiedSupporters(liveData).map((s) => s.uid)).toEqual(['1']);
     });
   });
 });
