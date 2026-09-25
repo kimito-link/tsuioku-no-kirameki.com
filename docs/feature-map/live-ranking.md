@@ -13,6 +13,8 @@
 ```mermaid
 graph LR
   n_live_ranking["Web版 追憶のきらめき ランキング(/live/)"]
+  n_live_ranking --> n_src_domain_user_identity_js["domain/user/identity.js"]:::shared
+  n_live_ranking --> n_src_domain_user_nickname_js["domain/user/nickname.js"]:::shared
   n_live_ranking --> n_src_lib_anonymousIdenticon_js["lib/anonymousIdenticon.js"]:::shared
   n_live_ranking --> n_src_lib_concurrentEstimate_js["lib/concurrentEstimate.js"]:::shared
   n_live_ranking --> n_src_lib_deriveAvatarUrlFromUid_js["lib/deriveAvatarUrlFromUid.js"]:::shared

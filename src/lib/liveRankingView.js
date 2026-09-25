@@ -28,6 +28,9 @@ import { anonymousIdenticonDataUrl } from './anonymousIdenticon.js';
 // ★時点(capturedAt)の解釈は timeAuthority.js に委ねる(独自に Number(x.capturedAt) しない。
 //   timeAuthorityRegistry の祖父条項=「時点フィールドを独自に持つファイルを増やさない」)。
 import { toEpochMs, ageMsOf } from './timeAuthority.js';
+// ★「ハンドルネームのみ」枠(サムネ無し)の強弱判定は拡張ポップアップの応援ユーザーレーン
+//   (りんく/こん太/たぬ姉)が使う正本をそのまま再利用する(独自の強弱ロジックを作らない)。
+import { isStrongNickname } from '../domain/user/nickname.js';
 
 /** ニコ生の番組 ID の形。★watch URL は外から来た値ではなく、この形を通った ID から組み立てる。 */
 export const LIVE_ID_RE = /^lv\d{6,15}$/i;
@@ -302,6 +305,35 @@ export function identifiedSupporters(live) {
   for (const r of gift) put(r, 'gift');
   for (const r of ad) put(r, 'ad');
   return Array.from(byUid.values()).sort((x, y) => y.total - x.total);
+}
+
+/** @typedef {{ uid: string, name: string, url: string, count: number }} NamedSupporter */
+
+/**
+ * ★「ハンドルネームだけ分かっている応援した人」= サムネは無いが強い表示名がある人。
+ *   `identifiedSupporters`(サムネ付き)の下に続けて出す第2段。
+ *
+ *   `commentRows` の avatar は数値 uid から機械生成した推測 URL(`deriveAvatarUrlFromUid`)
+ *   であり、実際にアイコンが存在するかは確認していない(`isBlankIcon` の文字列一致でも
+ *   検出できない)。そのため「サムネがある」という前提を汚さないよう、この段は**サムネ
+ *   フィールドを持たせない**(型を `IdentifiedSupporter` と分け、呼び出し側が誤って
+ *   avatar を参照できないようにする=AGENTS.md §3.6「外部APIはいつか落ちる前提」)。
+ *
+ *   強弱判定は拡張ポップアップの応援ユーザーレーンが使う正本 `isStrongNickname` を
+ *   再利用する(同じ基準=「プロフィールとして十分な強さの表示名か」)。
+ *   `identifiedSupporters` に既に載っている uid は重複させない(そちらを優先)。
+ * @param {{ gift?: any, ad?: any, comment?: any }|null|undefined} live
+ * @returns {NamedSupporter[]}
+ */
+export function identifiedSupportersByName(live) {
+  const known = new Set(identifiedSupporters(live).map((s) => s.uid));
+  /** @type {NamedSupporter[]} */
+  const out = [];
+  for (const r of commentRows(live)) {
+    if (r.anon || known.has(r.uid) || !isStrongNickname(r.name, r.uid)) continue;
+    out.push({ uid: r.uid, name: r.name, url: r.url, count: r.point });
+  }
+  return out.sort((a, b) => b.count - a.count);
 }
 
 /**
