@@ -842,7 +842,7 @@
   - `src/lib/commenterHistoricalAnalytics.js`
   - `src/lib/supporterRanking.js`
   - `src/lib/marketingChartsHtml.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 205</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 206</summary>
 
 - `app/app.js` — スマホ閲覧用 status Web 版。
 - `app/live-view.js` — global NL_BUILD_ID
@@ -870,6 +870,7 @@
 - `scripts/install-local-sounds.mjs` — マイ効果音「手動取込」を不要にするローカル自動同梱スクリプト。
 - `scripts/layer-config.mjs` — ★どのリポでも使えるように「設定」を読む部分だけを切り出す。
 - `scripts/lib/instrument-core.mjs` — ★検査・計器の共通土台（キット同梱・依存ゼロ・純Node）。
+- `scripts/lib/today-jst.mjs` — 運用日（JST）を返す唯一の正本。
 - `scripts/measure-flash-frames.mjs` — 「一瞬の黒」を【画面に出たピクセル】で測る。
 - `scripts/meeting-roles.mjs` — meeting.mjs の役割注入版。
 - `scripts/meeting.mjs` — 会議ハーネス: 同じ問いを「無料クラウド4系統 + ローカル ollama 数体」に投げ、

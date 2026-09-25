@@ -2,13 +2,13 @@
 
 STATUS: 完了
 ROOT_CAUSE: －（異常なし）
-FILES_CHANGED: council-scout/state.json, council-scout/briefs/2026-09-23.md（いずれも生成物）
-CHANGES: env充足を確認（有効 19/19体） / scoutを実行（日報: 2026-09-23.md） / 疎通不能の警告3件は据え置き（撤去条件=全モデル429/カタログ消滅/課金要求のいずれにも非該当。日数が伸びるのは新情報ではない）
+FILES_CHANGED: council-scout/state.json, council-scout/briefs/2026-09-26.md（いずれも生成物）
+CHANGES: env充足を確認（有効 19/19体） / scoutを実行（日報: 2026-09-26.md） / 疎通不能の警告3件は据え置き（撤去条件=全モデル429/カタログ消滅/課金要求のいずれにも非該当。日数が伸びるのは新情報ではない）
 TESTS_RUN: node scripts/council-env.mjs / node scripts/scout-models.mjs
 TEST_RESULT: 異常なし
 REMAINING_RISKS: なし
 NEXT_ACTION: 異常なし。次回の日課まで何もしない。
-LAST_WORKED_ON: 2026-09-23
+LAST_WORKED_ON: 2026-09-26
 WORKED_BY: council-daily.mjs（実行者: unknown）
 MACHINE_NOTES: -
 

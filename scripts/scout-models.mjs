@@ -23,6 +23,7 @@ import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { LINEUP } from './council-lineup.mjs';
+import { todayJst } from './lib/today-jst.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = join(__dirname, '..'); // パスはスクリプト位置基準（cwd非依存）
@@ -49,15 +50,10 @@ const CF_ACC = process.env.CLOUDFLARE_ACCOUNT_ID;
 const SN = process.env.SAMBANOVA_API_KEY;
 const MI = process.env.MISTRAL_API_KEY;
 
-function todayJst() {
-  const parts = new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'Asia/Tokyo', year: 'numeric', month: '2-digit', day: '2-digit',
-  }).formatToParts(new Date());
-  const y = parts.find((p) => p.type === 'year').value;
-  const m = parts.find((p) => p.type === 'month').value;
-  const d = parts.find((p) => p.type === 'day').value;
-  return `${y}-${m}-${d}`;
-}
+// ★2026-09-26: todayJst の定義は scripts/lib/today-jst.mjs へ移した（ここには残さない）。
+//  council-daily.mjs が UTC で日付を出し、このスクリプトが JST で日報を書いていたため
+//  「日報が見つからない」という偽の赤が毎日 JST 09:00 前に出ていた。
+//  「運用日＝JST」の定義をリポ内で1本に統一する（同じ定義を2箇所に置かない）。
 
 // ── ロック（scheduled taskの重複発火・手動実行との衝突防止）──────────────────
 // 自分が取得したロックだけを解放する（他プロセスのロックを誤って消さないため）。
