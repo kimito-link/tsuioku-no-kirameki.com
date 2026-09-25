@@ -231,6 +231,11 @@
       .tid { font-size: .64rem; color: var(--ink-sub); font-variant-numeric: tabular-nums; }
       .tpt { font-size: .66rem; color: var(--orange); font-variant-numeric: tabular-nums; white-space: nowrap; }
 
+      /* ── ハンドルネームで応援した人(サムネは無いが強い表示名がある人。2026-09-25追加の第2段) ── */
+      .known h3.named { margin-top: 10px; }
+      .tile.no-thumb { justify-content: center; min-height: 52px; }
+      .tile.no-thumb .tname { margin-top: 0; max-width: 76px; }
+
       .cols { display: grid; grid-template-columns: 1fr; gap: 0; }
       /* ★minmax(0,1fr): 素の 1fr は中身の最小幅(長い名前・件数)で列が押し広がり、800px 幅で 3 列目がはみ出た(実測 302/346/176px)。
          0 を下限にすると 3 等分に収まり、長い名前は .nm の ellipsis が受ける。 */

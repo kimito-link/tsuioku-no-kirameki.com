@@ -3,7 +3,7 @@ import { retentionRate } from './concurrentEstimate.js';
 import { anonymousDisplayLabel } from './nicoUserPage.js';
 import {
   watchUrlOf, jstClock, elapsedText, freshness, estimateConcurrentForLive, sortByEstimatedConcurrent,
-  cacheBust, supporterRows, identifiedSupporters, commentRows, isBlankIcon, uidFromUserPageUrl,
+  cacheBust, supporterRows, identifiedSupporters, identifiedSupportersByName, commentRows, isBlankIcon, uidFromUserPageUrl,
   createRowChangeTracker, rowKey, STALE_MIN,
   pinLiveFirst, liveShareText, liveOgTitle, SHARE_NAME_MAX, SHARE_TITLE_MAX, SHARE_TEXT_MAX
 } from './liveRankingView.js';
@@ -416,6 +416,62 @@ describe('liveRankingView', () => {
       const withComment = { ...base, comment: { rankers: [{ rank: 1, uid: '99', name: 'c', count: 9 }] } };
       expect(supporterRows(withComment)).toEqual(supporterRows(base));
       expect(identifiedSupporters(withComment)).toEqual(identifiedSupporters(base));
+    });
+  });
+
+  describe('identifiedSupportersByName(サムネ無し・ハンドルネームのみの第2段)', () => {
+    const live = (rankers) => ({ comment: { rankers, commenters: rankers.length, comments: 0, anonCommenters: 0 } });
+
+    it('コメントのみ・強い表示名の人が第2段に入る', () => {
+      const out = identifiedSupportersByName(live([
+        { rank: 1, uid: '143172392', name: 'みち', count: 42, anon: false }
+      ]));
+      expect(out).toEqual([{ uid: '143172392', name: 'みち', url: 'https://www.nicovideo.jp/user/143172392', count: 42 }]);
+    });
+
+    it('ギフト/広告で既に第1段(identifiedSupporters)に載っている uid は重複しない', () => {
+      const liveWithGift = {
+        gift: { rankers: [
+          { rank: 1, supporterId: 111, supporterName: 'みち', supporterThumbnailUrl: 'https://img/michi.jpg', contribution: 6000, userPageUrl: 'https://www.nicovideo.jp/user/111' }
+        ] },
+        comment: { rankers: [
+          { rank: 1, uid: '111', name: 'みち', count: 42, anon: false },
+          { rank: 2, uid: '999', name: 'べつじん', count: 3, anon: false }
+        ], commenters: 2, comments: 0, anonCommenters: 0 }
+      };
+      const out = identifiedSupportersByName(liveWithGift);
+      expect(out.map((s) => s.uid)).toEqual(['999']); // 111 は第1段に既出なので除外
+    });
+
+    it('匿名(anon:true)は除外される', () => {
+      const out = identifiedSupportersByName(live([
+        { rank: 1, uid: 'a:AbCdEfGh01', name: 'なまえあり', count: 30, anon: true }
+      ]));
+      expect(out).toEqual([]);
+    });
+
+    it('弱い表示名(未取得/ゲスト/user形式)は除外される', () => {
+      const out = identifiedSupportersByName(live([
+        { rank: 1, uid: '1', name: '（未取得）', count: 5, anon: false },
+        { rank: 2, uid: '2', name: 'ゲスト', count: 5, anon: false },
+        { rank: 3, uid: '3', name: 'user12ABCd', count: 5, anon: false },
+        { rank: 4, uid: '4', name: '', count: 5, anon: false }
+      ]));
+      expect(out).toEqual([]);
+    });
+
+    it('件数の降順に並ぶ', () => {
+      const out = identifiedSupportersByName(live([
+        { rank: 1, uid: '1', name: 'すくない', count: 3, anon: false },
+        { rank: 2, uid: '2', name: 'おおい', count: 99, anon: false }
+      ]));
+      expect(out.map((s) => s.uid)).toEqual(['2', '1']);
+    });
+
+    it('live が null / comment 無しは空配列', () => {
+      expect(identifiedSupportersByName(null)).toEqual([]);
+      expect(identifiedSupportersByName({})).toEqual([]);
+      expect(identifiedSupportersByName({ comment: null })).toEqual([]);
     });
   });
 });

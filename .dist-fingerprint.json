@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "mode": "default",
-  "fingerprint": "e2894d686230049eb6c0b9c7029068a805535201ce45a1d7ebe5de613cae48e1",
+  "fingerprint": "f8bfd8f1150c829fece3058f4cadce5630d0686c8257c156c3622ce391120262",
   "inputs": [
     "app/app.js",
     "app/live-view.js",
@@ -781,6 +781,6 @@
     "extension/dist/cloak-failsafe.js": "8baabc8a7ee4ab9f0e6fd66c6b917c4832bade10efa9917cf50bf40ca2588207",
     "app/dist/app.js": "9af7800bc0527fbcc239eba0a06d8c02324f0c4d3b7ff0c740bacd9a307a016e",
     "app/dist/live-view.js": "5eb0d897c62ceb736ea6ad4ce0716e149e342918004855677a189b5838f5a1cb",
-    "app/dist/live-ranking.js": "3be7cd22712ce6353fcc304866b3f3956cd331a9875a3c14672e3f1a48bed0ff"
+    "app/dist/live-ranking.js": "f5da94212840aff1dccc90ec660165f5753594c9b02dcc4fb60d760d203d46b4"
   }
 }
