@@ -266,9 +266,9 @@ graph LR
 - `auto/`（8 件） — 会議の自動実行ログ(code/design の JSON)  〔会議 / 自動生成〕
 
 ## `council-scout/` — 外部モデルの日次スカウト(会議の下ごしらえ)  〔会議 / 調査〕
-<sub>ファイル 19 件</sub>
+<sub>ファイル 20 件</sub>
 
-- `briefs/`（19 件） — スカウトの日次ブリーフ(md)  〔会議 / 原稿〕
+- `briefs/`（20 件） — スカウトの日次ブリーフ(md)  〔会議 / 原稿〕
 
 ## `docs/` — 設計正本・マインドマップ・フロー図・feature-map(AI/人間向け)  〔設計 / レポート〕
 <sub>ファイル 323 件</sub>
@@ -299,9 +299,9 @@ graph LR
 - `avatar-parts/`（29 件） — アバター素材(顔シート等)の参考画像  〔アバター / 画像〕
 
 ## `scripts/` — ビルド・検証・自動生成スクリプト(build/feature-map/repo-tree-map 等)  〔ビルド / 自動生成〕
-<sub>ファイル 71 件</sub>
+<sub>ファイル 72 件</sub>
 
-- `lib/`（1 件） — スクリプト共有の小部品(計器コア等)  〔ビルド / 共有〕
+- `lib/`（2 件） — スクリプト共有の小部品(計器コア等)  〔ビルド / 共有〕
 - `xserver/`（2 件） — Xserver 向け webhook(git pull デプロイ)スクリプト  〔デプロイ / webhook〕
 
 ## `sound-src/` — 効果音の元素材(HQ wav 等)。ここから build して配布用 mp3 を作る  〔音声 / 素材〕

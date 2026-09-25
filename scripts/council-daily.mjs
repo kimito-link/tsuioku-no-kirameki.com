@@ -34,10 +34,19 @@ import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { execFileSync } from 'node:child_process';
+import { todayJst } from './lib/today-jst.mjs';
 
 const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const DRY = process.argv.includes('--dry-run');
-const today = new Date().toISOString().slice(0, 10);
+
+// ★2026-09-26 修正（毎日必ず再発する時刻依存バグ）:
+//  従来は `new Date().toISOString().slice(0,10)` ＝ **UTC の日付**だったが、
+//  日報を書く scout-models.mjs は JST の日付でファイル名を決める。この不一致により
+//  **JST 09:00 より前（UTC 15:00〜24:00）に回すと、daily は前日のファイル名を探して
+//  「日報が見つからない」と誤判定**していた（exit 2 で止まる＝偽の赤）。
+//  実測（2026-09-26 UTC 20:37）: daily=2026-09-25 / scout=2026-09-26。
+//  日付の正本は scripts/lib/today-jst.mjs に一本化した（各所で自前計算しない）。
+const today = todayJst();
 
 const say = (m) => console.log(m);
 const run = (cmd, args) => execFileSync(cmd, args, { cwd: REPO_ROOT, encoding: 'utf8', timeout: 900000 });
