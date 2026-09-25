@@ -12,7 +12,7 @@
 import { escapeHtml as esc, safeHttpUrl, formatNumberJa as num } from '../lib/htmlText.js';
 import {
   watchUrlOf, jstClock, elapsedText, freshness, estimateConcurrentForLive, sortByEstimatedConcurrent,
-  cacheBust, supporterRows, identifiedSupporters, commentRows, isBlankIcon, createRowChangeTracker, rowKey,
+  cacheBust, supporterRows, identifiedSupporters, identifiedSupportersByName, commentRows, isBlankIcon, createRowChangeTracker, rowKey,
   LIVE_ID_RE, pinLiveFirst, liveShareText
 } from '../lib/liveRankingView.js';
 import { buildXIntentUrl } from '../lib/xIntentUrl.js';
@@ -71,21 +71,37 @@ function shareHref(l) {
  * ★「サムネ付きで応援した人」の枠(2026-09-14 ユーザー要望・全配信に出す)。
  *   数値ユーザーID と個人サムネの両方が揃った人だけ(判定は liveRankingView.identifiedSupporters)。
  *   サイドパネルの「アイコン列」と同じ考え方で、サムネ・名前・ID・リンクをセットで出す(AGENTS.md §3.5)。
+ *
+ *   ★2026-09-25 ユーザー要望「サムネ付きは全部拾って、そのあとにハンドルネームのみも入れる」。
+ *   第2段(namedPeople)はコメントだけで応援した人のうち、サムネは無いが強い表示名がある人
+ *   (判定は liveRankingView.identifiedSupportersByName)。サムネフィールドを持たない型
+ *   (NamedSupporter)なので、ここでも avatar を参照しない(=推測URLを本物のサムネとして
+ *   出さない・AGENTS.md §3.6)。
  * @param {import('../lib/liveRankingView.js').IdentifiedSupporter[]} people
+ * @param {import('../lib/liveRankingView.js').NamedSupporter[]} namedPeople
  */
-function renderKnown(people) {
+function renderKnown(people, namedPeople) {
   const head = `<h3><img src="${esc(FACE.linkSmile)}" alt="" loading="lazy" decoding="async">サムネ付きで応援した人 `
     + `<span class="cnt">${people.length}人</span><span class="hint">数値ID＋個人サムネが揃った人</span></h3>`;
-  if (!people.length) {
-    return `<div class="known">${head}<p class="empty"><img src="${esc(FACE.linkBlink)}" alt="" loading="lazy" decoding="async">まだいません（ID と個人サムネが両方揃った人だけ載ります）</p></div>`;
-  }
-  const tiles = people.map((p) => {
-    const pts = (p.giftPt ? `🎁${num(p.giftPt)}` : '') + (p.giftPt && p.adPt ? ' ' : '') + (p.adPt ? `📣${num(p.adPt)}` : '');
-    return `<li><a class="tile" href="${esc(p.url)}" target="_blank" rel="noopener noreferrer" title="${esc(p.name)}（ID ${esc(p.uid)}）">`
-      + `<img class="tava" src="${esc(p.avatar)}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer">`
-      + `<span class="tname">${esc(p.name)}</span><span class="tid">${esc(p.uid)}</span><span class="tpt">${esc(pts)}</span></a></li>`;
-  }).join('');
-  return `<div class="known">${head}<ul class="tiles">${tiles}</ul></div>`;
+  const thumbBlock = people.length
+    ? `<ul class="tiles">${people.map((p) => {
+        const pts = (p.giftPt ? `🎁${num(p.giftPt)}` : '') + (p.giftPt && p.adPt ? ' ' : '') + (p.adPt ? `📣${num(p.adPt)}` : '');
+        return `<li><a class="tile" href="${esc(p.url)}" target="_blank" rel="noopener noreferrer" title="${esc(p.name)}（ID ${esc(p.uid)}）">`
+          + `<img class="tava" src="${esc(p.avatar)}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer">`
+          + `<span class="tname">${esc(p.name)}</span><span class="tid">${esc(p.uid)}</span><span class="tpt">${esc(pts)}</span></a></li>`;
+      }).join('')}</ul>`
+    : `<p class="empty"><img src="${esc(FACE.linkBlink)}" alt="" loading="lazy" decoding="async">まだいません（ID と個人サムネが両方揃った人だけ載ります）</p>`;
+
+  const namedHead = namedPeople.length
+    ? `<h3 class="named"><img src="${esc(FACE.linkNormal)}" alt="" loading="lazy" decoding="async">ハンドルネームで応援した人 `
+      + `<span class="cnt">${namedPeople.length}人</span><span class="hint">サムネは無いが名前が分かる人</span></h3>`
+      + `<ul class="tiles tiles-named">${namedPeople.map((p) => (
+          `<li><a class="tile no-thumb" href="${esc(p.url)}" target="_blank" rel="noopener noreferrer" title="${esc(p.name)}（ID ${esc(p.uid)}）">`
+          + `<span class="tname">${esc(p.name)}</span><span class="tid">${esc(p.uid)}</span><span class="tpt">${esc(p.count ? `💬${num(p.count)}` : '')}</span></a></li>`
+        )).join('')}</ul>`
+    : '';
+
+  return `<div class="known">${head}${thumbBlock}${namedHead}</div>`;
 }
 
 /** 空のときに出す顔。★3 枠目(コメント)はりんく。 */
@@ -264,7 +280,7 @@ function render(data) {
       + (sx ? `<a class="share-x" href="${esc(sx)}" target="_blank" rel="noopener noreferrer" title="X（旧 Twitter）の投稿画面が新しいタブで開くだけよ。押したことも含めて、当サイトは何も記録しないわ">X でシェア</a>` : '')
       + '</span>'
       + '</div>'
-      + renderKnown(identifiedSupporters(l))
+      + renderKnown(identifiedSupporters(l), identifiedSupportersByName(l))
       + '<div class="cols">'
       + `<div class="col"><h3><img src="${esc(FACE.kontaSmile)}" alt="" loading="lazy" decoding="async">ギフトで支えた人 <span class="sum">${num(l.giftTotal)}pt</span></h3>${renderRows(rows.gift, l.liveId, 'gift')}</div>`
       + `<div class="col"><h3><img src="${esc(FACE.tanuNormal)}" alt="" loading="lazy" decoding="async">広告で支えた人 <span class="sum">${num(l.adTotal)}pt</span></h3>${renderRows(rows.ad, l.liveId, 'ad')}</div>`
