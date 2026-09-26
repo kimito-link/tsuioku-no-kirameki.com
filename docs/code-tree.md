@@ -194,7 +194,7 @@
     - `2026-09-16.md`
     - `2026-09-23.md`
     - `2026-09-26.md`
-- 📁 **docs/** (323)
+- 📁 **docs/** (325)
   - 📁 **article-assets/** (87)
     - 📁 **venue-frames/** (12)
       - `f01.png`
@@ -509,6 +509,8 @@
   - `koken-contrib-hidden-tab-stuck-fix-v0616.md`
   - `lane-architecture-redesign.md`
   - `layer-map.html`
+  - `live-platforms-multiplatform-DESIGN.md`
+  - `live-platforms-multiplatform-IMPLEMENTATION-HANDOFF.md`
   - `llm-handoff-inline-panel-current-state.md`
   - `llm-handoff-questions.md`
   - `loading-scroll-research-checklist.md`
