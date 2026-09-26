@@ -21,13 +21,23 @@ import { test, expect } from './fixtures.js';
  * ★`?lv=` が【必須】。venue-entry.js:7 が `if (liveId)` で分岐しており、
  *   lv 無しだと mountVenueStandalone を呼ばない＝DOM が何も作られず永遠に待つ。
  *   (最初 lv 無しで書いてテストがハングした。会場は URL に配信IDが要る。)
+ *
+ * ★2026-09-25 真因判明・修正: `playwright.config.js` は `d8025c6e`
+ *   (フローティングアニメで scrollIntoView が不安定になる問題を解消)で
+ *   全テスト共通の既定値を `reducedMotion: 'reduce'` にしている。この関数は
+ *   従来 `reducedMotion:true` のときだけ明示的に `emulateMedia` していたため、
+ *   「通常モード(reduce ではない)」のつもりで呼ぶテストも実際には config の
+ *   既定値(reduce)のまま実行され、CSS の `@media (prefers-reduced-motion: reduce)`
+ *   側(`nlsb-entry-fade`)が適用されてしまっていた(実測: masterでも直近10回の
+ *   e2e中7回がこの1件で不安定化)。★reducedMotion:false のときも明示的に
+ *   'no-preference' を指定し、config の既定値に依存しない(暗黙の継承をやめる)。
  */
 async function openVenue(context, { reducedMotion } = {}) {
   let sw = context.serviceWorkers().find((w) => w.url().startsWith('chrome-extension://'));
   if (!sw) sw = await context.waitForEvent('serviceworker', { timeout: 60_000 });
   const extensionId = new URL(sw.url()).hostname;
   const page = await context.newPage();
-  if (reducedMotion) await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.emulateMedia({ reducedMotion: reducedMotion ? 'reduce' : 'no-preference' });
   await page.setViewportSize({ width: 1280, height: 800 });
   await page.goto(`chrome-extension://${extensionId}/venue.html?lv=lv348888888`, {
     waitUntil: 'domcontentloaded',
