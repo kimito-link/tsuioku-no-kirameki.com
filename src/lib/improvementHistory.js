@@ -977,5 +977,23 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
       'をバイト単位で突き合わせ該当2ケース(eventScore/eventRank)がv0.1.359以降無変更であることを' +
       '実コードで裏取りした上で、northStarLaneReason.test.js/ndgrDecode.test.jsの単体テスト' +
       '(69+88件)で実際に緑になることを別の手段(npx vitest run単体実行)で確認済み。'
+  }),
+  Object.freeze({
+    version: '0.1.1544', metric: 'bundle-kb', value: 1360,
+    source: '[auto] extension/dist/popup.js のファイルサイズ'
+  }),
+  Object.freeze({
+    version: '0.1.1544', metric: 'gate-selftest', value: 4,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1544', metric: 'cross-checked-claims', value: 53,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: '★直近30日窓のスライドによる自然減(過去最良55→53)。今回はmultitab-storage-' +
+      'contention.spec.jsの真因(refresh()の完走待ちであるinitialRefreshDoneをスロットル判定に' +
+      '使っていたため、多タブ環境でrefresh()が完走できないと恒久的にスロットル無効になる自己言及的' +
+      'デッドロック)をconsole.logでの実測(refreshGenが1ms未満で50以上暴走)で特定し、修正前後で' +
+      'ローカルe2e実行(300秒超timeout→41.3秒成功)・関連e2e13件・単体テスト923ファイル/11487件を' +
+      '別の手段(npx playwright test単体実行・npx vitest run単体実行)で確認済み。'
   })
 ]);
