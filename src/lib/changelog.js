@@ -177,14 +177,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     items: Object.freeze([
       '配色プリセット(枠テーマ)まわりの内部コードを別ファイルへ整理しました(見た目・操作は変わりません)。'
     ])
-  }),
-  Object.freeze({
-    version: '0.1.1524',
-    date: '2026-09-18',
-    summary: '内部整理(表示や動作は変わりません)',
-    items: Object.freeze([
-      '内部の純粋な処理をさらに共通の場所へ移して見通しをよくしました(表示や動作は変わりません)。'
-    ])
   })
 ]);
 

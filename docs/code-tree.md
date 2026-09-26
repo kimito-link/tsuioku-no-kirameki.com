@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 7 / 871 件
+## ⚠️ 役割コメントが無いソース 7 / 872 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `scripts/build.mjs`
@@ -172,8 +172,8 @@
   - `index.html`
   - `live-view.html`
   - `live-view.js` — global NL_BUILD_ID
-- 📁 **council-scout/** (19)
-  - 📁 **briefs/** (19)
+- 📁 **council-scout/** (20)
+  - 📁 **briefs/** (20)
     - `2026-07-16.md`
     - `2026-07-17.md`
     - `2026-07-20.md`
@@ -193,7 +193,8 @@
     - `2026-09-09.md`
     - `2026-09-16.md`
     - `2026-09-23.md`
-- 📁 **docs/** (325)
+    - `2026-09-26.md`
+- 📁 **docs/** (323)
   - 📁 **article-assets/** (87)
     - 📁 **venue-frames/** (12)
       - `f01.png`
@@ -508,8 +509,6 @@
   - `koken-contrib-hidden-tab-stuck-fix-v0616.md`
   - `lane-architecture-redesign.md`
   - `layer-map.html`
-  - `live-platforms-multiplatform-DESIGN.md`
-  - `live-platforms-multiplatform-IMPLEMENTATION-HANDOFF.md`
   - `llm-handoff-inline-panel-current-state.md`
   - `llm-handoff-questions.md`
   - `loading-scroll-research-checklist.md`
@@ -687,9 +686,10 @@
   - `status-guard.js` — 状態速報ページ(status.html)の「何があっても開く」保険。
   - `status.html`
   - `venue.html`
-- 📁 **scripts/** (71)
-  - 📁 **lib/** (1)
+- 📁 **scripts/** (72)
+  - 📁 **lib/** (2)
     - `instrument-core.mjs` — ★検査・計器の共通土台（キット同梱・依存ゼロ・純Node）。
+    - `today-jst.mjs` — 運用日（JST）を返す唯一の正本。
   - 📁 **xserver/** (2)
     - `github-webhook-pull.php.example`
     - `webhook-git-pull-for-upload.php`
