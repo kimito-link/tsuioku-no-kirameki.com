@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "mode": "default",
-  "fingerprint": "381c98d7a00a3f0682fc33fd01af2120212c5945873dabfbc02120d28a841033",
+  "fingerprint": "d74d913f8fa37ffd645688da734238000b940970000a7e5980e01acb73516c5c",
   "inputs": [
     "app/app.js",
     "app/live-view.js",
@@ -359,6 +359,7 @@
     "src/lib/liveAudienceDom.js",
     "src/lib/liveChannelSwitch.js",
     "src/lib/liveCommenterStats.js",
+    "src/lib/liveDetailView.js",
     "src/lib/liveEndedFlag.js",
     "src/lib/liveHealthScore.js",
     "src/lib/livePersistInterval.js",
@@ -770,9 +771,9 @@
     "extension/dist/page-intercept.js": "b7412ed2690aaaeb874c842eddaa050da2b584e89369eee66af9d8495962687f",
     "extension/dist/backfill-sw.js": "720bfec80e95da0be85323627d39268d307b493b15654b18e81d5b097bdc0984",
     "extension/dist/content.js": "35b662af774ebdffbcabdf871dc07cf1fd22f148a3020a570f1ef3395c368bc1",
-    "extension/dist/popup.js": "0b0766c4a87061e88ce9509bb4704f5f2339b8277169274e2d86af3c258d1766",
+    "extension/dist/popup.js": "8b9ec82322573a8fcfb04fc17385c45b8cebe08925553271d24dc6712eda0923",
     "extension/dist/offscreen.js": "3bd8f15c2ce9e880b6dd150256d899377e2e2647bd0d71ec08803bc0233c48dc",
-    "extension/dist/status.js": "bb7210b36d8ef29247aca1a21ef0ab594b4c15f10492b24aa160ee0dc7b60f46",
+    "extension/dist/status.js": "af7084b8cbefd265b5363ba7cba9859734a3a29a3dba4ecead184a634a72a283",
     "extension/dist/live-view.js": "c4f54a96606bcb01af056fbfd2ada7e45b1864f72ef2cc697e965fe4f32a51f6",
     "extension/dist/marketing-export.js": "5e2900f6b47b7b1b861f661d448b293836ab138900eac6416fb61d83db125474",
     "extension/dist/comeview.js": "450f096bb45d8bab7f3a3646e116040972ef9db3b719c9c205e933dfef0aabeb",
@@ -780,7 +781,7 @@
     "extension/dist/sidepanel.js": "93b11868e25961b598089c5102dc8662c8f05d5ae99ea7542b37b478681d1352",
     "extension/dist/cloak-failsafe.js": "8baabc8a7ee4ab9f0e6fd66c6b917c4832bade10efa9917cf50bf40ca2588207",
     "app/dist/app.js": "9af7800bc0527fbcc239eba0a06d8c02324f0c4d3b7ff0c740bacd9a307a016e",
-    "app/dist/live-view.js": "89e1230ce8fd636187bc0edf0d098bd01259003dc46a026581fd1bdb13919115",
-    "app/dist/live-ranking.js": "89ef2f72192ab0a1f0a91ad98b72d4a541d81911c27895606ca67e5fac765e54"
+    "app/dist/live-view.js": "78aed437f4d4817637a2d364073da08002da821f4dc6c012f47baae0b6fa7fed",
+    "app/dist/live-ranking.js": "bb0f99c3e14b7ea55d31044add003f760b4411e6b54fc8aefc7177cb28fb6f4d"
   }
 }
