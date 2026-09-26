@@ -236,10 +236,6 @@ graph LR
   f43 --> f43_1["lib/commenterHistoricalAnalytics.js"]
   f43 --> f43_2["lib/supporterRanking.js"]
   f43 --> f43_3["lib/marketingChartsHtml.js"]
-  HUB --> f44["ランキング(/live/)の配信詳細モーダル"]
-  f44 --> f44_0["lib/liveDetailView.js"]
-  f44 --> f44_1["extension/live-ranking-entry.js"]
-  f44 --> f44_2["live/index.html"]
 ```
 
 ---
@@ -253,7 +249,7 @@ graph LR
 <sub>ファイル 2 件</sub>
 
 ## `_docs/` — 横断キット(web-ios-android)との手紙・KB・コンセプトメモ  〔横断 / KB〕
-<sub>ファイル 7 件</sub>
+<sub>ファイル 5 件</sub>
 
 ## `api/` — サーバレス API(status / live-ranking / live-recent-comments / live-og)  〔API〕
 <sub>ファイル 5 件</sub>
@@ -314,14 +310,14 @@ graph LR
 - `soundeffect-lab/`（19 件） — 効果音ラボ由来の素材候補(採否検討用)  〔音声 / 素材〕
 
 ## `src/` — LP 側 + 純粋関数ライブラリの源  〔ソース〕
-<sub>ファイル 1853 件</sub>
+<sub>ファイル 1850 件</sub>
 
 - `data/`（7 件） — 保存コメントからレーン候補を読む acquirer / source 層  〔コメント / 取得〕
 - `domain/`（20 件） — ドメイン正本(応援レーンの集約・列ポリシー等。識別子判定など)  〔応援 / 集約 / 識別子〕
 - `extension/`（56 件） — バンドル entry(content/popup/venue/status/offscreen/backfill-sw 等=機能境界)  〔entry / 記録 / 会場 / 応援〕
 - `fixtures/`（1 件） — テスト用フィクスチャ  〔テスト〕
 - `images/`（134 件） — LP / CWS 提出物のマスター画像  〔画像〕
-- `lib/`（1623 件） — 純粋関数ライブラリ(unit test 対象)。色・速度・コメント・レポート等の計算ロジックの大半  〔色 / 速度 / コメント / レポート / 純粋関数〕
+- `lib/`（1620 件） — 純粋関数ライブラリ(unit test 対象)。色・速度・コメント・レポート等の計算ロジックの大半  〔色 / 速度 / コメント / レポート / 純粋関数〕
 - `server/`（2 件） — Node 側 I/O 部品(fetch/WebSocket を実際に叩く。api と scripts が共用。lib には置けない)  〔API / 公開 / ランキング〕
 - `shared/`（7 件） — 複数機能で共有する小部品(アバター URL ガード等)  〔共有 / アバター〕
 - `sound/`（1 件） — 音声素材(src 側)  〔音声〕
@@ -640,13 +636,6 @@ pre-pushのbuild再実行でbuildIdタイムスタンプが毎回変わりdist�
 - [`src/lib/commenterHistoricalAnalytics.js`](../src/lib/commenterHistoricalAnalytics.js)
 - [`src/lib/supporterRanking.js`](../src/lib/supporterRanking.js)
 - [`src/lib/marketingChartsHtml.js`](../src/lib/marketingChartsHtml.js)
-
-### ランキング(/live/)の配信詳細モーダル  〔LP / 公開 / ランキング〕
-配信カードの「🔍詳しく見る」ボタンで <dialog> モーダルを開き、拡張の会場モードに近い見た目(参加者アイコン・ギフト/広告/コメントの3枠)を既存データのまま大きく表示。新規APIは作らず /api/live-ranking の応答から findLive で該当配信を検索するだけ。60秒の全体更新(#list全置換)とは DOM 上分離し、load() の成否から safeDetailSync/safeDetailSyncError で結果を伝える。配信が一覧から消えても閉じずに最後の姿を凍結しバナーで通知(detailBanner)。URLは ?lv=<lv>&detail=1 に pushState/popstate 同期(council-fable設計・2026-09-26)
-
-- [`src/lib/liveDetailView.js`](../src/lib/liveDetailView.js)
-- [`src/extension/live-ranking-entry.js`](../src/extension/live-ranking-entry.js)
-- [`tsuioku-no-kirameki/live/index.html`](../tsuioku-no-kirameki/live/index.html)
 
 ---
 
