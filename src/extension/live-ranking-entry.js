@@ -17,6 +17,7 @@ import {
 } from '../lib/liveRankingView.js';
 import { buildXIntentUrl } from '../lib/xIntentUrl.js';
 import { buildRecentCardHtml } from '../lib/liveRecentHoverCard.js';
+import { createGiftPulseRegistry, pulseRowKey, formatPtDelta, spanText } from '../lib/liveGiftPulse.js';
 
 const elList = /** @type {HTMLElement} */ (document.getElementById('list'));
 const elMeta = /** @type {HTMLElement} */ (document.getElementById('meta'));
@@ -34,6 +35,7 @@ const FACE = {
 };
 
 const tracker = createRowChangeTracker();
+const giftPulse = createGiftPulseRegistry();
 
 /** 本体(Chrome 拡張)のストア URL。★LP index.html と同じ ID(AGENTS.md §2 の拡張 ID)。 */
 const STORE_URL = 'https://chromewebstore.google.com/detail/cjbabignmmodaickpeckiojjabnlogdb';
@@ -127,14 +129,17 @@ const EMPTY_FACE = { gift: FACE.kontaHalf, ad: FACE.tanuHalf, comment: FACE.link
  * @param {import('../lib/liveRankingView.js').SupporterRow[]} rows
  * @param {string} liveId
  * @param {'gift'|'ad'|'comment'} kind
+ * @param {import('../lib/liveGiftPulse.js').PulseResult|null} [pulse]
  */
-function renderRows(rows, liveId, kind) {
+function renderRows(rows, liveId, kind, pulse = null) {
   if (!rows.length) {
     return `<p class="empty"><img src="${esc(EMPTY_FACE[kind] || FACE.tanuHalf)}" alt="" loading="lazy" decoding="async">まだいません</p>`;
   }
   const html = rows.map((r) => {
     const n = Number(r.rank) || 0;
-    const cls = tracker.classFor(rowKey(liveId, kind, r), Number(r.point) || 0);
+    const rp = pulse ? pulse.byKey.get(pulseRowKey(r)) : undefined;
+    const cls = [tracker.classFor(rowKey(liveId, kind, r), Number(r.point) || 0), rp ? `is-gifted tier-${rp.tier}` : '']
+      .filter(Boolean).join(' ');
     // ★inline onerror は使わない(このリポの既存ページに1件も無く、CSP を足したときに黙って壊れる)。
     //   読み込み失敗の面倒は bindImgFallback が見る。
     const ava = (r.avatar && !isBlankIcon(r.avatar))
@@ -142,7 +147,8 @@ function renderRows(rows, liveId, kind) {
       : '<span class="ava"></span>';
     const inner = `<span class="no${n > 0 && n <= 3 ? ' top' : ''}">${n || '-'}</span>`
       + `${ava}<span class="nm">${esc(r.name)}</span>`
-      + `<span class="pt">${num(r.point)}${kind === 'comment' ? '件' : 'pt'}</span>`;
+      + `<span class="pt">${num(r.point)}${kind === 'comment' ? '件' : 'pt'}</span>`
+      + (rp ? `<span class="delta" title="前回の取得（${esc(spanText(pulse.spanMs))}）からの増分">${esc(formatPtDelta(rp.delta))}</span>` : '');
     // ★comment 列だけ data-uid/data-lv を付ける(数値 uid・匿名 uid とも=ホバー対象)。
     const hoverAttr = (kind === 'comment' && r.uid) ? ` data-uid="${esc(r.uid)}" data-lv="${esc(liveId)}"` : '';
     // 行全体を 1 つのリンクに(url があるときだけ)。無い行は素の中身のまま。
@@ -273,8 +279,10 @@ function render(data) {
     + (missing ? '・<span class="pin-missing">その配信はもう放送が終わったみたい。いま支えている人の一覧は、そのまま見られるわ</span>' : '');
 
   tracker.begin();
+  giftPulse.begin();
   elList.innerHTML = ordered.map((l, i) => {
     const rows = supporterRows(l);
+    const gp = giftPulse.pulseFor(l.liveId, rows.gift, data.capturedAt);
     const sx = shareHref(l);
     return '<section class="live">'
       + renderHead(l, i + 1, data.capturedAt, nowMs)
@@ -292,12 +300,13 @@ function render(data) {
       + '</div>'
       + renderKnown(identifiedSupporters(l), identifiedSupportersByName(l))
       + '<div class="cols">'
-      + `<div class="col"><h3><img src="${esc(FACE.kontaSmile)}" alt="" loading="lazy" decoding="async">ギフトで支えた人 <span class="sum">${num(l.giftTotal)}pt</span></h3>${renderRows(rows.gift, l.liveId, 'gift')}</div>`
+      + `<div class="col"><h3><img src="${esc(FACE.kontaSmile)}" alt="" loading="lazy" decoding="async">ギフトで支えた人 <span class="sum">${num(l.giftTotal)}pt${gp.sum > 0 ? ` <span class="sum-delta">${esc(formatPtDelta(gp.sum))}</span>` : ''}</span></h3>${renderRows(rows.gift, l.liveId, 'gift', gp)}</div>`
       + `<div class="col"><h3><img src="${esc(FACE.tanuNormal)}" alt="" loading="lazy" decoding="async">広告で支えた人 <span class="sum">${num(l.adTotal)}pt</span></h3>${renderRows(rows.ad, l.liveId, 'ad')}</div>`
       + renderCommentCol(l)
       + '</div></section>';
   }).join('');
   tracker.end();
+  giftPulse.end();
   bindImgFallback(elList);
 }
 
