@@ -18,6 +18,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1547',
+    date: '2026-09-26',
+    summary: 'ライブビューに配信詳細モーダルを追加',
+    items: Object.freeze([
+      'ライブビュー(/live/)の配信カードに「🔍 詳しく見る」ボタンを追加しました。押すと、その配信を大きく開いて、応援した人・ギフト・広告・コメントをまとめて見られます。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1546',
     date: '2026-09-26',
     summary: 'ライブビューの最初の表示を高速化',
@@ -168,14 +176,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     summary: 'パネルを開いた直後の表示を速く',
     items: Object.freeze([
       'サイドパネルを開いた直後、前回までの応援レーンと上段カードを先に表示するようにしました。重い読み込みを待たずに中身が出るので、開いてから見えるまでの待ち時間が短くなります(一度開いた配信でのみ効きます)。'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.1526',
-    date: '2026-09-18',
-    summary: '内部整理(表示や動作は変わりません)',
-    items: Object.freeze([
-      '開発モニタのデータ書き出し処理を別ファイルへ整理しました(操作・出力は変わりません)。'
     ])
   })
 ]);
