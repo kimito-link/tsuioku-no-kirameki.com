@@ -14499,6 +14499,8 @@ async function refresh() {
   // await から戻ってきた paintWatchPopupUi が新しい放送の描画を上書きしないよう、以降の paint は
   // すべて isFreshRefresh() で守る。
   const refreshGen = ++watchPopupRefreshGeneration;
+  // v0.1.1544: 完走を待たず【開始した時点で】即座に立てる(理由は定義側コメント参照)。
+  refreshEverStarted = true;
   popupCelebrationGate.beginPopupRefresh(watchPopupLastPaintedLiveId || '', {
     refreshSessionKey: String(refreshGen)
   });
@@ -17489,6 +17491,19 @@ const northStarTickScheduler = createCoalescedRefreshScheduler({
 });
 /** 初回 refresh が完了するまではコアレスをバイパスし即時反映する */
 let initialRefreshDone = false;
+/**
+ * v0.1.1544(multitab-storage-contention根治): scheduleCoalescedStorageRefresh /
+ *   decideVisibilityAction の initialDone に渡す「refresh() が【1回でも開始された】か」フラグ。
+ *   ★initialRefreshDone(refresh完走)を渡してはいけない(v0.1.1450の教訓と同型の罠)。
+ *   多タブ環境で refresh() が snapshot fetch 等の非同期待ちの途中に次の storage.onChanged で
+ *   bail され続けると、refresh は【一度も完走せず】initialRefreshDone は永遠に false のまま
+ *   になり得る。initialDone にそれを渡すと、スケジューラの「初回はあらゆる抑制を無視」経路が
+ *   恒久的に有効になり続け、storage.onChanged のたびに refresh() が間引きなしで連打される
+ *   （実測: 起動直後の1秒未満で refreshGen が50以上進む・実機/CI で multitab-storage-contention
+ *   が数分〜数十分ハングする根本原因だった）。refresh() の開始時点で即座に立てることで、
+ *   2回目以降の storage.onChanged は通常の 450ms スロットルを通るようにする。
+ */
+let refreshEverStarted = false;
 
 /**
  * popup を開いた瞬間の白／空／ガタガタを隠していたロードシェードを撤去する。
@@ -18105,10 +18120,12 @@ function scheduleCoalescedStorageRefresh(changes, runRefresh) {
   // v0.1.440: 隠れタブ(他タブが前面)では re-render を skip して多タブ reflow N→1 を達成。
   //   可視復帰時の catch-up は既存 visibilitychange listener が担うので追加処理は不要。
   //   描画パスには触らない＝v0.1.421/422 パネル消失リグレッションを構造的に再発させない。
+  // v0.1.1544: initialDone には initialRefreshDone(refresh完走)ではなく refreshEverStarted
+  //   (refresh開始済みか)を渡す(理由は refreshEverStarted 定義側コメント参照)。
   const action = decideVisibilityAction({
     hidden: typeof document !== 'undefined' && document.hidden === true,
     gateEnabled: true,
-    initialDone: initialRefreshDone
+    initialDone: refreshEverStarted
   });
   if (action === 'skip') return;
   const keysForFreq = stripSelfWrittenRenderArtifacts(keys); // v0.1.1248: 混在でthrottleを失う穴を塞ぐ
@@ -18116,7 +18133,7 @@ function scheduleCoalescedStorageRefresh(changes, runRefresh) {
     keysForFreq.length > 0 &&
     keysForFreq.every((k) => isHighFrequencyCommentRelatedStorageKey(k));
   coalescedRefreshScheduler.schedule(
-    { allHighFreq, initialDone: initialRefreshDone },
+    { allHighFreq, initialDone: refreshEverStarted },
     runRefresh
   );
 }
