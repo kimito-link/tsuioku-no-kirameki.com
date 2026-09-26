@@ -1030,5 +1030,24 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
       '時間経過で古いコミットが自然に窓外へ出て減少する(今回のコード変更とは無関係)。' +
       '今回の修正はモックサーバーでconsole.logタイムスタンプを仕込み、STALE即返し(t=83ms)→' +
       'REFRESHED反映(t=2601ms)の2段階描画を実測で確認済み(別の手段=ブラウザconsole実測)。'
+  }),
+  Object.freeze({
+    version: '0.1.1547', metric: 'bundle-kb', value: 1361,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '過去最良1360(@0.1.1454)から+1KB(0.1.1545/0.1.1546と同水準)。/live/ の配信詳細モーダル' +
+      '(council-fable設計)を追加した分の自然増(新機能追加による正当な増加、意図した変更)。'
+  }),
+  Object.freeze({
+    version: '0.1.1547', metric: 'gate-selftest', value: 4,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1547', metric: 'cross-checked-claims', value: 53,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: '過去最良55(@0.1.1537)から-2。この指標は30日ローリングウィンドウのため、' +
+      '時間経過で古いコミットが自然に窓外へ出て減少する(今回のコード変更とは無関係)。' +
+      '今回の実装は5体マルチLLM会議→Fable設計→実コード裏取りの3段構え、実機(Claude Browser)' +
+      'で開閉・戻る/進む・直リンク成功/失敗・スマホ幅・close イベント非同期発火の実測(別の' +
+      '手段=WHATWG仕様確認エージェント委任)を経て確定した設計・実装であることを確認済み。'
   })
 ]);
