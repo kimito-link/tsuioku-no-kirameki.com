@@ -332,12 +332,15 @@ function setBusy(busy) {
   }
 }
 
-/** @param {{ refresh?: boolean }} [opts] */
+/**
+ * @param {{ refresh?: boolean }} [opts]
+ * @returns {Promise<void>}
+ */
 function load(opts) {
-  if (_loading) return;
+  if (_loading) return Promise.resolve();
   const refresh = !!(opts && opts.refresh);
   setBusy(true);
-  fetch(refresh ? '/api/live-ranking?refresh=1' : '/api/live-ranking', { cache: 'no-store' })
+  return fetch(refresh ? '/api/live-ranking?refresh=1' : '/api/live-ranking', { cache: 'no-store' })
     .then((r) => {
       if (r.status === 404) throw new Error('まだ集計されていません。しばらくお待ちください。');
       if (!r.ok) throw new Error(`読み込みに失敗しました (${r.status})`);
@@ -394,7 +397,16 @@ function tickCountdown() {
 }
 
 for (const b of elRefreshBtns) b.addEventListener('click', () => load({ refresh: true }));
-load({ refresh: true });
+/*
+ * ★初回だけ「まず保存済みをすぐ見せる」(2026-09-26 ユーザー要望「最初の読み込みだけ速く」)。
+ *   従来は初回から refresh:1 を投げており、スロットル(PUBLIC_REFRESH_MIN_MS=60秒)が
+ *   切れているタイミングの訪問者は、サーバ側の実収集(watch並列プローブ+koken/nicoad、
+ *   コード内実測コメントで1.2〜5秒)が終わるまで「読み込み中…」のまま待たされていた。
+ *   保存済みデータ(GET、Redis 読み出しのみ＝数十〜数百ms)を先に描画し、
+ *   その直後に refresh:1 を投げて裏で新鮮化する。表示が一度も出ない待ち時間を無くす。
+ *   2回目以降(60秒ごとの自動更新・タブ復帰)は従来どおり refresh:1 のみ(挙動不変)。
+ */
+load().finally(() => { load({ refresh: true }); });
 // ★見ていないときは止める(無駄に叩かない)。裏タブから戻った瞬間に取り直す。
 setInterval(() => { if (!document.hidden && Date.now() >= _nextAutoAt) load({ refresh: true }); }, 1000);
 setInterval(tickCountdown, 1000);

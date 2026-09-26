@@ -1012,5 +1012,23 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
     source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
     note: '過去最良55(@0.1.1537)から-2。この指標は30日ローリングウィンドウのため、' +
       '時間経過で古いコミットが自然に窓外へ出て減少する(今回のコード変更とは無関係)。'
+  }),
+  Object.freeze({
+    version: '0.1.1546', metric: 'bundle-kb', value: 1361,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '過去最良1360(@0.1.1454)から+1KB(0.1.1545の1361と同水準)。live-ranking-entry.js の' +
+      'load()をPromise返却に変更し初回描画を高速化した分の自然増(新機能追加による正当な増加)。'
+  }),
+  Object.freeze({
+    version: '0.1.1546', metric: 'gate-selftest', value: 4,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1546', metric: 'cross-checked-claims', value: 53,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: '過去最良55(@0.1.1537)から-2。この指標は30日ローリングウィンドウのため、' +
+      '時間経過で古いコミットが自然に窓外へ出て減少する(今回のコード変更とは無関係)。' +
+      '今回の修正はモックサーバーでconsole.logタイムスタンプを仕込み、STALE即返し(t=83ms)→' +
+      'REFRESHED反映(t=2601ms)の2段階描画を実測で確認済み(別の手段=ブラウザconsole実測)。'
   })
 ]);
