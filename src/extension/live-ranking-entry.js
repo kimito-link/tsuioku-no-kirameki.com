@@ -94,11 +94,21 @@ function renderKnown(people, namedPeople) {
 
   const namedHead = namedPeople.length
     ? `<h3 class="named"><img src="${esc(FACE.linkNormal)}" alt="" loading="lazy" decoding="async">ハンドルネームで応援した人 `
-      + `<span class="cnt">${namedPeople.length}人</span><span class="hint">サムネは無いが名前が分かる人</span></h3>`
-      + `<ul class="tiles tiles-named">${namedPeople.map((p) => (
-          `<li><a class="tile no-thumb" href="${esc(p.url)}" target="_blank" rel="noopener noreferrer" title="${esc(p.name)}（ID ${esc(p.uid)}）">`
-          + `<span class="tname">${esc(p.name)}</span><span class="tid">${esc(p.uid)}</span><span class="tpt">${esc(p.count ? `💬${num(p.count)}` : '')}</span></a></li>`
-        )).join('')}</ul>`
+      + `<span class="cnt">${namedPeople.length}人</span><span class="hint">サムネ未確定・名前は分かる人</span></h3>`
+      + `<ul class="tiles tiles-named">${namedPeople.map((p) => {
+          // ★2026-09-25: gift/ad/comment の合算内訳を「サムネ付き」と同じ書式(🎁 📣 💬)で見せる
+          //   (どの経路で応援したかが一目で分かるように。ユーザー確定の方針)。
+          const pts = (p.giftPt ? `🎁${num(p.giftPt)}` : '')
+            + (p.giftPt && p.adPt ? ' ' : '') + (p.adPt ? `📣${num(p.adPt)}` : '')
+            + ((p.giftPt || p.adPt) && p.commentCount ? ' ' : '') + (p.commentCount ? `💬${num(p.commentCount)}` : '');
+          // ★avatar は data:image/svg+xml(anonymousIdenticonDataUrl)で、読み込み失敗が原理上
+          //   起きないため、bindImgFallback の対象(img.tava)には含めない専用クラス
+          //   (tava-identicon)にする。「サムネ付き」枠(tava)と誤って同じ扱いにされ、
+          //   万一エラーが起きた場合に行ごと消えてしまう事故を防ぐ。
+          return `<li><a class="tile tile-identicon" href="${esc(p.url)}" target="_blank" rel="noopener noreferrer" title="${esc(p.name)}（ID ${esc(p.uid)}）">`
+            + `<img class="tava-identicon" src="${esc(p.avatar)}" alt="" loading="lazy" decoding="async">`
+            + `<span class="tname">${esc(p.name)}</span><span class="tid">${esc(p.uid)}</span><span class="tpt">${esc(pts)}</span></a></li>`;
+        }).join('')}</ul>`
     : '';
 
   return `<div class="known">${head}${thumbBlock}${namedHead}</div>`;

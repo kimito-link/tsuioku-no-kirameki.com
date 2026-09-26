@@ -18,6 +18,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1545',
+    date: '2026-09-26',
+    summary: 'ライブビューの応援した人の取りこぼしを修正',
+    items: Object.freeze([
+      'ライブビュー(/live/)で、ギフトや広告で応援してくれた人のうち、アイコンが未設定というだけで一覧から漏れていた不具合を修正しました。ゆっくり顔つきで「ハンドルネームで応援した人」の枠に表示されるようになります。',
+      '収集の更新間隔の表示しきい値を、実際の間隔のばらつきに合わせて調整しました。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1544',
     date: '2026-09-26',
     summary: '多タブ視聴で描画が長時間止まる不具合を修正',
@@ -167,14 +176,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     summary: '内部整理(表示や動作は変わりません)',
     items: Object.freeze([
       '配色プリセット(枠テーマ)まわりの内部コードを別ファイルへ整理しました(見た目・操作は変わりません)。'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.1524',
-    date: '2026-09-18',
-    summary: '内部整理(表示や動作は変わりません)',
-    items: Object.freeze([
-      '内部の純粋な処理をさらに共通の場所へ移して見通しをよくしました(表示や動作は変わりません)。'
     ])
   })
 ]);
