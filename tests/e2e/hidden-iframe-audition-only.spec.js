@@ -25,6 +25,16 @@ async function swOf(context) {
 test('hidden iframe は audition のみ（koken / nicoad iframe は作られない）', async ({
   context
 }) => {
+  // ★2026-09-26: この機能は実際に https://audition.nicovideo.jp/... へ iframe.src を
+  //   設定する(content-entry.js の maybeInjectHiddenOfficialIframes)。CI環境(GitHub Actions
+  //   ランナー)からの実ネットワークアクセスが応答保留のまま続くと、Playwrightの
+  //   context.close()がペンディング中のフレームロードを待ち続けてジョブ全体がハングする
+  //   事象を確認した(実測: masterでも毎回同じ箇所でハングし、timeout-minutes:30を
+  //   超えても終わらなかった)。このテストの本来の検証対象は「koken/nicoadのiframeが
+  //   作られないこと」であり、audition iframe自体の実ロードは検証対象外なので、
+  //   外部ドメインへのリクエストは応答をブロックしテスト内で完結させる。
+  await context.route('https://audition.nicovideo.jp/**', (route) => route.abort());
+
   const sw = await swOf(context);
 
   await sw.evaluate(
