@@ -18,11 +18,11 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
-    version: '0.1.1547',
+    version: '0.1.1548',
     date: '2026-09-26',
-    summary: 'ライブビューに配信詳細モーダルを追加',
+    summary: '配信詳細モーダルを一旦取り下げ',
     items: Object.freeze([
-      'ライブビュー(/live/)の配信カードに「🔍 詳しく見る」ボタンを追加しました。押すと、その配信を大きく開いて、応援した人・ギフト・広告・コメントをまとめて見られます。'
+      '前バージョンで追加した「詳しく見る」ボタンと詳細モーダルは、内容が一覧の拡大表示に留まり体験として不十分だったため、いったん取り下げました。'
     ])
   }),
   Object.freeze({

@@ -5840,16 +5840,6 @@
       ]
     },
     {
-      "file": "src/lib/liveDetailView.js",
-      "featureCount": 1,
-      "features": [
-        "live-ranking"
-      ],
-      "labels": [
-        "Web版 追憶のきらめき ランキング(/live/)"
-      ]
-    },
-    {
       "file": "src/lib/liveHealthScore.js",
       "featureCount": 1,
       "features": [

@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 7 / 873 件
+## ⚠️ 役割コメントが無いソース 7 / 872 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `scripts/build.mjs`
@@ -48,14 +48,12 @@
 - 📁 **.codex-osint/** (2)
   - `cc_pre_request_20220927.warc.gz`
   - `test-write.txt`
-- 📁 **_docs/** (7)
+- 📁 **_docs/** (5)
   - `CONCEPT-aibou-3nin-2026-09-04.md`
   - `FROM-web-ios-android-ledger-shipped-2026-08-22.md`
   - `KB-stale-premise.md`
   - `TO-web-ios-android-ai-maze-pattern-2026-08-31.md`
   - `TO-web-ios-android-unnamed-bucket-2026-09-03.md`
-  - `live-detail-modal-DESIGN.md`
-  - `live-detail-modal-IMPLEMENTATION-HANDOFF.md`
 - 📁 **api/** (5)
   - `live-og-image.js` — /api/live-og-image — 焼いた OGP カード画像(配信サムネ＋数字帯)を返す薄い I/O 係(v0.1.1519)。
   - `live-og.js` — /api/live-og — 配信ごとの OGP カード用 HTML を返す薄い I/O 係(v0.1.1517)。
@@ -788,7 +786,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (1853)
+- 📁 **src/** (1850)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1064,7 +1062,7 @@
         - `logo_funlink_white_RGB_link_black.png`
         - `logo_funlink_white_RGB_maru_black.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1623)
+  - 📁 **lib/** (1620)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -1806,9 +1804,6 @@
     - `liveCommentTally.test.js`
     - `liveCommenterStats.js` — 記録済みコメントから「ユニーク投稿者（推定）」用の集計（純関数）
     - `liveCommenterStats.test.js`
-    - `liveDetailModal.wiring.test.js`
-    - `liveDetailView.js` — `/live/` 配信詳細モーダルの純ロジック(DOM を触らない)。
-    - `liveDetailView.test.js`
     - `liveEndedFlag.js` — 配信終了フラグ。
     - `liveEndedFlag.test.js`
     - `liveHealthScore.js` — 配信ごとの「健康チェック」5段階評価(純関数)。
