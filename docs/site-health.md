@@ -6,10 +6,8 @@
 
 検証対象: 388 ファイル
 
-## 🔴 リンク切れ 1 件
+## ✅ 内部リンク健全性: 問題なし
 
-参照元 → リンク(解決先) の順。リネーム/削除したファイルへのリンクが残っている可能性。
-
-- `docs/live-comment-motion-IMPLEMENTATION-HANDOFF.md` → `../privacy.html`（解決先 `privacy.html` が無い）
+相対内部リンクの参照先はすべて実在します。
 
 ## ✅ canonical / og:url: 自ファイル名と一致

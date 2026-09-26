@@ -21,7 +21,8 @@
    (254行目)・`tracker`の使い方(36行目)・`.stats`の組み立て(281-292行目)を確認。
 4. [`tsuioku-no-kirameki/live/index.html`](../tsuioku-no-kirameki/live/index.html) — 既存`<style>`の
    構成、たぬ姉の吹き出し文言の場所。
-5. [`privacy.html`](../privacy.html) §14周辺(コメント関連の開示文の場所)。
+5. [`tsuioku-no-kirameki/privacy.html`](../tsuioku-no-kirameki/privacy.html) §14周辺
+   (コメント関連の開示文の場所)。
 
 ## 着手手順(ブランチ+TDD)
 
