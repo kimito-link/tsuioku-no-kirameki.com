@@ -38,9 +38,16 @@ export const LIVE_ID_RE = /^lv\d{6,15}$/i;
 /**
  * ★収集が古くなったことを画面で言うしきい値(分)。
  *   根拠(★数字を発明しない): 収集は GitHub Actions の cron で 5 分間隔に設定しているが、
- *   GitHub は負荷分散で実行を遅らせる仕様。★実測(2026-09-05)では 8〜13 分間隔。その 2 倍以上を「異常」とする。
+ *   GitHub は負荷分散で実行を遅らせる仕様。
+ *   実測(2026-09-05): 8〜13 分間隔 → 当時は STALE_MIN=30 に設定。
+ *   ★実測(2026-09-25・直近100回): 中央値12分・最小7.8分・最大55.3分、34/99回(34%)が15分超。
+ *   無料枠の遅延分布が想定より広いことが判明したため、実測最大値(55.3分)を上回る
+ *   60 分へ引き上げる(「本当に止まっている」との誤判定を避ける)。
+ *   ※動的算出(直近実行間隔からの自動計算)は見送り(理由: freshness() は純関数として
+ *   実行履歴を持たない設計を維持したい。cron 側の遅延がさらに悪化したら、その時点で
+ *   再実測してこの定数とコメントを更新する運用とする)。
  */
-export const STALE_MIN = 30;
+export const STALE_MIN = 60;
 
 /**
  * @param {unknown} liveId
@@ -307,33 +314,82 @@ export function identifiedSupporters(live) {
   return Array.from(byUid.values()).sort((x, y) => y.total - x.total);
 }
 
-/** @typedef {{ uid: string, name: string, url: string, count: number }} NamedSupporter */
+/**
+ * @typedef {{ uid: string, name: string, url: string, count: number, avatar: string,
+ *   thumbnailConfirmed: boolean, giftPt: number, adPt: number, commentCount: number }} NamedSupporter
+ */
 
 /**
- * ★「ハンドルネームだけ分かっている応援した人」= サムネは無いが強い表示名がある人。
+ * ★「ハンドルネームだけ分かっている応援した人」= 確定したサムネは無いが uid か強い表示名がある人。
  *   `identifiedSupporters`(サムネ付き)の下に続けて出す第2段。
  *
- *   `commentRows` の avatar は数値 uid から機械生成した推測 URL(`deriveAvatarUrlFromUid`)
- *   であり、実際にアイコンが存在するかは確認していない(`isBlankIcon` の文字列一致でも
- *   検出できない)。そのため「サムネがある」という前提を汚さないよう、この段は**サムネ
- *   フィールドを持たせない**(型を `IdentifiedSupporter` と分け、呼び出し側が誤って
- *   avatar を参照できないようにする=AGENTS.md §3.6「外部APIはいつか落ちる前提」)。
+ *   ★2026-09-25 実測(19配信)で判明した取りこぼし穴を塞ぐための拡張: 対象を「コメント発言者」
+ *   だけでなく「ギフト/広告経由で uid はあるがアイコン未設定/未確認だった人」にも広げる
+ *   (匿名を除いた記名の応援者90人中32人=約36%がこの穴で消えていた実測値)。
  *
- *   強弱判定は拡張ポップアップの応援ユーザーレーンが使う正本 `isStrongNickname` を
- *   再利用する(同じ基準=「プロフィールとして十分な強さの表示名か」)。
+ *   `identifiedSupporters`(299-306行、`put`)が `!r.avatar || isBlankIcon(r.avatar)` で
+ *   弾いた行を、ここで拾う設計(対になっている)。gift/ad は公式が名前を返しているので
+ *   `isStrongNickname` の強弱判定は課さない(ニコ生本家の表示をそのまま出す=AGENTS.md §3.5)。
+ *   comment 経由(匿名でない)は従来通り `isStrongNickname` を通す。
+ *
+ *   avatar は「本物のサムネが無い」ことが確定して初めて `anonymousIdenticonDataUrl`(ゆっくり顔)
+ *   を充てる(拡張 popup 側 `adLanePicksFromRooms.js` の
+ *   `avatarUrl || resolvedIcon || derivedIcon || yukkuriFaceFor(faceKey)` という既存の
+ *   フォールバック連鎖と同じ思想の再利用。新規ロジック・新規依存は増やさない)。
+ *   `thumbnailConfirmed` は常に false(この段に来る時点でサムネ未確定という契約を型で表す。
+ *   AGENTS.md §3.6「外部APIはいつか落ちる前提」= 推測画像を本物のサムネと混同させない)。
+ *
  *   `identifiedSupporters` に既に載っている uid は重複させない(そちらを優先)。
+ *   1人が複数経路(gift/ad/comment)に出た場合は合算し、内訳(giftPt/adPt/commentCount)を
+ *   個別に保持する(表示側が「🎁pt 📣pt 💬件」の内訳表示に使う)。
  * @param {{ gift?: any, ad?: any, comment?: any }|null|undefined} live
  * @returns {NamedSupporter[]}
  */
 export function identifiedSupportersByName(live) {
   const known = new Set(identifiedSupporters(live).map((s) => s.uid));
-  /** @type {NamedSupporter[]} */
-  const out = [];
+  /** @type {Map<string, { uid: string, name: string, url: string, giftPt: number, adPt: number, commentCount: number }>} */
+  const byUid = new Map();
+
+  /**
+   * @param {string} uid @param {string} name @param {string} url @param {number} point
+   * @param {'giftPt'|'adPt'|'commentCount'} field
+   */
+  const put = (uid, name, url, point, field) => {
+    if (!uid || known.has(uid)) return;
+    const cur = byUid.get(uid) || { uid, name, url, giftPt: 0, adPt: 0, commentCount: 0 };
+    cur[field] += Number(point) || 0;
+    if (name && !cur.name) cur.name = name; // 代表名は最初に見つかった非空の名前
+    if (!cur.url && url) cur.url = url;
+    byUid.set(uid, cur);
+  };
+
+  // gift/ad: uid はあるが avatar が空/blank(未設定)の行。強弱判定は課さない(公式表示のまま)。
+  const { gift, ad } = supporterRows(live);
+  for (const r of gift) {
+    if (r.uid && (!r.avatar || isBlankIcon(r.avatar))) put(r.uid, r.name, r.url, r.point, 'giftPt');
+  }
+  for (const r of ad) {
+    if (r.uid && (!r.avatar || isBlankIcon(r.avatar))) put(r.uid, r.name, r.url, r.point, 'adPt');
+  }
+  // comment: 匿名でなく強い表示名の行(従来通り)。
   for (const r of commentRows(live)) {
     if (r.anon || known.has(r.uid) || !isStrongNickname(r.name, r.uid)) continue;
-    out.push({ uid: r.uid, name: r.name, url: r.url, count: r.point });
+    put(r.uid, r.name, r.url, r.point, 'commentCount');
   }
-  return out.sort((a, b) => b.count - a.count);
+
+  return Array.from(byUid.values())
+    .map((s) => ({
+      uid: s.uid,
+      name: s.name,
+      url: s.url,
+      count: s.giftPt + s.adPt + s.commentCount,
+      avatar: anonymousIdenticonDataUrl(s.uid, 64),
+      thumbnailConfirmed: false,
+      giftPt: s.giftPt,
+      adPt: s.adPt,
+      commentCount: s.commentCount
+    }))
+    .sort((a, b) => b.count - a.count);
 }
 
 /**

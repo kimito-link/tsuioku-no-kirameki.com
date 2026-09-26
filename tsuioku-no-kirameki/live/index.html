@@ -231,10 +231,13 @@
       .tid { font-size: .64rem; color: var(--ink-sub); font-variant-numeric: tabular-nums; }
       .tpt { font-size: .66rem; color: var(--orange); font-variant-numeric: tabular-nums; white-space: nowrap; }
 
-      /* ── ハンドルネームで応援した人(サムネは無いが強い表示名がある人。2026-09-25追加の第2段) ── */
+      /* ── ハンドルネームで応援した人(サムネ未確定・名前は分かる人。2026-09-25追加の第2段) ── */
+      /* ★2026-09-25: ギフト/広告経由(アイコン未設定)の人も合流させ、ゆっくり顔(identicon)
+         付きで表示するよう拡張。第1段(.tava=本物サムネ)と視覚的に混同しないよう、枠線の色を
+         変え、identicon画像には点線の枠を付けて「本物のサムネではない」ことを示す。 */
       .known h3.named { margin-top: 10px; }
-      .tile.no-thumb { justify-content: center; min-height: 52px; }
-      .tile.no-thumb .tname { margin-top: 0; max-width: 76px; }
+      .tile.tile-identicon { border-style: dashed; }
+      .tava-identicon { width: 48px; height: 48px; border-radius: 50%; object-fit: cover; background: var(--bg-soft); border: 2px dashed var(--ink-sub); }
 
       .cols { display: grid; grid-template-columns: 1fr; gap: 0; }
       /* ★minmax(0,1fr): 素の 1fr は中身の最小幅(長い名前・件数)で列が押し広がり、800px 幅で 3 列目がはみ出た(実測 302/346/176px)。
