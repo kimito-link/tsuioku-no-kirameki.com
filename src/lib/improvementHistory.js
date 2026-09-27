@@ -1064,5 +1064,22 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
     source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
     note: '過去最良55(@0.1.1537)から-2。この指標は30日ローリングウィンドウのため、' +
       '時間経過で古いコミットが自然に窓外へ出て減少する(今回の実装とは無関係)。'
+  }),
+  Object.freeze({
+    version: '0.1.1550', metric: 'bundle-kb', value: 1362,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '過去最良1360(@0.1.1454)から+2KB。今回の4段アイコン列の実装はWebサイト側の' +
+      'live-ranking.jsに入りpopup.jsには含まれないが、更新履歴(0.1.1550)の追加分で' +
+      'popup.jsが+1KB増えた。新機能の掲載に伴う正当な増加。'
+  }),
+  Object.freeze({
+    version: '0.1.1550', metric: 'gate-selftest', value: 4,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1550', metric: 'cross-checked-claims', value: 52,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: '過去最良55(@0.1.1537)から-3。この指標は30日ローリングウィンドウのため、' +
+      '時間経過で古いコミットが自然に窓外へ出て減少したもので、今回のコード変更とは無関係。'
   })
 ]);

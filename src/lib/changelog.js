@@ -18,6 +18,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1550',
+    date: '2026-09-28',
+    summary: '/live/ 応援者を4段のアイコン列で表示',
+    items: Object.freeze([
+      'ライブビュー(/live/)の応援者を、りんく・こん太・ギフト・たぬ姉の4段に分けて表示するようにしました。ギフトの増分や匿名人数も段ごとに確認できます。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1549',
     date: '2026-09-27',
     summary: '/live/ ギフト増分を+ptで表示',
@@ -168,14 +176,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     summary: '拡張の識別子を固定し反映を安定化',
     items: Object.freeze([
       '拡張の内部識別子を固定しました。これまで読み込むフォルダの場所によって識別子が変わり、記録の紐づけが不安定になる・更新のたびに固まることがありました。識別子を固定したことで、フォルダを移動しても記録が保たれ、反映も安定します(内部改善・体感は変わりません)。'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.1528',
-    date: '2026-09-18',
-    summary: '先読み表示を応援レーンだけに絞りました',
-    items: Object.freeze([
-      '前版の「開いた直後の先読み表示」で、記録件数カードが一瞬前回の値を挟むと祝い演出が誤って出る恐れがあったため、先読みは応援レーンだけに絞りました。上段カードは従来どおり少し後に表示されます(誤演出の防止)。'
     ])
   })
 ]);

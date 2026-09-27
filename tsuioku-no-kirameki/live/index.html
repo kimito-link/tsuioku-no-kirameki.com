@@ -231,6 +231,22 @@
       .tid { font-size: .64rem; color: var(--ink-sub); font-variant-numeric: tabular-nums; }
       .tpt { font-size: .66rem; color: var(--orange); font-variant-numeric: tabular-nums; white-space: nowrap; }
 
+      .lanes { padding: 10px 14px 12px; border-bottom: 1px solid var(--line); background: linear-gradient(180deg, #fffdf9, #fff7ec); }
+      .lanes h3 { margin: 0 0 8px; min-height: 30px; font-size: .84rem; color: var(--navy-deep); font-weight: 700; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+      .lanes h3 + h3 { margin-top: 6px; }
+      .lanes .tiles + h3 { margin-top: 10px; }
+      .lanes h3 img { width: 30px; height: 30px; object-fit: contain; }
+      .lanes h3 .cnt { color: var(--orange); font-variant-numeric: tabular-nums; }
+      .lanes h3 .hint, .lanes h3 .lane-more { font-size: .72rem; font-weight: 500; color: var(--ink-sub); }
+      .lanes h3.lane-gift .cnt { color: #c02a2a; }
+      .tile.tile-anon { cursor: help; }
+      .tiles li.is-new { animation: nl-live-enter 420ms ease-out; }
+      .tiles li.is-bumped .tile { animation: nl-live-pop 900ms ease-out; }
+      .tiles li.is-gifted .tile { background: linear-gradient(180deg, #fff, #fff2df); border-color: var(--orange); }
+      .tiles li.is-gifted.tier-mega .tile { border-color: #c02a2a; }
+      .lane-pick { margin-left: auto; font-size: .76rem; font-weight: 800; color: var(--orange); }
+      @media (prefers-reduced-motion: reduce) { .tiles li.is-new, .tiles li.is-bumped .tile { animation: none; } }
+
       /* ── ハンドルネームで応援した人(サムネ未確定・名前は分かる人。2026-09-25追加の第2段) ── */
       /* ★2026-09-25: ギフト/広告経由(アイコン未設定)の人も合流させ、ゆっくり顔(identicon)
          付きで表示するよう拡張。第1段(.tava=本物サムネ)と視覚的に混同しないよう、枠線の色を
@@ -379,7 +395,7 @@
             <img src="../../extension/images/yukkuri-charactore-english/tanunee/tanuki-yukkuri-half-eyes-mouth-open.png" alt="たぬ姉" width="92" height="92" decoding="async">
             <span>たぬ姉</span>
           </div>
-          <div class="bubble">ギフトと広告の順位とポイントは<strong>ニコ生が公開している値そのまま</strong>。<strong>コメントの件数だけはうちが数えた値</strong>よ（誰が何件かだけ。本文は保存していないわ）。ほかに当サイトが足したのは「約○人（推定）」と並び順だけ。更新は<strong>60 秒ごとの自動＋「いま更新」ボタン</strong>（コメントの集計はもう少しゆっくりで、約 10 分ごと）。データの収集時刻は上に出しているから、古いときは正直に「⚠」が出るわ。<strong>名前にマウスを乗せる</strong>と、その人の直近の発言をその場で取ってくるわ（<strong>本文は保存しないわ</strong>）。<strong>「+○pt」はニコ生が公開しているギフト順位表を前回の取得と引き算しただけ</strong>で、新しく何かを取りに行ってはいないわ。</div>
+          <div class="bubble">ギフトと広告の順位とポイントは<strong>ニコ生が公開している値そのまま</strong>。<strong>コメントの件数だけはうちが数えた値</strong>よ（誰が何件かだけ。本文は保存していないわ）。ほかに当サイトが足したのは「約○人（推定）」と並び順だけ。更新は<strong>60 秒ごとの自動＋「いま更新」ボタン</strong>（コメントの集計はもう少しゆっくりで、約 10 分ごと）。データの収集時刻は上に出しているから、古いときは正直に「⚠」が出るわ。<strong>名前にマウスを乗せる</strong>と、その人の直近の発言をその場で取ってくるわ（<strong>本文は保存しないわ</strong>）。<strong>「+○pt」はニコ生が公開しているギフト順位表を前回の取得と引き算しただけ</strong>で、新しく何かを取りに行ってはいないわ。<strong>4段はニコ生が公開している順位表と当サイトのコメント集計を種類で分けただけで、上位10人ずつまでの表示</strong>よ。</div>
         </div>
       </div>
 
@@ -398,6 +414,7 @@
         <p>★このページは<b>配信者ではなく「応援した人」</b>を並べます（追憶のきらめき ランキング）。</p>
         <p><b>ギフト・広告のランキング</b>（名前・順位・ポイント）は、ニコニコ生放送が公開しているものを<b>そのまま</b>出しています。当サイトが独自に集計・改変した値ではありません。配信サムネ・配信者名・アイコンも、ニコニコ生放送の番組ページに掲載されているものです。</p>
         <p>★<b>「+○pt」</b>は、公開ポイントの前回取得（60 秒ごと）との差です。</p>
+        <p>★4段は、公開順位表と当サイトのコメント集計を種類で分けた表示で、各段は上位10人ずつまでです。</p>
         <p>★<b>「コメントで応援した人」の件数だけは当サイトが数えた値です。</b>ニコニコ生放送が公開している番組のコメントを読み、<b>誰が何件コメントしたか</b>だけを数えています（<b>本文・時刻は保存していません</b>）。匿名（184）の方は、その番組の中だけで通じる識別子から「匿名＋番号」と似顔絵を作っています（アカウントや個人を特定するものではありません）。集計は約 10 分ごとで、長い放送では「直近ぶんの集計」と添えます。</p>
         <p>★<b>「約○人（推定）」と並び順だけは当サイトの推定値です。</b>ニコニコ生放送に同時視聴数を知る手段が無いため、公開されている<b>累計の来場者数</b>と<b>放送の経過時間</b>から見積もっています（時間が経つほど視聴者が入れ替わる前提の減衰モデル）。実際の人数とは差があります。</p>
         <p>放送中の個人配信のみを対象にしています。表示は定期的に更新されます（更新が止まったときは上に警告が出ます）。</p>
