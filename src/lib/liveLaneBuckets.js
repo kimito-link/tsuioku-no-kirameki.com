@@ -75,14 +75,25 @@ export function laneBuckets(live, opts = {}) {
   };
 }
 
-/** タイルの追跡キー(段×uid)。匿名 uid(a:…)はその番組の中で一定なので鍵に使える。 */
+/**
+ * タイルの追跡キー(段×uid)。匿名 uid(a:…)はその番組の中で一定なので鍵に使える。
+ * @param {string} liveId
+ * @param {string} lane
+ * @param {{ uid: string }} tile
+ * @returns {string}
+ */
 export function laneTileKey(liveId, lane, tile) {
   return `${liveId}|${lane}|${tile.uid}`;
 }
 
-/** 「匿名 42人・上位10人を表示」/「名無し 3人」の文言。 */
+/**
+ * 「匿名 42人・上位10人を表示」/「名無し 3人」の文言。
+ * @param {string} lane
+ * @param {LaneBuckets['counts']} counts
+ * @returns {string}
+ */
 export function laneMoreText(lane, counts) {
-  const c = counts && typeof counts === 'object' ? counts : {};
+  const c = counts || /** @type {LaneBuckets['counts']} */ ({});
   if (lane === 'tanu') {
     const total = Math.max(0, Number(c.tanu) || 0);
     const tiles = Math.max(0, Number(c.tanuTiles) || 0);
