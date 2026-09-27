@@ -209,33 +209,37 @@ graph LR
   f39 --> f39_3["lib/liveRankingView.js"]
   f39 --> f39_4["extension/live-ranking-entry.js"]
   f39 --> f39_5["workflows/live-ranking.yml"]
-  HUB --> f40["ランキング(/live/)ホバーで直近の発言"]
-  f40 --> f40_0["live-recent-comments.js"]
-  f40 --> f40_1["server/nicoliveGuest.js"]
-  f40 --> f40_2["lib/liveRecentHoverCard.js"]
-  f40 --> f40_3["extension/live-ranking-entry.js"]
-  f40 --> f40_4["live/index.html"]
-  HUB --> f41["ランキング(/live/)の配信ごと OGP"]
-  f41 --> f41_0["live-og.js"]
-  f41 --> f41_1["live-og-image.js"]
-  f41 --> f41_2["lib/liveOgHtml.js"]
-  f41 --> f41_3["lib/liveOgStats.js"]
-  f41 --> f41_4["lib/liveRankingView.js"]
-  f41 --> f41_5["live-og-bake.mjs"]
-  f41 --> f41_6["og-live-compose.py"]
-  f41 --> f41_7["workflows/live-ranking.yml"]
-  f41 --> f41_8[""]
-  HUB --> f42["dist 鮮度ゲート(buildId無限差分ループ根治)"]
-  f42 --> f42_0["lib/distFingerprint.js"]
-  f42 --> f42_1["check-dist-fresh.mjs"]
-  f42 --> f42_2["build.mjs"]
-  f42 --> f42_3["pre-push"]
-  f42 --> f42_4["pre-commit"]
-  HUB --> f43["横断応援者ランキング(デバイス内・段B)"]
-  f43 --> f43_0["lib/crossSupporterRanking.js"]
-  f43 --> f43_1["lib/commenterHistoricalAnalytics.js"]
-  f43 --> f43_2["lib/supporterRanking.js"]
-  f43 --> f43_3["lib/marketingChartsHtml.js"]
+  HUB --> f40["ランキング(/live/)ギフト増分バッジ"]
+  f40 --> f40_0["lib/liveGiftPulse.js"]
+  f40 --> f40_1["extension/live-ranking-entry.js"]
+  f40 --> f40_2["live/index.html"]
+  HUB --> f41["ランキング(/live/)ホバーで直近の発言"]
+  f41 --> f41_0["live-recent-comments.js"]
+  f41 --> f41_1["server/nicoliveGuest.js"]
+  f41 --> f41_2["lib/liveRecentHoverCard.js"]
+  f41 --> f41_3["extension/live-ranking-entry.js"]
+  f41 --> f41_4["live/index.html"]
+  HUB --> f42["ランキング(/live/)の配信ごと OGP"]
+  f42 --> f42_0["live-og.js"]
+  f42 --> f42_1["live-og-image.js"]
+  f42 --> f42_2["lib/liveOgHtml.js"]
+  f42 --> f42_3["lib/liveOgStats.js"]
+  f42 --> f42_4["lib/liveRankingView.js"]
+  f42 --> f42_5["live-og-bake.mjs"]
+  f42 --> f42_6["og-live-compose.py"]
+  f42 --> f42_7["workflows/live-ranking.yml"]
+  f42 --> f42_8[""]
+  HUB --> f43["dist 鮮度ゲート(buildId無限差分ループ根治)"]
+  f43 --> f43_0["lib/distFingerprint.js"]
+  f43 --> f43_1["check-dist-fresh.mjs"]
+  f43 --> f43_2["build.mjs"]
+  f43 --> f43_3["pre-push"]
+  f43 --> f43_4["pre-commit"]
+  HUB --> f44["横断応援者ランキング(デバイス内・段B)"]
+  f44 --> f44_0["lib/crossSupporterRanking.js"]
+  f44 --> f44_1["lib/commenterHistoricalAnalytics.js"]
+  f44 --> f44_2["lib/supporterRanking.js"]
+  f44 --> f44_3["lib/marketingChartsHtml.js"]
 ```
 
 ---
@@ -310,14 +314,14 @@ graph LR
 - `soundeffect-lab/`（19 件） — 効果音ラボ由来の素材候補(採否検討用)  〔音声 / 素材〕
 
 ## `src/` — LP 側 + 純粋関数ライブラリの源  〔ソース〕
-<sub>ファイル 1850 件</sub>
+<sub>ファイル 1853 件</sub>
 
 - `data/`（7 件） — 保存コメントからレーン候補を読む acquirer / source 層  〔コメント / 取得〕
 - `domain/`（20 件） — ドメイン正本(応援レーンの集約・列ポリシー等。識別子判定など)  〔応援 / 集約 / 識別子〕
 - `extension/`（56 件） — バンドル entry(content/popup/venue/status/offscreen/backfill-sw 等=機能境界)  〔entry / 記録 / 会場 / 応援〕
 - `fixtures/`（1 件） — テスト用フィクスチャ  〔テスト〕
 - `images/`（134 件） — LP / CWS 提出物のマスター画像  〔画像〕
-- `lib/`（1620 件） — 純粋関数ライブラリ(unit test 対象)。色・速度・コメント・レポート等の計算ロジックの大半  〔色 / 速度 / コメント / レポート / 純粋関数〕
+- `lib/`（1623 件） — 純粋関数ライブラリ(unit test 対象)。色・速度・コメント・レポート等の計算ロジックの大半  〔色 / 速度 / コメント / レポート / 純粋関数〕
 - `server/`（2 件） — Node 側 I/O 部品(fetch/WebSocket を実際に叩く。api と scripts が共用。lib には置けない)  〔API / 公開 / ランキング〕
 - `shared/`（7 件） — 複数機能で共有する小部品(アバター URL ガード等)  〔共有 / アバター〕
 - `sound/`（1 件） — 音声素材(src 側)  〔音声〕
@@ -597,6 +601,13 @@ esbuild の import 到達グラフを逆引きし「このファイルを変え�
 - [`src/lib/liveRankingView.js`](../src/lib/liveRankingView.js)
 - [`src/extension/live-ranking-entry.js`](../src/extension/live-ranking-entry.js)
 - [`.github/workflows/live-ranking.yml`](../.github/workflows/live-ranking.yml)
+
+### ランキング(/live/)ギフト増分バッジ  〔LP / 公開 / ランキング / ギフト / 表示〕
+公開ギフト順位表を前回の取得と引き算し、増えた数値 uid の行だけに「+Npt」と帯色を表示。ギフト列見出しにも合計増分を添える。15分超の間隔・匿名行・新規ランクインは差分を発明せず静かに除外する
+
+- [`src/lib/liveGiftPulse.js`](../src/lib/liveGiftPulse.js)
+- [`src/extension/live-ranking-entry.js`](../src/extension/live-ranking-entry.js)
+- [`tsuioku-no-kirameki/live/index.html`](../tsuioku-no-kirameki/live/index.html)
 
 ### ランキング(/live/)ホバーで直近の発言  〔LP / 公開 / ランキング / コメント〕
 「コメントで応援した人」の名前にマウスを乗せると、その人の直近発言(最大5件)をその場で NDGR から浅く取って小さなカードで出す。POST /api/live-recent-comments が watch HTML→握手(nicoliveGuest)→crawlNdgrBackward を浅く回して byUid を返す。本文は Redis に保存せずサーバのメモリに最長60秒だけ。カード HTML は純関数 buildRecentCardHtml。行全体を1つの <a class="rank-link"> にまとめる変更も同段(v0.1.1514)

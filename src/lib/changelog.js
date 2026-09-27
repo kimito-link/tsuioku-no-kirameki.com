@@ -18,6 +18,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1549',
+    date: '2026-09-27',
+    summary: '/live/ ギフト増分を+ptで表示',
+    items: Object.freeze([
+      'ライブビュー(/live/)のギフト順位表で、前回取得から増えたポイントを「+Npt」として表示するようにしました。増分が大きい人ほど帯の色が濃くなります。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1548',
     date: '2026-09-26',
     summary: '配信詳細モーダルを一旦取り下げ',
@@ -168,14 +176,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     summary: '先読み表示を応援レーンだけに絞りました',
     items: Object.freeze([
       '前版の「開いた直後の先読み表示」で、記録件数カードが一瞬前回の値を挟むと祝い演出が誤って出る恐れがあったため、先読みは応援レーンだけに絞りました。上段カードは従来どおり少し後に表示されます(誤演出の防止)。'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.1527',
-    date: '2026-09-18',
-    summary: 'パネルを開いた直後の表示を速く',
-    items: Object.freeze([
-      'サイドパネルを開いた直後、前回までの応援レーンと上段カードを先に表示するようにしました。重い読み込みを待たずに中身が出るので、開いてから見えるまでの待ち時間が短くなります(一度開いた配信でのみ効きます)。'
     ])
   })
 ]);
