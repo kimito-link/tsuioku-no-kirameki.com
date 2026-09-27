@@ -50,6 +50,46 @@ const CF_ACC = process.env.CLOUDFLARE_ACCOUNT_ID;
 const SN = process.env.SAMBANOVA_API_KEY;
 const MI = process.env.MISTRAL_API_KEY;
 
+/**
+ * 連続失敗の記録を更新する。**同じ日に何度回しても1日は1回しか数えない。**
+ *
+ * ★2026-09-28 実損から新設: 従来は `(prev||0)+1` で単純に加算しており、
+ *  **「実行回数」を「〜日連続失敗」と表示していた**（日付を一切見ていなかった）。
+ *  実証: 同じ日(09-28)に2回回したら 36→37 に増えた。日数なら増えないはずの操作で増えた。
+ *  ★実害: 撤去するかどうかの判断材料が水増しされる。日報は「36日連続失敗」と出すが
+ *   8/21からの実日数は38日で、そもそも日報を書いた日は全期間で21日しかなかった
+ *   （=回数・実日数・実行日数のどれとも一致しない数字を根拠に撤去を推奨していた）。
+ *  ★「日数が伸びること自体は新情報ではない」という既存の据え置き判断
+ *   （council-lineup.mjs の SambaNova 節）は、その日数が**正しい前提**で書かれている。
+ *   水増しされた数字で運用すると、この判断の土台が崩れる。
+ *
+ * @param {object} prev 既存の記録（{streakDays, firstFailDate, lastFailDate} 形式）
+ * @param {string} date 今日（JST・YYYY-MM-DD）
+ * @returns {{streakDays:number, firstFailDate:string, lastFailDate:string}}
+ */
+function bumpFailStreak(prev, date) {
+  // 同じ日の再実行では増やさない（回数ではなく日数を数える）
+  if (prev?.lastFailDate === date) {
+    return { streakDays: prev.streakDays, firstFailDate: prev.firstFailDate, lastFailDate: date };
+  }
+  // 旧形式（probeFailStreak / missingStreak だけを持つ）からの移行:
+  // 旧値は「回数」なので日数として信用できない。初回失敗日も不明なので、
+  // **今日を起点に1から数え直す**（誤った大きい数字を引き継がない方が安全）。
+  // ★移行初日だけの既知の副作用: streak が1に戻るため、429系(閾値 streak>=2)の
+  //  警告が**その日1日だけ日報から消える**。翌日の実行で2日目になり再表示される。
+  //  これは「429は待てば戻るので単発で騒がない」という既存の意図的設計と整合するので
+  //  閾値は触らない（401/402/403 は streak に関係なく初回で警告するため影響を受けない）。
+  //  実測(2026-09-28): 移行直後の日報から SambaNova・magistral×2 の3件が消え、
+  //  「✅ 消滅疑いなし」に変わった。**据え置き中の3体が消えたのは移行のせいであって
+  //  復活したのではない**。翌日の日報で3件が戻ることを確認すること。
+  const carriedOver = typeof prev?.streakDays === 'number' ? prev.streakDays : 0;
+  return {
+    streakDays: carriedOver + 1,
+    firstFailDate: prev?.firstFailDate || date,
+    lastFailDate: date,
+  };
+}
+
 // ★2026-09-26: todayJst の定義は scripts/lib/today-jst.mjs へ移した（ここには残さない）。
 //  council-daily.mjs が UTC で日付を出し、このスクリプトが JST で日報を書いていたため
 //  「日報が見つからない」という偽の赤が毎日 JST 09:00 前に出ていた。
@@ -454,11 +494,12 @@ async function main() {
       if (health[key]) delete health[key]; // 復活したら欠落カウントをリセット
       continue;
     }
-    const streak = (health[key]?.missingStreak || 0) + 1;
-    health[key] = { missingStreak: streak, lastSeen: health[key]?.lastSeen || date };
+    const rec = bumpFailStreak(health[key], date);
+    const streak = rec.streakDays;
+    health[key] = { ...rec, lastSeen: health[key]?.lastSeen || date };
     if (streak >= 2) {
       const probe = await probeModel(entry.provider, entry.apiModel);
-      healthAlerts.push({ label: entry.label, streak, probeStatus: probe.status, kind: 'catalog' });
+      healthAlerts.push({ label: entry.label, streak, firstFailDate: rec.firstFailDate, probeStatus: probe.status, kind: 'catalog' });
     }
   }
 
@@ -477,8 +518,9 @@ async function main() {
       if (health[key]) delete health[key];
       continue;
     }
-    const streak = (health[key]?.probeFailStreak || 0) + 1;
-    health[key] = { probeFailStreak: streak, lastSeen: health[key]?.lastSeen || date };
+    const rec = bumpFailStreak(health[key], date);
+    const streak = rec.streakDays;
+    health[key] = { ...rec, lastSeen: health[key]?.lastSeen || date };
     const snippet = String(probe.snippet || '');
     // ★2026-08-31: 課金要求(=無料枠から外れた)は **初回で即警告**する。
     //  従来は streak>=2 一律で、2026-08-31 に mistral-large-latest が
@@ -503,7 +545,7 @@ async function main() {
       const kind = paywalled ? '有料化(無料枠から外れた)'
         : authFailed ? '認証エラー(キー/権限の問題・人が直すまで回復しない)'
         : '疎通不能';
-      healthAlerts.push({ label: entry.label, streak, probeStatus: probe.status, kind: 'live', liveKind: kind, snippet: snippet.slice(0, 80) });
+      healthAlerts.push({ label: entry.label, streak, firstFailDate: rec.firstFailDate, probeStatus: probe.status, kind: 'live', liveKind: kind, snippet: snippet.slice(0, 80) });
     }
   }
 
@@ -699,10 +741,14 @@ function buildBrief({ date, isFirstRun, fetchStatus, healthAlerts, probedCandida
     lines.push('- ✅ 消滅疑いなし（2日連続でカタログから消えた/実疎通が失敗し続けたモデルはありません）');
   } else {
     for (const a of healthAlerts) {
+      // ★2026-09-28: 「N日連続」の根拠を併記する（since=初回失敗日）。
+      //  数字だけだと、それが回数なのか日数なのか読む側に判別できない
+      //  （実際に「回数」を「日数」と表示していた期間があった＝bumpFailStreak のコメント参照）。
+      const since = a.firstFailDate ? `・初回 ${a.firstFailDate}` : '';
       if (a.kind === 'live') {
-        lines.push(`- ⚠ ${a.label}: 実疎通${a.streak}日連続失敗（${a.liveKind}）。応答: ${a.snippet}。要確認 → 外すなら会議へ`);
+        lines.push(`- ⚠ ${a.label}: 実疎通${a.streak}日連続失敗（${a.liveKind}${since}）。応答: ${a.snippet}。要確認 → 外すなら会議へ`);
       } else {
-        lines.push(`- ⚠ ${a.label}: カタログから${a.streak}日連続消滅。プローブ ${a.probeStatus}。要確認 → 外すなら会議へ`);
+        lines.push(`- ⚠ ${a.label}: カタログから${a.streak}日連続消滅${since}。プローブ ${a.probeStatus}。要確認 → 外すなら会議へ`);
       }
     }
   }
