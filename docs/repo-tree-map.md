@@ -213,33 +213,37 @@ graph LR
   f40 --> f40_0["lib/liveGiftPulse.js"]
   f40 --> f40_1["extension/live-ranking-entry.js"]
   f40 --> f40_2["live/index.html"]
-  HUB --> f41["ランキング(/live/)ホバーで直近の発言"]
-  f41 --> f41_0["live-recent-comments.js"]
-  f41 --> f41_1["server/nicoliveGuest.js"]
-  f41 --> f41_2["lib/liveRecentHoverCard.js"]
-  f41 --> f41_3["extension/live-ranking-entry.js"]
-  f41 --> f41_4["live/index.html"]
-  HUB --> f42["ランキング(/live/)の配信ごと OGP"]
-  f42 --> f42_0["live-og.js"]
-  f42 --> f42_1["live-og-image.js"]
-  f42 --> f42_2["lib/liveOgHtml.js"]
-  f42 --> f42_3["lib/liveOgStats.js"]
-  f42 --> f42_4["lib/liveRankingView.js"]
-  f42 --> f42_5["live-og-bake.mjs"]
-  f42 --> f42_6["og-live-compose.py"]
-  f42 --> f42_7["workflows/live-ranking.yml"]
-  f42 --> f42_8[""]
-  HUB --> f43["dist 鮮度ゲート(buildId無限差分ループ根治)"]
-  f43 --> f43_0["lib/distFingerprint.js"]
-  f43 --> f43_1["check-dist-fresh.mjs"]
-  f43 --> f43_2["build.mjs"]
-  f43 --> f43_3["pre-push"]
-  f43 --> f43_4["pre-commit"]
-  HUB --> f44["横断応援者ランキング(デバイス内・段B)"]
-  f44 --> f44_0["lib/crossSupporterRanking.js"]
-  f44 --> f44_1["lib/commenterHistoricalAnalytics.js"]
-  f44 --> f44_2["lib/supporterRanking.js"]
-  f44 --> f44_3["lib/marketingChartsHtml.js"]
+  HUB --> f41["ランキング(/live/)4段アイコン列"]
+  f41 --> f41_0["lib/liveLaneBuckets.js"]
+  f41 --> f41_1["extension/live-ranking-entry.js"]
+  f41 --> f41_2["live/index.html"]
+  HUB --> f42["ランキング(/live/)ホバーで直近の発言"]
+  f42 --> f42_0["live-recent-comments.js"]
+  f42 --> f42_1["server/nicoliveGuest.js"]
+  f42 --> f42_2["lib/liveRecentHoverCard.js"]
+  f42 --> f42_3["extension/live-ranking-entry.js"]
+  f42 --> f42_4["live/index.html"]
+  HUB --> f43["ランキング(/live/)の配信ごと OGP"]
+  f43 --> f43_0["live-og.js"]
+  f43 --> f43_1["live-og-image.js"]
+  f43 --> f43_2["lib/liveOgHtml.js"]
+  f43 --> f43_3["lib/liveOgStats.js"]
+  f43 --> f43_4["lib/liveRankingView.js"]
+  f43 --> f43_5["live-og-bake.mjs"]
+  f43 --> f43_6["og-live-compose.py"]
+  f43 --> f43_7["workflows/live-ranking.yml"]
+  f43 --> f43_8[""]
+  HUB --> f44["dist 鮮度ゲート(buildId無限差分ループ根治)"]
+  f44 --> f44_0["lib/distFingerprint.js"]
+  f44 --> f44_1["check-dist-fresh.mjs"]
+  f44 --> f44_2["build.mjs"]
+  f44 --> f44_3["pre-push"]
+  f44 --> f44_4["pre-commit"]
+  HUB --> f45["横断応援者ランキング(デバイス内・段B)"]
+  f45 --> f45_0["lib/crossSupporterRanking.js"]
+  f45 --> f45_1["lib/commenterHistoricalAnalytics.js"]
+  f45 --> f45_2["lib/supporterRanking.js"]
+  f45 --> f45_3["lib/marketingChartsHtml.js"]
 ```
 
 ---
@@ -314,14 +318,14 @@ graph LR
 - `soundeffect-lab/`（19 件） — 効果音ラボ由来の素材候補(採否検討用)  〔音声 / 素材〕
 
 ## `src/` — LP 側 + 純粋関数ライブラリの源  〔ソース〕
-<sub>ファイル 1853 件</sub>
+<sub>ファイル 1856 件</sub>
 
 - `data/`（7 件） — 保存コメントからレーン候補を読む acquirer / source 層  〔コメント / 取得〕
 - `domain/`（20 件） — ドメイン正本(応援レーンの集約・列ポリシー等。識別子判定など)  〔応援 / 集約 / 識別子〕
 - `extension/`（56 件） — バンドル entry(content/popup/venue/status/offscreen/backfill-sw 等=機能境界)  〔entry / 記録 / 会場 / 応援〕
 - `fixtures/`（1 件） — テスト用フィクスチャ  〔テスト〕
 - `images/`（134 件） — LP / CWS 提出物のマスター画像  〔画像〕
-- `lib/`（1623 件） — 純粋関数ライブラリ(unit test 対象)。色・速度・コメント・レポート等の計算ロジックの大半  〔色 / 速度 / コメント / レポート / 純粋関数〕
+- `lib/`（1626 件） — 純粋関数ライブラリ(unit test 対象)。色・速度・コメント・レポート等の計算ロジックの大半  〔色 / 速度 / コメント / レポート / 純粋関数〕
 - `server/`（2 件） — Node 側 I/O 部品(fetch/WebSocket を実際に叩く。api と scripts が共用。lib には置けない)  〔API / 公開 / ランキング〕
 - `shared/`（7 件） — 複数機能で共有する小部品(アバター URL ガード等)  〔共有 / アバター〕
 - `sound/`（1 件） — 音声素材(src 側)  〔音声〕
@@ -606,6 +610,13 @@ esbuild の import 到達グラフを逆引きし「このファイルを変え�
 公開ギフト順位表を前回の取得と引き算し、増えた数値 uid の行だけに「+Npt」と帯色を表示。ギフト列見出しにも合計増分を添える。15分超の間隔・匿名行・新規ランクインは差分を発明せず静かに除外する
 
 - [`src/lib/liveGiftPulse.js`](../src/lib/liveGiftPulse.js)
+- [`src/extension/live-ranking-entry.js`](../src/extension/live-ranking-entry.js)
+- [`tsuioku-no-kirameki/live/index.html`](../tsuioku-no-kirameki/live/index.html)
+
+### ランキング(/live/)4段アイコン列  〔LP / 公開 / ランキング / 応援 / 表示〕
+既存のサムネ付き段・名前段にギフト段と匿名コメント段を加え、公開順位表とコメント集計を4段のアイコン列として表示する。段ごとの人数・名無し人数・匿名の超過人数を正直に示し、同じ uid は段ごとの追跡器で入場/増分を控えめに知らせる
+
+- [`src/lib/liveLaneBuckets.js`](../src/lib/liveLaneBuckets.js)
 - [`src/extension/live-ranking-entry.js`](../src/extension/live-ranking-entry.js)
 - [`tsuioku-no-kirameki/live/index.html`](../tsuioku-no-kirameki/live/index.html)
 

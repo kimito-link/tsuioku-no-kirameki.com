@@ -12,12 +12,13 @@
 import { escapeHtml as esc, safeHttpUrl, formatNumberJa as num } from '../lib/htmlText.js';
 import {
   watchUrlOf, jstClock, elapsedText, freshness, estimateConcurrentForLive, sortByEstimatedConcurrent,
-  cacheBust, supporterRows, identifiedSupporters, identifiedSupportersByName, commentRows, isBlankIcon, createRowChangeTracker, rowKey,
+  cacheBust, supporterRows, commentRows, isBlankIcon, createRowChangeTracker, rowKey,
   LIVE_ID_RE, pinLiveFirst, liveShareText
 } from '../lib/liveRankingView.js';
 import { buildXIntentUrl } from '../lib/xIntentUrl.js';
 import { buildRecentCardHtml } from '../lib/liveRecentHoverCard.js';
 import { createGiftPulseRegistry, pulseRowKey, formatPtDelta, spanText } from '../lib/liveGiftPulse.js';
+import { laneBuckets, laneTileKey, laneMoreText, LANES } from '../lib/liveLaneBuckets.js';
 
 const elList = /** @type {HTMLElement} */ (document.getElementById('list'));
 const elMeta = /** @type {HTMLElement} */ (document.getElementById('meta'));
@@ -36,6 +37,7 @@ const FACE = {
 
 const tracker = createRowChangeTracker();
 const giftPulse = createGiftPulseRegistry();
+const laneTracker = createRowChangeTracker();
 
 /** 本体(Chrome 拡張)のストア URL。★LP index.html と同じ ID(AGENTS.md §2 の拡張 ID)。 */
 const STORE_URL = 'https://chromewebstore.google.com/detail/cjbabignmmodaickpeckiojjabnlogdb';
@@ -69,51 +71,46 @@ function shareHref(l) {
   return buildXIntentUrl({ text: liveShareText(l), url, hashtags: SHARE_HASHTAGS });
 }
 
-/**
- * ★「サムネ付きで応援した人」の枠(2026-09-14 ユーザー要望・全配信に出す)。
- *   数値ユーザーID と個人サムネの両方が揃った人だけ(判定は liveRankingView.identifiedSupporters)。
- *   サイドパネルの「アイコン列」と同じ考え方で、サムネ・名前・ID・リンクをセットで出す(AGENTS.md §3.5)。
- *
- *   ★2026-09-25 ユーザー要望「サムネ付きは全部拾って、そのあとにハンドルネームのみも入れる」。
- *   第2段(namedPeople)はコメントだけで応援した人のうち、サムネは無いが強い表示名がある人
- *   (判定は liveRankingView.identifiedSupportersByName)。サムネフィールドを持たない型
- *   (NamedSupporter)なので、ここでも avatar を参照しない(=推測URLを本物のサムネとして
- *   出さない・AGENTS.md §3.6)。
- * @param {import('../lib/liveRankingView.js').IdentifiedSupporter[]} people
- * @param {import('../lib/liveRankingView.js').NamedSupporter[]} namedPeople
- */
-function renderKnown(people, namedPeople) {
-  const head = `<h3><img src="${esc(FACE.linkSmile)}" alt="" loading="lazy" decoding="async">サムネ付きで応援した人 `
-    + `<span class="cnt">${people.length}人</span><span class="hint">数値ID＋個人サムネが揃った人</span></h3>`;
-  const thumbBlock = people.length
-    ? `<ul class="tiles">${people.map((p) => {
-        const pts = (p.giftPt ? `🎁${num(p.giftPt)}` : '') + (p.giftPt && p.adPt ? ' ' : '') + (p.adPt ? `📣${num(p.adPt)}` : '');
-        return `<li><a class="tile" href="${esc(p.url)}" target="_blank" rel="noopener noreferrer" title="${esc(p.name)}（ID ${esc(p.uid)}）">`
-          + `<img class="tava" src="${esc(p.avatar)}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer">`
-          + `<span class="tname">${esc(p.name)}</span><span class="tid">${esc(p.uid)}</span><span class="tpt">${esc(pts)}</span></a></li>`;
-      }).join('')}</ul>`
-    : `<p class="empty"><img src="${esc(FACE.linkBlink)}" alt="" loading="lazy" decoding="async">まだいません（ID と個人サムネが両方揃った人だけ載ります）</p>`;
+/** @param {import('../lib/liveLaneBuckets.js').LaneTile} t @param {string} cls @param {string} hoverAttr */
+function tileHtml(t, cls, hoverAttr) {
+  const img = t.identicon
+    ? `<img class="tava-identicon" src="${esc(t.avatar)}" alt="" loading="lazy" decoding="async">`
+    : `<img class="tava" src="${esc(t.avatar)}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer">`;
+  const body = `${img}<span class="tname">${esc(t.name)}</span><span class="tid">${esc(t.url ? t.uid : '')}</span><span class="tpt">${esc(t.pts)}</span>`;
+  const a = t.url
+    ? `<a class="tile${t.identicon ? ' tile-identicon' : ''}" href="${esc(t.url)}" target="_blank" rel="noopener noreferrer" title="${esc(t.name)}（ID ${esc(t.uid)}）">${body}</a>`
+    : `<span class="tile tile-identicon tile-anon" title="${esc(t.name)}">${body}</span>`;
+  return `<li${cls ? ` class="${cls}"` : ''}${hoverAttr}>${a}</li>`;
+}
 
-  const namedHead = namedPeople.length
-    ? `<h3 class="named"><img src="${esc(FACE.linkNormal)}" alt="" loading="lazy" decoding="async">ハンドルネームで応援した人 `
-      + `<span class="cnt">${namedPeople.length}人</span><span class="hint">サムネ未確定・名前は分かる人</span></h3>`
-      + `<ul class="tiles tiles-named">${namedPeople.map((p) => {
-          // ★2026-09-25: gift/ad/comment の合算内訳を「サムネ付き」と同じ書式(🎁 📣 💬)で見せる
-          //   (どの経路で応援したかが一目で分かるように。ユーザー確定の方針)。
-          const pts = (p.giftPt ? `🎁${num(p.giftPt)}` : '')
-            + (p.giftPt && p.adPt ? ' ' : '') + (p.adPt ? `📣${num(p.adPt)}` : '')
-            + ((p.giftPt || p.adPt) && p.commentCount ? ' ' : '') + (p.commentCount ? `💬${num(p.commentCount)}` : '');
-          // ★avatar は data:image/svg+xml(anonymousIdenticonDataUrl)で、読み込み失敗が原理上
-          //   起きないため、bindImgFallback の対象(img.tava)には含めない専用クラス
-          //   (tava-identicon)にする。「サムネ付き」枠(tava)と誤って同じ扱いにされ、
-          //   万一エラーが起きた場合に行ごと消えてしまう事故を防ぐ。
-          return `<li><a class="tile tile-identicon" href="${esc(p.url)}" target="_blank" rel="noopener noreferrer" title="${esc(p.name)}（ID ${esc(p.uid)}）">`
-            + `<img class="tava-identicon" src="${esc(p.avatar)}" alt="" loading="lazy" decoding="async">`
-            + `<span class="tname">${esc(p.name)}</span><span class="tid">${esc(p.uid)}</span><span class="tpt">${esc(pts)}</span></a></li>`;
-        }).join('')}</ul>`
-    : '';
+const LANE_HEAD = {
+  link: { face: FACE.linkSmile, label: 'サムネ付きで応援した人', hint: '数値ID＋個人サムネが揃った人' },
+  konta: { face: FACE.kontaSmile, label: '名前で応援した人', hint: 'サムネ未確定・名前は分かる人' },
+  gift: { face: FACE.kontaHalf, label: 'ギフトを投げた人', hint: 'ニコ生公開の上位10人' },
+  tanu: { face: FACE.tanuNormal, label: '匿名で応援した人', hint: '匿名（184）のコメント。番組内だけの番号と似顔絵' }
+};
 
-  return `<div class="known">${head}${thumbBlock}${namedHead}</div>`;
+/** @param {import('../lib/liveLaneBuckets.js').LaneBuckets} b @param {string} liveId @param {import('../lib/liveGiftPulse.js').PulseResult} gp */
+function renderLanes(b, liveId, gp) {
+  const pick = '';
+  return `<div class="lanes">${LANES.map((lane) => {
+    const tiles = b[lane];
+    const h = LANE_HEAD[lane];
+    const cnt = lane === 'tanu' ? `${num(b.counts.tanu)}人` : `${num(tiles.length)}人`;
+    const more = laneMoreText(lane, b.counts);
+    const hint = lane === 'tanu' && b.counts.partial ? `${h.hint}・直近ぶん` : h.hint;
+    const head = `<h3 class="lane-${lane}"><img src="${esc(h.face)}" alt="" loading="lazy" decoding="async">${esc(h.label)} `
+      + `<span class="cnt">${cnt}</span>${more ? `<span class="lane-more">${esc(more)}</span>` : ''}<span class="hint">${esc(hint)}</span>`
+      + (lane === 'gift' ? pick : '') + '</h3>';
+    if (!tiles.length) return head;
+    return head + `<ul class="tiles">${tiles.map((t) => {
+      const rp = lane === 'gift' && gp ? gp.byKey.get(`u:${t.uid}`) : undefined;
+      const cls = [laneTracker.classFor(laneTileKey(liveId, lane, t), t.point), rp ? `is-gifted tier-${rp.tier}` : ''].filter(Boolean).join(' ');
+      const hoverAttr = t.hover ? ` data-uid="${esc(t.uid)}" data-lv="${esc(liveId)}"` : '';
+      const tile = tileHtml({ ...t, pts: rp ? `${t.pts} ${formatPtDelta(rp.delta)}` : t.pts }, cls, hoverAttr);
+      return tile;
+    }).join('')}</ul>`;
+  }).join('')}</div>`;
 }
 
 /** 空のときに出す顔。★3 枠目(コメント)はりんく。 */
@@ -280,9 +277,11 @@ function render(data) {
 
   tracker.begin();
   giftPulse.begin();
+  laneTracker.begin();
   elList.innerHTML = ordered.map((l, i) => {
     const rows = supporterRows(l);
     const gp = giftPulse.pulseFor(l.liveId, rows.gift, data.capturedAt);
+    const buckets = laneBuckets(l);
     const sx = shareHref(l);
     return '<section class="live">'
       + renderHead(l, i + 1, data.capturedAt, nowMs)
@@ -298,7 +297,7 @@ function render(data) {
       + (sx ? `<a class="share-x" href="${esc(sx)}" target="_blank" rel="noopener noreferrer" title="X（旧 Twitter）の投稿画面が新しいタブで開くだけよ。押したことも含めて、当サイトは何も記録しないわ">X でシェア</a>` : '')
       + '</span>'
       + '</div>'
-      + renderKnown(identifiedSupporters(l), identifiedSupportersByName(l))
+      + renderLanes(buckets, l.liveId, gp)
       + '<div class="cols">'
       + `<div class="col"><h3><img src="${esc(FACE.kontaSmile)}" alt="" loading="lazy" decoding="async">ギフトで支えた人 <span class="sum">${num(l.giftTotal)}pt${gp.sum > 0 ? ` <span class="sum-delta">${esc(formatPtDelta(gp.sum))}</span>` : ''}</span></h3>${renderRows(rows.gift, l.liveId, 'gift', gp)}</div>`
       + `<div class="col"><h3><img src="${esc(FACE.tanuNormal)}" alt="" loading="lazy" decoding="async">広告で支えた人 <span class="sum">${num(l.adTotal)}pt</span></h3>${renderRows(rows.ad, l.liveId, 'ad')}</div>`
@@ -307,6 +306,7 @@ function render(data) {
   }).join('');
   tracker.end();
   giftPulse.end();
+  laneTracker.end();
   bindImgFallback(elList);
 }
 
