@@ -435,6 +435,12 @@ kokenが無認証で公開している順位表の値とその差(公開情報)�
 > 6版がかりで根治したちらつきの歴史を持つ・ユーザー証言「動きが遅かったりうまくいって
 > なかった」)を受けての追加裁定。MEMORY `story-userlane-churn-filllanetier-v1039.md` /
 > `rank-lane-freshness-churn-v1038.md`を再読して裏取り済み。
+>
+> ★2026-09-27追記(3回目のcouncil-fable): ユーザーが改めて「拡張の会場参加者画面を
+> ほぼそのまま`/live/`で再現したい」と要望し、この裁定のうち**「構造(4段の考え方)を
+> 移植しない」という部分は覆した**。一方「実装(3秒poll・2段paint・fillLaneTier)は
+> 移植しない」という結論は3回目でも維持している。詳細は
+> [`live-lane-buckets-DESIGN.md`](live-lane-buckets-DESIGN.md)を参照。
 
 **裁定: 推奨しない。理由は取得元の規約ではなく、性能・実装リスク。**
 
