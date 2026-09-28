@@ -196,7 +196,7 @@
     - `2026-09-23.md`
     - `2026-09-26.md`
     - `2026-09-28.md`
-- 📁 **docs/** (329)
+- 📁 **docs/** (331)
   - 📁 **article-assets/** (87)
     - 📁 **venue-frames/** (12)
       - `f01.png`
@@ -515,6 +515,8 @@
   - `live-comment-motion-IMPLEMENTATION-HANDOFF.md`
   - `live-gift-pulse-DESIGN.md`
   - `live-gift-pulse-IMPLEMENTATION-HANDOFF.md`
+  - `live-hover-card-latency-DESIGN.md`
+  - `live-hover-card-latency-IMPLEMENTATION-HANDOFF.md`
   - `live-lane-buckets-DESIGN.md`
   - `live-lane-buckets-IMPLEMENTATION-HANDOFF.md`
   - `llm-handoff-inline-panel-current-state.md`
