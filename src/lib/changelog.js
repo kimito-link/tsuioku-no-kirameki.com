@@ -18,6 +18,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1551',
+    date: '2026-09-28',
+    summary: '/live/ 発言カードの先読みを配信ホバーに拡大',
+    items: Object.freeze([
+      'ライブビュー(/live/)の配信カードに少し滞在すると、直近発言カードの取得を先に始めるようにしました。取得中の応答も自動再試行し、名前へ移ったときにすぐ表示しやすくなります。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1550',
     date: '2026-09-28',
     summary: '/live/ 応援者を4段のアイコン列で表示',
