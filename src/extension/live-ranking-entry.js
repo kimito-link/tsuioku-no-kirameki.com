@@ -255,6 +255,7 @@ function renderHead(l, rankNo, capturedAt, nowMs) {
 
 /** @param {any} data /api/live-ranking の応答 */
 function render(data) {
+  _lastData = data;
   const lives = (data && Array.isArray(data.lives)) ? data.lives : [];
   if (!lives.length) {
     elMeta.innerHTML = `<img class="face" src="${esc(FACE.tanuHalf)}" alt="">いま表示できる配信がありません。`;
@@ -283,7 +284,7 @@ function render(data) {
     const gp = giftPulse.pulseFor(l.liveId, rows.gift, data.capturedAt);
     const buckets = laneBuckets(l);
     const sx = shareHref(l);
-    return '<section class="live">'
+    return `<section class="live" data-lv="${esc(l.liveId)}">`
       + renderHead(l, i + 1, data.capturedAt, nowMs)
       + '<div class="stats">'
       + `<span>👥 来場 <b>${num(l.watchCount)}</b></span>`
@@ -330,6 +331,18 @@ const elCountdown = /** @type {HTMLElement|null} */ (document.getElementById('re
 let _loading = false;
 let _nextAutoAt = Date.now() + AUTO_REFRESH_MS;
 let _lastCapturedAt = 0;
+/** @type {any|null} 最新の /api/live-ranking 応答。dwell 先読みの uid 解決に使う。 */
+let _lastData = null;
+
+const PREWARM_DWELL_MS = 400;
+const PREWARM_TTL_MS = 60000;
+/** @type {Map<string, number>} lv → 先読みを投げた時刻 */
+const _prewarmedAt = new Map();
+/** @type {ReturnType<typeof setTimeout>|null} */
+let _dwellTimer = null;
+/** @type {HTMLElement|null} */
+let _dwellSection = null;
+let _prewarmBusy = false;
 
 /** @param {boolean} busy */
 function setBusy(busy) {
@@ -365,14 +378,23 @@ function load(opts) {
  *   ページを開いた【最初の 1 回だけ】、いま見えている上位数配信の代表 uid で
  *   /api/live-recent-comments を投げ、サーバのメモリキャッシュ(60 秒)を温める。
  *   ★60 秒ごとの再読み込みでは温め直さない=視聴WS 握手(来場者+1)を増やさない。
- *   ★本文は保存しない(現行と同じエンドポイントを叩くだけ・privacy §14)。応答は捨てる。
+ *   ★本文は保存しない(現行と同じエンドポイントを叩くだけ・privacy §14)。応答はページ内キャッシュへ入れる。
  *   会議の裁定=council/hover-latency-SYNTHESIS.md(先読み上位3・逐次・スケルトン併用)。
  * @param {any} data 収集ペイロード
  */
 let _didPrewarm = false;
+/** @param {string} lv @returns {string} */
+function firstRankerUidOf(lv) {
+  const lives = _lastData && Array.isArray(_lastData.lives) ? _lastData.lives : [];
+  const live = lives.find((/** @type {any} */ l) => String((l && l.liveId) || '').trim() === lv);
+  const rankers = live && live.comment && Array.isArray(live.comment.rankers) ? live.comment.rankers : [];
+  return rankers[0] ? String(rankers[0].uid || '').trim() : '';
+}
+
 async function prewarmRecent(/** @type {any} */ data) {
   if (_didPrewarm) return;
   _didPrewarm = true;
+  _prewarmBusy = true;
   try {
     const lives = data && Array.isArray(data.lives) ? data.lives : [];
     // 画面と同じ並び(賑わい順・pin 先頭)の上位 3 配信だけ温める。
@@ -385,17 +407,18 @@ async function prewarmRecent(/** @type {any} */ data) {
         ? String(l.comment.rankers[0].uid || '').trim()
         : '';
       if (!lv || !uid) continue;
+      const cached = _recentCache.get(lv);
+      if (cached && Date.now() - cached.at < HOVER_CACHE_TTL_MS) continue;
+      const prewarmedAt = _prewarmedAt.get(lv);
+      if (prewarmedAt && Date.now() - prewarmedAt < PREWARM_TTL_MS) continue;
+      _prewarmedAt.set(lv, Date.now());
       try {
-        // 逐次(並列にしない=Vercel Hobby の同時実行を圧迫しない)。応答は捨てる=キャッシュが温まるのが目的。
-        await fetch('/api/live-recent-comments', {
-          method: 'POST',
-          headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ lv, uid }),
-          cache: 'no-store'
-        });
+        // 逐次(並列にしない=Vercel Hobby の同時実行を圧迫しない)。応答はページ内キャッシュへ入れる。
+        await fetchRecentInto(lv, uid, null);
       } catch { /* 温めの失敗は無視(ホバー時に通常取得へフォールバック) */ }
     }
   } catch { /* 先読み全体の失敗は無視 */ }
+  finally { _prewarmBusy = false; }
 }
 
 function tickCountdown() {
@@ -432,6 +455,8 @@ document.addEventListener('visibilitychange', () => { if (!document.hidden) load
  */
 const HOVER_DELAY_MS = 250;
 const HOVER_CACHE_TTL_MS = 60000;
+const RECENT_RETRY_MS = 800;
+const RECENT_RETRY_MAX = 12;
 /** @type {Map<string, { at: number, byUid: Record<string, string[]>, partial: boolean }>} lv 単位の短命キャッシュ。 */
 const _recentCache = new Map();
 /** @type {HTMLElement|null} 使い回すカード要素。 */
@@ -484,10 +509,36 @@ function hideCard() {
 }
 
 /**
- * その人の直近発言を取得してカードに出す。
- * @param {HTMLElement} li @param {string} lv @param {string} uid
+ * 直近発言 API を取得し、成功時は lv 単位のページ内キャッシュへ格納する。
+ * @param {string} lv
+ * @param {string} uid
+ * @param {AbortSignal|null} signal
+ * @returns {Promise<{status: number, rec: {at: number, byUid: Record<string, string[]>, partial: boolean}|null}>}
  */
-async function requestRecent(li, lv, uid) {
+async function fetchRecentInto(lv, uid, signal) {
+  const resp = await fetch('/api/live-recent-comments', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ lv, uid }),
+    cache: 'no-store',
+    signal: signal || undefined
+  });
+  /** @type {{status: number, rec: {at: number, byUid: Record<string, string[]>, partial: boolean}|null}} */
+  const result = { status: resp.status, rec: null };
+  if (!resp.ok) return result;
+  let data = null;
+  try { data = await resp.json(); } catch { data = null; }
+  if (!data || !data.ok || !data.byUid || typeof data.byUid !== 'object') return result;
+  const rec = { at: Date.now(), byUid: data.byUid, partial: !!data.partial };
+  _recentCache.set(lv, rec);
+  return { status: resp.status, rec };
+}
+
+/**
+ * その人の直近発言を取得してカードに出す。
+ * @param {HTMLElement} li @param {string} lv @param {string} uid @param {number} [attempt]
+ */
+async function requestRecent(li, lv, uid, attempt = 0) {
   const cached = _recentCache.get(lv);
   if (cached && Date.now() - cached.at < HOVER_CACHE_TTL_MS) {
     renderRecentCard(li, cached, uid);
@@ -496,32 +547,24 @@ async function requestRecent(li, lv, uid) {
   showCardFor(li, buildRecentCardHtml({ phase: 'loading' }));
   const ac = new AbortController();
   _hoverAbort = ac;
-  let resp;
+  let result;
   try {
-    resp = await fetch('/api/live-recent-comments', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ lv, uid }),
-      cache: 'no-store',
-      signal: ac.signal
-    });
+    result = await fetchRecentInto(lv, uid, ac.signal);
   } catch {
     if (_hoverLi === li) showCardFor(li, buildRecentCardHtml({ phase: 'error' }));
     return;
   }
   if (_hoverLi !== li) return; // ホバーが別の行へ移った/離れた。
-  if (resp.status === 501) { showCardFor(li, buildRecentCardHtml({ phase: 'unsupported' })); return; }
-  if (resp.status === 410) { showCardFor(li, buildRecentCardHtml({ phase: 'empty' })); return; }
-  if (resp.status === 202) { showCardFor(li, buildRecentCardHtml({ phase: 'loading' })); return; }
-  if (!resp.ok) { showCardFor(li, buildRecentCardHtml({ phase: 'error' })); return; }
-  let data = null;
-  try { data = await resp.json(); } catch { data = null; }
-  if (!data || !data.ok || !data.byUid || typeof data.byUid !== 'object') {
-    if (_hoverLi === li) showCardFor(li, buildRecentCardHtml({ phase: 'error' }));
+  if (result.status === 501) { showCardFor(li, buildRecentCardHtml({ phase: 'unsupported' })); return; }
+  if (result.status === 410) { showCardFor(li, buildRecentCardHtml({ phase: 'empty' })); return; }
+  if (result.status === 202) {
+    if (attempt >= RECENT_RETRY_MAX) { showCardFor(li, buildRecentCardHtml({ phase: 'error' })); return; }
+    showCardFor(li, buildRecentCardHtml({ phase: 'loading' }));
+    _hoverTimer = setTimeout(() => { if (_hoverLi === li) requestRecent(li, lv, uid, attempt + 1); }, RECENT_RETRY_MS);
     return;
   }
-  const rec = { at: Date.now(), byUid: data.byUid, partial: !!data.partial };
-  _recentCache.set(lv, rec);
+  if (!result.rec) { showCardFor(li, buildRecentCardHtml({ phase: 'error' })); return; }
+  const rec = result.rec;
   if (_hoverLi === li) renderRecentCard(li, rec, uid);
 }
 
@@ -538,6 +581,47 @@ function renderRecentCard(li, rec, uid) {
     : buildRecentCardHtml({ phase: 'empty' });
   showCardFor(li, html);
 }
+
+/** @param {string} lv */
+async function prewarmOne(lv) {
+  const key = String(lv || '').trim();
+  if (!key) return;
+  const now = Date.now();
+  const cached = _recentCache.get(key);
+  if (cached && now - cached.at < HOVER_CACHE_TTL_MS) return;
+  const at = _prewarmedAt.get(key);
+  if (at && now - at < PREWARM_TTL_MS) return;
+  if (_prewarmBusy) return;
+  const uid = firstRankerUidOf(key);
+  if (!uid) return;
+  _prewarmedAt.set(key, Date.now());
+  _prewarmBusy = true;
+  try { await fetchRecentInto(key, uid, null); } catch { /* ホバー時に通常取得へフォールバック */ }
+  finally { _prewarmBusy = false; }
+}
+
+elList.addEventListener('mouseover', (ev) => {
+  const t = /** @type {HTMLElement} */ (ev.target);
+  const sec = /** @type {HTMLElement|null} */ (t && t.closest ? t.closest('section.live[data-lv]') : null);
+  if (!sec || sec === _dwellSection) return;
+  if (_dwellTimer) { clearTimeout(_dwellTimer); _dwellTimer = null; }
+  _dwellSection = sec;
+  const lv = String(sec.getAttribute('data-lv') || '').trim();
+  _dwellTimer = setTimeout(() => {
+    _dwellTimer = null;
+    if (_dwellSection !== sec || !sec.isConnected) return;
+    void prewarmOne(lv);
+  }, PREWARM_DWELL_MS);
+});
+
+elList.addEventListener('mouseout', (ev) => {
+  const rel = /** @type {HTMLElement|null} */ (ev.relatedTarget);
+  if (_dwellSection && !_dwellSection.contains(rel)) {
+    if (_dwellTimer) clearTimeout(_dwellTimer);
+    _dwellTimer = null;
+    _dwellSection = null;
+  }
+});
 
 elList.addEventListener('mouseover', (ev) => {
   const t = /** @type {HTMLElement} */ (ev.target);

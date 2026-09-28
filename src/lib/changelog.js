@@ -18,6 +18,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1551',
+    date: '2026-09-28',
+    summary: '/live/ 発言カードの先読みを配信ホバーに拡大',
+    items: Object.freeze([
+      'ライブビュー(/live/)の配信カードに少し滞在すると、直近発言カードの取得を先に始めるようにしました。取得中の応答も自動再試行し、名前へ移ったときにすぐ表示しやすくなります。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1550',
     date: '2026-09-28',
     summary: '/live/ 応援者を4段のアイコン列で表示',
@@ -168,14 +176,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     summary: 'パネルの一瞬黒とレーンのちらつきを修正',
     items: Object.freeze([
       'サイドパネルを開いた瞬間に一瞬黒くなることがあったのを直しました(背景の地色を必ず敷くようにしました)。また、応援レーンのアイコンが開いた直後に一瞬減って見えるちらつきを、描画のもとを一本化して抑えました(内部改善・見た目の安定)。'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.1529',
-    date: '2026-09-20',
-    summary: '拡張の識別子を固定し反映を安定化',
-    items: Object.freeze([
-      '拡張の内部識別子を固定しました。これまで読み込むフォルダの場所によって識別子が変わり、記録の紐づけが不安定になる・更新のたびに固まることがありました。識別子を固定したことで、フォルダを移動しても記録が保たれ、反映も安定します(内部改善・体感は変わりません)。'
     ])
   })
 ]);
