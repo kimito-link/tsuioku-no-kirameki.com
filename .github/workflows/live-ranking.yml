@@ -124,7 +124,7 @@ jobs:
         run: pip install pillow
       - name: フォント（BIZ UDGothic Bold）を取得（キャッシュ）
         id: font
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: .cache/fonts/BIZUDGothic-Bold.ttf
           # ★key に URL を入れて、URL が変われば取り直す。
