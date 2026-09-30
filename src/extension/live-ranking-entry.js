@@ -19,7 +19,10 @@ import { buildXIntentUrl } from '../lib/xIntentUrl.js';
 import { buildRecentCardHtml } from '../lib/liveRecentHoverCard.js';
 import { createGiftPulseRegistry, pulseRowKey, formatPtDelta, spanText } from '../lib/liveGiftPulse.js';
 import { laneBuckets, laneTileKey, laneMoreText, LANES } from '../lib/liveLaneBuckets.js';
-import { createMotionRegistry, sampleFromLive, lifetimeCommentRatePerMin, pulseIntervalMs, pulseIsBand, formatRatePerMin } from '../lib/liveMotion.js';
+import {
+  createMotionRegistry, sampleFromLive, lifetimeCommentRatePerMin, pulseIntervalMs, pulseIsBand, formatRatePerMin,
+  createSupporterFeedRegistry, supporterChipsFromLive
+} from '../lib/liveMotion.js';
 
 const elList = /** @type {HTMLElement} */ (document.getElementById('list'));
 const elMeta = /** @type {HTMLElement} */ (document.getElementById('meta'));
@@ -40,6 +43,7 @@ const tracker = createRowChangeTracker();
 const giftPulse = createGiftPulseRegistry();
 const laneTracker = createRowChangeTracker();
 const motion = createMotionRegistry();
+const supporterFeeds = createSupporterFeedRegistry();
 
 /** 本体(Chrome 拡張)のストア URL。★LP index.html と同じ ID(AGENTS.md §2 の拡張 ID)。 */
 const STORE_URL = 'https://chromewebstore.google.com/detail/cjbabignmmodaickpeckiojjabnlogdb';
@@ -282,6 +286,7 @@ function render(data) {
   giftPulse.begin();
   laneTracker.begin();
   motion.begin();
+  supporterFeeds.begin();
   const receivedAt = Date.now();
   elList.innerHTML = ordered.map((l, i) => {
     const rows = supporterRows(l);
@@ -289,6 +294,7 @@ function render(data) {
     const buckets = laneBuckets(l);
     const track = motion.trackFor(l.liveId);
     track.push(sampleFromLive(l, data.capturedAt), receivedAt);
+    supporterFeeds.feedFor(l.liveId).fill(supporterChipsFromLive(l));
     const shownComment = track.valueAt('comment', receivedAt);
     const rate0 = track.ratePerMin('comment') ?? lifetimeCommentRatePerMin(l, receivedAt);
     const sx = shareHref(l);
@@ -322,6 +328,7 @@ function render(data) {
   giftPulse.end();
   laneTracker.end();
   motion.end();
+  supporterFeeds.end();
   _motionEls = collectMotionEls();
   bindImgFallback(elList);
 }
@@ -678,11 +685,36 @@ function collectMotionEls() {
   return { counters, rates, lanes };
 }
 
-/** @param {HTMLElement} lane */
-function spawnDot(lane) {
+const KIND_LABEL = { comment: '💬', gift: '🎁', ad: '📣' };
+
+/**
+ * 脈拍レーンに「丸いサムネ＋名前」の1枚を流す。★本文(発言内容)は出さない
+ * (AGENTS.md §3.3・council-fable D-3②)。誰が(名前・サムネ)・何で(💬/🎁/📣)応援したかだけを表す。
+ * @param {HTMLElement} lane @param {import('../lib/liveMotion.js').SupporterChip|null} chip
+ */
+function spawnDot(lane, chip) {
   if (lane.childElementCount >= PULSE_DOTS_MAX_PER_LANE) return;
   const d = document.createElement('i');
   d.className = 'pulse-dot';
+  if (chip) {
+    d.classList.add(`is-${chip.kind}`);
+    d.title = `${KIND_LABEL[chip.kind] || ''} ${chip.name}`;
+    if (chip.avatar) {
+      const img = document.createElement('img');
+      img.className = 'pulse-dot-avatar';
+      img.src = chip.avatar;
+      img.alt = '';
+      img.loading = 'lazy';
+      img.decoding = 'async';
+      // ★外部CDNのサムネはいつか404になる(AGENTS.md §3.6)。読めなければチップごと消す(壊れ画像を流さない)。
+      img.addEventListener('error', () => d.remove(), { once: true });
+      d.appendChild(img);
+    }
+    const label = document.createElement('span');
+    label.className = 'pulse-dot-name';
+    label.textContent = chip.name;
+    d.appendChild(label);
+  }
   d.addEventListener('animationend', () => d.remove(), { once: true });
   lane.appendChild(d);
 }
@@ -707,7 +739,7 @@ function motionFrame(tMs) {
       const iv = pulseIntervalMs(rate);
       if (iv == null || pulseIsBand(rate)) continue;                       // 帯は CSS だけで表す
       if (tMs >= lane.nextAt) {
-        spawnDot(lane.el);
+        spawnDot(lane.el, supporterFeeds.feedFor(id).next());
         lane.nextAt = tMs + iv * (1 + (Math.random() * 2 - 1) * PULSE_JITTER);
       }
     }

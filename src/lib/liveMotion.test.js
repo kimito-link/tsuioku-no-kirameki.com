@@ -4,11 +4,14 @@ import {
   RATE_MAX_GAP_MS,
   createMotionRegistry,
   createMotionTrack,
+  createSupporterFeed,
+  createSupporterFeedRegistry,
   formatRatePerMin,
   lifetimeCommentRatePerMin,
   pulseIntervalMs,
   pulseIsBand,
-  sampleFromLive
+  sampleFromLive,
+  supporterChipsFromLive
 } from './liveMotion.js';
 
 const sample = (at, comment) => ({ at, comment, watch: 0, gift: 0, ad: 0 });
@@ -92,5 +95,72 @@ describe('liveMotion', () => {
   it('capturedAt は timeAuthority 経由で標本化し、不正値は捨てる', () => {
     expect(sampleFromLive({ commentCount: 3 }, '2026-09-30T00:00:00Z')).toMatchObject({ comment: 3 });
     expect(sampleFromLive({ commentCount: 3 }, 'not-a-time')).toBeNull();
+  });
+
+  describe('supporterChipsFromLive(名前+サムネの演出。本文は含めない)', () => {
+    it('comment/gift/ad の順で、名前・サムネ・種別だけを持つ配列にする(本文は無い)', () => {
+      const live = {
+        comment: { rankers: [{ rank: 1, uid: '99', name: 'こめんと太郎', count: 9, anon: false }] },
+        gift: { rankers: [{ rank: 1, supporterId: 111, supporterName: 'ぎふと花子', supporterThumbnailUrl: 'https://img/g.jpg', contribution: 500, userPageUrl: 'https://www.nicovideo.jp/user/111' }] },
+        ad: { ranking: [{ userId: 222, advertiserName: '広告次郎', totalContribution: 100, rank: 1, userPageUrl: 'https://www.nicovideo.jp/user/222', thumbnailUrl: 'https://img/a.jpg' }] }
+      };
+      const chips = supporterChipsFromLive(live);
+      expect(chips.map((c) => c.kind)).toEqual(['comment', 'gift', 'ad']);
+      expect(chips.map((c) => c.name)).toEqual(['こめんと太郎', 'ぎふと花子', '広告次郎']);
+      for (const c of chips) {
+        expect(c.avatar).toBeTruthy(); // ★必ず何かサムネが立つ(ゆっくり顔フォールバック含む)
+        expect(Object.keys(c)).toEqual(['key', 'kind', 'name', 'avatar', 'url']); // ★本文(comment.text等)を含むキーが無い
+      }
+    });
+
+    it('gift/ad のアイコン未設定(blank)は ゆっくり顔 identicon に差し替わる', () => {
+      const live = {
+        gift: { rankers: [{ rank: 1, supporterId: 555, supporterName: 'とろろ', supporterThumbnailUrl: 'https://img/usericon/defaults/blank.jpg', contribution: 200, userPageUrl: 'https://www.nicovideo.jp/user/555' }] }
+      };
+      const [chip] = supporterChipsFromLive(live);
+      expect(chip.avatar).not.toMatch(/defaults\/blank\.jpg/);
+      expect(chip.avatar).toBeTruthy();
+    });
+
+    it('live が null/空でも空配列(例外を投げない)', () => {
+      expect(supporterChipsFromLive(null)).toEqual([]);
+      expect(supporterChipsFromLive({})).toEqual([]);
+    });
+  });
+
+  describe('createSupporterFeed(巡回キュー)', () => {
+    it('候補を順に返し、尽きたら先頭から周回する', () => {
+      const feed = createSupporterFeed();
+      feed.fill([{ key: 'a', kind: 'comment', name: 'A', avatar: '', url: '' }, { key: 'b', kind: 'gift', name: 'B', avatar: '', url: '' }]);
+      expect(feed.next().key).toBe('a');
+      expect(feed.next().key).toBe('b');
+      expect(feed.next().key).toBe('a'); // 周回
+    });
+
+    it('候補が空なら null を返す', () => {
+      const feed = createSupporterFeed();
+      expect(feed.next()).toBeNull();
+    });
+
+    it('fill で候補を差し替えても例外にならない(カーソルは自動で丸められる)', () => {
+      const feed = createSupporterFeed();
+      feed.fill([{ key: 'a', kind: 'comment', name: 'A', avatar: '', url: '' }, { key: 'b', kind: 'gift', name: 'B', avatar: '', url: '' }, { key: 'c', kind: 'ad', name: 'C', avatar: '', url: '' }]);
+      feed.next(); feed.next(); feed.next(); // cursor=3
+      feed.fill([{ key: 'x', kind: 'comment', name: 'X', avatar: '', url: '' }]);
+      expect(feed.next().key).toBe('x'); // 例外にならず先頭から
+    });
+  });
+
+  it('契約8: supporterFeedRegistry.end は今回触らなかった配信を捨てる', () => {
+    const registry = createSupporterFeedRegistry();
+    registry.begin();
+    registry.feedFor('lv-a');
+    registry.feedFor('lv-b');
+    registry.end();
+    expect(registry.size()).toBe(2);
+    registry.begin();
+    registry.feedFor('lv-a');
+    registry.end();
+    expect(registry.size()).toBe(1);
   });
 });

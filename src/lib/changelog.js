@@ -18,6 +18,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1553',
+    date: '2026-09-30',
+    summary: '/live/ 脈拍レーンに応援者の名前とサムネ',
+    items: Object.freeze([
+      'ライブビュー(/live/)の脈拍レーンに、丸いサムネと名前つきのチップを流し「誰が応援したか」が見えるようにしました。コメント本文は表示していません。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1552',
     date: '2026-09-30',
     summary: '/live/ コメント速度の脈拍レーンを追加',
@@ -168,14 +176,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     summary: 'パチンコ風の点滅演出を削除しました',
     items: Object.freeze([
       'リーチ/フィーバーのパチンコ風の点滅・BGM・ボイス演出を削除しました。画面がすっきりし、動作も軽くなります。ギフト・広告の効果音や読み上げは従来どおりです(内部整理を含む)。'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.1531',
-    date: '2026-09-21',
-    summary: 'パネルを開く瞬間の黒帯を修正',
-    items: Object.freeze([
-      'watch を開いた瞬間、パネルの土台が一瞬黒くなることがあったのを直しました(土台に不透明の地色を敷き、下の黒が透けないようにしました)。'
     ])
   })
 ]);

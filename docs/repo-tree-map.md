@@ -244,7 +244,7 @@ graph LR
   f45 --> f45_1["lib/commenterHistoricalAnalytics.js"]
   f45 --> f45_2["lib/supporterRanking.js"]
   f45 --> f45_3["lib/marketingChartsHtml.js"]
-  HUB --> f46["/live/ コメント速度演出"]
+  HUB --> f46["/live/ コメント速度演出・応援者チップ"]
   f46 --> f46_0["lib/liveMotion.js"]
   f46 --> f46_1["extension/live-ranking-entry.js"]
   f46 --> f46_2["live/index.html"]
@@ -663,8 +663,8 @@ pre-pushのbuild再実行でbuildIdタイムスタンプが毎回変わりdist�
 - [`src/lib/supporterRanking.js`](../src/lib/supporterRanking.js)
 - [`src/lib/marketingChartsHtml.js`](../src/lib/marketingChartsHtml.js)
 
-### /live/ コメント速度演出  〔LP / 公開 / ランキング / コメント / 表示〕
-配信カードの番組合計コメント数だけを60秒ごとの実測値の間で線形補間し、実測2点から求めた「+N/分」と脈拍レーンを表示する。個人別順位・コメント本文・細かい時刻データは補間・保存しない
+### /live/ コメント速度演出・応援者チップ  〔LP / 公開 / ランキング / コメント / 表示〕
+配信カードの番組合計コメント数だけを60秒ごとの実測値の間で線形補間し、実測2点から求めた「+N/分」と脈拍レーンを表示する。レーンには既存の応援者一覧(commentRows/supporterRows)から名前・丸サムネ・種別(💬/🎁/📣)だけを巡回キューで流す(本文は一切含めない・AGENTS.md §3.3)。個人別順位・コメント本文・細かい時刻データは補間・保存しない
 
 - [`src/lib/liveMotion.js`](../src/lib/liveMotion.js)
 - [`src/extension/live-ranking-entry.js`](../src/extension/live-ranking-entry.js)
