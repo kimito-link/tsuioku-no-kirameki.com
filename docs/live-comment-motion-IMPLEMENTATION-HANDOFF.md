@@ -3,6 +3,36 @@
 > この1枚だけで着手できる。設計の正本は [`live-comment-motion-DESIGN.md`](live-comment-motion-DESIGN.md)
 > (council-fable手順2、Fable設計・司令塔裏取り済み)。実装はこのハンドオフに従い、疑問があれば
 > DESIGNのA〜Gへ戻って確認する(推測で進めない)。
+>
+> ★2026-09-30追記(司令塔): このハンドオフは2026-09-26時点の`live-ranking-entry.js`
+> (254行)を前提に書かれたが、その後2回・3回・4回目の実装(ギフト増分バッジ・4段
+> アイコン列・発言カード高速化)が入り、同ファイルは現在644行に増えている。
+> **下記「読む順」「着手手順」「転記元の実在パス」の行番号は古い**。実装時は行番号
+> ではなく関数名・変数名(`render`・`tracker`・`giftPulse`・`laneTracker`・`.stats`の
+> 組み立て箇所)を主キーにし、下記「2026-09-30時点の実配線ポイント」を優先すること。
+> DESIGN文書のA〜G(体験フロー・アーキ・具体機構・法的裁定・MVP・捨てた案・地雷)の
+> 内容自体は変わっていない(`liveMotion.js`の純ロジックはそのまま使える)。
+>
+> **2026-09-30時点の実配線ポイント(司令塔が`live-ranking-entry.js`を実際にRead
+> して確認済み)**:
+> - import群は12-21行目。`liveMotion.js`のimportをこのブロックに追加する。
+> - `tracker`(38行)・`giftPulse`(39行)・`laneTracker`(40行)がトップレベルで
+>   生成されている。新しい`motion`インスタンスもこの並びに追加する。
+> - `render(data)`関数は257-312行。`.stats`のHTML組み立ては289-300行
+>   (`👥 来場`・`💬 コメント`・`🎁 ギフト`・`📣 広告`の4つの`<span>`が並ぶ箇所)。
+>   `💬 コメント`のspan(291行)に`data-motion="comment"`と`.rate`要素を追記する。
+> - `tracker.begin()`/`giftPulse.begin()`/`laneTracker.begin()`は279-281行、
+>   対応する`.end()`は308-310行。新しい`motion.begin()`/`motion.end()`もこの並びに
+>   追加する(DESIGN §D-5c③の「begin/endは対で同じ位置に置く」規律を踏襲)。
+> - カードのmapコールバックは282-307行。`supporterRows`・`giftPulse.pulseFor`・
+>   `laneBuckets`の呼び出し(283-285行)と同じ並びに`motion.trackFor(...).push(...)`
+>   を追加する。
+> - ファイル末尾(644行時点)に新しいrAFループ(`motionFrame`)を追加する。既存の
+>   `tickCountdown`(424-429行、`setInterval`で1秒ごと)とは別の仕組み
+>   (`requestAnimationFrame`)なので混同しない。
+> - CSSは`tsuioku-no-kirameki/live/index.html`の`<style>`に追記(4段アイコン列の
+>   `.lanes`ブロック・ギフト増分バッジの`.delta`/`.is-gifted`ブロックが既にあるので、
+>   その近くに追記する)。
 
 ## スコープ(MVPのみ・これ以外は作らない)
 
