@@ -18,6 +18,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1555',
+    date: '2026-09-30',
+    summary: '脈拍レーンが開いた直後から動くように修正',
+    items: Object.freeze([
+      'ライブビュー(/live/)の脈拍レーンが、実測データが2回届くまで(数分〜十数分)動かなかった不具合を修正しました。配信開始からの平均速度で開いた直後から動くようにしています。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1554',
     date: '2026-09-30',
     summary: '脈拍レーン: いま話している人を強調',
@@ -168,14 +176,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     summary: '会場の席のちらつきを修正',
     items: Object.freeze([
       '会場モードで、同じ配信の一瞬だけ空になる瞬間に席(応援タイル)が消えてすぐ戻る「ちらつき」を修正しました。配信を切り替えたときは従来どおり前の配信の席は残しません。'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.1533',
-    date: '2026-09-21',
-    summary: '使っていない内部コードを整理',
-    items: Object.freeze([
-      'どこからも使われていない内部モジュール5件を削除しました。動作は変わらず、配布物が少し軽くなります。'
     ])
   })
 ]);
