@@ -19,6 +19,7 @@ import { buildXIntentUrl } from '../lib/xIntentUrl.js';
 import { buildRecentCardHtml } from '../lib/liveRecentHoverCard.js';
 import { createGiftPulseRegistry, pulseRowKey, formatPtDelta, spanText } from '../lib/liveGiftPulse.js';
 import { laneBuckets, laneTileKey, laneMoreText, LANES } from '../lib/liveLaneBuckets.js';
+import { createMotionRegistry, sampleFromLive, lifetimeCommentRatePerMin, pulseIntervalMs, pulseIsBand, formatRatePerMin } from '../lib/liveMotion.js';
 
 const elList = /** @type {HTMLElement} */ (document.getElementById('list'));
 const elMeta = /** @type {HTMLElement} */ (document.getElementById('meta'));
@@ -38,6 +39,7 @@ const FACE = {
 const tracker = createRowChangeTracker();
 const giftPulse = createGiftPulseRegistry();
 const laneTracker = createRowChangeTracker();
+const motion = createMotionRegistry();
 
 /** 本体(Chrome 拡張)のストア URL。★LP index.html と同じ ID(AGENTS.md §2 の拡張 ID)。 */
 const STORE_URL = 'https://chromewebstore.google.com/detail/cjbabignmmodaickpeckiojjabnlogdb';
@@ -279,16 +281,24 @@ function render(data) {
   tracker.begin();
   giftPulse.begin();
   laneTracker.begin();
+  motion.begin();
+  const receivedAt = Date.now();
   elList.innerHTML = ordered.map((l, i) => {
     const rows = supporterRows(l);
     const gp = giftPulse.pulseFor(l.liveId, rows.gift, data.capturedAt);
     const buckets = laneBuckets(l);
+    const track = motion.trackFor(l.liveId);
+    track.push(sampleFromLive(l, data.capturedAt), receivedAt);
+    const shownComment = track.valueAt('comment', receivedAt);
+    const rate0 = track.ratePerMin('comment') ?? lifetimeCommentRatePerMin(l, receivedAt);
     const sx = shareHref(l);
     return `<section class="live" data-lv="${esc(l.liveId)}">`
       + renderHead(l, i + 1, data.capturedAt, nowMs)
       + '<div class="stats">'
       + `<span>👥 来場 <b>${num(l.watchCount)}</b></span>`
-      + `<span>💬 コメント <b>${num(l.commentCount)}</b></span>`
+      + `<span>💬 コメント <b data-motion="comment" aria-hidden="true">${num(shownComment)}</b>`
+      + `<span class="visually-hidden">${num(l.commentCount)}</span>`
+      + `<span class="rate" data-rate="comment" title="直近の実測 2 回の差から求めた速度">${esc(formatRatePerMin(rate0))}</span></span>`
       + `<span>🎁 ギフト <b>${num(l.giftTotal)}pt</b></span>`
       + `<span>📣 広告 <b>${num(l.adTotal)}pt</b></span>`
       // ★本体(Chrome 拡張)への導線。配信ごとに「この配信を拡張で記録する」を置く。
@@ -298,6 +308,9 @@ function render(data) {
       + (sx ? `<a class="share-x" href="${esc(sx)}" target="_blank" rel="noopener noreferrer" title="X（旧 Twitter）の投稿画面が新しいタブで開くだけよ。押したことも含めて、当サイトは何も記録しないわ">X でシェア</a>` : '')
       + '</span>'
       + '</div>'
+      + (l.commentCount > 0
+        ? `<div class="pulse-lane${pulseIsBand(rate0) ? ' is-band' : ''}" data-lane="${esc(l.liveId)}" aria-hidden="true"></div>`
+        : '')
       + renderLanes(buckets, l.liveId, gp)
       + '<div class="cols">'
       + `<div class="col"><h3><img src="${esc(FACE.kontaSmile)}" alt="" loading="lazy" decoding="async">ギフトで支えた人 <span class="sum">${num(l.giftTotal)}pt${gp.sum > 0 ? ` <span class="sum-delta">${esc(formatPtDelta(gp.sum))}</span>` : ''}</span></h3>${renderRows(rows.gift, l.liveId, 'gift', gp)}</div>`
@@ -308,6 +321,8 @@ function render(data) {
   tracker.end();
   giftPulse.end();
   laneTracker.end();
+  motion.end();
+  _motionEls = collectMotionEls();
   bindImgFallback(elList);
 }
 
@@ -640,4 +655,69 @@ elList.addEventListener('mouseout', (ev) => {
   // 行の内側(サムネ↔名前)を移動しただけなら消さない。カードへ移ったときも消さない。
   if (rel && ((_hoverLi && _hoverLi.contains(rel)) || (_card && _card.contains(rel)))) return;
   hideCard();
+});
+
+/** @type {{ counters: {el:HTMLElement, id:string}[], rates: {el:HTMLElement, id:string}[], lanes: Map<string,{el:HTMLElement, nextAt:number}> }} */
+let _motionEls = { counters: [], rates: [], lanes: new Map() };
+const REDUCED = matchMedia('(prefers-reduced-motion: reduce)');
+const PULSE_JITTER = 0.3;          // 間隔の ±30%(メトロノームに見せない。平均は実測どおり)
+const PULSE_DOTS_MAX_PER_LANE = 12;
+
+/** @returns {{ counters: {el:HTMLElement, id:string}[], rates: {el:HTMLElement, id:string}[], lanes: Map<string,{el:HTMLElement, nextAt:number}> }} */
+function collectMotionEls() {
+  const counters = []; const rates = []; const lanes = new Map();
+  for (const sec of elList.querySelectorAll('section.live')) {
+    const lane = /** @type {HTMLElement|null} */ (sec.querySelector('.pulse-lane'));
+    const id = lane ? String(lane.getAttribute('data-lane') || '') : '';
+    const b = /** @type {HTMLElement|null} */ (sec.querySelector('[data-motion="comment"]'));
+    const r = /** @type {HTMLElement|null} */ (sec.querySelector('[data-rate="comment"]'));
+    if (lane) lanes.set(id, { el: lane, nextAt: performance.now() + 300 });
+    if (b && lane) counters.push({ el: b, id });
+    if (r && lane) rates.push({ el: r, id });
+  }
+  return { counters, rates, lanes };
+}
+
+/** @param {HTMLElement} lane */
+function spawnDot(lane) {
+  if (lane.childElementCount >= PULSE_DOTS_MAX_PER_LANE) return;
+  const d = document.createElement('i');
+  d.className = 'pulse-dot';
+  d.addEventListener('animationend', () => d.remove(), { once: true });
+  lane.appendChild(d);
+}
+
+let _lastCounterTick = 0;
+/** @param {number} tMs */
+function motionFrame(tMs) {
+  const now = Date.now();
+  // 数字は 1 秒に 1 回だけ書く(毎フレーム書かない・整数が変わらないなら触らない)。
+  if (tMs - _lastCounterTick >= 1000) {
+    _lastCounterTick = tMs;
+    for (const { el, id } of _motionEls.counters) {
+      const tr = motion.trackFor(id);
+      const v = num(REDUCED.matches ? (tr.latest()?.comment ?? 0) : tr.valueAt('comment', now));
+      if (el.textContent !== v) el.textContent = v;
+    }
+  }
+  if (!REDUCED.matches && !document.hidden) {
+    for (const [id, lane] of _motionEls.lanes) {
+      const tr = motion.trackFor(id);
+      const rate = tr.ratePerMin('comment');
+      const iv = pulseIntervalMs(rate);
+      if (iv == null || pulseIsBand(rate)) continue;                       // 帯は CSS だけで表す
+      if (tMs >= lane.nextAt) {
+        spawnDot(lane.el);
+        lane.nextAt = tMs + iv * (1 + (Math.random() * 2 - 1) * PULSE_JITTER);
+      }
+    }
+  }
+  requestAnimationFrame(motionFrame);
+}
+requestAnimationFrame(motionFrame);
+// ★裏タブから戻った直後に溜まった脈を一斉に吐かない(nextAt を今へ寄せる)。
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) return;
+  const t = performance.now();
+  for (const lane of _motionEls.lanes.values()) lane.nextAt = Math.max(lane.nextAt, t + 200);
 });
