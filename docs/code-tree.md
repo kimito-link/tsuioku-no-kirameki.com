@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 8 / 874 件
+## ⚠️ 役割コメントが無いソース 8 / 875 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `scripts/build.mjs`
@@ -797,7 +797,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (1856)
+- 📁 **src/** (1858)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1073,7 +1073,7 @@
         - `logo_funlink_white_RGB_link_black.png`
         - `logo_funlink_white_RGB_maru_black.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1626)
+  - 📁 **lib/** (1628)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -1825,6 +1825,8 @@
     - `liveLaneBuckets.js` — ⚠️ 役割コメント無し
     - `liveLaneBuckets.test.js`
     - `liveLaneBuckets.wiring.test.js`
+    - `liveMotion.js` — 補間する系列。MVP は 'comment' だけ使う(他は型として用意・後段で有効化)。
+    - `liveMotion.test.js`
     - `liveOgHtml.js` — 配信ごとの OGP カード用の最小 HTML を組み立てる純関数(v0.1.1517)。
     - `liveOgHtml.test.js`
     - `liveOgStats.js` — 配信ごと OGP カードの og:description に載せる「応援の数字」を組み立てる純関数(v0.1.1518)。

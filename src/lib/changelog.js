@@ -18,6 +18,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1552',
+    date: '2026-09-30',
+    summary: '/live/ コメント速度の脈拍レーンを追加',
+    items: Object.freeze([
+      'ライブビュー(/live/)の番組合計コメント数を実測値の間でなめらかに表示し、実測2点から求めた速度と脈拍レーンを添えました。個人別の値やコメント本文は動かしていません。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1551',
     date: '2026-09-28',
     summary: '/live/ 発言カードの先読みを配信ホバーに拡大',
@@ -168,14 +176,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     summary: 'パネルを開く瞬間の黒帯を修正',
     items: Object.freeze([
       'watch を開いた瞬間、パネルの土台が一瞬黒くなることがあったのを直しました(土台に不透明の地色を敷き、下の黒が透けないようにしました)。'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.1530',
-    date: '2026-09-20',
-    summary: 'パネルの一瞬黒とレーンのちらつきを修正',
-    items: Object.freeze([
-      'サイドパネルを開いた瞬間に一瞬黒くなることがあったのを直しました(背景の地色を必ず敷くようにしました)。また、応援レーンのアイコンが開いた直後に一瞬減って見えるちらつきを、描画のもとを一本化して抑えました(内部改善・見た目の安定)。'
     ])
   })
 ]);

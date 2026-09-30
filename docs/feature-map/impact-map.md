@@ -629,6 +629,7 @@
 | `src/lib/liveGiftPulse.js` | 1 | Web版 追憶のきらめき ランキング(/live/) |
 | `src/lib/liveHealthScore.js` | 1 | 状態速報ページ |
 | `src/lib/liveLaneBuckets.js` | 1 | Web版 追憶のきらめき ランキング(/live/) |
+| `src/lib/liveMotion.js` | 1 | Web版 追憶のきらめき ランキング(/live/) |
 | `src/lib/livePersistInterval.js` | 1 | 記録エンジン(watchページ常駐) |
 | `src/lib/liveRankingView.js` | 1 | Web版 追憶のきらめき ランキング(/live/) |
 | `src/lib/liveRecentHoverCard.js` | 1 | Web版 追憶のきらめき ランキング(/live/) |
