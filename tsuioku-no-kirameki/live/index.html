@@ -326,6 +326,17 @@
       ol.rank li.is-gifted.tier-mega { background: linear-gradient(90deg, rgba(192,42,42,.22), transparent 70%); }
       ol.rank li.is-gifted.tier-mega .delta { color: #c02a2a; font-size: .84rem; }
       .col h3 .sum-delta { font-size: .78rem; font-weight: 800; margin-left: 4px; }
+      /* ── 脈拍レーン(コメントの実測速度で点が流れる。本文・人物は出さない) ── */
+      /* .delta は既存のギフト増分バッジ専用。コメント速度は .rate で分離する。 */
+      .stats .rate { font-size: .74rem; color: var(--orange); font-weight: 700; margin-left: 4px; font-variant-numeric: tabular-nums; }
+      .pulse-lane { position: relative; height: 10px; overflow: hidden; background: linear-gradient(90deg, transparent, #fff7ec 20%, #fff7ec 80%, transparent); border-bottom: 1px solid var(--line); }
+      .pulse-dot { position: absolute; top: 3px; right: -6px; width: 5px; height: 5px; border-radius: 50%; background: var(--orange); opacity: .85;
+        animation: nl-pulse-flow 4s linear forwards; will-change: transform; }
+      @keyframes nl-pulse-flow { to { transform: translateX(calc(-100vw - 12px)); opacity: .15; } }
+      /* 240 件/分超: 点を増やさず帯の濃さで(点の数=負荷を天井で止める) */
+      .pulse-lane.is-band { background: repeating-linear-gradient(90deg, rgba(200,114,28,.35) 0 6px, transparent 6px 14px); background-size: 200% 100%; animation: nl-band 1.2s linear infinite; }
+      @keyframes nl-band { to { background-position: -28px 0; } }
+      @media (prefers-reduced-motion: reduce) { .pulse-lane { display: none; } }
       @media (prefers-reduced-motion: reduce) {
         ol.rank li.is-bumped, ol.rank li.is-new, .speaker img { animation: none; }
       }
@@ -395,7 +406,7 @@
             <img src="../../extension/images/yukkuri-charactore-english/tanunee/tanuki-yukkuri-half-eyes-mouth-open.png" alt="たぬ姉" width="92" height="92" decoding="async">
             <span>たぬ姉</span>
           </div>
-          <div class="bubble">ギフトと広告の順位とポイントは<strong>ニコ生が公開している値そのまま</strong>。<strong>コメントの件数だけはうちが数えた値</strong>よ（誰が何件かだけ。本文は保存していないわ）。ほかに当サイトが足したのは「約○人（推定）」と並び順だけ。更新は<strong>60 秒ごとの自動＋「いま更新」ボタン</strong>（コメントの集計はもう少しゆっくりで、約 10 分ごと）。データの収集時刻は上に出しているから、古いときは正直に「⚠」が出るわ。<strong>名前にマウスを乗せる</strong>と、その人の直近の発言をその場で取ってくるわ（<strong>本文は保存しないわ</strong>）。<strong>「+○pt」はニコ生が公開しているギフト順位表を前回の取得と引き算しただけ</strong>で、新しく何かを取りに行ってはいないわ。<strong>4段はニコ生が公開している順位表と当サイトのコメント集計を種類で分けただけで、上位10人ずつまでの表示</strong>よ。</div>
+          <div class="bubble">ギフトと広告の順位とポイントは<strong>ニコ生が公開している値そのまま</strong>。<strong>コメントの件数だけはうちが数えた値</strong>よ（誰が何件かだけ。本文は保存していないわ）。ほかに当サイトが足したのは「約○人（推定）」と並び順だけ。更新は<strong>60 秒ごとの自動＋「いま更新」ボタン</strong>（コメントの集計はもう少しゆっくりで、約 10 分ごと）。データの収集時刻は上に出しているから、古いときは正直に「⚠」が出るわ。<strong>数字が秒単位で動いて見えるのは、60秒ごとの実測値のあいだを表示上なめらかにつないでいるから。細かい時刻のデータは取得も保存もしていないわ。</strong> <strong>名前にマウスを乗せる</strong>と、その人の直近の発言をその場で取ってくるわ（<strong>本文は保存しないわ</strong>）。<strong>「+○pt」はニコ生が公開しているギフト順位表を前回の取得と引き算しただけ</strong>で、新しく何かを取りに行ってはいないわ。<strong>4段はニコ生が公開している順位表と当サイトのコメント集計を種類で分けただけで、上位10人ずつまでの表示</strong>よ。</div>
         </div>
       </div>
 

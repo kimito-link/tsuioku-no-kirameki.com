@@ -244,6 +244,10 @@ graph LR
   f45 --> f45_1["lib/commenterHistoricalAnalytics.js"]
   f45 --> f45_2["lib/supporterRanking.js"]
   f45 --> f45_3["lib/marketingChartsHtml.js"]
+  HUB --> f46["/live/ コメント速度演出"]
+  f46 --> f46_0["lib/liveMotion.js"]
+  f46 --> f46_1["extension/live-ranking-entry.js"]
+  f46 --> f46_2["live/index.html"]
 ```
 
 ---
@@ -318,14 +322,14 @@ graph LR
 - `soundeffect-lab/`（19 件） — 効果音ラボ由来の素材候補(採否検討用)  〔音声 / 素材〕
 
 ## `src/` — LP 側 + 純粋関数ライブラリの源  〔ソース〕
-<sub>ファイル 1856 件</sub>
+<sub>ファイル 1858 件</sub>
 
 - `data/`（7 件） — 保存コメントからレーン候補を読む acquirer / source 層  〔コメント / 取得〕
 - `domain/`（20 件） — ドメイン正本(応援レーンの集約・列ポリシー等。識別子判定など)  〔応援 / 集約 / 識別子〕
 - `extension/`（56 件） — バンドル entry(content/popup/venue/status/offscreen/backfill-sw 等=機能境界)  〔entry / 記録 / 会場 / 応援〕
 - `fixtures/`（1 件） — テスト用フィクスチャ  〔テスト〕
 - `images/`（134 件） — LP / CWS 提出物のマスター画像  〔画像〕
-- `lib/`（1626 件） — 純粋関数ライブラリ(unit test 対象)。色・速度・コメント・レポート等の計算ロジックの大半  〔色 / 速度 / コメント / レポート / 純粋関数〕
+- `lib/`（1628 件） — 純粋関数ライブラリ(unit test 対象)。色・速度・コメント・レポート等の計算ロジックの大半  〔色 / 速度 / コメント / レポート / 純粋関数〕
 - `server/`（2 件） — Node 側 I/O 部品(fetch/WebSocket を実際に叩く。api と scripts が共用。lib には置けない)  〔API / 公開 / ランキング〕
 - `shared/`（7 件） — 複数機能で共有する小部品(アバター URL ガード等)  〔共有 / アバター〕
 - `sound/`（1 件） — 音声素材(src 側)  〔音声〕
@@ -658,6 +662,13 @@ pre-pushのbuild再実行でbuildIdタイムスタンプが毎回変わりdist�
 - [`src/lib/commenterHistoricalAnalytics.js`](../src/lib/commenterHistoricalAnalytics.js)
 - [`src/lib/supporterRanking.js`](../src/lib/supporterRanking.js)
 - [`src/lib/marketingChartsHtml.js`](../src/lib/marketingChartsHtml.js)
+
+### /live/ コメント速度演出  〔LP / 公開 / ランキング / コメント / 表示〕
+配信カードの番組合計コメント数だけを60秒ごとの実測値の間で線形補間し、実測2点から求めた「+N/分」と脈拍レーンを表示する。個人別順位・コメント本文・細かい時刻データは補間・保存しない
+
+- [`src/lib/liveMotion.js`](../src/lib/liveMotion.js)
+- [`src/extension/live-ranking-entry.js`](../src/extension/live-ranking-entry.js)
+- [`tsuioku-no-kirameki/live/index.html`](../tsuioku-no-kirameki/live/index.html)
 
 ---
 

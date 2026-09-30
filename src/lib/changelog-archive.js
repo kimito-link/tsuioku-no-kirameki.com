@@ -24,6 +24,14 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.1530',
+    date: '2026-09-20',
+    summary: 'パネルの一瞬黒とレーンのちらつきを修正',
+    items: Object.freeze([
+      'サイドパネルを開いた瞬間に一瞬黒くなることがあったのを直しました(背景の地色を必ず敷くようにしました)。また、応援レーンのアイコンが開いた直後に一瞬減って見えるちらつきを、描画のもとを一本化して抑えました(内部改善・見た目の安定)。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1529',
     date: '2026-09-20',
     summary: '拡張の識別子を固定し反映を安定化',
