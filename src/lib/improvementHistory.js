@@ -1128,5 +1128,22 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
     source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
     note: '前版0.1.1552と同値(48)。過去最良55(@0.1.1537)との差は30日ローリングウィンドウで' +
       '古いコミットが自然に窓外へ出たもので、今回のコード変更とは無関係(0.1.1552のnoteに既出)。'
+  }),
+  Object.freeze({
+    version: '0.1.1554', metric: 'bundle-kb', value: 1361,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '前版0.1.1553と同値(1361)＝この版では増やしていない。/live/ 熱いチップ(コメント増分の' +
+      '強調表示)はlive-ranking.js側だけに配線しておりpopup.jsへ依存を追加していない。' +
+      '過去最良1360(@0.1.1454)との差は0.1.1552のnoteに記録済みの丸め境界。'
+  }),
+  Object.freeze({
+    version: '0.1.1554', metric: 'gate-selftest', value: 4,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1554', metric: 'cross-checked-claims', value: 48,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: '前版0.1.1553と同値(48)。過去最良55(@0.1.1537)との差は30日ローリングウィンドウで' +
+      '古いコミットが自然に窓外へ出たもので、今回のコード変更とは無関係(0.1.1552のnoteに既出)。'
   })
 ]);

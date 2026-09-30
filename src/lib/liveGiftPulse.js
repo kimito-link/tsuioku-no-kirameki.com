@@ -15,8 +15,10 @@ export const PULSE_MAX_GAP_MS = 15 * 60_000;
 export const EMPTY_PULSE = Object.freeze({ byKey: new Map(), sum: 0, spanMs: 0, top: null, tier: null });
 
 /**
- * 行の同一性キー。数値 uid がある行だけ追跡する。
- * 匿名行は同名の別人をつなぐおそれがあるため、差分を出さない。
+ * 行の同一性キー。uid がある行だけ追跡する。
+ * ★ギフト/広告は匿名行の uid が空文字なので結果的に数値 uid だけが追跡対象になる。
+ *   コメント行の匿名 uid(`a:...`)は同一番組内では安定した値なので、コメントの差分では
+ *   匿名も安全に追跡できる(commentRows の identicon 生成と同じ前提)。
  * @param {SupporterRow|null|undefined} row
  * @returns {string} '' なら追跡しない
  */
@@ -40,9 +42,10 @@ function pointsByKey(rows) {
  * @param {Map<string, number>} prevPoints
  * @param {SupporterRow[]} rows
  * @param {number} spanMs
+ * @param {(d: number) => RowPulse['tier']} [tierFor] 段階の判定関数(既定=ギフトpt段階)
  * @returns {PulseResult}
  */
-export function diffGiftRows(prevPoints, rows, spanMs) {
+export function diffGiftRows(prevPoints, rows, spanMs, tierFor = tierForGiftDeltaPoints) {
   const byKey = new Map();
   let sum = 0;
   /** @type {{ row: SupporterRow, delta: number }|null} */
@@ -52,18 +55,20 @@ export function diffGiftRows(prevPoints, rows, spanMs) {
     if (!k || !prevPoints.has(k)) continue;
     const d = (Number(r.point) || 0) - /** @type {number} */ (prevPoints.get(k));
     if (!(d > 0)) continue;
-    byKey.set(k, { delta: d, tier: tierForGiftDeltaPoints(d) });
+    byKey.set(k, { delta: d, tier: tierFor(d) });
     sum += d;
     if (!top || d > top.delta) top = { row: r, delta: d };
   }
   if (!top) return EMPTY_PULSE;
-  return { byKey, sum, spanMs, top, tier: tierForGiftDeltaPoints(top.delta) };
+  return { byKey, sum, spanMs, top, tier: tierFor(top.delta) };
 }
 
 /**
  * 配信ごとの標本と差分を保持する器。同じ capturedAt の再送は前回結果をそのまま返す。
+ * @param {(d: number) => RowPulse['tier']} [tierFor] 段階の判定関数(既定=ギフトpt段階)。
+ *   コメント件数の増分には呼び出し側が `tierForCommentDelta`(liveMotion.js)を渡す。
  */
-export function createGiftPulseRegistry() {
+export function createGiftPulseRegistry(tierFor = tierForGiftDeltaPoints) {
   /** @type {Map<string, { at: number, points: Map<string, number>, result: PulseResult }>} */
   const lives = new Map();
   /** @type {Set<string>|null} */ let touched = null;
@@ -86,7 +91,7 @@ export function createGiftPulseRegistry() {
       let result = EMPTY_PULSE;
       if (cur) {
         const span = at - cur.at;
-        result = span <= PULSE_MAX_GAP_MS ? diffGiftRows(cur.points, rows, span) : EMPTY_PULSE;
+        result = span <= PULSE_MAX_GAP_MS ? diffGiftRows(cur.points, rows, span, tierFor) : EMPTY_PULSE;
       }
       lives.set(id, { at, points, result });
       return result;
@@ -103,6 +108,12 @@ export function createGiftPulseRegistry() {
 export function formatPtDelta(d) {
   const n = Math.floor(Number(d) || 0);
   return n > 0 ? `+${n.toLocaleString('ja-JP')}pt` : '';
+}
+
+/** 「+12件」。0以下は空文字。コメント件数の増分用(ptとは単位が違う)。 @param {unknown} d */
+export function formatCountDelta(d) {
+  const n = Math.floor(Number(d) || 0);
+  return n > 0 ? `+${n.toLocaleString('ja-JP')}件` : '';
 }
 
 /** 実測間隔の文言。 @param {unknown} spanMs */

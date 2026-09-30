@@ -244,10 +244,11 @@ graph LR
   f45 --> f45_1["lib/commenterHistoricalAnalytics.js"]
   f45 --> f45_2["lib/supporterRanking.js"]
   f45 --> f45_3["lib/marketingChartsHtml.js"]
-  HUB --> f46["/live/ コメント速度演出・応援者チップ"]
+  HUB --> f46["/live/ コメント速度演出・応援者チップ・熱いチップ"]
   f46 --> f46_0["lib/liveMotion.js"]
-  f46 --> f46_1["extension/live-ranking-entry.js"]
-  f46 --> f46_2["live/index.html"]
+  f46 --> f46_1["lib/liveGiftPulse.js"]
+  f46 --> f46_2["extension/live-ranking-entry.js"]
+  f46 --> f46_3["live/index.html"]
 ```
 
 ---
@@ -283,7 +284,7 @@ graph LR
 - `briefs/`（22 件） — スカウトの日次ブリーフ(md)  〔会議 / 原稿〕
 
 ## `docs/` — 設計正本・マインドマップ・フロー図・feature-map(AI/人間向け)  〔設計 / レポート〕
-<sub>ファイル 331 件</sub>
+<sub>ファイル 333 件</sub>
 
 - `article-assets/`（87 件） — 記事用の画像・動画・音声アセット  〔記事 / 画像〕
 - `article-drafts/`（2 件） — 公開前の記事下書き(防御的公開の草稿)  〔記事 / 下書き〕
@@ -663,10 +664,11 @@ pre-pushのbuild再実行でbuildIdタイムスタンプが毎回変わりdist�
 - [`src/lib/supporterRanking.js`](../src/lib/supporterRanking.js)
 - [`src/lib/marketingChartsHtml.js`](../src/lib/marketingChartsHtml.js)
 
-### /live/ コメント速度演出・応援者チップ  〔LP / 公開 / ランキング / コメント / 表示〕
-配信カードの番組合計コメント数だけを60秒ごとの実測値の間で線形補間し、実測2点から求めた「+N/分」と脈拍レーンを表示する。レーンには既存の応援者一覧(commentRows/supporterRows)から名前・丸サムネ・種別(💬/🎁/📣)だけを巡回キューで流す(本文は一切含めない・AGENTS.md §3.3)。個人別順位・コメント本文・細かい時刻データは補間・保存しない
+### /live/ コメント速度演出・応援者チップ・熱いチップ  〔LP / 公開 / ランキング / コメント / 表示〕
+配信カードの番組合計コメント数だけを60秒ごとの実測値の間で線形補間し、実測2点から求めた「+N/分」と脈拍レーンを表示する。レーンには既存の応援者一覧(commentRows/supporterRows)から名前・丸サムネ・種別(💬/🎁/📣)だけを巡回キューで流す(本文は一切含めない・AGENTS.md §3.3・council-fable 2026-09-30で本文表示は却下)。直近実測2点間でコメント件数が増えた人は「熱いチップ」(+N件バッジ・拡大表示)として優先的に流れる(既存のギフト増分差分器createGiftPulseRegistryをtierFor引数で再利用)。個人別順位・コメント本文・細かい時刻データは補間・保存しない
 
 - [`src/lib/liveMotion.js`](../src/lib/liveMotion.js)
+- [`src/lib/liveGiftPulse.js`](../src/lib/liveGiftPulse.js)
 - [`src/extension/live-ranking-entry.js`](../src/extension/live-ranking-entry.js)
 - [`tsuioku-no-kirameki/live/index.html`](../tsuioku-no-kirameki/live/index.html)
 
