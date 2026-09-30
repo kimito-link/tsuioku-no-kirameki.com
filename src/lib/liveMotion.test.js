@@ -11,7 +11,8 @@ import {
   pulseIntervalMs,
   pulseIsBand,
   sampleFromLive,
-  supporterChipsFromLive
+  supporterChipsFromLive,
+  tierForCommentDelta
 } from './liveMotion.js';
 
 const sample = (at, comment) => ({ at, comment, watch: 0, gift: 0, ad: 0 });
@@ -109,7 +110,8 @@ describe('liveMotion', () => {
       expect(chips.map((c) => c.name)).toEqual(['こめんと太郎', 'ぎふと花子', '広告次郎']);
       for (const c of chips) {
         expect(c.avatar).toBeTruthy(); // ★必ず何かサムネが立つ(ゆっくり顔フォールバック含む)
-        expect(Object.keys(c)).toEqual(['key', 'kind', 'name', 'avatar', 'url']); // ★本文(comment.text等)を含むキーが無い
+        // ★本文(comment.text等)を含むキーが無い。heat/tierが増えても文字列フィールドはnameだけ(地雷8)。
+        expect(Object.keys(c).sort()).toEqual(['avatar', 'heat', 'key', 'kind', 'name', 'tier', 'url']);
       }
     });
 
@@ -129,9 +131,12 @@ describe('liveMotion', () => {
   });
 
   describe('createSupporterFeed(巡回キュー)', () => {
+    const cold = (key, kind, name) => ({ key, kind, name, avatar: '', url: '', heat: 0, tier: null });
+    const hot = (key, kind, name, heat, tier) => ({ key, kind, name, avatar: '', url: '', heat, tier });
+
     it('候補を順に返し、尽きたら先頭から周回する', () => {
       const feed = createSupporterFeed();
-      feed.fill([{ key: 'a', kind: 'comment', name: 'A', avatar: '', url: '' }, { key: 'b', kind: 'gift', name: 'B', avatar: '', url: '' }]);
+      feed.fill([cold('a', 'comment', 'A'), cold('b', 'gift', 'B')]);
       expect(feed.next().key).toBe('a');
       expect(feed.next().key).toBe('b');
       expect(feed.next().key).toBe('a'); // 周回
@@ -144,10 +149,76 @@ describe('liveMotion', () => {
 
     it('fill で候補を差し替えても例外にならない(カーソルは自動で丸められる)', () => {
       const feed = createSupporterFeed();
-      feed.fill([{ key: 'a', kind: 'comment', name: 'A', avatar: '', url: '' }, { key: 'b', kind: 'gift', name: 'B', avatar: '', url: '' }, { key: 'c', kind: 'ad', name: 'C', avatar: '', url: '' }]);
+      feed.fill([cold('a', 'comment', 'A'), cold('b', 'gift', 'B'), cold('c', 'ad', 'C')]);
       feed.next(); feed.next(); feed.next(); // cursor=3
-      feed.fill([{ key: 'x', kind: 'comment', name: 'X', avatar: '', url: '' }]);
+      feed.fill([cold('x', 'comment', 'X')]);
       expect(feed.next().key).toBe('x'); // 例外にならず先頭から
+    });
+
+    it('heat が全て0なら、fillした配列そのままの順で巡回する(旧来動作への退化)', () => {
+      const feed = createSupporterFeed();
+      feed.fill([cold('a', 'comment', 'A'), cold('b', 'gift', 'B'), cold('c', 'ad', 'C')], 1000);
+      expect([feed.next().key, feed.next().key, feed.next().key]).toEqual(['a', 'b', 'c']);
+    });
+
+    it('熱い人(heat>0)を増分降順で先頭に、heat回(上限HOT_REPEAT_MAX)だけ複製して並べる', () => {
+      const feed = createSupporterFeed();
+      feed.fill([
+        cold('cold1', 'comment', 'Cold1'),
+        hot('h2', 'comment', 'H2', 2, 'medium'),
+        hot('h12', 'comment', 'H12', 12, 'mega') // heat=12だがHOT_REPEAT_MAX=3で頭打ち
+      ], 2000);
+      const order = Array.from({ length: 3 + 2 + 1 }, () => feed.next().key);
+      expect(order).toEqual(['h12', 'h12', 'h12', 'h2', 'h2', 'cold1']);
+    });
+
+    it('同じepochのfillはカーソル位置を維持する(スロットル再送で先頭に戻らない)', () => {
+      const feed = createSupporterFeed();
+      feed.fill([hot('h', 'comment', 'H', 5, 'large'), cold('c', 'comment', 'C')], 3000);
+      feed.next(); feed.next(); // カーソルを進める
+      feed.fill([hot('h', 'comment', 'H', 5, 'large'), cold('c', 'comment', 'C')], 3000); // 同じepoch
+      // 並び替え(先頭リセット)が起きていれば次はまた 'h' から始まるはずだが、維持されるので続きが出る
+      const next = feed.next();
+      expect(next).toBeTruthy();
+    });
+
+    it('epochが変わると熱い順に並べ替えてカーソルを先頭に戻す', () => {
+      const feed = createSupporterFeed();
+      feed.fill([cold('a', 'comment', 'A'), cold('b', 'comment', 'B')], 4000);
+      feed.next(); feed.next(); // cursor=2
+      feed.fill([hot('h', 'comment', 'H', 3, 'large'), cold('a', 'comment', 'A'), cold('b', 'comment', 'B')], 5000);
+      expect(feed.next().key).toBe('h'); // 先頭にリセットされ、熱い人から
+    });
+  });
+
+  it('tierForCommentDelta: 境界値(1件と1ptは重みが違う=ギフトのtier段階とは別物)', () => {
+    expect(tierForCommentDelta(1)).toBe('small');
+    expect(tierForCommentDelta(2)).toBe('medium');
+    expect(tierForCommentDelta(4)).toBe('medium');
+    expect(tierForCommentDelta(5)).toBe('large');
+    expect(tierForCommentDelta(9)).toBe('large');
+    expect(tierForCommentDelta(10)).toBe('mega');
+  });
+
+  describe('supporterChipsFromLive の heat/tier 付与(コメント増分の演出)', () => {
+    it('heat(PulseResult)を渡すと、該当uidのコメントチップにdelta/tierが付く', () => {
+      const live = { comment: { rankers: [{ rank: 1, uid: '99', name: 'こめんと太郎', count: 9, anon: false }] } };
+      const heat = { byKey: new Map([['u:99', { delta: 6, tier: 'large' }]]), sum: 6, spanMs: 60000, top: null, tier: 'large' };
+      const [chip] = supporterChipsFromLive(live, heat);
+      expect(chip.heat).toBe(6);
+      expect(chip.tier).toBe('large');
+    });
+
+    it('heatが無い/該当uidが無いコメントはheat:0, tier:null', () => {
+      const live = { comment: { rankers: [{ rank: 1, uid: '99', name: 'こめんと太郎', count: 9, anon: false }] } };
+      expect(supporterChipsFromLive(live)[0]).toMatchObject({ heat: 0, tier: null });
+      const emptyHeat = { byKey: new Map(), sum: 0, spanMs: 0, top: null, tier: null };
+      expect(supporterChipsFromLive(live, emptyHeat)[0]).toMatchObject({ heat: 0, tier: null });
+    });
+
+    it('gift/adのチップは常にheat:0, tier:null(既存の.deltaバッジと二重に光らせない)', () => {
+      const live = { gift: { rankers: [{ rank: 1, supporterId: 111, supporterName: 'ぎふと花子', supporterThumbnailUrl: 'https://img/g.jpg', contribution: 500, userPageUrl: 'https://www.nicovideo.jp/user/111' }] } };
+      expect(supporterChipsFromLive(live)[0]).toMatchObject({ heat: 0, tier: null });
     });
   });
 

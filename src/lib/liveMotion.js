@@ -1,6 +1,7 @@
 import { toEpochMs } from './timeAuthority.js';
 import { commentRows, supporterRows, isBlankIcon } from './liveRankingView.js';
 import { anonymousIdenticonDataUrl } from './anonymousIdenticon.js';
+import { pulseRowKey } from './liveGiftPulse.js';
 
 /** 補間する系列。MVP は 'comment' だけ使う(他は型として用意・後段で有効化)。 */
 export const MOTION_KINDS = /** @type {const} */ (['comment', 'watch', 'gift', 'ad']);
@@ -137,7 +138,19 @@ export function formatRatePerMin(rate) {
   return `+${Math.round(rate).toLocaleString('ja-JP')}/分`;
 }
 
-/** @typedef {{ key: string, kind: 'comment'|'gift'|'ad', name: string, avatar: string, url: string }} SupporterChip */
+/** コメント増分(件)の段階。ギフトの pt 段階(tierForGiftDeltaPoints)とは別物(1件と1ptは重みが違う)。 */
+/** @param {number} d @returns {'small'|'medium'|'large'|'mega'} */
+export function tierForCommentDelta(d) {
+  return d >= 10 ? 'mega' : d >= 5 ? 'large' : d >= 2 ? 'medium' : 'small';
+}
+
+/** 熱い人(直近でコメントが増えた人)がキューに並ぶ最大回数(1人がレーンを独占しない天井)。 */
+export const HOT_REPEAT_MAX = 3;
+
+/**
+ * @typedef {{ key: string, kind: 'comment'|'gift'|'ad', name: string, avatar: string, url: string,
+ *   heat: number, tier: 'small'|'medium'|'large'|'mega'|null }} SupporterChip
+ */
 
 /**
  * 脈拍レーンに流す「誰が応援したか」カードの材料。★本文(発言内容)は一切含めない
@@ -145,28 +158,43 @@ export function formatRatePerMin(rate) {
  * 既存の応援者一覧(commentRows/supporterRows)から名前・サムネ・種別だけを取り出す
  * (新しいデータ源・新しい取得経路は一切増やさない)。
  *
+ * ★本文非表示の判定基準(council-fable 2026-09-30、live-comment-heat-chips-DESIGN.md §0の2問テスト):
+ *   Q1(入力): その計算はコメント本文を入力に取るか → No であること。
+ *   Q2(出力): 表示から本文の語句が1語でも復元・推定できるか → No であること。
+ *   両方 No のときだけ安全(件数・速度・増分・投稿者・種別・人数・時刻)。このチップに `name`
+ *   以外の文字列フィールドを増やす変更は、増やす前に必ずこの2問に立ち返って判定すること。
+ *
+ * `heat`(直近の実測2点間での件数増分)・`tier`は comment 種別にだけ付く演出用の重み
+ * (createSupporterFeed が熱い人を優先して繰り返し流すのに使う)。ギフト/広告の増分は
+ * 既存の `.delta` バッジで既に表現されているため、レーンでは二重に光らせず常に heat:0。
+ *
  * 並び順は「元の順位表の並びそのまま」(comment→gift→ad の種別ごとに連結)。呼び出し側
  * (createSupporterFeed)がこの配列を巡回キューとして使う。
  * @param {any} live
+ * @param {import('./liveGiftPulse.js').PulseResult|null} [heat] コメント件数の増分(直近実測2点間)
  * @returns {SupporterChip[]}
  */
-export function supporterChipsFromLive(live) {
+export function supporterChipsFromLive(live, heat = null) {
   /** @type {SupporterChip[]} */
   const out = [];
   for (const r of commentRows(live)) {
     if (!r.name) continue;
-    out.push({ key: `c:${r.uid || r.name}`, kind: 'comment', name: r.name, avatar: r.avatar || '', url: r.url || '' });
+    const rp = heat ? heat.byKey.get(pulseRowKey(r)) : undefined;
+    out.push({
+      key: `c:${r.uid || r.name}`, kind: 'comment', name: r.name, avatar: r.avatar || '', url: r.url || '',
+      heat: rp ? rp.delta : 0, tier: rp ? rp.tier : null
+    });
   }
   const { gift, ad } = supporterRows(live);
   for (const r of gift) {
     if (!r.name) continue;
     const avatar = r.avatar && !isBlankIcon(r.avatar) ? r.avatar : anonymousIdenticonDataUrl(r.uid || r.name, 64);
-    out.push({ key: `g:${r.uid || r.name}`, kind: 'gift', name: r.name, avatar, url: r.url || '' });
+    out.push({ key: `g:${r.uid || r.name}`, kind: 'gift', name: r.name, avatar, url: r.url || '', heat: 0, tier: null });
   }
   for (const r of ad) {
     if (!r.name) continue;
     const avatar = r.avatar && !isBlankIcon(r.avatar) ? r.avatar : anonymousIdenticonDataUrl(r.uid || r.name, 64);
-    out.push({ key: `a:${r.uid || r.name}`, kind: 'ad', name: r.name, avatar, url: r.url || '' });
+    out.push({ key: `a:${r.uid || r.name}`, kind: 'ad', name: r.name, avatar, url: r.url || '', heat: 0, tier: null });
   }
   return out;
 }
@@ -175,15 +203,33 @@ export function supporterChipsFromLive(live) {
  * 配信ごとに「まだ流していない人から順に」1人ずつ取り出す巡回キュー。
  * ★集計値ではなく演出専用(誰が何回流れても表示上の順番が変わるだけで、件数・金額には一切影響しない)。
  * 新しい render() のたびに `fill` で最新の候補配列を渡し、尽きたら先頭から周回する。
+ *
+ * `epoch`(通常は収集時刻 capturedAt の epoch ms)が前回と同じ呼び出しは、60秒スロットルの
+ * 再送・inFlight中の再描画とみなし、巡回位置(cursor)を維持したまま候補配列だけ差し替える
+ * (熱い人が更新のたびに先頭へ戻って点滅するのを防ぐ)。epoch が変わったときだけ、
+ * 熱い人(heat>0)を増分降順で先頭に集め、各人を `heat`(上限 HOT_REPEAT_MAX)回だけ複製して
+ * 冷たい人(heat===0)の前に並べ、cursor を先頭へ戻す。
  */
 export function createSupporterFeed() {
   /** @type {SupporterChip[]} */ let chips = [];
   let cursor = 0;
+  /** @type {number|null} */ let lastEpoch = null;
   return {
-    /** @param {SupporterChip[]} next */
-    fill(next) {
-      chips = Array.isArray(next) ? next : [];
-      if (cursor > chips.length) cursor = 0;
+    /** @param {SupporterChip[]} next @param {number} [epoch] */
+    fill(next, epoch) {
+      const list = Array.isArray(next) ? next : [];
+      if (epoch != null && epoch === lastEpoch) {
+        chips = list;
+        if (cursor > chips.length) cursor = 0;
+        return;
+      }
+      lastEpoch = epoch != null ? epoch : lastEpoch;
+      const hot = list.filter((c) => c.heat > 0).sort((a, b) => b.heat - a.heat);
+      const cold = list.filter((c) => !(c.heat > 0));
+      /** @type {SupporterChip[]} */ const queued = [];
+      for (const c of hot) for (let i = 0; i < Math.min(c.heat, HOT_REPEAT_MAX); i += 1) queued.push(c);
+      chips = queued.concat(cold);
+      cursor = 0;
     },
     /** @returns {SupporterChip|null} */
     next() {

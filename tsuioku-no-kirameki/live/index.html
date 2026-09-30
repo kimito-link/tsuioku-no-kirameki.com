@@ -326,6 +326,11 @@
       ol.rank li.is-gifted.tier-mega { background: linear-gradient(90deg, rgba(192,42,42,.22), transparent 70%); }
       ol.rank li.is-gifted.tier-mega .delta { color: #c02a2a; font-size: .84rem; }
       .col h3 .sum-delta { font-size: .78rem; font-weight: 800; margin-left: 4px; }
+      /* ── コメントの増分(前回取得との差)。ギフトの is-gifted と同じ視覚言語・別クラス(意味の混同防止) ── */
+      ol.rank li.is-talking { background: linear-gradient(90deg, rgba(200,114,28,.10), transparent 70%); border-radius: 8px; }
+      ol.rank li.is-talking.tier-large { background: linear-gradient(90deg, rgba(200,114,28,.22), transparent 70%); }
+      ol.rank li.is-talking.tier-mega { background: linear-gradient(90deg, rgba(192,42,42,.22), transparent 70%); }
+      ol.rank li.is-talking.tier-mega .delta { color: #c02a2a; font-size: .84rem; }
       /* ── 脈拍レーン(応援した「誰が」が丸サムネ＋名前で流れる。本文は出さない) ── */
       /* .delta は既存のギフト増分バッジ専用。コメント速度は .rate で分離する。 */
       .stats .rate { font-size: .74rem; color: var(--orange); font-weight: 700; margin-left: 4px; font-variant-numeric: tabular-nums; }
@@ -339,7 +344,13 @@
       .pulse-dot.is-comment { border-color: rgba(200,114,28,.35); }
       .pulse-dot.is-gift::before { content: '🎁'; font-size: .8rem; }
       .pulse-dot.is-ad::before { content: '📣'; font-size: .8rem; }
-      @keyframes nl-pulse-flow { to { transform: translateX(calc(-100vw - 160px)); opacity: .2; } }
+      /* ── 熱いチップ(直近の実測2点間でコメントが増えた人。本文は出さない・件数のみ) ── */
+      .pulse-dot.is-hot { border-color: var(--orange); box-shadow: 0 0 0 2px rgba(200,114,28,.18), 0 1px 3px rgba(0,0,0,.1); }
+      .pulse-dot.is-hot.tier-medium { --dot-scale: 1.06; }
+      .pulse-dot.is-hot.tier-large { --dot-scale: 1.12; }
+      .pulse-dot.is-hot.tier-mega { --dot-scale: 1.18; animation-duration: 7s; }
+      .pulse-dot-delta { font-weight: 800; color: var(--orange); font-variant-numeric: tabular-nums; margin-left: 2px; }
+      @keyframes nl-pulse-flow { to { transform: translateX(calc(-100vw - 160px)) scale(var(--dot-scale, 1)); opacity: .2; } }
       /* 240 件/分超: 点を増やさず帯の濃さで(点の数=負荷を天井で止める) */
       .pulse-lane.is-band { background: repeating-linear-gradient(90deg, rgba(200,114,28,.35) 0 6px, transparent 6px 14px); background-size: 200% 100%; animation: nl-band 1.2s linear infinite; }
       @keyframes nl-band { to { background-position: -28px 0; } }

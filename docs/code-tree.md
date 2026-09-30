@@ -197,7 +197,7 @@
     - `2026-09-26.md`
     - `2026-09-28.md`
     - `2026-09-30.md`
-- 📁 **docs/** (331)
+- 📁 **docs/** (333)
   - 📁 **article-assets/** (87)
     - 📁 **venue-frames/** (12)
       - `f01.png`
@@ -512,6 +512,8 @@
   - `koken-contrib-hidden-tab-stuck-fix-v0616.md`
   - `lane-architecture-redesign.md`
   - `layer-map.html`
+  - `live-comment-heat-chips-DESIGN.md`
+  - `live-comment-heat-chips-IMPLEMENTATION-HANDOFF.md`
   - `live-comment-motion-DESIGN.md`
   - `live-comment-motion-IMPLEMENTATION-HANDOFF.md`
   - `live-gift-pulse-DESIGN.md`
