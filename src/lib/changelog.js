@@ -18,6 +18,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1554',
+    date: '2026-09-30',
+    summary: '脈拍レーン: いま話している人を強調',
+    items: Object.freeze([
+      'ライブビュー(/live/)の脈拍レーンで、直近でコメントが増えた人を大きく・繰り返し表示するようにしました。件数のみで、コメント本文は表示していません。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1553',
     date: '2026-09-30',
     summary: '/live/ 脈拍レーンに応援者の名前とサムネ',
@@ -168,14 +176,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     summary: '使っていない内部コードを整理',
     items: Object.freeze([
       'どこからも使われていない内部モジュール5件を削除しました。動作は変わらず、配布物が少し軽くなります。'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.1532',
-    date: '2026-09-21',
-    summary: 'パチンコ風の点滅演出を削除しました',
-    items: Object.freeze([
-      'リーチ/フィーバーのパチンコ風の点滅・BGM・ボイス演出を削除しました。画面がすっきりし、動作も軽くなります。ギフト・広告の効果音や読み上げは従来どおりです(内部整理を含む)。'
     ])
   })
 ]);

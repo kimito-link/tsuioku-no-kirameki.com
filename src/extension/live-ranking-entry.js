@@ -17,12 +17,13 @@ import {
 } from '../lib/liveRankingView.js';
 import { buildXIntentUrl } from '../lib/xIntentUrl.js';
 import { buildRecentCardHtml } from '../lib/liveRecentHoverCard.js';
-import { createGiftPulseRegistry, pulseRowKey, formatPtDelta, spanText } from '../lib/liveGiftPulse.js';
+import { createGiftPulseRegistry, pulseRowKey, formatPtDelta, formatCountDelta, spanText } from '../lib/liveGiftPulse.js';
 import { laneBuckets, laneTileKey, laneMoreText, LANES } from '../lib/liveLaneBuckets.js';
 import {
   createMotionRegistry, sampleFromLive, lifetimeCommentRatePerMin, pulseIntervalMs, pulseIsBand, formatRatePerMin,
-  createSupporterFeedRegistry, supporterChipsFromLive
+  createSupporterFeedRegistry, supporterChipsFromLive, tierForCommentDelta
 } from '../lib/liveMotion.js';
+import { toEpochMs } from '../lib/timeAuthority.js';
 
 const elList = /** @type {HTMLElement} */ (document.getElementById('list'));
 const elMeta = /** @type {HTMLElement} */ (document.getElementById('meta'));
@@ -44,6 +45,7 @@ const giftPulse = createGiftPulseRegistry();
 const laneTracker = createRowChangeTracker();
 const motion = createMotionRegistry();
 const supporterFeeds = createSupporterFeedRegistry();
+const commentPulse = createGiftPulseRegistry(tierForCommentDelta);
 
 /** 本体(Chrome 拡張)のストア URL。★LP index.html と同じ ID(AGENTS.md §2 の拡張 ID)。 */
 const STORE_URL = 'https://chromewebstore.google.com/detail/cjbabignmmodaickpeckiojjabnlogdb';
@@ -141,17 +143,19 @@ function renderRows(rows, liveId, kind, pulse = null) {
   const html = rows.map((r) => {
     const n = Number(r.rank) || 0;
     const rp = pulse ? pulse.byKey.get(pulseRowKey(r)) : undefined;
-    const cls = [tracker.classFor(rowKey(liveId, kind, r), Number(r.point) || 0), rp ? `is-gifted tier-${rp.tier}` : '']
+    const pulseCls = kind === 'comment' ? 'is-talking' : 'is-gifted';
+    const cls = [tracker.classFor(rowKey(liveId, kind, r), Number(r.point) || 0), rp ? `${pulseCls} tier-${rp.tier}` : '']
       .filter(Boolean).join(' ');
     // ★inline onerror は使わない(このリポの既存ページに1件も無く、CSP を足したときに黙って壊れる)。
     //   読み込み失敗の面倒は bindImgFallback が見る。
     const ava = (r.avatar && !isBlankIcon(r.avatar))
       ? `<img class="ava" src="${esc(r.avatar)}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer">`
       : '<span class="ava"></span>';
+    const deltaText = kind === 'comment' ? formatCountDelta(rp?.delta) : formatPtDelta(rp?.delta);
     const inner = `<span class="no${n > 0 && n <= 3 ? ' top' : ''}">${n || '-'}</span>`
       + `${ava}<span class="nm">${esc(r.name)}</span>`
       + `<span class="pt">${num(r.point)}${kind === 'comment' ? '件' : 'pt'}</span>`
-      + (rp ? `<span class="delta" title="前回の取得（${esc(spanText(pulse.spanMs))}）からの増分">${esc(formatPtDelta(rp.delta))}</span>` : '');
+      + (rp ? `<span class="delta" title="前回の取得（${esc(spanText(pulse.spanMs))}）からの増分">${esc(deltaText)}</span>` : '');
     // ★comment 列だけ data-uid/data-lv を付ける(数値 uid・匿名 uid とも=ホバー対象)。
     const hoverAttr = (kind === 'comment' && r.uid) ? ` data-uid="${esc(r.uid)}" data-lv="${esc(liveId)}"` : '';
     // 行全体を 1 つのリンクに(url があるときだけ)。無い行は素の中身のまま。
@@ -199,8 +203,9 @@ function bindImgFallback(root) {
  *   集計は約 10 分ごとの別ジョブなので、まだ来ていない配信がある(そのときは黙らず「待ち」と出す)。
  * ★上限に当たった配信は「直近ぶんの集計」と正直に添える(全部を数えたふりをしない)。
  * @param {any} l
+ * @param {import('../lib/liveGiftPulse.js').PulseResult|null} [pulse] 直近の実測2点間のコメント増分
  */
-function renderCommentCol(l) {
+function renderCommentCol(l, pulse = null) {
   const c = (l && l.comment && typeof l.comment === 'object') ? l.comment : null;
   const sum = c ? `<span class="sum">${num(c.commenters)}人</span>` : '';
   const head = `<h3><img src="${esc(FACE.linkSmile)}" alt="" loading="lazy" decoding="async">💬 コメントで応援した人 ${sum}</h3>`;
@@ -208,7 +213,7 @@ function renderCommentCol(l) {
     return `<div class="col">${head}<p class="empty"><img src="${esc(FACE.linkBlink)}" alt="" loading="lazy" decoding="async">コメント集計待ち（約 10 分ごとに更新）</p></div>`;
   }
   const note = c.partial ? '<p class="col-note">直近ぶんの集計です（古い側は順次さかのぼり中）</p>' : '';
-  return `<div class="col">${head}${renderRows(commentRows(l), l.liveId, 'comment')}${note}</div>`;
+  return `<div class="col">${head}${renderRows(commentRows(l), l.liveId, 'comment', pulse)}${note}</div>`;
 }
 
 /**
@@ -287,6 +292,7 @@ function render(data) {
   laneTracker.begin();
   motion.begin();
   supporterFeeds.begin();
+  commentPulse.begin();
   const receivedAt = Date.now();
   elList.innerHTML = ordered.map((l, i) => {
     const rows = supporterRows(l);
@@ -294,7 +300,9 @@ function render(data) {
     const buckets = laneBuckets(l);
     const track = motion.trackFor(l.liveId);
     track.push(sampleFromLive(l, data.capturedAt), receivedAt);
-    supporterFeeds.feedFor(l.liveId).fill(supporterChipsFromLive(l));
+    // ★partial(まだ部分集計)の収集は増分を信じない(part→full切替時の見かけの大増分を防ぐ)。
+    const cp = (l.comment && l.comment.partial) ? null : commentPulse.pulseFor(l.liveId, commentRows(l), data.capturedAt);
+    supporterFeeds.feedFor(l.liveId).fill(supporterChipsFromLive(l, cp), toEpochMs(data.capturedAt));
     const shownComment = track.valueAt('comment', receivedAt);
     const rate0 = track.ratePerMin('comment') ?? lifetimeCommentRatePerMin(l, receivedAt);
     const sx = shareHref(l);
@@ -321,7 +329,7 @@ function render(data) {
       + '<div class="cols">'
       + `<div class="col"><h3><img src="${esc(FACE.kontaSmile)}" alt="" loading="lazy" decoding="async">ギフトで支えた人 <span class="sum">${num(l.giftTotal)}pt${gp.sum > 0 ? ` <span class="sum-delta">${esc(formatPtDelta(gp.sum))}</span>` : ''}</span></h3>${renderRows(rows.gift, l.liveId, 'gift', gp)}</div>`
       + `<div class="col"><h3><img src="${esc(FACE.tanuNormal)}" alt="" loading="lazy" decoding="async">広告で支えた人 <span class="sum">${num(l.adTotal)}pt</span></h3>${renderRows(rows.ad, l.liveId, 'ad')}</div>`
-      + renderCommentCol(l)
+      + renderCommentCol(l, cp)
       + '</div></section>';
   }).join('');
   tracker.end();
@@ -329,6 +337,7 @@ function render(data) {
   laneTracker.end();
   motion.end();
   supporterFeeds.end();
+  commentPulse.end();
   _motionEls = collectMotionEls();
   bindImgFallback(elList);
 }
@@ -714,6 +723,14 @@ function spawnDot(lane, chip) {
     label.className = 'pulse-dot-name';
     label.textContent = chip.name;
     d.appendChild(label);
+    if (chip.heat > 0) {
+      d.classList.add('is-hot', `tier-${chip.tier}`);
+      const badge = document.createElement('span');
+      badge.className = 'pulse-dot-delta';
+      badge.textContent = `+${chip.heat}`;
+      d.appendChild(badge);
+      d.title += ` +${chip.heat}`;
+    }
   }
   d.addEventListener('animationend', () => d.remove(), { once: true });
   lane.appendChild(d);
