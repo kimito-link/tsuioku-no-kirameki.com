@@ -713,9 +713,27 @@ function summarizeMeetingRecords(days = 30) {
   //  突き合わせるのをやめ、ツール側で構造的に潰す。
   //  落とすのでなく retired フラグを付けて件数だけ残す: 黙って消すと「集計に出ない＝健康」
   //  と読める偽の安心が生まれるため（fail-closed の流儀。撤去済みだと明記して除外する）。
+  //  ★★2026-09-30 修正: ローカル(Ollama)勢まで「撤去済み」として消していた実損。
+  //   LINEUP にはクラウドしか載っておらず、ローカルは meeting.mjs:421 が
+  //   `push(\`local/\${m}\`, 'local', ...)` で後から足す設計。よって `LINEUP.map(label)` だけで
+  //   判定すると **local/* が全部 retired 扱いになり、日報の成績表から丸ごと落ちる**。
+  //   実損: `local/qwen3.5:9b` が **2026-09-25 から毎会議 `model 'qwen3.5:9b' not found`**
+  //   で失敗し続けていた（累計 17失敗/70発言）のに、日報は5日間**一度も報告しなかった**。
+  //   Ollama の実体は `qwen3.6:35b-a3b` / `qwen3.8:27b` で、9b は入っていない＝
+  //   roleOf が fast を返す幽霊メンバーを毎回召集しては必ず落としていた
+  //   （しかも fast は code/design/fact の**3カテゴリ全部**が want に含む＝ほぼ毎会議）。
+  //   ★判定を「LINEUPに居るか」から「**roleOf が役割を返せるか**」へ変える:
+  //    ローカルもクラウドも roleOf が現役として扱うものは成績表に出す。
+  //    これで「LINEUPに載せない設計のメンバー」を構造的に取りこぼさなくなる。
   const liveLabels = new Set(LINEUP.map((m) => m.label));
+  const isRetired = (label) => {
+    if (liveLabels.has(label)) return false;
+    // ローカル勢は LINEUP に載らないので、roleOf が拾えるなら現役とみなす
+    if (label.startsWith('local/')) return false;
+    return true;
+  };
   const all = Object.entries(byLabel)
-    .map(([label, v]) => ({ label, n: v.n, ng: v.ng, rate: v.n ? v.ng / v.n : 0, retired: !liveLabels.has(label) }))
+    .map(([label, v]) => ({ label, n: v.n, ng: v.ng, rate: v.n ? v.ng / v.n : 0, retired: isRetired(label) }))
     .sort((a, b) => b.rate - a.rate || b.n - a.n);
   const rows = all.filter((r) => !r.retired);
   const retiredCount = all.length - rows.length;

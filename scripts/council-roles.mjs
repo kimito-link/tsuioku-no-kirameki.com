@@ -111,7 +111,24 @@ export function roleOf(name) {
   // 対処するなら OLLAMA_NUM_PARALLEL を上げるが、ユーザーのマシン全体に影響する設定のため
   // ここでは変更しない（VRAM 12GBでの同時ロードは別のリスクを生む）。
   // 頻発するようなら、まず `ollama ps` と他プロセスの使用状況を確認すること。
-  if (n.includes("qwen3.5:9b")) return "fast";
+  // ★★★2026-09-30 削除（幽霊メンバーを毎会議召集していた実損）:
+  //  旧: `if (n.includes("qwen3.5:9b")) return "fast";`
+  //  **Ollama に qwen3.5:9b が存在しなくなっていた**（実体は qwen3.6:35b-a3b / qwen3.8:27b の2件）。
+  //  それでも roleOf が fast を返すため会議は毎回この幽霊を fast 席へ召集し、
+  //  **2026-09-25 から毎会議 `model 'qwen3.5:9b' not found` で必ず失敗**していた
+  //  （累計 17失敗/70発言。しかも fast は code/design/fact の3カテゴリ全部が want に含む＝ほぼ毎会議）。
+  //  ★5日間気づけなかった理由: scout は Ollama を検査対象にしておらず、日報の成績表も
+  //   `LINEUP.map(label)` で現役判定していたため **local/* を「撤去済み」として丸ごと除外**していた
+  //   （scout-models.mjs 側も同日修正済み。そちらのコメント参照）。
+  //  ★上の「撤去条件: 2回連続FAILEDなら後継を立てず fast役の役割定義ごと削除」には**従わない**。
+  //   あの但し書きは「fast役のクラウド主力が全滅した」2026-08-18 の状況を前提に書かれたもので、
+  //   **今はクラウド側が復活している**（cloudflare/llama-3.3-70b を実測: 200 / 1075ms・本来の「爆速」）。
+  //   前提が変わったので、**役割定義は残し、実在しないローカル判定行だけを削る**のが正しい。
+  //  ★後継のローカルは立てない: 実在する2モデルを fast の system で実測したところ
+  //   qwen3.8:27b=128864ms / qwen3.6:35b-a3b=108540ms で、どちらも「爆速の視点」に値しない
+  //   （旧 9b は2.0〜2.4秒だった）。速くないものを fast に置くと役割名が嘘になる。
+  //  ★この行を消すと qwen3.8/3.6 は下の一括判定で diverge に落ちる（意図どおり。
+  //   diverge は groq/qwen3.8-27b と cloudflare/qwen3-30b-a3b が生存しており穴は空かない）。
   if (n.includes("qwen3") || n.includes("qwen3.5")) return "diverge";
   if (n.includes("gemma4")) return "lead";
   // 2026-07-14 追加: 超大型は統括(lead)。会議のlead枠は従来local/gemma4(8B)頼みで
