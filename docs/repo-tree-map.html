@@ -384,8 +384,8 @@
       <div class="fpaths"><code class="path">src/lib/crossSupporterRanking.js</code><code class="path">src/lib/commenterHistoricalAnalytics.js</code><code class="path">src/lib/supporterRanking.js</code><code class="path">src/lib/marketingChartsHtml.js</code></div>
     </section>
 <section class="feat">
-      <div class="fhead"><span class="fname">/live/ コメント速度演出</span> <span class="tag">LP</span><span class="tag">公開</span><span class="tag">ランキング</span><span class="tag">コメント</span><span class="tag">表示</span></div>
-      <div class="fdesc">配信カードの番組合計コメント数だけを60秒ごとの実測値の間で線形補間し、実測2点から求めた「+N/分」と脈拍レーンを表示する。個人別順位・コメント本文・細かい時刻データは補間・保存しない</div>
+      <div class="fhead"><span class="fname">/live/ コメント速度演出・応援者チップ</span> <span class="tag">LP</span><span class="tag">公開</span><span class="tag">ランキング</span><span class="tag">コメント</span><span class="tag">表示</span></div>
+      <div class="fdesc">配信カードの番組合計コメント数だけを60秒ごとの実測値の間で線形補間し、実測2点から求めた「+N/分」と脈拍レーンを表示する。レーンには既存の応援者一覧(commentRows/supporterRows)から名前・丸サムネ・種別(💬/🎁/📣)だけを巡回キューで流す(本文は一切含めない・AGENTS.md §3.3)。個人別順位・コメント本文・細かい時刻データは補間・保存しない</div>
       <div class="fpaths"><code class="path">src/lib/liveMotion.js</code><code class="path">src/extension/live-ranking-entry.js</code><code class="path">tsuioku-no-kirameki/live/index.html</code></div>
     </section>
 
