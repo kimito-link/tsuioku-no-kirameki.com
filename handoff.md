@@ -1,20 +1,20 @@
 # Handoff — 会議ハーネスの日課
 
-STATUS: 完了
-ROOT_CAUSE: －（異常なし）
-FILES_CHANGED: council-scout/state.json, council-scout/briefs/2026-09-28.md（いずれも生成物）
-CHANGES: env充足を確認（有効 19/19体） / scoutを実行（日報: 2026-09-28.md）
+STATUS: ブロック中
+ROOT_CAUSE: 下記 NEEDS_JUDGMENT を参照（未判断）
+FILES_CHANGED: council-scout/state.json, council-scout/briefs/2026-09-30.md（いずれも生成物）
+CHANGES: env充足を確認（有効 19/19体） / scoutを実行（日報: 2026-09-30.md） / 疎通不能の警告2件は据え置き（撤去条件=全モデル429/カタログ消滅/課金要求のいずれにも非該当。日数が伸びるのは新情報ではない）
 TESTS_RUN: node scripts/council-env.mjs / node scripts/scout-models.mjs
-TEST_RESULT: 異常なし
-REMAINING_RISKS: なし
-NEXT_ACTION: 異常なし。次回の日課まで何もしない。
-LAST_WORKED_ON: 2026-09-28
+TEST_RESULT: 異常あり（判断待ち）
+REMAINING_RISKS: 1件の未判断事象
+NEXT_ACTION: 下の NEEDS_JUDGMENT を司令塔（Claude本体）が判断する。**自動で直さないこと。**
+LAST_WORKED_ON: 2026-09-30
 WORKED_BY: council-daily.mjs（実行者: unknown）
 MACHINE_NOTES: -
 
 ## NEEDS_JUDGMENT（司令塔が判断する。ここを自動で直してはいけない）
 
-（なし）
+1. 認証エラー: sambanova/deepseek-v3.1: 実疎通2日連続失敗（認証エラー(キー/権限の問題・人が直すまで回復しない)・初回 2026-09-28）。応答: Incorrect API key  → キーの値より先に**変数名の取り違え**を疑う（2026-09-16の真因）。
 
 ## この日課がやること・やらないこと
 
