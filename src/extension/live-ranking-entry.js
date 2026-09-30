@@ -323,7 +323,9 @@ function render(data) {
       + '</span>'
       + '</div>'
       + (l.commentCount > 0
-        ? `<div class="pulse-lane${pulseIsBand(rate0) ? ' is-band' : ''}" data-lane="${esc(l.liveId)}" aria-hidden="true"></div>`
+        // ★data-fallback-rate: 実測2点が揃う前(開いた直後)は速度が null になり点が流れない。
+        //   表示にも使っている rate0(実測 ?? 配信開始からの平均)を控え、motionFrame がそれで代用する。
+        ? `<div class="pulse-lane${pulseIsBand(rate0) ? ' is-band' : ''}" data-lane="${esc(l.liveId)}" data-fallback-rate="${rate0 ?? ''}" aria-hidden="true"></div>`
         : '')
       + renderLanes(buckets, l.liveId, gp)
       + '<div class="cols">'
@@ -673,13 +675,13 @@ elList.addEventListener('mouseout', (ev) => {
   hideCard();
 });
 
-/** @type {{ counters: {el:HTMLElement, id:string}[], rates: {el:HTMLElement, id:string}[], lanes: Map<string,{el:HTMLElement, nextAt:number}> }} */
+/** @type {{ counters: {el:HTMLElement, id:string}[], rates: {el:HTMLElement, id:string}[], lanes: Map<string,{el:HTMLElement, nextAt:number, fallbackRate:number|null}> }} */
 let _motionEls = { counters: [], rates: [], lanes: new Map() };
 const REDUCED = matchMedia('(prefers-reduced-motion: reduce)');
 const PULSE_JITTER = 0.3;          // 間隔の ±30%(メトロノームに見せない。平均は実測どおり)
 const PULSE_DOTS_MAX_PER_LANE = 12;
 
-/** @returns {{ counters: {el:HTMLElement, id:string}[], rates: {el:HTMLElement, id:string}[], lanes: Map<string,{el:HTMLElement, nextAt:number}> }} */
+/** @returns {{ counters: {el:HTMLElement, id:string}[], rates: {el:HTMLElement, id:string}[], lanes: Map<string,{el:HTMLElement, nextAt:number, fallbackRate:number|null}> }} */
 function collectMotionEls() {
   const counters = []; const rates = []; const lanes = new Map();
   for (const sec of elList.querySelectorAll('section.live')) {
@@ -687,7 +689,10 @@ function collectMotionEls() {
     const id = lane ? String(lane.getAttribute('data-lane') || '') : '';
     const b = /** @type {HTMLElement|null} */ (sec.querySelector('[data-motion="comment"]'));
     const r = /** @type {HTMLElement|null} */ (sec.querySelector('[data-rate="comment"]'));
-    if (lane) lanes.set(id, { el: lane, nextAt: performance.now() + 300 });
+    if (lane) {
+      const fr = Number(lane.getAttribute('data-fallback-rate'));
+      lanes.set(id, { el: lane, nextAt: performance.now() + 300, fallbackRate: Number.isFinite(fr) && fr > 0 ? fr : null });
+    }
     if (b && lane) counters.push({ el: b, id });
     if (r && lane) rates.push({ el: r, id });
   }
@@ -752,7 +757,9 @@ function motionFrame(tMs) {
   if (!REDUCED.matches && !document.hidden) {
     for (const [id, lane] of _motionEls.lanes) {
       const tr = motion.trackFor(id);
-      const rate = tr.ratePerMin('comment');
+      // ★実測2点が揃う前(開いた直後)は ratePerMin が null。配信開始からの平均(fallbackRate)で
+      //   代用し、初回描画からレーンが動くようにする(実測が揃い次第そちらへ切り替わる)。
+      const rate = tr.ratePerMin('comment') ?? lane.fallbackRate;
       const iv = pulseIntervalMs(rate);
       if (iv == null || pulseIsBand(rate)) continue;                       // 帯は CSS だけで表す
       if (tMs >= lane.nextAt) {
