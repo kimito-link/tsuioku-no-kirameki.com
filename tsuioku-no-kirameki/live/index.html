@@ -326,13 +326,20 @@
       ol.rank li.is-gifted.tier-mega { background: linear-gradient(90deg, rgba(192,42,42,.22), transparent 70%); }
       ol.rank li.is-gifted.tier-mega .delta { color: #c02a2a; font-size: .84rem; }
       .col h3 .sum-delta { font-size: .78rem; font-weight: 800; margin-left: 4px; }
-      /* ── 脈拍レーン(コメントの実測速度で点が流れる。本文・人物は出さない) ── */
+      /* ── 脈拍レーン(応援した「誰が」が丸サムネ＋名前で流れる。本文は出さない) ── */
       /* .delta は既存のギフト増分バッジ専用。コメント速度は .rate で分離する。 */
       .stats .rate { font-size: .74rem; color: var(--orange); font-weight: 700; margin-left: 4px; font-variant-numeric: tabular-nums; }
-      .pulse-lane { position: relative; height: 10px; overflow: hidden; background: linear-gradient(90deg, transparent, #fff7ec 20%, #fff7ec 80%, transparent); border-bottom: 1px solid var(--line); }
-      .pulse-dot { position: absolute; top: 3px; right: -6px; width: 5px; height: 5px; border-radius: 50%; background: var(--orange); opacity: .85;
-        animation: nl-pulse-flow 4s linear forwards; will-change: transform; }
-      @keyframes nl-pulse-flow { to { transform: translateX(calc(-100vw - 12px)); opacity: .15; } }
+      .pulse-lane { position: relative; height: 30px; overflow: hidden; background: linear-gradient(90deg, transparent, #fff7ec 20%, #fff7ec 80%, transparent); border-bottom: 1px solid var(--line); }
+      .pulse-dot { position: absolute; top: 3px; right: -140px; display: flex; align-items: center; gap: 4px; max-width: 160px;
+        padding: 2px 8px 2px 3px; border-radius: 999px; background: #fff; border: 1px solid var(--line); box-shadow: 0 1px 3px rgba(0,0,0,.08);
+        font-size: .72rem; color: var(--ink-sub); white-space: nowrap; opacity: .95;
+        animation: nl-pulse-flow 6s linear forwards; will-change: transform; }
+      .pulse-dot-avatar { width: 20px; height: 20px; border-radius: 50%; object-fit: cover; flex: none; background: #f2e9dc; }
+      .pulse-dot-name { overflow: hidden; text-overflow: ellipsis; max-width: 110px; }
+      .pulse-dot.is-comment { border-color: rgba(200,114,28,.35); }
+      .pulse-dot.is-gift::before { content: '🎁'; font-size: .8rem; }
+      .pulse-dot.is-ad::before { content: '📣'; font-size: .8rem; }
+      @keyframes nl-pulse-flow { to { transform: translateX(calc(-100vw - 160px)); opacity: .2; } }
       /* 240 件/分超: 点を増やさず帯の濃さで(点の数=負荷を天井で止める) */
       .pulse-lane.is-band { background: repeating-linear-gradient(90deg, rgba(200,114,28,.35) 0 6px, transparent 6px 14px); background-size: 200% 100%; animation: nl-band 1.2s linear infinite; }
       @keyframes nl-band { to { background-position: -28px 0; } }

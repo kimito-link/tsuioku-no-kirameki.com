@@ -1,4 +1,6 @@
 import { toEpochMs } from './timeAuthority.js';
+import { commentRows, supporterRows, isBlankIcon } from './liveRankingView.js';
+import { anonymousIdenticonDataUrl } from './anonymousIdenticon.js';
 
 /** 補間する系列。MVP は 'comment' だけ使う(他は型として用意・後段で有効化)。 */
 export const MOTION_KINDS = /** @type {const} */ (['comment', 'watch', 'gift', 'ad']);
@@ -133,6 +135,86 @@ export function formatRatePerMin(rate) {
   if (rate == null) return '計測中';
   if (rate < 1) return `+${(Math.round(rate * 10) / 10).toFixed(1)}/分`;
   return `+${Math.round(rate).toLocaleString('ja-JP')}/分`;
+}
+
+/** @typedef {{ key: string, kind: 'comment'|'gift'|'ad', name: string, avatar: string, url: string }} SupporterChip */
+
+/**
+ * 脈拍レーンに流す「誰が応援したか」カードの材料。★本文(発言内容)は一切含めない
+ * (AGENTS.md §3.3・council-fable D-3②: コメント本文は一切保存・表示しない、を厳守)。
+ * 既存の応援者一覧(commentRows/supporterRows)から名前・サムネ・種別だけを取り出す
+ * (新しいデータ源・新しい取得経路は一切増やさない)。
+ *
+ * 並び順は「元の順位表の並びそのまま」(comment→gift→ad の種別ごとに連結)。呼び出し側
+ * (createSupporterFeed)がこの配列を巡回キューとして使う。
+ * @param {any} live
+ * @returns {SupporterChip[]}
+ */
+export function supporterChipsFromLive(live) {
+  /** @type {SupporterChip[]} */
+  const out = [];
+  for (const r of commentRows(live)) {
+    if (!r.name) continue;
+    out.push({ key: `c:${r.uid || r.name}`, kind: 'comment', name: r.name, avatar: r.avatar || '', url: r.url || '' });
+  }
+  const { gift, ad } = supporterRows(live);
+  for (const r of gift) {
+    if (!r.name) continue;
+    const avatar = r.avatar && !isBlankIcon(r.avatar) ? r.avatar : anonymousIdenticonDataUrl(r.uid || r.name, 64);
+    out.push({ key: `g:${r.uid || r.name}`, kind: 'gift', name: r.name, avatar, url: r.url || '' });
+  }
+  for (const r of ad) {
+    if (!r.name) continue;
+    const avatar = r.avatar && !isBlankIcon(r.avatar) ? r.avatar : anonymousIdenticonDataUrl(r.uid || r.name, 64);
+    out.push({ key: `a:${r.uid || r.name}`, kind: 'ad', name: r.name, avatar, url: r.url || '' });
+  }
+  return out;
+}
+
+/**
+ * 配信ごとに「まだ流していない人から順に」1人ずつ取り出す巡回キュー。
+ * ★集計値ではなく演出専用(誰が何回流れても表示上の順番が変わるだけで、件数・金額には一切影響しない)。
+ * 新しい render() のたびに `fill` で最新の候補配列を渡し、尽きたら先頭から周回する。
+ */
+export function createSupporterFeed() {
+  /** @type {SupporterChip[]} */ let chips = [];
+  let cursor = 0;
+  return {
+    /** @param {SupporterChip[]} next */
+    fill(next) {
+      chips = Array.isArray(next) ? next : [];
+      if (cursor > chips.length) cursor = 0;
+    },
+    /** @returns {SupporterChip|null} */
+    next() {
+      if (!chips.length) return null;
+      const c = chips[cursor % chips.length];
+      cursor += 1;
+      return c;
+    }
+  };
+}
+
+/** 配信ごとの createSupporterFeed() を持つ台帳(begin/end で今回出なかった配信を捨てる)。 */
+export function createSupporterFeedRegistry() {
+  /** @type {Map<string, ReturnType<typeof createSupporterFeed>>} */ const feeds = new Map();
+  /** @type {Set<string>|null} */ let touched = null;
+  return {
+    begin() { touched = new Set(); },
+    /** @param {string} liveId */
+    feedFor(liveId) {
+      const id = String(liveId || '');
+      if (touched) touched.add(id);
+      let f = feeds.get(id);
+      if (!f) { f = createSupporterFeed(); feeds.set(id, f); }
+      return f;
+    },
+    end() {
+      if (touched) for (const k of Array.from(feeds.keys())) if (!touched.has(k)) feeds.delete(k);
+      touched = null;
+    },
+    size() { return feeds.size; }
+  };
 }
 
 /** 配信ごとの track を持つ台帳。tracker(createRowChangeTracker)と同じ begin/end の流儀で、今回出なかった配信を捨てる。 */
