@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 8 / 875 件
+## ⚠️ 役割コメントが無いソース 8 / 879 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `scripts/build.mjs`
@@ -55,9 +55,10 @@
   - `KB-stale-premise.md`
   - `TO-web-ios-android-ai-maze-pattern-2026-08-31.md`
   - `TO-web-ios-android-unnamed-bucket-2026-09-03.md`
-- 📁 **api/** (5)
+- 📁 **api/** (6)
   - `live-og-image.js` — /api/live-og-image — 焼いた OGP カード画像(配信サムネ＋数字帯)を返す薄い I/O 係(v0.1.1519)。
   - `live-og.js` — /api/live-og — 配信ごとの OGP カード用 HTML を返す薄い I/O 係(v0.1.1517)。
+  - `live-platforms.js` — /api/live-platforms — /live/ の「ほかの配信サービス」セクション(Kick・後で YouTube)のデータ。
   - `live-ranking.js` — /live/ 用「支えた人ランキング」の収集・配信 Vercel Serverless Function。
   - `live-recent-comments.js` — /api/live-recent-comments — `/live/` の「コメントで応援した人」にホバーしたとき、
   - `status.js` — status 受け口 Vercel Serverless Function。
@@ -198,7 +199,7 @@
     - `2026-09-28.md`
     - `2026-09-30.md`
     - `2026-10-01.md`
-- 📁 **docs/** (334)
+- 📁 **docs/** (337)
   - 📁 **article-assets/** (87)
     - 📁 **venue-frames/** (12)
       - `f01.png`
@@ -310,7 +311,7 @@
     - `storage-bus.md`
     - `venue.md`
     - `web-status.md`
-  - 📁 **handoff/** (151)
+  - 📁 **handoff/** (154)
     - 📁 **bench/** (2)
       - `bench-interval.mjs` — ⚠️ 役割コメント無し
       - `bench-lane.mjs` — ⚠️ 役割コメント無し
@@ -419,6 +420,9 @@
     - `lanescene-structural-review-IMPLEMENTATION-HANDOFF.md`
     - `live-comment-body-DESIGN.md`
     - `live-comment-incremental-DESIGN.md`
+    - `live-multiplatform-kick-youtube-IMPLEMENTATION-HANDOFF.md`
+    - `live-multiplatform-kick-youtube-MAP.md`
+    - `live-multiplatform-kick-youtube-SPEC.md`
     - `live-ranking-dynamic-og-DESIGN.md`
     - `live-ranking-og-stats-DESIGN.md`
     - `live-ranking-share-DESIGN.md`
@@ -801,7 +805,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (1858)
+- 📁 **src/** (1865)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1077,7 +1081,7 @@
         - `logo_funlink_white_RGB_link_black.png`
         - `logo_funlink_white_RGB_maru_black.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1628)
+  - 📁 **lib/** (1633)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -1743,6 +1747,8 @@
     - `judgeConsistency.test.js`
     - `keyboardTypeDiagnostic.js` — L12: キーボード型診断（コメンターを 5 つの型に分類）。
     - `keyboardTypeDiagnostic.test.js`
+    - `kickLivestreams.js` — Kick 公式 API(v2 livestreams)の応答を「1 配信」の共通形にする純関数。
+    - `kickLivestreams.test.js`
     - `kiramekiAwards.js` — 「きらめきの賞」判定ロジック（純関数）。
     - `kiramekiAwards.test.js`
     - `kiramekiAwardsSectionHtml.js` — HTMLレポートの「きらめき表彰」セクション(CSS+各賞カード)の組み立て。
@@ -1837,6 +1843,9 @@
     - `liveOgStats.test.js`
     - `livePersistInterval.js` — v0.1.498〜501: ライブ記録の保存（コアレッサ）最小間隔を決める純粋関数。フリーズ対策 A。
     - `livePersistInterval.test.js`
+    - `livePlatforms.wiring.test.js`
+    - `livePlatformsHtml.js` — /live/ の「ほかの配信サービス」セクション(Kick・後で YouTube)の HTML 文字列を作る純関数。
+    - `livePlatformsHtml.test.js`
     - `liveRankingView.js` — `/live/`「追憶のきらめき ランキング」の純ロジック(DOM を触らない)。
     - `liveRankingView.test.js`
     - `liveRecentHoverCard.js` — `/live/` の「コメントで応援した人」にホバーしたとき出す
@@ -2708,7 +2717,9 @@
     - `yieldToBrowserPaint.js` — 【層】L0 判定層(依存ゼロ・chrome.* 非依存)
     - `yukkuriBroadcastSummary.js` — 放送終了後の HTML レポート / マーケ分析の頭にくる「ゆっくり解説風」要約セクション。
     - `yukkuriBroadcastSummary.test.js`
-  - 📁 **server/** (2)
+  - 📁 **server/** (4)
+    - `kickApi.js` — Kick 公式 API(App Access Token)の I/O だけ(サーバ専用・npm 依存なし)。
+    - `kickApi.test.js`
     - `nicoliveGuest.js` — ニコ生の「ゲスト視聴」で必要な素の I/O だけを持つ Node 側の共有部品。
     - `nicoliveGuest.test.js`
   - 📁 **shared/** (7)

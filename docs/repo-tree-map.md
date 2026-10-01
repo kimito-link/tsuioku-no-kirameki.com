@@ -249,6 +249,14 @@ graph LR
   f46 --> f46_1["lib/liveGiftPulse.js"]
   f46 --> f46_2["extension/live-ranking-entry.js"]
   f46 --> f46_3["live/index.html"]
+  HUB --> f47["/live/ Kick セクション(ほかの配信サービス)"]
+  f47 --> f47_0["live-platforms.js"]
+  f47 --> f47_1["server/kickApi.js"]
+  f47 --> f47_2["lib/kickLivestreams.js"]
+  f47 --> f47_3["lib/livePlatformsHtml.js"]
+  f47 --> f47_4["extension/live-ranking-entry.js"]
+  f47 --> f47_5["live/index.html"]
+  f47 --> f47_6["workflows/live-ranking.yml"]
 ```
 
 ---
@@ -264,8 +272,8 @@ graph LR
 ## `_docs/` — 横断キット(web-ios-android)との手紙・KB・コンセプトメモ  〔横断 / KB〕
 <sub>ファイル 5 件</sub>
 
-## `api/` — サーバレス API(status / live-ranking / live-recent-comments / live-og)  〔API〕
-<sub>ファイル 5 件</sub>
+## `api/` — サーバレス API(status / live-ranking / live-recent-comments / live-og / live-platforms)  〔API〕
+<sub>ファイル 6 件</sub>
 
 ## `app/` — Web 版状態ページのアプリ(app.js + dist)  〔Web版〕
 <sub>ファイル 100 件</sub>
@@ -284,12 +292,12 @@ graph LR
 - `briefs/`（23 件） — スカウトの日次ブリーフ(md)  〔会議 / 原稿〕
 
 ## `docs/` — 設計正本・マインドマップ・フロー図・feature-map(AI/人間向け)  〔設計 / レポート〕
-<sub>ファイル 334 件</sub>
+<sub>ファイル 337 件</sub>
 
 - `article-assets/`（87 件） — 記事用の画像・動画・音声アセット  〔記事 / 画像〕
 - `article-drafts/`（2 件） — 公開前の記事下書き(防御的公開の草稿)  〔記事 / 下書き〕
 - `feature-map/`（15 件） — 機能ごと依存図(自動生成)。誰が storage を書き/読むか  〔依存図 / 自動生成〕
-- `handoff/`（151 件） — セッション引継ぎ・調査設計の記録(HANDOFF-*/MAP/SPEC/DESIGN)。ルート直下に散らかっていたものを 2026-07-31 に集約  〔引継ぎ / 設計〕
+- `handoff/`（154 件） — セッション引継ぎ・調査設計の記録(HANDOFF-*/MAP/SPEC/DESIGN)。ルート直下に散らかっていたものを 2026-07-31 に集約  〔引継ぎ / 設計〕
 - `marketing/`（1 件） — 発信用の原稿(X 記事・告知文)。★数字は出典なしで書かない  〔マーケ / 原稿〕
 - `patent-unique-voice-reading-filing-final/`（1 件） — 読み上げ手法の出願関連(現在は MOVED=移設済みの残置)  〔特許 / 履歴〕
 - `policies/`（1 件） — 運用方針メモ(統計の失敗モード等)  〔方針〕
@@ -323,15 +331,15 @@ graph LR
 - `soundeffect-lab/`（19 件） — 効果音ラボ由来の素材候補(採否検討用)  〔音声 / 素材〕
 
 ## `src/` — LP 側 + 純粋関数ライブラリの源  〔ソース〕
-<sub>ファイル 1858 件</sub>
+<sub>ファイル 1865 件</sub>
 
 - `data/`（7 件） — 保存コメントからレーン候補を読む acquirer / source 層  〔コメント / 取得〕
 - `domain/`（20 件） — ドメイン正本(応援レーンの集約・列ポリシー等。識別子判定など)  〔応援 / 集約 / 識別子〕
 - `extension/`（56 件） — バンドル entry(content/popup/venue/status/offscreen/backfill-sw 等=機能境界)  〔entry / 記録 / 会場 / 応援〕
 - `fixtures/`（1 件） — テスト用フィクスチャ  〔テスト〕
 - `images/`（134 件） — LP / CWS 提出物のマスター画像  〔画像〕
-- `lib/`（1628 件） — 純粋関数ライブラリ(unit test 対象)。色・速度・コメント・レポート等の計算ロジックの大半  〔色 / 速度 / コメント / レポート / 純粋関数〕
-- `server/`（2 件） — Node 側 I/O 部品(fetch/WebSocket を実際に叩く。api と scripts が共用。lib には置けない)  〔API / 公開 / ランキング〕
+- `lib/`（1633 件） — 純粋関数ライブラリ(unit test 対象)。色・速度・コメント・レポート等の計算ロジックの大半  〔色 / 速度 / コメント / レポート / 純粋関数〕
+- `server/`（4 件） — Node 側 I/O 部品(fetch/WebSocket を実際に叩く。api と scripts が共用。lib には置けない)  〔API / 公開 / ランキング〕
 - `shared/`（7 件） — 複数機能で共有する小部品(アバター URL ガード等)  〔共有 / アバター〕
 - `sound/`（1 件） — 音声素材(src 側)  〔音声〕
 
@@ -671,6 +679,17 @@ pre-pushのbuild再実行でbuildIdタイムスタンプが毎回変わりdist�
 - [`src/lib/liveGiftPulse.js`](../src/lib/liveGiftPulse.js)
 - [`src/extension/live-ranking-entry.js`](../src/extension/live-ranking-entry.js)
 - [`tsuioku-no-kirameki/live/index.html`](../tsuioku-no-kirameki/live/index.html)
+
+### /live/ Kick セクション(ほかの配信サービス)  〔LP / 公開 / ランキング / Kick〕
+ニコ生とは別セクション・別データ(/api/live-platforms・Redis live:kick:latest)で、Kick 公式 API(App Access Token)の日本語配信を同時視聴数の多い順に最大20件。値は Kick が返したものをそのまま表示し推定・増分・順位推移は作らない(YouTube を同じ枠に乗せるため・規約)。収集は Actions の kick ジョブ(リポジトリ変数 KICK_COLLECT=1 で有効)だけで、閲覧者の操作では Kick へ問い合わせない。成人向けは既定で非表示(件数は表示)。live:platforms:off で再デプロイなしに停止
+
+- [`api/live-platforms.js`](../api/live-platforms.js)
+- [`src/server/kickApi.js`](../src/server/kickApi.js)
+- [`src/lib/kickLivestreams.js`](../src/lib/kickLivestreams.js)
+- [`src/lib/livePlatformsHtml.js`](../src/lib/livePlatformsHtml.js)
+- [`src/extension/live-ranking-entry.js`](../src/extension/live-ranking-entry.js)
+- [`tsuioku-no-kirameki/live/index.html`](../tsuioku-no-kirameki/live/index.html)
+- [`.github/workflows/live-ranking.yml`](../.github/workflows/live-ranking.yml)
 
 ---
 

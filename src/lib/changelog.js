@@ -18,6 +18,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1556',
+    date: '2026-10-01',
+    summary: '/live/ に Kick の配信一覧(別欄)を準備',
+    items: Object.freeze([
+      'ライブビュー(/live/)に、Kick で配信中の日本語配信を同時視聴数の多い順に並べる欄を用意しました。値は Kick の公式 API が返したものをそのまま表示し、ニコ生の一覧とは混ぜません。Kick 側の準備が整い次第、表示が始まります。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1555',
     date: '2026-09-30',
     summary: '脈拍レーンが開いた直後から動くように修正',
@@ -168,14 +176,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     summary: '終了配信の経過時間が伸び続ける不具合を修正',
     items: Object.freeze([
       '配信が終わっても「配信時間」が伸び続けて何十時間にもなる不具合を修正しました。終了を検知した時点の経過時間で止まります。'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.1534',
-    date: '2026-09-21',
-    summary: '会場の席のちらつきを修正',
-    items: Object.freeze([
-      '会場モードで、同じ配信の一瞬だけ空になる瞬間に席(応援タイル)が消えてすぐ戻る「ちらつき」を修正しました。配信を切り替えたときは従来どおり前の配信の席は残しません。'
     ])
   })
 ]);

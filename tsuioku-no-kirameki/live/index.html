@@ -362,6 +362,24 @@
       .state { display: flex; align-items: center; gap: 12px; padding: 18px; border: 1px dashed var(--line); border-radius: 16px; background: #fff; color: var(--ink-sub); margin-top: 18px; }
       .state img { width: 64px; height: 64px; object-fit: contain; }
 
+      /* ── ほかの配信サービス(Kick・後で YouTube)。カード内は .live__head 以下をニコ生と共用 ── */
+      .platforms { display: grid; gap: 16px; margin-top: 24px; }
+      .platforms:empty { display: none; }
+      .platform__title { margin: 0 0 4px; font-size: 1.15rem; color: var(--navy-deep); display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+      .platform__title small { font-size: .8rem; font-weight: 500; color: var(--ink-sub); }
+      .platform__badge { font-size: .72rem; font-weight: 800; letter-spacing: .06em; padding: 3px 8px; border-radius: 6px; background: var(--navy-deep); color: #fff; line-height: 1.2; }
+      .platform__badge--kick { background: #53fc18; color: #0b0e0b; }
+      .platform__meta { margin: 0 0 10px; font-size: .86rem; color: var(--ink-sub); display: flex; gap: 4px 8px; flex-wrap: wrap; }
+      .platform__meta .stale { color: #b3261e; }
+      .platform__list { display: grid; gap: 12px; }
+      .plive { border: 1px solid var(--line); border-radius: 16px; background: var(--card); overflow: hidden; box-shadow: 0 6px 20px rgba(20, 55, 92, .06); }
+      .plive .live__head { border-bottom: 0; }
+      .plive .live__info h3 { margin: 4px 0 2px; font-size: .95rem; font-weight: 500; line-height: 1.45; color: var(--ink); }
+      .plive .live__info h3 a { color: inherit; text-decoration: none; }
+      .plive .live__info h3 a:hover { text-decoration: underline; }
+      .plive .category { display: inline-block; margin-top: 4px; font-size: .74rem; color: var(--ink-sub); border: 1px solid var(--line); border-radius: 999px; padding: 1px 8px; }
+      .platform__source { margin: 8px 0 0; font-size: .74rem; color: var(--ink-sub); }
+
       .note { margin-top: 28px; padding: 14px 16px; border: 1px solid var(--line); border-radius: 16px; background: var(--bg-soft); font-size: .84rem; color: var(--ink-sub); }
       .note p { margin: 0 0 6px; }
       .note p:last-child { margin-bottom: 0; }
@@ -401,6 +419,9 @@
 
       <!-- ★ランキングは【すぐ見える位置】に(ユーザー要望 2026-09-14「すぐに ranking が見れるようにして」)。説明と導線はその下。 -->
       <main id="list" class="list" aria-live="polite"></main>
+
+      <!-- ★2026-10-01: ほかの配信サービス(Kick・後で YouTube)。ニコ生とは別セクション・別データ(/api/live-platforms)。 -->
+      <section id="platforms" class="platforms" aria-live="polite"></section>
 
       <button type="button" class="fab-refresh" data-refresh aria-label="ランキングをいま更新する" title="いま更新">🔄</button>
 
@@ -446,7 +467,8 @@
         <p>★4段は、公開順位表と当サイトのコメント集計を種類で分けた表示で、各段は上位10人ずつまでです。</p>
         <p>★<b>「コメントで応援した人」の件数だけは当サイトが数えた値です。</b>ニコニコ生放送が公開している番組のコメントを読み、<b>誰が何件コメントしたか</b>だけを数えています（<b>本文・時刻は保存していません</b>）。匿名（184）の方は、その番組の中だけで通じる識別子から「匿名＋番号」と似顔絵を作っています（アカウントや個人を特定するものではありません）。集計は約 10 分ごとで、長い放送では「直近ぶんの集計」と添えます。</p>
         <p>★<b>「約○人（推定）」と並び順だけは当サイトの推定値です。</b>ニコニコ生放送に同時視聴数を知る手段が無いため、公開されている<b>累計の来場者数</b>と<b>放送の経過時間</b>から見積もっています（時間が経つほど視聴者が入れ替わる前提の減衰モデル）。実際の人数とは差があります。</p>
-        <p>放送中の個人配信のみを対象にしています。表示は定期的に更新されます（更新が止まったときは上に警告が出ます）。</p>
+        <p>★<b>Kick の一覧</b>は、Kick の公式 API が返す配信中の日本語配信を<b>同時視聴数の多い順</b>に並べたものです。同時視聴数・配信者名・サムネ・カテゴリは Kick の値をそのまま表示しています（当サイトの推定・集計ではありません）。ギフト・コメントの集計は行っていません。</p>
+        <p>ニコニコ生放送は、放送中の個人配信のみを対象にしています。表示は定期的に更新されます（更新が止まったときは上に警告が出ます）。</p>
         <p>掲載されているご本人で、表示の停止をご希望の方は <a href="../privacy.html#s14">プライバシーポリシー 14-4</a> をご覧ください。</p>
       </div>
 

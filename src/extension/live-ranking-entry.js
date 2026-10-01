@@ -24,9 +24,12 @@ import {
   createSupporterFeedRegistry, supporterChipsFromLive, tierForCommentDelta
 } from '../lib/liveMotion.js';
 import { toEpochMs } from '../lib/timeAuthority.js';
+import { buildPlatformSectionHtml, platformsErrorHtml } from '../lib/livePlatformsHtml.js';
 
 const elList = /** @type {HTMLElement} */ (document.getElementById('list'));
 const elMeta = /** @type {HTMLElement} */ (document.getElementById('meta'));
+/** ★2026-10-01: ほかの配信サービス(Kick・後で YouTube)の別セクション。ニコ生の #list とは混ぜない。 */
+const elPlatforms = /** @type {HTMLElement|null} */ (document.getElementById('platforms'));
 
 /** キャラ画像(正本は extension/images/。ページからの相対 = LP index.html と同じ実体)。 */
 const IMG_BASE = '../../extension/images/yukkuri-charactore-english/';
@@ -406,6 +409,34 @@ function load(opts) {
     .finally(() => { setBusy(false); _nextAutoAt = Date.now() + AUTO_REFRESH_MS; });
 }
 
+let _platformsLoading = false;
+/** ★ニコ生の _nextAutoAt は load() の完了まで更新されないので相乗りしない(毎秒叩かないよう別に持つ)。 */
+let _nextPlatformsAt = 0;
+/**
+ * ★2026-10-01: Kick(・後で YouTube)の別セクションを取る。ニコ生の load() とは【別 fetch】
+ *   (片方が落ちてももう片方は出る)。収集は Actions の cron 専任なので ?refresh は付けない
+ *   (Kick のレート制限が未確認のうちは、閲覧者の操作で Kick へ問い合わせない)。
+ * @returns {Promise<void>}
+ */
+function loadPlatforms() {
+  if (!elPlatforms || _platformsLoading) return Promise.resolve();
+  _platformsLoading = true;
+  return fetch('/api/live-platforms', { cache: 'no-store' })
+    .then((r) => {
+      if (!r.ok) throw new Error(`ほかの配信サービスの一覧を読み込めませんでした (${r.status})。次の自動更新でもう一度試します。`);
+      return r.json();
+    })
+    .then((data) => {
+      const p = data && data.platforms && typeof data.platforms === 'object' ? data.platforms : {};
+      const nowMs = Date.now();
+      elPlatforms.innerHTML = ['kick', 'youtube'].map((k) => buildPlatformSectionHtml(p[k], { nowMs, faces: FACE })).join('');
+      bindImgFallback(elPlatforms);
+    })
+    // ★前回の表示が残っているなら消さない(一時的な失敗で空にしない)。
+    .catch((e) => { if (!elPlatforms.children.length) elPlatforms.innerHTML = platformsErrorHtml(String(e && e.message ? e.message : e), FACE.tanuHalf); })
+    .finally(() => { _platformsLoading = false; _nextPlatformsAt = Date.now() + AUTO_REFRESH_MS; });
+}
+
 /**
  * ★ホバーの初回待ち(実測 3.5 秒・主犯は NDGR の遡り)を消すための先読み。
  *   ページを開いた【最初の 1 回だけ】、いま見えている上位数配信の代表 uid で
@@ -472,10 +503,12 @@ for (const b of elRefreshBtns) b.addEventListener('click', () => load({ refresh:
  *   2回目以降(60秒ごとの自動更新・タブ復帰)は従来どおり refresh:1 のみ(挙動不変)。
  */
 load().finally(() => { load({ refresh: true }); });
+loadPlatforms();
 // ★見ていないときは止める(無駄に叩かない)。裏タブから戻った瞬間に取り直す。
 setInterval(() => { if (!document.hidden && Date.now() >= _nextAutoAt) load({ refresh: true }); }, 1000);
+setInterval(() => { if (!document.hidden && Date.now() >= _nextPlatformsAt) loadPlatforms(); }, 1000);
 setInterval(tickCountdown, 1000);
-document.addEventListener('visibilitychange', () => { if (!document.hidden) load({ refresh: true }); });
+document.addEventListener('visibilitychange', () => { if (!document.hidden) { load({ refresh: true }); loadPlatforms(); } });
 
 /*
  * ★ホバーで「その時点の発言」(2026-09-15 ユーザー要望「live はホバーしたときだけその時の発言を出す」)
