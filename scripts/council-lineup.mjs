@@ -351,7 +351,27 @@ export const LINEUP = [
   //   mistralが429で沈んでいる平常時に頭脳が1種類（nemotronのみ）に落ちる方が危険だった。
   //   ルールの字面より目的（統括役が単一モデル依存にならないこと）を優先した判断。
   //   将来 openrouter 以外で別系譜のleadが採れたら、そちらへ移して重複を解消してよい。
-  { label: 'openrouter/ling-3.0-flash', provider: 'openrouter', rawId: 'inclusionai/ling-3.0-flash-fin:free', apiModel: 'inclusionai/ling-3.0-flash-fin:free', opts: {}, requires: ['O'] },
+  // ★★★2026-10-01 差し替え（`-fin` が有料化で死亡 → 同系譜の `-sante` へ）:
+  //  旧: rawId/apiModel = `inclusionai/ling-3.0-flash-fin:free`
+  //  実測: **404 `This model is unavailable for free. The paid version is available now`**
+  //  ＝429の容量枯渇ではなく**課金要求＝死**（上のSambaNova節の撤去条件(c)と同型）。
+  //  カタログには `inclusionai/ling-3.0-flash-fin`（:free無し＝有料版）だけが残っていた。
+  //  ★これを放置すると lead の頭脳が nemotron 1種類に戻る（この枠を作った理由そのもの。
+  //   magistral-medium は429で沈んだままなので、ling が死ぬと上の懸念が即再発する）。
+  //  ★後継の選定（OpenRouterの:free 全16件を実測して決めた）:
+  //    inclusionai/ling-3.0-flash-sante:free … **2/2成功・4166/4092ms・cost=0**・
+  //      統括プロンプトで3案を統合し異論まで返した（質を確認済み）。**roleOf が lead を返す**
+  //    dots-studio/dots-3-note-preview:free … 2/2成功だが **11750/12032ms（3倍遅い）**、
+  //      かつ **roleOf が generalist** を返すため lead 席の穴を埋められない → 不採用
+  //    thinkingmachines/inkling:free … **403 "only available on agentic harnesses"** → 使用不可
+  //  ★「別系譜にすべき」という考えは正しいが**今は選べない**: :free 16件のうち roleOf が
+  //   lead を返す別系譜が存在しない（inkling は403・dots は generalist）。
+  //   同系譜である以上「inclusionAI が無料枠を畳む日にまた死ぬ」リスクは残るが、
+  //   **lead の頭脳が1種類に落ちる方が先に効く**ため、速度と質で実測に通ったこちらを採る。
+  //   将来 lead 判定になる別系譜の無料モデルが出たら、そちらへ移して系譜リスクを解消してよい。
+  //  ★`-fin`（金融特化）→`-sante`（医療特化）とドメインが変わるが、会議の統括役は
+  //   汎用の統合能力を使うだけなのでドメイン特化の差は実測の本文で問題にならなかった。
+  { label: 'openrouter/ling-3.0-flash', provider: 'openrouter', rawId: 'inclusionai/ling-3.0-flash-sante:free', apiModel: 'inclusionai/ling-3.0-flash-sante:free', opts: {}, requires: ['O'] },
 
   // 2026-07-31 追加: SambaNova Cloud（新規プロバイダ）。Free Tierは支払い方法未登録時に
   // 自動適用されカード登録不要（docs.sambanova.ai/docs/en/models/rate-limitsで確認済み）。

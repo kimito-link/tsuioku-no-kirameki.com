@@ -173,8 +173,8 @@
   - `index.html`
   - `live-view.html`
   - `live-view.js` — global NL_BUILD_ID
-- 📁 **council-scout/** (22)
-  - 📁 **briefs/** (22)
+- 📁 **council-scout/** (23)
+  - 📁 **briefs/** (23)
     - `2026-07-16.md`
     - `2026-07-17.md`
     - `2026-07-20.md`
@@ -197,6 +197,7 @@
     - `2026-09-26.md`
     - `2026-09-28.md`
     - `2026-09-30.md`
+    - `2026-10-01.md`
 - 📁 **docs/** (333)
   - 📁 **article-assets/** (87)
     - 📁 **venue-frames/** (12)
