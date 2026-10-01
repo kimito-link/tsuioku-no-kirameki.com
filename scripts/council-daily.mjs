@@ -235,12 +235,41 @@ ${judgments.length ? judgments.map((j, i) => `${i + 1}. ${j}`).join('\n') : '（
 正本: \`scripts/council-daily.mjs\` の冒頭コメント / \`web-ios-android/docs/ai-workflows/MULTI-BRAIN-HOWTO.md\`
 `;
 
+// ★★2026-10-01 追加: 司令塔(Claude本体)が書いた調査結論を上書きで消さない。
+//  実損: 2026-09-30 に SambaNova 401 の切り分け結果（「変数名の取り違えではない・
+//  キーの値そのものが失効・再発行URLはここ」）を handoff.md へ書き戻したが、
+//  翌日この日課が走った瞬間 writeFileSync の全文上書きで**丸ごと消えた**（-60行）。
+//  日報の NEEDS_JUDGMENT は毎回同じ「変数名の取り違えを疑う」を再提示するため、
+//  **結論を消した上で古い誘導だけが残り、次の人が同じ調査を繰り返す**構図だった。
+//  ★対処: 下のマーカーで囲まれた区間は日課が触らない（あれば必ず引き継ぐ）。
+//   司令塔はこのマーカーの中に結論を書く。マーカーが無ければ従来どおり全文を書く。
+const KEEP_BEGIN = '<!-- COMMANDER-NOTES:BEGIN (council-daily はこの区間を上書きしない) -->';
+const KEEP_END = '<!-- COMMANDER-NOTES:END -->';
+
+/** 既存 handoff.md から司令塔の追記ブロックを取り出す（無ければ空文字）。 */
+function carryOverCommanderNotes(path) {
+  try {
+    const prev = readFileSync(path, 'utf8');
+    const b = prev.indexOf(KEEP_BEGIN);
+    const e = prev.indexOf(KEEP_END);
+    if (b >= 0 && e > b) return prev.slice(b, e + KEEP_END.length);
+  } catch { /* 初回は存在しない */ }
+  return '';
+}
+
+const handoffPath = join(REPO_ROOT, 'handoff.md');
+const carried = carryOverCommanderNotes(handoffPath);
+const finalBody = carried
+  ? `${body}\n${carried}\n`
+  // マーカーが無い場合は、司令塔が書き足せる空の枠を置いておく（次回から保護される）
+  : `${body}\n${KEEP_BEGIN}\n\n（司令塔の調査結論をここに書く。この区間は日課に消されない）\n\n${KEEP_END}\n`;
+
 if (DRY) {
   say('\n──── --dry-run: handoff.md に書く内容 ────');
-  say(body);
+  say(finalBody);
 } else {
-  writeFileSync(join(REPO_ROOT, 'handoff.md'), body, 'utf8');
-  say(`\n[handoff] 更新: ${join(REPO_ROOT, 'handoff.md')}`);
+  writeFileSync(handoffPath, finalBody, 'utf8');
+  say(`\n[handoff] 更新: ${handoffPath}${carried ? '（司令塔の追記ブロックを保持）' : '（追記枠を新設）'}`);
 }
 
 // ── 5. 終了コード: 判断が必要なら非0で止める（fail-closed）────────
