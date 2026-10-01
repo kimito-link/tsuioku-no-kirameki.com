@@ -153,3 +153,39 @@ jobs:
             exit 1
           fi
           node scripts/live-og-bake.mjs
+
+  # ★Kick（ほかの配信サービス）の一覧を集める（2026-10-01 追加・設計 docs/handoff/live-multiplatform-kick-youtube-SPEC.md）。
+  #   ★ニコ生とは別ジョブ・needs なし＝ニコ生の refresh が落ちても走る（逆も同じ）。
+  #   ★リポジトリ変数 KICK_COLLECT が "1" のときだけ動く。Vercel に KICK_CLIENT_ID/SECRET を
+  #     入れる前に動くと 503(no credentials) で 5 分ごとに赤くなるため、鍵の登録後に
+  #     `gh variable set KICK_COLLECT --body 1` で有効化する。
+  #   ★赤の意味がニコ生と違う: 0 件=緑（保存する）/ 形不正・通信失敗・token 失敗=赤 / 停止中(disabled)=緑。
+  kick:
+    if: ${{ vars.KICK_COLLECT == '1' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Kick の一覧を集める
+        env:
+          INGEST_KEY: ${{ secrets.STATUS_INGEST_KEY }}
+        run: |
+          if [ -z "$INGEST_KEY" ]; then
+            echo "::error::secrets.STATUS_INGEST_KEY が未登録です。リポジトリの Settings > Secrets で登録してください。"
+            exit 1
+          fi
+          code=$(curl -sS -o /tmp/kick.json -w '%{http_code}' \
+            --max-time 60 \
+            -H "x-share-key: $INGEST_KEY" \
+            "https://app.tsuioku-no-kirameki.com/api/live-platforms?refresh=1&platform=kick")
+          echo "HTTP $code"
+          cat /tmp/kick.json || true
+          echo ""
+          if [ "$code" != "200" ]; then
+            echo "::error::Kick の収集に失敗しました (HTTP $code)"
+            exit 1
+          fi
+          # ★保存したか、意図して止めている(disabled)かのどちらかでなければ赤。
+          if ! grep -Eq '"stored":true|"disabled":true' /tmp/kick.json; then
+            echo "::error::200 が返りましたが保存されていません（応答本文を確認してください）"
+            exit 1
+          fi

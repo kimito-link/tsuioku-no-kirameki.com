@@ -612,6 +612,7 @@
 | `src/lib/isInsideRecommendedLiveSection.js` | 1 | 記録エンジン(watchページ常駐) |
 | `src/lib/isInsideRecommendedUserSection.js` | 1 | 記録エンジン(watchページ常駐) |
 | `src/lib/keyboardTypeDiagnostic.js` | 1 | ポップアップ(応援レーン) |
+| `src/lib/kickLivestreams.js` | 1 | Web版 追憶のきらめき ランキング(/live/) |
 | `src/lib/kiramekiAwards.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/kiramekiAwardsSectionHtml.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/laneDetailCells.js` | 1 | 状態速報ページ |
@@ -631,6 +632,7 @@
 | `src/lib/liveLaneBuckets.js` | 1 | Web版 追憶のきらめき ランキング(/live/) |
 | `src/lib/liveMotion.js` | 1 | Web版 追憶のきらめき ランキング(/live/) |
 | `src/lib/livePersistInterval.js` | 1 | 記録エンジン(watchページ常駐) |
+| `src/lib/livePlatformsHtml.js` | 1 | Web版 追憶のきらめき ランキング(/live/) |
 | `src/lib/liveRankingView.js` | 1 | Web版 追憶のきらめき ランキング(/live/) |
 | `src/lib/liveRecentHoverCard.js` | 1 | Web版 追憶のきらめき ランキング(/live/) |
 | `src/lib/livesCardSignature.js` | 1 | 状態速報ページ |
