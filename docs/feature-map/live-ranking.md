@@ -20,10 +20,12 @@ graph LR
   n_live_ranking --> n_src_lib_deriveAvatarUrlFromUid_js["lib/deriveAvatarUrlFromUid.js"]:::shared
   n_live_ranking --> n_src_lib_giftDeltaFallback_js["lib/giftDeltaFallback.js"]:::shared
   n_live_ranking --> n_src_lib_htmlText_js["lib/htmlText.js"]:::shared
+  n_live_ranking --> n_src_lib_kickLivestreams_js["lib/kickLivestreams.js"]
   n_live_ranking --> n_src_lib_kokenContributionRankingApi_js["lib/kokenContributionRankingApi.js"]:::shared
   n_live_ranking --> n_src_lib_liveGiftPulse_js["lib/liveGiftPulse.js"]
   n_live_ranking --> n_src_lib_liveLaneBuckets_js["lib/liveLaneBuckets.js"]
   n_live_ranking --> n_src_lib_liveMotion_js["lib/liveMotion.js"]
+  n_live_ranking --> n_src_lib_livePlatformsHtml_js["lib/livePlatformsHtml.js"]
   n_live_ranking --> n_src_lib_liveRankingView_js["lib/liveRankingView.js"]
   n_live_ranking --> n_src_lib_liveRecentHoverCard_js["lib/liveRecentHoverCard.js"]
   n_live_ranking --> n_src_lib_nicoUserPage_js["lib/nicoUserPage.js"]:::shared

@@ -86,7 +86,7 @@ const ROLES = {
   'app': { role: 'Web 版状態ページのアプリ(app.js + dist)', tags: ['Web版'] },
   'app/dist': { role: 'Web 版アプリのビルド成果物', tags: ['ビルド成果物'] },
   'app/images': { role: '純Web版 応援ライブビューの同梱画像(ゆっくり顔)', tags: ['Web版', '画像'] },
-  'api': { role: 'サーバレス API(status / live-ranking / live-recent-comments / live-og)', tags: ['API'] },
+  'api': { role: 'サーバレス API(status / live-ranking / live-recent-comments / live-og / live-platforms)', tags: ['API'] },
   'memory': { role: 'セッション横断の知見・引き継ぎ(AI のメモリ)。コミット対象外も混在', tags: ['メモリ', '知見'] },
   'memory/archive': { role: '過去セッションの引き継ぎ(HANDOFF)アーカイブ', tags: ['メモリ', '履歴'] },
   'memory/avatar-parts': { role: 'アバター素材(顔シート等)の参考画像', tags: ['アバター', '画像'] },
@@ -163,6 +163,7 @@ const FEATURES = [
   { feature: 'dist 鮮度ゲート(buildId無限差分ループ根治)', desc: 'pre-pushのbuild再実行でbuildIdタイムスタンプが毎回変わりdist差分が無限に再発していた問題を根治。esbuildのmetafileから実際のバンドル入力のgit blob shaを集めた指紋(.dist-fingerprint.json・buildIdを含まない)をbuild.mjsが書き、pre-commit(--index)/pre-push(--pushed)/CI(--ref HEAD)がこの指紋だけを照合してbuildを再実行しない。NL_BUILD_ID(buildAgeCell.jsが依存する時刻計器)は無変更。council-fable設計(docs/dist-fingerprint-gate-DESIGN.md・v0.1.1538)', paths: ['src/lib/distFingerprint.js', 'scripts/check-dist-fresh.mjs', 'scripts/build.mjs', '.husky/pre-push', '.husky/pre-commit'], tags: ['出荷', 'ゲート', 'dist', 'ビルド'] },
   { feature: '横断応援者ランキング(デバイス内・段B)', desc: '過去N配信+今回を横断して「少数固定・複数配信を横断して応援してくれている人」をコメント数順に可視化。indexPastUsers(横断集計)→buildSupporterRanking(既存の単一配信専用ランキング関数・無改変)を呼び、broadcastCount(横断配信数)を外側で合成。marketing-export.html側(heavyMktガード配下・明示トリガー時のみ)に新規セクションとして描画し、応援レーン描画経路(renderStoryUserLane等)や自律tick(popup-entry.js:15762)は一切通さない。公開・集約はせずこのPC内で完結(上位計画 elegant-crunching-quokka.md 段B・2026-09-22)', paths: ['src/lib/crossSupporterRanking.js', 'src/lib/commenterHistoricalAnalytics.js', 'src/lib/supporterRanking.js', 'src/lib/marketingChartsHtml.js'], tags: ['応援', 'ランキング', 'マーケ'] },
   { feature: '/live/ コメント速度演出・応援者チップ・熱いチップ', desc: '配信カードの番組合計コメント数だけを60秒ごとの実測値の間で線形補間し、実測2点から求めた「+N/分」と脈拍レーンを表示する。レーンには既存の応援者一覧(commentRows/supporterRows)から名前・丸サムネ・種別(💬/🎁/📣)だけを巡回キューで流す(本文は一切含めない・AGENTS.md §3.3・council-fable 2026-09-30で本文表示は却下)。直近実測2点間でコメント件数が増えた人は「熱いチップ」(+N件バッジ・拡大表示)として優先的に流れる(既存のギフト増分差分器createGiftPulseRegistryをtierFor引数で再利用)。個人別順位・コメント本文・細かい時刻データは補間・保存しない', paths: ['src/lib/liveMotion.js', 'src/lib/liveGiftPulse.js', 'src/extension/live-ranking-entry.js', 'tsuioku-no-kirameki/live/index.html'], tags: ['LP', '公開', 'ランキング', 'コメント', '表示'] },
+  { feature: '/live/ Kick セクション(ほかの配信サービス)', desc: 'ニコ生とは別セクション・別データ(/api/live-platforms・Redis live:kick:latest)で、Kick 公式 API(App Access Token)の日本語配信を同時視聴数の多い順に最大20件。値は Kick が返したものをそのまま表示し推定・増分・順位推移は作らない(YouTube を同じ枠に乗せるため・規約)。収集は Actions の kick ジョブ(リポジトリ変数 KICK_COLLECT=1 で有効)だけで、閲覧者の操作では Kick へ問い合わせない。成人向けは既定で非表示(件数は表示)。live:platforms:off で再デプロイなしに停止', paths: ['api/live-platforms.js', 'src/server/kickApi.js', 'src/lib/kickLivestreams.js', 'src/lib/livePlatformsHtml.js', 'src/extension/live-ranking-entry.js', 'tsuioku-no-kirameki/live/index.html', '.github/workflows/live-ranking.yml'], tags: ['LP', '公開', 'ランキング', 'Kick'] },
 ];
 
 /**
