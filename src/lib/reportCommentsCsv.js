@@ -10,6 +10,8 @@
  *     （`capturedAtIso` は ISO 8601、未取得は空欄）。
  */
 
+import { isNiconicoAnonymousUserId } from './nicoAnonymousDisplay.js';
+
 const HEADER_COLUMNS = Object.freeze([
   '#',
   'commentNo',
@@ -60,7 +62,8 @@ export function buildReportCommentsCsv(comments) {
   for (let i = 0; i < list.length; i++) {
     const c = list[i] || {};
     const uid = c.userId == null ? '' : String(c.userId);
-    const is184 = uid.startsWith('a:');
+    // v0.1.1559: is184 列の判定は正本(a: と、タイムシフトの a: 無し hashed 形)。列名・列順は不変。
+    const is184 = isNiconicoAnonymousUserId(uid);
     const selfPosted = Boolean(c.selfPosted);
     const at = typeof c.capturedAt === 'number' && Number.isFinite(c.capturedAt) && c.capturedAt > 0
       ? new Date(c.capturedAt).toISOString()

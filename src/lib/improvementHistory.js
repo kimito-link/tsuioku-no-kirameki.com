@@ -1179,5 +1179,23 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
     source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
     note: '前版0.1.1555と同値(48)。過去最良55(@0.1.1537)との差は30日ローリングウィンドウで' +
       '古いコミットが自然に窓外へ出たもので、今回のコード変更とは無関係(0.1.1552のnoteに既出)。'
+  }),
+  Object.freeze({
+    version: '0.1.1560', metric: 'bundle-kb', value: 1364,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '★+3KB(1361@0.1.1556→1364)は意図した増加。v0.1.1557〜1560 のタイムシフト3バグ修正で popup が読む共有 lib に' +
+      '匿名判定の hashed 形(nicoAnonymousDisplay.js: 正規表現+設計コメント)と a: 直書き4箇所の正本寄せ(各 import 1 行)が増えた分。' +
+      '過去最良1360(@0.1.1454)との差分の内訳は v0.1.1471/1537 の note に記録済み。計器は足していない(判定は lib・配線は content/page-intercept)。'
+  }),
+  Object.freeze({
+    version: '0.1.1560', metric: 'gate-selftest', value: 4,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1560', metric: 'cross-checked-claims', value: 36,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: '★直近30日窓のスライドによる自然減(48@0.1.1556→36・9月上旬の計器集中期のコミットが窓外に出た分)。' +
+      '今回(v0.1.1557〜1560)は devtools Chrome でタイムシフト lv342383970 を実際に開いて NDGR の view 2本・backward 0byte・' +
+      '匿名IDの a: 無しを実測してから直し、各版で変異テスト(ロジックを壊して赤→復元で緑)も行った。別の手段での確認は今回も行っている。'
   })
 ]);

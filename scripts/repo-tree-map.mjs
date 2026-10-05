@@ -120,7 +120,7 @@ const FEATURES = [
   { feature: 'popup スクロール(要素を見せる)', desc: '.nl-main などスクロール親で、子要素を見せるための scrollTop 加算 delta を計算', paths: ['src/lib/nlMainScrollReveal.js'], tags: ['popup', 'スクロール'] },
   { feature: '会場ドラッグスクロール(パン)', desc: '会場を左ドラッグで縦スクロール(パン)する純ロジック。venueBar が pointer を配線して呼ぶ', paths: ['src/lib/venueDragScroll.js'], tags: ['会場', 'スクロール'] },
   { feature: 'コメント収穫(DOM 観測)', desc: 'watch の仮想スクロールを送りながら DOM 上のコメント行を拾い集める。受理判定は nicoliveDom', paths: ['src/lib/commentHarvest.js', 'src/lib/nicoliveDom.js'], tags: ['コメント', '取得', 'DOM'] },
-  { feature: '過去ログ取得(バックフィル巡回)', desc: 'NDGR の backward URI を辿り配信開始まで遡って過去コメントを取り込む巡回エンジン(純ロジック)', paths: ['src/lib/ndgrBackfillCrawl.js'], tags: ['過去ログ', '取得'] },
+  { feature: '過去ログ取得(バックフィル巡回)', desc: 'NDGR の backward URI を辿り配信開始まで遡って過去コメントを取り込む巡回エンジン(純ロジック)', paths: ['src/lib/ndgrBackfillCrawl.js', 'src/lib/ndgrViewBasePick.js'], tags: ['過去ログ', '取得'] },
   { feature: 'コメント重複除去(NDGR)', desc: '再送/再接続/relay overlap の重複を liveId+messageId の canonical key で排除', paths: ['src/lib/ndgrMessageDedupe.js'], tags: ['コメント', '重複除去'] },
   { feature: '応援レーン集約(誰が候補か)', desc: '保存コメント行を userId 単位に畳み込みレーン候補を作る唯一の集約正本(popup/venue 共通)', paths: ['src/lib/userLaneCandidatesFromStorage.js'], tags: ['応援', '集約'] },
   { feature: '人物タイル描画(丸サムネ)', desc: 'popup 応援アイコン列の「1人ぶんのタイル(丸サムネ+ID+名前)」生成の正本 DOM ビルダー', paths: ['src/lib/personTileDom.js'], tags: ['応援', '描画'] },

@@ -308,6 +308,7 @@
 | `src/lib/milestoneEffectDiagKey.js` | 2 | ポップアップ(応援レーン) / 状態速報ページ |
 | `src/lib/monotonicCommentCount.js` | 2 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) |
 | `src/lib/ndgrBackfillCrawl.js` | 2 | バックフィル SW / 記録エンジン(watchページ常駐) |
+| `src/lib/ndgrViewBasePick.js` | 2 | 記録エンジン(watchページ常駐) / ページ傍受 |
 | `src/lib/nicoadContributionRankingApi.js` | 2 | 記録エンジン(watchページ常駐) / Web版 追憶のきらめき ランキング(/live/) |
 | `src/lib/nicoUserFollowingApi.js` | 2 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) |
 | `src/lib/nicoUserProfileApi.js` | 2 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) |

@@ -2514,6 +2514,18 @@
       ]
     },
     {
+      "file": "src/lib/ndgrViewBasePick.js",
+      "featureCount": 2,
+      "features": [
+        "content",
+        "page-intercept"
+      ],
+      "labels": [
+        "記録エンジン(watchページ常駐)",
+        "ページ傍受"
+      ]
+    },
+    {
       "file": "src/lib/nicoadContributionRankingApi.js",
       "featureCount": 2,
       "features": [

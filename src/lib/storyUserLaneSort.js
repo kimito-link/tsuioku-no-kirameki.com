@@ -3,6 +3,8 @@
  * popup と venue が同じ比較器を使うことで、段組みDOMの並び drift を防ぐ。
  */
 
+import { isNiconicoAnonymousUserId } from './nicoAnonymousDisplay.js';
+
 /**
  * @param {unknown} uidRaw
  * @returns {number}
@@ -10,7 +12,8 @@
 export function storyUserLaneUidSortRank(uidRaw) {
   const s = String(uidRaw || '').trim();
   if (/^\d{5,14}$/.test(s)) return 0;
-  if (/^a:/i.test(s)) return 1;
+  // v0.1.1559: 匿名(a: / タイムシフトの hashed 形)は正本判定で 1。popup と会場は同じ比較器。
+  if (isNiconicoAnonymousUserId(s)) return 1;
   return 2;
 }
 

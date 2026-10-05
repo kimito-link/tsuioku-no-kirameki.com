@@ -92,6 +92,7 @@
 | `data-nls-ndgr-unknown-samples` | extension/page-intercept-entry.js | extension/content-entry.js |
 | `data-nls-ndgr-view-uri` | extension/page-intercept-entry.js | extension/content-entry.js |
 | `data-nls-ndgr-view-uri-count` | extension/page-intercept-entry.js | — |
+| `data-nls-ndgr-view-uri-recent` | extension/page-intercept-entry.js | extension/content-entry.js |
 | `data-nls-nicoad-fetch` | extension/content-entry.js | extension/content-entry.js |
 | `data-nls-page-intercept` | extension/page-intercept-entry.js | extension/content-entry.js |
 | `data-nls-page-intercept-enqueued` | extension/page-intercept-entry.js | extension/content-entry.js |

@@ -458,7 +458,8 @@ import {
   pickViewerCountFromEmbeddedData,
   pickProgramBeginAt,
   pickPlanningEventId,
-  pickIsEventParticipating
+  pickIsEventParticipating,
+  describeEmbeddedProgramElapsed
 } from '../lib/embeddedDataExtract.js';
 import { countRecentActiveUsers } from '../lib/concurrentEstimate.js';
 import {
@@ -484,6 +485,11 @@ import {
   BACKFILL_FOREGROUND_FETCH_GAP_MS,
   BACKFILL_FOREGROUND_EMPTY_RESEED_PAUSE_MS
 } from '../lib/ndgrBackfillCrawl.js';
+import {
+  parseNdgrViewBaseCandidates,
+  pickNdgrViewBase,
+  shouldMarkNdgrViewBaseDead
+} from '../lib/ndgrViewBasePick.js';
 import {
   shouldActivateForwardForDeadEntry,
   FORWARD_REACTIVATION_STALE_MS
@@ -9516,6 +9522,9 @@ function collectWatchPageSnapshot() {
     }),
     totalComments: wsCommentCount,
     streamAgeMin: (() => {
+      // v0.1.1557: 終了済み枠(タイムシフト)は「開始〜終了」で固定。null は「—」(endTime 欠落)。
+      const ended = describeEmbeddedProgramElapsed(embeddedProps);
+      if (ended.ended) return ended.elapsedMin;
       // Priority 1: WebSocket schedule message
       if (programBeginAtMs != null && Number.isFinite(programBeginAtMs)) {
         const age = (Date.now() - programBeginAtMs) / 60000;
@@ -11298,6 +11307,13 @@ function buildPanelSummaryPayloadForCurrentLive(nowMs = Date.now()) {
 function resolvePanelSummaryStreamAgeMin(nowMs) {
   try {
     maybeFillProgramBeginFromEmbeddedData();
+  } catch {
+    // no-op
+  }
+  try {
+    // v0.1.1557: 終了済み枠(タイムシフト)は「開始〜終了」で固定(snapshot と同じ判定)。
+    const ended = describeEmbeddedProgramElapsed(extractEmbeddedDataProps(document));
+    if (ended.ended) return ended.elapsedMin;
   } catch {
     // no-op
   }
@@ -16645,6 +16661,15 @@ let _backfillVisibilityRearmedLiveId = '';
  */
 const _backfillTransientRetryByLiveId = {};
 /**
+ * v0.1.1560: liveId → 「本文を一度も取れずに終わった view base」の集合(タブ寿命・in-memory)。
+ *   タイムシフトはプレイヤーが NDGR view を 2 本開き片方は本文ゼロ(lv342383970 実測: backward 0byte)。
+ *   「最後に観測した view」だけだと空の方を掴んで stalled 固着するので、rows=0 で終わった base を
+ *   覚え、次の巡回(一過性リトライ)で候補配列の次へ進む。判定は src/lib/ndgrViewBasePick.js(純関数)。
+ *   直近 4 liveId だけ保持(古いものから落とす)。
+ * @type {Record<string, Set<string>>}
+ */
+const _ndgrDeadViewBasesByLiveId = {};
+/**
  * 自動補充（公式ギャップ追い）: liveId ごとの「ギャップ残存による NDGR バックフィル再開回数」。
  *   非一過性 stop（no_progress / cap_reseeds / visited_revisit / aborted 等）で止まっても、
  *   公式件数との差が大きい間は guard を解除して続きから掘り直す。OFFICIAL_GAP_DEEP_TIMING.
@@ -16680,7 +16705,7 @@ const NDGR_BACKFILL_TRANSIENT_RETRY_DELAY_MS = 20_000;
  *   popup 側（backfillRinkuNarration）が区別し、嘘の達成宣言をしないため。
  * v0.1.692: errMsg を持つ。aborted の真因(crawl 例外メッセージ)を status 診断へ保全する。
  */
-const _backfillProgress = { seg: 0, rows: 0, done: 0, stopReason: '', errMsg: '', elapsedMs: 0, reseeds: 0 };
+const _backfillProgress = { seg: 0, rows: 0, done: 0, stopReason: '', errMsg: '', elapsedMs: 0, reseeds: 0, viewPick: '', viewBaseHash: '' };
 /** v0.1.892: seg:0 で止まる箇所の細分計器(会議 backfill-stuck-seg0 の続き)。lastSkip:"started" の【先】=
  *  crawlNdgrBackward 起動後に gen.next() を何回回したか(genSteps)・このラウンド開始からの経過(roundStartedAt)。
  *  genSteps=0 のまま running=初回 gen.next() が pending(初回fetch/seek で詰まる)。genSteps>0 で seg:0=
@@ -16734,6 +16759,9 @@ function publishBackfillProgress() {
           // v0.1.999 スループット計器（観測値・取り込みには影響しない）。
           elapsedMs: Number(_backfillProgress.elapsedMs) || 0,
           reseeds: Number(_backfillProgress.reseeds) || 0,
+          // v0.1.1560: どの view を選んだか(latest/skip_dead/all_dead/override)と token 末尾(診断・additive)。
+          viewPick: String(_backfillProgress.viewPick || ''),
+          viewBaseHash: String(_backfillProgress.viewBaseHash || ''),
           ts: Date.now()
         }
       },
@@ -16810,6 +16838,19 @@ function readNdgrViewBaseUri() {
     return /^https?:\/\//.test(String(v || '')) ? String(v) : '';
   } catch {
     return '';
+  }
+}
+
+/**
+ * v0.1.1560: 観測済み view base の候補(最新順)。新属性が無い旧 page-intercept でも最新 1 本に落ちる。
+ * @returns {string[]}
+ */
+function readNdgrViewBaseCandidates() {
+  try {
+    const root = document.documentElement;
+    return parseNdgrViewBaseCandidates(root?.getAttribute('data-nls-ndgr-view-uri-recent'), root?.getAttribute('data-nls-ndgr-view-uri'));
+  } catch {
+    return [];
   }
 }
 
@@ -16934,8 +16975,16 @@ async function runNdgrBackfillOnce(ctx = {}) {
   if (!_backfillEnabled && !_backfillAutoEnabled) { _backfillLastSkipReason = 'disabled'; return; }
   if (!recording || !liveIdOverride || !locationAllowsCommentRecording()) { _backfillLastSkipReason = 'not_recording'; return; }
   if (!hasExtensionContext()) { _backfillLastSkipReason = 'no_context'; return; }
-  const viewBase = viewBaseOverride || readNdgrViewBaseUri();
+  // v0.1.1560: 「最新観測」1 本でなく候補配列から、この配信で死亡判定(rows=0 で終了)されていない最初の view を選ぶ。
+  //   先頭は常に最新観測(v0.1.762 のローテーション対策は不変)。全部死亡なら先頭に戻る(今日と同じ失敗形で有界)。
+  const deadViewBases = _ndgrDeadViewBasesByLiveId[liveIdOverride] || new Set();
+  const picked = viewBaseOverride
+    ? { base: viewBaseOverride, reason: 'override' }
+    : pickNdgrViewBase(readNdgrViewBaseCandidates(), deadViewBases);
+  const viewBase = picked.base;
   if (!viewBase) { _backfillLastSkipReason = 'no_view_base'; return; } // MAIN world がまだ view を観測していない（参加直後等）
+  _backfillProgress.viewPick = picked.reason;
+  _backfillProgress.viewBaseHash = viewBase.slice(-12); // 診断用(token 末尾のみ・URL 全体は書かない)
   _backfillLastSkipReason = 'started';
   _backfillTriedLiveId = liveIdOverride;
 
@@ -17440,6 +17489,13 @@ async function runNdgrBackfillOnce(ctx = {}) {
         _backfillVisibilityRearmedLiveId = liveIdOverride;
         _backfillTriedLiveId = '';
       }
+    }
+    // v0.1.1560: 本文を一度も取れずに終わった巡回(rows=0・seg=0・stalled/backward_exhausted/no_entry)なら、
+    //   使った view base をこの配信の死亡集合へ。次の巡回は候補の次へ進む。rate_limited/aborted 等は view のせいにしない。
+    if (shouldMarkNdgrViewBaseDead(_backfillProgress)) {
+      (_ndgrDeadViewBasesByLiveId[liveIdOverride] ||= new Set()).add(viewBase);
+      const lids = Object.keys(_ndgrDeadViewBasesByLiveId);
+      for (const old of lids.slice(0, Math.max(0, lids.length - 4))) delete _ndgrDeadViewBasesByLiveId[old];
     }
     _backfillProgress.done = 1;
     onProgress ? onProgress({ ..._backfillProgress }) : publishBackfillProgress();
