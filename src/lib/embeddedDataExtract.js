@@ -110,3 +110,60 @@ export function pickProgramBeginAt(props) {
   }
   return null;
 }
+
+/**
+ * embedded-data props から配信終了時刻を epoch ms として取得する（v0.1.1557）。
+ * 実測で確認したキーは `program.endTime`（Unix 秒）のみ。無ければ null。
+ * @param {Record<string, any> | null | undefined} props
+ * @returns {number | null}
+ */
+export function pickProgramEndAt(props) {
+  if (!props || typeof props !== 'object') return null;
+  const c = props?.program?.endTime;
+  if (c == null) return null;
+  if (typeof c === 'string' && c.length >= 10) {
+    const t = new Date(c).getTime();
+    return Number.isFinite(t) && t > 0 ? t : null;
+  }
+  if (typeof c === 'number' && Number.isFinite(c) && c > 0) {
+    return c < 1e12 ? c * 1000 : c;
+  }
+  return null;
+}
+
+/**
+ * embedded-data props の `program.status` を trim + 大文字で返す（"ENDED" 等）。無ければ null。
+ * @param {Record<string, any> | null | undefined} props
+ * @returns {string | null}
+ */
+export function pickProgramStatus(props) {
+  if (!props || typeof props !== 'object') return null;
+  const s = props?.program?.status;
+  if (typeof s !== 'string') return null;
+  const t = s.trim().toUpperCase();
+  return t ? t : null;
+}
+
+/**
+ * 終了済み枠（タイムシフト等）の経過を「開始〜終了」で固定するための判定（v0.1.1557）。
+ *
+ * 背景: 経過は従来 `Date.now() − beginTime` だけで計算しており、2023 年の放送を
+ * タイムシフトで開くと「26703時間」と出た（lv342383970 実測）。埋め込みデータには
+ * `program.status:"ENDED"` と `program.endTime` が入っているのに読んでいなかった。
+ *
+ * - `ended=true`（status が ENDED）のときだけ `elapsedMin` を `endTime − beginTime` で返す。
+ *   endTime が無い / end < begin の異常データは null（呼び出し側は「—」に倒す。
+ *   終了が確定している枠に `now − begin` の嘘の数字を出さない＝AGENTS §3.6）。
+ * - `ended=false`（ON_AIR / status 不明）のとき `elapsedMin` は常に null＝呼び出し側は従来どおり
+ *   `now − begin` へ落ちる。生放送の挙動は変えない。
+ * @param {Record<string, any> | null | undefined} props
+ * @returns {{ ended: boolean, elapsedMin: number | null }}
+ */
+export function describeEmbeddedProgramElapsed(props) {
+  const ended = pickProgramStatus(props) === 'ENDED';
+  if (!ended) return { ended: false, elapsedMin: null };
+  const beginMs = pickProgramBeginAt(props);
+  const endMs = pickProgramEndAt(props);
+  if (beginMs == null || endMs == null || endMs < beginMs) return { ended: true, elapsedMin: null };
+  return { ended: true, elapsedMin: Math.round((endMs - beginMs) / 60000) };
+}

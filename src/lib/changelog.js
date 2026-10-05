@@ -18,6 +18,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1557',
+    date: '2026-10-05',
+    summary: '終了した放送の経過時間を正しく表示',
+    items: Object.freeze([
+      'タイムシフト(終了した放送)を開いたとき、経過時間が「開始から今まで」で計算されて「26703時間」のように出ていた不具合を修正しました。終了した放送は「開始〜終了」の実際の放送時間で固定します(終了時刻が取れない場合は「—」)。放送中の経過時間はこれまでどおりです。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1556',
     date: '2026-10-01',
     summary: '/live/ に Kick の配信一覧(別欄)を準備',
@@ -168,14 +176,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     summary: '応援レーンのタイル競合(18→1)の残る原因を解消',
     items: Object.freeze([
       '応援レーンで、鏡(別画面用のスナップショット)で描いた席が直後に1枚へ減ることがある競合の残る原因を解消しました。鏡経路も「描いた配信」を記録して縮小ガードが正しく効くようにしています。'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.1535',
-    date: '2026-09-21',
-    summary: '終了配信の経過時間が伸び続ける不具合を修正',
-    items: Object.freeze([
-      '配信が終わっても「配信時間」が伸び続けて何十時間にもなる不具合を修正しました。終了を検知した時点の経過時間で止まります。'
     ])
   })
 ]);
