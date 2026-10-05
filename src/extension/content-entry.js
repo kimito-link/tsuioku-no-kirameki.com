@@ -458,7 +458,8 @@ import {
   pickViewerCountFromEmbeddedData,
   pickProgramBeginAt,
   pickPlanningEventId,
-  pickIsEventParticipating
+  pickIsEventParticipating,
+  describeEmbeddedProgramElapsed
 } from '../lib/embeddedDataExtract.js';
 import { countRecentActiveUsers } from '../lib/concurrentEstimate.js';
 import {
@@ -9516,6 +9517,9 @@ function collectWatchPageSnapshot() {
     }),
     totalComments: wsCommentCount,
     streamAgeMin: (() => {
+      // v0.1.1557: 終了済み枠(タイムシフト)は「開始〜終了」で固定。null は「—」(endTime 欠落)。
+      const ended = describeEmbeddedProgramElapsed(embeddedProps);
+      if (ended.ended) return ended.elapsedMin;
       // Priority 1: WebSocket schedule message
       if (programBeginAtMs != null && Number.isFinite(programBeginAtMs)) {
         const age = (Date.now() - programBeginAtMs) / 60000;
@@ -11298,6 +11302,13 @@ function buildPanelSummaryPayloadForCurrentLive(nowMs = Date.now()) {
 function resolvePanelSummaryStreamAgeMin(nowMs) {
   try {
     maybeFillProgramBeginFromEmbeddedData();
+  } catch {
+    // no-op
+  }
+  try {
+    // v0.1.1557: 終了済み枠(タイムシフト)は「開始〜終了」で固定(snapshot と同じ判定)。
+    const ended = describeEmbeddedProgramElapsed(extractEmbeddedDataProps(document));
+    if (ended.ended) return ended.elapsedMin;
   } catch {
     // no-op
   }

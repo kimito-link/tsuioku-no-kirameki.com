@@ -199,7 +199,7 @@
     - `2026-09-28.md`
     - `2026-09-30.md`
     - `2026-10-01.md`
-- 📁 **docs/** (337)
+- 📁 **docs/** (339)
   - 📁 **article-assets/** (87)
     - 📁 **venue-frames/** (12)
       - `f01.png`
@@ -311,7 +311,7 @@
     - `storage-bus.md`
     - `venue.md`
     - `web-status.md`
-  - 📁 **handoff/** (154)
+  - 📁 **handoff/** (156)
     - 📁 **bench/** (2)
       - `bench-interval.mjs` — ⚠️ 役割コメント無し
       - `bench-lane.mjs` — ⚠️ 役割コメント無し
@@ -450,6 +450,8 @@
     - `story-diag-realtime-sync-DESIGN.md`
     - `story-diag-realtime-sync-IMPLEMENTATION-HANDOFF.md`
     - `sw-reload-toil-council-MATERIAL.md`
+    - `timeshift-sidepanel-symptoms-MAP.md`
+    - `timeshift-sidepanel-symptoms-SPEC.md`
     - `user-identity-unification-DESIGN.md`
     - `user-identity-unification-IMPLEMENTATION-HANDOFF.md`
     - `venue-bubble-voice-realtime-max-DESIGN.md`
@@ -805,7 +807,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (1865)
+- 📁 **src/** (1866)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -842,7 +844,7 @@
       - `avatarResolver.test.js`
       - `identity.js` — ニコ生ユーザー ID の「匿名性」判定と関連アイデンティティ・ユーティリティ。
       - `nickname.js` — 表示名（ニックネーム）の「強弱」判定。
-  - 📁 **extension/** (56)
+  - 📁 **extension/** (57)
     - 📁 **popup/** (12)
       - 📁 **init/** (4)
         - `devMonitorExport.js` — devMonitorExport — 開発モニタの「エクスポート/ダウンロード/較正データ消去」一式。
@@ -871,6 +873,7 @@
     - `commentTickerStarvation.wiring.test.js`
     - `content-entry.js` — watch ページ常駐の記録エンジン本体。コメント取得(NDGR+DOM)・記録・バックフィル・パネル描画の中枢。
     - `dedupeSeedDiag.wiring.test.js`
+    - `embeddedProgramElapsed.wiring.test.js`
     - `giftHistoryLaneStateWiring.test.js`
     - `heavyReuseNotDoubleGated.wiring.test.js`
     - `inlineHostMoveProbe.wiring.test.js`

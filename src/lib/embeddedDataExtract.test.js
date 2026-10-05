@@ -6,7 +6,10 @@ import {
   pickWsUrlFromEmbeddedData,
   pickProgramBeginAt,
   pickPlanningEventId,
-  pickIsEventParticipating
+  pickIsEventParticipating,
+  pickProgramEndAt,
+  pickProgramStatus,
+  describeEmbeddedProgramElapsed
 } from './embeddedDataExtract.js';
 
 const SAMPLE_PROPS = JSON.stringify({
@@ -141,5 +144,73 @@ describe('pickIsEventParticipating', () => {
     expect(pickIsEventParticipating({ programAudition: {} })).toBe(false);
     expect(pickIsEventParticipating({})).toBe(false);
     expect(pickIsEventParticipating(null)).toBe(false);
+  });
+});
+
+// v0.1.1557: タイムシフト(終了済み枠)の経過が「開始〜現在」で 26703 時間になっていた不具合の根治。
+//   実値は lv342383970(2023-09-18 放送): beginTime=1695034800 / endTime=1695040646 / status="ENDED"。
+describe('pickProgramEndAt', () => {
+  it('program.endTime(Unix秒) を ms に変換（lv342383970 実値 1695040646）', () => {
+    expect(pickProgramEndAt({ program: { endTime: 1695040646 } })).toBe(1695040646000);
+  });
+  it('ms 値・ISO 文字列もそのまま/変換して返す', () => {
+    expect(pickProgramEndAt({ program: { endTime: 1695040646000 } })).toBe(1695040646000);
+    expect(pickProgramEndAt({ program: { endTime: '2023-09-18T13:37:26Z' } })).toBe(1695044246000);
+  });
+  it('endTime が無ければ null', () => {
+    expect(pickProgramEndAt({ program: {} })).toBeNull();
+    expect(pickProgramEndAt({})).toBeNull();
+    expect(pickProgramEndAt(null)).toBeNull();
+  });
+  it('負値・0・非数値は null', () => {
+    expect(pickProgramEndAt({ program: { endTime: -1 } })).toBeNull();
+    expect(pickProgramEndAt({ program: { endTime: 0 } })).toBeNull();
+    expect(pickProgramEndAt({ program: { endTime: 'abc' } })).toBeNull();
+  });
+});
+
+describe('pickProgramStatus', () => {
+  it('program.status を trim + 大文字で返す（"ENDED"）', () => {
+    expect(pickProgramStatus({ program: { status: 'ENDED' } })).toBe('ENDED');
+    expect(pickProgramStatus({ program: { status: ' ended ' } })).toBe('ENDED');
+  });
+  it('無ければ null', () => {
+    expect(pickProgramStatus({ program: {} })).toBeNull();
+    expect(pickProgramStatus({ program: { status: '' } })).toBeNull();
+    expect(pickProgramStatus({ program: { status: 1 } })).toBeNull();
+    expect(pickProgramStatus(null)).toBeNull();
+  });
+});
+
+describe('describeEmbeddedProgramElapsed (v0.1.1557)', () => {
+  it('ENDED + begin/end → endTime−beginTime の分（1695034800/1695040646 → 97）', () => {
+    expect(
+      describeEmbeddedProgramElapsed({ program: { status: 'ENDED', beginTime: 1695034800, endTime: 1695040646 } })
+    ).toEqual({ ended: true, elapsedMin: 97 });
+  });
+  it('ENDED だが endTime 無し → ended:true・elapsedMin:null（「—」に倒す・now−begin の嘘を出さない）', () => {
+    expect(describeEmbeddedProgramElapsed({ program: { status: 'ENDED', beginTime: 1695034800 } })).toEqual({
+      ended: true,
+      elapsedMin: null
+    });
+  });
+  it('ENDED で end<begin → elapsedMin:null', () => {
+    expect(
+      describeEmbeddedProgramElapsed({ program: { status: 'ENDED', beginTime: 1695040646, endTime: 1695034800 } })
+    ).toEqual({ ended: true, elapsedMin: null });
+  });
+  it('ON_AIR / status 無し → ended:false・elapsedMin:null（呼び出し側は従来どおり now−begin）', () => {
+    expect(
+      describeEmbeddedProgramElapsed({ program: { status: 'ON_AIR', beginTime: 1695034800, endTime: 1695040646 } })
+    ).toEqual({ ended: false, elapsedMin: null });
+    expect(describeEmbeddedProgramElapsed({ program: { beginTime: 1695034800, endTime: 1695040646 } })).toEqual({
+      ended: false,
+      elapsedMin: null
+    });
+  });
+  it('props が null/配列/不正でも落ちない', () => {
+    expect(describeEmbeddedProgramElapsed(null)).toEqual({ ended: false, elapsedMin: null });
+    expect(describeEmbeddedProgramElapsed(undefined)).toEqual({ ended: false, elapsedMin: null });
+    expect(describeEmbeddedProgramElapsed(/** @type {any} */ ([]))).toEqual({ ended: false, elapsedMin: null });
   });
 });
