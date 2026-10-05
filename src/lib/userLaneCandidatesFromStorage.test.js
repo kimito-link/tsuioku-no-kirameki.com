@@ -767,3 +767,25 @@ maybeEnrich('enrichUserLaneAggregatesWithProfileAndDisplay', () => {
     expect(lost).toEqual([]);
   });
 });
+
+// v0.1.1558: タイムシフトの a: 無し hashed 匿名 uid に u/<生ID> が合成されて画面に出ていた不具合。
+maybeEnrich('enrichUserLaneAggregatesWithProfileAndDisplay: hashed 匿名 (v0.1.1558)', () => {
+  it('hashed 匿名 uid でニックネーム無しの集約行は nickname に u/ を合成しない', () => {
+    const uid = 'sIEHqCaHKR_Pe1v1ZU61TnVABv8';
+    const aggs = userLaneCandidatesFromStorage([
+      { userId: uid, nickname: '', avatarObserved: false, liveId: 'lv342383970', text: 'のうや' }
+    ]);
+    const rows = enrichUserLaneAggregatesWithProfileAndDisplay(aggs, [], {});
+    const row = rows.find((r) => String(r?.userId || '') === uid);
+    expect(row).toBeTruthy();
+    expect(String(row?.nickname || '')).not.toMatch(/^u\//);
+  });
+  it('数値 uid でニックネーム無しは従来どおり u/<uid>（0.1.181 不変）', () => {
+    const aggs = userLaneCandidatesFromStorage([
+      { userId: '4814023', nickname: '', avatarObserved: false, liveId: 'lv342383970', text: 'a' }
+    ]);
+    const rows = enrichUserLaneAggregatesWithProfileAndDisplay(aggs, [], {});
+    const row = rows.find((r) => String(r?.userId || '') === '4814023');
+    expect(row?.nickname).toBe('u/4814023');
+  });
+});

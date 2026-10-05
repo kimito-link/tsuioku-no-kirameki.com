@@ -4,6 +4,7 @@
  */
 
 import { supportGridStrongNickname } from './supportGridDisplayTier.js';
+import { isNiconicoAnonymousUserId } from './nicoAnonymousDisplay.js';
 
 /**
  * v0.1.361: ギフト送り主名 / メッセージが「人間が読めるテキスト」として妥当かを
@@ -361,8 +362,9 @@ export function formatNicknameWithUidFallback(userId, resolvedNickname) {
   if (nick) return nick;
   const uid = String(userId || '').trim();
   if (!uid) return '';
-  // 匿名形式（a:xxx）はそのまま返す（既存の匿名表示ロジックを壊さない）
-  if (/^a:/i.test(uid)) return '';
+  // 匿名（a:xxx と、タイムシフトの a: 無し hashed 形）は空を返して既存の匿名表示経路へ
+  //   （v0.1.1558: 判定は正本 isNiconicoAnonymousUserId。a: 直書きだと hashed が u/<生ID> で画面に漏れる）
+  if (isNiconicoAnonymousUserId(uid)) return '';
   // 数値 uid なら `u/4814023` 形式（ニコ生の URL 形式に合わせる）
   if (/^\d+$/.test(uid)) return `u/${uid}`;
   // それ以外（予期しない形式）は uid をそのまま slice

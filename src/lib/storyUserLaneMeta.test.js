@@ -64,3 +64,13 @@ describe('storyUserLaneMetaLines', () => {
     });
   });
 });
+
+// v0.1.1558: タイムシフトの a: 無し hashed 匿名は名前行が「匿名」（a: と同じ）。
+describe('storyUserLaneMetaLines: hashed 匿名 (v0.1.1558)', () => {
+  it('hashed 匿名 uid + nickname 空 → nameLine「匿名」・idLine は汎用短縮（sIEHq…Bv8）', () => {
+    const r = storyUserLaneMetaLines({ userId: 'sIEHqCaHKR_Pe1v1ZU61TnVABv8', nickname: '' }, '', '');
+    expect(r.nameLine).toBe('匿名');
+    expect(r.idLine).toBe('sIEHq…Bv8');
+    expect(r.nameLine).not.toMatch(/^u\//);
+  });
+});

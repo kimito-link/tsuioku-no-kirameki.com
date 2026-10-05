@@ -12,6 +12,7 @@
 import { isGenericComeviewName } from './comeviewRows.js';
 // ★匿名NNN の採番は nicoUserPage.js が正本（2本に割れていたのを 2026-08-30 に統合）。
 import { anonymousDisplayLabel } from './nicoUserPage.js';
+import { isNiconicoHashedAnonymousUserId } from './nicoAnonymousDisplay.js';
 
 /** ユーザーノートの storage キー(配信を跨いで効く)。 */
 export const COMEVIEW_USER_NOTES_KEY = 'nls_comeview_usernotes_v1';
@@ -120,7 +121,9 @@ export function upsertComeviewUserNote(map, userKey, patch, nowMs = 0) {
  */
 export function comeviewAnonLabel(userId) {
   const s = String(userId || '').trim();
-  if (!s.startsWith('a:')) return '';
+  // v0.1.1558: 従来の a: 規則(本体 1 文字でも可=既存契約)に、タイムシフトの a: 無し hashed 形を足す。
+  //   数値 uid・空・汎用名は従来どおり ''（mediaKitHtml / supportTimelineHtml が依存する契約）。
+  if (!s.startsWith('a:') && !isNiconicoHashedAnonymousUserId(s)) return '';
   return anonymousDisplayLabel(s);
 }
 
