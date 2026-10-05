@@ -93,6 +93,7 @@ graph LR
   f3 --> f3_1["lib/nicoliveDom.js"]
   HUB --> f4["過去ログ取得(バックフィル巡回)"]
   f4 --> f4_0["lib/ndgrBackfillCrawl.js"]
+  f4 --> f4_1["lib/ndgrViewBasePick.js"]
   HUB --> f5["コメント重複除去(NDGR)"]
   f5 --> f5_0["lib/ndgrMessageDedupe.js"]
   HUB --> f6["応援レーン集約(誰が候補か)"]
@@ -331,14 +332,14 @@ graph LR
 - `soundeffect-lab/`（19 件） — 効果音ラボ由来の素材候補(採否検討用)  〔音声 / 素材〕
 
 ## `src/` — LP 側 + 純粋関数ライブラリの源  〔ソース〕
-<sub>ファイル 1866 件</sub>
+<sub>ファイル 1869 件</sub>
 
 - `data/`（7 件） — 保存コメントからレーン候補を読む acquirer / source 層  〔コメント / 取得〕
 - `domain/`（20 件） — ドメイン正本(応援レーンの集約・列ポリシー等。識別子判定など)  〔応援 / 集約 / 識別子〕
-- `extension/`（57 件） — バンドル entry(content/popup/venue/status/offscreen/backfill-sw 等=機能境界)  〔entry / 記録 / 会場 / 応援〕
+- `extension/`（58 件） — バンドル entry(content/popup/venue/status/offscreen/backfill-sw 等=機能境界)  〔entry / 記録 / 会場 / 応援〕
 - `fixtures/`（1 件） — テスト用フィクスチャ  〔テスト〕
 - `images/`（134 件） — LP / CWS 提出物のマスター画像  〔画像〕
-- `lib/`（1633 件） — 純粋関数ライブラリ(unit test 対象)。色・速度・コメント・レポート等の計算ロジックの大半  〔色 / 速度 / コメント / レポート / 純粋関数〕
+- `lib/`（1635 件） — 純粋関数ライブラリ(unit test 対象)。色・速度・コメント・レポート等の計算ロジックの大半  〔色 / 速度 / コメント / レポート / 純粋関数〕
 - `server/`（4 件） — Node 側 I/O 部品(fetch/WebSocket を実際に叩く。api と scripts が共用。lib には置けない)  〔API / 公開 / ランキング〕
 - `shared/`（7 件） — 複数機能で共有する小部品(アバター URL ガード等)  〔共有 / アバター〕
 - `sound/`（1 件） — 音声素材(src 側)  〔音声〕
@@ -397,6 +398,7 @@ watch の仮想スクロールを送りながら DOM 上のコメント行を拾
 NDGR の backward URI を辿り配信開始まで遡って過去コメントを取り込む巡回エンジン(純ロジック)
 
 - [`src/lib/ndgrBackfillCrawl.js`](../src/lib/ndgrBackfillCrawl.js)
+- [`src/lib/ndgrViewBasePick.js`](../src/lib/ndgrViewBasePick.js)
 
 ### コメント重複除去(NDGR)  〔コメント / 重複除去〕
 再送/再接続/relay overlap の重複を liveId+messageId の canonical key で排除

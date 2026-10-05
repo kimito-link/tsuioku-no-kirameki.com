@@ -18,6 +18,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1560',
+    date: '2026-10-05',
+    summary: 'タイムシフトの過去コメント一括取得が止まるのを修正',
+    items: Object.freeze([
+      'タイムシフトを見ているとき、過去コメントの一括取得が「stalled・残り約10,000件」のまま止まっていた不具合を修正しました。タイムシフトではニコ生のプレイヤーがコメント用の通信経路を2本開いていて、片方は中身が空です。拡張は「最後に見かけた経路」を使っていたため、空の方に当たると何も取れないまま止まっていました。見かけた経路を覚えておき、空だった経路は次の試行で飛ばして別の経路から取り込むようにしました。生放送での取り込み(最新の経路を優先)はこれまでどおりです。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1559',
     date: '2026-10-05',
     summary: '匿名の判定をレポート・CSV・並び順でも統一',
@@ -168,14 +176,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     summary: '内部整理(表示や動作は変わりません)',
     items: Object.freeze([
       '開発時の出荷手順のコード説明を強化しました(配布物には影響ありません)。'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.1538',
-    date: '2026-09-21',
-    summary: '内部整理(表示や動作は変わりません)',
-    items: Object.freeze([
-      '開発時の出荷手順を見直しました(配布物には影響ありません)。'
     ])
   })
 ]);
