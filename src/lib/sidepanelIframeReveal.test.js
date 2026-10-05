@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   HIDDEN_CLASS,
   REVEAL_FALLBACK_MS,
+  REVEAL_AFTER_LOAD_GRACE_MS,
   decideReveal,
   shouldHideUntilReady
 } from './sidepanelIframeReveal.js';
@@ -38,9 +39,18 @@ describe('shouldHideUntilReady — 隠してよい場面だけ隠す', () => {
   });
 });
 
-describe('decideReveal — どの理由でも必ず見せる', () => {
-  it('load したら見せる', () => {
-    expect(decideReveal({ loaded: true })).toEqual({ reveal: true, reason: 'load' });
+describe('decideReveal — 合図が来たら必ず見せる', () => {
+  it('★v0.1.1561: 中身が描かれたら見せる(paint)', () => {
+    expect(decideReveal({ painted: true })).toEqual({ reveal: true, reason: 'paint' });
+    expect(decideReveal({ loaded: true, painted: true })).toEqual({ reveal: true, reason: 'paint' });
+  });
+
+  it('★v0.1.1561: load だけでは見せない(load→初回描画の隙間が黒の正体・2026-10-05 実測 365ms)', () => {
+    expect(decideReveal({ loaded: true })).toEqual({ reveal: false, reason: 'wait-paint' });
+  });
+
+  it('★v0.1.1561: load から猶予が過ぎたら描画の合図が無くても見せる(白紙固着の防止)', () => {
+    expect(decideReveal({ loaded: true, loadGraceElapsed: true })).toEqual({ reveal: true, reason: 'load-grace' });
   });
 
   it('★読み込みに失敗しても見せる(隠したままにしない)', () => {
@@ -55,9 +65,9 @@ describe('decideReveal — どの理由でも必ず見せる', () => {
     expect(decideReveal({})).toEqual({ reveal: false, reason: 'none' });
   });
 
-  it('★「見せない」に倒れる分岐が load/error/timeout に存在しない', () => {
-    for (const ev of [{ loaded: true }, { errored: true }, { timedOut: true },
-                      { loaded: true, errored: true }, { loaded: false, timedOut: true }]) {
+  it('★「見せない」に倒れる分岐が paint/load-grace/error/timeout に存在しない', () => {
+    for (const ev of [{ painted: true }, { loadGraceElapsed: true }, { errored: true }, { timedOut: true },
+                      { loaded: true, errored: true }, { loaded: false, timedOut: true }, { loaded: true, loadGraceElapsed: true }]) {
       expect(decideReveal(ev).reveal).toBe(true);
     }
   });
@@ -69,9 +79,14 @@ describe('decideReveal — どの理由でも必ず見せる', () => {
 });
 
 describe('★保険のしきい値', () => {
-  it('load が来なくても1.2秒以内には必ず見せる', () => {
+  it('load が来なくても1.5秒以内には必ず見せる', () => {
     expect(REVEAL_FALLBACK_MS).toBeLessThanOrEqual(1500);
     expect(REVEAL_FALLBACK_MS).toBeGreaterThan(0);
+  });
+
+  it('★v0.1.1561: load からの猶予は最終保険より短い(描画待ちが最終保険を追い越さない)', () => {
+    expect(REVEAL_AFTER_LOAD_GRACE_MS).toBeGreaterThan(0);
+    expect(REVEAL_AFTER_LOAD_GRACE_MS).toBeLessThan(REVEAL_FALLBACK_MS);
   });
 
   it('隠しクラス名が定義されている(CSSと突き合わせる鍵)', () => {

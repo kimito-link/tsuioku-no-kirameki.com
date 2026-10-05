@@ -1197,5 +1197,23 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
     note: '★直近30日窓のスライドによる自然減(48@0.1.1556→36・9月上旬の計器集中期のコミットが窓外に出た分)。' +
       '今回(v0.1.1557〜1560)は devtools Chrome でタイムシフト lv342383970 を実際に開いて NDGR の view 2本・backward 0byte・' +
       '匿名IDの a: 無しを実測してから直し、各版で変異テスト(ロジックを壊して赤→復元で緑)も行った。別の手段での確認は今回も行っている。'
+  }),
+  Object.freeze({
+    version: '0.1.1561', metric: 'bundle-kb', value: 1365,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '★+1KB(1364@0.1.1560→1365)は更新履歴1版ぶん(直近20版は popup バンドルに同梱される仕様)。' +
+      'サイドパネルの覆い(v0.1.1561)は sidepanel.html/sidepanel.js 側の変更で popup.js には入っていない。' +
+      '過去最良1360(@0.1.1454)との差分の内訳は v0.1.1471/1537/1560 の note に記録済み。'
+  }),
+  Object.freeze({
+    version: '0.1.1561', metric: 'gate-selftest', value: 4,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1561', metric: 'cross-checked-claims', value: 37,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: '★直近30日窓のスライドによる自然減(55@0.1.1537→37。v0.1.1560 の note と同じ理由)。' +
+      '今回は devtools Chrome で sidepanel.html を 5 回測り、opacity:0 の iframe が見せた後まで描画されない事実と、' +
+      '覆い方式で黒の窓が 0 になることを first-paint の時刻で確かめた。別の手段での確認は今回も行っている。'
   })
 ]);

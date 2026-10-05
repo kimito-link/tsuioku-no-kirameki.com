@@ -110,41 +110,55 @@
           HTML で初期非表示にしないのは、JS が動かないと
           【永久に真っ白】になるから(黒より悪い退化)。
       */
+      /*
+        ★v0.1.1561: 【iframe は隠さない】。上に親側の覆い(#nl-ifr-cover)を置き、中身が描かれたら外す。
+
+        ■ なぜ opacity:0 で隠すのをやめたか(2026-10-05 実測・devtools Chrome)
+          opacity:0 の iframe は Chrome が【描画を後回しにする】。中の文書の first-paint は
+          見せた(opacity:1)【後】に初めて起きる(実測: 見せた 27〜50ms 後・= 2〜3 フレーム)。
+          その 2〜3 フレームは iframe が見えているのに中身が無く、直前の about:blank の
+          暗いフレームが残る＝「押した瞬間の黒」。2026-08-19 に「仕様由来の 32ms」と
+          受け入れたものの正体はこれ(about:blank のキャンバスではなく、隠し方が描画を止めていた)。
+          ★load を待っても描画を待っても、opacity:0 のままでは原理的に消えない。
+
+        ■ 覆いにすると消える理由(同日実測)
+          iframe を opacity:1 のまま、上に不透明な覆いを置くと、中の文書は覆われていても
+          描画される(first-paint が load より【前】に来た: 123ms < 146ms)。
+          覆いを外した瞬間には中身が既にある＝黒い隙間はゼロ。
+
+        ■ これは 2026-08 に空振りした「幕(cloak)」とは違う点
+          - 覆いは【親 sidepanel.html 側】にある。中の popup の JS が止まっていても外せる。
+          - 外す合図は【中の文書の first-paint】(sidepanel-entry.js)。load では外さない。
+          - 外す JS が死んでも CSS アニメーション(1.5s)で必ず外れる(下の保険)。
+          - 覆った事実は自己診断(reveal: reason/loadAt/paintAt/revealAt)に必ず載る。
+      */
       iframe.nl-ifr-loading {
-        /*
-          ★v0.1.1437: 中身が出来るまで iframe を【透明】にする。
-
-          ■ なぜこれで黒が消えるか(実測で確認済・2026-08-18)
-            iframe が透明の間は、背後の親(この sidepanel.html の地 #fffaf2)が
-            そのまま見える。実測: 透明にした状態で親の色を読むと
-            rgb(255,250,242) が返った。
-            ★つまり【黒の代わりにクリーム色が見える】。穴にはならない。
-
-          ■ 真因(世界調査でCSS仕様レベルまで確定)
-            iframe は src が commit されるまで initial about:blank で存在し、
-            この文書は色スキームを持たないので UA が不透明なキャンバス
-            (OSがダークなら黒)を敷く。
-            ★W3C CSSWG は2024-02に「常に透明にする」と決議し、理由を
-              【作者には制御できない】と明記 = 色を宣言する方向では消せない。
-              このリポはその方向で12版・200行を費やして失敗している。
-
-          ■ ★必ず自分で開ける(JS に頼らない)
-            v0.1.1436 は戻すのを JS(load / setTimeout)に任せたところ、
-            実機のパネルで【隠れたまま戻らない】のを見た。
-            パネルは 2.3MB のバンドルを読む間イベントループが止まるので
-            ハンドラもタイマーも発火できない
-            [[stalled-event-loop-masquerades-as-paint-bug-2026-08-12]]。
-            → CSS アニメーションを保険にする。
-            ★実測で分かった限界(正直に書く):
-              メインスレッドが固まっているあいだはこのアニメーションも進まない。
-              ただし【手が空いた瞬間に必ず開く】ので、永久に隠れっぱなしにはならない。
-              (実測: 1.2秒ブロック後、解除100msで開いた)
-        */
+        /* ★opacity は触らない(0 にすると中身の描画が止まる)。クラスは覆いの表示に使うだけ。 */
+      }
+      #nl-ifr-cover {
+        position: absolute;
+        inset: 0;
+        /* iframe(z-index:1) より上。中身は隠れるが、描画は止まらない。 */
+        z-index: 2;
+        background-color: #fffaf2;
+        background-image: linear-gradient(160deg, #fffaf2, #eef8ff);
+        pointer-events: none;
+        /* 既定は【無い】状態。JS が iframe に nl-ifr-loading を付けている間だけ現れる。 */
         opacity: 0;
-        animation: nl-ifr-reveal 1.2s step-end forwards;
+        visibility: hidden;
+      }
+      iframe.nl-ifr-loading + #nl-ifr-cover {
+        opacity: 1;
+        visibility: visible;
+        /*
+          ★JS に依存しない保険。中身の描画で外す JS が動かなくても、1.5 秒で必ず外れる。
+            (親と iframe は同じスレッドなので、JS が止まっている間は中身も描かれない。
+             その間は覆い=クリーム色が見えるだけで、黒にはならない)
+        */
+        animation: nl-ifr-reveal 1.5s step-end forwards;
       }
       @keyframes nl-ifr-reveal {
-        to { opacity: 1; }
+        to { opacity: 0; visibility: hidden; }
       }
       /*
         ★v0.1.1438: 【下敷き】。iframe の下に地の色を敷きっぱなしにする。
@@ -192,6 +206,8 @@
     -->
     <div id="nl-underlay"></div>
     <iframe title="ニコ生ログ" src="popup.html?inline=1&amp;dock=sidepanel"></iframe>
+    <!-- ★v0.1.1561: iframe の上に置く覆い。iframe が nl-ifr-loading の間だけ CSS で現れる(JS では作らない)。 -->
+    <div id="nl-ifr-cover" aria-hidden="true"></div>
     <!--
       自己診断だけ残す(描画には一切関与しない)。
       これが無いと「いま黒いか」を測る手段が消え、また推測に戻ってしまう。

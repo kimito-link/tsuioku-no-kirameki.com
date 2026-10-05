@@ -18,6 +18,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1561',
+    date: '2026-10-05',
+    summary: 'サイドパネルを開いた瞬間の黒を消す',
+    items: Object.freeze([
+      'サイドパネルを開いた瞬間(ツールバーを押した直後)に一瞬黒く見えていたのを直しました。これまでは中身のHTMLを読み終えた合図(load)で見せていましたが、その時点では中身がまだ一度も描かれておらず、直前の空ページの暗い画面が数十〜数百ミリ秒残っていました(実測 53〜365ms)。中身が初めて描かれた合図を待ってから見せるようにしました。描画の合図が取れない場合も0.6秒で必ず表示し、最終保険(1.5秒)もそのままです。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1560',
     date: '2026-10-05',
     summary: 'タイムシフトの過去コメント一括取得が止まるのを修正',
@@ -168,14 +176,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     summary: '内部整理(表示や動作は変わりません)',
     items: Object.freeze([
       '出荷手順の異常検知を強化しました(配布物には影響ありません)。'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.1539',
-    date: '2026-09-22',
-    summary: '内部整理(表示や動作は変わりません)',
-    items: Object.freeze([
-      '開発時の出荷手順のコード説明を強化しました(配布物には影響ありません)。'
     ])
   })
 ]);
