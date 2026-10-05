@@ -18,6 +18,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1559',
+    date: '2026-10-05',
+    summary: '匿名の判定をレポート・CSV・並び順でも統一',
+    items: Object.freeze([
+      '匿名さんかどうかの判定が画面ごとに別々に書かれていて、タイムシフトの匿名さん(a: が付かない形)がレポートの集計では「その他」、CSVでは is184=false、応援レーンの並び順では「その他」扱いになっていました。すべて同じ1つの判定(v0.1.1558で広げたもの)を使うようにしました。コメントCSVの is184 列は、タイムシフトの匿名コメントも true になります(列名・列の順番は変わりません)。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1558',
     date: '2026-10-05',
     summary: 'タイムシフトの匿名さんを匿名として表示',
@@ -168,14 +176,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     summary: '内部整理(表示や動作は変わりません)',
     items: Object.freeze([
       '開発時の出荷手順を見直しました(配布物には影響ありません)。'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.1537',
-    date: '2026-09-21',
-    summary: '即時コメント表示の重さ・停止を軽減',
-    items: Object.freeze([
-      'コメントが届くたびに応援レーンを即座に描き直していた処理を、短時間に複数届いても1回にまとめて描くよう変更しました。表示が固まる・重くなる場面を減らしています。'
     ])
   })
 ]);

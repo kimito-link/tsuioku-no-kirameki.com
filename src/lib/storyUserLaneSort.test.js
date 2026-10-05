@@ -41,3 +41,12 @@ describe('compareStoryUserLaneCandidates', () => {
     expect(rows.map((x) => x.entryIndex)).toEqual([3, 2, 1]);
   });
 });
+
+// v0.1.1559: タイムシフトの a: 無し hashed 匿名 ID も a: と同じ rank(1)。popup と会場で同じ並び。
+describe('storyUserLaneUidSortRank: hashed 匿名 (v0.1.1559)', () => {
+  it('hashed 匿名 uid は a: と同じ 1（数値 0 とその他 2 の間）', () => {
+    expect(storyUserLaneUidSortRank('sIEHqCaHKR_Pe1v1ZU61TnVABv8')).toBe(1);
+    expect(storyUserLaneUidSortRank('a:AbCdEfGhIjKlMnOp')).toBe(1);
+    expect(storyUserLaneUidSortRank('12345')).toBe(0);
+  });
+});

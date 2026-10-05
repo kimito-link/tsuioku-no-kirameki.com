@@ -129,3 +129,19 @@ describe('buildReportCommentsCsv', () => {
     expect(cols[5]).toBe('');
   });
 });
+
+// v0.1.1559: タイムシフトの a: 無し hashed 匿名 ID も is184=true で出力する（列名・列順は不変）。
+describe('buildReportCommentsCsv: hashed 匿名 (v0.1.1559)', () => {
+  it('hashed 匿名 uid の行は is184=true', () => {
+    const csv = buildReportCommentsCsv([
+      { commentNo: '635', userId: 'sIEHqCaHKR_Pe1v1ZU61TnVABv8', text: 'のうや', capturedAt: 0 }
+    ]);
+    const line = csv.split(/\r?\n/)[1];
+    expect(line).toContain(',true,false,');
+    expect(line).toContain('sIEHqCaHKR_Pe1v1ZU61TnVABv8');
+  });
+  it('数値 uid は従来どおり is184=false', () => {
+    const csv = buildReportCommentsCsv([{ commentNo: '1', userId: '14014777', text: 'x', capturedAt: 0 }]);
+    expect(csv.split(/\r?\n/)[1]).toContain(',false,false,');
+  });
+});
