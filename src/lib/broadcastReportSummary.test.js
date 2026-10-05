@@ -179,3 +179,18 @@ describe('summarizeIdentifierStats', () => {
     expect(r.selfPostedCount).toBe(2);
   });
 });
+
+// v0.1.1559: タイムシフトの a: 無し hashed 匿名 ID も 184 として分類する（正本 isNiconicoAnonymousUserId へ寄せた）。
+describe('summarizeIdentifierStats: hashed 匿名 (v0.1.1559)', () => {
+  it('hashed 匿名 uid は a: と同じ分類(anonymous184Count)になる', () => {
+    const r = summarizeIdentifierStats([
+      c({ at: t0, userId: 'a:AbCdEfGhIjKlMnOp' }),
+      c({ at: t0, userId: 'sIEHqCaHKR_Pe1v1ZU61TnVABv8' }),
+      c({ at: t0, userId: '12345' }),
+      c({ at: t0, userId: 'abc' })
+    ]);
+    expect(r.anonymous184Count).toBe(2);
+    expect(r.numericIdCount).toBe(1);
+    expect(r.otherCount).toBe(1);
+  });
+});

@@ -312,3 +312,15 @@ describe('ndgrChatsToMergeRows', () => {
     expect(rows[0]).not.toHaveProperty('is184');
   });
 });
+
+// v0.1.1558: タイムシフトの hashedUserId は a: が付かない（lv342383970 実測）。a: 行と同形で nickname「匿名」を付ける。
+describe('ndgrChatsToMergeRows: a: 無し hashed 匿名 (v0.1.1558)', () => {
+  it('hashedUserId に a: が無い chat でも nickname「匿名」が付く（a: と同形）', () => {
+    const rows = ndgrChatsToMergeRows([
+      { no: 635, rawUserId: null, hashedUserId: 'sIEHqCaHKR_Pe1v1ZU61TnVABv8', name: '', content: 'のうや' }
+    ]);
+    expect(rows).toEqual([
+      { commentNo: '635', text: 'のうや', userId: 'sIEHqCaHKR_Pe1v1ZU61TnVABv8', nickname: '匿名' }
+    ]);
+  });
+});

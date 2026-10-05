@@ -28,6 +28,7 @@ import { comeviewAnonLabel } from './comeviewUserNotes.js';
 
 const SAMPLES = [
   'a:d8KyTJKlU_rTi7sC', // ★実機の形（comeviewUserNotes.test.js:64 から採った）
+  'sIEHqCaHKR_Pe1v1ZU61TnVABv8', // ★タイムシフトの形（a: 無し・lv342383970 実測・v0.1.1558）
   'a:1234567890',
   'a:9876543210',
   'a:00000123',

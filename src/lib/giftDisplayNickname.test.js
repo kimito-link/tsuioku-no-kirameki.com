@@ -299,3 +299,18 @@ describe('upgradeGiftUserRowsWithInterceptNicknames', () => {
     expect(next[0]).toEqual(row);
   });
 });
+
+// v0.1.1558: タイムシフトの a: 無し hashed 匿名 uid が u/<生ID> で画面に漏れていた不具合。
+describe('formatNicknameWithUidFallback: hashed 匿名 (v0.1.1558)', () => {
+  it('hashed 匿名 uid は u/ を合成せず空文字（既存の匿名表示経路へ）', () => {
+    expect(formatNicknameWithUidFallback('sIEHqCaHKR_Pe1v1ZU61TnVABv8', '')).toBe('');
+    expect(formatNicknameWithUidFallback('-GGaQpHQUTGLRnNRYU1_', '')).toBe('');
+  });
+  it('数値 uid の u/<uid>・予期しない短い形の u/<sliced> は不変', () => {
+    expect(formatNicknameWithUidFallback('4814023', '')).toBe('u/4814023');
+    expect(formatNicknameWithUidFallback('abc-xyz', '')).toBe('u/abc-xyz');
+  });
+  it('解決済みニックネームがあれば hashed でもそれを返す', () => {
+    expect(formatNicknameWithUidFallback('sIEHqCaHKR_Pe1v1ZU61TnVABv8', '柿ピー')).toBe('柿ピー');
+  });
+});

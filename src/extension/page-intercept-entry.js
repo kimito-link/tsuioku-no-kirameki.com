@@ -11,6 +11,7 @@ import { decodeChunkedMessage, decodePackedSegment, ndgrStatisticsHasWireSignal 
 import { ndgrChatsToMergeRows } from '../lib/ndgrChatRows.js';
 import { createNdgrMessageDedupe } from '../lib/ndgrMessageDedupe.js';
 import { anonymousNicknameFallback } from '../lib/nicoAnonymousDisplay.js';
+import { pushRecentNdgrViewBase } from '../lib/ndgrViewBasePick.js';
 import {
   collectInterceptSignalsFromObject,
   extractLearnUsersFromNicoUserIconUrlsInString
@@ -504,7 +505,7 @@ import {
   //   ニコ生プレイヤーが叩く `api/view/v4` を傍受した時に、その base URL と観測回数を
   //   data 属性へ一度だけ露出して、実機 PoC（?at=過去 が本当に遡れるか）の足場にする。
   //   ⛔ ここでは「観測（属性に出す）」だけで、自前 fetch も巡回も行わない（hot path 非干渉）。
-  const _ndgrViewUri = { base: '', firstBase: '', count: 0 };
+  const _ndgrViewUri = { base: '', firstBase: '', count: 0, recent: /** @type {string[]} */ ([]) };
   /** @param {string} rawUrl */
   function observeNdgrViewUri(rawUrl) {
     try {
@@ -531,6 +532,17 @@ import {
       if (!root) return;
       root.setAttribute('data-nls-ndgr-view-uri', _ndgrViewUri.base.slice(0, 300));
       root.setAttribute('data-nls-ndgr-view-uri-count', String(_ndgrViewUri.count));
+      // v0.1.1560: 観測した view base を【最新順・重複なし・上限4】で別属性にも出す(既存属性の意味は不変)。
+      //   タイムシフトはプレイヤーが view を2本開き、片方は本文ゼロ(backward 0byte)。content 側の backfill が
+      //   rows=0 で死んだ view を飛ばして次の候補を選べるようにする(src/lib/ndgrViewBasePick.js)。
+      //   属性の書き換えはレイアウトを誘発し得るので、配列が変わったときだけ書く(v0.1.1460 属性予算)。
+      const nextRecent = pushRecentNdgrViewBase(_ndgrViewUri.recent, base);
+      const recentChanged =
+        nextRecent.length !== _ndgrViewUri.recent.length || nextRecent.some((b, i) => b !== _ndgrViewUri.recent[i]);
+      _ndgrViewUri.recent = nextRecent;
+      if (recentChanged) {
+        root.setAttribute('data-nls-ndgr-view-uri-recent', JSON.stringify(nextRecent.map((b) => b.slice(0, 300))));
+      }
     } catch {
       /* 観測失敗はページ挙動に影響させない */
     }
