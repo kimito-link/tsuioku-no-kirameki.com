@@ -23,6 +23,7 @@ graph LR
   n_page_intercept --> n_src_lib_ndgrDecode_js["lib/ndgrDecode.js"]:::shared
   n_page_intercept --> n_src_lib_ndgrMessageDedupe_js["lib/ndgrMessageDedupe.js"]
   n_page_intercept --> n_src_lib_ndgrUnknownSamplesBudget_js["lib/ndgrUnknownSamplesBudget.js"]
+  n_page_intercept --> n_src_lib_ndgrViewBasePick_js["lib/ndgrViewBasePick.js"]:::shared
   n_page_intercept --> n_src_lib_nicoAnonymousDisplay_js["lib/nicoAnonymousDisplay.js"]:::shared
   n_page_intercept --> n_src_lib_niconicoInterceptLearn_js["lib/niconicoInterceptLearn.js"]
   n_page_intercept --> n_src_lib_nlsInterceptAuth_js["lib/nlsInterceptAuth.js"]:::shared
