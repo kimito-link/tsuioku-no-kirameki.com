@@ -132,3 +132,24 @@ describe('buildSupporterChikuranRows', () => {
     });
   });
 });
+
+// v0.1.1559: タイムシフトの a: 無し hashed 匿名 ID も匿名応援として折り畳む（a: と同じ分類）。
+describe('buildSupporterChikuranRows: hashed 匿名 (v0.1.1559)', () => {
+  it('hashed 匿名 uid のコメントは a: と同じ匿名応援バケットに畳まれ、個別行にならない', () => {
+    const out = buildSupporterChikuranRows(
+      {
+        comments: [
+          { liveId: 'lv1', userId: 'sIEHqCaHKR_Pe1v1ZU61TnVABv8', nickname: '', capturedAt: NOW - minute },
+          { liveId: 'lv1', userId: 'a:abc', nickname: '匿名ユーザー', capturedAt: NOW - minute }
+        ]
+      },
+      { liveId: 'lv1', nowMs: NOW }
+    );
+    expect(out.rows).toHaveLength(1);
+    expect(out.rows[0]).toMatchObject({
+      supporterKey: SUPPORTER_CHIKURAN_ANONYMOUS_KEY,
+      identityKind: 'anonymous',
+      commentCount: 2
+    });
+  });
+});

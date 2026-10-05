@@ -6,6 +6,8 @@
  * chrome.storage / DOM / network には触れない。
  */
 
+import { isNiconicoAnonymousUserId } from './nicoAnonymousDisplay.js';
+
 export const SUPPORTER_CHIKURAN_ANONYMOUS_KEY = '__supporter_chikuran_anonymous__';
 
 export const SUPPORTER_CHIKURAN_DEFAULT_WEIGHTS = Object.freeze({
@@ -153,7 +155,8 @@ function isAnonymousSupporter(uid, name, raw) {
   const row = /** @type {{ is184?: unknown, isAnonymous?: unknown }} */ (raw || {});
   if (row.is184 === true || row.isAnonymous === true) return true;
   if (!uid && (!name || /^(名無し|匿名|anonymous)$/i.test(name))) return true;
-  if (lower.startsWith('a:')) return true;
+  // v0.1.1559: 匿名判定は正本(a: と、タイムシフトの a: 無し hashed 形)。内部キー(__anon_/__gift_sender_)は下で別途。
+  if (isNiconicoAnonymousUserId(uid)) return true;
   if (lower.startsWith('__anon_')) return true;
   if (lower.startsWith('__gift_sender_')) return true;
   return false;

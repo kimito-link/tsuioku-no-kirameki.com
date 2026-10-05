@@ -8,6 +8,8 @@
  *     `{ capturedAt: number, text: string, userId: string|null, selfPosted?: any }`。
  */
 
+import { isNiconicoAnonymousUserId } from './nicoAnonymousDisplay.js';
+
 /**
  * @typedef {{
  *   capturedAt?: number|string|null,
@@ -143,7 +145,8 @@ export function summarizeIdentifierStats(comments) {
     if (c?.selfPosted) self += 1;
     if (/^\d+$/.test(uid)) {
       numeric += 1;
-    } else if (uid.startsWith('a:')) {
+    } else if (isNiconicoAnonymousUserId(uid)) {
+      // v0.1.1559: 判定は正本(a: と、タイムシフトの a: 無し hashed 形)。a: 直書きだと hashed が other に落ちていた。
       anon += 1;
     } else {
       other += 1;
