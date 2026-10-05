@@ -29,13 +29,32 @@ describe('隠して→見せる の配線', () => {
     expect(e).toMatch(/setTimeout\([^;]*reveal\(\{\s*timedOut:\s*true\s*\}\)[^;]*,\s*REVEAL_FALLBACK_MS\s*\)/);
   });
 
-  it('★戻す経路は【3つ】ある(load / error / 時間切れ)', () => {
+  it('★戻す経路は【4つ】ある(描画 / load からの猶予 / error / 時間切れ)', () => {
     const e = entry();
     expect(e).toMatch(/addEventListener\('load'/);
     expect(e).toMatch(/addEventListener\('error'/);
+    expect(e).toMatch(/reveal\(\{\s*painted:\s*true/);
+    expect(e).toMatch(/setTimeout\(\s*\(\)\s*=>\s*reveal\(\{\s*loadGraceElapsed:\s*true\s*\}\),\s*REVEAL_AFTER_LOAD_GRACE_MS\s*\)/);
     expect(e).toMatch(/setTimeout\(\s*\(\)\s*=>\s*reveal\(\{\s*timedOut:\s*true/);
     const reveals = e.match(/reveal\(\{/g) || [];
-    expect(reveals.length).toBe(3);
+    expect(reveals.length).toBe(4);
+  });
+
+  it('★v0.1.1561: load では見せず、中身の初回描画(paint entry)を観測してから見せる', () => {
+    const e = entry();
+    // load ハンドラの中で中の performance timeline(paint)を見ている
+    expect(e).toMatch(/getEntriesByType\('paint'\)/);
+    expect(e).toMatch(/new cw\.PerformanceObserver\(/);
+    expect(e).toMatch(/observe\(\{\s*type:\s*'paint',\s*buffered:\s*true\s*\}\)/);
+    // load 直後に素で見せる旧経路(reveal({ loaded: true }))は残っていない
+    expect(e).not.toMatch(/reveal\(\{\s*loaded:\s*true/);
+  });
+
+  it('★v0.1.1561: 隠す→見せる の実測(reason/loadAt/paintAt/revealAt)を自己診断に載せている', () => {
+    const e = entry();
+    expect(e).toMatch(/_revealDiag\.reason = d\.reason/);
+    expect(e).toMatch(/_revealDiag\.paintAt = /);
+    expect(e).toMatch(/reveal: \{ \.\.\._revealDiag \}/);
   });
 
   it('★クラスを外す(=見せる)処理が存在する', () => {
@@ -52,21 +71,33 @@ describe('隠して→見せる の配線', () => {
     expect(tag).not.toMatch(/display:\s*none/);
   });
 
-  it('★CSS 側に隠しクラスの定義がある(JSだけ在ってCSSが無い片肺を防ぐ)', () => {
+  it('★v0.1.1561: iframe 自体は隠さない(opacity:0 にすると中身の描画が【見せた後】まで止まり、黒い2〜3フレームが残る)', () => {
     const html = read('extension/sidepanel.html');
     expect(html).toMatch(/iframe\.nl-ifr-loading\s*\{/);
-    // ★隔すのは opacity(コンポジタで扱える・親のクリーム色が透ける)
     const rule = /iframe\.nl-ifr-loading\s*\{([\s\S]*?)\}/.exec(html)?.[1] ?? '';
-    expect(rule.replace(/\/\*[\s\S]*?\*\//g, '')).toMatch(/opacity:\s*0/);
+    const block = rule.replace(/\/\*[\s\S]*?\*\//g, '');
+    expect(block).not.toMatch(/opacity:\s*0/);
+    expect(block).not.toMatch(/visibility:\s*hidden/);
+    expect(block).not.toMatch(/display:\s*none/);
   });
 
-  it('★display:none では隠さない(レイアウトが消えて中身の初期描画が狂う)', () => {
+  it('★v0.1.1561: 隠すのは iframe の【上】の覆い(#nl-ifr-cover)。読み込み中だけ CSS で現れ、既定は無い', () => {
     const html = read('extension/sidepanel.html');
-    const raw = /iframe\.nl-ifr-loading\s*\{([\s\S]*?)\}/.exec(html)?.[1] ?? '';
-    // ★コメント内の「display:none ではなく」という説明を拾わない
-    const block = raw.replace(/\/\*[\s\S]*?\*\//g, '');
-    expect(block).not.toMatch(/display:\s*none/);
-    expect(block).toMatch(/opacity:\s*0/);
+    // HTML に覆いの要素がある(JS で作らない=JS が死んでも覆いは CSS で外れる)
+    expect(html).toMatch(/<div id="nl-ifr-cover"/);
+    // 既定(読み込み中でない)は見えない
+    const base = /#nl-ifr-cover\s*\{([\s\S]*?)\}/.exec(html)?.[1] ?? '';
+    const baseBlock = base.replace(/\/\*[\s\S]*?\*\//g, '');
+    expect(baseBlock).toMatch(/opacity:\s*0/);
+    expect(baseBlock).toMatch(/pointer-events:\s*none/);
+    expect(baseBlock).toMatch(/z-index:\s*2/);
+    // 読み込み中(iframe.nl-ifr-loading の直後)だけ現れる
+    const on = /iframe\.nl-ifr-loading\s*\+\s*#nl-ifr-cover\s*\{([\s\S]*?)\}/.exec(html)?.[1] ?? '';
+    const onBlock = on.replace(/\/\*[\s\S]*?\*\//g, '');
+    expect(onBlock).toMatch(/opacity:\s*1/);
+    expect(onBlock).not.toMatch(/display:\s*none/);
+    // 覆いは親の地の色(黒ではない)
+    expect(baseBlock).toContain('#fffaf2');
   });
 
   it('★色の宣言は消していない(唯一効いている守り・消すと退化)', () => {
@@ -88,27 +119,27 @@ describe('★★JSに依存しない保険(v0.1.1437・実機で隠れっぱな�
    */
   const html = () => read('extension/sidepanel.html');
 
-  it('★隔しクラスに CSS アニメーションの保険が付いている', () => {
-    const raw = /iframe\.nl-ifr-loading\s*\{([\s\S]*?)\}/.exec(html())?.[1] ?? '';
-    const block = raw.replace(/\/\*[\s\S]*?\*\//g, '');
-    expect(block).toMatch(/animation:\s*nl-ifr-reveal/);
+  const coverOnRule = () => (/iframe\.nl-ifr-loading\s*\+\s*#nl-ifr-cover\s*\{([\s\S]*?)\}/.exec(html())?.[1] ?? '').replace(/\/\*[\s\S]*?\*\//g, '');
+
+  it('★覆い(読み込み中)に CSS アニメーションの保険が付いている', () => {
+    expect(coverOnRule()).toMatch(/animation:\s*nl-ifr-reveal/);
   });
 
-  it('★アニメーションの終点は visible(開く側へ倒れる)', () => {
+  it('★アニメーションの終点は【覆いが消える】(開く側へ倒れる)', () => {
     const kf = /@keyframes\s+nl-ifr-reveal\s*\{([\s\S]*?)\}\s*\}/.exec(html())?.[1]
       ?? /@keyframes\s+nl-ifr-reveal\s*\{([\s\S]*?)\}/.exec(html())?.[1] ?? '';
-    expect(kf).toMatch(/opacity:\s*1/);
-    expect(kf).not.toMatch(/opacity:\s*0/);
+    expect(kf).toMatch(/opacity:\s*0/);
+    expect(kf).toMatch(/visibility:\s*hidden/);
+    expect(kf).not.toMatch(/opacity:\s*1/);
   });
 
-  it('★forwards で終状態を保つ(終わった途端に隠れ戻らない)', () => {
-    const raw = /iframe\.nl-ifr-loading\s*\{([\s\S]*?)\}/.exec(html())?.[1] ?? '';
-    expect(raw.replace(/\/\*[\s\S]*?\*\//g, '')).toMatch(/forwards/);
+  it('★forwards で終状態を保つ(終わった途端に覆い戻らない)', () => {
+    expect(coverOnRule()).toMatch(/forwards/);
   });
 
-  it('★保険の長さは1.5秒以内(白いまま待たせない)', () => {
-    const raw = /iframe\.nl-ifr-loading\s*\{([\s\S]*?)\}/.exec(html())?.[1] ?? '';
-    const m = /animation:\s*nl-ifr-reveal\s+([\d.]+)s/.exec(raw.replace(/\/\*[\s\S]*?\*\//g, ''));
+  it('★保険の長さは1.5秒以内(クリーム色のまま待たせない)', () => {
+    const raw = coverOnRule();
+    const m = /animation:\s*nl-ifr-reveal\s+([\d.]+)s/.exec(raw);
     expect(m).toBeTruthy();
     expect(Number(m[1])).toBeLessThanOrEqual(1.5);
     expect(Number(m[1])).toBeGreaterThan(0);

@@ -22,9 +22,19 @@ import { SIDE_PANEL_WATCH_TAB_QUERY, pickLvFromTabs } from '../lib/sidePanelLvFr
 import {
   HIDDEN_CLASS,
   REVEAL_FALLBACK_MS,
+  REVEAL_AFTER_LOAD_GRACE_MS,
   decideReveal,
   shouldHideUntilReady
 } from '../lib/sidepanelIframeReveal.js';
+
+/**
+ * ★v0.1.1561: 「隠す→見せる」の実測(状態速報に載せる)。
+ *   reason=何の合図で見せたか / loadAt→paintAt→revealAt の ms(パネル起動基準)。
+ *   黒が見える条件は「見せた(revealAt)のに中身が未描画(paintAt が後 or 無い)」。
+ *   paint で見せていれば revealAt >= paintAt になる＝黒の窓はゼロ。
+ * @type {{ reason: string, loadAt: number|null, paintAt: number|null, revealAt: number|null }}
+ */
+const _revealDiag = { reason: '', loadAt: null, paintAt: null, revealAt: null };
 
 /*
  * ★v0.1.1419: iframe に配信ID(lv)を渡してから読み込ませる。【描画に関与する唯一の処理】。
@@ -62,17 +72,66 @@ try {
       const canHide = !!(ifr.classList && typeof ifr.classList.add === 'function');
       if (shouldHideUntilReady({ hasIframe: true, supportsHiding: canHide })) {
         let shown = false;
-        /** @param {{loaded?:boolean, errored?:boolean, timedOut?:boolean}} ev */
+        /** @param {{loaded?:boolean, painted?:boolean, loadGraceElapsed?:boolean, errored?:boolean, timedOut?:boolean}} ev */
         const reveal = (ev) => {
           if (shown) return;
-          if (!decideReveal(ev).reveal) return;
+          const d = decideReveal(ev);
+          if (!d.reveal) return;
           shown = true;
+          _revealDiag.reason = d.reason;
+          _revealDiag.revealAt = Math.round(performance.now());
           try { ifr.classList.remove(HIDDEN_CLASS); } catch { /* no-op */ }
         };
         ifr.classList.add(HIDDEN_CLASS);
-        ifr.addEventListener('load', () => reveal({ loaded: true }), { once: true });
+        /*
+         * ★v0.1.1561: load では見せない。中身が【初めて描かれた】合図で見せる。
+         *   実測(2026-10-05): load(739ms)→中身の first-paint(1,104ms)の 365ms(速い回でも 53ms)は、
+         *   iframe が見えているのに中身が未描画で、直前の about:blank の暗いフレームが残る
+         *   ＝「押した瞬間の黒」。描画の合図は同一オリジンなので中の performance timeline で取れる。
+         *   合図が来なくても load から REVEAL_AFTER_LOAD_GRACE_MS で必ず見せる(白紙固着の防止)。
+         */
+        ifr.addEventListener('load', () => {
+          _revealDiag.loadAt = Math.round(performance.now());
+          let painted = false;
+          const onPainted = () => {
+            if (painted) return;
+            painted = true;
+            _revealDiag.paintAt = Math.round(performance.now());
+            reveal({ painted: true });
+          };
+          try {
+            // 同一オリジンの中の window。PerformanceObserver は lib.dom の Window 型に無いので any で受ける(存在確認は下で行う)。
+            const cw = /** @type {any} */ (/** @type {HTMLIFrameElement} */ (ifr).contentWindow);
+            if (cw && cw.performance && cw.performance.getEntriesByType('paint').length > 0) {
+              onPainted();
+            } else if (cw && typeof cw.PerformanceObserver === 'function') {
+              const po = new cw.PerformanceObserver(() => {
+                try { po.disconnect(); } catch { /* no-op */ }
+                onPainted();
+              });
+              po.observe({ type: 'paint', buffered: true });
+              // ★observer の通知は描画より最大 300ms ほど遅れて届く(実測)。16ms ごとに entry を直接見て、
+              //   描かれた直後に外す(覆い=クリーム色を余分に見せない)。猶予までで打ち切る。
+              const pollUntil = performance.now() + REVEAL_AFTER_LOAD_GRACE_MS;
+              const pollPaint = () => {
+                if (painted || shown) return;
+                try {
+                  if (cw.performance.getEntriesByType('paint').length > 0) { onPainted(); return; }
+                } catch { return; }
+                // ★rAF は使わない(この entry は「rAF で経過を測らない」規律=G5。タブ非表示で止まる)。16ms の timer で足りる。
+                if (performance.now() < pollUntil) setTimeout(pollPaint, 16);
+              };
+              setTimeout(pollPaint, 16);
+            } else {
+              onPainted(); // 観測できない環境は従来どおり load で見せる
+            }
+          } catch {
+            onPainted(); // 読めなければ従来どおり load で見せる(隠したままにしない)
+          }
+          setTimeout(() => reveal({ loadGraceElapsed: true }), REVEAL_AFTER_LOAD_GRACE_MS);
+        }, { once: true });
         ifr.addEventListener('error', () => reveal({ errored: true }), { once: true });
-        // ★最後の砟: load が来なくても必ず見せる(白紙固着の防止)
+        // ★最後の砦: load も描画も来なくても必ず見せる(白紙固着の防止)
         setTimeout(() => reveal({ timedOut: true }), REVEAL_FALLBACK_MS);
       }
     } catch {
@@ -666,6 +725,8 @@ function collectAndPublish(phase, schedMs = null) {
     void chrome?.storage?.local?.set({
       [KEY_SIDEPANEL_SELF_DIAG]: {
         at: Date.now(),
+        // ★v0.1.1561: 隠す→見せる の実測(reason / loadAt / paintAt / revealAt)。黒の窓=revealAt<paintAt。
+        reveal: { ..._revealDiag },
         // ok は「この起動で一度も黒くなかった」を意味する(瞬間の黒も見逃さない)。
         // ★未レイアウトは黒として数えない(偽陽性を永久保持しない)。
         // ★v0.1.1351: あとから黒くなった場合も ok=false。ここを入れ忘れると、行には
