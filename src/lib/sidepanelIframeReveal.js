@@ -55,7 +55,23 @@
  *   実測の読み込みは91msだったので、その約10倍を上限に置く。
  *   ここを長くすると「白いまま待つ」時間が伸びる = 体感が悪化するので伸ばさない。
  */
-export const REVEAL_FALLBACK_MS = 1200;
+export const REVEAL_FALLBACK_MS = 1500;
+
+/**
+ * ★v0.1.1561: load から【中身の初回描画】を待つ猶予(ms)。
+ *   load では見せず、中身が初めて描かれた合図(paint entry)で見せる。
+ *   ■ なぜ(2026-10-05 実測・devtools Chrome・lv342383970)
+ *     load(739ms)→中身の first-paint(1,104ms)の【365ms】、iframe は見えているのに
+ *     中身がまだ一度も描かれておらず、直前の about:blank の暗いフレームが残る。
+ *     これが「押した瞬間の黒」。速い回でも 53ms(3フレーム)あった。
+ *     ＝ load は「中身が出来た」ではなく「HTML を読み終えた」に過ぎない。
+ *   描画の合図が来なくてもこの猶予で必ず見せる(白紙固着の防止)。
+ *   ★iframe を opacity:0 で隠していた間は、中身の描画が【見せた後】まで後回しにされ、
+ *     この猶予がいくつでも黒い 2〜3 フレームが残った(2026-10-05 実測)。v0.1.1561 で隠し方を
+ *     「上に覆いを置く」に変えたので、中身は覆いの下で描かれ、load 時点で paint entry が揃っている
+ *     のが通常。この猶予は「paint entry が取れない環境」のための保険。
+ */
+export const REVEAL_AFTER_LOAD_GRACE_MS = 600;
 
 /** 隠している間に付けるクラス名(CSS 側と一致させる)。 */
 export const HIDDEN_CLASS = 'nl-ifr-loading';
@@ -88,14 +104,20 @@ export function shouldHideUntilReady(ctx) {
  * 表示に戻す理由を決める。★構造で返す(文字列に閉じない)
  * [[judgement-trapped-in-a-string-2026-08-15]]
  *
- * @param {{ loaded?: boolean, timedOut?: boolean, errored?: boolean }} ev
- * @returns {{ reveal: boolean, reason: 'load'|'timeout'|'error'|'none' }}
+ * ★v0.1.1561: `loaded` だけでは見せない(load→初回描画の隙間が黒の正体・上の定数の説明)。
+ *   見せる合図は painted(中身が描かれた) / loadGraceElapsed(load から猶予が過ぎた) /
+ *   errored / timedOut の 4 つ。どれかが来れば必ず見せる(見せない分岐は『まだ何も来ていない』だけ)。
+ *
+ * @param {{ loaded?: boolean, painted?: boolean, loadGraceElapsed?: boolean, timedOut?: boolean, errored?: boolean }} ev
+ * @returns {{ reveal: boolean, reason: 'paint'|'load-grace'|'timeout'|'error'|'wait-paint'|'none' }}
  */
 export function decideReveal(ev) {
   if (!ev || typeof ev !== 'object') return { reveal: false, reason: 'none' };
-  // ★どの理由でも「見せる」に倒す。見せない分岐を作らない(白紙固着の防止)。
-  if (ev.loaded === true) return { reveal: true, reason: 'load' };
+  if (ev.painted === true) return { reveal: true, reason: 'paint' };
   if (ev.errored === true) return { reveal: true, reason: 'error' };
   if (ev.timedOut === true) return { reveal: true, reason: 'timeout' };
+  if (ev.loadGraceElapsed === true) return { reveal: true, reason: 'load-grace' };
+  // load だけ=まだ中身が描かれていない。猶予(REVEAL_AFTER_LOAD_GRACE_MS)か描画の合図を待つ。
+  if (ev.loaded === true) return { reveal: false, reason: 'wait-paint' };
   return { reveal: false, reason: 'none' };
 }

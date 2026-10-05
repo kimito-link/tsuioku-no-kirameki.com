@@ -226,3 +226,43 @@ npm run verify:deploy
 - 計器を足したら**変異で赤**を確認（緑のまま通り抜けるテストは無意味）
 - chrome-devtools MCP の **service worker ID は寝ると変わる**。掴み直すこと
 - `status.html` は `new_page` が60秒 timeout しても**実際には開いている**ことがある
+
+---
+
+## ★★2026-10-05 追記 — 「残り32msは仕様由来」は誤りだった。v0.1.1561 で黒の窓をゼロにした
+
+> 読む順はこの節が最新。上の 2026-08-19 の「32ms は受け入れる」を覆す。
+
+### ユーザーの言葉(一次情報)
+> 「押した瞬間またくろくなってますがそれはなおらない？」→「ではでないようにして」
+
+### 実測(devtools Chrome・OSダーク・sidepanel.html?lv=lv342383970・5回)
+
+| 回 | load(親ms) | 中身の first-paint(親ms) | 見せた時刻 | 黒の窓 |
+|---|---|---|---|---|
+| 旧(1x cold) | 739 | 1,104 | 764(load) | **約340ms** |
+| 旧(1x warm) | 127 | 181 | 128(load) | 53ms(3フレーム) |
+| 旧+paint待ち(grace 600) | 192 | 840 | 793(grace) | 47ms |
+| 旧+paint待ち(grace 1200) | 165 | 1,393 | 1,366(grace) | 27ms |
+| **覆い方式(v0.1.1561)** | 615 | **611** | 805(paint) | **0** |
+
+★決定的な事実: **`opacity:0` の iframe は Chrome が描画を後回しにする。** 中の文書の
+first-paint は、見せた(opacity:1 にした)**後**に初めて起きる(見せた 27〜50ms 後＝2〜3フレーム)。
+その 2〜3 フレームが「iframe は見えているのに中身が無い＝直前の about:blank の暗いフレーム」。
+2026-08-19 に「仕様由来の 32ms(about:blank のキャンバス)」と受け入れたものの正体はこれ。
+**隠し方そのものが描画を止めていた**ので、load を待っても paint を待っても、opacity:0 のままでは原理的に消えない。
+
+### 直し方(v0.1.1561・外科的・iframe 構造は変えない)
+- `sidepanel.html`: iframe は **隠さない**(opacity 1 のまま)。上に親側の覆い `#nl-ifr-cover`(クリーム色・z-index 2)を置き、
+  `iframe.nl-ifr-loading + #nl-ifr-cover` で読み込み中だけ現す。CSS アニメ 1.5s で必ず消える(JS が死んでも)。
+- `sidepanel-entry.js`: 見せる合図を **load → 中の文書の first-paint**(同一オリジンなので `cw.performance` の paint entry /
+  PerformanceObserver / 毎フレームの直接確認)に変更。load から 600ms の猶予と 1.5s の最終保険は残す。
+- 自己診断 `reveal: { reason, loadAt, paintAt, revealAt }` を状態速報の storage に載せた。**黒の窓 = revealAt < paintAt**。
+  paint で見せていれば常に revealAt ≥ paintAt。
+- 判定モジュール `aboutBlankGapVerdict.js` の関数は変えていない(「色/幕/透明/隠して戻す」が空振りだった記録は事実)。
+  ただし「残り 32ms は仕様由来」という前提は本節で訂正した。
+
+### 残っていること(正直に)
+- 実機(ユーザーの Chrome・OSダーク・storage 20〜37MB)での確認はこれから。devtools Chrome では 0。
+- 白 0.2 秒(Chromium issue 40190899・パネルの入れ物自体)は別物で、これは直せない。
+- 覆いが外れるまでの間はクリーム色が見える(実測 load 後 190〜300ms)。黒ではない。
