@@ -69,6 +69,12 @@ describe('comeviewAnonLabel', () => {
   it('匿名形式でない ID には付けない', () => {
     expect(comeviewAnonLabel('41199319')).toBe('');
     expect(comeviewAnonLabel('')).toBe('');
+    expect(comeviewAnonLabel('名無しさん')).toBe('');
+  });
+  it('v0.1.1558: タイムシフトの a: 無し hashed 匿名 ID も 匿名NNN（同じ ID は同じ番号）', () => {
+    const a = comeviewAnonLabel('sIEHqCaHKR_Pe1v1ZU61TnVABv8');
+    expect(a).toMatch(/^匿名\d{1,3}$/);
+    expect(comeviewAnonLabel('sIEHqCaHKR_Pe1v1ZU61TnVABv8')).toBe(a);
   });
 });
 

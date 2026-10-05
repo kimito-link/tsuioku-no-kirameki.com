@@ -10,6 +10,7 @@
  */
 
 import { resolveReportUserThumbSrc } from './reportUserThumb.js';
+import { isNiconicoAnonymousUserId } from './nicoAnonymousDisplay.js';
 
 /** @type {'numeric'} */
 export const THUMB_USER_KIND_NUMERIC = 'numeric';
@@ -50,7 +51,9 @@ function isNumericNicoUserId(userId) {
 function isAnonymousLikeUserId(userId) {
   const s = String(userId || '').trim();
   if (!s) return false;
-  if (/^a:/i.test(s)) return true;
+  // v0.1.1558: 正本判定（a: / hashed 16〜40 文字）。27 文字の実値は旧 {10,26} で取りこぼしていた。
+  if (isNiconicoAnonymousUserId(s)) return true;
+  // 旧規則（10〜15 文字の英数）は狭めない（挙動不変の安全側）。
   if (/^[a-zA-Z0-9_-]{10,26}$/.test(s)) return true;
   return false;
 }

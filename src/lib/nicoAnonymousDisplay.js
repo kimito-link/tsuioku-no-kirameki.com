@@ -4,14 +4,47 @@
  */
 
 /**
+ * タイムシフト等で `a:` 接頭辞を持たない NDGR 匿名 hashedUserId の形（v0.1.1558）。
+ *
+ * 実測（lv342383970・2023-09-18 のタイムシフト・2026-10-05）: 匿名コメント 417 件の userId は
+ * `sIEHqCaHKR_Pe1v1ZU61TnVABv8` のような 27 文字 base64url で `a:` が付かず、`is184` も false。
+ * 従来の判定（`a:` 始まりだけ）を素通りして `formatNicknameWithUidFallback` の `u/<uid先頭20文字>`
+ * に落ち、画面に `u/hlTkweodfOQ4gP…` のような内部 ID 断片が出ていた（AGENTS §3.5 違反）。
+ *
+ * 境界 16〜40: 実測は 20（断片）と 27、`a:` 形の本体は 16 文字。下限 16 で `ch2640322` のような
+ * 短い識別子やニックネーム風の文字列を弾き、上限 40 で既存の `u/` フォールバック契約
+ * （giftDisplayNickname.test.js の 50 文字ケース）を壊さない。
+ */
+export const NICO_HASHED_ANON_USER_ID_RE = /^[A-Za-z0-9_-]{16,40}$/;
+
+/**
+ * `a:` 無しの hashed 匿名 ID か。数値 uid・内部キー（`__anon_ad_2` 等の `__` 始まり）・空は false。
+ * @param {unknown} userId
+ * @returns {boolean}
+ */
+export function isNiconicoHashedAnonymousUserId(userId) {
+  const s = String(userId ?? '').trim();
+  if (!s) return false;
+  if (s.startsWith('__')) return false;
+  if (/^\d+$/.test(s)) return false;
+  return NICO_HASHED_ANON_USER_ID_RE.test(s);
+}
+
+/**
+ * 匿名ユーザー ID か（★匿名判定の正本・v0.1.1558 で hashed 形へ広げた）。
+ *   - `a:` 始まり（大小無視・本体 2 文字以上）= 生放送の匿名(184)
+ *   - 上記 `NICO_HASHED_ANON_USER_ID_RE` の hashed 形 = タイムシフトの匿名
+ * 各画面（会場=応援レーン=別窓・コメビュ・レポート）はこの関数を呼び、`a:` を直書きしない。
  * @param {unknown} userId
  * @returns {boolean}
  */
 export function isNiconicoAnonymousUserId(userId) {
   const s = String(userId ?? '').trim();
-  if (!s.startsWith('a:')) return false;
-  const rest = s.slice(2).trim();
-  return rest.length >= 2;
+  if (/^a:/i.test(s)) {
+    const rest = s.slice(2).trim();
+    return rest.length >= 2;
+  }
+  return isNiconicoHashedAnonymousUserId(s);
 }
 
 /**
