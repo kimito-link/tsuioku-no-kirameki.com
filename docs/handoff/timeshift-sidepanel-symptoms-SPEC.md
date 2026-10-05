@@ -176,3 +176,13 @@ ended ゲート除去→ON_AIR ケース赤／content の return 片方除去→
 - A8: 健全な view で「backward URI あり＋本文 0 byte」が連続しないとは仮定していない（だから早期見切りは入れない）。
 - A9: feature-map の属性台帳が新属性を自動で通すかは未確認。
 - A10: `viewBaseHash`（token 末尾 12 字）は公開 URL の一部で秘密ではない前提。
+
+---
+
+## 実装後の訂正（2026-10-05・司令塔の実機計測で判明）
+- §5.3「`nls_cchunk_*` 新規行の hashed 行に `nickname:'匿名'`」は**誤り**。chunk に保存される行は
+  `{capturedAt, commentNo, id, liveId, text, userId, vpos}` で、数値 uid でも `nickname` は保存されない
+  （実測 8,465 行すべて nickname 無し）。表示側（storyUserLaneMeta / comeviewAnonLabel）が uid から「匿名」を
+  導くので利用者には影響しない。A6 相当の仮定だった。
+- §5.3 の「記録件数が公式 11175 の 95% 以上」は未達: `reached_start` で 8,464 行取得・記録 9,180 / 公式 11,175（82%）。
+  stopReason は `reached_start`（配信開始まで遡り切った）。差分の内訳（ギフト/運営行の除外・重複排除・公式カウントの定義差）は未調査。
