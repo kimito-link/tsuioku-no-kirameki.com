@@ -1075,6 +1075,25 @@
         --nl-lane-avatar: 44px;
       }
 
+      /* ★v0.1.1569: 匿名(実サムネ無し)タイルの基本3規則。popup.html(v0.1.1049)と会場にはあったが、
+         このページには元から無く、識別絵が前列サイズ(44px)のまま・点線枠(v0.1.1564)も効いていなかった。
+         ★寸法は --nl-lane-avatar-anon を参照するだけ=このページは 26px のまま(上の注記・意図的な差)。 */
+      .nl-story-userlane-cell[data-thumb="0"] .nl-story-userlane-avatar {
+        width: var(--nl-lane-avatar-anon);
+        height: var(--nl-lane-avatar-anon);
+        border-width: 1px;
+        border-style: dashed;
+        box-shadow: none;
+      }
+      .nl-story-userlane-cell[data-thumb="0"] {
+        gap: 4px;
+        padding-right: 4px;
+      }
+      .nl-story-userlane-cell[data-thumb="0"] .nl-story-userlane-meta {
+        font-size: 9px;
+        max-width: 72px;
+      }
+
       /*
        * ★v0.1.1376: たぬ姉段の段内LOD(遠近法)。popup.html と同じ規約を純Webにも。
        *   先頭24人は読めるpill / 25人目以降の匿名はアイコンのみ=群れとして見せる。

@@ -18,6 +18,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1569',
+    date: '2026-10-06',
+    summary: '別窓の匿名タイルも小さく点線枠に',
+    items: Object.freeze([
+      '別窓(ブラウザで開く応援ライブビュー)で、匿名の人のタイルが顔写真の人と同じ大きさのまま・実線の枠で出ていたのを、サイドパネルや会場モードと同じく小さめの丸+点線の枠にそろえました。本物の写真と自動生成の識別絵がひと目で区別でき、段がぎゅっと詰まって見やすくなります。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1568',
     date: '2026-10-06',
     summary: '更新の追従で別の人の数字を貼らない',
@@ -167,14 +175,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     summary: '/live/ 応援者を4段のアイコン列で表示',
     items: Object.freeze([
       'ライブビュー(/live/)の応援者を、りんく・こん太・ギフト・たぬ姉の4段に分けて表示するようにしました。ギフトの増分や匿名人数も段ごとに確認できます。'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.1549',
-    date: '2026-09-27',
-    summary: '/live/ ギフト増分を+ptで表示',
-    items: Object.freeze([
-      'ライブビュー(/live/)のギフト順位表で、前回取得から増えたポイントを「+Npt」として表示するようにしました。増分が大きい人ほど帯の色が濃くなります。'
     ])
   })
 ]);

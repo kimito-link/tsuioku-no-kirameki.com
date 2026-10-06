@@ -118,6 +118,13 @@ describe('識別絵(匿名の identicon)は点線枠(v0.1.1564・/live/ の視�
     const body = ruleBody(sync, /\.nlsb-venue-lane-stack \.nl-story-userlane-cell\[data-thumb="0"\] \.nl-story-userlane-avatar \{/);
     expect(body).toContain('border-style: dashed;');
   });
+  it('app/live-view.html にも匿名タイルの基本3規則(avatar小+点線枠/gap・padding/meta 9px)がある(v0.1.1569・3画面そろえ)', () => {
+    const avatar = ruleBody(liveViewHtml, /\.nl-story-userlane-cell\[data-thumb="0"\] \.nl-story-userlane-avatar \{/);
+    expect(avatar).toContain('border-style: dashed;');
+    expect(avatar).toContain('var(--nl-lane-avatar-anon)');
+    expect(ruleBody(liveViewHtml, /\.nl-story-userlane-cell\[data-thumb="0"\] \{/)).toContain('padding-right: 4px;');
+    expect(ruleBody(liveViewHtml, /\.nl-story-userlane-cell\[data-thumb="0"\] \.nl-story-userlane-meta \{/)).toContain('font-size: 9px;');
+  });
 });
 
 describe('ギフト増分バッジの配線(v0.1.1565)', () => {
