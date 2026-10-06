@@ -1106,6 +1106,13 @@
       #sceneStoryUserLaneTanu {
         gap: 4px;
       }
+      /* ★v0.1.1576: 大人数のたぬ姉段を【窓】にする(popup.html と同じ規則)。renderer(applyStoryUserLaneWindow)は
+         wrapTileEl 無しの呼び出し=このページにも nl-story-userlane--windowed を付けるのに、CSS が無く
+         857人で段が画面を突き抜けていた。タイルは1枚も消さない(スクロールで全員に届く)。 */
+      #sceneStoryUserLaneTanu.nl-story-userlane--windowed {
+        max-height: min(42vh, 380px);
+        overflow-y: auto;
+      }
       #sceneStoryUserLaneTanu > .nl-story-userlane-cell:nth-child(n + 25)[data-thumb='0'] {
         gap: 0;
         padding-right: 0;
