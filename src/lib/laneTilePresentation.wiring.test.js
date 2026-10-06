@@ -156,3 +156,42 @@ describe('ギフト増分バッジの配線(v0.1.1565)', () => {
     expect(venueBarSrc).toContain('--nl-lane-pulse-gift:');
   });
 });
+
+describe('熱い人バッジの配線(v0.1.1566)', () => {
+  it('popup は createLaneHeatTracker を使い、鏡 publish の前(withLaneTileStats 内)で observe する', () => {
+    expect(popupSrc).toMatch(/from '\.\.\/lib\/laneHeatTracker\.js'/);
+    const iObs = popupSrc.indexOf('_laneHeat.observe(');
+    expect(iObs).toBeGreaterThan(0);
+    expect(iObs).toBeLessThan(popupSrc.indexOf('publishLaneMirror({'));
+  });
+
+  it('laneHeatTracker は葉の commentDeltaTier だけを読み、liveMotion.js(liveRankingView.js を連れてくる)を読まない', () => {
+    const heatSrc = read('src/lib/laneHeatTracker.js');
+    expect(heatSrc).toMatch(/from '\.\/commentDeltaTier\.js'/);
+    expect(heatSrc).not.toMatch(/liveMotion/);
+    expect(read('src/lib/commentDeltaTier.js')).not.toMatch(/^import /m);
+  });
+
+  it('venueBar は heat を計算しない(laneHeatTracker を import しない)', () => {
+    expect(venueBarSrc).not.toMatch(/laneHeatTracker|_laneHeat/);
+  });
+
+  for (const [name, getSrc] of [
+    ['popup.html', () => popupHtml],
+    ['app/live-view.html', () => liveViewHtml],
+    ['venueBar.js(LANE_CSS_SYNC 区間)', () => venueBarSrc.slice(venueBarSrc.indexOf('/* LANE_CSS_SYNC_BEGIN'), venueBarSrc.indexOf('/* LANE_CSS_SYNC_END */'))]
+  ]) {
+    it(`${name} に is-hot の規則と reduced-motion 無効化がある`, () => {
+      const src = getSrc();
+      expect(src).toContain('.nl-story-userlane-cell.is-hot');
+      expect(src).toContain('.is-hot[data-pulse]::after');
+      expect(src).toMatch(/prefers-reduced-motion: reduce\) \{[^}]*is-hot[^}]*animation: none/);
+    });
+  }
+
+  it('トークン --nl-lane-pulse-hot が popup.html / live-view に 2 つ(light/dark)・venueBar に 1 つ', () => {
+    expect(count(popupHtml, '--nl-lane-pulse-hot:')).toBeGreaterThanOrEqual(2);
+    expect(count(liveViewHtml, '--nl-lane-pulse-hot:')).toBeGreaterThanOrEqual(2);
+    expect(venueBarSrc).toContain('--nl-lane-pulse-hot:');
+  });
+});

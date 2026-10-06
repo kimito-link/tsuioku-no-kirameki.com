@@ -10,7 +10,7 @@
  */
 import { formatNumberJa } from './htmlText.js';
 import { officialDomRankingRowsToStripRooms } from './officialDomRankingRowsToStripRooms.js';
-import { formatPtDelta } from './liveGiftPulse.js';
+import { formatCountDelta, formatPtDelta } from './liveGiftPulse.js';
 
 /** @typedef {{ commentCount: number|null, giftPt: number|null, adPt: number|null }} LaneTileStats */
 
@@ -131,8 +131,9 @@ export function laneTileStatsLegendText() {
 }
 
 /**
- * @typedef {{ giftDelta?: number, giftTier?: string }} LaneTilePulse
- *   v0.1.1565: ギフト増分(公式 koken の標本間差分)。1566 で熱い人(heat/heatTier)が同じ器に入る。
+ * @typedef {{ giftDelta?: number, giftTier?: string, heat?: number, heatTier?: string }} LaneTilePulse
+ *   giftDelta/giftTier: ギフト増分(公式 koken の標本間差分・v0.1.1565)。
+ *   heat/heatTier: 直近60秒に増えたコメント件数(laneHeatTracker・v0.1.1566)。
  */
 
 /**
@@ -168,6 +169,37 @@ export function giftPulseByUid(result) {
 }
 
 /**
+ * laneHeatTracker.observe の結果 → uid → {heat, heatTier}。
+ * @param {ReadonlyMap<string, { heat: number, tier: string }>|null|undefined} heatMap
+ * @returns {Map<string, LaneTilePulse>}
+ */
+export function heatPulseByUid(heatMap) {
+  /** @type {Map<string, LaneTilePulse>} */
+  const out = new Map();
+  if (!heatMap || typeof heatMap.forEach !== 'function') return out;
+  heatMap.forEach((v, uid) => {
+    if (uid && v && v.heat > 0) out.set(uid, { heat: v.heat, heatTier: String(v.tier || '') });
+  });
+  return out;
+}
+
+/**
+ * gift と heat の uid→pulse を 1 つにまとめる(同じ uid の項目は合成)。
+ * @param {ReadonlyMap<string, LaneTilePulse>} a
+ * @param {ReadonlyMap<string, LaneTilePulse>} b
+ * @returns {Map<string, LaneTilePulse>}
+ */
+export function mergeLanePulseMaps(a, b) {
+  /** @type {Map<string, LaneTilePulse>} */
+  const out = new Map();
+  for (const m of [a, b]) {
+    if (!m || typeof m.forEach !== 'function') continue;
+    m.forEach((v, uid) => out.set(uid, { ...(out.get(uid) || {}), ...v }));
+  }
+  return out;
+}
+
+/**
  * 5 段のアイテムに pulse を載せた新しい buckets を返す(増分の無いアイテムは同じ参照のまま)。
  * @template {Record<string, any[]>} B
  * @param {B} buckets
@@ -191,10 +223,12 @@ export function attachLaneTilePulse(buckets, pulseByUid) {
 /**
  * タイルに付ける増分バッジの文字列・種別・段階。gift を優先する(同時に出さない)。
  * @param {LaneTilePulse|undefined|null} pulse
- * @returns {{ text: string, kind: ''|'gift', tier: string }}
+ * @returns {{ text: string, kind: ''|'gift'|'hot', tier: string }}
  */
 export function formatLaneTilePulse(pulse) {
   const gift = formatPtDelta(pulse && pulse.giftDelta);
   if (gift) return { text: gift, kind: 'gift', tier: String((pulse && pulse.giftTier) || '') };
+  const hot = formatCountDelta(pulse && pulse.heat);
+  if (hot) return { text: hot, kind: 'hot', tier: String((pulse && pulse.heatTier) || '') };
   return { text: '', kind: '', tier: '' };
 }

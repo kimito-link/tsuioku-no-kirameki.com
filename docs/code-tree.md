@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 8 / 881 件
+## ⚠️ 役割コメントが無いソース 8 / 883 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `scripts/build.mjs`
@@ -810,7 +810,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (1873)
+- 📁 **src/** (1877)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1088,7 +1088,7 @@
         - `logo_funlink_white_RGB_link_black.png`
         - `logo_funlink_white_RGB_maru_black.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1639)
+  - 📁 **lib/** (1643)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -1338,6 +1338,8 @@
     - `commentCountProvenance.test.js`
     - `commentDb.js` — v0.1.514: コメント本体の保存先を `chrome.storage.local`（値まるごと structured clone・
     - `commentDb.test.js`
+    - `commentDeltaTier.js` — コメント増分(件)の段階(葉モジュール・依存ゼロ)。
+    - `commentDeltaTier.test.js`
     - `commentEchoDetector.js` — L1 コメ伝染 + L5 コメ被り瞬間検出。
     - `commentEchoDetector.test.js`
     - `commentFatigue.js` — コメント疲労（「短い時間でコメントを打つと疲れて失速する」）をデータ化する純関数。
@@ -1777,6 +1779,8 @@
     - `laneDomSelfMeasure.js` — ⚠️ 役割コメント無し
     - `laneDomSelfMeasure.test.js`
     - `laneDomTileCount.probe.test.js`
+    - `laneHeatTracker.js` — 応援レーンの「熱い人」: 直近 60 秒にコメント件数が増えた人を見つける(純関数的な器・乱数もタイマーも無い)。
+    - `laneHeatTracker.test.js`
     - `laneMirror.js` — 応援レーンの「鏡」スナップショット純関数。popup がレーンを描いた buckets を、status が本物の
     - `laneMirror.test.js`
     - `laneMirrorContract.js` — `KEY_LANE_MIRROR`(応援レーンの鏡)の【契約の正本】。
