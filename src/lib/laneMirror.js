@@ -7,7 +7,7 @@
  *   5フィールドだけ(personTileDom.js)。鏡もこの5つだけ保存=最小化。
  * ★各段 cap で件数を抑え、全体が容量上限(JSON 512KB)を超えるなら cap を半減する二段ガード=status を重くしない。
  *
- * @typedef {{ displaySrc: string, title: string, idLine: string, nameLine: string, userId: string, recentTexts: string[] }} LaneMirrorCell
+ * @typedef {{ displaySrc: string, title: string, idLine: string, nameLine: string, userId: string, recentTexts: string[], stats?: { c?: number, g?: number, a?: number } }} LaneMirrorCell
  * @typedef {{ visible: number, tileW: number, tileH: number }} LaneMirrorDomTier
  * @typedef {{ measured: boolean,
  *   perTier: { link: LaneMirrorDomTier, gift: LaneMirrorDomTier, ad: LaneMirrorDomTier, konta: LaneMirrorDomTier, tanu: LaneMirrorDomTier },
@@ -105,7 +105,7 @@ const LANE_MIRROR_RECENT_TEXTS = 3;
  * @returns {LaneMirrorCell|null}
  */
 function toMirrorCell(item) {
-  const it = /** @type {{ displaySrc?: unknown, title?: unknown, meta?: { idLine?: unknown, nameLine?: unknown }, entry?: { userId?: unknown }, recentTexts?: unknown }} */ (
+  const it = /** @type {{ displaySrc?: unknown, title?: unknown, meta?: { idLine?: unknown, nameLine?: unknown }, entry?: { userId?: unknown }, recentTexts?: unknown, stats?: unknown }} */ (
     item && typeof item === 'object' ? item : {}
   );
   const displaySrc = String(it.displaySrc || '').trim();
@@ -136,7 +136,49 @@ function toMirrorCell(item) {
   const recentTexts = Array.isArray(it.recentTexts)
     ? it.recentTexts.filter((t) => typeof t === 'string' && t).slice(0, LANE_MIRROR_RECENT_TEXTS)
     : [];
-  return { displaySrc: slimSrc, title, idLine, nameLine, userId, recentTexts };
+  /** @type {LaneMirrorCell} */
+  const cellOut = { displaySrc: slimSrc, title, idLine, nameLine, userId, recentTexts };
+  // v0.1.1562: タイル 3 行目(🎁📣💬)の値。非 null のみ短縮キーで運ぶ(1セル ≤30B・全部無ければキー自体を付けない)。
+  //   ★laneSceneContentHash には入れない(揺れるフィールドを scene 判定に混ぜない)。
+  const stats = mirrorStatsOf(it.stats);
+  if (stats) cellOut.stats = stats;
+  return cellOut;
+}
+
+/**
+ * LaneTileStats({commentCount,giftPt,adPt}) → 鏡の短縮形 {c,g,a}(非 null の正数のみ)。
+ * @param {unknown} s
+ * @returns {{ c?: number, g?: number, a?: number }|null}
+ */
+function mirrorStatsOf(s) {
+  const o = /** @type {{ commentCount?: unknown, giftPt?: unknown, adPt?: unknown }|null} */ (
+    s && typeof s === 'object' ? s : null
+  );
+  if (!o) return null;
+  const out = /** @type {{ c?: number, g?: number, a?: number }} */ ({});
+  const c = Math.floor(Number(o.commentCount));
+  const g = Math.floor(Number(o.giftPt));
+  const a = Math.floor(Number(o.adPt));
+  if (o.commentCount != null && c > 0) out.c = c;
+  if (o.giftPt != null && g > 0) out.g = g;
+  if (o.adPt != null && a > 0) out.a = a;
+  return Object.keys(out).length ? out : null;
+}
+
+/**
+ * 鏡の短縮形 {c,g,a} → LaneTileStats。無い/空なら undefined(=属性を付けない)。
+ * @param {unknown} s
+ * @returns {{ commentCount: number|null, giftPt: number|null, adPt: number|null }|undefined}
+ */
+function restoreMirrorStats(s) {
+  const o = /** @type {{ c?: unknown, g?: unknown, a?: unknown }|null} */ (s && typeof s === 'object' ? s : null);
+  if (!o) return undefined;
+  const pos = (/** @type {unknown} */ v) => {
+    const n = Math.floor(Number(v));
+    return v != null && n > 0 ? n : null;
+  };
+  const r = { commentCount: pos(o.c), giftPt: pos(o.g), adPt: pos(o.a) };
+  return r.commentCount != null || r.giftPt != null || r.adPt != null ? r : undefined;
 }
 
 /**
@@ -245,11 +287,13 @@ export function restoreLaneMirrorBuckets(snap) {
       // v0.1.1112 B-1: displaySrc 空+uid有り=スリム化された匿名セル→①と同じ顔を再生成(冪等)。
       const displaySrc =
         String(cell.displaySrc || '') || (userId ? anonymousIdenticonDataUrl(userId, 64) : '');
+      const stats = restoreMirrorStats(cell.stats);
       return {
         displaySrc,
         title: String(cell.title || ''),
         meta: { idLine: String(cell.idLine || ''), nameLine: String(cell.nameLine || '') },
-        entry: { userId }
+        entry: { userId },
+        ...(stats ? { stats } : {})
       };
     });
   return {

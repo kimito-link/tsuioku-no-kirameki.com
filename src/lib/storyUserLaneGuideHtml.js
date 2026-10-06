@@ -4,6 +4,7 @@
 
 import { escapeAttr, escapeHtml } from './htmlEscape.js';
 import { SUPPORT_VISUAL_DEV_MONITOR_SUMMARY_LABEL } from './supportVisualStoryCopy.js';
+import { laneTileStatsLegendText } from './laneTileStats.js';
 
 /** @param {string} src @param {string} textEscaped 既に escapeHtml 済みの本文 */
 function storyUserLaneGuideLine(src, textEscaped) {
@@ -84,19 +85,31 @@ export function buildStoryUserLaneGuideFootHtml(displayCount, totalCandidates) {
   return `<p class="nl-story-userlane-guide__foot" aria-live="polite">${escapeHtml(text)}</p>`;
 }
 
+/** タイル 3 行目の注記(1 行)。renderStoryUserLaneDom の sync もこの文字列で付け外しする。 */
+export function buildStoryUserLaneStatsLegendHtml() {
+  return `<p class="nl-story-userlane-guide__legend">${escapeHtml(laneTileStatsLegendText())}</p>`;
+}
+
 /**
  * レーン直下の「表示枠」と「記録コメント総数」をつなぐ（診断ブロックの total と同じ数を渡すこと）。
  * @param {number} laneDisplayedSlots 三段レーンに並べた合計枠数（dedupe+cap 後）
  * @param {number|undefined|null} recordedCommentRowsTotal 当放送の記録コメント行数。未指定・非有限・0 以下なら第2文なし。
  * @param {number} [totalCandidates] 素性が取れた候補の総数（cap 前）。表示枠より多ければ「ほか M人」を併記。
+ * @param {boolean} [withStatsLegend] true のときだけタイル 3 行目(🎁📣💬)の注記を足す(v0.1.1562)。省略はバイト同一。
  * @returns {string}
  */
 export function buildStoryUserLaneGuideFootAndRecordedHtml(
   laneDisplayedSlots,
   recordedCommentRowsTotal,
-  totalCandidates
+  totalCandidates,
+  withStatsLegend
 ) {
-  const foot = buildStoryUserLaneGuideFootHtml(laneDisplayedSlots, totalCandidates);
+  let foot = buildStoryUserLaneGuideFootHtml(laneDisplayedSlots, totalCandidates);
+  // v0.1.1562: タイル 3 行目(🎁📣💬)を出しているときだけ、公式値と拡張記録の区別を一行で注記する。
+  //   省略/false はバイト同一(既存の脚注テストと①③status の DOM を変えない)。
+  if (withStatsLegend === true && Math.floor(Number(laneDisplayedSlots) || 0) > 0) {
+    foot += buildStoryUserLaneStatsLegendHtml();
+  }
   if (
     recordedCommentRowsTotal == null ||
     !Number.isFinite(Number(recordedCommentRowsTotal))

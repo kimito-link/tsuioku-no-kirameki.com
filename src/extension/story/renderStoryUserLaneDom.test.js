@@ -1,9 +1,10 @@
 /** @vitest-environment happy-dom */
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import {
   getStoryLaneRepaintCounts,
   paintStoryUserLaneDomFilled,
   resetStoryUserLaneDom,
+  syncStoryUserLaneStatsInPlace,
   shouldKeepStoryUserLaneTilesOnEmpty,
   shouldKeepStoryUserLaneTilesOnShrink,
   makeLaneShrinkKeepClock,
@@ -370,5 +371,107 @@ describe('guides:false(v0.1.1120 会場用) — 案内帯/空段ノート/hint/�
     expect(els.guideLinesTop.innerHTML).not.toBe('');
     expect(els.guideBottom.hidden).toBe(false);
     expect(els.guideLinesBottom.innerHTML).not.toBe('');
+  });
+});
+
+/**
+ * v0.1.1562: タイル 3 行目(🎁📣💬)は【属性だけ】で運ぶ(DOM 要素 +0)。
+ *   最重要の不変条件=stats だけが変わっても cell ノードを作り直さない(ちらつき対策 6 版の保護)。
+ */
+describe('タイル stats 属性(data-stats)— ちらつき固定', () => {
+  const withStats = (c, stats) => ({ ...c, stats });
+  const metaOf = (laneEl, i = 0) => laneEl.children[i].querySelector('.nl-story-userlane-meta');
+  const S1 = { commentCount: 12, giftPt: 1200, adPt: null };
+
+  it('stats 付きアイテムの meta に data-stats が付き、無いアイテムには付かない', () => {
+    const els = makeEls();
+    paint(els, { link: [withStats(LINK[0], S1)], gift: [], ad: [], konta: [], tanu: TANU });
+    expect(metaOf(els.laneLink).getAttribute('data-stats')).toBe('🎁1,200 💬12');
+    expect(metaOf(els.laneTanu, 0).hasAttribute('data-stats')).toBe(false);
+  });
+
+  it('★同一 items で stats だけ変えて 2 回描く → cell は同一参照・data-stats だけ更新・repaint カウントは増えない', () => {
+    const els = makeEls();
+    paint(els, { link: [withStats(LINK[0], S1)], gift: [], ad: [], konta: [], tanu: [] });
+    const cellBefore = els.laneLink.firstElementChild;
+    const countsBefore = getStoryLaneRepaintCounts();
+    paint(els, {
+      link: [withStats(LINK[0], { commentCount: 13, giftPt: 1200, adPt: null })],
+      gift: [], ad: [], konta: [], tanu: []
+    });
+    expect(els.laneLink.firstElementChild).toBe(cellBefore);
+    expect(metaOf(els.laneLink).getAttribute('data-stats')).toBe('🎁1,200 💬13');
+    expect(getStoryLaneRepaintCounts()).toEqual(countsBefore);
+  });
+
+  it('stats が消えたら属性も消える(古い数字を残さない)', () => {
+    const els = makeEls();
+    paint(els, { link: [withStats(LINK[0], S1)], gift: [], ad: [], konta: [], tanu: [] });
+    paint(els, { link: [LINK[0]], gift: [], ad: [], konta: [], tanu: [] });
+    expect(metaOf(els.laneLink).hasAttribute('data-stats')).toBe(false);
+  });
+
+  it('値が同じなら setAttribute を呼ばない(無駄な style 再計算を起こさない)', () => {
+    const els = makeEls();
+    paint(els, { link: [withStats(LINK[0], S1)], gift: [], ad: [], konta: [], tanu: [] });
+    const meta = metaOf(els.laneLink);
+    const spy = vi.spyOn(meta, 'setAttribute');
+    paint(els, { link: [withStats(LINK[0], { ...S1 })], gift: [], ad: [], konta: [], tanu: [] });
+    expect(spy).not.toHaveBeenCalled();
+  });
+
+  it('描かない経路用 syncStoryUserLaneStatsInPlace は DOM を作り直さず属性だけ更新する', () => {
+    const els = makeEls();
+    paint(els, { link: [withStats(LINK[0], S1)], gift: [], ad: [], konta: [], tanu: TANU });
+    const cellBefore = els.laneLink.firstElementChild;
+    syncStoryUserLaneStatsInPlace(els, {
+      link: [withStats(LINK[0], { commentCount: 99, giftPt: null, adPt: null })],
+      gift: [], ad: [], konta: [],
+      tanu: [withStats(TANU[0], { commentCount: 2, giftPt: null, adPt: null }), TANU[1]]
+    });
+    expect(els.laneLink.firstElementChild).toBe(cellBefore);
+    expect(metaOf(els.laneLink).getAttribute('data-stats')).toBe('💬99');
+    expect(metaOf(els.laneTanu, 0).getAttribute('data-stats')).toBe('💬2');
+    expect(metaOf(els.laneTanu, 1).hasAttribute('data-stats')).toBe(false);
+  });
+
+  it('sync は件数が食い違う(貼り替え前の)段では何もしない=落ちない', () => {
+    const els = makeEls();
+    paint(els, { link: LINK, gift: [], ad: [], konta: [], tanu: [] });
+    expect(() =>
+      syncStoryUserLaneStatsInPlace(els, { link: [], gift: [], ad: [], konta: [], tanu: TANU })
+    ).not.toThrow();
+  });
+
+  it('会場の席ラッパ越しでもタイル本体に付く', () => {
+    const els = makeEls();
+    paintStoryUserLaneDomFilled(
+      els, FACES, { link: [withStats(LINK[0], S1)], gift: [], ad: [], konta: [], tanu: [] }, 1, IO,
+      { wrapTileEl: (t) => { const w = document.createElement('div'); w.className = 'nlsb-seat'; w.append(t); return w; } }
+    );
+    const meta = els.laneLink.querySelector('.nl-story-userlane-cell .nl-story-userlane-meta');
+    expect(meta.getAttribute('data-stats')).toBe('🎁1,200 💬12');
+    syncStoryUserLaneStatsInPlace(els, { link: [withStats(LINK[0], { commentCount: 50, giftPt: null, adPt: null })], gift: [], ad: [], konta: [], tanu: [] });
+    expect(meta.getAttribute('data-stats')).toBe('💬50');
+  });
+
+  it('resetStoryUserLaneDom 後は node 控えが無効化され、同一 items でも再生成されて stats が付く', () => {
+    const els = makeEls();
+    paint(els, { link: [withStats(LINK[0], S1)], gift: [], ad: [], konta: [], tanu: [] });
+    resetStoryUserLaneDom(els);
+    paint(els, { link: [withStats(LINK[0], S1)], gift: [], ad: [], konta: [], tanu: [] });
+    expect(metaOf(els.laneLink).getAttribute('data-stats')).toBe('🎁1,200 💬12');
+  });
+
+  it('脚注: stats を出しているときだけ注記が出る。sync で付け外しされる', () => {
+    const els = makeEls();
+    paint(els, { link: [LINK[0]], gift: [], ad: [], konta: [], tanu: [] });
+    expect(els.guideLinesBottom.querySelector('.nl-story-userlane-guide__legend')).toBeNull();
+    syncStoryUserLaneStatsInPlace(els, { link: [withStats(LINK[0], S1)], gift: [], ad: [], konta: [], tanu: [] });
+    expect(els.guideLinesBottom.querySelector('.nl-story-userlane-guide__legend')).not.toBeNull();
+    syncStoryUserLaneStatsInPlace(els, { link: [LINK[0]], gift: [], ad: [], konta: [], tanu: [] });
+    expect(els.guideLinesBottom.querySelector('.nl-story-userlane-guide__legend')).toBeNull();
+    paint(els, { link: [withStats(LINK[0], S1)], gift: [], ad: [], konta: [], tanu: [] });
+    expect(els.guideLinesBottom.querySelector('.nl-story-userlane-guide__legend')).not.toBeNull();
   });
 });

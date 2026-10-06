@@ -113,11 +113,14 @@ export function adLanePicksFromRooms(rooms, io) {
     const idLine = uid ? '広告' : rankHint != null ? `#${rankHint}` : '広告';
     const nameLine = name || '広告主';
 
+    // v0.1.1562: 公式が公開している広告pt(=貢献度)をタイル 3 行目に出す。uid 無し広告主にも出す(公開値)。
+    const adPt = Math.floor(Number(room.count));
     picks.push({
       displaySrc,
       title: name || '広告主',
       meta: { idLine, nameLine },
-      entry: { userId: uid }
+      entry: { userId: uid },
+      ...(adPt > 0 ? { stats: { commentCount: null, giftPt: null, adPt } } : {})
     });
   }
   return picks;

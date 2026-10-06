@@ -24,6 +24,14 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.1540',
+    date: '2026-09-22',
+    summary: '内部整理(表示や動作は変わりません)',
+    items: Object.freeze([
+      '出荷手順の異常検知を強化しました(配布物には影響ありません)。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1539',
     date: '2026-09-22',
     summary: '内部整理(表示や動作は変わりません)',

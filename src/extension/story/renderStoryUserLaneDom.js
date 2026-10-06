@@ -13,8 +13,11 @@ import {
   buildStoryUserLaneGuideGiftHtml,
   buildStoryUserLaneGuideKontaHtml,
   buildStoryUserLaneGuideTanuHtml,
-  buildStoryUserLaneGuideTopHtml
+  buildStoryUserLaneGuideTopHtml,
+  buildStoryUserLaneStatsLegendHtml
 } from '../../lib/storyUserLaneGuideHtml.js';
+// v0.1.1562: タイル 3 行目(🎁📣💬)の文字列化(純関数・葉lib)。値の合成は popup 側で 1 回だけ行い鏡で運ぶ。
+import { formatLaneTileStats } from '../../lib/laneTileStats.js';
 import { buildStoryUserLaneStackAriaLabel } from '../../lib/supportVisualStoryCopy.js';
 import { buildPersonTileEl } from '../../lib/personTileDom.js';
 import { judgeLaneWindow } from '../../lib/laneWindowVerdict.js';
@@ -84,6 +87,78 @@ import {
  * @type {WeakMap<HTMLElement, string>}
  */
 const _laneTierLastKey = new WeakMap();
+
+/**
+ * ★v0.1.1562: 段(lane el)ごとに「いま描いているタイル本体の控え(items と同じ並び)」を持つ。
+ *   diff-skip で DOM を触らない回でも、stats(data-stats)だけを【その場で】更新するため(DOM query ゼロ)。
+ *   diff-skip が成立する=body key 一致=items の並びが同一、なので index で引いてよい(uid 衝突に強い)。
+ *   ★storyLaneTierBodyKey には stats を入れない(ちらつき対策 6 版の鍵を揺らさない)。
+ * @type {WeakMap<HTMLElement, Array<HTMLElement|null>>}
+ */
+const _laneTileNodes = new WeakMap();
+
+/**
+ * タイル本体の meta に data-stats を付け外しする。値が同じなら DOM に書かない。
+ *   枠だけ(hollow)のタイルには meta が無い=何もしない(中身が詰まった後の sync / 置換時に付く)。
+ * @param {HTMLElement|null|undefined} tileEl
+ * @param {unknown} p PersonTileItem(stats? を持つ)
+ */
+function applyLaneTileStatsAttr(tileEl, p) {
+  const metaEl = tileEl && tileEl.lastElementChild;
+  if (!metaEl || !metaEl.classList || !metaEl.classList.contains('nl-story-userlane-meta')) return;
+  const text = formatLaneTileStats(p && /** @type {any} */ (p).stats);
+  const cur = metaEl.getAttribute('data-stats');
+  if (text) {
+    if (cur !== text) metaEl.setAttribute('data-stats', text);
+  } else if (cur !== null) {
+    metaEl.removeAttribute('data-stats');
+  }
+}
+
+/**
+ * 控え済みタイルへ stats だけを反映する(貼り替えない)。控えと items の件数が食い違う段は触らない。
+ * @param {HTMLElement|null|undefined} laneEl
+ * @param {unknown[]} items
+ */
+function syncLaneTierStatsInPlace(laneEl, items) {
+  const nodes = laneEl ? _laneTileNodes.get(laneEl) : null;
+  if (!nodes || !Array.isArray(items) || nodes.length !== items.length) return;
+  for (let i = 0; i < nodes.length; i += 1) applyLaneTileStatsAttr(nodes[i], items[i]);
+}
+
+/** buckets のどこかに表示できる stats があるか(脚注の出し分け用)。 */
+function bucketsHaveTileStats(buckets) {
+  for (const tier of ['link', 'gift', 'ad', 'konta', 'tanu']) {
+    const arr = buckets && Array.isArray(buckets[tier]) ? buckets[tier] : [];
+    for (const p of arr) if (p && p.stats && formatLaneTileStats(p.stats)) return true;
+  }
+  return false;
+}
+
+/**
+ * ★v0.1.1562: 「描かない経路」(popup の sig 一致・縮小ガード・鏡 skip)から呼ぶ。
+ *   DOM は貼り替えず、各段の data-stats と脚注の注記だけを最新の buckets に合わせる。
+ *   テストは paint 経路しか通らないので、呼び忘れると実機でだけ「件数が更新されない」になる
+ *   (laneTilePresentation.wiring.test.js が呼び出し件数で固定)。
+ * @param {StoryUserLaneDomElements} els
+ * @param {{ link?: unknown[], gift?: unknown[], ad?: unknown[], konta?: unknown[], tanu?: unknown[] }} buckets
+ */
+export function syncStoryUserLaneStatsInPlace(els, buckets) {
+  if (!els || !buckets) return;
+  syncLaneTierStatsInPlace(els.laneLink, buckets.link || []);
+  syncLaneTierStatsInPlace(els.laneGift, buckets.gift || []);
+  syncLaneTierStatsInPlace(els.laneAd, buckets.ad || []);
+  syncLaneTierStatsInPlace(els.laneKonta, buckets.konta || []);
+  syncLaneTierStatsInPlace(els.laneTanu, buckets.tanu || []);
+  const bottom = els.guideLinesBottom;
+  if (!bottom || typeof bottom.querySelector !== 'function') return;
+  const foot = bottom.querySelector('.nl-story-userlane-guide__foot');
+  if (!foot) return; // 脚注自体が無い(会場の guides:false 等)なら注記も足さない
+  const legend = bottom.querySelector('.nl-story-userlane-guide__legend');
+  const want = bucketsHaveTileStats(buckets);
+  if (want && !legend) foot.insertAdjacentHTML('afterend', buildStoryUserLaneStatsLegendHtml());
+  else if (!want && legend) legend.remove();
+}
 
 /**
  * ★v0.1.1040(計器・観測のみ): 段(lane名)ごとに「実際に replaceChildren した回数(=DOM churn)」を数える。
@@ -366,7 +441,7 @@ export function resetStoryUserLaneDom(els) {
   for (const laneEl of [laneLink, laneGift, laneAd, laneKonta, laneTanu]) {
     // ★中身LOD: DOM を消す前に観測を解く(IO がターゲット参照を握る=リーク防止)。
     if (laneEl) forgetLaneContentLod(laneEl);
-    if (laneEl) { laneEl.innerHTML = ''; _laneTierLastKey.delete(laneEl); }
+    if (laneEl) { laneEl.innerHTML = ''; _laneTierLastKey.delete(laneEl); _laneTileNodes.delete(laneEl); }
   }
   laneLink.hidden = true;
   laneGift.hidden = true;
@@ -405,12 +480,14 @@ function fillLaneTier(el, items, io, wrapTileEl) {
     el.innerHTML = '';
     el.hidden = true;
     _laneTierLastKey.set(el, '');
+    _laneTileNodes.delete(el);
     return;
   }
   // ★diff-skip: 前回と同一 items(見た目の body key 一致)なら DOM を一切触らない=img 温存で churn 消滅。
   const key = storyLaneTierBodyKey(items);
   if (_laneTierLastKey.get(el) === key && el.firstChild) {
     el.hidden = false; // 温存(再描画しない)。hidden だけ念のため確実に外す(レイアウトは不変)。
+    syncLaneTierStatsInPlace(el, items); // v0.1.1562: 貼り替えずに stats(data-stats)だけ追従させる
     return;
   }
   // ★中身LOD: 段を貼り替える前に前回の観測を解く(IO がターゲット参照を握る=リーク防止)。
@@ -418,6 +495,8 @@ function fillLaneTier(el, items, io, wrapTileEl) {
   forgetLaneContentLod(el);
   const laneNameForLod = laneNameOfEl(el);
   const frag = document.createDocumentFragment();
+  /** @type {Array<HTMLElement|null>} */
+  const tileNodes = new Array(items.length).fill(null);
   for (let i = 0; i < items.length; i += 1) {
     const p = items[i];
     // ★中身LOD(枠は残す・中身だけ空にする): 後列の匿名は「枠だけ」を作り、
@@ -449,6 +528,8 @@ function fillLaneTier(el, items, io, wrapTileEl) {
           realEl.dataset.thumb = io.isHttpOrHttpsUrl(String((p && p.displaySrc) || '')) ? '1' : '0';
           realEl.dataset.userKey = venueLaneParityKey(p);
         } catch { /* 描画は止めない */ }
+        applyLaneTileStatsAttr(realEl, p); // 置換時点の値(以後の更新は次の sync が追いつく)
+        tileNodes[i] = realEl;
         hollowEl.replaceWith(realEl);
       });
       frag.appendChild(hollowEl);
@@ -487,11 +568,14 @@ function fillLaneTier(el, items, io, wrapTileEl) {
       //   ★storyLaneTierBodyKey には入れない(diff-skip の key 揺れを作らない)。
       tileEl.dataset.userKey = venueLaneParityKey(p);
     } catch { /* io 未注入等でも描画は止めない */ }
+    applyLaneTileStatsAttr(tileEl, p);
+    tileNodes[i] = tileEl;
     frag.appendChild(typeof wrapTileEl === 'function' ? wrapTileEl(tileEl, p, i) : tileEl);
   }
   el.replaceChildren(frag);
   el.hidden = false;
   _laneTierLastKey.set(el, key);
+  _laneTileNodes.set(el, tileNodes);
   // 計器(観測のみ): 実際に貼り替えた段を数える=churn の実測。
   const laneName = laneNameOfEl(el);
   _laneTierRepaintCount[laneName] = (_laneTierRepaintCount[laneName] || 0) + 1;
@@ -663,7 +747,8 @@ export function paintStoryUserLaneDomFilled(
             : undefined,
           opts && typeof opts.totalCandidates === 'number'
             ? opts.totalCandidates
-            : undefined
+            : undefined,
+          bucketsHaveTileStats(buckets)
         )
       : '';
   }
@@ -705,7 +790,7 @@ export function paintStoryUserLaneDomEmptyGuides(els, faces, opts) {
   for (const laneEl of [laneLink, laneGift, laneAd, laneKonta, laneTanu]) {
     // ★中身LOD: DOM を消す前に観測を解く(IO がターゲット参照を握る=リーク防止)。
     if (laneEl) forgetLaneContentLod(laneEl);
-    if (laneEl) { laneEl.innerHTML = ''; _laneTierLastKey.delete(laneEl); }
+    if (laneEl) { laneEl.innerHTML = ''; _laneTierLastKey.delete(laneEl); _laneTileNodes.delete(laneEl); }
   }
   laneLink.hidden = true;
   laneGift.hidden = true;

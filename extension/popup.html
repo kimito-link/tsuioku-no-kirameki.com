@@ -72,6 +72,8 @@
         --nl-lane-accent-event-rank: #b69cff;
         --nl-lane-accent-event-score: #ffb86c;
         --nl-lane-accent-event-broadcasters: #6fd0c8;
+        /* v0.1.1562: タイル 3 行目(🎁📣💬)の文字色。venueBar.js VENUE_CSS にも同値を置く。 */
+        --nl-lane-stats: #9a6f12;
         --nl-record-on: #0f9f6f;
         --nl-header-start: #0f8fd8;
         --nl-header-end: #14b8a6;
@@ -1152,6 +1154,22 @@
         max-width: 72px;
       }
 
+      /* v0.1.1562: タイル 3 行目「🎁pt 📣pt 💬件」。値は renderStoryUserLaneDom.js が meta の
+         data-stats に載せる(DOM 要素 +0・属性だけ更新=ちらつき対策の鍵に入れない)。
+         後列(25 枚目以降)の meta は display:none なので ::after も出ない=高さ不変。
+         venueBar.js の LANE_CSS_SYNC 区間と app/live-view.html(build 生成)に同じ規則を写す。 */
+      .nl-story-userlane-meta[data-stats]::after {
+        content: attr(data-stats);
+        font-size: 9px;
+        font-weight: 700;
+        line-height: 1.2;
+        color: var(--nl-lane-stats);
+        font-variant-numeric: tabular-nums;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
       /*
        * ★v0.1.1376: たぬ姉段の【段内LOD(遠近法)】。
        *
@@ -1436,6 +1454,14 @@
       .nl-story-userlane-guide__count {
         color: #9a6f12;
         font-weight: 800;
+      }
+
+      .nl-story-userlane-guide__legend {
+        margin: 2px 0 0;
+        padding: 0 2px;
+        font-size: 10px;
+        line-height: 1.35;
+        color: var(--nl-muted);
       }
 
       .nl-story-avatar-diag {
@@ -10416,6 +10442,7 @@
         --nl-lane-accent-event-rank: #c4afff;
         --nl-lane-accent-event-score: #ffc77f;
         --nl-lane-accent-event-broadcasters: #82ddd4;
+        --nl-lane-stats: #f5d975;
       }
 
       html.nl-skin-panel-dark body {
