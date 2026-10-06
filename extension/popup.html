@@ -1143,6 +1143,8 @@
         width: var(--nl-lane-avatar-anon);
         height: var(--nl-lane-avatar-anon);
         border-width: 1px;
+        /* v0.1.1564: 識別絵(実サムネ無し)は点線枠=「本物の写真ではない」を一目で(/live/ の視覚言語)。寸法は変えない。 */
+        border-style: dashed;
         box-shadow: none;
       }
       .nl-story-userlane-cell[data-thumb="0"] {
@@ -1157,7 +1159,7 @@
       /* v0.1.1562: タイル 3 行目「🎁pt 📣pt 💬件」。値は renderStoryUserLaneDom.js が meta の
          data-stats に載せる(DOM 要素 +0・属性だけ更新=ちらつき対策の鍵に入れない)。
          後列(25 枚目以降)の meta は display:none なので ::after も出ない=高さ不変。
-         venueBar.js の LANE_CSS_SYNC 区間と app/live-view.html(build 生成)に同じ規則を写す。 */
+         venueBar.js の LANE_CSS_SYNC 区間と app/live-view.html(★build では更新されない手動管理の丸ごとコピー)に同じ規則を写す。 */
       .nl-story-userlane-meta[data-stats]::after {
         content: attr(data-stats);
         font-size: 9px;

@@ -1298,6 +1298,7 @@ const VENUE_CSS = `
     width: var(--nl-lane-avatar-anon);
     height: var(--nl-lane-avatar-anon);
     border-width: 1px;
+    border-style: dashed;
     box-shadow: none;
   }
   .nlsb-venue-lane-stack .nl-story-userlane-cell[data-thumb="0"] {
