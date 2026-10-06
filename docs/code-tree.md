@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 8 / 884 件
+## ⚠️ 役割コメントが無いソース 8 / 885 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `scripts/build.mjs`
@@ -812,7 +812,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (1879)
+- 📁 **src/** (1880)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1090,7 +1090,7 @@
         - `logo_funlink_white_RGB_link_black.png`
         - `logo_funlink_white_RGB_maru_black.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1645)
+  - 📁 **lib/** (1646)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -1772,6 +1772,7 @@
     - `laneAvatarSize.wiring.test.js`
     - `laneContentLod.wiring.test.js`
     - `laneContentLodDiag.wiring.test.js`
+    - `laneCssSync.parity.test.js`
     - `laneDensityLod.wiring.test.js`
     - `laneDetailCells.js` — 応援レーンの観測を【打ち手が変わる単位】に割る(純関数)。
     - `laneDetailCells.test.js`
@@ -2758,7 +2759,7 @@
     - `yozora-small-yell.mp3`
   - `build-globals.d.ts` — ビルド時に esbuild の `define` で注入される定数の型宣言。
   - `speech-recognition-globals.d.ts` — Web Speech API（Chrome は webkit 接頭辞のことがある）
-- 📁 **tests/** (81)
+- 📁 **tests/** (82)
   - 📁 **contract/** (4)
     - `contentEntryFunctionBudget.test.js`
     - `layer-dependency.test.js`
@@ -2844,7 +2845,8 @@
     - `timeline-fill-standalone-window.spec.js`
     - `venue-entry-effect.spec.js`
     - `watch-messaging.spec.js`
-  - 📁 **helpers/** (1)
+  - 📁 **helpers/** (2)
+    - `laneCssSource.js` — laneCssSource — 応援レーン(タイル)CSS を3ファイル(popup.html / venueBar.js / app/live-view.html)から
     - `wiringTestSource.js` — wiringTestSource — wiring テストが「関数の本体」を、置き場所に依らず取得するための正本。
 - 📁 **tools/** (7)
   - 📁 **mcp-nicolive/** (3)

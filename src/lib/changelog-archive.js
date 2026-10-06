@@ -24,6 +24,14 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.1550',
+    date: '2026-09-28',
+    summary: '/live/ 応援者を4段のアイコン列で表示',
+    items: Object.freeze([
+      'ライブビュー(/live/)の応援者を、りんく・こん太・ギフト・たぬ姉の4段に分けて表示するようにしました。ギフトの増分や匿名人数も段ごとに確認できます。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1549',
     date: '2026-09-27',
     summary: '/live/ ギフト増分を+ptで表示',
