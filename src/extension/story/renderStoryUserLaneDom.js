@@ -171,6 +171,30 @@ function bucketsHaveTileStats(buckets) {
   return false;
 }
 
+/** 描かない経路の理由(skipStoryUserLanePaint の第3引数)。件数は診断用に数える。 */
+const SKIP_REASONS = ['sig-same', 'shrink-guard', 'mirror-sig-same'];
+const _paintSkipCount = { 'sig-same': 0, 'shrink-guard': 0, 'mirror-sig-same': 0 };
+
+/** 計器の現在値(描かずに属性だけ追従した回数・理由別)。 */
+export function getStoryLanePaintSkipCounts() {
+  return { ..._paintSkipCount };
+}
+
+/**
+ * ★v0.1.1572: 「描かない経路」の【唯一の入口】。paint を呼ばずに return する経路は、必ずこれを通す。
+ *   以前は popup-entry の3つの return の直前に syncStoryUserLaneStatsInPlace を手で書き、足し忘れは
+ *   実機でだけ「数字が更新されない」になった(テストは paint 経路しか通らない)。入口を1つにして
+ *   wiring テストが呼び出し件数(3)で固定する。理由は SKIP_REASONS のどれか(未知の理由は throw=打ち間違いを通さない)。
+ * @param {StoryUserLaneDomElements} els
+ * @param {{ link?: unknown[], gift?: unknown[], ad?: unknown[], konta?: unknown[], tanu?: unknown[] }} buckets
+ * @param {'sig-same'|'shrink-guard'|'mirror-sig-same'} reason
+ */
+export function skipStoryUserLanePaint(els, buckets, reason) {
+  if (!SKIP_REASONS.includes(reason)) throw new Error('skipStoryUserLanePaint: unknown reason ' + String(reason));
+  _paintSkipCount[reason] += 1;
+  syncStoryUserLaneStatsInPlace(els, buckets);
+}
+
 /**
  * ★v0.1.1562: 「描かない経路」(popup の sig 一致・縮小ガード・鏡 skip)から呼ぶ。
  *   DOM は貼り替えず、各段の data-stats と脚注の注記だけを最新の buckets に合わせる。

@@ -5,6 +5,8 @@ import {
   paintStoryUserLaneDomFilled,
   resetStoryUserLaneDom,
   syncStoryUserLaneStatsInPlace,
+  skipStoryUserLanePaint,
+  getStoryLanePaintSkipCounts,
   shouldKeepStoryUserLaneTilesOnEmpty,
   shouldKeepStoryUserLaneTilesOnShrink,
   makeLaneShrinkKeepClock,
@@ -644,3 +646,34 @@ describe('sync は別人の値を貼らない(v0.1.1568・reality-checker 指摘
     expect(els.laneTanu.children[0].querySelector('.nl-story-userlane-meta').getAttribute('data-stats')).toBe('💬7');
   });
 });
+
+describe('描かない経路の唯一の入口 skipStoryUserLanePaint(v0.1.1572)', () => {
+  const wp = (c, extra) => ({ ...c, ...extra });
+  const lane = (items) => ({ link: items, gift: [], ad: [], konta: [], tanu: [] });
+
+  it('stats だけを追従し、DOM は貼り替えない(cell 同一参照・repaint 不変)', () => {
+    const els = makeEls();
+    paint(els, lane([wp(LINK[0], { stats: { commentCount: 1, giftPt: null, adPt: null } })]));
+    const c = els.laneLink.firstElementChild;
+    const before = getStoryLaneRepaintCounts();
+    skipStoryUserLanePaint(els, lane([wp(LINK[0], { stats: { commentCount: 9, giftPt: null, adPt: null } })]), 'sig-same');
+    expect(els.laneLink.firstElementChild).toBe(c);
+    expect(c.querySelector('.nl-story-userlane-meta').getAttribute('data-stats')).toBe('💬9');
+    expect(getStoryLaneRepaintCounts()).toEqual(before);
+  });
+
+  it('理由別に回数を数える。未知の理由は throw(打ち間違いで計器が黙って外れない)', () => {
+    const els = makeEls();
+    paint(els, lane([LINK[0]]));
+    const b = getStoryLanePaintSkipCounts();
+    skipStoryUserLanePaint(els, lane([LINK[0]]), 'shrink-guard');
+    skipStoryUserLanePaint(els, lane([LINK[0]]), 'mirror-sig-same');
+    const a = getStoryLanePaintSkipCounts();
+    expect(a['shrink-guard']).toBe(b['shrink-guard'] + 1);
+    expect(a['mirror-sig-same']).toBe(b['mirror-sig-same'] + 1);
+    expect(a['sig-same']).toBe(b['sig-same']);
+    expect(() => skipStoryUserLanePaint(els, lane([LINK[0]]), 'sig-sane')).toThrow();
+    expect(getStoryLanePaintSkipCounts()).toEqual(a);
+  });
+});
+

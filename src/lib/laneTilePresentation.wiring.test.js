@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { resolveEntryFnSource } from '../../tests/helpers/wiringTestSource.js';
 
 /**
  * タイル 3 行目(🎁📣💬・v0.1.1562〜)の「配線忘れ=CI赤」ガード。
@@ -24,6 +25,7 @@ const liveViewHtml = read('app/live-view.html');
 
 const count = (src, needle) => src.split(needle).length - 1;
 
+
 describe('タイル stats の配線(popup-entry)', () => {
   it('attachLaneTileStats は publishLaneMirror({ より前にある(鏡に stats を載せるため)', () => {
     const iAttach = popupSrc.indexOf('attachLaneTileStats(');
@@ -33,18 +35,21 @@ describe('タイル stats の配線(popup-entry)', () => {
     expect(iAttach).toBeLessThan(iPublish);
   });
 
-  it('描かない 3 経路(sig 一致 / 縮小ガード / 鏡 skip)に syncStoryUserLaneStatsInPlace が 1 つずつある', () => {
-    // 呼び出し件数で固定(import 行の 1 件は除く)。1 つ消えるとここが 2 になって赤になる。
-    expect(count(popupSrc, 'syncStoryUserLaneStatsInPlace(els')).toBe(3);
-    const sigMatch = popupSrc.indexOf('if (laneSig === storyUserLaneLastRenderSig) {');
-    expect(sigMatch).toBeGreaterThan(0);
-    expect(popupSrc.slice(sigMatch, sigMatch + 1200)).toContain('syncStoryUserLaneStatsInPlace(els');
-    const shrink = popupSrc.indexOf('if (_shrinkGuardHit) {');
-    expect(shrink).toBeGreaterThan(0);
-    expect(popupSrc.slice(shrink, shrink + 800)).toContain('syncStoryUserLaneStatsInPlace(els');
-    const passive = popupSrc.indexOf('if (sig === _laneMirrorPassiveSig) {');
-    expect(passive).toBeGreaterThan(0);
-    expect(popupSrc.slice(passive, passive + 600)).toContain('syncStoryUserLaneStatsInPlace(els');
+  it('描かない 3 経路(sig 一致 / 縮小ガード / 鏡 skip)は skipStoryUserLanePaint 1 本で呼ぶ(v0.1.1572・直接 sync を呼ばない)', () => {
+    // 関数本体を括弧対応で切り出して数える(固定幅の窓にしない=ほかの関数に当たらない・fail-closed)。
+    const body = (name) => resolveEntryFnSource(name);
+    const code = (s) => s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^[ \t]*\/\/.*$/gm, '').replace(/\/\/[^\n]*$/gm, '');
+    const main = code(body('renderStoryUserLane'));
+    const passive = code(body('applyLaneMirrorForPassive'));
+    expect(count(main, "skipStoryUserLanePaint(els, bucketsWithStats, 'sig-same')")).toBe(1);
+    expect(count(main, "skipStoryUserLanePaint(els, bucketsWithStats, 'shrink-guard')")).toBe(1);
+    expect(count(passive, "skipStoryUserLanePaint(els, buckets, 'mirror-sig-same')")).toBe(1);
+    // 直接 sync を呼ぶ箇所はゼロ(popup-entry 全体・import 以外)。呼び忘れではなく「呼び方が1つ」になった。
+    expect(count(code(popupSrc), 'syncStoryUserLaneStatsInPlace(')).toBe(0);
+    // sig 一致の分岐の中、縮小ガードの分岐の中、というそれぞれの位置(順序)も固定する。
+    expect(main.indexOf("'sig-same'")).toBeGreaterThan(main.indexOf('laneSig === storyUserLaneLastRenderSig'));
+    expect(main.indexOf("'shrink-guard'")).toBeGreaterThan(main.indexOf('if (_shrinkGuardHit)'));
+    expect(passive.indexOf("'mirror-sig-same'")).toBeGreaterThan(passive.indexOf('sig === _laneMirrorPassiveSig'));
   });
 
   it('paint と鏡 publish には stats 付き buckets を渡す', () => {

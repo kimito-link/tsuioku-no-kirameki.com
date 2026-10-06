@@ -24,6 +24,14 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.1552',
+    date: '2026-09-30',
+    summary: '/live/ コメント速度の脈拍レーンを追加',
+    items: Object.freeze([
+      'ライブビュー(/live/)の番組合計コメント数を実測値の間でなめらかに表示し、実測2点から求めた速度と脈拍レーンを添えました。個人別の値やコメント本文は動かしていません。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1551',
     date: '2026-09-28',
     summary: '/live/ 発言カードの先読みを配信ホバーに拡大',
