@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 8 / 885 件
+## ⚠️ 役割コメントが無いソース 8 / 886 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `scripts/build.mjs`
@@ -812,7 +812,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (1880)
+- 📁 **src/** (1881)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1090,7 +1090,7 @@
         - `logo_funlink_white_RGB_link_black.png`
         - `logo_funlink_white_RGB_maru_black.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1646)
+  - 📁 **lib/** (1647)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -1784,6 +1784,7 @@
     - `laneDomTileCount.probe.test.js`
     - `laneHeatTracker.js` — 応援レーンの「熱い人」: 直近 60 秒にコメント件数が増えた人を見つける(純関数的な器・乱数もタイマーも無い)。
     - `laneHeatTracker.test.js`
+    - `laneImportContract.test.js`
     - `laneMirror.js` — 応援レーンの「鏡」スナップショット純関数。popup がレーンを描いた buckets を、status が本物の
     - `laneMirror.test.js`
     - `laneMirrorContract.js` — `KEY_LANE_MIRROR`(応援レーンの鏡)の【契約の正本】。
@@ -2759,7 +2760,7 @@
     - `yozora-small-yell.mp3`
   - `build-globals.d.ts` — ビルド時に esbuild の `define` で注入される定数の型宣言。
   - `speech-recognition-globals.d.ts` — Web Speech API（Chrome は webkit 接頭辞のことがある）
-- 📁 **tests/** (82)
+- 📁 **tests/** (83)
   - 📁 **contract/** (4)
     - `contentEntryFunctionBudget.test.js`
     - `layer-dependency.test.js`
@@ -2845,8 +2846,9 @@
     - `timeline-fill-standalone-window.spec.js`
     - `venue-entry-effect.spec.js`
     - `watch-messaging.spec.js`
-  - 📁 **helpers/** (2)
+  - 📁 **helpers/** (3)
     - `laneCssSource.js` — laneCssSource — 応援レーン(タイル)CSS を3ファイル(popup.html / venueBar.js / app/live-view.html)から
+    - `laneImportContract.js` — 応援レーンの「輸入契約」(テスト専用の定数・実装コードは import しない)。
     - `wiringTestSource.js` — wiringTestSource — wiring テストが「関数の本体」を、置き場所に依らず取得するための正本。
 - 📁 **tools/** (7)
   - 📁 **mcp-nicolive/** (3)
