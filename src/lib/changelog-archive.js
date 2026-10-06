@@ -24,6 +24,14 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.1541',
+    date: '2026-09-23',
+    summary: 'マーケ分析に横断応援者ランキングを追加',
+    items: Object.freeze([
+      'マーケ分析(HTMLレポート)に、過去の配信もまたいで応援してくれている人が分かる「横断応援者ランキング」を追加しました。公開や他PCとの集約はせず、このPC内の記録だけで完結します。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1540',
     date: '2026-09-22',
     summary: '内部整理(表示や動作は変わりません)',

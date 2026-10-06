@@ -1232,5 +1232,20 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
     source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
     note: '★直近30日窓のスライドによる自然減(37@0.1.1561→19。9月中旬のコミットが窓外に出た分で、v0.1.1560 の note と同じ理由)。' +
       '今回の変更で確認の手を抜いたわけではない(変異テスト6件で赤を確認し復元した)。'
+  }),
+  Object.freeze({
+    version: '0.1.1563', metric: 'bundle-kb', value: 1372,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '★+1372KB 台(前版 1371KB から微増)は意図した増加。段見出しに人数を出す配線(storyUserLaneGuideHtml の count 引数とレンダラの受け渡し)。' +
+      '更新履歴1版ぶんも含む(直近20版は popup バンドルに同梱される仕様)。計器は足していない。過去最良1360(@0.1.1454)との差分の内訳は v0.1.1471/1537/1560/1562 の note に記録済み。'
+  }),
+  Object.freeze({
+    version: '0.1.1563', metric: 'gate-selftest', value: 4,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1563', metric: 'cross-checked-claims', value: 19,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: '★直近30日窓のスライドによる自然減(v0.1.1562 の note と同じ理由)。今回も変異テストで赤を確認して復元している。'
   })
 ]);

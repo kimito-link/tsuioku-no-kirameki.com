@@ -475,3 +475,37 @@ describe('タイル stats 属性(data-stats)— ちらつき固定', () => {
     expect(els.guideLinesBottom.querySelector('.nl-story-userlane-guide__legend')).not.toBeNull();
   });
 });
+
+describe('段見出しの人数(v0.1.1563)', () => {
+  const countOf = (linesEl) => linesEl.querySelector('.nl-story-userlane-guide__count')?.textContent ?? null;
+
+  it('各段の案内帯の末尾に、その段の表示人数「N人」が出る', () => {
+    const els = makeEls();
+    paint(els, {
+      link: LINK,
+      gift: [cell('999', 'https://cdn/g.jpg', 'ギフト太郎'), cell('998', 'https://cdn/h.jpg', 'ギフト花子')],
+      ad: [cell('', 'https://cdn/ad.jpg', '広告主')],
+      konta: [],
+      tanu: TANU
+    });
+    expect(countOf(els.guideLinesTop)).toBe('1人');
+    expect(countOf(els.guideLinesMidGift)).toBe('2人');
+    expect(countOf(els.guideLinesMidAd)).toBe('1人');
+    expect(countOf(els.guideLinesMidKonta)).toBe('0人'); // 空段もそのまま「0人」(空段ノートは既存のまま)
+    expect(countOf(els.guideLinesMidTanu)).toBe('2人');
+  });
+
+  it('guides:false(会場の fallback 等)では案内帯ごと描かない=人数も出ない', () => {
+    const els = makeEls();
+    paintStoryUserLaneDomFilled(els, FACES, { link: LINK, gift: [], ad: [], konta: [], tanu: TANU }, 3, IO, { guides: false });
+    expect(els.guideLinesTop.innerHTML).toBe('');
+    expect(els.guideLinesMidTanu.innerHTML).toBe('');
+  });
+
+  it('人数が変われば次の paint で追従する', () => {
+    const els = makeEls();
+    paint(els, { link: LINK, gift: [], ad: [], konta: [], tanu: TANU });
+    paint(els, { link: LINK, gift: [], ad: [], konta: [], tanu: [...TANU, cell('a:CCC', 'ident-c.svg', '匿名C')] });
+    expect(countOf(els.guideLinesMidTanu)).toBe('3人');
+  });
+});
