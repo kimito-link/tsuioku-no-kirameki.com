@@ -1125,6 +1125,7 @@ const VENUE_CSS = `
     --nl-muted: #6f7c8b;
     --nl-user-accent: #5aa7ff;
     --nl-lane-stats: #9a6f12;
+    --nl-lane-pulse-gift: #c8721c;
     /*
      * 横スクロールバー根絶(ユーザー不満「位置がずれてスクロールバーが出て変な動きで
      * 見えなくなる」): 同時表示人数は selectStableVisibleMembers で行に収まる数に制限済み
@@ -1308,6 +1309,35 @@ const VENUE_CSS = `
   .nlsb-venue-lane-stack .nl-story-userlane-cell[data-thumb="0"] .nl-story-userlane-meta {
     font-size: 9px;
     max-width: 72px;
+  }
+  /* v0.1.1565: ギフト増分バッジ「+1,200pt」(popup.html の同名規則の写し) */
+  .nlsb-venue-lane-stack .nl-story-userlane-cell[data-pulse]::after {
+    content: attr(data-pulse);
+    margin-left: 2px;
+    padding: 0 5px;
+    border-radius: 999px;
+    font-size: 9px;
+    font-weight: 800;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+    align-self: center;
+    background: color-mix(in srgb, var(--nl-lane-pulse-gift) 16%, transparent);
+    color: var(--nl-lane-pulse-gift);
+  }
+  .nlsb-venue-lane-stack .nl-story-userlane-cell.is-gifted {
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--nl-lane-pulse-gift) 55%, transparent);
+    animation: nl-lane-pulse-pop 600ms ease-out 1;
+  }
+  .nlsb-venue-lane-stack .nl-story-userlane-cell[data-pulse-tier="mega"] {
+    --nl-lane-pulse-gift: #c02a2a;
+  }
+  @keyframes nl-lane-pulse-pop {
+    0% { transform: scale(1); }
+    40% { transform: scale(1.045); }
+    100% { transform: scale(1); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .nlsb-venue-lane-stack .nl-story-userlane-cell.is-gifted { animation: none; }
   }
   /* v0.1.1562: タイル 3 行目「🎁pt 📣pt 💬件」(popup.html の同名規則の写し) */
   .nlsb-venue-lane-stack .nl-story-userlane-meta[data-stats]::after {

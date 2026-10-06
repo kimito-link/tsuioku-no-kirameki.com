@@ -17,7 +17,7 @@ import {
   buildStoryUserLaneStatsLegendHtml
 } from '../../lib/storyUserLaneGuideHtml.js';
 // v0.1.1562: タイル 3 行目(🎁📣💬)の文字列化(純関数・葉lib)。値の合成は popup 側で 1 回だけ行い鏡で運ぶ。
-import { formatLaneTileStats } from '../../lib/laneTileStats.js';
+import { formatLaneTilePulse, formatLaneTileStats } from '../../lib/laneTileStats.js';
 import { buildStoryUserLaneStackAriaLabel } from '../../lib/supportVisualStoryCopy.js';
 import { buildPersonTileEl } from '../../lib/personTileDom.js';
 import { judgeLaneWindow } from '../../lib/laneWindowVerdict.js';
@@ -113,6 +113,32 @@ function applyLaneTileStatsAttr(tileEl, p) {
   } else if (cur !== null) {
     metaEl.removeAttribute('data-stats');
   }
+  applyLaneTilePulseAttr(tileEl, p);
+}
+
+/** 属性を「値が変わったときだけ」書く/消す(同値の再書き込みは style 再計算とアニメ再発火の元)。 */
+function setAttrIfChanged(el, name, value) {
+  const cur = el.getAttribute(name);
+  if (value) {
+    if (cur !== value) el.setAttribute(name, value);
+  } else if (cur !== null) {
+    el.removeAttribute(name);
+  }
+}
+
+/**
+ * v0.1.1565: ギフト増分バッジ。タイル本体(cell)に data-pulse / data-pulse-tier / is-gifted を付け外しする。
+ *   クラスは状態が変わるときだけ触る=CSS の一発アニメは「付いた瞬間」に 1 回だけ走り、同値の再描画では再発火しない。
+ *   値は鏡で運ばれた pulse を読むだけ(会場・別窓は計算しない)。
+ * @param {HTMLElement} tileEl
+ * @param {unknown} p
+ */
+function applyLaneTilePulseAttr(tileEl, p) {
+  const { text, kind, tier } = formatLaneTilePulse(p && /** @type {any} */ (p).pulse);
+  setAttrIfChanged(tileEl, 'data-pulse', text);
+  setAttrIfChanged(tileEl, 'data-pulse-tier', text ? tier : '');
+  const gifted = kind === 'gift';
+  if (tileEl.classList.contains('is-gifted') !== gifted) tileEl.classList.toggle('is-gifted', gifted);
 }
 
 /**

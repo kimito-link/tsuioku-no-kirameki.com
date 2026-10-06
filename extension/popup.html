@@ -74,6 +74,8 @@
         --nl-lane-accent-event-broadcasters: #6fd0c8;
         /* v0.1.1562: タイル 3 行目(🎁📣💬)の文字色。venueBar.js VENUE_CSS にも同値を置く。 */
         --nl-lane-stats: #9a6f12;
+        /* v0.1.1565: ギフト増分バッジ(/live/ の --orange 相当)。venueBar.js VENUE_CSS にも同値。 */
+        --nl-lane-pulse-gift: #c8721c;
         --nl-record-on: #0f9f6f;
         --nl-header-start: #0f8fd8;
         --nl-header-end: #14b8a6;
@@ -1154,6 +1156,38 @@
       .nl-story-userlane-cell[data-thumb="0"] .nl-story-userlane-meta {
         font-size: 9px;
         max-width: 72px;
+      }
+
+      /* v0.1.1565: ギフト増分バッジ「+1,200pt」。値は renderStoryUserLaneDom.js が cell の data-pulse に載せる
+         (DOM 要素 +0・クラスは付いた瞬間に一発だけアニメ)。venueBar.js の LANE_CSS_SYNC 区間と
+         app/live-view.html(手動管理の丸ごとコピー)に同じ規則を写す。 */
+      .nl-story-userlane-cell[data-pulse]::after {
+        content: attr(data-pulse);
+        margin-left: 2px;
+        padding: 0 5px;
+        border-radius: 999px;
+        font-size: 9px;
+        font-weight: 800;
+        font-variant-numeric: tabular-nums;
+        white-space: nowrap;
+        align-self: center;
+        background: color-mix(in srgb, var(--nl-lane-pulse-gift) 16%, transparent);
+        color: var(--nl-lane-pulse-gift);
+      }
+      .nl-story-userlane-cell.is-gifted {
+        box-shadow: 0 0 0 2px color-mix(in srgb, var(--nl-lane-pulse-gift) 55%, transparent);
+        animation: nl-lane-pulse-pop 600ms ease-out 1;
+      }
+      .nl-story-userlane-cell[data-pulse-tier="mega"] {
+        --nl-lane-pulse-gift: #c02a2a;
+      }
+      @keyframes nl-lane-pulse-pop {
+        0% { transform: scale(1); }
+        40% { transform: scale(1.045); }
+        100% { transform: scale(1); }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .nl-story-userlane-cell.is-gifted { animation: none; }
       }
 
       /* v0.1.1562: タイル 3 行目「🎁pt 📣pt 💬件」。値は renderStoryUserLaneDom.js が meta の
@@ -10445,6 +10479,7 @@
         --nl-lane-accent-event-score: #ffc77f;
         --nl-lane-accent-event-broadcasters: #82ddd4;
         --nl-lane-stats: #f5d975;
+        --nl-lane-pulse-gift: #ffb86c;
       }
 
       html.nl-skin-panel-dark body {

@@ -162,6 +162,16 @@ describe('composeVenueLaneBuckets', () => {
     expect(out.buckets.link[0].stats).toBeUndefined();
   });
 
+  it('pulse を落とさない(個別列挙の穴の回帰ガード・v0.1.1565)', () => {
+    const pulse = { giftDelta: 500, giftTier: 'large' };
+    const mb = {
+      link: [{ displaySrc: 'https://x/10.jpg', title: 't', meta: { idLine: '10', nameLine: 'n' }, entry: { userId: '10' }, pulse }],
+      gift: [], ad: [], konta: [], tanu: []
+    };
+    const out = composeVenueLaneBuckets({ mirrorBuckets: mb, seatIndexByUid });
+    expect(out.buckets.link[0].pulse).toEqual(pulse);
+  });
+
   it('段は鏡の中身をそのまま反映する(①がtanuに匿名を持てば会場のtanuにも同じ人が出る=完全一致)', () => {
     const out = composeVenueLaneBuckets({ mirrorBuckets, seatIndexByUid });
     expect(out.buckets.link.map((i) => i.entry.userId)).toEqual(['10', '20']);

@@ -119,3 +119,40 @@ describe('識別絵(匿名の identicon)は点線枠(v0.1.1564・/live/ の視�
     expect(body).toContain('border-style: dashed;');
   });
 });
+
+describe('ギフト増分バッジの配線(v0.1.1565)', () => {
+  it('popup が createGiftPulseRegistry(既存 liveGiftPulse.js)で標本間差分を取り、鏡 publish の前に attach する', () => {
+    expect(popupSrc).toMatch(/from '\.\.\/lib\/liveGiftPulse\.js'/);
+    expect(popupSrc).toContain('createGiftPulseRegistry(');
+    const iAttach = popupSrc.indexOf('attachLaneTilePulse(');
+    const iPublish = popupSrc.indexOf('publishLaneMirror({');
+    expect(iAttach).toBeGreaterThan(0);
+    expect(iAttach).toBeLessThan(iPublish);
+  });
+
+  it('標本時刻は koken storage の capturedAt を控える(新しい storage read を足さない)', () => {
+    const iRead = popupSrc.indexOf('await readCardCapturedAtMs(kokenContribStorageKey(');
+    expect(iRead).toBeGreaterThan(0);
+    expect(popupSrc.slice(iRead - 200, iRead + 600)).toContain('_kokenRowsCapturedAtMs =');
+  });
+
+  for (const [name, getSrc] of [
+    ['popup.html', () => popupHtml],
+    ['app/live-view.html', () => liveViewHtml],
+    ['venueBar.js(LANE_CSS_SYNC 区間)', () => venueBarSrc.slice(venueBarSrc.indexOf('/* LANE_CSS_SYNC_BEGIN'), venueBarSrc.indexOf('/* LANE_CSS_SYNC_END */'))]
+  ]) {
+    it(`${name} に pulse の規則・アニメ・reduced-motion 無効化がある`, () => {
+      const src = getSrc();
+      expect(src).toContain('.nl-story-userlane-cell[data-pulse]::after');
+      expect(src).toContain('.nl-story-userlane-cell.is-gifted');
+      expect(src).toContain('@keyframes nl-lane-pulse-pop');
+      expect(src).toMatch(/prefers-reduced-motion: reduce\) \{[^}]*is-gifted[^}]*animation: none/);
+    });
+  }
+
+  it('トークン --nl-lane-pulse-gift が popup.html / live-view に 2 つ(light/dark)・venueBar に 1 つ', () => {
+    expect(count(popupHtml, '--nl-lane-pulse-gift:')).toBeGreaterThanOrEqual(2);
+    expect(count(liveViewHtml, '--nl-lane-pulse-gift:')).toBeGreaterThanOrEqual(2);
+    expect(venueBarSrc).toContain('--nl-lane-pulse-gift:');
+  });
+});

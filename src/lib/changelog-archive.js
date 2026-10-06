@@ -24,6 +24,14 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.1544',
+    date: '2026-09-26',
+    summary: '多タブ視聴で描画が長時間止まる不具合を修正',
+    items: Object.freeze([
+      '同じ配信を複数タブで同時に見ているとき、まれに画面の描画が数分間止まって見えることがある不具合を修正しました。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1542',
     date: '2026-09-24',
     summary: 'イベント未参加時の誤表示・文字化けタイトルを根治',

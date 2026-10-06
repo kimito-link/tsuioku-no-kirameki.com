@@ -725,7 +725,14 @@ import { KEY_LANE_MIRROR } from '../lib/laneMirrorKey.js';
 import { publishLaneMirrorPerLive } from '../lib/laneMirrorPerLivePublish.js';
 import { KEY_PREVIEW_RENDER_ACK, buildPreviewRenderAck } from '../lib/previewRenderAckKey.js';
 import { buildLaneMirrorSnapshot, laneMirrorCapFromBuckets, restoreLaneMirrorBuckets } from '../lib/laneMirror.js';
-import { attachLaneTileStats, buildLaneTileStatsIndex } from '../lib/laneTileStats.js';
+import {
+  attachLaneTilePulse,
+  attachLaneTileStats,
+  buildLaneTileStatsIndex,
+  giftPulseByUid,
+  pulseRowsFromKokenRows
+} from '../lib/laneTileStats.js';
+import { createGiftPulseRegistry } from '../lib/liveGiftPulse.js';
 import { measureLaneDomSelf, perTierKeysOf } from '../lib/laneDomSelfMeasure.js';
 // v0.1.1284: ①実DOMのキー列指紋(会場が別ドキュメント起点で顔ぶれ一致を判定するために同梱)。
 import { laneDomFingerprint } from '../lib/laneSceneEnvelope.js';
@@ -6164,6 +6171,9 @@ function countStoryUserLaneDomTiles(els) {
   return n;
 }
 
+const _laneGiftPulse = createGiftPulseRegistry();
+/** koken 貢献度行を最後に取得した時刻(storage の capturedAt)。refreshNorthStarContributionRankingLaneAsync が更新する。 */
+let _kokenRowsCapturedAtMs = 0;
 /**
  * v0.1.1562: タイル 3 行目(🎁📣💬)の値を【ここで 1 回だけ】合成して各段のアイテムに載せる。
  *   ②会場・③別窓は再計算せず、鏡(nls_lane_mirror_v2)の additive な stats を読むだけ。
@@ -6172,11 +6182,19 @@ function countStoryUserLaneDomTiles(els) {
  */
 function withLaneTileStats(buckets) {
   try {
-    return attachLaneTileStats(buckets, buildLaneTileStatsIndex({
+    const withStats = attachLaneTileStats(buckets, buildLaneTileStatsIndex({
       aggregates: STORY_SOURCE_STATE.laneAggregates,
       kokenRows: _northStarMirrorLanes.contributionRanking,
       nicoadRows: _northStarMirrorLanes.adRanking
     }));
+    // v0.1.1565: ギフト増分(公式 koken の標本間差分)。標本時刻は koken storage の capturedAt(既存の読みで控えた値)。
+    //   同じ標本の再送には前回結果を返す=次の標本が来るまでバッジが残る。15分超の間隔は差分を出さない。
+    const gift = _laneGiftPulse.pulseFor(
+      STORY_SOURCE_STATE.liveId,
+      pulseRowsFromKokenRows(_northStarMirrorLanes.contributionRanking),
+      _kokenRowsCapturedAtMs
+    );
+    return attachLaneTilePulse(withStats, giftPulseByUid(gift));
   } catch {
     return buckets;
   }
@@ -11686,10 +11704,9 @@ async function refreshNorthStarContributionRankingLaneAsync(liveId) {
     // 縦リスト専用 host class が前回付いていたら剥がしてから横カードへ切替。
     body.classList.remove('nl-contrib-ranking-list-host');
     // v0.1.393: 鮮度表示。koken API は 30 秒間隔で自動更新されるので autoRefreshing。
-    const freshnessNote = formatCardFreshnessNote(
-      await readCardCapturedAtMs(kokenContribStorageKey(String(liveId || '').trim().toLowerCase())),
-      { autoRefreshing: true }
-    );
+    const kokenCapturedAt = await readCardCapturedAtMs(kokenContribStorageKey(String(liveId || '').trim().toLowerCase()));
+    _kokenRowsCapturedAtMs = Number(kokenCapturedAt) || 0; // v0.1.1565: ギフト増分の標本時刻(以降 publish まで同期処理)
+    const freshnessNote = formatCardFreshnessNote(kokenCapturedAt, { autoRefreshing: true });
     paintTopSupportRankStyleIntoElement(body, rooms, {
       noteText: '公式の貢献度ランキング（niconico の表示に準拠）',
       unitSuffix: '貢',
