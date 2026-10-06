@@ -5,6 +5,8 @@ import {
   attachLaneTileStats,
   formatLaneTilePulse,
   giftPulseByUid,
+  heatPulseByUid,
+  mergeLanePulseMaps,
   pulseRowsFromKokenRows,
   buildLaneTileStatsIndex,
   formatLaneTileStats,
@@ -175,5 +177,35 @@ describe('ギフト増分バッジ(v0.1.1565)', () => {
     expect(formatLaneTilePulse({ giftDelta: 1200, giftTier: 'large' })).toEqual({ text: '+1,200pt', kind: 'gift', tier: 'large' });
     expect(formatLaneTilePulse({ giftDelta: 0 })).toEqual({ text: '', kind: '', tier: '' });
     expect(formatLaneTilePulse(undefined)).toEqual({ text: '', kind: '', tier: '' });
+  });
+});
+
+describe('熱い人バッジ(v0.1.1566)', () => {
+  it('heatPulseByUid: tracker の結果 → uid → {heat, heatTier}', () => {
+    const m = heatPulseByUid(new Map([['1', { heat: 3, tier: 'medium', lastAt: 5 }], ['2', { heat: 0, tier: 'small', lastAt: 0 }]]));
+    expect(m.get('1')).toEqual({ heat: 3, heatTier: 'medium' });
+    expect(m.has('2')).toBe(false);
+    expect(heatPulseByUid(null).size).toBe(0);
+  });
+
+  it('mergeLanePulseMaps: 同じ uid は項目を合成し、どちらかだけの uid もそのまま残る', () => {
+    const g = new Map([['1', { giftDelta: 500, giftTier: 'large' }], ['2', { giftDelta: 50, giftTier: 'small' }]]);
+    const h = new Map([['1', { heat: 4, heatTier: 'medium' }], ['3', { heat: 2, heatTier: 'medium' }]]);
+    const m = mergeLanePulseMaps(g, h);
+    expect(m.get('1')).toEqual({ giftDelta: 500, giftTier: 'large', heat: 4, heatTier: 'medium' });
+    expect(m.get('2')).toEqual({ giftDelta: 50, giftTier: 'small' });
+    expect(m.get('3')).toEqual({ heat: 2, heatTier: 'medium' });
+  });
+
+  it('formatLaneTilePulse: gift が無ければ「+N件」(hot)。gift があれば gift を優先し同時には出さない', () => {
+    expect(formatLaneTilePulse({ heat: 12, heatTier: 'mega' })).toEqual({ text: '+12件', kind: 'hot', tier: 'mega' });
+    expect(formatLaneTilePulse({ giftDelta: 500, giftTier: 'large', heat: 12, heatTier: 'mega' })).toEqual({ text: '+500pt', kind: 'gift', tier: 'large' });
+    expect(formatLaneTilePulse({ heat: 0 })).toEqual({ text: '', kind: '', tier: '' });
+  });
+
+  it('attachLaneTilePulse は gift と heat が合成された pulse をそのまま載せる', () => {
+    const it = Object.freeze({ displaySrc: 'x', title: 't', meta: { idLine: 'i', nameLine: 'n' }, entry: { userId: '1' } });
+    const out = attachLaneTilePulse({ link: [it], gift: [], ad: [], konta: [], tanu: [] }, new Map([['1', { heat: 3, heatTier: 'medium' }]]));
+    expect(out.link[0].pulse).toEqual({ heat: 3, heatTier: 'medium' });
   });
 });

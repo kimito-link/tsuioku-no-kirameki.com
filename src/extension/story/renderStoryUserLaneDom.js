@@ -127,7 +127,8 @@ function setAttrIfChanged(el, name, value) {
 }
 
 /**
- * v0.1.1565: ギフト増分バッジ。タイル本体(cell)に data-pulse / data-pulse-tier / is-gifted を付け外しする。
+ * v0.1.1565/1566: 増分バッジ(ギフト +N pt / 熱い人 +N件)。タイル本体(cell)に data-pulse / data-pulse-tier /
+ *   is-gifted / is-hot を付け外しする。
  *   クラスは状態が変わるときだけ触る=CSS の一発アニメは「付いた瞬間」に 1 回だけ走り、同値の再描画では再発火しない。
  *   値は鏡で運ばれた pulse を読むだけ(会場・別窓は計算しない)。
  * @param {HTMLElement} tileEl
@@ -139,6 +140,8 @@ function applyLaneTilePulseAttr(tileEl, p) {
   setAttrIfChanged(tileEl, 'data-pulse-tier', text ? tier : '');
   const gifted = kind === 'gift';
   if (tileEl.classList.contains('is-gifted') !== gifted) tileEl.classList.toggle('is-gifted', gifted);
+  const hot = kind === 'hot'; // v0.1.1566: 直近60秒にコメントが増えた人(gift と同時には出さない)
+  if (tileEl.classList.contains('is-hot') !== hot) tileEl.classList.toggle('is-hot', hot);
 }
 
 /**

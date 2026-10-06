@@ -2168,6 +2168,18 @@
       ]
     },
     {
+      "file": "src/lib/commentDeltaTier.js",
+      "featureCount": 2,
+      "features": [
+        "live-ranking",
+        "popup"
+      ],
+      "labels": [
+        "Web版 追憶のきらめき ランキング(/live/)",
+        "ポップアップ(応援レーン)"
+      ]
+    },
+    {
       "file": "src/lib/commenterFollowCache.js",
       "featureCount": 2,
       "features": [
@@ -5815,6 +5827,16 @@
     },
     {
       "file": "src/lib/laneDomSelfMeasure.js",
+      "featureCount": 1,
+      "features": [
+        "popup"
+      ],
+      "labels": [
+        "ポップアップ(応援レーン)"
+      ]
+    },
+    {
+      "file": "src/lib/laneHeatTracker.js",
       "featureCount": 1,
       "features": [
         "popup"

@@ -730,8 +730,11 @@ import {
   attachLaneTileStats,
   buildLaneTileStatsIndex,
   giftPulseByUid,
+  heatPulseByUid,
+  mergeLanePulseMaps,
   pulseRowsFromKokenRows
 } from '../lib/laneTileStats.js';
+import { createLaneHeatTracker } from '../lib/laneHeatTracker.js';
 import { createGiftPulseRegistry } from '../lib/liveGiftPulse.js';
 import { measureLaneDomSelf, perTierKeysOf } from '../lib/laneDomSelfMeasure.js';
 // v0.1.1284: ①実DOMのキー列指紋(会場が別ドキュメント起点で顔ぶれ一致を判定するために同梱)。
@@ -6172,6 +6175,8 @@ function countStoryUserLaneDomTiles(els) {
 }
 
 const _laneGiftPulse = createGiftPulseRegistry();
+/** v0.1.1566: 直近60秒にコメントが増えた人(初回観測はベースライン・窓は自然失効)。 */
+const _laneHeat = createLaneHeatTracker();
 /** koken 貢献度行を最後に取得した時刻(storage の capturedAt)。refreshNorthStarContributionRankingLaneAsync が更新する。 */
 let _kokenRowsCapturedAtMs = 0;
 /**
@@ -6194,7 +6199,15 @@ function withLaneTileStats(buckets) {
       pulseRowsFromKokenRows(_northStarMirrorLanes.contributionRanking),
       _kokenRowsCapturedAtMs
     );
-    return attachLaneTilePulse(withStats, giftPulseByUid(gift));
+    // v0.1.1566: 熱い人(直近60秒のコメント増分)。鏡 publish は sig 判定より前なので裏タブでも会場へ届く。
+    const heat = _laneHeat.observe(
+      STORY_SOURCE_STATE.liveId,
+      (Array.isArray(STORY_SOURCE_STATE.laneAggregates) ? STORY_SOURCE_STATE.laneAggregates : []).map(
+        (a) => ({ uid: String(/** @type {any} */ (a)?.userId || ''), commentCount: Number(/** @type {any} */ (a)?.commentCount) })
+      ),
+      Date.now()
+    );
+    return attachLaneTilePulse(withStats, mergeLanePulseMaps(giftPulseByUid(gift), heatPulseByUid(heat)));
   } catch {
     return buckets;
   }

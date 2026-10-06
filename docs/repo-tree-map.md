@@ -138,9 +138,11 @@ graph LR
   f18 --> f18_4["extension/status-entry.js"]
   HUB --> f19["応援レーンのタイル3行目(🎁pt/📣pt/💬件)"]
   f19 --> f19_0["lib/laneTileStats.js"]
-  f19 --> f19_1["lib/laneMirror.js"]
-  f19 --> f19_2["lib/venueLaneMirrorSupply.js"]
-  f19 --> f19_3["extension/story/renderStoryUserLaneDom.js"]
+  f19 --> f19_1["lib/laneHeatTracker.js"]
+  f19 --> f19_2["lib/commentDeltaTier.js"]
+  f19 --> f19_3["lib/laneMirror.js"]
+  f19 --> f19_4["lib/venueLaneMirrorSupply.js"]
+  f19 --> f19_5["extension/story/renderStoryUserLaneDom.js"]
   HUB --> f20["応援ライブビュー(リアルタイム盛り上がり・新規タブ)"]
   f20 --> f20_0["live-view.html"]
   f20 --> f20_1["extension/live-view-entry.js"]
@@ -337,14 +339,14 @@ graph LR
 - `soundeffect-lab/`（19 件） — 効果音ラボ由来の素材候補(採否検討用)  〔音声 / 素材〕
 
 ## `src/` — LP 側 + 純粋関数ライブラリの源  〔ソース〕
-<sub>ファイル 1873 件</sub>
+<sub>ファイル 1877 件</sub>
 
 - `data/`（7 件） — 保存コメントからレーン候補を読む acquirer / source 層  〔コメント / 取得〕
 - `domain/`（20 件） — ドメイン正本(応援レーンの集約・列ポリシー等。識別子判定など)  〔応援 / 集約 / 識別子〕
 - `extension/`（58 件） — バンドル entry(content/popup/venue/status/offscreen/backfill-sw 等=機能境界)  〔entry / 記録 / 会場 / 応援〕
 - `fixtures/`（1 件） — テスト用フィクスチャ  〔テスト〕
 - `images/`（134 件） — LP / CWS 提出物のマスター画像  〔画像〕
-- `lib/`（1639 件） — 純粋関数ライブラリ(unit test 対象)。色・速度・コメント・レポート等の計算ロジックの大半  〔色 / 速度 / コメント / レポート / 純粋関数〕
+- `lib/`（1643 件） — 純粋関数ライブラリ(unit test 対象)。色・速度・コメント・レポート等の計算ロジックの大半  〔色 / 速度 / コメント / レポート / 純粋関数〕
 - `server/`（4 件） — Node 側 I/O 部品(fetch/WebSocket を実際に叩く。api と scripts が共用。lib には置けない)  〔API / 公開 / ランキング〕
 - `shared/`（7 件） — 複数機能で共有する小部品(アバター URL ガード等)  〔共有 / アバター〕
 - `sound/`（1 件） — 音声素材(src 側)  〔音声〕
@@ -490,9 +492,11 @@ HTML/マーケ/メディアキットの主要KPI(本文数/コメントした人
 - [`src/extension/status-entry.js`](../src/extension/status-entry.js)
 
 ### 応援レーンのタイル3行目(🎁pt/📣pt/💬件)  〔表示 / 応援レーン〕
-popup が laneTileStats.js で1回だけ合成し(💬=拡張記録/🎁📣=公式koken・nicoadの公開pt)、鏡(laneMirror.js の stats)で②会場・③別窓へ運ぶ。renderStoryUserLaneDom.js が meta の data-stats 属性だけで描く(DOM+0・鍵に入れない=ちらつき不変)。描かない3経路は syncStoryUserLaneStatsInPlace で追従
+popup が laneTileStats.js で1回だけ合成し(💬=拡張記録/🎁📣=公式koken・nicoadの公開pt)、鏡(laneMirror.js の stats)で②会場・③別窓へ運ぶ。renderStoryUserLaneDom.js が meta の data-stats 属性だけで描く(DOM+0・鍵に入れない=ちらつき不変)。描かない3経路は syncStoryUserLaneStatsInPlace で追従。ギフト増分(+N pt・koken標本間差分)と熱い人(+N件・直近60秒のコメント増分=laneHeatTracker)も同じ器(data-pulse)
 
 - [`src/lib/laneTileStats.js`](../src/lib/laneTileStats.js)
+- [`src/lib/laneHeatTracker.js`](../src/lib/laneHeatTracker.js)
+- [`src/lib/commentDeltaTier.js`](../src/lib/commentDeltaTier.js)
 - [`src/lib/laneMirror.js`](../src/lib/laneMirror.js)
 - [`src/lib/venueLaneMirrorSupply.js`](../src/lib/venueLaneMirrorSupply.js)
 - [`src/extension/story/renderStoryUserLaneDom.js`](../src/extension/story/renderStoryUserLaneDom.js)

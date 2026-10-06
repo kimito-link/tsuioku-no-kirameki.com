@@ -7,7 +7,7 @@
  *   5フィールドだけ(personTileDom.js)。鏡もこの5つだけ保存=最小化。
  * ★各段 cap で件数を抑え、全体が容量上限(JSON 512KB)を超えるなら cap を半減する二段ガード=status を重くしない。
  *
- * @typedef {{ displaySrc: string, title: string, idLine: string, nameLine: string, userId: string, recentTexts: string[], stats?: { c?: number, g?: number, a?: number }, pulse?: { g?: number, gt?: string } }} LaneMirrorCell
+ * @typedef {{ displaySrc: string, title: string, idLine: string, nameLine: string, userId: string, recentTexts: string[], stats?: { c?: number, g?: number, a?: number }, pulse?: { g?: number, gt?: string, h?: number, ht?: string } }} LaneMirrorCell
  * @typedef {{ visible: number, tileW: number, tileH: number }} LaneMirrorDomTier
  * @typedef {{ measured: boolean,
  *   perTier: { link: LaneMirrorDomTier, gift: LaneMirrorDomTier, ad: LaneMirrorDomTier, konta: LaneMirrorDomTier, tanu: LaneMirrorDomTier },
@@ -149,29 +149,51 @@ function toMirrorCell(item) {
 }
 
 /**
- * LaneTilePulse({giftDelta,giftTier}) → 鏡の短縮形 {g,gt}。増分が正でなければ null。
+ * LaneTilePulse({giftDelta,giftTier,heat,heatTier}) → 鏡の短縮形 {g,gt,h,ht}。どちらの増分も正でなければ null。
  * @param {unknown} p
- * @returns {{ g: number, gt?: string }|null}
+ * @returns {{ g?: number, gt?: string, h?: number, ht?: string }|null}
  */
 function mirrorPulseOf(p) {
-  const o = /** @type {{ giftDelta?: unknown, giftTier?: unknown }|null} */ (p && typeof p === 'object' ? p : null);
+  const o = /** @type {{ giftDelta?: unknown, giftTier?: unknown, heat?: unknown, heatTier?: unknown }|null} */ (
+    p && typeof p === 'object' ? p : null
+  );
   if (!o) return null;
+  /** @type {{ g?: number, gt?: string, h?: number, ht?: string }} */
+  const out = {};
   const g = Math.floor(Number(o.giftDelta));
-  if (!(g > 0)) return null;
-  const gt = typeof o.giftTier === 'string' ? o.giftTier : '';
-  return gt ? { g, gt } : { g };
+  if (g > 0) {
+    out.g = g;
+    if (typeof o.giftTier === 'string' && o.giftTier) out.gt = o.giftTier;
+  }
+  const h = Math.floor(Number(o.heat));
+  if (h > 0) {
+    out.h = h;
+    if (typeof o.heatTier === 'string' && o.heatTier) out.ht = o.heatTier;
+  }
+  return Object.keys(out).length ? out : null;
 }
 
 /**
- * 鏡の短縮形 {g,gt} → LaneTilePulse。無い/空なら undefined。
+ * 鏡の短縮形 {g,gt,h,ht} → LaneTilePulse。無い/空なら undefined。
  * @param {unknown} p
- * @returns {{ giftDelta: number, giftTier: string }|undefined}
+ * @returns {{ giftDelta?: number, giftTier?: string, heat?: number, heatTier?: string }|undefined}
  */
 function restoreMirrorPulse(p) {
-  const o = /** @type {{ g?: unknown, gt?: unknown }|null} */ (p && typeof p === 'object' ? p : null);
+  const o = /** @type {{ g?: unknown, gt?: unknown, h?: unknown, ht?: unknown }|null} */ (p && typeof p === 'object' ? p : null);
   if (!o) return undefined;
+  /** @type {{ giftDelta?: number, giftTier?: string, heat?: number, heatTier?: string }} */
+  const out = {};
   const g = Math.floor(Number(o.g));
-  return g > 0 ? { giftDelta: g, giftTier: typeof o.gt === 'string' ? o.gt : '' } : undefined;
+  if (g > 0) {
+    out.giftDelta = g;
+    out.giftTier = typeof o.gt === 'string' ? o.gt : '';
+  }
+  const h = Math.floor(Number(o.h));
+  if (h > 0) {
+    out.heat = h;
+    out.heatTier = typeof o.ht === 'string' ? o.ht : '';
+  }
+  return Object.keys(out).length ? out : undefined;
 }
 
 /**

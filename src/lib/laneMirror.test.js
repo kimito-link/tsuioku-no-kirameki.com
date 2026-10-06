@@ -543,3 +543,22 @@ describe('鏡の pulse(ギフト増分・v0.1.1565 additive)', () => {
     expect(laneSceneContentHash(b)).toBe(laneSceneContentHash(a));
   });
 });
+
+describe('鏡の pulse に熱い人(heat)も載る(v0.1.1566)', () => {
+  it('{h,ht} で載り復元される。gift と同居できる', () => {
+    const it = (pulse) => ({ ...cell('1', 'https://cdn/1.jpg'), pulse });
+    const snap = buildLaneMirrorSnapshot({
+      liveId: 'lv1',
+      buckets: {
+        link: [it({ heat: 3, heatTier: 'medium' }), it({ giftDelta: 500, giftTier: 'large', heat: 7, heatTier: 'large' }), it({ heat: 0 })],
+        gift: [], ad: [], konta: [], tanu: []
+      }
+    }, { nowMs: 1 });
+    expect(snap.link[0].pulse).toEqual({ h: 3, ht: 'medium' });
+    expect(snap.link[1].pulse).toEqual({ g: 500, gt: 'large', h: 7, ht: 'large' });
+    expect('pulse' in snap.link[2]).toBe(false);
+    const r = restoreLaneMirrorBuckets(snap);
+    expect(r.link[0].pulse).toEqual({ heat: 3, heatTier: 'medium' });
+    expect(r.link[1].pulse).toEqual({ giftDelta: 500, giftTier: 'large', heat: 7, heatTier: 'large' });
+  });
+});

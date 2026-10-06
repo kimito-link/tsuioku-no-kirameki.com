@@ -16,6 +16,7 @@ graph LR
   n_live_ranking --> n_src_domain_user_identity_js["domain/user/identity.js"]:::shared
   n_live_ranking --> n_src_domain_user_nickname_js["domain/user/nickname.js"]:::shared
   n_live_ranking --> n_src_lib_anonymousIdenticon_js["lib/anonymousIdenticon.js"]:::shared
+  n_live_ranking --> n_src_lib_commentDeltaTier_js["lib/commentDeltaTier.js"]:::shared
   n_live_ranking --> n_src_lib_concurrentEstimate_js["lib/concurrentEstimate.js"]:::shared
   n_live_ranking --> n_src_lib_deriveAvatarUrlFromUid_js["lib/deriveAvatarUrlFromUid.js"]:::shared
   n_live_ranking --> n_src_lib_giftDeltaFallback_js["lib/giftDeltaFallback.js"]:::shared

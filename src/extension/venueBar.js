@@ -1126,6 +1126,7 @@ const VENUE_CSS = `
     --nl-user-accent: #5aa7ff;
     --nl-lane-stats: #9a6f12;
     --nl-lane-pulse-gift: #c8721c;
+    --nl-lane-pulse-hot: #c8721c;
     /*
      * 横スクロールバー根絶(ユーザー不満「位置がずれてスクロールバーが出て変な動きで
      * 見えなくなる」): 同時表示人数は selectStableVisibleMembers で行に収まる数に制限済み
@@ -1331,13 +1332,26 @@ const VENUE_CSS = `
   .nlsb-venue-lane-stack .nl-story-userlane-cell[data-pulse-tier="mega"] {
     --nl-lane-pulse-gift: #c02a2a;
   }
+  /* v0.1.1566: 熱い人「+3件」(popup.html の同名規則の写し) */
+  .nlsb-venue-lane-stack .nl-story-userlane-cell.is-hot {
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--nl-lane-pulse-hot) 55%, transparent);
+    animation: nl-lane-pulse-pop 600ms ease-out 1;
+  }
+  .nlsb-venue-lane-stack .nl-story-userlane-cell.is-hot[data-pulse]::after {
+    background: color-mix(in srgb, var(--nl-lane-pulse-hot) 16%, transparent);
+    color: var(--nl-lane-pulse-hot);
+  }
+  .nlsb-venue-lane-stack .nl-story-userlane-cell.is-hot[data-pulse-tier="mega"] {
+    --nl-lane-pulse-hot: #c02a2a;
+  }
   @keyframes nl-lane-pulse-pop {
     0% { transform: scale(1); }
     40% { transform: scale(1.045); }
     100% { transform: scale(1); }
   }
   @media (prefers-reduced-motion: reduce) {
-    .nlsb-venue-lane-stack .nl-story-userlane-cell.is-gifted { animation: none; }
+    .nlsb-venue-lane-stack .nl-story-userlane-cell.is-gifted,
+    .nlsb-venue-lane-stack .nl-story-userlane-cell.is-hot { animation: none; }
   }
   /* v0.1.1562: タイル 3 行目「🎁pt 📣pt 💬件」(popup.html の同名規則の写し) */
   .nlsb-venue-lane-stack .nl-story-userlane-meta[data-stats]::after {

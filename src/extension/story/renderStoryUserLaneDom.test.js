@@ -572,3 +572,48 @@ describe('タイル pulse 属性(data-pulse / is-gifted)', () => {
     expect(c.classList.contains('is-gifted')).toBe(true);
   });
 });
+
+describe('熱い人バッジ(is-hot・v0.1.1566)', () => {
+  const HOT = { heat: 3, heatTier: 'medium' };
+  const lane = (items) => ({ link: items, gift: [], ad: [], konta: [], tanu: [] });
+  const wp = (c, pulse) => ({ ...c, pulse });
+
+  it('heat の pulse は data-pulse="+3件"・is-hot が付き、is-gifted は付かない', () => {
+    const els = makeEls();
+    paint(els, lane([wp(LINK[0], HOT)]));
+    const c = els.laneLink.firstElementChild;
+    expect(c.getAttribute('data-pulse')).toBe('+3件');
+    expect(c.getAttribute('data-pulse-tier')).toBe('medium');
+    expect(c.classList.contains('is-hot')).toBe(true);
+    expect(c.classList.contains('is-gifted')).toBe(false);
+  });
+
+  it('★heat だけが変わっても cell は同一参照・repaint 不変。消えたら is-hot も外れる(60秒失効)', () => {
+    const els = makeEls();
+    paint(els, lane([LINK[0]]));
+    const c = els.laneLink.firstElementChild;
+    const before = getStoryLaneRepaintCounts();
+    paint(els, lane([wp(LINK[0], HOT)]));
+    paint(els, lane([wp(LINK[0], { heat: 5, heatTier: 'large' })]));
+    expect(els.laneLink.firstElementChild).toBe(c);
+    expect(c.getAttribute('data-pulse')).toBe('+5件');
+    expect(c.getAttribute('data-pulse-tier')).toBe('large');
+    paint(els, lane([LINK[0]]));
+    expect(c.hasAttribute('data-pulse')).toBe(false);
+    expect(c.classList.contains('is-hot')).toBe(false);
+    expect(getStoryLaneRepaintCounts()).toEqual(before);
+  });
+
+  it('gift と heat が同時なら gift を表示(is-gifted のみ)。gift が消えたら hot に切り替わる', () => {
+    const els = makeEls();
+    paint(els, lane([wp(LINK[0], { giftDelta: 500, giftTier: 'large', ...HOT })]));
+    const c = els.laneLink.firstElementChild;
+    expect(c.getAttribute('data-pulse')).toBe('+500pt');
+    expect(c.classList.contains('is-gifted')).toBe(true);
+    expect(c.classList.contains('is-hot')).toBe(false);
+    paint(els, lane([wp(LINK[0], HOT)]));
+    expect(c.getAttribute('data-pulse')).toBe('+3件');
+    expect(c.classList.contains('is-gifted')).toBe(false);
+    expect(c.classList.contains('is-hot')).toBe(true);
+  });
+});

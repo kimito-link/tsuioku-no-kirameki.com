@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "mode": "default",
-  "fingerprint": "ae719038a30b5e768bf52f76e0f32041e91f96d2f6b40eca4d8c6ef8a678421c",
+  "fingerprint": "458b2289c1b605c95ba4251fd27d00a1d0bd72e2a278d72f95c07585a57f5302",
   "inputs": [
     "app/app.js",
     "app/live-view.js",
@@ -143,6 +143,7 @@
     "src/lib/commentComposeShortcuts.js",
     "src/lib/commentCountProvenance.js",
     "src/lib/commentDb.js",
+    "src/lib/commentDeltaTier.js",
     "src/lib/commentEchoDetector.js",
     "src/lib/commentFatigue.js",
     "src/lib/commentHarvest.js",
@@ -342,6 +343,7 @@
     "src/lib/laneDiag.js",
     "src/lib/laneDiagKey.js",
     "src/lib/laneDomSelfMeasure.js",
+    "src/lib/laneHeatTracker.js",
     "src/lib/laneMirror.js",
     "src/lib/laneMirrorContract.js",
     "src/lib/laneMirrorKey.js",
@@ -776,18 +778,18 @@
   "outputs": {
     "extension/dist/page-intercept.js": "5ccd2cd66f9caeb45060a68388f166cc0c55088e6fe47509075aecf66e6a7afa",
     "extension/dist/backfill-sw.js": "b6c8016fbe83e66f418528e09ec3b3187fb1aef2b1aaf6ab16a9fabee0a7b96e",
-    "extension/dist/content.js": "0ecde2b53a16bf68e92edfc03c9a175cabd691695de67bf385e25e371126de57",
-    "extension/dist/popup.js": "830b623015fec4063da2180274595fa8ea33d3517dc341eb97afc4494bd1e510",
+    "extension/dist/content.js": "e986309f42f7e9410f7ac9a68642c123d1d57203b9b181450b647c653520d987",
+    "extension/dist/popup.js": "49016c569d3f2ce560b65569727b58e87456f66705d6f3f41861e3d2eaf0cb6d",
     "extension/dist/offscreen.js": "71bbb25c82a3003ab1c032d665077218aed7ffce1c9472ab381155ba72cbefff",
-    "extension/dist/status.js": "fb89f25ede74ba42b2f59fa4278ca4bd9d8d5c85d4ac759a87751bf41c80e4c3",
+    "extension/dist/status.js": "3e34414bfacdabafb58521b9bbf4faa00af06f4fc80fa18b6bfb660131f6a386",
     "extension/dist/live-view.js": "c4f54a96606bcb01af056fbfd2ada7e45b1864f72ef2cc697e965fe4f32a51f6",
     "extension/dist/marketing-export.js": "f004a5ea152a39778c1a010e0d40ea07f85295161524d755d3f8ac09d05bd568",
     "extension/dist/comeview.js": "19ac10937d72dd5b0689594c43db390c0f9c88c688facf9e967e50b465d0395e",
-    "extension/dist/venue.js": "b10cacb71f341e62f78fb3550f558dc3205443a5d24e824f2be04bee8074bb1b",
+    "extension/dist/venue.js": "a4939eb04cba0925c56befa3581f64c276c85b1bf6c60f0b9fa71418c16374de",
     "extension/dist/sidepanel.js": "274c782d6da1969f84ed353e54c49c00adc269c712cb26afeef622f7b8953340",
     "extension/dist/cloak-failsafe.js": "8baabc8a7ee4ab9f0e6fd66c6b917c4832bade10efa9917cf50bf40ca2588207",
     "app/dist/app.js": "9af7800bc0527fbcc239eba0a06d8c02324f0c4d3b7ff0c740bacd9a307a016e",
-    "app/dist/live-view.js": "b90606b5d0425570728667a9960125432f4678e71e8a0147aac4f711c52da150",
-    "app/dist/live-ranking.js": "832039a708a295bcb0e2ec9d24c38b5694e5c3692f44439f15076393bb971eb6"
+    "app/dist/live-view.js": "b4e144413b696f43a515d716bd6f8fc1f01468427ae39026cfdcd42456e844fa",
+    "app/dist/live-ranking.js": "c34c1de9c3ad3e8a4120dcdb6dc48693ff2b7fb52d6d788265501d2fb23ed797"
   }
 }
