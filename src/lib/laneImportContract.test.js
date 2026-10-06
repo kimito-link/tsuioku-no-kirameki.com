@@ -39,18 +39,22 @@ const item = (userId, name, extra = {}) => ({
   ...extra
 });
 
-/** 契約の全項目を持つアイテム(各段に1件・uid 無し広告も含める)。 */
-function fullItem(userId, name) {
+/** 数値の項目に seed を足して「段ごと・人ごとに値が違う」fixture にする(全員同値だと取り違えても緑になる)。 */
+const varied = (sample, seed) =>
+  Object.fromEntries(Object.entries(sample).map(([k, v]) => [k, typeof v === 'number' ? v + seed : v]));
+
+/** 契約の全項目を持つアイテム(各段に1件・uid 無し広告も含める)。seed で値を変える。 */
+function fullItem(userId, name, seed) {
   const extra = {};
-  for (const c of LANE_IMPORT_CONTRACT) extra[c.itemKey] = { ...c.sampleItem };
+  for (const c of LANE_IMPORT_CONTRACT) extra[c.itemKey] = varied(c.sampleItem, seed);
   return item(userId, name, extra);
 }
 const fullBuckets = () => ({
-  link: [fullItem('1001', 'りんく友')],
-  gift: [fullItem('1002', 'ギフトさん')],
-  ad: [fullItem('', '広告主')],
-  konta: [fullItem('1003', 'こん太友')],
-  tanu: [fullItem('a:AAA111', '匿名A')]
+  link: [fullItem('1001', 'りんく友', 1)],
+  gift: [fullItem('1002', 'ギフトさん', 20)],
+  ad: [fullItem('', '広告主', 300)],
+  konta: [fullItem('1003', 'こん太友', 4000)],
+  tanu: [fullItem('a:AAA111', '匿名A', 50000)]
 });
 
 const sorted = (o) => Object.keys(o).sort();
@@ -80,8 +84,11 @@ describe('輸入契約: 各段階のキー集合が契約と完全一致する',
 
   it('③ 復元後の値が元の値と同じ(往復で欠けない・サブ項目も)', () => {
     const restored = restoreLaneMirrorBuckets(snapOf(fullBuckets()));
+    const src = fullBuckets();
     for (const c of LANE_IMPORT_CONTRACT) {
-      for (const t of TIERS) expect(restored[t][0][c.itemKey], `${c.id}@${t}`).toEqual(c.sampleItem);
+      for (const t of TIERS) expect(restored[t][0][c.itemKey], `${c.id}@${t}`).toEqual(src[t][0][c.itemKey]);
+      // 段をまたいで取り違えていない(段ごとに値が違うので、同じなら取り違え)
+      expect(restored.link[0][c.itemKey]).not.toEqual(restored.gift[0][c.itemKey]);
     }
   });
 
@@ -91,7 +98,7 @@ describe('輸入契約: 各段階のキー集合が契約と完全一致する',
     const want = [...new Set([...VENUE_INTERNAL_KEYS, ...contractItemKeys()])].sort();
     for (const t of TIERS) {
       expect(sorted(out[t][0]), `会場(${t})`).toEqual(want);
-      for (const c of LANE_IMPORT_CONTRACT) expect(out[t][0][c.itemKey], `${c.id}@${t}`).toEqual(c.sampleItem);
+      for (const c of LANE_IMPORT_CONTRACT) expect(out[t][0][c.itemKey], `${c.id}@${t}`).toEqual(restored[t][0][c.itemKey]);
     }
   });
 
@@ -116,6 +123,24 @@ describe('輸入契約: 各段階のキー集合が契約と完全一致する',
     const legacy = Object.values(out.legacyPayload).find((v) => v && Array.isArray(v.gift));
     expect(legacy, '旧キーの鏡が無い').toBeTruthy();
     expect(legacy.gift[0]).toEqual(snap.gift[0]);
+  });
+});
+
+describe('輸入契約: 一部のサブ項目だけ・項目なしのセルの往復', () => {
+  const only = (extra) => ({ link: [item('1001', 'りんく友', extra)], gift: [], ad: [], konta: [], tanu: [] });
+  it('stats の一部(giftPt だけ)は残りが null で復元される。pulse の heat だけも同様', () => {
+    const snap = snapOf(only({ stats: { commentCount: null, giftPt: 5, adPt: null }, pulse: { heat: 4, heatTier: 'medium' } }));
+    expect(snap.link[0].stats).toEqual({ g: 5 });
+    expect(snap.link[0].pulse).toEqual({ h: 4, ht: 'medium' });
+    const r = restoreLaneMirrorBuckets(snap).link[0];
+    expect(r.stats).toEqual({ commentCount: null, giftPt: 5, adPt: null });
+    expect(r.pulse).toEqual({ heat: 4, heatTier: 'medium' });
+  });
+  it('項目が無い/全部 null のセルは、鏡にも復元後にも項目のキーが生えない(旧鏡と同じ形)', () => {
+    const snap = snapOf(only({ stats: { commentCount: null, giftPt: null, adPt: null }, pulse: { giftDelta: 0, heat: 0 } }));
+    for (const k of contractMirrorKeys()) expect(k in snap.link[0], `鏡 ${k}`).toBe(false);
+    const r = restoreLaneMirrorBuckets(snap).link[0];
+    for (const k of contractItemKeys()) expect(k in r, `復元 ${k}`).toBe(false);
   });
 });
 
