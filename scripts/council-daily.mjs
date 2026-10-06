@@ -59,8 +59,28 @@ const done = [];
 // ── 0. 前提: 古いブランチで回すと監視stateが汚染される（2026-08-21 の実事故）────
 //    LINEUP件数が master と食い違う状態で scout を回すと、撤去済みモデルに
 //    「消滅カウント」が入り、存在しないモデルの警告を永久に鳴らし続ける。
+// ★2026-10-06 修正: worktree(detached HEAD)で毎回 `branch=(不明)` と出ていた表示を直す。
+//  `git branch --show-current` は detached HEAD で**空文字を返す**のが正しい挙動だが、
+//  このリポは「他セッションが別ブランチで作業中なら master の worktree を作って回す」のが
+//  標準手順（古いブランチで回すと監視stateが汚染される既知の地雷の回避策）なので、
+//  **標準手順を踏むと毎回「不明」と表示される**という紛らわしい状態になっていた。
+//  ★安全性は元から保たれている（汚染を防いでいるのは branch 名ではなく下の LINEUP 件数一致）。
+//   ここは表示だけの修正で、判定ロジックは変えない。
+//  実測（detached HEAD の worktree）: `branch --show-current`=空 /
+//   `describe --all --exact-match HEAD`=`heads/master` → これで「masterと同じ地点」と判る。
 let branch = '';
 try { branch = run('git', ['branch', '--show-current']).trim(); } catch { /* 取れなければ空 */ }
+if (!branch) {
+  // detached HEAD: 同じコミットを指すブランチ名が取れれば「master(detached)」等と出す
+  try {
+    const d = run('git', ['describe', '--all', '--exact-match', 'HEAD']).trim();
+    const name = d.replace(/^heads\//, '').replace(/^remotes\//, '');
+    if (name) branch = `${name}(detached)`;
+  } catch { /* タグもブランチも一致しない孤立コミット */ }
+  if (!branch) {
+    try { branch = `detached@${run('git', ['rev-parse', '--short', 'HEAD']).trim()}`; } catch { /* git外 */ }
+  }
+}
 const countLineup = (src) => (src.match(/^ {2}\{ label:/gm) || []).length;
 const lineupHere = countLineup(readFileSync(join(REPO_ROOT, 'scripts/council-lineup.mjs'), 'utf8'));
 let lineupMaster = lineupHere;
