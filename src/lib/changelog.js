@@ -18,6 +18,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1571',
+    date: '2026-10-06',
+    summary: '内部: 輸入項目の取りこぼし検査を追加',
+    items: Object.freeze([
+      '画面の見た目は変わりません。応援レーンに新しい表示項目を足したとき、サイドパネル・会場・別窓のどれかに運び忘れると自動検査が段階ごとに名指しして知らせる安全装置(内部の検査)を追加しました。顔ぶれが入れ替わった瞬間に別の人の数字が付かないことも検査します。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1570',
     date: '2026-10-06',
     summary: '内部: 応援レーンCSSの3画面照合を追加',
@@ -167,14 +175,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     summary: '/live/ コメント速度の脈拍レーンを追加',
     items: Object.freeze([
       'ライブビュー(/live/)の番組合計コメント数を実測値の間でなめらかに表示し、実測2点から求めた速度と脈拍レーンを添えました。個人別の値やコメント本文は動かしていません。'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.1551',
-    date: '2026-09-28',
-    summary: '/live/ 発言カードの先読みを配信ホバーに拡大',
-    items: Object.freeze([
-      'ライブビュー(/live/)の配信カードに少し滞在すると、直近発言カードの取得を先に始めるようにしました。取得中の応答も自動再試行し、名前へ移ったときにすぐ表示しやすくなります。'
     ])
   })
 ]);
