@@ -24,6 +24,14 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.1553',
+    date: '2026-09-30',
+    summary: '/live/ 脈拍レーンに応援者の名前とサムネ',
+    items: Object.freeze([
+      'ライブビュー(/live/)の脈拍レーンに、丸いサムネと名前つきのチップを流し「誰が応援したか」が見えるようにしました。コメント本文は表示していません。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1552',
     date: '2026-09-30',
     summary: '/live/ コメント速度の脈拍レーンを追加',
