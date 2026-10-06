@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "mode": "default",
-  "fingerprint": "851b271c155da7aca3c863f54c4030fc097d74fc13e3d2b6b3a627cb5e851432",
+  "fingerprint": "4af05ec253b1c81982cdcc8a597cb5a9ba878a56379eb4fec2220a78e4209a3c",
   "inputs": [
     "app/app.js",
     "app/live-view.js",
@@ -143,6 +143,7 @@
     "src/lib/commentComposeShortcuts.js",
     "src/lib/commentCountProvenance.js",
     "src/lib/commentDb.js",
+    "src/lib/commentDeltaTier.js",
     "src/lib/commentEchoDetector.js",
     "src/lib/commentFatigue.js",
     "src/lib/commentHarvest.js",
@@ -342,6 +343,7 @@
     "src/lib/laneDiag.js",
     "src/lib/laneDiagKey.js",
     "src/lib/laneDomSelfMeasure.js",
+    "src/lib/laneHeatTracker.js",
     "src/lib/laneMirror.js",
     "src/lib/laneMirrorContract.js",
     "src/lib/laneMirrorKey.js",
@@ -353,6 +355,7 @@
     "src/lib/laneSupplyOriginDiag.js",
     "src/lib/laneTickProbe.js",
     "src/lib/laneTileOscillation.js",
+    "src/lib/laneTileStats.js",
     "src/lib/laneWindowVerdict.js",
     "src/lib/lastWatchUrlAdoption.js",
     "src/lib/lengthDelimitedStream.js",
@@ -450,6 +453,7 @@
     "src/lib/numberConsistency.js",
     "src/lib/objectUrlRevokeQueue.js",
     "src/lib/observerTarget.js",
+    "src/lib/officialCommentRate.js",
     "src/lib/officialContributionRankingResolver.js",
     "src/lib/officialDomRankingRowsToStripRooms.js",
     "src/lib/officialEventBannerDom.js",
@@ -775,18 +779,18 @@
   "outputs": {
     "extension/dist/page-intercept.js": "5ccd2cd66f9caeb45060a68388f166cc0c55088e6fe47509075aecf66e6a7afa",
     "extension/dist/backfill-sw.js": "b6c8016fbe83e66f418528e09ec3b3187fb1aef2b1aaf6ab16a9fabee0a7b96e",
-    "extension/dist/content.js": "404a7547c5f7ae2ccaedbbbfeb329ae7aeb99ac830b48ae4e7135b3d58c519e8",
-    "extension/dist/popup.js": "b9b543e53d764dc17994c092a81e7a9200fba64f3868f4e781225dca9a2930d6",
+    "extension/dist/content.js": "c1e4faa1d76347a2afad979c18d3406eca2983f2cd7b00afc9fe59d03db2d978",
+    "extension/dist/popup.js": "756cc8e97f7b13fdc149007c49db5268488a07fb702bcd8cd36953bbb99ba1b7",
     "extension/dist/offscreen.js": "71bbb25c82a3003ab1c032d665077218aed7ffce1c9472ab381155ba72cbefff",
-    "extension/dist/status.js": "68b9da02ff0d0957e051bbee9619f78bfbc56a4099519886544b9df15dedd071",
+    "extension/dist/status.js": "cac561935f7a4ea96c731d887bf93320d22e84833fc07add8cbe409351387a28",
     "extension/dist/live-view.js": "c4f54a96606bcb01af056fbfd2ada7e45b1864f72ef2cc697e965fe4f32a51f6",
     "extension/dist/marketing-export.js": "f004a5ea152a39778c1a010e0d40ea07f85295161524d755d3f8ac09d05bd568",
     "extension/dist/comeview.js": "19ac10937d72dd5b0689594c43db390c0f9c88c688facf9e967e50b465d0395e",
-    "extension/dist/venue.js": "bd0522d1b28dc2bb6ff29bddcaa51ca4df7fdb571cd3f22031c197511aa8b6f3",
+    "extension/dist/venue.js": "729884c2e7f7ee89693eac39184bbf988ea1ab362ba74fca023bde0330bdd4b9",
     "extension/dist/sidepanel.js": "274c782d6da1969f84ed353e54c49c00adc269c712cb26afeef622f7b8953340",
     "extension/dist/cloak-failsafe.js": "8baabc8a7ee4ab9f0e6fd66c6b917c4832bade10efa9917cf50bf40ca2588207",
     "app/dist/app.js": "9af7800bc0527fbcc239eba0a06d8c02324f0c4d3b7ff0c740bacd9a307a016e",
-    "app/dist/live-view.js": "00af55a347ccf572e663909f2cc42a0ff94664cf3e09e86b7d067d4e7d3282ff",
-    "app/dist/live-ranking.js": "832039a708a295bcb0e2ec9d24c38b5694e5c3692f44439f15076393bb971eb6"
+    "app/dist/live-view.js": "034c234819677cd0e26bacdbdca63bc94ca94278d115a19607376b230a329c55",
+    "app/dist/live-ranking.js": "c34c1de9c3ad3e8a4120dcdb6dc48693ff2b7fb52d6d788265501d2fb23ed797"
   }
 }

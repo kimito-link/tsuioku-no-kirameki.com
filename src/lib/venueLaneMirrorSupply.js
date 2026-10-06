@@ -148,6 +148,9 @@ export function composeVenueLaneBuckets(input) {
           nameLine: String(cell?.meta?.nameLine || '')
         },
         // 席が無い(uid無し/席未割当)アイテムは -1 = wrapTileEl が素通し(席ラップしない)。
+        // v0.1.1562: タイル 3 行目の値。個別列挙で作り直す型なので明示的に引き継ぐ(落とすと会場だけ黙って消える)。
+        ...(cell?.stats ? { stats: cell.stats } : {}),
+        ...(cell?.pulse ? { pulse: cell.pulse } : {}),
         _venueSeatIndex: Number.isInteger(seatIdxRaw) && seatIdxRaw >= 0 ? seatIdxRaw : -1,
         _venueIsVip: isHttpUrl(cell?.displaySrc),
         _venueMirror: true

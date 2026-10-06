@@ -2,6 +2,7 @@ import { toEpochMs } from './timeAuthority.js';
 import { commentRows, supporterRows, isBlankIcon } from './liveRankingView.js';
 import { anonymousIdenticonDataUrl } from './anonymousIdenticon.js';
 import { pulseRowKey } from './liveGiftPulse.js';
+import { tierForCommentDelta } from './commentDeltaTier.js';
 
 /** 補間する系列。MVP は 'comment' だけ使う(他は型として用意・後段で有効化)。 */
 export const MOTION_KINDS = /** @type {const} */ (['comment', 'watch', 'gift', 'ad']);
@@ -138,11 +139,8 @@ export function formatRatePerMin(rate) {
   return `+${Math.round(rate).toLocaleString('ja-JP')}/分`;
 }
 
-/** コメント増分(件)の段階。ギフトの pt 段階(tierForGiftDeltaPoints)とは別物(1件と1ptは重みが違う)。 */
-/** @param {number} d @returns {'small'|'medium'|'large'|'mega'} */
-export function tierForCommentDelta(d) {
-  return d >= 10 ? 'mega' : d >= 5 ? 'large' : d >= 2 ? 'medium' : 'small';
-}
+/** コメント増分(件)の段階。正本は commentDeltaTier.js(葉モジュール・v0.1.1566 で移動)。ここは re-export。 */
+export { tierForCommentDelta };
 
 /** 熱い人(直近でコメントが増えた人)がキューに並ぶ最大回数(1人がレーンを独占しない天井)。 */
 export const HOT_REPEAT_MAX = 3;

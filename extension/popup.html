@@ -72,6 +72,11 @@
         --nl-lane-accent-event-rank: #b69cff;
         --nl-lane-accent-event-score: #ffb86c;
         --nl-lane-accent-event-broadcasters: #6fd0c8;
+        /* v0.1.1562: タイル 3 行目(🎁📣💬)の文字色。venueBar.js VENUE_CSS にも同値を置く。 */
+        --nl-lane-stats: #9a6f12;
+        /* v0.1.1565: ギフト増分バッジ(/live/ の --orange 相当)。venueBar.js VENUE_CSS にも同値。 */
+        --nl-lane-pulse-gift: #c8721c;
+        --nl-lane-pulse-hot: #c8721c;
         --nl-record-on: #0f9f6f;
         --nl-header-start: #0f8fd8;
         --nl-header-end: #14b8a6;
@@ -1141,6 +1146,8 @@
         width: var(--nl-lane-avatar-anon);
         height: var(--nl-lane-avatar-anon);
         border-width: 1px;
+        /* v0.1.1564: 識別絵(実サムネ無し)は点線枠=「本物の写真ではない」を一目で(/live/ の視覚言語)。寸法は変えない。 */
+        border-style: dashed;
         box-shadow: none;
       }
       .nl-story-userlane-cell[data-thumb="0"] {
@@ -1150,6 +1157,67 @@
       .nl-story-userlane-cell[data-thumb="0"] .nl-story-userlane-meta {
         font-size: 9px;
         max-width: 72px;
+      }
+
+      /* v0.1.1565: ギフト増分バッジ「+1,200pt」。値は renderStoryUserLaneDom.js が cell の data-pulse に載せる
+         (DOM 要素 +0・クラスは付いた瞬間に一発だけアニメ)。venueBar.js の LANE_CSS_SYNC 区間と
+         app/live-view.html(手動管理の丸ごとコピー)に同じ規則を写す。 */
+      .nl-story-userlane-cell[data-pulse]::after {
+        content: attr(data-pulse);
+        margin-left: 2px;
+        padding: 0 5px;
+        border-radius: 999px;
+        font-size: 9px;
+        font-weight: 800;
+        font-variant-numeric: tabular-nums;
+        white-space: nowrap;
+        align-self: center;
+        background: color-mix(in srgb, var(--nl-lane-pulse-gift) 16%, transparent);
+        color: var(--nl-lane-pulse-gift);
+      }
+      .nl-story-userlane-cell.is-gifted {
+        box-shadow: 0 0 0 2px color-mix(in srgb, var(--nl-lane-pulse-gift) 55%, transparent);
+        animation: nl-lane-pulse-pop 600ms ease-out 1;
+      }
+      .nl-story-userlane-cell[data-pulse-tier="mega"] {
+        --nl-lane-pulse-gift: #c02a2a;
+      }
+      /* v0.1.1566: 熱い人(直近60秒にコメントが増えた人)「+3件」。ギフト増分(is-gifted)と同じ器・同じ一発アニメ。 */
+      .nl-story-userlane-cell.is-hot {
+        box-shadow: 0 0 0 2px color-mix(in srgb, var(--nl-lane-pulse-hot) 55%, transparent);
+        animation: nl-lane-pulse-pop 600ms ease-out 1;
+      }
+      .nl-story-userlane-cell.is-hot[data-pulse]::after {
+        background: color-mix(in srgb, var(--nl-lane-pulse-hot) 16%, transparent);
+        color: var(--nl-lane-pulse-hot);
+      }
+      .nl-story-userlane-cell.is-hot[data-pulse-tier="mega"] {
+        --nl-lane-pulse-hot: #c02a2a;
+      }
+      @keyframes nl-lane-pulse-pop {
+        0% { transform: scale(1); }
+        40% { transform: scale(1.045); }
+        100% { transform: scale(1); }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .nl-story-userlane-cell.is-gifted,
+        .nl-story-userlane-cell.is-hot { animation: none; }
+      }
+
+      /* v0.1.1562: タイル 3 行目「🎁pt 📣pt 💬件」。値は renderStoryUserLaneDom.js が meta の
+         data-stats に載せる(DOM 要素 +0・属性だけ更新=ちらつき対策の鍵に入れない)。
+         後列(25 枚目以降)の meta は display:none なので ::after も出ない=高さ不変。
+         venueBar.js の LANE_CSS_SYNC 区間と app/live-view.html(★build では更新されない手動管理の丸ごとコピー)に同じ規則を写す。 */
+      .nl-story-userlane-meta[data-stats]::after {
+        content: attr(data-stats);
+        font-size: 9px;
+        font-weight: 700;
+        line-height: 1.2;
+        color: var(--nl-lane-stats);
+        font-variant-numeric: tabular-nums;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
       }
 
       /*
@@ -1436,6 +1504,14 @@
       .nl-story-userlane-guide__count {
         color: #9a6f12;
         font-weight: 800;
+      }
+
+      .nl-story-userlane-guide__legend {
+        margin: 2px 0 0;
+        padding: 0 2px;
+        font-size: 10px;
+        line-height: 1.35;
+        color: var(--nl-muted);
       }
 
       .nl-story-avatar-diag {
@@ -2741,6 +2817,20 @@
         font-size: clamp(10.5px, 2.6vw, 12px);
         font-weight: 700;
         color: var(--nl-muted);
+      }
+
+      /* v0.1.1567: 本家コメの速さ「+66/分」(2 つの公式実測の差)。出せない間は span ごと隠す=チップの幅を取らない。 */
+      .nl-official-nico-stats__rate {
+        margin-left: 4px;
+        font-size: 0.74em;
+        font-weight: 700;
+        color: var(--nl-lane-pulse-hot);
+        font-variant-numeric: tabular-nums;
+        white-space: nowrap;
+      }
+
+      .nl-official-nico-stats__rate.is-placeholder {
+        display: none;
       }
 
       .nl-live-stat-card {
@@ -10416,6 +10506,9 @@
         --nl-lane-accent-event-rank: #c4afff;
         --nl-lane-accent-event-score: #ffc77f;
         --nl-lane-accent-event-broadcasters: #82ddd4;
+        --nl-lane-stats: #f5d975;
+        --nl-lane-pulse-gift: #ffb86c;
+        --nl-lane-pulse-hot: #ffb86c;
       }
 
       html.nl-skin-panel-dark body {
@@ -11137,6 +11230,7 @@
           <div class="nl-official-nico-stats__chip">
             <span class="nl-official-nico-stats__label">本家コメ</span>
             <span class="nl-official-nico-stats__val is-placeholder" id="officialStatNicoComments">—</span>
+            <span class="nl-official-nico-stats__rate is-placeholder" id="officialStatNicoCommentsRate" aria-live="off"></span>
           </div>
           <div class="nl-official-nico-stats__chip">
             <span class="nl-official-nico-stats__label">経過</span>

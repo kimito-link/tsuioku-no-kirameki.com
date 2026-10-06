@@ -303,7 +303,7 @@
   - `src/lib/giftThrowProjectile.js`
 - **吹き出し寿命管理** — 会場の吹き出しの表示上限・追い出し(eviction)ライフサイクル
   - `src/lib/venueBubbleLifecycle.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 237</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 234</summary>
 
 - `scripts/encode-marketing-html-avatars.mjs` — extension/images/marketing-html-avatars/*.png を data URI にし、
 - `scripts/split-avatar-parts.mjs` — 偽市松背景の除去 + パーツ切り出し(one-off アセットパイプライン)
@@ -320,7 +320,6 @@
 - `src/domain/user/nickname.js` — 表示名（ニックネーム）の「強弱」判定。
 - `src/extension/popup/renderAcquisitionDashboard.js` — renderAcquisitionDashboard — 開発者モニタの「データ取得率」ダッシュボードを描く。
 - `src/extension/story/laneContentLod.js` — 応援レーンの【中身LOD】— 枠は残す。中身だけ空にする。
-- `src/extension/story/renderStoryUserLaneDom.js` — 応援ユーザーレーン DOM の同期（popup-entry から切り出し・状態は引数で受け取る）。
 - `src/extension/venue-entry.js` — 会場モード(standalone)のエントリ。venueBar をページに mount するだけの薄い起動点。
 - `src/extension/venueBar.js` — 会場モード UI 本体。観客の席割り・群衆・吹き出し・ギフト演出・読み上げ連動を描く。
 - `src/lib/adLanePicksFromRooms.js` — 広告ランキング行(officialDomRankingRowsToStripRooms の room)を、popup/会場の人物タイル
@@ -407,7 +406,6 @@
 - `src/lib/laneDetailCells.js` — 応援レーンの観測を【打ち手が変わる単位】に割る(純関数)。
 - `src/lib/laneDiag.js` — 応援アイコン列(popup レーン)の「人数整合」診断。popup が描いたレーンの純観測値を組み立てる純関数群。
 - `src/lib/laneDiagKey.js` — 応援アイコン列(popup レーン)の「人数整合」観測値を popup が書き、status が読む storage キー。
-- `src/lib/laneMirror.js` — 応援レーンの「鏡」スナップショット純関数。popup がレーンを描いた buckets を、status が本物の
 - `src/lib/laneMirrorContract.js` — `KEY_LANE_MIRROR`(応援レーンの鏡)の【契約の正本】。
 - `src/lib/laneMirrorKey.js` — popup の応援レーン(りんく/こん太/広告/たぬ姉の段組み)を「顔=avatar 含めてそっくり」status へ
 - `src/lib/laneMirrorPerLivePublish.js` — laneMirrorPerLivePublish — 配信ごとの鏡(v2)と実DOM受領証を storage へ書く薄いグルー。
@@ -512,7 +510,6 @@
 - `src/lib/venueHoverCard.js` — 会場アイコンのホバープレビューカード(純ロジック+DOMビルダー)。
 - `src/lib/venueHoverCardProbe.js` — 【層】L0 判定層（純関数・chrome/DOM/fetch に触らない）
 - `src/lib/venueHoverFacts.js` — 【層】L0 判定層（純関数・chrome/DOM/fetch に触らない）
-- `src/lib/venueLaneMirrorSupply.js` — 会場の「鏡優先+同型フォールバック」供給(純関数)。①POP が実 paint した5段 buckets の鏡
 - `src/lib/venueLaneParity.js` — 会場レーンのパリティ計器(純関数)。会場が実際に paint した段割当列を、①POP の実描画鏡
 - `src/lib/venueLiveOpenFlag.js` — 「会場モードがいま開いているか」を鏡の供給側へ伝える値。
 - `src/lib/venueLiveRoster.js` — v0.1.754 会場の3時間安定化(星野ロミ・メソッド会議の本質解・6体ほぼ全会一致):
@@ -768,6 +765,16 @@
   - `src/lib/reportPreviewPublish.js`
   - `src/extension/popup-entry.js`
   - `src/extension/status-entry.js`
+- **応援レーンのタイル3行目(🎁pt/📣pt/💬件)** — popup が laneTileStats.js で1回だけ合成し(💬=拡張記録/🎁📣=公式koken・nicoadの公開pt)、鏡(laneMirror.js の stats)で②会場・③別窓へ運ぶ。renderStoryUserLaneDom.js が meta の data-stats 属性だけで描く(DOM+0・鍵に入れない=ちらつき不変)。描かない3経路は syncStoryUserLaneStatsInPlace で追従。ギフト増分(+N pt・koken標本間差分)と熱い人(+N件・直近60秒のコメント増分=laneHeatTracker)も同じ器(data-pulse)
+  - `src/lib/laneTileStats.js`
+  - `src/lib/laneHeatTracker.js`
+  - `src/lib/commentDeltaTier.js`
+  - `src/lib/laneMirror.js`
+  - `src/lib/venueLaneMirrorSupply.js`
+  - `src/extension/story/renderStoryUserLaneDom.js`
+- **公式「本家コメ」チップの速さ(+N/分)** — paintOfficialNicoStatsStrip(popup-entry.js)が公式コメント累計の実測(値が変わったときだけ標本)を officialCommentRate.js に積み、20秒以上離れた2標本の差を「+66/分」としてチップ隣の span に出す。補間はしない・出せない間は空(span ごと非表示)・配信切替で標本を捨てる。officialNicoStatsStripDigest.js は無変更
+  - `src/lib/officialCommentRate.js`
+  - `src/extension/popup-entry.js`
 - **応援ライブビュー(リアルタイム盛り上がり・新規タブ)** — ちくらんカードの「🔥応援ライブビューを開く」で live-view.html?lv=... を新規タブで開く(chrome.runtime.getURL)。chrome.storage を2秒購読し盛り上がり🔥(分速→computeHeatLevel)/応援者ランキング🏆(配信者タイル先頭)/🔗りんく列(数値ID+個人サムネ・categorizeUsersForThumbGrid)/🎁ギフト列(nls_gift_users_<lv>・buildGiftThrowerLaneEntries)/コメント数/来場をリアルタイム再描画。配色は popup(dark)の正確な変数に完全一致。データ取得を createLiveViewDataSource に隔離=将来サーバー公開版(拡張不要で URL 閲覧)へ移植可能(描画は不変)。Web/iOS/Android への土台(v0.1.871-875)
   - `extension/live-view.html`
   - `src/extension/live-view-entry.js`
@@ -1079,29 +1086,45 @@
 
 > changelog 全 20 版を「バグ系統」で束ねた枝。同系統をまた触るとき、過去の修正と「なぜ毎回触るか」を辿る(再発防止)。新しい順。
 
-### 💾 記録件数 (1版)
+### 💾 記録件数 (2版)
+- `v0.1.1562` 2026-10-06 — 応援者のタイルに 🎁📣💬 の内訳を表示
 - `v0.1.1554` 2026-09-30 — 脈拍レーン: いま話している人を強調
 
 ### 📥 コメント取得 (4版)
+- `v0.1.1565` 2026-10-06 — 応援者のタイルにギフト増分バッジを表示
 - `v0.1.1560` 2026-10-05 — タイムシフトの過去コメント一括取得が止まるのを修正
 - `v0.1.1551` 2026-09-28 — /live/ 発言カードの先読みを配信ホバーに拡大
 - `v0.1.1549` 2026-09-27 — /live/ ギフト増分を+ptで表示
-- `v0.1.1545` 2026-09-26 — ライブビューの応援した人の取りこぼしを修正
 
-### 🙂 匿名(184) (3版)
+### 🙂 匿名(184) (4版)
+- `v0.1.1564` 2026-10-06 — 匿名の識別絵を点線の枠で表示
 - `v0.1.1559` 2026-10-05 — 匿名の判定をレポート・CSV・並び順でも統一
 - `v0.1.1558` 2026-10-05 — タイムシフトの匿名さんを匿名として表示
 - `v0.1.1550` 2026-09-28 — /live/ 応援者を4段のアイコン列で表示
 
-### 🏟 会場・席 (1版)
+### 🏟 会場・席 (6版)
+- `v0.1.1566` 2026-10-06 — 直近60秒に熱い人へ +N件 バッジ
+- `v0.1.1565` 2026-10-06 — 応援者のタイルにギフト増分バッジを表示
+- `v0.1.1564` 2026-10-06 — 匿名の識別絵を点線の枠で表示
+- `v0.1.1563` 2026-10-06 — 案内帯の見出しに各段の人数を表示
+- `v0.1.1562` 2026-10-06 — 応援者のタイルに 🎁📣💬 の内訳を表示
 - `v0.1.1558` 2026-10-05 — タイムシフトの匿名さんを匿名として表示
 
-### 🎁 ギフト (3版)
+### 🎁 ギフト (6版)
+- `v0.1.1566` 2026-10-06 — 直近60秒に熱い人へ +N件 バッジ
+- `v0.1.1565` 2026-10-06 — 応援者のタイルにギフト増分バッジを表示
+- `v0.1.1563` 2026-10-06 — 案内帯の見出しに各段の人数を表示
+- `v0.1.1562` 2026-10-06 — 応援者のタイルに 🎁📣💬 の内訳を表示
 - `v0.1.1550` 2026-09-28 — /live/ 応援者を4段のアイコン列で表示
 - `v0.1.1549` 2026-09-27 — /live/ ギフト増分を+ptで表示
-- `v0.1.1545` 2026-09-26 — ライブビューの応援した人の取りこぼしを修正
 
-### 🪟 応援レーン・タイル (6版)
+### 🪟 応援レーン・タイル (12版)
+- `v0.1.1568` 2026-10-06 — 更新の追従で別の人の数字を貼らない
+- `v0.1.1566` 2026-10-06 — 直近60秒に熱い人へ +N件 バッジ
+- `v0.1.1565` 2026-10-06 — 応援者のタイルにギフト増分バッジを表示
+- `v0.1.1564` 2026-10-06 — 匿名の識別絵を点線の枠で表示
+- `v0.1.1563` 2026-10-06 — 案内帯の見出しに各段の人数を表示
+- `v0.1.1562` 2026-10-06 — 応援者のタイルに 🎁📣💬 の内訳を表示
 - `v0.1.1559` 2026-10-05 — 匿名の判定をレポート・CSV・並び順でも統一
 - `v0.1.1558` 2026-10-05 — タイムシフトの匿名さんを匿名として表示
 - `v0.1.1555` 2026-09-30 — 脈拍レーンが開いた直後から動くように修正
@@ -1112,15 +1135,10 @@
 ### 🧊 storage安定 (1版)
 - `v0.1.1560` 2026-10-05 — タイムシフトの過去コメント一括取得が止まるのを修正
 
-### ⚡ 描画・性能 (2版)
+### ⚡ 描画・性能 (1版)
 - `v0.1.1561` 2026-10-05 — サイドパネルを開いた瞬間の黒を消す
-- `v0.1.1544` 2026-09-26 — 多タブ視聴で描画が長時間止まる不具合を修正
 
-### その他 (7版)
+### その他 (3版)
+- `v0.1.1567` 2026-10-06 — 本家コメのチップに +N/分 を表示
 - `v0.1.1557` 2026-10-05 — 終了した放送の経過時間を正しく表示
 - `v0.1.1556` 2026-10-01 — /live/ に Kick の配信一覧(別欄)を準備
-- `v0.1.1548` 2026-09-26 — 配信詳細モーダルを一旦取り下げ
-- `v0.1.1546` 2026-09-26 — ライブビューの最初の表示を高速化
-- `v0.1.1542` 2026-09-24 — イベント未参加時の誤表示・文字化けタイトルを根治
-- `v0.1.1541` 2026-09-23 — マーケ分析に横断応援者ランキングを追加
-- `v0.1.1540` 2026-09-22 — 内部整理(表示や動作は変わりません)

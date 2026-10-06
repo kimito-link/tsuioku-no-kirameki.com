@@ -457,3 +457,108 @@ describe('鏡スリム化 B-2(書き手が匿名 data URL を落とす・v0.1.12
     expect(JSON.stringify(snap).length).toBeLessThan(64 * 1024);
   });
 });
+
+describe('鏡の stats(🎁📣💬・v0.1.1562 additive)', () => {
+  const withStats = (uid, stats) => ({ ...cell(uid, `https://cdn/${uid}.jpg`), stats });
+
+  it('stats を持つアイテムは鏡セルに {c,g,a}(非 null のみ)で載り、復元で LaneTileStats 形に戻る(round-trip)', () => {
+    const snap = buildLaneMirrorSnapshot({
+      liveId: 'lv1',
+      buckets: {
+        link: [withStats('1', { commentCount: 12, giftPt: 1200, adPt: null })],
+        gift: [], ad: [], konta: [], tanu: []
+      }
+    }, { nowMs: 1 });
+    expect(snap.link[0].stats).toEqual({ c: 12, g: 1200 });
+    const restored = restoreLaneMirrorBuckets(snap);
+    expect(restored.link[0].stats).toEqual({ commentCount: 12, giftPt: 1200, adPt: null });
+  });
+
+  it('stats が無い/全 null のセルは stats キーを持たない(容量・旧鏡と同じ形)', () => {
+    const snap = buildLaneMirrorSnapshot({
+      liveId: 'lv1',
+      buckets: {
+        link: [cell('1', 'https://cdn/1.jpg'), withStats('2', { commentCount: null, giftPt: null, adPt: null })],
+        gift: [], ad: [], konta: [], tanu: []
+      }
+    }, { nowMs: 1 });
+    expect('stats' in snap.link[0]).toBe(false);
+    expect('stats' in snap.link[1]).toBe(false);
+    const restored = restoreLaneMirrorBuckets(snap);
+    expect(restored.link[0].stats).toBeUndefined();
+  });
+
+  it('旧鏡(stats なし)を読んでも復元できる(S8 互換)', () => {
+    const restored = restoreLaneMirrorBuckets({
+      link: [{ displaySrc: 'https://cdn/1.jpg', title: 't', idLine: 'i', nameLine: 'n', userId: '1', recentTexts: [] }]
+    });
+    expect(restored.link[0].stats).toBeUndefined();
+    expect(restored.link[0].entry.userId).toBe('1');
+  });
+
+  it('stats は laneSceneContentHash を揺らさない(scene 一致判定は不変)', () => {
+    const base = { link: [cell('1', 'https://cdn/1.jpg')], gift: [], ad: [], konta: [], tanu: [] };
+    const a = restoreLaneMirrorBuckets(buildLaneMirrorSnapshot({ liveId: 'lv1', buckets: base }, { nowMs: 1 }));
+    const b = restoreLaneMirrorBuckets(buildLaneMirrorSnapshot({
+      liveId: 'lv1',
+      buckets: { ...base, link: [withStats('1', { commentCount: 99, giftPt: 5, adPt: 7 })] }
+    }, { nowMs: 1 }));
+    expect(laneSceneContentHash(b)).toBe(laneSceneContentHash(a));
+  });
+});
+
+describe('鏡の pulse(ギフト増分・v0.1.1565 additive)', () => {
+  const withPulse = (uid, pulse) => ({ ...cell(uid, `https://cdn/${uid}.jpg`), pulse });
+
+  it('pulse は {g,gt} で載り、復元で {giftDelta,giftTier} に戻る。無ければキー自体が無い', () => {
+    const snap = buildLaneMirrorSnapshot({
+      liveId: 'lv1',
+      buckets: {
+        link: [withPulse('1', { giftDelta: 500, giftTier: 'large' }), cell('2', 'https://cdn/2.jpg')],
+        gift: [], ad: [], konta: [], tanu: []
+      }
+    }, { nowMs: 1 });
+    expect(snap.link[0].pulse).toEqual({ g: 500, gt: 'large' });
+    expect('pulse' in snap.link[1]).toBe(false);
+    const r = restoreLaneMirrorBuckets(snap);
+    expect(r.link[0].pulse).toEqual({ giftDelta: 500, giftTier: 'large' });
+    expect(r.link[1].pulse).toBeUndefined();
+  });
+
+  it('増分0・不正な pulse は載せない', () => {
+    const snap = buildLaneMirrorSnapshot({
+      liveId: 'lv1',
+      buckets: { link: [withPulse('1', { giftDelta: 0 }), withPulse('2', 'x')], gift: [], ad: [], konta: [], tanu: [] }
+    }, { nowMs: 1 });
+    expect('pulse' in snap.link[0]).toBe(false);
+    expect('pulse' in snap.link[1]).toBe(false);
+  });
+
+  it('pulse は laneSceneContentHash を揺らさない', () => {
+    const base = { link: [cell('1', 'https://cdn/1.jpg')], gift: [], ad: [], konta: [], tanu: [] };
+    const a = restoreLaneMirrorBuckets(buildLaneMirrorSnapshot({ liveId: 'lv1', buckets: base }, { nowMs: 1 }));
+    const b = restoreLaneMirrorBuckets(buildLaneMirrorSnapshot({
+      liveId: 'lv1', buckets: { ...base, link: [withPulse('1', { giftDelta: 900, giftTier: 'mega' })] }
+    }, { nowMs: 1 }));
+    expect(laneSceneContentHash(b)).toBe(laneSceneContentHash(a));
+  });
+});
+
+describe('鏡の pulse に熱い人(heat)も載る(v0.1.1566)', () => {
+  it('{h,ht} で載り復元される。gift と同居できる', () => {
+    const it = (pulse) => ({ ...cell('1', 'https://cdn/1.jpg'), pulse });
+    const snap = buildLaneMirrorSnapshot({
+      liveId: 'lv1',
+      buckets: {
+        link: [it({ heat: 3, heatTier: 'medium' }), it({ giftDelta: 500, giftTier: 'large', heat: 7, heatTier: 'large' }), it({ heat: 0 })],
+        gift: [], ad: [], konta: [], tanu: []
+      }
+    }, { nowMs: 1 });
+    expect(snap.link[0].pulse).toEqual({ h: 3, ht: 'medium' });
+    expect(snap.link[1].pulse).toEqual({ g: 500, gt: 'large', h: 7, ht: 'large' });
+    expect('pulse' in snap.link[2]).toBe(false);
+    const r = restoreLaneMirrorBuckets(snap);
+    expect(r.link[0].pulse).toEqual({ heat: 3, heatTier: 'medium' });
+    expect(r.link[1].pulse).toEqual({ giftDelta: 500, giftTier: 'large', heat: 7, heatTier: 'large' });
+  });
+});

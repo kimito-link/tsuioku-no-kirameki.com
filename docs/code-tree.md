@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 8 / 880 件
+## ⚠️ 役割コメントが無いソース 8 / 884 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `scripts/build.mjs`
@@ -200,7 +200,7 @@
     - `2026-09-30.md`
     - `2026-10-01.md`
     - `2026-10-06.md`
-- 📁 **docs/** (342)
+- 📁 **docs/** (344)
   - 📁 **article-assets/** (87)
     - 📁 **venue-frames/** (12)
       - `f01.png`
@@ -312,7 +312,7 @@
     - `storage-bus.md`
     - `venue.md`
     - `web-status.md`
-  - 📁 **handoff/** (159)
+  - 📁 **handoff/** (161)
     - 📁 **bench/** (2)
       - `bench-interval.mjs` — ⚠️ 役割コメント無し
       - `bench-lane.mjs` — ⚠️ 役割コメント無し
@@ -395,6 +395,8 @@
     - `PLAN-live-ranking-components-2026-09-14.md`
     - `ROOT-CAUSE-CLAIM-RULE.md`
     - `VOICE-BASELINE-2026-08-11.md`
+    - `asset-import-DESIGN.md`
+    - `asset-import-IMPLEMENTATION-HANDOFF.md`
     - `clip-history-persistence-synthesis.md`
     - `comment-pickup-ticker-DESIGN.md`
     - `comment-pickup-ticker-IMPLEMENTATION-HANDOFF.md`
@@ -811,7 +813,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (1869)
+- 📁 **src/** (1879)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1089,7 +1091,7 @@
         - `logo_funlink_white_RGB_link_black.png`
         - `logo_funlink_white_RGB_maru_black.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1635)
+  - 📁 **lib/** (1645)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -1339,6 +1341,8 @@
     - `commentCountProvenance.test.js`
     - `commentDb.js` — v0.1.514: コメント本体の保存先を `chrome.storage.local`（値まるごと structured clone・
     - `commentDb.test.js`
+    - `commentDeltaTier.js` — コメント増分(件)の段階(葉モジュール・依存ゼロ)。
+    - `commentDeltaTier.test.js`
     - `commentEchoDetector.js` — L1 コメ伝染 + L5 コメ被り瞬間検出。
     - `commentEchoDetector.test.js`
     - `commentFatigue.js` — コメント疲労（「短い時間でコメントを打つと疲れて失速する」）をデータ化する純関数。
@@ -1778,6 +1782,8 @@
     - `laneDomSelfMeasure.js` — ⚠️ 役割コメント無し
     - `laneDomSelfMeasure.test.js`
     - `laneDomTileCount.probe.test.js`
+    - `laneHeatTracker.js` — 応援レーンの「熱い人」: 直近 60 秒にコメント件数が増えた人を見つける(純関数的な器・乱数もタイマーも無い)。
+    - `laneHeatTracker.test.js`
     - `laneMirror.js` — 応援レーンの「鏡」スナップショット純関数。popup がレーンを描いた buckets を、status が本物の
     - `laneMirror.test.js`
     - `laneMirrorContract.js` — `KEY_LANE_MIRROR`(応援レーンの鏡)の【契約の正本】。
@@ -1814,6 +1820,10 @@
     - `laneTileHistoryUsesDom.wiring.test.js`
     - `laneTileOscillation.js` — 【層】L0 判定層(純粋関数・I/O禁止)
     - `laneTileOscillation.test.js`
+    - `laneTilePresentation.parity.test.js`
+    - `laneTilePresentation.wiring.test.js`
+    - `laneTileStats.js` — 応援レーンのタイル 3 行目「🎁pt / 📣pt / 💬件」の合成(純関数・DOM 非依存)。
+    - `laneTileStats.test.js`
     - `laneWindowVerdict.js` — 【層】L0 判定層(純粋関数・I/O禁止)
     - `laneWindowVerdict.test.js`
     - `lastWatchUrlAdoption.js` — 【層】L0 判定層(純粋関数・I/O禁止)
@@ -2035,6 +2045,8 @@
     - `objectUrlRevokeQueue.test.js`
     - `observerTarget.js` — MutationObserver の監視ルートを決める（ニコ生コメントパネル優先）
     - `observerTarget.test.js`
+    - `officialCommentRate.js` — 公式「本家コメ」の件数から、いまの速さ(件/分)を出す(葉モジュール・依存ゼロ)。
+    - `officialCommentRate.test.js`
     - `officialContributionRankingResolver.js` — 公式貢献度ランキングの取得経路（Koken API / DOM bundle / iframe storage）から
     - `officialContributionRankingResolver.test.js`
     - `officialDomRankingRowsToStripRooms.js` — 公式イベント DOM バンドルの貢献度／広告ランキング行を、

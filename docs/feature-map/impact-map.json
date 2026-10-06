@@ -314,6 +314,24 @@
       ]
     },
     {
+      "file": "src/lib/timeAuthority.js",
+      "featureCount": 5,
+      "features": [
+        "content",
+        "live-ranking",
+        "popup",
+        "status",
+        "venue"
+      ],
+      "labels": [
+        "記録エンジン(watchページ常駐)",
+        "Web版 追憶のきらめき ランキング(/live/)",
+        "ポップアップ(応援レーン)",
+        "状態速報ページ",
+        "会場モード(standalone)"
+      ]
+    },
+    {
       "file": "src/lib/voiceDiagKey.js",
       "featureCount": 5,
       "features": [
@@ -476,6 +494,22 @@
       ]
     },
     {
+      "file": "src/lib/giftDeltaFallback.js",
+      "featureCount": 4,
+      "features": [
+        "content",
+        "live-ranking",
+        "popup",
+        "venue"
+      ],
+      "labels": [
+        "記録エンジン(watchページ常駐)",
+        "Web版 追憶のきらめき ランキング(/live/)",
+        "ポップアップ(応援レーン)",
+        "会場モード(standalone)"
+      ]
+    },
+    {
       "file": "src/lib/giftEffectDiagKey.js",
       "featureCount": 4,
       "features": [
@@ -552,6 +586,22 @@
         "記録エンジン(watchページ常駐)",
         "ポップアップ(応援レーン)",
         "状態速報ページ",
+        "会場モード(standalone)"
+      ]
+    },
+    {
+      "file": "src/lib/liveGiftPulse.js",
+      "featureCount": 4,
+      "features": [
+        "content",
+        "live-ranking",
+        "popup",
+        "venue"
+      ],
+      "labels": [
+        "記録エンジン(watchページ常駐)",
+        "Web版 追憶のきらめき ランキング(/live/)",
+        "ポップアップ(応援レーン)",
         "会場モード(standalone)"
       ]
     },
@@ -1156,20 +1206,6 @@
       ]
     },
     {
-      "file": "src/lib/giftDeltaFallback.js",
-      "featureCount": 3,
-      "features": [
-        "content",
-        "live-ranking",
-        "venue"
-      ],
-      "labels": [
-        "記録エンジン(watchページ常駐)",
-        "Web版 追憶のきらめき ランキング(/live/)",
-        "会場モード(standalone)"
-      ]
-    },
-    {
       "file": "src/lib/giftEffectDiag.js",
       "featureCount": 3,
       "features": [
@@ -1241,6 +1277,20 @@
     },
     {
       "file": "src/lib/laneSceneEnvelope.js",
+      "featureCount": 3,
+      "features": [
+        "content",
+        "popup",
+        "venue"
+      ],
+      "labels": [
+        "記録エンジン(watchページ常駐)",
+        "ポップアップ(応援レーン)",
+        "会場モード(standalone)"
+      ]
+    },
+    {
+      "file": "src/lib/laneTileStats.js",
       "featureCount": 3,
       "features": [
         "content",
@@ -1335,6 +1385,20 @@
         "記録エンジン(watchページ常駐)",
         "ページ傍受",
         "ポップアップ(応援レーン)"
+      ]
+    },
+    {
+      "file": "src/lib/officialDomRankingRowsToStripRooms.js",
+      "featureCount": 3,
+      "features": [
+        "content",
+        "popup",
+        "venue"
+      ],
+      "labels": [
+        "記録エンジン(watchページ常駐)",
+        "ポップアップ(応援レーン)",
+        "会場モード(standalone)"
       ]
     },
     {
@@ -1559,20 +1623,6 @@
         "記録エンジン(watchページ常駐)",
         "ポップアップ(応援レーン)",
         "会場モード(standalone)"
-      ]
-    },
-    {
-      "file": "src/lib/timeAuthority.js",
-      "featureCount": 3,
-      "features": [
-        "live-ranking",
-        "popup",
-        "status"
-      ],
-      "labels": [
-        "Web版 追憶のきらめき ランキング(/live/)",
-        "ポップアップ(応援レーン)",
-        "状態速報ページ"
       ]
     },
     {
@@ -2114,6 +2164,18 @@
       ],
       "labels": [
         "コメビュ(別窓)",
+        "ポップアップ(応援レーン)"
+      ]
+    },
+    {
+      "file": "src/lib/commentDeltaTier.js",
+      "featureCount": 2,
+      "features": [
+        "live-ranking",
+        "popup"
+      ],
+      "labels": [
+        "Web版 追憶のきらめき ランキング(/live/)",
         "ポップアップ(応援レーン)"
       ]
     },
@@ -5774,6 +5836,16 @@
       ]
     },
     {
+      "file": "src/lib/laneHeatTracker.js",
+      "featureCount": 1,
+      "features": [
+        "popup"
+      ],
+      "labels": [
+        "ポップアップ(応援レーン)"
+      ]
+    },
+    {
       "file": "src/lib/laneMirrorPerLivePublish.js",
       "featureCount": 1,
       "features": [
@@ -5861,16 +5933,6 @@
       ],
       "labels": [
         "ポップアップ(応援レーン)"
-      ]
-    },
-    {
-      "file": "src/lib/liveGiftPulse.js",
-      "featureCount": 1,
-      "features": [
-        "live-ranking"
-      ],
-      "labels": [
-        "Web版 追憶のきらめき ランキング(/live/)"
       ]
     },
     {
@@ -6544,7 +6606,7 @@
       ]
     },
     {
-      "file": "src/lib/officialDomRankingRowsToStripRooms.js",
+      "file": "src/lib/officialCommentRate.js",
       "featureCount": 1,
       "features": [
         "popup"

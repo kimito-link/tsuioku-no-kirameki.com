@@ -619,6 +619,7 @@ function _measuredSection(name, fn) {
 import {
   paintStoryUserLaneDomEmptyGuides,
   paintStoryUserLaneDomFilled,
+  syncStoryUserLaneStatsInPlace,
   resetStoryUserLaneDom, getStoryLaneRepaintCounts, getStoryLaneHollowCounts, shouldKeepStoryUserLaneTilesOnEmpty,
   // heavyRace再発の即効対策(HANDOFF-heavyrace-backfill-IMPL.md A): 暫定(heavy未settle)の短い候補で
   //   一度出た完全描画を上書き退化させない単調性ガード。
@@ -724,6 +725,18 @@ import { KEY_LANE_MIRROR } from '../lib/laneMirrorKey.js';
 import { publishLaneMirrorPerLive } from '../lib/laneMirrorPerLivePublish.js';
 import { KEY_PREVIEW_RENDER_ACK, buildPreviewRenderAck } from '../lib/previewRenderAckKey.js';
 import { buildLaneMirrorSnapshot, laneMirrorCapFromBuckets, restoreLaneMirrorBuckets } from '../lib/laneMirror.js';
+import {
+  attachLaneTilePulse,
+  attachLaneTileStats,
+  buildLaneTileStatsIndex,
+  giftPulseByUid,
+  heatPulseByUid,
+  mergeLanePulseMaps,
+  pulseRowsFromKokenRows
+} from '../lib/laneTileStats.js';
+import { createLaneHeatTracker } from '../lib/laneHeatTracker.js';
+import { createCommentRateTrack, formatCommentRate } from '../lib/officialCommentRate.js';
+import { createGiftPulseRegistry } from '../lib/liveGiftPulse.js';
 import { measureLaneDomSelf, perTierKeysOf } from '../lib/laneDomSelfMeasure.js';
 // v0.1.1284: ①実DOMのキー列指紋(会場が別ドキュメント起点で顔ぶれ一致を判定するために同梱)。
 import { laneDomFingerprint } from '../lib/laneSceneEnvelope.js';
@@ -6162,6 +6175,45 @@ function countStoryUserLaneDomTiles(els) {
   return n;
 }
 
+const _laneGiftPulse = createGiftPulseRegistry();
+/** v0.1.1566: 直近60秒にコメントが増えた人(初回観測はベースライン・窓は自然失効)。 */
+const _laneHeat = createLaneHeatTracker();
+/** koken 貢献度行を最後に取得した時刻(storage の capturedAt)。refreshNorthStarContributionRankingLaneAsync が更新する。 */
+let _kokenRowsCapturedAtMs = 0;
+/**
+ * v0.1.1562: タイル 3 行目(🎁📣💬)の値を【ここで 1 回だけ】合成して各段のアイテムに載せる。
+ *   ②会場・③別窓は再計算せず、鏡(nls_lane_mirror_v2)の additive な stats を読むだけ。
+ *   付加情報なので失敗してもレーン描画は止めない(素の buckets をそのまま返す)。
+ * @param {Record<string, any[]>} buckets
+ */
+function withLaneTileStats(buckets) {
+  try {
+    const withStats = attachLaneTileStats(buckets, buildLaneTileStatsIndex({
+      aggregates: STORY_SOURCE_STATE.laneAggregates,
+      kokenRows: _northStarMirrorLanes.contributionRanking,
+      nicoadRows: _northStarMirrorLanes.adRanking
+    }));
+    // v0.1.1565: ギフト増分(公式 koken の標本間差分)。標本時刻は koken storage の capturedAt(既存の読みで控えた値)。
+    //   同じ標本の再送には前回結果を返す=次の標本が来るまでバッジが残る。15分超の間隔は差分を出さない。
+    const gift = _laneGiftPulse.pulseFor(
+      STORY_SOURCE_STATE.liveId,
+      pulseRowsFromKokenRows(_northStarMirrorLanes.contributionRanking),
+      _kokenRowsCapturedAtMs
+    );
+    // v0.1.1566: 熱い人(直近60秒のコメント増分)。鏡 publish は sig 判定より前なので裏タブでも会場へ届く。
+    const heat = _laneHeat.observe(
+      STORY_SOURCE_STATE.liveId,
+      (Array.isArray(STORY_SOURCE_STATE.laneAggregates) ? STORY_SOURCE_STATE.laneAggregates : []).map(
+        (a) => ({ uid: String(/** @type {any} */ (a)?.userId || ''), commentCount: Number(/** @type {any} */ (a)?.commentCount) })
+      ),
+      Date.now()
+    );
+    return attachLaneTilePulse(withStats, mergeLanePulseMaps(giftPulseByUid(gift), heatPulseByUid(heat)));
+  } catch {
+    return buckets;
+  }
+}
+
 function renderStoryUserLane() {
   // ★v0.1.1048 Phase0(全員表示の重さ判定・観測のみ): この関数1回の所要msを計測して laneDiag に載せる。
   //   candidates 全件走査+sort+bucket+paint の合計。全員表示(limit撤廃)で重くなるかの実機ベースライン。
@@ -6399,6 +6451,8 @@ function renderStoryUserLane() {
     ? STORY_SOURCE_STATE.adThrowerPicks
     : [];
   buckets.ad = [...adPicks];
+  // v0.1.1562: 鍵(laneSig / picked)は従来の buckets から作る=stats では再描画しない。鏡と paint にだけ stats 付きを渡す。
+  const bucketsWithStats = withLaneTileStats(buckets);
 
   const laneSig = storyUserLaneRenderSignature(
     liveId,
@@ -6436,7 +6490,7 @@ function renderStoryUserLane() {
   _lanePublishSkipDiag.lastPublishAt = Date.now();
   publishLaneMirror({
     liveId,
-    buckets,
+    buckets: bucketsWithStats,
     domSelf: _laneDomSelfLast,
     pickedLength: picked.length + buckets.gift.length + buckets.ad.length,
     // ★v0.1.1232: 名簿復活者を含む総数。③は cap 48 で切るため差分は鏡フッターが宣言する。
@@ -6450,6 +6504,7 @@ function renderStoryUserLane() {
     });
     // v0.1.1021: re-render skip でも描画済みなら幕を畳む(独立tick高頻度の sig 一致で幕畳みに到達せず残るのを根治)。
     if (countStoryUserLaneDomTiles(els) > 0) { try { dismissInitialLoadShade(); } catch { /* no-op */ } }
+    syncStoryUserLaneStatsInPlace(els, bucketsWithStats); // v0.1.1562: 描かない経路でも stats だけ追従
     return;
   }
   // ★描画単調性ガード(HANDOFF-heavyrace A-3): 暫定 supply が完全描画を短い候補で上書きするのを防ぐ。
@@ -6480,6 +6535,7 @@ function renderStoryUserLane() {
       domTilesPainted: countStoryUserLaneDomTiles(els)
     });
     if (countStoryUserLaneDomTiles(els) > 0) { try { dismissInitialLoadShade(); } catch { /* no-op */ } }
+    syncStoryUserLaneStatsInPlace(els, bucketsWithStats); // v0.1.1562: 縮小ガードで描かない経路
     return;
   }
   storyUserLaneLastRenderSig = laneSig;
@@ -6498,7 +6554,7 @@ function renderStoryUserLane() {
   const laneDisplayedTotal = picked.length + buckets.gift.length + buckets.ad.length;
   // 2026-07-14(Patch 2): 候補総数を渡し、切られたぶんは「ほか M人」と誠実に併記する(黙って切らない)。
   //   ★v0.1.1232: ①は上限撤廃で通常「ほか M人」は出ない(全員表示)が、器は③鏡(cap 48)の宣言に必要。
-  paintStoryUserLaneDomFilled(els, faces, buckets, laneDisplayedTotal, laneDomIo, {
+  paintStoryUserLaneDomFilled(els, faces, bucketsWithStats, laneDisplayedTotal, laneDomIo, {
     totalCandidates: rosteredCandidates.length
   });
   // C1: paint と同じ同期フレームで①実DOMを測り、後段の鏡publishへ渡す(TOCTOU防止)。
@@ -6617,6 +6673,7 @@ async function applyLaneMirrorForPassive() {
   //   中身同じでも再描画→innerHTML='' で要素が一瞬消えてチカチカしていた。件数だけで中身変化は検知できる。
   const sig = `${String(snap.liveId || '')}|${buckets.link.length}|${buckets.gift.length}|${buckets.ad.length}|${buckets.konta.length}|${buckets.tanu.length}|${pickedLength}|${totalCandidates}`;
   if (sig === _laneMirrorPassiveSig) {
+    syncStoryUserLaneStatsInPlace(els, buckets); // v0.1.1562: 鏡 skip(描かない経路)でも stats だけ追従(鏡は①が書いた値)
     // 自己診断: 鏡に変化なし＝再 paint しないが DOM は前回の描画済み（=完了扱い・現 DOM 件数）。
     recordStoryUserLaneStep(_storyUserLaneRenderProbe, STORY_USER_LANE_STEPS.DONE, {
       domTilesPainted: countStoryUserLaneDomTiles(els)
@@ -9046,6 +9103,10 @@ function watchMetaSnapshotMergedWithBundleProgramStats(snapshot) {
  * snapshot が null / liveId 不明のときは「—」プレースホルダに戻す。
  * @param {Record<string, unknown>|null|undefined} snapshot
  */
+/** v0.1.1567: 公式「本家コメ」の速さ(件/分)。2 つの実測の差だけを使う(補間しない)。配信が変わったら捨てる。 */
+const _officialCommentRate = createCommentRateTrack();
+let _officialCommentRateLid = '';
+
 function paintOfficialNicoStatsStrip(snapshot) {
   /** @param {string} id @param {{ text: string, isPlaceholder: boolean }} chip */
   const applyChip = (id, chip) => {
@@ -9062,9 +9123,19 @@ function paintOfficialNicoStatsStrip(snapshot) {
     'officialStatNicoAdPts',
     'officialStatNicoGiftPts'
   ];
+  const RATE_ID = 'officialStatNicoCommentsRate';
+  const RATE_PH = { text: '', isPlaceholder: true };
   if (!snapshot || !String(snapshot.liveId || '').trim()) {
     for (const id of ids) applyChip(id, PH);
+    applyChip(RATE_ID, RATE_PH);
+    _officialCommentRate.reset();
+    _officialCommentRateLid = '';
     return;
+  }
+  const rateLid = String(snapshot.liveId || '').trim().toLowerCase();
+  if (rateLid !== _officialCommentRateLid) {
+    _officialCommentRate.reset(); // 別配信の件数との差を速度にしない
+    _officialCommentRateLid = rateLid;
   }
   // niconico の watch ページ DOM から取れた正本値を最優先で snapshot に焼き込む。
   // niconico 側プレイヤーの「3,266」「1,060」等がリアルタイムで data-value に入っており
@@ -9091,10 +9162,17 @@ function paintOfficialNicoStatsStrip(snapshot) {
   const digest = buildOfficialNicoStatsStripDigest(augmented);
   if (!digest) {
     for (const id of ids) applyChip(id, PH);
+    applyChip(RATE_ID, RATE_PH);
     return;
   }
   applyChip('officialStatNicoViewers', digest.viewers);
   applyChip('officialStatNicoComments', digest.comments);
+  // v0.1.1567: 本家コメの速さ「+66/分」。標本は【値が変わったときだけ】(同値の再描画では積まない)。出せない間は空。
+  if (!digest.comments.isPlaceholder && typeof augmented.officialCommentCount === 'number') {
+    _officialCommentRate.push(augmented.officialCommentCount, Date.now());
+  }
+  const rateText = digest.comments.isPlaceholder ? '' : formatCommentRate(_officialCommentRate.ratePerMin(Date.now()));
+  applyChip(RATE_ID, { text: rateText, isPlaceholder: rateText === '' });
   applyChip('officialStatNicoStreamAge', digest.streamAge);
   applyChip('officialStatNicoAdPts', digest.adPts);
   applyChip('officialStatNicoGiftPts', digest.giftPts);
@@ -11661,10 +11739,9 @@ async function refreshNorthStarContributionRankingLaneAsync(liveId) {
     // 縦リスト専用 host class が前回付いていたら剥がしてから横カードへ切替。
     body.classList.remove('nl-contrib-ranking-list-host');
     // v0.1.393: 鮮度表示。koken API は 30 秒間隔で自動更新されるので autoRefreshing。
-    const freshnessNote = formatCardFreshnessNote(
-      await readCardCapturedAtMs(kokenContribStorageKey(String(liveId || '').trim().toLowerCase())),
-      { autoRefreshing: true }
-    );
+    const kokenCapturedAt = await readCardCapturedAtMs(kokenContribStorageKey(String(liveId || '').trim().toLowerCase()));
+    _kokenRowsCapturedAtMs = Number(kokenCapturedAt) || 0; // v0.1.1565: ギフト増分の標本時刻(以降 publish まで同期処理)
+    const freshnessNote = formatCardFreshnessNote(kokenCapturedAt, { autoRefreshing: true });
     paintTopSupportRankStyleIntoElement(body, rooms, {
       noteText: '公式の貢献度ランキング（niconico の表示に準拠）',
       unitSuffix: '貢',

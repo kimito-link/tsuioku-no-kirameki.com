@@ -147,6 +147,31 @@ describe('composeVenueLaneBuckets', () => {
     expect(Object.keys(out)).toEqual(['buckets']);
   });
 
+  it('stats を落とさない(個別列挙の穴の回帰ガード・v0.1.1562)', () => {
+    const stats = { commentCount: 4, giftPt: 300, adPt: null };
+    const mb = {
+      link: [{ displaySrc: 'https://x/10.jpg', title: 't', meta: { idLine: '10', nameLine: 'n' }, entry: { userId: '10' }, stats }],
+      gift: [], ad: [], konta: [], tanu: []
+    };
+    const out = composeVenueLaneBuckets({ mirrorBuckets: mb, seatIndexByUid });
+    expect(out.buckets.link[0].stats).toEqual(stats);
+  });
+
+  it('stats の無いセルには stats キーが生えない(今日と同じ形)', () => {
+    const out = composeVenueLaneBuckets({ mirrorBuckets, seatIndexByUid });
+    expect(out.buckets.link[0].stats).toBeUndefined();
+  });
+
+  it('pulse を落とさない(個別列挙の穴の回帰ガード・v0.1.1565)', () => {
+    const pulse = { giftDelta: 500, giftTier: 'large' };
+    const mb = {
+      link: [{ displaySrc: 'https://x/10.jpg', title: 't', meta: { idLine: '10', nameLine: 'n' }, entry: { userId: '10' }, pulse }],
+      gift: [], ad: [], konta: [], tanu: []
+    };
+    const out = composeVenueLaneBuckets({ mirrorBuckets: mb, seatIndexByUid });
+    expect(out.buckets.link[0].pulse).toEqual(pulse);
+  });
+
   it('段は鏡の中身をそのまま反映する(①がtanuに匿名を持てば会場のtanuにも同じ人が出る=完全一致)', () => {
     const out = composeVenueLaneBuckets({ mirrorBuckets, seatIndexByUid });
     expect(out.buckets.link.map((i) => i.entry.userId)).toEqual(['10', '20']);

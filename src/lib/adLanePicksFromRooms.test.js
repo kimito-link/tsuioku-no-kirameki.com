@@ -16,6 +16,20 @@ describe('adLanePicksFromRooms', () => {
     expect(out[0].meta.idLine).toBe('広告');
   });
 
+  it('広告ptを stats.adPt に載せる(uid 無し広告主にも・v0.1.1562)', () => {
+    const out = adLanePicksFromRooms(
+      [
+        { userKey: '144514252', nickname: 'ゲスト', count: 97633, rankHint: 1 },
+        { userKey: '__anon_ad_1', nickname: '伊藤福島', count: 30326, rankHint: 2 },
+        { userKey: '555', nickname: 'ゼロ', count: 0 }
+      ],
+      io
+    );
+    expect(out[0].stats).toEqual({ commentCount: null, giftPt: null, adPt: 97633 });
+    expect(out[1].stats).toEqual({ commentCount: null, giftPt: null, adPt: 30326 });
+    expect(out[2].stats).toBeUndefined(); // 0pt は 0 を捏造せず付けない
+  });
+
   it('ID無し広告(合成キー)も advertiserName で載せる(会議確定: 広告は全員表示)', () => {
     const out = adLanePicksFromRooms(
       [{ userKey: '__anon_ad_1', nickname: '伊藤福島', count: 30326, rankHint: 2 }],
