@@ -703,6 +703,7 @@
 | `src/lib/numberConsistency.js` | 1 | 状態速報ページ |
 | `src/lib/objectUrlRevokeQueue.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/observerTarget.js` | 1 | 記録エンジン(watchページ常駐) |
+| `src/lib/officialCommentRate.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/officialEventDomBundle.js` | 1 | 記録エンジン(watchページ常駐) |
 | `src/lib/officialEventRankChange.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/officialEventRankSoundEffect.js` | 1 | ポップアップ(応援レーン) |

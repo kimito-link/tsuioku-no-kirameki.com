@@ -18,6 +18,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1567',
+    date: '2026-10-06',
+    summary: '本家コメのチップに +N/分 を表示',
+    items: Object.freeze([
+      '配信画面の「本家コメ」の数字の隣に、いまのコメントの速さを「+66/分」のように小さく出すようにしました。公式のコメント数を2回(20秒以上あけて)測った差だけを使うので、間を作り話で埋めることはありません。測れるまでの間は何も出さず、配信が切り替わったら測り直します。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1566',
     date: '2026-10-06',
     summary: '直近60秒に熱い人へ +N件 バッジ',
@@ -167,14 +175,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     summary: '配信詳細モーダルを一旦取り下げ',
     items: Object.freeze([
       '前バージョンで追加した「詳しく見る」ボタンと詳細モーダルは、内容が一覧の拡大表示に留まり体験として不十分だったため、いったん取り下げました。'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.1546',
-    date: '2026-09-26',
-    summary: 'ライブビューの最初の表示を高速化',
-    items: Object.freeze([
-      'ライブビュー(/live/)を開いた瞬間、まず手元にある最新の集計をすぐに表示し、その裏で新しい集計に更新するようにしました。「読み込み中…」で待たされる時間が短くなります。'
     ])
   })
 ]);

@@ -2819,6 +2819,20 @@
         color: var(--nl-muted);
       }
 
+      /* v0.1.1567: 本家コメの速さ「+66/分」(2 つの公式実測の差)。出せない間は span ごと隠す=チップの幅を取らない。 */
+      .nl-official-nico-stats__rate {
+        margin-left: 4px;
+        font-size: 0.74em;
+        font-weight: 700;
+        color: var(--nl-lane-pulse-hot);
+        font-variant-numeric: tabular-nums;
+        white-space: nowrap;
+      }
+
+      .nl-official-nico-stats__rate.is-placeholder {
+        display: none;
+      }
+
       .nl-live-stat-card {
         position: relative;
         display: flex;
@@ -11216,6 +11230,7 @@
           <div class="nl-official-nico-stats__chip">
             <span class="nl-official-nico-stats__label">本家コメ</span>
             <span class="nl-official-nico-stats__val is-placeholder" id="officialStatNicoComments">—</span>
+            <span class="nl-official-nico-stats__rate is-placeholder" id="officialStatNicoCommentsRate" aria-live="off"></span>
           </div>
           <div class="nl-official-nico-stats__chip">
             <span class="nl-official-nico-stats__label">経過</span>

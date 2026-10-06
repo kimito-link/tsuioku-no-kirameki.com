@@ -24,6 +24,14 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.1546',
+    date: '2026-09-26',
+    summary: 'ライブビューの最初の表示を高速化',
+    items: Object.freeze([
+      'ライブビュー(/live/)を開いた瞬間、まず手元にある最新の集計をすぐに表示し、その裏で新しい集計に更新するようにしました。「読み込み中…」で待たされる時間が短くなります。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1545',
     date: '2026-09-26',
     summary: 'ライブビューの応援した人の取りこぼしを修正',

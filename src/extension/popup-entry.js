@@ -735,6 +735,7 @@ import {
   pulseRowsFromKokenRows
 } from '../lib/laneTileStats.js';
 import { createLaneHeatTracker } from '../lib/laneHeatTracker.js';
+import { createCommentRateTrack, formatCommentRate } from '../lib/officialCommentRate.js';
 import { createGiftPulseRegistry } from '../lib/liveGiftPulse.js';
 import { measureLaneDomSelf, perTierKeysOf } from '../lib/laneDomSelfMeasure.js';
 // v0.1.1284: ①実DOMのキー列指紋(会場が別ドキュメント起点で顔ぶれ一致を判定するために同梱)。
@@ -9102,6 +9103,10 @@ function watchMetaSnapshotMergedWithBundleProgramStats(snapshot) {
  * snapshot が null / liveId 不明のときは「—」プレースホルダに戻す。
  * @param {Record<string, unknown>|null|undefined} snapshot
  */
+/** v0.1.1567: 公式「本家コメ」の速さ(件/分)。2 つの実測の差だけを使う(補間しない)。配信が変わったら捨てる。 */
+const _officialCommentRate = createCommentRateTrack();
+let _officialCommentRateLid = '';
+
 function paintOfficialNicoStatsStrip(snapshot) {
   /** @param {string} id @param {{ text: string, isPlaceholder: boolean }} chip */
   const applyChip = (id, chip) => {
@@ -9118,9 +9123,19 @@ function paintOfficialNicoStatsStrip(snapshot) {
     'officialStatNicoAdPts',
     'officialStatNicoGiftPts'
   ];
+  const RATE_ID = 'officialStatNicoCommentsRate';
+  const RATE_PH = { text: '', isPlaceholder: true };
   if (!snapshot || !String(snapshot.liveId || '').trim()) {
     for (const id of ids) applyChip(id, PH);
+    applyChip(RATE_ID, RATE_PH);
+    _officialCommentRate.reset();
+    _officialCommentRateLid = '';
     return;
+  }
+  const rateLid = String(snapshot.liveId || '').trim().toLowerCase();
+  if (rateLid !== _officialCommentRateLid) {
+    _officialCommentRate.reset(); // 別配信の件数との差を速度にしない
+    _officialCommentRateLid = rateLid;
   }
   // niconico の watch ページ DOM から取れた正本値を最優先で snapshot に焼き込む。
   // niconico 側プレイヤーの「3,266」「1,060」等がリアルタイムで data-value に入っており
@@ -9147,10 +9162,17 @@ function paintOfficialNicoStatsStrip(snapshot) {
   const digest = buildOfficialNicoStatsStripDigest(augmented);
   if (!digest) {
     for (const id of ids) applyChip(id, PH);
+    applyChip(RATE_ID, RATE_PH);
     return;
   }
   applyChip('officialStatNicoViewers', digest.viewers);
   applyChip('officialStatNicoComments', digest.comments);
+  // v0.1.1567: 本家コメの速さ「+66/分」。標本は【値が変わったときだけ】(同値の再描画では積まない)。出せない間は空。
+  if (!digest.comments.isPlaceholder && typeof augmented.officialCommentCount === 'number') {
+    _officialCommentRate.push(augmented.officialCommentCount, Date.now());
+  }
+  const rateText = digest.comments.isPlaceholder ? '' : formatCommentRate(_officialCommentRate.ratePerMin(Date.now()));
+  applyChip(RATE_ID, { text: rateText, isPlaceholder: rateText === '' });
   applyChip('officialStatNicoStreamAge', digest.streamAge);
   applyChip('officialStatNicoAdPts', digest.adPts);
   applyChip('officialStatNicoGiftPts', digest.giftPts);
