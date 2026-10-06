@@ -24,6 +24,14 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.1542',
+    date: '2026-09-24',
+    summary: 'イベント未参加時の誤表示・文字化けタイトルを根治',
+    items: Object.freeze([
+      'イベントに参加していない配信で、順位やスコアが誤って表示されたり、文字化けしたイベント名が出ることがある不具合を修正しました。公式のイベント参加が確認できる時だけ表示するようにしています。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1541',
     date: '2026-09-23',
     summary: 'マーケ分析に横断応援者ランキングを追加',

@@ -100,3 +100,22 @@ describe('鍵を揺らさない(ちらつき対策 6 版の保護)', () => {
     expect(paritySrc).not.toMatch(/\bstats\b|\bpulse\b/);
   });
 });
+
+describe('識別絵(匿名の identicon)は点線枠(v0.1.1564・/live/ の視覚言語)', () => {
+  const ruleBody = (src, selectorRe) => {
+    const m = selectorRe.exec(src);
+    expect(m, `規則が見つからない: ${selectorRe}`).not.toBeNull();
+    return src.slice(m.index, src.indexOf('}', m.index));
+  };
+  it('popup.html の [data-thumb="0"] アバター規則に border-style: dashed がある(寸法は書かない)', () => {
+    const body = ruleBody(popupHtml, /\.nl-story-userlane-cell\[data-thumb="0"\] \.nl-story-userlane-avatar \{/);
+    expect(body).toContain('border-style: dashed;');
+  });
+  it('venueBar.js の LANE_CSS_SYNC 区間の同規則にも border-style: dashed がある', () => {
+    const begin = venueBarSrc.indexOf('/* LANE_CSS_SYNC_BEGIN');
+    const end = venueBarSrc.indexOf('/* LANE_CSS_SYNC_END */');
+    const sync = venueBarSrc.slice(begin, end);
+    const body = ruleBody(sync, /\.nlsb-venue-lane-stack \.nl-story-userlane-cell\[data-thumb="0"\] \.nl-story-userlane-avatar \{/);
+    expect(body).toContain('border-style: dashed;');
+  });
+});

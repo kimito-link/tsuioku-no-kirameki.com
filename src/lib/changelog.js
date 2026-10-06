@@ -18,6 +18,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1564',
+    date: '2026-10-06',
+    summary: '匿名の識別絵を点線の枠で表示',
+    items: Object.freeze([
+      '応援レーンで、実際の写真ではなく自動生成された識別用の絵(匿名の人のアイコン)になっているタイルの丸い枠を点線にしました。本物のサムネイルとひと目で区別できます。大きさや並びは変わりません。会場モード・応援プレビューも同じです。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1563',
     date: '2026-10-06',
     summary: '案内帯の見出しに各段の人数を表示',
@@ -168,14 +176,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     summary: '多タブ視聴で描画が長時間止まる不具合を修正',
     items: Object.freeze([
       '同じ配信を複数タブで同時に見ているとき、まれに画面の描画が数分間止まって見えることがある不具合を修正しました。'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.1542',
-    date: '2026-09-24',
-    summary: 'イベント未参加時の誤表示・文字化けタイトルを根治',
-    items: Object.freeze([
-      'イベントに参加していない配信で、順位やスコアが誤って表示されたり、文字化けしたイベント名が出ることがある不具合を修正しました。公式のイベント参加が確認できる時だけ表示するようにしています。'
     ])
   })
 ]);
