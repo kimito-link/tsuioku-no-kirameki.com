@@ -480,6 +480,36 @@ async function main() {
 
   // 3. 採用中ラインナップの健康診断（カタログ消滅の逆方向検知・§2-5）
   const health = { ...(state.adoptedHealth || {}) };
+
+  // ★★2026-10-06 追加: LINEUPから消えたモデルの health キーを掃除する。
+  //  実損: 2026-10-01 に `openrouter/ling-3.0-flash` の rawId を
+  //  `-fin:free`（有料化で死亡）→ `-sante:free` へ差し替えたが、**古いキー
+  //  `openrouter:inclusionai/ling-3.0-flash-fin:free` が state に残り続けた**
+  //  （`{streakDays:2, lastFailDate:"2026-10-01"}`＝差し替え後は更新されない孤児）。
+  //  ★既存の `delete health[key]` は**モデルが復活したときだけ**走る設計なので、
+  //   「LINEUPから消えた／rawIdが変わった」経路では永久に残る。
+  //  ★今回は日報に警告として出ていなかったが（警告は LINEUP を回す側で作るため）、
+  //   state が実態と食い違ったまま育つと、後から読んだ人間/AIが
+  //   「まだ ling-fin を積んでいる」と誤読する。記録済みの地雷
+  //   「scoutのhealth mapは復帰時しかdeleteしないので、stale keyが幻のアラートを鳴らす」
+  //   と同じ構図なので、ここで構造的に潰す。
+  //  ★掃除の基準は「現行 LINEUP から作れるキーに含まれないもの」。
+  //   カタログ照合キー `provider:rawId` と実疎通キー `provider:apiModel:probe` の
+  //   両方を作る（下のループが使う2形式と必ず一致させること）。
+  {
+    const validKeys = new Set();
+    for (const e of LINEUP) {
+      if (e.rawId) validKeys.add(`${e.provider}:${e.rawId}`);
+      validKeys.add(`${e.provider}:${e.apiModel}:probe`);
+    }
+    for (const k of Object.keys(health)) {
+      if (!validKeys.has(k)) {
+        delete health[k];
+        console.error(`[scout] stale health キーを掃除: ${k}（現行LINEUPに無い）`);
+      }
+    }
+  }
+
   const healthAlerts = [];
   let catalogCheckedCount = 0;
   let liveProbeCheckedCount = 0;
