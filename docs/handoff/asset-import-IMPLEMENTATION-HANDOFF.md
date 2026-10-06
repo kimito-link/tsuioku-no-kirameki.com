@@ -27,7 +27,7 @@
 | **1569 (MVP)** | `popup.html` と `app/live-view.html` に `/* LANE_CSS_SYNC_SRC_BEGIN */` `/* LANE_CSS_SYNC_SRC_END */` を足す(コメント2行・**CSSの位置は動かさない**)。`venueBar.js:1162` の「popup.html:1037-1320」手書き行番号をマーカー参照に直す。新規 `src/lib/laneCssSync.parity.test.js`(3区間の**セレクタ集合・`--nl-lane-*` トークン名集合・`@keyframes` 名集合・reduced-motion で animation:none のクラス集合**を照合・値は比較しない) | 不変 |
 | 1570 | `src/lib/laneImportContract.js`(テストだけが読む定数)+鏡キー集合の完全一致テスト+既存 `laneTilePresentation.wiring.test.js` の toContain 4ブロックを契約ループへ置換(行数が減る)+同一人物性の入れ替え fixture テスト(DESIGN D-1) | 不変 |
 | 1571 | `renderStoryUserLaneDom.js` に `skipStoryUserLanePaint()` を足し、popup-entry の「描かない3経路」の直接 sync 呼び出し3つを置換(**行数不変**)。wiring は `syncStoryUserLaneStatsInPlace(`=0件・`skipStoryUserLanePaint(`=3件に | 不変 |
-| 1572〜 | 既知弱点の修正(下記 §4)。**各々、実機で症状確認 or 単体テストで固定してから** | 修正 |
+| 1572〜 | 既知弱点の修正(下記 §4)。**各々、実機で症状確認 or 単体テストで固定してから**。再会議(DESIGN 追記)により、速度の固着→熱い人の窓超えの順で、1569〜1571 より先に出してもよい(単体テストで固定できるため) | 修正 |
 
 文字列スキャン型テストの脆さ(`laneContentLod.wiring.test.js:54-60` の `indexOf('continue;')`)は 1570 で `sliceFunction()`(`src/lib/testSrcSlice.js`・10行)に直す。
 
