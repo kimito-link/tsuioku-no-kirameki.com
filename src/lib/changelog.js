@@ -18,6 +18,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1572',
+    date: '2026-10-06',
+    summary: '内部: 描かない経路の入口を1本化',
+    items: Object.freeze([
+      '画面の見た目は変わりません。応援レーンの数字を「描き直さずに更新する」経路の呼び方を1つにまとめ、足し忘れを自動検査が見つけやすい形にしました(内部の整理)。あわせて、内部検査の1つが別の関数の書き方に引きずられて赤くなる弱点も直しました。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1571',
     date: '2026-10-06',
     summary: '内部: 輸入項目の取りこぼし検査を追加',
@@ -167,14 +175,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     summary: '/live/ 脈拍レーンに応援者の名前とサムネ',
     items: Object.freeze([
       'ライブビュー(/live/)の脈拍レーンに、丸いサムネと名前つきのチップを流し「誰が応援したか」が見えるようにしました。コメント本文は表示していません。'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.1552',
-    date: '2026-09-30',
-    summary: '/live/ コメント速度の脈拍レーンを追加',
-    items: Object.freeze([
-      'ライブビュー(/live/)の番組合計コメント数を実測値の間でなめらかに表示し、実測2点から求めた速度と脈拍レーンを添えました。個人別の値やコメント本文は動かしていません。'
     ])
   })
 ]);
