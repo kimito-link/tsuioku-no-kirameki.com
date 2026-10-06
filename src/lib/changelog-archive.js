@@ -24,6 +24,14 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.1548',
+    date: '2026-09-26',
+    summary: '配信詳細モーダルを一旦取り下げ',
+    items: Object.freeze([
+      '前バージョンで追加した「詳しく見る」ボタンと詳細モーダルは、内容が一覧の拡大表示に留まり体験として不十分だったため、いったん取り下げました。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1546',
     date: '2026-09-26',
     summary: 'ライブビューの最初の表示を高速化',

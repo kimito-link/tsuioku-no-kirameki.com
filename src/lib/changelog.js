@@ -18,6 +18,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1568',
+    date: '2026-10-06',
+    summary: '更新の追従で別の人の数字を貼らない',
+    items: Object.freeze([
+      '応援レーンの数字(🎁📣💬・増分バッジ)を、画面を描き直さずに更新する場面で、同じ人数でも顔ぶれが入れ替わっていた場合に別の人の数字を貼ってしまう可能性があったため、同じ人のタイルにだけ書くようにしました。通常の表示は変わりません。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1567',
     date: '2026-10-06',
     summary: '本家コメのチップに +N/分 を表示',
@@ -167,14 +175,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     summary: '/live/ ギフト増分を+ptで表示',
     items: Object.freeze([
       'ライブビュー(/live/)のギフト順位表で、前回取得から増えたポイントを「+Npt」として表示するようにしました。増分が大きい人ほど帯の色が濃くなります。'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.1548',
-    date: '2026-09-26',
-    summary: '配信詳細モーダルを一旦取り下げ',
-    items: Object.freeze([
-      '前バージョンで追加した「詳しく見る」ボタンと詳細モーダルは、内容が一覧の拡大表示に留まり体験として不十分だったため、いったん取り下げました。'
     ])
   })
 ]);
