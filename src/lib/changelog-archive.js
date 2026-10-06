@@ -24,6 +24,14 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.1554',
+    date: '2026-09-30',
+    summary: '脈拍レーン: いま話している人を強調',
+    items: Object.freeze([
+      'ライブビュー(/live/)の脈拍レーンで、直近でコメントが増えた人を大きく・繰り返し表示するようにしました。件数のみで、コメント本文は表示していません。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1553',
     date: '2026-09-30',
     summary: '/live/ 脈拍レーンに応援者の名前とサムネ',

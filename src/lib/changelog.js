@@ -18,6 +18,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1574',
+    date: '2026-10-06',
+    summary: '裏タブでも熱い人バッジが出るように',
+    items: Object.freeze([
+      '配信ページを裏のタブにして会場モードだけ見ているとき、ブラウザが処理を約1分に1回へ間引くため「+3件」の熱い人バッジが出なくなる可能性があったのを直しました(確認は未実施の見込みの修正です)。画面を長く(約3分以上)見ていなかった後は、溜まった分を一斉に光らせないよう従来どおり測り直します。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1573',
     date: '2026-10-06',
     summary: '本家コメの速さが古い値で止まらない',
@@ -167,14 +175,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     summary: '脈拍レーンが開いた直後から動くように修正',
     items: Object.freeze([
       'ライブビュー(/live/)の脈拍レーンが、実測データが2回届くまで(数分〜十数分)動かなかった不具合を修正しました。配信開始からの平均速度で開いた直後から動くようにしています。'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.1554',
-    date: '2026-09-30',
-    summary: '脈拍レーン: いま話している人を強調',
-    items: Object.freeze([
-      'ライブビュー(/live/)の脈拍レーンで、直近でコメントが増えた人を大きく・繰り返し表示するようにしました。件数のみで、コメント本文は表示していません。'
     ])
   })
 ]);

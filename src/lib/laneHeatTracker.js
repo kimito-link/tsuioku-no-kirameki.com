@@ -5,8 +5,13 @@
  *   ・初回観測(その人を初めて見た時)はベースライン=光らせない。/live/ の「増えた行だけ光る」と同じ規律。
  *   ・減少は無視(基準だけ更新)。外部値は減ることがある(AGENTS §3.6)。
  *   ・窓(windowMs)を過ぎた増分は、次の observe で自然に失効する(タイマーを持たない)。
- *   ・観測の間隔が窓を超えた(裏タブ・停止からの復帰)ときと liveId が変わったときは基準を取り直す。
- *     溜まった増分を「いま増えた」と見せて一斉にバーストさせない。
+ *   ・観測の間隔が rebaseGapMs(既定=窓の3倍=180秒)を超えた(長い裏タブ・停止からの復帰)ときと liveId が
+ *     変わったときは基準を取り直す。溜まった増分を「いま増えた」と見せて一斉にバーストさせない。
+ *     ★v0.1.1574: 取り直しの閾値を窓(60秒)そのものにしていた旧版は、裏タブの setTimeout が約1分に1回へ
+ *       クランプされる(実測の配達平均 47,686ms でゆらぐ)環境で観測が60秒を超えるたびに全リセットされ、
+ *       会場を開いた裏タブでは「熱い人」が原理的に出なかった。窓=増分を表示し続ける長さ、
+ *       rebaseGapMs=その増分を「直近」とみなせる観測間隔の上限、と役割を分けた。
+ *       (窓超えで events だけ空にして prev を更新する案は、全リセットと同じ出力になるため効かない)
  *   ・rows から消えた人は窓を過ぎたら忘れる。1人あたりのイベント数には上限を置く。
  */
 import { tierForCommentDelta } from './commentDeltaTier.js';
@@ -14,11 +19,12 @@ import { tierForCommentDelta } from './commentDeltaTier.js';
 export const LANE_HEAT_WINDOW_MS = 60_000;
 
 /**
- * @param {{ windowMs?: number, maxEventsPerUid?: number }} [opts]
+ * @param {{ windowMs?: number, maxEventsPerUid?: number, rebaseGapMs?: number }} [opts]
  */
 export function createLaneHeatTracker(opts = {}) {
   const windowMs = Number(opts.windowMs) > 0 ? Number(opts.windowMs) : LANE_HEAT_WINDOW_MS;
   const maxEvents = Number(opts.maxEventsPerUid) > 0 ? Math.floor(Number(opts.maxEventsPerUid)) : 8;
+  const rebaseGapMs = Number(opts.rebaseGapMs) > 0 ? Number(opts.rebaseGapMs) : windowMs * 3;
   let liveId = '';
   let lastAt = 0;
   /** @type {Map<string, { prev: number, events: Array<{ at: number, d: number }>, seenAt: number }>} */
@@ -34,7 +40,7 @@ export function createLaneHeatTracker(opts = {}) {
     observe(lid, rows, nowMs) {
       const id = String(lid || '');
       const now = Number(nowMs) || 0;
-      if (id !== liveId || (lastAt && (now < lastAt || now - lastAt > windowMs))) users = new Map();
+      if (id !== liveId || (lastAt && (now < lastAt || now - lastAt > rebaseGapMs))) users = new Map();
       liveId = id;
       lastAt = now;
 
