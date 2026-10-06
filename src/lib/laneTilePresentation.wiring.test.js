@@ -234,3 +234,14 @@ describe('公式コメント速度 +N/分 の配線(v0.1.1567)', () => {
     expect(read('src/lib/officialNicoStatsStripDigest.js')).not.toMatch(/Rate|rate/);
   });
 });
+
+describe('別窓(passive)の鏡 sig に顔ぶれが入る(v0.1.1575)', () => {
+  it('applyLaneMirrorForPassive の sig が snap.contentHash を含む(件数だけだと同数の入れ替えで再描画されない)', () => {
+    const body = resolveEntryFnSource('applyLaneMirrorForPassive');
+    const m = /const sig = `([^`]*)`;/.exec(body);
+    expect(m, 'sig の組み立てが見つからない').not.toBeNull();
+    expect(m[1]).toContain('snap.contentHash');
+    // ★capturedAt を入れない(①が3秒ごとに再publishするたびに再描画して明滅する=v0.1.1022 で直した退化)
+    expect(m[1]).not.toContain('capturedAt');
+  });
+});

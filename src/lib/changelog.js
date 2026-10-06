@@ -18,6 +18,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1575',
+    date: '2026-10-06',
+    summary: '別窓の顔ぶれ入れ替えが反映される',
+    items: Object.freeze([
+      '応援プレビュー・別窓で、人数が同じまま顔ぶれだけが入れ替わったとき、古い顔ぶれのまま更新されないことがありました。顔ぶれが変わったときは描き直すようにしました。数字だけが変わる更新では、これまでどおりアイコンを貼り替えません(ちらつきません)。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1574',
     date: '2026-10-06',
     summary: '裏タブでも熱い人バッジが出るように',
@@ -167,14 +175,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     summary: '/live/ に Kick の配信一覧(別欄)を準備',
     items: Object.freeze([
       'ライブビュー(/live/)に、Kick で配信中の日本語配信を同時視聴数の多い順に並べる欄を用意しました。値は Kick の公式 API が返したものをそのまま表示し、ニコ生の一覧とは混ぜません。Kick 側の準備が整い次第、表示が始まります。'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.1555',
-    date: '2026-09-30',
-    summary: '脈拍レーンが開いた直後から動くように修正',
-    items: Object.freeze([
-      'ライブビュー(/live/)の脈拍レーンが、実測データが2回届くまで(数分〜十数分)動かなかった不具合を修正しました。配信開始からの平均速度で開いた直後から動くようにしています。'
     ])
   })
 ]);
