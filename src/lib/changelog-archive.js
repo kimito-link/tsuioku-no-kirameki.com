@@ -24,6 +24,14 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.1549',
+    date: '2026-09-27',
+    summary: '/live/ ギフト増分を+ptで表示',
+    items: Object.freeze([
+      'ライブビュー(/live/)のギフト順位表で、前回取得から増えたポイントを「+Npt」として表示するようにしました。増分が大きい人ほど帯の色が濃くなります。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1548',
     date: '2026-09-26',
     summary: '配信詳細モーダルを一旦取り下げ',
