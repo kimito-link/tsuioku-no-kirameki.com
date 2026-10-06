@@ -18,6 +18,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1570',
+    date: '2026-10-06',
+    summary: '内部: 応援レーンCSSの3画面照合を追加',
+    items: Object.freeze([
+      '画面の見た目は変わりません。応援レーンのCSSをサイドパネル・会場・別窓の3か所にそろえて書く作業で、写し忘れがあると自動検査が「どのファイルに何が無いか」を名指しして知らせるようにしました(内部の安全装置)。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1569',
     date: '2026-10-06',
     summary: '別窓の匿名タイルも小さく点線枠に',
@@ -167,14 +175,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     summary: '/live/ 発言カードの先読みを配信ホバーに拡大',
     items: Object.freeze([
       'ライブビュー(/live/)の配信カードに少し滞在すると、直近発言カードの取得を先に始めるようにしました。取得中の応答も自動再試行し、名前へ移ったときにすぐ表示しやすくなります。'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.1550',
-    date: '2026-09-28',
-    summary: '/live/ 応援者を4段のアイコン列で表示',
-    items: Object.freeze([
-      'ライブビュー(/live/)の応援者を、りんく・こん太・ギフト・たぬ姉の4段に分けて表示するようにしました。ギフトの増分や匿名人数も段ごとに確認できます。'
     ])
   })
 ]);
