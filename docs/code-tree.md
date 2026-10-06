@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 8 / 880 件
+## ⚠️ 役割コメントが無いソース 8 / 881 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `scripts/build.mjs`
@@ -810,7 +810,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (1869)
+- 📁 **src/** (1873)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1088,7 +1088,7 @@
         - `logo_funlink_white_RGB_link_black.png`
         - `logo_funlink_white_RGB_maru_black.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1635)
+  - 📁 **lib/** (1639)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -1813,6 +1813,10 @@
     - `laneTileHistoryUsesDom.wiring.test.js`
     - `laneTileOscillation.js` — 【層】L0 判定層(純粋関数・I/O禁止)
     - `laneTileOscillation.test.js`
+    - `laneTilePresentation.parity.test.js`
+    - `laneTilePresentation.wiring.test.js`
+    - `laneTileStats.js` — 応援レーンのタイル 3 行目「🎁pt / 📣pt / 💬件」の合成(純関数・DOM 非依存)。
+    - `laneTileStats.test.js`
     - `laneWindowVerdict.js` — 【層】L0 判定層(純粋関数・I/O禁止)
     - `laneWindowVerdict.test.js`
     - `lastWatchUrlAdoption.js` — 【層】L0 判定層(純粋関数・I/O禁止)

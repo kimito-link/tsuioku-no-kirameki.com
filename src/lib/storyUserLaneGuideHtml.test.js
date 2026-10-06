@@ -87,6 +87,24 @@ describe('storyUserLaneGuideHtml', () => {
     );
   });
 
+  it('脚注(v0.1.1562): 第4引数 true のときだけ 🎁📣=公式pt・💬=拡張記録 の注記を足す。省略はバイト同一', () => {
+    const base = buildStoryUserLaneGuideFootAndRecordedHtml(3, 220, 5);
+    expect(buildStoryUserLaneGuideFootAndRecordedHtml(3, 220, 5, false)).toBe(base);
+    const withLegend = buildStoryUserLaneGuideFootAndRecordedHtml(3, 220, 5, true);
+    // 注記は脚注(foot)の直後・記録件数文の前に入る。
+    expect(withLegend.startsWith(buildStoryUserLaneGuideFootHtml(3, 5))).toBe(true);
+    expect(withLegend.endsWith(base.slice(buildStoryUserLaneGuideFootHtml(3, 5).length))).toBe(true);
+    expect(withLegend).toContain('nl-story-userlane-guide__legend');
+    expect(withLegend).toContain('公式の公開pt');
+    expect(withLegend).toContain('拡張が記録した件数');
+  });
+
+  it('脚注は表示枚数 0 のとき出さない(S2)', () => {
+    expect(buildStoryUserLaneGuideFootAndRecordedHtml(0, undefined, undefined, true)).toBe(
+      buildStoryUserLaneGuideFootHtml(0)
+    );
+  });
+
   it('空段ノートは段ごとに別文面で、増える一文は共通', () => {
     const link = buildStoryUserLaneEmptyNoteLinkHtml();
     const konta = buildStoryUserLaneEmptyNoteKontaHtml();

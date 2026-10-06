@@ -619,6 +619,7 @@ function _measuredSection(name, fn) {
 import {
   paintStoryUserLaneDomEmptyGuides,
   paintStoryUserLaneDomFilled,
+  syncStoryUserLaneStatsInPlace,
   resetStoryUserLaneDom, getStoryLaneRepaintCounts, getStoryLaneHollowCounts, shouldKeepStoryUserLaneTilesOnEmpty,
   // heavyRace再発の即効対策(HANDOFF-heavyrace-backfill-IMPL.md A): 暫定(heavy未settle)の短い候補で
   //   一度出た完全描画を上書き退化させない単調性ガード。
@@ -724,6 +725,7 @@ import { KEY_LANE_MIRROR } from '../lib/laneMirrorKey.js';
 import { publishLaneMirrorPerLive } from '../lib/laneMirrorPerLivePublish.js';
 import { KEY_PREVIEW_RENDER_ACK, buildPreviewRenderAck } from '../lib/previewRenderAckKey.js';
 import { buildLaneMirrorSnapshot, laneMirrorCapFromBuckets, restoreLaneMirrorBuckets } from '../lib/laneMirror.js';
+import { attachLaneTileStats, buildLaneTileStatsIndex } from '../lib/laneTileStats.js';
 import { measureLaneDomSelf, perTierKeysOf } from '../lib/laneDomSelfMeasure.js';
 // v0.1.1284: ①実DOMのキー列指紋(会場が別ドキュメント起点で顔ぶれ一致を判定するために同梱)。
 import { laneDomFingerprint } from '../lib/laneSceneEnvelope.js';
@@ -6162,6 +6164,24 @@ function countStoryUserLaneDomTiles(els) {
   return n;
 }
 
+/**
+ * v0.1.1562: タイル 3 行目(🎁📣💬)の値を【ここで 1 回だけ】合成して各段のアイテムに載せる。
+ *   ②会場・③別窓は再計算せず、鏡(nls_lane_mirror_v2)の additive な stats を読むだけ。
+ *   付加情報なので失敗してもレーン描画は止めない(素の buckets をそのまま返す)。
+ * @param {Record<string, any[]>} buckets
+ */
+function withLaneTileStats(buckets) {
+  try {
+    return attachLaneTileStats(buckets, buildLaneTileStatsIndex({
+      aggregates: STORY_SOURCE_STATE.laneAggregates,
+      kokenRows: _northStarMirrorLanes.contributionRanking,
+      nicoadRows: _northStarMirrorLanes.adRanking
+    }));
+  } catch {
+    return buckets;
+  }
+}
+
 function renderStoryUserLane() {
   // ★v0.1.1048 Phase0(全員表示の重さ判定・観測のみ): この関数1回の所要msを計測して laneDiag に載せる。
   //   candidates 全件走査+sort+bucket+paint の合計。全員表示(limit撤廃)で重くなるかの実機ベースライン。
@@ -6399,6 +6419,8 @@ function renderStoryUserLane() {
     ? STORY_SOURCE_STATE.adThrowerPicks
     : [];
   buckets.ad = [...adPicks];
+  // v0.1.1562: 鍵(laneSig / picked)は従来の buckets から作る=stats では再描画しない。鏡と paint にだけ stats 付きを渡す。
+  const bucketsWithStats = withLaneTileStats(buckets);
 
   const laneSig = storyUserLaneRenderSignature(
     liveId,
@@ -6436,7 +6458,7 @@ function renderStoryUserLane() {
   _lanePublishSkipDiag.lastPublishAt = Date.now();
   publishLaneMirror({
     liveId,
-    buckets,
+    buckets: bucketsWithStats,
     domSelf: _laneDomSelfLast,
     pickedLength: picked.length + buckets.gift.length + buckets.ad.length,
     // ★v0.1.1232: 名簿復活者を含む総数。③は cap 48 で切るため差分は鏡フッターが宣言する。
@@ -6450,6 +6472,7 @@ function renderStoryUserLane() {
     });
     // v0.1.1021: re-render skip でも描画済みなら幕を畳む(独立tick高頻度の sig 一致で幕畳みに到達せず残るのを根治)。
     if (countStoryUserLaneDomTiles(els) > 0) { try { dismissInitialLoadShade(); } catch { /* no-op */ } }
+    syncStoryUserLaneStatsInPlace(els, bucketsWithStats); // v0.1.1562: 描かない経路でも stats だけ追従
     return;
   }
   // ★描画単調性ガード(HANDOFF-heavyrace A-3): 暫定 supply が完全描画を短い候補で上書きするのを防ぐ。
@@ -6480,6 +6503,7 @@ function renderStoryUserLane() {
       domTilesPainted: countStoryUserLaneDomTiles(els)
     });
     if (countStoryUserLaneDomTiles(els) > 0) { try { dismissInitialLoadShade(); } catch { /* no-op */ } }
+    syncStoryUserLaneStatsInPlace(els, bucketsWithStats); // v0.1.1562: 縮小ガードで描かない経路
     return;
   }
   storyUserLaneLastRenderSig = laneSig;
@@ -6498,7 +6522,7 @@ function renderStoryUserLane() {
   const laneDisplayedTotal = picked.length + buckets.gift.length + buckets.ad.length;
   // 2026-07-14(Patch 2): 候補総数を渡し、切られたぶんは「ほか M人」と誠実に併記する(黙って切らない)。
   //   ★v0.1.1232: ①は上限撤廃で通常「ほか M人」は出ない(全員表示)が、器は③鏡(cap 48)の宣言に必要。
-  paintStoryUserLaneDomFilled(els, faces, buckets, laneDisplayedTotal, laneDomIo, {
+  paintStoryUserLaneDomFilled(els, faces, bucketsWithStats, laneDisplayedTotal, laneDomIo, {
     totalCandidates: rosteredCandidates.length
   });
   // C1: paint と同じ同期フレームで①実DOMを測り、後段の鏡publishへ渡す(TOCTOU防止)。
@@ -6617,6 +6641,7 @@ async function applyLaneMirrorForPassive() {
   //   中身同じでも再描画→innerHTML='' で要素が一瞬消えてチカチカしていた。件数だけで中身変化は検知できる。
   const sig = `${String(snap.liveId || '')}|${buckets.link.length}|${buckets.gift.length}|${buckets.ad.length}|${buckets.konta.length}|${buckets.tanu.length}|${pickedLength}|${totalCandidates}`;
   if (sig === _laneMirrorPassiveSig) {
+    syncStoryUserLaneStatsInPlace(els, buckets); // v0.1.1562: 鏡 skip(描かない経路)でも stats だけ追従(鏡は①が書いた値)
     // 自己診断: 鏡に変化なし＝再 paint しないが DOM は前回の描画済み（=完了扱い・現 DOM 件数）。
     recordStoryUserLaneStep(_storyUserLaneRenderProbe, STORY_USER_LANE_STEPS.DONE, {
       domTilesPainted: countStoryUserLaneDomTiles(els)

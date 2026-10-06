@@ -18,6 +18,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1562',
+    date: '2026-10-06',
+    summary: '応援者のタイルに 🎁📣💬 の内訳を表示',
+    items: Object.freeze([
+      '応援レーンの各タイルの3行目に、その人の🎁ギフトpt・📣広告pt・💬コメント件数を小さく表示するようにしました。ギフトと広告は公式が公開している値、コメント件数は拡張が記録した件数で、レーンの下に一行そう注記します。値が取れていない項目は出さず、0を作って見せることはしません。応援プレビューや会場モードにも同じ数字が出ます。数字が変わってもアイコンは貼り替えないので、ちらつきは増えません。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1561',
     date: '2026-10-05',
     summary: 'サイドパネルを開いた瞬間の黒を消す',
@@ -168,14 +176,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     summary: 'マーケ分析に横断応援者ランキングを追加',
     items: Object.freeze([
       'マーケ分析(HTMLレポート)に、過去の配信もまたいで応援してくれている人が分かる「横断応援者ランキング」を追加しました。公開や他PCとの集約はせず、このPC内の記録だけで完結します。'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.1540',
-    date: '2026-09-22',
-    summary: '内部整理(表示や動作は変わりません)',
-    items: Object.freeze([
-      '出荷手順の異常検知を強化しました(配布物には影響ありません)。'
     ])
   })
 ]);

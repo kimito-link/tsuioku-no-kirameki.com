@@ -192,7 +192,7 @@ export function sanitizeLaneMirrorForRead(rawSnap) {
     const kept = [];
     for (const cell of rows) {
       // ★uid は二刀流で読む。鏡セルは laneMirror.js:119 が返す【フラット】形
-      //   `{ displaySrc, title, idLine, nameLine, userId, recentTexts }` で、
+      //   `{ displaySrc, title, idLine, nameLine, userId, recentTexts, stats? }` で、
       //   `entry.userId` は復元後(restoreLaneMirrorBuckets)にしか生えない。
       //   venueLaneParity.js:63 の venueLaneParityKey が既に二刀流=それに揃える。
       const uid = String(cell?.userId ?? cell?.entry?.userId ?? '').trim();

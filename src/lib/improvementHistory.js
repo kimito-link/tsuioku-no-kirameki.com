@@ -1215,5 +1215,22 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
     note: '★直近30日窓のスライドによる自然減(55@0.1.1537→37。v0.1.1560 の note と同じ理由)。' +
       '今回は devtools Chrome で sidepanel.html を 5 回測り、opacity:0 の iframe が見せた後まで描画されない事実と、' +
       '覆い方式で黒の窓が 0 になることを first-paint の時刻で確かめた。別の手段での確認は今回も行っている。'
+  }),
+  Object.freeze({
+    version: '0.1.1562', metric: 'bundle-kb', value: 1371,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '★+6KB(1365@0.1.1561→1371)は意図した増加。応援レーンのタイル3行目(🎁📣💬)の合成 laneTileStats.js・' +
+      '鏡の stats 往復・レンダラの属性同期・更新履歴1版ぶんが popup に入った(判定は lib・DOM要素は+0)。' +
+      '計器は足していない。過去最良1360(@0.1.1454)との差分の内訳は v0.1.1471/1537/1560 の note に記録済み。'
+  }),
+  Object.freeze({
+    version: '0.1.1562', metric: 'gate-selftest', value: 4,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1562', metric: 'cross-checked-claims', value: 19,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: '★直近30日窓のスライドによる自然減(37@0.1.1561→19。9月中旬のコミットが窓外に出た分で、v0.1.1560 の note と同じ理由)。' +
+      '今回の変更で確認の手を抜いたわけではない(変異テスト6件で赤を確認し復元した)。'
   })
 ]);

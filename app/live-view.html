@@ -40,6 +40,8 @@
         --nl-lane-accent-event-rank: #b69cff;
         --nl-lane-accent-event-score: #ffb86c;
         --nl-lane-accent-event-broadcasters: #6fd0c8;
+        /* v0.1.1562: タイル 3 行目(🎁📣💬)の文字色。popup.html / venueBar.js と同値。 */
+        --nl-lane-stats: #9a6f12;
         --nl-record-on: #0f9f6f;
         --nl-header-start: #0f8fd8;
         --nl-header-end: #14b8a6;
@@ -983,6 +985,19 @@
         font-weight: 500;
       }
 
+      /* v0.1.1562: タイル 3 行目「🎁pt 📣pt 💬件」(popup.html の同名規則の写し)。値は meta の data-stats。 */
+      .nl-story-userlane-meta[data-stats]::after {
+        content: attr(data-stats);
+        font-size: 9px;
+        font-weight: 700;
+        line-height: 1.2;
+        color: var(--nl-lane-stats);
+        font-variant-numeric: tabular-nums;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
       html.nl-inline body .nl-story-userlane-meta {
         font-size: 11px;
         max-width: min(142px, 34vw);
@@ -1143,6 +1158,14 @@
       .nl-story-userlane-guide__count {
         color: #9a6f12;
         font-weight: 800;
+      }
+
+      .nl-story-userlane-guide__legend {
+        margin: 2px 0 0;
+        padding: 0 2px;
+        font-size: 10px;
+        line-height: 1.35;
+        color: var(--nl-muted);
       }
 
       .nl-story-avatar-diag {
@@ -9740,6 +9763,7 @@
         --nl-lane-accent-event-rank: #c4afff;
         --nl-lane-accent-event-score: #ffc77f;
         --nl-lane-accent-event-broadcasters: #82ddd4;
+        --nl-lane-stats: #f5d975;
       }
 
       html.nl-skin-panel-dark body {
