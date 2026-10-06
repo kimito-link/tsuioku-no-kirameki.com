@@ -24,6 +24,14 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.1555',
+    date: '2026-09-30',
+    summary: '脈拍レーンが開いた直後から動くように修正',
+    items: Object.freeze([
+      'ライブビュー(/live/)の脈拍レーンが、実測データが2回届くまで(数分〜十数分)動かなかった不具合を修正しました。配信開始からの平均速度で開いた直後から動くようにしています。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1554',
     date: '2026-09-30',
     summary: '脈拍レーン: いま話している人を強調',

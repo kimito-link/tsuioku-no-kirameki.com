@@ -6670,8 +6670,10 @@ async function applyLaneMirrorForPassive() {
   const pickedLength = Math.max(0, Math.floor(Number(snap.pickedLength) || 0) || totalCells);
   const totalCandidates = Math.max(0, Math.floor(Number(snap.totalCandidates) || 0));
   // v0.1.1022(②プレビュー明滅の根治): sig から capturedAt を外す。①が3秒ごと再publishで capturedAt だけ変わり
-  //   中身同じでも再描画→innerHTML='' で要素が一瞬消えてチカチカしていた。件数だけで中身変化は検知できる。
-  const sig = `${String(snap.liveId || '')}|${buckets.link.length}|${buckets.gift.length}|${buckets.ad.length}|${buckets.konta.length}|${buckets.tanu.length}|${pickedLength}|${totalCandidates}`;
+  //   中身同じでも再描画→innerHTML='' で要素が一瞬消えてチカチカしていた。
+  //   ★v0.1.1575: 件数だけだと【同数のまま顔ぶれが入れ替わった】とき再描画されず古い顔ぶれが残った(実機で再現)。
+  //     ①が鏡に焼く snap.contentHash(uid|displaySrc|title のみ・capturedAt を含まない=毎回は変わらない)を足す。
+  const sig = `${String(snap.liveId || '')}|${buckets.link.length}|${buckets.gift.length}|${buckets.ad.length}|${buckets.konta.length}|${buckets.tanu.length}|${pickedLength}|${totalCandidates}|${String(snap.contentHash || '')}`;
   if (sig === _laneMirrorPassiveSig) {
     skipStoryUserLanePaint(els, buckets, 'mirror-sig-same'); // 鏡 skip(描かない経路)でも stats だけ追従(鏡は①が書いた値)
     // 自己診断: 鏡に変化なし＝再 paint しないが DOM は前回の描画済み（=完了扱い・現 DOM 件数）。
