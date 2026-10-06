@@ -1124,6 +1124,9 @@ const VENUE_CSS = `
     --nl-text-sub: #56687d;
     --nl-muted: #6f7c8b;
     --nl-user-accent: #5aa7ff;
+    --nl-lane-stats: #9a6f12;
+    --nl-lane-pulse-gift: #c8721c;
+    --nl-lane-pulse-hot: #c8721c;
     /*
      * 横スクロールバー根絶(ユーザー不満「位置がずれてスクロールバーが出て変な動きで
      * 見えなくなる」): 同時表示人数は selectStableVisibleMembers で行に収まる数に制限済み
@@ -1297,6 +1300,7 @@ const VENUE_CSS = `
     width: var(--nl-lane-avatar-anon);
     height: var(--nl-lane-avatar-anon);
     border-width: 1px;
+    border-style: dashed;
     box-shadow: none;
   }
   .nlsb-venue-lane-stack .nl-story-userlane-cell[data-thumb="0"] {
@@ -1306,6 +1310,60 @@ const VENUE_CSS = `
   .nlsb-venue-lane-stack .nl-story-userlane-cell[data-thumb="0"] .nl-story-userlane-meta {
     font-size: 9px;
     max-width: 72px;
+  }
+  /* v0.1.1565: ギフト増分バッジ「+1,200pt」(popup.html の同名規則の写し) */
+  .nlsb-venue-lane-stack .nl-story-userlane-cell[data-pulse]::after {
+    content: attr(data-pulse);
+    margin-left: 2px;
+    padding: 0 5px;
+    border-radius: 999px;
+    font-size: 9px;
+    font-weight: 800;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+    align-self: center;
+    background: color-mix(in srgb, var(--nl-lane-pulse-gift) 16%, transparent);
+    color: var(--nl-lane-pulse-gift);
+  }
+  .nlsb-venue-lane-stack .nl-story-userlane-cell.is-gifted {
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--nl-lane-pulse-gift) 55%, transparent);
+    animation: nl-lane-pulse-pop 600ms ease-out 1;
+  }
+  .nlsb-venue-lane-stack .nl-story-userlane-cell[data-pulse-tier="mega"] {
+    --nl-lane-pulse-gift: #c02a2a;
+  }
+  /* v0.1.1566: 熱い人「+3件」(popup.html の同名規則の写し) */
+  .nlsb-venue-lane-stack .nl-story-userlane-cell.is-hot {
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--nl-lane-pulse-hot) 55%, transparent);
+    animation: nl-lane-pulse-pop 600ms ease-out 1;
+  }
+  .nlsb-venue-lane-stack .nl-story-userlane-cell.is-hot[data-pulse]::after {
+    background: color-mix(in srgb, var(--nl-lane-pulse-hot) 16%, transparent);
+    color: var(--nl-lane-pulse-hot);
+  }
+  .nlsb-venue-lane-stack .nl-story-userlane-cell.is-hot[data-pulse-tier="mega"] {
+    --nl-lane-pulse-hot: #c02a2a;
+  }
+  @keyframes nl-lane-pulse-pop {
+    0% { transform: scale(1); }
+    40% { transform: scale(1.045); }
+    100% { transform: scale(1); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .nlsb-venue-lane-stack .nl-story-userlane-cell.is-gifted,
+    .nlsb-venue-lane-stack .nl-story-userlane-cell.is-hot { animation: none; }
+  }
+  /* v0.1.1562: タイル 3 行目「🎁pt 📣pt 💬件」(popup.html の同名規則の写し) */
+  .nlsb-venue-lane-stack .nl-story-userlane-meta[data-stats]::after {
+    content: attr(data-stats);
+    font-size: 9px;
+    font-weight: 700;
+    line-height: 1.2;
+    color: var(--nl-lane-stats);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
   /* ★v0.1.1376: たぬ姉段の段内LOD(遠近法)。popup.html と同じ規約を会場にも。
      先頭24人は読めるpill / 25人目以降の匿名はアイコンのみ=群れとして見せる。
@@ -1410,6 +1468,13 @@ const VENUE_CSS = `
   .nlsb-venue-lane-stack .nl-story-userlane-guide__count {
     color: #9a6f12;
     font-weight: 800;
+  }
+  .nlsb-venue-lane-stack .nl-story-userlane-guide__legend {
+    margin: 2px 0 0;
+    padding: 0 2px;
+    font-size: 10px;
+    line-height: 1.35;
+    color: var(--nl-muted);
   }
   /* LANE_CSS_SYNC_END */
   .nlsb-story-diag {

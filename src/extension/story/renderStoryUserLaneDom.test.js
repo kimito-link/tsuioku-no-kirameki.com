@@ -1,9 +1,10 @@
 /** @vitest-environment happy-dom */
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import {
   getStoryLaneRepaintCounts,
   paintStoryUserLaneDomFilled,
   resetStoryUserLaneDom,
+  syncStoryUserLaneStatsInPlace,
   shouldKeepStoryUserLaneTilesOnEmpty,
   shouldKeepStoryUserLaneTilesOnShrink,
   makeLaneShrinkKeepClock,
@@ -370,5 +371,276 @@ describe('guides:false(v0.1.1120 会場用) — 案内帯/空段ノート/hint/�
     expect(els.guideLinesTop.innerHTML).not.toBe('');
     expect(els.guideBottom.hidden).toBe(false);
     expect(els.guideLinesBottom.innerHTML).not.toBe('');
+  });
+});
+
+/**
+ * v0.1.1562: タイル 3 行目(🎁📣💬)は【属性だけ】で運ぶ(DOM 要素 +0)。
+ *   最重要の不変条件=stats だけが変わっても cell ノードを作り直さない(ちらつき対策 6 版の保護)。
+ */
+describe('タイル stats 属性(data-stats)— ちらつき固定', () => {
+  const withStats = (c, stats) => ({ ...c, stats });
+  const metaOf = (laneEl, i = 0) => laneEl.children[i].querySelector('.nl-story-userlane-meta');
+  const S1 = { commentCount: 12, giftPt: 1200, adPt: null };
+
+  it('stats 付きアイテムの meta に data-stats が付き、無いアイテムには付かない', () => {
+    const els = makeEls();
+    paint(els, { link: [withStats(LINK[0], S1)], gift: [], ad: [], konta: [], tanu: TANU });
+    expect(metaOf(els.laneLink).getAttribute('data-stats')).toBe('🎁1,200 💬12');
+    expect(metaOf(els.laneTanu, 0).hasAttribute('data-stats')).toBe(false);
+  });
+
+  it('★同一 items で stats だけ変えて 2 回描く → cell は同一参照・data-stats だけ更新・repaint カウントは増えない', () => {
+    const els = makeEls();
+    paint(els, { link: [withStats(LINK[0], S1)], gift: [], ad: [], konta: [], tanu: [] });
+    const cellBefore = els.laneLink.firstElementChild;
+    const countsBefore = getStoryLaneRepaintCounts();
+    paint(els, {
+      link: [withStats(LINK[0], { commentCount: 13, giftPt: 1200, adPt: null })],
+      gift: [], ad: [], konta: [], tanu: []
+    });
+    expect(els.laneLink.firstElementChild).toBe(cellBefore);
+    expect(metaOf(els.laneLink).getAttribute('data-stats')).toBe('🎁1,200 💬13');
+    expect(getStoryLaneRepaintCounts()).toEqual(countsBefore);
+  });
+
+  it('stats が消えたら属性も消える(古い数字を残さない)', () => {
+    const els = makeEls();
+    paint(els, { link: [withStats(LINK[0], S1)], gift: [], ad: [], konta: [], tanu: [] });
+    paint(els, { link: [LINK[0]], gift: [], ad: [], konta: [], tanu: [] });
+    expect(metaOf(els.laneLink).hasAttribute('data-stats')).toBe(false);
+  });
+
+  it('値が同じなら setAttribute を呼ばない(無駄な style 再計算を起こさない)', () => {
+    const els = makeEls();
+    paint(els, { link: [withStats(LINK[0], S1)], gift: [], ad: [], konta: [], tanu: [] });
+    const meta = metaOf(els.laneLink);
+    const spy = vi.spyOn(meta, 'setAttribute');
+    paint(els, { link: [withStats(LINK[0], { ...S1 })], gift: [], ad: [], konta: [], tanu: [] });
+    expect(spy).not.toHaveBeenCalled();
+  });
+
+  it('描かない経路用 syncStoryUserLaneStatsInPlace は DOM を作り直さず属性だけ更新する', () => {
+    const els = makeEls();
+    paint(els, { link: [withStats(LINK[0], S1)], gift: [], ad: [], konta: [], tanu: TANU });
+    const cellBefore = els.laneLink.firstElementChild;
+    syncStoryUserLaneStatsInPlace(els, {
+      link: [withStats(LINK[0], { commentCount: 99, giftPt: null, adPt: null })],
+      gift: [], ad: [], konta: [],
+      tanu: [withStats(TANU[0], { commentCount: 2, giftPt: null, adPt: null }), TANU[1]]
+    });
+    expect(els.laneLink.firstElementChild).toBe(cellBefore);
+    expect(metaOf(els.laneLink).getAttribute('data-stats')).toBe('💬99');
+    expect(metaOf(els.laneTanu, 0).getAttribute('data-stats')).toBe('💬2');
+    expect(metaOf(els.laneTanu, 1).hasAttribute('data-stats')).toBe(false);
+  });
+
+  it('sync は件数が食い違う(貼り替え前の)段では何もしない=落ちない', () => {
+    const els = makeEls();
+    paint(els, { link: LINK, gift: [], ad: [], konta: [], tanu: [] });
+    expect(() =>
+      syncStoryUserLaneStatsInPlace(els, { link: [], gift: [], ad: [], konta: [], tanu: TANU })
+    ).not.toThrow();
+  });
+
+  it('会場の席ラッパ越しでもタイル本体に付く', () => {
+    const els = makeEls();
+    paintStoryUserLaneDomFilled(
+      els, FACES, { link: [withStats(LINK[0], S1)], gift: [], ad: [], konta: [], tanu: [] }, 1, IO,
+      { wrapTileEl: (t) => { const w = document.createElement('div'); w.className = 'nlsb-seat'; w.append(t); return w; } }
+    );
+    const meta = els.laneLink.querySelector('.nl-story-userlane-cell .nl-story-userlane-meta');
+    expect(meta.getAttribute('data-stats')).toBe('🎁1,200 💬12');
+    syncStoryUserLaneStatsInPlace(els, { link: [withStats(LINK[0], { commentCount: 50, giftPt: null, adPt: null })], gift: [], ad: [], konta: [], tanu: [] });
+    expect(meta.getAttribute('data-stats')).toBe('💬50');
+  });
+
+  it('resetStoryUserLaneDom 後は node 控えが無効化され、同一 items でも再生成されて stats が付く', () => {
+    const els = makeEls();
+    paint(els, { link: [withStats(LINK[0], S1)], gift: [], ad: [], konta: [], tanu: [] });
+    resetStoryUserLaneDom(els);
+    paint(els, { link: [withStats(LINK[0], S1)], gift: [], ad: [], konta: [], tanu: [] });
+    expect(metaOf(els.laneLink).getAttribute('data-stats')).toBe('🎁1,200 💬12');
+  });
+
+  it('脚注: stats を出しているときだけ注記が出る。sync で付け外しされる', () => {
+    const els = makeEls();
+    paint(els, { link: [LINK[0]], gift: [], ad: [], konta: [], tanu: [] });
+    expect(els.guideLinesBottom.querySelector('.nl-story-userlane-guide__legend')).toBeNull();
+    syncStoryUserLaneStatsInPlace(els, { link: [withStats(LINK[0], S1)], gift: [], ad: [], konta: [], tanu: [] });
+    expect(els.guideLinesBottom.querySelector('.nl-story-userlane-guide__legend')).not.toBeNull();
+    syncStoryUserLaneStatsInPlace(els, { link: [LINK[0]], gift: [], ad: [], konta: [], tanu: [] });
+    expect(els.guideLinesBottom.querySelector('.nl-story-userlane-guide__legend')).toBeNull();
+    paint(els, { link: [withStats(LINK[0], S1)], gift: [], ad: [], konta: [], tanu: [] });
+    expect(els.guideLinesBottom.querySelector('.nl-story-userlane-guide__legend')).not.toBeNull();
+  });
+});
+
+describe('段見出しの人数(v0.1.1563)', () => {
+  const countOf = (linesEl) => linesEl.querySelector('.nl-story-userlane-guide__count')?.textContent ?? null;
+
+  it('各段の案内帯の末尾に、その段の表示人数「N人」が出る', () => {
+    const els = makeEls();
+    paint(els, {
+      link: LINK,
+      gift: [cell('999', 'https://cdn/g.jpg', 'ギフト太郎'), cell('998', 'https://cdn/h.jpg', 'ギフト花子')],
+      ad: [cell('', 'https://cdn/ad.jpg', '広告主')],
+      konta: [],
+      tanu: TANU
+    });
+    expect(countOf(els.guideLinesTop)).toBe('1人');
+    expect(countOf(els.guideLinesMidGift)).toBe('2人');
+    expect(countOf(els.guideLinesMidAd)).toBe('1人');
+    expect(countOf(els.guideLinesMidKonta)).toBe('0人'); // 空段もそのまま「0人」(空段ノートは既存のまま)
+    expect(countOf(els.guideLinesMidTanu)).toBe('2人');
+  });
+
+  it('guides:false(会場の fallback 等)では案内帯ごと描かない=人数も出ない', () => {
+    const els = makeEls();
+    paintStoryUserLaneDomFilled(els, FACES, { link: LINK, gift: [], ad: [], konta: [], tanu: TANU }, 3, IO, { guides: false });
+    expect(els.guideLinesTop.innerHTML).toBe('');
+    expect(els.guideLinesMidTanu.innerHTML).toBe('');
+  });
+
+  it('人数が変われば次の paint で追従する', () => {
+    const els = makeEls();
+    paint(els, { link: LINK, gift: [], ad: [], konta: [], tanu: TANU });
+    paint(els, { link: LINK, gift: [], ad: [], konta: [], tanu: [...TANU, cell('a:CCC', 'ident-c.svg', '匿名C')] });
+    expect(countOf(els.guideLinesMidTanu)).toBe('3人');
+  });
+});
+
+/**
+ * v0.1.1565: ギフト増分バッジ(data-pulse / is-gifted)も属性とクラスだけで運ぶ。
+ *   cell(タイル本体)に付く。クラスは「変わったときだけ」付け外し=CSS アニメは class 追加時に 1 回だけ走る。
+ */
+describe('タイル pulse 属性(data-pulse / is-gifted)', () => {
+  const GIFT = { giftDelta: 1200, giftTier: 'large' };
+  const withPulse = (c, pulse) => ({ ...c, pulse });
+  const lane = (items) => ({ link: items, gift: [], ad: [], konta: [], tanu: [] });
+
+  it('gift の pulse は cell に data-pulse="+1,200pt"・data-pulse-tier・is-gifted が付く', () => {
+    const els = makeEls();
+    paint(els, lane([withPulse(LINK[0], GIFT)]));
+    const c = els.laneLink.firstElementChild;
+    expect(c.getAttribute('data-pulse')).toBe('+1,200pt');
+    expect(c.getAttribute('data-pulse-tier')).toBe('large');
+    expect(c.classList.contains('is-gifted')).toBe(true);
+  });
+
+  it('pulse の無いタイルには何も付かない', () => {
+    const els = makeEls();
+    paint(els, lane([LINK[0]]));
+    const c = els.laneLink.firstElementChild;
+    expect(c.hasAttribute('data-pulse')).toBe(false);
+    expect(c.hasAttribute('data-pulse-tier')).toBe(false);
+    expect(c.classList.contains('is-gifted')).toBe(false);
+  });
+
+  it('★pulse だけが変わっても cell は同一参照・repaint カウント不変・属性とクラスだけ更新、消えたら外れる', () => {
+    const els = makeEls();
+    paint(els, lane([LINK[0]]));
+    const c = els.laneLink.firstElementChild;
+    const before = getStoryLaneRepaintCounts();
+    paint(els, lane([withPulse(LINK[0], GIFT)]));
+    expect(els.laneLink.firstElementChild).toBe(c);
+    expect(c.getAttribute('data-pulse')).toBe('+1,200pt');
+    expect(c.classList.contains('is-gifted')).toBe(true);
+    paint(els, lane([LINK[0]]));
+    expect(c.hasAttribute('data-pulse')).toBe(false);
+    expect(c.classList.contains('is-gifted')).toBe(false);
+    expect(getStoryLaneRepaintCounts()).toEqual(before);
+  });
+
+  it('値が同じなら setAttribute/classList を触らない(アニメを再発火させない)', () => {
+    const els = makeEls();
+    paint(els, lane([withPulse(LINK[0], GIFT)]));
+    const c = els.laneLink.firstElementChild;
+    const spyAttr = vi.spyOn(c, 'setAttribute');
+    const spyClass = vi.spyOn(c.classList, 'add');
+    paint(els, lane([withPulse(LINK[0], { ...GIFT })]));
+    expect(spyAttr).not.toHaveBeenCalled();
+    expect(spyClass).not.toHaveBeenCalled();
+  });
+
+  it('描かない経路用 sync でも pulse が追従する', () => {
+    const els = makeEls();
+    paint(els, lane([LINK[0]]));
+    const c = els.laneLink.firstElementChild;
+    syncStoryUserLaneStatsInPlace(els, lane([withPulse(LINK[0], GIFT)]));
+    expect(c.getAttribute('data-pulse')).toBe('+1,200pt');
+    expect(c.classList.contains('is-gifted')).toBe(true);
+  });
+});
+
+describe('熱い人バッジ(is-hot・v0.1.1566)', () => {
+  const HOT = { heat: 3, heatTier: 'medium' };
+  const lane = (items) => ({ link: items, gift: [], ad: [], konta: [], tanu: [] });
+  const wp = (c, pulse) => ({ ...c, pulse });
+
+  it('heat の pulse は data-pulse="+3件"・is-hot が付き、is-gifted は付かない', () => {
+    const els = makeEls();
+    paint(els, lane([wp(LINK[0], HOT)]));
+    const c = els.laneLink.firstElementChild;
+    expect(c.getAttribute('data-pulse')).toBe('+3件');
+    expect(c.getAttribute('data-pulse-tier')).toBe('medium');
+    expect(c.classList.contains('is-hot')).toBe(true);
+    expect(c.classList.contains('is-gifted')).toBe(false);
+  });
+
+  it('★heat だけが変わっても cell は同一参照・repaint 不変。消えたら is-hot も外れる(60秒失効)', () => {
+    const els = makeEls();
+    paint(els, lane([LINK[0]]));
+    const c = els.laneLink.firstElementChild;
+    const before = getStoryLaneRepaintCounts();
+    paint(els, lane([wp(LINK[0], HOT)]));
+    paint(els, lane([wp(LINK[0], { heat: 5, heatTier: 'large' })]));
+    expect(els.laneLink.firstElementChild).toBe(c);
+    expect(c.getAttribute('data-pulse')).toBe('+5件');
+    expect(c.getAttribute('data-pulse-tier')).toBe('large');
+    paint(els, lane([LINK[0]]));
+    expect(c.hasAttribute('data-pulse')).toBe(false);
+    expect(c.classList.contains('is-hot')).toBe(false);
+    expect(getStoryLaneRepaintCounts()).toEqual(before);
+  });
+
+  it('gift と heat が同時なら gift を表示(is-gifted のみ)。gift が消えたら hot に切り替わる', () => {
+    const els = makeEls();
+    paint(els, lane([wp(LINK[0], { giftDelta: 500, giftTier: 'large', ...HOT })]));
+    const c = els.laneLink.firstElementChild;
+    expect(c.getAttribute('data-pulse')).toBe('+500pt');
+    expect(c.classList.contains('is-gifted')).toBe(true);
+    expect(c.classList.contains('is-hot')).toBe(false);
+    paint(els, lane([wp(LINK[0], HOT)]));
+    expect(c.getAttribute('data-pulse')).toBe('+3件');
+    expect(c.classList.contains('is-gifted')).toBe(false);
+    expect(c.classList.contains('is-hot')).toBe(true);
+  });
+});
+
+describe('sync は別人の値を貼らない(v0.1.1568・reality-checker 指摘)', () => {
+  const wp = (c, extra) => ({ ...c, ...extra });
+  const lane = (items) => ({ link: [], gift: [], ad: [], konta: [], tanu: items });
+
+  it('件数が同じでも顔ぶれが違う段には stats / pulse を書かない(縮小ガード・鏡 skip の経路)', () => {
+    const els = makeEls();
+    paint(els, lane([wp(TANU[0], { stats: { commentCount: 1, giftPt: null, adPt: null } }), TANU[1]]));
+    const cells = Array.from(els.laneTanu.children);
+    // DOM は A,B のまま。供給だけが C,D(同数・別人)に入れ替わった状態で sync が呼ばれる。
+    const C = cell('a:CCC', 'ident-c.svg', '匿名C');
+    const D = cell('a:DDD', 'ident-d.svg', '匿名D');
+    syncStoryUserLaneStatsInPlace(els, lane([
+      wp(C, { stats: { commentCount: 99, giftPt: null, adPt: null }, pulse: { giftDelta: 500, giftTier: 'large' } }),
+      D
+    ]));
+    expect(cells[0].querySelector('.nl-story-userlane-meta').getAttribute('data-stats')).toBe('💬1'); // 旧のまま
+    expect(cells[0].hasAttribute('data-pulse')).toBe(false);
+  });
+
+  it('同じ顔ぶれなら従来どおり追従する', () => {
+    const els = makeEls();
+    paint(els, lane([TANU[0], TANU[1]]));
+    syncStoryUserLaneStatsInPlace(els, lane([wp(TANU[0], { stats: { commentCount: 7, giftPt: null, adPt: null } }), TANU[1]]));
+    expect(els.laneTanu.children[0].querySelector('.nl-story-userlane-meta').getAttribute('data-stats')).toBe('💬7');
   });
 });

@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
+  buildStoryUserLaneGuideAdHtml,
+  buildStoryUserLaneGuideGiftHtml,
   buildStoryUserLaneEmptyNoteKontaHtml,
   buildStoryUserLaneEmptyNoteLinkHtml,
   buildStoryUserLaneEmptyNoteTanuHtml,
@@ -85,6 +87,50 @@ describe('storyUserLaneGuideHtml', () => {
     expect(buildStoryUserLaneGuideFootAndRecordedHtml(3, -2)).toBe(
       buildStoryUserLaneGuideFootHtml(3)
     );
+  });
+
+  it('脚注(v0.1.1562): 第4引数 true のときだけ 🎁📣=公式pt・💬=拡張記録 の注記を足す。省略はバイト同一', () => {
+    const base = buildStoryUserLaneGuideFootAndRecordedHtml(3, 220, 5);
+    expect(buildStoryUserLaneGuideFootAndRecordedHtml(3, 220, 5, false)).toBe(base);
+    const withLegend = buildStoryUserLaneGuideFootAndRecordedHtml(3, 220, 5, true);
+    // 注記は脚注(foot)の直後・記録件数文の前に入る。
+    expect(withLegend.startsWith(buildStoryUserLaneGuideFootHtml(3, 5))).toBe(true);
+    expect(withLegend.endsWith(base.slice(buildStoryUserLaneGuideFootHtml(3, 5).length))).toBe(true);
+    expect(withLegend).toContain('nl-story-userlane-guide__legend');
+    expect(withLegend).toContain('公式の公開pt');
+    expect(withLegend).toContain('拡張が記録した件数');
+  });
+
+  it('脚注は表示枚数 0 のとき出さない(S2)', () => {
+    expect(buildStoryUserLaneGuideFootAndRecordedHtml(0, undefined, undefined, true)).toBe(
+      buildStoryUserLaneGuideFootHtml(0)
+    );
+  });
+
+  describe('段見出しの人数(v0.1.1563・第2引数 count は additive)', () => {
+    const builders = [
+      ['りんく', buildStoryUserLaneGuideTopHtml],
+      ['ギフト', buildStoryUserLaneGuideGiftHtml],
+      ['広告', buildStoryUserLaneGuideAdHtml],
+      ['こん太', buildStoryUserLaneGuideKontaHtml],
+      ['たぬ姉', buildStoryUserLaneGuideTanuHtml]
+    ];
+    for (const [name, build] of builders) {
+      it(`${name}: 省略・不正値ならバイト同一(人数の span が付かない)`, () => {
+        const base = build(FACE_LINK);
+        for (const bad of [undefined, null, NaN, -1, 'abc', Infinity]) {
+          expect(build(FACE_LINK, bad)).toBe(base);
+        }
+        expect(base).not.toContain('guide__count');
+      });
+      it(`${name}: count を渡すと「N人」が本文の末尾に付く(0人もそのまま出す)`, () => {
+        const html = build(FACE_LINK, 12);
+        expect(html).toContain('<span class="nl-story-userlane-guide__count">12人</span>');
+        expect(build(FACE_LINK, 0)).toContain('guide__count">0人</span>');
+        expect(build(FACE_LINK, 480)).toContain('480人');
+        expect(html.startsWith(build(FACE_LINK).slice(0, 40))).toBe(true);
+      });
+    }
   });
 
   it('空段ノートは段ごとに別文面で、増える一文は共通', () => {
