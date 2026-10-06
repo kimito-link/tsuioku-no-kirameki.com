@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { resolveEntryFnSource } from '../../tests/helpers/wiringTestSource.js';
 
 /**
  * タイル 3 行目(🎁📣💬・v0.1.1562〜)の「配線忘れ=CI赤」ガード。
@@ -24,6 +25,7 @@ const liveViewHtml = read('app/live-view.html');
 
 const count = (src, needle) => src.split(needle).length - 1;
 
+
 describe('タイル stats の配線(popup-entry)', () => {
   it('attachLaneTileStats は publishLaneMirror({ より前にある(鏡に stats を載せるため)', () => {
     const iAttach = popupSrc.indexOf('attachLaneTileStats(');
@@ -33,18 +35,21 @@ describe('タイル stats の配線(popup-entry)', () => {
     expect(iAttach).toBeLessThan(iPublish);
   });
 
-  it('描かない 3 経路(sig 一致 / 縮小ガード / 鏡 skip)に syncStoryUserLaneStatsInPlace が 1 つずつある', () => {
-    // 呼び出し件数で固定(import 行の 1 件は除く)。1 つ消えるとここが 2 になって赤になる。
-    expect(count(popupSrc, 'syncStoryUserLaneStatsInPlace(els')).toBe(3);
-    const sigMatch = popupSrc.indexOf('if (laneSig === storyUserLaneLastRenderSig) {');
-    expect(sigMatch).toBeGreaterThan(0);
-    expect(popupSrc.slice(sigMatch, sigMatch + 1200)).toContain('syncStoryUserLaneStatsInPlace(els');
-    const shrink = popupSrc.indexOf('if (_shrinkGuardHit) {');
-    expect(shrink).toBeGreaterThan(0);
-    expect(popupSrc.slice(shrink, shrink + 800)).toContain('syncStoryUserLaneStatsInPlace(els');
-    const passive = popupSrc.indexOf('if (sig === _laneMirrorPassiveSig) {');
-    expect(passive).toBeGreaterThan(0);
-    expect(popupSrc.slice(passive, passive + 600)).toContain('syncStoryUserLaneStatsInPlace(els');
+  it('描かない 3 経路(sig 一致 / 縮小ガード / 鏡 skip)は skipStoryUserLanePaint 1 本で呼ぶ(v0.1.1572・直接 sync を呼ばない)', () => {
+    // 関数本体を括弧対応で切り出して数える(固定幅の窓にしない=ほかの関数に当たらない・fail-closed)。
+    const body = (name) => resolveEntryFnSource(name);
+    const code = (s) => s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^[ \t]*\/\/.*$/gm, '').replace(/\/\/[^\n]*$/gm, '');
+    const main = code(body('renderStoryUserLane'));
+    const passive = code(body('applyLaneMirrorForPassive'));
+    expect(count(main, "skipStoryUserLanePaint(els, bucketsWithStats, 'sig-same')")).toBe(1);
+    expect(count(main, "skipStoryUserLanePaint(els, bucketsWithStats, 'shrink-guard')")).toBe(1);
+    expect(count(passive, "skipStoryUserLanePaint(els, buckets, 'mirror-sig-same')")).toBe(1);
+    // 直接 sync を呼ぶ箇所はゼロ(popup-entry 全体・import 以外)。呼び忘れではなく「呼び方が1つ」になった。
+    expect(count(code(popupSrc), 'syncStoryUserLaneStatsInPlace(')).toBe(0);
+    // sig 一致の分岐の中、縮小ガードの分岐の中、というそれぞれの位置(順序)も固定する。
+    expect(main.indexOf("'sig-same'")).toBeGreaterThan(main.indexOf('laneSig === storyUserLaneLastRenderSig'));
+    expect(main.indexOf("'shrink-guard'")).toBeGreaterThan(main.indexOf('if (_shrinkGuardHit)'));
+    expect(passive.indexOf("'mirror-sig-same'")).toBeGreaterThan(passive.indexOf('sig === _laneMirrorPassiveSig'));
   });
 
   it('paint と鏡 publish には stats 付き buckets を渡す', () => {
@@ -117,6 +122,13 @@ describe('識別絵(匿名の identicon)は点線枠(v0.1.1564・/live/ の視�
     const sync = venueBarSrc.slice(begin, end);
     const body = ruleBody(sync, /\.nlsb-venue-lane-stack \.nl-story-userlane-cell\[data-thumb="0"\] \.nl-story-userlane-avatar \{/);
     expect(body).toContain('border-style: dashed;');
+  });
+  it('app/live-view.html にも匿名タイルの基本3規則(avatar小+点線枠/gap・padding/meta 9px)がある(v0.1.1569・3画面そろえ)', () => {
+    const avatar = ruleBody(liveViewHtml, /\.nl-story-userlane-cell\[data-thumb="0"\] \.nl-story-userlane-avatar \{/);
+    expect(avatar).toContain('border-style: dashed;');
+    expect(avatar).toContain('var(--nl-lane-avatar-anon)');
+    expect(ruleBody(liveViewHtml, /\.nl-story-userlane-cell\[data-thumb="0"\] \{/)).toContain('padding-right: 4px;');
+    expect(ruleBody(liveViewHtml, /\.nl-story-userlane-cell\[data-thumb="0"\] \.nl-story-userlane-meta \{/)).toContain('font-size: 9px;');
   });
 });
 
@@ -220,5 +232,16 @@ describe('公式コメント速度 +N/分 の配線(v0.1.1567)', () => {
 
   it('officialNicoStatsStripDigest.js は触っていない(stableKey/summaryText を固定するテストが無傷)', () => {
     expect(read('src/lib/officialNicoStatsStripDigest.js')).not.toMatch(/Rate|rate/);
+  });
+});
+
+describe('別窓(passive)の鏡 sig に顔ぶれが入る(v0.1.1575)', () => {
+  it('applyLaneMirrorForPassive の sig が snap.contentHash を含む(件数だけだと同数の入れ替えで再描画されない)', () => {
+    const body = resolveEntryFnSource('applyLaneMirrorForPassive');
+    const m = /const sig = `([^`]*)`;/.exec(body);
+    expect(m, 'sig の組み立てが見つからない').not.toBeNull();
+    expect(m[1]).toContain('snap.contentHash');
+    // ★capturedAt を入れない(①が3秒ごとに再publishするたびに再描画して明滅する=v0.1.1022 で直した退化)
+    expect(m[1]).not.toContain('capturedAt');
   });
 });

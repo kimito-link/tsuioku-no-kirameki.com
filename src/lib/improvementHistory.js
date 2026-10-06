@@ -1322,5 +1322,140 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
     version: '0.1.1568', metric: 'cross-checked-claims', value: 19,
     source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
     note: '★直近30日窓のスライドによる自然減(v0.1.1562 の note と同じ理由)。今回も変異テストで赤を確認して復元している。'
+  }),
+  Object.freeze({
+    version: '0.1.1569', metric: 'bundle-kb', value: 1382,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '★+1382KB 台(前版 1372KB から微増)は意図した増加。別窓CSSの追加(dist は更新履歴1版ぶんのみ)。' +
+      '更新履歴1版ぶんも含む(直近20版は popup バンドルに同梱される仕様)。計器は足していない。過去最良1360(@0.1.1454)との差分の内訳は v0.1.1471/1537/1560/1562 の note に記録済み。'
+  }),
+  Object.freeze({
+    version: '0.1.1569', metric: 'gate-selftest', value: 4,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1569', metric: 'cross-checked-claims', value: 19,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: '★直近30日窓のスライドによる自然減(v0.1.1562 の note と同じ理由)。今回も変異テストで赤を確認して復元している。'
+  }),
+  Object.freeze({
+    version: '0.1.1570', metric: 'bundle-kb', value: 1383,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '★+1383KB 台(前版 1372KB から微増)は意図した増加。テスト追加のみ(dist は更新履歴1版ぶん)。' +
+      '更新履歴1版ぶんも含む(直近20版は popup バンドルに同梱される仕様)。計器は足していない。過去最良1360(@0.1.1454)との差分の内訳は v0.1.1471/1537/1560/1562 の note に記録済み。'
+  }),
+  Object.freeze({
+    version: '0.1.1570', metric: 'gate-selftest', value: 4,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1570', metric: 'cross-checked-claims', value: 19,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: '★直近30日窓のスライドによる自然減(v0.1.1562 の note と同じ理由)。今回も変異テストで赤を確認して復元している。'
+  }),
+  Object.freeze({
+    version: '0.1.1571', metric: 'bundle-kb', value: 1383,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '★+1383KB 台(前版 1372KB から微増)は意図した増加。テスト追加のみ(dist は更新履歴1版ぶん)。' +
+      '更新履歴1版ぶんも含む(直近20版は popup バンドルに同梱される仕様)。計器は足していない。過去最良1360(@0.1.1454)との差分の内訳は v0.1.1471/1537/1560/1562 の note に記録済み。'
+  }),
+  Object.freeze({
+    version: '0.1.1571', metric: 'gate-selftest', value: 4,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1571', metric: 'cross-checked-claims', value: 19,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: '★直近30日窓のスライドによる自然減(v0.1.1562 の note と同じ理由)。今回も変異テストで赤を確認して復元している。'
+  }),
+  Object.freeze({
+    version: '0.1.1572', metric: 'bundle-kb', value: 1383,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '★+1383KB 台(前版 1372KB から微増)は意図した増加。skipStoryUserLanePaint(入口1本化・理由別カウンタ)と更新履歴1版ぶん。' +
+      '更新履歴1版ぶんも含む(直近20版は popup バンドルに同梱される仕様)。計器は足していない。過去最良1360(@0.1.1454)との差分の内訳は v0.1.1471/1537/1560/1562 の note に記録済み。'
+  }),
+  Object.freeze({
+    version: '0.1.1572', metric: 'gate-selftest', value: 4,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1572', metric: 'cross-checked-claims', value: 19,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: '★直近30日窓のスライドによる自然減(v0.1.1562 の note と同じ理由)。今回も変異テストで赤を確認して復元している。'
+  }),
+  Object.freeze({
+    version: '0.1.1573', metric: 'bundle-kb', value: 1384,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '★+1384KB 台(前版 1372KB から微増)は意図した増加。公式コメ速度の逆行3回リセット(数行)と更新履歴1版ぶん。' +
+      '更新履歴1版ぶんも含む(直近20版は popup バンドルに同梱される仕様)。計器は足していない。過去最良1360(@0.1.1454)との差分の内訳は v0.1.1471/1537/1560/1562 の note に記録済み。'
+  }),
+  Object.freeze({
+    version: '0.1.1573', metric: 'gate-selftest', value: 4,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1573', metric: 'cross-checked-claims', value: 19,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: '★直近30日窓のスライドによる自然減(v0.1.1562 の note と同じ理由)。今回も変異テストで赤を確認して復元している。'
+  }),
+  Object.freeze({
+    version: '0.1.1574', metric: 'bundle-kb', value: 1384,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '★+1384KB 台(前版 1372KB から微増)は意図した増加。熱い人の測り直し閾値(数行)と更新履歴1版ぶん。' +
+      '更新履歴1版ぶんも含む(直近20版は popup バンドルに同梱される仕様)。計器は足していない。過去最良1360(@0.1.1454)との差分の内訳は v0.1.1471/1537/1560/1562 の note に記録済み。'
+  }),
+  Object.freeze({
+    version: '0.1.1574', metric: 'gate-selftest', value: 4,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1574', metric: 'cross-checked-claims', value: 19,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: '★直近30日窓のスライドによる自然減(v0.1.1562 の note と同じ理由)。今回も変異テストで赤を確認して復元している。'
+  }),
+  Object.freeze({
+    version: '0.1.1575', metric: 'bundle-kb', value: 1384,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '★+1384KB 台(前版 1372KB から微増)は意図した増加。別窓の鏡 sig に contentHash を足す(1行)と更新履歴1版ぶん。' +
+      '更新履歴1版ぶんも含む(直近20版は popup バンドルに同梱される仕様)。計器は足していない。過去最良1360(@0.1.1454)との差分の内訳は v0.1.1471/1537/1560/1562 の note に記録済み。'
+  }),
+  Object.freeze({
+    version: '0.1.1575', metric: 'gate-selftest', value: 4,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1575', metric: 'cross-checked-claims', value: 19,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: '★直近30日窓のスライドによる自然減(v0.1.1562 の note と同じ理由)。今回も変異テストで赤を確認して復元している。'
+  }),
+  Object.freeze({
+    version: '0.1.1576', metric: 'bundle-kb', value: 1385,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '★+1385KB 台(前版 1372KB から微増)は意図した増加。別窓CSS追加のみ(dist は更新履歴1版ぶん)。' +
+      '更新履歴1版ぶんも含む(直近20版は popup バンドルに同梱される仕様)。計器は足していない。過去最良1360(@0.1.1454)との差分の内訳は v0.1.1471/1537/1560/1562 の note に記録済み。'
+  }),
+  Object.freeze({
+    version: '0.1.1576', metric: 'gate-selftest', value: 4,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1576', metric: 'cross-checked-claims', value: 20,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: '★直近30日窓のスライドによる自然減(v0.1.1562 の note と同じ理由)。今回も変異テストで赤を確認して復元している。'
+  }),
+  Object.freeze({
+    version: '0.1.1577', metric: 'bundle-kb', value: 1385,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '★+1385KB 台(前版 1372KB から微増)は意図した増加。公式コメ速度の鮮度(数行)と更新履歴1版ぶん。' +
+      '更新履歴1版ぶんも含む(直近20版は popup バンドルに同梱される仕様)。計器は足していない。過去最良1360(@0.1.1454)との差分の内訳は v0.1.1471/1537/1560/1562 の note に記録済み。'
+  }),
+  Object.freeze({
+    version: '0.1.1577', metric: 'gate-selftest', value: 4,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1577', metric: 'cross-checked-claims', value: 20,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: '★直近30日窓のスライドによる自然減(v0.1.1562 の note と同じ理由)。今回も変異テストで赤を確認して復元している。'
   })
 ]);

@@ -79,3 +79,37 @@ describe('createLaneHeatTracker(直近60秒にコメントが増えた人・v0.1
     expect(() => t.observe('lv1', [{ uid: '', commentCount: 3 }, null, { uid: 'a', commentCount: 'x' }], T0 + 1)).not.toThrow();
   });
 });
+
+describe('裏タブの観測間隔(v0.1.1574)', () => {
+  it('窓(60秒)を少し超える間隔(裏タブの約1分クランプのゆらぎ)でも、増分は「熱い人」として拾う', () => {
+    const t = createLaneHeatTracker();
+    t.observe('lv1', rows({ a: 10 }), T0);
+    const m = t.observe('lv1', rows({ a: 13 }), T0 + 65_000);
+    expect(m.get('a')).toMatchObject({ heat: 3, tier: 'medium' });
+    // 次の観測(さらに65秒後)では、その増分は窓を過ぎて失効する
+    expect(t.observe('lv1', rows({ a: 13 }), T0 + 130_000).has('a')).toBe(false);
+  });
+
+  it('1分おきの観測が続いても、毎回の増分が拾われる(基準を取り直し続けて永遠に出ない、を起こさない)', () => {
+    const t = createLaneHeatTracker();
+    t.observe('lv1', rows({ a: 0 }), T0);
+    for (let i = 1; i <= 5; i += 1) {
+      const m = t.observe('lv1', rows({ a: i * 2 }), T0 + i * 62_000);
+      expect(m.get('a')?.heat, `${i}回目`).toBe(2);
+    }
+  });
+
+  it('観測間隔が窓の3倍(既定180秒)を超えたら基準を取り直す(溜まった増分をバーストさせない)', () => {
+    const t = createLaneHeatTracker();
+    t.observe('lv1', rows({ a: 10 }), T0);
+    expect(t.observe('lv1', rows({ a: 500 }), T0 + 181_000).size).toBe(0);
+    expect(t.observe('lv1', rows({ a: 501 }), T0 + 184_000).get('a').heat).toBe(1);
+  });
+
+  it('rebaseGapMs を指定できる', () => {
+    const t = createLaneHeatTracker({ windowMs: 10_000, rebaseGapMs: 15_000 });
+    t.observe('lv1', rows({ a: 1 }), T0);
+    expect(t.observe('lv1', rows({ a: 4 }), T0 + 14_000).get('a').heat).toBe(3);
+    expect(t.observe('lv1', rows({ a: 9 }), T0 + 14_000 + 16_000).size).toBe(0);
+  });
+});
