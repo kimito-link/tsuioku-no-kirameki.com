@@ -18,6 +18,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1563',
+    date: '2026-10-06',
+    summary: '案内帯の見出しに各段の人数を表示',
+    items: Object.freeze([
+      '応援レーンの各段の見出し(りんく・ギフト・広告・こん太・たぬ姉)の末尾に、その段にいま並んでいる人数を「12人」のように出すようにしました。会場モード・応援プレビューも同じ数になります。人数が0の段は「0人」と出します。段の中身の並びや表示は変わりません。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1562',
     date: '2026-10-06',
     summary: '応援者のタイルに 🎁📣💬 の内訳を表示',
@@ -168,14 +176,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     summary: 'イベント未参加時の誤表示・文字化けタイトルを根治',
     items: Object.freeze([
       'イベントに参加していない配信で、順位やスコアが誤って表示されたり、文字化けしたイベント名が出ることがある不具合を修正しました。公式のイベント参加が確認できる時だけ表示するようにしています。'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.1541',
-    date: '2026-09-23',
-    summary: 'マーケ分析に横断応援者ランキングを追加',
-    items: Object.freeze([
-      'マーケ分析(HTMLレポート)に、過去の配信もまたいで応援してくれている人が分かる「横断応援者ランキング」を追加しました。公開や他PCとの集約はせず、このPC内の記録だけで完結します。'
     ])
   })
 ]);

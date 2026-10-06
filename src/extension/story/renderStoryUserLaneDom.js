@@ -709,7 +709,7 @@ export function paintStoryUserLaneDomFilled(
     if (guideMidAd) guideMidAd.hidden = !(showGuides && hasAd);
     if (guideLinesMidAd) {
       guideLinesMidAd.innerHTML =
-        showGuides && hasAd ? buildStoryUserLaneGuideAdHtml(faces.faceAd) : '';
+        showGuides && hasAd ? buildStoryUserLaneGuideAdHtml(faces.faceAd, buckets.ad.length) : '';
     }
   }
 
@@ -719,22 +719,27 @@ export function paintStoryUserLaneDomFilled(
   // ガイド帯: 非表示側も hidden=true + innerHTML='' を【能動的に】書く(モード遷移で残骸ゼロ)。
   //   showGuides=true 側は従来と同文=①③の diff ゼロ。
   if (guideLinesTop) {
-    guideLinesTop.innerHTML = showGuides ? buildStoryUserLaneGuideTopHtml(faces.faceLink) : '';
+    // v0.1.1563: 各段の見出しに表示人数「N人」(=その段の DOM 枚数)。会場は同じ paint なので自動で一致する。
+    guideLinesTop.innerHTML = showGuides
+      ? buildStoryUserLaneGuideTopHtml(faces.faceLink, buckets.link.length)
+      : '';
   }
   if (guideTop) guideTop.hidden = !showGuides;
   if (guideLinesMidGift) {
-    guideLinesMidGift.innerHTML = showGuides ? buildStoryUserLaneGuideGiftHtml(faces.faceGift) : '';
+    guideLinesMidGift.innerHTML = showGuides
+      ? buildStoryUserLaneGuideGiftHtml(faces.faceGift, buckets.gift.length)
+      : '';
   }
   if (guideMidGift) guideMidGift.hidden = !showGuides;
   if (guideLinesMidKonta) {
     guideLinesMidKonta.innerHTML = showGuides
-      ? buildStoryUserLaneGuideKontaHtml(faces.faceKonta)
+      ? buildStoryUserLaneGuideKontaHtml(faces.faceKonta, buckets.konta.length)
       : '';
   }
   if (guideMidKonta) guideMidKonta.hidden = !showGuides;
   if (guideLinesMidTanu) {
     guideLinesMidTanu.innerHTML = showGuides
-      ? buildStoryUserLaneGuideTanuHtml(faces.faceTanu)
+      ? buildStoryUserLaneGuideTanuHtml(faces.faceTanu, buckets.tanu.length)
       : '';
   }
   if (guideMidTanu) guideMidTanu.hidden = !showGuides;

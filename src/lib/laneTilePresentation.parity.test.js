@@ -142,4 +142,13 @@ describe('stats は ①直描画 / ③鏡復元 / ②会場 で同一 DOM にな
     expect(legend(paint3())).toBe(a);
     expect(legend(paint2())).toBe(a);
   });
+
+  it('案内帯の人数(v0.1.1563)も 3 経路で一致し、fixture の枚数と一致する', () => {
+    const guides = (els) => ['guideLinesTop', 'guideLinesMidGift', 'guideLinesMidAd', 'guideLinesMidKonta', 'guideLinesMidTanu']
+      .map((k) => els[k].querySelector('.nl-story-userlane-guide__count')?.textContent ?? null);
+    const a = guides(paint1());
+    expect(a).toEqual(['1人', '1人', '1人', '1人', '2人']);
+    expect(guides(paint3())).toEqual(a);
+    expect(guides(paint2())).toEqual(a);
+  });
 });
