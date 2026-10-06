@@ -81,3 +81,50 @@ describe('formatCommentRate', () => {
     expect(formatCommentRate(Number.NaN)).toBe('');
   });
 });
+
+describe('過大値の固着の回復(v0.1.1573)', () => {
+  it('過大値が1回入っても、正しい低い値が3回続けば基準を取り直し、その後また速度が出る', () => {
+    const t = createCommentRateTrack();
+    t.push(1000, T0);
+    t.push(1010, T0 + 30_000);
+    expect(t.push(5000, T0 + 35_000)).toBe(true); // 過大値(公式 DOM と NDGR の食い違い等)
+    // 以後の正しい値(1020)は「逆行」だが、3回続いたら値源が切り替わったとみなして取り直す
+    expect(t.push(1020, T0 + 40_000)).toBe(false);
+    expect(t.push(1020, T0 + 45_000)).toBe(false);
+    expect(t.push(1020, T0 + 50_000)).toBe(true);
+    expect(t.ratePerMin(T0 + 50_000)).toBeNull(); // 標本が1つ=まだ出さない(古い過大な速度を残さない)
+    expect(t.push(1030, T0 + 75_000)).toBe(true);
+    expect(t.ratePerMin(T0 + 75_000)).toBeCloseTo(24, 5); // (1030-1020)/25秒
+  });
+
+  it('逆行が3回続かなければ取り直さない(1〜2回の揺れで基準を捨てない)', () => {
+    const t = createCommentRateTrack();
+    t.push(100, T0);
+    expect(t.push(90, T0 + 5_000)).toBe(false);
+    expect(t.push(90, T0 + 10_000)).toBe(false);
+    expect(t.push(110, T0 + 15_000)).toBe(true); // 増えたら逆行の連続は切れる
+    expect(t.push(100, T0 + 20_000)).toBe(false);
+    expect(t.push(100, T0 + 25_000)).toBe(false);
+    expect(t.push(120, T0 + 45_000)).toBe(true);
+    expect(t.ratePerMin(T0 + 45_000)).toBeCloseTo(20, 5); // 取り直されていない: 20秒以上前で一番新しい標本=110@15秒、(120-110)/30秒
+  });
+
+  it('同値(増えていない・逆行でもない)は逆行の連続を切り、採用もしない', () => {
+    const t = createCommentRateTrack();
+    t.push(100, T0);
+    expect(t.push(90, T0 + 5_000)).toBe(false);
+    expect(t.push(90, T0 + 10_000)).toBe(false);
+    expect(t.push(100, T0 + 15_000)).toBe(false); // 同値(基準と同じ)=連続が切れる
+    expect(t.push(90, T0 + 20_000)).toBe(false);
+    expect(t.push(90, T0 + 25_000)).toBe(false);
+    expect(t.ratePerMin(T0 + 25_000)).toBeNull();
+  });
+
+  it('時刻が戻った/同時刻の観測は、逆行として数えない(無視する)', () => {
+    const t = createCommentRateTrack();
+    t.push(100, T0 + 10_000);
+    for (let i = 0; i < 5; i += 1) expect(t.push(50, T0 + 10_000 - i)).toBe(false);
+    expect(t.push(150, T0 + 40_000)).toBe(true);
+    expect(t.ratePerMin(T0 + 40_000)).toBeCloseTo(100, 5); // 100→150 / 30秒(取り直されていない)
+  });
+});

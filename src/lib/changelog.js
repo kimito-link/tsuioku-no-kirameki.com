@@ -18,6 +18,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1573',
+    date: '2026-10-06',
+    summary: '本家コメの速さが古い値で止まらない',
+    items: Object.freeze([
+      '「本家コメ」の隣の「+N/分」が、一度だけ大きすぎる数字を読み取ると、そのあとずっと出なくなる(最長15分)ことがありました。低い値が3回続いたら測り直すようにして、数十秒後にまた正しい速さが出ます。1〜2回の揺れでは測り直しません。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1572',
     date: '2026-10-06',
     summary: '内部: 描かない経路の入口を1本化',
@@ -167,14 +175,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     summary: '脈拍レーン: いま話している人を強調',
     items: Object.freeze([
       'ライブビュー(/live/)の脈拍レーンで、直近でコメントが増えた人を大きく・繰り返し表示するようにしました。件数のみで、コメント本文は表示していません。'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.1553',
-    date: '2026-09-30',
-    summary: '/live/ 脈拍レーンに応援者の名前とサムネ',
-    items: Object.freeze([
-      'ライブビュー(/live/)の脈拍レーンに、丸いサムネと名前つきのチップを流し「誰が応援したか」が見えるようにしました。コメント本文は表示していません。'
     ])
   })
 ]);
