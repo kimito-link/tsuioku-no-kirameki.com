@@ -24,6 +24,14 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.1556',
+    date: '2026-10-01',
+    summary: '/live/ に Kick の配信一覧(別欄)を準備',
+    items: Object.freeze([
+      'ライブビュー(/live/)に、Kick で配信中の日本語配信を同時視聴数の多い順に並べる欄を用意しました。値は Kick の公式 API が返したものをそのまま表示し、ニコ生の一覧とは混ぜません。Kick 側の準備が整い次第、表示が始まります。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1555',
     date: '2026-09-30',
     summary: '脈拍レーンが開いた直後から動くように修正',

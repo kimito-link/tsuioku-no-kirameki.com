@@ -18,6 +18,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1576',
+    date: '2026-10-06',
+    summary: '別窓でも大人数の応援レーンが伸びない',
+    items: Object.freeze([
+      '別窓(ブラウザで開く応援ライブビュー)で、応援者が49人以上のとき、たぬ姉の段が縦に伸び続けて画面を突き抜けることがありました。サイドパネルと同じく高さを抑えてスクロールで全員に届くようにしました(誰も消えません)。あわせて、LPの熱い人バッジの説明を実際の動きに合わせて「ごく最近」に改めました。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1575',
     date: '2026-10-06',
     summary: '別窓の顔ぶれ入れ替えが反映される',
@@ -167,14 +175,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     summary: '終了した放送の経過時間を正しく表示',
     items: Object.freeze([
       'タイムシフト(終了した放送)を開いたとき、経過時間が「開始から今まで」で計算されて「26703時間」のように出ていた不具合を修正しました。終了した放送は「開始〜終了」の実際の放送時間で固定します(終了時刻が取れない場合は「—」)。放送中の経過時間はこれまでどおりです。'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.1556',
-    date: '2026-10-01',
-    summary: '/live/ に Kick の配信一覧(別欄)を準備',
-    items: Object.freeze([
-      'ライブビュー(/live/)に、Kick で配信中の日本語配信を同時視聴数の多い順に並べる欄を用意しました。値は Kick の公式 API が返したものをそのまま表示し、ニコ生の一覧とは混ぜません。Kick 側の準備が整い次第、表示が始まります。'
     ])
   })
 ]);

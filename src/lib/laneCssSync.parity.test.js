@@ -34,8 +34,8 @@ const EXPECTED_SELECTOR_DIFFS = [
   { sel: ".nl-story-userlane--tanu > :nth-child(n + 25) .nl-story-userlane-cell[data-thumb='0']", has: '--V', status: 'intended', why: '後列LOD(子孫形)。会場は席ラッパ(.nlsb-seat)で包むため' },
   { sel: ".nl-story-userlane--tanu > :nth-child(n + 25) .nl-story-userlane-cell[data-thumb='0'] .nl-story-userlane-avatar", has: '--V', status: 'intended', why: '同上' },
   { sel: ".nl-story-userlane--tanu > :nth-child(n + 25) .nl-story-userlane-cell[data-thumb='0'] .nl-story-userlane-meta", has: '--V', status: 'intended', why: '同上' },
-  // --- 窓化(v0.1.1475)。renderer は wrapTileEl 無し=live-view でも class を付けるが CSS が live-view に無い ---
-  { sel: '#sceneStoryUserLaneTanu.nl-story-userlane--windowed', has: 'P--', status: 'unreviewed', why: 'v0.1.1475 の窓化CSSは popup だけ。会場は対象外(意図)だが、live-view も class は付くのに CSS が無い=未輸入の可能性(要判断・今回はコードを変えない)' },
+  // --- 窓化(v0.1.1475)。live-view も wrapTileEl 無しで class が付くため v0.1.1576 で CSS を写した。会場は judgeLaneWindow が isVenue で窓にしない ---
+  { sel: '#sceneStoryUserLaneTanu.nl-story-userlane--windowed', has: 'PL-', status: 'intended', why: '窓化は会場では行わない(laneWindowVerdict.js: venue-has-own-scroll)。popup と live-view は同じ規則' },
   // --- 中身LOD。会場には配線しない(laneContentLod.wiring.test.js)。現在は LANE_CONTENT_LOD_ENABLED=false ---
   { sel: '.nl-story-userlane-cell--hollow', has: 'PL-', status: 'intended', why: '中身LODの枠だけタイル。会場は3D変形で可視判定が崩れる前科があり配線しない' },
   // --- 段の器。会場は自前の surface 規則(区間外)で組む ---
