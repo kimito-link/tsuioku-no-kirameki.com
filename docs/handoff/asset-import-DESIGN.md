@@ -194,3 +194,32 @@ export const LANE_IMPORT_CONTRACT = [
 4. **キー照合**(qwen): index でなく ID キーで紐づける → 1568 で `dataset.userKey` 照合済み。D-1 の入れ替え fixture テスト(1570)で固定する。
 
 **変更なし**: MVP=1569(CSS 3区間の集合照合テスト+マーカー2行)。版の順は `asset-import-IMPLEMENTATION-HANDOFF.md` の §1(1572〜の弱点修正は速度→熱い人の順で先行してよい)。
+
+---
+
+## 追記2: 実装結果とソース調査での修正点(2026-10-06・v0.1.1569〜1575)
+
+実装前にソースを網羅調査(Explore 3本)し、設計の前提を次のとおり直した。branch `feat/asset-import-guards`。
+
+| 版 | 内容 | 設計からの変更・調査で分かったこと |
+|---|---|---|
+| 1569 | live-view に匿名タイルの基本3規則(+点線枠) | **調査で発見**: `app/live-view.html` には `[data-thumb="0"]` の基本規則が v0.1.1049 から無く、1564 の点線枠も別窓に効いていなかった。ユーザー判断で「3画面そろえる」。後列 anon 26px は意図的な差として維持 |
+| 1570 | `laneCssSync.parity.test.js`+`tests/helpers/laneCssSource.js` | popup/live-view へのマーカー追加は**不要**(`<style>` ブロックを直接読む)。除外リスト(理由つき22件)を契約化。**未確認の差を `unreviewed` で記録**: 窓化CSS(v0.1.1475)は popup だけ=live-view は class が付くのに CSS が無い(未輸入の可能性・コードは変えていない) |
+| 1571 | `tests/helpers/laneImportContract.js`+`laneImportContract.test.js` | 契約は `src/lib` でなく `tests/helpers` に(テスト専用)。鏡セル・復元・会場・関所・旧鏡 flush の各段階のキー集合が契約と完全一致。同一人物性・0 非捏造 |
+| 1572 | `skipStoryUserLanePaint`(入口1本化) | wiring を関数単位(`resolveEntryFnSource`)に。`laneContentLod.wiring.test.js` の偽陰性を修正。設計の `testSrcSlice.js` 新設はやめ、既存 `tests/helpers/wiringTestSource.js` を再利用 |
+| 1573 | 公式コメ速度の固着 | 逆行3回で基準取り直し。**見送り**: bundle の liveId 照合(bundle に liveId が無い) |
+| 1574 | 熱い人の裏タブ | **設計どおりでは効かなかった**: 「窓超えで events を空にして prev だけ更新」は全リセットと同じ出力になる。代わりに「取り直す閾値(rebaseGapMs=窓×3)」と「増分を表示し続ける窓」を分けた |
+| 1575 | 別窓(passive)の鏡 sig に `snap.contentHash` | **実機(受動ビュー)で再現**: 件数だけの sig では同数の顔ぶれ入れ替えが再描画されなかった(数字は 1568 の userKey 照合で別人に貼られないが顔ぶれが古い)。capturedAt は入れない(明滅の退化) |
+
+### 実機確認(devtools Chrome・実際の拡張 v0.1.1568〜1575・受動ビュー `popup.html?inline=1&dock=status`)
+- 鏡(`nls_lane_mirror_v1`)を storage に入れて**本物のコード経路**(restore → paint)で、🎁📣💬・`+500pt`(is-gifted)・`+7件`(is-hot)・段見出し「N人」・脚注・匿名タイルの点線枠が出ることを DOM と computed style で確認
+- 同じ顔ぶれで数字だけ変えると、タイルは同一ノードのまま `data-stats` だけ更新・熱い人バッジが消える・`animationstart` は 0 回(再発火しない)
+- 同数で顔ぶれ入れ替え: 1575 前=再描画されず、1575 後=再描画され各人の数字
+- ※鏡フラッシュ(書き込み側)は実機未測定だが、コードでは「stats だけの変化でも毎回書かれる」(同値スキップ無し・capturedAt=Date.now())と確認済み
+
+### まだ未確認・今回の対象外
+- 実配信データでの見え方・会場の吹き出し座標(タイル高さ+1行)・裏タブ+会場での熱い人の実発火
+- 会場(venueBar)・純Web live-view(app/live-view.js)での実画面(vitest の3経路パリティと CSS の集合照合までは済み)
+- `withLaneTileStats` の catch が黙って素の buckets を返す(診断カウンタ無し)・pulse の期限・北極星OFF注記(null と空配列の区別)・橙の同色・表示ON/OFF設定
+- 描かない2経路(entries空+keep / picked空+keep)と MainPopupFallback は新データが無い/設計意図のため sync を足していない
+- `app/live-view.js` は鏡の読み手登録簿(`LANE_MIRROR_CONSUMERS`)に未登録(登録簿のテストは `src/` しか走査しない)
