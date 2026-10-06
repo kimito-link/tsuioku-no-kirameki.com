@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { paintStoryUserLaneDomFilled } from '../extension/story/renderStoryUserLaneDom.js';
 import { buildLaneMirrorSnapshot, restoreLaneMirrorBuckets } from './laneMirror.js';
 import { composeVenueLaneBuckets } from './venueLaneMirrorSupply.js';
-import { attachLaneTileStats, buildLaneTileStatsIndex } from './laneTileStats.js';
+import { attachLaneTilePulse, attachLaneTileStats, buildLaneTileStatsIndex } from './laneTileStats.js';
 
 /**
  * 3 画面パリティ: 同一 fixture を
@@ -64,7 +64,7 @@ function fixtureBuckets() {
     kokenRows: [{ name: 'ギフトさん', contribution: 1200, userPageUrl: 'https://www.nicovideo.jp/user/1002' }],
     nicoadRows: []
   });
-  return attachLaneTileStats(base, idx);
+  return attachLaneTilePulse(attachLaneTileStats(base, idx), new Map([['1002', { giftDelta: 500, giftTier: 'large' }]]));
 }
 
 const tilesHtml = (els) =>
@@ -150,5 +150,20 @@ describe('stats は ①直描画 / ③鏡復元 / ②会場 で同一 DOM にな
     expect(a).toEqual(['1人', '1人', '1人', '1人', '2人']);
     expect(guides(paint3())).toEqual(a);
     expect(guides(paint2())).toEqual(a);
+  });
+
+  it('ギフト増分バッジ(v0.1.1565)が 3 経路で一致し、実際に付いている', () => {
+    const a = paint1();
+    const c = a.laneGift.querySelector('.nl-story-userlane-cell');
+    expect(c.getAttribute('data-pulse')).toBe('+500pt');
+    expect(c.getAttribute('data-pulse-tier')).toBe('large');
+    expect(c.classList.contains('is-gifted')).toBe(true);
+    for (const els of [paint3(), paint2()]) {
+      const x = els.laneGift.querySelector('.nl-story-userlane-cell');
+      expect(x.getAttribute('data-pulse')).toBe('+500pt');
+      expect(x.classList.contains('is-gifted')).toBe(true);
+      // 増分の無い人には付かない
+      expect(els.laneLink.querySelector('.nl-story-userlane-cell').hasAttribute('data-pulse')).toBe(false);
+    }
   });
 });

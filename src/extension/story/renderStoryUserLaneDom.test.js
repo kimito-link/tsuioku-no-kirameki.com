@@ -509,3 +509,66 @@ describe('段見出しの人数(v0.1.1563)', () => {
     expect(countOf(els.guideLinesMidTanu)).toBe('3人');
   });
 });
+
+/**
+ * v0.1.1565: ギフト増分バッジ(data-pulse / is-gifted)も属性とクラスだけで運ぶ。
+ *   cell(タイル本体)に付く。クラスは「変わったときだけ」付け外し=CSS アニメは class 追加時に 1 回だけ走る。
+ */
+describe('タイル pulse 属性(data-pulse / is-gifted)', () => {
+  const GIFT = { giftDelta: 1200, giftTier: 'large' };
+  const withPulse = (c, pulse) => ({ ...c, pulse });
+  const lane = (items) => ({ link: items, gift: [], ad: [], konta: [], tanu: [] });
+
+  it('gift の pulse は cell に data-pulse="+1,200pt"・data-pulse-tier・is-gifted が付く', () => {
+    const els = makeEls();
+    paint(els, lane([withPulse(LINK[0], GIFT)]));
+    const c = els.laneLink.firstElementChild;
+    expect(c.getAttribute('data-pulse')).toBe('+1,200pt');
+    expect(c.getAttribute('data-pulse-tier')).toBe('large');
+    expect(c.classList.contains('is-gifted')).toBe(true);
+  });
+
+  it('pulse の無いタイルには何も付かない', () => {
+    const els = makeEls();
+    paint(els, lane([LINK[0]]));
+    const c = els.laneLink.firstElementChild;
+    expect(c.hasAttribute('data-pulse')).toBe(false);
+    expect(c.hasAttribute('data-pulse-tier')).toBe(false);
+    expect(c.classList.contains('is-gifted')).toBe(false);
+  });
+
+  it('★pulse だけが変わっても cell は同一参照・repaint カウント不変・属性とクラスだけ更新、消えたら外れる', () => {
+    const els = makeEls();
+    paint(els, lane([LINK[0]]));
+    const c = els.laneLink.firstElementChild;
+    const before = getStoryLaneRepaintCounts();
+    paint(els, lane([withPulse(LINK[0], GIFT)]));
+    expect(els.laneLink.firstElementChild).toBe(c);
+    expect(c.getAttribute('data-pulse')).toBe('+1,200pt');
+    expect(c.classList.contains('is-gifted')).toBe(true);
+    paint(els, lane([LINK[0]]));
+    expect(c.hasAttribute('data-pulse')).toBe(false);
+    expect(c.classList.contains('is-gifted')).toBe(false);
+    expect(getStoryLaneRepaintCounts()).toEqual(before);
+  });
+
+  it('値が同じなら setAttribute/classList を触らない(アニメを再発火させない)', () => {
+    const els = makeEls();
+    paint(els, lane([withPulse(LINK[0], GIFT)]));
+    const c = els.laneLink.firstElementChild;
+    const spyAttr = vi.spyOn(c, 'setAttribute');
+    const spyClass = vi.spyOn(c.classList, 'add');
+    paint(els, lane([withPulse(LINK[0], { ...GIFT })]));
+    expect(spyAttr).not.toHaveBeenCalled();
+    expect(spyClass).not.toHaveBeenCalled();
+  });
+
+  it('描かない経路用 sync でも pulse が追従する', () => {
+    const els = makeEls();
+    paint(els, lane([LINK[0]]));
+    const c = els.laneLink.firstElementChild;
+    syncStoryUserLaneStatsInPlace(els, lane([withPulse(LINK[0], GIFT)]));
+    expect(c.getAttribute('data-pulse')).toBe('+1,200pt');
+    expect(c.classList.contains('is-gifted')).toBe(true);
+  });
+});

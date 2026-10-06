@@ -10,6 +10,7 @@
  */
 import { formatNumberJa } from './htmlText.js';
 import { officialDomRankingRowsToStripRooms } from './officialDomRankingRowsToStripRooms.js';
+import { formatPtDelta } from './liveGiftPulse.js';
 
 /** @typedef {{ commentCount: number|null, giftPt: number|null, adPt: number|null }} LaneTileStats */
 
@@ -127,4 +128,73 @@ export function formatLaneTileStats(stats) {
 /** 脚注(誠実な注記): 公式値と拡張記録の区別。 */
 export function laneTileStatsLegendText() {
   return '🎁📣は公式の公開pt・💬は拡張が記録した件数';
+}
+
+/**
+ * @typedef {{ giftDelta?: number, giftTier?: string }} LaneTilePulse
+ *   v0.1.1565: ギフト増分(公式 koken の標本間差分)。1566 で熱い人(heat/heatTier)が同じ器に入る。
+ */
+
+/**
+ * koken 貢献度行 → createGiftPulseRegistry が読む {uid, point}(数値 uid の行だけ)。
+ * @param {unknown[]|null|undefined} rows ContributionRankerRow[]
+ * @returns {Array<{ uid: string, point: number }>}
+ */
+export function pulseRowsFromKokenRows(rows) {
+  if (!Array.isArray(rows)) return [];
+  const out = [];
+  for (const r of officialDomRankingRowsToStripRooms(rows, { userKeyKind: 'contrib' })) {
+    const key = String(r.userKey || '');
+    if (/^\d+$/.test(key)) out.push({ uid: key, point: Math.max(0, Number(r.count) || 0) });
+  }
+  return out;
+}
+
+/**
+ * createGiftPulseRegistry().pulseFor の結果(byKey: 'u:<uid>' → {delta,tier})を uid → LaneTilePulse へ。
+ * @param {{ byKey?: ReadonlyMap<string, { delta: number, tier: string }> }|null|undefined} result
+ * @returns {Map<string, LaneTilePulse>}
+ */
+export function giftPulseByUid(result) {
+  /** @type {Map<string, LaneTilePulse>} */
+  const out = new Map();
+  const byKey = result && result.byKey;
+  if (!byKey || typeof byKey.forEach !== 'function') return out;
+  byKey.forEach((v, key) => {
+    const uid = String(key || '').replace(/^u:/, '');
+    if (uid && v && v.delta > 0) out.set(uid, { giftDelta: v.delta, giftTier: String(v.tier || '') });
+  });
+  return out;
+}
+
+/**
+ * 5 段のアイテムに pulse を載せた新しい buckets を返す(増分の無いアイテムは同じ参照のまま)。
+ * @template {Record<string, any[]>} B
+ * @param {B} buckets
+ * @param {ReadonlyMap<string, LaneTilePulse>} pulseByUid
+ * @returns {B}
+ */
+export function attachLaneTilePulse(buckets, pulseByUid) {
+  if (!pulseByUid || pulseByUid.size === 0) return buckets;
+  const out = /** @type {any} */ ({ ...buckets });
+  for (const tier of TIER_KEYS) {
+    const arr = Array.isArray(buckets?.[tier]) ? buckets[tier] : [];
+    out[tier] = arr.map((item) => {
+      const uid = String(item?.entry?.userId || '').trim();
+      const p = uid ? pulseByUid.get(uid) : undefined;
+      return p ? { ...item, pulse: { ...(item.pulse || {}), ...p } } : item;
+    });
+  }
+  return out;
+}
+
+/**
+ * タイルに付ける増分バッジの文字列・種別・段階。gift を優先する(同時に出さない)。
+ * @param {LaneTilePulse|undefined|null} pulse
+ * @returns {{ text: string, kind: ''|'gift', tier: string }}
+ */
+export function formatLaneTilePulse(pulse) {
+  const gift = formatPtDelta(pulse && pulse.giftDelta);
+  if (gift) return { text: gift, kind: 'gift', tier: String((pulse && pulse.giftTier) || '') };
+  return { text: '', kind: '', tier: '' };
 }

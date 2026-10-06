@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
+import { createGiftPulseRegistry } from './liveGiftPulse.js';
 import {
+  attachLaneTilePulse,
   attachLaneTileStats,
+  formatLaneTilePulse,
+  giftPulseByUid,
+  pulseRowsFromKokenRows,
   buildLaneTileStatsIndex,
   formatLaneTileStats,
   laneTileStatsLegendText,
@@ -115,5 +120,60 @@ describe('attachLaneTileStats', () => {
 describe('laneTileStatsLegendText', () => {
   it('公式pt と 拡張記録件数 の区別を述べる', () => {
     expect(laneTileStatsLegendText()).toBe('🎁📣は公式の公開pt・💬は拡張が記録した件数');
+  });
+});
+
+describe('ギフト増分バッジ(v0.1.1565)', () => {
+  const k = (uid, contribution) => ({
+    name: `u${uid}`,
+    contribution,
+    userPageUrl: `https://www.nicovideo.jp/user/${uid}`
+  });
+
+  it('pulseRowsFromKokenRows: 数値 uid の行だけを {uid, point} にする(名無し・uid無しは捨てる)', () => {
+    expect(
+      pulseRowsFromKokenRows([k('1', 1200), { name: '名無し', contribution: 9, isAnonymous: true }, { name: 'x', contribution: 5 }, k('2', 0)])
+    ).toEqual([{ uid: '1', point: 1200 }, { uid: '2', point: 0 }]);
+    expect(pulseRowsFromKokenRows(null)).toEqual([]);
+  });
+
+  it('標本間差分: 2標本目で +500pt(large)。同じ標本の再送でも結果は残る。増えなければ消える', () => {
+    const reg = createGiftPulseRegistry();
+    const t0 = 1_000_000;
+    expect(giftPulseByUid(reg.pulseFor('lv1', pulseRowsFromKokenRows([k('1', 1200)]), t0)).size).toBe(0); // 初回は基準だけ
+    const r2 = reg.pulseFor('lv1', pulseRowsFromKokenRows([k('1', 1700), k('2', 40)]), t0 + 30_000);
+    const m = giftPulseByUid(r2);
+    expect(m.get('1')).toEqual({ giftDelta: 500, giftTier: 'large' });
+    expect(m.has('2')).toBe(false); // 前の標本にいない人は光らせない
+    // 同じ capturedAt の再送=前回結果のまま(次の標本まで残る)
+    expect(giftPulseByUid(reg.pulseFor('lv1', pulseRowsFromKokenRows([k('1', 1700)]), t0 + 30_000)).get('1')?.giftDelta).toBe(500);
+    // 次の標本で増えていなければ消える
+    expect(giftPulseByUid(reg.pulseFor('lv1', pulseRowsFromKokenRows([k('1', 1700)]), t0 + 60_000)).size).toBe(0);
+  });
+
+  it('15分を超える間隔の差分は出さない', () => {
+    const reg = createGiftPulseRegistry();
+    reg.pulseFor('lv1', pulseRowsFromKokenRows([k('1', 100)]), 1_000_000);
+    expect(giftPulseByUid(reg.pulseFor('lv1', pulseRowsFromKokenRows([k('1', 9000)]), 1_000_000 + 16 * 60_000)).size).toBe(0);
+  });
+
+  it('attachLaneTilePulse: 該当 uid の item.pulse に載せ、他のフィールドと stats は不変。frozen でも壊さない', () => {
+    const mk = (uid, extra = {}) => Object.freeze({ displaySrc: 'x', title: 't', meta: { idLine: 'i', nameLine: 'n' }, entry: { userId: uid }, ...extra });
+    const pulse = new Map([['1', { giftDelta: 500, giftTier: 'large' }]]);
+    const stats = { commentCount: 3, giftPt: 10, adPt: null };
+    const b = { link: [mk('1', { stats })], gift: [mk('1')], ad: [mk('')], konta: [mk('2')], tanu: [] };
+    const out = attachLaneTilePulse(b, pulse);
+    expect(out.link[0].pulse).toEqual({ giftDelta: 500, giftTier: 'large' });
+    expect(out.link[0].stats).toBe(stats);
+    expect(out.gift[0].pulse).toEqual({ giftDelta: 500, giftTier: 'large' });
+    expect(out.konta[0].pulse).toBeUndefined();
+    expect(b.link[0].pulse).toBeUndefined();
+    expect(attachLaneTilePulse(b, new Map()).link[0]).toBe(b.link[0]); // 増分なしの item は同じ参照のまま
+  });
+
+  it('formatLaneTilePulse: gift は「+N pt」・不正/なしは空', () => {
+    expect(formatLaneTilePulse({ giftDelta: 1200, giftTier: 'large' })).toEqual({ text: '+1,200pt', kind: 'gift', tier: 'large' });
+    expect(formatLaneTilePulse({ giftDelta: 0 })).toEqual({ text: '', kind: '', tier: '' });
+    expect(formatLaneTilePulse(undefined)).toEqual({ text: '', kind: '', tier: '' });
   });
 });
