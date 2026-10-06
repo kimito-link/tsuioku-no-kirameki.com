@@ -9,7 +9,7 @@
 
 | 項目 | 結果 |
 |---|---|
-| 新規予定ファイル(`src/lib/laneImportContract.js` / `testSrcSlice.js` / `laneCssSync.parity.test.js`) | いずれも未存在=衝突なし |
+| 新規予定ファイル(`laneImportContract` / `testSrcSlice.js` / `laneCssSync.parity.test.js`) | 着手時はいずれも未存在=衝突なし。実際は契約を `tests/helpers/` に置き、`testSrcSlice.js` は作らず既存ヘルパを再利用 |
 | `popup.html` / `app/live-view.html` に `LANE_CSS_SYNC` **マーカー** | 無い(ヒットは私が書いたコメントだけ) |
 | `venueBar.js` の SYNC 区間 | 317行・`${` 補間なし(正規表現で切っても壊れない) |
 | `check-gate-bypass` の赤 | **今回の変更と無関係**。`.github/workflows/actionlint.yml:50` の `continue-on-error: true` は、同ファイル冒頭コメントが理由(actionlint を実測できず非ブロッキングで導入)を書いた**意図的な設定**。対応不要(格上げするなら別お題) |
@@ -18,18 +18,31 @@
 | 会議の「CSS正本→注入ビルド」案 | **却下**(DESIGN F)。カスケード位置依存・意図的な差を消す・巨大機構 |
 | ai-hub find | 該当なし(輸入手順の既存資産なし) |
 
-## 1. スコープ(MVP)と版の分割(1変更=1版・各版 `/nicolive-ship`)
+## 1. 実装状況(2026-10-06 時点・branch `feat/asset-import-guards`・全て push 済み)
 
-版番号は着手時の manifest 最新+1 に読み替える(2026-10-06 時点の最新 0.1.1568)。
+> ★この節は実装後に「計画」から「結果」へ書き換えた。計画との違いは [asset-import-DESIGN.md](asset-import-DESIGN.md) の「追記2」を見ること。
 
-| 版 | 内容 | 挙動 |
+| 版 | 内容 | 状態 |
 |---|---|---|
-| **1569 (MVP)** | `popup.html` と `app/live-view.html` に `/* LANE_CSS_SYNC_SRC_BEGIN */` `/* LANE_CSS_SYNC_SRC_END */` を足す(コメント2行・**CSSの位置は動かさない**)。`venueBar.js:1162` の「popup.html:1037-1320」手書き行番号をマーカー参照に直す。新規 `src/lib/laneCssSync.parity.test.js`(3区間の**セレクタ集合・`--nl-lane-*` トークン名集合・`@keyframes` 名集合・reduced-motion で animation:none のクラス集合**を照合・値は比較しない) | 不変 |
-| 1570 | `src/lib/laneImportContract.js`(テストだけが読む定数)+鏡キー集合の完全一致テスト+既存 `laneTilePresentation.wiring.test.js` の toContain 4ブロックを契約ループへ置換(行数が減る)+同一人物性の入れ替え fixture テスト(DESIGN D-1) | 不変 |
-| 1571 | `renderStoryUserLaneDom.js` に `skipStoryUserLanePaint()` を足し、popup-entry の「描かない3経路」の直接 sync 呼び出し3つを置換(**行数不変**)。wiring は `syncStoryUserLaneStatsInPlace(`=0件・`skipStoryUserLanePaint(`=3件に | 不変 |
-| 1572〜 | 既知弱点の修正(下記 §4)。**各々、実機で症状確認 or 単体テストで固定してから**。再会議(DESIGN 追記)により、速度の固着→熱い人の窓超えの順で、1569〜1571 より先に出してもよい(単体テストで固定できるため) | 修正 |
+| 1569 | `app/live-view.html` に匿名タイルの基本3規則(avatar小+点線枠/gap・padding/meta 9px)。調査で「元から無かった」と判明 | 済 |
+| 1570 | `src/lib/laneCssSync.parity.test.js`+`tests/helpers/laneCssSource.js`(CSS 3区間の集合照合・除外は理由つき宣言)。popup/live-view へのマーカー追加は不要と判断 | 済 |
+| 1571 | `tests/helpers/laneImportContract.js`(契約・テスト専用)+`src/lib/laneImportContract.test.js`(鏡キー集合の完全一致・同一人物性・0 非捏造) | 済 |
+| 1572 | `skipStoryUserLanePaint`(描かない経路の入口1本化)・wiring を関数単位に・`laneContentLod.wiring.test.js` の偽陰性修正 | 済 |
+| 1573 | 公式コメ速度: 逆行3回で基準取り直し | 済 |
+| 1574 | 熱い人: `rebaseGapMs`(窓×3)。設計の「events を空にして prev 更新」は全リセットと同じ出力で効かないため変更 | 済 |
+| 1575 | 別窓(passive)鏡 sig に `snap.contentHash`(実機再現した「同数の顔ぶれ入れ替え」) | 済 |
+| 1576 | 別窓にも窓化CSS・LP の熱い人の文言を実際に合わせる(reality-checker 指摘) | 済 |
+| 1577 | 速度チップ: 最新標本が2分より古ければ出さない・契約テスト fixture を段ごと/人ごとに別値に+一部サブ項目の往復 | 済 |
 
-文字列スキャン型テストの脆さ(`laneContentLod.wiring.test.js:54-60` の `indexOf('continue;')`)は 1570 で `sliceFunction()`(`src/lib/testSrcSlice.js`・10行)に直す。
+文字列スキャン型テストの共通ヘルパは新設せず、既存の `tests/helpers/wiringTestSource.js`(`extractFnBody` / `resolveEntryFnSource`)を再利用した。
+
+### 残り(別判断・計画外)
+- 実機: 実配信データでの見え方・会場の吹き出し座標・裏タブ+会場での熱い人の実発火・別窓(web 配信ページ)の見た目
+- `withLaneTileStats` の catch の診断カウンタ・pulse の期限・北極星OFF注記(null と空配列の区別)・橙の同色・表示ON/OFF設定
+- `app/live-view.js` を鏡の読み手の登録簿(`LANE_MIRROR_CONSUMERS`)へ(登録簿のテストは `src/` しか走査しない)
+- reality-checker の低〜中の指摘のうち未対応: 契約テストの tests 一部、CSS 抽出器の `:is(a, b)` の誤分割(現状ソースに無いので無害)
+
+> ★以降(§2〜§7)は【着手前に書いた計画】のまま残してある(版番号・MVP の指定は上の「実装状況」が最新)。同じ型で次の輸入をするときの手順・完了判定・地雷として読むこと。
 
 ## 2. 着手手順
 

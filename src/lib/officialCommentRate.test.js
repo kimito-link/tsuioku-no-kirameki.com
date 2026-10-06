@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   RATE_MAX_GAP_MS,
+  RATE_STALE_MS,
   RATE_MIN_SPAN_MS,
   createCommentRateTrack,
   formatCommentRate
@@ -46,12 +47,32 @@ describe('createCommentRateTrack(公式コメント数の速度・v0.1.1567)', (
     expect(r).toBeCloseTo(60, 5); // 1秒に1件=60/分
   });
 
-  it('最新の標本から 15 分以上たったら消す(止まった配信に古い速度を出し続けない)', () => {
+  it('最新の標本から RATE_STALE_MS(2分)たったら消す(静かになった配信に古い速度を出し続けない)', () => {
     const t = createCommentRateTrack();
     t.push(100, T0);
     t.push(200, T0 + 40_000);
-    expect(t.ratePerMin(T0 + 40_000 + RATE_MAX_GAP_MS - 1)).not.toBeNull();
-    expect(t.ratePerMin(T0 + 40_000 + RATE_MAX_GAP_MS)).toBeNull();
+    expect(RATE_STALE_MS).toBe(120_000);
+    expect(RATE_STALE_MS).toBeLessThan(RATE_MAX_GAP_MS);
+    expect(t.ratePerMin(T0 + 40_000 + 60_000)).not.toBeNull(); // 1分の静かな間(コメントが少し途切れた)では消さない
+    expect(t.ratePerMin(T0 + 40_000 + RATE_STALE_MS - 1)).not.toBeNull();
+    expect(t.ratePerMin(T0 + 40_000 + RATE_STALE_MS)).toBeNull();
+  });
+
+  it('コメントが数秒おきに来続けている間は、2分以上続けても消えない(標本が更新され続ける)', () => {
+    const t = createCommentRateTrack();
+    let c = 100;
+    for (let i = 0; i <= 40; i += 1) t.push((c += 3), T0 + i * 5_000); // 200秒間・5秒ごとに +3
+    expect(t.ratePerMin(T0 + 200_000)).toBeCloseTo(36, 5);
+  });
+
+  it('5件/10秒で増えた後に10分の無音でも、古い 30/分 を出し続けない', () => {
+    const t = createCommentRateTrack();
+    t.push(1000, T0);
+    t.push(1005, T0 + 10_000);
+    t.push(1010, T0 + 20_000);
+    t.push(1015, T0 + 30_000);
+    expect(t.ratePerMin(T0 + 30_000)).toBeCloseTo(30, 5);
+    expect(t.ratePerMin(T0 + 30_000 + 10 * 60_000)).toBeNull();
   });
 
   it('2標本が 15 分以上離れていたら出さない', () => {
