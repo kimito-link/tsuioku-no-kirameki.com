@@ -152,7 +152,14 @@ function applyLaneTilePulseAttr(tileEl, p) {
 function syncLaneTierStatsInPlace(laneEl, items) {
   const nodes = laneEl ? _laneTileNodes.get(laneEl) : null;
   if (!nodes || !Array.isArray(items) || nodes.length !== items.length) return;
-  for (let i = 0; i < nodes.length; i += 1) applyLaneTileStatsAttr(nodes[i], items[i]);
+  for (let i = 0; i < nodes.length; i += 1) {
+    const node = nodes[i];
+    // v0.1.1568: 控えは index 対応なので、縮小ガード・鏡 skip のように「DOM は旧のまま・供給だけ新しい」経路で
+    //   別人の値を貼らないよう、タイルに刻んだ照合キー(dataset.userKey)と一致するときだけ書く。
+    //   (laneContentLod.wiring.test.js が「最初の continue;」までを文字列スキャンするので、ここでは continue を使わない)
+    const sameWho = !node || !node.dataset || node.dataset.userKey === venueLaneParityKey(items[i]);
+    if (sameWho) applyLaneTileStatsAttr(node, items[i]);
+  }
 }
 
 /** buckets のどこかに表示できる stats があるか(脚注の出し分け用)。 */

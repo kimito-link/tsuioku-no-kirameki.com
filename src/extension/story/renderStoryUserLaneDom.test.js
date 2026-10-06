@@ -617,3 +617,30 @@ describe('熱い人バッジ(is-hot・v0.1.1566)', () => {
     expect(c.classList.contains('is-hot')).toBe(true);
   });
 });
+
+describe('sync は別人の値を貼らない(v0.1.1568・reality-checker 指摘)', () => {
+  const wp = (c, extra) => ({ ...c, ...extra });
+  const lane = (items) => ({ link: [], gift: [], ad: [], konta: [], tanu: items });
+
+  it('件数が同じでも顔ぶれが違う段には stats / pulse を書かない(縮小ガード・鏡 skip の経路)', () => {
+    const els = makeEls();
+    paint(els, lane([wp(TANU[0], { stats: { commentCount: 1, giftPt: null, adPt: null } }), TANU[1]]));
+    const cells = Array.from(els.laneTanu.children);
+    // DOM は A,B のまま。供給だけが C,D(同数・別人)に入れ替わった状態で sync が呼ばれる。
+    const C = cell('a:CCC', 'ident-c.svg', '匿名C');
+    const D = cell('a:DDD', 'ident-d.svg', '匿名D');
+    syncStoryUserLaneStatsInPlace(els, lane([
+      wp(C, { stats: { commentCount: 99, giftPt: null, adPt: null }, pulse: { giftDelta: 500, giftTier: 'large' } }),
+      D
+    ]));
+    expect(cells[0].querySelector('.nl-story-userlane-meta').getAttribute('data-stats')).toBe('💬1'); // 旧のまま
+    expect(cells[0].hasAttribute('data-pulse')).toBe(false);
+  });
+
+  it('同じ顔ぶれなら従来どおり追従する', () => {
+    const els = makeEls();
+    paint(els, lane([TANU[0], TANU[1]]));
+    syncStoryUserLaneStatsInPlace(els, lane([wp(TANU[0], { stats: { commentCount: 7, giftPt: null, adPt: null } }), TANU[1]]));
+    expect(els.laneTanu.children[0].querySelector('.nl-story-userlane-meta').getAttribute('data-stats')).toBe('💬7');
+  });
+});
