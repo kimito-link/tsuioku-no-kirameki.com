@@ -619,7 +619,7 @@ function _measuredSection(name, fn) {
 import {
   paintStoryUserLaneDomEmptyGuides,
   paintStoryUserLaneDomFilled,
-  syncStoryUserLaneStatsInPlace,
+  skipStoryUserLanePaint,
   resetStoryUserLaneDom, getStoryLaneRepaintCounts, getStoryLaneHollowCounts, shouldKeepStoryUserLaneTilesOnEmpty,
   // heavyRace再発の即効対策(HANDOFF-heavyrace-backfill-IMPL.md A): 暫定(heavy未settle)の短い候補で
   //   一度出た完全描画を上書き退化させない単調性ガード。
@@ -6504,7 +6504,7 @@ function renderStoryUserLane() {
     });
     // v0.1.1021: re-render skip でも描画済みなら幕を畳む(独立tick高頻度の sig 一致で幕畳みに到達せず残るのを根治)。
     if (countStoryUserLaneDomTiles(els) > 0) { try { dismissInitialLoadShade(); } catch { /* no-op */ } }
-    syncStoryUserLaneStatsInPlace(els, bucketsWithStats); // v0.1.1562: 描かない経路でも stats だけ追従
+    skipStoryUserLanePaint(els, bucketsWithStats, 'sig-same'); // 描かない経路でも stats だけ追従(入口は1つ)
     return;
   }
   // ★描画単調性ガード(HANDOFF-heavyrace A-3): 暫定 supply が完全描画を短い候補で上書きするのを防ぐ。
@@ -6535,7 +6535,7 @@ function renderStoryUserLane() {
       domTilesPainted: countStoryUserLaneDomTiles(els)
     });
     if (countStoryUserLaneDomTiles(els) > 0) { try { dismissInitialLoadShade(); } catch { /* no-op */ } }
-    syncStoryUserLaneStatsInPlace(els, bucketsWithStats); // v0.1.1562: 縮小ガードで描かない経路
+    skipStoryUserLanePaint(els, bucketsWithStats, 'shrink-guard'); // 縮小ガードで描かない経路
     return;
   }
   storyUserLaneLastRenderSig = laneSig;
@@ -6670,10 +6670,12 @@ async function applyLaneMirrorForPassive() {
   const pickedLength = Math.max(0, Math.floor(Number(snap.pickedLength) || 0) || totalCells);
   const totalCandidates = Math.max(0, Math.floor(Number(snap.totalCandidates) || 0));
   // v0.1.1022(②プレビュー明滅の根治): sig から capturedAt を外す。①が3秒ごと再publishで capturedAt だけ変わり
-  //   中身同じでも再描画→innerHTML='' で要素が一瞬消えてチカチカしていた。件数だけで中身変化は検知できる。
-  const sig = `${String(snap.liveId || '')}|${buckets.link.length}|${buckets.gift.length}|${buckets.ad.length}|${buckets.konta.length}|${buckets.tanu.length}|${pickedLength}|${totalCandidates}`;
+  //   中身同じでも再描画→innerHTML='' で要素が一瞬消えてチカチカしていた。
+  //   ★v0.1.1575: 件数だけだと【同数のまま顔ぶれが入れ替わった】とき再描画されず古い顔ぶれが残った(実機で再現)。
+  //     ①が鏡に焼く snap.contentHash(uid|displaySrc|title のみ・capturedAt を含まない=毎回は変わらない)を足す。
+  const sig = `${String(snap.liveId || '')}|${buckets.link.length}|${buckets.gift.length}|${buckets.ad.length}|${buckets.konta.length}|${buckets.tanu.length}|${pickedLength}|${totalCandidates}|${String(snap.contentHash || '')}`;
   if (sig === _laneMirrorPassiveSig) {
-    syncStoryUserLaneStatsInPlace(els, buckets); // v0.1.1562: 鏡 skip(描かない経路)でも stats だけ追従(鏡は①が書いた値)
+    skipStoryUserLanePaint(els, buckets, 'mirror-sig-same'); // 鏡 skip(描かない経路)でも stats だけ追従(鏡は①が書いた値)
     // 自己診断: 鏡に変化なし＝再 paint しないが DOM は前回の描画済み（=完了扱い・現 DOM 件数）。
     recordStoryUserLaneStep(_storyUserLaneRenderProbe, STORY_USER_LANE_STEPS.DONE, {
       domTilesPainted: countStoryUserLaneDomTiles(els)

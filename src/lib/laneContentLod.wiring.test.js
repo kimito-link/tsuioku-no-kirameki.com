@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
+import { extractFnBody } from '../../tests/helpers/wiringTestSource.js';
 
 /**
  * 中身LOD(枠は残す。中身だけ空にする)の【配線】検査。
@@ -54,9 +55,16 @@ describe('中身LOD: 描画側への配線', () => {
   it('★hollow でも frag に append される = タイル枚数が減らない(幕の解除条件を守る)', () => {
     const code = stripComments(read(RENDERER));
     // hollow 分岐の中で frag.appendChild(hollowEl) してから continue していること。
-    const branch = code.slice(code.indexOf('shouldRenderHollow'));
-    const upToContinue = branch.slice(0, branch.indexOf('continue;'));
-    expect(upToContinue).toContain('frag.appendChild(hollowEl)');
+    //   ★v0.1.1572: 旧版は「ファイル中の最初の shouldRenderHollow(=import 行)から最初の continue; まで」を
+    //     走査しており、別の関数に continue; が1つ足されるだけで赤になり、0個になると slice(0,-1) で
+    //     全文を見て緑になる偽陰性があった。fillLaneTier の本体(括弧対応)だけを見て、空振りは断言で止める。
+    const fn = extractFnBody(code, 'function fillLaneTier(');
+    expect(fn.length, 'fillLaneTier の本体が取れない').toBeGreaterThan(200);
+    const start = fn.indexOf('shouldRenderHollow(');
+    expect(start, 'fillLaneTier 内に shouldRenderHollow( が無い').toBeGreaterThan(-1);
+    const cont = fn.indexOf('continue;', start);
+    expect(cont, 'hollow 分岐の continue; が無い').toBeGreaterThan(start);
+    expect(fn.slice(start, cont)).toContain('frag.appendChild(hollowEl)');
   });
 
   it('★diff-skip の鍵(storyLaneTierBodyKey)に位置・LOD を混ぜていない', () => {

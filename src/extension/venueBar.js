@@ -1159,7 +1159,7 @@ const VENUE_CSS = `
     display: grid;
     place-items: center;
   }
-  /* LANE_CSS_SYNC_BEGIN popup.html:1037-1320 (★参照行は 2026-08-30 に実測して更新。旧 829-1067 は別のブロックを指していた) */
+  /* LANE_CSS_SYNC_BEGIN 転写元=popup.html の応援レーンCSS(★行番号参照は腐る=書かない。popup.html / app/live-view.html / この区間の集合差は src/lib/laneCssSync.parity.test.js が照合する) */
   .nlsb-venue-lane-stack.nl-story-userlane-stack {
     /*
      * ★レーンのアバター寸法（2026-08-30）。popup.html の値を写す。
