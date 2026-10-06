@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 8 / 883 件
+## ⚠️ 役割コメントが無いソース 8 / 884 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `scripts/build.mjs`
@@ -810,7 +810,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (1877)
+- 📁 **src/** (1879)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1088,7 +1088,7 @@
         - `logo_funlink_white_RGB_link_black.png`
         - `logo_funlink_white_RGB_maru_black.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1643)
+  - 📁 **lib/** (1645)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -2042,6 +2042,8 @@
     - `objectUrlRevokeQueue.test.js`
     - `observerTarget.js` — MutationObserver の監視ルートを決める（ニコ生コメントパネル優先）
     - `observerTarget.test.js`
+    - `officialCommentRate.js` — 公式「本家コメ」の件数から、いまの速さ(件/分)を出す(葉モジュール・依存ゼロ)。
+    - `officialCommentRate.test.js`
     - `officialContributionRankingResolver.js` — 公式貢献度ランキングの取得経路（Koken API / DOM bundle / iframe storage）から
     - `officialContributionRankingResolver.test.js`
     - `officialDomRankingRowsToStripRooms.js` — 公式イベント DOM バンドルの貢献度／広告ランキング行を、

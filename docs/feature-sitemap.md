@@ -772,6 +772,9 @@
   - `src/lib/laneMirror.js`
   - `src/lib/venueLaneMirrorSupply.js`
   - `src/extension/story/renderStoryUserLaneDom.js`
+- **公式「本家コメ」チップの速さ(+N/分)** — paintOfficialNicoStatsStrip(popup-entry.js)が公式コメント累計の実測(値が変わったときだけ標本)を officialCommentRate.js に積み、20秒以上離れた2標本の差を「+66/分」としてチップ隣の span に出す。補間はしない・出せない間は空(span ごと非表示)・配信切替で標本を捨てる。officialNicoStatsStripDigest.js は無変更
+  - `src/lib/officialCommentRate.js`
+  - `src/extension/popup-entry.js`
 - **応援ライブビュー(リアルタイム盛り上がり・新規タブ)** — ちくらんカードの「🔥応援ライブビューを開く」で live-view.html?lv=... を新規タブで開く(chrome.runtime.getURL)。chrome.storage を2秒購読し盛り上がり🔥(分速→computeHeatLevel)/応援者ランキング🏆(配信者タイル先頭)/🔗りんく列(数値ID+個人サムネ・categorizeUsersForThumbGrid)/🎁ギフト列(nls_gift_users_<lv>・buildGiftThrowerLaneEntries)/コメント数/来場をリアルタイム再描画。配色は popup(dark)の正確な変数に完全一致。データ取得を createLiveViewDataSource に隔離=将来サーバー公開版(拡張不要で URL 閲覧)へ移植可能(描画は不変)。Web/iOS/Android への土台(v0.1.871-875)
   - `extension/live-view.html`
   - `src/extension/live-view-entry.js`
@@ -1135,7 +1138,7 @@
 - `v0.1.1561` 2026-10-05 — サイドパネルを開いた瞬間の黒を消す
 
 ### その他 (4版)
+- `v0.1.1567` 2026-10-06 — 本家コメのチップに +N/分 を表示
 - `v0.1.1557` 2026-10-05 — 終了した放送の経過時間を正しく表示
 - `v0.1.1556` 2026-10-01 — /live/ に Kick の配信一覧(別欄)を準備
 - `v0.1.1548` 2026-09-26 — 配信詳細モーダルを一旦取り下げ
-- `v0.1.1546` 2026-09-26 — ライブビューの最初の表示を高速化

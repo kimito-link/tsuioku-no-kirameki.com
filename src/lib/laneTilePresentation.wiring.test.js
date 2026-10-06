@@ -195,3 +195,30 @@ describe('熱い人バッジの配線(v0.1.1566)', () => {
     expect(venueBarSrc).toContain('--nl-lane-pulse-hot:');
   });
 });
+
+describe('公式コメント速度 +N/分 の配線(v0.1.1567)', () => {
+  it('popup が officialCommentRate を使い、paintOfficialNicoStatsStrip で標本を積んでチップに出す', () => {
+    expect(popupSrc).toMatch(/from '\.\.\/lib\/officialCommentRate\.js'/);
+    const i = popupSrc.indexOf('function paintOfficialNicoStatsStrip(');
+    expect(i).toBeGreaterThan(0);
+    const body = popupSrc.slice(i, popupSrc.indexOf('\n}\n', i));
+    expect(body).toContain('_officialCommentRate.push(');
+    expect(body).toContain("'officialStatNicoCommentsRate'");
+    expect(body).toContain('formatCommentRate(');
+    // 配信が変わったら標本を捨てる(別配信の件数との差を速度にしない)
+    expect(body).toContain('rateLid !== _officialCommentRateLid');
+    expect(body).toContain('_officialCommentRate.reset(); // 別配信の件数との差を速度にしない');
+  });
+
+  for (const [name, src] of [['popup.html', popupHtml], ['app/live-view.html', liveViewHtml]]) {
+    it(`${name}: 本家コメの値の直後にレート用 span があり、CSS がある`, () => {
+      expect(src).toMatch(/id="officialStatNicoComments">[^<]*<\/span>\s*<span class="nl-official-nico-stats__rate is-placeholder" id="officialStatNicoCommentsRate" aria-live="off"><\/span>/);
+      expect(src).toContain('.nl-official-nico-stats__rate {');
+      expect(src).toContain('.nl-official-nico-stats__rate.is-placeholder {');
+    });
+  }
+
+  it('officialNicoStatsStripDigest.js は触っていない(stableKey/summaryText を固定するテストが無傷)', () => {
+    expect(read('src/lib/officialNicoStatsStripDigest.js')).not.toMatch(/Rate|rate/);
+  });
+});
