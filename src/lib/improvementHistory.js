@@ -1457,5 +1457,19 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
     version: '0.1.1577', metric: 'cross-checked-claims', value: 20,
     source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
     note: '★直近30日窓のスライドによる自然減(v0.1.1562 の note と同じ理由)。今回も変異テストで赤を確認して復元している。'
+  }),
+  Object.freeze({
+    version: '0.1.1578', metric: 'bundle-kb', value: 1385,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '★+1385KB 台は前版(1385KB)と同じ水準。今回は CSS の規則の書き換えと更新履歴1版ぶんだけ(直近20版は popup バンドルに同梱される仕様)。計器は足していない。過去最良1360(@0.1.1454)との差分の内訳は v0.1.1471/1537/1560/1562 の note に記録済み。'
+  }),
+  Object.freeze({
+    version: '0.1.1578', metric: 'gate-selftest', value: 4,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1578', metric: 'cross-checked-claims', value: 19,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: '★直近30日窓のスライドによる自然減(v0.1.1562/1577 の note と同じ理由)。今回は変異テスト2件で赤を確認して復元し、devtools の実ブラウザで layout-shift を修正前10回→修正後0回と別の手段でも確かめている。'
   })
 ]);
