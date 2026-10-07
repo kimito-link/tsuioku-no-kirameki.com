@@ -462,6 +462,8 @@ function removeStoryUserLaneEmptyNotesUnder(root) {
  *   /live/ が安定して見えるのは、更新が遅く 1人1行で、見出しの作り直しが目に入らないから。拡張は件数やバッジが
  *   数秒ごとに変わるたびに paint が走り、同じ文言の見出し(キャラ画像つき)を innerHTML で毎回作り直していた。
  *   ★外から中身を消された(resetStoryUserLaneDom 等)ときは子ノードが無いので、同じ HTML でも書き直す。
+ *   ★案内帯への【空でない書き込み】は必ずここを通す(paintStoryUserLaneDomEmptyGuides も)。別経路が直接 innerHTML を
+ *     書くと前回値と実 DOM がズレ、同じ内容の paint が skip されて古い見出しが残る(reality-checker 実測)。
  * @type {WeakMap<Element, string>}
  */
 const _guideHtmlLast = new WeakMap();
@@ -902,31 +904,30 @@ export function paintStoryUserLaneDomEmptyGuides(els, faces, opts) {
   if (adWrap) adWrap.hidden = true;
   stack.hidden = false;
   if (guideLinesTop) {
-    guideLinesTop.innerHTML = buildStoryUserLaneGuideTopHtml(faces.faceLink);
+    setGuideHtmlIfChanged(guideLinesTop, buildStoryUserLaneGuideTopHtml(faces.faceLink));
   }
   if (guideTop) guideTop.hidden = false;
   if (guideLinesMidGift) {
-    guideLinesMidGift.innerHTML = buildStoryUserLaneGuideGiftHtml(faces.faceGift);
+    setGuideHtmlIfChanged(guideLinesMidGift, buildStoryUserLaneGuideGiftHtml(faces.faceGift));
   }
   if (guideMidGift) guideMidGift.hidden = false;
   if (guideLinesMidKonta) {
-    guideLinesMidKonta.innerHTML = buildStoryUserLaneGuideKontaHtml(
-      faces.faceKonta
-    );
+    setGuideHtmlIfChanged(guideLinesMidKonta, buildStoryUserLaneGuideKontaHtml(faces.faceKonta));
   }
   if (guideMidKonta) guideMidKonta.hidden = false;
   if (guideLinesMidTanu) {
-    guideLinesMidTanu.innerHTML = buildStoryUserLaneGuideTanuHtml(
-      faces.faceTanu
-    );
+    setGuideHtmlIfChanged(guideLinesMidTanu, buildStoryUserLaneGuideTanuHtml(faces.faceTanu));
   }
   if (guideMidTanu) guideMidTanu.hidden = false;
   if (guideLinesBottom) {
-    guideLinesBottom.innerHTML = buildStoryUserLaneGuideFootAndRecordedHtml(
-      0,
-      opts && typeof opts.recordedCommentRowsTotal === 'number'
-        ? opts.recordedCommentRowsTotal
-        : undefined
+    setGuideHtmlIfChanged(
+      guideLinesBottom,
+      buildStoryUserLaneGuideFootAndRecordedHtml(
+        0,
+        opts && typeof opts.recordedCommentRowsTotal === 'number'
+          ? opts.recordedCommentRowsTotal
+          : undefined
+      )
     );
   }
   if (guideBottom) guideBottom.hidden = false;

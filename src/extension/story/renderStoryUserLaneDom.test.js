@@ -3,6 +3,7 @@ import { describe, it, expect, vi } from 'vitest';
 import {
   getStoryLaneRepaintCounts,
   paintStoryUserLaneDomFilled,
+  paintStoryUserLaneDomEmptyGuides,
   resetStoryUserLaneDom,
   syncStoryUserLaneStatsInPlace,
   skipStoryUserLanePaint,
@@ -742,5 +743,38 @@ describe('案内帯・空段ノートは【同じ内容なら DOM に触らな�
     paint(els, SAME);
     expect(els.guideLinesTop.innerHTML).not.toBe('');
     expect(emptyNotes(els).length).toBeGreaterThan(0);
+  });
+
+  it('★別経路(paintStoryUserLaneDomEmptyGuides が直接書いた)あとに同じ内容を paint しても、見出しと脚注が復元される(reality-checker 指摘の穴)', () => {
+    const els = mount(makeEls());
+    const opts = { recordedCommentRowsTotal: 50 };
+    paintStoryUserLaneDomFilled(els, FACES, SAME, 3, IO, opts);
+    const topFilled = els.guideLinesTop.innerHTML;
+    const bottomFilled = els.guideLinesBottom.innerHTML;
+    expect(topFilled).toContain('nl-story-userlane-guide__count');
+    paintStoryUserLaneDomEmptyGuides(els, FACES, opts); // 人数なしの見出しに直接書き換える
+    expect(els.guideLinesTop.innerHTML).not.toContain('nl-story-userlane-guide__count');
+    paintStoryUserLaneDomFilled(els, FACES, SAME, 3, IO, opts); // 同じ内容に戻る
+    expect(els.guideLinesTop.innerHTML).toBe(topFilled);
+    expect(els.guideLinesBottom.innerHTML).toBe(bottomFilled);
+  });
+
+  it('guides:false ⇄ true の切替で案内帯が出入りする', () => {
+    const els = mount(makeEls());
+    paintStoryUserLaneDomFilled(els, FACES, SAME, 3, IO, {});
+    const on = els.guideLinesTop.innerHTML;
+    expect(on).not.toBe('');
+    paintStoryUserLaneDomFilled(els, FACES, SAME, 3, IO, { guides: false });
+    expect(els.guideLinesTop.innerHTML).toBe('');
+    paintStoryUserLaneDomFilled(els, FACES, SAME, 3, IO, {});
+    expect(els.guideLinesTop.innerHTML).toBe(on);
+  });
+
+  it('脚注は pickedLength / recordedCommentRowsTotal が変われば書き直される', () => {
+    const els = mount(makeEls());
+    paintStoryUserLaneDomFilled(els, FACES, SAME, 3, IO, { recordedCommentRowsTotal: 10 });
+    const a = els.guideLinesBottom.innerHTML;
+    paintStoryUserLaneDomFilled(els, FACES, SAME, 3, IO, { recordedCommentRowsTotal: 99 });
+    expect(els.guideLinesBottom.innerHTML).not.toBe(a);
   });
 });

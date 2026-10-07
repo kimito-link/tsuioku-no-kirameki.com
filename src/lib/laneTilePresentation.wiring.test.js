@@ -279,3 +279,16 @@ describe('バッジはタイルの幅を変えない(v0.1.1578・会場のちか
     });
   }
 });
+
+describe('案内帯への書き込みは setGuideHtmlIfChanged に一本化(v0.1.1579)', () => {
+  // 別経路が直接 innerHTML を書くと「前回値」と実 DOM がズレ、同じ内容の paint が skip されて古い見出しが残る。
+  it('renderStoryUserLaneDom.js は guideLines* に【空でない文字列】を直接代入しない(空文字での消去だけ許す)', () => {
+    // ★`\s*` の後ろに (?!'') だけだと、空白を1つ戻して「次が空白」で通ってしまい `= ''` にも当たる。\S で次の1文字を要求する。
+    const direct = rendererSrc.match(/guideLines\w+\.innerHTML\s*=\s*(?!'')\S/g) || [];
+    expect(direct).toEqual([]);
+  });
+  it('setGuideHtmlIfChanged が定義され、案内帯の 6+5 箇所から呼ばれている', () => {
+    expect(rendererSrc).toContain('function setGuideHtmlIfChanged(');
+    expect(count(rendererSrc, 'setGuideHtmlIfChanged(')).toBeGreaterThanOrEqual(12); // 定義1 + paintFilled 6 + emptyGuides 5
+  });
+});
