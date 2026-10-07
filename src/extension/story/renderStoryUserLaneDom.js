@@ -457,15 +457,39 @@ function removeStoryUserLaneEmptyNotesUnder(root) {
  * @param {boolean} show
  * @param {string} innerHtml trusted HTML from storyUserLaneGuideHtml
  */
+/**
+ * 案内帯(段見出し・脚注)の「同じ HTML なら書かない」(v0.1.1579)。
+ *   /live/ が安定して見えるのは、更新が遅く 1人1行で、見出しの作り直しが目に入らないから。拡張は件数やバッジが
+ *   数秒ごとに変わるたびに paint が走り、同じ文言の見出し(キャラ画像つき)を innerHTML で毎回作り直していた。
+ *   ★外から中身を消された(resetStoryUserLaneDom 等)ときは子ノードが無いので、同じ HTML でも書き直す。
+ * @type {WeakMap<Element, string>}
+ */
+const _guideHtmlLast = new WeakMap();
+/** 空段ノート要素 → 書いた HTML(同じ文言なら付け替えない)。 @type {WeakMap<Element, string>} */
+const _emptyNoteHtml = new WeakMap();
+/**
+ * @param {HTMLElement} el
+ * @param {string} html
+ */
+function setGuideHtmlIfChanged(el, html) {
+  const next = String(html);
+  const hasChild = !!el.firstChild;
+  if (_guideHtmlLast.get(el) === next && (next === '' ? !hasChild : hasChild)) return;
+  el.innerHTML = next;
+  _guideHtmlLast.set(el, next);
+}
+
 function syncStoryUserLaneTierEmptyNote(laneEl, show, innerHtml) {
   const next = laneEl.nextElementSibling;
-  if (next && next.classList.contains('nl-story-userlane__empty-note')) {
-    next.remove();
-  }
+  const isNote = !!(next && next.classList.contains('nl-story-userlane__empty-note'));
+  // ★v0.1.1579: 同じ文言のノートが既にあれば付け替えない(毎 paint で消して作り直すと、数秒ごとに点滅して見える)。
+  if (isNote && show && innerHtml && _emptyNoteHtml.get(next) === innerHtml) return;
+  if (isNote) next.remove();
   if (!show || !innerHtml) return;
   const box = document.createElement('div');
   box.className = 'nl-story-userlane__empty-note';
   box.innerHTML = innerHtml;
+  _emptyNoteHtml.set(box, innerHtml);
   laneEl.insertAdjacentElement('afterend', box);
 }
 
@@ -768,8 +792,10 @@ export function paintStoryUserLaneDomFilled(
     adWrap.hidden = !hasAd;
     if (guideMidAd) guideMidAd.hidden = !(showGuides && hasAd);
     if (guideLinesMidAd) {
-      guideLinesMidAd.innerHTML =
-        showGuides && hasAd ? buildStoryUserLaneGuideAdHtml(faces.faceAd, buckets.ad.length) : '';
+      setGuideHtmlIfChanged(
+        guideLinesMidAd,
+        showGuides && hasAd ? buildStoryUserLaneGuideAdHtml(faces.faceAd, buckets.ad.length) : ''
+      );
     }
   }
 
@@ -780,42 +806,49 @@ export function paintStoryUserLaneDomFilled(
   //   showGuides=true 側は従来と同文=①③の diff ゼロ。
   if (guideLinesTop) {
     // v0.1.1563: 各段の見出しに表示人数「N人」(=その段の DOM 枚数)。会場は同じ paint なので自動で一致する。
-    guideLinesTop.innerHTML = showGuides
-      ? buildStoryUserLaneGuideTopHtml(faces.faceLink, buckets.link.length)
-      : '';
+    setGuideHtmlIfChanged(
+      guideLinesTop,
+      showGuides ? buildStoryUserLaneGuideTopHtml(faces.faceLink, buckets.link.length) : ''
+    );
   }
   if (guideTop) guideTop.hidden = !showGuides;
   if (guideLinesMidGift) {
-    guideLinesMidGift.innerHTML = showGuides
-      ? buildStoryUserLaneGuideGiftHtml(faces.faceGift, buckets.gift.length)
-      : '';
+    setGuideHtmlIfChanged(
+      guideLinesMidGift,
+      showGuides ? buildStoryUserLaneGuideGiftHtml(faces.faceGift, buckets.gift.length) : ''
+    );
   }
   if (guideMidGift) guideMidGift.hidden = !showGuides;
   if (guideLinesMidKonta) {
-    guideLinesMidKonta.innerHTML = showGuides
-      ? buildStoryUserLaneGuideKontaHtml(faces.faceKonta, buckets.konta.length)
-      : '';
+    setGuideHtmlIfChanged(
+      guideLinesMidKonta,
+      showGuides ? buildStoryUserLaneGuideKontaHtml(faces.faceKonta, buckets.konta.length) : ''
+    );
   }
   if (guideMidKonta) guideMidKonta.hidden = !showGuides;
   if (guideLinesMidTanu) {
-    guideLinesMidTanu.innerHTML = showGuides
-      ? buildStoryUserLaneGuideTanuHtml(faces.faceTanu, buckets.tanu.length)
-      : '';
+    setGuideHtmlIfChanged(
+      guideLinesMidTanu,
+      showGuides ? buildStoryUserLaneGuideTanuHtml(faces.faceTanu, buckets.tanu.length) : ''
+    );
   }
   if (guideMidTanu) guideMidTanu.hidden = !showGuides;
   if (guideLinesBottom) {
-    guideLinesBottom.innerHTML = showGuides
-      ? buildStoryUserLaneGuideFootAndRecordedHtml(
-          pickedLength,
-          opts && typeof opts.recordedCommentRowsTotal === 'number'
-            ? opts.recordedCommentRowsTotal
-            : undefined,
-          opts && typeof opts.totalCandidates === 'number'
-            ? opts.totalCandidates
-            : undefined,
-          bucketsHaveTileStats(buckets)
-        )
-      : '';
+    setGuideHtmlIfChanged(
+      guideLinesBottom,
+      showGuides
+        ? buildStoryUserLaneGuideFootAndRecordedHtml(
+            pickedLength,
+            opts && typeof opts.recordedCommentRowsTotal === 'number'
+              ? opts.recordedCommentRowsTotal
+              : undefined,
+            opts && typeof opts.totalCandidates === 'number'
+              ? opts.totalCandidates
+              : undefined,
+            bucketsHaveTileStats(buckets)
+          )
+        : ''
+    );
   }
   if (guideBottom) guideBottom.hidden = !showGuides;
 }
