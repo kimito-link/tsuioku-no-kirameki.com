@@ -677,3 +677,70 @@ describe('描かない経路の唯一の入口 skipStoryUserLanePaint(v0.1.1572)
   });
 });
 
+
+describe('案内帯・空段ノートは【同じ内容なら DOM に触らない】(v0.1.1579・/live/ の安定さの輸入)', () => {
+  // /live/ は 1人1行・60秒周期で、見出しの作り直しがそもそも目に入らない。拡張は件数やバッジが
+  // 数秒ごとに変わるたびに paint が走り、同じ文言の見出し(キャラ画像つき)・脚注・空段の説明を
+  // innerHTML で毎回作り直していた(devtools 実測: 更新10回で見出し系 約110ノードの追加+削除)。
+  const SAME = { link: LINK, gift: [], ad: [], konta: [], tanu: TANU };
+  const GUIDE_KEYS = ['guideLinesTop', 'guideLinesMidGift', 'guideLinesMidKonta', 'guideLinesMidTanu', 'guideLinesBottom'];
+  const nodesOf = (els) => Object.fromEntries(GUIDE_KEYS.map((k) => [k, Array.from(els[k].childNodes)]));
+  const emptyNotes = (els) => Array.from(els.stack.querySelectorAll('.nl-story-userlane__empty-note'));
+
+  const mount = (els) => {
+    // 空段ノートは lane 要素の直後に挿す仕様なので、stack の下に lane 要素を置く
+    for (const k of ['laneLink', 'laneGift', 'laneAd', 'laneKonta', 'laneTanu']) els.stack.appendChild(els[k]);
+    return els;
+  };
+
+  it('同じ buckets で 2 回 paint しても、見出し・脚注の子ノードは同一のまま(作り直さない)', () => {
+    const els = mount(makeEls());
+    paint(els, SAME);
+    const before = nodesOf(els);
+    expect(before.guideLinesTop.length).toBeGreaterThan(0); // 空振りで緑にしない
+    paint(els, SAME);
+    const after = nodesOf(els);
+    for (const k of GUIDE_KEYS) {
+      expect(after[k].length).toBe(before[k].length);
+      after[k].forEach((n, i) => expect(n, `${k}[${i}]`).toBe(before[k][i]));
+    }
+  });
+
+  it('同じ buckets で 2 回 paint しても、空段ノート(gift/konta が空)は同一ノードのまま', () => {
+    const els = mount(makeEls());
+    paint(els, SAME);
+    const before = emptyNotes(els);
+    expect(before.length).toBeGreaterThan(0); // gift と konta が空 → ノートがある
+    paint(els, SAME);
+    const after = emptyNotes(els);
+    expect(after.length).toBe(before.length);
+    after.forEach((n, i) => expect(n, `note[${i}]`).toBe(before[i]));
+  });
+
+  it('人数が変わったときは見出しを書き直す(安定化で更新を止めない)', () => {
+    const els = mount(makeEls());
+    paint(els, SAME);
+    const topBefore = els.guideLinesTop.firstChild;
+    paint(els, { ...SAME, link: [...LINK, cell('777', 'https://cdn/7.jpg', '次郎')] });
+    expect(els.guideLinesTop.querySelector('.nl-story-userlane-guide__count')?.textContent).toBe('2人');
+    expect(els.guideLinesTop.firstChild).not.toBe(topBefore);
+  });
+
+  it('空だった段に人が来たら空段ノートを外す(ノートが居座らない)', () => {
+    const els = mount(makeEls());
+    paint(els, SAME);
+    expect(emptyNotes(els).length).toBeGreaterThan(0);
+    paint(els, { ...SAME, gift: [cell('999', 'https://cdn/g.jpg', 'ギフト太郎')], konta: [cell('555', 'https://cdn/k.jpg', 'こん太')] });
+    expect(emptyNotes(els).length).toBe(0);
+  });
+
+  it('外から中身を消された(reset)あとの paint は、同じ内容でも書き直して復元する', () => {
+    const els = mount(makeEls());
+    paint(els, SAME);
+    resetStoryUserLaneDom(els);
+    expect(els.guideLinesTop.innerHTML).toBe('');
+    paint(els, SAME);
+    expect(els.guideLinesTop.innerHTML).not.toBe('');
+    expect(emptyNotes(els).length).toBeGreaterThan(0);
+  });
+});
