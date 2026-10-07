@@ -1,5 +1,14 @@
 {
   "mcpServers": {
+    "chrome-devtools": {
+      "command": "C:\\Program Files\\nodejs\\node.exe",
+      "args": [
+        "C:\\Users\\info\\AppData\\Roaming\\npm\\node_modules\\chrome-devtools-mcp\\build\\src\\bin\\chrome-devtools-mcp.js",
+        "--categoryExtensions",
+        "--isolated",
+        "--headless"
+      ]
+    },
     "github-actions": {
       "type": "http",
       "url": "https://api.githubcopilot.com/mcp/",
@@ -11,15 +20,6 @@
     "cloudflare-api": {
       "type": "http",
       "url": "https://mcp.cloudflare.com/mcp"
-    },
-    "_disabled_chrome-devtools": {
-      "command": "C:\\Program Files\\nodejs\\node.exe",
-      "args": [
-        "C:\\Users\\info\\AppData\\Roaming\\npm\\node_modules\\chrome-devtools-mcp\\build\\src\\bin\\chrome-devtools-mcp.js",
-        "--categoryExtensions",
-        "--isolated",
-        "--headless"
-      ]
     }
   }
 }
