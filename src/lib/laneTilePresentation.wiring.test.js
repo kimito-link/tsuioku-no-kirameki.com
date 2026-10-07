@@ -245,3 +245,50 @@ describe('別窓(passive)の鏡 sig に顔ぶれが入る(v0.1.1575)', () => {
     expect(m[1]).not.toContain('capturedAt');
   });
 });
+
+describe('バッジはタイルの幅を変えない(v0.1.1578・会場のちかちか)', () => {
+  // 熱い人/ギフト増分のバッジが出入りするたびにタイルが約 68px 伸び縮みし、折り返しの並びが全部ずれていた
+  // (devtools 実測: バッジの出入り 10 回 = layout-shift 10 回)。バッジは流れから外して重ねる。
+  const venueSync = venueBarSrc.slice(venueBarSrc.indexOf('/* LANE_CSS_SYNC_BEGIN'), venueBarSrc.indexOf('/* LANE_CSS_SYNC_END */'));
+  const ruleBody = (src, selector) => {
+    const i = src.indexOf(selector);
+    expect(i, `${selector} が見つからない`).toBeGreaterThanOrEqual(0);
+    return src.slice(i, src.indexOf('}', i));
+  };
+  for (const [name, src] of [
+    ['popup.html', popupHtml],
+    ['app/live-view.html', liveViewHtml],
+    ['venueBar.js(LANE_CSS_SYNC 区間)', venueSync]
+  ]) {
+    it(`${name}: [data-pulse]::after は position:absolute で、幅を増やす指定(margin-left / align-self)を持たない`, () => {
+      const body = ruleBody(src, '.nl-story-userlane-cell[data-pulse]::after {');
+      expect(body).toContain('position: absolute;');
+      expect(body).not.toContain('margin-left');
+      expect(body).not.toContain('align-self');
+    });
+    it(`${name}: バッジはタイルの内側に置く(負のオフセットでタイル外へ出さない=親の overflow に切られる)`, () => {
+      // reality-checker 実測: top:-6px だと popup / live-view(レーンに上 padding が無く overflow:auto)で上6pxが切れた
+      const body = ruleBody(src, '.nl-story-userlane-cell[data-pulse]::after {');
+      expect(body).not.toMatch(/(top|right|bottom|left):\s*-/);
+      expect(body).toMatch(/top:\s*0;/);
+      expect(body).toMatch(/right:\s*0;/);
+    });
+    it(`${name}: バッジの基準になるよう [data-pulse] のタイルは position: relative`, () => {
+      const body = ruleBody(src, '.nl-story-userlane-cell[data-pulse] {');
+      expect(body).toContain('position: relative;');
+    });
+  }
+});
+
+describe('案内帯への書き込みは setGuideHtmlIfChanged に一本化(v0.1.1579)', () => {
+  // 別経路が直接 innerHTML を書くと「前回値」と実 DOM がズレ、同じ内容の paint が skip されて古い見出しが残る。
+  it('renderStoryUserLaneDom.js は guideLines* に【空でない文字列】を直接代入しない(空文字での消去だけ許す)', () => {
+    // ★`\s*` の後ろに (?!'') だけだと、空白を1つ戻して「次が空白」で通ってしまい `= ''` にも当たる。\S で次の1文字を要求する。
+    const direct = rendererSrc.match(/guideLines\w+\.innerHTML\s*=\s*(?!'')\S/g) || [];
+    expect(direct).toEqual([]);
+  });
+  it('setGuideHtmlIfChanged が定義され、案内帯の 6+5 箇所から呼ばれている', () => {
+    expect(rendererSrc).toContain('function setGuideHtmlIfChanged(');
+    expect(count(rendererSrc, 'setGuideHtmlIfChanged(')).toBeGreaterThanOrEqual(12); // 定義1 + paintFilled 6 + emptyGuides 5
+  });
+});
