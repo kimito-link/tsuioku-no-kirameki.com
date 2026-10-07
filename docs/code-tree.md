@@ -200,7 +200,7 @@
     - `2026-09-30.md`
     - `2026-10-01.md`
     - `2026-10-06.md`
-- 📁 **docs/** (344)
+- 📁 **docs/** (346)
   - 📁 **article-assets/** (87)
     - 📁 **venue-frames/** (12)
       - `f01.png`
@@ -312,7 +312,7 @@
     - `storage-bus.md`
     - `venue.md`
     - `web-status.md`
-  - 📁 **handoff/** (161)
+  - 📁 **handoff/** (163)
     - 📁 **bench/** (2)
       - `bench-interval.mjs` — ⚠️ 役割コメント無し
       - `bench-lane.mjs` — ⚠️ 役割コメント無し
@@ -405,6 +405,8 @@
     - `diagnostic-architecture-strengthen-IMPLEMENTATION-HANDOFF.md`
     - `diagnostic-instrument-strengthen-2-DESIGN.md`
     - `diagnostic-instrument-strengthen-2-IMPLEMENTATION-HANDOFF.md`
+    - `ext-process-busy-census-DESIGN.md`
+    - `ext-process-busy-census-IMPLEMENTATION-HANDOFF.md`
     - `giant-entry-split-IMPLEMENTATION-HANDOFF-2026-08-10.md`
     - `giant-entry-split-MAP-2026-08-10.md`
     - `giant-entry-split-PHASE2-INVENTORY-2026-08-10.md`
