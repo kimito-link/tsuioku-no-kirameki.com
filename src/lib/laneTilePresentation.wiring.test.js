@@ -245,3 +245,37 @@ describe('別窓(passive)の鏡 sig に顔ぶれが入る(v0.1.1575)', () => {
     expect(m[1]).not.toContain('capturedAt');
   });
 });
+
+describe('バッジはタイルの幅を変えない(v0.1.1578・会場のちかちか)', () => {
+  // 熱い人/ギフト増分のバッジが出入りするたびにタイルが約 68px 伸び縮みし、折り返しの並びが全部ずれていた
+  // (devtools 実測: バッジの出入り 10 回 = layout-shift 10 回)。バッジは流れから外して重ねる。
+  const venueSync = venueBarSrc.slice(venueBarSrc.indexOf('/* LANE_CSS_SYNC_BEGIN'), venueBarSrc.indexOf('/* LANE_CSS_SYNC_END */'));
+  const ruleBody = (src, selector) => {
+    const i = src.indexOf(selector);
+    expect(i, `${selector} が見つからない`).toBeGreaterThanOrEqual(0);
+    return src.slice(i, src.indexOf('}', i));
+  };
+  for (const [name, src] of [
+    ['popup.html', popupHtml],
+    ['app/live-view.html', liveViewHtml],
+    ['venueBar.js(LANE_CSS_SYNC 区間)', venueSync]
+  ]) {
+    it(`${name}: [data-pulse]::after は position:absolute で、幅を増やす指定(margin-left / align-self)を持たない`, () => {
+      const body = ruleBody(src, '.nl-story-userlane-cell[data-pulse]::after {');
+      expect(body).toContain('position: absolute;');
+      expect(body).not.toContain('margin-left');
+      expect(body).not.toContain('align-self');
+    });
+    it(`${name}: バッジはタイルの内側に置く(負のオフセットでタイル外へ出さない=親の overflow に切られる)`, () => {
+      // reality-checker 実測: top:-6px だと popup / live-view(レーンに上 padding が無く overflow:auto)で上6pxが切れた
+      const body = ruleBody(src, '.nl-story-userlane-cell[data-pulse]::after {');
+      expect(body).not.toMatch(/(top|right|bottom|left):\s*-/);
+      expect(body).toMatch(/top:\s*0;/);
+      expect(body).toMatch(/right:\s*0;/);
+    });
+    it(`${name}: バッジの基準になるよう [data-pulse] のタイルは position: relative`, () => {
+      const body = ruleBody(src, '.nl-story-userlane-cell[data-pulse] {');
+      expect(body).toContain('position: relative;');
+    });
+  }
+});

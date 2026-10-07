@@ -1312,18 +1312,27 @@ const VENUE_CSS = `
     max-width: 72px;
   }
   /* v0.1.1565: ギフト増分バッジ「+1,200pt」(popup.html の同名規則の写し) */
+  .nlsb-venue-lane-stack .nl-story-userlane-cell[data-pulse] {
+    position: relative;
+  }
+  /* v0.1.1578: バッジはタイルの流れから外して【重ねる】。流れに置くと、出入りのたびにタイルが約 68px 伸び縮みして
+     折り返しの並びが全部ずれた(devtools 実測: バッジ出入り 10 回 = layout-shift 10 回)。幅を増やす指定は書かない。タイルの【内側】の角に置く(負のオフセットでタイル外へ出すと、上 padding の無い popup/別窓で親の overflow に切られる=実測)。 */
   .nlsb-venue-lane-stack .nl-story-userlane-cell[data-pulse]::after {
     content: attr(data-pulse);
-    margin-left: 2px;
+    position: absolute;
+    top: 0;
+    right: 0;
+    z-index: 2;
+    pointer-events: none;
     padding: 0 5px;
     border-radius: 999px;
     font-size: 9px;
     font-weight: 800;
+    line-height: 14px;
     font-variant-numeric: tabular-nums;
     white-space: nowrap;
-    align-self: center;
-    background: color-mix(in srgb, var(--nl-lane-pulse-gift) 16%, transparent);
-    color: var(--nl-lane-pulse-gift);
+    background: var(--nl-lane-pulse-gift);
+    color: #fff;
   }
   .nlsb-venue-lane-stack .nl-story-userlane-cell.is-gifted {
     box-shadow: 0 0 0 2px color-mix(in srgb, var(--nl-lane-pulse-gift) 55%, transparent);
@@ -1338,8 +1347,8 @@ const VENUE_CSS = `
     animation: nl-lane-pulse-pop 600ms ease-out 1;
   }
   .nlsb-venue-lane-stack .nl-story-userlane-cell.is-hot[data-pulse]::after {
-    background: color-mix(in srgb, var(--nl-lane-pulse-hot) 16%, transparent);
-    color: var(--nl-lane-pulse-hot);
+    background: var(--nl-lane-pulse-hot);
+    color: #fff;
   }
   .nlsb-venue-lane-stack .nl-story-userlane-cell.is-hot[data-pulse-tier="mega"] {
     --nl-lane-pulse-hot: #c02a2a;
