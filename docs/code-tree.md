@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 8 / 893 件
+## ⚠️ 役割コメントが無いソース 8 / 894 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `scripts/build.mjs`
@@ -815,7 +815,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (1899)
+- 📁 **src/** (1901)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1095,7 +1095,7 @@
         - `logo_funlink_white_RGB_link_black.png`
         - `logo_funlink_white_RGB_maru_black.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1663)
+  - 📁 **lib/** (1665)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -2526,6 +2526,8 @@
     - `timeAuthority.test.js`
     - `timeAuthorityRegistry.js` — timeAuthorityRegistry — 「独自に時点フィールドを持つファイル」の凍結リスト(祖父条項)。
     - `timeAuthorityRegistry.test.js`
+    - `timelineMirrorWriteGate.js` — 【層】L0 判定層(純粋関数・I/O禁止)
+    - `timelineMirrorWriteGate.test.js`
     - `timingConstants.js` — content-entry.js に散在していたマジックナンバーを集約した定数テーブル。
     - `timingConstants.test.js`
     - `tokenBucket.js` — PR5（feat/multitab-scale-ultraC）: トークンバケットによるグローバル流量制御の純ロジック。

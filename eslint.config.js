@@ -408,7 +408,8 @@ export default [
     // v0.1.1557: タイムシフト(終了済み枠)の経過を endTime で固定する配線を2箇所(+11行)。ロジックは lib(embeddedDataExtract.js)。
     // v0.1.1560: backfill の view 選択(候補配列・死亡集合)の配線(+45行)。判定は lib(ndgrViewBasePick.js)。
     // v0.1.1583: パネルの表示/非表示を popup iframe へ伝える配線(+23行)。判定は lib(panelActivity.js)。通知は display を書く唯一の入口から出す。
-    rules: { 'max-lines': ['error', { max: 19429, skipBlankLines: false, skipComments: false }] }
+    // v0.1.1585: コメントタイムライン鏡の書き込み頻度の天井の配線(+11行)。判定は lib(timelineMirrorWriteGate.js)。
+    rules: { 'max-lines': ['error', { max: 19440, skipBlankLines: false, skipComments: false }] }
   },
   {
     // 安全網のみ。分割は別地図。

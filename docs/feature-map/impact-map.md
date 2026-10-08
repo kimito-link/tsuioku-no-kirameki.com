@@ -857,6 +857,7 @@
 | `src/lib/tabLeaderLock.js` | 1 | 記録エンジン(watchページ常駐) |
 | `src/lib/thumbDb.js` | 1 | 記録エンジン(watchページ常駐) |
 | `src/lib/thumbFifo.js` | 1 | 記録エンジン(watchページ常駐) |
+| `src/lib/timelineMirrorWriteGate.js` | 1 | 記録エンジン(watchページ常駐) |
 | `src/lib/tokenBucket.js` | 1 | 記録エンジン(watchページ常駐) |
 | `src/lib/topSupportersMirror.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/topSupportRankAnonymousFold.js` | 1 | ポップアップ(応援レーン) |

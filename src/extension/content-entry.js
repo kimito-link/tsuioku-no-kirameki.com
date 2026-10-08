@@ -557,6 +557,7 @@ import { applyInstantPushDiagDelta } from '../lib/instantPushDiag.js';
 import { KEY_INSTANT_PUSH_DIAG } from '../lib/instantPushDiagKey.js';
 import { buildLiveChannelSwitchPayload } from '../lib/liveChannelSwitch.js';
 import { buildPanelVisibilityPayload } from '../lib/panelActivity.js';
+import { decideTimelineMirrorWrite } from '../lib/timelineMirrorWriteGate.js';
 import { applyChannelSwitchDiagDelta } from '../lib/channelSwitchDiag.js';
 import { KEY_CHANNEL_SWITCH_DIAG } from '../lib/channelSwitchDiagKey.js';
 import { createThrottledDiagFlusher } from '../lib/diagFlushThrottle.js';
@@ -11414,6 +11415,9 @@ async function persistPanelLiveSummaryIfDue(force = false) {
  *   最新N件を set していたが、内容が変わっていなければ書く必要がない。署名(liveId|件数|最新行id)が
  *   前回と同じなら set を省いて書込競合を減らす(記録/取り込みには触らない・鏡の鮮度は変化時に追従)。 */
 const _lastTimelineMirrorSigByLive = new Map();
+/** 配信ごとの最後の書き込み時刻と、間引いた分の追いつきタイマー(最短間隔の判定は timelineMirrorWriteGate.js)。 */
+const _timelineMirrorWriteAt = new Map();
+const _timelineMirrorRetry = new Map();
 
 /** content からコメントタイムライン鏡を publish(best-effort=記録を妨げない)。 */
 async function publishCommentTimelineMirrorFromContent(nowMs) {
@@ -11436,11 +11440,18 @@ async function publishCommentTimelineMirrorFromContent(nowMs) {
     const last = rows.length ? rows[rows.length - 1] : null;
     const sig = `${snap.liveId}|${Number(snap.totalSeen) || 0}|${rows.length}|${String(last?.id || last?.at || '')}`;
     if (_lastTimelineMirrorSigByLive.get(lid) === sig) return; // 内容変化なし=書込スキップ
+    // 頻度の天井(全拡張画面に約145KBが全文で配られる=35分で242MB・実機 census)。間引いた分は最短間隔の後に最新で1回書く。
+    const gate = decideTimelineMirrorWrite({ nowMs, lastWriteAt: _timelineMirrorWriteAt.get(lid) || 0 });
+    if (!gate.write) {
+      if (!_timelineMirrorRetry.has(lid)) _timelineMirrorRetry.set(lid, setTimeout(() => { _timelineMirrorRetry.delete(lid); void publishCommentTimelineMirrorFromContent(Date.now()); }, gate.retryInMs));
+      return;
+    }
     await runStorageOpWithTimeout(
       () => chrome.storage.local.set({ [KEY_COMMENT_TIMELINE_MIRROR]: snap }),
       INGEST_TIMING.persistWriteTimeoutMs
     );
     _lastTimelineMirrorSigByLive.set(lid, sig);
+    _timelineMirrorWriteAt.set(lid, nowMs);
   } catch (err) {
     if (err !== STORAGE_OP_TIMED_OUT) throw err;
   }
