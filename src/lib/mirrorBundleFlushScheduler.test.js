@@ -247,3 +247,42 @@ describe('変わっていない鏡は書かない(unchangedFloorMs)', () => {
     expect(Object.keys(sched.takeFlushPayload(2000).legacyPayload)).toEqual([KEY_LANE_MIRROR]);
   });
 });
+
+describe('★中身だけ変わった鏡は最短間隔にまとめる(changedFloorMs・2026-10-08 実機の並べ比較)', () => {
+  const CF = 10_000;
+  const mk = () => createMirrorBundleFlushScheduler({ minGapMs: 0, unchangedFloorMs: 15000, changedFloorMs: CF });
+  const laneWith = (o) => ({ liveId: 'lv1', contentHash: 'H1', capturedAt: 1, link: [{ title: 'りんく', stats: { c: 1 } }], ...o });
+
+  it('構造(contentHash)が同じで中身だけ変わったら、最短間隔内は書かない', () => {
+    const sched = mk();
+    sched.reflect('lane', laneWith({}), { liveId: 'lv1', nowMs: 1000 });
+    sched.takeFlushPayload(1000);
+    sched.reflect('lane', laneWith({ link: [{ title: 'りんく', stats: { c: 2 } }] }), { liveId: 'lv1', nowMs: 4000 });
+    expect(Object.keys(sched.takeFlushPayload(4000).legacyPayload)).toEqual([]);
+  });
+
+  it('最短間隔を過ぎたら、中身だけの変化も書く(最新の中身で)', () => {
+    const sched = mk();
+    sched.reflect('lane', laneWith({}), { liveId: 'lv1', nowMs: 1000 });
+    sched.takeFlushPayload(1000);
+    sched.reflect('lane', laneWith({ link: [{ title: 'りんく', stats: { c: 3 } }] }), { liveId: 'lv1', nowMs: 1000 + CF });
+    const out = sched.takeFlushPayload(1000 + CF);
+    expect(out.legacyPayload[KEY_LANE_MIRROR]).toMatchObject({ link: [{ stats: { c: 3 } }] });
+  });
+
+  it('★構造(contentHash)が変わったら、間隔内でもすぐ書く(新しい人の登場を遅らせない)', () => {
+    const sched = mk();
+    sched.reflect('lane', laneWith({}), { liveId: 'lv1', nowMs: 1000 });
+    sched.takeFlushPayload(1000);
+    sched.reflect('lane', laneWith({ contentHash: 'H2', link: [{ title: 'りんく' }, { title: '新人' }] }), { liveId: 'lv1', nowMs: 1500 });
+    expect(Object.keys(sched.takeFlushPayload(1500).legacyPayload)).toEqual([KEY_LANE_MIRROR]);
+  });
+
+  it('changedFloorMs を渡さなければ従来どおり(戻し口・既存の挙動は不変)', () => {
+    const sched = createMirrorBundleFlushScheduler({ minGapMs: 0, unchangedFloorMs: 15000 });
+    sched.reflect('lane', laneWith({}), { liveId: 'lv1', nowMs: 1000 });
+    sched.takeFlushPayload(1000);
+    sched.reflect('lane', laneWith({ link: [{ title: 'りんく', stats: { c: 2 } }] }), { liveId: 'lv1', nowMs: 1500 });
+    expect(Object.keys(sched.takeFlushPayload(1500).legacyPayload)).toEqual([KEY_LANE_MIRROR]);
+  });
+});

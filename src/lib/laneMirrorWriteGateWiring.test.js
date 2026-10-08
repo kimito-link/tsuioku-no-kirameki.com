@@ -38,8 +38,8 @@ describe('popup は配信別の鏡の書き込みにゲートを通す', () => {
   });
 
   it('ゲートはモジュールで1つだけ作る(呼び出しごとに作ると毎回「最初の1回」になって抑制が効かない)', () => {
-    expect(popupSrc.match(/createLaneMirrorWriteGate\(\)/g)).toHaveLength(1);
-    expect(popupSrc).toMatch(/\nconst _laneMirrorWriteGate = createLaneMirrorWriteGate\(\);\n/);
+    expect(popupSrc.match(/createLaneMirrorWriteGate\(/g)).toHaveLength(1);
+    expect(popupSrc).toMatch(/\nconst _laneMirrorWriteGate = createLaneMirrorWriteGate\(\{ changeFloorMs: 8000 \}\);/);
   });
 
   it('★旧キー(バンドル)への合流は無条件のまま(会場の既存 reader は無変更)', () => {

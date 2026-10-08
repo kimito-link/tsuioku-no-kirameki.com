@@ -28,7 +28,7 @@ import { KEY_GIFT_HISTORY_MIRROR } from './giftHistoryMirrorKey.js';
 import { KEY_ROOM_HEAT_MIRROR } from './roomHeatMirrorKey.js';
 import { KEY_SESSION_SUMMARY_MIRROR } from './sessionSummaryMirrorKey.js';
 import { KEY_STORY_DIAG_MIRROR } from './storyDiagMirrorKey.js';
-import { laneMirrorWriteSignature } from './laneMirrorWriteGate.js';
+import { laneMirrorWriteSignature, laneMirrorStructureKey } from './laneMirrorWriteGate.js';
 
 const DEFAULT_MIN_GAP_MS = 3000;
 /**
@@ -91,18 +91,21 @@ export function buildLegacyMirrorSetPayload(bundle) {
  * flush スケジューラの factory。popup-entry はこれ 1 個を持ち、reflect() で各鏡を合流バッファへ反映し、
  * takeFlushPayload() で「今 flush してよいか＋出すべきペイロード」を得る。タイマーは呼び手が持つ。
  *
- * @param {{ minGapMs?: number, unchangedFloorMs?: number }} [opts]
+ * @param {{ minGapMs?: number, unchangedFloorMs?: number, changedFloorMs?: number }} [opts]
+ *   changedFloorMs: 中身だけが変わった(顔ぶれ・並び=contentHash は同じ)鏡の最短書き込み間隔[ms]。0=変化のたびに書く(既定・従来)。
  */
 export function createMirrorBundleFlushScheduler(opts = {}) {
   const rawGap = Number(opts?.minGapMs);
   const minGapMs = opts && opts.minGapMs != null && Number.isFinite(rawGap) && rawGap >= 0 ? rawGap : DEFAULT_MIN_GAP_MS;
   const rawFloor = Number(opts?.unchangedFloorMs);
   const unchangedFloorMs = opts && opts.unchangedFloorMs != null && Number.isFinite(rawFloor) && rawFloor >= 0 ? rawFloor : DEFAULT_UNCHANGED_FLOOR_MS;
+  const rawChanged = Number(opts?.changedFloorMs);
+  const changedFloorMs = opts && opts.changedFloorMs != null && Number.isFinite(rawChanged) && rawChanged > 0 ? rawChanged : 0;
   let buffer = createEmptyMirrorBundle();
   let dirty = false;
   let lastFlushAt = 0;
   /** 鏡ごとの「最後に書いた内容の署名と時刻」。署名は時刻・受領証を除いた中身(laneMirrorWriteSignature=正本)。 */
-  const written = /** @type {Map<string, { sig: string, at: number }>} */ (new Map());
+  const written = /** @type {Map<string, { sig: string, at: number, struct: string }>} */ (new Map());
 
   return {
     /**
@@ -143,10 +146,15 @@ export function createMirrorBundleFlushScheduler(opts = {}) {
           if (!(key in legacyPayload)) continue;
           const sig = laneMirrorWriteSignature(sections[section]); // 空文字=判定不能=必ず書く側へ
           const prev = written.get(section);
-          if (sig && prev && prev.sig === sig && now >= prev.at && now - prev.at < unchangedFloorMs) {
-            delete legacyPayload[key]; // 内容が同じで床の内=書かない(読み手には前回の値が残る)
+          // 構造の目印: 顔ぶれ・並び(contentHash)と受領証の指紋。持たない鏡は '' =「構造は変わっていない」扱い。
+          const struct = laneMirrorStructureKey(sections[section]);
+          const sameContent = !!sig && !!prev && prev.sig === sig && now >= prev.at && now - prev.at < unchangedFloorMs;
+          // 中身だけ変わった(構造は同じ)鏡は changedFloorMs にまとめる。構造が変わった/初回/判定不能は即書く。
+          const throttledChange = changedFloorMs > 0 && !!sig && !!prev && prev.sig !== sig && prev.struct === struct && now >= prev.at && now - prev.at < changedFloorMs;
+          if (sameContent || throttledChange) {
+            delete legacyPayload[key]; // 書かない(読み手には前回の値が残る)
           } else {
-            written.set(section, { sig, at: now });
+            written.set(section, { sig, at: now, struct });
           }
         }
       }
