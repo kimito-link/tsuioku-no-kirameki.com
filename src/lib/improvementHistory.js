@@ -1555,5 +1555,19 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
     version: '0.1.1584', metric: 'cross-checked-claims', value: 20,
     source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
     note: '★直近30日窓のスライドによる自然減(v0.1.1562/1577〜1583 の note と同じ理由)。今回の根拠は実機の画面(会場のギフト列が「該当者がいません」)と公式API(/api/live-ranking にギフト貢献者3人)の突き合わせ、変異テスト3種(公式を足さない・kokenを読まない・同じIDを重ねる)で赤を確認して復元した別の手段。'
+  }),
+  Object.freeze({
+    version: '0.1.1585', metric: 'bundle-kb', value: 1393,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '★前版 1394KB → 1393KB(-1KB・更新履歴の入れ替わり)。今回はコード側の増加はほぼ無し(content 側の判定の純関数 timelineMirrorWriteGate.js は popup バンドルに入らない)。過去最良1360(@0.1.1454)との差分の内訳は v0.1.1471/1537/1560/1562/1584 の note に記録済み。'
+  }),
+  Object.freeze({
+    version: '0.1.1585', metric: 'gate-selftest', value: 4,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1585', metric: 'cross-checked-claims', value: 20,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: '★直近30日窓のスライドによる自然減(v0.1.1562/1577〜1584 の note と同じ理由)。今回の根拠は実機の census(35分で各拡張画面に届いた通知の内訳: タイムライン鏡が約1,670回・242MB)と、変異テスト3種(ゲート素通し・再試行タイマー無効・常に書く)で赤を確認して復元した別の手段。'
   })
 ]);
