@@ -1527,5 +1527,19 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
     version: '0.1.1582', metric: 'cross-checked-claims', value: 20,
     source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
     note: '★直近30日窓のスライドによる自然減(v0.1.1562/1577〜1581 の note と同じ理由)。今回の根拠は実機の二分探索(status を閉じると拡張プロセスのCPUが約半分・メモリ1,229→570MB、視聴ページも閉じると0.2%)で、プロセス別CPUとタスクマネージャーの両方で確かめた。'
+  }),
+  Object.freeze({
+    version: '0.1.1583', metric: 'bundle-kb', value: 1392,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '★+1KB(前版 1391KB → 1392KB)は意図した増加: 視聴ページの popup を隠れている間は止めるための判定部品(panelActivity.js・約90行)と更新履歴1版ぶん。計器は足していない。過去最良1360(@0.1.1454)との差分の内訳は v0.1.1471/1537/1560/1562 の note に記録済み。'
+  }),
+  Object.freeze({
+    version: '0.1.1583', metric: 'gate-selftest', value: 4,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1583', metric: 'cross-checked-claims', value: 20,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: '★直近30日窓のスライドによる自然減(v0.1.1562/1577〜1582 の note と同じ理由)。今回の根拠は実機の測定(視聴ページを閉じると拡張プロセスのCPUが消える・メインスレッド1本が約94%)と、変異テスト3種(content が通知しない・3秒refreshが生の document.hidden に戻る・既定を隠れている側にする)で赤を確認して復元した別の手段。'
   })
 ]);

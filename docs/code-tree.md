@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 8 / 891 件
+## ⚠️ 役割コメントが無いソース 8 / 892 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `scripts/build.mjs`
@@ -815,7 +815,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (1893)
+- 📁 **src/** (1896)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1095,7 +1095,7 @@
         - `logo_funlink_white_RGB_link_black.png`
         - `logo_funlink_white_RGB_maru_black.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1657)
+  - 📁 **lib/** (1660)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -2100,6 +2100,9 @@
     - `paintPerfLog.test.js`
     - `paintTopSupportRankStyleIntoElement.js` — 応援帯・公式値レーン（貢献度等）で共通の `nl-top-support-rank` ブロック描画。
     - `paintTopSupportRankStyleIntoElement.test.js`
+    - `panelActivity.js` — 【層】L0 判定層(純粋関数・I/O禁止)
+    - `panelActivity.test.js`
+    - `panelActivityWiring.test.js`
     - `panelCoverCulprit.js` — 【層】L0 判定層(純粋関数・I/O禁止)
     - `panelCoverCulprit.test.js`
     - `panelCoverCulpritWiring.test.js`
