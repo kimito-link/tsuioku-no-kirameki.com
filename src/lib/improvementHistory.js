@@ -1513,5 +1513,19 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
     version: '0.1.1581', metric: 'cross-checked-claims', value: 20,
     source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
     note: '★直近30日窓のスライドによる自然減(v0.1.1562/1577〜1579 の note と同じ理由)。今回は変異テスト5件(鮮度床・時刻を署名に含める・署名をcontentHashだけにする・popupがゲートを渡さない・最終コードでの時刻除外)で赤を確認して復元し、実行して数える形のテスト(同じ鏡を100回publishして書き込み1回)でも別の手段で確かめている。'
+  }),
+  Object.freeze({
+    version: '0.1.1582', metric: 'bundle-kb', value: 1391,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '★+1KB(前版 1390KB → 1391KB)は更新履歴1版ぶん(直近20版は popup バンドルに同梱される仕様)。コードの変更は status の既定オフ2行だけで、バンドルを太らせる追加は無い。過去最良1360(@0.1.1454)との差分の内訳は v0.1.1471/1537/1560/1562 の note に記録済み。'
+  }),
+  Object.freeze({
+    version: '0.1.1582', metric: 'gate-selftest', value: 4,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1582', metric: 'cross-checked-claims', value: 20,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: '★直近30日窓のスライドによる自然減(v0.1.1562/1577〜1581 の note と同じ理由)。今回の根拠は実機の二分探索(status を閉じると拡張プロセスのCPUが約半分・メモリ1,229→570MB、視聴ページも閉じると0.2%)で、プロセス別CPUとタスクマネージャーの両方で確かめた。'
   })
 ]);
