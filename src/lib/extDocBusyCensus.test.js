@@ -173,6 +173,12 @@ describe('mergeCensusReport — SW が読んで足して書く(メモリに持�
     expect(rec.bl['popup-watch']).toHaveLength(1);
   });
 
+  it('★壊れた台帳(null の要素・lt 欠落)でも例外を出さず、壊れた文書だけ捨てて自己修復する', () => {
+    const broken = { at: T0, bl: { 'popup-watch': [T0, 'x', null] }, docs: [null, { seenAt: T0 }, { i: 'zzzz9999', s: 'status', seenAt: T0, firstSeenAt: T0 }, mkReport('good0000', 'status')] };
+    const rec = mergeCensusReport(/** @type {any} */ (broken), mkReport('aaaa1111', 'popup-watch'), T0 + 1000);
+    expect(rec.docs.map((d) => d.i).sort()).toEqual(['aaaa1111']); // 形が正しい文書だけ残る(seenAt 等の無い報告も捨てる)
+  });
+
   it('壊れた報告(文字列・null・id 無し)は無視して既存の台帳をそのまま返す', () => {
     const rec = mergeCensusReport(null, mkReport('aaaa1111', 'status'), T0);
     expect(mergeCensusReport(rec, null, T0 + 1).docs).toHaveLength(1);
@@ -215,6 +221,13 @@ describe('formatExtProcessCensusLines — 速報の文言(誤診させない)', 
     const text = formatExtProcessCensusLines({ at: T0, bl: {}, docs: [d] }, T0).join(' | ');
     expect(text).toContain('同じタブの他の文書が実行 6回/計40000ms');
     expect(text).not.toContain('犯人候補'); // 自分(sidepanel)の長い処理は100msだけ
+  });
+
+  it('★壊れた台帳(null・lt 欠落)でも整形は例外を出さず、壊れた文書を除いて出す', () => {
+    const rec = { at: T0, bl: {}, docs: [null, { seenAt: T0 }, doc('aaaa1111', 'status', 0, 100)] };
+    const text = formatExtProcessCensusLines(/** @type {any} */ (rec), T0).join(' | ');
+    expect(text).toContain('status#1111');
+    expect(formatExtProcessCensusLines(/** @type {any} */ ({ at: T0, docs: [null] }), T0).join(' | ')).toContain('未受信');
   });
 
   it('古い形式(lo 無し)の台帳でも落ちない', () => {

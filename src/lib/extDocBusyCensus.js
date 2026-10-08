@@ -210,6 +210,22 @@ export function summarizeDocCensus(c, nowMs) {
  */
 
 /**
+ * 台帳の1文書として使える形か(壊れた台帳で例外を出さず、壊れた文書だけ捨てて自己修復するため)。
+ * @param {unknown} d
+ * @returns {d is CensusDoc}
+ */
+function isCensusDoc(d) {
+  if (!d || typeof d !== 'object') return false;
+  const x = /** @type {Record<string, unknown>} */ (d);
+  const triple = (/** @type {unknown} */ v) => Array.isArray(v) && v.length >= 3 && v.every((n) => typeof n === 'number');
+  return (
+    typeof x.i === 'string' && !!x.i && typeof x.s === 'string' &&
+    typeof x.a === 'number' && typeof x.seenAt === 'number' && typeof x.firstSeenAt === 'number' &&
+    triple(x.lt) && triple(x.lg) && Array.isArray(x.oc)
+  );
+}
+
+/**
  * SW が storage の台帳に1文書の報告を足す(純関数・読んで足して書く側が使う)。
  *   ・同じ instanceId は置き換え / 別 instanceId は並べる(★後勝ちで潰さない)
  *   ・EXT_CENSUS_STALE_MS 無音の文書は落とす / 上限 EXT_CENSUS_MAX_DOCS 件
@@ -222,7 +238,7 @@ export function summarizeDocCensus(c, nowMs) {
  */
 export function mergeCensusReport(prev, report, nowMs) {
   const base = prev && typeof prev === 'object' && Array.isArray(prev.docs)
-    ? prev
+    ? { at: prev.at, docs: prev.docs.filter(isCensusDoc), bl: prev.bl && typeof prev.bl === 'object' ? prev.bl : {} }
     : { at: 0, docs: [], bl: {} };
   const r = /** @type {Partial<DocReport>|null} */ (report && typeof report === 'object' ? report : null);
   if (!r || typeof r.i !== 'string' || !r.i || typeof r.s !== 'string') return /** @type {CensusRecord} */ (base);
@@ -230,7 +246,7 @@ export function mergeCensusReport(prev, report, nowMs) {
   const old = base.docs.find((d) => d.i === r.i);
   const bl = /** @type {Record<string, number[]>} */ ({});
   for (const [k, v] of Object.entries(base.bl || {})) {
-    const kept = (Array.isArray(v) ? v : []).filter((t) => nowMs - t <= EXT_CENSUS_BOOT_WINDOW_MS);
+    const kept = (Array.isArray(v) ? v : []).filter((t) => typeof t === 'number' && nowMs - t <= EXT_CENSUS_BOOT_WINDOW_MS);
     if (kept.length) bl[k] = kept;
   }
   if (!old) bl[r.s] = [...(bl[r.s] || []), nowMs];
@@ -265,7 +281,7 @@ function fmtAge(sec) {
  */
 export function formatExtProcessCensusLines(rec, nowMs) {
   const docs = rec && Array.isArray(rec.docs)
-    ? rec.docs.filter((d) => nowMs - d.seenAt <= EXT_CENSUS_STALE_MS * 2)
+    ? rec.docs.filter((d) => isCensusDoc(d) && nowMs - d.seenAt <= EXT_CENSUS_STALE_MS * 2)
     : [];
   if (!docs.length) {
     return ['拡張プロセスの忙しさ: ⏳未受信(拡張を更新した直後などは、60秒ほど待って再読込すると各文書の報告が入ります)'];
