@@ -135,3 +135,10 @@ describe('★会場モードの埋め込み（v0.1.1500）', () => {
     expect(html).not.toMatch(/nlsb-seat/);
   });
 });
+
+describe('★既定は両方オフ(v0.1.1582・拡張プロセスの CPU 占有対策)', () => {
+  it('status は popup/会場の複製を既定で起動しない(実測: status を閉じると CPU 約半分)', () => {
+    expect(statusSrc).toMatch(/const STATUS_POPUP_EMBED_ENABLED = false;/);
+    expect(statusSrc).toMatch(/const STATUS_VENUE_EMBED_ENABLED = false;/);
+  });
+});

@@ -556,6 +556,7 @@ import {
 import { applyInstantPushDiagDelta } from '../lib/instantPushDiag.js';
 import { KEY_INSTANT_PUSH_DIAG } from '../lib/instantPushDiagKey.js';
 import { buildLiveChannelSwitchPayload } from '../lib/liveChannelSwitch.js';
+import { buildPanelVisibilityPayload } from '../lib/panelActivity.js';
 import { applyChannelSwitchDiagDelta } from '../lib/channelSwitchDiag.js';
 import { KEY_CHANNEL_SWITCH_DIAG } from '../lib/channelSwitchDiagKey.js';
 import { createThrottledDiagFlusher } from '../lib/diagFlushThrottle.js';
@@ -2893,6 +2894,7 @@ function setInlineHostDisplay(host, display, _cause) {
     else host.removeAttribute(INLINE_HOST_HIDDEN_ATTR);
   } catch { /* 属性失敗は描画を止めない */ }
   host.style.display = display;
+  notifyInlineIframeOfPanelVisibility(display !== 'none'); // ★表示/非表示を popup iframe へ(隠れている間の定期処理を止めさせる)
 }
 
 /**
@@ -3982,6 +3984,8 @@ function ensureInlinePopupIframe(host) {
     // 読み込み直後の下地が白っぽく見えるのを防ぐ（透明にして親の背景に馴染ませる）
     iframe.style.backgroundColor = 'transparent';
     host.appendChild(iframe);
+    // ★load 後に最後のパネル表示状態を再送(display:none で先読みされた iframe が隠れていると知れるように)。
+    iframe.addEventListener('load', () => { if (_panelVisibilityIntent !== null) notifyInlineIframeOfPanelVisibility(_panelVisibilityIntent); });
     // iframe が描画されるまでの黒い空白を、キャラの待機ローディングに置き換える。
     ensureInlineLoadingPlaceholder(host);
   } else {
@@ -4116,6 +4120,25 @@ function noteInstantPushDiag(delta) {
  */
 function noteChannelSwitchDiag(delta) {
   channelSwitchDiagFlusher.note(delta);
+}
+
+/** 最後に決めたパネル表示状態(iframe の load 後に再送する)。null=未決。 */
+let _panelVisibilityIntent = /** @type {boolean|null} */ (null);
+
+/**
+ * 2026-10-08: パネルの表示/非表示を popup iframe へ伝える(iframe の document.hidden は display:none では変わらない)。
+ *   ベストエフォート: 失敗しても今までどおり動く。
+ * @param {boolean} visible
+ */
+function notifyInlineIframeOfPanelVisibility(visible) {
+  _panelVisibilityIntent = visible;
+  try {
+    if (!isWatchInlinePanelTopFrame()) return;
+    const payload = buildPanelVisibilityPayload(visible, ensureInstantPushNonce());
+    const host = pickPrimaryInlinePopupHostFromDom() || nlsInlinePopupHostSingleton;
+    const iframe = /** @type {HTMLIFrameElement|null} */ (payload && host && host.isConnected ? host.querySelector(`#${INLINE_POPUP_IFRAME_ID}`) : null);
+    iframe?.contentWindow?.postMessage(payload, '*');
+  } catch { /* no-op */ }
 }
 
 /**
