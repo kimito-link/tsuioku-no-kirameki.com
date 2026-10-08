@@ -815,7 +815,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (1892)
+- 📁 **src/** (1893)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1095,7 +1095,7 @@
         - `logo_funlink_white_RGB_link_black.png`
         - `logo_funlink_white_RGB_maru_black.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1656)
+  - 📁 **lib/** (1657)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -2661,6 +2661,7 @@
     - `venueViewport.test.js`
     - `venueYukkuriNamedCensus.js` — 「名前ありゆっくり顔」実害確定計器(診断先行アプローチ)。
     - `venueYukkuriNamedCensus.test.js`
+    - `vercelCsp.test.js`
     - `verifiedAvatar.wiring.test.js`
     - `verifiedAvatarRegistry.js` — 「推測URLだが**実際に画像が出た**」を覚えて、次から本物として扱う純関数群。
     - `verifiedAvatarRegistry.test.js`
