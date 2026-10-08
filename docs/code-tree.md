@@ -200,7 +200,7 @@
     - `2026-09-30.md`
     - `2026-10-01.md`
     - `2026-10-06.md`
-- 📁 **docs/** (346)
+- 📁 **docs/** (348)
   - 📁 **article-assets/** (87)
     - 📁 **venue-frames/** (12)
       - `f01.png`
@@ -312,7 +312,7 @@
     - `storage-bus.md`
     - `venue.md`
     - `web-status.md`
-  - 📁 **handoff/** (163)
+  - 📁 **handoff/** (165)
     - 📁 **bench/** (2)
       - `bench-interval.mjs` — ⚠️ 役割コメント無し
       - `bench-lane.mjs` — ⚠️ 役割コメント無し
@@ -451,6 +451,8 @@
     - `sidepanel-width-IMPLEMENTATION-HANDOFF.md`
     - `snippet-manager-clibor-parity-synthesis.md`
     - `sound-optimization-DESIGN.md`
+    - `stable-update-model-DESIGN.md`
+    - `stable-update-model-IMPLEMENTATION-HANDOFF.md`
     - `status-diag-608s-freeze-DESIGN.md`
     - `status-diag-608s-freeze-IMPLEMENTATION-HANDOFF.md`
     - `storage-stall-council-MATERIAL.md`
