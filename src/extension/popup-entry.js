@@ -34,6 +34,7 @@ import {
   isLiveChannelSwitchMessageValid,
   extractSwitchedLiveIdFromMessage } from '../lib/liveChannelSwitch.js';
 import { createPanelActivity, isPanelVisibilityMessageValid } from '../lib/panelActivity.js';
+import { shouldRequestPanelMetrics } from '../lib/panelMetricsRequestPolicy.js';
 import { applyChannelSwitchDiagDelta, computeChannelSwitchPaintGapAverage } from '../lib/channelSwitchDiag.js';
 import { KEY_CHANNEL_SWITCH_DIAG } from '../lib/channelSwitchDiagKey.js';
 import { createThrottledDiagFlusher } from '../lib/diagFlushThrottle.js';
@@ -3526,6 +3527,8 @@ let lastGoodRefreshOpenBag = null;
 let watchPopupLastPaintedLiveId = '';
 /** 速報 metrics 直結でカードを一度でも塗った lv（初回幕解除用） */
 let _panelMetricsAppliedForLv = '';
+/** content の応答(panel_summary)を最後に適用した時の updatedAt(epoch ms)。要求の頻度判定用(panelMetricsRequestPolicy.js)。 */
+let _panelMetricsLastUpdatedAt = 0;
 
 /** E2E / 体感計測用: メインコンテンツの初回ペイントが終わった印 */
 function markPopupRefreshContentPainted() {
@@ -9348,6 +9351,7 @@ function mergeWatchSnapshotWithPanelSummary(snapshot, panelSummary) {
 function applyPanelMetricsFromContent(summary, lv) {
   if (!isPanelLiveSummary(summary, lv)) return;
   _panelMetricsAppliedForLv = lv;
+  _panelMetricsLastUpdatedAt = Number(summary.updatedAt) || Date.now();
   // v0.1.839(第1): 表示記録件数は recordedCount 1本だけを正本に(診断カウンタに引っ張られない)。
   const recorded = selectDisplayRecordedCount(summary);
   let snapForCards = mergeWatchSnapshotWithPanelSummary(
@@ -16935,6 +16939,8 @@ async function requestPanelMetricsFromWatchTabOnce(watchUrl, expectedLv) {
  */
 async function requestPanelMetricsFromWatchTab(watchUrl, expectedLv) {
   if (INLINE_PASSIVE) return null; // 受動ビュー: watch タブへ注入しない(null→呼び出し側は storage 読みで描画)
+  // 読み手が書き手を起こす閉ループの遮断: 初回・配信切替・60秒の鮮度切れのときだけ要求する(null→storage の panel_summary で描く)。
+  if (!shouldRequestPanelMetrics({ lv: expectedLv, appliedLv: _panelMetricsAppliedForLv, lastAppliedUpdatedAt: _panelMetricsLastUpdatedAt, nowMs: Date.now() })) return null;
   try {
     return await withTimeout(
       requestPanelMetricsFromWatchTabOnce(watchUrl, expectedLv),
@@ -21289,6 +21295,7 @@ async function initPopup() {
           if (/^lv\d{1,15}$/.test(lidPoll) && pollUrl) {
             void requestPanelMetricsFromWatchTab(pollUrl, lidPoll).then((m) => {
               if (m) applyPanelMetricsFromContent(m, lidPoll);
+              else void applyLightweightPanelSummaryCards(lidPoll); // 要求を省いたとき(panelMetricsRequestPolicy)は storage の panel_summary で数字カードを更新
             });
           } else {
             void applyLightweightPanelSummaryCards();
