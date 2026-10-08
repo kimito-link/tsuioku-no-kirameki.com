@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 8 / 894 件
+## ⚠️ 役割コメントが無いソース 8 / 895 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `scripts/build.mjs`
@@ -817,7 +817,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (1902)
+- 📁 **src/** (1906)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1097,7 +1097,7 @@
         - `logo_funlink_white_RGB_link_black.png`
         - `logo_funlink_white_RGB_maru_black.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1666)
+  - 📁 **lib/** (1670)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -2116,6 +2116,9 @@
     - `panelLiveSummary.test.js`
     - `panelMetricsExport.js` — パネル向け速報メトリクス（content メモリ → popup 直結、storage バイパス）。
     - `panelMetricsExport.test.js`
+    - `panelMetricsRequestPolicy.js` — 【層】L0 判定層(純粋関数・I/O禁止)
+    - `panelMetricsRequestPolicy.test.js`
+    - `panelMetricsRequestWiring.test.js`
     - `panelWakeCurtain.js` — 「黒いまま」を見せないための、いつでも出せる幕。
     - `panelWakeCurtain.test.js`
     - `panelWakeCurtain.wiring.test.js`
@@ -2236,6 +2239,7 @@
     - `recentBroadcastLiveIds.js` — 最近の放送 liveId を `broadcastSessionSummary_v1` IDB から取得する純粋関数群。
     - `recentTextRing.js` — 「その人の直近N件の発言」を保持する固定長リングの純関数(v0.1.1218)。
     - `recentTextRing.test.js`
+    - `recordPathUntouched.test.js`
     - `recordRate.js` — 取得スピード(records/sec)の算出と健康スコア化(純ロジック)。
     - `recordRate.test.js`
     - `recordingStallWatchdog.js` — 記録停止ウォッチドッグの純粋判定ロジック。

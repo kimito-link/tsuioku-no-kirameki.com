@@ -1583,5 +1583,19 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
     version: '0.1.1586', metric: 'cross-checked-claims', value: 20,
     source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
     note: '★直近30日窓のスライドによる自然減(v0.1.1562/1577〜1585 の note と同じ理由)。今回の根拠は実機 census(35分で各画面に届く通知)と、測定用ブラウザでの古い版(v0.1.1577)と新しい版(v0.1.1585)の保存量の並べ比較(旧v1鏡57回・タイムライン鏡83回が減っていない=まとめ書き経路が残っていた)、変異テスト3種(床を0・差分判定を無効・空でも書く)で赤を確認して復元した別の手段。'
+  }),
+  Object.freeze({
+    version: '0.1.1587', metric: 'bundle-kb', value: 1395,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '★前版 1394KB → 1395KB(+1KB): 数字カードの要求を間引く純関数(panelMetricsRequestPolicy.js・約30行)の popup への取り込みと、更新履歴1版ぶん。判定を popup-entry.js に直接書かず lib に出している。過去最良1360(@0.1.1454)との差分の内訳は v0.1.1471/1537/1560/1562/1584 の note に記録済み。'
+  }),
+  Object.freeze({
+    version: '0.1.1587', metric: 'gate-selftest', value: 4,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1587', metric: 'cross-checked-claims', value: 20,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: '★直近30日窓のスライドによる自然減(v0.1.1562/1577〜1586 の note と同じ理由)。今回の根拠は実機 census(panel_summary が35分で各画面に約7,200回・51分で約7,700回=閉ループが続いている)と、コードの閉ループの確認(popup の要求→content の強制書込→onChanged→再描画)、変異テスト4種(content を強制書込に戻す・popup がポリシーを通さない・ポリシーが常に true・記録経路に1文字足す)で赤を確認して復元した別の手段。'
   })
 ]);
