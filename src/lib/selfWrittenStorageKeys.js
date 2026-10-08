@@ -129,7 +129,13 @@ const SELF_WRITTEN_PATTERNS = Object.freeze([
    */
   /^nls_watch_snapshot_lv\d{1,15}$/i,
   /^nls_ai_share_fast_diag_v\d+$/i,
-  /^nls_status_fast_diag_lite_v\d+$/i
+  /^nls_status_fast_diag_lite_v\d+$/i,
+  /*
+   * ★v0.1.1580: 拡張プロセスの忙しさ台帳(SW が書く純粋な診断キー・ext-census-sw.js)。
+   *   未登録だと、書き込みのたびに popup 全インスタンスが無スロットルで refresh する(上の every() の穴)。
+   *   文書数 N なら 1 分あたり最大 N 回書かれる。status が自前の 2 秒ループで読むので popup の再描画は不要。
+   */
+  /^nls_ext_process_census_v\d+$/i
 ]);
 
 /**

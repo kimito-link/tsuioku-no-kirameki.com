@@ -7,6 +7,8 @@
 //
 // ★描画には一切関与しない(読むだけ・best-effort)。失敗してもパネルは普通に動く。
 
+// v0.1.1580: 拡張プロセスの忙しさ台帳(文書別・ページを開かなくても犯人を名指しする)。import するだけで起動。
+import '../lib/extDocBusyCensusBoot.js';
 import {
   findCenterPainter,
   judgeSidepanelBlack,

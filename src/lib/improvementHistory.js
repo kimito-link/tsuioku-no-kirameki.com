@@ -1485,5 +1485,19 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
     version: '0.1.1579', metric: 'cross-checked-claims', value: 19,
     source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
     note: '★直近30日窓のスライドによる自然減(v0.1.1562/1577/1578 の note と同じ理由)。今回は変異テスト3件で赤を確認して復元し、devtools の実ブラウザで会場の見出し系ノードの追加を更新10回あたり 100〜110個→0個と別の手段でも確かめている。'
+  }),
+  Object.freeze({
+    version: '0.1.1580', metric: 'bundle-kb', value: 1389,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '★+4KB(前版 1385KB → 1389KB)は意図した増加: 拡張プロセスの忙しさ台帳(文書別・純関数と起動処理と状態速報の文言)と更新履歴1版ぶん(直近20版は popup バンドルに同梱される仕様)。★この版は計器を足す版(文書別の忙しさ台帳)。次の v0.1.1581 は必ず【削る】版にする(計器だけの版を連続で出さない契約・docs/handoff/ext-process-busy-census-DESIGN.md §E)。過去最良1360(@0.1.1454)との差分の内訳は v0.1.1471/1537/1560/1562 の note に記録済み。'
+  }),
+  Object.freeze({
+    version: '0.1.1580', metric: 'gate-selftest', value: 4,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1580', metric: 'cross-checked-claims', value: 20,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: '★直近30日窓のスライドによる自然減(v0.1.1562/1577〜1579 の note と同じ理由)。今回は変異テスト4件で赤を確認して復元し、測定用 Chrome の実ブラウザ(拡張の文書7つを同時に開く)で、各文書の報告→SW の台帳→状態速報の文言まで通ることを別の手段でも確かめている。'
   })
 ]);
