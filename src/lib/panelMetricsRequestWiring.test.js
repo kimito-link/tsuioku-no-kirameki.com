@@ -35,6 +35,12 @@ describe('popup: 数字カードの要求はポリシーを通る', () => {
   });
 });
 
+describe('popup: 3秒 poll の分岐は要求を省いたとき storage から数字カードを更新する', () => {
+  it('★null のとき applyLightweightPanelSummaryCards(lidPoll) に落ちる(独立検証の指摘・数字カードが fetch 中に止まらない)', () => {
+    expect(popup).toMatch(/if \(m\) applyPanelMetricsFromContent\(m, lidPoll\);\n\s+else void applyLightweightPanelSummaryCards\(lidPoll\);/);
+  });
+});
+
 describe('content: 数字カード要求の応答で panel_summary を強制書込しない', () => {
   it('★NLS_EXPORT_PANEL_METRICS の応答処理は persistPanelLiveSummaryIfDue(false)', () => {
     const i = content.indexOf('if (msg.type === PANEL_METRICS_MESSAGE_TYPE) {');

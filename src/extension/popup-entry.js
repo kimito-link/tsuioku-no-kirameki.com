@@ -21295,6 +21295,7 @@ async function initPopup() {
           if (/^lv\d{1,15}$/.test(lidPoll) && pollUrl) {
             void requestPanelMetricsFromWatchTab(pollUrl, lidPoll).then((m) => {
               if (m) applyPanelMetricsFromContent(m, lidPoll);
+              else void applyLightweightPanelSummaryCards(lidPoll); // 要求を省いたとき(panelMetricsRequestPolicy)は storage の panel_summary で数字カードを更新
             });
           } else {
             void applyLightweightPanelSummaryCards();
