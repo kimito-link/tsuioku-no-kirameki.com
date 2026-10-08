@@ -7111,7 +7111,7 @@ function mergeAndScheduleFlush(sectionKey, snapshot, liveId, nowMs) {
         const out = _mirrorFlushScheduler.takeFlushPayload(Date.now());
         try { observeNorthStarFlushOutcome(_northStarMirrorPublishRace, Boolean(out)); } catch { /* 計器失敗はflushを止めない */ }
         if (!out) { if (_mirrorFlushScheduler.isDirty()) mergeAndScheduleFlush(sectionKey, null, liveId, Date.now()); return; }
-        void chrome.storage.local.set(out.legacyPayload).catch(() => { /* best-effort */ });
+        if (Object.keys(out.legacyPayload).length) void chrome.storage.local.set(out.legacyPayload).catch(() => { /* best-effort */ }); // 変わった鏡だけ(全部同じなら書かない)
       } catch { /* no-op */ }
     }, 400);
   } catch { /* no-op */ }
