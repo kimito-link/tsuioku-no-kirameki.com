@@ -637,6 +637,7 @@
 | `src/lib/laneDomSelfMeasure.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/laneHeatTracker.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/laneMirrorPerLivePublish.js` | 1 | ポップアップ(応援レーン) |
+| `src/lib/laneMirrorWriteGate.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/lanePublishSkipDiag.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/laneRosterKeeper.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/laneSupplyOriginDiag.js` | 1 | ポップアップ(応援レーン) |
