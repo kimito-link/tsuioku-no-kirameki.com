@@ -2676,7 +2676,10 @@ let _lastStatusPopupEmbedSrc = '';
  *   ★「また勝手にタブが開く」ようなら、まず `background.js:1231` を疑う(そちらが真因だった)。
  * ───────────────────────────────────────────────────────────────────────────
  */
-const STATUS_POPUP_EMBED_ENABLED = true;
+// ★2026-10-08(v0.1.1582): 既定を false に。実機の二分探索で「status を閉じると拡張プロセスの CPU が約半分(メモリ
+//   1,229→570MB)」と実測。status は診断ページで、popup の複製を常駐させる理由が無い(同一拡張の iframe は
+//   親と同じメインスレッドを共有する)。必要なら true に戻す。
+const STATUS_POPUP_EMBED_ENABLED = false;
 
 function ensureStatusPopupIframe(lvList, laneMirror) {
   const section = document.getElementById('statusPopupEmbed');
@@ -2779,7 +2782,10 @@ function ensureStatusPopupIframe(lvList, laneMirror) {
  *   ここを false にするだけ。下の分岐が iframe を除去して section を隠す。
  * ───────────────────────────────────────────────────────────────────────────
  */
-const STATUS_VENUE_EMBED_ENABLED = true;
+// ★2026-10-08(v0.1.1582): 既定を false に。上の「重くならない」見立ては外れた: 会場は群衆 canvas(約18fps)と
+//   キャラ rAF を常時回し、status の裏でも拡張プロセスのメインスレッドを占有する(実機: status を閉じると CPU 約半分)。
+//   会場を見たいときは会場ページ/視聴ページ側で見る。戻すなら true。
+const STATUS_VENUE_EMBED_ENABLED = false;
 
 /** 直近に焼いた会場 iframe の src(=lv 変化時だけ作り直すための署名)。 */
 let _lastStatusVenueEmbedSrc = '';

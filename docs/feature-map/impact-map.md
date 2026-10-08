@@ -336,6 +336,7 @@
 | `src/lib/officialEventBannerDom.js` | 2 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) |
 | `src/lib/opSoundEffectDiag.js` | 2 | ポップアップ(応援レーン) / 状態速報ページ |
 | `src/lib/opSoundEffectDiagKey.js` | 2 | ポップアップ(応援レーン) / 状態速報ページ |
+| `src/lib/panelActivity.js` | 2 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) |
 | `src/lib/panelMetricsExport.js` | 2 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) |
 | `src/lib/panelWakeCurtainDiagKey.js` | 2 | ポップアップ(応援レーン) / 状態速報ページ |
 | `src/lib/parityVerdict.js` | 2 | ポップアップ(応援レーン) / 状態速報ページ |

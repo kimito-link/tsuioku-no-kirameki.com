@@ -33,6 +33,7 @@ import { KEY_INSTANT_PUSH_DIAG } from '../lib/instantPushDiagKey.js';
 import {
   isLiveChannelSwitchMessageValid,
   extractSwitchedLiveIdFromMessage } from '../lib/liveChannelSwitch.js';
+import { createPanelActivity, isPanelVisibilityMessageValid } from '../lib/panelActivity.js';
 import { applyChannelSwitchDiagDelta, computeChannelSwitchPaintGapAverage } from '../lib/channelSwitchDiag.js';
 import { KEY_CHANNEL_SWITCH_DIAG } from '../lib/channelSwitchDiagKey.js';
 import { createThrottledDiagFlusher } from '../lib/diagFlushThrottle.js';
@@ -5500,6 +5501,9 @@ const _instantPushSentAtByCommentNo = new Map();
 const _instantPushRepaintScheduler = createCoalescedRepaintScheduler(
   () => repaintStoryUserLaneWithInstantPushBuffer()
 );
+/** パネルが「見えているか」(親 content が伝える+document.hidden)。★定期処理はすべてこの判定で止める。 */
+const _panelActivity = createPanelActivity({ isDocHidden: () => typeof document !== 'undefined' && document.hidden === true });
+const _panelHidden = () => _panelActivity.isHidden();
 /** INLINE_EMBED_WATCH の自 iframe に content-entry.js が焼き込んだ照合用 nonce(`pn=`)。 */
 const _instantPushExpectedNonce = (() => {
   try {
@@ -5729,7 +5733,7 @@ function handleInstantCommentPushMessage(event) {
      *   「裏タブ滞留」と「本当に詰まっている」を混ぜて持ってしまう。
      *   ＝可視中だけの平均を別に持たないと、47秒が異常なのか正常なのか判定できない。
      */
-    const hiddenNow = typeof document !== 'undefined' && document.hidden === true;
+    const hiddenNow = _panelHidden();
     if (!hiddenNow) {
       _instantPushAvgVisibleDeliveryGapMsLocal = computeInstantPushGapAverage(
         _instantPushAvgVisibleDeliveryGapMsLocal,
@@ -5796,6 +5800,16 @@ let _channelSwitchAvgSwitchToPaintMsLocal = -1;
  *
  * nonce 不一致・lv 形式不正は黙って破棄する(表示は次の src 更新サイクルで追いつく)。
  */
+function handlePanelVisibilityMessage(event) {
+  if (!isPanelVisibilityMessageValid(event, _instantPushExpectedNonce, window.parent)) return;
+  // 隠れていた→見えるに戻ったら、止めていた間の分を1回で追いつく(既存の visibility_resume と同じ経路)。
+  if (_panelActivity.setHostVisible(event.data.visible).resumed) {
+    watchMetaCache.key = '';
+    tagRefreshReason('visibility_resume');
+    refresh().catch(() => { /* no-op: 次の定期/変化 refresh で追いつく */ });
+  }
+}
+
 function handleLiveChannelSwitchMessage(event) {
   if (!isLiveChannelSwitchMessageValid(event, _instantPushExpectedNonce)) {
     if (_instantPushExpectedNonce && event?.data?.type === 'NLS_LIVE_CHANNEL_SWITCH') {
@@ -5835,6 +5849,7 @@ function handleLiveChannelSwitchMessage(event) {
 if (INLINE_EMBED_WATCH && typeof window !== 'undefined') {
   window.addEventListener('message', handleInstantCommentPushMessage);
   window.addEventListener('message', handleLiveChannelSwitchMessage);
+  window.addEventListener('message', handlePanelVisibilityMessage);
 }
 
 /** initPopup の途中失敗後も DevTools から呼べるよう、読み込み直後に束縛する（観測のみ） */
@@ -15812,7 +15827,7 @@ async function refresh() {
       _lastUserRoomsPaintedLiveId === lv;
     // v0.1.813(スクロール/描画 重い 根治): 裏タブ(document.hidden)で描画済みなら重い paint を見送る
     //   (見えないので不要・万件で paint 135ms。可視復帰は visibilitychange→safeRefresh が塗り直す)。
-    const _hiddenSkipHeavyPaint = typeof document !== 'undefined' && document.hidden === true && userRoomsAlreadyPainted;
+    const _hiddenSkipHeavyPaint = _panelHidden() && userRoomsAlreadyPainted;
     const _perfDeferActive = (shouldDeferHeavyPopupPaintNow() && userRoomsAlreadyPainted) || _hiddenSkipHeavyPaint;
     // _perfDeferActive(スクロール中 or 裏タブ・描画済)は全消し再構築を見送る(白抜け防止・別配信は描画)。
     if (!_perfDeferActive) {
@@ -18207,7 +18222,7 @@ function scheduleCoalescedStorageRefresh(changes, runRefresh) {
   // v0.1.1544: initialDone には initialRefreshDone(refresh完走)ではなく refreshEverStarted
   //   (refresh開始済みか)を渡す(理由は refreshEverStarted 定義側コメント参照)。
   const action = decideVisibilityAction({
-    hidden: typeof document !== 'undefined' && document.hidden === true,
+    hidden: _panelHidden(),
     gateEnabled: true,
     initialDone: refreshEverStarted
   });
@@ -19767,7 +19782,7 @@ async function initPopup() {
 
   // 開いている間は状態（訪問数・現在の配信・記録サンプル数）を数秒ごとに更新する。
   refreshAutopatrolStatusLine();
-  setInterval(refreshAutopatrolStatusLine, 5000);
+  setInterval(() => { if (!_panelHidden()) refreshAutopatrolStatusLine(); }, 5000);
 
   // 視聴ページの自動表示 ON/OFF：OFF のときはツールバーアイコンを押すまで
   // インラインパネルを出さない（こん太を押す前から勝手に出るのを避ける）。
@@ -21249,7 +21264,7 @@ async function initPopup() {
           }
           return;
         }
-        if (typeof document !== 'undefined' && document.hidden) return;
+        if (_panelHidden()) return;
         // v0.1.392: 短間隔 polling で fetch が重ならないよう、前回の取得がまだ
         //   進行中なら今回の tick は見送る（その fetch がじき新しい値を届ける）。
         if (watchMetaCache.snapshotFetchActive) {
@@ -21283,7 +21298,7 @@ async function initPopup() {
   /** ギフト履歴: koken API 自動同期（storage 更新時だけ再描画。毎回 innerHTML すると点滅する） */
   setInterval(() => {
     if (!hasExtensionContext()) return;
-    if (typeof document !== 'undefined' && document.hidden) return;
+    if (_panelHidden()) return;
     const lid = String(watchPopupLastPaintedLiveId || '').trim().toLowerCase();
     if (!/^lv\d{1,15}$/.test(lid)) return;
     void syncKokenGiftHistoryForPopup(lid);
@@ -21315,7 +21330,7 @@ async function initPopup() {
       recordLaneTick(_laneTickProbe, LANE_TICK_REASONS.NO_CONTEXT);
       return;
     }
-    if (typeof document !== 'undefined' && document.hidden) {
+    if (_panelHidden()) {
       recordLaneTick(_laneTickProbe, LANE_TICK_REASONS.DOC_HIDDEN);
       // ★v1394: 隠れていても会場が開いていれば鏡は書く(正本 hiddenPublishPolicy.js)。
       try {
@@ -21425,7 +21440,7 @@ async function initPopup() {
   /** 鮮度注記だけ 30 秒ごとに更新（カード列は触らない） */
   setInterval(() => {
     if (!hasExtensionContext()) return;
-    if (typeof document !== 'undefined' && document.hidden) return;
+    if (_panelHidden()) return;
     const body = document.getElementById('northStarLaneBody-giftHistory');
     if (!(body instanceof HTMLElement)) return;
     if (body.getAttribute('data-lane-state') !== 'ok') return;
@@ -21486,7 +21501,7 @@ async function initPopup() {
     try {
       chrome.storage.onChanged.addListener((changes, area) => {
         if (area !== 'local' || !hasExtensionContext()) return;
-        if (typeof document !== 'undefined' && document.hidden) return; // 裏タブでは動かさない(競合/電池)
+        if (_panelHidden()) return; // 裏タブ/隠れたパネルでは動かさない(競合/電池)
         const changedKeys = Object.keys(changes);
         // 表示中の配信(lv)の panel_summary / watch_snapshot 変化時だけ上段3カードを埋め直す(キー完全一致)。
         // 応援レーン鏡(本物 popup が watch タブで publish)が更新されたら鏡から描き直す。
