@@ -24,6 +24,14 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.1564',
+    date: '2026-10-06',
+    summary: '匿名の識別絵を点線の枠で表示',
+    items: Object.freeze([
+      '応援レーンで、実際の写真ではなく自動生成された識別用の絵(匿名の人のアイコン)になっているタイルの丸い枠を点線にしました。本物のサムネイルとひと目で区別できます。大きさや並びは変わりません。会場モード・応援プレビューも同じです。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1563',
     date: '2026-10-06',
     summary: '案内帯の見出しに各段の人数を表示',

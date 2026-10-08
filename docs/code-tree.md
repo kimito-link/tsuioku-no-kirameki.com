@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 8 / 892 件
+## ⚠️ 役割コメントが無いソース 8 / 893 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `scripts/build.mjs`
@@ -815,7 +815,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (1896)
+- 📁 **src/** (1899)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1095,7 +1095,7 @@
         - `logo_funlink_white_RGB_link_black.png`
         - `logo_funlink_white_RGB_maru_black.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1660)
+  - 📁 **lib/** (1663)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -1610,6 +1610,9 @@
     - `giftHistorySourcePreference.test.js`
     - `giftHistoryViewModel.js` — 北極星ギフト履歴レーン用 ViewModel（送り主集計 + 個別投げ一覧）。
     - `giftHistoryViewModel.test.js`
+    - `giftLaneOfficialFill.js` — 【層】L0 判定層(純粋関数・I/O禁止)
+    - `giftLaneOfficialFill.test.js`
+    - `giftLaneOfficialFillWiring.test.js`
     - `giftMomentumAnalytics.js` — HTML マーケ分析向けのギフト深掘り集計。
     - `giftMomentumAnalytics.test.js`
     - `giftQuickStatsHtml.js` — ギフト/広告ユーザーのクイック統計（renderGiftQuickStatsPanel の本体）の HTML を組む純関数。
