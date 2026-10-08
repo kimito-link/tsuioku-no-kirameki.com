@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "mode": "default",
-  "fingerprint": "10b731f5b21b04b53f853a364bffd0c19a750c7023d42e7f7f354b406a1f6c20",
+  "fingerprint": "2bfce70cafe51e714c9e77a10aac812744bdc4474320309e882c8e74f7f5e1ff",
   "inputs": [
     "app/app.js",
     "app/live-view.js",
@@ -782,11 +782,11 @@
   ],
   "outputs": {
     "extension/dist/page-intercept.js": "5ccd2cd66f9caeb45060a68388f166cc0c55088e6fe47509075aecf66e6a7afa",
-    "extension/dist/backfill-sw.js": "ba32c8b3f2ef8aa7f83795f6125bba06e0555ddeb175610049465d1a32cc14b0",
+    "extension/dist/backfill-sw.js": "8ac07fda5d4e23bc4bee1167c0ff6beb1c93e37f9cd4a8f6319df30c280eb1d7",
     "extension/dist/content.js": "4a780201f4d20913bb98f2cc7e5fb4c44a3081ea155b2f4685c47029b742175a",
     "extension/dist/popup.js": "a0b1c469b9dad2f7b1b12e20f985fca0752d82eb4101d7a595eaf91aac272fa4",
     "extension/dist/offscreen.js": "ccb841a778ccf1f12d830a4bf8f3fe9ac5db3c7cc4dac536f6be33c6b95c0223",
-    "extension/dist/status.js": "7cb57a5c0b367533c739ad0ff085bba37413ff94901061e933965bff11c867dc",
+    "extension/dist/status.js": "614c6d047ff7b20bd096845a15726575537641122c4690263ba026d5f95c1d45",
     "extension/dist/live-view.js": "3243e97e6eca8aaae9f750d658f79dd47ced701b4d1e98f4d5f4cfc497ba85e4",
     "extension/dist/marketing-export.js": "e12c2de446ccb2155fa3ea291090f43fbde48450cbe51d04e2927b101acca283",
     "extension/dist/comeview.js": "5206934548bee27462bcd5cbe5f2a4f372dd2655bf445fb1548fc9091d7ad536",
