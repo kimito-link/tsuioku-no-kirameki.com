@@ -16,8 +16,12 @@ graph LR
   n_offscreen --> n_src_lib_commentDb_js["lib/commentDb.js"]:::shared
   n_offscreen --> n_src_lib_commentRecord_js["lib/commentRecord.js"]:::shared
   n_offscreen --> n_src_lib_deriveAvatarUrlFromUid_js["lib/deriveAvatarUrlFromUid.js"]:::shared
+  n_offscreen --> n_src_lib_extDocBusyCensus_js["lib/extDocBusyCensus.js"]:::shared
+  n_offscreen --> n_src_lib_extDocBusyCensusBoot_js["lib/extDocBusyCensusBoot.js"]:::shared
+  n_offscreen --> n_src_lib_extProcessCensusKey_js["lib/extProcessCensusKey.js"]:::shared
   n_offscreen --> n_src_lib_nicoAnonymousDisplay_js["lib/nicoAnonymousDisplay.js"]:::shared
   n_offscreen --> n_src_lib_storageKeys_js["lib/storageKeys.js"]:::shared
+  n_offscreen --> n_src_lib_storageRefreshTriggerKey_js["lib/storageRefreshTriggerKey.js"]:::shared
   n_offscreen --> n_src_lib_supportGrowthTileSrc_js["lib/supportGrowthTileSrc.js"]:::shared
   n_offscreen --> n_src_lib_userIdPreference_js["lib/userIdPreference.js"]:::shared
   n_offscreen --> n_src_shared_avatar_clampAvatarUrl_js["shared/avatar/clampAvatarUrl.js"]:::shared

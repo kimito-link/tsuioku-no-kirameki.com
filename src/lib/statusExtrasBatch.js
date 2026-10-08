@@ -42,6 +42,7 @@ import { KEY_CHANNEL_SWITCH_DIAG } from './channelSwitchDiagKey.js';
 import { KEY_HIGHLIGHT_LEDGER } from './highlightLedgerKey.js';
 import { KEY_SCORE_ANNOUNCE_DIAG } from './scoreAnnounceDiagKey.js';
 import { KEY_SIDEPANEL_SELF_DIAG } from './sidepanelSelfDiagKey.js';
+import { KEY_EXT_PROCESS_CENSUS } from './extProcessCensusKey.js';
 
 /**
  * 1回の chrome.storage.local.get で統合して読む21キー(いずれも単一キー get のみの項目)。
@@ -78,7 +79,9 @@ export const EXTRAS_BATCH_KEYS = [
   KEY_CHANNEL_SWITCH_DIAG,
   KEY_HIGHLIGHT_LEDGER,
   KEY_SCORE_ANNOUNCE_DIAG,
-  KEY_SIDEPANEL_SELF_DIAG
+  KEY_SIDEPANEL_SELF_DIAG,
+  // v0.1.1580: 拡張プロセスの忙しさ台帳(同じ get に同梱=読み取り回数は増えない・約4KB)。
+  KEY_EXT_PROCESS_CENSUS
 ];
 
 /**
@@ -96,7 +99,7 @@ export const EXTRAS_BATCH_KEYS = [
  *   previewRenderAck: any, backfillLiveMetric: any, giftEffectDiag: any, milestoneEffectDiag: any,
  *   opSoundEffectDiag: any, commentPostDiag: any,
  *   instantPushDiag: any, channelSwitchDiag: any, highlightLedger: any, scoreAnnounceDiag: any, sidepanelSelfDiag: any
- *   panelWakeCurtainDiag: any,
+ *   panelWakeCurtainDiag: any, processCensus: any,
  * }}
  */
 export function pickExtrasBatchValues(bag, nowMs) {
@@ -127,6 +130,8 @@ export function pickExtrasBatchValues(bag, nowMs) {
     highlightLedger: b[KEY_HIGHLIGHT_LEDGER] || null,
     scoreAnnounceDiag: b[KEY_SCORE_ANNOUNCE_DIAG] || null,
     // 2026-08-08: サイドパネルの自己診断(黒画面の切り分け用・sidepanel-entry.js が書く)。
-    sidepanelSelfDiag: b[KEY_SIDEPANEL_SELF_DIAG] || null
+    sidepanelSelfDiag: b[KEY_SIDEPANEL_SELF_DIAG] || null,
+    // v0.1.1580: 拡張プロセスの忙しさ台帳(SW が文書別の報告を束ねて書く・ext-census-sw.js)。
+    processCensus: b[KEY_EXT_PROCESS_CENSUS] || null
   };
 }

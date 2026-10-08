@@ -13,12 +13,15 @@
 ```mermaid
 graph LR
   n_backfill_sw["バックフィル SW"]
+  n_backfill_sw --> n_src_extension_ext_census_sw_js["extension/ext-census-sw.js"]
   n_backfill_sw --> n_src_lib_backfillCapturedAt_js["lib/backfillCapturedAt.js"]:::shared
   n_backfill_sw --> n_src_lib_backfillRetryBackoff_js["lib/backfillRetryBackoff.js"]:::shared
   n_backfill_sw --> n_src_lib_backfillSlotPool_js["lib/backfillSlotPool.js"]:::shared
   n_backfill_sw --> n_src_lib_backfillTransientRetry_js["lib/backfillTransientRetry.js"]:::shared
   n_backfill_sw --> n_src_lib_commentRecord_js["lib/commentRecord.js"]:::shared
   n_backfill_sw --> n_src_lib_deriveAvatarUrlFromUid_js["lib/deriveAvatarUrlFromUid.js"]:::shared
+  n_backfill_sw --> n_src_lib_extDocBusyCensus_js["lib/extDocBusyCensus.js"]:::shared
+  n_backfill_sw --> n_src_lib_extProcessCensusKey_js["lib/extProcessCensusKey.js"]:::shared
   n_backfill_sw --> n_src_lib_lengthDelimitedStream_js["lib/lengthDelimitedStream.js"]:::shared
   n_backfill_sw --> n_src_lib_ndgrBackfillCrawl_js["lib/ndgrBackfillCrawl.js"]:::shared
   n_backfill_sw --> n_src_lib_ndgrChatRows_js["lib/ndgrChatRows.js"]:::shared
@@ -27,6 +30,7 @@ graph LR
   n_backfill_sw --> n_src_lib_parseGiftComment_js["lib/parseGiftComment.js"]:::shared
   n_backfill_sw --> n_src_lib_protobufVarint_js["lib/protobufVarint.js"]:::shared
   n_backfill_sw --> n_src_lib_storageKeys_js["lib/storageKeys.js"]:::shared
+  n_backfill_sw --> n_src_lib_storageRefreshTriggerKey_js["lib/storageRefreshTriggerKey.js"]:::shared
   n_backfill_sw --> n_src_lib_supportGrowthTileSrc_js["lib/supportGrowthTileSrc.js"]:::shared
   n_backfill_sw --> n_src_lib_swBackfillStaging_js["lib/swBackfillStaging.js"]:::shared
   n_backfill_sw --> n_src_lib_swCrawlSlots_js["lib/swCrawlSlots.js"]

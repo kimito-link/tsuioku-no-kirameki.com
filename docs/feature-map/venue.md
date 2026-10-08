@@ -47,13 +47,13 @@ graph LR
   n_venue --> n_src_lib_displayRecordedCount_js["lib/displayRecordedCount.js"]:::shared
   n_venue --> n_src_lib_effectDirector_js["lib/effectDirector.js"]:::shared
   n_venue --> n_src_lib_effectSoundPlayer_js["lib/effectSoundPlayer.js"]:::shared
+  n_venue --> n_src_lib_extDocBusyCensus_js["lib/extDocBusyCensus.js"]:::shared
+  n_venue --> n_src_lib_extDocBusyCensusBoot_js["lib/extDocBusyCensusBoot.js"]:::shared
+  n_venue --> n_src_lib_extProcessCensusKey_js["lib/extProcessCensusKey.js"]:::shared
   n_venue --> n_src_lib_giftDeltaFallback_js["lib/giftDeltaFallback.js"]:::shared
   n_venue --> n_src_lib_giftDisplayNickname_js["lib/giftDisplayNickname.js"]:::shared
   n_venue --> n_src_lib_giftEffectDiag_js["lib/giftEffectDiag.js"]:::shared
-  n_venue --> n_src_lib_giftEffectDiagKey_js["lib/giftEffectDiagKey.js"]:::shared
-  n_venue --> n_src_lib_giftThrowProjectile_js["lib/giftThrowProjectile.js"]:::shared
-  n_venue --> n_src_lib_highlightLedger_js["lib/highlightLedger.js"]:::shared
   classDef shared fill:#eee,stroke:#999,color:#666;
 ```
 
-> ほか 104 ファイル省略（全件は storage-bus.md / metafile 参照）。
+> ほか 108 ファイル省略（全件は storage-bus.md / metafile 参照）。
