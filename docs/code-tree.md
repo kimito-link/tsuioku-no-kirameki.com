@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 8 / 886 件
+## ⚠️ 役割コメントが無いソース 8 / 890 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `scripts/build.mjs`
@@ -200,7 +200,7 @@
     - `2026-09-30.md`
     - `2026-10-01.md`
     - `2026-10-06.md`
-- 📁 **docs/** (344)
+- 📁 **docs/** (346)
   - 📁 **article-assets/** (87)
     - 📁 **venue-frames/** (12)
       - `f01.png`
@@ -312,7 +312,7 @@
     - `storage-bus.md`
     - `venue.md`
     - `web-status.md`
-  - 📁 **handoff/** (161)
+  - 📁 **handoff/** (163)
     - 📁 **bench/** (2)
       - `bench-interval.mjs` — ⚠️ 役割コメント無し
       - `bench-lane.mjs` — ⚠️ 役割コメント無し
@@ -405,6 +405,8 @@
     - `diagnostic-architecture-strengthen-IMPLEMENTATION-HANDOFF.md`
     - `diagnostic-instrument-strengthen-2-DESIGN.md`
     - `diagnostic-instrument-strengthen-2-IMPLEMENTATION-HANDOFF.md`
+    - `ext-process-busy-census-DESIGN.md`
+    - `ext-process-busy-census-IMPLEMENTATION-HANDOFF.md`
     - `giant-entry-split-IMPLEMENTATION-HANDOFF-2026-08-10.md`
     - `giant-entry-split-MAP-2026-08-10.md`
     - `giant-entry-split-PHASE2-INVENTORY-2026-08-10.md`
@@ -813,7 +815,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (1881)
+- 📁 **src/** (1889)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -850,7 +852,7 @@
       - `avatarResolver.test.js`
       - `identity.js` — ニコ生ユーザー ID の「匿名性」判定と関連アイデンティティ・ユーティリティ。
       - `nickname.js` — 表示名（ニックネーム）の「強弱」判定。
-  - 📁 **extension/** (58)
+  - 📁 **extension/** (60)
     - 📁 **popup/** (12)
       - 📁 **init/** (4)
         - `devMonitorExport.js` — devMonitorExport — 開発モニタの「エクスポート/ダウンロード/較正データ消去」一式。
@@ -880,6 +882,8 @@
     - `content-entry.js` — watch ページ常駐の記録エンジン本体。コメント取得(NDGR+DOM)・記録・バックフィル・パネル描画の中枢。
     - `dedupeSeedDiag.wiring.test.js`
     - `embeddedProgramElapsed.wiring.test.js`
+    - `ext-census-sw.js` — Service Worker 側: 各拡張文書の「忙しさ」報告を受けて、storage の台帳へ足す。
+    - `ext-census-sw.test.js`
     - `giftHistoryLaneStateWiring.test.js`
     - `heavyReuseNotDoubleGated.wiring.test.js`
     - `inlineHostMoveProbe.wiring.test.js`
@@ -1091,7 +1095,7 @@
         - `logo_funlink_white_RGB_link_black.png`
         - `logo_funlink_white_RGB_maru_black.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1647)
+  - 📁 **lib/** (1653)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -1555,6 +1559,12 @@
     - `exportStageProfiler.test.js`
     - `exportWaitNarration.js` — HTML / マーケ DL 待ち中の りんく・こん太・たぬ姉 セリフ（popup 吹き出し用）。
     - `exportWaitNarration.test.js`
+    - `extCensusWiring.test.js`
+    - `extDocBusyCensus.js` — 【層】L0 判定層(純粋関数・I/O禁止)
+    - `extDocBusyCensus.test.js`
+    - `extDocBusyCensusBoot.js` — 【層】L2 配線層(副作用あり・各拡張文書から1行 import で起動する)
+    - `extDocBusyCensusBoot.test.js`
+    - `extProcessCensusKey.js` — 拡張プロセスの忙しさ台帳の storage キーとメッセージ型(書き手と読み手が同じ名前を使うための1か所)。
     - `extensionCspInlineScript.test.js`
     - `externalFetchCells.js` — 外部API(貢献度/ニコニ広告)の取得をセルにする(純関数)。
     - `externalFetchCells.test.js`

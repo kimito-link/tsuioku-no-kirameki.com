@@ -118,11 +118,12 @@
   - `src/lib/monotonicCommentCount.js`
 - **storage キー定義** — chrome.storage のキー名の正本(nls_comments_<lv> 等)
   - `src/lib/storageKeys.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 51</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 53</summary>
 
 - `scripts/dump-panel-state.mjs` — 実機の chrome.storage.local を吸い出して
 - `scripts/migrate-ext-storage.mjs` — 拡張の記録データを「旧ID配下フォルダ」→「新ID配下フォルダ」へコピーする(一度だけ・v0.1.1529)。
 - `scripts/record-improvement.mjs` — ★実測値を台帳に書き足す【1本の口】。
+- `src/extension/ext-census-sw.js` — Service Worker 側: 各拡張文書の「忙しさ」報告を受けて、storage の台帳へ足す。
 - `src/lib/autoBackupState.js` — v0.1.808(星野ロミ式コンポーネント化・第1弾): content-entry.js の巨大化を抑えるため、
 - `src/lib/blobDownload.js` — Blob を指定ファイル名で保存する。
 - `src/lib/broadcastSessionSummaryDb.js` — 配信セッション単位の軽量サマリ（ポップアップの IndexedDB）
@@ -137,6 +138,7 @@
 - `src/lib/devMonitorTrendSession.js` — 開発監視トレンド: sessionStorage（セッション）+ chrome.storage.local（永続・最大7日）
 - `src/lib/displayRecordedCount.js` — 「画面に出す記録件数」の正本を1つに固定する純関数(v0.1.839・第1)。
 - `src/lib/effectDetailCells.js` — 演出・効果音・コメント送信の観測を割る(純関数)。
+- `src/lib/extProcessCensusKey.js` — 拡張プロセスの忙しさ台帳の storage キーとメッセージ型(書き手と読み手が同じ名前を使うための1か所)。
 - `src/lib/finalDetailCells.js` — 100個化の最終弾(識別・効果音・BGM・記録の質)。
 - `src/lib/giftRecord.js` — ギフト/広告ユーザーの永続化（純関数）
 - `src/lib/heavyChunkReadReuse.js` — heavy 全件コメント read の再利用判定純関数
@@ -873,7 +875,7 @@
   - `src/extension/live-ranking-entry.js`
   - `tsuioku-no-kirameki/live/index.html`
   - `.github/workflows/live-ranking.yml`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 206</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 208</summary>
 
 - `app/app.js` — スマホ閲覧用 status Web 版。
 - `app/live-view.js` — global NL_BUILD_ID
@@ -954,6 +956,8 @@
 - `src/lib/embeddedDataExtract.js` — ニコ生 watch ページの `#embedded-data[data-props]` から初期メタ情報を抽出する純関数。
 - `src/lib/eventParticipationProgramsApi.js` — ニコ生「企画イベント参加番組一覧」公式 JSON API の URL 組立 & 正規化（純関数）。
 - `src/lib/executeScriptWithTimeout.js` — v0.1.441: `chrome.scripting.executeScript` を timeout 付きで実行する純関数ラッパ。
+- `src/lib/extDocBusyCensus.js` — 【層】L0 判定層(純粋関数・I/O禁止)
+- `src/lib/extDocBusyCensusBoot.js` — 【層】L2 配線層(副作用あり・各拡張文書から1行 import で起動する)
 - `src/lib/externalLinksSectionHtml.js` — v0.1.812(星野ロミ式コンポーネント化・第5弾): buildHtmlReportDocument 内の
 - `src/lib/formatDateTime.js` — 日時の数値（epoch ms）を日本語ロケールで `YYYY/MM/DD HH:MM:SS` 形式に整形する
 - `src/lib/formatOfficialStreamAgeMinutes.js` — 視聴ページ由来の「放送開始からの経過（分）」を短い日本語にする。
@@ -1092,10 +1096,9 @@
 - `v0.1.1579` 2026-10-07 — 会場の見出しが数秒ごとに点滅しない
 - `v0.1.1562` 2026-10-06 — 応援者のタイルに 🎁📣💬 の内訳を表示
 
-### 📥 コメント取得 (3版)
+### 📥 コメント取得 (2版)
 - `v0.1.1571` 2026-10-06 — 内部: 輸入項目の取りこぼし検査を追加
 - `v0.1.1565` 2026-10-06 — 応援者のタイルにギフト増分バッジを表示
-- `v0.1.1560` 2026-10-05 — タイムシフトの過去コメント一括取得が止まるのを修正
 
 ### 🙂 匿名(184) (2版)
 - `v0.1.1569` 2026-10-06 — 別窓の匿名タイルも小さく点線枠に
@@ -1136,10 +1139,11 @@
 - `v0.1.1563` 2026-10-06 — 案内帯の見出しに各段の人数を表示
 - `v0.1.1562` 2026-10-06 — 応援者のタイルに 🎁📣💬 の内訳を表示
 
-### 🧊 storage安定 (1版)
-- `v0.1.1560` 2026-10-05 — タイムシフトの過去コメント一括取得が止まるのを修正
+### 🩺 診断・状態速報 (1版)
+- `v0.1.1580` 2026-10-08 — 状態速報に拡張の忙しさを文書別に表示
 
-### ⚡ 描画・性能 (2版)
+### ⚡ 描画・性能 (3版)
+- `v0.1.1580` 2026-10-08 — 状態速報に拡張の忙しさを文書別に表示
 - `v0.1.1576` 2026-10-06 — 別窓でも大人数の応援レーンが伸びない
 - `v0.1.1561` 2026-10-05 — サイドパネルを開いた瞬間の黒を消す
 

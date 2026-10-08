@@ -25,6 +25,8 @@
  * ───────────────────────────────────────────────────────────────────────────
  */
 
+// v0.1.1580: 拡張プロセスの忙しさ台帳(文書別・ページを開かなくても犯人を名指しする)。import するだけで起動。
+import '../lib/extDocBusyCensusBoot.js';
 import { aggregateMarketingReport } from '../lib/marketingAggregate.js';
 import { buildMarketingDashboardHtml } from '../lib/marketingChartsHtml.js';
 import { attachCommenterFollowToReport, buildYukkuriImageDataUrlMap } from './popup/report/htmlReportDocument.js';

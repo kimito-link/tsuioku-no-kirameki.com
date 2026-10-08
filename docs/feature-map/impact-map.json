@@ -204,6 +204,46 @@
       ]
     },
     {
+      "file": "src/lib/extDocBusyCensus.js",
+      "featureCount": 6,
+      "features": [
+        "backfill-sw",
+        "comeview",
+        "offscreen",
+        "popup",
+        "status",
+        "venue"
+      ],
+      "labels": [
+        "バックフィル SW",
+        "コメビュ(別窓)",
+        "コメント IDB 書き手",
+        "ポップアップ(応援レーン)",
+        "状態速報ページ",
+        "会場モード(standalone)"
+      ]
+    },
+    {
+      "file": "src/lib/extProcessCensusKey.js",
+      "featureCount": 6,
+      "features": [
+        "backfill-sw",
+        "comeview",
+        "offscreen",
+        "popup",
+        "status",
+        "venue"
+      ],
+      "labels": [
+        "バックフィル SW",
+        "コメビュ(別窓)",
+        "コメント IDB 書き手",
+        "ポップアップ(応援レーン)",
+        "状態速報ページ",
+        "会場モード(standalone)"
+      ]
+    },
+    {
       "file": "src/lib/nicoUserPage.js",
       "featureCount": 6,
       "features": [
@@ -224,6 +264,26 @@
       ]
     },
     {
+      "file": "src/lib/storageRefreshTriggerKey.js",
+      "featureCount": 6,
+      "features": [
+        "backfill-sw",
+        "comeview",
+        "offscreen",
+        "popup",
+        "status",
+        "venue"
+      ],
+      "labels": [
+        "バックフィル SW",
+        "コメビュ(別窓)",
+        "コメント IDB 書き手",
+        "ポップアップ(応援レーン)",
+        "状態速報ページ",
+        "会場モード(standalone)"
+      ]
+    },
+    {
       "file": "src/domain/user/identity.js",
       "featureCount": 5,
       "features": [
@@ -236,6 +296,24 @@
       "labels": [
         "記録エンジン(watchページ常駐)",
         "Web版 追憶のきらめき ランキング(/live/)",
+        "ポップアップ(応援レーン)",
+        "状態速報ページ",
+        "会場モード(standalone)"
+      ]
+    },
+    {
+      "file": "src/lib/extDocBusyCensusBoot.js",
+      "featureCount": 5,
+      "features": [
+        "comeview",
+        "offscreen",
+        "popup",
+        "status",
+        "venue"
+      ],
+      "labels": [
+        "コメビュ(別窓)",
+        "コメント IDB 書き手",
         "ポップアップ(応援レーン)",
         "状態速報ページ",
         "会場モード(standalone)"
@@ -3583,6 +3661,16 @@
       ],
       "labels": [
         "記録エンジン(watchページ常駐)"
+      ]
+    },
+    {
+      "file": "src/extension/ext-census-sw.js",
+      "featureCount": 1,
+      "features": [
+        "backfill-sw"
+      ],
+      "labels": [
+        "バックフィル SW"
       ]
     },
     {
@@ -7753,16 +7841,6 @@
       ],
       "labels": [
         "状態速報ページ"
-      ]
-    },
-    {
-      "file": "src/lib/storageRefreshTriggerKey.js",
-      "featureCount": 1,
-      "features": [
-        "popup"
-      ],
-      "labels": [
-        "ポップアップ(応援レーン)"
       ]
     },
     {

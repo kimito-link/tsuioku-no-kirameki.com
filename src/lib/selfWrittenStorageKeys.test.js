@@ -117,3 +117,15 @@ describe('stripSelfWrittenRenderArtifacts — 混在時に throttle を失う穴
     ]);
   });
 });
+
+describe('拡張プロセスの忙しさ台帳(v0.1.1580)は自己書き込み扱い=描き直しの理由にならない', () => {
+  it('実際に書かれるキー文字列 nls_ext_process_census_v1 が一致する', () => {
+    expect(isSelfWrittenRenderArtifactKey('nls_ext_process_census_v1')).toBe(true);
+  });
+  it('★every() の穴: 台帳キーだけの変更なら全部自己書き込み(スロットルを素通りしない)', () => {
+    expect(isAllSelfWrittenRenderArtifacts(['nls_ext_process_census_v1'])).toBe(true);
+  });
+  it('台帳キーにコメント系が混ざれば従来どおり再描画する(取りこぼさない)', () => {
+    expect(isAllSelfWrittenRenderArtifacts(['nls_ext_process_census_v1', 'nls_comments_lv351100897'])).toBe(false);
+  });
+});
