@@ -730,6 +730,7 @@
 | `src/lib/paintPerfLog.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/paintTopSupportRankStyleIntoElement.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/panelCoverCulprit.js` | 1 | ポップアップ(応援レーン) |
+| `src/lib/panelMetricsRequestPolicy.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/panelWakeCurtain.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/panelWakeCurtainDom.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/parseEmbeddedDataViewerInfo.js` | 1 | 記録エンジン(watchページ常駐) |
