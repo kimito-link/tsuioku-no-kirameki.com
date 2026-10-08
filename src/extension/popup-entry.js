@@ -1,5 +1,7 @@
 // @ts-nocheck — popup UI; DOM/Chrome API が広く any 相当
 // popup-entry.js — ポップアップ UI 本体。応援レーン描画・HTMLレポート生成・各種診断/共有のまとめ役。
+// v0.1.1580: 拡張プロセスの忙しさ台帳(文書別・ページを開かなくても犯人を名指しする)。import するだけで起動。
+import '../lib/extDocBusyCensusBoot.js';
 import { extractLiveIdFromUrl, isNicoLiveWatchUrl, watchPageUrlsMatchForSnapshot } from '../lib/broadcastUrl.js';
 import { shouldSkipMirrorForLiveId } from '../lib/passiveMirrorLiveIdGuard.js';
 // v0.1.1057: HTMLレポート組み立てクラスタを popup/report/ へ切り出し(max-linesラチェット対応・挙動不変)。

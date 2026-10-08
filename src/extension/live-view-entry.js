@@ -18,6 +18,8 @@
  * ───────────────────────────────────────────────────────────────────────────
  */
 
+// v0.1.1580: 拡張プロセスの忙しさ台帳(文書別・ページを開かなくても犯人を名指しする)。import するだけで起動。
+import '../lib/extDocBusyCensusBoot.js';
 import { KEY_LIVEVIEW_PUBLISH_PAYLOAD } from '../lib/storageKeys.js';
 import { buildStatusShareUrls } from '../lib/statusShareUrls.js';
 import { buildParityBadge } from '../lib/parityVerdict.js';

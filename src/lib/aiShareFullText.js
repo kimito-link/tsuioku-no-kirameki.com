@@ -7,6 +7,7 @@ import {
   liveviewPublishSelfDiagToActionCards
 } from './liveviewPublishSelfDiag.js';
 import { formatLaneRosterDeltaLine } from './laneRosterDelta.js';
+import { formatExtProcessCensusLines } from './extDocBusyCensus.js';
 import { summarizeLiveviewPublishOutcome } from './liveviewPublishOutcome.js';
 import { summarizeLiveviewPublishOutcomeRecord } from './liveviewPublishOutcomeKey.js';
 import { buildDiagnosticsTrust, formatDiagnosticsTrustLines } from './diagnosticsTrust.js';
@@ -134,7 +135,7 @@ export function formatRenderSectionMsLine(renderSectionMs) {
  * @param {any} args
  * @returns {string}
  */
-export function buildAiShareFullText({ overviewText, livesData, fastDiag, popupDiag, voiceDiag, venueSeatsDiag, laneDiag, laneMirror, reportPreview, trendFindings, jsonBlob, currentLiveId, publishKeys, publishOutcomeRec, previewRenderAck, refreshPerf, renderSectionMs, giftEffectDiag, milestoneEffectDiag, customSoundDiag, opSoundEffectDiag, commentPostDiag, instantPushDiag, channelSwitchDiag, highlightLedger, sidepanelSelfDiag, extrasAgeMs }) {
+export function buildAiShareFullText({ overviewText, livesData, fastDiag, popupDiag, voiceDiag, venueSeatsDiag, laneDiag, laneMirror, reportPreview, trendFindings, jsonBlob, currentLiveId, publishKeys, publishOutcomeRec, previewRenderAck, refreshPerf, renderSectionMs, giftEffectDiag, milestoneEffectDiag, customSoundDiag, opSoundEffectDiag, commentPostDiag, instantPushDiag, channelSwitchDiag, highlightLedger, sidepanelSelfDiag, processCensus, extrasAgeMs }) {
   const lines = [];
   lines.push('## 君斗りんくの追憶のきらめき 状態速報');
   lines.push(`生成: ${new Date().toISOString()}`);
@@ -661,6 +662,13 @@ export function buildAiShareFullText({ overviewText, livesData, fastDiag, popupD
   try {
     const spLine = String(sidepanelSelfDiag?.line || '');
     if (spLine) lines.push(spLine);
+  } catch {
+    /* no-op: 自己診断の失敗は状態速報を壊さない */
+  }
+  // v0.1.1580: 拡張プロセスの忙しさ(文書別・犯人=自分が実行した長い処理 / 被害=受けた遅れ)。
+  //   各文書が SW へ送った要約の台帳(storage)を読むだけ=popup/status を開いていなくても溜まる。
+  try {
+    for (const l of formatExtProcessCensusLines(processCensus, Date.now())) lines.push(l);
   } catch {
     /* no-op: 自己診断の失敗は状態速報を壊さない */
   }
