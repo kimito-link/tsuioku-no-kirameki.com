@@ -60,8 +60,13 @@ export function laneMirrorWriteSignature(snap) {
   try {
     const rest = { .../** @type {Record<string, unknown>} */ (snap) };
     delete rest[CANONICAL_TIME_FIELD]; // 時刻は毎回変わる=署名に入れると抑制が効かない(フィールド名は時刻の正本 timeAuthority に委ねる)
-    delete rest.domSelf; // 受領証は別キーに書く
-    return fingerprint(JSON.stringify(rest));
+    delete rest.domSelf; // 受領証本体は別キーに書く(測定時刻・寸法は毎回変わるので署名に入れない)
+    // ★ただし受領証の【指紋】は入れる(内容ベースで、DOM が変わらなければ安定する)。タイルを描き直したら署名が変わり、
+    //   受領証が最大60秒遅れて会場の診断が「未計測」になるのを防ぐ。
+    const dom = /** @type {{ fingerprint?: unknown, fingerprintFor?: unknown }|undefined} */ (
+      /** @type {Record<string, unknown>} */ (snap).domSelf
+    );
+    return fingerprint(`${JSON.stringify(rest)}|${String((dom && dom.fingerprint) || '')}|${String((dom && dom.fingerprintFor) || '')}`);
   } catch {
     return '';
   }
@@ -95,6 +100,10 @@ export function createLaneMirrorWriteGate(opts = {}) {
         state.delete(oldest);
       }
       return { write: true, reason: '' };
+    },
+    /** 書き込みが失敗したとき等に呼ぶ: 次の shouldWrite は(同じ署名でも)書く側に倒れる。 */
+    forget(/** @type {string} */ lid) {
+      state.delete(String(lid || ''));
     },
     size() {
       return state.size;

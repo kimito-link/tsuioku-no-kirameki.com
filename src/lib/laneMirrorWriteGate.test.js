@@ -43,10 +43,18 @@ describe('laneMirrorWriteSignature — 鏡の中身そのもの(時刻と受領�
     expect(laneMirrorWriteSignature(snapOf({ nowMs: 1000 }))).toBe(laneMirrorWriteSignature(snapOf({ nowMs: 99_999 })));
   });
 
-  it('受領証(domSelf)だけが違う鏡も同じ署名(domSelf は別キーの受領証に書く)', () => {
-    const a = snapOf({ domSelf: { measured: true, fingerprint: 'fp-a' } });
-    const b = snapOf({ domSelf: { measured: true, fingerprint: 'fp-b', measuredAt: 5 } });
+  it('受領証の測定時刻・寸法だけが違う鏡は同じ署名(毎回変わる値で抑制が効かなくなるのを防ぐ)', () => {
+    const a = snapOf({ domSelf: { measured: true, fingerprint: 'fp-a', measuredAt: 1, perTier: { link: { visible: 3 } } } });
+    const b = snapOf({ domSelf: { measured: true, fingerprint: 'fp-a', measuredAt: 99, perTier: { link: { visible: 9 } } } });
     expect(laneMirrorWriteSignature(a)).toBe(laneMirrorWriteSignature(b));
+  });
+
+  it('★受領証の指紋(fingerprint / fingerprintFor)が変われば署名が変わる(タイルを描き直したら受領証をすぐ追いつかせる)', () => {
+    const a = snapOf({ domSelf: { measured: true, fingerprint: 'fp-a', fingerprintFor: 'h1' } });
+    const b = snapOf({ domSelf: { measured: true, fingerprint: 'fp-b', fingerprintFor: 'h1' } });
+    const c = snapOf({ domSelf: { measured: true, fingerprint: 'fp-a', fingerprintFor: 'h2' } });
+    expect(laneMirrorWriteSignature(a)).not.toBe(laneMirrorWriteSignature(b));
+    expect(laneMirrorWriteSignature(a)).not.toBe(laneMirrorWriteSignature(c));
   });
 
   it('★統計(stats)が変われば署名が変わる(🎁📣💬の件数を最大60秒止めない)', () => {
@@ -124,6 +132,22 @@ describe('createLaneMirrorWriteGate', () => {
     expect(g.shouldWrite('lv1', '', 10).write).toBe(true);
   });
 
+  it('★forget すると、同じ署名でも次は書く(書き込み失敗の再試行に使う)', () => {
+    const g = createLaneMirrorWriteGate();
+    g.shouldWrite('lv1', 'sig', 0);
+    expect(g.shouldWrite('lv1', 'sig', 10).write).toBe(false);
+    g.forget('lv1');
+    expect(g.shouldWrite('lv1', 'sig', 20).write).toBe(true);
+  });
+
+  it('★複数のゲート(複数の popup インスタンス)は互いを抑制しない(それぞれ自分の最後の書き込みだけを覚える)', () => {
+    const a = createLaneMirrorWriteGate();
+    const b = createLaneMirrorWriteGate();
+    expect(a.shouldWrite('lv1', 'X', 0).write).toBe(true);
+    expect(b.shouldWrite('lv1', 'Y', 5).write).toBe(true); // B の最初の1回は A が書いていても書く
+    expect(a.shouldWrite('lv1', 'X', 10).write).toBe(false); // A は自分の内容が変わるまで書かない
+  });
+
   it('保持する配信数に上限がある(配信を渡り歩いても台帳が太らない)', () => {
     const g = createLaneMirrorWriteGate({ maxLives: 3 });
     for (let i = 0; i < 10; i += 1) g.shouldWrite(`lv${i}`, 's', i);
@@ -160,6 +184,23 @@ describe('publishLaneMirrorPerLive にゲートを通すと、同内容の set �
       publishLaneMirrorPerLive(s, 1000 + i, st, gate);
     }
     expect(st.writes).toHaveLength(10);
+  });
+
+  it('★書き込みが失敗(reject)したら、同じ内容でも次の publish で書き直す(失敗を「書いた」と見なして最大60秒止まらない)', async () => {
+    let call = 0;
+    const writes = /** @type {any[]} */ ([]);
+    const st = {
+      set: (o) => {
+        call += 1;
+        writes.push(o);
+        return call === 1 ? Promise.reject(new Error('quota')) : Promise.resolve();
+      }
+    };
+    const gate = createLaneMirrorWriteGate();
+    publishLaneMirrorPerLive(snapOf(), 1000, st, gate);
+    await new Promise((r) => setTimeout(r, 5)); // reject の catch が走るのを待つ
+    publishLaneMirrorPerLive(snapOf(), 1500, st, gate);
+    expect(writes).toHaveLength(2);
   });
 
   it('ゲート無し(従来の呼び方)は従来どおり毎回書く=後方互換', () => {
