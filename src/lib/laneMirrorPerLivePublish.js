@@ -31,7 +31,7 @@ import { laneMirrorWriteSignature } from './laneMirrorWriteGate.js';
  * @param {any} snap buildLaneMirrorSnapshot の戻り
  * @param {number} nowMs
  * @param {{ set: (obj: Record<string, unknown>) => unknown }} storage storage.local 相当(注入)
- * @param {{ shouldWrite: (lid: string, sig: string, nowMs: number) => { write: boolean, reason: string } }} [gate]
+ * @param {{ shouldWrite: (lid: string, sig: string, nowMs: number) => { write: boolean, reason: string }, forget?: (lid: string) => void }} [gate]
  *   書き込み抑制ゲート(laneMirrorWriteGate.js)。渡すと「同じ内容なら60秒に1回まで」に絞る。
  *   ★省略時は従来どおり毎回書く(後方互換)。stats/pulse の変化は署名に入っているので必ず書かれる。
  * @returns {{ written: boolean, reason: string, mirrorKey: string, receiptKey: string }}
@@ -61,6 +61,18 @@ export function publishLaneMirrorPerLive(snap, nowMs, storage, gate) {
     { nowMs, surface: 'popup' }
   );
   // ★鏡と受領証を【同じ set】で書く=片方だけ新しい状態を作らない。
-  storage.set({ [mirrorKey]: snap, [receiptKey]: receipt });
+  const setResult = storage.set({ [mirrorKey]: snap, [receiptKey]: receipt });
+  const r = /** @type {any} */ (setResult);
+  // ★書き込みが失敗(reject)したら、ゲートに「書いていない」と伝える(失敗を書いたと見なして最大60秒止まらない)。
+  //   set が Promise を返さない呼び手(テストのスパイ等)には何もしない。reject は握る(best-effort)。
+  if (r && typeof r.catch === 'function') {
+    r.catch(() => {
+      try {
+        if (gate && typeof gate.forget === 'function') gate.forget(lid);
+      } catch {
+        /* no-op */
+      }
+    });
+  }
   return { written: true, reason: '', mirrorKey, receiptKey };
 }

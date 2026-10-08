@@ -7125,7 +7125,7 @@ function publishLaneMirror(input) {
     // ★v0.1.1300: 配信ごとキー(v2)と受領証も書く(理由と不変条件は lib 側の JSDoc が正本)。
     //   旧キーへの合流は上の行で継続=既存 reader は無変更のまま(rollback の保険)。
     publishLaneMirrorPerLive(snap, now, {
-      set: (obj) => void chrome.storage.local.set(obj).catch(() => { /* best-effort */ })
+      set: (obj) => chrome.storage.local.set(obj) // reject は lib 側で拾う(ゲートへ「書けなかった」を伝えて再試行・握りつぶす)
     }, _laneMirrorWriteGate);
   } catch {
     /* no-op */
