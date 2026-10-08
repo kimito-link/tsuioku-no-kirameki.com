@@ -7094,7 +7094,7 @@ function publishLaneDiag(obs) {
 
 // ★v0.1.1036(鏡バンドル統合): 5鏡を合流バッファ→trailing-edge で旧5キーを1回の atomic set に統合(②③が別 get で読んでも
 //   相互一貫=「①150 vs ②129」根治)。min-gap は scheduler 一元(gap 中の更新も次 flush で載る=F-1 根治)。mirror bundle 単一キー化は後続(未実装)。
-const _mirrorFlushScheduler = createMirrorBundleFlushScheduler();
+const _mirrorFlushScheduler = createMirrorBundleFlushScheduler({ changedFloorMs: 8000 }); // 件数・バッジ・発言抜粋だけの変化は8秒にまとめる(顔ぶれが変われば即)
 let _mirrorFlushTimer = null;
 // 2026-07-21 診断先行(北極星鏡publish取りこぼし実害確定計器): 全9鏡共通のflushスケジューラが
 //   実際にstorageへ書けているかを観測する(観測のみ・修正はしない)。
@@ -7118,7 +7118,7 @@ function mergeAndScheduleFlush(sectionKey, snapshot, liveId, nowMs) {
 }
 
 /** v0.1.1581: 配信別の鏡(v2)は「同じ内容なら60秒に1回まで」に絞る(書くたびに全拡張ページへ onChanged が全文で配られる)。 */
-const _laneMirrorWriteGate = createLaneMirrorWriteGate();
+const _laneMirrorWriteGate = createLaneMirrorWriteGate({ changeFloorMs: 8000 }); // 件数・バッジ・発言抜粋だけの変化は8秒にまとめる(顔ぶれが変われば即)
 /** @param {{ liveId: string, buckets: Record<string, unknown[]>, domSelf: unknown,
  *   pickedLength: number, totalCandidates: number }} input */
 function publishLaneMirror(input) {
