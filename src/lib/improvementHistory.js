@@ -1499,5 +1499,19 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
     version: '0.1.1580', metric: 'cross-checked-claims', value: 20,
     source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
     note: '★直近30日窓のスライドによる自然減(v0.1.1562/1577〜1579 の note と同じ理由)。今回は変異テスト4件で赤を確認して復元し、測定用 Chrome の実ブラウザ(拡張の文書7つを同時に開く)で、各文書の報告→SW の台帳→状態速報の文言まで通ることを別の手段でも確かめている。'
+  }),
+  Object.freeze({
+    version: '0.1.1581', metric: 'bundle-kb', value: 1390,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '★+1KB(前版 1389KB → 1390KB)は意図した増加: 鏡の書き込み抑制ゲート(純関数・署名と60秒の鮮度床)と更新履歴1版ぶん(直近20版は popup バンドルに同梱される仕様)。計器は足していない。過去最良1360(@0.1.1454)との差分の内訳は v0.1.1471/1537/1560/1562 の note に記録済み。'
+  }),
+  Object.freeze({
+    version: '0.1.1581', metric: 'gate-selftest', value: 4,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1581', metric: 'cross-checked-claims', value: 20,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: '★直近30日窓のスライドによる自然減(v0.1.1562/1577〜1579 の note と同じ理由)。今回は変異テスト5件(鮮度床・時刻を署名に含める・署名をcontentHashだけにする・popupがゲートを渡さない・最終コードでの時刻除外)で赤を確認して復元し、実行して数える形のテスト(同じ鏡を100回publishして書き込み1回)でも別の手段で確かめている。'
   })
 ]);

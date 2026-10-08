@@ -725,6 +725,7 @@ import { buildLaneDiagSnapshot } from '../lib/laneDiag.js';
 import { KEY_LANE_MIRROR } from '../lib/laneMirrorKey.js';
 // ★v0.1.1300: 配信ごと鏡(v2)+受領証の書き出し(storage I/O グルーは lib へ抽出=max-lines ラチェット遵守)。
 import { publishLaneMirrorPerLive } from '../lib/laneMirrorPerLivePublish.js';
+import { createLaneMirrorWriteGate } from '../lib/laneMirrorWriteGate.js';
 import { KEY_PREVIEW_RENDER_ACK, buildPreviewRenderAck } from '../lib/previewRenderAckKey.js';
 import { buildLaneMirrorSnapshot, laneMirrorCapFromBuckets, restoreLaneMirrorBuckets } from '../lib/laneMirror.js';
 import {
@@ -7099,6 +7100,8 @@ function mergeAndScheduleFlush(sectionKey, snapshot, liveId, nowMs) {
   } catch { /* no-op */ }
 }
 
+/** v0.1.1581: 配信別の鏡(v2)は「同じ内容なら60秒に1回まで」に絞る(書くたびに全拡張ページへ onChanged が全文で配られる)。 */
+const _laneMirrorWriteGate = createLaneMirrorWriteGate();
 /** @param {{ liveId: string, buckets: Record<string, unknown[]>, domSelf: unknown,
  *   pickedLength: number, totalCandidates: number }} input */
 function publishLaneMirror(input) {
@@ -7122,8 +7125,8 @@ function publishLaneMirror(input) {
     // ★v0.1.1300: 配信ごとキー(v2)と受領証も書く(理由と不変条件は lib 側の JSDoc が正本)。
     //   旧キーへの合流は上の行で継続=既存 reader は無変更のまま(rollback の保険)。
     publishLaneMirrorPerLive(snap, now, {
-      set: (obj) => void chrome.storage.local.set(obj).catch(() => { /* best-effort */ })
-    });
+      set: (obj) => chrome.storage.local.set(obj) // reject は lib 側で拾う(ゲートへ「書けなかった」を伝えて再試行・握りつぶす)
+    }, _laneMirrorWriteGate);
   } catch {
     /* no-op */
   }
