@@ -10378,7 +10378,7 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
     syncLiveIdFromLocation();
     try {
       const payload = buildPanelSummaryPayloadForCurrentLive();
-      void persistPanelLiveSummaryIfDue(true);
+      void persistPanelLiveSummaryIfDue(false); // 強制書込は閉ループの起点だった(popup の要求→書込→onChanged→再描画→要求)。2秒ゲートに任せる
       sendResponse(buildPanelMetricsResponse(payload));
     } catch (err) {
       sendResponse({
