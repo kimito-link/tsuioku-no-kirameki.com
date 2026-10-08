@@ -73,27 +73,48 @@ export function laneMirrorWriteSignature(snap) {
 }
 
 /**
- * @param {{ floorMs?: number, maxLives?: number }} [opts]
+ * 鏡の「構造」の目印(顔ぶれ・並び+受領証の指紋)。統計・バッジ・発言抜粋・時刻は含めない。
+ *   構造が変わったら即書く/それ以外の変化は changeFloorMs にまとめる、の判定に使う(2026-10-08・実機の並べ比較)。
+ *   ★contentHash は統計・バッジを入れない決まり(ちらつき対策)なので、構造の目印としてそのまま使える。
+ * @param {unknown} snap buildLaneMirrorSnapshot の戻り
+ * @returns {string}
+ */
+export function laneMirrorStructureKey(snap) {
+  if (!snap || typeof snap !== 'object') return '';
+  const o = /** @type {Record<string, any>} */ (snap);
+  const dom = o.domSelf && typeof o.domSelf === 'object' ? o.domSelf : {};
+  return `${String(o.contentHash || '')}|${String(dom.fingerprint || '')}|${String(dom.fingerprintFor || '')}`;
+}
+
+/**
+ * @param {{ floorMs?: number, maxLives?: number, changeFloorMs?: number }} [opts]
+ *   changeFloorMs: 構造が同じまま中身(統計・バッジ・発言抜粋)だけ変わったときの最短書き込み間隔[ms]。0=変化のたびに書く(従来)。
  */
 export function createLaneMirrorWriteGate(opts = {}) {
   const floorMs = typeof opts.floorMs === 'number' && opts.floorMs > 0 ? opts.floorMs : LANE_MIRROR_WRITE_FLOOR_MS;
   const maxLives = typeof opts.maxLives === 'number' && opts.maxLives > 0 ? Math.floor(opts.maxLives) : DEFAULT_MAX_LIVES;
-  /** @type {Map<string, { sig: string, at: number }>} */
+  const changeFloorMs = typeof opts.changeFloorMs === 'number' && opts.changeFloorMs > 0 ? opts.changeFloorMs : 0;
+  /** @type {Map<string, { sig: string, at: number, struct: string }>} */
   const state = new Map();
   return {
     /**
      * @param {string} lid
      * @param {string} sig laneMirrorWriteSignature の戻り
      * @param {number} nowMs
+     * @param {string} [structKey] laneMirrorStructureKey(顔ぶれ・並びの目印)。省略=構造は不明=変化は常に即書く側(従来)
      * @returns {{ write: boolean, reason: string }}
      */
-    shouldWrite(lid, sig, nowMs) {
+    shouldWrite(lid, sig, nowMs, structKey) {
       const key = String(lid || '');
       const prev = state.get(key);
-      const write = !prev || !sig || sig !== prev.sig || nowMs < prev.at || nowMs - prev.at >= floorMs;
-      if (!write) return { write: false, reason: '同内容(60秒以内)' };
+      const struct = typeof structKey === 'string' ? structKey : '';
+      const changed = !!prev && sig !== prev.sig;
+      // 中身だけの変化(構造が同じ)は changeFloorMs にまとめる。構造の変化・構造不明・床なしは即書く。
+      const throttledChange = changed && changeFloorMs > 0 && !!struct && struct === prev.struct && nowMs >= prev.at && nowMs - prev.at < changeFloorMs;
+      const write = !prev || !sig || nowMs < prev.at || (changed ? !throttledChange : nowMs - prev.at >= floorMs);
+      if (!write) return { write: false, reason: throttledChange ? '中身だけの変化(最短間隔内)' : '同内容(60秒以内)' };
       state.delete(key); // 並びを「最後に書いた順」に保つ(上限を超えたら一番古い配信から忘れる)
-      state.set(key, { sig, at: nowMs });
+      state.set(key, { sig, at: nowMs, struct });
       while (state.size > maxLives) {
         const oldest = state.keys().next().value;
         if (oldest === undefined) break;

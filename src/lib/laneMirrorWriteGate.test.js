@@ -218,3 +218,50 @@ describe('publishLaneMirrorPerLive にゲートを通すと、同内容の set �
     expect(r.reason).toContain('同内容');
   });
 });
+
+import { laneMirrorStructureKey } from './laneMirrorWriteGate.js';
+
+describe('★中身だけの変化は最短間隔にまとめる(changeFloorMs・2026-10-08 実機の並べ比較)', () => {
+  const CF = 10_000;
+  it('構造が同じで中身(統計・バッジ・発言抜粋)だけ変わったら、最短間隔内は書かない', () => {
+    const g = createLaneMirrorWriteGate({ changeFloorMs: CF });
+    g.shouldWrite('lv1', 'a', 0, 'S1');
+    const r = g.shouldWrite('lv1', 'b', CF - 1, 'S1');
+    expect(r.write).toBe(false);
+    expect(r.reason).toContain('中身だけ');
+  });
+  it('最短間隔を過ぎたら、中身だけの変化も書く', () => {
+    const g = createLaneMirrorWriteGate({ changeFloorMs: CF });
+    g.shouldWrite('lv1', 'a', 0, 'S1');
+    expect(g.shouldWrite('lv1', 'b', CF, 'S1').write).toBe(true);
+  });
+  it('★構造(顔ぶれ・並び)が変わったら、間隔内でもすぐ書く', () => {
+    const g = createLaneMirrorWriteGate({ changeFloorMs: CF });
+    g.shouldWrite('lv1', 'a', 0, 'S1');
+    expect(g.shouldWrite('lv1', 'b', 100, 'S2').write).toBe(true);
+  });
+  it('構造が不明(省略)なら、従来どおり変化のたびに書く(後方互換)', () => {
+    const g = createLaneMirrorWriteGate({ changeFloorMs: CF });
+    g.shouldWrite('lv1', 'a', 0);
+    expect(g.shouldWrite('lv1', 'b', 100).write).toBe(true);
+  });
+  it('changeFloorMs を渡さなければ従来どおり(戻し口)', () => {
+    const g = createLaneMirrorWriteGate();
+    g.shouldWrite('lv1', 'a', 0, 'S1');
+    expect(g.shouldWrite('lv1', 'b', 100, 'S1').write).toBe(true);
+  });
+  it('間引いた間も、書いた時点の署名と時刻を保つ(間引いた変化を「書いた」と誤記録しない)', () => {
+    const g = createLaneMirrorWriteGate({ changeFloorMs: CF });
+    g.shouldWrite('lv1', 'a', 0, 'S1');
+    g.shouldWrite('lv1', 'b', 3000, 'S1'); // 間引き
+    expect(g.shouldWrite('lv1', 'b', CF, 'S1').write).toBe(true); // 床の経過で b を書く(a のまま扱われない)
+  });
+  it('laneMirrorStructureKey: 統計・バッジ・時刻では変わらず、顔ぶれ・並びと受領証の指紋では変わる', () => {
+    const s1 = snapOf({ buckets: { link: [cell('1', { stats: { commentCount: 3, giftPt: null, adPt: null } })], gift: [], ad: [], konta: [], tanu: [] } });
+    const s2 = snapOf({ nowMs: 9999, buckets: { link: [cell('1', { stats: { commentCount: 4, giftPt: null, adPt: null }, pulse: { giftDelta: 5, giftTier: 'large' } })], gift: [], ad: [], konta: [], tanu: [] } });
+    const s3 = snapOf({ buckets: { link: [cell('1'), cell('2')], gift: [], ad: [], konta: [], tanu: [] } });
+    expect(laneMirrorStructureKey(s1)).toBe(laneMirrorStructureKey(s2));
+    expect(laneMirrorStructureKey(s1)).not.toBe(laneMirrorStructureKey(s3));
+    expect(laneMirrorStructureKey(null)).toBe('');
+  });
+});
