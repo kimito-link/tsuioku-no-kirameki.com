@@ -1569,5 +1569,19 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
     version: '0.1.1585', metric: 'cross-checked-claims', value: 20,
     source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
     note: '★直近30日窓のスライドによる自然減(v0.1.1562/1577〜1584 の note と同じ理由)。今回の根拠は実機の census(35分で各拡張画面に届いた通知の内訳: タイムライン鏡が約1,670回・242MB)と、変異テスト3種(ゲート素通し・再試行タイマー無効・常に書く)で赤を確認して復元した別の手段。'
+  }),
+  Object.freeze({
+    version: '0.1.1586', metric: 'bundle-kb', value: 1394,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '★前版 1393KB → 1394KB(+1KB): 鏡のまとめ書きの部品に『変わっていない鏡を書かない』判定(約15行)と、更新履歴1版ぶん。署名は既存の laneMirrorWriteSignature を再利用しており新しい仕組みは足していない。過去最良1360(@0.1.1454)との差分の内訳は v0.1.1471/1537/1560/1562/1584 の note に記録済み。'
+  }),
+  Object.freeze({
+    version: '0.1.1586', metric: 'gate-selftest', value: 4,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1586', metric: 'cross-checked-claims', value: 20,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: '★直近30日窓のスライドによる自然減(v0.1.1562/1577〜1585 の note と同じ理由)。今回の根拠は実機 census(35分で各画面に届く通知)と、測定用ブラウザでの古い版(v0.1.1577)と新しい版(v0.1.1585)の保存量の並べ比較(旧v1鏡57回・タイムライン鏡83回が減っていない=まとめ書き経路が残っていた)、変異テスト3種(床を0・差分判定を無効・空でも書く)で赤を確認して復元した別の手段。'
   })
 ]);

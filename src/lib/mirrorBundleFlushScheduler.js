@@ -28,8 +28,16 @@ import { KEY_GIFT_HISTORY_MIRROR } from './giftHistoryMirrorKey.js';
 import { KEY_ROOM_HEAT_MIRROR } from './roomHeatMirrorKey.js';
 import { KEY_SESSION_SUMMARY_MIRROR } from './sessionSummaryMirrorKey.js';
 import { KEY_STORY_DIAG_MIRROR } from './storyDiagMirrorKey.js';
+import { laneMirrorWriteSignature } from './laneMirrorWriteGate.js';
 
 const DEFAULT_MIN_GAP_MS = 3000;
+/**
+ * 内容が変わっていない鏡を書き直さない間隔の床[ms](2026-10-08・実機 census)。
+ *   従来は「どれか1つが変わると9キー全部」を3秒おきに書き、変わっていない約100〜140KB の鏡も毎回
+ *   全拡張画面へ全文で配られていた(35分で各画面に 242MB のタイムライン鏡など)。
+ *   ★床は読み手の鮮度判定(状態速報・純Web・会場)が古いと誤判定しない長さに抑える。0 なら従来どおり(戻し口)。
+ */
+const DEFAULT_UNCHANGED_FLOOR_MS = 15000;
 
 /** section → 旧 storage キー(同梱書き込み用)。読み手(②③)を無変更のまま同一 tick 一貫にするため。
  *  ★v0.1.1344: export する。selfWrittenStorageKeys.js の登録漏れを機械照合するため
@@ -83,14 +91,18 @@ export function buildLegacyMirrorSetPayload(bundle) {
  * flush スケジューラの factory。popup-entry はこれ 1 個を持ち、reflect() で各鏡を合流バッファへ反映し、
  * takeFlushPayload() で「今 flush してよいか＋出すべきペイロード」を得る。タイマーは呼び手が持つ。
  *
- * @param {{ minGapMs?: number }} [opts]
+ * @param {{ minGapMs?: number, unchangedFloorMs?: number }} [opts]
  */
 export function createMirrorBundleFlushScheduler(opts = {}) {
   const rawGap = Number(opts?.minGapMs);
   const minGapMs = opts && opts.minGapMs != null && Number.isFinite(rawGap) && rawGap >= 0 ? rawGap : DEFAULT_MIN_GAP_MS;
+  const rawFloor = Number(opts?.unchangedFloorMs);
+  const unchangedFloorMs = opts && opts.unchangedFloorMs != null && Number.isFinite(rawFloor) && rawFloor >= 0 ? rawFloor : DEFAULT_UNCHANGED_FLOOR_MS;
   let buffer = createEmptyMirrorBundle();
   let dirty = false;
   let lastFlushAt = 0;
+  /** 鏡ごとの「最後に書いた内容の署名と時刻」。署名は時刻・受領証を除いた中身(laneMirrorWriteSignature=正本)。 */
+  const written = /** @type {Map<string, { sig: string, at: number }>} */ (new Map());
 
   return {
     /**
@@ -123,7 +135,22 @@ export function createMirrorBundleFlushScheduler(opts = {}) {
       buffer = bumpMirrorBundleGeneration(buffer, now);
       lastFlushAt = now;
       dirty = false;
-      return { bundle: buffer, legacyPayload: buildLegacyMirrorSetPayload(buffer) };
+      const legacyPayload = buildLegacyMirrorSetPayload(buffer);
+      if (unchangedFloorMs > 0) {
+        const sections = /** @type {Record<string, unknown>} */ (buffer.sections || {});
+        for (const section of Object.keys(SECTION_TO_LEGACY_KEY)) {
+          const key = /** @type {Record<string,string>} */ (SECTION_TO_LEGACY_KEY)[section];
+          if (!(key in legacyPayload)) continue;
+          const sig = laneMirrorWriteSignature(sections[section]); // 空文字=判定不能=必ず書く側へ
+          const prev = written.get(section);
+          if (sig && prev && prev.sig === sig && now >= prev.at && now - prev.at < unchangedFloorMs) {
+            delete legacyPayload[key]; // 内容が同じで床の内=書かない(読み手には前回の値が残る)
+          } else {
+            written.set(section, { sig, at: now });
+          }
+        }
+      }
+      return { bundle: buffer, legacyPayload };
     },
 
     /** 現在の合流バッファ(観測・テスト用・書き換えない)。 */
