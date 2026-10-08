@@ -23,6 +23,7 @@
 
 import { buildLaneReceipt } from './laneMirror.js';
 import { laneMirrorKeyFor, laneReceiptKeyFor } from './laneMirrorKey.js';
+import { laneMirrorWriteSignature } from './laneMirrorWriteGate.js';
 
 /**
  * 配信ごとの鏡と受領証を1回の set にまとめて書く。
@@ -30,10 +31,13 @@ import { laneMirrorKeyFor, laneReceiptKeyFor } from './laneMirrorKey.js';
  * @param {any} snap buildLaneMirrorSnapshot の戻り
  * @param {number} nowMs
  * @param {{ set: (obj: Record<string, unknown>) => unknown }} storage storage.local 相当(注入)
+ * @param {{ shouldWrite: (lid: string, sig: string, nowMs: number) => { write: boolean, reason: string } }} [gate]
+ *   書き込み抑制ゲート(laneMirrorWriteGate.js)。渡すと「同じ内容なら60秒に1回まで」に絞る。
+ *   ★省略時は従来どおり毎回書く(後方互換)。stats/pulse の変化は署名に入っているので必ず書かれる。
  * @returns {{ written: boolean, reason: string, mirrorKey: string, receiptKey: string }}
  *   written=false のときは reason に理由(呼び手は握りつぶしてよい=best-effort)
  */
-export function publishLaneMirrorPerLive(snap, nowMs, storage) {
+export function publishLaneMirrorPerLive(snap, nowMs, storage, gate) {
   const lid = String(snap?.liveId || '').trim().toLowerCase();
   const mirrorKey = laneMirrorKeyFor(lid);
   const receiptKey = laneReceiptKeyFor(lid);
@@ -43,6 +47,11 @@ export function publishLaneMirrorPerLive(snap, nowMs, storage) {
   }
   if (!storage || typeof storage.set !== 'function') {
     return { written: false, reason: 'storageが無い', mirrorKey, receiptKey };
+  }
+  // ★同じ内容なら書かない(書くたびに開いている全拡張ページへ onChanged が全文で配られる)。
+  if (gate && typeof gate.shouldWrite === 'function') {
+    const d = gate.shouldWrite(lid, laneMirrorWriteSignature(snap), nowMs);
+    if (!d.write) return { written: false, reason: d.reason, mirrorKey, receiptKey };
   }
   // ★contentHash は【渡さない】(v0.1.1301・Codex レビュー指摘): 指紋が測ったのは
   //   前回 paint 時の内容で、その内容アドレスは domSelf.fingerprintFor が既に持っている。
