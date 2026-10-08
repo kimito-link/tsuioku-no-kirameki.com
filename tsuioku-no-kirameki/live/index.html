@@ -8,8 +8,7 @@
     <link rel="icon" href="../images/favicon.ico" sizes="any">
     <link rel="icon" type="image/png" sizes="32x32" href="../images/favicon-32.png">
     <link rel="apple-touch-icon" sizes="180x180" href="../images/apple-touch-icon.png">
-    <!-- ★ロゴは主役(web-ios-android/docs/brand/LOGO-RULES.md)。最優先で読み込む。 -->
-    <link rel="preload" as="image" href="../../extension/images/logo/kimito-link-ginga-color.png" fetchpriority="high">
+    <!-- ★2026-10-08 ロゴは一覧の下へ移したので先読みしない(ランキングを先に見せる・ユーザー要望)。 -->
 
     <meta name="description" content="追憶のきらめき ランキング。ニコニコ生放送で、いまこの瞬間に配信を支えている人（ギフト・広告・コメント）を配信ごとに並べます。配信サムネ・配信者・経過時間つき。主役は配信者ではなく『応援した人』。">
     <meta name="theme-color" content="#fffaf4">
@@ -89,6 +88,11 @@
         box-shadow: 0 10px 30px rgba(20, 55, 92, .08), inset 0 1px 0 rgba(255,255,255,.9);
       }
       @media (min-width: 760px) { .brand { grid-template-columns: 260px 1fr; gap: 22px; padding: 22px 26px; } }
+      .rank-top { margin: 4px 0 14px; }
+      .rank-top h1 { font-size: clamp(1.2rem, 3.4vw, 1.6rem); margin: 0 0 2px; }
+      .rank-top h1 small { font-size: .85rem; }
+      .rank-top .meta { margin-top: 6px; }
+      .brand--foot { margin-top: 28px; }
       .brand__logo {
         display: block; justify-self: center; text-decoration: none; line-height: 0;
         padding: 10px 14px; border-radius: 18px;
@@ -396,25 +400,15 @@
     <div class="wrap">
       <a class="home" href="../">← 追憶のきらめき（トップへ）</a>
 
-      <header class="brand">
-        <a class="brand__logo" href="https://kimito-link.com/" target="_blank" rel="noopener noreferrer" aria-label="Kimito-Link Project（キミトリンクプロジェクト）公式サイト（新しいタブ）">
-          <img src="../../extension/images/logo/kimito-link-ginga-color.png" width="240" height="180" alt="Kimito-Link（キミトリンク）" fetchpriority="high" decoding="async">
-        </a>
-        <div>
-          <p class="brand__eyebrow">Kimito-Link Project</p>
+      <!-- ★2026-10-08 ユーザー要望「すぐにrankingをみたいのでロゴは下」: 上は見出し+更新だけ。ロゴ・説明・導線は一覧の下(.brand)。 -->
+      <header class="rank-top">
           <h1>追憶のきらめき ランキング<small>いま支えている人 ― ニコニコ生放送</small></h1>
-          <p class="lede">いまこの瞬間、配信を支えている人（ギフト・広告・コメント）を配信ごとに。配信サムネ・配信者・経過時間つき。</p>
           <p class="meta" id="meta"><img class="face" src="../../extension/images/yukkuri-charactore-english/link/link-yukkuri-blink-mouth-closed.thumb128.png" alt="">読み込み中…</p>
           <div class="refresh-row">
             <button type="button" class="btn btn--refresh" data-refresh aria-label="ランキングをいま更新する">🔄 いま更新</button>
             <span class="countdown" id="refreshCountdown" aria-live="polite">自動更新: 60 秒ごと</span>
             <span class="realtime-badge">⚡ リアルタイム取得</span>
           </div>
-          <div class="cta-row">
-            <a class="btn btn--primary" href="https://chromewebstore.google.com/detail/cjbabignmmodaickpeckiojjabnlogdb" target="_blank" rel="noopener noreferrer"><img src="../../extension/images/logo/konta-yukkuri-icon-48.png" alt="" width="22" height="22" decoding="async">Chrome 拡張を入れる（無料）</a>
-            <a class="btn btn--ghost" href="../#record-cta">本体アプリの使い方</a>
-          </div>
-        </div>
       </header>
 
       <!-- ★ランキングは【すぐ見える位置】に(ユーザー要望 2026-09-14「すぐに ranking が見れるようにして」)。説明と導線はその下。 -->
@@ -422,6 +416,20 @@
 
       <!-- ★2026-10-01: ほかの配信サービス(Kick・後で YouTube)。ニコ生とは別セクション・別データ(/api/live-platforms)。 -->
       <section id="platforms" class="platforms" aria-live="polite"></section>
+
+      <header class="brand brand--foot">
+        <a class="brand__logo" href="https://kimito-link.com/" target="_blank" rel="noopener noreferrer" aria-label="Kimito-Link Project（キミトリンクプロジェクト）公式サイト（新しいタブ）">
+          <img src="../../extension/images/logo/kimito-link-ginga-color.png" width="240" height="180" alt="Kimito-Link（キミトリンク）" loading="lazy" decoding="async">
+        </a>
+        <div>
+          <p class="brand__eyebrow">Kimito-Link Project</p>
+          <p class="lede">いまこの瞬間、配信を支えている人（ギフト・広告・コメント）を配信ごとに。配信サムネ・配信者・経過時間つき。</p>
+          <div class="cta-row">
+            <a class="btn btn--primary" href="https://chromewebstore.google.com/detail/cjbabignmmodaickpeckiojjabnlogdb" target="_blank" rel="noopener noreferrer"><img src="../../extension/images/logo/konta-yukkuri-icon-48.png" alt="" width="22" height="22" decoding="async">Chrome 拡張を入れる（無料）</a>
+            <a class="btn btn--ghost" href="../#record-cta">本体アプリの使い方</a>
+          </div>
+        </div>
+      </header>
 
       <button type="button" class="fab-refresh" data-refresh aria-label="ランキングをいま更新する" title="いま更新">🔄</button>
 
