@@ -1541,5 +1541,19 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
     version: '0.1.1583', metric: 'cross-checked-claims', value: 20,
     source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
     note: '★直近30日窓のスライドによる自然減(v0.1.1562/1577〜1582 の note と同じ理由)。今回の根拠は実機の測定(視聴ページを閉じると拡張プロセスのCPUが消える・メインスレッド1本が約94%)と、変異テスト3種(content が通知しない・3秒refreshが生の document.hidden に戻る・既定を隠れている側にする)で赤を確認して復元した別の手段。'
+  }),
+  Object.freeze({
+    version: '0.1.1584', metric: 'bundle-kb', value: 1394,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '★+2KB(前版 1392KB → 1394KB)は意図した増加: ギフト列を公式のギフト貢献度で補う純関数(giftLaneOfficialFill.js・約70行)と配線、更新履歴1版ぶん。広告列の変換(adLanePicksFromRooms)を再利用しており新しい取得処理は足していない。過去最良1360(@0.1.1454)との差分の内訳は v0.1.1471/1537/1560/1562 の note に記録済み。'
+  }),
+  Object.freeze({
+    version: '0.1.1584', metric: 'gate-selftest', value: 4,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1584', metric: 'cross-checked-claims', value: 20,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: '★直近30日窓のスライドによる自然減(v0.1.1562/1577〜1583 の note と同じ理由)。今回の根拠は実機の画面(会場のギフト列が「該当者がいません」)と公式API(/api/live-ranking にギフト貢献者3人)の突き合わせ、変異テスト3種(公式を足さない・kokenを読まない・同じIDを重ねる)で赤を確認して復元した別の手段。'
   })
 ]);

@@ -164,6 +164,8 @@ import {
 import { shouldShowNorthStarLane } from '../lib/northStarLaneVisibility.js';
 import { officialDomRankingRowsToStripRooms } from '../lib/officialDomRankingRowsToStripRooms.js';
 import { adLanePicksFromRooms } from '../lib/adLanePicksFromRooms.js';
+import { officialGiftPicksFromRows, mergeGiftPicksWithOfficial } from '../lib/giftLaneOfficialFill.js';
+import { pickKokenStorageRows } from '../lib/officialContributionRankingResolver.js';
 import {
   isNorthStarLaneWaitingState,
   isNorthStarEventLaneWaitTimedOut,
@@ -7562,12 +7564,16 @@ async function paintStoryUserLaneCoalesced(liveId, displayEntries, storageRows) 
   let giftUsers = [];
   // 広告列(別段)用: 公式ニコニ広告ランキング(この放送・nls_nicoad_api_ranking_<lid>)の行。
   let nicoadApiRows = [];
+  // ギフト列の補い: 公式ギフト貢献度(koken)。記録で数値IDが取れない配信でも「いるはずの人」を出す(giftLaneOfficialFill.js)。
+  let officialGiftRows = [];
   if (lid) {
     try {
       const gk = giftUsersStorageKey(lid);
       const adKey = `nls_nicoad_api_ranking_${lid}`;
-      const bag = await chrome.storage.local.get([gk, adKey]);
+      const kokenKey = kokenContribStorageKey(lid);
+      const bag = await chrome.storage.local.get([gk, adKey, kokenKey]);
       giftUsers = Array.isArray(bag[gk]) ? bag[gk] : [];
+      officialGiftRows = pickKokenStorageRows(bag[kokenKey], lid) || [];
       const adVal = bag[adKey];
       if (
         adVal &&
@@ -7580,6 +7586,7 @@ async function paintStoryUserLaneCoalesced(liveId, displayEntries, storageRows) 
     } catch {
       giftUsers = [];
       nicoadApiRows = [];
+      officialGiftRows = [];
     }
   }
 
@@ -7587,12 +7594,18 @@ async function paintStoryUserLaneCoalesced(liveId, displayEntries, storageRows) 
   if (String(STORY_SOURCE_STATE.liveId || '').trim().toLowerCase() !== lid) return;
 
   const giftLimit = INLINE_MODE ? 24 : 16;
-  STORY_SOURCE_STATE.giftThrowerPicks = buildStoryGiftThrowerLanePicks(
-    giftUsers,
-    lid,
-    storageRows,
+  // 公式の人のサムネも他レーンと同じ正本の解決器で引く(広告列と同型)。
+  const resolveAvatarForUid = (/** @type {string} */ uid) =>
+    storyGrowthAvatarSrcCandidate({ userId: uid, avatarUrl: '' }, lid, storageRows);
+  STORY_SOURCE_STATE.giftThrowerPicks = Object.freeze(mergeGiftPicksWithOfficial(
+    buildStoryGiftThrowerLanePicks(giftUsers, lid, storageRows, giftLimit),
+    officialGiftPicksFromRows(officialGiftRows, {
+      yukkuriFaceFor: (key) => anonymousIdenticonDataUrl(String(key || ''), 64),
+      resolveAvatarForUid,
+      limit: giftLimit
+    }),
     giftLimit
-  );
+  ));
   // 広告列: 広告ランキング行→room(本物 officialDomRankingRowsToStripRooms)→PersonTileItem。
   //   ID無し広告も広告主名で載せる(会議確定)。サムネ無しは uid 由来のゆっくり顔。
   STORY_SOURCE_STATE.adThrowerPicks = adLanePicksFromRooms(
