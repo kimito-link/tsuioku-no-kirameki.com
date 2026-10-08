@@ -24,6 +24,14 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.1568',
+    date: '2026-10-06',
+    summary: '更新の追従で別の人の数字を貼らない',
+    items: Object.freeze([
+      '応援レーンの数字(🎁📣💬・増分バッジ)を、画面を描き直さずに更新する場面で、同じ人数でも顔ぶれが入れ替わっていた場合に別の人の数字を貼ってしまう可能性があったため、同じ人のタイルにだけ書くようにしました。通常の表示は変わりません。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1567',
     date: '2026-10-06',
     summary: '本家コメのチップに +N/分 を表示',

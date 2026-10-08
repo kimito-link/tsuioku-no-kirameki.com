@@ -5,6 +5,7 @@ import {
   COMMENT_INGEST_LOG_MAX_ITEMS,
   COMMENT_INGEST_LOG_NDGR_MIN_ADDED,
   COMMENT_INGEST_LOG_NDGR_MIN_INTERVAL_MS,
+  COMMENT_INGEST_LOG_TAIL_MIN_INTERVAL_MS,
   COMMENT_INGEST_LOG_VISIBLE_MIN_ADDED,
   COMMENT_INGEST_LOG_VISIBLE_MIN_INTERVAL_MS,
   maybeAppendCommentIngestLog,
@@ -312,5 +313,58 @@ describe('commentIngestLog', () => {
       official: null
     });
     expect(b).toBeNull();
+  });
+});
+
+describe('★tail の取込ログは時間だけで間引く(2026-10-08・設計 stable-update-model V4)', () => {
+  const base = { liveId: 'lv1', batchIn: 3, added: 3, totalAfter: 100, official: 90 };
+
+  it('tail は有効な source として保存される(unknown に丸められて規則に当たらない事故を防ぐ)', () => {
+    expect(COMMENT_INGEST_SOURCE.TAIL).toBe('tail');
+    const r = appendCommentIngestLog(null, { ...base, t: 1000, source: 'tail' });
+    expect(r.items[0].source).toBe('tail');
+  });
+
+  it('★同じ配信の tail は最短間隔内なら追記しない(added が多くても・total が伸びても)', () => {
+    const first = maybeAppendCommentIngestLog(null, { ...base, t: 1000, source: 'tail' });
+    expect(first).not.toBeNull();
+    const t1 = 1000 + COMMENT_INGEST_LOG_TAIL_MIN_INTERVAL_MS - 1;
+    expect(maybeAppendCommentIngestLog(first, { ...base, t: t1, added: 500, batchIn: 500, totalAfter: 5000, source: 'tail' })).toBeNull();
+  });
+
+  it('最短間隔を過ぎたら追記する(ちょうどの境界を含む)', () => {
+    const first = maybeAppendCommentIngestLog(null, { ...base, t: 1000, source: 'tail' });
+    const t2 = 1000 + COMMENT_INGEST_LOG_TAIL_MIN_INTERVAL_MS;
+    const second = maybeAppendCommentIngestLog(first, { ...base, t: t2, source: 'tail' });
+    expect(second).not.toBeNull();
+    expect(second.items).toHaveLength(2);
+  });
+
+  it('★配信が替わったら間隔内でも必ず追記する', () => {
+    const first = maybeAppendCommentIngestLog(null, { ...base, t: 1000, source: 'tail' });
+    const other = maybeAppendCommentIngestLog(first, { ...base, liveId: 'lv2', t: 1001, source: 'tail' });
+    expect(other).not.toBeNull();
+    expect(other.items.map((x) => x.liveId)).toEqual(['lv1', 'lv2']);
+  });
+
+  it('★記録が巻き戻ったとき(total が減る)は間隔内でも追記する(異常を隠さない)', () => {
+    const first = maybeAppendCommentIngestLog(null, { ...base, t: 1000, totalAfter: 100, source: 'tail' });
+    const reset = maybeAppendCommentIngestLog(first, { ...base, t: 1500, totalAfter: 10, source: 'tail' });
+    expect(reset).not.toBeNull();
+  });
+
+  it('時計が巻き戻ったとき(dt<0)も追記する', () => {
+    const first = maybeAppendCommentIngestLog(null, { ...base, t: 5000, source: 'tail' });
+    expect(maybeAppendCommentIngestLog(first, { ...base, t: 1000, source: 'tail' })).not.toBeNull();
+  });
+
+  it('他の source(ndgr)の既存の規則は変わらない', () => {
+    const first = maybeAppendCommentIngestLog(null, { ...base, t: 1000, source: 'ndgr', added: 1 });
+    expect(maybeAppendCommentIngestLog(first, { ...base, t: 1500, source: 'ndgr', added: 1, totalAfter: 101 })).toBeNull();
+    expect(maybeAppendCommentIngestLog(first, { ...base, t: 1500, source: 'ndgr', added: 9, totalAfter: 109 })).not.toBeNull();
+  });
+
+  it('間隔は10秒(最終取り込みの表示が10秒以上古くならない)', () => {
+    expect(COMMENT_INGEST_LOG_TAIL_MIN_INTERVAL_MS).toBe(10_000);
   });
 });

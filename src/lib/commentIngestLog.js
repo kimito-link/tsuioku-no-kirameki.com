@@ -18,6 +18,12 @@ export const COMMENT_INGEST_SOURCE = {
   BACKFILL: 'backfill',
   /** v0.1.511: 前方向 NDGR 継続取得（crawlNdgrForward）由来のライブ新着 */
   NDGR_FORWARD: 'ndgr_forward',
+  /**
+   * 2026-10-08: テールバッファへの取込フラッシュ(content-entry.js の bufferRowsToTail)。
+   * 以前は有効な source に無く unknown に丸められ、クールダウン規則に当たらず【毎フラッシュ追記】していた
+   * (58KB の取込ログが全拡張画面へ旧値+新値で毎回配られた=census で約42回/分)。
+   */
+  TAIL: 'tail',
   UNKNOWN: 'unknown'
 };
 
@@ -26,6 +32,8 @@ const INGEST_LOG_VALID_SOURCES = /** @type {ReadonlySet<string>} */ (
 );
 export const COMMENT_INGEST_LOG_NDGR_MIN_INTERVAL_MS = 5000;
 export const COMMENT_INGEST_LOG_VISIBLE_MIN_INTERVAL_MS = 4000;
+/** tail の最短追記間隔[ms]。popup/status の「最終取り込み N秒前」が10秒以上古くならない長さ。 */
+export const COMMENT_INGEST_LOG_TAIL_MIN_INTERVAL_MS = 10_000;
 export const COMMENT_INGEST_LOG_NDGR_MIN_ADDED = 3;
 export const COMMENT_INGEST_LOG_VISIBLE_MIN_ADDED = 5;
 const INGEST_LOG_ALWAYS_LOG_TOTAL_DELTA = 10;
@@ -76,6 +84,13 @@ const INGEST_LOG_COOLDOWN_RULES = /** @type {Readonly<Record<string, { minInterv
     minIntervalMs: COMMENT_INGEST_LOG_VISIBLE_MIN_INTERVAL_MS,
     minAdded: COMMENT_INGEST_LOG_VISIBLE_MIN_ADDED,
     minTotalDelta: INGEST_LOG_ALWAYS_LOG_TOTAL_DELTA
+  },
+  // tail は【時間だけ】で間引く(added/total の増分は見ない=取込の「拍」の監査であって行ごとの監査ではない)。
+  //   配信が替われば prevSame が無いので必ず追記/total が減った・時計が戻ったときも追記(下の条件が false になる)。
+  [COMMENT_INGEST_SOURCE.TAIL]: {
+    minIntervalMs: COMMENT_INGEST_LOG_TAIL_MIN_INTERVAL_MS,
+    minAdded: Number.POSITIVE_INFINITY,
+    minTotalDelta: Number.POSITIVE_INFINITY
   }
 });
 
