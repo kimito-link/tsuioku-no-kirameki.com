@@ -815,7 +815,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (1901)
+- 📁 **src/** (1902)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1095,7 +1095,7 @@
         - `logo_funlink_white_RGB_link_black.png`
         - `logo_funlink_white_RGB_maru_black.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1665)
+  - 📁 **lib/** (1666)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -1970,6 +1970,7 @@
     - `mirrorBundle.test.js`
     - `mirrorBundleFlushScheduler.js` — 鏡バンドルの flush スケジューラ(状態を内部に閉じた純ロジック・タイマー非依存)。
     - `mirrorBundleFlushScheduler.test.js`
+    - `mirrorBundleSkipWiring.test.js`
     - `mirrorSanitize.js` — v0.1.237: 北極星「鏡のように貼り付け」用の自前最小サニタイザ。
     - `mirrorSanitize.test.js`
     - `monotonicCommentCount.js` — v0.1.645: コメント記録件数の「数値ズレ」根治。

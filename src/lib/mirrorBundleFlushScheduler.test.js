@@ -177,3 +177,112 @@ describe('createMirrorBundleFlushScheduler', () => {
     expect(sched.takeFlushPayload(100)).toBeNull();
   });
 });
+
+/**
+ * ★2026-10-08(実機 census): 鏡のまとめ書きは「どれか1つが変わると9キー全部」を最短3秒おきに書き直していた。
+ *   変わっていない鏡(約100〜140KB)も毎回、全拡張画面へ全文で配られていた。→ 変わった鏡だけ書く(床 15 秒)。
+ */
+describe('変わっていない鏡は書かない(unchangedFloorMs)', () => {
+  const timeOnly = (snap, t) => ({ ...snap, capturedAt: t }); // 時刻だけ違う=内容は同じ
+
+  it('★初回はぜんぶ書く(読み手が空にならない)', () => {
+    const sched = createMirrorBundleFlushScheduler({ minGapMs: 0, unchangedFloorMs: 15000 });
+    sched.reflect('lane', LANE, { liveId: 'lv1', nowMs: 1000 });
+    sched.reflect('statCards', STAT, { liveId: 'lv1', nowMs: 1000 });
+    const out = sched.takeFlushPayload(1000);
+    expect(Object.keys(out.legacyPayload).sort()).toEqual([KEY_LANE_MIRROR, KEY_STAT_CARDS_MIRROR].sort());
+  });
+
+  it('★別の鏡だけ変わったら、変わっていない鏡は書かない(時刻だけ違っても同じ内容と見る)', () => {
+    const sched = createMirrorBundleFlushScheduler({ minGapMs: 0, unchangedFloorMs: 15000 });
+    sched.reflect('lane', LANE, { liveId: 'lv1', nowMs: 1000 });
+    sched.reflect('statCards', STAT, { liveId: 'lv1', nowMs: 1000 });
+    sched.takeFlushPayload(1000);
+    sched.reflect('lane', timeOnly(LANE, 5000), { liveId: 'lv1', nowMs: 5000 }); // 時刻だけ更新
+    sched.reflect('statCards', { ...STAT, recordsText: '4件' }, { liveId: 'lv1', nowMs: 5000 }); // 中身が変わった
+    const out = sched.takeFlushPayload(5000);
+    expect(Object.keys(out.legacyPayload)).toEqual([KEY_STAT_CARDS_MIRROR]);
+    expect(out.legacyPayload[KEY_STAT_CARDS_MIRROR]).toMatchObject({ recordsText: '4件' });
+  });
+
+  it('★床(15秒)を過ぎたら同じ内容でも書く(読み手の鮮度判定を古くしない)', () => {
+    const sched = createMirrorBundleFlushScheduler({ minGapMs: 0, unchangedFloorMs: 15000 });
+    sched.reflect('lane', LANE, { liveId: 'lv1', nowMs: 1000 });
+    sched.takeFlushPayload(1000);
+    sched.reflect('lane', timeOnly(LANE, 15999), { liveId: 'lv1', nowMs: 15999 });
+    expect(Object.keys(sched.takeFlushPayload(15999).legacyPayload)).toEqual([]); // 14.999秒=まだ
+    sched.reflect('lane', timeOnly(LANE, 16000), { liveId: 'lv1', nowMs: 16000 });
+    expect(Object.keys(sched.takeFlushPayload(16000).legacyPayload)).toEqual([KEY_LANE_MIRROR]); // ちょうど15秒
+  });
+
+  it('★中身が変わった鏡は床の内でもすぐ書く(統計・バッジの変化を止めない)', () => {
+    const sched = createMirrorBundleFlushScheduler({ minGapMs: 0, unchangedFloorMs: 15000 });
+    sched.reflect('lane', LANE, { liveId: 'lv1', nowMs: 1000 });
+    sched.takeFlushPayload(1000);
+    sched.reflect('lane', { ...LANE, link: [{ title: 'りんく2' }] }, { liveId: 'lv1', nowMs: 2000 });
+    expect(Object.keys(sched.takeFlushPayload(2000).legacyPayload)).toEqual([KEY_LANE_MIRROR]);
+  });
+
+  it('配信が替わったら同じ形でも書く(別の配信の鏡を残さない)', () => {
+    const sched = createMirrorBundleFlushScheduler({ minGapMs: 0, unchangedFloorMs: 15000 });
+    sched.reflect('lane', LANE, { liveId: 'lv1', nowMs: 1000 });
+    sched.takeFlushPayload(1000);
+    sched.reflect('lane', { ...LANE, liveId: 'lv2' }, { liveId: 'lv2', nowMs: 2000 });
+    expect(Object.keys(sched.takeFlushPayload(2000).legacyPayload)).toEqual([KEY_LANE_MIRROR]);
+  });
+
+  it('時計が巻き戻ったら書く側に倒す', () => {
+    const sched = createMirrorBundleFlushScheduler({ minGapMs: 0, unchangedFloorMs: 15000 });
+    sched.reflect('lane', LANE, { liveId: 'lv1', nowMs: 100000 });
+    sched.takeFlushPayload(100000);
+    sched.reflect('lane', timeOnly(LANE, 500), { liveId: 'lv1', nowMs: 500 });
+    expect(Object.keys(sched.takeFlushPayload(500).legacyPayload)).toEqual([KEY_LANE_MIRROR]);
+  });
+
+  it('unchangedFloorMs=0 なら従来どおり毎回ぜんぶ書く(戻し口)', () => {
+    const sched = createMirrorBundleFlushScheduler({ minGapMs: 0, unchangedFloorMs: 0 });
+    sched.reflect('lane', LANE, { liveId: 'lv1', nowMs: 1000 });
+    sched.takeFlushPayload(1000);
+    sched.reflect('lane', timeOnly(LANE, 2000), { liveId: 'lv1', nowMs: 2000 });
+    expect(Object.keys(sched.takeFlushPayload(2000).legacyPayload)).toEqual([KEY_LANE_MIRROR]);
+  });
+});
+
+describe('★中身だけ変わった鏡は最短間隔にまとめる(changedFloorMs・2026-10-08 実機の並べ比較)', () => {
+  const CF = 10_000;
+  const mk = () => createMirrorBundleFlushScheduler({ minGapMs: 0, unchangedFloorMs: 15000, changedFloorMs: CF });
+  const laneWith = (o) => ({ liveId: 'lv1', contentHash: 'H1', capturedAt: 1, link: [{ title: 'りんく', stats: { c: 1 } }], ...o });
+
+  it('構造(contentHash)が同じで中身だけ変わったら、最短間隔内は書かない', () => {
+    const sched = mk();
+    sched.reflect('lane', laneWith({}), { liveId: 'lv1', nowMs: 1000 });
+    sched.takeFlushPayload(1000);
+    sched.reflect('lane', laneWith({ link: [{ title: 'りんく', stats: { c: 2 } }] }), { liveId: 'lv1', nowMs: 4000 });
+    expect(Object.keys(sched.takeFlushPayload(4000).legacyPayload)).toEqual([]);
+  });
+
+  it('最短間隔を過ぎたら、中身だけの変化も書く(最新の中身で)', () => {
+    const sched = mk();
+    sched.reflect('lane', laneWith({}), { liveId: 'lv1', nowMs: 1000 });
+    sched.takeFlushPayload(1000);
+    sched.reflect('lane', laneWith({ link: [{ title: 'りんく', stats: { c: 3 } }] }), { liveId: 'lv1', nowMs: 1000 + CF });
+    const out = sched.takeFlushPayload(1000 + CF);
+    expect(out.legacyPayload[KEY_LANE_MIRROR]).toMatchObject({ link: [{ stats: { c: 3 } }] });
+  });
+
+  it('★構造(contentHash)が変わったら、間隔内でもすぐ書く(新しい人の登場を遅らせない)', () => {
+    const sched = mk();
+    sched.reflect('lane', laneWith({}), { liveId: 'lv1', nowMs: 1000 });
+    sched.takeFlushPayload(1000);
+    sched.reflect('lane', laneWith({ contentHash: 'H2', link: [{ title: 'りんく' }, { title: '新人' }] }), { liveId: 'lv1', nowMs: 1500 });
+    expect(Object.keys(sched.takeFlushPayload(1500).legacyPayload)).toEqual([KEY_LANE_MIRROR]);
+  });
+
+  it('changedFloorMs を渡さなければ従来どおり(戻し口・既存の挙動は不変)', () => {
+    const sched = createMirrorBundleFlushScheduler({ minGapMs: 0, unchangedFloorMs: 15000 });
+    sched.reflect('lane', laneWith({}), { liveId: 'lv1', nowMs: 1000 });
+    sched.takeFlushPayload(1000);
+    sched.reflect('lane', laneWith({ link: [{ title: 'りんく', stats: { c: 2 } }] }), { liveId: 'lv1', nowMs: 1500 });
+    expect(Object.keys(sched.takeFlushPayload(1500).legacyPayload)).toEqual([KEY_LANE_MIRROR]);
+  });
+});
