@@ -24,6 +24,14 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.1570',
+    date: '2026-10-06',
+    summary: '内部: 応援レーンCSSの3画面照合を追加',
+    items: Object.freeze([
+      '画面の見た目は変わりません。応援レーンのCSSをサイドパネル・会場・別窓の3か所にそろえて書く作業で、写し忘れがあると自動検査が「どのファイルに何が無いか」を名指しして知らせるようにしました(内部の安全装置)。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1569',
     date: '2026-10-06',
     summary: '別窓の匿名タイルも小さく点線枠に',

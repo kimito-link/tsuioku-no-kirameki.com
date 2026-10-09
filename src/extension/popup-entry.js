@@ -278,8 +278,7 @@ import {
 //   (純関数・テスト済み)に集約し、ここではstorage readとinnerHTML代入だけを行う。
 import { buildBroadcastScorePanelHtml } from '../lib/broadcastScoreHtml.js';
 import { startScoreCountUp } from '../lib/scoreCountUp.js';
-import { appendHighlight, isHighlightWorthyKind } from '../lib/highlightLedger.js';
-import { KEY_HIGHLIGHT_LEDGER } from '../lib/highlightLedgerKey.js';
+import { highlightLedgerReadKeys, isHighlightWorthyKind, pickLedgerForLive, planHighlightAppend } from '../lib/highlightLedger.js';
 import { buildBroadcastScorePanelViewModel, broadcastScorePanelSig } from '../lib/broadcastScorePanelViewModel.js';
 import { KEY_REPORT_PREVIEW } from '../lib/reportPreviewKey.js';
 import { KEY_GIFT_EFFECT_DIAG } from '../lib/giftEffectDiagKey.js';
@@ -1386,9 +1385,10 @@ function triggerOpSoundShotSuccess(liveId) {
 //   storage競合の心配はない(giftEffectDiagのRMWと同オーダー)。
 function appendHighlightAndPublishPopup(liveId, kind, atMs) {
   if (!isHighlightWorthyKind(kind)) return;
-  void safeStorageLocalGet(KEY_HIGHLIGHT_LEDGER).then((bag) => {
-    const next = appendHighlight(bag?.[KEY_HIGHLIGHT_LEDGER], { liveId, kind, atMs });
-    void safeStorageLocalSet({ [KEY_HIGHLIGHT_LEDGER]: next });
+  // 2026-10-09: 配信別キーに追記(共通キーはコピー)。別配信の追記で台帳を消さない。
+  void safeStorageLocalGet(highlightLedgerReadKeys(liveId)).then((bag) => {
+    const plan = planHighlightAppend(bag, { liveId, kind, atMs });
+    if (plan) void safeStorageLocalSet(plan);
   });
 }
 
@@ -3741,8 +3741,8 @@ async function renderBroadcastScorePanel(liveId) {
   //   (コストゼロ・視聴の邪魔をしない=設計書§1.3)。
   if (!details || !details.open) return;
   try {
-    const bag = await safeStorageLocalGet([KEY_REPORT_PREVIEW, KEY_GIFT_EFFECT_DIAG, KEY_VOICE_DIAG, KEY_HIGHLIGHT_LEDGER]);
-    const ledgerRaw = bag?.[KEY_HIGHLIGHT_LEDGER];
+    const bag = await safeStorageLocalGet([KEY_REPORT_PREVIEW, KEY_GIFT_EFFECT_DIAG, KEY_VOICE_DIAG, ...highlightLedgerReadKeys(lid)]);
+    const ledgerRaw = pickLedgerForLive(bag, lid);
     const vm = buildBroadcastScorePanelViewModel({
       liveId: lid,
       nowMs: Date.now(),
@@ -3820,8 +3820,8 @@ function isScoreAnnounceRunning() {
 async function buildScoreAnnounceInputs(liveId) {
   const lid = String(liveId || '').trim().toLowerCase();
   if (!lid) return null;
-  const bag = await safeStorageLocalGet([KEY_REPORT_PREVIEW, KEY_GIFT_EFFECT_DIAG, KEY_VOICE_DIAG, KEY_HIGHLIGHT_LEDGER]);
-  const ledgerRaw = bag?.[KEY_HIGHLIGHT_LEDGER];
+  const bag = await safeStorageLocalGet([KEY_REPORT_PREVIEW, KEY_GIFT_EFFECT_DIAG, KEY_VOICE_DIAG, ...highlightLedgerReadKeys(lid)]);
+  const ledgerRaw = pickLedgerForLive(bag, lid);
   return buildBroadcastScorePanelViewModel({
     liveId: lid,
     nowMs: Date.now(),

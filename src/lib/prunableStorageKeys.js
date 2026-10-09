@@ -42,7 +42,10 @@ export const PRUNABLE_STORAGE_KEY_PREFIXES = Object.freeze([
   //     buildLaneReceipt)ので、既存の prune 判定がそのまま使える。
   //   ★現在視聴中の lv は pruneStaleEventDomLvs が別枠で保護する。
   'nls_lane_mirror_v2_',
-  'nls_lane_receipt_v1_'
+  'nls_lane_receipt_v1_',
+  // 2026-10-09: ハイライト台帳も配信ごとキーへ分離(highlightLedgerKeyFor)。視聴した配信の数だけ増えるので同じ巡回で掃除する。
+  //   値は capturedAt(最後のハイライト時刻)を持つので既存の prune 判定がそのまま使える。現在視聴中の lv は別枠で保護される。
+  'nls_highlight_ledger_v1_'
 ]);
 
 /**
@@ -68,6 +71,34 @@ export function pickPrunableStorageKeys(allKeys, prefixes = PRUNABLE_STORAGE_KEY
         break;
       }
     }
+  }
+  return out;
+}
+
+/**
+ * 配信別キー(`<prefix><lv>`・値に capturedAt)のうち、実際に消してよいキーを返す純関数(2026-10-09)。
+ *   pickPrunableStorageKeys は「読む対象」を絞るだけで消さない。消す人が居ないキーは増え続ける。
+ *   現在視聴中の配信は保護。TTL 超過・capturedAt 不明・壊れた値は消す。prefix に一致しないキーは返さない。
+ * @param {Record<string, unknown>|null|undefined} bag chrome.storage.local.get の戻り
+ * @param {string} prefix 例 'nls_highlight_ledger_v1_'(末尾 '_' まで)
+ * @param {string|null|undefined} currentLiveId 現在視聴中の lv(保護)
+ * @param {number} nowMs
+ * @param {number} ttlMs
+ * @returns {string[]}
+ */
+export function stalePerLiveCapturedAtKeys(bag, prefix, currentLiveId, nowMs, ttlMs) {
+  if (!bag || typeof bag !== 'object' || !prefix) return [];
+  if (!Number.isFinite(nowMs) || !Number.isFinite(ttlMs) || ttlMs <= 0) return [];
+  const cur = String(currentLiveId || '').trim().toLowerCase();
+  /** @type {string[]} */
+  const out = [];
+  for (const k of Object.keys(bag)) {
+    if (!k.startsWith(prefix)) continue;
+    const lv = k.slice(prefix.length).toLowerCase();
+    if (!lv || (cur && lv === cur)) continue;
+    const v = /** @type {any} */ (bag)[k];
+    const cap = v && typeof v === 'object' && typeof v.capturedAt === 'number' ? v.capturedAt : 0;
+    if (cap === 0 || nowMs - cap >= ttlMs) out.push(k);
   }
   return out;
 }

@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   pickPrunableStorageKeys,
+  stalePerLiveCapturedAtKeys,
   PRUNABLE_STORAGE_KEY_PREFIXES
 } from './prunableStorageKeys.js';
 
@@ -108,5 +109,44 @@ describe('配信ごと応援レーン鏡の lifecycle(v0.1.1301)', () => {
 
   it('★巨大なコメント配列は引き続き対象外(prune のために読まない)', () => {
     expect(pickPrunableStorageKeys(['nls_comments_lv351133862'])).toEqual([]);
+  });
+});
+
+describe('ハイライト台帳(配信別キー)は定期 prune の対象(増え続けない)', () => {
+  it("'nls_highlight_ledger_v1_' が prefix 一覧に入り、配信別キーだけが拾われる(共通キー本体は拾わない)", () => {
+    expect(PRUNABLE_STORAGE_KEY_PREFIXES).toContain('nls_highlight_ledger_v1_');
+    expect(
+      pickPrunableStorageKeys(['nls_highlight_ledger_v1_lv111', 'nls_highlight_ledger_v1', 'nls_ctail_lv111'])
+    ).toEqual(['nls_highlight_ledger_v1_lv111']);
+  });
+});
+
+describe('stalePerLiveCapturedAtKeys(配信別キーを実際に消す対象を決める)', () => {
+  const NOW = 1_700_000_000_000;
+  const DAY = 24 * 60 * 60 * 1000;
+  const P = 'nls_highlight_ledger_v1_';
+  const bag = {
+    [P + 'lv1']: { capturedAt: NOW - 2 * DAY },
+    [P + 'lv2']: { capturedAt: NOW - 1000 },
+    [P + 'lv3']: { capturedAt: 0 },
+    [P + 'lv4']: 'broken',
+    'nls_highlight_ledger_v1': { capturedAt: NOW - 9 * DAY },
+    'nls_ctail_lv1': { capturedAt: NOW - 9 * DAY }
+  };
+  it('TTL を超えた/capturedAt 不明/壊れた値の配信別キーだけを返す', () => {
+    expect(stalePerLiveCapturedAtKeys(bag, P, 'lv9', NOW, DAY).sort()).toEqual([P + 'lv1', P + 'lv3', P + 'lv4']);
+  });
+  it('★現在視聴中の配信は古くても必ず残す', () => {
+    expect(stalePerLiveCapturedAtKeys(bag, P, 'lv1', NOW, DAY)).not.toContain(P + 'lv1');
+  });
+  it('★prefix に一致しないキー(共通の本体・記録系)は絶対に返さない', () => {
+    const out = stalePerLiveCapturedAtKeys(bag, P, 'lv9', NOW, DAY);
+    expect(out).not.toContain('nls_highlight_ledger_v1');
+    expect(out).not.toContain('nls_ctail_lv1');
+  });
+  it('入力が不正なら空配列', () => {
+    expect(stalePerLiveCapturedAtKeys(null, P, 'lv1', NOW, DAY)).toEqual([]);
+    expect(stalePerLiveCapturedAtKeys(bag, '', 'lv1', NOW, DAY)).toEqual([]);
+    expect(stalePerLiveCapturedAtKeys(bag, P, 'lv1', NaN, DAY)).toEqual([]);
   });
 });

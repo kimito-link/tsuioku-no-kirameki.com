@@ -108,7 +108,6 @@
 | `KEY_FOLD_ANONYMOUS_IN_RANK_STRIP` | — | extension/popup-entry.js |
 | `KEY_GIFT_EFFECT_DIAG` | extension/venueBar.js | extension/popup-entry.js<br>extension/status-entry.js |
 | `KEY_GIFT_RANKING_LANE_ENABLED` | extension/popup-entry.js | extension/content-entry.js<br>extension/popup-entry.js |
-| `KEY_HIGHLIGHT_LEDGER` | extension/popup-entry.js<br>extension/venueBar.js | extension/popup-entry.js<br>extension/venueBar.js |
 | `KEY_INCREMENTAL_DEDUP_ENABLED` | — | extension/content-entry.js |
 | `KEY_INLINE_FLOATING_ANCHOR` | — | extension/content-entry.js<br>extension/popup-entry.js |
 | `KEY_INLINE_PANEL_AUTOSHOW_ENABLED` | — | extension/content-entry.js<br>extension/popup-entry.js |
