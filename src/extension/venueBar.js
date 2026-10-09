@@ -186,6 +186,7 @@ import { isReceiptComparable, restoreLaneMirrorBuckets } from '../lib/laneMirror
 import {
   composeVenueLaneBuckets,
   isLaneMirrorUsableForVenue,
+  shouldAdoptLaneMirrorForVenue,
   venueMirrorAgeNotice,
   venueRowsFromLaneMirror,
   venueSeatIndexByUid
@@ -6115,7 +6116,7 @@ export function mountVenueBarButton(options = {}) {
         if (open && _receiptKey && bag?.[_receiptKey]) {
           _laneReceiptFromPopup = /** @type {any} */ (bag[_receiptKey]);
         }
-        if (open && snap) {
+        if (open && snap && shouldAdoptLaneMirrorForVenue(snap, _catchUpLiveId)) {
           laneMirrorSnap = snap;
           scheduleLaneMirrorRecommit();
         }
@@ -6484,7 +6485,8 @@ export function mountVenueBarButton(options = {}) {
           reason: accepted ? '' : (_laneMirrorSanitizeIssues || '関所が捨てた')
         });
       } catch { /* 計器失敗は受け取りを止めない */ }
-      if (accepted) {
+      // ★2026-10-09: 別配信の鏡(旧グローバルキー経由)で良い鏡を上書きしない(2配信同時記録で会場が出たり消えた)。
+      if (accepted && shouldAdoptLaneMirrorForVenue(accepted, liveId)) {
         laneMirrorSnap = accepted;
         scheduleLaneMirrorRecommit();
       }
