@@ -5,8 +5,8 @@
 
 ## storage の出入り
 
-- 書くキー: `KEY_GIFT_EFFECT_DIAG`, `KEY_HIGHLIGHT_LEDGER`, `KEY_VENUE_EFFECT_SOUND_PRESENCE`, `KEY_VENUE_SEATS_DIAG`, `KEY_VOICE_DIAG`
-- 読むキー: `KEY_EFFECT_SOUND_ENABLED`, `KEY_HIGHLIGHT_LEDGER`, `KEY_LANE_MIRROR`, `KEY_LIVE_BROADCASTER_CTX`, `KEY_USER_COMMENT_PROFILE_CACHE`
+- 書くキー: `KEY_GIFT_EFFECT_DIAG`, `KEY_VENUE_EFFECT_SOUND_PRESENCE`, `KEY_VENUE_SEATS_DIAG`, `KEY_VOICE_DIAG`
+- 読むキー: `KEY_EFFECT_SOUND_ENABLED`, `KEY_LANE_MIRROR`, `KEY_LIVE_BROADCASTER_CTX`, `KEY_USER_COMMENT_PROFILE_CACHE`
 
 ## 構成ファイル（import 到達・最大40件表示）
 
@@ -56,4 +56,4 @@ graph LR
   classDef shared fill:#eee,stroke:#999,color:#666;
 ```
 
-> ほか 108 ファイル省略（全件は storage-bus.md / metafile 参照）。
+> ほか 109 ファイル省略（全件は storage-bus.md / metafile 参照）。

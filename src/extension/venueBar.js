@@ -129,8 +129,7 @@ import {
   computeGiftGapAverage
 } from '../lib/giftEffectDiag.js';
 // SC2(council/broadcast-scoring-SYNTHESIS.md §2.2): ハイライト台帳(実際に発火した演出だけ記録)。
-import { appendHighlight, isHighlightWorthyKind } from '../lib/highlightLedger.js';
-import { KEY_HIGHLIGHT_LEDGER } from '../lib/highlightLedgerKey.js';
+import { highlightLedgerReadKeys, isHighlightWorthyKind, planHighlightAppend } from '../lib/highlightLedger.js';
 // anonymousIdenticonDataUrl は P3(v0.1.1117)で venueLaneBuckets(①正本委譲)側へ移動=venueBar 直参照なし。
 import { tailStorageKey } from '../lib/commentTailBuffer.js';
 import { pickNewVenueSpeech, mergeSpeakersIntoVenueRows, liveFeedSpeechRows } from '../lib/venueSpeech.js';
@@ -3567,9 +3566,10 @@ export function mountVenueBarButton(options = {}) {
   /** @param {string} liveId @param {string} kind @param {number} atMs */
   const appendHighlightAndPublish = (liveId, kind, atMs) => {
     if (!isHighlightWorthyKind(kind)) return;
-    void safeStorageLocalGet(KEY_HIGHLIGHT_LEDGER).then((bag) => {
-      const next = appendHighlight(bag?.[KEY_HIGHLIGHT_LEDGER], { liveId, kind, atMs });
-      void safeStorageLocalSet({ [KEY_HIGHLIGHT_LEDGER]: next });
+    // 2026-10-09: 配信別キーに追記(共通キーはコピー)。別配信の追記で台帳を消さない。
+    void safeStorageLocalGet(highlightLedgerReadKeys(liveId)).then((bag) => {
+      const plan = planHighlightAppend(bag, { liveId, kind, atMs });
+      if (plan) void safeStorageLocalSet(plan);
     });
   };
 

@@ -226,6 +226,7 @@ import {
   validateEventScoreRankingRelayPayload
 } from '../lib/eventScoreRankingRelay.js';
 import { pickPrunableStorageKeys } from '../lib/prunableStorageKeys.js';
+import { pruneStaleHighlightLedgers } from '../lib/highlightLedger.js';
 // ★v0.1.1393: 公式「なふだを表示」トグルをPOPから操作する(探し方は lib 側=テスト可能)。
 import {
   findNameplateToggle, readToggleState, decideNameplateClick
@@ -18604,6 +18605,7 @@ async function persistOfficialEventDomBundleNow() {
           );
         } catch { /* best-effort */ }
       }
+      try { await pruneStaleHighlightLedgers(all, lid, Date.now(), (ks) => chrome.storage.local.remove(ks)); } catch { /* best-effort */ } // 配信別ハイライト台帳(24h・現lv保護)
       // 核心: koken API 鏡の専用キー（kokenContribStorageKey）も同規約で cleanup
       // （現 lv は保護、別 lv で 24h 超 or capturedAt 不明は prune）。キー累積防止。
       try {
