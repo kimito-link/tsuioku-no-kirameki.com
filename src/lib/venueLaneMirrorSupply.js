@@ -65,6 +65,24 @@ export function isLaneMirrorUsableForVenue(snap, liveId, nowMs) {
 }
 
 /**
+ * 会場が鏡を【採用してよいか】(2026-10-09)。現配信の鏡だけを採用する。
+ *   旧グローバルキー(KEY_LANE_MIRROR)は他配信の①も書く(最後の書き手が勝つ)ため、
+ *   2配信を同時に記録していると、通知で届いた【別配信の鏡】が良い鏡を上書きし、
+ *   isLaneMirrorUsableForVenue が liveIdMismatch で弾く→会場が fallback へ降格して
+ *   りんく/ギフト/広告段が空になり、次の自配信の鏡で戻る=「会場が出たり消えたりする」。
+ *   弾いても失うものは無い(別配信の鏡は usable で必ず弾かれる)。
+ * @param {Partial<LaneMirrorSnapshot>|null|undefined} snap
+ * @param {string} liveId 現配信
+ * @returns {boolean}
+ */
+export function shouldAdoptLaneMirrorForVenue(snap, liveId) {
+  if (!snap || typeof snap !== 'object') return false;
+  const snapLive = String(snap.liveId || '').trim().toLowerCase();
+  const cur = String(liveId || '').trim().toLowerCase();
+  return Boolean(snapLive && cur && snapLive === cur);
+}
+
+/**
  * 鏡セル→buildVenueSeating が食える行(P層)。uid のあるセルだけが席を持てる(uid無しの広告主
  * セル等は席に座らず、compose 側で lane に直接出る)。同一 uid の重複(link と gift の両在籍等)は
  * 先勝ちで1席に畳む。preCount 系は候補集計から join(L7)。

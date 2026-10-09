@@ -3,6 +3,7 @@ import { restoreLaneMirrorBuckets } from './laneMirror.js';
 import {
   composeVenueLaneBuckets,
   isLaneMirrorUsableForVenue,
+  shouldAdoptLaneMirrorForVenue,
   venueRowsFromLaneMirror,
   venueSeatIndexByUid
 } from './venueLaneMirrorSupply.js';
@@ -190,5 +191,22 @@ describe('venueSeatIndexByUid', () => {
     expect(map.get('10')).toBe(2);
     expect(map.get('a:abc')).toBe(8);
     expect(map.size).toBe(2);
+  });
+});
+
+describe('shouldAdoptLaneMirrorForVenue(他配信の鏡で良い鏡を上書きしない)', () => {
+  it('同じ配信の鏡は採用する(大文字小文字・空白は無視)', () => {
+    expect(shouldAdoptLaneMirrorForVenue(makeSnap(), 'lv350912687')).toBe(true);
+    expect(shouldAdoptLaneMirrorForVenue(makeSnap({ liveId: 'LV350912687 ' }), 'lv350912687')).toBe(true);
+  });
+  it('★別配信の鏡は採用しない(旧グローバルキーは他配信の①も書く=2配信同時記録で出たり消えたりの真因)', () => {
+    expect(shouldAdoptLaneMirrorForVenue(makeSnap({ liveId: 'lv999' }), 'lv350912687')).toBe(false);
+  });
+  it('liveId の無い鏡・空/不正な入力は採用しない', () => {
+    expect(shouldAdoptLaneMirrorForVenue(makeSnap({ liveId: '' }), 'lv350912687')).toBe(false);
+    expect(shouldAdoptLaneMirrorForVenue(null, 'lv350912687')).toBe(false);
+  });
+  it('現配信が未確定なら採用しない(判定できない鏡で上書きしない)', () => {
+    expect(shouldAdoptLaneMirrorForVenue(makeSnap(), '')).toBe(false);
   });
 });
