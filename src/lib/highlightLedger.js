@@ -15,6 +15,9 @@
  * @typedef {{ liveId: string, rows: HighlightRow[], capturedAt: number }} HighlightLedger
  */
 
+import { KEY_HIGHLIGHT_LEDGER, highlightLedgerKeyFor } from './highlightLedgerKey.js';
+import { stalePerLiveCapturedAtKeys } from './prunableStorageKeys.js';
+
 /** 台帳の上限件数(古い順に切り詰める・appendTrendSample と同型のcap)。 */
 export const HIGHLIGHT_LEDGER_CAP = 50;
 
@@ -95,6 +98,69 @@ export function appendHighlight(prevRaw, entry) {
   rows.push({ at: atMs, kind, label: /** @type {Record<string, string>} */ (HIGHLIGHT_KIND_LABEL)[kind] });
   const capped = rows.length > HIGHLIGHT_LEDGER_CAP ? rows.slice(rows.length - HIGHLIGHT_LEDGER_CAP) : rows;
   return { liveId, rows: capped, capturedAt: atMs };
+}
+
+/**
+ * 台帳を読むときに storage から取るキー(配信別 + 共通=移行用)。
+ * @param {string} liveId
+ * @returns {string[]}
+ */
+export function highlightLedgerReadKeys(liveId) {
+  const k = highlightLedgerKeyFor(liveId);
+  return k ? [k, KEY_HIGHLIGHT_LEDGER] : [KEY_HIGHLIGHT_LEDGER];
+}
+
+/**
+ * その配信の台帳を bag から選ぶ(配信別 > 共通(同じ配信のときだけ) > null)。別の配信の台帳は返さない。
+ * @param {Record<string, unknown>|null|undefined} bag chrome.storage.local.get の戻り
+ * @param {string} liveId
+ * @returns {HighlightLedger|null}
+ */
+export function pickLedgerForLive(bag, liveId) {
+  const lid = String(liveId || '').trim().toLowerCase();
+  if (!lid || !bag || typeof bag !== 'object') return null;
+  const perKey = highlightLedgerKeyFor(lid);
+  const cands = [perKey ? bag[perKey] : null, bag[KEY_HIGHLIGHT_LEDGER]];
+  for (const c of cands) {
+    if (c && typeof c === 'object' && String(/** @type {any} */ (c).liveId || '').trim().toLowerCase() === lid) {
+      return /** @type {HighlightLedger} */ (c);
+    }
+  }
+  return null;
+}
+
+/**
+ * ハイライト1件の追記を「storage へ書く内容」にする純関数。書き手(popup/会場)の共通部。
+ *   配信別キーに追記し、共通キーには同じ中身をコピーとして書く(状態速報の互換)。
+ *   他の配信の台帳には触れない=別配信の追記で消えない。書かない場合は null。
+ * @param {Record<string, unknown>|null|undefined} bag highlightLedgerReadKeys(liveId) で読んだ値
+ * @param {{ liveId: string, kind: string, atMs: number }} entry
+ * @returns {Record<string, HighlightLedger>|null}
+ */
+export function planHighlightAppend(bag, entry) {
+  const liveId = String(entry?.liveId || '').trim().toLowerCase();
+  const perKey = highlightLedgerKeyFor(liveId);
+  if (!perKey || !isHighlightWorthyKind(String(entry?.kind || ''))) return null;
+  const next = appendHighlight(pickLedgerForLive(bag, liveId), { liveId, kind: entry.kind, atMs: entry.atMs });
+  return { [perKey]: next, [KEY_HIGHLIGHT_LEDGER]: next };
+}
+
+/** 配信別の台帳を消すまでの猶予(最後のハイライトから)。koken 等の per-live キャッシュと同じ 24h。 */
+export const HIGHLIGHT_LEDGER_TTL_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * 古い配信の配信別台帳を消す(現在視聴中の配信は保護)。配信別キーは視聴した配信の数だけ増えるため、
+ *   消す人が必要(読む対象に入れるだけでは消えない=応援レーン鏡 v2 で同じ取りこぼしがあった)。
+ * @param {Record<string, unknown>|null|undefined} bag readPrunableStorageBagCheap の戻り
+ * @param {string} currentLiveId
+ * @param {number} nowMs
+ * @param {(keys: string[]) => Promise<unknown>|unknown} remove chrome.storage.local.remove 相当
+ * @returns {Promise<string[]>} 消したキー
+ */
+export async function pruneStaleHighlightLedgers(bag, currentLiveId, nowMs, remove) {
+  const keys = stalePerLiveCapturedAtKeys(bag, `${KEY_HIGHLIGHT_LEDGER}_`, currentLiveId, nowMs, HIGHLIGHT_LEDGER_TTL_MS);
+  if (keys.length) await remove(keys);
+  return keys;
 }
 
 /** kind → 選抜時の重み(降順ソート用・大きいほど優先)。 @type {Readonly<Record<string, number>>} */

@@ -5,10 +5,14 @@ import {
   isHighlightWorthyKind,
   makeInitialHighlightLedger,
   buildHighlightLedgerDiagLines,
+  highlightLedgerReadKeys,
+  pickLedgerForLive,
+  planHighlightAppend,
   HIGHLIGHT_LEDGER_CAP,
   HIGHLIGHT_PICK_COUNT,
   HIGHLIGHT_KIND_LABEL
 } from './highlightLedger.js';
+import { KEY_HIGHLIGHT_LEDGER, highlightLedgerKeyFor } from './highlightLedgerKey.js';
 
 describe('isHighlightWorthyKind', () => {
   it('記録対象のkindはtrue', () => {
@@ -184,5 +188,66 @@ describe('buildHighlightLedgerDiagLines', () => {
     const ledger = appendHighlight(null, { liveId: 'lv1', kind: 'gift_large', atMs: 1000 });
     const lines = buildHighlightLedgerDiagLines(ledger, 0);
     expect(lines[0]).not.toContain('秒前');
+  });
+});
+
+describe('配信別の台帳(2配信同時記録で互いの台帳を消さない)', () => {
+  const A = 'lv111';
+  const B = 'lv222';
+  const kA = highlightLedgerKeyFor(A);
+  const kB = highlightLedgerKeyFor(B);
+
+  it('キーは配信ごと(大文字小文字は正規化)・空の liveId は空文字', () => {
+    expect(kA).toBe('nls_highlight_ledger_v1_lv111');
+    expect(highlightLedgerKeyFor(' LV111 ')).toBe(kA);
+    expect(highlightLedgerKeyFor('')).toBe('');
+  });
+
+  it('読むキーは [配信別, 共通(移行用)]', () => {
+    expect(highlightLedgerReadKeys(A)).toEqual([kA, KEY_HIGHLIGHT_LEDGER]);
+    expect(highlightLedgerReadKeys('')).toEqual([KEY_HIGHLIGHT_LEDGER]);
+  });
+
+  it('★配信Bのハイライトを足しても配信Aの台帳は消えない', () => {
+    // A に1件
+    const w1 = planHighlightAppend({}, { liveId: A, kind: 'gift_large', atMs: 1000 });
+    expect(w1[kA].rows).toHaveLength(1);
+    // B に1件(storage には A の分が残っている状態で)
+    const bag = { ...w1 };
+    const w2 = planHighlightAppend(bag, { liveId: B, kind: 'gift_mega', atMs: 2000 });
+    expect(w2[kB].rows).toHaveLength(1);
+    // 配信別キーの A は書き換わらない(plan に含まれない)=消えない
+    expect(w2[kA]).toBeUndefined();
+    // storage に反映した後も A は2件目を足せる(B に上書きされていない)
+    const merged = { ...bag, ...w2 };
+    const w3 = planHighlightAppend(merged, { liveId: A, kind: 'milestone_hard', atMs: 3000 });
+    expect(w3[kA].rows.map((r) => r.kind)).toEqual(['gift_large', 'milestone_hard']);
+  });
+
+  it('★共通キーは「最後に書いた台帳のコピー」(状態速報の互換)として同じ中身で書く', () => {
+    const w = planHighlightAppend({}, { liveId: A, kind: 'gift_large', atMs: 1000 });
+    expect(w[KEY_HIGHLIGHT_LEDGER]).toEqual(w[kA]);
+  });
+
+  it('移行: 配信別キーが無く共通キーが同じ配信の台帳なら、それに続けて追記する', () => {
+    const legacy = { liveId: A, rows: [{ at: 500, kind: 'gift_large', label: 'ギフト大波(large)' }], capturedAt: 500 };
+    const w = planHighlightAppend({ [KEY_HIGHLIGHT_LEDGER]: legacy }, { liveId: A, kind: 'gift_mega', atMs: 900 });
+    expect(w[kA].rows).toHaveLength(2);
+  });
+
+  it('記録対象外の kind・liveId 空は何も書かない(null)', () => {
+    expect(planHighlightAppend({}, { liveId: A, kind: 'nope', atMs: 1 })).toBeNull();
+    expect(planHighlightAppend({}, { liveId: '', kind: 'gift_large', atMs: 1 })).toBeNull();
+  });
+
+  it('pickLedgerForLive: 配信別 > 共通(同じ配信のときだけ) > null。別配信の台帳は返さない', () => {
+    const la = { liveId: A, rows: [{ at: 1, kind: 'gift_large', label: 'x' }], capturedAt: 1 };
+    const lb = { liveId: B, rows: [{ at: 2, kind: 'gift_large', label: 'y' }], capturedAt: 2 };
+    expect(pickLedgerForLive({ [kA]: la, [KEY_HIGHLIGHT_LEDGER]: lb }, A)).toBe(la);
+    expect(pickLedgerForLive({ [KEY_HIGHLIGHT_LEDGER]: la }, A)).toBe(la);
+    expect(pickLedgerForLive({ [KEY_HIGHLIGHT_LEDGER]: lb }, A)).toBeNull();
+    expect(pickLedgerForLive({ [kA]: lb }, A)).toBeNull();
+    expect(pickLedgerForLive({}, A)).toBeNull();
+    expect(pickLedgerForLive(null, A)).toBeNull();
   });
 });

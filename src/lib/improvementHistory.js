@@ -1625,5 +1625,19 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
     version: '0.1.1589', metric: 'cross-checked-claims', value: 20,
     source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
     note: '★直近30日窓のスライドによる自然減(v0.1.1562/1577〜1587 の note と同じ理由)。今回の根拠は実機の速報(20:39 に会場の りんく0/ギフト0/広告0/こん太5/たぬ姉72 = 代替経路の形、同時刻の鏡は りんく14/ギフト5/広告5)と、コードの確認(onChanged が旧グローバルキーの別配信の鏡を採用していた)、変異テスト2種(採用判定を外す・常に採用)で赤を確認して復元した別の手段。'
+  }),
+  Object.freeze({
+    version: '0.1.1590', metric: 'bundle-kb', value: 1398,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '★前版 1397KB → 1398KB(+1KB): 配信別ハイライト台帳の読み書き(約40行・純関数)と更新履歴1版ぶん。過去最良1360(@0.1.1454)との差分の内訳は v0.1.1471/1537/1560/1562/1584 の note に記録済み。'
+  }),
+  Object.freeze({
+    version: '0.1.1590', metric: 'gate-selftest', value: 4,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1590', metric: 'cross-checked-claims', value: 20,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: '★直近30日窓のスライドによる自然減(v0.1.1562/1577〜1587 の note と同じ理由)。今回の根拠は、コードの確認(appendHighlight が別配信だと台帳を空にする: highlightLedger.js の rows 置換)と、変異テスト5種(書き手が plan を捨てる・読み手の選別を外す・掃除の呼び出しを消す・別配信の台帳を返す・現配信を保護しない)で赤を確認して復元した別の手段。'
   })
 ]);
