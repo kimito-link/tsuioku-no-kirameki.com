@@ -49,7 +49,8 @@ graph LR
   d9 --> d9_1["avatar-parts/ 〔アバター/画像〕"]
   ROOT --> d10["scripts/ 〔ビルド/自動生成〕"]
   d10 --> d10_0["lib/ 〔ビルド/共有〕"]
-  d10 --> d10_1["xserver/ 〔デプロイ/webhook〕"]
+  d10 --> d10_1["perf-ab/ 〔性能/計測〕"]
+  d10 --> d10_2["xserver/ 〔デプロイ/webhook〕"]
   ROOT --> d11["sound-src/ 〔音声/素材〕"]
   d11 --> d11_0["soundeffect-lab/ 〔音声/素材〕"]
   ROOT --> d12["src/ 〔ソース〕"]
@@ -331,9 +332,10 @@ graph LR
 - `avatar-parts/`（29 件） — アバター素材(顔シート等)の参考画像  〔アバター / 画像〕
 
 ## `scripts/` — ビルド・検証・自動生成スクリプト(build/feature-map/repo-tree-map 等)  〔ビルド / 自動生成〕
-<sub>ファイル 72 件</sub>
+<sub>ファイル 77 件</sub>
 
 - `lib/`（2 件） — スクリプト共有の小部品(計器コア等)  〔ビルド / 共有〕
+- `perf-ab/`（5 件） — 「重い」を前後比較で測る道具(一時プロファイルの Chromium で拡張プロセスの CPU を採取・プロファイル)  〔性能 / 計測〕
 - `xserver/`（2 件） — Xserver 向け webhook(git pull デプロイ)スクリプト  〔デプロイ / webhook〕
 
 ## `sound-src/` — 効果音の元素材(HQ wav 等)。ここから build して配布用 mp3 を作る  〔音声 / 素材〕
