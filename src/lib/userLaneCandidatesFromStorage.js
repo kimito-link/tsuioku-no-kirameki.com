@@ -272,6 +272,20 @@ export function enrichUserLaneAggregatesWithProfileAndDisplay(
       ? profileMap
       : /** @type {Record<string, { nickname?: unknown, avatarUrl?: unknown }>} */ ({});
 
+  // ★2026-10-11: コメント行を userId で【1回だけ】束ねる。旧実装はユーザーごとに全コメントを走査していた
+  //   (O(ユーザー×コメント))。実機の CPU プロファイルで、この関数の自分の時間が拡張プロセスの約2割
+  //   (10秒/52秒)を占めていた。束ねる順序は元の配列順のまま=各ユーザーの hits は旧実装と同じ並び。
+  //   出力が旧実装と同一であることは enrichUserLaneAggregatesEquivalence.test.js が固定する。
+  /** @type {Map<string, unknown[]>} */
+  const hitsByUid = new Map();
+  for (const e of entries) {
+    const key = String(/** @type {{ userId?: unknown }} */ (e)?.userId ?? '').trim();
+    if (!key) continue;
+    const bucket = hitsByUid.get(key);
+    if (bucket) bucket.push(e);
+    else hitsByUid.set(key, [e]);
+  }
+
   /**
    * @param {string} uid
    * @returns {string}
@@ -279,15 +293,10 @@ export function enrichUserLaneAggregatesWithProfileAndDisplay(
   function bestNicknameFromEntries(uid) {
     const id = String(uid || '').trim();
     if (!id || !entries.length) return '';
-    /** @type {unknown[]} */
-    const hits = [];
-    for (const e of entries) {
-      if (String(/** @type {{ userId?: unknown }} */ (e)?.userId ?? '').trim() !== id) {
-        continue;
-      }
-      hits.push(e);
-    }
-    if (!hits.length) return '';
+    const bucket = hitsByUid.get(id);
+    if (!bucket || !bucket.length) return '';
+    // 束ねた配列を直接並べ替えない(同じ uid の集約が複数あっても結果が変わらないよう毎回コピーする)。
+    const hits = bucket.slice();
     hits.sort((a, b) => rowCapturedAt(a) - rowCapturedAt(b));
     let nick = '';
     for (const e of hits) {
