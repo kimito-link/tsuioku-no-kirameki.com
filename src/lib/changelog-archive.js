@@ -24,6 +24,14 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.1573',
+    date: '2026-10-06',
+    summary: '本家コメの速さが古い値で止まらない',
+    items: Object.freeze([
+      '「本家コメ」の隣の「+N/分」が、一度だけ大きすぎる数字を読み取ると、そのあとずっと出なくなる(最長15分)ことがありました。低い値が3回続いたら測り直すようにして、数十秒後にまた正しい速さが出ます。1〜2回の揺れでは測り直しません。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1572',
     date: '2026-10-06',
     summary: '内部: 描かない経路の入口を1本化',
