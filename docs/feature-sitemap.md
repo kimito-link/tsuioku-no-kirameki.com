@@ -877,7 +877,7 @@
   - `src/extension/live-ranking-entry.js`
   - `tsuioku-no-kirameki/live/index.html`
   - `.github/workflows/live-ranking.yml`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 216</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 217</summary>
 
 - `app/app.js` — スマホ閲覧用 status Web 版。
 - `app/live-view.js` — global NL_BUILD_ID
@@ -911,6 +911,7 @@
 - `scripts/meeting.mjs` — 会議ハーネス: 同じ問いを「無料クラウド4系統 + ローカル ollama 数体」に投げ、
 - `scripts/perf-ab/common.mjs` — perf-ab 共通部品: 拡張を読み込んだ Chromium の起動・後片付け・拡張プロセスの CPU/メモリ採取。
 - `scripts/perf-ab/cpu-timeline.mjs` — 拡張プロセス(--extension-process)の CPU%・メモリが、ページを開くたびにどう積み上がるかを時系列で見る。
+- `scripts/perf-ab/growth.mjs` — 拡張プロセスのメモリが「何で」増えているかを時系列で見る(JS ヒープ / DOM ノード / リスナー / ドキュメント / OS 側メモリ)。
 - `scripts/perf-ab/make-before.mjs` — 「修正前」の拡張フォルダを作る(extension/ をコピーし、dist の bundle を git の指定リビジョンのものに差し替える)。
 - `scripts/perf-ab/profile-popup.mjs` — 視聴ページに埋め込まれたパネル(popup.html?inline=1)の【メインスレッド CPU プロファイル】を取る。
 - `scripts/pick-live-for-check.mjs` — 検証に使う実配信を【自動で1つ選ぶ】。
