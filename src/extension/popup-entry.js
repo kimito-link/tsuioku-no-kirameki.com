@@ -725,7 +725,7 @@ import { buildStoryUserLaneCandidateRow } from '../lib/storyUserLaneRowModel.js'
 // 2026-06-22(council/lane-show-all-active): 応援レーンの人数整合(素性 N/表示 M)を健全度パネルに載せる。
 import { KEY_LANE_DIAG } from '../lib/laneDiagKey.js';
 import { buildLaneDiagSnapshot } from '../lib/laneDiag.js';
-import { KEY_LANE_MIRROR } from '../lib/laneMirrorKey.js';
+import { KEY_LANE_MIRROR, laneMirrorKeyFor, laneMirrorReadKeys, pickLaneMirrorSnap } from '../lib/laneMirrorKey.js';
 // ★v0.1.1300: 配信ごと鏡(v2)+受領証の書き出し(storage I/O グルーは lib へ抽出=max-lines ラチェット遵守)。
 import { publishLaneMirrorPerLive } from '../lib/laneMirrorPerLivePublish.js';
 import { createLaneMirrorWriteGate } from '../lib/laneMirrorWriteGate.js';
@@ -6673,8 +6673,9 @@ async function applyLaneMirrorForPassive() {
   if (!els) return;
   let snap = null;
   try {
-    const bag = await chrome.storage.local.get(KEY_LANE_MIRROR);
-    snap = bag && bag[KEY_LANE_MIRROR];
+    // 2026-10-09: 配信別の鏡(v2)を優先(共通キーは別配信が最後に書くと自配信の鏡が消える)。
+    const _surfaceLid = currentPassiveSurfaceLiveId();
+    snap = pickLaneMirrorSnap(await chrome.storage.local.get(laneMirrorReadKeys(_surfaceLid)), _surfaceLid);
   } catch {
     return;
   }
@@ -6802,8 +6803,8 @@ async function applyLaneMirrorForMainPopupFallback(resolvedLid = '') {
   if (countStoryUserLaneDomTiles(els) > 0) return;
   let snap = null;
   try {
-    const bag = await chrome.storage.local.get(KEY_LANE_MIRROR);
-    snap = bag && bag[KEY_LANE_MIRROR];
+    // 2026-10-09: 配信別の鏡(v2)を優先(共通キーは別配信が最後に書くと自配信の鏡が消える)。
+    snap = pickLaneMirrorSnap(await chrome.storage.local.get(laneMirrorReadKeys(lid)), lid);
   } catch {
     return;
   }
@@ -21525,7 +21526,7 @@ async function initPopup() {
         const changedKeys = Object.keys(changes);
         // 表示中の配信(lv)の panel_summary / watch_snapshot 変化時だけ上段3カードを埋め直す(キー完全一致)。
         // 応援レーン鏡(本物 popup が watch タブで publish)が更新されたら鏡から描き直す。
-        if (changedKeys.includes(KEY_LANE_MIRROR)) {
+        if (changedKeys.includes(KEY_LANE_MIRROR) || changedKeys.includes(laneMirrorKeyFor(currentPassiveSurfaceLiveId()))) {
           void applyLaneMirrorForPassive();
         }
         // コメントティッカー鏡が更新されたら鏡から最新コメントを描き直す(=コメントが進む)。

@@ -1653,5 +1653,19 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
     version: '0.1.1591', metric: 'cross-checked-claims', value: 20,
     source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
     note: '★直近30日窓のスライドによる自然減(v0.1.1562/1577〜1587 の note と同じ理由)。今回の根拠は、コードの確認(live-view-entry.js の公開ボタンが全配信共通の KEY_LIVEVIEW_PUBLISH_PAYLOAD をページの ?lv= と照合せずに POST していた)と、変異テスト4種(送信前のガードを消す・初回 read の描画ガードを外す・常に ok・ページ lv 不明で必ず止める)で赤を確認して復元した別の手段。'
+  }),
+  Object.freeze({
+    version: '0.1.1592', metric: 'bundle-kb', value: 1399,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '★前版 1398KB → 1399KB(+1KB): 配信別の鏡の読み取り選択(約30行・純関数)と更新履歴1版ぶん。過去最良1360(@0.1.1454)との差分の内訳は v0.1.1471/1537/1560/1562/1584 の note に記録済み。'
+  }),
+  Object.freeze({
+    version: '0.1.1592', metric: 'gate-selftest', value: 4,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1592', metric: 'cross-checked-claims', value: 20,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: '★直近30日窓のスライドによる自然減(v0.1.1562/1577〜1587 の note と同じ理由)。今回の根拠は、コードの確認(受け身popupと通常popup代替読み込みが共通キー nls_lane_mirror_v1 しか読まず、2配信記録中は別配信が最後に書くと自配信の鏡が消える)と、変異テスト4種(受け身が共通だけ読む・代替読み込みが共通だけ読む・配信別キーの通知で描き直さない・pick が共通を先に選ぶ)で赤を確認して復元した別の手段。'
   })
 ]);
