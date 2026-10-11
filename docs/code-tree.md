@@ -817,7 +817,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (1911)
+- 📁 **src/** (1912)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1097,7 +1097,7 @@
         - `logo_funlink_white_RGB_link_black.png`
         - `logo_funlink_white_RGB_maru_black.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1675)
+  - 📁 **lib/** (1676)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -2193,6 +2193,7 @@
     - `popupFramePresets.js` — popup の配色プリセット（フレーム）管理。
     - `popupFramePresets.test.js`
     - `popupHtmlAnonymousIdenticon.test.js`
+    - `popupLaneMirrorPerLiveWiring.test.js`
     - `popupMainScrollDefer.js` — 拡張ポップアップ `.nl-main` スクロール中に重い DOM 更新を見送るかどうか。
     - `popupMainScrollDefer.test.js`
     - `popupStorageRefreshCoalesce.js` — popup / inline のコメント再描画スケジューラ。
