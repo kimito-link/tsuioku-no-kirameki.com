@@ -23,6 +23,7 @@ import '../lib/extDocBusyCensusBoot.js';
 import { KEY_LIVEVIEW_PUBLISH_PAYLOAD } from '../lib/storageKeys.js';
 import { buildStatusShareUrls } from '../lib/statusShareUrls.js';
 import { buildParityBadge } from '../lib/parityVerdict.js';
+import { checkPublishTarget } from '../lib/liveviewPublishTarget.js';
 // 根2対策(council/diagnostics-completeness-root-SYNTHESIS.md 第3段): この公開ボタンの送信結果を【storage】に
 //   記録する。従来 status の自己診断は globalThis 集計しか見ず、ここ(別ページ=別 globalThis)で送っても
 //   「押したのに未送信」と誤報していた。storage に1件書けば status から読める。
@@ -151,6 +152,13 @@ function setupPublishButton() {
         showError('まだ公開できる状態がありません。状態速報ページ(診断)を一度開いてから、もう一度お試しください。');
         return;
       }
+      // ★2026-10-09: 全配信共通の1キーなので、2配信記録中は別配信のデータのことがある。ページの ?lv= と違えば送らない。
+      const target = checkPublishTarget(payload.jsonBlob, liveIdFromUrl());
+      if (!target.ok) {
+        recordPublishOutcomeToStorage({ ok: false, httpStatus: null, error: '別配信のデータのため送信を中止', liveId: target.payloadLiveId });
+        showError(target.reason);
+        return;
+      }
       const { ingestUrl, liveViewUrl } = buildStatusShareUrls(payload.appOrigin, payload.viewToken);
       // 送信した snapshot の対象 lv(鏡 liveId 優先)=送信結果記録に添える(status の自己診断が別配信判定に使う)。
       const jb = /** @type {any} */ (payload.jsonBlob || {});
@@ -246,9 +254,9 @@ function setupStatusReportPanel() {
       const payload = /** @type {{ jsonBlob?: { statusReport?: string, parityVerdict?: object } }|undefined} */ (
         bag && bag[KEY_LIVEVIEW_PUBLISH_PAYLOAD]
       );
-      const report = payload && payload.jsonBlob ? payload.jsonBlob.statusReport : '';
-      paintStatusReportPanel(report);
-      paintParityBadge(payload && payload.jsonBlob ? payload.jsonBlob.parityVerdict : null);
+      const own = payload && payload.jsonBlob && checkPublishTarget(payload.jsonBlob, liveIdFromUrl()).ok ? payload.jsonBlob : null;
+      paintStatusReportPanel(own ? own.statusReport : '');
+      paintParityBadge(own ? own.parityVerdict : null);
     } catch {
       /* best-effort: 読めなくても応援ライブビュー本体は壊さない */
     }
@@ -260,9 +268,9 @@ function setupStatusReportPanel() {
       const next = /** @type {{ jsonBlob?: { statusReport?: string, parityVerdict?: object } }|undefined} */ (
         changes[KEY_LIVEVIEW_PUBLISH_PAYLOAD].newValue
       );
-      const report = next && next.jsonBlob ? next.jsonBlob.statusReport : '';
-      paintStatusReportPanel(report);
-      paintParityBadge(next && next.jsonBlob ? next.jsonBlob.parityVerdict : null);
+      const own = next && next.jsonBlob && checkPublishTarget(next.jsonBlob, liveIdFromUrl()).ok ? next.jsonBlob : null;
+      paintStatusReportPanel(own ? own.statusReport : '');
+      paintParityBadge(own ? own.parityVerdict : null);
     });
   } catch {
     /* best-effort: onChanged 登録不可でも初回 read で1枚は出る */
