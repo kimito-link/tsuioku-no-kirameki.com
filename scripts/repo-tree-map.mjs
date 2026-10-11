@@ -101,6 +101,7 @@ const ROLES = {
   'docs/patent-unique-voice-reading-filing-final': { role: '読み上げ手法の出願関連(現在は MOVED=移設済みの残置)', tags: ['特許', '履歴'] },
   'extension/data': { role: '拡張同梱の静的データ(応援バナー定義 json)', tags: ['データ', '応援'] },
   'scripts/lib': { role: 'スクリプト共有の小部品(計器コア等)', tags: ['ビルド', '共有'] },
+  'scripts/perf-ab': { role: '「重い」を前後比較で測る道具(一時プロファイルの Chromium で拡張プロセスの CPU を採取・プロファイル)', tags: ['性能', '計測'] },
   'sound-src': { role: '効果音の元素材(HQ wav 等)。ここから build して配布用 mp3 を作る', tags: ['音声', '素材'] },
   'sound-src/soundeffect-lab': { role: '効果音ラボ由来の素材候補(採否検討用)', tags: ['音声', '素材'] },
   'tests/helpers': { role: 'テスト共有ヘルパ(配線テストのソース走査等)', tags: ['テスト', '共有'] }
