@@ -16,11 +16,16 @@ import { fileURLToPath } from 'node:url';
 export const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 export const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-/** `--key value` 形式の引数を読む。 */
+/** `--key value` または `--key=value` 形式の引数を読む。 */
 export function parseArgs(argv = process.argv.slice(2)) {
   const out = {};
   for (let i = 0; i < argv.length; i += 1) {
     if (!argv[i].startsWith('--')) continue;
+    const eq = argv[i].indexOf('=');
+    if (eq > 2) {
+      out[argv[i].slice(2, eq)] = argv[i].slice(eq + 1); // --key=value(値が -- で始まる場合もこの形で渡せる)
+      continue;
+    }
     const k = argv[i].slice(2);
     const v = argv[i + 1] && !argv[i + 1].startsWith('--') ? argv[++i] : 'true';
     out[k] = v;
@@ -32,7 +37,7 @@ export function parseArgs(argv = process.argv.slice(2)) {
  * 拡張(extDir)を読み込んだ Chromium を一時プロファイルで起動する。
  * @param {{ extDir?: string, debugPort?: number }} opts
  */
-export async function launchWithExtension({ extDir = path.join(REPO_ROOT, 'extension'), debugPort = 0 } = {}) {
+export async function launchWithExtension({ extDir = path.join(REPO_ROOT, 'extension'), debugPort = 0, extraArgs = [] } = {}) {
   const userDataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'nls-perf-'));
   const args = [
     `--disable-extensions-except=${extDir}`,
@@ -41,6 +46,7 @@ export async function launchWithExtension({ extDir = path.join(REPO_ROOT, 'exten
     '--window-size=1280,900'
   ];
   if (debugPort) args.push(`--remote-debugging-port=${debugPort}`);
+  args.push(...extraArgs);
   const ctx = await chromium.launchPersistentContext(userDataDir, { headless: false, args });
   const sw = ctx.serviceWorkers()[0] || (await ctx.waitForEvent('serviceworker', { timeout: 60000 }));
   const extId = new URL(sw.url()).hostname;
@@ -96,7 +102,7 @@ export function sampleExtensionProcessCpu(userDataDir, intervalSec = 5) {
 
 /**
  * V8 の CPU プロファイル(profile)から、自分の時間の上位と、スタック上に居た時間(含む)の上位を集計する。
- * @returns {{ sampledMs: number, idleMs: number, busyPct: number, self: [string, number][], inclusive: [string, number][] }}
+ * @returns {{ sampledMs: number, idleMs: number, busyPct: number, self: [string, number][], inclusive: [string, number][], entries: [string, number][] }}
  */
 export function summarizeProfile(profile, { top = 22 } = {}) {
   const nodes = new Map(profile.nodes.map((n) => [n.id, n]));
@@ -126,6 +132,23 @@ export function summarizeProfile(profile, { top = 22 } = {}) {
       inclusive.set(kk, (inclusive.get(kk) || 0) + t);
     }
   }
+  // 入口(スタックの一番下=最初に現れる名前付き JS フレーム)ごとの合計時間。「誰が仕事を始めているか」を見る。
+  const entries = new Map();
+  for (const [nid, t] of selfByNode) {
+    const chain = [];
+    for (let cur = nid; cur; cur = parent.get(cur)) chain.push(cur);
+    chain.reverse();
+    const first = chain.find((id) => {
+      const fn = nodes.get(id).callFrame.functionName;
+      return !/^\((root|program|idle)\)$/.test(fn);
+    });
+    let k = '(native only)';
+    if (first) {
+      const cf = nodes.get(first).callFrame;
+      k = `${keyOf(first)}:${cf.columnNumber + 1}`; // 行だけだと minify で同じ行の無名関数が区別できない
+    }
+    entries.set(k, (entries.get(k) || 0) + t);
+  }
   const idleMs = [...self].filter(([k]) => k.startsWith('(idle)')).reduce((a, [, t]) => a + t, 0) / 1000;
   const sorted = (m, drop) =>
     [...m].filter(([k]) => !drop.test(k)).sort((a, b) => b[1] - a[1]).slice(0, top).map(([k, t]) => [k, t / 1000]);
@@ -134,6 +157,7 @@ export function summarizeProfile(profile, { top = 22 } = {}) {
     idleMs,
     busyPct: total ? Math.round((1 - (idleMs * 1000) / total) * 100) : 0,
     self: sorted(self, /^\(idle\)/),
-    inclusive: sorted(inclusive, /^\((root|program|idle|garbage)/)
+    inclusive: sorted(inclusive, /^\((root|program|idle|garbage)/),
+    entries: sorted(entries, /^\(idle\)/)
   };
 }
