@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 8 / 895 件
+## ⚠️ 役割コメントが無いソース 8 / 896 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `scripts/build.mjs`
@@ -817,7 +817,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (1908)
+- 📁 **src/** (1911)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1097,7 +1097,7 @@
         - `logo_funlink_white_RGB_link_black.png`
         - `logo_funlink_white_RGB_maru_black.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1672)
+  - 📁 **lib/** (1675)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -1906,6 +1906,9 @@
     - `liveviewPublishSelfDiag.js` — 純Web公開コピーの自己診断（council/status-self-diagnoses-SYNTHESIS.md）。
     - `liveviewPublishSelfDiag.test.js`
     - `liveviewPublishSelfDiagEmptyNormal.test.js`
+    - `liveviewPublishTarget.js` — 応援ライブビュー(live-view.html?lv=X)の公開ボタンが、別の配信のデータを送らないための判定(純関数)。
+    - `liveviewPublishTarget.test.js`
+    - `liveviewPublishTargetWiring.test.js`
     - `liveviewSnapshotFreshness.js` — 純Web応援ライブビューの「スナップショット丸ごと1枚の鮮度」判定（council/liveview-wholesale-root-SYNTHESIS.md 第1段）。
     - `liveviewSnapshotFreshness.test.js`
     - `loadLastBroadcastSummary.js` — 0.1.69 (AY): empty state（配信なし）popup で「前回の配信」cards を復元するために、
