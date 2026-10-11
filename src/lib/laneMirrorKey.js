@@ -63,3 +63,31 @@ export function liveIdFromLaneMirrorKey(key) {
   const m = /^nls_lane_mirror_v2_(lv\d{1,15})$/.exec(k);
   return m ? m[1] : '';
 }
+
+/**
+ * 応援レーン鏡を読むときに storage から取るキー(配信別 v2 + 共通 v1)。liveId が空なら共通だけ(従来どおり)。
+ *   受け身popup(応援プレビュー)と通常popupの代替読み込みは共通キーしか読んでいなかった。共通キーは
+ *   全配信の popup が書く(最後の書き手が勝つ)ため、2配信記録中は別配信が最後に書くと自配信の鏡が
+ *   「存在しない」状態になり、レーンが空/古いままだった。配信別キーを優先する。
+ * @param {unknown} liveId
+ * @returns {string[]}
+ */
+export function laneMirrorReadKeys(liveId) {
+  const k = laneMirrorKeyFor(liveId);
+  return k ? [k, KEY_LANE_MIRROR] : [KEY_LANE_MIRROR];
+}
+
+/**
+ * bag から鏡を選ぶ: 配信別(v2) > 共通(v1)。どちらも無い/不正なら null。
+ *   共通キーは別配信のことがある=呼び手が liveId 照合で弾く(配信別キーは自配信のものなので照合は素通し)。
+ * @param {Record<string, unknown>|null|undefined} bag chrome.storage.local.get の戻り
+ * @param {unknown} liveId
+ * @returns {any|null}
+ */
+export function pickLaneMirrorSnap(bag, liveId) {
+  if (!bag || typeof bag !== 'object') return null;
+  const per = laneMirrorKeyFor(liveId);
+  const cands = [per ? /** @type {any} */ (bag)[per] : null, /** @type {any} */ (bag)[KEY_LANE_MIRROR]];
+  for (const c of cands) if (c && typeof c === 'object') return c;
+  return null;
+}

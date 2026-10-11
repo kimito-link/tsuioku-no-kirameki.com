@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import {
   KEY_LANE_MIRROR,
   laneMirrorKeyFor,
+  laneMirrorReadKeys,
+  pickLaneMirrorSnap,
   laneReceiptKeyFor,
   liveIdFromLaneMirrorKey
 } from './laneMirrorKey.js';
@@ -63,5 +65,28 @@ describe('liveIdFromLaneMirrorKey(逆引き)', () => {
     expect(liveIdFromLaneMirrorKey(KEY_LANE_MIRROR)).toBe('');
     expect(liveIdFromLaneMirrorKey('nls_ctail_lv1')).toBe('');
     expect(liveIdFromLaneMirrorKey('')).toBe('');
+  });
+});
+
+describe('laneMirrorReadKeys / pickLaneMirrorSnap(受け身popup・代替読み込みが配信別の鏡を使う)', () => {
+  const A = 'lv111';
+  const kA = laneMirrorKeyFor(A);
+  const snapA = { liveId: A, link: [], capturedAt: 1 };
+  const snapB = { liveId: 'lv222', link: [], capturedAt: 2 };
+
+  it('読むキーは [配信別, 共通]。liveId が空なら共通だけ(従来どおり)', () => {
+    expect(laneMirrorReadKeys(A)).toEqual([kA, KEY_LANE_MIRROR]);
+    expect(laneMirrorReadKeys('')).toEqual([KEY_LANE_MIRROR]);
+  });
+  it('★共通キーが別配信に上書きされていても、配信別キーがあればそれを選ぶ', () => {
+    expect(pickLaneMirrorSnap({ [kA]: snapA, [KEY_LANE_MIRROR]: snapB }, A)).toBe(snapA);
+  });
+  it('配信別キーが無ければ共通キー(互換・移行)。呼び側が liveId 照合で弾く', () => {
+    expect(pickLaneMirrorSnap({ [KEY_LANE_MIRROR]: snapB }, A)).toBe(snapB);
+  });
+  it('どちらも無い/不正なら null', () => {
+    expect(pickLaneMirrorSnap({}, A)).toBeNull();
+    expect(pickLaneMirrorSnap(null, A)).toBeNull();
+    expect(pickLaneMirrorSnap({ [kA]: 'x', [KEY_LANE_MIRROR]: 3 }, A)).toBeNull();
   });
 });
