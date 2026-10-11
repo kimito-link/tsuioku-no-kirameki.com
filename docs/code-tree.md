@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 8 / 900 件
+## ⚠️ 役割コメントが無いソース 8 / 901 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `scripts/build.mjs`
@@ -717,14 +717,15 @@
   - `status-guard.js` — 状態速報ページ(status.html)の「何があっても開く」保険。
   - `status.html`
   - `venue.html`
-- 📁 **scripts/** (77)
+- 📁 **scripts/** (78)
   - 📁 **lib/** (2)
     - `instrument-core.mjs` — ★検査・計器の共通土台（キット同梱・依存ゼロ・純Node）。
     - `today-jst.mjs` — 運用日（JST）を返す唯一の正本。
-  - 📁 **perf-ab/** (5)
+  - 📁 **perf-ab/** (6)
     - `README.md`
     - `common.mjs` — perf-ab 共通部品: 拡張を読み込んだ Chromium の起動・後片付け・拡張プロセスの CPU/メモリ採取。
     - `cpu-timeline.mjs` — 拡張プロセス(--extension-process)の CPU%・メモリが、ページを開くたびにどう積み上がるかを時系列で見る。
+    - `growth.mjs` — 拡張プロセスのメモリが「何で」増えているかを時系列で見る(JS ヒープ / DOM ノード / リスナー / ドキュメント / OS 側メモリ)。
     - `make-before.mjs` — 「修正前」の拡張フォルダを作る(extension/ をコピーし、dist の bundle を git の指定リビジョンのものに差し替える)。
     - `profile-popup.mjs` — 視聴ページに埋め込まれたパネル(popup.html?inline=1)の【メインスレッド CPU プロファイル】を取る。
   - 📁 **xserver/** (2)

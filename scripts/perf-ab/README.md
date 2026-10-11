@@ -21,12 +21,29 @@ node scripts/perf-ab/make-before.mjs --ref master --dst C:/nls-ab/ext_before   #
 node scripts/perf-ab/profile-popup.mjs --lv lv351523930 --ext C:/nls-ab/ext_before   # 修正前
 node scripts/perf-ab/profile-popup.mjs --lv lv351523930                              # 修正後(extension/)
 
-# 3) ページを開くたびの CPU/メモリの積み上がり
+# 3) メモリが何で増えているか(JS ヒープ / DOM / リスナー / OS メモリの時系列)
+node scripts/perf-ab/growth.mjs --lv lv351523930 --minutes 3
+
+# 4) ページを開くたびの CPU/メモリの積み上がり
 node scripts/perf-ab/cpu-timeline.mjs --lv lv351523930 --side --status
 node scripts/perf-ab/cpu-timeline.mjs --lv lv351523930 --autoshow 0   # パネルを出さない場合(切り分け)
+node scripts/perf-ab/cpu-timeline.mjs --lv lv351523930 "--extra=--blink-settings=imagesEnabled=false"   # 画像を止めた場合(切り分け)
 ```
 
 比較する前に `npm run build` で `extension/dist` を最新にしておく(修正後=現在のビルド)。
+
+## ENTRY POINTS(誰が仕事を始めているか)
+`profile-popup.mjs` の最後に、スタックの一番下(入口)ごとの時間が出る。無名の入口は dist の「行:列」から関数の冒頭を読んで表示する。
+`(native only)` は JS を介さない処理(DOM/IPC/構造化複製など)。**関数単体の自分の時間が平らでも、入口で見ると偏りが分かる**。
+
+## 実機で熱いスレッドを名指しする(読み取りのみ)
+PowerShell で `GetThreadDescription`(kernel32)を P/Invoke すると、Chrome が付けたスレッド名(`CrRendererMain` / `Compositor` など)が読める。
+`Get-Process` の `Threads` の CPU 差分と組み合わせて「どのスレッドが何%か」を出す(`HRESULT` は **符号なし**で扱うこと。符号付きだと成功を失敗と読み違える)。
+2026-10-11 実機: 拡張プロセスの熱いスレッドは `CrRendererMain`(メインスレッド)88〜93%、メモリ 4.5GB。
+
+## 試して効果がなかったこと(同じことを繰り返さない)
+- 更新(`refresh`)を「処理時間に応じて間隔を空ける」スケジューラ(dutyFactor)に変える: 同じ配信での前後比較で稼働率が変わらなかった(`refresh` はもともと間引かれており、1回ごとが重いだけ)→ 取り消し。
+- 画像の読み込みを止める: CPU もメモリも変わらない → 画像は原因ではない。
 
 ## 読み方・注意
 - **BUSY%** が 100% 近い=メインスレッドが飽和。上位の関数がそのまま犯人候補。
