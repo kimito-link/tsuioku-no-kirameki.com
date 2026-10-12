@@ -39,6 +39,23 @@ export function parseArgs(argv = process.argv.slice(2)) {
  */
 export async function launchWithExtension({ extDir = path.join(REPO_ROOT, 'extension'), debugPort = 0, extraArgs = [] } = {}) {
   const userDataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'nls-perf-'));
+  // 実機と同じ量の保存データで測りたいとき: NLS_SEED_EXT_DIR=<実機の Chrome プロファイルのフォルダ(User Data 配下の Profile NN)>
+  //   chrome.storage.local と IndexedDB を【読むだけ】で一時プロファイルへ複製する(実機のファイルは変更しない・LOCK は除く)。
+  if (process.env.NLS_SEED_EXT_DIR) {
+    const id = 'ohifblceplfkfajfecaoaclmkiahfflm';
+    const copyDir = (from, to) => {
+      if (!fs.existsSync(from)) return;
+      fs.mkdirSync(to, { recursive: true });
+      for (const e of fs.readdirSync(from, { withFileTypes: true })) {
+        if (e.name === 'LOCK') continue;
+        if (e.isDirectory()) copyDir(path.join(from, e.name), path.join(to, e.name));
+        else { try { fs.copyFileSync(path.join(from, e.name), path.join(to, e.name)); } catch { /* 書き込み中のファイルは飛ばす */ } }
+      }
+    };
+    const src = process.env.NLS_SEED_EXT_DIR;
+    copyDir(path.join(src, 'Local Extension Settings', id), path.join(userDataDir, 'Default', 'Local Extension Settings', id));
+    copyDir(path.join(src, 'IndexedDB', `chrome-extension_${id}_0.indexeddb.leveldb`), path.join(userDataDir, 'Default', 'IndexedDB', `chrome-extension_${id}_0.indexeddb.leveldb`));
+  }
   const args = [
     `--disable-extensions-except=${extDir}`,
     `--load-extension=${extDir}`,
