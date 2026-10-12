@@ -829,7 +829,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (1921)
+- 📁 **src/** (1922)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1109,7 +1109,7 @@
         - `logo_funlink_white_RGB_link_black.png`
         - `logo_funlink_white_RGB_maru_black.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1685)
+  - 📁 **lib/** (1686)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -1315,6 +1315,7 @@
     - `charaLiveController.test.js`
     - `charaLiveFloatOnly.wiring.test.js`
     - `charaLiveStage.js` — 「キャラライブ」の描画層。charaLiveState.js が決めた状態を DOM に落とすだけ。
+    - `charaLiveStageHiddenCss.test.js`
     - `charaLiveState.js` — 「キャラライブ」= 画面に常駐する 3 キャラ(りんく/こん太/たぬ姉)が、ふわふわ浮遊しながら
     - `charaLiveState.test.js`
     - `cheerPalette.js` — 盛り上げワード（8888 / wwwww / 顔文字 等）のワンクリック挿入パレット。
