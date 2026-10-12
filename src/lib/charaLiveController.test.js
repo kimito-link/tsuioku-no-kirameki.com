@@ -12,7 +12,7 @@ import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 /** 時間と rAF を手で回すテスト用ハーネス(実時間に依存させない)。 */
-function makeHarness() {
+function makeHarness(extraDeps = {}) {
   let now = 0;
   /** @type {Array<() => void>} */
   let frames = [];
@@ -26,7 +26,8 @@ function makeHarness() {
     },
     cancelFrame: () => {},
     reducedMotion: false,
-    getHeatLevel: () => 0.3
+    getHeatLevel: () => 0.3,
+    ...extraDeps
   });
   return {
     live,
@@ -312,5 +313,61 @@ describe('★会場に覆われない(実機で踏んだ事故の固定)', () =>
     const block = charaStageBlock(charaLiveStageCss());
     expect(block).toContain('position: absolute');
     expect(block).not.toContain('position: fixed');
+  });
+});
+
+describe('★しゃべらない設定(talk:false)=浮かぶだけ(2026-10-12 ユーザー要望)', () => {
+  const visibleBubbles = (h) => h.live.root.querySelectorAll('.nlcl-chara__bubble:not([hidden])').length;
+  const visibleThinks = (h) => h.live.root.querySelectorAll('.nlcl-chara__think:not([hidden])').length;
+
+  it('★読み上げが鳴っても相槌の吹き出しを出さない・誰も is-speaking にならない', () => {
+    const h = makeHarness({ talk: false });
+    h.advance(0);
+    h.live.onCommentSpoken({ commentKey: 'no:1' });
+    h.advance(50);
+    expect(visibleBubbles(h)).toBe(0);
+    expect(h.live.root.querySelectorAll('.nlcl-chara.is-speaking')).toHaveLength(0);
+    h.live.destroy();
+  });
+
+  it('★配信者に話しかけられても返事の吹き出しを出さない', () => {
+    const h = makeHarness({ talk: false });
+    h.advance(0);
+    const who = h.live.onStreamerAddressed({ prompt: 'こん太、これ何?', answer: 'これだよ' });
+    h.advance(50);
+    expect(who).toBe('');
+    expect(visibleBubbles(h)).toBe(0);
+    h.live.destroy();
+  });
+
+  it('★AI が考え中でも「…」を出さない(考え込んだまま固まる事故も起きない)', () => {
+    const h = makeHarness({ talk: false });
+    h.advance(0);
+    const who = h.live.beginThinking({ prompt: 'こん太、これ何?' });
+    h.advance(50);
+    expect(who).toBe('');
+    expect(visibleThinks(h)).toBe(0);
+    expect(h.live.endThinking()).toEqual([]);
+    h.live.destroy();
+  });
+
+  it('★浮遊は続く(しゃべらなくても立ち絵が止まらない)', () => {
+    const h = makeHarness({ talk: false });
+    h.advance(0);
+    const before = [...h.live.root.querySelectorAll('.nlcl-chara')].map((c) => c.style.transform);
+    h.advance(700);
+    const after = [...h.live.root.querySelectorAll('.nlcl-chara')].map((c) => c.style.transform);
+    expect(after).not.toEqual(before);
+    expect(h.live.root.querySelectorAll('.nlcl-chara')).toHaveLength(3);
+    h.live.destroy();
+  });
+
+  it('★talk を指定しない既定は従来どおりしゃべる(他の呼び出し元を変えない)', () => {
+    const h = makeHarness();
+    h.advance(0);
+    h.live.onCommentSpoken({ commentKey: 'no:1' });
+    h.advance(50);
+    expect(visibleBubbles(h)).toBe(1);
+    h.live.destroy();
   });
 });
