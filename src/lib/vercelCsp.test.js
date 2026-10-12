@@ -20,6 +20,12 @@ describe('vercel.json の CSP', () => {
   it('★img-src は https: 全体を許す(外部CDNの配信サムネ・アイコンを塞がない)', () => {
     expect(directive('img-src')).toContain('https:');
   });
+  it('★img-src は blob: を許す(匿名の丸い顔は canvas.toBlob → blob: URL で <img> に出す。無いとウェブ版の /live-view で顔が壊れる)', () => {
+    expect(directive('img-src')).toContain('blob:');
+  });
+  it('img-src に data: も残す(SVG の即時表示の顔・従来の data URL を塞がない)', () => {
+    expect(directive('img-src')).toContain('data:');
+  });
   it('スクリプトは自サイトのみ(外部スクリプトは許さない)', () => {
     expect(directive('script-src')).not.toContain('https:');
     expect(directive('script-src')).not.toContain('*');

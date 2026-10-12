@@ -125,7 +125,9 @@ test.describe('HTML レポート イベント順位セクション（実拡張�
       const origCreate = URL.createObjectURL.bind(URL);
       URL.createObjectURL = (blob) => {
         try {
-          if (blob && typeof blob.text === 'function') {
+          // ★text/html の Blob だけ捕捉する。匿名アバターの PNG(canvas.toBlob)も createObjectURL を通るため、
+          //   型を見ないと「最後に作られた Blob」が画像になり、HTML レポートの本文を取り違える(2026-10-12 に実害)。
+          if (blob && typeof blob.text === 'function' && /html/i.test(String(blob.type || ''))) {
             blob.text().then((t) => {
               w.__capturedReportHtml = t;
             });
