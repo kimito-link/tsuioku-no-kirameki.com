@@ -804,7 +804,8 @@ import { appendViewerSelfLaneAggregate } from '../lib/viewerSelfLaneAggregate.js
 import {
   SESSION_COMMENT_CACHE_KEY,
   isSessionCommentCacheFresh,
-  buildSessionCommentCache
+  buildSessionCommentCache,
+  shouldPersistSessionCommentCache
 } from '../lib/sessionCommentCache.js';
 import { KEY_AI_SHARE_FAST_DIAG } from '../lib/aiShareFastDiagKey.js';
 import { KEY_AI_SHARE_POPUP_DIAG, buildAiSharePopupDiagRecord } from '../lib/aiSharePopupDiagKey.js';
@@ -5922,6 +5923,8 @@ let storyUserLaneLastRenderSig = '';
 let _laneDomSelfLast = null;
 /** ★v0.1.1284: 直近に publish した鏡の contentHash(=次の paint の指紋の内容アドレス)。 */
 let _lastPublishedLaneMirrorHash = '';
+/** 最後に chrome.storage.session へ全件配列を書いた記録(この文書の記憶・shouldPersistSessionCommentCache の入力)。 */
+let _sessionCommentPersisted = null;
 /** この文書(パネル)の書き手ID。同じ配信を複数のパネルが書くとき、鏡の「誰が焼いたか」を見分ける。 */
 const _laneMirrorWriterId = `w${Math.random().toString(36).slice(2, 10)}`;
 /** ★2026-08-08 計器: 鏡 publish の到達/見送りを数える。設計と読み方は lanePublishSkipDiag.js。 */
@@ -15402,7 +15405,11 @@ async function refresh() {
         ) {
           return;
         }
+        // 全件配列の複製(structured clone)は重い(実測: 読み込み1分後の重い時間帯の約3割)。再オープンで命中するのは
+        //   保存分が現在の80%以上のときだけなので、書き直すのは「足りなくなる前(約15%増)」だけにする。
+        if (!shouldPersistSessionCommentCache(_sessionCommentPersisted, lv, heavyArr.length, Date.now())) return;
         try {
+          _sessionCommentPersisted = { lv: String(lv || '').trim().toLowerCase(), len: heavyArr.length, at: Date.now() };
           void chrome.storage.session
             .set({
               [SESSION_COMMENT_CACHE_KEY]: buildSessionCommentCache(
@@ -15411,7 +15418,7 @@ async function refresh() {
                 heavyArr
               )
             })
-            .catch(() => {});
+            .catch(() => { _sessionCommentPersisted = null; }); // 書けなかったら次の機会に書き直す
         } catch {
           /* session 不可環境(古いChrome等)は無視=従来動作 */
         }

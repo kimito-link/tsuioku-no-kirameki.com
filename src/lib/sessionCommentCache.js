@@ -70,3 +70,49 @@ export function buildSessionCommentCache(lv, total, arr, nowMs) {
     arr: capped
   };
 }
+
+/**
+ * 書き直しの最短間隔[ms]。コメントが速い配信で、全件の複製を毎秒走らせない。
+ */
+export const SESSION_COMMENT_PERSIST_MIN_INTERVAL_MS = 30_000;
+
+/**
+ * 件数がこの倍率以上に増えたら書き直す。
+ *   再オープンで命中する条件は「保存分 ≥ 現在の件数の80%」(isSessionCommentCacheFresh)。
+ *   1/1.15 ≒ 87% なので、この倍率で書き直していれば保存分は常に命中条件(80%)を満たし続ける。
+ */
+export const SESSION_COMMENT_PERSIST_GROWTH_RATIO = 1.15;
+
+/**
+ * 全件配列を chrome.storage.session へ複製(structured clone)する必要があるか(純関数)。
+ *
+ * ■ 直す不具合(2026-10-12・perf-ab/profile-popup.mjs --settle 65 で実測)
+ *   視聴ページ内パネルは、読み込みの約1分後から占有率が約95%に張り付く。その中の約3割(20秒窓で約6秒)が、
+ *   heavy の全件読みのたびに全件配列を session へ書く処理だった(複製はメインスレッドのネイティブ処理)。
+ *   同じ配信・ほぼ同じ件数でも refresh のたびに書き直していたが、この保存が効く(再オープンで命中する)
+ *   のは保存分が現在の80%以上あるときだけで、書き直すべきなのは件数が増えて足りなくなるときだけ。
+ *
+ * ■ 判定
+ *   書く: 初回/別の配信/時計が戻った/入力が壊れている(判定できないときは従来どおり書く側に倒す)
+ *   書く: 最短間隔(30秒)を過ぎていて、件数が保存時の 1.15 倍以上に増えた
+ *   書かない: それ以外
+ *
+ * @param {{ lv?: unknown, len?: unknown, at?: unknown }|null|undefined} prev 最後に書いた記録(この文書の記憶)
+ * @param {string} lv 今の配信
+ * @param {number} arrLen 今書こうとしている配列の件数
+ * @param {number} nowMs
+ * @returns {boolean}
+ */
+export function shouldPersistSessionCommentCache(prev, lv, arrLen, nowMs) {
+  const want = String(lv || '').trim().toLowerCase();
+  if (!want || !prev || typeof prev !== 'object') return true;
+  if (prev.lv !== want) return true;
+  const len = Number(prev.len);
+  const at = Number(prev.at);
+  if (!Number.isFinite(len) || len <= 0 || !Number.isFinite(at)) return true;
+  if (nowMs < at) return true;
+  if (nowMs - at < SESSION_COMMENT_PERSIST_MIN_INTERVAL_MS) return false;
+  const n = Number(arrLen);
+  if (!Number.isFinite(n)) return true;
+  return n >= len * SESSION_COMMENT_PERSIST_GROWTH_RATIO;
+}
