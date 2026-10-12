@@ -24,10 +24,15 @@ import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { LINEUP } from './council-lineup.mjs';
 import { todayJst } from './lib/today-jst.mjs';
+import { resolveCouncilScoutDir } from './lib/council-scout-dir.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = join(__dirname, '..'); // パスはスクリプト位置基準（cwd非依存）
-const SCOUT_DIR = join(REPO_ROOT, 'council-scout');
+// ★置き場所は常に「本体のチェックアウト」に固定する（worktree から回しても本体を指す）。
+//   state.json は gitignore 対象で worktree には付いてこないため、worktree 側へ置くと
+//   毎回「初回実行」と誤判定し、連続失敗日数が 1 にリセットされて警告が出なくなる。
+//   理由と実測は lib/council-scout-dir.mjs のコメントが正本。
+const SCOUT_DIR = resolveCouncilScoutDir(REPO_ROOT);
 const BRIEFS_DIR = join(SCOUT_DIR, 'briefs');
 const STATE_PATH = join(SCOUT_DIR, 'state.json');
 const LATEST_PATH = join(SCOUT_DIR, 'LATEST.md');
