@@ -877,7 +877,7 @@
   - `src/extension/live-ranking-entry.js`
   - `tsuioku-no-kirameki/live/index.html`
   - `.github/workflows/live-ranking.yml`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 217</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 218</summary>
 
 - `app/app.js` — スマホ閲覧用 status Web 版。
 - `app/live-view.js` — global NL_BUILD_ID
@@ -904,6 +904,7 @@
 - `scripts/fix-src-images-mojibake.mjs` — Normalizes known mojibake paths under src/images (mirrored from kimito-link).
 - `scripts/install-local-sounds.mjs` — マイ効果音「手動取込」を不要にするローカル自動同梱スクリプト。
 - `scripts/layer-config.mjs` — ★どのリポでも使えるように「設定」を読む部分だけを切り出す。
+- `scripts/lib/council-scout-dir.mjs` — council-scout/ の置き場所を返す唯一の正本。
 - `scripts/lib/instrument-core.mjs` — ★検査・計器の共通土台（キット同梱・依存ゼロ・純Node）。
 - `scripts/lib/today-jst.mjs` — 運用日（JST）を返す唯一の正本。
 - `scripts/measure-flash-frames.mjs` — 「一瞬の黒」を【画面に出たピクセル】で測る。

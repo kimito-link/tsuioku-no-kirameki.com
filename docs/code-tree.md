@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 8 / 901 件
+## ⚠️ 役割コメントが無いソース 8 / 902 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `scripts/build.mjs`
@@ -174,8 +174,8 @@
   - `index.html`
   - `live-view.html`
   - `live-view.js` — global NL_BUILD_ID
-- 📁 **council-scout/** (24)
-  - 📁 **briefs/** (24)
+- 📁 **council-scout/** (25)
+  - 📁 **briefs/** (25)
     - `2026-07-16.md`
     - `2026-07-17.md`
     - `2026-07-20.md`
@@ -200,6 +200,7 @@
     - `2026-09-30.md`
     - `2026-10-01.md`
     - `2026-10-06.md`
+    - `2026-10-12.md`
 - 📁 **docs/** (348)
   - 📁 **article-assets/** (87)
     - 📁 **venue-frames/** (12)
@@ -717,8 +718,10 @@
   - `status-guard.js` — 状態速報ページ(status.html)の「何があっても開く」保険。
   - `status.html`
   - `venue.html`
-- 📁 **scripts/** (78)
-  - 📁 **lib/** (2)
+- 📁 **scripts/** (80)
+  - 📁 **lib/** (4)
+    - `council-scout-dir.mjs` — council-scout/ の置き場所を返す唯一の正本。
+    - `council-scout-dir.test.js`
     - `instrument-core.mjs` — ★検査・計器の共通土台（キット同梱・依存ゼロ・純Node）。
     - `today-jst.mjs` — 運用日（JST）を返す唯一の正本。
   - 📁 **perf-ab/** (6)
