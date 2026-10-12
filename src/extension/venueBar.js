@@ -6714,7 +6714,7 @@ export function mountVenueBarButton(options = {}) {
   });
   window.addEventListener(
     'pagehide',
-    () => {
+    (ev) => {
       stopAggregation();
       stopSpeechPolling();
       stopCrowdMotion();
@@ -6730,9 +6730,39 @@ export function mountVenueBarButton(options = {}) {
       try {
         document.documentElement.classList.remove('nlsb-venue-open');
       } catch { /* no-op */ }
-    },
-    { once: true }
+      /*
+       * ★2026-10-12: bfcache に保存される離脱(persisted)では、内部状態(open / stage の is-open)も閉じる。
+       *   上の掃除は html のクラスだけで、復帰時は mount が再実行されない(同じ JS 状態のまま戻る)。
+       *   開いたまま離脱 → 復帰すると「stage は開いたまま・html の印は無し・集計は停止」になり、
+       *   ①POPが会場の裏で見える/会場が固まる(出たり消えたり)。閉じた状態に揃えて戻す。
+       *   once を外した理由: 復帰後にもう一度離脱したときも掃除を走らせるため(中身は冪等)。
+       */
+      if (ev && /** @type {PageTransitionEvent} */ (ev).persisted && open) {
+        try { setOpen(false, false); } catch { /* no-op */ }
+      }
+    }
   );
+
+  /*
+   * ★2026-10-12: 全画面でも会場を出す。
+   *   会場の根(root)は <html> 直下にあるため、プレイヤーを全画面にすると全画面要素(top layer)に覆われ、
+   *   会場のボタンもステージも描かれない/押せない(実測: 全画面中 elementFromPoint がボタンに当たらない)。
+   *   解除すると戻るので「会場が出たり消えたりする」ように見える。
+   *   → 全画面要素の【中】へ root を移し、解除したら <html> 直下へ戻す。<video> は子を描けないので除外。
+   *   移すのは root だけ(中の DOM・状態・タイマーはそのまま)。標準の Fullscreen API だけを使う。
+   */
+  const relocateRootForFullscreen = () => {
+    try {
+      const fs = document.fullscreenElement;
+      const home = document.documentElement;
+      if (fs) {
+        if (fs !== root && !(fs instanceof HTMLVideoElement) && !fs.contains(root)) fs.appendChild(root);
+      } else if (root.parentNode !== home) {
+        home.appendChild(root); // 解除後(全画面要素が消えていても戻す)
+      }
+    } catch { /* 会場を止めない */ }
+  };
+  document.addEventListener('fullscreenchange', relocateRootForFullscreen);
 
   // v0.1.773 長時間ラグ対策(会議): タブが裏に回ると setTimeout/合成がスロットリングされ、
   //   復帰時に古い読み上げ backlog が溜まったまま=「今」から大きく遅れて喋り出す。可視復帰時に
