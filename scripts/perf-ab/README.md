@@ -28,7 +28,13 @@ node scripts/perf-ab/growth.mjs --lv lv351523930 --minutes 3
 node scripts/perf-ab/cpu-timeline.mjs --lv lv351523930 --side --status
 node scripts/perf-ab/cpu-timeline.mjs --lv lv351523930 --autoshow 0   # パネルを出さない場合(切り分け)
 node scripts/perf-ab/cpu-timeline.mjs --lv lv351523930 "--extra=--blink-settings=imagesEnabled=false"   # 画像を止めた場合(切り分け)
+
+# 5) 会場(venue.html)が POP の鏡の投影になっているか(時系列・2026-10-12 導入)
+node scripts/perf-ab/parity.mjs --lv lv351531643 --collect 30 --at 4,8,12,16,20,25,30,40,50,70
 ```
+
+列の読み方: `会場-鏡` が 0 でなければ会場が鏡を映していない / `鏡-POP` が 0 でなければ鏡が POP の画面と別物 / 鏡KB が 512KB 近辺なら容量の安全弁(件数半減)を疑う。
+実績(2026-10-12): 鏡が POP の画面(1092人)より小さい(154人)瞬間を確認。POP は縮小ガードで画面を保つが、鏡にはガード前の小さい候補集合が出ていた(原因B)。
 
 比較する前に `npm run build` で `extension/dist` を最新にしておく(修正後=現在のビルド)。
 

@@ -272,7 +272,7 @@ export function laneMirrorCapFromBuckets(buckets) {
  * storage 書き込み用の鏡スナップショット。容量超過時は cap を半減して作り直す(status を重くしない)。
  * @param {{ liveId?: unknown, buckets?: Record<string, unknown[]>, pickedLength?: unknown,
  *   totalCandidates?: unknown, domSelf?: unknown }} input
- * @param {{ cap?: number, nowMs?: number, writer?: string }} [opts]
+ * @param {{ cap?: number, nowMs?: number, writer?: string, writerId?: string }} [opts]
  *   writer: この鏡を焼いた主体('popup' 既定)。★2026-08-08 追加。将来 content 側の
  *   書き手を足したとき「最後に書いたのは誰か」を読み手が見分けられるようにするための印。
  * @returns {LaneMirrorSnapshot}
@@ -302,6 +302,8 @@ export function buildLaneMirrorSnapshot(input, opts = {}) {
       //   ★laneMirrorContract.js:80 の「唯一の書き手」不変条件は現時点では維持している。
       //     将来 content 側の書き手を足すなら、この値で見分けられるようにしておく。
       writer: String(opts?.writer || 'popup'),
+      // 2026-10-12: 同じ配信を複数パネルが書くとき「誰が焼いたか」を見分ける印(laneMirrorWriterYield.js)。contentHash には入れない。
+      writerId: String(opts?.writerId || ''),
       // v0.1.1137(lanescene-structural-review MVP): revisionはcapturedAt(壁時計)をそのまま使う
       //   (新規カウンタを作らない)。
       // 会場一致gift/ad根治(2026-07-14 Patch 2b): contentHashは復元正準形(読み手B-1適用後)で

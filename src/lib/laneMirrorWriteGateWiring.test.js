@@ -34,7 +34,7 @@ describe('popup は配信別の鏡の書き込みにゲートを通す', () => {
   });
 
   it('★publishLaneMirrorPerLive の第4引数にゲートを渡している(行頭インデントまで固定)', () => {
-    expect(publishBody).toMatch(/\n {4}\}, _laneMirrorWriteGate\);\n/);
+    expect(publishBody).toMatch(/\n {4}\}, _laneMirrorWriteGate, \{\n/); // 第5引数は guard(laneMirrorWriterYieldWiring.wiring.test.js が中身を固定)
   });
 
   it('ゲートはモジュールで1つだけ作る(呼び出しごとに作ると毎回「最初の1回」になって抑制が効かない)', () => {

@@ -562,3 +562,37 @@ describe('鏡の pulse に熱い人(heat)も載る(v0.1.1566)', () => {
     expect(r.link[1].pulse).toEqual({ giftDelta: 500, giftTier: 'large', heat: 7, heatTier: 'large' });
   });
 });
+
+describe('writerId(複数パネルが鏡を取り合うときの「誰が焼いたか」・laneMirrorWriterYield)', () => {
+  const buckets = { link: [{ displaySrc: 'x', title: 't', entry: { userId: '1' } }] };
+  it('opts.writerId が鏡に載る(載らないと譲り合いが静かに無効になる)', () => {
+    const snap = buildLaneMirrorSnapshot({ liveId: 'lv1', buckets }, { cap: 5, nowMs: 1, writerId: 'wabc' });
+    expect(snap.writerId).toBe('wabc');
+  });
+  it('writerId が違っても contentHash は変わらない(会場の鍵・一致判定に混ぜない)', () => {
+    const a = buildLaneMirrorSnapshot({ liveId: 'lv1', buckets }, { cap: 5, nowMs: 1, writerId: 'wa' });
+    const b = buildLaneMirrorSnapshot({ liveId: 'lv1', buckets }, { cap: 5, nowMs: 1, writerId: 'wb' });
+    expect(a.contentHash).toBe(b.contentHash);
+  });
+  it('writerId を渡さない旧呼び出しは空文字(譲り判定は「旧版の鏡」として扱い譲らない)', () => {
+    const snap = buildLaneMirrorSnapshot({ liveId: 'lv1', buckets }, { cap: 5, nowMs: 1 });
+    expect(snap.writerId).toBe('');
+  });
+});
+
+describe('writerId(複数パネルが鏡を取り合うときの「誰が焼いたか」・laneMirrorWriterYield)', () => {
+  const buckets = { link: [{ displaySrc: 'x', title: 't', entry: { userId: '1' } }] };
+  it('opts.writerId が鏡に載る(載らないと譲り合いが静かに無効になる)', () => {
+    const snap = buildLaneMirrorSnapshot({ liveId: 'lv1', buckets }, { cap: 5, nowMs: 1, writerId: 'wabc' });
+    expect(snap.writerId).toBe('wabc');
+  });
+  it('writerId が違っても contentHash は変わらない(会場の鍵・一致判定に混ぜない)', () => {
+    const a = buildLaneMirrorSnapshot({ liveId: 'lv1', buckets }, { cap: 5, nowMs: 1, writerId: 'wa' });
+    const b = buildLaneMirrorSnapshot({ liveId: 'lv1', buckets }, { cap: 5, nowMs: 1, writerId: 'wb' });
+    expect(a.contentHash).toBe(b.contentHash);
+  });
+  it('writerId を渡さない旧呼び出しは空文字(譲り判定は「旧版の鏡」として扱い譲らない)', () => {
+    const snap = buildLaneMirrorSnapshot({ liveId: 'lv1', buckets }, { cap: 5, nowMs: 1 });
+    expect(snap.writerId).toBe('');
+  });
+});
