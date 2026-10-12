@@ -1681,5 +1681,19 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
     version: '0.1.1593', metric: 'cross-checked-claims', value: 20,
     source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
     note: '★直近30日窓のスライドによる自然減(v0.1.1562/1577〜1587 の note と同じ理由)。今回の根拠は、CPU プロファイルによる前後比較(同じ配信・同じ手順で、修正前は10秒の窓のうち暇が0.15秒/bestNicknameFromEntries が自分の時間 20.1秒、修正後は暇 8.1秒)と、ランダム1500ケースでの旧実装との出力同一性テスト、変異テスト4種(キーのtrimを外す・並べ替えを逆にする・束ねる順序を崩す・総当たりに戻す)で赤を確認して復元した別の手段。'
+  }),
+  Object.freeze({
+    version: '0.1.1594', metric: 'bundle-kb', value: 1399,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '★前版 1399KB → 1399KB(±0): canvas の書き出し関数(約15行)と更新履歴1版ぶん。過去最良1360(@0.1.1454)との差分の内訳は v0.1.1471/1537/1560/1562/1584 の note に記録済み。'
+  }),
+  Object.freeze({
+    version: '0.1.1594', metric: 'gate-selftest', value: 4,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1594', metric: 'cross-checked-claims', value: 20,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: '★直近30日窓のスライドによる自然減(v0.1.1562/1577〜1587 の note と同じ理由)。今回の根拠は、CPU プロファイルの前後比較(同じ配信・同じ手順・続けて2回: 起動の主スレッド総時間 9.8〜11.3秒 → 6.5〜6.7秒、toDataURL 3.1〜3.8秒が消えた)と、振る舞いテスト(toBlob を使う・null や非対応では toDataURL に戻る)、変異テスト4種(toBlob を使わない・null のフォールバックを外す・直書きに戻す・createObjectURL の有無を見ない)で赤を確認して復元した別の手段。'
   })
 ]);
