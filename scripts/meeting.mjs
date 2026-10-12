@@ -402,16 +402,36 @@ const ANTHRO = process.env.ANTHROPIC_API_KEY;
 const ANTHRO_MODEL = process.env.COUNCIL_CLAUDE_MODEL || 'claude-opus-4-8';
 if (ANTHRO) push(`anthropic/${ANTHRO_MODEL}`, 'cloud', (p, s) => anthropicChat(ANTHRO_MODEL, p, s));
 // ローカル(オフライン保険・別頭脳・無料無制限)。MEETING_LOCAL_MODELS=csv で上書き可。
+// ※ glm-5.2:cloud は Ollama サブスク必須(無料は subscription エラー)のため不採用。
+// 2026-06-24 棚卸し: gemma4:31b(19GB/最重量・統括は latest+Opus で代替) を削除。
+// 2026-07-03 棚卸し: hermes3:8b(役割未定のまま無価値・fastはクラウドで充足) を削除。
+//
+// ★★2026-10-12 全面入れ替え（6体中5体が「幽霊」だった実損の修正）:
+//  旧: gpt-oss:20b / qwen3.5:9b / qwen3:14b / deepseek-r1:14b / gemma4:latest / qwen2.5-coder:14b
+//  このうち**実在したのは qwen2.5-coder:14b だけ**で、残り5体は未インストール＝毎会議
+//  `model not found` で落ちていた（09-30 に qwen3.5:9b の roleOf 判定行だけ消して、
+//  **呼ぶ側のこのリストを直し忘れていた**。穴の片側しか塞いでいなかった）。
+//
+//  ★選定基準は「12GB(RTX 4070 Ti)に収まるか」＝**100% GPU で動くか**。
+//   実測(2026-10-12・同一プロンプト・他モデルを停止してVRAMを空けてから計測):
+//     wwhite/whiterabbitneo-v3-7b:q4_k_m …  7.5秒 / **100% GPU** / 5.7GB
+//     qwen2.5-coder-14b-8k:latest        …  9.1秒 / **100% GPU** / 9.5GB
+//     qwen2.5:14b                        … 26.6秒 / 81% GPU(CPUはみ出し)
+//     qwen2.5-coder:14b (旧採用)          … 25.8秒 / 81% GPU ← **8k版と同じ中身で3倍遅い**
+//     qwen2.5-coder-32b-8k               … 67秒   / 48% GPU
+//     qwen3.6-35b-a3b-8k                 … 185秒  / 42% GPU
+//     qwen3.8:27b                        … **300秒でタイムアウト** / 42% GPU
+//   ＝**VRAMからはみ出した瞬間に実用外**。`-8k` 付きは文脈長を絞ってこのカードに
+//   収めるための版で、同じ14bでも 25.8秒→9.1秒 と約3倍速い。**32k版を選ぶ理由は無い**。
+//
+//  ★役割は roleOf が自動で付ける（判定行の追加は不要・実測で確認）:
+//     coder-14b-8k → implement / whiterabbitneo-7b → generalist
+//  ★ローカルは「オフライン保険・無料無制限」であって主力ではない。クラウド18体で会議は
+//   成立するので、**速い2体だけ**置く（遅い大物を足すと会議全体が待たされるだけ）。
+//  ★モデルを消したら、このリストも直すこと——とは言え**直し忘れても自動で外れる**ように
+//   verifyLiveModels() が /api/tags と突き合わせるようにした（2026-10-12・同コミット）。
 const LOCAL_DEFAULT = [
-  'gpt-oss:20b', 'qwen3.5:9b', 'qwen3:14b', 'deepseek-r1:14b',
-  // gemma4:latest(8B) が「統括(lead)」のローカル担当。最終的な統括はチャットの Claude(Opus)が
-  // 司令塔として担うため、ローカルに最重量の統括(旧 gemma4:31b≒19GB/weight9)は置かない。
-  // 2026-06-22 会議ハーネスで採否を合議し、3視点一致＋実機応答確認の上で追加。
-  // ※ glm-5.2:cloud は Ollama サブスク必須(無料は subscription エラー)のため不採用。
-  // 2026-06-24 棚卸し: gemma4:31b(19GB/最重量・統括は latest+Opus で代替) と
-  //   qwen2.5:14b(発散は qwen3/qwen3.5 の新版で代替・2ヶ月未使用) を削除し計28GB回収。
-  // 2026-07-03 棚卸し: hermes3:8b(役割未定のまま無価値・fastはクラウドで充足) を削除。
-  'gemma4:latest', 'qwen2.5-coder:14b',
+  'qwen2.5-coder-14b-8k:latest', 'wwhite/whiterabbitneo-v3-7b:q4_k_m',
 ];
 const localModels = (process.env.MEETING_LOCAL_MODELS || LOCAL_DEFAULT.join(','))
   .split(',').map((s) => s.trim()).filter(Boolean);
@@ -455,12 +475,32 @@ async function fetchLiveModelIds(provider) {
 //   groq/gemini: null(検証不能)=素通し・除外しない / Set(検証可能)=一覧に無ければ除外。
 //   ollama:      到達不能=Ollamaが起動していない=ローカル全メンバーを丸ごと除外すべき状況。
 // そのため fetchLiveModelIds の null 分岐を流用せず、ollama 専用の生死フラグを別に持つ。
-/** Ollama の /api/tags に2秒timeoutで疎通確認する。生きていれば true。 */
-async function isOllamaAlive() {
+/**
+ * Ollama の /api/tags に2秒timeoutで疎通確認し、**実在モデル名の集合**も返す。
+ *
+ * ★2026-10-12 改修（幽霊メンバーを機械で落とすため）:
+ *  従来は `return r.ok` で**生死だけ**を見て、応答の中身（インストール済み一覧）を捨てていた。
+ *  そのため「Ollamaは起動しているが、そのモデルは消している」という状態を検出できず、
+ *  **存在しないモデルを毎会議召集し続けていた**（2026-10-12 の実会議で6体中5体が該当）。
+ *  /api/tags は元から一覧を返しているので、捨てずに使う＝新しい通信は増えない。
+ *  これで「名簿に書いたモデルを後で消した」場合も、次の会議で自動的に外れる。
+ * @returns {Promise<{alive: boolean, names: Set<string>|null}>}
+ *   alive=false は Ollama 自体が落ちている（ローカル勢を丸ごと除外すべき状況）。
+ *   names=null は一覧が読めなかった場合＝**個別判定はしない**（生きている前提で素通し）。
+ */
+async function fetchOllamaStatus() {
   try {
     const r = await fetch(`${OLLAMA}/api/tags`, { signal: AbortSignal.timeout(2000) });
-    return r.ok;
-  } catch { return false; }
+    if (!r.ok) return { alive: false, names: null };
+    try {
+      const j = await r.json();
+      const names = new Set((j?.models || []).map((m) => String(m?.name || '')).filter(Boolean));
+      // 一覧が空なら「読めなかった」扱いにする（0件の可能性もあるが、誤って全除外する方が有害）。
+      return { alive: true, names: names.size ? names : null };
+    } catch {
+      return { alive: true, names: null }; // 疎通はしたが本文が壊れている→生きている扱い
+    }
+  } catch { return { alive: false, names: null }; }
 }
 /** allMembers から、live 一覧に無い(=幻覚/廃止)クラウドメンバーを警告除去する。 */
 async function verifyLiveModels() {
@@ -468,10 +508,11 @@ async function verifyLiveModels() {
   const providers = [...new Set(allMembers.map(m => m.provider).filter(Boolean).filter(p => p !== 'ollama'))];
   const live = new Map();
   const hasOllamaMembers = allMembers.some(m => m.provider === 'ollama');
-  const [, ollamaAlive] = await Promise.all([
+  const [, ollamaStatus] = await Promise.all([
     Promise.all(providers.map(async p => { live.set(p, await fetchLiveModelIds(p)); })),
-    hasOllamaMembers ? isOllamaAlive() : Promise.resolve(true),
+    hasOllamaMembers ? fetchOllamaStatus() : Promise.resolve({ alive: true, names: null }),
   ]);
+  const ollamaAlive = ollamaStatus.alive;
   let removed = 0;
   if (hasOllamaMembers && !ollamaAlive) {
     const before = allMembers.length;
@@ -482,17 +523,26 @@ async function verifyLiveModels() {
     removed += droppedCount;
     console.error(`[Ollama生死] http://127.0.0.1:11434 に到達不能 → local ${droppedCount}体を除外（クラウドのみで縮退運用）`);
   }
+  // Ollama が生きていて一覧も読めたなら、**個々のモデルの実在**を下のループに判定させる。
+  // ここで live に積むだけでクラウドと同じ経路に乗る（判定ロジックを増やさない＝2箇所目を書かない）。
+  // names=null（一覧が読めない/空）のときは積まない＝従来どおり素通し。
+  if (hasOllamaMembers && ollamaAlive && ollamaStatus.names) live.set('ollama', ollamaStatus.names);
   for (let i = allMembers.length - 1; i >= 0; i--) {
     const m = allMembers[i];
     const set = m.provider && live.get(m.provider);
     if (!set) continue; // 検証不能 or 対象外 → 残す
     if (m.rawId && !set.has(m.rawId)) {
-      console.error(`[実在チェック] ${m.label}（${m.rawId}）は ${m.provider} のライブ一覧に無い→除外（幻覚/廃止の可能性）`);
+      const why = m.provider === 'ollama'
+        ? '未インストール→除外（`ollama pull` するか LOCAL_DEFAULT から外す）'
+        : '除外（幻覚/廃止の可能性）';
+      console.error(`[実在チェック] ${m.label}（${m.rawId}）は ${m.provider} のライブ一覧に無い→${why}`);
       allMembers.splice(i, 1);
       removed++;
     }
   }
-  const okProviders = providers.filter(p => live.get(p));
+  // ollama は providers から除外してあるので、照合できたときだけ表示に足す
+  // （「何を照合したか」が出ないと、検査が動いたのか判らない＝沈黙する検査になる）。
+  const okProviders = [...providers.filter(p => live.get(p)), ...(live.get('ollama') ? ['ollama'] : [])];
   if (okProviders.length) {
     console.error(`[実在チェック] ${okProviders.join('/')} を照合。${removed ? removed + '体を除外' : '全メンバー実在OK'}`);
   }
