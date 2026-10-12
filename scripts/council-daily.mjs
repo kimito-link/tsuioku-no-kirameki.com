@@ -35,8 +35,14 @@ import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { execFileSync } from 'node:child_process';
 import { todayJst } from './lib/today-jst.mjs';
+import { resolveCouncilScoutDir } from './lib/council-scout-dir.mjs';
 
 const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
+// ★日報を探す場所は scout-models.mjs が書く場所と必ず同じ解決関数を通す。
+//   ここを REPO_ROOT 基準のままにすると、worktree で回したとき
+//   scout は本体へ書き・daily は worktree を見る、という食い違いになり
+//   「日報が見つからない」の偽の赤が出る（2026-09-26 の UTC/JST ズレと同じ形）。
+const SCOUT_BRIEFS_DIR = join(resolveCouncilScoutDir(REPO_ROOT), 'briefs');
 const DRY = process.argv.includes('--dry-run');
 
 // ★2026-09-26 修正（毎日必ず再発する時刻依存バグ）:
@@ -134,11 +140,11 @@ if (!judgments.length) {
       });
       briefPath = '';
       // 生成物の実在から日報を特定する（出力の書式に依存しない方が壊れにくい）
-      const todayBrief = join(REPO_ROOT, 'council-scout/briefs', `${today}.md`);
+      const todayBrief = join(SCOUT_BRIEFS_DIR, `${today}.md`);
       if (existsSync(todayBrief)) briefPath = todayBrief;
       else {
         const m = String(r || '').match(/briefs[/\\]([\d-]+\.md)/);
-        if (m) briefPath = join(REPO_ROOT, 'council-scout/briefs', m[1]);
+        if (m) briefPath = join(SCOUT_BRIEFS_DIR, m[1]);
       }
       if (!briefPath) {
         judgments.push('scoutは終了したが日報が見つからない（生成に失敗した可能性）。council-scout/briefs/ を確認すること。');

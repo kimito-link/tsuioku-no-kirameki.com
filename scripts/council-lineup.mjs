@@ -371,7 +371,24 @@ export const LINEUP = [
   //   将来 lead 判定になる別系譜の無料モデルが出たら、そちらへ移して系譜リスクを解消してよい。
   //  ★`-fin`（金融特化）→`-sante`（医療特化）とドメインが変わるが、会議の統括役は
   //   汎用の統合能力を使うだけなのでドメイン特化の差は実測の本文で問題にならなかった。
-  { label: 'openrouter/ling-3.0-flash', provider: 'openrouter', rawId: 'inclusionai/ling-3.0-flash-sante:free', apiModel: 'inclusionai/ling-3.0-flash-sante:free', opts: {}, requires: ['O'] },
+  // ★★★★2026-10-12 撤去（`-sante:free` も有料化。上の行で予告した「inclusionAI が
+  //  無料枠を畳む日」が**11日後に来た**。同系譜へ逃げる延命は1回で尽きた）:
+  //  実測（OpenRouter カタログ 458件・:free 15件を全件確認）:
+  //    inclusionai/ling-3.0-flash-sante      … **存在する（:free 無し＝有料版）**
+  //    inclusionai/ling-3.0-flash-sante:free … **消滅**
+  //   ＝429の容量枯渇ではなく課金要求＝**死**（撤去条件(c)と同型・自力回復しない）。
+  //  ★後継は**今回も居ない**（:free 15件の roleOf を全件実測した結果、lead を返すのは
+  //   `nvidia/nemotron-3-ultra-550b-a55b:free` だけ＝**既に上の2行で座っている**）。
+  //   そのため席を空けたまま撤去する（埋められない席を埋めたふりをしない）。
+  //  ★撤去してよいと判断した根拠＝**lead の頭脳は2系譜のまま維持される**:
+  //   nemotron（NVIDIA・2経路＝経路の冗長化）＋ magistral-medium（Mistral・別系譜）。
+  //   10-01 のコメントは「magistral は429で沈んだまま」としていたが、**それは死ではない**。
+  //   同一キーで `codestral-latest` が **200/414ms** を返す（2026-10-12 実測）＝キーは健全で、
+  //   429 はモデル単位の容量上限。恒久ルール「429は容量枯渇＝撤去理由にならない」のとおり、
+  //   magistral は別系譜の lead として生きている（容量が戻れば発言する）。
+  //  ★再採用の条件: roleOf が lead を返す**別系譜**の `:free` が現れたらこの席に入れる
+  //   （同系譜への逃げは今回で2回死んだので繰り返さない）。inclusionAI が `:free` を
+  //   復活させた場合は council-scout が「新着候補」で拾う。
 
   // 2026-07-31 追加: SambaNova Cloud（新規プロバイダ）。Free Tierは支払い方法未登録時に
   // 自動適用されカード登録不要（docs.sambanova.ai/docs/en/models/rate-limitsで確認済み）。
