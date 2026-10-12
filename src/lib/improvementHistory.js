@@ -1695,5 +1695,19 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
     version: '0.1.1594', metric: 'cross-checked-claims', value: 20,
     source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
     note: '★直近30日窓のスライドによる自然減(v0.1.1562/1577〜1587 の note と同じ理由)。今回の根拠は、CPU プロファイルの前後比較(同じ配信・同じ手順・続けて2回: 起動の主スレッド総時間 9.8〜11.3秒 → 6.5〜6.7秒、toDataURL 3.1〜3.8秒が消えた)と、振る舞いテスト(toBlob を使う・null や非対応では toDataURL に戻る)、変異テスト4種(toBlob を使わない・null のフォールバックを外す・直書きに戻す・createObjectURL の有無を見ない)で赤を確認して復元した別の手段。'
+  }),
+  Object.freeze({
+    version: '0.1.1595', metric: 'bundle-kb', value: 1399,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '★前版 1399KB → 1399KB(±0): 設定スイッチ(約10行)と更新履歴1版ぶん。過去最良1360(@0.1.1454)との差分の内訳は v0.1.1471/1537/1560/1562/1584 の note に記録済み。'
+  }),
+  Object.freeze({
+    version: '0.1.1595', metric: 'gate-selftest', value: 4,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1595', metric: 'cross-checked-claims', value: 22,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: '★直近30日窓のスライドによる自然減(v0.1.1562/1577〜1587 の note と同じ理由)。今回の根拠は、ユーザー要望(浮かぶだけ)とコードの確認(キャラライブの吹き出し=.nlcl-chara__bubble と考え中の…=.nlcl-chara__think が会場の内容に被る)と、振る舞いテスト5件+配線2件、変異テスト5種(相槌・考え中・返事のガードを外す・既定を false にする・会場が talk:false を渡さない)で赤を確認して復元した別の手段。'
   })
 ]);
