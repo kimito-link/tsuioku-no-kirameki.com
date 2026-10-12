@@ -6460,7 +6460,10 @@ export function mountVenueBarButton(options = {}) {
     //     ここで採用すると別配信の鏡で上書きしてしまう(単一グローバルキーの害)。
     const _perLiveKey = laneMirrorKeyFor(liveId);
     const perLiveChange = _perLiveKey ? changes[_perLiveKey] : null;
-    const mirrorChange = perLiveChange || changes[KEY_LANE_MIRROR];
+    // 配信別キー(v2)が使える間は旧キーの変化を【採用しない】(2026-10-12): 旧キーは複数パネルの書き手が無条件に上書きし合う
+    //   (v2 は書く直前の確認で小さい鏡が譲る=laneMirrorWriterYield.js)。旧キーの小さい鏡を採ると会場が大小を往復する。
+    //   liveId が取れず v2 キーを作れないときだけ旧キー(従来どおり)。
+    const mirrorChange = _perLiveKey ? perLiveChange : changes[KEY_LANE_MIRROR];
     /*
      * ★v0.1.1317: 会場が鏡を「受け取れているか」を経路ごとに数える(会場が完全一致しない件)。
      *

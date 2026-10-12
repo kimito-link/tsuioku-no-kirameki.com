@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "mode": "default",
-  "fingerprint": "3462f22b9cf8609b80b70f277a3733fedb374480b27ef39e72c082f695923611",
+  "fingerprint": "cff66d86dfa151ca2f073dabdad7ab9ecac9b6f9a9d99209ed149fcee91d5e02",
   "inputs": [
     "app/app.js",
     "app/live-view.js",
@@ -790,14 +790,14 @@
   "outputs": {
     "extension/dist/page-intercept.js": "5ccd2cd66f9caeb45060a68388f166cc0c55088e6fe47509075aecf66e6a7afa",
     "extension/dist/backfill-sw.js": "8ac07fda5d4e23bc4bee1167c0ff6beb1c93e37f9cd4a8f6319df30c280eb1d7",
-    "extension/dist/content.js": "5fe60c65076ea4a1cbf0792eb35f46f554f4ed6cdca29345c772fe4503e96c8d",
+    "extension/dist/content.js": "5bbd76d6ae814456382dd2cc8d84fd4fa45e7f832307d4b7e91c43ee0409ed47",
     "extension/dist/popup.js": "b5f45f22781e379ae903a45ae6e9cf32b29eb43ea649e1dc0bbcfacf10ad65ab",
     "extension/dist/offscreen.js": "ccb841a778ccf1f12d830a4bf8f3fe9ac5db3c7cc4dac536f6be33c6b95c0223",
     "extension/dist/status.js": "a9278593c9f979f2d2a423952a015b463154a20d49af3b9b62c0117ac4cc690a",
     "extension/dist/live-view.js": "c50e014feaad0a45e012e5ea561b71a10234665e79bae170fcf611b47e69700e",
     "extension/dist/marketing-export.js": "e12c2de446ccb2155fa3ea291090f43fbde48450cbe51d04e2927b101acca283",
     "extension/dist/comeview.js": "36a6367299092918c663260202e257b300bef92cfbcbb618058e7a62b390b10e",
-    "extension/dist/venue.js": "a393730c0082ee826f9d7a291ac6808782d66e5495e350131c5c3e6317b0ca2d",
+    "extension/dist/venue.js": "819cb4e1c8a0c29147fa1857d3413e258e7779c7b4ea847af3dbaed5dc90b295",
     "extension/dist/sidepanel.js": "bf4d08c2b684050e964377f86df8efe53ec6a02a4fddd66d31127cce32445038",
     "extension/dist/cloak-failsafe.js": "8baabc8a7ee4ab9f0e6fd66c6b917c4832bade10efa9917cf50bf40ca2588207",
     "app/dist/app.js": "9af7800bc0527fbcc239eba0a06d8c02324f0c4d3b7ff0c740bacd9a307a016e",
