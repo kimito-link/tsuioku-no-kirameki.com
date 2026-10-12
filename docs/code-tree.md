@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 8 / 904 件
+## ⚠️ 役割コメントが無いソース 8 / 905 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `scripts/build.mjs`
@@ -829,7 +829,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (1916)
+- 📁 **src/** (1920)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1109,7 +1109,7 @@
         - `logo_funlink_white_RGB_link_black.png`
         - `logo_funlink_white_RGB_maru_black.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1680)
+  - 📁 **lib/** (1684)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -1825,6 +1825,7 @@
     - `laneMirrorContract.test.js`
     - `laneMirrorKey.js` — popup の応援レーン(りんく/こん太/広告/たぬ姉の段組み)を「顔=avatar 含めてそっくり」status へ
     - `laneMirrorKey.test.js`
+    - `laneMirrorPerLiveGuard.test.js`
     - `laneMirrorPerLiveIsolation.test.js`
     - `laneMirrorPerLivePublish.js` — laneMirrorPerLivePublish — 配信ごとの鏡(v2)と実DOM受領証を storage へ書く薄いグルー。
     - `laneMirrorPerLivePublish.test.js`
@@ -1833,6 +1834,9 @@
     - `laneMirrorWriteGate.js` — 【層】L0 判定層(純粋関数・I/O禁止)
     - `laneMirrorWriteGate.test.js`
     - `laneMirrorWriteGateWiring.test.js`
+    - `laneMirrorWriterYield.js` — 【層】L0 判定層(純粋関数・I/O禁止)
+    - `laneMirrorWriterYield.test.js`
+    - `laneMirrorWriterYieldWiring.wiring.test.js`
     - `laneNeverDrop.integration.test.js`
     - `laneNeverDrop.wiring.test.js`
     - `lanePublishSkipDiag.js` — lanePublishSkipDiag — 応援レーン鏡の publish が「到達したか/何で見送られたか」を1行にする純関数。

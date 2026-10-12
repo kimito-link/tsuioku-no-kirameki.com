@@ -24,7 +24,6 @@ const marks = String(args.at || '5,10,15,25,40,60,90').split(',').map(Number).fi
 const { ctx, sw, extId, userDataDir } = await launchWithExtension({ extDir: args.ext });
 let code = 0;
 
-const LANES = ['link', 'gift', 'ad', 'konta', 'tanu'];
 const POP_IDS = { link: 'sceneStoryUserLaneLink', gift: 'sceneStoryUserLaneGift', ad: 'sceneStoryUserLaneAd', konta: 'sceneStoryUserLaneKonta', tanu: 'sceneStoryUserLaneTanu' };
 
 const diff = (a, b) => {
@@ -49,6 +48,15 @@ try {
     ven.goto(`chrome-extension://${extId}/venue.html?lv=${args.lv}`, { waitUntil: 'domcontentloaded' })
   ]);
 
+  // 鏡の書き手別の書き込みを会場ページで控える(誰が・何人の鏡を・何回書いたか)。
+  await ven.evaluate((lv) => {
+    const key = `nls_lane_mirror_v2_${lv}`;
+    window.__nlsMirrorWrites = [];
+    chrome.storage.onChanged.addListener((ch) => {
+      const m = ch[key] && ch[key].newValue;
+      if (m) window.__nlsMirrorWrites.push({ at: Date.now(), writerId: m.writerId || '(なし)', picked: m.pickedLength || 0 });
+    });
+  }, args.lv);
   console.log('秒   POP  鏡   会場 | 会場-鏡(会場のみ/鏡のみ) | 鏡-POP(鏡のみ/POPのみ) | 鏡の古さ(s) 鏡KB 申告(picked/候補)');
   for (const sec of marks) {
     const wait = sec * 1000 - (Date.now() - t0);
@@ -80,6 +88,15 @@ try {
         `${String(dv.onlyA).padStart(5)}/${String(dv.onlyB).padEnd(5)}            | ${String(dm.onlyA).padStart(5)}/${String(dm.onlyB).padEnd(5)}              | ${age}  ${mirror ? mirror.kb + 'KB ' + mirror.picked + '/' + mirror.total : '(鏡なし)'}`
     );
   }
+  const writes = await ven.evaluate(() => window.__nlsMirrorWrites || []);
+  const byWriter = new Map();
+  for (const w of writes) {
+    const e = byWriter.get(w.writerId) || { n: 0, min: Infinity, max: 0 };
+    e.n += 1; e.min = Math.min(e.min, w.picked); e.max = Math.max(e.max, w.picked);
+    byWriter.set(w.writerId, e);
+  }
+  if (args.writes) console.log('書き込み列(t秒:書き手:人数): ' + writes.map((w) => `${((w.at - t0) / 1000).toFixed(0)}:${w.writerId.slice(1, 4)}:${w.picked}`).join(' '));
+  console.log('鏡の書き手別(開いてから): ' + ([...byWriter].map(([id, e]) => `${id}: ${e.n}回 ${e.min}〜${e.max}人`).join(' / ') || '書き込み無し'));
 } catch (e) {
   console.error('FAILED:', String(e));
   code = 1;
