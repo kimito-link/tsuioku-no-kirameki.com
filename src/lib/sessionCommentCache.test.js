@@ -67,3 +67,65 @@ describe('isSessionCommentCacheFresh', () => {
     expect(isSessionCommentCacheFresh('nope', 'lv1', 100)).toBe(false);
   });
 });
+
+import {
+  shouldPersistSessionCommentCache,
+  SESSION_COMMENT_PERSIST_MIN_INTERVAL_MS,
+  SESSION_COMMENT_PERSIST_GROWTH_RATIO,
+  isSessionCommentCacheFresh as _fresh,
+  buildSessionCommentCache as _build
+} from './sessionCommentCache.js';
+
+describe('shouldPersistSessionCommentCache(全件配列の複製は「必要なときだけ」)', () => {
+  const at = 1_000_000;
+  const prev = { lv: 'lv1', len: 1000, at };
+
+  it('まだ書いていない/別の配信なら書く', () => {
+    expect(shouldPersistSessionCommentCache(null, 'lv1', 1000, at)).toBe(true);
+    expect(shouldPersistSessionCommentCache(prev, 'lv2', 1000, at + 1)).toBe(true);
+  });
+
+  it('同じ配信で件数がほぼ同じなら書かない(refresh のたびに全件を複製していた)', () => {
+    expect(shouldPersistSessionCommentCache(prev, 'lv1', 1000, at + 60_000)).toBe(false);
+    expect(shouldPersistSessionCommentCache(prev, 'lv1', 1100, at + 60_000)).toBe(false);
+  });
+
+  it('保存分が足りなくなる前(増えた割合が閾値以上)に書き直す', () => {
+    const grown = Math.ceil(1000 * SESSION_COMMENT_PERSIST_GROWTH_RATIO);
+    expect(shouldPersistSessionCommentCache(prev, 'lv1', grown, at + SESSION_COMMENT_PERSIST_MIN_INTERVAL_MS)).toBe(true);
+  });
+
+  it('増えていても最短間隔内は書かない(コメントが速い配信で毎秒書かない)', () => {
+    const grown = Math.ceil(1000 * SESSION_COMMENT_PERSIST_GROWTH_RATIO);
+    expect(shouldPersistSessionCommentCache(prev, 'lv1', grown, at + SESSION_COMMENT_PERSIST_MIN_INTERVAL_MS - 1)).toBe(false);
+  });
+
+  it('時計が戻ったら書く側に倒す(止めない)', () => {
+    expect(shouldPersistSessionCommentCache(prev, 'lv1', 1000, at - 1)).toBe(true);
+  });
+
+  it('壊れた入力は書く側に倒す(判定できないときに止めない)', () => {
+    expect(shouldPersistSessionCommentCache({ lv: 'lv1', len: NaN, at }, 'lv1', 1000, at + 99_999)).toBe(true);
+    expect(shouldPersistSessionCommentCache(prev, '', 1000, at + 99_999)).toBe(true);
+  });
+
+  it('★不変条件: 閾値どおりに書き直していれば、保存分は常に「再オープン時に有効(80%以上)」のまま', () => {
+    // 件数が増え続ける配信を1秒刻みで再現し、毎秒「いま再オープンしたら命中するか」を検査する。
+    let state = null;
+    let total = 5000;
+    let writes = 0;
+    let misses = 0;
+    for (let sec = 0; sec < 3600; sec += 1) {
+      total += 3; // 毎秒3件増える
+      const now = sec * 1000;
+      if (shouldPersistSessionCommentCache(state, 'lv1', total, now)) {
+        state = { lv: 'lv1', len: total, at: now };
+        writes += 1;
+      }
+      const cache = _build('lv1', state.len, new Array(Math.min(state.len, 30000)).fill(0), now);
+      if (!_fresh(cache, 'lv1', total)) misses += 1;
+    }
+    expect(misses).toBe(0); // 命中率は従来(毎回書く)と同じ
+    expect(writes).toBeLessThan(40); // 1時間で毎回(数千回)→数十回
+  });
+});

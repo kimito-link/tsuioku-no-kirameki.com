@@ -2,7 +2,8 @@
  * 視聴ページに埋め込まれたパネル(popup.html?inline=1)の【メインスレッド CPU プロファイル】を取る。
  *
  * 使い方:
- *   node scripts/perf-ab/profile-popup.mjs --lv lv351523930 [--ext <拡張フォルダ>] [--settle 25] [--seconds 10]
+ *   node scripts/perf-ab/profile-popup.mjs --lv lv351523930 [--ext <拡張フォルダ>] [--settle 25] [--seconds 10] [--save out.cpuprofile.json]
+ *   (--settle 65 で「読み込みの1分後以降の重い時間帯」を測れる。--save は呼び出し元をたどる解析用)
  *   (放送中の lv を渡す。ranking: https://live.nicovideo.jp/ranking)
  *
  * 出力: 窓の長さ・暇な時間・稼働率(busy%)・自分の時間の上位・スタック上に居た時間(含む)の上位。
@@ -66,6 +67,7 @@ try {
   await sleep(windowMs);
   const m1 = await metricsOf();
   const { result } = await send('Profiler.stop');
+  if (args.save) fs.writeFileSync(String(args.save), JSON.stringify(result.profile));
   const s = summarizeProfile(result.profile, { top: Number(args.top || 22) });
 
   console.log(`ext=${args.ext || 'extension/'}  lv=${args.lv}  settle=${settleMs / 1000}s`);
