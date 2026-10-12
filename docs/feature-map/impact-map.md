@@ -834,6 +834,7 @@
 | `src/lib/statusShareUrls.js` | 1 | 状態速報ページ |
 | `src/lib/statusTrend.js` | 1 | 状態速報ページ |
 | `src/lib/statusTrendKey.js` | 1 | 状態速報ページ |
+| `src/lib/storageTriggerPolicy.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/storedCommentDedupeKey.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/storedCommentDedupeMerge.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/storedCommentEntriesNormalize.js` | 1 | ポップアップ(応援レーン) |

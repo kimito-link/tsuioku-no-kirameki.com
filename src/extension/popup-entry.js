@@ -66,6 +66,7 @@ import { buildStorageWriteErrorPayload } from '../lib/storageErrorState.js';
 import { createCoalescedRefreshScheduler } from '../lib/popupStorageRefreshCoalesce.js';
 // v0.1.1248: refresh() の自己フィードバックループ(ちらつきの真因)を断つ判定と理由別内訳。
 import { isAllSelfWrittenRenderArtifacts, stripSelfWrittenRenderArtifacts } from '../lib/selfWrittenStorageKeys.js';
+import { isThrottledExtraStorageKey } from '../lib/storageTriggerPolicy.js';
 import { addRepaintReason } from '../lib/repaintReasonCensus.js';
 import { deriveCommentPostUiState } from '../lib/commentPostUi.js';
 import {
@@ -18241,7 +18242,8 @@ function isHighFrequencyCommentRelatedStorageKey(key) {
   if (/^nls_gift_users_/i.test(k)) return true;
   if (k === KEY_SELF_POSTED_RECENTS) return true;
   if (k.startsWith(KEY_DEV_MONITOR_TREND_PREFIX)) return true;
-  return false;
+  // v0.1.1603(設計V3): 実測で即時側を素通りしていたデータキーを間引き側へ(正本=storageTriggerPolicy.js)。
+  return isThrottledExtraStorageKey(k);
 }
 
 /**

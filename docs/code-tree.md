@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 8 / 907 件
+## ⚠️ 役割コメントが無いソース 8 / 908 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `scripts/build.mjs`
@@ -830,7 +830,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (1929)
+- 📁 **src/** (1931)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1110,7 +1110,7 @@
         - `logo_funlink_white_RGB_link_black.png`
         - `logo_funlink_white_RGB_maru_black.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1693)
+  - 📁 **lib/** (1695)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -2456,6 +2456,8 @@
     - `storageOpTimeout.test.js`
     - `storageRefreshTriggerKey.js` — 【層】L0 判定層(純粋関数・I/O禁止)
     - `storageRefreshTriggerKey.test.js`
+    - `storageTriggerPolicy.js` — 【層】L0 判定層(純粋関数・I/O禁止)
+    - `storageTriggerPolicy.test.js`
     - `storageWriteLedger.js` — 2026-07-07 (robust-arch Phase 0 / 計器のみ・挙動不変):
     - `storageWriteLedger.test.js`
     - `storedCommentDedupeKey.js` — 保存済みコメントの重複判定キーを作る純関数(v0.1.1313)。
