@@ -169,6 +169,8 @@ export function composeVenueLaneBuckets(input) {
         // v0.1.1562: タイル 3 行目の値。個別列挙で作り直す型なので明示的に引き継ぐ(落とすと会場だけ黙って消える)。
         ...(cell?.stats ? { stats: cell.stats } : {}),
         ...(cell?.pulse ? { pulse: cell.pulse } : {}),
+        // 2026-10-12: 発言(ホバーカードの「セリフ」)。同上=個別列挙で作り直すので明示的に引き継ぐ。
+        ...(Array.isArray(cell?.recentTexts) && cell.recentTexts.length ? { recentTexts: cell.recentTexts.slice() } : {}),
         _venueSeatIndex: Number.isInteger(seatIdxRaw) && seatIdxRaw >= 0 ? seatIdxRaw : -1,
         _venueIsVip: isHttpUrl(cell?.displaySrc),
         _venueMirror: true

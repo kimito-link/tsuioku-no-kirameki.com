@@ -393,6 +393,7 @@
 | `src/lib/venueSeats.js` | 2 | 記録エンジン(watchページ常駐) / 会場モード(standalone) |
 | `src/lib/venueSeatsDiag.js` | 2 | 記録エンジン(watchページ常駐) / 会場モード(standalone) |
 | `src/lib/venueSpeech.js` | 2 | 記録エンジン(watchページ常駐) / 会場モード(standalone) |
+| `src/lib/venueSpeechCensus.js` | 2 | 記録エンジン(watchページ常駐) / 会場モード(standalone) |
 | `src/lib/venueSpeechStreak.js` | 2 | 記録エンジン(watchページ常駐) / 会場モード(standalone) |
 | `src/lib/venueStoryDiagMirrorPanel.js` | 2 | 記録エンジン(watchページ常駐) / 会場モード(standalone) |
 | `src/lib/venueViewport.js` | 2 | 記録エンジン(watchページ常駐) / 会場モード(standalone) |
