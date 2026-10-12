@@ -89,7 +89,8 @@ describe('会場(reader)は配信ごとキーを優先する', () => {
   });
 
   it('★onChanged も v2 を優先する(旧キーは他配信も書くので後回し)', () => {
-    expect(venueSrc).toMatch(/const mirrorChange = perLiveChange \|\| changes\[KEY_LANE_MIRROR\];/);
+    // 2026-10-12: v2 が使える間は旧キーの変化を採用しない(旧キーは複数パネルが譲らず上書きし合う)。liveId 不明のときだけ旧キー。
+    expect(venueSrc).toMatch(/const mirrorChange = _perLiveKey \? perLiveChange : changes\[KEY_LANE_MIRROR\];/);
   });
 
   it('★受領証は別キーで受け取る(データ本体と混ぜない)', () => {
