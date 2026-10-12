@@ -830,7 +830,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (1928)
+- 📁 **src/** (1929)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1110,7 +1110,7 @@
         - `logo_funlink_white_RGB_link_black.png`
         - `logo_funlink_white_RGB_maru_black.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1692)
+  - 📁 **lib/** (1693)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -2434,6 +2434,7 @@
     - `statusMindmapSignature.js` — マインドマップの再描画を止める署名を作る純関数。
     - `statusMindmapSignature.test.js`
     - `statusMindmapSignature.wiring.test.js`
+    - `statusNoOnChangedRefresh.wiring.test.js`
     - `statusPopupEmbed.wiring.test.js`
     - `statusReadPolicy.js` — 【層】L0 判定層(純粋関数・I/O禁止)
     - `statusReadPolicy.test.js`

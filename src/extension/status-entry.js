@@ -605,7 +605,11 @@ async function bootstrap() {
 
   setupButtons();
   setupVisibilityHandler();
-  setupStorageChangeListener();
+  // ★V2(2026-10-12・設計 stable-update-model-DESIGN.md): 保存の通知(storage.onChanged)で描き直さない。
+  //   診断ページは /live/ と同じ「読み手は引く(pull)」: 下の2秒周期(startRefreshLoop)だけで描く。
+  //   実測(放送中・60秒): 更新 38回/分(周期なら30回/分)・保存の通知 668回/分 = 通知起因の描き直しが周期に上乗せされていた。
+  //   鮮度は落ちない(2秒周期・初回 refresh・可視復帰の即時 refresh は従来どおり)。減るのは重複した実行だけ。
+  //   関数 setupStorageChangeListener 本体は撤回しやすいよう残す(呼び出しだけ外した)。
   setupSoundPreviewPanel();
   setupMyCustomSoundPanel();
 
@@ -4406,6 +4410,8 @@ function setupVisibilityHandler() {
   });
 }
 
+// V2(2026-10-12): 呼び出しを外した。撤回しやすいよう本体は残す(通知で描き直す版に戻すときは setup の呼び出しを戻す)。
+// eslint-disable-next-line no-unused-vars
 function setupStorageChangeListener() {
   try {
     chrome.storage.local.onChanged.addListener((changes) => {
