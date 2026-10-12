@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 8 / 905 件
+## ⚠️ 役割コメントが無いソース 8 / 906 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `scripts/build.mjs`
@@ -718,13 +718,13 @@
   - `status-guard.js` — 状態速報ページ(status.html)の「何があっても開く」保険。
   - `status.html`
   - `venue.html`
-- 📁 **scripts/** (82)
+- 📁 **scripts/** (83)
   - 📁 **lib/** (4)
     - `council-scout-dir.mjs` — council-scout/ の置き場所を返す唯一の正本。
     - `council-scout-dir.test.js`
     - `instrument-core.mjs` — ★検査・計器の共通土台（キット同梱・依存ゼロ・純Node）。
     - `today-jst.mjs` — 運用日（JST）を返す唯一の正本。
-  - 📁 **perf-ab/** (8)
+  - 📁 **perf-ab/** (9)
     - `README.md`
     - `boot-profile.mjs` — パネル(popup)の【起動の瞬間】のメインスレッド CPU プロファイル。「押した瞬間の黒い幕」の原因探し用。
     - `common.mjs` — perf-ab 共通部品: 拡張を読み込んだ Chromium の起動・後片付け・拡張プロセスの CPU/メモリ採取。
@@ -733,6 +733,7 @@
     - `make-before.mjs` — 「修正前」の拡張フォルダを作る(extension/ をコピーし、dist の bundle を git の指定リビジョンのものに差し替える)。
     - `parity.mjs` — 会場(venue.html)が「POP(popup.html)の鏡の投影」になっているかを、時系列で測る。
     - `profile-popup.mjs` — 視聴ページに埋め込まれたパネル(popup.html?inline=1)の【メインスレッド CPU プロファイル】を取る。
+    - `profile-status.mjs` — 診断ページ(status.html)自身のメインスレッド CPU プロファイル。「診断ページが重くて出てこない」の原因探し用。
   - 📁 **xserver/** (2)
     - `github-webhook-pull.php.example`
     - `webhook-git-pull-for-upload.php`
@@ -829,7 +830,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (1922)
+- 📁 **src/** (1923)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1109,7 +1110,7 @@
         - `logo_funlink_white_RGB_link_black.png`
         - `logo_funlink_white_RGB_maru_black.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1686)
+  - 📁 **lib/** (1687)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -2353,6 +2354,7 @@
     - `selfWrittenStorageKeys.test.js`
     - `sessionCommentCache.js` — v0.1.650: JSONキャッシュ即時表示の本丸。「開いた瞬間に全コメント表示・ローディングなし」。
     - `sessionCommentCache.test.js`
+    - `sessionCommentPersistWiring.wiring.test.js`
     - `sessionSummaryCompareTableHtml.js` — セッションサマリ推移テーブル（renderSessionSummaryComparePanel の <table>）の HTML を組む純関数。
     - `sessionSummaryCompareTableHtml.test.js`
     - `sessionSummaryMirror.js` — セッション比較(記録サマリの推移)の「鏡」スナップショット純関数
