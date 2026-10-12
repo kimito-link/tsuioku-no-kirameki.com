@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 8 / 902 件
+## ⚠️ 役割コメントが無いソース 8 / 903 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `scripts/build.mjs`
@@ -718,14 +718,15 @@
   - `status-guard.js` — 状態速報ページ(status.html)の「何があっても開く」保険。
   - `status.html`
   - `venue.html`
-- 📁 **scripts/** (80)
+- 📁 **scripts/** (81)
   - 📁 **lib/** (4)
     - `council-scout-dir.mjs` — council-scout/ の置き場所を返す唯一の正本。
     - `council-scout-dir.test.js`
     - `instrument-core.mjs` — ★検査・計器の共通土台（キット同梱・依存ゼロ・純Node）。
     - `today-jst.mjs` — 運用日（JST）を返す唯一の正本。
-  - 📁 **perf-ab/** (6)
+  - 📁 **perf-ab/** (7)
     - `README.md`
+    - `boot-profile.mjs` — パネル(popup)の【起動の瞬間】のメインスレッド CPU プロファイル。「押した瞬間の黒い幕」の原因探し用。
     - `common.mjs` — perf-ab 共通部品: 拡張を読み込んだ Chromium の起動・後片付け・拡張プロセスの CPU/メモリ採取。
     - `cpu-timeline.mjs` — 拡張プロセス(--extension-process)の CPU%・メモリが、ページを開くたびにどう積み上がるかを時系列で見る。
     - `growth.mjs` — 拡張プロセスのメモリが「何で」増えているかを時系列で見る(JS ヒープ / DOM ノード / リスナー / ドキュメント / OS 側メモリ)。
@@ -827,7 +828,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (1913)
+- 📁 **src/** (1915)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1107,7 +1108,7 @@
         - `logo_funlink_white_RGB_link_black.png`
         - `logo_funlink_white_RGB_maru_black.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1677)
+  - 📁 **lib/** (1679)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -1173,6 +1174,8 @@
     - `autoshowHideExperiment.wiring.test.js`
     - `avatarBroadcasterGuard.js` — 配信者アイコン取り違え防止ガード（純粋関数）。
     - `avatarBroadcasterGuard.test.js`
+    - `avatarCanvasToImageUrl.test.js`
+    - `avatarCanvasToImageUrl.wiring.test.js`
     - `avatarEntryCounts.js` — コメントエントリ配列から avatar の数を数える純関数。
     - `avatarEntryCounts.test.js`
     - `avatarLoadReport.js` — アイコン画像(usericon)の【実際のロード失敗】を状態速報の対処候補カードに出す純関数(v0.1.1026)。

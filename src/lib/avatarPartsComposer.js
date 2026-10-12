@@ -73,6 +73,34 @@ export const AVATAR_PART_ANCHORS = Object.freeze({
 const AVATAR_DATA_URL_CACHE_MAX = 256;
 /** @type {Map<string, string>} */
 const avatarDataUrlCache = new Map();
+
+/**
+ * canvas を <img src> に使える URL にする。
+ * ★2026-10-11: toDataURL('image/png') は PNG 書き出しをメインスレッドで同期に行う。匿名330人ぶんの合成で
+ *   toDataURL だけが 3〜4秒(起動の主スレッド総時間 約10秒のうち)・最長 4.1秒連続で止まっていた。
+ *   toBlob は書き出しを別スレッドで行うのでメインスレッドの負担が大きく減る(同じ配信・同じ手順の前後比較で、
+ *   起動の主スレッド総時間 9.8〜11.3秒 → 6.5〜6.7秒)。blob: URL は <img> でそのまま使える
+ *   (拡張ページの CSP に img-src の制限は無い)。toBlob / createObjectURL が無い、または toBlob が null を返す
+ *   環境では従来の toDataURL に戻る(機能を失わない)。
+ *   ★blob URL は revoke しない(キャッシュから追い出された後も、画面に残っている <img> が壊れないように)。
+ *     blob は文書が閉じるまで残る(1枚 数KB×その文書で合成した別人の数)。文書は数分〜数時間で作り直される。
+ *     人数が数千になる長時間の放送では数十MBになりうる点に注意。
+ * @param {HTMLCanvasElement} canvas
+ * @returns {Promise<string>}
+ */
+export async function canvasToImageUrl(canvas) {
+  if (typeof canvas.toBlob === 'function' && typeof URL !== 'undefined' && typeof URL.createObjectURL === 'function') {
+    const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/png'));
+    if (blob) {
+      try {
+        return URL.createObjectURL(blob);
+      } catch {
+        /* createObjectURL が例外(差し替え・制限)でも画像を失わない=toDataURL に戻る */
+      }
+    }
+  }
+  return canvas.toDataURL('image/png');
+}
 /** @type {Map<string, Promise<string>>} */
 const avatarComposeInFlight = new Map();
 /** @type {Map<string, Promise<HTMLImageElement>>} */
@@ -273,7 +301,7 @@ export function composeAvatarPartsDataUrl(userKey) {
     drawPart(ctx, mouth, AVATAR_PART_ANCHORS.mouth, size);
     ctx.drawImage(colorizeHair(hair, selected.hairHue, size), 0, 0);
 
-    const dataUrl = canvas.toDataURL('image/png');
+    const dataUrl = await canvasToImageUrl(canvas);
     avatarDataUrlCache.set(key, dataUrl);
     while (avatarDataUrlCache.size > AVATAR_DATA_URL_CACHE_MAX) {
       const oldestKey = avatarDataUrlCache.keys().next().value;
