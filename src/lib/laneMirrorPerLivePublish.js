@@ -24,6 +24,7 @@
 import { buildLaneReceipt } from './laneMirror.js';
 import { laneMirrorKeyFor, laneReceiptKeyFor } from './laneMirrorKey.js';
 import { laneMirrorWriteSignature, laneMirrorStructureKey } from './laneMirrorWriteGate.js';
+import { shouldYieldToStoredMirror, LANE_MIRROR_YIELD_WINDOW_MS } from './laneMirrorWriterYield.js';
 
 /**
  * 配信ごとの鏡と受領証を1回の set にまとめて書く。
@@ -34,10 +35,16 @@ import { laneMirrorWriteSignature, laneMirrorStructureKey } from './laneMirrorWr
  * @param {{ shouldWrite: (lid: string, sig: string, nowMs: number, structKey?: string) => { write: boolean, reason: string }, forget?: (lid: string) => void }} [gate]
  *   書き込み抑制ゲート(laneMirrorWriteGate.js)。渡すと「同じ内容なら60秒に1回まで」に絞る。
  *   ★省略時は従来どおり毎回書く(後方互換)。stats/pulse の変化は署名に入っているので必ず書かれる。
+ * @param {{ writerId: string, windowMs?: number, get: (key: string) => Promise<Record<string, any>>,
+ *   withLock: (name: string, fn: () => Promise<unknown>) => Promise<unknown>, onYield?: () => void }} [guard]
+ *   複数パネルが同じ配信の鏡を書くときの衝突回避(laneMirrorWriterYield.js)。渡すと、書く直前に
+ *   (Web Locks で直列化した中で)保存済みの鏡を読み、他のパネルが直近に書いた【より大きい鏡】なら書かずに譲る。
+ *   ★省略時は従来どおり即書く。ロック/読み取りが失敗したら書く側に倒れる(誰も書かない谷を作らない)。
  * @returns {{ written: boolean, reason: string, mirrorKey: string, receiptKey: string }}
- *   written=false のときは reason に理由(呼び手は握りつぶしてよい=best-effort)
+ *   written=false のときは reason に理由(呼び手は握りつぶしてよい=best-effort)。
+ *   guard を渡したときの written=true は「書く手続きに入った」(譲った場合は onYield が呼ばれる)。
  */
-export function publishLaneMirrorPerLive(snap, nowMs, storage, gate) {
+export function publishLaneMirrorPerLive(snap, nowMs, storage, gate, guard) {
   const lid = String(snap?.liveId || '').trim().toLowerCase();
   const mirrorKey = laneMirrorKeyFor(lid);
   const receiptKey = laneReceiptKeyFor(lid);
@@ -61,7 +68,38 @@ export function publishLaneMirrorPerLive(snap, nowMs, storage, gate) {
     { nowMs, surface: 'popup' }
   );
   // ★鏡と受領証を【同じ set】で書く=片方だけ新しい状態を作らない。
-  const setResult = storage.set({ [mirrorKey]: snap, [receiptKey]: receipt });
+  const doSet = () => storage.set({ [mirrorKey]: snap, [receiptKey]: receipt });
+  const forget = () => {
+    try {
+      if (gate && typeof gate.forget === 'function') gate.forget(lid);
+    } catch {
+      /* no-op */
+    }
+  };
+  if (guard && typeof guard.withLock === 'function' && typeof guard.get === 'function') {
+    // 書く直前に保存済みの鏡を読んで確かめる(ロックの中=2つのパネルの「読む→書く」が交互に入り込まない)。
+    const run = async () => {
+      let yieldNow = false;
+      try {
+        const cur = (await guard.get(mirrorKey))?.[mirrorKey];
+        yieldNow = shouldYieldToStoredMirror(cur, snap, guard.writerId, Date.now(), guard.windowMs ?? LANE_MIRROR_YIELD_WINDOW_MS);
+      } catch {
+        yieldNow = false; // 読めない → 書く側に倒す
+      }
+      if (yieldNow) {
+        try { guard.onYield?.(); } catch { /* no-op */ }
+        return; // ★ゲートの記録は残す: 忘れさせると次の tick ごとに保存済みの鏡を読み直す(読み込みが毎秒走る)。次は床(8〜60秒)後。
+      }
+      await doSet();
+    };
+    try {
+      Promise.resolve(guard.withLock(`nls-lane-mirror-write-${lid}`, run)).catch(forget);
+    } catch {
+      forget();
+    }
+    return { written: true, reason: 'guarded', mirrorKey, receiptKey };
+  }
+  const setResult = doSet();
   const r = /** @type {any} */ (setResult);
   // ★書き込みが失敗(reject)したら、ゲートに「書いていない」と伝える(失敗を書いたと見なして最大60秒止まらない)。
   //   set が Promise を返さない呼び手(テストのスパイ等)には何もしない。reject は握る(best-effort)。
