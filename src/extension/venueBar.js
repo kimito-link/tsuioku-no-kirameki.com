@@ -245,6 +245,13 @@ import {
   observeVenueYukkuriNamedTile,
   toVenueYukkuriNamedCensusDiag
 } from '../lib/venueYukkuriNamedCensus.js';
+// 2026-10-12(ユーザー要望): 会場のホバーカードの「セリフ(発言の行)」がちゃんと出ているかの診断(観測のみ)。
+import {
+  createVenueSpeechCensusState,
+  observeVenueSpeechTiles,
+  observeVenueSpeechHover,
+  toVenueSpeechCensusDiag
+} from '../lib/venueSpeechCensus.js';
 import {
   paintStoryUserLaneDomFilled,
   resetStoryUserLaneDom,
@@ -2835,7 +2842,8 @@ export function mountVenueBarButton(options = {}) {
         lastAt: facts.lastAt,
         tier,
         lastText: facts.lastText,
-        recentTexts: facts.recentTexts,
+        // 2026-10-12: 在席名簿に発言が無い人(会場を開く前に発言した人)は、鏡のセルが持つ発言を使う(カードの「セリフ」)。
+        recentTexts: facts.recentTexts && facts.recentTexts.length ? facts.recentTexts : (Array.isArray(it?.recentTexts) ? it.recentTexts : []),
         // ★どこから採った値かを残す（後から「どちらを見たか」を言えるようにする）。
         factsSource: facts.source
       };
@@ -2886,6 +2894,17 @@ export function mountVenueBarButton(options = {}) {
     //   diagModeは既存の🩺状態パネルの開閉状態に連動(新規UI・新規storageを追加しない)。
     //   開いた瞬間の状態を都度読む(固定しない・地雷3)。nowMsは純関数を汚さないための注入。
     const model = buildVenueHoverCardModel({ ...data, thumb, nowMs: Date.now(), diagMode: !diagPanel.hidden });
+    // 診断(観測のみ): カードに発言の行(セリフ)が出たか。発言の形跡があるのに空なら🔴の材料になる。投擲段(広告/ギフト)は対象外。
+    try {
+      const isThrow = data.tier === 'gift' || data.tier === 'ad';
+      if (!isThrow) {
+        observeVenueSpeechHover(_speechCensus, {
+          name: model.displayName || data.displayName,
+          lines: model.recentTexts && model.recentTexts.length ? model.recentTexts : (model.lastText ? [model.lastText] : []),
+          spoke: Number(data.count) > 0
+        });
+      }
+    } catch { /* 計器失敗はカードを止めない */ }
     renderVenueHoverCard(hoverCardEl, model);
     hoverCardEl.classList.add('nlsb-hover-card--open');
 
@@ -3328,6 +3347,7 @@ export function mountVenueBarButton(options = {}) {
   // 2026-07-15 名前ありゆっくり顔 計器(診断先行アプローチ): 実害の有無・頻度を累積で数える
   //   (観測のみ・修正はしない)。
   const _yukkuriNamedCensus = createVenueYukkuriNamedCensusState();
+  const _speechCensus = createVenueSpeechCensusState();
   // 2026-07-21 応援TOP吹き出しchurn計器(診断先行アプローチ): 生成頻度・寿命分布・強制退去を
   //   累積で数える(観測のみ・修正はしない)。
   const _bubbleChurn = createVenueBubbleChurnState();
@@ -5444,7 +5464,10 @@ export function mountVenueBarButton(options = {}) {
         // 2026-07-31(ユーザー要望): 直前の発言内容(既存データ・新規取得ゼロ)。
         lastText: String(participant.lastText || ''),
         // v0.1.1218: ホバーで直近数件を読めるようにする(既存データ・新規取得ゼロ)。
-        recentTexts: Array.isArray(participant.recentTexts) ? participant.recentTexts : []
+        //   在席名簿に発言が無い人は、鏡のセルが持つ発言を使う(2026-10-12・会場を開く前に発言した人のカードが空だった)。
+        recentTexts: Array.isArray(participant.recentTexts) && participant.recentTexts.length
+          ? participant.recentTexts
+          : (Array.isArray(item?.recentTexts) ? item.recentTexts : [])
       });
       const speakerKey = uid ? `u:${uid}` : rawName ? `n:${rawName}` : '';
       const streakEntry = speakerKey ? speechStreaks.get(speakerKey) : null;
@@ -5477,6 +5500,26 @@ export function mountVenueBarButton(options = {}) {
       try {
         venueAvatarLoadGuard.retrySweep(venueLaneEls.stack, laneWallNow);
       } catch { /* 計器/再試行の失敗は描画を止めない */ }
+      // 診断(観測のみ・この3秒期日の中だけ・データだけを見る=DOM走査ゼロ): カードに出せる発言が名簿/鏡のどちらにあるか。
+      try {
+        /** @type {Array<{ uid: string, name: string, rosterTexts: unknown, mirrorTexts: unknown, commentCount: number, rosterCount: number }>} */
+        const speechTiles = [];
+        for (const tier of /** @type {const} */ (['link', 'konta', 'tanu'])) { // 投擲段(広告/ギフト)は発言由来でないので対象外
+          for (const it of /** @type {any[]} */ (_laneItemsByTier[tier] || [])) {
+            const uid = String(it?.entry?.userId || '').trim();
+            const rosterEntry = uid ? liveRoster.get(uid) || null : null;
+            speechTiles.push({
+              uid,
+              name: String(it?.title || '').trim(),
+              rosterTexts: rosterEntry ? rosterEntry.recentTexts : null,
+              mirrorTexts: it?.recentTexts,
+              commentCount: Number(it?.stats?.c) || 0,
+              rosterCount: rosterEntry ? Number(rosterEntry.commentCount) || 0 : 0
+            });
+          }
+        }
+        observeVenueSpeechTiles(_speechCensus, speechTiles);
+      } catch { /* 計器失敗は描画を止めない */ }
       try {
         /** @type {Record<string, string[]>} */
         const painted = {};
@@ -5679,6 +5722,8 @@ export function mountVenueBarButton(options = {}) {
       seatLinkParity: toVenueSeatLinkParityDiag(_seatLinkParity, Date.now()),
       // 2026-07-15 診断先行(venue-yukkuri-named-diagnose): 「名前ありゆっくり顔」の実害を数えるだけの1行。
       yukkuriNamedCensus: toVenueYukkuriNamedCensusDiag(_yukkuriNamedCensus),
+      // 2026-10-12(ユーザー要望): 会場のホバーカードの「セリフ」がちゃんと出ているか。
+      speechCensus: toVenueSpeechCensusDiag(_speechCensus),
       // 2026-07-21 診断先行: 応援TOP吹き出しchurnの実害を数えるだけの1行。
       bubbleChurn: toVenueBubbleChurnDiag(_bubbleChurn),
       storyDiagMirror: storyDiagMirrorStatus(storyDiagMirrorSnap, String(activeLiveId || liveIdFromPathname() || ''), Date.now()),

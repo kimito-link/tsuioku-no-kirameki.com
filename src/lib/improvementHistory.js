@@ -1780,5 +1780,19 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
     version: '0.1.1600', metric: 'cross-checked-claims', value: 22,
     source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
     note: '★前版と同値(±0)。今回も変異テストで赤を確認して復元している。'
+  }),
+  Object.freeze({
+    version: '0.1.1601', metric: 'bundle-kb', value: 1401,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '★前版 1401KB → 1401KB(±0): 会場(venueBar.js)側の診断と鏡の引き継ぎ(popup バンドルは更新履歴1版ぶんのみ)。過去最良1360(@0.1.1454)との差分の内訳は v0.1.1471/1537/1560/1562/1584 の note に記録済み。'
+  }),
+  Object.freeze({
+    version: '0.1.1601', metric: 'gate-selftest', value: 4,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1601', metric: 'cross-checked-claims', value: 22,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: '★前版と同値(±0)。今回も変異テストで赤を確認して復元している。'
   })
 ]);

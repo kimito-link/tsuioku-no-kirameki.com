@@ -342,13 +342,16 @@ export function restoreLaneMirrorBuckets(snap) {
         String(cell.displaySrc || '') || (userId ? anonymousIdenticonDataUrl(userId, 64) : '');
       const stats = restoreMirrorStats(cell.stats);
       const pulse = restoreMirrorPulse(cell.pulse);
+      // 2026-10-12: 発言(ホバーカードの「セリフ」)も引き継ぐ。個別列挙で作り直す型なので、落とすと会場のカードだけ黙って空になる。
+      const recentTexts = Array.isArray(cell.recentTexts) ? cell.recentTexts.filter((t) => typeof t === 'string' && t) : [];
       return {
         displaySrc,
         title: String(cell.title || ''),
         meta: { idLine: String(cell.idLine || ''), nameLine: String(cell.nameLine || '') },
         entry: { userId },
         ...(stats ? { stats } : {}),
-        ...(pulse ? { pulse } : {})
+        ...(pulse ? { pulse } : {}),
+        ...(recentTexts.length ? { recentTexts } : {})
       };
     });
   return {
