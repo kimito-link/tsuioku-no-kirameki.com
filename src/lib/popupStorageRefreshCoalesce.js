@@ -25,9 +25,11 @@
  * @typedef {Object} ScheduleContext
  * @property {boolean} allHighFreq 変更キーがすべて高頻度キーだけか
  * @property {boolean} initialDone 初回 refresh 完了後か
+ * @property {boolean} [allSlow] 変更キーがすべて「遅い側(slowThrottleMs に1回で足りる)」キーだけか(設計V3b)
  *
  * @param {{
  *   throttleMs?: number,
+ *   slowThrottleMs?: number,
  *   deps?: Partial<CoalesceDeps>
  * }} [opts]
  */
@@ -35,6 +37,9 @@ export function createCoalescedRefreshScheduler(opts = {}) {
   const throttleMs = Number.isFinite(opts.throttleMs)
     ? Math.max(0, /** @type {number} */ (opts.throttleMs))
     : 450;
+  const slowThrottleMs = Number.isFinite(opts.slowThrottleMs)
+    ? Math.max(0, /** @type {number} */ (opts.slowThrottleMs))
+    : 3000;
   const nowFn = opts.deps?.now || (() => Date.now());
   /** @type {(fn: () => void, ms: number) => unknown} */
   const setT = opts.deps?.setTimer || ((fn, ms) => setTimeout(fn, ms));
@@ -65,7 +70,9 @@ export function createCoalescedRefreshScheduler(opts = {}) {
       lastPaintAt = nowFn();
       return;
     }
-    if (!ctx.allHighFreq) {
+    // ★設計V3b: 遅い側のキーだけの変更は、高頻度側より長い間隔(既定 3 秒)で先行＋末尾のスロットル。
+    const effectiveMs = ctx.allSlow === true && !ctx.allHighFreq ? slowThrottleMs : throttleMs;
+    if (!ctx.allHighFreq && ctx.allSlow !== true) {
       // 非高頻度の変更（例: 設定トグル）は遅延させない
       clearTrailing();
       runRefresh();
@@ -75,7 +82,7 @@ export function createCoalescedRefreshScheduler(opts = {}) {
     // 高頻度キー（nls_comments_* 等）: 先行＋末尾のスロットル
     const now = nowFn();
     const sinceLast = now - lastPaintAt;
-    if (sinceLast >= throttleMs) {
+    if (sinceLast >= effectiveMs) {
       clearTrailing();
       runRefresh();
       lastPaintAt = nowFn();
@@ -83,7 +90,7 @@ export function createCoalescedRefreshScheduler(opts = {}) {
     }
     // 直近に既に paint 済み: trailing を一度だけ積む（デバウンスのように延長しない）
     if (trailingTimer == null) {
-      const delay = Math.max(0, throttleMs - sinceLast);
+      const delay = Math.max(0, effectiveMs - sinceLast);
       trailingTimer = setT(() => {
         trailingTimer = null;
         runRefresh();

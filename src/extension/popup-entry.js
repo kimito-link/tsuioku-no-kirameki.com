@@ -66,7 +66,7 @@ import { buildStorageWriteErrorPayload } from '../lib/storageErrorState.js';
 import { createCoalescedRefreshScheduler } from '../lib/popupStorageRefreshCoalesce.js';
 // v0.1.1248: refresh() の自己フィードバックループ(ちらつきの真因)を断つ判定と理由別内訳。
 import { isAllSelfWrittenRenderArtifacts, stripSelfWrittenRenderArtifacts } from '../lib/selfWrittenStorageKeys.js';
-import { isThrottledExtraStorageKey } from '../lib/storageTriggerPolicy.js';
+import { isSlowStorageKey, isThrottledExtraStorageKey } from '../lib/storageTriggerPolicy.js';
 import { addRepaintReason } from '../lib/repaintReasonCensus.js';
 import { deriveCommentPostUiState } from '../lib/commentPostUi.js';
 import {
@@ -18274,8 +18274,10 @@ function scheduleCoalescedStorageRefresh(changes, runRefresh) {
   const allHighFreq =
     keysForFreq.length > 0 &&
     keysForFreq.every((k) => isHighFrequencyCommentRelatedStorageKey(k));
+  // v0.1.1604(設計V3b): 遅い側のキーだけなら 3 秒に1回(正本=storageTriggerPolicy.js)。
+  const allSlow = keysForFreq.length > 0 && keysForFreq.every((k) => isSlowStorageKey(k));
   coalescedRefreshScheduler.schedule(
-    { allHighFreq, initialDone: refreshEverStarted },
+    { allHighFreq, allSlow, initialDone: refreshEverStarted },
     runRefresh
   );
 }

@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "mode": "default",
-  "fingerprint": "e81a243e6812adcef082892c7276160e13eb0262d2bc385b1c9091b621fde8c3",
+  "fingerprint": "419c1f2b0766c68afe7cef93e7644448c668571d2ae411d3e1ac81267433694f",
   "inputs": [
     "app/app.js",
     "app/live-view.js",
@@ -793,9 +793,9 @@
     "extension/dist/page-intercept.js": "5ccd2cd66f9caeb45060a68388f166cc0c55088e6fe47509075aecf66e6a7afa",
     "extension/dist/backfill-sw.js": "8ac07fda5d4e23bc4bee1167c0ff6beb1c93e37f9cd4a8f6319df30c280eb1d7",
     "extension/dist/content.js": "32f68b25f8775dbc58312310036c0ebdff5427a90c5350c451e786d786ec0fac",
-    "extension/dist/popup.js": "f64a45dab0fca283f45daeeaf56b8f74673a168a08eb52be8491767292a18196",
+    "extension/dist/popup.js": "01f96d19bb9f4c4132ae49d90cfbc5306e3847943e672ff61e2f0bb439d59520",
     "extension/dist/offscreen.js": "ccb841a778ccf1f12d830a4bf8f3fe9ac5db3c7cc4dac536f6be33c6b95c0223",
-    "extension/dist/status.js": "b0a0f52dd99286ae44ac42a0beaf8f6e586618ab0c2a0b836dc0ad563b4ee916",
+    "extension/dist/status.js": "bf992e50dfe671efc9a064e5e7296fdd1bafb40fc4eb3515e1ebd39967367d29",
     "extension/dist/live-view.js": "c50e014feaad0a45e012e5ea561b71a10234665e79bae170fcf611b47e69700e",
     "extension/dist/marketing-export.js": "e12c2de446ccb2155fa3ea291090f43fbde48450cbe51d04e2927b101acca283",
     "extension/dist/comeview.js": "017a0846482331ae7867e397c283944003b92e578b9abe0af0693b2e826d7ddb",
@@ -803,7 +803,7 @@
     "extension/dist/sidepanel.js": "bf4d08c2b684050e964377f86df8efe53ec6a02a4fddd66d31127cce32445038",
     "extension/dist/cloak-failsafe.js": "8baabc8a7ee4ab9f0e6fd66c6b917c4832bade10efa9917cf50bf40ca2588207",
     "app/dist/app.js": "9af7800bc0527fbcc239eba0a06d8c02324f0c4d3b7ff0c740bacd9a307a016e",
-    "app/dist/live-view.js": "a7b72a95ef52b69199d4446418a2ceccfd563f332c215bf0b4622b4af875331f",
+    "app/dist/live-view.js": "bfb3703814a18d92a3596f601150f58ac23a3d51ccca0a7cdbabd9062cf26198",
     "app/dist/live-ranking.js": "c34c1de9c3ad3e8a4120dcdb6dc48693ff2b7fb52d6d788265501d2fb23ed797"
   }
 }

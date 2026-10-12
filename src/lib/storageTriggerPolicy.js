@@ -35,3 +35,28 @@ export function isThrottledExtraStorageKey(key) {
   if (!k) return false;
   return THROTTLED_EXTRA_PATTERNS.some((re) => re.test(k));
 }
+
+/*
+ * ★v0.1.1604(設計V3b): 「描き直しは要るが、1回が重いので 3 秒に1回で足りる」キー(=遅い側)。
+ *   実データ入り(実機の保存データ 43MB を複製した環境)で、サイドパネルの safeRefresh が 30 秒に 74 回(2.5回/秒)。
+ *   描き直し1回=約 0.35 秒(保存データの読み込み約 40 回を含む)なので、メインスレッドの 87% を使い切っていた。
+ *   主犯(30秒): score_announce_diag ×14 / report_preview ×14 / live_broadcaster_ctx ×12 / live_ended ×7 / event_dom ×6。
+ *   前2者は診断・自己書き込み(selfWrittenStorageKeys.js へ)。残りは描画が読むが、最後の1回が 3 秒以内に
+ *   必ず描かれれば足りる(コメント本文は別経路=高頻度側のまま 450ms)。演出(event_dom)は別の即時経路で反映済み。
+ */
+const SLOW_PATTERNS = Object.freeze([
+  /^nls_live_broadcaster_ctx_v\d+$/i,
+  /^nls_live_ended_lv\d{1,15}$/i,
+  /^nls_event_dom_lv\d{1,15}$/i
+]);
+
+/**
+ * 遅い側(3 秒に1回)でよいキーか。
+ * @param {unknown} key
+ * @returns {boolean}
+ */
+export function isSlowStorageKey(key) {
+  const k = String(key == null ? '' : key);
+  if (!k) return false;
+  return SLOW_PATTERNS.some((re) => re.test(k));
+}
