@@ -135,7 +135,22 @@ const SELF_WRITTEN_PATTERNS = Object.freeze([
    *   未登録だと、書き込みのたびに popup 全インスタンスが無スロットルで refresh する(上の every() の穴)。
    *   文書数 N なら 1 分あたり最大 N 回書かれる。status が自前の 2 秒ループで読むので popup の再描画は不要。
    */
-  /^nls_ext_process_census_v\d+$/i
+  /^nls_ext_process_census_v\d+$/i,
+  /*
+   * ★v0.1.1603(設計V3): 描き直しに使われない【診断・ログ専用キー】を追加(実測 2026-10-12・60秒の描き直し214回のうち
+   *   即時側を素通りした storage_changed の主犯)。いずれも popup の描画は読まない(AI 共有/状態速報が必要時に読むだけ)。
+   *     nls_backfill_live_metric_v1 ×9 / nls_instant_push_diag_v1 ×3 / nls_mcp_live_* ×2
+   *   ※ nls_live_broadcaster_ctx_v1 は userLaneCandidatesFromStorage が読む実データなので入れない。
+   */
+  /^nls_backfill_live_metric_v\d+$/i,
+  /^nls_instant_push_diag_v\d+$/i,
+  /^nls_comment_write_mode_diag_v\d+$/i,
+  /^nls_comment_ingest_log_v\d+$/i,
+  /^nls_mcp_live_latest_v\d+$/i,
+  /^nls_mcp_live_snapshot_v\d+_lv\d{1,15}$/i,
+  /^nls_voice_diag_v\d+$/i,
+  /^nls_venue_seats_diag_v\d+$/i,
+  /^nls_gift_effect_diag_v\d+$/i
 ]);
 
 /**
