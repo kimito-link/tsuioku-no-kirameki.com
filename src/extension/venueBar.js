@@ -3134,7 +3134,11 @@ export function mountVenueBarButton(options = {}) {
     mount: stage,
     resolveUrl: resolveVenueAssetUrl,
     getHeatLevel: () => crowdHeatLevel,
-    reducedMotion: crowdReducedMotion
+    reducedMotion: crowdReducedMotion,
+    // ★2026-10-12 ユーザー要望「とりあえず浮かんでるだけでいい」: しゃべらない(相槌・返事・考え中の「…」を出さない)。
+    //   吹き出しが会場の内容(広告ランキング等)に被っていた。浮遊・まばたき・表情だけ続ける。
+    //   しゃべらせたくなったら true(または削除=既定 true)に戻すだけ。
+    talk: false
   });
   // 会場は「必ず閉じた状態から始まる」設計(:2386)。開くのは setOpen(true) の時だけ。
   //   ここで明示的に閉じておかないと、開く前からキャラだけが放送画面に浮かぶ。

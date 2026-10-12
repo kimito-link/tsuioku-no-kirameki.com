@@ -73,7 +73,8 @@ export const REACTION_MIN_GAP_MS = 2600;
  *   cancelFrame?: (id: number) => void,
  *   getHeatLevel?: () => number,
  *   reducedMotion?: boolean,
- *   backchannels?: readonly string[]
+ *   backchannels?: readonly string[],
+ *   talk?: boolean
  * }} deps
  * @returns {{
  *   root: HTMLElement,
@@ -114,6 +115,13 @@ export function startCharaLive(deps) {
         ? view.cancelAnimationFrame.bind(view)
         : (/** @type {number} */ id) => clearTimeout(id);
   const getHeat = typeof deps.getHeatLevel === 'function' ? deps.getHeatLevel : () => 0;
+  /*
+   * ★しゃべるか(2026-10-12 ユーザー要望「とりあえず浮かんでるだけでいい」)。
+   *   false なら、相槌(読み上げ)・配信者への返事・AI の考え中(…)の入口をすべて何もしない。
+   *   3 体は浮遊・まばたき・表情のゆらぎだけを続ける=吹き出しも「…」も出ない。
+   *   既定は true(従来どおり)=他の呼び出し元の挙動を変えない。会場(venueBar.js)が false を渡す。
+   */
+  const talk = deps.talk !== false;
   const backchannels =
     Array.isArray(deps.backchannels) && deps.backchannels.length
       ? deps.backchannels
@@ -212,6 +220,7 @@ export function startCharaLive(deps) {
      * @param {{ commentKey: string, text?: string }} input
      */
     onCommentSpoken(input) {
+      if (!talk) return;
       const t = now();
       // 間引き: 直前の相槌から十分空いていなければ黙っている(全部に反応しない)。
       if (t - lastReactionAt < REACTION_MIN_GAP_MS) return;
@@ -255,6 +264,7 @@ export function startCharaLive(deps) {
      * @returns {string} 答える子の id
      */
     onStreamerAddressed(input) {
+      if (!talk) return '';
       needsImmediateDraw = true;
       return triggerCharaAnswer(state, {
         prompt: String(input?.prompt ?? ''),
@@ -270,6 +280,7 @@ export function startCharaLive(deps) {
      * @returns {string}
      */
     beginThinking(input = {}) {
+      if (!talk) return '';
       needsImmediateDraw = true;
       return startCharaThinking(state, {
         nowMs: now(),
@@ -285,6 +296,7 @@ export function startCharaLive(deps) {
      * @returns {string[]}
      */
     endThinking(input = {}) {
+      if (!talk) return [];
       needsImmediateDraw = true;
       return endCharaThinking(state, {
         nowMs: now(),
