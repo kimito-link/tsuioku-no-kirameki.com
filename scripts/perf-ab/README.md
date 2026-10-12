@@ -57,3 +57,11 @@ PowerShell で `GetThreadDescription`(kernel32)を P/Invoke すると、Chrome �
 - 放送の混み具合で数字は揺れる。**前後は必ず続けて**測る。
 - 端末の本物の Chrome・プロファイル・保存データには触れない(一時プロファイルのみ・終了時に自分の Chromium だけ終了)。
 - 残った `nls-perf-*` の Chromium が見えたら、そのプロファイル名を含むプロセスだけを終了する。
+
+## 実機と同じ量の保存データで測る(NLS_SEED_EXT_DIR)
+空のプロファイルでは再現しない重さ(保存データ 40MB 超で初めて出る)を測るときは、実機の Chrome プロファイルフォルダを指定する。
+chrome.storage.local と IndexedDB を**読むだけ**で一時プロファイルへ複製する(実機のファイルは変更しない・LOCK は除く)。
+```
+NLS_SEED_EXT_DIR="C:/Users/<you>/AppData/Local/Google/Chrome/User Data/Profile 45" node scripts/perf-ab/profile-popup.mjs --lv <lv>
+```
+2026-10-12: これで初めて「診断が重い」が再現した(30 秒のうち 26 秒がメインスレッド作業・保存データの読み込み約 2,300 回)。

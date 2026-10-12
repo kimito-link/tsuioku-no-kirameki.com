@@ -150,7 +150,14 @@ const SELF_WRITTEN_PATTERNS = Object.freeze([
   /^nls_mcp_live_snapshot_v\d+_lv\d{1,15}$/i,
   /^nls_voice_diag_v\d+$/i,
   /^nls_venue_seats_diag_v\d+$/i,
-  /^nls_gift_effect_diag_v\d+$/i
+  /^nls_gift_effect_diag_v\d+$/i,
+  /*
+   * ★v0.1.1604(設計V3b): 実データ入りの実測(30秒)で描き直しを呼んでいた診断・自己書き込み。
+   *   nls_score_announce_diag_v1 ×14 / nls_report_preview_v1 ×14 / nls_recording_watchdog_v1 ×2。
+   */
+  /^nls_score_announce_diag_v\d+$/i,
+  /^nls_report_preview_v\d+$/i,
+  /^nls_recording_watchdog_v\d+$/i
 ]);
 
 /**
