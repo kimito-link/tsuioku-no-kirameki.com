@@ -32,6 +32,7 @@ export const LANE_PUBLISH_SOFT_WINDOW_SEC = 180;
  * @typedef {{
  *   noEls?: unknown,
  *   entriesEmpty?: unknown,
+ *   yielded?: unknown,
  *   lastPublishAt?: unknown,
  *   lastSkipAt?: unknown,
  *   lastSkipReason?: unknown
@@ -86,7 +87,7 @@ export function formatLanePublishSkipLine(state, nowMs) {
  * @param {LanePublishSkipDiagState|null|undefined} state
  * @param {number} nowMs
  * @returns {{
- *   noEls: number, entriesEmpty: number, lastSkipReason: string,
+ *   noEls: number, entriesEmpty: number, yielded: number, lastSkipReason: string,
  *   lastPublishAgoSec: number, lastSkipAgoSec: number, line: string
  * }|null}
  */
@@ -101,6 +102,7 @@ export function snapshotLanePublishSkipDiag(state, nowMs) {
   return {
     noEls: nonNegInt(state.noEls),
     entriesEmpty: nonNegInt(state.entriesEmpty),
+    yielded: nonNegInt(state.yielded), // 他のパネルの大きい鏡に譲って書かなかった回数(laneMirrorWriterYield.js)
     lastSkipReason: String(state.lastSkipReason || ''),
     lastPublishAgoSec: agoSecOf(state.lastPublishAt),
     lastSkipAgoSec: agoSecOf(state.lastSkipAt),

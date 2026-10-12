@@ -728,6 +728,7 @@ import { buildLaneDiagSnapshot } from '../lib/laneDiag.js';
 import { KEY_LANE_MIRROR, laneMirrorKeyFor, laneMirrorReadKeys, pickLaneMirrorSnap } from '../lib/laneMirrorKey.js';
 // ★v0.1.1300: 配信ごと鏡(v2)+受領証の書き出し(storage I/O グルーは lib へ抽出=max-lines ラチェット遵守)。
 import { publishLaneMirrorPerLive } from '../lib/laneMirrorPerLivePublish.js';
+import { LANE_MIRROR_YIELD_WINDOW_MS } from '../lib/laneMirrorWriterYield.js';
 import { createLaneMirrorWriteGate } from '../lib/laneMirrorWriteGate.js';
 import { KEY_PREVIEW_RENDER_ACK, buildPreviewRenderAck } from '../lib/previewRenderAckKey.js';
 import { buildLaneMirrorSnapshot, laneMirrorCapFromBuckets, restoreLaneMirrorBuckets } from '../lib/laneMirror.js';
@@ -5921,10 +5922,13 @@ let storyUserLaneLastRenderSig = '';
 let _laneDomSelfLast = null;
 /** ★v0.1.1284: 直近に publish した鏡の contentHash(=次の paint の指紋の内容アドレス)。 */
 let _lastPublishedLaneMirrorHash = '';
+/** この文書(パネル)の書き手ID。同じ配信を複数のパネルが書くとき、鏡の「誰が焼いたか」を見分ける。 */
+const _laneMirrorWriterId = `w${Math.random().toString(36).slice(2, 10)}`;
 /** ★2026-08-08 計器: 鏡 publish の到達/見送りを数える。設計と読み方は lanePublishSkipDiag.js。 */
 const _lanePublishSkipDiag = {
   noEls: 0,
   entriesEmpty: 0,
+  yielded: 0,
   lastPublishAt: 0,
   lastSkipAt: 0,
   lastSkipReason: ''
@@ -7138,7 +7142,8 @@ function publishLaneMirror(input) {
     //   「全員載せる」と「容量の最終防衛」を両立できる。
     const snap = buildLaneMirrorSnapshot(input, {
       cap: laneMirrorCapFromBuckets(input?.buckets),
-      nowMs: now
+      nowMs: now,
+      writerId: _laneMirrorWriterId
     });
     // ★v0.1.1284: publish は paint より前なので、この直後の paint が測る DOM = この hash の中身。
     _lastPublishedLaneMirrorHash = String(snap?.contentHash || '');
@@ -7147,7 +7152,16 @@ function publishLaneMirror(input) {
     //   旧キーへの合流は上の行で継続=既存 reader は無変更のまま(rollback の保険)。
     publishLaneMirrorPerLive(snap, now, {
       set: (obj) => chrome.storage.local.set(obj) // reject は lib 側で拾う(ゲートへ「書けなかった」を伝えて再試行・握りつぶす)
-    }, _laneMirrorWriteGate);
+    }, _laneMirrorWriteGate, {
+      // 視聴ページ内パネルとサイドパネルが同じ配信の鏡を取り合う(1096↔283 の往復)のを止める。書く直前に確かめる。
+      writerId: _laneMirrorWriterId,
+      windowMs: LANE_MIRROR_YIELD_WINDOW_MS,
+      get: (key) => chrome.storage.local.get(key),
+      withLock: (name, fn) => (typeof navigator !== 'undefined' && navigator.locks && typeof navigator.locks.request === 'function'
+        ? navigator.locks.request(name, fn)
+        : fn()),
+      onYield: () => { _lanePublishSkipDiag.yielded += 1; }
+    });
   } catch {
     /* no-op */
   }

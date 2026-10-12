@@ -1709,5 +1709,20 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
     version: '0.1.1595', metric: 'cross-checked-claims', value: 22,
     source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
     note: '★直近30日窓のスライドによる自然減(v0.1.1562/1577〜1587 の note と同じ理由)。今回の根拠は、ユーザー要望(浮かぶだけ)とコードの確認(キャラライブの吹き出し=.nlcl-chara__bubble と考え中の…=.nlcl-chara__think が会場の内容に被る)と、振る舞いテスト5件+配線2件、変異テスト5種(相槌・考え中・返事のガードを外す・既定を false にする・会場が talk:false を渡さない)で赤を確認して復元した別の手段。'
+  }),
+  Object.freeze({
+    version: '0.1.1596', metric: 'bundle-kb', value: 1401,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '★+1401KB 台(前版 1399KB から微増)は意図した増加。鏡を書く直前に保存済みの鏡を確かめて譲る処理(約25行)と書き手ID。' +
+      '更新履歴1版ぶんも含む(直近20版は popup バンドルに同梱される仕様)。計器は足していない。過去最良1360(@0.1.1454)との差分の内訳は v0.1.1471/1537/1560/1562 の note に記録済み。'
+  }),
+  Object.freeze({
+    version: '0.1.1596', metric: 'gate-selftest', value: 4,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1596', metric: 'cross-checked-claims', value: 22,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: '★直近30日窓のスライドによる自然減(v0.1.1562 の note と同じ理由)。今回も変異テストで赤を確認して復元している。'
   })
 ]);
