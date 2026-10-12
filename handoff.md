@@ -45,8 +45,35 @@ MACHINE_NOTES: -
 
 **人がやること（急ぎではない）**:
 **https://cloud.sambanova.ai/apis** で再発行し `SAMBANOVA_API_KEY` を差し替えるだけ。
-**LINEUP側の変更は不要**。この枠は weight4（予備）で、critic は
-groq + nvidia + cloudflare の**3体・3プロバイダが生存**。会議は19体のまま回る。
+**LINEUP側の変更は不要**。この枠は weight4（予備）。
 ★LINEUPからこの行を消さないこと（再発行すれば同じ行のまま復活する）。
+
+★2026-10-12 更新（この節の古い数字を実測で訂正）:
+ 旧文は「critic は groq + nvidia + cloudflare の3体・3プロバイダが生存／会議は19体」。
+ 実測では **critic は5席・sambanova(401)を除いても4体4プロバイダが生存**
+ （groq / cloudflare / nvidia / **mistral**）。magistral-small を「死んでいる」側に
+ 数えていたのが誤りで、**429 は容量上限＝復帰する**
+ （同一キーで codestral が **200/414ms**。2026-10-12 実測）。
+ 会議は **18体**（10-12 に openrouter/ling を有料化で撤去）。
+
+## ★ling は撤去済み・後継は「居ない」が正しい状態（2026-10-12）
+
+`openrouter/ling-3.0-flash`（`-sante:free`）が**有料化で消滅**
+（`:free` 無しの有料版だけがカタログに残る＝10-01 に `-fin:free` で踏んだのと同型。
+**同系譜への逃げは2回で尽きた**）。
+★**席は空けたまま**にしている。OpenRouter の `:free` 15件を全件 roleOf にかけた結果、
+lead を返すのは `nvidia/nemotron-3-ultra-550b-a55b:free` だけ＝**既に座っている**ため
+（埋められない席を埋めたふりをしない）。
+★lead の頭脳は **2系譜のまま維持**（nemotron=NVIDIA 2経路／magistral-medium=Mistral 別系譜）。
+★再採用の条件: roleOf が lead を返す**別系譜**の `:free` が現れたらその席に入れる。
+
+## ★worktree で日課を回しても state が分裂しなくなった（2026-10-12）
+
+`council-scout/` の置き場所を **常に本体のチェックアウト**へ固定した
+（`scripts/lib/council-scout-dir.mjs`）。**もう手でコピーして戻す必要はない。**
+実損: 新しい worktree は `state.json`（gitignore）を持たないため「初回実行」と誤判定し、
+**連続失敗日数が 4→1 にリセット**された（警告しきい値が `>=2` なので**本物の障害が
+警告されなくなる**）。10-06 は逆向き（本体へ戻し忘れで巻き戻り）で踏んでおり、
+**手順の記憶に頼る対策が実際に外れた**ので置き場所自体を直した。
 
 <!-- COMMANDER-NOTES:END -->
