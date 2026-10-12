@@ -221,6 +221,10 @@ export function charaLiveStageCss() {
    display:flex は hidden 属性の既定 display:none に勝ってしまうため、
    setVisible(false) しても隠れない。明示的に打ち消す。 */
 .nlcl-stage[hidden] { display: none; }
+/* ★2026-10-12 同じ罠が吹き出しと「…」にも残っていた(実測: 3体とも hidden なのに画面に出ていた)。
+   display:flex / -webkit-box は hidden の既定 display:none に勝つ。JS が hidden で出し入れする部品は全部ここで打ち消す。 */
+.nlcl-chara__bubble[hidden] { display: none; }
+.nlcl-chara__think[hidden] { display: none; }
 @keyframes nlcl-pop {
   from { opacity: 0; transform: translateX(-50%) translateY(4px) scale(0.94); }
   to   { opacity: 1; transform: translateX(-50%) translateY(0)   scale(1); }
