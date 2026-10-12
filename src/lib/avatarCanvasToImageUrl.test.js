@@ -39,6 +39,17 @@ describe('canvasToImageUrl', () => {
     expect(await canvasToImageUrl(canvas)).toBe('data:image/png;base64,OLD');
   });
 
+  it('★createObjectURL が例外を投げても toDataURL に戻る(e2e が createObjectURL を差し替える・拡張側の制限でも顔が消えない)', async () => {
+    const canvas = {
+      toBlob: vi.fn((cb) => cb({})),
+      toDataURL: vi.fn(() => 'data:image/png;base64,THROWN')
+    };
+    vi.spyOn(URL, 'createObjectURL').mockImplementation(() => {
+      throw new Error('blocked');
+    });
+    expect(await canvasToImageUrl(canvas)).toBe('data:image/png;base64,THROWN');
+  });
+
   it('★createObjectURL が無い環境でも toDataURL に戻る', async () => {
     const canvas = {
       toBlob: vi.fn((cb) => cb({})),
