@@ -91,7 +91,13 @@ const avatarDataUrlCache = new Map();
 export async function canvasToImageUrl(canvas) {
   if (typeof canvas.toBlob === 'function' && typeof URL !== 'undefined' && typeof URL.createObjectURL === 'function') {
     const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/png'));
-    if (blob) return URL.createObjectURL(blob);
+    if (blob) {
+      try {
+        return URL.createObjectURL(blob);
+      } catch {
+        /* createObjectURL が例外(差し替え・制限)でも画像を失わない=toDataURL に戻る */
+      }
+    }
   }
   return canvas.toDataURL('image/png');
 }
