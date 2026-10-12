@@ -15,6 +15,13 @@
 export const BASE_MIRROR_CELL_KEYS = Object.freeze(['displaySrc', 'title', 'idLine', 'nameLine', 'userId', 'recentTexts']);
 /** 復元後(paintStoryUserLaneDomFilled が受ける形)の基本キー。 */
 export const BASE_RESTORED_ITEM_KEYS = Object.freeze(['displaySrc', 'title', 'meta', 'entry']);
+/**
+ * 鏡セルの基本形のうち、【発言があるときだけ】復元後・会場の組み立てまで運ばれるキー(2026-10-12)。
+ *   以前は復元・組み立てが落としていた(=ホバーカードのセリフが、会場自前の在席名簿にしか無い人にしか出なかった)ため、
+ *   この定数は空だった。ここに宣言して、②復元と④会場の組み立ての期待に含める(落とす実装に戻したら赤)。
+ *   値は文字列の配列(輸入契約の枠 LANE_IMPORT_CONTRACT はオブジェクト型の項目専用なので、枠には入れない)。
+ */
+export const CARRIED_WHEN_PRESENT_KEYS = Object.freeze(['recentTexts']);
 /** 会場の組み立て(composeVenueLaneBuckets)が付ける内部キー。輸入項目ではない。 */
 export const VENUE_INTERNAL_KEYS = Object.freeze([
   'entryIndex', 'profileTier', 'thumbScore', 'displaySrc', 'title', 'entry', 'meta',

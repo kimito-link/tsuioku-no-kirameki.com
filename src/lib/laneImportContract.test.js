@@ -8,6 +8,7 @@ import { composeVenueLaneBuckets } from './venueLaneMirrorSupply.js';
 import {
   BASE_MIRROR_CELL_KEYS,
   BASE_RESTORED_ITEM_KEYS,
+  CARRIED_WHEN_PRESENT_KEYS,
   LANE_IMPORT_CONTRACT,
   VENUE_INTERNAL_KEYS,
   contractItemKeys,
@@ -78,7 +79,7 @@ describe('輸入契約: 各段階のキー集合が契約と完全一致する',
 
   it('② 復元後のアイテム: 基本キー+契約の itemKey と完全一致', () => {
     const restored = restoreLaneMirrorBuckets(snapOf(fullBuckets()));
-    const want = [...BASE_RESTORED_ITEM_KEYS, ...contractItemKeys()].sort();
+    const want = [...BASE_RESTORED_ITEM_KEYS, ...CARRIED_WHEN_PRESENT_KEYS, ...contractItemKeys()].sort();
     for (const t of TIERS) expect(sorted(restored[t][0]), `復元(${t})`).toEqual(want);
   });
 
@@ -95,7 +96,7 @@ describe('輸入契約: 各段階のキー集合が契約と完全一致する',
   it('④ 会場の組み立て(composeVenueLaneBuckets): 内部キー+契約の itemKey と完全一致し、値も落とさない', () => {
     const restored = restoreLaneMirrorBuckets(snapOf(fullBuckets()));
     const out = composeVenueLaneBuckets({ mirrorBuckets: restored, seatIndexByUid: new Map([['1001', 0]]) }).buckets;
-    const want = [...new Set([...VENUE_INTERNAL_KEYS, ...contractItemKeys()])].sort();
+    const want = [...new Set([...VENUE_INTERNAL_KEYS, ...CARRIED_WHEN_PRESENT_KEYS, ...contractItemKeys()])].sort();
     for (const t of TIERS) {
       expect(sorted(out[t][0]), `会場(${t})`).toEqual(want);
       for (const c of LANE_IMPORT_CONTRACT) expect(out[t][0][c.itemKey], `${c.id}@${t}`).toEqual(restored[t][0][c.itemKey]);

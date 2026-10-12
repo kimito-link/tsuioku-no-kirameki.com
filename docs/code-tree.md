@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 8 / 906 件
+## ⚠️ 役割コメントが無いソース 8 / 907 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `scripts/build.mjs`
@@ -830,7 +830,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (1923)
+- 📁 **src/** (1928)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1110,7 +1110,7 @@
         - `logo_funlink_white_RGB_link_black.png`
         - `logo_funlink_white_RGB_maru_black.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1687)
+  - 📁 **lib/** (1692)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -1833,6 +1833,7 @@
     - `laneMirrorPerLivePublish.test.js`
     - `laneMirrorPerLiveWiring.wiring.test.js`
     - `laneMirrorPublishNotSkipped.wiring.test.js`
+    - `laneMirrorRecentTextsCarry.test.js`
     - `laneMirrorWriteGate.js` — 【層】L0 判定層(純粋関数・I/O禁止)
     - `laneMirrorWriteGate.test.js`
     - `laneMirrorWriteGateWiring.test.js`
@@ -2647,6 +2648,7 @@
     - `venueHoverCard.wiring.test.js`
     - `venueHoverCardProbe.js` — 【層】L0 判定層（純関数・chrome/DOM/fetch に触らない）
     - `venueHoverCardProbe.test.js`
+    - `venueHoverCardRecentTextsWiring.wiring.test.js`
     - `venueHoverFacts.js` — 【層】L0 判定層（純関数・chrome/DOM/fetch に触らない）
     - `venueHoverFacts.test.js`
     - `venueHoverParity.test.js`
@@ -2697,6 +2699,9 @@
     - `venueSeatsDiagKey.js` — 会場モードの「座席健全度」観測値を会場(venueBar.js)が書き、status が読む storage キー。
     - `venueSpeech.js` — v0.1.711: ライブ会場モードの「発言→吹き出し」純関数。
     - `venueSpeech.test.js`
+    - `venueSpeechCensus.js` — 【層】L0 判定層(純粋関数・I/O禁止)
+    - `venueSpeechCensus.test.js`
+    - `venueSpeechCensusWiring.wiring.test.js`
     - `venueSpeechPanelIdentity.wiring.test.js`
     - `venueSpeechStreak.js` — 「会話の連鎖」(2026-06-15 会議の最大多数決の本命・弱点A/C):
     - `venueSpeechStreak.test.js`
