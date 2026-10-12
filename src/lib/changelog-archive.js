@@ -24,6 +24,14 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.1577',
+    date: '2026-10-06',
+    summary: '本家コメの速さが静かな配信で残らない',
+    items: Object.freeze([
+      '「本家コメ」の隣の「+N/分」が、コメントが止まって静かになった配信でも、直前の速さを最大15分まで出し続けることがありました。最後にコメントが増えてから2分たったら表示を消すようにしました(数秒おきにコメントが来ている間は消えません)。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1576',
     date: '2026-10-06',
     summary: '別窓でも大人数の応援レーンが伸びない',
