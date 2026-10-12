@@ -422,6 +422,13 @@ export function buildAiShareFullText({ overviewText, livesData, fastDiag, popupD
     } catch {
       /* no-op */
     }
+    // 2026-10-12(ユーザー要望): 会場のホバーカードの「セリフ(発言の行)」がちゃんと出ているかの1行。
+    try {
+      const scLine = String(/** @type {any} */ (venueSeatsDiag)?.speechCensus?.line || '');
+      if (scLine) lines.push(scLine);
+    } catch {
+      /* no-op */
+    }
     // 2026-07-21 診断先行: 応援TOP吹き出しchurnの実害を数えるだけの1行。
     try {
       const bcLine = String(/** @type {any} */ (venueSeatsDiag)?.bubbleChurn?.line || '');

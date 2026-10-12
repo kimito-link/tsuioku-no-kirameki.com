@@ -34,6 +34,8 @@
  *       tileTag: string, seatLinkOn: boolean, mode: string, atWall: number } }|null,
  *   yukkuriNamedCensus: { line: string, checked: number, yukkuriNamed: number, outOfRangeDigits: number,
  *     lastSample: null | { uid: string, name: string, digits: number } }|null,
+ *   speechCensus: { line: string, verdict: 'ok'|'warn'|'idle', checked: number, shown: number, mirrorOnly: number,
+ *     missing: number, silent: number, hoverOpened: number, hoverWithLines: number, hoverEmptyButSpoke: number }|null,
  *   mirrorIntakeLine: string,
  *   mirrorIntake: { changedEvents:number, keyMatched:number, keyMissed:number, accepted:number,
  *     rejectedByGate:number, lastMissedKeys:string[], lastExpectedKey:string,
@@ -78,6 +80,7 @@ export function makeInitialVenueSeatsDiag() {
     },
     seatLinkParity: /** @type {VenueSeatsDiagState['seatLinkParity']} */ (null),
     yukkuriNamedCensus: /** @type {VenueSeatsDiagState['yukkuriNamedCensus']} */ (null),
+    speechCensus: /** @type {VenueSeatsDiagState['speechCensus']} */ (null),
     // ★v0.1.1317: 会場が鏡を受け取れているかの1行(未観測は空文字=状態速報に出ない)。
     mirrorIntakeLine: '',
     /*
@@ -255,6 +258,22 @@ export function buildVenueSeatsDiagSnapshot(diag, nowMs) {
           : null
       }
     : null;
+  // 2026-10-12(ユーザー要望・会場のセリフ診断): 検証済みのフィールドだけ通す(未知の巨大オブジェクトを写さない)。
+  const scIn = /** @type {any} */ (d.speechCensus && typeof d.speechCensus === 'object' ? d.speechCensus : null);
+  const speechCensus = scIn
+    ? {
+        line: String(scIn.line || ''),
+        verdict: scIn.verdict === 'warn' || scIn.verdict === 'ok' ? scIn.verdict : 'idle',
+        checked: Math.max(0, Math.floor(num(scIn.checked, 0))),
+        shown: Math.max(0, Math.floor(num(scIn.shown, 0))),
+        mirrorOnly: Math.max(0, Math.floor(num(scIn.mirrorOnly, 0))),
+        missing: Math.max(0, Math.floor(num(scIn.missing, 0))),
+        silent: Math.max(0, Math.floor(num(scIn.silent, 0))),
+        hoverOpened: Math.max(0, Math.floor(num(scIn.hoverOpened, 0))),
+        hoverWithLines: Math.max(0, Math.floor(num(scIn.hoverWithLines, 0))),
+        hoverEmptyButSpoke: Math.max(0, Math.floor(num(scIn.hoverEmptyButSpoke, 0)))
+      }
+    : null;
   return {
     enabled: !!d.enabled,
     liveId: String(d.liveId || base.liveId),
@@ -277,6 +296,7 @@ export function buildVenueSeatsDiagSnapshot(diag, nowMs) {
     openLatency,
     seatLinkParity,
     yukkuriNamedCensus,
+    speechCensus,
     /*
      * ★v0.1.1317: 会場が鏡を受け取れているかの1行(会場が完全一致しない件の切り分け)。
      *   文字列1本だけ通す(未知の巨大オブジェクトを写さない=このファイルの既存方針)。
