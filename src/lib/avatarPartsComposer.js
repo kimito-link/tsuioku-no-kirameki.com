@@ -75,27 +75,50 @@ const AVATAR_DATA_URL_CACHE_MAX = 256;
 const avatarDataUrlCache = new Map();
 
 /**
+ * Blob を data: URL の【文字列】にする(FileReader)。失敗したら reject。
+ * @param {Blob} blob
+ * @returns {Promise<string>}
+ */
+function blobToDataUrl(blob) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const r = typeof reader.result === 'string' ? reader.result : '';
+      if (r.startsWith('data:')) resolve(r);
+      else reject(new Error('FileReader returned a non data: value'));
+    };
+    reader.onerror = () => reject(reader.error || new Error('FileReader failed'));
+    reader.readAsDataURL(blob);
+  });
+}
+
+/**
  * canvas を <img src> に使える URL にする。
- * ★2026-10-11: toDataURL('image/png') は PNG 書き出しをメインスレッドで同期に行う。匿名330人ぶんの合成で
- *   toDataURL だけが 3〜4秒(起動の主スレッド総時間 約10秒のうち)・最長 4.1秒連続で止まっていた。
- *   toBlob は書き出しを別スレッドで行うのでメインスレッドの負担が大きく減る(同じ配信・同じ手順の前後比較で、
- *   起動の主スレッド総時間 9.8〜11.3秒 → 6.5〜6.7秒)。blob: URL は <img> でそのまま使える
- *   (拡張ページの CSP に img-src の制限は無い)。toBlob / createObjectURL が無い、または toBlob が null を返す
- *   環境では従来の toDataURL に戻る(機能を失わない)。
- *   ★blob URL は revoke しない(キャッシュから追い出された後も、画面に残っている <img> が壊れないように)。
- *     blob は文書が閉じるまで残る(1枚 数KB×その文書で合成した別人の数)。文書は数分〜数時間で作り直される。
- *     人数が数千になる長時間の放送では数十MBになりうる点に注意。
+ *
+ * ■ 経緯
+ *   2026-10-11: toDataURL('image/png') は PNG 書き出しをメインスレッドで同期に行う。匿名330人ぶんの合成で
+ *     toDataURL だけが 3〜4秒(起動の主スレッド総時間 約10秒のうち)・最長 4.1秒連続で止まっていた。
+ *     toBlob は書き出しを別スレッドで行うので負担が大きく減る(前後比較で 9.8〜11.3秒 → 6.5〜6.7秒)。
+ *   2026-10-12: ★その結果を blob: URL にしていたのが【解放されずに積み上がる漏れ】だった(私の退化)。
+ *     実測: 作成295・解放0(10秒)→ 378・解放0・8.6MB(91秒)。1枚 約23KB。しかも「別人の数」ではなく
+ *     【合成のたび】に増える(キャッシュは256件=追い出された人は次の描画でまた合成され、新しい blob が積まれる)。
+ *     お使いのPCの記録では、起動直後のプロセスのメモリが1分で約1.8GB・5分ごとに約+2GB で 6.3GB に達していた。
+ *   → 書き出しは toBlob(別スレッド)のまま、結果は FileReader で data: URL の【文字列】にする。
+ *     文字列は使い終われば GC され、解放の管理が要らない(標準の作法)。blob URL を一切作らない。
+ *     追い出されたキャッシュの文字列も、画面の <img> が持っていれば残り、無ければ GC される。
+ *   toBlob / FileReader が無い、toBlob が null を返す、読み込みが失敗する環境では従来の toDataURL に戻る
+ *   (機能を失わない)。
  * @param {HTMLCanvasElement} canvas
  * @returns {Promise<string>}
  */
 export async function canvasToImageUrl(canvas) {
-  if (typeof canvas.toBlob === 'function' && typeof URL !== 'undefined' && typeof URL.createObjectURL === 'function') {
+  if (typeof canvas.toBlob === 'function' && typeof FileReader !== 'undefined') {
     const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/png'));
     if (blob) {
       try {
-        return URL.createObjectURL(blob);
+        return await blobToDataUrl(blob);
       } catch {
-        /* createObjectURL が例外(差し替え・制限)でも画像を失わない=toDataURL に戻る */
+        /* 読み込みの失敗でも画像を失わない=toDataURL に戻る */
       }
     }
   }
