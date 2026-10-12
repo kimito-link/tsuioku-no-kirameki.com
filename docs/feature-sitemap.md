@@ -877,7 +877,7 @@
   - `src/extension/live-ranking-entry.js`
   - `tsuioku-no-kirameki/live/index.html`
   - `.github/workflows/live-ranking.yml`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 217</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 218</summary>
 
 - `app/app.js` — スマホ閲覧用 status Web 版。
 - `app/live-view.js` — global NL_BUILD_ID
@@ -909,6 +909,7 @@
 - `scripts/measure-flash-frames.mjs` — 「一瞬の黒」を【画面に出たピクセル】で測る。
 - `scripts/meeting-roles.mjs` — meeting.mjs の役割注入版。
 - `scripts/meeting.mjs` — 会議ハーネス: 同じ問いを「無料クラウド4系統 + ローカル ollama 数体」に投げ、
+- `scripts/perf-ab/boot-profile.mjs` — パネル(popup)の【起動の瞬間】のメインスレッド CPU プロファイル。「押した瞬間の黒い幕」の原因探し用。
 - `scripts/perf-ab/common.mjs` — perf-ab 共通部品: 拡張を読み込んだ Chromium の起動・後片付け・拡張プロセスの CPU/メモリ採取。
 - `scripts/perf-ab/cpu-timeline.mjs` — 拡張プロセス(--extension-process)の CPU%・メモリが、ページを開くたびにどう積み上がるかを時系列で見る。
 - `scripts/perf-ab/growth.mjs` — 拡張プロセスのメモリが「何で」増えているかを時系列で見る(JS ヒープ / DOM ノード / リスナー / ドキュメント / OS 側メモリ)。
@@ -1108,7 +1109,10 @@
 - `v0.1.1581` 2026-10-08 — 拡張の無駄な書き込みを減らして軽く
 - `v0.1.1579` 2026-10-07 — 会場の見出しが数秒ごとに点滅しない
 
-### 🏟 会場・席 (8版)
+### 🙂 匿名(184) (1版)
+- `v0.1.1594` 2026-10-08 — 匿名の顔の作成が軽くなる
+
+### 🏟 会場・席 (7版)
 - `v0.1.1589` 2026-10-08 — 2配信同時でも会場が消えない
 - `v0.1.1587` 2026-10-08 — 数字カードの更新要求を減らして軽く
 - `v0.1.1584` 2026-10-08 — ギフト列に公式の貢献者も出す
@@ -1116,7 +1120,6 @@
 - `v0.1.1581` 2026-10-08 — 拡張の無駄な書き込みを減らして軽く
 - `v0.1.1579` 2026-10-07 — 会場の見出しが数秒ごとに点滅しない
 - `v0.1.1578` 2026-10-07 — 会場のバッジが出入りしてもちかちかしない
-- `v0.1.1574` 2026-10-06 — 裏タブでも熱い人バッジが出るように
 
 ### 🎁 ギフト (2版)
 - `v0.1.1584` 2026-10-08 — ギフト列に公式の貢献者も出す

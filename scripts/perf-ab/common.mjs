@@ -102,7 +102,7 @@ export function sampleExtensionProcessCpu(userDataDir, intervalSec = 5) {
 
 /**
  * V8 の CPU プロファイル(profile)から、自分の時間の上位と、スタック上に居た時間(含む)の上位を集計する。
- * @returns {{ sampledMs: number, idleMs: number, busyPct: number, self: [string, number][], inclusive: [string, number][], entries: [string, number][] }}
+ * @returns {{ sampledMs: number, idleMs: number, busyPct: number, longestBusyRunMs: number, self: [string, number][], inclusive: [string, number][], entries: [string, number][] }}
  */
 export function summarizeProfile(profile, { top = 22 } = {}) {
   const nodes = new Map(profile.nodes.map((n) => [n.id, n]));
@@ -135,6 +135,8 @@ export function summarizeProfile(profile, { top = 22 } = {}) {
   // 入口(スタックの一番下=最初に現れる名前付き JS フレーム)ごとの合計時間。「誰が仕事を始めているか」を見る。
   const entries = new Map();
   for (const [nid, t] of selfByNode) {
+    // 暇(idle)は入口の集計に入れない(入れると「native only」に暇な時間が混ざり、重さを過大に見積もる=2026-10-11 に誤報した)
+    if (nodes.get(nid).callFrame.functionName === '(idle)') continue;
     const chain = [];
     for (let cur = nid; cur; cur = parent.get(cur)) chain.push(cur);
     chain.reverse();
@@ -149,6 +151,17 @@ export function summarizeProfile(profile, { top = 22 } = {}) {
     }
     entries.set(k, (entries.get(k) || 0) + t);
   }
+  // 最長の連続稼働(暇が挟まらず続けて動いた最長の時間)=「メインスレッドが止まった最大の長さ」の目安。
+  let runMs = 0;
+  let longestBusyRunMs = 0;
+  profile.samples.forEach((nid, i) => {
+    const d = (profile.timeDeltas[i] || 0) / 1000;
+    if (nodes.get(nid).callFrame.functionName === '(idle)') runMs = 0;
+    else {
+      runMs += d;
+      if (runMs > longestBusyRunMs) longestBusyRunMs = runMs;
+    }
+  });
   const idleMs = [...self].filter(([k]) => k.startsWith('(idle)')).reduce((a, [, t]) => a + t, 0) / 1000;
   const sorted = (m, drop) =>
     [...m].filter(([k]) => !drop.test(k)).sort((a, b) => b[1] - a[1]).slice(0, top).map(([k, t]) => [k, t / 1000]);
@@ -156,6 +169,7 @@ export function summarizeProfile(profile, { top = 22 } = {}) {
     sampledMs: total / 1000,
     idleMs,
     busyPct: total ? Math.round((1 - (idleMs * 1000) / total) * 100) : 0,
+    longestBusyRunMs,
     self: sorted(self, /^\(idle\)/),
     inclusive: sorted(inclusive, /^\((root|program|idle|garbage)/),
     entries: sorted(entries, /^\(idle\)/)
