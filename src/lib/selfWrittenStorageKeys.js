@@ -157,19 +157,7 @@ const SELF_WRITTEN_PATTERNS = Object.freeze([
    */
   /^nls_score_announce_diag_v\d+$/i,
   /^nls_report_preview_v\d+$/i,
-  /^nls_recording_watchdog_v\d+$/i,
-  /*
-   * ★v0.1.1607(設計V3d): 実機の状態速報(2026-10-13・描き直し計732回)で描き直しを呼んでいた診断・フラグ専用キー。
-   *   nls_sidepanel_self_diag_v1 ×21 / nls_venue_effect_sound_presence_v1 ×11 / nls_ai_share_popup_diag_v1 ×2 /
-   *   nls_concurrent_calibration_ring_v1 ×2(1回 約820KB) / nls_status_trend_v1 ×1。
-   *   いずれも【使う側が必要なときに get する】(状態速報・効果音の二重再生判定)か診断ページが読むだけで、
-   *   popup の描画は onChanged に頼っていない。  ★nls_venue_live_open_v1 は開閉フラグ(意味のある状態)なので入れない。
-   */
-  /^nls_sidepanel_self_diag_v\d+$/i,
-  /^nls_venue_effect_sound_presence_v\d+$/i,
-  /^nls_ai_share_popup_diag_v\d+$/i,
-  /^nls_concurrent_calibration_ring_v\d+$/i,
-  /^nls_status_trend_v\d+$/i
+  /^nls_recording_watchdog_v\d+$/i
 ]);
 
 /**
