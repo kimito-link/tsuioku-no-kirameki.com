@@ -24,6 +24,14 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.1592',
+    date: '2026-10-08',
+    summary: '2配信でも応援プレビューが空にならない',
+    items: Object.freeze([
+      '2つの配信を同時に記録していると、応援プレビューや、通常のパネルの代替表示で、応援レーンが空のままになることがありました。別の配信が最後に書いた共通の保存場所しか見ていなかったためで、配信ごとの保存場所を先に読むようにしました。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1591',
     date: '2026-10-08',
     summary: '公開は表示中の配信の分だけ送る',
