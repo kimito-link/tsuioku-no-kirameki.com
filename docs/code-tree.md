@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 8 / 908 件
+## ⚠️ 役割コメントが無いソース 8 / 909 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `scripts/build.mjs`
@@ -830,7 +830,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (1933)
+- 📁 **src/** (1935)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1110,7 +1110,7 @@
         - `logo_funlink_white_RGB_link_black.png`
         - `logo_funlink_white_RGB_maru_black.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1697)
+  - 📁 **lib/** (1699)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -2695,6 +2695,8 @@
     - `venueResidents.test.js`
     - `venueRoster.js` — 2026-06-14 ユーザー要望「今会場にいるメンバーを視覚的に確認できるボタン・AIも人間も検証
     - `venueRoster.test.js`
+    - `venueSeatDomState.js` — 【層】L0 判定層(DOM を触るが「値が違うときだけ書く」だけの薄い部品。chrome.*・storage・fetch は無い)
+    - `venueSeatDomState.test.js`
     - `venueSeatLinkParity.js` — 会場タイルの「リンク欠落」実害確定計器(診断先行アプローチ)。
     - `venueSeatLinkParity.test.js`
     - `venueSeats.js` — v0.1.707: ライブ会場モードの「座席モデル」純関数。
