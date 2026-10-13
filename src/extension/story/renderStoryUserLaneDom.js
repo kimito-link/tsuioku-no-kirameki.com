@@ -89,6 +89,15 @@ import {
 const _laneTierLastKey = new WeakMap();
 
 /**
+ * 段を「前回と同じ」とみなさせない(次の描画で必ず貼り替える)。
+ * 会場で席の持ち主が段をまたいで変わったとき、前後の段を作り直させるために使う(venueBar.js・2026-10-13)。
+ * @param {HTMLElement|null|undefined} laneEl
+ */
+export function invalidateStoryUserLaneTierKey(laneEl) {
+  if (laneEl) _laneTierLastKey.delete(laneEl);
+}
+
+/**
  * ★v0.1.1562: 段(lane el)ごとに「いま描いているタイル本体の控え(items と同じ並び)」を持つ。
  *   diff-skip で DOM を触らない回でも、stats(data-stats)だけを【その場で】更新するため(DOM query ゼロ)。
  *   diff-skip が成立する=body key 一致=items の並びが同一、なので index で引いてよい(uid 衝突に強い)。

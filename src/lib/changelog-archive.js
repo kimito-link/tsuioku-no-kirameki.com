@@ -24,6 +24,14 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.1589',
+    date: '2026-10-08',
+    summary: '2配信同時でも会場が消えない',
+    items: Object.freeze([
+      '2つの配信を同時に記録していると、会場モードが一瞬『該当者がいません』になったり戻ったりすることがありました。別の配信の応援レーン情報で自分の配信の表示を上書きしていたのが原因で、自分の配信のものだけを使うようにしました。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1588',
     date: '2026-10-08',
     summary: '取り込みログの保存を減らして軽く',
