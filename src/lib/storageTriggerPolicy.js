@@ -47,6 +47,8 @@ export function isThrottledExtraStorageKey(key) {
 const SLOW_PATTERNS = Object.freeze([
   /^nls_live_broadcaster_ctx_v\d+$/i,
   /^nls_live_ended_lv\d{1,15}$/i,
+  // 最後に視聴した URL(複数タブで書き合う・実機で698回/46分)。パネルの URL 解決は別経路でも追従する=3秒に1回で足りる。
+  /^nls_last_watch_url$/i,
   /^nls_event_dom_lv\d{1,15}$/i
 ]);
 
