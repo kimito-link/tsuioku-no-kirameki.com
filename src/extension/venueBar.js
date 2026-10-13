@@ -2221,6 +2221,23 @@ const VENUE_CSS = `
     animation: none;
     z-index: auto;
   }
+  /* v0.1.1613 文字サイズ・寸法規則を①に揃える(2026-10-13・状態速報「幾何≠ gift:179×46px(①149×44px)」)。
+     タイルは font-size を自分で持たず親から継承する。①は popup の body が 15px、会場はニコ生ページの 16px を継承して
+     いた=同じ人のタイルが会場だけ約7%大きい(再現環境の実測: 会場 16px・高さ46 / ①15px・高さ44)。
+     段(レーン帯)の中だけを①の値に固定する。席/ツールバー等の他の部品は触らない。
+     ★LANE_CSS_SYNC マーカー区間の外(区間内の直接編集は同期テスト赤)。 */
+  .nlsb-venue-lane-stack {
+    font-size: 15px;
+  }
+  /* ★寸法の本当の原因: ①(popup)は全要素 box-sizing:border-box だが、会場はホストページ上にあり既定の content-box。
+     アバターは width:44px でも border(1.5px×2)が外側へ足されて 46px になる(実測: 会場46×46 / ①44×44)。
+     段の中だけ border-box にして①と同じ寸法規則にする。 */
+  .nlsb-venue-lane-stack,
+  .nlsb-venue-lane-stack *,
+  .nlsb-venue-lane-stack *::before,
+  .nlsb-venue-lane-stack *::after {
+    box-sizing: border-box;
+  }
   /* v0.1.1121 surface行単位化(C): v0.1.1119 の stack 全面surfaceは、ガイド/空文込みの下端55vh
      バンド全体を白い大パネルにして画面下半分を占有した(実機で確認)。surfaceは【実在タイルの行
      (.nl-story-userlane)だけ】に敷く=透け防止(タイル背後)と「画面を占有しない」を粒度で両立。
