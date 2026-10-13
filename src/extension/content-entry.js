@@ -10498,18 +10498,36 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
 return true;
 }
 
-function rememberWatchPageUrl() {
+/**
+ * v0.1.1607: このタブが最後に書いた URL。syncLiveIdFromLocation は見えているタブで約360msごとに走り、従来は
+ *   毎回この関数を通って同じ URL を書き直していた。見えているタブが複数(複数ウィンドウ・分割表示)あると、タブ同士が
+ *   交互に nls_last_watch_url を書き換え合い、書かれるたびに全タブのパネルが描き直しを繰り返した
+ *   (実機 2026-10-13: 終了済みの裏タブが46分で nls_last_watch_url の変化698回・描画1431回)。
+ *   「最後に視聴した URL」の意味は変えず、【URL が変わったとき】と【このタブが前面に来たとき(focus/visible)】だけ書く。
+ */
+let _lastRememberedWatchHref = '';
+/** @param {boolean} [force] 前面に来たとき等、同じ URL でも書き直す */
+function rememberWatchPageUrl(force = false) {
   if (!hasExtensionContext()) return;
   if (!isNicoLiveWatchUrl(window.location.href)) return;
+  if (force !== true && window.location.href === _lastRememberedWatchHref) return;
   if (lastWatchUrlTimer) clearTimeout(lastWatchUrlTimer);
   lastWatchUrlTimer = setTimeout(() => {
     lastWatchUrlTimer = null;
     if (!hasExtensionContext()) return;
+    _lastRememberedWatchHref = window.location.href;
     chrome.storage.local
       .set({ [KEY_LAST_WATCH_URL]: window.location.href })
       .catch(() => {});
   }, 400);
 }
+try {
+  // このタブが前面に来たら、最後に視聴した URL として書き直す(別のタブが書いた後でも「いま見ているのはこれ」を取り戻す)。
+  window.addEventListener('focus', () => rememberWatchPageUrl(true));
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') rememberWatchPageUrl(true);
+  });
+} catch { /* no-op */ }
 
 async function readRecordingFlag() {
   if (!hasExtensionContext()) return false;
