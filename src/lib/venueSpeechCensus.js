@@ -97,7 +97,8 @@ export function observeVenueSpeechTiles(state, tiles) {
 /**
  * カードが開かれたときに1回呼ぶ(累計)。
  * @param {ReturnType<typeof createVenueSpeechCensusState>} state
- * @param {{ name?: unknown, lines?: unknown, spoke?: unknown }} card
+ * @param {{ name?: unknown, lines?: unknown, spoke?: unknown, detail?: unknown }} card
+ *   detail: 空だったときの手がかり(関数でも文字列でも可。空のときだけ評価する=ふだんは何も作らない)。標本の名前の後ろに付く(原因の切り分け用・2026-10-13)
  *   lines: カードに出した発言の行数 / spoke: その人が発言している形跡(カードの発言回数>0 など)
  */
 export function observeVenueSpeechHover(state, card) {
@@ -108,7 +109,12 @@ export function observeVenueSpeechHover(state, card) {
   }
   if (card?.spoke === true) {
     state.hover.emptyButSpoke += 1;
-    if (state.hoverEmptySamples.length < SAMPLE_MAX) state.hoverEmptySamples.push(String(card?.name || '?').slice(0, 20));
+    if (state.hoverEmptySamples.length < SAMPLE_MAX) {
+      let raw = card?.detail;
+      try { if (typeof raw === 'function') raw = raw(); } catch { raw = ''; }
+      const detail = String(raw || '').slice(0, 60);
+      state.hoverEmptySamples.push(String(card?.name || '?').slice(0, 20) + (detail ? `(${detail})` : ''));
+    }
   }
 }
 
