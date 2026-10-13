@@ -830,7 +830,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (1931)
+- 📁 **src/** (1933)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1110,7 +1110,7 @@
         - `logo_funlink_white_RGB_link_black.png`
         - `logo_funlink_white_RGB_maru_black.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1695)
+  - 📁 **lib/** (1697)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -1534,6 +1534,7 @@
     - `displayRecordedCount.test.js`
     - `distFingerprint.js` — 「この dist はこのソースから build されたものか」を判定する純関数。
     - `distFingerprint.test.js`
+    - `distNoNoncharacters.test.js`
     - `domAttrBus.test.js`
     - `domHarvestScrollDefer.js` — 「ユーザーが今まさにスクロール中か」を判定して、コメントの DOM ハーベスト
     - `domHarvestScrollDefer.test.js`
@@ -1694,6 +1695,7 @@
     - `highlightLedgerKey.js` — 配信採点「発表演出」用のハイライト台帳(実際に画面に出た演出だけを記録する最小台帳)の
     - `highlightLedgerPerLiveWiring.test.js`
     - `hostCreateOnce.wiring.test.js`
+    - `hotPathMemo.test.js`
     - `htmlEscape.js` — 旧パス：`src/lib/htmlEscape.js`
     - `htmlEscape.test.js`
     - `htmlReportCommenterFollowSection.js` — HTML レポート向けコメンターフォロー分析ブロック。

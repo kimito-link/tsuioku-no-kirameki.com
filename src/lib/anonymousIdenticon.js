@@ -125,6 +125,11 @@ function shade(hex, f) {
   return `rgb(${c(m[1])},${c(m[2])},${c(m[3])})`;
 }
 
+/** 使い回しの上限(1件 約3KB → 約6MB)。1配信の匿名の人数(数百〜2千)を覆い、無限には増えない。 */
+const IDENTICON_CACHE_MAX = 2000;
+/** @type {Map<string, string>} */
+const identiconCache = new Map();
+
 /**
  * @param {unknown} userId
  * @param {number} [sizePx]
@@ -135,6 +140,15 @@ export function anonymousIdenticonDataUrl(userId, sizePx = 64) {
   if (!s) return '';
 
   const n = Math.max(16, Math.min(128, Number(sizePx) || 64));
+  // ★v0.1.1605: 純関数(同じ入力→同じ文字列)なので結果を使い回す。実データ入りのプロファイルで、描き直し1回あたり
+  //   全員分の SVG 組み立て+encodeURIComponent が自分の時間の最上位(15秒中 0.5 秒)だった。上限つき LRU(古い順に捨てる)。
+  const cacheKey = `${n}|${s}`;
+  const hit = identiconCache.get(cacheKey);
+  if (hit !== undefined) {
+    identiconCache.delete(cacheKey);
+    identiconCache.set(cacheKey, hit);
+    return hit;
+  }
   const h = hashString(s);
 
   const hue = (h >>> 15) % 360;
@@ -167,5 +181,21 @@ export function anonymousIdenticonDataUrl(userId, sizePx = 64) {
     eyes(iris, irisDark) +
     mouth() +
     `</g></svg>`;
-  return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+  const out = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+  identiconCache.set(cacheKey, out);
+  while (identiconCache.size > IDENTICON_CACHE_MAX) {
+    const oldest = identiconCache.keys().next().value;
+    if (oldest === undefined) break;
+    identiconCache.delete(oldest);
+  }
+  return out;
+}
+
+/** テスト用: 使い回しを空にする。 */
+export function clearAnonymousIdenticonCacheForTest() {
+  identiconCache.clear();
+}
+/** テスト用: 使い回しの件数。 */
+export function anonymousIdenticonCacheSizeForTest() {
+  return identiconCache.size;
 }
