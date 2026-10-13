@@ -82,6 +82,39 @@ export function shouldAdoptLaneMirrorForVenue(snap, liveId) {
   return Boolean(snapLive && cur && snapLive === cur);
 }
 
+/** @param {Partial<LaneMirrorSnapshot>|null|undefined} snap @returns {number} 5段のセル総数 */
+export function countLaneMirrorCells(snap) {
+  if (!snap || typeof snap !== 'object') return 0;
+  const s = /** @type {any} */ (snap);
+  return TIERS.reduce((a, t) => a + (Array.isArray(s[t]) ? s[t].length : 0), 0);
+}
+
+/**
+ * 会場が鏡を【採用してよいか】の縮小ガード付き版(2026-10-13・ユーザー確定「増えるのはいい・途中で減るのはだめ」)。
+ *   同一配信で、いま描いている鏡より【セル総数が少ない】鏡が来ても採らない(直近の良い鏡を保持)。
+ *   ★古い大きい鏡を居座らせない: 保持中の鏡が HARD 窓(15分)を超えて古ければ縮小でも採る
+ *   (その鏡は isLaneMirrorUsableForVenue が staleHard で降格させるため、居座っても fallback に落ちるだけ)。
+ *   配信が替われば liveId が違うので current は比較対象外=採用(shouldAdoptLaneMirrorForVenue が先に通る)。
+ * @param {Partial<LaneMirrorSnapshot>|null|undefined} current いま保持している鏡
+ * @param {Partial<LaneMirrorSnapshot>|null|undefined} incoming 新着の鏡
+ * @param {string} liveId 現配信
+ * @param {number} nowMs
+ * @returns {{ adopt: boolean, shrunk: boolean, from: number, to: number }}
+ */
+export function decideVenueMirrorAdoption(current, incoming, liveId, nowMs) {
+  const from = countLaneMirrorCells(current);
+  const to = countLaneMirrorCells(incoming);
+  if (!shouldAdoptLaneMirrorForVenue(incoming, liveId)) return { adopt: false, shrunk: false, from, to };
+  const sameLive =
+    current &&
+    String(current.liveId || '').trim().toLowerCase() === String(liveId || '').trim().toLowerCase();
+  if (!sameLive || to >= from) return { adopt: true, shrunk: false, from, to };
+  const heldAt = Number(current.capturedAt) || 0;
+  const heldAge = (Number(nowMs) || 0) - heldAt;
+  if (heldAt <= 0 || heldAge > VENUE_LANE_MIRROR_HARD_WINDOW_MS) return { adopt: true, shrunk: true, from, to };
+  return { adopt: false, shrunk: true, from, to };
+}
+
 /**
  * 鏡セル→buildVenueSeating が食える行(P層)。uid のあるセルだけが席を持てる(uid無しの広告主
  * セル等は席に座らず、compose 側で lane に直接出る)。同一 uid の重複(link と gift の両在籍等)は
