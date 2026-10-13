@@ -36,6 +36,8 @@
  *     lastSample: null | { uid: string, name: string, digits: number } }|null,
  *   speechCensus: { line: string, verdict: 'ok'|'warn'|'idle', checked: number, shown: number, mirrorOnly: number,
  *     missing: number, silent: number, hoverOpened: number, hoverWithLines: number, hoverEmptyButSpoke: number }|null,
+ *   tileCountCensus: { line: string, verdict: 'ok'|'warn'|'idle', paints: number, changes: number, last: number, max: number,
+ *     drops: number, worstDrop: number, worstFrom: number, worstTo: number, worstCause: string }|null,
  *   mirrorIntakeLine: string,
  *   mirrorIntake: { changedEvents:number, keyMatched:number, keyMissed:number, accepted:number,
  *     rejectedByGate:number, lastMissedKeys:string[], lastExpectedKey:string,
@@ -81,6 +83,8 @@ export function makeInitialVenueSeatsDiag() {
     seatLinkParity: /** @type {VenueSeatsDiagState['seatLinkParity']} */ (null),
     yukkuriNamedCensus: /** @type {VenueSeatsDiagState['yukkuriNamedCensus']} */ (null),
     speechCensus: /** @type {VenueSeatsDiagState['speechCensus']} */ (null),
+    // 2026-10-13: 会場の人数の増減(減った瞬間の証拠取り)。未観測は null=状態速報に出ない。
+    tileCountCensus: /** @type {VenueSeatsDiagState['tileCountCensus']} */ (null),
     // ★v0.1.1317: 会場が鏡を受け取れているかの1行(未観測は空文字=状態速報に出ない)。
     mirrorIntakeLine: '',
     /*
@@ -274,6 +278,23 @@ export function buildVenueSeatsDiagSnapshot(diag, nowMs) {
         hoverEmptyButSpoke: Math.max(0, Math.floor(num(scIn.hoverEmptyButSpoke, 0)))
       }
     : null;
+  // 2026-10-13(ユーザー報告「途中で減るのはだめ」): 会場の人数の増減。検証済みのフィールドだけ通す。
+  const tcIn = /** @type {any} */ (d.tileCountCensus && typeof d.tileCountCensus === 'object' ? d.tileCountCensus : null);
+  const tileCountCensus = tcIn
+    ? {
+        line: String(tcIn.line || ''),
+        verdict: tcIn.verdict === 'warn' || tcIn.verdict === 'ok' ? tcIn.verdict : 'idle',
+        paints: Math.max(0, Math.floor(num(tcIn.paints, 0))),
+        changes: Math.max(0, Math.floor(num(tcIn.changes, 0))),
+        last: Math.max(0, Math.floor(num(tcIn.last, 0))),
+        max: Math.max(0, Math.floor(num(tcIn.max, 0))),
+        drops: Math.max(0, Math.floor(num(tcIn.drops, 0))),
+        worstDrop: Math.max(0, Math.floor(num(tcIn.worstDrop, 0))),
+        worstFrom: Math.max(0, Math.floor(num(tcIn.worstFrom, 0))),
+        worstTo: Math.max(0, Math.floor(num(tcIn.worstTo, 0))),
+        worstCause: String(tcIn.worstCause || '')
+      }
+    : null;
   return {
     enabled: !!d.enabled,
     liveId: String(d.liveId || base.liveId),
@@ -297,6 +318,7 @@ export function buildVenueSeatsDiagSnapshot(diag, nowMs) {
     seatLinkParity,
     yukkuriNamedCensus,
     speechCensus,
+    tileCountCensus,
     /*
      * ★v0.1.1317: 会場が鏡を受け取れているかの1行(会場が完全一致しない件の切り分け)。
      *   文字列1本だけ通す(未知の巨大オブジェクトを写さない=このファイルの既存方針)。
