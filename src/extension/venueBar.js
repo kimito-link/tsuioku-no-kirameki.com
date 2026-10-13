@@ -238,6 +238,7 @@ import {
   observeVenueSeatLink,
   toVenueSeatLinkParityDiag
 } from '../lib/venueSeatLinkParity.js';
+import { createEmptySeatState, flushVenueSeatState } from '../lib/venueSeatDomState.js';
 // 2026-07-15 診断先行(venue-yukkuri-named-diagnose): 「名前ありゆっくり顔」の実害を数えるだけの計器
 //   (修正はしない・観測のみ)。真因は桁レンジ境界(isAnonymousStyleNicoUserId)で、意図的仕様のため触らない。
 import {
@@ -2283,7 +2284,7 @@ function createSeatNode(seatIndex) {
   seat.setAttribute('aria-hidden', 'true');
   // tile: renderSeats が buildPersonTileEl で作る本物タイル要素(.nl-story-userlane-cell)。
   //   座標測定(吹き出し/ギフト)は tile 内の .nl-story-userlane-avatar を基準にする。
-  return { seat, tile: /** @type {HTMLElement|null} */ (null) };
+  return { seat, tile: /** @type {HTMLElement|null} */ (null), next: createEmptySeatState() };
 }
 
 /**
@@ -5214,21 +5215,15 @@ export function mountVenueBarButton(options = {}) {
     const entryBySeatIndex = new Map(visibleSeats.map((entry) => [entry.seatIndex, entry]));
     for (let i = 0; i < seatNodes.length; i += 1) {
       const node = seatNodes[i];
-      node.seat.classList.add('nlsb-is-empty');
-      node.seat.classList.remove(
-        'nlsb-seat-link',
-        'nlsb-seat-vip',
-        'nlsb-seat-regular'
-      );
-      node.seat.setAttribute('aria-hidden', 'true');
-      node.seat.removeAttribute('title');
-      delete node.seat.dataset.tierIndex;
+      // v0.1.1608: 「空へ戻す」は望む最終状態(next)を作るだけ。DOM へは席装飾ループの後に1回だけ、変わった項目だけ書く
+      //   (旧: 全席を毎回 class/aria-hidden/title ごと書き戻し→飾り直しで、視聴ページの DOM 変更が 7,200件/秒になっていた。正本=venueSeatDomState.js)。
+      node.next = createEmptySeatState();
+      if (node.seat.dataset.tierIndex !== undefined) delete node.seat.dataset.tierIndex;
       // 2026-07-24: venueRankはここでdeleteしない(装飾ループのWeakMap diff-skipに一本化)。
       //   1コメントごとに全参加者のスコアが僅かに動き上位3位が頻繁に入れ替わる構造(venueSeats.js
       //   resolveVenueRegularScore)に対し、順位不変でも毎paintでdelete→再代入していたのがバッジの
       //   明滅(ちらつき)の真因。renderSeats全体のsig-skipはv0.1.1032で撤回済みの地雷なので、
       //   ここではRANKバッジのdataset属性1つだけを対象にした局所diff-skipで対処する。
-      delete node.seat.dataset.streak;
       if (!visibleSeatIndexSet.has(i)) {
         if (node.seat.parentElement) node.seat.parentElement.removeChild(node.seat);
         node.seat.replaceChildren();
@@ -5417,7 +5412,7 @@ export function mountVenueBarButton(options = {}) {
       const tile = node.seat.querySelector('.nl-story-userlane-cell');
       if (tile instanceof HTMLElement) node.tile = tile;
       const seatLinkOn = isNumericNicoUserId(uid) && nicoUserPageUrl(uid) !== '';
-      node.seat.classList.toggle('nlsb-seat-link', seatLinkOn);
+      if (node.next) node.next.link = seatLinkOn;
       // 観測のみ(DOM/データ不変・失敗は握る=描画を止めない)。tileは直前で取得済み=新規クエリ0。
       try {
         observeVenueSeatLink(_seatLinkParity, {
@@ -5433,11 +5428,12 @@ export function mountVenueBarButton(options = {}) {
       } catch {
         /* 計器失敗は描画を止めない */
       }
-      node.seat.title = displayName;
-      node.seat.classList.remove('nlsb-is-empty');
-      node.seat.setAttribute('aria-hidden', 'false');
-      node.seat.classList.toggle('nlsb-seat-vip', item?._venueIsVip === true);
-      node.seat.classList.remove('nlsb-seat-regular');
+      if (node.next) {
+        node.next.title = displayName;
+        node.next.empty = false;
+        node.next.aria = 'false';
+        node.next.vip = item?._venueIsVip === true;
+      }
       const venueRank = Math.max(0, Math.floor(Number(entry.venueRank || item?._venueRank) || 0));
       // 2026-07-24(局所diff-skip): この席(node.seat)へ最後に書き込んだ順位と同じなら何もしない。
       //   順位が実際に変わったときだけdataset書き込み(delete/再代入)を行い、無変化でのバッジ明滅を防ぐ。
@@ -5474,12 +5470,10 @@ export function mountVenueBarButton(options = {}) {
       const speakerKey = uid ? `u:${uid}` : rawName ? `n:${rawName}` : '';
       const streakEntry = speakerKey ? speechStreaks.get(speakerKey) : null;
       const seatStreakStage = streakEntry ? streakGlowStage(streakEntry.count) : 0;
-      if (seatStreakStage > 0) {
-        node.seat.dataset.streak = String(seatStreakStage);
-      } else {
-        delete node.seat.dataset.streak;
-      }
+      if (node.next) node.next.streak = seatStreakStage;
     }
+    // v0.1.1608: この描画で望む最終状態を、変わった項目だけ DOM へ書く(census 等は最終 DOM を数えるのでこの直後に1回)。
+    for (let i = 0; i < seatNodes.length; i += 1) flushVenueSeatState(seatNodes[i].seat, seatNodes[i].next);
     _venueUnseatedCount = unseatedThisPaint;
 
     // v0.1.1113 一致計器 v3(Tri-Parity): 鏡データ=段割当データ=【段実DOM】の3点一致で初めて✅。
