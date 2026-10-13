@@ -30,6 +30,7 @@ import {
   classifyVenueGeometryDiff,
   formatVenueGeometryCause
 } from './venueGeometryVerdict.js';
+import { countVenueKeyDuplicates } from './venueDomCensus.js';
 
 export const VENUE_LANE_MIRROR_HARD_WINDOW_MS = 900_000;
 /** X層(鏡にまだ居ない直近発言者)の猶予窓(ms)。①のpoll+paint+publishの通常10秒に十分な余裕。 */
@@ -344,11 +345,21 @@ export function buildVenueLaneParity(input) {
     ? Math.max(0, Math.floor(Number(domIn.dupIntra) || 0)) +
       Math.max(0, Math.floor(Number(domIn.dupCross) || 0))
     : 0;
+  // 2026-10-13: 同じ人が複数の段に居る(例: りんく段と広告段)のは【データ(鏡)自体の仕様】で、①POP も同じ重複を出す。
+  //   会場の DOM が忠実にそれを映していれば正常。異常なのは「データが持つ重複を超えた分」(席の二重占有など)だけ。
+  //   旧: 重複を一律に異常扱い → 会場が重複を欠かして(席の要素を奪い合って)いても、直して重複を映すと逆に🔴になった。
+  const expectedDup = countVenueKeyDuplicates(
+    Object.fromEntries(
+      TIERS.map((t) => [t, { keys: Array.isArray(painted[t]) ? painted[t].map(String).filter(Boolean) : [] }])
+    )
+  );
+  const expectedDupTotal = expectedDup.dupIntra + expectedDup.dupCross;
+  const domDupExcess = Math.max(0, domDupTotal - expectedDupTotal);
   const domStrays = domMeasured ? Math.max(0, Math.floor(Number(domIn.strays) || 0)) : 0;
   const domVisibleEmpty = domMeasured ? Math.max(0, Math.floor(Number(domIn.visibleEmpty) || 0)) : 0;
   const domUnkeyed = domMeasured ? Math.max(0, Math.floor(Number(domIn.unkeyed) || 0)) : 0;
   // 重複/迷子/空可視/無鍵は「検証できない・二重在籍・白円」=✅ブロッカー(幽霊 ghost は不算入)。
-  const domAnomalyCount = domDupTotal + domStrays + domVisibleEmpty + domUnkeyed;
+  const domAnomalyCount = domDupExcess + domStrays + domVisibleEmpty + domUnkeyed;
 
   // --- verdict(全条件AND=嘘の緑防止) ---
   /** @type {'✅'|'⚪'|'🔴'} */
@@ -363,7 +374,7 @@ export function buildVenueLaneParity(input) {
     reason = `未説明${unexplainedCount}`;
   } else if (domMeasured && domAnomalyCount > 0) {
     verdict = '🔴';
-    reason = `DOM異常(重複${domDupTotal} 迷子${domStrays} 空可視${domVisibleEmpty} 無鍵${domUnkeyed})`;
+    reason = `DOM異常(重複超過${domDupExcess}(データ内${expectedDupTotal}) 迷子${domStrays} 空可視${domVisibleEmpty} 無鍵${domUnkeyed})`;
   } else if (!domMeasured) {
     // fail-closed: DOMを測れなかったとき✅を名乗れない(データ一致だけでは画面の真実を保証しない)。
     verdict = '⚪';
@@ -400,11 +411,11 @@ export function buildVenueLaneParity(input) {
   if (!domMeasured) {
     domStr = ' / DOM未計測';
   } else if (domMismatchParts.length > 0) {
-    domStr = ` / DOM≠ ${domMismatchParts.join(' ')} / 重複${domDupTotal} 迷子${domStrays}`;
+    domStr = ` / DOM≠ ${domMismatchParts.join(' ')} / 重複${domDupTotal}${expectedDupTotal > 0 ? `(データ内${expectedDupTotal})` : ''} 迷子${domStrays}`;
   } else {
     domStr =
       ` / DOM=データ${domGhost > 0 ? `(幽${domGhost})` : ''}` +
-      (domDupTotal > 0 || domStrays > 0 ? ` / 重複${domDupTotal} 迷子${domStrays}` : '');
+      (domDupTotal > 0 || domStrays > 0 ? ` / 重複${domDupTotal}${expectedDupTotal > 0 ? `(データ内${expectedDupTotal})` : ''} 迷子${domStrays}` : '');
   }
   /*
    * ★venue-exact-parity-SPEC-2026-08-07 §6-2: ①DOM計測の「齢」を表示だけする(verdict不変)。

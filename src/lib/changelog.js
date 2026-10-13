@@ -18,6 +18,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1609',
+    date: '2026-10-08',
+    summary: '会場で重複する人のタイルが消えるのを直す',
+    items: Object.freeze([
+      '同じ人が2つの列(例: りんく列と広告列)にいるとき、会場では片方のタイルが消えていました。POPと同じように両方の列に出るようにしました。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1608',
     date: '2026-10-08',
     summary: '会場が席を毎回書き直すのをやめて軽く',
@@ -167,14 +175,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     summary: '2配信同時でもハイライトが消えない',
     items: Object.freeze([
       '2つの配信を同時に記録していると、片方の配信のハイライトを記録したときに、もう片方の配信のハイライト台帳が空になっていました。配信ごとに台帳を分け、最終スコアや発表に出るハイライトが消えないようにしました。古い配信の台帳は24時間後に自動で片付けます。'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.1589',
-    date: '2026-10-08',
-    summary: '2配信同時でも会場が消えない',
-    items: Object.freeze([
-      '2つの配信を同時に記録していると、会場モードが一瞬『該当者がいません』になったり戻ったりすることがありました。別の配信の応援レーン情報で自分の配信の表示を上書きしていたのが原因で、自分の配信のものだけを使うようにしました。'
     ])
   })
 ]);
