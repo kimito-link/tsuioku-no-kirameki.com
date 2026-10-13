@@ -410,7 +410,8 @@ export default [
     // v0.1.1590: 配信別ハイライト台帳の掃除の呼び出し(+2行)。ロジックは lib(highlightLedger.js の pruneStaleHighlightLedgers)。
     // v0.1.1583: パネルの表示/非表示を popup iframe へ伝える配線(+23行)。判定は lib(panelActivity.js)。通知は display を書く唯一の入口から出す。
     // v0.1.1585: コメントタイムライン鏡の書き込み頻度の天井の配線(+11行)。判定は lib(timelineMirrorWriteGate.js)。
-    rules: { 'max-lines': ['error', { max: 19442, skipBlankLines: false, skipComments: false }] }
+    // v0.1.1608: 『最後に視聴した URL』を毎ティック書き直さない(URL変化時・前面に来た時だけ)=+18行(大半は【なぜ】のコメント)。複数タブの書き合いで配信が入れ替わるのを止める。
+    rules: { 'max-lines': ['error', { max: 19460, skipBlankLines: false, skipComments: false }] }
   },
   {
     // 安全網のみ。分割は別地図。

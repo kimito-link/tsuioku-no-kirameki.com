@@ -134,3 +134,21 @@ describe('設計V3d: 診断・フラグ専用キーは描き直さない(実キ�
     }
   });
 });
+
+describe('v0.1.1608: 最後に視聴した URL の書き合い(複数タブ)', () => {
+  it('★nls_last_watch_url は遅い側(3秒に1回)', () => {
+    expect(isSlowStorageKey('nls_last_watch_url')).toBe(true);
+    expect(isSlowStorageKey('nls_last_watch_url_x')).toBe(false);
+  });
+  const csrc = fs.readFileSync(path.resolve('src/extension/content-entry.js'), 'utf8');
+  const i = csrc.indexOf('function rememberWatchPageUrl(');
+  const body = csrc.slice(i, i + 1800);
+  it('★同じ URL を毎ティック書き直さない(URL が変わったときだけ・force で上書き)', () => {
+    expect(body).toMatch(/if \(force !== true && window\.location\.href === _lastRememberedWatchHref\) return;/);
+    expect(body).toMatch(/_lastRememberedWatchHref = window\.location\.href;/);
+  });
+  it('★前面に来たら書き直す(focus / visibilitychange=visible)', () => {
+    expect(body).toMatch(/window\.addEventListener\('focus', \(\) => rememberWatchPageUrl\(true\)\)/);
+    expect(body).toMatch(/document\.visibilityState === 'visible'\) rememberWatchPageUrl\(true\)/);
+  });
+});
