@@ -2901,7 +2901,9 @@ export function mountVenueBarButton(options = {}) {
         observeVenueSpeechHover(_speechCensus, {
           name: model.displayName || data.displayName,
           lines: model.recentTexts && model.recentTexts.length ? model.recentTexts : (model.lastText ? [model.lastText] : []),
-          spoke: Number(data.count) > 0
+          spoke: Number(data.count) > 0,
+          // 空だったときだけ評価する原因切り分け用の手がかり(2026-10-13): 発言回数・最後の発言から何秒・データの出所・本文の有無・uidの種類。
+          detail: () => `発言${Number(data.count) || 0}・${data.lastAt ? Math.max(0, Math.round((Date.now() - Number(data.lastAt)) / 1000)) : '?'}秒前・出所${String(data.factsSource || '?')}・本文${data.lastText ? 1 : 0}・uid${/^\d+$/.test(String(data.uid || '')) ? '数値' : (data.uid ? '匿名系' : '無')}`
         });
       }
     } catch { /* 計器失敗はカードを止めない */ }
@@ -3362,7 +3364,7 @@ export function mountVenueBarButton(options = {}) {
   // 2026-07-30(wayfinder→to-spec方式・venue-avatar-hover-preview-SPEC.md §4.3): ホバープレビュー
   //   カード用のデータ。paint時(席装飾ループ/renderTopBar)にWeakMapへ相乗り登録するだけで、
   //   DOM書き込み・新規タイマー・新規計算は無い(RANKバッジちらつき教訓=diff-skip不要な設計)。
-  /** @type {WeakMap<HTMLElement, { uid: string, displayName: string, count: number, hasGift: boolean, giftCount: number, venueRank: number, lastAt: number, tier?: string, lastText?: string, recentTexts?: string[] }>} */
+  /** @type {WeakMap<HTMLElement, { uid: string, displayName: string, count: number, hasGift: boolean, giftCount: number, venueRank: number, lastAt: number, tier?: string, lastText?: string, recentTexts?: string[], factsSource?: string }>} */
   const _hoverCardDataByEl = new WeakMap();
   // v0.1.1207: 会場の「開いてから見えるまで」を分解して観測する(ユーザー報告
   //   「立ち上がりが遅い/出ないときがある」を体感でなく数字で切り分けるため)。

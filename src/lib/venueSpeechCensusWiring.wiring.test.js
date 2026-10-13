@@ -75,3 +75,17 @@ describe('会場のセリフ診断: 状態速報に出る(本物の buildAiShare
     expect(build(undefined)).not.toContain('会場セリフ');
   });
 });
+
+describe('空だったカードの手がかり(detail)の配線', () => {
+  // ★ふだんは何も作らない=軽さを守る: detail は【関数】で渡し、空のときだけ評価される。
+  it('★venueBar.js が detail を関数で渡している(文字列を毎回作らない)', async () => {
+    const fs = await import('node:fs');
+    const path = await import('node:path');
+    const src = fs.readFileSync(path.resolve('src/extension/venueBar.js'), 'utf8');
+    const i = src.indexOf('observeVenueSpeechHover(_speechCensus');
+    expect(i).toBeGreaterThan(0);
+    const body = src.slice(i, i + 1400);
+    expect(body).toMatch(/detail: \(\) => `発言\$\{Number\(data\.count\) \|\| 0\}/);
+    expect(body).toMatch(/出所\$\{String\(data\.factsSource/);
+  });
+});
