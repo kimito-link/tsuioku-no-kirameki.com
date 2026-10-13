@@ -305,7 +305,7 @@
   - `src/lib/giftThrowProjectile.js`
 - **吹き出し寿命管理** — 会場の吹き出しの表示上限・追い出し(eviction)ライフサイクル
   - `src/lib/venueBubbleLifecycle.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 242</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 243</summary>
 
 - `scripts/encode-marketing-html-avatars.mjs` — extension/images/marketing-html-avatars/*.png を data URI にし、
 - `scripts/perf-ab/parity.mjs` — 会場(venue.html)が「POP(popup.html)の鏡の投影」になっているかを、時系列で測る。
@@ -329,6 +329,7 @@
 - `src/lib/anonymousIdenticon.js` — 匿名 userId 向けの決定論的アバター（SVG data URL）。
 - `src/lib/avatarBroadcasterGuard.js` — 配信者アイコン取り違え防止ガード（純粋関数）。
 - `src/lib/avatarEntryCounts.js` — コメントエントリ配列から avatar の数を数える純関数。
+- `src/lib/avatarFallbackFromUrl.js` — 【層】L0 判定層(純粋関数・I/O禁止)
 - `src/lib/avatarLoadReport.js` — アイコン画像(usericon)の【実際のロード失敗】を状態速報の対処候補カードに出す純関数(v0.1.1026)。
 - `src/lib/avatarPartsComposer.js` — 匿名ユーザー用アバターのパーツ(髪/目/口など)定義と組み合わせ合成。
 - `src/lib/avatarRetrySweepThrottle.js` — 【層】L0 判定層(純粋関数・I/O禁止)
@@ -1114,7 +1115,8 @@
 ### 🙂 匿名(184) (1版)
 - `v0.1.1594` 2026-10-08 — 匿名の顔の作成が軽くなる
 
-### 🏟 会場・席 (8版)
+### 🏟 会場・席 (9版)
+- `v0.1.1610` 2026-10-08 — サムネが出ない人の顔をPOPと会場で揃える
 - `v0.1.1609` 2026-10-08 — 会場で重複する人のタイルが消えるのを直す
 - `v0.1.1608` 2026-10-08 — 会場が席を毎回書き直すのをやめて軽く
 - `v0.1.1606` 2026-10-08 — 会場カードが空の原因を診断に出す
@@ -1152,10 +1154,9 @@
 ### ⚡ 描画・性能 (1版)
 - `v0.1.1593` 2026-10-08 — 応援レーンの描画が軽くなる
 
-### その他 (6版)
+### その他 (5版)
 - `v0.1.1607` 2026-10-08 — 複数タブで配信が入れ替わるのを止める
 - `v0.1.1605` 2026-10-08 — 全員分の再計算を使い回して軽く
 - `v0.1.1600` 2026-10-08 — メモリが増え続ける漏れを直す
 - `v0.1.1599` 2026-10-08 — コメントが多い配信でパネルの負荷を下げる
 - `v0.1.1591` 2026-10-08 — 公開は表示中の配信の分だけ送る
-- `v0.1.1590` 2026-10-08 — 2配信同時でもハイライトが消えない

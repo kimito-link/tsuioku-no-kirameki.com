@@ -161,7 +161,7 @@ import { buildVenueMirrorAvatarMap, enrichVenueRowsWithMirrorAvatars } from '../
 //   会場は reader として登録済み。読み口は必ず acceptLaneMirrorSnapshot を通す(受け入れ点は2箇所)。
 import { sanitizeLaneMirrorForRead } from '../lib/laneMirrorContract.js';
 // ★v0.1.1318: アイコン未設定(404)の人を白丸でなく「その人ごとのゆっくり顔」にするため。
-import { anonymousIdenticonDataUrl } from '../lib/anonymousIdenticon.js';
+import { identiconFallbackForAvatarUrl } from '../lib/avatarFallbackFromUrl.js';
 import {
   createVenueMirrorIntakeState,
   observeVenueMirrorChange,
@@ -415,17 +415,8 @@ const VENUE_FALLBACK_GIFT_EMPTY_HTML = buildVenueFallbackGiftEmptyNoteHtml();
  *   そこから uid を復元して【その人ごとの identicon】を生成する
  *   ＝全員違う顔になり、誰が誰か見分けられる(白丸だらけにならない)。
  */
-/** @param {string} requestedSrc @returns {string} 解決できなければ ''(共通fallbackへ倒れる) */
-const venueAvatarFallbackFor = (requestedSrc) => {
-  try {
-    const m = /\/usericon\/(?:[sm]\/)?\d+\/(\d{1,14})\.jpg/i.exec(String(requestedSrc || ''));
-    const uid = m ? m[1] : '';
-    if (!uid) return '';
-    return anonymousIdenticonDataUrl(uid, 64) || '';
-  } catch {
-    return ''; // 失敗時は共通 fallback(blank.jpg)へ倒れる
-  }
-};
+/* 失敗時の代替顔は POP と共通(正本=avatarFallbackFromUrl.js・2026-10-13)。 */
+const venueAvatarFallbackFor = identiconFallbackForAvatarUrl;
 const venueAvatarLoadGuard = createSupportAvatarLoadGuard({
   fallbackSrc: NICONICO_OFFICIAL_DEFAULT_USERICON_HTTPS,
   fallbackSrcFor: venueAvatarFallbackFor,

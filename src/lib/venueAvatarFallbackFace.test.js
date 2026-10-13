@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { anonymousIdenticonDataUrl } from './anonymousIdenticon.js';
+import { identiconFallbackForAvatarUrl } from './avatarFallbackFromUrl.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = join(here, '../..');
@@ -69,9 +70,9 @@ describe('会場のアイコン未設定フォールバック', () => {
   });
 
   describe('★配線: venueBar が解決器を guard に渡している', () => {
-    it('anonymousIdenticonDataUrl を import している', () => {
+    it('代替顔の解決器(共通部品 avatarFallbackFromUrl.js)を import している', () => {
       expect(venueBar).toMatch(
-        /import\s*\{\s*anonymousIdenticonDataUrl\s*\}\s*from\s*'\.\.\/lib\/anonymousIdenticon\.js'/
+        /import\s*\{\s*identiconFallbackForAvatarUrl\s*\}\s*from\s*'\.\.\/lib\/avatarFallbackFromUrl\.js'/
       );
     });
 
@@ -79,11 +80,19 @@ describe('会場のアイコン未設定フォールバック', () => {
       expect(venueBar).toMatch(/fallbackSrcFor:\s*venueAvatarFallbackFor/);
     });
 
-    it('★解決器は uid を抽出して identicon を返す', () => {
-      const m = venueBar.match(/const venueAvatarFallbackFor = \(requestedSrc\) => \{([\s\S]*?)\n\};/);
-      expect(m, '解決器が読めること').toBeTruthy();
-      expect(m[1]).toMatch(/usericon/);
-      expect(m[1]).toMatch(/anonymousIdenticonDataUrl/);
+    it('★解決器は共通部品そのもの(会場に別実装を持たない)で、共通部品が uid を抽出して identicon を返す', () => {
+      expect(venueBar).toMatch(/const venueAvatarFallbackFor = identiconFallbackForAvatarUrl;/);
+      // このテストの extractUid と共通部品の結果が、あらゆる URL で一致する(抽出規則を揃える)
+      for (const u of [
+        'https://secure-dcdn.cdn.nimg.jp/nicoaccount/usericon/s/13531/135315894.jpg',
+        'https://secure-dcdn.cdn.nimg.jp/nicoaccount/usericon/12812/128121142.jpg',
+        'https://example.com/foo.jpg',
+        '',
+        'data:image/svg+xml;base64,AAA'
+      ]) {
+        const uid = extractUid(u);
+        expect(identiconFallbackForAvatarUrl(u)).toBe(uid ? anonymousIdenticonDataUrl(uid, 64) : '');
+      }
     });
 
     it('★共通 fallback(blank.jpg)も残す(解決できないときの最後の砦)', () => {
