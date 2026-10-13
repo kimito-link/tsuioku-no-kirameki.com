@@ -108,6 +108,11 @@ export function attachLaneTileStats(buckets, index) {
   return out;
 }
 
+/** 使い回しの上限(超えたら空にして作り直す=無限には増えない)。 */
+const STATS_TEXT_CACHE_MAX = 5000;
+/** @type {Map<string, string>} */
+const statsTextCache = new Map();
+
 /**
  * タイル 3 行目の文字列。順序・区切りは /live/ の liveLaneBuckets.js と同じ(🎁 📣 💬)。
  * @param {LaneTileStats|undefined|null} stats
@@ -115,14 +120,22 @@ export function attachLaneTileStats(buckets, index) {
  */
 export function formatLaneTileStats(stats) {
   if (!stats || typeof stats !== 'object') return '';
-  const parts = [];
   const g = positiveOrNull(stats.giftPt);
   const a = positiveOrNull(stats.adPt);
   const c = positiveOrNull(stats.commentCount);
+  if (g == null && a == null && c == null) return '';
+  // ★v0.1.1605: 同じ3つの数なら同じ文字列(純関数)。全タイル×描き直しごとの呼び出しで、桁区切り整形3回+配列+joinを省く。
+  const key = `${g ?? ''}|${a ?? ''}|${c ?? ''}`;
+  const hit = statsTextCache.get(key);
+  if (hit !== undefined) return hit;
+  const parts = [];
   if (g != null) parts.push(`🎁${formatNumberJa(g)}`);
   if (a != null) parts.push(`📣${formatNumberJa(a)}`);
   if (c != null) parts.push(`💬${formatNumberJa(c)}`);
-  return parts.join(' ');
+  const out = parts.join(' ');
+  if (statsTextCache.size >= STATS_TEXT_CACHE_MAX) statsTextCache.clear();
+  statsTextCache.set(key, out);
+  return out;
 }
 
 /** 脚注(誠実な注記): 公式値と拡張記録の区別。 */

@@ -52,7 +52,16 @@ export function isLikelyInternalNdgGiftOrCampaignLabel(s) {
   // ニコ生クライアントがコメント／ギフト行に載せる内部系プレフィックス（本家プロフィール名ではない）
   if (/^stamp_[a-z0-9_]{2,}$/i.test(t)) return true;
   // 長い ASCII のみ snake_case（人間のニックに稀なパターン）
-  const hasNonAscii = [...t].some((ch) => (ch.codePointAt(0) ?? 0) > 127);
+  // v0.1.1605: 配列を作らず判定(コードポイント>127 の有無と同値: サロゲートもコード単位は >127)。
+  //   ★正規表現 /[-￿]/ にしない: esbuild が U+FFFF(非文字)を【生のまま】バンドルへ出力し、
+  //   Chrome が content script を「UTF-8 でない」と判定して拡張ごと読み込まなくなった(実測 2026-10-13)。
+  let hasNonAscii = false;
+  for (let i = 0; i < t.length; i += 1) {
+    if (t.charCodeAt(i) > 127) {
+      hasNonAscii = true;
+      break;
+    }
+  }
   if (/^[a-z][a-z0-9_]{22,}$/i.test(t) && !hasNonAscii) return true;
   // 「unei_niconico」を含む = niconico 運営内部ラベル確定（めがくろ誤表示 fix）
   if (/unei_niconico/i.test(t)) return true;
@@ -204,6 +213,8 @@ export function pickBetterInterceptNickname(userId, prevNick, incomingNick) {
   const next = String(incomingNick || '').trim();
   if (!next) return prev;
   if (!prev) return next;
+  // v0.1.1605: 同じ名前なら結果は常にその名前(以降の6判定は同じ文字列を2回調べるだけ)。毎描画・全員分の呼び出しを素通しにする。
+  if (prev === next) return prev;
 
   const prevInternal = isLikelyInternalNdgGiftOrCampaignLabel(prev);
   const nextInternal = isLikelyInternalNdgGiftOrCampaignLabel(next);
