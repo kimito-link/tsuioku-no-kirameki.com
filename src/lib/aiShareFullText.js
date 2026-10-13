@@ -319,6 +319,14 @@ export function buildAiShareFullText({ overviewText, livesData, fastDiag, popupD
   } catch {
     /* no-op */
   }
+  // 2026-10-13: 会場の人数の増減(減った瞬間の証拠取り)。概要ブロックの外=視聴中の配信が無くても、会場が動いていれば出す。
+  //   未観測(null/空)なら行ごと出さない=普段の速報を汚さない。
+  try {
+    const tcLine = String(/** @type {any} */ (venueSeatsDiag)?.tileCountCensus?.line || '');
+    if (tcLine) lines.push(tcLine);
+  } catch {
+    /* no-op */
+  }
   if (overviewText) {
     lines.push('### 概要');
     lines.push(overviewText);

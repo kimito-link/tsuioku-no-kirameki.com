@@ -253,6 +253,7 @@ import {
   observeVenueSpeechHover,
   toVenueSpeechCensusDiag
 } from '../lib/venueSpeechCensus.js';
+import { createVenueTileCountState, observeVenueTileCount, toVenueTileCountDiag } from '../lib/venueTileCountCensus.js';
 import {
   invalidateStoryUserLaneTierKey,
   paintStoryUserLaneDomFilled,
@@ -3343,6 +3344,10 @@ export function mountVenueBarButton(options = {}) {
   //   (観測のみ・修正はしない)。
   const _yukkuriNamedCensus = createVenueYukkuriNamedCensusState();
   const _speechCensus = createVenueSpeechCensusState();
+  // 2026-10-13(ユーザー報告「途中で減るのはだめ」): 会場のタイル数の増減(累計)。配信が替わったら数え直す。close/open では消さない。
+  const _tileCountCensus = createVenueTileCountState();
+  /** いま会場が描いている供給元のラベル(composeVenueBaseRows が決める): 'mirror' / 'mirror-stale' / 'fallback:<理由>'。 */
+  let _venueTileOrigin = 'fallback:absent';
   // 2026-07-21 応援TOP吹き出しchurn計器(診断先行アプローチ): 生成頻度・寿命分布・強制退去を
   //   累積で数える(観測のみ・修正はしない)。
   const _bubbleChurn = createVenueBubbleChurnState();
@@ -5252,6 +5257,15 @@ export function mountVenueBarButton(options = {}) {
     // v0.1.1207: 会場が実際に描いた瞬間と、そのとき人が居たかを刻む。
     //   「出ない」報告が仕様(匿名主体で0人)か不具合かを、体感でなく数字で分けるため。
     try { noteVenueFirstPaint(_openLatency, Date.now(), visibleLaneItems.length); } catch { /* no-op */ }
+    // 2026-10-13: 会場のタイル数の増減を毎描画で観測する(3秒間引き diagDue の内側に置かない=過渡的な減少も累計に残す)。観測のみ。
+    try {
+      observeVenueTileCount(_tileCountCensus, {
+        liveId: activeLiveId || liveIdFromPathname(),
+        tiles: visibleLaneItems.length,
+        origin: _venueTileOrigin,
+        nowMs: Date.now()
+      });
+    } catch { /* 計器失敗は描画を止めない */ }
     // 2026-07-31(ユーザー指摘): ホバーカードのラベルを段に合わせて出し分けるための uid→段 索引。
     //   広告段/ギフト段に載る条件は「投げたこと」であって発言ではないため、「発言N」は嘘になる。
     //   flattenVenueLaneBuckets は段を捨てて平坦化するので、平坦化する前のここで拾っておく。
@@ -5748,6 +5762,8 @@ export function mountVenueBarButton(options = {}) {
       yukkuriNamedCensus: toVenueYukkuriNamedCensusDiag(_yukkuriNamedCensus),
       // 2026-10-12(ユーザー要望): 会場のホバーカードの「セリフ」がちゃんと出ているか。
       speechCensus: toVenueSpeechCensusDiag(_speechCensus),
+      // 2026-10-13: 会場のタイル数の増減(減った回数・最大の脱落・原因=供給元の切替)。★ここに載せないと状態速報に出ない。
+      tileCountCensus: toVenueTileCountDiag(_tileCountCensus, Date.now()),
       // 2026-07-21 診断先行: 応援TOP吹き出しchurnの実害を数えるだけの1行。
       bubbleChurn: toVenueBubbleChurnDiag(_bubbleChurn),
       storyDiagMirror: storyDiagMirrorStatus(storyDiagMirrorSnap, String(activeLiveId || liveIdFromPathname() || ''), Date.now()),
@@ -5864,9 +5880,11 @@ export function mountVenueBarButton(options = {}) {
     const staleButUsable = !usable.usable && usable.reason === 'stale';
     if (!usable.usable && !staleButUsable) {
       laneMirrorPaintSnap = null;
+      _venueTileOrigin = `fallback:${usable.reason || '?'}`;
       return fallbackRows;
     }
     laneMirrorPaintSnap = laneMirrorSnap;
+    _venueTileOrigin = staleButUsable ? 'mirror-stale' : 'mirror';
     // venue-avatar-stale-mirror-DESIGN.md §C-1d: 鏡capturedAtが前進した(popup復帰等でstorageが
     //   新鮮化した)節目で、timeout種別の失敗記録だけ消して即座の再機会を与える(errorは維持=
     //   404の再打撃を避ける)。clearFailedUrls(全消し)は使わない(§G-1: succeededKeysも消えて
