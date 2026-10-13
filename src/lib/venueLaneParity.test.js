@@ -452,6 +452,50 @@ describe('buildVenueLaneParity', () => {
       expect(p.line).toContain('空可視1');
     });
 
+    describe('2026-10-13: 同じ人が複数の段に居る(データ自体の仕様)は異常ではない', () => {
+      // 鏡に「りんく段にもギフト段にも uid 1 が居る」データ。①POP も同じ重複を出す。会場の DOM が忠実に映せば正常。
+      const dupSnap = () => makeSnap({
+        link: cells(['1', '2']),
+        gift: cells(['1']),
+        ad: [],
+        konta: [],
+        tanu: [],
+        pickedLength: 3,
+        totalCandidates: 3,
+        domSelf: {
+          measured: true,
+          dpr: 1,
+          perTier: {
+            link: { visible: 2, tileW: 64, tileH: 84 },
+            gift: { visible: 1, tileW: 64, tileH: 84 },
+            ad: { visible: 0, tileW: 0, tileH: 0 },
+            konta: { visible: 0, tileW: 0, tileH: 0 },
+            tanu: { visible: 0, tileW: 0, tileH: 0 }
+          }
+        }
+      });
+      const dupPainted = () => ({ link: keys(['1', '2']), gift: keys(['1']), ad: [], konta: [], tanu: [] });
+      const dupBase = () => ({ snap: dupSnap(), liveId: 'lv350912687', nowMs: NOW, mode: /** @type {const} */ ('mirror'), painted: dupPainted() });
+
+      it('★データ内の重複(1)を会場が忠実に映している(DOM重複1)なら ✅ で、行に「データ内1」と出る', () => {
+        const p = buildVenueLaneParity({ ...dupBase(), dom: domMatching(dupPainted(), { dupCross: 1 }) });
+        expect(p.verdict).toBe('✅');
+        expect(p.line).toContain('重複1(データ内1)');
+      });
+
+      it('★データが持つ重複を超えた重複(席の二重占有など)は 🔴 DOM異常=重複超過', () => {
+        const p = buildVenueLaneParity({ ...dupBase(), dom: domMatching(dupPainted(), { dupCross: 3 }) });
+        expect(p.verdict).toBe('🔴');
+        expect(p.reason).toContain('重複超過2(データ内1)');
+      });
+
+      it('★データに重複が無いのに DOM に重複があれば従来どおり 🔴(重複超過=重複そのもの)', () => {
+        const p = buildVenueLaneParity({ ...base(), dom: domMatching(painted(), { dupIntra: 2 }) });
+        expect(p.verdict).toBe('🔴');
+        expect(p.reason).toContain('重複超過2(データ内0)');
+      });
+    });
+
     it('群衆Canvas/額縁は判定外の参考値として付帯する(容疑者③④が写る)', () => {
       const p = buildVenueLaneParity({
         ...base(),
