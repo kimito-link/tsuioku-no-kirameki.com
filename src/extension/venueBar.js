@@ -185,7 +185,7 @@ import { isReceiptComparable, restoreLaneMirrorBuckets } from '../lib/laneMirror
 import {
   composeVenueLaneBuckets,
   isLaneMirrorUsableForVenue,
-  shouldAdoptLaneMirrorForVenue,
+  decideVenueMirrorAdoption,
   venueMirrorAgeNotice,
   venueRowsFromLaneMirror,
   venueSeatIndexByUid
@@ -253,7 +253,12 @@ import {
   observeVenueSpeechHover,
   toVenueSpeechCensusDiag
 } from '../lib/venueSpeechCensus.js';
-import { createVenueTileCountState, observeVenueTileCount, toVenueTileCountDiag } from '../lib/venueTileCountCensus.js';
+import {
+  createVenueTileCountState,
+  noteVenueMirrorShrinkRefused,
+  observeVenueTileCount,
+  toVenueTileCountDiag
+} from '../lib/venueTileCountCensus.js';
 import {
   invalidateStoryUserLaneTierKey,
   paintStoryUserLaneDomFilled,
@@ -3346,6 +3351,16 @@ export function mountVenueBarButton(options = {}) {
   const _speechCensus = createVenueSpeechCensusState();
   // 2026-10-13(ユーザー報告「途中で減るのはだめ」): 会場のタイル数の増減(累計)。配信が替わったら数え直す。close/open では消さない。
   const _tileCountCensus = createVenueTileCountState();
+  /**
+   * 鏡の採用口(開時 catch-up と onChanged の2か所が共有)。縮小ガード: 同一配信でいま描いている鏡より小さい鏡は採らない
+   * (2026-10-13・ユーザー確定「増えるのはいい・途中で減るのはだめ」/ docs 会議G1)。拒否は人数計器に数える。
+   * @param {any} incoming @param {string} liveIdNow @returns {boolean}
+   */
+  const adoptVenueMirrorGuarded = (incoming, liveIdNow) => {
+    const d = decideVenueMirrorAdoption(laneMirrorSnap, incoming, liveIdNow, Date.now());
+    if (!d.adopt && d.shrunk) noteVenueMirrorShrinkRefused(_tileCountCensus);
+    return d.adopt;
+  };
   /** いま会場が描いている供給元のラベル(composeVenueBaseRows が決める): 'mirror' / 'mirror-stale' / 'fallback:<理由>'。 */
   let _venueTileOrigin = 'fallback:absent';
   // 2026-07-21 応援TOP吹き出しchurn計器(診断先行アプローチ): 生成頻度・寿命分布・強制退去を
@@ -6207,7 +6222,7 @@ export function mountVenueBarButton(options = {}) {
         if (open && _receiptKey && bag?.[_receiptKey]) {
           _laneReceiptFromPopup = /** @type {any} */ (bag[_receiptKey]);
         }
-        if (open && snap && shouldAdoptLaneMirrorForVenue(snap, _catchUpLiveId)) {
+        if (open && snap && adoptVenueMirrorGuarded(snap, _catchUpLiveId)) {
           laneMirrorSnap = snap;
           scheduleLaneMirrorRecommit();
         }
@@ -6580,7 +6595,7 @@ export function mountVenueBarButton(options = {}) {
         });
       } catch { /* 計器失敗は受け取りを止めない */ }
       // ★2026-10-09: 別配信の鏡(旧グローバルキー経由)で良い鏡を上書きしない(2配信同時記録で会場が出たり消えた)。
-      if (accepted && shouldAdoptLaneMirrorForVenue(accepted, liveId)) {
+      if (accepted && adoptVenueMirrorGuarded(accepted, liveId)) {
         laneMirrorSnap = accepted;
         scheduleLaneMirrorRecommit();
       }

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { restoreLaneMirrorBuckets } from './laneMirror.js';
 import {
   composeVenueLaneBuckets,
+  decideVenueMirrorAdoption,
   isLaneMirrorUsableForVenue,
   shouldAdoptLaneMirrorForVenue,
   venueRowsFromLaneMirror,
@@ -208,5 +209,33 @@ describe('shouldAdoptLaneMirrorForVenue(他配信の鏡で良い鏡を上書き�
   });
   it('現配信が未確定なら採用しない(判定できない鏡で上書きしない)', () => {
     expect(shouldAdoptLaneMirrorForVenue(makeSnap(), '')).toBe(false);
+  });
+});
+
+describe('decideVenueMirrorAdoption(縮小ガード・減らさない)', () => {
+  const small = () => makeSnap({ link: [makeSnap().link[0]], ad: [], tanu: [] });
+  it('★同一配信で小さい鏡は採らない(直近の良い鏡を保持)', () => {
+    const d = decideVenueMirrorAdoption(makeSnap(), small(), 'lv350912687', NOW);
+    expect(d).toMatchObject({ adopt: false, shrunk: true, from: 4, to: 1 });
+  });
+  it('★link 以外の段(ギフト/広告/匿名)だけが縮んでも採らない(全段を数える)', () => {
+    const noTanu = makeSnap({ tanu: [], ad: [] });
+    expect(decideVenueMirrorAdoption(makeSnap(), noTanu, 'lv350912687', NOW)).toMatchObject({ adopt: false, shrunk: true, from: 4, to: 2 });
+  });
+  it('同数・増える鏡は採る', () => {
+    expect(decideVenueMirrorAdoption(small(), makeSnap(), 'lv350912687', NOW).adopt).toBe(true);
+    expect(decideVenueMirrorAdoption(makeSnap(), makeSnap(), 'lv350912687', NOW).adopt).toBe(true);
+  });
+  it('保持中の鏡が15分超に古ければ縮小でも採る(古い大きい鏡を居座らせない)', () => {
+    const old = makeSnap({ capturedAt: NOW - 901_000 });
+    expect(decideVenueMirrorAdoption(old, small(), 'lv350912687', NOW)).toMatchObject({ adopt: true, shrunk: true });
+  });
+  it('最初の鏡(保持なし)は採る/別配信の鏡は縮小判定の前に弾く', () => {
+    expect(decideVenueMirrorAdoption(null, small(), 'lv350912687', NOW).adopt).toBe(true);
+    expect(decideVenueMirrorAdoption(makeSnap(), makeSnap({ liveId: 'lv999' }), 'lv350912687', NOW)).toMatchObject({ adopt: false, shrunk: false });
+  });
+  it('配信が替わった(保持は別配信)なら小さくても採る', () => {
+    const prev = makeSnap({ liveId: 'lv111' });
+    expect(decideVenueMirrorAdoption(prev, small(), 'lv350912687', NOW)).toMatchObject({ adopt: true, shrunk: false });
   });
 });

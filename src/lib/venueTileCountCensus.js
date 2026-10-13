@@ -27,7 +27,7 @@ export const VENUE_TILE_RECENT_CAP = 6;
 /**
  * @returns {{
  *   liveId: string, last: number, lastOrigin: string, paints: number, changes: number,
- *   max: number, min: number, drops: number,
+ *   max: number, min: number, drops: number, shrinkRefused: number,
  *   worstDrop: number, worstFrom: number, worstTo: number, worstCause: string, worstAt: number,
  *   lastDropAt: number,
  *   recent: Array<{ at: number, tiles: number, origin: string }>
@@ -43,6 +43,7 @@ export function createVenueTileCountState() {
     max: 0,
     min: 0,
     drops: 0,
+    shrinkRefused: 0,
     worstDrop: 0,
     worstFrom: 0,
     worstTo: 0,
@@ -103,6 +104,14 @@ export function observeVenueTileCount(state, sample) {
   if (state.recent.length > VENUE_TILE_RECENT_CAP) state.recent.shift();
 }
 
+/**
+ * 会場の鏡採用ガードが【縮小した鏡を採らなかった】回数(減らさない安全網が効いた数)。
+ * @param {ReturnType<typeof createVenueTileCountState>} state
+ */
+export function noteVenueMirrorShrinkRefused(state) {
+  state.shrinkRefused += 1;
+}
+
 /** @param {number} ms @param {number} nowMs @returns {string} 「12秒前」形式(時計に依らない=決定的) */
 function ago(ms, nowMs) {
   if (!(ms > 0) || !(nowMs > 0)) return '?';
@@ -115,7 +124,7 @@ function ago(ms, nowMs) {
  * @param {ReturnType<typeof createVenueTileCountState>} state
  * @param {number} nowMs
  * @returns {{ line: string, verdict: 'ok'|'warn'|'idle', paints: number, changes: number, last: number, max: number,
- *   drops: number, worstDrop: number, worstFrom: number, worstTo: number, worstCause: string }}
+ *   drops: number, shrinkRefused: number, worstDrop: number, worstFrom: number, worstTo: number, worstCause: string }}
  */
 export function toVenueTileCountDiag(state, nowMs) {
   const idle = state.paints === 0 || state.last < 0;
@@ -141,6 +150,7 @@ export function toVenueTileCountDiag(state, nowMs) {
     const tail = state.recent.map((r) => `${r.tiles}(${r.origin}・${ago(r.at, nowMs)})`).join(' → ');
     parts.push(`直近の変化: ${tail}`);
   }
+  if (state.shrinkRefused > 0) parts.push(`縮んだ鏡を採らなかった${state.shrinkRefused}回(減らさない安全網)`);
   return {
     line: parts.join(' / '),
     verdict,
@@ -149,6 +159,7 @@ export function toVenueTileCountDiag(state, nowMs) {
     last: Math.max(0, state.last),
     max: state.max,
     drops: state.drops,
+    shrinkRefused: state.shrinkRefused,
     worstDrop: state.worstDrop,
     worstFrom: state.worstFrom,
     worstTo: state.worstTo,

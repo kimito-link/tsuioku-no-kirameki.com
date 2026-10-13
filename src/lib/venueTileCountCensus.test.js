@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   VENUE_TILE_RECENT_CAP,
   createVenueTileCountState,
+  noteVenueMirrorShrinkRefused,
   observeVenueTileCount,
   toVenueTileCountDiag
 } from './venueTileCountCensus.js';
@@ -133,5 +134,18 @@ describe('不正入力', () => {
     expect(() => observeVenueTileCount(st, { liveId: 'lv1', tiles: NaN, origin: '', nowMs: -1 })).not.toThrow();
     expect(() => observeVenueTileCount(st, null)).not.toThrow();
     expect(() => toVenueTileCountDiag(st, 0)).not.toThrow();
+  });
+});
+
+describe('鏡の縮小を採らなかった回数', () => {
+  it('★回数が行と構造化値に出る(0なら出ない)', () => {
+    const st = createVenueTileCountState();
+    obs(st, 50);
+    expect(toVenueTileCountDiag(st, 1_000_000).line).not.toContain('縮んだ鏡');
+    noteVenueMirrorShrinkRefused(st);
+    noteVenueMirrorShrinkRefused(st);
+    const d = toVenueTileCountDiag(st, 1_000_000);
+    expect(d.shrinkRefused).toBe(2);
+    expect(d.line).toContain('縮んだ鏡を採らなかった2回');
   });
 });
