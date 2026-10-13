@@ -117,3 +117,20 @@ describe('設計V3b: スケジューラの遅い側', () => {
     expect(runs.length).toBe(2);
   });
 });
+
+import { KEY_SIDEPANEL_SELF_DIAG } from './sidepanelSelfDiagKey.js';
+import { KEY_AI_SHARE_POPUP_DIAG } from './aiSharePopupDiagKey.js';
+import { KEY_STATUS_TREND } from './statusTrendKey.js';
+import { KEY_VENUE_EFFECT_SOUND_PRESENCE, KEY_CONCURRENT_CALIBRATION_RING_V1 } from './storageKeys.js';
+
+describe('設計V3d: 診断・フラグ専用キーは描き直さない(実キーで照合)', () => {
+  it('★5種すべて自己書き込み扱い', () => {
+    const keys = [KEY_SIDEPANEL_SELF_DIAG, KEY_AI_SHARE_POPUP_DIAG, KEY_STATUS_TREND, KEY_VENUE_EFFECT_SOUND_PRESENCE, KEY_CONCURRENT_CALIBRATION_RING_V1];
+    expect(keys.filter((k) => !isSelfWrittenRenderArtifactKey(k))).toEqual([]);
+  });
+  it('★意味のある状態(会場の開閉フラグ・コメント・設定)は引き金のまま', () => {
+    for (const k of ['nls_venue_live_open_v1', 'nls_comments_lv1', 'nls_panel_summary_lv1', 'nls_voice_autosend_v1', 'nls_profile_resolve_state_v1']) {
+      expect(isSelfWrittenRenderArtifactKey(k)).toBe(false);
+    }
+  });
+});
