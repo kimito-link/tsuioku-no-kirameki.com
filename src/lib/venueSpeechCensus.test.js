@@ -94,3 +94,31 @@ describe('venueSpeechCensus(会場のセリフが出ているかの診断)', () 
     expect(s.missingSamples).toHaveLength(3);
   });
 });
+
+describe('空だったカードの手がかり(detail)', () => {
+  it('★detail があれば標本の名前の後ろに付く(原因の切り分け用)', () => {
+    const st = createVenueSpeechCensusState();
+    observeVenueSpeechHover(st, { name: 'ゆ〜き', lines: [], spoke: true, detail: () => '発言1・3秒前・出所roster・本文0・uid数値' });
+    const d = toVenueSpeechCensusDiag(st);
+    expect(d.line).toContain('空だったカード{ゆ〜き(発言1・3秒前・出所roster・本文0・uid数値)}');
+  });
+  it('★detail が無ければ従来どおり名前だけ', () => {
+    const st = createVenueSpeechCensusState();
+    observeVenueSpeechHover(st, { name: 'レトルト', lines: [], spoke: true });
+    expect(toVenueSpeechCensusDiag(st).line).toContain('空だったカード{レトルト}');
+  });
+});
+
+describe('detail は空のときだけ評価する(ふだんは何も作らない=軽さを守る)', () => {
+  it('★セリフがあるカードでは detail 関数は呼ばれない', () => {
+    const st = createVenueSpeechCensusState();
+    let called = 0;
+    observeVenueSpeechHover(st, { name: 'a', lines: ['こんにちは'], spoke: true, detail: () => { called += 1; return 'x'; } });
+    expect(called).toBe(0);
+  });
+  it('★detail が例外を投げてもカードを止めない', () => {
+    const st = createVenueSpeechCensusState();
+    expect(() => observeVenueSpeechHover(st, { name: 'a', lines: [], spoke: true, detail: () => { throw new Error('x'); } })).not.toThrow();
+    expect(st.hover.emptyButSpoke).toBe(1);
+  });
+});
