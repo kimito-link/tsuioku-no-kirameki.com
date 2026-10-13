@@ -1948,5 +1948,19 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
     version: '0.1.1612', metric: 'cross-checked-claims', value: 24,
     source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
     note: '★直近30日窓のスライドによる自然増減(v0.1.1562 の note と同じ理由)。今回も変異テスト5種で赤を確認して復元している。'
+  }),
+  Object.freeze({
+    version: '0.1.1613', metric: 'bundle-kb', value: 1398,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '★今回は会場側(venueBar)の CSS だけの変更で popup.js は触っていない(値は v0.1.1612 と同じ)。過去最良 1360KB との差は v0.1.1454 以降の機能追加によるもので、今回の悪化ではない。'
+  }),
+  Object.freeze({
+    version: '0.1.1613', metric: 'gate-selftest', value: 4,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1613', metric: 'cross-checked-claims', value: 24,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: '★直近30日窓のスライドによる自然増減(v0.1.1562 の note と同じ理由)。今回も変異テスト2種で赤を確認して復元している。'
   })
 ]);
