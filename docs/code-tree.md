@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 8 / 910 件
+## ⚠️ 役割コメントが無いソース 8 / 911 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `scripts/build.mjs`
@@ -830,7 +830,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (1938)
+- 📁 **src/** (1941)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1110,7 +1110,7 @@
         - `logo_funlink_white_RGB_link_black.png`
         - `logo_funlink_white_RGB_maru_black.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1702)
+  - 📁 **lib/** (1705)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -2717,6 +2717,9 @@
     - `venueSpeechStreak.test.js`
     - `venueStoryDiagMirrorPanel.js` — ⚠️ 役割コメント無し
     - `venueStoryDiagMirrorPanel.test.js`
+    - `venueTileCountCensus.js` — 【層】L0 判定層(純粋関数・I/O禁止)
+    - `venueTileCountCensus.test.js`
+    - `venueTileCountCensusWiring.wiring.test.js`
     - `venueViewport.js` — v0.1.715: 会場モードの「映像セーフエリア」と「同時表示人数」を決める純関数。
     - `venueViewport.test.js`
     - `venueYukkuriNamedCensus.js` — 「名前ありゆっくり顔」実害確定計器(診断先行アプローチ)。

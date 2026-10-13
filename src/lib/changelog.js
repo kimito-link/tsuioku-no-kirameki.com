@@ -18,6 +18,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1611',
+    date: '2026-10-08',
+    summary: '会場の人数の増減を状態速報に出す',
+    items: Object.freeze([
+      '会場で人数が減ったとき、いつ・何人から何人に・何が原因かを状態速報に出すようにしました(観測だけで、ふだんの動きは変えません)。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1610',
     date: '2026-10-08',
     summary: 'サムネが出ない人の顔をPOPと会場で揃える',
@@ -167,14 +175,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     summary: '2配信でも応援プレビューが空にならない',
     items: Object.freeze([
       '2つの配信を同時に記録していると、応援プレビューや、通常のパネルの代替表示で、応援レーンが空のままになることがありました。別の配信が最後に書いた共通の保存場所しか見ていなかったためで、配信ごとの保存場所を先に読むようにしました。'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.1591',
-    date: '2026-10-08',
-    summary: '公開は表示中の配信の分だけ送る',
-    items: Object.freeze([
-      '2つの配信を同時に記録していると、応援ライブビューの『公開』ボタンが、開いている配信とは別の配信のデータを公開URLへ送ってしまうことがありました。画面の配信と送るデータの配信が違うときは送信を止めて、理由を表示するようにしました。状態報告・一致表示も、この画面の配信の分だけ描きます。'
     ])
   })
 ]);
