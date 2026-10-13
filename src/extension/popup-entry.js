@@ -675,6 +675,7 @@ import { applyLaneRosterKeeper, makeLaneRosterKeeperState } from '../lib/laneRos
 // 人物タイルの ID 行・名前行の正本(person-tile-unify 第3コミット)。popup と会場で共有。
 import { storyUserLaneMetaLines } from '../lib/storyUserLaneMeta.js';
 import { anonymousIdenticonDataUrl } from '../lib/anonymousIdenticon.js';
+import { identiconFallbackForAvatarUrl } from '../lib/avatarFallbackFromUrl.js';
 import { upgradeAnonymousAvatarImage, upgradeAnonymousAvatarImageFromFallback, upgradeAnonymousAvatarImages } from '../lib/avatarPartsComposer.js';
 import { buildHtmlReportDownloadFilename } from '../lib/exportDownloadFilename.js';
 import {
@@ -4368,6 +4369,8 @@ function maybeFlushVerifiedAvatars() {
 
 const storyAvatarLoadGuard = createSupportAvatarLoadGuard({
   fallbackSrc: STORY_REMOTE_FAILED_PLACEHOLDER_IMG,
+  // 2026-10-13: 失敗(アイコン未設定の404等)の代替顔は会場と共通(白丸でなく、その人ごとのゆっくり顔)。正本=avatarFallbackFromUrl.js
+  fallbackSrcFor: identiconFallbackForAvatarUrl,
   onFallbackApplied: applyStoryAvatarTvFallbackClass,
   onRemoteSuccess: (img) => {
     removeStoryAvatarTvFallbackClass(img);

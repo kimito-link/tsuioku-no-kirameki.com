@@ -18,6 +18,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1610',
+    date: '2026-10-08',
+    summary: 'サムネが出ない人の顔をPOPと会場で揃える',
+    items: Object.freeze([
+      'アイコン未設定の人が、POPでは白い丸、会場ではゆっくり顔と別々の見た目になっていました。どちらも同じ、その人ごとのゆっくり顔に揃えました。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1609',
     date: '2026-10-08',
     summary: '会場で重複する人のタイルが消えるのを直す',
@@ -167,14 +175,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     summary: '公開は表示中の配信の分だけ送る',
     items: Object.freeze([
       '2つの配信を同時に記録していると、応援ライブビューの『公開』ボタンが、開いている配信とは別の配信のデータを公開URLへ送ってしまうことがありました。画面の配信と送るデータの配信が違うときは送信を止めて、理由を表示するようにしました。状態報告・一致表示も、この画面の配信の分だけ描きます。'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.1590',
-    date: '2026-10-08',
-    summary: '2配信同時でもハイライトが消えない',
-    items: Object.freeze([
-      '2つの配信を同時に記録していると、片方の配信のハイライトを記録したときに、もう片方の配信のハイライト台帳が空になっていました。配信ごとに台帳を分け、最終スコアや発表に出るハイライトが消えないようにしました。古い配信の台帳は24時間後に自動で片付けます。'
     ])
   })
 ]);

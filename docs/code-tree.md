@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 8 / 909 件
+## ⚠️ 役割コメントが無いソース 8 / 910 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `scripts/build.mjs`
@@ -830,7 +830,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (1936)
+- 📁 **src/** (1938)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1110,7 +1110,7 @@
         - `logo_funlink_white_RGB_link_black.png`
         - `logo_funlink_white_RGB_maru_black.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1700)
+  - 📁 **lib/** (1702)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -1180,6 +1180,8 @@
     - `avatarCanvasToImageUrl.wiring.test.js`
     - `avatarEntryCounts.js` — コメントエントリ配列から avatar の数を数える純関数。
     - `avatarEntryCounts.test.js`
+    - `avatarFallbackFromUrl.js` — 【層】L0 判定層(純粋関数・I/O禁止)
+    - `avatarFallbackFromUrl.test.js`
     - `avatarLoadReport.js` — アイコン画像(usericon)の【実際のロード失敗】を状態速報の対処候補カードに出す純関数(v0.1.1026)。
     - `avatarLoadReport.test.js`
     - `avatarPartsComposer.js` — 匿名ユーザー用アバターのパーツ(髪/目/口など)定義と組み合わせ合成。
