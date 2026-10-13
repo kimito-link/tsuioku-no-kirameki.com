@@ -254,6 +254,7 @@ import {
   toVenueSpeechCensusDiag
 } from '../lib/venueSpeechCensus.js';
 import {
+  invalidateStoryUserLaneTierKey,
   paintStoryUserLaneDomFilled,
   resetStoryUserLaneDom,
   shouldKeepStoryUserLaneTilesOnEmpty
@@ -3375,6 +3376,9 @@ export function mountVenueBarButton(options = {}) {
   //   ★paint のたびに querySelectorAll する実装は hot path 汚染で実機が重くなったため撤去した。
   /** @type {{ link: any[], gift: any[], ad: any[], konta: any[], tanu: any[] }} */
   let _laneItemsByTier = { link: [], gift: [], ad: [], konta: [], tanu: [] };
+  /** 席(seatIndex)ごとの前回の持ち主の段。持ち主が段をまたいで変わったとき前後の段を作り直させる(重複の人の席)。 */
+  /** @type {Map<number, string>} */
+  let _seatOwnerTierPrev = new Map();
   /** @type {WeakMap<HTMLElement, { seatTitle: string, cellTitle: string, imgTitle: string, cellEl: HTMLElement|null }>} */
   const _hoverCardTitleBackupByEl = new WeakMap();
   let _hoverCardTimer = 0;
@@ -5315,6 +5319,37 @@ export function mountVenueBarButton(options = {}) {
         resetStoryUserLaneDom(venueLaneEls);
       }
     } else {
+      // 2026-10-13(「POPと会場が完全一致しない」の真因): 同じ人が複数の段に居る(例: りんく段と広告段)と、
+      //   席は1人1つなのに wrapTileEl が段ごとに同じ席の要素を自分の段へ移してしまい、先の段のタイルが消えていた
+      //   (実機: 重複7 = DOM欠 7(りんく4+広告3)/ 再現環境: 重複5 = DOM欠 5)。席の持ち主を「段の並び順で最初の1か所」に
+      //   決め、持ち主以外の段には席に包まない素のタイルを置く(席の装飾・吹き出しは持ち主のタイルにだけ出る)。
+      /** @type {Map<number, unknown>} */
+      const seatOwnerItem = new Map();
+      /** @type {Map<number, string>} */
+      const seatOwnerTier = new Map();
+      for (const tierName of ['link', 'gift', 'ad', 'konta', 'tanu']) {
+        const arr = Array.isArray(/** @type {any} */ (laneBuckets)?.[tierName]) ? /** @type {any} */ (laneBuckets)[tierName] : [];
+        for (const it of arr) {
+          const si = Number(it?._venueSeatIndex);
+          if (Number.isInteger(si) && si >= 0 && !seatOwnerItem.has(si)) {
+            seatOwnerItem.set(si, it);
+            seatOwnerTier.set(si, tierName);
+          }
+        }
+      }
+      // 持ち主の段が前回と変わった席: 前の段(席を失う)と新しい段(席を得る)を、次の描画で必ず作り直させる。
+      const _laneElByTier = {
+        link: venueLaneEls.laneLink, gift: venueLaneEls.laneGift, ad: venueLaneEls.laneAd,
+        konta: venueLaneEls.laneKonta, tanu: venueLaneEls.laneTanu
+      };
+      for (const [si, tierNow] of seatOwnerTier) {
+        const tierPrev = _seatOwnerTierPrev.get(si);
+        if (tierPrev && tierPrev !== tierNow) {
+          invalidateStoryUserLaneTierKey(/** @type {any} */ (_laneElByTier)[tierPrev]);
+          invalidateStoryUserLaneTierKey(/** @type {any} */ (_laneElByTier)[tierNow]);
+        }
+      }
+      _seatOwnerTierPrev = seatOwnerTier;
       paintStoryUserLaneDomFilled(
         venueLaneEls,
         venueStoryFaces,
@@ -5350,6 +5385,8 @@ export function mountVenueBarButton(options = {}) {
             if (!Number.isInteger(seatIndexRaw) || seatIndexRaw < 0) return tileEl;
             const node = seatNodes[seatIndexRaw];
             if (!node) return tileEl;
+            // 席の持ち主ではない段(同じ人が別の段にも居る)は席に包まない=席の要素を奪わない。
+            if (seatOwnerItem.has(seatIndexRaw) && seatOwnerItem.get(seatIndexRaw) !== item) return tileEl;
             node.seat.replaceChildren(tileEl);
             node.tile = tileEl;
             return node.seat;
