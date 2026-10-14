@@ -24,6 +24,14 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.1606',
+    date: '2026-10-08',
+    summary: '会場カードが空の原因を診断に出す',
+    items: Object.freeze([
+      '会場のカードで発言の中身が出なかったとき、状態速報に『発言回数・何秒前・データの出所・本文の有無』が出るようにしました(原因の切り分け用。ふだんの動きは変えません)。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1605',
     date: '2026-10-08',
     summary: '全員分の再計算を使い回して軽く',
