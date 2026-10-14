@@ -65,3 +65,13 @@ chrome.storage.local と IndexedDB を**読むだけ**で一時プロファイ�
 NLS_SEED_EXT_DIR="C:/Users/<you>/AppData/Local/Google/Chrome/User Data/Profile 45" node scripts/perf-ab/profile-popup.mjs --lv <lv>
 ```
 2026-10-12: これで初めて「診断が重い」が再現した(30 秒のうち 26 秒がメインスレッド作業・保存データの読み込み約 2,300 回)。
+
+## /live/ の集計を輸入したら何が違うか(lane-import-diff)
+/live/ と同じ純モジュール(`liveCommentTally.js` / `liveLaneBuckets.js`)を、拡張の保存コメントにそのまま当てて、現行の応援レーン(鏡)と並べる(読み取り専用・何も書かない)。
+人物の集合・先頭の並び・段の人数・`userId` 空の行(応援コメントのアイコングリッドで「同一人物×N」に見える要因)・配信者の行を出す。
+```
+NLS_SEED_EXT_DIR="C:/Users/<you>/AppData/Local/Google/Chrome/User Data/Profile 45" node scripts/perf-ab/lane-import-diff.mjs --lv lv351592874
+NLS_SEED_EXT_DIR="..." node scripts/perf-ab/lane-import-diff.mjs --all --max 12
+```
+2026-10-14 の実測(12配信): 匿名(たぬ姉)の人物の集合は /live/ 規則と一致(全員)、並びだけが別(拡張=uid 昇順 / /live/=件数降順)。
+拡張の「りんく」は /live/ の「りんく」ではなく「こん太」に近い(重なり 17 中 13)。`userId` 空の行は配信により 0〜148 件(lv351592874 は 210 件中 74 件)。
