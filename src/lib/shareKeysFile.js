@@ -13,8 +13,8 @@
 const MAX_LEN = 300;
 
 /**
- * @param {unknown} text JSON 文字列 {"ingestKey":"…","viewToken":"…","appOrigin":"https://…"(省略可)}
- * @returns {{ ok: true, ingestKey: string, viewToken: string, appOrigin: string } | { ok: false, error: string }}
+ * @param {unknown} text JSON 文字列 {"ingestKey":"…","viewToken":"…","appOrigin":"https://…"(省略可),"autoPublishConsent":true(省略可)}
+ * @returns {{ ok: true, ingestKey: string, viewToken: string, appOrigin: string, autoPublishConsent: boolean } | { ok: false, error: string }}
  */
 export function parseShareKeysFile(text) {
   let obj;
@@ -36,5 +36,6 @@ export function parseShareKeysFile(text) {
   if (appOrigin && !/^https:\/\/[A-Za-z0-9.-]+(:\d+)?$/.test(appOrigin)) {
     return { ok: false, error: 'appOrigin は https://ホスト名 の形にしてください' };
   }
-  return { ok: true, ingestKey, viewToken, appOrigin };
+  // 自動公開の同意は【ファイルに true と明記されているときだけ】(省略・true 以外は同意なし)。
+  return { ok: true, ingestKey, viewToken, appOrigin, autoPublishConsent: o.autoPublishConsent === true };
 }

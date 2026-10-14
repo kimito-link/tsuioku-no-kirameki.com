@@ -597,6 +597,8 @@ async function bootstrap() {
   // ★v0.1.1245: 共有キーを storage から読む(ビルドに焼き込まない)。
   //   キャッシュ初期値は未設定なので、これより前に送信やURL提示が走ることはない。
   await refreshUploadConfigCache();
+  // v0.1.1626: 拡張フォルダに鍵ファイルがあれば一度だけ取り込む(貼り付け・クリック不要)。
+  if (await seedShareKeysFromLocalFile()) await refreshUploadConfigCache();
 
   try {
     checkVersionMismatchBanner();
@@ -3602,6 +3604,40 @@ let _uploadConfigCache = { ingestKey: '', viewToken: '', appOrigin: DEFAULT_APP_
 
 function getUploadConfig() {
   return _uploadConfigCache;
+}
+
+const KEY_SHARE_KEYS_SEEDED = 'nls_share_keys_seeded_v1';
+const SHARE_KEYS_LOCAL_FILE = 'nicolive-share-keys.json';
+
+/**
+ * v0.1.1626: 拡張フォルダの鍵ファイル(nicolive-share-keys.json)を【一度だけ】取り込む。
+ *   貼り付けもクリックもできない環境のための入口。ファイルは git にも提出物にも入らない(開発機のローカルだけ)。
+ *   - 取り込み済みの印(KEY_SHARE_KEYS_SEEDED)があれば何もしない(あとで利用者が同意を切っても、起動のたびに戻さない)。
+ *   - 同意(autoPublishConsent)は、ファイルに true と明記されているときだけ入れる。
+ *   - ファイルが無い/読めない/形が不正なら何もしない(起動を止めない)。
+ * @returns {Promise<boolean>} 取り込んだか
+ */
+async function seedShareKeysFromLocalFile() {
+  try {
+    const done = await runStorageOpWithTimeout(
+      () => chrome.storage.local.get(KEY_SHARE_KEYS_SEEDED),
+      BOOT_STORAGE_TIMEOUT_MS
+    );
+    if (done?.[KEY_SHARE_KEYS_SEEDED]) return false;
+    const res = await Promise.race([
+      fetch(chrome.runtime.getURL(SHARE_KEYS_LOCAL_FILE)),
+      new Promise((resolve) => setTimeout(() => resolve(null), 1500))
+    ]);
+    if (!res || !res.ok) return false;
+    const parsed = parseShareKeysFile(await res.text());
+    if (!parsed.ok) return false;
+    await setUploadConfig({ ingestKey: parsed.ingestKey, viewToken: parsed.viewToken, appOrigin: parsed.appOrigin });
+    if (parsed.autoPublishConsent) await setWebPublishOptIn(true);
+    await chrome.storage.local.set({ [KEY_SHARE_KEYS_SEEDED]: Date.now() });
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 /** storage から共有キーを読み直してキャッシュする(失敗時は未設定=公開機能を出さない側に倒す)。 */
