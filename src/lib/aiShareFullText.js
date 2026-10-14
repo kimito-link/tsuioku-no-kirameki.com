@@ -619,6 +619,8 @@ export function buildAiShareFullText({ overviewText, livesData, fastDiag, popupD
   try {
     const shadowLine = String((popupDiag?.popup ?? popupDiag)?.laneImportShadow?.line || '');
     if (shadowLine) { lines.push(shadowLine); lines.push(''); }
+    const orderLine = String((popupDiag?.popup ?? popupDiag)?.laneCountOrder?.line || '');
+    if (orderLine) { lines.push(orderLine); lines.push(''); }
   } catch { /* no-op: 計器の失敗は状態速報を壊さない */ }
   // ★v0.1.1251: 不完全な軽い供給が完全描画を潰すのを止めた回数(72枚→3枚 の実測に対する防御)。
   try {
