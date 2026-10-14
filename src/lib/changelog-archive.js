@@ -24,6 +24,14 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.1598',
+    date: '2026-10-08',
+    summary: '会場のキャラの空の吹き出しを消す',
+    items: Object.freeze([
+      '会場の3体のキャラの頭上に、中身のない吹き出しと「…」が出たままになっていました。「しゃべらせない」設定のときも枠だけが残っていたためで、表示しないときはきちんと隠れるようにしました。キャラは浮かぶだけになります。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1597',
     date: '2026-10-08',
     summary: '全画面でも会場が消えないようにする',
