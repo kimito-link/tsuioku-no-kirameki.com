@@ -58,6 +58,7 @@ import { buildStatusActions } from '../lib/statusActionAdvisor.js';
 //   =新規 storage read ゼロ。致命は症状カードにも昇格する。
 // AI共有(状態速報)本文ビルダーを lib に切り出し(②応援ライブビュー/③WEB で再利用)。挙動同値。
 import { buildAiShareFullText } from '../lib/aiShareFullText.js';
+import { parseShareKeysFile } from '../lib/shareKeysFile.js';
 // ★v0.1.1424: 「いま視聴中の lv」を鏡とは別の起点(watch タブ)から決める。
 //   鏡から取ると別配信ガードが恒真になり、前の配信の鏡と突合して誤検知する。
 import { resolveCurrentLiveId, canCompareMirrorCounts } from '../lib/currentLiveIdOrigin.js';
@@ -3184,6 +3185,32 @@ function buildUploadConfigEditor() {
       : '保存しました（未設定＝共有機能は出ません）';
   });
   row.appendChild(saveBtn);
+  // v0.1.1625: 貼り付けなしで入れる入口。鍵ファイル(JSON)を選ぶだけ。値は画面にも出さない。
+  const fileBtn = document.createElement('button');
+  fileBtn.type = 'button';
+  fileBtn.textContent = '鍵ファイルを読み込む';
+  fileBtn.style.cssText =
+    'padding:4px 12px;border-radius:6px;cursor:pointer;font-size:11px;' +
+    'border:1px solid var(--nl-border);background:var(--nl-card-bg);color:var(--nl-fg);';
+  const fileInput = document.createElement('input');
+  fileInput.type = 'file';
+  fileInput.accept = '.json,application/json';
+  fileInput.style.display = 'none';
+  fileBtn.addEventListener('click', () => fileInput.click());
+  fileInput.addEventListener('change', async () => {
+    const f = fileInput.files && fileInput.files[0];
+    fileInput.value = '';
+    if (!f) return;
+    const parsed = parseShareKeysFile(await f.text());
+    if (!parsed.ok) { result.textContent = '読み込めませんでした: ' + parsed.error; return; }
+    await setUploadConfig({ ingestKey: parsed.ingestKey, viewToken: parsed.viewToken, appOrigin: parsed.appOrigin });
+    _uploadConfigDraft.ingestKey = null;
+    _uploadConfigDraft.viewToken = null;
+    _uploadConfigDraft.appOrigin = null;
+    result.textContent = '✅ 鍵ファイルを読み込んで保存しました(画面を更新すると反映されます)。ファイルは削除してください';
+  });
+  row.appendChild(fileBtn);
+  row.appendChild(fileInput);
   row.appendChild(result);
   details.appendChild(row);
   return details;
