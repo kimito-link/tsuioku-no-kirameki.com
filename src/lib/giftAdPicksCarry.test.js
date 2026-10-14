@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createGiftAdPicksCarry, resolvePicksOnLiveChange } from './giftAdPicksCarry.js';
+import { createGiftAdPicksCarry, keepPicksIfEmptied, resolvePicksOnLiveChange } from './giftAdPicksCarry.js';
 
 const G = [{ k: 'g1' }, { k: 'g2' }];
 const A = [{ k: 'a1' }];
@@ -46,5 +46,27 @@ describe('resolvePicksOnLiveChange(同じ配信へ戻るなら picks を持ち�
   it('不正な入力でも落ちない', () => {
     const c = createGiftAdPicksCarry();
     expect(() => resolvePicksOnLiveChange(c, /** @type {any} */ (null))).not.toThrow();
+  });
+});
+
+describe('keepPicksIfEmptied(読み直しで一瞬空になっても消さない)', () => {
+  it('★前に人がいて今回が空なら、前を残す(ギフト11+広告4が一瞬0になる事故)', () => {
+    const r = keepPicksIfEmptied(G, []);
+    expect(r.kept).toBe(true);
+    expect(r.picks).toBe(G);
+  });
+  it('今回に人がいれば、今回を使う(増減は素直に反映)', () => {
+    const r = keepPicksIfEmptied(G, A);
+    expect(r.kept).toBe(false);
+    expect(r.picks).toBe(A);
+  });
+  it('前も今回も空なら空のまま(何も無い配信を作り話にしない)', () => {
+    const r = keepPicksIfEmptied([], []);
+    expect(r.kept).toBe(false);
+    expect(r.picks).toHaveLength(0);
+  });
+  it('不正な入力でも落ちない', () => {
+    expect(() => keepPicksIfEmptied(null, undefined)).not.toThrow();
+    expect(keepPicksIfEmptied(undefined, G).picks).toBe(G);
   });
 });
