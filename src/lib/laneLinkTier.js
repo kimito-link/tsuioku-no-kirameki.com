@@ -42,3 +42,60 @@ export function linkTierFor(tier, userId, supporters) {
   if (!supporters || supporters.size === 0) return tier;
   return supporters.has(String(userId ?? '').trim()) ? 3 : 2;
 }
+
+/** @param {unknown} src 本物の個人サムネの URL か(識別絵・ゆっくり顔・未設定の既定画像は除く) */
+export function isRealThumbSrc(src) {
+  const s = String(src ?? '').trim();
+  if (!/^https?:\/\//i.test(s)) return false;
+  return !/usericon\/defaults\/|blank\.(jpg|png)/i.test(s);
+}
+
+/**
+ * ギフト/広告の行から直接「りんく」の候補を作る(/live/ の identifiedSupporters と同じ発想)。
+ * コメント集計に居なくても、ギフト/広告で支えて本物のサムネが確定した人はりんく。
+ *   - 既にコメント由来の候補に居る人: その候補を tier 3 へ上げる(本物のサムネがある場合のみ)
+ *   - 居ない人: ギフト/広告の行から新しい候補を作る
+ * 同じ人がギフトと広告の両方に居ても1人(先に見つけた行を使う)。
+ * @param {readonly unknown[]|null|undefined} giftPicks
+ * @param {readonly unknown[]|null|undefined} adPicks
+ * @param {Array<any>} candidates in-place(追加・tier 更新)
+ * @returns {{ added: number, promoted: number }}
+ */
+export function mergeSupporterLinkCandidates(giftPicks, adPicks, candidates) {
+  const byUid = new Map();
+  for (const c of candidates) {
+    const u = String(c?.entry?.userId ?? '').trim();
+    if (u) byUid.set(u, c);
+  }
+  let added = 0;
+  let promoted = 0;
+  for (const list of [giftPicks, adPicks]) {
+    for (const p of Array.isArray(list) ? list : []) {
+      const uid = String(/** @type {any} */ (p)?.entry?.userId ?? '').trim();
+      if (!uid) continue;
+      const pick = /** @type {any} */ (p);
+      if (!isRealThumbSrc(pick.displaySrc)) continue;
+      const cur = byUid.get(uid);
+      if (cur) {
+        if ((Number(cur.profileTier) || 0) < 3) { cur.profileTier = 3; promoted += 1; }
+        continue;
+      }
+      const row = {
+        entryIndex: 0,
+        profileTier: 3,
+        thumbScore: 1000,
+        displaySrc: pick.displaySrc,
+        title: pick.title,
+        entry: pick.entry,
+        recentTexts: /** @type {string[]} */ ([]),
+        commentCount: 0,
+        meta: pick.meta,
+        ...(pick.stats ? { stats: pick.stats } : {})
+      };
+      candidates.push(row);
+      byUid.set(uid, row);
+      added += 1;
+    }
+  }
+  return { added, promoted };
+}

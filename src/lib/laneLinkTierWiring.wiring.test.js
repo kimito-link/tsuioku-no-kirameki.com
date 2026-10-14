@@ -17,4 +17,10 @@ describe('popup-entry: りんく段は /live/ と同じ定義', () => {
     const body = popup.slice(at, at + 3200);
     expect(body).toMatch(/profileTier: _tier,\n\s+thumbScore: row\.thumbScore,/);
   });
+  it('★ギフト/広告の応援者を候補へ入れるのは名簿合流(applyLaneRosterKeeper)の前', () => {
+    const merge = popup.indexOf('mergeSupporterLinkCandidates(STORY_SOURCE_STATE.giftThrowerPicks, STORY_SOURCE_STATE.adThrowerPicks, candidates);');
+    const keeper = popup.indexOf('applyLaneRosterKeeper(_laneRosterKeeperState, {');
+    expect(merge).toBeGreaterThan(0);
+    expect(keeper).toBeGreaterThan(merge);
+  });
 });

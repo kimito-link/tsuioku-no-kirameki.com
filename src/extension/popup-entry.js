@@ -675,7 +675,7 @@ import { LANE_SUPPLY_ORIGIN, createLaneSupplyOriginDiag, noteLaneSupplyShrink, n
 import { snapshotLanePublishSkipDiag } from '../lib/lanePublishSkipDiag.js';
 // v0.1.1232 lane-never-drop: 「一度出た人」を覚える名簿(Phase2 蓄積器)。計器とは別モジュール。
 import { applyLaneRosterKeeper, makeLaneRosterKeeperState } from '../lib/laneRosterKeeper.js';
-import { linkTierFor, supporterUidSet } from '../lib/laneLinkTier.js';
+import { linkTierFor, mergeSupporterLinkCandidates, supporterUidSet } from '../lib/laneLinkTier.js';
 import { formatLaneCountOrderLine, makeLaneCountOrderState, orderLaneCandidatesByCount } from '../lib/laneCountOrder.js';
 // 人物タイルの ID 行・名前行の正本(person-tile-unify 第3コミット)。popup と会場で共有。
 import { storyUserLaneMetaLines } from '../lib/storyUserLaneMeta.js';
@@ -6474,6 +6474,8 @@ function renderStoryUserLane() {
   STORY_AVATAR_DIAG_STATE.userLaneStrongNick = laneDiagStrongNick;
   STORY_AVATAR_DIAG_STATE.userLanePersonalThumb = laneDiagPersonalThumb;
 
+  // v0.1.1623: りんく=ギフト/広告で支えて本物のサムネが確定した人(/live/ と同じ)。コメントしていない応援者もここで候補に入れる。
+  mergeSupporterLinkCandidates(STORY_SOURCE_STATE.giftThrowerPicks, STORY_SOURCE_STATE.adThrowerPicks, candidates);
   // v0.1.1232 lane-never-drop Phase2: 「一度出た人」を名簿から復活合流させる。上限撤廃だけでは
   //   「候補集合そのものから人が落ちた」場合に消える(候補は毎paint再構築=名簿が唯一の記憶・MAP §4.1)。
   //   ★必ず sort の前。後に足すと復活行が段末尾に固まり表示順契約(popup=venue)を壊す(SPEC §7-1)。
