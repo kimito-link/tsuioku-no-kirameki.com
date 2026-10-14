@@ -675,6 +675,7 @@ import { LANE_SUPPLY_ORIGIN, createLaneSupplyOriginDiag, noteLaneSupplyShrink, n
 import { snapshotLanePublishSkipDiag } from '../lib/lanePublishSkipDiag.js';
 // v0.1.1232 lane-never-drop: 「一度出た人」を覚える名簿(Phase2 蓄積器)。計器とは別モジュール。
 import { applyLaneRosterKeeper, makeLaneRosterKeeperState } from '../lib/laneRosterKeeper.js';
+import { linkTierFor, supporterUidSet } from '../lib/laneLinkTier.js';
 import { formatLaneCountOrderLine, makeLaneCountOrderState, orderLaneCandidatesByCount } from '../lib/laneCountOrder.js';
 // 人物タイルの ID 行・名前行の正本(person-tile-unify 第3コミット)。popup と会場で共有。
 import { storyUserLaneMetaLines } from '../lib/storyUserLaneMeta.js';
@@ -6365,6 +6366,8 @@ function renderStoryUserLane() {
 
   /** @type {{ entryIndex: number, profileTier: number, thumbScore: number, displaySrc: string, title: string, entry: PopupCommentEntry, meta: { idLine: string, nameLine: string } }[]} */
   const candidates = [];
+  // v0.1.1621: りんく段は /live/ と同じ定義(ギフト/広告で支えた人だけ)。コメントだけの人は本物のサムネがあってもこん太へ。
+  const _linkSupporters = supporterUidSet(STORY_SOURCE_STATE.giftThrowerPicks, STORY_SOURCE_STATE.adThrowerPicks);
   let laneDiagDeduped = 0;
   let laneDiagT3 = 0;
   let laneDiagT2 = 0;
@@ -6439,8 +6442,9 @@ function renderStoryUserLane() {
     laneDiagDeduped += 1;
     if (ex.strongNick) laneDiagStrongNick += 1;
     if (ex.hasPersonalThumb) laneDiagPersonalThumb += 1;
-    if (row.profileTier === 3) laneDiagT3 += 1;
-    else if (row.profileTier === 2) laneDiagT2 += 1;
+    const _tier = linkTierFor(row.profileTier, uidRaw, _linkSupporters);
+    if (_tier === 3) laneDiagT3 += 1;
+    else if (_tier === 2) laneDiagT2 += 1;
     else laneDiagT1 += 1;
     const label = storyGrowthDisplayLabel(e, liveId) || 'ユーザー';
     const meta = storyUserLaneMetaLines(e, row.httpForLane, dedupeKey);
@@ -6452,7 +6456,7 @@ function renderStoryUserLane() {
 
     candidates.push({
       entryIndex: row.entryIndex,
-      profileTier: row.profileTier,
+      profileTier: _tier,
       thumbScore: row.thumbScore,
       displaySrc: row.displaySrc,
       title: label,
