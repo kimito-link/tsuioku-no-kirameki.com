@@ -94,6 +94,30 @@ export function computeVoiceCongestion(queueLength) {
 }
 
 /**
+ * 実効ブースト(待機件数由来+持続的な需要超過由来)に応じた本文上限を返す。
+ *
+ * ★なぜ要るか(2026-10-14・実機の状態速報: 需要47.9件/分 vs 供給13.4件/分・合成2,975ms・時間切れ26件・voiced率38%):
+ *   v0.1.1222 で「速度のブースト」は持続的な需要超過(sustained)を足せるようになったが、本文上限(maxChars)は
+ *   待機件数(computeVoiceCongestion)だけで決まるままだった。実効上限が絞られるとキューは5件を超えず
+ *   本文上限が 40〜60 に留まる=長いコメントを長いまま合成して詰まりを悪化させていた(速度の穴と同じ構造穴)。
+ *   速度を上げる局面では本文も同じ段で短くする。★下げるだけ(待機件数由来の上限より長くしない)。
+ * @param {unknown} effectiveBoost
+ * @param {number} queueMaxChars computeVoiceCongestion(queueLength).maxChars
+ * @returns {number}
+ */
+export function capVoiceMaxCharsByBoost(effectiveBoost, queueMaxChars) {
+  const boost = Number(effectiveBoost);
+  const base = Number.isFinite(Number(queueMaxChars)) && Number(queueMaxChars) >= 1 ? Math.floor(Number(queueMaxChars)) : 60;
+  let cap = 60;
+  if (Number.isFinite(boost)) {
+    if (boost >= 0.8) cap = 30;
+    else if (boost >= 0.5) cap = 40;
+    else if (boost >= 0.3) cap = 50;
+  }
+  return Math.min(base, cap);
+}
+
+/**
  * 待機件数に応じて VOICEVOX speedScale へ加える値を返す。
  * @param {unknown} queueLength
  * @returns {number}
