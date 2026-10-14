@@ -889,7 +889,7 @@
   - `src/extension/live-ranking-entry.js`
   - `tsuioku-no-kirameki/live/index.html`
   - `.github/workflows/live-ranking.yml`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 220</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 221</summary>
 
 - `app/app.js` — スマホ閲覧用 status Web 版。
 - `app/live-view.js` — global NL_BUILD_ID
@@ -1064,6 +1064,7 @@
 - `src/lib/safeStorageLocal.js` — v0.1.1080: 拡張リロード後の古いタブ(stale content script / iframe)が
 - `src/lib/scoreAnnounce.js` — 配信採点「結果発表シーケンス」の純関数プランナー(council/broadcast-scoring-SYNTHESIS.md
 - `src/lib/scoreRadar.js` — 配信採点の「講評レーダー」5軸(council/broadcast-scoring-SYNTHESIS.md §2.3)を組む純関数群。
+- `src/lib/shareKeysFile.js` — 【層】L0 判定層(純粋関数・I/O禁止)
 - `src/lib/sidepanelCloakDuration.js` — 幕(cloak)が「いつ外れたか / まだ残っているか」を要約する純関数。
 - `src/lib/sidepanelIframeReveal.js` — iframe を【出来上がってから見せる】ための純関数。
 - `src/lib/sidepanelIframeSrc.js` — サイドパネルの iframe に渡す src を組み立てる純関数。
@@ -1161,6 +1162,6 @@
 - `v0.1.1606` 2026-10-08 — 会場カードが空の原因を診断に出す
 
 ### その他 (3版)
+- `v0.1.1625` 2026-10-14 — 共有キーを貼り付けなしでファイルから入れる
 - `v0.1.1624` 2026-10-14 — 共有キーの入力が貼った直後に消えない
 - `v0.1.1607` 2026-10-08 — 複数タブで配信が入れ替わるのを止める
-- `v0.1.1605` 2026-10-08 — 全員分の再計算を使い回して軽く

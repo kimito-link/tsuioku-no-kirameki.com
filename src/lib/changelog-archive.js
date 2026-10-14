@@ -24,6 +24,14 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.1605',
+    date: '2026-10-08',
+    summary: '全員分の再計算を使い回して軽く',
+    items: Object.freeze([
+      'パネルが描き直すたびに全員分やり直していた顔画像の生成・ニックネーム判定・数字の整形を、使い回すようにしました(見た目は変わりません)。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1604',
     date: '2026-10-08',
     summary: '頻繁な保存で何度も描き直さない',
