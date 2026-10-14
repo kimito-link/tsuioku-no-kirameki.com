@@ -6080,6 +6080,16 @@
       ]
     },
     {
+      "file": "src/lib/laneLinkTier.js",
+      "featureCount": 1,
+      "features": [
+        "popup"
+      ],
+      "labels": [
+        "ポップアップ(応援レーン)"
+      ]
+    },
+    {
       "file": "src/lib/laneMirrorPerLivePublish.js",
       "featureCount": 1,
       "features": [
