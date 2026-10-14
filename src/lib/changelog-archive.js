@@ -24,6 +24,14 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.1600',
+    date: '2026-10-08',
+    summary: 'メモリが増え続ける漏れを直す',
+    items: Object.freeze([
+      'コメントの多い配信で、拡張のメモリが時間とともに増え続け、PC全体が重くなることがありました。アイコン画像を作るたびに使い終わったあとも消えない一時データが積み上がっていたためで、積み上がらない形に直しました。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1599',
     date: '2026-10-08',
     summary: 'コメントが多い配信でパネルの負荷を下げる',

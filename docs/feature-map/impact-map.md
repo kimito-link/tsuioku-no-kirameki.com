@@ -646,6 +646,7 @@
 | `src/lib/kickLivestreams.js` | 1 | Web版 追憶のきらめき ランキング(/live/) |
 | `src/lib/kiramekiAwards.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/kiramekiAwardsSectionHtml.js` | 1 | ポップアップ(応援レーン) |
+| `src/lib/laneCountOrder.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/laneDetailCells.js` | 1 | 状態速報ページ |
 | `src/lib/laneDiag.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/laneDomSelfMeasure.js` | 1 | ポップアップ(応援レーン) |
