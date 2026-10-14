@@ -537,6 +537,7 @@ import { createCoalescedRepaintScheduler } from '../lib/coalescedRepaintSchedule
 import { buildStorageRefreshTriggerTag } from '../lib/storageRefreshTriggerKey.js';
 import { prefersReducedMotion } from '../lib/prefersReducedMotion.js';
 import { pushLaneTileSample, summarizeLaneTileOscillation } from '../lib/laneTileOscillation.js';
+import { createGiftAdPicksCarry, resolvePicksOnLiveChange } from '../lib/giftAdPicksCarry.js';
 import { makeLaneResult } from '../lib/northStarLaneResult.js';
 import {
   buildTickerTextAndTip,
@@ -7671,6 +7672,9 @@ async function paintStoryUserLaneCoalesced(liveId, displayEntries, storageRows) 
  *   旧「無指定=false(確定)」は申告漏れがそのまま静かなタイル消失になった(v1233穴1・08-04実配信で再観測)。
  *   無指定=暫定へ反転し、最悪ケースを「消える」→「最長10分stale(非常口で回復)」に格下げする。
  */
+/** v0.1.1617: gift/ad picks の持ち越し台帳と計器(同じ配信へ戻ったとき restored / 別の配信へ替わったとき cleared)。 */
+const _giftAdPicksCarry = createGiftAdPicksCarry();
+const _giftAdPicksCarryDiag = { restored: 0, cleared: 0 };
 function syncStorySourceEntries(liveId, displayList, storageRowsForLane, opts = {}) {
   const nextLiveId = String(liveId || '');
   const list = Array.isArray(displayList) ? displayList : [];
@@ -7686,12 +7690,24 @@ function syncStorySourceEntries(liveId, displayList, storageRowsForLane, opts = 
 
   if (STORY_SOURCE_STATE.liveId !== nextLiveId) {
     resetCelebrationIncrementalScan();
+    const _prevLidForPicks = STORY_SOURCE_STATE.liveId;
     STORY_SOURCE_STATE.liveId = nextLiveId;
     STORY_GROWTH_STATE.pinnedCommentId = null;
     STORY_GROWTH_STATE.hoverPreviewCommentId = null;
     cancelStoryHoverClearTimer();
     // ★v0.1.1042: gift/ad picks の [] リセットは配信切替時のみ(旧:毎poll)。毎poll [] だと2段paint で gift/ad 段が空↔充填し「ギフトタイル出入り」churn になっていた(同一配信は前値保持=出入り消滅・Phase-2 が同poll内で最新に上書き)。
-    STORY_SOURCE_STATE.giftThrowerPicks = Object.freeze([]); STORY_SOURCE_STATE.adThrowerPicks = Object.freeze([]);
+    // ★v0.1.1617: 「配信なし」を経由して【同じ配信へ戻る】ときは前の picks を持ち越す(空に戻すと再取得が終わるまで gift/ad が消える=29→14枚)。別の配信へ替わるときだけ空。
+    {
+      const carried = resolvePicksOnLiveChange(_giftAdPicksCarry, {
+        prevLid: _prevLidForPicks,
+        nextLid: nextLiveId,
+        gift: STORY_SOURCE_STATE.giftThrowerPicks,
+        ad: STORY_SOURCE_STATE.adThrowerPicks
+      });
+      STORY_SOURCE_STATE.giftThrowerPicks = Object.freeze([...carried.gift]);
+      STORY_SOURCE_STATE.adThrowerPicks = Object.freeze([...carried.ad]);
+      if (carried.action === 'restored') _giftAdPicksCarryDiag.restored += 1; else _giftAdPicksCarryDiag.cleared += 1;
+    }
     // v0.1.1092: 配信切替では前の配信の先出しプッシュ行を持ち越さない(別配信のコメントが
     //   新しい配信のレーンに混入するのを防ぐ)。同一配信内の poll では消さない(先出しの意味が無くなる)。
     // ★2026-09-21(段A): _instantPushRepaintScheduler に pending 中の repaint 予約があっても安全。
@@ -18490,6 +18506,7 @@ async function collectAiShareDevMonitorPayloadBundle(watchUrl) {
       laneSupplyOrigin: snapshotLaneSupplyOriginDiag(_laneSupplyOriginDiag),
       // ★2026-08-08 計器: 鏡 publish の到達/見送り。読み方は lanePublishSkipDiag.js の冒頭。
       lanePublishSkip: snapshotLanePublishSkipDiag(_lanePublishSkipDiag, Date.now()),
+      giftAdPicksCarry: { restored: _giftAdPicksCarryDiag.restored, cleared: _giftAdPicksCarryDiag.cleared },
       mainThreadBlocker, // ★v1394: 黒くなる件の【当人】(longtask 実測・boot 側で観測)
       // v0.1.1215: 「積み上げ式にならずアイコンがちらちら変わる」の観測。上の churn は
       //   全消し再構築だけを数えるため、DOM枚数を変えない「中身のすり替え」を取りこぼす。

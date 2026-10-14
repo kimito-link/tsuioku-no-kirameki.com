@@ -578,6 +578,7 @@
 | `src/lib/forwardReactivation.js` | 1 | 記録エンジン(watchページ常駐) |
 | `src/lib/frozenElapsedOnEnd.js` | 1 | 状態速報ページ |
 | `src/lib/geminiNanoBridge.js` | 1 | ポップアップ(応援レーン) |
+| `src/lib/giftAdPicksCarry.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/giftAdPipelineCensus.js` | 1 | 状態速報ページ |
 | `src/lib/giftBahamutCelebration.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/giftHistoryMirror.js` | 1 | ポップアップ(応援レーン) |

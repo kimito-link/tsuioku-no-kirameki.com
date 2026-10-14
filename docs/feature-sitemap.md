@@ -305,7 +305,7 @@
   - `src/lib/giftThrowProjectile.js`
 - **吹き出し寿命管理** — 会場の吹き出しの表示上限・追い出し(eviction)ライフサイクル
   - `src/lib/venueBubbleLifecycle.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 245</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 246</summary>
 
 - `scripts/encode-marketing-html-avatars.mjs` — extension/images/marketing-html-avatars/*.png を data URI にし、
 - `scripts/perf-ab/lane-import-diff.mjs` — lane-import-diff — 「/live/ の集計を拡張へ輸入したら、いまの応援レーンと何が違うか」を数字にする(読み取り専用)。
@@ -365,6 +365,7 @@
 - `src/lib/effectDirector.js` — 「演出ディレクター」層(パチンコ的ゲーム性 Phase 1・Fable設計 2026-07-04)。
 - `src/lib/enrichmentAvatarFallback.js` — enrichRowsWithInterceptedUserIds 内で、全ソースにアバターURLがない場合に
 - `src/lib/formatGiftSubAppHistory.js` — v0.1.198: gift sub-app DOM 由来の history / totalCounts を popup 表示用に
+- `src/lib/giftAdPicksCarry.js` — 【層】L0 判定層(純粋関数・I/O禁止)
 - `src/lib/giftAdPipelineCensus.js` — ギフト/広告が「取れて→出て→鳴る」まで通っているかを
 - `src/lib/giftBahamutCelebration.js` — ギフト到着時の「画面ズームイン」演出 spec（純関数）。
 - `src/lib/giftDeltaFallback.js` — 「ギフト個別イベント欠落配信」のフォールバック検知(2026-07-06)。
@@ -1120,7 +1121,7 @@
 ### 🙂 匿名(184) (1版)
 - `v0.1.1614` 2026-10-08 — IDなしコメントを同じ人扱いしない
 
-### 🏟 会場・席 (10版)
+### 🏟 会場・席 (9版)
 - `v0.1.1613` 2026-10-08 — 会場のタイルの大きさを①と同じにした
 - `v0.1.1612` 2026-10-08 — 会場の人数が途中で減らないようにした
 - `v0.1.1611` 2026-10-08 — 会場の人数の増減を状態速報に出す
@@ -1130,12 +1131,12 @@
 - `v0.1.1606` 2026-10-08 — 会場カードが空の原因を診断に出す
 - `v0.1.1601` 2026-10-08 — 会場のセリフが出ているか診断に追加
 - `v0.1.1598` 2026-10-08 — 会場のキャラの空の吹き出しを消す
-- `v0.1.1597` 2026-10-08 — 全画面でも会場が消えないようにする
 
 ### 🎈 吹き出し (1版)
 - `v0.1.1598` 2026-10-08 — 会場のキャラの空の吹き出しを消す
 
-### 🎁 ギフト (2版)
+### 🎁 ギフト (3版)
+- `v0.1.1617` 2026-10-08 — ギフト・広告の列が一瞬消えるのを防ぐ
 - `v0.1.1613` 2026-10-08 — 会場のタイルの大きさを①と同じにした
 - `v0.1.1603` 2026-10-08 — 診断キーの保存で描き直さない
 
