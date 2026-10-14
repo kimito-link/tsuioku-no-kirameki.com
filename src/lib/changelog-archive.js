@@ -24,6 +24,14 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.1603',
+    date: '2026-10-08',
+    summary: '診断キーの保存で描き直さない',
+    items: Object.freeze([
+      'パネルが、診断・ログ専用の保存(読み込み記録・音声診断など)に反応して描き直す無駄を減らしました。書き込みの多いデータ(プロフィール表・ギフト履歴)は間引き側に回しています。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1602',
     date: '2026-10-08',
     summary: '診断ページの余分な描き直しを減らす',
