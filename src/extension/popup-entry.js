@@ -675,6 +675,7 @@ import { LANE_SUPPLY_ORIGIN, createLaneSupplyOriginDiag, noteLaneSupplyShrink, n
 import { snapshotLanePublishSkipDiag } from '../lib/lanePublishSkipDiag.js';
 // v0.1.1232 lane-never-drop: 「一度出た人」を覚える名簿(Phase2 蓄積器)。計器とは別モジュール。
 import { applyLaneRosterKeeper, makeLaneRosterKeeperState } from '../lib/laneRosterKeeper.js';
+import { formatLaneCountOrderLine, makeLaneCountOrderState, orderLaneCandidatesByCount } from '../lib/laneCountOrder.js';
 // 人物タイルの ID 行・名前行の正本(person-tile-unify 第3コミット)。popup と会場で共有。
 import { storyUserLaneMetaLines } from '../lib/storyUserLaneMeta.js';
 import { anonymousIdenticonDataUrl } from '../lib/anonymousIdenticon.js';
@@ -725,7 +726,6 @@ import {
   bucketStoryUserLanePicks,
   flattenStoryUserLaneBuckets
 } from '../lib/storyUserLaneBuckets.js';
-import { compareStoryUserLaneCandidates } from '../lib/storyUserLaneSort.js';
 import { buildStoryUserLaneCandidateRow } from '../lib/storyUserLaneRowModel.js';
 // 2026-06-22(council/lane-show-all-active): 応援レーンの人数整合(素性 N/表示 M)を健全度パネルに載せる。
 import { KEY_LANE_DIAG } from '../lib/laneDiagKey.js';
@@ -5958,6 +5958,8 @@ const _lightSupplyGuardDiag = { skipCount: 0, observedCount: 0, worst: null, pai
 const _laneSupplyOriginDiag = createLaneSupplyOriginDiag();
 /** v0.1.1232 Phase2: 「一度出た人」を覚える名簿(描画に使う・計器とは別物)。 */
 const _laneRosterKeeperState = makeLaneRosterKeeperState();
+/** v0.1.1620: レーン内の並び(件数の多い順・取り直しは60秒に1回・新しい人は末尾に足すだけ)。 */
+const _laneCountOrderState = makeLaneCountOrderState();
 /** v0.1.1233 出口4: 縮小keepが続きすぎたら非常口を開くための時計(永久stale防止)。 */
 const _laneShrinkKeepClock = makeLaneShrinkKeepClock();
 /** renderStoryAvatarDiag の同内容再描画を抑止（診断パネルのチカつき抑制） */
@@ -6456,6 +6458,7 @@ function renderStoryUserLane() {
       title: label,
       entry: row.entry,
       recentTexts: _recentTexts,
+      commentCount: Number(/** @type {any} */ (agg)?.commentCount) || 0,
       meta
     });
   }
@@ -6475,7 +6478,14 @@ function renderStoryUserLane() {
     candidates
   });
 
-  rosteredCandidates.sort(compareStoryUserLaneCandidates);
+  // v0.1.1620: 件数の多い順(/live/ と同じ)・並べ替えは60秒に1回まで。人は足すだけで動かさない。
+  const _countOrdered = orderLaneCandidatesByCount(_laneCountOrderState, {
+    liveId: STORY_SOURCE_STATE.liveId,
+    candidates: rosteredCandidates,
+    nowMs: Date.now()
+  }).ordered;
+  rosteredCandidates.length = 0;
+  rosteredCandidates.push(..._countOrdered);
 
   const buckets = bucketStoryUserLanePicks(rosteredCandidates, limit);
   const picked = flattenStoryUserLaneBuckets(buckets);
@@ -18548,6 +18558,7 @@ async function collectAiShareDevMonitorPayloadBundle(watchUrl) {
       // ★2026-08-08 計器: 鏡 publish の到達/見送り。読み方は lanePublishSkipDiag.js の冒頭。
       lanePublishSkip: snapshotLanePublishSkipDiag(_lanePublishSkipDiag, Date.now()),
       giftAdPicksCarry: { restored: _giftAdPicksCarryDiag.restored, cleared: _giftAdPicksCarryDiag.cleared, keptGift: _giftAdPicksCarryDiag.keptGift, keptAd: _giftAdPicksCarryDiag.keptAd },
+      laneCountOrder: { line: formatLaneCountOrderLine(_laneCountOrderState), reorders: _laneCountOrderState.reorders, appended: _laneCountOrderState.appended, ranked: _laneCountOrderState.rank.size },
       laneImportShadow: {
         line: formatLaneImportShadowLine(_laneImportShadow),
         calls: _laneImportShadow.calls,

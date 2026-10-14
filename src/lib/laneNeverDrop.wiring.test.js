@@ -48,7 +48,7 @@ describe('lane-never-drop の配線(配線忘れ=CI赤)', () => {
 
   it('★keeper は sort より前に呼ばれている(順序が逆転したらCI赤)', () => {
     const keeperAt = popupSrc.indexOf('applyLaneRosterKeeper(');
-    const sortAt = popupSrc.indexOf('rosteredCandidates.sort(compareStoryUserLaneCandidates)');
+    const sortAt = popupSrc.indexOf('orderLaneCandidatesByCount(_laneCountOrderState, {');
     expect(keeperAt).toBeGreaterThan(-1);
     expect(sortAt).toBeGreaterThan(-1);
     // sort 後に足すと復活行が段の末尾に固まり、表示順契約(popup=venue)を壊す(SPEC §7-1)。
