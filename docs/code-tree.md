@@ -831,7 +831,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (1942)
+- 📁 **src/** (1943)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1111,7 +1111,7 @@
         - `logo_funlink_white_RGB_link_black.png`
         - `logo_funlink_white_RGB_maru_black.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1706)
+  - 📁 **lib/** (1707)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -2765,6 +2765,7 @@
     - `voicePlayer.js` — comeview-entry.js と同じ方針(@ts-nocheck)。ロジックは変更しない。
     - `voicePlayer.lagDecomposition.test.js`
     - `voicePlayer.test.js`
+    - `voicePlayerMaxCharsCap.wiring.test.js`
     - `voiceReachabilityProbe.js` — 「読み上げは今どういう状態か」を1行で断定する純関数。
     - `voiceReachabilityProbe.test.js`
     - `voiceReachabilityWiring.test.js`

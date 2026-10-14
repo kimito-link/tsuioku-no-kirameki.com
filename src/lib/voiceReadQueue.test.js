@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  capVoiceMaxCharsByBoost,
   computeVoiceCongestion,
   computeVoiceE2eAverage,
   computeVoicePlaybackRate,
@@ -361,5 +362,24 @@ describe('computeVoicePlaybackRate（voice-tempo-realtime-SYNTHESIS §3 Phase 2:
     expect(computeVoicePlaybackRate(NaN, 0.5)).toBe(1.0);
     expect(computeVoicePlaybackRate(0.5, NaN)).toBe(1.0);
     expect(computeVoicePlaybackRate(undefined, undefined)).toBe(1.0);
+  });
+});
+
+describe('capVoiceMaxCharsByBoost(速度を上げる局面では本文も短く・下げるだけ)', () => {
+  it('★持続的な需要超過で boost が上がったら、待機件数が少なくても本文上限を段に合わせて短くする', () => {
+    // 実効上限が絞られてキューが 2 件のまま(待機件数由来は 60)でも、boost 0.8 なら 30 文字。
+    expect(capVoiceMaxCharsByBoost(0.8, 60)).toBe(30);
+    expect(capVoiceMaxCharsByBoost(0.5, 60)).toBe(40);
+    expect(capVoiceMaxCharsByBoost(0.3, 60)).toBe(50);
+    expect(capVoiceMaxCharsByBoost(0.15, 60)).toBe(60);
+    expect(capVoiceMaxCharsByBoost(0, 60)).toBe(60);
+  });
+  it('★待機件数由来の上限より長くはしない(下げるだけ)', () => {
+    expect(capVoiceMaxCharsByBoost(0.3, 30)).toBe(30);
+    expect(capVoiceMaxCharsByBoost(0, 40)).toBe(40);
+  });
+  it('不正な入力でも落ちない(上限 60 に倒す)', () => {
+    expect(capVoiceMaxCharsByBoost(Number.NaN, Number.NaN)).toBe(60);
+    expect(capVoiceMaxCharsByBoost(undefined, undefined)).toBe(60);
   });
 });

@@ -18,6 +18,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1615',
+    date: '2026-10-08',
+    summary: '忙しい配信で読み上げ文を短くする',
+    items: Object.freeze([
+      'コメントが速くて読み上げが追いつかないとき、速度を上げるのと同じ段で、読み上げる文字数も短く(最短30文字)するようにしました。長いコメントを長いまま合成して詰まる状態を減らします。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1614',
     date: '2026-10-08',
     summary: 'IDなしコメントを同じ人扱いしない',
@@ -167,14 +175,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     summary: '鏡の取り合いを止め、会場のずれを減らす',
     items: Object.freeze([
       '視聴ページ内のパネルとサイドパネルを両方開いていると、応援レーンの「鏡」を取り合い、会場の顔ぶれが多い状態と少ない状態を行き来することがありました。鏡を書く直前に確かめ、他のパネルが最近もっと大きい鏡を書いていたら譲るようにしました。'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.1595',
-    date: '2026-10-08',
-    summary: '会場のキャラは浮かぶだけに',
-    items: Object.freeze([
-      '会場モードのりんく・こん太・たぬ姉が、読み上げに合わせた相槌や『…』の吹き出しを出して、広告ランキングなどに被っていました。ひとまず、しゃべらず浮かぶだけ(ふわふわ・まばたき・表情)にしました。'
     ])
   })
 ]);
