@@ -18,6 +18,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1614',
+    date: '2026-10-08',
+    summary: 'IDなしコメントを同じ人扱いしない',
+    items: Object.freeze([
+      '応援コメントのアイコングリッドで、ID が取れていない匿名コメントが「同じ人の×2〜×75」のように並んで見えていたのを直しました。ID が分からないコメントは、1件ずつ別の人として数えます。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1613',
     date: '2026-10-08',
     summary: '会場のタイルの大きさを①と同じにした',
@@ -167,14 +175,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     summary: '会場のキャラは浮かぶだけに',
     items: Object.freeze([
       '会場モードのりんく・こん太・たぬ姉が、読み上げに合わせた相槌や『…』の吹き出しを出して、広告ランキングなどに被っていました。ひとまず、しゃべらず浮かぶだけ(ふわふわ・まばたき・表情)にしました。'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.1594',
-    date: '2026-10-08',
-    summary: '匿名の顔の作成が軽くなる',
-    items: Object.freeze([
-      'パネルを開いた直後に、匿名ユーザーの丸い顔を画像に書き出す処理が、画面の動きを止めていました。書き出しを別の処理に任せる方式に変え、結果の見た目は変えずに、起動時の負荷を減らしました。測定環境(匿名が330人いる配信)では、起動時の処理時間が約10秒から約6.6秒に下がりました。'
     ])
   })
 ]);

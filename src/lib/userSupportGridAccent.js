@@ -149,6 +149,8 @@ export function supportOrdinalForIndex(entries, index) {
   const i = Math.floor(index);
   if (i < 0 || i >= entries.length) return 0;
   const key = supportUserKeyFromEntry(entries[i]);
+  // ★userId が取れていない行は「同じ人」ではない(誰か分からない人の集まり)。1件目として数える。
+  if (key === UNKNOWN_USER_KEY) return 1;
   let n = 0;
   for (let j = 0; j <= i; j += 1) {
     if (supportUserKeyFromEntry(entries[j]) === key) n += 1;
@@ -219,6 +221,11 @@ export function buildSupportAccentIndex(entries, offset = 0, count) {
   const running = new Map();
   for (let i = 0; i < len; i += 1) {
     const key = keys[i];
+    if (key === UNKNOWN_USER_KEY) {
+      ordinals[i] = 1;
+      totals[i] = 1;
+      continue;
+    }
     const r = (running.get(key) || 0) + 1;
     running.set(key, r);
     ordinals[i] = r;

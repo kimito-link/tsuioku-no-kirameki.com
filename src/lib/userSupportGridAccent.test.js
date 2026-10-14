@@ -134,10 +134,12 @@ describe('supportOrdinalForIndex', () => {
     expect(supportOrdinalForIndex(entries, 3)).toBe(3);
   });
 
-  it('userId なしは同一 UNKNOWN として数える', () => {
-    const entries = [{ nickname: 'x' }, { nickname: 'y' }];
+  it('★userId なし(ID 未取得)は同一人物として数えない=毎回 1 件目(「同じ人×75」に見せない)', () => {
+    const entries = [{ nickname: 'x' }, { nickname: 'y' }, { userId: 'a' }, { nickname: 'z' }, { userId: 'a' }];
     expect(supportOrdinalForIndex(entries, 0)).toBe(1);
-    expect(supportOrdinalForIndex(entries, 1)).toBe(2);
+    expect(supportOrdinalForIndex(entries, 1)).toBe(1);
+    expect(supportOrdinalForIndex(entries, 3)).toBe(1);
+    expect(supportOrdinalForIndex(entries, 4)).toBe(2); // 既知の人の数えは従来どおり
   });
 });
 
@@ -163,12 +165,10 @@ describe('buildSupportAccentIndex', () => {
     expect(ordinals).toHaveLength(entries.length);
     for (let i = 0; i < entries.length; i += 1) {
       expect(ordinals[i]).toBe(supportOrdinalForIndex(entries, i));
-      const key = supportUserKeyFromEntry(entries[i]);
-      expect(totals[i]).toBe(supportSameUserTotalInEntries(entries, key));
     }
-    // userId なしはまとめて UNKNOWN として数える
-    expect(ordinals).toEqual([1, 1, 2, 1, 3, 2]);
-    expect(totals).toEqual([3, 1, 3, 2, 3, 2]);
+    // 既知の人は従来の total と一致する。userId なし(ID 未取得)は同一人物に畳まず 1/1。
+    expect(ordinals).toEqual([1, 1, 2, 1, 3, 1]);
+    expect(totals).toEqual([3, 1, 3, 1, 3, 1]);
   });
 
   it('ウィンドウ（offset>0）は窓内だけで ordinal/total を数える', () => {
