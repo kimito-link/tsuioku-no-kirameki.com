@@ -554,7 +554,8 @@ import {
 } from '../lib/userRooms.js';
 import {
   buildSupportAccentIndex,
-  supportOrdinalForIndex
+  supportOrdinalForIndex,
+  supportUserKeyFromEntry
 } from '../lib/userSupportGridAccent.js';
 import {
   applyUserCommentProfileMapToEntries,
@@ -827,6 +828,7 @@ import {
 import {
   createStoryGrowthCellSwapState,
   noteStoryGrowthPatch,
+  noteStoryGrowthCellIdentities,
   formatStoryGrowthCellSwapLine
 } from '../lib/storyGrowthCellSwap.js';
 import { buildDevMonitorDlChartsHtml } from '../lib/devMonitorViz.js';
@@ -8520,6 +8522,7 @@ function patchStoryGrowthIconsFromSource(root, opts = {}) {
       total: accent.totals[i] || 0
     });
   }
+  noteStoryGrowthIdentitiesNow(n);
   if (opts.pulseLast && n > 0) {
     const last = /** @type {HTMLImageElement} */ (imgs[n - 1]);
     last.classList.remove('is-new');
@@ -8538,6 +8541,24 @@ function patchStoryGrowthIconsFromSource(root, opts = {}) {
 const STORY_GROWTH_CHURN = createStoryGrowthChurnState();
 // v0.1.1215: 全消し再構築ではなく「既存マスの中身のすり替え」を観測する(churn の盲点)。
 const STORY_GROWTH_CELL_SWAP = createStoryGrowthCellSwapState();
+
+/**
+ * v0.1.1616計器: 各マスが「どのコメントか」「誰として数えたか」を控えて、前回との食い違いを数える(観測のみ)。
+ *   ★窓は常に0固定なので、既存の storyGrowthCellSwap は「入替なし」しか出せない(盲点)。実際の入替・userId後付けはここで数える。
+ * @param {number} n
+ */
+function noteStoryGrowthIdentitiesNow(n) {
+  try {
+    const ids = new Array(n);
+    const keys = new Array(n);
+    for (let i = 0; i < n; i += 1) {
+      const entry = getStoryEntryByIndex(i);
+      ids[i] = entry ? commentStableId(entry) || '' : '';
+      keys[i] = entry ? supportUserKeyFromEntry(entry) : '';
+    }
+    noteStoryGrowthCellIdentities(STORY_GROWTH_CELL_SWAP, { ids, keys, atMs: Date.now() });
+  } catch { /* 計器の失敗は描画を止めない */ }
+}
 
 function rebuildStoryGrowth(root, total) {
   // ★v0.1.1462: 全消し再構築=DOMを最も動かす経路。実測する。
@@ -8558,6 +8579,7 @@ function rebuildStoryGrowthImpl(root, total) {
     );
   }
   root.appendChild(frag);
+  noteStoryGrowthIdentitiesNow(total);
   // 観測のみ(失敗は握る=描画を止めない)。offset は「窓の先頭位置」で、これが進んだ回が
   //   スライド=既存の枚を捨てて描き直した回。
   try {
@@ -18478,6 +18500,9 @@ async function collectAiShareDevMonitorPayloadBundle(watchUrl) {
             cellsPatched: STORY_GROWTH_CELL_SWAP.cellsPatched,
             swaps: STORY_GROWTH_CELL_SWAP.swaps,
             maxSwapsInOnePatch: STORY_GROWTH_CELL_SWAP.maxSwapsInOnePatch,
+            identitySwaps: STORY_GROWTH_CELL_SWAP.identitySwaps,
+            userKeyChanges: STORY_GROWTH_CELL_SWAP.userKeyChanges,
+            unknownCells: STORY_GROWTH_CELL_SWAP.unknownCells,
             line: formatStoryGrowthCellSwapLine(STORY_GROWTH_CELL_SWAP)
           };
         } catch {
