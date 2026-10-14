@@ -537,7 +537,7 @@ import { createCoalescedRepaintScheduler } from '../lib/coalescedRepaintSchedule
 import { buildStorageRefreshTriggerTag } from '../lib/storageRefreshTriggerKey.js';
 import { prefersReducedMotion } from '../lib/prefersReducedMotion.js';
 import { pushLaneTileSample, summarizeLaneTileOscillation } from '../lib/laneTileOscillation.js';
-import { createGiftAdPicksCarry, resolvePicksOnLiveChange } from '../lib/giftAdPicksCarry.js';
+import { createGiftAdPicksCarry, keepPicksIfEmptied, resolvePicksOnLiveChange } from '../lib/giftAdPicksCarry.js';
 import { createLaneImportShadowState, observeLaneImportShadow, formatLaneImportShadowLine } from '../lib/laneImportShadow.js';
 import { makeLaneResult } from '../lib/northStarLaneResult.js';
 import {
@@ -7657,6 +7657,9 @@ async function paintStoryUserLaneCoalesced(liveId, displayEntries, storageRows) 
   // 公式の人のサムネも他レーンと同じ正本の解決器で引く(広告列と同型)。
   const resolveAvatarForUid = (/** @type {string} */ uid) =>
     storyGrowthAvatarSrcCandidate({ userId: uid, avatarUrl: '' }, lid, storageRows);
+  // ★v0.1.1619: 読み直しが一瞬空で返っても、同じ配信の前の gift/ad を消さない(29→14・54→48 の真因・正本=giftAdPicksCarry.js)。
+  const _prevGiftPicks = STORY_SOURCE_STATE.giftThrowerPicks;
+  const _prevAdPicks = STORY_SOURCE_STATE.adThrowerPicks;
   STORY_SOURCE_STATE.giftThrowerPicks = Object.freeze(mergeGiftPicksWithOfficial(
     buildStoryGiftThrowerLanePicks(giftUsers, lid, storageRows, giftLimit),
     officialGiftPicksFromRows(officialGiftRows, {
@@ -7688,6 +7691,12 @@ async function paintStoryUserLaneCoalesced(liveId, displayEntries, storageRows) 
       limit: giftLimit
     }
   );
+  {
+    const g = keepPicksIfEmptied(_prevGiftPicks, STORY_SOURCE_STATE.giftThrowerPicks);
+    const ad = keepPicksIfEmptied(_prevAdPicks, STORY_SOURCE_STATE.adThrowerPicks);
+    if (g.kept) { STORY_SOURCE_STATE.giftThrowerPicks = g.picks; _giftAdPicksCarryDiag.keptGift += 1; }
+    if (ad.kept) { STORY_SOURCE_STATE.adThrowerPicks = ad.picks; _giftAdPicksCarryDiag.keptAd += 1; }
+  }
   renderStoryUserLane();
   renderStoryAvatarDiag();
 }
@@ -7706,7 +7715,7 @@ async function paintStoryUserLaneCoalesced(liveId, displayEntries, storageRows) 
  */
 /** v0.1.1617: gift/ad picks の持ち越し台帳と計器(同じ配信へ戻ったとき restored / 別の配信へ替わったとき cleared)。 */
 const _giftAdPicksCarry = createGiftAdPicksCarry();
-const _giftAdPicksCarryDiag = { restored: 0, cleared: 0 };
+const _giftAdPicksCarryDiag = { restored: 0, cleared: 0, keptGift: 0, keptAd: 0 };
 function syncStorySourceEntries(liveId, displayList, storageRowsForLane, opts = {}) {
   const nextLiveId = String(liveId || '');
   const list = Array.isArray(displayList) ? displayList : [];
@@ -18538,7 +18547,7 @@ async function collectAiShareDevMonitorPayloadBundle(watchUrl) {
       laneSupplyOrigin: snapshotLaneSupplyOriginDiag(_laneSupplyOriginDiag),
       // ★2026-08-08 計器: 鏡 publish の到達/見送り。読み方は lanePublishSkipDiag.js の冒頭。
       lanePublishSkip: snapshotLanePublishSkipDiag(_lanePublishSkipDiag, Date.now()),
-      giftAdPicksCarry: { restored: _giftAdPicksCarryDiag.restored, cleared: _giftAdPicksCarryDiag.cleared },
+      giftAdPicksCarry: { restored: _giftAdPicksCarryDiag.restored, cleared: _giftAdPicksCarryDiag.cleared, keptGift: _giftAdPicksCarryDiag.keptGift, keptAd: _giftAdPicksCarryDiag.keptAd },
       laneImportShadow: {
         line: formatLaneImportShadowLine(_laneImportShadow),
         calls: _laneImportShadow.calls,
