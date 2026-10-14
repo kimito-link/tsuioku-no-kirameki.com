@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 8 / 912 件
+## ⚠️ 役割コメントが無いソース 8 / 913 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `scripts/build.mjs`
@@ -831,7 +831,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (1944)
+- 📁 **src/** (1947)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1111,7 +1111,7 @@
         - `logo_funlink_white_RGB_link_black.png`
         - `logo_funlink_white_RGB_maru_black.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1708)
+  - 📁 **lib/** (1711)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -1609,6 +1609,9 @@
     - `frozenElapsedOnEnd.test.js`
     - `geminiNanoBridge.js` — v0.1.205 Phase C: Built-in AI (Gemini Nano, Chrome 138+) の薄いラッパー。
     - `geminiNanoBridge.test.js`
+    - `giftAdPicksCarry.js` — 【層】L0 判定層(純粋関数・I/O禁止)
+    - `giftAdPicksCarry.test.js`
+    - `giftAdPicksCarryWiring.wiring.test.js`
     - `giftAdPipelineCensus.js` — ギフト/広告が「取れて→出て→鳴る」まで通っているかを
     - `giftAdPipelineCensus.test.js`
     - `giftBahamutCelebration.js` — ギフト到着時の「画面ズームイン」演出 spec（純関数）。
