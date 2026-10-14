@@ -18,6 +18,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1626',
+    date: '2026-10-14',
+    summary: '共有キーを拡張フォルダのファイルから自動で入れる',
+    items: Object.freeze([
+      '拡張のフォルダに鍵ファイル(nicolive-share-keys.json)があれば、状態画面を開いたときに一度だけ自動で取り込みます。貼り付けもクリックも要りません。',
+      '自動公開の同意は、ファイルに「同意する」と明記されているときだけ入ります。取り込みは一度きりで、あとで同意を切っても起動のたびに戻しません。ファイルが無い・形が不正なときは何もしません。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1625',
     date: '2026-10-14',
     summary: '共有キーを貼り付けなしでファイルから入れる',
@@ -174,14 +183,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     summary: '複数タブで配信が入れ替わるのを止める',
     items: Object.freeze([
       'ニコ生のタブを複数開いていると、タブ同士が『最後に見た配信』を書き合い、パネルの配信が入れ替わったり、全パネルが描き直しを繰り返したりしていました。URLが変わった時と前面に来た時だけ書くようにしました。'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.1606',
-    date: '2026-10-08',
-    summary: '会場カードが空の原因を診断に出す',
-    items: Object.freeze([
-      '会場のカードで発言の中身が出なかったとき、状態速報に『発言回数・何秒前・データの出所・本文の有無』が出るようにしました(原因の切り分け用。ふだんの動きは変えません)。'
     ])
   })
 ]);
