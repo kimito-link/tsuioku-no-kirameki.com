@@ -305,9 +305,10 @@
   - `src/lib/giftThrowProjectile.js`
 - **吹き出し寿命管理** — 会場の吹き出しの表示上限・追い出し(eviction)ライフサイクル
   - `src/lib/venueBubbleLifecycle.js`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 244</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 245</summary>
 
 - `scripts/encode-marketing-html-avatars.mjs` — extension/images/marketing-html-avatars/*.png を data URI にし、
+- `scripts/perf-ab/lane-import-diff.mjs` — lane-import-diff — 「/live/ の集計を拡張へ輸入したら、いまの応援レーンと何が違うか」を数字にする(読み取り専用)。
 - `scripts/perf-ab/parity.mjs` — 会場(venue.html)が「POP(popup.html)の鏡の投影」になっているかを、時系列で測る。
 - `scripts/split-avatar-parts.mjs` — 偽市松背景の除去 + パーツ切り出し(one-off アセットパイプライン)
 - `src/data/acquirers/laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。

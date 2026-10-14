@@ -395,11 +395,11 @@ for (const entry of LINEUP) {
     console.error(`[env] 有効 ${enabledCount}/${LINEUP.length}体（欠落なし）`);
   }
 }
-// 司令塔 Claude(Opus 4.8) を会議の最強メンバー(統括/批判)として自動参加させる。
+// 司令塔 Claude(Opus 5.5) を会議の最強メンバー(統括/批判)として自動参加させる。
 // 既定(プランB)は ANTHROPIC_API_KEY 無し＝このブロックは無効で、Claude はチャット側で手動統括する。
 // キーを env に入れた日から自動で会議に降臨する（プランA・従量課金）。OpenAI 非互換なので専用 fetch。
 const ANTHRO = process.env.ANTHROPIC_API_KEY;
-const ANTHRO_MODEL = process.env.COUNCIL_CLAUDE_MODEL || 'claude-opus-4-8';
+const ANTHRO_MODEL = process.env.COUNCIL_CLAUDE_MODEL || 'claude-opus-5-5';
 if (ANTHRO) push(`anthropic/${ANTHRO_MODEL}`, 'cloud', (p, s) => anthropicChat(ANTHRO_MODEL, p, s));
 // ローカル(オフライン保険・別頭脳・無料無制限)。MEETING_LOCAL_MODELS=csv で上書き可。
 // ※ glm-5.2:cloud は Ollama サブスク必須(無料は subscription エラー)のため不採用。
