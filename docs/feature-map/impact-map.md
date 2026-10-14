@@ -824,6 +824,7 @@
 | `src/lib/sessionCommentCache.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/sessionSummaryCompareTableHtml.js` | 1 | ポップアップ(応援レーン) |
 | `src/lib/sessionSummaryMirror.js` | 1 | ポップアップ(応援レーン) |
+| `src/lib/shareKeysFile.js` | 1 | 状態速報ページ |
 | `src/lib/shouldRearmBackfillForOfficialGap.js` | 1 | 記録エンジン(watchページ常駐) |
 | `src/lib/shouldSkipDeepHarvest.js` | 1 | 記録エンジン(watchページ常駐) |
 | `src/lib/shouldTriggerOfficialGapDeepHarvest.js` | 1 | 記録エンジン(watchページ常駐) |

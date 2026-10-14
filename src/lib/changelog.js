@@ -18,6 +18,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1625',
+    date: '2026-10-14',
+    summary: '共有キーを貼り付けなしでファイルから入れる',
+    items: Object.freeze([
+      '状態画面の「WEB共有の設定」に「鍵ファイルを読み込む」ボタンを追加しました。貼り付けができない環境でも、鍵のファイル(JSON)を選ぶだけで設定できます。',
+      '形が正しくないファイル(鍵が欠けている・送信先が https でない・長すぎる)は保存せずに断ります。鍵の値は画面には出しません。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1624',
     date: '2026-10-14',
     summary: '共有キーの入力が貼った直後に消えない',
@@ -173,14 +182,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     summary: '会場カードが空の原因を診断に出す',
     items: Object.freeze([
       '会場のカードで発言の中身が出なかったとき、状態速報に『発言回数・何秒前・データの出所・本文の有無』が出るようにしました(原因の切り分け用。ふだんの動きは変えません)。'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.1605',
-    date: '2026-10-08',
-    summary: '全員分の再計算を使い回して軽く',
-    items: Object.freeze([
-      'パネルが描き直すたびに全員分やり直していた顔画像の生成・ニックネーム判定・数字の整形を、使い回すようにしました(見た目は変わりません)。'
     ])
   })
 ]);
