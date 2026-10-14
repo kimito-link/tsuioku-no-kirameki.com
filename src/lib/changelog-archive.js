@@ -24,6 +24,14 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.1604',
+    date: '2026-10-08',
+    summary: '頻繁な保存で何度も描き直さない',
+    items: Object.freeze([
+      'パネルが、配信者情報や放送終了などの頻繁な保存のたびに描き直していたのを、3秒に1回にまとめました。診断専用の保存では描き直しません。実データ入りの計測で、パネルが忙しい時間が約4割減りました。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1603',
     date: '2026-10-08',
     summary: '診断キーの保存で描き直さない',

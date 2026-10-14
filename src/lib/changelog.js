@@ -18,6 +18,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1624',
+    date: '2026-10-14',
+    summary: '共有キーの入力が貼った直後に消えない',
+    items: Object.freeze([
+      '状態画面の「WEB共有の設定」で、貼り付けたキーが保存ボタンを押す前に空へ戻ってしまう不具合を直しました(画面を数秒ごとに描き直すたびに入力欄が作り直されていたため)。',
+      '保存するまでの入力と、欄の開閉を、描き直しをまたいで覚えます。保存すると下書きは捨てます。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1623',
     date: '2026-10-14',
     summary: 'りんく段にコメントしていない応援者も出す',
@@ -172,14 +181,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     summary: '全員分の再計算を使い回して軽く',
     items: Object.freeze([
       'パネルが描き直すたびに全員分やり直していた顔画像の生成・ニックネーム判定・数字の整形を、使い回すようにしました(見た目は変わりません)。'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.1604',
-    date: '2026-10-08',
-    summary: '頻繁な保存で何度も描き直さない',
-    items: Object.freeze([
-      'パネルが、配信者情報や放送終了などの頻繁な保存のたびに描き直していたのを、3秒に1回にまとめました。診断専用の保存では描き直しません。実データ入りの計測で、パネルが忙しい時間が約4割減りました。'
     ])
   })
 ]);
