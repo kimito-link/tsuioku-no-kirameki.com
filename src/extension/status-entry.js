@@ -3100,6 +3100,13 @@ function buildLiveViewButton(live) {
  *
  * @returns {HTMLElement}
  */
+/**
+ * v0.1.1624: 保存前の入力の下書き。status 画面は配信カードを数秒ごとに作り直すため、設定欄も毎回新しい <input> になり、
+ *   貼り付けた鍵が保存を押す前に空へ戻っていた(利用者の「貼り付けても消えてしまう」)。作り直しをまたいで覚える。
+ * @type {{ ingestKey: string|null, viewToken: string|null, appOrigin: string|null, open: boolean|null }}
+ */
+const _uploadConfigDraft = { ingestKey: null, viewToken: null, appOrigin: null, open: null };
+
 function buildUploadConfigEditor() {
   const cfg = getUploadConfig();
   const details = document.createElement('details');
@@ -3107,7 +3114,8 @@ function buildUploadConfigEditor() {
     'margin-top:8px;padding:6px 8px;border-radius:6px;font-size:11px;line-height:1.5;' +
     'border:1px solid var(--nl-border);background:var(--nl-card-bg);';
   // 未設定なら開いた状態で出す（何をすればいいか一目で分かる）
-  details.open = !(cfg.ingestKey && cfg.viewToken);
+  details.open = _uploadConfigDraft.open !== null ? _uploadConfigDraft.open : !(cfg.ingestKey && cfg.viewToken);
+  details.addEventListener('toggle', () => { _uploadConfigDraft.open = details.open; });
 
   const summary = document.createElement('summary');
   summary.style.cssText = 'cursor:pointer;font-weight:600;';
@@ -3123,8 +3131,8 @@ function buildUploadConfigEditor() {
     'この値はこのPCの中だけに保存され、外部には送られません。';
   details.appendChild(note);
 
-  /** @param {string} label @param {string} value @param {string} hint */
-  const field = (label, value, hint) => {
+  /** @param {'ingestKey'|'viewToken'|'appOrigin'} draftKey @param {string} label @param {string} value @param {string} hint */
+  const field = (draftKey, label, value, hint) => {
     const wrap = document.createElement('label');
     wrap.style.cssText = 'display:block;margin:6px 0;';
     const cap = document.createElement('span');
@@ -3132,7 +3140,9 @@ function buildUploadConfigEditor() {
     cap.textContent = label;
     const input = document.createElement('input');
     input.type = 'text';
-    input.value = value;
+    const draft = _uploadConfigDraft[draftKey];
+    input.value = draft !== null ? draft : value;
+    input.addEventListener('input', () => { _uploadConfigDraft[draftKey] = input.value; });
     input.placeholder = hint;
     input.spellcheck = false;
     input.autocomplete = 'off';
@@ -3145,9 +3155,9 @@ function buildUploadConfigEditor() {
     return input;
   };
 
-  const ingestInput = field('書き込みキー（x-share-key）', cfg.ingestKey, '未設定');
-  const tokenInput = field('閲覧トークン（URLの ?v=）', cfg.viewToken, '未設定');
-  const originInput = field('送信先（通常は変更不要）', cfg.appOrigin, DEFAULT_APP_ORIGIN);
+  const ingestInput = field('ingestKey', '書き込みキー（x-share-key）', cfg.ingestKey, '未設定');
+  const tokenInput = field('viewToken', '閲覧トークン（URLの ?v=）', cfg.viewToken, '未設定');
+  const originInput = field('appOrigin', '送信先（通常は変更不要）', cfg.appOrigin, DEFAULT_APP_ORIGIN);
 
   const row = document.createElement('div');
   row.style.cssText = 'display:flex;gap:6px;align-items:center;margin-top:6px;';
@@ -3165,6 +3175,9 @@ function buildUploadConfigEditor() {
       viewToken: tokenInput.value,
       appOrigin: originInput.value
     });
+    _uploadConfigDraft.ingestKey = null;
+    _uploadConfigDraft.viewToken = null;
+    _uploadConfigDraft.appOrigin = null;
     const now = getUploadConfig();
     result.textContent = now.ingestKey && now.viewToken
       ? '✅ 保存しました（画面を更新すると共有ボタンが出ます）'
