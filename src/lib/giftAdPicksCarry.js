@@ -50,3 +50,24 @@ export function resolvePicksOnLiveChange(carry, ev) {
   }
   return { gift: Object.freeze([]), ad: Object.freeze([]), action: 'cleared' };
 }
+
+/**
+ * 保存データの読み直し(描くたび)で候補が【一瞬空】になっても、直前の人たちを消さない。
+ *
+ * ★なぜ要るか(2026-10-14・実機の状態速報で2回): レーンの人数が 29→14(ギフト11+広告4が空)・54→48(広告6が空)に減った。
+ *   どちらも「減った枚数 = ギフト列/広告列の人数」にちょうど一致し、配信ID の切替(giftAdPicksCarry の restored)は0回=別の経路。
+ *   描画のたびに保存データ(ギフト/広告の公式順位)を読み直して候補を作り直すので、その読み込みが一瞬空で返ると
+ *   (空を保存する成功0件・読み取りの失敗・配信なしの瞬間)、その回の描画でその列が丸ごと消える。確定供給を名乗るため
+ *   縮小ガードも通らない。同じ配信の公式順位は【増えるだけ】(AGENTS.md §3.6「rows>0 のときだけ上書き」と同じ考え方)。
+ * ★同じ配信のなかで「前は人がいたのに、今回は空」のときだけ前を残す。別の配信への切替は呼び出し側が先に空へ戻す。
+ *
+ * @param {readonly unknown[]|null|undefined} prev いま保持している候補(同じ配信)
+ * @param {readonly unknown[]|null|undefined} next 今回作り直した候補
+ * @returns {{ picks: readonly unknown[], kept: boolean }}
+ */
+export function keepPicksIfEmptied(prev, next) {
+  const p = Array.isArray(prev) ? prev : [];
+  const n = Array.isArray(next) ? next : [];
+  if (n.length === 0 && p.length > 0) return { picks: p, kept: true };
+  return { picks: n, kept: false };
+}

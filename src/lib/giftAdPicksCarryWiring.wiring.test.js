@@ -23,6 +23,23 @@ describe('popup-entry: 配信 ID の切替で gift/ad picks を判定してか�
     expect(popup.slice(at, end)).not.toMatch(/giftThrowerPicks = Object\.freeze\(\[\]\)/);
   });
   it('★計器(restored / cleared)を診断へ載せる', () => {
-    expect(popup).toMatch(/giftAdPicksCarry: \{ restored: _giftAdPicksCarryDiag\.restored, cleared: _giftAdPicksCarryDiag\.cleared \},/);
+    expect(popup).toMatch(/giftAdPicksCarry: \{ restored: _giftAdPicksCarryDiag\.restored, cleared: _giftAdPicksCarryDiag\.cleared, keptGift: _giftAdPicksCarryDiag\.keptGift, keptAd: _giftAdPicksCarryDiag\.keptAd \},/);
+  });
+
+  it('★読み直しで作り直した候補が空なら直前を残す(keepPicksIfEmptied)・再構築より前に直前の値を控える', () => {
+    const at = popup.indexOf('const _prevGiftPicks = STORY_SOURCE_STATE.giftThrowerPicks;');
+    expect(at).toBeGreaterThan(0);
+    const body = popup.slice(at, at + 3200);
+    expect(body).toMatch(/const _prevAdPicks = STORY_SOURCE_STATE\.adThrowerPicks;/);
+    expect(body).toMatch(/keepPicksIfEmptied\(_prevGiftPicks, STORY_SOURCE_STATE\.giftThrowerPicks\)/);
+    expect(body).toMatch(/keepPicksIfEmptied\(_prevAdPicks, STORY_SOURCE_STATE\.adThrowerPicks\)/);
+    // 残すと決めたら実際に state へ戻している(判定だけで戻し忘れると効かない)
+    expect(body).toMatch(/if \(g\.kept\) \{ STORY_SOURCE_STATE\.giftThrowerPicks = g\.picks; _giftAdPicksCarryDiag\.keptGift \+= 1; \}/);
+    expect(body).toMatch(/if \(ad\.kept\) \{ STORY_SOURCE_STATE\.adThrowerPicks = ad\.picks; _giftAdPicksCarryDiag\.keptAd \+= 1; \}/);
+    // 描画(renderStoryUserLane)に入る【前】に決めている
+    expect(body.indexOf('keepPicksIfEmptied(_prevAdPicks')).toBeLessThan(body.indexOf('renderStoryUserLane();'));
+  });
+  it('★残した回数を診断へ(keptGift / keptAd)', () => {
+    expect(popup).toMatch(/keptGift: _giftAdPicksCarryDiag\.keptGift, keptAd: _giftAdPicksCarryDiag\.keptAd/);
   });
 });
