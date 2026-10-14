@@ -18,6 +18,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1623',
+    date: '2026-10-14',
+    summary: 'りんく段にコメントしていない応援者も出す',
+    items: Object.freeze([
+      'ギフトや広告で応援して本物のサムネが分かっている人は、コメントしていなくても、りんく段に並びます(/live/ と同じ)。前の版では、コメントした応援者しか出ず、りんく段が空になる配信がありました。',
+      'ギフト列・広告列にも引き続き出ます(両方に出るのは /live/ と同じ)。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1622',
     date: '2026-10-14',
     summary: '開いた直後から応援レーンが件数順に並ぶ',
@@ -171,14 +180,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     summary: '頻繁な保存で何度も描き直さない',
     items: Object.freeze([
       'パネルが、配信者情報や放送終了などの頻繁な保存のたびに描き直していたのを、3秒に1回にまとめました。診断専用の保存では描き直しません。実データ入りの計測で、パネルが忙しい時間が約4割減りました。'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.1603',
-    date: '2026-10-08',
-    summary: '診断キーの保存で描き直さない',
-    items: Object.freeze([
-      'パネルが、診断・ログ専用の保存(読み込み記録・音声診断など)に反応して描き直す無駄を減らしました。書き込みの多いデータ(プロフィール表・ギフト履歴)は間引き側に回しています。'
     ])
   })
 ]);
