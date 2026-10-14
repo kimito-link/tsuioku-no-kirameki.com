@@ -1,0 +1,28 @@
+import { describe, expect, it } from 'vitest';
+import { parseShareKeysFile } from './shareKeysFile.js';
+
+describe('parseShareKeysFile', () => {
+  it('★2つの鍵があれば取り出す(前後の空白は落とす・appOrigin は省略可)', () => {
+    expect(parseShareKeysFile('{"ingestKey":" a ","viewToken":"b"}')).toEqual({ ok: true, ingestKey: 'a', viewToken: 'b', appOrigin: '' });
+    expect(parseShareKeysFile('{"ingestKey":"a","viewToken":"b","appOrigin":"https://app.example.com"}')).toMatchObject({ ok: true, appOrigin: 'https://app.example.com' });
+  });
+  it('★どちらかが欠けたら拒否する', () => {
+    expect(parseShareKeysFile('{"ingestKey":"a"}').ok).toBe(false);
+    expect(parseShareKeysFile('{"viewToken":"b"}').ok).toBe(false);
+    expect(parseShareKeysFile('{"ingestKey":"","viewToken":"b"}').ok).toBe(false);
+  });
+  it('★JSON でない・配列・数値の鍵は拒否する(落ちない)', () => {
+    expect(parseShareKeysFile('not json').ok).toBe(false);
+    expect(parseShareKeysFile('[1]').ok).toBe(false);
+    expect(parseShareKeysFile('{"ingestKey":1,"viewToken":2}').ok).toBe(false);
+    expect(parseShareKeysFile(undefined).ok).toBe(false);
+  });
+  it('★送信先は https のホスト名だけ許す(http・パス付き・他スキームは拒否)', () => {
+    for (const bad of ['http://x.com', 'https://x.com/path', 'javascript:alert(1)', 'https://']) {
+      expect(parseShareKeysFile(JSON.stringify({ ingestKey: 'a', viewToken: 'b', appOrigin: bad })).ok).toBe(false);
+    }
+  });
+  it('★長すぎる値は拒否する', () => {
+    expect(parseShareKeysFile(JSON.stringify({ ingestKey: 'a'.repeat(301), viewToken: 'b' })).ok).toBe(false);
+  });
+});

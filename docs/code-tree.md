@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 8 / 916 件
+## ⚠️ 役割コメントが無いソース 8 / 917 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `scripts/build.mjs`
@@ -831,7 +831,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (1957)
+- 📁 **src/** (1960)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1111,7 +1111,7 @@
         - `logo_funlink_white_RGB_link_black.png`
         - `logo_funlink_white_RGB_maru_black.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1721)
+  - 📁 **lib/** (1724)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -2378,6 +2378,8 @@
     - `sessionSummaryMirror.js` — セッション比較(記録サマリの推移)の「鏡」スナップショット純関数
     - `sessionSummaryMirror.test.js`
     - `sessionSummaryMirrorKey.js` — セッション比較(記録サマリの推移)鏡の storage キー正本
+    - `shareKeysFile.js` — 【層】L0 判定層(純粋関数・I/O禁止)
+    - `shareKeysFile.test.js`
     - `shouldRearmBackfillForOfficialGap.js` — 自動補充の核心: 「公式コメント件数と記録件数のギャップが大きいまま、NDGR バックフィルが
     - `shouldRearmBackfillForOfficialGap.test.js`
     - `shouldSkipDeepHarvest.js` — NDGR がリアルタイムでコメントを提供している間は deep harvest（仮想リスト走査）を
@@ -2459,6 +2461,7 @@
     - `statusRefreshBackoff.js` — v0.1.1010: 状態速報(status.html)の自動更新を「直近 refresh の所要に比例して間引く」純関数。
     - `statusRefreshBackoff.test.js`
     - `statusShareFormDraft.wiring.test.js`
+    - `statusShareKeysImport.wiring.test.js`
     - `statusShareUrls.js` — 状態速報の共有 URL を組み立てる純関数。
     - `statusShareUrls.test.js`
     - `statusTrend.js` — 状態速報の主要KPIを時系列で記録し、「スナップショットでは見えない劣化」を検知する純関数(v0.1.862)。
