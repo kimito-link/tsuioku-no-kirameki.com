@@ -10,6 +10,7 @@ import {
 } from './voiceKeys.js';
 import { classifyVoiceSynthFailureReason } from './voiceSynthFailureReason.js';
 import {
+  capVoiceMaxCharsByBoost,
   computeVoiceCongestion,
   computeVoiceE2eAverage,
   computeVoicePlaybackRate,
@@ -401,7 +402,7 @@ export class VoicePlayer {
     const effBoost = this._resolveEffectiveSpeedBoost(congestion.speedBoost);
     const assigned = this.resolveVoice(item.userKey, this.assignments, this.styleIds);
     const promise = this.fetchSynthesizeVoice(
-      buildMergedVoiceText(item, { maxChars: congestion.maxChars }),
+      buildMergedVoiceText(item, { maxChars: capVoiceMaxCharsByBoost(effBoost, congestion.maxChars) }),
       {
         ...assigned,
         speedOffset: assigned.speedOffset + effBoost
@@ -569,7 +570,7 @@ export class VoicePlayer {
         const wav = pf
           ? await pf.promise
           : await this.fetchSynthesizeVoice(
-              buildMergedVoiceText(item, { maxChars: congestion.maxChars }),
+              buildMergedVoiceText(item, { maxChars: capVoiceMaxCharsByBoost(effBoostNow, congestion.maxChars) }),
               {
                 ...assigned,
                 speedOffset: assigned.speedOffset + effBoostNow

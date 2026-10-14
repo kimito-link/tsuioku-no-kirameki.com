@@ -24,6 +24,14 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.1595',
+    date: '2026-10-08',
+    summary: '会場のキャラは浮かぶだけに',
+    items: Object.freeze([
+      '会場モードのりんく・こん太・たぬ姉が、読み上げに合わせた相槌や『…』の吹き出しを出して、広告ランキングなどに被っていました。ひとまず、しゃべらず浮かぶだけ(ふわふわ・まばたき・表情)にしました。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1594',
     date: '2026-10-08',
     summary: '匿名の顔の作成が軽くなる',
