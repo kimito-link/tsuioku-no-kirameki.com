@@ -832,7 +832,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (1960)
+- 📁 **src/** (1961)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1112,7 +1112,7 @@
         - `logo_funlink_white_RGB_link_black.png`
         - `logo_funlink_white_RGB_maru_black.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1724)
+  - 📁 **lib/** (1725)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -2463,6 +2463,7 @@
     - `statusRefreshBackoff.test.js`
     - `statusShareFormDraft.wiring.test.js`
     - `statusShareKeysImport.wiring.test.js`
+    - `statusShareKeysSeed.wiring.test.js`
     - `statusShareUrls.js` — 状態速報の共有 URL を組み立てる純関数。
     - `statusShareUrls.test.js`
     - `statusTrend.js` — 状態速報の主要KPIを時系列で記録し、「スナップショットでは見えない劣化」を検知する純関数(v0.1.862)。

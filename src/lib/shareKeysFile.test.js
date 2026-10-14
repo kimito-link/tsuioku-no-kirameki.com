@@ -3,7 +3,7 @@ import { parseShareKeysFile } from './shareKeysFile.js';
 
 describe('parseShareKeysFile', () => {
   it('★2つの鍵があれば取り出す(前後の空白は落とす・appOrigin は省略可)', () => {
-    expect(parseShareKeysFile('{"ingestKey":" a ","viewToken":"b"}')).toEqual({ ok: true, ingestKey: 'a', viewToken: 'b', appOrigin: '' });
+    expect(parseShareKeysFile('{"ingestKey":" a ","viewToken":"b"}')).toEqual({ ok: true, ingestKey: 'a', viewToken: 'b', appOrigin: '', autoPublishConsent: false });
     expect(parseShareKeysFile('{"ingestKey":"a","viewToken":"b","appOrigin":"https://app.example.com"}')).toMatchObject({ ok: true, appOrigin: 'https://app.example.com' });
   });
   it('★どちらかが欠けたら拒否する', () => {
@@ -24,5 +24,15 @@ describe('parseShareKeysFile', () => {
   });
   it('★長すぎる値は拒否する', () => {
     expect(parseShareKeysFile(JSON.stringify({ ingestKey: 'a'.repeat(301), viewToken: 'b' })).ok).toBe(false);
+  });
+});
+
+describe('parseShareKeysFile: 自動公開の同意', () => {
+  const base = { ingestKey: 'a', viewToken: 'b' };
+  it('★同意は true と明記されているときだけ(省略・"true"文字列・1 は同意なし)', () => {
+    expect(parseShareKeysFile(JSON.stringify({ ...base, autoPublishConsent: true }))).toMatchObject({ ok: true, autoPublishConsent: true });
+    for (const v of [undefined, 'true', 1, null, false]) {
+      expect(parseShareKeysFile(JSON.stringify({ ...base, autoPublishConsent: v }))).toMatchObject({ ok: true, autoPublishConsent: false });
+    }
   });
 });
