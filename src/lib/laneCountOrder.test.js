@@ -51,6 +51,17 @@ describe('orderLaneCandidatesByCount', () => {
     expect(r.appended).toBe(1);
     expect(uids(orderLaneCandidatesByCount(st, { liveId: 'lv1', candidates: [c('a:n', 500), c('a:x', 1), c('a:y', 5)], nowMs: T0 + 2000 }))).toEqual(['a:y', 'a:x', 'a:n']);
   });
+  it('★順位表より多い人数が一度に届いたら(暫定→確定の流し込み)取り直す・少数の追加は取り直さない', () => {
+    const st = makeLaneCountOrderState();
+    orderLaneCandidatesByCount(st, { liveId: 'lv1', candidates: [c('a:s1', 1), c('a:s2', 2)], nowMs: T0 });
+    const many = [c('a:s1', 1), c('a:s2', 2), c('a:b1', 50), c('a:b2', 40), c('a:b3', 30)];
+    const r = orderLaneCandidatesByCount(st, { liveId: 'lv1', candidates: many, nowMs: T0 + 1000 });
+    expect(r.reordered).toBe(true);
+    expect(uids(r)).toEqual(['a:b1', 'a:b2', 'a:b3', 'a:s2', 'a:s1']);
+    const r2 = orderLaneCandidatesByCount(st, { liveId: 'lv1', candidates: [...many, c('a:late', 99)], nowMs: T0 + 2000 });
+    expect(r2.reordered).toBe(false);
+    expect(uids(r2)[5]).toBe('a:late');
+  });
   it('★減らさない: 入力にいる人は必ず出力にいる', () => {
     const st = makeLaneCountOrderState();
     const input = [c('a:x', 1), c('a:y', 5), c('3', 2, 3)];

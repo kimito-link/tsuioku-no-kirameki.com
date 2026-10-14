@@ -18,6 +18,15 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1622',
+    date: '2026-10-14',
+    summary: '開いた直後から応援レーンが件数順に並ぶ',
+    items: Object.freeze([
+      'パネルを開いた直後、最初に届く一部の人だけで並びが決まり、あとから来た大勢が後ろに回って件数順にならないことがありました。人数が一気に増えた最初の瞬間だけ、全員を件数の多い順に並べ直します。',
+      'そのあとの並べ替えは、これまでどおり1分に1回までです。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1621',
     date: '2026-10-14',
     summary: 'りんく段を/live/と同じ定義に(応援した人だけ)',
@@ -170,14 +179,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     summary: '診断キーの保存で描き直さない',
     items: Object.freeze([
       'パネルが、診断・ログ専用の保存(読み込み記録・音声診断など)に反応して描き直す無駄を減らしました。書き込みの多いデータ(プロフィール表・ギフト履歴)は間引き側に回しています。'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.1602',
-    date: '2026-10-08',
-    summary: '診断ページの余分な描き直しを減らす',
-    items: Object.freeze([
-      '診断ページが、保存のたびに追加で描き直していたため、更新が必要以上に多く走っていました。2秒ごとの定期更新だけで描くようにして、更新の回数を約半分にしました(診断の鮮度は2秒周期のまま)。'
     ])
   })
 ]);
