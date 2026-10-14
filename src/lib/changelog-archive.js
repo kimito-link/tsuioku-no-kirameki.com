@@ -24,6 +24,14 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.1596',
+    date: '2026-10-08',
+    summary: '鏡の取り合いを止め、会場のずれを減らす',
+    items: Object.freeze([
+      '視聴ページ内のパネルとサイドパネルを両方開いていると、応援レーンの「鏡」を取り合い、会場の顔ぶれが多い状態と少ない状態を行き来することがありました。鏡を書く直前に確かめ、他のパネルが最近もっと大きい鏡を書いていたら譲るようにしました。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1595',
     date: '2026-10-08',
     summary: '会場のキャラは浮かぶだけに',
