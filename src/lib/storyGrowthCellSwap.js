@@ -29,7 +29,16 @@
  *   swaps: number,
  *   maxSwapsInOnePatch: number,
  *   lastOffset: number,
- *   lastAtMs: number
+ *   lastAtMs: number,
+ *   identityCalls: number,
+ *   identitySwaps: number,
+ *   userKeyChanges: number,
+ *   maxIdentitySwapsInOnePatch: number,
+ *   maxUserKeyChangesInOnePatch: number,
+ *   unknownCells: number,
+ *   lastIdentityChangeAtMs: number,
+ *   prevIds: string[],
+ *   prevKeys: string[]
  * }} StoryGrowthCellSwapState
  */
 
@@ -41,8 +50,61 @@ export function createStoryGrowthCellSwapState() {
     swaps: 0,
     maxSwapsInOnePatch: 0,
     lastOffset: -1,
-    lastAtMs: 0
+    lastAtMs: 0,
+    identityCalls: 0,
+    identitySwaps: 0,
+    userKeyChanges: 0,
+    maxIdentitySwapsInOnePatch: 0,
+    maxUserKeyChangesInOnePatch: 0,
+    unknownCells: 0,
+    lastIdentityChangeAtMs: 0,
+    prevIds: [],
+    prevKeys: []
   };
+}
+
+/** userId が取れていないマスの利用者キー(userRooms.js の UNKNOWN_USER_KEY と同じ値。依存を増やさないため値で持つ)。 */
+const UNKNOWN_KEY = '__unknown__';
+
+/**
+ * 各マスの「どのコメントか(ids)」と「誰として数えたか(keys)」を前回と比べて数える。
+ *
+ * ★窓オフセットだけを見る noteStoryGrowthPatch は、窓が常に 0 固定の今は何も検出できない(2026-10-14 の調査)。
+ *   実際にマスの中身が変わる経路は2つで、ここで分けて数える:
+ *   (a) 同じマスに【別のコメント】が入った(identitySwaps): 供給経路ごとに entries の中身が違う・配信者行の出入りで以降が1つずつずれる等
+ *   (b) 【同じコメント】なのに利用者キーが変わった(userKeyChanges): userId が後から付いた(UNKNOWN→実ID)等
+ *   どちらもマスが見た目で入れ替わる(ちらつき)原因になる。
+ * 受け取るのは呼び出し側が組んだ文字列配列だけ。配列は state に控える(最大でマス数ぶん)。
+ *
+ * @param {StoryGrowthCellSwapState|null|undefined} state
+ * @param {{ ids: ReadonlyArray<unknown>, keys: ReadonlyArray<unknown>, atMs?: number }} ev
+ */
+export function noteStoryGrowthCellIdentities(state, ev) {
+  if (!state || typeof state !== 'object') return;
+  const ids = Array.isArray(ev?.ids) ? ev.ids.map((v) => String(v ?? '')) : [];
+  const keys = Array.isArray(ev?.keys) ? ev.keys.map((v) => String(v ?? '')) : [];
+  const atMs = Number(ev?.atMs) || 0;
+  const prevIds = Array.isArray(state.prevIds) ? state.prevIds : [];
+  const prevKeys = Array.isArray(state.prevKeys) ? state.prevKeys : [];
+  const common = Math.min(prevIds.length, ids.length);
+  let swaps = 0;
+  let keyChanges = 0;
+  for (let i = 0; i < common; i += 1) {
+    if (!prevIds[i] || !ids[i]) continue;
+    if (ids[i] !== prevIds[i]) swaps += 1;
+    else if ((prevKeys[i] || '') !== (keys[i] || '')) keyChanges += 1;
+  }
+  let unknown = 0;
+  for (let i = 0; i < keys.length; i += 1) if (keys[i] === UNKNOWN_KEY) unknown += 1;
+  state.identityCalls += 1;
+  state.identitySwaps += swaps;
+  state.userKeyChanges += keyChanges;
+  if (swaps > state.maxIdentitySwapsInOnePatch) state.maxIdentitySwapsInOnePatch = swaps;
+  if (keyChanges > state.maxUserKeyChangesInOnePatch) state.maxUserKeyChangesInOnePatch = keyChanges;
+  if ((swaps > 0 || keyChanges > 0) && atMs > 0) state.lastIdentityChangeAtMs = atMs;
+  state.unknownCells = unknown;
+  state.prevIds = ids;
+  state.prevKeys = keys;
 }
 
 /**
@@ -93,5 +155,22 @@ export function formatStoryGrowthCellSwapLine(state) {
     swaps <= 0
       ? '中身の入替なし(積み上がり)'
       : `中身の入替${swaps}マス=既存アイコンが別人にすり替わっています(最大${maxSwaps}マス/回)`;
-  return `グリッド中身更新 ${patches}回 / 書換${cellsPatched}マス — ${verdict}`;
+  return `グリッド中身更新 ${patches}回 / 書換${cellsPatched}マス — ${verdict}${formatIdentitySuffix(state)}`;
+}
+
+/**
+ * @param {StoryGrowthCellSwapState|null|undefined} state
+ * @returns {string} マスの中身の指紋の要約(未観測なら空)
+ */
+function formatIdentitySuffix(state) {
+  const calls = Math.max(0, Math.floor(Number(state?.identityCalls) || 0));
+  if (calls <= 0) return '';
+  const swaps = Math.max(0, Math.floor(Number(state?.identitySwaps) || 0));
+  const keyChanges = Math.max(0, Math.floor(Number(state?.userKeyChanges) || 0));
+  const unknown = Math.max(0, Math.floor(Number(state?.unknownCells) || 0));
+  const maxSwaps = Math.max(0, Math.floor(Number(state?.maxIdentitySwapsInOnePatch) || 0));
+  const maxKeys = Math.max(0, Math.floor(Number(state?.maxUserKeyChangesInOnePatch) || 0));
+  const bad = swaps > 0 || keyChanges > 0;
+  const head = bad ? ' / ★マスの中身が変わっています' : ' / マスの中身は安定';
+  return `${head}(別コメントへ入替${swaps}マス(最大${maxSwaps}/回)・同じコメントでIDが後から付いた${keyChanges}マス(最大${maxKeys}/回)・ID未取得${unknown}マス・観測${calls}回)`;
 }
