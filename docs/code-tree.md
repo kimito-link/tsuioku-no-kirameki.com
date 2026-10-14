@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 8 / 914 件
+## ⚠️ 役割コメントが無いソース 8 / 915 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `scripts/build.mjs`
@@ -831,7 +831,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (1950)
+- 📁 **src/** (1953)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1111,7 +1111,7 @@
         - `logo_funlink_white_RGB_link_black.png`
         - `logo_funlink_white_RGB_maru_black.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1714)
+  - 📁 **lib/** (1717)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -1815,6 +1815,9 @@
     - `laneAvatarSize.wiring.test.js`
     - `laneContentLod.wiring.test.js`
     - `laneContentLodDiag.wiring.test.js`
+    - `laneCountOrder.js` — 【層】L0 判定層(純粋関数・I/O禁止)
+    - `laneCountOrder.test.js`
+    - `laneCountOrderWiring.wiring.test.js`
     - `laneCssSync.parity.test.js`
     - `laneDensityLod.wiring.test.js`
     - `laneDetailCells.js` — 応援レーンの観測を【打ち手が変わる単位】に割る(純関数)。
