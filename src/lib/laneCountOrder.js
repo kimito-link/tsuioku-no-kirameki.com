@@ -76,7 +76,11 @@ export function orderLaneCandidatesByCount(state, input) {
     state.nextRank = 0;
     state.lastSortAtMs = 0;
   }
-  const due = state.rank.size === 0 || nowMs - state.lastSortAtMs >= gap;
+  // 初期の流し込み: 順位表を作ったあとで【順位表より多い人数】が一度に届いたら(暫定の小さな供給→確定の全件)、
+  //   末尾に足すのではなく取り直す。足すだけだと先頭の99人の後ろに残り全員が並び、全体としては件数順にならない。
+  const unseen = list.reduce((n, c) => { const k = keyOf(c); return k && !state.rank.has(k) ? n + 1 : n; }, 0);
+  const initialFill = state.rank.size > 0 && unseen > state.rank.size;
+  const due = state.rank.size === 0 || initialFill || nowMs - state.lastSortAtMs >= gap;
   if (due) {
     list.sort(compareByTierThenCount);
     state.rank = new Map();
