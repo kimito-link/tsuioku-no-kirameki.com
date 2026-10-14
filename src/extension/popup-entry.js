@@ -538,6 +538,7 @@ import { buildStorageRefreshTriggerTag } from '../lib/storageRefreshTriggerKey.j
 import { prefersReducedMotion } from '../lib/prefersReducedMotion.js';
 import { pushLaneTileSample, summarizeLaneTileOscillation } from '../lib/laneTileOscillation.js';
 import { createGiftAdPicksCarry, resolvePicksOnLiveChange } from '../lib/giftAdPicksCarry.js';
+import { createLaneImportShadowState, observeLaneImportShadow, formatLaneImportShadowLine } from '../lib/laneImportShadow.js';
 import { makeLaneResult } from '../lib/northStarLaneResult.js';
 import {
   buildTickerTextAndTip,
@@ -5455,6 +5456,9 @@ const STORY_SOURCE_STATE = {
   giftThrowerPicks: /** @type {readonly unknown[]} */ (Object.freeze([])),
   /** 広告投稿者専用列（公式ニコニ広告ランキング由来・ギフト列とは別段） */
   adThrowerPicks: /** @type {readonly unknown[]} */ (Object.freeze([])),
+  /** v0.1.1618: 影運用(laneImportShadow)の入力。公式ギフト/広告の【正規化済みの行】(picks は加工後なので別に持つ)。表示には使わない。 */
+  officialGiftRows: /** @type {readonly unknown[]} */ (Object.freeze([])),
+  nicoadApiRows: /** @type {readonly unknown[]} */ (Object.freeze([])),
   /** heavyRace再発の即効対策(HANDOFF-heavyrace-backfill-IMPL.md A-2): supply が暫定(heavy未settle)か。
    *   syncStorySourceEntries の opts.provisional で毎回上書き(sticky にしない・デフォルト false)。
    *   renderStoryUserLane の単調性ガードが「暫定の縮小で完全描画を上書きしない」判定に使う。 */
@@ -7135,6 +7139,31 @@ function mergeAndScheduleFlush(sectionKey, snapshot, liveId, nowMs) {
   } catch { /* no-op */ }
 }
 
+/**
+ * v0.1.1618: /live/ と同じ集計規則を拡張の保存コメントへ当て、現行レーン(鏡)との差を数える(影運用・観測のみ)。
+ *   確定供給(暫定でない)のときだけ・見えているときだけ・15秒に1回まで。表示は一切変えない。
+ * @param {any} snap
+ * @param {number} nowMs
+ */
+function observeLaneImportShadowNow(snap, nowMs) {
+  try {
+    if (INLINE_PASSIVE || _panelHidden() || STORY_SOURCE_STATE.entriesProvisional) return;
+    observeLaneImportShadow(
+      _laneImportShadow,
+      {
+        comments: STORY_SOURCE_STATE.storageRowsForCurrentLive,
+        kokenRows: STORY_SOURCE_STATE.officialGiftRows,
+        nicoadRows: STORY_SOURCE_STATE.nicoadApiRows,
+        broadcasterUid: _broadcasterUidTracker.current().uid,
+        liveId: snap && snap.liveId,
+        mirror: snap
+      },
+      { nowMs, perfNow: () => (typeof performance !== 'undefined' ? performance.now() : 0) }
+    );
+  } catch { /* 計器の失敗は鏡の publish を止めない */ }
+}
+const _laneImportShadow = createLaneImportShadowState();
+
 /** v0.1.1581: 配信別の鏡(v2)は「同じ内容なら60秒に1回まで」に絞る(書くたびに全拡張ページへ onChanged が全文で配られる)。 */
 const _laneMirrorWriteGate = createLaneMirrorWriteGate({ changeFloorMs: 8000 }); // 件数・バッジ・発言抜粋だけの変化は8秒にまとめる(顔ぶれが変われば即)
 /** @param {{ liveId: string, buckets: Record<string, unknown[]>, domSelf: unknown,
@@ -7158,6 +7187,7 @@ function publishLaneMirror(input) {
     // ★v0.1.1284: publish は paint より前なので、この直後の paint が測る DOM = この hash の中身。
     _lastPublishedLaneMirrorHash = String(snap?.contentHash || '');
     mergeAndScheduleFlush('lane', snap, snap && snap.liveId, now);
+    observeLaneImportShadowNow(snap, now); // v0.1.1618: /live/ 規則の影運用(観測のみ・表示は変えない)
     // ★v0.1.1300: 配信ごとキー(v2)と受領証も書く(理由と不変条件は lib 側の JSDoc が正本)。
     //   旧キーへの合流は上の行で継続=既存 reader は無変更のまま(rollback の保険)。
     publishLaneMirrorPerLive(snap, now, {
@@ -7621,6 +7651,8 @@ async function paintStoryUserLaneCoalesced(liveId, displayEntries, storageRows) 
   if (seq !== _storyLanePaintSeq) return;
   if (String(STORY_SOURCE_STATE.liveId || '').trim().toLowerCase() !== lid) return;
 
+  STORY_SOURCE_STATE.officialGiftRows = officialGiftRows;
+  STORY_SOURCE_STATE.nicoadApiRows = nicoadApiRows;
   const giftLimit = INLINE_MODE ? 24 : 16;
   // 公式の人のサムネも他レーンと同じ正本の解決器で引く(広告列と同型)。
   const resolveAvatarForUid = (/** @type {string} */ uid) =>
@@ -18507,6 +18539,14 @@ async function collectAiShareDevMonitorPayloadBundle(watchUrl) {
       // ★2026-08-08 計器: 鏡 publish の到達/見送り。読み方は lanePublishSkipDiag.js の冒頭。
       lanePublishSkip: snapshotLanePublishSkipDiag(_lanePublishSkipDiag, Date.now()),
       giftAdPicksCarry: { restored: _giftAdPicksCarryDiag.restored, cleared: _giftAdPicksCarryDiag.cleared },
+      laneImportShadow: {
+        line: formatLaneImportShadowLine(_laneImportShadow),
+        calls: _laneImportShadow.calls,
+        skipped: _laneImportShadow.skipped,
+        maxMs: _laneImportShadow.maxMs,
+        comments: _laneImportShadow.comments,
+        tanu: _laneImportShadow.last ? _laneImportShadow.last.tanu : null
+      },
       mainThreadBlocker, // ★v1394: 黒くなる件の【当人】(longtask 実測・boot 側で観測)
       // v0.1.1215: 「積み上げ式にならずアイコンがちらちら変わる」の観測。上の churn は
       //   全消し再構築だけを数えるため、DOM枚数を変えない「中身のすり替え」を取りこぼす。

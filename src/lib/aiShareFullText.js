@@ -614,6 +614,12 @@ export function buildAiShareFullText({ overviewText, livesData, fastDiag, popupD
     const supplyLine = String((popupDiag?.popup ?? popupDiag)?.laneSupplyOrigin?.line || '');
     if (supplyLine) { lines.push(supplyLine); lines.push(''); }
   } catch { /* no-op: 計器の失敗は状態速報を壊さない */ }
+  // ★v0.1.1618: /live/ と同じ集計規則を拡張の保存コメントへ当てた「輸入レーン」との差(影運用・表示は変えない)。
+  //   ユーザー「/live/ の安定性を全部移植して」の第1段=差が安定して小さいことを実機で確かめてから切り替える。
+  try {
+    const shadowLine = String((popupDiag?.popup ?? popupDiag)?.laneImportShadow?.line || '');
+    if (shadowLine) { lines.push(shadowLine); lines.push(''); }
+  } catch { /* no-op: 計器の失敗は状態速報を壊さない */ }
   // ★v0.1.1251: 不完全な軽い供給が完全描画を潰すのを止めた回数(72枚→3枚 の実測に対する防御)。
   try {
     const lightLine = String((popupDiag?.popup ?? popupDiag)?.lightSupplyGuard?.line || '');
