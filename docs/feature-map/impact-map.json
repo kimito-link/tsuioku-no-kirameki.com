@@ -1482,6 +1482,20 @@
       ]
     },
     {
+      "file": "src/lib/nicoadContributionRankingApi.js",
+      "featureCount": 3,
+      "features": [
+        "content",
+        "live-ranking",
+        "popup"
+      ],
+      "labels": [
+        "記録エンジン(watchページ常駐)",
+        "Web版 追憶のきらめき ランキング(/live/)",
+        "ポップアップ(応援レーン)"
+      ]
+    },
+    {
       "file": "src/lib/nlsInterceptAuth.js",
       "featureCount": 3,
       "features": [
@@ -2638,6 +2652,30 @@
       ]
     },
     {
+      "file": "src/lib/liveLaneBuckets.js",
+      "featureCount": 2,
+      "features": [
+        "live-ranking",
+        "popup"
+      ],
+      "labels": [
+        "Web版 追憶のきらめき ランキング(/live/)",
+        "ポップアップ(応援レーン)"
+      ]
+    },
+    {
+      "file": "src/lib/liveRankingView.js",
+      "featureCount": 2,
+      "features": [
+        "live-ranking",
+        "popup"
+      ],
+      "labels": [
+        "Web版 追憶のきらめき ランキング(/live/)",
+        "ポップアップ(応援レーン)"
+      ]
+    },
+    {
       "file": "src/lib/metricConfidence.js",
       "featureCount": 2,
       "features": [
@@ -2707,18 +2745,6 @@
       "labels": [
         "記録エンジン(watchページ常駐)",
         "ページ傍受"
-      ]
-    },
-    {
-      "file": "src/lib/nicoadContributionRankingApi.js",
-      "featureCount": 2,
-      "features": [
-        "content",
-        "live-ranking"
-      ],
-      "labels": [
-        "記録エンジン(watchページ常駐)",
-        "Web版 追憶のきらめき ランキング(/live/)"
       ]
     },
     {
@@ -6034,6 +6060,16 @@
       ]
     },
     {
+      "file": "src/lib/laneImportShadow.js",
+      "featureCount": 1,
+      "features": [
+        "popup"
+      ],
+      "labels": [
+        "ポップアップ(応援レーン)"
+      ]
+    },
+    {
       "file": "src/lib/laneMirrorPerLivePublish.js",
       "featureCount": 1,
       "features": [
@@ -6144,6 +6180,16 @@
       ]
     },
     {
+      "file": "src/lib/liveCommentTally.js",
+      "featureCount": 1,
+      "features": [
+        "popup"
+      ],
+      "labels": [
+        "ポップアップ(応援レーン)"
+      ]
+    },
+    {
       "file": "src/lib/liveHealthScore.js",
       "featureCount": 1,
       "features": [
@@ -6151,16 +6197,6 @@
       ],
       "labels": [
         "状態速報ページ"
-      ]
-    },
-    {
-      "file": "src/lib/liveLaneBuckets.js",
-      "featureCount": 1,
-      "features": [
-        "live-ranking"
-      ],
-      "labels": [
-        "Web版 追憶のきらめき ランキング(/live/)"
       ]
     },
     {
@@ -6185,16 +6221,6 @@
     },
     {
       "file": "src/lib/livePlatformsHtml.js",
-      "featureCount": 1,
-      "features": [
-        "live-ranking"
-      ],
-      "labels": [
-        "Web版 追憶のきらめき ランキング(/live/)"
-      ]
-    },
-    {
-      "file": "src/lib/liveRankingView.js",
       "featureCount": 1,
       "features": [
         "live-ranking"

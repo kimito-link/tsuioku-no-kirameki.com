@@ -23,6 +23,7 @@ const args = parseArgs();
 const lib = (name) => import(pathToFileURL(path.join(REPO_ROOT, 'src', 'lib', name)).href);
 const { createCommentTally } = await lib('liveCommentTally.js');
 const { laneBuckets } = await lib('liveLaneBuckets.js');
+const { rawGiftRankers: rawGift, rawAdRanking: rawAd } = await lib('laneImportShadow.js'); // 正本はここ(拡張の影運用と同じ変換)
 
 /** 拡張プロセス(SW)の中で、保存データを読み出す(書かない)。 */
 const readFromExtension = async (sw, lvArg, all, max) => {
@@ -85,18 +86,6 @@ const readFromExtension = async (sw, lvArg, all, max) => {
     return result;
   }, { lvArg, all, max });
 };
-
-const uidOfUrl = (u) => (/\/user\/(\d+)/.exec(String(u || '')) || [])[1] || '';
-
-/** 拡張が保存した正規化済みの順位行を、/live/ の API と同じ「生の形」へ戻す。 */
-const rawGift = (rows) => (Array.isArray(rows) ? rows : []).map((r, i) => ({
-  rank: r.rank ?? i + 1, supporterId: uidOfUrl(r.userPageUrl) || undefined, supporterName: r.name,
-  supporterThumbnailUrl: r.thumbnailUrl || '', contribution: r.contribution, userPageUrl: r.userPageUrl || ''
-}));
-const rawAd = (rows) => (Array.isArray(rows) ? rows : []).map((r, i) => ({
-  rank: r.rank ?? i + 1, userId: uidOfUrl(r.userPageUrl) || undefined, advertiserName: r.name,
-  totalContribution: r.contribution, userPageUrl: r.userPageUrl || '', thumbnailUrl: r.thumbnailUrl || ''
-}));
 
 const TIERS_EXT = ['link', 'gift', 'ad', 'konta', 'tanu'];
 const TIERS_LIVE = ['link', 'konta', 'gift', 'tanu'];
