@@ -24,6 +24,14 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.1602',
+    date: '2026-10-08',
+    summary: '診断ページの余分な描き直しを減らす',
+    items: Object.freeze([
+      '診断ページが、保存のたびに追加で描き直していたため、更新が必要以上に多く走っていました。2秒ごとの定期更新だけで描くようにして、更新の回数を約半分にしました(診断の鮮度は2秒周期のまま)。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1601',
     date: '2026-10-08',
     summary: '会場のセリフが出ているか診断に追加',
