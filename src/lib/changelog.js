@@ -18,6 +18,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1618',
+    date: '2026-10-08',
+    summary: '拡張が/live/と同じ数え方で差を測る',
+    items: Object.freeze([
+      '拡張の中でも、/live/ と同じ数え方(配信者を除く・ID なしは数えない・コメントの多い順)で応援レーンを作り、いまの応援レーンと並べて違いを数えるようにしました(表示はまだ変えません。状態速報の「/live/規則との差」の行で確認できます)。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1617',
     date: '2026-10-08',
     summary: 'ギフト・広告の列が一瞬消えるのを防ぐ',
@@ -167,14 +175,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     summary: 'コメントが多い配信でパネルの負荷を下げる',
     items: Object.freeze([
       'コメントが多い配信で、パネルが読み込みの1分後から処理を使い切りやすくなっていました。パネルが毎回コメント全件を一時保存へ丸ごと複製していたためで、再オープンの速さを保てる範囲(増えた分が約15%以上)だけ書き直すようにしました。'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.1598',
-    date: '2026-10-08',
-    summary: '会場のキャラの空の吹き出しを消す',
-    items: Object.freeze([
-      '会場の3体のキャラの頭上に、中身のない吹き出しと「…」が出たままになっていました。「しゃべらせない」設定のときも枠だけが残っていたためで、表示しないときはきちんと隠れるようにしました。キャラは浮かぶだけになります。'
     ])
   })
 ]);
