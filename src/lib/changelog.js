@@ -18,6 +18,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1619',
+    date: '2026-10-08',
+    summary: 'ギフト・広告の列が空で消えないように',
+    items: Object.freeze([
+      'ギフトの列・広告の列は、保存データを読み直す一瞬に空で返ると、その回だけ列ごと消えて(人数が29人→14人のように)減って見えていました。前の回に人がいたのに今回が空のときは、前の人たちを残すようにしました。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1618',
     date: '2026-10-08',
     summary: '拡張が/live/と同じ数え方で差を測る',
@@ -167,14 +175,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     summary: 'メモリが増え続ける漏れを直す',
     items: Object.freeze([
       'コメントの多い配信で、拡張のメモリが時間とともに増え続け、PC全体が重くなることがありました。アイコン画像を作るたびに使い終わったあとも消えない一時データが積み上がっていたためで、積み上がらない形に直しました。'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.1599',
-    date: '2026-10-08',
-    summary: 'コメントが多い配信でパネルの負荷を下げる',
-    items: Object.freeze([
-      'コメントが多い配信で、パネルが読み込みの1分後から処理を使い切りやすくなっていました。パネルが毎回コメント全件を一時保存へ丸ごと複製していたためで、再オープンの速さを保てる範囲(増えた分が約15%以上)だけ書き直すようにしました。'
     ])
   })
 ]);

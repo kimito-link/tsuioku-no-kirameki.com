@@ -24,6 +24,14 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.1599',
+    date: '2026-10-08',
+    summary: 'コメントが多い配信でパネルの負荷を下げる',
+    items: Object.freeze([
+      'コメントが多い配信で、パネルが読み込みの1分後から処理を使い切りやすくなっていました。パネルが毎回コメント全件を一時保存へ丸ごと複製していたためで、再オープンの速さを保てる範囲(増えた分が約15%以上)だけ書き直すようにしました。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1598',
     date: '2026-10-08',
     summary: '会場のキャラの空の吹き出しを消す',
