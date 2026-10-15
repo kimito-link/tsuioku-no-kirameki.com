@@ -19,6 +19,7 @@ import { summarizeEventLoopStall } from '../lib/eventLoopStallSummary.js';
 import { buildCommentWriteModeDiagLine } from '../lib/commentWriteModeDiag.js';
 import { KEY_COMMENT_WRITE_MODE_DIAG } from '../lib/commentWriteModeDiagKey.js';
 import { KEY_SIDEPANEL_SELF_DIAG } from '../lib/sidepanelSelfDiagKey.js';
+import { startStatusPublisherHost } from './statusPublisherHost.js';
 import { buildSidePanelIframeSrc, readSidePanelLv } from '../lib/sidepanelIframeSrc.js';
 import { SIDE_PANEL_WATCH_TAB_QUERY, pickLvFromTabs } from '../lib/sidePanelLvFromTabs.js';
 import {
@@ -902,6 +903,25 @@ try {
       setTimeout(() => collectAndPublish('reload'), 120);
     });
   }
+} catch {
+  /* no-op */
+}
+
+/*
+ * ★2026-10-15(v0.1.1629): 状態速報の自動送信を「状態画面のタブなし」で動かす。
+ *   状態画面は document.hidden で更新を止める作り=タブが前面に出ているときしか送らない。サイドパネルは開いている間は
+ *   常に可視なので、その中に1pxの見えない状態画面(送信担当)を置いて、そこから送る。
+ *   開いて15秒後・共有キーと自動公開の同意が両方あるときだけ・別のパネルが担当していなければ。判定は statusPublisherPlan.js。
+ *   ★必ず fire-and-forget の try/catch(送信の準備の失敗でパネルを止めない)。iframe は body の【末尾】=上の
+ *     document.querySelector('iframe')(パネル本体)を壊さない。
+ */
+try {
+  startStatusPublisherHost({
+    document,
+    storage: chrome.storage.local,
+    locks: typeof navigator !== 'undefined' ? navigator.locks : undefined,
+    getUrl: (p) => chrome.runtime.getURL(p)
+  });
 } catch {
   /* no-op */
 }

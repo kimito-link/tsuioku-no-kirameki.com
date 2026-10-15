@@ -24,6 +24,14 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.1609',
+    date: '2026-10-08',
+    summary: '会場で重複する人のタイルが消えるのを直す',
+    items: Object.freeze([
+      '同じ人が2つの列(例: りんく列と広告列)にいるとき、会場では片方のタイルが消えていました。POPと同じように両方の列に出るようにしました。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1608',
     date: '2026-10-08',
     summary: '会場が席を毎回書き直すのをやめて軽く',
