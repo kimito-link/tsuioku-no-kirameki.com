@@ -102,3 +102,33 @@ describe('shouldAutoPublish — まだ送らないとき', () => {
     expect(shouldAutoPublish({ ...base, nowMs: 0 }).reason).toBe('no_now');
   });
 });
+
+import { latestPublishTime } from './autoPublishDecision.js';
+
+describe('latestPublishTime(送信の連打を止める)', () => {
+  it('★記録と自分の送信開始時刻の新しい方を返す・どちらも無ければ 0', () => {
+    expect(latestPublishTime(1000, 5000)).toBe(5000);
+    expect(latestPublishTime(9000, 5000)).toBe(9000);
+    expect(latestPublishTime(0, 0)).toBe(0);
+    expect(latestPublishTime(undefined, null)).toBe(0);
+    expect(latestPublishTime(-5, 'x')).toBe(0);
+  });
+  it('★再現: 記録が古いままでも、自分の送信開始時刻を使えば、2秒ごとの描画で連打しない(2分に1回)', () => {
+    const interval = DEFAULT_AUTO_PUBLISH_INTERVAL_MS;
+    const staleRecordAt = 1_000; // 記録は12秒間引きで古いまま
+    const run = (useLaunched) => {
+      let launchedAt = 0; let posts = 0;
+      for (let t = 200_000; t <= 200_000 + 20_000; t += 2_000) {
+        const d = shouldAutoPublish({
+          optedIn: true, hasKeys: true, hasPayload: true, hasWatchTab: true, inFlight: false, everSent: true,
+          lastSentAtMs: useLaunched ? latestPublishTime(staleRecordAt, launchedAt) : staleRecordAt,
+          nowMs: t, intervalMs: interval
+        });
+        if (d.publish) { posts += 1; launchedAt = t; }
+      }
+      return posts;
+    };
+    expect(run(false)).toBeGreaterThan(5); // 旧: 20秒間に6回以上=連打
+    expect(run(true)).toBe(1); // 新: 1回だけ
+  });
+});

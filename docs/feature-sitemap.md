@@ -671,7 +671,7 @@
 - **影響範囲ゲート(規律を自動化)** — 星野ロミ式「規律を自動ゲートに」。diff から影響大(複数機能波及)の変更ファイルを検出し波及先機能を列挙。警告のみ(摩擦ゼロ)・--strict で exit1。AGENTS.md §10 のルールを diff 発火に
   - `scripts/impact-check.mjs`
   - `docs/feature-map/impact-map.json`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 80</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 82</summary>
 
 - `api/status.js` — status 受け口 Vercel Serverless Function。
 - `extension/status-guard.js` — 状態速報ページ(status.html)の「何があっても開く」保険。
@@ -685,6 +685,7 @@
 - `scripts/verify-deploy.mjs` — 「Chrome に配ったビルドが本当に今の版か」を照合する。
 - `src/extension/popup/attachAiDiagButtonHandler.js` — attachAiDiagButtonHandler — 「AIで診断」ボタンの delegated listener を張る。
 - `src/extension/sidepanel-entry.js` — サイドパネルの自己診断だけを担う極小エントリ。
+- `src/extension/statusPublisherHost.js` — 【層】L2 画面層(DOM・chrome を触る。判定は statusPublisherPlan.js に任せる)
 - `src/lib/aiShareDiagnosticsMarkdown.js` — AI 共有用「診断バンドル」Markdown の整形（純粋関数）。
 - `src/lib/aiShareDiagSchema.js` — AI 共有診断バンドル（popup が組み立てる JSON / storage の nls_ai_share_fast_diag_v1）の
 - `src/lib/aiShareFastDiagKey.js` — v0.1.629: AI 共有 fastDiag キャッシュの storage key を popup と status ページで共有。
@@ -744,6 +745,7 @@
 - `src/lib/statusExtrasBatch.js` — 状態速報「重さ根治 P2」: status-entry.js の extras ブロック(12秒間引き)が単一キー get だけの
 - `src/lib/statusFastDiagLite.js` — status.html 用「軽量 fastDiag ダイジェスト」。
 - `src/lib/statusMindmapSignature.js` — マインドマップの再描画を止める署名を作る純関数。
+- `src/lib/statusPublisherPlan.js` — 【層】L0 判定層(純粋関数・I/O禁止。locks 等は引数で受け取る)
 - `src/lib/statusReadPolicy.js` — 【層】L0 判定層(純粋関数・I/O禁止)
 - `src/lib/statusRefreshBackoff.js` — v0.1.1010: 状態速報(status.html)の自動更新を「直近 refresh の所要に比例して間引く」純関数。
 - `src/lib/statusShareUrls.js` — 状態速報の共有 URL を組み立てる純関数。
@@ -1129,12 +1131,11 @@
 - `v0.1.1628` 2026-10-15 — 匿名の顔を見える所から作って起動を軽く
 - `v0.1.1614` 2026-10-08 — IDなしコメントを同じ人扱いしない
 
-### 🏟 会場・席 (5版)
+### 🏟 会場・席 (4版)
 - `v0.1.1613` 2026-10-08 — 会場のタイルの大きさを①と同じにした
 - `v0.1.1612` 2026-10-08 — 会場の人数が途中で減らないようにした
 - `v0.1.1611` 2026-10-08 — 会場の人数の増減を状態速報に出す
 - `v0.1.1610` 2026-10-08 — サムネが出ない人の顔をPOPと会場で揃える
-- `v0.1.1609` 2026-10-08 — 会場で重複する人のタイルが消えるのを直す
 
 ### 🎁 ギフト (5版)
 - `v0.1.1623` 2026-10-14 — りんく段にコメントしていない応援者も出す
@@ -1146,14 +1147,14 @@
 ### 🔊 読み上げ (1版)
 - `v0.1.1615` 2026-10-08 — 忙しい配信で読み上げ文を短くする
 
-### 🪟 応援レーン・タイル (5版)
+### 🪟 応援レーン・タイル (4版)
 - `v0.1.1622` 2026-10-14 — 開いた直後から応援レーンが件数順に並ぶ
 - `v0.1.1620` 2026-10-14 — 応援レーンを件数の多い順に(動くのは1分に1回)
 - `v0.1.1618` 2026-10-08 — 拡張が/live/と同じ数え方で差を測る
 - `v0.1.1613` 2026-10-08 — 会場のタイルの大きさを①と同じにした
-- `v0.1.1609` 2026-10-08 — 会場で重複する人のタイルが消えるのを直す
 
-### 🩺 診断・状態速報 (6版)
+### 🩺 診断・状態速報 (7版)
+- `v0.1.1629` 2026-10-15 — 状態速報の自動送信が状態画面のタブなしで動く
 - `v0.1.1628` 2026-10-15 — 匿名の顔を見える所から作って起動を軽く
 - `v0.1.1620` 2026-10-14 — 応援レーンを件数の多い順に(動くのは1分に1回)
 - `v0.1.1618` 2026-10-08 — 拡張が/live/と同じ数え方で差を測る

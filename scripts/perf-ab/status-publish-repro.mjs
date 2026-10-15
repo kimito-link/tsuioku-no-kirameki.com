@@ -9,6 +9,8 @@
  *   - 一時プロファイルで拡張を起動し、共有設定(鍵・同意)を service worker 経由で storage へ入れる
  *     (鍵は環境変数 NL_STATUS_INGEST_KEY / NL_STATUS_VIEW_TOKEN / NL_STATUS_APP_ORIGIN から読む=.env。画面にも出さない)
  *   - 視聴ページ(--no-watch で省略)→ status.html を開き、/api/status への POST を観察する
+ *   - --via sidepanel: 状態画面のタブを開かず sidepanel.html だけを開く(サイドパネル内の見えない送信担当の確認)
+ *   - --keep: 最初の送信で止めず --wait の最後まで観察する(送信の間隔・頻度の確認)
  *   - ★本物のサーバーへは送らない: /api/status への要求は page.route で止めて 200 を返す(試みた事実だけを数える)
  *
  * 読み方: 「POST の試み N 回」が 0 なら、判定(shouldAutoPublish)のどこかで止まっている(下に各条件の実測を出す)。
@@ -51,13 +53,15 @@ try {
     watch.goto(`https://live.nicovideo.jp/watch/${args.lv}`, { waitUntil: 'domcontentloaded', timeout: 60000 }).catch(() => {});
     await sleep(30000);
   }
+  // --via sidepanel: 状態画面のタブを開かず、サイドパネル(sidepanel.html)だけを開く=見えない送信担当(v0.1.1629)の確認。
+  const viaSidepanel = args.via === 'sidepanel';
   const page = await ctx.newPage();
   page.on('console', (m) => { const t = m.text(); if (/publish|upload|公開|送信/i.test(t)) console.log('[status console]', t.slice(0, 160)); });
-  await page.goto(`chrome-extension://${extId}/status.html`, { waitUntil: 'domcontentloaded', timeout: 60000 });
+  await page.goto(`chrome-extension://${extId}/${viaSidepanel ? 'sidepanel.html' : 'status.html'}`, { waitUntil: 'domcontentloaded', timeout: 60000 });
   const t0 = Date.now();
   while (Date.now() - t0 < waitMs) {
     await sleep(5000);
-    if (attempts > 0) break;
+    if (attempts > 0 && args.keep === undefined) break; // --keep: 最後まで待って送信の時刻をすべて出す(頻度の確認)
   }
   // 条件の実測: 同意・鍵・視聴中の配信・直近の送信結果の記録
   const gates = await page.evaluate(async () => {
@@ -67,6 +71,7 @@ try {
       optIn: bag.nls_web_publish_opt_in === true,
       hasKeys: Boolean(cfg.ingestKey && cfg.viewToken),
       outcomeRecorded: Boolean(bag.nls_liveview_publish_outcome_v1),
+      publisherIframe: document.querySelectorAll('iframe[data-nl-status-publisher]').length,
       livesCardText: (document.querySelector('#lives')?.innerText || document.body.innerText || '').slice(0, 160).replace(/\s+/g, ' ')
     };
   }).catch((e) => ({ error: String(e) }));

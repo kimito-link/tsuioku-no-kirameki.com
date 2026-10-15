@@ -2172,5 +2172,19 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
     version: '0.1.1628', metric: 'cross-checked-claims', value: 25,
     source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
     note: '★直近30日窓のスライドによる自然増減(v0.1.1562 の note と同じ理由)。今回も変異テスト6種で赤を確認して復元している。'
+  }),
+  Object.freeze({
+    version: '0.1.1629', metric: 'bundle-kb', value: 1427,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '★今回の変更は sidepanel.js と status.js 側(送信担当の起動と送信の連打止め)で popup.js は変わらない。過去最良との差は 1618 で /live/ の集計を取り込んだ分+以降の小さな追加。'
+  }),
+  Object.freeze({
+    version: '0.1.1629', metric: 'gate-selftest', value: 4,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1629', metric: 'cross-checked-claims', value: 25,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: '★直近30日窓のスライドによる自然増減(v0.1.1562 の note と同じ理由)。今回も変異テスト12種で赤を確認して復元している。'
   })
 ]);
