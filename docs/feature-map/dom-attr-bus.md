@@ -53,6 +53,7 @@
 | `data-nl-score-final` | lib/broadcastScoreHtml.js | — |
 | `data-nl-scroll-perf-bound` | extension/popup-entry.js | extension/popup-entry.js |
 | `data-nl-state` | extension/popup-entry.js | — |
+| `data-nl-status-publisher` | extension/statusPublisherHost.js | extension/statusPublisherHost.js |
 | `data-nl-story-growth-bound` | extension/popup-entry.js | extension/popup-entry.js |
 | `data-nl-support-wired` | extension/popup-entry.js | — |
 | `data-nl-ticker-key` | extension/popup-entry.js | extension/popup-entry.js |

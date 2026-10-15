@@ -78,3 +78,21 @@ export function shouldAutoPublish(input) {
 
   return { publish: false, reason: 'fresh_enough' };
 }
+
+/**
+ * 「前回の送信の時刻」を、保存された記録と【このページが最後に送信を始めた時刻】の新しい方にする。
+ *
+ * ★なぜ(2026-10-15・サイドパネル内の送信担当を常駐させる版で計測して発覚):
+ *   送信の結果の記録(publishOutcomeRec)は、補助情報(extras)の12秒間引きで読まれるため、送信した直後も最大12秒は
+ *   【古いまま】。描画は2秒ごとなので、その間「前回から2分たった」と何度も判定され、2分ごとに4〜6回(各130KB)が
+ *   2秒間隔で連続して送られていた(実測: 08:19:12〜19 に4回・08:21:20〜22 に2回)。
+ *   このページが自分で送信を始めた時刻を覚えておけば、記録の更新を待たずに、次の2分まで送らない。
+ * @param {unknown} recordAtMs 保存された記録の時刻(0/未定義なら無し)
+ * @param {unknown} launchedAtMs このページが最後に送信を始めた時刻(0/未定義なら無し)
+ * @returns {number} 新しい方(どちらも無ければ 0)
+ */
+export function latestPublishTime(recordAtMs, launchedAtMs) {
+  const a = Number(recordAtMs) > 0 ? Number(recordAtMs) : 0;
+  const b = Number(launchedAtMs) > 0 ? Number(launchedAtMs) : 0;
+  return Math.max(a, b);
+}

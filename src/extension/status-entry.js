@@ -63,7 +63,7 @@ import { parseShareKeysFile, shareKeysFingerprint } from '../lib/shareKeysFile.j
 //   鏡から取ると別配信ガードが恒真になり、前の配信の鏡と突合して誤検知する。
 import { resolveCurrentLiveId, canCompareMirrorCounts } from '../lib/currentLiveIdOrigin.js';
 // v0.1.1016: ③WEB が古くなる前に自動で再 publish すべきかの判定(手動ボタンの往復を無くす)。
-import { shouldAutoPublish } from '../lib/autoPublishDecision.js';
+import { latestPublishTime, shouldAutoPublish } from '../lib/autoPublishDecision.js';
 // 直近の公開送信(POST)結果を globalThis に集計(read を増やさない)→送信時の記録に使う。
 import {
   recordLiveviewPublishOutcome
@@ -94,7 +94,9 @@ import {
   KEY_BACKFILL_LIVE_METRIC,
   KEY_LIVEVIEW_PUBLISH_PAYLOAD,
   KEY_CUSTOM_SOUND_REV,
-  KEY_LAST_WATCH_URL
+  KEY_LAST_WATCH_URL,
+  KEY_STATUS_UPLOAD_CONFIG,
+  KEY_WEB_PUBLISH_OPT_IN
 } from '../lib/storageKeys.js';
 // レポートプレビュー信頼度注釈の文脈(fastDiag→ctx)の純関数。挙動同値で status-entry から切り出し。
 import { reportPreviewCtxFromFastDiag } from '../lib/reportPreviewCtx.js';
@@ -270,6 +272,7 @@ import {
 // ★v0.1.1388: 症状別判定を【画面に】出す(v0.1.1385 はコピー本文にしか配線されていなかった)。
 import { buildSymptomVerdicts } from '../lib/symptomVerdicts.js';
 import { popupSnapshotAgeMs } from '../lib/aiShareFullText.js';
+import { acquireStatusPublisherLock, isStatusPublisherMode } from '../lib/statusPublisherPlan.js';
 // ★v0.1.1389: 33セルを症状の言葉(コメント記録/人の識別/レーン/公式値/演出/健全性)で枠に分ける。
 import { groupHealthCells, summarizeGroup } from '../lib/healthCellGroups.js';
 
@@ -297,7 +300,7 @@ const WATCH_SNAPSHOT_PREFIX = 'nls_watch_snapshot_';
  * true を明示的に保存するまで自動送信しない。手動の共有ボタンは従来どおり
  * 「押した=その回の同意」として扱うので、このフラグの対象は【自動送信のみ】。
  */
-const KEY_WEB_PUBLISH_OPT_IN = 'nls_web_publish_opt_in';
+// ★v0.1.1629: キー文字列は src/lib/storageKeys.js の KEY_WEB_PUBLISH_OPT_IN(サイドパネルの送信担当と共有・正本1つ)。
 
 /** 同意フラグのメモリキャッシュ。判定は同期で行うため(コアreadを増やさない)。 */
 let _webPublishOptIn = false;
@@ -597,6 +600,9 @@ async function bootstrap() {
   // ★v0.1.1245: 共有キーを storage から読む(ビルドに焼き込まない)。
   //   キャッシュ初期値は未設定なので、これより前に送信やURL提示が走ることはない。
   await refreshUploadConfigCache();
+  // v0.1.1629: サイドパネルの中の見えない状態画面(?publisher=1)=送信担当。担当は1つだけ(Web Locks)。
+  //   ロックが取れなければ何もせず止まる(重複して描画・送信しない)。ふつうの状態画面(タブ)は影響を受けない。
+  if (isStatusPublisherMode(location.search) && !(await acquireStatusPublisherLock(navigator.locks))) return;
   // v0.1.1626: 拡張フォルダに鍵ファイルがあれば一度だけ取り込む(貼り付け・クリック不要)。
   if (await seedShareKeysFromLocalFile()) await refreshUploadConfigCache();
 
@@ -2348,6 +2354,12 @@ function renderAll({ extrasAgeMs, lvList, summaries, fastDiag, popupDiag, backfi
  * @param {any[]} livesData
  * @param {{ at?: number }|null|undefined} publishOutcomeRec
  */
+/**
+ * v0.1.1629: このページが最後に自動送信を始めた時刻。結果の記録(publishOutcomeRec)は12秒間引きで古いままのことがあり、
+ *   それだけを見ると、2秒ごとの描画のたびに「2分たった」と判定されて送信が連打された(2分ごとに4〜6回)。
+ */
+let _autoPublishLastLaunchAtMs = 0;
+
 function maybeAutoPublishStatusSnapshot(livesData, publishOutcomeRec) {
   try {
     const { ingestKey, viewToken } = getUploadConfig();
@@ -2360,11 +2372,12 @@ function maybeAutoPublishStatusSnapshot(livesData, publishOutcomeRec) {
       hasPayload: Boolean(_lastRenderedBundle?.jsonBlob),
       hasWatchTab,
       inFlight: _autoPublishInFlight,
-      everSent: outcome.everSent,
-      lastSentAtMs: publishOutcomeRec && Number(publishOutcomeRec.at) > 0 ? Number(publishOutcomeRec.at) : 0,
+      everSent: outcome.everSent || _autoPublishLastLaunchAtMs > 0,
+      lastSentAtMs: latestPublishTime(publishOutcomeRec && publishOutcomeRec.at, _autoPublishLastLaunchAtMs),
       nowMs: Date.now()
     });
     if (!decision.publish) return;
+    _autoPublishLastLaunchAtMs = Date.now();
     _autoPublishInFlight = true;
     void uploadStatusSnapshot().finally(() => {
       _autoPublishInFlight = false;
@@ -3596,7 +3609,7 @@ function numOrNull(v) {
  *   ★同期で読めるようメモリにキャッシュする(呼び出しが6箇所あり、描画経路から
  *   同期的に呼ばれるため)。storage 読みは bootstrap で1回だけ(コアread を増やさない)。
  */
-const KEY_STATUS_UPLOAD_CONFIG = 'nls_status_upload_config_v1';
+// ★v0.1.1629: キー文字列は src/lib/storageKeys.js の KEY_STATUS_UPLOAD_CONFIG(サイドパネルの送信担当と共有・正本1つ)。
 const DEFAULT_APP_ORIGIN = 'https://app.tsuioku-no-kirameki.com';
 
 /** @type {{ ingestKey: string, viewToken: string, appOrigin: string }} */

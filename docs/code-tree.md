@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 8 / 918 件
+## ⚠️ 役割コメントが無いソース 8 / 920 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `scripts/build.mjs`
@@ -833,7 +833,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (1963)
+- 📁 **src/** (1967)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -870,7 +870,7 @@
       - `avatarResolver.test.js`
       - `identity.js` — ニコ生ユーザー ID の「匿名性」判定と関連アイデンティティ・ユーティリティ。
       - `nickname.js` — 表示名（ニックネーム）の「強弱」判定。
-  - 📁 **extension/** (60)
+  - 📁 **extension/** (62)
     - 📁 **popup/** (12)
       - 📁 **init/** (4)
         - `devMonitorExport.js` — devMonitorExport — 開発モニタの「エクスポート/ダウンロード/較正データ消去」一式。
@@ -923,6 +923,8 @@
     - `sidepanel-entry.js` — サイドパネルの自己診断だけを担う極小エントリ。
     - `status-entry.js` — v0.1.629: 固定 URL 状態表示ページ。
     - `statusCopyFreshness.wiring.test.js`
+    - `statusPublisherHost.js` — 【層】L2 画面層(DOM・chrome を触る。判定は statusPublisherPlan.js に任せる)
+    - `statusPublisherHost.test.js`
     - `storyDiagTotalSourcePopupEntry.wiring.test.js`
     - `storyGrowthSameUserBlurb.wiring.test.js`
     - `symptomVerdictsOnScreen.wiring.test.js`
@@ -1113,7 +1115,7 @@
         - `logo_funlink_white_RGB_link_black.png`
         - `logo_funlink_white_RGB_maru_black.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1727)
+  - 📁 **lib/** (1729)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -2459,6 +2461,8 @@
     - `statusMindmapSignature.wiring.test.js`
     - `statusNoOnChangedRefresh.wiring.test.js`
     - `statusPopupEmbed.wiring.test.js`
+    - `statusPublisherPlan.js` — 【層】L0 判定層(純粋関数・I/O禁止。locks 等は引数で受け取る)
+    - `statusPublisherPlan.test.js`
     - `statusReadPolicy.js` — 【層】L0 判定層(純粋関数・I/O禁止)
     - `statusReadPolicy.test.js`
     - `statusReadPolicy.wiring.test.js`
