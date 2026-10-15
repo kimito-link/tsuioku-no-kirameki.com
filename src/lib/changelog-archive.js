@@ -24,6 +24,14 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.1610',
+    date: '2026-10-08',
+    summary: 'サムネが出ない人の顔をPOPと会場で揃える',
+    items: Object.freeze([
+      'アイコン未設定の人が、POPでは白い丸、会場ではゆっくり顔と別々の見た目になっていました。どちらも同じ、その人ごとのゆっくり顔に揃えました。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1609',
     date: '2026-10-08',
     summary: '会場で重複する人のタイルが消えるのを直す',

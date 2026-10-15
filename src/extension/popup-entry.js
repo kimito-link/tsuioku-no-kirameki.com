@@ -568,6 +568,7 @@ import {
   upsertUserCommentProfileFromEntry,
   upsertUserCommentProfileFromIntercept
 } from '../lib/userCommentProfileCache.js';
+import { createStorageKeyMemo } from '../lib/storageKeyMemo.js';
 import {
   isHttpOrHttpsUrl,
   isAnonymousStyleNicoUserId,
@@ -4558,15 +4559,23 @@ function refreshAutoCalibrationProfileCache(ringBagValue) {
 async function refreshAutopatrolStatusLine() {
   try {
     const statusEl = $('autopatrolStatus');
+    // v0.1.1630: 較正の記録(最大2000件・約820KB)は、記憶が新しければ get しない(5秒ごとに読み直していた)。
+    const _ringFresh = _calibrationRingMemo.isFresh(Date.now());
+    const _ringV0 = _calibrationRingMemo.version();
     const bag = await chrome.storage.local.get([
       KEY_AUTOPATROL_ENABLED,
       KEY_AUTOPATROL_STATE,
-      KEY_CONCURRENT_CALIBRATION_RING_V1
+      ...(_ringFresh ? [] : [KEY_CONCURRENT_CALIBRATION_RING_V1])
     ]);
-    // 自動補正キャッシュは status 要素の有無に関わらず更新する。
-    refreshAutoCalibrationProfileCache(bag[KEY_CONCURRENT_CALIBRATION_RING_V1]);
+    if (!_ringFresh) _calibrationRingMemo.absorbBag(bag, _ringV0, Date.now());
+    const ringValue = _calibrationRingMemo.isLoaded() ? _calibrationRingMemo.get() : bag[KEY_CONCURRENT_CALIBRATION_RING_V1];
+    // 自動補正キャッシュは status 要素の有無に関わらず更新する(記録が変わったときだけ再計算=2000件の走査を5秒ごとにしない)。
+    if (_calibrationFitVersion !== _calibrationRingMemo.version()) {
+      refreshAutoCalibrationProfileCache(ringValue);
+      _calibrationFitVersion = _calibrationRingMemo.version();
+    }
     if (!statusEl) return;
-    const sampleCount = parseCalibrationLog(bag[KEY_CONCURRENT_CALIBRATION_RING_V1]).items.length;
+    const sampleCount = parseCalibrationLog(ringValue).items.length;
     const sampleLabel = `記録 ${sampleCount.toLocaleString('ja-JP')} サンプル`;
     // v0.1.528: 既定 ON（未設定=ON）。明示的に false のときだけ OFF 表示。
     const enabled = bag[KEY_AUTOPATROL_ENABLED] !== false;
@@ -4820,6 +4829,39 @@ function isOwnPostedSupportComment(entry, liveId, entries = STORY_SOURCE_STATE.e
 //   popup メインスレッドを塞ぐ性能問題だったため、buildOwnPostedUserIdSet で事前に1パス集合化し、
 //   各ループは O(1) の has() で判定する(りんく列・ギフト列とも)。
 
+/**
+ * v0.1.1630: 巨大なキー(プロフィール cache 332KB・較正の記録 820KB)を毎回読み直さない記憶(規則は lib/storageKeyMemo.js)。
+ *   実測(boot-profile --gets・起動8秒): chrome.storage.local.get 約450回・結果12MB。同じ360KBの組を12〜14回・較正の記録を2回(+5秒ごと)読み直していた。
+ *   storage.onChanged の newValue を権威として更新・寿命60秒・読み出し中の変化は古い結果で上書きしない。
+ */
+const _profileCacheMemo = createStorageKeyMemo(KEY_USER_COMMENT_PROFILE_CACHE);
+const _calibrationRingMemo = createStorageKeyMemo(KEY_CONCURRENT_CALIBRATION_RING_V1);
+let _calibrationFitVersion = -1;
+try {
+  if (typeof chrome !== 'undefined' && chrome.storage?.onChanged?.addListener) {
+    chrome.storage.onChanged.addListener((changes, area) => {
+      const now = Date.now();
+      _profileCacheMemo.onChanged(changes, area, now);
+      _calibrationRingMemo.onChanged(changes, area, now);
+    });
+  }
+} catch {
+  /* no-op: 記憶が働かなくても従来どおり毎回読むだけ(機能は失わない) */
+}
+
+/**
+ * プロフィール cache の生の値を返す。記憶が新しければ get しない。無ければ従来どおり get して記憶する。
+ * @param {() => Promise<Record<string, any>>} [readBag] 従来の読み方(リトライ付きなど)
+ */
+async function readUserCommentProfileCacheRaw(readBag) {
+  if (_profileCacheMemo.isFresh(Date.now())) return _profileCacheMemo.get();
+  const v0 = _profileCacheMemo.version();
+  const bag = await (readBag ? readBag() : chrome.storage.local.get(KEY_USER_COMMENT_PROFILE_CACHE));
+  _profileCacheMemo.absorbBag(bag, v0, Date.now());
+  // 読み出し中に onChanged が来て記憶のほうが新しければ、そちらを返す(古い読み出し結果を返さない)。
+  return _profileCacheMemo.isLoaded() ? _profileCacheMemo.get() : bag?.[KEY_USER_COMMENT_PROFILE_CACHE];
+}
+
 /** 永続プロファイルキャッシュ（refresh ごとに再読込） */
 let popupUserCommentProfileMap = /** @type {null|Record<string, { nickname?: string, avatarUrl?: string, updatedAt: number }>} */ (
   null
@@ -4868,15 +4910,15 @@ async function runDeferredUserCommentProfileHydrate(ctx) {
   try {
     if (!hasExtensionContext()) return;
     if (refreshGen !== watchPopupRefreshGeneration) return;
-    const bag = await readStorageBagWithRetry(
-      () => chrome.storage.local.get(KEY_USER_COMMENT_PROFILE_CACHE),
-      { attempts: 4, delaysMs: [0, 60, 150, 300] }
+    const profRaw = await readUserCommentProfileCacheRaw(() =>
+      readStorageBagWithRetry(
+        () => chrome.storage.local.get(KEY_USER_COMMENT_PROFILE_CACHE),
+        { attempts: 4, delaysMs: [0, 60, 150, 300] }
+      )
     );
     if (refreshGen !== watchPopupRefreshGeneration) return;
     if (!popupUserCommentProfileMap) return;
-    const late = normalizeUserCommentProfileMap(
-      bag[KEY_USER_COMMENT_PROFILE_CACHE]
-    );
+    const late = normalizeUserCommentProfileMap(profRaw);
     if (!Object.keys(late).length) return;
     const hydrated = hydrateUserCommentProfileMapFromStorage(
       popupUserCommentProfileMap,
@@ -12638,10 +12680,7 @@ async function refreshSupportActivityTimeline(liveId) {
   let timelineProfileMap = popupUserCommentProfileMap;
   if (!timelineProfileMap || !Object.keys(timelineProfileMap).length) {
     try {
-      const profBag = await chrome.storage.local.get(KEY_USER_COMMENT_PROFILE_CACHE);
-      timelineProfileMap = normalizeUserCommentProfileMap(
-        profBag[KEY_USER_COMMENT_PROFILE_CACHE]
-      );
+      timelineProfileMap = normalizeUserCommentProfileMap(await readUserCommentProfileCacheRaw());
     } catch {
       timelineProfileMap = null;
     }
@@ -15348,10 +15387,13 @@ async function refresh() {
   // v0.1.336: 描画前ゲート（軽量読みは固まりを per-attempt 900ms で失敗扱いにし、
   //   最悪 4 試行で {} に落として描画を続行）。
   const metricsFromContentPromise = requestPanelMetricsFromWatchTab(url, lv);
+  // v0.1.1630: プロフィール cache(332KB)は、記憶が新しければ get のキーから外す(毎回の読み直しをやめる)。
+  const _profFresh = _profileCacheMemo.isFresh(Date.now());
+  const _profV0 = _profileCacheMemo.version();
   const lightData = await readStorageBagWithRetry(
     () =>
       chrome.storage.local.get([
-        KEY_USER_COMMENT_PROFILE_CACHE,
+        ...(_profFresh ? [] : [KEY_USER_COMMENT_PROFILE_CACHE]),
         snapKey,
         tailKey,
         summaryKey,
@@ -15361,6 +15403,9 @@ async function refresh() {
       ]),
     { attempts: 4, delaysMs: [0, 50, 120, 280], perAttemptTimeoutMs: 900 }
   );
+  if (!_profFresh) _profileCacheMemo.absorbBag(lightData, _profV0, Date.now());
+  // 以降の処理(従来どおり lightData[KEY] を読む)へ、記憶している値を渡す。
+  if (_profileCacheMemo.isLoaded()) /** @type {Record<string, unknown>} */ (lightData)[KEY_USER_COMMENT_PROFILE_CACHE] = _profileCacheMemo.get();
   void metricsFromContentPromise.then((metricsFromContent) => {
     if (!metricsFromContent || !isPanelLiveSummary(metricsFromContent, lv)) return;
     const paintedLv = String(watchPopupLastPaintedLiveId || '').trim().toLowerCase();
@@ -17642,10 +17687,7 @@ async function downloadMediaKitHtml() {
   let supporterProfileMap = popupUserCommentProfileMap;
   if (!supporterProfileMap || !Object.keys(supporterProfileMap).length) {
     try {
-      const profBag = await chrome.storage.local.get(KEY_USER_COMMENT_PROFILE_CACHE);
-      supporterProfileMap = normalizeUserCommentProfileMap(
-        profBag[KEY_USER_COMMENT_PROFILE_CACHE]
-      );
+      supporterProfileMap = normalizeUserCommentProfileMap(await readUserCommentProfileCacheRaw());
     } catch {
       supporterProfileMap = {};
     }
