@@ -621,6 +621,11 @@ export function buildAiShareFullText({ overviewText, livesData, fastDiag, popupD
     if (shadowLine) { lines.push(shadowLine); lines.push(''); }
     const orderLine = String((popupDiag?.popup ?? popupDiag)?.laneCountOrder?.line || '');
     if (orderLine) { lines.push(orderLine); lines.push(''); }
+    const ac = (popupDiag?.popup ?? popupDiag)?.avatarCompose;
+    if (ac && Number(ac.requested) > 0) {
+      lines.push(`顔画像の合成: 要求${ac.requested}(キャッシュ命中${ac.cacheHit} / 画面の近くで合成${ac.composedAfterNear} / 取り外されて見送り${ac.skippedDetached} / 失敗${ac.failed}) / 近く待ち${ac.waitingNear}・実行中${ac.active}・待ち行列${ac.queued}(最大${ac.maxQueued}) / 保存${ac.cacheSize}件`);
+      lines.push('');
+    }
   } catch { /* no-op: 計器の失敗は状態速報を壊さない */ }
   // ★v0.1.1251: 不完全な軽い供給が完全描画を潰すのを止めた回数(72枚→3枚 の実測に対する防御)。
   try {

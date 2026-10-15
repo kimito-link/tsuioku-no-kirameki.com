@@ -376,8 +376,10 @@ export function anonymousAvatarDataUrlUpgrade(userKey, sizePx = 64) {
  */
 export function upgradeAnonymousAvatarImage(img, userKey, sizePx = 64) {
   const key = normalizeUserKey(userKey);
-  const upgrade = anonymousAvatarDataUrlUpgrade(key, sizePx);
-  if (!img || !key || !upgrade.immediate) return upgrade;
+  const immediate = key ? anonymousIdenticonDataUrl(key, sizePx) : '';
+  if (!img || !key || !immediate) return anonymousAvatarDataUrlUpgrade(key, sizePx);
+  // ★合成は画面の近くに来てから・同時3つまで(上の説明)。最終的な画像は従来と同じ。
+  const upgrade = { immediate, promise: composeWhenNear(img, key, immediate) };
 
   img.dataset.nlAnonymousAvatarKey = key;
   if (!img.getAttribute('src')) img.src = upgrade.immediate;
@@ -407,6 +409,130 @@ export function upgradeAnonymousAvatarImageFromFallback(
 ) {
   if (!String(currentSrc || '').startsWith('data:image/svg+xml')) return;
   upgradeAnonymousAvatarImage(img, userKey, sizePx);
+}
+
+/**
+ * ★2026-10-15 黒い幕の実測(boot-profile 13回)で、起動が重い回の犯人がこの顔の合成(toBlob 約1.5〜1.8秒)と判明。
+ *   原因: 匿名タイルを描くたびに【全員ぶん】を canvas で合成していた。しかもキャッシュは 256 件なのに匿名は 500 人超
+ *   =追い出された人を描き直しのたびにまた合成していた。
+ *   対策(見た目は1画素も変えない=最終的な画像は同じ・作る【時期と数】だけを変える):
+ *     ① 画面の近く(上下 400px)に来るまで合成しない(それまでは即時表示の SVG 顔のまま)
+ *     ② 同時に走らせる合成は 3 つまで
+ *   IntersectionObserver が無い環境では従来どおり即時に合成する(機能を失わない)。
+ */
+export const AVATAR_COMPOSE_MAX_CONCURRENT = 3;
+export const AVATAR_COMPOSE_NEAR_MARGIN_PX = 400;
+const AVATAR_GATE_SWEEP_MS = 3000;
+
+/**
+ * 同時実行数を制限する。task は Promise を返す関数。
+ * @param {number} max
+ */
+export function createComposeLimiter(max = AVATAR_COMPOSE_MAX_CONCURRENT) {
+  const limit = Math.max(1, Math.floor(max) || 1);
+  let active = 0;
+  /** @type {Array<{ task: () => Promise<any>, resolve: (v: any) => void, reject: (e: any) => void }>} */
+  const queue = [];
+  const stats = { maxQueued: 0 };
+  const pump = () => {
+    while (active < limit && queue.length > 0) {
+      const job = /** @type {NonNullable<ReturnType<typeof queue.shift>>} */ (queue.shift());
+      active += 1;
+      let p;
+      try { p = Promise.resolve(job.task()); } catch (e) { p = Promise.reject(e); }
+      p.then(job.resolve, job.reject).finally(() => { active -= 1; pump(); });
+    }
+  };
+  return {
+    run(/** @type {() => Promise<any>} */ task) {
+      return new Promise((resolve, reject) => {
+        queue.push({ task, resolve, reject });
+        if (queue.length > stats.maxQueued) stats.maxQueued = queue.length;
+        pump();
+      });
+    },
+    snapshot: () => ({ active, queued: queue.length, maxQueued: stats.maxQueued })
+  };
+}
+
+/**
+ * 「画面の近くに来た」を待つゲート。IntersectionObserver を1つだけ共有する。
+ *   - 近くに来たら resolve(true)。取り外された(isConnected=false)要素は定期掃除で resolve(false) にして解放する
+ *     (描き直しのたびに古いタイルが取り外される=観測が積み上がらないように)。
+ *   - IntersectionObserver が無ければ即 resolve(true)(従来どおり=機能を失わない)。
+ * @param {{ IntersectionObserver?: any, setInterval?: any, clearInterval?: any, marginPx?: number }} [deps]
+ */
+export function createViewportGate(deps = {}) {
+  const IO = deps.IntersectionObserver !== undefined ? deps.IntersectionObserver : globalThis.IntersectionObserver;
+  const setIv = deps.setInterval || globalThis.setInterval;
+  const clearIv = deps.clearInterval || globalThis.clearInterval;
+  const marginPx = deps.marginPx ?? AVATAR_COMPOSE_NEAR_MARGIN_PX;
+  /** @type {Map<any, (near: boolean) => void>} */
+  const pending = new Map();
+  /** @type {any} */ let io = null;
+  /** @type {any} */ let timer = null;
+  const stopSweepIfIdle = () => { if (pending.size === 0 && timer != null) { clearIv(timer); timer = null; } };
+  const sweep = () => {
+    for (const [el, resolve] of [...pending]) {
+      if (el && el.isConnected === false) { pending.delete(el); try { io?.unobserve(el); } catch { /* no-op */ } resolve(false); }
+    }
+    stopSweepIfIdle();
+  };
+  return {
+    whenNear(/** @type {any} */ el) {
+      if (!el || typeof IO !== 'function') return Promise.resolve(true);
+      return new Promise((resolve) => {
+        if (!io) {
+          io = new IO((/** @type {any[]} */ entries) => {
+            for (const e of entries) {
+              if (!e.isIntersecting) continue;
+              const r = pending.get(e.target);
+              if (!r) continue;
+              pending.delete(e.target);
+              try { io.unobserve(e.target); } catch { /* no-op */ }
+              r(true);
+            }
+            stopSweepIfIdle();
+          }, { rootMargin: `${marginPx}px 0px` });
+        }
+        pending.set(el, resolve);
+        io.observe(el);
+        if (timer == null) timer = setIv(sweep, AVATAR_GATE_SWEEP_MS);
+      });
+    },
+    pendingCount: () => pending.size,
+    sweepNow: sweep
+  };
+}
+
+const avatarComposeLimiter = createComposeLimiter();
+const avatarViewportGate = createViewportGate();
+const avatarComposeStats = { requested: 0, cacheHit: 0, composedAfterNear: 0, skippedDetached: 0, failed: 0 };
+
+/** 状態速報用: 顔の合成の要求・実行・見送りの内訳。 */
+export function getAvatarComposeStats() {
+  const lim = avatarComposeLimiter.snapshot();
+  return { ...avatarComposeStats, waitingNear: avatarViewportGate.pendingCount(), active: lim.active, queued: lim.queued, maxQueued: lim.maxQueued, cacheSize: avatarDataUrlCache.size };
+}
+
+/**
+ * img が画面の近くに来てから(キャッシュ済みなら即)合成する。取り外されたら合成しない。失敗時は即時の SVG のまま。
+ * @param {any} img
+ * @param {string} key
+ * @param {string} immediate
+ * @returns {Promise<string>}
+ */
+function composeWhenNear(img, key, immediate) {
+  avatarComposeStats.requested += 1;
+  if (avatarDataUrlCache.has(key)) {
+    avatarComposeStats.cacheHit += 1;
+    return composeAvatarPartsDataUrl(key).catch(() => immediate);
+  }
+  return avatarViewportGate.whenNear(img).then((near) => {
+    if (!near) { avatarComposeStats.skippedDetached += 1; return immediate; }
+    avatarComposeStats.composedAfterNear += 1;
+    return avatarComposeLimiter.run(() => composeAvatarPartsDataUrl(key)).catch(() => { avatarComposeStats.failed += 1; return immediate; });
+  });
 }
 
 /**
