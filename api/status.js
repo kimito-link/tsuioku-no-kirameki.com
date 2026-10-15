@@ -54,6 +54,25 @@ function readBody(req) {
   return null;
 }
 
+/**
+ * 受け口の記録(2026-10-15): 「拡張の送信が届いているか・どう返したか」を、サーバー側の1行で分かるようにする。
+ *   ★鍵・閲覧トークン・本文は書かない。結果と大きさと送信元の種類だけ。
+ *   (記録が無い間は、拡張が送っていないのか断られたのかを、拡張の画面を見ずに区別できなかった)
+ */
+export function logIngest(req, outcome) {
+  try {
+    const origin = String(req.headers?.origin || '');
+    console.log(JSON.stringify({
+      m: 'status-ingest',
+      outcome,
+      bytes: Number(req.headers?.['content-length']) || 0,
+      from: origin.startsWith('chrome-extension://') ? 'extension' : origin ? 'web' : 'none'
+    }));
+  } catch {
+    /* 記録の失敗で受け口を止めない */
+  }
+}
+
 export default async function handler(req, res) {
   res.setHeader('Cache-Control', 'no-store');
   try {
@@ -61,16 +80,19 @@ export default async function handler(req, res) {
       const ingestKey = process.env.STATUS_INGEST_KEY;
       const sent = req.headers['x-share-key'];
       if (!ingestKey || sent !== ingestKey) {
+        logIngest(req, 'unauthorized');
         res.status(401).json({ ok: false, error: 'unauthorized' });
         return;
       }
       const body = readBody(req);
       if (!body || typeof body !== 'object') {
+        logIngest(req, 'bad_body');
         res.status(400).json({ ok: false, error: 'bad body' });
         return;
       }
       const token = String(body.v || req.headers['x-view-token'] || '');
       if (!VIEW_TOKEN_RE.test(token)) {
+        logIngest(req, 'bad_token');
         res.status(400).json({ ok: false, error: 'bad view token' });
         return;
       }
@@ -78,6 +100,7 @@ export default async function handler(req, res) {
       const payload = { ...body };
       delete payload.v;
       await upstash(['SET', `status:latest:${token}`, JSON.stringify(payload), 'EX', String(TTL_SECONDS)]);
+      logIngest(req, 'ok');
       res.status(200).json({ ok: true });
       return;
     }
