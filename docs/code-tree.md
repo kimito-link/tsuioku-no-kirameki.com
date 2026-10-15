@@ -832,7 +832,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (1961)
+- 📁 **src/** (1962)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1112,7 +1112,7 @@
         - `logo_funlink_white_RGB_link_black.png`
         - `logo_funlink_white_RGB_maru_black.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1725)
+  - 📁 **lib/** (1726)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -2448,6 +2448,7 @@
     - `statusFirstPaint.wiring.test.js`
     - `statusFormat.js` — status 整形の純関数群。
     - `statusFormat.test.js`
+    - `statusIngestLog.test.js`
     - `statusInitCost.wiring.test.js`
     - `statusMindmapModel.js` — status.html「全体マインドマップ」のツリーモデルを組み立てる純関数(2026-06-18 ユーザー要望)。
     - `statusMindmapModel.test.js`
