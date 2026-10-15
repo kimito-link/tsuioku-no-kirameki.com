@@ -753,3 +753,11 @@ export function commenterFollowLiveStorageKey(liveId) {
   const id = String(liveId || '').trim().toLowerCase();
   return `nls_commenter_follow_live_${id}`;
 }
+
+/**
+ * 状態画面の「WEB共有の設定」(書き込みキー・閲覧トークン・送信先)。値: { ingestKey, viewToken, appOrigin }。
+ * 状態画面(status-entry.js)とサイドパネルの送信担当(statusPublisherHost.js)が同じキーを読む=正本はここ1つ。
+ */
+export const KEY_STATUS_UPLOAD_CONFIG = 'nls_status_upload_config_v1';
+/** 自動送信(WEBへ2分ごと)の明示同意。true のときだけ自動送信する(既定OFF)。 */
+export const KEY_WEB_PUBLISH_OPT_IN = 'nls_web_publish_opt_in';

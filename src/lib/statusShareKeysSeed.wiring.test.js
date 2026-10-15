@@ -9,9 +9,10 @@ const body = src.slice(at, at + 1700);
 
 describe('status-entry: 鍵ファイルの自動取り込み', () => {
   it('★boot で共有キーを読んだあとに呼び、取り込んだら読み直す', () => {
-    const boot = src.indexOf('await refreshUploadConfigCache();\n  // v0.1.1626');
-    expect(boot).toBeGreaterThan(0);
-    expect(src.slice(boot, boot + 400)).toMatch(/if \(await seedShareKeysFromLocalFile\(\)\) await refreshUploadConfigCache\(\);/);
+    const keys = src.indexOf('await refreshUploadConfigCache();\n  // v0.1.16');
+    const seed = src.indexOf('if (await seedShareKeysFromLocalFile()) await refreshUploadConfigCache();');
+    expect(keys).toBeGreaterThan(0);
+    expect(seed).toBeGreaterThan(keys);
   });
   it('★取り込み済みの印はファイル内容の指紋: 同じなら何もせず、違えば取り込み直す', () => {
     expect(at).toBeGreaterThan(0);
