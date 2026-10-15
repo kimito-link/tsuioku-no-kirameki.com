@@ -681,7 +681,7 @@ import { formatLaneCountOrderLine, makeLaneCountOrderState, orderLaneCandidatesB
 import { storyUserLaneMetaLines } from '../lib/storyUserLaneMeta.js';
 import { anonymousIdenticonDataUrl } from '../lib/anonymousIdenticon.js';
 import { identiconFallbackForAvatarUrl } from '../lib/avatarFallbackFromUrl.js';
-import { upgradeAnonymousAvatarImage, upgradeAnonymousAvatarImageFromFallback, upgradeAnonymousAvatarImages } from '../lib/avatarPartsComposer.js';
+import { getAvatarComposeStats, upgradeAnonymousAvatarImage, upgradeAnonymousAvatarImageFromFallback, upgradeAnonymousAvatarImages } from '../lib/avatarPartsComposer.js';
 import { buildHtmlReportDownloadFilename } from '../lib/exportDownloadFilename.js';
 import {
   createExportStageProfiler,
@@ -18564,6 +18564,7 @@ async function collectAiShareDevMonitorPayloadBundle(watchUrl) {
       // ★2026-08-08 計器: 鏡 publish の到達/見送り。読み方は lanePublishSkipDiag.js の冒頭。
       lanePublishSkip: snapshotLanePublishSkipDiag(_lanePublishSkipDiag, Date.now()),
       giftAdPicksCarry: { restored: _giftAdPicksCarryDiag.restored, cleared: _giftAdPicksCarryDiag.cleared, keptGift: _giftAdPicksCarryDiag.keptGift, keptAd: _giftAdPicksCarryDiag.keptAd },
+      avatarCompose: getAvatarComposeStats(),
       laneCountOrder: { line: formatLaneCountOrderLine(_laneCountOrderState), reorders: _laneCountOrderState.reorders, appended: _laneCountOrderState.appended, ranked: _laneCountOrderState.rank.size },
       laneImportShadow: {
         line: formatLaneImportShadowLine(_laneImportShadow),
