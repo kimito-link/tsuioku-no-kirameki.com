@@ -24,6 +24,14 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.1608',
+    date: '2026-10-08',
+    summary: '会場が席を毎回書き直すのをやめて軽く',
+    items: Object.freeze([
+      '会場モードを開くと、視聴ページが席の見た目を1秒に何千回も書き直していて重くなっていました。変わった所だけ書くようにして、書き直しを約98%減らしました(見た目は変わりません)。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1607',
     date: '2026-10-08',
     summary: '複数タブで配信が入れ替わるのを止める',
