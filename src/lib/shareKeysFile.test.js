@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseShareKeysFile } from './shareKeysFile.js';
+import { parseShareKeysFile, shareKeysFingerprint } from './shareKeysFile.js';
 
 describe('parseShareKeysFile', () => {
   it('★2つの鍵があれば取り出す(前後の空白は落とす・appOrigin は省略可)', () => {
@@ -34,5 +34,20 @@ describe('parseShareKeysFile: 自動公開の同意', () => {
     for (const v of [undefined, 'true', 1, null, false]) {
       expect(parseShareKeysFile(JSON.stringify({ ...base, autoPublishConsent: v }))).toMatchObject({ ok: true, autoPublishConsent: false });
     }
+  });
+});
+
+describe('shareKeysFingerprint', () => {
+  const base = { ingestKey: 'a', viewToken: 'b', appOrigin: 'https://x.example', autoPublishConsent: true };
+  it('★同じ内容なら同じ指紋・どれか1つでも変われば別の指紋', () => {
+    const fp = shareKeysFingerprint(base);
+    expect(shareKeysFingerprint({ ...base })).toBe(fp);
+    for (const ch of [{ ingestKey: 'a2' }, { viewToken: 'b2' }, { appOrigin: 'https://y.example' }, { autoPublishConsent: false }]) {
+      expect(shareKeysFingerprint({ ...base, ...ch })).not.toBe(fp);
+    }
+  });
+  it('★指紋から鍵の値は読めない(値そのものを含まない)', () => {
+    const fp = shareKeysFingerprint({ ...base, ingestKey: 'SECRET-KEY-VALUE', viewToken: 'SECRET-TOKEN-VALUE' });
+    expect(fp).not.toContain('SECRET');
   });
 });

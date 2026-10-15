@@ -39,3 +39,16 @@ export function parseShareKeysFile(text) {
   // 自動公開の同意は【ファイルに true と明記されているときだけ】(省略・true 以外は同意なし)。
   return { ok: true, ingestKey, viewToken, appOrigin, autoPublishConsent: o.autoPublishConsent === true };
 }
+
+/**
+ * 鍵ファイルの内容の指紋(暗号用ではない・変わったかを見分けるだけ)。取り込み済みの印に使う。
+ *   値そのものは保存しない=印から鍵は読めない。ファイルの中身が変わったら指紋も変わり、取り込み直す。
+ * @param {{ ingestKey: string, viewToken: string, appOrigin: string, autoPublishConsent: boolean }} p
+ * @returns {string}
+ */
+export function shareKeysFingerprint(p) {
+  const src = [p.ingestKey, p.viewToken, p.appOrigin, p.autoPublishConsent ? '1' : '0'].join('');
+  let h = 5381;
+  for (let i = 0; i < src.length; i += 1) h = ((h * 33) ^ src.charCodeAt(i)) >>> 0;
+  return 'fp1:' + h.toString(36) + ':' + src.length;
+}
