@@ -5,6 +5,7 @@
  *   1) 視聴ページを開いて collect 秒ほどコメントを溜める(autoshow は切る=他のパネルが同じスレッドを使わない)
  *   2) 新しいタブで popup.html?inline=1&dock=sidepanel&lv=<lv> を開く【前】にプロファイラを開始
  *   3) 起動から seconds 秒間のプロファイル(稼働率・自分の時間・入口)を出す
+ *   --status 1 : 起動の前に status.html のタブも開いておく(--status-wait 秒待つ。既定20)。あり/なしの差=状態画面が足す時間
  *   --width/--height: パネルの表示サイズ(既定 664x1000=サイドパネル相当。画面に見える範囲が結果を左右する)
  *
  * 読み方: 起動の数秒でメインスレッドが何に使われたか。幕が長いなら、その上位が犯人。
@@ -28,6 +29,14 @@ try {
   const watch = await ctx.newPage();
   watch.goto(`https://live.nicovideo.jp/watch/${args.lv}`, { waitUntil: 'domcontentloaded', timeout: 60000 }).catch(() => {});
   await sleep(collectMs);
+
+  // --status 1: 状態画面(status.html)のタブも開いておく(自動送信のために開きっぱなしにする運用の再現)。
+  //   拡張の全ページは1本のメインスレッドを共有するので、これが起動の幕に足す時間を比べる(2026-10-15)。
+  if (String(args.status || '0') === '1') {
+    const st = await ctx.newPage();
+    st.goto(`chrome-extension://${extId}/status.html`, { waitUntil: 'domcontentloaded', timeout: 60000 }).catch(() => {});
+    await sleep(Number(args['status-wait'] || 20) * 1000);
+  }
 
   const page = await ctx.newPage();
   // 実際のサイドパネルの大きさ(幅 約664px)に合わせる。全面表示だと「画面に見える顔」が増えて遅延読み込みの効果が見えない。
