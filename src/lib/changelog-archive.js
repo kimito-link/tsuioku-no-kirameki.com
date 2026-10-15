@@ -24,6 +24,14 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.1607',
+    date: '2026-10-08',
+    summary: '複数タブで配信が入れ替わるのを止める',
+    items: Object.freeze([
+      'ニコ生のタブを複数開いていると、タブ同士が『最後に見た配信』を書き合い、パネルの配信が入れ替わったり、全パネルが描き直しを繰り返したりしていました。URLが変わった時と前面に来た時だけ書くようにしました。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1606',
     date: '2026-10-08',
     summary: '会場カードが空の原因を診断に出す',

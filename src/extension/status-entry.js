@@ -58,7 +58,7 @@ import { buildStatusActions } from '../lib/statusActionAdvisor.js';
 //   =新規 storage read ゼロ。致命は症状カードにも昇格する。
 // AI共有(状態速報)本文ビルダーを lib に切り出し(②応援ライブビュー/③WEB で再利用)。挙動同値。
 import { buildAiShareFullText } from '../lib/aiShareFullText.js';
-import { parseShareKeysFile } from '../lib/shareKeysFile.js';
+import { parseShareKeysFile, shareKeysFingerprint } from '../lib/shareKeysFile.js';
 // ★v0.1.1424: 「いま視聴中の lv」を鏡とは別の起点(watch タブ)から決める。
 //   鏡から取ると別配信ガードが恒真になり、前の配信の鏡と突合して誤検知する。
 import { resolveCurrentLiveId, canCompareMirrorCounts } from '../lib/currentLiveIdOrigin.js';
@@ -3612,7 +3612,7 @@ const SHARE_KEYS_LOCAL_FILE = 'nicolive-share-keys.json';
 /**
  * v0.1.1626: 拡張フォルダの鍵ファイル(nicolive-share-keys.json)を【一度だけ】取り込む。
  *   貼り付けもクリックもできない環境のための入口。ファイルは git にも提出物にも入らない(開発機のローカルだけ)。
- *   - 取り込み済みの印(KEY_SHARE_KEYS_SEEDED)があれば何もしない(あとで利用者が同意を切っても、起動のたびに戻さない)。
+ *   - 取り込み済みの印(KEY_SHARE_KEYS_SEEDED)はファイル内容の指紋。同じ内容なら何もしない(あとで利用者が同意を切っても、起動のたびに戻さない)。内容が変われば取り込み直す。
  *   - 同意(autoPublishConsent)は、ファイルに true と明記されているときだけ入れる。
  *   - ファイルが無い/読めない/形が不正なら何もしない(起動を止めない)。
  * @returns {Promise<boolean>} 取り込んだか
@@ -3623,7 +3623,6 @@ async function seedShareKeysFromLocalFile() {
       () => chrome.storage.local.get(KEY_SHARE_KEYS_SEEDED),
       BOOT_STORAGE_TIMEOUT_MS
     );
-    if (done?.[KEY_SHARE_KEYS_SEEDED]) return false;
     const res = await Promise.race([
       fetch(chrome.runtime.getURL(SHARE_KEYS_LOCAL_FILE)),
       new Promise((resolve) => setTimeout(() => resolve(null), 1500))
@@ -3631,9 +3630,13 @@ async function seedShareKeysFromLocalFile() {
     if (!res || !res.ok) return false;
     const parsed = parseShareKeysFile(await res.text());
     if (!parsed.ok) return false;
+    // v0.1.1627: 取り込み済みの印はファイル内容の指紋。同じ内容なら何もしない(同意を切った後に戻さない)・
+    //   内容が変わったら取り込み直す(鍵を作り直したのに古い鍵のまま送り続けない)。
+    const fp = shareKeysFingerprint(parsed);
+    if (done?.[KEY_SHARE_KEYS_SEEDED] === fp) return false;
     await setUploadConfig({ ingestKey: parsed.ingestKey, viewToken: parsed.viewToken, appOrigin: parsed.appOrigin });
     if (parsed.autoPublishConsent) await setWebPublishOptIn(true);
-    await chrome.storage.local.set({ [KEY_SHARE_KEYS_SEEDED]: Date.now() });
+    await chrome.storage.local.set({ [KEY_SHARE_KEYS_SEEDED]: fp });
     return true;
   } catch {
     return false;

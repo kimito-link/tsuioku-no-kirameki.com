@@ -13,10 +13,13 @@ describe('status-entry: 鍵ファイルの自動取り込み', () => {
     expect(boot).toBeGreaterThan(0);
     expect(src.slice(boot, boot + 400)).toMatch(/if \(await seedShareKeysFromLocalFile\(\)\) await refreshUploadConfigCache\(\);/);
   });
-  it('★取り込み済みの印があれば何もしない(同意を切った後に戻さない)', () => {
+  it('★取り込み済みの印はファイル内容の指紋: 同じなら何もせず、違えば取り込み直す', () => {
     expect(at).toBeGreaterThan(0);
-    expect(body).toMatch(/if \(done\?\.\[KEY_SHARE_KEYS_SEEDED\]\) return false;/);
-    expect(body).toMatch(/\[KEY_SHARE_KEYS_SEEDED\]: Date\.now\(\)/);
+    expect(body).toContain('const fp = shareKeysFingerprint(parsed);');
+    expect(body).toContain('if (done?.[KEY_SHARE_KEYS_SEEDED] === fp) return false;');
+    expect(body).toContain('[KEY_SHARE_KEYS_SEEDED]: fp');
+    // 古い『印があれば何もしない』には戻っていない
+    expect(body).not.toContain('if (done?.[KEY_SHARE_KEYS_SEEDED]) return false;');
   });
   it('★検査(parseShareKeysFile)に通らなければ保存しない', () => {
     const bad = body.indexOf('if (!parsed.ok) return false;');

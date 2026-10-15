@@ -671,12 +671,13 @@
 - **影響範囲ゲート(規律を自動化)** — 星野ロミ式「規律を自動ゲートに」。diff から影響大(複数機能波及)の変更ファイルを検出し波及先機能を列挙。警告のみ(摩擦ゼロ)・--strict で exit1。AGENTS.md §10 のルールを diff 発火に
   - `scripts/impact-check.mjs`
   - `docs/feature-map/impact-map.json`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 79</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 80</summary>
 
 - `api/status.js` — status 受け口 Vercel Serverless Function。
 - `extension/status-guard.js` — 状態速報ページ(status.html)の「何があっても開く」保険。
 - `scripts/council-env.mjs` — 会議ハーネスに必要な env の診断と流し込み（2026-08-25 新設）
 - `scripts/perf-ab/profile-status.mjs` — 診断ページ(status.html)自身のメインスレッド CPU プロファイル。「診断ページが重くて出てこない」の原因探し用。
+- `scripts/perf-ab/status-publish-repro.mjs` — 状態画面(status.html)が「自動公開(WEBへ2分ごとに送信)」を実際に試みるかを、一時プロファイルで再現する。
 - `scripts/run-verify-cc.mjs` — Claude Code 向け verify ランナー。
 - `scripts/split-changelog.mjs` — scripts/split-changelog.mjs — changelog.js を直近20版(本体)と旧版(archive)に分割
 - `scripts/status-live.mjs` — 状態速報(status.html の「AI共有」全文)を、コピー&貼り付けせずにターミナルへ取得する CLI。
@@ -1160,7 +1161,7 @@
 - `v0.1.1611` 2026-10-08 — 会場の人数の増減を状態速報に出す
 
 ### その他 (4版)
+- `v0.1.1627` 2026-10-15 — 鍵ファイルを作り直したら自動で取り込み直す
 - `v0.1.1626` 2026-10-14 — 共有キーを拡張フォルダのファイルから自動で入れる
 - `v0.1.1625` 2026-10-14 — 共有キーを貼り付けなしでファイルから入れる
 - `v0.1.1624` 2026-10-14 — 共有キーの入力が貼った直後に消えない
-- `v0.1.1607` 2026-10-08 — 複数タブで配信が入れ替わるのを止める
