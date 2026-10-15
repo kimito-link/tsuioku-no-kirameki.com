@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 8 / 920 件
+## ⚠️ 役割コメントが無いソース 8 / 921 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `scripts/build.mjs`
@@ -719,13 +719,13 @@
   - `status-guard.js` — 状態速報ページ(status.html)の「何があっても開く」保険。
   - `status.html`
   - `venue.html`
-- 📁 **scripts/** (85)
+- 📁 **scripts/** (87)
   - 📁 **lib/** (4)
     - `council-scout-dir.mjs` — council-scout/ の置き場所を返す唯一の正本。
     - `council-scout-dir.test.js`
     - `instrument-core.mjs` — ★検査・計器の共通土台（キット同梱・依存ゼロ・純Node）。
     - `today-jst.mjs` — 運用日（JST）を返す唯一の正本。
-  - 📁 **perf-ab/** (11)
+  - 📁 **perf-ab/** (13)
     - `README.md`
     - `boot-profile.mjs` — パネル(popup)の【起動の瞬間】のメインスレッド CPU プロファイル。「押した瞬間の黒い幕」の原因探し用。
     - `common.mjs` — perf-ab 共通部品: 拡張を読み込んだ Chromium の起動・後片付け・拡張プロセスの CPU/メモリ採取。
@@ -737,6 +737,8 @@
     - `profile-popup.mjs` — 視聴ページに埋め込まれたパネル(popup.html?inline=1)の【メインスレッド CPU プロファイル】を取る。
     - `profile-status.mjs` — 診断ページ(status.html)自身のメインスレッド CPU プロファイル。「診断ページが重くて出てこない」の原因探し用。
     - `status-publish-repro.mjs` — 状態画面(status.html)が「自動公開(WEBへ2分ごとに送信)」を実際に試みるかを、一時プロファイルで再現する。
+    - `trace-summary.mjs` — Chrome のトレース(CDP Tracing)を取って、メインスレッドごとに「自分の時間(self time)」を名前別に集計する。
+    - `trace-summary.test.js`
   - 📁 **xserver/** (2)
     - `github-webhook-pull.php.example`
     - `webhook-git-pull-for-upload.php`
