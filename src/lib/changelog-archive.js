@@ -24,6 +24,14 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.1613',
+    date: '2026-10-08',
+    summary: '会場のタイルの大きさを①と同じにした',
+    items: Object.freeze([
+      '会場の段(ギフト・広告など)のタイルが、サイドパネルの同じ人より少し大きく(アイコン46px・①は44px)出ていたのを揃えました。原因は、会場がニコ生ページ上で別の寸法規則(枠線が外側に足される)で描かれていたことです。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1612',
     date: '2026-10-08',
     summary: '会場の人数が途中で減らないようにした',

@@ -42,6 +42,32 @@ export function pushRecentText(list, text, keep) {
 }
 
 /**
+ * 2つの直近リスト(どちらも新しい順)を合流する。newer を先頭に、older を後ろに続ける。
+ *   - 空文字は捨てる / 境目や連続の同一本文は畳む(連投で枠を埋めない) / 上限(keep)で切る
+ *   - 入力は破壊しない。2026-10-16(発言の証拠 v3): 差分集計(チャンク単位)の合流で本文を持ち回すために使う。
+ * @param {ReadonlyArray<string>|null|undefined} newer 新しい側(新しい順)
+ * @param {ReadonlyArray<string>|null|undefined} older 古い側(新しい順)
+ * @param {number} [keep] 保持件数(既定=RECENT_TEXT_KEEP)
+ * @returns {string[]}
+ */
+export function mergeRecentTexts(newer, older, keep) {
+  const cap = Math.max(1, Math.floor(Number(keep) || RECENT_TEXT_KEEP));
+  /** @type {string[]} */
+  const out = [];
+  for (const list of [newer, older]) {
+    if (!Array.isArray(list)) continue;
+    for (const raw of list) {
+      if (out.length >= cap) return out;
+      const t = String(raw ?? '').replace(/\s+/g, ' ').trim();
+      if (!t) continue;
+      if (out[out.length - 1] === t) continue;
+      out.push(t);
+    }
+  }
+  return out;
+}
+
+/**
  * ホバーカード表示用に整形する。長文はカードが伸びて会場を覆うので切る。
  *
  * @param {ReadonlyArray<string>|null|undefined} list 直近リスト(新しい順)

@@ -96,3 +96,29 @@ describe('formatRecentTexts', () => {
     expect(formatRecentTexts(undefined)).toEqual([]);
   });
 });
+
+import { mergeRecentTexts } from './recentTextRing.js';
+
+describe('mergeRecentTexts(2026-10-16・発言の証拠 v3)', () => {
+  it('★newer を先頭・older を後ろに続ける(どちらも新しい順)', () => {
+    expect(mergeRecentTexts(['c', 'b'], ['a'])).toEqual(['c', 'b', 'a']);
+  });
+  it('空文字・空白だけは捨て、空白を畳む', () => {
+    expect(mergeRecentTexts(['  x   y ', '', '   '], ['z'])).toEqual(['x y', 'z']);
+  });
+  it('★境目・連続の同一本文は畳む(連投で枠を埋めない)', () => {
+    expect(mergeRecentTexts(['a', 'a', 'b'], ['b', 'c'])).toEqual(['a', 'b', 'c']);
+  });
+  it('上限(既定5・指定可)で切る', () => {
+    expect(mergeRecentTexts(['1', '2', '3'], ['4', '5', '6', '7'])).toEqual(['1', '2', '3', '4', '5']);
+    expect(mergeRecentTexts(['1', '2'], ['3'], 2)).toEqual(['1', '2']);
+    expect(RECENT_TEXT_KEEP).toBe(5);
+  });
+  it('null/undefined/配列でない入力でも落ちず、入力を破壊しない', () => {
+    expect(mergeRecentTexts(null, undefined)).toEqual([]);
+    expect(mergeRecentTexts('x', ['a'])).toEqual(['a']);
+    const a = ['a'];
+    mergeRecentTexts(a, ['b']);
+    expect(a).toEqual(['a']);
+  });
+});
