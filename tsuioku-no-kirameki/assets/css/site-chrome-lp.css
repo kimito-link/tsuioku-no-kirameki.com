@@ -186,7 +186,7 @@ body.topbar-menu-open{overflow:hidden;touch-action:none}
   font-size:clamp(.72rem,2.2vw,.8rem)
 }
 .footer-note__ip{
-  margin-top:10px;font-size:.92em;opacity:.82;line-height:1.7;
+  margin-top:10px;font-size:.92em;opacity:.95;line-height:1.7;
 }
 .footer-note__links{
   margin-top:10px;
