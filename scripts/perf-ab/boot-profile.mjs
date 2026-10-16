@@ -91,6 +91,15 @@ try {
   const taskMs = dms('TaskDuration');
   const known = dms('ScriptDuration') + dms('LayoutDuration') + dms('RecalcStyleDuration');
   console.log(`[metrics Δ] task ${taskMs}ms = script ${dms('ScriptDuration')} + layout ${dms('LayoutDuration')} + style ${dms('RecalcStyleDuration')} + その他 ${taskMs - known}ms / layout回数 ${Math.round((m1.LayoutCount || 0) - (m0.LayoutCount || 0))} / style回数 ${Math.round((m1.RecalcStyleCount || 0) - (m0.RecalcStyleCount || 0))} / JSヒープ ${Math.round((m1.JSHeapUsedSize || 0) / 1048576)}MB / DOM ${Math.round(m1.Nodes || 0)}`);
+  // --gc 1: ガベージコレクションを強制して Nodes を取り直す。『DOM 2万』が生きている要素なのか、捨てたあとの未回収(detached)なのかを分ける。
+  if (String(args.gc || '0') === '1') {
+    const before = await cdp.send('Memory.getDOMCounters').catch(() => null);
+    await cdp.send('HeapProfiler.enable').catch(() => {});
+    await cdp.send('HeapProfiler.collectGarbage').catch(() => {});
+    await sleep(300);
+    const after = await cdp.send('Memory.getDOMCounters').catch(() => null);
+    console.log(`[gc] DOM nodes ${before?.nodes} → GC後 ${after?.nodes} / documents ${after?.documents} / listeners ${after?.jsEventListeners}`);
+  }
   if (args.eval) console.log(`eval ${args.eval} =`, JSON.stringify((await cdp.send('Runtime.evaluate', { expression: String(args.eval), returnByValue: true })).result?.value));
   if (traceRows) {
     for (const t of traceRows.slice(0, 2)) {
