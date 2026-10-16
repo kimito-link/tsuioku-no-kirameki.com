@@ -24,6 +24,14 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.1611',
+    date: '2026-10-08',
+    summary: '会場の人数の増減を状態速報に出す',
+    items: Object.freeze([
+      '会場で人数が減ったとき、いつ・何人から何人に・何が原因かを状態速報に出すようにしました(観測だけで、ふだんの動きは変えません)。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1610',
     date: '2026-10-08',
     summary: 'サムネが出ない人の顔をPOPと会場で揃える',

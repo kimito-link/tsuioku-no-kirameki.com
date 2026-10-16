@@ -361,6 +361,7 @@
 | `src/lib/selfActionCelebration.js` | 2 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) |
 | `src/lib/selfPostedMatcher.js` | 2 | 記録エンジン(watchページ常駐) / ポップアップ(応援レーン) |
 | `src/lib/sessionSummaryMirrorKey.js` | 2 | ポップアップ(応援レーン) / 状態速報ページ |
+| `src/lib/speechEvidence.js` | 2 | 記録エンジン(watchページ常駐) / 会場モード(standalone) |
 | `src/lib/statCardsMirrorKey.js` | 2 | ポップアップ(応援レーン) / 状態速報ページ |
 | `src/lib/statusFastDiagLite.js` | 2 | 記録エンジン(watchページ常駐) / 状態速報ページ |
 | `src/lib/statusFormat.js` | 2 | 状態速報ページ / Web版 状態(スマホ) |

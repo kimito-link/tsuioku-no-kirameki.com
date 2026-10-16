@@ -11,6 +11,7 @@
  * DOM/chrome 非依存=単体テスト可能。venueBar.js が snap/candidates/seats を渡す。
  */
 
+import { speechEvidenceFromCandidate, speechEvidenceFromMirrorCell } from './speechEvidence.js';
 import {
   VENUE_LANE_MIRROR_SOFT_WINDOW_MS,
   VENUE_LANE_MIRROR_HARD_WINDOW_MS
@@ -153,7 +154,9 @@ export function venueRowsFromLaneMirror(snap, candidatesByUid) {
         capturedAt: Math.max(0, Number(cand?._laneSortAt) || 0) || fallbackAt,
         preCount: Math.max(1, Math.floor(Number(cand?.commentCount) || 0) || 1),
         preHasGift: giftCount > 0,
-        preGiftCount: giftCount
+        preGiftCount: giftCount,
+        // 2026-10-16(発言の証拠): 候補があれば候補の実数、無ければ鏡セルの stats.c と本文だけ(★鏡の発行時刻から発言時刻を作らない)。
+        speech: cand ? speechEvidenceFromCandidate(cand) : speechEvidenceFromMirrorCell(cell)
       });
     }
   }

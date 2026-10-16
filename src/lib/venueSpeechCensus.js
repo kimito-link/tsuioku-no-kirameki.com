@@ -36,16 +36,18 @@ const SAMPLE_MAX = 3;
  * @returns {{
  *   tiles: { checked: number, shown: number, mirrorOnly: number, missing: number, silent: number },
  *   missingSamples: string[],
- *   hover: { opened: number, withLines: number, emptyButSpoke: number },
- *   hoverEmptySamples: string[]
+ *   hover: { opened: number, withLines: number, emptyButSpoke: number, lied: number },
+ *   hoverEmptySamples: string[],
+ *   hoverLiedSamples: string[]
  * }}
  */
 export function createVenueSpeechCensusState() {
   return {
     tiles: { checked: 0, shown: 0, mirrorOnly: 0, missing: 0, silent: 0 },
     missingSamples: [],
-    hover: { opened: 0, withLines: 0, emptyButSpoke: 0 },
-    hoverEmptySamples: []
+    hover: { opened: 0, withLines: 0, emptyButSpoke: 0, lied: 0 },
+    hoverEmptySamples: [],
+    hoverLiedSamples: []
   };
 }
 
@@ -97,12 +99,23 @@ export function observeVenueSpeechTiles(state, tiles) {
 /**
  * カードが開かれたときに1回呼ぶ(累計)。
  * @param {ReturnType<typeof createVenueSpeechCensusState>} state
- * @param {{ name?: unknown, lines?: unknown, spoke?: unknown, detail?: unknown }} card
+ * @param {{ name?: unknown, lines?: unknown, spoke?: unknown, saidSpeech?: unknown, detail?: unknown }} card
+ *   saidSpeech: カードが「発言」と言ったか(statLine に「発言」を含む)。★言ったのに spoke(発言の【証拠】)が偽=嘘(lied・2026-10-16)
  *   detail: 空だったときの手がかり(関数でも文字列でも可。空のときだけ評価する=ふだんは何も作らない)。標本の名前の後ろに付く(原因の切り分け用・2026-10-13)
  *   lines: カードに出した発言の行数 / spoke: その人が発言している形跡(カードの発言回数>0 など)
  */
 export function observeVenueSpeechHover(state, card) {
   state.hover.opened += 1;
+  // ★発言の嘘(2026-10-16): 「発言」と言ったのに発言の証拠が無い。構造上 0 になるはずだが、意図でなく【出力】を測る。
+  if (card?.saidSpeech === true && card?.spoke !== true) {
+    state.hover.lied += 1;
+    if (state.hoverLiedSamples.length < SAMPLE_MAX) {
+      let raw = card?.detail;
+      try { if (typeof raw === 'function') raw = raw(); } catch { raw = ''; }
+      const detail = String(raw || '').slice(0, 80);
+      state.hoverLiedSamples.push(String(card?.name || '?').slice(0, 20) + (detail ? `(${detail})` : ''));
+    }
+  }
   if (lineCount(card?.lines) > 0 || n0(card?.lines) > 0) {
     state.hover.withLines += 1;
     return;
@@ -122,13 +135,13 @@ export function observeVenueSpeechHover(state, card) {
  * 状態速報に出す1行と、構造化した値。
  * @param {ReturnType<typeof createVenueSpeechCensusState>} state
  * @returns {{ line: string, verdict: 'ok'|'warn'|'idle', checked: number, shown: number, mirrorOnly: number, missing: number,
- *   silent: number, hoverOpened: number, hoverWithLines: number, hoverEmptyButSpoke: number }}
+ *   silent: number, hoverOpened: number, hoverWithLines: number, hoverEmptyButSpoke: number, hoverLied: number }}
  */
 export function toVenueSpeechCensusDiag(state) {
   const t = state.tiles;
   const h = state.hover;
   const idle = t.checked === 0 && h.opened === 0;
-  const bad = t.missing > 0 || h.emptyButSpoke > 0;
+  const bad = t.missing > 0 || h.emptyButSpoke > 0 || h.lied > 0;
   const verdict = idle ? 'idle' : bad ? 'warn' : 'ok';
   const mark = idle ? '⚪' : bad ? '🔴' : '✅';
   const parts = [`会場セリフ ${mark}`];
@@ -136,9 +149,10 @@ export function toVenueSpeechCensusDiag(state) {
     parts.push('未観測(会場を開いて数秒後に出ます)');
   } else {
     parts.push(`タイル${t.checked}枚: 出る${t.shown}(うち鏡頼み${t.mirrorOnly}) / 欠け${t.missing} / 無言${t.silent}`);
-    parts.push(`カード${h.opened}回: セリフあり${h.withLines} / 発言ありなのに空${h.emptyButSpoke}`);
+    parts.push(`カード${h.opened}回: セリフあり${h.withLines} / 発言ありなのに空${h.emptyButSpoke} / 発言の嘘${h.lied}`);
     if (state.missingSamples.length) parts.push(`欠け例{${state.missingSamples.join('・')}}`);
     if (state.hoverEmptySamples.length) parts.push(`空だったカード{${state.hoverEmptySamples.join('・')}}`);
+    if (state.hoverLiedSamples.length) parts.push(`嘘だったカード{${state.hoverLiedSamples.join('・')}}`);
   }
   return {
     line: parts.join(' / '),
@@ -150,6 +164,7 @@ export function toVenueSpeechCensusDiag(state) {
     silent: t.silent,
     hoverOpened: h.opened,
     hoverWithLines: h.withLines,
-    hoverEmptyButSpoke: h.emptyButSpoke
+    hoverEmptyButSpoke: h.emptyButSpoke,
+    hoverLied: h.lied
   };
 }
