@@ -129,3 +129,29 @@ describe('mergeUserLaneAggregates (既存集約 + 新規集約を userId 単位�
     expect(mergeUserLaneAggregates([cand({ userId: 'a' })], null)).toHaveLength(1);
   });
 });
+
+describe('mergeUserLaneAggregates の本文(2026-10-16・発言の証拠 v3)', () => {
+  const cand = (over = {}) => ({ userId: '111', nickname: 'a', avatarUrl: '', avatarObserved: false, liveId: 'lv1', commentCount: 1, giftCount: 0, _laneSortAt: 1, recentTexts: [], ...over });
+  it('★新規 uid の本文(直近・新しい順)を落とさず持ち回す(以前は落としていた=チャンク経路の会場はカードに本文が出なかった)', () => {
+    const out = mergeUserLaneAggregates([], [cand({ recentTexts: ['こんにちは', 'やあ'] })]);
+    expect(out[0].recentTexts).toEqual(['こんにちは', 'やあ']);
+  });
+  it('★同じ人の合流: incoming(後から来た新しいチャンク)を先頭に、既存を後ろに(上限5・連続同一は畳む)', () => {
+    const existing = [cand({ commentCount: 2, _laneSortAt: 10, recentTexts: ['古2', '古1'] })];
+    const incoming = [cand({ commentCount: 1, _laneSortAt: 20, recentTexts: ['新'] })];
+    const out = mergeUserLaneAggregates(existing, incoming);
+    expect(out).toHaveLength(1);
+    expect(out[0].commentCount).toBe(3); // 加算は従来どおり
+    expect(out[0].recentTexts).toEqual(['新', '古2', '古1']);
+  });
+  it('recentTexts が無い候補同士でも落ちず空配列(旧データ)', () => {
+    const a = cand(); delete a.recentTexts;
+    const out = mergeUserLaneAggregates([a], [cand({ userId: '222' })]);
+    expect(out.map((c) => c.recentTexts)).toEqual([[], []]);
+  });
+  it('入力の配列は破壊しない', () => {
+    const existing = [cand({ recentTexts: ['a'] })];
+    mergeUserLaneAggregates(existing, [cand({ recentTexts: ['b'] })]);
+    expect(existing[0].recentTexts).toEqual(['a']);
+  });
+});
