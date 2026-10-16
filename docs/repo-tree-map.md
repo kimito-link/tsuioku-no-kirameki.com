@@ -332,7 +332,7 @@ graph LR
 - `avatar-parts/`（29 件） — アバター素材(顔シート等)の参考画像  〔アバター / 画像〕
 
 ## `scripts/` — ビルド・検証・自動生成スクリプト(build/feature-map/repo-tree-map 等)  〔ビルド / 自動生成〕
-<sub>ファイル 87 件</sub>
+<sub>ファイル 88 件</sub>
 
 - `lib/`（4 件） — スクリプト共有の小部品(計器コア等)  〔ビルド / 共有〕
 - `perf-ab/`（13 件） — 「重い」を前後比較で測る道具(一時プロファイルの Chromium で拡張プロセスの CPU を採取・プロファイル)  〔性能 / 計測〕
@@ -344,14 +344,14 @@ graph LR
 - `soundeffect-lab/`（19 件） — 効果音ラボ由来の素材候補(採否検討用)  〔音声 / 素材〕
 
 ## `src/` — LP 側 + 純粋関数ライブラリの源  〔ソース〕
-<sub>ファイル 1970 件</sub>
+<sub>ファイル 1971 件</sub>
 
 - `data/`（7 件） — 保存コメントからレーン候補を読む acquirer / source 層  〔コメント / 取得〕
 - `domain/`（20 件） — ドメイン正本(応援レーンの集約・列ポリシー等。識別子判定など)  〔応援 / 集約 / 識別子〕
 - `extension/`（62 件） — バンドル entry(content/popup/venue/status/offscreen/backfill-sw 等=機能境界)  〔entry / 記録 / 会場 / 応援〕
 - `fixtures/`（1 件） — テスト用フィクスチャ  〔テスト〕
 - `images/`（134 件） — LP / CWS 提出物のマスター画像  〔画像〕
-- `lib/`（1732 件） — 純粋関数ライブラリ(unit test 対象)。色・速度・コメント・レポート等の計算ロジックの大半  〔色 / 速度 / コメント / レポート / 純粋関数〕
+- `lib/`（1733 件） — 純粋関数ライブラリ(unit test 対象)。色・速度・コメント・レポート等の計算ロジックの大半  〔色 / 速度 / コメント / レポート / 純粋関数〕
 - `server/`（4 件） — Node 側 I/O 部品(fetch/WebSocket を実際に叩く。api と scripts が共用。lib には置けない)  〔API / 公開 / ランキング〕
 - `shared/`（7 件） — 複数機能で共有する小部品(アバター URL ガード等)  〔共有 / アバター〕
 - `sound/`（1 件） — 音声素材(src 側)  〔音声〕
@@ -369,11 +369,11 @@ graph LR
 - `mcp-nicolive/`（3 件） — ニコ生状態を読む MCP サーバ(司令塔の状態取得用)  〔MCP / 診断〕
 
 ## `tsuioku-no-kirameki/` — 本番 LP の配信ディレクトリ(Cloudflare Pages へ deploy)  〔LP / 公開〕
-<sub>ファイル 45 件</sub>
+<sub>ファイル 65 件</sub>
 
 - `articles/`（14 件） — 技術記事(防御的公開)。手法を再利用可能な形で解説  〔記事 / 公開〕
 - `assets/`（3 件） — 公開ページ群が共有する静的資産の置き場(2026-09-14)  〔LP / 共有〕
-- `images/`（18 件） — LP 用の favicon・OG 画像等  〔画像〕
+- `images/`（38 件） — LP 用の favicon・OG 画像等  〔画像〕
 - `live/`（1 件） — /live/ 追憶のきらめき ランキング(描画は app/dist/live-ranking.js・収集は api/live-ranking.js)  〔LP / 公開 / ランキング〕
 - `sound/`（1 件） — LP 公開用の音声素材(エール音等)  〔音声 / 公開〕
 
