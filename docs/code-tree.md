@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 8 / 924 件
+## ⚠️ 役割コメントが無いソース 8 / 925 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `scripts/build.mjs`
@@ -839,7 +839,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (1974)
+- 📁 **src/** (1976)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1121,7 +1121,7 @@
         - `logo_funlink_white_RGB_link_black.png`
         - `logo_funlink_white_RGB_maru_black.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1736)
+  - 📁 **lib/** (1738)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -2732,6 +2732,8 @@
     - `venueOpenLatency.test.js`
     - `venuePickupBanner.js` — 会場モードの「ピックアップ枠」(BSP風・v0.1.1230)。
     - `venuePickupBanner.test.js`
+    - `venuePickupRing.js` — 【層】L0 判定層(純粋関数・I/O禁止)
+    - `venuePickupRing.test.js`
     - `venuePresenceNote.js` — 【層】L0 判定層（純関数・chrome/DOM/fetch に触らない）
     - `venuePresenceNote.test.js`
     - `venueResidents.js` — 会場モードの常駐3キャラ(りんく・こん太・たぬ姉)の描画モデル(純関数)。

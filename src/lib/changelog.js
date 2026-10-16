@@ -18,6 +18,14 @@
 /** @type {readonly ChangelogEntry[]} */
 export const EXTENSION_CHANGELOG = Object.freeze([
   Object.freeze({
+    version: '0.1.1635',
+    date: '2026-10-17',
+    summary: '会場のピックアップ枠に本当にコメントが出る',
+    items: Object.freeze([
+      '会場の上の「PICK UP」枠が、コメントが流れているのに案内文のままだった問題を直しました(前の版の直し方が不十分でした)。原因は、枠が会場の表示行から選んでいて、その行はコメントの本文を持たないためでした。届いたコメントを枠専用に積んで、そこから選ぶようにしました。実際の配信で、枠に本物のコメントが出ることを確認しています。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1634',
     date: '2026-10-16',
     summary: '会場のピックアップ枠にコメントが出る',
@@ -183,14 +191,6 @@ export const EXTENSION_CHANGELOG = Object.freeze([
     summary: 'グリッドの中身の入替を数える',
     items: Object.freeze([
       '応援コメントのアイコングリッドで、同じマスに別のコメントが入った回数と、ID が後から付いた回数を数えて状態速報に出すようにしました(ちらつきの原因を調べるための計器です)。'
-    ])
-  }),
-  Object.freeze({
-    version: '0.1.1615',
-    date: '2026-10-08',
-    summary: '忙しい配信で読み上げ文を短くする',
-    items: Object.freeze([
-      'コメントが速くて読み上げが追いつかないとき、速度を上げるのと同じ段で、読み上げる文字数も短く(最短30文字)するようにしました。長いコメントを長いまま合成して詰まる状態を減らします。'
     ])
   })
 ]);
