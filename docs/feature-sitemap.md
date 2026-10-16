@@ -893,7 +893,7 @@
   - `src/extension/live-ranking-entry.js`
   - `tsuioku-no-kirameki/live/index.html`
   - `.github/workflows/live-ranking.yml`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 222</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 223</summary>
 
 - `app/app.js` — スマホ閲覧用 status Web 版。
 - `app/live-view.js` — global NL_BUILD_ID
@@ -923,6 +923,7 @@
 - `scripts/lib/council-scout-dir.mjs` — council-scout/ の置き場所を返す唯一の正本。
 - `scripts/lib/instrument-core.mjs` — ★検査・計器の共通土台（キット同梱・依存ゼロ・純Node）。
 - `scripts/lib/today-jst.mjs` — 運用日（JST）を返す唯一の正本。
+- `scripts/lp-optimize-images.mjs` — LP(tsuioku-no-kirameki/index.html)用に、拡張の元画像(1500x1500 の PNG・1枚 400〜520KB)を、
 - `scripts/measure-flash-frames.mjs` — 「一瞬の黒」を【画面に出たピクセル】で測る。
 - `scripts/meeting-roles.mjs` — meeting.mjs の役割注入版。
 - `scripts/meeting.mjs` — 会議ハーネス: 同じ問いを「無料クラウド4系統 + ローカル ollama 数体」に投げ、
