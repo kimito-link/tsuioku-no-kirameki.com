@@ -26,7 +26,7 @@ export const VENUE_PICKUP_CLASS = 'nlsb-pickup';
  * ピックアップ枠のDOMを作る(1回だけ呼ぶ)。
  *
  * @param {Document} doc
- * @returns {{ root: HTMLElement, body: HTMLElement, meta: HTMLElement }}
+ * @returns {{ root: HTMLElement, body: HTMLElement, meta: HTMLElement, face: HTMLElement, main: HTMLElement }}
  */
 export function createVenuePickupBanner(doc) {
   const root = doc.createElement('div');
@@ -39,14 +39,23 @@ export function createVenuePickupBanner(doc) {
   badge.className = 'nlsb-pickup__badge';
   badge.textContent = 'PICK UP';
 
+  // 発言者のサムネ(2026-10-17・§3.5 サムネ+ハンドル名+ID+リンクをセットで出す)。無いときは隠す(空の枠を作らない)。
+  const face = doc.createElement('img');
+  face.className = 'nlsb-pickup__face';
+  face.setAttribute('alt', '');
+  face.setAttribute('hidden', '');
+
+  // 本文の下に『ハンドル名 ・ ID:数値』の小さな行。数値IDはユーザーページへのリンク(a)、匿名はリンクなし。
+  const main = doc.createElement('span');
+  main.className = 'nlsb-pickup__main';
   const body = doc.createElement('span');
   body.className = 'nlsb-pickup__body';
-
-  const meta = doc.createElement('span');
+  const meta = doc.createElement('a');
   meta.className = 'nlsb-pickup__meta';
+  main.append(body, meta);
 
-  root.append(badge, body, meta);
-  return { root, body, meta };
+  root.append(badge, face, main);
+  return { root, body, meta, face, main };
 }
 
 /**
@@ -54,7 +63,7 @@ export function createVenuePickupBanner(doc) {
  *
  * @param {{ entry?: any, why?: string }|null|undefined} picked pickTickerHighlightEntry の戻り
  * @param {{ maxChars?: number }} [opts]
- * @returns {{ text: string, meta: string, empty: boolean }}
+ * @returns {{ text: string, meta: string, empty: boolean, speaker: any }}
  */
 export function buildVenuePickupView(picked, opts = {}) {
   const maxChars = Math.max(8, Math.floor(Number(opts.maxChars) || 60));
@@ -63,6 +72,8 @@ export function buildVenuePickupView(picked, opts = {}) {
   const raw = String(e?.text ?? '').replace(/\s+/g, ' ').trim();
   const isGift = String(p?.why || '') === 'gift';
   const giftName = String(e?.name ?? e?.nickname ?? '').trim();
+  /** 発言者の情報セット(venuePickupSpeaker.js)。無い行(旧入力)は従来の表示。 */
+  const speaker = e?.speaker && typeof e.speaker === 'object' ? e.speaker : null;
   if (!raw) {
     // ★ギフト行は本文が空のことがある(会場の行は text:'' で kind:'gift')。
     //   選ばれているのに案内文が出ると「動いていない」ように見えるので、
@@ -71,20 +82,23 @@ export function buildVenuePickupView(picked, opts = {}) {
       return {
         text: giftName ? `${giftName} さんがギフトを贈りました` : 'ギフトが届きました',
         meta: '🎁 ギフト',
-        empty: false
+        empty: false,
+        speaker
       };
     }
     return {
       text: 'コメントが流れると、ここに1件ずつ大きく出るよ',
       meta: '',
-      empty: true
+      empty: true,
+      speaker: null
     };
   }
   const chars = Array.from(raw);
   const text = chars.length > maxChars ? `${chars.slice(0, maxChars).join('')}…` : raw;
   // 誰の発言かを添える(匿名は名前を出さない=無い名前を捏造しない)。
-  const meta = isGift ? '🎁 ギフト' : (giftName || '');
-  return { text, meta, empty: false };
+  const speakerMeta = speaker ? [String(speaker.name || ''), String(speaker.idLine || '')].filter(Boolean).join(' ・ ') : '';
+  const meta = isGift ? '🎁 ギフト' : (speakerMeta || giftName || '');
+  return { text, meta, empty: false, speaker };
 }
 
 /**
@@ -93,17 +107,45 @@ export function buildVenuePickupView(picked, opts = {}) {
  * ★「消す側」も同じ経路を通す(消す/空にする側に計器も diff-skip も無いのが
  *   ちらつき7版の真犯人だった、という既存の教訓に倣う)。
  *
- * @param {{ root: HTMLElement, body: HTMLElement, meta: HTMLElement }|null|undefined} els
- * @param {{ text: string, meta: string, empty: boolean }} view
+ * @param {{ root: HTMLElement, body: HTMLElement, meta: HTMLElement, face?: HTMLElement|any }|null|undefined} els
+ * @param {{ text: string, meta: string, empty: boolean, speaker?: any }} view
  * @returns {boolean} DOM を書き換えたら true
  */
 export function applyVenuePickupView(els, view) {
   if (!els || !els.root || !els.body) return false;
-  const key = `${view?.empty ? 'e' : 'f'}|${view?.text || ''}|${view?.meta || ''}`;
+  const sp = view?.speaker && typeof view.speaker === 'object' ? view.speaker : null;
+  const key = `${view?.empty ? 'e' : 'f'}|${view?.text || ''}|${view?.meta || ''}|${sp ? `${sp.avatar || ''}|${sp.href || ''}` : ''}`;
   if (els.root.dataset.nlPickupKey === key) return false;
   els.root.dataset.nlPickupKey = key;
   els.body.textContent = String(view?.text || '');
-  if (els.meta) els.meta.textContent = String(view?.meta || '');
+  if (els.meta) {
+    els.meta.textContent = String(view?.meta || '');
+    // 数値IDだけユーザーページへのリンク(匿名・ギフトは href なし=リンクにしない)。
+    if (sp && sp.href) {
+      els.meta.setAttribute('href', String(sp.href));
+      els.meta.setAttribute('target', '_blank');
+      els.meta.setAttribute('rel', 'noopener noreferrer');
+    } else {
+      els.meta.removeAttribute('href');
+      els.meta.removeAttribute('target');
+      els.meta.removeAttribute('rel');
+    }
+  }
+  if (els.face) {
+    // サムネ: 発言者がいれば出す。画像が壊れていたら代替顔(identicon)へ1回だけ差し替える(白丸・壊れ画像を出さない)。
+    if (sp && sp.avatar) {
+      els.face.removeAttribute('hidden');
+      els.face.onerror = () => {
+        els.face.onerror = null;
+        if (sp.fallbackAvatar && sp.fallbackAvatar !== sp.avatar) els.face.setAttribute('src', String(sp.fallbackAvatar));
+        else els.face.setAttribute('hidden', '');
+      };
+      els.face.setAttribute('src', String(sp.avatar));
+    } else {
+      els.face.setAttribute('hidden', '');
+      els.face.removeAttribute('src');
+    }
+  }
   if (view?.empty) els.root.setAttribute('data-empty', '1');
   else els.root.removeAttribute('data-empty');
   return true;

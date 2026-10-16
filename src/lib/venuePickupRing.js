@@ -21,7 +21,7 @@ export const PICKUP_RING_MAX = 40;
 export const PICKUP_RING_MAX_AGE_MS = 120_000;
 
 /**
- * @typedef {{ userId: string, name: string, text: string, capturedAt: number, kind: string }} PickupRow
+ * @typedef {{ userId: string, name: string, text: string, capturedAt: number, kind: string, speaker?: any }} PickupRow
  */
 
 /**
@@ -30,7 +30,8 @@ export const PICKUP_RING_MAX_AGE_MS = 120_000;
  * @param {ReadonlyArray<PickupRow & { key?: string }>|null|undefined} ring
  * @param {ReadonlyArray<{ key?: unknown, userId?: unknown, name?: unknown, text?: unknown }>|null|undefined} speeches 新着の発言(processSpeechRows の speeches)
  * @param {number} nowMs
- * @param {{ max?: number, maxAgeMs?: number }} [opts]
+ * @param {{ max?: number, maxAgeMs?: number, resolveSpeaker?: (speech: any) => any }} [opts]
+ *   resolveSpeaker: 発言者の情報セット(サムネ・ハンドル名・ID・リンク)を作る関数(venuePickupSpeaker.js)。行に speaker として持たせる。
  * @returns {Array<PickupRow & { key?: string }>}
  */
 export function appendPickupRows(ring, speeches, nowMs, opts = {}) {
@@ -45,7 +46,10 @@ export function appendPickupRows(ring, speeches, nowMs, opts = {}) {
     const key = String(s?.key ?? '').trim();
     if (key && seen.has(key)) continue;
     if (key) seen.add(key);
-    base.push({ key, userId: String(s?.userId ?? '').trim(), name: String(s?.name ?? '').trim(), text, capturedAt: Number.isFinite(now) && now > 0 ? now : 0, kind: 'comment' });
+    /** @type {any} */
+    let speaker = null;
+    try { speaker = typeof opts.resolveSpeaker === 'function' ? opts.resolveSpeaker(s) : null; } catch { speaker = null; }
+    base.push({ key, userId: String(s?.userId ?? '').trim(), name: String(s?.name ?? '').trim(), text, capturedAt: Number.isFinite(now) && now > 0 ? now : 0, kind: 'comment', speaker });
   }
   const fresh = Number.isFinite(now) && now > 0 ? base.filter((r) => now - toEpochMs(r.capturedAt) <= maxAge) : base;
   return fresh.length > max ? fresh.slice(fresh.length - max) : fresh;

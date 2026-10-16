@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "mode": "default",
-  "fingerprint": "3f753e28a37c26d2cb91595eab54165b9cd19d703101d0c009788b1596cb9591",
+  "fingerprint": "4b72f5f3dc0a37d1a86987c88de5ea8ad5d01e07e7ef202ba7647d4e3ec072ff",
   "inputs": [
     "app/app.js",
     "app/live-view.js",
@@ -737,6 +737,7 @@
     "src/lib/venueOpenLatency.js",
     "src/lib/venuePickupBanner.js",
     "src/lib/venuePickupRing.js",
+    "src/lib/venuePickupSpeaker.js",
     "src/lib/venuePresenceNote.js",
     "src/lib/venueResidents.js",
     "src/lib/venueRoster.js",
@@ -806,18 +807,18 @@
   "outputs": {
     "extension/dist/page-intercept.js": "5ccd2cd66f9caeb45060a68388f166cc0c55088e6fe47509075aecf66e6a7afa",
     "extension/dist/backfill-sw.js": "8ac07fda5d4e23bc4bee1167c0ff6beb1c93e37f9cd4a8f6319df30c280eb1d7",
-    "extension/dist/content.js": "e3ba15e06abda1b4556e50a35fc95e2da3428473c0f683e1991cbf820253a44b",
-    "extension/dist/popup.js": "987235201769524af5f7dd56b265997f18e366cca1162cb88f96ebb4e26d635a",
+    "extension/dist/content.js": "93fc7a20dd1b26234b714f102890b565f34b95e76216d00b505fe4c18a30b871",
+    "extension/dist/popup.js": "0411a1312a07f022f71d0759e2406719268f4f2d4591a84d9bc9890211eeb188",
     "extension/dist/offscreen.js": "ccb841a778ccf1f12d830a4bf8f3fe9ac5db3c7cc4dac536f6be33c6b95c0223",
-    "extension/dist/status.js": "525288e0893aa6ff6cd14d305ed22b28bdd118a45bbcc05aa5d35872fba4e6dc",
+    "extension/dist/status.js": "306a83973759fd7c8dc1aaea3b090c333f22f0102e4ad7b78cc929de838b1e93",
     "extension/dist/live-view.js": "c50e014feaad0a45e012e5ea561b71a10234665e79bae170fcf611b47e69700e",
     "extension/dist/marketing-export.js": "314ad193891a12bfbe0fbf40d01040de396fd241c50c4ccf279a91a42cc55cb3",
     "extension/dist/comeview.js": "6baa817d621acff3b04400ecf79f682a9fc2a9852b7c97795b5ffdd28abe8e30",
-    "extension/dist/venue.js": "ea0abf12322dde6e1866a9b83b839b4025ee04701a6a97999b2afab47d0a5aec",
+    "extension/dist/venue.js": "600103cfbb8620db51a5847f094a8d0ba7459a26b8b7ecfa2a1f723a79bd2708",
     "extension/dist/sidepanel.js": "08c71a049913562d3d6107bb8476a1adc8b9aa741f071fdaac7b05e8c5b1b2ca",
     "extension/dist/cloak-failsafe.js": "8baabc8a7ee4ab9f0e6fd66c6b917c4832bade10efa9917cf50bf40ca2588207",
     "app/dist/app.js": "9af7800bc0527fbcc239eba0a06d8c02324f0c4d3b7ff0c740bacd9a307a016e",
-    "app/dist/live-view.js": "6b8bc1d51703a06a9c7c9c8804a1a762ab4e3f17a6920d54e048a73196e24962",
+    "app/dist/live-view.js": "406b639799ff60240f260f5194e763c2f8c78e5bd7d45248d24952b092b247e5",
     "app/dist/live-ranking.js": "19ef34cc05ea0b755210b3de23593469cc3319585a5048c234fd83b8614a10b8"
   }
 }
