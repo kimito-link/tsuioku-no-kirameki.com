@@ -1,5 +1,7 @@
 # 小さな storage 読み出しの一括化(storage get batching)— 設計+実装ハンドオフ(2026-10-16)
 
+> ★★【却下済み(2026-10-16 実装→再測定)】実装(storageGetBatcher・popup 文書の get を差し替え)して OFF/ON を同じ配信で交互に測り直した結果、get 回数は確かに減った(OFF 303〜482 → ON 74〜111)が、主スレッドの仕事は減らなかった(task ms OFF 6391/7250/5853/5496/6398 vs ON 7591/5524/7038/7502/4865・BUSY OFF 70〜92% vs ON 62〜96%・中央値は ON のほうが悪い)。下の実験(各4回で −1.0 秒)はノイズ(ベースライン自体が 4.6〜7.3 秒でばらつく)だった。**起動の重さの主因は storage の get の本数ではない**。コードは破棄。再提案しない。以下は経緯として残す。
+
 > 設計=司令塔(実測つき・先行事例=DataLoader 方式) / 実装は【まだしていない】。実験は scripts/perf-ab/boot-profile.mjs の `--gets batch`(製品は変えない)。
 > 関連(却下済み・再提案しない): [boot-quiescence-DESIGN-and-HANDOFF-2026-10-16.md](boot-quiescence-DESIGN-and-HANDOFF-2026-10-16.md)(回数を畳む案は効かなかった)。
 
