@@ -240,3 +240,41 @@ describe('契約 end-to-end: roster→buildVenueSeating で VIP-glow が効く(p
     expect(gifterSeat.isVipRegular).toBe(true); // preGiftCount が collectVenueParticipants→VIPスコアまで生きている
   });
 });
+
+describe('名簿の本文と最終発言時刻(2026-10-16・発言の証拠 v4)', () => {
+  const T = 5_000_000;
+  it('★hydrate は候補が持つ本文(直近・新しい順)を読む(以前は空にしていた)', () => {
+    const roster = new Map();
+    hydrateRosterFromCandidates(roster, [{ userId: '111', nickname: 'a', commentCount: 2, _laneSortAt: T, recentTexts: ['最新', '前'] }]);
+    const e = roster.get('111');
+    expect(e.recentTexts).toEqual(['最新', '前']);
+    expect(e.lastText).toBe('最新');
+    expect(e.lastTextAt).toBe(T);
+    const rows = rosterToVenueRows(roster);
+    expect(rows[0].recentTexts).toEqual(['最新', '前']);
+    expect(rows[0].text).toBe('最新');
+  });
+  it('本文が無い候補(支援者のみ等)は本文も lastTextAt も空のまま', () => {
+    const roster = new Map();
+    hydrateRosterFromCandidates(roster, [{ userId: '222', nickname: 'b', commentCount: 0, _laneSortAt: T, recentTexts: [] }]);
+    const e = roster.get('222');
+    expect(e.lastText).toBe('');
+    expect(e.recentTexts).toEqual([]);
+    expect(e.lastTextAt).toBe(0);
+  });
+  it('★touchRoster は本文行で lastTextAt を更新し、ギフト行では更新しない', () => {
+    const roster = new Map();
+    touchRoster(roster, { userId: '333', name: 'c', text: 'hi' }, T);
+    expect(roster.get('333').lastTextAt).toBe(T);
+    touchRoster(roster, { userId: '333', name: 'c', text: 'gift' }, T + 50, { isGift: true });
+    expect(roster.get('333').lastTextAt).toBe(T);
+    touchRoster(roster, { userId: '333', name: 'c', text: 'again' }, T + 100);
+    expect(roster.get('333').lastTextAt).toBe(T + 100);
+  });
+  it('hydrate 済みの人にライブ発言が来たら本文が先頭に足される', () => {
+    const roster = new Map();
+    hydrateRosterFromCandidates(roster, [{ userId: '444', nickname: 'd', commentCount: 1, _laneSortAt: T, recentTexts: ['昔'] }]);
+    touchRoster(roster, { userId: '444', name: 'd', text: '今' }, T + 10);
+    expect(roster.get('444').recentTexts).toEqual(['今', '昔']);
+  });
+});

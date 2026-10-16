@@ -23,7 +23,7 @@
 
 import { speechEvidenceFromRoster } from './speechEvidence.js';
 import { hasRealThumbnail, VENUE_FULLSCREEN_MAX_SEATS } from './venueSeats.js';
-import { pushRecentText } from './recentTextRing.js';
+import { mergeRecentTexts, pushRecentText } from './recentTextRing.js';
 
 /** 常連/支援者(=保持窓を延長する軸)の発言数しきい値。これ以上 or ギフト有りで vip。 */
 export const VENUE_ROSTER_VIP_COMMENT_THRESHOLD = 5;
@@ -45,6 +45,7 @@ export const VENUE_ROSTER_MAX_SEATS = VENUE_FULLSCREEN_MAX_SEATS;
  *   lastSeen: number,
  *   commentCount: number,
  *   realComments?: number|null,
+ *   lastTextAt?: number,
  *   giftCount: number,
  *   vip: boolean
  * }} RosterEntry
@@ -100,6 +101,8 @@ export function touchRoster(roster, row, nowMs, opts = {}) {
       commentCount: 1,
       // 発言の証拠(2026-10-16): 実際に本文のある発言を受けた回数。commentCount は並び/VIP 用の下駄込み(hydrate は最低1)で、発言の根拠にしない。
       realComments: isGift ? 0 : 1,
+      // 本文のある発言を最後に受けた時刻(ギフト行では更新しない)。speechEvidenceFromRoster が最終発言時刻として使う。
+      lastTextAt: isGift ? 0 : now,
       giftCount: isGift ? 1 : 0,
       vip: false
     };
@@ -116,6 +119,7 @@ export function touchRoster(roster, row, nowMs, opts = {}) {
   //   ギフトだけの行では上書きしない=直前の発言を投擲で消さない。
   if (!isGift && text) {
     e.lastText = text;
+    e.lastTextAt = now;
     e.recentTexts = pushRecentText(e.recentTexts, text);
   }
   if (!e.name && incomingName) e.name = incomingName; // 非空を採用・下げない
@@ -232,8 +236,10 @@ export function hydrateRosterFromCandidates(roster, candidates, opts = {}) {
       avatar: String(c.avatarUrl ?? '').trim(),
       // 候補(storage シード)は本文を持たないので空。以後ライブで発言が届いたときに
       //   touchRoster が埋める=「開いた直後は空欄・喋ったら出る」という自然な挙動になる。
-      lastText: '',
-      recentTexts: /** @type {string[]} */ ([]),
+      // 2026-10-16(発言の証拠 v4): 候補が持つ本文(直近・新しい順)を読む。以前は『候補は本文を持たない』と決めつけて空にしていた(実際は userLaneCandidatesFromStorage が最大5件持つ)。
+      lastText: mergeRecentTexts(c.recentTexts, [], 1)[0] || '',
+      recentTexts: mergeRecentTexts(c.recentTexts, []),
+      lastTextAt: mergeRecentTexts(c.recentTexts, [], 1).length > 0 ? lastSeen : 0,
       firstSeen: lastSeen,
       lastSeen,
       commentCount: Math.max(1, Math.floor(Number(c.commentCount) || 0) || 1),
