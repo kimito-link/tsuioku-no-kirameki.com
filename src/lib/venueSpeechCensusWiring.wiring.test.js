@@ -92,10 +92,18 @@ describe('空だったカードの手がかり(detail)の配線', () => {
   });
 });
 
-describe('ピックアップ枠の入力(2026-10-16)', () => {
-  it('★名簿駆動のときは名簿の本文行から選ぶ(鏡由来の表示行は text が空)・名簿に本文が無ければ従来の表示行', () => {
-    const venueSrc = readFileSync(new URL('../extension/venueBar.js', import.meta.url), 'utf8').split('\r\n').join('\n');
-    expect(venueSrc).toContain('const speechRows = rosterDriven ? rosterSpeechRows(liveRoster) : [];');
-    expect(venueSrc).toContain('pickTickerHighlightEntry(speechRows.length ? speechRows : resolved.rows, Date.now())');
+describe('ピックアップ枠の入力(2026-10-17)', () => {
+  const venueSrc = readFileSync(new URL('../extension/venueBar.js', import.meta.url), 'utf8').split('\r\n').join('\n');
+  it('★発言が届いたら(processSpeechRows)リングに積んでその場で枠を更新する', () => {
+    expect(venueSrc).toContain('pickupRing = appendPickupRows(pickupRing, result.speeches, Date.now());');
+    const at = venueSrc.indexOf('pickupRing = appendPickupRows(pickupRing, result.speeches, Date.now());');
+    expect(venueSrc.slice(at, at + 200)).toContain('updatePickupBanner(null);');
+  });
+  it('★commitDisplay は枠を updatePickupBanner(表示行は空のときだけの従来入力)で更新し、枠を直接 pick しない', () => {
+    expect(venueSrc).toContain('updatePickupBanner(resolved.rows);');
+    expect(venueSrc).toContain('const rows = pickupRing.length ? pickupRing : (Array.isArray(fallbackRows) ? fallbackRows : []);');
+  });
+  it('★配信切替(resetSpeechTracking)でリングを捨てる', () => {
+    expect(venueSrc).toContain('pickupRing = []; // ピックアップ枠の入力も前配信から持ち越さない');
   });
 });

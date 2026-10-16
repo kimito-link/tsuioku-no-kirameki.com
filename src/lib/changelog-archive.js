@@ -24,6 +24,14 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.1615',
+    date: '2026-10-08',
+    summary: '忙しい配信で読み上げ文を短くする',
+    items: Object.freeze([
+      'コメントが速くて読み上げが追いつかないとき、速度を上げるのと同じ段で、読み上げる文字数も短く(最短30文字)するようにしました。長いコメントを長いまま合成して詰まる状態を減らします。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1614',
     date: '2026-10-08',
     summary: 'IDなしコメントを同じ人扱いしない',

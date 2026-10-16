@@ -214,27 +214,6 @@ export function rosterToVenueRows(roster) {
 }
 
 /**
- * ピックアップ枠(BSP風)用の「本文のある人」の行。在席名簿から直接作る(2026-10-16)。
- *   ★なぜ: 会場の表示行(baseRows)は【鏡由来(text:'' 固定)】と【名簿由来(本文あり)】の書き手が並立し、鏡が使えているあいだは
- *   本文を持たない行で枠を選ぶため、枠が「コメントが流れると、ここに…」の案内文のまま動かなかった(実機)。
- *   名簿は onLiveComments(ライブ新着)で touch されるので、本文と時刻が最も新鮮。
- * @param {Map<string, RosterEntry>} roster
- * @returns {Array<{ userId: string, name: string, text: string, capturedAt: number, kind: string }>}
- */
-export function rosterSpeechRows(roster) {
-  if (!(roster instanceof Map)) return [];
-  const out = [];
-  for (const e of roster.values()) {
-    const text = String(e?.lastText || '').trim();
-    if (!text) continue;
-    const at = Number(e.lastTextAt) > 0 ? Number(e.lastTextAt) : Number(e.lastSeen) || 0;
-    if (at <= 0) continue;
-    out.push({ userId: e.userId, name: String(e.name || ''), text, capturedAt: at, kind: 'comment' });
-  }
-  return out;
-}
-
-/**
  * 開いた瞬間の catch-up: storage 集計済み候補(UserLaneCandidate[])で在席を seed(in-place)。
  * lastSeen は _laneSortAt(実発言時刻)から。既に【ライブで存在する】エントリは上書きしない
  * (非clobber=ライブの新しい lastSeen を保持・二重加算しない)=冪等。
