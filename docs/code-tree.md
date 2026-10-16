@@ -202,7 +202,7 @@
     - `2026-10-06.md`
     - `2026-10-12.md`
     - `2026-10-14.md`
-- 📁 **docs/** (348)
+- 📁 **docs/** (349)
   - 📁 **article-assets/** (87)
     - 📁 **venue-frames/** (12)
       - `f01.png`
@@ -314,7 +314,7 @@
     - `storage-bus.md`
     - `venue.md`
     - `web-status.md`
-  - 📁 **handoff/** (165)
+  - 📁 **handoff/** (166)
     - 📁 **bench/** (2)
       - `bench-interval.mjs` — ⚠️ 役割コメント無し
       - `bench-lane.mjs` — ⚠️ 役割コメント無し
@@ -399,6 +399,7 @@
     - `VOICE-BASELINE-2026-08-11.md`
     - `asset-import-DESIGN.md`
     - `asset-import-IMPLEMENTATION-HANDOFF.md`
+    - `boot-quiescence-DESIGN-and-HANDOFF-2026-10-16.md`
     - `clip-history-persistence-synthesis.md`
     - `comment-pickup-ticker-DESIGN.md`
     - `comment-pickup-ticker-IMPLEMENTATION-HANDOFF.md`
