@@ -30,6 +30,9 @@ import { toEpochMs } from './timeAuthority.js'; // 時点の解釈は正本(time
 
 /** @typedef {{ comments: number|null, lastAt: number|null, texts: readonly string[] }} SpeechEvidence */
 
+/** false にすると会場ホバーカードは従来(段名の例外処理)の文言ロジックに戻る(撤回手順その1・2026-10-16 v2)。 */
+export const SPEECH_EVIDENCE_GATE_ENABLED = true;
+
 /** 不明(何も言えない)。 */
 export const SPEECH_UNKNOWN = Object.freeze(
   /** @type {SpeechEvidence} */ ({ comments: null, lastAt: null, texts: Object.freeze([]) })

@@ -553,3 +553,63 @@ describe('buildVenueHoverCardModel: lastAt相対時刻のstatLine反映(MVP-2)',
     expect(model.statLine).toBe('発言 12(3分前) ・ 🎁2 ・ 🥇1位');
   });
 });
+
+/**
+ * 2026-10-16(発言の証拠・v2): カードの発言の文言は speech(発言の証拠)だけから作る。段名で『発言』を抑える例外処理はやめた。
+ *   症状: 広告 4,200pt の人(コメント無し)が りんく段 に昇格して「発言1・たった今・いま喋っている・ここで1回」と出ていた(下駄の count と鏡の発行時刻)。
+ */
+import { speechEvidence as _se } from './speechEvidence.js';
+import { buildVenueHoverCardModel as _build } from './venueHoverCard.js';
+
+describe('発言の証拠(speech)によるカード(v2)', () => {
+  const NOW = 1_700_000_000_000;
+  const base = { uid: '19707371', displayName: 'キリン', hasGift: false, giftCount: 0, venueRank: 0, nowMs: NOW };
+
+  it('★証拠が無い人には、段が link でも「発言」「たった今」「いま喋っている」「ここで1回」「セリフ」を出さない(キリンの症状)', () => {
+    const m = _build({ ...base, tier: 'link', count: 1, lastAt: NOW - 1000, lastText: '', recentTexts: [], speech: _se({ comments: 0, lastAt: null, texts: [] }) });
+    expect(m.statLine).toContain('会場に居る');
+    expect(m.statLine).not.toContain('発言');
+    expect(m.statLine).not.toContain('たった今');
+    expect(m.presenceNote).not.toContain('喋っている');
+    expect(m.presenceNote).not.toContain('1回');
+    expect(m.recentTexts).toEqual([]);
+    expect(m.lastText).toBe('');
+  });
+  it('証拠が不明(null)でも同じ(鏡の旧セル・支援者のみ)', () => {
+    const m = _build({ ...base, tier: 'link', count: 1, lastAt: NOW - 1000, speech: _se({}) });
+    expect(m.statLine).toContain('会場に居る');
+    expect(m.statLine).not.toContain('発言');
+  });
+  it('証拠が無い広告段・ギフト段の人は「広告」「ギフト」(時刻は言わない)', () => {
+    expect(_build({ ...base, tier: 'ad', count: 1, lastAt: NOW - 1000, speech: _se({}) }).statLine).toBe('広告');
+    expect(_build({ ...base, tier: 'gift', count: 1, lastAt: NOW - 1000, speech: _se({}) }).statLine).toBe('ギフト');
+  });
+  it('★証拠がある人は「発言 N(時刻)」と本文を出す', () => {
+    const m = _build({ ...base, tier: 'konta', count: 99, lastAt: 1, speech: _se({ comments: 3, lastAt: NOW - 30_000, texts: ['こんばんは', 'やあ'] }) });
+    expect(m.statLine).toContain('発言 3(たった今)');
+    expect(m.recentTexts).toEqual(['こんばんは', 'やあ']);
+    expect(m.lastText).toBe('こんばんは');
+    expect(m.presenceNote).toContain('喋っている');
+  });
+  it('★広告段・ギフト段でも、発言の証拠があれば発言と本文を出す(段名で隠さない・ユーザー確認済み)', () => {
+    const ad = _build({ ...base, tier: 'ad', count: 1, lastAt: NOW - 30_000, speech: _se({ comments: 2, lastAt: NOW - 30_000, texts: ['広告のあとに一言'] }) });
+    expect(ad.statLine).toContain('発言 2');
+    expect(ad.recentTexts).toEqual(['広告のあとに一言']);
+    const gift = _build({ ...base, tier: 'gift', count: 1, lastAt: NOW - 30_000, speech: _se({ comments: 1, lastAt: NOW - 30_000, texts: ['ありがとう'] }) });
+    expect(gift.statLine).toContain('発言 1');
+    expect(gift.recentTexts).toEqual(['ありがとう']);
+  });
+  it('証拠ありで件数が不明(本文だけ)は「発言あり」(件数を捏造しない)', () => {
+    const m = _build({ ...base, tier: 'link', speech: _se({ texts: ['本文だけ'] }) });
+    expect(m.statLine).toContain('発言あり');
+    expect(m.statLine).not.toMatch(/発言 \d/);
+  });
+  it('★鏡の発行時刻を lastAt に渡しても、証拠の lastAt が無ければ時刻を出さない', () => {
+    const m = _build({ ...base, tier: 'link', count: 5, lastAt: NOW - 1000, speech: _se({ comments: 5, lastAt: null, texts: ['a'] }) });
+    expect(m.statLine).toBe('発言 5');
+  });
+  it('★speech が無い入力(旧呼び出し)は従来のロジックのまま=広告段は「広告(時刻)」・投擲段は本文を出さない', () => {
+    expect(_build({ ...base, tier: 'ad', count: 1, lastAt: NOW - 1000 }).statLine).toBe('広告(たった今)');
+    expect(_build({ ...base, tier: 'ad', count: 1, lastAt: NOW - 1000, lastText: 'x', recentTexts: ['x'] }).recentTexts).toEqual([]);
+  });
+});

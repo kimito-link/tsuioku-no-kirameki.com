@@ -2214,5 +2214,19 @@ export const IMPROVEMENT_HISTORY = Object.freeze([
     version: '0.1.1631', metric: 'cross-checked-claims', value: 24,
     source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
     note: '★直近30日窓のスライドによる自然増減(v0.1.1562・1630 の note と同じ理由)。今回も変異テスト(鏡の speech 落とし・件数の下駄 Math.max(1)混入)で赤を確認して復元している。'
+  }),
+  Object.freeze({
+    version: '0.1.1632', metric: 'bundle-kb', value: 1431,
+    source: '[auto] extension/dist/popup.js のファイルサイズ',
+    note: '★今回の追加はカードの文言を発言の証拠から作る分岐(venueHoverCard.js 数十行)だけ。過去最良との差の大半は 1618 以降の /live/ 取り込みなどで、増分は小さい。'
+  }),
+  Object.freeze({
+    version: '0.1.1632', metric: 'gate-selftest', value: 4,
+    source: '[auto] npm run audit:gates（--selftest を持つ検査の本数）'
+  }),
+  Object.freeze({
+    version: '0.1.1632', metric: 'cross-checked-claims', value: 24,
+    source: '[auto] 直近30日のコミット本文で「別の手段でも確かめた」と書かれた回数',
+    note: '★直近30日窓のスライドによる自然増減(v0.1.1562・1630・1631 の note と同じ理由)。今回も変異テスト(ゲートを false にする→10件赤)で確認して復元している。'
   })
 ]);
