@@ -893,7 +893,7 @@
   - `src/extension/live-ranking-entry.js`
   - `tsuioku-no-kirameki/live/index.html`
   - `.github/workflows/live-ranking.yml`
-<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 221</summary>
+<details><summary>🗂 このカテゴリの全担当ファイル(自動分類) 222</summary>
 
 - `app/app.js` — スマホ閲覧用 status Web 版。
 - `app/live-view.js` — global NL_BUILD_ID
@@ -1078,6 +1078,7 @@
 - `src/lib/singleFlightByKey.js` — key 単位の single-flight 実行器(純関数コア)。
 - `src/lib/standalonePopupClose.js` — v0.1.433: 別ウィンドウ POP（standalone popup window）を「配信に飛ばしたら閉じる」判定（純ロジック）。
 - `src/lib/storageErrorState.js` — ストレージ書き込みエラーをポップアップ向けにシリアライズする純関数
+- `src/lib/storageKeyMemo.js` — 【層】L0 判定層(純粋関数・I/O禁止。時計は引数で受け取る)
 - `src/lib/storageRefreshTriggerKey.js` — 【層】L0 判定層(純粋関数・I/O禁止)
 - `src/lib/storageTriggerPolicy.js` — 【層】L0 判定層(純粋関数・I/O禁止)
 - `src/lib/storageWriteLedger.js` — 2026-07-07 (robust-arch Phase 0 / 計器のみ・挙動不変):
@@ -1132,11 +1133,10 @@
 - `v0.1.1628` 2026-10-15 — 匿名の顔を見える所から作って起動を軽く
 - `v0.1.1614` 2026-10-08 — IDなしコメントを同じ人扱いしない
 
-### 🏟 会場・席 (4版)
+### 🏟 会場・席 (3版)
 - `v0.1.1613` 2026-10-08 — 会場のタイルの大きさを①と同じにした
 - `v0.1.1612` 2026-10-08 — 会場の人数が途中で減らないようにした
 - `v0.1.1611` 2026-10-08 — 会場の人数の増減を状態速報に出す
-- `v0.1.1610` 2026-10-08 — サムネが出ない人の顔をPOPと会場で揃える
 
 ### 🎁 ギフト (5版)
 - `v0.1.1623` 2026-10-14 — りんく段にコメントしていない応援者も出す
@@ -1148,7 +1148,8 @@
 ### 🔊 読み上げ (1版)
 - `v0.1.1615` 2026-10-08 — 忙しい配信で読み上げ文を短くする
 
-### 🪟 応援レーン・タイル (4版)
+### 🪟 応援レーン・タイル (5版)
+- `v0.1.1630` 2026-10-16 — パネルの保存データの読み直しを半分以下に
 - `v0.1.1622` 2026-10-14 — 開いた直後から応援レーンが件数順に並ぶ
 - `v0.1.1620` 2026-10-14 — 応援レーンを件数の多い順に(動くのは1分に1回)
 - `v0.1.1618` 2026-10-08 — 拡張が/live/と同じ数え方で差を測る

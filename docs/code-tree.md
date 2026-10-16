@@ -27,7 +27,7 @@
 
 > 値が次の段へ届かない「断線」(broadcaster バグ型)は `npm run feature-map -- --check` が機械検知。
 
-## ⚠️ 役割コメントが無いソース 8 / 921 件
+## ⚠️ 役割コメントが無いソース 8 / 922 件
 - `docs/handoff/bench/bench-interval.mjs`
 - `docs/handoff/bench/bench-lane.mjs`
 - `scripts/build.mjs`
@@ -835,7 +835,7 @@
   - `gift-coin-hq.wav`
   - `gift-register-hq.wav`
   - `gift-register.mp3`
-- 📁 **src/** (1967)
+- 📁 **src/** (1970)
   - 📁 **data/** (7)
     - 📁 **acquirers/** (2)
       - `laneFromStorage.js` — 応援レーン acquirer: chrome.storage.local(nls_comments) → laneStore の橋渡し。
@@ -1117,7 +1117,7 @@
         - `logo_funlink_white_RGB_link_black.png`
         - `logo_funlink_white_RGB_maru_black.png`
     - `hero-connect-hub.svg`
-  - 📁 **lib/** (1729)
+  - 📁 **lib/** (1732)
     - 📁 **fixtures/** (2)
       - `interceptLearn.sample.json`
       - `nicoliveVisitorJoinSignal.placeholder.json`
@@ -1240,6 +1240,7 @@
     - `blobDownload.js` — Blob を指定ファイル名で保存する。
     - `blobDownload.test.js`
     - `blockerSectionNamed.test.js`
+    - `bootReadBudgetWiring.wiring.test.js`
     - `broadcastContext.js` — v0.1.793: 「この配信の配信者(broadcaster)情報」を 1 か所で型定義し、storage キー・
     - `broadcastContext.test.js`
     - `broadcastCrossCompare.js` — 0.1.24 (Y): 横断比較系の純粋関数群。
@@ -2482,6 +2483,8 @@
     - `storageErrorState.test.js`
     - `storageFullReadCensus.test.js`
     - `storageKeyLiteralSingleSource.test.js`
+    - `storageKeyMemo.js` — 【層】L0 判定層(純粋関数・I/O禁止。時計は引数で受け取る)
+    - `storageKeyMemo.test.js`
     - `storageKeys.js` — chrome.storage.local キー（プレフィックスで衝突回避）
     - `storageKeys.test.js`
     - `storageOpTimeout.js` — v0.1.502: 単発の非同期処理（主に chrome.storage.local の get/set/remove）を
