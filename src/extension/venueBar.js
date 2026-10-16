@@ -323,6 +323,7 @@ import { startCharaLive } from '../lib/charaLiveController.js';
 import { venueHoverCardPresenceVerdict } from '../lib/venueHoverCardProbe.js';
 // ★会場ホバーに出す数字の出所はここが正本（3経路すべてがこの判定を通る）。
 import { resolveVenueHoverFacts } from '../lib/venueHoverFacts.js';
+import { hasSpeech, speechWithFallbackTexts } from '../lib/speechEvidence.js';
 // キャラライブの「本当に見えているか」実測計器(2026-08-25)。推測で3回外した反省で追加。
 import { collectCharaLiveCensus, charaLiveVerdict } from '../lib/charaLiveCensus.js';
 import { parseGiftCommentText, parseNicoadCommentText } from '../lib/parseGiftComment.js';
@@ -2814,7 +2815,7 @@ export function mountVenueBarButton(options = {}) {
    * @param {HTMLElement} el
    * ★count/giftCount は number|null。null は「在席名簿に居らず、数が分からない」。
    *   ここで 0 と言うと画面に「発言 0」という嘘が出る（2026-08-29 に実機で確認した症状）。
-   * @returns {{ uid: string, displayName: string, count: number|null, hasGift: boolean, giftCount: number|null, venueRank: number, lastAt: number, tier?: string, lastText?: string, recentTexts?: string[], factsSource?: string }|null}
+   * @returns {{ uid: string, displayName: string, count: number|null, hasGift: boolean, giftCount: number|null, venueRank: number, lastAt: number, tier?: string, lastText?: string, recentTexts?: string[], factsSource?: string, speech?: import('../lib/speechEvidence.js').SpeechEvidence }|null}
    */
   const resolveSeatlessHoverData = (el) => {
     try {
@@ -2847,7 +2848,7 @@ export function mountVenueBarButton(options = {}) {
        *   数字の出所の決定そのものは venueHoverFacts.js が正本。ここは引いて渡すだけ。
        */
       const rosterEntry = u ? liveRoster.get(u) || null : null;
-      const facts = resolveVenueHoverFacts({ registered: null, rosterEntry });
+      const facts = resolveVenueHoverFacts({ registered: null, rosterEntry, mirrorCell: it });
       return {
         uid: u,
         displayName: String(it?.title || '').trim(),
@@ -2861,7 +2862,9 @@ export function mountVenueBarButton(options = {}) {
         // 2026-10-12: 在席名簿に発言が無い人(会場を開く前に発言した人)は、鏡のセルが持つ発言を使う(カードの「セリフ」)。
         recentTexts: facts.recentTexts && facts.recentTexts.length ? facts.recentTexts : (Array.isArray(it?.recentTexts) ? it.recentTexts : []),
         // ★どこから採った値かを残す（後から「どちらを見たか」を言えるようにする）。
-        factsSource: facts.source
+        factsSource: facts.source,
+        // 発言の証拠(2026-10-16・v1は表示に使わず census の計測だけ)。名簿の本文が空なら鏡セルの本文だけ借りる(件数/時刻は借りない)。
+        speech: speechWithFallbackTexts(facts.speech, it?.recentTexts)
       };
     } catch {
       return null;
@@ -2910,18 +2913,18 @@ export function mountVenueBarButton(options = {}) {
     //   diagModeは既存の🩺状態パネルの開閉状態に連動(新規UI・新規storageを追加しない)。
     //   開いた瞬間の状態を都度読む(固定しない・地雷3)。nowMsは純関数を汚さないための注入。
     const model = buildVenueHoverCardModel({ ...data, thumb, nowMs: Date.now(), diagMode: !diagPanel.hidden });
-    // 診断(観測のみ): カードに発言の行(セリフ)が出たか。発言の形跡があるのに空なら🔴の材料になる。投擲段(広告/ギフト)は対象外。
+    // 診断(観測のみ): カードに発言の行(セリフ)が出たか。発言の【証拠】があるのに空なら🔴の材料。
+    //   2026-10-16: spoke は count(下駄込み)でなく発言の証拠で判定(正本=speechEvidence.js)。saidSpeech=カードが「発言」と言ったか。
+    //   「発言と言ったのに証拠が無い」=嘘(lied)。段(広告/ギフト)では除外しない=嘘の計測漏れを作らない。
     try {
-      const isThrow = data.tier === 'gift' || data.tier === 'ad';
-      if (!isThrow) {
-        observeVenueSpeechHover(_speechCensus, {
-          name: model.displayName || data.displayName,
-          lines: model.recentTexts && model.recentTexts.length ? model.recentTexts : (model.lastText ? [model.lastText] : []),
-          spoke: Number(data.count) > 0,
-          // 空だったときだけ評価する原因切り分け用の手がかり(2026-10-13): 発言回数・最後の発言から何秒・データの出所・本文の有無・uidの種類。
-          detail: () => `発言${Number(data.count) || 0}・${data.lastAt ? Math.max(0, Math.round((Date.now() - Number(data.lastAt)) / 1000)) : '?'}秒前・出所${String(data.factsSource || '?')}・本文${data.lastText ? 1 : 0}・uid${/^\d+$/.test(String(data.uid || '')) ? '数値' : (data.uid ? '匿名系' : '無')}`
-        });
-      }
+      observeVenueSpeechHover(_speechCensus, {
+        name: model.displayName || data.displayName,
+        lines: model.recentTexts && model.recentTexts.length ? model.recentTexts : (model.lastText ? [model.lastText] : []),
+        spoke: hasSpeech(data.speech),
+        saidSpeech: /発言/.test(String(model.statLine || '')),
+        // 空/嘘だったときだけ評価する原因切り分け用の手がかり: 発言回数・最後の発言から何秒・データの出所・本文の有無・uidの種類・段・名簿の本文。
+        detail: () => `発言${Number(data.count) || 0}・${data.lastAt ? Math.max(0, Math.round((Date.now() - Number(data.lastAt)) / 1000)) : '?'}秒前・出所${String(data.factsSource || '?')}・本文${data.lastText ? 1 : 0}・uid${/^\d+$/.test(String(data.uid || '')) ? '数値' : (data.uid ? '匿名系' : '無')}・段${String(data.tier || '?')}`
+      });
     } catch { /* 計器失敗はカードを止めない */ }
     renderVenueHoverCard(hoverCardEl, model);
     hoverCardEl.classList.add('nlsb-hover-card--open');
@@ -3394,7 +3397,7 @@ export function mountVenueBarButton(options = {}) {
   // 2026-07-30(wayfinder→to-spec方式・venue-avatar-hover-preview-SPEC.md §4.3): ホバープレビュー
   //   カード用のデータ。paint時(席装飾ループ/renderTopBar)にWeakMapへ相乗り登録するだけで、
   //   DOM書き込み・新規タイマー・新規計算は無い(RANKバッジちらつき教訓=diff-skip不要な設計)。
-  /** @type {WeakMap<HTMLElement, { uid: string, displayName: string, count: number, hasGift: boolean, giftCount: number, venueRank: number, lastAt: number, tier?: string, lastText?: string, recentTexts?: string[], factsSource?: string }>} */
+  /** @type {WeakMap<HTMLElement, { uid: string, displayName: string, count: number, hasGift: boolean, giftCount: number, venueRank: number, lastAt: number, tier?: string, lastText?: string, recentTexts?: string[], factsSource?: string, speech?: import('../lib/speechEvidence.js').SpeechEvidence }>} */
   const _hoverCardDataByEl = new WeakMap();
   // v0.1.1207: 会場の「開いてから見えるまで」を分解して観測する(ユーザー報告
   //   「立ち上がりが遅い/出ないときがある」を体感でなく数字で切り分けるため)。
@@ -5055,7 +5058,7 @@ export function mountVenueBarButton(options = {}) {
   //   sig(上位の userId+順位)が無変化なら DOM を触らない=毎フレーム作り直さない(hot path 保護)。
   //   一度でも非空を描いたら、一瞬の空(データ遅延)では畳まない=高さ振動を作らない(v0.1.1026)。
   //   状態フラグは clearDisplay(先に定義)からも触るため、宣言は関数より前(下の hasRenderedNonEmpty 付近)。
-  /** @param {Array<{ rank:number, participant:{ key?:string, userId?:string, name?:string, count?:number, hasGift?:boolean, giftCount?:number, lastAt?:number, lastText?:string, recentTexts?:string[] } }>} topSupporters */
+  /** @param {Array<{ rank:number, participant:{ key?:string, userId?:string, name?:string, count?:number, hasGift?:boolean, giftCount?:number, lastAt?:number, lastText?:string, recentTexts?:string[], speech?:import('../lib/speechEvidence.js').SpeechEvidence } }>} topSupporters */
   const renderTopBar = (topSupporters) => {
     const list = Array.isArray(topSupporters) ? topSupporters : [];
     // 空入力でも、一度出したバーは畳まない(前回の顔を残す=明滅/高さ振動を防ぐ)。
@@ -5089,7 +5092,9 @@ export function mountVenueBarButton(options = {}) {
         lastAt: Number(p.lastAt) || 0,
         // 2026-07-31(ユーザー要望): 直前の発言内容(既存データ・新規取得ゼロ)。
         lastText: String(p.lastText || ''),
-        recentTexts: Array.isArray(p.recentTexts) ? p.recentTexts : []
+        recentTexts: Array.isArray(p.recentTexts) ? p.recentTexts : [],
+        // 発言の証拠(2026-10-16・v1は表示に使わず census の計測だけ)。応援者トップのセルも同じ participant 由来。
+        speech: p.speech
       });
       frag.appendChild(cell);
     }
@@ -5539,7 +5544,9 @@ export function mountVenueBarButton(options = {}) {
         //   在席名簿に発言が無い人は、鏡のセルが持つ発言を使う(2026-10-12・会場を開く前に発言した人のカードが空だった)。
         recentTexts: Array.isArray(participant.recentTexts) && participant.recentTexts.length
           ? participant.recentTexts
-          : (Array.isArray(item?.recentTexts) ? item.recentTexts : [])
+          : (Array.isArray(item?.recentTexts) ? item.recentTexts : []),
+        // 発言の証拠(2026-10-16・v1は表示に使わず census の計測だけ)。
+        speech: speechWithFallbackTexts(participant.speech, item?.recentTexts)
       });
       const speakerKey = uid ? `u:${uid}` : rawName ? `n:${rawName}` : '';
       const streakEntry = speakerKey ? speechStreaks.get(speakerKey) : null;

@@ -35,7 +35,7 @@
  *   yukkuriNamedCensus: { line: string, checked: number, yukkuriNamed: number, outOfRangeDigits: number,
  *     lastSample: null | { uid: string, name: string, digits: number } }|null,
  *   speechCensus: { line: string, verdict: 'ok'|'warn'|'idle', checked: number, shown: number, mirrorOnly: number,
- *     missing: number, silent: number, hoverOpened: number, hoverWithLines: number, hoverEmptyButSpoke: number }|null,
+ *     missing: number, silent: number, hoverOpened: number, hoverWithLines: number, hoverEmptyButSpoke: number, hoverLied: number }|null,
  *   tileCountCensus: { line: string, verdict: 'ok'|'warn'|'idle', paints: number, changes: number, last: number, max: number,
  *     drops: number, shrinkRefused: number, worstDrop: number, worstFrom: number, worstTo: number, worstCause: string }|null,
  *   mirrorIntakeLine: string,
@@ -275,7 +275,8 @@ export function buildVenueSeatsDiagSnapshot(diag, nowMs) {
         silent: Math.max(0, Math.floor(num(scIn.silent, 0))),
         hoverOpened: Math.max(0, Math.floor(num(scIn.hoverOpened, 0))),
         hoverWithLines: Math.max(0, Math.floor(num(scIn.hoverWithLines, 0))),
-        hoverEmptyButSpoke: Math.max(0, Math.floor(num(scIn.hoverEmptyButSpoke, 0)))
+        hoverEmptyButSpoke: Math.max(0, Math.floor(num(scIn.hoverEmptyButSpoke, 0))),
+        hoverLied: Math.max(0, Math.floor(num(scIn.hoverLied, 0)))
       }
     : null;
   // 2026-10-13(ユーザー報告「途中で減るのはだめ」): 会場の人数の増減。検証済みのフィールドだけ通す。

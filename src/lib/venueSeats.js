@@ -17,6 +17,7 @@
 //   + docs/person-tile-architecture.md(人物タイル経路の正本マインドマップ・用語/データフロー/方針変遷)。
 //   SHOWROOM 風の会場感を、ごちゃごちゃさせず整理して出す。
 //
+import { SPEECH_UNKNOWN, mergeSpeechEvidence, speechEvidenceFromCandidate, speechEvidenceFromRow } from './speechEvidence.js';
 import { deriveAvatarUrlFromUid } from './deriveAvatarUrlFromUid.js';
 
 // このファイルは席割りの核ロジックだけ(DOM/storage/chrome.* 非依存・テスト可能・Web/OBS版で共用):
@@ -120,16 +121,16 @@ export function venueParticipantKey(row, isGenericName, _promoteUserIds) {
  * 正規化済み発言行の配列(昇順=古い→新しい)から、会場参加者を集計する純関数。
  * 同一参加者はまとめ、最終発言・最新本文・発言数・ギフト有無を持つ。
  *
- * @param {Array<{ userId?: string, name?: string, text?: string, avatar?: string, capturedAt?: number|null, isGift?: boolean, preCount?: number, preHasGift?: boolean, preGiftCount?: number, recentTexts?: string[] }>} rows
+ * @param {Array<{ userId?: string, name?: string, text?: string, avatar?: string, capturedAt?: number|null, isGift?: boolean, preCount?: number, preHasGift?: boolean, preGiftCount?: number, recentTexts?: string[], speech?: import('./speechEvidence.js').SpeechEvidence }>} rows
  * @param {{ isGenericName?: (name: string) => boolean, promoteUserIds?: Set<string>|null }} [opts]
- * @returns {Array<{ key: string, name: string, userId: string, avatar: string, lastText: string, lastAt: number, count: number, hasGift: boolean, giftCount: number, firstAt: number, recentTexts: string[] }>}
+ * @returns {Array<{ key: string, name: string, userId: string, avatar: string, lastText: string, lastAt: number, count: number, hasGift: boolean, giftCount: number, firstAt: number, recentTexts: string[], speech: import('./speechEvidence.js').SpeechEvidence }>}
  *   参加者配列(初出順=安定。席割りはこの順を尊重しつつ優先度で並べ替える)
  */
 export function collectVenueParticipants(rows, opts = {}) {
   const list = Array.isArray(rows) ? rows : [];
   const isGenericName = opts.isGenericName;
   const promoteUserIds = opts.promoteUserIds instanceof Set ? opts.promoteUserIds : null;
-  /** @type {Map<string, { key: string, name: string, userId: string, avatar: string, lastText: string, lastAt: number, count: number, hasGift: boolean, giftCount: number, firstAt: number, order: number, recentTexts: string[] }>} */
+  /** @type {Map<string, { key: string, name: string, userId: string, avatar: string, lastText: string, lastAt: number, count: number, hasGift: boolean, giftCount: number, firstAt: number, order: number, recentTexts: string[], speech: import('./speechEvidence.js').SpeechEvidence }>} */
   const byKey = new Map();
   let order = 0;
   for (const r of list) {
@@ -146,6 +147,7 @@ export function collectVenueParticipants(rows, opts = {}) {
     if (existing) {
       existing.count += preCount;
       existing.giftCount += preGiftCount;
+      existing.speech = mergeSpeechEvidence(existing.speech, r?.speech || speechEvidenceFromRow(r)); // 発言の証拠(2026-10-16)
       if (at >= existing.lastAt) {
         existing.lastAt = at;
         if (text) existing.lastText = text;
@@ -174,6 +176,7 @@ export function collectVenueParticipants(rows, opts = {}) {
         count: preCount,
         hasGift: preHasGift,
         giftCount: preGiftCount,
+        speech: r?.speech || speechEvidenceFromRow(r) || SPEECH_UNKNOWN, // 発言の証拠(2026-10-16・表示用。count は並び/VIP 用)
         order: order++
       });
     }
@@ -892,7 +895,9 @@ export function venueRowsFromUserLaneCandidates(candidates) {
       // 集約済みの実数(VIP常連光らせのスコア用)。collectVenueParticipants が拾う。
       preCount,
       preHasGift: giftCount > 0,
-      preGiftCount: giftCount
+      preGiftCount: giftCount,
+      // 2026-10-16(発言の証拠): 表示用の『発言したか』は preCount(下駄込み)でなくこちらを見る(正本=speechEvidence.js)。
+      speech: speechEvidenceFromCandidate(c)
     });
   }
   return out;
