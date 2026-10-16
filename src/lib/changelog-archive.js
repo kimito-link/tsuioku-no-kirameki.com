@@ -24,6 +24,14 @@
 /** @type {ChangelogEntry[]} */
 const ARCHIVE_ENTRIES = [
   Object.freeze({
+    version: '0.1.1614',
+    date: '2026-10-08',
+    summary: 'IDなしコメントを同じ人扱いしない',
+    items: Object.freeze([
+      '応援コメントのアイコングリッドで、ID が取れていない匿名コメントが「同じ人の×2〜×75」のように並んで見えていたのを直しました。ID が分からないコメントは、1件ずつ別の人として数えます。'
+    ])
+  }),
+  Object.freeze({
     version: '0.1.1613',
     date: '2026-10-08',
     summary: '会場のタイルの大きさを①と同じにした',

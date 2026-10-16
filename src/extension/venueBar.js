@@ -39,6 +39,7 @@ import {
   touchRoster,
   pruneRoster,
   rosterToVenueRows,
+  rosterSpeechRows,
   hydrateRosterFromCandidates,
   VENUE_ROSTER_WINDOW_MS,
   VENUE_ROSTER_VIP_WINDOW_MS,
@@ -4965,7 +4966,9 @@ export function mountVenueBarButton(options = {}) {
     //   7秒バケットが同じなら同じ1件になる(画面ごとに違うものが出ない)。
     //   diff-skip 済み=同じ内容なら DOM を書き換えない。
     try {
-      const picked = pickTickerHighlightEntry(resolved.rows, Date.now());
+      // 2026-10-16: 名簿駆動のときは、本文を持つ名簿から選ぶ(鏡由来の表示行は text:'' なので枠が案内文のまま動かなかった)。名簿に本文が無ければ従来どおり表示行から。
+      const speechRows = rosterDriven ? rosterSpeechRows(liveRoster) : [];
+      const picked = pickTickerHighlightEntry(speechRows.length ? speechRows : resolved.rows, Date.now());
       applyVenuePickupView(pickupEls, buildVenuePickupView(picked));
     } catch { /* 枠の更新失敗は席の描画を止めない */ }
   };
