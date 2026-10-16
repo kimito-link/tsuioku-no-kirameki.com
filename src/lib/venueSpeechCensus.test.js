@@ -122,3 +122,30 @@ describe('detail は空のときだけ評価する(ふだんは何も作らな�
     expect(st.hover.emptyButSpoke).toBe(1);
   });
 });
+
+describe('発言の嘘(lied・2026-10-16)', () => {
+  it('★「発言」と言ったのに発言の証拠が無いカードを嘘として数え、標本を残す', () => {
+    const s = createVenueSpeechCensusState();
+    observeVenueSpeechHover(s, { name: 'キリン', lines: [], spoke: false, saidSpeech: true, detail: () => '発言1・段link' });
+    expect(s.hover.lied).toBe(1);
+    expect(s.hoverLiedSamples[0]).toContain('キリン');
+    expect(s.hoverLiedSamples[0]).toContain('段link');
+    const d = toVenueSpeechCensusDiag(s);
+    expect(d.hoverLied).toBe(1);
+    expect(d.verdict).toBe('warn');
+    expect(d.line).toContain('発言の嘘1');
+  });
+  it('発言の証拠がある・「発言」と言っていないカードは嘘ではない', () => {
+    const s = createVenueSpeechCensusState();
+    observeVenueSpeechHover(s, { name: 'a', lines: ['x'], spoke: true, saidSpeech: true });
+    observeVenueSpeechHover(s, { name: 'b', lines: [], spoke: false, saidSpeech: false });
+    expect(s.hover.lied).toBe(0);
+    expect(toVenueSpeechCensusDiag(s).line).toContain('発言の嘘0');
+  });
+  it('標本は最大3件', () => {
+    const s = createVenueSpeechCensusState();
+    for (let i = 0; i < 6; i += 1) observeVenueSpeechHover(s, { name: `n${i}`, lines: [], spoke: false, saidSpeech: true });
+    expect(s.hover.lied).toBe(6);
+    expect(s.hoverLiedSamples).toHaveLength(3);
+  });
+});

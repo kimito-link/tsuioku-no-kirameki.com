@@ -63,6 +63,8 @@
  */
 
 /** 会場ホバーの事実の出所。★どちらを見たか後から言えるようにする。 */
+import { SPEECH_UNKNOWN, speechEvidenceFromMirrorCell, speechEvidenceFromRoster } from './speechEvidence.js';
+
 export const VENUE_HOVER_SOURCE_REGISTERED = 'registered';
 export const VENUE_HOVER_SOURCE_ROSTER = 'roster';
 export const VENUE_HOVER_SOURCE_NONE = 'none';
@@ -112,13 +114,16 @@ function toTexts(v) {
  *
  * @param {{
  *   registered?: { count?: number, giftCount?: number, venueRank?: number,
- *                  lastAt?: number, lastText?: string, recentTexts?: string[] } | null,
+ *                  lastAt?: number, lastText?: string, recentTexts?: string[],
+ *                  speech?: import('./speechEvidence.js').SpeechEvidence } | null,
  *   rosterEntry?: { commentCount?: number, giftCount?: number, venueRank?: number,
  *                   lastSeen?: number, lastAt?: number, lastText?: string,
  *                   recentTexts?: string[] } | null
+ *   ,
+ *   mirrorCell?: { stats?: { c?: number }, recentTexts?: string[] } | null
  * } | null | undefined} input
  * @returns {{ count: number|null, giftCount: number|null, venueRank: number,
- *             lastAt: number, lastText: string, recentTexts: string[], source: string }}
+ *             lastAt: number, lastText: string, recentTexts: string[], speech: import('./speechEvidence.js').SpeechEvidence, source: string }}
  */
 export function resolveVenueHoverFacts(input) {
   const i = input && typeof input === 'object' ? input : {};
@@ -140,6 +145,8 @@ export function resolveVenueHoverFacts(input) {
       lastAt: toStamp(registered.lastAt),
       lastText: typeof registered.lastText === 'string' ? registered.lastText : '',
       recentTexts: toTexts(registered.recentTexts),
+      // 発言の証拠(2026-10-16): 席の participant が持つ speech をそのまま。無い旧呼び出しは不明(count は並び/VIP 用で発言の根拠にしない)。
+      speech: registered.speech || SPEECH_UNKNOWN,
       source: VENUE_HOVER_SOURCE_REGISTERED
     };
   }
@@ -155,6 +162,7 @@ export function resolveVenueHoverFacts(input) {
       lastAt: toStamp(roster.lastSeen) || toStamp(roster.lastAt),
       lastText: typeof roster.lastText === 'string' ? roster.lastText : '',
       recentTexts: toTexts(roster.recentTexts),
+      speech: speechEvidenceFromRoster(roster),
       source: VENUE_HOVER_SOURCE_ROSTER
     };
   }
@@ -170,6 +178,8 @@ export function resolveVenueHoverFacts(input) {
     lastAt: 0,
     lastText: '',
     recentTexts: [],
+    // 名簿にも席にも居ない=知らない。鏡のセルが stats.c/本文を持っていればそれだけ(時刻は作らない)。
+    speech: i.mirrorCell && typeof i.mirrorCell === 'object' ? speechEvidenceFromMirrorCell(i.mirrorCell) : SPEECH_UNKNOWN,
     source: VENUE_HOVER_SOURCE_NONE
   };
 }

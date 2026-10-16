@@ -39,7 +39,9 @@ function viaRegistered() {
       venueRank: TRUTH.venueRank,
       lastAt: TRUTH.lastAt,
       lastText: TRUTH.lastText,
-      recentTexts: TRUTH.recentTexts
+      recentTexts: TRUTH.recentTexts,
+      // 実物の participant は speech(発言の証拠・2026-10-16)を持つ。同じ事実を同じ証拠として渡す。
+      speech: { comments: TRUTH.count, lastAt: TRUTH.lastAt, texts: TRUTH.recentTexts }
     },
     rosterEntry: null
   });
@@ -92,9 +94,12 @@ describe('T3: ★同じ事実なら、どの経路から来ても同じ画面に
   });
 
   it('★事実そのものが一致する（source 以外の全項目）', () => {
-    const { source: sa, ...a } = viaRegistered();
-    const { source: sb, ...b } = viaRoster();
+    // 発言の証拠(speech・2026-10-16)は出所ごとに正規化の経路が違うので、中身そのものでなく【有る/無いと本文】が一致することを見る
+    //   (数は出所ごとに違ってよいが、無いものが有るに化けない)。
+    const { source: sa, speech: spa, ...a } = viaRegistered();
+    const { source: sb, speech: spb, ...b } = viaRoster();
     expect(a).toEqual(b);
+    expect(spa).toEqual(spb); // 同じ事実なら、どの経路でも同じ発言の証拠(件数・時刻・本文)になる
     expect(sa).not.toBe(sb); // 出所は違ってよい。★中身が同じであることが要件
   });
 });

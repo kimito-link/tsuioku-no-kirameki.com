@@ -20,9 +20,11 @@ describe('会場のセリフ診断: 配線', () => {
     expect(venue).toContain('const _speechCensus = createVenueSpeechCensusState();');
   });
 
-  it('★カードを開いたとき(model 作成直後・描画前)に数える。投擲段は対象外・発言の形跡は count>0', () => {
-    expect(venue).toMatch(/const model = buildVenueHoverCardModel\([^\n]*\);\n[^\n]*\n\s+try \{\n\s+const isThrow = data\.tier === 'gift' \|\| data\.tier === 'ad';/);
-    expect(venue).toContain('spoke: Number(data.count) > 0');
+  it('★カードを開いたとき(model 作成直後・描画前)に数える。段(広告/ギフト)で除外しない・発言の形跡は【発言の証拠】(count の下駄ではない)', () => {
+    expect(venue).toMatch(/const model = buildVenueHoverCardModel\([^\n]*\);(\n\s+\/\/[^\n]*)+\n\s+try \{\n\s+observeVenueSpeechHover\(_speechCensus, \{/);
+    expect(venue).not.toContain("const isThrow = data.tier === 'gift' || data.tier === 'ad';");
+    expect(venue).toContain('spoke: hasSpeech(data.speech),');
+    expect(venue).toContain("saidSpeech: /発言/.test(String(model.statLine || '')),");
   });
 
   it('★タイルの数え直しは3秒期日(diagDue)の中だけ(毎paintで走らない)', () => {
