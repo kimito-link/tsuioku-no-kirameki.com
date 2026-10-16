@@ -15,6 +15,7 @@
 
 import { pickStrongestAvatarUrlForUser } from './supportGrowthTileSrc.js';
 import { pickBetterInterceptNickname } from './giftDisplayNickname.js';
+import { mergeRecentTexts } from './recentTextRing.js';
 
 /**
  * チャンクインデックスの全 seq から「まだ集約していない新規 seq」だけを昇順で返す。
@@ -45,6 +46,7 @@ export function selectNewChunkSeqs(allSeqs, processedSeqs) {
  *   liveId: string,
  *   commentCount?: number,
  *   giftCount?: number,
+ *   recentTexts?: readonly string[],
  *   _laneSortAt?: number
  * }} UserLaneCandidate
  */
@@ -84,6 +86,8 @@ export function mergeUserLaneAggregates(existing, incoming) {
           liveId: String(c.liveId || ''),
           commentCount: Math.max(0, Math.floor(Number(c.commentCount) || 0)),
           giftCount: Math.max(0, Math.floor(Number(c.giftCount) || 0)),
+          // 2026-10-16(発言の証拠 v3): 本文(直近・新しい順)を持ち回す。以前は落としていたので、チャンク経路の会場はカードに本文が出なかった。
+          recentTexts: mergeRecentTexts(c.recentTexts, []),
           _laneSortAt: Math.max(0, Number(c._laneSortAt) || 0)
         });
         continue;
@@ -94,6 +98,8 @@ export function mergeUserLaneAggregates(existing, incoming) {
       prev.giftCount =
         (prev.giftCount || 0) + Math.max(0, Math.floor(Number(c.giftCount) || 0));
       prev._laneSortAt = Math.max(prev._laneSortAt || 0, Math.max(0, Number(c._laneSortAt) || 0));
+      // incoming は後から来た(新しい)チャンク=本文は incoming を先頭に合流(追記専用チャンクの昇順前提)。
+      prev.recentTexts = mergeRecentTexts(c.recentTexts, prev.recentTexts);
       prev.avatarObserved = prev.avatarObserved || Boolean(c.avatarObserved);
       prev.nickname = pickBetterInterceptNickname(uid, prev.nickname, String(c.nickname || ''));
       // avatarUrl は両候補を強さスコアで比較(空は無視・実URL後着を拾う)。

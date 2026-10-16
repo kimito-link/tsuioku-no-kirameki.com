@@ -179,3 +179,31 @@ describe('★結果が使われているか(v2): 鏡の支援者セル → 参�
     expect(m.recentTexts).toEqual(['こんにちは']);
   });
 });
+
+import { mergeUserLaneAggregates } from './venueIncrementalAggregate.js';
+
+describe('★結果が使われているか(v3+v4): チャンク差分集計 → 名簿 hydrate → 参加者 → カードに本文が出る', () => {
+  const NOW = 1_700_000_000_000;
+  it('会場を開く前に発言していた人(チャンク2つに分かれた記録)のカードに、発言と本文が出る(以前は count≥1 なのに本文が空だった)', () => {
+    const chunk1 = [{ userId: '555', nickname: 'x', avatarUrl: '', liveId: 'lv1', commentCount: 2, giftCount: 0, _laneSortAt: NOW - 600_000, recentTexts: ['二番目', '最初'] }];
+    const chunk2 = [{ userId: '555', nickname: 'x', avatarUrl: '', liveId: 'lv1', commentCount: 1, giftCount: 0, _laneSortAt: NOW - 120_000, recentTexts: ['いちばん新しい'] }];
+    const aggregated = mergeUserLaneAggregates(chunk1, chunk2); // チャンク経路の aggregatedCandidates
+    const roster = new Map();
+    hydrateRosterFromCandidates(roster, aggregated);
+    const p = collectVenueParticipants(rosterToVenueRows(roster))[0];
+    expect(p.speech.comments).toBe(3);
+    expect(p.speech.texts).toEqual(['いちばん新しい', '二番目', '最初']);
+    const m = buildVenueHoverCardModel({ uid: '555', displayName: 'x', count: p.count, lastAt: p.lastAt, tier: 'link', nowMs: NOW, speech: p.speech });
+    expect(m.statLine).toContain('発言 3(2分前)');
+    expect(m.recentTexts).toEqual(['いちばん新しい', '二番目', '最初']);
+  });
+  it('発言0の支援者を同じ経路に通しても「発言」は出ない(v2 の効果が v3/v4 で壊れていない)', () => {
+    const aggregated = mergeUserLaneAggregates([], [{ userId: '666', nickname: 'ad', avatarUrl: '', liveId: 'lv1', commentCount: 0, giftCount: 1, _laneSortAt: NOW - 1000, recentTexts: [] }]);
+    const roster = new Map();
+    hydrateRosterFromCandidates(roster, aggregated);
+    const p = collectVenueParticipants(rosterToVenueRows(roster))[0];
+    const m = buildVenueHoverCardModel({ uid: '666', displayName: 'ad', count: p.count, lastAt: p.lastAt, tier: 'link', nowMs: NOW, speech: p.speech, hasGift: true, giftCount: 1 });
+    expect(m.statLine).not.toContain('発言');
+    expect(m.presenceNote).not.toContain('喋っている');
+  });
+});
