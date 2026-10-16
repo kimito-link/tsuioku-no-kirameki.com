@@ -150,3 +150,32 @@ describe('★毒テスト: 持ち回しの配線を落とすと赤になる', ()
     expect(bar).toContain('resolveVenueHoverFacts({ registered: null, rosterEntry, mirrorCell: it })');
   });
 });
+
+import { buildVenueHoverCardModel } from './venueHoverCard.js';
+import { SPEECH_EVIDENCE_GATE_ENABLED } from './speechEvidence.js';
+
+describe('★結果が使われているか(v2): 鏡の支援者セル → 参加者 → カード', () => {
+  const NOW = 1_700_000_000_000;
+  it('既定でゲートは有効', () => {
+    expect(SPEECH_EVIDENCE_GATE_ENABLED).toBe(true);
+  });
+  it('★広告の支援者(りんく段・コメント無し)のカードに「発言」「たった今」「いま喋っている」が出ない(キリンの症状)', () => {
+    const snap = { capturedAt: NOW - 2000, link: [{ userId: '19707371', title: 'キリン', displaySrc: 'https://x/k.jpg', recentTexts: [] }], konta: [], gift: [], tanu: [], ad: [] };
+    const p = collectVenueParticipants(venueRowsFromLaneMirror(snap, new Map()))[0];
+    // 席の count は下駄で1・lastAt は鏡の発行時刻=旧ロジックなら「発言 1(たった今)」になる入力
+    expect(p.count).toBe(1);
+    expect(p.lastAt).toBe(NOW - 2000);
+    const m = buildVenueHoverCardModel({ uid: p.userId, displayName: p.name, count: p.count, lastAt: p.lastAt, tier: 'link', nowMs: NOW, speech: p.speech, lastText: p.lastText, recentTexts: p.recentTexts });
+    expect(m.statLine).toBe('会場に居る');
+    expect(m.presenceNote).not.toContain('喋っている');
+    const old = buildVenueHoverCardModel({ uid: p.userId, displayName: p.name, count: p.count, lastAt: p.lastAt, tier: 'link', nowMs: NOW, lastText: p.lastText, recentTexts: p.recentTexts });
+    expect(old.statLine).toContain('発言 1'); // 旧ロジック(speech 無し)では嘘が出る=この差が v2 の効果
+  });
+  it('★storage で実際に発言していた人(本文あり)は、鏡のセルでも本文つきの発言として出る', () => {
+    const snap = { capturedAt: NOW, link: [{ userId: '1', title: 'a', displaySrc: 'https://x/a.jpg', recentTexts: ['こんにちは'], stats: { c: 3 } }], konta: [], gift: [], tanu: [], ad: [] };
+    const p = collectVenueParticipants(venueRowsFromLaneMirror(snap, new Map()))[0];
+    const m = buildVenueHoverCardModel({ uid: '1', displayName: 'a', count: p.count, lastAt: p.lastAt, tier: 'link', nowMs: NOW, speech: p.speech });
+    expect(m.statLine).toContain('発言 3'); // 鏡由来は時刻を言わない
+    expect(m.recentTexts).toEqual(['こんにちは']);
+  });
+});

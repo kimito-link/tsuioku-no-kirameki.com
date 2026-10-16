@@ -24,6 +24,7 @@
 import { isNumericNicoUserId } from '../domain/user/identity.js';
 import { RECENT_TEXT_KEEP, formatRecentTexts } from './recentTextRing.js';
 import { buildVenuePresenceNote } from './venuePresenceNote.js';
+import { SPEECH_EVIDENCE_GATE_ENABLED, hasSpeech, speechEvidence } from './speechEvidence.js';
 // ★匿名NNN の採番は nicoUserPage.js が正本（席タイル venueBar.js:5715 と同じ関数）。
 import { anonymousDisplayLabel } from './nicoUserPage.js';
 
@@ -124,7 +125,8 @@ export const HOVER_LAST_TEXT_MAX = 60;
  *   uid?: unknown, displayName?: unknown, count?: unknown, hasGift?: unknown,
  *   giftCount?: unknown, venueRank?: unknown, thumb?: Partial<VenueTileThumbState>,
  *   lastAt?: unknown, nowMs?: unknown, diagMode?: unknown, tier?: unknown,
- *   lastText?: unknown, recentTexts?: unknown
+ *   lastText?: unknown, recentTexts?: unknown,
+ *   speech?: import('./speechEvidence.js').SpeechEvidence
  * }} input
  * @returns {VenueHoverCardModel}
  */
@@ -183,17 +185,34 @@ export function buildVenueHoverCardModel(input) {
 
   // 2026-07-30(MVP-2): lastAt/nowMsが両方有効なら「発言N(3分前)」のように括弧で埋め込む。
   // 専用行・専用DOM・タイマー更新は追加しない(カード寿命は数秒なのでtick更新は不要)。
-  const relTime = formatVenueHoverRelativeTime(i.lastAt, i.nowMs);
+  /*
+   * ★2026-10-16(発言の証拠・v2): speech(行が持つ『実際に発言したか』の証拠)があれば、発言の文言は【証拠だけ】から作る。
+   *   段名(広告/ギフト)で『発言』を抑える例外処理をやめ、証拠が無ければ段名に関わらず『発言』『たった今』『いま喋っている』『セリフ』を出さない。
+   *   count(preCount の下駄=最低1)・lastAt(鏡の発行時刻になりうる)は発言の根拠にしない。
+   *   speech が無い旧呼び出し・フラグ off は従来のロジックのまま(バイト同一)。設計: docs/handoff/person-evidence-SPEC-2026-10-16.md
+   */
+  const sp = SPEECH_EVIDENCE_GATE_ENABLED && i.speech && typeof i.speech === 'object' ? speechEvidence(i.speech) : null;
+  const spoke = sp ? hasSpeech(sp) : false;
+  const relTime = formatVenueHoverRelativeTime(sp ? sp.lastAt : i.lastAt, i.nowMs);
   const statParts = [];
   // 2026-07-31(ユーザー指摘): 広告段・ギフト段の人は「発言」していない。その段に載る条件は
   //   投擲(広告/ギフト)であって発言ではないため、「発言N」と出すのは意味が合わない。
   //   lastAt の実体は capturedAt(その行を記録した時刻・venueSeats.js:138)なので、
   //   投擲で載った人にとっては実質「最後に投げたタイミング」を指す。ラベルだけを段に
   //   合わせて出し分ける(データも集計も変えない)。
+  //   (v2・2026-10-16: speech(発言の証拠)がある入力は下の sp 分岐で段名に頼らず証拠だけから作る。以下は speech が無い旧呼び出し用の従来ロジック。)
   //   ★count は preCount の最低1仕様(venueLaneMirrorSupply.js:100)で、発言0でも1になる。
   //     投擲段では件数を出すとその1が「発言1」の嘘になるので、件数ごと出さず時刻だけ出す。
   const tier = String(i.tier || '').trim();
-  if (tier === 'ad') {
+  if (sp) {
+    if (spoke) {
+      const n = sp.comments;
+      statParts.push(n !== null && n > 0 ? (relTime ? `発言 ${n}(${relTime})` : `発言 ${n}`) : relTime ? `発言あり(${relTime})` : '発言あり');
+    } else {
+      // 証拠が無い人: 段名は『発言が無いときの呼び名』にだけ使う。時刻・件数は言わない。
+      statParts.push(tier === 'ad' ? '広告' : tier === 'gift' ? 'ギフト' : '会場に居る');
+    }
+  } else if (tier === 'ad') {
     statParts.push(relTime ? `広告(${relTime})` : '広告');
   } else if (tier === 'gift') {
     statParts.push(relTime ? `ギフト(${relTime})` : 'ギフト');
@@ -220,8 +239,9 @@ export function buildVenueHoverCardModel(input) {
   //   participant.lastText(既存データ・新規取得ゼロ)をそのまま出す。長文はカードが伸びて
   //   会場を覆うので上限で切る(切ったことが分かるよう省略記号を付ける)。
   //   投擲段(広告/ギフト)は発言由来ではないので出さない=「発言していないのに本文が出る」嘘を作らない。
-  const isThrowTier = tier === 'ad' || tier === 'gift';
-  const rawLastText = String(i.lastText || '').replace(/\s+/g, ' ').trim();
+  // 証拠があるとき(sp)は段名で本文を隠さない(2026-10-16・ユーザー確認済み: 広告/ギフト段の人でも発言の証拠があれば本文を出す)。
+  const isThrowTier = !sp && (tier === 'ad' || tier === 'gift');
+  const rawLastText = String(sp ? (sp.texts[0] || '') : (i.lastText || '')).replace(/\s+/g, ' ').trim();
   const lastText =
     isThrowTier || !rawLastText
       ? ''
@@ -243,17 +263,18 @@ export function buildVenueHoverCardModel(input) {
      *   ★追加の storage 読みはゼロ（既に手元にある値だけで作る）。
      */
     presenceNote: buildVenuePresenceNote({
-      count,
+      // 証拠が無い人は数を『知らない(null)』・時刻なしで渡す=『いま喋っている』『ここでN回』を言わず、居ることだけ言う。
+      count: sp ? (spoke ? sp.comments : null) : count,
       giftCount,
       venueRank,
-      lastAt: i.lastAt,
+      lastAt: sp ? (spoke ? sp.lastAt : 0) : i.lastAt,
       nowMs: i.nowMs
     }),
     lastText,
     // v0.1.1218(ユーザー要望): ホバーだけでその人の発言を数件読めるようにする。
     //   既存データ(在席の記録)から来るので storage の追加読みはゼロ。
     //   投擲段(広告/ギフト)は発言由来ではないので出さない=lastText と同じ扱い。
-    recentTexts: isThrowTier ? [] : formatRecentTexts(i.recentTexts, { max: RECENT_TEXT_KEEP, maxChars: HOVER_LAST_TEXT_MAX }),
+    recentTexts: isThrowTier ? [] : formatRecentTexts(sp ? sp.texts : i.recentTexts, { max: RECENT_TEXT_KEEP, maxChars: HOVER_LAST_TEXT_MAX }),
     thumbStatusLabel: diagMode ? resolveThumbStatusLabel(thumbKind, thumbLoad) : '',
     thumbKind,
     thumbLoad
