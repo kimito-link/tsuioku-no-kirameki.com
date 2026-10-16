@@ -51,7 +51,7 @@ try {
   // --gets 1: 起動の間の chrome.storage.local.get を【全部】記録する(キー・かかった時間・結果の大きさ)。
   //   ★(program)/Receive mojo message の正体=保存データの巨大な読み出しを名指しするため。結果の大きさの測定は get の【後】に行う。
   const getsMode = String(args.gets || '0'); // '1'=記録のみ / 'memo'=記録+【実験】同じキーの組の2回目以降は最初の結果を返す(因果の確認用・製品は変えない)
-  if (getsMode === '1' || getsMode === 'memo') {
+  if (getsMode === '1' || getsMode === 'memo' || getsMode === 'batch') {
     await page.addInitScript((memoOn) => {
       try {
         const st = chrome.storage.local; const orig = st.get.bind(st);
@@ -69,6 +69,27 @@ try {
       } catch { /* no-op */ }
     }, getsMode === 'memo');
   }
+  // --gets batch: 【実験】小さなキーの get を窓(既定5ms)でまとめて1回の get にする(DataLoader 方式)。製品は変えない=効果の見積もり用。
+  if (getsMode === 'batch') {
+    await page.addInitScript((windowMs) => {
+      try {
+        const st = chrome.storage.local; const logged = st.get.bind(st);
+        const BIG = /^(nls_comments|nls_cchunk|nls_ctail|nls_user_comment_profile|nls_calibration|nls_comment_ingest_log|nls_watch_snapshot|nls_lane_mirror|nls_comment_timeline)/;
+        /** @type {Array<{keys: string[], resolve: Function, reject: Function}>} */
+        let queue = []; let timer = null;
+        const flush = () => {
+          const q = queue; queue = []; timer = null;
+          const union = [...new Set(q.flatMap((e) => e.keys))];
+          logged(union).then((bag) => { for (const e of q) { const o = {}; for (const k of e.keys) if (k in bag) o[k] = bag[k]; e.resolve(o); } }, (err) => { for (const e of q) e.reject(err); });
+        };
+        st.get = function (keys, cb) {
+          const arr = typeof keys === 'string' ? [keys] : (Array.isArray(keys) ? keys : null);
+          if (typeof cb === 'function' || !arr || !arr.length || arr.some((k) => BIG.test(k))) return logged(keys, cb);
+          return new Promise((resolve, reject) => { queue.push({ keys: arr, resolve, reject }); if (!timer) timer = setTimeout(flush, windowMs); });
+        };
+      } catch { /* no-op */ }
+    }, Number(args['batch-ms'] || 5));
+  }
   const cdp = await ctx.newCDPSession(page);
   await cdp.send('Profiler.enable');
   await cdp.send('Profiler.setSamplingInterval', { interval: 1000 });
@@ -83,7 +104,7 @@ try {
   const t0 = Date.now();
   page.goto(`chrome-extension://${extId}/popup.html?inline=1&dock=sidepanel&lv=${args.lv}`, { waitUntil: 'domcontentloaded', timeout: 60000 }).catch(() => {});
   await sleep(windowMs);
-  const getsRows = (getsMode === '1' || getsMode === 'memo') ? await page.evaluate(() => window.__nlGets || []).catch(() => []) : null;
+  const getsRows = (getsMode === '1' || getsMode === 'memo' || getsMode === 'batch') ? await page.evaluate(() => window.__nlGets || []).catch(() => []) : null;
   const m1 = await metricsOf();
   const traceRows = traceHandle ? await stopTraceAndSummarize(traceHandle, { top: Number(args['trace-top'] || 14) }) : null;
   const { profile } = await cdp.send('Profiler.stop');
