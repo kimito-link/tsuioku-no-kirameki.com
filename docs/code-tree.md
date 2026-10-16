@@ -202,7 +202,7 @@
     - `2026-10-06.md`
     - `2026-10-12.md`
     - `2026-10-14.md`
-- 📁 **docs/** (348)
+- 📁 **docs/** (351)
   - 📁 **article-assets/** (87)
     - 📁 **venue-frames/** (12)
       - `f01.png`
@@ -314,7 +314,7 @@
     - `storage-bus.md`
     - `venue.md`
     - `web-status.md`
-  - 📁 **handoff/** (165)
+  - 📁 **handoff/** (168)
     - 📁 **bench/** (2)
       - `bench-interval.mjs` — ⚠️ 役割コメント無し
       - `bench-lane.mjs` — ⚠️ 役割コメント無し
@@ -444,6 +444,9 @@
     - `panel-flicker-resolution-DESIGN.md`
     - `panel-flicker-resolution-IMPLEMENTATION-HANDOFF.md`
     - `panel-flicker-round2-brief-2026-08-05.md`
+    - `person-evidence-IMPLEMENTATION-HANDOFF-2026-10-16.md`
+    - `person-evidence-MAP-2026-10-16.md`
+    - `person-evidence-SPEC-2026-10-16.md`
     - `readability-council-BRIEF-2026-08-14.md`
     - `scroll-whiteout-freeze-DESIGN.md`
     - `side-panel-spike-HOWTO.md`
