@@ -39,7 +39,6 @@ import {
   touchRoster,
   pruneRoster,
   rosterToVenueRows,
-  rosterSpeechRows,
   hydrateRosterFromCandidates,
   VENUE_ROSTER_WINDOW_MS,
   VENUE_ROSTER_VIP_WINDOW_MS,
@@ -325,6 +324,7 @@ import { venueHoverCardPresenceVerdict } from '../lib/venueHoverCardProbe.js';
 // ★会場ホバーに出す数字の出所はここが正本（3経路すべてがこの判定を通る）。
 import { resolveVenueHoverFacts } from '../lib/venueHoverFacts.js';
 import { hasSpeech, speechWithFallbackTexts } from '../lib/speechEvidence.js';
+import { appendPickupRows } from '../lib/venuePickupRing.js';
 // キャラライブの「本当に見えているか」実測計器(2026-08-25)。推測で3回外した反省で追加。
 import { collectCharaLiveCensus, charaLiveVerdict } from '../lib/charaLiveCensus.js';
 import { parseGiftCommentText, parseNicoadCommentText } from '../lib/parseGiftComment.js';
@@ -2745,6 +2745,19 @@ export function mountVenueBarButton(options = {}) {
   //     「埋もれるコメントを拾う」のに拾った先がまた埋もれていた(ユーザー報告)。
   //   DOM は一度作ったら remove しない(churn地雷対策)。中身の差し替えだけで進行する。
   const pickupEls = createVenuePickupBanner(document);
+  /*
+   * ピックアップ枠の入力(2026-10-17): 表示行(storage集計/鏡由来=text空)ではなく、届いた発言(吹き出し・読み上げと同じ speeches)を積む独立のリングから選ぶ。
+   *   以前は commitDisplay の表示行から選んでいたため、発言を行へ混ぜた直後の1回しか本文が乗らず枠が案内文のままだった(実機+headlessで再現)。正本=venuePickupRing.js。
+   */
+  /** @type {Array<any>} */
+  let pickupRing = [];
+  /** @param {ReadonlyArray<any>|null} fallbackRows リングが空のときの従来入力(表示行) */
+  const updatePickupBanner = (fallbackRows) => {
+    try {
+      const rows = pickupRing.length ? pickupRing : (Array.isArray(fallbackRows) ? fallbackRows : []);
+      applyVenuePickupView(pickupEls, buildVenuePickupView(pickTickerHighlightEntry(rows, Date.now())));
+    } catch { /* 枠の更新失敗は席の描画を止めない */ }
+  };
   // seating は下端のひな壇だけ(header + pickup + seats)。
   seating.append(header, pickupEls.root, topBar, seatsHost);
   // center は CSS で display:none(撤去)だが、互換のため DOM には残す。
@@ -4832,6 +4845,7 @@ export function mountVenueBarButton(options = {}) {
     lastGoodRows = [];
     hasRenderedNonEmpty = false;
     liveRoster.clear(); // v0.1.754: 在席も持ち越さない(再オープンで storage から再 hydrate)
+    pickupRing = []; // ピックアップ枠の入力も前配信から持ち越さない
     clearBubbles();
   };
 
@@ -4962,15 +4976,9 @@ export function mountVenueBarButton(options = {}) {
     );
     lastGoodRows = resolved.nextLastGood;
     renderSeats(resolved.rows);
-    // v0.1.1230: ピックアップ枠を更新。①POPと【同一の純関数】で選ぶので、
-    //   7秒バケットが同じなら同じ1件になる(画面ごとに違うものが出ない)。
-    //   diff-skip 済み=同じ内容なら DOM を書き換えない。
-    try {
-      // 2026-10-16: 名簿駆動のときは、本文を持つ名簿から選ぶ(鏡由来の表示行は text:'' なので枠が案内文のまま動かなかった)。名簿に本文が無ければ従来どおり表示行から。
-      const speechRows = rosterDriven ? rosterSpeechRows(liveRoster) : [];
-      const picked = pickTickerHighlightEntry(speechRows.length ? speechRows : resolved.rows, Date.now());
-      applyVenuePickupView(pickupEls, buildVenuePickupView(picked));
-    } catch { /* 枠の更新失敗は席の描画を止めない */ }
+    // v0.1.1230: ピックアップ枠を更新(2026-10-17: 入力は発言のリング。空のときだけ従来の表示行)。
+    //   ①POPと【同一の純関数】で選ぶので、7秒バケットが同じなら同じ1件になる。diff-skip 済み=同じ内容なら DOM を書き換えない。
+    updatePickupBanner(resolved.rows);
   };
 
   /**
@@ -6344,6 +6352,11 @@ export function mountVenueBarButton(options = {}) {
       seenKeys: result.seenKeys,
       primed: result.primed
     };
+    // ピックアップ枠: 届いた発言をリングへ積み、その場で枠を更新する(commit を待たない=本文を持つ唯一の瞬間を逃さない)。
+    if (result.speeches.length > 0) {
+      pickupRing = appendPickupRows(pickupRing, result.speeches, Date.now());
+      updatePickupBanner(null);
+    }
     // ユーザー方針「しゃべった人を席に出して吹かせる」: 新着発言者を会場行にマージして
     //   先に席を作り直す(buildVenueSeating が capturedAt=now で上位席へ出す)。その後で
     //   吹き出しを出すと、しゃべった人の席が必ず存在するので吹き出しが宙に浮かない。
